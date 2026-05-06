@@ -801,7 +801,12 @@ def render(**kwargs):
             with doc_t3:
                 _render_thong_bao_ket_luan(doc_t3, **kwargs)
 
-    _pgd_df_kwargs = {**kwargs, "df": df, "df_full": df}
+    # Lọc df theo PGD cho user để tab Tổng quan hiển thị đúng phạm vi
+    if role == "user" and pgd_user and df is not None and COT_TEN_PGD in df.columns:
+        df_pgd = df[df[COT_TEN_PGD] == pgd_user].copy()
+    else:
+        df_pgd = df
+    _pgd_df_kwargs = {**kwargs, "df": df_pgd, "df_full": df_pgd}
     _tab_renderers = (
         lambda: tab_tongquan.render(tabs_op[0], **_pgd_df_kwargs),
         lambda: tab_baocao.render(tabs_op[1], **_pgd_df_kwargs),

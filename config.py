@@ -332,6 +332,30 @@ WORKSPACE_MAP = {
     "user":      "🛠️ Tác nghiệp",
 }
 
+# ── Roles cũ — giữ nguyên để tương thích ─────────────────────────────────────
+ROLES_CU = ["executive", "admin", "manager", "user"]
+
+# ── Roles mới — phân hệ 2 cấp ────────────────────────────────────────────────
+ROLES_MOI = [
+    "executive",
+    "admin_cn", "manager_cn",      # Phân hệ Chi nhánh
+    "admin_pgd", "manager_pgd", "user_pgd",  # Phân hệ PGD
+]
+
+# Tất cả roles hợp lệ (cũ + mới)
+ALL_ROLES = list(dict.fromkeys(ROLES_CU + ROLES_MOI))
+
+# Nhóm theo phân hệ
+ROLES_PHAN_HE_CN  = ["executive", "admin_cn", "manager_cn", "admin", "manager"]
+ROLES_PHAN_HE_PGD = ["admin_pgd", "manager_pgd", "user_pgd", "user"]
+
+# Quyền cụ thể
+ROLES_CO_QUYEN_UPLOAD_CN  = ["admin_cn", "manager_cn", "admin", "manager"]
+ROLES_CO_QUYEN_UPLOAD_PGD = ["admin_pgd", "manager_pgd"]
+ROLES_CO_QUYEN_QUAN_LY_USER_CN  = ["admin_cn", "admin"]
+ROLES_CO_QUYEN_QUAN_LY_USER_PGD = ["admin_pgd"]
+ROLES_CO_QUYEN_GIAO_NHIEM_VU    = ["admin_pgd", "manager_pgd", "admin", "manager"]
+
 # ── Mapping cột dữ liệu ↔ tag trong file Word template ───────────────────────
 # Thêm/sửa tại đây để hỗ trợ mẫu biểu mới mà không cần sửa code khác
 TAG_MAP = {

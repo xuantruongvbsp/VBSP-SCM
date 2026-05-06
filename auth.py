@@ -196,37 +196,6 @@ def kiem_tra(pw, h):
         return False
 
 
-# ── Hàm helper phân hệ 2 cấp ────────────────────────────────────────────────
-def la_phan_he_cn(role: str) -> bool:
-    """Role thuộc phân hệ Chi nhánh."""
-    from config import ROLES_PHAN_HE_CN
-    return role in ROLES_PHAN_HE_CN
-
-
-def la_phan_he_pgd(role: str) -> bool:
-    """Role thuộc phân hệ PGD."""
-    from config import ROLES_PHAN_HE_PGD
-    return role in ROLES_PHAN_HE_PGD
-
-
-def co_quyen_upload_pgd(role: str) -> bool:
-    """Kiểm tra quyền upload dữ liệu PGD."""
-    from config import ROLES_CO_QUYEN_UPLOAD_PGD
-    return role in ROLES_CO_QUYEN_UPLOAD_PGD
-
-
-def co_quyen_quan_ly_user_pgd(role: str) -> bool:
-    """Kiểm tra quyền quản lý user PGD."""
-    from config import ROLES_CO_QUYEN_QUAN_LY_USER_PGD
-    return role in ROLES_CO_QUYEN_QUAN_LY_USER_PGD
-
-
-def co_quyen_giao_nhiem_vu(role: str) -> bool:
-    """Kiểm tra quyền giao nhiệm vụ cho PGD."""
-    from config import ROLES_CO_QUYEN_GIAO_NHIEM_VU
-    return role in ROLES_CO_QUYEN_GIAO_NHIEM_VU
-
-
 def dang_nhap(un: str, pw: str):
     u = un.strip().lower()
     with db.get_conn() as conn:

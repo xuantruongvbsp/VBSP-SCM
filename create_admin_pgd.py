@@ -48,8 +48,8 @@ for ma_pgd, ten_pgd in MA_PGD_MAP.items():
     
     conn.execute(
         """INSERT INTO users 
-           (username, password_hash, role, pgd, ho_ten, active)
-           VALUES (?, ?, ?, ?, ?, 1)""",
+           (username, password, role, pgd, ho_ten)
+           VALUES (?, ?, ?, ?, ?)""",
         (
             username,
             ma_hoa("123456"),

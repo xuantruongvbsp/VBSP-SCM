@@ -972,6 +972,16 @@ def _tab_khtd_theo_xa(role: str, username: str, df_full: "pd.DataFrame | None") 
     font-weight: 600 !important;
     padding: 4px 0 !important;
 }
+/* Tăng font size cho ô nhập số KHTD */
+.stNumberInput input[type="number"] {
+    font-size: 17px !important;
+    font-weight: 500 !important;
+    padding: 6px 8px !important;
+    height: 36px !important;
+}
+.stNumberInput {
+    margin: 2px 0 !important;
+}
 </style>
 """,
         unsafe_allow_html=True,
@@ -1027,10 +1037,10 @@ def _tab_khtd_theo_xa(role: str, username: str, df_full: "pd.DataFrame | None") 
                 vnd_tw = float(th_xa.get(mk_tw, 0.0) or 0.0)
                 trieu_tw = vnd_tw / 1e6
                 txt_th_tw = (
-                    f"{_fmt_vn(trieu_tw, 1)} tr" if trieu_tw > 0 else "—"
+                    f"{_fmt_vn(int(trieu_tw), 0)} tr" if trieu_tw > 0 else "—"
                 )
                 cols[2].markdown(
-                    f"<div style='text-align:right;font-size:0.88rem;padding:4px 0'>"
+                    f"<div class='khtd-amount' style='text-align:right'>"
                     f"{txt_th_tw}</div>",
                     unsafe_allow_html=True,
                 )
@@ -1052,10 +1062,10 @@ def _tab_khtd_theo_xa(role: str, username: str, df_full: "pd.DataFrame | None") 
                 vnd_dp = float(th_xa.get(mk_dp, 0.0) or 0.0)
                 trieu_dp = vnd_dp / 1e6
                 txt_th_dp = (
-                    f"{_fmt_vn(trieu_dp, 1)} tr" if trieu_dp > 0 else "—"
+                    f"{_fmt_vn(int(trieu_dp), 0)} tr" if trieu_dp > 0 else "—"
                 )
                 cols[4].markdown(
-                    f"<div style='text-align:right;font-size:0.88rem;padding:4px 0'>"
+                    f"<div class='khtd-amount' style='text-align:right'>"
                     f"{txt_th_dp}</div>",
                     unsafe_allow_html=True,
                 )

@@ -706,10 +706,12 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                     if df_to_raw is not None and not df_to_raw.empty:
                         df_to_pgd = tong_hop_theo_pgd(df_to_raw)
 
-                        # Map tên viết tắt trong CDTOTKVV → tên chuẩn trong DS_PGD
+                        # Map tên viết tắt trong CDTOTKVV → tên chuẩn (DON_VI_CHI_NHANH)
+                        # "PGD Biên Hòa" là alias cho file cũ — trong HSTD tên thực là "Hội sở Chi nhánh tỉnh"
                         _TEN_MAP = {
                             "Hội sở CN Đồng Nai":   DON_VI_CHI_NHANH,
                             "Hội sở CN Bình Phước": DON_VI_CHI_NHANH,
+                            "PGD Biên Hòa":         DON_VI_CHI_NHANH,
                         }
                         def _map_ten(val):
                             val = str(val).strip()
@@ -791,9 +793,11 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
 
             # Merge điểm tổ theo PGD vào df_pgd nếu có
             if _df_to_pgd_map is not None and not _df_to_pgd_map.empty:
+                # "PGD Biên Hòa" là alias cho file cũ — trong HSTD tên thực là "Hội sở Chi nhánh tỉnh"
                 _TEN_MAP = {
                     "Hội sở CN Đồng Nai": DON_VI_CHI_NHANH,
                     "Hội sở CN Bình Phước": DON_VI_CHI_NHANH,
+                    "PGD Biên Hòa":       DON_VI_CHI_NHANH,
                 }
                 def _map_ten_to(val):
                     val = str(val).strip()
@@ -842,7 +846,8 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
             ]
             cot_hien += [c for c in ["Tổng Tổ", "Tốt", "Khá", "TB", "Yếu"] if c in df_pgd.columns]
             cot_hien = [c for c in cot_hien if c in df_pgd.columns]
-            # Loại bỏ dòng DON_VI_CHI_NHANH nếu có (tránh trùng lặp với PGD Biên Hòa trong bảng)
+            # Loại bỏ dòng DON_VI_CHI_NHANH nếu có (vì DON_VI_CHI_NHANH = Hội sở Chi nhánh tỉnh
+            # là PGD Biên Hòa — đã được tính trong dòng riêng, không tính lại trong tổng)
             df_pgd = df_pgd[df_pgd[COT_TEN_PGD] != DON_VI_CHI_NHANH].reset_index(drop=True)
             
             # Xây dựng column_config cho bảng PGD

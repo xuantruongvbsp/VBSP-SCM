@@ -49,6 +49,7 @@ def _md5_file(path: str) -> str:
 
 # Bảng alias tên đơn vị: tên trong file Excel → tên nội bộ hệ thống  
 # Dùng để so sánh "upload nhầm đơn vị" không bị lỗi do tên khác nhau
+# "PGD Biên Hòa" là alias — trong HSTD tên thực là "Hội sở Chi nhánh tỉnh"
 _TEN_DV_ALIAS: dict[str, str] = {
     "Hội sở CN Đồng Nai":      DON_VI_CHI_NHANH,
     "Hội sở CN tỉnh":          DON_VI_CHI_NHANH,

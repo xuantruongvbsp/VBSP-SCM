@@ -26,7 +26,6 @@ DVUT_ORDER = [
     "Hội cựu chiến binh",
     "Đoàn thanh niên",
 ]
-COT_NGAY_KT = "Ngày KTAHSV"
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -63,7 +62,7 @@ def _loc_mau06(_df_bytes: bytes, ngay_tu: str, ngay_den: str) -> bytes:
     cols = [c for c in [
         COT_TEN_TO, COT_DVUT, COT_TEN_XA, COT_TEN_KH,
         COT_SO_KU, COT_TEN_CT, COT_NGAY_VAY, COT_MUC_VAY,
-        COT_TONG_DU_NO, COT_DU_NO_QH, COT_LAI_TON, COT_NGAY_KT,
+        COT_TONG_DU_NO, COT_DU_NO_QH, COT_LAI_TON,
     ] if c in df.columns]
     result = df.loc[mask, cols].copy()
     return pickle.dumps(result.sort_values(COT_NGAY_VAY, ascending=False))
@@ -638,14 +637,13 @@ def _render_mau06(df: pd.DataFrame, pgd_user: str) -> None:
     if COT_NGAY_VAY not in df.columns:
         st.warning(f"Không tìm thấy cột '{COT_NGAY_VAY}'."); return
 
-    c1, c2, c3 = st.columns(3)
-    loai_mau    = c1.radio("Loại mẫu", ["06/TD (bảng nhiều KH)",
-                                          "06A/TD (từng KH riêng)"],
-                            key="m06_loai")
-    hien_chua_kt = c2.checkbox("Chỉ hiện chưa có Ngày KTAHSV",
-                                value=True, key="m06_chua_kt")
-    so_ngay     = c3.slider("Giải ngân trong N ngày qua", 7, 30, 30,
-                             key="m06_ngay")
+    c1, c2 = st.columns(2)
+    loai_mau = c1.radio("Loại mẫu", ["06/TD (bảng nhiều KH)",
+                                       "06A/TD (từng KH riêng)"],
+                         key="m06_loai")
+    so_ngay  = c2.slider("Giải ngân trong N ngày qua", 7, 30, 30,
+                          key="m06_ngay")
+    st.caption("Ngày kiểm tra thực tế do Cán bộ hội đi kiểm tra ghi vào mẫu.")
 
     ngay_den = date.today()
     ngay_tu  = date.today() - timedelta(days=so_ngay)
@@ -656,12 +654,6 @@ def _render_mau06(df: pd.DataFrame, pgd_user: str) -> None:
         df_m06 = pickle.loads(raw)
     except Exception as e:
         st.error(f"Lỗi: {e}"); return
-
-    if hien_chua_kt and COT_NGAY_KT in df_m06.columns:
-        df_m06 = df_m06[
-            df_m06[COT_NGAY_KT].isna() |
-            (df_m06[COT_NGAY_KT].astype(str).str.strip() == "")
-        ]
 
     if df_m06.empty:
         st.success("✅ Không có món vay nào cần kiểm tra."); return

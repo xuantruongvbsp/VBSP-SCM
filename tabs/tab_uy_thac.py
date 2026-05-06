@@ -578,10 +578,20 @@ def _render_ke_hoach(df: pd.DataFrame, pgd_user: str) -> None:
 
     with st.form("form_ke_hoach_kt"):
         c1, c2 = st.columns(2)
-        don_vi_kt  = c1.text_input("Đơn vị kiểm tra",
-                                    placeholder="Hội Nông dân xã...")
+        don_vi_kt = c1.selectbox(
+            "Hội đoàn thể kiểm tra",
+            options=DVUT_ORDER,
+            key="kh_don_vi_kt"
+        )
         so_vb      = c1.text_input("Số văn bản", placeholder="VD: 12/KH-HND")
-        dia_danh   = c1.text_input("Địa danh", placeholder="VD: Biên Hòa")
+        ds_xa_kh = sorted(df[COT_TEN_XA].dropna().unique().tolist()) \
+                   if df is not None and COT_TEN_XA in df.columns else []
+        dia_danh = c1.selectbox(
+            "Địa danh (xã/phường)",
+            options=ds_xa_kh,
+            key="kh_dia_danh",
+            help="Xã/phường nơi Hội đóng trụ sở — dùng làm địa danh ký văn bản"
+        )
         nam_kh     = c2.number_input("Năm kế hoạch",
                                       value=date.today().year,
                                       min_value=2020, max_value=2035, step=1)
@@ -670,14 +680,28 @@ def _render_mau06(df: pd.DataFrame, pgd_user: str) -> None:
     with st.form("form_xuat_m06"):
         st.markdown("**Thông tin xuất mẫu:**")
         f1, f2 = st.columns(2)
-        don_vi_kt = f1.text_input("Đơn vị kiểm tra",
-                                   placeholder="Hội Nông dân xã...")
-        ten_xa    = f1.text_input("Xã/Phường")
-        ten_to    = f1.selectbox(
+        don_vi_kt = f1.selectbox(
+            "Hội đoàn thể kiểm tra",
+            options=DVUT_ORDER,
+            key="m06_don_vi_kt"
+        )
+        ds_xa_m06 = [""] + sorted(df_m06[COT_TEN_XA].dropna().unique().tolist()) \
+                    if COT_TEN_XA in df_m06.columns else [""]
+        ten_xa = f1.selectbox(
+            "Xã/Phường",
+            options=ds_xa_m06,
+            key="m06_ten_xa"
+        )
+        # Lọc Tổ theo Xã đã chọn (dùng session_state vì trong form)
+        ten_xa_filter = st.session_state.get("m06_ten_xa", "")
+        df_to_filter = df_m06[df_m06[COT_TEN_XA] == ten_xa_filter] \
+                       if ten_xa_filter and COT_TEN_XA in df_m06.columns else df_m06
+        ds_to_m06 = [""] + sorted(df_to_filter[COT_TEN_TO].dropna().unique().tolist()) \
+                    if COT_TEN_TO in df_to_filter.columns else [""]
+        ten_to = f1.selectbox(
             "Tổ TK&VV",
-            options=[""] + sorted(df_m06[COT_TEN_TO].dropna().unique().tolist())
-            if COT_TEN_TO in df_m06.columns else [""],
-            key="m06_chon_to",
+            options=ds_to_m06,
+            key="m06_chon_to"
         )
         can_bo_1  = f2.text_input("Cán bộ kiểm tra 1")
         chuc_vu_1 = f2.text_input("Chức vụ 1")
@@ -772,13 +796,42 @@ def _render_mau15(df: pd.DataFrame, pgd_user: str) -> None:
     k4.metric("Tổng TG TK (tr.đ)", fmt(tong_tg))
     st.dataframe(df_to, use_container_width=True, hide_index=True, height=350)
 
+    # Tự động lấy xã và tổ trưởng từ Tổ đang chọn
+    xa_cua_to = ""
+    ten_to_truong = ""
+    if chon_to:
+        if COT_TEN_XA in df.columns and COT_TEN_TO in df.columns:
+            s_xa = df[df[COT_TEN_TO] == chon_to][COT_TEN_XA].dropna()
+            xa_cua_to = s_xa.iloc[0] if not s_xa.empty else ""
+        for cot in ["Tên Tổ trưởng", "Tổ trưởng", "Họ tên Tổ trưởng"]:
+            if cot in df.columns:
+                s_tt = df[df[COT_TEN_TO] == chon_to][cot].dropna()
+                ten_to_truong = str(s_tt.iloc[0]) if not s_tt.empty else ""
+                break
+
     # Form xuất Word
     with st.form("form_xuat_m15"):
         st.markdown("**Thông tin xuất mẫu:**")
         f1, f2 = st.columns(2)
-        pgd       = f1.text_input("PGD", value=pgd_user)
-        ten_xa    = f1.text_input("Xã/Phường")
-        to_truong = f1.text_input("Tổ trưởng")
+        pgd = f1.text_input(
+            "PGD",
+            value=pgd_user,
+            disabled=True,
+            key="m15_pgd"
+        )
+        ten_xa = f1.text_input(
+            "Xã/Phường",
+            value=xa_cua_to,
+            disabled=True,
+            help="Tự động lấy theo Tổ TK&VV đã chọn",
+            key="m15_ten_xa"
+        )
+        to_truong = f1.text_input(
+            "Tổ trưởng",
+            value=ten_to_truong,
+            help="Tự động lấy từ HSTD, có thể sửa lại nếu cần",
+            key="m15_to_truong"
+        )
         ma_to     = f1.text_input("Mã Tổ")
         dia_chi   = f2.text_input("Địa chỉ Tổ")
         can_bo_kt = f2.text_input("Cán bộ đối chiếu")

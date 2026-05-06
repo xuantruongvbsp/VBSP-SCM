@@ -1,6 +1,6 @@
 # Kiến trúc Module — VBSP-SCM
 > Tài liệu tham chiếu nhanh khi Cursor cần biết file nào làm gì.
-> Cập nhật lần cuối: 05/2026 — thêm khtd_service, tab_khtd_giao_dc, 4 key DP mới, ws_operation tabs thực tế
+> Cập nhật lần cuối: 06/05/2026 — thêm phân hệ 2 cấp CN/PGD, role mới, tab Ủy thác, template_service
 
 ---
 
@@ -41,10 +41,19 @@ VBSP-SCM/
 │   │                         # bao_cao_trang_thai_nguon(), cap_nhat_nguon_uu_tien()
 │   ├── khtd_service.py       # Giao KHTD & Điều chỉnh: Google Sheet, kv_store,
 │   │                         # duyệt tập trung, lũy kế đợt
-│   └── kiem_soat_service.py  # Kiểm soát CN: registry báo cáo, BaoCaoMeta,
-│                             # render từng loại báo cáo kiểm soát
+│   ├── kiem_soat_service.py  # Kiểm soát CN: registry báo cáo, BaoCaoMeta,
+│   │                         # render từng loại báo cáo kiểm soát
+│   └── template_service.py   # Template Word: docxtpl + docx2pdf,
+│                             # dien_template(), nut_tai_word_va_pdf()
 │
-├── tabs/                     # Giao diện — mỗi file = 1 tab
+├── templates/                # Template Word mẫu chuẩn NHCSXH
+│   ├── mau_06td.docx         # Phiếu KT sử dụng vốn
+│   ├── mau_16td.docx         # BB kiểm tra Tổ TK&VV
+│   ├── mau_15td.docx         # DS đối chiếu số dư (chờ template)
+│   ├── ke_hoach_kt.docx      # KH kiểm tra GS ủy thác (chờ template)
+│   └── bb_xac_minh_no.docx   # BB xác minh nợ chiếm dụng (chờ template)
+│
+├── tabs/                     # Giao diện — mỗi file = 1 tab (15+ tab)
 │   ├── tab_tongquan.py       # Tổng quan danh mục tín dụng
 │   ├── tab_tracuu.py         # Tra cứu hồ sơ khách hàng
 │   ├── tab_candoi.py         # Cân đối nguồn vốn + điện báo
@@ -52,10 +61,13 @@ VBSP-SCM/
 │   ├── tab_khtd_pgd.py       # Kế hoạch tín dụng (PGD)
 │   ├── tab_khtd_mau07.py     # Mẫu 07 KHTD
 │   ├── tab_khtd_giao_dc.py   # Giao KHTD & Điều chỉnh KHTD (Google Sheet + kv_store)
+│   ├── tab_khtd_nhap.py      # Nhập KHTD Excel
+│   ├── tab_khtd_xuat.py      # Xuất KHTD Excel/PDF
 │   ├── tab_cbtd.py           # Chuẩn bị tín dụng
 │   ├── tab_gqvl.py           # Giải quyết việc làm (GQVL)
 │   ├── tab_nq11.py           # Nghị quyết 11
-│   ├── tab_cdtotkvv.py       # Chấm điểm Tổ TK&VV
+│   ├── tab_cdtotkvv.py       # Chấm điểm Tổ TK&VV (toàn CN)
+│   ├── tab_cdtotkvv_pgd.py   # Chấm điểm Tổ TK&VV (PGD)
 │   ├── tab_kiem_soat.py      # Kiểm soát CN (chọn nhóm/báo cáo từ kiem_soat_service)
 │   ├── tab_baocao.py         # Xuất báo cáo
 │   ├── tab_danhsach.py       # Danh sách khách hàng
@@ -63,16 +75,22 @@ VBSP-SCM/
 │   ├── tab_nhiem_vu.py       # Nhiệm vụ giao
 │   ├── tab_upload_khnv.py    # Upload tập trung (Phòng KH-NV)
 │   ├── tab_upload_pgd.py     # Upload địa bàn (PGD)
+│   ├── tab_uy_thac.py        # Ủy thác: 5 sub-tab (Tổng quan, Mẫu 06, Mẫu 15, Mẫu 16, KH KT)
+│   ├── tab_quan_ly_dgd.py    # Quản lý điểm giao dịch
+│   ├── tab_diem_gd_pgd.py    # Điểm giao dịch PGD
+│   ├── tab_ban_dai_dien.py   # Ban đại diện
 │   └── tab_trang_thai_nguon.py # Trạng thái nguồn dữ liệu
 │
 ├── widgets/                  # Widget UI tái sử dụng
 │   ├── data_source_status.py # Widget trạng thái 2 luồng (ws_operation vs ws_management)
 │   └── status_widget.py      # Widget trạng thái compact cho sidebar
 │
-├── workspaces/               # Container workspace theo role
+├── workspaces/               # Container workspace theo phân hệ + role
 │   ├── ws_executive.py       # BGĐ: gauge, heatmap, tổng quan vĩ mô
-│   ├── ws_management.py      # Điều hành: admin/manager (toàn CN)
-│   └── ws_operation.py       # Tác nghiệp: user (theo PGD)
+│   ├── ws_management.py      # Phân hệ CN: admin_cn/manager_cn/admin/manager
+│   │                         # Toàn quyền CN, tổng hợp 22 PGD
+│   └── ws_operation.py       # Phân hệ PGD: admin_pgd/manager_pgd/user_pgd/user
+│                             # Tác nghiệp địa bàn, chỉ thấy PGD được phân công
 │
 ├── docs/                     # Tài liệu kỹ thuật nội bộ
 │   ├── definition_of_ready_noxh_2026.md  # Định nghĩa "sẵn sàng" cho NỢ XH 2026
@@ -233,7 +251,45 @@ ws_operation.py  → tab_tracuu, tab_danhsach, tab_upload_pgd,
 
 ---
 
-## 5. Workspace — Tab nào thuộc workspace nào
+## 5. Phân hệ hệ thống (2 cấp)
+
+### 5.1 Phân hệ Chi nhánh (CN)
+Dành cho TP/PTP KH-NV, CBTD Hội sở, Ban Giám đốc tại **Hội sở Chi nhánh tỉnh**.
+
+| Role | Tương đương cũ | Mô tả |
+|---|---|---|
+| `executive` | — | Ban Giám đốc — chỉ đọc dashboard vĩ mô |
+| `admin_cn` | `admin` | Quản trị CN — toàn quyền |
+| `manager_cn` | `manager` | Lãnh đạo CN — upload CN, giao chỉ tiêu |
+
+**Workspace:** `ws_management` (toàn quyền CN, tổng hợp 22 PGD)
+
+### 5.2 Phân hệ PGD
+Dành cho Giám đốc PGD, Tổ trưởng KHNV, CBTD tại **21 Phòng giao dịch**.
+
+| Role | Tương đương cũ | Mô tả |
+|---|---|---|
+| `admin_pgd` | — | Quản trị PGD — upload HSTD + quản lý user PGD + giao nhiệm vụ |
+| `manager_pgd` | — | Lãnh đạo PGD — upload HSTD + nhập kế hoạch |
+| `user_pgd` | `user` | CBTD — tác nghiệp, chỉ thấy PGD mình |
+
+**Workspace:** `ws_operation` (tác nghiệp địa bàn, chỉ thấy PGD được phân công)
+
+### 5.3 Routing theo role
+```
+CN roles (executive, admin_cn, manager_cn, admin, manager)
+    → ws_management
+
+PGD roles (admin_pgd, manager_pgd, user_pgd, user)
+    → ws_operation
+
+executive
+    → ws_executive (nếu muốn view vĩ mô) hoặc ws_management
+```
+
+---
+
+## 6. Workspace — Tab nào thuộc workspace nào
 
 ### ws_executive (BGĐ — chỉ đọc)
 | Tab | Mô tả |
@@ -271,7 +327,7 @@ ws_operation.py  → tab_tracuu, tab_danhsach, tab_upload_pgd,
 
 ---
 
-## 6. Tham chiếu nhanh — "Tôi cần sửa gì?"
+## 7. Tham chiếu nhanh — "Tôi cần sửa gì?"
 
 | Yêu cầu | File cần sửa |
 |---|---|
@@ -293,3 +349,6 @@ ws_operation.py  → tab_tracuu, tab_danhsach, tab_upload_pgd,
 | Sửa widget trạng thái sidebar | `widgets/data_source_status.py` hoặc `widgets/status_widget.py` |
 | Sửa upload file hệ thống (Quản trị) | `services/upload_center.py` → `render_panel_upload()` |
 | Sửa tính toán số liệu giao ban | `giao_ban.py` → `tinh_so_lieu_van_xuoi()`, `xuat_bien_ban_giao_ban()` |
+| Thêm template Word mới | `templates/*.docx` + `services/template_service.py` → thêm `TMPL_*` |
+| Sửa logic check role | `auth.py` → dùng `la_phan_he_cn()`, `la_phan_he_pgd()` |
+| Thêm user PGD mới | `auth.py` → format `admin_{slug_pgd}` |

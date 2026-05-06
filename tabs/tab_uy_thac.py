@@ -122,7 +122,7 @@ def _add_header_quoc_hieu(doc: Document, don_vi: str, so_vb: str,
     cell_l = t.rows[0].cells[0]
     p = cell_l.paragraphs[0]
     p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    run = p.add_run(don_vi.upper())
+    run = p.add_run((don_vi or "").upper())
     run.bold = True
     run.font.size = Pt(12)
     p2 = cell_l.add_paragraph(f"Số: {so_vb}")

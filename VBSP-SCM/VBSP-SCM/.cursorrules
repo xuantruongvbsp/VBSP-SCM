@@ -1,0 +1,246 @@
+# VBSP-SCM — Cursor Rules
+# Hệ thống Quản trị Tín dụng Nội bộ — NHCSXH Chi nhánh Đồng Nai
+# Cập nhật: 05/2026
+
+---
+
+## Hệ thống là gì
+
+Phần mềm quản trị tín dụng nội bộ cho Ngân hàng Chính sách Xã hội
+Chi nhánh Đồng Nai (đã sáp nhập Bình Phước 2025).
+
+- Stack: Streamlit + Python + SQLite + DuckDB/Parquet
+- ~20 users, 4 vai trò: executive / admin / manager / user
+- 22 đơn vị: Hội sở Chi nhánh tỉnh + 21 PGD
+- 95 xã/phường
+
+---
+
+## Sơ đồ kiến trúc
+
+```
+app.py                    # Điểm vào, routing, session, load df
+auth.py                   # Đăng nhập, RBAC, quản lý user
+config.py                 # Hằng số toàn hệ thống (DS_PGD, PGD_XA_MAP, MA_PGD_MAP...)
+db.py                     # SQLite: kv_store, users, audit_log
+utils.py                  # fmt(), fmt_ty(), fmt_pct(), Excel helpers, Word autofill
+
+data/
+  core.py                 # ts_file(), excel_to_parquet(), parquet cache
+  hstd.py                 # doc_file(), cảnh báo 3 tháng KHĐ
+  pgd.py                  # pgd_slug(), doc_hstd_pgd(), doc_nq11_pgd(), duong_dan_pgd()
+  khtd.py                 # KHTD, CBTD, KH, QĐ UBND
+  ct_discovery.py         # Quét HSTD+GQVL+NQ11 → ct_registry
+
+services/
+  upload_service.py       # luu_pgd_file(), luu_file_he_thong(), merge_du_lieu_toan_cn()
+  report_service.py       # xuat_bao_cao(), ten_file_bao_cao()
+  data_quality.py         # kiem_tra_chat_luong()
+  data_source_status.py   # Widget trạng thái nguồn (chỉ hiển thị)
+
+tabs/                     # Mỗi file = 1 tab, hàm render(role, username, **kwargs)
+workspaces/
+  ws_executive.py         # BGĐ — chỉ đọc
+  ws_management.py        # Phòng KH-NV — toàn CN
+  ws_operation.py         # Hỗ trợ địa bàn — cấp PGD
+```
+
+---
+
+## NGUYÊN TẮC 2 LUỒNG DỮ LIỆU — BẤT BIẾN
+
+```
+┌─────────────────────────────────────────────────────┐
+│  PHÂN HỆ KH-NV: ws_management + ws_executive        │
+│  Nguồn: CACHE_HSTD / CACHE_NQ11 / CACHE_GQVL        │
+│  Tạo bởi: KH-NV upload 22 file → merge_du_lieu_toan_cn()
+│  KHÔNG BAO GIỜ bị ảnh hưởng bởi PGD upload          │
+└─────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────┐
+│  PHÂN HỆ ĐỊA BÀN: ws_operation                      │
+│  Nguồn: pgd_data/{slug}/hstd_latest.xlsx             │
+│         pgd_data/{slug}/nq11_latest.xlsx             │
+│         pgd_data/{slug}/gqvl_latest.xlsx             │
+│  Tạo bởi: PGD tự upload → luu_pgd_file() MÀ THÔI   │
+│  Mọi tính năng PGD hiện tại và tương lai dùng nguồn này
+└─────────────────────────────────────────────────────┘
+```
+
+### ws_operation — PHẢI
+- Tab nhận `df` từ `kwargs` — không tự load file
+- Nếu cần đọc trực tiếp: dùng `doc_hstd_pgd()`, `doc_nq11_pgd()`
+- Nếu PGD chưa upload → `st.info("Vui lòng upload tại tab Upload")` + `st.stop()`
+
+### ws_operation — KHÔNG BAO GIỜ
+- Import hoặc đọc `CACHE_HSTD`, `CACHE_NQ11`, `CACHE_GQVL`
+- Gọi `merge_du_lieu_toan_cn()`
+- Gọi `_load_hstd(CACHE_HSTD, ...)`
+- Ghi đè `CACHE_*` dưới bất kỳ hình thức nào
+- `luu_pgd_file()` KHÔNG được gọi `merge_du_lieu_toan_cn()`
+
+---
+
+## QUY ƯỚC CODE — BẮT BUỘC
+
+### 1. Lưu trữ dữ liệu — chỉ kv_store
+```python
+value = db.doc_kv("ten_key")                        # đọc
+db.ghi_kv("ten_key", value, username)               # ghi
+db.ghi_audit(username, "ten_action", f"[{hostname}] chi tiết")
+st.cache_data.clear()
+```
+Key chuẩn: `"khtd_cn"`, `"khtd_pgd_{slug}"`, `"ct_registry_{slug}"`, `"merge_meta_{loai}"`
+
+### 2. Audit log — bắt buộc sau mọi thao tác ghi
+```python
+import socket
+hostname = socket.gethostname()
+db.ghi_audit(username, "ten_action", f"[{hostname}] {loai} — {ten_pgd}")
+```
+Action chuẩn: `upload_khnv`, `upload_pgd`, `merge_toan_cn`, `xoa_du_lieu_pgd`,
+`ghi_khtd`, `ghi_nhiem_vu`, `xuat_bao_cao`
+
+### 3. Upload file
+```python
+# KH-NV: luu_file_he_thong() → merge_du_lieu_toan_cn() → st.cache_data.clear()
+# PGD:   luu_pgd_file() → DỪNG — không merge, không ghi CACHE
+ket_qua.hien_thi()   # hiển thị kết quả KetQuaUpload
+```
+
+### 4. Tiền tệ
+```
+Nhập: triệu đồng → Lưu: VND (×1,000,000) → Hiển thị: fmt() từ utils.py
+Làm tròn: tỷ (3 chữ số), triệu (0 chữ số), % (2 chữ số)
+round(a / b * 100, 2) if b else 0.0
+```
+
+### 5. Error handling — KHÔNG dùng except: pass
+```python
+try:
+    xu_ly_gi_do()
+except Exception as e:
+    db.ghi_audit(username, "loi_he_thong", f"[{hostname}] {e}")
+    st.error(f"❌ Lỗi: {e}")
+```
+
+### 6. Naming conventions
+- snake_case cho biến/hàm, UPPER_CASE cho hằng số
+- Prefix: `df_` DataFrame, `ds_` list, `dict_` dict, `path_` đường dẫn,
+  `ten_` tên, `ma_` mã số, `so_` số lượng, `is_`/`co_` boolean
+
+### 7. Cấu trúc tab chuẩn
+```python
+def render(role: str, username: str, **kwargs) -> None:
+    df       = kwargs.get("df")        # HSTD — nguồn tùy workspace
+    df_nq11  = kwargs.get("df_nq11")
+    pgd_user = kwargs.get("pgd_user")  # chỉ có trong ws_operation
+    if df is None or df.empty:
+        st.info("Chưa có dữ liệu. Vui lòng upload."); return
+```
+
+### 8. RBAC
+```python
+role     = st.session_state.get("role", "user")
+username = st.session_state.get("username", "unknown")
+pgd_user = st.session_state.get("user_info", {}).get("pgd")
+# executive=chỉ đọc | admin=toàn quyền | manager=upload+kế hoạch | user=PGD của mình
+```
+
+### 9. Hằng số hay dùng
+```python
+from config import (
+    DS_PGD, DON_VI_CHI_NHANH, PGD_XA_MAP, MA_PGD_MAP,
+    CACHE_HSTD, CACHE_NQ11, CACHE_GQVL,
+    COT_TEN_PGD, COT_MA_KH, COT_TEN_KH,
+    CHUONG_TRINH_KHTD, UPLOAD_CANH_BAO_NGAY,
+)
+from data.pgd import (
+    pgd_slug, duong_dan_pgd, doc_hstd_pgd, doc_nq11_pgd,
+    doc_hstd_toan_cn_pgd, doc_trang_thai_file,
+)
+from utils import fmt, fmt_ty, fmt_tien, fmt_pct, fmt_so
+```
+
+---
+
+## TÀI LIỆU CONTEXT — TAG KHI RA LỆNH
+
+| Tag | Khi nào dùng |
+|---|---|
+| `@HUONG_DAN_NGUON_DU_LIEU.md` | Mọi tính năng đọc/ghi dữ liệu |
+| `@CONVENTIONS.md` | Mọi tính năng mới |
+| `@ARCHITECTURE.md` | Thêm tab mới, workspace, sửa app.py |
+
+---
+
+## MẪU PROMPT CHUẨN
+
+```
+[Mô tả task 1-2 câu]
+
+Phân hệ: ws_management | ws_operation  ← chọn 1
+Tài liệu: @CONVENTIONS.md @HUONG_DAN_NGUON_DU_LIEU.md
+
+File cần sửa:
+- [đường_dẫn]: [sửa gì]
+
+Yêu cầu:
+- Nguồn dữ liệu: df từ kwargs (KHÔNG tự import CACHE_*)
+- Lưu: db.ghi_kv(key, value, username)
+- Audit: db.ghi_audit(username, "action", f"[{hostname}] chi tiết")
+- Cache: st.cache_data.clear() sau khi ghi thành công
+- Upload PGD: luu_pgd_file() KHÔNG gọi merge_du_lieu_toan_cn()
+- Tiền tệ: nhập triệu → lưu VND → hiển thị fmt()
+- Làm tròn: tỷ(3) / %(2) / triệu(0)
+- Error: KHÔNG except:pass — log vào db.ghi_audit()
+
+Tái sử dụng:
+- [tên_hàm]: [mục đích]
+
+Trường hợp đặc biệt:
+- [tình huống]
+```
+
+---
+
+## VÍ DỤ PROMPT
+
+```
+Thêm tab "Theo dõi NQH" vào ws_operation — hiển thị danh sách
+khách hàng quá hạn của PGD, lọc theo xã và chương trình tín dụng.
+
+Phân hệ: ws_operation
+Tài liệu: @CONVENTIONS.md @HUONG_DAN_NGUON_DU_LIEU.md @ARCHITECTURE.md
+
+File cần sửa:
+- tabs/tab_theo_doi_nqh.py: Tạo mới
+- workspaces/ws_operation.py: Đăng ký tab mới
+
+Yêu cầu:
+- df nhận từ kwargs — KHÔNG import CACHE_HSTD
+- Lọc: df[df["Nợ quá hạn"] > 0]
+- Bộ lọc: selectbox Xã (PGD_XA_MAP[pgd_user]), selectbox Chương trình
+- Bảng: Tên KH, Số KU, Dư nợ (fmt_ty), NQH (fmt_ty), Ngày đến hạn
+- Chưa upload: st.info("Vui lòng upload HSTD tại tab Upload") + st.stop()
+- Audit: db.ghi_audit(username, "xem_nqh", f"[hostname] {pgd_user}")
+
+Tái sử dụng:
+- config.PGD_XA_MAP: lấy danh sách xã
+- utils.fmt_ty(): hiển thị tiền tệ
+```
+
+---
+
+## CHECKLIST TRƯỚC KHI CODE
+
+```
+□ Xác định ws_management hay ws_operation
+□ Tag đúng file tài liệu context
+□ Nguồn df rõ ràng (CACHE_* hay pgd_data/)
+□ Audit log kèm hostname
+□ Error handling đúng — không except:pass
+□ Làm tròn tiền tệ đúng quy ước
+□ Không hardcode đường dẫn file
+□ Không có thông tin nhạy cảm (mật khẩu, token, path cá nhân)
+```

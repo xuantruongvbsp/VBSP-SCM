@@ -1,0 +1,850 @@
+"""
+Tính số liệu giao ban xã và tạo 3 bảng động cho mẫu Word.
+Dùng chung cho ws_operation (CBTD) và ws_management (PGD).
+"""
+from __future__ import annotations
+
+import pandas as pd
+from datetime import date
+from io import BytesIO
+from dateutil.relativedelta import relativedelta
+from docx import Document
+from docx.shared import Pt, Cm, RGBColor
+from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_LINE_SPACING
+from docx.oxml import OxmlElement
+from docx.oxml.ns import qn
+from config import (
+    COT_MA_KH,
+    COT_TONG_DU_NO,
+    COT_DU_NO_QH,
+    COT_TEN_CT,
+    COT_TEN_XA,
+)
+
+COT_DU_NO_KHOANH = "Dư nợ khoanh"
+COT_NGAY_DH_GH = "Ngày ĐH theo Gia hạn"
+COT_DVUT = "Tên ĐVUT"
+COT_TEN_TO = "Tên tổ"
+COT_DS_CV_THANG = "Giải ngân trong tháng"
+COT_TN_TH_THANG = "Thu nợ TH tháng"
+COT_TN_QH_THANG = "Thu nợ QH tháng"
+COT_TIEN_GUI = "Số dư tiền gửi 105"
+COT_MON_3M = "is_3m_inactive"  # từ danh_dau_khong_hd()
+
+
+def loc_theo_xa(df: pd.DataFrame, ten_xa: str) -> pd.DataFrame:
+    return df[df[COT_TEN_XA] == ten_xa].copy()
+
+
+def tinh_so_lieu_van_xuoi(
+    df_xa: pd.DataFrame,
+    df_baseline: pd.DataFrame | None,
+    nam_moc: int,
+) -> dict:
+    """
+    Trả về dict các tag văn xuôi cho mẫu Word.
+    df_xa       : HSTD đã lọc theo xã hiện tại
+    df_baseline : HSTD mốc 31/12 (toàn CN, chưa lọc) — None nếu chưa có
+    nam_moc     : năm của baseline (VD: 2025)
+    """
+    dn = pd.to_numeric(df_xa[COT_TONG_DU_NO], errors="coerce").fillna(0)
+    qh = pd.to_numeric(df_xa[COT_DU_NO_QH], errors="coerce").fillna(0)
+    kh = pd.to_numeric(df_xa.get(COT_DU_NO_KHOANH, 0), errors="coerce").fillna(0)
+    tg = pd.to_numeric(df_xa.get(COT_TIEN_GUI, 0), errors="coerce").fillna(0)
+    gn = pd.to_numeric(df_xa.get(COT_DS_CV_THANG, 0), errors="coerce").fillna(0)
+    tn_th = pd.to_numeric(df_xa.get(COT_TN_TH_THANG, 0), errors="coerce").fillna(0)
+    tn_qh = pd.to_numeric(df_xa.get(COT_TN_QH_THANG, 0), errors="coerce").fillna(0)
+
+    tong_dn = dn.sum()
+    tong_qh = qh.sum()
+    tong_kh = kh.sum()
+    tong_tg = tg.sum()
+    tl_qh = tong_qh / tong_dn * 100 if tong_dn > 0 else 0.0
+    tl_kh = tong_kh / tong_dn * 100 if tong_dn > 0 else 0.0
+    so_kh = df_xa[df_xa[COT_TONG_DU_NO] > 0][COT_MA_KH].nunique()
+    so_to = df_xa[COT_TEN_TO].nunique() if COT_TEN_TO in df_xa.columns else 0
+
+    dn_thang_truoc = tong_dn - gn.sum() + tn_th.sum() + tn_qh.sum()
+    chenh_lech_thang = tong_dn - dn_thang_truoc
+    tang_giam_thang = "tăng" if chenh_lech_thang >= 0 else "giảm"
+
+    chenh_lech_dn = pct_dau_nam = 0.0
+    tang_giam_dau_nam = "tăng"
+    if df_baseline is not None and COT_TEN_XA in df_baseline.columns:
+        df_bl_xa = df_baseline[df_baseline[COT_TEN_XA] == df_xa[COT_TEN_XA].iloc[0]]
+        dn_bl = pd.to_numeric(df_bl_xa[COT_TONG_DU_NO], errors="coerce").fillna(0).sum()
+        chenh_lech_dn = tong_dn - dn_bl
+        pct_dau_nam = chenh_lech_dn / dn_bl * 100 if dn_bl > 0 else 0.0
+        tang_giam_dau_nam = "tăng" if chenh_lech_dn >= 0 else "giảm"
+
+    from utils import fmt
+
+    return {
+        "{{tong_du_no}}": fmt(tong_dn),
+        "{{so_kh}}": str(so_kh),
+        "{{so_to}}": str(so_to),
+        "{{du_no_qh}}": fmt(tong_qh),
+        "{{ty_le_nqh}}": f"{tl_qh:.2f}",
+        "{{du_no_khoanh}}": fmt(tong_kh),
+        "{{ty_le_khoanh}}": f"{tl_kh:.2f}",
+        "{{tien_gui_105}}": fmt(tong_tg),
+        "{{tang_giam_thang}}": tang_giam_thang,
+        "{{chenh_lech_thang}}": fmt(abs(chenh_lech_thang)),
+        "{{tang_giam_dau_nam}}": tang_giam_dau_nam,
+        "{{chenh_lech_dau_nam}}": fmt(abs(chenh_lech_dn)),
+        "{{pct_dau_nam}}": f"{abs(pct_dau_nam):.1f}",
+        "{{nam_moc}}": str(nam_moc),
+    }
+
+
+def tao_bang_dvut(doc: Document, df_xa: pd.DataFrame) -> None:
+    """Chèn bảng kết quả theo ĐVUT vào doc tại vị trí placeholder."""
+    from data import danh_dau_khong_hd
+
+    df_m = danh_dau_khong_hd(df_xa)
+
+    DVUT_ORDER = [
+        "Hội nông dân",
+        "Hội liên hiệp phụ nữ",
+        "Hội cựu chiến binh",
+        "Đoàn thanh niên",
+    ]
+
+    t = df_m.groupby(COT_DVUT).agg(
+        so_to=(COT_TEN_TO, "nunique"),
+        so_kh=(COT_MA_KH, "nunique"),
+        ds_cv=(COT_DS_CV_THANG, "sum"),
+        ds_tn=(COT_TN_TH_THANG, "sum"),
+        tong_dn=(COT_TONG_DU_NO, "sum"),
+        nqh=(COT_DU_NO_QH, "sum"),
+        no_kh=(COT_DU_NO_KHOANH, "sum"),
+        mon_3m=(COT_MON_3M, "sum"),
+    ).reset_index()
+
+    t = t[t["tong_dn"] > 0]
+    t["_ord"] = t[COT_DVUT].apply(
+        lambda x: DVUT_ORDER.index(x) if x in DVUT_ORDER else 99
+    )
+    t = t.sort_values("_ord").drop(columns="_ord")
+
+    tong_dn_all = t["tong_dn"].sum()
+
+    HEADERS = [
+        "Stt",
+        "Đơn vị nhận ủy thác",
+        "Số Tổ",
+        "Số KH",
+        "DS cho vay",
+        "DS thu nợ",
+        "Tổng dư nợ",
+        "Tỷ trọng %",
+        "NQH",
+        "Nợ khoanh",
+        "Món 3T KHĐ",
+    ]
+
+    tbl = doc.add_table(rows=1, cols=len(HEADERS))
+    tbl.style = "Table Grid"
+    for i, h in enumerate(HEADERS):
+        cell = tbl.rows[0].cells[i]
+        cell.text = h
+        cell.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+        run = cell.paragraphs[0].runs[0]
+        run.bold = True
+        run.font.size = Pt(9)
+
+    from utils import fmt
+
+    for idx, row in enumerate(t.itertuples(), 1):
+        ty_trong = row.tong_dn / tong_dn_all * 100 if tong_dn_all > 0 else 0
+        vals = [
+            str(idx),
+            row[1],
+            str(int(row.so_to)),
+            str(int(row.so_kh)),
+            fmt(row.ds_cv),
+            fmt(row.ds_tn),
+            fmt(row.tong_dn),
+            f"{ty_trong:.1f}%",
+            fmt(row.nqh),
+            fmt(row.no_kh),
+            str(int(row.mon_3m)),
+        ]
+        tr = tbl.add_row()
+        for i, v in enumerate(vals):
+            tr.cells[i].text = v
+            tr.cells[i].paragraphs[0].alignment = (
+                WD_ALIGN_PARAGRAPH.CENTER if i != 1 else WD_ALIGN_PARAGRAPH.LEFT
+            )
+            tr.cells[i].paragraphs[0].runs[0].font.size = Pt(9)
+
+    tr = tbl.add_row()
+    cong_vals = [
+        "",
+        "Cộng",
+        str(int(t["so_to"].sum())),
+        str(int(t["so_kh"].sum())),
+        fmt(t["ds_cv"].sum()),
+        fmt(t["ds_tn"].sum()),
+        fmt(tong_dn_all),
+        "100%",
+        fmt(t["nqh"].sum()),
+        fmt(t["no_kh"].sum()),
+        str(int(t["mon_3m"].sum())),
+    ]
+    for i, v in enumerate(cong_vals):
+        tr.cells[i].text = v
+        para = tr.cells[i].paragraphs[0]
+        run = para.runs[0] if para.runs else para.add_run(v)
+        run.bold = True
+        run.font.size = Pt(9)
+
+
+def tao_bang_chuong_trinh(
+    doc: Document,
+    df_xa: pd.DataFrame,
+    df_baseline: pd.DataFrame | None,
+    nam_moc: int,
+) -> None:
+    if df_baseline is not None and COT_TEN_XA in df_baseline.columns:
+        ten_xa = df_xa[COT_TEN_XA].iloc[0]
+        df_bl = df_baseline[df_baseline[COT_TEN_XA] == ten_xa]
+    else:
+        df_bl = None
+
+    g_ht = df_xa.groupby(COT_TEN_CT)[COT_TONG_DU_NO].sum().reset_index()
+    g_ht.columns = [COT_TEN_CT, "dn_ht"]
+
+    if df_bl is not None and not df_bl.empty:
+        g_bl = df_bl.groupby(COT_TEN_CT)[COT_TONG_DU_NO].sum().reset_index()
+        g_bl.columns = [COT_TEN_CT, "dn_bl"]
+        mg = g_ht.merge(g_bl, on=COT_TEN_CT, how="left").fillna(0)
+    else:
+        mg = g_ht.copy()
+        mg["dn_bl"] = 0
+
+    mg = mg[mg["dn_ht"] > 0].copy()
+    mg["chenh_lech"] = mg["dn_ht"] - mg["dn_bl"]
+    mg["pct"] = mg.apply(
+        lambda r: r["chenh_lech"] / r["dn_bl"] * 100 if r["dn_bl"] > 0 else 0,
+        axis=1,
+    )
+
+    HEADERS = [
+        "Stt",
+        "Chương trình tín dụng",
+        f"Dư nợ 31/12/{nam_moc}",
+        "Dư nợ hiện tại",
+        "Tăng/giảm",
+        "%",
+    ]
+
+    tbl = doc.add_table(rows=1, cols=len(HEADERS))
+    tbl.style = "Table Grid"
+    for i, h in enumerate(HEADERS):
+        cell = tbl.rows[0].cells[i]
+        cell.text = h
+        cell.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+        run = cell.paragraphs[0].runs[0]
+        run.bold = True
+        run.font.size = Pt(9)
+
+    from utils import fmt
+
+    for idx, row in enumerate(mg.itertuples(), 1):
+        dau = "+" if row.chenh_lech >= 0 else ""
+        vals = [
+            str(idx),
+            row[1],
+            fmt(row.dn_bl),
+            fmt(row.dn_ht),
+            f"{dau}{fmt(row.chenh_lech)}",
+            f"{dau}{row.pct:.1f}%",
+        ]
+        tr = tbl.add_row()
+        for i, v in enumerate(vals):
+            tr.cells[i].text = v
+            tr.cells[i].paragraphs[0].alignment = (
+                WD_ALIGN_PARAGRAPH.LEFT if i == 1 else WD_ALIGN_PARAGRAPH.CENTER
+            )
+            tr.cells[i].paragraphs[0].runs[0].font.size = Pt(9)
+
+    tr = tbl.add_row()
+    tong_bl = mg["dn_bl"].sum()
+    tong_ht = mg["dn_ht"].sum()
+    tong_cl = tong_ht - tong_bl
+    dau = "+" if tong_cl >= 0 else ""
+    pct_tong = tong_cl / tong_bl * 100 if tong_bl > 0 else 0
+    cong = [
+        "",
+        "Cộng",
+        fmt(tong_bl),
+        fmt(tong_ht),
+        f"{dau}{fmt(tong_cl)}",
+        f"{dau}{pct_tong:.1f}%",
+    ]
+    for i, v in enumerate(cong):
+        tr.cells[i].text = v
+        para = tr.cells[i].paragraphs[0]
+        run = para.runs[0] if para.runs else para.add_run(v)
+        run.bold = True
+        run.font.size = Pt(9)
+
+
+def tao_bang_ke_hoach(
+    doc: Document,
+    df_xa: pd.DataFrame,
+    giai_ngan_input: dict | None = None,
+) -> None:
+    """
+    df_xa            : HSTD lọc theo xã hiện tại
+    giai_ngan_input  : dict {(ten_dvut, ten_to, ten_ct): so_tien} — CBTD nhập tay
+                       None = để trống cột giải ngân
+    """
+    thang_toi = date.today() + relativedelta(months=1)
+    thang_toi_dau = date(thang_toi.year, thang_toi.month, 1)
+
+    ngay_dh = pd.to_datetime(df_xa[COT_NGAY_DH_GH], errors="coerce")
+    mask = (ngay_dh.dt.year == thang_toi_dau.year) & (
+        ngay_dh.dt.month == thang_toi_dau.month
+    )
+    df_dh = df_xa[mask].copy()
+
+    g = (
+        df_dh.groupby([COT_DVUT, COT_TEN_TO, COT_TEN_CT])[COT_TONG_DU_NO]
+        .sum()
+        .reset_index()
+    )
+    g = g[g[COT_TONG_DU_NO] > 0]
+
+    HEADERS = [
+        "Stt",
+        "Đơn vị nhận ủy thác / Tổ TK&VV",
+        "Chương trình cho vay",
+        "Số tiền thu nợ",
+        "Số tiền giải ngân",
+    ]
+
+    tbl = doc.add_table(rows=1, cols=len(HEADERS))
+    tbl.style = "Table Grid"
+    for i, h in enumerate(HEADERS):
+        cell = tbl.rows[0].cells[i]
+        cell.text = h
+        cell.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+        run = cell.paragraphs[0].runs[0]
+        run.bold = True
+        run.font.size = Pt(9)
+
+    from utils import fmt
+
+    stt = 0
+    for dvut, grp_dvut in g.groupby(COT_DVUT):
+        tr = tbl.add_row()
+        tr.cells[0].text = ""
+        run = tr.cells[1].paragraphs[0].add_run(dvut.upper())
+        run.bold = True
+        run.font.size = Pt(9)
+        for i in range(2, len(HEADERS)):
+            tr.cells[i].text = ""
+
+        for to, grp_to in grp_dvut.groupby(COT_TEN_TO):
+            for _, row in grp_to.iterrows():
+                stt += 1
+                gn_val = ""
+                if giai_ngan_input:
+                    key = (dvut, to, row[COT_TEN_CT])
+                    gn_val = (
+                        fmt(giai_ngan_input.get(key, 0))
+                        if giai_ngan_input.get(key, 0) > 0
+                        else ""
+                    )
+                vals = [
+                    str(stt),
+                    to,
+                    row[COT_TEN_CT],
+                    fmt(row[COT_TONG_DU_NO]),
+                    gn_val,
+                ]
+                tr = tbl.add_row()
+                for i, v in enumerate(vals):
+                    tr.cells[i].text = v
+                    tr.cells[i].paragraphs[0].alignment = (
+                        WD_ALIGN_PARAGRAPH.LEFT if i in (1, 2) else WD_ALIGN_PARAGRAPH.CENTER
+                    )
+                    if tr.cells[i].paragraphs[0].runs:
+                        tr.cells[i].paragraphs[0].runs[0].font.size = Pt(9)
+
+    if len(tbl.rows) == 1:
+        tr = tbl.add_row()
+        tr.cells[1].text = "Không có món đến hạn tháng tới"
+
+
+def xuat_thong_bao_ket_luan_giao_ban(
+    df_xa: pd.DataFrame,
+    ten_pgd: str,
+    ten_xa: str,
+    ten_dgd: str,
+    thang_bao_cao: int,
+    nam_bao_cao: int,
+    ngay_hop: str,
+    chinh_sach_moi: str,
+    ton_tai_han_che: str,
+    nhiem_vu_tiep: str,
+    df_baseline: pd.DataFrame | None = None,
+    nam_moc: int = 2025,
+    so_van_ban: str | None = None,
+    nguoi_ky: str | None = None,
+    chuc_danh: str | None = None,
+) -> bytes:
+    """
+    Xuất Thông báo Kết luận Giao ban chuẩn NĐ30/2020 (python-docx, không template).
+    Tái sử dụng: tinh_so_lieu_van_xuoi(), tao_bang_dvut(), tao_bang_ke_hoach().
+    Trả về bytes .docx.
+    """
+    doc = Document()
+
+    for section in doc.sections:
+        section.page_width = Cm(21)
+        section.page_height = Cm(29.7)
+        section.left_margin = Cm(3.0)
+        section.right_margin = Cm(2.0)
+        section.top_margin = Cm(2.0)
+        section.bottom_margin = Cm(2.0)
+        section.different_first_page_header_footer = True
+
+    def _ten_pgd_hien_thi(s: str) -> str:
+        t = (s or "").strip()
+        if t.upper().startswith("PGD"):
+            t = t[3:].strip().lstrip("-").strip()
+        return t.upper() or "…………"
+
+    ten_pgd_hd = _ten_pgd_hien_thi(ten_pgd)
+
+    def _p(
+        text: str = "",
+        bold: bool = False,
+        italic: bool = False,
+        size: int = 14,
+        align=WD_ALIGN_PARAGRAPH.LEFT,
+        space_before: float = 0,
+        space_after: float = 6,
+        indent_cm: float = 0,
+        line_spacing: float = 1.25,
+    ):
+        para = doc.add_paragraph()
+        para.alignment = align
+        fmt_pf = para.paragraph_format
+        fmt_pf.space_before = Pt(space_before)
+        fmt_pf.space_after = Pt(space_after)
+        if indent_cm and indent_cm > 0:
+            fmt_pf.first_line_indent = Cm(indent_cm)
+        fmt_pf.line_spacing_rule = WD_LINE_SPACING.MULTIPLE
+        fmt_pf.line_spacing = line_spacing
+        if text:
+            r = para.add_run(text)
+            r.bold = bold
+            r.italic = italic
+            r.font.name = "Times New Roman"
+            r.font.size = Pt(size)
+            r.font.color.rgb = RGBColor(0, 0, 0)
+        return para
+
+    def _heading(so: str, text: str) -> None:
+        _p(
+            f"{so}. {text}",
+            bold=True,
+            size=14,
+            align=WD_ALIGN_PARAGRAPH.LEFT,
+            space_before=6,
+            space_after=3,
+            indent_cm=0,
+        )
+
+    def _underline_para(para) -> None:
+        p_pr = para._p.get_or_add_pPr()
+        p_bdr = OxmlElement("w:pBdr")
+        bot = OxmlElement("w:bottom")
+        bot.set(qn("w:val"), "single")
+        bot.set(qn("w:sz"), "6")
+        bot.set(qn("w:space"), "1")
+        bot.set(qn("w:color"), "000000")
+        p_bdr.append(bot)
+        p_pr.append(p_bdr)
+
+    def _no_border(table) -> None:
+        for row in table.rows:
+            for cell in row.cells:
+                tc = cell._tc
+                tc_pr = tc.get_or_add_tcPr()
+                tc_borders = OxmlElement("w:tcBorders")
+                for side in ("top", "left", "bottom", "right", "insideH", "insideV"):
+                    b = OxmlElement(f"w:{side}")
+                    b.set(qn("w:val"), "none")
+                    tc_borders.append(b)
+                tc_pr.append(tc_borders)
+
+    def _cell_w(cell, cm: float) -> None:
+        tc_pr = cell._tc.get_or_add_tcPr()
+        tc_w = OxmlElement("w:tcW")
+        tc_w.set(qn("w:w"), str(int(cm * 567)))
+        tc_w.set(qn("w:type"), "dxa")
+        tc_pr.append(tc_w)
+
+    def _patch_font(table, size: int = 11) -> None:
+        for row in table.rows:
+            for cell in row.cells:
+                for para in cell.paragraphs:
+                    for run in para.runs:
+                        run.font.name = "Times New Roman"
+                        run.font.size = Pt(size)
+                        run.font.color.rgb = RGBColor(0, 0, 0)
+
+    def _fmt_ngay(s: str) -> tuple[str, str, str]:
+        parts = (s or "").strip().split("/")
+        if len(parts) != 3:
+            raise ValueError("Ngày họp cần định dạng DD/MM/YYYY")
+        d, m, y = parts[0].strip(), parts[1].strip(), parts[2].strip()
+        return f"{int(d):02d}", f"{int(m):02d}", y
+
+    ngay_s, thang_s, nam_s = _fmt_ngay(ngay_hop)
+    thang_fmt = f"{thang_bao_cao:02d}"
+
+    header = doc.sections[0].header
+    hp = header.paragraphs[0] if header.paragraphs else header.add_paragraph()
+    hp.text = ""
+    hp.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    run_pg = hp.add_run()
+    run_pg.font.size = Pt(13)
+    run_pg.font.name = "Times New Roman"
+    fc1 = OxmlElement("w:fldChar")
+    fc1.set(qn("w:fldCharType"), "begin")
+    it = OxmlElement("w:instrText")
+    it.set(qn("xml:space"), "preserve")
+    it.text = " PAGE "
+    fc2 = OxmlElement("w:fldChar")
+    fc2.set(qn("w:fldCharType"), "end")
+    run_pg._r.extend([fc1, it, fc2])
+
+    fh = doc.sections[0].first_page_header
+    for fp in fh.paragraphs:
+        fp.text = ""
+
+    tbl_h = doc.add_table(rows=1, cols=2)
+    _no_border(tbl_h)
+    cl, cr = tbl_h.rows[0].cells
+    _cell_w(cl, 8.5)
+    _cell_w(cr, 8.5)
+
+    p = cl.paragraphs[0]
+    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    r = p.add_run("NGÂN HÀNG CHÍNH SÁCH XÃ HỘI")
+    r.bold = False
+    r.font.size = Pt(12)
+    r.font.name = "Times New Roman"
+    r.font.color.rgb = RGBColor(0, 0, 0)
+
+    p2 = cl.add_paragraph()
+    p2.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    r2 = p2.add_run(f"CHI NHÁNH ĐỒNG NAI - PGD {ten_pgd_hd}")
+    r2.bold = True
+    r2.font.size = Pt(12)
+    r2.font.name = "Times New Roman"
+    r2.font.color.rgb = RGBColor(0, 0, 0)
+    _underline_para(p2)
+
+    p3 = cl.add_paragraph()
+    p3.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    so_vb_text = f"Số: {so_van_ban}" if so_van_ban else "Số:       /TB-KLGB"
+    r3 = p3.add_run(so_vb_text)
+    r3.font.size = Pt(12)
+    r3.font.name = "Times New Roman"
+    r3.font.color.rgb = RGBColor(0, 0, 0)
+
+    p4 = cr.paragraphs[0]
+    p4.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    r4 = p4.add_run("CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM")
+    r4.bold = True
+    r4.font.size = Pt(13)
+    r4.font.name = "Times New Roman"
+    r4.font.color.rgb = RGBColor(0, 0, 0)
+
+    p5 = cr.add_paragraph()
+    p5.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    r5 = p5.add_run("Độc lập - Tự do - Hạnh phúc")
+    r5.bold = True
+    r5.font.size = Pt(14)
+    r5.font.name = "Times New Roman"
+    r5.font.color.rgb = RGBColor(0, 0, 0)
+    _underline_para(p5)
+
+    p6 = cr.add_paragraph()
+    p6.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    r6 = p6.add_run(f"Đồng Nai, ngày {ngay_s} tháng {thang_s} năm {nam_s}")
+    r6.italic = True
+    r6.font.size = Pt(13)
+    r6.font.name = "Times New Roman"
+    r6.font.color.rgb = RGBColor(0, 0, 0)
+
+    _p()
+
+    _p(
+        "THÔNG BÁO",
+        bold=True,
+        size=14,
+        align=WD_ALIGN_PARAGRAPH.CENTER,
+        space_after=0,
+        indent_cm=0,
+    )
+    p_ty = _p(
+        f"Kết luận cuộc họp giao ban tháng {thang_fmt}/{nam_bao_cao}",
+        bold=True,
+        size=14,
+        align=WD_ALIGN_PARAGRAPH.CENTER,
+        space_after=0,
+        indent_cm=0,
+    )
+    _underline_para(p_ty)
+
+    _p(
+        f"Tại điểm giao dịch {ten_dgd} xã {ten_xa}",
+        bold=True,
+        size=13,
+        align=WD_ALIGN_PARAGRAPH.CENTER,
+        space_after=6,
+        indent_cm=0,
+    )
+
+    _p(
+        f"Ngày {ngay_s}/{thang_s}/{nam_s}, NHCSXH và các tổ chức CT-XH nhận ủy thác "
+        f"đã tổ chức cuộc họp giao ban tại điểm giao dịch {ten_dgd} xã {ten_xa}. "
+        f"Các thành phần tham gia cuộc họp cùng thống nhất các nội dung sau:",
+        size=14,
+        align=WD_ALIGN_PARAGRAPH.JUSTIFY,
+        indent_cm=1.0,
+    )
+
+    _heading("I", "CHÍNH SÁCH MỚI TRONG THÁNG")
+    if chinh_sach_moi.strip():
+        _p(
+            chinh_sach_moi,
+            size=14,
+            align=WD_ALIGN_PARAGRAPH.JUSTIFY,
+            indent_cm=1.0,
+        )
+    else:
+        _p(
+            "(Không có chính sách mới trong tháng)",
+            italic=True,
+            size=14,
+            indent_cm=1.0,
+        )
+
+    _heading("II", "KẾT QUẢ THỰC HIỆN HOẠT ĐỘNG ỦY THÁC")
+    _p(
+        "1. Kết quả cho vay trong tháng",
+        bold=True,
+        size=14,
+        indent_cm=0,
+        space_after=3,
+    )
+
+    tags = tinh_so_lieu_van_xuoi(df_xa, df_baseline, nam_moc)
+    van_xuoi = (
+        f"Tổng dư nợ đạt {tags['{{tong_du_no}}']} triệu đồng "
+        f"({tags['{{tang_giam_thang}}']} {tags['{{chenh_lech_thang}}']} triệu đồng "
+        f"so với tháng trước), với {tags['{{so_kh}}']} khách hàng còn dư nợ, "
+        f"thông qua {tags['{{so_to}}']} Tổ TK&VV. Trong đó, nợ quá hạn "
+        f"{tags['{{du_no_qh}}']} triệu đồng, tỷ lệ {tags['{{ty_le_nqh}}']}%; "
+        f"nợ khoanh {tags['{{du_no_khoanh}}']} triệu đồng, tỷ lệ "
+        f"{tags['{{ty_le_khoanh}}']}%. Số dư tiền gửi tổ viên đạt "
+        f"{tags['{{tien_gui_105}}']} triệu đồng."
+    )
+    _p(van_xuoi, size=14, align=WD_ALIGN_PARAGRAPH.JUSTIFY, indent_cm=1.0)
+    _p(
+        "Đơn vị tính: tổ, khách hàng, triệu đồng, %",
+        italic=True,
+        size=11,
+        indent_cm=0,
+    )
+
+    tao_bang_dvut(doc, df_xa)
+    _patch_font(doc.tables[-1], size=11)
+
+    _p(
+        "Biểu chi tiết kết quả giao dịch kèm theo.",
+        italic=True,
+        size=12,
+        indent_cm=0,
+    )
+
+    _p(
+        "2. Tồn tại, hạn chế",
+        bold=True,
+        size=14,
+        indent_cm=0,
+        space_after=3,
+    )
+    if ton_tai_han_che.strip():
+        _p(
+            ton_tai_han_che,
+            size=14,
+            align=WD_ALIGN_PARAGRAPH.JUSTIFY,
+            indent_cm=1.0,
+        )
+    else:
+        _p("(Không có)", italic=True, size=14, indent_cm=1.0)
+
+    _heading("III", "NHIỆM VỤ THÁNG TIẾP THEO")
+    _p(
+        "1. Kế hoạch thu nợ, giải ngân",
+        bold=True,
+        size=14,
+        indent_cm=0,
+        space_after=3,
+    )
+
+    tao_bang_ke_hoach(doc, df_xa, giai_ngan_input=None)
+    _patch_font(doc.tables[-1], size=11)
+
+    _p(
+        "(Danh sách nợ đến hạn kèm theo)",
+        italic=True,
+        size=12,
+        indent_cm=0,
+    )
+
+    _p(
+        "2. Kế hoạch kiểm tra, giám sát",
+        bold=True,
+        size=14,
+        indent_cm=0,
+        space_after=3,
+    )
+    _p(
+        "3. Kế hoạch đôn đốc, xử lý nợ xấu",
+        bold=True,
+        size=14,
+        indent_cm=0,
+        space_after=3,
+    )
+    _p(
+        "4. Kế hoạch triển khai các nội dung khác (nếu có)",
+        bold=True,
+        size=14,
+        indent_cm=0,
+        space_after=3,
+    )
+    if nhiem_vu_tiep.strip():
+        _p(
+            nhiem_vu_tiep,
+            size=14,
+            align=WD_ALIGN_PARAGRAPH.JUSTIFY,
+            indent_cm=1.0,
+        )
+
+    _p()
+
+    tbl_f = doc.add_table(rows=1, cols=2)
+    _no_border(tbl_f)
+    fl, fr = tbl_f.rows[0].cells
+    _cell_w(fl, 9.0)
+    _cell_w(fr, 8.0)
+
+    p_nn = fl.paragraphs[0]
+    r_nn = p_nn.add_run("Nơi nhận:")
+    r_nn.bold = True
+    r_nn.font.size = Pt(12)
+    r_nn.font.name = "Times New Roman"
+    r_nn.font.color.rgb = RGBColor(0, 0, 0)
+    for dong in (
+        "- Đảng ủy, UBND xã (để b/c);",
+        "- Các tổ chức CT-XH nhận ủy thác;",
+        "- Ban Giám đốc, Tổ trưởng Tổ KH-NV;",
+        "- Lưu: VT, CBTD.",
+    ):
+        p_ln = fl.add_paragraph()
+        r_ln = p_ln.add_run(dong)
+        r_ln.font.size = Pt(11)
+        r_ln.font.name = "Times New Roman"
+        r_ln.font.color.rgb = RGBColor(0, 0, 0)
+
+    p_gd = fr.paragraphs[0]
+    p_gd.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    chuc_danh_ky = (chuc_danh or "GIÁM ĐỐC").upper()
+    r_gd = p_gd.add_run(chuc_danh_ky)
+    r_gd.bold = True
+    r_gd.font.size = Pt(14)
+    r_gd.font.name = "Times New Roman"
+    r_gd.font.color.rgb = RGBColor(0, 0, 0)
+
+    p_kt = fr.add_paragraph()
+    p_kt.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    nguoi_ky_text = f"({nguoi_ky})" if nguoi_ky else "(Ký tên, đóng dấu)"
+    r_kt = p_kt.add_run(nguoi_ky_text)
+    r_kt.italic = True
+    r_kt.font.size = Pt(13)
+    r_kt.font.name = "Times New Roman"
+    r_kt.font.color.rgb = RGBColor(0, 0, 0)
+
+    for _ in range(3):
+        p_sp = fr.add_paragraph()
+        p_sp.alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+    p_ht = fr.add_paragraph()
+    p_ht.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    r_ht = p_ht.add_run(ten_pgd_hd)
+    r_ht.bold = True
+    r_ht.font.size = Pt(14)
+    r_ht.font.name = "Times New Roman"
+    r_ht.font.color.rgb = RGBColor(0, 0, 0)
+
+    buf = BytesIO()
+    doc.save(buf)
+    buf.seek(0)
+    return buf.getvalue()
+
+
+def xuat_bien_ban_giao_ban(
+    df_xa: pd.DataFrame,
+    df_baseline: pd.DataFrame | None,
+    nam_moc: int,
+    template_path: str,
+    giai_ngan_input: dict | None = None,
+) -> bytes:
+    """
+    Trả về bytes file .docx đã điền đầy đủ.
+    Gọi từ ws_operation hoặc ws_management.
+    """
+    import io
+
+    from docx import Document as _Doc
+
+    doc = _Doc(template_path)
+    tag_values = tinh_so_lieu_van_xuoi(df_xa, df_baseline, nam_moc)
+
+    for para in doc.paragraphs:
+        for tag, val in tag_values.items():
+            if tag in para.text:
+                for run in para.runs:
+                    if tag in run.text:
+                        run.text = run.text.replace(tag, val)
+
+    BANG_FUNCS = {
+        "{{bang_dvut}}": lambda p: tao_bang_dvut(doc, df_xa),
+        "{{bang_chuong_trinh}}": lambda p: tao_bang_chuong_trinh(
+            doc, df_xa, df_baseline, nam_moc
+        ),
+        "{{bang_ke_hoach}}": lambda p: tao_bang_ke_hoach(doc, df_xa, giai_ngan_input),
+    }
+    for para in doc.paragraphs:
+        for tag, fn in BANG_FUNCS.items():
+            if tag in para.text:
+                fn(para)
+                p = para._element
+                p.getparent().remove(p)
+                break
+
+    buf = io.BytesIO()
+    doc.save(buf)
+    buf.seek(0)
+    return buf.getvalue()

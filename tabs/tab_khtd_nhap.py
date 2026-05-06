@@ -832,6 +832,23 @@ def _tab_khtd_theo_xa(role: str, username: str, df_full: "pd.DataFrame | None") 
         st.warning(f"Chưa có danh sách xã cho **{pgd_chon}**.")
         return
 
+    # ── Thư mục lưu PDF ────────────────────────────────────────────────────
+    st.session_state.setdefault("khtd_pdf_folder", "")
+    col_path, col_btn = st.columns([3, 1])
+    with col_path:
+        pdf_folder = st.text_input(
+            "📁 Thư mục lưu PDF",
+            value=st.session_state["khtd_pdf_folder"],
+            placeholder="C:\\KHTD_PDF\\ hoặc /home/user/khtd_pdf/",
+            help="Để trống nếu muốn tải về thay vì lưu file",
+            key="khtd_pdf_folder_input"
+        )
+        st.session_state["khtd_pdf_folder"] = pdf_folder
+    
+    with col_btn:
+        st.markdown("<br>", unsafe_allow_html=True)
+        xuat_pdf_clicked = st.button("🖨️ Xuất PDF", use_container_width=True)
+
     # ── Upload Excel hàng loạt ────────────────────────────────────────────
     with st.expander("📤 Upload Excel kế hoạch hàng loạt", expanded=False):
         st.caption(
@@ -1042,6 +1059,72 @@ def _tab_khtd_theo_xa(role: str, username: str, df_full: "pd.DataFrame | None") 
                     f"{txt_th_dp}</div>",
                     unsafe_allow_html=True,
                 )
+
+        # ── Xuất PDF nếu được yêu cầu ──────────────────────────────────────
+        if xuat_pdf_clicked:
+            # Tạo DataFrame cho PDF
+            pdf_data = []
+            stt = 1
+            
+            for tieu_de_nhom, ds_ma_ct in KHTD_CN_NHOM_MA_CT:
+                for ma_ct in ds_ma_ct:
+                    mk_tw = f"{ma_ct}_TW"
+                    mk_dp = f"{ma_ct}_DP"
+                    khoa_tw = f"{xa_chon}|{mk_tw}"
+                    khoa_dp = f"{xa_chon}|{mk_dp}"
+                    
+                    # Lấy giá trị kế hoạch (triệu đồng)
+                    kh_tw = float(gia_tri_moi.get(khoa_tw, kh_xa.get(khoa_tw, 0.0))) / 1_000_000
+                    kh_dp = float(gia_tri_moi.get(khoa_dp, kh_xa.get(khoa_dp, 0.0))) / 1_000_000
+                    
+                    # Chỉ thêm vào PDF nếu có kế hoạch TW hoặc ĐP
+                    if kh_tw > 0 or kh_dp > 0:
+                        ten_ct = _ten_ct_base(ma_ct, ten_map_q)
+                        pdf_data.append({
+                            "STT": stt,
+                            "Chương trình": ten_ct,
+                            "KH TW (triệu đ)": fmt(kh_tw) if kh_tw > 0 else "—",
+                            "KH ĐP (triệu đ)": fmt(kh_dp) if kh_dp > 0 else "—"
+                        })
+                        stt += 1
+            
+            if pdf_data:
+                df_pdf = pd.DataFrame(pdf_data)
+                ngay_hien_tai = datetime.now().strftime("%d/%m/%Y")
+                tieu_de = f"KẾ HOẠCH TÍN DỤNG - XÃ {xa_chon.upper()}"
+                tieu_de_phu = f"PGD {pgd_chon} - Ngày {ngay_hien_tai}"
+                
+                try:
+                    pdf_bytes = xuat_pdf_bang(
+                        df_pdf,
+                        tieu_de,
+                        tieu_de_phu,
+                        nguoi_xuat=username,
+                        cols_tien=["KH TW (triệu đ)", "KH ĐP (triệu đ)"],
+                        prefix_file="KHTD"
+                    )
+                    
+                    # Option A: Lưu vào thư mục nếu có đường dẫn hợp lệ
+                    if pdf_folder and os.path.exists(pdf_folder):
+                        ten_file = f"KHTD_{xa_chon}_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf"
+                        duong_dan_file = os.path.join(pdf_folder, ten_file)
+                        with open(duong_dan_file, "wb") as f:
+                            f.write(pdf_bytes)
+                        st.success(f"✅ Đã lưu PDF: {duong_dan_file}")
+                    
+                    # Option B: Download button fallback
+                    st.download_button(
+                        label="⬇️ Tải PDF về máy",
+                        data=pdf_bytes,
+                        file_name=f"KHTD_{xa_chon}_{datetime.now().strftime('%Y%m%d')}.pdf",
+                        mime="application/pdf",
+                        key=f"download_pdf_{xa_chon}"
+                    )
+                    
+                except Exception as e:
+                    st.error(f"Lỗi xuất PDF: {e}")
+            else:
+                st.warning("Không có dữ liệu kế hoạch để xuất PDF")
 
         if st.form_submit_button("💾 Lưu kế hoạch xã này", type="primary"):
             for khoa, gia_tri_trieu in gia_tri_moi.items():

@@ -300,6 +300,8 @@ COT_TEN_VC        = "Họ tên vợ/chồng"   # tên vợ / chồng
 # ── Cột phân tích rủi ro & hoạt động ─────────────────────────────────────────
 # Lãi tồn trong hạn — dùng để phát hiện "3 tháng không hoạt động"
 COT_LAI_TON    = "Lãi tồn TH"
+COT_LAI_TON_QH = "Lãi tồn QH"          # Lãi tồn quá hạn
+COT_SO_DU_TG   = "Số dư tiền gửi 105"   # Số dư tiền gửi tiết kiệm TK105
 # Lãi dự thu trong tháng — đại diện cho lãi 1 tháng của món vay
 COT_LAI_THANG  = "Lãi DT trong tháng"
 # Đơn vị ủy thác (Hội Phụ nữ / Nông dân / CCB / Thanh niên)

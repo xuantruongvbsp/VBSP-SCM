@@ -38,6 +38,7 @@ from tabs import (
     tab_candoi, tab_cbtd, tab_khtd, tab_kehoach,
     tab_nhiem_vu, tab_cdtotkvv, tab_khtd_giao_dc, tab_kiem_soat,
     tab_ban_dai_dien,
+    tab_uy_thac,
 )
 from tabs import tab_upload_khnv
 from tabs import tab_quan_ly_dgd
@@ -435,6 +436,7 @@ def render(**kwargs):
         "👔 Quản lý CBTD", "📍 Điểm Giao Dịch", "🏘️ Mạng lưới Tổ TK&VV", "🚨 Cảnh báo sớm",
         "✅ Nhiệm vụ",
         "🏛️ Ban Đại Diện",
+        "🤝 Ủy thác",
     ]
     
     # Chỉ admin/manager mới thấy tab Quản lý Template
@@ -460,9 +462,10 @@ def render(**kwargs):
         _render_canh_bao(df_full, ds_pgd_all)
     tab_nhiem_vu.render(tabs[11], **kwargs)
     tab_ban_dai_dien.render(tabs[12], cap="tinh", **kwargs)
+    tab_uy_thac.render(tabs[13], **kwargs)
     if role in ["admin", "manager"]:
-        with tabs[13]:
+        with tabs[14]:
             _render_quan_ly_template(df_full)
-        tab_upload_khnv.render(tabs[14], **kwargs)
+        tab_upload_khnv.render(tabs[15], **kwargs)
     else:
-        tab_upload_khnv.render(tabs[13], **kwargs)
+        tab_upload_khnv.render(tabs[14], **kwargs)

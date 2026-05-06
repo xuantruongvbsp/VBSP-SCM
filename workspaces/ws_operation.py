@@ -45,6 +45,7 @@ from tabs import (
     tab_baocao,
     tab_nq11,
     tab_candoi,
+    tab_uy_thac,
 )
 
 
@@ -775,6 +776,7 @@ def render(**kwargs):
         "📤 Upload Dữ liệu",
         "📋 Mẫu 07 Giao KH",
         "🏛️ Ban Đại Diện",
+        "🤝 Ủy thác",
     ]
     # Lazy render: chỉ chạy nội dung tab đang mở (cần key + on_change="rerun";
     # nhãn tab hiện tại: st.session_state["ws_op_active_tab"]).
@@ -819,6 +821,7 @@ def render(**kwargs):
         lambda: tab_upload_pgd.render(tabs_op[13], **kwargs),
         lambda: tab_khtd_mau07.render(tabs_op[14], **kwargs),
         lambda: tab_ban_dai_dien.render(tabs_op[15], cap="xa", **kwargs),
+        lambda: tab_uy_thac.render(tabs_op[16], **kwargs),
     )
     assert len(tab_names_op) == len(_tab_renderers), (
         "tab_names_op và _tab_renderers phải cùng số phần tử"

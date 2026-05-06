@@ -38,12 +38,13 @@ for ma_pgd, ten_pgd in MA_PGD_MAP.items():
     username = f"admin_{slug}"
     
     existing = conn.execute(
-        "SELECT id FROM users WHERE username=?", (username,)
+        "SELECT username FROM users WHERE username=?", (username,)
     ).fetchone()
     
+    # Xóa user cũ nếu tồn tại (để cập nhật password mới)
     if existing:
-        print(f"⚠️  Đã tồn tại: {username}")
-        continue
+        conn.execute("DELETE FROM users WHERE username=?", (username,))
+        print(f"🗑️  Xóa user cũ: {username}")
     
     conn.execute(
         """INSERT INTO users 

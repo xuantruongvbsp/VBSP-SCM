@@ -570,7 +570,9 @@ def render(tab: DeltaGenerator, **kwargs) -> None:
     pgd_user = kwargs.get("pgd_user", "")
 
     with tab:
-        if role not in ("admin", "manager", "user"):
+        if role not in ("admin", "manager", "user",
+                        "admin_cn", "manager_cn",
+                        "admin_pgd", "manager_pgd", "user_pgd"):
             st.error("Bạn không có quyền truy cập trang này.")
             return
 

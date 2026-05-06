@@ -30,7 +30,7 @@ from data.pgd import (
 )
 from utils import lay_config
 import auth
-from auth import LOGO_NHCSXH_B64 as LOGO_B64
+from auth import LOGO_NHCSXH_B64 as LOGO_B64, normalize_role
 from workspaces import ws_executive, ws_management, ws_operation
 import db
 from widgets.status_widget import render_status_compact
@@ -365,6 +365,9 @@ def main():
     role      = user_info["role"]
     pgd_user  = user_info.get("pgd")
     username  = st.session_state.username
+
+    # Chuẩn hóa role về dạng mới (backward-compatible)
+    role = normalize_role(role)
 
     # Workspace mặc định theo role
     WS_DEFAULT = {

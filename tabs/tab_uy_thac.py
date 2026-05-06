@@ -18,6 +18,10 @@ from config import (
     TEN_CHI_NHANH_HIEN_THI,
 )
 from utils import fmt, fmt_so, xuat_excel
+from services.template_service import (
+    co_template, dien_template, nut_tai_word_va_pdf,
+    TMPL_MAU06, TMPL_MAU06A, TMPL_MAU15, TMPL_MAU16, TMPL_KH_KT
+)
 
 # ── Hằng số ──────────────────────────────────────────────────────────────────
 DVUT_ORDER = [
@@ -619,23 +623,38 @@ def _render_ke_hoach(df: pd.DataFrame, pgd_user: str) -> None:
         submitted = st.form_submit_button("📄 Tạo Word")
 
     if submitted:
-        du_lieu = dict(
-            don_vi_kt=don_vi_kt, so_vb=so_vb, dia_danh=dia_danh,
-            nam_kh=int(nam_kh), ngay_ky=ngay_ky,
-            muc_dich=muc_dich, yeu_cau=yeu_cau,
-            noi_dung_kt=noi_dung_kt, thanh_phan=thanh_phan,
-            noi_dung_gs=noi_dung_gs, phan_cong_gs=phan_cong_gs,
-            to_chuc=to_chuc, chu_tich=chu_tich,
-        )
-        with st.spinner("Đang tạo file..."):
-            docx_bytes = _tao_word_ke_hoach(du_lieu, ds_to)
-        ten_file = (f"KH_KiemTra_UyThac_{int(nam_kh)}_"
-                    f"{don_vi_kt[:20].replace(' ','_')}.docx")
-        st.download_button("⬇️ Tải Word (.docx)", data=docx_bytes,
-                           file_name=ten_file,
-                           mime="application/vnd.openxmlformats-officedocument"
-                                ".wordprocessingml.document",
-                           key="kh_dl_docx")
+        # Build context cho template Kế hoạch kiểm tra
+        context = {
+            "don_vi_kt":   don_vi_kt,
+            "so_vb":       so_vb,
+            "dia_danh":    dia_danh,
+            "nam_kh":      int(nam_kh),
+            "ngay_ky":     ngay_ky.strftime("%d/%m/%Y"),
+            "ngay":        ngay_ky.day,
+            "thang":       ngay_ky.month,
+            "nam":         ngay_ky.year,
+            "muc_dich":    muc_dich,
+            "yeu_cau":     yeu_cau,
+            "noi_dung_kt": noi_dung_kt,
+            "thanh_phan":  thanh_phan,
+            "noi_dung_gs": noi_dung_gs,
+            "phan_cong_gs": phan_cong_gs,
+            "to_chuc":     to_chuc,
+            "chu_tich":    chu_tich,
+            "so_to":       len(ds_to),
+            "ds_to":       ds_to,
+        }
+
+        if co_template(TMPL_KH_KT):
+            with st.spinner("Đang tạo file..."):
+                docx_bytes = dien_template(TMPL_KH_KT, context)
+            ten_file = f"KH_KiemTra_UyThac_{int(nam_kh)}_{don_vi_kt[:20].replace(' ','_')}"
+            nut_tai_word_va_pdf(docx_bytes, ten_file, "kh")
+        else:
+            st.warning(
+                f"⚠️ Chưa có template '{TMPL_KH_KT}' trong thư mục templates/. "
+                f"Vui lòng upload file Word mẫu chuẩn vào thư mục này."
+            )
 
 
 def _render_mau06(df: pd.DataFrame, pgd_user: str) -> None:
@@ -721,34 +740,50 @@ def _render_mau06(df: pd.DataFrame, pgd_user: str) -> None:
         if COT_LAI_TON in df_xuat.columns and COT_LAI_TON_QH in df_xuat.columns:
             df_xuat["Nợ lãi"] = (df_xuat[COT_LAI_TON].fillna(0) +
                                   df_xuat[COT_LAI_TON_QH].fillna(0))
-        du_lieu = dict(
-            don_vi_kt=don_vi_kt, ten_xa=ten_xa, ten_to=ten_to,
-            can_bo_1=can_bo_1, chuc_vu_1=chuc_vu_1,
-            can_bo_2=can_bo_2, chuc_vu_2="",
-            dia_ban=dia_ban, ngay_kt=ngay_kt,
-        )
-        loai = "06" if "06/TD" in loai_mau else "06A"
-        with st.spinner("Đang tạo file..."):
-            docx_bytes = _tao_word_mau06(du_lieu, df_xuat, loai=loai)
-        ten_file = (f"Mau{loai}TD_{pgd_user}_"
-                    f"{ngay_kt.strftime('%d%m%Y')}.docx")
-        st.download_button(
-            f"⬇️ Tải Word Mẫu {loai}/TD",
-            data=docx_bytes, file_name=ten_file,
-            mime="application/vnd.openxmlformats-officedocument"
-                 ".wordprocessingml.document",
-            key="m06_dl_docx",
-        )
-        # Xuất Excel kèm theo
-        buf = xuat_excel({"Mau06TD": df_xuat})
-        st.download_button(
-            "⬇️ Xuất Excel (danh sách)",
-            data=buf,
-            file_name=f"DS_Mau06_{pgd_user}_{ngay_kt.strftime('%d%m%Y')}.xlsx",
-            mime="application/vnd.openxmlformats-officedocument"
-                 ".spreadsheetml.sheet",
-            key="m06_dl_excel",
-        )
+        # Build context cho template
+        ds_kh = []
+        for i, (_, row) in enumerate(df_xuat.iterrows(), 1):
+            ds_kh.append({
+                "stt":      i,
+                "ten_kh":  str(row.get(COT_TEN_KH, "")),
+                "so_ku":   str(row.get(COT_SO_KU, "")),
+                "ten_ct":  str(row.get(COT_TEN_CT, "")),
+                "muc_vay": fmt(row.get(COT_MUC_VAY, 0)),
+                "du_no":   fmt(row.get(COT_TONG_DU_NO, 0)),
+                "muc_dich": str(row.get("Mục đích sử dụng vốn vay", "")),
+                "no_lai":  fmt(row.get("Nợ lãi", 0)),
+            })
+        context = {
+            "don_vi_kt":   don_vi_kt,
+            "ten_xa":      ten_xa,
+            "ten_to":      ten_to,
+            "can_bo_1":    can_bo_1,
+            "chuc_vu_1":   chuc_vu_1,
+            "can_bo_2":    can_bo_2,
+            "dia_ban":     dia_ban,
+            "ngay_kt":     ngay_kt.strftime("%d/%m/%Y"),
+            "ngay":        ngay_kt.day,
+            "thang":       ngay_kt.month,
+            "nam":         ngay_kt.year,
+            "so_kh_kt":    len(df_xuat),
+            "ds_kh":       ds_kh,
+            "tong_muc_vay": fmt(df_xuat[COT_MUC_VAY].sum()
+                               if COT_MUC_VAY in df_xuat.columns else 0),
+            "tong_du_no":  fmt(df_xuat[COT_TONG_DU_NO].sum()
+                               if COT_TONG_DU_NO in df_xuat.columns else 0),
+        }
+        tmpl = TMPL_MAU06 if "06/TD" in loai_mau else TMPL_MAU06A
+
+        if co_template(tmpl):
+            with st.spinner("Đang tạo file..."):
+                docx_bytes = dien_template(tmpl, context)
+            ten_file = f"Mau06TD_{pgd_user}_{ngay_kt.strftime('%d%m%Y')}"
+            nut_tai_word_va_pdf(docx_bytes, ten_file, "m06")
+        else:
+            st.warning(
+                f"⚠️ Chưa có template '{tmpl}' trong thư mục templates/. "
+                f"Vui lòng upload file Word mẫu chuẩn vào thư mục này."
+            )
 
 
 def _render_mau15(df: pd.DataFrame, pgd_user: str) -> None:
@@ -840,32 +875,47 @@ def _render_mau15(df: pd.DataFrame, pgd_user: str) -> None:
         submitted = st.form_submit_button("📄 Tạo Word")
 
     if submitted:
-        du_lieu = dict(
-            pgd=pgd, ten_xa=ten_xa, to_truong=to_truong,
-            ma_to=ma_to, dia_chi=dia_chi,
-            can_bo_kt=can_bo_kt, ngay_chot=ngay_chot,
-        )
-        with st.spinner("Đang tạo file..."):
-            docx_bytes = _tao_word_mau15(du_lieu, df_to)
-        ten_file = (f"Mau15TD_{chon_to.replace(' ','_')}_"
-                    f"{ngay_chot.strftime('%d%m%Y')}.docx")
-        st.download_button(
-            "⬇️ Tải Word Mẫu 15/TD", data=docx_bytes,
-            file_name=ten_file,
-            mime="application/vnd.openxmlformats-officedocument"
-                 ".wordprocessingml.document",
-            key="m15_dl_docx",
-        )
-        buf = xuat_excel({"Mau15TD": df_to})
-        st.download_button(
-            "⬇️ Xuất Excel",
-            data=buf,
-            file_name=f"DS_Mau15_{chon_to.replace(' ','_')}"
-                      f"_{ngay_chot.strftime('%d%m%Y')}.xlsx",
-            mime="application/vnd.openxmlformats-officedocument"
-                 ".spreadsheetml.sheet",
-            key="m15_dl_excel",
-        )
+        # Build context cho template Mẫu 15/TD
+        context = {
+            "pgd":         pgd,
+            "ten_xa":      ten_xa,
+            "ten_to":      chon_to,
+            "to_truong":   to_truong,
+            "ma_to":       ma_to,
+            "dia_chi":     dia_chi,
+            "can_bo_kt":   can_bo_kt,
+            "ngay_chot":   ngay_chot.strftime("%d/%m/%Y"),
+            "ngay":        ngay_chot.day,
+            "thang":       ngay_chot.month,
+            "nam":         ngay_chot.year,
+            "tong_du_no":  fmt(tong_goc),
+            "tong_lai":    fmt(tong_lai),
+            "tong_tg":     fmt(tong_tg),
+            "so_kh":       len(df_to),
+            "ds_kh": [
+                {
+                    "stt":    i,
+                    "ten_kh": str(row.get(COT_TEN_KH, "")),
+                    "ten_ct": str(row.get(COT_TEN_CT, "")),
+                    "so_ku":  str(row.get(COT_SO_KU, "")),
+                    "du_no":  fmt(row.get(COT_TONG_DU_NO, 0)),
+                    "lai":    fmt(row.get("Nợ lãi", 0)),
+                    "tg":     fmt(row.get(COT_SO_DU_TG, 0)),
+                }
+                for i, (_, row) in enumerate(df_to.iterrows(), 1)
+            ],
+        }
+
+        if co_template(TMPL_MAU15):
+            with st.spinner("Đang tạo file..."):
+                docx_bytes = dien_template(TMPL_MAU15, context)
+            ten_file = f"Mau15TD_{chon_to.replace(' ','_')}_{ngay_chot.strftime('%d%m%Y')}"
+            nut_tai_word_va_pdf(docx_bytes, ten_file, "m15")
+        else:
+            st.warning(
+                f"⚠️ Chưa có template '{TMPL_MAU15}' trong thư mục templates/. "
+                f"Vui lòng upload file Word mẫu chuẩn vào thư mục này."
+            )
 
 
 # ══════════════════════════════════════════════════════════════════════════════

@@ -65,6 +65,27 @@ def docx_to_pdf(docx_bytes: bytes) -> bytes | None:
         return None
 
 
+def docx_bytes_to_pdf(docx_bytes: bytes) -> bytes | None:
+    """Convert .docx bytes → .pdf bytes dùng MS Word (Windows)."""
+    try:
+        from docx2pdf import convert
+        import tempfile, os
+        with tempfile.TemporaryDirectory() as tmp:
+            inp = os.path.join(tmp, "input.docx")
+            out = os.path.join(tmp, "input.pdf")
+            with open(inp, "wb") as f:
+                f.write(docx_bytes)
+            convert(inp, out)
+            if os.path.exists(out):
+                with open(out, "rb") as f:
+                    return f.read()
+        return None
+    except Exception as e:
+        import logging
+        logging.warning(f"docx_to_pdf failed: {e}")
+        return None
+
+
 def nut_tai_word_va_pdf(
     docx_bytes: bytes,
     ten_file_goc: str,

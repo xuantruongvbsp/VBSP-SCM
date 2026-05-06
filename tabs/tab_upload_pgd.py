@@ -28,6 +28,7 @@ from services.upload_service import (
     lay_meta_chat_luong,
     luu_pgd_file,
 )
+from auth import co_quyen_upload_pgd
 # data_priority_service và _render_upload_hang_loat đã được tách ra
 # theo kiến trúc 2 luồng độc lập (xem HUONG_DAN_NGUON_DU_LIEU.md)
 
@@ -371,6 +372,11 @@ def render(tab=None, **kwargs) -> None:
     username = kwargs.get("username", "unknown")
     pgd_user = kwargs.get("pgd_user", "")
 
+    # Kiểm tra quyền upload
+    if not co_quyen_upload_pgd(role):
+        st.warning("⚠️ Bạn không có quyền upload.")
+        return
+
     ctx = tab if tab is not None else st
 
     with ctx:
@@ -402,13 +408,22 @@ def render(tab=None, **kwargs) -> None:
         st.divider()
         # Form upload riêng cho phân hệ Hỗ trợ địa bàn
         # Không dùng form của KH-NV — 2 luồng độc lập
-        if role == "user":
+        # Phân hệ PGD (admin_pgd, manager_pgd, user_pgd) chỉ upload cho PGD của mình
+        if role in ["admin_pgd", "manager_pgd", "user_pgd"]:
+            ten_dv = pgd_user or ""
+            if ten_dv:
+                st.info(f"📍 Đơn vị upload: **{pgd_user}**")
+                _render_upload_form(ten_dv, "pgd_op", username)
+            else:
+                st.warning("⚠️ Không xác định được PGD. Liên hệ Admin.")
+        elif role == "user":
             ten_dv = pgd_user or ""
             if ten_dv:
                 _render_upload_form(ten_dv, "pgd_op", username)
             else:
                 st.warning("⚠️ Không xác định được PGD. Liên hệ Admin.")
         else:
+            # admin_cn, admin được chọn tự do
             ten_dv = st.selectbox(
                 "🏢 Chọn PGD cần upload",
                 DS_DON_VI,

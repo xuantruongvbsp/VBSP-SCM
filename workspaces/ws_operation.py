@@ -18,6 +18,7 @@ from config import (
     COT_LAI_TON, COT_LAI_THANG, COT_DVUT,
     TEMPLATES_DIR, TAG_MAP,
 )
+from auth import co_quyen_upload_pgd
 from data import danh_dau_khong_hd, tong_hop_khong_hd, ds_chi_tiet_khong_hd
 from utils import (
     fmt,
@@ -778,6 +779,10 @@ def render(**kwargs):
         "🏛️ Ban Đại Diện",
         "🤝 Ủy thác",
     ]
+    # Thêm tab Upload HSTD cho admin_pgd/manager_pgd
+    if co_quyen_upload_pgd(role):
+        tab_names_op.append("📤 Upload HSTD")
+
     # Lazy render: chỉ chạy nội dung tab đang mở (cần key + on_change="rerun";
     # nhãn tab hiện tại: st.session_state["ws_op_active_tab"]).
     tabs_op = st.tabs(tab_names_op, key="ws_op_active_tab", on_change="rerun")
@@ -807,7 +812,7 @@ def render(**kwargs):
     else:
         df_pgd = df
     _pgd_df_kwargs = {**kwargs, "df": df_pgd, "df_full": df_pgd}
-    _tab_renderers = (
+    _tab_renderers = [
         lambda: tab_tongquan.render(tabs_op[0], **_pgd_df_kwargs),
         lambda: tab_baocao.render(tabs_op[1], **_pgd_df_kwargs),
         lambda: tab_nq11.render(tabs_op[2], **_pgd_df_kwargs),
@@ -827,7 +832,14 @@ def render(**kwargs):
         lambda: tab_khtd_mau07.render(tabs_op[14], **kwargs),
         lambda: tab_ban_dai_dien.render(tabs_op[15], cap="xa", **kwargs),
         lambda: tab_uy_thac.render(tabs_op[16], **kwargs),
-    )
+    ]
+
+    # Thêm renderer cho tab Upload HSTD nếu có quyền
+    if co_quyen_upload_pgd(role):
+        from tabs.tab_upload_pgd import render as render_upload_pgd
+        _tab_renderers.append(lambda: render_upload_pgd(pgd_user=pgd_user, role=role))
+
+    _tab_renderers = tuple(_tab_renderers)
     assert len(tab_names_op) == len(_tab_renderers), (
         "tab_names_op và _tab_renderers phải cùng số phần tử"
     )

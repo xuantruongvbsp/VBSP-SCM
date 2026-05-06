@@ -368,27 +368,30 @@ def main():
 
     # Workspace mặc định theo role
     WS_DEFAULT = {
-        "executive":"executive",
-        "admin":"management", "manager":"management", "user":"operation",
-        # Phân hệ mới
-        "admin_cn":"management", "manager_cn":"management",
-        "admin_pgd":"operation", "manager_pgd":"operation", "user_pgd":"operation",
+        "executive":   "executive",
+        "admin":       "management",
+        "manager":     "management",
+        "user":        "operation",
+        "admin_cn":    "management",
+        "manager_cn":  "management",
+        "admin_pgd":   "operation",
+        "manager_pgd": "operation",
+        "user_pgd":    "operation",
     }
     if st.session_state.workspace is None:
         st.session_state.workspace = WS_DEFAULT.get(role, "operation")
 
     # Workspace được phép dùng
     WS_ALLOWED = {
-        "executive": ["executive"],
-        "admin":     ["executive","management","operation"],
-        "manager":   ["management","operation"],
-        "user":      ["operation"],
-        # Phân hệ mới
-        "admin_cn":  ["executive","management","operation"],
-        "manager_cn":["management","operation"],
-        "admin_pgd": ["management","operation"],
-        "manager_pgd":["operation"],
-        "user_pgd":  ["operation"],
+        "executive":   ["executive"],
+        "admin":       ["executive","management","operation"],
+        "manager":     ["management","operation"],
+        "user":        ["operation"],
+        "admin_cn":    ["executive","management","operation"],
+        "manager_cn":  ["management","operation"],
+        "admin_pgd":   ["operation"],
+        "manager_pgd": ["operation"],
+        "user_pgd":    ["operation"],
     }
     allowed = WS_ALLOWED.get(role, ["operation"])
 
@@ -404,16 +407,15 @@ def main():
         st.markdown("<div style='text-align:center;font-weight:700;font-size:1rem;margin-top:4px'>VBSP-SCM</div>", unsafe_allow_html=True)
         st.divider()
         badge_map = {
-            "executive":  '<span class="role-executive">👑 Ban Giám đốc</span>',
-            "admin":      '<span class="role-admin">⭐ Quản trị viên</span>',
-            "manager":    '<span class="role-manager">🔑 Lãnh đạo KH-NV</span>',
-            "user":       '<span class="role-user">👤 CBTD</span>',
-            # Phân hệ mới
-            "admin_cn":   '<span class="role-admin">⭐ QTV Chi nhánh</span>',
-            "manager_cn": '<span class="role-manager">🔑 Lãnh đạo CN</span>',
-            "admin_pgd":  '<span class="role-admin">⭐ QTV PGD</span>',
-            "manager_pgd":'<span class="role-manager">🔑 Lãnh đạo PGD</span>',
-            "user_pgd":   '<span class="role-user">👤 CBTD PGD</span>',
+            "executive":   '<span class="role-executive">👑 Ban Giám đốc</span>',
+            "admin":       '<span class="role-admin">⭐ Quản trị viên</span>',
+            "manager":     '<span class="role-manager">🔑 Lãnh đạo KH-NV</span>',
+            "user":        '<span class="role-user">👤 CBTD</span>',
+            "admin_cn":    '<span class="role-admin">⭐ Quản trị CN</span>',
+            "manager_cn":  '<span class="role-manager">🔑 Lãnh đạo CN</span>',
+            "admin_pgd":   '<span class="role-admin">⭐ Quản trị PGD</span>',
+            "manager_pgd": '<span class="role-manager">🔑 Lãnh đạo PGD</span>',
+            "user_pgd":    '<span class="role-user">👤 CBTD</span>',
         }
         st.markdown(f"**{ho_ten}**")
         st.markdown(badge_map.get(role,""), unsafe_allow_html=True)

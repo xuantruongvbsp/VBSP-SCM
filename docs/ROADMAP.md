@@ -1,5 +1,5 @@
 # ROADMAP — VBSP-SCM
-> Cập nhật lần cuối: 05/2026
+> Cập nhật lần cuối: 06/05/2026
 
 ---
 
@@ -15,10 +15,18 @@
 | 6 | KHTD theo Xã thêm cột TH TW/ĐP | `tab_khtd.py` | ✅ Xong |
 | 7 | PDF: thêm logo, fix cột, font size | `pdf_service.py` | ✅ Xong |
 | 8 | Cập nhật 3 file .md root | `.md files` | ✅ Xong |
+| 9 | **Hệ thống phân hệ 2 cấp (CN + PGD)** | `auth.py`, `config.py`, `ws_*.py` | ✅ Xong |
+| 10 | **Role mới:** admin_pgd, manager_pgd, user_pgd | `auth.py`, `config.py` | ✅ Xong |
+| 11 | **Tab Ủy thác với 5 sub-tab** | `tab_uy_thac.py` | ✅ Xong |
+| 12 | **Template service dùng docxtpl** | `template_service.py` | ✅ Xong |
+| 13 | **Fix ws_operation Tab Tổng quan lọc PGD** | `ws_operation.py` | ✅ Xong |
+| 14 | **Nhất quán hóa DON_VI_CHI_NHANH** | `config.py` | ✅ Xong |
+| 15 | **Tab Upload HSTD cho admin_pgd** | `ws_operation.py` | ✅ Xong |
+| 16 | **Cập nhật toàn bộ file .md** | `docs/*.md` | ✅ Xong |
 
 ---
 
-## Backlog — Ưu tiên cao
+## Q2/2026 — Backlog ưu tiên cao
 
 | # | Việc | File liên quan | Ghi chú |
 |---|---|---|---|
@@ -26,10 +34,13 @@
 | B2 | Bảng tóm tắt KHTD CN → HTML thuần | `tab_khtd.py` | Mockup đã có |
 | B3 | Thêm chữ ký cuối PDF báo cáo | `pdf_service.py` | Chuẩn ngân hàng |
 | B4 | Dòng tổng cộng cuối bảng PDF | `tab_khtd.py` | Thiếu trong PDF hiện tại |
+| **B5** | **Biên bản kiểm tra sử dụng vốn (tab Ủy thác)** | `tab_uy_thac.py` | Mẫu 06TD |
+| **B6** | **Cảnh báo 3 tháng không hoạt động** | `data/hstd.py`, `ws_operation.py` | Tự động phát hiện |
+| **B7** | **Fix check role cứng trong các tab** | `tabs/*.py` | Dùng `la_phan_he_*()` |
 
 ---
 
-## Backlog — Ưu tiên trung bình
+## Q3/2026 — Backlog trung bình
 
 | # | Việc | File liên quan | Ghi chú |
 |---|---|---|---|
@@ -37,6 +48,9 @@
 | M2 | Export Excel KHTD theo Xã đầy đủ | `tab_khtd.py` | Hiện chỉ có PDF |
 | M3 | Dashboard executive: cập nhật KPI mới | `ws_executive.py` | Sau khi KHTD CN ổn định |
 | M4 | Tìm kiếm toàn văn trong tab Tra cứu | `tab_tracuu.py` | UX cải thiện |
+| **M5** | **Xếp loại HĐT tổng hợp** | `tabs/tab_xep_loai_hdt.py` | Theo tiêu chí NHCSXH |
+| **M6** | **Báo cáo tổng hợp gửi HĐT cấp tỉnh** | `services/report_service.py` | Mẫu chuẩn tỉnh |
+| **M7** | **Tích hợp HĐT điện tử** | `services/hdt_service.py` | Kết nối API HĐT |
 
 ---
 

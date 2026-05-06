@@ -19,7 +19,7 @@ from config import (
 )
 from utils import fmt, fmt_so, xuat_excel
 from services.template_service import (
-    co_template, dien_template, nut_tai_word_va_pdf,
+    co_template, dien_template, nut_tai_word_va_pdf, docx_bytes_to_pdf,
     TMPL_MAU06, TMPL_MAU06A, TMPL_MAU15, TMPL_MAU16, TMPL_KH_KT
 )
 
@@ -649,7 +649,29 @@ def _render_ke_hoach(df: pd.DataFrame, pgd_user: str) -> None:
             with st.spinner("Đang tạo file..."):
                 docx_bytes = dien_template(TMPL_KH_KT, context)
             ten_file = f"KH_KiemTra_UyThac_{int(nam_kh)}_{don_vi_kt[:20].replace(' ','_')}"
-            nut_tai_word_va_pdf(docx_bytes, ten_file, "kh")
+            col1, col2 = st.columns(2)
+            with col1:
+                st.download_button(
+                    "⬇️ Tải Word (.docx)",
+                    data=docx_bytes,
+                    file_name=ten_file + ".docx",
+                    mime="application/vnd.openxmlformats-officedocument"
+                         ".wordprocessingml.document",
+                    key="kh_docx",
+                )
+            with col2:
+                with st.spinner("Đang tạo PDF..."):
+                    pdf_bytes = docx_bytes_to_pdf(docx_bytes)
+                if pdf_bytes:
+                    st.download_button(
+                        "⬇️ Tải PDF",
+                        data=pdf_bytes,
+                        file_name=ten_file + ".pdf",
+                        mime="application/pdf",
+                        key="kh_pdf",
+                    )
+                else:
+                    st.caption("⚠️ PDF không khả dụng — cần MS Word trên server")
         else:
             st.warning(
                 f"⚠️ Chưa có template '{TMPL_KH_KT}' trong thư mục templates/. "
@@ -778,7 +800,29 @@ def _render_mau06(df: pd.DataFrame, pgd_user: str) -> None:
             with st.spinner("Đang tạo file..."):
                 docx_bytes = dien_template(tmpl, context)
             ten_file = f"Mau06TD_{pgd_user}_{ngay_kt.strftime('%d%m%Y')}"
-            nut_tai_word_va_pdf(docx_bytes, ten_file, "m06")
+            col1, col2 = st.columns(2)
+            with col1:
+                st.download_button(
+                    "⬇️ Tải Word (.docx)",
+                    data=docx_bytes,
+                    file_name=ten_file + ".docx",
+                    mime="application/vnd.openxmlformats-officedocument"
+                         ".wordprocessingml.document",
+                    key="m06_docx",
+                )
+            with col2:
+                with st.spinner("Đang tạo PDF..."):
+                    pdf_bytes = docx_bytes_to_pdf(docx_bytes)
+                if pdf_bytes:
+                    st.download_button(
+                        "⬇️ Tải PDF",
+                        data=pdf_bytes,
+                        file_name=ten_file + ".pdf",
+                        mime="application/pdf",
+                        key="m06_pdf",
+                    )
+                else:
+                    st.caption("⚠️ PDF không khả dụng — cần MS Word trên server")
         else:
             st.warning(
                 f"⚠️ Chưa có template '{tmpl}' trong thư mục templates/. "
@@ -910,7 +954,29 @@ def _render_mau15(df: pd.DataFrame, pgd_user: str) -> None:
             with st.spinner("Đang tạo file..."):
                 docx_bytes = dien_template(TMPL_MAU15, context)
             ten_file = f"Mau15TD_{chon_to.replace(' ','_')}_{ngay_chot.strftime('%d%m%Y')}"
-            nut_tai_word_va_pdf(docx_bytes, ten_file, "m15")
+            col1, col2 = st.columns(2)
+            with col1:
+                st.download_button(
+                    "⬇️ Tải Word (.docx)",
+                    data=docx_bytes,
+                    file_name=ten_file + ".docx",
+                    mime="application/vnd.openxmlformats-officedocument"
+                         ".wordprocessingml.document",
+                    key="m15_docx",
+                )
+            with col2:
+                with st.spinner("Đang tạo PDF..."):
+                    pdf_bytes = docx_bytes_to_pdf(docx_bytes)
+                if pdf_bytes:
+                    st.download_button(
+                        "⬇️ Tải PDF",
+                        data=pdf_bytes,
+                        file_name=ten_file + ".pdf",
+                        mime="application/pdf",
+                        key="m15_pdf",
+                    )
+                else:
+                    st.caption("⚠️ PDF không khả dụng — cần MS Word trên server")
         else:
             st.warning(
                 f"⚠️ Chưa có template '{TMPL_MAU15}' trong thư mục templates/. "

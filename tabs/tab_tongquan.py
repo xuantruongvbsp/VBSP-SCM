@@ -846,9 +846,13 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
             ]
             cot_hien += [c for c in ["Tổng Tổ", "Tốt", "Khá", "TB", "Yếu"] if c in df_pgd.columns]
             cot_hien = [c for c in cot_hien if c in df_pgd.columns]
-            # Loại bỏ dòng DON_VI_CHI_NHANH nếu có (vì DON_VI_CHI_NHANH = Hội sở Chi nhánh tỉnh
-            # là PGD Biên Hòa — đã được tính trong dòng riêng, không tính lại trong tổng)
+            # Tách riêng dòng Hội sở Chi nhánh tỉnh để hiển thị đầu bảng
+            df_hoi_so = df_pgd[df_pgd[COT_TEN_PGD] == DON_VI_CHI_NHANH].copy()
+            # Loại bỏ dòng DON_VI_CHI_NHANH khỏi df_pgd (giữ nguyên logic cũ)
             df_pgd = df_pgd[df_pgd[COT_TEN_PGD] != DON_VI_CHI_NHANH].reset_index(drop=True)
+            # Ghép Hội sở lên đầu bảng nếu có dữ liệu
+            if not df_hoi_so.empty:
+                df_pgd = pd.concat([df_hoi_so, df_pgd], ignore_index=True)
             
             # Xây dựng column_config cho bảng PGD
             column_config_pgd = _tao_column_config_pgd()

@@ -1,6 +1,6 @@
 # AGENTS.md — VBSP-SCM
 > File này là context chính cho Trae AI. Đọc toàn bộ trước khi sinh code.
-> Cập nhật: 05/2026
+> Cập nhật: 06/05/2026
 
 ---
 
@@ -9,8 +9,9 @@
 Hệ thống Quản trị Tín dụng Nội bộ cho **Ngân hàng Chính sách Xã hội Chi nhánh Đồng Nai** (đã sáp nhập Bình Phước 2025).
 
 - **Stack:** Streamlit + Python + SQLite
-- **Người dùng:** ~20 users, 4 vai trò: `executive` / `admin` / `manager` / `user`
+- **Người dùng:** ~20 users, 9 vai trò (tương thích cũ + mới)
 - **Phạm vi:** 22 đơn vị (Hội sở + 21 PGD), 95 xã/phường
+- **Phân hệ:** 2 cấp — CN (Chi nhánh) + PGD (Phòng giao dịch)
 - **Chạy:** `streamlit run app.py` → `http://localhost:8501`
 
 ---
@@ -117,9 +118,14 @@ pgd_user = st.session_state["user_info"].get("pgd") # None nếu không phải P
 | Role | Quyền |
 |---|---|
 | `executive` | Chỉ đọc |
-| `admin` | Toàn quyền |
-| `manager` | Upload, nhập KH, giao nhiệm vụ |
-| `user` | Tác nghiệp, chỉ thấy PGD mình |
+| `admin` (= `admin_cn`) | Toàn quyền CN |
+| `manager` (= `manager_cn`) | Upload CN, giao chỉ tiêu |
+| `user` (= `user_pgd`) | Tác nghiệp PGD |
+| `admin_cn` | Quản trị Chi nhánh |
+| `manager_cn` | Lãnh đạo Chi nhánh |
+| `admin_pgd` | Quản trị PGD — upload + quản lý user |
+| `manager_pgd` | Lãnh đạo PGD — upload, nhập KH |
+| `user_pgd` | CBTD PGD — tác nghiệp |
 
 ### 3.7 CSS & UI
 
@@ -192,7 +198,48 @@ PGD địa bàn:
 
 ---
 
-## 7. File tài liệu đầy đủ
+## 7. Quy tắc mới (06/05/2026)
+
+### Quy tắc check role — BẮT BUỘC
+- **KHÔNG dùng:** `role not in ("admin", "manager", "user")`
+- **PHẢI dùng:** Import từ `auth.py`:
+```python
+from auth import la_phan_he_cn, la_phan_he_pgd
+from auth import co_quyen_upload_pgd, co_quyen_quan_ly_user_pgd
+
+# Check phân hệ
+if la_phan_he_cn(role):      # CN roles
+if la_phan_he_pgd(role):     # PGD roles
+
+# Check quyền cụ thể
+if co_quyen_upload_pgd(role):
+if co_quyen_quan_ly_user_pgd(role):
+```
+
+- **Hoặc thêm đủ cả role cũ lẫn mới** nếu check trực tiếp:
+```python
+role not in ("admin","manager","user",
+             "admin_cn","manager_cn",
+             "admin_pgd","manager_pgd","user_pgd")
+```
+
+### Quy tắc tên đơn vị — BẮT BUỘC
+| Constant | Dùng để |
+|---|---|
+| `DON_VI_CHI_NHANH = "Hội sở Chi nhánh tỉnh"` | **Chỉ dùng để lọc df** (khớp cột Tên PGD trong HSTD) |
+| `TEN_CHI_NHANH_HIEN_THI = "Chi nhánh NHCSXH tỉnh Đồng Nai"` | **Chỉ dùng để hiển thị UI** |
+
+**⚠️ KHÔNG hardcode** `"PGD Biên Hòa"` để lọc df — luôn dùng `DON_VI_CHI_NHANH`.
+
+### Quy tắc Template Word — BẮT BUỘC
+- Dùng `services/template_service.py` — không tự render docx
+- File template đặt trong `templates/`
+- Test trước khi dùng: `python test_template.py`
+- Quy ước đặt tên constant: `TMPL_*` trong `template_service.py`
+
+---
+
+## 8. File tài liệu đầy đủ
 
 | File | Nội dung |
 |---|---|
@@ -202,3 +249,6 @@ PGD địa bàn:
 | `CHANGELOG.md` | Lịch sử thay đổi |
 | `ROADMAP.md` | Sprint + backlog |
 | `TROUBLESHOOTING.md` | Xử lý lỗi thường gặp |
+| `ROLES.md` | **Mô tả chi tiết hệ thống role** |
+| `TEMPLATES.md` | **Hướng dẫn quản lý template Word** |
+| `HUONG_DAN_PHAN_HE.md` | **Hướng dẫn sử dụng theo phân hệ** |

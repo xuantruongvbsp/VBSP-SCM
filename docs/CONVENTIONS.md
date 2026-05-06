@@ -1,6 +1,6 @@
 # Conventions — VBSP-SCM
 > Quy ước bắt buộc khi phát triển. Cursor/Windsurf đọc file này trước khi sinh code.
-> Cập nhật lần cuối: 05/2026
+> Cập nhật lần cuối: 06/05/2026
 
 ---
 
@@ -121,14 +121,35 @@ username = st.session_state.get("username", "unknown")
 | Role | Quyền |
 |---|---|
 | `executive` | Chỉ đọc, dashboard vĩ mô |
-| `admin` | Toàn quyền |
-| `manager` | Upload, nhập kế hoạch, giao nhiệm vụ |
-| `user` | Tác nghiệp, chỉ thấy PGD được phân công |
+| `admin` | = `admin_cn` (tương thích ngược) |
+| `manager` | = `manager_cn` (tương thích ngược) |
+| `user` | = `user_pgd` (tương thích ngược) |
+| `admin_cn` | Quản trị Chi nhánh — toàn quyền CN |
+| `manager_cn` | Lãnh đạo CN — upload CN, giao chỉ tiêu |
+| `admin_pgd` | Quản trị PGD — upload + quản lý user PGD |
+| `manager_pgd` | Lãnh đạo PGD — upload, nhập kế hoạch |
+| `user_pgd` | CBTD PGD — tác nghiệp, chỉ thấy PGD mình |
 
 **User chỉ thấy dữ liệu PGD của mình:**
 ```python
-if role == "user" and pgd_user:
+# Dùng hàm từ auth.py để check phân hệ
+from auth import la_phan_he_pgd
+
+if la_phan_he_pgd(role) and pgd_user:
     df = df[df[COT_TEN_PGD] == pgd_user]
+```
+
+**Check quyền upload PGD:**
+```python
+from auth import co_quyen_upload_pgd, co_quyen_quan_ly_user_pgd
+
+if co_quyen_upload_pgd(role):
+    # Hiện form upload
+    pass
+
+if co_quyen_quan_ly_user_pgd(role):
+    # Hiện panel quản lý user
+    pass
 ```
 
 ---
@@ -142,19 +163,64 @@ if role == "user" and pgd_user:
 
 ---
 
-## 8. File QĐ UBND
+## 8. Template Word — docxtpl
+
+### Thư mục
+Template đặt trong `templates/` — file `.docx` mẫu chuẩn NHCSXH.
+
+### Cú pháp placeholder
+| Loại | Cú pháp | Ví dụ |
+|---|---|---|
+| Biến đơn | `{{ten_truong}}` | `{{ten_kh}}`, `{{so_ku}}` |
+| Vòng lặp bảng | `{%tr for item in ds %}...{%tr endfor %}` | Lặp qua danh sách KH |
+| Điều kiện | `{% if condition %}...{% endif %}` | Hiện/ẩn section |
+
+### Quy ước đặt tên template constant
+```python
+# Trong services/template_service.py
+TMPL_MAU06    = "mau_06td.docx"    # Phiếu KT sử dụng vốn
+TMPL_MAU06A   = "mau_06atd.docx"   # Phiếu KT mở rộng
+TMPL_MAU15    = "mau_15td.docx"   # DS đối chiếu số dư
+TMPL_MAU16    = "mau_16td.docx"   # BB kiểm tra Tổ TK&VV
+TMPL_KH_KT    = "ke_hoach_kt.docx" # KH kiểm tra GS ủy thác
+TMPL_BB_XMN   = "bb_xac_minh_no.docx"  # BB xác minh nợ chiếm dụng
+```
+
+### Sử dụng
+```python
+from services.template_service import dien_template, nut_tai_word_va_pdf, TMPL_MAU06
+
+context = {"ten_kh": "Nguyễn Văn A", "so_ku": "12345"}
+docx_bytes = dien_template(TMPL_MAU06, context)
+nut_tai_word_va_pdf(docx_bytes, "Mau06_001", "prefix")
+```
+
+---
+
+## 9. Hằng số tên đơn vị
+
+| Constant | Giá trị | Dùng để |
+|---|---|---|
+| `DON_VI_CHI_NHANH` | `"Hội sở Chi nhánh tỉnh"` | Key nội bộ để lọc DataFrame (khớp cột Tên PGD trong HSTD) |
+| `TEN_CHI_NHANH_HIEN_THI` | `"Chi nhánh NHCSXH tỉnh Đồng Nai"` | Nhãn hiển thị trên UI |
+
+**⚠️ KHÔNG hardcode** `"PGD Biên Hòa"` để lọc df — dùng `DON_VI_CHI_NHANH`.
+
+---
+
+## 10. File QĐ UBND
 
 Lưu có phiên bản — không ghi đè. Dùng hàm trong `data/khtd.py`.
 
 ---
 
-## 9. Không thêm dependency mới
+## 11. Không thêm dependency mới
 
 Kiểm tra `utils.py`, `data/`, `services/` trước. Không dùng `streamlit-aggrid` hay thư viện UI nặng.
 
 ---
 
-## 10. Mẫu prompt Cursor
+## 12. Mẫu prompt Cursor
 
 ```
 [Mô tả task 1-2 câu]
@@ -175,7 +241,7 @@ Tái sử dụng:
 
 ---
 
-## 11. Checklist trước khi commit
+## 13. Checklist trước khi commit
 
 - [ ] Dùng `db.doc_kv()` / `db.ghi_kv()` — không dùng JSON file
 - [ ] Gọi `db.ghi_audit()` sau mọi thao tác ghi
@@ -183,5 +249,7 @@ Tái sử dụng:
 - [ ] Upload đi qua `upload_service.py`
 - [ ] Tiền tệ: nhập triệu → lưu VND → hiển thị `fmt*()`
 - [ ] Metric tỷ đồng chia `/1e12` (không `/1e9`)
-- [ ] Kiểm tra role trước khi cho phép ghi
+- [ ] Kiểm tra role trước khi cho phép ghi (dùng `la_phan_he_cn()`, `la_phan_he_pgd()`)
 - [ ] Không hardcode đường dẫn file
+- [ ] Dùng `DON_VI_CHI_NHANH` để lọc df (không dùng `"PGD Biên Hòa"`)
+- [ ] Đặt template constant `TMPL_*` trong `template_service.py`

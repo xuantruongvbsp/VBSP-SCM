@@ -825,7 +825,7 @@ def render(**kwargs):
         df_pgd = df[df[COT_TEN_PGD] == pgd_filter].copy()
     else:
         df_pgd = df
-    _pgd_df_kwargs = {**kwargs, "df": df_pgd, "df_full": df_pgd}
+    _pgd_df_kwargs = {**kwargs, "df": df_pgd, "df_full": df_pgd, "pgd_filter": pgd_filter}
     _tab_renderers = [
         lambda: tab_tongquan.render(tabs_op[0], **_pgd_df_kwargs),
         lambda: tab_baocao.render(tabs_op[1], **_pgd_df_kwargs),

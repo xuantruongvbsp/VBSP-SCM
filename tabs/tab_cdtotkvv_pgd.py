@@ -28,7 +28,7 @@ from data.cdtotkvv import (
 )
 from data.core import ts_file
 from data.pgd import duong_dan_pgd, luu_file_pgd_voi_lich_su
-from utils import fmt_so, hien_thi_dataframe_phan_trang, ten_file_xuat, xuat_excel
+from utils import fmt, fmt_so, hien_thi_dataframe_phan_trang, ten_file_xuat, xuat_excel
 
 if TYPE_CHECKING:
     from streamlit.delta_generator import DeltaGenerator
@@ -545,6 +545,25 @@ def _sub_xu_huong(pgd_user: str, _username: str) -> None:
         st.info("Cần ít nhất 3 tháng dữ liệu để phát hiện xu hướng.")
 
 
+@st.cache_data(show_spinner=False, ttl=300)
+def _tinh_no_den_han(_df_bytes: bytes, ngay_tu: str, ngay_den: str) -> bytes:
+    import pickle, pandas as pd
+    df = pickle.loads(_df_bytes)
+    from config import COT_NGAY_DH, COT_TEN_TO, COT_DVUT
+    from config import COT_TEN_KH, COT_SO_KU, COT_TEN_CT, COT_TONG_DU_NO
+    cols_can = [COT_TEN_TO, COT_DVUT, COT_TEN_KH,
+                COT_SO_KU, COT_TEN_CT, COT_NGAY_DH, COT_TONG_DU_NO]
+    cols_co  = [c for c in cols_can if c in df.columns]
+    if COT_NGAY_DH not in df.columns:
+        return pickle.dumps(pd.DataFrame())
+    ngay_dh = pd.to_datetime(df[COT_NGAY_DH], errors="coerce")
+    mask    = (ngay_dh >= pd.Timestamp(ngay_tu)) & \
+              (ngay_dh <= pd.Timestamp(ngay_den))
+    result  = df.loc[mask, cols_co].copy()
+    result  = result.sort_values(COT_NGAY_DH)
+    return pickle.dumps(result)
+
+
 def render(tab: DeltaGenerator, **kwargs) -> None:
     role = kwargs.get("role", "user")
     username = kwargs.get("username", "unknown")
@@ -562,11 +581,12 @@ def render(tab: DeltaGenerator, **kwargs) -> None:
         st.subheader(f"🏘️ Tổ TK&VV — {pgd_user}")
         st.caption("Dữ liệu từ file upload riêng của PGD · Độc lập với hệ thống tập trung")
 
-        sub1, sub2, sub3 = st.tabs(
+        sub1, sub2, sub3, sub_ndh = st.tabs(
             [
                 "📤 Upload",
                 "📋 Phân tích Chất lượng",
                 "📈 Xu hướng",
+                "📅 Nợ đến hạn",
             ]
         )
         with sub1:
@@ -575,3 +595,60 @@ def render(tab: DeltaGenerator, **kwargs) -> None:
             _sub_phan_tich(pgd_user, username)
         with sub3:
             _sub_xu_huong(pgd_user, username)
+        with sub_ndh:
+            import pickle
+            from datetime import date, timedelta
+            from config import COT_NGAY_DH, COT_TEN_TO, COT_TONG_DU_NO
+
+            st.markdown("#### 📅 Nợ đến hạn trong 30 ngày tới")
+
+            so_ngay = st.slider("Xem trong", 7, 60, 30,
+                          key="ndh_so_ngay", format="%d ngày")
+            ngay_tu  = date.today()
+            ngay_den = date.today() + timedelta(days=so_ngay)
+            st.caption(
+                f"Từ {ngay_tu.strftime('%d/%m/%Y')} "
+                f"đến {ngay_den.strftime('%d/%m/%Y')}"
+            )
+
+            # Lấy df — đã lọc theo PGD ở cấp ws_operation
+            df_src = kwargs.get("df") if kwargs else None
+            if df_src is None or df_src.empty:
+                st.warning("Chưa có dữ liệu HSTD.")
+            elif COT_NGAY_DH not in df_src.columns:
+                st.warning(f"Không tìm thấy cột ngày đến hạn.")
+            else:
+                try:
+                    raw    = _tinh_no_den_han(
+                                 pickle.dumps(df_src),
+                                 str(ngay_tu), str(ngay_den))
+                    df_ndh = pickle.loads(raw)
+                except Exception as e:
+                    st.error(f"Lỗi: {e}")
+                    df_ndh = pd.DataFrame()
+
+                if df_ndh.empty:
+                    st.success(
+                        f"✅ Không có món vay nào đến hạn "
+                        f"trong {so_ngay} ngày tới.")
+                else:
+                    tong_dn = df_ndh[COT_TONG_DU_NO].sum() \
+                              if COT_TONG_DU_NO in df_ndh.columns else 0
+                    c1, c2 = st.columns(2)
+                    c1.metric("Số món đến hạn", fmt_so(len(df_ndh)))
+                    c2.metric("Tổng dư nợ (tr.đ)", fmt(tong_dn))
+
+                    st.dataframe(df_ndh, use_container_width=True,
+                                 hide_index=True)
+
+                    # Xuất Excel
+                    ten_file = (f"NoDenHan_"
+                                f"{ngay_tu.strftime('%d%m%Y')}.xlsx")
+                    buf = xuat_excel({"NoDenHan": df_ndh})
+                    st.download_button(
+                        f"⬇️ Xuất Excel ({len(df_ndh)} món)",
+                        data=buf, file_name=ten_file,
+                        mime="application/vnd.openxmlformats-"
+                             "officedocument.spreadsheetml.sheet",
+                        key="ndh_xuat_excel",
+                    )

@@ -8,9 +8,12 @@ from datetime import datetime
 
 import pandas as pd
 import streamlit as st
+import os
+from datetime import datetime
 
 import db
 from auth import get_permissions
+from pdf_service import xuat_pdf_bang
 from config import CHUONG_TRINH_KHTD, COT_TEN_PGD, DS_PGD, PGD_XA_MAP
 from utils import xuat_excel, ten_file_xuat, vn
 
@@ -928,10 +931,29 @@ def _tab_khtd_theo_xa(role: str, username: str, df_full: "pd.DataFrame | None") 
 <style>
 [data-testid="stHorizontalBlock"] {
     border-bottom: 1px solid #e2e8f0 !important;
-    padding: 2px 0 !important;
+    border-right: 1px solid #e2e8f0 !important;
+    padding: 4px 0 !important;
+    margin: 0 !important;
 }
 [data-testid="stHorizontalBlock"]:hover {
     background-color: #f8fafc !important;
+}
+[data-testid="column"] {
+    border-right: 1px solid #e2e8f0 !important;
+    padding: 0 8px !important;
+}
+[data-testid="column"]:last-child {
+    border-right: none !important;
+}
+.khtd-program-name {
+    font-size: 17px !important;
+    font-weight: 500 !important;
+    padding: 6px 0 !important;
+}
+.khtd-amount {
+    font-size: 18px !important;
+    font-weight: 600 !important;
+    padding: 4px 0 !important;
 }
 </style>
 """,
@@ -967,7 +989,7 @@ def _tab_khtd_theo_xa(role: str, username: str, df_full: "pd.DataFrame | None") 
                 cols = st.columns(_colw_xa)
                 ten_hang = _ten_ct_base(ma_ct, ten_map_q)
                 cols[0].markdown(
-                    f"<div style='font-size:0.88rem;padding:4px 0'>{ten_hang}</div>",
+                    f"<div class='khtd-program-name'>{ten_hang}</div>",
                     unsafe_allow_html=True,
                 )
 

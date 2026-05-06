@@ -529,6 +529,9 @@ def main():
                     df = df_op
                     # df_full GIỮ NGUYÊN — ws_management/executive vẫn dùng CACHE_HSTD
                 # Nếu pgd_data/ chưa có → df giữ nguyên CACHE_HSTD, không warning
+        else:
+            df = df_full  # reset về toàn chi nhánh khi không phải workspace operation
+            st.cache_data.clear()  # clear cache khi đổi workspace
 
         # ── NQ11 ─────────────────────────────────────────────────────────────────────
         df_nq11 = None

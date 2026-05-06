@@ -783,6 +783,18 @@ def render(**kwargs):
     if co_quyen_upload_pgd(role):
         tab_names_op.append("📤 Upload HSTD")
 
+    # Dropdown chọn PGD cho admin_cn/manager_cn — hiển thị trước tabs
+    pgd_filter: str | None = None
+    if is_cn_role(role) and pgd_user is None and df is not None and COT_TEN_PGD in df.columns:
+        ds_pgd_all: list = kwargs.get("ds_pgd_all", [])
+        _pgd_filter_val = st.selectbox(
+            "🔎 Xem theo PGD",
+            ["Toàn Chi nhánh"] + ds_pgd_all,
+            key="ws_op_pgd_filter",
+        )
+        if _pgd_filter_val != "Toàn Chi nhánh":
+            pgd_filter = _pgd_filter_val
+
     # Lazy render: chỉ chạy nội dung tab đang mở (cần key + on_change="rerun";
     # nhãn tab hiện tại: st.session_state["ws_op_active_tab"]).
     tabs_op = st.tabs(tab_names_op, key="ws_op_active_tab", on_change="rerun")
@@ -809,17 +821,8 @@ def render(**kwargs):
     # Lọc df theo PGD cho user để tab Tổng quan hiển thị đúng phạm vi
     if is_pgd_role(role) and pgd_user and df is not None and COT_TEN_PGD in df.columns:
         df_pgd = df[df[COT_TEN_PGD] == pgd_user].copy()
-    elif is_cn_role(role) and pgd_user is None and df is not None and COT_TEN_PGD in df.columns:
-        ds_pgd_all: list = kwargs.get("ds_pgd_all", [])
-        pgd_filter = st.selectbox(
-            "🔎 Xem theo PGD",
-            ["Toàn Chi nhánh"] + ds_pgd_all,
-            key="ws_op_pgd_filter",
-        )
-        if pgd_filter != "Toàn Chi nhánh":
-            df_pgd = df[df[COT_TEN_PGD] == pgd_filter].copy()
-        else:
-            df_pgd = df
+    elif is_cn_role(role) and pgd_filter is not None and df is not None and COT_TEN_PGD in df.columns:
+        df_pgd = df[df[COT_TEN_PGD] == pgd_filter].copy()
     else:
         df_pgd = df
     _pgd_df_kwargs = {**kwargs, "df": df_pgd, "df_full": df_pgd}

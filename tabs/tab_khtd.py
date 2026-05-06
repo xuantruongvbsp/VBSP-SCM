@@ -53,8 +53,10 @@ MA_KEYS_CO_KHTD = {row[0] for row in CHUONG_TRINH_KHTD}
 # Nhóm giao diện nhập thủ công KHTD Chi nhánh (theo ma_ct HSTD)
 KHTD_CN_NHOM_MA_CT: list[tuple[str, list[int]]] = [
     ("Hộ nghèo · Cận nghèo · Thoát nghèo", [1, 9, 19]),
-    ("HSSV · GQVL · Xuất khẩu lao động", [2, 3, 4]),
-    ("Nhà ở · Nước sạch · SXKD · Khác", [6, 7, 10, 12, 15, 17, 21, 25, 26, 99]),
+    ("HSSV · GQVL", [2, 3]),
+    ("Nhà ở · DTTS · Xuất khẩu lao động", [4, 7, 17, 21, 25]),
+    ("Vùng khó khăn", [10, 15]),
+    ("Nước sạch · SXKD · Khác", [6, 12, 26, 99]),
 ]
 MAKEY_BY_MACT_NV: dict[tuple[int, int], str] = {}
 TEN_BASE_BY_MACT: dict[int, str] = {}

@@ -1,7 +1,7 @@
 import sys, re
 sys.path.insert(0, '.')
 from db import get_conn
-from auth import hash_password
+from auth import ma_hoa
 from config import MA_PGD_MAP
 
 conn = get_conn()
@@ -51,7 +51,7 @@ for ma_pgd, ten_pgd in MA_PGD_MAP.items():
            VALUES (?, ?, ?, ?, ?, 1)""",
         (
             username,
-            hash_password("123456"),
+            ma_hoa("123456"),
             "admin_pgd",
             ten_pgd,
             f"Admin {ten_pgd}",

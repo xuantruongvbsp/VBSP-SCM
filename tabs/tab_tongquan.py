@@ -38,6 +38,7 @@ def _cache_kpi_tongquan(
     _df: pd.DataFrame,
     ts: float,
     pgd_user: str,
+    pgd_filter: str,
     cot_tdn: str,
     cot_dth: str,
     cot_dqh: str,
@@ -45,7 +46,7 @@ def _cache_kpi_tongquan(
     cot_ku: str,
     cot_ma_kh: str,
 ) -> dict:
-    _ = (ts, pgd_user)  # tham gia cache key; tránh unused-argument
+    _ = (ts, pgd_user, pgd_filter)  # tham gia cache key; tránh unused-argument
     tdn = _df[cot_tdn].sum() if cot_tdn in _df.columns else 0
     dth = _df[cot_dth].sum() if cot_dth in _df.columns else 0
     dqh = _df[cot_dqh].sum() if cot_dqh in _df.columns else 0
@@ -86,12 +87,13 @@ def _cache_heatmap_pgd(
     _df: pd.DataFrame,
     ts: float,
     pgd_user: str,
+    pgd_filter: str,
     cot_pgd: str,
     cot_tdn: str,
     cot_ma_kh: str,
     cot_dqh: str,
 ) -> pd.DataFrame:
-    _ = (ts, pgd_user)  # tham gia cache key; tránh unused-argument
+    _ = (ts, pgd_user, pgd_filter)  # tham gia cache key; tránh unused-argument
     return _df.groupby(cot_pgd, as_index=False).agg(
         du_no=(cot_tdn, "sum"),
         so_kh=(cot_ma_kh, "nunique"),
@@ -188,6 +190,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
     df_full  = kwargs.get("df_full", df)
     role     = kwargs.get("role")
     pgd_user = kwargs.get("pgd_user") or ""
+    pgd_filter = kwargs.get("pgd_filter") or pgd_user
     username = kwargs.get("username")
     df_nq11  = kwargs.get("df_nq11")
     ts = kwargs.get("ts_hstd", 0.0)
@@ -241,6 +244,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
             df,
             ts,
             pgd_user,
+            pgd_filter,
             COT_TONG_DU_NO,
             COT_DU_NO_TH,
             COT_DU_NO_QH,
@@ -548,6 +552,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                 df,
                 ts,
                 pgd_user,
+                pgd_filter,
                 COT_TEN_PGD,
                 COT_TONG_DU_NO,
                 COT_MA_KH,
@@ -1128,4 +1133,3 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
 
             except Exception as e:
                 st.error(f"Lỗi xử lý đến hạn: {e}")
-

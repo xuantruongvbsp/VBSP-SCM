@@ -10,6 +10,7 @@ import pandas as pd
 import streamlit as st
 
 import db
+from auth import get_permissions
 from config import CHUONG_TRINH_KHTD, COT_TEN_PGD, DS_PGD, PGD_XA_MAP
 from utils import xuat_excel, ten_file_xuat, vn
 
@@ -130,7 +131,7 @@ def _hien_thi_lich_su_qd(kv_key: str, nhan: str, role: str, username: str) -> No
         else:
             c5.markdown("⚠️")
 
-        if role == "admin":
+        if get_permissions(role)["can_edit_khtd"]:
             if c6.button("🗑", key=f"del_{kv_key}_{idx_rev}", help="Xóa file"):
                 if duong_dan.exists():
                     duong_dan.unlink()
@@ -153,7 +154,7 @@ def _section_van_ban_qd_cn(role: str, username: str) -> None:
         with col_hist2:
             _hien_thi_lich_su_qd("qd_files_tw", "QĐ NHCSXH TW", role, username)
 
-        if role not in ("admin", "manager"):
+        if not get_permissions(role)["can_edit_khtd"]:
             st.caption("🔒 Chỉ Admin / Manager mới được upload văn bản QĐ.")
             return
 
@@ -288,7 +289,7 @@ def _doc_excel_khtd_cn_upload(file_bytes: bytes) -> tuple[dict[str, float], int,
 def _tab_khtd_chi_nhanh(role: str, username: str, df_full: "pd.DataFrame | None") -> None:
     st.subheader("🏛️ Kế hoạch Tín dụng Chi nhánh")
 
-    co_quyen = role in ("admin", "manager")
+    co_quyen = get_permissions(role)["can_edit_khtd"]
     kh_cn = _doc_kv(KV_KEY_CN)
     th_cn = _tinh_thuc_hien_theo_ct(df_full) if df_full is not None else {}
 
@@ -806,7 +807,7 @@ def _tab_khtd_chi_nhanh(role: str, username: str, df_full: "pd.DataFrame | None"
 def _tab_khtd_theo_xa(role: str, username: str, df_full: "pd.DataFrame | None") -> None:
     st.subheader("📍 Kế hoạch Tín dụng theo Xã")
 
-    co_quyen = role in ("admin", "manager")
+    co_quyen = get_permissions(role)["can_edit_khtd"]
     if not co_quyen:
         st.warning("⚠️ Chỉ Admin / Manager mới được nhập kế hoạch theo Xã.")
         return

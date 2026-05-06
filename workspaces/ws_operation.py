@@ -18,7 +18,7 @@ from config import (
     COT_LAI_TON, COT_LAI_THANG, COT_DVUT,
     TEMPLATES_DIR, TAG_MAP,
 )
-from auth import co_quyen_upload_pgd
+from auth import co_quyen_upload_pgd, is_cn_role, is_pgd_role, get_permissions
 from data import danh_dau_khong_hd, tong_hop_khong_hd, ds_chi_tiet_khong_hd
 from utils import (
     fmt,
@@ -284,7 +284,7 @@ def _init_gb2_session_for_doc_hub(kwargs: dict) -> None:
     pgd_user = kwargs.get("pgd_user")
     if df is None or df.empty:
         return
-    if role == "user" and pgd_user and COT_TEN_PGD in df.columns:
+    if is_pgd_role(role) and pgd_user and COT_TEN_PGD in df.columns:
         df = df[df[COT_TEN_PGD] == pgd_user].copy()
     if "Tên xã" not in df.columns:
         return
@@ -326,7 +326,7 @@ def _render_thong_bao_ket_luan(tab, **kwargs):
         if df is None or df.empty:
             st.warning("⚠️ Chưa có dữ liệu HSTD.")
             return
-        if role == "user" and pgd_user and COT_TEN_PGD in df.columns:
+        if is_pgd_role(role) and pgd_user and COT_TEN_PGD in df.columns:
             df = df[df[COT_TEN_PGD] == pgd_user].copy()
 
         ds_xa = sorted(df["Tên xã"].dropna().unique().tolist())
@@ -434,7 +434,7 @@ def _render_bien_ban_giao_ban(tab, **kwargs):
     pgd_user = kwargs.get("pgd_user")
     role = kwargs.get("role")
 
-    if df is not None and not df.empty and role == "user" and pgd_user and COT_TEN_PGD in df.columns:
+    if df is not None and not df.empty and is_pgd_role(role) and pgd_user and COT_TEN_PGD in df.columns:
         df = df[df[COT_TEN_PGD] == pgd_user].copy()
 
     with ctx:
@@ -531,11 +531,11 @@ def _render_bao_cao_giao_ban(tab, **kwargs):
         
         # Lọc theo PGD
         df_filtered = df.copy()
-        if role == "user" and pgd_user:
+        if is_pgd_role(role) and pgd_user:
             if COT_TEN_PGD in df.columns:
                 df_filtered = df[df[COT_TEN_PGD] == pgd_user].copy()
             st.info(f"Dữ liệu đã lọc theo PGD: **{pgd_user}**")
-        elif role in ["admin", "manager"]:
+        elif is_cn_role(role):
             if COT_TEN_PGD in df.columns:
                 ds_pgd = sorted(df[COT_TEN_PGD].dropna().unique().tolist())
                 if ds_pgd:
@@ -563,7 +563,7 @@ def _render_bao_cao_giao_ban(tab, **kwargs):
         dgd_map = db.doc_dgd_map()
         
         # Lấy PGD hiện tại
-        current_pgd = pgd_user if role == "user" else (
+        current_pgd = pgd_user if is_pgd_role(role) else (
             chon_pgd if 'chon_pgd' in locals() else pgd_user
         )
         
@@ -807,8 +807,19 @@ def render(**kwargs):
                 _render_thong_bao_ket_luan(doc_t3, **kwargs)
 
     # Lọc df theo PGD cho user để tab Tổng quan hiển thị đúng phạm vi
-    if role == "user" and pgd_user and df is not None and COT_TEN_PGD in df.columns:
+    if is_pgd_role(role) and pgd_user and df is not None and COT_TEN_PGD in df.columns:
         df_pgd = df[df[COT_TEN_PGD] == pgd_user].copy()
+    elif is_cn_role(role) and pgd_user is None and df is not None and COT_TEN_PGD in df.columns:
+        ds_pgd_all: list = kwargs.get("ds_pgd_all", [])
+        pgd_filter = st.selectbox(
+            "🔎 Xem theo PGD",
+            ["Toàn Chi nhánh"] + ds_pgd_all,
+            key="ws_op_pgd_filter",
+        )
+        if pgd_filter != "Toàn Chi nhánh":
+            df_pgd = df[df[COT_TEN_PGD] == pgd_filter].copy()
+        else:
+            df_pgd = df
     else:
         df_pgd = df
     _pgd_df_kwargs = {**kwargs, "df": df_pgd, "df_full": df_pgd}

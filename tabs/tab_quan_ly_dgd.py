@@ -31,6 +31,16 @@ if TYPE_CHECKING:
     from streamlit.delta_generator import DeltaGenerator
 
 
+def _resolve_pgd_key(pgd_user: str) -> str:
+    """
+    Chuẩn hóa tên PGD để lookup dgd_map.
+    'PGD Biên Hòa' → DON_VI_CHI_NHANH vì dgd_map lưu key nội bộ.
+    """
+    if pgd_user in ("PGD Biên Hòa", "Hội sở CN tỉnh", "Hội sở CN Đồng Nai"):
+        return DON_VI_CHI_NHANH
+    return pgd_user
+
+
 def _hostname() -> str:
     try:
         return socket.gethostname()
@@ -141,7 +151,7 @@ def _render_import(role: str, username: str, hn: str) -> None:
                 if st.button("Merge vào dgd_map hiện tại", type="primary", key="dgd_merge"):
                     try:
                         m = copy.deepcopy(db.doc_dgd_map())
-                        m[ten_pgd] = parsed_xa
+                        m[_resolve_pgd_key(ten_pgd)] = parsed_xa
                         db.luu_dgd_map(m, username)
                         db.ghi_audit(
                             username,
@@ -160,7 +170,7 @@ def _render_import(role: str, username: str, hn: str) -> None:
                     st.caption('Nút "Thay thế toàn bộ" chỉ dành cho admin.')
                 elif st.button("Thay thế toàn bộ dgd_map", type="secondary", key="dgd_replace_all"):
                     try:
-                        db.luu_dgd_map({ten_pgd: parsed_xa}, username)
+                        db.luu_dgd_map({_resolve_pgd_key(ten_pgd): parsed_xa}, username)
                         db.ghi_audit(
                             username,
                             "thay_the_dgd_map_toan_bo",
@@ -218,7 +228,7 @@ def _render_import(role: str, username: str, hn: str) -> None:
         dgd_map_imp,
     )
 
-    xa_hien_co = dgd_map_imp.get(ten_pgd_imp, {}).get(chon_xa_imp, {})
+    xa_hien_co = dgd_map_imp.get(_resolve_pgd_key(ten_pgd_imp), {}).get(chon_xa_imp, {})
     if not isinstance(xa_hien_co, dict):
         xa_hien_co = {}
 
@@ -243,11 +253,11 @@ def _render_import(role: str, username: str, hn: str) -> None:
             with col_xoa:
                 if st.button("🗑️", key=f"imp_xoa_dgd_{slug_x}", help="Xóa ĐGD"):
                     try:
-                        del dgd_map_imp[ten_pgd_imp][chon_xa_imp][dgd_name]
-                        if not dgd_map_imp[ten_pgd_imp][chon_xa_imp]:
-                            del dgd_map_imp[ten_pgd_imp][chon_xa_imp]
-                        if not dgd_map_imp[ten_pgd_imp]:
-                            del dgd_map_imp[ten_pgd_imp]
+                        del dgd_map_imp[_resolve_pgd_key(ten_pgd_imp)][chon_xa_imp][dgd_name]
+                        if not dgd_map_imp[_resolve_pgd_key(ten_pgd_imp)][chon_xa_imp]:
+                            del dgd_map_imp[_resolve_pgd_key(ten_pgd_imp)][chon_xa_imp]
+                        if not dgd_map_imp[_resolve_pgd_key(ten_pgd_imp)]:
+                            del dgd_map_imp[_resolve_pgd_key(ten_pgd_imp)]
                         db.luu_dgd_map(dgd_map_imp, username)
                         db.ghi_audit(
                             username,
@@ -289,13 +299,13 @@ def _render_import(role: str, username: str, hn: str) -> None:
             else:
                 try:
                     m = copy.deepcopy(db.doc_dgd_map())
-                    cur = m.setdefault(ten_pgd_imp, {}).setdefault(chon_xa_imp, {})
+                    cur = m.setdefault(_resolve_pgd_key(ten_pgd_imp), {}).setdefault(chon_xa_imp, {})
                     cur[ten_dgd_typed] = [str(t).strip() for t in chon_thon_imp]
                     db.luu_dgd_map(m, username)
                     db.ghi_audit(
                         username,
                         "them_dgd",
-                        f"[{hn}] PGD={ten_pgd_imp} / {chon_xa_imp} / "
+                        f"[{hn}] PGD={_resolve_pgd_key(ten_pgd_imp)} / {chon_xa_imp} / "
                         f"{ten_dgd_typed}: {chon_thon_imp}",
                     )
                     st.cache_data.clear()
@@ -361,8 +371,8 @@ def _render_xem_sua(df_h: pd.DataFrame, username: str, hn: str) -> None:
     ten_pgd = st.selectbox("Chọn PGD", [DON_VI_CHI_NHANH] + DS_PGD, key="dgd_edit_pgd")
 
     xa_from_map = (
-        sorted(dgd_map.get(ten_pgd, {}).keys())
-        if isinstance(dgd_map.get(ten_pgd), dict)
+        sorted(dgd_map.get(_resolve_pgd_key(ten_pgd), {}).keys())
+        if isinstance(dgd_map.get(_resolve_pgd_key(ten_pgd)), dict)
         else []
     )
     ds_xa_cfg = list(PGD_XA_MAP.get(ten_pgd, []))
@@ -380,8 +390,8 @@ def _render_xem_sua(df_h: pd.DataFrame, username: str, hn: str) -> None:
         st.warning("PGD không có trong PGD_XA_MAP.")
         return
 
-    pool = pool_thon_cho_xa(df_h, ten_pgd, chon_xa, dgd_map)
-    xa_dgd = dgd_map.get(ten_pgd, {}).get(chon_xa, {})
+    pool = pool_thon_cho_xa(df_h, _resolve_pgd_key(ten_pgd), chon_xa, dgd_map)
+    xa_dgd = dgd_map.get(_resolve_pgd_key(ten_pgd), {}).get(chon_xa, {})
     if not isinstance(xa_dgd, dict):
         xa_dgd = {}
 
@@ -410,7 +420,7 @@ def _render_xem_sua(df_h: pd.DataFrame, username: str, hn: str) -> None:
                     tm = ten_moi.strip()
                     if not tm:
                         st.error("Tên ĐGD không được để trống.")
-                    elif dgd_dang_dung_trong_hstd(df_h, ten_pgd, chon_xa, ten_dgd) and (
+                    elif dgd_dang_dung_trong_hstd(df_h, _resolve_pgd_key(ten_pgd), chon_xa, ten_dgd) and (
                         tm != ten_dgd.strip()
                     ):
                         st.error(
@@ -436,7 +446,7 @@ def _render_xem_sua(df_h: pd.DataFrame, username: str, hn: str) -> None:
                         else:
                             try:
                                 m = copy.deepcopy(db.doc_dgd_map())
-                                cur = m.setdefault(ten_pgd, {}).setdefault(
+                                cur = m.setdefault(_resolve_pgd_key(ten_pgd), {}).setdefault(
                                     chon_xa, {}
                                 )
                                 if tm != ten_dgd:

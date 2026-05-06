@@ -13,6 +13,7 @@ import streamlit as st
 from config import (
     COT_TEN_PGD,
     COT_TEN_XA,
+    DON_VI_CHI_NHANH,
     PGD_XA_MAP,
 )
 
@@ -29,6 +30,16 @@ from utils import fmt_so, hien_thi_dataframe_phan_trang, pick_hstd_column
 
 if TYPE_CHECKING:
     from streamlit.delta_generator import DeltaGenerator
+
+
+def _resolve_pgd_key(pgd_user: str) -> str:
+    """
+    Chuẩn hóa tên PGD để lookup dgd_map.
+    'PGD Biên Hòa' → DON_VI_CHI_NHANH vì dgd_map lưu key nội bộ.
+    """
+    if pgd_user in ("PGD Biên Hòa", "Hội sở CN tỉnh", "Hội sở CN Đồng Nai"):
+        return DON_VI_CHI_NHANH
+    return pgd_user
 
 
 def _hostname() -> str:
@@ -110,7 +121,7 @@ def _render_import_pgd(
             ):
                 try:
                     m = copy.deepcopy(db.doc_dgd_map())
-                    m[pgd_user] = parsed_xa
+                    m[_resolve_pgd_key(pgd_user)] = parsed_xa
                     db.luu_dgd_map(m, username)
                     db.ghi_audit(
                         username,
@@ -163,7 +174,7 @@ def _render_import_pgd(
         dgd_map_imp,
     )
 
-    xa_hien_co = dgd_map_imp.get(pgd_user, {}).get(chon_xa_imp, {})
+    xa_hien_co = dgd_map_imp.get(_resolve_pgd_key(pgd_user), {}).get(chon_xa_imp, {})
     if not isinstance(xa_hien_co, dict):
         xa_hien_co = {}
 
@@ -192,11 +203,11 @@ def _render_import_pgd(
                     help="Xóa ĐGD",
                 ):
                     try:
-                        del dgd_map_imp[pgd_user][chon_xa_imp][dgd_name]
-                        if not dgd_map_imp[pgd_user][chon_xa_imp]:
-                            del dgd_map_imp[pgd_user][chon_xa_imp]
-                        if not dgd_map_imp[pgd_user]:
-                            del dgd_map_imp[pgd_user]
+                        del dgd_map_imp[_resolve_pgd_key(pgd_user)][chon_xa_imp][dgd_name]
+                        if not dgd_map_imp[_resolve_pgd_key(pgd_user)][chon_xa_imp]:
+                            del dgd_map_imp[_resolve_pgd_key(pgd_user)][chon_xa_imp]
+                        if not dgd_map_imp[_resolve_pgd_key(pgd_user)]:
+                            del dgd_map_imp[_resolve_pgd_key(pgd_user)]
                         db.luu_dgd_map(dgd_map_imp, username)
                         db.ghi_audit(
                             username,
@@ -238,7 +249,7 @@ def _render_import_pgd(
             else:
                 try:
                     m = copy.deepcopy(db.doc_dgd_map())
-                    cur = m.setdefault(pgd_user, {}).setdefault(chon_xa_imp, {})
+                    cur = m.setdefault(_resolve_pgd_key(pgd_user), {}).setdefault(chon_xa_imp, {})
                     cur[ten_dgd_typed] = [str(t).strip() for t in chon_thon_imp]
                     db.luu_dgd_map(m, username)
                     db.ghi_audit(
@@ -269,8 +280,8 @@ def _render_xem_sua_pgd(
     ten_pgd = pgd_user
 
     xa_from_map = (
-        sorted(dgd_map.get(ten_pgd, {}).keys())
-        if isinstance(dgd_map.get(ten_pgd), dict)
+        sorted(dgd_map.get(_resolve_pgd_key(ten_pgd), {}).keys())
+        if isinstance(dgd_map.get(_resolve_pgd_key(ten_pgd)), dict)
         else []
     )
     ds_xa_cfg = list(PGD_XA_MAP.get(ten_pgd, []))
@@ -456,7 +467,7 @@ def _render_tong_quan_pgd(pgd_user: str) -> None:
     st.markdown("### 📋 Tổng quan PGD của tôi")
     st.caption("So sánh dgd_map với danh mục xã trong PGD_XA_MAP (chỉ đơn vị bạn).")
     dgd_map = db.doc_dgd_map()
-    block = dgd_map.get(pgd_user, {})
+    block = dgd_map.get(_resolve_pgd_key(pgd_user), {})
     if not isinstance(block, dict):
         block = {}
     so_xa = len(block)

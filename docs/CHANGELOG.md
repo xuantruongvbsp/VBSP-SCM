@@ -2,6 +2,37 @@
 
 ---
 
+## [06/05/2026] — Phân hệ 2 cấp & Role mới
+
+### Thêm mới
+- **Hệ thống phân hệ 2 cấp (CN + PGD)** — routing workspace theo role
+- **Role mới:** `admin_pgd`, `manager_pgd`, `user_pgd`, `admin_cn`, `manager_cn`
+- **`tab_uy_thac.py`** — tab Ủy thác với 5 sub-tab:
+  - Tổng quan theo ĐVUT
+  - Mẫu 06 — Phiếu kiểm tra sử dụng vốn
+  - Mẫu 15 — Danh sách đối chiếu số dư
+  - Mẫu 16 — Biên bản kiểm tra Tổ TK&VV
+  - KH KT — Kế hoạch kiểm tra giám sát ủy thác
+- **`services/template_service.py`** — xử lý template Word dùng `docxtpl` + `docx2pdf`
+- **Template folder** `templates/` — chứa file `.docx` mẫu chuẩn NHCSXH
+
+### Sửa đổi
+- `ws_operation.py`: Fix tab Tổng quan lọc theo PGD (dùng `DON_VI_CHI_NHANH`)
+- `config.py`: Nhất quán hóa hằng số tên đơn vị
+  - `DON_VI_CHI_NHANH = "Hội sở Chi nhánh tỉnh"` — key nội bộ
+  - `TEN_CHI_NHANH_HIEN_THI = "Chi nhánh NHCSXH tỉnh Đồng Nai"` — hiển thị UI
+- `ws_operation.py`: Thêm tab Upload HSTD cho `admin_pgd` (trong Document Hub)
+- `auth.py`: Thêm hàm helper phân hệ `la_phan_he_cn()`, `la_phan_he_pgd()`, `co_quyen_upload_pgd()`, `co_quyen_quan_ly_user_pgd()`
+
+### Tài liệu
+- Cập nhật `ARCHITECTURE.md` — thêm mô tả 2 phân hệ, role mới, services/, templates/
+- Cập nhật `CONVENTIONS.md` — thêm quy ước role, template, hằng số tên đơn vị
+- Tạo `ROLES.md` — mô tả chi tiết hệ thống role
+- Tạo `TEMPLATES.md` — hướng dẫn quản lý template Word
+- Tạo `HUONG_DAN_PHAN_HE.md` — hướng dẫn sử dụng theo phân hệ
+
+---
+
 ## [05/2026] — Sprint hiện tại
 
 ### Thêm mới

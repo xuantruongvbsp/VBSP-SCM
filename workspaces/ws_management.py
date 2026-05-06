@@ -19,6 +19,7 @@ from config import (
     COT_NGAY_VAY, COT_THOI_HAN, COT_LAI_SUAT,
     TEMPLATES_DIR, TAG_MAP,
 )
+from auth import is_cn_role, is_pgd_role, get_permissions
 from data import (
     danh_dau_khong_hd, tong_hop_khong_hd,
     ds_chi_tiet_khong_hd, canh_bao_migration,
@@ -440,7 +441,7 @@ def render(**kwargs):
     ]
     
     # Chỉ admin/manager mới thấy tab Quản lý Template
-    if role in ["admin", "manager"]:
+    if get_permissions(role)["can_upload"]:
         tab_names.extend(["📁 Quản lý Template", "📤 Upload KH-NV"])
     else:
         tab_names.append("📤 Upload KH-NV")
@@ -463,7 +464,7 @@ def render(**kwargs):
     tab_nhiem_vu.render(tabs[11], **kwargs)
     tab_ban_dai_dien.render(tabs[12], cap="tinh", **kwargs)
     tab_uy_thac.render(tabs[13], **kwargs)
-    if role in ["admin", "manager"]:
+    if get_permissions(role)["can_upload"]:
         with tabs[14]:
             _render_quan_ly_template(df_full)
         tab_upload_khnv.render(tabs[15], **kwargs)

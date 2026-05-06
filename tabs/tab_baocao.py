@@ -8,7 +8,7 @@ import streamlit as st
 import pandas as pd
 
 from config import *
-from utils import fmt_so, ten_file_xuat, hien_thi_dataframe_phan_trang
+from utils import fmt_so, ten_file_xuat, hien_thi_dataframe_phan_trang, xuat_excel
 from services import xuat_bao_cao, ten_file_bao_cao
 from pdf_service import nut_xuat_pdf
 from data import (danh_dau_khong_hd, tong_hop_khong_hd, ds_chi_tiet_khong_hd)

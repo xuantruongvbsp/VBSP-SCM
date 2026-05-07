@@ -434,7 +434,9 @@ def render(**kwargs):
         "📤 Giao KH theo Đợt",
         "📡 Điện Báo",
         "🎯 KH vs Thực hiện",
-        "👔 Quản lý CBTD", "📍 Điểm Giao Dịch", "🏘️ Mạng lưới Tổ TK&VV", "🚨 Cảnh báo sớm",
+        "👔 Quản lý CBTD",
+        "📍 Điểm GD & Tổ TK&VV",
+        "🚨 Cảnh báo sớm",
         "✅ Nhiệm vụ",
         "🏛️ Ban Đại Diện",
         "🤝 Ủy thác",
@@ -457,16 +459,18 @@ def render(**kwargs):
     tab_candoi.render(tabs[5], **kwargs)
     tab_kehoach.render(tabs[6], **kwargs)
     tab_cbtd.render(tabs[7], **kwargs)
-    tab_quan_ly_dgd.render(tabs[8], **kwargs)
-    tab_cdtotkvv.render(tabs[9], **dict(kwargs, cdto_mode="cn"))
-    with tabs[10]:
+    with tabs[8]:
+        _sub1, _sub2 = st.tabs(["📍 Điểm Giao Dịch", "🏘️ Tổ TK&VV"])
+        tab_quan_ly_dgd.render(_sub1, **kwargs)
+        tab_cdtotkvv.render(_sub2, **dict(kwargs, cdto_mode="cn"))
+    with tabs[9]:
         _render_canh_bao(df_full, ds_pgd_all)
-    tab_nhiem_vu.render(tabs[11], **kwargs)
-    tab_ban_dai_dien.render(tabs[12], cap="tinh", **kwargs)
-    tab_uy_thac.render(tabs[13], **kwargs)
+    tab_nhiem_vu.render(tabs[10], **kwargs)
+    tab_ban_dai_dien.render(tabs[11], cap="tinh", **kwargs)
+    tab_uy_thac.render(tabs[12], **kwargs)
     if get_permissions(role)["can_upload"]:
-        with tabs[14]:
+        with tabs[13]:
             _render_quan_ly_template(df_full)
-        tab_upload_khnv.render(tabs[15], **kwargs)
-    else:
         tab_upload_khnv.render(tabs[14], **kwargs)
+    else:
+        tab_upload_khnv.render(tabs[13], **kwargs)

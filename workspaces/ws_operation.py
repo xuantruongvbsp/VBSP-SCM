@@ -855,8 +855,7 @@ def render(**kwargs):
 
     # Thêm renderer cho tab Upload HSTD nếu có quyền
     if co_quyen_upload_pgd(role):
-        from tabs.tab_upload_pgd import render as render_upload_pgd
-        _tab_renderers.append(lambda: render_upload_pgd(pgd_user=pgd_user, role=role))
+        _tab_renderers.append(lambda: tab_upload_pgd.render(tabs_op[-1], **kwargs))
 
     _tab_renderers = tuple(_tab_renderers)
     assert len(tab_names_op) == len(_tab_renderers), (

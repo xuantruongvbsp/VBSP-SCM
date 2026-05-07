@@ -769,9 +769,8 @@ def render(**kwargs):
         "📋 Danh sách & Lọc",
         "🎯 KHTD",
         "📋 Giao & ĐC KHTD",
-        "🏘️ Tổ TK&VV",
+        "📍 Điểm GD & Tổ TK&VV",
         "📝 Báo cáo Giao ban",
-        "📍 Điểm GD của tôi",
         "📄 Mẫu biểu",
         "📋 Nhiệm vụ",
         "📤 Upload Dữ liệu",
@@ -826,6 +825,13 @@ def render(**kwargs):
     else:
         df_pgd = df
     _pgd_df_kwargs = {**kwargs, "df": df_pgd, "df_full": df_pgd, "pgd_filter": pgd_filter}
+
+    def _render_diem_gd_va_to_tkvv(tab_parent, **kw):
+        with tab_parent:
+            _sub1, _sub2 = st.tabs(["📍 Điểm Giao Dịch", "🏘️ Tổ TK&VV"])
+            tab_diem_gd_pgd.render(_sub1, **kw)
+            tab_cdtotkvv_pgd.render(_sub2, **kw)
+
     _tab_renderers = [
         lambda: tab_tongquan.render(tabs_op[0], **_pgd_df_kwargs),
         lambda: tab_baocao.render(tabs_op[1], **_pgd_df_kwargs),
@@ -837,15 +843,14 @@ def render(**kwargs):
         lambda: tab_danhsach.render(tabs_op[5], **kwargs),
         lambda: tab_khtd_pgd.render(tabs_op[6], **kwargs),
         lambda: tab_khtd_giao_dc.render(tabs_op[7], **kwargs),
-        lambda: tab_cdtotkvv_pgd.render(tabs_op[8], **kwargs),
+        lambda: _render_diem_gd_va_to_tkvv(tabs_op[8], **kwargs),
         lambda: _render_bao_cao_giao_ban(tabs_op[9], **kwargs),
-        lambda: tab_diem_gd_pgd.render(tabs_op[10], **kwargs),
         lambda: _render_mau_bieu_tab(),
-        lambda: tab_nhiem_vu.render(tabs_op[12], **kwargs),
-        lambda: tab_upload_pgd.render(tabs_op[13], **kwargs),
-        lambda: tab_khtd_mau07.render(tabs_op[14], **kwargs),
-        lambda: tab_ban_dai_dien.render(tabs_op[15], cap="xa", **kwargs),
-        lambda: tab_uy_thac.render(tabs_op[16], **kwargs),
+        lambda: tab_nhiem_vu.render(tabs_op[11], **kwargs),
+        lambda: tab_upload_pgd.render(tabs_op[12], **kwargs),
+        lambda: tab_khtd_mau07.render(tabs_op[13], **kwargs),
+        lambda: tab_ban_dai_dien.render(tabs_op[14], cap="xa", **kwargs),
+        lambda: tab_uy_thac.render(tabs_op[15], **kwargs),
     ]
 
     # Thêm renderer cho tab Upload HSTD nếu có quyền

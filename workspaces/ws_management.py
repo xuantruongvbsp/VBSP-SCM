@@ -429,17 +429,19 @@ def render(**kwargs):
 
     # Tạo danh sách tabs dựa trên role
     tab_names = [
-        "📊 Tổng quan", "📈 Báo cáo chi tiết", "🔍 Kiểm soát CN",
+        "📊 Tổng quan",
+        "🚨 Cảnh báo sớm",
+        "🔍 Kiểm soát CN",
         "🗓️ KH Tín dụng Năm",
         "📤 Giao KH theo Đợt",
-        "📡 Điện Báo",
         "🎯 KH vs Thực hiện",
+        "📈 Báo cáo chi tiết",
+        "📡 Điện Báo",
         "👔 Quản lý CBTD",
         "📍 Điểm GD & Tổ TK&VV",
-        "🚨 Cảnh báo sớm",
-        "✅ Nhiệm vụ",
         "🏛️ Ban Đại Diện",
         "🤝 Ủy thác",
+        "✅ Nhiệm vụ",
     ]
     
     # Chỉ admin/manager mới thấy tab Quản lý Template
@@ -451,23 +453,23 @@ def render(**kwargs):
     tabs = st.tabs(tab_names)
 
     tab_tongquan.render(tabs[0], **kwargs)
-    tab_baocao.render(tabs[1], **kwargs)
+    with tabs[1]:
+        _render_canh_bao(df_full, ds_pgd_all)
     with tabs[2]:
         tab_kiem_soat.render_tab(df_full, role, kwargs.get("username", "unknown"))
     tab_khtd.render(tabs[3], **dict(kwargs, khtd_mode="cn"))
     tab_khtd_giao_dc.render(tabs[4], **kwargs)
-    tab_candoi.render(tabs[5], **kwargs)
-    tab_kehoach.render(tabs[6], **kwargs)
-    tab_cbtd.render(tabs[7], **kwargs)
-    with tabs[8]:
+    tab_kehoach.render(tabs[5], **kwargs)
+    tab_baocao.render(tabs[6], **kwargs)
+    tab_candoi.render(tabs[7], **kwargs)
+    tab_cbtd.render(tabs[8], **kwargs)
+    with tabs[9]:
         _sub1, _sub2 = st.tabs(["📍 Điểm Giao Dịch", "🏘️ Tổ TK&VV"])
         tab_quan_ly_dgd.render(_sub1, **kwargs)
         tab_cdtotkvv.render(_sub2, **dict(kwargs, cdto_mode="cn"))
-    with tabs[9]:
-        _render_canh_bao(df_full, ds_pgd_all)
-    tab_nhiem_vu.render(tabs[10], **kwargs)
-    tab_ban_dai_dien.render(tabs[11], cap="tinh", **kwargs)
-    tab_uy_thac.render(tabs[12], **kwargs)
+    tab_ban_dai_dien.render(tabs[10], cap="tinh", **kwargs)
+    tab_uy_thac.render(tabs[11], **kwargs)
+    tab_nhiem_vu.render(tabs[12], **kwargs)
     if get_permissions(role)["can_upload"]:
         with tabs[13]:
             _render_quan_ly_template(df_full)

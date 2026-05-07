@@ -763,20 +763,20 @@ def render(**kwargs):
     tab_names_op = [
         "📊 Tổng quan",
         "📈 Báo cáo chi tiết",
-        "📋 NQ11",
-        "📡 Điện Báo",
-        "🔍 Tra cứu hồ sơ",
-        "📋 Danh sách & Lọc",
         "🎯 KHTD",
         "📋 Giao & ĐC KHTD",
+        "📋 Mẫu 07 Giao KH",
+        "📋 NQ11",
+        "🔍 Tra cứu hồ sơ",
+        "📋 Danh sách & Lọc",
+        "📡 Điện Báo",
         "📍 Điểm GD & Tổ TK&VV",
         "📝 Báo cáo Giao ban",
         "📄 Mẫu biểu",
-        "📋 Nhiệm vụ",
-        "📤 Upload Dữ liệu",
-        "📋 Mẫu 07 Giao KH",
         "🏛️ Ban Đại Diện",
         "🤝 Ủy thác",
+        "✅ Nhiệm vụ",
+        "📤 Upload Dữ liệu",
     ]
     # Thêm tab Upload HSTD cho admin_pgd/manager_pgd
     if co_quyen_upload_pgd(role):
@@ -835,22 +835,22 @@ def render(**kwargs):
     _tab_renderers = [
         lambda: tab_tongquan.render(tabs_op[0], **_pgd_df_kwargs),
         lambda: tab_baocao.render(tabs_op[1], **_pgd_df_kwargs),
-        lambda: tab_nq11.render(tabs_op[2], **_pgd_df_kwargs),
+        lambda: tab_khtd_pgd.render(tabs_op[2], **kwargs),
+        lambda: tab_khtd_giao_dc.render(tabs_op[3], **kwargs),
+        lambda: tab_khtd_mau07.render(tabs_op[4], **kwargs),
+        lambda: tab_nq11.render(tabs_op[5], **_pgd_df_kwargs),
+        lambda: tab_tracuu.render(tabs_op[6], **kwargs),
+        lambda: tab_danhsach.render(tabs_op[7], **kwargs),
         lambda: tab_candoi.render(
-            tabs_op[3], **{**kwargs, "pgd_mode": True, "df": df, "df_full": df}
+            tabs_op[8], **{**kwargs, "pgd_mode": True, "df": df, "df_full": df}
         ),
-        lambda: tab_tracuu.render(tabs_op[4], **kwargs),
-        lambda: tab_danhsach.render(tabs_op[5], **kwargs),
-        lambda: tab_khtd_pgd.render(tabs_op[6], **kwargs),
-        lambda: tab_khtd_giao_dc.render(tabs_op[7], **kwargs),
-        lambda: _render_diem_gd_va_to_tkvv(tabs_op[8], **kwargs),
-        lambda: _render_bao_cao_giao_ban(tabs_op[9], **kwargs),
+        lambda: _render_diem_gd_va_to_tkvv(tabs_op[9], **kwargs),
+        lambda: _render_bao_cao_giao_ban(tabs_op[10], **kwargs),
         lambda: _render_mau_bieu_tab(),
-        lambda: tab_nhiem_vu.render(tabs_op[11], **kwargs),
-        lambda: tab_upload_pgd.render(tabs_op[12], **kwargs),
-        lambda: tab_khtd_mau07.render(tabs_op[13], **kwargs),
-        lambda: tab_ban_dai_dien.render(tabs_op[14], cap="xa", **kwargs),
-        lambda: tab_uy_thac.render(tabs_op[15], **kwargs),
+        lambda: tab_ban_dai_dien.render(tabs_op[12], cap="xa", **kwargs),
+        lambda: tab_uy_thac.render(tabs_op[13], **kwargs),
+        lambda: tab_nhiem_vu.render(tabs_op[14], **kwargs),
+        lambda: tab_upload_pgd.render(tabs_op[15], **kwargs),
     ]
 
     # Thêm renderer cho tab Upload HSTD nếu có quyền

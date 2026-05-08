@@ -31,7 +31,7 @@ from utils import (
     xuat_excel,
     ten_file_xuat,
 )
-from tabs import tab_khtd_giao_dc, tab_kiem_soat
+from tabs import tab_khtd_giao_dc, tab_kiem_soat, tab_no_rui_ro
 
 # ── Hằng số ngưỡng NQH ────────────────────────────────────────────────────────
 _NGUONG_AN_TOAN  = 1.0   # % — xanh lá
@@ -713,8 +713,8 @@ def render(**kwargs) -> None:
     role = kwargs.get("role", "executive")
     username = kwargs.get("username", "unknown")
 
-    tab_phan_tich, tab_kiem_soat_cn = st.tabs(
-        ["📊 Phân tích & cảnh báo", "🔍 Kiểm soát CN"]
+    tab_phan_tich, tab_kiem_soat_cn, tab_no_rui_ro_cn = st.tabs(
+        ["📊 Phân tích & cảnh báo", "🔍 Kiểm soát CN", "💳 Nợ rủi ro QĐ62"]
     )
 
     with tab_phan_tich:
@@ -763,3 +763,6 @@ def render(**kwargs) -> None:
 
     with tab_kiem_soat_cn:
         tab_kiem_soat.render_tab(df_full, role, username)
+
+    with tab_no_rui_ro_cn:
+        tab_no_rui_ro.render(tab_no_rui_ro_cn, **kwargs)

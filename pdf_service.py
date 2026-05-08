@@ -78,6 +78,7 @@ def xuat_pdf(
     cols_tien: list[str] | None = None,
     don_vi_tien: str = "đồng",
     prefix_file: str = "",
+    them_dong_tong: bool = True,
 ) -> bytes:
     if not _REPORTLAB_READY:
         raise ImportError("Chưa cài thư viện reportlab. Chạy: pip install reportlab")
@@ -90,6 +91,19 @@ def xuat_pdf(
     from utils import fmt_so
 
     cols_tien = cols_tien or []
+
+    dong_tong_cells = None
+    if them_dong_tong and cols_tien and len(df) > 0:
+        tong_row = {}
+        for col in df.columns:
+            if col in cols_tien:
+                try:
+                    tong_row[col] = pd.to_numeric(df[col], errors="coerce").sum()
+                except Exception:
+                    tong_row[col] = ""
+            else:
+                tong_row[col] = "TỔNG CỘNG" if list(df.columns).index(col) == 0 else ""
+        dong_tong_cells = tong_row
 
     buf = BytesIO()
     # Landscape nếu nhiều cột hoặc báo cáo TQPGD
@@ -212,6 +226,31 @@ def xuat_pdf(
             cells.append(p)
         table_data.append(cells)
 
+    if dong_tong_cells is not None:
+        tong_cells = []
+        for col in df.columns:
+            val = dong_tong_cells[col]
+            if col in cols_tien and isinstance(val, (int, float)):
+                txt = fmt_so(float(val))
+                p = Paragraph(
+                    f"<b>{txt}</b>",
+                    ParagraphStyle("tong_r", fontName=fb,
+                                   fontSize=font_size, alignment=TA_RIGHT)
+                )
+            elif val == "TỔNG CỘNG":
+                p = Paragraph(
+                    "<b>TỔNG CỘNG</b>",
+                    ParagraphStyle("tong_lbl", fontName=fb,
+                                   fontSize=font_size, alignment=TA_CENTER)
+                )
+            else:
+                p = Paragraph(
+                    str(val) if val else "",
+                    ParagraphStyle("tong_empty", fontName=fn, fontSize=font_size)
+                )
+            tong_cells.append(p)
+        table_data.append(tong_cells)
+
     if n_cols > 0:
         cols_list = list(df.columns)
 
@@ -261,6 +300,15 @@ def xuat_pdf(
     for r in range(1, len(table_data)):
         if r % 2 == 0:
             style_cmds.append(("BACKGROUND", (0, r), (-1, r), ROW_ALT))
+
+    # Style dòng tổng cộng (dòng cuối)
+    if dong_tong_cells is not None:
+        last_row = len(table_data) - 1
+        style_cmds.extend([
+            ("BACKGROUND", (0, last_row), (-1, last_row), VBSP_GREEN_LIGHT),
+            ("FONTNAME",   (0, last_row), (-1, last_row), fb),
+            ("LINEABOVE",  (0, last_row), (-1, last_row), 1.5, VBSP_GREEN),
+        ])
 
     tbl.setStyle(TableStyle(style_cmds))
     for ci, col in enumerate(df.columns):

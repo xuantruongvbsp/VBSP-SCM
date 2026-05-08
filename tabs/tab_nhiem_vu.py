@@ -528,7 +528,7 @@ def render(tab, **kwargs):
     role: str = kwargs.get("role", "user")
 
     with tab:
-        if role in ("admin", "manager"):
+        if role in ("admin", "manager", "admin_cn", "manager_cn"):
             t1, t2, t3 = st.tabs([
                 "📥 Danh sách nhiệm vụ",
                 "➕ Nhập nhiệm vụ mới",

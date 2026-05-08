@@ -13,6 +13,7 @@ from services import xuat_bao_cao, ten_file_bao_cao
 from pdf_service import nut_xuat_pdf
 from data import (danh_dau_khong_hd, tong_hop_khong_hd, ds_chi_tiet_khong_hd)
 from tabs import tab_nq11
+from auth import la_phan_he_pgd
 
 if TYPE_CHECKING:
     from streamlit.delta_generator import DeltaGenerator
@@ -118,7 +119,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
         st.divider()
 
         # Bộ lọc PGD dùng chung
-        if role in ["admin","manager"] and COT_TEN_PGD in df.columns:
+        if role in ("admin","manager","admin_cn","manager_cn") and COT_TEN_PGD in df.columns:
             loc_pgd_bc = st.selectbox("📍 PGD",
                 ["Tất cả"]+sorted(df[COT_TEN_PGD].dropna().unique().tolist()),
                 key="bc_pgd_chung")
@@ -127,9 +128,9 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
             st.markdown(f"📍 PGD: **{loc_pgd_bc}**")
 
         df_base = df.copy()
-        if role in ["admin","manager"] and loc_pgd_bc != "Tất cả":
+        if role in ("admin","manager","admin_cn","manager_cn") and loc_pgd_bc != "Tất cả":
             df_base = df_base[df_base[COT_TEN_PGD] == loc_pgd_bc]
-        elif role == "user":
+        elif la_phan_he_pgd(role) and pgd_user:
             df_base = df_base[df_base[COT_TEN_PGD] == loc_pgd_bc] if loc_pgd_bc != "Tất cả" else df_base
 
         # ══════════════════════════════
@@ -486,7 +487,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                     with col_xl:
                         if st.button("📥 Xuất báo cáo chi tiết", type="primary", key="btn_xuat_ct"):
                             sheets = {"Chi tiết": export_df}
-                            if role in ["admin", "manager"] and COT_TEN_PGD in df.columns:
+                            if role in ("admin", "manager", "admin_cn", "manager_cn") and COT_TEN_PGD in df.columns:
                                 sheets["Tổng hợp PGD"] = df.groupby(COT_TEN_PGD).agg(
                                     Số_hồ_sơ=(COT_MA_KH, "count"),
                                     Tổng_dư_nợ=(COT_TONG_DU_NO, "sum"),

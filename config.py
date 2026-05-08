@@ -273,6 +273,7 @@ COT_TEN_KH     = "Tên KH"
 COT_SO_KU      = "Số khế ước"
 COT_NGAY_VAY   = "Ngày vay"
 COT_NGAY_DH    = "Ngày ĐH theo hợp đồng"
+COT_NGAY_DEN_HAN = COT_NGAY_DH  # alias cho module đến hạn
 COT_THOI_HAN   = "Thời hạn vay"
 COT_LAI_SUAT   = "Lãi suất"
 COT_MUC_VAY    = "Mức vay"

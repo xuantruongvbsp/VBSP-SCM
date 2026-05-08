@@ -559,7 +559,7 @@ def _section_c_tong_hop(
                 "⚠️ Còn đơn vị chưa nhập đủ KH giao (hoặc chưa đúng loại Giao)."
             )
 
-    if not readonly_exec and role in ("admin", "manager"):
+    if not readonly_exec and role in ("admin", "manager", "admin_cn", "manager_cn"):
         y_all = st.text_input("Ý kiến duyệt tất cả", key=_SS + "y_kien_all")
         if st.button(
             "✅ Duyệt tất cả",
@@ -749,7 +749,7 @@ def render(tab=None, **kwargs) -> None:
 
         nam, thang, dot = _chon_dot()
 
-        if role in ("admin", "manager"):
+        if role in ("admin", "manager", "admin_cn", "manager_cn"):
             loai_radio = st.radio(
                 "Loại đợt",
                 ["📋 Giao KHTD", "📉 Điều chỉnh KHTD"],

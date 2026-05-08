@@ -18,6 +18,7 @@ from utils import (
     ten_file_xuat,
     hien_thi_dataframe_phan_trang,
 )
+from auth import la_phan_he_pgd
 if TYPE_CHECKING:
     from streamlit.delta_generator import DeltaGenerator
 
@@ -147,7 +148,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
 
         # Filter sau expander — dùng boolean mask, không copy toàn bộ df
         _masks = []
-        if role not in ["admin", "manager"] and pgd_user:
+        if la_phan_he_pgd(role) and pgd_user:
             _masks.append(df[COT_TEN_PGD] == pgd_user)
         if cxa   != "Tất cả" and COT_TEN_XA  in df.columns:
             _masks.append(df[COT_TEN_XA]  == cxa)

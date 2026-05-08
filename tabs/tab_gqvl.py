@@ -168,7 +168,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                 )
             with upc2:
                 # Chọn PGD để lưu
-                if role in ["admin","manager"] and COT_TEN_PGD in kwargs.get("df_full", pd.DataFrame()).columns:
+                if role in ("admin","manager","admin_cn","manager_cn") and COT_TEN_PGD in kwargs.get("df_full", pd.DataFrame()).columns:
                     ds_pgd_all = sorted(kwargs["df_full"][COT_TEN_PGD].dropna().unique().tolist())
                     pgd_up = st.selectbox("Lưu cho PGD", ds_pgd_all, key="gqvl_pgd_up")
                 else:
@@ -194,7 +194,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
             st.info("👆 Upload file GQVL của PGD bên trên để xem số liệu.")
             return
 
-        if role in ["admin","manager"]:
+        if role in ("admin","manager","admin_cn","manager_cn"):
             pgd_xem = st.selectbox("📍 Xem PGD", ["Tất cả"] + pgd_da_up, key="gqvl_pgd_xem")
         else:
             pgd_xem = pgd_user or pgd_da_up[0]

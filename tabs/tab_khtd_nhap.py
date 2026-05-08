@@ -806,6 +806,57 @@ def _tab_khtd_chi_nhanh(role: str, username: str, df_full: "pd.DataFrame | None"
     st.divider()
     _section_van_ban_qd_cn(role, username)
 
+    # ── Lịch sử phiên bản (chỉ admin / admin_cn) ───────────────────────────
+    if role in ("admin", "admin_cn"):
+        with st.expander("🕐 Lịch sử chỉnh sửa KHTD Chi nhánh", expanded=False):
+            history = db.doc_kv_history(KV_KEY_CN, limit=15)
+            if not history:
+                st.info("Chưa có lịch sử chỉnh sửa.")
+            else:
+                df_hist = pd.DataFrame(history)
+                df_hist_display = df_hist.rename(columns={
+                    "changed_at": "Thời điểm",
+                    "changed_by": "Người sửa",
+                    "note": "Ghi chú",
+                })
+                st.dataframe(
+                    df_hist_display[["Thời điểm", "Người sửa", "Ghi chú"]],
+                    use_container_width=True,
+                    hide_index=True,
+                )
+
+                options = ["-- Chọn --"] + [
+                    f"#{row['id']} — {row['changed_at']} ({row['changed_by']})"
+                    for row in history
+                ]
+                lua_chon = st.selectbox(
+                    "Chọn phiên bản để xem trước",
+                    options=options,
+                    key="khtd_cn_history_select",
+                )
+                if lua_chon != "-- Chọn --":
+                    try:
+                        hist_id = int(lua_chon.split(" — ")[0].lstrip("#"))
+                        row_match = next((r for r in history if r["id"] == hist_id), None)
+                        if row_match:
+                            value_preview = json.loads(row_match["value"])
+                            st.json(value_preview)
+                            if st.button(
+                                "♻️ Khôi phục phiên bản này",
+                                type="secondary",
+                                key=f"khtd_restore_{hist_id}",
+                            ):
+                                ok = db.khoi_phuc_kv(
+                                    KV_KEY_CN, hist_id, username
+                                )
+                                if ok:
+                                    st.success("✅ Đã khôi phục. Tải lại trang để xem.")
+                                    st.cache_data.clear()
+                                else:
+                                    st.error("Không tìm thấy phiên bản.")
+                    except (ValueError, StopIteration):
+                        st.error("Không tìm thấy phiên bản.")
+
 
 def _tab_khtd_theo_xa(role: str, username: str, df_full: "pd.DataFrame | None") -> None:
     st.subheader("📍 Kế hoạch Tín dụng theo Xã")

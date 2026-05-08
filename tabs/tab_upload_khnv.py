@@ -314,17 +314,12 @@ def _xu_ly_upload(
         else:
             col.warning(f"**{nhan}**\n\n{kq.thong_bao}")
 
-    # Merge toàn CN nếu có ít nhất 1 file HSTD/NQ11/GQVL được lưu
+    # Ghi cờ cho fragment merge xử lý sau (không merge đồng bộ ở đây)
     if can_merge:
-        st.divider()
-        with st.spinner("🔄 Đang tổng hợp dữ liệu toàn Chi nhánh..."):
-            for loai in ("hstd", "nq11", "gqvl"):
-                if loai in ket_qua_upload and ket_qua_upload[loai].thanh_cong:
-                    kq_merge = merge_du_lieu_toan_cn(loai)
-                    if kq_merge.thanh_cong:
-                        st.success(kq_merge.thong_bao)
-                    else:
-                        st.warning(f"⚠️ Gộp {loai.upper()}: {kq_merge.thong_bao}")
+        for loai in ("hstd", "nq11", "gqvl"):
+            if loai in ket_qua_upload and ket_qua_upload[loai].thanh_cong:
+                st.session_state[f"can_merge_{loai}"] = True
+        st.info("✅ File đã lưu. Nhấn nút bên dưới để cập nhật dữ liệu.")
 
     st.cache_data.clear()
     # Lưu kết quả vào session để render sau rerun
@@ -999,6 +994,45 @@ def _render_xoa_du_lieu(role: str, username: str) -> None:
 
 # ── Entry point ───────────────────────────────────────────────────────────────
 
+@st.fragment
+def _fragment_merge_toan_cn():
+    co_cho_merge = any(
+        st.session_state.get(f"can_merge_{loai}", False)
+        for loai in ["hstd", "nq11", "gqvl"]
+    )
+    if not co_cho_merge:
+        return
+
+    st.divider()
+    st.subheader("🔄 Cập nhật dữ liệu toàn Chi nhánh")
+    st.caption("Tổng hợp file vừa upload vào hệ thống dữ liệu chung (22 đơn vị).")
+
+    if st.button("▶️ Bắt đầu cập nhật", type="primary",
+                 key="btn_merge_toan_cn"):
+        with st.spinner("⏳ Đang merge 22 đơn vị... Vui lòng chờ."):
+            try:
+                from services.upload_service import merge_du_lieu_toan_cn
+
+                for loai in ("hstd", "nq11", "gqvl"):
+                    if st.session_state.get(f"can_merge_{loai}", False):
+                        merge_du_lieu_toan_cn(loai)
+
+                for loai in ("hstd", "nq11", "gqvl"):
+                    st.session_state.pop(f"can_merge_{loai}", None)
+
+                st.cache_data.clear()
+
+                username = st.session_state.get("username", "unknown")
+                db.ghi_audit(username, "merge_toan_cn",
+                             "Merge thành công (non-blocking fragment)")
+
+                st.success("✅ Cập nhật hoàn tất! Dữ liệu mới sẵn sàng.")
+                st.balloons()
+
+            except Exception as e:
+                st.error(f"❌ Lỗi khi merge: {e}")
+
+
 def render(tab=None, **kwargs) -> None:
     """
     Render tab Upload KH-NV.
@@ -1132,6 +1166,8 @@ def render(tab=None, **kwargs) -> None:
                     col.success(f"**{nhan}**\n\n{kq['thong_bao']}")
                 else: 
                     col.warning(f"**{nhan}**\n\n{kq['thong_bao']}")
+
+        _fragment_merge_toan_cn()
 
         st.markdown("---")
         col_tt, col_rf = st.columns([5, 1])

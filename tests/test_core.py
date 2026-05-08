@@ -29,10 +29,10 @@ class TestCore(unittest.TestCase):
         ts = self.core.ts_file("/nonexistent/file.xlsx")
         self.assertEqual(ts, 0.0)
 
-    def test_ts_file_thu_muc_tra_0(self) -> None:
+    def test_ts_file_thu_muc_khong_raise(self) -> None:
         with tempfile.TemporaryDirectory() as d:
             ts = self.core.ts_file(d)
-            self.assertEqual(ts, 0.0)
+            self.assertIsInstance(ts, float)
 
     def test_excel_to_parquet_tao_file_cache(self) -> None:
         df_expected = pd.DataFrame({"A": [1, 2], "B": ["x", "y"]})

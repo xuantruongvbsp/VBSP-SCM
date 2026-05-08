@@ -60,8 +60,21 @@ def _doc_gqvl_parquet() -> pd.DataFrame:
 
 
 def _phan_loai_4_nhom(df: pd.DataFrame) -> dict[str, pd.DataFrame]:
-    cot_nv = config.COT_NGUON_VON
-    cot_ma_ndt = config.COT_MA_NHA_DAU_TU
+    """
+    Phân tầng 4 nhóm GQVL theo quy tắc từ file thực tế.
+
+    Quy tắc:
+      - TW: dùng "Phân loại NV" (1=NSNN, 2=NHCSXH), KHÔNG dùng Mã NĐT
+      - ĐP: dùng "Mã nhà đầu tư" với substring match từ ndt_dp_list
+
+    Cột sau khi rename từ GQVL_COT_MAP:
+      - "Nguồn vốn": "TW" hoặc "ĐP"
+      - "Phân loại NV": 1.0 hoặc 2.0
+      - "Mã nhà đầu tư": chuỗi như "INV0802140002662" hoặc NaN
+    """
+    cot_nv = "Nguồn vốn"           # sau rename từ GQVL_COT_MAP
+    cot_pl_nv = "Phân loại NV"    # sau rename từ "PL NV"
+    cot_ma_ndt = "Mã nhà đầu tư"  # giữ nguyên tên
 
     result: dict[str, pd.DataFrame] = {
         "cap_tinh_tw_nhcsxh": pd.DataFrame(),
@@ -78,42 +91,53 @@ def _phan_loai_4_nhom(df: pd.DataFrame) -> dict[str, pd.DataFrame]:
         _LOG.warning("Cot '%s' khong co trong GQVL. Cac cot: %s", cot_nv, list(df.columns))
         return result
 
-    ndt_dp_list = db.doc_kv("ndt_dp_list")
-    if not ndt_dp_list:
-        ndt_dp_list = config.MA_NDT_CAP_TINH_DUOI
-    ndt_dp_set = set(str(m).strip() for m in ndt_dp_list)
-    _LOG.info("Danh sach ma NDT cap tinh: %s", ndt_dp_set)
+    # Load ndt_dp_list từ db hoặc fallback về config (dùng cho ĐP phân tầng)
+    ndt_dp_list: list[str] = db.doc_kv("ndt_dp_list") or config.MA_NDT_CAP_TINH_DUOI
+    _LOG.info("Danh sach ma NDT cap tinh: %s", ndt_dp_list)
 
+    # ── Phân biệt TW vs ĐP ───────────────────────────────────────────────────
     nv_str = df[cot_nv].astype(str).str.strip()
-    mask_tw = nv_str == "1"
-    mask_dp = nv_str == "2"
+    mask_tw = nv_str == "TW"
+    mask_dp = nv_str == "ĐP"
     so_khong_xac_dinh = int((~mask_tw & ~mask_dp).sum())
     if so_khong_xac_dinh:
-        _LOG.warning("Co %d dong khong xac dinh duoc Nguon von", so_khong_xac_dinh)
+        _LOG.warning("Co %d dong khong xac dinh duoc Nguon von (khong phai TW/ĐP)", so_khong_xac_dinh)
 
+    # ── Xử lý TW: phân biệt bằng Phân loại NV ─────────────────────────────────
     df_tw = df[mask_tw].copy()
     _LOG.info("Tong so dong TW: %d", len(df_tw))
     if not df_tw.empty:
-        if cot_ma_ndt in df_tw.columns:
-            ma_ndt_str = df_tw[cot_ma_ndt].astype(str).str.strip()
-            mask_nhcsxh = ma_ndt_str == "2"
+        if cot_pl_nv in df_tw.columns:
+            # Ép kiểu PL NV: int(float(val)) vì file lưu dạng float 1.0/2.0
+            pl_vals = pd.to_numeric(df_tw[cot_pl_nv], errors="coerce")
+            mask_nhcsxh = pl_vals == 2.0  # PL = 2 → NHCSXH huy động
+            mask_nsnn = pl_vals == 1.0   # PL = 1 → NSNN
         else:
-            _LOG.warning("Cot '%s' khong co trong TW het xep vao NSNN", cot_ma_ndt)
+            _LOG.warning("Cot '%s' khong co trong TW, het xep vao NSNN", cot_pl_nv)
             mask_nhcsxh = pd.Series(False, index=df_tw.index)
-        result["cap_tinh_tw_nhcsxh"] = df_tw[mask_nhcsxh]
-        result["cap_tinh_tw_nsnn"] = df_tw[~mask_nhcsxh]
+            mask_nsnn = pd.Series(True, index=df_tw.index)
 
+        result["cap_tinh_tw_nhcsxh"] = df_tw[mask_nhcsxh]
+        result["cap_tinh_tw_nsnn"] = df_tw[mask_nsnn]
+        _LOG.info("  TW NHCSXH (PL=2): %d dong", mask_nhcsxh.sum())
+        _LOG.info("  TW NSNN (PL=1): %d dong", mask_nsnn.sum())
+
+    # ── Xử lý ĐP: phân biệt bằng Mã nhà đầu tư (substring match) ──────────────
     df_dp = df[mask_dp].copy()
     _LOG.info("Tong so dong DP: %d", len(df_dp))
     if not df_dp.empty:
         if cot_ma_ndt in df_dp.columns:
             ma_ndt_str = df_dp[cot_ma_ndt].astype(str).str.strip()
-            mask_cap_tinh = ma_ndt_str.isin(ndt_dp_set)
+            # Substring match: nếu bất kỳ mã nào trong ndt_dp_list xuất hiện trong Mã NĐT
+            mask_cap_tinh = ma_ndt_str.apply(lambda x: any(ma in x for ma in ndt_dp_list))
         else:
-            _LOG.warning("Cot '%s' khong co trong DP het xep vao cap xa", cot_ma_ndt)
+            _LOG.warning("Cot '%s' khong co trong DP, het xep vao cap xa", cot_ma_ndt)
             mask_cap_tinh = pd.Series(False, index=df_dp.index)
+
         result["cap_tinh"] = df_dp[mask_cap_tinh]
         result["cap_xa"] = df_dp[~mask_cap_tinh]
+        _LOG.info("  DP Cấp tỉnh (match NĐT): %d dong", mask_cap_tinh.sum())
+        _LOG.info("  DP Cấp xã/khác: %d dong", (~mask_cap_tinh).sum())
 
     for slug, df_nhom in result.items():
         _LOG.info("Phan tang '%s': %d dong", slug, len(df_nhom))

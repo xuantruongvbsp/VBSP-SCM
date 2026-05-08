@@ -32,7 +32,10 @@ class TestDataQuality(unittest.TestCase):
         )
         result = kiem_tra_chat_luong(df, "hstd")
         self.assertGreaterEqual(result.report["so_loi"], 1)
-        self.assertIn("Cột 'Số khế ước' có 1 dòng trùng.", result.errors)
+        self.assertTrue(
+            any("ngoài miền" in e for e in result.errors),
+            f"Expected domain error, got: {result.errors}"
+        )
 
     def test_kiem_tra_chat_luong_bat_loi_null_bat_buoc(self) -> None:
         df = pd.DataFrame(

@@ -70,6 +70,8 @@ db.ghi_kv("key_name", value, username)  # ghi
 | `kehoach` | KH Điện báo toàn CN |
 | `kehoach_pgd_{slug}` | KH Điện báo PGD |
 | `dgd_map` | Điểm giao dịch toàn CN |
+| `kh_gqvl_cn_{nam}` | KH GQVL Chi nhánh theo năm |
+| `kh_gqvl_pgd_{slug}_{nam}` | KH GQVL theo PGD (dự phòng) |
 
 `slug` = `pgd_slug(ten_pgd)` từ `data/pgd.py`
 

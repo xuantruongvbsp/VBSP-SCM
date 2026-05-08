@@ -103,15 +103,7 @@ def _luu_kv(key: str, data: dict[str, Any], username: str) -> bool:
         True nếu lưu thành công
     """
     try:
-        with db.get_conn() as conn:
-            conn.execute(
-                "INSERT OR REPLACE INTO kv_store (key, value, updated_at, updated_by) "
-                "VALUES (?,?,?,?)",
-                (key, json.dumps(data, ensure_ascii=False),
-                 datetime.now().isoformat(), username),
-            )
-            conn.commit()
-        # Ghi audit log
+        db.ghi_kv(key, data, username)
         db.ghi_audit(username, "luu_kv", f"key={key}, {len(data)} items")
         return True
     except Exception as e:

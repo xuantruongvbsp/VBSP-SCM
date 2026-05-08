@@ -215,6 +215,48 @@ def doc_kv_nhieu(keys: list[str]) -> dict[str, Any]:
         return {}
 
 
+def doc_kv_history(key: str, limit: int = 10) -> list[dict]:
+    """
+    Đọc lịch sử thay đổi của một key từ bảng kv_history.
+
+    Trả về list[dict] với các khóa: id, value, changed_by, changed_at, note.
+    Nếu không có lịch sử → trả về [].
+    """
+    try:
+        with get_conn() as conn:
+            rows = conn.execute(
+                """SELECT id, value, changed_by, changed_at, note
+                   FROM kv_history WHERE key = ?
+                   ORDER BY id DESC LIMIT ?""",
+                (key, limit),
+            ).fetchall()
+        return [dict(row) for row in rows]
+    except Exception:
+        return []
+
+
+def khoi_phuc_kv(key: str, history_id: int, username: str) -> bool:
+    """
+    Khôi phục giá trị của một key từ lịch sử theo history_id.
+
+    Trả về True nếu thành công, False nếu không tìm thấy id.
+    """
+    try:
+        with get_conn() as conn:
+            row = conn.execute(
+                "SELECT value FROM kv_history WHERE id = ? AND key = ?",
+                (history_id, key),
+            ).fetchone()
+        if not row:
+            return False
+        value_cu = json.loads(row["value"])
+        ghi_kv(key, value_cu, username, note=f"Khôi phục từ phiên bản #{history_id}")
+        ghi_audit(username, "khoi_phuc_kv", f"key={key}, history_id={history_id}")
+        return True
+    except Exception:
+        return False
+
+
 def ghi_audit(username: str, action: str, detail: str = "") -> None:
     try:
         with get_conn() as conn:

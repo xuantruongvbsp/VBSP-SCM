@@ -3,7 +3,6 @@ import os
 import tempfile
 import unittest
 from io import BytesIO
-from pathlib import Path
 
 import pandas as pd
 
@@ -13,13 +12,6 @@ class TestDienBao(unittest.TestCase):
     def setUpClass(cls) -> None:
         from data import hstd
         cls.hstd = hstd
-
-    def _tao_file_dienbao(self, data: list[list]) -> bytes:
-        df = pd.DataFrame(data)
-        bio = BytesIO()
-        with pd.ExcelWriter(bio, engine="openpyxl") as writer:
-            df.to_excel(writer, header=False, index=False)
-        return bio.getvalue()
 
     def test_doc_dienbao_rong(self) -> None:
         fp = tempfile.mktemp(suffix=".xlsx")
@@ -106,7 +98,7 @@ class TestKhongHoatDong(unittest.TestCase):
         return pd.DataFrame({
             "Số khế ước": ["KU001", "KU002", "KU003"],
             "Mã chương trình": [1, 2, 3],
-            "Dư nợ TH": [10_000_000, 5_000_000, 0],
+            "Dư nợ trong hạn": [10_000_000, 5_000_000, 0],
             "Dư nợ quá hạn": [0, 0, 0],
             "Dư nợ khoanh": [0, 0, 0],
             "Ngày số liệu": pd.to_datetime(["2026-05-08", "2026-05-08", "2026-05-08"]),
@@ -114,19 +106,20 @@ class TestKhongHoatDong(unittest.TestCase):
                 "2025-01-01", "2026-04-01", "2026-05-01"
             ]),
             "Ngày vay": pd.to_datetime(["2025-01-01", "2026-04-01", "2026-05-01"]),
-            "Lãi tồn": [1_000_000, 0, 0],
-            "Lãi DT tháng": [100_000, 100_000, 100_000],
+            "Lãi tồn TH": [1_000_000, 0, 0],
+            "Lãi DT trong tháng": [100_000, 100_000, 100_000],
+            "Tổng dư nợ": [10_000_000, 5_000_000, 0],
         })
 
     def _df_khong_ngay(self) -> pd.DataFrame:
         return pd.DataFrame({
             "Số khế ước": ["KU001", "KU002"],
             "Mã chương trình": [1, 3],
-            "Dư nợ TH": [10_000_000, 5_000_000],
+            "Dư nợ trong hạn": [10_000_000, 5_000_000],
             "Dư nợ quá hạn": [0, 0],
             "Dư nợ khoanh": [0, 0],
-            "Lãi tồn": [5_000_000, 0],
-            "Lãi DT tháng": [100_000, 100_000],
+            "Lãi tồn TH": [5_000_000, 0],
+            "Lãi DT trong tháng": [100_000, 100_000],
         })
 
     def test_danh_dau_khong_hd_co_ngay(self) -> None:
@@ -140,7 +133,7 @@ class TestKhongHoatDong(unittest.TestCase):
 
     def test_danh_dau_khong_hd_loai_tru_du_no_0(self) -> None:
         df = self._df_co_ngay()
-        df.loc[2, "Dư nợ TH"] = 0
+        df.loc[2, "Dư nợ trong hạn"] = 0
         df.loc[2, "Dư nợ quá hạn"] = 0
         result = self.hstd.danh_dau_khong_hd(df)
         self.assertFalse(result.loc[2, "is_3m_inactive"])
@@ -199,6 +192,11 @@ class TestKhongHoatDong(unittest.TestCase):
     def test_ds_chi_tiet_khong_hd(self) -> None:
         df = self._df_co_ngay()
         df["Tên ĐVUT"] = ["ĐVUT A", "ĐVUT A", "ĐVUT B"]
+        df["Tên xã"] = ["Xã A", "Xã A", "Xã B"]
+        df["Tên PGD"] = ["PGD A", "PGD A", "PGD B"]
+        df["Tên khách hàng"] = ["KH A", "KH B", "KH C"]
+        df["Ngày đến hạn cuối"] = pd.to_datetime(["2026-06-01", "2026-06-01", "2026-06-01"])
+        df["Chương trình"] = ["CT A", "CT B", "CT C"]
         result = self.hstd.ds_chi_tiet_khong_hd(df, nhom_theo="Tên ĐVUT")
         self.assertIsInstance(result, pd.DataFrame)
         self.assertGreater(len(result), 0)
@@ -206,6 +204,11 @@ class TestKhongHoatDong(unittest.TestCase):
     def test_ds_chi_tiet_khong_hd_loc_theo_nhom(self) -> None:
         df = self._df_co_ngay()
         df["Tên ĐVUT"] = ["ĐVUT A", "ĐVUT A", "ĐVUT B"]
+        df["Tên xã"] = ["Xã A", "Xã A", "Xã B"]
+        df["Tên PGD"] = ["PGD A", "PGD A", "PGD B"]
+        df["Tên khách hàng"] = ["KH A", "KH B", "KH C"]
+        df["Ngày đến hạn cuối"] = pd.to_datetime(["2026-06-01", "2026-06-01", "2026-06-01"])
+        df["Chương trình"] = ["CT A", "CT B", "CT C"]
         result = self.hstd.ds_chi_tiet_khong_hd(
             df, nhom_theo="Tên ĐVUT", gia_tri_nhom="ĐVUT A"
         )
@@ -223,12 +226,12 @@ class TestCanhBaoMigration(unittest.TestCase):
         df = pd.DataFrame({
             "Số khế ước": ["KU001", "KU002"],
             "Phân loại": ["E", "E"],
-            "Dư nợ TH": [10_000_000, 10_000_000],
+            "Dư nợ trong hạn": [10_000_000, 10_000_000],
             "Dư nợ quá hạn": [0, 0],
             "Dư nợ khoanh": [0, 0],
             "Mã chương trình": [1, 1],
-            "Lãi tồn": [300_000, 50_000],
-            "Lãi DT tháng": [100_000, 100_000],
+            "Lãi tồn TH": [300_000, 50_000],
+            "Lãi DT trong tháng": [100_000, 100_000],
             "Ngày số liệu": pd.to_datetime(["2026-05-08", "2026-05-08"]),
             "Ngày giao dịch gần nhất": pd.to_datetime(["2026-01-01", "2026-04-01"]),
             "Ngày vay": pd.to_datetime(["2026-01-01", "2026-04-01"]),
@@ -241,12 +244,12 @@ class TestCanhBaoMigration(unittest.TestCase):
     def test_canh_bao_migration_khong_co_phan_loai(self) -> None:
         df = pd.DataFrame({
             "Số khế ước": ["KU001"],
-            "Dư nợ TH": [10_000_000],
+            "Dư nợ trong hạn": [10_000_000],
             "Dư nợ quá hạn": [0],
             "Dư nợ khoanh": [0],
             "Mã chương trình": [1],
-            "Lãi tồn": [300_000],
-            "Lãi DT tháng": [100_000],
+            "Lãi tồn TH": [300_000],
+            "Lãi DT trong tháng": [100_000],
             "Ngày số liệu": pd.to_datetime(["2026-05-08"]),
             "Ngày giao dịch gần nhất": pd.to_datetime(["2026-01-01"]),
             "Ngày vay": pd.to_datetime(["2026-01-01"]),

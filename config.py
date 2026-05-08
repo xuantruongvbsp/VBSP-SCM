@@ -458,6 +458,21 @@ NGUON_VON_LABEL = {1: "Trung ương", 2: "Địa phương", "1": "Trung ương",
 # ── Key kv_store cho registry chương trình toàn hệ thống ──────────────────────
 KV_KEY_CT_REGISTRY_ALL = "ct_registry_all"
 
+# ── Nguyên nhân rủi ro QĐ 62/2015/QĐ-TTg ────────────────────────────────────
+NGUYEN_NHAN_RR = [
+    "Thiên tai, dịch bệnh (QĐ62)",
+    "Nhà nước thay đổi chính sách (QĐ62)",
+    "Lao động về nước trước hạn (QĐ62)",
+    "KH/TV hộ GĐ gặp rủi ro (QĐ62)",
+    "Vắng mặt tại nơi cư trú (QĐ62)",
+    "Rủi ro không làm kịp thời (QĐ62)",
+    "Hết thời gian khoanh nợ (QĐ62)",
+    "Nợ nhận bàn giao (QĐ62)",
+]
+
+# ── KV key prefix cho Nợ rủi ro ──────────────────────────────────────────────
+KV_PREFIX_NO_RUI_RO = "no_rui_ro_"
+
 # ── Thông tin đơn vị ─────────────────────────────────────────────────────────
 # "Hội sở Chi nhánh tỉnh" = PGD địa bàn Biên Hòa (key nội bộ, khớp cột Tên PGD trong HSTD)
 # TEN_CHI_NHANH_HIEN_THI = nhãn hiển thị toàn Chi nhánh trên UI

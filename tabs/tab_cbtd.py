@@ -11,6 +11,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 
 from config import *
+from auth import la_phan_he_cn
 from utils import xuat_excel, ten_file_xuat, hien_thi_dataframe_phan_trang
 from data import doc_cbtd, luu_cbtd
 
@@ -313,7 +314,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
             return trung
 
         # ── Thao tác (admin + manager) ──
-        if role not in ["admin","manager"]:
+        if not la_phan_he_cn(role) or role == "executive":
             st.caption("Chỉ Quản lý trở lên mới được quản lý CBTD.")
         else:
             che_do = st.radio("Thao tác",

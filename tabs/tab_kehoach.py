@@ -10,6 +10,7 @@ from config import *
 from data import doc_dienbao, db_lookup, ts_file, doc_kehoach, luu_kehoach
 from data.pgd import duong_dan_pgd, pgd_slug
 from services import kiem_tra_file
+from auth import la_phan_he_cn
 from utils import (
     fmt,
     fmt_tien,
@@ -108,7 +109,7 @@ def render(tab, **kwargs):
 
         with col_up:
             st.markdown("**📤 Upload file kế hoạch Excel**")
-            if role not in ["admin", "manager"]:
+            if not la_phan_he_cn(role) or role == "executive":
                 st.info("Chỉ Quản lý trở lên mới upload được.")
             else:
                 st.caption("Cấu trúc: Cột A = Tên chỉ tiêu, Cột B = Giá trị (đồng)")
@@ -143,7 +144,7 @@ def render(tab, **kwargs):
 
         with col_nhap:
             st.markdown("**✏️ Nhập kế hoạch thủ công**")
-            if role not in ["admin", "manager"]:
+            if not la_phan_he_cn(role) or role == "executive":
                 st.caption("Chỉ Quản lý trở lên mới nhập được.")
             else:
                 with st.form(f"nhap_kh_{prefix}"):

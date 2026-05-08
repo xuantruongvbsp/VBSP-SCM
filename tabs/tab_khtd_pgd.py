@@ -17,6 +17,7 @@ import pandas as pd
 from openpyxl.styles import Font, PatternFill
 
 import db
+from auth import la_phan_he_cn
 from utils import hien_thi_dataframe_phan_trang
 
 from config import (
@@ -171,7 +172,7 @@ def _section_van_ban_qd_pgd(pgd: str, role: str, username: str) -> None:
         with col_hist2:
             _hien_thi_lich_su_qd(kv_hdqt_xa, "QĐ HĐQT xã", role, username)
 
-        if role not in ("admin", "manager"):
+        if not la_phan_he_cn(role) or role == "executive":
             st.caption("🔒 Chỉ Admin / Manager mới được upload văn bản QĐ.")
             return
 
@@ -558,7 +559,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
         st.caption("Hỗ trợ địa bàn · Xem tổng hợp KH theo Xã × Chương trình")
 
         # ── Xác định PGD hiển thị ─────────────────────────────────────────
-        if role in ("admin", "manager"):
+        if role in ("admin", "manager", "admin_cn", "manager_cn"):
             pgd_hien_tai: str = st.selectbox(
                 "Chọn PGD", DS_PGD, key="khtd_pgd_sel_admin"
             )

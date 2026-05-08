@@ -43,6 +43,7 @@ from tabs import (
 )
 from tabs import tab_upload_khnv
 from tabs import tab_quan_ly_dgd
+from tabs.tab_kh_gqvl import render as render_kh_gqvl
 
 
 def _render_canh_bao(df: pd.DataFrame, ds_pgd_all: list):
@@ -433,6 +434,7 @@ def render(**kwargs):
         "🚨 Cảnh báo sớm",
         "🔍 Kiểm soát CN",
         "🗓️ KH Tín dụng Năm",
+        "📋 KH GQVL",
         "📤 Giao KH theo Đợt",
         "🎯 KH vs Thực hiện",
         "📈 Báo cáo chi tiết",
@@ -458,21 +460,23 @@ def render(**kwargs):
     with tabs[2]:
         tab_kiem_soat.render_tab(df_full, role, kwargs.get("username", "unknown"))
     tab_khtd.render(tabs[3], **dict(kwargs, khtd_mode="cn"))
-    tab_khtd_giao_dc.render(tabs[4], **kwargs)
-    tab_kehoach.render(tabs[5], **kwargs)
-    tab_baocao.render(tabs[6], **kwargs)
-    tab_candoi.render(tabs[7], **kwargs)
-    tab_cbtd.render(tabs[8], **kwargs)
-    with tabs[9]:
+    with tabs[4]:
+        render_kh_gqvl(role=role)
+    tab_khtd_giao_dc.render(tabs[5], **kwargs)
+    tab_kehoach.render(tabs[6], **kwargs)
+    tab_baocao.render(tabs[7], **kwargs)
+    tab_candoi.render(tabs[8], **kwargs)
+    tab_cbtd.render(tabs[9], **kwargs)
+    with tabs[10]:
         _sub1, _sub2 = st.tabs(["📍 Điểm Giao Dịch", "🏘️ Tổ TK&VV"])
         tab_quan_ly_dgd.render(_sub1, **kwargs)
         tab_cdtotkvv.render(_sub2, **dict(kwargs, cdto_mode="cn"))
-    tab_ban_dai_dien.render(tabs[10], cap="tinh", **kwargs)
-    tab_uy_thac.render(tabs[11], **kwargs)
-    tab_nhiem_vu.render(tabs[12], **kwargs)
+    tab_ban_dai_dien.render(tabs[11], cap="tinh", **kwargs)
+    tab_uy_thac.render(tabs[12], **kwargs)
+    tab_nhiem_vu.render(tabs[13], **kwargs)
     if get_permissions(role)["can_upload"]:
-        with tabs[13]:
+        with tabs[14]:
             _render_quan_ly_template(df_full)
-        tab_upload_khnv.render(tabs[14], **kwargs)
+        tab_upload_khnv.render(tabs[15], **kwargs)
     else:
-        tab_upload_khnv.render(tabs[13], **kwargs)
+        tab_upload_khnv.render(tabs[14], **kwargs)

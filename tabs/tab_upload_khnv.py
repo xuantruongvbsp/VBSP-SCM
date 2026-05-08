@@ -20,6 +20,7 @@ import pandas as pd
 import streamlit as st
 
 import db
+from auth import la_phan_he_cn
 from config import DS_PGD, DON_VI_CHI_NHANH, MA_PGD_MAP
 from data.pgd import (
     duong_dan_pgd,
@@ -909,7 +910,7 @@ def _thuc_hien_xoa(
 
 def _render_xoa_du_lieu(role: str, username: str) -> None:
     """Expander xóa dữ liệu PGD — chỉ admin/manager."""
-    if role not in ("admin", "manager"):
+    if not la_phan_he_cn(role) or role == "executive":
         return
 
     with st.expander("🗑️ Xóa dữ liệu PGD", expanded=False):
@@ -1044,7 +1045,7 @@ def render(tab=None, **kwargs) -> None:
     ctx = tab if tab is not None else st
 
     with ctx:
-        if role not in ("admin", "manager"):
+        if not la_phan_he_cn(role) or role == "executive":
             st.error("🔒 Chức năng này chỉ dành cho Phòng KH-NV (admin/manager).")
             return
 

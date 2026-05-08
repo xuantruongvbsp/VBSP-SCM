@@ -103,18 +103,37 @@ def init_db():
                 y_kien_duyet  TEXT,
                 UNIQUE(nhiem_vu_id, pgd)
             );
+            CREATE TABLE IF NOT EXISTS kv_history (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                key         TEXT    NOT NULL,
+                value       TEXT,
+                changed_by  TEXT,
+                changed_at  TEXT DEFAULT (datetime('now','localtime')),
+                note        TEXT
+            );
+            CREATE INDEX IF NOT EXISTS idx_kv_history_key ON kv_history(key);
         """)
         conn.commit()
 
 
-def ghi_kv(key: str, value: dict, username: str = "system") -> None:
+def ghi_kv(key: str, value: dict, username: str = "system", note: str = None) -> None:
     """Ghi hoặc cập nhật một cặp key-value vào bảng kv_store."""
     try:
         with get_conn() as conn:
+            old_row = conn.execute(
+                "SELECT value FROM kv_store WHERE key = ?", (key,)
+            ).fetchone()
+            new_value_str = json.dumps(value, ensure_ascii=False)
+            if old_row and old_row["value"] != new_value_str:
+                conn.execute(
+                    """INSERT INTO kv_history (key, value, changed_by, note)
+                       VALUES (?, ?, ?, ?)""",
+                    (key, old_row["value"], username, note),
+                )
             conn.execute(
                 """INSERT OR REPLACE INTO kv_store (key, value, updated_at, updated_by)
                    VALUES (?, ?, ?, ?)""",
-                (key, json.dumps(value, ensure_ascii=False),
+                (key, new_value_str,
                  datetime.now().isoformat(), username),
             )
             conn.commit()

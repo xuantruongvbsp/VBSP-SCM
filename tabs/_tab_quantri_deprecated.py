@@ -13,6 +13,7 @@ from datetime import datetime
 from config import BASE_DIR, THU_MUC_DATA, CACHE_DIR, FILE_USERS
 from data import ts_file
 from utils import fmt_so, vn, hien_thi_dataframe_phan_trang
+from auth import la_phan_he_cn
 from services import (
     kiem_tra_file_he_thong,
     luu_file_he_thong,
@@ -209,11 +210,11 @@ def render(tab, **kwargs):
 
     with tab:
         # Chỉ admin/manager được vào
-        if role not in ["admin", "manager"]:
+        if not la_phan_he_cn(role) or role == "executive":
             st.error("🔒 Bạn không có quyền truy cập trang này.")
             return
 
-        if role in ["admin", "manager"]:
+        if role in ("admin", "manager", "admin_cn", "manager_cn"):
             tab_chinh, tab_baseline = st.tabs([
                 "⚙️ Upload & hệ thống",
                 "📁 Dữ liệu mốc 31/12",
@@ -298,7 +299,7 @@ def render(tab, **kwargs):
                 st.divider()
 
                 # ── Cấu hình Điểm Giao dịch (admin/manager) ──────────────────────────
-                if role in ["admin", "manager"]:
+                if role in ("admin", "manager", "admin_cn", "manager_cn"):
                     _render_cau_hinh_dgd(username, df_full)
                     st.divider()
 

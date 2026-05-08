@@ -18,7 +18,7 @@ from config import (
     COT_LAI_TON, COT_LAI_THANG, COT_DVUT,
     TEMPLATES_DIR, TAG_MAP,
 )
-from auth import co_quyen_upload_pgd, is_cn_role, is_pgd_role, get_permissions
+from auth import co_quyen_upload_pgd, is_cn_role, is_pgd_role, get_permissions, get_tab_permissions
 from data import danh_dau_khong_hd, tong_hop_khong_hd, ds_chi_tiet_khong_hd
 from utils import (
     fmt,
@@ -47,7 +47,7 @@ from tabs import (
     tab_nq11,
     tab_candoi,
     tab_uy_thac,
-    tab_no_rui_ro,
+    tab_qd62,
 )
 
 from tabs.tab_den_han import render as render_den_han
@@ -791,37 +791,17 @@ def render(**kwargs):
     if _wl:
         st.warning(_wl)
 
-    df       = kwargs.get("df")
-    df_nq11  = kwargs.get("df_nq11")
-    role     = kwargs.get("role")
+    df = kwargs.get("df")
+    df_nq11 = kwargs.get("df_nq11")
+    role = kwargs.get("role")
     pgd_user = kwargs.get("pgd_user")
 
     st.title("🗺️ Hỗ Trợ Địa Bàn PGD/Biên Hòa")
     st.caption("Tra cứu hồ sơ · Danh sách · Báo cáo giao ban · Văn bản tự động · Nhiệm vụ · Upload dữ liệu")
 
-    tab_names_op = [
-        "📊 Tổng quan",
-        "📈 Báo cáo chi tiết",
-        "🎯 KHTD",
-        "📋 Giao & ĐC KHTD",
-        "📋 Mẫu 07 Giao KH",
-        "📋 NQ11",
-        "🔍 Tra cứu hồ sơ",
-        "💳 Nợ rủi ro QĐ62",
-        "📋 Danh sách & Lọc",
-        "⏰ Đến hạn",
-        "📡 Điện Báo",
-        "📍 Điểm GD & Tổ TK&VV",
-        "📝 Báo cáo Giao ban",
-        "📄 Mẫu biểu",
-        "🏛️ Ban Đại Diện",
-        "🤝 Ủy thác",
-        "✅ Nhiệm vụ",
-        "📤 Upload Dữ liệu",
-    ]
-    # Thêm tab Upload HSTD cho admin_pgd/manager_pgd
-    if co_quyen_upload_pgd(role):
-        tab_names_op.append("📤 Upload HSTD")
+    # ── Phân quyền tab theo role ─────────────────────────────────────────
+    tab_perm = get_tab_permissions(role)
+    nhom_duoc_phep = tab_perm["nhom_duoc_phep"]
 
     # Dropdown chọn PGD cho admin_cn/manager_cn — hiển thị trước tabs
     pgd_filter: str | None = None
@@ -835,30 +815,7 @@ def render(**kwargs):
         if _pgd_filter_val != "Toàn Chi nhánh":
             pgd_filter = _pgd_filter_val
 
-    # Lazy render: chỉ chạy nội dung tab đang mở (cần key + on_change="rerun";
-    # nhãn tab hiện tại: st.session_state["ws_op_active_tab"]).
-    tabs_op = st.tabs(tab_names_op, key="ws_op_active_tab", on_change="rerun")
-
-    _ix_mau_bieu = tab_names_op.index("📄 Mẫu biểu")
-
-    def _render_mau_bieu_tab() -> None:
-        with tabs_op[_ix_mau_bieu]:
-            _init_gb2_session_for_doc_hub(kwargs)
-            doc_t1, doc_t2, doc_t3 = st.tabs(
-                [
-                    "📄 Trung tâm mẫu biểu",
-                    "📋 Biên bản giao ban",
-                    "📢 Thông báo kết luận",
-                ]
-            )
-            with doc_t1:
-                _render_doc_hub(df, df_nq11, role)
-            with doc_t2:
-                _render_bien_ban_giao_ban(doc_t2, **kwargs)
-            with doc_t3:
-                _render_thong_bao_ket_luan(doc_t3, **kwargs)
-
-    # Lọc df theo PGD cho user để tab Tổng quan hiển thị đúng phạm vi
+    # Lọc df theo PGD
     if is_pgd_role(role) and pgd_user and df is not None and COT_TEN_PGD in df.columns:
         df_pgd = df[df[COT_TEN_PGD] == pgd_user].copy()
     elif is_cn_role(role) and pgd_filter is not None and df is not None and COT_TEN_PGD in df.columns:
@@ -867,44 +824,109 @@ def render(**kwargs):
         df_pgd = df
     _pgd_df_kwargs = {**kwargs, "df": df_pgd, "df_full": df_pgd, "pgd_filter": pgd_filter}
 
+    # ── Helpers render ──────────────────────────────────────────────────
     def _render_diem_gd_va_to_tkvv(tab_parent, **kw):
         with tab_parent:
             _sub1, _sub2 = st.tabs(["📍 Điểm Giao Dịch", "🏘️ Tổ TK&VV"])
             tab_diem_gd_pgd.render(_sub1, **kw)
             tab_cdtotkvv_pgd.render(_sub2, **kw)
 
-    _tab_renderers = [
-        lambda: tab_tongquan.render(tabs_op[0], **_pgd_df_kwargs),
-        lambda: tab_baocao.render(tabs_op[1], **_pgd_df_kwargs),
-        lambda: tab_khtd_pgd.render(tabs_op[2], **kwargs),
-        lambda: tab_khtd_giao_dc.render(tabs_op[3], **kwargs),
-        lambda: tab_khtd_mau07.render(tabs_op[4], **kwargs),
-        lambda: tab_nq11.render(tabs_op[5], **_pgd_df_kwargs),
-        lambda: tab_tracuu.render(tabs_op[6], **kwargs),
-        lambda: tab_no_rui_ro.render(tabs_op[7], **kwargs),
-        lambda: tab_danhsach.render(tabs_op[8], **kwargs),
-        lambda: render_den_han(role=role, pgd_user=pgd_user),
-        lambda: tab_candoi.render(
-            tabs_op[10], **{**kwargs, "pgd_mode": True, "df": df, "df_full": df}
-        ),
-        lambda: _render_diem_gd_va_to_tkvv(tabs_op[11], **kwargs),
-        lambda: _render_bao_cao_giao_ban(tabs_op[12], **kwargs),
-        lambda: _render_mau_bieu_tab(),
-        lambda: tab_ban_dai_dien.render(tabs_op[14], cap="xa", **kwargs),
-        lambda: tab_uy_thac.render(tabs_op[15], **kwargs),
-        lambda: tab_nhiem_vu.render(tabs_op[16], **kwargs),
-        lambda: tab_upload_pgd.render(tabs_op[17], **kwargs),
-    ]
+    def _render_mau_bieu_tab(tab_parent) -> None:
+        with tab_parent:
+            _init_gb2_session_for_doc_hub(kwargs)
+            doc_t1, doc_t2, doc_t3 = st.tabs(
+                ["📄 Trung tâm mẫu biểu", "📋 Biên bản giao ban", "📢 Thông báo kết luận"]
+            )
+            with doc_t1:
+                _render_doc_hub(df, df_nq11, role)
+            with doc_t2:
+                _render_bien_ban_giao_ban(doc_t2, **kwargs)
+            with doc_t3:
+                _render_thong_bao_ket_luan(doc_t3, **kwargs)
 
-    # Thêm renderer cho tab Upload HSTD nếu có quyền
-    if co_quyen_upload_pgd(role):
-        _tab_renderers.append(lambda: tab_upload_pgd.render(tabs_op[-1], **kwargs))
+    # ── Định nghĩa nhóm tab ─────────────────────────────────────────────
+    CAC_NHOM = {
+        "nghiep_vu_pgd": {
+            "label": "📋 Nghiệp vụ hàng ngày",
+            "tabs": [
+                ("📊 Tổng quan", lambda tab: tab_tongquan.render(tab, **_pgd_df_kwargs)),
+                ("🔍 Tra cứu hồ sơ", lambda tab: tab_tracuu.render(tab, **kwargs)),
+                ("📋 Danh sách & Lọc", lambda tab: tab_danhsach.render(tab, **kwargs)),
+                ("⏰ Đến hạn", lambda tab: render_den_han(role=role, pgd_user=pgd_user)),
+            ],
+        },
+        "bao_cao_giao_ban": {
+            "label": "📈 Báo cáo & Giao ban",
+            "tabs": [
+                ("📈 Báo cáo chi tiết", lambda tab: tab_baocao.render(tab, **_pgd_df_kwargs)),
+                ("📡 Điện Báo", lambda tab: tab_candoi.render(
+                    tab, **{**kwargs, "pgd_mode": True, "df": df, "df_full": df}
+                )),
+                ("📝 Báo cáo Giao ban", lambda tab: _render_bao_cao_giao_ban(tab, **kwargs)),
+                ("📄 Mẫu biểu", lambda tab: _render_mau_bieu_tab(tab)),
+            ],
+        },
+        "ke_hoach_pgd": {
+            "label": "🎯 Kế hoạch PGD",
+            "tabs": [
+                ("🎯 KHTD", lambda tab: tab_khtd_pgd.render(tab, **kwargs)),
+                ("📋 Giao & ĐC KHTD", lambda tab: tab_khtd_giao_dc.render(tab, **kwargs)),
+                ("📋 Mẫu 07 Giao KH", lambda tab: tab_khtd_mau07.render(tab, **kwargs)),
+                ("📋 NQ11", lambda tab: tab_nq11.render(tab, **_pgd_df_kwargs)),
+            ],
+        },
+        "kiem_soat_rr": {
+            "label": "🔍 Kiểm soát & Rủi ro",
+            "tabs": [
+                ("💳 Nợ rủi ro QĐ62", lambda tab: tab_qd62.render(
+                    mode="pgd", pgd_filter=pgd_user or pgd_filter
+                )),
+                ("📍 Điểm GD & Tổ TK&VV", lambda tab: _render_diem_gd_va_to_tkvv(tab, **kwargs)),
+                ("🏛️ Ban Đại Diện", lambda tab: tab_ban_dai_dien.render(tab, cap="xa", **kwargs)),
+                ("🤝 Ủy thác", lambda tab: tab_uy_thac.render(tab, **kwargs)),
+            ],
+        },
+        "quan_tri_pgd": {
+            "label": "⚙️ Quản trị PGD",
+            "tabs": [
+                ("✅ Nhiệm vụ", lambda tab: tab_nhiem_vu.render(tab, **kwargs)),
+                ("📤 Upload Dữ liệu", lambda tab: tab_upload_pgd.render(tab, **kwargs)),
+                ("📤 Upload HSTD", lambda tab: tab_upload_pgd.render(tab, **kwargs)),
+            ],
+        },
+    }
 
-    _tab_renderers = tuple(_tab_renderers)
-    assert len(tab_names_op) == len(_tab_renderers), (
-        "tab_names_op và _tab_renderers phải cùng số phần tử"
+    # ── Lọc nhóm được phép ──────────────────────────────────────────────
+    nhom_kha_dung = {}
+    for key, info in CAC_NHOM.items():
+        if key in nhom_duoc_phep:
+            # Ẩn Upload HSTD nếu không phải admin_pgd
+            if key == "quan_tri_pgd" and not tab_perm["co_quyen_upload_hstd"]:
+                info_copy = dict(info)
+                info_copy["tabs"] = [t for t in info["tabs"] if "Upload HSTD" not in t[0]]
+                nhom_kha_dung[key] = info_copy
+            else:
+                nhom_kha_dung[key] = info
+
+    # ── Render ───────────────────────────────────────────────────────────
+    ds_key = list(nhom_kha_dung.keys())
+    ds_label = [nhom_kha_dung[k]["label"] for k in ds_key]
+
+    nhom_chon = st.radio(
+        "Chọn nhóm công việc",
+        ds_label,
+        horizontal=True,
+        key="ws_op_nhom",
     )
 
-    for i, tab_c in enumerate(tabs_op):
-        if tab_c.open:
-            _tab_renderers[i]()
+    idx_chon = ds_label.index(nhom_chon)
+    key_chon = ds_key[idx_chon]
+    tabs_info = nhom_kha_dung[key_chon]["tabs"]
+
+    ten_tabs = [t[0] for t in tabs_info]
+    renderers = [t[1] for t in tabs_info]
+
+    tabs_con = st.tabs(ten_tabs)
+    for i, tab_c in enumerate(tabs_con):
+        with tab_c:
+            renderers[i](tab_c)

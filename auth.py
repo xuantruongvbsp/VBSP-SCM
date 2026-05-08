@@ -198,10 +198,11 @@ def get_tab_permissions(role: str) -> dict:
         }
     # Fallback: CBTD mặc định
     return {
-        "nhom_duoc_phep": ["nghiep_vu_pgd", "bao_cao_giao_ban"],
-        "co_quyen_khtd": False,
-        "co_quyen_kiem_soat": False,
-        "co_quyen_quan_tri": False,
+        "nhom_duoc_phep": ["nghiep_vu_pgd", "bao_cao_giao_ban",
+                           "ke_hoach_pgd", "kiem_soat_rr", "quan_tri_pgd"],
+        "co_quyen_khtd": True,
+        "co_quyen_kiem_soat": True,
+        "co_quyen_quan_tri": True,
         "co_quyen_upload_hstd": False,
     }
 

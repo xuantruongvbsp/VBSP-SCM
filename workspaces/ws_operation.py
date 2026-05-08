@@ -336,9 +336,16 @@ def _render_thong_bao_ket_luan(tab, **kwargs):
             st.warning("Không có cột Tên xã.")
             return
 
-        chon_xa = st.session_state.get("gb2_xa", ds_xa[0])
-        if chon_xa not in ds_xa:
-            chon_xa = ds_xa[0]
+        default_xa = st.session_state.get("gb2_xa", ds_xa[0] if ds_xa else None)
+        if default_xa not in ds_xa:
+            default_xa = ds_xa[0] if ds_xa else None
+        chon_xa = st.selectbox(
+            "Chọn xã / điểm giao dịch",
+            ds_xa,
+            index=ds_xa.index(default_xa) if default_xa in ds_xa else 0,
+            key="tb_chon_xa",
+        )
+        st.session_state["gb2_xa"] = chon_xa
 
         ds_nam = danh_sach_nam_baseline_pgd() or danh_sach_nam_baseline()
         chon_nam = st.session_state.get("gb2_nam")
@@ -365,9 +372,7 @@ def _render_thong_bao_ket_luan(tab, **kwargs):
             st.info(
                 f"📊 Số liệu tự động từ HSTD\n\n"
                 f"**Xã:** {chon_xa}  \n"
-                f"**Tháng:** {date.today().month}/{date.today().year}\n\n"
-                "Chọn xã và mốc baseline ở tab **Biên bản giao ban** "
-                "(cùng màn hình Mẫu biểu)."
+                f"**Tháng:** {date.today().month}/{date.today().year}"
             )
 
         tb_cs = st.text_area(
@@ -410,6 +415,8 @@ def _render_thong_bao_ket_luan(tab, **kwargs):
                     f"TB_KetLuan_{chon_xa.replace(' ', '_')}"
                     f"_{date.today().strftime('%m%Y')}.docx"
                 )
+                st.session_state["tb_data"] = data
+                st.session_state["tb_ten_file"] = ten_file
                 st.download_button(
                     "⬇️ Tải về Word",
                     data=data,
@@ -421,6 +428,35 @@ def _render_thong_bao_ket_luan(tab, **kwargs):
                 st.success("✅ Đã tạo Thông báo Kết luận!")
             except Exception as e:
                 st.error(f"❌ Lỗi tạo file: {e}")
+
+        if st.session_state.get("tb_data") and st.button("📄 Xuất PDF", type="secondary", key="tb_xuat_pdf"):
+            try:
+                import tempfile, os
+                from docx2pdf import convert
+                data_pdf = st.session_state["tb_data"]
+                ten_file_pdf = st.session_state["tb_ten_file"]
+                with tempfile.NamedTemporaryFile(suffix=".docx", delete=False) as tmp:
+                    tmp.write(data_pdf)
+                    tmp_path = tmp.name
+                pdf_path = tmp_path.replace(".docx", ".pdf")
+                convert(tmp_path, pdf_path)
+                with open(pdf_path, "rb") as f:
+                    pdf_bytes = f.read()
+                os.unlink(tmp_path)
+                os.unlink(pdf_path)
+                ten_pdf = ten_file_pdf.replace(".docx", ".pdf")
+                st.download_button(
+                    "⬇️ Tải về PDF",
+                    data=pdf_bytes,
+                    file_name=ten_pdf,
+                    mime="application/pdf",
+                    key="tb_dl_pdf",
+                )
+            except ImportError:
+                st.warning("⚠️ Chưa cài docx2pdf. Chạy: pip install docx2pdf")
+                st.info("💡 Mở file Word rồi chọn **Save As → PDF** thủ công.")
+            except Exception as e:
+                st.error(f"❌ Lỗi tạo PDF: {e}")
 
 
 def _render_bien_ban_giao_ban(tab, **kwargs):

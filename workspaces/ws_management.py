@@ -40,7 +40,7 @@ from tabs import (
     tab_nhiem_vu, tab_cdtotkvv, tab_khtd_giao_dc, tab_kiem_soat,
     tab_ban_dai_dien,
     tab_uy_thac,
-    tab_no_rui_ro,
+    tab_qd62,
 )
 from tabs import tab_upload_khnv
 from tabs import tab_quan_ly_dgd
@@ -171,6 +171,14 @@ def _render_canh_bao(df: pd.DataFrame, ds_pgd_all: list):
                 st.success("✅ Đã tạo xong — nhấn nút trên để tải về.")
             except Exception as e:
                 st.error(f"Lỗi tạo KL giao ban: {e}")
+
+
+def _render_dgd_to_tkvv(tab_parent, **kw):
+    """Sub-tab Điểm GD & Tổ TK&VV — nested tabs."""
+    with tab_parent:
+        _sub1, _sub2 = st.tabs(["📍 Điểm Giao Dịch", "🏘️ Tổ TK&VV"])
+        tab_quan_ly_dgd.render(_sub1, **kw)
+        tab_cdtotkvv.render(_sub2, **dict(kw, cdto_mode="cn"))
 
 
 def _render_quan_ly_template(df: pd.DataFrame):
@@ -426,65 +434,74 @@ def render(**kwargs):
     df         = kwargs.get("df")
     df_full    = kwargs.get("df_full", df)
     ds_pgd_all = kwargs.get("ds_pgd_all", [])
+    can_upload = get_permissions(role)["can_upload"]
 
     st.title("📋 Phòng KH-NV")
     st.caption("Giám sát chỉ tiêu · Cân đối vốn · Quản lý NQH · GQVL · Quản lý CBTD")
 
-    # Tạo danh sách tabs dựa trên role
-    tab_names = [
-        "📊 Tổng quan",
-        "🚨 Cảnh báo sớm",
-        "🔍 Kiểm soát CN",
-        "💳 Nợ rủi ro QĐ62",
-        "⏰ Đến hạn",
-        "🗓️ KH Tín dụng Năm",
-        "📋 KH GQVL",
-        "📤 Giao KH theo Đợt",
-        "🎯 KH vs Thực hiện",
-        "📈 Báo cáo chi tiết",
-        "📡 Điện Báo",
-        "👔 Quản lý CBTD",
-        "📍 Điểm GD & Tổ TK&VV",
-        "🏛️ Ban Đại Diện",
-        "🤝 Ủy thác",
-        "✅ Nhiệm vụ",
+    # ── Định nghĩa nhóm tab ─────────────────────────────────────────────
+    nhom_giam_sat = [
+        ("📊 Tổng quan", lambda tab: tab_tongquan.render(tab, **kwargs)),
+        ("🚨 Cảnh báo sớm", lambda tab: _render_canh_bao(df_full, ds_pgd_all)),
+        ("⏰ Đến hạn", lambda tab: render_den_han(role=role)),
     ]
-    
-    # Chỉ admin/manager mới thấy tab Quản lý Template
-    if get_permissions(role)["can_upload"]:
-        tab_names.extend(["📁 Quản lý Template", "📤 Upload KH-NV"])
-    else:
-        tab_names.append("📤 Upload KH-NV")
+    nhom_kiem_soat = [
+        ("🔍 Kiểm soát CN", lambda tab: tab_kiem_soat.render_tab(
+            df_full, role, kwargs.get("username", "unknown"))),
+        ("💳 Nợ rủi ro QĐ62", lambda tab: tab_qd62.render(mode="cn")),
+        ("👔 Quản lý CBTD", lambda tab: tab_cbtd.render(tab, **kwargs)),
+    ]
+    nhom_ke_hoach = [
+        ("🗓️ KH Tín dụng Năm", lambda tab: tab_khtd.render(tab, **dict(kwargs, khtd_mode="cn"))),
+        ("📋 KH GQVL", lambda tab: render_kh_gqvl(role=role)),
+        ("📤 Giao KH theo Đợt", lambda tab: tab_khtd_giao_dc.render(tab, **kwargs)),
+        ("🎯 KH vs Thực hiện", lambda tab: tab_kehoach.render(tab, **kwargs)),
+    ]
+    nhom_bao_cao = [
+        ("📈 Báo cáo chi tiết", lambda tab: tab_baocao.render(tab, **kwargs)),
+        ("📡 Điện Báo", lambda tab: tab_candoi.render(tab, **kwargs)),
+        ("📍 Điểm GD & Tổ TK&VV", lambda tab: _render_dgd_to_tkvv(tab, **kwargs)),
+    ]
+    nhom_hanh_chinh = [
+        ("🏛️ Ban Đại Diện", lambda tab: tab_ban_dai_dien.render(tab, cap="tinh", **kwargs)),
+        ("🤝 Ủy thác", lambda tab: tab_uy_thac.render(tab, **kwargs)),
+        ("✅ Nhiệm vụ", lambda tab: tab_nhiem_vu.render(tab, **kwargs)),
+    ]
+    if can_upload:
+        nhom_hanh_chinh.append(
+            ("📁 Quản lý Template", lambda tab: _render_quan_ly_template(df_full))
+        )
+    nhom_hanh_chinh.append(
+        ("📤 Upload KH-NV", lambda tab: tab_upload_khnv.render(tab, **kwargs))
+    )
 
-    tabs = st.tabs(tab_names)
+    CAC_NHOM = {
+        "giam_sat":   {"label": "📊 Giám sát",    "tabs": nhom_giam_sat},
+        "kiem_soat":  {"label": "🔍 Kiểm soát & Rủi ro", "tabs": nhom_kiem_soat},
+        "ke_hoach":   {"label": "🎯 Kế hoạch",    "tabs": nhom_ke_hoach},
+        "bao_cao":    {"label": "📈 Báo cáo & Cân đối", "tabs": nhom_bao_cao},
+        "hanh_chinh": {"label": "🏛️ Hành chính",  "tabs": nhom_hanh_chinh},
+    }
 
-    tab_tongquan.render(tabs[0], **kwargs)
-    with tabs[1]:
-        _render_canh_bao(df_full, ds_pgd_all)
-    with tabs[2]:
-        tab_kiem_soat.render_tab(df_full, role, kwargs.get("username", "unknown"))
-    with tabs[3]:
-        tab_no_rui_ro.render(tabs[3], **kwargs)
-    with tabs[4]:
-        render_den_han(role=role)
-    tab_khtd.render(tabs[5], **dict(kwargs, khtd_mode="cn"))
-    with tabs[6]:
-        render_kh_gqvl(role=role)
-    tab_khtd_giao_dc.render(tabs[7], **kwargs)
-    tab_kehoach.render(tabs[8], **kwargs)
-    tab_baocao.render(tabs[9], **kwargs)
-    tab_candoi.render(tabs[10], **kwargs)
-    tab_cbtd.render(tabs[11], **kwargs)
-    with tabs[12]:
-        _sub1, _sub2 = st.tabs(["📍 Điểm Giao Dịch", "🏘️ Tổ TK&VV"])
-        tab_quan_ly_dgd.render(_sub1, **kwargs)
-        tab_cdtotkvv.render(_sub2, **dict(kwargs, cdto_mode="cn"))
-    tab_ban_dai_dien.render(tabs[13], cap="tinh", **kwargs)
-    tab_uy_thac.render(tabs[14], **kwargs)
-    tab_nhiem_vu.render(tabs[15], **kwargs)
-    if get_permissions(role)["can_upload"]:
-        with tabs[16]:
-            _render_quan_ly_template(df_full)
-        tab_upload_khnv.render(tabs[17], **kwargs)
-    else:
-        tab_upload_khnv.render(tabs[15], **kwargs)
+    # ── Render ───────────────────────────────────────────────────────────
+    ds_key = list(CAC_NHOM.keys())
+    ds_label = [CAC_NHOM[k]["label"] for k in ds_key]
+
+    nhom_chon = st.radio(
+        "Chọn nhóm công việc",
+        ds_label,
+        horizontal=True,
+        key="ws_mgmt_nhom",
+    )
+
+    idx_chon = ds_label.index(nhom_chon)
+    key_chon = ds_key[idx_chon]
+    tabs_info = CAC_NHOM[key_chon]["tabs"]
+
+    ten_tabs = [t[0] for t in tabs_info]
+    renderers = [t[1] for t in tabs_info]
+
+    tabs_con = st.tabs(ten_tabs)
+    for i, tab_c in enumerate(tabs_con):
+        with tab_c:
+            renderers[i](tab_c)

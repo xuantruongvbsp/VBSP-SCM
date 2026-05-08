@@ -30,6 +30,8 @@ db.ghi_kv("key_name", value, username)
 | `ma_pgd_map` | Mapping mã PGD ↔ tên PGD |
 | `pgd_xa_map` | Mapping PGD → danh sách xã |
 | `chuong_trinh_khtd` | Danh mục chương trình KHTD |
+| `kh_gqvl_cn_{nam}` | KH GQVL Chi nhánh theo năm |
+| `kh_gqvl_pgd_{slug}_{nam}` | KH GQVL theo PGD (dự phòng) |
 
 `slug` = `pgd_slug(ten_pgd)` từ `data/pgd.py` — ví dụ: `"pgd_long_thanh"`.
 

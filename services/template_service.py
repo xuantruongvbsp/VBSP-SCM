@@ -19,6 +19,12 @@ TMPL_MAU16    = "mau_16td.docx"   # BB kiểm tra Tổ TK&VV
 TMPL_KH_KT    = "ke_hoach_kt.docx"
 TMPL_BB_XMN   = "bb_xac_minh_no.docx"
 
+# ── Mẫu xử lý nợ rủi ro QĐ 62/2015/QĐ-TTg ──────────────────────────────────
+TMPL_13XLN     = "mau_13xln.docx"     # Đề nghị khoanh nợ
+TMPL_14XLN     = "mau_14xln.docx"     # Đề nghị xóa nợ
+TMPL_TT_KHOANH = "to_trinh_khoanh_no.docx"  # Tờ trình khoanh nợ
+TMPL_TT_XOA    = "to_trinh_xoa_no.docx"     # Tờ trình xóa nợ
+
 
 def co_template(ten_mau: str) -> bool:
     """Kiểm tra file template có tồn tại không."""

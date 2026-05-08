@@ -198,9 +198,12 @@ def kiem_tra_ma_don_vi_hop_le(df: pd.DataFrame) -> list[str]:
 
     if COT_TEN_XA in df.columns:
         xa_vals = df[COT_TEN_XA].astype(str).str.strip()
+        xa_vals_stripped = xa_vals
+        for p in _TIEN_TO:
+            xa_vals_stripped = xa_vals_stripped.str.replace(p, "", regex=False)
         xa_invalid = xa_vals[
-            ~xa_vals.isin(xa_hop_le)
-            & ~xa_vals.isin(_GIA_TRI_DAC_BIET)
+            ~xa_vals_stripped.isin(xa_hop_le)
+            & ~xa_vals_stripped.isin(_GIA_TRI_DAC_BIET)
             & xa_vals.notna()
         ]
         if len(xa_invalid) > 0:

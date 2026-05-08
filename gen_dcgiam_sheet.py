@@ -1,10 +1,11 @@
+
 """
 gen_dcgiam_sheet.py
-─────────────────
-Script độc lập đẩy dữ liệu GQVL lên Google Sheet để theo dõi
-KH vs TH phân tầng TW/ĐP.
+_________________
+Script doc lap day du lieu GQVL len Google Sheet de theo doi
+KH vs TH phan tang 4 nhom: NHCSXH TW, NSNN TW, DP cap tinh, DP cap xa.
 
-Cách dùng:
+Cach dung:
     python gen_dcgiam_sheet.py --th
     python gen_dcgiam_sheet.py --kh --nam 2026
     python gen_dcgiam_sheet.py --all
@@ -41,7 +42,7 @@ def _ket_noi_gsheet():
     ]
     if not Path(CREDENTIALS_FILE).exists():
         raise FileNotFoundError(
-            f"Không tìm thấy file credentials: {CREDENTIALS_FILE}"
+            f"Khong tim thay file credentials: {CREDENTIALS_FILE}"
         )
     creds = ServiceAccountCredentials.from_json_keyfile_name(CREDENTIALS_FILE, scope)
     return gspread.authorize(creds)
@@ -50,62 +51,106 @@ def _ket_noi_gsheet():
 def _doc_gqvl_parquet() -> pd.DataFrame:
     if not GQVL_PARQUET.exists():
         raise FileNotFoundError(
-            f"Không tìm thấy file parquet: {GQVL_PARQUET}. "
-            "Hãy upload và merge GQVL trước khi chạy script này."
+            f"Khong tim thay file parquet: {GQVL_PARQUET}. "
+            "Hay upload va merge GQVL truoc khi chay script nay."
         )
     df = pd.read_parquet(GQVL_PARQUET)
-    _LOG.info("Đọc %d dòng từ %s", len(df), GQVL_PARQUET)
+    _LOG.info("Doc %d dong tu %s", len(df), GQVL_PARQUET)
     return df
 
 
-def _phan_loai_tw_dp(df: pd.DataFrame):
-    cot_ct = config.COT_TEN_CT
-    ds_tw = [ten for _mk, _ma_ct, ten, nv, _ten_match in config.CHUONG_TRINH_KHTD if nv == "TW"]
-    ds_dp = [ten for _mk, _ma_ct, ten, nv, _ten_match in config.CHUONG_TRINH_KHTD if nv == "DP"]
+def _phan_loai_4_nhom(df: pd.DataFrame) -> dict[str, pd.DataFrame]:
+    cot_nv = config.COT_NGUON_VON
+    cot_ma_ndt = config.COT_MA_NHA_DAU_TU
 
-    if cot_ct not in df.columns:
-        _LOG.warning("Cột '%s' không có trong DataFrame. Các cột hiện có: %s", cot_ct, list(df.columns))
-        df_tw = pd.DataFrame()
-        df_dp = pd.DataFrame()
-        return df_tw, df_dp
+    result: dict[str, pd.DataFrame] = {
+        "cap_tinh_tw_nhcsxh": pd.DataFrame(),
+        "cap_tinh_tw_nsnn": pd.DataFrame(),
+        "cap_tinh": pd.DataFrame(),
+        "cap_xa": pd.DataFrame(),
+    }
 
-    df_tw = df[df[cot_ct].isin(ds_tw)]
-    df_dp = df[df[cot_ct].isin(ds_dp)]
-    so_khong_khop = len(df) - len(df_tw) - len(df_dp)
-    _LOG.info("Phân loại: TW=%d dòng, ĐP=%d dòng, Không khớp=%d dòng", len(df_tw), len(df_dp), so_khong_khop)
-    return df_tw, df_dp
+    if df.empty:
+        _LOG.info("DataFrame rong, tra ve 4 nhom rong")
+        return result
+
+    if cot_nv not in df.columns:
+        _LOG.warning("Cot '%s' khong co trong GQVL. Cac cot: %s", cot_nv, list(df.columns))
+        return result
+
+    ndt_dp_list = db.doc_kv("ndt_dp_list")
+    if not ndt_dp_list:
+        ndt_dp_list = config.MA_NDT_CAP_TINH_DUOI
+    ndt_dp_set = set(str(m).strip() for m in ndt_dp_list)
+    _LOG.info("Danh sach ma NDT cap tinh: %s", ndt_dp_set)
+
+    nv_str = df[cot_nv].astype(str).str.strip()
+    mask_tw = nv_str == "1"
+    mask_dp = nv_str == "2"
+    so_khong_xac_dinh = int((~mask_tw & ~mask_dp).sum())
+    if so_khong_xac_dinh:
+        _LOG.warning("Co %d dong khong xac dinh duoc Nguon von", so_khong_xac_dinh)
+
+    df_tw = df[mask_tw].copy()
+    _LOG.info("Tong so dong TW: %d", len(df_tw))
+    if not df_tw.empty:
+        if cot_ma_ndt in df_tw.columns:
+            ma_ndt_str = df_tw[cot_ma_ndt].astype(str).str.strip()
+            mask_nhcsxh = ma_ndt_str == "2"
+        else:
+            _LOG.warning("Cot '%s' khong co trong TW het xep vao NSNN", cot_ma_ndt)
+            mask_nhcsxh = pd.Series(False, index=df_tw.index)
+        result["cap_tinh_tw_nhcsxh"] = df_tw[mask_nhcsxh]
+        result["cap_tinh_tw_nsnn"] = df_tw[~mask_nhcsxh]
+
+    df_dp = df[mask_dp].copy()
+    _LOG.info("Tong so dong DP: %d", len(df_dp))
+    if not df_dp.empty:
+        if cot_ma_ndt in df_dp.columns:
+            ma_ndt_str = df_dp[cot_ma_ndt].astype(str).str.strip()
+            mask_cap_tinh = ma_ndt_str.isin(ndt_dp_set)
+        else:
+            _LOG.warning("Cot '%s' khong co trong DP het xep vao cap xa", cot_ma_ndt)
+            mask_cap_tinh = pd.Series(False, index=df_dp.index)
+        result["cap_tinh"] = df_dp[mask_cap_tinh]
+        result["cap_xa"] = df_dp[~mask_cap_tinh]
+
+    for slug, df_nhom in result.items():
+        _LOG.info("Phan tang '%s': %d dong", slug, len(df_nhom))
+
+    return result
 
 
 def _tong_hop_theo_pgd(df: pd.DataFrame) -> pd.DataFrame:
     if df.empty:
-        return pd.DataFrame(columns=["Tên PGD", "Tổng dư nợ", "Số hộ vay"])
+        return pd.DataFrame(columns=["Ten PGD", "Tong du no", "So ho vay"])
 
     cot_pgd = config.COT_TEN_PGD
     cot_dn = config.COT_TONG_DU_NO
     cot_ma_kh = config.COT_MA_KH
 
     if cot_pgd not in df.columns:
-        _LOG.warning("Cột '%s' không có, trả về DataFrame rỗng", cot_pgd)
-        return pd.DataFrame(columns=["Tên PGD", "Tổng dư nợ", "Số hộ vay"])
+        _LOG.warning("Cot '%s' khong co, tra ve DataFrame rong", cot_pgd)
+        return pd.DataFrame(columns=["Ten PGD", "Tong du no", "So ho vay"])
 
-    agg_dict = {"Tổng dư nợ": (cot_dn, "sum") if cot_dn in df.columns else ("__count__", "count")}
+    agg_dict = {"Tong du no": (cot_dn, "sum") if cot_dn in df.columns else ("__count__", "count")}
     if cot_ma_kh in df.columns:
-        agg_dict["Số hộ vay"] = (cot_ma_kh, "nunique")
+        agg_dict["So ho vay"] = (cot_ma_kh, "nunique")
     else:
-        agg_dict["Số hộ vay"] = (cot_pgd, "count")
+        agg_dict["So ho vay"] = (cot_pgd, "count")
 
     grouped = df.groupby(cot_pgd).agg(**agg_dict).reset_index()
-    grouped = grouped.rename(columns={cot_pgd: "Tên PGD"})
-    grouped["Tổng dư nợ"] = grouped["Tổng dư nợ"].fillna(0).astype(float)
-    grouped["Số hộ vay"] = grouped["Số hộ vay"].fillna(0).astype(int)
+    grouped = grouped.rename(columns={cot_pgd: "Ten PGD"})
+    grouped["Tong du no"] = grouped["Tong du no"].fillna(0).astype(float)
+    grouped["So ho vay"] = grouped["So ho vay"].fillna(0).astype(int)
 
     thutu = {ten: i for i, ten in enumerate(config.DS_PGD)}
-    grouped["_order"] = grouped["Tên PGD"].map(thutu).fillna(999)
+    grouped["_order"] = grouped["Ten PGD"].map(thutu).fillna(999)
     grouped = grouped.sort_values("_order").drop(columns=["_order"])
 
-    tong_dn = grouped["Tổng dư nợ"].sum()
-    tong_ho = grouped["Số hộ vay"].sum()
-    row_tc = pd.DataFrame([{"Tên PGD": "TỔNG CỘNG", "Tổng dư nợ": tong_dn, "Số hộ vay": tong_ho}])
+    tong_dn = grouped["Tong du no"].sum()
+    tong_ho = grouped["So ho vay"].sum()
+    row_tc = pd.DataFrame([{"Ten PGD": "TONG CONG", "Tong du no": tong_dn, "So ho vay": tong_ho}])
     grouped = pd.concat([grouped, row_tc], ignore_index=True)
     return grouped
 
@@ -114,10 +159,12 @@ def push_th_gqvl_len_sheet() -> bool:
     try:
         client = _ket_noi_gsheet()
         df_full = _doc_gqvl_parquet()
-        df_tw, df_dp = _phan_loai_tw_dp(df_full)
+        nhom_dict = _phan_loai_4_nhom(df_full)
 
-        bang_tw = _tong_hop_theo_pgd(df_tw)
-        bang_dp = _tong_hop_theo_pgd(df_dp)
+        bang_nhcsxh = _tong_hop_theo_pgd(nhom_dict["cap_tinh_tw_nhcsxh"])
+        bang_nsnn = _tong_hop_theo_pgd(nhom_dict["cap_tinh_tw_nsnn"])
+        bang_cap_tinh = _tong_hop_theo_pgd(nhom_dict["cap_tinh"])
+        bang_cap_xa = _tong_hop_theo_pgd(nhom_dict["cap_xa"])
 
         spreadsheet = client.open_by_key(DCGIAM_SHEET_ID)
         try:
@@ -127,37 +174,62 @@ def push_th_gqvl_len_sheet() -> bool:
 
         ws.clear()
 
-        header1 = ["", "NGUỒN VỐN TRUNG ƯƠNG (TW)", "", "", "NGUỒN VỐN ĐỊA PHƯƠNG (ĐP)", "", ""]
-        header2 = ["Tên PGD", "Tổng dư nợ TW", "Số hộ TW", "", "Tổng dư nợ ĐP", "Số hộ ĐP", "Tổng cộng"]
+        header1 = [
+            "",
+            "TW \u2014 NHCSXH huy dong", "", "TW \u2014 NSNN (Quy QG TW)", "",
+            "DP \u2014 Cap tinh", "", "DP \u2014 Cap xa/khac", "", "",
+        ]
+        header2 = [
+            "Ten PGD",
+            "Du no", "So ho",
+            "Du no", "So ho",
+            "Du no", "So ho",
+            "Du no", "So ho",
+            "Tong cong",
+        ]
 
-        ds_pgd = config.DS_PGD + ["TỔNG CỘNG"]
+        ds_pgd = config.DS_PGD + ["TONG CONG"]
         rows_data = [header1, header2]
 
-        tw_map = {}
-        for _, row in bang_tw.iterrows():
-            tw_map[row["Tên PGD"]] = (row["Tổng dư nợ"], row["Số hộ vay"])
+        def _build_map(bang):
+            m = {}
+            for _, row in bang.iterrows():
+                m[row["Ten PGD"]] = (row["Tong du no"], row["So ho vay"])
+            return m
 
-        dp_map = {}
-        for _, row in bang_dp.iterrows():
-            dp_map[row["Tên PGD"]] = (row["Tổng dư nợ"], row["Số hộ vay"])
+        map_nhcsxh = _build_map(bang_nhcsxh)
+        map_nsnn = _build_map(bang_nsnn)
+        map_tinh = _build_map(bang_cap_tinh)
+        map_xa = _build_map(bang_cap_xa)
 
         for ten_pgd in ds_pgd:
-            dn_tw, ho_tw = tw_map.get(ten_pgd, (0, 0))
-            dn_dp, ho_dp = dp_map.get(ten_pgd, (0, 0))
-            dn_tw = int(dn_tw)
-            dn_dp = int(dn_dp)
-            tong_cong = int(dn_tw + dn_dp)
-            rows_data.append([ten_pgd, dn_tw, ho_tw, "", dn_dp, ho_dp, tong_cong])
+            dn_nhcsxh, ho_nhcsxh = map_nhcsxh.get(ten_pgd, (0, 0))
+            dn_nsnn, ho_nsnn = map_nsnn.get(ten_pgd, (0, 0))
+            dn_tinh, ho_tinh = map_tinh.get(ten_pgd, (0, 0))
+            dn_xa, ho_xa = map_xa.get(ten_pgd, (0, 0))
+            dn_nhcsxh = int(dn_nhcsxh)
+            dn_nsnn = int(dn_nsnn)
+            dn_tinh = int(dn_tinh)
+            dn_xa = int(dn_xa)
+            tong_cong = dn_nhcsxh + dn_nsnn + dn_tinh + dn_xa
+            rows_data.append([
+                ten_pgd,
+                dn_nhcsxh, int(ho_nhcsxh),
+                dn_nsnn, int(ho_nsnn),
+                dn_tinh, int(ho_tinh),
+                dn_xa, int(ho_xa),
+                tong_cong,
+            ])
 
         ws.update(rows_data, value_input_option="USER_ENTERED")
 
-        timestamp = datetime.now().strftime("Cập nhật lúc %H:%M %d/%m/%Y")
+        timestamp = datetime.now().strftime("Cap nhat luc %H:%M %d/%m/%Y")
         ws.update_acell("A40", timestamp)
 
-        _LOG.info("Push TH GQVL lên sheet thành công — %d PGD", len(config.DS_PGD))
+        _LOG.info("Push TH GQVL len sheet thanh cong %d PGD", len(config.DS_PGD))
         return True
     except Exception:
-        _LOG.exception("Lỗi push TH GQVL lên sheet")
+        _LOG.exception("Loi push TH GQVL len sheet")
         return False
 
 
@@ -168,12 +240,12 @@ def push_kh_len_sheet(nam: int = None) -> bool:
     try:
         kh_data = db.doc_kv(f"kh_gqvl_cn_{nam}")
         if kh_data is None:
-            _LOG.warning("Chưa có KH GQVL năm %d", nam)
+            _LOG.warning("Chua co KH GQVL nam %d", nam)
             return False
 
         pgd_data = kh_data.get("pgd", {})
         if not pgd_data:
-            _LOG.warning("KH GQVL năm %d rỗng (không có PGD nào)", nam)
+            _LOG.warning("KH GQVL nam %d rong (khong co PGD nao)", nam)
             return False
 
         client = _ket_noi_gsheet()
@@ -185,7 +257,7 @@ def push_kh_len_sheet(nam: int = None) -> bool:
 
         ws.clear()
 
-        rows_data = [["Tên PGD", "KH TW (VND)", "KH ĐP (VND)", "KH Tổng cộng"]]
+        rows_data = [["Ten PGD", "KH TW (VND)", "KH DP (VND)", "KH Tong cong"]]
         tong_tw = 0
         tong_dp = 0
 
@@ -198,32 +270,32 @@ def push_kh_len_sheet(nam: int = None) -> bool:
             tong_tw += kh_tw
             tong_dp += kh_dp
 
-        rows_data.append(["TỔNG CỘNG", int(tong_tw), int(tong_dp), int(tong_tw + tong_dp)])
+        rows_data.append(["TONG CONG", int(tong_tw), int(tong_dp), int(tong_tw + tong_dp)])
 
         ws.update(rows_data, value_input_option="USER_ENTERED")
 
-        _LOG.info("Push KH GQVL năm %d lên sheet thành công — %d PGD", nam, len(pgd_data))
+        _LOG.info("Push KH GQVL nam %d len sheet thanh cong %d PGD", nam, len(pgd_data))
         return True
     except Exception:
-        _LOG.exception("Lỗi push KH GQVL lên sheet")
+        _LOG.exception("Loi push KH GQVL len sheet")
         return False
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Đẩy dữ liệu GQVL lên Google Sheet")
-    parser.add_argument("--th", action="store_true", help="Push TH GQVL lên sheet")
-    parser.add_argument("--kh", action="store_true", help="Push KH GQVL lên sheet")
-    parser.add_argument("--nam", type=int, default=None, help="Năm kế hoạch (mặc định: năm hiện tại)")
-    parser.add_argument("--all", action="store_true", help="Push cả TH lẫn KH")
+    parser = argparse.ArgumentParser(description="Day du lieu GQVL len Google Sheet")
+    parser.add_argument("--th", action="store_true", help="Push TH GQVL len sheet")
+    parser.add_argument("--kh", action="store_true", help="Push KH GQVL len sheet")
+    parser.add_argument("--nam", type=int, default=None, help="Nam ke hoach (mac dinh: nam hien tai)")
+    parser.add_argument("--all", action="store_true", help="Push ca TH lan KH")
     args = parser.parse_args()
 
     if args.all or args.th:
         ok = push_th_gqvl_len_sheet()
-        print(f"TH: {'✅ OK' if ok else '❌ FAIL'}")
+        print(f"TH: {'OK' if ok else 'FAIL'}")
 
     if args.all or args.kh:
         ok = push_kh_len_sheet(args.nam)
-        print(f"KH: {'✅ OK' if ok else '❌ FAIL'}")
+        print(f"KH: {'OK' if ok else 'FAIL'}")
 
     if not any([args.all, args.th, args.kh]):
         parser.print_help()

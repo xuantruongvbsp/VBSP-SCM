@@ -31,7 +31,7 @@ from utils import (
     xuat_excel,
     ten_file_xuat,
 )
-from tabs import tab_khtd_giao_dc, tab_kiem_soat, tab_no_rui_ro
+from tabs import tab_khtd_giao_dc, tab_kiem_soat, tab_qd62
 
 # ── Hằng số ngưỡng NQH ────────────────────────────────────────────────────────
 _NGUONG_AN_TOAN  = 1.0   # % — xanh lá
@@ -765,4 +765,4 @@ def render(**kwargs) -> None:
         tab_kiem_soat.render_tab(df_full, role, username)
 
     with tab_no_rui_ro_cn:
-        tab_no_rui_ro.render(tab_no_rui_ro_cn, **kwargs)
+        tab_qd62.render(mode="cn")

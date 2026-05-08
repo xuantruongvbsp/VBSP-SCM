@@ -29,15 +29,6 @@ from config import (
 # ── Tiền tố key kv_store cho từng PGD ────────────────────────────────────────
 _KV_PREFIX = "ct_registry_"
 
-# ── Bảng tên hiển thị 2 nhóm GQVL ───────────────────────────────────────────
-_GQVL_TEN_MAP: dict[str, str] = {
-    "3_TW": "Cho vay giải quyết việc làm",
-    "3_DP": "Cho vay giải quyết việc làm (ĐP)",
-}
-_GQVL_NV_INT: dict[str, int] = {
-    "3_TW": 1, "3_DP": 2,
-}
-
 # ── Lookup nhanh: (ma_ct, nguon_von_int) → ma_key ────────────────────────────
 # Xây từ CHUONG_TRINH_KHTD — bao gồm cả GQVL (ma_ct=3, xử lý chung)
 _MA_KEY_LOOKUP: dict[tuple[int, int], str] = {}
@@ -192,24 +183,48 @@ def _quet_hstd(
 # Logic phân tầng GQVL
 # ─────────────────────────────────────────────────────────────────────────────
 
-def _phan_tang_gqvl(row: pd.Series) -> str | None:
+def _phan_tang_gqvl(row: pd.Series, ndt_dp_list: list[str] | None = None) -> str | None:
     """
-    Xác định ma_key cho 1 dòng GQVL: 3_TW (Trung ương) hoặc 3_DP (Địa phương).
+    Phân tầng 4 nhóm GQVL theo quy tắc từ file thực tế.
 
-    Quy tắc:
-        Nguồn vốn=1 (TW) → 3_TW
-        Nguồn vốn=2 (ĐP) → 3_DP
-    Trả về None nếu không xác định được nguồn vốn.
+    Quy tắc phân loại:
+      - TW: dùng "Phân loại NV" (1=NSNN, 2=NHCSXH), không dùng Mã NĐT
+      - ĐP: dùng "Mã nhà đầu tư" với ndt_dp_list, PL NV không dùng để phân tầng
+
+    Trả về ma_key: 3_TW_NHCSXH | 3_TW_NSNN | 3_DP_TINH | 3_DP_XA
+    Hoặc None nếu không xác định được.
     """
-    try:
-        nv = int(float(row.get("Nguồn vốn", 0)))
-    except (TypeError, ValueError):
+    nguon_von = str(row.get("Nguồn vốn", "")).strip()
+
+    # ── TW: phân biệt bằng Phân loại NV ──────────────────────────────────────
+    if nguon_von == "TW":
+        pl_val = row.get("Phân loại NV")
+        try:
+            pl = int(float(pl_val)) if pd.notna(pl_val) else 0
+        except (TypeError, ValueError):
+            pl = 0
+
+        if pl == 2:
+            return "3_TW_NHCSXH"  # GQVL TW — NHCSXH huy động
+        if pl == 1:
+            return "3_TW_NSNN"   # GQVL TW — NSNN (Quỹ QG TW)
+        # Không xác định được PL NV → bỏ qua
         return None
 
-    if nv == 1:
-        return "3_TW"
-    if nv == 2:
-        return "3_DP"
+    # ── ĐP: phân biệt bằng Mã nhà đầu tư ─────────────────────────────────────
+    if nguon_von == "ĐP":
+        if ndt_dp_list is None:
+            ndt_dp_list = db.doc_kv("ndt_dp_list") or config.MA_NDT_CAP_TINH_DUOI
+
+        ma_ndt_raw = row.get("Mã nhà đầu tư")
+        ma_ndt = str(ma_ndt_raw).strip() if pd.notna(ma_ndt_raw) else ""
+
+        # Kiểm tra substring match: nếu bất kỳ mã nào trong ndt_dp_list xuất hiện trong ma_ndt
+        if any(ma in ma_ndt for ma in ndt_dp_list):
+            return "3_DP_TINH"  # GQVL ĐP — Cấp tỉnh
+        return "3_DP_XA"      # GQVL ĐP — Cấp xã/khác
+
+    # Không phải TW hoặc ĐP → bỏ qua
     return None
 
 
@@ -218,16 +233,21 @@ def _quet_gqvl(
     df_hstd: pd.DataFrame,
 ) -> tuple[dict[str, Any], dict[str, dict[str, Any]], dict[str, int]]:
     """
-    Quét GQVL, join với HSTD để lấy Tên PGD, xác định 3_TW hoặc 3_DP.
+    Quét GQVL, join với HSTD để lấy Tên PGD, phân tầng 4 nhóm.
 
     Trả về:
         registry_all    : { ma_key: entry }
         pgd_registries  : { ten_pgd: { ma_key: entry } }
-        phan_tang_count : { "3_TW": N, "3_DP": N }
+        phan_tang_count : { "3_TW_NHCSXH": N, "3_TW_NSNN": N, "3_DP_TINH": N, "3_DP_XA": N }
     """
     registry_all: dict[str, Any] = {}
     pgd_registries: dict[str, dict[str, Any]] = {}
-    phan_tang_count: dict[str, int] = {"3_TW": 0, "3_DP": 0}
+    phan_tang_count: dict[str, int] = {
+        "3_TW_NHCSXH": 0, "3_TW_NSNN": 0, "3_DP_TINH": 0, "3_DP_XA": 0
+    }
+
+    # Load ndt_dp_list 1 lần ngoài vòng lặp (ĐP phân tầng bằng Mã NĐT)
+    ndt_dp_list: list[str] = db.doc_kv("ndt_dp_list") or config.MA_NDT_CAP_TINH_DUOI
 
     # Tạo map Số khế ước → Tên PGD từ HSTD để join
     ku_col = "Số khế ước"
@@ -241,8 +261,20 @@ def _quet_gqvl(
     else:
         pgd_map = {}
 
+    # Map ma_key → thông tin hiển thị
+    _TEN_HIEN_THI: dict[str, str] = {
+        "3_TW_NHCSXH": "Cho vay giải quyết việc làm (TW — NHCSXH)",
+        "3_TW_NSNN":   "Cho vay giải quyết việc làm (TW — NSNN)",
+        "3_DP_TINH":   "Cho vay giải quyết việc làm (ĐP — Cấp tỉnh)",
+        "3_DP_XA":     "Cho vay giải quyết việc làm (ĐP — Cấp xã)",
+    }
+    _NV_INT: dict[str, int] = {
+        "3_TW_NHCSXH": 1, "3_TW_NSNN": 1,  # TW đều là nguồn vốn 1
+        "3_DP_TINH": 2, "3_DP_XA": 2,       # ĐP đều là nguồn vốn 2
+    }
+
     for _, row in df_gqvl.iterrows():
-        mk = _phan_tang_gqvl(row)
+        mk = _phan_tang_gqvl(row, ndt_dp_list=ndt_dp_list)
         if mk is None:
             continue
 
@@ -250,11 +282,11 @@ def _quet_gqvl(
 
         so_ku   = row.get(ku_col, None)
         ten_pgd = str(pgd_map.get(so_ku, DON_VI_CHI_NHANH)).strip() or DON_VI_CHI_NHANH
-        nv_int  = _GQVL_NV_INT[mk]
+        nv_int  = _NV_INT[mk]
 
         entry: dict[str, Any] = {
             "ma_ct":    3,
-            "ten_ct":   _GQVL_TEN_MAP[mk],
+            "ten_ct":   _TEN_HIEN_THI[mk],
             "nguon_von": nv_int,
             "pgd":      ten_pgd,
             "ma_key":   mk,
@@ -322,14 +354,14 @@ def quet_va_ghi_chuong_trinh(username: str) -> dict:
         {
             "tong_ct"       : int   — số chương trình unique trong registry_all,
             "pgd_stats"     : dict  — { ten_pgd: so_ct } số CT per PGD,
-            "gqvl_phan_tang": dict  — { "6a_TW": N, "6b_TW": N, ... },
+            "gqvl_phan_tang": dict  — { "3_TW_NHCSXH": N, "3_TW_NSNN": N, "3_DP_TINH": N, "3_DP_XA": N },
             "loi"           : list  — danh sách thông báo lỗi (nếu có),
         }
     """
     ket_qua: dict = {
         "tong_ct":        0,
         "pgd_stats":      {},
-        "gqvl_phan_tang": {"6a_TW": 0, "6b_TW": 0, "6c_DP": 0, "6d_DP": 0},
+        "gqvl_phan_tang": {"3_TW_NHCSXH": 0, "3_TW_NSNN": 0, "3_DP_TINH": 0, "3_DP_XA": 0},
         "loi":            [],
     }
 

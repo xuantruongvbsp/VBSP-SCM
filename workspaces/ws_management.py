@@ -173,6 +173,161 @@ def _render_canh_bao(df: pd.DataFrame, ds_pgd_all: list):
                 st.error(f"Lỗi tạo KL giao ban: {e}")
 
 
+def _render_canh_bao_no(df_full: pd.DataFrame, ds_pgd_all: list, role: str, username: str):
+    """Cảnh báo nợ — 4 sub-tab: Đến hạn, 3 tháng KHĐ, Migration, Nợ QH phát sinh."""
+    sub1, sub2, sub3, sub4 = st.tabs([
+        "⏰ Đến hạn",
+        "🔴 3 tháng KHĐ",
+        "🚨 Migration (đủ chuẩn → NQH)",
+        "📋 Nợ QH phát sinh",
+    ])
+
+    with sub1:
+        render_den_han(role=role)
+
+    if df_full is None or df_full.empty:
+        for tab in [sub2, sub3, sub4]:
+            with tab:
+                st.warning("Chưa có dữ liệu HSTD.")
+        return
+
+    df_kh = danh_dau_khong_hd(df_full)
+
+    with sub2:
+        _hien_thi_khd_tab(df_kh, ds_pgd_all)
+
+    with sub3:
+        _hien_thi_migration_tab(df_kh, ds_pgd_all)
+
+    with sub4:
+        _hien_thi_nqh_tab(df_full, username)
+
+
+def _hien_thi_khd_tab(df_kh: pd.DataFrame, ds_pgd_all: list):
+    """Sub-tab: 3 tháng không hoạt động."""
+    khd_tong = int(df_kh["is_3m_inactive"].sum()) if "is_3m_inactive" in df_kh.columns else 0
+    tong_mon = len(df_kh)
+    tl_khd = khd_tong / tong_mon * 100 if tong_mon > 0 else 0
+
+    k1, k2, k3 = st.columns(3)
+    k1.metric("Tổng món vay", fmt_so(tong_mon))
+    k2.metric("3 tháng không HĐ 🔴", fmt_so(khd_tong),
+              delta=f"{tl_khd:.1f}%", delta_color="inverse" if tl_khd > 2 else "off")
+    tong_lai = df_kh[df_kh.get("is_3m_inactive", False)][COT_LAI_TON].sum() \
+               if COT_LAI_TON in df_kh.columns else 0
+    k3.metric("Lãi tồn (tr.đ)", vn(tong_lai / 1e6, 1))
+
+    st.markdown("**📋 Tổng hợp theo PGD**")
+    nhom_pgd = tong_hop_khong_hd(df_kh, nhom_theo=COT_TEN_PGD)
+    if not nhom_pgd.empty:
+        hien_thi_dataframe_phan_trang(nhom_pgd, key="khd_pgd", height=280)
+
+    st.markdown("**📋 Tổng hợp theo Hội đoàn thể**")
+    nhom_dvut = tong_hop_khong_hd(df_kh, nhom_theo="Tên ĐVUT")
+    if not nhom_dvut.empty:
+        hien_thi_dataframe_phan_trang(nhom_dvut, key="khd_dvut", height=220)
+
+    ds_chi = ds_chi_tiet_khong_hd(df_kh)
+    if not ds_chi.empty:
+        col_loc, col_xuat = st.columns([2, 1])
+        with col_loc:
+            loc_pgd = st.selectbox("Lọc PGD", ["Tất cả"] + ds_pgd_all, key="khd_loc_pgd")
+        df_chi_loc = ds_chi if loc_pgd == "Tất cả" else ds_chi[ds_chi[COT_TEN_PGD] == loc_pgd]
+        with col_xuat:
+            st.markdown("<br>", unsafe_allow_html=True)
+            buf = xuat_excel({"3mKHD": df_chi_loc})
+            st.download_button(
+                f"⬇️ Excel ({len(df_chi_loc)} món)", data=buf,
+                file_name=f"3mKHD_{datetime.now().strftime('%Y%m%d')}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                key="khd_xuat",
+            )
+        hien_thi_dataframe_phan_trang(df_chi_loc, key="khd_chi", height=320)
+
+
+def _hien_thi_migration_tab(df_kh: pd.DataFrame, ds_pgd_all: list):
+    """Sub-tab: Migration — món vay đủ chuẩn có nguy cơ chuyển NQH."""
+    df_amber = canh_bao_migration(df_kh)
+    amber_tong = len(df_amber)
+
+    if amber_tong == 0:
+        st.success("✅ Không có món vay nào có dấu hiệu rủi ro chuyển NQH.")
+        return
+
+    k1, k2 = st.columns(2)
+    k1.metric("⚠️ Số món cần theo dõi", fmt_so(amber_tong))
+    tong_lai = df_amber[COT_LAI_TON].sum() if COT_LAI_TON in df_amber.columns else 0
+    k2.metric("Tổng lãi tồn (tr.đ)", vn(tong_lai / 1e6, 1))
+
+    col_loc, col_xuat = st.columns([2, 1])
+    with col_loc:
+        loc_pgd = st.selectbox("Lọc PGD", ["Tất cả"] + ds_pgd_all, key="mg_loc_pgd")
+    df_loc = df_amber if loc_pgd == "Tất cả" else df_amber[df_amber[COT_TEN_PGD] == loc_pgd]
+    with col_xuat:
+        st.markdown("<br>", unsafe_allow_html=True)
+        buf = xuat_excel({"Migration": df_loc})
+        st.download_button(
+            f"⬇️ Excel ({len(df_loc)} món)", data=buf,
+            file_name=f"Migration_{datetime.now().strftime('%Y%m%d')}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            key="mg_xuat",
+        )
+    cols_hien = [c for c in [
+        COT_TEN_PGD, "Tên xã", COT_DVUT, COT_TEN_KH, COT_SO_KU,
+        COT_TEN_CT, COT_LAI_TON, COT_LAI_THANG, "so_thang_ton_uoc", "muc_canh_bao",
+    ] if c in df_loc.columns]
+    hien_thi_dataframe_phan_trang(df_loc[cols_hien], key="mg_chi", height=360)
+
+
+def _hien_thi_nqh_tab(df_full: pd.DataFrame, username: str):
+    """Sub-tab: Nợ quá hạn phát sinh."""
+    df_kh = danh_dau_khong_hd(df_full)
+    mask_nqh = pd.to_numeric(
+        df_kh.get(COT_DU_NO_QH, pd.Series(dtype=float, index=df_kh.index)),
+        errors="coerce",
+    ).fillna(0) > 0
+    df_nqh = df_kh[mask_nqh]
+
+    if df_nqh.empty:
+        st.success("✅ Không có nợ quá hạn phát sinh.")
+        return
+
+    tong_nqh = df_nqh[COT_DU_NO_QH].sum() if COT_DU_NO_QH in df_nqh.columns else 0
+    tong_dn = df_nqh[COT_TONG_DU_NO].sum() if COT_TONG_DU_NO in df_nqh.columns else 0
+    k1, k2, k3 = st.columns(3)
+    k1.metric("📋 Số hồ sơ NQH", fmt_so(len(df_nqh)))
+    k2.metric("💰 Dư nợ QH", fmt_ty(tong_nqh) if tong_nqh else "0")
+    k3.metric("📊 Tỷ lệ NQH", f"{tong_nqh / tong_dn * 100:.2f}%" if tong_dn else "0%")
+
+    if COT_TEN_PGD in df_nqh.columns:
+        nqh_pgd = (
+            df_nqh.groupby(COT_TEN_PGD, dropna=False)
+            .agg(Số_hồ_sơ_NQH=(COT_SO_KU, "nunique"),
+                 Tổng_dư_nợ_QH=(COT_DU_NO_QH, "sum"),
+                 Tổng_dư_nợ=(COT_TONG_DU_NO, "sum"))
+            .reset_index()
+        )
+        tdn = nqh_pgd["Tổng_dư_nợ"].replace(0, pd.NA)
+        nqh_pgd["Tỷ_lệ_QH_%"] = (nqh_pgd["Tổng_dư_nợ_QH"] / tdn * 100).round(1).fillna(0)
+        st.markdown("**📋 Tổng hợp theo PGD**")
+        hien_thi_dataframe_phan_trang(nqh_pgd, key="nqh_pgd", height=280)
+
+    cols_chi = [c for c in [
+        COT_TEN_PGD, COT_TEN_KH, COT_SO_KU, COT_TEN_CT,
+        COT_DU_NO_QH, COT_TONG_DU_NO, COT_NGAY_DH,
+    ] if c in df_nqh.columns]
+    df_nqh_chi = df_nqh[cols_chi].reset_index(drop=True)
+    st.markdown("**📋 Danh sách chi tiết**")
+    buf = xuat_excel({"NQH": df_nqh_chi})
+    st.download_button(
+        "⬇️ Xuất Excel", data=buf,
+        file_name=f"NQH_{datetime.now().strftime('%Y%m%d')}.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        key="nqh_xuat",
+    )
+    hien_thi_dataframe_phan_trang(df_nqh_chi, key="nqh_chi", height=360)
+
+
 def _render_dgd_to_tkvv(tab_parent, **kw):
     """Sub-tab Điểm GD & Tổ TK&VV — nested tabs."""
     with tab_parent:
@@ -442,8 +597,8 @@ def render(**kwargs):
     # ── Định nghĩa nhóm tab ─────────────────────────────────────────────
     nhom_giam_sat = [
         ("📊 Tổng quan", lambda tab: tab_tongquan.render(tab, **kwargs)),
-        ("🚨 Cảnh báo sớm", lambda tab: _render_canh_bao(df_full, ds_pgd_all)),
-        ("⏰ Đến hạn", lambda tab: render_den_han(role=role)),
+        ("🚨 Cảnh báo nợ", lambda tab: _render_canh_bao_no(
+            df_full, ds_pgd_all, role, kwargs.get("username", "unknown"))),
     ]
     nhom_kiem_soat = [
         ("🔍 Kiểm soát CN", lambda tab: tab_kiem_soat.render_tab(

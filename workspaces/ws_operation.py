@@ -47,6 +47,7 @@ from tabs import (
     tab_nq11,
     tab_candoi,
     tab_uy_thac,
+    tab_no_rui_ro,
 )
 
 from tabs.tab_den_han import render as render_den_han
@@ -806,6 +807,7 @@ def render(**kwargs):
         "📋 Mẫu 07 Giao KH",
         "📋 NQ11",
         "🔍 Tra cứu hồ sơ",
+        "💳 Nợ rủi ro QĐ62",
         "📋 Danh sách & Lọc",
         "⏰ Đến hạn",
         "📡 Điện Báo",
@@ -879,18 +881,19 @@ def render(**kwargs):
         lambda: tab_khtd_mau07.render(tabs_op[4], **kwargs),
         lambda: tab_nq11.render(tabs_op[5], **_pgd_df_kwargs),
         lambda: tab_tracuu.render(tabs_op[6], **kwargs),
-        lambda: tab_danhsach.render(tabs_op[7], **kwargs),
+        lambda: tab_no_rui_ro.render(tabs_op[7], **kwargs),
+        lambda: tab_danhsach.render(tabs_op[8], **kwargs),
         lambda: render_den_han(role=role, pgd_user=pgd_user),
         lambda: tab_candoi.render(
-            tabs_op[9], **{**kwargs, "pgd_mode": True, "df": df, "df_full": df}
+            tabs_op[10], **{**kwargs, "pgd_mode": True, "df": df, "df_full": df}
         ),
-        lambda: _render_diem_gd_va_to_tkvv(tabs_op[10], **kwargs),
-        lambda: _render_bao_cao_giao_ban(tabs_op[11], **kwargs),
+        lambda: _render_diem_gd_va_to_tkvv(tabs_op[11], **kwargs),
+        lambda: _render_bao_cao_giao_ban(tabs_op[12], **kwargs),
         lambda: _render_mau_bieu_tab(),
-        lambda: tab_ban_dai_dien.render(tabs_op[13], cap="xa", **kwargs),
-        lambda: tab_uy_thac.render(tabs_op[14], **kwargs),
-        lambda: tab_nhiem_vu.render(tabs_op[15], **kwargs),
-        lambda: tab_upload_pgd.render(tabs_op[16], **kwargs),
+        lambda: tab_ban_dai_dien.render(tabs_op[14], cap="xa", **kwargs),
+        lambda: tab_uy_thac.render(tabs_op[15], **kwargs),
+        lambda: tab_nhiem_vu.render(tabs_op[16], **kwargs),
+        lambda: tab_upload_pgd.render(tabs_op[17], **kwargs),
     ]
 
     # Thêm renderer cho tab Upload HSTD nếu có quyền

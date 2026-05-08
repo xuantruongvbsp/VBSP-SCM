@@ -20,6 +20,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 
 import db
+from auth import la_phan_he_cn, la_phan_he_pgd
 from utils import fmt_so, xuat_excel, ten_file_xuat, hien_thi_dataframe_phan_trang
 from services import luu_cdtotkvv, KetQuaUpload
 from data.cdtotkvv import (
@@ -1167,7 +1168,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
     pgd_user = kwargs.get("pgd_user", "")
 
     with tab:
-        if role not in ("admin", "manager", "user"):
+        if not la_phan_he_cn(role) and not la_phan_he_pgd(role):
             st.error("Bạn không có quyền truy cập trang này.")
             return
 
@@ -1180,7 +1181,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
             st.caption("Quản lý và xem tổng hợp chấm điểm Tổ Tiết kiệm & Vay vốn toàn chi nhánh")
 
         # Tạo 5 sub-tabs
-        if cdto_mode == "cn" and role in ("admin", "manager"):
+        if cdto_mode == "cn" and role in ("admin", "manager", "admin_cn", "manager_cn"):
             # Admin/Manager workspace: đầy đủ chức năng
             sub1, sub2, sub3, sub4, sub5 = st.tabs([
                 "📤 Upload", 

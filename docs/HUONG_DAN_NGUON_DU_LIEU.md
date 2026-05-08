@@ -1,160 +1,170 @@
 # Hướng dẫn Nguồn Dữ liệu — VBSP-SCM
-> Cập nhật lần cuối: 05/2026
+> Mô tả chi tiết các loại file dữ liệu, quy trình upload, cache và baseline.
+> Cập nhật lần cuối: 08/05/2026
 
 ---
 
-## 1. Tổng quan các nguồn
+## Các loại file dữ liệu
 
-Hệ thống đọc dữ liệu từ **4 nguồn chính**, mỗi nguồn có luồng upload riêng:
-
-| Nguồn | Loại file | Upload tại | Dùng bởi |
+| Loại | Tên file | Mô tả | Upload bởi |
 |---|---|---|---|
-| **HSTD** — Hồ sơ tín dụng | `.xlsx` | Tab Upload KH-NV hoặc Upload PGD | Toàn hệ thống |
-| **NQ11** — Nghị quyết 11 | `.xlsx` | Tab Upload KH-NV hoặc Upload PGD | Tab NQ11, báo cáo |
-| **GQVL** — Giải quyết việc làm | `.xlsx` | Tab Upload KH-NV hoặc Upload PGD | Tab GQVL, báo cáo |
-| **Điện báo** — Cân đối nguồn vốn | `.xlsx` | Tab Điện Báo (Cân đối) | Tab Cân đối, KH vs TH |
+| **HSTDCT** | `HSTD_Du_lieu_tho.XLSX` | Hồ sơ tín dụng chi tiết — dư nợ, khách hàng, chương trình | admin/manager (KH-NV) |
+| **NQ11** | `SAO_KE_CT__NQ11_du_lieu_tho.XLSX` | Sao kê Nghị quyết 11 — giải ngân theo chương trình | admin/manager (KH-NV) |
+| **GQVL** | `SK_GQVL_du_lieu_tho.xlsx` | Giải quyết vốn lưu động — sao kê chi tiết | admin/manager (KH-NV) |
+| **Điện báo hiện tại** | `Dienbao_ht.xlsx` | Số liệu cân đối nguồn vốn kỳ hiện tại | admin |
+| **Điện báo kỳ trước** | `Dienbao_prev.xlsx` | Số liệu cân đối kỳ trước — so sánh tăng/giảm | admin |
+| **CDTOTKVV** | `CDTOTKVV_{thang}.xlsx` | Chấm điểm Tổ TK&VV theo tháng | admin_pgd / manager_pgd |
 
----
+### Hằng số cấu hình (config.py)
 
-## 2. Hai luồng upload
-
-### Luồng 1 — Phòng KH-NV (tập trung)
-
-**Tab:** `📤 Upload KH-NV`  
-**Role được phép:** `admin`, `manager`  
-**Hàm:** `luu_file_he_thong()`
-
-- Upload file toàn Chi nhánh (gộp tất cả 22 đơn vị)
-- Sau khi upload → tự động gọi `merge_du_lieu_toan_cn()` → cập nhật parquet cache
-- Dùng bởi workspace **Phòng KH-NV** và **BGĐ**
-
-```
-File upload → cache/hstd.parquet
-           → cache/nq11.parquet
-           → cache/gqvl.parquet
-```
-
-### Luồng 2 — PGD địa bàn (phân tán)
-
-**Tab:** `📤 Upload PGD`  
-**Role được phép:** `user` (chỉ PGD của mình), `admin`  
-**Hàm:** `luu_pgd_file()`
-
-- Mỗi PGD upload file riêng của đơn vị mình
-- Lưu vào `pgd_data/{slug}/hstd_latest.xlsx`
-- Dùng bởi workspace **Hỗ trợ Địa bàn PGD**
-
-```
-File upload → pgd_data/pgd_long_thanh/hstd_latest.xlsx
-           → pgd_data/pgd_long_thanh/nq11_latest.xlsx
-           → pgd_data/pgd_long_thanh/gqvl_latest.xlsx
+```python
+TEN_FILE      = "HSTD_Du_lieu_tho.XLSX"        # Đường dẫn: data/HSTD_Du_lieu_tho.XLSX
+TEN_FILE_NQ11 = "SAO_KE_CT__NQ11_du_lieu_tho.XLSX"
+TEN_FILE_DB   = "Dienbao_ht.xlsx"               # Cache: cache/dienbao_ht.xlsx
+TEN_FILE_DB_PREV = "Dienbao_prev.xlsx"          # Cache: cache/dienbao_prev.xlsx
 ```
 
 ---
 
-## 3. Nguồn HSTD
+## Quy trình upload
 
-### Cấu trúc cột bắt buộc
+### Luồng 1 — Upload tập trung (Phòng KH-NV)
 
-Hệ thống đọc theo tên cột — **tên phải khớp** với `config.py`:
+```
+Tab Upload KH-NV (tab_upload_khnv)
+  → luu_file_he_thong(file, loai, username)
+    → Kiểm tra ext (.xlsx/.xls) + kích thước (≥ 1KB)
+    → Kiểm tra chất lượng (data_quality.py)
+    → Lưu file gốc vào data/
+    → merge_du_lieu_toan_cn(loai)
+      → Đọc file từng PGD: pgd_data/{slug}/{loai}_latest.xlsx
+      → ThreadPoolExecutor (max_workers=8) đọc song song
+      -> excel_to_parquet() — cache Parquet
+      → Ghi parquet tổng: cache/hstd.parquet / cache/nq11.parquet
+  → st.cache_data.clear()
+  → Ghi audit_log
+```
 
-| Hằng số config | Tên cột trong file |
+### Luồng 2 — Upload phân tán (PGD địa bàn)
+
+```
+Tab Upload PGD (tab_upload_pgd)
+  → luu_pgd_file(ten_pgd, loai, file, username)
+    → Kiểm tra ext + kích thước
+    → Kiểm tra chất lượng
+    → Lưu file: pgd_data/{slug}/{loai}_latest.xlsx
+    → Gọi merge_du_lieu_toan_cn() — cập nhật cache toàn CN
+  → st.cache_data.clear()
+  → Ghi audit_log
+```
+
+### Luồng 3 — Upload Điện báo
+
+```
+Tab Cân đối (tab_candoi)
+  → luu_dienbao(file_ht, file_prev, username)
+    → Lưu: cache/dienbao_ht.xlsx và cache/dienbao_prev.xlsx
+    → Không gọi merge (điện báo độc lập, không gộp PGD)
+```
+
+---
+
+## Cache & Parquet
+
+Hệ thống sử dụng **2 lớp cache** để tối ưu tốc độ đọc:
+
+### Lớp 1 — Parquet cache (data/core.py)
+
+```python
+def excel_to_parquet(excel_path, parquet_path, sheet, header, post_fn=None):
+    # Chỉ chuyển đổi khi file Excel mới hơn cache
+    if ts_file(parquet_path) < ts_file(excel_path):
+        df = pd.read_excel(excel_path, ...)  # PyArrow backend
+        df.to_parquet(parquet_path, compression='zstd')
+    return pd.read_parquet(parquet_path)
+```
+
+### Lớp 2 — Streamlit cache (app.py)
+
+```python
+@st.cache_data(show_spinner=False, ttl=3600)  # Tự xóa sau 1 giờ
+def _load_hstd(cache_path: str, _ts: float) -> pd.DataFrame:
+    return duckdb.query(f"SELECT * FROM '{cache_path}'").df()
+```
+
+### Xóa cache
+
+Sau mọi thao tác upload thành công, bắt buộc gọi:
+
+```python
+st.cache_data.clear()
+```
+
+### Vị trí cache
+
+| File dữ liệu | Cache Parquet |
 |---|---|
-| `COT_TEN_PGD` | Tên PGD |
-| `COT_TEN_KH` | Tên khách hàng |
-| `COT_MA_KH` | Mã khách hàng |
-| `COT_TONG_DU_NO` | Tổng dư nợ |
-| `COT_DU_NO_TH` | Dư nợ trong hạn |
-| `COT_DU_NO_QH` | Dư nợ quá hạn |
-| `COT_TEN_CT` | Tên chương trình |
-| `COT_NGAY_VAY` | Ngày vay |
-| `COT_THOI_HAN` | Thời hạn |
+| `data/HSTD_Du_lieu_tho.XLSX` | `cache/hstd.parquet` |
+| `data/SAO_KE_CT__NQ11_du_lieu_tho.XLSX` | `cache/nq11.parquet` |
+| `data/SK_GQVL_du_lieu_tho.xlsx` | `cache/gqvl.parquet` |
+| `data/baseline/HSTD_3112_{nam}.XLSX` | `cache/hstd_baseline_{nam}.parquet` |
 
-### Kiểm tra khi merge thất bại
+---
+
+## Baseline 31/12
+
+Hệ thống hỗ trợ lưu trữ **dữ liệu mốc 31/12** hàng năm để so sánh tăng/giảm.
+
+### Vị trí lưu trữ
+
+```
+data/baseline/HSTD_3112_{nam}.XLSX            # File tổng toàn CN
+data/baseline_pgd/{slug}/HSTD_3112_{nam}.XLSX # File riêng từng PGD
+```
+
+### Hàm tiện ích
 
 ```python
-# Xem log
-SELECT * FROM audit_log WHERE action LIKE '%merge%' ORDER BY created_at DESC LIMIT 10
+from config import baseline_path, baseline_cache, danh_sach_nam_baseline
 
-# Kiểm tra tên xã
-from config import PGD_XA_MAP
-print(PGD_XA_MAP["PGD Long Thành"])
-# So sánh với cột "Tên xã" trong file HSTD
+# Đường dẫn file baseline theo năm
+path = baseline_path(2025)      # → "data/baseline/HSTD_3112_2025.XLSX"
+
+# Cache parquet tương ứng
+cache = baseline_cache(2025)    # → "cache/hstd_baseline_2025.parquet"
+
+# Danh sách năm đã có baseline
+years = danh_sach_nam_baseline()  # → [2026, 2025, ...] giảm dần
 ```
 
----
-
-## 4. Nguồn Điện báo
-
-### Cấu trúc file
-
-Hệ thống đọc theo từng dòng — **không dùng header chuẩn pandas**:
-
-| Cột | Nội dung |
-|---|---|
-| **Cột B** (cột thứ 2) | Tên chỉ tiêu (text) |
-| **Cột C** (cột thứ 3) | Giá trị số (float) |
-
-Hai file cần upload:
-- **File hiện tại** — số liệu tại thời điểm báo cáo
-- **File 31/12 năm trước** — mốc so sánh đầu năm
-
-> Hai file phải **cùng cấu trúc** (cùng tên chỉ tiêu ở cột B, cùng đơn vị số ở cột C).
-
-### Upload Điện báo
-
-1. Đăng nhập role `admin` hoặc `manager`
-2. Vào workspace **Phòng KH-NV** → tab **📡 Điện Báo**
-3. Kéo đến mục **📤 Upload file Điện báo**
-4. Upload file hiện tại và/hoặc file 31/12
-
-Chi tiết → xem `HUONG_DAN_DIEN_BAO.md`.
-
----
-
-## 5. Ưu tiên nguồn dữ liệu
-
-Khi cả hai luồng đều có dữ liệu, hệ thống ưu tiên theo `data_priority_service.py`:
-
-```
-Luồng KH-NV (tập trung) > Luồng PGD (địa bàn)
-```
-
-Trạng thái nguồn hiển thị trong **sidebar** (widget `data_source_status.py`).
-
----
-
-## 6. Kiểm tra trạng thái dữ liệu
-
-### Xem merge metadata
+### Đọc dữ liệu baseline
 
 ```python
-meta = db.doc_kv("merge_meta_hstd")
-# {'ts': '2026-05-04T10:30:00', 'so_don_vi': 22, 'tong_ban_ghi': 45123}
+from data.hstd import doc_baseline, doc_baseline_merged
+
+# Baseline của một đơn vị
+df = doc_baseline(2025)
+
+# Baseline đã merge tất cả đơn vị
+df_merged = doc_baseline_merged(2025)
 ```
 
-### Xem trạng thái file PGD
+### Upload baseline PGD
 
 ```python
-from data.pgd import doc_trang_thai_file
-trang_thai = doc_trang_thai_file("PGD Long Thành", "hstd")
-# {'co_file': True, 'ngay': '04/05/2026'}
+from config import baseline_pgd_path
+
+# Lưu file baseline cho PGD
+path = baseline_pgd_path("PGD Long Thành", 2025)
+# → "data/baseline_pgd/pgd_long_thanh/HSTD_3112_2025.XLSX"
 ```
 
-### Tab trạng thái nguồn
+### Kiểm tra trạng thái baseline
 
-Vào tab **🔌 Trạng thái Nguồn** (trong workspace Management) để xem tổng quan tất cả 22 đơn vị.
+```python
+from config import trang_thai_baseline_pgd
 
----
-
-## 7. Lỗi thường gặp
-
-| Hiện tượng | Nguyên nhân | Xử lý |
-|---|---|---|
-| TH = 0 toàn bộ | Chưa upload HSTD hoặc chưa merge | Upload lại → kiểm tra audit log |
-| Số liệu xã bị lệch | Tên xã trong file khác `PGD_XA_MAP` | Chuẩn hóa tên xã trong file Excel |
-| `th_cn` lệch ~8 tỷ | Thiếu 4 key ĐP trong config | Kiểm tra `9_DP`, `12_DP`, `17_DP`, `26_DP` |
-| Merge lỗi 1 PGD | File PGD bị lỗi format | Upload lại file PGD đó |
-| Dữ liệu không cập nhật sau upload | Cache cũ | `st.cache_data.clear()` |
-
-Chi tiết xử lý → xem `TROUBLESHOOTING.md`.
+# Xem PGD nào đã upload baseline cho năm 2025
+status = trang_thai_baseline_pgd(2025)
+# → {"Hội sở Chi nhánh tỉnh": True, "PGD Long Thành": False, ...}
+```

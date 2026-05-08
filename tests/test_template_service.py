@@ -46,15 +46,13 @@ class TestTemplateServiceRender(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         from services import template_service
-        from docx import Document
         cls.ts = template_service
-        cls.Document = Document
 
     def _tao_file_docx_tam(self) -> str:
-        """Tạo file .docx tạm thời để test."""
+        from docx import Document as TaoDocx
         tmp_dir = Path(tempfile.mkdtemp())
         tmpl_path = tmp_dir / "test_template.docx"
-        doc = self.Document()
+        doc = TaoDocx()
         doc.add_paragraph("Hello {{ name }}")
         doc.save(str(tmpl_path))
         return str(tmpl_path)

@@ -120,9 +120,10 @@ class TestCdtotkvvTongHop(unittest.TestCase):
         self.assertEqual(result.iloc[0]["to_tinh_trang_b"], 1)
 
     def test_tong_hop_theo_pgd_df_rong(self) -> None:
-        df = pd.DataFrame()
+        df = pd.DataFrame({"ma_dv": [], "ten_dv": [], "stt": [], "tong_diem": [], "xep_loai": [], "tinh_trang": []})
         result = self.cdtotkvv.tong_hop_theo_pgd(df)
         self.assertIsInstance(result, pd.DataFrame)
+        self.assertTrue(result.empty)
 
     def test_tong_hop_theo_pgd_nhieu_don_vi(self) -> None:
         df = pd.DataFrame({

@@ -37,7 +37,7 @@ class TestPgdSlug(unittest.TestCase):
         self.assertNotEqual(result[-1], "_")
 
     def test_slug_hoi_so(self) -> None:
-        self.assertEqual(self.pgd.pgd_slug("Hội sở Chi nhánh tỉnh"), "hoi_so")
+        self.assertEqual(self.pgd.pgd_slug("Hội sở Chi nhánh tỉnh"), "hoi_so_chi_nhanh_tinh")
 
 
 class TestPgdDuongDan(unittest.TestCase):

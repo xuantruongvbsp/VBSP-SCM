@@ -40,6 +40,7 @@ from tabs import (
     tab_nhiem_vu, tab_cdtotkvv, tab_khtd_giao_dc, tab_kiem_soat,
     tab_ban_dai_dien,
     tab_uy_thac,
+    tab_no_rui_ro,
 )
 from tabs import tab_upload_khnv
 from tabs import tab_quan_ly_dgd
@@ -434,6 +435,7 @@ def render(**kwargs):
         "📊 Tổng quan",
         "🚨 Cảnh báo sớm",
         "🔍 Kiểm soát CN",
+        "💳 Nợ rủi ro QĐ62",
         "⏰ Đến hạn",
         "🗓️ KH Tín dụng Năm",
         "📋 KH GQVL",
@@ -462,25 +464,27 @@ def render(**kwargs):
     with tabs[2]:
         tab_kiem_soat.render_tab(df_full, role, kwargs.get("username", "unknown"))
     with tabs[3]:
+        tab_no_rui_ro.render(tabs[3], **kwargs)
+    with tabs[4]:
         render_den_han(role=role)
-    tab_khtd.render(tabs[4], **dict(kwargs, khtd_mode="cn"))
-    with tabs[5]:
+    tab_khtd.render(tabs[5], **dict(kwargs, khtd_mode="cn"))
+    with tabs[6]:
         render_kh_gqvl(role=role)
-    tab_khtd_giao_dc.render(tabs[6], **kwargs)
-    tab_kehoach.render(tabs[7], **kwargs)
-    tab_baocao.render(tabs[8], **kwargs)
-    tab_candoi.render(tabs[9], **kwargs)
-    tab_cbtd.render(tabs[10], **kwargs)
-    with tabs[11]:
+    tab_khtd_giao_dc.render(tabs[7], **kwargs)
+    tab_kehoach.render(tabs[8], **kwargs)
+    tab_baocao.render(tabs[9], **kwargs)
+    tab_candoi.render(tabs[10], **kwargs)
+    tab_cbtd.render(tabs[11], **kwargs)
+    with tabs[12]:
         _sub1, _sub2 = st.tabs(["📍 Điểm Giao Dịch", "🏘️ Tổ TK&VV"])
         tab_quan_ly_dgd.render(_sub1, **kwargs)
         tab_cdtotkvv.render(_sub2, **dict(kwargs, cdto_mode="cn"))
-    tab_ban_dai_dien.render(tabs[12], cap="tinh", **kwargs)
-    tab_uy_thac.render(tabs[13], **kwargs)
-    tab_nhiem_vu.render(tabs[14], **kwargs)
+    tab_ban_dai_dien.render(tabs[13], cap="tinh", **kwargs)
+    tab_uy_thac.render(tabs[14], **kwargs)
+    tab_nhiem_vu.render(tabs[15], **kwargs)
     if get_permissions(role)["can_upload"]:
-        with tabs[15]:
+        with tabs[16]:
             _render_quan_ly_template(df_full)
-        tab_upload_khnv.render(tabs[16], **kwargs)
+        tab_upload_khnv.render(tabs[17], **kwargs)
     else:
         tab_upload_khnv.render(tabs[15], **kwargs)

@@ -27,6 +27,7 @@ from data import (
 from utils import (
     fmt,
     fmt_so,
+    fmt_ty,
     vn,
     xuat_excel,
     quet_templates,

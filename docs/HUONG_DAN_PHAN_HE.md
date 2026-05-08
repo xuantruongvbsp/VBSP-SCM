@@ -67,6 +67,7 @@ Các tab chính:
 - 🏠 Điểm GD — Quản lý điểm giao dịch
 - 👥 Ban đại diện — Thông tin BĐD
 - 📤 Upload — File riêng PGD
+- 📢 Thông báo Kết luận Giao ban — Xuất Word/PDF kết luận họp giao ban xã (chuẩn NĐ30)
 
 ---
 

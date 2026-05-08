@@ -200,6 +200,81 @@ def tao_bang_dvut(doc: Document, df_xa: pd.DataFrame) -> None:
         run.font.size = Pt(9)
 
 
+def _tao_bang_chi_tiet_to(doc: Document, df_xa: pd.DataFrame) -> None:
+    """Bảng 2 — Chi tiết thu nợ / giải ngân theo Tổ TK&VV (5 cột)."""
+    DVUT_ORDER = [
+        "Hội nông dân",
+        "Hội liên hiệp phụ nữ",
+        "Hội cựu chiến binh",
+        "Đoàn thanh niên",
+    ]
+
+    HEADERS = [
+        "Stt",
+        "Đơn vị nhận ủy thác / Tổ TK&VV",
+        "Chương trình cho vay",
+        "Số tiền thu nợ",
+        "Số tiền giải ngân",
+    ]
+
+    tbl = doc.add_table(rows=1, cols=5)
+    tbl.style = "Table Grid"
+    for i, h in enumerate(HEADERS):
+        cell = tbl.rows[0].cells[i]
+        cell.text = h
+        cell.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+        run = cell.paragraphs[0].runs[0]
+        run.bold = True
+        run.font.name = "Times New Roman"
+        run.font.size = Pt(11)
+
+    co_ten_to = COT_TEN_TO in df_xa.columns
+    dvut_list = [d for d in DVUT_ORDER if d in df_xa[COT_DVUT].dropna().unique()]
+    stt = 0
+
+    for dvut in dvut_list:
+        df_dvut = df_xa[df_xa[COT_DVUT] == dvut]
+
+        tr = tbl.add_row()
+        merged = tr.cells[0].merge(tr.cells[4])
+        merged.text = ""
+        p = merged.paragraphs[0]
+        p.alignment = WD_ALIGN_PARAGRAPH.LEFT
+        r = p.add_run(dvut.upper())
+        r.bold = True
+        r.font.name = "Times New Roman"
+        r.font.size = Pt(11)
+
+        tc_pr = merged._tc.get_or_add_tcPr()
+        shading_elm = OxmlElement("w:shd")
+        shading_elm.set(qn("w:fill"), "DEEAF1")
+        shading_elm.set(qn("w:val"), "clear")
+        tc_pr.append(shading_elm)
+
+        if co_ten_to:
+            ds_to = sorted(df_dvut[COT_TEN_TO].dropna().unique().tolist())
+            for to in ds_to:
+                stt += 1
+                tr = tbl.add_row()
+                vals = [str(stt), to, "", "", ""]
+                for i, v in enumerate(vals):
+                    tr.cells[i].text = v
+                    tr.cells[i].paragraphs[0].alignment = (
+                        WD_ALIGN_PARAGRAPH.LEFT if i == 1 else WD_ALIGN_PARAGRAPH.CENTER
+                    )
+
+    tr = tbl.add_row()
+    for i in range(5):
+        tr.cells[i].text = "Tổng cộng" if i == 1 else ""
+        para = tr.cells[i].paragraphs[0]
+        run = para.runs[0] if para.runs else para.add_run(tr.cells[i].text)
+        run.bold = True
+        run.font.name = "Times New Roman"
+        run.font.size = Pt(11)
+
+    _patch_font(tbl, size=11)
+
+
 def tao_bang_chuong_trinh(
     doc: Document,
     df_xa: pd.DataFrame,
@@ -644,18 +719,25 @@ def xuat_thong_bao_ket_luan_giao_ban(
         space_after=3,
     )
 
-    tags = tinh_so_lieu_van_xuoi(df_xa, df_baseline, nam_moc)
+    tong_dn = pd.to_numeric(df_xa[COT_TONG_DU_NO], errors="coerce").sum() / 1e6
+    so_kh = df_xa[COT_MA_KH].nunique()
+    so_to = df_xa[COT_TEN_TO].nunique() if COT_TEN_TO in df_xa.columns else 0
+    nqh = pd.to_numeric(df_xa[COT_DU_NO_QH], errors="coerce").sum() / 1e6
+    ty_le_nqh = nqh / tong_dn * 100 if tong_dn > 0 else 0
+
     van_xuoi = (
-        f"Tổng dư nợ đạt {tags['{{tong_du_no}}']} triệu đồng "
-        f"({tags['{{tang_giam_thang}}']} {tags['{{chenh_lech_thang}}']} triệu đồng "
-        f"so với tháng trước), với {tags['{{so_kh}}']} khách hàng còn dư nợ, "
-        f"thông qua {tags['{{so_to}}']} Tổ TK&VV. Trong đó, nợ quá hạn "
-        f"{tags['{{du_no_qh}}']} triệu đồng, tỷ lệ {tags['{{ty_le_nqh}}']}%; "
-        f"nợ khoanh {tags['{{du_no_khoanh}}']} triệu đồng, tỷ lệ "
-        f"{tags['{{ty_le_khoanh}}']}%. Số dư tiền gửi tổ viên đạt "
-        f"{tags['{{tien_gui_105}}']} triệu đồng."
+        f"Tổng dư nợ đạt {tong_dn:,.0f} triệu đồng, với {so_kh:,} khách hàng "
+        f"còn dư nợ, thông qua {so_to} Tổ TK&VV. "
+        f"Trong đó nợ quá hạn {nqh:,.0f} triệu đồng, tỷ lệ {ty_le_nqh:.2f}%."
     )
-    _p(van_xuoi, size=14, align=WD_ALIGN_PARAGRAPH.JUSTIFY, indent_cm=1.0)
+    if df_baseline is not None and COT_TEN_XA in df_baseline.columns:
+        ten_xa_val = df_xa[COT_TEN_XA].iloc[0] if COT_TEN_XA in df_xa.columns else None
+        if ten_xa_val:
+            df_bl_xa = df_baseline[df_baseline[COT_TEN_XA] == ten_xa_val]
+            baseline = pd.to_numeric(df_bl_xa[COT_TONG_DU_NO], errors="coerce").sum()
+            tang_giam = tong_dn - (baseline / 1e6)
+            van_xuoi += f" (tăng/giảm {abs(tang_giam):,.0f} triệu so với cùng kỳ)"
+    _p(van_xuoi, size=13, align=WD_ALIGN_PARAGRAPH.JUSTIFY, indent_cm=1.0)
     _p(
         "Đơn vị tính: tổ, khách hàng, triệu đồng, %",
         italic=True,
@@ -667,11 +749,13 @@ def xuat_thong_bao_ket_luan_giao_ban(
     _patch_font(doc.tables[-1], size=11)
 
     _p(
-        "Biểu chi tiết kết quả giao dịch kèm theo.",
+        "Biểu chi tiết kết quả giao dịch kèm theo",
         italic=True,
-        size=12,
+        size=11,
+        align=WD_ALIGN_PARAGRAPH.CENTER,
         indent_cm=0,
     )
+    _tao_bang_chi_tiet_to(doc, df_xa)
 
     _p(
         "2. Tồn tại, hạn chế",
@@ -743,20 +827,19 @@ def xuat_thong_bao_ket_luan_giao_ban(
     tbl_f = doc.add_table(rows=1, cols=2)
     _no_border(tbl_f)
     fl, fr = tbl_f.rows[0].cells
-    _cell_w(fl, 9.0)
-    _cell_w(fr, 8.0)
+    _cell_w(fl, 6.4)
+    _cell_w(fr, 9.6)
 
     p_nn = fl.paragraphs[0]
     r_nn = p_nn.add_run("Nơi nhận:")
     r_nn.bold = True
-    r_nn.font.size = Pt(12)
+    r_nn.font.size = Pt(11)
     r_nn.font.name = "Times New Roman"
     r_nn.font.color.rgb = RGBColor(0, 0, 0)
     for dong in (
         "- Đảng ủy, UBND xã (để b/c);",
-        "- Các tổ chức CT-XH nhận ủy thác;",
-        "- Ban Giám đốc, Tổ trưởng Tổ KH-NV;",
-        "- Lưu: VT, CBTD.",
+        "- Tổ chức CT-XH nhận ủy thác;",
+        "- Lưu PGD.",
     ):
         p_ln = fl.add_paragraph()
         r_ln = p_ln.add_run(dong)
@@ -764,19 +847,27 @@ def xuat_thong_bao_ket_luan_giao_ban(
         r_ln.font.name = "Times New Roman"
         r_ln.font.color.rgb = RGBColor(0, 0, 0)
 
-    p_gd = fr.paragraphs[0]
-    p_gd.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    r_gd = p_gd.add_run("GIÁM ĐỐC")
-    r_gd.bold = True
-    r_gd.font.size = Pt(14)
-    r_gd.font.name = "Times New Roman"
-    r_gd.font.color.rgb = RGBColor(0, 0, 0)
+    p_kt_gd = fr.paragraphs[0]
+    p_kt_gd.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    r_kt_gd = p_kt_gd.add_run("KT.GIÁM ĐỐC")
+    r_kt_gd.bold = True
+    r_kt_gd.font.size = Pt(11)
+    r_kt_gd.font.name = "Times New Roman"
+    r_kt_gd.font.color.rgb = RGBColor(0, 0, 0)
+
+    p_pgd = fr.add_paragraph()
+    p_pgd.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    r_pgd = p_pgd.add_run("PHÓ GIÁM ĐỐC")
+    r_pgd.bold = True
+    r_pgd.font.size = Pt(11)
+    r_pgd.font.name = "Times New Roman"
+    r_pgd.font.color.rgb = RGBColor(0, 0, 0)
 
     p_kt = fr.add_paragraph()
     p_kt.alignment = WD_ALIGN_PARAGRAPH.CENTER
     r_kt = p_kt.add_run("(Ký tên, đóng dấu)")
     r_kt.italic = True
-    r_kt.font.size = Pt(13)
+    r_kt.font.size = Pt(11)
     r_kt.font.name = "Times New Roman"
     r_kt.font.color.rgb = RGBColor(0, 0, 0)
 
@@ -786,9 +877,8 @@ def xuat_thong_bao_ket_luan_giao_ban(
 
     p_ht = fr.add_paragraph()
     p_ht.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    r_ht = p_ht.add_run(ten_pgd_hd)
-    r_ht.bold = True
-    r_ht.font.size = Pt(14)
+    r_ht = p_ht.add_run("…………………………………")
+    r_ht.font.size = Pt(11)
     r_ht.font.name = "Times New Roman"
     r_ht.font.color.rgb = RGBColor(0, 0, 0)
 

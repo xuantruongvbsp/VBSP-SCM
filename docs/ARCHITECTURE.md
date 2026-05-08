@@ -234,9 +234,11 @@ giao_ban.py  (root)
   Hàm chính:
     tinh_so_lieu_van_xuoi(df, ten_xa, ...)  → dict số liệu giao ban
     tao_bang_dvut(doc, df_xa)               → điền bảng đơn vị thụ hưởng
+    _tao_bang_chi_tiet_to(doc, df_xa)       → Bảng 2 chi tiết theo Tổ TK&VV (5 cột)
     tao_bang_chuong_trinh(doc, ...)         → điền bảng chương trình
     tao_bang_ke_hoach(doc, ...)             → điền bảng kế hoạch
-    xuat_bien_ban_giao_ban(...)             → xuất file Word giao ban xã
+    xuat_bien_ban_giao_ban(...)             → xuất file Word giao ban xã (template)
+    xuat_thong_bao_ket_luan_giao_ban(...)   → xuất Thông báo Kết luận Giao ban (runtime render)
   ← dùng chung cho ws_operation (CBTD) và ws_management
 ```
 
@@ -324,6 +326,7 @@ executive
 | tab_nq11 | NQ11 PGD |
 | tab_cdtotkvv | Chấm điểm Tổ TK&VV |
 | tab_upload_pgd | Upload file riêng PGD |
+| Document Hub (tích hợp trong ws_operation) | Trung tâm văn bản: Biên bản giao ban, Thông báo Kết luận (Word/PDF) |
 
 ---
 

@@ -1,6 +1,6 @@
 # 📁 Codebase: VBSP-SCM
 
-**Generated:** 2026-05-08 08:24:13
+**Generated:** 2026-05-08 18:14:41
 
 ---
 
@@ -96,6 +96,7 @@ VBSP-SCM/
 │   ├── cdtotkvv.py
 │   ├── core.py
 │   ├── CT_CDTOTKVV_004601_31032026.xlsx
+│   ├── den_han.py
 │   ├── dgd_helpers.py
 │   ├── DienBao_2025_3112.xlsx
 │   ├── Dienbao_2026.xlsx
@@ -320,9 +321,11 @@ VBSP-SCM/
 │   ├── tab_cdtotkvv.py
 │   ├── tab_cdtotkvv_pgd.py
 │   ├── tab_danhsach.py
+│   ├── tab_den_han.py
 │   ├── tab_diem_gd_pgd.py
 │   ├── tab_gqvl.py
 │   ├── tab_kehoach.py
+│   ├── tab_kh_gqvl.py
 │   ├── tab_khtd.py
 │   ├── tab_khtd_giao_dc.py
 │   ├── tab_khtd_mau07.py
@@ -452,6 +455,7 @@ VBSP-SCM/
 │   │   ├── cdtotkvv.py
 │   │   ├── core.py
 │   │   ├── CT_CDTOTKVV_004601_31032026.xlsx
+│   │   ├── den_han.py
 │   │   ├── dgd_helpers.py
 │   │   ├── DienBao_2025_3112.xlsx
 │   │   ├── Dienbao_2026.xlsx
@@ -677,9 +681,11 @@ VBSP-SCM/
 │   │   ├── tab_cdtotkvv.py
 │   │   ├── tab_cdtotkvv_pgd.py
 │   │   ├── tab_danhsach.py
+│   │   ├── tab_den_han.py
 │   │   ├── tab_diem_gd_pgd.py
 │   │   ├── tab_gqvl.py
 │   │   ├── tab_kehoach.py
+│   │   ├── tab_kh_gqvl.py
 │   │   ├── tab_khtd.py
 │   │   ├── tab_khtd_giao_dc.py
 │   │   ├── tab_khtd_mau07.py
@@ -748,6 +754,7 @@ VBSP-SCM/
 │   ├── DienBao_2025_3112.xlsx
 │   ├── Dienbao_2026.xlsx
 │   ├── fix_sheet_id.py
+│   ├── gen_dcgiam_sheet.py
 │   ├── HSTD_Du_lieu_tho.XLSX
 │   ├── logo-vbsp.jpg
 │   ├── logo.png
@@ -807,6 +814,7 @@ VBSP-SCM/
 ├── DienBao_2025_3112.xlsx
 ├── Dienbao_2026.xlsx
 ├── fix_sheet_id.py
+├── gen_dcgiam_sheet.py
 ├── HSTD_Du_lieu_tho.XLSX
 ├── logo-vbsp.jpg
 ├── logo.png
@@ -3442,6 +3450,7 @@ COT_TEN_KH     = "Tên KH"
 COT_SO_KU      = "Số khế ước"
 COT_NGAY_VAY   = "Ngày vay"
 COT_NGAY_DH    = "Ngày ĐH theo hợp đồng"
+COT_NGAY_DEN_HAN = COT_NGAY_DH  # alias cho module đến hạn
 COT_THOI_HAN   = "Thời hạn vay"
 COT_LAI_SUAT   = "Lãi suất"
 COT_MUC_VAY    = "Mức vay"
@@ -4034,18 +4043,37 @@ def init_db():
                 y_kien_duyet  TEXT,
                 UNIQUE(nhiem_vu_id, pgd)
             );
+            CREATE TABLE IF NOT EXISTS kv_history (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                key         TEXT    NOT NULL,
+                value       TEXT,
+                changed_by  TEXT,
+                changed_at  TEXT DEFAULT (datetime('now','localtime')),
+                note        TEXT
+            );
+            CREATE INDEX IF NOT EXISTS idx_kv_history_key ON kv_history(key);
         """)
         conn.commit()
 
 
-def ghi_kv(key: str, value: dict, username: str = "system") -> None:
+def ghi_kv(key: str, value: dict, username: str = "system", note: str = None) -> None:
     """Ghi hoặc cập nhật một cặp key-value vào bảng kv_store."""
     try:
         with get_conn() as conn:
+            old_row = conn.execute(
+                "SELECT value FROM kv_store WHERE key = ?", (key,)
+            ).fetchone()
+            new_value_str = json.dumps(value, ensure_ascii=False)
+            if old_row and old_row["value"] != new_value_str:
+                conn.execute(
+                    """INSERT INTO kv_history (key, value, changed_by, note)
+                       VALUES (?, ?, ?, ?)""",
+                    (key, old_row["value"], username, note),
+                )
             conn.execute(
                 """INSERT OR REPLACE INTO kv_store (key, value, updated_at, updated_by)
                    VALUES (?, ?, ?, ?)""",
-                (key, json.dumps(value, ensure_ascii=False),
+                (key, new_value_str,
                  datetime.now().isoformat(), username),
             )
             conn.commit()
@@ -4125,6 +4153,48 @@ def doc_kv_nhieu(keys: list[str]) -> dict[str, Any]:
         return {row["key"]: json.loads(row["value"]) for row in rows}
     except Exception:
         return {}
+
+
+def doc_kv_history(key: str, limit: int = 10) -> list[dict]:
+    """
+    Đọc lịch sử thay đổi của một key từ bảng kv_history.
+
+    Trả về list[dict] với các khóa: id, value, changed_by, changed_at, note.
+    Nếu không có lịch sử → trả về [].
+    """
+    try:
+        with get_conn() as conn:
+            rows = conn.execute(
+                """SELECT id, value, changed_by, changed_at, note
+                   FROM kv_history WHERE key = ?
+                   ORDER BY id DESC LIMIT ?""",
+                (key, limit),
+            ).fetchall()
+        return [dict(row) for row in rows]
+    except Exception:
+        return []
+
+
+def khoi_phuc_kv(key: str, history_id: int, username: str) -> bool:
+    """
+    Khôi phục giá trị của một key từ lịch sử theo history_id.
+
+    Trả về True nếu thành công, False nếu không tìm thấy id.
+    """
+    try:
+        with get_conn() as conn:
+            row = conn.execute(
+                "SELECT value FROM kv_history WHERE id = ? AND key = ?",
+                (history_id, key),
+            ).fetchone()
+        if not row:
+            return False
+        value_cu = json.loads(row["value"])
+        ghi_kv(key, value_cu, username, note=f"Khôi phục từ phiên bản #{history_id}")
+        ghi_audit(username, "khoi_phuc_kv", f"key={key}, history_id={history_id}")
+        return True
+    except Exception:
+        return False
 
 
 def ghi_audit(username: str, action: str, detail: str = "") -> None:
@@ -4361,6 +4431,246 @@ else:
 
 ---
 
+### 📄 `gen_dcgiam_sheet.py`
+
+```python
+"""
+gen_dcgiam_sheet.py
+─────────────────
+Script độc lập đẩy dữ liệu GQVL lên Google Sheet để theo dõi
+KH vs TH phân tầng TW/ĐP.
+
+Cách dùng:
+    python gen_dcgiam_sheet.py --th
+    python gen_dcgiam_sheet.py --kh --nam 2026
+    python gen_dcgiam_sheet.py --all
+"""
+
+import argparse
+import logging
+import sys
+from datetime import datetime
+from pathlib import Path
+
+import pandas as pd
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
+
+import db
+import config
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+_LOG = logging.getLogger(__name__)
+
+DCGIAM_SHEET_ID = "15Ev2rTv6khLFaMpAiMwqJCVC_33ocJ-6cp016RGNkYk"
+CREDENTIALS_FILE = "credentials.json"
+SHEET_TAB_GQVL = "GQVL"
+SHEET_TAB_KH = "KH_GQVL"
+
+GQVL_PARQUET = Path("cache") / "gqvl.parquet"
+
+
+def _ket_noi_gsheet():
+    scope = [
+        "https://spreadsheets.google.com/feeds",
+        "https://www.googleapis.com/auth/drive",
+    ]
+    if not Path(CREDENTIALS_FILE).exists():
+        raise FileNotFoundError(
+            f"Không tìm thấy file credentials: {CREDENTIALS_FILE}"
+        )
+    creds = ServiceAccountCredentials.from_json_keyfile_name(CREDENTIALS_FILE, scope)
+    return gspread.authorize(creds)
+
+
+def _doc_gqvl_parquet() -> pd.DataFrame:
+    if not GQVL_PARQUET.exists():
+        raise FileNotFoundError(
+            f"Không tìm thấy file parquet: {GQVL_PARQUET}. "
+            "Hãy upload và merge GQVL trước khi chạy script này."
+        )
+    df = pd.read_parquet(GQVL_PARQUET)
+    _LOG.info("Đọc %d dòng từ %s", len(df), GQVL_PARQUET)
+    return df
+
+
+def _phan_loai_tw_dp(df: pd.DataFrame):
+    cot_ct = config.COT_TEN_CT
+    ds_tw = [ten for _mk, _ma_ct, ten, nv, _ten_match in config.CHUONG_TRINH_KHTD if nv == "TW"]
+    ds_dp = [ten for _mk, _ma_ct, ten, nv, _ten_match in config.CHUONG_TRINH_KHTD if nv == "DP"]
+
+    if cot_ct not in df.columns:
+        _LOG.warning("Cột '%s' không có trong DataFrame. Các cột hiện có: %s", cot_ct, list(df.columns))
+        df_tw = pd.DataFrame()
+        df_dp = pd.DataFrame()
+        return df_tw, df_dp
+
+    df_tw = df[df[cot_ct].isin(ds_tw)]
+    df_dp = df[df[cot_ct].isin(ds_dp)]
+    so_khong_khop = len(df) - len(df_tw) - len(df_dp)
+    _LOG.info("Phân loại: TW=%d dòng, ĐP=%d dòng, Không khớp=%d dòng", len(df_tw), len(df_dp), so_khong_khop)
+    return df_tw, df_dp
+
+
+def _tong_hop_theo_pgd(df: pd.DataFrame) -> pd.DataFrame:
+    if df.empty:
+        return pd.DataFrame(columns=["Tên PGD", "Tổng dư nợ", "Số hộ vay"])
+
+    cot_pgd = config.COT_TEN_PGD
+    cot_dn = config.COT_TONG_DU_NO
+    cot_ma_kh = config.COT_MA_KH
+
+    if cot_pgd not in df.columns:
+        _LOG.warning("Cột '%s' không có, trả về DataFrame rỗng", cot_pgd)
+        return pd.DataFrame(columns=["Tên PGD", "Tổng dư nợ", "Số hộ vay"])
+
+    agg_dict = {"Tổng dư nợ": (cot_dn, "sum") if cot_dn in df.columns else ("__count__", "count")}
+    if cot_ma_kh in df.columns:
+        agg_dict["Số hộ vay"] = (cot_ma_kh, "nunique")
+    else:
+        agg_dict["Số hộ vay"] = (cot_pgd, "count")
+
+    grouped = df.groupby(cot_pgd).agg(**agg_dict).reset_index()
+    grouped = grouped.rename(columns={cot_pgd: "Tên PGD"})
+    grouped["Tổng dư nợ"] = grouped["Tổng dư nợ"].fillna(0).astype(float)
+    grouped["Số hộ vay"] = grouped["Số hộ vay"].fillna(0).astype(int)
+
+    thutu = {ten: i for i, ten in enumerate(config.DS_PGD)}
+    grouped["_order"] = grouped["Tên PGD"].map(thutu).fillna(999)
+    grouped = grouped.sort_values("_order").drop(columns=["_order"])
+
+    tong_dn = grouped["Tổng dư nợ"].sum()
+    tong_ho = grouped["Số hộ vay"].sum()
+    row_tc = pd.DataFrame([{"Tên PGD": "TỔNG CỘNG", "Tổng dư nợ": tong_dn, "Số hộ vay": tong_ho}])
+    grouped = pd.concat([grouped, row_tc], ignore_index=True)
+    return grouped
+
+
+def push_th_gqvl_len_sheet() -> bool:
+    try:
+        client = _ket_noi_gsheet()
+        df_full = _doc_gqvl_parquet()
+        df_tw, df_dp = _phan_loai_tw_dp(df_full)
+
+        bang_tw = _tong_hop_theo_pgd(df_tw)
+        bang_dp = _tong_hop_theo_pgd(df_dp)
+
+        spreadsheet = client.open_by_key(DCGIAM_SHEET_ID)
+        try:
+            ws = spreadsheet.worksheet(SHEET_TAB_GQVL)
+        except gspread.exceptions.WorksheetNotFound:
+            ws = spreadsheet.add_worksheet(title=SHEET_TAB_GQVL, rows=100, cols=10)
+
+        ws.clear()
+
+        header1 = ["", "NGUỒN VỐN TRUNG ƯƠNG (TW)", "", "", "NGUỒN VỐN ĐỊA PHƯƠNG (ĐP)", "", ""]
+        header2 = ["Tên PGD", "Tổng dư nợ TW", "Số hộ TW", "", "Tổng dư nợ ĐP", "Số hộ ĐP", "Tổng cộng"]
+
+        ds_pgd = config.DS_PGD + ["TỔNG CỘNG"]
+        rows_data = [header1, header2]
+
+        tw_map = {}
+        for _, row in bang_tw.iterrows():
+            tw_map[row["Tên PGD"]] = (row["Tổng dư nợ"], row["Số hộ vay"])
+
+        dp_map = {}
+        for _, row in bang_dp.iterrows():
+            dp_map[row["Tên PGD"]] = (row["Tổng dư nợ"], row["Số hộ vay"])
+
+        for ten_pgd in ds_pgd:
+            dn_tw, ho_tw = tw_map.get(ten_pgd, (0, 0))
+            dn_dp, ho_dp = dp_map.get(ten_pgd, (0, 0))
+            dn_tw = int(dn_tw)
+            dn_dp = int(dn_dp)
+            tong_cong = int(dn_tw + dn_dp)
+            rows_data.append([ten_pgd, dn_tw, ho_tw, "", dn_dp, ho_dp, tong_cong])
+
+        ws.update(rows_data, value_input_option="USER_ENTERED")
+
+        timestamp = datetime.now().strftime("Cập nhật lúc %H:%M %d/%m/%Y")
+        ws.update_acell("A40", timestamp)
+
+        _LOG.info("Push TH GQVL lên sheet thành công — %d PGD", len(config.DS_PGD))
+        return True
+    except Exception:
+        _LOG.exception("Lỗi push TH GQVL lên sheet")
+        return False
+
+
+def push_kh_len_sheet(nam: int = None) -> bool:
+    if nam is None:
+        nam = datetime.now().year
+
+    try:
+        kh_data = db.doc_kv(f"kh_gqvl_cn_{nam}")
+        if kh_data is None:
+            _LOG.warning("Chưa có KH GQVL năm %d", nam)
+            return False
+
+        pgd_data = kh_data.get("pgd", {})
+        if not pgd_data:
+            _LOG.warning("KH GQVL năm %d rỗng (không có PGD nào)", nam)
+            return False
+
+        client = _ket_noi_gsheet()
+        spreadsheet = client.open_by_key(DCGIAM_SHEET_ID)
+        try:
+            ws = spreadsheet.worksheet(SHEET_TAB_KH)
+        except gspread.exceptions.WorksheetNotFound:
+            ws = spreadsheet.add_worksheet(title=SHEET_TAB_KH, rows=100, cols=5)
+
+        ws.clear()
+
+        rows_data = [["Tên PGD", "KH TW (VND)", "KH ĐP (VND)", "KH Tổng cộng"]]
+        tong_tw = 0
+        tong_dp = 0
+
+        for ten_pgd in config.DS_PGD:
+            info = pgd_data.get(ten_pgd, {})
+            kh_tw = int(info.get("kh_tw", 0))
+            kh_dp = int(info.get("kh_dp", 0))
+            tong = kh_tw + kh_dp
+            rows_data.append([ten_pgd, kh_tw, kh_dp, int(tong)])
+            tong_tw += kh_tw
+            tong_dp += kh_dp
+
+        rows_data.append(["TỔNG CỘNG", int(tong_tw), int(tong_dp), int(tong_tw + tong_dp)])
+
+        ws.update(rows_data, value_input_option="USER_ENTERED")
+
+        _LOG.info("Push KH GQVL năm %d lên sheet thành công — %d PGD", nam, len(pgd_data))
+        return True
+    except Exception:
+        _LOG.exception("Lỗi push KH GQVL lên sheet")
+        return False
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Đẩy dữ liệu GQVL lên Google Sheet")
+    parser.add_argument("--th", action="store_true", help="Push TH GQVL lên sheet")
+    parser.add_argument("--kh", action="store_true", help="Push KH GQVL lên sheet")
+    parser.add_argument("--nam", type=int, default=None, help="Năm kế hoạch (mặc định: năm hiện tại)")
+    parser.add_argument("--all", action="store_true", help="Push cả TH lẫn KH")
+    args = parser.parse_args()
+
+    if args.all or args.th:
+        ok = push_th_gqvl_len_sheet()
+        print(f"TH: {'✅ OK' if ok else '❌ FAIL'}")
+
+    if args.all or args.kh:
+        ok = push_kh_len_sheet(args.nam)
+        print(f"KH: {'✅ OK' if ok else '❌ FAIL'}")
+
+    if not any([args.all, args.th, args.kh]):
+        parser.print_help()
+
+
+if __name__ == "__main__":
+    main()
+```
+
+---
+
 ### 📄 `logo_b64_snippet.py`
 
 ```python
@@ -4484,6 +4794,7 @@ def xuat_pdf(
     cols_tien: list[str] | None = None,
     don_vi_tien: str = "đồng",
     prefix_file: str = "",
+    them_dong_tong: bool = True,
 ) -> bytes:
     if not _REPORTLAB_READY:
         raise ImportError("Chưa cài thư viện reportlab. Chạy: pip install reportlab")
@@ -4496,6 +4807,19 @@ def xuat_pdf(
     from utils import fmt_so
 
     cols_tien = cols_tien or []
+
+    dong_tong_cells = None
+    if them_dong_tong and cols_tien and len(df) > 0:
+        tong_row = {}
+        for col in df.columns:
+            if col in cols_tien:
+                try:
+                    tong_row[col] = pd.to_numeric(df[col], errors="coerce").sum()
+                except Exception:
+                    tong_row[col] = ""
+            else:
+                tong_row[col] = "TỔNG CỘNG" if list(df.columns).index(col) == 0 else ""
+        dong_tong_cells = tong_row
 
     buf = BytesIO()
     # Landscape nếu nhiều cột hoặc báo cáo TQPGD
@@ -4618,6 +4942,31 @@ def xuat_pdf(
             cells.append(p)
         table_data.append(cells)
 
+    if dong_tong_cells is not None:
+        tong_cells = []
+        for col in df.columns:
+            val = dong_tong_cells[col]
+            if col in cols_tien and isinstance(val, (int, float)):
+                txt = fmt_so(float(val))
+                p = Paragraph(
+                    f"<b>{txt}</b>",
+                    ParagraphStyle("tong_r", fontName=fb,
+                                   fontSize=font_size, alignment=TA_RIGHT)
+                )
+            elif val == "TỔNG CỘNG":
+                p = Paragraph(
+                    "<b>TỔNG CỘNG</b>",
+                    ParagraphStyle("tong_lbl", fontName=fb,
+                                   fontSize=font_size, alignment=TA_CENTER)
+                )
+            else:
+                p = Paragraph(
+                    str(val) if val else "",
+                    ParagraphStyle("tong_empty", fontName=fn, fontSize=font_size)
+                )
+            tong_cells.append(p)
+        table_data.append(tong_cells)
+
     if n_cols > 0:
         cols_list = list(df.columns)
 
@@ -4667,6 +5016,15 @@ def xuat_pdf(
     for r in range(1, len(table_data)):
         if r % 2 == 0:
             style_cmds.append(("BACKGROUND", (0, r), (-1, r), ROW_ALT))
+
+    # Style dòng tổng cộng (dòng cuối)
+    if dong_tong_cells is not None:
+        last_row = len(table_data) - 1
+        style_cmds.extend([
+            ("BACKGROUND", (0, last_row), (-1, last_row), VBSP_GREEN_LIGHT),
+            ("FONTNAME",   (0, last_row), (-1, last_row), fb),
+            ("LINEABOVE",  (0, last_row), (-1, last_row), 1.5, VBSP_GREEN),
+        ])
 
     tbl.setStyle(TableStyle(style_cmds))
     for ci, col in enumerate(df.columns):
@@ -9114,6 +9472,7 @@ COT_TEN_KH     = "Tên KH"
 COT_SO_KU      = "Số khế ước"
 COT_NGAY_VAY   = "Ngày vay"
 COT_NGAY_DH    = "Ngày ĐH theo hợp đồng"
+COT_NGAY_DEN_HAN = COT_NGAY_DH  # alias cho module đến hạn
 COT_THOI_HAN   = "Thời hạn vay"
 COT_LAI_SUAT   = "Lãi suất"
 COT_MUC_VAY    = "Mức vay"
@@ -9706,18 +10065,37 @@ def init_db():
                 y_kien_duyet  TEXT,
                 UNIQUE(nhiem_vu_id, pgd)
             );
+            CREATE TABLE IF NOT EXISTS kv_history (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                key         TEXT    NOT NULL,
+                value       TEXT,
+                changed_by  TEXT,
+                changed_at  TEXT DEFAULT (datetime('now','localtime')),
+                note        TEXT
+            );
+            CREATE INDEX IF NOT EXISTS idx_kv_history_key ON kv_history(key);
         """)
         conn.commit()
 
 
-def ghi_kv(key: str, value: dict, username: str = "system") -> None:
+def ghi_kv(key: str, value: dict, username: str = "system", note: str = None) -> None:
     """Ghi hoặc cập nhật một cặp key-value vào bảng kv_store."""
     try:
         with get_conn() as conn:
+            old_row = conn.execute(
+                "SELECT value FROM kv_store WHERE key = ?", (key,)
+            ).fetchone()
+            new_value_str = json.dumps(value, ensure_ascii=False)
+            if old_row and old_row["value"] != new_value_str:
+                conn.execute(
+                    """INSERT INTO kv_history (key, value, changed_by, note)
+                       VALUES (?, ?, ?, ?)""",
+                    (key, old_row["value"], username, note),
+                )
             conn.execute(
                 """INSERT OR REPLACE INTO kv_store (key, value, updated_at, updated_by)
                    VALUES (?, ?, ?, ?)""",
-                (key, json.dumps(value, ensure_ascii=False),
+                (key, new_value_str,
                  datetime.now().isoformat(), username),
             )
             conn.commit()
@@ -9797,6 +10175,48 @@ def doc_kv_nhieu(keys: list[str]) -> dict[str, Any]:
         return {row["key"]: json.loads(row["value"]) for row in rows}
     except Exception:
         return {}
+
+
+def doc_kv_history(key: str, limit: int = 10) -> list[dict]:
+    """
+    Đọc lịch sử thay đổi của một key từ bảng kv_history.
+
+    Trả về list[dict] với các khóa: id, value, changed_by, changed_at, note.
+    Nếu không có lịch sử → trả về [].
+    """
+    try:
+        with get_conn() as conn:
+            rows = conn.execute(
+                """SELECT id, value, changed_by, changed_at, note
+                   FROM kv_history WHERE key = ?
+                   ORDER BY id DESC LIMIT ?""",
+                (key, limit),
+            ).fetchall()
+        return [dict(row) for row in rows]
+    except Exception:
+        return []
+
+
+def khoi_phuc_kv(key: str, history_id: int, username: str) -> bool:
+    """
+    Khôi phục giá trị của một key từ lịch sử theo history_id.
+
+    Trả về True nếu thành công, False nếu không tìm thấy id.
+    """
+    try:
+        with get_conn() as conn:
+            row = conn.execute(
+                "SELECT value FROM kv_history WHERE id = ? AND key = ?",
+                (history_id, key),
+            ).fetchone()
+        if not row:
+            return False
+        value_cu = json.loads(row["value"])
+        ghi_kv(key, value_cu, username, note=f"Khôi phục từ phiên bản #{history_id}")
+        ghi_audit(username, "khoi_phuc_kv", f"key={key}, history_id={history_id}")
+        return True
+    except Exception:
+        return False
 
 
 def ghi_audit(username: str, action: str, detail: str = "") -> None:
@@ -10033,6 +10453,246 @@ else:
 
 ---
 
+### 📄 `VBSP-SCM/gen_dcgiam_sheet.py`
+
+```python
+"""
+gen_dcgiam_sheet.py
+─────────────────
+Script độc lập đẩy dữ liệu GQVL lên Google Sheet để theo dõi
+KH vs TH phân tầng TW/ĐP.
+
+Cách dùng:
+    python gen_dcgiam_sheet.py --th
+    python gen_dcgiam_sheet.py --kh --nam 2026
+    python gen_dcgiam_sheet.py --all
+"""
+
+import argparse
+import logging
+import sys
+from datetime import datetime
+from pathlib import Path
+
+import pandas as pd
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
+
+import db
+import config
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+_LOG = logging.getLogger(__name__)
+
+DCGIAM_SHEET_ID = "15Ev2rTv6khLFaMpAiMwqJCVC_33ocJ-6cp016RGNkYk"
+CREDENTIALS_FILE = "credentials.json"
+SHEET_TAB_GQVL = "GQVL"
+SHEET_TAB_KH = "KH_GQVL"
+
+GQVL_PARQUET = Path("cache") / "gqvl.parquet"
+
+
+def _ket_noi_gsheet():
+    scope = [
+        "https://spreadsheets.google.com/feeds",
+        "https://www.googleapis.com/auth/drive",
+    ]
+    if not Path(CREDENTIALS_FILE).exists():
+        raise FileNotFoundError(
+            f"Không tìm thấy file credentials: {CREDENTIALS_FILE}"
+        )
+    creds = ServiceAccountCredentials.from_json_keyfile_name(CREDENTIALS_FILE, scope)
+    return gspread.authorize(creds)
+
+
+def _doc_gqvl_parquet() -> pd.DataFrame:
+    if not GQVL_PARQUET.exists():
+        raise FileNotFoundError(
+            f"Không tìm thấy file parquet: {GQVL_PARQUET}. "
+            "Hãy upload và merge GQVL trước khi chạy script này."
+        )
+    df = pd.read_parquet(GQVL_PARQUET)
+    _LOG.info("Đọc %d dòng từ %s", len(df), GQVL_PARQUET)
+    return df
+
+
+def _phan_loai_tw_dp(df: pd.DataFrame):
+    cot_ct = config.COT_TEN_CT
+    ds_tw = [ten for _mk, _ma_ct, ten, nv, _ten_match in config.CHUONG_TRINH_KHTD if nv == "TW"]
+    ds_dp = [ten for _mk, _ma_ct, ten, nv, _ten_match in config.CHUONG_TRINH_KHTD if nv == "DP"]
+
+    if cot_ct not in df.columns:
+        _LOG.warning("Cột '%s' không có trong DataFrame. Các cột hiện có: %s", cot_ct, list(df.columns))
+        df_tw = pd.DataFrame()
+        df_dp = pd.DataFrame()
+        return df_tw, df_dp
+
+    df_tw = df[df[cot_ct].isin(ds_tw)]
+    df_dp = df[df[cot_ct].isin(ds_dp)]
+    so_khong_khop = len(df) - len(df_tw) - len(df_dp)
+    _LOG.info("Phân loại: TW=%d dòng, ĐP=%d dòng, Không khớp=%d dòng", len(df_tw), len(df_dp), so_khong_khop)
+    return df_tw, df_dp
+
+
+def _tong_hop_theo_pgd(df: pd.DataFrame) -> pd.DataFrame:
+    if df.empty:
+        return pd.DataFrame(columns=["Tên PGD", "Tổng dư nợ", "Số hộ vay"])
+
+    cot_pgd = config.COT_TEN_PGD
+    cot_dn = config.COT_TONG_DU_NO
+    cot_ma_kh = config.COT_MA_KH
+
+    if cot_pgd not in df.columns:
+        _LOG.warning("Cột '%s' không có, trả về DataFrame rỗng", cot_pgd)
+        return pd.DataFrame(columns=["Tên PGD", "Tổng dư nợ", "Số hộ vay"])
+
+    agg_dict = {"Tổng dư nợ": (cot_dn, "sum") if cot_dn in df.columns else ("__count__", "count")}
+    if cot_ma_kh in df.columns:
+        agg_dict["Số hộ vay"] = (cot_ma_kh, "nunique")
+    else:
+        agg_dict["Số hộ vay"] = (cot_pgd, "count")
+
+    grouped = df.groupby(cot_pgd).agg(**agg_dict).reset_index()
+    grouped = grouped.rename(columns={cot_pgd: "Tên PGD"})
+    grouped["Tổng dư nợ"] = grouped["Tổng dư nợ"].fillna(0).astype(float)
+    grouped["Số hộ vay"] = grouped["Số hộ vay"].fillna(0).astype(int)
+
+    thutu = {ten: i for i, ten in enumerate(config.DS_PGD)}
+    grouped["_order"] = grouped["Tên PGD"].map(thutu).fillna(999)
+    grouped = grouped.sort_values("_order").drop(columns=["_order"])
+
+    tong_dn = grouped["Tổng dư nợ"].sum()
+    tong_ho = grouped["Số hộ vay"].sum()
+    row_tc = pd.DataFrame([{"Tên PGD": "TỔNG CỘNG", "Tổng dư nợ": tong_dn, "Số hộ vay": tong_ho}])
+    grouped = pd.concat([grouped, row_tc], ignore_index=True)
+    return grouped
+
+
+def push_th_gqvl_len_sheet() -> bool:
+    try:
+        client = _ket_noi_gsheet()
+        df_full = _doc_gqvl_parquet()
+        df_tw, df_dp = _phan_loai_tw_dp(df_full)
+
+        bang_tw = _tong_hop_theo_pgd(df_tw)
+        bang_dp = _tong_hop_theo_pgd(df_dp)
+
+        spreadsheet = client.open_by_key(DCGIAM_SHEET_ID)
+        try:
+            ws = spreadsheet.worksheet(SHEET_TAB_GQVL)
+        except gspread.exceptions.WorksheetNotFound:
+            ws = spreadsheet.add_worksheet(title=SHEET_TAB_GQVL, rows=100, cols=10)
+
+        ws.clear()
+
+        header1 = ["", "NGUỒN VỐN TRUNG ƯƠNG (TW)", "", "", "NGUỒN VỐN ĐỊA PHƯƠNG (ĐP)", "", ""]
+        header2 = ["Tên PGD", "Tổng dư nợ TW", "Số hộ TW", "", "Tổng dư nợ ĐP", "Số hộ ĐP", "Tổng cộng"]
+
+        ds_pgd = config.DS_PGD + ["TỔNG CỘNG"]
+        rows_data = [header1, header2]
+
+        tw_map = {}
+        for _, row in bang_tw.iterrows():
+            tw_map[row["Tên PGD"]] = (row["Tổng dư nợ"], row["Số hộ vay"])
+
+        dp_map = {}
+        for _, row in bang_dp.iterrows():
+            dp_map[row["Tên PGD"]] = (row["Tổng dư nợ"], row["Số hộ vay"])
+
+        for ten_pgd in ds_pgd:
+            dn_tw, ho_tw = tw_map.get(ten_pgd, (0, 0))
+            dn_dp, ho_dp = dp_map.get(ten_pgd, (0, 0))
+            dn_tw = int(dn_tw)
+            dn_dp = int(dn_dp)
+            tong_cong = int(dn_tw + dn_dp)
+            rows_data.append([ten_pgd, dn_tw, ho_tw, "", dn_dp, ho_dp, tong_cong])
+
+        ws.update(rows_data, value_input_option="USER_ENTERED")
+
+        timestamp = datetime.now().strftime("Cập nhật lúc %H:%M %d/%m/%Y")
+        ws.update_acell("A40", timestamp)
+
+        _LOG.info("Push TH GQVL lên sheet thành công — %d PGD", len(config.DS_PGD))
+        return True
+    except Exception:
+        _LOG.exception("Lỗi push TH GQVL lên sheet")
+        return False
+
+
+def push_kh_len_sheet(nam: int = None) -> bool:
+    if nam is None:
+        nam = datetime.now().year
+
+    try:
+        kh_data = db.doc_kv(f"kh_gqvl_cn_{nam}")
+        if kh_data is None:
+            _LOG.warning("Chưa có KH GQVL năm %d", nam)
+            return False
+
+        pgd_data = kh_data.get("pgd", {})
+        if not pgd_data:
+            _LOG.warning("KH GQVL năm %d rỗng (không có PGD nào)", nam)
+            return False
+
+        client = _ket_noi_gsheet()
+        spreadsheet = client.open_by_key(DCGIAM_SHEET_ID)
+        try:
+            ws = spreadsheet.worksheet(SHEET_TAB_KH)
+        except gspread.exceptions.WorksheetNotFound:
+            ws = spreadsheet.add_worksheet(title=SHEET_TAB_KH, rows=100, cols=5)
+
+        ws.clear()
+
+        rows_data = [["Tên PGD", "KH TW (VND)", "KH ĐP (VND)", "KH Tổng cộng"]]
+        tong_tw = 0
+        tong_dp = 0
+
+        for ten_pgd in config.DS_PGD:
+            info = pgd_data.get(ten_pgd, {})
+            kh_tw = int(info.get("kh_tw", 0))
+            kh_dp = int(info.get("kh_dp", 0))
+            tong = kh_tw + kh_dp
+            rows_data.append([ten_pgd, kh_tw, kh_dp, int(tong)])
+            tong_tw += kh_tw
+            tong_dp += kh_dp
+
+        rows_data.append(["TỔNG CỘNG", int(tong_tw), int(tong_dp), int(tong_tw + tong_dp)])
+
+        ws.update(rows_data, value_input_option="USER_ENTERED")
+
+        _LOG.info("Push KH GQVL năm %d lên sheet thành công — %d PGD", nam, len(pgd_data))
+        return True
+    except Exception:
+        _LOG.exception("Lỗi push KH GQVL lên sheet")
+        return False
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Đẩy dữ liệu GQVL lên Google Sheet")
+    parser.add_argument("--th", action="store_true", help="Push TH GQVL lên sheet")
+    parser.add_argument("--kh", action="store_true", help="Push KH GQVL lên sheet")
+    parser.add_argument("--nam", type=int, default=None, help="Năm kế hoạch (mặc định: năm hiện tại)")
+    parser.add_argument("--all", action="store_true", help="Push cả TH lẫn KH")
+    args = parser.parse_args()
+
+    if args.all or args.th:
+        ok = push_th_gqvl_len_sheet()
+        print(f"TH: {'✅ OK' if ok else '❌ FAIL'}")
+
+    if args.all or args.kh:
+        ok = push_kh_len_sheet(args.nam)
+        print(f"KH: {'✅ OK' if ok else '❌ FAIL'}")
+
+    if not any([args.all, args.th, args.kh]):
+        parser.print_help()
+
+
+if __name__ == "__main__":
+    main()
+```
+
+---
+
 ### 📄 `VBSP-SCM/logo_b64_snippet.py`
 
 ```python
@@ -10149,57 +10809,6 @@ else:
     BORDER_COLOR = None
 
 
-def _build_signature_rows(
-    chu_ky_list: list[tuple[str, str | None]] | None,
-    usable_w: float,
-) -> Table:
-    fb = FONT_BOLD if _FONT_REGISTERED else FONT_FALLBACK
-    fn = FONT_NORMAL if _FONT_REGISTERED else FONT_FALLBACK
-
-    chu_ky_list = chu_ky_list or [
-        ("NGƯỜI LẬP BIỂU", None),
-        ("KIỂM SOÁT", None),
-        ("GIÁM ĐỐC", None),
-    ]
-
-    n_cols = len(chu_ky_list)
-    col_w = usable_w / n_cols
-
-    row1 = []
-    row2 = []
-    row3 = []
-
-    for chuc_danh, ghi_chu in chu_ky_list:
-        if chuc_danh.startswith("Nơi nhận"):
-            row1.append(Paragraph(
-                chuc_danh.replace("\n", "<br/>"),
-                ParagraphStyle("noi_nhan", fontName=fn, fontSize=9,
-                               leading=14)
-            ))
-            row2.append(Paragraph("", ParagraphStyle("empty", fontSize=9)))
-        else:
-            row1.append(Paragraph(
-                chuc_danh,
-                ParagraphStyle("ky", fontName=fb, fontSize=10,
-                               alignment=TA_CENTER)
-            ))
-            txt = ghi_chu or "(Ký, ghi rõ họ tên)"
-            row2.append(Paragraph(
-                f"<i>{txt}</i>",
-                ParagraphStyle("ky2", fontName=fn, fontSize=9,
-                               alignment=TA_CENTER, textColor=colors.grey)
-            ))
-        row3.append(Paragraph("&nbsp;", ParagraphStyle("gap", fontSize=24)))
-
-    ky_tbl = Table([row1, row2, row3], colWidths=[col_w] * n_cols)
-    ky_tbl.setStyle(TableStyle([
-        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
-        ("VALIGN", (0, 0), (-1, -1), "TOP"),
-        ("TOPPADDING", (0, 0), (-1, -1), 6),
-    ]))
-    return ky_tbl
-
-
 def xuat_pdf(
     df: pd.DataFrame,
     tieu_de: str,
@@ -10207,7 +10816,7 @@ def xuat_pdf(
     cols_tien: list[str] | None = None,
     don_vi_tien: str = "đồng",
     prefix_file: str = "",
-    chu_ky_list: list[tuple[str, str | None]] | None = None,
+    them_dong_tong: bool = True,
 ) -> bytes:
     if not _REPORTLAB_READY:
         raise ImportError("Chưa cài thư viện reportlab. Chạy: pip install reportlab")
@@ -10220,6 +10829,19 @@ def xuat_pdf(
     from utils import fmt_so
 
     cols_tien = cols_tien or []
+
+    dong_tong_cells = None
+    if them_dong_tong and cols_tien and len(df) > 0:
+        tong_row = {}
+        for col in df.columns:
+            if col in cols_tien:
+                try:
+                    tong_row[col] = pd.to_numeric(df[col], errors="coerce").sum()
+                except Exception:
+                    tong_row[col] = ""
+            else:
+                tong_row[col] = "TỔNG CỘNG" if list(df.columns).index(col) == 0 else ""
+        dong_tong_cells = tong_row
 
     buf = BytesIO()
     # Landscape nếu nhiều cột hoặc báo cáo TQPGD
@@ -10342,6 +10964,31 @@ def xuat_pdf(
             cells.append(p)
         table_data.append(cells)
 
+    if dong_tong_cells is not None:
+        tong_cells = []
+        for col in df.columns:
+            val = dong_tong_cells[col]
+            if col in cols_tien and isinstance(val, (int, float)):
+                txt = fmt_so(float(val))
+                p = Paragraph(
+                    f"<b>{txt}</b>",
+                    ParagraphStyle("tong_r", fontName=fb,
+                                   fontSize=font_size, alignment=TA_RIGHT)
+                )
+            elif val == "TỔNG CỘNG":
+                p = Paragraph(
+                    "<b>TỔNG CỘNG</b>",
+                    ParagraphStyle("tong_lbl", fontName=fb,
+                                   fontSize=font_size, alignment=TA_CENTER)
+                )
+            else:
+                p = Paragraph(
+                    str(val) if val else "",
+                    ParagraphStyle("tong_empty", fontName=fn, fontSize=font_size)
+                )
+            tong_cells.append(p)
+        table_data.append(tong_cells)
+
     if n_cols > 0:
         cols_list = list(df.columns)
 
@@ -10392,6 +11039,15 @@ def xuat_pdf(
         if r % 2 == 0:
             style_cmds.append(("BACKGROUND", (0, r), (-1, r), ROW_ALT))
 
+    # Style dòng tổng cộng (dòng cuối)
+    if dong_tong_cells is not None:
+        last_row = len(table_data) - 1
+        style_cmds.extend([
+            ("BACKGROUND", (0, last_row), (-1, last_row), VBSP_GREEN_LIGHT),
+            ("FONTNAME",   (0, last_row), (-1, last_row), fb),
+            ("LINEABOVE",  (0, last_row), (-1, last_row), 1.5, VBSP_GREEN),
+        ])
+
     tbl.setStyle(TableStyle(style_cmds))
     for ci, col in enumerate(df.columns):
         c = str(col).lower()
@@ -10411,8 +11067,26 @@ def xuat_pdf(
                        alignment=TA_RIGHT, spaceAfter=6)
     ))
 
-    ky_data = _build_signature_rows(chu_ky_list, usable_w)
-    story.append(ky_data)
+    ky_data = [[
+        Paragraph("NGƯỜI LẬP BIỂU", ParagraphStyle("ky", fontName=fb, fontSize=10, alignment=TA_CENTER)),
+        Paragraph("KIỂM SOÁT", ParagraphStyle("ky", fontName=fb, fontSize=10, alignment=TA_CENTER)),
+        Paragraph("GIÁM ĐỐC", ParagraphStyle("ky", fontName=fb, fontSize=10, alignment=TA_CENTER)),
+    ], [
+        Paragraph("<i>(Ký, ghi rõ họ tên)</i>", ParagraphStyle("ky2", fontName=fn, fontSize=9, alignment=TA_CENTER, textColor=colors.grey)),
+        Paragraph("<i>(Ký, ghi rõ họ tên)</i>", ParagraphStyle("ky2", fontName=fn, fontSize=9, alignment=TA_CENTER, textColor=colors.grey)),
+        Paragraph("<i>(Ký, ghi rõ họ tên)</i>", ParagraphStyle("ky2", fontName=fn, fontSize=9, alignment=TA_CENTER, textColor=colors.grey)),
+    ], [
+        Paragraph(" \n\n\n", ParagraphStyle("gap", fontSize=10)),
+        Paragraph(" \n\n\n", ParagraphStyle("gap", fontSize=10)),
+        Paragraph(" \n\n\n", ParagraphStyle("gap", fontSize=10)),
+    ]]
+    ky_tbl = Table(ky_data, colWidths=[usable_w / 3] * 3)
+    ky_tbl.setStyle(TableStyle([
+        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("TOPPADDING", (0, 0), (-1, -1), 6),
+    ]))
+    story.append(ky_tbl)
 
     # ── 4. Header/Footer mỗi trang (số trang) ─────────────────────────
     def _on_page(canvas, _doc):
@@ -12700,6 +13374,131 @@ def tong_hop_theo_xa(parquet_path: str, ten_pgd: str) -> pd.DataFrame:
 
 ---
 
+### 📄 `VBSP-SCM/data/den_han.py`
+
+```python
+"""
+Module tính ngày đến hạn khoản vay từ hstd.parquet.
+KHÔNG import streamlit — dùng pandas + thư viện chuẩn.
+"""
+from datetime import date, datetime
+from dateutil.relativedelta import relativedelta
+
+import pandas as pd
+import numpy as np
+
+from config import (
+    CACHE_HSTD,
+    COT_TEN_PGD, COT_TEN_KH, COT_MA_KH,
+    COT_TONG_DU_NO, COT_DU_NO_TH, COT_DU_NO_QH,
+    COT_TEN_CT, COT_NGAY_DEN_HAN,
+    COT_TEN_XA,
+)
+
+
+def _parse_ngay(val):
+    if val is None or (isinstance(val, float) and pd.isna(val)):
+        return None
+    try:
+        if isinstance(val, date):
+            return val
+        if isinstance(val, datetime):
+            return val.date()
+        if isinstance(val, str):
+            for fmt in ("%d/%m/%Y", "%Y-%m-%d", "%m/%d/%Y"):
+                try:
+                    return datetime.strptime(val, fmt).date()
+                except ValueError:
+                    continue
+        return None
+    except Exception:
+        return None
+
+
+def tinh_den_han_df(df: pd.DataFrame) -> pd.DataFrame:
+    df = df.copy()
+    df["_ngay_dh"] = df[COT_NGAY_DEN_HAN].apply(_parse_ngay)
+    df["Ngày đến hạn"] = df["_ngay_dh"]
+    today = date.today()
+    df["Tháng đến hạn còn lại"] = df["_ngay_dh"].apply(
+        lambda d: (
+            relativedelta(d, today).months + relativedelta(d, today).years * 12
+            if d is not None else None
+        )
+    )
+    df.drop(columns=["_ngay_dh"], inplace=True)
+    return df
+
+
+def loc_den_han_trong(df, tu_thang=0, den_thang=6) -> pd.DataFrame:
+    df_tinh = tinh_den_han_df(df)
+    mask = (
+        df_tinh["Tháng đến hạn còn lại"].notna()
+        & (df_tinh["Tháng đến hạn còn lại"] >= tu_thang)
+        & (df_tinh["Tháng đến hạn còn lại"] <= den_thang)
+    )
+    return df_tinh[mask].copy()
+
+
+def tong_hop_den_han(df, nhom_theo="pgd") -> pd.DataFrame:
+    cot_nhom = COT_TEN_PGD if nhom_theo == "pgd" else COT_TEN_XA
+    if cot_nhom not in df.columns:
+        return pd.DataFrame()
+
+    df_loc = loc_den_han_trong(df, tu_thang=0, den_thang=6)
+    if df_loc.empty:
+        return pd.DataFrame()
+
+    ket_qua = df_loc.groupby([cot_nhom, "Tháng đến hạn còn lại"]).agg(
+        so_khoan_vay=(COT_MA_KH if COT_MA_KH in df_loc.columns else cot_nhom, "count"),
+        tong_du_no=(COT_TONG_DU_NO if COT_TONG_DU_NO in df_loc.columns else cot_nhom, "sum"),
+    ).reset_index()
+
+    today = date.today()
+    ket_qua["Tháng"] = ket_qua["Tháng đến hạn còn lại"].apply(
+        lambda n: (today + relativedelta(months=int(n))).strftime("Tháng %m/%Y")
+    )
+    ket_qua = ket_qua.sort_values([cot_nhom, "Tháng đến hạn còn lại"])
+    return ket_qua
+
+
+def canh_bao_tap_trung(df, nguong_ty_le=0.30) -> list[dict]:
+    df_loc = loc_den_han_trong(df, tu_thang=0, den_thang=6)
+    if df_loc.empty or COT_TEN_PGD not in df.columns:
+        return []
+
+    tong_pgd = df[df[COT_TEN_PGD].isin(df_loc[COT_TEN_PGD])]\
+        .groupby(COT_TEN_PGD)[COT_TONG_DU_NO].sum()
+
+    canh_bao_list = []
+    grouped = df_loc.groupby([COT_TEN_PGD, "Tháng đến hạn còn lại"])
+
+    today = date.today()
+    for (ten_pgd, thang_con_lai), grp in grouped:
+        tong_den_han = grp[COT_TONG_DU_NO].sum()
+        tong_pgd_val = tong_pgd.get(ten_pgd, 0)
+        if tong_pgd_val <= 0:
+            continue
+        ty_le = tong_den_han / tong_pgd_val
+        if ty_le >= nguong_ty_le:
+            thang_str = (today + relativedelta(months=int(thang_con_lai))).strftime("Tháng %m/%Y")
+            canh_bao_list.append({
+                "pgd": ten_pgd,
+                "thang": thang_str,
+                "thang_con_lai": int(thang_con_lai),
+                "so_khoan": int(len(grp)),
+                "tong_den_han": int(tong_den_han),
+                "tong_pgd": int(tong_pgd_val),
+                "ty_le": float(ty_le),
+                "muc_do": "high" if ty_le >= 0.50 else "medium",
+            })
+
+    canh_bao_list.sort(key=lambda x: x["ty_le"], reverse=True)
+    return canh_bao_list
+```
+
+---
+
 ### 📄 `VBSP-SCM/data/dgd_helpers.py`
 
 ```python
@@ -14941,6 +15740,8 @@ db.ghi_kv("key_name", value, username)  # ghi
 | `kehoach` | KH Điện báo toàn CN |
 | `kehoach_pgd_{slug}` | KH Điện báo PGD |
 | `dgd_map` | Điểm giao dịch toàn CN |
+| `kh_gqvl_cn_{nam}` | KH GQVL Chi nhánh theo năm |
+| `kh_gqvl_pgd_{slug}_{nam}` | KH GQVL theo PGD (dự phòng) |
 
 `slug` = `pgd_slug(ten_pgd)` từ `data/pgd.py`
 
@@ -15639,6 +16440,8 @@ db.ghi_kv("key_name", value, username)
 | `ma_pgd_map` | Mapping mã PGD ↔ tên PGD |
 | `pgd_xa_map` | Mapping PGD → danh sách xã |
 | `chuong_trinh_khtd` | Danh mục chương trình KHTD |
+| `kh_gqvl_cn_{nam}` | KH GQVL Chi nhánh theo năm |
+| `kh_gqvl_pgd_{slug}_{nam}` | KH GQVL theo PGD (dự phòng) |
 
 `slug` = `pgd_slug(ten_pgd)` từ `data/pgd.py` — ví dụ: `"pgd_long_thanh"`.
 
@@ -30547,6 +31350,145 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
 
 ---
 
+### 📄 `VBSP-SCM/tabs/tab_den_han.py`
+
+```python
+"""
+Tab Cảnh báo Khoản vay Đến hạn.
+Phân tích dư nợ đến hạn trong N tháng tới dựa trên HSTD hiện tại.
+"""
+from __future__ import annotations
+
+from io import BytesIO
+from typing import TYPE_CHECKING
+
+import pandas as pd
+import streamlit as st
+
+from auth import la_phan_he_pgd
+from config import CACHE_HSTD, COT_TEN_PGD, COT_TEN_KH, COT_TEN_CT, COT_TONG_DU_NO, COT_NGAY_DEN_HAN
+from data.den_han import (
+    tinh_den_han_df,
+    loc_den_han_trong,
+    tong_hop_den_han,
+    canh_bao_tap_trung,
+)
+from utils import fmt_ty, fmt_so
+
+
+def render(role: str = None, **kwargs) -> None:
+    st.subheader("⏰ Cảnh báo Khoản vay Đến hạn")
+    st.caption("Phân tích dư nợ đến hạn trong N tháng tới dựa trên HSTD hiện tại.")
+
+    try:
+        df = pd.read_parquet(CACHE_HSTD)
+    except FileNotFoundError:
+        st.warning("⚠️ Chưa có dữ liệu HSTD. Vui lòng upload file trước.")
+        return
+
+    pgd_user = kwargs.get("pgd_user")
+    if la_phan_he_pgd(role) and pgd_user and COT_TEN_PGD in df.columns:
+        df = df[df[COT_TEN_PGD] == pgd_user]
+
+    if COT_NGAY_DEN_HAN not in df.columns:
+        st.error(
+            f"❌ File HSTD thiếu cột '{COT_NGAY_DEN_HAN}'. "
+            f"Kiểm tra lại file upload."
+        )
+        return
+
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        den_thang = st.slider(
+            "Xem trước (tháng)", min_value=1, max_value=12,
+            value=6, key="den_han_slider")
+    with col2:
+        nhom_theo = st.radio(
+            "Nhóm theo", ["PGD", "Xã"],
+            horizontal=True, key="den_han_nhom")
+    with col3:
+        nguong = st.number_input(
+            "Ngưỡng tập trung (%)", min_value=10, max_value=80,
+            value=30, step=5, key="den_han_nguong") / 100
+
+    df_loc = loc_den_han_trong(df, tu_thang=0, den_thang=den_thang)
+    nhom_key = "pgd" if nhom_theo == "PGD" else "xa"
+
+    tong_khoan = len(df_loc)
+    tong_tien = df_loc[COT_TONG_DU_NO].sum() if tong_khoan > 0 else 0
+    so_pgd = df_loc[COT_TEN_PGD].nunique() if tong_khoan > 0 else 0
+    ds_cb = canh_bao_tap_trung(df, nguong_ty_le=nguong)
+
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Số khoản đến hạn", fmt_so(tong_khoan))
+    c2.metric("Tổng dư nợ đến hạn", fmt_ty(tong_tien))
+    c3.metric("Số PGD liên quan", so_pgd)
+    c4.metric("⚠️ Điểm tập trung", len(ds_cb),
+              delta_color="inverse" if ds_cb else "off")
+
+    if ds_cb:
+        st.divider()
+        st.markdown("#### ⚠️ Điểm tập trung rủi ro đến hạn")
+        for item in ds_cb:
+            icon = "🔴" if item["muc_do"] == "high" else "🟡"
+            with st.container(border=True):
+                pc1, pc2, pc3, pc4 = st.columns([3, 2, 2, 2])
+                pc1.markdown(
+                    f"{icon} **{item['pgd']}**  \n"
+                    f"Tháng: `{item['thang']}`"
+                )
+                pc2.metric("Đến hạn", fmt_ty(item["tong_den_han"]))
+                pc3.metric("Tổng PGD", fmt_ty(item["tong_pgd"]))
+                pc4.metric("Tỷ lệ", f"{item['ty_le']*100:.1f}%")
+
+    st.divider()
+    st.markdown("#### 📅 Chi tiết theo tháng")
+    df_th = tong_hop_den_han(df, nhom_theo=nhom_key)
+
+    if df_th.empty:
+        st.info("Không có khoản vay đến hạn trong khoảng thời gian đã chọn.")
+    else:
+        try:
+            df_pivot = df_th.pivot_table(
+                index=df_th.columns[0],
+                columns="Tháng",
+                values="tong_du_no",
+                aggfunc="sum",
+                fill_value=0,
+            )
+            df_display = df_pivot.map(lambda x: fmt_ty(x) if x > 0 else "—")
+            st.dataframe(df_display, use_container_width=True)
+        except Exception:
+            st.dataframe(df_th, use_container_width=True, hide_index=True)
+
+    cols_hien_thi = [
+        COT_TEN_PGD, COT_TEN_KH,
+        COT_TEN_CT, COT_TONG_DU_NO,
+        "Ngày đến hạn", "Tháng đến hạn còn lại",
+    ]
+    cols_hien_thi = [c for c in cols_hien_thi if c in df_loc.columns]
+
+    with st.expander(f"📋 Danh sách {fmt_so(tong_khoan)} khoản vay đến hạn", expanded=False):
+        if df_loc.empty:
+            st.info("Không có dữ liệu.")
+        else:
+            st.dataframe(
+                df_loc[cols_hien_thi].sort_values("Tháng đến hạn còn lại"),
+                use_container_width=True, hide_index=True,
+            )
+            buf = BytesIO()
+            df_loc[cols_hien_thi].to_excel(buf, index=False)
+            st.download_button(
+                "📥 Xuất Excel",
+                data=buf.getvalue(),
+                file_name=f"den_han_{den_thang}thang.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                key="btn_xuat_den_han",
+            )
+```
+
+---
+
 ### 📄 `VBSP-SCM/tabs/tab_diem_gd_pgd.py`
 
 ```python
@@ -31813,6 +32755,178 @@ def render(tab, **kwargs):
 
 ---
 
+### 📄 `VBSP-SCM/tabs/tab_kh_gqvl.py`
+
+```python
+"""
+Tab Kế hoạch GQVL Chi nhánh — nhập KH GQVL theo năm, phân tầng TW/ĐP.
+Lưu vào kv_store key "kh_gqvl_cn_{nam}".
+"""
+from __future__ import annotations
+
+import subprocess
+from datetime import datetime
+
+import streamlit as st
+
+import db
+from auth import la_phan_he_cn
+from config import DS_PGD
+from data.pgd import pgd_slug
+
+
+def render(role: str = None, **kwargs) -> None:
+    username = st.session_state.get("username", "unknown")
+
+    st.markdown("## 📋 Kế hoạch GQVL Chi nhánh")
+    st.caption("Nhập kế hoạch GQVL toàn Chi nhánh theo nguồn vốn TW và ĐP.")
+
+    nam = st.selectbox(
+        "Năm kế hoạch",
+        [datetime.now().year, datetime.now().year + 1],
+        key="kh_gqvl_nam",
+    )
+
+    co_quyen = la_phan_he_cn(role) and role != "executive"
+    kh_data = db.doc_kv(f"kh_gqvl_cn_{nam}") or {"pgd": {}}
+
+    if not co_quyen:
+        st.info("Bạn chỉ có quyền xem.")
+        _hien_thi_bang_readonly(kh_data, nam)
+        return
+
+    with st.form(f"form_kh_gqvl_{nam}"):
+        st.markdown("##### Nhập kế hoạch theo PGD (triệu đồng)")
+
+        col_labels = st.columns([3, 2, 2, 2])
+        col_labels[0].markdown("**Tên PGD**")
+        col_labels[1].markdown("**KH TW**")
+        col_labels[2].markdown("**KH ĐP**")
+        col_labels[3].markdown("**Tổng**")
+
+        tong_tw_all = 0
+        tong_dp_all = 0
+
+        for ten_pgd in DS_PGD:
+            slug = pgd_slug(ten_pgd)
+            kh_pgd = kh_data.get("pgd", {}).get(ten_pgd, {})
+            val_tw_trieu = int(kh_pgd.get("kh_tw", 0)) // 1_000_000
+            val_dp_trieu = int(kh_pgd.get("kh_dp", 0)) // 1_000_000
+
+            col1, col2, col3, col4 = st.columns([3, 2, 2, 2])
+            with col1:
+                st.text(ten_pgd)
+            with col2:
+                kh_tw = st.number_input(
+                    "KH TW",
+                    min_value=0,
+                    step=100,
+                    format="%d",
+                    key=f"kh_tw_{slug}_{nam}",
+                    value=val_tw_trieu,
+                    label_visibility="collapsed",
+                )
+            with col3:
+                kh_dp = st.number_input(
+                    "KH ĐP",
+                    min_value=0,
+                    step=100,
+                    format="%d",
+                    key=f"kh_dp_{slug}_{nam}",
+                    value=val_dp_trieu,
+                    label_visibility="collapsed",
+                )
+            with col4:
+                st.metric("Tổng", f"{kh_tw + kh_dp:,}", label_visibility="collapsed")
+
+            tong_tw_all += kh_tw
+            tong_dp_all += kh_dp
+
+        st.divider()
+        tc1, tc2, tc3, tc4 = st.columns([3, 2, 2, 2])
+        with tc1:
+            st.markdown("**TỔNG CỘNG**")
+        with tc2:
+            st.markdown(f"**{tong_tw_all:,}**")
+        with tc3:
+            st.markdown(f"**{tong_dp_all:,}**")
+        with tc4:
+            st.markdown(f"**{tong_tw_all + tong_dp_all:,}**")
+
+        submitted = st.form_submit_button("💾 Lưu kế hoạch GQVL", type="primary")
+
+    if submitted:
+        pgd_map = {}
+        for ten_pgd in DS_PGD:
+            slug = pgd_slug(ten_pgd)
+            val_tw = st.session_state.get(f"kh_tw_{slug}_{nam}", 0) * 1_000_000
+            val_dp = st.session_state.get(f"kh_dp_{slug}_{nam}", 0) * 1_000_000
+            pgd_map[ten_pgd] = {"kh_tw": int(val_tw), "kh_dp": int(val_dp)}
+
+        kh_new = {
+            "pgd": pgd_map,
+            "updated_by": username,
+            "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "nam": nam,
+        }
+        db.ghi_kv(f"kh_gqvl_cn_{nam}", kh_new, username)
+        db.ghi_audit(username, "luu_kh_gqvl_cn", f"Năm {nam}, {len(pgd_map)} PGD")
+        st.success(f"✅ Đã lưu kế hoạch GQVL năm {nam}.")
+        st.cache_data.clear()
+
+    st.divider()
+    st.subheader("📤 Đẩy lên Google Sheet")
+
+    col_a, col_b = st.columns(2)
+    with col_a:
+        if st.button("📊 Push TH lên GSheet", key="btn_push_th_gqvl"):
+            subprocess.Popen(["python", "gen_dcgiam_sheet.py", "--th"])
+            st.info("Đang push TH... Kiểm tra terminal để xem kết quả.")
+    with col_b:
+        if st.button("📋 Push KH lên GSheet", key="btn_push_kh_gqvl"):
+            subprocess.Popen(["python", "gen_dcgiam_sheet.py", "--kh", "--nam", str(nam)])
+            st.info("Đang push KH... Kiểm tra terminal để xem kết quả.")
+
+
+def _hien_thi_bang_readonly(kh_data: dict, nam: int) -> None:
+    st.markdown(f"##### 📊 Kế hoạch GQVL năm {nam} (chỉ đọc)")
+    pgd_map = kh_data.get("pgd", {})
+    if not pgd_map:
+        st.info(f"Chưa có kế hoạch GQVL năm {nam}.")
+        return
+
+    rows = []
+    tong_tw = 0
+    tong_dp = 0
+    for ten_pgd in DS_PGD:
+        info = pgd_map.get(ten_pgd, {})
+        kh_tw = int(info.get("kh_tw", 0)) // 1_000_000
+        kh_dp = int(info.get("kh_dp", 0)) // 1_000_000
+        rows.append({"Tên PGD": ten_pgd, "KH TW (tr)": kh_tw, "KH ĐP (tr)": kh_dp, "Tổng (tr)": kh_tw + kh_dp})
+        tong_tw += kh_tw
+        tong_dp += kh_dp
+
+    import pandas as pd
+    df = pd.DataFrame(rows)
+
+    st.dataframe(
+        df,
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            "KH TW (tr)": st.column_config.NumberColumn(format="%d"),
+            "KH ĐP (tr)": st.column_config.NumberColumn(format="%d"),
+            "Tổng (tr)": st.column_config.NumberColumn(format="%d"),
+        },
+    )
+
+    updated_by = kh_data.get("updated_by", "—")
+    updated_at = kh_data.get("updated_at", "—")
+    st.caption(f"📅 Cập nhật: {updated_at} · Người cập nhật: {updated_by}")
+```
+
+---
+
 ### 📄 `VBSP-SCM/tabs/tab_khtd.py`
 
 ```python
@@ -31921,15 +33035,7 @@ def _luu_kv(key: str, data: dict[str, Any], username: str) -> bool:
         True nếu lưu thành công
     """
     try:
-        with db.get_conn() as conn:
-            conn.execute(
-                "INSERT OR REPLACE INTO kv_store (key, value, updated_at, updated_by) "
-                "VALUES (?,?,?,?)",
-                (key, json.dumps(data, ensure_ascii=False),
-                 datetime.now().isoformat(), username),
-            )
-            conn.commit()
-        # Ghi audit log
+        db.ghi_kv(key, data, username)
         db.ghi_audit(username, "luu_kv", f"key={key}, {len(data)} items")
         return True
     except Exception as e:
@@ -34990,6 +36096,57 @@ def _tab_khtd_chi_nhanh(role: str, username: str, df_full: "pd.DataFrame | None"
 
     st.divider()
     _section_van_ban_qd_cn(role, username)
+
+    # ── Lịch sử phiên bản (chỉ admin / admin_cn) ───────────────────────────
+    if role in ("admin", "admin_cn"):
+        with st.expander("🕐 Lịch sử chỉnh sửa KHTD Chi nhánh", expanded=False):
+            history = db.doc_kv_history(KV_KEY_CN, limit=15)
+            if not history:
+                st.info("Chưa có lịch sử chỉnh sửa.")
+            else:
+                df_hist = pd.DataFrame(history)
+                df_hist_display = df_hist.rename(columns={
+                    "changed_at": "Thời điểm",
+                    "changed_by": "Người sửa",
+                    "note": "Ghi chú",
+                })
+                st.dataframe(
+                    df_hist_display[["Thời điểm", "Người sửa", "Ghi chú"]],
+                    use_container_width=True,
+                    hide_index=True,
+                )
+
+                options = ["-- Chọn --"] + [
+                    f"#{row['id']} — {row['changed_at']} ({row['changed_by']})"
+                    for row in history
+                ]
+                lua_chon = st.selectbox(
+                    "Chọn phiên bản để xem trước",
+                    options=options,
+                    key="khtd_cn_history_select",
+                )
+                if lua_chon != "-- Chọn --":
+                    try:
+                        hist_id = int(lua_chon.split(" — ")[0].lstrip("#"))
+                        row_match = next((r for r in history if r["id"] == hist_id), None)
+                        if row_match:
+                            value_preview = json.loads(row_match["value"])
+                            st.json(value_preview)
+                            if st.button(
+                                "♻️ Khôi phục phiên bản này",
+                                type="secondary",
+                                key=f"khtd_restore_{hist_id}",
+                            ):
+                                ok = db.khoi_phuc_kv(
+                                    KV_KEY_CN, hist_id, username
+                                )
+                                if ok:
+                                    st.success("✅ Đã khôi phục. Tải lại trang để xem.")
+                                    st.cache_data.clear()
+                                else:
+                                    st.error("Không tìm thấy phiên bản.")
+                    except (ValueError, StopIteration):
+                        st.error("Không tìm thấy phiên bản.")
 
 
 def _tab_khtd_theo_xa(role: str, username: str, df_full: "pd.DataFrame | None") -> None:
@@ -40833,7 +41990,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
 """
 Tab Upload KH-NV — Phòng Kế hoạch Nghiệp vụ.
 ──────────────────────────────────────────────
-Quyền: role in ("admin", "manager", "admin_cn", "manager_cn")
+Quyền: role in ("admin", "manager")
 
 Giao diện:
   - Selectbox chọn đơn vị: ["Hội sở Chi nhánh tỉnh"] + DS_PGD (22 đơn vị)
@@ -41146,17 +42303,12 @@ def _xu_ly_upload(
         else:
             col.warning(f"**{nhan}**\n\n{kq.thong_bao}")
 
-    # Merge toàn CN nếu có ít nhất 1 file HSTD/NQ11/GQVL được lưu
+    # Ghi cờ cho fragment merge xử lý sau (không merge đồng bộ ở đây)
     if can_merge:
-        st.divider()
-        with st.spinner("🔄 Đang tổng hợp dữ liệu toàn Chi nhánh..."):
-            for loai in ("hstd", "nq11", "gqvl"):
-                if loai in ket_qua_upload and ket_qua_upload[loai].thanh_cong:
-                    kq_merge = merge_du_lieu_toan_cn(loai)
-                    if kq_merge.thanh_cong:
-                        st.success(kq_merge.thong_bao)
-                    else:
-                        st.warning(f"⚠️ Gộp {loai.upper()}: {kq_merge.thong_bao}")
+        for loai in ("hstd", "nq11", "gqvl"):
+            if loai in ket_qua_upload and ket_qua_upload[loai].thanh_cong:
+                st.session_state[f"can_merge_{loai}"] = True
+        st.info("✅ File đã lưu. Nhấn nút bên dưới để cập nhật dữ liệu.")
 
     st.cache_data.clear()
     # Lưu kết quả vào session để render sau rerun
@@ -41746,7 +42898,7 @@ def _thuc_hien_xoa(
 
 def _render_xoa_du_lieu(role: str, username: str) -> None:
     """Expander xóa dữ liệu PGD — chỉ admin/manager."""
-    if role not in ("admin", "manager", "admin_cn", "manager_cn"):
+    if role not in ("admin", "manager"):
         return
 
     with st.expander("🗑️ Xóa dữ liệu PGD", expanded=False):
@@ -41831,6 +42983,45 @@ def _render_xoa_du_lieu(role: str, username: str) -> None:
 
 # ── Entry point ───────────────────────────────────────────────────────────────
 
+@st.fragment
+def _fragment_merge_toan_cn():
+    co_cho_merge = any(
+        st.session_state.get(f"can_merge_{loai}", False)
+        for loai in ["hstd", "nq11", "gqvl"]
+    )
+    if not co_cho_merge:
+        return
+
+    st.divider()
+    st.subheader("🔄 Cập nhật dữ liệu toàn Chi nhánh")
+    st.caption("Tổng hợp file vừa upload vào hệ thống dữ liệu chung (22 đơn vị).")
+
+    if st.button("▶️ Bắt đầu cập nhật", type="primary",
+                 key="btn_merge_toan_cn"):
+        with st.spinner("⏳ Đang merge 22 đơn vị... Vui lòng chờ."):
+            try:
+                from services.upload_service import merge_du_lieu_toan_cn
+
+                for loai in ("hstd", "nq11", "gqvl"):
+                    if st.session_state.get(f"can_merge_{loai}", False):
+                        merge_du_lieu_toan_cn(loai)
+
+                for loai in ("hstd", "nq11", "gqvl"):
+                    st.session_state.pop(f"can_merge_{loai}", None)
+
+                st.cache_data.clear()
+
+                username = st.session_state.get("username", "unknown")
+                db.ghi_audit(username, "merge_toan_cn",
+                             "Merge thành công (non-blocking fragment)")
+
+                st.success("✅ Cập nhật hoàn tất! Dữ liệu mới sẵn sàng.")
+                st.balloons()
+
+            except Exception as e:
+                st.error(f"❌ Lỗi khi merge: {e}")
+
+
 def render(tab=None, **kwargs) -> None:
     """
     Render tab Upload KH-NV.
@@ -41842,7 +43033,7 @@ def render(tab=None, **kwargs) -> None:
     ctx = tab if tab is not None else st
 
     with ctx:
-        if role not in ("admin", "manager", "admin_cn", "manager_cn"):
+        if role not in ("admin", "manager"):
             st.error("🔒 Chức năng này chỉ dành cho Phòng KH-NV (admin/manager).")
             return
 
@@ -41965,6 +43156,8 @@ def render(tab=None, **kwargs) -> None:
                 else: 
                     col.warning(f"**{nhan}**\n\n{kq['thong_bao']}")
 
+        _fragment_merge_toan_cn()
+
         st.markdown("---")
         col_tt, col_rf = st.columns([5, 1])
         with col_tt:
@@ -41979,76 +43172,6 @@ def render(tab=None, **kwargs) -> None:
                 st.rerun()
         with st.container(key="khnv_bang_trang_thai_upload"):
             _hien_thi_bang_trang_thai()
-
-        st.divider()
-        st.subheader("📡 Upload số liệu TTBC")
-        st.caption(
-            "File export từ hệ thống TTBC — upload hàng ngày. "
-            "Gồm 2 file: (1) Dư nợ chi tiết và (2) Nguồn vốn."
-        )
-
-        with st.expander("📋 Hướng dẫn tải file Chỉ tiêu NHCS", expanded=False):
-            st.markdown("""
-        **Bước 1 — Tải file Tín dụng:**
-        > Báo cáo quản trị nội bộ → Báo cáo từ chỉ tiêu NHCS → **Tín dụng**
-        - Chọn ngày báo cáo → Export Excel
-
-        **Bước 2 — Tải file Nguồn vốn:**
-        > Báo cáo quản trị nội bộ → Báo cáo từ chỉ tiêu NHCS → **Nguồn vốn**
-        - Chọn ngày báo cáo → Export Excel
-
-        **Bước 3 — Upload vào hệ thống:**
-        - Upload **File Tín dụng** vào ô bên trái
-        - Upload **File Nguồn vốn** vào ô bên phải
-        - Bấm **Lưu**
-
-        ⚠️ Lưu ý: 2 file phải cùng ngày báo cáo.
-        """)
-
-        # Chỉ admin/manager mới thấy upload UI
-        if role not in ("admin", "manager", "admin_cn", "manager_cn"):
-            return
-
-        st.divider()
-        st.subheader("📊 Upload Chỉ tiêu NHCS")
-
-        col1, col2 = st.columns(2)
-        with col1:
-            file_du_no = st.file_uploader(
-                "File Dư nợ chi tiết",
-                type=["xlsx", "xls"],
-                key="ttbc_du_no_upload",
-            )
-        with col2:
-            file_nguon_von = st.file_uploader(
-                "File Nguồn vốn",
-                type=["xlsx", "xls"],
-                key="ttbc_nguon_von_upload",
-            )
-
-        if st.button(
-            "💾 Lưu số liệu TTBC",
-            key="btn_luu_ttbc",
-            disabled=(file_du_no is None or file_nguon_von is None),
-        ):
-            try:
-                from services.ttbc_service import doc_file_ttbc, luu_ttbc
-
-                df_dn, ngay1 = doc_file_ttbc(file_du_no.read(), "du_no")
-                df_nv, ngay2 = doc_file_ttbc(
-                    file_nguon_von.read(), "nguon_von"
-                )
-                if ngay1 != ngay2:
-                    st.warning(
-                        f"⚠️ 2 file có ngày khác nhau: {ngay1} vs {ngay2}. "
-                        "Vẫn lưu theo ngày file Dư nợ."
-                    )
-                kq = luu_ttbc(df_dn, df_nv, ngay1, username)
-                kq.hien_thi()
-            except ValueError as e:
-                st.error(f"❌ File không hợp lệ: {e}")
-            except Exception as e:
-                st.error(f"❌ Lỗi: {e}")
 ```
 
 ---
@@ -45940,8 +47063,8 @@ from tabs import (
 )
 from tabs import tab_upload_khnv
 from tabs import tab_quan_ly_dgd
-from tabs import tab_no_rui_ro
-from tabs import tab_tap_huan
+from tabs.tab_kh_gqvl import render as render_kh_gqvl
+from tabs.tab_den_han import render as render_den_han
 
 
 def _render_canh_bao(df: pd.DataFrame, ds_pgd_all: list):
@@ -46331,8 +47454,9 @@ def render(**kwargs):
         "📊 Tổng quan",
         "🚨 Cảnh báo sớm",
         "🔍 Kiểm soát CN",
-        "💳 Nợ rủi ro",
+        "⏰ Đến hạn",
         "🗓️ KH Tín dụng Năm",
+        "📋 KH GQVL",
         "📤 Giao KH theo Đợt",
         "🎯 KH vs Thực hiện",
         "📈 Báo cáo chi tiết",
@@ -46342,7 +47466,6 @@ def render(**kwargs):
         "🏛️ Ban Đại Diện",
         "🤝 Ủy thác",
         "✅ Nhiệm vụ",
-        "🎓 Tập huấn",
     ]
     
     # Chỉ admin/manager mới thấy tab Quản lý Template
@@ -46351,113 +47474,36 @@ def render(**kwargs):
     else:
         tab_names.append("📤 Upload KH-NV")
 
-    tabs = st.tabs(tab_names, key="ws_mgmt_active_tab", on_change="rerun")
+    tabs = st.tabs(tab_names)
 
-    def _render_diem_gd_va_to_tkvv(tab_parent, **kw):
-        with tab_parent:
-            _sub1, _sub2 = st.tabs(["📍 Điểm Giao Dịch", "🏘️ Tổ TK&VV"])
-            tab_quan_ly_dgd.render(_sub1, **kw)
-            tab_cdtotkvv.render(_sub2, **dict(kw, cdto_mode="cn"))
-
-    co_upload = get_permissions(role)["can_upload"]
-
-    # ── Lazy rendering: chỉ render tab đang active ──────────────────────
-    active_tab_idx = 0
-    for i, tc in enumerate(tabs):
-        if tc.open:
-            active_tab_idx = i
-            break
-
-    # Tab 0 — Tổng quan (luôn render)
     tab_tongquan.render(tabs[0], **kwargs)
-
-    # Tab 1 — Cảnh báo sớm
     with tabs[1]:
-        if st.session_state.get("_tab_visited_1") or active_tab_idx == 1:
-            st.session_state["_tab_visited_1"] = True
-            _render_canh_bao(df_full, ds_pgd_all)
-
-    # Tab 2 — Kiểm soát CN
+        _render_canh_bao(df_full, ds_pgd_all)
     with tabs[2]:
-        if st.session_state.get("_tab_visited_2") or active_tab_idx == 2:
-            st.session_state["_tab_visited_2"] = True
-            tab_kiem_soat.render_tab(df_full, role, kwargs.get("username", "unknown"))
-
-    # Tab 3 — Nợ rủi ro
-    if st.session_state.get("_tab_visited_3") or active_tab_idx == 3:
-        st.session_state["_tab_visited_3"] = True
-        tab_no_rui_ro.render(tabs[3], **kwargs)
-
-    # Tab 4 — KH Tín dụng Năm
-    if st.session_state.get("_tab_visited_4") or active_tab_idx == 4:
-        st.session_state["_tab_visited_4"] = True
-        tab_khtd.render(tabs[4], **dict(kwargs, khtd_mode="cn"))
-
-    # Tab 5 — Giao KH theo Đợt
-    if st.session_state.get("_tab_visited_5") or active_tab_idx == 5:
-        st.session_state["_tab_visited_5"] = True
-        tab_khtd_giao_dc.render(tabs[5], **kwargs)
-
-    # Tab 6 — KH vs Thực hiện
-    if st.session_state.get("_tab_visited_6") or active_tab_idx == 6:
-        st.session_state["_tab_visited_6"] = True
-        tab_kehoach.render(tabs[6], **kwargs)
-
-    # Tab 7 — Báo cáo chi tiết
-    if st.session_state.get("_tab_visited_7") or active_tab_idx == 7:
-        st.session_state["_tab_visited_7"] = True
-        tab_baocao.render(tabs[7], **kwargs)
-
-    # Tab 8 — Điện Báo
-    if st.session_state.get("_tab_visited_8") or active_tab_idx == 8:
-        st.session_state["_tab_visited_8"] = True
-        tab_candoi.render(tabs[8], **kwargs)
-
-    # Tab 9 — Quản lý CBTD
-    if st.session_state.get("_tab_visited_9") or active_tab_idx == 9:
-        st.session_state["_tab_visited_9"] = True
-        tab_cbtd.render(tabs[9], **kwargs)
-
-    # Tab 10 — Điểm GD & Tổ TK&VV
-    if st.session_state.get("_tab_visited_10") or active_tab_idx == 10:
-        st.session_state["_tab_visited_10"] = True
-        _render_diem_gd_va_to_tkvv(tabs[10], **kwargs)
-
-    # Tab 11 — Ban Đại Diện
-    if st.session_state.get("_tab_visited_11") or active_tab_idx == 11:
-        st.session_state["_tab_visited_11"] = True
-        tab_ban_dai_dien.render(tabs[11], cap="tinh", **kwargs)
-
-    # Tab 12 — Ủy thác
-    if st.session_state.get("_tab_visited_12") or active_tab_idx == 12:
-        st.session_state["_tab_visited_12"] = True
-        tab_uy_thac.render(tabs[12], **kwargs)
-
-    # Tab 13 — Nhiệm vụ
-    if st.session_state.get("_tab_visited_13") or active_tab_idx == 13:
-        st.session_state["_tab_visited_13"] = True
-        tab_nhiem_vu.render(tabs[13], **kwargs)
-
-    # Tab 14 — Tập huấn
-    if st.session_state.get("_tab_visited_14") or active_tab_idx == 14:
-        st.session_state["_tab_visited_14"] = True
-        tab_tap_huan.render(tabs[14], **kwargs)
-
-    # Tab Quản lý Template + Upload KH-NV (tuỳ quyền)
-    upload_idx = len(tab_names) - 1
-    if co_upload:
-        tmpl_idx = len(tab_names) - 2
-        with tabs[tmpl_idx]:
-            if st.session_state.get("_tab_visited_tmpl") or active_tab_idx == tmpl_idx:
-                st.session_state["_tab_visited_tmpl"] = True
-                _render_quan_ly_template(df_full)
-        if st.session_state.get("_tab_visited_up") or active_tab_idx == upload_idx:
-            st.session_state["_tab_visited_up"] = True
-            tab_upload_khnv.render(tabs[upload_idx], **kwargs)
+        tab_kiem_soat.render_tab(df_full, role, kwargs.get("username", "unknown"))
+    with tabs[3]:
+        render_den_han(role=role)
+    tab_khtd.render(tabs[4], **dict(kwargs, khtd_mode="cn"))
+    with tabs[5]:
+        render_kh_gqvl(role=role)
+    tab_khtd_giao_dc.render(tabs[6], **kwargs)
+    tab_kehoach.render(tabs[7], **kwargs)
+    tab_baocao.render(tabs[8], **kwargs)
+    tab_candoi.render(tabs[9], **kwargs)
+    tab_cbtd.render(tabs[10], **kwargs)
+    with tabs[11]:
+        _sub1, _sub2 = st.tabs(["📍 Điểm Giao Dịch", "🏘️ Tổ TK&VV"])
+        tab_quan_ly_dgd.render(_sub1, **kwargs)
+        tab_cdtotkvv.render(_sub2, **dict(kwargs, cdto_mode="cn"))
+    tab_ban_dai_dien.render(tabs[12], cap="tinh", **kwargs)
+    tab_uy_thac.render(tabs[13], **kwargs)
+    tab_nhiem_vu.render(tabs[14], **kwargs)
+    if get_permissions(role)["can_upload"]:
+        with tabs[15]:
+            _render_quan_ly_template(df_full)
+        tab_upload_khnv.render(tabs[16], **kwargs)
     else:
-        if st.session_state.get("_tab_visited_up") or active_tab_idx == upload_idx:
-            st.session_state["_tab_visited_up"] = True
-            tab_upload_khnv.render(tabs[upload_idx], **kwargs)
+        tab_upload_khnv.render(tabs[15], **kwargs)
 ```
 
 ---
@@ -46514,9 +47560,9 @@ from tabs import (
     tab_nq11,
     tab_candoi,
     tab_uy_thac,
-    tab_no_rui_ro,
-    tab_tap_huan,
 )
+
+from tabs.tab_den_han import render as render_den_han
 
 
 def _render_don_doc(df: pd.DataFrame, pgd_user: str, role: str):
@@ -47238,15 +48284,14 @@ def render(**kwargs):
         "📋 NQ11",
         "🔍 Tra cứu hồ sơ",
         "📋 Danh sách & Lọc",
+        "⏰ Đến hạn",
         "📡 Điện Báo",
         "📍 Điểm GD & Tổ TK&VV",
         "📝 Báo cáo Giao ban",
         "📄 Mẫu biểu",
         "🏛️ Ban Đại Diện",
-        "💳 Nợ rủi ro",
         "🤝 Ủy thác",
         "✅ Nhiệm vụ",
-        "🎓 Tập huấn",
         "📤 Upload Dữ liệu",
     ]
     # Thêm tab Upload HSTD cho admin_pgd/manager_pgd
@@ -47312,18 +48357,17 @@ def render(**kwargs):
         lambda: tab_nq11.render(tabs_op[5], **_pgd_df_kwargs),
         lambda: tab_tracuu.render(tabs_op[6], **kwargs),
         lambda: tab_danhsach.render(tabs_op[7], **kwargs),
+        lambda: render_den_han(role=role, pgd_user=pgd_user),
         lambda: tab_candoi.render(
-            tabs_op[8], **{**kwargs, "pgd_mode": True, "df": df, "df_full": df}
+            tabs_op[9], **{**kwargs, "pgd_mode": True, "df": df, "df_full": df}
         ),
-        lambda: _render_diem_gd_va_to_tkvv(tabs_op[9], **kwargs),
-        lambda: _render_bao_cao_giao_ban(tabs_op[10], **kwargs),
+        lambda: _render_diem_gd_va_to_tkvv(tabs_op[10], **kwargs),
+        lambda: _render_bao_cao_giao_ban(tabs_op[11], **kwargs),
         lambda: _render_mau_bieu_tab(),
-        lambda: tab_ban_dai_dien.render(tabs_op[12], cap="xa", **kwargs),
-        lambda: tab_no_rui_ro.render(tabs_op[13], **kwargs),
+        lambda: tab_ban_dai_dien.render(tabs_op[13], cap="xa", **kwargs),
         lambda: tab_uy_thac.render(tabs_op[14], **kwargs),
         lambda: tab_nhiem_vu.render(tabs_op[15], **kwargs),
-        lambda: tab_tap_huan.render(tabs_op[16], **kwargs),
-        lambda: tab_upload_pgd.render(tabs_op[17], **kwargs),
+        lambda: tab_upload_pgd.render(tabs_op[16], **kwargs),
     ]
 
     # Thêm renderer cho tab Upload HSTD nếu có quyền
@@ -47820,6 +48864,131 @@ def tong_hop_theo_xa(parquet_path: str, ten_pgd: str) -> pd.DataFrame:
 
 ---
 
+### 📄 `data/den_han.py`
+
+```python
+"""
+Module tính ngày đến hạn khoản vay từ hstd.parquet.
+KHÔNG import streamlit — dùng pandas + thư viện chuẩn.
+"""
+from datetime import date, datetime
+from dateutil.relativedelta import relativedelta
+
+import pandas as pd
+import numpy as np
+
+from config import (
+    CACHE_HSTD,
+    COT_TEN_PGD, COT_TEN_KH, COT_MA_KH,
+    COT_TONG_DU_NO, COT_DU_NO_TH, COT_DU_NO_QH,
+    COT_TEN_CT, COT_NGAY_DEN_HAN,
+    COT_TEN_XA,
+)
+
+
+def _parse_ngay(val):
+    if val is None or (isinstance(val, float) and pd.isna(val)):
+        return None
+    try:
+        if isinstance(val, date):
+            return val
+        if isinstance(val, datetime):
+            return val.date()
+        if isinstance(val, str):
+            for fmt in ("%d/%m/%Y", "%Y-%m-%d", "%m/%d/%Y"):
+                try:
+                    return datetime.strptime(val, fmt).date()
+                except ValueError:
+                    continue
+        return None
+    except Exception:
+        return None
+
+
+def tinh_den_han_df(df: pd.DataFrame) -> pd.DataFrame:
+    df = df.copy()
+    df["_ngay_dh"] = df[COT_NGAY_DEN_HAN].apply(_parse_ngay)
+    df["Ngày đến hạn"] = df["_ngay_dh"]
+    today = date.today()
+    df["Tháng đến hạn còn lại"] = df["_ngay_dh"].apply(
+        lambda d: (
+            relativedelta(d, today).months + relativedelta(d, today).years * 12
+            if d is not None else None
+        )
+    )
+    df.drop(columns=["_ngay_dh"], inplace=True)
+    return df
+
+
+def loc_den_han_trong(df, tu_thang=0, den_thang=6) -> pd.DataFrame:
+    df_tinh = tinh_den_han_df(df)
+    mask = (
+        df_tinh["Tháng đến hạn còn lại"].notna()
+        & (df_tinh["Tháng đến hạn còn lại"] >= tu_thang)
+        & (df_tinh["Tháng đến hạn còn lại"] <= den_thang)
+    )
+    return df_tinh[mask].copy()
+
+
+def tong_hop_den_han(df, nhom_theo="pgd") -> pd.DataFrame:
+    cot_nhom = COT_TEN_PGD if nhom_theo == "pgd" else COT_TEN_XA
+    if cot_nhom not in df.columns:
+        return pd.DataFrame()
+
+    df_loc = loc_den_han_trong(df, tu_thang=0, den_thang=6)
+    if df_loc.empty:
+        return pd.DataFrame()
+
+    ket_qua = df_loc.groupby([cot_nhom, "Tháng đến hạn còn lại"]).agg(
+        so_khoan_vay=(COT_MA_KH if COT_MA_KH in df_loc.columns else cot_nhom, "count"),
+        tong_du_no=(COT_TONG_DU_NO if COT_TONG_DU_NO in df_loc.columns else cot_nhom, "sum"),
+    ).reset_index()
+
+    today = date.today()
+    ket_qua["Tháng"] = ket_qua["Tháng đến hạn còn lại"].apply(
+        lambda n: (today + relativedelta(months=int(n))).strftime("Tháng %m/%Y")
+    )
+    ket_qua = ket_qua.sort_values([cot_nhom, "Tháng đến hạn còn lại"])
+    return ket_qua
+
+
+def canh_bao_tap_trung(df, nguong_ty_le=0.30) -> list[dict]:
+    df_loc = loc_den_han_trong(df, tu_thang=0, den_thang=6)
+    if df_loc.empty or COT_TEN_PGD not in df.columns:
+        return []
+
+    tong_pgd = df[df[COT_TEN_PGD].isin(df_loc[COT_TEN_PGD])]\
+        .groupby(COT_TEN_PGD)[COT_TONG_DU_NO].sum()
+
+    canh_bao_list = []
+    grouped = df_loc.groupby([COT_TEN_PGD, "Tháng đến hạn còn lại"])
+
+    today = date.today()
+    for (ten_pgd, thang_con_lai), grp in grouped:
+        tong_den_han = grp[COT_TONG_DU_NO].sum()
+        tong_pgd_val = tong_pgd.get(ten_pgd, 0)
+        if tong_pgd_val <= 0:
+            continue
+        ty_le = tong_den_han / tong_pgd_val
+        if ty_le >= nguong_ty_le:
+            thang_str = (today + relativedelta(months=int(thang_con_lai))).strftime("Tháng %m/%Y")
+            canh_bao_list.append({
+                "pgd": ten_pgd,
+                "thang": thang_str,
+                "thang_con_lai": int(thang_con_lai),
+                "so_khoan": int(len(grp)),
+                "tong_den_han": int(tong_den_han),
+                "tong_pgd": int(tong_pgd_val),
+                "ty_le": float(ty_le),
+                "muc_do": "high" if ty_le >= 0.50 else "medium",
+            })
+
+    canh_bao_list.sort(key=lambda x: x["ty_le"], reverse=True)
+    return canh_bao_list
+```
+
+---
+
 ### 📄 `data/dgd_helpers.py`
 
 ```python
@@ -48311,6 +49480,81 @@ def tao_bang_dvut(doc: Document, df_xa: pd.DataFrame) -> None:
         run.font.size = Pt(9)
 
 
+def _tao_bang_chi_tiet_to(doc: Document, df_xa: pd.DataFrame) -> None:
+    """Bảng 2 — Chi tiết thu nợ / giải ngân theo Tổ TK&VV (5 cột)."""
+    DVUT_ORDER = [
+        "Hội nông dân",
+        "Hội liên hiệp phụ nữ",
+        "Hội cựu chiến binh",
+        "Đoàn thanh niên",
+    ]
+
+    HEADERS = [
+        "Stt",
+        "Đơn vị nhận ủy thác / Tổ TK&VV",
+        "Chương trình cho vay",
+        "Số tiền thu nợ",
+        "Số tiền giải ngân",
+    ]
+
+    tbl = doc.add_table(rows=1, cols=5)
+    tbl.style = "Table Grid"
+    for i, h in enumerate(HEADERS):
+        cell = tbl.rows[0].cells[i]
+        cell.text = h
+        cell.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+        run = cell.paragraphs[0].runs[0]
+        run.bold = True
+        run.font.name = "Times New Roman"
+        run.font.size = Pt(11)
+
+    co_ten_to = COT_TEN_TO in df_xa.columns
+    dvut_list = [d for d in DVUT_ORDER if d in df_xa[COT_DVUT].dropna().unique()]
+    stt = 0
+
+    for dvut in dvut_list:
+        df_dvut = df_xa[df_xa[COT_DVUT] == dvut]
+
+        tr = tbl.add_row()
+        merged = tr.cells[0].merge(tr.cells[4])
+        merged.text = ""
+        p = merged.paragraphs[0]
+        p.alignment = WD_ALIGN_PARAGRAPH.LEFT
+        r = p.add_run(dvut.upper())
+        r.bold = True
+        r.font.name = "Times New Roman"
+        r.font.size = Pt(11)
+
+        tc_pr = merged._tc.get_or_add_tcPr()
+        shading_elm = OxmlElement("w:shd")
+        shading_elm.set(qn("w:fill"), "DEEAF1")
+        shading_elm.set(qn("w:val"), "clear")
+        tc_pr.append(shading_elm)
+
+        if co_ten_to:
+            ds_to = sorted(df_dvut[COT_TEN_TO].dropna().unique().tolist())
+            for to in ds_to:
+                stt += 1
+                tr = tbl.add_row()
+                vals = [str(stt), to, "", "", ""]
+                for i, v in enumerate(vals):
+                    tr.cells[i].text = v
+                    tr.cells[i].paragraphs[0].alignment = (
+                        WD_ALIGN_PARAGRAPH.LEFT if i == 1 else WD_ALIGN_PARAGRAPH.CENTER
+                    )
+
+    tr = tbl.add_row()
+    for i in range(5):
+        tr.cells[i].text = "Tổng cộng" if i == 1 else ""
+        para = tr.cells[i].paragraphs[0]
+        run = para.runs[0] if para.runs else para.add_run(tr.cells[i].text)
+        run.bold = True
+        run.font.name = "Times New Roman"
+        run.font.size = Pt(11)
+
+    _patch_font(tbl, size=11)
+
+
 def tao_bang_chuong_trinh(
     doc: Document,
     df_xa: pd.DataFrame,
@@ -48755,18 +49999,25 @@ def xuat_thong_bao_ket_luan_giao_ban(
         space_after=3,
     )
 
-    tags = tinh_so_lieu_van_xuoi(df_xa, df_baseline, nam_moc)
+    tong_dn = pd.to_numeric(df_xa[COT_TONG_DU_NO], errors="coerce").sum() / 1e6
+    so_kh = df_xa[COT_MA_KH].nunique()
+    so_to = df_xa[COT_TEN_TO].nunique() if COT_TEN_TO in df_xa.columns else 0
+    nqh = pd.to_numeric(df_xa[COT_DU_NO_QH], errors="coerce").sum() / 1e6
+    ty_le_nqh = nqh / tong_dn * 100 if tong_dn > 0 else 0
+
     van_xuoi = (
-        f"Tổng dư nợ đạt {tags['{{tong_du_no}}']} triệu đồng "
-        f"({tags['{{tang_giam_thang}}']} {tags['{{chenh_lech_thang}}']} triệu đồng "
-        f"so với tháng trước), với {tags['{{so_kh}}']} khách hàng còn dư nợ, "
-        f"thông qua {tags['{{so_to}}']} Tổ TK&VV. Trong đó, nợ quá hạn "
-        f"{tags['{{du_no_qh}}']} triệu đồng, tỷ lệ {tags['{{ty_le_nqh}}']}%; "
-        f"nợ khoanh {tags['{{du_no_khoanh}}']} triệu đồng, tỷ lệ "
-        f"{tags['{{ty_le_khoanh}}']}%. Số dư tiền gửi tổ viên đạt "
-        f"{tags['{{tien_gui_105}}']} triệu đồng."
+        f"Tổng dư nợ đạt {tong_dn:,.0f} triệu đồng, với {so_kh:,} khách hàng "
+        f"còn dư nợ, thông qua {so_to} Tổ TK&VV. "
+        f"Trong đó nợ quá hạn {nqh:,.0f} triệu đồng, tỷ lệ {ty_le_nqh:.2f}%."
     )
-    _p(van_xuoi, size=14, align=WD_ALIGN_PARAGRAPH.JUSTIFY, indent_cm=1.0)
+    if df_baseline is not None and COT_TEN_XA in df_baseline.columns:
+        ten_xa_val = df_xa[COT_TEN_XA].iloc[0] if COT_TEN_XA in df_xa.columns else None
+        if ten_xa_val:
+            df_bl_xa = df_baseline[df_baseline[COT_TEN_XA] == ten_xa_val]
+            baseline = pd.to_numeric(df_bl_xa[COT_TONG_DU_NO], errors="coerce").sum()
+            tang_giam = tong_dn - (baseline / 1e6)
+            van_xuoi += f" (tăng/giảm {abs(tang_giam):,.0f} triệu so với cùng kỳ)"
+    _p(van_xuoi, size=13, align=WD_ALIGN_PARAGRAPH.JUSTIFY, indent_cm=1.0)
     _p(
         "Đơn vị tính: tổ, khách hàng, triệu đồng, %",
         italic=True,
@@ -48778,11 +50029,13 @@ def xuat_thong_bao_ket_luan_giao_ban(
     _patch_font(doc.tables[-1], size=11)
 
     _p(
-        "Biểu chi tiết kết quả giao dịch kèm theo.",
+        "Biểu chi tiết kết quả giao dịch kèm theo",
         italic=True,
-        size=12,
+        size=11,
+        align=WD_ALIGN_PARAGRAPH.CENTER,
         indent_cm=0,
     )
+    _tao_bang_chi_tiet_to(doc, df_xa)
 
     _p(
         "2. Tồn tại, hạn chế",
@@ -48854,20 +50107,19 @@ def xuat_thong_bao_ket_luan_giao_ban(
     tbl_f = doc.add_table(rows=1, cols=2)
     _no_border(tbl_f)
     fl, fr = tbl_f.rows[0].cells
-    _cell_w(fl, 9.0)
-    _cell_w(fr, 8.0)
+    _cell_w(fl, 6.4)
+    _cell_w(fr, 9.6)
 
     p_nn = fl.paragraphs[0]
     r_nn = p_nn.add_run("Nơi nhận:")
     r_nn.bold = True
-    r_nn.font.size = Pt(12)
+    r_nn.font.size = Pt(11)
     r_nn.font.name = "Times New Roman"
     r_nn.font.color.rgb = RGBColor(0, 0, 0)
     for dong in (
         "- Đảng ủy, UBND xã (để b/c);",
-        "- Các tổ chức CT-XH nhận ủy thác;",
-        "- Ban Giám đốc, Tổ trưởng Tổ KH-NV;",
-        "- Lưu: VT, CBTD.",
+        "- Tổ chức CT-XH nhận ủy thác;",
+        "- Lưu PGD.",
     ):
         p_ln = fl.add_paragraph()
         r_ln = p_ln.add_run(dong)
@@ -48875,19 +50127,27 @@ def xuat_thong_bao_ket_luan_giao_ban(
         r_ln.font.name = "Times New Roman"
         r_ln.font.color.rgb = RGBColor(0, 0, 0)
 
-    p_gd = fr.paragraphs[0]
-    p_gd.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    r_gd = p_gd.add_run("GIÁM ĐỐC")
-    r_gd.bold = True
-    r_gd.font.size = Pt(14)
-    r_gd.font.name = "Times New Roman"
-    r_gd.font.color.rgb = RGBColor(0, 0, 0)
+    p_kt_gd = fr.paragraphs[0]
+    p_kt_gd.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    r_kt_gd = p_kt_gd.add_run("KT.GIÁM ĐỐC")
+    r_kt_gd.bold = True
+    r_kt_gd.font.size = Pt(11)
+    r_kt_gd.font.name = "Times New Roman"
+    r_kt_gd.font.color.rgb = RGBColor(0, 0, 0)
+
+    p_pgd = fr.add_paragraph()
+    p_pgd.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    r_pgd = p_pgd.add_run("PHÓ GIÁM ĐỐC")
+    r_pgd.bold = True
+    r_pgd.font.size = Pt(11)
+    r_pgd.font.name = "Times New Roman"
+    r_pgd.font.color.rgb = RGBColor(0, 0, 0)
 
     p_kt = fr.add_paragraph()
     p_kt.alignment = WD_ALIGN_PARAGRAPH.CENTER
     r_kt = p_kt.add_run("(Ký tên, đóng dấu)")
     r_kt.italic = True
-    r_kt.font.size = Pt(13)
+    r_kt.font.size = Pt(11)
     r_kt.font.name = "Times New Roman"
     r_kt.font.color.rgb = RGBColor(0, 0, 0)
 
@@ -48897,9 +50157,8 @@ def xuat_thong_bao_ket_luan_giao_ban(
 
     p_ht = fr.add_paragraph()
     p_ht.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    r_ht = p_ht.add_run(ten_pgd_hd)
-    r_ht.bold = True
-    r_ht.font.size = Pt(14)
+    r_ht = p_ht.add_run("…………………………………")
+    r_ht.font.size = Pt(11)
     r_ht.font.name = "Times New Roman"
     r_ht.font.color.rgb = RGBColor(0, 0, 0)
 
@@ -50061,6 +51320,8 @@ db.ghi_kv("key_name", value, username)  # ghi
 | `kehoach` | KH Điện báo toàn CN |
 | `kehoach_pgd_{slug}` | KH Điện báo PGD |
 | `dgd_map` | Điểm giao dịch toàn CN |
+| `kh_gqvl_cn_{nam}` | KH GQVL Chi nhánh theo năm |
+| `kh_gqvl_pgd_{slug}_{nam}` | KH GQVL theo PGD (dự phòng) |
 
 `slug` = `pgd_slug(ten_pgd)` từ `data/pgd.py`
 
@@ -50171,6 +51432,8 @@ PGD địa bàn:
 | Thêm báo cáo kiểm soát | `kiem_soat_service.py` → thêm `BaoCaoMeta` |
 | Sửa giao KHTD | `khtd_service.py` + `tab_khtd_giao_dc.py` |
 | Sửa số liệu giao ban | `giao_ban.py` → `tinh_so_lieu_van_xuoi()` |
+| Xuất Thông báo Kết luận Giao ban | `giao_ban.py` → `xuat_thong_bao_ket_luan_giao_ban()` |
+| Xuất PDF (docx2pdf) | `ws_operation.py` → `_render_thong_bao_ket_luan()` |
 | Quản lý điểm GD | `db.doc_dgd_map()` / `db.luu_dgd_map()` |
 
 ---
@@ -50486,9 +51749,11 @@ giao_ban.py  (root)
   Hàm chính:
     tinh_so_lieu_van_xuoi(df, ten_xa, ...)  → dict số liệu giao ban
     tao_bang_dvut(doc, df_xa)               → điền bảng đơn vị thụ hưởng
+    _tao_bang_chi_tiet_to(doc, df_xa)       → Bảng 2 chi tiết theo Tổ TK&VV (5 cột)
     tao_bang_chuong_trinh(doc, ...)         → điền bảng chương trình
     tao_bang_ke_hoach(doc, ...)             → điền bảng kế hoạch
-    xuat_bien_ban_giao_ban(...)             → xuất file Word giao ban xã
+    xuat_bien_ban_giao_ban(...)             → xuất file Word giao ban xã (template)
+    xuat_thong_bao_ket_luan_giao_ban(...)   → xuất Thông báo Kết luận Giao ban (runtime render)
   ← dùng chung cho ws_operation (CBTD) và ws_management
 ```
 
@@ -50576,6 +51841,7 @@ executive
 | tab_nq11 | NQ11 PGD |
 | tab_cdtotkvv | Chấm điểm Tổ TK&VV |
 | tab_upload_pgd | Upload file riêng PGD |
+| Document Hub (tích hợp trong ws_operation) | Trung tâm văn bản: Biên bản giao ban, Thông báo Kết luận (Word/PDF) |
 
 ---
 
@@ -50612,6 +51878,30 @@ executive
 
 ```markdown
 # CHANGELOG — VBSP-SCM
+
+---
+
+## [08/05/2026] — Thông báo Kết luận Giao ban chuẩn chi nhánh
+
+### Thêm mới
+- **`data/giao_ban.py` → `_tao_bang_chi_tiet_to()`** — Bảng 2 chi tiết thu nợ/giải ngân theo Tổ TK&VV
+  - 5 cột: Stt, ĐVUT/Tổ TK&VV, Chương trình CV, Thu nợ, Giải ngân
+  - Dòng nhóm ĐVUT merge 5 cột, nền xanh `#DEEAF1`, chữ in hoa
+  - Mỗi Tổ 1 dòng, cột số liệu để trống (CBTD điền tay sau in)
+- **`workspaces/ws_operation.py` → Nút xuất PDF** — Convert Word → PDF bằng `docx2pdf`
+  - Lưu data vào `session_state` để dùng chung cho cả Word và PDF
+  - Bắt lỗi `ImportError` nếu chưa cài `docx2pdf`
+  - Hướng dẫn Save As PDF thủ công nếu không có Microsoft Word
+
+### Sửa đổi
+- **`data/giao_ban.py` → `xuat_thong_bao_ket_luan_giao_ban()`**:
+  - Section II: Format đoạn văn tự sự *"Tổng dư nợ đạt ... triệu đồng, với ... khách hàng còn dư nợ, thông qua ... Tổ TK&VV. Trong đó nợ quá hạn ... triệu đồng, tỷ lệ ...%"* — lấy số liệu trực tiếp từ `df_xa`, font 13pt
+  - So sánh baseline: thêm `(tăng/giảm ... triệu so với cùng kỳ)` khi có dữ liệu
+  - Thay thế phần ký tên cuối văn bản: **KT.GIÁM ĐỐC / PHÓ GIÁM ĐỐC** thay vì **GIÁM ĐỐC**, bảng 2 cột không viền (trái 40% — Nơi nhận, phải 60% — ký tên)
+  - Gọi `_tao_bang_chi_tiet_to()` ngay sau bảng tổng hợp ĐVUT
+- **`workspaces/ws_operation.py` → `_render_thong_bao_ket_luan()`**:
+  - Thêm `st.selectbox` chọn xã độc lập (key: `tb_chon_xa`), đồng bộ `session_state["gb2_xa"]`
+  - Bỏ phụ thuộc tab Biên bản — user không cần vào tab Biên bản trước
 
 ---
 
@@ -50737,6 +52027,8 @@ db.ghi_kv("key_name", value, username)
 | `ma_pgd_map` | Mapping mã PGD ↔ tên PGD |
 | `pgd_xa_map` | Mapping PGD → danh sách xã |
 | `chuong_trinh_khtd` | Danh mục chương trình KHTD |
+| `kh_gqvl_cn_{nam}` | KH GQVL Chi nhánh theo năm |
+| `kh_gqvl_pgd_{slug}_{nam}` | KH GQVL theo PGD (dự phòng) |
 
 `slug` = `pgd_slug(ten_pgd)` từ `data/pgd.py` — ví dụ: `"pgd_long_thanh"`.
 
@@ -51686,6 +52978,7 @@ Các tab chính:
 - 🏠 Điểm GD — Quản lý điểm giao dịch
 - 👥 Ban đại diện — Thông tin BĐD
 - 📤 Upload — File riêng PGD
+- 📢 Thông báo Kết luận Giao ban — Xuất Word/PDF kết luận họp giao ban xã (chuẩn NĐ30)
 
 ---
 
@@ -52787,6 +54080,9 @@ templates/
 | `mau_15td.docx` | DS đối chiếu số dư | ⏳ Chờ template | tab_uy_thac → Mẫu 15 |
 | `ke_hoach_kt.docx` | KH kiểm tra GS ủy thác | ⏳ Chờ template | tab_uy_thac → KH KT |
 | `bb_xac_minh_no.docx` | BB xác minh nợ chiếm dụng | ⏳ Chờ template | TBD |
+| *(không template)* | Thông báo Kết luận Giao ban 🆕 | ✅ Runtime render | ws_operation → Document Hub → TB Kết luận |
+
+> **Thông báo Kết luận Giao ban** không dùng template — render trực tiếp bằng `python-docx` qua hàm `xuat_thong_bao_ket_luan_giao_ban()` trong `data/giao_ban.py`. Có hỗ trợ xuất PDF qua `docx2pdf`.
 
 ---
 
@@ -53118,7 +54414,31 @@ with db.get_conn() as conn:
 
 ---
 
-## 8. Lệnh debug hữu ích
+## 9. docx2pdf / Xuất PDF
+
+### Lỗi "No module named docx2pdf"
+**Nguyên nhân:** Chưa cài package `docx2pdf`
+```bash
+pip install docx2pdf
+```
+
+### Lỗi "docx2pdf failed" / "Word not found"
+**Nguyên nhân:** `docx2pdf` yêu cầu Microsoft Word trên Windows
+- **Có Word:** Kiểm tra Word có bị lỗi không, mở được file .docx không
+- **Không Word:** Mở file Word đã tạo → **File → Save As → PDF** thủ công
+- **Linux/Mac:** `docx2pdf` không hỗ trợ — dùng `libreoffice --headless --convert-to pdf`
+
+### PDF xuất ra thiếu font / lỗi hiển thị
+**Nguyên nhân:** Font Times New Roman không khả dụng trong Word
+→ Cài font Times New Roman trên máy tính trước khi convert
+
+### Nút PDF không hiện download button
+**Nguyên nhân:** Cần bấm **📄 Xuất PDF** trước — button download chỉ hiện sau khi convert thành công
+→ Kiểm tra: đã bấm "Xuất Word" để tạo dữ liệu chưa? Nút PDF cần dữ liệu từ session_state
+
+---
+
+## 10. Lệnh debug hữu ích
 
 ```bash
 # Xem 20 audit log gần nhất
@@ -60033,6 +61353,7 @@ from datetime import datetime
 from config import BASE_DIR, THU_MUC_DATA, CACHE_DIR, FILE_USERS
 from data import ts_file
 from utils import fmt_so, vn, hien_thi_dataframe_phan_trang
+from auth import la_phan_he_cn
 from services import (
     kiem_tra_file_he_thong,
     luu_file_he_thong,
@@ -60229,11 +61550,11 @@ def render(tab, **kwargs):
 
     with tab:
         # Chỉ admin/manager được vào
-        if role not in ["admin", "manager"]:
+        if not la_phan_he_cn(role) or role == "executive":
             st.error("🔒 Bạn không có quyền truy cập trang này.")
             return
 
-        if role in ["admin", "manager"]:
+        if role in ("admin", "manager", "admin_cn", "manager_cn"):
             tab_chinh, tab_baseline = st.tabs([
                 "⚙️ Upload & hệ thống",
                 "📁 Dữ liệu mốc 31/12",
@@ -60318,7 +61639,7 @@ def render(tab, **kwargs):
                 st.divider()
 
                 # ── Cấu hình Điểm Giao dịch (admin/manager) ──────────────────────────
-                if role in ["admin", "manager"]:
+                if role in ("admin", "manager", "admin_cn", "manager_cn"):
                     _render_cau_hinh_dgd(username, df_full)
                     st.divider()
 
@@ -60771,6 +62092,7 @@ from services import xuat_bao_cao, ten_file_bao_cao
 from pdf_service import nut_xuat_pdf
 from data import (danh_dau_khong_hd, tong_hop_khong_hd, ds_chi_tiet_khong_hd)
 from tabs import tab_nq11
+from auth import la_phan_he_pgd
 
 if TYPE_CHECKING:
     from streamlit.delta_generator import DeltaGenerator
@@ -60876,7 +62198,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
         st.divider()
 
         # Bộ lọc PGD dùng chung
-        if role in ["admin","manager"] and COT_TEN_PGD in df.columns:
+        if role in ("admin","manager","admin_cn","manager_cn") and COT_TEN_PGD in df.columns:
             loc_pgd_bc = st.selectbox("📍 PGD",
                 ["Tất cả"]+sorted(df[COT_TEN_PGD].dropna().unique().tolist()),
                 key="bc_pgd_chung")
@@ -60885,9 +62207,9 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
             st.markdown(f"📍 PGD: **{loc_pgd_bc}**")
 
         df_base = df.copy()
-        if role in ["admin","manager"] and loc_pgd_bc != "Tất cả":
+        if role in ("admin","manager","admin_cn","manager_cn") and loc_pgd_bc != "Tất cả":
             df_base = df_base[df_base[COT_TEN_PGD] == loc_pgd_bc]
-        elif role == "user":
+        elif la_phan_he_pgd(role) and pgd_user:
             df_base = df_base[df_base[COT_TEN_PGD] == loc_pgd_bc] if loc_pgd_bc != "Tất cả" else df_base
 
         # ══════════════════════════════
@@ -61244,7 +62566,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                     with col_xl:
                         if st.button("📥 Xuất báo cáo chi tiết", type="primary", key="btn_xuat_ct"):
                             sheets = {"Chi tiết": export_df}
-                            if role in ["admin", "manager"] and COT_TEN_PGD in df.columns:
+                            if role in ("admin", "manager", "admin_cn", "manager_cn") and COT_TEN_PGD in df.columns:
                                 sheets["Tổng hợp PGD"] = df.groupby(COT_TEN_PGD).agg(
                                     Số_hồ_sơ=(COT_MA_KH, "count"),
                                     Tổng_dư_nợ=(COT_TONG_DU_NO, "sum"),
@@ -61302,6 +62624,7 @@ from utils import (
 )
 from data import (ts_file, danh_dau_khong_hd, tong_hop_khong_hd,
                   ds_chi_tiet_khong_hd)
+from auth import la_phan_he_pgd
 
 
 def render(tab, **kwargs):
@@ -61357,7 +62680,7 @@ def render(tab, **kwargs):
         st.divider()
 
         # Bộ lọc PGD dùng chung
-        if role in ["admin","manager"] and COT_TEN_PGD in df.columns:
+        if role in ("admin","manager","admin_cn","manager_cn") and COT_TEN_PGD in df.columns:
             loc_pgd_bc = st.selectbox("📍 PGD",
                 ["Tất cả"]+sorted(df[COT_TEN_PGD].dropna().unique().tolist()),
                 key="bc_pgd_chung")
@@ -61366,9 +62689,9 @@ def render(tab, **kwargs):
             st.markdown(f"📍 PGD: **{loc_pgd_bc}**")
 
         df_base = df.copy()
-        if role in ["admin","manager"] and loc_pgd_bc != "Tất cả":
+        if role in ("admin","manager","admin_cn","manager_cn") and loc_pgd_bc != "Tất cả":
             df_base = df_base[df_base[COT_TEN_PGD] == loc_pgd_bc]
-        elif role == "user":
+        elif la_phan_he_pgd(role) and pgd_user:
             df_base = df_base[df_base[COT_TEN_PGD] == loc_pgd_bc] if loc_pgd_bc != "Tất cả" else df_base
 
         # ══════════════════════════════
@@ -61711,7 +63034,7 @@ def render(tab, **kwargs):
                     buf = BytesIO()
                     with pd.ExcelWriter(buf, engine="openpyxl") as w:
                         export_df.to_excel(w, index=False, sheet_name="Chi tiết")
-                        if role in ["admin","manager"] and COT_TEN_PGD in df.columns:
+                        if role in ("admin","manager","admin_cn","manager_cn") and COT_TEN_PGD in df.columns:
                             df.groupby(COT_TEN_PGD).agg(
                                 Số_hồ_sơ=(COT_MA_KH,"count"),
                                 Tổng_dư_nợ=(COT_TONG_DU_NO,"sum"),
@@ -62372,6 +63695,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 
 from config import *
+from auth import la_phan_he_cn
 from utils import xuat_excel, ten_file_xuat, hien_thi_dataframe_phan_trang
 from data import doc_cbtd, luu_cbtd
 
@@ -62674,7 +63998,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
             return trung
 
         # ── Thao tác (admin + manager) ──
-        if role not in ["admin","manager"]:
+        if not la_phan_he_cn(role) or role == "executive":
             st.caption("Chỉ Quản lý trở lên mới được quản lý CBTD.")
         else:
             che_do = st.radio("Thao tác",
@@ -62965,6 +64289,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 
 import db
+from auth import la_phan_he_cn, la_phan_he_pgd
 from utils import fmt_so, xuat_excel, ten_file_xuat, hien_thi_dataframe_phan_trang
 from services import luu_cdtotkvv, KetQuaUpload
 from data.cdtotkvv import (
@@ -64112,7 +65437,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
     pgd_user = kwargs.get("pgd_user", "")
 
     with tab:
-        if role not in ("admin", "manager", "user"):
+        if not la_phan_he_cn(role) and not la_phan_he_pgd(role):
             st.error("Bạn không có quyền truy cập trang này.")
             return
 
@@ -64125,7 +65450,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
             st.caption("Quản lý và xem tổng hợp chấm điểm Tổ Tiết kiệm & Vay vốn toàn chi nhánh")
 
         # Tạo 5 sub-tabs
-        if cdto_mode == "cn" and role in ("admin", "manager"):
+        if cdto_mode == "cn" and role in ("admin", "manager", "admin_cn", "manager_cn"):
             # Admin/Manager workspace: đầy đủ chức năng
             sub1, sub2, sub3, sub4, sub5 = st.tabs([
                 "📤 Upload", 
@@ -64844,6 +66169,7 @@ from utils import (
     ten_file_xuat,
     hien_thi_dataframe_phan_trang,
 )
+from auth import la_phan_he_pgd
 if TYPE_CHECKING:
     from streamlit.delta_generator import DeltaGenerator
 
@@ -64973,7 +66299,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
 
         # Filter sau expander — dùng boolean mask, không copy toàn bộ df
         _masks = []
-        if role not in ["admin", "manager"] and pgd_user:
+        if la_phan_he_pgd(role) and pgd_user:
             _masks.append(df[COT_TEN_PGD] == pgd_user)
         if cxa   != "Tất cả" and COT_TEN_XA  in df.columns:
             _masks.append(df[COT_TEN_XA]  == cxa)
@@ -65342,6 +66668,145 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                 f"📍 Phạm vi: **{ten_pham_vi}**  ·  "
                 f"🟢 Dưới bình quân ({fmt_so(round(binh_quan_no, 0))} tr.đ)  "
                 f"🔴 Trên bình quân — màu càng đậm càng lớn hơn bình quân"
+            )
+```
+
+---
+
+### 📄 `tabs/tab_den_han.py`
+
+```python
+"""
+Tab Cảnh báo Khoản vay Đến hạn.
+Phân tích dư nợ đến hạn trong N tháng tới dựa trên HSTD hiện tại.
+"""
+from __future__ import annotations
+
+from io import BytesIO
+from typing import TYPE_CHECKING
+
+import pandas as pd
+import streamlit as st
+
+from auth import la_phan_he_pgd
+from config import CACHE_HSTD, COT_TEN_PGD, COT_TEN_KH, COT_TEN_CT, COT_TONG_DU_NO, COT_NGAY_DEN_HAN
+from data.den_han import (
+    tinh_den_han_df,
+    loc_den_han_trong,
+    tong_hop_den_han,
+    canh_bao_tap_trung,
+)
+from utils import fmt_ty, fmt_so
+
+
+def render(role: str = None, **kwargs) -> None:
+    st.subheader("⏰ Cảnh báo Khoản vay Đến hạn")
+    st.caption("Phân tích dư nợ đến hạn trong N tháng tới dựa trên HSTD hiện tại.")
+
+    try:
+        df = pd.read_parquet(CACHE_HSTD)
+    except FileNotFoundError:
+        st.warning("⚠️ Chưa có dữ liệu HSTD. Vui lòng upload file trước.")
+        return
+
+    pgd_user = kwargs.get("pgd_user")
+    if la_phan_he_pgd(role) and pgd_user and COT_TEN_PGD in df.columns:
+        df = df[df[COT_TEN_PGD] == pgd_user]
+
+    if COT_NGAY_DEN_HAN not in df.columns:
+        st.error(
+            f"❌ File HSTD thiếu cột '{COT_NGAY_DEN_HAN}'. "
+            f"Kiểm tra lại file upload."
+        )
+        return
+
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        den_thang = st.slider(
+            "Xem trước (tháng)", min_value=1, max_value=12,
+            value=6, key="den_han_slider")
+    with col2:
+        nhom_theo = st.radio(
+            "Nhóm theo", ["PGD", "Xã"],
+            horizontal=True, key="den_han_nhom")
+    with col3:
+        nguong = st.number_input(
+            "Ngưỡng tập trung (%)", min_value=10, max_value=80,
+            value=30, step=5, key="den_han_nguong") / 100
+
+    df_loc = loc_den_han_trong(df, tu_thang=0, den_thang=den_thang)
+    nhom_key = "pgd" if nhom_theo == "PGD" else "xa"
+
+    tong_khoan = len(df_loc)
+    tong_tien = df_loc[COT_TONG_DU_NO].sum() if tong_khoan > 0 else 0
+    so_pgd = df_loc[COT_TEN_PGD].nunique() if tong_khoan > 0 else 0
+    ds_cb = canh_bao_tap_trung(df, nguong_ty_le=nguong)
+
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Số khoản đến hạn", fmt_so(tong_khoan))
+    c2.metric("Tổng dư nợ đến hạn", fmt_ty(tong_tien))
+    c3.metric("Số PGD liên quan", so_pgd)
+    c4.metric("⚠️ Điểm tập trung", len(ds_cb),
+              delta_color="inverse" if ds_cb else "off")
+
+    if ds_cb:
+        st.divider()
+        st.markdown("#### ⚠️ Điểm tập trung rủi ro đến hạn")
+        for item in ds_cb:
+            icon = "🔴" if item["muc_do"] == "high" else "🟡"
+            with st.container(border=True):
+                pc1, pc2, pc3, pc4 = st.columns([3, 2, 2, 2])
+                pc1.markdown(
+                    f"{icon} **{item['pgd']}**  \n"
+                    f"Tháng: `{item['thang']}`"
+                )
+                pc2.metric("Đến hạn", fmt_ty(item["tong_den_han"]))
+                pc3.metric("Tổng PGD", fmt_ty(item["tong_pgd"]))
+                pc4.metric("Tỷ lệ", f"{item['ty_le']*100:.1f}%")
+
+    st.divider()
+    st.markdown("#### 📅 Chi tiết theo tháng")
+    df_th = tong_hop_den_han(df, nhom_theo=nhom_key)
+
+    if df_th.empty:
+        st.info("Không có khoản vay đến hạn trong khoảng thời gian đã chọn.")
+    else:
+        try:
+            df_pivot = df_th.pivot_table(
+                index=df_th.columns[0],
+                columns="Tháng",
+                values="tong_du_no",
+                aggfunc="sum",
+                fill_value=0,
+            )
+            df_display = df_pivot.map(lambda x: fmt_ty(x) if x > 0 else "—")
+            st.dataframe(df_display, use_container_width=True)
+        except Exception:
+            st.dataframe(df_th, use_container_width=True, hide_index=True)
+
+    cols_hien_thi = [
+        COT_TEN_PGD, COT_TEN_KH,
+        COT_TEN_CT, COT_TONG_DU_NO,
+        "Ngày đến hạn", "Tháng đến hạn còn lại",
+    ]
+    cols_hien_thi = [c for c in cols_hien_thi if c in df_loc.columns]
+
+    with st.expander(f"📋 Danh sách {fmt_so(tong_khoan)} khoản vay đến hạn", expanded=False):
+        if df_loc.empty:
+            st.info("Không có dữ liệu.")
+        else:
+            st.dataframe(
+                df_loc[cols_hien_thi].sort_values("Tháng đến hạn còn lại"),
+                use_container_width=True, hide_index=True,
+            )
+            buf = BytesIO()
+            df_loc[cols_hien_thi].to_excel(buf, index=False)
+            st.download_button(
+                "📥 Xuất Excel",
+                data=buf.getvalue(),
+                file_name=f"den_han_{den_thang}thang.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                key="btn_xuat_den_han",
             )
 ```
 
@@ -66074,7 +67539,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                 )
             with upc2:
                 # Chọn PGD để lưu
-                if role in ["admin","manager"] and COT_TEN_PGD in kwargs.get("df_full", pd.DataFrame()).columns:
+                if role in ("admin","manager","admin_cn","manager_cn") and COT_TEN_PGD in kwargs.get("df_full", pd.DataFrame()).columns:
                     ds_pgd_all = sorted(kwargs["df_full"][COT_TEN_PGD].dropna().unique().tolist())
                     pgd_up = st.selectbox("Lưu cho PGD", ds_pgd_all, key="gqvl_pgd_up")
                 else:
@@ -66100,7 +67565,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
             st.info("👆 Upload file GQVL của PGD bên trên để xem số liệu.")
             return
 
-        if role in ["admin","manager"]:
+        if role in ("admin","manager","admin_cn","manager_cn"):
             pgd_xem = st.selectbox("📍 Xem PGD", ["Tất cả"] + pgd_da_up, key="gqvl_pgd_xem")
         else:
             pgd_xem = pgd_user or pgd_da_up[0]
@@ -66363,6 +67828,7 @@ from config import *
 from data import doc_dienbao, db_lookup, ts_file, doc_kehoach, luu_kehoach
 from data.pgd import duong_dan_pgd, pgd_slug
 from services import kiem_tra_file
+from auth import la_phan_he_cn
 from utils import (
     fmt,
     fmt_tien,
@@ -66461,7 +67927,7 @@ def render(tab, **kwargs):
 
         with col_up:
             st.markdown("**📤 Upload file kế hoạch Excel**")
-            if role not in ["admin", "manager"]:
+            if not la_phan_he_cn(role) or role == "executive":
                 st.info("Chỉ Quản lý trở lên mới upload được.")
             else:
                 st.caption("Cấu trúc: Cột A = Tên chỉ tiêu, Cột B = Giá trị (đồng)")
@@ -66496,7 +67962,7 @@ def render(tab, **kwargs):
 
         with col_nhap:
             st.markdown("**✏️ Nhập kế hoạch thủ công**")
-            if role not in ["admin", "manager"]:
+            if not la_phan_he_cn(role) or role == "executive":
                 st.caption("Chỉ Quản lý trở lên mới nhập được.")
             else:
                 with st.form(f"nhap_kh_{prefix}"):
@@ -66613,6 +68079,178 @@ def render(tab, **kwargs):
 
 ---
 
+### 📄 `tabs/tab_kh_gqvl.py`
+
+```python
+"""
+Tab Kế hoạch GQVL Chi nhánh — nhập KH GQVL theo năm, phân tầng TW/ĐP.
+Lưu vào kv_store key "kh_gqvl_cn_{nam}".
+"""
+from __future__ import annotations
+
+import subprocess
+from datetime import datetime
+
+import streamlit as st
+
+import db
+from auth import la_phan_he_cn
+from config import DS_PGD
+from data.pgd import pgd_slug
+
+
+def render(role: str = None, **kwargs) -> None:
+    username = st.session_state.get("username", "unknown")
+
+    st.markdown("## 📋 Kế hoạch GQVL Chi nhánh")
+    st.caption("Nhập kế hoạch GQVL toàn Chi nhánh theo nguồn vốn TW và ĐP.")
+
+    nam = st.selectbox(
+        "Năm kế hoạch",
+        [datetime.now().year, datetime.now().year + 1],
+        key="kh_gqvl_nam",
+    )
+
+    co_quyen = la_phan_he_cn(role) and role != "executive"
+    kh_data = db.doc_kv(f"kh_gqvl_cn_{nam}") or {"pgd": {}}
+
+    if not co_quyen:
+        st.info("Bạn chỉ có quyền xem.")
+        _hien_thi_bang_readonly(kh_data, nam)
+        return
+
+    with st.form(f"form_kh_gqvl_{nam}"):
+        st.markdown("##### Nhập kế hoạch theo PGD (triệu đồng)")
+
+        col_labels = st.columns([3, 2, 2, 2])
+        col_labels[0].markdown("**Tên PGD**")
+        col_labels[1].markdown("**KH TW**")
+        col_labels[2].markdown("**KH ĐP**")
+        col_labels[3].markdown("**Tổng**")
+
+        tong_tw_all = 0
+        tong_dp_all = 0
+
+        for ten_pgd in DS_PGD:
+            slug = pgd_slug(ten_pgd)
+            kh_pgd = kh_data.get("pgd", {}).get(ten_pgd, {})
+            val_tw_trieu = int(kh_pgd.get("kh_tw", 0)) // 1_000_000
+            val_dp_trieu = int(kh_pgd.get("kh_dp", 0)) // 1_000_000
+
+            col1, col2, col3, col4 = st.columns([3, 2, 2, 2])
+            with col1:
+                st.text(ten_pgd)
+            with col2:
+                kh_tw = st.number_input(
+                    "KH TW",
+                    min_value=0,
+                    step=100,
+                    format="%d",
+                    key=f"kh_tw_{slug}_{nam}",
+                    value=val_tw_trieu,
+                    label_visibility="collapsed",
+                )
+            with col3:
+                kh_dp = st.number_input(
+                    "KH ĐP",
+                    min_value=0,
+                    step=100,
+                    format="%d",
+                    key=f"kh_dp_{slug}_{nam}",
+                    value=val_dp_trieu,
+                    label_visibility="collapsed",
+                )
+            with col4:
+                st.metric("Tổng", f"{kh_tw + kh_dp:,}", label_visibility="collapsed")
+
+            tong_tw_all += kh_tw
+            tong_dp_all += kh_dp
+
+        st.divider()
+        tc1, tc2, tc3, tc4 = st.columns([3, 2, 2, 2])
+        with tc1:
+            st.markdown("**TỔNG CỘNG**")
+        with tc2:
+            st.markdown(f"**{tong_tw_all:,}**")
+        with tc3:
+            st.markdown(f"**{tong_dp_all:,}**")
+        with tc4:
+            st.markdown(f"**{tong_tw_all + tong_dp_all:,}**")
+
+        submitted = st.form_submit_button("💾 Lưu kế hoạch GQVL", type="primary")
+
+    if submitted:
+        pgd_map = {}
+        for ten_pgd in DS_PGD:
+            slug = pgd_slug(ten_pgd)
+            val_tw = st.session_state.get(f"kh_tw_{slug}_{nam}", 0) * 1_000_000
+            val_dp = st.session_state.get(f"kh_dp_{slug}_{nam}", 0) * 1_000_000
+            pgd_map[ten_pgd] = {"kh_tw": int(val_tw), "kh_dp": int(val_dp)}
+
+        kh_new = {
+            "pgd": pgd_map,
+            "updated_by": username,
+            "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "nam": nam,
+        }
+        db.ghi_kv(f"kh_gqvl_cn_{nam}", kh_new, username)
+        db.ghi_audit(username, "luu_kh_gqvl_cn", f"Năm {nam}, {len(pgd_map)} PGD")
+        st.success(f"✅ Đã lưu kế hoạch GQVL năm {nam}.")
+        st.cache_data.clear()
+
+    st.divider()
+    st.subheader("📤 Đẩy lên Google Sheet")
+
+    col_a, col_b = st.columns(2)
+    with col_a:
+        if st.button("📊 Push TH lên GSheet", key="btn_push_th_gqvl"):
+            subprocess.Popen(["python", "gen_dcgiam_sheet.py", "--th"])
+            st.info("Đang push TH... Kiểm tra terminal để xem kết quả.")
+    with col_b:
+        if st.button("📋 Push KH lên GSheet", key="btn_push_kh_gqvl"):
+            subprocess.Popen(["python", "gen_dcgiam_sheet.py", "--kh", "--nam", str(nam)])
+            st.info("Đang push KH... Kiểm tra terminal để xem kết quả.")
+
+
+def _hien_thi_bang_readonly(kh_data: dict, nam: int) -> None:
+    st.markdown(f"##### 📊 Kế hoạch GQVL năm {nam} (chỉ đọc)")
+    pgd_map = kh_data.get("pgd", {})
+    if not pgd_map:
+        st.info(f"Chưa có kế hoạch GQVL năm {nam}.")
+        return
+
+    rows = []
+    tong_tw = 0
+    tong_dp = 0
+    for ten_pgd in DS_PGD:
+        info = pgd_map.get(ten_pgd, {})
+        kh_tw = int(info.get("kh_tw", 0)) // 1_000_000
+        kh_dp = int(info.get("kh_dp", 0)) // 1_000_000
+        rows.append({"Tên PGD": ten_pgd, "KH TW (tr)": kh_tw, "KH ĐP (tr)": kh_dp, "Tổng (tr)": kh_tw + kh_dp})
+        tong_tw += kh_tw
+        tong_dp += kh_dp
+
+    import pandas as pd
+    df = pd.DataFrame(rows)
+
+    st.dataframe(
+        df,
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            "KH TW (tr)": st.column_config.NumberColumn(format="%d"),
+            "KH ĐP (tr)": st.column_config.NumberColumn(format="%d"),
+            "Tổng (tr)": st.column_config.NumberColumn(format="%d"),
+        },
+    )
+
+    updated_by = kh_data.get("updated_by", "—")
+    updated_at = kh_data.get("updated_at", "—")
+    st.caption(f"📅 Cập nhật: {updated_at} · Người cập nhật: {updated_by}")
+```
+
+---
+
 ### 📄 `tabs/tab_khtd.py`
 
 ```python
@@ -66721,15 +68359,7 @@ def _luu_kv(key: str, data: dict[str, Any], username: str) -> bool:
         True nếu lưu thành công
     """
     try:
-        with db.get_conn() as conn:
-            conn.execute(
-                "INSERT OR REPLACE INTO kv_store (key, value, updated_at, updated_by) "
-                "VALUES (?,?,?,?)",
-                (key, json.dumps(data, ensure_ascii=False),
-                 datetime.now().isoformat(), username),
-            )
-            conn.commit()
-        # Ghi audit log
+        db.ghi_kv(key, data, username)
         db.ghi_audit(username, "luu_kv", f"key={key}, {len(data)} items")
         return True
     except Exception as e:
@@ -67575,7 +69205,7 @@ def _section_c_tong_hop(
                 "⚠️ Còn đơn vị chưa nhập đủ KH giao (hoặc chưa đúng loại Giao)."
             )
 
-    if not readonly_exec and role in ("admin", "manager"):
+    if not readonly_exec and role in ("admin", "manager", "admin_cn", "manager_cn"):
         y_all = st.text_input("Ý kiến duyệt tất cả", key=_SS + "y_kien_all")
         if st.button(
             "✅ Duyệt tất cả",
@@ -67765,7 +69395,7 @@ def render(tab=None, **kwargs) -> None:
 
         nam, thang, dot = _chon_dot()
 
-        if role in ("admin", "manager"):
+        if role in ("admin", "manager", "admin_cn", "manager_cn"):
             loai_radio = st.radio(
                 "Loại đợt",
                 ["📋 Giao KHTD", "📉 Điều chỉnh KHTD"],
@@ -69791,6 +71421,57 @@ def _tab_khtd_chi_nhanh(role: str, username: str, df_full: "pd.DataFrame | None"
     st.divider()
     _section_van_ban_qd_cn(role, username)
 
+    # ── Lịch sử phiên bản (chỉ admin / admin_cn) ───────────────────────────
+    if role in ("admin", "admin_cn"):
+        with st.expander("🕐 Lịch sử chỉnh sửa KHTD Chi nhánh", expanded=False):
+            history = db.doc_kv_history(KV_KEY_CN, limit=15)
+            if not history:
+                st.info("Chưa có lịch sử chỉnh sửa.")
+            else:
+                df_hist = pd.DataFrame(history)
+                df_hist_display = df_hist.rename(columns={
+                    "changed_at": "Thời điểm",
+                    "changed_by": "Người sửa",
+                    "note": "Ghi chú",
+                })
+                st.dataframe(
+                    df_hist_display[["Thời điểm", "Người sửa", "Ghi chú"]],
+                    use_container_width=True,
+                    hide_index=True,
+                )
+
+                options = ["-- Chọn --"] + [
+                    f"#{row['id']} — {row['changed_at']} ({row['changed_by']})"
+                    for row in history
+                ]
+                lua_chon = st.selectbox(
+                    "Chọn phiên bản để xem trước",
+                    options=options,
+                    key="khtd_cn_history_select",
+                )
+                if lua_chon != "-- Chọn --":
+                    try:
+                        hist_id = int(lua_chon.split(" — ")[0].lstrip("#"))
+                        row_match = next((r for r in history if r["id"] == hist_id), None)
+                        if row_match:
+                            value_preview = json.loads(row_match["value"])
+                            st.json(value_preview)
+                            if st.button(
+                                "♻️ Khôi phục phiên bản này",
+                                type="secondary",
+                                key=f"khtd_restore_{hist_id}",
+                            ):
+                                ok = db.khoi_phuc_kv(
+                                    KV_KEY_CN, hist_id, username
+                                )
+                                if ok:
+                                    st.success("✅ Đã khôi phục. Tải lại trang để xem.")
+                                    st.cache_data.clear()
+                                else:
+                                    st.error("Không tìm thấy phiên bản.")
+                    except (ValueError, StopIteration):
+                        st.error("Không tìm thấy phiên bản.")
+
 
 def _tab_khtd_theo_xa(role: str, username: str, df_full: "pd.DataFrame | None") -> None:
     st.subheader("📍 Kế hoạch Tín dụng theo Xã")
@@ -70163,6 +71844,7 @@ import pandas as pd
 from openpyxl.styles import Font, PatternFill
 
 import db
+from auth import la_phan_he_cn
 from utils import hien_thi_dataframe_phan_trang
 
 from config import (
@@ -70317,7 +71999,7 @@ def _section_van_ban_qd_pgd(pgd: str, role: str, username: str) -> None:
         with col_hist2:
             _hien_thi_lich_su_qd(kv_hdqt_xa, "QĐ HĐQT xã", role, username)
 
-        if role not in ("admin", "manager"):
+        if not la_phan_he_cn(role) or role == "executive":
             st.caption("🔒 Chỉ Admin / Manager mới được upload văn bản QĐ.")
             return
 
@@ -70704,7 +72386,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
         st.caption("Hỗ trợ địa bàn · Xem tổng hợp KH theo Xã × Chương trình")
 
         # ── Xác định PGD hiển thị ─────────────────────────────────────────
-        if role in ("admin", "manager"):
+        if role in ("admin", "manager", "admin_cn", "manager_cn"):
             pgd_hien_tai: str = st.selectbox(
                 "Chọn PGD", DS_PGD, key="khtd_pgd_sel_admin"
             )
@@ -72103,7 +73785,7 @@ def render(tab, **kwargs):
     role: str = kwargs.get("role", "user")
 
     with tab:
-        if role in ("admin", "manager"):
+        if role in ("admin", "manager", "admin_cn", "manager_cn"):
             t1, t2, t3 = st.tabs([
                 "📥 Danh sách nhiệm vụ",
                 "➕ Nhập nhiệm vụ mới",
@@ -72367,6 +74049,7 @@ from config import (
 )
 
 import db
+from auth import la_phan_he_cn
 from data.dgd_helpers import (
     dem_thong_ke,
     dgd_dang_dung_trong_hstd,
@@ -72428,13 +74111,13 @@ def render(tab: DeltaGenerator, **kwargs: Any) -> None:
         )
 
         with t_imp:
-            if role not in ("admin", "manager"):
+            if not la_phan_he_cn(role) or role == "executive":
                 st.warning("Bạn chỉ có quyền xem tổng quan (executive) hoặc không đủ quyền.")
             else:
                 _render_import(role, username, hn)
 
         with t_edit:
-            if role not in ("admin", "manager"):
+            if not la_phan_he_cn(role) or role == "executive":
                 st.warning("Bạn không có quyền sửa.")
             else:
                 _render_xem_sua(df_h, username, hn)
@@ -74553,6 +76236,7 @@ import pandas as pd
 import streamlit as st
 
 import db
+from auth import la_phan_he_cn
 from config import DS_PGD, DON_VI_CHI_NHANH, MA_PGD_MAP
 from data.pgd import (
     duong_dan_pgd,
@@ -74847,17 +76531,12 @@ def _xu_ly_upload(
         else:
             col.warning(f"**{nhan}**\n\n{kq.thong_bao}")
 
-    # Merge toàn CN nếu có ít nhất 1 file HSTD/NQ11/GQVL được lưu
+    # Ghi cờ cho fragment merge xử lý sau (không merge đồng bộ ở đây)
     if can_merge:
-        st.divider()
-        with st.spinner("🔄 Đang tổng hợp dữ liệu toàn Chi nhánh..."):
-            for loai in ("hstd", "nq11", "gqvl"):
-                if loai in ket_qua_upload and ket_qua_upload[loai].thanh_cong:
-                    kq_merge = merge_du_lieu_toan_cn(loai)
-                    if kq_merge.thanh_cong:
-                        st.success(kq_merge.thong_bao)
-                    else:
-                        st.warning(f"⚠️ Gộp {loai.upper()}: {kq_merge.thong_bao}")
+        for loai in ("hstd", "nq11", "gqvl"):
+            if loai in ket_qua_upload and ket_qua_upload[loai].thanh_cong:
+                st.session_state[f"can_merge_{loai}"] = True
+        st.info("✅ File đã lưu. Nhấn nút bên dưới để cập nhật dữ liệu.")
 
     st.cache_data.clear()
     # Lưu kết quả vào session để render sau rerun
@@ -75447,7 +77126,7 @@ def _thuc_hien_xoa(
 
 def _render_xoa_du_lieu(role: str, username: str) -> None:
     """Expander xóa dữ liệu PGD — chỉ admin/manager."""
-    if role not in ("admin", "manager"):
+    if not la_phan_he_cn(role) or role == "executive":
         return
 
     with st.expander("🗑️ Xóa dữ liệu PGD", expanded=False):
@@ -75532,6 +77211,45 @@ def _render_xoa_du_lieu(role: str, username: str) -> None:
 
 # ── Entry point ───────────────────────────────────────────────────────────────
 
+@st.fragment
+def _fragment_merge_toan_cn():
+    co_cho_merge = any(
+        st.session_state.get(f"can_merge_{loai}", False)
+        for loai in ["hstd", "nq11", "gqvl"]
+    )
+    if not co_cho_merge:
+        return
+
+    st.divider()
+    st.subheader("🔄 Cập nhật dữ liệu toàn Chi nhánh")
+    st.caption("Tổng hợp file vừa upload vào hệ thống dữ liệu chung (22 đơn vị).")
+
+    if st.button("▶️ Bắt đầu cập nhật", type="primary",
+                 key="btn_merge_toan_cn"):
+        with st.spinner("⏳ Đang merge 22 đơn vị... Vui lòng chờ."):
+            try:
+                from services.upload_service import merge_du_lieu_toan_cn
+
+                for loai in ("hstd", "nq11", "gqvl"):
+                    if st.session_state.get(f"can_merge_{loai}", False):
+                        merge_du_lieu_toan_cn(loai)
+
+                for loai in ("hstd", "nq11", "gqvl"):
+                    st.session_state.pop(f"can_merge_{loai}", None)
+
+                st.cache_data.clear()
+
+                username = st.session_state.get("username", "unknown")
+                db.ghi_audit(username, "merge_toan_cn",
+                             "Merge thành công (non-blocking fragment)")
+
+                st.success("✅ Cập nhật hoàn tất! Dữ liệu mới sẵn sàng.")
+                st.balloons()
+
+            except Exception as e:
+                st.error(f"❌ Lỗi khi merge: {e}")
+
+
 def render(tab=None, **kwargs) -> None:
     """
     Render tab Upload KH-NV.
@@ -75543,7 +77261,7 @@ def render(tab=None, **kwargs) -> None:
     ctx = tab if tab is not None else st
 
     with ctx:
-        if role not in ("admin", "manager"):
+        if not la_phan_he_cn(role) or role == "executive":
             st.error("🔒 Chức năng này chỉ dành cho Phòng KH-NV (admin/manager).")
             return
 
@@ -75665,6 +77383,8 @@ def render(tab=None, **kwargs) -> None:
                     col.success(f"**{nhan}**\n\n{kq['thong_bao']}")
                 else: 
                     col.warning(f"**{nhan}**\n\n{kq['thong_bao']}")
+
+        _fragment_merge_toan_cn()
 
         st.markdown("---")
         col_tt, col_rf = st.columns([5, 1])
@@ -80036,6 +81756,8 @@ from tabs import (
 )
 from tabs import tab_upload_khnv
 from tabs import tab_quan_ly_dgd
+from tabs.tab_kh_gqvl import render as render_kh_gqvl
+from tabs.tab_den_han import render as render_den_han
 
 
 def _render_canh_bao(df: pd.DataFrame, ds_pgd_all: list):
@@ -80425,7 +82147,9 @@ def render(**kwargs):
         "📊 Tổng quan",
         "🚨 Cảnh báo sớm",
         "🔍 Kiểm soát CN",
+        "⏰ Đến hạn",
         "🗓️ KH Tín dụng Năm",
+        "📋 KH GQVL",
         "📤 Giao KH theo Đợt",
         "🎯 KH vs Thực hiện",
         "📈 Báo cáo chi tiết",
@@ -80450,25 +82174,29 @@ def render(**kwargs):
         _render_canh_bao(df_full, ds_pgd_all)
     with tabs[2]:
         tab_kiem_soat.render_tab(df_full, role, kwargs.get("username", "unknown"))
-    tab_khtd.render(tabs[3], **dict(kwargs, khtd_mode="cn"))
-    tab_khtd_giao_dc.render(tabs[4], **kwargs)
-    tab_kehoach.render(tabs[5], **kwargs)
-    tab_baocao.render(tabs[6], **kwargs)
-    tab_candoi.render(tabs[7], **kwargs)
-    tab_cbtd.render(tabs[8], **kwargs)
-    with tabs[9]:
+    with tabs[3]:
+        render_den_han(role=role)
+    tab_khtd.render(tabs[4], **dict(kwargs, khtd_mode="cn"))
+    with tabs[5]:
+        render_kh_gqvl(role=role)
+    tab_khtd_giao_dc.render(tabs[6], **kwargs)
+    tab_kehoach.render(tabs[7], **kwargs)
+    tab_baocao.render(tabs[8], **kwargs)
+    tab_candoi.render(tabs[9], **kwargs)
+    tab_cbtd.render(tabs[10], **kwargs)
+    with tabs[11]:
         _sub1, _sub2 = st.tabs(["📍 Điểm Giao Dịch", "🏘️ Tổ TK&VV"])
         tab_quan_ly_dgd.render(_sub1, **kwargs)
         tab_cdtotkvv.render(_sub2, **dict(kwargs, cdto_mode="cn"))
-    tab_ban_dai_dien.render(tabs[10], cap="tinh", **kwargs)
-    tab_uy_thac.render(tabs[11], **kwargs)
-    tab_nhiem_vu.render(tabs[12], **kwargs)
+    tab_ban_dai_dien.render(tabs[12], cap="tinh", **kwargs)
+    tab_uy_thac.render(tabs[13], **kwargs)
+    tab_nhiem_vu.render(tabs[14], **kwargs)
     if get_permissions(role)["can_upload"]:
-        with tabs[13]:
+        with tabs[15]:
             _render_quan_ly_template(df_full)
-        tab_upload_khnv.render(tabs[14], **kwargs)
+        tab_upload_khnv.render(tabs[16], **kwargs)
     else:
-        tab_upload_khnv.render(tabs[13], **kwargs)
+        tab_upload_khnv.render(tabs[15], **kwargs)
 ```
 
 ---
@@ -80526,6 +82254,8 @@ from tabs import (
     tab_candoi,
     tab_uy_thac,
 )
+
+from tabs.tab_den_han import render as render_den_han
 
 
 def _render_don_doc(df: pd.DataFrame, pgd_user: str, role: str):
@@ -80812,9 +82542,16 @@ def _render_thong_bao_ket_luan(tab, **kwargs):
             st.warning("Không có cột Tên xã.")
             return
 
-        chon_xa = st.session_state.get("gb2_xa", ds_xa[0])
-        if chon_xa not in ds_xa:
-            chon_xa = ds_xa[0]
+        default_xa = st.session_state.get("gb2_xa", ds_xa[0] if ds_xa else None)
+        if default_xa not in ds_xa:
+            default_xa = ds_xa[0] if ds_xa else None
+        chon_xa = st.selectbox(
+            "Chọn xã / điểm giao dịch",
+            ds_xa,
+            index=ds_xa.index(default_xa) if default_xa in ds_xa else 0,
+            key="tb_chon_xa",
+        )
+        st.session_state["gb2_xa"] = chon_xa
 
         ds_nam = danh_sach_nam_baseline_pgd() or danh_sach_nam_baseline()
         chon_nam = st.session_state.get("gb2_nam")
@@ -80841,9 +82578,7 @@ def _render_thong_bao_ket_luan(tab, **kwargs):
             st.info(
                 f"📊 Số liệu tự động từ HSTD\n\n"
                 f"**Xã:** {chon_xa}  \n"
-                f"**Tháng:** {date.today().month}/{date.today().year}\n\n"
-                "Chọn xã và mốc baseline ở tab **Biên bản giao ban** "
-                "(cùng màn hình Mẫu biểu)."
+                f"**Tháng:** {date.today().month}/{date.today().year}"
             )
 
         tb_cs = st.text_area(
@@ -80886,6 +82621,8 @@ def _render_thong_bao_ket_luan(tab, **kwargs):
                     f"TB_KetLuan_{chon_xa.replace(' ', '_')}"
                     f"_{date.today().strftime('%m%Y')}.docx"
                 )
+                st.session_state["tb_data"] = data
+                st.session_state["tb_ten_file"] = ten_file
                 st.download_button(
                     "⬇️ Tải về Word",
                     data=data,
@@ -80897,6 +82634,35 @@ def _render_thong_bao_ket_luan(tab, **kwargs):
                 st.success("✅ Đã tạo Thông báo Kết luận!")
             except Exception as e:
                 st.error(f"❌ Lỗi tạo file: {e}")
+
+        if st.session_state.get("tb_data") and st.button("📄 Xuất PDF", type="secondary", key="tb_xuat_pdf"):
+            try:
+                import tempfile, os
+                from docx2pdf import convert
+                data_pdf = st.session_state["tb_data"]
+                ten_file_pdf = st.session_state["tb_ten_file"]
+                with tempfile.NamedTemporaryFile(suffix=".docx", delete=False) as tmp:
+                    tmp.write(data_pdf)
+                    tmp_path = tmp.name
+                pdf_path = tmp_path.replace(".docx", ".pdf")
+                convert(tmp_path, pdf_path)
+                with open(pdf_path, "rb") as f:
+                    pdf_bytes = f.read()
+                os.unlink(tmp_path)
+                os.unlink(pdf_path)
+                ten_pdf = ten_file_pdf.replace(".docx", ".pdf")
+                st.download_button(
+                    "⬇️ Tải về PDF",
+                    data=pdf_bytes,
+                    file_name=ten_pdf,
+                    mime="application/pdf",
+                    key="tb_dl_pdf",
+                )
+            except ImportError:
+                st.warning("⚠️ Chưa cài docx2pdf. Chạy: pip install docx2pdf")
+                st.info("💡 Mở file Word rồi chọn **Save As → PDF** thủ công.")
+            except Exception as e:
+                st.error(f"❌ Lỗi tạo PDF: {e}")
 
 
 def _render_bien_ban_giao_ban(tab, **kwargs):
@@ -81247,6 +83013,7 @@ def render(**kwargs):
         "📋 NQ11",
         "🔍 Tra cứu hồ sơ",
         "📋 Danh sách & Lọc",
+        "⏰ Đến hạn",
         "📡 Điện Báo",
         "📍 Điểm GD & Tổ TK&VV",
         "📝 Báo cáo Giao ban",
@@ -81319,16 +83086,17 @@ def render(**kwargs):
         lambda: tab_nq11.render(tabs_op[5], **_pgd_df_kwargs),
         lambda: tab_tracuu.render(tabs_op[6], **kwargs),
         lambda: tab_danhsach.render(tabs_op[7], **kwargs),
+        lambda: render_den_han(role=role, pgd_user=pgd_user),
         lambda: tab_candoi.render(
-            tabs_op[8], **{**kwargs, "pgd_mode": True, "df": df, "df_full": df}
+            tabs_op[9], **{**kwargs, "pgd_mode": True, "df": df, "df_full": df}
         ),
-        lambda: _render_diem_gd_va_to_tkvv(tabs_op[9], **kwargs),
-        lambda: _render_bao_cao_giao_ban(tabs_op[10], **kwargs),
+        lambda: _render_diem_gd_va_to_tkvv(tabs_op[10], **kwargs),
+        lambda: _render_bao_cao_giao_ban(tabs_op[11], **kwargs),
         lambda: _render_mau_bieu_tab(),
-        lambda: tab_ban_dai_dien.render(tabs_op[12], cap="xa", **kwargs),
-        lambda: tab_uy_thac.render(tabs_op[13], **kwargs),
-        lambda: tab_nhiem_vu.render(tabs_op[14], **kwargs),
-        lambda: tab_upload_pgd.render(tabs_op[15], **kwargs),
+        lambda: tab_ban_dai_dien.render(tabs_op[13], cap="xa", **kwargs),
+        lambda: tab_uy_thac.render(tabs_op[14], **kwargs),
+        lambda: tab_nhiem_vu.render(tabs_op[15], **kwargs),
+        lambda: tab_upload_pgd.render(tabs_op[16], **kwargs),
     ]
 
     # Thêm renderer cho tab Upload HSTD nếu có quyền

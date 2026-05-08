@@ -147,7 +147,31 @@ with db.get_conn() as conn:
 
 ---
 
-## 8. Lệnh debug hữu ích
+## 9. docx2pdf / Xuất PDF
+
+### Lỗi "No module named docx2pdf"
+**Nguyên nhân:** Chưa cài package `docx2pdf`
+```bash
+pip install docx2pdf
+```
+
+### Lỗi "docx2pdf failed" / "Word not found"
+**Nguyên nhân:** `docx2pdf` yêu cầu Microsoft Word trên Windows
+- **Có Word:** Kiểm tra Word có bị lỗi không, mở được file .docx không
+- **Không Word:** Mở file Word đã tạo → **File → Save As → PDF** thủ công
+- **Linux/Mac:** `docx2pdf` không hỗ trợ — dùng `libreoffice --headless --convert-to pdf`
+
+### PDF xuất ra thiếu font / lỗi hiển thị
+**Nguyên nhân:** Font Times New Roman không khả dụng trong Word
+→ Cài font Times New Roman trên máy tính trước khi convert
+
+### Nút PDF không hiện download button
+**Nguyên nhân:** Cần bấm **📄 Xuất PDF** trước — button download chỉ hiện sau khi convert thành công
+→ Kiểm tra: đã bấm "Xuất Word" để tạo dữ liệu chưa? Nút PDF cần dữ liệu từ session_state
+
+---
+
+## 10. Lệnh debug hữu ích
 
 ```bash
 # Xem 20 audit log gần nhất

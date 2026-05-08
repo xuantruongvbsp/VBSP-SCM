@@ -29,6 +29,9 @@ templates/
 | `mau_15td.docx` | DS đối chiếu số dư | ⏳ Chờ template | tab_uy_thac → Mẫu 15 |
 | `ke_hoach_kt.docx` | KH kiểm tra GS ủy thác | ⏳ Chờ template | tab_uy_thac → KH KT |
 | `bb_xac_minh_no.docx` | BB xác minh nợ chiếm dụng | ⏳ Chờ template | TBD |
+| *(không template)* | Thông báo Kết luận Giao ban 🆕 | ✅ Runtime render | ws_operation → Document Hub → TB Kết luận |
+
+> **Thông báo Kết luận Giao ban** không dùng template — render trực tiếp bằng `python-docx` qua hàm `xuat_thong_bao_ket_luan_giao_ban()` trong `data/giao_ban.py`. Có hỗ trợ xuất PDF qua `docx2pdf`.
 
 ---
 

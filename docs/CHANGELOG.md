@@ -2,6 +2,30 @@
 
 ---
 
+## [08/05/2026] — Thông báo Kết luận Giao ban chuẩn chi nhánh
+
+### Thêm mới
+- **`data/giao_ban.py` → `_tao_bang_chi_tiet_to()`** — Bảng 2 chi tiết thu nợ/giải ngân theo Tổ TK&VV
+  - 5 cột: Stt, ĐVUT/Tổ TK&VV, Chương trình CV, Thu nợ, Giải ngân
+  - Dòng nhóm ĐVUT merge 5 cột, nền xanh `#DEEAF1`, chữ in hoa
+  - Mỗi Tổ 1 dòng, cột số liệu để trống (CBTD điền tay sau in)
+- **`workspaces/ws_operation.py` → Nút xuất PDF** — Convert Word → PDF bằng `docx2pdf`
+  - Lưu data vào `session_state` để dùng chung cho cả Word và PDF
+  - Bắt lỗi `ImportError` nếu chưa cài `docx2pdf`
+  - Hướng dẫn Save As PDF thủ công nếu không có Microsoft Word
+
+### Sửa đổi
+- **`data/giao_ban.py` → `xuat_thong_bao_ket_luan_giao_ban()`**:
+  - Section II: Format đoạn văn tự sự *"Tổng dư nợ đạt ... triệu đồng, với ... khách hàng còn dư nợ, thông qua ... Tổ TK&VV. Trong đó nợ quá hạn ... triệu đồng, tỷ lệ ...%"* — lấy số liệu trực tiếp từ `df_xa`, font 13pt
+  - So sánh baseline: thêm `(tăng/giảm ... triệu so với cùng kỳ)` khi có dữ liệu
+  - Thay thế phần ký tên cuối văn bản: **KT.GIÁM ĐỐC / PHÓ GIÁM ĐỐC** thay vì **GIÁM ĐỐC**, bảng 2 cột không viền (trái 40% — Nơi nhận, phải 60% — ký tên)
+  - Gọi `_tao_bang_chi_tiet_to()` ngay sau bảng tổng hợp ĐVUT
+- **`workspaces/ws_operation.py` → `_render_thong_bao_ket_luan()`**:
+  - Thêm `st.selectbox` chọn xã độc lập (key: `tb_chon_xa`), đồng bộ `session_state["gb2_xa"]`
+  - Bỏ phụ thuộc tab Biên bản — user không cần vào tab Biên bản trước
+
+---
+
 ## [06/05/2026] — Phân hệ 2 cấp & Role mới
 
 ### Thêm mới

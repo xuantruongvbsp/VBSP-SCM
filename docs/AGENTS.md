@@ -182,6 +182,8 @@ PGD địa bàn:
 | Thêm báo cáo kiểm soát | `kiem_soat_service.py` → thêm `BaoCaoMeta` |
 | Sửa giao KHTD | `khtd_service.py` + `tab_khtd_giao_dc.py` |
 | Sửa số liệu giao ban | `giao_ban.py` → `tinh_so_lieu_van_xuoi()` |
+| Xuất Thông báo Kết luận Giao ban | `giao_ban.py` → `xuat_thong_bao_ket_luan_giao_ban()` |
+| Xuất PDF (docx2pdf) | `ws_operation.py` → `_render_thong_bao_ket_luan()` |
 | Quản lý điểm GD | `db.doc_dgd_map()` / `db.luu_dgd_map()` |
 
 ---

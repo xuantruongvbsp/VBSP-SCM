@@ -1019,7 +1019,6 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                 .print-header p  { font-size: 0.78rem; color: #555; margin: 0; }
                 </style>
                 """
-                from config import TEN_CHI_NHANH_HIEN_THI
                 from datetime import datetime as _dt_now
                 _ngay_in = _dt_now.now().strftime("%d/%m/%Y %H:%M")
                 _preview_header = f"""
@@ -1174,29 +1173,114 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                             st.plotly_chart(fig, use_container_width=True)
 
                         st.divider()
-                        col_ex, col_pdf = st.columns(2)
+                        _c1_dh, _c2_dh, _c3_dh = st.columns([1, 1, 1])
 
                         df_xuat = tg[[nhom_col, "Số món vay", "Số KH", "Dư nợ"]].rename(
                             columns={nhom_col: nhom_chon}
                         )
-                        with col_ex:
-                            excel_bytes = xuat_excel({f"Đến hạn {label}": df_xuat})
-                            st.download_button(
-                                label="📥 Xuất Excel",
-                                data=excel_bytes,
-                                file_name=ten_file_xuat(f"HoSoDenHan_{key_prefix}"),
-                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                                use_container_width=True,
-                                key=f"excel_den_han_{key_prefix}",
-                            )
+                        # df_xuat_so: giữ nguyên số để Excel sort/filter
+                        df_xuat_so = df_xuat.copy()
 
-                        with col_pdf:
+                        # ── (1) Xuất Excel ────────────────────────────────────────
+                        with _c1_dh:
+                            try:
+                                excel_bytes = xuat_excel({f"Đến hạn {label}": df_xuat_so})
+                                st.download_button(
+                                    label="📥 Xuất Excel",
+                                    data=excel_bytes,
+                                    file_name=ten_file_xuat(f"HoSoDenHan_{key_prefix}"),
+                                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                    use_container_width=True,
+                                    key=f"excel_den_han_{key_prefix}",
+                                )
+                            except Exception as _e_dh:
+                                st.error(f"❌ Lỗi xuất Excel: {_e_dh}")
+
+                        # ── (2) Preview + In PDF ──────────────────────────────────
+                        with _c2_dh:
+                            _preview_key = f"preview_den_han_{key_prefix}"
+                            if st.button("🔍 Preview / In PDF", key=_preview_key, type="secondary"):
+                                st.session_state[_preview_key] = not st.session_state.get(
+                                    _preview_key, False
+                                )
+
+                        # ── (3) Xuất PDF ──────────────────────────────────────────
+                        with _c3_dh:
                             nut_xuat_pdf(
                                 df=df_xuat,
                                 tieu_de=f"Hồ sơ đến hạn {label} — Tổng hợp theo {nhom_chon}",
                                 username=username,
                                 prefix_file=f"HoSoDenHan_{key_prefix}",
                                 key=f"pdf_den_han_{key_prefix}",
+                            )
+
+                        # ── Khung preview HTML ────────────────────────────────────
+                        _preview_key = f"preview_den_han_{key_prefix}"
+                        if st.session_state.get(_preview_key, False):
+                            st.markdown("---")
+                            st.markdown(f"#### 🖨️ Preview — Hồ sơ đến hạn {label}")
+                            _print_style_dh = """
+                            <style>
+                            @media print {
+                                body * { visibility: hidden; }
+                                #print-denhan, #print-denhan * { visibility: visible; }
+                                #print-denhan { position: fixed; top: 0; left: 0; width: 100%; }
+                                .no-print { display: none !important; }
+                            }
+                            .print-header {
+                                font-family: sans-serif;
+                                text-align: center;
+                                margin-bottom: 6px;
+                            }
+                            .print-header h3 { font-size: 1rem; margin: 2px 0; color: #1565C0; }
+                            .print-header p  { font-size: 0.78rem; color: #555; margin: 0; }
+                            </style>
+                            """
+                            from datetime import datetime as _dt_now_dh
+                            _ngay_in_dh = _dt_now_dh.now().strftime("%d/%m/%Y %H:%M")
+                            _preview_header_dh = f"""
+                            <div class="print-header">
+                                <h3>HỒ SƠ ĐẾN HẠN {label.upper()}</h3>
+                                <p>{TEN_CHI_NHANH_HIEN_THI} — Ngày in: {_ngay_in_dh}</p>
+                            </div>
+                            """
+                            # Xây bảng HTML đơn giản từ df_xuat
+                            _cols_dh = list(df_xuat.columns)
+                            _header_html_dh = "".join(
+                                f'<th style="background:#2E7D32;color:#fff;padding:6px 8px;border:1px solid #1B5E20;font-size:0.82rem;text-align:center">{c}</th>'
+                                for c in _cols_dh
+                            )
+                            _rows_html_dh = ""
+                            for i_dh, (_, r_dh) in enumerate(df_xuat.iterrows()):
+                                _bg_dh = "#F9FAFB" if i_dh % 2 == 0 else "#FFFFFF"
+                                _cells_dh = "".join(
+                                    f'<td style="padding:5px 6px;border:1px solid #E0E0E0;text-align:{"left" if i_c == 0 else "right"};font-size:0.82rem;white-space:nowrap">{r_dh[c]}</td>'
+                                    for i_c, c in enumerate(_cols_dh)
+                                )
+                                _rows_html_dh += f'<tr style="background:{_bg_dh}">{_cells_dh}</tr>\n'
+                            _table_html_dh = f"""
+                            <div style="overflow-x:auto;margin:8px 0">
+                            <table style="border-collapse:collapse;width:100%;font-family:sans-serif">
+                              <thead><tr>{_header_html_dh}</tr></thead>
+                              <tbody>{_rows_html_dh}</tbody>
+                            </table>
+                            </div>
+                            """
+                            st.markdown(
+                                _print_style_dh + f'<div id="print-denhan">{_preview_header_dh}{_table_html_dh}</div>',
+                                unsafe_allow_html=True,
+                            )
+                            st.button(
+                                "🖨️ In trang này (Ctrl+P)",
+                                key=f"btn_in_den_han_{key_prefix}",
+                                on_click=lambda: None,
+                                type="primary",
+                                help="Nhấn Ctrl+P sau đó chọn máy in hoặc 'Save as PDF'",
+                            )
+                            st.caption(
+                                "💡 Sau khi nhấn **Ctrl+P**, chọn *Save as PDF* để lưu file; "
+                                "hoặc chọn máy in để in trực tiếp. "
+                                "Chỉ vùng bảng này sẽ được in nhờ CSS @media print."
                             )
                     else:
                         st.caption(f"⚠️ Không có cột '{nhom_chon}' trong dữ liệu")

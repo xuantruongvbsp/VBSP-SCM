@@ -1295,8 +1295,8 @@ def _tab_khtd_theo_xa(role: str, username: str, df_full: "pd.DataFrame | None") 
                 st.rerun()
 
 
-def render_nhap_cn(role: str, username: str, df_full: "pd.DataFrame | None") -> None:
-    _tab_khtd_chi_nhanh(role, username, df_full)
+def render_nhap_cn(role: str, username: str, df_full: "pd.DataFrame | None", df_gqvl: "pd.DataFrame | None" = None) -> None:
+    _tab_khtd_chi_nhanh(role, username, df_full, df_gqvl)
 
 
 def render_nhap_pgd(role: str, username: str, df_full: "pd.DataFrame | None") -> None:

@@ -23,6 +23,7 @@ from tabs.tab_khtd import (
     KV_KEY_XA,
     KHTD_CN_NHOM_MA_CT,
     MA_KEYS_CO_KHTD,
+    GQVL_SUB_NHOM,
     _chon_ds_ct,
     _doc_kv,
     _fvn,
@@ -32,6 +33,7 @@ from tabs.tab_khtd import (
     _quet_ct_co_du_no,
     _ten_ct_base,
     _tinh_thuc_hien_theo_ct,
+    _tinh_th_gqvl_phan_tang,
 )
 from tabs.tab_khtd_xuat import _hien_thi_bang_cn_readonly
 
@@ -289,12 +291,17 @@ def _doc_excel_khtd_cn_upload(file_bytes: bytes) -> tuple[dict[str, float], int,
     return out, len(out), bo_qua
 
 
-def _tab_khtd_chi_nhanh(role: str, username: str, df_full: "pd.DataFrame | None") -> None:
+def _tab_khtd_chi_nhanh(
+    role: str, username: str, df_full: "pd.DataFrame | None",
+    df_gqvl: "pd.DataFrame | None" = None
+) -> None:
     st.subheader("🏛️ Kế hoạch Tín dụng Chi nhánh")
 
     co_quyen = get_permissions(role)["can_edit_khtd"]
     kh_cn = _doc_kv(KV_KEY_CN)
     th_cn = _tinh_thuc_hien_theo_ct(df_full) if df_full is not None else {}
+    # Tính TH GQVL phân tầng 4 nhóm
+    th_gqvl = _tinh_th_gqvl_phan_tang(df_gqvl)
 
     if not co_quyen:
         st.warning("⚠️ Chỉ Admin / Manager mới được nhập kế hoạch cấp Chi nhánh.")
@@ -535,6 +542,77 @@ def _tab_khtd_chi_nhanh(role: str, username: str, df_full: "pd.DataFrame | None"
             unsafe_allow_html=True,
         )
         for ma_ct in ds_ma_ct:
+            # ── Xử lý đặc biệt: GQVL (ma_ct=3) phân tầng 4 nhóm ─────────────────
+            if ma_ct == 3:
+                # Header GQVL (chỉ hiển thị, không có input)
+                cols_hdr = st.columns(_colw)
+                cols_hdr[0].markdown(
+                    "<div style='font-size:0.88rem;font-weight:600;"
+                    "padding:4px 0'>Cho vay giải quyết việc làm</div>",
+                    unsafe_allow_html=True
+                )
+                # Tổng TW và ĐP để hiển thị ở header
+                th_3_tw = (th_gqvl.get("3_TW_NHCSXH", 0.0) + th_gqvl.get("3_TW_NSNN", 0.0)) / 1e6
+                th_3_dp = (th_gqvl.get("3_DP_TINH", 0.0) + th_gqvl.get("3_DP_XA", 0.0)) / 1e6
+                cols_hdr[2].markdown(_md_right(_fvn_form(th_3_tw, 0)), unsafe_allow_html=True)
+                cols_hdr[5].markdown(_md_right(_fvn_form(th_3_dp, 0)), unsafe_allow_html=True)
+                cols_hdr[7].markdown(_md_right(_fvn_form(th_3_tw + th_3_dp, 0)), unsafe_allow_html=True)
+
+                # 4 sub-dòng thụt vào
+                for sub_key, sub_ten, sub_nv in GQVL_SUB_NHOM:
+                    k_inp = f"khtd_cn_inp_{sub_key}"
+                    kh_vnd = float(kh_cn.get(sub_key, 0.0))
+                    kh_trieu = kh_vnd / 1_000_000
+                    th_trieu = th_gqvl.get(sub_key, 0.0) / 1e6
+
+                    cols_sub = st.columns(_colw)
+                    # Tên sub: thụt vào, màu nhạt hơn
+                    cols_sub[0].markdown(
+                        f"<div style='font-size:0.83rem;color:#555;"
+                        f"padding:3px 0 3px 16px'>{sub_ten}</div>",
+                        unsafe_allow_html=True
+                    )
+                    # Cột KH: TW ở cols[1], ĐP ở cols[4]
+                    col_kh_idx = 1 if sub_nv == "TW" else 4
+                    col_th_idx = 2 if sub_nv == "TW" else 5
+                    col_cp_idx = 3 if sub_nv == "TW" else 6
+
+                    cols_sub[col_kh_idx].number_input(
+                        sub_ten,
+                        value=kh_trieu,
+                        min_value=0.0,
+                        step=1000.0,
+                        format="%.0f",
+                        label_visibility="collapsed",
+                        key=k_inp,
+                    )
+                    kh_inp = float(st.session_state.get(k_inp, kh_trieu))
+
+                    cols_sub[col_th_idx].markdown(
+                        _md_right(_fvn_form(th_trieu, 0)), unsafe_allow_html=True
+                    )
+                    # Còn phải TH
+                    cpth = kh_inp - th_trieu
+                    if kh_inp == 0:
+                        cols_sub[col_cp_idx].markdown(
+                            _md_right("—", "#9e9e9e"), unsafe_allow_html=True
+                        )
+                    elif cpth < 0:
+                        cols_sub[col_cp_idx].markdown(
+                            _md_right(_fvn_form(cpth), "#c62828"), unsafe_allow_html=True
+                        )
+                    elif cpth == 0:
+                        cols_sub[col_cp_idx].markdown(
+                            _md_right("0 ✓", "#2e7d32"), unsafe_allow_html=True
+                        )
+                    else:
+                        cols_sub[col_cp_idx].markdown(
+                            _md_right(_fvn_form(cpth)), unsafe_allow_html=True
+                        )
+                    # Các cột tổng để trống cho sub-dòng
+                continue  # Bỏ qua xử lý mặc định cho ma_ct == 3
+
+            # ── Xử lý mặc định cho các CT khác ────────────────────────────────────
             mk_tw = f"{ma_ct}_TW"
             mk_dp = f"{ma_ct}_DP"
             co_tw = mk_tw in MA_KEYS_CO_KHTD
@@ -670,6 +748,9 @@ def _tab_khtd_chi_nhanh(role: str, username: str, df_full: "pd.DataFrame | None"
     tong_kh_trieu_hien_tai = 0.0
     for _tieu_de, ds_ma_ct in KHTD_CN_NHOM_MA_CT:
         for ma_ct in ds_ma_ct:
+            # Bỏ qua CT 3 (GQVL) - đã tính qua sub-key bên dưới
+            if ma_ct == 3:
+                continue
             mk_tw = f"{ma_ct}_TW"
             mk_dp = f"{ma_ct}_DP"
             if mk_tw in MA_KEYS_CO_KHTD:
@@ -686,6 +767,13 @@ def _tab_khtd_chi_nhanh(role: str, username: str, df_full: "pd.DataFrame | None"
                     if k_dp in st.session_state
                     else float(kh_cn.get(mk_dp, 0.0)) / 1_000_000
                 )
+    # Thêm 4 sub-key GQVL vào tổng (thay vì đếm 3_TW/3_DP)
+    for sub_key, _, _ in GQVL_SUB_NHOM:
+        k_inp = f"khtd_cn_inp_{sub_key}"
+        tong_kh_trieu_hien_tai += float(
+            st.session_state.get(k_inp,
+                float(kh_cn.get(sub_key, 0.0)) / 1_000_000)
+        )
     tong_kh_nhap_form = tong_kh_trieu_hien_tai * 1_000_000
 
     if tong_kh_nhap_form <= 0:
@@ -697,6 +785,9 @@ def _tab_khtd_chi_nhanh(role: str, username: str, df_full: "pd.DataFrame | None"
         patch: dict[str, float] = {}
         for tieu_de_nhom, ds_ma_ct in KHTD_CN_NHOM_MA_CT:
             for ma_ct in ds_ma_ct:
+                # Bỏ qua CT 3 khi lưu mặc định - sẽ lưu qua sub-key
+                if ma_ct == 3:
+                    continue
                 mk_tw = f"{ma_ct}_TW"
                 mk_dp = f"{ma_ct}_DP"
                 if mk_tw in MA_KEYS_CO_KHTD:
@@ -707,6 +798,13 @@ def _tab_khtd_chi_nhanh(role: str, username: str, df_full: "pd.DataFrame | None"
                     patch[mk_dp] = float(
                         st.session_state.get(f"khtd_cn_inp_{ma_ct}_dp", 0.0)
                     )
+        # Lưu 4 sub-key GQVL
+        for sub_key, _, _ in GQVL_SUB_NHOM:
+            k_inp = f"khtd_cn_inp_{sub_key}"
+            patch[sub_key] = float(st.session_state.get(k_inp, 0.0))
+        # Backward compat: ghi tổng vào key cũ
+        patch["3_TW"] = patch.get("3_TW_NHCSXH", 0.0) + patch.get("3_TW_NSNN", 0.0)
+        patch["3_DP"] = patch.get("3_DP_TINH", 0.0) + patch.get("3_DP_XA", 0.0)
         tong_kh_luu = sum(v * 1_000_000 for v in patch.values())
         if tong_kh_luu <= 0:
             st.warning(

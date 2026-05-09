@@ -677,7 +677,7 @@ def render(**kwargs):
     ]
     nhom_ke_hoach = [
         ("🗓️ KH Tín dụng Năm", lambda tab: tab_khtd.render(tab, **dict(kwargs, khtd_mode="cn"))),
-        ("📋 KH GQVL", lambda tab: render_kh_gqvl(role=role)),
+        # ("📋 KH GQVL", lambda tab: render_kh_gqvl(role=role)),  # Đã gộp vào tab KHTD CN
         ("📤 Giao KH theo Đợt", lambda tab: tab_khtd_giao_dc.render(tab, **kwargs)),
         ("🎯 KH vs Thực hiện", lambda tab: tab_kehoach.render(tab, **kwargs)),
     ]

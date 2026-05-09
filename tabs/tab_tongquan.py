@@ -1183,16 +1183,21 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
 
                         # ── (1) Xuất Excel ────────────────────────────────────────
                         with _c1_dh:
+                            _xl_key_done = f"xl_denhan_{key_prefix}_done"
                             try:
-                                excel_bytes = xuat_excel({f"Đến hạn {label}": df_xuat_so})
+                                with st.spinner("⏳ Đang tạo file Excel..."):
+                                    _xl_bytes = xuat_excel({f"Đến hạn {label}": df_xuat_so})
+                                st.session_state[_xl_key_done] = True
                                 st.download_button(
                                     label="📥 Xuất Excel",
-                                    data=excel_bytes,
+                                    data=_xl_bytes,
                                     file_name=ten_file_xuat(f"HoSoDenHan_{key_prefix}"),
                                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                                     use_container_width=True,
                                     key=f"excel_den_han_{key_prefix}",
                                 )
+                                if st.session_state.get(_xl_key_done, False):
+                                    st.success("✅ Đã tạo xong — nhấn nút tải để lưu file")
                             except Exception as _e_dh:
                                 st.error(f"❌ Lỗi xuất Excel: {_e_dh}")
 
@@ -1204,6 +1209,8 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                                          type="secondary",
                                          use_container_width=True):
                                 st.session_state[_show_key] = not st.session_state.get(_show_key, False)
+                            if st.session_state.get(_show_key, False):
+                                st.info("👁️ Đang hiển thị preview — nhấn Ctrl+P để in")
 
                         # ── (3) Xuất PDF ──────────────────────────────────────────
                         with _c3_dh:
@@ -1239,10 +1246,31 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                             """
                             from datetime import datetime as _dt_now_dh
                             _ngay_in_dh = _dt_now_dh.now().strftime("%d/%m/%Y %H:%M")
+
+                            # Xây dựng subtitle phạm vi in
+                            _subtitle_parts = []
+                            if loc_pgd:
+                                _subtitle_parts.append("PGD")
+                            if loc_ct:
+                                _subtitle_parts.append("Chương trình")
+                            if loc_xa:
+                                _subtitle_parts.append("Xã")
+                            if not _subtitle_parts:
+                                _subtitle_loc_dh = "Toàn Chi nhánh"
+                            elif len(_subtitle_parts) == 1:
+                                _subtitle_loc_dh = f"Theo {_subtitle_parts[0]}"
+                            elif len(_subtitle_parts) == 2:
+                                _subtitle_loc_dh = f"Theo {_subtitle_parts[0]} và {_subtitle_parts[1]}"
+                            else:
+                                _subtitle_loc_dh = f"Theo {_subtitle_parts[0]}, {_subtitle_parts[1]} và {_subtitle_parts[2]}"
+
                             _preview_header_dh = f"""
                             <div class="print-header">
                                 <h3>HỒ SƠ ĐẾN HẠN {label.upper()}</h3>
                                 <p>{TEN_CHI_NHANH_HIEN_THI} — Ngày in: {_ngay_in_dh}</p>
+                                <p style="font-size:0.85rem;font-weight:bold;color:#1B5E20;margin:2px 0">
+                                📋 Phạm vi: {_subtitle_loc_dh}
+                                </p>
                             </div>
                             """
                             # Xây bảng HTML đơn giản từ df_xuat

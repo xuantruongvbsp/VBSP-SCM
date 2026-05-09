@@ -958,14 +958,15 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                         lambda v, c=col: _fmt_cell(v, c)
                     )
 
-            nut_xuat_pdf(
-                df=df_export,
-                tieu_de="Thông tin tổng quát theo PGD",
-                username=username,
-                cols_tien=[],
-                prefix_file="TQPGD",
-                key="btn_pdf_tqpgd",
-            )
+            # Nút Xuất PDF đã được tạm ẩn theo yêu cầu
+            # nut_xuat_pdf(
+            #     df=df_export,
+            #     tieu_de="Thông tin tổng quát theo PGD",
+            #     username=username,
+            #     cols_tien=[],
+            #     prefix_file="TQPGD",
+            #     key="btn_pdf_tqpgd",
+            # )
         st.divider()
         st.subheader("🔔 Hồ sơ đến hạn — Tổng hợp")
         if COT_NGAY_DH in df.columns:

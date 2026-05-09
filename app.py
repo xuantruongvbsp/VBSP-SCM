@@ -294,7 +294,7 @@ def show_logo(width=80):
 
 def main():
     # Splash screen chỉ hiện khi chưa đăng nhập
-    if not st.session_state.get("_splash_done") and not st.session_state.get("logged_in"):
+    if not st.session_state.get("_splash_done"):
         placeholder = st.empty()
         placeholder.markdown(
             f"""<div style="position:fixed;top:0;left:0;width:100vw;height:100vh;

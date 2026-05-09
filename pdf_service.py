@@ -445,5 +445,6 @@ def nut_xuat_pdf(
                 mime="application/pdf",
                 key=f"{key}_dl",
             )
+            st.success("✅ PDF đã tạo xong")
         except Exception as e:
             st.error(f"❌ Lỗi tạo PDF: {e}")

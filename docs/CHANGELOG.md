@@ -2,6 +2,20 @@
 
 ---
 
+## [2026-05-09] — Thêm nút PDF Chi tiết (Group Header) vào tab Tổng Quan / Hồ sơ Đến hạn
+- `tabs/tab_tongquan.py` dòng ~29 — import `xuat_pdf_group_header` từ `pdf_service`
+- `tabs/tab_tongquan.py` dòng ~1212 — mở rộng từ 3 cột thành 4 cột, thêm nút **📄 PDF Chi tiết** dùng `df_loc` (chi tiết từng hồ sơ) với Group Header/Footer
+
+## [2026-05-09] — Thêm hàm xuất PDF Group Header/Footer cho tab Đến hạn
+- `pdf_service.py` dòng ~445 — thêm hàm `xuat_pdf_group_header()` hỗ trợ cấu trúc Report Header → Group Header → Detail → Group Footer → Report Footer
+- `tabs/tab_den_han.py` — thêm section xuất PDF nhóm theo Chương trình/PGD/Xã, bộ lọc loc_pgd/loc_ct, nút xuất và download
+
+## [2026-05-09] — Fix lỗi "Invalid binary data format: NoneType" khi Xuất PDF trong tab Đến hạn
+- `tabs/tab_tongquan.py` dòng ~1214-1222 — tạo `df_xuat` từ cột số gốc (`_mon`, `_kh`, `_no`) thay vì cột đã format bằng `fmt_so()`
+- **Bug 1:** `df_xuat` là None khi `nhom_col` không tồn tại → gây crash khi gọi `xuat_pdf(None, ...)`
+- **Bug 2:** Cột "Dư nợ" chứa string đã format `"1.234,5"` thay vì số → PDF tính tổng bị NaN
+- Fix đảm bảo `cols_tien=["Dư nợ"]` nhận giá trị số thật để tính tổng cộng chính xác
+
 ## [2026-05-09] — Cập nhật phản hồi trạng thái rõ ràng cho 3 nút xuất trong tab Đến hạn
 - `pdf_service.py` dòng ~461,463 — cập nhật spinner "⏳ Đang tạo báo cáo PDF..." và success "✅ Báo cáo PDF đã xuất xong!"
 - `tabs/tab_tongquan.py` dòng ~1243-1261 — refactor nút Xuất Excel: button → spinner → success → download_button với session_state

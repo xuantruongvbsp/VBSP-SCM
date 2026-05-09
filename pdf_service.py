@@ -3,6 +3,7 @@ from datetime import datetime
 from pathlib import Path
 import pandas as pd
 import streamlit as st
+from config import COT_MA_KH, COT_TONG_DU_NO
 
 try:
     from reportlab.lib import colors
@@ -440,6 +441,359 @@ def xuat_pdf(
     Xuất một báo cáo DataFrame ra PDF.
     """
     # ... (rest of the code remains the same)
+
+
+def xuat_pdf_group_header(
+    df: pd.DataFrame,
+    tieu_de: str,
+    nhom_theo: str,
+    *,
+    nguoi_xuat: str = "",
+    cols_tien: list[str] | None = None,
+    tieu_de_phu: str = "",
+    loc_pgd: str = "",
+    loc_ct: str = "",
+    loc_xa: str = "",
+) -> bytes:
+    """
+    Xuất PDF dạng Group Header/Group Footer — cấu trúc giống Access Report.
+
+    Cấu trúc:
+    - Report Header : tiêu đề, ngày xuất, thông tin bộ lọc
+    - Group Header  : tên nhóm (nền xanh nhạt, in đậm)
+    - Detail rows   : danh sách hồ sơ thuộc nhóm
+    - Group Footer  : tổng món vay / tổng KH / tổng dư nợ của nhóm (in đậm)
+    - Report Footer : tổng toàn báo cáo
+
+    Tham số:
+        df          : DataFrame chi tiết (đã lọc theo điều kiện bộ lọc bên ngoài)
+        tieu_de     : Tiêu đề báo cáo
+        nhom_theo   : Tên cột dùng để nhóm (ví dụ COT_TEN_CT / COT_TEN_PGD / COT_TEN_XA)
+        nguoi_xuat  : Tên người xuất
+        cols_tien   : Danh sách cột tiền (sẽ format số, tính tổng)
+        tieu_de_phu : Phụ đề / thông tin bổ sung hiển thị dưới tiêu đề
+        loc_pgd     : Giá trị bộ lọc PGD (chỉ để hiển thị info)
+        loc_ct      : Giá trị bộ lọc chương trình (chỉ để hiển thị info)
+        loc_xa      : Giá trị bộ lọc xã (chỉ để hiển thị info)
+    """
+    if not _REPORTLAB_READY:
+        raise ImportError("Chưa cài thư viện reportlab. Chạy: pip install reportlab")
+    _dang_ky_font()
+    from utils import fmt_so
+
+    cols_tien = cols_tien or []
+
+    if df is None or df.empty:
+        raise ValueError("Không có dữ liệu để xuất PDF.")
+    if nhom_theo not in df.columns:
+        raise ValueError(f"Cột nhóm '{nhom_theo}' không tồn tại trong DataFrame.")
+
+    ngay_str = datetime.now().strftime("%d/%m/%Y %H:%M")
+    fn = FONT_NORMAL if _FONT_REGISTERED else FONT_FALLBACK
+    fb = FONT_BOLD if _FONT_REGISTERED else FONT_FALLBACK
+
+    buf = BytesIO()
+    page_size = A4
+    margin = 1.0 * cm
+    usable_w = page_size[0] - 2 * margin
+
+    doc = SimpleDocTemplate(
+        buf,
+        pagesize=page_size,
+        leftMargin=margin, rightMargin=margin,
+        topMargin=margin, bottomMargin=2 * cm,
+        title=tieu_de,
+        author="VBSP-SCM",
+    )
+
+    # ── Style chung ──────────────────────────────────────────────────────────
+    _st_normal = ParagraphStyle("gh_normal", fontName=fn, fontSize=9, leading=12)
+    _st_bold   = ParagraphStyle("gh_bold",   fontName=fb, fontSize=9, leading=12)
+    _st_right  = ParagraphStyle("gh_right",  fontName=fn, fontSize=9, leading=12,
+                                alignment=TA_RIGHT)
+    _st_bold_r = ParagraphStyle("gh_bold_r", fontName=fb, fontSize=9, leading=12,
+                                alignment=TA_RIGHT)
+    _st_center = ParagraphStyle("gh_center", fontName=fn, fontSize=9, leading=12,
+                                alignment=TA_CENTER)
+    _st_h3 = ParagraphStyle("gh_h3", fontName=fb, fontSize=10, leading=14,
+                            textColor=VBSP_GREEN)
+
+    story: list = []
+
+    # ── Report Header ────────────────────────────────────────────────────────
+    logo_path = Path("assets/logo.png")
+    if logo_path.exists():
+        logo = RLImage(str(logo_path), width=2.0 * cm, height=2.0 * cm)
+        from reportlab.platypus import Table as RLTable
+        hdr_tbl = RLTable(
+            [[logo, Paragraph(
+                "NGÂN HÀNG CHÍNH SÁCH XÃ HỘI VIỆT NAM<br/>"
+                "<font size='9'>Chi nhánh tỉnh Đồng Nai</font>",
+                ParagraphStyle("rh_txt", fontName=fb, fontSize=11,
+                               alignment=TA_CENTER, leading=15)
+            )]],
+            colWidths=[2.3 * cm, usable_w - 2.3 * cm]
+        )
+        hdr_tbl.setStyle(TableStyle([
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 0),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+        ]))
+        story.append(hdr_tbl)
+    else:
+        story.append(Paragraph(
+            "NGÂN HÀNG CHÍNH SÁCH XÃ HỘI VIỆT NAM — Chi nhánh tỉnh Đồng Nai",
+            ParagraphStyle("rh_txt2", fontName=fb, fontSize=11,
+                           alignment=TA_CENTER, spaceAfter=4)
+        ))
+
+    story.append(HRFlowable(width="100%", thickness=1.5, color=VBSP_GREEN, spaceAfter=4))
+    story.append(Paragraph(
+        tieu_de.upper(),
+        ParagraphStyle("rh_title", fontName=fb, fontSize=13, alignment=TA_CENTER,
+                       textColor=VBSP_GREEN, spaceAfter=3)
+    ))
+    story.append(Paragraph(
+        f"Ngày xuất: {ngay_str}  |  Người xuất: {nguoi_xuat or 'VBSP-SCM'}",
+        ParagraphStyle("rh_meta", fontName=fn, fontSize=8, alignment=TA_CENTER,
+                       textColor=colors.grey, spaceAfter=3)
+    ))
+
+    # Hiển thị thông tin bộ lọc đang áp dụng
+    loc_parts: list[str] = []
+    if loc_pgd:
+        loc_parts.append(f"PGD: <b>{loc_pgd}</b>")
+    if loc_ct:
+        loc_parts.append(f"Chương trình: <b>{loc_ct}</b>")
+    if loc_xa:
+        loc_parts.append(f"Xã: <b>{loc_xa}</b>")
+    if tieu_de_phu:
+        loc_parts.insert(0, tieu_de_phu)
+
+    if loc_parts:
+        story.append(Paragraph(
+            "  |  ".join(loc_parts),
+            ParagraphStyle("rh_filter", fontName=fn, fontSize=8, alignment=TA_CENTER,
+                           textColor=colors.HexColor("#1B5E20"), spaceAfter=6)
+        ))
+    else:
+        story.append(Spacer(1, 0.3 * cm))
+
+    # ── Xác định các cột hiển thị detail ────────────────────────────────────
+    detail_cols = [c for c in df.columns if c != nhom_theo]
+
+    # Tính tỷ lệ độ rộng cột detail
+    def _detail_ratio(col_name: str) -> float:
+        c = str(col_name).lower()
+        if any(k in c for k in ("tên kh", "ten kh")):
+            return 2.8
+        if any(k in c for k in ("tên chương trình", "ten chuong trinh", "chương trình")):
+            return 2.5
+        if any(k in c for k in ("số khế ước", "so khe uoc", "khế ước")):
+            return 1.8
+        if any(k in c for k in ("ngày đến hạn", "ngay den han")):
+            return 1.5
+        if any(k in c for k in ("tháng đến hạn", "thang den han", "tháng còn")):
+            return 1.2
+        if any(k in c for k in ("dư nợ", "du no", "tổng dư")):
+            return 1.4
+        if any(k in c for k in ("mã kh", "ma kh")):
+            return 1.2
+        return 1.0
+
+    det_ratios = [_detail_ratio(c) for c in detail_cols]
+    det_total  = sum(det_ratios)
+    det_widths = [usable_w * r / det_total for r in det_ratios]
+
+    # ── Màu sắc group ────────────────────────────────────────────────────────
+    GH_BG  = colors.HexColor("#DCEEFB")   # Group Header nền xanh nhạt
+    GF_BG  = VBSP_GREEN_LIGHT              # Group Footer nền xanh lá nhạt
+    RF_BG  = colors.HexColor("#E8F5E9")   # Report Footer
+
+    # ── Tổng toàn báo cáo ────────────────────────────────────────────────────
+    report_so_mon:  int   = 0
+    report_so_kh:   int   = 0
+    report_tong_dn: float = 0.0
+
+    # ── Lặp qua từng nhóm ────────────────────────────────────────────────────
+    cot_ma_kh = None
+    if COT_MA_KH in df.columns:
+        cot_ma_kh = COT_MA_KH
+    cot_du_no = COT_TONG_DU_NO if COT_TONG_DU_NO in df.columns else None
+
+    groups = df.groupby(nhom_theo, sort=True)
+
+    for ten_nhom, grp in groups:
+        # ── Group Header ─────────────────────────────────────────────────────
+        story.append(Spacer(1, 0.2 * cm))
+        gh_tbl = Table(
+            [[Paragraph(str(ten_nhom), ParagraphStyle(
+                "gh_lbl", fontName=fb, fontSize=10, leading=14,
+                textColor=colors.HexColor("#1A237E")
+            ))]],
+            colWidths=[usable_w],
+        )
+        gh_tbl.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, -1), GH_BG),
+            ("TOPPADDING",    (0, 0), (-1, -1), 5),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+            ("LEFTPADDING",   (0, 0), (-1, -1), 8),
+            ("RIGHTPADDING",  (0, 0), (-1, -1), 8),
+            ("BOX", (0, 0), (-1, -1), 0.8, colors.HexColor("#1565C0")),
+        ]))
+        story.append(gh_tbl)
+
+        # ── Header row của bảng detail ────────────────────────────────────────
+        det_header = [
+            Paragraph(
+                str(c).replace("_", " "),
+                ParagraphStyle("det_th", fontName=fb, fontSize=8,
+                               alignment=TA_CENTER, textColor=colors.white, leading=10)
+            )
+            for c in detail_cols
+        ]
+        detail_data = [det_header]
+
+        # ── Detail rows ───────────────────────────────────────────────────────
+        for _, row in grp.iterrows():
+            cells = []
+            for col in detail_cols:
+                val = row[col]
+                if col in cols_tien and pd.notna(val):
+                    try:
+                        txt = fmt_so(float(val))
+                        cells.append(Paragraph(txt, _st_right))
+                    except (ValueError, TypeError):
+                        cells.append(Paragraph(str(val) if pd.notna(val) else "", _st_right))
+                else:
+                    cells.append(Paragraph(str(val) if pd.notna(val) else "", _st_normal))
+            detail_data.append(cells)
+
+        det_tbl = Table(detail_data, colWidths=det_widths, repeatRows=1)
+        det_style = [
+            ("BACKGROUND", (0, 0), (-1, 0), VBSP_GREEN),
+            ("TEXTCOLOR",  (0, 0), (-1, 0), colors.white),
+            ("FONTNAME",   (0, 0), (-1, 0), fb),
+            ("ALIGN",      (0, 0), (-1, 0), "CENTER"),
+            ("VALIGN",     (0, 0), (-1, -1), "MIDDLE"),
+            ("TOPPADDING",    (0, 0), (-1, -1), 4),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+            ("GRID", (0, 0), (-1, -1), 0.4, BORDER_COLOR),
+        ]
+        # Xen kẽ màu dòng detail
+        for r in range(1, len(detail_data)):
+            if r % 2 == 0:
+                det_style.append(("BACKGROUND", (0, r), (-1, r), ROW_ALT))
+        det_tbl.setStyle(TableStyle(det_style))
+        story.append(det_tbl)
+
+        # ── Group Footer ──────────────────────────────────────────────────────
+        so_mon_nhom  = len(grp)
+        so_kh_nhom   = grp[cot_ma_kh].nunique() if cot_ma_kh else so_mon_nhom
+        tong_dn_nhom = grp[cot_du_no].sum() if cot_du_no else 0.0
+
+        report_so_mon  += so_mon_nhom
+        report_so_kh   += so_kh_nhom
+        report_tong_dn += tong_dn_nhom
+
+        gf_cells = [
+            Paragraph(
+                f"<b>Tổng nhóm: {so_mon_nhom} món vay"
+                f" | {so_kh_nhom} KH"
+                f" | Dư nợ: {fmt_so(tong_dn_nhom)}</b>",
+                ParagraphStyle("gf_lbl", fontName=fb, fontSize=8,
+                               alignment=TA_RIGHT, leading=11,
+                               textColor=colors.HexColor("#1B5E20"))
+            )
+        ]
+        gf_tbl = Table([gf_cells], colWidths=[usable_w])
+        gf_tbl.setStyle(TableStyle([
+            ("BACKGROUND",    (0, 0), (-1, -1), GF_BG),
+            ("TOPPADDING",    (0, 0), (-1, -1), 4),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+            ("LEFTPADDING",   (0, 0), (-1, -1), 6),
+            ("RIGHTPADDING",  (0, 0), (-1, -1), 6),
+            ("LINEABOVE", (0, 0), (-1, 0), 0.8, VBSP_GREEN),
+        ]))
+        story.append(gf_tbl)
+
+    # ── Report Footer ─────────────────────────────────────────────────────────
+    story.append(Spacer(1, 0.4 * cm))
+    story.append(HRFlowable(width="100%", thickness=1.5, color=VBSP_GREEN, spaceAfter=4))
+    rf_cells = [
+        Paragraph(
+            f"<b>TỔNG TOÀN BÁO CÁO: {report_so_mon} món vay"
+            f" | {report_so_kh} khách hàng"
+            f" | Tổng dư nợ: {fmt_so(report_tong_dn)}</b>",
+            ParagraphStyle("rf_lbl", fontName=fb, fontSize=10,
+                           alignment=TA_RIGHT, leading=14,
+                           textColor=VBSP_GREEN)
+        )
+    ]
+    rf_tbl = Table([rf_cells], colWidths=[usable_w])
+    rf_tbl.setStyle(TableStyle([
+        ("BACKGROUND",    (0, 0), (-1, -1), RF_BG),
+        ("TOPPADDING",    (0, 0), (-1, -1), 6),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+        ("LEFTPADDING",   (0, 0), (-1, -1), 8),
+        ("RIGHTPADDING",  (0, 0), (-1, -1), 8),
+        ("BOX", (0, 0), (-1, -1), 1, VBSP_GREEN),
+    ]))
+    story.append(rf_tbl)
+
+    # ── Chữ ký ────────────────────────────────────────────────────────────────
+    story.append(Spacer(1, 1.0 * cm))
+    story.append(Paragraph(
+        f"Đồng Nai, ngày {datetime.now().strftime('%d')} "
+        f"tháng {datetime.now().strftime('%m')} "
+        f"năm {datetime.now().strftime('%Y')}",
+        ParagraphStyle("rf_date", fontName=fn, fontSize=9,
+                       alignment=TA_RIGHT, spaceAfter=4)
+    ))
+    ky_data = [[
+        Paragraph("NGƯỜI LẬP BIỂU",
+                  ParagraphStyle("ky", fontName=fb, fontSize=9, alignment=TA_CENTER)),
+        Paragraph("KIỂM SOÁT",
+                  ParagraphStyle("ky", fontName=fb, fontSize=9, alignment=TA_CENTER)),
+        Paragraph("GIÁM ĐỐC",
+                  ParagraphStyle("ky", fontName=fb, fontSize=9, alignment=TA_CENTER)),
+    ], [
+        Paragraph("<i>(Ký, ghi rõ họ tên)</i>",
+                  ParagraphStyle("ky2", fontName=fn, fontSize=8,
+                                 alignment=TA_CENTER, textColor=colors.grey)),
+        Paragraph("<i>(Ký, ghi rõ họ tên)</i>",
+                  ParagraphStyle("ky2", fontName=fn, fontSize=8,
+                                 alignment=TA_CENTER, textColor=colors.grey)),
+        Paragraph("<i>(Ký, ghi rõ họ tên)</i>",
+                  ParagraphStyle("ky2", fontName=fn, fontSize=8,
+                                 alignment=TA_CENTER, textColor=colors.grey)),
+    ], [
+        Paragraph("&nbsp;", ParagraphStyle("gap", fontName=fn, fontSize=24)),
+        Paragraph("&nbsp;", ParagraphStyle("gap", fontName=fn, fontSize=24)),
+        Paragraph("&nbsp;", ParagraphStyle("gap", fontName=fn, fontSize=24)),
+    ]]
+    ky_tbl = Table(ky_data, colWidths=[usable_w / 3] * 3)
+    ky_tbl.setStyle(TableStyle([
+        ("ALIGN",      (0, 0), (-1, -1), "CENTER"),
+        ("VALIGN",     (0, 0), (-1, -1), "TOP"),
+        ("TOPPADDING", (0, 0), (-1, -1), 5),
+    ]))
+    story.append(ky_tbl)
+
+    # ── Số trang footer mỗi trang ────────────────────────────────────────────
+    def _on_page(canvas, _doc):
+        canvas.saveState()
+        canvas.setFont(fn if _FONT_REGISTERED else FONT_FALLBACK, 7)
+        canvas.setFillColor(colors.grey)
+        canvas.drawRightString(
+            page_size[0] - margin, 0.7 * cm,
+            f"Trang {_doc.page}  |  VBSP-SCM  |  {ngay_str}"
+        )
+        canvas.restoreState()
+
+    doc.build(story, onFirstPage=_on_page, onLaterPages=_on_page)
+    buf.seek(0)
+    return buf.getvalue()
 
 
 def nut_xuat_pdf(

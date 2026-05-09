@@ -4,6 +4,7 @@ Phân tích dư nợ đến hạn trong N tháng tới dựa trên HSTD hiện t
 """
 from __future__ import annotations
 
+from datetime import datetime
 from io import BytesIO
 from typing import TYPE_CHECKING
 
@@ -11,13 +12,18 @@ import pandas as pd
 import streamlit as st
 
 from auth import la_phan_he_pgd
-from config import CACHE_HSTD, COT_TEN_PGD, COT_TEN_KH, COT_TEN_CT, COT_TONG_DU_NO, COT_NGAY_DEN_HAN
+from config import (
+    CACHE_HSTD, COT_TEN_PGD, COT_TEN_KH, COT_TEN_CT,
+    COT_TONG_DU_NO, COT_NGAY_DEN_HAN, COT_MA_KH, COT_TEN_XA,
+    COT_SO_KU,
+)
 from data.den_han import (
     tinh_den_han_df,
     loc_den_han_trong,
     tong_hop_den_han,
     canh_bao_tap_trung,
 )
+from pdf_service import xuat_pdf_group_header
 from utils import fmt_ty, fmt_so
 
 
@@ -130,3 +136,101 @@ def render(role: str = None, **kwargs) -> None:
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 key="btn_xuat_den_han",
             )
+
+    # ── Xuất PDF Group Header/Footer ─────────────────────────────────────────
+    st.divider()
+    st.markdown("#### 📄 Xuất PDF Báo cáo Đến hạn")
+
+    col_pdf1, col_pdf2 = st.columns([2, 2])
+    with col_pdf1:
+        nhom_pdf = st.radio(
+            "Nhóm theo (PDF)",
+            options=["Chương trình", "PGD", "Xã"],
+            horizontal=True,
+            key="den_han_nhom_pdf",
+        )
+    with col_pdf2:
+        loc_pgd_pdf = ""
+        loc_ct_pdf  = ""
+        loc_xa_pdf  = ""
+        if not la_phan_he_pgd(role) and COT_TEN_PGD in df_loc.columns:
+            ds_pgd = sorted(df_loc[COT_TEN_PGD].dropna().unique().tolist())
+            loc_pgd_pdf = st.selectbox(
+                "Lọc PGD", [""] + ds_pgd,
+                format_func=lambda x: "(Tất cả)" if x == "" else x,
+                key="den_han_loc_pgd_pdf",
+            )
+        if COT_TEN_CT in df_loc.columns:
+            ds_ct = sorted(df_loc[COT_TEN_CT].dropna().unique().tolist())
+            loc_ct_pdf = st.selectbox(
+                "Lọc Chương trình", [""] + ds_ct,
+                format_func=lambda x: "(Tất cả)" if x == "" else x,
+                key="den_han_loc_ct_pdf",
+            )
+
+    # Áp dụng bộ lọc PDF
+    df_pdf = df_loc.copy()
+    if loc_pgd_pdf and COT_TEN_PGD in df_pdf.columns:
+        df_pdf = df_pdf[df_pdf[COT_TEN_PGD] == loc_pgd_pdf]
+    if loc_ct_pdf and COT_TEN_CT in df_pdf.columns:
+        df_pdf = df_pdf[df_pdf[COT_TEN_CT] == loc_ct_pdf]
+    if loc_xa_pdf and COT_TEN_XA in df_pdf.columns:
+        df_pdf = df_pdf[df_pdf[COT_TEN_XA] == loc_xa_pdf]
+
+    # Xác định cột nhóm và cột detail cho PDF
+    _nhom_col_map = {
+        "Chương trình": COT_TEN_CT,
+        "PGD":          COT_TEN_PGD,
+        "Xã":           COT_TEN_XA,
+    }
+    nhom_col_pdf = _nhom_col_map[nhom_pdf]
+
+    _detail_pdf_cols = [
+        COT_MA_KH, COT_TEN_KH, COT_SO_KU,
+        "Ngày đến hạn", "Tháng đến hạn còn lại",
+        COT_TONG_DU_NO,
+    ]
+    _detail_pdf_cols = [c for c in _detail_pdf_cols if c in df_pdf.columns]
+    if nhom_col_pdf not in _detail_pdf_cols:
+        _detail_pdf_cols = [nhom_col_pdf] + _detail_pdf_cols
+    else:
+        _detail_pdf_cols = [nhom_col_pdf] + [c for c in _detail_pdf_cols if c != nhom_col_pdf]
+
+    if st.button("📄 Xuất PDF Group Header", key="btn_pdf_den_han_group", type="secondary"):
+        if df_pdf.empty:
+            st.warning("⚠️ Không có dữ liệu sau khi lọc để xuất PDF.")
+        else:
+            username = st.session_state.get("username", "VBSP-SCM")
+            _tieu_de_phu_parts = []
+            if loc_pgd_pdf:
+                _tieu_de_phu_parts.append(f"PGD: {loc_pgd_pdf}")
+            if loc_ct_pdf:
+                _tieu_de_phu_parts.append(f"CT: {loc_ct_pdf}")
+            _tieu_de_phu = "  |  ".join(_tieu_de_phu_parts) if _tieu_de_phu_parts else ""
+            try:
+                with st.spinner("⏳ Đang tạo PDF, vui lòng chờ..."):
+                    pdf_bytes = xuat_pdf_group_header(
+                        df=df_pdf[_detail_pdf_cols].sort_values(
+                            [nhom_col_pdf, "Tháng đến hạn còn lại"]
+                            if "Tháng đến hạn còn lại" in df_pdf.columns
+                            else [nhom_col_pdf]
+                        ),
+                        tieu_de=f"Báo cáo Khoản vay Đến hạn trong {den_thang} tháng",
+                        nhom_theo=nhom_col_pdf,
+                        nguoi_xuat=username,
+                        cols_tien=[COT_TONG_DU_NO],
+                        tieu_de_phu=_tieu_de_phu,
+                        loc_pgd=loc_pgd_pdf,
+                        loc_ct=loc_ct_pdf,
+                        loc_xa=loc_xa_pdf,
+                    )
+                st.success("✅ Xuất PDF thành công! Nhấn nút bên dưới để tải.")
+                st.download_button(
+                    label="⬇ Tải file PDF",
+                    data=pdf_bytes,
+                    file_name=f"DenHan_{den_thang}thang_{datetime.now().strftime('%d%m%Y_%H%M')}.pdf",
+                    mime="application/pdf",
+                    key="btn_pdf_den_han_group_dl",
+                )
+            except Exception as _e:
+                st.error(f"❌ Lỗi tạo PDF: {_e}")

@@ -26,7 +26,7 @@ from utils import (
 )
 from data.pgd import ds_pgd_co_file
 from data.cdtotkvv import doc_cdtotkvv, ds_thang_nam, tong_hop_theo_pgd
-from pdf_service import nut_xuat_pdf
+from pdf_service import nut_xuat_pdf, xuat_pdf_group_header
 from services.upload_service import format_caption_merge
 
 if TYPE_CHECKING:
@@ -1209,10 +1209,16 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                             st.plotly_chart(st.session_state[_chart_key], use_container_width=True, key=f"plot_{_chart_key}")
 
                         st.divider()
-                        _c1_dh, _c2_dh, _c3_dh = st.columns([1, 1, 1])
+                        _c1_dh, _c2_dh, _c3_dh, _c4_dh = st.columns([1, 1, 1, 1])
 
-                        df_xuat = tg[[nhom_col, "Số món vay", "Số KH", "Dư nợ"]].rename(
-                            columns={nhom_col: nhom_chon}
+                        # Tạo df_xuat từ cột số gốc (_mon, _kh, _no) - không dùng cột đã format
+                        df_xuat = tg[[nhom_col, "_mon", "_kh", "_no"]].rename(
+                            columns={
+                                nhom_col: nhom_chon,
+                                "_mon": "Số món vay",
+                                "_kh": "Số khách hàng",
+                                "_no": "Dư nợ",
+                            }
                         )
                         # df_xuat_so: giữ nguyên số để Excel sort/filter
                         df_xuat_so = df_xuat.copy()
@@ -1273,7 +1279,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                             if st.session_state.get(_show_key, False):
                                 st.info("👁️ Đang hiển thị preview — nhấn Ctrl+P để in")
 
-                        # ── (3) Xuất PDF ──────────────────────────────────────────
+                        # ── (3) Xuất PDF tổng hợp ───────────────────────────────────────
                         with _c3_dh:
                             nut_xuat_pdf(
                                 df=df_xuat,
@@ -1283,6 +1289,62 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                                 key=f"pdf_den_han_{key_prefix}",
                                 tieu_de_phu=_tieu_de_phu,
                             )
+
+                        # ── (4) Xuất PDF Group Header chi tiết hồ sơ ────────────
+                        with _c4_dh:
+                            if st.button(
+                                "📄 PDF Chi tiết",
+                                key=f"btn_pdf_group_{key_prefix}",
+                                type="secondary",
+                                use_container_width=True,
+                                help="Xuất PDF chi tiết từng hồ sơ dạng Group Header/Footer",
+                            ):
+                                if df_loc.empty:
+                                    st.warning("⚠️ Không có dữ liệu để xuất PDF.")
+                                else:
+                                    _det_cols = [
+                                        nhom_col,
+                                        COT_MA_KH, COT_TEN_KH, COT_SO_KU,
+                                        COT_NGAY_DH, COT_TONG_DU_NO,
+                                    ]
+                                    _det_cols = [c for c in _det_cols if c in df_loc.columns]
+                                    _loc_pgd_str = ", ".join(loc_pgd[:3]) + (
+                                        f" +{len(loc_pgd)-3}" if len(loc_pgd) > 3 else ""
+                                    ) if loc_pgd else ""
+                                    _loc_ct_str  = ", ".join(loc_ct[:3]) + (
+                                        f" +{len(loc_ct)-3}" if len(loc_ct) > 3 else ""
+                                    ) if loc_ct else ""
+                                    _loc_xa_str  = ", ".join(loc_xa[:3]) + (
+                                        f" +{len(loc_xa)-3}" if len(loc_xa) > 3 else ""
+                                    ) if loc_xa else ""
+                                    try:
+                                        with st.spinner("⏳ Đang tạo PDF chi tiết..."):
+                                            _pdf_grp = xuat_pdf_group_header(
+                                                df=df_loc[_det_cols].sort_values(
+                                                    [nhom_col, COT_NGAY_DH]
+                                                    if COT_NGAY_DH in df_loc.columns
+                                                    else [nhom_col]
+                                                ),
+                                                tieu_de=f"Hồ sơ Đến hạn {label} — Chi tiết theo {nhom_chon}",
+                                                nhom_theo=nhom_col,
+                                                nguoi_xuat=username,
+                                                cols_tien=[COT_TONG_DU_NO],
+                                                tieu_de_phu=_tieu_de_phu,
+                                                loc_pgd=_loc_pgd_str,
+                                                loc_ct=_loc_ct_str,
+                                                loc_xa=_loc_xa_str,
+                                            )
+                                        st.success("✅ Xuất PDF thành công!")
+                                        st.download_button(
+                                            label="⬇ Tải PDF",
+                                            data=_pdf_grp,
+                                            file_name=ten_file_xuat(f"ChiTietDenHan_{key_prefix}", ext="pdf"),
+                                            mime="application/pdf",
+                                            key=f"dl_pdf_group_{key_prefix}",
+                                            use_container_width=True,
+                                        )
+                                    except Exception as _e_grp:
+                                        st.error(f"❌ Lỗi tạo PDF: {_e_grp}")
 
                         # ── Khung preview HTML ────────────────────────────────────
                         _show_key = f"show_preview_den_han_{key_prefix}"

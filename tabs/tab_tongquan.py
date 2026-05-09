@@ -950,23 +950,98 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
             """
             st.markdown(html_table, unsafe_allow_html=True)
 
-            # Format từng ô theo _fmt_cell trước khi xuất PDF
+            # ── Chuẩn bị df_export dùng chung cho cả Excel lẫn PDF ──────────────
             df_export = df_show.copy().rename(columns={COT_TEN_PGD: "Đơn vị"})
+            # df_export_so: giữ nguyên số để Excel có thể sort/filter
+            df_export_so = df_export.copy()
+            # df_export_fmt: format chuỗi để PDF đọc đẹp
             for col in df_export.columns:
                 if col != "Đơn vị":
                     df_export[col] = df_export[col].apply(
                         lambda v, c=col: _fmt_cell(v, c)
                     )
 
-            # Nút Xuất PDF đã được tạm ẩn theo yêu cầu
-            # nut_xuat_pdf(
-            #     df=df_export,
-            #     tieu_de="Thông tin tổng quát theo PGD",
-            #     username=username,
-            #     cols_tien=[],
-            #     prefix_file="TQPGD",
-            #     key="btn_pdf_tqpgd",
-            # )
+            # ── Nút xuất — 3 nút nằm ngang ───────────────────────────────────────
+            _c1, _c2, _c3 = st.columns([1, 1, 1])
+
+            # ── (1) Xuất Excel ────────────────────────────────────────────────────
+            with _c1:
+                try:
+                    _xl_bytes = xuat_excel({"TQPGD": df_export_so})
+                    st.download_button(
+                        label="📥 Xuất Excel",
+                        data=_xl_bytes,
+                        file_name=ten_file_xuat("TQPGD", "xlsx"),
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        key="btn_xl_tqpgd",
+                        type="secondary",
+                    )
+                except Exception as _e:
+                    st.error(f"❌ Lỗi xuất Excel: {_e}")
+
+            # ── (2) Preview + In PDF ──────────────────────────────────────────────
+            with _c2:
+                if st.button("🔍 Preview / In PDF", key="btn_preview_tqpgd", type="secondary"):
+                    st.session_state["tqpgd_show_preview"] = not st.session_state.get(
+                        "tqpgd_show_preview", False
+                    )
+
+            # ── (3) Xuất PDF ──────────────────────────────────────────────────────
+            with _c3:
+                nut_xuat_pdf(
+                    df=df_export,
+                    tieu_de="Thông tin tổng quát theo PGD",
+                    username=username,
+                    cols_tien=[],
+                    prefix_file="TQPGD",
+                    key="btn_pdf_tqpgd",
+                )
+
+            # ── Khung preview HTML có nút In ─────────────────────────────────────
+            if st.session_state.get("tqpgd_show_preview", False):
+                st.markdown("---")
+                st.markdown("#### 🖨️ Preview — Thông tin tổng quát theo PGD")
+                # Xây dựng lại bảng HTML tương tự html_table nhưng thêm @media print
+                _print_style = """
+                <style>
+                @media print {
+                    body * { visibility: hidden; }
+                    #print-tqpgd, #print-tqpgd * { visibility: visible; }
+                    #print-tqpgd { position: fixed; top: 0; left: 0; width: 100%; }
+                    .no-print { display: none !important; }
+                }
+                .print-header {
+                    font-family: sans-serif;
+                    text-align: center;
+                    margin-bottom: 6px;
+                }
+                .print-header h3 { font-size: 1rem; margin: 2px 0; color: #1565C0; }
+                .print-header p  { font-size: 0.78rem; color: #555; margin: 0; }
+                </style>
+                """
+                from config import TEN_CHI_NHANH_HIEN_THI
+                from datetime import datetime as _dt_now
+                _ngay_in = _dt_now.now().strftime("%d/%m/%Y %H:%M")
+                _preview_header = f"""
+                <div class="print-header">
+                    <h3>THÔNG TIN TỔNG QUÁT THEO PGD</h3>
+                    <p>{TEN_CHI_NHANH_HIEN_THI} — Ngày in: {_ngay_in}</p>
+                </div>
+                """
+                st.markdown(_print_style + f'<div id="print-tqpgd">{_preview_header}{html_table}</div>',
+                            unsafe_allow_html=True)
+                st.button(
+                    "🖨️ In trang này (Ctrl+P)",
+                    key="btn_in_tqpgd",
+                    on_click=lambda: None,   # placeholder — người dùng dùng Ctrl+P
+                    type="primary",
+                    help="Nhấn Ctrl+P sau đó chọn máy in hoặc 'Save as PDF'",
+                )
+                st.caption(
+                    "💡 Sau khi nhấn **Ctrl+P**, chọn *Save as PDF* để lưu file; "
+                    "hoặc chọn máy in để in trực tiếp. "
+                    "Chỉ vùng bảng này sẽ được in nhờ CSS @media print."
+                )
         st.divider()
         st.subheader("🔔 Hồ sơ đến hạn — Tổng hợp")
         if COT_NGAY_DH in df.columns:

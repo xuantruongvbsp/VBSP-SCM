@@ -73,6 +73,11 @@ slug = pgd_slug(ten_pgd) từ data/pgd.py
   pgd_mode = kwargs.get("pgd_mode", False)
   pgd_user = kwargs.get("pgd_user")
   # prefix widget = f"pgd_{pgd_slug(pgd_user)}_" ← tránh DuplicateElementKey
+## 2.10 Hiệu năng làm việc
+- Chỉ đọc file liên quan đến task hiện tại
+- Không đọc toàn bộ codebase khi bắt đầu
+- Ưu tiên đọc file được chỉ định trong prompt trước
+- Không chạy lệnh kiểm tra toàn bộ project trừ khi được yêu cầu
 
 ---
 
@@ -141,3 +146,4 @@ Quy tắc:
 - Chuyên nghiệp, chính xác như cán bộ ngân hàng
 - Không giải thích lý thuyết dài dòng — đưa ra code thực tế
 - Nếu có lỗi: giải thích nguyên nhân tiếng Việt ngắn gọn + mã khắc phục
+

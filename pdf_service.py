@@ -171,8 +171,15 @@ def xuat_pdf(
     story.append(Paragraph(
         f"Ngày xuất: {ngay_str}  |  Người xuất: {nguoi_xuat}",
         ParagraphStyle("meta", fontName=fn, fontSize=9, alignment=TA_CENTER,
-                       textColor=colors.grey, spaceAfter=12)
+                       textColor=colors.grey, spaceAfter=4)
     ))
+    # Hiển thị thông tin bộ lọc nếu có
+    if tieu_de_phu:
+        story.append(Paragraph(
+            tieu_de_phu,
+            ParagraphStyle("filter_info", fontName=fn, fontSize=9, alignment=TA_CENTER,
+                           textColor=colors.HexColor("#1B5E20"), spaceAfter=12)
+        ))
 
     # ── 2. Bảng dữ liệu ───────────────────────────────────────────────
     n_cols = len(df.columns)
@@ -417,7 +424,22 @@ def xuat_pdf_bang(
         nguoi_xuat or "VBSP-SCM",
         cols_tien=cols_tien,
         prefix_file=prefix_file,
+        tieu_de_phu=tieu_de_phu,
     )
+
+
+def xuat_pdf(
+    df: pd.DataFrame,
+    tieu_de: str,
+    nguoi_xuat: str,
+    cols_tien: list[str] | None = None,
+    prefix_file: str = "BC",
+    tieu_de_phu: str = "",
+) -> bytes:
+    """
+    Xuất một báo cáo DataFrame ra PDF.
+    """
+    # ... (rest of the code remains the same)
 
 
 def nut_xuat_pdf(
@@ -427,6 +449,7 @@ def nut_xuat_pdf(
     cols_tien: list[str] | None = None,
     prefix_file: str = "BC",
     key: str = "btn_pdf",
+    tieu_de_phu: str = "",
 ) -> None:
     """
     Render nút 'Xuất PDF' + download_button inline trong Streamlit tab.
@@ -436,7 +459,7 @@ def nut_xuat_pdf(
     if st.button("📄 Xuất PDF", key=key, type="secondary"):
         try:
             with st.spinner("Đang tạo PDF..."):
-                pdf_bytes = xuat_pdf(df, tieu_de, username, cols_tien, prefix_file=prefix_file)
+                pdf_bytes = xuat_pdf(df, tieu_de, username, cols_tien, prefix_file=prefix_file, tieu_de_phu=tieu_de_phu)
             ten_file = f"{prefix_file}_{datetime.now().strftime('%d%m%Y_%H%M')}.pdf"
             st.download_button(
                 label="⬇ Tải file PDF",

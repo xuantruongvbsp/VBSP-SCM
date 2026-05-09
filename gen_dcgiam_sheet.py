@@ -33,7 +33,7 @@ CREDENTIALS_FILE = "credentials.json"
 SHEET_TAB_GQVL = "GQVL"
 SHEET_TAB_KH = "KH_GQVL"
 
-GQVL_PARQUET = Path("cache") / "gqvl.parquet"
+GQVL_PARQUET = Path(config.CACHE_GQVL)
 
 
 def _ket_noi_gsheet():

@@ -2,6 +2,13 @@
 
 ---
 
+## [2026-05-09] — Fix PDF bảng TQPGD bị dồn cột header
+- `pdf_service.py` dòng ~283 — thêm 4 case _col_ratio() cho cột đơn vị (3.5), số lượng (0.7), tiền tỷ (1.1), tỷ lệ % (0.8)
+- `pdf_service.py` dòng ~192 — header wrap + font nhỏ hơn cho bảng >= 11 cột
+
+## [2026-05-09] — Thêm unit test cho pdf_service.py
+- `tests/test_pdf_service.py` — 5 test cases: xuat_pdf trả về bytes, xuat_pdf với cols_tien, xuat_pdf DataFrame rỗng, xuat_pdf_bang, reportlab chưa cài
+
 ## [2026-05-09] — Dọn rác project
 
 ### Xóa hẳn (25 files)

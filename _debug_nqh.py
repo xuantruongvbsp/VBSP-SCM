@@ -1,37 +1,50 @@
-import os, sys, pandas as pd
+"""Debug: check Unicode normalization of column names"""
+import unicodedata, pandas as pd, os, sys
 sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+sys.path.insert(0, r'c:\VBSP-SCM')
 
 path = r'c:\VBSP-SCM\cache\hstd.parquet'
-if not os.path.exists(path):
-    print("No parquet cache at", path)
-    sys.exit(0)
-
 df = pd.read_parquet(path)
-nqh_cols = [c for c in df.columns if any(k in c.lower() for k in ['nq','chuy','qua han','qua_h','cqh','no_'])]
-print("Relevant columns:")
-for c in nqh_cols:
-    print(f"  '{c}': {df[c].dtype}")
-print(f"\nTotal columns: {len(df.columns)}, rows: {len(df)}")
 
-cot = "D\u01b0 n\u1ee3 qu\u00e1 h\u1ea1n"
-if cot in df.columns:
-    s = pd.to_numeric(df[cot], errors="coerce").fillna(0)
-    print(f"\n'{cot}' min={s.min()} max={s.max()} >0 count={(s>0).sum()}")
+# Find NQH-related columns
+target = "Dư nợ quá hạn"
+col = [c for c in df.columns if target.lower() in c.lower()]
+if col:
+    c = col[0]
+    print(f"Found column: {repr(c)}")
+    print(f"  is NFC: {unicodedata.is_normalized('NFC', c)}")
+    print(f"  is NFD: {unicodedata.is_normalized('NFD', c)}")
+    print(f"  normalize NFC: {repr(unicodedata.normalize('NFC', c))}")
 else:
-    similar = [c for c in df.columns if 'du' in c.lower() or 'qua' in c.lower()]
-    print(f"\nColumn NOT found. Similar: {similar[:10]}")
+    print(f"Column '{target}' not found via fuzzy match!")
+    print(f"Similar cols: {[c for c in df.columns if 'du' in c.lower()]}")
 
-print("\n--- Check specific columns ---")
-targets = ["Chuy\u1ec3n QH trong th\u00e1ng", "CQH trong Qu\u00fd", "CQH N\u0103m",
-           "Ng\u00e0y s\u1ed1 li\u1ec7u", "Ng\u00e0y chuy\u1ec3n QH", "Ng\u00e0y ph\u00e1t sinh NQH",
-           "Ng\u00e0y \u0110H theo h\u1ee3p \u0111\u1ed3ng", "Ng\u00e0y \u0110H theo Gia h\u1ea1n",
-           "Ng\u00e0y \u0110H theo GDXA"]
-for t in targets:
-    if t in df.columns:
-        print(f"  '{t}' EXISTS")
+import config
+cc = config.COT_DU_NO_QH
+print(f"\nConfig COT_DU_NO_QH: {repr(cc)}")
+print(f"  is NFC: {unicodedata.is_normalized('NFC', cc)}")
+print(f"  is NFD: {unicodedata.is_normalized('NFD', cc)}")
+
+if col:
+    print(f"\nExact match: {col[0] == cc}")
+    print(f"NFC match: {unicodedata.normalize('NFC', col[0]) == unicodedata.normalize('NFC', cc)}")
+
+# Check CQH columns
+cqh_cols = ["Chuyển QH trong tháng", "CQH trong Quý", "CQH Năm"]
+for cqh in cqh_cols:
+    found = [c for c in df.columns if cqh.lower() in c.lower()]
+    if found:
+        print(f"\n'{cqh}' -> {repr(found[0])}")
+        print(f"  Exact match: {found[0] == cqh}")
     else:
-        print(f"  '{t}' NOT in data")
+        print(f"\n'{cqh}' NOT found!")
 
-print("\n--- First 120 columns ---")
-for i, c in enumerate(df.columns[:120]):
-    print(f"  [{i}] '{c}'")
+print(f"\nTotal rows: {len(df)}")
+s = pd.to_numeric(df["Dư nợ quá hạn"], errors="coerce").fillna(0)
+print(f"NQH > 0: {(s > 0).sum()}")
+
+# Check CQH thang values
+cqh_col = "Chuyển QH trong tháng"
+if cqh_col in df.columns:
+    cqh_s = pd.to_numeric(df[cqh_col], errors="coerce").fillna(0)
+    print(f"\n'{cqh_col}' > 0: {(cqh_s > 0).sum()}")

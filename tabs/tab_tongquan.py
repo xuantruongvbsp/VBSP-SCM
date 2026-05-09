@@ -1242,6 +1242,17 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                             _filter_parts.append(f"Xã: {_xa_str}")
                         _tieu_de_phu = " • ".join(_filter_parts) if _filter_parts else ""
 
+                        # Chuẩn bị df chi tiết hồ sơ dùng chung cho Excel và Preview
+                        _det_cols_xl = [
+                            nhom_col, COT_MA_KH, COT_TEN_KH, COT_SO_KU,
+                            COT_NGAY_DH, COT_TONG_DU_NO,
+                        ]
+                        _det_cols_xl = [c for c in _det_cols_xl if c in df_loc.columns]
+                        _df_chitiet = df_loc[_det_cols_xl].sort_values(
+                            [nhom_col, COT_NGAY_DH]
+                            if COT_NGAY_DH in df_loc.columns else [nhom_col]
+                        )
+
                         # ── (1) Xuất Excel ────────────────────────────────────────
                         with _c1_dh:
                             sk_excel = f"excel_bytes_den_han_{key_prefix}"
@@ -1250,8 +1261,8 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                                             key=f"btn_excel_den_han_{key_prefix}",
                                             use_container_width=True):
                                     with st.spinner("⏳ Đang tạo file Excel..."):
-                                        # Tạo sheet chính và sheet thông tin bộ lọc
-                                        _xl_sheets = {f"Đến hạn {label}": df_xuat_so}
+                                        _xl_sheets = {f"Tổng hợp {label}": df_xuat_so}
+                                        _xl_sheets[f"Chi tiết hồ sơ"] = _df_chitiet
                                         if _tieu_de_phu:
                                             _xl_sheets["Thông tin bộ lọc"] = pd.DataFrame({"Bộ lọc": [_tieu_de_phu]})
                                         st.session_state[sk_excel] = xuat_excel(_xl_sheets)
@@ -1408,16 +1419,15 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                                 {_filter_detail_html}
                             </div>
                             """
-                            # Xây bảng HTML đơn giản từ df_xuat — giới hạn top 100 dòng
-                            _MAX_PREVIEW_ROWS = 100
-                            _cols_dh = list(df_xuat.columns)
+                            # Xây bảng HTML từ df_chitiet (chi tiết từng hồ sơ) — top 150 dòng
+                            _MAX_PREVIEW_ROWS = 150
+                            _cols_dh = list(_df_chitiet.columns)
                             _header_html_dh = "".join(
                                 f'<th style="background:#2E7D32;color:#fff;padding:6px 8px;border:1px solid #1B5E20;font-size:0.82rem;text-align:center">{c}</th>'
                                 for c in _cols_dh
                             )
                             _rows_html_dh = ""
-                            # Chỉ lấy top 100 dòng cho preview nhanh
-                            _df_preview = df_xuat.head(_MAX_PREVIEW_ROWS)
+                            _df_preview = _df_chitiet.head(_MAX_PREVIEW_ROWS)
                             for i_dh, (_, r_dh) in enumerate(_df_preview.iterrows()):
                                 _bg_dh = "#F9FAFB" if i_dh % 2 == 0 else "#FFFFFF"
                                 _cells_dh = "".join(
@@ -1425,8 +1435,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                                     for i_c, c in enumerate(_cols_dh)
                                 )
                                 _rows_html_dh += f'<tr style="background:{_bg_dh}">{_cells_dh}</tr>\n'
-                            # Thêm thông báo nếu có nhiều dòng hơn 100
-                            _total_rows = len(df_xuat)
+                            _total_rows = len(_df_chitiet)
                             if _total_rows > _MAX_PREVIEW_ROWS:
                                 _rows_html_dh += f'<tr style="background:#FFF3E0"><td colspan="{len(_cols_dh)}" style="padding:8px;border:1px solid #E0E0E0;text-align:center;font-size:0.85rem;color:#E65100">⚠️ Chỉ hiển thị {_MAX_PREVIEW_ROWS}/{_total_rows} dòng — Tải Excel hoặc PDF để xem đầy đủ</td></tr>\n'
                             _table_html_dh = f"""

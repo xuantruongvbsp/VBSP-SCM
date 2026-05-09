@@ -82,6 +82,39 @@ def _cache_kpi_tongquan(
     )
 
 
+@st.cache_data(show_spinner=False, ttl=3600)
+def _cache_datetime_denhan(
+    _df: pd.DataFrame,
+    ts: float,
+    cot_ngay_dh: str,
+) -> pd.DataFrame:
+    """Cache pd.to_datetime cho cột Ngày ĐH — tránh chạy lại mỗi lần đổi filter."""
+    df_out = _df.copy()
+    df_out[cot_ngay_dh] = pd.to_datetime(
+        df_out[cot_ngay_dh], dayfirst=True, errors="coerce"
+    )
+    return df_out
+
+
+@st.cache_data(show_spinner=False)
+def _cache_bang_denhan(
+    _df: pd.DataFrame,
+    nhom_col: str,
+    key_prefix: str,
+    ts: float,
+) -> pd.DataFrame:
+    """Cache kết quả groupby cho bảng đến hạn."""
+    _ = (key_prefix, ts)  # tham gia cache key
+    if nhom_col not in _df.columns:
+        return pd.DataFrame()
+    tg = _df.groupby(nhom_col, as_index=False).agg(
+        _mon=(COT_SO_KU, "nunique"),
+        _kh=(COT_MA_KH, "nunique"),
+        _no=(COT_TONG_DU_NO, "sum"),
+    ).reset_index().sort_values("_no", ascending=False)
+    return tg
+
+
 @st.cache_data(show_spinner=False)
 def _cache_heatmap_pgd(
     _df: pd.DataFrame,
@@ -1045,8 +1078,8 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
         st.subheader("🔔 Hồ sơ đến hạn — Tổng hợp")
         if COT_NGAY_DH in df.columns:
             try:
-                dt = df.copy()
-                dt[COT_NGAY_DH] = pd.to_datetime(dt[COT_NGAY_DH], dayfirst=True, errors="coerce")
+                # Cache pd.to_datetime — bottleneck chính
+                dt = _cache_datetime_denhan(df.copy(), ts, COT_NGAY_DH)
                 hn       = pd.Timestamp.today().normalize()
                 cuoi_nam = pd.Timestamp(hn.year, 12, 31)
 
@@ -1123,11 +1156,11 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                     st.divider()
 
                     if nhom_col in df_loc.columns:
-                        tg = df_loc.groupby(nhom_col).agg(
-                            _mon=(COT_SO_KU,      "nunique"),
-                            _kh =(COT_MA_KH,      "nunique"),
-                            _no =(COT_TONG_DU_NO, "sum"),
-                        ).reset_index().sort_values("_no", ascending=False)
+                        # Cache groupby — bottleneck chính
+                        tg = _cache_bang_denhan(df_loc, nhom_col, key_prefix, ts)
+                        if tg.empty:
+                            st.info("Không có dữ liệu sau khi nhóm.")
+                            return
 
                         tg["Số món vay"] = tg["_mon"].apply(fmt_so)
                         tg["Số KH"]      = tg["_kh"].apply(fmt_so)
@@ -1139,38 +1172,41 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                             key=f"tongquan_den_han_{key_prefix}",
                         )
 
+                        # Lazy render chart — chỉ render khi có dữ liệu và tab active
                         if nhom_col in df_loc.columns and len(tg) > 0:
                             top10 = tg.nlargest(10, "_no")
 
-                            fig = go.Figure(go.Pie(
-                                labels=top10[nhom_col],
-                                values=top10["_no"],
-                                hole=0.5,
-                                textinfo="label+percent",
-                                textposition="outside",
-                                hovertemplate="<b>%{label}</b><br>Dư nợ: %{customdata}<br>Tỷ lệ: %{percent}<extra></extra>",
-                                customdata=top10["Dư nợ"],
-                                marker=dict(
-                                    colors=px.colors.sequential.Greens_r[: len(top10)],
-                                    line=dict(color="white", width=2),
-                                ),
-                            ))
-
-                            fig.update_layout(
-                                title=f"Top 10 {nhom_chon} có dư nợ đến hạn cao nhất",
-                                height=450,
-                                annotations=[dict(
-                                    text=f"<b>{fmt(tong_no)}</b><br>Tổng dư nợ",
-                                    x=0.5, y=0.5,
-                                    font=dict(size=13),
-                                    showarrow=False,
-                                )],
-                                legend=dict(orientation="v", x=1.05, y=0.5),
-                                margin=dict(l=0, r=150, t=50, b=0),
-                                paper_bgcolor="rgba(0,0,0,0)",
-                            )
-
-                            st.plotly_chart(fig, use_container_width=True)
+                            # Dùng st.session_state để tránh render chart lại khi không cần
+                            _chart_key = f"chart_denhan_{key_prefix}"
+                            if _chart_key not in st.session_state:
+                                fig = go.Figure(go.Pie(
+                                    labels=top10[nhom_col],
+                                    values=top10["_no"],
+                                    hole=0.5,
+                                    textinfo="label+percent",
+                                    textposition="outside",
+                                    hovertemplate="<b>%{label}</b><br>Dư nợ: %{customdata}<br>Tỷ lệ: %{percent}<extra></extra>",
+                                    customdata=top10["Dư nợ"],
+                                    marker=dict(
+                                        colors=px.colors.sequential.Greens_r[: len(top10)],
+                                        line=dict(color="white", width=2),
+                                    ),
+                                ))
+                                fig.update_layout(
+                                    title=f"Top 10 {nhom_chon} có dư nợ đến hạn cao nhất",
+                                    height=450,
+                                    annotations=[dict(
+                                        text=f"<b>{fmt(tong_no)}</b><br>Tổng dư nợ",
+                                        x=0.5, y=0.5,
+                                        font=dict(size=13),
+                                        showarrow=False,
+                                    )],
+                                    legend=dict(orientation="v", x=1.05, y=0.5),
+                                    margin=dict(l=0, r=150, t=50, b=0),
+                                    paper_bgcolor="rgba(0,0,0,0)",
+                                )
+                                st.session_state[_chart_key] = fig
+                            st.plotly_chart(st.session_state[_chart_key], use_container_width=True, key=f"plot_{_chart_key}")
 
                         st.divider()
                         _c1_dh, _c2_dh, _c3_dh = st.columns([1, 1, 1])
@@ -1273,20 +1309,27 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                                 </p>
                             </div>
                             """
-                            # Xây bảng HTML đơn giản từ df_xuat
+                            # Xây bảng HTML đơn giản từ df_xuat — giới hạn top 100 dòng
+                            _MAX_PREVIEW_ROWS = 100
                             _cols_dh = list(df_xuat.columns)
                             _header_html_dh = "".join(
                                 f'<th style="background:#2E7D32;color:#fff;padding:6px 8px;border:1px solid #1B5E20;font-size:0.82rem;text-align:center">{c}</th>'
                                 for c in _cols_dh
                             )
                             _rows_html_dh = ""
-                            for i_dh, (_, r_dh) in enumerate(df_xuat.iterrows()):
+                            # Chỉ lấy top 100 dòng cho preview nhanh
+                            _df_preview = df_xuat.head(_MAX_PREVIEW_ROWS)
+                            for i_dh, (_, r_dh) in enumerate(_df_preview.iterrows()):
                                 _bg_dh = "#F9FAFB" if i_dh % 2 == 0 else "#FFFFFF"
                                 _cells_dh = "".join(
                                     f'<td style="padding:5px 6px;border:1px solid #E0E0E0;text-align:{"left" if i_c == 0 else "right"};font-size:0.82rem;white-space:nowrap">{r_dh[c]}</td>'
                                     for i_c, c in enumerate(_cols_dh)
                                 )
                                 _rows_html_dh += f'<tr style="background:{_bg_dh}">{_cells_dh}</tr>\n'
+                            # Thêm thông báo nếu có nhiều dòng hơn 100
+                            _total_rows = len(df_xuat)
+                            if _total_rows > _MAX_PREVIEW_ROWS:
+                                _rows_html_dh += f'<tr style="background:#FFF3E0"><td colspan="{len(_cols_dh)}" style="padding:8px;border:1px solid #E0E0E0;text-align:center;font-size:0.85rem;color:#E65100">⚠️ Chỉ hiển thị {_MAX_PREVIEW_ROWS}/{_total_rows} dòng — Tải Excel hoặc PDF để xem đầy đủ</td></tr>\n'
                             _table_html_dh = f"""
                             <div style="overflow-x:auto;margin:8px 0">
                             <table style="border-collapse:collapse;width:100%;font-family:sans-serif">

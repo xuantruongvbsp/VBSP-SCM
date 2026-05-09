@@ -193,7 +193,10 @@ def _render_canh_bao_no(df_full: pd.DataFrame, ds_pgd_all: list, role: str, user
                 st.warning("Chưa có dữ liệu HSTD.")
         return
 
-    df_kh = danh_dau_khong_hd(df_full)
+    _cache_key = f"df_kh_{id(df_full)}"
+    if _cache_key not in st.session_state:
+        st.session_state[_cache_key] = danh_dau_khong_hd(df_full)
+    df_kh = st.session_state[_cache_key]
 
     with sub2:
         _hien_thi_khd_tab(df_kh, ds_pgd_all)

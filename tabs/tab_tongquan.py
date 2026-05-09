@@ -1217,12 +1217,35 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                         # df_xuat_so: giữ nguyên số để Excel sort/filter
                         df_xuat_so = df_xuat.copy()
 
+                        # Xây dựng chuỗi thông tin bộ lọc
+                        _filter_parts = []
+                        if loc_pgd:
+                            _pgd_str = ", ".join(loc_pgd[:3])  # Giới hạn hiển thị 3 PGD đầu
+                            if len(loc_pgd) > 3:
+                                _pgd_str += f" và {len(loc_pgd) - 3} PGD khác"
+                            _filter_parts.append(f"PGD: {_pgd_str}")
+                        if loc_ct:
+                            _ct_str = ", ".join(loc_ct[:3])
+                            if len(loc_ct) > 3:
+                                _ct_str += f" và {len(loc_ct) - 3} CT khác"
+                            _filter_parts.append(f"Chương trình: {_ct_str}")
+                        if loc_xa:
+                            _xa_str = ", ".join(loc_xa[:3])
+                            if len(loc_xa) > 3:
+                                _xa_str += f" và {len(loc_xa) - 3} xã khác"
+                            _filter_parts.append(f"Xã: {_xa_str}")
+                        _tieu_de_phu = " • ".join(_filter_parts) if _filter_parts else ""
+
                         # ── (1) Xuất Excel ────────────────────────────────────────
                         with _c1_dh:
                             _xl_key_done = f"xl_denhan_{key_prefix}_done"
                             try:
                                 with st.spinner("⏳ Đang tạo file Excel..."):
-                                    _xl_bytes = xuat_excel({f"Đến hạn {label}": df_xuat_so})
+                                    # Tạo sheet chính và sheet thông tin bộ lọc
+                                    _xl_sheets = {f"Đến hạn {label}": df_xuat_so}
+                                    if _tieu_de_phu:
+                                        _xl_sheets["Thông tin bộ lọc"] = pd.DataFrame({"Bộ lọc": [_tieu_de_phu]})
+                                    _xl_bytes = xuat_excel(_xl_sheets)
                                 st.session_state[_xl_key_done] = True
                                 st.download_button(
                                     label="📥 Xuất Excel",
@@ -1256,6 +1279,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                                 username=username,
                                 prefix_file=f"HoSoDenHan_{key_prefix}",
                                 key=f"pdf_den_han_{key_prefix}",
+                                tieu_de_phu=_tieu_de_phu,
                             )
 
                         # ── Khung preview HTML ────────────────────────────────────
@@ -1300,6 +1324,16 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                             else:
                                 _subtitle_loc_dh = f"Theo {_subtitle_parts[0]}, {_subtitle_parts[1]} và {_subtitle_parts[2]}"
 
+                            # Xây dựng HTML hiển thị chi tiết bộ lọc
+                            _filter_detail_html = ""
+                            if _tieu_de_phu:
+                                _filter_detail_html = f'''
+                                <div style="background:#E8F5E9;border:1px solid #4CAF50;border-radius:4px;padding:8px 12px;margin:8px 0;text-align:left">
+                                    <p style="font-size:0.8rem;font-weight:bold;color:#1B5E20;margin:0 0 4px 0">🔍 Bộ lọc đã chọn:</p>
+                                    <p style="font-size:0.75rem;color:#2E7D32;margin:0;line-height:1.4">{_tieu_de_phu}</p>
+                                </div>
+                                '''
+
                             _preview_header_dh = f"""
                             <div class="print-header">
                                 <h3>HỒ SƠ ĐẾN HẠN {label.upper()}</h3>
@@ -1307,6 +1341,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                                 <p style="font-size:0.85rem;font-weight:bold;color:#1B5E20;margin:2px 0">
                                 📋 Phạm vi: {_subtitle_loc_dh}
                                 </p>
+                                {_filter_detail_html}
                             </div>
                             """
                             # Xây bảng HTML đơn giản từ df_xuat — giới hạn top 100 dòng

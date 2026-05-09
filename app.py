@@ -502,7 +502,6 @@ def main():
                 st.warning("⚠️ Chưa có dữ liệu HSTD. Vui lòng upload qua tab Upload.")
                 st.stop()
 
-        # Load dữ liệu: phân hệ CN thấy toàn bộ, phân hệ PGD chỉ thấy của mình
         from auth import la_phan_he_cn
         if la_phan_he_cn(role) or not pgd_user:
             df_full = _load_hstd(CACHE_HSTD, ts_file(CACHE_HSTD))
@@ -512,19 +511,13 @@ def main():
             if COT_TEN_PGD not in _hstd_cols:
                 st.error("Lỗi dữ liệu: Không tìm thấy cột 'Tên PGD' trong file gốc để phân quyền. Vui lòng liên hệ Admin.")
                 st.stop()
-            # user role: chỉ lấy đúng dữ liệu PGD của mình — tránh load cả file vào RAM
             df = duckdb.query(
                 f"SELECT * FROM '{CACHE_HSTD}' WHERE \"{COT_TEN_PGD}\" = '{pgd_user}'"
             ).df()
             if df.empty:
                 st.warning(f"Không có dữ liệu PGD: {pgd_user}"); st.stop()
-            # df_full cho user = chính df đã lọc (user không có quyền xem dữ liệu PGD khác)
             df_full = df
 
-        # ── Workspace Operation: dùng pgd_data/ riêng — KHÔNG ghi đè df_full toàn CN ──
-        # Theo kiến trúc 2 luồng (HUONG_DAN_NGUON_DU_LIEU.md):
-        #   df_full  = CACHE_HSTD (22 PGD — do KH-NV quản lý, KHÔNG thay đổi)
-        #   df       = pgd_data/{slug}/ (do PGD upload — chỉ dùng trong ws_operation)
         if ws_hien_tai == "operation":
             if role == "user" and pgd_user:
                 path_hstd_pgd = duong_dan_pgd(pgd_user, "hstd")
@@ -532,7 +525,6 @@ def main():
                     df_pgd = doc_hstd_pgd(pgd_user, ts_file(path_hstd_pgd))
                     if df_pgd is not None and not df_pgd.empty:
                         df = df_pgd
-                        # df_full GIỮ NGUYÊN — không ghi đè bằng pgd_data
                     else:
                         st.warning(f"⚠️ File Upload HSTD của `{pgd_user}` rỗng, "
                                    f"tạm dùng dữ liệu Phòng KH-NV.")
@@ -540,17 +532,13 @@ def main():
                     st.info(f"ℹ️ `{pgd_user}` chưa upload HSTD — "
                             f"tạm dùng dữ liệu từ Phòng KH-NV.")
             elif role in ("admin", "manager"):
-                # admin/manager vào operation → xem tổng hợp pgd_data/
                 df_op = doc_hstd_toan_cn_pgd()
                 if df_op is not None and not df_op.empty:
                     df = df_op
-                    # df_full GIỮ NGUYÊN — ws_management/executive vẫn dùng CACHE_HSTD
-                # Nếu pgd_data/ chưa có → df giữ nguyên CACHE_HSTD, không warning
         else:
-            df = df_full  # reset về toàn chi nhánh khi không phải workspace operation
+            df = df_full
             # KHÔNG clear cache ở đây — cache chỉ xóa khi upload file mới
 
-        # ── NQ11 ─────────────────────────────────────────────────────────────────────
         df_nq11 = None
         if ws_hien_tai == "operation":
             if role == "user" and pgd_user:
@@ -561,56 +549,46 @@ def main():
                 df_nq11 = doc_nq11_toan_cn_pgd()
 
         if df_nq11 is None and os.path.exists(FILE_PATH_NQ11):
-            # Đảm bảo parquet NQ11 tồn tại
             if not os.path.exists(CACHE_NQ11):
                 doc_file_nq11(FILE_PATH_NQ11, ts_file(FILE_PATH_NQ11))
-
             if role == "user" and pgd_user:
-                # Chỉ lấy các dòng NQ11 thuộc mã KH trong PGD của user
                 makh_list = df[COT_MA_KH].dropna().astype(str).unique().tolist()
                 if makh_list:
                     _makh_sql = ", ".join(f"'{m}'" for m in makh_list)
-                    _sql = f"SELECT * FROM '{CACHE_NQ11}' WHERE \"{COT_MA_KH}\" IN ({_makh_sql})"
-                    try:
-                        df_nq11 = duckdb.query(_sql).df()
-                    except Exception:
-                        df_nq11 = _load_nq11(CACHE_NQ11, ts_file(CACHE_NQ11))
+                    df_nq11 = duckdb.query(
+                        f"SELECT * FROM '{CACHE_NQ11}'"
+                        f" WHERE CAST(\"Mã khách hàng\" AS VARCHAR) IN ({_makh_sql})"
+                    ).df()
                 else:
-                    df_nq11 = pd.DataFrame()
+                    import pandas as _pd
+                    df_nq11 = _pd.DataFrame()
             else:
                 df_nq11 = _load_nq11(CACHE_NQ11, ts_file(CACHE_NQ11))
 
-        # Sao kê GQVL chi tiết — dùng để xác định nhãn NQ11 cho món vay dư nợ = 0
         df_sk_gqvl = None
         if os.path.exists(FILE_PATH_SK_GQVL):
-            if not os.path.exists(CACHE_SK_GQVL):
-                doc_file_sk_gqvl(FILE_PATH_SK_GQVL, ts_file(FILE_PATH_SK_GQVL))
-            if os.path.exists(CACHE_SK_GQVL):
-                df_sk_gqvl = _load_nq11(CACHE_SK_GQVL, ts_file(CACHE_SK_GQVL))
+            df_sk_gqvl = doc_file_sk_gqvl(FILE_PATH_SK_GQVL, ts_file(FILE_PATH_SK_GQVL))
 
-        # ── Xây dựng mapping Xã → PGD ───────────────────────────────────────────────
-        # Ưu tiên: 1) kv_store (admin config), 2) dữ liệu thực tế từ HSTD
-        # KHÔNG dùng DS_PGD / PGD_XA_MAP hardcode nữa
-        if df_full is not None and not df_full.empty:
-            _df_ref = df_full
+        if role == "user" and os.path.exists(CACHE_HSTD):
+            _df_ref = duckdb.query(
+                f"SELECT DISTINCT \"{COT_TEN_PGD}\", \"Tên xã\" FROM '{CACHE_HSTD}'"
+            ).df()
         else:
-            _df_ref = df
+            _df_ref = df_full
 
-        # --- Build từ HSTD (nguồn thực tế) ---
         _pgd_xa_map = {}
         if COT_TEN_PGD in _df_ref.columns and "Tên xã" in _df_ref.columns:
             for pgd, xa in _df_ref[[COT_TEN_PGD, "Tên xã"]].dropna().drop_duplicates().values:
                 _pgd_xa_map[str(xa).strip()] = str(pgd).strip()
+        _ds_pgd_all = sorted(_df_ref[COT_TEN_PGD].dropna().unique().tolist()) \
+                      if COT_TEN_PGD in _df_ref.columns else []
 
-        # --- Bổ sung / ghi đè từ kv_store nếu Admin đã cấu hình ---
-        _kv_ds_pgd    = lay_config("ds_pgd",    _DS_PGD_DEFAULT)
-        _kv_pgd_xa    = lay_config("pgd_xa_map", _PGD_XA_MAP_DEFAULT)
+        _kv_ds_pgd = lay_config("ds_pgd",    _DS_PGD_DEFAULT)
+        _kv_pgd_xa = lay_config("pgd_xa_map", _PGD_XA_MAP_DEFAULT)
 
-        # ds_pgd_all: dùng danh sách kv_store làm chuẩn (Admin có thể thêm/bớt PGD)
         if _kv_ds_pgd:
             _ds_pgd_all = sorted(set(_ds_pgd_all) | set(_kv_ds_pgd))
 
-        # pgd_xa_map (inverse): bổ sung các xã từ PGD_XA_MAP kv_store chưa có trong HSTD
         if isinstance(_kv_pgd_xa, dict):
             for _pgd, _ds_xa in _kv_pgd_xa.items():
                 for _xa in (_ds_xa or []):

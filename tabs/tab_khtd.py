@@ -49,7 +49,8 @@ CT_TW      = [(mk, ten) for mk, _, ten, nv, _ in CHUONG_TRINH_KHTD if nv == "TW"
 CT_DP      = [(mk, ten) for mk, _, ten, nv, _ in CHUONG_TRINH_KHTD if nv == "DP"]
 NGUON_VON_MA = {mk: nv for mk, _, _, nv, _ in CHUONG_TRINH_KHTD}
 MA_CT_BY_MAKEY = {mk: int(ma_ct) for mk, ma_ct, _, _, _ in CHUONG_TRINH_KHTD}
-MA_KEYS_CO_KHTD = {row[0] for row in CHUONG_TRINH_KHTD}
+MA_KEYS_CO_KHTD = {row[0] for row in CHUONG_TRINH_KHTD} \
+                    | {"3_TW_NHCSXH", "3_TW_NSNN", "3_DP_TINH", "3_DP_XA"}
 # Nhóm giao diện nhập thủ công KHTD Chi nhánh (theo ma_ct HSTD)
 KHTD_CN_NHOM_MA_CT: list[tuple[str, list[int]]] = [
     ("Hộ nghèo · Cận nghèo · Thoát nghèo", [1, 9, 19]),
@@ -57,6 +58,15 @@ KHTD_CN_NHOM_MA_CT: list[tuple[str, list[int]]] = [
     ("Nhà ở · DTTS · Xuất khẩu lao động", [4, 7, 17, 21, 25]),
     ("Vùng khó khăn", [10, 15]),
     ("Nước sạch · SXKD · Khác", [6, 12, 26, 99]),
+]
+# Sub-nhóm GQVL phân tầng 4 nhóm (TW: PL NV, ĐP: Mã NĐT)
+GQVL_SUB_NHOM = [
+    # (sub_key, ten_hien_thi, nguon_von)
+    # nguon_von: "TW" → hiện ở cột KH TW, "ĐP" → hiện ở cột KH ĐP
+    ("3_TW_NHCSXH", "↳ TW — NHCSXH huy động",   "TW"),
+    ("3_TW_NSNN",   "↳ TW — NSNN (Quỹ QG TW)",  "TW"),
+    ("3_DP_TINH",   "↳ ĐP — Cấp tỉnh",          "ĐP"),
+    ("3_DP_XA",     "↳ ĐP — Cấp xã/khác",       "ĐP"),
 ]
 MAKEY_BY_MACT_NV: dict[tuple[int, int], str] = {}
 TEN_BASE_BY_MACT: dict[int, str] = {}
@@ -346,8 +356,66 @@ def _tinh_thuc_hien_theo_ct(df: "pd.DataFrame") -> dict[str, float]:
     return out
 
 
+def _tinh_th_gqvl_phan_tang(df_gqvl: "pd.DataFrame | None") -> dict[str, float]:
+    """
+    Tính TH thực tế cho 4 nhóm GQVL từ file GQVL (df sau merge toàn CN).
+    Dùng cùng logic phân tầng với gen_dcgiam_sheet._phan_loai_4_nhom().
+    Trả về: {"3_TW_NHCSXH": VND, "3_TW_NSNN": VND,
+             "3_DP_TINH": VND, "3_DP_XA": VND}
+    """
+    result = {"3_TW_NHCSXH": 0.0, "3_TW_NSNN": 0.0,
+              "3_DP_TINH": 0.0,   "3_DP_XA": 0.0}
+    if df_gqvl is None or df_gqvl.empty:
+        return result
+
+    # Cột dư nợ: ưu tiên COT_TONG_DU_NO, fallback COT_DU_NO_TH
+    col_dn = COT_TONG_DU_NO if COT_TONG_DU_NO in df_gqvl.columns \
+             else (COT_DU_NO_TH if COT_DU_NO_TH in df_gqvl.columns else None)
+    if col_dn is None:
+        return result
+
+    from db import doc_ndt_dp_ma_list
+    ndt_list = doc_ndt_dp_ma_list()
+
+    for _, row in df_gqvl.iterrows():
+        nv  = str(row.get("Nguồn vốn", "")).strip()
+        dn  = float(pd.to_numeric(row.get(col_dn, 0), errors="coerce") or 0)
+        if dn == 0:
+            continue
+        if nv == "TW":
+            try:
+                pl = int(float(row.get("Phân loại NV", 0)))
+            except:
+                continue
+            if pl == 2:
+                result["3_TW_NHCSXH"] += dn
+            elif pl == 1:
+                result["3_TW_NSNN"]   += dn
+        elif nv == "ĐP":
+            ma = str(row.get("Mã nhà đầu tư", "")).strip()
+            if ma in ndt_list:
+                result["3_DP_TINH"] += dn
+            else:
+                result["3_DP_XA"]   += dn
+    return result
+
+
 from tabs.tab_khtd_nhap import render_nhap_cn, render_nhap_pgd
 from tabs.tab_khtd_xuat import render_xuat_baocao
+
+
+# ── Helper đọc GQVL parquet toàn CN ─────────────────────────────────────────
+def _doc_gqvl_parquet() -> "pd.DataFrame | None":
+    """Đọc GQVL từ cache parquet nếu có."""
+    from pathlib import Path
+    from config import CACHE_DIR
+    gqvl_parquet = Path(CACHE_DIR) / "gqvl.parquet"
+    if not gqvl_parquet.exists():
+        return None
+    try:
+        return pd.read_parquet(gqvl_parquet)
+    except Exception:
+        return None
 
 
 # ── Entry point ───────────────────────────────────────────────────────────────
@@ -362,6 +430,8 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
     role = kwargs.get("role", "user")
     username = kwargs.get("username", "unknown")
     df_full = kwargs.get("df_full")
+    # Đọc GQVL toàn CN để tính TH phân tầng 4 nhóm
+    df_gqvl = _doc_gqvl_parquet()
 
     with tab:
         st.title("🏛️ Kế hoạch Tín dụng — Phòng KH-NV")
@@ -376,7 +446,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
             "⚠️ Cảnh báo chênh lệch",
         ])
         with tab_cn:
-            render_nhap_cn(role, username, df_full)
+            render_nhap_cn(role, username, df_full, df_gqvl)
         with tab_xa:
             render_nhap_pgd(role, username, df_full)
         with tab_cb:

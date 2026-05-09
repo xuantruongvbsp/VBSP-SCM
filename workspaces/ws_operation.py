@@ -446,18 +446,24 @@ def _render_thong_bao_ket_luan(tab, **kwargs):
                 os.unlink(tmp_path)
                 os.unlink(pdf_path)
                 ten_pdf = ten_file_pdf.replace(".docx", ".pdf")
-                st.download_button(
-                    "⬇️ Tải về PDF",
-                    data=pdf_bytes,
-                    file_name=ten_pdf,
-                    mime="application/pdf",
-                    key="tb_dl_pdf",
-                )
+                st.session_state["_tb_pdf_bytes"] = pdf_bytes
+                st.session_state["_tb_pdf_file"] = ten_pdf
             except ImportError:
                 st.warning("⚠️ Chưa cài docx2pdf. Chạy: pip install docx2pdf")
                 st.info("💡 Mở file Word rồi chọn **Save As → PDF** thủ công.")
-            except Exception as e:
-                st.error(f"❌ Lỗi tạo PDF: {e}")
+                st.session_state["_tb_pdf_bytes"] = None
+            except Exception as _e_pdf:
+                st.error(f"❌ Lỗi chuyển PDF: {_e_pdf}")
+                st.session_state["_tb_pdf_bytes"] = None
+
+        if st.session_state.get("_tb_pdf_bytes"):
+            st.download_button(
+                "⬇️ Tải về PDF",
+                data=st.session_state["_tb_pdf_bytes"],
+                file_name=st.session_state.get("_tb_pdf_file", "output.pdf"),
+                mime="application/pdf",
+                key="tb_dl_pdf",
+            )
 
 
 def _render_bien_ban_giao_ban(tab, **kwargs):

@@ -261,13 +261,16 @@ def render(role: str = None, **kwargs) -> None:
                         loc_ct=loc_ct_pdf,
                         loc_xa=loc_xa_pdf,
                     )
-                st.success("✅ Xuất PDF thành công! Nhấn nút bên dưới để tải.")
-                st.download_button(
-                    label="⬇ Tải file PDF",
-                    data=pdf_bytes,
-                    file_name=f"DenHan_{den_thang}thang_{datetime.now().strftime('%d%m%Y_%H%M')}.pdf",
-                    mime="application/pdf",
-                    key="btn_pdf_den_han_group_dl",
-                )
+                st.session_state["_pdf_bytes_den_han_group"] = pdf_bytes
             except Exception as _e:
+                st.session_state["_pdf_bytes_den_han_group"] = None
                 st.error(f"❌ Lỗi tạo PDF: {_e}")
+
+    if st.session_state.get("_pdf_bytes_den_han_group"):
+        st.download_button(
+            label="⬇ Tải file PDF",
+            data=st.session_state["_pdf_bytes_den_han_group"],
+            file_name=f"DenHan_{den_thang}thang_{datetime.now().strftime('%d%m%Y_%H%M')}.pdf",
+            mime="application/pdf",
+            key="btn_pdf_den_han_group_dl",
+        )

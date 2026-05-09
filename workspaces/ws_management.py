@@ -45,6 +45,7 @@ from tabs import (
 )
 from tabs import tab_upload_khnv
 from tabs import tab_quan_ly_dgd
+from tabs import tab_audit_log
 from tabs.tab_kh_gqvl import render as render_kh_gqvl
 from tabs.tab_den_han import render as render_den_han
 
@@ -699,6 +700,10 @@ def render(**kwargs):
     if role in ("admin", "admin_cn"):
         nhom_hanh_chinh.append(
             ("🏦 Mã NĐT ĐP", lambda tab: _render_ndt_dp(role, username))
+        )
+    if role in ("admin", "admin_cn"):
+        nhom_hanh_chinh.append(
+            ("📋 Audit Log", lambda tab: tab_audit_log.render(tab, **kwargs))
         )
     nhom_hanh_chinh.append(
         ("📤 Upload KH-NV", lambda tab: tab_upload_khnv.render(tab, **kwargs))

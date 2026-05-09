@@ -1238,25 +1238,27 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
 
                         # ── (1) Xuất Excel ────────────────────────────────────────
                         with _c1_dh:
-                            _xl_key_done = f"xl_denhan_{key_prefix}_done"
+                            sk_excel = f"excel_bytes_den_han_{key_prefix}"
                             try:
-                                with st.spinner("⏳ Đang tạo file Excel..."):
-                                    # Tạo sheet chính và sheet thông tin bộ lọc
-                                    _xl_sheets = {f"Đến hạn {label}": df_xuat_so}
-                                    if _tieu_de_phu:
-                                        _xl_sheets["Thông tin bộ lọc"] = pd.DataFrame({"Bộ lọc": [_tieu_de_phu]})
-                                    _xl_bytes = xuat_excel(_xl_sheets)
-                                st.session_state[_xl_key_done] = True
-                                st.download_button(
-                                    label="📥 Xuất Excel",
-                                    data=_xl_bytes,
-                                    file_name=ten_file_xuat(f"HoSoDenHan_{key_prefix}"),
-                                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                                    use_container_width=True,
-                                    key=f"excel_den_han_{key_prefix}",
-                                )
-                                if st.session_state.get(_xl_key_done, False):
-                                    st.success("✅ Đã tạo xong — nhấn nút tải để lưu file")
+                                if st.button("📥 Xuất Excel",
+                                            key=f"btn_excel_den_han_{key_prefix}",
+                                            use_container_width=True):
+                                    with st.spinner("⏳ Đang tạo file Excel..."):
+                                        # Tạo sheet chính và sheet thông tin bộ lọc
+                                        _xl_sheets = {f"Đến hạn {label}": df_xuat_so}
+                                        if _tieu_de_phu:
+                                            _xl_sheets["Thông tin bộ lọc"] = pd.DataFrame({"Bộ lọc": [_tieu_de_phu]})
+                                        st.session_state[sk_excel] = xuat_excel(_xl_sheets)
+                                    st.success("✅ File Excel đã sẵn sàng! Nhấn nút bên dưới để tải.")
+                                if sk_excel in st.session_state:
+                                    st.download_button(
+                                        label="⬇ Tải file Excel",
+                                        data=st.session_state[sk_excel],
+                                        file_name=ten_file_xuat(f"HoSoDenHan_{key_prefix}"),
+                                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                        use_container_width=True,
+                                        key=f"excel_den_han_{key_prefix}",
+                                    )
                             except Exception as _e_dh:
                                 st.error(f"❌ Lỗi xuất Excel: {_e_dh}")
 

@@ -7,7 +7,6 @@ import time
 from datetime import datetime, date
 import streamlit as st
 
-from logo_b64_snippet import LOGO_NHCSXH_B64
 import duckdb
 import pandas as pd
 
@@ -293,58 +292,8 @@ def show_logo(width=80):
 
 
 def main():
-    # Splash screen chỉ hiện khi chưa đăng nhập
-    if not st.session_state.get("_splash_done"):
-        placeholder = st.empty()
-        placeholder.markdown(
-            f"""<div style="position:fixed;top:0;left:0;width:100vw;height:100vh;
-  background:linear-gradient(145deg,#1a1a6e 0%,#003087 50%,#0055b3 100%);
-  display:flex;flex-direction:column;align-items:center;justify-content:center;
-  z-index:9999;font-family:'Times New Roman',Georgia,serif;">
-
-  <img src="data:image/jpeg;base64,{LOGO_NHCSXH_B64}"
-       style="width:100px;margin-bottom:28px;">
-
-  <div style="color:white;font-size:1.8rem;font-weight:700;
-    text-align:center;margin-bottom:10px;letter-spacing:0.5px;">
-    NGÂN HÀNG CHÍNH SÁCH XÃ HỘI
-  </div>
-  <div style="color:rgba(255,255,255,0.97);font-size:1.45rem;font-weight:600;
-    text-align:center;margin-bottom:6px;">
-    Chi nhánh tỉnh Đồng Nai
-  </div>
-  <div style="color:rgba(255,255,255,0.85);font-size:1.25rem;font-weight:500;
-    text-align:center;margin-bottom:44px;font-style:italic;">
-    Phòng Kế hoạch - Nghiệp vụ Tín dụng
-  </div>
-
-  <div style="width:280px;height:3px;background:rgba(255,255,255,0.25);
-    border-radius:4px;overflow:hidden;">
-    <div style="height:100%;background:white;border-radius:4px;
-      animation:load 1.8s ease-in-out forwards;"></div>
-  </div>
-  <div style="color:rgba(255,255,255,0.55);font-size:0.8rem;margin-top:12px;">
-    Đang tải hệ thống...
-  </div>
-
-  <div style="position:absolute;bottom:24px;color:rgba(255,255,255,0.3);
-    font-size:0.72rem;">
-    Hệ thống Quản trị Tín dụng Nội bộ · VBSP-SCM
-  </div>
-</div>
-
-<style>
-@keyframes load {{
-  from {{ width:0%; }}
-  to   {{ width:100%; }}
-}}
-</style>""",
-            unsafe_allow_html=True,
-        )
-        time.sleep(1.8)
-        placeholder.empty()
-        st.session_state["_splash_done"] = True
-        st.rerun()
+    # Splash screen — tạm tắt để debug
+    st.session_state["_splash_done"] = True
 
     # ── Session state ─────────────────────────────────────────────────────────
     for k, v in [("logged_in",False),("user_info",None),("username",""),("workspace",None)]:

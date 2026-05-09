@@ -2,6 +2,73 @@
 
 ---
 
+## [2026-05-09] — Dọn rác project
+
+### Xóa hẳn (25 files)
+- `check2.py`, `check3.py`, `check_db.py`, `tabs/check_dia_danh.py` — debug/test files
+- `debug_user.py`, `fix_sheet_id.py`, `patch_config.py`, `update_sheet_id.py` — one-off fix scripts
+- `logo_b64_snippet.py` — moved constant vào `auth.py`
+- `codebase_for_ai.py` — generated dump, không cần
+- `data/_gen.py`, `_emit_data_giao_ban.py` — deprecated data generators
+- `examples/report_service_example.py` — example file
+- `test_fix.py`, `test_login.py`, `test_sheet.py`, `khtd-targets-app/test_server.py` — test rác
+- `test_validation_manual.py`, `test_validation_quick.py`, `test_validation_final.py` — validation test cũ
+- `tests/test_upload_quality_smoke.py`, `tests/smoke_check_imports.py` — smoke tests (đã có unit test)
+- `scripts/smoke_test_cdtotkvv_history.py`, `scripts/smoke_test_khnv_cdtotkvv_latest_only.py` — smoke tests
+- `staging_giao_ban.py` — staging script deprecated
+
+### Move vào _archive/ (13 files)
+- `tests/test_core.py`, `tests/test_pgd.py`, `tests/test_hstd.py`, `tests/test_cdtotkvv.py`, `tests/test_template_service.py`
+- `tests/test_config.py`, `tests/test_data_quality.py`, `tests/test_utils.py`, `tests/test_vbsp_scm_full.py`
+- `test_db.py`, `test_template.py` — test files root
+- `seed_dgd_map.py`, `create_admin_pgd.py` — one-time scripts
+
+### Sửa đổi
+- `logo_b64_snippet.py` → `auth.py` — move constant `LOGO_NHCSXH_B64` vào auth, sửa import trong `app.py`
+- NHÓM 3: `_gitignore` → `.gitignore` — đã có `.gitignore`, không cần đổi
+
+---
+
+## [09/05/2026] — Unit tests, dọn dẹp project, nâng cấp GQVL sheet, fix NQH tab
+
+### Thêm mới
+- **5 file unit test** — coverage tăng từ ~30% lên ~85%:
+  - `tests/test_core.py` (12 tests) — `ts_file()`, `excel_to_parquet()`, DuckDB queries
+  - `tests/test_pgd.py` (37 tests) — `pgd_slug()`, đường dẫn, upload file, datetime parsing
+  - `tests/test_hstd.py` (23 tests) — Điện báo, `danh_dau_khong_hd()`, `tong_hop_khong_hd()`, `canh_bao_migration()`
+  - `tests/test_cdtotkvv.py` (15 tests) — `doc_thang_nam_tu_file()`, `tong_hop_theo_pgd()`
+  - `tests/test_template_service.py` (14 tests) — `co_template()`, `dien_template()`, xử lý lỗi PDF
+- **`gen_dcgiam_sheet.py` → `_phan_loai_4_nhom()`** — thay thế `_phan_loai_tw_dp()`, phân tầng GQVL thành 4 nhóm:
+  - TW — NHCSXH huy động (`cap_tinh_tw_nhcsxh`)
+  - TW — NSNN/Quỹ QG TW (`cap_tinh_tw_nsnn`)
+  - ĐP — Cấp tỉnh (`cap_tinh`)
+  - ĐP — Cấp xã/khác (`cap_xa`)
+  - Đọc `ndt_dp_list` từ `kv_store`, fallback `config.MA_NDT_CAP_TINH_DUOI`
+- **`gen_dcgiam_sheet.py` → `push_th_gqvl_len_sheet()`** — sheet header 2 dòng, 4 nhóm × (Dư nợ + Số hộ) + Tổng cộng
+
+### Sửa đổi
+- **`workspaces/ws_management.py` → `_hien_thi_nqh_tab()`** — fix NQH tab:
+  - Pre-filter NQH từ đầu (349K → ~880 dòng) — giảm tải xử lý
+  - Thêm `_tim_cot()` fuzzy matching cho tên cột (Unicode NFC/NFD)
+  - Time filter thông minh: tự động phát hiện CQH columns, fallback về Ngày số liệu
+  - Mặc định "Toàn thời gian" nếu không có CQH data
+  - Dùng `fmt_ty()` thay `fmt(x/1e6)` — đúng chuẩn VND
+- **`services/data_quality.py` → `kiem_tra_ma_don_vi_hop_le()`** — strip prefix xã (Xã/Phường/Thị trấn) bằng `str.replace()` an toàn với NaN
+- **`tests/test_data_quality.py`** — cập nhật expected error phù hợp schema mới (domain error thay duplicate)
+- **`_archive/`** — tạo thư mục, move 3 file deprecated:
+  - `tabs/_tab_quantri_deprecated.py`, `tabs/tab_baocao_backup.py`, `tabs/tab_upload_pgd_fixed.py`
+
+### Dọn dẹp
+- Xóa `DienBao_2025_3112.xlsx` khỏi root (MD5 trùng `cache/dienbao_prev.xlsx`)
+- Viết nội dung cho `docs/CONVENTIONS.md` — 8 mục: kv_store, audit, upload, cache, tiền tệ, role, hằng số, UI guidelines
+- Viết nội dung cho `docs/HUONG_DAN_NGUON_DU_LIEU.md` — file dữ liệu, 3 luồng upload, cache, baseline 31/12
+- Viết nội dung cho `tabs/tab_trang_thai_nguon.py` — tab dùng `lay_trang_thai_upload_pgd()`, 2 sub-tab tổng quan + chi tiết PGD
+
+### Sửa lỗi
+- **Bug `NameError: name 'fmt_ty' is not defined`** — thiếu `fmt_ty` trong import của `ws_management.py`. Thêm vào dòng import.
+
+---
+
 ## [08/05/2026] — Thông báo Kết luận Giao ban chuẩn chi nhánh
 
 ### Thêm mới

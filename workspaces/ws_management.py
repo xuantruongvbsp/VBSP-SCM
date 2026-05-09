@@ -787,7 +787,7 @@ def render(**kwargs):
     )
 
     CAC_NHOM = {
-        "giam_sat":   {"label": "📊 Giám sát",    "tabs": nhom_giam_sat},
+        "giam_sat":   {"label": "📊 Tổng quan",   "tabs": nhom_giam_sat},
         "kiem_soat":  {"label": "🔍 Kiểm soát & Rủi ro", "tabs": nhom_kiem_soat},
         "ke_hoach":   {"label": "🎯 Kế hoạch",    "tabs": nhom_ke_hoach},
         "bao_cao":    {"label": "📈 Báo cáo & Cân đối", "tabs": nhom_bao_cao},

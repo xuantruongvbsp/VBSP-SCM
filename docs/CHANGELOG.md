@@ -2,6 +2,12 @@
 
 ---
 
+## [2026-05-09] — Cập nhật phản hồi trạng thái rõ ràng cho 3 nút xuất trong tab Đến hạn
+- `pdf_service.py` dòng ~461,463 — cập nhật spinner "⏳ Đang tạo báo cáo PDF..." và success "✅ Báo cáo PDF đã xuất xong!"
+- `tabs/tab_tongquan.py` dòng ~1243-1261 — refactor nút Xuất Excel: button → spinner → success → download_button với session_state
+- Pattern mới cho Excel: `st.button("📥 Xuất Excel")` → `st.spinner()` → `st.success()` → `st.download_button("⬇ Tải file Excel")`
+- Key session_state unique theo `key_prefix` để tránh conflict giữa các tab (1m, 3m, 6m, nam)
+
 ## [2026-05-09] — Thêm thông tin bộ lọc chi tiết vào báo cáo Xuất Excel/PDF và Preview
 - `pdf_service.py` dòng ~74-82 — thêm tham số `tieu_de_phu` cho hàm `xuat_pdf()` và `nut_xuat_pdf()`
 - `pdf_service.py` dòng ~143-149 — hiển thị thông tin bộ lọc trong header PDF

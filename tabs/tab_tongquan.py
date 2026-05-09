@@ -1219,7 +1219,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                         _show_key = f"show_preview_den_han_{key_prefix}"
                         if st.session_state.get(_show_key, False):
                             st.markdown("---")
-                            st.markdown(f"#### 🖨️ Preview — Hồ sơ đến hạn {label}")
+                            st.markdown(f"#### 🖨️ Preview — Hồ sơ đến hạn {label}", unsafe_allow_html=True)
                             _print_style_dh = """
                             <style>
                             @media print {
@@ -1267,9 +1267,11 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                             </table>
                             </div>
                             """
-                            st.markdown(
+                            import streamlit.components.v1 as components
+                            components.html(
                                 _print_style_dh + f'<div id="print-denhan">{_preview_header_dh}{_table_html_dh}</div>',
-                                unsafe_allow_html=True,
+                                height=600,
+                                scrolling=True,
                             )
                             st.button(
                                 "🖨️ In trang này (Ctrl+P)",

@@ -13,7 +13,7 @@ import pandas as pd
 
 from config import (
     FILE_PATH, FILE_PATH_NQ11, FILE_PATH_DB, FILE_PATH_DB_PREV,
-    FILE_PATH_SK_GQVL,
+    FILE_PATH_SK_GQVL, CACHE_SK_GQVL,
     TEN_FILE, TEN_FILE_NQ11, TEN_FILE_DB, TEN_FILE_DB_PREV,
     COT_TEN_PGD, COT_MA_KH, COT_NGAY_SL, WORKSPACE_MAP,
     CACHE_HSTD, CACHE_NQ11, DON_VI_CHI_NHANH,
@@ -490,21 +490,9 @@ def main():
             db.ghi_audit(username, "logout", "")
             st.rerun()
 
-    # ── Load dữ liệu — skip nếu đã có ctx và file chưa thay đổi ─────────────────
-    _ts_hien_tai = ts_file(CACHE_HSTD) if os.path.exists(CACHE_HSTD) else 0.0
-    _ctx_cu = st.session_state.get("_ctx_cache")
-    _ws_hien_tai = st.session_state.workspace
-
-    if (
-        _ctx_cu is not None
-        and _ctx_cu.get("ts_hstd") == _ts_hien_tai
-        and _ctx_cu.get("_ws") == _ws_hien_tai
-        and _ws_hien_tai != "operation"   # operation luôn load mới vì PGD tự upload
-    ):
-        ctx = _ctx_cu
-    else:
-      with st.spinner("⏳ Đang tải dữ liệu, vui lòng chờ..."):
-        ws_hien_tai = _ws_hien_tai
+    # ── Load dữ liệu (ưu tiên Upload PGD cho workspace Operation) ────────────────
+    with st.spinner("⏳ Đang tải dữ liệu, vui lòng chờ..."):
+        ws_hien_tai = st.session_state.workspace
 
         # Ưu tiên CACHE_HSTD (merge từ 22 PGD upload).
         if not os.path.exists(CACHE_HSTD):
@@ -642,8 +630,6 @@ def main():
             ds_pgd_all=_ds_pgd_all,
             ts_hstd=ts_file(CACHE_HSTD) if os.path.exists(CACHE_HSTD) else 0.0,
         )
-        ctx["_ws"] = ws_hien_tai
-        st.session_state["_ctx_cache"] = ctx
 
     # ── Render workspace ──────────────────────────────────────────────────────────
     ws = st.session_state.workspace

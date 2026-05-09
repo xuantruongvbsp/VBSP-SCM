@@ -2,6 +2,9 @@
 
 ---
 
+## [2026-05-09] — Ẩn nút Xuất PDF trong tab Tổng quan
+- `tabs/tab_tongquan.py` dòng ~961 — comment nút Xuất PDF trong bảng "Thông tin tổng quát theo PGD"
+
 ## [2026-05-09] — Fix PDF bảng TQPGD bị dồn cột header
 - `pdf_service.py` dòng ~283 — thêm 4 case _col_ratio() cho cột đơn vị (3.5), số lượng (0.7), tiền tỷ (1.1), tỷ lệ % (0.8)
 - `pdf_service.py` dòng ~192 — header wrap + font nhỏ hơn cho bảng >= 11 cột

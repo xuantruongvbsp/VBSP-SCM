@@ -202,7 +202,7 @@ def _render_canh_bao_no(df_full: pd.DataFrame, ds_pgd_all: list, role: str, user
         _hien_thi_migration_tab(df_kh, ds_pgd_all)
 
     with sub4:
-        _hien_thi_nqh_tab(df_full, username)
+        _hien_thi_nqh_tab(df_kh, username)
 
 
 def _hien_thi_khd_tab(df_kh: pd.DataFrame, ds_pgd_all: list):
@@ -281,7 +281,7 @@ def _hien_thi_migration_tab(df_kh: pd.DataFrame, ds_pgd_all: list):
     hien_thi_dataframe_phan_trang(df_loc[cols_hien], key="mg_chi", height=360)
 
 
-def _hien_thi_nqh_tab(df_full: pd.DataFrame, username: str):
+def _hien_thi_nqh_tab(df_kh: pd.DataFrame, username: str):
     """Sub-tab: Nợ quá hạn phát sinh — có bộ lọc thời gian."""
 
     # Cột lọc thời gian — string literal vì chưa có constant trong config.py
@@ -289,8 +289,7 @@ def _hien_thi_nqh_tab(df_full: pd.DataFrame, username: str):
     COT_CQH_QUY   = "CQH trong Quý"
     COT_CQH_NAM   = "CQH Năm"
 
-    df_kh = danh_dau_khong_hd(df_full)
-
+    # df_kh đã được danh_dau_khong_hd() xử lý từ _render_canh_bao_no()
     # Điều kiện nền: Dư nợ QH > 0
     mask_nqh = pd.to_numeric(
         df_kh.get(COT_DU_NO_QH, pd.Series(dtype=float, index=df_kh.index)),
@@ -339,7 +338,7 @@ def _hien_thi_nqh_tab(df_full: pd.DataFrame, username: str):
     tong_dn  = df_nqh[COT_TONG_DU_NO].sum() if COT_TONG_DU_NO in df_nqh.columns else 0
     k1, k2, k3 = st.columns(3)
     k1.metric("📋 Số hồ sơ NQH", fmt_so(len(df_nqh)))
-    k2.metric("💰 Dư nợ QH (tr.đ)", fmt(tong_nqh / 1e6, 1))
+    k2.metric("💰 Dư nợ QH (tr.đ)", fmt(tong_nqh / 1e6))
     k3.metric("📊 Tỷ lệ NQH",
               f"{tong_nqh / tong_dn * 100:.2f}%" if tong_dn else "0%")
 

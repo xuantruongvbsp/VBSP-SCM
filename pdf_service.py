@@ -458,8 +458,9 @@ def nut_xuat_pdf(
     """
     if st.button("📄 Xuất PDF", key=key, type="secondary"):
         try:
-            with st.spinner("Đang tạo PDF..."):
+            with st.spinner("⏳ Đang tạo báo cáo PDF, vui lòng chờ..."):
                 pdf_bytes = xuat_pdf(df, tieu_de, username, cols_tien, prefix_file=prefix_file, tieu_de_phu=tieu_de_phu)
+            st.success("✅ Báo cáo PDF đã xuất xong! Nhấn nút bên dưới để tải.")
             ten_file = f"{prefix_file}_{datetime.now().strftime('%d%m%Y_%H%M')}.pdf"
             st.download_button(
                 label="⬇ Tải file PDF",
@@ -468,6 +469,5 @@ def nut_xuat_pdf(
                 mime="application/pdf",
                 key=f"{key}_dl",
             )
-            st.success("✅ PDF đã tạo xong")
         except Exception as e:
             st.error(f"❌ Lỗi tạo PDF: {e}")

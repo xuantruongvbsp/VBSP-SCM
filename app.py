@@ -34,6 +34,7 @@ from auth import LOGO_NHCSXH_B64 as LOGO_B64, normalize_role
 from workspaces import ws_executive, ws_management, ws_operation
 import db
 from widgets.status_widget import render_status_compact
+from alert_center import render_alert_sidebar
 
 
 @st.cache_data(show_spinner=False, ttl=3600)  # tự xóa sau 1 giờ
@@ -351,6 +352,16 @@ def main():
             st.session_state[k] = v
 
     # ── Login ─────────────────────────────────────────────────────────────────
+    # DEV MODE: tự động đăng nhập admin (xóa block này khi deploy)
+    if not st.session_state.logged_in:
+        st.session_state.logged_in = True
+        st.session_state.username  = "admin"
+        st.session_state.user_info = {
+            "ho_ten": "Admin Dev",
+            "role":   "admin",
+            "pgd":    None,
+        }
+    # END DEV MODE
     if not st.session_state.logged_in:
         auth.hien_thi_login()
         st.stop()
@@ -453,6 +464,12 @@ def main():
                     icon = "✅" if ngay.date() >= date.today() else "⚠️"
                     st.caption(f"{icon} `{ten}` {mb:.1f}MB")
 
+        render_alert_sidebar(
+            df_full=st.session_state.get("df_full"),
+            role=role,
+            pgd_user=pgd_user,
+        )
+
         from auth import la_phan_he_cn, la_phan_he_pgd
 
         if role in ["admin","manager","executive"] or la_phan_he_cn(role) or la_phan_he_pgd(role):
@@ -471,11 +488,23 @@ def main():
                 st.session_state[k] = False if k=="logged_in" else None
             st.session_state.username = ""
             db.ghi_audit(username, "logout", "")
-            st.cache_data.clear(); st.rerun()
+            st.rerun()
 
-    # ── Load dữ liệu (ưu tiên Upload PGD cho workspace Operation) ────────────────
-    with st.spinner("⏳ Đang tải dữ liệu, vui lòng chờ..."):
-        ws_hien_tai = st.session_state.workspace
+    # ── Load dữ liệu — skip nếu đã có ctx và file chưa thay đổi ─────────────────
+    _ts_hien_tai = ts_file(CACHE_HSTD) if os.path.exists(CACHE_HSTD) else 0.0
+    _ctx_cu = st.session_state.get("_ctx_cache")
+    _ws_hien_tai = st.session_state.workspace
+
+    if (
+        _ctx_cu is not None
+        and _ctx_cu.get("ts_hstd") == _ts_hien_tai
+        and _ctx_cu.get("_ws") == _ws_hien_tai
+        and _ws_hien_tai != "operation"   # operation luôn load mới vì PGD tự upload
+    ):
+        ctx = _ctx_cu
+    else:
+      with st.spinner("⏳ Đang tải dữ liệu, vui lòng chờ..."):
+        ws_hien_tai = _ws_hien_tai
 
         # Ưu tiên CACHE_HSTD (merge từ 22 PGD upload).
         if not os.path.exists(CACHE_HSTD):
@@ -531,7 +560,7 @@ def main():
                 # Nếu pgd_data/ chưa có → df giữ nguyên CACHE_HSTD, không warning
         else:
             df = df_full  # reset về toàn chi nhánh khi không phải workspace operation
-            st.cache_data.clear()  # clear cache khi đổi workspace
+            # KHÔNG clear cache ở đây — cache chỉ xóa khi upload file mới
 
         # ── NQ11 ─────────────────────────────────────────────────────────────────────
         df_nq11 = None
@@ -553,39 +582,37 @@ def main():
                 makh_list = df[COT_MA_KH].dropna().astype(str).unique().tolist()
                 if makh_list:
                     _makh_sql = ", ".join(f"'{m}'" for m in makh_list)
-                    df_nq11 = duckdb.query(
-                        f"SELECT * FROM '{CACHE_NQ11}'"
-                        f" WHERE CAST(\"Mã khách hàng\" AS VARCHAR) IN ({_makh_sql})"
-                    ).df()
+                    _sql = f"SELECT * FROM '{CACHE_NQ11}' WHERE \"{COT_MA_KH}\" IN ({_makh_sql})"
+                    try:
+                        df_nq11 = duckdb.query(_sql).df()
+                    except Exception:
+                        df_nq11 = _load_nq11(CACHE_NQ11, ts_file(CACHE_NQ11))
                 else:
-                    import pandas as _pd
-                    df_nq11 = _pd.DataFrame()
+                    df_nq11 = pd.DataFrame()
             else:
                 df_nq11 = _load_nq11(CACHE_NQ11, ts_file(CACHE_NQ11))
 
         # Sao kê GQVL chi tiết — dùng để xác định nhãn NQ11 cho món vay dư nợ = 0
         df_sk_gqvl = None
         if os.path.exists(FILE_PATH_SK_GQVL):
-            df_sk_gqvl = doc_file_sk_gqvl(FILE_PATH_SK_GQVL, ts_file(FILE_PATH_SK_GQVL))
+            if not os.path.exists(CACHE_SK_GQVL):
+                doc_file_sk_gqvl(FILE_PATH_SK_GQVL, ts_file(FILE_PATH_SK_GQVL))
+            if os.path.exists(CACHE_SK_GQVL):
+                df_sk_gqvl = _load_nq11(CACHE_SK_GQVL, ts_file(CACHE_SK_GQVL))
 
-        # ── Build pgd_xa_map và ds_pgd_all ───────────────────────────────────────────
-        # pgd_xa_map: {tên_xã: tên_pgd} — dùng cho tab KHTD, CBTD, Cân đối
-        # ds_pgd_all: danh sách tên PGD đã sắp xếp
-        # Ưu tiên: 1) kv_store (Admin chỉnh qua giao diện), 2) dữ liệu HSTD thực tế
-        if role == "user" and os.path.exists(CACHE_HSTD):
-            _df_ref = duckdb.query(
-                f"SELECT DISTINCT \"{COT_TEN_PGD}\", \"Tên xã\" FROM '{CACHE_HSTD}'"
-            ).df()
-        else:
+        # ── Xây dựng mapping Xã → PGD ───────────────────────────────────────────────
+        # Ưu tiên: 1) kv_store (admin config), 2) dữ liệu thực tế từ HSTD
+        # KHÔNG dùng DS_PGD / PGD_XA_MAP hardcode nữa
+        if df_full is not None and not df_full.empty:
             _df_ref = df_full
+        else:
+            _df_ref = df
 
         # --- Build từ HSTD (nguồn thực tế) ---
         _pgd_xa_map = {}
         if COT_TEN_PGD in _df_ref.columns and "Tên xã" in _df_ref.columns:
             for pgd, xa in _df_ref[[COT_TEN_PGD, "Tên xã"]].dropna().drop_duplicates().values:
                 _pgd_xa_map[str(xa).strip()] = str(pgd).strip()
-        _ds_pgd_all = sorted(_df_ref[COT_TEN_PGD].dropna().unique().tolist()) \
-                      if COT_TEN_PGD in _df_ref.columns else []
 
         # --- Bổ sung / ghi đè từ kv_store nếu Admin đã cấu hình ---
         _kv_ds_pgd    = lay_config("ds_pgd",    _DS_PGD_DEFAULT)
@@ -615,6 +642,8 @@ def main():
             ds_pgd_all=_ds_pgd_all,
             ts_hstd=ts_file(CACHE_HSTD) if os.path.exists(CACHE_HSTD) else 0.0,
         )
+        ctx["_ws"] = ws_hien_tai
+        st.session_state["_ctx_cache"] = ctx
 
     # ── Render workspace ──────────────────────────────────────────────────────────
     ws = st.session_state.workspace

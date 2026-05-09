@@ -292,6 +292,32 @@ def dang_nhap(un: str, pw: str):
 
 
 # ── Trang login ───────────────────────────────────────────────────────────────
+@st.cache_data(show_spinner=False)
+def _build_login_html() -> str:
+    """Cache HTML header login (chứa logo base64 nặng)."""
+    return f"""
+<div style="background:linear-gradient(160deg,#1b5e20,#2e7d32);
+            border-radius:12px 12px 0 0; margin:-40px -40px 20px;
+            padding:28px 24px 20px; text-align:center">
+  <img src="data:image/jpeg;base64,{LOGO_NHCSXH_B64}"
+       width="88"
+       style="border-radius:50%;border:3px solid rgba(255,255,255,0.5);
+              display:block;margin:0 auto 12px">
+  <div style="color:#fff;font-size:13.5px;font-weight:700;
+              letter-spacing:0.4px;line-height:1.5">
+    NGÂN HÀNG CHÍNH SÁCH XÃ HỘI
+  </div>
+  <hr style="border:none;border-top:1px solid rgba(255,255,255,0.3);
+             margin:8px 20px">
+  <div style="color:#c8e6c9;font-size:11.5px">Chi nhánh Đồng Nai</div>
+  <div style="color:rgba(255,255,255,0.55);font-size:10.5px;
+              margin-top:3px">
+    Hệ thống Quản trị Tín dụng Nội bộ · VBSP-SCM
+  </div>
+</div>
+"""
+
+
 def hien_thi_login():
     st.markdown(
         """
@@ -350,30 +376,7 @@ def hien_thi_login():
         so_tai_khoan = len(doc_users())
 
         # HEADER
-        st.markdown(
-            f"""
-<div style="background:linear-gradient(160deg,#1b5e20,#2e7d32);
-            border-radius:12px 12px 0 0; margin:-40px -40px 20px;
-            padding:28px 24px 20px; text-align:center">
-  <img src="data:image/jpeg;base64,{LOGO_NHCSXH_B64}"
-       width="88"
-       style="border-radius:50%;border:3px solid rgba(255,255,255,0.5);
-              display:block;margin:0 auto 12px">
-  <div style="color:#fff;font-size:13.5px;font-weight:700;
-              letter-spacing:0.4px;line-height:1.5">
-    NGÂN HÀNG CHÍNH SÁCH XÃ HỘI
-  </div>
-  <hr style="border:none;border-top:1px solid rgba(255,255,255,0.3);
-             margin:8px 20px">
-  <div style="color:#c8e6c9;font-size:11.5px">Chi nhánh Đồng Nai</div>
-  <div style="color:rgba(255,255,255,0.55);font-size:10.5px;
-              margin-top:3px">
-    Hệ thống Quản trị Tín dụng Nội bộ · VBSP-SCM
-  </div>
-</div>
-""",
-            unsafe_allow_html=True,
-        )
+        st.markdown(_build_login_html(), unsafe_allow_html=True)
 
         # FORM (logic giữ nguyên)
         with st.form("login"):

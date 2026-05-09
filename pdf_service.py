@@ -92,6 +92,9 @@ def xuat_pdf(
 
     cols_tien = cols_tien or []
 
+    if df is None or df.empty:
+        raise ValueError("Không có dữ liệu để xuất PDF.")
+
     dong_tong_cells = None
     if them_dong_tong and cols_tien and len(df) > 0:
         tong_row = {}
@@ -186,11 +189,15 @@ def xuat_pdf(
 
     header_font_size = font_size + 2
 
-    # Header row
+    # Header row — font nhỏ hơn cho bảng nhiều cột
+    h_font = header_font_size if n_cols <= 10 else max(font_size - 1, 7)
     header_cells = [
-        Paragraph(str(c).replace("_", " "), ParagraphStyle("th", fontName=fb,
-                  fontSize=header_font_size, alignment=TA_CENTER,
-                  textColor=colors.white))
+        Paragraph(
+            str(c).replace("_", " ").replace(" (tỷ)", "\n(tỷ)").replace(" %", "\n%"),
+            ParagraphStyle("th", fontName=fb, fontSize=h_font,
+                           alignment=TA_CENTER, textColor=colors.white,
+                           leading=h_font + 2)
+        )
         for c in df.columns
     ]
     table_data = [header_cells]
@@ -272,6 +279,26 @@ def xuat_pdf(
                 return 0.8
             if any(k in c for k in ("còn", "con ")):
                 return 1.0
+
+            # Cột tên đơn vị — rộng nhất
+            if any(k in c for k in ("đơn vị", "don vi", "tên pgd", "ten pgd")):
+                return 3.5
+
+            # Cột số lượng nguyên (KH, Tổ)
+            if any(k in c for k in ("số kh", "so kh", "tổng tổ", "tong to",
+                                     "tốt", "tot", "khá", "kha", " tb", "yếu", "yeu")):
+                return 0.7
+
+            # Cột tiền tỷ
+            if any(k in c for k in ("dư nợ", "du no", "qh (", "khoanh", "lãi tồn",
+                                     "nợ xấu", "no xau", "nợ đh", "no dh",
+                                     "ds cho", "ds thu")):
+                return 1.1
+
+            # Cột tỷ lệ %
+            if any(k in c for k in ("tl qh", "tl kh", "tl npl", "% ", "tỷ lệ")):
+                return 0.8
+
             return 1.2
 
         ratios = [_col_ratio(c) for c in cols_list]

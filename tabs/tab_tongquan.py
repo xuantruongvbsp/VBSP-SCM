@@ -1198,11 +1198,12 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
 
                         # ── (2) Preview + In PDF ──────────────────────────────────
                         with _c2_dh:
-                            _preview_key = f"preview_den_han_{key_prefix}"
-                            if st.button("🔍 Preview / In PDF", key=_preview_key, type="secondary"):
-                                st.session_state[_preview_key] = not st.session_state.get(
-                                    _preview_key, False
-                                )
+                            _show_key = f"show_preview_den_han_{key_prefix}"
+                            if st.button("🔍 Preview / In PDF",
+                                         key=f"btn_{_show_key}",
+                                         type="secondary",
+                                         use_container_width=True):
+                                st.session_state[_show_key] = not st.session_state.get(_show_key, False)
 
                         # ── (3) Xuất PDF ──────────────────────────────────────────
                         with _c3_dh:
@@ -1215,8 +1216,8 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                             )
 
                         # ── Khung preview HTML ────────────────────────────────────
-                        _preview_key = f"preview_den_han_{key_prefix}"
-                        if st.session_state.get(_preview_key, False):
+                        _show_key = f"show_preview_den_han_{key_prefix}"
+                        if st.session_state.get(_show_key, False):
                             st.markdown("---")
                             st.markdown(f"#### 🖨️ Preview — Hồ sơ đến hạn {label}")
                             _print_style_dh = """

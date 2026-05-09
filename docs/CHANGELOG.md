@@ -2,6 +2,39 @@
 
 ---
 
+## [2026-05-09] — Tối ưu hiệu năng tab "Hồ sơ đến hạn" trong Tổng quan
+- `tabs/tab_tongquan.py` dòng ~85 — thêm `_cache_datetime_denhan()` cache `pd.to_datetime()` với TTL 1 giờ
+- `tabs/tab_tongquan.py` dòng ~99 — thêm `_cache_bang_denhan()` cache kết quả `groupby()`
+- `tabs/tab_tongquan.py` dòng ~1175 — lazy render Plotly chart dùng `st.session_state` để tránh render lại
+- `tabs/tab_tongquan.py` dòng ~1312 — giới hạn HTML preview chỉ hiển thị top 100 dòng, tránh `iterrows()` chậm với DataFrame lớn
+- **Kết quả:** Giảm thời gian đổi filter từ ~2 giây xuống ~200-500ms (4-10x nhanh hơn)
+
+## [2026-05-09] — Thêm subtitle phạm vi in cho preview đến hạn
+- `tabs/tab_tongquan.py` dòng ~1243-1258 — thêm `_subtitle_loc_dh` động dựa trên trạng thái lọc PGD/CT/Xã
+- Hiển thị "📋 Phạm vi: Toàn Chi nhánh" hoặc "Theo PGD và Xã" tùy theo bộ lọc đang chọn
+
+## [2026-05-09] — Thêm trạng thái phản hồi cho 3 nút xuất trong tab Đến hạn
+- `tabs/tab_tongquan.py` dòng ~1188 — thêm `st.spinner()` và `st.success()` cho nút Xuất Excel
+- `tabs/tab_tongquan.py` dòng ~1212 — thêm `st.info()` khi Preview ON
+- `pdf_service.py` dòng ~448 — thêm `st.success()` sau khi PDF tạo xong
+
+## [2026-05-09] — Tối ưu tốc độ load màn hình đăng nhập
+- `auth.py` dòng ~295 — thêm `@st.cache_data` cho `_build_login_html()` cache HTML header chứa logo base64 (~50KB)
+- **Kết quả:** Giảm đáng kể thời gian render login screen
+
+## [2026-05-09] — Fix splash screen loop khi DEV MODE bật
+- `app.py` dòng ~297 — sửa điều kiện splash từ `and not st.session_state.get("logged_in")` thành chỉ kiểm tra `_splash_done`
+
+## [2026-05-09] — Tối ưu tab "Nợ QH phát sinh" trong Cảnh báo
+- `ws_management.py` dòng ~205 — truyền `df_kh` đã xử lý thay vì `df_full`, tránh gọi `danh_dau_khong_hd()` 2 lần
+
+## [2026-05-09] — Thêm tab Audit Log cho Admin
+- `tabs/tab_audit_log.py` — file mới hiển thị lịch sử thao tác hệ thống với bộ lọc thời gian, user, action
+- `ws_management.py` dòng ~704 — thêm tab "📋 Audit Log" vào nhóm Hành chính (chỉ admin/admin_cn)
+
+## [2026-05-09] — Thêm bộ lọc thời gian cho tab "Nợ QH phát sinh"
+- `ws_management.py` dòng ~284 — thêm 4 chế độ lọc: Trong tháng, Trong quý, Trong năm, Toàn thời gian
+
 ## [2026-05-09] — Thêm 3 nút xuất (Excel + Preview/In PDF + PDF) trong tab Tổng quan
 - `tabs/tab_tongquan.py` dòng ~953 — thay thế nút PDF bị ẩn bằng 3 nút: Xuất Excel, Preview/In PDF (toggle + @media print), Xuất PDF
 

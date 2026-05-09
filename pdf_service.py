@@ -810,18 +810,28 @@ def nut_xuat_pdf(
     Gọi: nut_xuat_pdf(export_df, "Báo cáo dư nợ", username,
                       cols_tien=[COT_TONG_DU_NO, COT_DU_NO_QH])
     """
+    ss_key = f"_pdf_bytes_{key}"
+    ss_file_key = f"_pdf_file_{key}"
+
     if st.button("📄 Xuất PDF", key=key, type="secondary"):
         try:
             with st.spinner("⏳ Đang tạo báo cáo PDF, vui lòng chờ..."):
                 pdf_bytes = xuat_pdf(df, tieu_de, username, cols_tien, prefix_file=prefix_file, tieu_de_phu=tieu_de_phu)
-            st.success("✅ Báo cáo PDF đã xuất xong! Nhấn nút bên dưới để tải.")
-            ten_file = f"{prefix_file}_{datetime.now().strftime('%d%m%Y_%H%M')}.pdf"
-            st.download_button(
-                label="⬇ Tải file PDF",
-                data=pdf_bytes,
-                file_name=ten_file,
-                mime="application/pdf",
-                key=f"{key}_dl",
-            )
+            st.session_state[ss_key] = pdf_bytes
+            st.session_state[ss_file_key] = f"{prefix_file}_{datetime.now().strftime('%d%m%Y_%H%M')}.pdf"
         except Exception as e:
-            st.error(f"❌ Lỗi tạo PDF: {e}")
+            import traceback
+            st.session_state[ss_key] = None
+            st.error(f"❌ Lỗi tạo PDF: {e}\n\n```\n{traceback.format_exc()}\n```")
+
+    st.session_state.setdefault(ss_key, None)
+    pdf_data = st.session_state.get(ss_key)
+    if pdf_data is not None:
+        st.success("✅ Báo cáo PDF đã xuất xong! Nhấn nút bên dưới để tải.")
+        st.download_button(
+            label="⬇ Tải file PDF",
+            data=pdf_data,
+            file_name=st.session_state.get(ss_file_key, f"{prefix_file}.pdf"),
+            mime="application/pdf",
+            key=f"{key}_dl",
+        )

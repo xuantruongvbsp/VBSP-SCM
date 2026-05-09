@@ -2,6 +2,15 @@
 
 ---
 
+## [2026-05-09] — Thêm thông tin bộ lọc chi tiết vào báo cáo Xuất Excel/PDF và Preview
+- `pdf_service.py` dòng ~74-82 — thêm tham số `tieu_de_phu` cho hàm `xuat_pdf()` và `nut_xuat_pdf()`
+- `pdf_service.py` dòng ~143-149 — hiển thị thông tin bộ lọc trong header PDF
+- `tabs/tab_tongquan.py` dòng ~1220-1237 — xây dựng chuỗi `_tieu_de_phu` từ `loc_pgd`, `loc_ct`, `loc_xa`
+- `tabs/tab_tongquan.py` dòng ~1244-1248 — thêm sheet "Thông tin bộ lọc" trong file Excel xuất ra
+- `tabs/tab_tongquan.py` dòng ~1282 — truyền `tieu_de_phu` vào `nut_xuat_pdf()`
+- `tabs/tab_tongquan.py` dòng ~1327-1335 — hiển thị chi tiết bộ lọc trong HTML preview (khung xanh lá)
+- Ví dụ hiển thị: "PGD: Bình Long, Bình Sơn • Chương trình: HSSV, GQVL"
+
 ## [2026-05-09] — Tối ưu hiệu năng tab "Hồ sơ đến hạn" trong Tổng quan
 - `tabs/tab_tongquan.py` dòng ~85 — thêm `_cache_datetime_denhan()` cache `pd.to_datetime()` với TTL 1 giờ
 - `tabs/tab_tongquan.py` dòng ~99 — thêm `_cache_bang_denhan()` cache kết quả `groupby()`

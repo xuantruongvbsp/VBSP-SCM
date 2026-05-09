@@ -282,48 +282,102 @@ def _hien_thi_migration_tab(df_kh: pd.DataFrame, ds_pgd_all: list):
 
 
 def _hien_thi_nqh_tab(df_full: pd.DataFrame, username: str):
-    """Sub-tab: Nợ quá hạn phát sinh."""
+    """Sub-tab: Nợ quá hạn phát sinh — có bộ lọc thời gian."""
+
+    # Cột lọc thời gian — string literal vì chưa có constant trong config.py
+    COT_CQH_THANG = "Chuyển QH trong tháng"
+    COT_CQH_QUY   = "CQH trong Quý"
+    COT_CQH_NAM   = "CQH Năm"
+
     df_kh = danh_dau_khong_hd(df_full)
+
+    # Điều kiện nền: Dư nợ QH > 0
     mask_nqh = pd.to_numeric(
         df_kh.get(COT_DU_NO_QH, pd.Series(dtype=float, index=df_kh.index)),
         errors="coerce",
     ).fillna(0) > 0
-    df_nqh = df_kh[mask_nqh]
+    df_nqh_all = df_kh[mask_nqh].copy()
 
-    if df_nqh.empty:
+    if df_nqh_all.empty:
         st.success("✅ Không có nợ quá hạn phát sinh.")
         return
 
+    # ── Bộ lọc thời gian ─────────────────────────────────────────────────
+    BOC_LOC = {
+        "📅 Trong tháng": COT_CQH_THANG,
+        "📆 Trong quý":   COT_CQH_QUY,
+        "📋 Trong năm":   COT_CQH_NAM,
+        "🗂️ Toàn thời gian": None,
+    }
+    chon = st.radio(
+        "Lọc theo thời gian phát sinh chuyển QH",
+        list(BOC_LOC.keys()),
+        index=3,
+        horizontal=True,
+        key="nqh_loc_tg",
+    )
+    cot_loc = BOC_LOC[chon]
+
+    # ── Áp dụng lọc ──────────────────────────────────────────────────────
+    df_nqh = df_nqh_all.copy()
+    if cot_loc is not None:
+        if cot_loc in df_nqh.columns:
+            mask_tg = pd.to_numeric(
+                df_nqh[cot_loc], errors="coerce"
+            ).fillna(0) > 0
+            df_nqh = df_nqh[mask_tg]
+        else:
+            st.warning(f"⚠️ Cột '{cot_loc}' không có trong dữ liệu. "
+                       f"Hiển thị toàn thời gian.")
+
+    if df_nqh.empty:
+        st.info("Không có hồ sơ NQH phát sinh trong kỳ đã chọn.")
+        return
+
+    # ── Metrics ──────────────────────────────────────────────────────────
     tong_nqh = df_nqh[COT_DU_NO_QH].sum() if COT_DU_NO_QH in df_nqh.columns else 0
-    tong_dn = df_nqh[COT_TONG_DU_NO].sum() if COT_TONG_DU_NO in df_nqh.columns else 0
+    tong_dn  = df_nqh[COT_TONG_DU_NO].sum() if COT_TONG_DU_NO in df_nqh.columns else 0
     k1, k2, k3 = st.columns(3)
     k1.metric("📋 Số hồ sơ NQH", fmt_so(len(df_nqh)))
-    k2.metric("💰 Dư nợ QH", fmt_ty(tong_nqh) if tong_nqh else "0")
-    k3.metric("📊 Tỷ lệ NQH", f"{tong_nqh / tong_dn * 100:.2f}%" if tong_dn else "0%")
+    k2.metric("💰 Dư nợ QH (tr.đ)", fmt(tong_nqh / 1e6, 1))
+    k3.metric("📊 Tỷ lệ NQH",
+              f"{tong_nqh / tong_dn * 100:.2f}%" if tong_dn else "0%")
 
+    # ── Tổng hợp theo PGD ────────────────────────────────────────────────
     if COT_TEN_PGD in df_nqh.columns:
         nqh_pgd = (
             df_nqh.groupby(COT_TEN_PGD, dropna=False)
-            .agg(Số_hồ_sơ_NQH=(COT_SO_KU, "nunique"),
-                 Tổng_dư_nợ_QH=(COT_DU_NO_QH, "sum"),
-                 Tổng_dư_nợ=(COT_TONG_DU_NO, "sum"))
+            .agg(
+                Số_hồ_sơ_NQH =(COT_SO_KU,      "nunique"),
+                Tổng_dư_nợ_QH=(COT_DU_NO_QH,   "sum"),
+                Tổng_dư_nợ   =(COT_TONG_DU_NO, "sum"),
+            )
             .reset_index()
         )
         tdn = nqh_pgd["Tổng_dư_nợ"].replace(0, pd.NA)
-        nqh_pgd["Tỷ_lệ_QH_%"] = (nqh_pgd["Tổng_dư_nợ_QH"] / tdn * 100).round(1).fillna(0)
+        nqh_pgd["Tỷ_lệ_QH_%"] = (
+            nqh_pgd["Tổng_dư_nợ_QH"] / tdn * 100
+        ).round(1).fillna(0)
         st.markdown("**📋 Tổng hợp theo PGD**")
         hien_thi_dataframe_phan_trang(nqh_pgd, key="nqh_pgd", height=280)
 
+    # ── Chi tiết ─────────────────────────────────────────────────────────
     cols_chi = [c for c in [
         COT_TEN_PGD, COT_TEN_KH, COT_SO_KU, COT_TEN_CT,
-        COT_DU_NO_QH, COT_TONG_DU_NO, COT_NGAY_DH,
+        COT_DU_NO_QH, COT_TONG_DU_NO,
+        "Ngày ĐH theo hợp đồng",
+        "Ngày ĐH theo Gia hạn",
+        "Ngày ĐH theo GDXA",
+        COT_CQH_THANG, COT_CQH_QUY, COT_CQH_NAM,
     ] if c in df_nqh.columns]
     df_nqh_chi = df_nqh[cols_chi].reset_index(drop=True)
+
     st.markdown("**📋 Danh sách chi tiết**")
     buf = xuat_excel({"NQH": df_nqh_chi})
+    ky_label = chon.split(" ", 1)[-1].strip()
     st.download_button(
-        "⬇️ Xuất Excel", data=buf,
-        file_name=f"NQH_{datetime.now().strftime('%Y%m%d')}.xlsx",
+        f"⬇️ Xuất Excel ({len(df_nqh_chi)} hồ sơ)", data=buf,
+        file_name=f"NQH_{ky_label}_{datetime.now().strftime('%Y%m%d')}.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         key="nqh_xuat",
     )

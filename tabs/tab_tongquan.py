@@ -26,7 +26,7 @@ from utils import (
 )
 from data.pgd import ds_pgd_co_file
 from data.cdtotkvv import doc_cdtotkvv, ds_thang_nam, tong_hop_theo_pgd
-from pdf_service import nut_xuat_pdf, xuat_pdf_group_header
+from pdf_service import nut_xuat_pdf
 from services.upload_service import format_caption_merge
 
 if TYPE_CHECKING:
@@ -80,39 +80,6 @@ def _cache_kpi_tongquan(
         n_3m=n_3m,
         dn_3m=dn_3m,
     )
-
-
-@st.cache_data(show_spinner=False, ttl=3600)
-def _cache_datetime_denhan(
-    _df: pd.DataFrame,
-    ts: float,
-    cot_ngay_dh: str,
-) -> pd.DataFrame:
-    """Cache pd.to_datetime cho cột Ngày ĐH — tránh chạy lại mỗi lần đổi filter."""
-    df_out = _df.copy()
-    df_out[cot_ngay_dh] = pd.to_datetime(
-        df_out[cot_ngay_dh], dayfirst=True, errors="coerce"
-    )
-    return df_out
-
-
-@st.cache_data(show_spinner=False)
-def _cache_bang_denhan(
-    _df: pd.DataFrame,
-    nhom_col: str,
-    key_prefix: str,
-    ts: float,
-) -> pd.DataFrame:
-    """Cache kết quả groupby cho bảng đến hạn."""
-    _ = (key_prefix, ts)  # tham gia cache key
-    if nhom_col not in _df.columns:
-        return pd.DataFrame()
-    tg = _df.groupby(nhom_col, as_index=False).agg(
-        _mon=(COT_SO_KU, "nunique"),
-        _kh=(COT_MA_KH, "nunique"),
-        _no=(COT_TONG_DU_NO, "sum"),
-    ).reset_index().sort_values("_no", ascending=False)
-    return tg
 
 
 @st.cache_data(show_spinner=False)
@@ -983,103 +950,28 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
             """
             st.markdown(html_table, unsafe_allow_html=True)
 
-            # ── Chuẩn bị df_export dùng chung cho cả Excel lẫn PDF ──────────────
+            # Format từng ô theo _fmt_cell trước khi xuất PDF
             df_export = df_show.copy().rename(columns={COT_TEN_PGD: "Đơn vị"})
-            # df_export_so: giữ nguyên số để Excel có thể sort/filter
-            df_export_so = df_export.copy()
-            # df_export_fmt: format chuỗi để PDF đọc đẹp
             for col in df_export.columns:
                 if col != "Đơn vị":
                     df_export[col] = df_export[col].apply(
                         lambda v, c=col: _fmt_cell(v, c)
                     )
 
-            # ── Nút xuất — 3 nút nằm ngang ───────────────────────────────────────
-            _c1, _c2, _c3 = st.columns([1, 1, 1])
-
-            # ── (1) Xuất Excel ────────────────────────────────────────────────────
-            with _c1:
-                try:
-                    _xl_bytes = xuat_excel({"TQPGD": df_export_so})
-                    st.download_button(
-                        label="📥 Xuất Excel",
-                        data=_xl_bytes,
-                        file_name=ten_file_xuat("TQPGD", "xlsx"),
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                        key="btn_xl_tqpgd",
-                        type="secondary",
-                    )
-                except Exception as _e:
-                    st.error(f"❌ Lỗi xuất Excel: {_e}")
-
-            # ── (2) Preview + In PDF ──────────────────────────────────────────────
-            with _c2:
-                if st.button("🔍 Preview / In PDF", key="btn_preview_tqpgd", type="secondary"):
-                    st.session_state["tqpgd_show_preview"] = not st.session_state.get(
-                        "tqpgd_show_preview", False
-                    )
-
-            # ── (3) Xuất PDF ──────────────────────────────────────────────────────
-            with _c3:
-                nut_xuat_pdf(
-                    df=df_export,
-                    tieu_de="Thông tin tổng quát theo PGD",
-                    username=username,
-                    cols_tien=[],
-                    prefix_file="TQPGD",
-                    key="btn_pdf_tqpgd",
-                )
-
-            # ── Khung preview HTML có nút In ─────────────────────────────────────
-            if st.session_state.get("tqpgd_show_preview", False):
-                st.markdown("---")
-                st.markdown("#### 🖨️ Preview — Thông tin tổng quát theo PGD")
-                # Xây dựng lại bảng HTML tương tự html_table nhưng thêm @media print
-                _print_style = """
-                <style>
-                @media print {
-                    body * { visibility: hidden; }
-                    #print-tqpgd, #print-tqpgd * { visibility: visible; }
-                    #print-tqpgd { position: fixed; top: 0; left: 0; width: 100%; }
-                    .no-print { display: none !important; }
-                }
-                .print-header {
-                    font-family: sans-serif;
-                    text-align: center;
-                    margin-bottom: 6px;
-                }
-                .print-header h3 { font-size: 1rem; margin: 2px 0; color: #1565C0; }
-                .print-header p  { font-size: 0.78rem; color: #555; margin: 0; }
-                </style>
-                """
-                from datetime import datetime as _dt_now
-                _ngay_in = _dt_now.now().strftime("%d/%m/%Y %H:%M")
-                _preview_header = f"""
-                <div class="print-header">
-                    <h3>THÔNG TIN TỔNG QUÁT THEO PGD</h3>
-                    <p>{TEN_CHI_NHANH_HIEN_THI} — Ngày in: {_ngay_in}</p>
-                </div>
-                """
-                st.markdown(_print_style + f'<div id="print-tqpgd">{_preview_header}{html_table}</div>',
-                            unsafe_allow_html=True)
-                st.button(
-                    "🖨️ In trang này (Ctrl+P)",
-                    key="btn_in_tqpgd",
-                    on_click=lambda: None,   # placeholder — người dùng dùng Ctrl+P
-                    type="primary",
-                    help="Nhấn Ctrl+P sau đó chọn máy in hoặc 'Save as PDF'",
-                )
-                st.caption(
-                    "💡 Sau khi nhấn **Ctrl+P**, chọn *Save as PDF* để lưu file; "
-                    "hoặc chọn máy in để in trực tiếp. "
-                    "Chỉ vùng bảng này sẽ được in nhờ CSS @media print."
-                )
+            nut_xuat_pdf(
+                df=df_export,
+                tieu_de="Thông tin tổng quát theo PGD",
+                username=username,
+                cols_tien=[],
+                prefix_file="TQPGD",
+                key="btn_pdf_tqpgd",
+            )
         st.divider()
         st.subheader("🔔 Hồ sơ đến hạn — Tổng hợp")
         if COT_NGAY_DH in df.columns:
             try:
-                # Cache pd.to_datetime — bottleneck chính
-                dt = _cache_datetime_denhan(df.copy(), ts, COT_NGAY_DH)
+                dt = df.copy()
+                dt[COT_NGAY_DH] = pd.to_datetime(dt[COT_NGAY_DH], dayfirst=True, errors="coerce")
                 hn       = pd.Timestamp.today().normalize()
                 cuoi_nam = pd.Timestamp(hn.year, 12, 31)
 
@@ -1140,6 +1032,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                 ])
 
                 def _bang_den_han(df_loc, label, key_prefix):
+                    tg = None
                     if df_loc.empty:
                         st.success(f"✅ Không có món vay đến hạn {label}")
                         return
@@ -1156,11 +1049,11 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                     st.divider()
 
                     if nhom_col in df_loc.columns:
-                        # Cache groupby — bottleneck chính
-                        tg = _cache_bang_denhan(df_loc, nhom_col, key_prefix, ts)
-                        if tg.empty:
-                            st.info("Không có dữ liệu sau khi nhóm.")
-                            return
+                        tg = df_loc.groupby(nhom_col).agg(
+                            _mon=(COT_SO_KU,      "nunique"),
+                            _kh =(COT_MA_KH,      "nunique"),
+                            _no =(COT_TONG_DU_NO, "sum"),
+                        ).reset_index().sort_values("_no", ascending=False)
 
                         tg["Số món vay"] = tg["_mon"].apply(fmt_so)
                         tg["Số KH"]      = tg["_kh"].apply(fmt_so)
@@ -1172,298 +1065,84 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                             key=f"tongquan_den_han_{key_prefix}",
                         )
 
-                        # Lazy render chart — chỉ render khi có dữ liệu và tab active
                         if nhom_col in df_loc.columns and len(tg) > 0:
                             top10 = tg.nlargest(10, "_no")
 
-                            # Dùng st.session_state để tránh render chart lại khi không cần
-                            _chart_key = f"chart_denhan_{key_prefix}"
-                            if _chart_key not in st.session_state:
-                                fig = go.Figure(go.Pie(
-                                    labels=top10[nhom_col],
-                                    values=top10["_no"],
-                                    hole=0.5,
-                                    textinfo="label+percent",
-                                    textposition="outside",
-                                    hovertemplate="<b>%{label}</b><br>Dư nợ: %{customdata}<br>Tỷ lệ: %{percent}<extra></extra>",
-                                    customdata=top10["Dư nợ"],
-                                    marker=dict(
-                                        colors=px.colors.sequential.Greens_r[: len(top10)],
-                                        line=dict(color="white", width=2),
-                                    ),
-                                ))
-                                fig.update_layout(
-                                    title=f"Top 10 {nhom_chon} có dư nợ đến hạn cao nhất",
-                                    height=450,
-                                    annotations=[dict(
-                                        text=f"<b>{fmt(tong_no)}</b><br>Tổng dư nợ",
-                                        x=0.5, y=0.5,
-                                        font=dict(size=13),
-                                        showarrow=False,
-                                    )],
-                                    legend=dict(orientation="v", x=1.05, y=0.5),
-                                    margin=dict(l=0, r=150, t=50, b=0),
-                                    paper_bgcolor="rgba(0,0,0,0)",
-                                )
-                                st.session_state[_chart_key] = fig
-                            st.plotly_chart(st.session_state[_chart_key], use_container_width=True, key=f"plot_{_chart_key}")
+                            fig = go.Figure(go.Pie(
+                                labels=top10[nhom_col],
+                                values=top10["_no"],
+                                hole=0.5,
+                                textinfo="label+percent",
+                                textposition="outside",
+                                hovertemplate="<b>%{label}</b><br>Dư nợ: %{customdata}<br>Tỷ lệ: %{percent}<extra></extra>",
+                                customdata=top10["Dư nợ"],
+                                marker=dict(
+                                    colors=px.colors.sequential.Greens_r[: len(top10)],
+                                    line=dict(color="white", width=2),
+                                ),
+                            ))
 
-                        st.divider()
-                        _c1_dh, _c2_dh, _c3_dh, _c4_dh = st.columns([1, 1, 1, 1])
-
-                        # Tạo df_xuat từ cột số gốc (_mon, _kh, _no) - không dùng cột đã format
-                        df_xuat = tg[[nhom_col, "_mon", "_kh", "_no"]].rename(
-                            columns={
-                                nhom_col: nhom_chon,
-                                "_mon": "Số món vay",
-                                "_kh": "Số khách hàng",
-                                "_no": "Dư nợ",
-                            }
-                        )
-                        # df_xuat_so: giữ nguyên số để Excel sort/filter
-                        df_xuat_so = df_xuat.copy()
-
-                        # Xây dựng chuỗi thông tin bộ lọc
-                        _filter_parts = []
-                        if loc_pgd:
-                            _pgd_str = ", ".join(loc_pgd[:3])  # Giới hạn hiển thị 3 PGD đầu
-                            if len(loc_pgd) > 3:
-                                _pgd_str += f" và {len(loc_pgd) - 3} PGD khác"
-                            _filter_parts.append(f"PGD: {_pgd_str}")
-                        if loc_ct:
-                            _ct_str = ", ".join(loc_ct[:3])
-                            if len(loc_ct) > 3:
-                                _ct_str += f" và {len(loc_ct) - 3} CT khác"
-                            _filter_parts.append(f"Chương trình: {_ct_str}")
-                        if loc_xa:
-                            _xa_str = ", ".join(loc_xa[:3])
-                            if len(loc_xa) > 3:
-                                _xa_str += f" và {len(loc_xa) - 3} xã khác"
-                            _filter_parts.append(f"Xã: {_xa_str}")
-                        _tieu_de_phu = " • ".join(_filter_parts) if _filter_parts else ""
-
-                        # Chuẩn bị df chi tiết hồ sơ dùng chung cho Excel và Preview
-                        _det_cols_xl = [
-                            nhom_col, COT_MA_KH, COT_TEN_KH, COT_SO_KU,
-                            COT_NGAY_DH, COT_TONG_DU_NO,
-                        ]
-                        _det_cols_xl = [c for c in _det_cols_xl if c in df_loc.columns]
-                        _df_chitiet = df_loc[_det_cols_xl].sort_values(
-                            [nhom_col, COT_NGAY_DH]
-                            if COT_NGAY_DH in df_loc.columns else [nhom_col]
-                        )
-
-                        # ── (1) Xuất Excel ────────────────────────────────────────
-                        with _c1_dh:
-                            sk_excel = f"excel_bytes_den_han_{key_prefix}"
-                            try:
-                                if st.button("📥 Xuất Excel",
-                                            key=f"btn_excel_den_han_{key_prefix}",
-                                            use_container_width=True):
-                                    with st.spinner("⏳ Đang tạo file Excel..."):
-                                        _xl_sheets = {f"Tổng hợp {label}": df_xuat_so}
-                                        _xl_sheets[f"Chi tiết hồ sơ"] = _df_chitiet
-                                        if _tieu_de_phu:
-                                            _xl_sheets["Thông tin bộ lọc"] = pd.DataFrame({"Bộ lọc": [_tieu_de_phu]})
-                                        st.session_state[sk_excel] = xuat_excel(_xl_sheets)
-                                    st.success("✅ File Excel đã sẵn sàng! Nhấn nút bên dưới để tải.")
-                                if sk_excel in st.session_state:
-                                    st.download_button(
-                                        label="⬇ Tải file Excel",
-                                        data=st.session_state[sk_excel],
-                                        file_name=ten_file_xuat(f"HoSoDenHan_{key_prefix}"),
-                                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                                        use_container_width=True,
-                                        key=f"excel_den_han_{key_prefix}",
-                                    )
-                            except Exception as _e_dh:
-                                st.error(f"❌ Lỗi xuất Excel: {_e_dh}")
-
-                        # ── (2) Preview + In PDF ──────────────────────────────────
-                        with _c2_dh:
-                            _show_key = f"show_preview_den_han_{key_prefix}"
-                            if st.button("🔍 Preview / In PDF",
-                                         key=f"btn_{_show_key}",
-                                         type="secondary",
-                                         use_container_width=True):
-                                st.session_state[_show_key] = not st.session_state.get(_show_key, False)
-                            if st.session_state.get(_show_key, False):
-                                st.info("👁️ Đang hiển thị preview — nhấn Ctrl+P để in")
-
-                        # ── (3) Xuất PDF tổng hợp ───────────────────────────────────────
-                        with _c3_dh:
-                            nut_xuat_pdf(
-                                df=df_xuat,
-                                tieu_de=f"Hồ sơ đến hạn {label} — Tổng hợp theo {nhom_chon}",
-                                username=username,
-                                prefix_file=f"HoSoDenHan_{key_prefix}",
-                                key=f"pdf_den_han_{key_prefix}",
-                                tieu_de_phu=_tieu_de_phu,
+                            fig.update_layout(
+                                title=f"Top 10 {nhom_chon} có dư nợ đến hạn cao nhất",
+                                height=450,
+                                annotations=[dict(
+                                    text=f"<b>{fmt(tong_no)}</b><br>Tổng dư nợ",
+                                    x=0.5, y=0.5,
+                                    font=dict(size=13),
+                                    showarrow=False,
+                                )],
+                                legend=dict(orientation="v", x=1.05, y=0.5),
+                                margin=dict(l=0, r=150, t=50, b=0),
+                                paper_bgcolor="rgba(0,0,0,0)",
                             )
 
-                        # ── (4) Xuất PDF Group Header chi tiết hồ sơ ────────────
-                        with _c4_dh:
-                            if st.button(
-                                "📄 PDF Chi tiết",
-                                key=f"btn_pdf_group_{key_prefix}",
-                                type="secondary",
-                                use_container_width=True,
-                                help="Xuất PDF chi tiết từng hồ sơ dạng Group Header/Footer",
-                            ):
-                                if df_loc.empty:
-                                    st.warning("⚠️ Không có dữ liệu để xuất PDF.")
-                                else:
-                                    _det_cols = [
-                                        nhom_col,
-                                        COT_MA_KH, COT_TEN_KH, COT_SO_KU,
-                                        COT_NGAY_DH, COT_TONG_DU_NO,
-                                    ]
-                                    _det_cols = [c for c in _det_cols if c in df_loc.columns]
-                                    _loc_pgd_str = ", ".join(loc_pgd[:3]) + (
-                                        f" +{len(loc_pgd)-3}" if len(loc_pgd) > 3 else ""
-                                    ) if loc_pgd else ""
-                                    _loc_ct_str  = ", ".join(loc_ct[:3]) + (
-                                        f" +{len(loc_ct)-3}" if len(loc_ct) > 3 else ""
-                                    ) if loc_ct else ""
-                                    _loc_xa_str  = ", ".join(loc_xa[:3]) + (
-                                        f" +{len(loc_xa)-3}" if len(loc_xa) > 3 else ""
-                                    ) if loc_xa else ""
-                                    try:
-                                        with st.spinner("⏳ Đang tạo PDF chi tiết..."):
-                                            _pdf_grp = xuat_pdf_group_header(
-                                                df=df_loc[_det_cols].sort_values(
-                                                    [nhom_col, COT_NGAY_DH]
-                                                    if COT_NGAY_DH in df_loc.columns
-                                                    else [nhom_col]
-                                                ),
-                                                tieu_de=f"Hồ sơ Đến hạn {label} — Chi tiết theo {nhom_chon}",
-                                                nhom_theo=nhom_col,
-                                                nguoi_xuat=username,
-                                                cols_tien=[COT_TONG_DU_NO],
-                                                tieu_de_phu=_tieu_de_phu,
-                                                loc_pgd=_loc_pgd_str,
-                                                loc_ct=_loc_ct_str,
-                                                loc_xa=_loc_xa_str,
-                                            )
-                                        st.success("✅ Xuất PDF thành công!")
-                                        st.download_button(
-                                            label="⬇ Tải PDF",
-                                            data=_pdf_grp,
-                                            file_name=ten_file_xuat(f"ChiTietDenHan_{key_prefix}", ext="pdf"),
-                                            mime="application/pdf",
-                                            key=f"dl_pdf_group_{key_prefix}",
-                                            use_container_width=True,
-                                        )
-                                    except Exception as _e_grp:
-                                        st.error(f"❌ Lỗi tạo PDF: {_e_grp}")
+                            st.plotly_chart(fig, use_container_width=True)
 
-                        # ── Khung preview HTML ────────────────────────────────────
-                        _show_key = f"show_preview_den_han_{key_prefix}"
-                        if st.session_state.get(_show_key, False):
-                            st.markdown("---")
-                            st.markdown(f"#### 🖨️ Preview — Hồ sơ đến hạn {label}", unsafe_allow_html=True)
-                            _print_style_dh = """
-                            <style>
-                            @media print {
-                                body * { visibility: hidden; }
-                                #print-denhan, #print-denhan * { visibility: visible; }
-                                #print-denhan { position: fixed; top: 0; left: 0; width: 100%; }
-                                .no-print { display: none !important; }
-                            }
-                            .print-header {
-                                font-family: sans-serif;
-                                text-align: center;
-                                margin-bottom: 6px;
-                            }
-                            .print-header h3 { font-size: 1rem; margin: 2px 0; color: #1565C0; }
-                            .print-header p  { font-size: 0.78rem; color: #555; margin: 0; }
-                            </style>
-                            """
-                            from datetime import datetime as _dt_now_dh
-                            _ngay_in_dh = _dt_now_dh.now().strftime("%d/%m/%Y %H:%M")
+                        if tg is not None:
+                            st.divider()
+                            col_ex, col_pdf = st.columns(2)
 
-                            # Xây dựng subtitle phạm vi in
-                            _subtitle_parts = []
-                            if loc_pgd:
-                                _subtitle_parts.append("PGD")
-                            if loc_ct:
-                                _subtitle_parts.append("Chương trình")
-                            if loc_xa:
-                                _subtitle_parts.append("Xã")
-                            if not _subtitle_parts:
-                                _subtitle_loc_dh = "Toàn Chi nhánh"
-                            elif len(_subtitle_parts) == 1:
-                                _subtitle_loc_dh = f"Theo {_subtitle_parts[0]}"
-                            elif len(_subtitle_parts) == 2:
-                                _subtitle_loc_dh = f"Theo {_subtitle_parts[0]} và {_subtitle_parts[1]}"
+                            # Xác định chế độ xuất: có bộ lọc → tổng hợp; không → chi tiết
+                            co_loc = bool(loc_pgd or loc_ct or loc_xa)
+
+                            if co_loc:
+                                df_xuat = tg[[nhom_col, "Số món vay", "Số KH", "Dư nợ"]].rename(
+                                    columns={nhom_col: nhom_chon}
+                                )
+                                tieu_de_pdf = f"Hồ sơ đến hạn {label} — Tổng hợp theo {nhom_chon}"
+                                ten_sheet   = f"TH_{nhom_chon[:10]}_{key_prefix}"
+                                cols_tien_pdf = ["Dư nợ"]
                             else:
-                                _subtitle_loc_dh = f"Theo {_subtitle_parts[0]}, {_subtitle_parts[1]} và {_subtitle_parts[2]}"
+                                COLS_CHI_TIET = [
+                                    COT_TEN_PGD, COT_MA_KH, COT_TEN_KH, COT_SO_KU,
+                                    COT_TEN_CT, COT_TONG_DU_NO, COT_NGAY_DH,
+                                ]
+                                cols_ok = [c for c in COLS_CHI_TIET if c in df_loc.columns]
+                                df_xuat = df_loc[cols_ok].sort_values(COT_TEN_PGD).reset_index(drop=True)
+                                tieu_de_pdf = f"Hồ sơ đến hạn {label} — Chi tiết toàn Chi nhánh"
+                                ten_sheet   = f"ChiTiet_{key_prefix}"
+                                cols_tien_pdf = [COT_TONG_DU_NO]
 
-                            # Xây dựng HTML hiển thị chi tiết bộ lọc
-                            _filter_detail_html = ""
-                            if _tieu_de_phu:
-                                _filter_detail_html = f'''
-                                <div style="background:#E8F5E9;border:1px solid #4CAF50;border-radius:4px;padding:8px 12px;margin:8px 0;text-align:left">
-                                    <p style="font-size:0.8rem;font-weight:bold;color:#1B5E20;margin:0 0 4px 0">🔍 Bộ lọc đã chọn:</p>
-                                    <p style="font-size:0.75rem;color:#2E7D32;margin:0;line-height:1.4">{_tieu_de_phu}</p>
-                                </div>
-                                '''
-
-                            _preview_header_dh = f"""
-                            <div class="print-header">
-                                <h3>HỒ SƠ ĐẾN HẠN {label.upper()}</h3>
-                                <p>{TEN_CHI_NHANH_HIEN_THI} — Ngày in: {_ngay_in_dh}</p>
-                                <p style="font-size:0.85rem;font-weight:bold;color:#1B5E20;margin:2px 0">
-                                📋 Phạm vi: {_subtitle_loc_dh}
-                                </p>
-                                {_filter_detail_html}
-                            </div>
-                            """
-                            # Xây bảng HTML từ df_chitiet (chi tiết từng hồ sơ) — top 150 dòng
-                            _MAX_PREVIEW_ROWS = 150
-                            _cols_dh = list(_df_chitiet.columns)
-                            _header_html_dh = "".join(
-                                f'<th style="background:#2E7D32;color:#fff;padding:6px 8px;border:1px solid #1B5E20;font-size:0.82rem;text-align:center">{c}</th>'
-                                for c in _cols_dh
-                            )
-                            _rows_html_dh = ""
-                            _df_preview = _df_chitiet.head(_MAX_PREVIEW_ROWS)
-                            for i_dh, (_, r_dh) in enumerate(_df_preview.iterrows()):
-                                _bg_dh = "#F9FAFB" if i_dh % 2 == 0 else "#FFFFFF"
-                                _cells_dh = "".join(
-                                    f'<td style="padding:5px 6px;border:1px solid #E0E0E0;text-align:{"left" if i_c == 0 else "right"};font-size:0.82rem;white-space:nowrap">{r_dh[c]}</td>'
-                                    for i_c, c in enumerate(_cols_dh)
+                            with col_ex:
+                                excel_bytes = xuat_excel({ten_sheet: df_xuat})
+                                st.download_button(
+                                    label="📥 Xuất Excel",
+                                    data=excel_bytes,
+                                    file_name=ten_file_xuat(f"HoSoDenHan_{key_prefix}"),
+                                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                    use_container_width=True,
+                                    key=f"excel_den_han_{key_prefix}",
                                 )
-                                _rows_html_dh += f'<tr style="background:{_bg_dh}">{_cells_dh}</tr>\n'
-                            _total_rows = len(_df_chitiet)
-                            if _total_rows > _MAX_PREVIEW_ROWS:
-                                _rows_html_dh += f'<tr style="background:#FFF3E0"><td colspan="{len(_cols_dh)}" style="padding:8px;border:1px solid #E0E0E0;text-align:center;font-size:0.85rem;color:#E65100">⚠️ Chỉ hiển thị {_MAX_PREVIEW_ROWS}/{_total_rows} dòng — Tải Excel hoặc PDF để xem đầy đủ</td></tr>\n'
-                            _table_html_dh = f"""
-                            <div style="overflow-x:auto;margin:8px 0">
-                            <table style="border-collapse:collapse;width:100%;font-family:sans-serif">
-                              <thead><tr>{_header_html_dh}</tr></thead>
-                              <tbody>{_rows_html_dh}</tbody>
-                            </table>
-                            </div>
-                            """
-                            import streamlit.components.v1 as components
-                            components.html(
-                                _print_style_dh + f'<div id="print-denhan">{_preview_header_dh}{_table_html_dh}</div>',
-                                height=600,
-                                scrolling=True,
-                            )
-                            st.button(
-                                "🖨️ In trang này (Ctrl+P)",
-                                key=f"btn_in_den_han_{key_prefix}",
-                                on_click=lambda: None,
-                                type="primary",
-                                help="Nhấn Ctrl+P sau đó chọn máy in hoặc 'Save as PDF'",
-                            )
-                            st.caption(
-                                "💡 Sau khi nhấn **Ctrl+P**, chọn *Save as PDF* để lưu file; "
-                                "hoặc chọn máy in để in trực tiếp. "
-                                "Chỉ vùng bảng này sẽ được in nhờ CSS @media print."
-                            )
+
+                            with col_pdf:
+                                nut_xuat_pdf(
+                                    df=df_xuat,
+                                    tieu_de=tieu_de_pdf,
+                                    username=username,
+                                    cols_tien=cols_tien_pdf,
+                                    prefix_file=f"HoSoDenHan_{key_prefix}",
+                                    key=f"pdf_den_han_{key_prefix}",
+                                )
                     else:
                         st.caption(f"⚠️ Không có cột '{nhom_chon}' trong dữ liệu")
 

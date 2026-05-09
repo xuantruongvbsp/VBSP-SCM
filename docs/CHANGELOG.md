@@ -1,6 +1,29 @@
 # CHANGELOG — VBSP-SCM
 
+## [2026-05-09] — Fix báo cáo đến hạn: phân cấp PGD > Xã > Chương trình
+
+### Sửa đổi
+- `tabs/tab_tongquan.py` — `_bang_den_han()`:
+  - Thêm `_build_hierarchy_den_han()`: xây dựng báo cáo phân cấp PGD > Xã > Chương trình với 4 cấp (tổng > PGD > Xã > CT)
+  - Thêm `_render_hierarchy_html()`: render hierarchy dạng HTML cho Preview
+  - Bỏ radio "Tổng hợp theo" (Chương trình/PGD/Xã) — thay bằng phân cấp cố định
+  - 3 nút Xuất Excel, Preview/In PDF, Xuất PDF: dùng dữ liệu phân cấp thay vì 1 cấp
+  - Giữ nguyên nút "PDF Chi tiết" xuất group header + hồ sơ chi tiết
+  - Sửa IndentationError do code dư sau merge preview
+
+## [2026-05-09] — Fix kiểm soát gia hạn: tách cột Ngày ĐH hợp đồng / Gia hạn
+
+### Sửa đổi
+- `config.py`: `COT_NGAY_DH` → "Ngày ĐH theo Gia hạn" (cột chính toàn hệ thống)
+- `config.py`: thêm `COT_NGAY_DH_HD = "Ngày ĐH theo hợp đồng"` (cột gốc — chỉ dùng kiểm soát gia hạn)
+- `services/kiem_soat_service.py`: dùng `_COT_NGAY_DH_HD` (ngày HĐ gốc) để tính giới hạn gia hạn, dùng `COT_NGAY_DH` (ngày GH thực tế) để so sánh vi phạm
+
 ---
+
+## [2026-05-09] — Bổ sung chi tiết hồ sơ vào Excel và Preview/In PDF tab Tổng Quan
+- `tabs/tab_tongquan.py` dòng ~1245 — tạo `_df_chitiet` (chi tiết hồ sơ từ `df_loc`) dùng chung
+- `tabs/tab_tongquan.py` — Excel thêm sheet **"Chi tiết hồ sơ"** bên cạnh sheet tổng hợp
+- `tabs/tab_tongquan.py` — Preview HTML chuyển sang dùng `_df_chitiet` thay `df_xuat`, tăng limit từ 100 → 150 dòng
 
 ## [2026-05-09] — Thêm nút PDF Chi tiết (Group Header) vào tab Tổng Quan / Hồ sơ Đến hạn
 - `tabs/tab_tongquan.py` dòng ~29 — import `xuat_pdf_group_header` từ `pdf_service`

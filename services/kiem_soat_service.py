@@ -31,6 +31,7 @@ from config import (
     COT_THOI_HAN,
     COT_NGUON_VON,
     COT_MA_CHUONG_TRINH,
+    COT_NGAY_DH_HD,
 )
 from pdf_service import xuat_pdf
 from services.report_service import ten_file_bao_cao
@@ -39,7 +40,7 @@ from utils import fmt_so, xuat_excel, hien_thi_dataframe_phan_trang
 DUOI_TV = 5
 TREN_TV = 60
 
-_COT_NGAY_DH_GH = "Ngày ĐH theo Gia hạn"
+_COT_NGAY_DH_HD = COT_NGAY_DH_HD
 _COT_MA_QD = "Mã Quyết định"
 _COT_TEN_DTTH = "Tên ĐTTH"
 _COT_NGAY_RT = "Ngày ra trường"
@@ -191,7 +192,7 @@ def _tinh_ngaygh_dp(row: pd.Series) -> pd.Timestamp:
     ma_ct = str(row.get(COT_MA_CHUONG_TRINH, "")).strip()
     ma_qd = str(row.get(_COT_MA_QD, "")).strip()
     ten_dtth = str(row.get(_COT_TEN_DTTH, "")).strip()
-    ngay_dh = pd.to_datetime(row.get(COT_NGAY_DH), dayfirst=True, errors="coerce")
+    ngay_dh = pd.to_datetime(row.get(_COT_NGAY_DH_HD), dayfirst=True, errors="coerce")
     thoi_han = pd.to_numeric(row.get(COT_THOI_HAN), errors="coerce")
 
     if pd.isna(ngay_dh):
@@ -228,7 +229,7 @@ def _tinh_ngaygh_dp(row: pd.Series) -> pd.Timestamp:
 def _tinh_gia_han_vuot(df: pd.DataFrame) -> pd.DataFrame:
     if df is None or df.empty:
         return pd.DataFrame()
-    need = [COT_NGUON_VON, COT_NGAY_DH, _COT_NGAY_DH_GH, COT_DU_NO_TH]
+    need = [COT_NGUON_VON, _COT_NGAY_DH_HD, COT_NGAY_DH, COT_DU_NO_TH]
     if not all(c in df.columns for c in need):
         return pd.DataFrame()
 
@@ -250,16 +251,16 @@ def _tinh_gia_han_vuot(df: pd.DataFrame) -> pd.DataFrame:
     if d.empty:
         return pd.DataFrame()
 
-    n_dh_gh = pd.to_datetime(d[_COT_NGAY_DH_GH], dayfirst=True, errors="coerce")
-    n_dh = pd.to_datetime(d[COT_NGAY_DH], dayfirst=True, errors="coerce")
+    n_dh_gh = pd.to_datetime(d[COT_NGAY_DH], dayfirst=True, errors="coerce")
+    n_dh = pd.to_datetime(d[_COT_NGAY_DH_HD], dayfirst=True, errors="coerce")
     m_gh = n_dh_gh.notna() & n_dh.notna() & (n_dh_gh > n_dh)
     d = d.loc[m_gh].copy()
     if d.empty:
         return pd.DataFrame()
 
-    d[COT_NGAY_DH] = pd.to_datetime(d[COT_NGAY_DH], dayfirst=True, errors="coerce")
-    d[_COT_NGAY_DH_GH] = pd.to_datetime(
-        d[_COT_NGAY_DH_GH], dayfirst=True, errors="coerce"
+    d[_COT_NGAY_DH_HD] = pd.to_datetime(d[_COT_NGAY_DH_HD], dayfirst=True, errors="coerce")
+    d[COT_NGAY_DH] = pd.to_datetime(
+        d[COT_NGAY_DH], dayfirst=True, errors="coerce"
     )
     for _c in (_COT_NGAY_RT, _COT_NGAY_GN1):
         if _c in d.columns:
@@ -271,13 +272,13 @@ def _tinh_gia_han_vuot(df: pd.DataFrame) -> pd.DataFrame:
     if d.empty:
         return pd.DataFrame()
 
-    m_vp = d[_COT_NGAY_DH_GH] > d["Ngày GH được phép"]
+    m_vp = d[COT_NGAY_DH] > d["Ngày GH được phép"]
     d = d.loc[m_vp].copy()
     if d.empty:
         return pd.DataFrame()
 
     d["Vượt (tháng)"] = (
-        (d[_COT_NGAY_DH_GH] - d["Ngày GH được phép"]).dt.days / 30
+        (d[COT_NGAY_DH] - d["Ngày GH được phép"]).dt.days / 30
     ).round(1)
     d = d.sort_values("Vượt (tháng)", ascending=False)
 
@@ -292,8 +293,8 @@ def _tinh_gia_han_vuot(df: pd.DataFrame) -> pd.DataFrame:
         _COT_TEN_DTTH,
         COT_NGAY_VAY,
         COT_THOI_HAN,
+        _COT_NGAY_DH_HD,
         COT_NGAY_DH,
-        _COT_NGAY_DH_GH,
         "Ngày GH được phép",
         "Vượt (tháng)",
         COT_TONG_DU_NO,
@@ -479,6 +480,10 @@ def _xuat_pdf_btn(
     """Render Xuất PDF (xuat_pdf) — ẩn khi readonly."""
     if readonly or df is None or df.empty:
         return
+
+    ss_key      = f"_pdf_bytes_{key}"
+    ss_file_key = f"_pdf_file_{key}"
+
     if st.button("📄 Xuất PDF", key=key, type="secondary"):
         try:
             with st.spinner("Đang tạo PDF..."):
@@ -489,16 +494,21 @@ def _xuat_pdf_btn(
                     cols_tien,
                     prefix_file=prefix_pdf,
                 )
-            ten_file = f"{prefix_pdf}_{datetime.now().strftime('%d%m%Y_%H%M')}.pdf"
-            st.download_button(
-                label="⬇ Tải file PDF",
-                data=pdf_bytes,
-                file_name=ten_file,
-                mime="application/pdf",
-                key=f"{key}_dl",
-            )
+            st.session_state[ss_key]      = pdf_bytes
+            st.session_state[ss_file_key] = f"{prefix_pdf}_{datetime.now().strftime('%d%m%Y_%H%M')}.pdf"
         except Exception as e:
+            st.session_state[ss_key] = None
             st.error(f"❌ Lỗi tạo PDF: {e}")
+
+    pdf_data = st.session_state.get(ss_key)
+    if pdf_data is not None:
+        st.download_button(
+            label="⬇ Tải file PDF",
+            data=pdf_data,
+            file_name=st.session_state.get(ss_file_key, f"{prefix_pdf}.pdf"),
+            mime="application/pdf",
+            key=f"{key}_dl",
+        )
 
 
 def render_3m_khd(

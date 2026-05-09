@@ -127,15 +127,52 @@ def render(role: str = None, **kwargs) -> None:
                 df_loc[cols_hien_thi].sort_values("Tháng đến hạn còn lại"),
                 use_container_width=True, hide_index=True,
             )
-            buf = BytesIO()
-            df_loc[cols_hien_thi].to_excel(buf, index=False)
-            st.download_button(
-                "📥 Xuất Excel",
-                data=buf.getvalue(),
-                file_name=f"den_han_{den_thang}thang.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                key="btn_xuat_den_han",
-            )
+
+            # Xác định chế độ xuất: tab này không có bộ lọc PGD/CT/Xã tường minh
+            # → luôn xuất chi tiết, nhưng thêm sheet tổng hợp theo nhom_theo
+            COLS_CHI_TIET = [
+                COT_TEN_PGD, COT_TEN_KH, COT_TEN_CT,
+                COT_TONG_DU_NO, "Ngày đến hạn", "Tháng đến hạn còn lại",
+            ]
+            cols_ok = [c for c in COLS_CHI_TIET if c in df_loc.columns]
+            df_chi_tiet = df_loc[cols_ok].sort_values("Tháng đến hạn còn lại").reset_index(drop=True)
+
+            # Sheet tổng hợp theo nhom_theo (pgd hoặc xa)
+            nhom_col_dt = COT_TEN_PGD if nhom_theo == "PGD" else "Tên xã"
+            if nhom_col_dt in df_loc.columns:
+                df_tong_hop = df_loc.groupby(nhom_col_dt).agg(
+                    **{"Số khoản": (COT_TONG_DU_NO, "count"),
+                       "Dư nợ (VND)": (COT_TONG_DU_NO, "sum")}
+                ).reset_index().sort_values("Dư nợ (VND)", ascending=False)
+                df_tong_hop["Dư nợ (VND)"] = df_tong_hop["Dư nợ (VND)"].apply(fmt_so)
+                sheets_xuat = {
+                    f"TH_{nhom_theo}": df_tong_hop,
+                    "Chi tiết": df_chi_tiet,
+                }
+            else:
+                sheets_xuat = {"Chi tiết": df_chi_tiet}
+
+            col_ex2, col_pdf2 = st.columns(2)
+            with col_ex2:
+                excel_bytes = xuat_excel(sheets_xuat)
+                st.download_button(
+                    "📥 Xuất Excel",
+                    data=excel_bytes,
+                    file_name=ten_file_xuat(f"DenHan_{den_thang}thang"),
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    key="btn_xuat_den_han_excel",
+                    use_container_width=True,
+                )
+
+            with col_pdf2:
+                nut_xuat_pdf(
+                    df=df_chi_tiet,
+                    tieu_de=f"Hồ sơ đến hạn trong {den_thang} tháng — Chi tiết",
+                    username=kwargs.get("username", ""),
+                    cols_tien=[COT_TONG_DU_NO],
+                    prefix_file=f"DenHan_{den_thang}thang",
+                    key="btn_pdf_den_han",
+                )
 
     # ── Xuất PDF Group Header/Footer ─────────────────────────────────────────
     st.divider()

@@ -356,11 +356,14 @@ def _hien_thi_bang_cn_readonly(
                 cols_tien=[],
                 prefix_file="KHTD_CN",
             )
-        ten_pdf = f"KHTD_CN_{datetime.today().strftime('%d%m%Y')}.pdf"
+        st.session_state["_pdf_bytes_khtd_cn"]   = pdf_bytes
+        st.session_state["_pdf_file_khtd_cn"]    = f"KHTD_CN_{datetime.today().strftime('%d%m%Y')}.pdf"
+
+    if st.session_state.get("_pdf_bytes_khtd_cn"):
         st.download_button(
             label="⬇ Tải PDF",
-            data=pdf_bytes,
-            file_name=ten_pdf,
+            data=st.session_state["_pdf_bytes_khtd_cn"],
+            file_name=st.session_state.get("_pdf_file_khtd_cn", "KHTD_CN.pdf"),
             mime="application/pdf",
             key="dl_pdf_khtd_cn",
         )

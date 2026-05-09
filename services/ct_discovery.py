@@ -20,11 +20,11 @@ from config import (
     COT_TEN_PGD, COT_MA_CHUONG_TRINH, COT_TEN_CT, COT_NGUON_VON,
     COT_TONG_DU_NO, COT_DU_NO_TH, COT_SO_KU,
     COT_PL_NV, COT_MA_NDT,
-    MA_NDT_CAP_TINH_DUOI,
     CHUONG_TRINH_KHTD, TEN_CHINH_THUC_CT,
     DON_VI_CHI_NHANH, KV_KEY_CT_REGISTRY_ALL,
     GQVL_COT_MAP,
 )
+from db import doc_ndt_dp_ma_list
 
 # ── Tiền tố key kv_store cho từng PGD ────────────────────────────────────────
 _KV_PREFIX = "ct_registry_"
@@ -213,14 +213,11 @@ def _phan_tang_gqvl(row: pd.Series, ndt_dp_list: list[str] | None = None) -> str
 
     # ── ĐP: phân biệt bằng Mã nhà đầu tư ─────────────────────────────────────
     if nguon_von == "ĐP":
-        if ndt_dp_list is None:
-            ndt_dp_list = db.doc_kv("ndt_dp_list") or config.MA_NDT_CAP_TINH_DUOI
-
         ma_ndt_raw = row.get("Mã nhà đầu tư")
         ma_ndt = str(ma_ndt_raw).strip() if pd.notna(ma_ndt_raw) else ""
 
-        # Kiểm tra substring match: nếu bất kỳ mã nào trong ndt_dp_list xuất hiện trong ma_ndt
-        if any(ma in ma_ndt for ma in ndt_dp_list):
+        # Exact match: kiểm tra chính xác ma_ndt có trong danh sách không
+        if ma_ndt in ndt_dp_list:
             return "3_DP_TINH"  # GQVL ĐP — Cấp tỉnh
         return "3_DP_XA"      # GQVL ĐP — Cấp xã/khác
 
@@ -247,7 +244,7 @@ def _quet_gqvl(
     }
 
     # Load ndt_dp_list 1 lần ngoài vòng lặp (ĐP phân tầng bằng Mã NĐT)
-    ndt_dp_list: list[str] = db.doc_kv("ndt_dp_list") or config.MA_NDT_CAP_TINH_DUOI
+    ndt_dp_list: list[str] = doc_ndt_dp_ma_list()
 
     # Tạo map Số khế ước → Tên PGD từ HSTD để join
     ku_col = "Số khế ước"

@@ -417,6 +417,27 @@ def migrate_pgd_bien_hoa() -> None:
         ghi_audit("system", "migrate_pgd_bien_hoa_error", str(e))
 
 
+def doc_ndt_dp_list() -> list[dict]:
+    """
+    Đọc danh sách Mã NĐT cấp tỉnh từ kv_store.
+    Mỗi phần tử: {"ma": "INV0802140002662", "ghi_chu": "UBND tỉnh Đồng Nai"}
+    Fallback về seed data nếu chưa có.
+    """
+    val = doc_kv("ndt_dp_list")
+    if val and isinstance(val, list) and len(val) > 0:
+        return val
+    # Seed mặc định
+    return [
+        {"ma": "INV0802140002662", "ghi_chu": "UBND tỉnh Đồng Nai"},
+        {"ma": "INV0603170027393", "ghi_chu": "Nguồn vốn cho vay đào tạo nghề"},
+    ]
+
+
+def doc_ndt_dp_ma_list() -> list[str]:
+    """Trả về chỉ list mã (str) để dùng trong phân tầng."""
+    return [item["ma"] for item in doc_ndt_dp_list()]
+
+
 # Khởi tạo DB, migrate dữ liệu cũ, sau đó seed cấu hình động
 init_db()
 migrate_from_json()

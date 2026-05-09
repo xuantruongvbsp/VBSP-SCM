@@ -23,6 +23,7 @@ from oauth2client.service_account import ServiceAccountCredentials
 
 import db
 import config
+from db import doc_ndt_dp_ma_list
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 _LOG = logging.getLogger(__name__)
@@ -91,8 +92,8 @@ def _phan_loai_4_nhom(df: pd.DataFrame) -> dict[str, pd.DataFrame]:
         _LOG.warning("Cot '%s' khong co trong GQVL. Cac cot: %s", cot_nv, list(df.columns))
         return result
 
-    # Load ndt_dp_list từ db hoặc fallback về config (dùng cho ĐP phân tầng)
-    ndt_dp_list: list[str] = db.doc_kv("ndt_dp_list") or config.MA_NDT_CAP_TINH_DUOI
+    # Load ndt_dp_list từ db (dùng cho ĐP phân tầng)
+    ndt_dp_list: list[str] = doc_ndt_dp_ma_list()
     _LOG.info("Danh sach ma NDT cap tinh: %s", ndt_dp_list)
 
     # ── Phân biệt TW vs ĐP ───────────────────────────────────────────────────
@@ -128,8 +129,8 @@ def _phan_loai_4_nhom(df: pd.DataFrame) -> dict[str, pd.DataFrame]:
     if not df_dp.empty:
         if cot_ma_ndt in df_dp.columns:
             ma_ndt_str = df_dp[cot_ma_ndt].astype(str).str.strip()
-            # Substring match: nếu bất kỳ mã nào trong ndt_dp_list xuất hiện trong Mã NĐT
-            mask_cap_tinh = ma_ndt_str.apply(lambda x: any(ma in x for ma in ndt_dp_list))
+            # Exact match: chỉ khớp khi Mã NĐT chính xác có trong danh sách
+            mask_cap_tinh = ma_ndt_str.isin(ndt_dp_list)
         else:
             _LOG.warning("Cot '%s' khong co trong DP, het xep vao cap xa", cot_ma_ndt)
             mask_cap_tinh = pd.Series(False, index=df_dp.index)

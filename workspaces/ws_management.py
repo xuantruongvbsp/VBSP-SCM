@@ -337,6 +337,74 @@ def _render_dgd_to_tkvv(tab_parent, **kw):
         tab_cdtotkvv.render(_sub2, **dict(kw, cdto_mode="cn"))
 
 
+def _render_ndt_dp(role: str, username: str) -> None:
+    """Tab quản lý Mã Nhà đầu tư Địa phương — dùng phân tầng GQVL ĐP."""
+    from db import doc_ndt_dp_list, ghi_kv, ghi_audit
+
+    st.subheader("🏦 Mã Nhà đầu tư Địa phương — Cấp tỉnh")
+    st.caption(
+        "Danh sách này dùng để phân loại nguồn vốn ĐP trong file GQVL. "
+        "Món vay nào có Mã NĐT khớp chính xác (exact match) với 1 mã trong "
+        "danh sách → xếp vào GQVL ĐP Cấp tỉnh. Còn lại → Cấp xã/khác."
+    )
+
+    ds = doc_ndt_dp_list()   # list[dict] {"ma", "ghi_chu"}
+    can_edit = role in ("admin", "admin_cn")
+
+    # Hiển thị bảng hiện tại
+    if ds:
+        for i, item in enumerate(ds):
+            c1, c2, c3 = st.columns([3, 4, 1])
+            c1.code(item["ma"])
+            c2.text(item.get("ghi_chu", ""))
+            if can_edit:
+                if c3.button("🗑️", key=f"xoa_ndt_{i}",
+                             disabled=(len(ds) <= 1),
+                             help="Không thể xóa mã duy nhất"):
+                    ds_moi = [x for j, x in enumerate(ds) if j != i]
+                    ghi_kv("ndt_dp_list", ds_moi, username)
+                    ghi_audit(username, "xoa_ndt_dp",
+                              f"Xóa mã {item['ma']}")
+                    st.cache_data.clear()
+                    st.rerun()
+    else:
+        st.info("Chưa có mã nào.")
+
+    if not can_edit:
+        st.caption("⚠️ Chỉ admin mới có thể thêm/xóa.")
+        return
+
+    # Form thêm mới
+    st.divider()
+    st.markdown("##### ➕ Thêm mã mới")
+    with st.form("form_them_ndt", clear_on_submit=True):
+        ma_moi = st.text_input(
+            "Mã NĐT đầy đủ",
+            placeholder="VD: INV0802140002662",
+            help="Lấy chính xác từ cột 'Mã nhà đầu tư' trong file GQVL"
+        )
+        ghi_chu_moi = st.text_input(
+            "Ghi chú",
+            placeholder="VD: UBND tỉnh Đồng Nai"
+        )
+        submitted = st.form_submit_button("➕ Thêm", type="primary")
+
+    if submitted:
+        ma_moi = ma_moi.strip()
+        if not ma_moi:
+            st.error("Vui lòng nhập mã NĐT.")
+        elif any(x["ma"] == ma_moi for x in ds):
+            st.warning(f"Mã {ma_moi} đã có trong danh sách.")
+        else:
+            ds_moi = ds + [{"ma": ma_moi, "ghi_chu": ghi_chu_moi.strip()}]
+            ghi_kv("ndt_dp_list", ds_moi, username)
+            ghi_audit(username, "them_ndt_dp",
+                      f"Thêm mã {ma_moi} — {ghi_chu_moi}")
+            st.cache_data.clear()
+            st.success(f"✅ Đã thêm mã {ma_moi}")
+            st.rerun()
+
+
 def _render_quan_ly_template(df: pd.DataFrame):
     """
     Sub-tab Quản lý Template — Upload, xem, xóa file .docx và test mẫu.
@@ -626,6 +694,11 @@ def render(**kwargs):
     if can_upload:
         nhom_hanh_chinh.append(
             ("📁 Quản lý Template", lambda tab: _render_quan_ly_template(df_full))
+        )
+    # Chỉ admin/manager CN mới thấy tab quản lý Mã NĐT ĐP
+    if role in ("admin", "admin_cn"):
+        nhom_hanh_chinh.append(
+            ("🏦 Mã NĐT ĐP", lambda tab: _render_ndt_dp(role, username))
         )
     nhom_hanh_chinh.append(
         ("📤 Upload KH-NV", lambda tab: tab_upload_khnv.render(tab, **kwargs))

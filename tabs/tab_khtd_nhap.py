@@ -1272,18 +1272,24 @@ def _tab_khtd_theo_xa(role: str, username: str, df_full: "pd.DataFrame | None") 
                         st.success(f"✅ Đã lưu PDF: {duong_dan_file}")
                     
                     # Option B: Download button fallback
-                    st.download_button(
-                        label="⬇️ Tải PDF về máy",
-                        data=pdf_bytes,
-                        file_name=f"KHTD_{xa_chon}_{datetime.now().strftime('%Y%m%d')}.pdf",
-                        mime="application/pdf",
-                        key=f"download_pdf_{xa_chon}"
-                    )
+                    st.session_state["_pdf_bytes_khtd_xa"] = pdf_bytes
+                    st.session_state["_pdf_file_khtd_xa"] = f"KHTD_{xa_chon}_{datetime.now().strftime('%Y%m%d')}.pdf"
                     
                 except Exception as e:
+                    st.session_state["_pdf_bytes_khtd_xa"] = None
                     st.error(f"Lỗi xuất PDF: {e}")
             else:
                 st.warning("Không có dữ liệu kế hoạch để xuất PDF")
+                st.session_state["_pdf_bytes_khtd_xa"] = None
+
+    if st.session_state.get("_pdf_bytes_khtd_xa"):
+        st.download_button(
+            label="⬇️ Tải PDF về máy",
+            data=st.session_state["_pdf_bytes_khtd_xa"],
+            file_name=st.session_state.get("_pdf_file_khtd_xa", "KHTD.pdf"),
+            mime="application/pdf",
+            key="download_pdf_khtd_xa"
+        )
 
         if st.form_submit_button("💾 Lưu kế hoạch xã này", type="primary"):
             for khoa, gia_tri_trieu in gia_tri_moi.items():

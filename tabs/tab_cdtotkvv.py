@@ -910,19 +910,22 @@ def _sub_ban_do_chat_luong(username: str, cdto_mode: str, pgd_user: str) -> None
             with col_xuat:
                 if st.button("⬇️ Xuất Excel Top Tổ Yếu", key="cdto4_xuat_yeu"):
                     try:
-                        xlsx_bytes = xuat_excel({"To_Yeu": df_yeu})
-                        st.download_button(
-                            label="📥 Tải file Excel",
-                            data=xlsx_bytes,
-                            file_name=ten_file_xuat(f"ToYeu_{thang_chon}"),
-                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                            key="cdto4_download_yeu"
-                        )
+                        st.session_state["_bytes_cdto4"] = xuat_excel({"To_Yeu": df_yeu})
+                        st.session_state["_file_cdto4"] = ten_file_xuat(f"ToYeu_{thang_chon}")
                         db.ghi_audit(username, "xuat_excel_to_yeu", f"thang={thang_chon}")
                         st.cache_data.clear()
                         st.success("✅ Đã tạo file Excel!")
                     except Exception as e:
                         st.error(f"Lỗi xuất Excel: {e}")
+
+                if st.session_state.get("_bytes_cdto4"):
+                    st.download_button(
+                        label="📥 Tải file Excel",
+                        data=st.session_state["_bytes_cdto4"],
+                        file_name=st.session_state["_file_cdto4"],
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        key="cdto4_download_yeu"
+                    )
         else:
             st.success("✅ Không có Tổ nào xếp loại Yếu!")
     else:

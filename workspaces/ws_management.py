@@ -164,15 +164,20 @@ def _render_canh_bao(df: pd.DataFrame, ds_pgd_all: list):
                 ten_pgd_str = "" if pgd_kl == "Toàn CN" else pgd_kl
                 data = auto_fill_klgb(df_kl, str(path_mau), ten_pgd_str)
                 fname = f"KL_GiaoBan_{pgd_kl}_{datetime.now().strftime('%d%m%Y')}.docx"
-                st.download_button(
-                    f"⬇️ Tải KL giao ban — {pgd_kl}",
-                    data=data, file_name=fname,
-                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                    key="kl_dl",
-                )
-                st.success("✅ Đã tạo xong — nhấn nút trên để tải về.")
+                st.session_state["_bytes_kl"] = data
+                st.session_state["_file_kl"] = fname
+                st.success("✅ Đã tạo xong — nhấn nút bên dưới để tải về.")
             except Exception as e:
                 st.error(f"Lỗi tạo KL giao ban: {e}")
+
+        if st.session_state.get("_bytes_kl"):
+            st.download_button(
+                f"⬇️ Tải KL giao ban — {st.session_state['_file_kl']}",
+                data=st.session_state["_bytes_kl"],
+                file_name=st.session_state["_file_kl"],
+                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                key="kl_dl",
+            )
 
 
 def _render_canh_bao_no(df_full: pd.DataFrame, ds_pgd_all: list, role: str, username: str):

@@ -25,6 +25,7 @@ from services.template_service import (
     co_template,
     dien_template,
     nut_tai_word_va_pdf,
+    hien_thi_nut_tai,
     TMPL_13XLN,
     TMPL_14XLN,
     TMPL_TT_KHOANH,
@@ -253,6 +254,7 @@ def render(tab: DeltaGenerator, **kwargs) -> None:
                         nut_tai_word_va_pdf(docx_bytes, ten_file, "nrr_13xln")
                     else:
                         st.warning("⚠️ Chưa có template 13/XLN — liên hệ admin để upload mẫu.")
+                hien_thi_nut_tai("nrr_13xln")
             with cols_btn[1]:
                 if st.button("📄 Xuất 14/XLN (Xóa nợ)", use_container_width=True, key="nrr_btn_14"):
                     if co_template(TMPL_14XLN):
@@ -262,6 +264,7 @@ def render(tab: DeltaGenerator, **kwargs) -> None:
                         nut_tai_word_va_pdf(docx_bytes, ten_file, "nrr_14xln")
                     else:
                         st.warning("⚠️ Chưa có template 14/XLN — liên hệ admin để upload mẫu.")
+                hien_thi_nut_tai("nrr_14xln")
             with cols_btn[2]:
                 bp = bien_phap if "bien_phap" in dir() else ""
                 tmpl_tt = TMPL_TT_KHOANH if "Khoanh nợ" in bp else TMPL_TT_XOA
@@ -274,6 +277,7 @@ def render(tab: DeltaGenerator, **kwargs) -> None:
                         nut_tai_word_va_pdf(docx_bytes, ten_file, "nrr_tt")
                     else:
                         st.warning(f"⚠️ Chưa có template '{tmpl_tt}' — liên hệ admin để upload mẫu.")
+                hien_thi_nut_tai("nrr_tt")
 
         # ── Bước 5: Xem lại hồ sơ đã lưu ─────────────────────────────────
         st.markdown("---")

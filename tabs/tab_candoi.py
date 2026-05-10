@@ -618,7 +618,11 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
             with pd.ExcelWriter(buf, engine="openpyxl") as w:
                 pd.DataFrame(rows_ex1).to_excel(w, index=False, sheet_name="Tổng hợp chỉ tiêu")
                 pd.DataFrame(rows_ex2).to_excel(w, index=False, sheet_name="Theo chương trình")
-            st.download_button("⬇ Tải Excel", data=buf.getvalue(),
-                file_name=f"CanDoi_{nam_prev}_vs_{nam_ht}_{datetime.today().strftime('%d%m%Y')}.xlsx",
+            st.session_state[f"_bytes_cd{key_sfx}"] = buf.getvalue()
+            st.session_state[f"_file_cd{key_sfx}"] = f"CanDoi_{nam_prev}_vs_{nam_ht}_{datetime.today().strftime('%d%m%Y')}.xlsx"
+
+        if st.session_state.get(f"_bytes_cd{key_sfx}"):
+            st.download_button("⬇ Tải Excel", data=st.session_state[f"_bytes_cd{key_sfx}"],
+                file_name=st.session_state[f"_file_cd{key_sfx}"],
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 key=f"dl_cd_excel{key_sfx}")

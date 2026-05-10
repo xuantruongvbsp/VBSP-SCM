@@ -375,9 +375,13 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                         buf = BytesIO()
                         with pd.ExcelWriter(buf, engine="openpyxl") as w:
                             df_qh[cols_qh].to_excel(w, index=False, sheet_name="NQH_GQVL")
+                        st.session_state["_bytes_gqvl_qh"] = buf.getvalue()
+                        st.session_state["_file_gqvl_qh"] = f"NQH_GQVL_{datetime.today().strftime('%d%m%Y')}.xlsx"
+
+                    if st.session_state.get("_bytes_gqvl_qh"):
                         st.download_button("⬇ Tải Excel NQH GQVL",
-                            data=buf.getvalue(),
-                            file_name=f"NQH_GQVL_{datetime.today().strftime('%d%m%Y')}.xlsx",
+                            data=st.session_state["_bytes_gqvl_qh"],
+                            file_name=st.session_state["_file_gqvl_qh"],
                             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                             key="dl_gqvl_qh")
 
@@ -433,8 +437,12 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                 buf = BytesIO()
                 with pd.ExcelWriter(buf, engine="openpyxl") as w:
                     df_loc[cols_hien].to_excel(w, index=False, sheet_name="GQVL")
+                st.session_state["_bytes_gqvl_ds"] = buf.getvalue()
+                st.session_state["_file_gqvl_ds"] = f"GQVL_{datetime.today().strftime('%d%m%Y')}.xlsx"
+
+            if st.session_state.get("_bytes_gqvl_ds"):
                 st.download_button("⬇ Tải Excel",
-                    data=buf.getvalue(),
-                    file_name=f"GQVL_{datetime.today().strftime('%d%m%Y')}.xlsx",
+                    data=st.session_state["_bytes_gqvl_ds"],
+                    file_name=st.session_state["_file_gqvl_ds"],
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     key="dl_gqvl_ds")

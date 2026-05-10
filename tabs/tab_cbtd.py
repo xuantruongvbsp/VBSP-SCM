@@ -572,8 +572,13 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                                 df_cb2 = df_cb2[df_cb2["Hình thức vay"] != 1]
                             if not df_cb2.empty:
                                 df_cb2.to_excel(w, index=False, sheet_name=f"CB_{ma}"[:31])
-                    st.download_button("⬇ Tải Excel", data=buf.getvalue(),
-                        file_name=f"BC_CBTD_{datetime.today().strftime('%d%m%Y')}.xlsx",
+                    st.session_state["_bytes_cbtd"] = buf.getvalue()
+                    st.session_state["_file_cbtd"] = f"BC_CBTD_{datetime.today().strftime('%d%m%Y')}.xlsx"
+
+                if st.session_state.get("_bytes_cbtd"):
+                    st.download_button("⬇ Tải Excel",
+                        data=st.session_state["_bytes_cbtd"],
+                        file_name=st.session_state["_file_cbtd"],
                         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                         key="dl_cbtd")
 

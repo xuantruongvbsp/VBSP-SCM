@@ -254,13 +254,18 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
             height=400,
         )
         st.divider()
-        if st.button("📥 Xuất danh sách đang lọc"):
+        if st.button("📥 Xuất danh sách đang lọc", key="btn_ds_xuat"):
             buf = BytesIO()
             with pd.ExcelWriter(buf, engine="openpyxl") as w:
                 dl[ch].to_excel(w, index=False, sheet_name="Danh sách")
-            st.download_button("⬇ Tải file Excel", data=buf.getvalue(),
-                file_name=f"danh_sach_{datetime.today().strftime('%d%m%Y')}.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+            st.session_state["_bytes_ds"] = buf.getvalue()
+            st.session_state["_file_ds"] = f"danh_sach_{datetime.today().strftime('%d%m%Y')}.xlsx"
+
+        if st.session_state.get("_bytes_ds"):
+            st.download_button("⬇ Tải file Excel", data=st.session_state["_bytes_ds"],
+                file_name=st.session_state["_file_ds"],
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                key="dl_ds")
 
         # ══════════════════════════════════════════════════════════════════════
         # SECTION: NỢ ĐẾN HẠN

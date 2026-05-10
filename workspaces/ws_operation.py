@@ -241,7 +241,9 @@ def _render_doc_hub(df: pd.DataFrame, df_nq11, role: str):
         horizontal=True, key="dh_xuat_mode",
     ) if len(df_chon) > 1 else "Mỗi hồ sơ 1 file riêng"
 
+    dh_ss_key = "_dh_docx_hub"
     if st.button("🖨️ Tạo văn bản", type="primary", key="dh_btn_xuat"):
+        results = []
         for ten_mau in chon_mau_list:
             idx_mau  = ten_mau_list.index(ten_mau)
             path_mau = path_mau_list[idx_mau]
@@ -253,23 +255,23 @@ def _render_doc_hub(df: pd.DataFrame, df_nq11, role: str):
                         ten_kh = str(row.get(COT_TEN_KH, f"hs_{i+1}"))
                         fname  = f"{path_mau.stem}_{ten_kh}_{datetime.today().strftime('%d%m%Y')}.docx"
                         data   = auto_fill_document(row, str(path_mau), TAG_MAP)
-                        st.download_button(
-                            f"⬇ {ten_mau} — {ten_kh}", data=data, file_name=fname,
-                            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                            key=f"dl_{ten_mau}_{i}",
-                        )
+                        results.append((f"{ten_mau} — {ten_kh}", data, fname, f"dl_{ten_mau}_{i}"))
                 else:
                     fname = f"{path_mau.stem}_batch_{datetime.today().strftime('%d%m%Y')}.docx"
                     data  = auto_fill_batch(df_chon, str(path_mau), TAG_MAP)
-                    st.download_button(
-                        f"⬇ {ten_mau} — {len(df_chon)} hồ sơ (gộp)",
-                        data=data, file_name=fname,
-                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                        key=f"dl_batch_{ten_mau}",
-                    )
+                    results.append((f"⬇ {ten_mau} — {len(df_chon)} hồ sơ (gộp)", data, fname, f"dl_batch_{ten_mau}"))
                 st.success(f"✅ Đã tạo: **{ten_mau}**")
             except Exception as e:
                 st.error(f"Lỗi tạo {ten_mau}: {e}")
+        st.session_state[dh_ss_key] = results
+
+    if st.session_state.get(dh_ss_key):
+        for label, data, fname, key in st.session_state[dh_ss_key]:
+            st.download_button(
+                f"⬇ {label}", data=data, file_name=fname,
+                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                key=key,
+            )
 
 
 def _init_gb2_session_for_doc_hub(kwargs: dict) -> None:
@@ -418,17 +420,20 @@ def _render_thong_bao_ket_luan(tab, **kwargs):
                 )
                 st.session_state["tb_data"] = data
                 st.session_state["tb_ten_file"] = ten_file
-                st.download_button(
-                    "⬇️ Tải về Word",
-                    data=data,
-                    file_name=ten_file,
-                    mime="application/vnd.openxmlformats-officedocument"
-                    ".wordprocessingml.document",
-                    key="tb_dl_word",
-                )
-                st.success("✅ Đã tạo Thông báo Kết luận!")
+                st.success("✅ Đã tạo Thông báo Kết luận! Nhấn nút bên dưới để tải về.")
+
             except Exception as e:
                 st.error(f"❌ Lỗi tạo file: {e}")
+
+        if st.session_state.get("tb_data"):
+            st.download_button(
+                "⬇️ Tải về Word",
+                data=st.session_state["tb_data"],
+                file_name=st.session_state["tb_ten_file"],
+                mime="application/vnd.openxmlformats-officedocument"
+                ".wordprocessingml.document",
+                key="tb_dl_word",
+            )
 
         if st.session_state.get("tb_data") and st.button("📄 Xuất PDF", type="secondary", key="tb_xuat_pdf"):
             try:
@@ -542,16 +547,22 @@ def _render_bien_ban_giao_ban(tab, **kwargs):
                 )
                 thang = date.today().strftime("%m%Y")
                 ten_file = f"BB_GiaoBan_{chon_xa.replace(' ','_')}_{thang}.docx"
-                st.download_button(
-                    "⬇️ Tải về Word", data=data, file_name=ten_file,
-                    mime="application/vnd.openxmlformats-officedocument"
-                         ".wordprocessingml.document",
-                    key="gb2_dl_word",
-                )
-                st.success("✅ Đã tạo biên bản!")
+                st.session_state["_bytes_gb2"] = data
+                st.session_state["_file_gb2"] = ten_file
+                st.success("✅ Đã tạo biên bản! Nhấn nút bên dưới để tải về.")
             except Exception as e:
                 st.error(f"❌ Lỗi xuất file: {e}")
                 st.exception(e)
+
+        if st.session_state.get("_bytes_gb2"):
+            st.download_button(
+                "⬇️ Tải về Word",
+                data=st.session_state["_bytes_gb2"],
+                file_name=st.session_state["_file_gb2"],
+                mime="application/vnd.openxmlformats-officedocument"
+                     ".wordprocessingml.document",
+                key="gb2_dl_word",
+            )
 
 
 def _render_bao_cao_giao_ban(tab, **kwargs):
@@ -779,17 +790,20 @@ Doanh số cho vay trong tháng: {ds_cv:.1f} triệu đồng; doanh số thu n�
                 # Tạo tên file với thông tin điểm giao dịch
                 ten_file_safe = (ten_dgd or chon_xa).replace("/", "_").replace("\\", "_")
                 ten_file = f"GiaoBan_{chon_xa}_{ten_file_safe}_{datetime.now().strftime('%Y%m%d')}.xlsx"
-                
-                st.download_button(
-                    label=f"📥 Tải về {ten_file}",
-                    data=buf,
-                    file_name=ten_file,
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    key="gb_download"
-                )
+                st.session_state["_bytes_gb"] = buf
+                st.session_state["_file_gb"] = ten_file
                 st.success(f"✅ Đã tạo file Excel: **{ten_file}**")
             except Exception as e:
                 st.error(f"❌ Lỗi xuất Excel: {e}")
+
+        if st.session_state.get("_bytes_gb"):
+            st.download_button(
+                label=f"📥 Tải về {st.session_state['_file_gb']}",
+                data=st.session_state["_bytes_gb"],
+                file_name=st.session_state["_file_gb"],
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                key="gb_download"
+            )
 
 
 def render(**kwargs):

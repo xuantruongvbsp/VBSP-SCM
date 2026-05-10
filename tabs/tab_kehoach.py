@@ -169,8 +169,13 @@ def render(tab, **kwargs):
                         for ten in ds_chi_tieu]
             with pd.ExcelWriter(buf, engine="openpyxl") as w:
                 pd.DataFrame(rows_mau).to_excel(w, index=False, sheet_name="Ke hoach")
-            st.download_button("⬇ Tải ngay", data=buf.getvalue(),
-                file_name="mau_ke_hoach.xlsx",
+            st.session_state[f"_bytes_{prefix}_mau_kh"] = buf.getvalue()
+            st.session_state[f"_file_{prefix}_mau_kh"] = "mau_ke_hoach.xlsx"
+
+        if st.session_state.get(f"_bytes_{prefix}_mau_kh"):
+            st.download_button("⬇ Tải ngay",
+                data=st.session_state[f"_bytes_{prefix}_mau_kh"],
+                file_name=st.session_state[f"_file_{prefix}_mau_kh"],
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 key=f"{prefix}_dl_mau_kh")
 
@@ -253,7 +258,12 @@ def render(tab, **kwargs):
                        for i, r in df_ss.iterrows()]
             with pd.ExcelWriter(buf, engine="openpyxl") as w:
                 pd.DataFrame(rows_ex).to_excel(w, index=False, sheet_name="KH vs TH")
-            st.download_button("⬇ Tải báo cáo", data=buf.getvalue(),
-                file_name=f"KHvsTH_{datetime.today().strftime('%d%m%Y')}.xlsx",
+            st.session_state[f"_bytes_{prefix}_khvsth"] = buf.getvalue()
+            st.session_state[f"_file_{prefix}_khvsth"] = f"KHvsTH_{datetime.today().strftime('%d%m%Y')}.xlsx"
+
+        if st.session_state.get(f"_bytes_{prefix}_khvsth"):
+            st.download_button("⬇ Tải báo cáo",
+                data=st.session_state[f"_bytes_{prefix}_khvsth"],
+                file_name=st.session_state[f"_file_{prefix}_khvsth"],
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 key=f"{prefix}_dl_khvsth")

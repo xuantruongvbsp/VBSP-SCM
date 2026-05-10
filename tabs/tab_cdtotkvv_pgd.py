@@ -345,14 +345,8 @@ def _sub_phan_tich(pgd_user: str, username: str) -> None:
             with col_xuat:
                 if st.button("⬇️ Xuất Excel Top Tổ Yếu", key="cdtotkvv_pgd_xuat_yeu"):
                     try:
-                        xlsx_bytes = xuat_excel({"To_Yeu": df_yeu})
-                        st.download_button(
-                            label="📥 Tải file Excel",
-                            data=xlsx_bytes,
-                            file_name=ten_file_xuat(f"ToYeu_{pgd_user}"),
-                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                            key="cdtotkvv_pgd_download_yeu",
-                        )
+                        st.session_state["_bytes_cdto_pgd"] = xuat_excel({"To_Yeu": df_yeu})
+                        st.session_state["_file_cdto_pgd"] = ten_file_xuat(f"ToYeu_{pgd_user}")
                         hostname = socket.gethostname()
                         db.ghi_audit(
                             username,
@@ -362,6 +356,15 @@ def _sub_phan_tich(pgd_user: str, username: str) -> None:
                         st.success("✅ Đã tạo file Excel!")
                     except Exception as e:
                         st.error(f"Lỗi xuất Excel: {e}")
+
+                if st.session_state.get("_bytes_cdto_pgd"):
+                    st.download_button(
+                        label="📥 Tải file Excel",
+                        data=st.session_state["_bytes_cdto_pgd"],
+                        file_name=st.session_state["_file_cdto_pgd"],
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        key="cdtotkvv_pgd_download_yeu",
+                    )
         else:
             st.success("✅ Không có Tổ nào xếp loại Yếu!")
     else:

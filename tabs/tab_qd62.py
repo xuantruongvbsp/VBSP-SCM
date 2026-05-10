@@ -443,13 +443,17 @@ def _render_cn(username: str, role: str) -> None:
             output.seek(0)
 
             ten_file = f"QD62_tong_hop_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
-            st.download_button(
-                "⬇️ Tải file Excel",
-                data=output,
-                file_name=ten_file,
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                key="qd62_cn_dl_excel",
-            )
+            st.session_state["_bytes_qd62"] = output.getvalue()
+            st.session_state["_file_qd62"] = ten_file
+
+    if st.session_state.get("_bytes_qd62"):
+        st.download_button(
+            "⬇️ Tải file Excel",
+            data=st.session_state["_bytes_qd62"],
+            file_name=st.session_state["_file_qd62"],
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            key="qd62_cn_dl_excel",
+        )
 
 
 # ══════════════════════════════════════════════════════════════════════════════

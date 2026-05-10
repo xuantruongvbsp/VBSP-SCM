@@ -392,10 +392,14 @@ def _hien_thi_bang_cn_readonly(
                     ws.column_dimensions[
                         ws.cell(row=1, column=i).column_letter
                     ].width = w
+        st.session_state["_bytes_khtd_matrix"] = buf.getvalue()
+        st.session_state["_file_khtd_matrix"] = ten_file
+
+    if st.session_state.get("_bytes_khtd_matrix"):
         st.download_button(
             label="⬇️ Tải Excel",
-            data=buf.getvalue(),
-            file_name=ten_file,
+            data=st.session_state["_bytes_khtd_matrix"],
+            file_name=st.session_state["_file_khtd_matrix"],
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             key="dl_khtd_cn_matrix",
         )
@@ -549,10 +553,14 @@ def _tab_canh_bao_chenh_lech() -> None:
         buf = BytesIO()
         with pd.ExcelWriter(buf, engine="openpyxl") as writer:
             df.to_excel(writer, index=False, sheet_name="Chênh lệch KHTD")
+        st.session_state["_bytes_khtd_cl"] = buf.getvalue()
+        st.session_state["_file_khtd_cl"] = f"CanhBao_KHTD_{datetime.today().strftime('%d%m%Y')}.xlsx"
+
+    if st.session_state.get("_bytes_khtd_cl"):
         st.download_button(
             label="⬇ Tải file Excel",
-            data=buf.getvalue(),
-            file_name=f"CanhBao_KHTD_{datetime.today().strftime('%d%m%Y')}.xlsx",
+            data=st.session_state["_bytes_khtd_cl"],
+            file_name=st.session_state["_file_khtd_cl"],
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             key="dl_chenh_lech_excel",
         )

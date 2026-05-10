@@ -192,7 +192,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
 
                 # ── Xuất Excel ──
                 st.divider()
-                if st.button("📥 Xuất dữ liệu NQ11 ra Excel", type="primary"):
+                if st.button("📥 Xuất dữ liệu NQ11 ra Excel", type="primary", key="btn_nq11_xuat"):
                     buf = BytesIO()
                     with pd.ExcelWriter(buf, engine="openpyxl") as w:
                         # Sheet 1: Tổng hợp chương trình (số gốc)
@@ -203,11 +203,16 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                         if loai_loc != "Chỉ món không có NQ11":
                             df_loc_nq[df_loc_nq["DNO NQ11"]>0][cot_hien_nq].to_excel(
                                 w, index=False, sheet_name="Chỉ món NQ11")
+                    st.session_state["_bytes_nq11"] = buf.getvalue()
+                    st.session_state["_file_nq11"] = f"NQ11_{datetime.today().strftime('%d%m%Y')}.xlsx"
+
+                if st.session_state.get("_bytes_nq11"):
                     st.download_button(
                         "⬇ Tải file Excel",
-                        data=buf.getvalue(),
-                        file_name=f"NQ11_{datetime.today().strftime('%d%m%Y')}.xlsx",
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                        data=st.session_state["_bytes_nq11"],
+                        file_name=st.session_state["_file_nq11"],
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        key="dl_nq11",
                     )
 
         # =============================================

@@ -31,7 +31,7 @@ from utils import (
     xuat_excel,
     ten_file_xuat,
 )
-from tabs import tab_khtd_giao_dc, tab_kiem_soat, tab_qd62
+from tabs import tab_khtd_giao_dc, tab_kiem_soat, tab_qd62, tab_tien_do
 
 # ── Hằng số ngưỡng NQH ────────────────────────────────────────────────────────
 _NGUONG_AN_TOAN  = 1.0   # % — xanh lá
@@ -713,8 +713,8 @@ def render(**kwargs) -> None:
     role = kwargs.get("role", "executive")
     username = kwargs.get("username", "unknown")
 
-    tab_phan_tich, tab_kiem_soat_cn, tab_no_rui_ro_cn = st.tabs(
-        ["📊 Phân tích & cảnh báo", "🔍 Kiểm soát CN", "💳 Nợ rủi ro QĐ62"]
+    tab_phan_tich, tab_tien_do_ui, tab_kiem_soat_cn, tab_no_rui_ro_cn = st.tabs(
+        ["📊 Phân tích & cảnh báo", "📅 Tiến độ", "🔍 Kiểm soát CN", "💳 Nợ rủi ro QĐ62"]
     )
 
     with tab_phan_tich:
@@ -760,6 +760,9 @@ def render(**kwargs) -> None:
             "— cần chấn chỉnh trước khi phát sinh NQH"
         )
         _canh_bao_migration(df_full)
+
+    with tab_tien_do_ui:
+        tab_tien_do.render_tong_quan_only(tab_tien_do_ui, **kwargs)
 
     with tab_kiem_soat_cn:
         tab_kiem_soat.render_tab(df_full, role, username)

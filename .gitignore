@@ -43,6 +43,11 @@ Thumbs.db
 ~$*.xlsx
 ~$*.docx
 
+# File Excel - không commit
+*.xlsx
+*.XLSX
+data/
+
 # C extensions
 *.so
 

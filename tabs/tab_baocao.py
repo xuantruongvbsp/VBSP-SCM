@@ -298,8 +298,13 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                         tieu_de="Báo cáo tổng hợp",
                         nguoi_xuat=username or "Người dùng",
                     )
-                    st.download_button("⬇ Tải Excel", data=data_excel,
-                        file_name=ten_file_bao_cao("BC_TH"),
+                    st.session_state["_bytes_bc_th"] = data_excel
+                    st.session_state["_file_bc_th"] = ten_file_bao_cao("BC_TH")
+
+                if st.session_state.get("_bytes_bc_th"):
+                    st.download_button("⬇ Tải Excel",
+                        data=st.session_state["_bytes_bc_th"],
+                        file_name=st.session_state["_file_bc_th"],
                         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                         key="dl_bc_th")
 
@@ -499,10 +504,14 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                                 f"BC_CT_{loai_ct[2:12].strip().replace(' ','_')}"
                             )
                             file_bytes = xuat_bao_cao(sheets, tieu_de_xuat, username or "unknown")
+                            st.session_state["_bytes_bc_ct"] = file_bytes
+                            st.session_state["_file_bc_ct"] = ten_file
+
+                        if st.session_state.get("_bytes_bc_ct"):
                             st.download_button(
                                 "⬇ Tải Excel",
-                                data=file_bytes,
-                                file_name=ten_file,
+                                data=st.session_state["_bytes_bc_ct"],
+                                file_name=st.session_state["_file_bc_ct"],
                                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                                 key="dl_bc_ct",
                             )

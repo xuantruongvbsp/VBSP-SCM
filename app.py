@@ -72,78 +72,82 @@ h3 { font-size: 1.1rem  !important; font-weight: 600 !important; color: #1a3a5c 
 [data-testid="stAppViewContainer"] > .main { background: #f0f4f8 !important; }
 .block-container { padding: 1.5rem 2rem 2rem !important; max-width: 1400px !important; }
 
-/* ── 3. SIDEBAR ── */
+/* ── 3. SIDEBAR — Light Theme VBSP ── */
 [data-testid="stSidebar"] {
-    background: linear-gradient(180deg, #0a1628 0%, #0d2137 60%, #1a3a5c 100%) !important;
-    border-right: none !important;
-    box-shadow: 4px 0 20px rgba(0,0,0,0.25) !important;
-}
-[data-testid="stSidebar"] * { color: #e8edf2 !important; }
-
-/* Tên người dùng */
-[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p {
-    color: #e8edf2 !important;
-    font-size: 0.93rem !important;
+    background: linear-gradient(180deg, #FFFFFF 0%, #F1F8E9 100%) !important;
+    border-right: 2px solid #C8E6C9 !important;
 }
 
-/* Caption PGD */
-[data-testid="stSidebar"] [data-testid="stCaptionContainer"] p {
-    color: #94a3b8 !important;
-    font-size: 0.80rem !important;
+[data-testid="stSidebar"] h1,
+[data-testid="stSidebar"] h2,
+[data-testid="stSidebar"] h3 {
+    color: #1B5E20 !important;
+    font-weight: 700;
 }
 
-/* Label "Không gian làm việc" */
-[data-testid="stSidebar"] strong {
-    color: #94a3b8 !important;
-    font-size: 0.75rem !important;
-    text-transform: uppercase !important;
-    letter-spacing: 1px !important;
-}
-
-/* Tất cả nút trong sidebar */
-[data-testid="stSidebar"] .stButton > button {
-    background: rgba(255,255,255,0.06) !important;
-    color: #cbd5e1 !important;
-    border: 1px solid rgba(255,255,255,0.10) !important;
-    border-radius: 10px !important;
-    font-size: 0.82rem !important;
-    font-weight: 500 !important;
-    padding: 9px 14px !important;
-    text-align: left !important;
-    white-space: normal !important;
-    word-break: break-word !important;
-    line-height: 1.4 !important;
-    transition: all 0.2s ease !important;
-    width: 100% !important;
-}
-[data-testid="stSidebar"] .stButton > button:hover {
-    background: rgba(255,255,255,0.13) !important;
-    border-color: rgba(255,255,255,0.25) !important;
-    color: #ffffff !important;
-    transform: translateX(2px) !important;
-}
-
-/* Nút workspace đang active (type="primary") */
-[data-testid="stSidebar"] .stButton > button[kind="primary"] {
-    background: linear-gradient(135deg, rgba(21,101,192,0.75), rgba(25,118,210,0.65)) !important;
-    border: 1px solid rgba(100,160,255,0.4) !important;
-    color: #ffffff !important;
+[data-testid="stSidebar"] label,
+[data-testid="stSidebar"] .stMarkdown p {
+    color: #558B2F !important;
+    font-size: 11px !important;
     font-weight: 700 !important;
-    box-shadow: 0 2px 12px rgba(21,101,192,0.35) !important;
-}
-[data-testid="stSidebar"] .stButton > button[kind="primary"]:hover {
-    background: linear-gradient(135deg, rgba(21,101,192,0.90), rgba(25,118,210,0.80)) !important;
-    box-shadow: 0 4px 16px rgba(21,101,192,0.50) !important;
-    transform: translateX(2px) !important;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
 }
 
-/* Divider trong sidebar */
+[data-testid="stSidebar"] .stButton > button {
+    background-color: #FFFFFF;
+    color: #2E7D32 !important;
+    border: 1.5px solid #A5D6A7;
+    border-radius: 10px;
+    width: 100%;
+    text-align: left;
+    padding: 10px 16px;
+    font-size: 14px;
+    font-weight: 500;
+    margin-bottom: 4px;
+    transition: all 0.2s ease;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+
+[data-testid="stSidebar"] .stButton > button:hover {
+    background-color: #E8F5E9 !important;
+    border-color: #2E7D32 !important;
+    color: #1B5E20 !important;
+    box-shadow: 0 2px 8px rgba(46,125,50,0.15);
+    transform: translateX(2px);
+}
+
+[data-testid="stSidebar"] .stButton > button[kind="primary"] {
+    background: linear-gradient(135deg, #2E7D32, #43A047) !important;
+    color: #FFFFFF !important;
+    border-color: #2E7D32 !important;
+    box-shadow: 0 3px 10px rgba(46,125,50,0.3);
+}
+
 [data-testid="stSidebar"] hr {
-    border-top: 1px solid rgba(255,255,255,0.10) !important;
-    margin: 0.6rem 0 !important;
+    border-color: #C8E6C9;
+    margin: 12px 0;
 }
 
-/* ── 4. TABS ── */
+[data-testid="stSidebar"] .stAlert {
+    background-color: #F9FBE7;
+    border: 1px solid #C5E1A5;
+    border-radius: 8px;
+    font-size: 12px;
+}
+
+/* ── 4. Main area ── */
+.main .block-container {
+    background-color: #FAFAFA;
+    padding-top: 1.5rem;
+}
+
+header[data-testid="stHeader"] {
+    background-color: #FFFFFF;
+    border-bottom: 2px solid #C8E6C9;
+}
+
+/* ── 5. TABS ── */
 [data-testid="stTabs"] { background: white !important; border-radius: 12px !important;
     padding: 0 8px !important; box-shadow: 0 1px 4px rgba(0,0,0,0.08) !important; }
 [data-testid="stTabs"] button[role="tab"] {
@@ -152,13 +156,13 @@ h3 { font-size: 1.1rem  !important; font-weight: 600 !important; color: #1a3a5c 
     border-radius: 0 !important; transition: color 0.2s !important;
 }
 [data-testid="stTabs"] button[role="tab"][aria-selected="true"] {
-    color: #1565c0 !important;
-    border-bottom: 3px solid #1565c0 !important;
+    color: #2E7D32 !important;
+    border-bottom: 3px solid #2E7D32 !important;
     background: transparent !important;
 }
-[data-testid="stTabs"] button[role="tab"]:hover { color: #1565c0 !important; }
+[data-testid="stTabs"] button[role="tab"]:hover { color: #2E7D32 !important; }
 
-/* ── 5. EXPANDER (card-style) ── */
+/* ── 6. EXPANDER (card-style) ── */
 [data-testid="stExpander"] {
     background: white !important;
     border: 1px solid #e2e8f0 !important;
@@ -171,7 +175,7 @@ h3 { font-size: 1.1rem  !important; font-weight: 600 !important; color: #1a3a5c 
     color: #1a3a5c !important; padding: 12px 16px !important;
 }
 
-/* ── 6. METRIC (KPI card) ── */
+/* ── 7. METRIC (KPI card) ── */
 [data-testid="stMetric"] {
     background: white !important;
     border: 1px solid #e2e8f0 !important;
@@ -189,14 +193,14 @@ h3 { font-size: 1.1rem  !important; font-weight: 600 !important; color: #1a3a5c 
     color: #0d2137 !important;
 }
 
-/* ── 7. DATAFRAME ── */
+/* ── 8. DATAFRAME ── */
 [data-testid="stDataFrame"] {
     border-radius: 10px !important; overflow: hidden !important;
     border: 1px solid #e2e8f0 !important;
     box-shadow: 0 1px 4px rgba(0,0,0,0.06) !important;
 }
 [data-testid="stDataFrame"] th {
-    background: #1a3a5c !important; color: white !important;
+    background: #2E7D32 !important; color: white !important;
     font-size: 0.85rem !important; font-weight: 600 !important;
     padding: 10px 12px !important; letter-spacing: 0.3px !important;
 }
@@ -205,7 +209,7 @@ h3 { font-size: 1.1rem  !important; font-weight: 600 !important; color: #1a3a5c 
     border-bottom: 1px solid #f1f5f9 !important;
 }
 
-/* ── 8. INPUT / SELECTBOX / NUMBER INPUT ── */
+/* ── 9. INPUT / SELECTBOX / NUMBER INPUT ── */
 [data-testid="stSelectbox"] label,
 [data-testid="stNumberInput"] label,
 [data-testid="stTextInput"]  label,
@@ -224,13 +228,13 @@ h3 { font-size: 1.1rem  !important; font-weight: 600 !important; color: #1a3a5c 
 }
 [data-testid="stNumberInput"] input:focus,
 [data-testid="stTextInput"]   input:focus {
-    border-color: #1565c0 !important;
-    box-shadow: 0 0 0 3px rgba(21,101,192,0.12) !important;
+    border-color: #2E7D32 !important;
+    box-shadow: 0 0 0 3px rgba(46,125,50,0.12) !important;
     outline: none !important;
     background: white !important;
 }
 
-/* ── 9. BUTTON ── */
+/* ── 10. BUTTON ── */
 .stButton > button {
     font-size: 0.9rem !important; font-weight: 600 !important;
     padding: 8px 20px !important; border-radius: 8px !important;
@@ -239,26 +243,26 @@ h3 { font-size: 1.1rem  !important; font-weight: 600 !important; color: #1a3a5c 
     transition: all 0.2s !important;
 }
 .stButton > button:hover {
-    border-color: #1565c0 !important; color: #1565c0 !important;
-    box-shadow: 0 2px 8px rgba(21,101,192,0.15) !important;
+    border-color: #2E7D32 !important; color: #2E7D32 !important;
+    box-shadow: 0 2px 8px rgba(46,125,50,0.15) !important;
 }
 .stButton > button[kind="primary"] {
-    background: linear-gradient(135deg, #1565c0, #1976d2) !important;
+    background: linear-gradient(135deg, #2E7D32, #43A047) !important;
     color: white !important; border: none !important;
-    box-shadow: 0 3px 10px rgba(21,101,192,0.3) !important;
+    box-shadow: 0 3px 10px rgba(46,125,50,0.3) !important;
 }
 .stButton > button[kind="primary"]:hover {
-    background: linear-gradient(135deg, #0d47a1, #1565c0) !important;
-    box-shadow: 0 4px 14px rgba(21,101,192,0.4) !important;
+    background: linear-gradient(135deg, #1B5E20, #2E7D32) !important;
+    box-shadow: 0 4px 14px rgba(46,125,50,0.4) !important;
 }
 
-/* ── 10. ALERT / INFO / WARNING / SUCCESS ── */
+/* ── 11. ALERT / INFO / WARNING / SUCCESS ── */
 [data-testid="stAlert"] {
     border-radius: 10px !important; font-size: 0.92rem !important;
     border: none !important; padding: 12px 16px !important;
 }
 
-/* ── 11. ROLE BADGES ── */
+/* ── 12. ROLE BADGES ── */
 .role-executive { background:#ede7f6; color:#4527a0; padding:3px 12px;
     border-radius:20px; font-size:.82rem; font-weight:700; }
 .role-admin     { background:#e8f5e9; color:#1b5e20; padding:3px 12px;
@@ -268,10 +272,10 @@ h3 { font-size: 1.1rem  !important; font-weight: 600 !important; color: #1a3a5c 
 .role-user      { background:#e3f2fd; color:#0d47a1; padding:3px 12px;
     border-radius:20px; font-size:.82rem; font-weight:600; }
 
-/* ── 12. DIVIDER ── */
+/* ── 13. DIVIDER ── */
 hr { border: none !important; border-top: 1px solid #e2e8f0 !important; margin: 1rem 0 !important; }
 
-/* ── 13. FORM ── */
+/* ── 14. FORM ── */
 [data-testid="stForm"] {
     background: white !important; border-radius: 12px !important;
     border: 1px solid #e2e8f0 !important;

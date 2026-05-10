@@ -1161,6 +1161,9 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                 if loc_xa:
                     dt_loc = dt_loc[dt_loc["Tên xã"].isin(loc_xa)]
 
+                # Loại bỏ hồ sơ dư nợ = 0
+                dt_loc = dt_loc[dt_loc[COT_TONG_DU_NO].fillna(0) > 0]
+
                 tab_1m, tab_3m, tab_6m, tab_nam = st.tabs([
                     "📅 1 tháng", "📅 3 tháng", "📅 6 tháng", "📅 Trong năm"
                 ])

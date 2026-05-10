@@ -43,6 +43,7 @@ from tabs import (
     tab_diem_gd_pgd,
     tab_ban_dai_dien,
     tab_tongquan,
+    tab_tien_do,
     tab_baocao,
     tab_nq11,
     tab_candoi,
@@ -870,7 +871,8 @@ def render(**kwargs):
             "label": "📋 Nghiệp vụ hàng ngày",
             "tabs": [
                 ("📊 Thông tin chung", lambda tab: tab_tongquan.render(tab, **_pgd_df_kwargs)),
-                ("🔍 Tra cứu hồ sơ", lambda tab: tab_tracuu.render(tab, **kwargs)),
+                ("� Tiến độ", lambda tab: tab_tien_do.render(tab, **kwargs)),
+                ("�🔍 Tra cứu hồ sơ", lambda tab: tab_tracuu.render(tab, **kwargs)),
                 ("📋 Danh sách & Lọc", lambda tab: tab_danhsach.render(tab, **kwargs)),
                 ("⏰ Đến hạn", lambda tab: render_den_han(role=role, pgd_user=pgd_user)),
             ],

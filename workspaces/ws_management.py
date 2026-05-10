@@ -42,6 +42,7 @@ from tabs import (
     tab_ban_dai_dien,
     tab_uy_thac,
     tab_qd62,
+    tab_tien_do,
 )
 from tabs import tab_upload_khnv
 from tabs import tab_quan_ly_dgd
@@ -752,7 +753,8 @@ def render(**kwargs):
     # ── Định nghĩa nhóm tab ─────────────────────────────────────────────
     nhom_giam_sat = [
         ("📊 Thông tin chung", lambda tab: tab_tongquan.render(tab, **kwargs)),
-        ("🚨 Cảnh báo nợ", lambda tab: _render_canh_bao_no(
+        ("� Tiến độ", lambda tab: tab_tien_do.render(tab, **kwargs)),
+        ("�🚨 Cảnh báo nợ", lambda tab: _render_canh_bao_no(
             df_full, ds_pgd_all, role, kwargs.get("username", "unknown"))),
     ]
     nhom_kiem_soat = [

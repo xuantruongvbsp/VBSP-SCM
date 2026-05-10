@@ -1184,7 +1184,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
 
                     pdf_tg["Số món vay"] = pdf_tg["_mon"].apply(fmt_so)
                     pdf_tg["Số KH"]      = pdf_tg["_kh"].apply(fmt_so)
-                    pdf_tg["Dư nợ"]      = pdf_tg["_no"].apply(fmt_so)
+                    pdf_tg["Dư nợ"]      = pdf_tg["_no"]
 
                     pdf_tg = pdf_tg.rename(columns=rename_ok)
                     pdf_tg = pdf_tg.sort_values(

@@ -98,34 +98,47 @@ def nut_tai_word_va_pdf(
     key_prefix: str,
 ) -> None:
     """
-    Hiển thị 2 nút download: Word + PDF (nếu convert được).
-    Dùng trong Streamlit sau khi render template.
-
-    Args:
-        docx_bytes: bytes file .docx đã render
-        ten_file_goc: tên file không có extension, VD "Mau06_PGD_BienHoa_01052026"
-        key_prefix: prefix để tránh trùng key Streamlit
+    Lưu Word + PDF bytes vào session_state.
+    Gọi bên trong if st.button().
     """
     import streamlit as st
+
+    st.session_state[f"_w_bytes_{key_prefix}"] = docx_bytes
+    st.session_state[f"_f_name_{key_prefix}"] = ten_file_goc
+    pdf_bytes = docx_to_pdf(docx_bytes)
+    if pdf_bytes:
+        st.session_state[f"_p_bytes_{key_prefix}"] = pdf_bytes
+
+
+def hien_thi_nut_tai(key_prefix: str) -> None:
+    """
+    Hiển thị 2 nút download: Word + PDF từ session_state.
+    Gọi NGOÀI if st.button() — luôn render.
+    """
+    import streamlit as st
+
+    docx_bytes = st.session_state.get(f"_w_bytes_{key_prefix}")
+    if not docx_bytes:
+        return
 
     col1, col2 = st.columns(2)
     with col1:
         st.download_button(
             "⬇️ Tải Word (.docx)",
             data=docx_bytes,
-            file_name=f"{ten_file_goc}.docx",
+            file_name=f"{st.session_state.get(f'_f_name_{key_prefix}', 'file')}.docx",
             mime="application/vnd.openxmlformats-officedocument"
                  ".wordprocessingml.document",
             key=f"{key_prefix}_dl_docx",
             use_container_width=True,
         )
     with col2:
-        pdf_bytes = docx_to_pdf(docx_bytes)
+        pdf_bytes = st.session_state.get(f"_p_bytes_{key_prefix}")
         if pdf_bytes:
             st.download_button(
                 "⬇️ Tải PDF",
                 data=pdf_bytes,
-                file_name=f"{ten_file_goc}.pdf",
+                file_name=f"{st.session_state.get(f'_f_name_{key_prefix}', 'file')}.pdf",
                 mime="application/pdf",
                 key=f"{key_prefix}_dl_pdf",
                 use_container_width=True,

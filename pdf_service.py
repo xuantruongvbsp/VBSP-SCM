@@ -97,6 +97,12 @@ def xuat_pdf(
     if df is None or df.empty:
         raise ValueError("Không có dữ liệu để xuất PDF.")
 
+    # PERF: Giới hạn số dòng để tránh PDF quá lớn
+    MAX_ROWS_PDF = 2000
+    if len(df) > MAX_ROWS_PDF:
+        df = df.head(MAX_ROWS_PDF)
+        st.warning(f"⚠️ PDF chỉ xuất {MAX_ROWS_PDF} dòng đầu (tổng {len(df)} dòng)")
+
     dong_tong_cells = None
     if them_dong_tong and cols_tien and len(df) > 0:
         tong_row = {}
@@ -235,28 +241,30 @@ def xuat_pdf(
             return str(val) if pd.notna(val) else ""
 
     # Data rows — format số tiền
-    for _, row in df.iterrows():
+    # PERF: vectorized thay thế vòng lặp df.iterrows()
+    # Pre-build styles một lần ngoài vòng lặp
+    style_td = ParagraphStyle("td", fontName=fn, fontSize=font_size, wordWrap="CJK")
+    style_td_r = ParagraphStyle("td_r", fontName=fn, fontSize=font_size, alignment=TA_RIGHT)
+    cols_list = list(df.columns)
+    set_tien = set(cols_tien or [])
+    
+    # Chuyển df sang list of lists một lần (tránh overhead iterrows)
+    arr = df.fillna("").values.tolist()
+    
+    for row_vals in arr:
         cells = []
-        for col in df.columns:
-            val = row[col]
-            if col in cols_tien and pd.notna(val):
+        for ci, val in enumerate(row_vals):
+            col = cols_list[ci]
+            if col in set_tien and val != "":
                 try:
                     if isinstance(val, bool):
                         raise ValueError
                     txt = _fmt_tien_pdf(val)
-                    p = Paragraph(txt, ParagraphStyle("td_r", fontName=fn,
-                                                      fontSize=font_size, alignment=TA_RIGHT))
+                    cells.append(Paragraph(txt, style_td_r))
                 except (ValueError, TypeError):
-                    p = Paragraph(
-                        str(val) if pd.notna(val) else "",
-                        ParagraphStyle("td_r", fontName=fn,
-                                       fontSize=font_size, alignment=TA_RIGHT),
-                    )
+                    cells.append(Paragraph(str(val), style_td_r))
             else:
-                p = Paragraph(str(val) if pd.notna(val) else "",
-                              ParagraphStyle("td", fontName=fn, fontSize=font_size,
-                                             wordWrap="CJK"))
-            cells.append(p)
+                cells.append(Paragraph(str(val) if val != "" else "", style_td))
         table_data.append(cells)
 
     if dong_tong_cells is not None:

@@ -1170,17 +1170,27 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                     COLS_GROUP = [COT_TEN_PGD, "Tên xã", COT_TEN_CT]
                     cols_ok = [c for c in COLS_GROUP if c in df_loc.columns]
 
+                    RENAME_MAP = {COT_TEN_PGD: "PGD", "Tên xã": "Xã", COT_TEN_CT: "Chương trình"}
+                    rename_ok = {k: v for k, v in RENAME_MAP.items() if k in df_loc.columns}
+
                     pdf_tg = df_loc.groupby(cols_ok).agg(
                         _mon=(COT_SO_KU,      "nunique"),
                         _kh =(COT_MA_KH,      "nunique"),
                         _no =(COT_TONG_DU_NO, "sum"),
-                    ).reset_index().sort_values("_no", ascending=False)
+                    ).reset_index()
 
                     pdf_tg["Số món vay"] = pdf_tg["_mon"].apply(fmt_so)
                     pdf_tg["Số KH"]      = pdf_tg["_kh"].apply(fmt_so)
                     pdf_tg["Dư nợ"]      = pdf_tg["_no"].apply(fmt_so)
 
-                    df_pdf = pdf_tg[[*cols_ok, "Số món vay", "Số KH", "Dư nợ"]]
+                    pdf_tg = pdf_tg.rename(columns=rename_ok)
+                    pdf_tg = pdf_tg.sort_values(
+                        by=[c for c in ["PGD", "Xã", "Chương trình"] if c in pdf_tg.columns],
+                        ascending=True,
+                    )
+
+                    cols_hien_thi = [v for v in ["PGD", "Xã", "Chương trình"] if v in pdf_tg.columns]
+                    df_pdf = pdf_tg[[*cols_hien_thi, "Số món vay", "Số KH", "Dư nợ"]]
 
                     return xuat_pdf(
                         df_pdf,

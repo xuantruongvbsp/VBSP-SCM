@@ -1,5 +1,13 @@
 # CHANGELOG — VBSP-SCM
 
+## [2026-05-11] — Tiến độ Công việc Hàng ngày
+- `db.py` dòng ~115 — thêm bảng `tien_do_task` và `tien_do_ketqua` (SQLite)
+- `tabs/tab_tien_do.py` — thêm module Tiến độ: dashboard, tạo đầu việc, cập nhật bằng data_editor, xuất Excel, view read-only
+- `tabs/__init__.py` — export `tab_tien_do`
+- `workspaces/ws_management.py` — thêm tab con “📅 Tiến độ”
+- `workspaces/ws_operation.py` — thêm tab con “📅 Tiến độ” cho phân hệ PGD (read-only)
+- `workspaces/ws_executive.py` — thêm tab “📅 Tiến độ” (read-only)
+
 ## [2026-05-10] — Fix _tinh_th_gqvl_phan_tang() — luôn có 4 alias key dù df rỗng
 - `tabs/tab_khtd_nhap.py` dòng ~58 — thêm 4 dòng `setdefault("3_TW_NHCSXH", "3_TW_NSNN", "3_DP_TINH", "3_DP_XA")` để đảm bảo hàm luôn trả về đủ 4 alias key khi df rỗng/thiếu cột (tránh lỗi KeyError ở _hien_thi_bang_cn_readonly)
 

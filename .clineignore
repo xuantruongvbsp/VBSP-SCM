@@ -1,0 +1,169 @@
+# ============================================================
+# .clineignore — Tối ưu cho Python / SQL / Web / Config project
+# Đặt file này ở thư mục gốc (root) của project
+# ============================================================
+
+# ─── Dependencies & Package managers ───────────────────────
+node_modules/
+bower_components/
+vendor/
+.pnp/
+.pnp.js
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+poetry.lock
+Pipfile.lock
+
+# ─── Python ────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+*.pyd
+.Python
+build/
+dist/
+eggs/
+*.egg-info/
+*.egg
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.whl
+.venv/
+venv/
+ENV/
+env/
+.env
+.env.*
+!.env.example
+
+# ─── DATABASE FILES (quan trọng — ngăn Cline đọc binary) ───
+*.db
+*.sqlite
+*.sqlite3
+*.accdb
+*.mdb
+*.ldb
+*.frm
+*.ibd
+*.MYD
+*.MYI
+dump.sql
+*.dump
+backup*.sql
+*_backup.sql
+*.bak
+
+# ─── Logs & Reports ────────────────────────────────────────
+*.log
+*.log.*
+logs/
+log/
+*.out
+*.err
+reports/
+coverage/
+htmlcov/
+.coverage
+.coverage.*
+*.lcov
+junit*.xml
+test-results/
+
+# ─── Build & Compiled output ───────────────────────────────
+dist/
+build/
+out/
+.next/
+.nuxt/
+.svelte-kit/
+__pycache__/
+*.min.js
+*.min.css
+*.bundle.js
+*.chunk.js
+*.map
+
+# ─── Version Control ───────────────────────────────────────
+.git/
+.gitattributes
+.hg/
+.svn/
+
+# ─── IDE & Editor ──────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ─── Cache & Temp ──────────────────────────────────────────
+.cache/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.eslintcache
+.stylelintcache
+tmp/
+temp/
+.tmp/
+*.tmp
+*.temp
+
+# ─── Large Data / Assets ───────────────────────────────────
+*.csv           # Comment dòng này nếu bạn cần Cline đọc CSV
+*.xlsx
+*.xls
+*.parquet
+*.feather
+*.arrow
+data/raw/
+data/processed/
+datasets/
+*.zip
+*.tar
+*.tar.gz
+*.rar
+*.7z
+
+# ─── Media & Binary ────────────────────────────────────────
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.ico
+*.svg
+*.webp
+*.mp4
+*.mp3
+*.wav
+*.pdf
+*.docx
+*.pptx
+fonts/
+images/
+assets/img/
+static/media/
+
+# ─── Migration & Seed files lớn ────────────────────────────
+migrations/versions/
+seeds/
+fixtures/
+
+# ─── Môi trường & Secret ───────────────────────────────────
+*.pem
+*.key
+*.cert
+*.p12
+secrets/
+.secrets/
+credentials/

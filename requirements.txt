@@ -1,12 +1,32 @@
-streamlit>=1.33.0
-pandas>=2.0.0
+# ============================================================
+# VBSP-SCM — Requirements
+# Hệ thống Quản trị Tín dụng Nội bộ NHCSXH Chi nhánh Đồng Nai
+# Cập nhật: 2026-05-10
+# Cài đặt: pip install -r requirements.txt
+# ============================================================
+
+# --- Core UI ---
+streamlit>=1.35.0
+
+# --- Data & Analytics ---
+pandas>=2.2.0
+numpy>=1.26.0
+plotly>=5.20.0
+
+# --- Excel ---
 openpyxl>=3.1.0
-plotly>=5.18.0
-bcrypt>=4.1.0
-pyarrow>=14.0.0
-python-docx>=1.1.0
-python-dateutil>=2.8.0
-gspread>=6.0.0
 duckdb>=0.10.0
-docxtpl>=0.16.0
-docx2pdf>=0.1.8
+
+# --- Word / PDF ---
+python-docx>=1.1.0
+docxtpl>=0.17.0
+
+# --- Auth ---
+bcrypt>=4.1.0
+
+# --- Google Sheets (Điện báo / Điều báo) ---
+gspread>=6.0.0
+oauth2client>=4.1.3
+
+# --- Date utilities ---
+python-dateutil>=2.9.0

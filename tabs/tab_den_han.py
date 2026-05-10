@@ -23,8 +23,8 @@ from data.den_han import (
     tong_hop_den_han,
     canh_bao_tap_trung,
 )
-from pdf_service import xuat_pdf_group_header
-from utils import fmt_ty, fmt_so
+from pdf_service import xuat_pdf_group_header, nut_xuat_pdf
+from utils import fmt_ty, fmt_so, xuat_excel, ten_file_xuat
 
 
 def render(role: str = None, **kwargs) -> None:

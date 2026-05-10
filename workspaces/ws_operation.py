@@ -869,7 +869,7 @@ def render(**kwargs):
         "nghiep_vu_pgd": {
             "label": "📋 Nghiệp vụ hàng ngày",
             "tabs": [
-                ("📊 Tổng quan", lambda tab: tab_tongquan.render(tab, **_pgd_df_kwargs)),
+                ("📊 Thông tin chung", lambda tab: tab_tongquan.render(tab, **_pgd_df_kwargs)),
                 ("🔍 Tra cứu hồ sơ", lambda tab: tab_tracuu.render(tab, **kwargs)),
                 ("📋 Danh sách & Lọc", lambda tab: tab_danhsach.render(tab, **kwargs)),
                 ("⏰ Đến hạn", lambda tab: render_den_han(role=role, pgd_user=pgd_user)),

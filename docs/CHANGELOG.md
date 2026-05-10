@@ -1,5 +1,39 @@
 # CHANGELOG — VBSP-SCM
 
+## [2026-05-10] — Refactor download buttons pattern: chuyển sang session_state để tránh Streamlit widget lifecycle
+
+### Sửa đổi
+- `pdf_service.py` dòng ~810 — `nut_xuat_pdf()`: chuyển `st.download_button()` ra khỏi `if st.button()` block, lưu bytes vào `session_state`, hiển thị button riêng sau khi tạo thành công
+- `tabs/tab_candoi.py` — chuyển download button Excel/PDF sang pattern session_state
+- `tabs/tab_cbtd.py` — chuyển download button Excel sang session_state
+- `tabs/tab_cdtotkvv.py` — chuyển download button Excel sang session_state
+- `tabs/tab_cdtotkvv_pgd.py` — chuyển download button sang session_state
+- `tabs/tab_danhsach.py` — chuyển download button Excel/PDF sang session_state
+- `tabs/tab_gqvl.py` — chuyển download button Excel sang session_state
+- `tabs/tab_kehoach.py` — chuyển download button "KH vs TH" sang session_state
+- `tabs/tab_khtd_nhap.py` — chuyển download button PDF KHTD xã sang session_state
+- `tabs/tab_khtd_xuat.py` — chuyển download button Excel Matrix + Cảnh báo chênh lệch sang session_state
+- `tabs/tab_nq11.py` — chuyển download button Excel NQ11 sang session_state
+- `tabs/tab_qd62.py` — chuyển download button Excel QĐ62 sang session_state
+- `tabs/tab_no_rui_ro.py` — thêm `hien_thi_nut_tai()` sau mỗi nút xuất template (13/XLN, 14/XLN, TT khoanh/xóa)
+- `tabs/tab_den_han.py` — chuyển download button PDF Group Header sang session_state
+- `workspaces/ws_management.py` — chuyển download button Kết luận Giao ban sang session_state
+- `workspaces/ws_operation.py` — chuyển download buttons (Thông báo KL, Biên bản GB, Excel GB, Doc Hub) sang session_state
+- **Tác dụng:** Fix lỗi `DuplicateElementKey` và mất download button sau mỗi lần rerun (Streamlit lifecycle)
+
+## [2026-05-10] — Cập nhật template_service.py: thêm hàm hien_thi_nut_tai()
+- `services/template_service.py` dòng ~142 — thêm `hien_thi_nut_tai()` hiển thị nút tải Word/PDF từ session_state (dùng chung cho các tab gọi `nut_tai_word_va_pdf()`)
+- `tabs/tab_no_rui_ro.py` — tích hợp `hien_thi_nut_tai()` sau mỗi nút xuất template
+
+## [2026-05-10] — Cập nhật tab_baocao.py
+- `tabs/tab_baocao.py` — sửa lỗi hiển thị, cập nhật logic xuất báo cáo
+
+## [2026-05-10] — Tạo file hỗ trợ & fix scripts
+- `.cline-deepseek-guide.jsx` — hướng dẫn cho AI
+- `.clineignore` — ignore rules
+- `_fix_all_buttons.py` — script tự động refactor button pattern
+- `_fix_template_service.py` — script fix template_service
+
 ## [2026-05-09] — Fix báo cáo đến hạn: phân cấp PGD > Xã > Chương trình
 
 ### Sửa đổi

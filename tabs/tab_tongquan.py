@@ -26,7 +26,7 @@ from utils import (
 )
 from data.pgd import ds_pgd_co_file
 from data.cdtotkvv import doc_cdtotkvv, ds_thang_nam, tong_hop_theo_pgd
-from pdf_service import nut_xuat_pdf
+from pdf_service import nut_xuat_pdf, xuat_pdf
 from services.upload_service import format_caption_merge
 
 if TYPE_CHECKING:
@@ -1166,6 +1166,31 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                     "📅 1 tháng", "📅 3 tháng", "📅 6 tháng", "📅 Trong năm"
                 ])
 
+                def _build_pdf_den_han(df_loc, label, loc_pgd, loc_ct, loc_xa, username, key_prefix):
+                    """Build PDF bytes: luôn groupby [PGD, Xã, Chương trình], bộ lọc chỉ thu hẹp input."""
+                    COLS_GROUP = [COT_TEN_PGD, "Tên xã", COT_TEN_CT]
+                    cols_ok = [c for c in COLS_GROUP if c in df_loc.columns]
+
+                    pdf_tg = df_loc.groupby(cols_ok).agg(
+                        _mon=(COT_SO_KU,      "nunique"),
+                        _kh =(COT_MA_KH,      "nunique"),
+                        _no =(COT_TONG_DU_NO, "sum"),
+                    ).reset_index().sort_values("_no", ascending=False)
+
+                    pdf_tg["Số món vay"] = pdf_tg["_mon"].apply(fmt_so)
+                    pdf_tg["Số KH"]      = pdf_tg["_kh"].apply(fmt_so)
+                    pdf_tg["Dư nợ"]      = pdf_tg["_no"].apply(fmt_so)
+
+                    df_pdf = pdf_tg[[*cols_ok, "Số món vay", "Số KH", "Dư nợ"]]
+
+                    return xuat_pdf(
+                        df_pdf,
+                        f"Hồ sơ đến hạn {label} — Tổng hợp theo PGD / Xã / Chương trình",
+                        username,
+                        cols_tien=["Dư nợ"],
+                        prefix_file=f"HoSoDenHan_{key_prefix}",
+                    )
+
                 def _bang_den_han(df_loc, label, key_prefix):
                     tg = None
                     if df_loc.empty:
@@ -1237,32 +1262,31 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                             st.divider()
                             col_ex, col_pdf = st.columns(2)
 
-                            # Xác định chế độ xuất: có bộ lọc → tổng hợp; không → chi tiết
-                            co_loc = bool(loc_pgd or loc_ct or loc_xa)
-
-                            if co_loc:
-                                df_xuat = tg[[nhom_col, "_mon", "_kh", "_no"]].rename(columns={
-                                    nhom_col: nhom_chon,
-                                    "_mon": "Số món vay",
-                                    "_kh":  "Số KH",
-                                    "_no":  "Dư nợ",
-                                })
-                                tieu_de_pdf   = f"Hồ sơ đến hạn {label} — Tổng hợp theo {nhom_chon}"
-                                ten_sheet     = f"TH_{nhom_chon[:10]}_{key_prefix}"
-                                cols_tien_pdf = ["Dư nợ"]
-                            else:
-                                COLS_CHI_TIET = [
-                                    COT_TEN_PGD, COT_MA_KH, COT_TEN_KH, COT_SO_KU,
-                                    COT_TEN_CT, COT_TONG_DU_NO, COT_NGAY_DH,
-                                ]
-                                cols_ok = [c for c in COLS_CHI_TIET if c in df_loc.columns]
-                                df_xuat = df_loc[cols_ok].sort_values(COT_TEN_PGD).reset_index(drop=True)
-                                tieu_de_pdf = f"Hồ sơ đến hạn {label} — Chi tiết toàn Chi nhánh"
-                                ten_sheet   = f"ChiTiet_{key_prefix}"
-                                cols_tien_pdf = [COT_TONG_DU_NO]
+                            # PDF: luôn groupby [PGD, Xã, Chương trình] — bộ lọc chỉ thu hẹp input
+                            ss_key      = f"_pdf_bytes_denh_{key_prefix}"
+                            ss_file_key = f"_pdf_file_denh_{key_prefix}"
 
                             with col_ex:
-                                excel_bytes = xuat_excel({ten_sheet: df_xuat})
+                                # Excel: giữ logic hiện tại
+                                co_loc = bool(loc_pgd or loc_ct or loc_xa)
+                                if co_loc:
+                                    df_excel = tg[[nhom_col, "_mon", "_kh", "_no"]].rename(columns={
+                                        nhom_col: nhom_chon,
+                                        "_mon": "Số món vay",
+                                        "_kh":  "Số KH",
+                                        "_no":  "Dư nợ",
+                                    })
+                                    ten_sheet = f"TH_{nhom_chon[:10]}_{key_prefix}"
+                                else:
+                                    COLS_CHI_TIET = [
+                                        COT_TEN_PGD, COT_MA_KH, COT_TEN_KH, COT_SO_KU,
+                                        COT_TEN_CT, COT_TONG_DU_NO, COT_NGAY_DH,
+                                    ]
+                                    cols_ok = [c for c in COLS_CHI_TIET if c in df_loc.columns]
+                                    df_excel = df_loc[cols_ok].sort_values(COT_TEN_PGD).reset_index(drop=True)
+                                    ten_sheet = f"ChiTiet_{key_prefix}"
+
+                                excel_bytes = xuat_excel({ten_sheet: df_excel})
                                 st.download_button(
                                     label="📥 Xuất Excel",
                                     data=excel_bytes,
@@ -1273,13 +1297,26 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                                 )
 
                             with col_pdf:
-                                nut_xuat_pdf(
-                                    df=df_xuat,
-                                    tieu_de=tieu_de_pdf,
-                                    username=username,
-                                    cols_tien=cols_tien_pdf,
-                                    prefix_file=f"HoSoDenHan_{key_prefix}",
-                                    key=f"pdf_den_han_{key_prefix}",
+                                if st.button("📄 Xuất PDF", key=f"pdf_den_han_{key_prefix}",
+                                             type="secondary", use_container_width=True):
+                                    with st.spinner("⏳ Đang tạo PDF..."):
+                                        pdf_bytes = _build_pdf_den_han(
+                                            df_loc, label, loc_pgd, loc_ct, loc_xa, username, key_prefix
+                                        )
+                                    st.session_state[ss_key]      = pdf_bytes
+                                    st.session_state[ss_file_key] = (
+                                        f"HoSoDenHan_{key_prefix}_{datetime.now().strftime('%d%m%Y_%H%M')}.pdf"
+                                    )
+
+                            # Download button đặt NGOÀI block columns để tránh duplicate widget
+                            if st.session_state.get(ss_key):
+                                st.download_button(
+                                    label="⬇ Tải file PDF",
+                                    data=st.session_state[ss_key],
+                                    file_name=st.session_state.get(ss_file_key, f"HoSoDenHan_{key_prefix}.pdf"),
+                                    mime="application/pdf",
+                                    key=f"dl_den_han_{key_prefix}",
+                                    use_container_width=True,
                                 )
                     else:
                         st.caption(f"⚠️ Không có cột '{nhom_chon}' trong dữ liệu")
@@ -1296,20 +1333,20 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
             # ── Download PDF ngoài tabs ───────────────────────────────────
             _pdf_keys = ["1_tháng", "3_tháng", "6_tháng", "Trong_năm"]
             _co_pdf = any(
-                st.session_state.get(f"_pdf_bytes_pdf_den_han_{k}")
+                st.session_state.get(f"_pdf_bytes_denh_{k}")
                 for k in _pdf_keys
             )
             if _co_pdf:
                 st.markdown("#### ⬇ Tải file PDF đã tạo")
                 _cols = st.columns(len(_pdf_keys))
                 for i, _k in enumerate(_pdf_keys):
-                    _dat = st.session_state.get(f"_pdf_bytes_pdf_den_han_{_k}")
-                    _sf  = st.session_state.get(f"_pdf_file_pdf_den_han_{_k}", f"{_k}.pdf")
+                    _dat = st.session_state.get(f"_pdf_bytes_denh_{_k}")
+                    _sf  = st.session_state.get(f"_pdf_file_denh_{_k}", f"{_k}.pdf")
                     if _dat:
                         _cols[i].download_button(
                             label=f"⬇ {_k.replace('_', ' ')}",
                             data=_dat,
                             file_name=_sf,
                             mime="application/pdf",
-                            key=f"dl_outside_{_k}",
+                            key=f"dl_outside_denh_{_k}",
                         )

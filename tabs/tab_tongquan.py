@@ -1268,7 +1268,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                                 paper_bgcolor="rgba(0,0,0,0)",
                             )
 
-                            st.plotly_chart(fig, use_container_width=True)
+                            st.plotly_chart(fig, use_container_width=True, key=f"pie_den_han_{key_prefix}")
 
                         if tg is not None:
                             st.divider()

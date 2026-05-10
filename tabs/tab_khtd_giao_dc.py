@@ -9,7 +9,7 @@ import pandas as pd
 import streamlit as st
 
 import db
-from config import CHUONG_TRINH_KHTD, DON_VI_CHI_NHANH, DS_PGD, PGD_XA_MAP
+from config import CHUONG_TRINH_KHTD, DON_VI_CHI_NHANH, DS_PGD, GQVL_MA_KEY_GIAO, PGD_XA_MAP
 from data.pgd import pgd_slug as _pgd_slug
 from services import khtd_service
 from services.khtd_service import LOAI_DIEU_CHINH, LOAI_GIAO
@@ -396,6 +396,8 @@ def _section_b_giao(
     rows_nhap: list[dict] = []
     for xa in ds_xa:
         for ma_key, _ma_ct, ten_ct, nguon, _ in CHUONG_TRINH_KHTD:
+            if ma_key.startswith("3_") and ma_key not in GQVL_MA_KEY_GIAO:
+                continue
             kh_prev = kh_truoc.get(ma_key, {})
             rows_nhap.append(
                 {

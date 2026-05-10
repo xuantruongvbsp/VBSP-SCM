@@ -8,9 +8,9 @@ import pandas as pd
 import streamlit as st
 from openpyxl.styles import Font, PatternFill
 
-from config import TEN_CHINH_THUC_CT, CHUONG_TRINH_KHTD
+from config import TEN_CHINH_THUC_CT, CHUONG_TRINH_KHTD, DS_PGD, COT_TEN_PGD, CACHE_HSTD, CACHE_GQVL
 from pdf_service import xuat_pdf
-from utils import hien_thi_dataframe_phan_trang
+from utils import hien_thi_dataframe_phan_trang, xuat_excel, ten_file_xuat
 
 from tabs.tab_khtd import (
     KV_KEY_CN,
@@ -23,6 +23,8 @@ from tabs.tab_khtd import (
     _ma_key_tu_ma_ct_nv,
     _nv_int_tu_ma_key,
     _ten_ct_base,
+    _tinh_thuc_hien_theo_ct,
+    GQVL_SUB_NHOM,
 )
 
 
@@ -33,376 +35,249 @@ def _hien_thi_bang_cn_readonly(
     df_loc: "pd.DataFrame | None" = None,
     username: str = "",
 ) -> None:
-    """Bảng tóm tắt KHTD Chi nhánh — KH/TH/CPTH (triệu) dạng chuỗi _fvn, KPI VND → tỷ qua /1e12."""
-    _ = df_loc
-    kh_d = kh_cn or {}
-    th_d = th_cn or {}
+    """Bảng tóm tắt KHTD Chi nhánh — HTML thuần: STT | Chỉ tiêu | KH (tỷ) | TH (tỷ) | TL% | Trạng thái."""
+    from tabs.tab_khtd_nhap import _tinh_th_gqvl_phan_tang
+
+    kh_d = dict(kh_cn or {})
+    th_d = dict(th_cn or {})
+
+    try:
+        df_gqvl = pd.read_parquet(CACHE_GQVL)
+    except Exception:
+        df_gqvl = pd.DataFrame()
+    th_gqvl = _tinh_th_gqvl_phan_tang(df_gqvl)
+    for sk, sv in th_gqvl.items():
+        if sv:
+            th_d[sk] = sv
+
+    if ds_ct_loc:
+        loc_set = set(ds_ct_loc)
+        kh_d = {k: v for k, v in kh_d.items() if k in loc_set}
+        th_d = {k: v for k, v in th_d.items() if k in loc_set}
+
     if not kh_d and not th_d:
         st.info("Chưa có dữ liệu.")
         return
 
-    tong_kh_tw = sum(
-        float(kh_d.get(mk, 0.0))
-        for mk, _mc, _t, nv, _tm in CHUONG_TRINH_KHTD
-        if nv == "TW"
-    )
-    tong_kh_dp = sum(
-        float(kh_d.get(mk, 0.0))
-        for mk, _mc, _t, nv, _tm in CHUONG_TRINH_KHTD
-        if nv == "DP"
-    )
-    tong_th_tw = sum(
-        float(th_d.get(mk, 0.0))
-        for mk, _mc, _t, nv, _tm in CHUONG_TRINH_KHTD
-        if nv == "TW"
-    )
-    tong_th_dp = sum(
-        float(th_d.get(mk, 0.0))
-        for mk, _mc, _t, nv, _tm in CHUONG_TRINH_KHTD
-        if nv == "DP"
-    )
-    tong_kh = tong_kh_tw + tong_kh_dp
-    tong_th = tong_th_tw + tong_th_dp
-    pct_tong_kpi = round(tong_th / tong_kh * 100, 1) if tong_kh > 0 else None
-    so_ct_co_kh = sum(
-        1
-        for mk, _a, _b, _c, _d in CHUONG_TRINH_KHTD
-        if float(kh_d.get(mk, 0.0)) > 0
-    )
-
-    k1, k2, k3, k4 = st.columns(4)
-    # VND → đơn vị hiển thị “tỷ” trong tab: chia 1e12 (không dùng 1e9)
-    k1.metric("Tổng kế hoạch", f"{_fvn(tong_kh / 1e12, 3)} tỷ đồng")
-    k2.metric("Tổng thực hiện", f"{_fvn(tong_th / 1e12, 3)} tỷ đồng")
-    k3.metric(
-        "Tỷ lệ đạt kế hoạch",
-        (f"{_fvn(pct_tong_kpi, 1)}%") if pct_tong_kpi is not None else "—",
-    )
-    k4.metric(
-        "Số chương trình có KH",
-        f"{so_ct_co_kh}/26 chương trình",
-    )
-
-    ds_ct_hien_thi = [mk for mk, *_ in CHUONG_TRINH_KHTD]
-    if ds_ct_loc:
-        ds_loc_set = set(ds_ct_loc)
-        ds_ct_hien_thi = [mk for mk in ds_ct_hien_thi if mk in ds_loc_set]
-    if not ds_ct_hien_thi:
-        st.info("Không có dữ liệu để hiển thị.")
-        return
-
-    loc_set = set(ds_ct_hien_thi)
+    sub_key_3_dp_xa = "3_DP_XA"
 
     seen_ma_ct: set[int] = set()
     order_ma_ct: list[int] = []
-    for mk, ma_ct, _ten, nv, *_ in CHUONG_TRINH_KHTD:
-        if mk not in loc_set:
-            continue
+    for mk, ma_ct, _ten, _nv, *_ in CHUONG_TRINH_KHTD:
         mci = int(ma_ct)
-        if mci in seen_ma_ct:
-            continue
-        mk_tw = _ma_key_tu_ma_ct_nv(mci, 1)
-        mk_dp = _ma_key_tu_ma_ct_nv(mci, 2)
-        show_tw = mk_tw in MA_KEYS_CO_KHTD and mk_tw in loc_set
-        show_dp = mk_dp in MA_KEYS_CO_KHTD and mk_dp in loc_set
-        if not show_tw and not show_dp:
-            continue
-        seen_ma_ct.add(mci)
-        order_ma_ct.append(mci)
+        if mci not in seen_ma_ct:
+            seen_ma_ct.add(mci)
+            order_ma_ct.append(mci)
 
-    COT_XUAT = [
-        "STT",
-        "Chỉ tiêu",
-        "KH TW",
-        "KH ĐP",
-        "KH Tổng",
-        "TH TW",
-        "TH ĐP",
-        "Còn TW",
-        "Còn ĐP",
-        "TL TW%",
-        "TL ĐP%",
-    ]
-    data_rows: list[dict] = []
+    BD = "#d1d5db"
+    H_BG = "#003D7A"
+    NHOM_BG = "#e8f0f8"
+    TONG_BG = "#E8F4FD"
+    WHITE = "#ffffff"
+    ALT = "#F8FAFC"
+    RED = "#DC2626"
+    AMBER = "#D97706"
+    GREEN = "#16A34A"
 
-    def _row(
-        nhom: str,
-        stt: str,
-        chi_tieu: str,
-        cells: tuple[str, ...] | None,
+    tong_kh = 0.0
+    tong_th = 0.0
+    so_ct_co_kh = 0
+    tong_ct = len(order_ma_ct)
+    stt_i = 0
+
+    html_rows: list[str] = []
+    nhom_hien = ""
+
+    def _tl_color(tl: float | None) -> str:
+        if tl is None:
+            return "#9ca3af"
+        if tl >= 100:
+            return GREEN
+        if tl >= 95:
+            return AMBER
+        return RED
+
+    def _tl_text(tl: float | None) -> str:
+        if tl is None:
+            return "—"
+        if tl >= 100:
+            return "🟢 Đạt"
+        if tl >= 95:
+            return "🟡 Đang thực hiện"
+        return "🔴 Chậm"
+
+    def _td(v: str, align: str = "right", color: str = "", bg: str = "", fw: str = "") -> str:
+        s = f'text-align:{align};padding:5px 8px;border:1px solid {BD};font-size:0.82rem;white-space:nowrap'
+        if color:
+            s += f";color:{color}"
+        if bg:
+            s += f";background:{bg}"
+        if fw:
+            s += f";font-weight:{fw}"
+        return f"<td style='{s}'>{v}</td>"
+
+    def _add_group_hdr(label: str) -> None:
+        nonlocal nhom_hien
+        nhom_hien = label
+        tds = (
+            _td("", "center", "", NHOM_BG, "bold")
+            + _td(label, "left", "#fff", H_BG, "bold")
+            + _td("", "right", "", NHOM_BG)
+            + _td("", "right", "", NHOM_BG)
+            + _td("", "right", "", NHOM_BG)
+            + _td("", "right", "", NHOM_BG)
+        )
+        html_rows.append(f"<tr>{tds}</tr>")
+
+    def _add_row(
+        stt: str, ten: str, kh_vnd: float, th_vnd: float, indent: str = ""
     ) -> None:
-        r: dict[str, str] = {"STT": stt, "Chỉ tiêu": chi_tieu, "_nhom": nhom}
-        if cells is None:
-            for c in COT_XUAT[2:]:
-                r[c] = ""
-        else:
-            for c, v in zip(COT_XUAT[2:], cells, strict=True):
-                r[c] = v
-        data_rows.append(r)
+        nonlocal tong_kh, tong_th, so_ct_co_kh, stt_i
+        kh_v = kh_vnd / 1e9
+        th_v = th_vnd / 1e9
+        tl = th_v / kh_v * 100 if kh_v > 0 else None
 
-    def _fmt_amt(v: float) -> str:
-        return _fmt_vn(v, 0)
+        if kh_v > 0 or th_v > 0:
+            tong_kh += kh_vnd
+            tong_th += th_vnd
+            if kh_v > 0:
+                so_ct_co_kh += 1
 
-    def _fmt_con(kh: float, th: float) -> str:
-        if kh <= 0:
-            return "—"
-        return _fmt_vn(kh - th, 0)
+        bg = WHITE if stt_i % 2 == 0 else ALT
+        stt_i += 1
 
-    def _fmt_tl_pct(th: float, kh: float) -> str:
-        if kh <= 0:
-            return "—"
-        return f"{_fmt_vn(th / kh * 100, 1)}%"
+        kh_str = _fvn(kh_v, 3) if kh_v > 0 else ("—" if indent else _fvn(kh_v, 3))
+        if kh_vnd == 0:
+            kh_str = "—"
 
-    _row("A", "A", "KẾ HOẠCH", None)
-    _row("I", "I", "Nguồn vốn Trung ương", None)
+        th_str = _fvn(th_v, 3) if th_v > 0 else "—"
+        tl_str = f"{_fvn(tl, 1)}%" if tl is not None else "—"
+        tl_c = _tl_color(tl)
+        stt_s = _tl_text(tl)
 
-    sum_kh_tw = sum_th_tw = 0.0
-    sum_kh_dp = sum_th_dp = 0.0
-    stt_i = 1
+        tds = (
+            _td(stt, "center", "", "", "") +
+            _td(f"{indent}{ten}", "left", "", "", "") +
+            _td(kh_str, "right", "", "", "") +
+            _td(th_str, "right", "", "", "") +
+            _td(tl_str, "right", tl_c, "", "") +
+            _td(stt_s, "left", tl_c, "", "")
+        )
+        html_rows.append(f"<tr>{tds}</tr>")
+
+    def _add_gqvl_sub_ten(sub_key: str, sub_ten: str, sub_nv: str) -> None:
+        nonlocal tong_kh, tong_th, so_ct_co_kh, stt_i
+        kh_vnd = float(kh_d.get(sub_key, 0.0))
+        th_vnd = float(th_d.get(sub_key, 0.0))
+
+        kh_v = kh_vnd / 1e9
+        th_v = th_vnd / 1e9
+        tl = th_v / kh_v * 100 if kh_v > 0 else None
+
+        if kh_v > 0 or th_v > 0:
+            tong_kh += kh_vnd
+            tong_th += th_vnd
+            if kh_v > 0:
+                so_ct_co_kh += 1
+
+        bg = WHITE if stt_i % 2 == 0 else ALT
+        stt_i += 1
+
+        kh_str = "—" if sub_key == sub_key_3_dp_xa else (_fvn(kh_v, 3) if kh_v > 0 else _fvn(kh_v, 3))
+        th_str = _fvn(th_v, 3) if th_v > 0 else "—"
+        tl_str = f"{_fvn(tl, 1)}%" if tl is not None else "—"
+        tl_c = _tl_color(tl)
+        stt_s = _tl_text(tl)
+
+        tds = (
+            _td("", "center") +
+            _td(f"    {sub_ten}", "left") +
+            _td(kh_str, "right") +
+            _td(th_str, "right") +
+            _td(tl_str, "right", tl_c) +
+            _td(stt_s, "left", tl_c)
+        )
+        html_rows.append(f"<tr style='background:{bg}'>{tds}</tr>")
 
     for ma_ct in order_ma_ct:
         mk_tw = _ma_key_tu_ma_ct_nv(ma_ct, 1)
         mk_dp = _ma_key_tu_ma_ct_nv(ma_ct, 2)
-        show_tw = mk_tw in MA_KEYS_CO_KHTD and mk_tw in loc_set
-        show_dp = mk_dp in MA_KEYS_CO_KHTD and mk_dp in loc_set
 
-        kh_tw = float(kh_d.get(mk_tw, 0.0)) / 1_000_000
-        th_tw = float(th_d.get(mk_tw, 0.0)) / 1_000_000
-        kh_dp = float(kh_d.get(mk_dp, 0.0)) / 1_000_000
-        th_dp = float(th_d.get(mk_dp, 0.0)) / 1_000_000
-        kh_tong = kh_tw + kh_dp
+        kh_tw = float(kh_d.get(mk_tw, 0.0))
+        th_tw = float(th_d.get(mk_tw, 0.0))
+        kh_dp = float(kh_d.get(mk_dp, 0.0))
+        th_dp = float(th_d.get(mk_dp, 0.0))
 
-        if show_tw:
-            sum_kh_tw += kh_tw
-            sum_th_tw += th_tw
-        if show_dp:
-            sum_kh_dp += kh_dp
-            sum_th_dp += th_dp
+        ten_base = _ten_ct_base(ma_ct, {})
 
-        ten_h = _ten_ct_base(ma_ct, {})
-        _row(
-            "con",
-            str(stt_i),
-            f"  {ten_h}",
-            (
-                _fmt_amt(kh_tw),
-                _fmt_amt(kh_dp),
-                _fmt_amt(kh_tong),
-                _fmt_amt(th_tw),
-                _fmt_amt(th_dp),
-                _fmt_con(kh_tw, th_tw),
-                _fmt_con(kh_dp, th_dp),
-                _fmt_tl_pct(th_tw, kh_tw),
-                _fmt_tl_pct(th_dp, kh_dp),
-            ),
-        )
-        stt_i += 1
-
-    _row(
-        "tong_tw",
-        "",
-        "  Tổng Trung ương",
-        (
-            _fmt_amt(sum_kh_tw),
-            "",
-            _fmt_amt(sum_kh_tw),
-            _fmt_amt(sum_th_tw),
-            "",
-            _fmt_con(sum_kh_tw, sum_th_tw),
-            "",
-            _fmt_tl_pct(sum_th_tw, sum_kh_tw),
-            "",
-        ),
-    )
-
-    _row("II", "II", "Nguồn vốn Địa phương", None)
-
-    _row(
-        "tong_dp",
-        "",
-        "  Tổng Địa phương",
-        (
-            "",
-            _fmt_amt(sum_kh_dp),
-            _fmt_amt(sum_kh_dp),
-            "",
-            _fmt_amt(sum_th_dp),
-            "",
-            _fmt_con(sum_kh_dp, sum_th_dp),
-            "",
-            _fmt_tl_pct(sum_th_dp, sum_kh_dp),
-        ),
-    )
-
-    all_kh_tw = sum_kh_tw
-    all_kh_dp = sum_kh_dp
-    all_kh = all_kh_tw + all_kh_dp
-    all_th_tw = sum_th_tw
-    all_th_dp = sum_th_dp
-    _row(
-        "tong_all",
-        "",
-        "🔹 TỔNG CỘNG",
-        (
-            _fmt_amt(all_kh_tw),
-            _fmt_amt(all_kh_dp),
-            _fmt_amt(all_kh),
-            _fmt_amt(all_th_tw),
-            _fmt_amt(all_th_dp),
-            _fmt_con(all_kh_tw, all_th_tw),
-            _fmt_con(all_kh_dp, all_th_dp),
-            _fmt_tl_pct(all_th_tw, all_kh_tw),
-            _fmt_tl_pct(all_th_dp, all_kh_dp),
-        ),
-    )
-
-    df = pd.DataFrame(data_rows)
-    if df.empty:
-        st.info("Không có dữ liệu để hiển thị.")
-        return
-
-    BD = "#c8d8e8"
-    H1 = "#1a3a5c"
-    H2 = "#2d5986"
-
-    header1 = (
-        f'<th rowspan="2" style="background:{H1};color:#fff;text-align:center;'
-        f'padding:6px 4px;border:1px solid {BD};font-size:0.82rem;vertical-align:middle">'
-        f"STT</th>"
-        f'<th rowspan="2" style="background:{H1};color:#fff;text-align:center;'
-        f'padding:6px 4px;border:1px solid {BD};font-size:0.82rem;vertical-align:middle">'
-        f"Chỉ tiêu</th>"
-        f'<th colspan="3" style="background:{H1};color:#fff;text-align:center;'
-        f'padding:6px 4px;border:1px solid {BD};font-size:0.82rem">'
-        f"KẾ HOẠCH</th>"
-        f'<th colspan="2" style="background:{H1};color:#fff;text-align:center;'
-        f'padding:6px 4px;border:1px solid {BD};font-size:0.82rem">'
-        f"THỰC HIỆN</th>"
-        f'<th colspan="2" style="background:{H1};color:#fff;text-align:center;'
-        f'padding:6px 4px;border:1px solid {BD};font-size:0.82rem">'
-        f"CÒN PHẢI TH</th>"
-        f'<th colspan="2" style="background:{H1};color:#fff;text-align:center;'
-        f'padding:6px 4px;border:1px solid {BD};font-size:0.82rem">'
-        f"TỶ LỆ TH</th>"
-    )
-    sub_names = [
-        "KH TW",
-        "KH ĐP",
-        "KH Tổng",
-        "TH TW",
-        "TH ĐP",
-        "Còn TW",
-        "Còn ĐP",
-        "TL TW%",
-        "TL ĐP%",
-    ]
-    header2 = "".join(
-        f'<th style="background:{H2};color:#fff;text-align:center;'
-        f'padding:5px 4px;border:1px solid {BD};font-size:0.78rem;white-space:nowrap">'
-        f"{sn}</th>"
-        for sn in sub_names
-    )
-
-    rows_html = ""
-    for i, rdict in enumerate(data_rows):
-        nhom = str(rdict.get("_nhom", ""))
-        if nhom in ("A", "I", "II"):
-            bg = "#e8f0f8"
-            fw = "bold"
-        elif nhom in ("tong_tw", "tong_dp", "tong_all"):
-            bg = "#e8f0f8"
-            fw = "700"
+        if ma_ct == 3:
+            nhom_moi = "I. Trung ương"
+            if nhom_hien != nhom_moi:
+                _add_group_hdr(nhom_moi)
+            for sub_key, sub_ten, sub_nv in GQVL_SUB_NHOM:
+                _add_gqvl_sub_ten(sub_key, sub_ten, sub_nv)
         else:
-            bg = "#f5f8fc" if i % 2 == 0 else "#ffffff"
-            fw = "normal"
-        tds = []
-        for col in COT_XUAT:
-            raw = rdict.get(col, "")
-            align = (
-                "left"
-                if col == "Chỉ tiêu"
-                else ("center" if col == "STT" else "right")
-            )
-            tds.append(
-                f'<td style="padding:6px 8px;border:1px solid {BD};text-align:{align};'
-                f'font-weight:{fw};font-size:0.82rem;white-space:nowrap">{raw}</td>'
-            )
-        rows_html += f'<tr style="background:{bg}">{"".join(tds)}</tr>\n'
+            show_tw = (kh_tw > 0 or th_tw > 0) and mk_tw in MA_KEYS_CO_KHTD
+            show_dp = (kh_dp > 0 or th_dp > 0) and mk_dp in MA_KEYS_CO_KHTD
+            if not show_tw and not show_dp:
+                continue
 
-    html_table = f"""
+            kh_tong = kh_tw + kh_dp
+            th_tong = th_tw + th_dp
+
+            if kh_tw > 0 or th_tw > 0:
+                nhom_moi = "I. Nguồn vốn Trung ương"
+            else:
+                nhom_moi = "II. Nguồn vốn Địa phương"
+
+            if nhom_hien != nhom_moi:
+                _add_group_hdr(nhom_moi)
+
+            _add_row(str(len([r for r in html_rows if "<td" in r]) + 1), ten_base, kh_tong, th_tong, "  ")
+
+    tong_tl = tong_th / tong_kh * 100 if tong_kh > 0 else None
+
+    tds_tong = (
+        _td("", "center", "", TONG_BG, "bold") +
+        _td("TỔNG CỘNG", "left", "", TONG_BG, "bold") +
+        _td(_fvn(tong_kh / 1e9, 3), "right", "", TONG_BG, "bold") +
+        _td(_fvn(tong_th / 1e9, 3), "right", "", TONG_BG, "bold") +
+        _td(f"{_fvn(tong_tl, 1)}%" if tong_tl is not None else "—", "right", _tl_color(tong_tl), TONG_BG, "bold") +
+        _td(_tl_text(tong_tl), "left", _tl_color(tong_tl), TONG_BG, "bold")
+    )
+    html_rows.append(f"<tr>{tds_tong}</tr>")
+
+    k1, k2, k3, k4 = st.columns(4)
+    k1.metric("Tổng KH (tỷ)", f"{_fvn(tong_kh / 1e9, 3)}")
+    k2.metric("Tổng TH (tỷ)", f"{_fvn(tong_th / 1e9, 3)}")
+    k3.metric(
+        "Tỷ lệ đạt KH",
+        f"{_fvn(tong_tl, 1)}%" if tong_tl is not None else "—",
+    )
+    k4.metric("Số CT có KH / tổng", f"{so_ct_co_kh}/{tong_ct}")
+
+    headers = ["STT", "Chỉ tiêu", "KH (tỷ)", "TH (tỷ)", "TL%", "Trạng thái"]
+    thead = "".join(
+        f'<th style="background:{H_BG};color:#fff;text-align:{"center" if i==0 else "left" if i==1 else "right"};'
+        f'padding:6px 8px;border:1px solid {BD};font-size:0.82rem;white-space:nowrap">{h}</th>'
+        for i, h in enumerate(headers)
+    )
+
+    html = f"""
 <div style="overflow-x:auto;margin:8px 0">
 <table style="border-collapse:collapse;width:100%;font-family:'Inter','Segoe UI',sans-serif;font-size:0.82rem">
-  <thead>
-    <tr>{header1}</tr>
-    <tr>{header2}</tr>
-  </thead>
-  <tbody>{rows_html}</tbody>
+  <thead><tr>{thead}</tr></thead>
+  <tbody>{"".join(html_rows)}</tbody>
 </table>
 <p style="font-size:0.78rem;color:#6B7280;margin:4px 0 0 0">
-  * Đơn vị: triệu đồng · Thực hiện lấy theo Tổng dư nợ (HSTD)
+  * Đơn vị: tỷ đồng · KH từ nhập liệu, TH từ Tổng dư nợ HSTD + GQVL phân tầng<br>
+  <span style="color:{GREEN}">🟢</span> TL ≥ 100% &nbsp;
+  <span style="color:{AMBER}">🟡</span> TL ≥ 95% &nbsp;
+  <span style="color:{RED}">🔴</span> TL &lt; 95%
 </p>
 </div>
 """
-    st.markdown(html_table, unsafe_allow_html=True)
-
-    df_pdf = df.drop(columns=["_nhom"], errors="ignore").copy()
-
-    if st.button("📄 Xuất PDF", key="btn_pdf_khtd_cn"):
-        with st.spinner("Đang tạo PDF..."):
-            pdf_bytes = xuat_pdf(
-                df_pdf,
-                tieu_de="BÁO CÁO KẾ HOẠCH TÍN DỤNG CHI NHÁNH",
-                nguoi_xuat=username or "—",
-                cols_tien=[],
-                prefix_file="KHTD_CN",
-            )
-        st.session_state["_pdf_bytes_khtd_cn"] = pdf_bytes
-        st.session_state["_pdf_file_khtd_cn"]  = f"KHTD_CN_{datetime.today().strftime('%d%m%Y')}.pdf"
-    if st.session_state.get("_pdf_bytes_khtd_cn"):
-        st.download_button(
-            label="⬇ Tải PDF",
-            data=st.session_state["_pdf_bytes_khtd_cn"],
-            file_name=st.session_state.get("_pdf_file_khtd_cn", "KHTD_CN.pdf"),
-            mime="application/pdf",
-            key="dl_pdf_khtd_cn",
-        )
-
-    if st.button("📥 Xuất Excel", key="btn_xuat_khtd_cn_matrix"):
-        ten_file = f"KHTD_CN_{datetime.today().strftime('%d%m%Y')}.xlsx"
-        buf = BytesIO()
-        df_xuat = df.drop(columns=["_nhom"], errors="ignore").copy()
-        n_col = len(COT_XUAT)
-        with pd.ExcelWriter(buf, engine="openpyxl") as writer:
-            df_xuat.to_excel(writer, index=False, sheet_name="KHTD_CN_Matrix")
-            ws = writer.book["KHTD_CN_Matrix"]
-            fill_grp = PatternFill(fill_type="solid", fgColor="E8F0F8")
-            fill_head = PatternFill(fill_type="solid", fgColor="D6E4F0")
-            for cell in ws[1]:
-                cell.font = Font(bold=True)
-                cell.fill = fill_head
-            for ridx, nhom in enumerate(df["_nhom"].tolist(), start=2):
-                if nhom in ("A", "I", "II", "tong_tw", "tong_dp", "tong_all"):
-                    for cidx in range(1, n_col + 1):
-                        c = ws.cell(row=ridx, column=cidx)
-                        c.fill = fill_grp
-                        c.font = Font(bold=(nhom in ("A", "I", "II")))
-            widths = [7, 34, 11, 11, 12, 11, 11, 11, 11, 10, 10]
-            for i, w in enumerate(widths, start=1):
-                if i <= n_col:
-                    ws.column_dimensions[
-                        ws.cell(row=1, column=i).column_letter
-                    ].width = w
-        st.session_state["_bytes_khtd_matrix"] = buf.getvalue()
-        st.session_state["_file_khtd_matrix"] = ten_file
-
-    if st.session_state.get("_bytes_khtd_matrix"):
-        st.download_button(
-            label="⬇️ Tải Excel",
-            data=st.session_state["_bytes_khtd_matrix"],
-            file_name=st.session_state["_file_khtd_matrix"],
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            key="dl_khtd_cn_matrix",
-        )
+    st.markdown(html, unsafe_allow_html=True)
 
 
 def _tab_canh_bao_chenh_lech() -> None:
@@ -566,6 +441,235 @@ def _tab_canh_bao_chenh_lech() -> None:
         )
 
 
+def _tab_tien_do_kh_th() -> None:
+    """Dashboard cảnh báo tiến độ KH vs TH thực hiện theo PGD."""
+    from tabs.tab_khtd_nhap import _tinh_th_gqvl_phan_tang
+
+    st.subheader("🎯 Tiến độ Kế hoạch vs Thực hiện")
+    st.caption(
+        "So sánh KH đã nhập với TH thực tế từ HSTD + GQVL. "
+        "Cảnh báo 🔴 khi PGD đạt < 95% KH."
+    )
+
+    kh_cn = _doc_kv(KV_KEY_CN)
+    if not kh_cn:
+        st.warning("⚠️ Chưa có KH Chi nhánh. Vào tab **🏛️ KHTD Chi nhánh** nhập trước.")
+        return
+
+    try:
+        df_hstd = pd.read_parquet(CACHE_HSTD)
+    except Exception:
+        st.warning("⚠️ Chưa có dữ liệu HSTD. Upload file trước.")
+        return
+
+    th_cn = _tinh_thuc_hien_theo_ct(df_hstd)
+
+    try:
+        df_gqvl = pd.read_parquet(CACHE_GQVL)
+    except Exception:
+        df_gqvl = pd.DataFrame()
+
+    th_gqvl = _tinh_th_gqvl_phan_tang(df_gqvl)
+    for sub_key, val in th_gqvl.items():
+        th_cn[sub_key] = val
+
+    tong_kh = sum(float(v) for v in kh_cn.values())
+    tong_th = sum(float(th_cn.get(mk, 0))
+                  for mk, *_ in CHUONG_TRINH_KHTD)
+    tl_cn = tong_th / tong_kh * 100 if tong_kh > 0 else 0
+
+    so_dat = sum(1 for mk, *_ in CHUONG_TRINH_KHTD
+                 if float(kh_cn.get(mk, 0)) > 0
+                 and float(th_cn.get(mk, 0)) / float(kh_cn.get(mk, 1)) >= 0.7)
+    so_chua = sum(1 for mk, *_ in CHUONG_TRINH_KHTD
+                  if float(kh_cn.get(mk, 0)) > 0
+                  and float(th_cn.get(mk, 0)) / float(kh_cn.get(mk, 1)) < 0.7)
+
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Tổng KH (tỷ)", f"{_fvn(tong_kh/1e9, 3)}")
+    c2.metric("Tổng TH (tỷ)", f"{_fvn(tong_th/1e9, 3)}")
+    c3.metric("Tỷ lệ CN", f"{_fvn(tl_cn, 1)}%",
+              delta=f"{'✅' if tl_cn >= 95 else '⚠️'}")
+    c4.metric("CT chưa đạt 95%", str(so_chua),
+              delta_color="inverse" if so_chua > 0 else "off")
+
+    st.divider()
+
+    st.markdown("#### 📋 Chi tiết theo Chương trình")
+
+    rows_ct = []
+    nhom_hien = ""
+    for mk, _ma_ct, ten_ct, nv, *_ in CHUONG_TRINH_KHTD:
+        kh_val = float(kh_cn.get(mk, 0))
+        th_val = float(th_cn.get(mk, 0))
+        tl_val = th_val / kh_val * 100 if kh_val > 0 else None
+
+        nhom_moi = "I. Trung ương" if nv == "TW" else "II. Địa phương"
+        if nhom_moi != nhom_hien:
+            nhom_hien = nhom_moi
+            rows_ct.append({
+                "STT": nhom_hien,
+                "Chỉ tiêu": nhom_hien,
+                "KH (tỷ)": None, "TH (tỷ)": None, "TL%": None,
+                "Trạng thái": "", "_nhom": True,
+            })
+
+        if kh_val == 0 and th_val == 0:
+            continue
+
+        if tl_val is None:
+            trang_thai = "—"
+        elif tl_val >= 100:
+            trang_thai = "🟢 Đạt"
+        elif tl_val >= 95:
+            trang_thai = "🟡 Đang thực hiện"
+        else:
+            trang_thai = "🔴 Chậm"
+
+        rows_ct.append({
+            "STT": "",
+            "Chỉ tiêu": f"  {ten_ct}",
+            "KH (tỷ)": round(kh_val/1e9, 3) if kh_val else None,
+            "TH (tỷ)": round(th_val/1e9, 3) if th_val else None,
+            "TL%": round(tl_val, 1) if tl_val is not None else None,
+            "Trạng thái": trang_thai,
+            "_nhom": False,
+        })
+
+    rows_ct.append({
+        "STT": "", "Chỉ tiêu": "TỔNG CỘNG",
+        "KH (tỷ)": round(tong_kh/1e9, 3),
+        "TH (tỷ)": round(tong_th/1e9, 3),
+        "TL%": round(tl_cn, 1),
+        "Trạng thái": "🟢 Đạt" if tl_cn >= 95 else "🔴 Chậm",
+        "_nhom": False,
+    })
+
+    df_ct = pd.DataFrame(rows_ct)
+
+    def _to_mau_ct(row):
+        if row.get("_nhom"):
+            return ["background-color: #D9E1F2; font-weight: bold"] * len(row)
+        if "🔴" in str(row.get("Trạng thái", "")):
+            return ["background-color: #ffd6d6"] * len(row)
+        if "🟡" in str(row.get("Trạng thái", "")):
+            return ["background-color: #fff9d6"] * len(row)
+        return [""] * len(row)
+
+    cols_show = ["Chỉ tiêu", "KH (tỷ)", "TH (tỷ)", "TL%", "Trạng thái"]
+    hien_thi_dataframe_phan_trang(
+        df_ct[cols_show].style.apply(_to_mau_ct, axis=1),
+        key="khtd_tien_do_ct",
+        height=480,
+        column_config={
+            "KH (tỷ)": st.column_config.NumberColumn(format="%.3f"),
+            "TH (tỷ)": st.column_config.NumberColumn(format="%.3f"),
+            "TL%":     st.column_config.ProgressColumn(
+                           min_value=0, max_value=100, format="%.1f%%"),
+        },
+    )
+
+    st.divider()
+    st.markdown("#### 🔴 Cảnh báo PGD chậm tiến độ (< 95% KH)")
+
+    if COT_TEN_PGD not in df_hstd.columns:
+        st.info("Không có cột PGD trong HSTD.")
+        return
+
+    rows_pgd = []
+    for ten_pgd in DS_PGD:
+        df_pgd = df_hstd[df_hstd[COT_TEN_PGD] == ten_pgd]
+        th_pgd = _tinh_thuc_hien_theo_ct(df_pgd)
+
+        try:
+            df_gqvl_pgd = df_gqvl[df_gqvl[COT_TEN_PGD] == ten_pgd] \
+                if not df_gqvl.empty and COT_TEN_PGD in df_gqvl.columns \
+                else pd.DataFrame()
+        except Exception:
+            df_gqvl_pgd = pd.DataFrame()
+        th_gqvl_pgd = _tinh_th_gqvl_phan_tang(df_gqvl_pgd)
+        for sk, sv in th_gqvl_pgd.items():
+            th_pgd[sk] = sv
+
+        tong_kh_pgd = tong_kh
+        tong_th_pgd = sum(float(th_pgd.get(mk, 0))
+                          for mk, *_ in CHUONG_TRINH_KHTD)
+        tl_pgd = tong_th_pgd / tong_kh_pgd * 100 if tong_kh_pgd > 0 else 0
+
+        if tl_pgd < 95:
+            rows_pgd.append({
+                "PGD": ten_pgd,
+                "TH (tỷ)": round(tong_th_pgd/1e9, 3),
+                "KH CN (tỷ)": round(tong_kh_pgd/1e9, 3),
+                "TL%": round(tl_pgd, 1),
+            })
+
+    if rows_pgd:
+        df_pgd_cb = pd.DataFrame(rows_pgd).sort_values("TL%")
+        st.dataframe(
+            df_pgd_cb,
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                "TL%": st.column_config.ProgressColumn(
+                    min_value=0, max_value=100, format="%.1f%%"),
+            },
+        )
+    else:
+        st.success("🟢 Tất cả PGD đang đạt ≥ 95% KH Chi nhánh.")
+
+    st.divider()
+    col_ex, col_pdf = st.columns(2)
+
+    with col_ex:
+        _ss_ex = "_excel_tien_do_kh_th"
+        if st.button("📥 Xuất Excel", key="btn_xuat_tien_do_excel"):
+            try:
+                buf = xuat_excel({
+                    "KH vs TH": df_ct[cols_show],
+                    "PGD chậm": pd.DataFrame(rows_pgd) if rows_pgd else pd.DataFrame(),
+                })
+                st.session_state[_ss_ex] = buf
+            except Exception as e:
+                st.error(f"❌ Lỗi: {e}")
+        if st.session_state.get(_ss_ex):
+            st.download_button(
+                "⬇ Tải Excel",
+                data=st.session_state[_ss_ex],
+                file_name=ten_file_xuat("TienDo_KH_TH"),
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                key="dl_tien_do_excel",
+            )
+
+    with col_pdf:
+        _ss_pdf = "_pdf_tien_do_kh_th"
+        if st.button("📄 Xuất PDF", key="btn_xuat_tien_do_pdf"):
+            try:
+                with st.spinner("⏳ Đang tạo PDF..."):
+                    pdf_bytes = xuat_pdf(
+                        df_ct[cols_show].dropna(subset=["KH (tỷ)"]),
+                        "Báo cáo Tiến độ Kế hoạch vs Thực hiện",
+                        username="VBSP-SCM",
+                        cols_tien=["KH (tỷ)", "TH (tỷ)"],
+                    )
+                st.session_state[_ss_pdf] = pdf_bytes
+                st.session_state["_pdf_file_tien_do"] = ten_file_xuat("TienDo_KH_TH", ext=".pdf")
+            except Exception as e:
+                st.error(f"❌ Lỗi PDF: {e}")
+        if st.session_state.get(_ss_pdf):
+            st.download_button(
+                "⬇ Tải PDF",
+                data=st.session_state[_ss_pdf],
+                file_name=st.session_state.get("_pdf_file_tien_do", "TienDo_KH_TH.pdf"),
+                mime="application/pdf",
+                key="dl_tien_do_pdf",
+            )
+
+
 def render_xuat_baocao() -> None:
-    _tab_canh_bao_chenh_lech()
+    sub1, sub2 = st.tabs(["📊 Chênh lệch phân bổ", "🎯 Tiến độ KH vs TH"])
+    with sub1:
+        _tab_canh_bao_chenh_lech()
+    with sub2:
+        _tab_tien_do_kh_th()
 

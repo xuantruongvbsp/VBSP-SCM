@@ -1,5 +1,64 @@
 # CHANGELOG — VBSP-SCM
 
+## [2026-05-10] — Fix _tinh_th_gqvl_phan_tang() — luôn có 4 alias key dù df rỗng
+- `tabs/tab_khtd_nhap.py` dòng ~58 — thêm 4 dòng `setdefault("3_TW_NHCSXH", "3_TW_NSNN", "3_DP_TINH", "3_DP_XA")` để đảm bảo hàm luôn trả về đủ 4 alias key khi df rỗng/thiếu cột (tránh lỗi KeyError ở _hien_thi_bang_cn_readonly)
+
+## [2026-05-10] — Nâng cấp _hien_thi_bang_cn_readonly() thành bảng HTML thuần
+- `tabs/tab_khtd_xuat.py` dòng ~28 — viết lại _hien_thi_bang_cn_readonly(): bảng HTML thuần 6 cột (STT | Chỉ tiêu | KH (tỷ) | TH (tỷ) | TL% | Trạng thái), KPI metrics 4 cột, GQVL 4 sub-rows thụt lề sâu, 3_DP_XA hiển thị "—" cho KH, tô màu TL% (đỏ <95%, cam 95-99%, xanh ≥100%)
+- `tabs/tab_khtd_xuat.py` dòng ~28 — thêm imports: GQVL_SUB_NHOM, CACHE_GQVL; lazy import _tinh_th_gqvl_phan_tang từ tab_khtd_nhap; bỏ Excel/PDF export cũ
+
+## [2026-05-10] — Thay đổi phần chữ ký trong pdf_service.py (KIỂM SOÁT → TRƯỞNG PHÒNG KH-NV)
+- `pdf_service.py` dòng ~347-397 — thay thế chữ ký trong xuat_pdf(): cập nhật chức danh "KIỂM SOÁT" thành "TRƯỞNG PHÒNG KH-NV", dùng style chuẩn như xuat_pdf_group_header()
+- `pdf_service.py` — smoke test xác nhận: PDF tạo đúng 100,234 bytes, 3 cột chữ ký (NGƯỜI LẬP BIỂU | TRƯỞNG PHÒNG KH-NV | GIÁM ĐỐC) hiển thị OK
+
+## [2026-05-10] — Dashboard Cảnh báo tiến độ KH vs TH trong tab_khtd_xuat.py
+- `tabs/tab_khtd_xuat.py` dòng ~11 — thêm imports: xuat_excel, ten_file_xuat, _tinh_thuc_hien_theo_ct, GQVL config, HSTD/GQVL cache
+- `tabs/tab_khtd_xuat.py` dòng ~571 — thêm _tab_tien_do_kh_th(): dashboard so sánh KH vs TH theo CT + PGD + cảnh báo < 70%
+- `tabs/tab_khtd_xuat.py` dòng ~795 — render_xuat_baocao(): thêm 2 sub-tab (Chênh lệch phân bổ + Tiến độ KH vs TH)
+
+## [2026-05-10] — GQVL phân tầng 4 nhóm: cập nhật luồng Giao & Điều chỉnh KHTD
+- `config.py` dòng ~123-141 — thay 2 dòng GQVL (3_TW, 3_DP) bằng 4 dòng (3_TW_NHCSXH, 3_TW_NSNN, 3_DP_TINH, 3_DP_XA); thêm GQVL_MA_KEY_GIAO và GQVL_MA_KEY_THEO_DOI
+- `tabs/tab_khtd.py` dòng ~52 — đơn giản MA_KEYS_CO_KHTD (4 key mới đã có trong CHUONG_TRINH_KHTD)
+- `services/khtd_service.py` dòng ~340 — push_kh_len_sheet(): lọc bỏ 3_DP_XA khi push GSheet
+- `services/khtd_service.py` dòng ~610 — tao_dot_giao_dau_nam(): lọc bỏ 3_DP_XA khi tạo đợt giao
+- `services/khtd_service.py` dòng ~145 — lay_kh_dot_truoc(): backward compat chia đều KH cũ 3_TW/3_DP sang key mới
+- `tabs/tab_khtd_giao_dc.py` dòng ~400 — _section_b_giao(): lọc bỏ 3_DP_XA khỏi bảng nhập giao
+
+## [2026-05-10] — KHTD: GQVL phân tầng 4 nhóm + push GSheet KH/TH dạng dọc
+- `tabs/tab_khtd_nhap.py` dòng ~41 — thêm `_tinh_th_gqvl_phan_tang()` theo PL NV + Mã NĐT (cap_tinh_tw_nhcsxh/cap_tinh_tw_nsnn/cap_tinh/cap_xa) và alias 3_* để tương thích
+- `tabs/tab_khtd_nhap.py` dòng ~562 — hiển thị 4 dòng GQVL phân tầng trong bảng KH vs TH (giữ dòng tổng GQVL để đối chiếu)
+- `gen_dcgiam_sheet.py` dòng ~39 — nâng cấp push `--th` lên 2 sheet dọc: `KH_TH_TONG_HOP` (CN) và `KH_TH_THEO_PGD` (từng PGD) + format + audit
+- `docs/ROADMAP.md` — đánh dấu item backlog B1 đã hoàn thành
+- `docs/TROUBLESHOOTING.md` — thêm mục lỗi thường gặp khi push GSheet KH/TH
+
+## [2026-05-10] — TQPGD: bỏ cột Nợ ĐH năm (tỷ) khỏi hiển thị
+- `tabs/tab_tongquan.py` dòng ~932 — bỏ cột “Nợ ĐH năm (tỷ)” khỏi danh sách `cot_hien`
+
+## [2026-05-10] — PDF: tinh chỉnh độ rộng cột + format tiền gọn trong xuat_pdf()
+- `pdf_service.py` dòng ~75 — thay logic tính `col_widths` theo phân loại text/số (text rộng hơn, số hẹp hơn) và scale về khổ trang
+- `pdf_service.py` dòng ~224 — format cột tiền trong `xuat_pdf()` theo dạng gọn (tỷ/triệu) với tối đa 3 chữ số thập phân
+
+## [2026-05-10] — Xuất PDF phân cấp PGD > Xã > CT trong tab_baocao
+- `tabs/tab_baocao.py` dòng ~122 — thêm bộ lọc 3 cấp độc lập (PGD/Xã/CT), role PGD khóa PGD theo `pgd_user`
+- `tabs/tab_baocao.py` dòng ~180 — thêm groupby 3 cấp + tính `TL Nợ xấu %` (QH + Khoanh) / Tổng dư nợ
+- `tabs/tab_baocao.py` dòng ~241 — thêm nút xuất/tải PDF dùng `xuat_pdf_group_header` + ghi audit sau khi xuất
+
+## [2026-05-10] — TQPGD: thêm xuất Excel + tự động giãn cột PDF theo nội dung
+- `tabs/tab_tongquan.py` — thêm nút Xuất Excel (openpyxl format) cho bảng "Thông tin tổng quát theo PGD" và bố trí 2 cột Excel/PDF
+- `pdf_service.py` — `xuat_pdf()` tăng font size, thêm title/subtitle rõ ràng, và tính `colWidths` theo độ dài nội dung + ưu tiên header để tránh dồn cột (kể cả dòng TỔNG CỘNG)
+
+## [2026-05-10] — Dọn debug PDF trong tab Tổng quan
+- `tabs/tab_tongquan.py` — gỡ các `st.write/st.caption` debug (render OK, clicked, size bytes) và bỏ biến placeholder PDF không dùng
+
+## [2026-05-10] — Đơn giản hóa nut_xuat_pdf(): bỏ st.rerun/st.stop/ss_trigger
+- `pdf_service.py` dòng ~818 — `nut_xuat_pdf()`: bỏ `st.rerun()`, `st.stop()`, `ss_trigger`; thêm `use_container_width=True`; giữ pattern đơn giản `st.button` lưu session_state → `st.download_button` ngoài block
+
+## [2026-05-10] — Fix PDF tab Tổng quan: dùng cột số gốc thay vì cột đã format
+- `tabs/tab_tongquan.py` dòng ~1111 — `df_xuat` dùng cột số gốc `_mon`, `_kh`, `_no` thay vì cột đã format string, tránh PDF tính tổng NaN
+
+## [2026-05-10] — Sửa import trong tab_den_han.py
+- `tabs/tab_den_han.py` dòng 25-26 — thêm `nut_xuat_pdf` vào import `pdf_service`, thêm `xuat_excel`, `ten_file_xuat` vào import `utils`
+
 ## [2026-05-10] — Refactor download buttons pattern: chuyển sang session_state để tránh Streamlit widget lifecycle
 
 ### Sửa đổi

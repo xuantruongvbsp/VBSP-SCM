@@ -186,3 +186,18 @@ sqlite3 data.db "SELECT key, value FROM kv_store WHERE key LIKE 'merge_meta%'"
 # Chạy với DEBUG mode
 DEBUG=1 streamlit run app.py
 ```
+
+---
+
+### Xuất PDF phân cấp PGD > Xã > CT (tab Báo cáo) — Các lỗi thường gặp
+- Cảnh báo “Thiếu cột dữ liệu để xuất PDF …” → File HSTD/merge đang thiếu cột bắt buộc (PGD/Xã/CT, Mã KH, Số KU, Dư nợ…) → Kiểm tra `config.py` các `COT_*` có khớp tên cột thực tế trong HSTD; upload lại HSTD và chạy merge
+- Bộ lọc “📌 Chương trình” trống / không đúng theo PGD → Key `ct_registry_{slug}` chưa có hoặc rỗng → Thiết lập chương trình theo PGD trong kv_store; hệ thống sẽ fallback sang danh sách CT từ cột dữ liệu nếu registry trống
+- Bấm “📄 Xuất PDF phân cấp” nhưng báo “Không có dữ liệu để xuất” → Bộ lọc đang quá hẹp (PGD/Xã/CT) hoặc dữ liệu cột nhóm có NaN → Chọn lại “Tất cả” từng điều kiện để nới lọc, kiểm tra dữ liệu nguồn có đủ giá trị cho cột nhóm
+
+---
+
+### Push GSheet KH/TH (KH_TH_TONG_HOP, KH_TH_THEO_PGD) — Các lỗi thường gặp
+- Script báo “Khong tim thay file credentials.json” → Chưa có file service account hoặc đặt sai thư mục → Copy `credentials.json` vào root project và cấp quyền Editor trên Google Sheet cho service account
+- Script báo “No module named gspread” → Môi trường Python chưa cài thư viện → Cài `gspread` và `oauth2client` trong đúng env đang chạy script
+- Sheet trống hoặc thiếu số liệu GQVL phân tầng → Chưa có `gqvl.parquet` (chưa upload/merge GQVL) hoặc dữ liệu thiếu cột nguồn vốn/PL NV/Mã NĐT → Upload lại GQVL, đảm bảo merge tạo parquet và có cột theo `config.GQVL_COT_MAP`
+- Sheet thiếu số liệu KH theo PGD → Kế hoạch theo Xã (`khtd_xa`) chưa nhập hoặc PGD chưa có danh sách xã (`PGD_XA_MAP`) → Nhập KH theo Xã hoặc cập nhật danh sách xã trong config

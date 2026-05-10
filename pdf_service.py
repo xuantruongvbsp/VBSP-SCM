@@ -80,16 +80,17 @@ def xuat_pdf(
     don_vi_tien: str = "đồng",
     prefix_file: str = "",
     them_dong_tong: bool = True,
+    tieu_de_phu: str = "",
 ) -> bytes:
-    if not _REPORTLAB_READY:
-        raise ImportError("Chưa cài thư viện reportlab. Chạy: pip install reportlab")
     """
     Xuất DataFrame ra PDF chuẩn in A4, hỗ trợ tiếng Việt.
     Tự động landscape nếu số cột >= 8 hoặc prefix_file == "TQPGD".
     Trả về bytes để dùng với st.download_button.
     """
+    if not _REPORTLAB_READY:
+        raise ImportError("Chưa cài thư viện reportlab. Chạy: pip install reportlab")
     _dang_ky_font()
-    from utils import fmt_so
+    from utils import vn
 
     cols_tien = cols_tien or []
 
@@ -163,34 +164,43 @@ def xuat_pdf(
         ))
     story.append(HRFlowable(width="100%", thickness=1.5,
                             color=VBSP_GREEN, spaceAfter=6))
-    story.append(Paragraph(
-        tieu_de.upper(),
-        ParagraphStyle("title", fontName=fb, fontSize=13, alignment=TA_CENTER,
-                       textColor=VBSP_GREEN, spaceAfter=4)
-    ))
+    # Tiêu đề báo cáo
+    title_style = ParagraphStyle(
+        "title",
+        fontName=fb if _FONT_REGISTERED else FONT_FALLBACK,
+        fontSize=14,
+        alignment=TA_CENTER,
+        spaceAfter=6,
+        textColor=colors.HexColor("#003D7A"),
+    )
+    sub_style = ParagraphStyle(
+        "sub",
+        fontName=fn if _FONT_REGISTERED else FONT_FALLBACK,
+        fontSize=9,
+        alignment=TA_CENTER,
+        spaceAfter=12,
+        textColor=colors.grey,
+    )
     ngay_str = datetime.now().strftime("%d/%m/%Y %H:%M")
+    story.append(Paragraph(tieu_de.upper(), title_style))
     story.append(Paragraph(
         f"Ngày xuất: {ngay_str}  |  Người xuất: {nguoi_xuat}",
-        ParagraphStyle("meta", fontName=fn, fontSize=9, alignment=TA_CENTER,
-                       textColor=colors.grey, spaceAfter=4)
+        sub_style,
     ))
-    # Hiển thị thông tin bộ lọc nếu có
     if tieu_de_phu:
-        story.append(Paragraph(
-            tieu_de_phu,
-            ParagraphStyle("filter_info", fontName=fn, fontSize=9, alignment=TA_CENTER,
-                           textColor=colors.HexColor("#1B5E20"), spaceAfter=12)
-        ))
+        story.append(Paragraph(tieu_de_phu, sub_style))
+    story.append(Spacer(1, 0.3 * cm))
 
     # ── 2. Bảng dữ liệu ───────────────────────────────────────────────
     n_cols = len(df.columns)
     
-    # Tự động co font size theo số cột
-    if n_cols <= 6:
+    if n_cols <= 5:
+        font_size = 13
+    elif n_cols <= 8:
         font_size = 11
-    elif n_cols <= 10:
+    elif n_cols <= 12:
         font_size = 10
-    elif n_cols <= 14:
+    elif n_cols <= 16:
         font_size = 9
     else:
         font_size = 8
@@ -210,6 +220,20 @@ def xuat_pdf(
     ]
     table_data = [header_cells]
 
+    def _fmt_tien_pdf(val: object) -> str:
+        try:
+            if isinstance(val, bool):
+                raise ValueError
+            if isinstance(val, (int, float)):
+                num = float(val)
+            else:
+                num = float(str(val).strip().replace(".", "").replace(",", "."))
+            if abs(num) >= 1_000_000:
+                return f"{vn(num / 1_000_000, 2)} tỷ"
+            return f"{vn(num / 1_000, 1)} triệu"
+        except Exception:
+            return str(val) if pd.notna(val) else ""
+
     # Data rows — format số tiền
     for _, row in df.iterrows():
         cells = []
@@ -219,13 +243,7 @@ def xuat_pdf(
                 try:
                     if isinstance(val, bool):
                         raise ValueError
-                    if isinstance(val, (int, float)):
-                        txt = fmt_so(float(val))
-                    else:
-                        num = float(
-                            str(val).strip().replace(".", "").replace(",", ".")
-                        )
-                        txt = fmt_so(num)
+                    txt = _fmt_tien_pdf(val)
                     p = Paragraph(txt, ParagraphStyle("td_r", fontName=fn,
                                                       fontSize=font_size, alignment=TA_RIGHT))
                 except (ValueError, TypeError):
@@ -246,7 +264,7 @@ def xuat_pdf(
         for col in df.columns:
             val = dong_tong_cells[col]
             if col in cols_tien and isinstance(val, (int, float)):
-                txt = fmt_so(float(val))
+                txt = _fmt_tien_pdf(val)
                 p = Paragraph(
                     f"<b>{txt}</b>",
                     ParagraphStyle("tong_r", fontName=fb,
@@ -267,51 +285,23 @@ def xuat_pdf(
         table_data.append(tong_cells)
 
     if n_cols > 0:
-        cols_list = list(df.columns)
+        col_max_chars = []
+        col_widths = []
+        for col in df.columns:
+            header_len = len(str(col))
+            try:
+                pd.to_numeric(df[col], errors="raise")
+                data_len = 8
+            except (ValueError, TypeError):
+                data_len = min(df[col].astype(str).str.len().max(), 20) if len(df) > 0 else 0
+            col_max_chars.append(max(header_len, data_len, 4))
 
-        def _col_ratio(col_name: str) -> float:
-            c = str(col_name).lower()
-            if c in ("stt",):
-                return 0.5
-            if any(k in c for k in ("tiêu chí", "tieu chi")):
-                return 2.5
-            if any(k in c for k in ("tổ trưởng", "to truong")):
-                return 2.0
-            if any(k in c for k in ("xếp loại", "xep loai")):
-                return 1.2
-            if any(k in c for k in ("mã tổ", "ma to")):
-                return 1.0
-            if any(k in c for k in ("chỉ tiêu", "đơn vị", "chi tiêu", "chương trình", "ten")):
-                return 3.0
-            if any(k in c for k in ("tỷ lệ", "tl ", "%")):
-                return 0.8
-            if any(k in c for k in ("còn", "con ")):
-                return 1.0
-
-            # Cột tên đơn vị — rộng nhất
-            if any(k in c for k in ("đơn vị", "don vi", "tên pgd", "ten pgd")):
-                return 3.5
-
-            # Cột số lượng nguyên (KH, Tổ)
-            if any(k in c for k in ("số kh", "so kh", "tổng tổ", "tong to",
-                                     "tốt", "tot", "khá", "kha", " tb", "yếu", "yeu")):
-                return 0.7
-
-            # Cột tiền tỷ
-            if any(k in c for k in ("dư nợ", "du no", "qh (", "khoanh", "lãi tồn",
-                                     "nợ xấu", "no xau", "nợ đh", "no dh",
-                                     "ds cho", "ds thu")):
-                return 1.1
-
-            # Cột tỷ lệ %
-            if any(k in c for k in ("tl qh", "tl kh", "tl npl", "% ", "tỷ lệ")):
-                return 0.8
-
-            return 1.2
-
-        ratios = [_col_ratio(c) for c in cols_list]
-        total_ratio = sum(ratios)
-        col_widths = [usable_w * r / total_ratio for r in ratios]
+        total_chars = sum(col_max_chars) or 1
+        col_widths = [max((c / total_chars) * usable_w, 1.2 * cm) for c in col_max_chars]
+        total_w = sum(col_widths)
+        if total_w > usable_w and total_w > 0:
+            scale = usable_w / total_w
+            col_widths = [w * scale for w in col_widths]
     else:
         col_widths = [usable_w]
 
@@ -356,31 +346,58 @@ def xuat_pdf(
 
     # ── 3. Phần chữ ký ────────────────────────────────────────────────
     story.append(Spacer(1, 1.5 * cm))
+
+    # Dòng ngày tháng căn phải
+    ngay_ky = datetime.now().strftime("Đồng Nai, ngày %d tháng %m năm %Y")
     story.append(Paragraph(
-        f"Đồng Nai, ngày {datetime.now().strftime('%d')} "
-        f"tháng {datetime.now().strftime('%m')} "
-        f"năm {datetime.now().strftime('%Y')}",
-        ParagraphStyle("date_sign", fontName=fn, fontSize=10,
-                       alignment=TA_RIGHT, spaceAfter=6)
+        ngay_ky,
+        ParagraphStyle("ngay_ky",
+            fontName=fn if _FONT_REGISTERED else FONT_FALLBACK,
+            fontSize=10,
+            alignment=TA_RIGHT,
+            spaceAfter=16,
+        )
     ))
 
-    ky_data = [[
-        Paragraph("NGƯỜI LẬP BIỂU", ParagraphStyle("ky", fontName=fb, fontSize=10, alignment=TA_CENTER)),
-        Paragraph("KIỂM SOÁT", ParagraphStyle("ky", fontName=fb, fontSize=10, alignment=TA_CENTER)),
-        Paragraph("GIÁM ĐỐC", ParagraphStyle("ky", fontName=fb, fontSize=10, alignment=TA_CENTER)),
-    ], [
-        Paragraph("<i>(Ký, ghi rõ họ tên)</i>", ParagraphStyle("ky2", fontName=fn, fontSize=9, alignment=TA_CENTER, textColor=colors.grey)),
-        Paragraph("<i>(Ký, ghi rõ họ tên)</i>", ParagraphStyle("ky2", fontName=fn, fontSize=9, alignment=TA_CENTER, textColor=colors.grey)),
-        Paragraph("<i>(Ký, ghi rõ họ tên)</i>", ParagraphStyle("ky2", fontName=fn, fontSize=9, alignment=TA_CENTER, textColor=colors.grey)),
-    ], [
-        Paragraph(" \n\n\n", ParagraphStyle("gap", fontSize=10)),
-        Paragraph(" \n\n\n", ParagraphStyle("gap", fontSize=10)),
-        Paragraph(" \n\n\n", ParagraphStyle("gap", fontSize=10)),
-    ]]
+    # Bảng 3 cột chữ ký
+    ky_style = ParagraphStyle("ky",
+        fontName=fb if _FONT_REGISTERED else FONT_FALLBACK,
+        fontSize=10,
+        alignment=TA_CENTER,
+    )
+    ky_sub_style = ParagraphStyle("ky_sub",
+        fontName=fn if _FONT_REGISTERED else FONT_FALLBACK,
+        fontSize=9,
+        alignment=TA_CENTER,
+        textColor=colors.grey,
+    )
+    gap_style = ParagraphStyle("gap",
+        fontName=fn if _FONT_REGISTERED else FONT_FALLBACK,
+        fontSize=10,
+    )
+
+    ky_data = [
+        [
+            Paragraph("NGƯỜI LẬP BIỂU", ky_style),
+            Paragraph("TRƯỞNG PHÒNG KH-NV", ky_style),
+            Paragraph("GIÁM ĐỐC", ky_style),
+        ],
+        [
+            Paragraph("<i>(Ký, ghi rõ họ tên)</i>", ky_sub_style),
+            Paragraph("<i>(Ký, ghi rõ họ tên)</i>", ky_sub_style),
+            Paragraph("<i>(Ký, đóng dấu)</i>", ky_sub_style),
+        ],
+        [
+            Paragraph(" \n\n\n", gap_style),
+            Paragraph(" \n\n\n", gap_style),
+            Paragraph(" \n\n\n", gap_style),
+        ],
+    ]
+
     ky_tbl = Table(ky_data, colWidths=[usable_w / 3] * 3)
     ky_tbl.setStyle(TableStyle([
-        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
-        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("ALIGN",      (0, 0), (-1, -1), "CENTER"),
+        ("VALIGN",     (0, 0), (-1, -1), "TOP"),
         ("TOPPADDING", (0, 0), (-1, -1), 6),
     ]))
     story.append(ky_tbl)
@@ -427,20 +444,6 @@ def xuat_pdf_bang(
         prefix_file=prefix_file,
         tieu_de_phu=tieu_de_phu,
     )
-
-
-def xuat_pdf(
-    df: pd.DataFrame,
-    tieu_de: str,
-    nguoi_xuat: str,
-    cols_tien: list[str] | None = None,
-    prefix_file: str = "BC",
-    tieu_de_phu: str = "",
-) -> bytes:
-    """
-    Xuất một báo cáo DataFrame ra PDF.
-    """
-    # ... (rest of the code remains the same)
 
 
 def xuat_pdf_group_header(
@@ -810,24 +813,23 @@ def nut_xuat_pdf(
     Gọi: nut_xuat_pdf(export_df, "Báo cáo dư nợ", username,
                       cols_tien=[COT_TONG_DU_NO, COT_DU_NO_QH])
     """
-    ss_key = f"_pdf_bytes_{key}"
+    ss_key      = f"_pdf_bytes_{key}"
     ss_file_key = f"_pdf_file_{key}"
 
-    if st.button("📄 Xuất PDF", key=key, type="secondary"):
+    if st.button("📄 Xuất PDF", key=key, type="secondary", use_container_width=True):
         try:
-            with st.spinner("⏳ Đang tạo báo cáo PDF, vui lòng chờ..."):
+            with st.spinner("⏳ Đang tạo PDF..."):
                 pdf_bytes = xuat_pdf(df, tieu_de, username, cols_tien, prefix_file=prefix_file, tieu_de_phu=tieu_de_phu)
-            st.session_state[ss_key] = pdf_bytes
+            st.session_state[ss_key]      = pdf_bytes
             st.session_state[ss_file_key] = f"{prefix_file}_{datetime.now().strftime('%d%m%Y_%H%M')}.pdf"
         except Exception as e:
             import traceback
             st.session_state[ss_key] = None
-            st.error(f"❌ Lỗi tạo PDF: {e}\n\n```\n{traceback.format_exc()}\n```")
+            st.error(f"❌ Lỗi tạo PDF: {e}")
+            st.code(traceback.format_exc())
 
-    st.session_state.setdefault(ss_key, None)
     pdf_data = st.session_state.get(ss_key)
-    if pdf_data is not None:
-        st.success("✅ Báo cáo PDF đã xuất xong! Nhấn nút bên dưới để tải.")
+    if pdf_data:
         st.download_button(
             label="⬇ Tải file PDF",
             data=pdf_data,

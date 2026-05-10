@@ -19,6 +19,7 @@ from config import (
     COT_TONG_DU_NO,
     DS_PGD,
     DON_VI_CHI_NHANH,
+    GQVL_MA_KEY_GIAO,
     PGD_XA_MAP,
 )
 from data.pgd import pgd_slug as _pgd_slug
@@ -140,6 +141,15 @@ def lay_kh_dot_truoc(
             "kh_moi_tw": float(item.get("kh_moi_tw") or 0),
             "kh_moi_dp": float(item.get("kh_moi_dp") or 0),
         }
+
+    if not out.get("3_TW_NHCSXH") and out.get("3_TW"):
+        val = float(out["3_TW"].get("kh_moi_tw", 0)) / 2
+        out.setdefault("3_TW_NHCSXH", {"kh_moi_tw": val, "kh_moi_dp": 0.0})
+        out.setdefault("3_TW_NSNN", {"kh_moi_tw": val, "kh_moi_dp": 0.0})
+    if not out.get("3_DP_TINH") and out.get("3_DP"):
+        val = float(out["3_DP"].get("kh_moi_dp", 0))
+        out.setdefault("3_DP_TINH", {"kh_moi_tw": 0.0, "kh_moi_dp": val})
+
     return out
 
 
@@ -340,6 +350,8 @@ def push_kh_len_sheet(
 
         ma_key = _gc(2)
         if not ma_key:
+            continue
+        if ma_key.startswith("3_") and ma_key not in GQVL_MA_KEY_GIAO:
             continue
         nguon = _gc(4).strip().upper()
         kh_prev = kh_truoc.get(ma_key, {})
@@ -593,6 +605,8 @@ def tao_dot_giao_dau_nam(
         du_lieu: list[dict] = []
         for xa in ds_xa:
             for ma_key, _ma_ct, ten_ct, nguon, _ten_match in CHUONG_TRINH_KHTD:
+                if ma_key.startswith("3_") and ma_key not in GQVL_MA_KEY_GIAO:
+                    continue
                 kh_prev = kh_base.get(ma_key, {})
                 tw_vnd = float(kh_prev.get("kh_moi_tw") or 0)
                 dp_vnd = float(kh_prev.get("kh_moi_dp") or 0)

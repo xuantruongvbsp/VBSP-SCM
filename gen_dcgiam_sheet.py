@@ -18,8 +18,6 @@ from datetime import datetime
 from pathlib import Path
 
 import pandas as pd
-import gspread
-from oauth2client.service_account import ServiceAccountCredentials
 
 import db
 import config
@@ -32,11 +30,16 @@ DCGIAM_SHEET_ID = "15Ev2rTv6khLFaMpAiMwqJCVC_33ocJ-6cp016RGNkYk"
 CREDENTIALS_FILE = "credentials.json"
 SHEET_TAB_GQVL = "GQVL"
 SHEET_TAB_KH = "KH_GQVL"
+SHEET_KH_TH_TONG_HOP = "KH_TH_TONG_HOP"
+SHEET_KH_TH_THEO_PGD = "KH_TH_THEO_PGD"
 
 GQVL_PARQUET = Path(config.CACHE_GQVL)
 
 
 def _ket_noi_gsheet():
+    import gspread
+    from oauth2client.service_account import ServiceAccountCredentials
+
     scope = [
         "https://spreadsheets.google.com/feeds",
         "https://www.googleapis.com/auth/drive",
@@ -58,6 +61,253 @@ def _doc_gqvl_parquet() -> pd.DataFrame:
     df = pd.read_parquet(GQVL_PARQUET)
     _LOG.info("Doc %d dong tu %s", len(df), GQVL_PARQUET)
     return df
+
+
+def _doc_hstd_parquet() -> pd.DataFrame:
+    hstd_parquet = Path(config.CACHE_HSTD)
+    if not hstd_parquet.exists():
+        raise FileNotFoundError(
+            f"Khong tim thay file parquet: {hstd_parquet}. "
+            "Hay upload va merge HSTD truoc khi chay script nay."
+        )
+    df = pd.read_parquet(hstd_parquet)
+    _LOG.info("Doc %d dong tu %s", len(df), hstd_parquet)
+    return df
+
+
+def _build_rows_kh_th(
+    kh_cn: dict,
+    th_hstd: dict,
+    th_gqvl: dict,
+    ten_don_vi: str,
+) -> list[list]:
+    rows: list[list] = []
+    rows.append([ten_don_vi, "", "", "", ""])
+    rows.append(["STT", "Chỉ tiêu", "KH năm (tỷ)", "TH (tỷ)", "TL%"])
+
+    rows.append(["A", "KẾ HOẠCH TÍN DỤNG", "", "", ""])
+
+    stt_tw = 1
+    stt_dp = 1
+    tong_kh = 0.0
+    tong_th = 0.0
+
+    rows.append(["I", "NGUỒN VỐN TRUNG ƯƠNG", "", "", ""])
+    for mk, _, ten, nv, *_ in config.CHUONG_TRINH_KHTD:
+        if nv != "TW":
+            continue
+        kh = float(kh_cn.get(mk, 0.0)) / 1e9
+        if "GQVL" in str(ten) or str(mk).startswith("3_TW"):
+            th_tw_gqvl = (
+                float(th_gqvl.get("cap_tinh_tw_nhcsxh", 0.0))
+                + float(th_gqvl.get("cap_tinh_tw_nsnn", 0.0))
+            ) / 1e9
+            tl = (th_tw_gqvl / kh) if kh > 0 else None
+            rows.append([str(stt_tw), f"  {ten}", round(kh, 3), round(th_tw_gqvl, 3), tl])
+            for sub_ten, sub_key in [
+                ("    TW - NHCSXH huy động", "cap_tinh_tw_nhcsxh"),
+                ("    TW - NSNN/Quỹ QG TW", "cap_tinh_tw_nsnn"),
+            ]:
+                th_sub = float(th_gqvl.get(sub_key, 0.0)) / 1e9
+                rows.append(["*", sub_ten, "", round(th_sub, 3), ""])
+            th = th_tw_gqvl
+        else:
+            th = float(th_hstd.get(mk, 0.0)) / 1e9
+            tl = (th / kh) if kh > 0 else None
+            rows.append([str(stt_tw), f"  {ten}", round(kh, 3), round(th, 3), tl])
+        tong_kh += kh
+        tong_th += th
+        stt_tw += 1
+
+    rows.append(["II", "NGUỒN VỐN ĐỊA PHƯƠNG", "", "", ""])
+    for mk, _, ten, nv, *_ in config.CHUONG_TRINH_KHTD:
+        if nv != "DP":
+            continue
+        kh = float(kh_cn.get(mk, 0.0)) / 1e9
+        if "GQVL" in str(ten) or str(mk).startswith("3_DP"):
+            th_dp_gqvl = (
+                float(th_gqvl.get("cap_tinh", 0.0))
+                + float(th_gqvl.get("cap_xa", 0.0))
+            ) / 1e9
+            tl = (th_dp_gqvl / kh) if kh > 0 else None
+            rows.append([str(stt_dp), f"  {ten}", round(kh, 3), round(th_dp_gqvl, 3), tl])
+            for sub_ten, sub_key in [
+                ("    ĐP - Cấp tỉnh", "cap_tinh"),
+                ("    ĐP - Cấp xã/khác", "cap_xa"),
+            ]:
+                th_sub = float(th_gqvl.get(sub_key, 0.0)) / 1e9
+                rows.append(["*", sub_ten, "", round(th_sub, 3), ""])
+            th = th_dp_gqvl
+        else:
+            th = float(th_hstd.get(mk, 0.0)) / 1e9
+            tl = (th / kh) if kh > 0 else None
+            rows.append([str(stt_dp), f"  {ten}", round(kh, 3), round(th, 3), tl])
+        tong_kh += kh
+        tong_th += th
+        stt_dp += 1
+
+    tl_tong = (tong_th / tong_kh) if tong_kh > 0 else None
+    rows.append(["", "TỔNG CỘNG", round(tong_kh, 3), round(tong_th, 3), tl_tong])
+    rows.append(["", "", "", "", ""])
+    return rows
+
+
+def _hex_to_rgb01(hex_color: str) -> dict:
+    s = hex_color.strip().lstrip("#")
+    r = int(s[0:2], 16) / 255.0
+    g = int(s[2:4], 16) / 255.0
+    b = int(s[4:6], 16) / 255.0
+    return {"red": r, "green": g, "blue": b}
+
+
+def _repeat_row_format(ws, row_idx_1based: int, fmt: dict) -> dict:
+    sheet_id = ws._properties["sheetId"]
+    return {
+        "repeatCell": {
+            "range": {
+                "sheetId": sheet_id,
+                "startRowIndex": row_idx_1based - 1,
+                "endRowIndex": row_idx_1based,
+                "startColumnIndex": 0,
+                "endColumnIndex": 5,
+            },
+            "cell": {"userEnteredFormat": fmt},
+            "fields": "userEnteredFormat(backgroundColor,textFormat,horizontalAlignment,numberFormat)",
+        }
+    }
+
+
+def _apply_format_kh_th(ws, rows: list[list]) -> None:
+    navy = _hex_to_rgb01("#003D7A")
+    group_bg = _hex_to_rgb01("#D9E1F2")
+    total_bg = _hex_to_rgb01("#F2F2F2")
+    sub_bg = _hex_to_rgb01("#EBF3E8")
+
+    reqs: list[dict] = []
+    for i, r in enumerate(rows, start=1):
+        stt = str(r[0]) if len(r) > 0 else ""
+        chi_tieu = str(r[1]) if len(r) > 1 else ""
+        if stt and chi_tieu == "" and (len(r) >= 5 and all(str(x) == "" for x in r[1:])):
+            reqs.append(
+                _repeat_row_format(
+                    ws,
+                    i,
+                    {
+                        "backgroundColor": navy,
+                        "textFormat": {"bold": True, "foregroundColor": _hex_to_rgb01("#FFFFFF")},
+                        "horizontalAlignment": "LEFT",
+                    },
+                )
+            )
+        elif stt == "STT":
+            reqs.append(
+                _repeat_row_format(
+                    ws,
+                    i,
+                    {
+                        "backgroundColor": navy,
+                        "textFormat": {"bold": True, "foregroundColor": _hex_to_rgb01("#FFFFFF")},
+                        "horizontalAlignment": "CENTER",
+                    },
+                )
+            )
+        elif stt in ("A", "I", "II"):
+            reqs.append(
+                _repeat_row_format(
+                    ws,
+                    i,
+                    {"backgroundColor": group_bg, "textFormat": {"bold": True}, "horizontalAlignment": "LEFT"},
+                )
+            )
+        elif chi_tieu == "TỔNG CỘNG":
+            reqs.append(
+                _repeat_row_format(
+                    ws,
+                    i,
+                    {"backgroundColor": total_bg, "textFormat": {"bold": True}, "horizontalAlignment": "LEFT"},
+                )
+            )
+        elif stt == "*":
+            reqs.append(
+                _repeat_row_format(
+                    ws,
+                    i,
+                    {"backgroundColor": sub_bg, "horizontalAlignment": "LEFT"},
+                )
+            )
+
+    sheet_id = ws._properties["sheetId"]
+    n_rows = len(rows)
+    if n_rows >= 3:
+        reqs.append(
+            {
+                "repeatCell": {
+                    "range": {
+                        "sheetId": sheet_id,
+                        "startRowIndex": 2,
+                        "endRowIndex": n_rows,
+                        "startColumnIndex": 2,
+                        "endColumnIndex": 4,
+                    },
+                    "cell": {"userEnteredFormat": {"numberFormat": {"type": "NUMBER", "pattern": "0.000"}}},
+                    "fields": "userEnteredFormat.numberFormat",
+                }
+            }
+        )
+        reqs.append(
+            {
+                "repeatCell": {
+                    "range": {
+                        "sheetId": sheet_id,
+                        "startRowIndex": 2,
+                        "endRowIndex": n_rows,
+                        "startColumnIndex": 4,
+                        "endColumnIndex": 5,
+                    },
+                    "cell": {"userEnteredFormat": {"numberFormat": {"type": "PERCENT", "pattern": "0.0%"}}},
+                    "fields": "userEnteredFormat.numberFormat",
+                }
+            }
+        )
+
+        tl_range = {
+            "sheetId": sheet_id,
+            "startRowIndex": 2,
+            "endRowIndex": n_rows,
+            "startColumnIndex": 4,
+            "endColumnIndex": 5,
+        }
+        reqs.append(
+            {
+                "addConditionalFormatRule": {
+                    "rule": {
+                        "ranges": [tl_range],
+                        "booleanRule": {
+                            "condition": {"type": "NUMBER_LESS", "values": [{"userEnteredValue": "0.8"}]},
+                            "format": {"textFormat": {"foregroundColor": _hex_to_rgb01("#C62828")}},
+                        },
+                    },
+                    "index": 0,
+                }
+            }
+        )
+        reqs.append(
+            {
+                "addConditionalFormatRule": {
+                    "rule": {
+                        "ranges": [tl_range],
+                        "booleanRule": {
+                            "condition": {"type": "NUMBER_GREATER_THAN_EQ", "values": [{"userEnteredValue": "1"}]},
+                            "format": {"textFormat": {"foregroundColor": _hex_to_rgb01("#2E7D32")}},
+                        },
+                    },
+                    "index": 0,
+                }
+            }
+        )
+
+    if reqs:
+        ws.spreadsheet.batch_update({"requests": reqs})
 
 
 def _phan_loai_4_nhom(df: pd.DataFrame) -> dict[str, pd.DataFrame]:
@@ -182,76 +432,92 @@ def _tong_hop_theo_pgd(df: pd.DataFrame) -> pd.DataFrame:
 
 def push_th_gqvl_len_sheet() -> bool:
     try:
-        client = _ket_noi_gsheet()
-        df_full = _doc_gqvl_parquet()
-        nhom_dict = _phan_loai_4_nhom(df_full)
+        import gspread
 
-        bang_nhcsxh = _tong_hop_theo_pgd(nhom_dict["cap_tinh_tw_nhcsxh"])
-        bang_nsnn = _tong_hop_theo_pgd(nhom_dict["cap_tinh_tw_nsnn"])
-        bang_cap_tinh = _tong_hop_theo_pgd(nhom_dict["cap_tinh"])
-        bang_cap_xa = _tong_hop_theo_pgd(nhom_dict["cap_xa"])
+        client = _ket_noi_gsheet()
+        df_hstd = _doc_hstd_parquet()
+        df_gqvl = _doc_gqvl_parquet()
+
+        from tabs.tab_khtd import _tinh_thuc_hien_theo_ct, KV_KEY_XA
+        from tabs.tab_khtd_nhap import _tinh_th_gqvl_phan_tang
+
+        kh_cn = db.doc_kv("khtd_cn")
+        if not isinstance(kh_cn, dict):
+            kh_cn = {}
+
+        th_hstd_cn = _tinh_thuc_hien_theo_ct(df_hstd) if df_hstd is not None else {}
+        th_gqvl_cn = _tinh_th_gqvl_phan_tang(df_gqvl) if df_gqvl is not None else {}
+
+        rows_cn = _build_rows_kh_th(kh_cn, th_hstd_cn, th_gqvl_cn, "TOÀN CHI NHÁNH")
+        rows_cn.append(["", f"Cập nhật lúc {datetime.now().strftime('%H:%M %d/%m/%Y')}", "", "", ""])
 
         spreadsheet = client.open_by_key(DCGIAM_SHEET_ID)
+
         try:
-            ws = spreadsheet.worksheet(SHEET_TAB_GQVL)
+            ws_cn = spreadsheet.worksheet(SHEET_KH_TH_TONG_HOP)
         except gspread.exceptions.WorksheetNotFound:
-            ws = spreadsheet.add_worksheet(title=SHEET_TAB_GQVL, rows=100, cols=10)
+            ws_cn = spreadsheet.add_worksheet(title=SHEET_KH_TH_TONG_HOP, rows=500, cols=8)
+        ws_cn.clear()
+        ws_cn.resize(rows=len(rows_cn), cols=5)
+        ws_cn.update(rows_cn, value_input_option="USER_ENTERED")
+        _apply_format_kh_th(ws_cn, rows_cn)
 
-        ws.clear()
+        try:
+            ws_pgd = spreadsheet.worksheet(SHEET_KH_TH_THEO_PGD)
+        except gspread.exceptions.WorksheetNotFound:
+            ws_pgd = spreadsheet.add_worksheet(title=SHEET_KH_TH_THEO_PGD, rows=2000, cols=8)
+        ws_pgd.clear()
 
-        header1 = [
-            "",
-            "TW \u2014 NHCSXH huy dong", "", "TW \u2014 NSNN (Quy QG TW)", "",
-            "DP \u2014 Cap tinh", "", "DP \u2014 Cap xa/khac", "", "",
-        ]
-        header2 = [
-            "Ten PGD",
-            "Du no", "So ho",
-            "Du no", "So ho",
-            "Du no", "So ho",
-            "Du no", "So ho",
-            "Tong cong",
-        ]
+        kh_xa = db.doc_kv(KV_KEY_XA)
+        if not isinstance(kh_xa, dict):
+            kh_xa = {}
 
-        ds_pgd = config.DS_PGD + ["TONG CONG"]
-        rows_data = [header1, header2]
+        all_rows: list[list] = []
+        for ten_pgd in config.DS_PGD:
+            xa_list = config.PGD_XA_MAP.get(ten_pgd, [])
+            kh_pgd: dict[str, float] = {}
+            for xa in xa_list:
+                for mk, v in kh_xa.items():
+                    if not isinstance(mk, str) or "|" not in mk:
+                        continue
+                    xa_key, ma_key = mk.split("|", 1)
+                    if str(xa_key).strip() != str(xa).strip():
+                        continue
+                    try:
+                        kh_pgd[ma_key] = float(kh_pgd.get(ma_key, 0.0)) + float(v or 0.0)
+                    except Exception:
+                        continue
 
-        def _build_map(bang):
-            m = {}
-            for _, row in bang.iterrows():
-                m[row["Ten PGD"]] = (row["Tong du no"], row["So ho vay"])
-            return m
+            if df_hstd is not None and config.COT_TEN_PGD in df_hstd.columns:
+                df_hstd_pgd = df_hstd[df_hstd[config.COT_TEN_PGD].astype(str).str.strip() == str(ten_pgd).strip()]
+            else:
+                df_hstd_pgd = pd.DataFrame()
+            th_hstd_pgd = _tinh_thuc_hien_theo_ct(df_hstd_pgd) if not df_hstd_pgd.empty else {}
 
-        map_nhcsxh = _build_map(bang_nhcsxh)
-        map_nsnn = _build_map(bang_nsnn)
-        map_tinh = _build_map(bang_cap_tinh)
-        map_xa = _build_map(bang_cap_xa)
+            if df_gqvl is not None and config.COT_TEN_PGD in df_gqvl.columns:
+                df_gqvl_pgd = df_gqvl[df_gqvl[config.COT_TEN_PGD].astype(str).str.strip() == str(ten_pgd).strip()]
+            else:
+                df_gqvl_pgd = pd.DataFrame()
+            th_gqvl_pgd = _tinh_th_gqvl_phan_tang(df_gqvl_pgd) if not df_gqvl_pgd.empty else {}
 
-        for ten_pgd in ds_pgd:
-            dn_nhcsxh, ho_nhcsxh = map_nhcsxh.get(ten_pgd, (0, 0))
-            dn_nsnn, ho_nsnn = map_nsnn.get(ten_pgd, (0, 0))
-            dn_tinh, ho_tinh = map_tinh.get(ten_pgd, (0, 0))
-            dn_xa, ho_xa = map_xa.get(ten_pgd, (0, 0))
-            dn_nhcsxh = int(dn_nhcsxh)
-            dn_nsnn = int(dn_nsnn)
-            dn_tinh = int(dn_tinh)
-            dn_xa = int(dn_xa)
-            tong_cong = dn_nhcsxh + dn_nsnn + dn_tinh + dn_xa
-            rows_data.append([
-                ten_pgd,
-                dn_nhcsxh, int(ho_nhcsxh),
-                dn_nsnn, int(ho_nsnn),
-                dn_tinh, int(ho_tinh),
-                dn_xa, int(ho_xa),
-                tong_cong,
-            ])
+            all_rows.extend(_build_rows_kh_th(kh_pgd, th_hstd_pgd, th_gqvl_pgd, ten_pgd))
 
-        ws.update(rows_data, value_input_option="USER_ENTERED")
+        all_rows.append(["", f"Cập nhật lúc {datetime.now().strftime('%H:%M %d/%m/%Y')}", "", "", ""])
 
-        timestamp = datetime.now().strftime("Cap nhat luc %H:%M %d/%m/%Y")
-        ws.update_acell("A40", timestamp)
+        ws_pgd.resize(rows=len(all_rows), cols=5)
+        ws_pgd.update(all_rows, value_input_option="USER_ENTERED")
+        _apply_format_kh_th(ws_pgd, all_rows)
 
-        _LOG.info("Push TH GQVL len sheet thanh cong %d PGD", len(config.DS_PGD))
+        try:
+            db.ghi_audit(
+                "gen_dcgiam_sheet",
+                "push_gsheet_kh_th",
+                f"Push KH vs TH (CN + {len(config.DS_PGD)} PGD) lên GSheet",
+            )
+        except Exception:
+            pass
+
+        _LOG.info("Push KH vs TH len sheet thanh cong %d PGD", len(config.DS_PGD))
         return True
     except Exception:
         _LOG.exception("Loi push TH GQVL len sheet")
@@ -263,6 +529,8 @@ def push_kh_len_sheet(nam: int = None) -> bool:
         nam = datetime.now().year
 
     try:
+        import gspread
+
         kh_data = db.doc_kv(f"kh_gqvl_cn_{nam}")
         if kh_data is None:
             _LOG.warning("Chua co KH GQVL nam %d", nam)

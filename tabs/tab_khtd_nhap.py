@@ -38,6 +38,68 @@ from tabs.tab_khtd import (
 from tabs.tab_khtd_xuat import _hien_thi_bang_cn_readonly
 
 
+def _tinh_th_gqvl_phan_tang(df_gqvl: pd.DataFrame) -> dict[str, float]:
+    """
+    Tính TH GQVL phân tầng 4 nhóm từ gqvl.parquet.
+    Dùng config.GQVL_PHAN_TANG, config.COT_PL_NV, config.MA_NDT_CAP_TINH_DUOI.
+
+    Trả về dict: {sub_key: tong_du_no_VND}
+    sub_key theo GQVL_PHAN_TANG[i][3]:
+      "cap_tinh_tw_nhcsxh", "cap_tinh_tw_nsnn", "cap_tinh", "cap_xa"
+
+    Logic phân loại:
+    - TW + PL NV=2 (NHCSXH HĐ) → "cap_tinh_tw_nhcsxh"
+    - TW + PL NV=1 (NSNN/Quỹ QG) → "cap_tinh_tw_nsnn"
+    - DP + Mã NĐT endswith bất kỳ trong MA_NDT_CAP_TINH_DUOI → "cap_tinh"
+    - DP + còn lại → "cap_xa"
+    """
+    from config import GQVL_PHAN_TANG, COT_PL_NV, MA_NDT_CAP_TINH_DUOI
+    from config import COT_NGUON_VON, COT_TONG_DU_NO, COT_DU_NO_TH
+
+    result = {row[3]: 0.0 for row in GQVL_PHAN_TANG}
+    result.setdefault("3_TW_NHCSXH", 0.0)
+    result.setdefault("3_TW_NSNN", 0.0)
+    result.setdefault("3_DP_TINH", 0.0)
+    result.setdefault("3_DP_XA", 0.0)
+
+    if df_gqvl is None or df_gqvl.empty:
+        return result
+
+    col_dn = COT_TONG_DU_NO if COT_TONG_DU_NO in df_gqvl.columns else (
+        COT_DU_NO_TH if COT_DU_NO_TH in df_gqvl.columns else None
+    )
+    if not col_dn:
+        return result
+
+    df = df_gqvl.copy()
+    nv_raw = df.get(COT_NGUON_VON, pd.Series(dtype=object))
+    nv = pd.to_numeric(nv_raw, errors="coerce")
+    if nv.isna().all():
+        nv_str = nv_raw.fillna("").astype(str).str.strip().str.upper()
+        nv = nv_str.map({"TW": 1, "ĐP": 2, "DP": 2}).fillna(0)
+    else:
+        nv = nv.fillna(0)
+
+    plnv = pd.to_numeric(df.get(COT_PL_NV, pd.Series(dtype=object)), errors="coerce").fillna(0)
+    mandt = df.get("Mã nhà đầu tư", pd.Series(dtype=str)).fillna("").astype(str)
+    dn = pd.to_numeric(df[col_dn], errors="coerce").fillna(0)
+
+    mask_tw = nv == 1
+    result["cap_tinh_tw_nhcsxh"] = float(dn[mask_tw & (plnv == 2)].sum())
+    result["cap_tinh_tw_nsnn"] = float(dn[mask_tw & (plnv == 1)].sum())
+
+    mask_dp = nv == 2
+    mask_cap_tinh = mandt.apply(lambda x: any(str(x).endswith(m) for m in MA_NDT_CAP_TINH_DUOI))
+    result["cap_tinh"] = float(dn[mask_dp & mask_cap_tinh].sum())
+    result["cap_xa"] = float(dn[mask_dp & ~mask_cap_tinh].sum())
+
+    result["3_TW_NHCSXH"] = result.get("cap_tinh_tw_nhcsxh", 0.0)
+    result["3_TW_NSNN"] = result.get("cap_tinh_tw_nsnn", 0.0)
+    result["3_DP_TINH"] = result.get("cap_tinh", 0.0)
+    result["3_DP_XA"] = result.get("cap_xa", 0.0)
+    return result
+
+
 # Thư mục lưu văn bản QĐ cấp Chi nhánh
 QD_DIR_CN = DATA_DIR / "qd"
 
@@ -559,7 +621,13 @@ def _tab_khtd_chi_nhanh(
                 cols_hdr[7].markdown(_md_right(_fvn_form(th_3_tw + th_3_dp, 0)), unsafe_allow_html=True)
 
                 # 4 sub-dòng thụt vào
-                for sub_key, sub_ten, sub_nv in GQVL_SUB_NHOM:
+                GQVL_SUB_ROWS = [
+                    ("GQVL TW — NHCSXH huy động", "3_TW_NHCSXH", "TW"),
+                    ("GQVL TW — NSNN (Quỹ QG TW)", "3_TW_NSNN", "TW"),
+                    ("GQVL ĐP — Cấp tỉnh", "3_DP_TINH", "ĐP"),
+                    ("GQVL ĐP — Cấp xã/khác", "3_DP_XA", "ĐP"),
+                ]
+                for sub_ten, sub_key, sub_nv in GQVL_SUB_ROWS:
                     k_inp = f"khtd_cn_inp_{sub_key}"
                     kh_vnd = float(kh_cn.get(sub_key, 0.0))
                     kh_trieu = kh_vnd / 1_000_000
@@ -569,7 +637,7 @@ def _tab_khtd_chi_nhanh(
                     # Tên sub: thụt vào, màu nhạt hơn
                     cols_sub[0].markdown(
                         f"<div style='font-size:0.83rem;color:#555;"
-                        f"padding:3px 0 3px 16px'>{sub_ten}</div>",
+                        f"padding:3px 0 3px 16px'>  {sub_ten}</div>",
                         unsafe_allow_html=True
                     )
                     # Cột KH: TW ở cols[1], ĐP ở cols[4]
@@ -1307,4 +1375,3 @@ def render_nhap_cn(role: str, username: str, df_full: "pd.DataFrame | None", df_
 
 def render_nhap_pgd(role: str, username: str, df_full: "pd.DataFrame | None") -> None:
     _tab_khtd_theo_xa(role, username, df_full)
-

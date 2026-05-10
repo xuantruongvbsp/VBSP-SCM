@@ -120,7 +120,8 @@ CHUONG_TRINH_KHTD = [
     # ── NGUỒN VỐN TRUNG ƯƠNG ──
     ("1_TW",   1,  "Cho vay ưu đãi hộ nghèo",                              "TW", "hộ nghèo"),
     ("2_TW",   2,  "Cho vay học sinh, sinh viên có hoàn cảnh khó khăn",    "TW", "học sinh sinh viên"),
-    ("3_TW",   3,  "Cho vay giải quyết việc làm",                          "TW", "giải quyết việc làm"),
+    ("3_TW_NHCSXH", 3, "GQVL TW — NHCSXH huy động",  "TW", "GQVL"),
+    ("3_TW_NSNN",   3, "GQVL TW — NSNN/Quỹ QG TW",   "TW", "GQVL"),
     ("4_TW",   4,  "Cho vay ĐTCS đi lao động có thời hạn ở nước ngoài",   "TW", "xuất khẩu lao động"),
     ("6_TW",   6,  "Cho vay nước sạch và vệ sinh môi trường nông thôn",   "TW", "nước sạch"),
     ("7_TW",   7,  "Cho vay hộ nghèo về nhà ở",                           "TW", "nhà ở hộ nghèo"),
@@ -138,7 +139,8 @@ CHUONG_TRINH_KHTD = [
     # ── NGUỒN VỐN ĐỊA PHƯƠNG ──
     ("1_DP",   1,  "Cho vay ưu đãi hộ nghèo (ĐP)",                        "DP", "hộ nghèo"),
     ("2_DP",   2,  "Cho vay học sinh, sinh viên (ĐP)",                     "DP", "học sinh sinh viên"),
-    ("3_DP",   3,  "Cho vay giải quyết việc làm (ĐP)",                    "DP", "giải quyết việc làm"),
+    ("3_DP_TINH",   3, "GQVL ĐP — Cấp tỉnh",          "DP", "GQVL"),
+    ("3_DP_XA",     3, "GQVL ĐP — Cấp xã/khác",       "DP", "GQVL"),
     ("6_DP",   6,  "Cho vay nước sạch và VSMT NT (ĐP)",                   "DP", "nước sạch"),
     ("9_DP",   9,  "Cho vay hộ mới thoát nghèo theo QĐ 28 (ĐP)",           "DP", "mới thoát nghèo"),
     ("12_DP", 12, "Cho vay nhà ở xã hội theo Nghị định số 100 (ĐP)",      "DP", "nhà ở xã hội"),
@@ -163,6 +165,14 @@ CHUONG_TRINH_KHTD_NHOM = [
     for mk, ma_ct, ten, nv, ten_match in CHUONG_TRINH_KHTD
 ]
 
+# ── GQVL phân tầng: key giao KH và key theo dõi TH ───────────────────────────
+# 3 key giao KH qua GSheet (CN tỉnh không giao 3_DP_XA)
+GQVL_MA_KEY_GIAO = frozenset({"3_TW_NHCSXH", "3_TW_NSNN", "3_DP_TINH"})
+
+# 4 key theo dõi TH từ HSTD (đủ 4 nhóm kể cả 3_DP_XA)
+GQVL_MA_KEY_THEO_DOI = frozenset({
+    "3_TW_NHCSXH", "3_TW_NSNN", "3_DP_TINH", "3_DP_XA"
+})
 
 # ── Tên chính thức (hiển thị) theo ma_key — dùng cho báo cáo ─────────────────
 TEN_CHINH_THUC_CT = {row[0]: row[2] for row in CHUONG_TRINH_KHTD}

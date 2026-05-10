@@ -8,7 +8,7 @@
 | # | Việc | File | Trạng thái |
 |---|---|---|---|
 | 1 | Apply prompt nâng cấp tab_khtd.py Phần A–E | `tab_khtd.py` | ✅ Xong |
-| 2 | Cập nhật gen_dcgiam_sheet.py (GQVL phân tầng + push_kh_len_sheet) | `gen_dcgiam_sheet.py` | 🔄 Chưa làm |
+| 2 | Cập nhật gen_dcgiam_sheet.py (GQVL phân tầng + push_kh_len_sheet) | `gen_dcgiam_sheet.py` | ✅ Xong |
 | 3 | ARCHITECTURE.md cập nhật module mới | `ARCHITECTURE.md` | ✅ Xong |
 | 4 | Fix bug metric /1e9 → /1e12 | `tab_khtd.py` | ✅ Xong |
 | 5 | Bỏ expander form nhập KHTD CN | `tab_khtd.py` | ✅ Xong |
@@ -23,6 +23,8 @@
 | 14 | **Nhất quán hóa DON_VI_CHI_NHANH** | `config.py` | ✅ Xong |
 | 15 | **Tab Upload HSTD cho admin_pgd** | `ws_operation.py` | ✅ Xong |
 | 16 | **Cập nhật toàn bộ file .md** | `docs/*.md` | ✅ Xong |
+| **17** | **GQVL 4 nhóm: tích hợp vào Giao & ĐC KHTD** | `config.py`, `khtd_service.py`, `tab_khtd_giao_dc.py`, `tab_khtd.py` | ✅ Xong |
+| **18** | **Dashboard Cảnh báo tiến độ KH vs TH** | `tab_khtd_xuat.py` | ✅ Xong |
 
 ---
 
@@ -30,13 +32,14 @@
 
 | # | Việc | File liên quan | Ghi chú |
 |---|---|---|---|
-| B1 | gen_dcgiam_sheet.py: GQVL phân tầng | `gen_dcgiam_sheet.py` | Cần làm ngay |
+| B1 | ✅ gen_dcgiam_sheet.py: GQVL phân tầng | `gen_dcgiam_sheet.py` | ✅ Xong |
 | B2 | Bảng tóm tắt KHTD CN → HTML thuần | `tab_khtd.py` | Mockup đã có |
 | B3 | Thêm chữ ký cuối PDF báo cáo | `pdf_service.py` | Chuẩn ngân hàng |
 | B4 | Dòng tổng cộng cuối bảng PDF | `tab_khtd.py` | Thiếu trong PDF hiện tại |
 | **B5** | **Biên bản kiểm tra sử dụng vốn (tab Ủy thác)** | `tab_uy_thac.py` | Mẫu 06TD |
 | **B6** | **Cảnh báo 3 tháng không hoạt động** | `data/hstd.py`, `ws_operation.py` | Tự động phát hiện |
 | **B7** | **Fix check role cứng trong các tab** | `tabs/*.py` | Dùng `la_phan_he_*()` |
+| **B8** | **Dashboard Cảnh báo tiến độ KH vs TH** | `tab_khtd_xuat.py` | ✅ Xong |
 
 ---
 
@@ -66,6 +69,6 @@
 
 ## Ghi chú kỹ thuật còn mở
 
-- `gen_dcgiam_sheet.py`: cần cập nhật `push_kh_len_sheet()` và GQVL phân tầng
+- GQVL 4 nhóm đã tích hợp vào toàn bộ luồng Giao & Điều chỉnh KHTD (B1 ✅)
 - GSheet ID: `DCGIAM_SHEET_ID = 15Ev2rTv6khLFaMpAiMwqJCVC_33ocJ-6cp016RGNkYk`
 - 4 key ĐP chưa có trong config gốc: `9_DP`, `12_DP`, `17_DP`, `26_DP` — đã thêm

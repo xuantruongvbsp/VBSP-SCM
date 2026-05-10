@@ -33,6 +33,96 @@ if TYPE_CHECKING:
     from streamlit.delta_generator import DeltaGenerator
 
 
+def _xuat_excel_tqpgd(df: pd.DataFrame, ten_file: str) -> bytes:
+    """Xuất df_show TQPGD ra Excel với định dạng đẹp."""
+    from io import BytesIO
+
+    import openpyxl
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from openpyxl.utils import get_column_letter
+
+    _ = ten_file
+    df_xuat = df.copy()
+    cols_pct = [c for c in df_xuat.columns if "%" in str(c)]
+    for c in cols_pct:
+        df_xuat[c] = pd.to_numeric(df_xuat[c], errors="coerce") / 100.0
+
+    buf = BytesIO()
+    with pd.ExcelWriter(buf, engine="openpyxl") as writer:
+        df_xuat.to_excel(writer, sheet_name="Tổng quan PGD", index=False)
+        ws = writer.sheets["Tổng quan PGD"]
+
+        header_fill = PatternFill("solid", fgColor="003D7A")
+        header_font = Font(bold=True, color="FFFFFF", size=10)
+        center = Alignment(horizontal="center", vertical="center", wrap_text=True)
+        left = Alignment(horizontal="left", vertical="center")
+        right = Alignment(horizontal="right", vertical="center")
+        thin = Side(style="thin", color="CCCCCC")
+        border = Border(left=thin, right=thin, top=thin, bottom=thin)
+
+        for cell in ws[1]:
+            cell.fill = header_fill
+            cell.font = header_font
+            cell.alignment = center
+            cell.border = border
+
+        COT_SO = [
+            "Số KH",
+            "Dư nợ (tỷ)",
+            "QH (tỷ)",
+            "TL QH %",
+            "Khoanh (tỷ)",
+            "TL Khoanh %",
+            "Nợ xấu (tỷ)",
+            "TL NPL %",
+            "Lãi tồn (tỷ)",
+            "Nợ ĐH năm (tỷ)",
+            "DS Cho vay (tỷ)",
+            "DS Thu nợ (tỷ)",
+            "Tổng Tổ",
+            "Tốt",
+            "Khá",
+            "TB",
+            "Yếu",
+        ]
+        col_names = [cell.value for cell in ws[1]]
+
+        for row in ws.iter_rows(min_row=2, max_row=ws.max_row):
+            for cell in row:
+                col_name = col_names[cell.column - 1]
+                cell.border = border
+                if col_name == df_xuat.columns[0]:
+                    cell.alignment = left
+                    cell.font = Font(bold=True, size=10)
+                elif col_name in COT_SO:
+                    cell.alignment = right
+                    cell.font = Font(size=10)
+                    if "%" in str(col_name):
+                        cell.number_format = "0.00%"
+                    elif col_name == "Số KH" or col_name in ["Tổng Tổ", "Tốt", "Khá", "TB", "Yếu"]:
+                        cell.number_format = "#,##0"
+                    else:
+                        cell.number_format = "#,##0.000"
+                else:
+                    cell.alignment = center
+                    cell.font = Font(size=10)
+
+        alt_fill = PatternFill("solid", fgColor="EEF4FB")
+        for i, row in enumerate(ws.iter_rows(min_row=2, max_row=ws.max_row), start=1):
+            if i % 2 == 0:
+                for cell in row:
+                    if not cell.fill or cell.fill.fgColor.rgb == "00000000":
+                        cell.fill = alt_fill
+
+        for col_idx, col_cells in enumerate(ws.columns, start=1):
+            max_len = max((len(str(c.value)) if c.value is not None else 0) for c in col_cells)
+            ws.column_dimensions[get_column_letter(col_idx)].width = min(max_len + 4, 30)
+
+        ws.freeze_panes = "B2"
+
+    return buf.getvalue()
+
+
 @st.cache_data(show_spinner=False)
 def _cache_kpi_tongquan(
     _df: pd.DataFrame,
@@ -846,7 +936,6 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                 "Khoanh (tỷ)", "TL Khoanh %",
                 "Nợ xấu (tỷ)", "TL NPL %",
                 "Lãi tồn (tỷ)",
-                "Nợ ĐH năm (tỷ)",
                 "DS Cho vay (tỷ)", "DS Thu nợ (tỷ)",
             ]
             cot_hien += [c for c in ["Tổng Tổ", "Tốt", "Khá", "TB", "Yếu"] if c in df_pgd.columns]
@@ -958,14 +1047,60 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                         lambda v, c=col: _fmt_cell(v, c)
                     )
 
-            nut_xuat_pdf(
-                df=df_export,
-                tieu_de="Thông tin tổng quát theo PGD",
-                username=username,
-                cols_tien=[],
-                prefix_file="TQPGD",
-                key="btn_pdf_tqpgd",
-            )
+            col_ex, col_pdf = st.columns(2)
+
+            with col_ex:
+                if st.button("📥 Xuất Excel", key="btn_excel_tqpgd", use_container_width=True):
+                    try:
+                        _ten_excel = ten_file_xuat("TQPGD")
+                        buf = _xuat_excel_tqpgd(df_show, _ten_excel)
+                        st.session_state["_excel_bytes_tqpgd"] = buf
+                        st.session_state["_excel_file_tqpgd"] = _ten_excel
+                    except Exception as e:
+                        st.error(f"❌ Lỗi xuất Excel: {e}")
+                if st.session_state.get("_excel_bytes_tqpgd"):
+                    st.download_button(
+                        "⬇ Tải Excel",
+                        data=st.session_state["_excel_bytes_tqpgd"],
+                        file_name=st.session_state.get("_excel_file_tqpgd", "TQPGD.xlsx"),
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        key="btn_excel_tqpgd_dl",
+                        use_container_width=True,
+                    )
+
+            with col_pdf:
+                _ss_tqpgd = "_pdf_bytes_tqpgd"
+                _ssf_tqpgd = "_pdf_file_tqpgd"
+                if st.button("📄 Xuất PDF", key="btn_pdf_tqpgd", type="secondary", use_container_width=True):
+                    try:
+                        from pdf_service import xuat_pdf
+
+                        with st.spinner("⏳ Đang tạo PDF..."):
+                            _bytes = xuat_pdf(
+                                df_export,
+                                "Thông tin tổng quát theo PGD",
+                                username,
+                                cols_tien=[],
+                                prefix_file="TQPGD",
+                            )
+                        st.session_state[_ss_tqpgd] = _bytes
+                        st.session_state[_ssf_tqpgd] = f"TQPGD_{datetime.now().strftime('%d%m%Y_%H%M')}.pdf"
+                    except Exception as _e:
+                        import traceback
+
+                        st.session_state[_ss_tqpgd] = None
+                        st.error(f"❌ Lỗi: {_e}")
+                        st.code(traceback.format_exc())
+
+                if st.session_state.get(_ss_tqpgd):
+                    st.download_button(
+                        label="⬇ Tải file PDF TQPGD",
+                        data=st.session_state[_ss_tqpgd],
+                        file_name=st.session_state.get(_ssf_tqpgd, "TQPGD.pdf"),
+                        mime="application/pdf",
+                        key="btn_pdf_tqpgd_dl",
+                        use_container_width=True,
+                    )
         st.divider()
         st.subheader("🔔 Hồ sơ đến hạn — Tổng hợp")
         if COT_NGAY_DH in df.columns:
@@ -1106,11 +1241,14 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                             co_loc = bool(loc_pgd or loc_ct or loc_xa)
 
                             if co_loc:
-                                df_xuat = tg[[nhom_col, "Số món vay", "Số KH", "Dư nợ"]].rename(
-                                    columns={nhom_col: nhom_chon}
-                                )
-                                tieu_de_pdf = f"Hồ sơ đến hạn {label} — Tổng hợp theo {nhom_chon}"
-                                ten_sheet   = f"TH_{nhom_chon[:10]}_{key_prefix}"
+                                df_xuat = tg[[nhom_col, "_mon", "_kh", "_no"]].rename(columns={
+                                    nhom_col: nhom_chon,
+                                    "_mon": "Số món vay",
+                                    "_kh":  "Số KH",
+                                    "_no":  "Dư nợ",
+                                })
+                                tieu_de_pdf   = f"Hồ sơ đến hạn {label} — Tổng hợp theo {nhom_chon}"
+                                ten_sheet     = f"TH_{nhom_chon[:10]}_{key_prefix}"
                                 cols_tien_pdf = ["Dư nợ"]
                             else:
                                 COLS_CHI_TIET = [
@@ -1154,3 +1292,24 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
 
             except Exception as e:
                 st.error(f"Lỗi xử lý đến hạn: {e}")
+
+            # ── Download PDF ngoài tabs ───────────────────────────────────
+            _pdf_keys = ["1_tháng", "3_tháng", "6_tháng", "Trong_năm"]
+            _co_pdf = any(
+                st.session_state.get(f"_pdf_bytes_pdf_den_han_{k}")
+                for k in _pdf_keys
+            )
+            if _co_pdf:
+                st.markdown("#### ⬇ Tải file PDF đã tạo")
+                _cols = st.columns(len(_pdf_keys))
+                for i, _k in enumerate(_pdf_keys):
+                    _dat = st.session_state.get(f"_pdf_bytes_pdf_den_han_{_k}")
+                    _sf  = st.session_state.get(f"_pdf_file_pdf_den_han_{_k}", f"{_k}.pdf")
+                    if _dat:
+                        _cols[i].download_button(
+                            label=f"⬇ {_k.replace('_', ' ')}",
+                            data=_dat,
+                            file_name=_sf,
+                            mime="application/pdf",
+                            key=f"dl_outside_{_k}",
+                        )

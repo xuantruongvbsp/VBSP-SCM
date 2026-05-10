@@ -49,8 +49,7 @@ CT_TW      = [(mk, ten) for mk, _, ten, nv, _ in CHUONG_TRINH_KHTD if nv == "TW"
 CT_DP      = [(mk, ten) for mk, _, ten, nv, _ in CHUONG_TRINH_KHTD if nv == "DP"]
 NGUON_VON_MA = {mk: nv for mk, _, _, nv, _ in CHUONG_TRINH_KHTD}
 MA_CT_BY_MAKEY = {mk: int(ma_ct) for mk, ma_ct, _, _, _ in CHUONG_TRINH_KHTD}
-MA_KEYS_CO_KHTD = {row[0] for row in CHUONG_TRINH_KHTD} \
-                    | {"3_TW_NHCSXH", "3_TW_NSNN", "3_DP_TINH", "3_DP_XA"}
+MA_KEYS_CO_KHTD = {row[0] for row in CHUONG_TRINH_KHTD}
 # Nhóm giao diện nhập thủ công KHTD Chi nhánh (theo ma_ct HSTD)
 KHTD_CN_NHOM_MA_CT: list[tuple[str, list[int]]] = [
     ("Hộ nghèo · Cận nghèo · Thoát nghèo", [1, 9, 19]),

@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 import streamlit as st
 import pandas as pd
 
+import db
 from config import *
 from utils import fmt_so, ten_file_xuat, hien_thi_dataframe_phan_trang, xuat_excel
 from services import xuat_bao_cao, ten_file_bao_cao
@@ -118,20 +119,195 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
 
         st.divider()
 
-        # Bộ lọc PGD dùng chung
-        if role in ("admin","manager","admin_cn","manager_cn") and COT_TEN_PGD in df.columns:
-            loc_pgd_bc = st.selectbox("📍 PGD",
-                ["Tất cả"]+sorted(df[COT_TEN_PGD].dropna().unique().tolist()),
-                key="bc_pgd_chung")
-        else:
-            loc_pgd_bc = pgd_user or "Tất cả"
-            st.markdown(f"📍 PGD: **{loc_pgd_bc}**")
+        if mang == "📊 Tổng hợp theo PGD":
+            col_f1, col_f2, col_f3 = st.columns(3)
 
-        df_base = df.copy()
-        if role in ("admin","manager","admin_cn","manager_cn") and loc_pgd_bc != "Tất cả":
-            df_base = df_base[df_base[COT_TEN_PGD] == loc_pgd_bc]
-        elif la_phan_he_pgd(role) and pgd_user:
-            df_base = df_base[df_base[COT_TEN_PGD] == loc_pgd_bc] if loc_pgd_bc != "Tất cả" else df_base
+            with col_f1:
+                if la_phan_he_pgd(role) and pgd_user:
+                    loc_pgd = pgd_user
+                    st.markdown(f"📍 PGD: **{loc_pgd}**")
+                else:
+                    ds_pgd = (
+                        sorted(df[COT_TEN_PGD].dropna().unique())
+                        if COT_TEN_PGD in df.columns
+                        else []
+                    )
+                    loc_pgd = st.selectbox(
+                        "📍 PGD",
+                        ["Tất cả"] + ds_pgd,
+                        key="bc_pc_pgd",
+                    )
+
+            with col_f2:
+                if loc_pgd != "Tất cả":
+                    ds_xa = (
+                        sorted(df[df[COT_TEN_PGD] == loc_pgd][COT_TEN_XA].dropna().unique())
+                        if COT_TEN_XA in df.columns and COT_TEN_PGD in df.columns
+                        else []
+                    )
+                else:
+                    ds_xa = (
+                        sorted(df[COT_TEN_XA].dropna().unique())
+                        if COT_TEN_XA in df.columns
+                        else []
+                    )
+                loc_xa = st.selectbox("🏘️ Xã", ["Tất cả"] + ds_xa, key="bc_pc_xa")
+
+            with col_f3:
+                ds_ct = []
+                if loc_pgd != "Tất cả":
+                    from data.pgd import pgd_slug
+
+                    ds_ct = db.doc_kv(f"ct_registry_{pgd_slug(loc_pgd)}") or []
+                if not ds_ct:
+                    ds_ct = (
+                        sorted(df[COT_TEN_CT].dropna().unique())
+                        if COT_TEN_CT in df.columns
+                        else []
+                    )
+                loc_ct = st.selectbox("📌 Chương trình", ["Tất cả"] + ds_ct, key="bc_pc_ct")
+
+            df_filtered = df.copy()
+            if loc_pgd != "Tất cả" and COT_TEN_PGD in df_filtered.columns:
+                df_filtered = df_filtered[df_filtered[COT_TEN_PGD] == loc_pgd]
+            if loc_xa != "Tất cả" and COT_TEN_XA in df_filtered.columns:
+                df_filtered = df_filtered[df_filtered[COT_TEN_XA] == loc_xa]
+            if loc_ct != "Tất cả" and COT_TEN_CT in df_filtered.columns:
+                df_filtered = df_filtered[df_filtered[COT_TEN_CT] == loc_ct]
+
+            df_base = df_filtered
+
+            COT_DU_NO_KHOANH = "Dư nợ khoanh"
+
+            _required_cols = [
+                COT_TEN_PGD,
+                COT_TEN_XA,
+                COT_TEN_CT,
+                COT_MA_KH,
+                COT_SO_KU,
+                COT_DU_NO_TH,
+                COT_DU_NO_QH,
+                COT_TONG_DU_NO,
+                COT_LAI_TON,
+            ]
+            _missing_cols = [c for c in _required_cols if c not in df_base.columns]
+            df_pdf = pd.DataFrame()
+            if not _missing_cols:
+                df_pdf_src = df_base.copy()
+                if COT_DU_NO_KHOANH not in df_pdf_src.columns:
+                    df_pdf_src[COT_DU_NO_KHOANH] = 0
+
+                df_pdf = (
+                    df_pdf_src.groupby([COT_TEN_PGD, COT_TEN_XA, COT_TEN_CT])
+                    .agg(
+                        **{
+                            "Số KH": (COT_MA_KH, "nunique"),
+                            "Số món": (COT_SO_KU, "nunique"),
+                            "Dư nợ TH": (COT_DU_NO_TH, "sum"),
+                            "Dư nợ QH": (COT_DU_NO_QH, "sum"),
+                            "Nợ khoanh": (COT_DU_NO_KHOANH, "sum"),
+                            "Tổng dư nợ": (COT_TONG_DU_NO, "sum"),
+                            "Lãi tồn": (COT_LAI_TON, "sum"),
+                        }
+                    )
+                    .reset_index()
+                )
+
+                df_pdf["TL Nợ xấu %"] = (
+                    (df_pdf["Dư nợ QH"] + df_pdf["Nợ khoanh"])
+                    / df_pdf["Tổng dư nợ"].replace(0, float("nan"))
+                    * 100
+                ).round(2).fillna(0)
+
+                COLS_PDF = [
+                    COT_TEN_PGD,
+                    COT_TEN_XA,
+                    COT_TEN_CT,
+                    "Số KH",
+                    "Số món",
+                    "Dư nợ TH",
+                    "Dư nợ QH",
+                    "Nợ khoanh",
+                    "Tổng dư nợ",
+                    "Lãi tồn",
+                    "TL Nợ xấu %",
+                ]
+                COLS_PDF = [c for c in COLS_PDF if c in df_pdf.columns]
+                df_pdf = df_pdf[COLS_PDF].sort_values([COT_TEN_PGD, COT_TEN_XA, COT_TEN_CT])
+
+            _ss_pdf = "_pdf_bytes_baocao_phancap"
+            _ssf_pdf = "_pdf_file_baocao_phancap"
+
+            if st.button("📄 Xuất PDF phân cấp", key="btn_pdf_bc_phancap", type="secondary"):
+                if _missing_cols:
+                    st.warning(f"⚠️ Thiếu cột dữ liệu để xuất PDF: {', '.join(_missing_cols)}")
+                elif df_pdf.empty:
+                    st.warning("⚠️ Không có dữ liệu để xuất.")
+                else:
+                    try:
+                        from pdf_service import xuat_pdf_group_header
+
+                        _phu = []
+                        if loc_pgd != "Tất cả":
+                            _phu.append(f"PGD: {loc_pgd}")
+                        if loc_xa != "Tất cả":
+                            _phu.append(f"Xã: {loc_xa}")
+                        if loc_ct != "Tất cả":
+                            _phu.append(f"CT: {loc_ct}")
+                        tieu_de_phu = "  |  ".join(_phu) if _phu else "Toàn Chi nhánh"
+
+                        with st.spinner("⏳ Đang tạo PDF..."):
+                            pdf_bytes = xuat_pdf_group_header(
+                                df=df_pdf,
+                                tieu_de="Báo cáo Tổng hợp Tín dụng — Phân cấp PGD > Xã > Chương trình",
+                                nhom_theo=COT_TEN_PGD,
+                                nguoi_xuat=username or "unknown",
+                                cols_tien=[
+                                    "Dư nợ TH",
+                                    "Dư nợ QH",
+                                    "Nợ khoanh",
+                                    "Tổng dư nợ",
+                                    "Lãi tồn",
+                                ],
+                                tieu_de_phu=tieu_de_phu,
+                            )
+                        st.session_state[_ss_pdf] = pdf_bytes
+                        st.session_state[_ssf_pdf] = ten_file_xuat("BC_PhanCap_PGD_Xa_CT")
+                        db.ghi_audit(
+                            username or "unknown",
+                            "xuat_pdf_bao_cao",
+                            f"PDF phân cấp — {tieu_de_phu}",
+                        )
+                    except Exception as _e:
+                        import traceback
+
+                        st.error(f"❌ Lỗi tạo PDF: {_e}")
+                        st.code(traceback.format_exc())
+
+            if st.session_state.get(_ss_pdf):
+                st.download_button(
+                    "⬇ Tải PDF phân cấp",
+                    data=st.session_state[_ss_pdf],
+                    file_name=st.session_state.get(_ssf_pdf, "BC_PhanCap.pdf"),
+                    mime="application/pdf",
+                    key="btn_pdf_bc_phancap_dl",
+                )
+        else:
+            if role in ("admin", "manager", "admin_cn", "manager_cn") and COT_TEN_PGD in df.columns:
+                loc_pgd_bc = st.selectbox(
+                    "📍 PGD",
+                    ["Tất cả"] + sorted(df[COT_TEN_PGD].dropna().unique().tolist()),
+                    key="bc_pgd_chung",
+                )
+            else:
+                loc_pgd_bc = pgd_user or "Tất cả"
+                st.markdown(f"📍 PGD: **{loc_pgd_bc}**")
+
+            df_base = df.copy()
+            if role in ("admin", "manager", "admin_cn", "manager_cn") and loc_pgd_bc != "Tất cả":
+                df_base = df_base[df_base[COT_TEN_PGD] == loc_pgd_bc]
+            elif la_phan_he_pgd(role) and pgd_user:
+                df_base = df_base[df_base[COT_TEN_PGD] == loc_pgd_bc] if loc_pgd_bc != "Tất cả" else df_base
 
         # ══════════════════════════════
         # MẢNG 1: TỔNG HỢP
@@ -526,4 +702,3 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                             prefix_file="BC_CT",
                             key="pdf_bc_ct",
                         )
-

@@ -822,5 +822,8 @@ def render(**kwargs):
 
     tabs_con = st.tabs(ten_tabs)
     for i, tab_c in enumerate(tabs_con):
-        with tab_c:
+        if ten_tabs[i] == "📊 Tổng quan":
             renderers[i](tab_c)
+        else:
+            with tab_c:
+                renderers[i](tab_c)

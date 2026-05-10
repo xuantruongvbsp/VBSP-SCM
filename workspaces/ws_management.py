@@ -751,7 +751,7 @@ def render(**kwargs):
 
     # ── Định nghĩa nhóm tab ─────────────────────────────────────────────
     nhom_giam_sat = [
-        ("📊 Tổng quan", lambda tab: tab_tongquan.render(tab, **kwargs)),
+        ("📊 Thông tin chung", lambda tab: tab_tongquan.render(tab, **kwargs)),
         ("🚨 Cảnh báo nợ", lambda tab: _render_canh_bao_no(
             df_full, ds_pgd_all, role, kwargs.get("username", "unknown"))),
     ]
@@ -822,7 +822,7 @@ def render(**kwargs):
 
     tabs_con = st.tabs(ten_tabs)
     for i, tab_c in enumerate(tabs_con):
-        if ten_tabs[i] == "📊 Tổng quan":
+        if ten_tabs[i] == "📊 Thông tin chung":
             renderers[i](tab_c)
         else:
             with tab_c:

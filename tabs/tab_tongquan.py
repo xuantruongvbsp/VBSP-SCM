@@ -1073,7 +1073,6 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                 _ssf_tqpgd = "_pdf_file_tqpgd"
                 if st.button("📄 Xuất PDF", key="btn_pdf_tqpgd", type="secondary", use_container_width=True):
                     try:
-                        from pdf_service import xuat_pdf
 
                         with st.spinner("⏳ Đang tạo PDF..."):
                             _bytes = xuat_pdf(

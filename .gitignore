@@ -11,6 +11,7 @@ env/
 
 # Parquet cache
 cache/*.parquet
+cache/
 
 # Dữ liệu upload của PGD — không commit
 pgd_data/
@@ -34,3 +35,10 @@ tmp_*.txt
 .idea/
 .DS_Store
 Thumbs.db
+
+# Trae AI
+.trae/
+
+# File Excel tạm khi mở
+~$*.xlsx
+~$*.docx

@@ -1,6 +1,6 @@
 # VBSP-SCM — Hệ thống Quản trị Tín dụng Nội bộ
 
-Hệ thống nội bộ cho **Ngân hàng Chính sách Xã hội Chi nhánh Đồng Nai** (đã sáp nhập Bình Phước 2025).
+Hệ thống nội bộ cho **Ngân hàng Chính sách Xã hội Chi nhánh Đồng Nai** .
 
 - **Stack:** Streamlit + Python + SQLite
 - **Người dùng:** ~20 users, 4 vai trò

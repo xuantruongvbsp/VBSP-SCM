@@ -416,9 +416,13 @@ def _hien_thi_nqh_tab(df_kh: pd.DataFrame, username: str):
     )
     hien_thi_dataframe_phan_trang(df_nqh_chi, key="nqh_chi", height=360)
 
-def _render_dgd_to_tkvv(tab_parent, **kw):
+def _render_dgd_to_tkvv(tab_parent=None, **kw):
     """Sub-tab Điểm GD & Tổ TK&VV — nested tabs."""
-    with tab_parent:
+    if tab_parent is not None:
+        ctx = tab_parent
+    else:
+        ctx = st
+    with ctx:
         _sub1, _sub2 = st.tabs(["📍 Điểm Giao Dịch", "🏘️ Tổ TK&VV"])
         tab_quan_ly_dgd.render(_sub1, **kw)
         tab_cdtotkvv.render(_sub2, **dict(kw, cdto_mode="cn"))
@@ -829,82 +833,81 @@ def render(**kwargs):
     st.title("📋 Phòng KH-NV")
     st.caption("Giám sát chỉ tiêu · Cân đối vốn · Quản lý NQH · GQVL · Quản lý CBTD")
 
-    # ── Định nghĩa nhóm tab ─────────────────────────────────────────────
-    nhom_giam_sat = [
-        ("📊 Thông tin chung", lambda tab: tab_tongquan.render(tab, **kwargs)),
-        ("📅 Tiến độ", lambda tab: tab_tien_do.render(tab, **kwargs)),
-        ("🚨 Cảnh báo nợ", lambda tab: _render_canh_bao_no(
-            df_full, ds_pgd_all, role, kwargs.get("username", "unknown"))),
+    # ── BƯỚC 1: Xây danh sách tất cả menu items ───────────────────────────
+    ALL_ITEMS = [
+        {"group": "Tổng quan",     "label": "Thông tin chung", "icon": "chart-bar",      "fn": lambda: tab_tongquan.render(None, **kwargs)},
+        {"group": "Tổng quan",     "label": "Tiến độ",         "icon": "calendar",       "fn": lambda: tab_tien_do.render(None, **kwargs)},
+        {"group": "Tổng quan",     "label": "Cảnh báo nợ",     "icon": "alert-triangle", "fn": lambda: _render_canh_bao_no(df_full, ds_pgd_all, role, kwargs.get("username", "unknown"))},
+        {"group": "Kiểm soát",     "label": "Kiểm soát CN",    "icon": "search",         "fn": lambda: tab_kiem_soat.render_tab(df_full, role, kwargs.get("username", "unknown"))},
+        {"group": "Kiểm soát",     "label": "Nợ rủi ro QĐ62",  "icon": "credit-card",    "fn": lambda: tab_qd62.render(mode="cn")},
+        {"group": "Kiểm soát",     "label": "Quản lý CBTD",    "icon": "user",           "fn": lambda: tab_cbtd.render(None, **kwargs)},
+        {"group": "Kế hoạch",      "label": "KH Tín dụng Năm", "icon": "file-text",      "fn": lambda: tab_khtd.render(None, **dict(kwargs, khtd_mode="cn"))},
+        {"group": "Kế hoạch",      "label": "Giao KH theo Đợt", "icon": "upload",         "fn": lambda: tab_khtd_giao_dc.render(None, **kwargs)},
+        {"group": "Kế hoạch",      "label": "KH vs Thực hiện", "icon": "chart-line",     "fn": lambda: tab_kehoach.render(None, **kwargs)},
+        {"group": "Báo cáo",       "label": "Báo cáo chi tiết", "icon": "file",           "fn": lambda: tab_baocao.render(None, **kwargs)},
+        {"group": "Báo cáo",       "label": "Điện Báo",        "icon": "antenna",        "fn": lambda: tab_candoi.render(None, **kwargs)},
+        {"group": "Báo cáo",       "label": "Điểm GD & Tổ TK&VV", "icon": "map-pin",      "fn": lambda: _render_dgd_to_tkvv(None, **kwargs)},
+        {"group": "Hành chính",    "label": "Ban Đại Diện",    "icon": "building",       "fn": lambda: tab_ban_dai_dien.render(None, cap="tinh", **kwargs)},
+        {"group": "Hành chính",    "label": "Ủy thác",         "icon": "handshake",      "fn": lambda: tab_uy_thac.render(None, **kwargs)},
+        {"group": "Hành chính",    "label": "Nhiệm vụ",        "icon": "check",          "fn": lambda: tab_nhiem_vu.render(None, **kwargs)},
     ]
-    nhom_kiem_soat = [
-        ("🔍 Kiểm soát CN", lambda tab: tab_kiem_soat.render_tab(
-            df_full, role, kwargs.get("username", "unknown"))),
-        ("💳 Nợ rủi ro QĐ62", lambda tab: tab_qd62.render(mode="cn")),
-        ("👔 Quản lý CBTD", lambda tab: tab_cbtd.render(tab, **kwargs)),
-    ]
-    nhom_ke_hoach = [
-        ("🗓️ KH Tín dụng Năm", lambda tab: tab_khtd.render(tab, **dict(kwargs, khtd_mode="cn"))),
-        # ("📋 KH GQVL", lambda tab: render_kh_gqvl(role=role)),  # Đã gộp vào tab KHTD CN
-        ("📤 Giao KH theo Đợt", lambda tab: tab_khtd_giao_dc.render(tab, **kwargs)),
-        ("🎯 KH vs Thực hiện", lambda tab: tab_kehoach.render(tab, **kwargs)),
-    ]
-    nhom_bao_cao = [
-        ("📈 Báo cáo chi tiết", lambda tab: tab_baocao.render(tab, **kwargs)),
-        ("📡 Điện Báo", lambda tab: tab_candoi.render(tab, **kwargs)),
-        ("📍 Điểm GD & Tổ TK&VV", lambda tab: _render_dgd_to_tkvv(tab, **kwargs)),
-    ]
-    nhom_hanh_chinh = [
-        ("🏛️ Ban Đại Diện", lambda tab: tab_ban_dai_dien.render(tab, cap="tinh", **kwargs)),
-        ("🤝 Ủy thác", lambda tab: tab_uy_thac.render(tab, **kwargs)),
-        ("✅ Nhiệm vụ", lambda tab: tab_nhiem_vu.render(tab, **kwargs)),
-    ]
+
+    # Thêm theo điều kiện (giống logic cũ)
     if can_upload:
-        nhom_hanh_chinh.append(
-            ("📁 Quản lý Template", lambda tab: _render_quan_ly_template(df_full))
-        )
-    # Chỉ admin/manager CN mới thấy tab quản lý Mã NĐT ĐP
+        ALL_ITEMS.append({"group": "Hành chính", "label": "Quản lý Template", "icon": "template", "fn": lambda: _render_quan_ly_template(df_full)})
     if role in ("admin", "admin_cn", "manager", "manager_cn"):
-        nhom_hanh_chinh.append(
-            ("🏦 Mã NĐT ĐP", lambda tab: _render_ndt_dp(role, kwargs.get("username", "unknown")))
-        )
+        ALL_ITEMS.append({"group": "Hành chính", "label": "Mã NĐT ĐP", "icon": "building-bank", "fn": lambda: _render_ndt_dp(role, kwargs.get("username", "unknown"))})
     if role in ("admin", "admin_cn"):
-        nhom_hanh_chinh.append(
-            ("📋 Audit Log", lambda tab: tab_audit_log.render(tab, **kwargs))
+        ALL_ITEMS.append({"group": "Hành chính", "label": "Audit Log", "icon": "list", "fn": lambda: tab_audit_log.render(None, **kwargs)})
+    ALL_ITEMS.append({"group": "Hành chính", "label": "Upload KH-NV", "icon": "upload", "fn": lambda: tab_upload_khnv.render(None, **kwargs)})
+
+    # ── BƯỚC 2: Quản lý state menu item đang chọn ─────────────────────────
+    if "ws_mgmt_menu" not in st.session_state:
+        st.session_state["ws_mgmt_menu"] = ALL_ITEMS[0]["label"]
+
+    valid_labels = [x["label"] for x in ALL_ITEMS]
+    if st.session_state["ws_mgmt_menu"] not in valid_labels:
+        st.session_state["ws_mgmt_menu"] = ALL_ITEMS[0]["label"]
+
+    # ── BƯỚC 3: Render layout 2 cột ───────────────────────────────────────
+    col_sidebar, col_content = st.columns([1, 4], gap="small")
+
+    with col_sidebar:
+        current_group = None
+        for item in ALL_ITEMS:
+            # In header nhóm khi đổi nhóm mới
+            if item["group"] != current_group:
+                current_group = item["group"]
+                st.markdown(
+                    f"<p style='font-size:10px;font-weight:500;color:var(--color-text-tertiary);"
+                    f"text-transform:uppercase;letter-spacing:0.05em;"
+                    f"padding:10px 0 2px 4px;margin:0'>{current_group}</p>",
+                    unsafe_allow_html=True
+                )
+
+            is_active = st.session_state["ws_mgmt_menu"] == item["label"]
+            btn_style = (
+                "background:#E6F1FB;color:#185FA5;border-radius:6px;"
+                "font-weight:500;" if is_active else
+                "background:transparent;color:inherit;"
+            )
+            if st.button(
+                item["label"],
+                key=f"menu_{item['label']}",
+                use_container_width=True,
+                help=item["label"],
+            ):
+                st.session_state["ws_mgmt_menu"] = item["label"]
+                st.rerun()
+
+    # ── BƯỚC 4: Render nội dung bên phải ──────────────────────────────────
+    with col_content:
+        # Tìm item đang active và gọi hàm render của nó
+        active_item = next(
+            (x for x in ALL_ITEMS if x["label"] == st.session_state["ws_mgmt_menu"]),
+            ALL_ITEMS[0]
         )
-    nhom_hanh_chinh.append(
-        ("📤 Upload KH-NV", lambda tab: tab_upload_khnv.render(tab, **kwargs))
-    )
-
-    CAC_NHOM = {
-        "giam_sat":   {"label": "📊 Tổng quan",   "tabs": nhom_giam_sat},
-        "kiem_soat":  {"label": "🔍 Kiểm soát & Rủi ro", "tabs": nhom_kiem_soat},
-        "ke_hoach":   {"label": "🎯 Kế hoạch",    "tabs": nhom_ke_hoach},
-        "bao_cao":    {"label": "📈 Báo cáo & Cân đối", "tabs": nhom_bao_cao},
-        "hanh_chinh": {"label": "🏛️ Hành chính",  "tabs": nhom_hanh_chinh},
-    }
-
-    # ── Render ───────────────────────────────────────────────────────────
-    ds_key = list(CAC_NHOM.keys())
-    ds_label = [CAC_NHOM[k]["label"] for k in ds_key]
-
-    nhom_chon = st.radio(
-        "Chọn nhóm công việc",
-        ds_label,
-        horizontal=True,
-        key="ws_mgmt_nhom",
-    )
-
-    idx_chon = ds_label.index(nhom_chon)
-    key_chon = ds_key[idx_chon]
-    tabs_info = CAC_NHOM[key_chon]["tabs"]
-
-    ten_tabs = [t[0] for t in tabs_info]
-    renderers = [t[1] for t in tabs_info]
-
-    tabs_con = st.tabs(ten_tabs)
-    for i, tab_c in enumerate(tabs_con):
-        if ten_tabs[i] == "📊 Thông tin chung":
-            renderers[i](tab_c)
-        else:
-            with tab_c:
-                renderers[i](tab_c)
+        try:
+            active_item["fn"]()
+        except Exception as e:
+            st.error(f"Lỗi render: {e}")

@@ -1,5 +1,8 @@
 # CHANGELOG
 
+## [2026-05-12] — Thêm hàm _xuat_pdf_nhiem_vu() với tiêu đề đầy đủ, font Times New Roman
+- `tabs/tab_nhiem_vu.py` dòng ~555-661 — Thêm hàm _xuat_pdf_nhiem_vu() tạo PDF báo cáo "BÁO CÁO TÌNH HÌNH THỰC HIỆN NHIỆM VỤ" với header ngân hàng, font Times New Roman, bảng zebra, footer tự động
+
 ## [2026-05-12] — Chuyển navigation menu từ col_sidebar sang st.sidebar thật
 - `workspaces/ws_management.py` dòng ~838-935 — Xóa `st.columns([1, 4])` + `with col_sidebar` + `with col_content`, thay bằng `with st.sidebar` và render nội dung trực tiếp
 - `workspaces/ws_management.py` dòng ~842-865 — Cập nhật tất cả lambda trong ALL_ITEMS: bỏ `c=col_content`, dùng `st` làm đối số render

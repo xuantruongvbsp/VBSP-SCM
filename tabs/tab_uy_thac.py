@@ -17,7 +17,7 @@ from config import (
     COT_TEN_XA, COT_TEN_THON, COT_MUC_VAY,
     TEN_CHI_NHANH_HIEN_THI,
 )
-from utils import fmt, fmt_so, xuat_excel
+from utils import fmt, fmt_bang_ty, fmt_so, xuat_excel
 from services.template_service import (
     co_template, dien_template, nut_tai_word_va_pdf, docx_bytes_to_pdf,
     TMPL_MAU06, TMPL_MAU06A, TMPL_MAU15, TMPL_MAU16, TMPL_KH_KT

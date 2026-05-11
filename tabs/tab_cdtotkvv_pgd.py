@@ -28,7 +28,7 @@ from data.cdtotkvv import (
 )
 from data.core import ts_file
 from data.pgd import duong_dan_pgd, luu_file_pgd_voi_lich_su
-from utils import fmt, fmt_so, hien_thi_dataframe_phan_trang, ten_file_xuat, xuat_excel
+from utils import fmt, fmt_bang_ty, fmt_so, hien_thi_dataframe_phan_trang, ten_file_xuat, xuat_excel
 
 if TYPE_CHECKING:
     from streamlit.delta_generator import DeltaGenerator

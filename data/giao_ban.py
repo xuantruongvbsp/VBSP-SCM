@@ -22,6 +22,7 @@ from config import (
     COT_LAI_TON,
     COT_LAI_TON_QH,
 )
+from utils import fmt
 
 COT_DU_NO_KHOANH = "Dư nợ khoanh"
 COT_NGAY_DH_GH = "Ngày ĐH theo Gia hạn"
@@ -78,8 +79,6 @@ def tinh_so_lieu_van_xuoi(
         chenh_lech_dn = tong_dn - dn_bl
         pct_dau_nam = chenh_lech_dn / dn_bl * 100 if dn_bl > 0 else 0.0
         tang_giam_dau_nam = "tăng" if chenh_lech_dn >= 0 else "giảm"
-
-    from utils import fmt
 
     return {
         "{{tong_du_no}}": fmt(tong_dn),
@@ -631,7 +630,8 @@ def xuat_thong_bao_ket_luan_giao_ban(
 
     p3 = cl.add_paragraph()
     p3.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    r3 = p3.add_run("Số:       /TB-KLGB")
+    so_vb_hien_thi = so_van_ban.strip() if so_van_ban.strip() else "      "
+    r3 = p3.add_run(f"Số: {so_vb_hien_thi}/TB-KLGB")
     r3.font.size = Pt(12)
     r3.font.name = "Times New Roman"
     r3.font.color.rgb = RGBColor(0, 0, 0)
@@ -751,6 +751,32 @@ def xuat_thong_bao_ket_luan_giao_ban(
             tang_giam = tong_dn - (baseline / 1e6)
             van_xuoi += f" (tăng/giảm {abs(tang_giam):,.0f} triệu so với cùng kỳ)"
     _p(van_xuoi, size=13, align=WD_ALIGN_PARAGRAPH.JUSTIFY, indent_cm=1.0)
+
+    tien_gui = pd.to_numeric(
+        df_xa.get(COT_TIEN_GUI, pd.Series(dtype=float)), errors="coerce"
+    ).fillna(0).sum() / 1e6
+    so_kh_gui = (
+        df_xa[df_xa.get(COT_TIEN_GUI, pd.Series(0)) > 0][COT_MA_KH].nunique()
+        if COT_TIEN_GUI in df_xa.columns else 0
+    )
+    ty_le_gui = so_kh_gui / so_kh * 100 if so_kh > 0 else 0.0
+    van_xuoi_tg = (
+        f"Tổng số dư tiền gửi tiết kiệm đạt {fmt(tien_gui * 1e6)} triệu đồng. "
+        f"Tỷ lệ hộ vay có tham gia gửi tiết kiệm đạt {ty_le_gui:.0f}%."
+    )
+    _p(van_xuoi_tg, size=13, align=WD_ALIGN_PARAGRAPH.JUSTIFY, indent_cm=1.0)
+
+    from data import danh_dau_khong_hd
+    df_m = danh_dau_khong_hd(df_xa)
+    so_mon_3m = int(df_m[COT_MON_3M].sum()) if COT_MON_3M in df_m.columns else 0
+    if so_mon_3m > 0:
+        van_xuoi_3m = (
+            f"Toàn xã hiện còn {so_mon_3m} món vay từ 03 tháng trở lên "
+            f"không hoạt động, tiềm ẩn nguy cơ phát sinh nợ quá hạn, "
+            f"cần tiếp tục theo dõi và xử lý kịp thời."
+        )
+        _p(van_xuoi_3m, size=13, align=WD_ALIGN_PARAGRAPH.JUSTIFY, indent_cm=1.0)
+
     _p(
         "Đơn vị tính: tổ, khách hàng, triệu đồng, %",
         italic=True,
@@ -796,7 +822,7 @@ def xuat_thong_bao_ket_luan_giao_ban(
         space_after=3,
     )
 
-    tao_bang_ke_hoach(doc, df_xa, giai_ngan_input=None)
+    tao_bang_ke_hoach(doc, df_xa, giai_ngan_input=giai_ngan_input)
     _patch_font(doc.tables[-1], size=11)
 
     _p(
@@ -890,7 +916,8 @@ def xuat_thong_bao_ket_luan_giao_ban(
 
     p_ht = fr.add_paragraph()
     p_ht.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    r_ht = p_ht.add_run("…………………………………")
+    ten_ky_hien_thi = ten_nguoi_ky.strip() if ten_nguoi_ky.strip() else "…………………………………"
+    r_ht = p_ht.add_run(ten_ky_hien_thi)
     r_ht.font.size = Pt(11)
     r_ht.font.name = "Times New Roman"
     r_ht.font.color.rgb = RGBColor(0, 0, 0)

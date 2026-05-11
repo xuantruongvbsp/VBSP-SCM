@@ -558,12 +558,12 @@ def _render_theo_dvut(df: pd.DataFrame) -> None:
     st.divider()
     hien = t.rename(columns={
         COT_DVUT: "Hội đoàn thể", "so_to": "Số Tổ",
-        "so_kh": "Số KH", "tong_dn": "Dư nợ (tr.đ)",
-        "nqh": "NQH (tr.đ)", "lai_ton": "Lãi tồn (tr.đ)",
+        "so_kh": "Số KH", "tong_dn": "Dư nợ (tỷ)",
+        "nqh": "NQH (tỷ)", "lai_ton": "Lãi tồn (tỷ)",
     })
-    for col in ["Dư nợ (tr.đ)", "NQH (tr.đ)", "Lãi tồn (tr.đ)"]:
+    for col in ["Dư nợ (tỷ)", "NQH (tỷ)", "Lãi tồn (tỷ)"]:
         if col in hien.columns:
-            hien[col] = hien[col].apply(fmt)
+            hien[col] = hien[col].apply(fmt_bang_ty)
     st.dataframe(hien, use_container_width=True, hide_index=True)
 
 

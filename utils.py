@@ -242,6 +242,29 @@ def fmt_ty(x):
         return "—"
 
 
+def fmt_bang_ty(x, so_le: int = 3) -> str:
+    """
+    Format số tiền (đồng) → tỷ đồng, CỐ ĐỊNH đơn vị tỷ.
+    Dùng trong cột bảng để đảm bảo đồng nhất đơn vị.
+    Ví dụ:
+        28_100_000_000 → "28,100"
+        190_000_000    → "0,190"
+        14_000_000     → "0,014"
+        0              → "—"
+    Tham số so_le: số chữ số thập phân (mặc định 3).
+    Header cột phải ghi rõ "(tỷ đồng)" hoặc "(tỷ)".
+    """
+    try:
+        x = float(x)
+        if x == 0:
+            return "—"
+        ty = x / 1e9
+        s = f"{ty:,.{so_le}f}".replace(",", "X").replace(".", ",").replace("X", ".")
+        return s
+    except Exception:
+        return "—"
+
+
 def fmt_cl(x):
     """Chênh lệch tỷ có dấu + / -."""
     try:

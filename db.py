@@ -112,6 +112,36 @@ def init_db():
                 note        TEXT
             );
             CREATE INDEX IF NOT EXISTS idx_kv_history_key ON kv_history(key);
+            DROP TABLE IF EXISTS tien_do_ketqua;
+            DROP TABLE IF EXISTS tien_do_task;
+            CREATE TABLE IF NOT EXISTS tien_do_task (
+                id            INTEGER PRIMARY KEY AUTOINCREMENT,
+                tieu_de       TEXT NOT NULL,
+                mo_ta         TEXT,
+                ngay_deadline TEXT NOT NULL,
+                ds_pgd        TEXT NOT NULL DEFAULT '[]',
+                loai          TEXT NOT NULL DEFAULT 'chung',
+                uu_tien       TEXT NOT NULL DEFAULT 'binh_thuong',
+                nguoi_tao     TEXT NOT NULL,
+                ngay_tao      TEXT NOT NULL,
+                trang_thai    TEXT NOT NULL DEFAULT 'dang_theo_doi',
+                ghi_chu       TEXT
+            );
+            CREATE INDEX IF NOT EXISTS idx_tiendo_deadline ON tien_do_task(ngay_deadline);
+            CREATE TABLE IF NOT EXISTS tien_do_ketqua (
+                id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                task_id         INTEGER NOT NULL REFERENCES tien_do_task(id) ON DELETE CASCADE,
+                pgd             TEXT NOT NULL,
+                ten_xa          TEXT NOT NULL,
+                trang_thai      TEXT NOT NULL DEFAULT 'chua_thuc_hien',
+                ngay_hoan_thanh TEXT,
+                ghi_chu         TEXT,
+                nguoi_nhap      TEXT,
+                ngay_nhap       TEXT,
+                UNIQUE(task_id, ten_xa)
+            );
+            CREATE INDEX IF NOT EXISTS idx_tiendo_kq_task ON tien_do_ketqua(task_id);
+            CREATE INDEX IF NOT EXISTS idx_tiendo_kq_pgd ON tien_do_ketqua(task_id, pgd);
         """)
         conn.commit()
 

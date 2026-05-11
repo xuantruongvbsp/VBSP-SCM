@@ -1,5 +1,10 @@
 # CHANGELOG — VBSP-SCM
 
+## [2026-05-12] — Tiến độ: preview xã khi tạo task + sheet Tổng hợp + session_state cho download
+- `tabs/tab_tien_do.py` dòng ~259 — `_render_tao_task()`: thêm expander preview xã nhóm theo PGD (ds_preview → PGD_XA_MAP → st.write join)
+- `tabs/tab_tien_do.py` dòng ~413 — `_render_xuat()`: thêm sheet 0 "Tổng hợp" (STT, Đầu việc, Loại, Deadline, Số PGD, Tổng xã, Đã hoàn thành, Trễ hạn, Tỷ lệ HT%)
+- `tabs/tab_tien_do.py` dòng ~413 — `_render_xuat()`: dùng session_state `_td_xuat_excel` lưu bytes → download_button không mất sau rerun, thêm nút ✕ tạo lại
+
 ## [2026-05-11] — Tích hợp tab Tiến độ vào ws_management + ws_executive; fix PDF đơn vị sai
 - `pdf_service.py` dòng ~823 — `nut_xuat_pdf()`: lưu dict `{"data", "filename"}` vào session_state, render download_button khi có key, thêm nút "✕" xoá để tạo lại PDF
 - `workspaces/ws_management.py` dòng ~756 — fix emoji lỗi (�→📅, �🚨→🚨) trong `nhom_giam_sat`

@@ -441,11 +441,35 @@ def _render_ndt_dp(role: str, username: str) -> None:
     # Hiển thị bảng hiện tại
     if ds:
         for i, item in enumerate(ds):
-            c1, c2, c3 = st.columns([3, 4, 1])
+            c1, c2, c3, c4 = st.columns([3, 4, 1, 1])
             c1.code(item["ma"])
-            c2.text(item.get("ghi_chu", ""))
+            edit_key = f"edit_ndt_{i}"
+            if st.session_state.get(edit_key) and can_edit:
+                ghi_chu_moi = c2.text_input(
+                    "Ghi chú",
+                    value=item.get("ghi_chu", "") or "",
+                    key=f"ndt_note_{i}",
+                    label_visibility="collapsed",
+                )
+                if c3.button("💾", key=f"luu_ndt_{i}", help="Lưu"):
+                    ghi_chu_cu = item.get("ghi_chu", "") or ""
+                    ghi_chu_moi = (ghi_chu_moi or "").strip()
+                    if ghi_chu_moi != ghi_chu_cu:
+                        ds_moi = [dict(x) for x in ds]
+                        ds_moi[i]["ghi_chu"] = ghi_chu_moi
+                        ghi_kv("ndt_dp_list", ds_moi, username)
+                        ghi_audit(username, "sua_ndt_dp",
+                                  f"Sửa mã {item['ma']}: {ghi_chu_cu} → {ghi_chu_moi}")
+                        st.cache_data.clear()
+                    st.session_state.pop(edit_key, None)
+                    st.rerun()
+            else:
+                c2.text(item.get("ghi_chu", ""))
             if can_edit:
-                if c3.button("🗑️", key=f"xoa_ndt_{i}",
+                if c3.button("✏️", key=f"sua_ndt_{i}", help="Sửa ghi chú"):
+                    st.session_state[edit_key] = True
+                    st.rerun()
+                if c4.button("🗑️", key=f"xoa_ndt_{i}",
                              disabled=(len(ds) <= 1),
                              help="Không thể xóa mã duy nhất"):
                     ds_moi = [x for j, x in enumerate(ds) if j != i]
@@ -459,37 +483,92 @@ def _render_ndt_dp(role: str, username: str) -> None:
 
     if not can_edit:
         st.caption("⚠️ Chỉ admin mới có thể thêm/xóa.")
-        return
 
-    # Form thêm mới
+    with st.expander("📊 Xem tác động lên dữ liệu GQVL hiện tại", expanded=False):
+        try:
+            from pathlib import Path
+            from config import CACHE_DIR, COT_MA_NDT
+
+            gqvl_path = Path(CACHE_DIR) / "gqvl.parquet"
+            if not gqvl_path.exists():
+                st.info("Chưa có dữ liệu GQVL. Upload file để xem tác động.")
+            else:
+                df_gqvl = pd.read_parquet(gqvl_path)
+                if ("Nguồn vốn" not in df_gqvl.columns) or (COT_MA_NDT not in df_gqvl.columns):
+                    st.warning("File GQVL không có đủ cột để phân tích.")
+                else:
+                    df_dp = df_gqvl[df_gqvl["Nguồn vốn"] == "ĐP"].copy()
+                    ma_ndt_str = df_dp[COT_MA_NDT].astype(str).str.strip()
+                    ndt_list = [x.get("ma", "") for x in (ds or [])]
+                    mask_cap_tinh = ma_ndt_str.isin(ndt_list)
+
+                    p1, p2, p3 = st.columns(3)
+                    p1.metric("Tổng món ĐP", fmt_so(len(df_dp)))
+                    p2.metric("→ Cấp tỉnh 🏛️", fmt_so(int(mask_cap_tinh.sum())))
+                    p3.metric("→ Cấp xã/khác 🏘️", fmt_so(int((~mask_cap_tinh).sum())))
+
+                    df_preview = (
+                        df_dp.assign(
+                            _ma_label=ma_ndt_str.where(mask_cap_tinh, "Cấp xã/khác"),
+                        )
+                        .groupby("_ma_label")
+                        .size()
+                        .reset_index(name="Số món")
+                        .rename(columns={"_ma_label": "Mã NĐT / Nhóm"})
+                    )
+                    ghi_chu_map = {x.get("ma", ""): x.get("ghi_chu", "") for x in (ds or [])}
+                    df_preview["Ghi chú"] = df_preview["Mã NĐT / Nhóm"].map(
+                        lambda m: ghi_chu_map.get(m, "")
+                    )
+                    st.dataframe(df_preview, hide_index=True, use_container_width=True)
+        except Exception as e:
+            st.warning(f"Không thể phân tích tác động GQVL: {e}")
+
+    if can_edit:
+        st.divider()
+        st.markdown("##### ➕ Thêm mã mới")
+        with st.form("form_them_ndt", clear_on_submit=True):
+            ma_moi = st.text_input(
+                "Mã NĐT đầy đủ",
+                placeholder="VD: INV0802140002662",
+                help="Lấy chính xác từ cột 'Mã nhà đầu tư' trong file GQVL"
+            )
+            ghi_chu_moi = st.text_input(
+                "Ghi chú",
+                placeholder="VD: UBND tỉnh Đồng Nai"
+            )
+            submitted = st.form_submit_button("➕ Thêm", type="primary")
+
+        if submitted:
+            ma_moi = ma_moi.strip()
+            if not ma_moi:
+                st.error("Vui lòng nhập mã NĐT.")
+            elif any(x["ma"] == ma_moi for x in ds):
+                st.warning(f"Mã {ma_moi} đã có trong danh sách.")
+            else:
+                ds_moi = ds + [{"ma": ma_moi, "ghi_chu": ghi_chu_moi.strip()}]
+                ghi_kv("ndt_dp_list", ds_moi, username)
+                ghi_audit(username, "them_ndt_dp",
+                          f"Thêm mã {ma_moi} — {ghi_chu_moi}")
+                st.cache_data.clear()
+                st.success(f"✅ Đã thêm mã {ma_moi}")
+                st.rerun()
+
     st.divider()
-    st.markdown("##### ➕ Thêm mã mới")
-    with st.form("form_them_ndt", clear_on_submit=True):
-        ma_moi = st.text_input(
-            "Mã NĐT đầy đủ",
-            placeholder="VD: INV0802140002662",
-            help="Lấy chính xác từ cột 'Mã nhà đầu tư' trong file GQVL"
-        )
-        ghi_chu_moi = st.text_input(
-            "Ghi chú",
-            placeholder="VD: UBND tỉnh Đồng Nai"
-        )
-        submitted = st.form_submit_button("➕ Thêm", type="primary")
+    if st.button("📥 Xuất danh sách Excel", key="export_ndt_dp"):
+        import io
 
-    if submitted:
-        ma_moi = ma_moi.strip()
-        if not ma_moi:
-            st.error("Vui lòng nhập mã NĐT.")
-        elif any(x["ma"] == ma_moi for x in ds):
-            st.warning(f"Mã {ma_moi} đã có trong danh sách.")
-        else:
-            ds_moi = ds + [{"ma": ma_moi, "ghi_chu": ghi_chu_moi.strip()}]
-            ghi_kv("ndt_dp_list", ds_moi, username)
-            ghi_audit(username, "them_ndt_dp",
-                      f"Thêm mã {ma_moi} — {ghi_chu_moi}")
-            st.cache_data.clear()
-            st.success(f"✅ Đã thêm mã {ma_moi}")
-            st.rerun()
+        df_export = pd.DataFrame(ds or [], columns=["ma", "ghi_chu"])
+        df_export.columns = ["Mã NĐT", "Ghi chú"]
+        buf = io.BytesIO()
+        df_export.to_excel(buf, index=False)
+        st.download_button(
+            "💾 Tải về",
+            data=buf.getvalue(),
+            file_name="danh_sach_ndt_dp.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            key="dl_ndt_dp",
+        )
 
 
 def _render_quan_ly_template(df: pd.DataFrame):
@@ -784,9 +863,9 @@ def render(**kwargs):
             ("📁 Quản lý Template", lambda tab: _render_quan_ly_template(df_full))
         )
     # Chỉ admin/manager CN mới thấy tab quản lý Mã NĐT ĐP
-    if role in ("admin", "admin_cn"):
+    if role in ("admin", "admin_cn", "manager", "manager_cn"):
         nhom_hanh_chinh.append(
-            ("🏦 Mã NĐT ĐP", lambda tab: _render_ndt_dp(role, username))
+            ("🏦 Mã NĐT ĐP", lambda tab: _render_ndt_dp(role, kwargs.get("username", "unknown")))
         )
     if role in ("admin", "admin_cn"):
         nhom_hanh_chinh.append(

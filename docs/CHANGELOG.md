@@ -1,8 +1,8 @@
 # CHANGELOG — VBSP-SCM
 
-## [2026-05-11] — Tiến độ Công việc Hàng ngày
-- `db.py` dòng ~115 — thêm bảng `tien_do_task` và `tien_do_ketqua` (SQLite)
-- `tabs/tab_tien_do.py` — thêm module Tiến độ: dashboard, tạo đầu việc, cập nhật bằng data_editor, xuất Excel, view read-only
+## [2026-05-11] — Tiến độ Công việc Hàng ngày (cấp xã)
+- `db.py` init_db() — thêm schema mới `tien_do_task` (ngay_deadline NOT NULL, ds_pgd JSON, loai, uu_tien) + `tien_do_ketqua` (cấp xã: task_id FK, pgd, ten_xa, UNIQUE task_id+ten_xa)
+- `tabs/tab_tien_do.py` — viết lại hoàn toàn: dashboard KPI cards, bảng PGD × đầu việc, biểu đồ thanh ngang, drill-down xã, tạo task với auto-init kết quả từng xã, cập nhật bằng st.data_editor, xuất Excel 2 sheet (Ma trận + Chi tiết xã)
 - `tabs/__init__.py` — export `tab_tien_do`
 - `workspaces/ws_management.py` — thêm tab con “📅 Tiến độ”
 - `workspaces/ws_operation.py` — thêm tab con “📅 Tiến độ” cho phân hệ PGD (read-only)

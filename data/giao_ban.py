@@ -19,6 +19,8 @@ from config import (
     COT_DU_NO_QH,
     COT_TEN_CT,
     COT_TEN_XA,
+    COT_LAI_TON,
+    COT_LAI_TON_QH,
 )
 
 COT_DU_NO_KHOANH = "Dư nợ khoanh"
@@ -465,6 +467,9 @@ def xuat_thong_bao_ket_luan_giao_ban(
     chinh_sach_moi: str,
     ton_tai_han_che: str,
     nhiem_vu_tiep: str,
+    so_van_ban: str = "",
+    ten_nguoi_ky: str = "",
+    giai_ngan_input: dict | None = None,
     df_baseline: pd.DataFrame | None = None,
     nam_moc: int = 2025,
 ) -> bytes:
@@ -730,6 +735,14 @@ def xuat_thong_bao_ket_luan_giao_ban(
         f"còn dư nợ, thông qua {so_to} Tổ TK&VV. "
         f"Trong đó nợ quá hạn {nqh:,.0f} triệu đồng, tỷ lệ {ty_le_nqh:.2f}%."
     )
+    lai_ton_th = pd.to_numeric(
+        df_xa.get(COT_LAI_TON, pd.Series(dtype=float)), errors="coerce"
+    ).fillna(0).sum() / 1e6
+    lai_ton_qh = pd.to_numeric(
+        df_xa.get(COT_LAI_TON_QH, pd.Series(dtype=float)), errors="coerce"
+    ).fillna(0).sum() / 1e6
+    tong_lai_ton = lai_ton_th + lai_ton_qh
+    van_xuoi += f" Lãi tồn {fmt(tong_lai_ton * 1e6)} triệu đồng."
     if df_baseline is not None and COT_TEN_XA in df_baseline.columns:
         ten_xa_val = df_xa[COT_TEN_XA].iloc[0] if COT_TEN_XA in df_xa.columns else None
         if ten_xa_val:

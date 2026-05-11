@@ -753,8 +753,8 @@ def render(**kwargs):
     # ── Định nghĩa nhóm tab ─────────────────────────────────────────────
     nhom_giam_sat = [
         ("📊 Thông tin chung", lambda tab: tab_tongquan.render(tab, **kwargs)),
-        ("� Tiến độ", lambda tab: tab_tien_do.render(tab, **kwargs)),
-        ("�🚨 Cảnh báo nợ", lambda tab: _render_canh_bao_no(
+        ("📅 Tiến độ", lambda tab: tab_tien_do.render(tab, **kwargs)),
+        ("🚨 Cảnh báo nợ", lambda tab: _render_canh_bao_no(
             df_full, ds_pgd_all, role, kwargs.get("username", "unknown"))),
     ]
     nhom_kiem_soat = [

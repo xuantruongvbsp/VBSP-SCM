@@ -1,5 +1,13 @@
 # CHANGELOG — VBSP-SCM
 
+## [2026-05-11] — Bổ sung 5 thiếu sót trong hàm xuat_thong_bao_ket_luan_giao_ban()
+- `data/giao_ban.py` — thêm signature params: so_van_ban, ten_nguoi_ky, giai_ngan_input
+- `data/giao_ban.py` — thêm lãi tồn (COT_LAI_TON + COT_LAI_TON_QH) vào văn xuôi
+- `data/giao_ban.py` — thêm đoạn tiền gửi tiết kiệm + tỷ lệ hộ vay gửi tiết kiệm
+- `data/giao_ban.py` — thêm đoạn món vay 3 tháng không hoạt động
+- `data/giao_ban.py` — truyền giai_ngan_input vào tao_bang_ke_hoach()
+- `data/giao_ban.py` — số văn bản (Số: xxx/TB-KLGB) + tên người ký động
+
 ## [2026-05-11] — Tiến độ Công việc Hàng ngày (cấp xã)
 - `db.py` init_db() — thêm schema mới `tien_do_task` (ngay_deadline NOT NULL, ds_pgd JSON, loai, uu_tien) + `tien_do_ketqua` (cấp xã: task_id FK, pgd, ten_xa, UNIQUE task_id+ten_xa)
 - `tabs/tab_tien_do.py` — viết lại hoàn toàn: dashboard KPI cards, bảng PGD × đầu việc, biểu đồ thanh ngang, drill-down xã, tạo task với auto-init kết quả từng xã, cập nhật bằng st.data_editor, xuất Excel 2 sheet (Ma trận + Chi tiết xã)

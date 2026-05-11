@@ -20,6 +20,7 @@ from utils import (
     fmt_so,
     vn,
     fmt_ty,
+    fmt_bang_ty,
     xuat_excel,
     ten_file_xuat,
     hien_thi_dataframe_phan_trang,
@@ -1184,7 +1185,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
 
                     pdf_tg["Số món vay"] = pdf_tg["_mon"].apply(fmt_so)
                     pdf_tg["Số KH"]      = pdf_tg["_kh"].apply(fmt_so)
-                    pdf_tg["Dư nợ"]      = pdf_tg["_no"].apply(fmt)
+                    pdf_tg["Dư nợ (tỷ)"] = pdf_tg["_no"].apply(fmt_bang_ty)
 
                     pdf_tg = pdf_tg.rename(columns=rename_ok)
                     pdf_tg = pdf_tg.sort_values(
@@ -1193,7 +1194,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                     )
 
                     cols_hien_thi = [v for v in ["PGD", "Xã", "Chương trình"] if v in pdf_tg.columns]
-                    df_pdf = pdf_tg[[*cols_hien_thi, "Số món vay", "Số KH", "Dư nợ"]]
+                    df_pdf = pdf_tg[[*cols_hien_thi, "Số món vay", "Số KH", "Dư nợ (tỷ)"]]
 
                     return xuat_pdf(
                         df_pdf,
@@ -1229,8 +1230,8 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                             ).reset_index().sort_values("_no", ascending=False)
                             tg["Số món vay"] = tg["_mon"].apply(fmt_so)
                             tg["Số KH"]      = tg["_kh"].apply(fmt_so)
-                            tg["Dư nợ"]      = tg["_no"].apply(fmt)
-                            cols_hien_thi = [COT_TEN_PGD, nhom_col, "Số món vay", "Số KH", "Dư nợ"]
+                            tg["Dư nợ (tỷ)"] = tg["_no"].apply(fmt_bang_ty)
+                            cols_hien_thi = [COT_TEN_PGD, nhom_col, "Số món vay", "Số KH", "Dư nợ (tỷ)"]
                             rename_map = {COT_TEN_PGD: "PGD", nhom_col: "Xã"}
                         else:
                             tg = df_loc.groupby(nhom_col).agg(
@@ -1240,8 +1241,8 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                             ).reset_index().sort_values("_no", ascending=False)
                             tg["Số món vay"] = tg["_mon"].apply(fmt_so)
                             tg["Số KH"]      = tg["_kh"].apply(fmt_so)
-                            tg["Dư nợ"]      = tg["_no"].apply(fmt)
-                            cols_hien_thi = [nhom_col, "Số món vay", "Số KH", "Dư nợ"]
+                            tg["Dư nợ (tỷ)"] = tg["_no"].apply(fmt_bang_ty)
+                            cols_hien_thi = [nhom_col, "Số món vay", "Số KH", "Dư nợ (tỷ)"]
                             rename_map = {nhom_col: nhom_chon}
 
                         hien_thi_dataframe_phan_trang(
@@ -1259,7 +1260,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                                 textinfo="label+percent",
                                 textposition="outside",
                                 hovertemplate="<b>%{label}</b><br>Dư nợ: %{customdata}<br>Tỷ lệ: %{percent}<extra></extra>",
-                                customdata=top10["Dư nợ"],
+                                customdata=top10["Dư nợ (tỷ)"],
                                 marker=dict(
                                     colors=px.colors.sequential.Greens_r[: len(top10)],
                                     line=dict(color="white", width=2),

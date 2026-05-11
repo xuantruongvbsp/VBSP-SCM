@@ -834,6 +834,29 @@ def render(**kwargs):
     st.caption("Giám sát chỉ tiêu · Cân đối vốn · Quản lý NQH · GQVL · Quản lý CBTD")
 
     # ── BƯỚC 1: Render layout 2 cột ───────────────────────────────────────
+    # CSS tô màu nền sidebar — inject ở cấp page để tránh lỗi không work
+    st.markdown("""
+    <style>
+    div[data-testid="stHorizontalBlock"] > div:first-child {
+        background-color: #F1EFE8 !important;
+        border-radius: 8px !important;
+        padding: 8px 4px !important;
+        border-right: 0.5px solid #D3D1C7 !important;
+    }
+    div[data-testid="stHorizontalBlock"] > div:first-child button[kind="secondary"] {
+        background: transparent !important;
+        border: none !important;
+        text-align: left !important;
+        padding: 5px 8px !important;
+        font-size: 13px !important;
+    }
+    div[data-testid="stHorizontalBlock"] > div:first-child button[kind="secondary"]:hover {
+        background: #D3D1C7 !important;
+        border-radius: 5px !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
     col_sidebar, col_content = st.columns([1, 4], gap="small")
 
     # ── BƯỚC 2: Xây danh sách tất cả menu items ───────────────────────────
@@ -883,20 +906,6 @@ def render(**kwargs):
     }
 
     with col_sidebar:
-        # CSS tô màu nền sidebar — phân biệt với vùng nội dung
-        st.markdown(
-            """
-            <style>
-            div[data-testid="column"]:nth-child(1) {
-                background-color: #F1EFE8 !important;
-                border-radius: 8px;
-                padding: 8px !important;
-                border-right: 0.5px solid #D3D1C7;
-            }
-            </style>
-            """,
-            unsafe_allow_html=True
-        )
         current_group = None
         for item in ALL_ITEMS:
             grp = item["group"]

@@ -1,7 +1,16 @@
 # CHANGELOG
 
-## [2026-05-12] — Thêm màu nền sidebar cho ws_management.py
-- `workspaces/ws_management.py` dòng ~885 — Thêm CSS injection tô màu nền sidebar #F1EFE8 để dễ phân biệt với vùng nội dung
+## [2026-05-12] — Chuyển navigation menu từ col_sidebar sang st.sidebar thật
+- `workspaces/ws_management.py` dòng ~838-935 — Xóa `st.columns([1, 4])` + `with col_sidebar` + `with col_content`, thay bằng `with st.sidebar` và render nội dung trực tiếp
+- `workspaces/ws_management.py` dòng ~842-865 — Cập nhật tất cả lambda trong ALL_ITEMS: bỏ `c=col_content`, dùng `st` làm đối số render
+
+## [2026-05-12] — Sửa CSS sidebar: dùng st.container(border=True) thay CSS selector chung
+- `workspaces/ws_management.py` dòng ~838-858 — Xóa toàn bộ CSS injection `<style>...</style>` dùng selector `div[data-testid="stHorizontalBlock"] > div:first-child` gây tô màu nhầm toàn trang
+- `workspaces/ws_management.py` dòng ~908 — Wrap toàn bộ nội dung sidebar trong `st.container(border=True)` thay vì CSS hack, chỉ tô viền đúng cột sidebar
+
+## [2026-05-12] — Di chuyển CSS sidebar ws_management.py lên cấp page
+- `workspaces/ws_management.py` dòng ~837 — Di chuyển CSS injection sidebar ra ngoài `with col_sidebar` lên trước `st.columns()` để inject ở cấp page, thêm CSS cho button secondary
+- `workspaces/ws_management.py` dòng ~886-899 — Xóa CSS injection cũ bên trong `with col_sidebar` để tránh trùng lặp
 
 ## [2026-05-12] — Thêm hàm fmt_bang_ty() và cập nhật import
 - `utils.py` dòng ~243-261 — Thêm hàm `fmt_bang_ty()` format số tiền → tỷ đồng (cố định đơn vị)

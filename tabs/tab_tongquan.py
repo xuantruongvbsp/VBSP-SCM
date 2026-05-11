@@ -1354,23 +1354,6 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
             except Exception as e:
                 st.error(f"Lỗi xử lý đến hạn: {e}")
 
-            # ── Download PDF ngoài tabs ───────────────────────────────────
-            _pdf_keys = ["1_tháng", "3_tháng", "6_tháng", "Trong_năm"]
-            _co_pdf = any(
-                st.session_state.get(f"_pdf_bytes_denh_{k}")
-                for k in _pdf_keys
-            )
-            if _co_pdf:
-                st.markdown("#### ⬇ Tải file PDF đã tạo")
-                _cols = st.columns(len(_pdf_keys))
-                for i, _k in enumerate(_pdf_keys):
-                    _dat = st.session_state.get(f"_pdf_bytes_denh_{_k}")
-                    _sf  = st.session_state.get(f"_pdf_file_denh_{_k}", f"{_k}.pdf")
-                    if _dat:
-                        _cols[i].download_button(
-                            label=f"⬇ {_k.replace('_', ' ')}",
-                            data=_dat,
-                            file_name=_sf,
-                            mime="application/pdf",
-                            key=f"dl_outside_denh_{_k}",
-                        )
+            # ── Download PDF: chỉ giữ nút trong mỗi tab (không duplicate) ──
+            # Phần download ngoài tabs đã xóa để tránh trùng lặp với nút
+            # "⬇ Tải file PDF" trong mỗi tab 1/3/6 tháng và Trong năm

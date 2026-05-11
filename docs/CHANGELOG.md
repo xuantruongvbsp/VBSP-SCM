@@ -1,5 +1,8 @@
 # CHANGELOG — VBSP-SCM
 
+## [2026-05-11] — Migration an toàn: gỡ DROP TABLE trong init_db()
+- `db.py` dòng 115-116 — xóa `DROP TABLE IF EXISTS tien_do_ketqua/tien_do_task`, chỉ giữ `CREATE TABLE IF NOT EXISTS` (+ index) để không mất dữ liệu khi restart
+
 ## [2026-05-11] — Bổ sung 5 thiếu sót trong hàm xuat_thong_bao_ket_luan_giao_ban()
 - `data/giao_ban.py` — thêm signature params: so_van_ban, ten_nguoi_ky, giai_ngan_input
 - `data/giao_ban.py` — thêm lãi tồn (COT_LAI_TON + COT_LAI_TON_QH) vào văn xuôi

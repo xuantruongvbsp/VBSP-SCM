@@ -112,8 +112,6 @@ def init_db():
                 note        TEXT
             );
             CREATE INDEX IF NOT EXISTS idx_kv_history_key ON kv_history(key);
-            DROP TABLE IF EXISTS tien_do_ketqua;
-            DROP TABLE IF EXISTS tien_do_task;
             CREATE TABLE IF NOT EXISTS tien_do_task (
                 id            INTEGER PRIMARY KEY AUTOINCREMENT,
                 tieu_de       TEXT NOT NULL,

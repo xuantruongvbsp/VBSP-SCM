@@ -544,3 +544,166 @@ def render(tab, **kwargs):
             ])
             _render_nhiem_vu_duoc_giao(t1, **kwargs)
             _render_nhap_ket_qua(t2, **kwargs)
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# XUẤT PDF
+# ══════════════════════════════════════════════════════════════════════════
+
+def _xuat_pdf_nhiem_vu(ds_nv: list, chu_ky: str, ky: str) -> bytes:
+    """Tạo PDF báo cáo danh sách nhiệm vụ. Trả về bytes."""
+    import io
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib import colors
+    from reportlab.lib.units import cm
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
+    from reportlab.lib.styles import ParagraphStyle
+    from reportlab.pdfbase import pdfmetrics
+    from reportlab.pdfbase.ttfonts import TTFont
+    import os
+
+    buf = io.BytesIO()
+
+    # Đăng ký font Times New Roman hỗ trợ tiếng Việt
+    font_dir = "C:/Windows/Fonts"
+    try:
+        pdfmetrics.registerFont(TTFont("TimesVN",        os.path.join(font_dir, "times.ttf")))
+        pdfmetrics.registerFont(TTFont("TimesVN-Bold",   os.path.join(font_dir, "timesbd.ttf")))
+        pdfmetrics.registerFont(TTFont("TimesVN-Italic", os.path.join(font_dir, "timesi.ttf")))
+        base_font      = "TimesVN"
+        base_font_bold = "TimesVN-Bold"
+        base_font_ital = "TimesVN-Italic"
+    except Exception:
+        # Fallback nếu không tìm thấy font
+        base_font      = "Helvetica"
+        base_font_bold = "Helvetica-Bold"
+        base_font_ital = "Helvetica-Oblique"
+
+    doc = SimpleDocTemplate(
+        buf, pagesize=A4,
+        leftMargin=2.5*cm, rightMargin=2*cm,
+        topMargin=2*cm, bottomMargin=2*cm
+    )
+
+    # ── Styles ──
+    s_co_quan = ParagraphStyle(
+        "co_quan", fontName=base_font, fontSize=10,
+        leading=14, alignment=1  # center
+    )
+    s_tieu_de = ParagraphStyle(
+        "tieu_de", fontName=base_font_bold, fontSize=13,
+        leading=18, alignment=1, spaceBefore=10, spaceAfter=4
+    )
+    s_phu_de = ParagraphStyle(
+        "phu_de", fontName=base_font_ital, fontSize=10,
+        leading=14, alignment=1, spaceAfter=14, textColor=colors.HexColor("#444444")
+    )
+    s_normal = ParagraphStyle(
+        "normal", fontName=base_font, fontSize=9, leading=13
+    )
+    s_footer = ParagraphStyle(
+        "footer", fontName=base_font_ital, fontSize=8,
+        leading=12, textColor=colors.grey
+    )
+
+    story = []
+
+    # ── Header cơ quan ──
+    story.append(Paragraph(
+        "NGÂN HÀNG CHÍNH SÁCH XÃ HỘI",
+        s_co_quan
+    ))
+    story.append(Paragraph(
+        "Chi nhánh tỉnh Đồng Nai",
+        s_co_quan
+    ))
+    story.append(Spacer(1, 0.3*cm))
+    story.append(HRFlowable(width="100%", thickness=1,
+                             color=colors.HexColor("#185FA5")))
+    story.append(Spacer(1, 0.4*cm))
+
+    # ── Tên báo cáo ──
+    story.append(Paragraph(
+        "BÁO CÁO TÌNH HÌNH THỰC HIỆN NHIỆM VỤ",
+        s_tieu_de
+    ))
+    story.append(Paragraph(
+        f"{_NHAN_CHU_KY.get(chu_ky, chu_ky).upper()} {ky}",
+        s_phu_de
+    ))
+
+    # ── Thông tin xuất ──
+    story.append(Paragraph(
+        f"Ngày xuất báo cáo: {datetime.now().strftime('%d/%m/%Y %H:%M')}  "
+        f"&nbsp;&nbsp;|&nbsp;&nbsp;  "
+        f"Tổng số nhiệm vụ: <b>{len(ds_nv)}</b>",
+        s_normal
+    ))
+    story.append(Spacer(1, 0.4*cm))
+
+    # ── Bảng nhiệm vụ ──
+    header = [
+        Paragraph("<b>STT</b>", s_normal),
+        Paragraph("<b>Tiêu đề nhiệm vụ</b>", s_normal),
+        Paragraph("<b>PGD</b>", s_normal),
+        Paragraph("<b>Trạng thái</b>", s_normal),
+        Paragraph("<b>Deadline</b>", s_normal),
+    ]
+    data = [header]
+    for i, nv in enumerate(ds_nv, 1):
+        ten_nv = nv["tieu_de"]
+        ten_nv = ten_nv[:80] + "..." if len(ten_nv) > 80 else ten_nv
+        data.append([
+            Paragraph(str(i), s_normal),
+            Paragraph(ten_nv, s_normal),
+            Paragraph(nv["pgd"] or "Tất cả PGD", s_normal),
+            Paragraph(
+                _NHAN_TRANG_THAI_NV.get(nv["trang_thai"], nv["trang_thai"]),
+                s_normal
+            ),
+            Paragraph(
+                datetime.strptime(nv["ngay_deadline"], "%Y-%m-%d")
+                        .strftime("%d/%m/%Y")
+                if nv.get("ngay_deadline") else "—",
+                s_normal
+            ),
+        ])
+
+    tbl = Table(
+        data,
+        colWidths=[1*cm, 8.5*cm, 3.5*cm, 3.5*cm, 2.5*cm],
+        repeatRows=1  # lặp header khi sang trang mới
+    )
+    tbl.setStyle(TableStyle([
+        # Header
+        ("BACKGROUND",    (0, 0), (-1, 0), colors.HexColor("#185FA5")),
+        ("TEXTCOLOR",     (0, 0), (-1, 0), colors.white),
+        # Zebra rows
+        ("ROWBACKGROUNDS",(0, 1), (-1, -1),
+         [colors.white, colors.HexColor("#F1EFE8")]),
+        # Grid
+        ("GRID",          (0, 0), (-1, -1), 0.3, colors.HexColor("#AAAAAA")),
+        ("LINEBELOW",     (0, 0), (-1, 0),  0.8, colors.HexColor("#0C447C")),
+        # Padding
+        ("TOPPADDING",    (0, 0), (-1, -1), 5),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+        ("LEFTPADDING",   (0, 0), (-1, -1), 4),
+        ("VALIGN",        (0, 0), (-1, -1), "TOP"),
+        # Căn giữa cột STT và Deadline
+        ("ALIGN",         (0, 0), (0, -1), "CENTER"),
+        ("ALIGN",         (4, 0), (4, -1), "CENTER"),
+    ]))
+    story.append(tbl)
+
+    # ── Footer ──
+    story.append(Spacer(1, 0.6*cm))
+    story.append(HRFlowable(width="100%", thickness=0.5,
+                             color=colors.grey))
+    story.append(Spacer(1, 0.2*cm))
+    story.append(Paragraph(
+        "Tài liệu được tạo tự động từ Hệ thống Quản trị Tín dụng Nội bộ VBSP-SCM",
+        s_footer
+    ))
+
+    doc.build(story)
+    return buf.getvalue()

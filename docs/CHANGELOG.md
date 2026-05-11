@@ -1,5 +1,17 @@
 # CHANGELOG — VBSP-SCM
 
+## [2026-05-12] — Hoàn thiện tab “🏦 Mã NĐT ĐP” cho Trưởng phòng KH-NV
+- `workspaces/ws_management.py` dòng ~427 — `_render_ndt_dp()`: manager/manager_cn xem được (read-only), admin/admin_cn có inline edit ghi chú (✏️/💾) + xóa (🗑️) + audit + clear cache
+- `workspaces/ws_management.py` dòng ~782 — tab “🏦 Mã NĐT ĐP” hiển thị cho admin/admin_cn/manager/manager_cn; fix lấy `username` từ kwargs để tránh NameError
+- `workspaces/ws_management.py` — thêm preview tác động lên GQVL từ `cache/gqvl.parquet` (nguồn ĐP, phân loại cấp tỉnh theo danh sách mã), xử lý thiếu file/thiếu cột; thêm xuất Excel danh sách
+
+## [2026-05-12] — fmt_bang_ty(): format cột bảng dư nợ cố định đơn vị tỷ
+- `utils.py` dòng ~259 — thêm `fmt_bang_ty(x, so_le=3)`: format VND → tỷ, cố định đơn vị, header cột ghi rõ "(tỷ)"
+- `tabs/tab_tongquan.py` dòng ~17 — thêm `fmt_bang_ty` import; `_build_pdf_den_han()` + `_bang_den_han()`: cột "Dư nợ" → "Dư nợ (tỷ)", dùng `fmt_bang_ty`
+- `workspaces/ws_executive.py` dòng ~24 — thêm `fmt_bang_ty` import; bảng xếp hạng PGD: "Tổng dư nợ"/"Dư nợ trong hạn"/"Nợ quá hạn" → thêm (tỷ), dùng `fmt_bang_ty`
+- `tabs/tab_uy_thac.py` dòng ~559 — đổi header "Dư nợ/NQH/Lãi tồn (tr.đ)" → "(tỷ)", dùng `fmt_bang_ty`
+- Không thay đổi ở KPI metric (st.metric), PDF service, report service, và các file không có `.apply(fmt)` trên cột bảng
+
 ## [2026-05-12] — Fix StreamlitAPIException trong _render_cap_nhat()
 - `tabs/tab_tien_do.py` dòng ~356 — `_render_cap_nhat()`: thêm `_parse_date()` helper convert cột "Ngày HT" sang datetime.date trước khi dùng st.data_editor với DateColumn
 - `tabs/tab_tien_do.py` — review toàn bộ file (577 dòng): không phát hiện lỗi logic hay cú pháp

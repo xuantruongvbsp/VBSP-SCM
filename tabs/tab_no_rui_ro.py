@@ -20,7 +20,7 @@ from config import (
     NGUYEN_NHAN_RR,
 )
 from data.pgd import pgd_slug
-from utils import fmt
+from utils import fmt, fmt_bang_ty
 from services.template_service import (
     co_template,
     dien_template,

@@ -17,7 +17,7 @@ from config import (
 from data import (ts_file, doc_file_gqvl,
                   doc_gqvl_pgd, ds_pgd_co_gqvl, duong_dan_gqvl_pgd)
 from services import luu_pgd_file
-from utils import fmt, fmt_ty, fmt_so, vn, xuat_excel, hien_thi_dataframe_phan_trang
+from utils import fmt, fmt_bang_ty, fmt_ty, fmt_so, vn, xuat_excel, hien_thi_dataframe_phan_trang
 
 if TYPE_CHECKING:
     from streamlit.delta_generator import DeltaGenerator

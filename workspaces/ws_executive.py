@@ -27,6 +27,7 @@ from utils import (
     fmt_ty,
     fmt_pct,
     fmt_so,
+    fmt_bang_ty,
     hien_thi_dataframe_phan_trang,
     xuat_excel,
     ten_file_xuat,
@@ -462,15 +463,15 @@ def _render_heatmap_pgd(**kwargs) -> None:
             COT_TEN_PGD, "Tổng_dư_nợ", "Dư_nợ_TH",
             "NQH", "TL_NQH", "Số_KH", "TL_TH", "Trạng_thái",
         ]].copy()
-        df_display["Tổng_dư_nợ"] = df_display["Tổng_dư_nợ"].apply(fmt)
-        df_display["Dư_nợ_TH"]   = df_display["Dư_nợ_TH"].apply(fmt)
-        df_display["NQH"]         = df_display["NQH"].apply(fmt)
+        df_display["Tổng_dư_nợ"] = df_display["Tổng_dư_nợ"].apply(fmt_bang_ty)
+        df_display["Dư_nợ_TH"]   = df_display["Dư_nợ_TH"].apply(fmt_bang_ty)
+        df_display["NQH"]         = df_display["NQH"].apply(fmt_bang_ty)
         df_display["TL_NQH"]      = df_display["TL_NQH"].apply(lambda x: f"{x:.3f}%")
         df_display["TL_TH"]       = df_display["TL_TH"].apply(lambda x: f"{x:.1f}%")
         df_display["Số_KH"]       = df_display["Số_KH"].apply(fmt_so)
         df_display.columns = [
-            "PGD", "Tổng dư nợ", "Dư nợ trong hạn",
-            "Nợ quá hạn", "Tỷ lệ NQH", "Số KH", "Tỷ lệ TH", "Trạng thái",
+            "PGD", "Tổng dư nợ (tỷ)", "Dư nợ trong hạn (tỷ)",
+            "Nợ quá hạn (tỷ)", "Tỷ lệ NQH", "Số KH", "Tỷ lệ TH", "Trạng thái",
         ]
         hien_thi_dataframe_phan_trang(
             df_display,

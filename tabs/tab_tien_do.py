@@ -353,15 +353,25 @@ def _render_cap_nhat(tab, **kwargs):
         st.progress(xong / len(kq_list),
                     text=f"Hoàn thành: {xong}/{len(kq_list)} xã")
 
+        def _parse_date(val):
+            if not val:
+                return None
+            try:
+                return pd.to_datetime(val).date()
+            except Exception:
+                return None
+
         df_edit = pd.DataFrame([
             {
                 "Xã / Phường": r["ten_xa"],
                 "Trạng thái": r["trang_thai"],
-                "Ngày HT": r.get("ngay_hoan_thanh") or "",
+                "Ngày HT": _parse_date(r.get("ngay_hoan_thanh")),
                 "Ghi chú": r.get("ghi_chu") or "",
             }
             for r in kq_list
         ])
+        # Convert cột "Ngày HT" sang datetime.date, thay thế None bằng NaT để DateColumn hoạt động
+        df_edit["Ngày HT"] = pd.to_datetime(df_edit["Ngày HT"], errors="coerce").dt.date
 
         edited = st.data_editor(
             df_edit,

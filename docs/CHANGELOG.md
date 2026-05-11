@@ -1,7 +1,8 @@
 # CHANGELOG — VBSP-SCM
 
-## [2026-05-12] — Fix StreamlitAPIException trong _render_cap_nhat() + cập nhật CHANGELOG
+## [2026-05-12] — Fix StreamlitAPIException trong _render_cap_nhat()
 - `tabs/tab_tien_do.py` dòng ~356 — `_render_cap_nhat()`: thêm `_parse_date()` helper convert cột "Ngày HT" sang datetime.date trước khi dùng st.data_editor với DateColumn
+- `tabs/tab_tien_do.py` — review toàn bộ file (577 dòng): không phát hiện lỗi logic hay cú pháp
 
 ## [2026-05-12] — Tiến độ: preview xã khi tạo task + sheet Tổng hợp + session_state cho download
 - `tabs/tab_tien_do.py` dòng ~259 — `_render_tao_task()`: thêm expander preview xã nhóm theo PGD (ds_preview → PGD_XA_MAP → st.write join)

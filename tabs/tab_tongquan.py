@@ -1221,19 +1221,31 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                     st.divider()
 
                     if nhom_col in df_loc.columns:
-                        tg = df_loc.groupby(nhom_col).agg(
-                            _mon=(COT_SO_KU,      "nunique"),
-                            _kh =(COT_MA_KH,      "nunique"),
-                            _no =(COT_TONG_DU_NO, "sum"),
-                        ).reset_index().sort_values("_no", ascending=False)
-
-                        tg["Số món vay"] = tg["_mon"].apply(fmt_so)
-                        tg["Số KH"]      = tg["_kh"].apply(fmt_so)
-                        tg["Dư nợ"]      = tg["_no"].apply(fmt_so)
+                        if nhom_chon == "Xã" and COT_TEN_PGD in df_loc.columns:
+                            tg = df_loc.groupby([COT_TEN_PGD, nhom_col]).agg(
+                                _mon=(COT_SO_KU,      "nunique"),
+                                _kh =(COT_MA_KH,      "nunique"),
+                                _no =(COT_TONG_DU_NO, "sum"),
+                            ).reset_index().sort_values("_no", ascending=False)
+                            tg["Số món vay"] = tg["_mon"].apply(fmt_so)
+                            tg["Số KH"]      = tg["_kh"].apply(fmt_so)
+                            tg["Dư nợ"]      = tg["_no"].apply(fmt)
+                            cols_hien_thi = [COT_TEN_PGD, nhom_col, "Số món vay", "Số KH", "Dư nợ"]
+                            rename_map = {COT_TEN_PGD: "PGD", nhom_col: "Xã"}
+                        else:
+                            tg = df_loc.groupby(nhom_col).agg(
+                                _mon=(COT_SO_KU,      "nunique"),
+                                _kh =(COT_MA_KH,      "nunique"),
+                                _no =(COT_TONG_DU_NO, "sum"),
+                            ).reset_index().sort_values("_no", ascending=False)
+                            tg["Số món vay"] = tg["_mon"].apply(fmt_so)
+                            tg["Số KH"]      = tg["_kh"].apply(fmt_so)
+                            tg["Dư nợ"]      = tg["_no"].apply(fmt)
+                            cols_hien_thi = [nhom_col, "Số món vay", "Số KH", "Dư nợ"]
+                            rename_map = {nhom_col: nhom_chon}
 
                         hien_thi_dataframe_phan_trang(
-                            tg[[nhom_col, "Số món vay", "Số KH", "Dư nợ"]].rename(
-                                columns={nhom_col: nhom_chon}),
+                            tg[cols_hien_thi].rename(columns=rename_map),
                             key=f"tongquan_den_han_{key_prefix}",
                         )
 

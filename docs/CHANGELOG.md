@@ -1,5 +1,13 @@
 # CHANGELOG — VBSP-SCM
 
+## [2026-05-11] — Tích hợp tab Tiến độ vào ws_management + ws_executive; fix PDF đơn vị sai
+- `pdf_service.py` dòng ~823 — `nut_xuat_pdf()`: lưu dict `{"data", "filename"}` vào session_state, render download_button khi có key, thêm nút "✕" xoá để tạo lại PDF
+- `workspaces/ws_management.py` dòng ~756 — fix emoji lỗi (�→📅, �🚨→🚨) trong `nhom_giam_sat`
+- `workspaces/ws_executive.py` dòng ~717 — đã có sẵn tab "📅 Tiến độ" với `tab_tien_do.render_tong_quan_only()`
+- `tabs/tab_tongquan.py` dòng ~1224 — `_bang_den_han()` VĐ1: đổi `fmt_so`→`fmt` cho cột "Dư nợ" (VND→tỷ/triệu)
+- `tabs/tab_tongquan.py` dòng ~1224 — `_bang_den_han()` VĐ2: khi nhóm Xã, groupby theo [PGD, Xã] + thêm cột PGD context
+- `tabs/tab_tongquan.py` dòng ~1187 — `_build_pdf_den_han()`: fix đơn vị PDF (apply fmt thay raw number, cols_tien=[])
+
 ## [2026-05-11] — Migration an toàn: gỡ DROP TABLE trong init_db()
 - `db.py` dòng 115-116 — xóa `DROP TABLE IF EXISTS tien_do_ketqua/tien_do_task`, chỉ giữ `CREATE TABLE IF NOT EXISTS` (+ index) để không mất dữ liệu khi restart
 

@@ -883,6 +883,20 @@ def render(**kwargs):
     }
 
     with col_sidebar:
+        # CSS tô màu nền sidebar — phân biệt với vùng nội dung
+        st.markdown(
+            """
+            <style>
+            div[data-testid="column"]:nth-child(1) {
+                background-color: #F1EFE8 !important;
+                border-radius: 8px;
+                padding: 8px !important;
+                border-right: 0.5px solid #D3D1C7;
+            }
+            </style>
+            """,
+            unsafe_allow_html=True
+        )
         current_group = None
         for item in ALL_ITEMS:
             grp = item["group"]

@@ -373,11 +373,68 @@ def _render_thong_bao_ket_luan(tab, **kwargs):
             )
             tb_ngay = st.date_input("Ngày họp", value=date.today(), key="tb_ngay_hop")
         with col_b:
-            st.info(
-                f"📊 Số liệu tự động từ HSTD\n\n"
-                f"**Xã:** {chon_xa}  \n"
-                f"**Tháng:** {date.today().month}/{date.today().year}"
+            tb_so_vb = st.text_input(
+                "Số văn bản",
+                placeholder="VD: 05",
+                key="tb_so_van_ban",
+                help="Phần số trong 'Số: .../TB-KLGB'",
             )
+            tb_ten_ky = st.text_input(
+                "Tên người ký",
+                placeholder="VD: Nguyễn Văn A",
+                key="tb_ten_nguoi_ky",
+                help="Tên Phó Giám đốc ký văn bản",
+            )
+
+        # Preview số liệu tự động
+        from config import COT_LAI_TON_QH, COT_SO_DU_TG
+        df_xa_preview = df[df["Tên xã"] == chon_xa].copy()
+        if not df_xa_preview.empty:
+            dn_prev = pd.to_numeric(df_xa_preview[COT_TONG_DU_NO], errors="coerce").sum() / 1e6
+            nqh_prev = pd.to_numeric(df_xa_preview[COT_DU_NO_QH], errors="coerce").sum() / 1e6
+            lai_prev = (
+                pd.to_numeric(df_xa_preview.get(COT_LAI_TON, 0), errors="coerce").sum()
+                + pd.to_numeric(df_xa_preview.get(COT_LAI_TON_QH, 0), errors="coerce").sum()
+            ) / 1e6
+            tg_prev = pd.to_numeric(df_xa_preview.get(COT_SO_DU_TG, 0), errors="coerce").sum() / 1e6
+            st.info(
+                f"📊 **Số liệu tự động — {chon_xa}**\n\n"
+                f"Dư nợ: **{fmt(dn_prev * 1e6)}** triệu · "
+                f"NQH: **{fmt(nqh_prev * 1e6)}** triệu · "
+                f"Lãi tồn: **{fmt(lai_prev * 1e6)}** triệu · "
+                f"Tiền gửi TK: **{fmt(tg_prev * 1e6)}** triệu"
+            )
+
+        # Giải ngân kế hoạch tháng tới
+        from dateutil.relativedelta import relativedelta
+        from config import COT_TEN_TO
+        thang_toi = date.today() + relativedelta(months=1)
+        ngay_dh_col = "Ngày ĐH theo Gia hạn" if "Ngày ĐH theo Gia hạn" in df_xa_preview.columns else COT_NGAY_DH
+        mask_dh = (
+            pd.to_datetime(df_xa_preview[ngay_dh_col], errors="coerce").dt.month == thang_toi.month
+        ) & (
+            pd.to_datetime(df_xa_preview[ngay_dh_col], errors="coerce").dt.year == thang_toi.year
+        )
+        df_dh_prev = df_xa_preview[mask_dh].copy()
+        giai_ngan_input = {}
+        with st.expander("💰 Nhập số giải ngân dự kiến tháng tới (tùy chọn)"):
+            st.caption("Để trống nếu chưa xác định. Nhập theo đơn vị triệu đồng.")
+            if not df_dh_prev.empty and COT_TEN_TO in df_dh_prev.columns:
+                for (dvut, to, ct), grp in df_dh_prev.groupby([COT_DVUT, COT_TEN_TO, COT_TEN_CT]):
+                    val = st.number_input(
+                        f"{to} — {ct}",
+                        min_value=0.0,
+                        value=0.0,
+                        step=1.0,
+                        format="%.0f",
+                        key=f"gn_{dvut}_{to}_{ct}",
+                        help="Triệu đồng",
+                    )
+                    if val > 0:
+                        giai_ngan_input[(dvut, to, ct)] = val * 1e6
+            else:
+                st.caption("Không có món đến hạn tháng tới hoặc chưa có dữ liệu.")
+                giai_ngan_input = None
 
         tb_cs = st.text_area(
             "I. Chính sách mới trong tháng",
@@ -412,6 +469,9 @@ def _render_thong_bao_ket_luan(tab, **kwargs):
                     chinh_sach_moi=tb_cs,
                     ton_tai_han_che=tb_tt,
                     nhiem_vu_tiep=tb_nv,
+                    so_van_ban=tb_so_vb,
+                    ten_nguoi_ky=tb_ten_ky,
+                    giai_ngan_input=giai_ngan_input,
                     df_baseline=df_bl,
                     nam_moc=chon_nam or date.today().year - 1,
                 )

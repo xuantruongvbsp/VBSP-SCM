@@ -833,49 +833,23 @@ def render(**kwargs):
     st.title("📋 Phòng KH-NV")
     st.caption("Giám sát chỉ tiêu · Cân đối vốn · Quản lý NQH · GQVL · Quản lý CBTD")
 
-    # ── BƯỚC 1: Render layout 2 cột ───────────────────────────────────────
-    # CSS tô màu nền sidebar — inject ở cấp page để tránh lỗi không work
-    st.markdown("""
-    <style>
-    div[data-testid="stHorizontalBlock"] > div:first-child {
-        background-color: #F1EFE8 !important;
-        border-radius: 8px !important;
-        padding: 8px 4px !important;
-        border-right: 0.5px solid #D3D1C7 !important;
-    }
-    div[data-testid="stHorizontalBlock"] > div:first-child button[kind="secondary"] {
-        background: transparent !important;
-        border: none !important;
-        text-align: left !important;
-        padding: 5px 8px !important;
-        font-size: 13px !important;
-    }
-    div[data-testid="stHorizontalBlock"] > div:first-child button[kind="secondary"]:hover {
-        background: #D3D1C7 !important;
-        border-radius: 5px !important;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-
-    col_sidebar, col_content = st.columns([1, 4], gap="small")
-
-    # ── BƯỚC 2: Xây danh sách tất cả menu items ───────────────────────────
+    # ── BƯỚC 1: Xây danh sách tất cả menu items ───────────────────────────
     ALL_ITEMS = [
-        {"group": "Tổng quan",     "label": "Thông tin chung", "icon": "chart-bar",      "fn": lambda c=col_content: tab_tongquan.render(c, **kwargs)},
-        {"group": "Tổng quan",     "label": "Tiến độ",         "icon": "calendar",       "fn": lambda c=col_content: tab_tien_do.render(c, **kwargs)},
+        {"group": "Tổng quan",     "label": "Thông tin chung", "icon": "chart-bar",      "fn": lambda: tab_tongquan.render(st, **kwargs)},
+        {"group": "Tổng quan",     "label": "Tiến độ",         "icon": "calendar",       "fn": lambda: tab_tien_do.render(st, **kwargs)},
         {"group": "Tổng quan",     "label": "Cảnh báo nợ",     "icon": "alert-triangle", "fn": lambda: _render_canh_bao_no(df_full, ds_pgd_all, role, kwargs.get("username", "unknown"))},
         {"group": "Kiểm soát",     "label": "Kiểm soát CN",    "icon": "search",         "fn": lambda: tab_kiem_soat.render_tab(df_full, role, kwargs.get("username", "unknown"))},
         {"group": "Kiểm soát",     "label": "Nợ rủi ro QĐ62",  "icon": "credit-card",    "fn": lambda: tab_qd62.render(mode="cn")},
-        {"group": "Kiểm soát",     "label": "Quản lý CBTD",    "icon": "user",           "fn": lambda c=col_content: tab_cbtd.render(c, **kwargs)},
-        {"group": "Kế hoạch",      "label": "KH Tín dụng Năm", "icon": "file-text",      "fn": lambda c=col_content: tab_khtd.render(c, **dict(kwargs, khtd_mode="cn"))},
-        {"group": "Kế hoạch",      "label": "Giao KH theo Đợt", "icon": "upload",         "fn": lambda c=col_content: tab_khtd_giao_dc.render(c, **kwargs)},
-        {"group": "Kế hoạch",      "label": "KH vs Thực hiện", "icon": "chart-line",     "fn": lambda c=col_content: tab_kehoach.render(c, **kwargs)},
-        {"group": "Báo cáo",       "label": "Báo cáo chi tiết", "icon": "file",           "fn": lambda c=col_content: tab_baocao.render(c, **kwargs)},
-        {"group": "Báo cáo",       "label": "Điện Báo",        "icon": "antenna",        "fn": lambda c=col_content: tab_candoi.render(c, **kwargs)},
-        {"group": "Báo cáo",       "label": "Điểm GD & Tổ TK&VV", "icon": "map-pin",      "fn": lambda c=col_content: _render_dgd_to_tkvv(c, **kwargs)},
-        {"group": "Hành chính",    "label": "Ban Đại Diện",    "icon": "building",       "fn": lambda c=col_content: tab_ban_dai_dien.render(c, cap="tinh", **kwargs)},
-        {"group": "Hành chính",    "label": "Ủy thác",         "icon": "handshake",      "fn": lambda c=col_content: tab_uy_thac.render(c, **kwargs)},
-        {"group": "Hành chính",    "label": "Nhiệm vụ",        "icon": "check",          "fn": lambda c=col_content: tab_nhiem_vu.render(c, **kwargs)},
+        {"group": "Kiểm soát",     "label": "Quản lý CBTD",    "icon": "user",           "fn": lambda: tab_cbtd.render(st, **kwargs)},
+        {"group": "Kế hoạch",      "label": "KH Tín dụng Năm", "icon": "file-text",      "fn": lambda: tab_khtd.render(st, **dict(kwargs, khtd_mode="cn"))},
+        {"group": "Kế hoạch",      "label": "Giao KH theo Đợt", "icon": "upload",         "fn": lambda: tab_khtd_giao_dc.render(st, **kwargs)},
+        {"group": "Kế hoạch",      "label": "KH vs Thực hiện", "icon": "chart-line",     "fn": lambda: tab_kehoach.render(st, **kwargs)},
+        {"group": "Báo cáo",       "label": "Báo cáo chi tiết", "icon": "file",           "fn": lambda: tab_baocao.render(st, **kwargs)},
+        {"group": "Báo cáo",       "label": "Điện Báo",        "icon": "antenna",        "fn": lambda: tab_candoi.render(st, **kwargs)},
+        {"group": "Báo cáo",       "label": "Điểm GD & Tổ TK&VV", "icon": "map-pin",      "fn": lambda: _render_dgd_to_tkvv(st, **kwargs)},
+        {"group": "Hành chính",    "label": "Ban Đại Diện",    "icon": "building",       "fn": lambda: tab_ban_dai_dien.render(st, cap="tinh", **kwargs)},
+        {"group": "Hành chính",    "label": "Ủy thác",         "icon": "handshake",      "fn": lambda: tab_uy_thac.render(st, **kwargs)},
+        {"group": "Hành chính",    "label": "Nhiệm vụ",        "icon": "check",          "fn": lambda: tab_nhiem_vu.render(st, **kwargs)},
     ]
 
     # Thêm theo điều kiện (giống logic cũ)
@@ -884,8 +858,8 @@ def render(**kwargs):
     if role in ("admin", "admin_cn", "manager", "manager_cn"):
         ALL_ITEMS.append({"group": "Hành chính", "label": "Mã NĐT ĐP", "icon": "building-bank", "fn": lambda: _render_ndt_dp(role, kwargs.get("username", "unknown"))})
     if role in ("admin", "admin_cn"):
-        ALL_ITEMS.append({"group": "Hành chính", "label": "Audit Log", "icon": "list", "fn": lambda c=col_content: tab_audit_log.render(c, **kwargs)})
-    ALL_ITEMS.append({"group": "Hành chính", "label": "Upload KH-NV", "icon": "upload", "fn": lambda c=col_content: tab_upload_khnv.render(c, **kwargs)})
+        ALL_ITEMS.append({"group": "Hành chính", "label": "Audit Log", "icon": "list", "fn": lambda: tab_audit_log.render(st, **kwargs)})
+    ALL_ITEMS.append({"group": "Hành chính", "label": "Upload KH-NV", "icon": "upload", "fn": lambda: tab_upload_khnv.render(st, **kwargs)})
 
     # ── BƯỚC 3: Quản lý state menu item đang chọn ─────────────────────────
     if "ws_mgmt_menu" not in st.session_state:
@@ -905,13 +879,18 @@ def render(**kwargs):
         "Hành chính": {"bg": "#EEEDFE", "border": "#7F77DD", "text": "#3C3489"},
     }
 
-    with col_sidebar:
+    # ── BƯỚC 2: Sidebar menu ──────────────────────────────────────────────
+    with st.sidebar:
+        st.markdown(
+            "<p style='font-size:12px;font-weight:500;"
+            "color:#444;margin-bottom:4px'>MENU ĐIỀU HÀNH</p>",
+            unsafe_allow_html=True
+        )
         current_group = None
         for item in ALL_ITEMS:
             grp = item["group"]
-            clr = GROUP_COLORS.get(grp, {"bg": "#F1EFE8", "border": "#888780", "text": "#444441"})
+            clr = GROUP_COLORS.get(grp, {"bg": "#F1EFE8", "border": "#888", "text": "#444"})
 
-            # Header nhóm — hiện khi đổi nhóm mới
             if grp != current_group:
                 current_group = grp
                 st.markdown(
@@ -925,7 +904,6 @@ def render(**kwargs):
             is_active = st.session_state["ws_mgmt_menu"] == item["label"]
 
             if is_active:
-                # Hiển thị item active bằng markdown (không dùng button để style tự do hơn)
                 st.markdown(
                     f"<div style='"
                     f"background:{clr['bg']};"
@@ -947,11 +925,12 @@ def render(**kwargs):
                     st.session_state["ws_mgmt_menu"] = item["label"]
                     st.rerun()
 
-    # ── BƯỚC 4: Render nội dung bên phải ──────────────────────────────────
-    with col_content:
-        # Tìm item đang active và gọi hàm render của nó
-        active_item = next(
-            (x for x in ALL_ITEMS if x["label"] == st.session_state["ws_mgmt_menu"]),
-            ALL_ITEMS[0]
-        )
+    # ── BƯỚC 3: Render nội dung (không cần col_content nữa) ────────────────
+    active_item = next(
+        (x for x in ALL_ITEMS if x["label"] == st.session_state["ws_mgmt_menu"]),
+        ALL_ITEMS[0]
+    )
+    try:
         active_item["fn"]()
+    except Exception as e:
+        st.error(f"Lỗi render: {e}")

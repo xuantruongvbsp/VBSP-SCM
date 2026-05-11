@@ -256,6 +256,16 @@ def _render_tao_task(tab, **kwargs):
                     placeholder="Mặc định: tất cả 22 đơn vị",
                 )
 
+            ds_preview = pgd_chon or DS_PGD_ALL
+            tong_xa_preview = sum(len(PGD_XA_MAP.get(p, [])) for p in ds_preview)
+            st.caption(f"📍 {len(ds_preview)} đơn vị · {tong_xa_preview} xã/phường")
+            with st.expander(f"Xem chi tiết {tong_xa_preview} xã sẽ áp dụng", expanded=False):
+                for pgd in ds_preview:
+                    ds_xa = PGD_XA_MAP.get(pgd, [])
+                    if ds_xa:
+                        st.markdown(f"**{pgd}** ({len(ds_xa)} xã)")
+                        st.write(" — ".join(ds_xa))
+
             ghi_chu = st.text_input("Ghi chú thêm")
             submitted = st.form_submit_button("💾 Tạo đầu việc", type="primary")
 
@@ -401,6 +411,7 @@ def _render_cap_nhat(tab, **kwargs):
 
 
 def _render_xuat(tab, **kwargs):
+    SS_KEY = "_td_xuat_excel"
     with tab:
         st.subheader("📤 Xuất báo cáo tiến độ")
 
@@ -410,16 +421,45 @@ def _render_xuat(tab, **kwargs):
         with c2:
             den_ngay = st.date_input("Deadline đến", value=date.today(), key="td_x2")
 
-        if st.button("📥 Tạo Excel", type="primary"):
+        if st.button("📥 Tạo Excel", type="primary", key="td_btn_tao"):
             ds_task = _doc_tasks(chi_dang_theo_doi=False)
             ds_task = [t for t in ds_task
                        if tu_ngay.isoformat() <= t["ngay_deadline"] <= den_ngay.isoformat()]
 
             if not ds_task:
+                st.session_state.pop(SS_KEY, None)
                 st.info("Không có đầu việc trong khoảng thời gian đã chọn.")
-                return
+                st.stop()
 
             hom_nay = date.today().isoformat()
+
+            # Sheet 0: Tổng hợp đầu việc
+            summary_rows = []
+            for i, t in enumerate(ds_task, 1):
+                kq = _doc_ketqua_task(t["id"])
+                xong  = sum(1 for r in kq if r["trang_thai"] == "da_hoan_thanh")
+                chua  = sum(1 for r in kq if r["trang_thai"] == "chua_thuc_hien")
+                tre   = sum(1 for r in kq
+                            if r["trang_thai"] == "chua_thuc_hien"
+                            and t["ngay_deadline"] < hom_nay)
+                na    = sum(1 for r in kq if r["trang_thai"] == "khong_ap_dung")
+                tong  = len(kq)
+                ds_p  = json.loads(t.get("ds_pgd") or "[]")
+                summary_rows.append({
+                    "STT":           i,
+                    "Đầu việc":      t["tieu_de"],
+                    "Loại":          LOAI_TASK.get(t["loai"], t["loai"]),
+                    "Ưu tiên":       UU_TIEN.get(t["uu_tien"], t["uu_tien"]).replace("🔴","").replace("🟡","").replace("🟢","").strip(),
+                    "Deadline":      t["ngay_deadline"],
+                    "Số PGD":        len(ds_p),
+                    "Tổng xã":       tong,
+                    "Đã hoàn thành": xong,
+                    "Chưa thực hiện": chua - tre,
+                    "Trễ hạn":       tre,
+                    "N/A":           na,
+                    "Tỷ lệ HT%":    round(xong / tong * 100, 1) if tong else 0,
+                })
+            df_tonghop = pd.DataFrame(summary_rows)
 
             # Sheet 1: Ma trận PGD × đầu việc
             bang_rows = []
@@ -454,18 +494,38 @@ def _render_xuat(tab, **kwargs):
 
             out = BytesIO()
             with pd.ExcelWriter(out, engine="openpyxl") as writer:
+                df_tonghop.to_excel(writer, sheet_name="Tổng hợp", index=False)
                 df_matran.to_excel(writer, sheet_name="Ma trận PGD", index=False)
                 df_ct.to_excel(writer, sheet_name="Chi tiết xã", index=False)
 
-            st.download_button(
-                label="⬇ Tải Excel",
-                data=out.getvalue(),
-                file_name=f"TienDoCongViec_{date.today().isoformat()}.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                use_container_width=True,
-                key="td_xuat_dl",
-            )
-            st.success(f"Đã xuất {len(ds_task)} đầu việc × {len(df_ct)} dòng chi tiết.")
+            st.session_state[SS_KEY] = {
+                "data": out.getvalue(),
+                "filename": f"TienDoCongViec_{date.today().isoformat()}.xlsx",
+                "n_task": len(ds_task),
+                "n_ct": len(df_ct),
+                "n_th": len(df_tonghop),
+            }
+            st.rerun()
+
+        if SS_KEY in st.session_state:
+            payload = st.session_state[SS_KEY]
+            col_dl, col_clear = st.columns([4, 1])
+            with col_dl:
+                st.download_button(
+                    label="⬇ Tải file Excel",
+                    data=payload["data"],
+                    file_name=payload["filename"],
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    use_container_width=True,
+                    key="td_xuat_dl",
+                )
+            with col_clear:
+                if st.button("✕", key="td_xuat_clear", help="Tạo lại"):
+                    del st.session_state[SS_KEY]
+                    st.rerun()
+            st.success(f"Đã xuất {payload['n_task']} đầu việc · "
+                       f"{payload['n_ct']} dòng chi tiết · "
+                       f"{payload['n_th']} đầu việc tổng hợp.")
 
 
 def render(tab, **kwargs):

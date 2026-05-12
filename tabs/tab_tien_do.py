@@ -546,7 +546,11 @@ def render(tab, **kwargs):
     is_exec = role == "executive"
     is_pgd_view = (role not in ROLES_PHAN_HE_CN) and bool(pgd_user)
 
-    with tab:
+    if tab is not None:
+        _ctx = tab
+    else:
+        _ctx = st.container()
+    with _ctx:
         st.subheader("📅 Tiến độ Công việc Hàng ngày")
 
         if is_exec or is_pgd_view:

@@ -125,7 +125,8 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
     username = kwargs.get("username")
     df_nq11  = kwargs.get("df_nq11")
 
-    with tab:
+    _tab_ctx = tab if tab is not None else __import__('streamlit').container()
+    with _tab_ctx:
         st.subheader("Danh sách hồ sơ & Bộ lọc")
         with st.expander("🔧 Bộ lọc", expanded=True):
             f1, f2, f3, f4 = st.columns(4)

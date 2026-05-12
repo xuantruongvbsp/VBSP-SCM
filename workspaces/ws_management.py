@@ -44,6 +44,7 @@ from tabs import (
     tab_qd62,
     tab_tien_do,
 )
+from tabs import tab_checklist_bc
 from tabs import tab_xlrr_tong_hop
 from tabs import tab_upload_khnv
 from tabs import tab_quan_ly_dgd
@@ -838,6 +839,7 @@ def _build_all_items(role: str, username: str, **kwargs) -> list:
         {"group": "Kế hoạch",      "label": "Giao KH theo Đợt", "icon": "upload",         "fn": lambda: tab_khtd_giao_dc.render(None, **kwargs)},
         {"group": "Kế hoạch",      "label": "KH vs Thực hiện", "icon": "chart-line",     "fn": lambda: tab_kehoach.render(None, **kwargs)},
         {"group": "Báo cáo",       "label": "Báo cáo chi tiết", "icon": "file",           "fn": lambda: tab_baocao.render(None, **kwargs)},
+        {"group": "Báo cáo", "label": "Checklist BC Định kỳ", "icon": "calendar-check", "fn": lambda: tab_checklist_bc.render(None, **kwargs)},
         {"group": "Báo cáo",       "label": "Điện Báo",        "icon": "antenna",        "fn": lambda: tab_candoi.render(None, **kwargs)},
         {"group": "Báo cáo",       "label": "Điểm GD & Tổ TK&VV", "icon": "map-pin",      "fn": lambda: _render_dgd_to_tkvv(None, **kwargs)},
         {"group": "Hành chính",    "label": "Ban Đại Diện",    "icon": "building",       "fn": lambda: tab_ban_dai_dien.render(None, cap="tinh", **kwargs)},

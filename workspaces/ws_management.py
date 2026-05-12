@@ -819,6 +819,111 @@ def _render_quan_ly_template(df: pd.DataFrame):
                 st.exception(e)  # Debug info
 
 
+def _build_all_items(role: str, username: str, **kwargs) -> list:
+    """Xây danh sách ALL_ITEMS — dùng chung cho sidebar và render."""
+    import streamlit as st
+    df_full = kwargs.get("df_full")
+    ds_pgd_all = kwargs.get("ds_pgd_all", [])
+    can_upload = kwargs.get("can_upload", False)
+
+    ALL_ITEMS = [
+        {"group": "Tổng quan",     "label": "Thông tin chung", "icon": "chart-bar",      "fn": lambda: tab_tongquan.render(None, **kwargs)},
+        {"group": "Tổng quan",     "label": "Tiến độ",         "icon": "calendar",       "fn": lambda: tab_tien_do.render(None, **kwargs)},
+        {"group": "Tổng quan",     "label": "Cảnh báo nợ",     "icon": "alert-triangle", "fn": lambda: _render_canh_bao_no(df_full, ds_pgd_all, role, kwargs.get("username", "unknown"))},
+        {"group": "Kiểm soát",     "label": "Kiểm soát CN",    "icon": "search",         "fn": lambda: tab_kiem_soat.render_tab(df_full, role, kwargs.get("username", "unknown"))},
+        {"group": "Kiểm soát",     "label": "Nợ rủi ro QĐ62",  "icon": "credit-card",    "fn": lambda: tab_qd62.render(mode="cn")},
+        {"group": "Kiểm soát",     "label": "Quản lý CBTD",    "icon": "user",           "fn": lambda: tab_cbtd.render(None, **kwargs)},
+        {"group": "Kế hoạch",      "label": "KH Tín dụng Năm", "icon": "file-text",      "fn": lambda: tab_khtd.render(None, **dict(kwargs, khtd_mode="cn"))},
+        {"group": "Kế hoạch",      "label": "Giao KH theo Đợt", "icon": "upload",         "fn": lambda: tab_khtd_giao_dc.render(None, **kwargs)},
+        {"group": "Kế hoạch",      "label": "KH vs Thực hiện", "icon": "chart-line",     "fn": lambda: tab_kehoach.render(None, **kwargs)},
+        {"group": "Báo cáo",       "label": "Báo cáo chi tiết", "icon": "file",           "fn": lambda: tab_baocao.render(None, **kwargs)},
+        {"group": "Báo cáo",       "label": "Điện Báo",        "icon": "antenna",        "fn": lambda: tab_candoi.render(None, **kwargs)},
+        {"group": "Báo cáo",       "label": "Điểm GD & Tổ TK&VV", "icon": "map-pin",      "fn": lambda: _render_dgd_to_tkvv(None, **kwargs)},
+        {"group": "Hành chính",    "label": "Ban Đại Diện",    "icon": "building",       "fn": lambda: tab_ban_dai_dien.render(None, cap="tinh", **kwargs)},
+        {"group": "Hành chính",    "label": "Ủy thác",         "icon": "handshake",      "fn": lambda: tab_uy_thac.render(None, **kwargs)},
+        {"group": "Hành chính",    "label": "Nhiệm vụ",        "icon": "check",          "fn": lambda: tab_nhiem_vu.render(None, **kwargs)},
+    ]
+
+    if can_upload:
+        ALL_ITEMS.append({"group": "Hành chính", "label": "Quản lý Template", "icon": "template", "fn": lambda: _render_quan_ly_template(df_full)})
+    if role in ("admin", "admin_cn", "manager", "manager_cn"):
+        ALL_ITEMS.append({"group": "Hành chính", "label": "Mã NĐT ĐP", "icon": "building-bank", "fn": lambda: _render_ndt_dp(role, kwargs.get("username", "unknown"))})
+    if role in ("admin", "admin_cn"):
+        ALL_ITEMS.append({"group": "Hành chính", "label": "Audit Log", "icon": "list", "fn": lambda: tab_audit_log.render(None, **kwargs)})
+    ALL_ITEMS.append({"group": "Hành chính", "label": "Upload KH-NV", "icon": "upload", "fn": lambda: tab_upload_khnv.render(None, **kwargs)})
+
+    return ALL_ITEMS
+
+
+def render_sidebar_menu(role: str, username: str, **kwargs):
+    """Render menu ĐIỀU HÀNH — gọi từ app.py bên trong with st.sidebar."""
+    import streamlit as st
+
+    GROUP_COLORS = {
+        "Tổng quan":  {"bg": "#E6F1FB", "border": "#378ADD", "text": "#185FA5"},
+        "Kiểm soát":  {"bg": "#FCEBEB", "border": "#E24B4A", "text": "#A32D2D"},
+        "Kế hoạch":   {"bg": "#EAF3DE", "border": "#639922", "text": "#3B6D11"},
+        "Báo cáo":    {"bg": "#FAEEDA", "border": "#BA7517", "text": "#854F0B"},
+        "Hành chính": {"bg": "#EEEDFE", "border": "#7F77DD", "text": "#3C3489"},
+    }
+
+    all_items = _build_all_items(role, username, **kwargs)
+    if not all_items:
+        return
+
+    if "ws_mgmt_menu" not in st.session_state:
+        st.session_state["ws_mgmt_menu"] = all_items[0]["label"]
+
+    valid_labels = [x["label"] for x in all_items]
+    if st.session_state["ws_mgmt_menu"] not in valid_labels:
+        st.session_state["ws_mgmt_menu"] = all_items[0]["label"]
+
+    st.markdown(
+        "<p style='font-size:12px;font-weight:500;"
+        "color:#444;margin-bottom:4px'>MENU ĐIỀU HÀNH</p>",
+        unsafe_allow_html=True
+    )
+
+    current_group = None
+    for item in all_items:
+        grp = item["group"]
+        clr = GROUP_COLORS.get(grp, {"bg": "#F1EFE8", "border": "#888", "text": "#444"})
+
+        if grp != current_group:
+            current_group = grp
+            st.markdown(
+                f"<p style='font-size:10px;font-weight:500;"
+                f"color:{clr['text']};text-transform:uppercase;"
+                f"letter-spacing:0.06em;padding:10px 4px 2px;margin:0'>"
+                f"{grp}</p>",
+                unsafe_allow_html=True
+            )
+
+        is_active = st.session_state["ws_mgmt_menu"] == item["label"]
+
+        if is_active:
+            st.markdown(
+                f"<div style='"
+                f"background:{clr['bg']};"
+                f"border-left:2px solid {clr['border']};"
+                f"color:{clr['text']};"
+                f"font-size:13px;font-weight:500;"
+                f"padding:6px 8px 6px 10px;"
+                f"border-radius:0 5px 5px 0;"
+                f"margin-bottom:2px'>"
+                f"{item['label']}</div>",
+                unsafe_allow_html=True
+            )
+        else:
+            if st.button(
+                item["label"],
+                key=f"menu_{item['label']}",
+                use_container_width=True,
+            ):
+                st.session_state["ws_mgmt_menu"] = item["label"]
+                st.rerun()
+
+
 def render(**kwargs):
     _wl = st.session_state.pop("_data_load_warning", None)
     if _wl:

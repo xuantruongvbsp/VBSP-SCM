@@ -95,7 +95,11 @@ def _render_cap_tinh(**kwargs):
 
 
 def render(tab, cap: str = "xa", **kwargs):
-    with tab:
+    if tab is not None:
+        _ctx = tab
+    else:
+        _ctx = st.container()
+    with _ctx:
         if cap == "tinh":
             _render_cap_tinh(**kwargs)
         else:

@@ -13,6 +13,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 import os
 
+from snapshot_service import doc_snapshot, doc_snapshot_range, danh_sach_ky
 from config import (
     COT_TEN_PGD, COT_MA_KH, COT_SO_KU, COT_TEN_KH,
     COT_DU_NO_QH, COT_TONG_DU_NO, COT_DU_NO_TH, COT_TEN_CT,
@@ -20,7 +21,8 @@ from config import (
     NAM_HT, NAM_PREV, COT_LAI_TON,
 )
 from data import (doc_dienbao, db_lookup, db_nqh_con, ts_file, doc_kehoach,
-                  danh_dau_khong_hd, tong_hop_khong_hd, canh_bao_migration)
+                  canh_bao_migration)
+from data.hstd import danh_dau_khong_hd, tong_hop_khong_hd
 from utils import (
     fmt,
     fmt_tien,
@@ -203,6 +205,196 @@ def _render_metric_cards(**kwargs) -> None:
 # ═══════════════════════════════════════════════════════════════════════════════
 # SECTION 1 — Sức Khỏe Tín Dụng (Gauge + KPI tổng hợp)
 # ═══════════════════════════════════════════════════════════════════════════════
+def _kpi_strip_nhanh(df_full: pd.DataFrame) -> None:
+    """
+    4 KPI tổng hợp so sánh với snapshot tháng trước.
+    Hiển thị delta nếu có snapshot; hiện số tuyệt đối nếu chưa có.
+    """
+    tdn = float(df_full[COT_TONG_DU_NO].sum()) if COT_TONG_DU_NO in df_full.columns else 0
+    dqh = float(df_full[COT_DU_NO_QH].sum()) if COT_DU_NO_QH in df_full.columns else 0
+    n_kh = int(df_full[COT_MA_KH].nunique()) if COT_MA_KH in df_full.columns else 0
+    tlqh = dqh / tdn * 100 if tdn > 0 else 0
+
+    ds_ky = danh_sach_ky()
+    prev_row = None
+    if len(ds_ky) >= 2:
+        df_prev = doc_snapshot(ds_ky[1])
+        cn_prev = df_prev[df_prev["ten_pgd"] == "__CN__"] if not df_prev.empty else pd.DataFrame()
+        if not cn_prev.empty:
+            prev_row = cn_prev.iloc[0]
+
+    def _delta_ty(val_now, val_prev_row, col):
+        if prev_row is None:
+            return None
+        prev = float(prev_row.get(col, 0) or 0)
+        return (val_now - prev) / 1e9
+
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric(
+        "Tổng dư nợ",
+        fmt_ty(tdn),
+        delta=f"{_delta_ty(tdn, prev_row, 'tong_du_no'):+.1f} tỷ"
+        if _delta_ty(tdn, prev_row, "tong_du_no") is not None
+        else None,
+        help="So với snapshot tháng trước",
+    )
+    c2.metric(
+        "Dư nợ quá hạn",
+        fmt_ty(dqh),
+        delta=f"{_delta_ty(dqh, prev_row, 'du_no_qh'):+.1f} tỷ"
+        if _delta_ty(dqh, prev_row, "du_no_qh") is not None
+        else None,
+        delta_color="inverse",
+    )
+    c3.metric("Tỷ lệ NQH", f"{fmt_pct(tlqh)}")
+    c4.metric("Số hộ vay", fmt_so(n_kh))
+
+
+def _heatmap_rui_ro_pgd(df_full: pd.DataFrame) -> None:
+    """
+    Bảng HTML tổng hợp rủi ro 4 chiều theo PGD:
+      Cột 1: Tên PGD
+      Cột 2: Dư nợ (tỷ)
+      Cột 3: NQH% — tô màu đỏ/vàng/xanh
+      Cột 4: 3 tháng KHĐ (số món)
+      Cột 5: Migration risk (số món sắp chuyển NQH)
+      Cột 6: Tăng trưởng so baseline (nếu có snapshot)
+      Cột 7: Điểm rủi ro tổng (rank)
+    """
+    if COT_TEN_PGD not in df_full.columns:
+        st.info("Không có cột Tên PGD.")
+        return
+
+    grp = df_full.groupby(COT_TEN_PGD)
+    t = (
+        grp.agg(
+            du_no=(COT_TONG_DU_NO, "sum"),
+            du_no_qh=(COT_DU_NO_QH, "sum"),
+            so_kh=(COT_MA_KH, "nunique"),
+        )
+        .reset_index()
+    )
+    t["tl_nqh"] = (
+        t["du_no_qh"] / t["du_no"].replace(0, float("nan")) * 100
+    ).round(3).fillna(0)
+
+    df_khd = danh_dau_khong_hd(df_full)
+    khd_pgd = (
+        df_khd[df_khd["is_3m_inactive"]]
+        .groupby(COT_TEN_PGD)
+        .size()
+        .reset_index(name="so_khd")
+    )
+    t = t.merge(khd_pgd, on=COT_TEN_PGD, how="left")
+    t["so_khd"] = t["so_khd"].fillna(0).astype(int)
+
+    df_mg = canh_bao_migration(df_full)
+    mg_pgd = (
+        df_mg.groupby(COT_TEN_PGD).size().reset_index(name="so_mg")
+        if not df_mg.empty
+        else pd.DataFrame(columns=[COT_TEN_PGD, "so_mg"])
+    )
+    t = t.merge(mg_pgd, on=COT_TEN_PGD, how="left")
+    t["so_mg"] = t["so_mg"].fillna(0).astype(int)
+
+    ds_ky = danh_sach_ky()
+    t["tang_truong"] = None
+    if len(ds_ky) >= 2:
+        df_prev = doc_snapshot(ds_ky[1])
+        if not df_prev.empty:
+            prev_map = df_prev.set_index("ten_pgd")["tong_du_no"].to_dict()
+            t["tang_truong"] = t.apply(
+                lambda r: (r["du_no"] - prev_map.get(r[COT_TEN_PGD], r["du_no"])) / 1e9,
+                axis=1,
+            )
+
+    t["diem_rr"] = (
+        t["tl_nqh"] * 3
+        + (t["so_khd"] / t["so_kh"].replace(0, 1) * 100)
+        + (t["so_mg"] / t["so_kh"].replace(0, 1) * 100)
+    ).round(1)
+    t = t.sort_values("diem_rr", ascending=False).reset_index(drop=True)
+
+    BD = "#d1d5db"
+    H_BG = "#003D7A"
+    WHITE = "#fff"
+    ALT = "#f8fafc"
+    RED = "#dc2626"
+    AMBER = "#d97706"
+    GREEN = "#16a34a"
+    GRAY = "#9ca3af"
+
+    def _td(v, align="right", color="", bg="", fw=""):
+        s = (
+            f"text-align:{align};padding:5px 8px;border:1px solid {BD};"
+            "font-size:0.8rem;white-space:nowrap"
+        )
+        if color:
+            s += f";color:{color}"
+        if bg:
+            s += f";background:{bg}"
+        if fw:
+            s += f";font-weight:{fw}"
+        return f"<td style='{s}'>{v}</td>"
+
+    def _nqh_color(tl):
+        if tl >= 2.0:
+            return RED
+        if tl >= 0.5:
+            return AMBER
+        return GREEN
+
+    headers = ["#", "PGD", "Dư nợ (tỷ)", "NQH%", "3T KHĐ", "Migration", "Tăng trưởng", "Điểm RR"]
+    thead = "".join(
+        f'<th style="background:{H_BG};color:#fff;text-align:{"center" if i==0 else "left" if i==1 else "right"};'
+        f'padding:6px 8px;border:1px solid {BD};font-size:0.8rem">{h}</th>'
+        for i, h in enumerate(headers)
+    )
+
+    rows_html = []
+    for i, row in t.iterrows():
+        bg = WHITE if i % 2 == 0 else ALT
+        tl = row["tl_nqh"]
+        nc = _nqh_color(tl)
+        tt_str = "—"
+        if row["tang_truong"] is not None:
+            tt_val = row["tang_truong"]
+            tt_color = GREEN if tt_val >= 0 else RED
+            tt_str = f'<span style="color:{tt_color}">{tt_val:+.2f} tỷ</span>'
+        tds = (
+            _td(str(i + 1), "center", "", bg)
+            + _td(row[COT_TEN_PGD], "left", "", bg)
+            + _td(fmt_ty(row["du_no"]), "right", "", bg)
+            + _td(f"{tl:.3f}%", "right", nc, bg, "bold" if tl >= 0.5 else "")
+            + _td(str(row["so_khd"]), "right", RED if row["so_khd"] > 0 else GRAY, bg)
+            + _td(str(row["so_mg"]), "right", AMBER if row["so_mg"] > 0 else GRAY, bg)
+            + _td(tt_str, "right", "", bg)
+            + _td(
+                f"{row['diem_rr']:.1f}",
+                "right",
+                RED if row["diem_rr"] >= 5 else AMBER if row["diem_rr"] >= 2 else GREEN,
+                bg,
+                "bold",
+            )
+        )
+        rows_html.append(f"<tr style='background:{bg}'>{tds}</tr>")
+
+    html = f"""
+<div style="overflow-x:auto;margin:8px 0">
+<table style="border-collapse:collapse;width:100%;font-family:'Inter','Segoe UI',sans-serif">
+  <thead><tr>{thead}</tr></thead>
+  <tbody>{"".join(rows_html)}</tbody>
+</table>
+<p style="font-size:0.75rem;color:#6b7280;margin:4px 0 0">
+  NQH%: <span style="color:{GREEN}">■</span> &lt;0.5% an toàn &nbsp;
+  <span style="color:{AMBER}">■</span> 0.5–2% cần theo dõi &nbsp;
+  <span style="color:{RED}">■</span> ≥2% nguy hiểm &nbsp;·&nbsp;
+  Điểm RR = NQH%×3 + KHĐ/KH% + Migration/KH%
+</p>
+</div>"""
+    st.markdown(html, unsafe_allow_html=True)
+
+
 def _the_suc_khoe(df_full: pd.DataFrame) -> None:
     """
     Hiển thị section 'Sức Khỏe Tín Dụng' gồm:
@@ -719,47 +911,74 @@ def render(**kwargs) -> None:
     )
 
     with tab_phan_tich:
-        # ═══════════ 1. SỨC KHỎE TÍN DỤNG ═══════════════════════════════════
+        # ═══════════ 0. KPI NHANH (MỚI) ══════════════════════════════════════
+        _kpi_strip_nhanh(df_full)
+        st.divider()
+
+        # ═══════════ 1. HEATMAP RỦI RO PGD (MỚI) ════════════════════════════
+        st.markdown("**🗺️ Bảng Rủi ro Tổng hợp theo PGD**")
+        _heatmap_rui_ro_pgd(df_full)
+        st.divider()
+
+        # ═══════════ 2. SỨC KHỎE TÍN DỤNG (giữ nguyên) ═════════════════════
         _the_suc_khoe(df_full)
 
         st.divider()
 
-        # ═══════════ 2. TĂNG TRƯỞNG & SO SÁNH PGD ═══════════════════════════
+        # ═══════════ 3. BIỂU ĐỒ SO SÁNH PGD (giữ nguyên) ════════════════════
         _render_heatmap_pgd(df_full=df_full)
 
         st.divider()
 
-        # ═══════════ 3. TOP 10 CHƯƠNG TRÌNH ═══════════════════════════════════
+        # ═══════════ 4. TOP CT + TIẾN ĐỘ KH (giữ nguyên) ════════════════════
         st.markdown("**📌 Top 10 Chương trình tín dụng theo dư nợ**")
         _render_bieu_do_tron(df_full=df_full)
 
         st.divider()
 
-        # ═══════════ 4. TIẾN ĐỘ KẾ HOẠCH VS THỰC HIỆN ═══════════════════════
-        st.markdown("**🎯 Tiến độ Kế hoạch vs Thực hiện — Toàn Chi nhánh**")
         _tien_do_ke_hoach()
 
         st.divider()
 
-        # ═══════════ 5. CẢNH BÁO NQH ĐỘT BIẾN THEO XÃ ═══════════════════════
+        # ═══════════ 5. TĂNG TRƯỞNG LIÊN THÁNG (MỚI) ════════════════════════
+        ds_ky = danh_sach_ky()
+        if len(ds_ky) >= 2:
+            st.markdown("**📈 Tăng trưởng Dư nợ liên tháng**")
+            df_range = doc_snapshot_range(ds_ky[-1], ds_ky[0])
+            if not df_range.empty:
+                df_range["du_no_ty"] = df_range["tong_du_no"] / 1e9
+                import plotly.express as px
+
+                fig = px.line(
+                    df_range,
+                    x="ky",
+                    y="du_no_ty",
+                    markers=True,
+                    labels={"ky": "Kỳ", "du_no_ty": "Dư nợ (tỷ đ)"},
+                )
+                fig.update_layout(
+                    height=280,
+                    margin=dict(l=0, r=20, t=10, b=10),
+                    plot_bgcolor="rgba(0,0,0,0)",
+                    paper_bgcolor="rgba(0,0,0,0)",
+                    font_family="Arial",
+                )
+                st.plotly_chart(fig, use_container_width=True)
+            st.divider()
+
+        # ═══════════ 6-7. CẢNH BÁO (giữ nguyên) ════════════════════════════
         st.markdown("**⚠️ Cảnh báo: Xã/Phường có NQH tăng đột biến**")
         st.caption("So sánh dữ liệu HSTD hiện tại với kỳ trước (nếu có)")
         _canh_bao_xa_nqh(df_full)
 
         st.divider()
 
-        # ═══════════ 6. ĐIỀU CHỈNH GIẢM KHTD (Sheet → KV) ══════════════════
         with st.expander("📋 Giao & Điều chỉnh KHTD", expanded=False):
             tab_khtd_giao_dc.render(None, **kwargs)
 
         st.divider()
 
-        # ═══════════ 7. CẢNH BÁO PHÂN LOẠI NỢ — RỦI RO CHUYỂN NQH ═══════════
         st.subheader("🚨 Cảnh báo Phân loại nợ — Rủi ro chuyển NQH")
-        st.caption(
-            "Món vay Đủ tiêu chuẩn (E) nhưng đã tồn lãi > 1 tháng "
-            "— cần chấn chỉnh trước khi phát sinh NQH"
-        )
         _canh_bao_migration(df_full)
 
     with tab_tien_do_ui:

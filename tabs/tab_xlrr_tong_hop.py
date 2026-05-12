@@ -265,12 +265,20 @@ def render(tab=None, **kwargs) -> None:
     """Render Dashboard XLRR tổng hợp."""
     role = kwargs.get("role")
     if role not in ("admin", "admin_cn", "manager", "manager_cn"):
-        _ctx = get_tab_context(tab)
+        if tab is not None:
+            _ctx = tab
+        else:
+            import streamlit as _st
+            _ctx = _st.container()
         with _ctx:
             st.warning("Bạn không có quyền truy cập Dashboard XLRR tổng hợp.")
         return
 
-    _ctx = get_tab_context(tab)
+    if tab is not None:
+        _ctx = tab
+    else:
+        import streamlit as _st
+        _ctx = _st.container()
     with _ctx:
         st.title("🔴 Quản lý Xử lý Rủi ro (XLRR)")
         st.caption("Tổng hợp hồ sơ QĐ62 và nợ rủi ro từ HSTD toàn Chi nhánh.")

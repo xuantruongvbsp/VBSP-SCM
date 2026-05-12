@@ -14,6 +14,7 @@ import plotly.graph_objects as go
 
 from config import *
 from config import DS_PGD, CACHE_HSTD, DON_VI_CHI_NHANH, TEN_CHI_NHANH_HIEN_THI
+
 from utils import (
     fmt,
     fmt_tien,
@@ -327,6 +328,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
             .ct-card .ct-name{font-size:0.82rem;font-weight:600;color:#374151;margin:0 0 6px 0;line-height:1.3}
             .ct-card .ct-val{font-size:1.35rem;font-weight:700;color:#111827;margin:0}
             .ct-card .ct-pct{font-size:0.85rem;color:#6b7280;margin-top:3px}
+            .ct-card .ct-src{font-size:0.72rem;color:var(--color-text-secondary);margin-top:2px}
             .ct-card .ct-bar{height:4px;border-radius:2px;margin-top:8px;background:var(--ct-color,#2E7D32);opacity:0.35}
             @media(max-width:1200px){.ct-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
             @media (max-width: 1200px){.tq-grid,.totkvv-grid{grid-template-columns:repeat(2,minmax(0,1fr));}}
@@ -547,56 +549,62 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
         st.markdown("**📂 Cơ cấu dư nợ theo chương trình tín dụng**")
         if COT_TEN_CT in df.columns and COT_TONG_DU_NO in df.columns:
 
-            # Tính toán
+            # Build _NGUON_MAP from DS_CHUONG_TRINH inside render() to avoid NameError at module import time
+            _NGUON_MAP: dict[str, str] = {
+                ten_hien_thi: nguon_von
+                for _, _, ten_hien_thi, nguon_von, _ in DS_CHUONG_TRINH
+            }
+
             df_ct = (
-                df.groupby(COT_TEN_CT)[COT_TONG_DU_NO]
-                .sum()
-                .sort_values(ascending=False)
+                df.groupby(COT_TEN_CT)
+                .agg(
+                    du_no   =(COT_TONG_DU_NO, "sum"),
+                    so_mon  =(COT_SO_KU,      "nunique"),
+                    so_kh   =(COT_MA_KH,      "nunique"),
+                )
+                .sort_values("du_no", ascending=False)
                 .reset_index()
             )
-            df_ct.columns = ["ten_ct", "du_no"]
+            df_ct.columns = ["ten_ct", "du_no", "so_mon", "so_kh"]
             df_ct = df_ct[df_ct["du_no"] > 0]
-            tong = df_ct["du_no"].sum()
-            df_ct["ty_trong"] = (df_ct["du_no"] / tong * 100) if tong > 0 else 0
 
-            # Bảng màu xoay vòng theo thứ tự
-            _MAUS = [
-                "#1565C0", "#2E7D32", "#6A1B9A", "#E65100",
-                "#00695C", "#AD1457", "#4527A0", "#558B2F",
+            tong = df_ct["du_no"].sum()
+            df_ct["ty_trong"] = (df_ct["du_no"] / tong * 100).round(1) if tong > 0 else 0
+
+            # Tách nguồn TW / ĐP theo config
+            df_ct["_nguon"] = df_ct["ten_ct"].map(_NGUON_MAP).fillna("TW")
+            df_ct["du_no_tw"] = df_ct.apply(
+                lambda r: r["du_no"] if r["_nguon"] == "TW" else 0, axis=1
+            )
+            df_ct["du_no_dp"] = df_ct.apply(
+                lambda r: r["du_no"] if r["_nguon"] == "DP" else 0, axis=1
+            )
+
+            # Hiển thị bảng
+            df_hien = df_ct.rename(columns={"ten_ct": "Chương trình"}).copy()
+            df_hien["Số món vay"]      = df_hien["so_mon"].apply(fmt_so)
+            df_hien["Số KH"]           = df_hien["so_kh"].apply(fmt_so)
+            df_hien["Dư nợ (tỷ)"]     = (df_hien["du_no"]    / 1e9).round(3)
+            df_hien["Nguồn TW (tỷ)"]  = (df_hien["du_no_tw"] / 1e9).round(3)
+            df_hien["Nguồn ĐP (tỷ)"]  = (df_hien["du_no_dp"] / 1e9).round(3)
+            df_hien["Tỷ trọng %"]     = df_hien["ty_trong"]
+
+            cols_hien = [
+                "Chương trình", "Số món vay", "Số KH",
+                "Dư nợ (tỷ)", "Nguồn TW (tỷ)", "Nguồn ĐP (tỷ)", "Tỷ trọng %"
             ]
 
-            # Render cards HTML
-            cards_html = '<div class="ct-grid">'
-            for i, row in df_ct.iterrows():
-                mau = _MAUS[i % len(_MAUS)]
-                ten_hien = str(row["ten_ct"])
-                ten_hien = (ten_hien[:40] + "…") if len(ten_hien) > 40 else ten_hien
-                bar_w = min(row["ty_trong"] * 2, 100)  # scale bar 0–50% → 0–100px
-                cards_html += f"""
-            <div class="ct-card" style="--ct-color:{mau}">
-                <div class="ct-name">{ten_hien}</div>
-                <div class="ct-val">{fmt_ty(row['du_no'])}</div>
-                <div class="ct-pct">Tỷ trọng: {row['ty_trong']:.1f}%</div>
-                <div class="ct-bar" style="width:{bar_w}%"></div>
-            </div>"""
-            cards_html += "</div>"
-
-            st.markdown(cards_html, unsafe_allow_html=True)
-
-            # Toggle xem bảng chi tiết (ẩn mặc định)
-            # with st.expander("📋 Xem bảng chi tiết", expanded=False):
-            #     df_hien = df_ct.copy()
-            #     df_hien = df_hien.rename(columns={
-            #         "ten_ct": "Chương trình",
-            #         "du_no": "Dư nợ",
-            #         "ty_trong": "Tỷ trọng"
-            #     })
-            #     st.dataframe(
-            #         df_hien[["Chương trình", "Dư nợ", "Tỷ trọng"]],
-            #         column_config=_tao_column_config_co_cau(),
-            #         use_container_width=True,
-            #         hide_index=True,
-            #     )
+            st.dataframe(
+                df_hien[cols_hien],
+                use_container_width=True,
+                hide_index=True,
+                column_config={
+                    "Dư nợ (tỷ)":    st.column_config.NumberColumn("Dư nợ (tỷ)",   format="%.3f"),
+                    "Nguồn TW (tỷ)": st.column_config.NumberColumn("TW (tỷ)",      format="%.3f"),
+                    "Nguồn ĐP (tỷ)": st.column_config.NumberColumn("ĐP (tỷ)",      format="%.3f"),
+                    "Tỷ trọng %":    st.column_config.NumberColumn("Tỷ trọng %",   format="%.1f%%"),
+                }
+            )
 
         st.markdown("**🟢 Thông tin tổng quát theo PGD**")
         if COT_TEN_PGD in df.columns:

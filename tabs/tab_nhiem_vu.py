@@ -164,7 +164,8 @@ def _render_danh_sach_manager(tab, **kwargs):
     """📥 Danh sách nhiệm vụ — manager / admin xem tổng hợp kết quả từng PGD."""
     ds_pgd_all: list = kwargs.get("ds_pgd_all", [])
 
-    with tab:
+    _tab_ctx = tab if tab is not None else __import__('streamlit').container()
+    with _tab_ctx:
         st.subheader("📥 Danh sách nhiệm vụ")
         chu_ky, ky, pgd_loc = _bo_loc_ky("mgr_ds", hien_pgd=True, ds_pgd=ds_pgd_all)
 
@@ -216,7 +217,8 @@ def _render_nhap_moi(tab, **kwargs):
     username: str  = kwargs.get("username", "")
     ds_pgd_all: list = kwargs.get("ds_pgd_all", [])
 
-    with tab:
+    _tab_ctx = tab if tab is not None else __import__('streamlit').container()
+    with _tab_ctx:
         st.subheader("➕ Nhập nhiệm vụ mới")
 
         # chu_ky đặt NGOÀI form để kỳ cập nhật động khi người dùng đổi chu kỳ
@@ -305,7 +307,8 @@ def _render_hau_kiem(tab, **kwargs):
     username: str    = kwargs.get("username", "")
     ds_pgd_all: list = kwargs.get("ds_pgd_all", [])
 
-    with tab:
+    _tab_ctx = tab if tab is not None else __import__('streamlit').container()
+    with _tab_ctx:
         st.subheader("🔍 Hậu kiểm kết quả")
         chu_ky, ky, pgd_loc = _bo_loc_ky("hk", hien_pgd=True, ds_pgd=ds_pgd_all)
 
@@ -392,7 +395,8 @@ def _render_nhiem_vu_duoc_giao(tab, **kwargs):
     """📥 Nhiệm vụ được giao — CBTD xem nhiệm vụ và trạng thái kết quả."""
     pgd_user: str = kwargs.get("pgd_user") or ""
 
-    with tab:
+    _tab_ctx = tab if tab is not None else __import__('streamlit').container()
+    with _tab_ctx:
         st.subheader("📥 Nhiệm vụ được giao")
         if not pgd_user:
             st.warning("Tài khoản chưa được gán PGD. Liên hệ quản trị viên.")
@@ -444,7 +448,8 @@ def _render_nhap_ket_qua(tab, **kwargs):
     username: str = kwargs.get("username", "")
     pgd_user: str = kwargs.get("pgd_user") or ""
 
-    with tab:
+    _tab_ctx = tab if tab is not None else __import__('streamlit').container()
+    with _tab_ctx:
         st.subheader("✏️ Nhập kết quả nhiệm vụ")
         if not pgd_user:
             st.warning("Tài khoản chưa được gán PGD. Liên hệ quản trị viên.")
@@ -529,7 +534,9 @@ def render(tab, **kwargs):
     """Render tab Quản lý Nhiệm vụ — phân nhánh theo role."""
     role: str = kwargs.get("role", "user")
 
-    with get_tab_context(tab):
+    import streamlit as _st
+    _tab_ctx = tab if tab is not None else _st.container()
+    with _tab_ctx:
         if role in ("admin", "manager", "admin_cn", "manager_cn"):
             t1, t2, t3 = st.tabs([
                 "📥 Danh sách nhiệm vụ",

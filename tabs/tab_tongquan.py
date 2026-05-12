@@ -13,6 +13,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 
 from config import *
+from config import CHUONG_TRINH_KHTD
 from config import DS_PGD, CACHE_HSTD, DON_VI_CHI_NHANH, TEN_CHI_NHANH_HIEN_THI
 
 from utils import (
@@ -549,10 +550,10 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
         st.markdown("**📂 Cơ cấu dư nợ theo chương trình tín dụng**")
         if COT_TEN_CT in df.columns and COT_TONG_DU_NO in df.columns:
 
-            # Build _NGUON_MAP from DS_CHUONG_TRINH inside render() to avoid NameError at module import time
+            # Build _NGUON_MAP from CHUONG_TRINH_KHTD inside render() to avoid NameError at module import time
             _NGUON_MAP: dict[str, str] = {
                 ten_hien_thi: nguon_von
-                for _, _, ten_hien_thi, nguon_von, _ in DS_CHUONG_TRINH
+                for _, _, ten_hien_thi, nguon_von, _ in CHUONG_TRINH_KHTD
             }
 
             df_ct = (

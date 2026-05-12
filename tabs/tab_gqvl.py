@@ -153,7 +153,8 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
     pgd_user = kwargs.get("pgd_user")
     df_full = kwargs.get("df_full")
 
-    with tab:
+    _tab_ctx = tab if tab is not None else __import__('streamlit').container()
+    with _tab_ctx:
         st.subheader("💼 Theo dõi chỉ tiêu Giải quyết Việc làm (GQVL)")
 
         # ── Upload file ───────────────────────────────────────────────────

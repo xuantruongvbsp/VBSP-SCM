@@ -17,7 +17,7 @@ import pandas as pd
 from openpyxl.styles import Font, PatternFill
 
 import db
-from auth import la_phan_he_cn
+from auth import la_phan_he_cn, normalize_role
 from utils import hien_thi_dataframe_phan_trang
 
 from config import (
@@ -143,7 +143,7 @@ def _hien_thi_lich_su_qd(kv_key: str, nhan: str, role: str, username: str) -> No
         else:
             c5.markdown("⚠️")
 
-        if role == "admin":
+        if normalize_role(role) in ("admin_cn", "admin"):
             if c6.button("🗑", key=f"del_{kv_key}_{idx_rev}", help="Xóa file"):
                 if duong_dan.exists():
                     duong_dan.unlink()

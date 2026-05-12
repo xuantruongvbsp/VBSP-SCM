@@ -1,5 +1,22 @@
 # CHANGELOG
 
+## [2026-05-12] — Thêm dashboard XLRR tổng hợp (QĐ62 + nợ RR HSTD)
+- `tabs/tab_xlrr_tong_hop.py` — Dashboard tổng hợp XLRR toàn CN với 4 tab con + xuất Excel
+- `workspaces/ws_management.py` — Thêm menu “XLRR Tổng hợp” trong nhóm “Kiểm soát”
+
+## [2026-05-12] — Đổi tên menu XLRR
+- `workspaces/ws_management.py` — Đổi nhãn menu "Nợ rủi ro & XLRR" thành "XLRR theo QĐ"
+
+## [2026-05-12] — Gộp menu QĐ62 vào dashboard XLRR
+- `workspaces/ws_management.py` — Xóa item “Nợ rủi ro QĐ62”, đổi label “XLRR Tổng hợp” → “Nợ rủi ro & XLRR”
+
+## [2026-05-12] — Chuyển menu Điều hành sang sidebar cấp app.py
+- `app.py` — Gọi `render_sidebar_menu()` (ws_management) ngay sau phần “Không gian làm việc” trong sidebar
+- `workspaces/ws_management.py` — Xóa block `with st.sidebar:` trong `render()` vì menu đã render từ `app.py`
+
+## [2026-05-12] — Đổi nhãn menu “Tiến độ” → “Tiến độ Công việc”
+- `workspaces/ws_management.py` — Đổi label menu “Tiến độ” thành “Tiến độ Công việc” để hiển thị rõ nghĩa
+
 ## [2026-05-12] — Căn chỉnh helper menu Điều hành (ws_management)
 - `workspaces/ws_management.py` — Đồng bộ lambda trong `_build_all_items()` với `render()` và thêm guard state cho `render_sidebar_menu()`
 

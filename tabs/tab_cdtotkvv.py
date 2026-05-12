@@ -1170,7 +1170,8 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
     cdto_mode = kwargs.get("cdto_mode", "cn")  # "cn" hoặc "pgd"
     pgd_user = kwargs.get("pgd_user", "")
 
-    with tab:
+    _tab_ctx = tab if tab is not None else __import__('streamlit').container()
+    with _tab_ctx:
         if not la_phan_he_cn(role) and not la_phan_he_pgd(role):
             st.error("Bạn không có quyền truy cập trang này.")
             return

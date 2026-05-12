@@ -52,7 +52,9 @@ def render(tab, **kwargs) -> None:
         st.warning("⛔ Chỉ Admin mới có quyền xem Audit Log.")
         return
 
-    with get_tab_context(tab):
+    import streamlit as _st
+    _tab_ctx = tab if tab is not None else _st.container()
+    with _tab_ctx:
         st.subheader("📋 Lịch sử thao tác hệ thống")
 
         # ── Bộ lọc ───────────────────────────────────────────────────────

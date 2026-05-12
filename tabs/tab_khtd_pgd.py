@@ -554,7 +554,8 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
     pgd_user = kwargs.get("pgd_user", "")
     df = kwargs.get("df_full", kwargs.get("df"))
 
-    with tab:
+    _tab_ctx = tab if tab is not None else __import__('streamlit').container()
+    with _tab_ctx:
         st.title("🏦 Kế hoạch Tín dụng — Cấp PGD")
         st.caption("Hỗ trợ địa bàn · Xem tổng hợp KH theo Xã × Chương trình")
 

@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## [2026-05-12] — Checklist BC: đổi context render(tab)
+- `tabs/tab_checklist_bc.py` — `render()` dùng `tab` nếu có, fallback `st.container()` nếu tab=None
+
+## [2026-05-12] — Thêm tab Checklist báo cáo định kỳ
+- `tabs/tab_checklist_bc.py` — Checklist theo dõi hạn nộp báo cáo tháng/quý/năm, cập nhật trạng thái và xuất Excel (lưu kv_store)
+
 ## [2026-05-12] — Đổi nhãn menu XLRR theo QĐ62
 - `workspaces/ws_management.py` — Đổi label menu “XLRR theo QĐ” → “Xử lý rủi ro theo QĐ62”
 

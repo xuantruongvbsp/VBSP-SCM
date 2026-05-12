@@ -64,7 +64,8 @@ def render(tab: DeltaGenerator, **kwargs: Any) -> None:
     df_h = _df_hstd(kwargs)
     hn = _hostname()
 
-    with tab:
+    _tab_ctx = tab if tab is not None else __import__('streamlit').container()
+    with _tab_ctx:
         st.subheader("📍 Điểm Giao Dịch (dgd_map)")
         st.caption(
             "Cấu hình ĐGD — thôn/ấp theo PGD/Xã. Import Excel hoặc sửa trực tiếp."

@@ -286,7 +286,11 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
     df_nq11  = kwargs.get("df_nq11")
     ts = kwargs.get("ts_hstd", 0.0)
 
-    with tab:
+    if tab is not None:
+        _ctx = tab
+    else:
+        _ctx = st.container()
+    with _ctx:
         st.markdown(
             """
             <style>

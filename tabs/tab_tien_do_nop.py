@@ -1,7 +1,8 @@
 import streamlit as st
 import pandas as pd
 import gspread
-from oauth2client.service_account import ServiceAccountCredentials
+# import oauth2client only as fallback; prefer google-auth via gspread.service_account
+# oauth2client will be imported lazily inside _ket_noi_gsheet() if needed
 from pathlib import Path
 from typing import Optional
 from config import DS_PGD, DON_VI_CHI_NHANH
@@ -21,8 +22,20 @@ def _ket_noi_gsheet():
     ]
     if not Path(CREDENTIALS_FILE).exists():
         raise FileNotFoundError(f"Không tìm thấy file credentials: {CREDENTIALS_FILE}")
-    creds = ServiceAccountCredentials.from_json_keyfile_name(CREDENTIALS_FILE, scope)
-    return gspread.authorize(creds)
+    # Thử dùng google-auth (gspread.service_account) trước — hiện đại và không cần oauth2client
+    try:
+        client = gspread.service_account(filename=CREDENTIALS_FILE, scopes=scope)
+        return client
+    except Exception:
+        # Fallback: nếu môi trường còn dùng oauth2client
+        try:
+            from oauth2client.service_account import ServiceAccountCredentials  # type: ignore
+        except Exception as e:
+            raise RuntimeError(
+                "Không thể kết nối GSheet: cần cài đặt google-auth và gspread, hoặc oauth2client."
+            ) from e
+        creds = ServiceAccountCredentials.from_json_keyfile_name(CREDENTIALS_FILE, scope)
+        return gspread.authorize(creds)
 
 @st.cache_data(ttl=300)
 def _doc_du_lieu() -> pd.DataFrame:
@@ -43,6 +56,7 @@ def _doc_du_lieu() -> pd.DataFrame:
 
 def render(tab: Optional[st.delta_generator.DeltaGenerator] = None, **kwargs) -> None:
     """Render tab Báo cáo Tiến độ PGD."""
+    role = kwargs.get("role")
     ctx = tab if tab is not None else st
     
     with ctx:

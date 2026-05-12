@@ -434,7 +434,9 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
     # Đọc GQVL toàn CN để tính TH phân tầng 4 nhóm
     df_gqvl = _doc_gqvl_parquet()
 
-    with get_tab_context(tab):
+    import streamlit as _st
+    _tab_ctx = tab if tab is not None else _st.container()
+    with _tab_ctx:
         st.title("🏛️ Kế hoạch Tín dụng — Phòng KH-NV")
         st.caption(
             "Quản lý KHTD cấp Chi nhánh và phân bổ xuống Xã · "

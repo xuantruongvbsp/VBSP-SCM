@@ -145,7 +145,8 @@ def init_db():
                 id           INTEGER PRIMARY KEY AUTOINCREMENT,
                 ky           TEXT    NOT NULL,
                 ten_pgd      TEXT    NOT NULL,
-                ma_ct        TEXT    NOT NULL,
+                ma_ct        TEXT    NOT NULL DEFAULT 'ALL',
+                nguon_von    TEXT    NOT NULL DEFAULT 'ALL',
                 tong_du_no   REAL    NOT NULL DEFAULT 0,
                 du_no_th     REAL    NOT NULL DEFAULT 0,
                 du_no_qh     REAL    NOT NULL DEFAULT 0,
@@ -153,7 +154,6 @@ def init_db():
                 so_ho        INTEGER NOT NULL DEFAULT 0,
                 so_ku        INTEGER NOT NULL DEFAULT 0,
                 gn_nam       REAL    NOT NULL DEFAULT 0,
-                nguon_von    TEXT    NOT NULL DEFAULT 'ALL',
                 ngay_so_lieu TEXT,
                 created_at   TEXT    NOT NULL DEFAULT (datetime('now','localtime')),
                 created_by   TEXT    NOT NULL DEFAULT 'system',
@@ -161,7 +161,6 @@ def init_db():
             );
             CREATE INDEX IF NOT EXISTS idx_snapshot_ky     ON hstd_snapshot(ky);
             CREATE INDEX IF NOT EXISTS idx_snapshot_pgd    ON hstd_snapshot(ky, ten_pgd);
-            CREATE INDEX IF NOT EXISTS idx_snapshot_ct     ON hstd_snapshot(ky, ma_ct);
         """)
         conn.commit()
 

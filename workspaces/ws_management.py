@@ -44,6 +44,7 @@ from tabs import (
     tab_qd62,
     tab_tien_do,
 )
+from tabs import tab_xlrr_tong_hop
 from tabs import tab_upload_khnv
 from tabs import tab_quan_ly_dgd
 from tabs import tab_audit_log
@@ -828,10 +829,10 @@ def _build_all_items(role: str, username: str, **kwargs) -> list:
 
     ALL_ITEMS = [
         {"group": "Tổng quan",     "label": "Thông tin chung", "icon": "chart-bar",      "fn": lambda: tab_tongquan.render(None, **kwargs)},
-        {"group": "Tổng quan",     "label": "Tiến độ",         "icon": "calendar",       "fn": lambda: tab_tien_do.render(None, **kwargs)},
+        {"group": "Tổng quan",     "label": "Tiến độ Công việc", "icon": "calendar",       "fn": lambda: tab_tien_do.render(None, **kwargs)},
         {"group": "Tổng quan",     "label": "Cảnh báo nợ",     "icon": "alert-triangle", "fn": lambda: _render_canh_bao_no(df_full, ds_pgd_all, role, kwargs.get("username", "unknown"))},
         {"group": "Kiểm soát",     "label": "Kiểm soát CN",    "icon": "search",         "fn": lambda: tab_kiem_soat.render_tab(df_full, role, kwargs.get("username", "unknown"))},
-        {"group": "Kiểm soát",     "label": "Nợ rủi ro QĐ62",  "icon": "credit-card",    "fn": lambda: tab_qd62.render(mode="cn")},
+        {"group": "Kiểm soát",     "label": "XLRR theo QĐ",   "icon": "alert-circle",   "fn": lambda: tab_xlrr_tong_hop.render(None, **kwargs)},
         {"group": "Kiểm soát",     "label": "Quản lý CBTD",    "icon": "user",           "fn": lambda: tab_cbtd.render(None, **kwargs)},
         {"group": "Kế hoạch",      "label": "KH Tín dụng Năm", "icon": "file-text",      "fn": lambda: tab_khtd.render(None, **dict(kwargs, khtd_mode="cn"))},
         {"group": "Kế hoạch",      "label": "Giao KH theo Đợt", "icon": "upload",         "fn": lambda: tab_khtd_giao_dc.render(None, **kwargs)},
@@ -941,10 +942,10 @@ def render(**kwargs):
     # ── BƯỚC 1: Xây danh sách tất cả menu items ───────────────────────────
     ALL_ITEMS = [
         {"group": "Tổng quan",     "label": "Thông tin chung", "icon": "chart-bar",      "fn": lambda: tab_tongquan.render(None, **kwargs)},
-        {"group": "Tổng quan",     "label": "Tiến độ",         "icon": "calendar",       "fn": lambda: tab_tien_do.render(None, **kwargs)},
+        {"group": "Tổng quan",     "label": "Tiến độ Công việc", "icon": "calendar",       "fn": lambda: tab_tien_do.render(None, **kwargs)},
         {"group": "Tổng quan",     "label": "Cảnh báo nợ",     "icon": "alert-triangle", "fn": lambda: _render_canh_bao_no(df_full, ds_pgd_all, role, kwargs.get("username", "unknown"))},
         {"group": "Kiểm soát",     "label": "Kiểm soát CN",    "icon": "search",         "fn": lambda: tab_kiem_soat.render_tab(df_full, role, kwargs.get("username", "unknown"))},
-        {"group": "Kiểm soát",     "label": "Nợ rủi ro QĐ62",  "icon": "credit-card",    "fn": lambda: tab_qd62.render(mode="cn")},
+        {"group": "Kiểm soát",     "label": "XLRR theo QĐ",   "icon": "alert-circle",   "fn": lambda: tab_xlrr_tong_hop.render(None, **kwargs)},
         {"group": "Kiểm soát",     "label": "Quản lý CBTD",    "icon": "user",           "fn": lambda: tab_cbtd.render(None, **kwargs)},
         {"group": "Kế hoạch",      "label": "KH Tín dụng Năm", "icon": "file-text",      "fn": lambda: tab_khtd.render(None, **dict(kwargs, khtd_mode="cn"))},
         {"group": "Kế hoạch",      "label": "Giao KH theo Đợt", "icon": "upload",         "fn": lambda: tab_khtd_giao_dc.render(None, **kwargs)},
@@ -983,52 +984,6 @@ def render(**kwargs):
         "Báo cáo":    {"bg": "#FAEEDA", "border": "#BA7517", "text": "#854F0B"},
         "Hành chính": {"bg": "#EEEDFE", "border": "#7F77DD", "text": "#3C3489"},
     }
-
-    # ── BƯỚC 2: Sidebar menu ──────────────────────────────────────────────
-    with st.sidebar:
-        st.markdown(
-            "<p style='font-size:12px;font-weight:500;"
-            "color:#444;margin-bottom:4px'>MENU ĐIỀU HÀNH</p>",
-            unsafe_allow_html=True
-        )
-        current_group = None
-        for item in ALL_ITEMS:
-            grp = item["group"]
-            clr = GROUP_COLORS.get(grp, {"bg": "#F1EFE8", "border": "#888", "text": "#444"})
-
-            if grp != current_group:
-                current_group = grp
-                st.markdown(
-                    f"<p style='font-size:10px;font-weight:500;"
-                    f"color:{clr['text']};text-transform:uppercase;"
-                    f"letter-spacing:0.06em;padding:10px 4px 2px;margin:0'>"
-                    f"{grp}</p>",
-                    unsafe_allow_html=True
-                )
-
-            is_active = st.session_state["ws_mgmt_menu"] == item["label"]
-
-            if is_active:
-                st.markdown(
-                    f"<div style='"
-                    f"background:{clr['bg']};"
-                    f"border-left:2px solid {clr['border']};"
-                    f"color:{clr['text']};"
-                    f"font-size:13px;font-weight:500;"
-                    f"padding:6px 8px 6px 10px;"
-                    f"border-radius:0 5px 5px 0;"
-                    f"margin-bottom:2px'>"
-                    f"{item['label']}</div>",
-                    unsafe_allow_html=True
-                )
-            else:
-                if st.button(
-                    item["label"],
-                    key=f"menu_{item['label']}",
-                    use_container_width=True,
-                ):
-                    st.session_state["ws_mgmt_menu"] = item["label"]
-                    st.rerun()
 
     # ── BƯỚC 3: Render nội dung (không cần col_content nữa) ────────────────
     active_item = next(

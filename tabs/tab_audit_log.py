@@ -44,17 +44,15 @@ def _doc_ds_user() -> list[str]:
     return ["Tất cả"] + [r[0] for r in rows]
 
 
+from utils import get_tab_context
+
 def render(tab, **kwargs) -> None:
     role = kwargs.get("role", "user")
     if role not in ("admin", "admin_cn"):
         st.warning("⛔ Chỉ Admin mới có quyền xem Audit Log.")
         return
 
-    if tab is not None:
-        _ctx = tab
-    else:
-        _ctx = st.container()
-    with _ctx:
+    with get_tab_context(tab):
         st.subheader("📋 Lịch sử thao tác hệ thống")
 
         # ── Bộ lọc ───────────────────────────────────────────────────────

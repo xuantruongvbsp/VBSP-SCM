@@ -124,6 +124,8 @@ def _lay_nqh_con(rows: list[dict], ten_cha: str) -> float:
     return 0.0
 
 
+from utils import get_tab_context
+
 def render(tab: DeltaGenerator, **kwargs: dict) -> None:
     """
     Render tab Cân đối Nguồn vốn & Sử dụng vốn.
@@ -140,13 +142,9 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
     df_nq11   = kwargs.get("df_nq11")
     pgd_mode  = kwargs.get("pgd_mode", False)
     key_sfx   = f"_{pgd_slug(pgd_user)}" if pgd_mode else ""
-    if tab is not None:
-        _ctx = tab
-    else:
-        _ctx = st.container()
 
     if pgd_mode and not pgd_user:
-        with _ctx:
+        with get_tab_context(tab):
             st.error("Không xác định được PGD.")
         return
 
@@ -159,7 +157,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
     store_ht = path_dien_ht if pgd_mode else DB_HT_CACHE
     store_prev = path_dien_prev if pgd_mode else DB_PREV_CACHE
 
-    with _ctx:
+    with get_tab_context(tab):
         nam_ht   = str(datetime.today().year)
         nam_prev = str(datetime.today().year - 1)
 

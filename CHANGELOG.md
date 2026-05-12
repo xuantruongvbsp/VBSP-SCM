@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [2026-05-12] — Cập nhật Chay_VBSP_SCM.bat: tự mở trình duyệt
+- `Chay_VBSP_SCM.bat` — Thêm `start "" http://localhost:8501` để tự động mở tab trình duyệt sau khi double-click
+
+## [2026-05-12] — Fix sót `with tab:` trong tab_tien_do.py _render_tong_quan
+- `tabs/tab_tien_do.py` dòng ~94 — `_render_tong_quan()` còn dùng `with tab:` thay vì `with get_tab_context(tab):` gây lỗi khi render từ sidebar (gọi với tab=None)
+- `tabs/tab_tien_do.py` — Thêm `from utils import get_tab_context` ở đầu file, xoá import trùng ở dòng 542
+
 ## [2026-05-12] — Sửa lỗi context manager khi render tab trong ws_management
 - `workspaces/ws_management.py` — ALL_ITEMS truyền `None` thay vì `st` vào render(tab, **kwargs); `_render_dgd_to_tkvv()` dùng `st.container()` khi tab_parent=None
 - `tabs/tab_tongquan.py` — Cho phép render(tab=None) bằng `st.container()`

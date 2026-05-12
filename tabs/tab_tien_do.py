@@ -10,6 +10,7 @@ import streamlit as st
 
 import db
 from config import DS_PGD, DON_VI_CHI_NHANH, PGD_XA_MAP, ROLES_PHAN_HE_CN
+from utils import get_tab_context
 
 DS_PGD_ALL = [DON_VI_CHI_NHANH] + DS_PGD
 
@@ -91,7 +92,7 @@ def _upsert_ketqua_xa(
 
 
 def _render_tong_quan(tab, **kwargs):
-    with tab:
+    with get_tab_context(tab):
         st.subheader("📊 Tổng quan tiến độ")
 
         c1, c2 = st.columns([2, 1])
@@ -538,6 +539,7 @@ def _render_xuat(tab, **kwargs):
                        f"{payload['n_th']} đầu việc tổng hợp.")
 
 
+
 def render(tab, **kwargs):
     role = kwargs.get("role")
     pgd_user = kwargs.get("pgd_user")
@@ -546,11 +548,7 @@ def render(tab, **kwargs):
     is_exec = role == "executive"
     is_pgd_view = (role not in ROLES_PHAN_HE_CN) and bool(pgd_user)
 
-    if tab is not None:
-        _ctx = tab
-    else:
-        _ctx = st.container()
-    with _ctx:
+    with get_tab_context(tab):
         st.subheader("📅 Tiến độ Công việc Hàng ngày")
 
         if is_exec or is_pgd_view:

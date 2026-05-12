@@ -988,16 +988,14 @@ def _render_mau15(df: pd.DataFrame, pgd_user: str) -> None:
 # ENTRY POINT
 # ══════════════════════════════════════════════════════════════════════════════
 
+from utils import get_tab_context
+
 def render(tab: DeltaGenerator, **kwargs) -> None:
     """Entry point — dùng chung cho ws_operation và ws_management."""
     df       = kwargs.get("df")
     pgd_user = kwargs.get("pgd_user", "")
 
-    if tab is not None:
-        _ctx = tab
-    else:
-        _ctx = st.container()
-    with _ctx:
+    with get_tab_context(tab):
         st.subheader("🤝 Ủy thác — Hội đoàn thể")
         st.caption(
             "Theo dõi hoạt động ủy thác và các mẫu biểu kiểm tra "

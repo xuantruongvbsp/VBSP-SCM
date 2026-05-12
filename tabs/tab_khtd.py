@@ -417,6 +417,8 @@ def _doc_gqvl_parquet() -> "pd.DataFrame | None":
         return None
 
 
+from utils import get_tab_context
+
 # ── Entry point ───────────────────────────────────────────────────────────────
 def render(tab: DeltaGenerator, **kwargs: dict) -> None:
     """
@@ -432,11 +434,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
     # Đọc GQVL toàn CN để tính TH phân tầng 4 nhóm
     df_gqvl = _doc_gqvl_parquet()
 
-    if tab is not None:
-        _ctx = tab
-    else:
-        _ctx = st.container()
-    with _ctx:
+    with get_tab_context(tab):
         st.title("🏛️ Kế hoạch Tín dụng — Phòng KH-NV")
         st.caption(
             "Quản lý KHTD cấp Chi nhánh và phân bổ xuống Xã · "

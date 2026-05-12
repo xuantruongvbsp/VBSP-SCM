@@ -85,6 +85,8 @@ def _bc_fmt_metric(x: float) -> str:
         return "—"
 
 
+from utils import get_tab_context
+
 def render(tab: DeltaGenerator, **kwargs: dict) -> None:
     """
     Render tab Báo cáo.
@@ -100,11 +102,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
     username = kwargs.get("username")
     df_nq11 = kwargs.get("df_nq11")
 
-    if tab is not None:
-        _ctx = tab
-    else:
-        _ctx = st.container()
-    with _ctx:
+    with get_tab_context(tab):
         st.subheader("📈 Báo cáo")
 
         COL_CHUNG = [c for c in [

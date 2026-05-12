@@ -1,6 +1,6 @@
 @echo off
 cd /d %~dp0
 echo Dang khoi dong VBSP-SCM...
-echo.
-python -m streamlit run app.py
+start "" http://localhost:8501
+.\.venv\Scripts\streamlit run app.py
 pause

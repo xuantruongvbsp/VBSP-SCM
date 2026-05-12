@@ -269,6 +269,8 @@ def _tao_column_config_pgd() -> dict[str, st.column_config.Column]:
     }
 
 
+from utils import get_tab_context
+
 def render(tab: DeltaGenerator, **kwargs: dict) -> None:
     """
     Render tab Tổng quan.
@@ -286,11 +288,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
     df_nq11  = kwargs.get("df_nq11")
     ts = kwargs.get("ts_hstd", 0.0)
 
-    if tab is not None:
-        _ctx = tab
-    else:
-        _ctx = st.container()
-    with _ctx:
+    with get_tab_context(tab):
         st.markdown(
             """
             <style>

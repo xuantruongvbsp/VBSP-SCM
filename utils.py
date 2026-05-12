@@ -265,6 +265,15 @@ def fmt_bang_ty(x, so_le: int = 3) -> str:
         return "—"
 
 
+def get_tab_context(tab):
+    """
+    Trả về context manager cho tab.
+    Nếu tab is None, trả về st.container() thay thế.
+    """
+    import streamlit as st
+    return tab if tab is not None else st.container()
+
+
 def fmt_cl(x):
     """Chênh lệch tỷ có dấu + / -."""
     try:

@@ -19,6 +19,8 @@ if TYPE_CHECKING:
     from streamlit.delta_generator import DeltaGenerator
 
 
+from utils import get_tab_context
+
 def render(tab: DeltaGenerator, **kwargs: dict) -> None:
     """
     Render tab Quản lý Cán bộ Tín dụng (CBTD).
@@ -34,11 +36,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
     username = kwargs.get("username")
     df_nq11 = kwargs.get("df_nq11")
 
-    if tab is not None:
-        _ctx = tab
-    else:
-        _ctx = st.container()
-    with _ctx:
+    with get_tab_context(tab):
         st.subheader("👔 Quản lý Cán bộ Tín dụng (CBTD)")
         st.caption("Phân CBTD theo ấp/thôn. Mã CBTD là khóa chính. 1 CBTD có thể phụ trách nhiều ấp.")
 

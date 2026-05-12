@@ -28,7 +28,7 @@ from services.upload_service import (
     lay_meta_chat_luong,
     luu_pgd_file,
 )
-from auth import co_quyen_upload_pgd
+from auth import co_quyen_upload_pgd, la_phan_he_pgd, normalize_role
 # data_priority_service và _render_upload_hang_loat đã được tách ra
 # theo kiến trúc 2 luồng độc lập (xem HUONG_DAN_NGUON_DU_LIEU.md)
 
@@ -393,7 +393,7 @@ def render(tab=None, **kwargs) -> None:
 
         # ── Trạng thái theo đơn vị (không còn upload thủ công từng ô) ───────
         st.markdown("**📋 Trạng thái dữ liệu hiện tại**")
-        if role == "user":
+        if la_phan_he_pgd(role):
             ten_dv = pgd_user or (DS_PGD[0] if DS_PGD else DON_VI_CHI_NHANH)
             st.info(f"🏢 Đơn vị của bạn: **{ten_dv}**")
             _bang_trang_thai_don_vi(ten_dv)
@@ -409,16 +409,11 @@ def render(tab=None, **kwargs) -> None:
         # Form upload riêng cho phân hệ Hỗ trợ địa bàn
         # Không dùng form của KH-NV — 2 luồng độc lập
         # Phân hệ PGD (admin_pgd, manager_pgd, user_pgd) chỉ upload cho PGD của mình
-        if role in ["admin_pgd", "manager_pgd", "user_pgd"]:
+        if la_phan_he_pgd(role):
             ten_dv = pgd_user or ""
             if ten_dv:
-                st.info(f"📍 Đơn vị upload: **{pgd_user}**")
-                _render_upload_form(ten_dv, "pgd_op", username)
-            else:
-                st.warning("⚠️ Không xác định được PGD. Liên hệ Admin.")
-        elif role == "user":
-            ten_dv = pgd_user or ""
-            if ten_dv:
+                if normalize_role(role) != "user_pgd":
+                    st.info(f"📍 Đơn vị upload: **{pgd_user}**")
                 _render_upload_form(ten_dv, "pgd_op", username)
             else:
                 st.warning("⚠️ Không xác định được PGD. Liên hệ Admin.")

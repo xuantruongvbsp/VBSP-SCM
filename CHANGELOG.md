@@ -1,5 +1,19 @@
 # CHANGELOG
 
+## [2026-05-12] — Sửa lỗi context manager khi render tab trong ws_management
+- `workspaces/ws_management.py` — ALL_ITEMS truyền `None` thay vì `st` vào render(tab, **kwargs); `_render_dgd_to_tkvv()` dùng `st.container()` khi tab_parent=None
+- `tabs/tab_tongquan.py` — Cho phép render(tab=None) bằng `st.container()`
+- `tabs/tab_tien_do.py` — Cho phép render(tab=None) bằng `st.container()`
+- `tabs/tab_cbtd.py` — Cho phép render(tab=None) bằng `st.container()`
+- `tabs/tab_khtd.py` — Cho phép render(tab=None) bằng `st.container()`
+- `tabs/tab_kehoach.py` — Cho phép render(tab=None) bằng `st.container()`
+- `tabs/tab_baocao.py` — Cho phép render(tab=None) bằng `st.container()`
+- `tabs/tab_candoi.py` — Cho phép render(tab=None) bằng `st.container()`
+- `tabs/tab_ban_dai_dien.py` — Cho phép render(tab=None) bằng `st.container()`
+- `tabs/tab_uy_thac.py` — Cho phép render(tab=None) bằng `st.container()`
+- `tabs/tab_nhiem_vu.py` — Cho phép render(tab=None) bằng `st.container()`
+- `tabs/tab_audit_log.py` — Cho phép render(tab=None) bằng `st.container()`
+
 ## [2026-05-12] — Tắt prompt Streamlit “Welcome/Email” để chạy không tương tác
 - `.streamlit/config.toml` — Thêm `browser.gatherUsageStats = false`, `server.headless = true`
 

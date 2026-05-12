@@ -993,7 +993,11 @@ def render(tab: DeltaGenerator, **kwargs) -> None:
     df       = kwargs.get("df")
     pgd_user = kwargs.get("pgd_user", "")
 
-    with tab:
+    if tab is not None:
+        _ctx = tab
+    else:
+        _ctx = st.container()
+    with _ctx:
         st.subheader("🤝 Ủy thác — Hội đoàn thể")
         st.caption(
             "Theo dõi hoạt động ủy thác và các mẫu biểu kiểm tra "

@@ -400,6 +400,21 @@ def main():
                 st.session_state.workspace = ws_key
                 st.rerun()
 
+        # ── Menu điều hành (chỉ hiện khi workspace = management) ──
+        if st.session_state.get("workspace") == "management":
+            from workspaces.ws_management import render_sidebar_menu
+            can_upload = locals().get("can_upload")
+            if can_upload is None:
+                can_upload = role in ("admin", "admin_cn", "manager", "manager_cn")
+            render_sidebar_menu(
+                role=role,
+                username=username,
+                df=locals().get("df"),
+                df_full=locals().get("df_full"),
+                ds_pgd_all=locals().get("ds_pgd_all", []),
+                can_upload=can_upload,
+            )
+
         st.divider()
         # Widget trạng thái nguồn dữ liệu ưu tiên PGD
         try:

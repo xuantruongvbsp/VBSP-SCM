@@ -50,7 +50,11 @@ def render(tab, **kwargs) -> None:
         st.warning("⛔ Chỉ Admin mới có quyền xem Audit Log.")
         return
 
-    with tab:
+    if tab is not None:
+        _ctx = tab
+    else:
+        _ctx = st.container()
+    with _ctx:
         st.subheader("📋 Lịch sử thao tác hệ thống")
 
         # ── Bộ lọc ───────────────────────────────────────────────────────

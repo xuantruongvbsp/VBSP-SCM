@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## [2026-05-12] — Chuẩn hóa schema/service snapshot theo spec Bước 1-2
+- `db.py` — Chỉnh `hstd_snapshot` theo default `ma_ct/nguon_von='ALL'` và bỏ index ct theo spec
+- `snapshot_service.py` — Cập nhật nội dung service theo spec Bước 2 (API + logic tổng hợp)
+
 ## [2026-05-12] — Snapshot HSTD theo tháng + Executive Risk Heatmap
 - `db.py` — Thêm bảng `hstd_snapshot` + index trong `init_db()`
 - `snapshot_service.py` — Thêm service lưu/đọc/xóa snapshot theo kỳ (upsert-safe)

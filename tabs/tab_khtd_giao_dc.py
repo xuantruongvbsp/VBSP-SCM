@@ -14,6 +14,7 @@ from data.pgd import pgd_slug as _pgd_slug
 from services import khtd_service
 from services.khtd_service import LOAI_DIEU_CHINH, LOAI_GIAO
 from utils import fmt_tien, hien_thi_dataframe_phan_trang, xuat_excel
+from auth import la_phan_he_pgd, normalize_role
 
 _SS = "khtd_gdc_"
 
@@ -416,7 +417,7 @@ def _section_b_giao(
             )
     df_nhap = pd.DataFrame(rows_nhap)
 
-    readonly = role == "executive"
+    readonly = normalize_role(role) == "executive"
     if not readonly:
         df_edited = st.data_editor(
             df_nhap,
@@ -765,13 +766,13 @@ def render(tab=None, **kwargs) -> None:
         else:
             loai_val = st.session_state.get(_SS + "loai", LOAI_DIEU_CHINH)
 
-        if role == "user":
+        if la_phan_he_pgd(role):
             _section_d_user(pgd_user, nam, thang, dot)
             return
 
-        readonly_exec = role == "executive"
+        readonly_exec = normalize_role(role) == "executive"
 
-        if role == "admin":
+        if normalize_role(role) in ("admin_cn", "admin"):
             st.divider()
             _section_a(username, nam, thang, dot, df_hstd)
 

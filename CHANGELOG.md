@@ -1,7 +1,17 @@
 # CHANGELOG
 
-## [2026-05-12] — Cập nhật Chay_VBSP_SCM.bat: tự mở trình duyệt
-- `Chay_VBSP_SCM.bat` — Thêm `start "" http://localhost:8501` để tự động mở tab trình duyệt sau khi double-click
+## [2026-05-12] — Căn chỉnh helper menu Điều hành (ws_management)
+- `workspaces/ws_management.py` — Đồng bộ lambda trong `_build_all_items()` với `render()` và thêm guard state cho `render_sidebar_menu()`
+
+## [2026-05-12] — Thêm hàm dựng menu điều hành cho app.py gọi
+- `workspaces/ws_management.py` — Thêm `_build_all_items()` và `render_sidebar_menu()` để tách logic menu sidebar dùng chung
+
+## [2026-05-12] — Fix thiếu dòng Hội sở trong bảng tổng quan PGD
+- `tabs/tab_tongquan.py` dòng ~673 — Thêm `DON_VI_CHI_NHANH` vào list `pgd_thieu_bang` để không bỏ sót "Hội sở Chi nhánh tỉnh" khi render bảng
+- `tabs/tab_tongquan.py` dòng ~16 — Import thêm `DON_VI_CHI_NHANH`
+
+## [2026-05-12] — Cập nhật Chay_VBSP_SCM.bat: start /b + timeout chờ server
+- `Chay_VBSP_SCM.bat` — Dùng `start /b` để chạy server ngầm + `timeout /t 4` chờ 4 giây rồi mới mở trình duyệt
 
 ## [2026-05-12] — Fix sót `with tab:` trong tab_tien_do.py _render_tong_quan
 - `tabs/tab_tien_do.py` dòng ~94 — `_render_tong_quan()` còn dùng `with tab:` thay vì `with get_tab_context(tab):` gây lỗi khi render từ sidebar (gọi với tab=None)

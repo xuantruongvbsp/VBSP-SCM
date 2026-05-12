@@ -4,6 +4,7 @@ Mở rộng báo cáo: chỉ sửa services/kiem_soat_service.py (registry + hà
 """
 import pandas as pd
 import streamlit as st
+from auth import normalize_role
 
 from config import (
     COT_TEN_PGD,
@@ -84,7 +85,7 @@ def render_tab(df, role: str, username: str) -> None:
 
     cache = _get_ks_cache(df)
 
-    readonly = role == "executive"
+    readonly = normalize_role(role) == "executive"
     nhom_keys = list(NHOM_BAO_CAO.keys())
 
     col_a, col_b, col_c = st.columns([1, 1, 2])

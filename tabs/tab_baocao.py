@@ -100,7 +100,11 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
     username = kwargs.get("username")
     df_nq11 = kwargs.get("df_nq11")
 
-    with tab:
+    if tab is not None:
+        _ctx = tab
+    else:
+        _ctx = st.container()
+    with _ctx:
         st.subheader("📈 Báo cáo")
 
         COL_CHUNG = [c for c in [

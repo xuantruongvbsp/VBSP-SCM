@@ -417,6 +417,15 @@ def merge_du_lieu_toan_cn(loai: str, ds_pgd: list[str] | None = None) -> KetQuaU
     df_toan_cn.to_parquet(cache_path, index=False, engine="pyarrow", compression="zstd")
 
     username = st.session_state.get("username", "unknown")
+
+    # Auto-snapshot sau khi merge HSTD
+    if loai == "hstd":
+        try:
+            from snapshot_service import luu_snapshot
+            _snap_kq = luu_snapshot(df_toan_cn, username)
+        except Exception:
+            pass
+
     canh_bao = f" | {len(pgd_loi)} PGD lỗi" if pgd_loi else ""
     db.ghi_audit(
         username,

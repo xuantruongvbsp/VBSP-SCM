@@ -9,6 +9,7 @@ import plotly.express as px
 import streamlit as st
 
 import db
+from auth import normalize_role
 from config import DS_PGD, DON_VI_CHI_NHANH, PGD_XA_MAP, ROLES_PHAN_HE_CN
 from utils import get_tab_context
 
@@ -550,7 +551,7 @@ def render(tab, **kwargs):
     pgd_user = kwargs.get("pgd_user")
 
     can_manage = (role in ROLES_PHAN_HE_CN) and (role != "executive")
-    is_exec = role == "executive"
+    is_exec = normalize_role(role) == "executive"
     is_pgd_view = (role not in ROLES_PHAN_HE_CN) and bool(pgd_user)
 
     import streamlit as _st

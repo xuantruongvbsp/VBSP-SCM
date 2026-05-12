@@ -92,7 +92,9 @@ def _upsert_ketqua_xa(
 
 
 def _render_tong_quan(tab, **kwargs):
-    with get_tab_context(tab):
+    import streamlit as _st
+    _tab_ctx = tab if tab is not None else _st.container()
+    with _tab_ctx:
         st.subheader("📊 Tổng quan tiến độ")
 
         c1, c2 = st.columns([2, 1])
@@ -235,7 +237,8 @@ def _render_tong_quan(tab, **kwargs):
 
 def _render_tao_task(tab, **kwargs):
     username = kwargs.get("username", "")
-    with tab:
+    _tab_ctx = tab if tab is not None else __import__('streamlit').container()
+    with _tab_ctx:
         st.subheader("➕ Tạo đầu việc mới")
 
         with st.form("form_tao_task", clear_on_submit=True):
@@ -310,7 +313,8 @@ def _render_cap_nhat(tab, **kwargs):
     pgd_user = kwargs.get("pgd_user") or ""
     la_manager = role in ROLES_PHAN_HE_CN
 
-    with tab:
+    _tab_ctx = tab if tab is not None else __import__('streamlit').container()
+    with _tab_ctx:
         st.subheader("📋 Cập nhật tiến độ theo xã")
 
         ds_task = _doc_tasks()
@@ -423,7 +427,8 @@ def _render_cap_nhat(tab, **kwargs):
 
 def _render_xuat(tab, **kwargs):
     SS_KEY = "_td_xuat_excel"
-    with tab:
+    _tab_ctx = tab if tab is not None else __import__('streamlit').container()
+    with _tab_ctx:
         st.subheader("📤 Xuất báo cáo tiến độ")
 
         c1, c2 = st.columns(2)
@@ -548,7 +553,9 @@ def render(tab, **kwargs):
     is_exec = role == "executive"
     is_pgd_view = (role not in ROLES_PHAN_HE_CN) and bool(pgd_user)
 
-    with get_tab_context(tab):
+    import streamlit as _st
+    _tab_ctx = tab if tab is not None else _st.container()
+    with _tab_ctx:
         st.subheader("📅 Tiến độ Công việc Hàng ngày")
 
         if is_exec or is_pgd_view:
@@ -574,6 +581,7 @@ def render(tab, **kwargs):
 
 
 def render_tong_quan_only(tab, **kwargs):
-    with tab:
+    _tab_ctx = tab if tab is not None else __import__('streamlit').container()
+    with _tab_ctx:
         st.subheader("📅 Tiến độ Công việc Hàng ngày")
         _render_tong_quan(tab, **kwargs)

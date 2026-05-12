@@ -17,7 +17,7 @@ from config import (
 )
 
 import db
-from auth import la_phan_he_cn
+from auth import la_phan_he_cn, normalize_role
 from data.dgd_helpers import (
     dem_thong_ke,
     dgd_dang_dung_trong_hstd,
@@ -71,7 +71,7 @@ def render(tab: DeltaGenerator, **kwargs: Any) -> None:
             "Cấu hình ĐGD — thôn/ấp theo PGD/Xã. Import Excel hoặc sửa trực tiếp."
         )
 
-        if role == "executive":
+        if normalize_role(role) == "executive":
             _render_tong_quan(df_h, username, hn)
             return
 
@@ -80,13 +80,13 @@ def render(tab: DeltaGenerator, **kwargs: Any) -> None:
         )
 
         with t_imp:
-            if not la_phan_he_cn(role) or role == "executive":
+            if not la_phan_he_cn(role) or normalize_role(role) == "executive":
                 st.warning("Bạn chỉ có quyền xem tổng quan (executive) hoặc không đủ quyền.")
             else:
                 _render_import(role, username, hn)
 
         with t_edit:
-            if not la_phan_he_cn(role) or role == "executive":
+            if not la_phan_he_cn(role) or normalize_role(role) == "executive":
                 st.warning("Bạn không có quyền sửa.")
             else:
                 _render_xem_sua(df_h, username, hn)

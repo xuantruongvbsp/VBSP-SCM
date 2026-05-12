@@ -572,7 +572,8 @@ def render(tab: DeltaGenerator, **kwargs) -> None:
     username = kwargs.get("username", "unknown")
     pgd_user = kwargs.get("pgd_user", "")
 
-    with tab:
+    _tab_ctx = tab if tab is not None else __import__('streamlit').container()
+    with _tab_ctx:
         if role not in ("admin", "manager", "user",
                         "admin_cn", "manager_cn",
                         "admin_pgd", "manager_pgd", "user_pgd"):

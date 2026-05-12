@@ -501,7 +501,8 @@ def render(tab: "DeltaGenerator", **kwargs: dict) -> None:
     pgd_user: str | None = kwargs.get("pgd_user")
     username: str = kwargs.get("username") or st.session_state.get("username", "unknown")
 
-    with tab:
+    _tab_ctx = tab if tab is not None else __import__('streamlit').container()
+    with _tab_ctx:
         st.subheader("📍 Điểm GD của tôi")
         st.caption(
             "Cấu hình điểm giao dịch — Import Excel, xem & sửa theo xã (chỉ PGD của bạn)."

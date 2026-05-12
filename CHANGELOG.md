@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## [2026-05-12] — Snapshot HSTD theo tháng + Executive Risk Heatmap
+- `db.py` — Thêm bảng `hstd_snapshot` + index trong `init_db()`
+- `snapshot_service.py` — Thêm service lưu/đọc/xóa snapshot theo kỳ (upsert-safe)
+- `services/upload_service.py` — Auto tạo snapshot sau merge HSTD
+- `workspaces/ws_executive.py` — KPI strip so với tháng trước + heatmap rủi ro PGD + line chart theo snapshot
+
 ## [2026-05-12] — Cập nhật ROADMAP B2/B7 và refactor role check theo auth.py
 - `docs/ROADMAP.md` — Đánh dấu B2 hoàn tất và B7 hoàn tất theo thực tế code
 - `tabs/tab_khtd_giao_dc.py` — Dùng `normalize_role()`/`la_phan_he_pgd()` thay check role cứng

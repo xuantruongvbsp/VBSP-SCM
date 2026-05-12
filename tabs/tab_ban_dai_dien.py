@@ -97,7 +97,9 @@ def _render_cap_tinh(**kwargs):
 from utils import get_tab_context
 
 def render(tab, cap: str = "xa", **kwargs):
-    with get_tab_context(tab):
+    import streamlit as _st
+    _tab_ctx = tab if tab is not None else _st.container()
+    with _tab_ctx:
         if cap == "tinh":
             _render_cap_tinh(**kwargs)
         else:

@@ -527,7 +527,11 @@ def render(tab, **kwargs):
     """Render tab Quản lý Nhiệm vụ — phân nhánh theo role."""
     role: str = kwargs.get("role", "user")
 
-    with tab:
+    if tab is not None:
+        _ctx = tab
+    else:
+        _ctx = st.container()
+    with _ctx:
         if role in ("admin", "manager", "admin_cn", "manager_cn"):
             t1, t2, t3 = st.tabs([
                 "📥 Danh sách nhiệm vụ",

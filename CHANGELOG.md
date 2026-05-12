@@ -1,5 +1,8 @@
 # CHANGELOG
 
+## [2026-05-12] — Sửa: Xóa context manager trong tabs/tab_tien_do_nop.py
+- `tabs/tab_tien_do_nop.py` dòng ~57 — Xóa `ctx = tab if tab is not None else st` và `with ctx:`; render trực tiếp bằng `st.*` giữ nguyên toàn bộ logic bên trong
+
 ## [2026-05-12] — Sửa: lỗi import GSheet (oauth2client)
 - `tabs/tab_tien_do_nop.py` dòng ~32 — ưu tiên dùng google-auth (`gspread.service_account`) và lazy-load `oauth2client` làm fallback để tránh ModuleNotFoundError; hiển thị lỗi rõ ràng khi thiếu dependencies/credentials
 - `requirements.txt` — đã cài `oauth2client` trong môi trường bằng `pip install -r requirements.txt`
@@ -81,6 +84,7 @@
 ## [2026-05-12] — Chuyển menu Điều hành sang sidebar cấp app.py
 - `app.py` — Gọi `render_sidebar_menu()` (ws_management) ngay sau phần “Không gian làm việc” trong sidebar
 - `workspaces/ws_management.py` — Xóa block `with st.sidebar:` trong `render()` vì menu đã render từ `app.py`
+- `workspaces/ws_management.py` — Đồng bộ lambda trong `_build_all_items()` với `render()` và thêm guard state cho `render_sidebar_menu()`
 
 ## [2026-05-12] — Đổi nhãn menu “Tiến độ” → “Tiến độ Công việc”
 - `workspaces/ws_management.py` — Đổi label menu “Tiến độ” thành “Tiến độ Công việc” để hiển thị rõ nghĩa

@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## [2026-05-13] — Sửa: Thay thế cards HTML bằng bảng DataFrame cho "Cơ cấu dư nợ theo chương trình tín dụng"
+- `tabs/tab_tongquan.py` dòng ~552-615 — Thay thế phần hiển thị "Cơ cấu dư nợ theo chương trình tín dụng" (cards HTML) bằng bảng DataFrame 7 cột (Chương trình, Số món vay, Số KH, Dư nợ (tỷ), Nguồn TW (tỷ), Nguồn ĐP (tỷ), Tỷ trọng %); xóa hoàn toàn phần cards_html và expander cũ; thêm `_NGUON_MAP` (dict comprehension) ngay sau import; không thay đổi các phần khác của file
+
+## [2026-05-13] — Thêm: Hiển thị Nguồn TW/ĐP trong Cơ cấu dư nợ theo chương trình tín dụng
+- `tabs/tab_tongquan.py` dòng ~542-582 — Thêm `_NGUON_MAP` từ `DS_CHUONG_TRINH`; tách dư nợ theo nguồn (`du_no_tw`, `du_no_dp`); bổ sung hiển thị TW/ĐP trong cards HTML; thêm CSS `.ct-src`
+
 ## [2026-05-12] — Sửa: Xóa context manager trong tabs/tab_tien_do_nop.py
 - `tabs/tab_tien_do_nop.py` dòng ~57 — Xóa `ctx = tab if tab is not None else st` và `with ctx:`; render trực tiếp bằng `st.*` giữ nguyên toàn bộ logic bên trong
 
@@ -20,6 +26,8 @@
 ## [2026-05-12] — Chuẩn hóa schema/service snapshot theo spec Bước 1-2
 - `db.py` — Chỉnh `hstd_snapshot` theo default `ma_ct/nguon_von='ALL'` và bỏ index ct theo spec
 - `snapshot_service.py` — Cập nhật nội dung service theo spec Bước 2 (API + logic tổng hợp)
+- `services/upload_service.py` — Auto tạo snapshot sau merge HSTD
+- `workspaces/ws_executive.py` — KPI strip so với tháng trước + heatmap rủi ro PGD + line chart theo snapshot
 
 ## [2026-05-12] — Snapshot HSTD theo tháng + Executive Risk Heatmap
 - `db.py` — Thêm bảng `hstd_snapshot` + index trong `init_db()`
@@ -109,13 +117,13 @@
 ## [2026-05-12] — Sửa lỗi context manager khi render tab trong ws_management
 - `workspaces/ws_management.py` — ALL_ITEMS truyền `None` thay vì `st` vào render(tab, **kwargs); `_render_dgd_to_tkvv()` dùng `st.container()` khi tab_parent=None
 - `tabs/tab_tongquan.py` — Cho phép render(tab=None) bằng `st.container()`
-- `tabs/tab_tien_do.py` — Cho phép render(tab=None) bằng `st.container()` bằng `st.container()`
-- `tabs/tab_cbtd.py` — Cho phép render(tab=None) bằng `st.container()`
-- `tabs/tab_khtd.py` — Cho phép render(tab=None) bằng `st.container()`
-- `tabs/tab_kehoach.py` — Cho phép render(tab=None) bằng `st.container()`
-- `tabs/tab_baocao.py` — Cho phép render(tab=None) bằng `st.container()`
-- `tabs/tab_candoi.py` — Cho phép render(tab=None) bằng `st.container()`
-- `tabs/tab_ban_dai_dien.py` — Cho phép render(tab=None) bằng `st.container()`
-- `tabs/tab_uy_thac.py` — Cho phép render(tab=None) bằng `st.container()`
-- `tabs/tab_nhiem_vu.py` — Cho phép render(tab=None) bằng `st.container()`
-- `tabs/tab_audit_log.py` — Cho phép render(tab=None) bằng `st.container()`
+- `tabs/tab_tien_do.py` — Cho phép render(tab=None) bằng context fallback `st.container()` bằng `st.container()`
+- `tabs/tab_cbtd.py` — Cho phép render(tab=None) bằng context fallback `st.container()`
+- `tabs/tab_khtd.py` — Cho phép render(tab=None) bằng context fallback `st.container()`
+- `tabs/tab_kehoach.py` — Cho phép render(tab=None) bằng context fallback `st.container()`
+- `tabs/tab_baocao.py` — Cho phép render(tab=None) bằng context fallback `st.container()`
+- `tabs/tab_candoi.py` — Cho phép render(tab=None) bằng context fallback `st.container()`
+- `tabs/tab_ban_dai_dien.py` — Cho phép render(tab=None) bằng context fallback `st.container()`
+- `tabs/tab_uy_thac.py` — Cho phép render(tab=None) bằng context fallback `st.container()`
+- `tabs/tab_nhiem_vu.py` — Cho phép render(tab=None) bằng context fallback `st.container()`
+- `tabs/tab_audit_log.py` — Cho phép render(tab=None) bằng context fallback `st.container()`

@@ -43,6 +43,7 @@ from tabs import (
     tab_uy_thac,
     tab_qd62,
     tab_tien_do,
+    tab_tien_do_nop,
 )
 from tabs import tab_checklist_bc
 from tabs import tab_xlrr_tong_hop
@@ -831,6 +832,7 @@ def _build_all_items(role: str, username: str, **kwargs) -> list:
     ALL_ITEMS = [
         {"group": "Tổng quan",     "label": "Thông tin chung", "icon": "chart-bar",      "fn": lambda: tab_tongquan.render(None, **kwargs)},
         {"group": "Tổng quan",     "label": "Tiến độ Công việc", "icon": "calendar",       "fn": lambda: tab_tien_do.render(None, **kwargs)},
+        {"group": "Tổng quan",     "label": "BC Tiến độ PGD", "icon": "file", "fn": lambda: tab_tien_do_nop.render(None, **kwargs)},
         {"group": "Tổng quan",     "label": "Cảnh báo nợ",     "icon": "alert-triangle", "fn": lambda: _render_canh_bao_no(df_full, ds_pgd_all, role, kwargs.get("username", "unknown"))},
         {"group": "Kiểm soát",     "label": "Kiểm soát CN",    "icon": "search",         "fn": lambda: tab_kiem_soat.render_tab(df_full, role, kwargs.get("username", "unknown"))},
         {"group": "Kiểm soát",     "label": "Xử lý rủi ro theo QĐ62",   "icon": "alert-circle",   "fn": lambda: tab_xlrr_tong_hop.render(None, **kwargs)},
@@ -945,6 +947,7 @@ def render(**kwargs):
     ALL_ITEMS = [
         {"group": "Tổng quan",     "label": "Thông tin chung", "icon": "chart-bar",      "fn": lambda: tab_tongquan.render(None, **kwargs)},
         {"group": "Tổng quan",     "label": "Tiến độ Công việc", "icon": "calendar",       "fn": lambda: tab_tien_do.render(None, **kwargs)},
+        {"group": "Tổng quan",     "label": "BC Tiến độ PGD", "icon": "file", "fn": lambda: tab_tien_do_nop.render(None, **kwargs)},
         {"group": "Tổng quan",     "label": "Cảnh báo nợ",     "icon": "alert-triangle", "fn": lambda: _render_canh_bao_no(df_full, ds_pgd_all, role, kwargs.get("username", "unknown"))},
         {"group": "Kiểm soát",     "label": "Kiểm soát CN",    "icon": "search",         "fn": lambda: tab_kiem_soat.render_tab(df_full, role, kwargs.get("username", "unknown"))},
         {"group": "Kiểm soát",     "label": "Xử lý rủi ro theo QĐ62",   "icon": "alert-circle",   "fn": lambda: tab_xlrr_tong_hop.render(None, **kwargs)},
@@ -953,6 +956,7 @@ def render(**kwargs):
         {"group": "Kế hoạch",      "label": "Giao KH theo Đợt", "icon": "upload",         "fn": lambda: tab_khtd_giao_dc.render(None, **kwargs)},
         {"group": "Kế hoạch",      "label": "KH vs Thực hiện", "icon": "chart-line",     "fn": lambda: tab_kehoach.render(None, **kwargs)},
         {"group": "Báo cáo",       "label": "Báo cáo chi tiết", "icon": "file",           "fn": lambda: tab_baocao.render(None, **kwargs)},
+        {"group": "Báo cáo", "label": "Checklist BC Định kỳ", "icon": "calendar-check", "fn": lambda: tab_checklist_bc.render(None, **kwargs)},
         {"group": "Báo cáo",       "label": "Điện Báo",        "icon": "antenna",        "fn": lambda: tab_candoi.render(None, **kwargs)},
         {"group": "Báo cáo",       "label": "Điểm GD & Tổ TK&VV", "icon": "map-pin",      "fn": lambda: _render_dgd_to_tkvv(None, **kwargs)},
         {"group": "Hành chính",    "label": "Ban Đại Diện",    "icon": "building",       "fn": lambda: tab_ban_dai_dien.render(None, cap="tinh", **kwargs)},

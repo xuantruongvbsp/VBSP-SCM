@@ -144,7 +144,9 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
     key_sfx   = f"_{pgd_slug(pgd_user)}" if pgd_mode else ""
 
     if pgd_mode and not pgd_user:
-        with get_tab_context(tab):
+        import streamlit as _st
+        _tab_ctx = tab if tab is not None else _st.container()
+        with _tab_ctx:
             st.error("Không xác định được PGD.")
         return
 
@@ -157,7 +159,9 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
     store_ht = path_dien_ht if pgd_mode else DB_HT_CACHE
     store_prev = path_dien_prev if pgd_mode else DB_PREV_CACHE
 
-    with get_tab_context(tab):
+    import streamlit as _st
+    _tab_ctx = tab if tab is not None else _st.container()
+    with _tab_ctx:
         nam_ht   = str(datetime.today().year)
         nam_prev = str(datetime.today().year - 1)
 

@@ -27,8 +27,12 @@ def render(tab, **kwargs):
     role      = kwargs.get("role")
     pgd_user  = kwargs.get("pgd_user")
     pgd_mode  = kwargs.get("pgd_mode", False)
+    if tab is not None:
+        _ctx = tab
+    else:
+        _ctx = st.container()
     if pgd_mode and not pgd_user:
-        with tab:
+        with _ctx:
             st.error("Không xác định được PGD.")
         return
     # prefix duy nhất theo mode — tránh DuplicateElementKey khi render nhiều workspace
@@ -38,7 +42,7 @@ def render(tab, **kwargs):
         else kwargs.get("khtd_mode", kwargs.get("mode", "kh"))
     )
 
-    with tab:
+    with _ctx:
         st.subheader("🎯 Kế hoạch Chi nhánh vs Thực hiện")
         st.caption("📌 So sánh kế hoạch nhập tay với số liệu Điện báo hiện tại")
 

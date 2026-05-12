@@ -1,5 +1,15 @@
 # CHANGELOG
 
+## [2026-05-12] — Cập nhật ROADMAP B2/B7 và refactor role check theo auth.py
+- `docs/ROADMAP.md` — Đánh dấu B2 hoàn tất và B7 hoàn tất theo thực tế code
+- `tabs/tab_khtd_giao_dc.py` — Dùng `normalize_role()`/`la_phan_he_pgd()` thay check role cứng
+- `tabs/tab_khtd_mau07.py` — Dùng `la_phan_he_pgd()` thay `role == "user"`
+- `tabs/tab_khtd_pgd.py` — Dùng `normalize_role()` thay `role == "admin"` khi xóa văn bản
+- `tabs/tab_kiem_soat.py` — Dùng `normalize_role()` cho chế độ readonly executive
+- `tabs/tab_quan_ly_dgd.py` — Dùng `normalize_role()` cho nhánh executive/readonly
+- `tabs/tab_tien_do.py` — Dùng `normalize_role()` cho biến `is_exec`
+- `tabs/tab_upload_pgd.py` — Dùng `la_phan_he_pgd()`/`normalize_role()` thay check role cứng
+
 ## [2026-05-12] — Chuẩn hóa context manager cho render(tab) trong tabs
 - `tabs/tab_cdtotkvv.py` — Thay `with tab:` bằng context fallback `st.container()` khi tab=None
 - `tabs/tab_cdtotkvv_pgd.py` — Thay `with tab:` bằng context fallback `st.container()` khi tab=None

@@ -762,7 +762,8 @@ def render(tab, **kwargs) -> None:
     username = kwargs.get("username", "system")
     pgd_user = kwargs.get("pgd_user")
 
-    with tab:
+    _tab_ctx = tab if tab is not None else __import__('streamlit').container()
+    with _tab_ctx:
         st.subheader("📋 Mẫu 07 — Giao/Điều chỉnh Chỉ tiêu KHTD theo Ấp/Thôn")
         st.caption("Biểu số 07/NHCS-KH · Theo CV 7064 · Số QĐ & ngày tháng để trống cho UBND xã điền khi ký")
 

@@ -84,7 +84,8 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
     username = kwargs.get("username")
     df_nq11 = kwargs.get("df_nq11")
 
-    with tab:
+    _tab_ctx = tab if tab is not None else __import__('streamlit').container()
+    with _tab_ctx:
             st.subheader("📑 Dữ liệu Nghị Quyết 11 (NQ11)")
 
             def fmt_vn_tien(x: float) -> str:

@@ -1,5 +1,8 @@
 # CHANGELOG
 
+## [2026-05-12] — Tắt prompt Streamlit “Welcome/Email” để chạy không tương tác
+- `.streamlit/config.toml` — Thêm `browser.gatherUsageStats = false`, `server.headless = true`
+
 ## [2026-05-12] — Thêm hàm _xuat_pdf_nhiem_vu() với tiêu đề đầy đủ, font Times New Roman
 - `tabs/tab_nhiem_vu.py` dòng ~555-661 — Thêm hàm _xuat_pdf_nhiem_vu() tạo PDF báo cáo "BÁO CÁO TÌNH HÌNH THỰC HIỆN NHIỆM VỤ" với header ngân hàng, font Times New Roman, bảng zebra, footer tự động
 

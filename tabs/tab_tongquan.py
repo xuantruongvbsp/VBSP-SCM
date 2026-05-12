@@ -13,7 +13,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 
 from config import *
-from config import DS_PGD, CACHE_HSTD, TEN_CHI_NHANH_HIEN_THI
+from config import DS_PGD, CACHE_HSTD, DON_VI_CHI_NHANH, TEN_CHI_NHANH_HIEN_THI
 from utils import (
     fmt,
     fmt_tien,
@@ -670,7 +670,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
 
             # Bổ sung PGD trong DS_PGD nhưng không có dòng trong df → hiển thị với giá trị 0
             pgd_co_trong_bang = set(df_pgd[COT_TEN_PGD].tolist())
-            pgd_thieu_bang = [p for p in DS_PGD if p not in pgd_co_trong_bang]
+            pgd_thieu_bang = [p for p in [DON_VI_CHI_NHANH] + DS_PGD if p not in pgd_co_trong_bang]
             if pgd_thieu_bang:
                 rows_thieu = [{COT_TEN_PGD: p} for p in pgd_thieu_bang]
                 df_thieu = pd.DataFrame(rows_thieu)

@@ -34,7 +34,11 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
     username = kwargs.get("username")
     df_nq11 = kwargs.get("df_nq11")
 
-    with tab:
+    if tab is not None:
+        _ctx = tab
+    else:
+        _ctx = st.container()
+    with _ctx:
         st.subheader("👔 Quản lý Cán bộ Tín dụng (CBTD)")
         st.caption("Phân CBTD theo ấp/thôn. Mã CBTD là khóa chính. 1 CBTD có thể phụ trách nhiều ấp.")
 

@@ -57,97 +57,95 @@ def _doc_du_lieu() -> pd.DataFrame:
 def render(tab: Optional[st.delta_generator.DeltaGenerator] = None, **kwargs) -> None:
     """Render tab Báo cáo Tiến độ PGD."""
     role = kwargs.get("role")
-    ctx = tab if tab is not None else st
-    
-    with ctx:
-        st.subheader("📋 Báo cáo Tiến độ — PGD")
-        st.caption("Dữ liệu từ Google Form · Tự động cập nhật mỗi 5 phút")
 
-        if not Path(CREDENTIALS_FILE).exists():
-            st.warning("Chưa cấu hình kết nối Google Sheet (thiếu credentials.json)")
-            return
+    st.subheader("📋 Báo cáo Tiến độ — PGD")
+    st.caption("Dữ liệu từ Google Form · Tự động cập nhật mỗi 5 phút")
 
-        if st.button("🔄 Làm mới", key="tdn_refresh"):
-            st.cache_data.clear()
-            st.rerun()
+    if not Path(CREDENTIALS_FILE).exists():
+        st.warning("Chưa cấu hình kết nối Google Sheet (thiếu credentials.json)")
+        return
 
-        df = _doc_du_lieu()
+    if st.button("🔄 Làm mới", key="tdn_refresh"):
+        st.cache_data.clear()
+        st.rerun()
 
-        if df.empty:
-            st.info("Chưa có dữ liệu. PGD chưa nộp báo cáo hoặc chưa kết nối GSheet.")
-            return
+    df = _doc_du_lieu()
 
-        # ── PHẦN A: Metric tổng quan ─────────────────────
-        tong_nop = len(df)
-        so_pgd = df["ten_pgd"].nunique()
-        ky_moi = df["ky_bao_cao"].iloc[-1] if tong_nop else "—"
+    if df.empty:
+        st.info("Chưa có dữ liệu. PGD chưa nộp báo cáo hoặc chưa kết nối GSheet.")
+        return
 
-        c1, c2, c3 = st.columns(3)
-        c1.metric("Tổng lượt nộp", tong_nop)
-        c2.metric("Số PGD đã nộp", so_pgd)
-        c3.metric("Kỳ mới nhất", ky_moi)
+    # ── PHẦN A: Metric tổng quan ─────────────────────
+    tong_nop = len(df)
+    so_pgd = df["ten_pgd"].nunique()
+    ky_moi = df["ky_bao_cao"].iloc[-1] if tong_nop else "—"
 
-        st.divider()
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Tổng lượt nộp", tong_nop)
+    c2.metric("Số PGD đã nộp", so_pgd)
+    c3.metric("Kỳ mới nhất", ky_moi)
 
-        # ── PHẦN B: Bộ lọc ───────────────────────────────
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            ds_ky = ["Tất cả"] + sorted(df["ky_bao_cao"].dropna().unique().tolist(), reverse=True)
-            ky_chon = st.selectbox("Kỳ báo cáo", ds_ky, key="tdn_ky")
-        with col2:
-            ds_loai = ["Tất cả"] + sorted(df["loai_bao_cao"].dropna().unique().tolist())
-            loai_chon = st.selectbox("Loại báo cáo", ds_loai, key="tdn_loai")
-        with col3:
-            ds_pgd = ["Tất cả"] + sorted(df["ten_pgd"].dropna().unique().tolist())
-            pgd_chon = st.selectbox("Đơn vị", ds_pgd, key="tdn_pgd")
+    st.divider()
 
-        df_loc = df.copy()
-        if ky_chon != "Tất cả": df_loc = df_loc[df_loc["ky_bao_cao"] == ky_chon]
-        if loai_chon != "Tất cả": df_loc = df_loc[df_loc["loai_bao_cao"] == loai_chon]
-        if pgd_chon != "Tất cả": df_loc = df_loc[df_loc["ten_pgd"] == pgd_chon]
+    # ── PHẦN B: Bộ lọc ───────────────────────────────
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        ds_ky = ["Tất cả"] + sorted(df["ky_bao_cao"].dropna().unique().tolist(), reverse=True)
+        ky_chon = st.selectbox("Kỳ báo cáo", ds_ky, key="tdn_ky")
+    with col2:
+        ds_loai = ["Tất cả"] + sorted(df["loai_bao_cao"].dropna().unique().tolist())
+        loai_chon = st.selectbox("Loại báo cáo", ds_loai, key="tdn_loai")
+    with col3:
+        ds_pgd = ["Tất cả"] + sorted(df["ten_pgd"].dropna().unique().tolist())
+        pgd_chon = st.selectbox("Đơn vị", ds_pgd, key="tdn_pgd")
 
-        st.caption(f"Hiển thị {len(df_loc)} / {len(df)} lượt nộp")
+    df_loc = df.copy()
+    if ky_chon != "Tất cả": df_loc = df_loc[df_loc["ky_bao_cao"] == ky_chon]
+    if loai_chon != "Tất cả": df_loc = df_loc[df_loc["loai_bao_cao"] == loai_chon]
+    if pgd_chon != "Tất cả": df_loc = df_loc[df_loc["ten_pgd"] == pgd_chon]
 
-        # ── PHẦN C: Bảng chi tiết ────────────────────────
-        df_hien = df_loc[[
-            "thoi_gian", "ho_ten", "ten_pgd",
-            "loai_bao_cao", "ky_bao_cao", "noi_dung", "file_dinh_kem"
-        ]].copy()
-        df_hien["thoi_gian"] = df_hien["thoi_gian"].dt.strftime("%d/%m/%Y %H:%M")
-        df_hien = df_hien.rename(columns={
-            "thoi_gian": "Thời gian",
-            "ho_ten": "Họ tên",
-            "ten_pgd": "Đơn vị",
-            "loai_bao_cao": "Loại",
-            "ky_bao_cao": "Kỳ",
-            "noi_dung": "Nội dung tóm tắt",
-            "file_dinh_kem": "File đính kèm",
-        })
+    st.caption(f"Hiển thị {len(df_loc)} / {len(df)} lượt nộp")
 
-        st.dataframe(
-            df_hien,
-            use_container_width=True,
-            hide_index=True,
-            column_config={
-                "File đính kèm": st.column_config.LinkColumn(
-                    "File đính kèm",
-                    display_text="📎 Xem file"
-                ),
-                "Nội dung tóm tắt": st.column_config.TextColumn(
-                    width="large"
-                ),
-            }
-        )
+    # ── PHẦN C: Bảng chi tiết ────────────────────────
+    df_hien = df_loc[[
+        "thoi_gian", "ho_ten", "ten_pgd",
+        "loai_bao_cao", "ky_bao_cao", "noi_dung", "file_dinh_kem"
+    ]].copy()
+    df_hien["thoi_gian"] = df_hien["thoi_gian"].dt.strftime("%d/%m/%Y %H:%M")
+    df_hien = df_hien.rename(columns={
+        "thoi_gian": "Thời gian",
+        "ho_ten": "Họ tên",
+        "ten_pgd": "Đơn vị",
+        "loai_bao_cao": "Loại",
+        "ky_bao_cao": "Kỳ",
+        "noi_dung": "Nội dung tóm tắt",
+        "file_dinh_kem": "File đính kèm",
+    })
 
-        # ── PHẦN D: Bảng PGD chưa nộp (nếu có lọc theo kỳ) ──
-        if ky_chon != "Tất cả":
-            ds_tat_ca = [DON_VI_CHI_NHANH] + DS_PGD
-            da_nop = df_loc["ten_pgd"].unique().tolist()
-            chua_nop = [p for p in ds_tat_ca if p not in da_nop]
-            if chua_nop:
-                st.warning(f"⚠️ {len(chua_nop)} đơn vị chưa nộp kỳ **{ky_chon}**")
-                st.dataframe(
-                    pd.DataFrame({"Đơn vị chưa nộp": chua_nop}),
-                    hide_index=True,
-                    use_container_width=True,
-                )
+    st.dataframe(
+        df_hien,
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            "File đính kèm": st.column_config.LinkColumn(
+                "File đính kèm",
+                display_text="📎 Xem file"
+            ),
+            "Nội dung tóm tắt": st.column_config.TextColumn(
+                width="large"
+            ),
+        }
+    )
+
+    # ── PHẦN D: Bảng PGD chưa nộp (nếu có lọc theo kỳ) ──
+    if ky_chon != "Tất cả":
+        ds_tat_ca = [DON_VI_CHI_NHANH] + DS_PGD
+        da_nop = df_loc["ten_pgd"].unique().tolist()
+        chua_nop = [p for p in ds_tat_ca if p not in da_nop]
+        if chua_nop:
+            st.warning(f"⚠️ {len(chua_nop)} đơn vị chưa nộp kỳ **{ky_chon}**")
+            st.dataframe(
+                pd.DataFrame({"Đơn vị chưa nộp": chua_nop}),
+                hide_index=True,
+                use_container_width=True,
+            )

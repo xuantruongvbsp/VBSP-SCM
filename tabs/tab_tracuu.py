@@ -368,7 +368,8 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
     ]
     df_work = df[[c for c in COLS_CAN if c in df.columns]].copy()
 
-    with tab:
+    _tab_ctx = tab if tab is not None else __import__('streamlit').container()
+    with _tab_ctx:
         st.subheader("🔍 Tra cứu hồ sơ khách hàng")
 
         # ── Search box ──────────────────────────────────────────────────────

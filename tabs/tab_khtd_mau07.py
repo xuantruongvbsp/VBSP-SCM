@@ -21,6 +21,7 @@ import pandas as pd
 import streamlit as st
 
 import db
+from auth import la_phan_he_pgd
 from config import (
     CHUONG_TRINH_KHTD,
     COT_MA_CHUONG_TRINH,
@@ -771,7 +772,7 @@ def render(tab, **kwargs) -> None:
         col_pgd, col_xa, col_nam = st.columns([2, 2, 1])
 
         with col_pgd:
-            if role == "user" and pgd_user:
+            if la_phan_he_pgd(role) and pgd_user:
                 st.info(f"PGD: **{pgd_user}**")
                 pgd_chon = pgd_user
             else:

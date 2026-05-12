@@ -42,8 +42,8 @@
 
 | # | Việc | File liên quan | Ghi chú |
 |---|---|---|---|
-| **B2** | **Bảng tóm tắt KHTD CN → HTML thuần** | `tab_khtd.py` | Mockup có sẵn, chưa implement `unsafe_allow_html` |
-| **B7** | **Fix check role cứng → dùng `la_phan_he_*()`** | `tabs/*.py` | Refactor hàng loạt, chưa hoàn tất |
+| B2 | ✅ Bảng tóm tắt KHTD CN → HTML thuần | `tab_khtd_xuat.py` | ✅ Xong — `_hien_thi_bang_cn_readonly()` |
+| B7 | ✅ Fix check role cứng → `normalize_role()` / `la_phan_he_*()` | `tabs/*.py` | ✅ Xong |
 
 ---
 

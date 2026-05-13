@@ -6,6 +6,7 @@ import db
 from config import DS_PGD, DON_VI_CHI_NHANH
 from data.pgd import pgd_slug
 from utils import fmt_ty, fmt_so, get_tab_context
+from auth import normalize_role
 
 TRANG_THAI_QD62 = {
     "cho_duyet": "🟡 Chờ duyệt",
@@ -263,8 +264,9 @@ def _render_xuat_bao_cao(df_qd62: pd.DataFrame, df_no_rr: pd.DataFrame) -> None:
 
 def render(tab=None, **kwargs) -> None:
     """Render Dashboard XLRR tổng hợp."""
-    role = kwargs.get("role")
-    if role not in ("admin", "admin_cn", "manager", "manager_cn"):
+    role_raw = str(kwargs.get("role", "user") or "user")
+    role = normalize_role(role_raw)
+    if role not in ("admin_cn", "manager_cn"):
         if tab is not None:
             _ctx = tab
         else:

@@ -30,7 +30,7 @@ from data.pgd import (
 from utils import lay_config
 import auth
 from auth import LOGO_NHCSXH_B64 as LOGO_B64, normalize_role
-from workspaces import ws_executive, ws_management, ws_operation
+import workspaces
 import db
 from widgets.status_widget import render_status_compact
 from alert_center import render_alert_sidebar
@@ -584,11 +584,11 @@ def main():
     ws = st.session_state.workspace
 
     if ws == "executive":
-        ws_executive.render(**ctx)
+        workspaces.ws_executive.render(**ctx)
     elif ws == "management":
-        ws_management.render(**ctx)
+        workspaces.ws_management.render(**ctx)
     elif ws == "operation":
-        ws_operation.render(**ctx)
+        workspaces.ws_operation.render(**ctx)
     elif ws == "admin_users" and role == "admin":
         st.title("👥 Quản lý người dùng")
         class _FakeTab:
@@ -596,7 +596,7 @@ def main():
             def __exit__(self,*a): pass
         auth.render(_FakeTab(), df_full=df_full, role=role, username=username)
     else:
-        ws_operation.render(**ctx)
+        workspaces.ws_operation.render(**ctx)
 
 
 main()

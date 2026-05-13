@@ -20,7 +20,7 @@ from config import (
 from utils import fmt, fmt_bang_ty, fmt_so, xuat_excel
 from services.template_service import (
     co_template, dien_template, nut_tai_word_va_pdf, docx_bytes_to_pdf,
-    TMPL_MAU06, TMPL_MAU06A, TMPL_MAU15, TMPL_MAU16, TMPL_KH_KT
+    TMPL_MAU16
 )
 
 # ── Hằng số ──────────────────────────────────────────────────────────────────
@@ -535,6 +535,221 @@ def _tao_word_mau06(du_lieu: dict, df_m06: pd.DataFrame,
     return buf.getvalue()
 
 
+def _tao_word_mau16(du_lieu: dict, df_to: pd.DataFrame) -> bytes:
+    doc = Document()
+    _style_doc(doc)
+    for section in doc.sections:
+        section.top_margin = Cm(2)
+        section.bottom_margin = Cm(2)
+        section.left_margin = Cm(3)
+        section.right_margin = Cm(2)
+        section.page_width = Cm(21)
+        section.page_height = Cm(29.7)
+
+    ngay_kt = du_lieu.get("ngay_kt", date.today())
+    _add_header_quoc_hieu(
+        doc,
+        don_vi=du_lieu.get("don_vi_kt", ""),
+        so_vb="16/TD",
+        dia_danh=du_lieu.get("ten_xa", ""),
+        ngay_ky=ngay_kt,
+    )
+
+    title = doc.add_paragraph()
+    title.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    run_t = title.add_run("BIÊN BẢN KIỂM TRA\nHoạt động tín dụng chính sách tại Tổ TK&VV")
+    run_t.bold = True
+    run_t.font.size = Pt(13)
+
+    ten_to = du_lieu.get("ten_to", "")
+    ten_xa = du_lieu.get("ten_xa", "")
+    doc.add_paragraph(
+        f"Hôm nay, ngày {ngay_kt.day} tháng {ngay_kt.month} năm {ngay_kt.year}\n"
+        f"Đoàn kiểm tra: {du_lieu.get('don_vi_kt', '')}\n"
+        f"Cán bộ kiểm tra: {du_lieu.get('can_bo_kt', '')} — Chức vụ: {du_lieu.get('chuc_vu', '')}\n"
+        f"Địa điểm kiểm tra: Tổ TK&VV {ten_to}, xã/phường {ten_xa}\n"
+        f"Đơn vị được kiểm tra: Tổ trưởng Tổ TK&VV {ten_to}"
+    )
+
+    doc.add_paragraph("I. NỘI DUNG KIỂM TRA").runs[0].bold = True
+    doc.add_paragraph("1. Kết quả hoạt động tín dụng").runs[0].bold = True
+
+    headers = [
+        "STT",
+        "Họ và tên KH",
+        "Mã khoản vay",
+        "Chương trình",
+        "Dư nợ (đồng)",
+        "Nợ quá hạn (đồng)",
+        "Lãi tồn (đồng)",
+        "Ghi chú",
+    ]
+    tbl = doc.add_table(rows=1, cols=len(headers))
+    tbl.style = "Table Grid"
+    for i, h in enumerate(headers):
+        cell = tbl.rows[0].cells[i]
+        cell.text = h
+        cell.vertical_alignment = WD_ALIGN_VERTICAL.CENTER
+        p = cell.paragraphs[0]
+        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        if p.runs:
+            p.runs[0].bold = True
+            p.runs[0].font.size = Pt(9)
+
+    tong_dn = tong_nqh = tong_lai_ton = 0.0
+    for stt, (_, row) in enumerate(df_to.iterrows(), 1):
+        r = tbl.add_row()
+        dn = float(row.get(COT_TONG_DU_NO, 0) or 0)
+        nqh = float(row.get(COT_DU_NO_QH, 0) or 0)
+        lai_ton = float(row.get(COT_LAI_TON, 0) or 0)
+        tong_dn += dn
+        tong_nqh += nqh
+        tong_lai_ton += lai_ton
+
+        vals = [
+            str(stt),
+            str(row.get(COT_TEN_KH, "")),
+            str(row.get(COT_SO_KU, "")),
+            str(row.get(COT_TEN_CT, "")),
+            f"{dn:,.0f}",
+            f"{nqh:,.0f}",
+            f"{lai_ton:,.0f}",
+            "",
+        ]
+        for i, v in enumerate(vals):
+            r.cells[i].text = v
+            r.cells[i].vertical_alignment = WD_ALIGN_VERTICAL.CENTER
+            p = r.cells[i].paragraphs[0]
+            if i in (0, 4, 5, 6):
+                p.alignment = WD_ALIGN_PARAGRAPH.RIGHT if i in (4, 5, 6) else WD_ALIGN_PARAGRAPH.CENTER
+            else:
+                p.alignment = WD_ALIGN_PARAGRAPH.LEFT
+            if p.runs:
+                p.runs[0].font.size = Pt(9)
+
+    r_tong = tbl.add_row()
+    r_tong.cells[0].merge(r_tong.cells[3])
+    r_tong.cells[0].text = "Tổng cộng"
+    p_t = r_tong.cells[0].paragraphs[0]
+    p_t.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    if p_t.runs:
+        p_t.runs[0].bold = True
+        p_t.runs[0].font.size = Pt(9)
+    r_tong.cells[4].text = f"{tong_dn:,.0f}"
+    r_tong.cells[5].text = f"{tong_nqh:,.0f}"
+    r_tong.cells[6].text = f"{tong_lai_ton:,.0f}"
+    for i in (4, 5, 6):
+        p = r_tong.cells[i].paragraphs[0]
+        p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+        if p.runs:
+            p.runs[0].bold = True
+            p.runs[0].font.size = Pt(9)
+
+    doc.add_paragraph()
+    doc.add_paragraph("2. Nhận xét").runs[0].bold = True
+    doc.add_paragraph(du_lieu.get("nhan_xet", "................") or "................")
+    doc.add_paragraph("II. KẾT LUẬN VÀ KIẾN NGHỊ").runs[0].bold = True
+    doc.add_paragraph(du_lieu.get("ket_luan", "................") or "................")
+
+    doc.add_paragraph()
+    ky = doc.add_table(rows=1, cols=2)
+    ky.style = "Table Grid"
+    from docx.oxml.ns import qn
+    from docx.oxml import OxmlElement
+    for cell in ky.rows[0].cells:
+        tc = cell._tc
+        tcPr = tc.get_or_add_tcPr()
+        tcBorders = OxmlElement("w:tcBorders")
+        for border_name in ["top", "left", "bottom", "right"]:
+            border = OxmlElement(f"w:{border_name}")
+            border.set(qn("w:val"), "none")
+            tcBorders.append(border)
+        tcPr.append(tcBorders)
+
+    p_l = ky.rows[0].cells[0].paragraphs[0]
+    p_l.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    p_l.add_run("TỔ TRƯỞNG TỔ TK&VV\n(Ký, ghi rõ họ tên)\n\n\n\n").bold = True
+
+    p_r = ky.rows[0].cells[1].paragraphs[0]
+    p_r.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    p_r.add_run("CÁN BỘ KIỂM TRA\n(Ký, ghi rõ họ tên)\n\n\n\n").bold = True
+    p_r.add_run(str(du_lieu.get("can_bo_kt", "")))
+
+    buf = io.BytesIO()
+    doc.save(buf)
+    return buf.getvalue()
+
+
+def _tao_word_bien_ban_xac_minh(du_lieu: dict) -> bytes:
+    doc = Document()
+    _style_doc(doc)
+    for section in doc.sections:
+        section.top_margin = Cm(2)
+        section.bottom_margin = Cm(2)
+        section.left_margin = Cm(3)
+        section.right_margin = Cm(2)
+        section.page_width = Cm(21)
+        section.page_height = Cm(29.7)
+
+    ngay_lap = du_lieu.get("ngay_lap", date.today())
+    _add_header_quoc_hieu(
+        doc,
+        don_vi=du_lieu.get("pgd_user", ""),
+        so_vb="",
+        dia_danh="",
+        ngay_ky=ngay_lap,
+    )
+
+    title = doc.add_paragraph()
+    title.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    run_t = title.add_run("BIÊN BẢN\nXác minh nợ chiếm dụng")
+    run_t.bold = True
+    run_t.font.size = Pt(13)
+
+    doc.add_paragraph(
+        f"Hôm nay, ngày {ngay_lap.day} tháng {ngay_lap.month} năm {ngay_lap.year}\n"
+        f"Cán bộ lập biên bản: {du_lieu.get('can_bo_lap', '')}\n"
+        f"Làm việc với: Khách hàng {du_lieu.get('ten_kh', '')}\n"
+        f"Số khế ước: {du_lieu.get('so_ku', '')}\n"
+        "NỘI DUNG XÁC MINH:\n\n"
+        f"Số tiền chiếm dụng: {du_lieu.get('so_tien', '')} triệu đồng\n"
+        "Lý do / Hoàn cảnh:\n"
+        f"{du_lieu.get('ly_do', '')}\n"
+        "Biện pháp xử lý đã thống nhất:\n"
+        f"{du_lieu.get('bien_phap', '')}\n\n"
+        "Biên bản được lập thành 02 liên, mỗi bên giữ 01 liên."
+    )
+
+    doc.add_paragraph()
+    ky = doc.add_table(rows=1, cols=2)
+    ky.style = "Table Grid"
+    from docx.oxml.ns import qn
+    from docx.oxml import OxmlElement
+    for cell in ky.rows[0].cells:
+        tc = cell._tc
+        tcPr = tc.get_or_add_tcPr()
+        tcBorders = OxmlElement("w:tcBorders")
+        for border_name in ["top", "left", "bottom", "right"]:
+            border = OxmlElement(f"w:{border_name}")
+            border.set(qn("w:val"), "none")
+            tcBorders.append(border)
+        tcPr.append(tcBorders)
+
+    p_l = ky.rows[0].cells[0].paragraphs[0]
+    p_l.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    p_l.add_run("KHÁCH HÀNG\n(Ký, ghi rõ họ tên)\n\n\n\n").bold = True
+    p_l.add_run(str(du_lieu.get("ten_kh", "")))
+
+    p_r = ky.rows[0].cells[1].paragraphs[0]
+    p_r.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    p_r.add_run("CÁN BỘ LẬP BIÊN BẢN\n(Ký, ghi rõ họ tên)\n\n\n\n").bold = True
+    p_r.add_run(str(du_lieu.get("can_bo_lap", "")))
+
+    buf = io.BytesIO()
+    doc.save(buf)
+    return buf.getvalue()
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # SUB-TAB RENDERERS
 # ══════════════════════════════════════════════════════════════════════════════
@@ -645,38 +860,33 @@ def _render_ke_hoach(df: pd.DataFrame, pgd_user: str) -> None:
             "ds_to":       ds_to,
         }
 
-        if co_template(TMPL_KH_KT):
-            with st.spinner("Đang tạo file..."):
-                docx_bytes = dien_template(TMPL_KH_KT, context)
-            ten_file = f"KH_KiemTra_UyThac_{int(nam_kh)}_{don_vi_kt[:20].replace(' ','_')}"
-            col1, col2 = st.columns(2)
-            with col1:
-                st.download_button(
-                    "⬇️ Tải Word (.docx)",
-                    data=docx_bytes,
-                    file_name=ten_file + ".docx",
-                    mime="application/vnd.openxmlformats-officedocument"
-                         ".wordprocessingml.document",
-                    key="kh_docx",
-                )
-            with col2:
-                with st.spinner("Đang tạo PDF..."):
-                    pdf_bytes = docx_bytes_to_pdf(docx_bytes)
-                if pdf_bytes:
-                    st.download_button(
-                        "⬇️ Tải PDF",
-                        data=pdf_bytes,
-                        file_name=ten_file + ".pdf",
-                        mime="application/pdf",
-                        key="kh_pdf",
-                    )
-                else:
-                    st.caption("⚠️ PDF không khả dụng — cần MS Word trên server")
-        else:
-            st.warning(
-                f"⚠️ Chưa có template '{TMPL_KH_KT}' trong thư mục templates/. "
-                f"Vui lòng upload file Word mẫu chuẩn vào thư mục này."
+        with st.spinner("Đang tạo file..."):
+            du_lieu_word = {**context, "ngay_ky": ngay_ky}
+            docx_bytes = _tao_word_ke_hoach(du_lieu_word, ds_to)
+        ten_file = f"KH_KiemTra_UyThac_{int(nam_kh)}_{don_vi_kt[:20].replace(' ','_')}"
+        col1, col2 = st.columns(2)
+        with col1:
+            st.download_button(
+                "⬇️ Tải Word (.docx)",
+                data=docx_bytes,
+                file_name=ten_file + ".docx",
+                mime="application/vnd.openxmlformats-officedocument"
+                     ".wordprocessingml.document",
+                key="kh_docx",
             )
+        with col2:
+            with st.spinner("Đang tạo PDF..."):
+                pdf_bytes = docx_bytes_to_pdf(docx_bytes)
+            if pdf_bytes:
+                st.download_button(
+                    "⬇️ Tải PDF",
+                    data=pdf_bytes,
+                    file_name=ten_file + ".pdf",
+                    mime="application/pdf",
+                    key="kh_pdf",
+                )
+            else:
+                st.caption("⚠️ PDF không khả dụng — cần MS Word trên server")
 
 
 def _render_mau06(df: pd.DataFrame, pgd_user: str) -> None:
@@ -794,40 +1004,43 @@ def _render_mau06(df: pd.DataFrame, pgd_user: str) -> None:
             "tong_du_no":  fmt(df_xuat[COT_TONG_DU_NO].sum()
                                if COT_TONG_DU_NO in df_xuat.columns else 0),
         }
-        tmpl = TMPL_MAU06 if "06/TD" in loai_mau else TMPL_MAU06A
-
-        if co_template(tmpl):
-            with st.spinner("Đang tạo file..."):
-                docx_bytes = dien_template(tmpl, context)
-            ten_file = f"Mau06TD_{pgd_user}_{ngay_kt.strftime('%d%m%Y')}"
-            col1, col2 = st.columns(2)
-            with col1:
-                st.download_button(
-                    "⬇️ Tải Word (.docx)",
-                    data=docx_bytes,
-                    file_name=ten_file + ".docx",
-                    mime="application/vnd.openxmlformats-officedocument"
-                         ".wordprocessingml.document",
-                    key="m06_docx",
-                )
-            with col2:
-                with st.spinner("Đang tạo PDF..."):
-                    pdf_bytes = docx_bytes_to_pdf(docx_bytes)
-                if pdf_bytes:
-                    st.download_button(
-                        "⬇️ Tải PDF",
-                        data=pdf_bytes,
-                        file_name=ten_file + ".pdf",
-                        mime="application/pdf",
-                        key="m06_pdf",
-                    )
-                else:
-                    st.caption("⚠️ PDF không khả dụng — cần MS Word trên server")
-        else:
-            st.warning(
-                f"⚠️ Chưa có template '{tmpl}' trong thư mục templates/. "
-                f"Vui lòng upload file Word mẫu chuẩn vào thư mục này."
+        loai_word = "06" if "06/TD" in loai_mau else "06A"
+        with st.spinner("Đang tạo file..."):
+            du_lieu_word = {
+                "don_vi_kt": don_vi_kt,
+                "ten_xa": ten_xa,
+                "ten_to": ten_to,
+                "can_bo_1": can_bo_1,
+                "chuc_vu_1": chuc_vu_1,
+                "can_bo_2": can_bo_2,
+                "dia_ban": dia_ban,
+                "ngay_kt": ngay_kt,
+            }
+            docx_bytes = _tao_word_mau06(du_lieu_word, df_xuat, loai=loai_word)
+        ten_file = f"Mau06TD_{pgd_user}_{ngay_kt.strftime('%d%m%Y')}"
+        col1, col2 = st.columns(2)
+        with col1:
+            st.download_button(
+                "⬇️ Tải Word (.docx)",
+                data=docx_bytes,
+                file_name=ten_file + ".docx",
+                mime="application/vnd.openxmlformats-officedocument"
+                     ".wordprocessingml.document",
+                key="m06_docx",
             )
+        with col2:
+            with st.spinner("Đang tạo PDF..."):
+                pdf_bytes = docx_bytes_to_pdf(docx_bytes)
+            if pdf_bytes:
+                st.download_button(
+                    "⬇️ Tải PDF",
+                    data=pdf_bytes,
+                    file_name=ten_file + ".pdf",
+                    mime="application/pdf",
+                    key="m06_pdf",
+                )
+            else:
+                st.caption("⚠️ PDF không khả dụng — cần MS Word trên server")
 
 
 def _render_mau15(df: pd.DataFrame, pgd_user: str) -> None:
@@ -950,10 +1163,118 @@ def _render_mau15(df: pd.DataFrame, pgd_user: str) -> None:
             ],
         }
 
-        if co_template(TMPL_MAU15):
+        with st.spinner("Đang tạo file..."):
+            du_lieu_word = {
+                "pgd": pgd,
+                "ten_xa": ten_xa,
+                "ten_to": chon_to,
+                "to_truong": to_truong,
+                "ma_to": ma_to,
+                "dia_chi": dia_chi,
+                "can_bo_kt": can_bo_kt,
+                "ngay_chot": ngay_chot,
+            }
+            docx_bytes = _tao_word_mau15(du_lieu_word, df_to)
+        ten_file = f"Mau15TD_{chon_to.replace(' ','_')}_{ngay_chot.strftime('%d%m%Y')}"
+        col1, col2 = st.columns(2)
+        with col1:
+            st.download_button(
+                "⬇️ Tải Word (.docx)",
+                data=docx_bytes,
+                file_name=ten_file + ".docx",
+                mime="application/vnd.openxmlformats-officedocument"
+                     ".wordprocessingml.document",
+                key="m15_docx",
+            )
+        with col2:
+            with st.spinner("Đang tạo PDF..."):
+                pdf_bytes = docx_bytes_to_pdf(docx_bytes)
+            if pdf_bytes:
+                st.download_button(
+                    "⬇️ Tải PDF",
+                    data=pdf_bytes,
+                    file_name=ten_file + ".pdf",
+                    mime="application/pdf",
+                    key="m15_pdf",
+                )
+            else:
+                st.caption("⚠️ PDF không khả dụng — cần MS Word trên server")
+
+
+def _render_bien_ban(df: pd.DataFrame, pgd_user: str) -> None:
+    st.markdown("#### 📋 Biên bản & Báo cáo tổng hợp")
+    loai = st.radio(
+        "Loại biên bản",
+        [
+            "📋 Mẫu 16/TD — Kiểm tra CT-XH Tổ TK&VV",
+            "📄 Biên bản xác minh nợ chiếm dụng",
+            "📊 Báo cáo tổng hợp ủy thác (Excel)",
+        ],
+        horizontal=True,
+        key="bb_loai",
+    )
+
+    if loai.startswith("📋"):
+        if df is None or df.empty:
+            st.warning("Chưa có dữ liệu HSTD.")
+            return
+
+        with st.form("form_bb_m16"):
+            c1, c2 = st.columns(2)
+            don_vi_kt = c1.selectbox("Hội đoàn thể kiểm tra", DVUT_ORDER, key="bb_dvkt")
+            ds_xa_bb = (
+                sorted(df[COT_TEN_XA].dropna().unique().tolist())
+                if COT_TEN_XA in df.columns
+                else []
+            )
+            ten_xa = c1.selectbox("Xã/Phường", [""] + ds_xa_bb, key="bb_xa")
+            ten_xa_filter = st.session_state.get("bb_xa", "")
+            df_to_filter = (
+                df[df[COT_TEN_XA] == ten_xa_filter]
+                if ten_xa_filter and COT_TEN_XA in df.columns
+                else df
+            )
+            ds_to_bb = (
+                sorted(df_to_filter[COT_TEN_TO].dropna().unique().tolist())
+                if COT_TEN_TO in df_to_filter.columns
+                else []
+            )
+            ten_to = c1.selectbox("Tổ TK&VV", ["Tất cả"] + ds_to_bb, key="bb_to")
+
+            can_bo_kt = c2.text_input("Cán bộ kiểm tra", key="bb_cb")
+            chuc_vu = c2.text_input("Chức vụ", key="bb_cv")
+            ngay_kt = c2.date_input("Ngày kiểm tra", value=date.today(), key="bb_ngay")
+
+            nhan_xet = st.text_area("Nhận xét", height=80, key="bb_nhanxet")
+            ket_luan = st.text_area("Kết luận & Kiến nghị", height=80, key="bb_ketluan")
+            submitted_m16 = st.form_submit_button("📄 Tạo Word", type="primary")
+
+        if submitted_m16:
+            df_xuat = df.copy()
+            if ten_xa and COT_TEN_XA in df_xuat.columns:
+                df_xuat = df_xuat[df_xuat[COT_TEN_XA] == ten_xa]
+            if ten_to != "Tất cả" and COT_TEN_TO in df_xuat.columns:
+                df_xuat = df_xuat[df_xuat[COT_TEN_TO] == ten_to]
+
+            du_lieu = {
+                "don_vi_kt": don_vi_kt,
+                "ten_xa": ten_xa,
+                "ten_to": ten_to if ten_to != "Tất cả" else "",
+                "can_bo_kt": can_bo_kt,
+                "chuc_vu": chuc_vu,
+                "ngay_kt": ngay_kt,
+                "ngay": ngay_kt.day,
+                "thang": ngay_kt.month,
+                "nam": ngay_kt.year,
+                "nhan_xet": nhan_xet,
+                "ket_luan": ket_luan,
+            }
+
             with st.spinner("Đang tạo file..."):
-                docx_bytes = dien_template(TMPL_MAU15, context)
-            ten_file = f"Mau15TD_{chon_to.replace(' ','_')}_{ngay_chot.strftime('%d%m%Y')}"
+                docx_bytes = _tao_word_mau16(du_lieu, df_xuat)
+            ten_to_file = (ten_to if ten_to != "Tất cả" else "TatCa").replace(" ", "_")
+            ten_file = f"Mau16TD_{ten_to_file}_{ngay_kt.strftime('%d%m%Y')}"
+
             col1, col2 = st.columns(2)
             with col1:
                 st.download_button(
@@ -961,8 +1282,8 @@ def _render_mau15(df: pd.DataFrame, pgd_user: str) -> None:
                     data=docx_bytes,
                     file_name=ten_file + ".docx",
                     mime="application/vnd.openxmlformats-officedocument"
-                         ".wordprocessingml.document",
-                    key="m15_docx",
+                    ".wordprocessingml.document",
+                    key="bb_m16_docx",
                 )
             with col2:
                 with st.spinner("Đang tạo PDF..."):
@@ -973,15 +1294,111 @@ def _render_mau15(df: pd.DataFrame, pgd_user: str) -> None:
                         data=pdf_bytes,
                         file_name=ten_file + ".pdf",
                         mime="application/pdf",
-                        key="m15_pdf",
+                        key="bb_m16_pdf",
                     )
                 else:
                     st.caption("⚠️ PDF không khả dụng — cần MS Word trên server")
-        else:
-            st.warning(
-                f"⚠️ Chưa có template '{TMPL_MAU15}' trong thư mục templates/. "
-                f"Vui lòng upload file Word mẫu chuẩn vào thư mục này."
+
+        return
+
+    if loai.startswith("📄"):
+        with st.form("form_bb_xm"):
+            c1, c2 = st.columns(2)
+            ten_kh = c1.text_input("Họ tên khách hàng", key="xm_kh")
+            so_ku = c1.text_input("Số khế ước", key="xm_sku")
+            so_tien = c1.number_input(
+                "Số tiền chiếm dụng (triệu đồng)",
+                min_value=0.0,
+                step=0.1,
+                key="xm_sotien",
             )
+            can_bo_lap = c2.text_input("Cán bộ lập biên bản", key="xm_cb")
+            ngay_lap = c2.date_input("Ngày lập", value=date.today(), key="xm_ngay")
+            ly_do = st.text_area("Lý do / Hoàn cảnh", height=80, key="xm_lydo")
+            bien_phap = st.text_area("Biện pháp xử lý", height=80, key="xm_bien_phap")
+            submitted_xm = st.form_submit_button("📄 Tạo Word", type="primary")
+
+        if submitted_xm:
+            du_lieu = {
+                "ten_kh": ten_kh,
+                "so_ku": so_ku,
+                "so_tien": f"{so_tien:,.1f}",
+                "ly_do": ly_do,
+                "bien_phap": bien_phap,
+                "can_bo_lap": can_bo_lap,
+                "pgd_user": pgd_user,
+                "ngay_lap": ngay_lap,
+                "ngay": ngay_lap.day,
+                "thang": ngay_lap.month,
+                "nam": ngay_lap.year,
+            }
+            with st.spinner("Đang tạo file..."):
+                docx_bytes = _tao_word_bien_ban_xac_minh(du_lieu)
+            ten_file = f"BBXacMinh_{so_ku}_{ngay_lap.strftime('%d%m%Y')}"
+
+            col1, col2 = st.columns(2)
+            with col1:
+                st.download_button(
+                    "⬇️ Tải Word (.docx)",
+                    data=docx_bytes,
+                    file_name=ten_file + ".docx",
+                    mime="application/vnd.openxmlformats-officedocument"
+                    ".wordprocessingml.document",
+                    key="xm_docx",
+                )
+            with col2:
+                with st.spinner("Đang tạo PDF..."):
+                    pdf_bytes = docx_bytes_to_pdf(docx_bytes)
+                if pdf_bytes:
+                    st.download_button(
+                        "⬇️ Tải PDF",
+                        data=pdf_bytes,
+                        file_name=ten_file + ".pdf",
+                        mime="application/pdf",
+                        key="xm_pdf",
+                    )
+                else:
+                    st.caption("⚠️ PDF không khả dụng — cần MS Word trên server")
+        return
+
+    if df is None or df.empty:
+        st.warning("Chưa có dữ liệu.")
+        return
+
+    try:
+        df_th = pickle.loads(_tinh_theo_dvut(pickle.dumps(df)))
+    except Exception as e:
+        st.error(f"Lỗi: {e}")
+        df_th = pd.DataFrame()
+
+    if df_th.empty:
+        st.info("Không có dữ liệu.")
+        return
+
+    hien = df_th.rename(
+        columns={
+            COT_DVUT: "Hội đoàn thể",
+            "so_to": "Số Tổ TK&VV",
+            "so_kh": "Số hộ vay",
+            "tong_dn": "Dư nợ (tr.đ)",
+            "nqh": "NQH (tr.đ)",
+            "lai_ton": "Lãi tồn (tr.đ)",
+        }
+    )
+    for col in ["Dư nợ (tr.đ)", "NQH (tr.đ)", "Lãi tồn (tr.đ)"]:
+        if col in hien.columns:
+            hien[col] = hien[col].apply(fmt)
+    st.dataframe(hien, use_container_width=True, hide_index=True)
+
+    buf = xuat_excel({"Tổng hợp ủy thác": df_th})
+    ten_file = f"TongHopUyThac_{pgd_user}_{date.today().strftime('%d%m%Y')}.xlsx"
+    st.download_button(
+        "📥 Tải Excel",
+        data=buf,
+        file_name=ten_file,
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        key="th_dl",
+    )
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1015,6 +1432,4 @@ def render(tab: DeltaGenerator, **kwargs) -> None:
         with sub3: _render_mau06(df, pgd_user)
         with sub4: _render_mau15(df, pgd_user)
         with sub5:
-            st.info("🚧 Đang phát triển — Biên bản kiểm tra CT-XH cấp tỉnh, "
-                    "cấp xã, Tổ TK&VV, Biên bản xác minh nợ chiếm dụng "
-                    "và Báo cáo tổng hợp.")
+            _render_bien_ban(df, pgd_user)

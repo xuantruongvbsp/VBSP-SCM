@@ -45,7 +45,7 @@ def _clean_sheet_name(name: str) -> str:
     cleaned = re.sub(r'[\\/*?[\]:]', '', name.strip())
     return cleaned[:31]
 
-def _tinh_th_gqvl_phan_tang(df_gqvl: pd.DataFrame) -> dict[str, float]]:
+def _tinh_th_gqvl_phan_tang(df_gqvl: pd.DataFrame) -> dict[str, float]:
     """
     Tính TH GQVL phân tầng 4 nhóm từ gqvl.parquet.
     Dùng config.GQVL_PHAN_TANG, config.COT_PL_NV, config.MA_NDT_CAP_TINH_DUOI.

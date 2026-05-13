@@ -19,7 +19,7 @@ from config import (
     COT_NGAY_VAY, COT_THOI_HAN, COT_LAI_SUAT,
     TEMPLATES_DIR, TAG_MAP,
 )
-from auth import is_cn_role, is_pgd_role, get_permissions
+from auth import is_cn_role, is_pgd_role, get_permissions, normalize_role
 from data import (
     danh_dau_khong_hd, tong_hop_khong_hd,
     ds_chi_tiet_khong_hd, canh_bao_migration,
@@ -443,7 +443,7 @@ def _render_ndt_dp(role: str, username: str) -> None:
     )
 
     ds = doc_ndt_dp_list()   # list[dict] {"ma", "ghi_chu"}
-    can_edit = role in ("admin", "admin_cn")
+    can_edit = normalize_role(str(role or "user")) == "admin_cn"
 
     # Hiển thị bảng hiện tại
     if ds:
@@ -828,6 +828,7 @@ def _build_all_items(role: str, username: str, **kwargs) -> list:
     df_full = kwargs.get("df_full")
     ds_pgd_all = kwargs.get("ds_pgd_all", [])
     can_upload = kwargs.get("can_upload", False)
+    role_n = normalize_role(str(role or "user"))
 
     ALL_ITEMS = [
         {"group": "Tổng quan",     "label": "Thông tin chung", "icon": "chart-bar",      "fn": lambda: tab_tongquan.render(None, **kwargs)},
@@ -851,9 +852,9 @@ def _build_all_items(role: str, username: str, **kwargs) -> list:
 
     if can_upload:
         ALL_ITEMS.append({"group": "Hành chính", "label": "Quản lý Template", "icon": "template", "fn": lambda: _render_quan_ly_template(df_full)})
-    if role in ("admin", "admin_cn", "manager", "manager_cn"):
-        ALL_ITEMS.append({"group": "Hành chính", "label": "Mã NĐT ĐP", "icon": "building-bank", "fn": lambda: _render_ndt_dp(role, kwargs.get("username", "unknown"))})
-    if role in ("admin", "admin_cn"):
+    if role_n in ("admin_cn", "manager_cn"):
+        ALL_ITEMS.append({"group": "Hành chính", "label": "Mã NĐT ĐP", "icon": "building-bank", "fn": lambda: _render_ndt_dp(role_n, kwargs.get("username", "unknown"))})
+    if role_n == "admin_cn":
         ALL_ITEMS.append({"group": "Hành chính", "label": "Audit Log", "icon": "list", "fn": lambda: tab_audit_log.render(None, **kwargs)})
     ALL_ITEMS.append({"group": "Hành chính", "label": "Upload KH-NV", "icon": "upload", "fn": lambda: tab_upload_khnv.render(None, **kwargs)})
 
@@ -938,7 +939,8 @@ def render(**kwargs):
     df         = kwargs.get("df")
     df_full    = kwargs.get("df_full", df)
     ds_pgd_all = kwargs.get("ds_pgd_all", [])
-    can_upload = get_permissions(role)["can_upload"]
+    role_n = normalize_role(str(role or "user"))
+    can_upload = get_permissions(role_n)["can_upload"]
 
     st.title("📋 Phòng KH-NV")
     st.caption("Giám sát chỉ tiêu · Cân đối vốn · Quản lý NQH · GQVL · Quản lý CBTD")
@@ -967,9 +969,9 @@ def render(**kwargs):
     # Thêm theo điều kiện (giống logic cũ)
     if can_upload:
         ALL_ITEMS.append({"group": "Hành chính", "label": "Quản lý Template", "icon": "template", "fn": lambda: _render_quan_ly_template(df_full)})
-    if role in ("admin", "admin_cn", "manager", "manager_cn"):
-        ALL_ITEMS.append({"group": "Hành chính", "label": "Mã NĐT ĐP", "icon": "building-bank", "fn": lambda: _render_ndt_dp(role, kwargs.get("username", "unknown"))})
-    if role in ("admin", "admin_cn"):
+    if role_n in ("admin_cn", "manager_cn"):
+        ALL_ITEMS.append({"group": "Hành chính", "label": "Mã NĐT ĐP", "icon": "building-bank", "fn": lambda: _render_ndt_dp(role_n, kwargs.get("username", "unknown"))})
+    if role_n == "admin_cn":
         ALL_ITEMS.append({"group": "Hành chính", "label": "Audit Log", "icon": "list", "fn": lambda: tab_audit_log.render(None, **kwargs)})
     ALL_ITEMS.append({"group": "Hành chính", "label": "Upload KH-NV", "icon": "upload", "fn": lambda: tab_upload_khnv.render(None, **kwargs)})
 

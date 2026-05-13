@@ -19,8 +19,7 @@ from config import (
 )
 from utils import fmt, fmt_bang_ty, fmt_so, xuat_excel
 from services.template_service import (
-    co_template, dien_template, nut_tai_word_va_pdf, docx_bytes_to_pdf,
-    TMPL_MAU16
+    docx_bytes_to_pdf,
 )
 
 # ── Hằng số ──────────────────────────────────────────────────────────────────

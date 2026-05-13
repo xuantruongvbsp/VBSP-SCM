@@ -10,7 +10,7 @@ from datetime import datetime
 import streamlit as st
 
 import db
-from auth import la_phan_he_cn
+from auth import la_phan_he_cn, normalize_role
 from config import DS_PGD
 from data.pgd import pgd_slug
 
@@ -27,7 +27,8 @@ def render(role: str = None, **kwargs) -> None:
         key="kh_gqvl_nam",
     )
 
-    co_quyen = la_phan_he_cn(role) and role != "executive"
+    role_n = normalize_role(str(role or "user"))
+    co_quyen = la_phan_he_cn(role_n) and role_n != "executive"
     kh_data = db.doc_kv(f"kh_gqvl_cn_{nam}") or {"pgd": {}}
 
     if not co_quyen:

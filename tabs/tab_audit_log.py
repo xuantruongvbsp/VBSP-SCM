@@ -4,6 +4,7 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta
 import db
+from auth import normalize_role
 
 ACTION_NHOM = {
     "Upload":    ["upload", "merge", "luu_pgd", "luu_file"],
@@ -47,8 +48,9 @@ def _doc_ds_user() -> list[str]:
 from utils import get_tab_context
 
 def render(tab, **kwargs) -> None:
-    role = kwargs.get("role", "user")
-    if role not in ("admin", "admin_cn"):
+    role_raw = str(kwargs.get("role", "user") or "user")
+    role = normalize_role(role_raw)
+    if role != "admin_cn":
         st.warning("⛔ Chỉ Admin mới có quyền xem Audit Log.")
         return
 

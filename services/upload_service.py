@@ -18,7 +18,9 @@ Các hàm công khai:
   luu_cdtotkvv()           — lưu file chấm điểm Tổ TK&VV theo tháng (legacy)
 """
 import os
+import shutil
 import socket
+import threading
 from dataclasses import dataclass
 from datetime import datetime
 from io import BytesIO
@@ -42,6 +44,12 @@ from config import (
     DS_PGD, DON_VI_CHI_NHANH, GQVL_COT_MAP, COT_TEN_PGD,
     UPLOAD_CANH_BAO_NGAY,
 )
+
+_MERGE_LOCK: dict[str, threading.Lock] = {
+    "hstd": threading.Lock(),
+    "nq11": threading.Lock(),
+    "gqvl": threading.Lock(),
+}
 
 # ── Hằng số kiểm tra ─────────────────────────────────────────────────────────
 
@@ -414,50 +422,62 @@ def merge_du_lieu_toan_cn(
     # Ghi trực tiếp vào parquet cache (không qua Excel)
     os.makedirs(os.path.dirname(os.path.abspath(cache_path)), exist_ok=True)
     
-    # Ép tất cả cột kiểu object về str để tránh ArrowTypeError
+    # convert_dtypes() tự suy luận kiểu tốt hơn, sau đó ép object còn lại về str
+    df_toan_cn = df_toan_cn.convert_dtypes()
     for col in df_toan_cn.select_dtypes(include="object").columns:
         df_toan_cn[col] = df_toan_cn[col].astype(str)
     
-    df_toan_cn.to_parquet(cache_path, index=False, engine="pyarrow", compression="zstd")
-
-    # Auto-snapshot sau mỗi lần merge HSTD thành công
-    if loai == "hstd":
+    with _MERGE_LOCK[loai]:
+        bak_path = cache_path + ".bak"
+        if os.path.exists(cache_path):
+            shutil.copy2(cache_path, bak_path)
         try:
-            from snapshot_service import luu_snapshot as _luu_snap
-            _luu_snap(df_toan_cn, st.session_state.get("username", "system"))
+            df_toan_cn.to_parquet(cache_path, index=False, engine="pyarrow", compression="zstd")
         except Exception:
-            pass  # Không block luồng chính nếu snapshot lỗi
+            if os.path.exists(bak_path):
+                os.replace(bak_path, cache_path)
+            raise
+        if os.path.exists(bak_path):
+            os.remove(bak_path)
 
-    username = st.session_state.get("username", "unknown")
+        # Auto-snapshot sau mỗi lần merge HSTD thành công
+        if loai == "hstd":
+            try:
+                from snapshot_service import luu_snapshot as _luu_snap
+                _luu_snap(df_toan_cn, st.session_state.get("username", "system"))
+            except Exception:
+                pass  # Không block luồng chính nếu snapshot lỗi
 
-    canh_bao = f" | {len(pgd_loi)} PGD lỗi" if pgd_loi else ""
-    db.ghi_audit(
-        username,
-        "merge_toan_cn",
-        f"{loai.upper()} — {fmt_so(len(df_toan_cn))} dòng, {len(pgd_da_merge)} PGD{canh_bao}",
-    )
+        username = st.session_state.get("username", "unknown")
 
-    # Ghi metadata vào kv_store để các tab phân tích hiển thị caption
-    db.ghi_kv(
-        f"merge_meta_{loai}",
-        {
-            "thoi_gian": datetime.now().isoformat(),
-            "so_pgd":    len(pgd_da_merge),
-            "so_dong":   len(df_toan_cn),
-            "pgd_cu":    pgd_cu,
-        },
-        username,
-    )
-    db.ghi_kv(
-        f"data_quality_meta_{loai}",
-        {
-            "thoi_gian": datetime.now().isoformat(),
-            "bao_cao": bao_cao_chat_luong,
-            "tong_so_loi": int(sum(x.get("so_loi", 0) for x in bao_cao_chat_luong)),
-            "tong_dong": int(sum(x.get("tong_dong", 0) for x in bao_cao_chat_luong)),
-        },
-        username,
-    )
+        canh_bao = f" | {len(pgd_loi)} PGD lỗi" if pgd_loi else ""
+        db.ghi_audit(
+            username,
+            "merge_toan_cn",
+            f"{loai.upper()} — {fmt_so(len(df_toan_cn))} dòng, {len(pgd_da_merge)} PGD{canh_bao}",
+        )
+
+        # Ghi metadata vào kv_store để các tab phân tích hiển thị caption
+        db.ghi_kv(
+            f"merge_meta_{loai}",
+            {
+                "thoi_gian": datetime.now().isoformat(),
+                "so_pgd":    len(pgd_da_merge),
+                "so_dong":   len(df_toan_cn),
+                "pgd_cu":    pgd_cu,
+            },
+            username,
+        )
+        db.ghi_kv(
+            f"data_quality_meta_{loai}",
+            {
+                "thoi_gian": datetime.now().isoformat(),
+                "bao_cao": bao_cao_chat_luong,
+                "tong_so_loi": int(sum(x.get("so_loi", 0) for x in bao_cao_chat_luong)),
+                "tong_dong": int(sum(x.get("tong_dong", 0) for x in bao_cao_chat_luong)),
+            },
+            username,
+        )
 
     return KetQuaUpload(
         True,

@@ -20,6 +20,7 @@ from config import (
     NGUYEN_NHAN_RR,
 )
 from data.pgd import pgd_slug
+from auth import la_phan_he_cn, la_phan_he_pgd, normalize_role
 from utils import fmt, fmt_bang_ty
 from services.template_service import (
     co_template,
@@ -36,7 +37,7 @@ from services.template_service import (
 def _lay_pgd_tu_user(role: str, pgd_user: str | None, df: pd.DataFrame) -> str | None:
     if pgd_user:
         return pgd_user
-    if role in ("admin", "manager", "admin_cn", "manager_cn", "executive") and df is not None and COT_TEN_PGD in df.columns:
+    if la_phan_he_cn(role) and df is not None and COT_TEN_PGD in df.columns:
         ds = df[COT_TEN_PGD].dropna().unique().tolist()
         if len(ds) == 1:
             return str(ds[0])
@@ -46,7 +47,7 @@ def _lay_pgd_tu_user(role: str, pgd_user: str | None, df: pd.DataFrame) -> str |
 def _loc_df_theo_pgd(df: pd.DataFrame, role: str, pgd_user: str | None) -> pd.DataFrame:
     if df is None or df.empty:
         return df
-    if role in ("user_pgd", "admin_pgd", "manager_pgd", "user") and pgd_user and COT_TEN_PGD in df.columns:
+    if la_phan_he_pgd(role) and pgd_user and COT_TEN_PGD in df.columns:
         return df[df[COT_TEN_PGD] == pgd_user].copy()
     return df
 
@@ -72,7 +73,8 @@ def _hien_thi_chi_tiet(ds: list[dict]) -> None:
 
 def render(tab: DeltaGenerator, **kwargs) -> None:
     df = kwargs.get("df")
-    role = kwargs.get("role", "user")
+    role_raw = str(kwargs.get("role", "user") or "user")
+    role = normalize_role(role_raw)
     username = kwargs.get("username", "unknown")
     pgd_user = kwargs.get("pgd_user")
 

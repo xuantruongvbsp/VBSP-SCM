@@ -377,7 +377,7 @@ def render(tab=None, **kwargs) -> None:
         st.warning("⚠️ Bạn không có quyền upload.")
         return
 
-    ctx = tab if tab is not None else st
+    ctx = tab if tab is not None else st.container()
 
     with ctx:
         st.markdown("### 📤 Upload Dữ liệu — Phòng Giao Dịch")

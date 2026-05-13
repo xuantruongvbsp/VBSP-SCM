@@ -698,7 +698,7 @@ def render(tab=None, **kwargs) -> None:
     pgd_user = kwargs.get("pgd_user")
     df_hstd = kwargs.get("df_full")
 
-    ctx = tab if tab is not None else st
+    ctx = tab if tab is not None else st.container()
     with ctx:
         st.subheader("📋 Giao & Điều chỉnh KHTD")
         st.caption(

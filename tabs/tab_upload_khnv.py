@@ -1099,6 +1099,7 @@ def _fragment_merge_toan_cn():
 
                 st.success("✅ Cập nhật hoàn tất! Dữ liệu mới sẵn sàng.")
                 st.balloons()
+                st.rerun()
 
             except Exception as e:
                 st.error(f"❌ Lỗi khi merge: {e}")
@@ -1198,12 +1199,14 @@ def render(tab=None, **kwargs) -> None:
                     progress_bar.progress(1.0, text="✅ Hoàn tất!")
                     status_text.empty()
                     st.cache_data.clear()
+
                     db.ghi_audit(
                         username,
                         "manual_merge_toan_cn",
                         f"loai={loai_chon}",
                     )
                     st.toast("✅ Tổng hợp hoàn tất!", icon="✅")
+                    st.rerun()
 
         if "folder_import_ket_qua_merge" in st.session_state:
             merge_rows = st.session_state.pop("folder_import_ket_qua_merge")

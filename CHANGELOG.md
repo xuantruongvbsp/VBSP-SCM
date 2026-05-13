@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## [2026-05-13] — Defensive coding: convert_dtypes trước khi ghi parquet + cảnh báo file trùng khi import hàng loạt
+- `services/upload_service.py` — Dùng `convert_dtypes()` trước khi ép object→str để giảm rủi ro ArrowTypeError khi có cột mixed-type
+- `tabs/tab_upload_khnv.py` — Hiển thị warning tổng hợp khi có file trùng (cùng đơn vị + cùng loại) trước khi bấm Import
+
 ## [2026-05-13] — Thêm lock + rollback an toàn khi merge parquet toàn CN
 - `services/upload_service.py` — Thêm module-level lock theo loại (hstd/nq11/gqvl) và cơ chế .bak (copy2/replace) để tránh race condition khi 2 session merge đồng thời
 

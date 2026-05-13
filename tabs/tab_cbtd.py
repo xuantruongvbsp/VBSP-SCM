@@ -11,7 +11,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 
 from config import *
-from auth import la_phan_he_cn
+from auth import la_phan_he_cn, normalize_role
 from utils import xuat_excel, ten_file_xuat, hien_thi_dataframe_phan_trang
 from data import doc_cbtd, luu_cbtd
 
@@ -31,7 +31,8 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
     """
     df = kwargs.get("df")
     df_full = kwargs.get("df_full", df)
-    role = kwargs.get("role")
+    role_raw = str(kwargs.get("role", "user") or "user")
+    role = normalize_role(role_raw)
     pgd_user = kwargs.get("pgd_user")
     username = kwargs.get("username")
     df_nq11 = kwargs.get("df_nq11")

@@ -800,6 +800,13 @@ def _render_upload_hang_loat(role: str, username: str) -> None:
                     "data": data,
                 })
 
+        so_trung = sum(1 for r in rows if "Trùng" in r.get("trang_thai", ""))
+        if so_trung > 0:
+            st.warning(
+                f"⚠️ Có **{so_trung}** file trùng (cùng đơn vị + cùng loại). "
+                f"Hệ thống sẽ giữ file xuất hiện sau cùng. Kiểm tra cột **Trạng thái** trước khi Import."
+            )
+
         def _style_preview(val: str) -> str:
             if val.startswith("✅"):
                 return "background-color:#d4edda;color:#155724;font-weight:bold"

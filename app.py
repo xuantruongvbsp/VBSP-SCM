@@ -341,6 +341,7 @@ def main():
         "user":        "operation",
         "admin_cn":    "management",
         "manager_cn":  "management",
+        "chuyenvien_cn":"management",
         "admin_pgd":   "operation",
         "manager_pgd": "operation",
         "user_pgd":    "operation",
@@ -356,6 +357,7 @@ def main():
         "user":        ["operation"],
         "admin_cn":    ["executive","management","operation"],
         "manager_cn":  ["management","operation"],
+        "chuyenvien_cn":["management","operation"],
         "admin_pgd":   ["operation"],
         "manager_pgd": ["operation"],
         "user_pgd":    ["operation"],
@@ -380,6 +382,7 @@ def main():
             "user":        '<span class="role-user">👤 CBTD</span>',
             "admin_cn":    '<span class="role-admin">⭐ Quản trị CN</span>',
             "manager_cn":  '<span class="role-manager">🔑 Lãnh đạo CN</span>',
+            "chuyenvien_cn": '<span class="role-manager">🧩 Chuyên viên CN</span>',
             "admin_pgd":   '<span class="role-admin">⭐ Quản trị PGD</span>',
             "manager_pgd": '<span class="role-manager">🔑 Lãnh đạo PGD</span>',
             "user_pgd":    '<span class="role-user">👤 CBTD</span>',
@@ -405,7 +408,7 @@ def main():
             from workspaces.ws_management import render_sidebar_menu
             can_upload = locals().get("can_upload")
             if can_upload is None:
-                can_upload = role in ("admin", "admin_cn", "manager", "manager_cn")
+                can_upload = role in ("admin", "admin_cn", "manager", "manager_cn", "chuyenvien_cn")
             render_sidebar_menu(
                 role=role,
                 username=username,

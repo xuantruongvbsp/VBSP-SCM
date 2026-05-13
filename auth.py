@@ -29,7 +29,7 @@ LOGO_NHCSXH_B64 = "/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAIBAQIBAQICAgICAgICAwUDAwMDA
 # + 4 role cũ vẫn hoạt động: executive, admin, manager, user
 ALL_ROLES = [
     "executive",
-    "admin_cn", "manager_cn",           # Phân hệ Chi nhánh
+    "admin_cn", "manager_cn", "chuyenvien_cn",           # Phân hệ Chi nhánh
     "admin_pgd", "manager_pgd", "user_pgd",  # Phân hệ PGD
     "admin", "manager", "user",          # Role cũ (tương thích ngược)
 ]
@@ -44,22 +44,23 @@ ROLE_MAP = {
     "executive": "executive",
     "admin_cn": "admin_cn",
     "manager_cn": "manager_cn",
+    "chuyenvien_cn": "chuyenvien_cn",
     "admin_pgd": "admin_pgd",
     "manager_pgd": "manager_pgd",
     "user_pgd": "user_pgd",
 }
 
 # Phân hệ Chi nhánh (CN)
-ROLES_CN = ["executive", "admin_cn", "manager_cn", "admin", "manager"]
+ROLES_CN = ["executive", "admin_cn", "manager_cn", "chuyenvien_cn", "admin", "manager"]
 
 # Phân hệ PGD
 ROLES_PGD = ["admin_pgd", "manager_pgd", "user_pgd", "user"]
 
 # Quyền cụ thể
-ROLES_CAN_UPLOAD = ["admin_cn", "manager_cn", "admin", "manager", "admin_pgd", "manager_pgd"]
+ROLES_CAN_UPLOAD = ["admin_cn", "manager_cn", "chuyenvien_cn", "admin", "manager", "admin_pgd", "manager_pgd"]
 ROLES_CAN_MANAGE_USERS = ["admin_cn", "admin", "admin_pgd"]
-ROLES_CAN_VIEW_ALL_PGD = ["executive", "admin_cn", "manager_cn", "admin", "manager"]
-ROLES_CAN_EDIT_KHTD = ["admin_cn", "manager_cn", "admin", "manager", "admin_pgd", "manager_pgd"]
+ROLES_CAN_VIEW_ALL_PGD = ["executive", "admin_cn", "manager_cn", "chuyenvien_cn", "admin", "manager"]
+ROLES_CAN_EDIT_KHTD = ["admin_cn", "manager_cn", "chuyenvien_cn", "admin", "manager", "admin_pgd", "manager_pgd"]
 
 
 def normalize_role(role: str) -> str:
@@ -77,7 +78,7 @@ def is_cn_role(role: str) -> bool:
         True nếu role thuộc phân hệ CN
     """
     normalized = normalize_role(role)
-    return normalized in ["executive", "admin_cn", "manager_cn"]
+    return normalized in ["executive", "admin_cn", "manager_cn", "chuyenvien_cn"]
 
 
 def is_pgd_role(role: str) -> bool:
@@ -108,10 +109,10 @@ def get_permissions(role: str) -> dict:
     """
     normalized = normalize_role(role)
     return {
-        "can_upload": normalized in ["admin_cn", "manager_cn", "admin_pgd", "manager_pgd"],
+        "can_upload": normalized in ["admin_cn", "manager_cn", "chuyenvien_cn", "admin_pgd", "manager_pgd"],
         "can_manage_users": normalized in ["admin_cn", "admin_pgd"],
-        "can_view_all_pgd": normalized in ["executive", "admin_cn", "manager_cn"],
-        "can_edit_khtd": normalized in ["admin_cn", "manager_cn", "admin_pgd", "manager_pgd"],
+        "can_view_all_pgd": normalized in ["executive", "admin_cn", "manager_cn", "chuyenvien_cn"],
+        "can_edit_khtd": normalized in ["admin_cn", "manager_cn", "chuyenvien_cn", "admin_pgd", "manager_pgd"],
     }
 
 
@@ -135,7 +136,12 @@ def co_quyen_quan_ly_user_pgd(role: str) -> bool:
 def co_quyen_giao_nhiem_vu(role: str) -> bool:
     """Kiểm tra quyền giao nhiệm vụ cho PGD."""
     normalized = normalize_role(role)
-    return normalized in ["admin_pgd", "manager_pgd", "admin_cn", "manager_cn"]
+    return normalized in ["admin_pgd", "manager_pgd", "admin_cn", "manager_cn", "chuyenvien_cn"]
+
+
+def la_chuyen_vien_cn(role: str) -> bool:
+    """Kiểm tra role là chuyên viên CN (có thể thao tác nhưng không quản lý user)."""
+    return normalize_role(role) == "chuyenvien_cn"
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -190,7 +196,7 @@ def get_tab_permissions(role: str) -> dict:
             "co_quyen_upload_hstd": True,
         }
     # CN roles / executive vào operation → thấy tất cả
-    if normalized in ("admin_cn", "manager_cn", "executive"):
+    if normalized in ("admin_cn", "manager_cn", "chuyenvien_cn", "executive"):
         return {
             "nhom_duoc_phep": ["nghiep_vu_pgd", "bao_cao_giao_ban",
                                "ke_hoach_pgd", "kiem_soat_rr", "quan_tri_pgd"],

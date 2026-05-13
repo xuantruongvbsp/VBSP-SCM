@@ -941,6 +941,7 @@ def render(**kwargs):
     ds_pgd_all = kwargs.get("ds_pgd_all", [])
     role_n = normalize_role(str(role or "user"))
     can_upload = get_permissions(role_n)["can_upload"]
+    can_manage_users = get_permissions(role_n)["can_manage_users"]
 
     st.title("📋 Phòng KH-NV")
     st.caption("Giám sát chỉ tiêu · Cân đối vốn · Quản lý NQH · GQVL · Quản lý CBTD")

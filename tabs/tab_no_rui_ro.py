@@ -67,6 +67,63 @@ def _style_doc_xln(doc: Document) -> None:
     style.font.size = Pt(12)
 
 
+# ── Helpers dùng chung cho Word XLN ─────────────────────────────
+def _bo_border_cell(cell) -> None:
+    """Xóa border khỏi 4 cạnh của một cell."""
+    tc = cell._tc
+    tcPr = tc.get_or_add_tcPr()
+    tcBorders = OxmlElement("w:tcBorders")
+    for bn in ["top", "left", "bottom", "right"]:
+        b = OxmlElement(f"w:{bn}")
+        b.set(qn("w:val"), "none")
+        tcBorders.append(b)
+    tcPr.append(tcBorders)
+
+
+def _set_cell(
+    cell, text: str, *,
+    bold: bool = False, italic: bool = False,
+    align=WD_ALIGN_PARAGRAPH.CENTER,
+    v_align=WD_ALIGN_VERTICAL.CENTER,
+    font_size: int = 10,
+) -> None:
+    """Gán text + format cho một cell bảng."""
+    cell.text = ""
+    p = cell.paragraphs[0]
+    p.alignment = align
+    run = p.add_run(text)
+    run.bold = bold
+    run.italic = italic
+    run.font.name = "Times New Roman"
+    run.font.size = Pt(font_size)
+    cell.vertical_alignment = v_align
+
+
+def _set_row_font(row, font_size: int = 10) -> None:
+    """Đồng bộ font cho toàn bộ row."""
+    for cell in row.cells:
+        for p in cell.paragraphs:
+            for run in p.runs:
+                run.font.name = "Times New Roman"
+                run.font.size = Pt(font_size)
+
+
+def _num(v) -> float:
+    """Chuyển đổi an toàn string → float."""
+    if v is None:
+        return 0.0
+    if isinstance(v, (int, float)):
+        return float(v)
+    s = str(v).strip()
+    if not s:
+        return 0.0
+    s = s.replace(" ", "").replace(".", "").replace(",", ".")
+    try:
+        return float(s)
+    except Exception:
+        return 0.0
+
+
 def _add_header_xln(doc: Document, dia_danh: str, ngay_ky: date) -> None:
     """Header Quốc hiệu + ngày tháng, không có số VB (mẫu đơn cá nhân)."""
     from docx.oxml import OxmlElement
@@ -395,46 +452,6 @@ def _tao_word_xln_bao_cao(
     mau_so: str,
     tieu_de: str,
 ) -> bytes:
-    from docx.oxml import OxmlElement
-    from docx.oxml.ns import qn
-
-    def _bo_border_cell(cell) -> None:
-        tc = cell._tc
-        tcPr = tc.get_or_add_tcPr()
-        tcBorders = OxmlElement("w:tcBorders")
-        for bn in ["top", "left", "bottom", "right"]:
-            b = OxmlElement(f"w:{bn}")
-            b.set(qn("w:val"), "none")
-            tcBorders.append(b)
-        tcPr.append(tcBorders)
-
-    def _set_cell(
-        cell,
-        text: str,
-        *,
-        bold: bool = False,
-        italic: bool = False,
-        align=WD_ALIGN_PARAGRAPH.CENTER,
-        v_align=WD_ALIGN_VERTICAL.CENTER,
-        font_size: int = 10,
-    ) -> None:
-        cell.text = ""
-        p = cell.paragraphs[0]
-        p.alignment = align
-        run = p.add_run(text)
-        run.bold = bold
-        run.italic = italic
-        run.font.name = "Times New Roman"
-        run.font.size = Pt(font_size)
-        cell.vertical_alignment = v_align
-
-    def _set_row_font(row, font_size: int = 10) -> None:
-        for cell in row.cells:
-            for p in cell.paragraphs:
-                for run in p.runs:
-                    run.font.name = "Times New Roman"
-                    run.font.size = Pt(font_size)
-
     doc = Document()
     _style_doc_xln(doc)
     sec = doc.sections[0]
@@ -660,39 +677,6 @@ def _tao_word_04xln(
     dot: int,
     nam: int,
 ) -> bytes:
-    from docx.oxml import OxmlElement
-    from docx.oxml.ns import qn
-
-    def _bo_border_cell(cell) -> None:
-        tc = cell._tc
-        tcPr = tc.get_or_add_tcPr()
-        tcBorders = OxmlElement("w:tcBorders")
-        for bn in ["top", "left", "bottom", "right"]:
-            b = OxmlElement(f"w:{bn}")
-            b.set(qn("w:val"), "none")
-            tcBorders.append(b)
-        tcPr.append(tcBorders)
-
-    def _set_cell(
-        cell,
-        text: str,
-        *,
-        bold: bool = False,
-        italic: bool = False,
-        align=WD_ALIGN_PARAGRAPH.CENTER,
-        v_align=WD_ALIGN_VERTICAL.CENTER,
-        font_size: int = 10,
-    ) -> None:
-        cell.text = ""
-        p = cell.paragraphs[0]
-        p.alignment = align
-        run = p.add_run(text)
-        run.bold = bold
-        run.italic = italic
-        run.font.name = "Times New Roman"
-        run.font.size = Pt(font_size)
-        cell.vertical_alignment = v_align
-
     doc = Document()
     _style_doc_xln(doc)
     sec = doc.sections[0]
@@ -906,39 +890,6 @@ def _tao_word_05xln(
     dot: int,
     nam: int,
 ) -> bytes:
-    from docx.oxml import OxmlElement
-    from docx.oxml.ns import qn
-
-    def _bo_border_cell(cell) -> None:
-        tc = cell._tc
-        tcPr = tc.get_or_add_tcPr()
-        tcBorders = OxmlElement("w:tcBorders")
-        for bn in ["top", "left", "bottom", "right"]:
-            b = OxmlElement(f"w:{bn}")
-            b.set(qn("w:val"), "none")
-            tcBorders.append(b)
-        tcPr.append(tcBorders)
-
-    def _set_cell(
-        cell,
-        text: str,
-        *,
-        bold: bool = False,
-        italic: bool = False,
-        align=WD_ALIGN_PARAGRAPH.CENTER,
-        v_align=WD_ALIGN_VERTICAL.CENTER,
-        font_size: int = 10,
-    ) -> None:
-        cell.text = ""
-        p = cell.paragraphs[0]
-        p.alignment = align
-        run = p.add_run(text)
-        run.bold = bold
-        run.italic = italic
-        run.font.name = "Times New Roman"
-        run.font.size = Pt(font_size)
-        cell.vertical_alignment = v_align
-
     doc = Document()
     _style_doc_xln(doc)
     sec = doc.sections[0]
@@ -1100,19 +1051,6 @@ def _tao_word_to_trinh_pgd(
     dot: int,
     nam: int,
 ) -> bytes:
-    from docx.oxml import OxmlElement
-    from docx.oxml.ns import qn
-
-    def _bo_border_cell(cell) -> None:
-        tc = cell._tc
-        tcPr = tc.get_or_add_tcPr()
-        tcBorders = OxmlElement("w:tcBorders")
-        for bn in ["top", "left", "bottom", "right"]:
-            b = OxmlElement(f"w:{bn}")
-            b.set(qn("w:val"), "none")
-            tcBorders.append(b)
-        tcPr.append(tcBorders)
-
     def _set_run(p, text: str, *, bold: bool = False, italic: bool = False) -> None:
         run = p.add_run(text)
         run.bold = bold
@@ -1298,22 +1236,10 @@ def _tao_word_to_trinh_cn(
     dot: int,
     nam: int,
 ) -> bytes:
-    from docx.oxml import OxmlElement
-    from docx.oxml.ns import qn
-
-    def _bo_border_cell(cell) -> None:
-        tc = cell._tc
-        tcPr = tc.get_or_add_tcPr()
-        tcBorders = OxmlElement("w:tcBorders")
-        for bn in ["top", "left", "bottom", "right"]:
-            b = OxmlElement(f"w:{bn}")
-            b.set(qn("w:val"), "none")
-            tcBorders.append(b)
-        tcPr.append(tcBorders)
-
-    def _set_run(p, text: str, *, bold: bool = False) -> None:
+    def _set_run(p, text: str, *, bold: bool = False, italic: bool = False) -> None:
         run = p.add_run(text)
         run.bold = bold
+        run.italic = italic
         run.font.name = "Times New Roman"
         run.font.size = Pt(12)
 
@@ -1630,19 +1556,6 @@ def render(tab: DeltaGenerator, **kwargs) -> None:
             if len(ghi_chu.strip()) < 20:
                 st.error("⚠️ Ghi chú phải có ít nhất 20 ký tự.")
                 st.stop()
-            def _num(v) -> float:
-                if v is None:
-                    return 0.0
-                if isinstance(v, (int, float)):
-                    return float(v)
-                s = str(v).strip()
-                if not s:
-                    return 0.0
-                s = s.replace(" ", "").replace(".", "").replace(",", ".")
-                try:
-                    return float(s)
-                except Exception:
-                    return 0.0
 
             ds_luu = []
             for _, row in ds_chon.iterrows():
@@ -1694,20 +1607,6 @@ def render(tab: DeltaGenerator, **kwargs) -> None:
             if row_src is None:
                 row_src = row0
 
-            def _num(v) -> float:
-                if v is None:
-                    return 0.0
-                if isinstance(v, (int, float)):
-                    return float(v)
-                s = str(v).strip()
-                if not s:
-                    return 0.0
-                s = s.replace(" ", "").replace(".", "").replace(",", ".")
-                try:
-                    return float(s)
-                except Exception:
-                    return 0.0
-
             ngay_vay_str = ""
             try:
                 nv = pd.to_datetime(row_src.get(COT_NGAY_VAY, ""), errors="coerce", dayfirst=True)
@@ -1746,9 +1645,9 @@ def render(tab: DeltaGenerator, **kwargs) -> None:
                 "dia_chi": str(row_src.get(COT_DIA_CHI, "")) if COT_DIA_CHI in getattr(row_src, "index", []) else "",
                 "dia_danh": ten_pgd or "",
                 "ten_nhcsxh": ten_pgd or "",
-                "nguyen_nhan": nguyen_nhan if "nguyen_nhan" in locals() else "",
-                "bien_phap": bien_phap if "bien_phap" in locals() else "",
-                "so_thang": str(so_thang) if "so_thang" in locals() else "",
+                "nguyen_nhan": locals().get("nguyen_nhan", ""),
+                "bien_phap": locals().get("bien_phap", ""),
+                "so_thang": str(locals().get("so_thang", "")),
                 "so_tien_de_nghi": fmt(du_no_raw),
                 "so_tien_thiet_hai": fmt(du_no_raw),
                 "muc_do_thiet_hai": "",
@@ -1804,6 +1703,7 @@ def render(tab: DeltaGenerator, **kwargs) -> None:
                 hien_thi_nut_tai("nrr_02xln")
 
             ds_xuat_full = []
+            so_hs_khong_nguon = 0
             for _, row in ds_chon.iterrows():
                 so_ku_r = str(row.get(COT_SO_KU, ""))
                 row_full = row
@@ -1815,6 +1715,9 @@ def render(tab: DeltaGenerator, **kwargs) -> None:
                     nguon_von_int = int(row_full.get(COT_NGUON_VON, 0) or 0)
                 except (ValueError, TypeError):
                     nguon_von_int = 0
+                if nguon_von_int not in (NGUON_TW, NGUON_DP):
+                    so_hs_khong_nguon += 1
+                    nguon_von_int = NGUON_TW
                 ds_xuat_full.append({
                     "ten_ct":    str(row_full.get(COT_TEN_CT, "")),
                     "ten_kh":    str(row_full.get(COT_TEN_KH, "")),
@@ -1823,12 +1726,18 @@ def render(tab: DeltaGenerator, **kwargs) -> None:
                     "ngay_vay":  str(row_full.get(COT_NGAY_VAY, "")),
                     "du_no_goc": float(row_full.get(COT_TONG_DU_NO, 0) or 0),
                     "lai_ton":   float(row_full.get(COT_LAI_TON, 0) or 0),
-                    "bien_phap": bien_phap if "bien_phap" in locals() else "",
-                    "muc_do":    muc_do if "muc_do" in locals() else "",
-                    "so_thang":  int(so_thang) if "so_thang" in locals() else 0,
-                    "ghi_chu":   ghi_chu if "ghi_chu" in locals() else "",
+                    "bien_phap": locals().get("bien_phap", ""),
+                    "muc_do":    locals().get("muc_do", ""),
+                    "so_thang":  int(locals().get("so_thang", 0)),
+                    "ghi_chu":   locals().get("ghi_chu", ""),
                     "nguon_von": nguon_von_int,
                 })
+            if so_hs_khong_nguon:
+                st.warning(
+                    f"Có {so_hs_khong_nguon} hồ sơ không xác định được nguồn vốn "
+                    f"(cột 'Nguồn vốn' trong HSTD gốc bị trống hoặc sai). "
+                    f"Mặc định gán về Trung ương. Kiểm tra lại file HSTD gốc nếu cần."
+                )
 
             ds_tw = _loc_theo_nguon(ds_xuat_full, NGUON_TW)
             ds_dp = _loc_theo_nguon(ds_xuat_full, NGUON_DP)

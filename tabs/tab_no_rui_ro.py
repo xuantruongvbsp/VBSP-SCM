@@ -7,6 +7,8 @@ from datetime import date, datetime
 import pandas as pd
 import streamlit as st
 from docx import Document
+from docx.enum.section import WD_ORIENT
+from docx.enum.table import WD_ALIGN_VERTICAL, WD_TABLE_ALIGNMENT
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.shared import Cm, Pt
 from streamlit.delta_generator import DeltaGenerator
@@ -15,8 +17,10 @@ import db
 from config import (
     COT_DIA_CHI,
     COT_LAI_TON,
+    COT_MUC_VAY,
     COT_NGAY_DH,
     COT_NGAY_VAY,
+    COT_NGUON_VON,
     COT_TEN_XA,
     COT_TEN_TO,
     COT_TEN_KH,
@@ -31,15 +35,14 @@ from data.pgd import pgd_slug
 from auth import la_phan_he_cn, la_phan_he_pgd, normalize_role
 from utils import fmt, fmt_bang_ty
 from services.template_service import (
-    co_template,
-    dien_template,
     nut_tai_word_va_pdf,
     hien_thi_nut_tai,
-    TMPL_13XLN,
-    TMPL_14XLN,
-    TMPL_TT_KHOANH,
-    TMPL_TT_XOA,
 )
+
+NGUON_TW = 1
+NGUON_DP = 2
+LABEL_TW = "Trung ương"
+LABEL_DP = "Địa phương"
 
 
 def _style_doc_xln(doc: Document) -> None:
@@ -324,6 +327,514 @@ def _tao_word_02xln(du_lieu: dict) -> bytes:
     return buf.getvalue()
 
 
+def _set_margins(
+    doc: Document,
+    left_cm: float = 3.0,
+    right_cm: float = 2.0,
+    top_cm: float = 2.5,
+    bottom_cm: float = 2.5,
+) -> None:
+    for section in doc.sections:
+        section.left_margin = Cm(left_cm)
+        section.right_margin = Cm(right_cm)
+        section.top_margin = Cm(top_cm)
+        section.bottom_margin = Cm(bottom_cm)
+
+
+def _loc_theo_nguon(df_rows: list[dict], nguon: int) -> list[dict]:
+    """Lọc danh sách hồ sơ theo nguồn vốn (1=TW, 2=ĐP)."""
+    return [r for r in df_rows if int(r.get("nguon_von", 0)) == nguon]
+
+
+def _tong_hop_khoanh_xoa(ds: list[dict]) -> dict:
+    """
+    Tính tổng gốc/lãi/số hộ từ danh sách hồ sơ.
+    Mỗi phần tử ds có keys: ten_ct, du_no_goc (float), lai_ton (float),
+    bien_phap ('Khoanh nợ...' hoặc 'Xóa nợ...'), so_thang (int).
+    Trả về dict dùng cho _tao_word_13xln / _tao_word_14xln.
+    """
+    from collections import defaultdict
+
+    nhom: dict[str, dict] = defaultdict(lambda: {"so_ho": 0, "goc": 0.0, "lai": 0.0})
+    for r in ds:
+        ct = r.get("ten_ct", "Khác")
+        nhom[ct]["so_ho"] += 1
+        nhom[ct]["goc"] += float(r.get("du_no_goc", 0) or 0)
+        nhom[ct]["lai"] += float(r.get("lai_ton", 0) or 0)
+    tong_ho = sum(v["so_ho"] for v in nhom.values())
+    tong_goc = sum(v["goc"] for v in nhom.values())
+    tong_lai = sum(v["lai"] for v in nhom.values())
+    return {
+        "nhom_ct": dict(nhom),
+        "tong_ho": tong_ho,
+        "tong_goc": tong_goc,
+        "tong_lai": tong_lai,
+        "tong_tien": tong_goc + tong_lai,
+    }
+
+
+def _tao_word_xln_bao_cao(
+    tong_hop: dict,
+    ten_pgd: str,
+    nguon_label: str,
+    ngay_bat_dau: date,
+    ngay_ket_thuc: date,
+    mau_so: str,
+    tieu_de: str,
+) -> bytes:
+    from docx.oxml import OxmlElement
+    from docx.oxml.ns import qn
+
+    def _bo_border_cell(cell) -> None:
+        tc = cell._tc
+        tcPr = tc.get_or_add_tcPr()
+        tcBorders = OxmlElement("w:tcBorders")
+        for bn in ["top", "left", "bottom", "right"]:
+            b = OxmlElement(f"w:{bn}")
+            b.set(qn("w:val"), "none")
+            tcBorders.append(b)
+        tcPr.append(tcBorders)
+
+    def _set_cell(
+        cell,
+        text: str,
+        *,
+        bold: bool = False,
+        italic: bool = False,
+        align=WD_ALIGN_PARAGRAPH.CENTER,
+        v_align=WD_ALIGN_VERTICAL.CENTER,
+        font_size: int = 10,
+    ) -> None:
+        cell.text = ""
+        p = cell.paragraphs[0]
+        p.alignment = align
+        run = p.add_run(text)
+        run.bold = bold
+        run.italic = italic
+        run.font.name = "Times New Roman"
+        run.font.size = Pt(font_size)
+        cell.vertical_alignment = v_align
+
+    def _set_row_font(row, font_size: int = 10) -> None:
+        for cell in row.cells:
+            for p in cell.paragraphs:
+                for run in p.runs:
+                    run.font.name = "Times New Roman"
+                    run.font.size = Pt(font_size)
+
+    doc = Document()
+    _style_doc_xln(doc)
+    sec = doc.sections[0]
+    sec.orientation = WD_ORIENT.LANDSCAPE
+    sec.page_width = Cm(27.9)
+    sec.page_height = Cm(19.0)
+    _set_margins(doc, left_cm=1.5, right_cm=1.5, top_cm=1.5, bottom_cm=1.5)
+
+    p_ms = doc.add_paragraph(f"Mẫu số: {mau_so}")
+    p_ms.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+
+    p = doc.add_paragraph("NGÂN HÀNG CHÍNH SÁCH XÃ HỘI")
+    if p.runs:
+        p.runs[0].bold = True
+    if ten_pgd:
+        p2 = doc.add_paragraph(f"PGD {ten_pgd}")
+        if p2.runs:
+            p2.runs[0].bold = True
+    else:
+        doc.add_paragraph("PGD")
+
+    t = doc.add_paragraph()
+    t.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    r = t.add_run(tieu_de)
+    r.bold = True
+
+    t2 = doc.add_paragraph(
+        "(theo Quyết định số .../QĐ-HĐQT ngày ... tháng ... năm ... của Chủ tịch Hội đồng quản trị NHCSXH)"
+    )
+    t2.alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+    tu_ngay = ngay_bat_dau.strftime("%d/%m/%Y")
+    den_ngay = ngay_ket_thuc.strftime("%d/%m/%Y")
+    t3 = doc.add_paragraph(f"Từ ngày {tu_ngay} đến ngày {den_ngay}")
+    t3.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    doc.add_paragraph(f"Nguồn vốn: {nguon_label}")
+    doc.add_paragraph("Đơn vị tính: hộ, đồng")
+
+    tbl = doc.add_table(rows=3, cols=15)
+    tbl.style = "Table Grid"
+    tbl.alignment = WD_TABLE_ALIGNMENT.CENTER
+
+    hdr0 = tbl.rows[0].cells
+    hdr1 = tbl.rows[1].cells
+    hdr2 = tbl.rows[2].cells
+
+    hdr0[0].merge(hdr2[0])
+    hdr0[1].merge(hdr2[1])
+    hdr0[14].merge(hdr2[14])
+
+    hdr0[2].merge(hdr0[5])
+    hdr0[6].merge(hdr0[9])
+    hdr0[10].merge(hdr0[13])
+
+    hdr1[2].merge(hdr2[2])
+    hdr1[6].merge(hdr2[6])
+    hdr1[10].merge(hdr2[10])
+
+    hdr1[3].merge(hdr1[5])
+    hdr1[7].merge(hdr1[9])
+    hdr1[11].merge(hdr1[13])
+
+    _set_cell(hdr0[0], "STT", bold=True)
+    _set_cell(hdr0[1], "Chi nhánh tỉnh, thành phố", bold=True)
+    _set_cell(hdr0[2], "Số được thông báo", bold=True)
+    _set_cell(hdr0[6], "Số hạch toán thực tế", bold=True)
+    _set_cell(hdr0[10], "Chênh lệch", bold=True)
+    _set_cell(hdr0[14], "Nguyên nhân chênh lệch", bold=True)
+
+    _set_cell(hdr1[2], "Số hộ", bold=True)
+    _set_cell(hdr1[3], "Số tiền", bold=True)
+    _set_cell(hdr1[6], "Số hộ", bold=True)
+    _set_cell(hdr1[7], "Số tiền", bold=True)
+    _set_cell(hdr1[10], "Số hộ", bold=True)
+    _set_cell(hdr1[11], "Số tiền", bold=True)
+
+    _set_cell(hdr2[3], "Tổng", bold=True)
+    _set_cell(hdr2[4], "Gốc", bold=True)
+    _set_cell(hdr2[5], "Lãi", bold=True)
+    _set_cell(hdr2[7], "Tổng", bold=True)
+    _set_cell(hdr2[8], "Gốc", bold=True)
+    _set_cell(hdr2[9], "Lãi", bold=True)
+    _set_cell(hdr2[11], "Tổng", bold=True)
+    _set_cell(hdr2[12], "Gốc", bold=True)
+    _set_cell(hdr2[13], "Lãi", bold=True)
+
+    _set_row_font(tbl.rows[0], 10)
+    _set_row_font(tbl.rows[1], 10)
+    _set_row_font(tbl.rows[2], 10)
+
+    stt = 0
+    nhom_ct = tong_hop.get("nhom_ct", {}) or {}
+    for ten_ct, v in nhom_ct.items():
+        row_nhom = tbl.add_row()
+        cell_nhom = row_nhom.cells[0].merge(row_nhom.cells[-1])
+        _set_cell(
+            cell_nhom,
+            str(ten_ct),
+            bold=True,
+            italic=True,
+            align=WD_ALIGN_PARAGRAPH.LEFT,
+        )
+
+        stt += 1
+        so_ho = int(v.get("so_ho", 0) or 0)
+        goc = float(v.get("goc", 0) or 0)
+        lai = float(v.get("lai", 0) or 0)
+        tong = goc + lai
+
+        row = tbl.add_row()
+        _set_row_font(row, 10)
+        _set_cell(row.cells[0], str(stt), align=WD_ALIGN_PARAGRAPH.CENTER)
+        _set_cell(row.cells[1], ten_pgd or "", align=WD_ALIGN_PARAGRAPH.LEFT)
+
+        _set_cell(row.cells[2], str(so_ho), align=WD_ALIGN_PARAGRAPH.CENTER)
+        _set_cell(row.cells[3], fmt(tong), align=WD_ALIGN_PARAGRAPH.RIGHT)
+        _set_cell(row.cells[4], fmt(goc), align=WD_ALIGN_PARAGRAPH.RIGHT)
+        _set_cell(row.cells[5], fmt(lai), align=WD_ALIGN_PARAGRAPH.RIGHT)
+
+        _set_cell(row.cells[6], str(so_ho), align=WD_ALIGN_PARAGRAPH.CENTER)
+        _set_cell(row.cells[7], fmt(tong), align=WD_ALIGN_PARAGRAPH.RIGHT)
+        _set_cell(row.cells[8], fmt(goc), align=WD_ALIGN_PARAGRAPH.RIGHT)
+        _set_cell(row.cells[9], fmt(lai), align=WD_ALIGN_PARAGRAPH.RIGHT)
+
+        _set_cell(row.cells[10], "0", align=WD_ALIGN_PARAGRAPH.CENTER)
+        _set_cell(row.cells[11], "0", align=WD_ALIGN_PARAGRAPH.RIGHT)
+        _set_cell(row.cells[12], "0", align=WD_ALIGN_PARAGRAPH.RIGHT)
+        _set_cell(row.cells[13], "0", align=WD_ALIGN_PARAGRAPH.RIGHT)
+        _set_cell(row.cells[14], "", align=WD_ALIGN_PARAGRAPH.LEFT)
+
+    row_tong = tbl.add_row()
+    _set_row_font(row_tong, 10)
+    _set_cell(row_tong.cells[0], "", bold=True)
+    _set_cell(row_tong.cells[1], "Tổng cộng:", bold=True, align=WD_ALIGN_PARAGRAPH.LEFT)
+
+    tong_ho = int(tong_hop.get("tong_ho", 0) or 0)
+    tong_goc = float(tong_hop.get("tong_goc", 0) or 0)
+    tong_lai = float(tong_hop.get("tong_lai", 0) or 0)
+    tong_tien = tong_goc + tong_lai
+
+    _set_cell(row_tong.cells[2], str(tong_ho), bold=True)
+    _set_cell(row_tong.cells[3], fmt(tong_tien), bold=True, align=WD_ALIGN_PARAGRAPH.RIGHT)
+    _set_cell(row_tong.cells[4], fmt(tong_goc), bold=True, align=WD_ALIGN_PARAGRAPH.RIGHT)
+    _set_cell(row_tong.cells[5], fmt(tong_lai), bold=True, align=WD_ALIGN_PARAGRAPH.RIGHT)
+
+    _set_cell(row_tong.cells[6], str(tong_ho), bold=True)
+    _set_cell(row_tong.cells[7], fmt(tong_tien), bold=True, align=WD_ALIGN_PARAGRAPH.RIGHT)
+    _set_cell(row_tong.cells[8], fmt(tong_goc), bold=True, align=WD_ALIGN_PARAGRAPH.RIGHT)
+    _set_cell(row_tong.cells[9], fmt(tong_lai), bold=True, align=WD_ALIGN_PARAGRAPH.RIGHT)
+
+    _set_cell(row_tong.cells[10], "0", bold=True)
+    _set_cell(row_tong.cells[11], "0", bold=True, align=WD_ALIGN_PARAGRAPH.RIGHT)
+    _set_cell(row_tong.cells[12], "0", bold=True, align=WD_ALIGN_PARAGRAPH.RIGHT)
+    _set_cell(row_tong.cells[13], "0", bold=True, align=WD_ALIGN_PARAGRAPH.RIGHT)
+    _set_cell(row_tong.cells[14], "", bold=True)
+
+    doc.add_paragraph()
+    ky = doc.add_table(rows=1, cols=3)
+    ky.style = "Table Grid"
+    for cell in ky.rows[0].cells:
+        _bo_border_cell(cell)
+        _set_cell(cell, "", font_size=11)
+
+    _set_cell(ky.rows[0].cells[0], "LẬP BIỂU\n\n\n\n", bold=True, font_size=11)
+    _set_cell(ky.rows[0].cells[1], "KIỂM SOÁT\n\n\n\n", bold=True, font_size=11)
+    _set_cell(ky.rows[0].cells[2], "GIÁM ĐỐC\n\n\n\n", bold=True, font_size=11)
+
+    buf = io.BytesIO()
+    doc.save(buf)
+    return buf.getvalue()
+
+
+def _tao_word_13xln(
+    tong_hop: dict,
+    ten_pgd: str,
+    nguon_label: str,
+    ngay_bat_dau: date,
+    ngay_ket_thuc: date,
+) -> bytes:
+    return _tao_word_xln_bao_cao(
+        tong_hop=tong_hop,
+        ten_pgd=ten_pgd,
+        nguon_label=nguon_label,
+        ngay_bat_dau=ngay_bat_dau,
+        ngay_ket_thuc=ngay_ket_thuc,
+        mau_so="13/XLN",
+        tieu_de="BÁO CÁO CÁC KHOẢN NỢ SAU KHI THỰC HIỆN HẠCH TOÁN KHOANH NỢ",
+    )
+
+
+def _tao_word_14xln(
+    tong_hop: dict,
+    ten_pgd: str,
+    nguon_label: str,
+    ngay_bat_dau: date,
+    ngay_ket_thuc: date,
+) -> bytes:
+    return _tao_word_xln_bao_cao(
+        tong_hop=tong_hop,
+        ten_pgd=ten_pgd,
+        nguon_label=nguon_label,
+        ngay_bat_dau=ngay_bat_dau,
+        ngay_ket_thuc=ngay_ket_thuc,
+        mau_so="14/XLN",
+        tieu_de="BÁO CÁO CÁC KHOẢN NỢ SAU KHI THỰC HIỆN HẠCH TOÁN XÓA NỢ",
+    )
+
+
+def _tao_word_to_trinh(
+    tong_hop_khoanh: dict,
+    tong_hop_xoa: dict,
+    ten_pgd: str,
+    nguon_label: str,
+    dot: int,
+    nam: int,
+) -> bytes:
+    from docx.oxml import OxmlElement
+    from docx.oxml.ns import qn
+
+    def _bo_border_cell(cell) -> None:
+        tc = cell._tc
+        tcPr = tc.get_or_add_tcPr()
+        tcBorders = OxmlElement("w:tcBorders")
+        for bn in ["top", "left", "bottom", "right"]:
+            b = OxmlElement(f"w:{bn}")
+            b.set(qn("w:val"), "none")
+            tcBorders.append(b)
+        tcPr.append(tcBorders)
+
+    def _p(doc_or_cell, text: str, *, bold: bool = False, align=None) -> None:
+        if hasattr(doc_or_cell, "add_paragraph"):
+            p = doc_or_cell.add_paragraph(text)
+        else:
+            p = doc_or_cell.paragraphs[0]
+            p.text = text
+        if align is not None:
+            p.alignment = align
+        for run in p.runs:
+            run.bold = bold
+            run.font.name = "Times New Roman"
+            run.font.size = Pt(12)
+
+    doc = Document()
+    _style_doc_xln(doc)
+    sec = doc.sections[0]
+    sec.page_height = Cm(29.7)
+    sec.page_width = Cm(21.0)
+    _set_margins(doc, left_cm=3.0, right_cm=2.0, top_cm=2.5, bottom_cm=2.5)
+
+    ngay_hn = date.today()
+    dia_danh = ten_pgd or "Đồng Nai"
+
+    hdr = doc.add_table(rows=1, cols=2)
+    hdr.style = "Table Grid"
+    for cell in hdr.rows[0].cells:
+        _bo_border_cell(cell)
+
+    cell_l = hdr.rows[0].cells[0]
+    cell_r = hdr.rows[0].cells[1]
+
+    p_l = cell_l.paragraphs[0]
+    p_l.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    run_l = p_l.add_run("CHI NHÁNH NHCSXH TỈNH ĐỒNG NAI")
+    run_l.bold = True
+    run_l.font.name = "Times New Roman"
+    run_l.font.size = Pt(12)
+    p_l2 = cell_l.add_paragraph(f"PGD {ten_pgd}".strip())
+    p_l2.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    if p_l2.runs:
+        p_l2.runs[0].bold = True
+
+    p_r = cell_r.paragraphs[0]
+    p_r.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    run_r = p_r.add_run("CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM")
+    run_r.bold = True
+    run_r.font.name = "Times New Roman"
+    run_r.font.size = Pt(12)
+    p_r2 = cell_r.add_paragraph("Độc lập - Tự do - Hạnh phúc")
+    p_r2.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    if p_r2.runs:
+        p_r2.runs[0].bold = True
+
+    hdr2 = doc.add_table(rows=1, cols=2)
+    hdr2.style = "Table Grid"
+    for cell in hdr2.rows[0].cells:
+        _bo_border_cell(cell)
+
+    cell2_l = hdr2.rows[0].cells[0]
+    cell2_r = hdr2.rows[0].cells[1]
+    p2_l = cell2_l.paragraphs[0]
+    p2_l.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    p2_l.add_run("Số: .../TTr-NHCSXH")
+
+    p2_r = cell2_r.paragraphs[0]
+    p2_r.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    p2_r.add_run(
+        f"{dia_danh}, ngày {ngay_hn.day} tháng {ngay_hn.month} năm {ngay_hn.year}"
+    )
+
+    doc.add_paragraph()
+    t = doc.add_paragraph()
+    t.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    rt = t.add_run("TỜ TRÌNH")
+    rt.bold = True
+    rt.font.size = Pt(14)
+    doc.add_paragraph(
+        f"Về việc đề nghị xử lý nợ bị rủi ro đợt {dot} năm {nam}",
+    ).alignment = WD_ALIGN_PARAGRAPH.CENTER
+    doc.add_paragraph(f"Nguồn vốn: {nguon_label}").alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+    doc.add_paragraph()
+    doc.add_paragraph(
+        "Kính gửi: Giám đốc Chi nhánh Ngân hàng Chính sách xã hội tỉnh Đồng Nai"
+    )
+
+    doc.add_paragraph(
+        "Căn cứ Quyết định số 62/2015/QĐ-TTg ngày 04/12/2015 của Thủ tướng Chính phủ "
+        "về việc xử lý nợ bị rủi ro tại Ngân hàng Chính sách xã hội;"
+    )
+    doc.add_paragraph(
+        "Căn cứ quy định hiện hành của Ngân hàng Chính sách xã hội về xử lý nợ bị rủi ro;"
+    )
+    doc.add_paragraph(
+        f"Phòng giao dịch NHCSXH {ten_pgd} kính trình Giám đốc Chi nhánh NHCSXH tỉnh Đồng Nai "
+        f"xem xét, quyết định xử lý nợ bị rủi ro đợt {dot} năm {nam} như sau:"
+    )
+
+    so_mon_khoanh = int(tong_hop_khoanh.get("tong_ho", 0) or 0)
+    so_mon_xoa = int(tong_hop_xoa.get("tong_ho", 0) or 0)
+    so_mon_tong = so_mon_khoanh + so_mon_xoa
+
+    goc_khoanh = float(tong_hop_khoanh.get("tong_goc", 0) or 0)
+    lai_khoanh = float(tong_hop_khoanh.get("tong_lai", 0) or 0)
+    tien_khoanh = goc_khoanh + lai_khoanh
+
+    goc_xoa = float(tong_hop_xoa.get("tong_goc", 0) or 0)
+    lai_xoa = float(tong_hop_xoa.get("tong_lai", 0) or 0)
+    tien_xoa = goc_xoa + lai_xoa
+
+    goc_tong = goc_khoanh + goc_xoa
+    lai_tong = lai_khoanh + lai_xoa
+    tien_tong = goc_tong + lai_tong
+
+    k3 = tong_hop_khoanh.get("khoanh_3y", {}) or {}
+    k5 = tong_hop_khoanh.get("khoanh_5y", {}) or {}
+    so_mon_k3 = int(k3.get("so_mon", 0) or 0)
+    so_mon_k5 = int(k5.get("so_mon", 0) or 0)
+    tien_k3 = float(k3.get("tong_tien", 0) or 0)
+    tien_k5 = float(k5.get("tong_tien", 0) or 0)
+
+    doc.add_paragraph(
+        f"1. Tổng số đề nghị xử lý rủi ro đợt {dot} năm {nam}: {so_mon_tong} món vay, "
+        f"số tiền {fmt(tien_tong)} đồng (gốc {fmt(goc_tong)} đồng, lãi {fmt(lai_tong)} đồng). Cụ thể:"
+    )
+    doc.add_paragraph(
+        f"a) Khoanh nợ: {so_mon_khoanh} món vay, số tiền {fmt(tien_khoanh)} đồng, "
+        f"gốc {fmt(goc_khoanh)} đồng, lãi {fmt(lai_khoanh)} đồng. Trong đó:"
+    )
+    doc.add_paragraph(
+        f"+ Khoanh nợ tối đa 3 năm: {so_mon_k3} món vay, {fmt(tien_k3)} đồng."
+    )
+    doc.add_paragraph(
+        f"+ Khoanh nợ tối đa 5 năm: {so_mon_k5} món vay, {fmt(tien_k5)} đồng."
+    )
+    doc.add_paragraph(
+        f"b) Xóa nợ: {so_mon_xoa} món vay, số tiền {fmt(tien_xoa)} đồng, "
+        f"gốc {fmt(goc_xoa)} đồng, lãi {fmt(lai_xoa)} đồng."
+    )
+    doc.add_paragraph("(Biểu tổng hợp đề nghị xử lý nợ mẫu số 03, 04, 05/XLN đính kèm)")
+
+    doc.add_paragraph(
+        "2. Các khoản nợ bị rủi ro đề nghị xử lý nêu trên đã được Phòng giao dịch rà soát, "
+        "đối chiếu hồ sơ, xác định đúng đối tượng và đảm bảo đầy đủ điều kiện theo quy định."
+    )
+    doc.add_paragraph(
+        "3. Phòng giao dịch chịu trách nhiệm trước pháp luật và trước NHCSXH về tính chính xác "
+        "của các thông tin, hồ sơ và số liệu báo cáo; đồng thời phối hợp các đơn vị liên quan "
+        "tổ chức thực hiện sau khi được cấp có thẩm quyền phê duyệt."
+    )
+
+    doc.add_paragraph()
+    doc.add_paragraph(f"Phòng giao dịch NHCSXH {ten_pgd} kính trình.").alignment = (
+        WD_ALIGN_PARAGRAPH.LEFT
+    )
+
+    doc.add_paragraph()
+    ky = doc.add_table(rows=1, cols=2)
+    ky.style = "Table Grid"
+    for cell in ky.rows[0].cells:
+        _bo_border_cell(cell)
+
+    ky_l = ky.rows[0].cells[0]
+    ky_r = ky.rows[0].cells[1]
+
+    ky_l.text = "Nơi nhận:\n- Như kính gửi;\n- Lưu VT."
+    for p in ky_l.paragraphs:
+        p.alignment = WD_ALIGN_PARAGRAPH.LEFT
+        for run in p.runs:
+            run.font.name = "Times New Roman"
+            run.font.size = Pt(12)
+
+    pr = ky_r.paragraphs[0]
+    pr.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    rr = pr.add_run("GIÁM ĐỐC\n(Ký tên, đóng dấu)")
+    rr.bold = True
+    rr.font.name = "Times New Roman"
+    rr.font.size = Pt(12)
+
+    buf = io.BytesIO()
+    doc.save(buf)
+    return buf.getvalue()
+
+
 def _lay_pgd_tu_user(role: str, pgd_user: str | None, df: pd.DataFrame) -> str | None:
     if pgd_user:
         return pgd_user
@@ -560,7 +1071,7 @@ def render(tab: DeltaGenerator, **kwargs) -> None:
 
             du_no_raw = _num(row_src.get(COT_TONG_DU_NO, 0))
             lai_ton_raw = _num(row_src.get(COT_LAI_TON, 0))
-            muc_vay_raw = row_src.get("Mức cho vay", du_no_raw)
+            muc_vay_raw = row_src.get(COT_MUC_VAY, du_no_raw) if COT_MUC_VAY in getattr(row_src, "index", []) else du_no_raw
             muc_vay_num = _num(muc_vay_raw)
 
             du_lieu_xln = {
@@ -635,66 +1146,193 @@ def render(tab: DeltaGenerator, **kwargs) -> None:
                     nut_tai_word_va_pdf(docx_bytes_02, ten_file_02, "nrr_02xln")
                 hien_thi_nut_tai("nrr_02xln")
 
-            cols_btn = st.columns(3)
+            st.markdown("#### 📊 Xuất biểu tổng hợp (13/XLN · 14/XLN · Tờ trình)")
 
-            ds_xuat = []
+            ds_xuat_full = []
             for _, row in ds_chon.iterrows():
-                ds_xuat.append({
-                    "ten_kh": str(row.get(COT_TEN_KH, "")),
-                    "so_ku":  str(row.get(COT_SO_KU, "")),
-                    "ten_ct": str(row.get(COT_TEN_CT, "")),
-                    "du_no":  fmt(row.get(COT_TONG_DU_NO, 0)),
-                    "nqh":    fmt(row.get(COT_DU_NO_QH, 0)),
-                })
-            context_mau = {
-                "pgd":       ten_pgd or "",
-                "ngay_lap":  date.today().strftime("%d/%m/%Y"),
-                "ngay":      date.today().day,
-                "thang":     date.today().month,
-                "nam":       date.today().year,
-                "bien_phap": bien_phap if "bien_phap" in dir() else "",
-                "nguyen_nhan": nguyen_nhan if "nguyen_nhan" in dir() else "",
-                "so_kh":     len(ds_xuat),
-                "ds_kh":     ds_xuat,
-            }
-            if "Khoanh nợ" in (bien_phap if "bien_phap" in dir() else ""):
-                context_mau["muc_do"] = muc_do
-                context_mau["so_thang"] = so_thang
-                context_mau["ngay_rr"] = ngay_rr.isoformat() if "ngay_rr" in dir() else ""
+                so_ku_r = str(row.get(COT_SO_KU, ""))
+                row_full = row
+                if so_ku_r and df is not None and COT_SO_KU in df.columns:
+                    df_tmp = df[df[COT_SO_KU].astype(str) == so_ku_r]
+                    if not df_tmp.empty:
+                        row_full = df_tmp.iloc[0]
 
-            with cols_btn[0]:
-                if st.button("📄 Xuất 13/XLN (Khoanh nợ)", use_container_width=True, key="nrr_btn_13"):
-                    if co_template(TMPL_13XLN):
-                        with st.spinner("Đang tạo 13/XLN..."):
-                            docx_bytes = dien_template(TMPL_13XLN, context_mau)
-                        ten_file = f"Mau13XLN_{ten_pgd or 'unknown'}_{date.today().strftime('%d%m%Y')}"
-                        nut_tai_word_va_pdf(docx_bytes, ten_file, "nrr_13xln")
+                nguon_von_val = row_full.get(COT_NGUON_VON, 0)
+                try:
+                    nguon_von_int = int(nguon_von_val)
+                except (ValueError, TypeError):
+                    nguon_von_int = 0
+
+                du_no_goc_r = float(row_full.get(COT_TONG_DU_NO, 0) or 0)
+                lai_ton_r = float(row_full.get(COT_LAI_TON, 0) or 0)
+
+                ds_xuat_full.append(
+                    {
+                        "ten_kh": str(row_full.get(COT_TEN_KH, "")),
+                        "so_ku": so_ku_r,
+                        "ten_ct": str(row_full.get(COT_TEN_CT, "")),
+                        "du_no_goc": du_no_goc_r,
+                        "lai_ton": lai_ton_r,
+                        "bien_phap": bien_phap if "bien_phap" in locals() else "",
+                        "so_thang": int(so_thang) if "so_thang" in locals() else 0,
+                        "nguon_von": nguon_von_int,
+                    }
+                )
+
+            ds_tw = _loc_theo_nguon(ds_xuat_full, NGUON_TW)
+            ds_dp = _loc_theo_nguon(ds_xuat_full, NGUON_DP)
+
+            ds_khoanh_tw = [r for r in ds_tw if "Khoanh" in r.get("bien_phap", "")]
+            ds_xoa_tw = [r for r in ds_tw if "Xóa" in r.get("bien_phap", "")]
+            ds_khoanh_dp = [r for r in ds_dp if "Khoanh" in r.get("bien_phap", "")]
+            ds_xoa_dp = [r for r in ds_dp if "Xóa" in r.get("bien_phap", "")]
+
+            def _tinh_khoanh_3y_5y(ds_khoanh: list[dict]) -> tuple[dict, dict]:
+                so_mon_3y = 0
+                goc_3y = 0.0
+                lai_3y = 0.0
+                so_mon_5y = 0
+                goc_5y = 0.0
+                lai_5y = 0.0
+                for r in ds_khoanh:
+                    so_thang_r = int(r.get("so_thang", 0) or 0)
+                    goc_r = float(r.get("du_no_goc", 0) or 0)
+                    lai_r = float(r.get("lai_ton", 0) or 0)
+                    if so_thang_r <= 36:
+                        so_mon_3y += 1
+                        goc_3y += goc_r
+                        lai_3y += lai_r
                     else:
-                        st.warning("⚠️ Chưa có template 13/XLN — liên hệ admin để upload mẫu.")
-                hien_thi_nut_tai("nrr_13xln")
-            with cols_btn[1]:
-                if st.button("📄 Xuất 14/XLN (Xóa nợ)", use_container_width=True, key="nrr_btn_14"):
-                    if co_template(TMPL_14XLN):
-                        with st.spinner("Đang tạo 14/XLN..."):
-                            docx_bytes = dien_template(TMPL_14XLN, context_mau)
-                        ten_file = f"Mau14XLN_{ten_pgd or 'unknown'}_{date.today().strftime('%d%m%Y')}"
-                        nut_tai_word_va_pdf(docx_bytes, ten_file, "nrr_14xln")
+                        so_mon_5y += 1
+                        goc_5y += goc_r
+                        lai_5y += lai_r
+                return (
+                    {"so_mon": so_mon_3y, "tong_tien": goc_3y + lai_3y},
+                    {"so_mon": so_mon_5y, "tong_tien": goc_5y + lai_5y},
+                )
+
+            ngay_hom_nay = date.today()
+            dot_xuat = 1
+            nam_xuat = ngay_hom_nay.year
+
+            st.markdown("**📄 13/XLN — Báo cáo khoanh nợ**")
+            col13_tw, col13_dp = st.columns(2)
+            with col13_tw:
+                if st.button(
+                    "📥 13/XLN — Trung ương",
+                    use_container_width=True,
+                    key="nrr_13xln_tw",
+                ):
+                    if not ds_khoanh_tw:
+                        st.warning("⚠️ Không có hồ sơ khoanh nợ nguồn Trung ương.")
                     else:
-                        st.warning("⚠️ Chưa có template 14/XLN — liên hệ admin để upload mẫu.")
-                hien_thi_nut_tai("nrr_14xln")
-            with cols_btn[2]:
-                bp = bien_phap if "bien_phap" in dir() else ""
-                tmpl_tt = TMPL_TT_KHOANH if "Khoanh nợ" in bp else TMPL_TT_XOA
-                ten_tt = "Tờ trình khoanh nợ" if "Khoanh nợ" in bp else "Tờ trình xóa nợ"
-                if st.button(f"📄 Xuất {ten_tt}", use_container_width=True, key="nrr_btn_tt"):
-                    if co_template(tmpl_tt):
-                        with st.spinner(f"Đang tạo {ten_tt}..."):
-                            docx_bytes = dien_template(tmpl_tt, context_mau)
-                        ten_file = f"ToTrinh_{ten_pgd or 'unknown'}_{date.today().strftime('%d%m%Y')}"
-                        nut_tai_word_va_pdf(docx_bytes, ten_file, "nrr_tt")
+                        th = _tong_hop_khoanh_xoa(ds_khoanh_tw)
+                        k3, k5 = _tinh_khoanh_3y_5y(ds_khoanh_tw)
+                        th["khoanh_3y"] = k3
+                        th["khoanh_5y"] = k5
+                        docx_b = _tao_word_13xln(
+                            th, ten_pgd or "", LABEL_TW, ngay_hom_nay, ngay_hom_nay
+                        )
+                        ten_f = f"Mau13XLN_TW_{ten_pgd or 'PGD'}_{ngay_hom_nay.strftime('%d%m%Y')}"
+                        nut_tai_word_va_pdf(docx_b, ten_f, "nrr_13xln_tw")
+                hien_thi_nut_tai("nrr_13xln_tw")
+            with col13_dp:
+                if st.button(
+                    "📥 13/XLN — Địa phương",
+                    use_container_width=True,
+                    key="nrr_13xln_dp",
+                ):
+                    if not ds_khoanh_dp:
+                        st.warning("⚠️ Không có hồ sơ khoanh nợ nguồn Địa phương.")
                     else:
-                        st.warning(f"⚠️ Chưa có template '{tmpl_tt}' — liên hệ admin để upload mẫu.")
-                hien_thi_nut_tai("nrr_tt")
+                        th = _tong_hop_khoanh_xoa(ds_khoanh_dp)
+                        k3, k5 = _tinh_khoanh_3y_5y(ds_khoanh_dp)
+                        th["khoanh_3y"] = k3
+                        th["khoanh_5y"] = k5
+                        docx_b = _tao_word_13xln(
+                            th, ten_pgd or "", LABEL_DP, ngay_hom_nay, ngay_hom_nay
+                        )
+                        ten_f = f"Mau13XLN_DP_{ten_pgd or 'PGD'}_{ngay_hom_nay.strftime('%d%m%Y')}"
+                        nut_tai_word_va_pdf(docx_b, ten_f, "nrr_13xln_dp")
+                hien_thi_nut_tai("nrr_13xln_dp")
+
+            st.markdown("**📄 14/XLN — Báo cáo xóa nợ**")
+            col14_tw, col14_dp = st.columns(2)
+            with col14_tw:
+                if st.button(
+                    "📥 14/XLN — Trung ương",
+                    use_container_width=True,
+                    key="nrr_14xln_tw",
+                ):
+                    if not ds_xoa_tw:
+                        st.warning("⚠️ Không có hồ sơ xóa nợ nguồn Trung ương.")
+                    else:
+                        th = _tong_hop_khoanh_xoa(ds_xoa_tw)
+                        docx_b = _tao_word_14xln(
+                            th, ten_pgd or "", LABEL_TW, ngay_hom_nay, ngay_hom_nay
+                        )
+                        ten_f = f"Mau14XLN_TW_{ten_pgd or 'PGD'}_{ngay_hom_nay.strftime('%d%m%Y')}"
+                        nut_tai_word_va_pdf(docx_b, ten_f, "nrr_14xln_tw")
+                hien_thi_nut_tai("nrr_14xln_tw")
+            with col14_dp:
+                if st.button(
+                    "📥 14/XLN — Địa phương",
+                    use_container_width=True,
+                    key="nrr_14xln_dp",
+                ):
+                    if not ds_xoa_dp:
+                        st.warning("⚠️ Không có hồ sơ xóa nợ nguồn Địa phương.")
+                    else:
+                        th = _tong_hop_khoanh_xoa(ds_xoa_dp)
+                        docx_b = _tao_word_14xln(
+                            th, ten_pgd or "", LABEL_DP, ngay_hom_nay, ngay_hom_nay
+                        )
+                        ten_f = f"Mau14XLN_DP_{ten_pgd or 'PGD'}_{ngay_hom_nay.strftime('%d%m%Y')}"
+                        nut_tai_word_va_pdf(docx_b, ten_f, "nrr_14xln_dp")
+                hien_thi_nut_tai("nrr_14xln_dp")
+
+            st.markdown("**📄 Tờ trình đề nghị xử lý nợ rủi ro**")
+            coltt_tw, coltt_dp = st.columns(2)
+            with coltt_tw:
+                if st.button(
+                    "📥 Tờ trình — Trung ương",
+                    use_container_width=True,
+                    key="nrr_tt_tw",
+                ):
+                    if not ds_tw:
+                        st.warning("⚠️ Không có hồ sơ nguồn Trung ương.")
+                    else:
+                        th_k = _tong_hop_khoanh_xoa(ds_khoanh_tw)
+                        th_x = _tong_hop_khoanh_xoa(ds_xoa_tw)
+                        k3, k5 = _tinh_khoanh_3y_5y(ds_khoanh_tw)
+                        th_k["khoanh_3y"] = k3
+                        th_k["khoanh_5y"] = k5
+                        docx_b = _tao_word_to_trinh(
+                            th_k, th_x, ten_pgd or "", LABEL_TW, dot_xuat, nam_xuat
+                        )
+                        ten_f = f"ToTrinh_TW_{ten_pgd or 'PGD'}_{ngay_hom_nay.strftime('%d%m%Y')}"
+                        nut_tai_word_va_pdf(docx_b, ten_f, "nrr_tt_tw")
+                hien_thi_nut_tai("nrr_tt_tw")
+            with coltt_dp:
+                if st.button(
+                    "📥 Tờ trình — Địa phương",
+                    use_container_width=True,
+                    key="nrr_tt_dp",
+                ):
+                    if not ds_dp:
+                        st.warning("⚠️ Không có hồ sơ nguồn Địa phương.")
+                    else:
+                        th_k = _tong_hop_khoanh_xoa(ds_khoanh_dp)
+                        th_x = _tong_hop_khoanh_xoa(ds_xoa_dp)
+                        k3, k5 = _tinh_khoanh_3y_5y(ds_khoanh_dp)
+                        th_k["khoanh_3y"] = k3
+                        th_k["khoanh_5y"] = k5
+                        docx_b = _tao_word_to_trinh(
+                            th_k, th_x, ten_pgd or "", LABEL_DP, dot_xuat, nam_xuat
+                        )
+                        ten_f = f"ToTrinh_DP_{ten_pgd or 'PGD'}_{ngay_hom_nay.strftime('%d%m%Y')}"
+                        nut_tai_word_va_pdf(docx_b, ten_f, "nrr_tt_dp")
+                hien_thi_nut_tai("nrr_tt_dp")
 
         # ── Bước 5: Xem lại hồ sơ đã lưu ─────────────────────────────────
         st.markdown("---")

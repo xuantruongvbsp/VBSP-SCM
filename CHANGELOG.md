@@ -1,5 +1,8 @@
 # CHANGELOG
 
+## [2026-05-13] — Sửa lỗi parse mã PGD dạng float trong upload NQ11
+- `tabs/tab_upload_khnv.py` dòng ~113 — Thay `str(...).zfill(6)` bằng `int(float(raw))` để xử lý giá trị float (4602.0 → "004602") khi pandas đọc ô số từ Excel
+
 ## [2026-05-13] — Cập nhật codebase: sửa type hint và phân quyền tab_cdtotkvv
 - `tabs/tab_cdtotkvv.py` dòng ~1160 — Sửa `**kwargs: dict` → `**kwargs` và ép kiểu `str()` cho role/username/cdto_mode/pgd_user
 - `tabs/tab_cdtotkvv.py` dòng ~1176 — Dùng `la_phan_he_cn`/`la_phan_he_pgd` từ auth.py thay vì import hàm chưa tồn tại

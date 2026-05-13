@@ -363,12 +363,25 @@ def _nhan_dien_loai_tu_noi_dung(data: bytes) -> str | None:
             # Fallback: BCQUERY nhưng không rõ → coi là NQ11
             return "nq11"
 
-        # ── GQVL ─────────────────────────────────────────────────────
+        # ── GQVL / CDTOTKVV ───────────────────────────────────────────
         if "SHEET1" in sheets_upper or any(
             s for s in sheets_upper
             if s not in ("BCQUERY",) and not s.startswith("_")
         ):
             try:
+                if "SHEET1" in sheets_upper:
+                    real = xl.sheet_names[sheets_upper.index("SHEET1")]
+                    df_check = pd.read_excel(
+                        BytesIO(data), sheet_name=real,
+                        header=7, nrows=1
+                    )
+                    cols_check = [str(c).strip().lower() for c in df_check.columns]
+                    if any("tên đơn vị" in c for c in cols_check):
+                        return "cdtotkvv"
+                    if any("tên pgd" in c for c in cols_check):
+                        return "gqvl"
+                    return "gqvl"
+
                 real = xl.sheet_names[0]
                 df_check = pd.read_excel(
                     BytesIO(data), sheet_name=real,

@@ -1157,21 +1157,22 @@ def _sub_xu_huong(username: str, cdto_mode: str, pgd_user: str) -> None:
     else:
         st.info("Cần ít nhất 3 tháng dữ liệu để phát hiện xu hướng.")
 
-def render(tab: DeltaGenerator, **kwargs: dict) -> None:
+def render(tab: DeltaGenerator, **kwargs) -> None:
     """
     Render tab Chấm điểm Tổ TK&VV.
-    
+
     Args:
         tab: Streamlit DeltaGenerator cho tab này
         **kwargs: Chứa role, username, cdto_mode, pgd_user
     """
-    role = kwargs.get("role", "")
-    username = kwargs.get("username", "unknown")
-    cdto_mode = kwargs.get("cdto_mode", "cn")  # "cn" hoặc "pgd"
-    pgd_user = kwargs.get("pgd_user", "")
+    role: str = str(kwargs.get("role", ""))
+    username: str = str(kwargs.get("username", "unknown"))
+    cdto_mode: str = str(kwargs.get("cdto_mode", "cn"))  # "cn" hoặc "pgd"
+    pgd_user: str = str(kwargs.get("pgd_user", ""))
 
     _tab_ctx = tab if tab is not None else __import__('streamlit').container()
     with _tab_ctx:
+        # Kiểm tra phân quyền — chỉ cho phép CN và PGD roles
         if not la_phan_he_cn(role) and not la_phan_he_pgd(role):
             st.error("Bạn không có quyền truy cập trang này.")
             return

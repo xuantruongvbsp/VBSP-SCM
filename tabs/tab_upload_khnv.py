@@ -110,7 +110,15 @@ def _lay_ten_don_vi_trong_file(file_bytes: bytes, loai: str) -> str | None:
             cot = next((c for c in df.columns if "mã pgd" in str(c).lower()), None)
             if cot is None:
                 return None
-            ma_pgd = str(df[cot].dropna().iloc[0]).strip().zfill(6) if not df[cot].dropna().empty else None
+            raw = df[cot].dropna().iloc[0] if not df[cot].dropna().empty else None
+            if raw is None:
+                ma_pgd = None
+            else:
+                try:
+                    # Xử lý trường hợp pandas đọc ô số dạng float (vd: 4602.0 → "004602")
+                    ma_pgd = str(int(float(raw))).zfill(6)
+                except (ValueError, TypeError):
+                    ma_pgd = str(raw).strip().zfill(6)
             if ma_pgd is None:
                 return None
             return MA_PGD_MAP.get(ma_pgd)

@@ -20,7 +20,7 @@ import pandas as pd
 import streamlit as st
 
 import db
-from auth import la_phan_he_cn
+from auth import la_phan_he_cn, normalize_role
 from config import DS_PGD, DON_VI_CHI_NHANH, MA_PGD_MAP
 from data.pgd import (
     duong_dan_pgd,
@@ -980,7 +980,7 @@ def _thuc_hien_xoa(
 
 def _render_xoa_du_lieu(role: str, username: str) -> None:
     """Expander xóa dữ liệu PGD — chỉ admin/manager."""
-    if not la_phan_he_cn(role) or role == "executive":
+    if not la_phan_he_cn(role) or normalize_role(role) == "executive":
         return
 
     with st.expander("🗑️ Xóa dữ liệu PGD", expanded=False):
@@ -1114,7 +1114,7 @@ def render(tab=None, **kwargs) -> None:
 
     _ctx = tab if tab is not None else st.container()
     with _ctx:
-        if not la_phan_he_cn(role) or role == "executive":
+        if not la_phan_he_cn(role) or normalize_role(role) == "executive":
             st.error("🔒 Chức năng này chỉ dành cho Phòng KH-NV (admin/manager).")
             return
 

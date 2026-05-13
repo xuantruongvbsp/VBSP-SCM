@@ -1,5 +1,8 @@
 # CHANGELOG
 
+## [2026-05-13] — Thêm lock + rollback an toàn khi merge parquet toàn CN
+- `services/upload_service.py` — Thêm module-level lock theo loại (hstd/nq11/gqvl) và cơ chế .bak (copy2/replace) để tránh race condition khi 2 session merge đồng thời
+
 ## [2026-05-13] — Sửa lỗi parse mã PGD dạng float trong upload NQ11
 - `tabs/tab_upload_khnv.py` dòng ~113 — Thay `str(...).zfill(6)` bằng `int(float(raw))` để xử lý giá trị float (4602.0 → "004602") khi pandas đọc ô số từ Excel
 

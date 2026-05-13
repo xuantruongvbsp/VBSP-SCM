@@ -1,6 +1,6 @@
 # AGENTS.md — VBSP-SCM
-> File này là context chính cho Trae AI. Đọc toàn bộ trước khi sinh code.
-> Cập nhật: 06/05/2026
+> File này là context chính cho Trae AI / Cline / Cursor. Đọc toàn bộ trước khi sinh code.
+> Cập nhật: 13/05/2026
 
 ---
 
@@ -19,11 +19,11 @@ Hệ thống Quản trị Tín dụng Nội bộ cho **Ngân hàng Chính sách 
 ## 2. Cấu trúc thư mục
 
 ```
-├── app.py                  # Điểm vào: routing, session, load df
-├── auth.py                 # Đăng nhập, RBAC
+├── app.py                  # Điểm vào: routing, session, normalize_role
+├── auth.py                 # Đăng nhập, RBAC, normalize_role(), la_phan_he_*()
 ├── config.py               # Hằng số toàn hệ thống (DS_PGD, cột, chương trình...)
-├── db.py                   # SQLite: kv_store, users, audit_log
-├── utils.py                # fmt(), Excel helpers
+├── db.py                   # SQLite: kv_store, users, audit_log, hstd_snapshot
+├── utils.py                # fmt(), Excel helpers, get_tab_context()
 │
 ├── data/
 │   ├── core.py             # ts_file(), parquet cache
@@ -36,9 +36,12 @@ Hệ thống Quản trị Tín dụng Nội bộ cho **Ngân hàng Chính sách 
 │   ├── upload_service.py   # luu_pgd_file(), luu_file_he_thong(), luu_dienbao(), KetQuaUpload
 │   ├── report_service.py   # Tạo báo cáo Excel
 │   ├── khtd_service.py     # Giao & Điều chỉnh KHTD
-│   └── kiem_soat_service.py# Kiểm soát Chi nhánh
+│   ├── kiem_soat_service.py# Kiểm soát Chi nhánh
+│   └── snapshot_service.py # HSTD snapshot theo kỳ (nền tảng Direction A/B/C)
 │
 ├── tabs/                   # Mỗi file = 1 tab UI
+│   ├── tab_ban_dai_dien.py # Ban Đại Diện (mount cả ws_management lẫn ws_operation)
+│   └── ...
 ├── workspaces/
 │   ├── ws_executive.py     # BGĐ — chỉ đọc
 │   ├── ws_management.py    # Phòng KH-NV — toàn CN
@@ -86,7 +89,9 @@ db.ghi_audit(username, "ten_action", "mô tả chi tiết")
 
 ```python
 from services.upload_service import luu_pgd_file, luu_file_he_thong, luu_dienbao, KetQuaUpload
-ket_qua = luu_pgd_file(ten_pgd, loai, uploaded_file, username)
+
+# ⚠️ luu_pgd_file KHÔNG nhận username — 3 tham số, không hơn
+ket_qua = luu_pgd_file(ten_pgd, loai, file_bytes)
 ket_qua.hien_thi()
 ```
 
@@ -110,11 +115,13 @@ st.cache_data.clear()
 from utils import fmt, fmt_tien, fmt_ty, fmt_pct, fmt_so
 ```
 
-### 3.6 Phân quyền
+### 3.6 Phân quyền — LUÔN normalize trước khi check
 
 ```python
-role     = st.session_state["user_info"]["role"]    # executive|admin|manager|user
-pgd_user = st.session_state["user_info"].get("pgd") # None nếu không phải PGD user
+# app.py đã normalize, nhưng nếu tự lấy role thì phải normalize:
+from auth import normalize_role
+role = normalize_role(st.session_state["user_info"]["role"])
+pgd_user = st.session_state["user_info"].get("pgd")  # None nếu không phải PGD user
 ```
 
 | Role | Quyền |
@@ -150,20 +157,38 @@ else:
     key  = "kehoach"
 ```
 
+### 3.9 render(tab) — pattern fallback st.container()
+
+Tất cả tabs dùng fallback `st.container()` thay vì `with tab:` trực tiếp:
+
+```python
+def render(tab=None, **kwargs):
+    ctx = tab if tab is not None else st.container()
+    with ctx:
+        # ... nội dung tab
+```
+
+Không viết `with tab:` trực tiếp — tab có thể là `None` khi gọi standalone.
+
 ---
 
 ## 4. Luồng dữ liệu chính
 
 ```
-Phòng KH-NV:
-  tab_upload_khnv → luu_file_he_thong() → merge_du_lieu_toan_cn()
-                 → cache/hstd.parquet (CACHE_HSTD)
-                 → dùng bởi ws_management, ws_executive
+Phòng KH-NV (tab_upload_khnv):
+  → luu_file_he_thong()  — lưu file gốc vào data/
+  → merge_du_lieu_toan_cn(loai)  — gộp 22 PGD → cache/hstd.parquet (CACHE_HSTD)
+  → dùng bởi ws_management, ws_executive
 
-PGD địa bàn:
-  tab_upload_pgd → luu_pgd_file()
-               → pgd_data/{slug}/hstd_latest.xlsx
-               → dùng bởi ws_operation
+PGD địa bàn (tab_upload_pgd):
+  → luu_pgd_file(ten_pgd, loai, file_bytes)
+  → pgd_data/{slug}/hstd_latest.xlsx
+  → dùng bởi ws_operation
+
+Snapshot (snapshot_service.py):
+  → chạy tự động sau merge thành công
+  → ghi vào bảng hstd_snapshot (db.py)
+  → nền tảng cho risk heatmap, báo cáo Word/PDF tự động
 ```
 
 ---
@@ -185,6 +210,8 @@ PGD địa bàn:
 | Xuất Thông báo Kết luận Giao ban | `giao_ban.py` → `xuat_thong_bao_ket_luan_giao_ban()` |
 | Xuất PDF (docx2pdf) | `ws_operation.py` → `_render_thong_bao_ket_luan()` |
 | Quản lý điểm GD | `db.doc_dgd_map()` / `db.luu_dgd_map()` |
+| Tab Ban Đại Diện | `tab_ban_dai_dien.py` — tham số `cap="tinh"` (CN) hoặc `cap="xa"` (PGD) |
+| Snapshot HSTD theo kỳ | `snapshot_service.py` — upsert-safe, tự trigger sau merge |
 
 ---
 
@@ -194,48 +221,46 @@ PGD địa bàn:
 - [ ] `db.ghi_audit()` sau mọi thao tác ghi
 - [ ] `st.cache_data.clear()` sau upload thành công
 - [ ] Upload qua `upload_service.py`
+- [ ] `luu_pgd_file(ten_pgd, loai, file_bytes)` — 3 tham số, không truyền username
 - [ ] Tiền: nhập triệu → lưu VND → hiển thị `fmt_ty()` chia `/1e12`
-- [ ] Kiểm tra role trước khi cho phép ghi
+- [ ] `normalize_role(role)` trước khi check role
+- [ ] Dùng `la_phan_he_cn()` / `la_phan_he_pgd()` thay vì so sánh chuỗi role
 - [ ] Không hardcode đường dẫn file
+- [ ] `render(tab=None, **kwargs)` với fallback `st.container()`
 - [ ] `len(tab_names) == len(_tab_renderers)` nếu sửa ws_*.py
 - [ ] prefix widget unique khi pgd_mode=True
 
 ---
 
-## 7. Quy tắc mới (06/05/2026)
+## 7. Quy tắc bắt buộc (tổng hợp)
 
-### Quy tắc check role — BẮT BUỘC
-- **KHÔNG dùng:** `role not in ("admin", "manager", "user")`
-- **PHẢI dùng:** Import từ `auth.py`:
+### Check role — BẮT BUỘC
+
 ```python
-from auth import la_phan_he_cn, la_phan_he_pgd
+from auth import normalize_role, la_phan_he_cn, la_phan_he_pgd
 from auth import co_quyen_upload_pgd, co_quyen_quan_ly_user_pgd
 
-# Check phân hệ
-if la_phan_he_cn(role):      # CN roles
-if la_phan_he_pgd(role):     # PGD roles
+role = normalize_role(role)   # luôn normalize trước
 
-# Check quyền cụ thể
+if la_phan_he_cn(role):       # CN roles: executive, admin_cn, manager_cn
+if la_phan_he_pgd(role):      # PGD roles: admin_pgd, manager_pgd, user_pgd
 if co_quyen_upload_pgd(role):
 if co_quyen_quan_ly_user_pgd(role):
 ```
 
-- **Hoặc thêm đủ cả role cũ lẫn mới** nếu check trực tiếp:
-```python
-role not in ("admin","manager","user",
-             "admin_cn","manager_cn",
-             "admin_pgd","manager_pgd","user_pgd")
-```
+**KHÔNG dùng:** `role not in ("admin", "manager", "user")` — thiếu role mới.
 
-### Quy tắc tên đơn vị — BẮT BUỘC
+### Tên đơn vị — BẮT BUỘC
+
 | Constant | Dùng để |
 |---|---|
-| `DON_VI_CHI_NHANH = "Hội sở Chi nhánh tỉnh"` | **Chỉ dùng để lọc df** (khớp cột Tên PGD trong HSTD) |
+| `DON_VI_CHI_NHANH = "Hội sở Chi nhánh tỉnh"` | **Chỉ dùng để lọc df** |
 | `TEN_CHI_NHANH_HIEN_THI = "Chi nhánh NHCSXH tỉnh Đồng Nai"` | **Chỉ dùng để hiển thị UI** |
 
 **⚠️ KHÔNG hardcode** `"PGD Biên Hòa"` để lọc df — luôn dùng `DON_VI_CHI_NHANH`.
 
-### Quy tắc Template Word — BẮT BUỘC
+### Template Word — BẮT BUỘC
+
 - Dùng `services/template_service.py` — không tự render docx
 - File template đặt trong `templates/`
 - Test trước khi dùng: `python test_template.py`
@@ -253,9 +278,10 @@ role not in ("admin","manager","user",
 | `CHANGELOG.md` | Lịch sử thay đổi |
 | `ROADMAP.md` | Sprint + backlog |
 | `TROUBLESHOOTING.md` | Xử lý lỗi thường gặp |
-| `ROLES.md` | **Mô tả chi tiết hệ thống role** |
-| `TEMPLATES.md` | **Hướng dẫn quản lý template Word** |
-| `HUONG_DAN_PHAN_HE.md` | **Hướng dẫn sử dụng theo phân hệ** |
+| `ROLES.md` | Mô tả chi tiết hệ thống role |
+| `TEMPLATES.md` | Hướng dẫn quản lý template Word |
+| `HUONG_DAN_PHAN_HE.md` | Hướng dẫn sử dụng theo phân hệ |
+| `HUONG_DAN_NGUON_DU_LIEU.md` | Luồng upload, cache, 2 luồng dữ liệu |
 
 ---
 

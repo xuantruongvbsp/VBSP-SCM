@@ -18,6 +18,7 @@ from data import (ts_file, doc_file_gqvl,
                   doc_gqvl_pgd, ds_pgd_co_gqvl, duong_dan_gqvl_pgd)
 from services import luu_pgd_file
 from utils import fmt, fmt_bang_ty, fmt_ty, fmt_so, vn, xuat_excel, hien_thi_dataframe_phan_trang
+from auth import la_phan_he_cn, normalize_role
 
 if TYPE_CHECKING:
     from streamlit.delta_generator import DeltaGenerator
@@ -149,7 +150,8 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
         tab: Streamlit DeltaGenerator cho tab này
         **kwargs: Chứa role, pgd_user, df_full
     """
-    role = kwargs.get("role")
+    role_raw = str(kwargs.get("role", "user") or "user")
+    role = normalize_role(role_raw)
     pgd_user = kwargs.get("pgd_user")
     df_full = kwargs.get("df_full")
 
@@ -169,7 +171,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                 )
             with upc2:
                 # Chọn PGD để lưu
-                if role in ("admin","manager","admin_cn","manager_cn") and COT_TEN_PGD in kwargs.get("df_full", pd.DataFrame()).columns:
+                if (la_phan_he_cn(role) and role != "executive") and COT_TEN_PGD in kwargs.get("df_full", pd.DataFrame()).columns:
                     ds_pgd_all = sorted(kwargs["df_full"][COT_TEN_PGD].dropna().unique().tolist())
                     pgd_up = st.selectbox("Lưu cho PGD", ds_pgd_all, key="gqvl_pgd_up")
                 else:
@@ -195,7 +197,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
             st.info("👆 Upload file GQVL của PGD bên trên để xem số liệu.")
             return
 
-        if role in ("admin","manager","admin_cn","manager_cn"):
+        if la_phan_he_cn(role) and role != "executive":
             pgd_xem = st.selectbox("📍 Xem PGD", ["Tất cả"] + pgd_da_up, key="gqvl_pgd_xem")
         else:
             pgd_xem = pgd_user or pgd_da_up[0]

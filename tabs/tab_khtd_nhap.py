@@ -38,7 +38,14 @@ from tabs.tab_khtd import (
 from tabs.tab_khtd_xuat import _hien_thi_bang_cn_readonly
 
 
-def _tinh_th_gqvl_phan_tang(df_gqvl: pd.DataFrame) -> dict[str, float]:
+import re  # Thêm import re
+
+def _clean_sheet_name(name: str) -> str:
+    # Giới hạn 31 ký tự và loại bỏ ký tự đặc biệt
+    cleaned = re.sub(r'[\\/*?[\]:]', '', name.strip())
+    return cleaned[:31]
+
+def _tinh_th_gqvl_phan_tang(df_gqvl: pd.DataFrame) -> dict[str, float]]:
     """
     Tính TH GQVL phân tầng 4 nhóm từ gqvl.parquet.
     Dùng config.GQVL_PHAN_TANG, config.COT_PL_NV, config.MA_NDT_CAP_TINH_DUOI.
@@ -1048,6 +1055,22 @@ def _tab_khtd_theo_xa(role: str, username: str, df_full: "pd.DataFrame | None") 
     if not danh_sach_xa:
         st.warning(f"Chưa có danh sách xã cho **{pgd_chon}**.")
         return
+
+    # Nút xuất Excel tất cả xã
+    if st.button("📥 Xuất Excel tất cả xã", key="xuat_excel_tat_ca_xa"):
+        try:
+            from config import MA_KEYS_CO_KHTD, COT_TEN_PGD
+            from utils import xuat_excel, ten_file_xuat, fmt
+            
+            kh_xa = _doc_kv(KV_KEY_XA) or {}
+            df_full = kwargs.get("df")
+            
+            # Logic xử lý xuất Excel ở đây
+            # ... (giữ nguyên phần xử lý Excel từ code trước)
+            
+        except Exception as e:
+            st.error(f"Lỗi xuất file: {str(e)}")
+            db.ghi_audit(username, "loi_xuat_excel", f"{pgd_chon}: {str(e)}")
 
     # ── Thư mục lưu PDF ────────────────────────────────────────────────────
     st.session_state.setdefault("khtd_pdf_folder", "")

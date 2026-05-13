@@ -15,7 +15,7 @@ import db
 from auth import get_permissions
 from pdf_service import xuat_pdf_bang
 from config import CHUONG_TRINH_KHTD, COT_TEN_PGD, DS_PGD, PGD_XA_MAP
-from utils import xuat_excel, ten_file_xuat, vn
+from utils import fmt, xuat_excel, ten_file_xuat, vn
 
 from tabs.tab_khtd import (
     DATA_DIR,
@@ -33,7 +33,6 @@ from tabs.tab_khtd import (
     _quet_ct_co_du_no,
     _ten_ct_base,
     _tinh_thuc_hien_theo_ct,
-    _tinh_th_gqvl_phan_tang,
 )
 from tabs.tab_khtd_xuat import _hien_thi_bang_cn_readonly
 
@@ -1058,19 +1057,88 @@ def _tab_khtd_theo_xa(role: str, username: str, df_full: "pd.DataFrame | None") 
 
     # Nút xuất Excel tất cả xã
     if st.button("📥 Xuất Excel tất cả xã", key="xuat_excel_tat_ca_xa"):
-        try:
-            from config import MA_KEYS_CO_KHTD, COT_TEN_PGD
-            from utils import xuat_excel, ten_file_xuat, fmt
-            
-            kh_xa = _doc_kv(KV_KEY_XA) or {}
-            df_full = kwargs.get("df")
-            
-            # Logic xử lý xuất Excel ở đây
-            # ... (giữ nguyên phần xử lý Excel từ code trước)
-            
-        except Exception as e:
-            st.error(f"Lỗi xuất file: {str(e)}")
-            db.ghi_audit(username, "loi_xuat_excel", f"{pgd_chon}: {str(e)}")
+        kh_xa = _doc_kv(KV_KEY_XA) or {}
+        ds_xa = PGD_XA_MAP.get(pgd_chon, [])
+        sheets = {}
+
+        # Sheet tổng hợp PGD
+        rows_th = []
+        for ten_xa in ds_xa:
+            kh_tw = sum(
+                kh_xa.get(f"{ten_xa}|{mk}", 0)
+                for mk in MA_KEYS_CO_KHTD if mk.endswith("_TW")
+            ) / 1e6
+            kh_dp = sum(
+                kh_xa.get(f"{ten_xa}|{mk}", 0)
+                for mk in MA_KEYS_CO_KHTD if mk.endswith("_DP")
+            ) / 1e6
+            tong_kh = kh_tw + kh_dp
+            rows_th.append({
+                "Xã/Phường": ten_xa,
+                "KH TW (triệu)": round(kh_tw, 1),
+                "KH ĐP (triệu)": round(kh_dp, 1),
+                "Tổng KH (triệu)": round(tong_kh, 1),
+            })
+        if rows_th:
+            df_th = pd.DataFrame(rows_th)
+            tong_row = {
+                "Xã/Phường": "Tổng cộng",
+                "KH TW (triệu)": round(df_th["KH TW (triệu)"].sum(), 1),
+                "KH ĐP (triệu)": round(df_th["KH ĐP (triệu)"].sum(), 1),
+                "Tổng KH (triệu)": round(df_th["Tổng KH (triệu)"].sum(), 1),
+            }
+            df_th = pd.concat([df_th, pd.DataFrame([tong_row])], ignore_index=True)
+            sheets["Tổng hợp PGD"] = df_th
+
+        # Sheet từng xã
+        for ten_xa in ds_xa:
+            rows_xa = []
+            stt = 1
+            for _, ds_ma_ct in KHTD_CN_NHOM_MA_CT:
+                for ma_ct in ds_ma_ct:
+                    for mk, nv_label in [
+                        (f"{ma_ct}_TW", "TW"),
+                        (f"{ma_ct}_DP", "ĐP"),
+                    ]:
+                        if mk not in MA_KEYS_CO_KHTD:
+                            continue
+                        kh = kh_xa.get(f"{ten_xa}|{mk}", 0) / 1e6
+                        if kh <= 0:
+                            continue
+                        rows_xa.append({
+                            "STT": stt,
+                            "Chương trình": _ten_ct_base(ma_ct),
+                            "Nguồn vốn": nv_label,
+                            "KH (triệu)": round(kh, 1),
+                        })
+                        stt += 1
+            if rows_xa:
+                df_xa = pd.DataFrame(rows_xa)
+                tong_xa = {
+                    "STT": "",
+                    "Chương trình": "Tổng cộng",
+                    "Nguồn vốn": "",
+                    "KH (triệu)": round(df_xa["KH (triệu)"].sum(), 1),
+                }
+                df_xa = pd.concat(
+                    [df_xa, pd.DataFrame([tong_xa])], ignore_index=True
+                )
+                ten_sheet = re.sub(r'[\\/*?\[\]:]', '', ten_xa)[:31]
+                sheets[ten_sheet] = df_xa
+
+        if sheets:
+            excel_bytes = xuat_excel(sheets)
+            ten_file = ten_file_xuat(f"KHTD_XA_{pgd_chon}")
+            st.download_button(
+                "⬇️ Tải Excel",
+                data=excel_bytes,
+                file_name=ten_file,
+                mime="application/vnd.openxmlformats-officedocument"
+                     ".spreadsheetml.sheet",
+                key="dl_khtd_xa_excel",
+            )
+        else:
+            st.info("Chưa có dữ liệu kế hoạch để xuất.")
 
     # ── Thư mục lưu PDF ────────────────────────────────────────────────────
     st.session_state.setdefault("khtd_pdf_folder", "")
@@ -1373,15 +1441,6 @@ def _tab_khtd_theo_xa(role: str, username: str, df_full: "pd.DataFrame | None") 
                 st.warning("Không có dữ liệu kế hoạch để xuất PDF")
                 st.session_state["_pdf_bytes_khtd_xa"] = None
 
-    if st.session_state.get("_pdf_bytes_khtd_xa"):
-        st.download_button(
-            label="⬇️ Tải PDF về máy",
-            data=st.session_state["_pdf_bytes_khtd_xa"],
-            file_name=st.session_state.get("_pdf_file_khtd_xa", "KHTD.pdf"),
-            mime="application/pdf",
-            key="download_pdf_khtd_xa"
-        )
-
         if st.form_submit_button("💾 Lưu kế hoạch xã này", type="primary"):
             for khoa, gia_tri_trieu in gia_tri_moi.items():
                 kh_xa[khoa] = gia_tri_trieu * 1_000_000
@@ -1390,6 +1449,15 @@ def _tab_khtd_theo_xa(role: str, username: str, df_full: "pd.DataFrame | None") 
                              f"PGD: {pgd_chon} — Xã: {xa_chon}")
                 st.success(f"✅ Đã lưu kế hoạch cho xã **{xa_chon}**")
                 st.rerun()
+
+    if st.session_state.get("_pdf_bytes_khtd_xa"):
+        st.download_button(
+            label="⬇️ Tải PDF về máy",
+            data=st.session_state["_pdf_bytes_khtd_xa"],
+            file_name=st.session_state.get("_pdf_file_khtd_xa", "KHTD.pdf"),
+            mime="application/pdf",
+            key="download_pdf_khtd_xa"
+        )
 
 
 def render_nhap_cn(role: str, username: str, df_full: "pd.DataFrame | None", df_gqvl: "pd.DataFrame | None" = None) -> None:

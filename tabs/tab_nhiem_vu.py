@@ -529,15 +529,17 @@ def _render_nhap_ket_qua(tab, **kwargs):
 # ══════════════════════════════════════════════════════════════════════════
 
 from utils import get_tab_context
+from auth import normalize_role
 
 def render(tab, **kwargs):
     """Render tab Quản lý Nhiệm vụ — phân nhánh theo role."""
-    role: str = kwargs.get("role", "user")
+    role_raw = str(kwargs.get("role", "user") or "user")
+    role = normalize_role(role_raw)
 
     import streamlit as _st
     _tab_ctx = tab if tab is not None else _st.container()
     with _tab_ctx:
-        if role in ("admin", "manager", "admin_cn", "manager_cn"):
+        if role in ("admin_cn", "manager_cn"):
             t1, t2, t3 = st.tabs([
                 "📥 Danh sách nhiệm vụ",
                 "➕ Nhập nhiệm vụ mới",

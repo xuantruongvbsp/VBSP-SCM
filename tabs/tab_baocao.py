@@ -14,7 +14,7 @@ from services import xuat_bao_cao, ten_file_bao_cao
 from pdf_service import nut_xuat_pdf
 from data import (danh_dau_khong_hd, tong_hop_khong_hd, ds_chi_tiet_khong_hd)
 from tabs import tab_nq11
-from auth import la_phan_he_pgd
+from auth import la_phan_he_pgd, la_phan_he_cn, normalize_role
 
 if TYPE_CHECKING:
     from streamlit.delta_generator import DeltaGenerator
@@ -97,7 +97,8 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
     """
     df = kwargs.get("df")
     df_full = kwargs.get("df_full", df)
-    role = kwargs.get("role")
+    role_raw = str(kwargs.get("role", "user") or "user")
+    role = normalize_role(role_raw)
     pgd_user = kwargs.get("pgd_user")
     username = kwargs.get("username")
     df_nq11 = kwargs.get("df_nq11")
@@ -297,7 +298,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                     key="btn_pdf_bc_phancap_dl",
                 )
         else:
-            if role in ("admin", "manager", "admin_cn", "manager_cn") and COT_TEN_PGD in df.columns:
+            if (la_phan_he_cn(role) and role != "executive") and COT_TEN_PGD in df.columns:
                 loc_pgd_bc = st.selectbox(
                     "📍 PGD",
                     ["Tất cả"] + sorted(df[COT_TEN_PGD].dropna().unique().tolist()),
@@ -308,7 +309,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                 st.markdown(f"📍 PGD: **{loc_pgd_bc}**")
 
             df_base = df.copy()
-            if role in ("admin", "manager", "admin_cn", "manager_cn") and loc_pgd_bc != "Tất cả":
+            if (la_phan_he_cn(role) and role != "executive") and loc_pgd_bc != "Tất cả":
                 df_base = df_base[df_base[COT_TEN_PGD] == loc_pgd_bc]
             elif la_phan_he_pgd(role) and pgd_user:
                 df_base = df_base[df_base[COT_TEN_PGD] == loc_pgd_bc] if loc_pgd_bc != "Tất cả" else df_base

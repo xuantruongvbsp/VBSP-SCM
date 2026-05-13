@@ -12,7 +12,7 @@ if not exist ".\.venv\Scripts\streamlit.exe" (
   exit /b 1
 )
 
-start /b "" ".\.venv\Scripts\streamlit.exe" run app.py --server.address 127.0.0.1 --server.port %PORT% --server.headless true
+start /b "" ".\.venv\Scripts\streamlit.exe" run app.py --server.address 127.0.0.1 --server.port %PORT% --server.headless true --server.fileWatcherType none --browser.gatherUsageStats false
 
 echo Dang doi server khoi dong...
 for /l %%i in (1,1,60) do (

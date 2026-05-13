@@ -679,6 +679,9 @@ def _xu_ly_import_folder(danh_sach: list[dict], username: str) -> None:
 
     st.session_state.pop("folder_scan_result", None)
     st.session_state.pop("folder_scan_meta", None)
+    st.session_state.pop("khnv_bulk_upload", None)
+    st.session_state.pop("khnv_bulk_bytes", None)
+    st.session_state.pop("khnv_bulk_names", None)
     st.rerun()
 
 

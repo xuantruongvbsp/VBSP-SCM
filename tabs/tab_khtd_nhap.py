@@ -12,7 +12,7 @@ import os
 from datetime import datetime
 
 import db
-from auth import get_permissions
+from auth import get_permissions, normalize_role
 from pdf_service import xuat_pdf_bang
 from config import CHUONG_TRINH_KHTD, COT_TEN_PGD, DS_PGD, PGD_XA_MAP
 from utils import fmt, xuat_excel, ten_file_xuat, vn
@@ -979,7 +979,7 @@ def _tab_khtd_chi_nhanh(
     _section_van_ban_qd_cn(role, username)
 
     # ── Lịch sử phiên bản (chỉ admin / admin_cn) ───────────────────────────
-    if role in ("admin", "admin_cn"):
+    if normalize_role(str(role or "user")) == "admin_cn":
         with st.expander("🕐 Lịch sử chỉnh sửa KHTD Chi nhánh", expanded=False):
             history = db.doc_kv_history(KV_KEY_CN, limit=15)
             if not history:

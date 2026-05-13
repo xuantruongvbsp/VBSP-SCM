@@ -10,7 +10,7 @@ from config import *
 from data import doc_dienbao, db_lookup, ts_file, doc_kehoach, luu_kehoach
 from data.pgd import duong_dan_pgd, pgd_slug
 from services import kiem_tra_file
-from auth import la_phan_he_cn
+from auth import la_phan_he_cn, normalize_role
 from utils import (
     fmt,
     fmt_tien,
@@ -26,7 +26,8 @@ from utils import (
 from utils import get_tab_context
 
 def render(tab, **kwargs):
-    role      = kwargs.get("role")
+    role_raw  = str(kwargs.get("role", "user") or "user")
+    role      = normalize_role(role_raw)
     pgd_user  = kwargs.get("pgd_user")
     pgd_mode  = kwargs.get("pgd_mode", False)
     if pgd_mode and not pgd_user:

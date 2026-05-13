@@ -447,23 +447,36 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                 if loc_ct_th != "Tất cả" and COT_TEN_CT in df_ct_th.columns:
                     df_ct_th = df_ct_th[df_ct_th[COT_TEN_CT] == loc_ct_th]
 
-                dbc_raw = df_ct_th.groupby(COT_TEN_CT).agg(
-                    Số_KH          =(COT_MA_KH,"nunique"),
-                    Số_món_vay     =(COT_SO_KU,"nunique"),
-                    Tổng_mức_vay   =(COT_MUC_VAY,"sum"),
-                    Tổng_giải_ngân  =("Tổng giải ngân","sum"),
-                    Tổng_dư_nợ     =(COT_TONG_DU_NO,"sum"),
-                    Dư_nợ_trong_hạn=(COT_DU_NO_TH,"sum"),
-                    Dư_nợ_quá_hạn  =(COT_DU_NO_QH,"sum"),
-                ).sort_values("Tổng_dư_nợ",ascending=False).reset_index() if COT_TEN_CT in df_ct_th.columns else None
-                if dbc_raw is not None:
-                    dbc_raw["Tỷ_lệ_QH_%"] = (dbc_raw["Dư_nợ_quá_hạn"]/dbc_raw["Tổng_dư_nợ"]*100).round(2)
-                    st.info(f"**{fmt_so(len(dbc_raw))}** chương trình · {fmt_so(len(df_ct_th))} hồ sơ")
-                    hien_thi_dataframe_phan_trang(
-                        dbc_raw,
-                        key="baocao_th_chuong_trinh",
-                        column_config=_tao_column_config_baocao(dbc_raw),
-                    )
+                try:
+                    agg_dict = {
+                        "Số_KH":          (COT_MA_KH, "nunique"),
+                        "Số_món_vay":     (COT_SO_KU, "nunique"),
+                        "Tổng_mức_vay":   (COT_MUC_VAY, "sum"),
+                        "Tổng_dư_nợ":     (COT_TONG_DU_NO, "sum"),
+                        "Dư_nợ_trong_hạn":(COT_DU_NO_TH, "sum"),
+                        "Dư_nợ_quá_hạn":  (COT_DU_NO_QH, "sum"),
+                    }
+                    if COT_LAI_TON in df_ct_th.columns:
+                        agg_dict["Lãi_tồn_KHĐ"] = (COT_LAI_TON, "sum")
+
+                    dbc_raw = (
+                        df_ct_th.groupby(COT_TEN_CT)
+                        .agg(**agg_dict)
+                        .sort_values("Tổng_dư_nợ", ascending=False)
+                        .reset_index()
+                    ) if COT_TEN_CT in df_ct_th.columns else None
+
+                    if dbc_raw is not None:
+                        dbc_raw["Tỷ_lệ_QH_%"] = (dbc_raw["Dư_nợ_quá_hạn"] / dbc_raw["Tổng_dư_nợ"] * 100).round(2)
+                        st.info(f"**{fmt_so(len(dbc_raw))}** chương trình · {fmt_so(len(df_ct_th))} hồ sơ")
+                        hien_thi_dataframe_phan_trang(
+                            dbc_raw,
+                            key="baocao_th_chuong_trinh",
+                            column_config=_tao_column_config_baocao(dbc_raw),
+                        )
+                except Exception as e:
+                    st.error(f"Lỗi khi nhóm theo chương trình vay: {e}")
+                    dbc_raw = None
 
             # ── CBTD (chờ bổ sung) ──
             elif loai_th == "👤 Theo CBTD (sẽ bổ sung)":

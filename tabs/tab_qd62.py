@@ -11,6 +11,7 @@ import pandas as pd
 import streamlit as st
 
 import db
+from auth import normalize_role
 from config import DS_PGD, PGD_XA_MAP, PGD_DATA_DIR
 from data.pgd import pgd_slug, thu_muc_pgd
 from utils import fmt_ty
@@ -363,7 +364,7 @@ def _render_cn(username: str, role: str) -> None:
     st.markdown("#### ✅ Duyệt hồ sơ")
 
     # Xác định danh sách PGD được phép duyệt
-    if role in ("admin", "admin_cn", "executive"):
+    if normalize_role(str(role or "user")) in ("admin_cn", "executive"):
         ds_pgd_duyet = DS_PGD
     else:
         ds_pgd_duyet = DS_PGD  # manager_cn được xem tất cả

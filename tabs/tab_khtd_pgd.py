@@ -172,7 +172,7 @@ def _section_van_ban_qd_pgd(pgd: str, role: str, username: str) -> None:
         with col_hist2:
             _hien_thi_lich_su_qd(kv_hdqt_xa, "QĐ HĐQT xã", role, username)
 
-        if not la_phan_he_cn(role) or role == "executive":
+        if not la_phan_he_cn(role) or normalize_role(role) == "executive":
             st.caption("🔒 Chỉ Admin / Manager mới được upload văn bản QĐ.")
             return
 
@@ -549,7 +549,8 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
         tab: Streamlit DeltaGenerator cho tab này
         **kwargs: Chứa role, username, pgd_user, df_full, df
     """
-    role = kwargs.get("role", "user")
+    role_raw = str(kwargs.get("role", "user") or "user")
+    role = normalize_role(role_raw)
     username = kwargs.get("username", "unknown")
     pgd_user = kwargs.get("pgd_user", "")
     df = kwargs.get("df_full", kwargs.get("df"))
@@ -560,7 +561,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
         st.caption("Hỗ trợ địa bàn · Xem tổng hợp KH theo Xã × Chương trình")
 
         # ── Xác định PGD hiển thị ─────────────────────────────────────────
-        if role in ("admin", "manager", "admin_cn", "manager_cn"):
+        if la_phan_he_cn(role) and role != "executive":
             pgd_hien_tai: str = st.selectbox(
                 "Chọn PGD", DS_PGD, key="khtd_pgd_sel_admin"
             )

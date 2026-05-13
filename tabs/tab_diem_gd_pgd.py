@@ -18,6 +18,7 @@ from config import (
 )
 
 import db
+from auth import normalize_role
 from data.dgd_helpers import (
     dem_thong_ke,
     dgd_dang_dung_trong_hstd,
@@ -508,7 +509,7 @@ def render(tab: "DeltaGenerator", **kwargs: dict) -> None:
             "Cấu hình điểm giao dịch — Import Excel, xem & sửa theo xã (chỉ PGD của bạn)."
         )
 
-        if role != "user":
+        if normalize_role(str(role or "user")) != "user_pgd":
             st.info("Tab này dành cho CBTD (role=user).")
 
         if not pgd_user:

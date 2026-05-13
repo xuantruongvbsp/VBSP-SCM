@@ -123,7 +123,8 @@ def init_db():
                 nguoi_tao     TEXT NOT NULL,
                 ngay_tao      TEXT NOT NULL,
                 trang_thai    TEXT NOT NULL DEFAULT 'dang_theo_doi',
-                ghi_chu       TEXT
+                ghi_chu       TEXT,
+                cap_theo_doi  TEXT NOT NULL DEFAULT 'xa'
             );
             CREATE INDEX IF NOT EXISTS idx_tiendo_deadline ON tien_do_task(ngay_deadline);
             CREATE TABLE IF NOT EXISTS tien_do_ketqua (
@@ -141,6 +142,15 @@ def init_db():
             CREATE INDEX IF NOT EXISTS idx_tiendo_kq_task ON tien_do_ketqua(task_id);
             CREATE INDEX IF NOT EXISTS idx_tiendo_kq_pgd ON tien_do_ketqua(task_id, pgd);
 
+        -- Migration: thêm cột cap_theo_doi cho bảng tien_do_task (nếu chưa có)
+        try:
+            conn.execute(
+                "ALTER TABLE tien_do_task ADD COLUMN cap_theo_doi TEXT NOT NULL DEFAULT 'xa'"
+            )
+        except Exception:
+            pass  # Cột đã tồn tại
+
+        conn.executescript("""
             CREATE TABLE IF NOT EXISTS hstd_snapshot (
                 id           INTEGER PRIMARY KEY AUTOINCREMENT,
                 ky           TEXT    NOT NULL,

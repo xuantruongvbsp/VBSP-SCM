@@ -27,7 +27,6 @@ def excel_to_parquet(
     if ts_file(parquet_path) < ts_file(excel_path):
         df = pd.read_excel(
             excel_path, sheet_name=sheet, header=header,
-            dtype_backend='pyarrow',
         )
         if post_fn:
             df = post_fn(df)

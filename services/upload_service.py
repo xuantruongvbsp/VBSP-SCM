@@ -352,7 +352,16 @@ def merge_du_lieu_toan_cn(
             else:
                 def _clean(df: pd.DataFrame) -> pd.DataFrame:
                     d = df.iloc[:, 1:].dropna(how="all").iloc[1:]
-                    return d.rename(columns=GQVL_COT_MAP).reset_index(drop=True)
+                    d = d.rename(columns=GQVL_COT_MAP).reset_index(drop=True)
+                    _cols_so = [
+                        "Dư nợ trong hạn", "Dư nợ quá hạn", "Dư nợ khoanh",
+                        "Tổng giải ngân", "Giải ngân trong năm", "Dư tài khoản",
+                        "Thời hạn vay", "Nguồn vốn",
+                    ]
+                    for col in _cols_so:
+                        if col in d.columns:
+                            d[col] = pd.to_numeric(d[col], errors="coerce")
+                    return d
 
                 df = excel_to_parquet(
                     path_excel,
@@ -409,6 +418,29 @@ def merge_du_lieu_toan_cn(
             f"Không có đơn vị nào có file {loai.upper()} để gộp."
         )
 
+    # ── Chuẩn hóa schema: tránh DataType(null) khi các PGD
+    #    có cột toàn null hoặc thiếu cột ──────────────────────
+    all_cols = list(dict.fromkeys(
+        col for df in frames for col in df.columns
+    ))
+    normalized: list[pd.DataFrame] = []
+    for df in frames:
+        for col in all_cols:
+            if col not in df.columns:
+                df[col] = pd.NA
+        for col in df.columns:
+            if df[col].dtype == object or str(df[col].dtype) in (
+                "null", "ArrowDtype(null)", "large_string[pyarrow]"
+            ):
+                try:
+                    df[col] = pd.to_numeric(df[col], errors="ignore")
+                except Exception:
+                    pass
+                if df[col].dtype == object:
+                    df[col] = df[col].astype(str).replace("nan", "")
+        normalized.append(df[all_cols])
+    frames = normalized
+
     df_toan_cn = pd.concat(frames, ignore_index=True)
 
     # Xác định đường dẫn parquet cache đích
@@ -421,11 +453,28 @@ def merge_du_lieu_toan_cn(
 
     # Ghi trực tiếp vào parquet cache (không qua Excel)
     os.makedirs(os.path.dirname(os.path.abspath(cache_path)), exist_ok=True)
-    
-    # convert_dtypes() tự suy luận kiểu tốt hơn, sau đó ép object còn lại về str
-    df_toan_cn = df_toan_cn.convert_dtypes()
-    for col in df_toan_cn.select_dtypes(include="object").columns:
-        df_toan_cn[col] = df_toan_cn[col].astype(str)
+
+    # Ép kiểu thủ công để tránh DataType(null) từ PyArrow
+    _cols_so_cn = [
+        "Dư nợ trong hạn", "Dư nợ quá hạn", "Dư nợ khoanh",
+        "Tổng giải ngân", "Giải ngân trong năm", "Dư tài khoản",
+        "Thời hạn vay", "Nguồn vốn",
+        "Mức vay", "Tổng dư nợ", "Lãi tồn TH", "Lãi tồn QH",
+        "Lãi DT trong tháng", "Gốc đã trả",
+    ]
+    for col in _cols_so_cn:
+        if col in df_toan_cn.columns:
+            df_toan_cn[col] = pd.to_numeric(df_toan_cn[col], errors="coerce")
+    for col in df_toan_cn.columns:
+        if col not in _cols_so_cn:
+            df_toan_cn[col] = (
+                df_toan_cn[col]
+                .astype(object)
+                .where(df_toan_cn[col].notna(), other="")
+                .astype(str)
+                .str.strip()
+                .replace({"nan": "", "None": "", "<NA>": ""})
+            )
     
     with _MERGE_LOCK[loai]:
         bak_path = cache_path + ".bak"
@@ -433,7 +482,10 @@ def merge_du_lieu_toan_cn(
             shutil.copy2(cache_path, bak_path)
         try:
             df_toan_cn.to_parquet(cache_path, index=False, engine="pyarrow", compression="zstd")
-        except Exception:
+        except Exception as e:
+            _u_merge = st.session_state.get("username", "unknown")
+            db.ghi_audit(_u_merge, "merge_loi_dtype",
+                         f"{loai.upper()} — {str(e)[:200]}")
             if os.path.exists(bak_path):
                 os.replace(bak_path, cache_path)
             raise

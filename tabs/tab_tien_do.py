@@ -53,11 +53,16 @@ def _doc_ketqua_task(task_id: int) -> list[dict]:
         ).fetchall()]
 
 
-def _khoi_tao_ketqua_task(task_id: int, ds_pgd_task: list[str]) -> None:
+def _khoi_tao_ketqua_task(task_id: int, ds_pgd_task: list[str],
+                           cap_theo_doi: str = "xa") -> None:
     rows = []
-    for pgd in ds_pgd_task:
-        for xa in PGD_XA_MAP.get(pgd, []):
-            rows.append((task_id, pgd, xa))
+    if cap_theo_doi == "pgd":
+        for pgd in ds_pgd_task:
+            rows.append((task_id, pgd, pgd))
+    else:
+        for pgd in ds_pgd_task:
+            for xa in PGD_XA_MAP.get(pgd, []):
+                rows.append((task_id, pgd, xa))
     with db.get_conn() as conn:
         conn.executemany(
             """INSERT OR IGNORE INTO tien_do_ketqua
@@ -261,15 +266,37 @@ def _render_tao_task(tab, **kwargs):
                     placeholder="Mặc định: tất cả 22 đơn vị",
                 )
 
+            cap_theo_doi = st.radio(
+                "Cấp theo dõi tiến độ",
+                options=["pgd", "xa"],
+                format_func=lambda x: (
+                    "🏢 Cấp PGD (1 dòng / PGD)" if x == "pgd"
+                    else "🏘️ Cấp Xã (1 dòng / xã)"
+                ),
+                index=1,
+                horizontal=True,
+                key="td_cap_theo_doi",
+            )
+
             ds_preview = pgd_chon or DS_PGD_ALL
-            tong_xa_preview = sum(len(PGD_XA_MAP.get(p, [])) for p in ds_preview)
-            st.caption(f"📍 {len(ds_preview)} đơn vị · {tong_xa_preview} xã/phường")
-            with st.expander(f"Xem chi tiết {tong_xa_preview} xã sẽ áp dụng", expanded=False):
+            if cap_theo_doi == "pgd":
+                st.caption(f"📍 {len(ds_preview)} đơn vị PGD")
+            else:
+                tong_xa_preview = sum(
+                    len(PGD_XA_MAP.get(p, [])) for p in ds_preview
+                )
+                st.caption(
+                    f"📍 {len(ds_preview)} đơn vị · {tong_xa_preview} xã/phường"
+                )
+            with st.expander(f"Xem chi tiết sẽ áp dụng", expanded=False):
                 for pgd in ds_preview:
-                    ds_xa = PGD_XA_MAP.get(pgd, [])
-                    if ds_xa:
-                        st.markdown(f"**{pgd}** ({len(ds_xa)} xã)")
-                        st.write(" — ".join(ds_xa))
+                    if cap_theo_doi == "pgd":
+                        st.markdown(f"**{pgd}**")
+                    else:
+                        ds_xa = PGD_XA_MAP.get(pgd, [])
+                        if ds_xa:
+                            st.markdown(f"**{pgd}** ({len(ds_xa)} xã)")
+                            st.write(" — ".join(ds_xa))
 
             ghi_chu = st.text_input("Ghi chú thêm")
             submitted = st.form_submit_button("💾 Tạo đầu việc", type="primary")
@@ -285,23 +312,30 @@ def _render_tao_task(tab, **kwargs):
                     cur = conn.execute(
                         """INSERT INTO tien_do_task
                            (tieu_de, mo_ta, ngay_deadline, ds_pgd, loai,
-                            uu_tien, nguoi_tao, ngay_tao, trang_thai, ghi_chu)
-                           VALUES (?,?,?,?,?,?,?,?,'dang_theo_doi',?)""",
+                            uu_tien, nguoi_tao, ngay_tao, trang_thai, ghi_chu,
+                            cap_theo_doi)
+                           VALUES (?,?,?,?,?,?,?,?,'dang_theo_doi',?,?)""",
                         (tieu_de.strip(), mo_ta.strip() or None,
                          deadline.isoformat(), ds_pgd_json,
                          loai, uu_tien, username,
                          datetime.now().isoformat(),
-                         ghi_chu.strip() or None),
+                         ghi_chu.strip() or None,
+                         cap_theo_doi),
                     )
                     task_id = cur.lastrowid
                     conn.commit()
 
-                _khoi_tao_ketqua_task(task_id, pgd_luu)
+                _khoi_tao_ketqua_task(task_id, pgd_luu, cap_theo_doi)
 
+                so_xa = (
+                    sum(len(PGD_XA_MAP.get(p, [])) for p in pgd_luu)
+                    if cap_theo_doi == "xa" else len(pgd_luu)
+                )
                 db.ghi_audit(username, "tien_do_tao_task",
                              f"'{tieu_de}' · deadline={deadline} · "
                              f"{len(pgd_luu)} PGD · "
-                             f"{sum(len(PGD_XA_MAP.get(p, [])) for p in pgd_luu)} xã")
+                             f"{so_xa} đơn vị {cap_theo_doi} · "
+                             f"cap_theo_doi={cap_theo_doi}")
                 st.toast(f"✅ Đã tạo: {tieu_de}")
                 st.rerun()
             except Exception as e:
@@ -505,8 +539,6 @@ def _render_cap_nhat(tab, **kwargs):
 
     _tab_ctx = tab if tab is not None else __import__('streamlit').container()
     with _tab_ctx:
-        st.subheader("📋 Cập nhật tiến độ theo xã")
-
         ds_task = _doc_tasks()
         if not ds_task:
             st.info("Chưa có đầu việc nào đang theo dõi.")
@@ -521,6 +553,10 @@ def _render_cap_nhat(tab, **kwargs):
         task = next((t for t in ds_task if t["id"] == task_id), None)
         if task is None:
             return
+
+        cap_theo_doi = task.get("cap_theo_doi", "xa")
+        label_dv = "PGD" if cap_theo_doi == "pgd" else "xã"
+        st.subheader(f"📋 Cập nhật tiến độ theo {label_dv}")
 
         if la_manager:
             ds_pgd_task = json.loads(task.get("ds_pgd") or "[]") or DS_PGD_ALL
@@ -540,13 +576,15 @@ def _render_cap_nhat(tab, **kwargs):
 
         kq_list = [r for r in _doc_ketqua_task(task_id) if r["pgd"] == pgd_sel]
         if not kq_list:
-            st.warning(f"Không tìm thấy dữ liệu xã cho {pgd_sel}. "
+            st.warning(f"Không tìm thấy dữ liệu {label_dv} cho {pgd_sel}. "
                        "Thử tạo lại đầu việc.")
             return
 
         xong = sum(1 for r in kq_list if r["trang_thai"] == "da_hoan_thanh")
         st.progress(xong / len(kq_list),
-                    text=f"Hoàn thành: {xong}/{len(kq_list)} xã")
+                    text=f"Hoàn thành: {xong}/{len(kq_list)} {label_dv}")
+
+        ten_cot = "Đơn vị PGD" if cap_theo_doi == "pgd" else "Xã / Phường"
 
         def _parse_date(val):
             if not val:
@@ -558,20 +596,21 @@ def _render_cap_nhat(tab, **kwargs):
 
         df_edit = pd.DataFrame([
             {
-                "Xã / Phường": r["ten_xa"],
+                ten_cot: r["ten_xa"],
                 "Trạng thái": r["trang_thai"],
                 "Ngày HT": _parse_date(r.get("ngay_hoan_thanh")),
                 "Ghi chú": r.get("ghi_chu") or "",
             }
             for r in kq_list
         ])
-        # Convert cột "Ngày HT" sang datetime.date, thay thế None bằng NaT để DateColumn hoạt động
         df_edit["Ngày HT"] = pd.to_datetime(df_edit["Ngày HT"], errors="coerce").dt.date
 
         edited = st.data_editor(
             df_edit,
             column_config={
-                "Xã / Phường": st.column_config.TextColumn(disabled=True, width="medium"),
+                ten_cot: st.column_config.TextColumn(
+                    ten_cot, disabled=True, width="medium"
+                ),
                 "Trạng thái": st.column_config.SelectboxColumn(
                     options=list(TS_KQ_LABEL.keys()),
                     width="small",

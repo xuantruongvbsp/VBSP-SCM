@@ -308,6 +308,195 @@ def _render_tao_task(tab, **kwargs):
                 st.error(f"Lỗi: {e}")
 
 
+def _render_quan_ly_task(tab, **kwargs):
+    username = kwargs.get("username", "")
+    role_raw = str(kwargs.get("role", "user") or "user")
+    role = normalize_role(role_raw)
+
+    _tab_ctx = tab if tab is not None else __import__("streamlit").container()
+    with _tab_ctx:
+        st.subheader("✏️ Quản lý đầu việc")
+
+        ds_task = _doc_tasks(chi_dang_theo_doi=False)
+        if not ds_task:
+            st.info("Chưa có đầu việc nào.")
+            return
+
+        task_map = {t["id"]: t for t in ds_task}
+
+        def _fmt_task(task_id: int) -> str:
+            t = task_map.get(task_id) or {}
+            stt = "[ĐANG]" if t.get("trang_thai") == "dang_theo_doi" else "[ĐÓNG]"
+            return f"{stt} {t.get('tieu_de','')} · {t.get('ngay_deadline','')}"
+
+        task_id = st.selectbox(
+            "Chọn đầu việc",
+            options=list(task_map.keys()),
+            format_func=_fmt_task,
+            key="td_ql_task",
+        )
+        task = task_map.get(task_id)
+        if not task:
+            return
+
+        try:
+            deadline_default = date.fromisoformat(str(task.get("ngay_deadline") or date.today().isoformat()))
+        except Exception:
+            deadline_default = date.today()
+
+        loai_keys = list(LOAI_TASK.keys())
+        uu_tien_keys = list(UU_TIEN.keys())
+
+        try:
+            loai_index = loai_keys.index(task.get("loai")) if task.get("loai") in loai_keys else 0
+        except Exception:
+            loai_index = 0
+
+        try:
+            uu_tien_index = uu_tien_keys.index(task.get("uu_tien")) if task.get("uu_tien") in uu_tien_keys else 2
+        except Exception:
+            uu_tien_index = 2
+
+        with st.form("form_sua_task"):
+            tieu_de = st.text_input(
+                "Tên đầu việc *",
+                value=str(task.get("tieu_de") or ""),
+                key=f"td_sua_tieu_de_{task_id}",
+            )
+            mo_ta = st.text_area(
+                "Mô tả / Hướng dẫn",
+                value=str(task.get("mo_ta") or ""),
+                key=f"td_sua_mo_ta_{task_id}",
+            )
+            loai = st.selectbox(
+                "Loại",
+                options=loai_keys,
+                format_func=lambda x: LOAI_TASK.get(x, x),
+                index=loai_index,
+                key=f"td_sua_loai_{task_id}",
+            )
+            uu_tien = st.selectbox(
+                "Ưu tiên",
+                options=uu_tien_keys,
+                format_func=lambda x: UU_TIEN.get(x, x),
+                index=uu_tien_index,
+                key=f"td_sua_uu_tien_{task_id}",
+            )
+            deadline = st.date_input(
+                "Hạn hoàn thành *",
+                value=deadline_default,
+                key=f"td_sua_deadline_{task_id}",
+            )
+            ghi_chu = st.text_input(
+                "Ghi chú thêm",
+                value=str(task.get("ghi_chu") or ""),
+                key=f"td_sua_ghi_chu_{task_id}",
+            )
+
+            st.caption(
+                "Danh sách PGD không thể thay đổi sau khi tạo. Nếu cần, hãy đóng đầu việc này và tạo mới."
+            )
+
+            submitted = st.form_submit_button("💾 Lưu thay đổi", type="primary")
+
+        if submitted:
+            if not str(tieu_de or "").strip():
+                st.error("Vui lòng nhập tên đầu việc.")
+                return
+            try:
+                with db.get_conn() as conn:
+                    conn.execute(
+                        """UPDATE tien_do_task
+                           SET tieu_de=?, mo_ta=?, ngay_deadline=?, loai=?,
+                               uu_tien=?, ghi_chu=?
+                           WHERE id=?""",
+                        (
+                            str(tieu_de).strip(),
+                            str(mo_ta).strip() or None,
+                            deadline.isoformat(),
+                            loai,
+                            uu_tien,
+                            str(ghi_chu).strip() or None,
+                            task_id,
+                        ),
+                    )
+                    conn.commit()
+                db.ghi_audit(
+                    username,
+                    "tien_do_sua_task",
+                    f"ID={task_id} · '{str(tieu_de).strip()}' · deadline={deadline}",
+                )
+                st.toast("✅ Đã lưu thay đổi.")
+                st.rerun()
+            except Exception as e:
+                st.error(f"Lỗi: {e}")
+
+        c1, c2, c3 = st.columns([1.2, 1.2, 1.6])
+        with c1:
+            if task.get("trang_thai") == "dang_theo_doi":
+                if st.button("🔒 Đóng đầu việc", key=f"td_dong_{task_id}", use_container_width=True):
+                    try:
+                        with db.get_conn() as conn:
+                            conn.execute(
+                                "UPDATE tien_do_task SET trang_thai=? WHERE id=?",
+                                ("da_dong", task_id),
+                            )
+                            conn.commit()
+                        db.ghi_audit(
+                            username,
+                            "tien_do_doi_trang_thai",
+                            f"ID={task_id} · '{task.get('tieu_de')}' → da_dong",
+                        )
+                        st.toast("✅ Đã cập nhật trạng thái.")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Lỗi: {e}")
+            else:
+                if st.button("🔓 Mở lại", key=f"td_mo_lai_{task_id}", use_container_width=True):
+                    try:
+                        with db.get_conn() as conn:
+                            conn.execute(
+                                "UPDATE tien_do_task SET trang_thai=? WHERE id=?",
+                                ("dang_theo_doi", task_id),
+                            )
+                            conn.commit()
+                        db.ghi_audit(
+                            username,
+                            "tien_do_doi_trang_thai",
+                            f"ID={task_id} · '{task.get('tieu_de')}' → dang_theo_doi",
+                        )
+                        st.toast("✅ Đã cập nhật trạng thái.")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Lỗi: {e}")
+
+        if role == "admin_cn":
+            confirm_key = f"_td_xoa_confirm_{task_id}"
+            with c3:
+                if not st.session_state.get(confirm_key):
+                    if st.button("🗑️ Xóa vĩnh viễn", key=f"td_xoa_{task_id}", use_container_width=True):
+                        st.session_state[confirm_key] = True
+                        st.rerun()
+                else:
+                    st.warning("⚠️ Hành động này không thể hoàn tác.")
+                    if st.button("Xác nhận xóa", key=f"td_xoa_ok_{task_id}", type="primary", use_container_width=True):
+                        try:
+                            with db.get_conn() as conn:
+                                conn.execute("DELETE FROM tien_do_ketqua WHERE task_id=?", (task_id,))
+                                conn.execute("DELETE FROM tien_do_task WHERE id=?", (task_id,))
+                                conn.commit()
+                            db.ghi_audit(
+                                username,
+                                "tien_do_xoa_task",
+                                f"ID={task_id} · '{task.get('tieu_de')}'",
+                            )
+                            st.session_state.pop(confirm_key, None)
+                            st.toast("🗑️ Đã xóa đầu việc.")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Lỗi: {e}")
+
+
 def _render_cap_nhat(tab, **kwargs):
     username = kwargs.get("username", "")
     role = kwargs.get("role", "user")
@@ -550,9 +739,10 @@ def render(tab, **kwargs):
     role = kwargs.get("role")
     pgd_user = kwargs.get("pgd_user")
 
-    can_manage = (role in ROLES_PHAN_HE_CN) and (role != "executive")
-    is_exec = normalize_role(role) == "executive"
-    is_pgd_view = (role not in ROLES_PHAN_HE_CN) and bool(pgd_user)
+    role_n = normalize_role(str(role or "user"))
+    can_manage = (role_n in ROLES_PHAN_HE_CN) and (role_n != "executive")
+    is_exec = role_n == "executive"
+    is_pgd_view = (role_n not in ROLES_PHAN_HE_CN) and bool(pgd_user)
 
     import streamlit as _st
     _tab_ctx = tab if tab is not None else _st.container()
@@ -567,8 +757,8 @@ def render(tab, **kwargs):
             _render_tong_quan(tab, **kwargs)
             return
 
-        t1, t2, t3, t4 = st.tabs([
-            "📊 Tổng quan", "➕ Tạo đầu việc",
+        t1, t2, t3, t4, t5 = st.tabs([
+            "📊 Tổng quan", "➕ Tạo đầu việc", "✏️ Quản lý đầu việc",
             "📋 Cập nhật tiến độ", "📤 Xuất báo cáo",
         ])
         with t1:
@@ -576,9 +766,11 @@ def render(tab, **kwargs):
         with t2:
             _render_tao_task(t2, **kwargs)
         with t3:
-            _render_cap_nhat(t3, **kwargs)
+            _render_quan_ly_task(t3, **kwargs)
         with t4:
-            _render_xuat(t4, **kwargs)
+            _render_cap_nhat(t4, **kwargs)
+        with t5:
+            _render_xuat(t5, **kwargs)
 
 
 def render_tong_quan_only(tab, **kwargs):

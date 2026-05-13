@@ -364,8 +364,26 @@ def _nhan_dien_loai_tu_noi_dung(data: bytes) -> str | None:
             return "nq11"
 
         # ── GQVL ─────────────────────────────────────────────────────
-        if "SHEET1" in sheets_upper:
-            return "gqvl"
+        if "SHEET1" in sheets_upper or any(
+            s for s in sheets_upper
+            if s not in ("BCQUERY",) and not s.startswith("_")
+        ):
+            try:
+                real = xl.sheet_names[0]
+                df_check = pd.read_excel(
+                    BytesIO(data), sheet_name=real,
+                    header=7, nrows=2
+                )
+                cols_check = [str(c).strip().lower() for c in df_check.columns]
+                if any(
+                    "khế ước" in c or "khe uoc" in c
+                    or "dư nợ" in c or "du no" in c
+                    or "mã kh" in c
+                    for c in cols_check
+                ):
+                    return "gqvl"
+            except Exception:
+                pass
 
         # ── CDTOTKVV ─────────────────────────────────────────────────
         df2 = pd.read_excel(BytesIO(data), header=None, skiprows=9, nrows=2)
@@ -441,14 +459,39 @@ def _tim_ten_pgd_tu_noi_dung(file_bytes: bytes, loai: str) -> str | None:
             return None
 
         if loai == "gqvl":
-            df = pd.read_excel(buf, sheet_name="Sheet1", header=7, nrows=1)
+            df = pd.read_excel(buf, sheet_name="Sheet1", header=7, nrows=10)
             if df.empty:
                 return None
-            for col in df.columns:
-                hit = _ten_doc_ve_don_vi_chuan(str(df[col].iloc[0]).strip())
-                if hit:
-                    return hit
-            return None
+
+            cot_ma = next(
+                (
+                    c
+                    for c in df.columns
+                    if "mã đơn vị" in str(c).strip().lower()
+                    or "ma don vi" in str(c).strip().lower()
+                ),
+                None,
+            )
+            if cot_ma is None:
+                cot_ma = df.columns[1] if len(df.columns) > 1 else df.columns[0]
+
+            s = df[cot_ma].dropna()
+            if s.empty:
+                return None
+
+            raw = s.iloc[0]
+            try:
+                ma = str(int(float(raw))).zfill(6)
+            except Exception:
+                ma = str(raw).strip()
+                digits = "".join(ch for ch in ma if ch.isdigit())
+                if digits:
+                    ma = digits.zfill(6)
+
+            ten_ma = MA_PGD_MAP.get(ma)
+            if ten_ma and ten_ma in DS_DON_VI:
+                return ten_ma
+            return ten_ma
 
         if loai == "cdtotkvv":
             df = pd.read_excel(buf, header=None, nrows=15)
@@ -650,7 +693,6 @@ def _render_upload_hang_loat(role: str, username: str) -> None:
         PREFIX_MAP = {
             "hstd":     ("HSTD", "CT_CDTO"),
             "nq11":     ("NQ11", "SAO_KE_CT"),
-            "gqvl":     ("GQVL", "SK_GQVL", "SAO_KE_GQVL"),
             "cdtotkvv": ("CDTOTKVV", "CT_CDTOTKVV"),
         }
 
@@ -1042,9 +1084,8 @@ def render(tab=None, **kwargs) -> None:
     role     = kwargs.get("role", "")
     username = kwargs.get("username", "unknown")
 
-    ctx = tab if tab is not None else st
-
-    with ctx:
+    _ctx = tab if tab is not None else st.container()
+    with _ctx:
         if not la_phan_he_cn(role) or role == "executive":
             st.error("🔒 Chức năng này chỉ dành cho Phòng KH-NV (admin/manager).")
             return

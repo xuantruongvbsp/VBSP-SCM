@@ -277,7 +277,11 @@ def luu_dienbao(
 
 # ── Gộp dữ liệu toàn Chi nhánh từ 22 đơn vị ─────────────────────────────────
 
-def merge_du_lieu_toan_cn(loai: str, ds_pgd: list[str] | None = None) -> KetQuaUpload:
+def merge_du_lieu_toan_cn(
+    loai: str,
+    ds_pgd: list[str] | None = None,
+    pgd_moi_upload: str | None = None,
+) -> KetQuaUpload:
     """
     Gộp file {loai} của tất cả 22 đơn vị thành dữ liệu toàn Chi nhánh.
     Đọc pgd_data/{slug}/{loai}_latest.xlsx → concat → ghi ra parquet cache.
@@ -382,7 +386,7 @@ def merge_du_lieu_toan_cn(loai: str, ds_pgd: list[str] | None = None) -> KetQuaU
 
     # Kiểm tra chất lượng sau khi tất cả luồng đọc file đã hoàn thành
     for ten_pgd, df, da_dung_cache, qua_nguong in raw_results:
-        if not da_dung_cache:
+        if (not da_dung_cache) and (pgd_moi_upload is not None) and (ten_pgd == pgd_moi_upload):
             kq_dq = kiem_tra_chat_luong(df, loai)
             df = kq_dq.df
             bao_cao_chat_luong.append({**kq_dq.report, "don_vi": ten_pgd})

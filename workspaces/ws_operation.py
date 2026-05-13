@@ -151,6 +151,26 @@ def _render_don_doc(df: pd.DataFrame, pgd_user: str, role: str):
         st.info("Không có hộ nào thỏa điều kiện.")
 
 
+def _banner_canh_bao_khd(df_pgd: pd.DataFrame, role: str) -> None:
+    if df_pgd is None or df_pgd.empty:
+        return
+    df_kh = danh_dau_khong_hd(df_pgd)
+    n_khd = int(df_kh["is_3m_inactive"].sum()) if "is_3m_inactive" in df_kh.columns else 0
+    if n_khd == 0:
+        return
+    du_no_khd = 0.0
+    if COT_TONG_DU_NO in df_kh.columns and "is_3m_inactive" in df_kh.columns:
+        du_no_khd = pd.to_numeric(
+            df_kh.loc[df_kh["is_3m_inactive"], COT_TONG_DU_NO], errors="coerce"
+        ).sum() / 1e6
+    st.warning(
+        f"⚠️ **{fmt_so(n_khd)} món vay 3 tháng không hoạt động** · "
+        f"Dư nợ: **{du_no_khd:,.1f} triệu đồng** · "
+        f"Vào nhóm **🔍 Kiểm soát & Rủi ro → Tab Đôn đốc KHĐ** để xem chi tiết.",
+        icon="🔴",
+    )
+
+
 def _render_doc_hub(df: pd.DataFrame, df_nq11, role: str):
     """Module Trung tâm Tự động hóa Văn bản."""
     st.subheader("📄 Trung tâm Tự động hóa Văn bản")
@@ -905,6 +925,8 @@ def render(**kwargs):
         df_pgd = df
     _pgd_df_kwargs = {**kwargs, "df": df_pgd, "df_full": df_pgd, "pgd_filter": pgd_filter}
 
+    _banner_canh_bao_khd(df_pgd, role)
+
     # ── Helpers render ──────────────────────────────────────────────────
     def _render_diem_gd_va_to_tkvv(tab_parent, **kw):
         with tab_parent:
@@ -960,6 +982,7 @@ def render(**kwargs):
         "kiem_soat_rr": {
             "label": "🔍 Kiểm soát & Rủi ro",
             "tabs": [
+                ("🔔 Đôn đốc KHĐ", lambda tab: _render_don_doc(df_pgd, pgd_user or pgd_filter or "", role)),
                 ("💳 Nợ rủi ro QĐ62", lambda tab: tab_qd62.render(
                     mode="pgd", pgd_filter=pgd_user or pgd_filter
                 )),

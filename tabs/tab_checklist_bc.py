@@ -5,6 +5,7 @@ from io import BytesIO
 import uuid
 import db
 from utils import get_tab_context
+from auth import normalize_role
 
 _KEY_CONFIG = "checklist_bc_config"
 _TRANG_THAI = {
@@ -480,14 +481,15 @@ def render(tab=None, **kwargs) -> None:
     else:
         _ctx = st.container()
     with _ctx:
-        role = kwargs.get("role")
+        role_raw = str(kwargs.get("role", "user") or "user")
+        role = normalize_role(role_raw)
         username = kwargs.get("username", "unknown")
-        can_edit = role in ("admin", "admin_cn", "manager", "manager_cn")
+        can_edit = role in ("admin_cn", "manager_cn")
 
         st.title("✅ Checklist báo cáo định kỳ")
         st.caption("Theo dõi hạn nộp báo cáo tháng/quý/năm và trạng thái thực hiện.")
 
-        if role not in ("admin", "admin_cn", "manager", "manager_cn"):
+        if role not in ("admin_cn", "manager_cn"):
             st.warning("Bạn không có quyền truy cập checklist báo cáo.")
             return
 

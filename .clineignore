@@ -1,169 +1,85 @@
-# ============================================================
-# .clineignore — Tối ưu cho Python / SQL / Web / Config project
-# Đặt file này ở thư mục gốc (root) của project
-# ============================================================
-
-# ─── Dependencies & Package managers ───────────────────────
-node_modules/
-bower_components/
-vendor/
-.pnp/
-.pnp.js
-package-lock.json
-yarn.lock
-pnpm-lock.yaml
-poetry.lock
-Pipfile.lock
-
-# ─── Python ────────────────────────────────────────────────
+# ── Python cache ─────────────────────────────────────────────────────────────
 __pycache__/
-*.py[cod]
-*$py.class
+*.pyc
 *.pyo
 *.pyd
 .Python
-build/
-dist/
-eggs/
-*.egg-info/
-*.egg
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.whl
-.venv/
-venv/
-ENV/
-env/
-.env
-.env.*
-!.env.example
 
-# ─── DATABASE FILES (quan trọng — ngăn Cline đọc binary) ───
+# ── Virtual environment ───────────────────────────────────────────────────────
+venv/
+.venv/
+env/
+.env/
+.virtualenvs/
+.conda/
+conda-env/
+
+# ── Biến môi trường / bảo mật (QUAN TRỌNG: chứa API key, mật khẩu) ───────────
+.env
+*.env
+.env.local
+.env.production
+secrets.toml
+.streamlit/secrets.toml
+
+# ── Data files (lớn, không cần AI đọc) ───────────────────────────────────────
+pgd_data/
+cache/
+*.parquet
+*.csv
+*.xlsx
+*.xls
+
+# ── Cơ sở dữ liệu (binary, AI không đọc được) ────────────────────────────────
 *.db
 *.sqlite
 *.sqlite3
 *.accdb
 *.mdb
-*.ldb
-*.frm
-*.ibd
-*.MYD
-*.MYI
-dump.sql
-*.dump
-backup*.sql
-*_backup.sql
-*.bak
 
-# ─── Logs & Reports ────────────────────────────────────────
-*.log
-*.log.*
-logs/
-log/
-*.out
-*.err
-reports/
-coverage/
-htmlcov/
-.coverage
-.coverage.*
-*.lcov
-junit*.xml
-test-results/
+# ── Tài liệu PDF (chỉ đọc khi chủ động cung cấp) ─────────────────────────────
+*.pdf
 
-# ─── Build & Compiled output ───────────────────────────────
-dist/
-build/
-out/
-.next/
-.nuxt/
-.svelte-kit/
-__pycache__/
-*.min.js
-*.min.css
-*.bundle.js
-*.chunk.js
-*.map
-
-# ─── Version Control ───────────────────────────────────────
+# ── Git ───────────────────────────────────────────────────────────────────────
 .git/
-.gitattributes
-.hg/
-.svn/
+.gitignore
 
-# ─── IDE & Editor ──────────────────────────────────────────
+# ── Log và temp ───────────────────────────────────────────────────────────────
+*.log
+*.tmp
+*.bak
+logs/
+temp/
+tmp/
+# kv_store audit logs (db.ghi_kv / db.ghi_audit)
+kv_audit.log
+audit_*.log
+
+# ── IDE ───────────────────────────────────────────────────────────────────────
 .vscode/
 .idea/
-*.swp
-*.swo
-*~
+*.code-workspace
+
+# ── Streamlit cache ───────────────────────────────────────────────────────────
+.streamlit/cache/
+
+# ── Snapshot và backup ────────────────────────────────────────────────────────
+snapshots/
+backups/
+*.bak.py
+
+# ── File hệ thống đồng bộ (Dropbox, macOS, Windows) ──────────────────────────
+.dropbox
+.dropbox.cache/
+.dropbox*
 .DS_Store
-Thumbs.db
 desktop.ini
+Thumbs.db
 
-# ─── Cache & Temp ──────────────────────────────────────────
-.cache/
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
-.eslintcache
-.stylelintcache
-tmp/
-temp/
-.tmp/
-*.tmp
-*.temp
-
-# ─── Large Data / Assets ───────────────────────────────────
-*.csv           # Comment dòng này nếu bạn cần Cline đọc CSV
-*.xlsx
-*.xls
-*.parquet
-*.feather
-*.arrow
-data/raw/
-data/processed/
-datasets/
-*.zip
-*.tar
-*.tar.gz
-*.rar
-*.7z
-
-# ─── Media & Binary ────────────────────────────────────────
-*.png
-*.jpg
-*.jpeg
-*.gif
-*.ico
-*.svg
-*.webp
-*.mp4
-*.mp3
-*.wav
-*.pdf
-*.docx
-*.pptx
-fonts/
-images/
-assets/img/
-static/media/
-
-# ─── Migration & Seed files lớn ────────────────────────────
-migrations/versions/
-seeds/
-fixtures/
-
-# ─── Môi trường & Secret ───────────────────────────────────
-*.pem
-*.key
-*.cert
-*.p12
-secrets/
-.secrets/
-credentials/
+# ── Dữ liệu khu vực / địa lý (dung lượng lớn) ────────────────────────────────
+pgd_data/**/ban_do/
+pgd_data/**/geojson/
+*.geojson
+*.shp
+*.shx
+*.dbf

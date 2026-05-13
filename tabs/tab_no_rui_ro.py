@@ -16,11 +16,15 @@ from streamlit.delta_generator import DeltaGenerator
 import db
 from config import (
     COT_DIA_CHI,
+    COT_DU_NO_QH,
+    COT_DU_NO_TH,
     COT_LAI_TON,
+    COT_MA_KH,
     COT_MUC_VAY,
     COT_NGAY_DH,
     COT_NGAY_VAY,
     COT_NGUON_VON,
+    COT_SDT,
     COT_TEN_XA,
     COT_TEN_TO,
     COT_TEN_KH,
@@ -35,6 +39,7 @@ from data.pgd import pgd_slug
 from auth import la_phan_he_cn, la_phan_he_pgd, normalize_role
 from utils import fmt, fmt_bang_ty
 from services.template_service import (
+    docx_bytes_to_pdf,
     nut_tai_word_va_pdf,
     hien_thi_nut_tai,
 )
@@ -1457,6 +1462,284 @@ def render(tab: DeltaGenerator, **kwargs) -> None:
         ten_pgd = _lay_pgd_tu_user(role, pgd_user, df)
         kv_key = _tao_kv_key(ten_pgd or "unknown")
 
+        st.markdown("#### 🧾 Soạn mẫu 01/XLN và 02/XLN")
+        so_ku_list = []
+        if COT_SO_KU in df.columns:
+            try:
+                so_ku_list = sorted(
+                    [str(x).strip() for x in df[COT_SO_KU].dropna().astype(str).unique().tolist()]
+                )
+            except Exception:
+                so_ku_list = []
+
+        if not so_ku_list:
+            st.warning("⚠️ Không có món vay nào để soạn mẫu (thiếu Số khế ước hoặc dữ liệu rỗng).")
+        else:
+            so_ku_chon = st.selectbox(
+                "BƯỚC 1 — Chọn món vay (Số khế ước)",
+                options=so_ku_list,
+                key="xln_so_ku_chon",
+            )
+
+            row_hstd = None
+            try:
+                df_row = df[df[COT_SO_KU].astype(str) == str(so_ku_chon)]
+                if not df_row.empty:
+                    row_hstd = df_row.iloc[0]
+            except Exception:
+                row_hstd = None
+
+            if row_hstd is None:
+                st.warning("⚠️ Không tìm thấy dữ liệu HSTD tương ứng Số khế ước đã chọn.")
+            else:
+                ten_kh = str(row_hstd.get(COT_TEN_KH, "") or "")
+                dia_chi = str(row_hstd.get(COT_DIA_CHI, "") or "")
+                sdt = str(row_hstd.get(COT_SDT, "") or "")
+
+                ngay_vay_str = ""
+                try:
+                    nv = pd.to_datetime(row_hstd.get(COT_NGAY_VAY, ""), errors="coerce", dayfirst=True)
+                    if pd.notna(nv):
+                        ngay_vay_str = nv.strftime("%d/%m/%Y")
+                    else:
+                        ngay_vay_str = str(row_hstd.get(COT_NGAY_VAY, "") or "")
+                except Exception:
+                    ngay_vay_str = str(row_hstd.get(COT_NGAY_VAY, "") or "")
+
+                ngay_dh_str = ""
+                try:
+                    ndh = pd.to_datetime(row_hstd.get(COT_NGAY_DH, ""), errors="coerce", dayfirst=True)
+                    if pd.notna(ndh):
+                        ngay_dh_str = ndh.strftime("%d/%m/%Y")
+                    else:
+                        ngay_dh_str = str(row_hstd.get(COT_NGAY_DH, "") or "")
+                except Exception:
+                    ngay_dh_str = str(row_hstd.get(COT_NGAY_DH, "") or "")
+
+                ten_ct = str(row_hstd.get(COT_TEN_CT, "") or "")
+                muc_vay_vnd = _num(row_hstd.get(COT_MUC_VAY, 0) or 0)
+                du_no_th_vnd = _num(row_hstd.get(COT_DU_NO_TH, 0) or 0)
+                du_no_qh_vnd = _num(row_hstd.get(COT_DU_NO_QH, 0) or 0)
+                du_no_goc_vnd = du_no_th_vnd + du_no_qh_vnd
+                tong_du_no_vnd = _num(row_hstd.get(COT_TONG_DU_NO, 0) or 0)
+
+                co_cot_lai_ton = COT_LAI_TON in df.columns
+                lai_ton_vnd = _num(row_hstd.get(COT_LAI_TON, 0) or 0) if co_cot_lai_ton else 0.0
+
+                ten_pgd_row = str(row_hstd.get(COT_TEN_PGD, "") or "")
+                ten_nhcsxh = ten_pgd_row or (ten_pgd or "")
+
+                st.info("BƯỚC 2 — Thông tin tự động điền (từ HSTD)")
+                a1, a2 = st.columns(2)
+                with a1:
+                    st.markdown(f"**Tên KH:** {ten_kh or '—'}")
+                    st.markdown(f"**Địa chỉ:** {dia_chi or '—'}")
+                    st.markdown(f"**Số điện thoại:** {sdt or '—'}")
+                    st.markdown(f"**Số khế ước:** {str(so_ku_chon) or '—'}")
+                    st.markdown(f"**Ngày vay:** {ngay_vay_str or '—'}")
+                    st.markdown(f"**Ngày đến hạn:** {ngay_dh_str or '—'}")
+                with a2:
+                    st.markdown(f"**Chương trình tín dụng:** {ten_ct or '—'}")
+                    st.markdown(f"**Mức vay:** {fmt(muc_vay_vnd) if muc_vay_vnd else '—'}")
+                    st.markdown(f"**Dư nợ gốc:** {fmt(du_no_goc_vnd) if du_no_goc_vnd else '—'}")
+                    if co_cot_lai_ton:
+                        st.markdown(f"**Lãi tồn:** {fmt(lai_ton_vnd) if lai_ton_vnd else '—'}")
+                    else:
+                        st.markdown("**Lãi tồn:** 0 (không có cột Lãi tồn)")
+                    st.markdown(f"**Tổng dư nợ:** {fmt(tong_du_no_vnd) if tong_du_no_vnd else '—'}")
+                    st.markdown(f"**NHCSXH/PGD:** {ten_nhcsxh or '—'}")
+
+                with st.form("form_xln_soan", clear_on_submit=False):
+                    st.markdown("BƯỚC 3 — Nhập phần tự thuật")
+                    c_trai, c_phai = st.columns(2)
+                    with c_trai:
+                        nguyen_nhan = st.text_area(
+                            "Nguyên nhân rủi ro",
+                            height=110,
+                            key="xln_nguyen_nhan",
+                        )
+                        thuc_trang = st.text_area(
+                            "Thực trạng dự án / tài sản (chỉ dùng cho 02/XLN)",
+                            height=90,
+                            key="xln_thuc_trang",
+                        )
+                        kha_nang = st.text_area(
+                            "Khả năng trả nợ",
+                            height=70,
+                            key="xln_kha_nang",
+                        )
+                    with c_phai:
+                        muc_do_pct = st.number_input(
+                            "Mức độ thiệt hại %",
+                            min_value=0,
+                            max_value=100,
+                            value=0,
+                            step=1,
+                            key="xln_muc_do_pct",
+                        )
+                        so_tien_thiet_hai_trieu = st.number_input(
+                            "Số tiền thiệt hại (triệu đồng)",
+                            min_value=0.0,
+                            value=0.0,
+                            step=1.0,
+                            key="xln_thiet_hai_trieu",
+                        )
+                        bien_phap = st.selectbox(
+                            "Biện pháp đề nghị",
+                            options=["Khoanh nợ", "Xóa nợ"],
+                            key="xln_bien_phap",
+                        )
+                        so_thang = st.number_input(
+                            "Số tháng đề nghị",
+                            min_value=0,
+                            max_value=120,
+                            value=36,
+                            step=1,
+                            key="xln_so_thang",
+                        )
+                        ke_hoach = st.text_input(
+                            "Kế hoạch trả nợ",
+                            key="xln_ke_hoach",
+                        )
+                        ngay_lap = st.date_input(
+                            "Ngày lập",
+                            value=date.today(),
+                            key="xln_ngay_lap",
+                        )
+                        dia_danh_default = _pgd_plain(ten_pgd_row or ten_pgd or "")
+                        dia_danh = st.text_input(
+                            "Địa danh",
+                            value=dia_danh_default,
+                            key="xln_dia_danh",
+                        )
+
+                    st.markdown("BƯỚC 4 — Xuất")
+                    b1, b2, b3 = st.columns(3)
+                    xuat_01 = b1.form_submit_button("📄 Xuất Word 01/XLN", type="primary")
+                    xuat_02 = b2.form_submit_button("📋 Xuất Word 02/XLN")
+                    xuat_pdf = b3.form_submit_button("📕 Xuất PDF")
+
+                so_tien_thiet_hai_vnd = float(so_tien_thiet_hai_trieu) * 1_000_000.0
+
+                du_lieu_xln = {
+                    "ma_kh": str(row_hstd.get(COT_MA_KH, "") or ""),
+                    "ten_kh": ten_kh,
+                    "dia_chi": dia_chi,
+                    "sdt": sdt,
+                    "so_ku": str(so_ku_chon),
+                    "ten_ct": ten_ct,
+                    "muc_vay": fmt(muc_vay_vnd),
+                    "tong_du_no": fmt(tong_du_no_vnd),
+                    "du_no_goc": fmt(du_no_goc_vnd),
+                    "lai_ton": fmt(lai_ton_vnd),
+                    "nqh": fmt(du_no_qh_vnd),
+                    "ngay_vay": ngay_vay_str,
+                    "ngay_dh": ngay_dh_str,
+                    "ten_to": str(row_hstd.get(COT_TEN_TO, "") or ""),
+                    "dia_danh": str(dia_danh or ""),
+                    "ten_nhcsxh": ten_nhcsxh,
+                    "nguyen_nhan": str(nguyen_nhan or ""),
+                    "bien_phap": str(bien_phap or ""),
+                    "so_thang": str(int(so_thang)),
+                    "so_tien_de_nghi": fmt(tong_du_no_vnd),
+                    "so_tien_thiet_hai": fmt(so_tien_thiet_hai_vnd),
+                    "muc_do_thiet_hai": str(int(muc_do_pct)),
+                    "kha_nang_tra_no": str(kha_nang or ""),
+                    "thuc_trang_du_an": str(thuc_trang or ""),
+                    "ke_hoach_tra_no": str(ke_hoach or ""),
+                    "dia_diem": ten_nhcsxh,
+                    "can_bo_td": st.session_state.get("username", ""),
+                    "ngay_ky": ngay_lap,
+                    "ngay_lap": ngay_lap,
+                    "thanh_phan": [
+                        {
+                            "stt": 1,
+                            "ho_ten": st.session_state.get("username", ""),
+                            "chuc_vu": "Cán bộ tín dụng",
+                            "dai_dien": ten_nhcsxh,
+                        },
+                        {
+                            "stt": 7,
+                            "ho_ten": ten_kh,
+                            "chuc_vu": "",
+                            "dai_dien": "Khách hàng vay vốn",
+                        },
+                    ],
+                }
+
+                if xuat_01:
+                    with st.spinner("Đang tạo 01/XLN..."):
+                        docx_b = _tao_word_01xln(du_lieu_xln)
+                    ten_file = f"Mau01XLN_{str(so_ku_chon) or 'KH'}_{date.today():%d%m%Y}"
+                    nut_tai_word_va_pdf(docx_b, ten_file, "xln_01")
+                    st.session_state["_xln_last_docx"] = docx_b
+                    st.session_state["_xln_last_name"] = ten_file
+                    db.ghi_audit(
+                        username,
+                        "xuat_01xln",
+                        f"so_ku={str(so_ku_chon)} · pgd={ten_nhcsxh} · bien_phap={bien_phap}",
+                    )
+
+                if xuat_02:
+                    with st.spinner("Đang tạo 02/XLN..."):
+                        docx_b = _tao_word_02xln(du_lieu_xln)
+                    ten_file = f"Mau02XLN_{str(so_ku_chon) or 'KH'}_{date.today():%d%m%Y}"
+                    nut_tai_word_va_pdf(docx_b, ten_file, "xln_02")
+                    st.session_state["_xln_last_docx"] = docx_b
+                    st.session_state["_xln_last_name"] = ten_file
+                    db.ghi_audit(
+                        username,
+                        "xuat_02xln",
+                        f"so_ku={str(so_ku_chon)} · pgd={ten_nhcsxh} · bien_phap={bien_phap}",
+                    )
+
+                if xuat_pdf:
+                    src_docx = st.session_state.get("_xln_last_docx")
+                    ten_file = st.session_state.get("_xln_last_name")
+                    if not src_docx:
+                        with st.spinner("Đang tạo 02/XLN để xuất PDF..."):
+                            src_docx = _tao_word_02xln(du_lieu_xln)
+                        ten_file = f"Mau02XLN_{str(so_ku_chon) or 'KH'}_{date.today():%d%m%Y}"
+                    pdf_b = docx_bytes_to_pdf(src_docx)
+                    st.session_state["_xln_pdf_docx"] = src_docx
+                    st.session_state["_xln_pdf_pdf"] = pdf_b
+                    st.session_state["_xln_pdf_name"] = ten_file
+
+                pdf_docx = st.session_state.get("_xln_pdf_docx")
+                if pdf_docx:
+                    ten_pdf = st.session_state.get("_xln_pdf_name", "MauXLN")
+                    pdf_bytes = st.session_state.get("_xln_pdf_pdf")
+                    d1, d2 = st.columns(2)
+                    with d1:
+                        st.download_button(
+                            "⬇️ Tải Word (.docx)",
+                            data=pdf_docx,
+                            file_name=f"{ten_pdf}.docx",
+                            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                            use_container_width=True,
+                            key="xln_pdf_dl_docx",
+                        )
+                    with d2:
+                        if pdf_bytes:
+                            st.download_button(
+                                "⬇️ Tải PDF",
+                                data=pdf_bytes,
+                                file_name=f"{ten_pdf}.pdf",
+                                mime="application/pdf",
+                                use_container_width=True,
+                                key="xln_pdf_dl_pdf",
+                            )
+                        else:
+                            st.caption("⚠️ PDF: cần MS Word trên server. Vẫn có thể tải Word.")
+
+                col_dl_01, col_dl_02 = st.columns(2)
+                with col_dl_01:
+                    hien_thi_nut_tai("xln_01")
+                with col_dl_02:
+                    hien_thi_nut_tai("xln_02")
+
+        st.divider()
+
         # ── Bước 1: Lọc hộ vay ──────────────────────────────────────────
         with st.expander("🔎 Lọc hộ vay", expanded=True):
             c1, c2, c3 = st.columns(3)
@@ -1592,115 +1875,7 @@ def render(tab: DeltaGenerator, **kwargs) -> None:
         # ── Bước 4: Xuất biểu mẫu ───────────────────────────────────────
         if ds_chon is not None and not ds_chon.empty:
             st.markdown("#### 📄 Xuất biểu mẫu")
-            cols_xln = st.columns(2)
-
-            row0 = ds_chon.iloc[0] if not ds_chon.empty else pd.Series()
-            so_ku0 = str(row0.get(COT_SO_KU, "")) if hasattr(row0, "get") else ""
-            row_src = None
-            try:
-                if so_ku0 and df is not None and not df.empty and COT_SO_KU in df.columns:
-                    df_src = df[df[COT_SO_KU].astype(str) == so_ku0]
-                    if not df_src.empty:
-                        row_src = df_src.iloc[0]
-            except Exception:
-                row_src = None
-            if row_src is None:
-                row_src = row0
-
-            ngay_vay_str = ""
-            try:
-                nv = pd.to_datetime(row_src.get(COT_NGAY_VAY, ""), errors="coerce", dayfirst=True)
-                if pd.notna(nv):
-                    ngay_vay_str = nv.strftime("%d/%m/%Y")
-            except Exception:
-                pass
-
-            ngay_dh_str = ""
-            try:
-                ndh = pd.to_datetime(row_src.get(COT_NGAY_DH, ""), errors="coerce", dayfirst=True)
-                if pd.notna(ndh):
-                    ngay_dh_str = ndh.strftime("%d/%m/%Y")
-                else:
-                    ngay_dh_str = str(row_src.get(COT_NGAY_DH, "") or "")
-            except Exception:
-                ngay_dh_str = str(row_src.get(COT_NGAY_DH, "") or "")
-
-            du_no_raw = _num(row_src.get(COT_TONG_DU_NO, 0))
-            lai_ton_raw = _num(row_src.get(COT_LAI_TON, 0))
-            muc_vay_raw = row_src.get(COT_MUC_VAY, du_no_raw) if COT_MUC_VAY in getattr(row_src, "index", []) else du_no_raw
-            muc_vay_num = _num(muc_vay_raw)
-
-            du_lieu_xln = {
-                "ten_kh": str(row_src.get(COT_TEN_KH, "")),
-                "so_ku": so_ku0,
-                "ten_ct": str(row_src.get(COT_TEN_CT, "")),
-                "muc_vay": fmt(muc_vay_num),
-                "tong_du_no": fmt(du_no_raw),
-                "du_no_goc": fmt(du_no_raw),
-                "lai_ton": fmt(lai_ton_raw),
-                "nqh": fmt(_num(row_src.get(COT_DU_NO_QH, 0))),
-                "ngay_vay": ngay_vay_str,
-                "ngay_dh": ngay_dh_str,
-                "ten_to": str(row_src.get(COT_TEN_TO, "")),
-                "dia_chi": str(row_src.get(COT_DIA_CHI, "")) if COT_DIA_CHI in getattr(row_src, "index", []) else "",
-                "dia_danh": ten_pgd or "",
-                "ten_nhcsxh": ten_pgd or "",
-                "nguyen_nhan": locals().get("nguyen_nhan", ""),
-                "bien_phap": locals().get("bien_phap", ""),
-                "so_thang": str(locals().get("so_thang", "")),
-                "so_tien_de_nghi": fmt(du_no_raw),
-                "so_tien_thiet_hai": fmt(du_no_raw),
-                "muc_do_thiet_hai": "",
-                "muc_dich_vay": "",
-                "kha_nang_tra_no": "",
-                "thuc_trang_du_an": "",
-                "tai_san_hien_tai": "",
-                "bien_phap_thu_hoi": "",
-                "ke_hoach_tra_no": "",
-                "to_truong": "",
-                "dia_diem": ten_pgd or "",
-                "can_bo_td": st.session_state.get("username", ""),
-                "ngay_ky": date.today(),
-                "ngay_lap": date.today(),
-                "thanh_phan": [
-                    {
-                        "stt": 1,
-                        "ho_ten": st.session_state.get("username", ""),
-                        "chuc_vu": "Cán bộ tín dụng",
-                        "dai_dien": ten_pgd or "",
-                    },
-                    {
-                        "stt": 7,
-                        "ho_ten": str(row_src.get(COT_TEN_KH, "")),
-                        "chuc_vu": "",
-                        "dai_dien": "Khách hàng vay vốn",
-                    },
-                ],
-            }
-
-            with cols_xln[0]:
-                if st.button(
-                    "📄 Xuất 01/XLN (Đơn KH)",
-                    use_container_width=True,
-                    key="nrr_btn_01xln",
-                ):
-                    with st.spinner("Đang tạo 01/XLN..."):
-                        docx_bytes_01 = _tao_word_01xln(du_lieu_xln)
-                    ten_file_01 = f"Mau01XLN_{so_ku0 or 'KH'}_{date.today().strftime('%d%m%Y')}"
-                    nut_tai_word_va_pdf(docx_bytes_01, ten_file_01, "nrr_01xln")
-                hien_thi_nut_tai("nrr_01xln")
-
-            with cols_xln[1]:
-                if st.button(
-                    "📄 Xuất 02/XLN (Biên bản)",
-                    use_container_width=True,
-                    key="nrr_btn_02xln",
-                ):
-                    with st.spinner("Đang tạo 02/XLN..."):
-                        docx_bytes_02 = _tao_word_02xln(du_lieu_xln)
-                    ten_file_02 = f"Mau02XLN_{so_ku0 or 'KH'}_{date.today().strftime('%d%m%Y')}"
-                    nut_tai_word_va_pdf(docx_bytes_02, ten_file_02, "nrr_02xln")
-                hien_thi_nut_tai("nrr_02xln")
+            st.info("Soạn mẫu 01/02 XLN đã được chuyển sang phần '🧾 Soạn mẫu 01/XLN và 02/XLN' ở phía trên.")
 
             ds_xuat_full = []
             so_hs_khong_nguon = 0

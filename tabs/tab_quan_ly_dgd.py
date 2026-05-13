@@ -168,7 +168,7 @@ def _render_import(role: str, username: str, hn: str) -> None:
                         db.ghi_audit(username, "import_dgd_map_loi", f"[{hn}] {e}")
                         st.error(f"❌ Lỗi: {e}")
             with c2:
-                if role != "admin":
+                if normalize_role(role) != "admin_cn":
                     st.caption('Nút "Thay thế toàn bộ" chỉ dành cho admin.')
                 elif st.button("Thay thế toàn bộ dgd_map", type="secondary", key="dgd_replace_all"):
                     try:

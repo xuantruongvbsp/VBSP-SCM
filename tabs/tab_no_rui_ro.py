@@ -1,14 +1,22 @@
 """Xử lý nợ rủi ro theo QĐ 62/2015/QĐ-TTg — 5 bước: lọc, chọn, nhập, xuất, xem lại."""
 from __future__ import annotations
 
+import io
 from datetime import date, datetime
 
 import pandas as pd
 import streamlit as st
+from docx import Document
+from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.shared import Cm, Pt
 from streamlit.delta_generator import DeltaGenerator
 
 import db
 from config import (
+    COT_DIA_CHI,
+    COT_LAI_TON,
+    COT_NGAY_DH,
+    COT_NGAY_VAY,
     COT_TEN_XA,
     COT_TEN_TO,
     COT_TEN_KH,
@@ -32,6 +40,288 @@ from services.template_service import (
     TMPL_TT_KHOANH,
     TMPL_TT_XOA,
 )
+
+
+def _style_doc_xln(doc: Document) -> None:
+    style = doc.styles["Normal"]
+    style.font.name = "Times New Roman"
+    style.font.size = Pt(12)
+
+
+def _add_header_xln(doc: Document, dia_danh: str, ngay_ky: date) -> None:
+    """Header Quốc hiệu + ngày tháng, không có số VB (mẫu đơn cá nhân)."""
+    from docx.oxml import OxmlElement
+    from docx.oxml.ns import qn
+
+    t = doc.add_table(rows=1, cols=2)
+    t.style = "Table Grid"
+    for cell in t.rows[0].cells:
+        tc = cell._tc
+        tcPr = tc.get_or_add_tcPr()
+        tcBorders = OxmlElement("w:tcBorders")
+        for bn in ["top", "left", "bottom", "right"]:
+            b = OxmlElement(f"w:{bn}")
+            b.set(qn("w:val"), "none")
+            tcBorders.append(b)
+        tcPr.append(tcBorders)
+
+    cell_l = t.rows[0].cells[0]
+    cell_l.paragraphs[0].add_run("Mẫu số 01/XLN")
+
+    cell_r = t.rows[0].cells[1]
+    p3 = cell_r.paragraphs[0]
+    p3.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    p3.add_run("CỘNG HOÀ XÃ HỘI CHỦ NGHĨA VIỆT NAM").bold = True
+    p4 = cell_r.add_paragraph("Độc lập - Tự do - Hạnh phúc")
+    p4.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    p4.runs[0].bold = True
+    p5 = cell_r.add_paragraph(
+        f"{dia_danh}, ngày {ngay_ky.day} tháng {ngay_ky.month} năm {ngay_ky.year}"
+    )
+    p5.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    doc.add_paragraph()
+
+
+def _tao_word_01xln(du_lieu: dict) -> bytes:
+    """Mẫu 01/XLN — Đơn đề nghị xử lý nợ (KH tự viết)."""
+    doc = Document()
+    _style_doc_xln(doc)
+    for section in doc.sections:
+        section.top_margin = Cm(2.5)
+        section.bottom_margin = Cm(2.5)
+        section.left_margin = Cm(3)
+        section.right_margin = Cm(2)
+
+    _add_header_xln(
+        doc,
+        dia_danh=du_lieu.get("dia_danh", ""),
+        ngay_ky=du_lieu.get("ngay_ky", date.today()),
+    )
+
+    t = doc.add_paragraph()
+    t.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    r = t.add_run("ĐƠN ĐỀ NGHỊ XỬ LÝ NỢ")
+    r.bold = True
+    r.font.size = Pt(14)
+
+    doc.add_paragraph(
+        f"Kính gửi: Ngân hàng Chính sách xã hội {du_lieu.get('ten_nhcsxh','')}"
+    )
+    doc.add_paragraph()
+
+    doc.add_paragraph(
+        f"Tên tôi là: {du_lieu.get('ten_kh','')}\n"
+        f"Hiện cư trú tại: {du_lieu.get('dia_chi','')}\n"
+        f"Là thành viên của Tổ TK&VV: {du_lieu.get('ten_to','')} "
+        f"do ông (bà): {du_lieu.get('to_truong','')} làm Tổ trưởng"
+    )
+    doc.add_paragraph(
+        f"1. Theo HĐTD (sổ Vay vốn) số {du_lieu.get('so_ku','')}, "
+        f"ngày {du_lieu.get('ngay_vay','')}, tôi có đứng tên vay vốn "
+        f"chương trình {du_lieu.get('ten_ct','')} tại NHCSXH "
+        f"{du_lieu.get('ten_nhcsxh','')}.\n"
+        f"    Số tiền vay: {du_lieu.get('muc_vay','')} đồng; "
+        f"Hạn trả nợ: {du_lieu.get('ngay_dh','')}; "
+        f"Mục đích vay vốn: {du_lieu.get('muc_dich_vay','')}\n"
+        f"    Hiện nay, tôi còn nợ Ngân hàng số tiền: "
+        f"{du_lieu.get('tong_du_no','')} đồng\n"
+        f"    (Trong đó: Nợ gốc: {du_lieu.get('du_no_goc','')} đồng; "
+        f"Nợ lãi: {du_lieu.get('lai_ton','')} đồng)"
+    )
+    doc.add_paragraph(f"2. Trong thời gian vừa qua do:\n{du_lieu.get('nguyen_nhan','')}")
+    doc.add_paragraph(
+        "3. Số vốn, tài sản của dự án bị thiệt hại:\n"
+        f"    - Số vốn và tài sản bị thiệt hại: {du_lieu.get('so_tien_thiet_hai','')} đồng\n"
+        f"    - Tổng số vốn thực hiện dự án: {du_lieu.get('muc_vay','')} đồng\n"
+        f"    - Mức độ thiệt hại: {du_lieu.get('muc_do_thiet_hai','')}%"
+    )
+    doc.add_paragraph(
+        "4. Tình hình kinh tế, khả năng trả nợ sau khi gặp rủi ro:\n"
+        f"{du_lieu.get('kha_nang_tra_no','')}"
+    )
+    doc.add_paragraph(
+        f"Vậy tôi làm đơn này đề nghị NHCSXH {du_lieu.get('ten_nhcsxh','')} "
+        f"xem xét {du_lieu.get('bien_phap','')} số nợ bị rủi ro, cụ thể:\n"
+        f"    - Số tiền đề nghị: {du_lieu.get('so_tien_de_nghi','')} đồng\n"
+        f"      (Nợ gốc: {du_lieu.get('du_no_goc','')} đồng; "
+        f"Nợ lãi: {du_lieu.get('lai_ton','')} đồng)\n"
+        f"    - Thời gian đề nghị: {du_lieu.get('so_thang','')} tháng\n"
+        f"    - Kế hoạch trả nợ: {du_lieu.get('ke_hoach_tra_no','')}"
+    )
+    doc.add_paragraph(
+        "Tôi xin cam đoan và chịu trách nhiệm trước pháp luật về nội dung "
+        "kê khai trên đơn và các hồ sơ giấy tờ chứng minh là đúng."
+    )
+
+    doc.add_paragraph()
+    p_ky = doc.add_paragraph()
+    p_ky.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    d_ky = du_lieu.get("ngay_ky", date.today())
+    p_ky.add_run(
+        f"Ngày {d_ky.day} tháng {d_ky.month} năm {d_ky.year}\n"
+        "Người làm đơn\n(Ký, ghi rõ họ tên)\n\n\n\n"
+        f"{du_lieu.get('ten_kh','')}"
+    )
+
+    buf = io.BytesIO()
+    doc.save(buf)
+    return buf.getvalue()
+
+
+def _tao_word_02xln(du_lieu: dict) -> bytes:
+    """Mẫu 02/XLN — Biên bản đề nghị xử lý nợ bị rủi ro (nhiều bên ký)."""
+    from docx.oxml import OxmlElement
+    from docx.oxml.ns import qn
+
+    doc = Document()
+    _style_doc_xln(doc)
+    for section in doc.sections:
+        section.top_margin = Cm(2.5)
+        section.bottom_margin = Cm(2.5)
+        section.left_margin = Cm(3)
+        section.right_margin = Cm(2)
+
+    _add_header_xln(
+        doc, dia_danh=du_lieu.get("dia_danh", ""), ngay_ky=du_lieu.get("ngay_lap", date.today())
+    )
+    if doc.tables:
+        cell = doc.tables[0].rows[0].cells[0]
+        if cell.paragraphs and cell.paragraphs[0].runs:
+            cell.paragraphs[0].runs[0].text = "Mẫu số 02/XLN"
+            for rr in cell.paragraphs[0].runs[1:]:
+                rr.text = ""
+        else:
+            cell.text = "Mẫu số 02/XLN"
+
+    t = doc.add_paragraph()
+    t.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    t.add_run("BIÊN BẢN\nĐề nghị xử lý nợ bị rủi ro").bold = True
+    p_ct = doc.add_paragraph(f"(Chương trình {du_lieu.get('ten_ct','')})")
+    p_ct.alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+    ngay_lap = du_lieu.get("ngay_lap", date.today())
+    doc.add_paragraph(
+        f"Hôm nay, ngày {ngay_lap.day} tháng {ngay_lap.month} "
+        f"năm {ngay_lap.year}, tại {du_lieu.get('dia_diem','')}, "
+        "chúng tôi gồm có:"
+    )
+
+    thanh_phan = du_lieu.get("thanh_phan", [])
+    for i, tp in enumerate(thanh_phan, 1):
+        doc.add_paragraph(
+            f"{i}. Ông (bà) {tp.get('ho_ten','')}   "
+            f"Chức vụ: {tp.get('chuc_vu','')}   "
+            f"Đại diện: {tp.get('dai_dien','')}"
+        )
+    for i in range(len(thanh_phan) + 1, 8):
+        doc.add_paragraph(
+            f"{i}. Ông (bà) ....................................   "
+            "Chức vụ: ....................   "
+            "Đại diện: ......................"
+        )
+
+    doc.add_paragraph(
+        "Đã tiến hành thẩm tra và lập biên bản đề nghị xử lý nợ bị rủi ro "
+        f"của ông (bà): {du_lieu.get('ten_kh','')}  "
+        f"địa chỉ: {du_lieu.get('dia_chi','')}\n"
+        "Là đại diện hộ gia đình vay vốn NHCSXH theo HĐTD số "
+        f"{du_lieu.get('so_ku','')} ngày {du_lieu.get('ngay_vay','')}, "
+        f"có mã món vay: {du_lieu.get('so_ku','')}. Cụ thể như sau:"
+    )
+
+    p = doc.add_paragraph("I. Nguyên nhân khách hàng bị rủi ro:")
+    p.runs[0].bold = True
+    doc.add_paragraph(du_lieu.get("nguyen_nhan", ""))
+
+    p = doc.add_paragraph("II. Xác định mức độ thiệt hại về vốn và tài sản:")
+    p.runs[0].bold = True
+    doc.add_paragraph(
+        "1. Số vốn và tài sản bị thiệt hại: "
+        f"{du_lieu.get('so_tien_thiet_hai','')} đồng\n"
+        f"2. Tổng số vốn thực hiện dự án: {du_lieu.get('muc_vay','')} đồng\n"
+        f"3. Đánh giá mức độ thiệt hại: {du_lieu.get('muc_do_thiet_hai','')}%"
+    )
+
+    p = doc.add_paragraph("III. Dư nợ tại NHCSXH đến ngày lập biên bản:")
+    p.runs[0].bold = True
+    doc.add_paragraph(
+        f"Tổng số nợ còn phải trả: {du_lieu.get('tong_du_no','')} đồng\n"
+        f"    Trong đó:  + Nợ gốc: {du_lieu.get('du_no_goc','')} đồng\n"
+        f"               + Nợ lãi: {du_lieu.get('lai_ton','')} đồng"
+    )
+
+    p = doc.add_paragraph("IV. Đánh giá thực trạng dự án, tài sản và khả năng trả nợ:")
+    p.runs[0].bold = True
+    doc.add_paragraph(
+        "1. Đánh giá thực trạng dự án / phương án khôi phục:\n"
+        f"{du_lieu.get('thuc_trang_du_an','')}\n\n"
+        "2. Tài sản hiện tại của khách hàng:\n"
+        f"{du_lieu.get('tai_san_hien_tai','')}\n\n"
+        "3. Đánh giá khả năng trả nợ:\n"
+        f"{du_lieu.get('kha_nang_tra_no','')}\n\n"
+        "4. Về việc áp dụng biện pháp thu hồi nợ:\n"
+        f"{du_lieu.get('bien_phap_thu_hoi','')}"
+    )
+
+    p = doc.add_paragraph("V. Đề xuất biện pháp xử lý:")
+    p.runs[0].bold = True
+    doc.add_paragraph(
+        f"Chúng tôi nhất trí đề nghị NHCSXH xem xét {du_lieu.get('bien_phap','')} "
+        f"cho ông (bà) {du_lieu.get('ten_kh','')} với thời gian "
+        f"{du_lieu.get('so_thang','')} tháng, số tiền "
+        f"{du_lieu.get('so_tien_de_nghi','')} đồng.\n"
+        f"    Trong đó:  + Nợ gốc: {du_lieu.get('du_no_goc','')} đồng\n"
+        f"               + Nợ lãi: {du_lieu.get('lai_ton','')} đồng\n"
+        "Biên bản này lập thành 02 bản có giá trị pháp lý như nhau."
+    )
+
+    doc.add_paragraph()
+    ky = doc.add_table(rows=1, cols=3)
+    ky.style = "Table Grid"
+    for cell in ky.rows[0].cells:
+        tc = cell._tc
+        tcPr = tc.get_or_add_tcPr()
+        tcBorders = OxmlElement("w:tcBorders")
+        for bn in ["top", "left", "bottom", "right"]:
+            b = OxmlElement(f"w:{bn}")
+            b.set(qn("w:val"), "none")
+            tcBorders.append(b)
+        tcPr.append(tcBorders)
+
+    def _ky(cell, nhan: str, ten: str = ""):
+        p = cell.paragraphs[0]
+        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        p.add_run(f"{nhan}\n(Ký, ghi rõ họ tên)\n\n\n\n{ten}")
+
+    _ky(
+        ky.rows[0].cells[0],
+        "ĐẠI DIỆN KHÁCH HÀNG\nĐẠI DIỆN UBND CẤP XÃ",
+        du_lieu.get("ten_kh", ""),
+    )
+    _ky(ky.rows[0].cells[1], "TỔ TRƯỞNG TỔ TK&VV\nĐẠI DIỆN HỘI ĐOÀN THỂ")
+    _ky(
+        ky.rows[0].cells[2],
+        "CÁN BỘ TÍN DỤNG\nĐẠI DIỆN NHCSXH",
+        du_lieu.get("can_bo_td", ""),
+    )
+
+    ky2 = doc.add_table(rows=1, cols=2)
+    ky2.style = "Table Grid"
+    for cell in ky2.rows[0].cells:
+        tc = cell._tc
+        tcPr = tc.get_or_add_tcPr()
+        tcBorders = OxmlElement("w:tcBorders")
+        for bn in ["top", "left", "bottom", "right"]:
+            b = OxmlElement(f"w:{bn}")
+            b.set(qn("w:val"), "none")
+            tcBorders.append(b)
+        tcPr.append(tcBorders)
+    _ky(ky2.rows[0].cells[0], "ĐẠI DIỆN CƠ QUAN CÔNG AN CẤP XÃ\n(Xác nhận, ký tên, đóng dấu)")
+    _ky(ky2.rows[0].cells[1], "ĐẠI DIỆN TỔ CHỨC, CÁ NHÂN LIÊN QUAN (nếu có)")
+
+    buf = io.BytesIO()
+    doc.save(buf)
+    return buf.getvalue()
 
 
 def _lay_pgd_tu_user(role: str, pgd_user: str | None, df: pd.DataFrame) -> str | None:
@@ -221,6 +511,130 @@ def render(tab: DeltaGenerator, **kwargs) -> None:
         # ── Bước 4: Xuất biểu mẫu ───────────────────────────────────────
         if ds_chon is not None and not ds_chon.empty:
             st.markdown("#### 📄 Xuất biểu mẫu")
+            cols_xln = st.columns(2)
+
+            row0 = ds_chon.iloc[0] if not ds_chon.empty else pd.Series()
+            so_ku0 = str(row0.get(COT_SO_KU, "")) if hasattr(row0, "get") else ""
+            row_src = None
+            try:
+                if so_ku0 and df is not None and not df.empty and COT_SO_KU in df.columns:
+                    df_src = df[df[COT_SO_KU].astype(str) == so_ku0]
+                    if not df_src.empty:
+                        row_src = df_src.iloc[0]
+            except Exception:
+                row_src = None
+            if row_src is None:
+                row_src = row0
+
+            def _num(v) -> float:
+                if v is None:
+                    return 0.0
+                if isinstance(v, (int, float)):
+                    return float(v)
+                s = str(v).strip()
+                if not s:
+                    return 0.0
+                s = s.replace(" ", "").replace(".", "").replace(",", ".")
+                try:
+                    return float(s)
+                except Exception:
+                    return 0.0
+
+            ngay_vay_str = ""
+            try:
+                nv = pd.to_datetime(row_src.get(COT_NGAY_VAY, ""), errors="coerce", dayfirst=True)
+                if pd.notna(nv):
+                    ngay_vay_str = nv.strftime("%d/%m/%Y")
+            except Exception:
+                pass
+
+            ngay_dh_str = ""
+            try:
+                ndh = pd.to_datetime(row_src.get(COT_NGAY_DH, ""), errors="coerce", dayfirst=True)
+                if pd.notna(ndh):
+                    ngay_dh_str = ndh.strftime("%d/%m/%Y")
+                else:
+                    ngay_dh_str = str(row_src.get(COT_NGAY_DH, "") or "")
+            except Exception:
+                ngay_dh_str = str(row_src.get(COT_NGAY_DH, "") or "")
+
+            du_no_raw = _num(row_src.get(COT_TONG_DU_NO, 0))
+            lai_ton_raw = _num(row_src.get(COT_LAI_TON, 0))
+            muc_vay_raw = row_src.get("Mức cho vay", du_no_raw)
+            muc_vay_num = _num(muc_vay_raw)
+
+            du_lieu_xln = {
+                "ten_kh": str(row_src.get(COT_TEN_KH, "")),
+                "so_ku": so_ku0,
+                "ten_ct": str(row_src.get(COT_TEN_CT, "")),
+                "muc_vay": fmt(muc_vay_num),
+                "tong_du_no": fmt(du_no_raw),
+                "du_no_goc": fmt(du_no_raw),
+                "lai_ton": fmt(lai_ton_raw),
+                "nqh": fmt(_num(row_src.get(COT_DU_NO_QH, 0))),
+                "ngay_vay": ngay_vay_str,
+                "ngay_dh": ngay_dh_str,
+                "ten_to": str(row_src.get(COT_TEN_TO, "")),
+                "dia_chi": str(row_src.get(COT_DIA_CHI, "")) if COT_DIA_CHI in getattr(row_src, "index", []) else "",
+                "dia_danh": ten_pgd or "",
+                "ten_nhcsxh": ten_pgd or "",
+                "nguyen_nhan": nguyen_nhan if "nguyen_nhan" in locals() else "",
+                "bien_phap": bien_phap if "bien_phap" in locals() else "",
+                "so_thang": str(so_thang) if "so_thang" in locals() else "",
+                "so_tien_de_nghi": fmt(du_no_raw),
+                "so_tien_thiet_hai": fmt(du_no_raw),
+                "muc_do_thiet_hai": "",
+                "muc_dich_vay": "",
+                "kha_nang_tra_no": "",
+                "thuc_trang_du_an": "",
+                "tai_san_hien_tai": "",
+                "bien_phap_thu_hoi": "",
+                "ke_hoach_tra_no": "",
+                "to_truong": "",
+                "dia_diem": ten_pgd or "",
+                "can_bo_td": st.session_state.get("username", ""),
+                "ngay_ky": date.today(),
+                "ngay_lap": date.today(),
+                "thanh_phan": [
+                    {
+                        "stt": 1,
+                        "ho_ten": st.session_state.get("username", ""),
+                        "chuc_vu": "Cán bộ tín dụng",
+                        "dai_dien": ten_pgd or "",
+                    },
+                    {
+                        "stt": 7,
+                        "ho_ten": str(row_src.get(COT_TEN_KH, "")),
+                        "chuc_vu": "",
+                        "dai_dien": "Khách hàng vay vốn",
+                    },
+                ],
+            }
+
+            with cols_xln[0]:
+                if st.button(
+                    "📄 Xuất 01/XLN (Đơn KH)",
+                    use_container_width=True,
+                    key="nrr_btn_01xln",
+                ):
+                    with st.spinner("Đang tạo 01/XLN..."):
+                        docx_bytes_01 = _tao_word_01xln(du_lieu_xln)
+                    ten_file_01 = f"Mau01XLN_{so_ku0 or 'KH'}_{date.today().strftime('%d%m%Y')}"
+                    nut_tai_word_va_pdf(docx_bytes_01, ten_file_01, "nrr_01xln")
+                hien_thi_nut_tai("nrr_01xln")
+
+            with cols_xln[1]:
+                if st.button(
+                    "📄 Xuất 02/XLN (Biên bản)",
+                    use_container_width=True,
+                    key="nrr_btn_02xln",
+                ):
+                    with st.spinner("Đang tạo 02/XLN..."):
+                        docx_bytes_02 = _tao_word_02xln(du_lieu_xln)
+                    ten_file_02 = f"Mau02XLN_{so_ku0 or 'KH'}_{date.today().strftime('%d%m%Y')}"
+                    nut_tai_word_va_pdf(docx_bytes_02, ten_file_02, "nrr_02xln")
+                hien_thi_nut_tai("nrr_02xln")
+
             cols_btn = st.columns(3)
 
             ds_xuat = []

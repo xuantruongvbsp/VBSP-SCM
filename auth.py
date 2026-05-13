@@ -684,7 +684,7 @@ def _render_mapping_pgd_xa(username: str) -> None:
                 
                 st.download_button(
                     label="⬇️ Tải file mapping_pgd_xa.xlsx",
-                    data=output,
+                    data=output.getvalue(),
                     file_name=f"mapping_pgd_xa_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     key="dl_pgd_xa_export"

@@ -1,5 +1,17 @@
 # CHANGELOG
 
+## [2026-05-14] — Mở rộng bảng "Cơ cấu dư nợ theo chương trình tín dụng" — thêm 6 cột + sửa đơn vị
+- `tabs/tab_tongquan.py` dòng ~197 — Cập nhật `_tao_column_config_co_cau()` với config cho 9 cột mới
+- `tabs/tab_tongquan.py` dòng ~587 — Sửa `/1e9` → `/1e12` cho tất cả cột tiền tệ (theo quy ước `fmt_ty()`)
+- `tabs/tab_tongquan.py` dòng ~619 — Thêm cột Dư nợ QH (tỷ) + Tỷ lệ QH % từ `COT_DU_NO_QH`
+- `tabs/tab_tongquan.py` dòng ~627 — Thêm cột Dư nợ khoanh (tỷ) từ cột `"Dư nợ khoanh"` nếu tồn tại
+- `tabs/tab_tongquan.py` dòng ~635 — Thêm cột Giải ngân năm (tỷ) từ `HSTD_DS_CHO_VAY_NAM_ALIASES`
+- `tabs/tab_tongquan.py` dòng ~643 — Thêm cột Thu nợ năm (tỷ) từ `HSTD_THU_NO_NAM_ALIASES`
+
+## [2026-05-14] — An toàn + Hiệu năng: NQ11 query user PGD dùng JOIN DataFrame thay IN chuỗi + cache session_state
+- `app.py` dòng ~534–556 — Thay SQL `IN ('KH001','KH002',...)` build bằng string join thành DuckDB `JOIN` trực tiếp với `makh_df` (pandas DataFrame), tránh SQL injection + chuỗi SQL khổng lồ, không cần register/unregister
+- `app.py` dòng ~534 — Cache kết quả vào `st.session_state["nq11_pgd_cache"]` với 3 trường: `data`, `ts_nq11 = ts_file(CACHE_NQ11)`, `pgd_user`. Chỉ query lại khi file NQ11 hoặc pgd_user thay đổi
+
 ## [2026-05-14] — Lazy import workspace: ws_management & ws_operation, chuyển ~30 import tab vào trong render()
 - `workspaces/ws_management.py` — Xóa 24 dòng import tab top-level; thêm lazy imports vào `render()` (16 tab) + `_render_canh_bao()` (render_den_han) + `_render_dgd_to_tkvv()` (tab_quan_ly_dgd, tab_cdtotkvv)
 - `workspaces/ws_operation.py` — Xóa 22 dòng import tab top-level; thêm lazy imports vào `render()` (17 tab + render_den_han)

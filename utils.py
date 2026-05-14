@@ -230,6 +230,8 @@ def fmt_ty(x):
     """Đồng → tỷ ngắn gọn (dùng trong bảng so sánh Điện báo)."""
     try:
         x = float(x)
+        if x != x or x == float('inf') or x == float('-inf'):
+            return "—"
         ty = x / 1e9
         if abs(ty) >= 1:
             return f"{vn(ty, 3)} tỷ"

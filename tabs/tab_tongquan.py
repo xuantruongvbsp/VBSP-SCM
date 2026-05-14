@@ -293,17 +293,17 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
             .tq-caption{color:#4b5563;font-size:0.96rem;margin:-6px 0 14px 0}
             .tq-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:14px}
             .tq-card{border-radius:10px;padding:12px 14px;border:1px solid #e0e7ef;background:#f8fafc;min-height:84px;position:relative;overflow:hidden}
-.tq-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--tq-color,#6366f1)}
-.tq-card h4{margin:0 0 6px 0;font-size:0.95rem;font-weight:600;color:#374151}
-.tq-card .val{font-size:2.05rem;line-height:1.05;font-weight:700;color:#111827;margin:0}
-.tq-card .sub{font-size:0.88rem;color:#4b5563;margin-top:3px}
-.tq-card .sub.up{color:#1f7a35;font-weight:600}
-.tq-card.soft-blue{background:#eff6ff;border-color:#bfdbfe;--tq-color:#3b82f6}
-.tq-card.soft-indigo{background:#eef2ff;border-color:#c7d2fe;--tq-color:#6366f1}
-.tq-card.soft-green{background:#f0fdf4;border-color:#bbf7d0;--tq-color:#22c55e}
-.tq-card.soft-red{background:#fef2f2;border-color:#fecaca;--tq-color:#ef4444}
-.tq-card.soft-amber{background:#fffbeb;border-color:#fde68a;--tq-color:#f59e0b}
-.tq-card.soft-purple{background:#faf5ff;border-color:#e9d5ff;--tq-color:#a855f7}
+            .tq-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--tq-color,#6366f1)}
+            .tq-card h4{margin:0 0 6px 0;font-size:0.95rem;font-weight:600;color:#374151}
+            .tq-card .val{font-size:2.05rem;line-height:1.05;font-weight:700;color:#111827;margin:0}
+            .tq-card .sub{font-size:0.88rem;color:#4b5563;margin-top:3px}
+            .tq-card .sub.up{color:#1f7a35;font-weight:600}
+            .tq-card.soft-blue{background:#eff6ff;border-color:#bfdbfe;--tq-color:#3b82f6}
+            .tq-card.soft-indigo{background:#eef2ff;border-color:#c7d2fe;--tq-color:#6366f1}
+            .tq-card.soft-green{background:#f0fdf4;border-color:#bbf7d0;--tq-color:#22c55e}
+            .tq-card.soft-red{background:#fef2f2;border-color:#fecaca;--tq-color:#ef4444}
+            .tq-card.soft-amber{background:#fffbeb;border-color:#fde68a;--tq-color:#f59e0b}
+            .tq-card.soft-purple{background:#faf5ff;border-color:#e9d5ff;--tq-color:#a855f7}
             .totkvv-wrap{border:1px solid #e5e7eb;border-radius:12px;padding:12px 14px;margin:4px 0 8px 0;background:#fff}
             .totkvv-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
             .totkvv-title{font-size:1.02rem;font-weight:700;color:#202938}
@@ -421,7 +421,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                     <div class="sub">{'⚠️ Cần theo dõi' if tlk >= 0.5 else 'Trong kiểm soát'}</div>
                 </div>
                 <div class="tq-card {no_xau_class}">
-                    <h4>Tỷ lệ nợ xấu (NPL)</h4>
+                    <h4>Tỷ lệ nợ xấu (NX)</h4>
                     <p class="val">{_tl_no_xau}%</p>
                     <div class="sub">= (QH + Khoanh) / Tổng dư nợ</div>
                 </div>

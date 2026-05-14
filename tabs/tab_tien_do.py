@@ -255,6 +255,39 @@ def _render_tao_task(tab, **kwargs):
     with _tab_ctx:
         st.subheader("➕ Tạo đầu việc mới")
 
+        with st.expander("📖 Hướng dẫn tạo đầu việc", expanded=False):
+            st.markdown("""
+**1. Tên đầu việc** — Đặt tên ngắn gọn, rõ ràng.
+VD: *Nộp hồ sơ rủi ro tháng 5/2026*, *Khảo sát nhu cầu vay vốn Q2*
+
+**2. Mô tả / Hướng dẫn** — Ghi rõ nội dung cần thực hiện, tài liệu tham khảo,
+lưu ý đặc biệt để PGD/CBTD biết cần làm gì.
+
+**3. Loại** — Phân loại đầu việc:
+- 📋 Công việc chung — việc hành chính, tổng hợp
+- 🗂️ Hồ sơ rủi ro — liên quan nợ xấu, NQH
+- 📊 Khảo sát nhu cầu — điều tra nhu cầu vay vốn
+- 📄 Báo cáo — các loại báo cáo định kỳ
+- 🎓 Tập huấn — đào tạo, hướng dẫn nghiệp vụ
+
+**4. Loại theo dõi** — Quan trọng!
+- 📍 **Chi tiết từng xã** — hệ thống tạo 1 dòng theo dõi cho mỗi xã/phường
+  → Dùng khi cần biết xã nào đã làm, xã nào chưa
+- 🏢 **Chung PGD** — hệ thống tạo 1 dòng theo dõi cho mỗi PGD
+  → Dùng khi chỉ cần biết PGD đã hoàn thành chưa
+
+**5. Ưu tiên** — 🔴 Khẩn cấp / 🟡 Quan trọng / 🟢 Bình thường
+Ảnh hưởng màu sắc hiển thị trong biểu đồ tổng quan.
+
+**6. Ngày bắt đầu & Hạn hoàn thành** — Xác định khung thời gian.
+Sau deadline hệ thống tự đánh dấu 🔴 trễ hạn.
+
+**7. Áp dụng cho đơn vị** — Mặc định tất cả 22 đơn vị.
+Bỏ chọn nếu chỉ áp dụng cho một số PGD cụ thể.
+
+**8. Người phụ trách** — Ghi tên cán bộ chịu trách nhiệm theo dõi đầu việc này.
+            """)
+
         with st.form("form_tao_task", clear_on_submit=True):
             tieu_de = st.text_input("Tên đầu việc *",
                                     placeholder="VD: Nộp hồ sơ rủi ro tháng 5/2026")

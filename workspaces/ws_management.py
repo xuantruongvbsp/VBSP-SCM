@@ -35,23 +35,6 @@ from utils import (
     auto_fill_document,
     hien_thi_dataframe_phan_trang,
 )
-from tabs import (
-    tab_tongquan, tab_baocao, tab_nq11,
-    tab_candoi, tab_cbtd, tab_khtd, tab_kehoach,
-    tab_nhiem_vu, tab_cdtotkvv, tab_khtd_giao_dc, tab_kiem_soat,
-    tab_ban_dai_dien,
-    tab_uy_thac,
-    tab_qd62,
-    tab_tien_do,
-    tab_tien_do_nop,
-)
-from tabs import tab_checklist_bc
-from tabs import tab_xlrr_tong_hop
-from tabs import tab_upload_khnv
-from tabs import tab_quan_ly_dgd
-from tabs import tab_audit_log
-from tabs.tab_kh_gqvl import render as render_kh_gqvl
-from tabs.tab_den_han import render as render_den_han
 
 
 def _render_canh_bao(df: pd.DataFrame, ds_pgd_all: list):
@@ -59,6 +42,8 @@ def _render_canh_bao(df: pd.DataFrame, ds_pgd_all: list):
     Tab Cảnh báo sớm — Migration & 3 tháng không hoạt động.
     Hiển thị bảng Top đơn vị cần chấn chỉnh + xuất KL giao ban.
     """
+    from tabs.tab_den_han import render as render_den_han
+
     st.subheader("🚨 Cảnh báo sớm — Phân loại nợ & 3 tháng không HĐ")
 
     if df is None or df.empty:
@@ -421,6 +406,9 @@ def _hien_thi_nqh_tab(df_kh: pd.DataFrame, username: str):
 
 def _render_dgd_to_tkvv(tab_parent=None, **kw):
     """Sub-tab Điểm GD & Tổ TK&VV — nested tabs."""
+    from tabs import tab_quan_ly_dgd
+    from tabs import tab_cdtotkvv
+
     if tab_parent is not None:
         ctx = tab_parent
     else:

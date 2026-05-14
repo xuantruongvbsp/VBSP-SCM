@@ -7,6 +7,13 @@
 - `tabs/tab_tien_do.py` — `_render_tong_quan()`: thêm filter "Loại nhiệm vụ" (Tất cả/Chung PGD/Chi tiết xã); KPI labels generic (✅ Hoàn thành, 🔴 Trễ hạn)
 - `tabs/tab_tien_do.py` — `_render_cap_nhat()`: hiển thị tag 🏢 Chung PGD / 🏘️ Chi tiết xã bên cạnh tên task
 
+## [2026-05-14] — Cải thiện Dashboard: sắp xếp KPI, thêm biểu đồ Top 10, bảng PGD dễ đọc hơn
+- `tabs/tab_tongquan.py` dòng ~380 — Sắp xếp lại 10 KPI Cards: Hàng 1 (Món vay, KH, Dư nợ, Trong hạn) → Hàng 2 (QH, TL QH, Khoanh, TL Khoanh) → Hàng 3 (NPL, 3m KHD)
+- `tabs/tab_tongquan.py` dòng ~635 — Thêm biểu đồ Plotly stacked bar ngang "Top 10 chương trình theo dư nợ" (xanh TW + cam ĐP)
+- `tabs/tab_tongquan.py` dòng ~1078 — Header bảng PGD tăng font 0.78/0.82rem → 13px
+- `tabs/tab_tongquan.py` dòng ~1094 — Zebra stripes rõ hơn (#F5F7FA / #FFFFFF), dòng tổng nền #C8E6C9 đậm + font 0.84rem
+- `tabs/tab_tongquan.py` dòng ~1098 — Cột % đỏ nếu vượt ngưỡng: TL QH > 0.5%, TL NPL > 0.3%, TL Khoanh > 1%
+
 ## [2026-05-14] — Fix tách nguồn TW/ĐP dùng `Nguồn vốn` thay vì map tên + sửa alias thu nợ
 - `config.py` dòng ~263 — Sửa `HSTD_THU_NO_NAM_ALIASES` từ 6 alias sai (`"trong năm"`, chữ thường `"năm"`) → 3 alias đúng (`"Thu nợ TH Năm"`, `"Thu nợ QH Năm"`, `"Thu nợ Khoanh Năm"`)
 - `tabs/tab_tongquan.py` dòng ~548 — Bỏ `_NGUON_MAP` (map tên chương trình → TW/DP, `.fillna("TW")` sai DP)

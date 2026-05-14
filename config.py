@@ -261,12 +261,9 @@ HSTD_DS_CHO_VAY_NAM_ALIASES = (
     "Giải ngân năm",
 )
 HSTD_THU_NO_NAM_ALIASES = (
-    "Thu nợ TH trong năm",
-    "Thu nợ QH trong năm",
-    "Thu nợ khoanh trong năm",
-    "Thu nợ TH năm",
-    "Thu nợ QH năm",
-    "Thu nợ khoanh năm",
+    "Thu nợ TH Năm",
+    "Thu nợ QH Năm",
+    "Thu nợ Khoanh Năm",
 )
 
 DB_HT_CACHE   = str(CACHE_DIR / "dienbao_ht.xlsx")

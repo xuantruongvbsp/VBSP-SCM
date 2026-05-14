@@ -106,7 +106,7 @@ def _render_tong_quan(tab, **kwargs):
 
         c1, c2, c3 = st.columns([2, 1, 1])
         with c1:
-            ngay_loc = st.date_input("Deadline đến ngày",
+            ngay_loc = st.date_input("Thời hạn đến ngày",
                                      value=date.today(), key="td_ngay")
         with c2:
             loai_loc = st.selectbox("Lọc loại", ["Tất cả"] + list(LOAI_TASK.values()),
@@ -189,7 +189,7 @@ def _render_tong_quan(tab, **kwargs):
                 "Đầu việc": t["tieu_de"][:35],
                 "% Hoàn thành": round(xong / tong * 100) if tong else 0,
                 "Ưu tiên": UU_TIEN.get(t["uu_tien"], ""),
-                "Deadline": t["ngay_deadline"],
+                "Thời hạn": t["ngay_deadline"],
             })
         df_chart = pd.DataFrame(chart_rows)
         color_map = {
@@ -234,7 +234,7 @@ def _render_tong_quan(tab, **kwargs):
                 st.caption(
                     f"**{pgd_dd}** — {task_sel['tieu_de']} · "
                     f"Hoàn thành: **{xong}/{len(kq_xa)}** · "
-                    f"Deadline: {task_sel['ngay_deadline']}"
+                    f"Thời hạn: {task_sel['ngay_deadline']}"
                 )
                 df_xa = pd.DataFrame([
                     {
@@ -280,7 +280,7 @@ lưu ý đặc biệt để PGD/CBTD biết cần làm gì.
 Ảnh hưởng màu sắc hiển thị trong biểu đồ tổng quan.
 
 **6. Ngày bắt đầu & Hạn hoàn thành** — Xác định khung thời gian.  
-Sau deadline hệ thống tự đánh dấu 🔴 trễ hạn.
+Sau thời hạn hệ thống tự đánh dấu 🔴 trễ hạn.
 
 **7. Áp dụng cho đơn vị** — Mặc định tất cả 22 đơn vị.  
 Bỏ chọn nếu chỉ áp dụng cho một số PGD cụ thể.
@@ -311,7 +311,7 @@ Bỏ chọn nếu chỉ áp dụng cho một số PGD cụ thể.
                     placeholder="Tên người phụ trách chính",
                 )
             with c2:
-                deadline = st.date_input("Hạn hoàn thành *", value=date.today())
+                deadline = st.date_input("Thời hạn hoàn thành *", value=date.today())
                 ngay_bat_dau = st.date_input(
                     "Ngày bắt đầu",
                     value=date.today(),
@@ -380,7 +380,7 @@ Bỏ chọn nếu chỉ áp dụng cho một số PGD cụ thể.
                     if loai_theo_doi == "xa" else len(pgd_luu)
                 )
                 db.ghi_audit(username, "tien_do_tao_task",
-                             f"'{tieu_de}' · deadline={deadline} · "
+                             f"'{tieu_de}' · thời hạn={deadline} · "
                              f"{len(pgd_luu)} PGD · "
                              f"{so_xa} đơn vị {loai_theo_doi} · "
                              f"cap_theo_doi={loai_theo_doi}")
@@ -465,7 +465,7 @@ def _render_quan_ly_task(tab, **kwargs):
                 key=f"td_sua_uu_tien_{task_id}",
             )
             deadline = st.date_input(
-                "Hạn hoàn thành *",
+                "Thời hạn hoàn thành *",
                 value=deadline_default,
                 key=f"td_sua_deadline_{task_id}",
             )
@@ -506,7 +506,7 @@ def _render_quan_ly_task(tab, **kwargs):
                 db.ghi_audit(
                     username,
                     "tien_do_sua_task",
-                    f"ID={task_id} · '{str(tieu_de).strip()}' · deadline={deadline}",
+                    f"ID={task_id} · '{str(tieu_de).strip()}' · thời hạn={deadline}",
                 )
                 st.toast("✅ Đã lưu thay đổi.")
                 st.rerun()
@@ -619,7 +619,7 @@ def _render_cap_nhat(tab, **kwargs):
         st.caption(
             f"**{task['tieu_de']}** · {tag_nd} · "
             f"{LOAI_TASK.get(task['loai'], task['loai'])} · "
-            f"Deadline: **{task['ngay_deadline']}** · {UU_TIEN.get(task['uu_tien'], '')}"
+            f"Thời hạn: **{task['ngay_deadline']}** · {UU_TIEN.get(task['uu_tien'], '')}"
         )
         if task.get("mo_ta"):
             st.info(task["mo_ta"])
@@ -732,9 +732,9 @@ def _render_xuat(tab, **kwargs):
 
         c1, c2 = st.columns(2)
         with c1:
-            tu_ngay = st.date_input("Deadline từ", value=date.today(), key="td_x1")
+            tu_ngay = st.date_input("Thời hạn từ", value=date.today(), key="td_x1")
         with c2:
-            den_ngay = st.date_input("Deadline đến", value=date.today(), key="td_x2")
+            den_ngay = st.date_input("Thời hạn đến", value=date.today(), key="td_x2")
 
         if st.button("📥 Tạo Excel", type="primary", key="td_btn_tao"):
             ds_task = _doc_tasks(chi_dang_theo_doi=False)
@@ -765,7 +765,7 @@ def _render_xuat(tab, **kwargs):
                     "Đầu việc":      t["tieu_de"],
                     "Loại":          LOAI_TASK.get(t["loai"], t["loai"]),
                     "Ưu tiên":       UU_TIEN.get(t["uu_tien"], t["uu_tien"]).replace("🔴","").replace("🟡","").replace("🟢","").strip(),
-                    "Deadline":      t["ngay_deadline"],
+                    "Thời hạn":      t["ngay_deadline"],
                     "Số PGD":        len(ds_p),
                     "Tổng xã":       tong,
                     "Đã hoàn thành": xong,
@@ -798,7 +798,7 @@ def _render_xuat(tab, **kwargs):
                     rows_ct.append({
                         "Task ID": t["id"],
                         "Đầu việc": t["tieu_de"],
-                        "Deadline": t["ngay_deadline"],
+                        "Thời hạn": t["ngay_deadline"],
                         "PGD": r["pgd"],
                         "Xã / Phường": r["ten_xa"],
                         "Trạng thái": TS_KQ_LABEL.get(r["trang_thai"], r["trang_thai"]),
@@ -940,7 +940,7 @@ def _xuat_pdf_tien_do(task, ds_kq, username):
         ngay_xuat = now.strftime("%d/%m/%Y %H:%M")
 
         story.append(Paragraph(
-            f"Loại: {loai} | Ưu tiên: {uu_tien} | Deadline: {deadline}",
+            f"Loại: {loai} | Ưu tiên: {uu_tien} | Thời hạn: {deadline}",
             normal_style,
         ))
         story.append(Paragraph(

@@ -592,11 +592,6 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                 df_ct4.columns = ["ten_ct", "gn_nam"]
                 df_ct = df_ct.merge(df_ct4, on="ten_ct", how="left")
                 df_ct["gn_nam"] = df_ct["gn_nam"].fillna(0).replace([float('inf'), float('-inf')], 0)
-                import streamlit as st
-                col_gn = next((c for c in HSTD_DS_CHO_VAY_NAM_ALIASES if c in df.columns), None)
-                st.write("DEBUG gn_nam col:", col_gn)
-                st.write("DEBUG gn_nam sum:", df_ct["gn_nam"].sum())
-                st.write("DEBUG tn_nam sum:", df_ct["tn_nam"].sum() if "tn_nam" in df_ct.columns else "N/A")
             else:
                 df_ct["gn_nam"] = 0
 

@@ -399,11 +399,6 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                     <p class="val">{_dth} tỷ</p>
                     <div class="sub">{_dth_pct}% tổng dư nợ</div>
                 </div>
-                <div class="tq-card">
-                    <h4>Nợ khoanh</h4>
-                    <p class="val">{_dnk} tỷ</p>
-                    <div class="sub">{_tlk}% tổng dư nợ</div>
-                </div>
                 <div class="tq-card soft-red">
                     <h4>Dư nợ quá hạn</h4>
                     <p class="val">{_dqh} tỷ</p>
@@ -413,6 +408,11 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                     <h4>Tỷ lệ quá hạn</h4>
                     <p class="val">{_tlq}%</p>
                     <div class="sub">{'⚠️ Mức cao > 0.5%' if tlq >= 0.5 else '< 0.5% toàn hệ thống'}</div>
+                </div>
+                <div class="tq-card">
+                    <h4>Nợ khoanh</h4>
+                    <p class="val">{_dnk} tỷ</p>
+                    <div class="sub">{_tlk}% tổng dư nợ</div>
                 </div>
                 <div class="tq-card soft-amber">
                     <h4>Tỷ lệ khoanh</h4>
@@ -630,6 +630,47 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                 hide_index=True,
                 column_config=_tao_column_config_co_cau(),
             )
+
+            df_top10 = df_ct.nlargest(10, "du_no").copy()
+            df_top10["label"] = df_top10["ten_ct"].str[:30]
+            df_top10["du_no_ty"] = df_top10["du_no"] / 1e9
+            df_top10["du_no_tw_ty"] = df_top10["du_no_tw"] / 1e9
+            df_top10["du_no_dp_ty"] = df_top10["du_no_dp"] / 1e9
+            df_top10["du_no_tw_ty"] = df_top10["du_no_tw_ty"].where(df_top10["du_no_tw_ty"] > 0, 0)
+            df_top10["du_no_dp_ty"] = df_top10["du_no_dp_ty"].where(df_top10["du_no_dp_ty"] > 0, 0)
+            fig_ct = go.Figure()
+            fig_ct.add_trace(go.Bar(
+                y=df_top10["label"],
+                x=df_top10["du_no_tw_ty"],
+                name="TW",
+                orientation="h",
+                marker_color="#2E7D32",
+                text=df_top10["du_no_tw_ty"].apply(lambda x: vn(x, 1) if x > 0 else ""),
+                textposition="inside",
+                insidetextanchor="middle",
+                textfont=dict(color="white", size=10),
+            ))
+            fig_ct.add_trace(go.Bar(
+                y=df_top10["label"],
+                x=df_top10["du_no_dp_ty"],
+                name="ĐP",
+                orientation="h",
+                marker_color="#E65100",
+                text=df_top10["du_no_dp_ty"].apply(lambda x: vn(x, 1) if x > 0 else ""),
+                textposition="inside",
+                insidetextanchor="middle",
+                textfont=dict(color="white", size=10),
+            ))
+            fig_ct.update_layout(
+                barmode="stack",
+                title="📊 Top 10 chương trình theo dư nợ",
+                xaxis_title="Dư nợ (tỷ đồng)",
+                yaxis=dict(autorange="reversed"),
+                height=max(350, len(df_top10) * 35),
+                margin=dict(l=10, r=40, t=40, b=10),
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+            )
+            st.plotly_chart(fig_ct, use_container_width=True, key="ct_bar_top10")
 
         st.markdown("**🟢 Thông tin tổng quát theo PGD**")
         if COT_TEN_PGD in df.columns:
@@ -1036,13 +1077,13 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
 
             header1 = "".join(
                 f'<th colspan="{span}" style="background:#2E7D32;color:#fff;'
-                f'text-align:center;padding:6px 4px;border:1px solid #1B5E20;font-size:0.82rem">'
+                f'text-align:center;padding:7px 5px;border:1px solid #1B5E20;font-size:13px">'
                 f'{nhom}</th>'
                 for nhom, span in NHOM_COT
             )
             header2 = "".join(
                 f'<th style="background:#388E3C;color:#fff;text-align:center;'
-                f'padding:5px 4px;border:1px solid #1B5E20;font-size:0.78rem;'
+                f'padding:6px 5px;border:1px solid #1B5E20;font-size:13px;'
                 f'white-space:nowrap">{c if c != COT_TEN_PGD else "Đơn vị"}</th>'
                 for c in cot_hien
             )
@@ -1050,12 +1091,17 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
             rows_html = ""
             for i, (_, row) in enumerate(df_show.iterrows()):
                 is_last = row[COT_TEN_PGD] == "Toàn Chi nhánh"
-                bg = "#E8F5E9" if is_last else ("#F9FAFB" if i % 2 == 0 else "#FFFFFF")
+                bg = "#C8E6C9" if is_last else ("#F5F7FA" if i % 2 == 0 else "#FFFFFF")
                 fw = "bold" if is_last else "normal"
+                row_fs = "0.84rem" if is_last else "0.82rem"
                 cells = "".join(
-                    f'<td style="padding:5px 6px;border:1px solid #E0E0E0;'
+                    f'<td style="padding:6px 7px;border:1px solid #E0E0E0;'
                     f'text-align:{"left" if c == COT_TEN_PGD else "right"};'
-                    f'font-weight:{fw};font-size:0.82rem;white-space:nowrap">'
+                    f'font-weight:{fw};font-size:{row_fs};white-space:nowrap;'
+                    f'{"color:#C62828;font-weight:800" if c == "TL QH %" and pd.to_numeric(row.get(c, 0), errors="coerce") > 0.5 else ""}'
+                    f'{"color:#C62828;font-weight:800" if c == "TL NPL %" and pd.to_numeric(row.get(c, 0), errors="coerce") > 0.3 else ""}'
+                    f'{"color:#C62828;font-weight:800" if c == "TL Khoanh %" and pd.to_numeric(row.get(c, 0), errors="coerce") > 1 else ""}'
+                    f'">'
                     f'{_fmt_cell(row[c], c)}</td>'
                     for c in cot_hien
                 )

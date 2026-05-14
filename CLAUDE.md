@@ -210,15 +210,26 @@ st.cache_data.clear()
 |---|---|---|
 | Nhập liệu | Triệu đồng | `number_input` hiển thị triệu |
 | Lưu trữ | VND (`× 1_000_000`) | Ghi vào kv_store / DataFrame |
-| Hiển thị | `fmt_ty()` chia `/1e12` | ← `/1e9` là SAI |
+| Hiển thị | `fmt_ty()` | Tự chia `/1e9`, ra chuỗi VN |
 
 ```python
 from utils import fmt, fmt_tien, fmt_ty, fmt_pct, fmt_so
 
-fmt_ty(gia_tri_vnd)      # → "1,234 tỷ"
+fmt_ty(gia_tri_vnd)      # → "1.234,560 tỷ"  ← chuẩn VN
 fmt(gia_tri_vnd)         # → "1.234.567.890"
-fmt_so(so_luong)         # → "1,234"
+fmt_so(so_luong)         # → "1.234"
 ```
+
+**Quy tắc format số — LUÔN dùng kiểu Việt Nam:**
+
+| Loại | Dùng | Ví dụ |
+|---|---|---|
+| Tiền tệ (tỷ) | `fmt_ty(x)` | `1.234,560 tỷ` |
+| Số lượng | `fmt_so(x)` | `1.234` |
+| Phần trăm | `f"{x:.2f}".replace(".", ",") + "%"` | `12,34%` |
+| **KHÔNG dùng** | `NumberColumn(format="%.3f")` | ~~`1,234.560`~~ (kiểu Mỹ) |
+
+**Trong `st.dataframe`:** Chuyển cột float → string bằng `.apply(fmt_ty)` trước khi hiển thị — **không dùng `NumberColumn`** cho cột tiền tệ vì Streamlit luôn hiển thị kiểu Mỹ.
 
 ---
 

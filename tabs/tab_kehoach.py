@@ -7,7 +7,8 @@ from datetime import datetime
 import os
 
 from config import *
-from data import doc_dienbao, db_lookup, ts_file, doc_kehoach, luu_kehoach
+from data import doc_dienbao, db_lookup, ts_file
+from data.khtd import doc_kehoach, luu_kehoach
 from data.pgd import duong_dan_pgd, pgd_slug
 from services import kiem_tra_file
 from auth import la_phan_he_cn, normalize_role

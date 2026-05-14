@@ -670,6 +670,26 @@ def _render_cap_nhat(tab, **kwargs):
             st.toast(f"✅ Đã lưu {count} xã.")
             st.rerun()
 
+        kq_all = _doc_ketqua_task(task_id)
+        if st.button("📄 Xuất PDF tiến độ", key=f"td_pdf_{task_id}"):
+            pdf_bytes = _xuat_pdf_tien_do(task, kq_all, username)
+            if pdf_bytes:
+                ten_file = (
+                    f"TienDo_{task['tieu_de'][:20].replace(' ', '_')}_"
+                    f"{date.today().isoformat()}.pdf"
+                )
+                st.download_button(
+                    "⬇ Tải PDF",
+                    data=pdf_bytes,
+                    file_name=ten_file,
+                    mime="application/pdf",
+                    key=f"td_pdf_dl_{task_id}",
+                )
+                db.ghi_audit(
+                    username, "tien_do_xuat_pdf",
+                    f"Task '{task['tieu_de']}'"
+                )
+
 
 def _render_xuat(tab, **kwargs):
     SS_KEY = "_td_xuat_excel"
@@ -789,6 +809,183 @@ def _render_xuat(tab, **kwargs):
                        f"{payload['n_ct']} dòng chi tiết · "
                        f"{payload['n_th']} đầu việc tổng hợp.")
 
+
+def _xuat_pdf_tien_do(task, ds_kq, username):
+    try:
+        from itertools import groupby
+        from reportlab.lib.pagesizes import A4
+        from reportlab.platypus import (
+            SimpleDocTemplate, Paragraph, Spacer, HRFlowable,
+        )
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib import colors
+        from reportlab.lib.enums import TA_CENTER
+        from reportlab.pdfbase import pdfmetrics
+        from reportlab.pdfbase.ttfonts import TTFont
+        import os
+
+        FONT_NORMAL = "Helvetica"
+        FONT_BOLD = "Helvetica-Bold"
+
+        arial_path = "C:/Windows/Fonts/arial.ttf"
+        arialbd_path = "C:/Windows/Fonts/arialbd.ttf"
+        if os.path.exists(arial_path):
+            pdfmetrics.registerFont(TTFont("ArialUni", arial_path))
+            FONT_NORMAL = "ArialUni"
+        if os.path.exists(arialbd_path):
+            pdfmetrics.registerFont(TTFont("ArialUni-Bold", arialbd_path))
+            FONT_BOLD = "ArialUni-Bold"
+
+        kq_theo_pgd = {}
+        for r in sorted(ds_kq, key=lambda x: x["pgd"]):
+            kq_theo_pgd.setdefault(r["pgd"], []).append(r)
+
+        pgd_order = sorted(kq_theo_pgd.keys())
+
+        TS_LABEL = {
+            "chua_thuc_hien": "○",
+            "da_hoan_thanh": "✓",
+            "khong_ap_dung": "—",
+        }
+
+        buf = BytesIO()
+        doc = SimpleDocTemplate(
+            buf, pagesize=A4,
+            leftMargin=28, rightMargin=28,
+            topMargin=20, bottomMargin=20,
+        )
+
+        story = []
+        styles = getSampleStyleSheet()
+
+        title_style = ParagraphStyle(
+            "Title_VN", parent=styles["Title"],
+            fontName=FONT_BOLD, fontSize=14,
+            alignment=TA_CENTER, spaceAfter=2, leading=18,
+        )
+        subtitle_style = ParagraphStyle(
+            "Sub_VN", parent=styles["Normal"],
+            fontName=FONT_BOLD, fontSize=12,
+            alignment=TA_CENTER, spaceAfter=4, leading=16,
+        )
+        header_style = ParagraphStyle(
+            "Header_VN", parent=styles["Normal"],
+            fontName=FONT_BOLD, fontSize=11,
+            alignment=TA_CENTER, spaceAfter=6, leading=15,
+        )
+        normal_style = ParagraphStyle(
+            "Normal_VN", parent=styles["Normal"],
+            fontName=FONT_NORMAL, fontSize=9, leading=13,
+        )
+        pgd_header_style = ParagraphStyle(
+            "PGDHeader", parent=styles["Normal"],
+            fontName=FONT_BOLD, fontSize=10, leading=14,
+            spaceBefore=6, spaceAfter=2,
+        )
+        xa_style = ParagraphStyle(
+            "XaStyle", parent=styles["Normal"],
+            fontName=FONT_NORMAL, fontSize=9, leading=12, leftIndent=12,
+        )
+        summary_style = ParagraphStyle(
+            "Summary", parent=styles["Normal"],
+            fontName=FONT_BOLD, fontSize=10, leading=14,
+            spaceBefore=8, spaceAfter=4,
+        )
+
+        story.append(Paragraph(
+            "NGÂN HÀNG CHÍNH SÁCH XÃ HỘI VIỆT NAM", title_style))
+        story.append(Paragraph("CHI NHÁNH TỈNH ĐỒNG NAI", subtitle_style))
+        story.append(Spacer(1, 6))
+        story.append(Paragraph("BÁO CÁO TIẾN ĐỘ CÔNG VIỆC", header_style))
+        story.append(Paragraph(task.get("tieu_de", ""), header_style))
+        story.append(Spacer(1, 4))
+
+        loai = LOAI_TASK.get(task.get("loai", ""), task.get("loai", ""))
+        uu_tien = UU_TIEN.get(task.get("uu_tien", ""), task.get("uu_tien", ""))
+        deadline = task.get("ngay_deadline", "")
+        now = datetime.now()
+        ngay_xuat = now.strftime("%d/%m/%Y %H:%M")
+
+        story.append(Paragraph(
+            f"Loại: {loai} | Ưu tiên: {uu_tien} | Deadline: {deadline}",
+            normal_style,
+        ))
+        story.append(Paragraph(
+            f"Ngày xuất: {ngay_xuat} | Người xuất: {username}",
+            normal_style,
+        ))
+
+        story.append(HRFlowable(
+            width="100%", thickness=0.5, color=colors.grey))
+        story.append(Spacer(1, 4))
+
+        tong_dv = 0
+        tong_dv_ht = 0
+        tong_xa_all = 0
+        tong_xa_xong_all = 0
+
+        for pgd in pgd_order:
+            items = kq_theo_pgd[pgd]
+            tong = len(items)
+            xong = sum(1 for r in items if r["trang_thai"] == "da_hoan_thanh")
+            tong_xa_all += tong
+            tong_xa_xong_all += xong
+            pct = round(xong / tong * 100) if tong > 0 else 0
+
+            story.append(Paragraph(
+                f"<b>{pgd}</b>  ({xong}/{tong} xã — {pct}%)",
+                pgd_header_style,
+            ))
+
+            for r in items:
+                symbol = TS_LABEL.get(r["trang_thai"], "?")
+                ten_xa = r["ten_xa"]
+                ngay_ht = r.get("ngay_hoan_thanh") or ""
+
+                if r["trang_thai"] == "da_hoan_thanh":
+                    try:
+                        ngay_ht = datetime.strptime(
+                            ngay_ht[:10], "%Y-%m-%d"
+                        ).strftime("%d/%m/%Y")
+                    except Exception:
+                        pass
+                    status_text = ngay_ht
+                elif r["trang_thai"] == "khong_ap_dung":
+                    status_text = "N/A"
+                else:
+                    status_text = "Chưa thực hiện"
+
+                dots = "." * max(2, 45 - len(ten_xa) - len(status_text))
+                line = f"{symbol} {ten_xa} {dots} {status_text}"
+                story.append(Paragraph(line, xa_style))
+
+            story.append(Spacer(1, 2))
+
+            tong_dv += 1
+            if xong == tong and tong > 0:
+                tong_dv_ht += 1
+
+        story.append(HRFlowable(
+            width="100%", thickness=0.5, color=colors.grey))
+        story.append(Spacer(1, 6))
+
+        tong_pct = (
+            round(tong_xa_xong_all / tong_xa_all * 100)
+            if tong_xa_all > 0 else 0
+        )
+        story.append(Paragraph(
+            f"TỔNG KẾT: {tong_dv_ht}/{tong_dv} đơn vị hoàn thành"
+            f" | {tong_pct}% toàn Chi nhánh",
+            summary_style,
+        ))
+
+        doc.build(story)
+        buf.seek(0)
+        return buf
+
+    except Exception as e:
+        st.error(f"Lỗi tạo PDF: {e}")
+        return None
 
 
 def render(tab, **kwargs):

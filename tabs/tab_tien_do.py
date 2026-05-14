@@ -264,6 +264,13 @@ def _render_tao_task(tab, **kwargs):
             with c1:
                 loai = st.selectbox("Loại", list(LOAI_TASK.keys()),
                                     format_func=lambda x: LOAI_TASK[x])
+                loai_theo_doi = st.radio(
+                    "Loại theo dõi",
+                    options=["xa", "pgd"],
+                    format_func=lambda x: "📍 Chi tiết từng xã" if x == "xa" else "🏢 Chung PGD",
+                    horizontal=True,
+                    key="td_tao_loai_theo_doi",
+                )
                 uu_tien = st.selectbox("Ưu tiên", list(UU_TIEN.keys()),
                                        format_func=lambda x: UU_TIEN[x], index=2)
                 nguoi_phu_trach = st.text_input(
@@ -283,21 +290,9 @@ def _render_tao_task(tab, **kwargs):
                     placeholder="Mặc định: tất cả 22 đơn vị",
                 )
 
-            cap_theo_doi = st.radio(
-                "Cấp theo dõi tiến độ",
-                options=["pgd", "xa"],
-                format_func=lambda x: (
-                    "🏢 Cấp PGD (1 dòng / PGD)" if x == "pgd"
-                    else "🏘️ Cấp Xã (1 dòng / xã)"
-                ),
-                index=1,
-                horizontal=True,
-                key="td_cap_theo_doi",
-            )
-
             ds_preview = pgd_chon or DS_PGD_ALL
-            if cap_theo_doi == "pgd":
-                st.caption(f"📍 {len(ds_preview)} đơn vị PGD")
+            if loai_theo_doi == "pgd":
+                st.caption(f"🏢 {len(ds_preview)} đơn vị — theo dõi cấp PGD")
             else:
                 tong_xa_preview = sum(
                     len(PGD_XA_MAP.get(p, [])) for p in ds_preview
@@ -307,7 +302,7 @@ def _render_tao_task(tab, **kwargs):
                 )
             with st.expander(f"Xem chi tiết sẽ áp dụng", expanded=False):
                 for pgd in ds_preview:
-                    if cap_theo_doi == "pgd":
+                    if loai_theo_doi == "pgd":
                         st.markdown(f"**{pgd}**")
                     else:
                         ds_xa = PGD_XA_MAP.get(pgd, [])
@@ -337,25 +332,25 @@ def _render_tao_task(tab, **kwargs):
                          loai, uu_tien, username,
                          datetime.now().isoformat(),
                          ghi_chu.strip() or None,
-                         cap_theo_doi,
+                         loai_theo_doi,
                          ngay_bat_dau.isoformat(),
                          nguoi_phu_trach.strip() or None),
                     )
                     task_id = cur.lastrowid
                     conn.commit()
 
-                loai_noi_dung = "chung_pgd" if cap_theo_doi == "pgd" else "chi_tiet_xa"
-                _khoi_tao_ketqua_task(task_id, pgd_luu, cap_theo_doi, loai_noi_dung)
+                loai_noi_dung = "chung_pgd" if loai_theo_doi == "pgd" else "chi_tiet_xa"
+                _khoi_tao_ketqua_task(task_id, pgd_luu, loai_theo_doi, loai_noi_dung)
 
                 so_xa = (
                     sum(len(PGD_XA_MAP.get(p, [])) for p in pgd_luu)
-                    if cap_theo_doi == "xa" else len(pgd_luu)
+                    if loai_theo_doi == "xa" else len(pgd_luu)
                 )
                 db.ghi_audit(username, "tien_do_tao_task",
                              f"'{tieu_de}' · deadline={deadline} · "
                              f"{len(pgd_luu)} PGD · "
-                             f"{so_xa} đơn vị {cap_theo_doi} · "
-                             f"cap_theo_doi={cap_theo_doi}")
+                             f"{so_xa} đơn vị {loai_theo_doi} · "
+                             f"cap_theo_doi={loai_theo_doi}")
                 st.toast(f"✅ Đã tạo: {tieu_de}")
                 st.rerun()
             except Exception as e:

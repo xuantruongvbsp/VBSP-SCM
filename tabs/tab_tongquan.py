@@ -202,14 +202,49 @@ def _tao_column_config_co_cau() -> dict[str, st.column_config.Column]:
         Dict cấu hình column cho st.dataframe
     """
     return {
-        "du_no": st.column_config.NumberColumn(
-            "Dư nợ",
-            format="%.0f ₫",
-            help="Tổng dư nợ chương trình"
+        "Dư nợ (tỷ)": st.column_config.NumberColumn(
+            "Dư nợ (tỷ)",
+            format="%.3f",
+            help="Tổng dư nợ chương trình (nghìn tỷ)"
         ),
-        "ty_trong": st.column_config.NumberColumn(
-            "Tỷ trọng",
+        "Nguồn TW (tỷ)": st.column_config.NumberColumn(
+            "TW (tỷ)",
+            format="%.3f",
+            help="Dư nợ nguồn TW (nghìn tỷ)"
+        ),
+        "Nguồn ĐP (tỷ)": st.column_config.NumberColumn(
+            "ĐP (tỷ)",
+            format="%.3f",
+            help="Dư nợ nguồn ĐP (nghìn tỷ)"
+        ),
+        "Dư nợ QH (tỷ)": st.column_config.NumberColumn(
+            "QH (tỷ)",
+            format="%.3f",
+            help="Dư nợ quá hạn (nghìn tỷ)"
+        ),
+        "Tỷ lệ QH %": st.column_config.NumberColumn(
+            "TL QH %",
             format="%.2f%%",
+            help="Tỷ lệ quá hạn %"
+        ),
+        "Dư nợ khoanh (tỷ)": st.column_config.NumberColumn(
+            "Khoanh (tỷ)",
+            format="%.3f",
+            help="Dư nợ khoanh (nghìn tỷ)"
+        ),
+        "Giải ngân năm (tỷ)": st.column_config.NumberColumn(
+            "GN năm (tỷ)",
+            format="%.3f",
+            help="Giải ngân trong năm (nghìn tỷ)"
+        ),
+        "Thu nợ năm (tỷ)": st.column_config.NumberColumn(
+            "Thu nợ (tỷ)",
+            format="%.3f",
+            help="Thu nợ trong năm (nghìn tỷ)"
+        ),
+        "Tỷ trọng %": st.column_config.NumberColumn(
+            "Tỷ trọng %",
+            format="%.1f%%",
             help="Tỷ trọng % trên tổng dư nợ"
         ),
     }
@@ -581,18 +616,61 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                 lambda r: r["du_no"] if r["_nguon"] == "DP" else 0, axis=1
             )
 
+            # Chỉ số bổ sung: join từ df grouped riêng nếu cột tồn tại
+            if COT_DU_NO_QH in df.columns:
+                df_ct2 = df.groupby(COT_TEN_CT)[COT_DU_NO_QH].sum().reset_index()
+                df_ct2.columns = ["ten_ct", "du_no_qh"]
+                df_ct = df_ct.merge(df_ct2, on="ten_ct", how="left")
+                df_ct["du_no_qh"] = df_ct["du_no_qh"].fillna(0)
+            else:
+                df_ct["du_no_qh"] = 0
+
+            col_khoanh = "Dư nợ khoanh" if "Dư nợ khoanh" in df.columns else None
+            if col_khoanh:
+                df_ct3 = df.groupby(COT_TEN_CT)[col_khoanh].sum().reset_index()
+                df_ct3.columns = ["ten_ct", "du_no_khoanh"]
+                df_ct = df_ct.merge(df_ct3, on="ten_ct", how="left")
+                df_ct["du_no_khoanh"] = df_ct["du_no_khoanh"].fillna(0)
+            else:
+                df_ct["du_no_khoanh"] = 0
+
+            col_gn = next((c for c in HSTD_DS_CHO_VAY_NAM_ALIASES if c in df.columns), None)
+            if col_gn:
+                df_ct4 = df.groupby(COT_TEN_CT)[col_gn].sum().reset_index()
+                df_ct4.columns = ["ten_ct", "gn_nam"]
+                df_ct = df_ct.merge(df_ct4, on="ten_ct", how="left")
+                df_ct["gn_nam"] = df_ct["gn_nam"].fillna(0)
+            else:
+                df_ct["gn_nam"] = 0
+
+            col_tn = next((c for c in HSTD_THU_NO_NAM_ALIASES if c in df.columns), None)
+            if col_tn:
+                df_ct5 = df.groupby(COT_TEN_CT)[col_tn].sum().reset_index()
+                df_ct5.columns = ["ten_ct", "tn_nam"]
+                df_ct = df_ct.merge(df_ct5, on="ten_ct", how="left")
+                df_ct["tn_nam"] = df_ct["tn_nam"].fillna(0)
+            else:
+                df_ct["tn_nam"] = 0
+
             # Hiển thị bảng
             df_hien = df_ct.rename(columns={"ten_ct": "Chương trình"}).copy()
-            df_hien["Số món vay"]      = df_hien["so_mon"].apply(fmt_so)
-            df_hien["Số KH"]           = df_hien["so_kh"].apply(fmt_so)
-            df_hien["Dư nợ (tỷ)"]     = (df_hien["du_no"]    / 1e9).round(3)
-            df_hien["Nguồn TW (tỷ)"]  = (df_hien["du_no_tw"] / 1e9).round(3)
-            df_hien["Nguồn ĐP (tỷ)"]  = (df_hien["du_no_dp"] / 1e9).round(3)
-            df_hien["Tỷ trọng %"]     = df_hien["ty_trong"]
+            df_hien["Số món vay"]         = df_hien["so_mon"].apply(fmt_so)
+            df_hien["Số KH"]              = df_hien["so_kh"].apply(fmt_so)
+            df_hien["Dư nợ (tỷ)"]        = (df_hien["du_no"]        / 1e12).round(3)
+            df_hien["Nguồn TW (tỷ)"]     = (df_hien["du_no_tw"]     / 1e12).round(3)
+            df_hien["Nguồn ĐP (tỷ)"]     = (df_hien["du_no_dp"]     / 1e12).round(3)
+            df_hien["Dư nợ QH (tỷ)"]     = (df_hien["du_no_qh"]     / 1e12).round(3)
+            df_hien["Tỷ lệ QH %"]         = ((df_hien["du_no_qh"] / df_hien["du_no"] * 100).round(2)) if (df_hien["du_no"] > 0).any() else 0
+            df_hien["Dư nợ khoanh (tỷ)"] = (df_hien["du_no_khoanh"] / 1e12).round(3)
+            df_hien["Giải ngân năm (tỷ)"]= (df_hien["gn_nam"]       / 1e12).round(3)
+            df_hien["Thu nợ năm (tỷ)"]   = (df_hien["tn_nam"]       / 1e12).round(3)
+            df_hien["Tỷ trọng %"]         = df_hien["ty_trong"]
 
             cols_hien = [
                 "Chương trình", "Số món vay", "Số KH",
-                "Dư nợ (tỷ)", "Nguồn TW (tỷ)", "Nguồn ĐP (tỷ)", "Tỷ trọng %"
+                "Dư nợ (tỷ)", "Nguồn TW (tỷ)", "Nguồn ĐP (tỷ)",
+                "Dư nợ QH (tỷ)", "Tỷ lệ QH %", "Dư nợ khoanh (tỷ)",
+                "Giải ngân năm (tỷ)", "Thu nợ năm (tỷ)", "Tỷ trọng %"
             ]
 
             st.dataframe(
@@ -600,10 +678,15 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                 use_container_width=True,
                 hide_index=True,
                 column_config={
-                    "Dư nợ (tỷ)":    st.column_config.NumberColumn("Dư nợ (tỷ)",   format="%.3f"),
-                    "Nguồn TW (tỷ)": st.column_config.NumberColumn("TW (tỷ)",      format="%.3f"),
-                    "Nguồn ĐP (tỷ)": st.column_config.NumberColumn("ĐP (tỷ)",      format="%.3f"),
-                    "Tỷ trọng %":    st.column_config.NumberColumn("Tỷ trọng %",   format="%.1f%%"),
+                    "Dư nợ (tỷ)":        st.column_config.NumberColumn("Dư nợ (tỷ)",       format="%.3f"),
+                    "Nguồn TW (tỷ)":     st.column_config.NumberColumn("TW (tỷ)",          format="%.3f"),
+                    "Nguồn ĐP (tỷ)":     st.column_config.NumberColumn("ĐP (tỷ)",          format="%.3f"),
+                    "Dư nợ QH (tỷ)":     st.column_config.NumberColumn("QH (tỷ)",          format="%.3f"),
+                    "Tỷ lệ QH %":         st.column_config.NumberColumn("TL QH %",          format="%.2f%%"),
+                    "Dư nợ khoanh (tỷ)": st.column_config.NumberColumn("Khoanh (tỷ)",      format="%.3f"),
+                    "Giải ngân năm (tỷ)":st.column_config.NumberColumn("GN năm (tỷ)",      format="%.3f"),
+                    "Thu nợ năm (tỷ)":   st.column_config.NumberColumn("Thu nợ (tỷ)",      format="%.3f"),
+                    "Tỷ trọng %":         st.column_config.NumberColumn("Tỷ trọng %",       format="%.1f%%"),
                 }
             )
 

@@ -54,20 +54,21 @@ def _doc_ketqua_task(task_id: int) -> list[dict]:
 
 
 def _khoi_tao_ketqua_task(task_id: int, ds_pgd_task: list[str],
-                           cap_theo_doi: str = "xa") -> None:
+                           cap_theo_doi: str = "xa",
+                           loai_noi_dung: str = "chi_tiet_xa") -> None:
     rows = []
     if cap_theo_doi == "pgd":
         for pgd in ds_pgd_task:
-            rows.append((task_id, pgd, pgd))
+            rows.append((task_id, pgd, pgd, loai_noi_dung))
     else:
         for pgd in ds_pgd_task:
             for xa in PGD_XA_MAP.get(pgd, []):
-                rows.append((task_id, pgd, xa))
+                rows.append((task_id, pgd, xa, loai_noi_dung))
     with db.get_conn() as conn:
         conn.executemany(
             """INSERT OR IGNORE INTO tien_do_ketqua
-               (task_id, pgd, ten_xa, trang_thai)
-               VALUES (?, ?, ?, 'chua_thuc_hien')""",
+               (task_id, pgd, ten_xa, trang_thai, loai_noi_dung)
+               VALUES (?, ?, ?, 'chua_thuc_hien', ?)""",
             rows,
         )
         conn.commit()
@@ -103,13 +104,17 @@ def _render_tong_quan(tab, **kwargs):
     with _tab_ctx:
         st.subheader("📊 Tổng quan tiến độ")
 
-        c1, c2 = st.columns([2, 1])
+        c1, c2, c3 = st.columns([2, 1, 1])
         with c1:
             ngay_loc = st.date_input("Deadline đến ngày",
                                      value=date.today(), key="td_ngay")
         with c2:
             loai_loc = st.selectbox("Lọc loại", ["Tất cả"] + list(LOAI_TASK.values()),
                                     key="td_loai")
+        with c3:
+            nd_loc = st.selectbox("Loại nhiệm vụ",
+                                  ["Tất cả", "Chung PGD", "Chi tiết xã"],
+                                  key="td_nd")
 
         hom_nay = date.today().isoformat()
         ds_task = _doc_tasks()
@@ -118,6 +123,9 @@ def _render_tong_quan(tab, **kwargs):
         if loai_loc != "Tất cả":
             loai_key = next((k for k, v in LOAI_TASK.items() if v == loai_loc), None)
             ds_task = [t for t in ds_task if loai_key and t["loai"] == loai_key]
+        if nd_loc != "Tất cả":
+            nd_map = {"Chung PGD": "pgd", "Chi tiết xã": "xa"}
+            ds_task = [t for t in ds_task if t.get("cap_theo_doi") == nd_map.get(nd_loc)]
 
         if not ds_task:
             st.info("Không có đầu việc nào trong khoảng thời gian đã chọn.")
@@ -138,16 +146,16 @@ def _render_tong_quan(tab, **kwargs):
 
         c1, c2, c3, c4 = st.columns(4)
         c1.metric("Đầu việc", len(ds_task))
-        c2.metric("Lượt xã hoàn thành",
+        c2.metric("✅ Hoàn thành",
                   f"{tong_xong}/{tong_xa}",
                   f"{round(tong_xong/tong_xa*100) if tong_xa else 0}%")
-        c3.metric("🔴 Xã trễ hạn", tong_tre, delta_color="inverse")
+        c3.metric("🔴 Trễ hạn", tong_tre, delta_color="inverse")
         c4.metric("⬜ Chưa báo cáo", tong_xa - tong_xong - tong_tre)
 
         st.divider()
 
         st.markdown("#### 🗺️ Bảng tiến độ theo PGD")
-        st.caption("Số trong ô = Xã hoàn thành / Tổng xã. 🔴 = có xã trễ hạn.")
+        st.caption("Ô trong bảng = Hoàn thành / Tổng số. 🔴 = có đơn vị trễ hạn.")
 
         bang_rows = []
         for pgd in DS_PGD_ALL:
@@ -225,7 +233,7 @@ def _render_tong_quan(tab, **kwargs):
                 xong = sum(1 for r in kq_xa if r["trang_thai"] == "da_hoan_thanh")
                 st.caption(
                     f"**{pgd_dd}** — {task_sel['tieu_de']} · "
-                    f"Hoàn thành: **{xong}/{len(kq_xa)} xã** · "
+                    f"Hoàn thành: **{xong}/{len(kq_xa)}** · "
                     f"Deadline: {task_sel['ngay_deadline']}"
                 )
                 df_xa = pd.DataFrame([
@@ -258,8 +266,17 @@ def _render_tao_task(tab, **kwargs):
                                     format_func=lambda x: LOAI_TASK[x])
                 uu_tien = st.selectbox("Ưu tiên", list(UU_TIEN.keys()),
                                        format_func=lambda x: UU_TIEN[x], index=2)
+                nguoi_phu_trach = st.text_input(
+                    "Người phụ trách",
+                    placeholder="Tên người phụ trách chính",
+                )
             with c2:
                 deadline = st.date_input("Hạn hoàn thành *", value=date.today())
+                ngay_bat_dau = st.date_input(
+                    "Ngày bắt đầu",
+                    value=date.today(),
+                    key="td_ngay_bat_dau",
+                )
                 pgd_chon = st.multiselect(
                     "Áp dụng cho đơn vị",
                     DS_PGD_ALL, default=DS_PGD_ALL,
@@ -313,19 +330,22 @@ def _render_tao_task(tab, **kwargs):
                         """INSERT INTO tien_do_task
                            (tieu_de, mo_ta, ngay_deadline, ds_pgd, loai,
                             uu_tien, nguoi_tao, ngay_tao, trang_thai, ghi_chu,
-                            cap_theo_doi)
-                           VALUES (?,?,?,?,?,?,?,?,'dang_theo_doi',?,?)""",
+                            cap_theo_doi, ngay_bat_dau, nguoi_phu_trach)
+                           VALUES (?,?,?,?,?,?,?,?,'dang_theo_doi',?,?,?,?)""",
                         (tieu_de.strip(), mo_ta.strip() or None,
                          deadline.isoformat(), ds_pgd_json,
                          loai, uu_tien, username,
                          datetime.now().isoformat(),
                          ghi_chu.strip() or None,
-                         cap_theo_doi),
+                         cap_theo_doi,
+                         ngay_bat_dau.isoformat(),
+                         nguoi_phu_trach.strip() or None),
                     )
                     task_id = cur.lastrowid
                     conn.commit()
 
-                _khoi_tao_ketqua_task(task_id, pgd_luu, cap_theo_doi)
+                loai_noi_dung = "chung_pgd" if cap_theo_doi == "pgd" else "chi_tiet_xa"
+                _khoi_tao_ketqua_task(task_id, pgd_luu, cap_theo_doi, loai_noi_dung)
 
                 so_xa = (
                     sum(len(PGD_XA_MAP.get(p, [])) for p in pgd_luu)
@@ -567,8 +587,10 @@ def _render_cap_nhat(tab, **kwargs):
                 st.warning("Tài khoản chưa được gán đơn vị.")
                 return
 
+        tag_nd = "🏢 Chung PGD" if cap_theo_doi == "pgd" else "🏘️ Chi tiết xã"
         st.caption(
-            f"**{task['tieu_de']}** · {LOAI_TASK.get(task['loai'], task['loai'])} · "
+            f"**{task['tieu_de']}** · {tag_nd} · "
+            f"{LOAI_TASK.get(task['loai'], task['loai'])} · "
             f"Deadline: **{task['ngay_deadline']}** · {UU_TIEN.get(task['uu_tien'], '')}"
         )
         if task.get("mo_ta"):

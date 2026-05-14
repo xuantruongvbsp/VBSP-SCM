@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## [2026-05-14] — Lazy import data/__init__.py: giao_ban, cdtotkvv, khtd không còn eager
+- `data/__init__.py` dòng ~41–54 — Xóa eager import `cdtotkvv`, `khtd`, `giao_ban`; thay bằng comment lazy
+- `workspaces/ws_executive.py` dòng ~22 — Tách `doc_kehoach` sang `from data.khtd import ...`
+- `tabs/tab_kehoach.py` dòng ~10 — Tách `doc_kehoach, luu_kehoach` sang `from data.khtd import ...`
+- `tabs/tab_cbtd.py` dòng ~16 — Chuyển `from data import doc_cbtd, luu_cbtd` sang `from data.khtd import ...`
+
 ## [2026-05-14] — Cache sidebar I/O: giảm 12 I/O/rerun xuống ~1 (file stat)
 - `data/pgd.py` dòng ~92 — Thêm `@st.cache_data(ttl=30)` cho `_doc_ngay_so_lieu()` + tham số `_mtime` làm cache key
 - `data/pgd.py` dòng ~128 — Thêm `@st.cache_data(ttl=30)` cho `doc_trang_thai_file()` + tham số `_mtime` làm cache key

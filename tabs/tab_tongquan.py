@@ -292,17 +292,18 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
             <style>
             .tq-caption{color:#4b5563;font-size:0.96rem;margin:-6px 0 14px 0}
             .tq-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:14px}
-            .tq-card{border-radius:10px;padding:12px 14px;border:1px solid #eceff3;background:#ffffff;min-height:84px}
-            .tq-card h4{margin:0 0 6px 0;font-size:0.95rem;font-weight:600;color:#374151}
-            .tq-card .val{font-size:2.05rem;line-height:1.05;font-weight:700;color:#111827;margin:0}
-            .tq-card .sub{font-size:0.88rem;color:#4b5563;margin-top:3px}
-            .tq-card .sub.up{color:#1f7a35;font-weight:600}
-            .tq-card.soft-red{background:#fdf1f1;border-color:#f8dddd}
-            .tq-card.soft-red h4,.tq-card.soft-red .val,.tq-card.soft-red .sub{color:#9f1d1d}
-            .tq-card.soft-amber{background:#fcf4df;border-color:#f2e2ba}
-            .tq-card.soft-amber h4,.tq-card.soft-amber .val{color:#8a5a0a}
-            .tq-card.soft-green{background:#edf6e6;border-color:#d6e7c7}
-            .tq-card.soft-green h4,.tq-card.soft-green .val,.tq-card.soft-green .sub{color:#2f5f13}
+            .tq-card{border-radius:10px;padding:12px 14px;border:1px solid #e0e7ef;background:#f8fafc;min-height:84px;position:relative;overflow:hidden}
+.tq-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--tq-color,#6366f1)}
+.tq-card h4{margin:0 0 6px 0;font-size:0.95rem;font-weight:600;color:#374151}
+.tq-card .val{font-size:2.05rem;line-height:1.05;font-weight:700;color:#111827;margin:0}
+.tq-card .sub{font-size:0.88rem;color:#4b5563;margin-top:3px}
+.tq-card .sub.up{color:#1f7a35;font-weight:600}
+.tq-card.soft-blue{background:#eff6ff;border-color:#bfdbfe;--tq-color:#3b82f6}
+.tq-card.soft-indigo{background:#eef2ff;border-color:#c7d2fe;--tq-color:#6366f1}
+.tq-card.soft-green{background:#f0fdf4;border-color:#bbf7d0;--tq-color:#22c55e}
+.tq-card.soft-red{background:#fef2f2;border-color:#fecaca;--tq-color:#ef4444}
+.tq-card.soft-amber{background:#fffbeb;border-color:#fde68a;--tq-color:#f59e0b}
+.tq-card.soft-purple{background:#faf5ff;border-color:#e9d5ff;--tq-color:#a855f7}
             .totkvv-wrap{border:1px solid #e5e7eb;border-radius:12px;padding:12px 14px;margin:4px 0 8px 0;background:#fff}
             .totkvv-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
             .totkvv-title{font-size:1.02rem;font-weight:700;color:#202938}
@@ -379,22 +380,22 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
         st.markdown(
             f"""
             <div class="tq-grid">
-                <div class="tq-card">
+                <div class="tq-card soft-indigo">
                     <h4>Tổng món vay</h4>
                     <p class="val">{_n_mon_vay}</p>
                     <div class="sub">Số khế ước đang dư nợ</div>
                 </div>
-                <div class="tq-card soft-green">
+                <div class="tq-card soft-blue">
                     <h4>Tổng khách hàng</h4>
                     <p class="val">{_n_kh}</p>
                     <div class="sub">{(f"BQ {_bq_mon_kh} món/KH") if n_kh > 0 else "—"}</div>
                 </div>
-                <div class="tq-card">
+                <div class="tq-card soft-green">
                     <h4>Tổng dư nợ</h4>
                     <p class="val">{_tdn} tỷ</p>
                     <div class="sub up">+{_tdn_delta} tỷ so kỳ trước</div>
                 </div>
-                <div class="tq-card">
+                <div class="tq-card soft-green">
                     <h4>Dư nợ trong hạn</h4>
                     <p class="val">{_dth} tỷ</p>
                     <div class="sub">{_dth_pct}% tổng dư nợ</div>
@@ -409,7 +410,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                     <p class="val">{_tlq}%</p>
                     <div class="sub">{'⚠️ Mức cao > 0.5%' if tlq >= 0.5 else '< 0.5% toàn hệ thống'}</div>
                 </div>
-                <div class="tq-card">
+                <div class="tq-card soft-amber">
                     <h4>Nợ khoanh</h4>
                     <p class="val">{_dnk} tỷ</p>
                     <div class="sub">{_tlk}% tổng dư nợ</div>

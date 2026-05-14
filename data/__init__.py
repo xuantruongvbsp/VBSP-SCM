@@ -32,21 +32,6 @@ from data.pgd import (
     doc_gqvl_toan_cn, doc_nq11_toan_cn_pgd,
 )
 
-# cdtotkvv
-from data.cdtotkvv import (
-    doc_cdtotkvv,
-    ds_thang_nam as ds_thang_nam_cdtotkvv,
-    tong_hop_theo_pgd as tong_hop_cdtotkvv_theo_pgd,
-)
-
-# khtd
-from data.khtd import (
-    doc_khtd, luu_khtd,
-    doc_kehoach, luu_kehoach,
-    doc_cbtd, luu_cbtd,
-    doc_phu_luc_qd, luu_phu_luc_qd,
-    FILE_KH_QD,
-)
-
-# giao_ban
-from data.giao_ban import xuat_bien_ban_giao_ban
+# cdtotkvv — lazy: import directly via `from data.cdtotkvv import ...`
+# khtd    — lazy: import directly via `from data.khtd import ...`
+# giao_ban— lazy: import directly via `from data.giao_ban import ...`

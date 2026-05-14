@@ -963,7 +963,10 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
             tong["TL Khoanh %"] = round((tong.get("Khoanh (tỷ)", 0) / tong.get("Dư nợ (tỷ)", 1) * 100), 2) if tong.get("Dư nợ (tỷ)", 0) else 0
             tong["Nợ xấu (tỷ)"] = round(tong.get("QH (tỷ)", 0) + tong.get("Khoanh (tỷ)", 0), 3)
             tong["TL NPL %"] = round(tong["Nợ xấu (tỷ)"] / tong.get("Dư nợ (tỷ)", 1) * 100, 2) if tong.get("Dư nợ (tỷ)", 0) else 0
-            df_pgd = pd.concat([df_pgd, pd.DataFrame([tong])], ignore_index=True)
+            tong_clean = {k: (v if pd.notna(v) else 0) for k, v in tong.items()
+                          if k != COT_TEN_PGD}
+            tong_clean[COT_TEN_PGD] = "Toàn Chi nhánh"
+            df_pgd = pd.concat([df_pgd, pd.DataFrame([tong_clean])], ignore_index=True)
 
             # Merge điểm tổ theo PGD vào df_pgd nếu có
             if _df_to_pgd_map is not None and not _df_to_pgd_map.empty:
@@ -1096,7 +1099,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                 row_fs = "0.84rem" if is_last else "0.82rem"
                 cells = "".join(
                     f'<td style="padding:6px 7px;border:1px solid #E0E0E0;'
-                    f'text-align:{"left" if c == COT_TEN_PGD else "right"};'
+                    f'text-align:{"left" if c == cot_hien[0] else "right"};'
                     f'font-weight:{fw};font-size:{row_fs};white-space:nowrap;'
                     f'{"color:#C62828;font-weight:800" if c == "TL QH %" and pd.to_numeric(row.get(c, 0), errors="coerce") > 0.5 else ""}'
                     f'{"color:#C62828;font-weight:800" if c == "TL NPL %" and pd.to_numeric(row.get(c, 0), errors="coerce") > 0.3 else ""}'

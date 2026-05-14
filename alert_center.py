@@ -15,9 +15,14 @@ NGUONG_NGAY_UPLOAD_CU = 3   # cảnh báo nếu file chưa merge quá 3 ngày
 
 
 def _kiem_tra_upload_tre() -> list[str]:
-    """Trả về danh sách loại file chưa được merge trong NGUONG_NGAY_UPLOAD_CU ngày."""
-    canh_bao = []
+    """Trả về danh sách loại file chưa được merge trong NGUONG_NGAY_UPLOAD_CU ngày.
+    Cache vào st.session_state["merge_meta_cache"], invalidate sau 60 giây."""
     now = datetime.now()
+    cache = st.session_state.get("merge_meta_cache")
+    if cache and (now - cache["timestamp"]).total_seconds() < 60:
+        return cache["data"]
+
+    canh_bao = []
     for loai in ["hstd", "nq11", "gqvl"]:
         meta = db.doc_kv(f"merge_meta_{loai}")
         if not meta:
@@ -32,6 +37,8 @@ def _kiem_tra_upload_tre() -> list[str]:
                 )
         except Exception:
             pass
+
+    st.session_state["merge_meta_cache"] = {"data": canh_bao, "timestamp": now}
     return canh_bao
 
 

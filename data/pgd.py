@@ -89,8 +89,10 @@ def _xlsx_val_to_datetime(val) -> datetime | None:
     return None
 
 
-def _doc_ngay_so_lieu(path: Path, loai: str) -> datetime | None:
-    """Đọc ngày số liệu từ trong file xlsx (read_only, tối thiểu ô cần thiết). Lỗi → None."""
+@st.cache_data(ttl=30, show_spinner=False)
+def _doc_ngay_so_lieu(path: Path, loai: str, _mtime: float = 0.0) -> datetime | None:
+    """Đọc ngày số liệu từ trong file xlsx (read_only, tối thiểu ô cần thiết). Lỗi → None.
+    _mtime: os.path.getmtime(path) — dùng làm cache key, tự invalidate khi file thay đổi."""
     try:
         wb = load_workbook(filename=str(path), read_only=True, data_only=True)
         try:
@@ -123,9 +125,11 @@ def _doc_ngay_so_lieu(path: Path, loai: str) -> datetime | None:
         return None
 
 
-def doc_trang_thai_file(ten_don_vi: str, loai: LoaiFile) -> dict:
+@st.cache_data(ttl=30, show_spinner=False)
+def doc_trang_thai_file(ten_don_vi: str, loai: LoaiFile, _mtime: float = 0.0) -> dict:
     """
     Đọc trạng thái file upload của một đơn vị theo loại.
+    _mtime: os.path.getmtime của file — cache key, invalidate khi file thay đổi.
 
     Trả về dict:
       {
@@ -156,7 +160,7 @@ def doc_trang_thai_file(ten_don_vi: str, loai: LoaiFile) -> dict:
     canh_bao    = "ok" if so_ngay_cu <= nguong else "cu"
 
     try:
-        ngay_so_lieu = _doc_ngay_so_lieu(path, loai)
+        ngay_so_lieu = _doc_ngay_so_lieu(path, loai, _mtime=os.path.getmtime(path))
     except Exception:
         ngay_so_lieu = None
 

@@ -629,7 +629,7 @@ def _render_cap_nhat(tab, **kwargs):
         if st.button("💾 Lưu", type="primary", key=f"td_luu_{task_id}_{pgd_sel}"):
             count = 0
             for i in range(len(edited)):
-                ten_xa = df_edit.iloc[i]["Xã / Phường"]
+                ten_xa = df_edit.iloc[i][ten_cot]
                 ngay_val = edited.iloc[i]["Ngày HT"]
                 ngay_ht = None
                 if pd.notna(ngay_val) and str(ngay_val) not in ("", "NaT"):

@@ -7,6 +7,13 @@
 - `tabs/tab_tien_do.py` — `_render_tong_quan()`: thêm filter "Loại nhiệm vụ" (Tất cả/Chung PGD/Chi tiết xã); KPI labels generic (✅ Hoàn thành, 🔴 Trễ hạn)
 - `tabs/tab_tien_do.py` — `_render_cap_nhat()`: hiển thị tag 🏢 Chung PGD / 🏘️ Chi tiết xã bên cạnh tên task
 
+## [2026-05-14] — Format số VN: tiền tệ dùng `fmt_ty()`, `%` dùng replace `.` → `,`
+- `tabs/tab_tongquan.py` dòng ~23 — Thêm `fmt_pct` vào import từ utils
+- `tabs/tab_tongquan.py` dòng ~627 — 7 cột tiền tệ: bỏ `/1e12`, dùng `.apply(fmt_ty)` trên raw đồng (fmt_ty tự chia 1e9 + VN format)
+- `tabs/tab_tongquan.py` dòng ~635 — Cột Tỷ lệ QH % và Tỷ trọng %: lambda `f"{x:.2f}".replace(".", ",") + "%"` (đơn giản, không swap 2 bước)
+- `tabs/tab_tongquan.py` dòng ~208 — `_tao_column_config_co_cau()`: xoá NumberColumn cho % và tiền tệ, chỉ giữ config cho Số món vay + Số KH
+- `tabs/tab_tongquan.py` dòng ~681 — Gọi `_tao_column_config_co_cau()` thay inline dict
+
 ## [2026-05-14] — Mở rộng bảng "Cơ cấu dư nợ theo chương trình tín dụng" — thêm 6 cột + sửa đơn vị
 - `tabs/tab_tongquan.py` dòng ~197 — Cập nhật `_tao_column_config_co_cau()` với config cho 9 cột mới
 - `tabs/tab_tongquan.py` dòng ~587 — Sửa `/1e9` → `/1e12` cho tất cả cột tiền tệ (theo quy ước `fmt_ty()`)

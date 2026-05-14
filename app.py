@@ -503,7 +503,15 @@ def main():
                     st.info(f"ℹ️ `{pgd_user}` chưa upload HSTD — "
                             f"tạm dùng dữ liệu từ Phòng KH-NV.")
             elif role in ("admin", "manager"):
-                df_op = doc_hstd_toan_cn_pgd()
+                from pathlib import Path
+                from config import PGD_DATA_DIR
+                _pgd_hstd_mtime = max(
+                    (ts_file(str(d / "hstd_latest.xlsx"))
+                     for d in Path(PGD_DATA_DIR).iterdir()
+                     if d.is_dir() and (d / "hstd_latest.xlsx").exists()),
+                    default=0.0,
+                )
+                df_op = doc_hstd_toan_cn_pgd(_pgd_hstd_mtime)
                 if df_op is not None and not df_op.empty:
                     df = df_op
         else:
@@ -540,32 +548,41 @@ def main():
         if os.path.exists(FILE_PATH_SK_GQVL):
             df_sk_gqvl = doc_file_sk_gqvl(FILE_PATH_SK_GQVL, ts_file(FILE_PATH_SK_GQVL))
 
-        if role == "user" and os.path.exists(CACHE_HSTD):
-            _df_ref = duckdb.query(
-                f"SELECT DISTINCT \"{COT_TEN_PGD}\", \"Tên xã\" FROM '{CACHE_HSTD}'"
-            ).df()
+        _map_cache_ts = ts_file(CACHE_HSTD) if os.path.exists(CACHE_HSTD) else 0.0
+        if st.session_state.get("_pgd_map_cache_ts") != _map_cache_ts:
+            if role == "user" and os.path.exists(CACHE_HSTD):
+                _df_ref = duckdb.query(
+                    f"SELECT DISTINCT \"{COT_TEN_PGD}\", \"Tên xã\" FROM '{CACHE_HSTD}'"
+                ).df()
+            else:
+                _df_ref = df_full
+
+            _pgd_xa_map = {}
+            if COT_TEN_PGD in _df_ref.columns and "Tên xã" in _df_ref.columns:
+                for pgd, xa in _df_ref[[COT_TEN_PGD, "Tên xã"]].dropna().drop_duplicates().values:
+                    _pgd_xa_map[str(xa).strip()] = str(pgd).strip()
+            _ds_pgd_all = sorted(_df_ref[COT_TEN_PGD].dropna().unique().tolist()) \
+                          if COT_TEN_PGD in _df_ref.columns else []
+
+            _kv_ds_pgd = lay_config("ds_pgd",    _DS_PGD_DEFAULT)
+            _kv_pgd_xa = lay_config("pgd_xa_map", _PGD_XA_MAP_DEFAULT)
+
+            if _kv_ds_pgd:
+                _ds_pgd_all = sorted(set(_ds_pgd_all) | set(_kv_ds_pgd))
+
+            if isinstance(_kv_pgd_xa, dict):
+                for _pgd, _ds_xa in _kv_pgd_xa.items():
+                    for _xa in (_ds_xa or []):
+                        _xa = str(_xa).strip()
+                        if _xa and _xa not in _pgd_xa_map:
+                            _pgd_xa_map[_xa] = str(_pgd).strip()
+
+            st.session_state["_pgd_map_cache_ts"]  = _map_cache_ts
+            st.session_state["_pgd_xa_map_cached"] = _pgd_xa_map
+            st.session_state["_ds_pgd_all_cached"] = _ds_pgd_all
         else:
-            _df_ref = df_full
-
-        _pgd_xa_map = {}
-        if COT_TEN_PGD in _df_ref.columns and "Tên xã" in _df_ref.columns:
-            for pgd, xa in _df_ref[[COT_TEN_PGD, "Tên xã"]].dropna().drop_duplicates().values:
-                _pgd_xa_map[str(xa).strip()] = str(pgd).strip()
-        _ds_pgd_all = sorted(_df_ref[COT_TEN_PGD].dropna().unique().tolist()) \
-                      if COT_TEN_PGD in _df_ref.columns else []
-
-        _kv_ds_pgd = lay_config("ds_pgd",    _DS_PGD_DEFAULT)
-        _kv_pgd_xa = lay_config("pgd_xa_map", _PGD_XA_MAP_DEFAULT)
-
-        if _kv_ds_pgd:
-            _ds_pgd_all = sorted(set(_ds_pgd_all) | set(_kv_ds_pgd))
-
-        if isinstance(_kv_pgd_xa, dict):
-            for _pgd, _ds_xa in _kv_pgd_xa.items():
-                for _xa in (_ds_xa or []):
-                    _xa = str(_xa).strip()
-                    if _xa and _xa not in _pgd_xa_map:
-                        _pgd_xa_map[_xa] = str(_pgd).strip()
+            _pgd_xa_map = st.session_state["_pgd_xa_map_cached"]
+            _ds_pgd_all = st.session_state["_ds_pgd_all_cached"]
 
         ctx = dict(
             df=df,

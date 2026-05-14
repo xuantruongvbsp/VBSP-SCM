@@ -1,5 +1,5 @@
 # CLAUDE.md — VBSP-SCM
-> Hướng dẫn dự án dành riêng cho **Claude Code** / Cursor / Cline / Cursor.  
+> Hướng dẫn dự án dành riêng cho **Claude Code** / Trae / Cline / Trae.  
 > Đọc toàn bộ file này trước khi đọc bất kỳ file code nào.  
 > Cập nhật: 14/05/2026
 
@@ -331,15 +331,15 @@ else:
 
 | Model | Tool | Dùng cho |
 |---|---|---|
-| **DeepSeek V4 Flash** | Cursor | Đọc file, grep, hỏi nhanh, fix bug 1-2 dòng |
-| **DeepSeek V4 Pro** | Cursor | Viết tính năng mới, refactor, sửa services/, tabs/ |
-| **DeepSeek R1** | Cursor | Thiết kế kiến trúc, debug logic khó, tối ưu query |
+| **DeepSeek V4 Flash** | Trae | Đọc file, grep, hỏi nhanh, fix bug 1-2 dòng |
+| **DeepSeek V4 Pro** | Trae | Viết tính năng mới, refactor, sửa services/, tabs/ |
+| **DeepSeek R1** | Trae | Thiết kế kiến trúc, debug logic khó, tối ưu query |
 | **Claude Haiku 4.5** | Claude Code | Đọc file, grep ngược, kiểm tra context trước khi sửa |
 | **Claude Sonnet 4.6** | Claude Code | Viết code, sửa auth.py, app.py, ws_*.py, review diff |
 | **Claude Opus 4.6** | Claude Code | Migration db.py, snapshot_service, tính năng quan trọng |
 
 **Quy tắc leo model:**
-- Cursor: Flash → Pro → R1
+- Trae: Flash → Pro → R1
 - Claude Code: Haiku → Sonnet → Opus
 - Chỉ leo khi model nhẹ lặp lỗi ≥ 2 lần
 - Không dùng Opus/R1 cho task đọc/tìm/format

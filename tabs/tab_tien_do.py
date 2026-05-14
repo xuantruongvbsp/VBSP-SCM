@@ -16,11 +16,16 @@ from utils import get_tab_context
 DS_PGD_ALL = [DON_VI_CHI_NHANH] + DS_PGD
 
 LOAI_TASK = {
-    "chung":            "Công việc chung",
-    "ho_so_rui_ro":     "Hồ sơ rủi ro",
-    "khao_sat_nhu_cau": "Khảo sát nhu cầu vay vốn",
-    "bao_cao":          "Báo cáo",
-    "tap_huan":         "Tập huấn",
+    "chung":            "📋 Công việc chung",
+    "chi_tieu_khtd":    "🎯 Chỉ tiêu KHTD",
+    "ho_so_rui_ro":     "🗂️ Hồ sơ rủi ro",
+    "khao_sat_nhu_cau": "📊 Khảo sát nhu cầu vay vốn",
+    "bao_cao":          "📄 Báo cáo",
+    "tap_huan":         "🎓 Tập huấn",
+    "giao_dich_xa":     "📅 Giao dịch xã",
+    "uy_thac":          "🤝 Hoạt động ủy thác",
+    "nguon_von":        "💰 Nguồn vốn",
+    "ban_dai_dien":     "📑 Ban đại diện HĐQT",
     "khac":             "Khác",
 }
 UU_TIEN = {
@@ -265,10 +270,15 @@ lưu ý đặc biệt để PGD/CBTD biết cần làm gì.
 
 **3. Loại** — Phân loại đầu việc:
 - 📋 Công việc chung — việc hành chính, tổng hợp
-- 🗂️ Hồ sơ rủi ro — liên quan nợ xấu, NQH
+- 🎯 Chỉ tiêu KHTD — giao/điều chỉnh chỉ tiêu tín dụng cho PGD/xã
+- 🗂️ Hồ sơ rủi ro — liên quan nợ xấu, NQH, xử lý rủi ro
 - 📊 Khảo sát nhu cầu — điều tra nhu cầu vay vốn
-- 📄 Báo cáo — các loại báo cáo định kỳ
+- 📄 Báo cáo — các loại báo cáo định kỳ, thống kê
 - 🎓 Tập huấn — đào tạo, hướng dẫn nghiệp vụ
+- 📅 Giao dịch xã — tổ chức, kiểm tra hoạt động giao dịch xã
+- 🤝 Hoạt động ủy thác — kiểm tra, giám sát 4 tổ chức CT-XH
+- 💰 Nguồn vốn — theo dõi quỹ, điện báo xin vốn, huy động
+- 📑 Ban đại diện HĐQT — phiên họp, nghị quyết, kiểm tra giám sát
 
 **4. Loại theo dõi** — Quan trọng!
 - 📍 **Chi tiết từng xã** — hệ thống tạo 1 dòng theo dõi cho mỗi xã/phường  

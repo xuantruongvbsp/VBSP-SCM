@@ -305,7 +305,17 @@ else:
 
 ---
 
-### 5.10 Không thêm dependency mới
+### 5.10 Git — LUÔN làm việc tại worktree gốc
+
+- **LUÔN** sửa file tại `D:/VBSP-SCM` (worktree gốc, branch `main`)
+- **KHÔNG** sửa trong worktree phụ (`claude/...`) — thay đổi sẽ không hiện trong GitHub Desktop
+- Sau mỗi lần sửa: chạy `git status` tại `D:/VBSP-SCM` để xác nhận file đã modified
+- **KHÔNG tự commit** — để người dùng commit qua GitHub Desktop
+- Nếu đang ở worktree phụ: hỏi người dùng trước, đề xuất sửa tại `D:/VBSP-SCM`
+
+---
+
+### 5.11 Không thêm dependency mới
 
 Trước khi dùng thư viện mới, kiểm tra đã có trong codebase:
 - `pandas`, `openpyxl`, `pyarrow` — có

@@ -302,7 +302,7 @@ Bỏ chọn nếu chỉ áp dụng cho một số PGD cụ thể.
             tieu_de = st.text_area("Tên đầu việc *",
                                    placeholder="VD: Nộp hồ sơ rủi ro tháng 5/2026",
                                    height=68,
-                                   key="td_tao_tieu_de")
+                                   key="tao_task_tieu_de")
             mo_ta = st.text_area("Mô tả / Hướng dẫn", key="tao_task_mo_ta")
 
             c1, c2 = st.columns(2)
@@ -315,7 +315,7 @@ Bỏ chọn nếu chỉ áp dụng cho một số PGD cụ thể.
                     options=["xa", "pgd"],
                     format_func=lambda x: "📍 Chi tiết từng xã" if x == "xa" else "🏢 Chung PGD",
                     horizontal=True,
-                    key="td_tao_loai_theo_doi",
+                    key="tao_task_loai_theo_doi",
                 )
                 uu_tien = st.selectbox("Ưu tiên", list(UU_TIEN.keys()),
                                        format_func=lambda x: UU_TIEN[x], index=2,
@@ -332,7 +332,7 @@ Bỏ chọn nếu chỉ áp dụng cho một số PGD cụ thể.
                 ngay_bat_dau = st.date_input(
                     "Ngày bắt đầu",
                     value=date.today(),
-                    key="td_ngay_bat_dau",
+                    key="tao_task_ngay_bat_dau",
                 )
                 pgd_chon = st.multiselect(
                     "Áp dụng cho đơn vị",

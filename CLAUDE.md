@@ -315,7 +315,21 @@ else:
 
 ---
 
-### 5.11 Không thêm dependency mới
+### 5.11 Chọn model — tiết kiệm token
+
+| Model | Dùng cho |
+|---|---|
+| **DeepSeek V4 Flash** | Đọc file, tìm kiếm, phân tích nhanh, fix bug nhỏ 1-2 dòng |
+| **DeepSeek V4 Pro** | Viết code phức tạp, refactor nhiều file, tính năng mới |
+| **DeepSeek R1** | Thiết kế kiến trúc, tối ưu logic phức tạp, debug khó |
+| **Claude Sonnet 4.6** | Khi DeepSeek không đủ chính xác, đụng `auth.py`, phân quyền |
+| **Claude Opus 4.6** | Migration DB, tính năng quan trọng, đụng `db.py` |
+
+**Quy tắc:** Luôn dùng model nhẹ nhất có thể hoàn thành task. Chỉ leo lên model nặng hơn khi model nhẹ không đủ.
+
+---
+
+### 5.12 Không thêm dependency mới
 
 Trước khi dùng thư viện mới, kiểm tra đã có trong codebase:
 - `pandas`, `openpyxl`, `pyarrow` — có

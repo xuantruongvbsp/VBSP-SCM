@@ -647,17 +647,6 @@ def _render_cap_nhat(tab, **kwargs):
             return
 
         cap_theo_doi = task.get("cap_theo_doi", "xa")
-        label_dv = "PGD" if cap_theo_doi == "pgd" else "xã"
-        st.subheader(f"📋 Cập nhật tiến độ theo {label_dv}")
-
-        if la_manager:
-            ds_pgd_task = json.loads(task.get("ds_pgd") or "[]") or DS_PGD_ALL
-            pgd_sel = st.selectbox("Chọn đơn vị", ds_pgd_task, key="td_cu_pgd")
-        else:
-            pgd_sel = pgd_user
-            if not pgd_sel:
-                st.warning("Tài khoản chưa được gán đơn vị.")
-                return
 
         tag_nd = "🏢 Chung PGD" if cap_theo_doi == "pgd" else "🏘️ Chi tiết xã"
         nguoi_pt = task.get("nguoi_phu_trach") or ""
@@ -672,17 +661,40 @@ def _render_cap_nhat(tab, **kwargs):
         if task.get("mo_ta"):
             st.info(task["mo_ta"])
 
-        kq_list = [r for r in _doc_ketqua_task(task_id) if r["pgd"] == pgd_sel]
+        pgd_user_val = kwargs.get("pgd_user") or ""
+        la_pgd_role = bool(pgd_user_val) and role not in ROLES_PHAN_HE_CN
+
+        if cap_theo_doi == "xa":
+            if la_pgd_role:
+                pgd_sel = pgd_user_val
+            else:
+                ds_pgd_task = json.loads(task.get("ds_pgd") or "[]") or DS_PGD_ALL
+                pgd_sel = st.selectbox(
+                    "Chọn đơn vị",
+                    options=ds_pgd_task,
+                    key=f"td_cap_nhat_pgd_{task_id}",
+                )
+            if not pgd_sel:
+                st.warning("Tài khoản chưa được gán đơn vị.")
+                return
+            kq_list = [r for r in _doc_ketqua_task(task_id) if r["pgd"] == pgd_sel]
+            ten_cot = "Xã / Phường"
+            label_dv = "xã"
+        else:
+            kq_list = _doc_ketqua_task(task_id)
+            if la_pgd_role:
+                kq_list = [r for r in kq_list if r["pgd"] == pgd_user_val]
+            pgd_sel = "__ALL__"
+            ten_cot = "Đơn vị PGD"
+            label_dv = "PGD"
+
         if not kq_list:
-            st.warning(f"Không tìm thấy dữ liệu {label_dv} cho {pgd_sel}. "
-                       "Thử tạo lại đầu việc.")
+            st.warning(f"Không tìm thấy dữ liệu {label_dv}. Thử tạo lại đầu việc.")
             return
 
         xong = sum(1 for r in kq_list if r["trang_thai"] == "da_hoan_thanh")
         st.progress(xong / len(kq_list),
                     text=f"Hoàn thành: {xong}/{len(kq_list)} {label_dv}")
-
-        ten_cot = "Đơn vị PGD" if cap_theo_doi == "pgd" else "Xã / Phường"
 
         def _parse_date(val):
             if not val:
@@ -695,26 +707,21 @@ def _render_cap_nhat(tab, **kwargs):
         df_edit = pd.DataFrame([
             {
                 ten_cot: r["ten_xa"],
-                "Trạng thái": r["trang_thai"],
-                "Ngày HT": _parse_date(r.get("ngay_hoan_thanh")),
+                "Hoàn thành": r["trang_thai"] == "da_hoan_thanh",
+                "Ngày hoàn thành": _parse_date(r.get("ngay_hoan_thanh")),
                 "Ghi chú": r.get("ghi_chu") or "",
             }
             for r in kq_list
         ])
-        df_edit["Ngày HT"] = pd.to_datetime(df_edit["Ngày HT"], errors="coerce").dt.date
 
         edited = st.data_editor(
             df_edit,
             column_config={
-                ten_cot: st.column_config.TextColumn(
-                    ten_cot, disabled=True, width="medium"
-                ),
-                "Trạng thái": st.column_config.SelectboxColumn(
-                    options=list(TS_KQ_LABEL.keys()),
-                    width="small",
-                ),
-                "Ngày HT": st.column_config.DateColumn(
-                    "Ngày HT", format="YYYY-MM-DD", width="small",
+                ten_cot: st.column_config.TextColumn(ten_cot, disabled=True),
+                "Hoàn thành": st.column_config.CheckboxColumn("✅ Hoàn thành"),
+                "Ngày hoàn thành": st.column_config.DateColumn(
+                    "Ngày hoàn thành",
+                    format="DD/MM/YYYY",
                     default=None,
                 ),
                 "Ghi chú": st.column_config.TextColumn(width="large"),
@@ -728,18 +735,19 @@ def _render_cap_nhat(tab, **kwargs):
             count = 0
             for i in range(len(edited)):
                 ten_xa = df_edit.iloc[i][ten_cot]
-                ngay_val = edited.iloc[i]["Ngày HT"]
+                trang_thai = "da_hoan_thanh" if edited.iloc[i]["Hoàn thành"] else "chua_thuc_hien"
+                ngay_val = edited.iloc[i]["Ngày hoàn thành"]
                 ngay_ht = None
-                if pd.notna(ngay_val) and str(ngay_val) not in ("", "NaT"):
+                if pd.notna(ngay_val) and ngay_val:
                     try:
                         ngay_ht = pd.to_datetime(ngay_val).date().isoformat()
                     except Exception:
                         ngay_ht = None
+                pgd_val = ten_xa if cap_theo_doi == "pgd" else pgd_sel
                 try:
                     _upsert_ketqua_xa(
-                        task_id, ten_xa, pgd_sel,
-                        str(edited.iloc[i]["Trạng thái"]),
-                        ngay_ht,
+                        task_id, ten_xa, pgd_val,
+                        trang_thai, ngay_ht,
                         str(edited.iloc[i]["Ghi chú"]).strip() or None,
                         username,
                     )
@@ -747,33 +755,15 @@ def _render_cap_nhat(tab, **kwargs):
                 except Exception as e:
                     st.warning(f"Lỗi {ten_xa}: {e}")
             db.ghi_audit(username, "tien_do_cap_nhat_xa",
-                         f"Task '{task['tieu_de']}' · {pgd_sel} · {count} xã")
-            st.toast(f"✅ Đã lưu {count} xã.")
+                         f"Task '{task['tieu_de']}' · {count} {label_dv}")
+            st.toast(f"✅ Đã lưu {count} {label_dv}.")
             st.rerun()
 
-        kq_all = _doc_ketqua_task(task_id)
-        if st.button("📄 Xuất PDF tiến độ", key=f"td_pdf_{task_id}"):
-            pdf_bytes = _xuat_pdf_tien_do(task, kq_all, username)
-            if pdf_bytes:
-                ten_file = (
-                    f"TienDo_{task['tieu_de'][:20].replace(' ', '_')}_"
-                    f"{date.today().isoformat()}.pdf"
-                )
-                st.download_button(
-                    "⬇ Tải PDF",
-                    data=pdf_bytes,
-                    file_name=ten_file,
-                    mime="application/pdf",
-                    key=f"td_pdf_dl_{task_id}",
-                )
-                db.ghi_audit(
-                    username, "tien_do_xuat_pdf",
-                    f"Task '{task['tieu_de']}'"
-                )
 
 
 def _render_xuat(tab, **kwargs):
     SS_KEY = "_td_xuat_excel"
+    username = kwargs.get("username", "")
     _tab_ctx = tab if tab is not None else __import__('streamlit').container()
     with _tab_ctx:
         st.subheader("📤 Xuất báo cáo tiến độ")
@@ -892,6 +882,148 @@ def _render_xuat(tab, **kwargs):
             st.success(f"Đã xuất {payload['n_task']} đầu việc · "
                        f"{payload['n_ct']} dòng chi tiết · "
                        f"{payload['n_th']} đầu việc tổng hợp.")
+
+        st.divider()
+        st.markdown("### 📄 Xuất PDF tiến độ theo task")
+
+        ds_task_pdf = _doc_tasks(chi_dang_theo_doi=False)
+        if not ds_task_pdf:
+            st.info("Chưa có đầu việc nào.")
+        else:
+            task_map_pdf = {t["id"]: t for t in ds_task_pdf}
+
+            def _fmt_task_pdf(task_id):
+                t = task_map_pdf.get(task_id) or {}
+                stt = "[ĐANG]" if t.get("trang_thai") == "dang_theo_doi" else "[ĐÓNG]"
+                return f"{stt} {t.get('tieu_de','')} · {t.get('ngay_deadline','')}"
+
+            task_id_pdf = st.selectbox(
+                "Chọn đầu việc",
+                options=list(task_map_pdf.keys()),
+                format_func=_fmt_task_pdf,
+                key="td_xuat_pdf_task",
+            )
+            task_pdf = task_map_pdf.get(task_id_pdf)
+
+            if task_pdf and st.button(
+                "📄 Xuất PDF tiến độ",
+                type="primary",
+                key="td_btn_xuat_pdf"
+            ):
+                kq_all = _doc_ketqua_task(task_id_pdf)
+                pdf_bytes = _xuat_pdf_tien_do(task_pdf, kq_all, username)
+                if pdf_bytes:
+                    ten_file = (
+                        f"TienDo_{task_pdf['tieu_de'][:20].replace(' ', '_')}_"
+                        f"{date.today().isoformat()}.pdf"
+                    )
+                    st.session_state["_td_pdf_bytes"] = pdf_bytes
+                    st.session_state["_td_pdf_file"] = ten_file
+                    db.ghi_audit(
+                        username, "tien_do_xuat_pdf",
+                        f"Task '{task_pdf['tieu_de']}'"
+                    )
+                    st.rerun()
+
+            if st.session_state.get("_td_pdf_bytes"):
+                st.download_button(
+                    "⬇ Tải PDF",
+                    data=st.session_state["_td_pdf_bytes"],
+                    file_name=st.session_state.get("_td_pdf_file", "TienDo.pdf"),
+                    mime="application/pdf",
+                    key="td_pdf_dl",
+                    use_container_width=True,
+                )
+
+        st.divider()
+        st.markdown("### 🔴 Báo cáo trễ hạn")
+        st.caption("Danh sách xã/PGD chưa hoàn thành sau thời hạn")
+
+        hom_nay = date.today().isoformat()
+        ds_task_all = _doc_tasks(chi_dang_theo_doi=False)
+
+        tre_rows = []
+        for t in ds_task_all:
+            if t["ngay_deadline"] >= hom_nay:
+                continue
+            kq = _doc_ketqua_task(t["id"])
+            for r in kq:
+                if r["trang_thai"] != "chua_thuc_hien":
+                    continue
+                so_ngay_tre = (date.today() - date.fromisoformat(t["ngay_deadline"])).days
+                tre_rows.append({
+                    "Đầu việc": t["tieu_de"],
+                    "Loại": LOAI_TASK.get(t["loai"], t["loai"]),
+                    "Thời hạn": t["ngay_deadline"],
+                    "PGD": r["pgd"],
+                    "Xã / Phường": r["ten_xa"],
+                    "Số ngày trễ": so_ngay_tre,
+                    "Người phụ trách": t.get("nguoi_phu_trach") or "—",
+                })
+
+        df_tre = pd.DataFrame(tre_rows) if tre_rows else pd.DataFrame(
+            columns=["Đầu việc", "Loại", "Thời hạn", "PGD",
+                     "Xã / Phường", "Số ngày trễ", "Người phụ trách"]
+        )
+
+        c1t, c2t, c3t = st.columns(3)
+        c1t.metric("Tổng trễ hạn", len(df_tre))
+        c2t.metric("PGD bị ảnh hưởng", df_tre["PGD"].nunique() if not df_tre.empty else 0)
+        c3t.metric("Đầu việc trễ", df_tre["Đầu việc"].nunique() if not df_tre.empty else 0)
+
+        if df_tre.empty:
+            st.success("✅ Không có đơn vị nào trễ hạn.")
+        else:
+            st.dataframe(df_tre, use_container_width=True, hide_index=True)
+
+            SS_TRE_EXCEL = "_td_tre_excel"
+            SS_TRE_PDF = "_td_tre_pdf"
+
+            col_tre1, col_tre2 = st.columns(2)
+            with col_tre1:
+                if st.button("📥 Xuất Excel trễ hạn", key="td_btn_tre_excel"):
+                    out = BytesIO()
+                    with pd.ExcelWriter(out, engine="openpyxl") as writer:
+                        df_tre.to_excel(writer, sheet_name="Trễ hạn", index=False)
+                    st.session_state[SS_TRE_EXCEL] = {
+                        "data": out.getvalue(),
+                        "filename": f"TreHan_{date.today().isoformat()}.xlsx",
+                    }
+                    db.ghi_audit(username, "tien_do_xuat_tre_han",
+                                 f"{len(df_tre)} dòng trễ hạn")
+                    st.rerun()
+
+                if st.session_state.get(SS_TRE_EXCEL):
+                    st.download_button(
+                        "⬇ Tải Excel trễ hạn",
+                        data=st.session_state[SS_TRE_EXCEL]["data"],
+                        file_name=st.session_state[SS_TRE_EXCEL]["filename"],
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        key="td_tre_excel_dl",
+                        use_container_width=True,
+                    )
+
+            with col_tre2:
+                if st.button("📄 Xuất PDF trễ hạn", key="td_btn_tre_pdf"):
+                    pdf_bytes = _xuat_pdf_tre_han(df_tre, username)
+                    if pdf_bytes:
+                        st.session_state[SS_TRE_PDF] = {
+                            "data": pdf_bytes.read(),
+                            "filename": f"TreHan_{date.today().isoformat()}.pdf",
+                        }
+                        db.ghi_audit(username, "tien_do_xuat_tre_han_pdf",
+                                     f"{len(df_tre)} dòng trễ hạn")
+                        st.rerun()
+
+                if st.session_state.get(SS_TRE_PDF):
+                    st.download_button(
+                        "⬇ Tải PDF trễ hạn",
+                        data=st.session_state[SS_TRE_PDF]["data"],
+                        file_name=st.session_state[SS_TRE_PDF]["filename"],
+                        mime="application/pdf",
+                        key="td_tre_pdf_dl",
+                        use_container_width=True,
+                    )
 
 
 def _xuat_pdf_tien_do(task, ds_kq, username):
@@ -1074,6 +1206,158 @@ def _xuat_pdf_tien_do(task, ds_kq, username):
         return None
 
 
+def _xuat_pdf_tre_han(df_tre, username):
+    try:
+        from reportlab.lib.pagesizes import A4
+        from reportlab.platypus import (
+            SimpleDocTemplate, Paragraph, Spacer, HRFlowable,
+        )
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib import colors
+        from reportlab.lib.enums import TA_CENTER
+        from reportlab.pdfbase import pdfmetrics
+        from reportlab.pdfbase.ttfonts import TTFont
+        import os
+
+        FONT_NORMAL = "Helvetica"
+        FONT_BOLD = "Helvetica-Bold"
+
+        arial_path = "C:/Windows/Fonts/arial.ttf"
+        arialbd_path = "C:/Windows/Fonts/arialbd.ttf"
+        if os.path.exists(arial_path):
+            pdfmetrics.registerFont(TTFont("ArialUni", arial_path))
+            FONT_NORMAL = "ArialUni"
+        if os.path.exists(arialbd_path):
+            pdfmetrics.registerFont(TTFont("ArialUni-Bold", arialbd_path))
+            FONT_BOLD = "ArialUni-Bold"
+
+        if df_tre.empty:
+            return None
+
+        nhom_theo_pgd = {}
+        for _, r in df_tre.iterrows():
+            nhom_theo_pgd.setdefault(r["PGD"], []).append(r)
+
+        buf = BytesIO()
+        doc = SimpleDocTemplate(
+            buf, pagesize=A4,
+            leftMargin=28, rightMargin=28,
+            topMargin=20, bottomMargin=20,
+        )
+
+        story = []
+        styles = getSampleStyleSheet()
+
+        title_style = ParagraphStyle(
+            "Title_VN", parent=styles["Title"],
+            fontName=FONT_BOLD, fontSize=14,
+            alignment=TA_CENTER, spaceAfter=2, leading=18,
+        )
+        subtitle_style = ParagraphStyle(
+            "Sub_VN", parent=styles["Normal"],
+            fontName=FONT_BOLD, fontSize=12,
+            alignment=TA_CENTER, spaceAfter=4, leading=16,
+        )
+        normal_style = ParagraphStyle(
+            "Normal_VN", parent=styles["Normal"],
+            fontName=FONT_NORMAL, fontSize=10,
+            leading=14,
+        )
+        pgd_style = ParagraphStyle(
+            "PGD_VN", parent=styles["Normal"],
+            fontName=FONT_BOLD, fontSize=11,
+            spaceBefore=8, spaceAfter=4, leading=15,
+            textColor=colors.HexColor("#2e7d32"),
+        )
+        task_style = ParagraphStyle(
+            "Task_VN", parent=styles["Normal"],
+            fontName=FONT_NORMAL, fontSize=10,
+            leftIndent=12, spaceBefore=2, spaceAfter=2, leading=14,
+        )
+        xa_style = ParagraphStyle(
+            "Xa_VN", parent=styles["Normal"],
+            fontName=FONT_NORMAL, fontSize=9,
+            leftIndent=24, leading=13, textColor=colors.grey,
+        )
+        summary_style = ParagraphStyle(
+            "Summary_VN", parent=styles["Normal"],
+            fontName=FONT_BOLD, fontSize=10,
+            spaceBefore=8, spaceAfter=4, leading=14,
+        )
+
+        story.append(Paragraph(
+            "NGÂN HÀNG CHÍNH SÁCH XÃ HỘI VIỆT NAM",
+            title_style,
+        ))
+        story.append(Paragraph(
+            "CHI NHÁNH TỈNH ĐỒNG NAI",
+            subtitle_style,
+        ))
+        story.append(Spacer(1, 10))
+        story.append(Paragraph("BÁO CÁO ĐƠN VỊ TRỄ HẠN", subtitle_style))
+        story.append(Spacer(1, 4))
+
+        now = datetime.now()
+        so_pgd = df_tre["PGD"].nunique()
+        so_task = df_tre["Đầu việc"].nunique()
+        story.append(Paragraph(
+            f"Ngày xuất: {now.strftime('%d/%m/%Y %H:%M')} | Người xuất: {username}",
+            normal_style,
+        ))
+        story.append(Paragraph(
+            f"Tổng: {len(df_tre)} đơn vị trễ | {so_pgd} PGD | {so_task} đầu việc",
+            normal_style,
+        ))
+        story.append(HRFlowable(
+            width="100%", thickness=0.5, color=colors.grey))
+        story.append(Spacer(1, 6))
+
+        tong_pgd = 0
+        tong_pgd_tre = 0
+        for pgd, rows in sorted(nhom_theo_pgd.items()):
+            tong_pgd += 1
+            so_task_tre = len(set(r["Đầu việc"] for r in rows))
+            story.append(Paragraph(
+                f"{pgd} ({so_task_tre} đầu việc trễ)",
+                pgd_style,
+            ))
+
+            nhom_theo_task = {}
+            for r in rows:
+                nhom_theo_task.setdefault(r["Đầu việc"], []).append(r)
+
+            for ten_task, task_rows in nhom_theo_task.items():
+                so_ngay = task_rows[0]["Số ngày trễ"]
+                story.append(Paragraph(
+                    f"• {ten_task} — trễ {so_ngay} ngày",
+                    task_style,
+                ))
+                ds_xa = [r["Xã / Phường"] for r in task_rows[:8]]
+                xa_text = ", ".join(ds_xa)
+                if len(task_rows) > 8:
+                    xa_text += f" và {len(task_rows) - 8} đơn vị khác"
+                story.append(Paragraph(f"○ {xa_text}", xa_style))
+
+            tong_pgd_tre += 1
+
+        story.append(Spacer(1, 6))
+        story.append(HRFlowable(
+            width="100%", thickness=0.5, color=colors.grey))
+        story.append(Spacer(1, 6))
+        story.append(Paragraph(
+            f"TỔNG KẾT: {tong_pgd_tre}/{tong_pgd} PGD có đơn vị trễ hạn",
+            summary_style,
+        ))
+
+        doc.build(story)
+        buf.seek(0)
+        return buf
+
+    except Exception as e:
+        st.error(f"Lỗi tạo PDF trễ hạn: {e}")
+        return None
+
+
 def render(tab, **kwargs):
     role = kwargs.get("role")
     pgd_user = kwargs.get("pgd_user")
@@ -1088,8 +1372,16 @@ def render(tab, **kwargs):
     with _tab_ctx:
         st.subheader("📅 Tiến độ Công việc Hàng ngày")
 
-        if is_exec or is_pgd_view:
+        if is_exec:
             _render_tong_quan(tab, **kwargs)
+            return
+
+        if is_pgd_view:
+            t1, t2 = st.tabs(["📊 Tổng quan", "📋 Cập nhật tiến độ"])
+            with t1:
+                _render_tong_quan(t1, **kwargs)
+            with t2:
+                _render_cap_nhat(t2, **kwargs)
             return
 
         if not can_manage:

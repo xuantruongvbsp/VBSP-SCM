@@ -338,8 +338,13 @@ def doc_gqvl_pgd(ten_pgd: str, _ts):
 
 
 # ── Gộp toàn CN ──────────────────────────────────────────────────────────────
-def doc_hstd_toan_cn_pgd() -> pd.DataFrame | None:
-    """Gộp HSTD tất cả PGD đã upload (từ cấu trúc mới)."""
+@st.cache_data(show_spinner=False)
+def doc_hstd_toan_cn_pgd(pgd_dir_mtime: float = 0.0) -> pd.DataFrame | None:
+    """Gộp HSTD tất cả PGD đã upload (từ cấu trúc mới).
+
+    `pgd_dir_mtime` = max mtime của các file hstd_latest.xlsx → cache key.
+    (Không dùng tiền tố `_` để Streamlit đưa vào cache key.)
+    """
     from data.hstd import doc_file
 
     if not os.path.exists(PGD_DATA_DIR):

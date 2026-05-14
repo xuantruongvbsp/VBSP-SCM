@@ -531,16 +531,28 @@ def main():
             if not os.path.exists(CACHE_NQ11):
                 doc_file_nq11(FILE_PATH_NQ11, ts_file(FILE_PATH_NQ11))
             if role == "user" and pgd_user:
-                makh_list = df[COT_MA_KH].dropna().astype(str).unique().tolist()
-                if makh_list:
-                    _makh_sql = ", ".join(f"'{m}'" for m in makh_list)
-                    df_nq11 = duckdb.query(
-                        f"SELECT * FROM '{CACHE_NQ11}'"
-                        f" WHERE CAST(\"Mã khách hàng\" AS VARCHAR) IN ({_makh_sql})"
-                    ).df()
+                _nq11_cache = st.session_state.get("nq11_pgd_cache")
+                _nq11_ts = ts_file(CACHE_NQ11)
+                if (
+                    _nq11_cache
+                    and _nq11_cache.get("ts_nq11") == _nq11_ts
+                    and _nq11_cache.get("pgd_user") == pgd_user
+                ):
+                    df_nq11 = _nq11_cache["data"]
                 else:
-                    import pandas as _pd
-                    df_nq11 = _pd.DataFrame()
+                    makh_df = df[[COT_MA_KH]].dropna().astype(str).drop_duplicates()
+                    if not makh_df.empty:
+                        df_nq11 = duckdb.query(
+                            f"SELECT n.* FROM '{CACHE_NQ11}' n "
+                            f"JOIN makh_df m ON CAST(n.\"Mã khách hàng\" AS VARCHAR) = m[\"{COT_MA_KH}\"]"
+                        ).df()
+                    else:
+                        df_nq11 = pd.DataFrame()
+                    st.session_state["nq11_pgd_cache"] = {
+                        "data": df_nq11,
+                        "ts_nq11": _nq11_ts,
+                        "pgd_user": pgd_user,
+                    }
             else:
                 df_nq11 = _load_nq11(CACHE_NQ11, ts_file(CACHE_NQ11))
 

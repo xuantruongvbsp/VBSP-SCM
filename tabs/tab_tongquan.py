@@ -13,7 +13,6 @@ import plotly.express as px
 import plotly.graph_objects as go
 
 from config import *
-from config import CHUONG_TRINH_KHTD
 from config import DS_PGD, CACHE_HSTD, DON_VI_CHI_NHANH, TEN_CHI_NHANH_HIEN_THI
 
 from utils import (
@@ -545,11 +544,8 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
         st.markdown("**📂 Cơ cấu dư nợ theo chương trình tín dụng**")
         if COT_TEN_CT in df.columns and COT_TONG_DU_NO in df.columns:
 
-            # Build _NGUON_MAP from CHUONG_TRINH_KHTD inside render() to avoid NameError at module import time
-            _NGUON_MAP: dict[str, str] = {
-                ten_hien_thi: nguon_von
-                for _, _, ten_hien_thi, nguon_von, _ in CHUONG_TRINH_KHTD
-            }
+            du_no_tw = df[df[COT_NGUON_VON].astype(str) == "1"].groupby(COT_TEN_CT)[COT_TONG_DU_NO].sum()
+            du_no_dp = df[df[COT_NGUON_VON].astype(str) == "2"].groupby(COT_TEN_CT)[COT_TONG_DU_NO].sum()
 
             df_ct = (
                 df.groupby(COT_TEN_CT)
@@ -567,14 +563,8 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
             tong = df_ct["du_no"].sum()
             df_ct["ty_trong"] = (df_ct["du_no"] / tong * 100).round(1) if tong > 0 else 0
 
-            # Tách nguồn TW / ĐP theo config
-            df_ct["_nguon"] = df_ct["ten_ct"].map(_NGUON_MAP).fillna("TW")
-            df_ct["du_no_tw"] = df_ct.apply(
-                lambda r: r["du_no"] if r["_nguon"] == "TW" else 0, axis=1
-            )
-            df_ct["du_no_dp"] = df_ct.apply(
-                lambda r: r["du_no"] if r["_nguon"] == "DP" else 0, axis=1
-            )
+            df_ct["du_no_tw"] = df_ct["ten_ct"].map(du_no_tw).fillna(0)
+            df_ct["du_no_dp"] = df_ct["ten_ct"].map(du_no_dp).fillna(0)
 
             # Chỉ số bổ sung: join từ df grouped riêng nếu cột tồn tại
             if COT_DU_NO_QH in df.columns:

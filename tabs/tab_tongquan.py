@@ -545,8 +545,9 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
         st.markdown("**📂 Cơ cấu dư nợ theo chương trình tín dụng**")
         if COT_TEN_CT in df.columns and COT_TONG_DU_NO in df.columns:
 
-            du_no_tw = df[df[COT_NGUON_VON].astype(str) == "1"].groupby(COT_TEN_CT)[COT_TONG_DU_NO].sum()
-            du_no_dp = df[df[COT_NGUON_VON].astype(str) == "2"].groupby(COT_TEN_CT)[COT_TONG_DU_NO].sum()
+            _nv = pd.to_numeric(df[COT_NGUON_VON], errors="coerce")
+            du_no_tw = df[_nv == 1].groupby(COT_TEN_CT)[COT_TONG_DU_NO].sum()
+            du_no_dp = df[_nv == 2].groupby(COT_TEN_CT)[COT_TONG_DU_NO].sum()
 
             df_ct = (
                 df.groupby(COT_TEN_CT)
@@ -594,9 +595,9 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
             else:
                 df_ct["gn_nam"] = 0
 
-            col_tn = next((c for c in HSTD_THU_NO_NAM_ALIASES if c in df.columns), None)
-            if col_tn:
-                df_ct5 = df.groupby(COT_TEN_CT)[col_tn].sum().reset_index()
+            cols_tn = [c for c in HSTD_THU_NO_NAM_ALIASES if c in df.columns]
+            if cols_tn:
+                df_ct5 = df.groupby(COT_TEN_CT)[cols_tn].sum().sum(axis=1).reset_index()
                 df_ct5.columns = ["ten_ct", "tn_nam"]
                 df_ct = df_ct.merge(df_ct5, on="ten_ct", how="left")
                 df_ct["tn_nam"] = df_ct["tn_nam"].fillna(0)
@@ -605,8 +606,8 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
 
             # Hiển thị bảng
             df_hien = df_ct.rename(columns={"ten_ct": "Chương trình"}).copy()
-            df_hien["Số món vay"]         = df_hien["so_mon"]
-            df_hien["Số KH"]              = df_hien["so_kh"]
+            df_hien["Số món vay"]         = df_hien["so_mon"].apply(fmt_so)
+            df_hien["Số KH"]              = df_hien["so_kh"].apply(fmt_so)
             df_hien["Dư nợ (tỷ)"]        = df_hien["du_no"].apply(fmt_ty)
             df_hien["Nguồn TW (tỷ)"]     = df_hien["du_no_tw"].apply(fmt_ty)
             df_hien["Nguồn ĐP (tỷ)"]     = df_hien["du_no_dp"].apply(fmt_ty)

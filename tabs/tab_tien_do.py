@@ -448,9 +448,10 @@ def _render_quan_ly_task(tab, **kwargs):
             uu_tien_index = 2
 
         with st.form("form_sua_task"):
-            tieu_de = st.text_input(
+            tieu_de = st.text_area(
                 "Tên đầu việc *",
                 value=str(task.get("tieu_de") or ""),
+                height=68,
                 key=f"td_sua_tieu_de_{task_id}",
             )
             mo_ta = st.text_area(
@@ -477,10 +478,41 @@ def _render_quan_ly_task(tab, **kwargs):
                 value=deadline_default,
                 key=f"td_sua_deadline_{task_id}",
             )
-            ghi_chu = st.text_input(
+            ghi_chu = st.text_area(
                 "Ghi chú thêm",
                 value=str(task.get("ghi_chu") or ""),
+                height=68,
                 key=f"td_sua_ghi_chu_{task_id}",
+            )
+            nguoi_phu_trach = st.text_area(
+                "Người phụ trách",
+                value=str(task.get("nguoi_phu_trach") or ""),
+                height=68,
+                key=f"td_sua_nguoi_pt_{task_id}",
+            )
+            ngay_bat_dau_val = date.today()
+            try:
+                ngay_bat_dau_val = date.fromisoformat(
+                    str(task.get("ngay_bat_dau") or date.today().isoformat())
+                )
+            except Exception:
+                pass
+            ngay_bat_dau = st.date_input(
+                "Ngày bắt đầu",
+                value=ngay_bat_dau_val,
+                key=f"td_sua_ngay_bat_dau_{task_id}",
+            )
+            cap_theo_doi_keys = ["xa", "pgd"]
+            cap_theo_doi_idx = cap_theo_doi_keys.index(
+                task.get("cap_theo_doi", "xa")
+            ) if task.get("cap_theo_doi") in cap_theo_doi_keys else 0
+            cap_theo_doi = st.radio(
+                "Loại theo dõi",
+                options=cap_theo_doi_keys,
+                format_func=lambda x: "📍 Chi tiết từng xã" if x == "xa" else "🏢 Chung PGD",
+                index=cap_theo_doi_idx,
+                horizontal=True,
+                key=f"td_sua_cap_theo_doi_{task_id}",
             )
 
             st.caption(
@@ -498,7 +530,8 @@ def _render_quan_ly_task(tab, **kwargs):
                     conn.execute(
                         """UPDATE tien_do_task
                            SET tieu_de=?, mo_ta=?, ngay_deadline=?, loai=?,
-                               uu_tien=?, ghi_chu=?
+                               uu_tien=?, ghi_chu=?,
+                               cap_theo_doi=?, ngay_bat_dau=?, nguoi_phu_trach=?
                            WHERE id=?""",
                         (
                             str(tieu_de).strip(),
@@ -507,6 +540,9 @@ def _render_quan_ly_task(tab, **kwargs):
                             loai,
                             uu_tien,
                             str(ghi_chu).strip() or None,
+                            cap_theo_doi,
+                            ngay_bat_dau.isoformat(),
+                            str(nguoi_phu_trach).strip() or None,
                             task_id,
                         ),
                     )
@@ -624,10 +660,14 @@ def _render_cap_nhat(tab, **kwargs):
                 return
 
         tag_nd = "🏢 Chung PGD" if cap_theo_doi == "pgd" else "🏘️ Chi tiết xã"
+        nguoi_pt = task.get("nguoi_phu_trach") or ""
+        ngay_bd = task.get("ngay_bat_dau") or ""
         st.caption(
             f"**{task['tieu_de']}** · {tag_nd} · "
             f"{LOAI_TASK.get(task['loai'], task['loai'])} · "
             f"Thời hạn: **{task['ngay_deadline']}** · {UU_TIEN.get(task['uu_tien'], '')}"
+            + (f" · Người PT: {nguoi_pt}" if nguoi_pt else "")
+            + (f" · Từ: {ngay_bd}" if ngay_bd else "")
         )
         if task.get("mo_ta"):
             st.info(task["mo_ta"])
@@ -781,6 +821,9 @@ def _render_xuat(tab, **kwargs):
                     "Trễ hạn":       tre,
                     "N/A":           na,
                     "Tỷ lệ HT%":    round(xong / tong * 100, 1) if tong else 0,
+                    "Loại theo dõi": "Chung PGD" if t.get("cap_theo_doi") == "pgd" else "Chi tiết xã",
+                    "Ngày bắt đầu": t.get("ngay_bat_dau") or "",
+                    "Người phụ trách": t.get("nguoi_phu_trach") or "",
                 })
             df_tonghop = pd.DataFrame(summary_rows)
 
@@ -948,7 +991,9 @@ def _xuat_pdf_tien_do(task, ds_kq, username):
         ngay_xuat = now.strftime("%d/%m/%Y %H:%M")
 
         story.append(Paragraph(
-            f"Loại: {loai} | Ưu tiên: {uu_tien} | Thời hạn: {deadline}",
+            f"Loại: {loai} | Ưu tiên: {uu_tien} | "
+            f"Người phụ trách: {task.get('nguoi_phu_trach') or '—'} | "
+            f"Từ ngày: {task.get('ngay_bat_dau') or '—'} → Thời hạn: {deadline}",
             normal_style,
         ))
         story.append(Paragraph(

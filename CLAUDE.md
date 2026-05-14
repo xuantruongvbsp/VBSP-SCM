@@ -329,15 +329,20 @@ else:
 
 ### 5.11 Chọn model — tiết kiệm token
 
-| Model | Dùng cho |
-|---|---|
-| **DeepSeek V4 Flash** | Đọc file, tìm kiếm, phân tích nhanh, fix bug nhỏ 1-2 dòng |
-| **DeepSeek V4 Pro** | Viết code phức tạp, refactor nhiều file, tính năng mới |
-| **DeepSeek R1** | Thiết kế kiến trúc, tối ưu logic phức tạp, debug khó |
-| **Claude Sonnet 4.6** | Khi DeepSeek không đủ chính xác, đụng `auth.py`, phân quyền |
-| **Claude Opus 4.6** | Migration DB, tính năng quan trọng, đụng `db.py` |
+| Model | Tool | Dùng cho |
+|---|---|---|
+| **DeepSeek V4 Flash** | Trae | Đọc file, grep, hỏi nhanh, fix bug 1-2 dòng |
+| **DeepSeek V4 Pro** | Trae | Viết tính năng mới, refactor, sửa services/, tabs/ |
+| **DeepSeek R1** | Trae | Thiết kế kiến trúc, debug logic khó, tối ưu query |
+| **Claude Haiku 4.5** | Claude Code | Đọc file, grep ngược, kiểm tra context trước khi sửa |
+| **Claude Sonnet 4.6** | Claude Code | Viết code, sửa auth.py, app.py, ws_*.py, review diff |
+| **Claude Opus 4.6** | Claude Code | Migration db.py, snapshot_service, tính năng quan trọng |
 
-**Quy tắc:** Luôn dùng model nhẹ nhất có thể hoàn thành task. Chỉ leo lên model nặng hơn khi model nhẹ không đủ.
+**Quy tắc leo model:**
+- Trae: Flash → Pro → R1
+- Claude Code: Haiku → Sonnet → Opus
+- Chỉ leo khi model nhẹ lặp lỗi ≥ 2 lần
+- Không dùng Opus/R1 cho task đọc/tìm/format
 
 ---
 

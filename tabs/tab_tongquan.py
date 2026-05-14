@@ -591,7 +591,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                 df_ct4 = df.groupby(COT_TEN_CT)[col_gn].sum().reset_index()
                 df_ct4.columns = ["ten_ct", "gn_nam"]
                 df_ct = df_ct.merge(df_ct4, on="ten_ct", how="left")
-                df_ct["gn_nam"] = df_ct["gn_nam"].fillna(0)
+                df_ct["gn_nam"] = df_ct["gn_nam"].fillna(0).replace([float('inf'), float('-inf')], 0)
             else:
                 df_ct["gn_nam"] = 0
 
@@ -600,7 +600,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                 df_ct5 = df.groupby(COT_TEN_CT)[cols_tn].sum().sum(axis=1).reset_index()
                 df_ct5.columns = ["ten_ct", "tn_nam"]
                 df_ct = df_ct.merge(df_ct5, on="ten_ct", how="left")
-                df_ct["tn_nam"] = df_ct["tn_nam"].fillna(0)
+                df_ct["tn_nam"] = df_ct["tn_nam"].fillna(0).replace([float('inf'), float('-inf')], 0)
             else:
                 df_ct["tn_nam"] = 0
 

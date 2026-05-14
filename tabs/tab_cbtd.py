@@ -13,7 +13,7 @@ import plotly.graph_objects as go
 from config import *
 from auth import la_phan_he_cn, normalize_role
 from utils import xuat_excel, ten_file_xuat, hien_thi_dataframe_phan_trang
-from data import doc_cbtd, luu_cbtd
+from data.khtd import doc_cbtd, luu_cbtd
 
 if TYPE_CHECKING:
     from streamlit.delta_generator import DeltaGenerator

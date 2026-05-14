@@ -405,7 +405,7 @@ def _render_quan_ly_task(tab, **kwargs):
 
     _tab_ctx = tab if tab is not None else __import__("streamlit").container()
     with _tab_ctx:
-        st.subheader("✏️ Quản lý đầu việc")
+        st.subheader("✏️ Chỉnh sửa & Xóa đầu việc")
 
         ds_task = _doc_tasks(chi_dang_theo_doi=False)
         if not ds_task:
@@ -1097,7 +1097,7 @@ def render(tab, **kwargs):
             return
 
         t1, t2, t3, t4, t5 = st.tabs([
-            "📊 Tổng quan", "➕ Tạo đầu việc", "✏️ Quản lý đầu việc",
+            "📊 Tổng quan", "➕ Tạo đầu việc", "✏️ Chỉnh sửa & Xóa đầu việc",
             "📋 Cập nhật tiến độ", "📤 Xuất báo cáo",
         ])
         with t1:

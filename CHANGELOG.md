@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [2026-05-14] — Tiến độ nhiệm vụ: thêm loại Chung PGD / Chi tiết xã + metadata
+- `db.py` — Migration: ALTER TABLE thêm `loai_noi_dung TEXT` vào `tien_do_ketqua`, `ngay_bat_dau TEXT` + `nguoi_phu_trach TEXT` vào `tien_do_task`
+- `tabs/tab_tien_do.py` — `_khoi_tao_ketqua_task()`: thêm tham số `loai_noi_dung`, ghi vào DB mỗi dòng kết quả
+- `tabs/tab_tien_do.py` — `_render_tao_task()`: thêm field `ngay_bat_dau` (date_input) + `nguoi_phu_trach` (text_input), lưu vào DB
+- `tabs/tab_tien_do.py` — `_render_tong_quan()`: thêm filter "Loại nhiệm vụ" (Tất cả/Chung PGD/Chi tiết xã); KPI labels generic (✅ Hoàn thành, 🔴 Trễ hạn)
+- `tabs/tab_tien_do.py` — `_render_cap_nhat()`: hiển thị tag 🏢 Chung PGD / 🏘️ Chi tiết xã bên cạnh tên task
+
 ## [2026-05-14] — Mở rộng bảng "Cơ cấu dư nợ theo chương trình tín dụng" — thêm 6 cột + sửa đơn vị
 - `tabs/tab_tongquan.py` dòng ~197 — Cập nhật `_tao_column_config_co_cau()` với config cho 9 cột mới
 - `tabs/tab_tongquan.py` dòng ~587 — Sửa `/1e9` → `/1e12` cho tất cả cột tiền tệ (theo quy ước `fmt_ty()`)

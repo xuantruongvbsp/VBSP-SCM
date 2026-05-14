@@ -310,7 +310,8 @@ else:
 - **LUÔN** sửa file tại `D:/VBSP-SCM` (worktree gốc, branch `main`)
 - **KHÔNG** sửa trong worktree phụ (`claude/...`) — thay đổi sẽ không hiện trong GitHub Desktop
 - Sau mỗi lần sửa: chạy `git status` tại `D:/VBSP-SCM` để xác nhận file đã modified
-- **KHÔNG tự commit** — để người dùng commit qua GitHub Desktop
+- **TUYỆT ĐỐI KHÔNG tự `git commit` hay `git push`** — người dùng tự commit qua GitHub Desktop
+- **TUYỆT ĐỐI KHÔNG chạy `git add`** trừ khi người dùng yêu cầu rõ ràng
 - Nếu đang ở worktree phụ: hỏi người dùng trước, đề xuất sửa tại `D:/VBSP-SCM`
 
 ---
@@ -445,7 +446,7 @@ except Exception as e:
 
 ---
 
-## 8. Checklist trước khi sửa
+ Checklist trước khi sửa
 
 ```
 □ Đọc file cần sửa (view toàn bộ hoặc phần liên quan)

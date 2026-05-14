@@ -923,6 +923,19 @@ def render(**kwargs):
     if _wl:
         st.warning(_wl)
 
+    # ── Lazy import tab modules ──────────────────────────────────────────
+    from tabs import (
+        tab_tongquan, tab_baocao,
+        tab_candoi, tab_cbtd, tab_khtd, tab_kehoach,
+        tab_nhiem_vu, tab_khtd_giao_dc, tab_kiem_soat,
+        tab_ban_dai_dien, tab_uy_thac,
+        tab_tien_do, tab_tien_do_nop,
+    )
+    from tabs import tab_checklist_bc
+    from tabs import tab_xlrr_tong_hop
+    from tabs import tab_upload_khnv
+    from tabs import tab_audit_log
+
     role       = kwargs.get("role")
     df         = kwargs.get("df")
     df_full    = kwargs.get("df_full", df)

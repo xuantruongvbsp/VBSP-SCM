@@ -30,28 +30,6 @@ from utils import (
     xuat_excel,
     hien_thi_dataframe_phan_trang,
 )
-from tabs import (
-    tab_tracuu,
-    tab_danhsach,
-    tab_khtd,
-    tab_khtd_pgd,
-    tab_nhiem_vu,
-    tab_upload_pgd,
-    tab_cdtotkvv_pgd,
-    tab_khtd_mau07,
-    tab_khtd_giao_dc,
-    tab_diem_gd_pgd,
-    tab_ban_dai_dien,
-    tab_tongquan,
-    tab_tien_do,
-    tab_baocao,
-    tab_nq11,
-    tab_candoi,
-    tab_uy_thac,
-    tab_qd62,
-)
-
-from tabs.tab_den_han import render as render_den_han
 
 
 def _render_don_doc(df: pd.DataFrame, pgd_user: str, role: str):
@@ -891,6 +869,17 @@ def render(**kwargs):
     _wl = st.session_state.pop("_data_load_warning", None)
     if _wl:
         st.warning(_wl)
+
+    # ── Lazy import tab modules ──────────────────────────────────────────
+    from tabs import (
+        tab_tracuu, tab_danhsach,
+        tab_khtd_pgd, tab_nhiem_vu, tab_upload_pgd,
+        tab_cdtotkvv_pgd, tab_khtd_mau07, tab_khtd_giao_dc,
+        tab_diem_gd_pgd, tab_ban_dai_dien,
+        tab_tongquan, tab_tien_do, tab_baocao,
+        tab_nq11, tab_candoi, tab_uy_thac, tab_qd62,
+    )
+    from tabs.tab_den_han import render as render_den_han
 
     df = kwargs.get("df")
     df_nq11 = kwargs.get("df_nq11")

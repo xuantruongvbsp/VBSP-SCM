@@ -298,15 +298,18 @@ Bỏ chọn nếu chỉ áp dụng cho một số PGD cụ thể.
 **8. Người phụ trách** — Ghi tên cán bộ chịu trách nhiệm theo dõi đầu việc này.
             """)
 
-        with st.form("form_tao_task", clear_on_submit=True):
-            tieu_de = st.text_input("Tên đầu việc *",
-                                    placeholder="VD: Nộp hồ sơ rủi ro tháng 5/2026")
-            mo_ta = st.text_area("Mô tả / Hướng dẫn")
+        with st.form("form_tao_task", clear_on_submit=False):
+            tieu_de = st.text_area("Tên đầu việc *",
+                                   placeholder="VD: Nộp hồ sơ rủi ro tháng 5/2026",
+                                   height=68,
+                                   key="td_tao_tieu_de")
+            mo_ta = st.text_area("Mô tả / Hướng dẫn", key="tao_task_mo_ta")
 
             c1, c2 = st.columns(2)
             with c1:
                 loai = st.selectbox("Loại", list(LOAI_TASK.keys()),
-                                    format_func=lambda x: LOAI_TASK[x])
+                                    format_func=lambda x: LOAI_TASK[x],
+                                    key="tao_task_loai")
                 loai_theo_doi = st.radio(
                     "Loại theo dõi",
                     options=["xa", "pgd"],
@@ -315,13 +318,17 @@ Bỏ chọn nếu chỉ áp dụng cho một số PGD cụ thể.
                     key="td_tao_loai_theo_doi",
                 )
                 uu_tien = st.selectbox("Ưu tiên", list(UU_TIEN.keys()),
-                                       format_func=lambda x: UU_TIEN[x], index=2)
-                nguoi_phu_trach = st.text_input(
+                                       format_func=lambda x: UU_TIEN[x], index=2,
+                                       key="tao_task_uu_tien")
+                nguoi_phu_trach = st.text_area(
                     "Người phụ trách",
                     placeholder="Tên người phụ trách chính",
+                    height=68,
+                    key="tao_task_nguoi_pt",
                 )
             with c2:
-                deadline = st.date_input("Thời hạn hoàn thành *", value=date.today())
+                deadline = st.date_input("Thời hạn hoàn thành *", value=date.today(),
+                                          key="tao_task_deadline")
                 ngay_bat_dau = st.date_input(
                     "Ngày bắt đầu",
                     value=date.today(),
@@ -331,6 +338,7 @@ Bỏ chọn nếu chỉ áp dụng cho một số PGD cụ thể.
                     "Áp dụng cho đơn vị",
                     DS_PGD_ALL, default=DS_PGD_ALL,
                     placeholder="Mặc định: tất cả 22 đơn vị",
+                    key="tao_task_pgd",
                 )
 
             ds_preview = pgd_chon or DS_PGD_ALL
@@ -343,17 +351,7 @@ Bỏ chọn nếu chỉ áp dụng cho một số PGD cụ thể.
                 st.caption(
                     f"📍 {len(ds_preview)} đơn vị · {tong_xa_preview} xã/phường"
                 )
-            with st.expander(f"Xem chi tiết sẽ áp dụng", expanded=False):
-                for pgd in ds_preview:
-                    if loai_theo_doi == "pgd":
-                        st.markdown(f"**{pgd}**")
-                    else:
-                        ds_xa = PGD_XA_MAP.get(pgd, [])
-                        if ds_xa:
-                            st.markdown(f"**{pgd}** ({len(ds_xa)} xã)")
-                            st.write(" — ".join(ds_xa))
-
-            ghi_chu = st.text_input("Ghi chú thêm")
+            ghi_chu = st.text_area("Ghi chú thêm", height=68, key="tao_task_ghi_chu")
             submitted = st.form_submit_button("💾 Tạo đầu việc", type="primary")
 
         if submitted:

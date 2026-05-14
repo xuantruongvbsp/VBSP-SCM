@@ -19,8 +19,9 @@ from config import (
     COT_NGAY_SL, DB_HT_CACHE, DB_PREV_CACHE, FILE_PATH_DB, FILE_PATH_DB_PREV,
     NAM_HT, NAM_PREV, COT_LAI_TON,
 )
-from data import (doc_dienbao, db_lookup, db_nqh_con, ts_file, doc_kehoach,
+from data import (doc_dienbao, db_lookup, db_nqh_con, ts_file,
                   canh_bao_migration)
+from data.khtd import doc_kehoach
 from data.hstd import danh_dau_khong_hd, tong_hop_khong_hd
 from utils import (
     fmt,

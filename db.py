@@ -169,6 +169,24 @@ def init_db():
             )
         except sqlite3.OperationalError:
             pass
+        try:
+            conn.execute(
+                "ALTER TABLE tien_do_ketqua ADD COLUMN loai_noi_dung TEXT"
+            )
+        except sqlite3.OperationalError:
+            pass
+        try:
+            conn.execute(
+                "ALTER TABLE tien_do_task ADD COLUMN ngay_bat_dau TEXT"
+            )
+        except sqlite3.OperationalError:
+            pass
+        try:
+            conn.execute(
+                "ALTER TABLE tien_do_task ADD COLUMN nguoi_phu_trach TEXT"
+            )
+        except sqlite3.OperationalError:
+            pass
         conn.commit()
 
 

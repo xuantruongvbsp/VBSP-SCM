@@ -11,3 +11,5 @@ gatherUsageStats = false
 
 [server]
 headless = true
+fileWatcherType = "watchdog"
+runOnSave = true

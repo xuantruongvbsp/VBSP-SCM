@@ -21,8 +21,9 @@ from config import (
 )
 from auth import is_cn_role, is_pgd_role, get_permissions, normalize_role, la_phan_he_cn
 from data import (
-    danh_dau_khong_hd, danh_dau_khong_hd_cached, tong_hop_khong_hd,
-    ds_chi_tiet_khong_hd, canh_bao_migration,
+    danh_dau_khong_hd, danh_dau_khong_hd_cached,
+    tong_hop_khong_hd, tong_hop_khong_hd_cached,
+    ds_chi_tiet_khong_hd, canh_bao_migration, canh_bao_migration_cached,
 )
 from utils import (
     fmt,
@@ -50,12 +51,12 @@ def _render_canh_bao(df: pd.DataFrame, ds_pgd_all: list):
         st.warning("Chưa có dữ liệu HSTD."); return
 
     # Đánh dấu 3 tháng không hoạt động
-    df_kh = danh_dau_khong_hd(df)
+    df_kh = danh_dau_khong_hd_cached(df)
 
     # ── KPI nhanh ──────────────────────────────────────────────────────────
     tong_mon    = len(df_kh)
     khd_tong    = int(df_kh["is_3m_inactive"].sum()) if "is_3m_inactive" in df_kh.columns else 0
-    df_amber    = canh_bao_migration(df_kh)
+    df_amber    = canh_bao_migration_cached(df_kh)
     amber_tong  = len(df_amber)
     tl_khd      = khd_tong / tong_mon * 100 if tong_mon > 0 else 0
 
@@ -74,7 +75,7 @@ def _render_canh_bao(df: pd.DataFrame, ds_pgd_all: list):
 
     # ── Bảng Top đơn vị cần chấn chỉnh ───────────────────────────────────
     st.markdown("**📋 Tổng hợp theo PGD**")
-    nhom_pgd = tong_hop_khong_hd(df_kh, nhom_theo=COT_TEN_PGD)
+    nhom_pgd = tong_hop_khong_hd_cached(df_kh, nhom_theo=COT_TEN_PGD)
     if not nhom_pgd.empty:
         hien_thi_dataframe_phan_trang(
             nhom_pgd,
@@ -83,7 +84,7 @@ def _render_canh_bao(df: pd.DataFrame, ds_pgd_all: list):
         )
 
     st.markdown("**📋 Tổng hợp theo Hội đoàn thể (ĐVUT)**")
-    nhom_dvut = tong_hop_khong_hd(df_kh, nhom_theo="Tên ĐVUT")
+    nhom_dvut = tong_hop_khong_hd_cached(df_kh, nhom_theo="Tên ĐVUT")
     if not nhom_dvut.empty:
         hien_thi_dataframe_phan_trang(
             nhom_dvut,
@@ -214,12 +215,12 @@ def _hien_thi_khd_tab(df_kh: pd.DataFrame, ds_pgd_all: list):
     k3.metric("Lãi tồn (triệu đồng)", vn(tong_lai / 1e6, 0))
 
     st.markdown("**📋 Tổng hợp theo PGD**")
-    nhom_pgd = tong_hop_khong_hd(df_kh, nhom_theo=COT_TEN_PGD)
+    nhom_pgd = tong_hop_khong_hd_cached(df_kh, nhom_theo=COT_TEN_PGD)
     if not nhom_pgd.empty:
         hien_thi_dataframe_phan_trang(nhom_pgd, key="khd_pgd", height=280)
 
     st.markdown("**📋 Tổng hợp theo Hội đoàn thể**")
-    nhom_dvut = tong_hop_khong_hd(df_kh, nhom_theo="Tên ĐVUT")
+    nhom_dvut = tong_hop_khong_hd_cached(df_kh, nhom_theo="Tên ĐVUT")
     if not nhom_dvut.empty:
         hien_thi_dataframe_phan_trang(nhom_dvut, key="khd_dvut", height=220)
 
@@ -243,7 +244,7 @@ def _hien_thi_khd_tab(df_kh: pd.DataFrame, ds_pgd_all: list):
 
 def _hien_thi_migration_tab(df_kh: pd.DataFrame, ds_pgd_all: list):
     """Sub-tab: Migration — món vay đủ chuẩn có nguy cơ chuyển NQH."""
-    df_amber = canh_bao_migration(df_kh)
+    df_amber = canh_bao_migration_cached(df_kh)
     amber_tong = len(df_amber)
 
     if amber_tong == 0:

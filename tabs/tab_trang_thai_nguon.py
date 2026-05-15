@@ -1,9 +1,7 @@
-"""Tab "🔍 Trạng thái hệ thống" — hiển thị tổng quan trạng thái quy trình và audit log gần nhất.
-
-Chỉ dành cho phân hệ Chi nhánh (la_phan_he_cn).
-"""
+"""Tab "🔍 Trạng thái hệ thống" — hiển thị tổng quan trạng thái quy trình, audit log và trạng thái PGD."""
 from __future__ import annotations
 import os
+from datetime import datetime, timedelta
 
 import streamlit as st
 import pandas as pd
@@ -11,29 +9,35 @@ import pandas as pd
 import db
 from config import CACHE_HSTD, CACHE_NQ11
 from auth import la_phan_he_cn, normalize_role
-from utils import format_df_vn
+from tabs import tab_audit_log as _tab_audit_log
 
 
 def render(tab=None, **kwargs) -> None:
     role_raw = str(kwargs.get("role", "user") or "user")
     username = str(kwargs.get("username", "unknown") or "unknown")
     role = normalize_role(role_raw)
-
-    if not la_phan_he_cn(role):
-        st.warning("⛔ Chỉ tài khoản Chi nhánh mới xem được Trạng thái hệ thống.")
-        return
+    pgd_user = kwargs.get("pgd_user")
 
     ctx = tab if tab is not None else st.container()
     with ctx:
-        st.subheader("� Trạng thái hệ thống")
+        st.subheader("🔍 Trạng thái hệ thống")
 
-        tab_tq, tab_audit = st.tabs(["� Tổng quan", "� Audit Log"])
+        la_cn = la_phan_he_cn(role)
+        if la_cn:
+            if pgd_user:
+                tab_tq, tab_audit, tab_pgd = st.tabs(["📊 Tổng quan", "📋 Lịch sử giao dịch", "🏢 Trạng thái PGD"])
+            else:
+                tab_tq, tab_audit = st.tabs(["📊 Tổng quan", "📋 Lịch sử giao dịch"])
+            with tab_tq:
+                _render_tong_quan()
+            with tab_audit:
+                _tab_audit_log.render(None, mode="compact", force_allow=True)
+        else:
+            tab_pgd = st.tabs(["🏢 Trạng thái PGD"])[0]
 
-        with tab_tq:
-            _render_tong_quan()
-
-        with tab_audit:
-            _render_audit_log()
+        if not la_cn or pgd_user:
+            with tab_pgd if la_cn else tab_pgd:
+                _render_trang_thai_pgd(pgd_user, username)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -136,50 +140,46 @@ def _lay_tt_file_nq11() -> tuple:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# Sub-tab 2: Audit Log — 20 dòng gần nhất
+# Sub-tab 2: Lịch sử giao dịch — dùng tab_audit_log (compact mode)
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def _render_audit_log() -> None:
-    """Hiển thị 20 dòng audit gần nhất, có bộ lọc action."""
-    try:
-        with db.get_conn() as conn:
-            rows = conn.execute(
-                "SELECT DISTINCT action FROM audit_log ORDER BY action"
-            ).fetchall()
-        ds_action = ["Tất cả"] + [r["action"] for r in rows]
-    except Exception as e:
-        st.error(f"Không thể đọc danh sách action: {e}")
-        ds_action = ["Tất cả"]
 
-    action_chon = st.selectbox(
-        "Lọc theo hành động",
-        ds_action,
-        key="tttq_audit_action",
-    )
+# ═══════════════════════════════════════════════════════════════════════════════
+# Sub-tab 3: Trạng thái PGD — kiểm tra file upload của một PGD
+# ═══════════════════════════════════════════════════════════════════════════════
 
-    try:
-        sql = "SELECT ts, username, action, detail FROM audit_log"
-        params = []
-        if action_chon and action_chon != "Tất cả":
-            sql += " WHERE action = ?"
-            params.append(action_chon)
-        sql += " ORDER BY ts DESC LIMIT 20"
+def _render_trang_thai_pgd(pgd_user: str | None, username: str) -> None:
+    """Hiển thị trạng thái upload file của PGD."""
+    pgd_user = pgd_user or username
+    st.markdown(f"**Trạng thái upload — {pgd_user}**")
 
-        with db.get_conn() as conn:
-            rows = conn.execute(sql, params).fetchall()
+    from data.pgd import duong_dan_pgd
 
-        if not rows:
-            st.info("Không có bản ghi audit log nào.")
-            return
+    ds_file = [
+        ("HSTD", "hstd"),
+        ("NQ11", "nq11"),
+        ("GQVL", "gqvl"),
+    ]
 
-        df = pd.DataFrame(
-            rows,
-            columns=["Thời gian", "User", "Hành động", "Chi tiết"],
-        )
-        df = format_df_vn(df)
+    rows = []
+    for ten, loai in ds_file:
+        try:
+            path = duong_dan_pgd(pgd_user, loai)
+            if os.path.exists(path):
+                mtime = os.path.getmtime(path)
+                lan_cuoi = datetime.fromtimestamp(mtime).strftime("%Y-%m-%d %H:%M")
+                tuoi = datetime.now() - datetime.fromtimestamp(mtime)
+                if tuoi < timedelta(days=7):
+                    tt = "✅"
+                else:
+                    tt = "⚠️"
+                rows.append({"Loại file": ten, "Trạng thái": tt, "Cập nhật lần cuối": lan_cuoi})
+            else:
+                rows.append({"Loại file": ten, "Trạng thái": "❌", "Cập nhật lần cuối": "Chưa upload"})
+        except Exception as e:
+            rows.append({"Loại file": ten, "Trạng thái": "❌", "Cập nhật lần cuối": f"Lỗi: {e}"})
 
-        st.caption(f"Hiển thị {len(df)} bản ghi gần nhất")
-        st.dataframe(df, use_container_width=True, hide_index=True)
+    st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
 
-    except Exception as e:
-        st.error(f"Lỗi đọc audit log: {e}")
+    st.markdown("**📋 Hoạt động gần đây**")
+    _tab_audit_log.render(None, mode="compact", force_allow=True, username_filter=pgd_user)

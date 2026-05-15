@@ -186,22 +186,6 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                 return s.rstrip("0").rstrip(",") if "," in s else s
             except: return "—"
 
-        def fmt_ty(x):
-            try:
-                x = float(x)
-                if abs(x) > 0:
-                    trieu = x / 1_000_000
-                    s = f"{trieu:,.0f}".replace(",","X").replace(".",",").replace("X",".")
-                    return s
-                return "—"
-            except: return "—"
-
-        def fmt_cl(x):
-            try:
-                x = float(x); s = fmt_ty(x)
-                return ("+" + s if x > 0 else s) if s != "—" else "—"
-            except: return "—"
-
         def fmt_pct(x):
             try:
                 x = float(x)

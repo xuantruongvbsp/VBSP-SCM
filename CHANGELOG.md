@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [2026-05-16] — Cache hàm nặng để giảm độ trễ chuyển tab
+- `data/hstd.py` dòng ~267 — Thêm `tong_hop_khong_hd_cached` và `canh_bao_migration_cached` với `@st.cache_data(ttl=3600)`
+- `data/__init__.py` — Export 2 cached wrapper mới
+- `workspaces/ws_management.py` — Thay `danh_dau_khong_hd`, `tong_hop_khong_hd`, `canh_bao_migration` → cached versions tại dòng 53, 58, 77, 86, 217, 222, 246
+- `workspaces/ws_operation.py` — Thay `tong_hop_khong_hd` → `tong_hop_khong_hd_cached` tại dòng 69, 79
+- `workspaces/ws_executive.py` — Thay `danh_dau_khong_hd`, `canh_bao_migration` → cached versions tại dòng 259, 264, 799
+
 ## [2026-05-16] — Thêm báo cáo Nợ Khoanh và Nợ Quá Hạn vào tab Báo cáo
 - `tabs/tab_baocao.py` dòng ~502 — Thêm 2 option radio "🔴 Danh sách nợ khoanh" và "🟠 Danh sách nợ quá hạn" vào Mảng 2
 - `tabs/tab_baocao.py` dòng ~677–755 — Nhánh nợ khoanh: lọc `Dư nợ khoanh > 0`, metrics + tổng hợp ĐVUT + danh sách chi tiết + export Excel

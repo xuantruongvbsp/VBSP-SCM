@@ -769,6 +769,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                             file_bytes = xuat_bao_cao(sheets, tieu_de_xuat, username or "unknown")
                             st.session_state["_bytes_bc_ct"] = file_bytes
                             st.session_state["_file_bc_ct"] = ten_file
+                            db.ghi_audit(username or "unknown", "xuat_excel", f"BC_chi_tiet_{loai_ct[2:12].strip()}")
 
                         if st.session_state.get("_bytes_bc_ct"):
                             st.download_button(

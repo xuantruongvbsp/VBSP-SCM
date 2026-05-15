@@ -467,7 +467,6 @@ def _render_ndt_dp(role: str, username: str) -> None:
                     ghi_kv("ndt_dp_list", ds_moi, username)
                     ghi_audit(username, "xoa_ndt_dp",
                               f"Xóa mã {item['ma']}")
-                    st.cache_data.clear()
                     st.rerun()
     else:
         st.info("Chưa có mã nào.")
@@ -541,7 +540,6 @@ def _render_ndt_dp(role: str, username: str) -> None:
                 ghi_kv("ndt_dp_list", ds_moi, username)
                 ghi_audit(username, "them_ndt_dp",
                           f"Thêm mã {ma_moi} — {ghi_chu_moi}")
-                st.cache_data.clear()
                 st.success(f"✅ Đã thêm mã {ma_moi}")
                 st.rerun()
 

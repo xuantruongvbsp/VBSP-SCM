@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## [2026-05-15] — Fix bảng số liệu tab Báo cáo tín dụng
+- `tabs/tab_baocao.py` — Thay `_tao_column_config_baocao` (NumberColumn kiểu Mỹ) bằng `_fmt_df()` dùng `fmt_ty` → tiền hiển thị đúng định dạng VN
+- `tabs/tab_baocao.py` — Fix chia cho 0 trong tính `Tỷ_lệ_QH_%` tại 5 bảng (thêm `.replace(0, nan).fillna(0)`)
+- `tabs/tab_baocao.py` — Fix `vn()` không được import; thêm `fmt_ty`, `vn` vào imports
+- `tabs/tab_baocao.py` — `Số_hồ_sơ` theo xã dùng `nunique` thay vì `count`; fix `la_phan_he_cn(role)` thay chuỗi cứng
+
 ## [2026-05-15] — Đồng bộ tên xã config với data HSTD thực tế
 - `config.py` — `Bầu Hàm` → `Bàu Hàm`; `Đak Lua` → `Dak Lua` (khớp spelling trong data)
 - `config.py` — giữ `Đăk Nhau` (data dùng ă, không phải a)

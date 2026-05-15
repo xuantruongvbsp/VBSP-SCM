@@ -141,7 +141,6 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
     username  = kwargs.get("username")
     df_nq11   = kwargs.get("df_nq11")
     pgd_mode  = kwargs.get("pgd_mode", False)
-    key_sfx   = f"_{pgd_slug(pgd_user)}" if pgd_mode else ""
 
     if pgd_mode and not pgd_user:
         import streamlit as _st
@@ -149,6 +148,8 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
         with _tab_ctx:
             st.error("Không xác định được PGD.")
         return
+
+    key_sfx   = f"_{pgd_slug(pgd_user)}" if pgd_mode else ""
 
     path_dien_ht = (
         duong_dan_pgd(pgd_user, "dienbao_ht") if pgd_mode else None

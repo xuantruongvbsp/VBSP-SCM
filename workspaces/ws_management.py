@@ -894,10 +894,10 @@ def render_sidebar_menu(role: str, username: str, **kwargs):
         if is_active:
             st.markdown(
                 f"<div style='"
-                f"background:{clr['bg']};"
-                f"border-left:2px solid {clr['border']};"
-                f"color:{clr['text']};"
-                f"font-size:13px;font-weight:500;"
+                f"background:#E65100;"
+                f"border-left:2px solid #BF360C;"
+                f"color:#FFFFFF;"
+                f"font-size:13px;font-weight:600;"
                 f"padding:6px 8px 6px 10px;"
                 f"border-radius:0 5px 5px 0;"
                 f"margin-bottom:2px'>"

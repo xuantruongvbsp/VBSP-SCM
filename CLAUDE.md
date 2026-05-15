@@ -329,20 +329,26 @@ else:
 
 ### 5.11 Chọn model — tiết kiệm token
 
-| Model | Tool | Dùng cho |
+| Chức năng | Tool | Model |
 |---|---|---|
-| **DeepSeek V4 Flash** | Trae | Đọc file, grep, hỏi nhanh, fix bug 1-2 dòng |
-| **DeepSeek V4 Pro** | Trae | Viết tính năng mới, refactor, sửa services/, tabs/ |
-| **DeepSeek R1** | Trae | Thiết kế kiến trúc, debug logic khó, tối ưu query |
-| **Claude Haiku 4.5** | Claude Code | Đọc file, grep ngược, kiểm tra context trước khi sửa |
-| **Claude Sonnet 4.6** | Claude Code | Viết code, sửa auth.py, app.py, ws_*.py, review diff |
-| **Claude Opus 4.6** | Claude Code | Migration db.py, snapshot_service, tính năng quan trọng |
+| Đọc file, grep, tìm kiếm, fix nhỏ 1-3 dòng | Trae | Flash |
+| Viết code mới, tính năng tabs/, services/ | Trae | Pro |
+| Sửa auth.py, app.py, ws_*.py | Trae | Pro |
+| Kiến trúc, debug logic khó, refactor lớn | Trae | R1 |
+| Backup khi Trae fail apply | Claude Code Desktop | Haiku 4.5 |
+| Logic phức tạp, phân quyền | Claude Code Desktop | Sonnet 4.6 |
+| db.py, migration, snapshot_service | Claude Code Desktop | Opus 4.6 |
+
+**Quy tắc chọn tool:**
+- Trae → viết + apply code
+- Thấy `edit_file_search_replace` + `status: success` → ✅ done
+- Không thấy tool call hoặc status: failed → chuyển Claude Code Desktop ngay
+- Không cần thử lại Trae, không cần ép prompt
 
 **Quy tắc leo model:**
 - Trae: Flash → Pro → R1
-- Claude Code: Haiku → Sonnet → Opus
-- Chỉ leo khi model nhẹ lặp lỗi ≥ 2 lần
-- Không dùng Opus/R1 cho task đọc/tìm/format
+- Claude Code Desktop: Haiku → Sonnet → Opus
+- Chỉ leo khi model nhẹ không đủ khả năng xử lý task
 
 ---
 

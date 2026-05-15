@@ -24,6 +24,7 @@ _COLS_TIEN = {
     COT_DU_NO_TH, COT_DU_NO_QH, COT_TONG_DU_NO, COT_LAI_TON,
     "Tổng_dư_nợ", "Dư_nợ_trong_hạn", "Dư_nợ_quá_hạn",
     "Lãi_tồn_KHĐ", "Dư nợ TH", "Dư nợ QH", "Nợ khoanh", "Tổng dư nợ", "Lãi tồn",
+    "Dư nợ khoanh", "Nợ_khoanh",
 }
 _COLS_PCT = {"Tỷ_lệ_QH_%", "Tỷ_lệ_KHĐ_%", "QH%", "TL Nợ xấu %"}
 
@@ -502,7 +503,9 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                     ["📋 Danh sách theo tiêu chí lọc",
                      "⏰ Hồ sơ đến hạn / quá hạn",
                      "📌 Theo chương trình vay cụ thể",
-                     "🏦 Theo nguồn vốn"],
+                     "🏦 Theo nguồn vốn",
+                     "🔴 Danh sách nợ khoanh",
+                     "🟠 Danh sách nợ quá hạn"],
                     horizontal=True, key="bc_loai_ct")
 
                 # Bộ lọc chi tiết
@@ -670,6 +673,86 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                             )
                         else:
                             export_df = df_ct[COL_CHUNG].copy()
+
+                # ── Cột dùng chung cho 2 báo cáo DSML ──
+                _COL_DSML = [c for c in [
+                    COT_TEN_PGD, "Tên xã", "Tên ĐVUT", "Tên tổ",
+                    COT_MA_KH, COT_TEN_KH, "Số điện thoại",
+                    COT_SO_KU, COT_TEN_CT, COT_NGAY_VAY, COT_NGAY_DH,
+                    COT_TONG_DU_NO, COT_DU_NO_QH, "Dư nợ khoanh", COT_LAI_TON, "Nguồn vốn",
+                ] if c in df_ct.columns]
+
+                # ── Nợ khoanh ──
+                if loai_ct == "🔴 Danh sách nợ khoanh":
+                    _COT_KHOANH = "Dư nợ khoanh"
+                    if _COT_KHOANH not in df_ct.columns or df_ct[_COT_KHOANH].sum() == 0:
+                        st.info("✅ Không có nợ khoanh trong phạm vi đã lọc.")
+                    else:
+                        _sort_kh = [c for c in ["Tên ĐVUT", "Tên tổ", COT_TEN_KH] if c in df_ct.columns]
+                        df_kh_rpt = (
+                            df_ct[df_ct[_COT_KHOANH] > 0]
+                            .sort_values(_sort_kh).reset_index(drop=True)
+                        )
+                        c1, c2, c3 = st.columns(3)
+                        c1.metric("Số món khoanh", fmt_so(len(df_kh_rpt)))
+                        c2.metric("Tổng nợ khoanh", _bc_fmt_metric(df_kh_rpt[_COT_KHOANH].sum()))
+                        c3.metric("Tổng lãi tồn",
+                            _bc_fmt_metric(df_kh_rpt[COT_LAI_TON].sum())
+                            if COT_LAI_TON in df_kh_rpt.columns else "—")
+
+                        if "Tên ĐVUT" in df_kh_rpt.columns:
+                            st.markdown("**Tổng hợp theo hội đoàn thể**")
+                            _agg_kh = {"Số_món": (COT_MA_KH, "count"), "Nợ_khoanh": (_COT_KHOANH, "sum")}
+                            if COT_LAI_TON in df_kh_rpt.columns:
+                                _agg_kh["Lãi_tồn"] = (COT_LAI_TON, "sum")
+                            t_kh = (
+                                df_kh_rpt.groupby("Tên ĐVUT").agg(**_agg_kh)
+                                .sort_values("Nợ_khoanh", ascending=False).reset_index()
+                            )
+                            _hien_thi_bc(_fmt_df(t_kh), key="bc_kh_dvut")
+
+                        export_df = df_kh_rpt[_COL_DSML].copy()
+                        st.markdown("**Danh sách chi tiết**")
+                        _hien_thi_bc(_fmt_df(export_df), key="bc_dsml_khoanh", height=420)
+
+                # ── Nợ quá hạn ──
+                elif loai_ct == "🟠 Danh sách nợ quá hạn":
+                    _sort_qh = [c for c in ["Tên ĐVUT", "Tên tổ", COT_TEN_KH] if c in df_ct.columns]
+                    df_qh_rpt = (
+                        df_ct[df_ct[COT_DU_NO_QH] > 0]
+                        .sort_values(_sort_qh).reset_index(drop=True)
+                    )
+                    if df_qh_rpt.empty:
+                        st.success("✅ Không có nợ quá hạn trong phạm vi đã lọc.")
+                    else:
+                        c1, c2, c3 = st.columns(3)
+                        c1.metric("Số món QH", fmt_so(len(df_qh_rpt)))
+                        c2.metric("Dư nợ QH", _bc_fmt_metric(df_qh_rpt[COT_DU_NO_QH].sum()))
+                        _tl_qh = (
+                            df_qh_rpt[COT_DU_NO_QH].sum() / df_qh_rpt[COT_TONG_DU_NO].sum() * 100
+                            if df_qh_rpt[COT_TONG_DU_NO].sum() > 0 else 0
+                        )
+                        c3.metric("Tỷ lệ QH", f"{_tl_qh:.2f}%".replace(".", ","))
+
+                        if "Tên ĐVUT" in df_qh_rpt.columns:
+                            st.markdown("**Tổng hợp theo hội đoàn thể**")
+                            t_qh = (
+                                df_qh_rpt.groupby("Tên ĐVUT").agg(
+                                    Số_món=(COT_MA_KH, "count"),
+                                    Tổng_dư_nợ=(COT_TONG_DU_NO, "sum"),
+                                    Dư_nợ_QH=(COT_DU_NO_QH, "sum"),
+                                ).sort_values("Dư_nợ_QH", ascending=False).reset_index()
+                            )
+                            t_qh["Tỷ_lệ_QH_%"] = (
+                                t_qh["Dư_nợ_QH"]
+                                / t_qh["Tổng_dư_nợ"].replace(0, float("nan"))
+                                * 100
+                            ).round(2).fillna(0)
+                            _hien_thi_bc(_fmt_df(t_qh), key="bc_qh_dvut")
+
+                        export_df = df_qh_rpt[_COL_DSML].copy()
+                        st.markdown("**Danh sách chi tiết**")
+                        _hien_thi_bc(_fmt_df(export_df), key="bc_dsml_qh", height=420)
 
                 # Xuất Excel
                 if export_df is not None:

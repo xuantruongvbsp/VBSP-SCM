@@ -232,9 +232,11 @@ def _render_nhap_moi(tab, **kwargs):
         ky_default = _ky_mac_dinh(chu_ky, ds_ky)
 
         with st.form("form_nhap_nhiem_vu_moi"):
-            tieu_de = st.text_input(
+            tieu_de = st.text_area(
                 "Tiêu đề nhiệm vụ *",
                 placeholder="Ví dụ: Tổng hợp dư nợ NOXH tháng 4",
+                height=68,
+                key="nhiem_vu_tieu_de",
             )
             mo_ta = st.text_area(
                 "Mô tả chi tiết",

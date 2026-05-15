@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## [2026-05-15] — Fix số KH / số món vay bị phồng trong tab Báo cáo
+- `tabs/tab_baocao.py` dòng ~158 — Lọc `df_base[COT_TONG_DU_NO] > 0` sau filter Mảng 1 (Tổng hợp)
+- `tabs/tab_baocao.py` dòng ~290 — Lọc `df_base[COT_TONG_DU_NO] > 0` sau filter Mảng 2 (Chi tiết)
+- Loại bỏ ~25.627 hồ sơ đã tất toán (dư nợ = 0) khỏi đếm KH và món; KH giảm từ 245.489 → 213.343, món vay từ 323.673 → 292.739
+
 ## [2026-05-15] — Fix bảng số liệu tab Báo cáo tín dụng
 - `tabs/tab_baocao.py` — Thay `_tao_column_config_baocao` (NumberColumn kiểu Mỹ) bằng `_fmt_df()` dùng `fmt_ty` → tiền hiển thị đúng định dạng VN
 - `tabs/tab_baocao.py` — Fix chia cho 0 trong tính `Tỷ_lệ_QH_%` tại 5 bảng (thêm `.replace(0, nan).fillna(0)`)

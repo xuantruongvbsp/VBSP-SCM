@@ -96,23 +96,23 @@ def _build_rows_kh_th(
     for mk, _, ten, nv, *_ in config.CHUONG_TRINH_KHTD:
         if nv != "TW":
             continue
-        kh = float(kh_cn.get(mk, 0.0)) / 1e9
+        kh = float(kh_cn.get(mk, 0.0)) / 1e6
         if "GQVL" in str(ten) or str(mk).startswith("3_TW"):
             th_tw_gqvl = (
                 float(th_gqvl.get("cap_tinh_tw_nhcsxh", 0.0))
                 + float(th_gqvl.get("cap_tinh_tw_nsnn", 0.0))
-            ) / 1e9
+            ) / 1e6
             tl = (th_tw_gqvl / kh) if kh > 0 else None
             rows.append([str(stt_tw), f"  {ten}", round(kh, 3), round(th_tw_gqvl, 3), tl])
             for sub_ten, sub_key in [
                 ("    TW - NHCSXH huy động", "cap_tinh_tw_nhcsxh"),
                 ("    TW - NSNN/Quỹ QG TW", "cap_tinh_tw_nsnn"),
             ]:
-                th_sub = float(th_gqvl.get(sub_key, 0.0)) / 1e9
+                th_sub = float(th_gqvl.get(sub_key, 0.0)) / 1e6
                 rows.append(["*", sub_ten, "", round(th_sub, 3), ""])
             th = th_tw_gqvl
         else:
-            th = float(th_hstd.get(mk, 0.0)) / 1e9
+            th = float(th_hstd.get(mk, 0.0)) / 1e6
             tl = (th / kh) if kh > 0 else None
             rows.append([str(stt_tw), f"  {ten}", round(kh, 3), round(th, 3), tl])
         tong_kh += kh
@@ -123,23 +123,23 @@ def _build_rows_kh_th(
     for mk, _, ten, nv, *_ in config.CHUONG_TRINH_KHTD:
         if nv != "DP":
             continue
-        kh = float(kh_cn.get(mk, 0.0)) / 1e9
+        kh = float(kh_cn.get(mk, 0.0)) / 1e6
         if "GQVL" in str(ten) or str(mk).startswith("3_DP"):
             th_dp_gqvl = (
                 float(th_gqvl.get("cap_tinh", 0.0))
                 + float(th_gqvl.get("cap_xa", 0.0))
-            ) / 1e9
+            ) / 1e6
             tl = (th_dp_gqvl / kh) if kh > 0 else None
             rows.append([str(stt_dp), f"  {ten}", round(kh, 3), round(th_dp_gqvl, 3), tl])
             for sub_ten, sub_key in [
                 ("    ĐP - Cấp tỉnh", "cap_tinh"),
                 ("    ĐP - Cấp xã/khác", "cap_xa"),
             ]:
-                th_sub = float(th_gqvl.get(sub_key, 0.0)) / 1e9
+                th_sub = float(th_gqvl.get(sub_key, 0.0)) / 1e6
                 rows.append(["*", sub_ten, "", round(th_sub, 3), ""])
             th = th_dp_gqvl
         else:
-            th = float(th_hstd.get(mk, 0.0)) / 1e9
+            th = float(th_hstd.get(mk, 0.0)) / 1e6
             tl = (th / kh) if kh > 0 else None
             rows.append([str(stt_dp), f"  {ten}", round(kh, 3), round(th, 3), tl])
         tong_kh += kh

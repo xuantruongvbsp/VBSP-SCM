@@ -256,7 +256,7 @@ def _hien_thi_bang_cn_readonly(
     )
     k4.metric("Số CT có KH / tổng", f"{so_ct_co_kh}/{tong_ct}")
 
-    headers = ["STT", "Chỉ tiêu", "KH (tỷ)", "TH (tỷ)", "TL%", "Trạng thái"]
+    headers = ["STT", "Chỉ tiêu", "KH (triệu đồng)", "TH (triệu đồng)", "TL%", "Trạng thái"]
     thead = "".join(
         f'<th style="background:{H_BG};color:#fff;text-align:{"center" if i==0 else "left" if i==1 else "right"};'
         f'padding:6px 8px;border:1px solid {BD};font-size:0.82rem;white-space:nowrap">{h}</th>'
@@ -270,7 +270,7 @@ def _hien_thi_bang_cn_readonly(
   <tbody>{"".join(html_rows)}</tbody>
 </table>
 <p style="font-size:0.78rem;color:#6B7280;margin:4px 0 0 0">
-  * Đơn vị: tỷ đồng · KH từ nhập liệu, TH từ Tổng dư nợ HSTD + GQVL phân tầng<br>
+  * Đơn vị: triệu đồng · KH từ nhập liệu, TH từ Tổng dư nợ HSTD + GQVL phân tầng<br>
   <span style="color:{GREEN}">🟢</span> TL ≥ 100% &nbsp;
   <span style="color:{AMBER}">🟡</span> TL ≥ 95% &nbsp;
   <span style="color:{RED}">🔴</span> TL &lt; 95%
@@ -510,7 +510,7 @@ def _tab_tien_do_kh_th() -> None:
             rows_ct.append({
                 "STT": nhom_hien,
                 "Chỉ tiêu": nhom_hien,
-                "KH (tỷ)": None, "TH (tỷ)": None, "TL%": None,
+                "KH (triệu đồng)": None, "TH (triệu đồng)": None, "TL%": None,
                 "Trạng thái": "", "_nhom": True,
             })
 
@@ -529,8 +529,8 @@ def _tab_tien_do_kh_th() -> None:
         rows_ct.append({
             "STT": "",
             "Chỉ tiêu": f"  {ten_ct}",
-            "KH (tỷ)": round(kh_val/1e9, 3) if kh_val else None,
-            "TH (tỷ)": round(th_val/1e9, 3) if th_val else None,
+            "KH (triệu đồng)": round(kh_val/1e9, 3) if kh_val else None,
+            "TH (triệu đồng)": round(th_val/1e9, 3) if th_val else None,
             "TL%": round(tl_val, 1) if tl_val is not None else None,
             "Trạng thái": trang_thai,
             "_nhom": False,
@@ -538,8 +538,8 @@ def _tab_tien_do_kh_th() -> None:
 
     rows_ct.append({
         "STT": "", "Chỉ tiêu": "TỔNG CỘNG",
-        "KH (tỷ)": round(tong_kh/1e9, 3),
-        "TH (tỷ)": round(tong_th/1e9, 3),
+        "KH (triệu đồng)": round(tong_kh/1e9, 3),
+        "TH (triệu đồng)": round(tong_th/1e9, 3),
         "TL%": round(tl_cn, 1),
         "Trạng thái": "🟢 Đạt" if tl_cn >= 95 else "🔴 Chậm",
         "_nhom": False,
@@ -556,14 +556,14 @@ def _tab_tien_do_kh_th() -> None:
             return ["background-color: #fff9d6"] * len(row)
         return [""] * len(row)
 
-    cols_show = ["Chỉ tiêu", "KH (tỷ)", "TH (tỷ)", "TL%", "Trạng thái"]
+    cols_show = ["Chỉ tiêu", "KH (triệu đồng)", "TH (triệu đồng)", "TL%", "Trạng thái"]
     hien_thi_dataframe_phan_trang(
         df_ct[cols_show].style.apply(_to_mau_ct, axis=1),
         key="khtd_tien_do_ct",
         height=480,
         column_config={
-            "KH (tỷ)": st.column_config.NumberColumn(format="%.3f"),
-            "TH (tỷ)": st.column_config.NumberColumn(format="%.3f"),
+            "KH (triệu đồng)": st.column_config.NumberColumn(format="%.3f"),
+            "TH (triệu đồng)": st.column_config.NumberColumn(format="%.3f"),
             "TL%":     st.column_config.ProgressColumn(
                            min_value=0, max_value=100, format="%.1f%%"),
         },
@@ -599,7 +599,7 @@ def _tab_tien_do_kh_th() -> None:
         if tl_pgd < 95:
             rows_pgd.append({
                 "PGD": ten_pgd,
-                "TH (tỷ)": round(tong_th_pgd/1e9, 3),
+                "TH (triệu đồng)": round(tong_th_pgd/1e9, 3),
                 "KH CN (tỷ)": round(tong_kh_pgd/1e9, 3),
                 "TL%": round(tl_pgd, 1),
             })
@@ -647,10 +647,10 @@ def _tab_tien_do_kh_th() -> None:
             try:
                 with st.spinner("⏳ Đang tạo PDF..."):
                     pdf_bytes = xuat_pdf(
-                        df_ct[cols_show].dropna(subset=["KH (tỷ)"]),
+                        df_ct[cols_show].dropna(subset=["KH (triệu đồng)"]),
                         "Báo cáo Tiến độ Kế hoạch vs Thực hiện",
                         username="VBSP-SCM",
-                        cols_tien=["KH (tỷ)", "TH (tỷ)"],
+                        cols_tien=["KH (triệu đồng)", "TH (triệu đồng)"],
                     )
                 st.session_state[_ss_pdf] = pdf_bytes
                 st.session_state["_pdf_file_tien_do"] = ten_file_xuat("TienDo_KH_TH", ext=".pdf")

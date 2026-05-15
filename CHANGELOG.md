@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## [2026-05-15] — Số tiền thuần trong bảng + dòng ĐVT: triệu đồng
+- `tabs/tab_baocao.py` — `_fmt_df()`: cột tiền → số triệu đồng thuần (VN format 3 chữ số TP), không còn "tỷ"/"triệu" trong ô
+- `tabs/tab_baocao.py` — Thêm `_hien_thi_bc()` wrapper: tự hiện `st.caption("ĐVT: triệu đồng")` trước mỗi bảng
+- `tabs/tab_baocao.py` — Xóa call `_tao_column_config_baocao()` còn sót (hàm không còn tồn tại → sẽ crash)
+- Áp dụng `_fmt_df` cho bảng đôn đốc ĐVUT (trước đây hiển thị số VND thô)
+
 ## [2026-05-15] — Bỏ cột Tổng mức vay khỏi tab Báo cáo
 - `tabs/tab_baocao.py` — Xóa `Tổng_mức_vay` khỏi tất cả bảng tổng hợp (theo xã/thôn, ĐVUT, chương trình, nguồn vốn) và khỏi `COL_CHUNG` bảng chi tiết
 

@@ -1,5 +1,23 @@
 # CHANGELOG
 
+## [2026-05-15] — Cải thiện Dashboard + Tab Tiến độ
+- `tabs/tab_tongquan.py` — fix màu 10 thẻ KPI (soft-indigo/blue/green/red/amber)
+- `tabs/tab_tongquan.py` — fix bug Nguồn TW/ĐP (so sánh float thay string)
+- `tabs/tab_tongquan.py` — fix Thu nợ năm (cộng TH+QH+Khoanh)
+- `tabs/tab_tongquan.py` — fix bảng cơ cấu dư nợ 12 cột đầy đủ
+- `tabs/tab_tongquan.py` — fix lỗi import streamlit as _st trong hàm render()
+- `workspaces/ws_management.py` — fix lỗi import streamlit as st trong hàm
+- `tabs/tab_tien_do.py` — thêm field "Loại theo dõi" (pgd/xa) form tạo đầu việc
+- `tabs/tab_tien_do.py` — thêm field Người phụ trách, Ngày bắt đầu
+- `tabs/tab_tien_do.py` — chuẩn hóa key widget prefix tao_task_*
+- `tabs/tab_tien_do.py` — đổi text_input → text_area chống Enter submit
+- `tabs/tab_tien_do.py` — thêm xuất PDF tiến độ + báo cáo trễ hạn Excel/PDF
+- `tabs/tab_tien_do.py` — cập nhật LOAI_TASK 11 loại đầy đủ
+- `tabs/tab_tien_do.py` — đổi "deadline" → tiếng Việt toàn bộ
+- `tabs/tab_tien_do.py` — thêm hướng dẫn chi tiết form tạo đầu việc
+- `CLAUDE.md` — cập nhật workflow Trae + Claude Code Desktop + model
+- `.streamlit/config.toml` — thêm watchdog auto-reload
+
 ## [2026-05-14] — Tiến độ nhiệm vụ: thêm loại Chung PGD / Chi tiết xã + metadata
 - `db.py` — Migration: ALTER TABLE thêm `loai_noi_dung TEXT` vào `tien_do_ketqua`, `ngay_bat_dau TEXT` + `nguoi_phu_trach TEXT` vào `tien_do_task`
 - `tabs/tab_tien_do.py` — `_khoi_tao_ketqua_task()`: thêm tham số `loai_noi_dung`, ghi vào DB mỗi dòng kết quả

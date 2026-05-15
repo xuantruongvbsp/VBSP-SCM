@@ -314,6 +314,8 @@ def main():
             "role":   "admin",
             "pgd":    None,
         }
+        st.session_state["role"] = "admin_cn"
+        st.session_state["username"] = "admin"
     # END DEV MODE
     if not st.session_state.logged_in:
         auth.hien_thi_login()

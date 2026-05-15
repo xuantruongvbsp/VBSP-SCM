@@ -154,6 +154,8 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                 df_filtered = df_filtered[df_filtered[COT_TEN_CT] == loc_ct]
 
             df_base = df_filtered
+            if COT_TONG_DU_NO in df_base.columns:
+                df_base = df_base[df_base[COT_TONG_DU_NO] > 0]
 
             COT_DU_NO_KHOANH = "Dư nợ khoanh"
 
@@ -287,6 +289,8 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                 df_base = df_base[df_base[COT_TEN_PGD] == loc_pgd_bc]
             elif la_phan_he_pgd(role) and pgd_user:
                 df_base = df_base[df_base[COT_TEN_PGD] == loc_pgd_bc] if loc_pgd_bc != "Tất cả" else df_base
+            if COT_TONG_DU_NO in df_base.columns:
+                df_base = df_base[df_base[COT_TONG_DU_NO] > 0]
 
         # ══════════════════════════════
         # MẢNG 1: TỔNG HỢP

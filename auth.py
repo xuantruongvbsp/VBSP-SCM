@@ -902,7 +902,7 @@ def render(tab, df_full, role, username):
 
         st.divider()
         st.markdown("**➕ Thêm tài khoản mới**")
-        with st.form("them_user", clear_on_submit=True):
+        with st.form("them_user", clear_on_submit=False):
             c1, c2 = st.columns(2)
             with c1:
                 new_un  = st.text_input("Tên đăng nhập *", placeholder="vd: nv03")

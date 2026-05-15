@@ -1,5 +1,8 @@
 # CHANGELOG
 
+## [2026-05-15] — Thêm health_check.py kiểm tra sức khỏe hệ thống
+- `health_check.py` — Script CLI mới, không import Streamlit; kiểm tra 13 điểm: DB/bảng tồn tại, kv_store không corrupt, khtd_cn, merge_meta_hstd, 3 parquet cache, upload HSTD 22 PGD, audit log 24h; in ✅/❌ từng check + bảng 5 log gần nhất + tổng kết exit-code
+
 ## [2026-05-15] — Mở rộng tab Trạng thái hệ thống cho mọi role + thêm vào ws_operation
 - `workspaces/ws_management.py` — Xóa guard `if la_phan_he_cn(role_n)`, tab "Trạng thái hệ thống" hiển thị cho mọi role CN
 - `workspaces/ws_operation.py` — Thêm tab "Trạng thái hệ thống" vào nhóm Quản trị PGD

@@ -327,22 +327,27 @@ else:
 
 ---
 
-### 5.11 Chọn model — tiết kiệm token
+### 5.11 Chọn model — theo mức độ quan trọng
 
-| Model | Tool | Dùng cho |
-|---|---|---|
-| **DeepSeek V4 Flash** | Trae | Đọc file, grep, hỏi nhanh, fix bug 1-2 dòng |
-| **DeepSeek V4 Pro** | Trae | Viết tính năng mới, refactor, sửa services/, tabs/ |
-| **DeepSeek R1** | Trae | Thiết kế kiến trúc, debug logic khó, tối ưu query |
-| **Claude Haiku 4.5** | Claude Code | Đọc file, grep ngược, kiểm tra context trước khi sửa |
-| **Claude Sonnet 4.6** | Claude Code | Viết code, sửa auth.py, app.py, ws_*.py, review diff |
-| **Claude Opus 4.6** | Claude Code | Migration db.py, snapshot_service, tính năng quan trọng |
+| Mức độ | Tool | Model | Giá | Khi nào |
+|---|---|---|---|---|
+| Thấp | Trae | Flash | rẻ nhất | Đọc, tìm, fix nhỏ, đổi label |
+| Trung bình | Trae | Pro | rẻ | Viết tính năng, tabs/, services/ |
+| Cao | Trae | R1 | rẻ | Kiến trúc, debug logic khó |
+| Quan trọng | Claude Code Desktop | Haiku 4.5 | $1/M | auth.py, ws_*.py, phân quyền, Trae fail |
+| Rất quan trọng | Claude Code Desktop | Sonnet 4.6 | $3/M | db.py, migration |
+| Cực quan trọng | Claude Code Desktop | Opus 4.6 | $5/M | Tính năng ảnh hưởng toàn hệ thống |
+
+**Quy tắc chọn tool:**
+- Sai thì chỉ ảnh hưởng UI → Trae
+- Sai thì ảnh hưởng toàn bộ user/session → Claude Code Desktop Haiku
+- Sai thì mất dữ liệu → Claude Code Desktop Sonnet/Opus
+- Trae fail apply (không thấy edit_file_search_replace + status: success) → Claude Code Desktop Haiku ngay
 
 **Quy tắc leo model:**
 - Trae: Flash → Pro → R1
-- Claude Code: Haiku → Sonnet → Opus
-- Chỉ leo khi model nhẹ lặp lỗi ≥ 2 lần
-- Không dùng Opus/R1 cho task đọc/tìm/format
+- Claude Code Desktop: Haiku → Sonnet → Opus
+- Chỉ leo khi model nhẹ không đủ khả năng
 
 ---
 

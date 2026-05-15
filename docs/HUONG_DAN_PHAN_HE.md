@@ -33,6 +33,7 @@ Các tab chính:
 - 📤 Giao KH theo Đợt — Giao & điều chỉnh
 - ✅ Nhiệm vụ — Giao nhiệm vụ
 - 🔒 Kiểm soát — Báo cáo kiểm soát
+- 🔍 Trạng thái hệ thống — Trạng thái quy trình, audit log
 - 📤 Upload — 22 file PGD + merge
 
 ---
@@ -66,6 +67,7 @@ Các tab chính:
 - 📄 Ủy thác — 5 sub-tab (Mẫu 06, 15, 16...)
 - 🏠 Điểm GD — Quản lý điểm giao dịch
 - 👥 Ban đại diện — Thông tin BĐD
+- 🔍 Trạng thái hệ thống — Trạng thái upload PGD, audit log
 - 📤 Upload — File riêng PGD
 - 📢 Thông báo Kết luận Giao ban — Xuất Word/PDF kết luận họp giao ban xã (chuẩn NĐ30)
 

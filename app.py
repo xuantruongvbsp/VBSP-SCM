@@ -310,10 +310,13 @@ def main():
         st.session_state.logged_in = True
         st.session_state.username  = "admin"
         st.session_state.user_info = {
+            "username": "admin",
             "ho_ten": "Admin Dev",
-            "role":   "admin",
+            "role":   "admin_cn",
             "pgd":    None,
         }
+        st.session_state["role"] = "admin_cn"
+        st.session_state["username"] = "admin"
     # END DEV MODE
     if not st.session_state.logged_in:
         auth.hien_thi_login()

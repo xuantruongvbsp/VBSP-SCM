@@ -774,6 +774,36 @@ def _render_xuat(tab, **kwargs):
         with c2:
             den_ngay = st.date_input("Thời hạn đến", value=date.today(), key="td_x2")
 
+        SS_PDF_BAOCAO = "_td_pdf_baocao"
+
+        if st.button("📄 Xuất PDF báo cáo tiến độ", type="primary", key="td_btn_pdf_baocao"):
+            ds_task = _doc_tasks(chi_dang_theo_doi=False)
+            ds_task = [t for t in ds_task
+                       if tu_ngay.isoformat() <= t["ngay_deadline"] <= den_ngay.isoformat()]
+            if not ds_task:
+                st.info("Không có đầu việc trong khoảng thời gian đã chọn.")
+            else:
+                pdf_buf = _xuat_pdf_bao_cao_tien_do(ds_task, username)
+                if pdf_buf:
+                    st.session_state[SS_PDF_BAOCAO] = {
+                        "data": pdf_buf.getvalue(),
+                        "filename": f"baocao_tiendo_{datetime.now().strftime('%Y%m%d')}.pdf",
+                    }
+                    db.ghi_audit(username, "tien_do_xuat_pdf_baocao",
+                                 f"{len(ds_task)} đầu việc")
+                    st.rerun()
+
+        if st.session_state.get(SS_PDF_BAOCAO):
+            _p = st.session_state[SS_PDF_BAOCAO]
+            st.download_button(
+                "⬇ Tải PDF báo cáo tiến độ",
+                data=_p["data"],
+                file_name=_p["filename"],
+                mime="application/pdf",
+                key="td_pdf_baocao_dl",
+                use_container_width=True,
+            )
+
         if st.button("📥 Tạo Excel", type="primary", key="td_btn_tao"):
             ds_task = _doc_tasks(chi_dang_theo_doi=False)
             ds_task = [t for t in ds_task
@@ -935,95 +965,413 @@ def _render_xuat(tab, **kwargs):
                     use_container_width=True,
                 )
 
-        st.divider()
-        st.markdown("### 🔴 Báo cáo trễ hạn")
-        st.caption("Danh sách xã/PGD chưa hoàn thành sau thời hạn")
+
+
+
+def _xuat_pdf_bao_cao_tien_do(ds_task, username):
+    try:
+        from pdf_service import _dang_ky_font, VBSP_GREEN, ROW_ALT, BORDER_COLOR, _REPORTLAB_READY
+        if not _REPORTLAB_READY:
+            st.error("Chưa cài thư viện reportlab. Chạy: pip install reportlab")
+            return None
+        _dang_ky_font()
+
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib.units import cm
+        from reportlab.lib.styles import ParagraphStyle
+        from reportlab.lib.enums import TA_CENTER, TA_RIGHT, TA_LEFT
+        from reportlab.lib import colors
+        from reportlab.platypus import (
+            SimpleDocTemplate, Table, TableStyle, Paragraph,
+            Spacer, HRFlowable, PageBreak,
+        )
+        from io import BytesIO
+        from datetime import date, datetime
+        import json
+
+        FONT_NORMAL = "TNR"
+        FONT_BOLD = "TNR-Bold"
+        FONT_FALLBACK = "Helvetica"
+
+        fn = FONT_NORMAL if FONT_NORMAL else FONT_FALLBACK
+        fb = FONT_BOLD if FONT_BOLD else FONT_FALLBACK
 
         hom_nay = date.today().isoformat()
-        ds_task_all = _doc_tasks(chi_dang_theo_doi=False)
+        ngay_str = datetime.now().strftime("%d/%m/%Y")
+        buf = BytesIO()
+        margin = 1.5 * cm
+        page_size = A4
+        usable_w = page_size[0] - 2 * margin
 
-        tre_rows = []
-        for t in ds_task_all:
+        doc = SimpleDocTemplate(
+            buf, pagesize=page_size,
+            leftMargin=margin, rightMargin=margin,
+            topMargin=margin, bottomMargin=1.5 * cm,
+            title=f"Báo cáo tiến độ công việc {ngay_str}",
+            author="VBSP-SCM",
+        )
+
+        story = []
+
+        # ── Header ─────────────────────────────────────────────────────
+        story.append(Paragraph(
+            "NGÂN HÀNG CHÍNH SÁCH XÃ HỘI VIỆT NAM",
+            ParagraphStyle("bank", fontName=fb, fontSize=13,
+                           alignment=TA_CENTER, spaceAfter=2)
+        ))
+        story.append(Paragraph(
+            "CHI NHÁNH TỈNH ĐỒNG NAI",
+            ParagraphStyle("branch", fontName=fn, fontSize=11,
+                           alignment=TA_CENTER, spaceAfter=4)
+        ))
+        story.append(HRFlowable(width="100%", thickness=1.5,
+                                color=colors.HexColor("#2E7D32"), spaceAfter=6))
+        story.append(Paragraph(
+            f"BÁO CÁO TIẾN ĐỘ CÔNG VIỆC — {ngay_str}",
+            ParagraphStyle("title", fontName=fb, fontSize=14,
+                           alignment=TA_CENTER, spaceAfter=4,
+                           textColor=colors.HexColor("#003D7A"))
+        ))
+        story.append(Paragraph(
+            f"Người xuất: {username}  |  {datetime.now().strftime('%d/%m/%Y %H:%M')}",
+            ParagraphStyle("meta", fontName=fn, fontSize=9,
+                           alignment=TA_CENTER, spaceAfter=10,
+                           textColor=colors.grey)
+        ))
+
+        # ── Phần 1: Tiến độ theo đầu việc ─────────────────────────────
+        story.append(Paragraph(
+            "PHẦN 1: TIẾN ĐỘ THEO ĐẦU VIỆC",
+            ParagraphStyle("p1_title", fontName=fb, fontSize=11,
+                           alignment=TA_LEFT, spaceBefore=4, spaceAfter=6,
+                           textColor=colors.HexColor("#2E7D32"))
+        ))
+
+        task_header_s = ParagraphStyle("task_h", fontName=fb, fontSize=13,
+                                       leading=17, spaceBefore=10, spaceAfter=3,
+                                       textColor=colors.HexColor("#003D7A"))
+        task_meta_s = ParagraphStyle("task_m", fontName=fn, fontSize=11,
+                                     leading=15, spaceAfter=4, textColor=colors.grey)
+        pgd_group_s = ParagraphStyle("pgd_g", fontName=fb, fontSize=10,
+                                     leading=14, spaceBefore=4, spaceAfter=1,
+                                     textColor=colors.HexColor("#2E7D32"))
+        xa_line_s = ParagraphStyle("xa_l", fontName=fn, fontSize=9,
+                                   leading=12, leftIndent=12)
+        th_s = ParagraphStyle("th", fontName=fb, fontSize=11,
+                              alignment=TA_CENTER, textColor=colors.white,
+                              leading=14)
+        td_s = ParagraphStyle("td", fontName=fn, fontSize=11,
+                              leading=14, wordWrap="CJK")
+        td_c = ParagraphStyle("td_c", fontName=fn, fontSize=11,
+                              alignment=TA_CENTER, leading=14)
+        td_green = ParagraphStyle("td_green", fontName=fn, fontSize=11,
+                                  alignment=TA_CENTER, leading=14,
+                                  textColor=colors.HexColor("#2E7D32"))
+        td_red = ParagraphStyle("td_red", fontName=fn, fontSize=11,
+                                alignment=TA_CENTER, leading=14,
+                                textColor=colors.HexColor("#C62828"))
+        td_r = ParagraphStyle("td_r", fontName=fn, fontSize=11,
+                              alignment=TA_RIGHT, leading=14)
+
+        for i, t in enumerate(ds_task, 1):
+            kq = _doc_ketqua_task(t["id"])
+            xong = sum(1 for r in kq if r["trang_thai"] == "da_hoan_thanh")
+            tong = len(kq)
+            pct = round(xong / tong * 100) if tong else 0
+
+            loai_label = LOAI_TASK.get(t["loai"], t["loai"])
+            nguoi_pt = t.get("nguoi_phu_trach") or "—"
+            cap = t.get("cap_theo_doi", "xa")
+
+            tag_cap = "🏢 Theo dõi chung PGD" if cap == "pgd" else "📍 Theo dõi chi tiết xã"
+
+            if pct == 100:
+                css_cls = "✅ Hoàn thành"
+            elif t["ngay_deadline"] < hom_nay:
+                css_cls = "🔴 Trễ hạn"
+            else:
+                css_cls = "⏳ Đang thực hiện"
+
+            story.append(Paragraph(
+                f"{i}. {t['tieu_de']}",
+                task_header_s
+            ))
+            story.append(Paragraph(
+                f"Thời hạn cuối cùng: {t['ngay_deadline']} | Tiến độ hoàn thành: {pct}% | "
+                f"{css_cls} | Loại: {loai_label} | {tag_cap} | "
+                f"Người PT: {nguoi_pt}",
+                task_meta_s
+            ))
+
+            if cap == "pgd":
+                pgd_order = sorted(set(r["pgd"] for r in kq))
+                tbl_data = [[
+                    Paragraph("STT", th_s),
+                    Paragraph("PGD", th_s),
+                    Paragraph("Trạng thái", th_s),
+                    Paragraph("Ghi chú", th_s),
+                ]]
+                for j, pgd in enumerate(pgd_order, 1):
+                    r_pgd = next((r for r in kq if r["pgd"] == pgd), {})
+                    tt = r_pgd.get("trang_thai", "chua_thuc_hien")
+                    if tt == "da_hoan_thanh":
+                        tt_txt = "✅ Hoàn thành"
+                        stt_style = td_green
+                    elif tt == "khong_ap_dung":
+                        tt_txt = "➖ N/A"
+                        stt_style = td_c
+                    else:
+                        tt_txt = "⬜ Chưa thực hiện"
+                        stt_style = td_red
+                    gc = (r_pgd.get("ghi_chu") or "").strip()
+                    tbl_data.append([
+                        Paragraph(str(j), td_c),
+                        Paragraph(pgd, td_s),
+                        Paragraph(tt_txt, stt_style),
+                        Paragraph(gc, td_s),
+                    ])
+                cw = [1.5 * cm, 7.0 * cm, 3.5 * cm, 6.0 * cm]
+                tbl = Table(tbl_data, colWidths=cw, repeatRows=1)
+                tbl.setStyle(TableStyle([
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#2E7D32")),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                    ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                    ("TOPPADDING", (0, 0), (-1, -1), 4),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+                    ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#BDBDBD")),
+                ]))
+                for r_idx in range(1, len(tbl_data)):
+                    if r_idx % 2 == 0:
+                        tbl.setStyle(TableStyle([
+                            ("BACKGROUND", (0, r_idx), (-1, r_idx),
+                             colors.HexColor("#F5F5F5"))
+                        ]))
+                story.append(tbl)
+            else:
+                tbl_data = [[
+                    Paragraph("STT", th_s),
+                    Paragraph("PGD", th_s),
+                    Paragraph("Xã / Phường", th_s),
+                    Paragraph("Trạng thái", th_s),
+                    Paragraph("Ghi chú", th_s),
+                ]]
+                for j, r in enumerate(
+                    sorted(kq, key=lambda x: (x["pgd"], x["ten_xa"])), 1
+                ):
+                    tt = r["trang_thai"]
+                    if tt == "da_hoan_thanh":
+                        tt_txt = "✅ Hoàn thành"
+                        stt_style = td_green
+                        ngay_ht = r.get("ngay_hoan_thanh") or ""
+                        try:
+                            ngay_ht = datetime.strptime(
+                                ngay_ht[:10], "%Y-%m-%d"
+                            ).strftime("%d/%m/%Y")
+                        except Exception:
+                            pass
+                        gc = ngay_ht
+                    elif tt == "khong_ap_dung":
+                        tt_txt = "➖ N/A"
+                        stt_style = td_c
+                        gc = ""
+                    else:
+                        tt_txt = "⬜ Chưa thực hiện"
+                        stt_style = td_red
+                        gc = ""
+                    tbl_data.append([
+                        Paragraph(str(j), td_c),
+                        Paragraph(r["pgd"], td_s),
+                        Paragraph(r["ten_xa"] or "", td_s),
+                        Paragraph(tt_txt, stt_style),
+                        Paragraph(gc, td_s),
+                    ])
+                cw = [1.2 * cm, 5.2 * cm, 4.3 * cm, 3.3 * cm, 4.0 * cm]
+                tbl = Table(tbl_data, colWidths=cw, repeatRows=1)
+                tbl.setStyle(TableStyle([
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#2E7D32")),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                    ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                    ("TOPPADDING", (0, 0), (-1, -1), 4),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+                    ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#BDBDBD")),
+                ]))
+                for r_idx in range(1, len(tbl_data)):
+                    if r_idx % 2 == 0:
+                        tbl.setStyle(TableStyle([
+                            ("BACKGROUND", (0, r_idx), (-1, r_idx),
+                             colors.HexColor("#F5F5F5"))
+                        ]))
+                story.append(tbl)
+
+            story.append(Spacer(1, 0.3 * cm))
+            story.append(HRFlowable(width="60%", thickness=0.3,
+                                    color=colors.HexColor("#E0E0E0"),
+                                    spaceAfter=2))
+
+        # ── Page break → Phần 2 ───────────────────────────────────────
+        story.append(PageBreak())
+
+        story.append(Paragraph(
+            "PHẦN 2: BÁO CÁO TRỄ HẠN",
+            ParagraphStyle("p2_title", fontName=fb, fontSize=11,
+                           alignment=TA_LEFT, spaceBefore=4, spaceAfter=6,
+                           textColor=colors.HexColor("#C62828"))
+        ))
+
+        p2_th = ParagraphStyle("p2_th", fontName=fb, fontSize=11,
+                                alignment=TA_CENTER, textColor=colors.white,
+                                leading=14)
+        p2_td = ParagraphStyle("p2_td", fontName=fn, fontSize=11,
+                               leading=14, wordWrap="CJK")
+        p2_td_c = ParagraphStyle("p2_td_c", fontName=fn, fontSize=11,
+                                 alignment=TA_CENTER, leading=14)
+        p2_td_r = ParagraphStyle("p2_td_r", fontName=fb, fontSize=11,
+                                 alignment=TA_CENTER, leading=14,
+                                 textColor=colors.HexColor("#C62828"))
+
+        p2_count = 0
+        for t in ds_task:
             if t["ngay_deadline"] >= hom_nay:
                 continue
             kq = _doc_ketqua_task(t["id"])
-            for r in kq:
-                if r["trang_thai"] != "chua_thuc_hien":
-                    continue
-                so_ngay_tre = (date.today() - date.fromisoformat(t["ngay_deadline"])).days
-                tre_rows.append({
-                    "Đầu việc": t["tieu_de"],
-                    "Loại": LOAI_TASK.get(t["loai"], t["loai"]),
-                    "Thời hạn": t["ngay_deadline"],
-                    "PGD": r["pgd"],
-                    "Xã / Phường": r["ten_xa"],
-                    "Số ngày trễ": so_ngay_tre,
-                    "Người phụ trách": t.get("nguoi_phu_trach") or "—",
-                })
+            tre_list = [r for r in kq if r["trang_thai"] == "chua_thuc_hien"]
+            if not tre_list:
+                continue
 
-        df_tre = pd.DataFrame(tre_rows) if tre_rows else pd.DataFrame(
-            columns=["Đầu việc", "Loại", "Thời hạn", "PGD",
-                     "Xã / Phường", "Số ngày trễ", "Người phụ trách"]
-        )
+            so_ngay_tre = (date.today() -
+                           date.fromisoformat(t["ngay_deadline"])).days
+            cap = t.get("cap_theo_doi", "xa")
 
-        c1t, c2t, c3t = st.columns(3)
-        c1t.metric("Tổng trễ hạn", len(df_tre))
-        c2t.metric("PGD bị ảnh hưởng", df_tre["PGD"].nunique() if not df_tre.empty else 0)
-        c3t.metric("Đầu việc trễ", df_tre["Đầu việc"].nunique() if not df_tre.empty else 0)
+            story.append(Paragraph(
+                f"▪ {t['tieu_de']} — Trễ {so_ngay_tre} ngày (thời hạn: {t['ngay_deadline']})",
+                ParagraphStyle("p2_task", fontName=fb, fontSize=11,
+                               leading=15, spaceBefore=8, spaceAfter=3,
+                               textColor=colors.HexColor("#C62828"))
+            ))
 
-        if df_tre.empty:
-            st.success("✅ Không có đơn vị nào trễ hạn.")
+            if cap == "pgd":
+                cols = ["STT", "PGD", "Số ngày trễ"]
+                tbl_data = [[Paragraph(c, p2_th) for c in cols]]
+                for j, r in enumerate(tre_list, 1):
+                    p2_count += 1
+                    tbl_data.append([
+                        Paragraph(str(j), p2_td_c),
+                        Paragraph(r["pgd"], p2_td),
+                        Paragraph(f"{so_ngay_tre} ngày", p2_td_r),
+                    ])
+                cw2 = [1.5 * cm, 10.0 * cm, 6.5 * cm]
+                tbl2 = Table(tbl_data, colWidths=cw2, repeatRows=1)
+                tbl2.setStyle(TableStyle([
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#C62828")),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                    ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                    ("TOPPADDING", (0, 0), (-1, -1), 4),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+                    ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#BDBDBD")),
+                ]))
+                for r_idx in range(1, len(tbl_data)):
+                    if r_idx % 2 == 0:
+                        tbl2.setStyle(TableStyle([
+                            ("BACKGROUND", (0, r_idx), (-1, r_idx),
+                             colors.HexColor("#FFEBEE"))
+                        ]))
+                story.append(tbl2)
+            else:
+                cols = ["STT", "PGD", "Xã / Phường", "Số ngày trễ"]
+                tbl_data = [[Paragraph(c, p2_th) for c in cols]]
+                idx2 = 0
+                kq_by_pgd = {}
+                for r in tre_list:
+                    kq_by_pgd.setdefault(r["pgd"], []).append(r)
+                for pgd, items in sorted(kq_by_pgd.items()):
+                    for r in items:
+                        idx2 += 1
+                        p2_count += 1
+                        tbl_data.append([
+                            Paragraph(str(idx2), p2_td_c),
+                            Paragraph(pgd, p2_td),
+                            Paragraph(r["ten_xa"], p2_td),
+                            Paragraph(f"{so_ngay_tre} ngày", p2_td_r),
+                        ])
+                cw2 = [1.2 * cm, 5.5 * cm, 6.5 * cm, 4.8 * cm]
+                tbl2 = Table(tbl_data, colWidths=cw2, repeatRows=1)
+                tbl2.setStyle(TableStyle([
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#C62828")),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                    ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                    ("TOPPADDING", (0, 0), (-1, -1), 4),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+                    ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#BDBDBD")),
+                ]))
+                for r_idx in range(1, len(tbl_data)):
+                    if r_idx % 2 == 0:
+                        tbl2.setStyle(TableStyle([
+                            ("BACKGROUND", (0, r_idx), (-1, r_idx),
+                             colors.HexColor("#FFEBEE"))
+                        ]))
+                story.append(tbl2)
+
+        if p2_count > 0:
+            story.append(Spacer(1, 0.5 * cm))
+            story.append(Paragraph(
+                f"Tổng số: {p2_count} đơn vị trễ hạn",
+                ParagraphStyle("sum", fontName=fb, fontSize=10,
+                               alignment=TA_CENTER, spaceBefore=8,
+                               textColor=colors.HexColor("#C62828"))
+            ))
         else:
-            st.dataframe(df_tre, use_container_width=True, hide_index=True)
+            story.append(Paragraph(
+                "✅ Không có đơn vị nào trễ hạn.",
+                ParagraphStyle("ok", fontName=fn, fontSize=10,
+                               alignment=TA_CENTER, spaceAfter=6,
+                               textColor=colors.HexColor("#2E7D32"))
+            ))
 
-            SS_TRE_EXCEL = "_td_tre_excel"
-            SS_TRE_PDF = "_td_tre_pdf"
+        # ── Chữ ký ───────────────────────────────────────────────────
+        story.append(Spacer(1, 0.6 * cm))
+        story.append(HRFlowable(width="100%", thickness=0.5,
+                                color=colors.HexColor("#BDBDBD"), spaceAfter=4))
+        sig_style = ParagraphStyle("sig", fontName=fn, fontSize=11,
+                                   alignment=TA_CENTER, leading=15)
+        sig_bold = ParagraphStyle("sig_b", fontName=fb, fontSize=12,
+                                  alignment=TA_CENTER, leading=17)
+        sig_data = [[
+            Paragraph("Người lập", sig_bold),
+            Paragraph("Kiểm soát", sig_bold),
+            Paragraph("Giám đốc", sig_bold),
+        ], [
+            Paragraph("(Ký, ghi rõ họ tên)", sig_style),
+            Paragraph("(Ký, ghi rõ họ tên)", sig_style),
+            Paragraph("(Ký, ghi rõ họ tên, đóng dấu)", sig_style),
+        ]]
+        sig_tbl = Table(sig_data, colWidths=[5.5*cm, 5.5*cm, 5.5*cm])
+        sig_tbl.setStyle(TableStyle([
+            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("TOPPADDING", (0, 0), (-1, -1), 6),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+        ]))
+        story.append(sig_tbl)
 
-            col_tre1, col_tre2 = st.columns(2)
-            with col_tre1:
-                if st.button("📥 Xuất Excel trễ hạn", key="td_btn_tre_excel"):
-                    out = BytesIO()
-                    with pd.ExcelWriter(out, engine="openpyxl") as writer:
-                        df_tre.to_excel(writer, sheet_name="Trễ hạn", index=False)
-                    st.session_state[SS_TRE_EXCEL] = {
-                        "data": out.getvalue(),
-                        "filename": f"TreHan_{date.today().isoformat()}.xlsx",
-                    }
-                    db.ghi_audit(username, "tien_do_xuat_tre_han",
-                                 f"{len(df_tre)} dòng trễ hạn")
-                    st.rerun()
+        # ── Footer ────────────────────────────────────────────────────
+        def _on_page(canvas, _doc):
+            canvas.saveState()
+            canvas.setFont(fn if FONT_NORMAL else FONT_FALLBACK, 8)
+            canvas.setFillColor(colors.grey)
+            canvas.drawRightString(
+                page_size[0] - margin,
+                0.6 * cm,
+                f"Trang {_doc.page}  |  VBSP-SCM  |  {ngay_str}"
+            )
+            canvas.restoreState()
 
-                if st.session_state.get(SS_TRE_EXCEL):
-                    st.download_button(
-                        "⬇ Tải Excel trễ hạn",
-                        data=st.session_state[SS_TRE_EXCEL]["data"],
-                        file_name=st.session_state[SS_TRE_EXCEL]["filename"],
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                        key="td_tre_excel_dl",
-                        use_container_width=True,
-                    )
+        doc.build(story, onFirstPage=_on_page, onLaterPages=_on_page)
+        buf.seek(0)
+        return buf
 
-            with col_tre2:
-                if st.button("📄 Xuất PDF trễ hạn", key="td_btn_tre_pdf"):
-                    pdf_bytes = _xuat_pdf_tre_han(df_tre, username)
-                    if pdf_bytes:
-                        st.session_state[SS_TRE_PDF] = {
-                            "data": pdf_bytes.read(),
-                            "filename": f"TreHan_{date.today().isoformat()}.pdf",
-                        }
-                        db.ghi_audit(username, "tien_do_xuat_tre_han_pdf",
-                                     f"{len(df_tre)} dòng trễ hạn")
-                        st.rerun()
-
-                if st.session_state.get(SS_TRE_PDF):
-                    st.download_button(
-                        "⬇ Tải PDF trễ hạn",
-                        data=st.session_state[SS_TRE_PDF]["data"],
-                        file_name=st.session_state[SS_TRE_PDF]["filename"],
-                        mime="application/pdf",
-                        key="td_tre_pdf_dl",
-                        use_container_width=True,
-                    )
+    except Exception as e:
+        st.error(f"Lỗi tạo PDF báo cáo tiến độ: {e}")
+        return None
 
 
 def _xuat_pdf_tien_do(task, ds_kq, username):
@@ -1206,156 +1554,6 @@ def _xuat_pdf_tien_do(task, ds_kq, username):
         return None
 
 
-def _xuat_pdf_tre_han(df_tre, username):
-    try:
-        from reportlab.lib.pagesizes import A4
-        from reportlab.platypus import (
-            SimpleDocTemplate, Paragraph, Spacer, HRFlowable,
-        )
-        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-        from reportlab.lib import colors
-        from reportlab.lib.enums import TA_CENTER
-        from reportlab.pdfbase import pdfmetrics
-        from reportlab.pdfbase.ttfonts import TTFont
-        import os
-
-        FONT_NORMAL = "Helvetica"
-        FONT_BOLD = "Helvetica-Bold"
-
-        arial_path = "C:/Windows/Fonts/arial.ttf"
-        arialbd_path = "C:/Windows/Fonts/arialbd.ttf"
-        if os.path.exists(arial_path):
-            pdfmetrics.registerFont(TTFont("ArialUni", arial_path))
-            FONT_NORMAL = "ArialUni"
-        if os.path.exists(arialbd_path):
-            pdfmetrics.registerFont(TTFont("ArialUni-Bold", arialbd_path))
-            FONT_BOLD = "ArialUni-Bold"
-
-        if df_tre.empty:
-            return None
-
-        nhom_theo_pgd = {}
-        for _, r in df_tre.iterrows():
-            nhom_theo_pgd.setdefault(r["PGD"], []).append(r)
-
-        buf = BytesIO()
-        doc = SimpleDocTemplate(
-            buf, pagesize=A4,
-            leftMargin=28, rightMargin=28,
-            topMargin=20, bottomMargin=20,
-        )
-
-        story = []
-        styles = getSampleStyleSheet()
-
-        title_style = ParagraphStyle(
-            "Title_VN", parent=styles["Title"],
-            fontName=FONT_BOLD, fontSize=14,
-            alignment=TA_CENTER, spaceAfter=2, leading=18,
-        )
-        subtitle_style = ParagraphStyle(
-            "Sub_VN", parent=styles["Normal"],
-            fontName=FONT_BOLD, fontSize=12,
-            alignment=TA_CENTER, spaceAfter=4, leading=16,
-        )
-        normal_style = ParagraphStyle(
-            "Normal_VN", parent=styles["Normal"],
-            fontName=FONT_NORMAL, fontSize=10,
-            leading=14,
-        )
-        pgd_style = ParagraphStyle(
-            "PGD_VN", parent=styles["Normal"],
-            fontName=FONT_BOLD, fontSize=11,
-            spaceBefore=8, spaceAfter=4, leading=15,
-            textColor=colors.HexColor("#2e7d32"),
-        )
-        task_style = ParagraphStyle(
-            "Task_VN", parent=styles["Normal"],
-            fontName=FONT_NORMAL, fontSize=10,
-            leftIndent=12, spaceBefore=2, spaceAfter=2, leading=14,
-        )
-        xa_style = ParagraphStyle(
-            "Xa_VN", parent=styles["Normal"],
-            fontName=FONT_NORMAL, fontSize=9,
-            leftIndent=24, leading=13, textColor=colors.grey,
-        )
-        summary_style = ParagraphStyle(
-            "Summary_VN", parent=styles["Normal"],
-            fontName=FONT_BOLD, fontSize=10,
-            spaceBefore=8, spaceAfter=4, leading=14,
-        )
-
-        story.append(Paragraph(
-            "NGÂN HÀNG CHÍNH SÁCH XÃ HỘI VIỆT NAM",
-            title_style,
-        ))
-        story.append(Paragraph(
-            "CHI NHÁNH TỈNH ĐỒNG NAI",
-            subtitle_style,
-        ))
-        story.append(Spacer(1, 10))
-        story.append(Paragraph("BÁO CÁO ĐƠN VỊ TRỄ HẠN", subtitle_style))
-        story.append(Spacer(1, 4))
-
-        now = datetime.now()
-        so_pgd = df_tre["PGD"].nunique()
-        so_task = df_tre["Đầu việc"].nunique()
-        story.append(Paragraph(
-            f"Ngày xuất: {now.strftime('%d/%m/%Y %H:%M')} | Người xuất: {username}",
-            normal_style,
-        ))
-        story.append(Paragraph(
-            f"Tổng: {len(df_tre)} đơn vị trễ | {so_pgd} PGD | {so_task} đầu việc",
-            normal_style,
-        ))
-        story.append(HRFlowable(
-            width="100%", thickness=0.5, color=colors.grey))
-        story.append(Spacer(1, 6))
-
-        tong_pgd = 0
-        tong_pgd_tre = 0
-        for pgd, rows in sorted(nhom_theo_pgd.items()):
-            tong_pgd += 1
-            so_task_tre = len(set(r["Đầu việc"] for r in rows))
-            story.append(Paragraph(
-                f"{pgd} ({so_task_tre} đầu việc trễ)",
-                pgd_style,
-            ))
-
-            nhom_theo_task = {}
-            for r in rows:
-                nhom_theo_task.setdefault(r["Đầu việc"], []).append(r)
-
-            for ten_task, task_rows in nhom_theo_task.items():
-                so_ngay = task_rows[0]["Số ngày trễ"]
-                story.append(Paragraph(
-                    f"• {ten_task} — trễ {so_ngay} ngày",
-                    task_style,
-                ))
-                ds_xa = [r["Xã / Phường"] for r in task_rows[:8]]
-                xa_text = ", ".join(ds_xa)
-                if len(task_rows) > 8:
-                    xa_text += f" và {len(task_rows) - 8} đơn vị khác"
-                story.append(Paragraph(f"○ {xa_text}", xa_style))
-
-            tong_pgd_tre += 1
-
-        story.append(Spacer(1, 6))
-        story.append(HRFlowable(
-            width="100%", thickness=0.5, color=colors.grey))
-        story.append(Spacer(1, 6))
-        story.append(Paragraph(
-            f"TỔNG KẾT: {tong_pgd_tre}/{tong_pgd} PGD có đơn vị trễ hạn",
-            summary_style,
-        ))
-
-        doc.build(story)
-        buf.seek(0)
-        return buf
-
-    except Exception as e:
-        st.error(f"Lỗi tạo PDF trễ hạn: {e}")
-        return None
 
 
 def render(tab, **kwargs):

@@ -172,6 +172,8 @@ def _render_canh_bao(df: pd.DataFrame, ds_pgd_all: list):
 
 def _render_canh_bao_no(df_full: pd.DataFrame, ds_pgd_all: list, role: str, username: str):
     """Cảnh báo nợ — 4 sub-tab: Đến hạn, 3 tháng KHĐ, Migration, Nợ QH phát sinh."""
+    from tabs.tab_den_han import render as render_den_han
+
     sub1, sub2, sub3, sub4 = st.tabs([
         "⏰ Đến hạn",
         "🔴 3 tháng KHĐ",

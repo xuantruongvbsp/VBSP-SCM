@@ -878,6 +878,7 @@ def render(**kwargs):
         tab_diem_gd_pgd, tab_ban_dai_dien,
         tab_tongquan, tab_tien_do, tab_baocao,
         tab_nq11, tab_candoi, tab_uy_thac, tab_qd62,
+        tab_trang_thai_nguon,
     )
     from tabs.tab_den_han import render as render_den_han
 
@@ -986,6 +987,7 @@ def render(**kwargs):
                 ("✅ Nhiệm vụ", lambda tab: tab_nhiem_vu.render(tab, **kwargs)),
                 ("📤 Upload Dữ liệu", lambda tab: tab_upload_pgd.render(tab, **kwargs)),
                 ("📤 Upload HSTD", lambda tab: tab_upload_pgd.render(tab, **kwargs)),
+                ("🔍 Trạng thái hệ thống", lambda tab: tab_trang_thai_nguon.render(tab, **kwargs)),
             ],
         },
     }

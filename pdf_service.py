@@ -38,16 +38,21 @@ def _dang_ky_font():
     candidates = [
         Path("assets/times.ttf"),
         Path("assets/timesbd.ttf"),
+        Path("assets/timesi.ttf"),
         Path("C:/Windows/Fonts/times.ttf"),
         Path("C:/Windows/Fonts/timesbd.ttf"),
+        Path("C:/Windows/Fonts/timesi.ttf"),
     ]
-    regular = next((p for p in candidates[:2] + [candidates[2]] if p.exists()), None)
-    bold = next((p for p in [candidates[1], candidates[3]] if p.exists()), None)
+    regular = next((p for p in [candidates[0], candidates[3]] if p.exists()), None)
+    bold = next((p for p in [candidates[1], candidates[4]] if p.exists()), None)
+    italic = next((p for p in [candidates[2], candidates[5]] if p.exists()), None)
 
     if regular:
         pdfmetrics.registerFont(TTFont("TNR", str(regular)))
     if bold:
         pdfmetrics.registerFont(TTFont("TNR-Bold", str(bold)))
+    if italic:
+        pdfmetrics.registerFont(TTFont("TNR-Italic", str(italic)))
 
     # Fallback nếu không có Times: dùng Helvetica (ASCII only, báo lỗi)
     if not regular:
@@ -58,6 +63,7 @@ def _dang_ky_font():
 
 FONT_NORMAL = "TNR"       # dùng sau khi _dang_ky_font() đã chạy
 FONT_BOLD = "TNR-Bold"
+FONT_ITALIC = "TNR-Italic"
 FONT_FALLBACK = "Helvetica"  # khi font chưa đăng ký được
 
 if _REPORTLAB_READY:

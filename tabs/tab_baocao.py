@@ -29,16 +29,24 @@ _COLS_PCT = {"Tỷ_lệ_QH_%", "Tỷ_lệ_KHĐ_%", "QH%", "TL Nợ xấu %"}
 
 
 def _fmt_df(df: pd.DataFrame) -> pd.DataFrame:
-    """Chuyển cột tiền → fmt_ty string, cột % → chuỗi VN trước khi hiển thị."""
+    """Cột tiền → số triệu đồng (VN format, 3 chữ số thập phân). Cột % → chuỗi VN."""
     d = df.copy()
     for col in d.columns:
         if col in _COLS_TIEN:
-            d[col] = pd.to_numeric(d[col], errors="coerce").apply(fmt_ty)
+            d[col] = pd.to_numeric(d[col], errors="coerce").apply(
+                lambda x: vn(x / 1_000_000, 3) if pd.notna(x) else "—"
+            )
         elif col in _COLS_PCT:
             d[col] = pd.to_numeric(d[col], errors="coerce").apply(
                 lambda x: f"{x:.2f}".replace(".", ",") + "%" if pd.notna(x) else "—"
             )
     return d
+
+
+def _hien_thi_bc(df: pd.DataFrame, **kw) -> None:
+    """Hiển thị bảng báo cáo kèm dòng đơn vị tính."""
+    st.caption("ĐVT: triệu đồng")
+    hien_thi_dataframe_phan_trang(df, **kw)
 
 
 def _bc_fmt_metric(x: float) -> str:
@@ -324,7 +332,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                         * 100
                     ).round(2).fillna(0)
                     st.info(f"**{fmt_so(len(dbc_raw))}** {nhom.lower()}")
-                    hien_thi_dataframe_phan_trang(
+                    _hien_thi_bc(
                         _fmt_df(dbc_raw),
                         key="baocao_th_xa_thon",
                     )

@@ -284,8 +284,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
     df_nq11  = kwargs.get("df_nq11")
     ts = kwargs.get("ts_hstd", 0.0)
 
-    import streamlit as _st
-    _tab_ctx = tab if tab is not None else _st.container()
+    _tab_ctx = tab if tab is not None else st.container()
     with _tab_ctx:
         st.markdown(
             """

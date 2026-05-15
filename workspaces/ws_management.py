@@ -21,7 +21,7 @@ from config import (
 )
 from auth import is_cn_role, is_pgd_role, get_permissions, normalize_role, la_phan_he_cn
 from data import (
-    danh_dau_khong_hd, tong_hop_khong_hd,
+    danh_dau_khong_hd, danh_dau_khong_hd_cached, tong_hop_khong_hd,
     ds_chi_tiet_khong_hd, canh_bao_migration,
 )
 from utils import (
@@ -187,10 +187,7 @@ def _render_canh_bao_no(df_full: pd.DataFrame, ds_pgd_all: list, role: str, user
                 st.warning("Chưa có dữ liệu HSTD.")
         return
 
-    _cache_key = f"df_kh_{id(df_full)}"
-    if _cache_key not in st.session_state:
-        st.session_state[_cache_key] = danh_dau_khong_hd(df_full)
-    df_kh = st.session_state[_cache_key]
+    df_kh = danh_dau_khong_hd_cached(df_full)
 
     with sub2:
         _hien_thi_khd_tab(df_kh, ds_pgd_all)
@@ -455,7 +452,6 @@ def _render_ndt_dp(role: str, username: str) -> None:
                         ghi_kv("ndt_dp_list", ds_moi, username)
                         ghi_audit(username, "sua_ndt_dp",
                                   f"Sửa mã {item['ma']}: {ghi_chu_cu} → {ghi_chu_moi}")
-                        st.cache_data.clear()
                     st.session_state.pop(edit_key, None)
                     st.rerun()
             else:

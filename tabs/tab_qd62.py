@@ -119,11 +119,11 @@ def _render_pgd(pgd_filter: str, username: str) -> None:
 
     # ── B. Form nhập hồ sơ mới ────────────────────────────────────────────
     with st.expander("➕ Thêm hồ sơ mới", expanded=True):
-        with st.form("form_qd62_pgd", clear_on_submit=True):
+        with st.form("form_qd62_pgd", clear_on_submit=False):
             col_a, col_b = st.columns(2)
             with col_a:
-                ho_ten = st.text_input("Họ tên khách hàng *", placeholder="Nguyễn Văn A")
-                so_cccd = st.text_input("Số CCCD/CMND *", placeholder="0790xxxxxx")
+                ho_ten = st.text_input("Họ tên khách hàng *", placeholder="Nguyễn Văn A", key="qd62_ho_ten")
+                so_cccd = st.text_input("Số CCCD/CMND *", placeholder="0790xxxxxx", key="qd62_so_cccd")
                 ds_xa = _lay_ds_xa(slug)
                 xa = st.selectbox("Xã/Phường *", ds_xa if ds_xa else [""])
             with col_b:

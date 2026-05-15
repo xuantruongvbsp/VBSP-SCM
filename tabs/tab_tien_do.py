@@ -774,6 +774,36 @@ def _render_xuat(tab, **kwargs):
         with c2:
             den_ngay = st.date_input("Thời hạn đến", value=date.today(), key="td_x2")
 
+        SS_PDF_BAOCAO = "_td_pdf_baocao"
+
+        if st.button("📄 Xuất PDF báo cáo tiến độ", type="primary", key="td_btn_pdf_baocao"):
+            ds_task = _doc_tasks(chi_dang_theo_doi=False)
+            ds_task = [t for t in ds_task
+                       if tu_ngay.isoformat() <= t["ngay_deadline"] <= den_ngay.isoformat()]
+            if not ds_task:
+                st.info("Không có đầu việc trong khoảng thời gian đã chọn.")
+            else:
+                pdf_buf = _xuat_pdf_bao_cao_tien_do(ds_task, username)
+                if pdf_buf:
+                    st.session_state[SS_PDF_BAOCAO] = {
+                        "data": pdf_buf.getvalue(),
+                        "filename": f"baocao_tiendo_{datetime.now().strftime('%Y%m%d')}.pdf",
+                    }
+                    db.ghi_audit(username, "tien_do_xuat_pdf_baocao",
+                                 f"{len(ds_task)} đầu việc")
+                    st.rerun()
+
+        if st.session_state.get(SS_PDF_BAOCAO):
+            _p = st.session_state[SS_PDF_BAOCAO]
+            st.download_button(
+                "⬇ Tải PDF báo cáo tiến độ",
+                data=_p["data"],
+                file_name=_p["filename"],
+                mime="application/pdf",
+                key="td_pdf_baocao_dl",
+                use_container_width=True,
+            )
+
         if st.button("📥 Tạo Excel", type="primary", key="td_btn_tao"):
             ds_task = _doc_tasks(chi_dang_theo_doi=False)
             ds_task = [t for t in ds_task
@@ -1024,6 +1054,303 @@ def _render_xuat(tab, **kwargs):
                         key="td_tre_pdf_dl",
                         use_container_width=True,
                     )
+
+
+def _xuat_pdf_bao_cao_tien_do(ds_task, username):
+    try:
+        from pdf_service import _dang_ky_font, VBSP_GREEN, ROW_ALT, BORDER_COLOR, _REPORTLAB_READY
+        if not _REPORTLAB_READY:
+            st.error("Chưa cài thư viện reportlab. Chạy: pip install reportlab")
+            return None
+        _dang_ky_font()
+
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib.units import cm
+        from reportlab.lib.styles import ParagraphStyle
+        from reportlab.lib.enums import TA_CENTER, TA_RIGHT, TA_LEFT
+        from reportlab.lib import colors
+        from reportlab.platypus import (
+            SimpleDocTemplate, Table, TableStyle, Paragraph,
+            Spacer, HRFlowable, PageBreak,
+        )
+        from io import BytesIO
+        from datetime import date, datetime
+        import json
+
+        FONT_NORMAL = "TNR"
+        FONT_BOLD = "TNR-Bold"
+        FONT_FALLBACK = "Helvetica"
+
+        fn = FONT_NORMAL if FONT_NORMAL else FONT_FALLBACK
+        fb = FONT_BOLD if FONT_BOLD else FONT_FALLBACK
+
+        hom_nay = date.today().isoformat()
+        ngay_str = datetime.now().strftime("%d/%m/%Y")
+        buf = BytesIO()
+        margin = 1.5 * cm
+        page_size = A4
+        usable_w = page_size[0] - 2 * margin
+
+        doc = SimpleDocTemplate(
+            buf, pagesize=page_size,
+            leftMargin=margin, rightMargin=margin,
+            topMargin=margin, bottomMargin=1.5 * cm,
+            title=f"Báo cáo tiến độ công việc {ngay_str}",
+            author="VBSP-SCM",
+        )
+
+        story = []
+
+        # ── Header ─────────────────────────────────────────────────────
+        story.append(Paragraph(
+            "NGÂN HÀNG CHÍNH SÁCH XÃ HỘI VIỆT NAM",
+            ParagraphStyle("bank", fontName=fb, fontSize=13,
+                           alignment=TA_CENTER, spaceAfter=2)
+        ))
+        story.append(Paragraph(
+            "CHI NHÁNH TỈNH ĐỒNG NAI",
+            ParagraphStyle("branch", fontName=fn, fontSize=11,
+                           alignment=TA_CENTER, spaceAfter=4)
+        ))
+        story.append(HRFlowable(width="100%", thickness=1.5,
+                                color=colors.HexColor("#2E7D32"), spaceAfter=6))
+        story.append(Paragraph(
+            f"BÁO CÁO TIẾN ĐỘ CÔNG VIỆC — {ngay_str}",
+            ParagraphStyle("title", fontName=fb, fontSize=14,
+                           alignment=TA_CENTER, spaceAfter=4,
+                           textColor=colors.HexColor("#003D7A"))
+        ))
+        story.append(Paragraph(
+            f"Người xuất: {username}  |  {datetime.now().strftime('%d/%m/%Y %H:%M')}",
+            ParagraphStyle("meta", fontName=fn, fontSize=9,
+                           alignment=TA_CENTER, spaceAfter=10,
+                           textColor=colors.grey)
+        ))
+
+        # ── Phần 1: Tiến độ theo đầu việc ─────────────────────────────
+        story.append(Paragraph(
+            "PHẦN 1: TIẾN ĐỘ THEO ĐẦU VIỆC",
+            ParagraphStyle("p1_title", fontName=fb, fontSize=11,
+                           alignment=TA_LEFT, spaceBefore=4, spaceAfter=6,
+                           textColor=colors.HexColor("#2E7D32"))
+        ))
+
+        task_header_s = ParagraphStyle("task_h", fontName=fb, fontSize=10,
+                                       leading=14, spaceBefore=8, spaceAfter=2,
+                                       textColor=colors.HexColor("#003D7A"))
+        task_meta_s = ParagraphStyle("task_m", fontName=fn, fontSize=8,
+                                     leading=11, spaceAfter=3, textColor=colors.grey)
+        pgd_group_s = ParagraphStyle("pgd_g", fontName=fb, fontSize=9,
+                                     leading=13, spaceBefore=4, spaceAfter=1,
+                                     textColor=colors.HexColor("#2E7D32"))
+        xa_line_s = ParagraphStyle("xa_l", fontName=fn, fontSize=8,
+                                   leading=11, leftIndent=12)
+        th_s = ParagraphStyle("th", fontName=fb, fontSize=8,
+                              alignment=TA_CENTER, textColor=colors.white,
+                              leading=10)
+        td_s = ParagraphStyle("td", fontName=fn, fontSize=8,
+                              leading=11, wordWrap="CJK")
+        td_c = ParagraphStyle("td_c", fontName=fn, fontSize=8,
+                              alignment=TA_CENTER, leading=11)
+        td_r = ParagraphStyle("td_r", fontName=fn, fontSize=8,
+                              alignment=TA_RIGHT, leading=11)
+
+        for i, t in enumerate(ds_task, 1):
+            kq = _doc_ketqua_task(t["id"])
+            xong = sum(1 for r in kq if r["trang_thai"] == "da_hoan_thanh")
+            tong = len(kq)
+            pct = round(xong / tong * 100) if tong else 0
+
+            loai_label = LOAI_TASK.get(t["loai"], t["loai"])
+            nguoi_pt = t.get("nguoi_phu_trach") or "—"
+            cap = t.get("cap_theo_doi", "xa")
+
+            tag_cap = "🏢 Theo dõi chung PGD" if cap == "pgd" else "📍 Theo dõi chi tiết xã"
+
+            if pct == 100:
+                css_cls = "✅ Hoàn thành"
+            elif t["ngay_deadline"] < hom_nay:
+                css_cls = "🔴 Trễ hạn"
+            else:
+                css_cls = "⏳ Đang thực hiện"
+
+            story.append(Paragraph(
+                f"{i}. {t['tieu_de']}",
+                task_header_s
+            ))
+            story.append(Paragraph(
+                f"Deadline: {t['ngay_deadline']} | Tiến độ: {pct}% | "
+                f"{css_cls} | Loại: {loai_label} | {tag_cap} | "
+                f"Người PT: {nguoi_pt}",
+                task_meta_s
+            ))
+
+            if cap == "pgd":
+                pgd_order = sorted(set(r["pgd"] for r in kq))
+                tbl_data = [[
+                    Paragraph("STT", th_s),
+                    Paragraph("PGD", th_s),
+                    Paragraph("Trạng thái", th_s),
+                    Paragraph("Ghi chú", th_s),
+                ]]
+                for j, pgd in enumerate(pgd_order, 1):
+                    r_pgd = next((r for r in kq if r["pgd"] == pgd), {})
+                    tt = r_pgd.get("trang_thai", "chua_thuc_hien")
+                    if tt == "da_hoan_thanh":
+                        tt_txt = "✅ Hoàn thành"
+                    elif tt == "khong_ap_dung":
+                        tt_txt = "➖ N/A"
+                    else:
+                        tt_txt = "⬜ Chưa thực hiện"
+                    gc = (r_pgd.get("ghi_chu") or "").strip()
+                    tbl_data.append([
+                        Paragraph(str(j), td_c),
+                        Paragraph(pgd, td_s),
+                        Paragraph(tt_txt, td_c),
+                        Paragraph(gc, td_s),
+                    ])
+                cw = [1.0 * cm, 5.0 * cm, 4.0 * cm, 7.0 * cm]
+                tbl = Table(tbl_data, colWidths=cw, repeatRows=1)
+                tbl.setStyle(TableStyle([
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#2E7D32")),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                    ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                    ("TOPPADDING", (0, 0), (-1, -1), 4),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+                    ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#BDBDBD")),
+                ]))
+                for r_idx in range(1, len(tbl_data)):
+                    if r_idx % 2 == 0:
+                        tbl.setStyle(TableStyle([
+                            ("BACKGROUND", (0, r_idx), (-1, r_idx),
+                             colors.HexColor("#F5F5F5"))
+                        ]))
+                story.append(tbl)
+            else:
+                from collections import OrderedDict
+                kq_by_pgd = OrderedDict()
+                for r in sorted(kq, key=lambda x: x["pgd"]):
+                    kq_by_pgd.setdefault(r["pgd"], []).append(r)
+
+                for pgd, items in kq_by_pgd.items():
+                    xong_pgd = sum(1 for r in items if r["trang_thai"] == "da_hoan_thanh")
+                    t_pgd = len(items)
+                    story.append(Paragraph(
+                        f"{pgd} ({xong_pgd}/{t_pgd} xã)",
+                        pgd_group_s
+                    ))
+                    for r in items:
+                        tt = r["trang_thai"]
+                        if tt == "da_hoan_thanh":
+                            sym = "✓"
+                            ngay_ht = r.get("ngay_hoan_thanh") or ""
+                            try:
+                                ngay_ht = datetime.strptime(
+                                    ngay_ht[:10], "%Y-%m-%d"
+                                ).strftime("%d/%m/%Y")
+                            except Exception:
+                                pass
+                            txt = f"  {sym} {r['ten_xa']}  —  {ngay_ht}"
+                        elif tt == "khong_ap_dung":
+                            txt = f"  — {r['ten_xa']}  —  N/A"
+                        else:
+                            txt = f"  ○ {r['ten_xa']}  —  Chưa thực hiện"
+                        story.append(Paragraph(txt, xa_line_s))
+                story.append(Spacer(1, 0.15 * cm))
+
+            story.append(Spacer(1, 0.3 * cm))
+            story.append(HRFlowable(width="60%", thickness=0.3,
+                                    color=colors.HexColor("#E0E0E0"),
+                                    spaceAfter=2))
+
+        # ── Page break → Phần 2 ───────────────────────────────────────
+        story.append(PageBreak())
+
+        story.append(Paragraph(
+            "PHẦN 2: BÁO CÁO TRỄ HẠN",
+            ParagraphStyle("p2_title", fontName=fb, fontSize=11,
+                           alignment=TA_LEFT, spaceBefore=4, spaceAfter=6,
+                           textColor=colors.HexColor("#C62828"))
+        ))
+
+        p2_count = 0
+        for t in ds_task:
+            if t["ngay_deadline"] >= hom_nay:
+                continue
+            kq = _doc_ketqua_task(t["id"])
+            tre_list = [r for r in kq if r["trang_thai"] == "chua_thuc_hien"]
+            if not tre_list:
+                continue
+
+            so_ngay_tre = (date.today() -
+                           date.fromisoformat(t["ngay_deadline"])).days
+            cap = t.get("cap_theo_doi", "xa")
+
+            story.append(Paragraph(
+                f"▪ {t['tieu_de']} — Trễ {so_ngay_tre} ngày (deadline: {t['ngay_deadline']})",
+                ParagraphStyle("p2_task", fontName=fb, fontSize=9,
+                               leading=13, spaceBefore=6, spaceAfter=2,
+                               textColor=colors.HexColor("#C62828"))
+            ))
+
+            if cap == "pgd":
+                for r in tre_list:
+                    p2_count += 1
+                    story.append(Paragraph(
+                        f"    {r['pgd']}",
+                        ParagraphStyle("p2_pgd", fontName=fn, fontSize=8,
+                                       leading=12, leftIndent=12,
+                                       textColor=colors.HexColor("#C62828"))
+                    ))
+            else:
+                kq_by_pgd = {}
+                for r in tre_list:
+                    kq_by_pgd.setdefault(r["pgd"], []).append(r)
+                for pgd, items in sorted(kq_by_pgd.items()):
+                    p2_count += 1
+                    ds_xa = ", ".join(r["ten_xa"] for r in items)
+                    story.append(Paragraph(
+                        f"    {pgd}: {ds_xa}",
+                        ParagraphStyle("p2_xa", fontName=fn, fontSize=8,
+                                       leading=12, leftIndent=12,
+                                       textColor=colors.HexColor("#C62828"))
+                    ))
+
+        if p2_count > 0:
+            story.append(Spacer(1, 0.5 * cm))
+            story.append(Paragraph(
+                f"Tổng số: {p2_count} đơn vị trễ hạn",
+                ParagraphStyle("sum", fontName=fb, fontSize=10,
+                               alignment=TA_CENTER, spaceBefore=8,
+                               textColor=colors.HexColor("#C62828"))
+            ))
+        else:
+            story.append(Paragraph(
+                "✅ Không có đơn vị nào trễ hạn.",
+                ParagraphStyle("ok", fontName=fn, fontSize=10,
+                               alignment=TA_CENTER, spaceAfter=6,
+                               textColor=colors.HexColor("#2E7D32"))
+            ))
+
+        # ── Footer ────────────────────────────────────────────────────
+        def _on_page(canvas, _doc):
+            canvas.saveState()
+            canvas.setFont(fn if FONT_NORMAL else FONT_FALLBACK, 8)
+            canvas.setFillColor(colors.grey)
+            canvas.drawRightString(
+                page_size[0] - margin,
+                0.6 * cm,
+                f"Trang {_doc.page}  |  VBSP-SCM  |  {ngay_str}"
+            )
+            canvas.restoreState()
+
+        doc.build(story, onFirstPage=_on_page, onLaterPages=_on_page)
+        buf.seek(0)
+        return buf
+
+    except Exception as e:
+        st.error(f"Lỗi tạo PDF báo cáo tiến độ: {e}")
+        return None
 
 
 def _xuat_pdf_tien_do(task, ds_kq, username):

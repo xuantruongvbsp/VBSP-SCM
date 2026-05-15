@@ -89,7 +89,7 @@ def _xlsx_val_to_datetime(val) -> datetime | None:
     return None
 
 
-@st.cache_data(ttl=30, show_spinner=False)
+@st.cache_data(ttl=300, show_spinner=False)
 def _doc_ngay_so_lieu(path: Path, loai: str, _mtime: float = 0.0) -> datetime | None:
     """Đọc ngày số liệu từ trong file xlsx (read_only, tối thiểu ô cần thiết). Lỗi → None.
     _mtime: os.path.getmtime(path) — dùng làm cache key, tự invalidate khi file thay đổi."""
@@ -125,7 +125,7 @@ def _doc_ngay_so_lieu(path: Path, loai: str, _mtime: float = 0.0) -> datetime | 
         return None
 
 
-@st.cache_data(ttl=30, show_spinner=False)
+@st.cache_data(ttl=300, show_spinner=False)
 def doc_trang_thai_file(ten_don_vi: str, loai: LoaiFile, _mtime: float = 0.0) -> dict:
     """
     Đọc trạng thái file upload của một đơn vị theo loại.

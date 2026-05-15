@@ -590,7 +590,6 @@ PGD_XA_MAP: dict[str, list[str]] = {
     ],
     "PGD Bình Long": [
         "Phường An Lộc", "Phường Bình Long",
-        "Xã Phú Thịnh", "Xã Phú Đức",
     ],
     "PGD Lộc Ninh": [
         "Xã Lộc Tấn", "Xã Lộc Thạnh", "Xã Lộc Thành",
@@ -705,10 +704,8 @@ XA_THON_MAP: dict[str, list[str]] = {
     'Xã Phú Lý': ['Ấp 1', 'Ấp 2', 'Ấp 3', 'Bình Chánh', 'Bầu Phụng', 'Cây cầy', 'Lý Lịch 1', 'Lý Lịch 2', 'Ấp 4'],
     'Xã Phú Nghĩa': ['Bù Kroai', 'Bù Gia Phúc 2', 'Tân Lập', 'Đak Son 2', 'Bình Đức 1', 'Bình đức 2', 'Phước sơn', 'Sơn Trung', 'Thôn 19/5', 'Bù Gia Phúc 1', 'Đak Son 1', 'Khắc Khoan', 'Hai Căn', 'Bù Cà Mau', 'Phú Nghĩa', 'Đức Lập', 'Thôn 1', 'Thôn 2', 'Thôn 3', 'Cây Da', 'Đak Khâu', 'Thác Dài'],
     'Xã Phú Riềng': ['Tân Phú', 'Tân Hòa', 'Phú Thành', 'Phú hưng', 'Phú Nguyên', 'Phú Bình', 'Phú Tân', 'Phú Thịnh', 'Phú Cường', 'Phú Hòa', 'Tân Phước', 'Tân Hiệp 1', 'Tân Hiệp 2', 'Tân Bình', 'Tân Lực', 'Phú Lợi', 'Phú Thuận', 'Tân Long', 'Phú Vinh'],
-    'Xã Phú Thịnh': ['ấp Phú Thịnh'],
-    'Xã Phú Trung': ['Phú Nghĩa', 'Phú An', 'Phú Lâm', 'Phú Bình', 'Đồng Tiến', 'Bình Trung', 'Đồng Tâm', 'Đồng Tháp', 'Phú Tâm', 'Bù Tố', 'Phú Tiến', 'Bàu Đỉa'],
+    'Xã Phú Trung':['Phú Nghĩa', 'Phú An', 'Phú Lâm', 'Phú Bình', 'Đồng Tiến', 'Bình Trung', 'Đồng Tâm', 'Đồng Tháp', 'Phú Tâm', 'Bù Tố', 'Phú Tiến', 'Bàu Đỉa'],
     'Xã Phú Vinh': ['Ấp 1', 'Ấp 3', 'Ấp 5', 'Ấp 6', 'Ấp 7', 'Ấp Phú Vinh 2', 'Ấp Phú Vinh 3', 'Ấp Phú Vinh 4', 'Ba Tầng', 'Suối Soong 1', 'Suối Soong 2', 'Ấp 2', 'Ấp 8', 'Ấp Phú Vinh 5', 'Ấp Phú Vinh 1'],
-    'Xã Phú Đức': ['ấp Phú Đức'],
     'Xã Phước An': ['Ấp 1', 'Ấp 2', 'Ấp 3', 'Ấp 5', 'Bàu bông', 'Bà trường', 'Qưới thạnh', 'Vũng gấm', 'Chính nghiã', 'Đại thắng', 'Hoà Bình', 'Nhất trí', 'Sơn hà', 'Thành công', 'Thanh minh', 'Vĩnh cửu', 'Ấp 4', 'Đoàn kết', 'Thống nhất'],
     'Xã Phước Sơn': ['Thôn 1 Thống Nhất', 'Thôn 2 Thống Nhất', 'Thôn 3 Thống Nhất', 'Thôn 4 Thống Nhất', 'Thôn 5 Thống Nhất', 'Thôn 7 Thống Nhất', 'Thôn 8 Thống Nhất', 'Thôn 9 Thống Nhất', 'Thôn 10 Thống Nhất', 'Thôn 11 Thống Nhất', 'Thôn 12 Thống Nhất', 'Thôn 1', 'Thôn 2', 'Thôn 3', 'Thôn 8', 'Thôn 7', 'Thôn 5', 'Thôn 6', 'Thôn 2 Đăng Hà', 'Thôn 3 Đăng Hà', 'Thôn 4 Đăng Hà', 'Thôn 5 Đăng Hà', 'Thôn 6 Đăng Hà', 'Thôn 6 Thống Nhất', 'Thôn 4', 'Thôn 1 Đăng Hà'],
     'Xã Phước Thái': ['Ấp 3 Phước Thái', 'Ấp 1A', 'Ấp 1C', 'HIEN ĐUC', 'HIEN HOA', 'LONG PHU', 'ấp Tân Hiệp 1', 'ấp Tân Hiệp 3', 'ấp Tân Hiệp 4', 'ấp Tân Hiệp 5', 'ấp Phước Bình 1', 'ấp Phước Bình 2', 'ấp Phước Bình 3', 'ấp Phước Bình 5', 'ấp Phước Bình 7', 'Ấp 4 Phước Bình', 'Ấp 1B', 'ấp Tân Hiệp 2', 'ấp Phước Bình 6'],

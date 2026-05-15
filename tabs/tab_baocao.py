@@ -367,7 +367,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                         dbc_raw["Món_3m_KHĐ"] = dbc_raw["Món_3m_KHĐ"].astype(int)
 
                     st.info(f"**{fmt_so(len(dbc_raw))}** hội đoàn thể")
-                    hien_thi_dataframe_phan_trang(
+                    _hien_thi_bc(
                         _fmt_df(dbc_raw),
                         key="baocao_th_dvut",
                     )
@@ -400,8 +400,8 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                             )
 
                     if not df_dondoc.empty:
-                        hien_thi_dataframe_phan_trang(
-                            df_dondoc,
+                        _hien_thi_bc(
+                            _fmt_df(df_dondoc),
                             key="baocao_dondoc_dvut",
                             height=340,
                         )
@@ -460,7 +460,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                             * 100
                         ).round(2).fillna(0)
                         st.info(f"**{fmt_so(len(dbc_raw))}** chương trình · {fmt_so(len(df_ct_th))} hồ sơ")
-                        hien_thi_dataframe_phan_trang(
+                        _hien_thi_bc(
                             _fmt_df(dbc_raw),
                             key="baocao_th_chuong_trinh",
                         )
@@ -543,10 +543,9 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                 # ── Danh sách theo tiêu chí ──
                 if loai_ct == "📋 Danh sách theo tiêu chí lọc":
                     export_df = df_ct[COL_CHUNG].copy()
-                    hien_thi_dataframe_phan_trang(
+                    _hien_thi_bc(
                         _fmt_df(export_df.reset_index(drop=True)),
                         key="baocao_ct_loc",
-                        column_config=_tao_column_config_baocao(export_df),
                         height=420,
                     )
 
@@ -567,7 +566,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                             df_tmp = df_tmp[(df_tmp[COT_NGAY_DH]>=hn)&(df_tmp[COT_NGAY_DH]<=hn+pd.Timedelta(days=ngay))]
                             st.info(f"📅 **{fmt_so(len(df_tmp))}** hồ sơ đến hạn trong {ngay} ngày tới")
                         export_df = df_tmp[COL_CHUNG].sort_values(COT_NGAY_DH)
-                        hien_thi_dataframe_phan_trang(
+                        _hien_thi_bc(
                             _fmt_df(export_df.reset_index(drop=True)),
                             key="baocao_ct_den_han",
                             height=400,
@@ -602,14 +601,14 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                                 / t_xa["Tổng_dư_nợ"].replace(0, float("nan"))
                                 * 100
                             ).round(2).fillna(0)
-                            hien_thi_dataframe_phan_trang(
+                            _hien_thi_bc(
                                 _fmt_df(t_xa),
                                 key="baocao_ct_ct2_xa",
                             )
 
                         export_df = df_ct2[COL_CHUNG].copy()
                         st.markdown("**Danh sách hồ sơ**")
-                        hien_thi_dataframe_phan_trang(
+                        _hien_thi_bc(
                             _fmt_df(export_df.reset_index(drop=True)),
                             key="baocao_ct_ct2_ds",
                             height=350,
@@ -637,7 +636,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                             / t_nv["Tổng_dư_nợ"].replace(0, float("nan"))
                             * 100
                         ).round(2).fillna(0)
-                        hien_thi_dataframe_phan_trang(
+                        _hien_thi_bc(
                             _fmt_df(t_nv),
                             key="baocao_ct_nv_tong",
                         )
@@ -661,17 +660,17 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                                     / t_ct_nv["Tổng_dư_nợ"].replace(0, float("nan"))
                                     * 100
                                 ).round(2).fillna(0)
-                                hien_thi_dataframe_phan_trang(
+                                _hien_thi_bc(
                                     _fmt_df(t_ct_nv),
                                     key="baocao_ct_nv_ct",
                                 )
 
                             export_df = df_nv[COL_CHUNG].copy()
                             st.markdown("**Danh sách hồ sơ**")
-                            hien_thi_dataframe_phan_trang(
+                            _hien_thi_bc(
                                 _fmt_df(export_df.reset_index(drop=True)),
                                 key="baocao_ct_nv_ds",
-                                    height=350,
+                                height=350,
                             )
                         else:
                             export_df = df_ct[COL_CHUNG].copy()

@@ -9,7 +9,7 @@ import pandas as pd
 
 import db
 from config import *
-from utils import fmt_so, ten_file_xuat, hien_thi_dataframe_phan_trang, xuat_excel
+from utils import fmt_so, fmt_ty, vn, ten_file_xuat, hien_thi_dataframe_phan_trang, xuat_excel
 from services import xuat_bao_cao, ten_file_bao_cao
 from pdf_service import nut_xuat_pdf
 from data import (danh_dau_khong_hd, tong_hop_khong_hd, ds_chi_tiet_khong_hd)
@@ -20,52 +20,25 @@ if TYPE_CHECKING:
     from streamlit.delta_generator import DeltaGenerator
 
 
-def _tao_column_config_baocao(df: pd.DataFrame) -> dict[str, st.column_config.Column]:
-    """
-    Tạo column_config cho bảng báo cáo dựa trên cột hiện có.
-    
-    Args:
-        df: DataFrame cần hiển thị
-    
-    Returns:
-        Dict cấu hình column cho st.dataframe
-    """
-    config: dict[str, st.column_config.Column] = {}
-    
-    # Cột tiền tệ
-    cols_tien = [COT_MUC_VAY, COT_DU_NO_TH, COT_DU_NO_QH, COT_TONG_DU_NO,
-                 "Tổng_mức_vay", "Tổng_dư_nợ", "Dư_nợ_trong_hạn", "Dư_nợ_quá_hạn",
-                 "Tổng_mức_vay", "Tổng_giải_ngân", "Lãi_tồn_KHĐ",
-                 "Tổng giải ngân","Giải ngân trong tháng","Giải ngân Năm"]
-    for col in cols_tien:
-        if col in df.columns:
-            config[col] = st.column_config.NumberColumn(
-                col.replace("_", " "),
-                format="%.0f ₫",
-                help="Đơn vị: đồng"
+_COLS_TIEN = {
+    COT_MUC_VAY, COT_DU_NO_TH, COT_DU_NO_QH, COT_TONG_DU_NO, COT_LAI_TON,
+    "Tổng_mức_vay", "Tổng_dư_nợ", "Dư_nợ_trong_hạn", "Dư_nợ_quá_hạn",
+    "Lãi_tồn_KHĐ", "Dư nợ TH", "Dư nợ QH", "Nợ khoanh", "Tổng dư nợ", "Lãi tồn",
+}
+_COLS_PCT = {"Tỷ_lệ_QH_%", "Tỷ_lệ_KHĐ_%", "QH%", "TL Nợ xấu %"}
+
+
+def _fmt_df(df: pd.DataFrame) -> pd.DataFrame:
+    """Chuyển cột tiền → fmt_ty string, cột % → chuỗi VN trước khi hiển thị."""
+    d = df.copy()
+    for col in d.columns:
+        if col in _COLS_TIEN:
+            d[col] = pd.to_numeric(d[col], errors="coerce").apply(fmt_ty)
+        elif col in _COLS_PCT:
+            d[col] = pd.to_numeric(d[col], errors="coerce").apply(
+                lambda x: f"{x:.2f}".replace(".", ",") + "%" if pd.notna(x) else "—"
             )
-    
-    # Cột số lượng
-    cols_so = ["Số_KH","Số_món_vay","Số_hồ_sơ", "Món_3m_KHĐ"]
-    for col in cols_so:
-        if col in df.columns:
-            config[col] = st.column_config.NumberColumn(
-                col.replace("_", " "),
-                format="%d",
-                help="Số lượng"
-            )
-    
-    # Cột tỷ lệ %
-    cols_pct = ["Tỷ_lệ_QH_%", "Tỷ_lệ_KHĐ_%", "QH%"]
-    for col in cols_pct:
-        if col in df.columns:
-            config[col] = st.column_config.NumberColumn(
-                col.replace("_", " "),
-                format="%.2f%%",
-                help="Tỷ lệ phần trăm"
-            )
-    
-    return config
+    return d
 
 
 def _bc_fmt_metric(x: float) -> str:
@@ -224,6 +197,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                     * 100
                 ).round(2).fillna(0)
 
+
                 COLS_PDF = [
                     COT_TEN_PGD,
                     COT_TEN_XA,
@@ -341,12 +315,15 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                         Dư_nợ_trong_hạn=(COT_DU_NO_TH,"sum"),
                         Dư_nợ_quá_hạn  =(COT_DU_NO_QH,"sum"),
                     ).sort_values("Tổng_dư_nợ",ascending=False).reset_index()
-                    dbc_raw["Tỷ_lệ_QH_%"] = (dbc_raw["Dư_nợ_quá_hạn"]/dbc_raw["Tổng_dư_nợ"]*100).round(2)
+                    dbc_raw["Tỷ_lệ_QH_%"] = (
+                        dbc_raw["Dư_nợ_quá_hạn"]
+                        / dbc_raw["Tổng_dư_nợ"].replace(0, float("nan"))
+                        * 100
+                    ).round(2).fillna(0)
                     st.info(f"**{fmt_so(len(dbc_raw))}** {nhom.lower()}")
                     hien_thi_dataframe_phan_trang(
-                        dbc_raw,
+                        _fmt_df(dbc_raw),
                         key="baocao_th_xa_thon",
-                        column_config=_tao_column_config_baocao(dbc_raw),
                     )
 
             # ── ĐVUT ──
@@ -364,8 +341,10 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                         Dư_nợ_quá_hạn  =(COT_DU_NO_QH, "sum"),
                     ).sort_values("Tổng_dư_nợ", ascending=False).reset_index()
                     dbc_raw["Tỷ_lệ_QH_%"] = (
-                        dbc_raw["Dư_nợ_quá_hạn"] / dbc_raw["Tổng_dư_nợ"] * 100
-                    ).round(2)
+                        dbc_raw["Dư_nợ_quá_hạn"]
+                        / dbc_raw["Tổng_dư_nợ"].replace(0, float("nan"))
+                        * 100
+                    ).round(2).fillna(0)
 
                     # Tổng hợp 3 tháng không hoạt động theo ĐVUT
                     khd = tong_hop_khong_hd(df_kh, nhom_theo="Tên ĐVUT")
@@ -379,9 +358,8 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
 
                     st.info(f"**{fmt_so(len(dbc_raw))}** hội đoàn thể")
                     hien_thi_dataframe_phan_trang(
-                        dbc_raw,
+                        _fmt_df(dbc_raw),
                         key="baocao_th_dvut",
-                        column_config=_tao_column_config_baocao(dbc_raw),
                     )
 
                     # ── Xuất danh sách chi tiết để đôn đốc ───────────────
@@ -467,12 +445,15 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                     ) if COT_TEN_CT in df_ct_th.columns else None
 
                     if dbc_raw is not None:
-                        dbc_raw["Tỷ_lệ_QH_%"] = (dbc_raw["Dư_nợ_quá_hạn"] / dbc_raw["Tổng_dư_nợ"] * 100).round(2)
+                        dbc_raw["Tỷ_lệ_QH_%"] = (
+                            dbc_raw["Dư_nợ_quá_hạn"]
+                            / dbc_raw["Tổng_dư_nợ"].replace(0, float("nan"))
+                            * 100
+                        ).round(2).fillna(0)
                         st.info(f"**{fmt_so(len(dbc_raw))}** chương trình · {fmt_so(len(df_ct_th))} hồ sơ")
                         hien_thi_dataframe_phan_trang(
-                            dbc_raw,
+                            _fmt_df(dbc_raw),
                             key="baocao_th_chuong_trinh",
-                            column_config=_tao_column_config_baocao(dbc_raw),
                         )
                 except Exception as e:
                     st.error(f"Lỗi khi nhóm theo chương trình vay: {e}")
@@ -554,7 +535,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                 if loai_ct == "📋 Danh sách theo tiêu chí lọc":
                     export_df = df_ct[COL_CHUNG].copy()
                     hien_thi_dataframe_phan_trang(
-                        export_df.reset_index(drop=True),
+                        _fmt_df(export_df.reset_index(drop=True)),
                         key="baocao_ct_loc",
                         column_config=_tao_column_config_baocao(export_df),
                         height=420,
@@ -578,9 +559,8 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                             st.info(f"📅 **{fmt_so(len(df_tmp))}** hồ sơ đến hạn trong {ngay} ngày tới")
                         export_df = df_tmp[COL_CHUNG].sort_values(COT_NGAY_DH)
                         hien_thi_dataframe_phan_trang(
-                            export_df.reset_index(drop=True),
+                            _fmt_df(export_df.reset_index(drop=True)),
                             key="baocao_ct_den_han",
-                            column_config=_tao_column_config_baocao(export_df),
                             height=400,
                         )
                     except: st.error("Không thể tính hồ sơ đến hạn.")
@@ -604,22 +584,25 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                         if "Tên xã" in df_ct2.columns:
                             st.markdown("**Tổng hợp theo xã**")
                             t_xa = df_ct2.groupby("Tên xã").agg(
-                                Số_hồ_sơ=(COT_MA_KH,"count"),
-                                Tổng_dư_nợ=(COT_TONG_DU_NO,"sum"),
-                                Dư_nợ_QH=(COT_DU_NO_QH,"sum")
-                            ).sort_values("Tổng_dư_nợ",ascending=False).reset_index()
+                                Số_hồ_sơ=(COT_MA_KH, "nunique"),
+                                Tổng_dư_nợ=(COT_TONG_DU_NO, "sum"),
+                                Dư_nợ_QH=(COT_DU_NO_QH, "sum"),
+                            ).sort_values("Tổng_dư_nợ", ascending=False).reset_index()
+                            t_xa["Tỷ_lệ_QH_%"] = (
+                                t_xa["Dư_nợ_QH"]
+                                / t_xa["Tổng_dư_nợ"].replace(0, float("nan"))
+                                * 100
+                            ).round(2).fillna(0)
                             hien_thi_dataframe_phan_trang(
-                                t_xa,
+                                _fmt_df(t_xa),
                                 key="baocao_ct_ct2_xa",
-                                column_config=_tao_column_config_baocao(t_xa),
                             )
 
                         export_df = df_ct2[COL_CHUNG].copy()
                         st.markdown("**Danh sách hồ sơ**")
                         hien_thi_dataframe_phan_trang(
-                            export_df.reset_index(drop=True),
+                            _fmt_df(export_df.reset_index(drop=True)),
                             key="baocao_ct_ct2_ds",
-                            column_config=_tao_column_config_baocao(export_df),
                             height=350,
                         )
 
@@ -641,11 +624,14 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                             Dư_nợ_quá_hạn  =(COT_DU_NO_QH,"sum"),
                         ).reset_index()
                         t_nv["Nguồn vốn"] = t_nv["Nguồn vốn"].map({1:"1 - TW",2:"2 - ĐP"}).fillna(t_nv["Nguồn vốn"].astype(str))
-                        t_nv["Tỷ_lệ_QH_%"] = (t_nv["Dư_nợ_quá_hạn"]/t_nv["Tổng_dư_nợ"]*100).round(2)
+                        t_nv["Tỷ_lệ_QH_%"] = (
+                            t_nv["Dư_nợ_quá_hạn"]
+                            / t_nv["Tổng_dư_nợ"].replace(0, float("nan"))
+                            * 100
+                        ).round(2).fillna(0)
                         hien_thi_dataframe_phan_trang(
-                            t_nv,
+                            _fmt_df(t_nv),
                             key="baocao_ct_nv_tong",
-                            column_config=_tao_column_config_baocao(t_nv),
                         )
 
                         # Lọc và hiển thị chi tiết
@@ -662,19 +648,22 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                                 Dư_nợ_QH   =(COT_DU_NO_QH,"sum"),
                             ).sort_values("Tổng_dư_nợ",ascending=False).reset_index() if COT_TEN_CT in df_nv.columns else None
                             if t_ct_nv is not None:
+                                t_ct_nv["Tỷ_lệ_QH_%"] = (
+                                    t_ct_nv["Dư_nợ_QH"]
+                                    / t_ct_nv["Tổng_dư_nợ"].replace(0, float("nan"))
+                                    * 100
+                                ).round(2).fillna(0)
                                 hien_thi_dataframe_phan_trang(
-                                    t_ct_nv,
+                                    _fmt_df(t_ct_nv),
                                     key="baocao_ct_nv_ct",
-                                    column_config=_tao_column_config_baocao(t_ct_nv),
                                 )
 
                             export_df = df_nv[COL_CHUNG].copy()
                             st.markdown("**Danh sách hồ sơ**")
                             hien_thi_dataframe_phan_trang(
-                                export_df.reset_index(drop=True),
+                                _fmt_df(export_df.reset_index(drop=True)),
                                 key="baocao_ct_nv_ds",
-                                column_config=_tao_column_config_baocao(export_df),
-                                height=350,
+                                    height=350,
                             )
                         else:
                             export_df = df_ct[COL_CHUNG].copy()
@@ -686,7 +675,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                     with col_xl:
                         if st.button("📥 Xuất báo cáo chi tiết", type="primary", key="btn_xuat_ct"):
                             sheets = {"Chi tiết": export_df}
-                            if role in ("admin", "manager", "admin_cn", "manager_cn") and COT_TEN_PGD in df.columns:
+                            if la_phan_he_cn(role) and COT_TEN_PGD in df.columns:
                                 sheets["Tổng hợp PGD"] = df.groupby(COT_TEN_PGD).agg(
                                     Số_hồ_sơ=(COT_MA_KH, "count"),
                                     Tổng_dư_nợ=(COT_TONG_DU_NO, "sum"),

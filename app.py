@@ -72,32 +72,39 @@ h3 { font-size: 1.1rem  !important; font-weight: 600 !important; color: #1a3a5c 
 [data-testid="stAppViewContainer"] > .main { background: #f0f4f8 !important; }
 .block-container { padding: 1.5rem 2rem 2rem !important; max-width: 1400px !important; }
 
-/* ── 3. SIDEBAR — Light Theme VBSP ── */
+/* ── 3. SIDEBAR — Dark Green NHCSXH ── */
 [data-testid="stSidebar"] {
-    background: linear-gradient(180deg, #FFFFFF 0%, #F1F8E9 100%) !important;
-    border-right: 2px solid #C8E6C9 !important;
+    background: linear-gradient(180deg, #1B5E20 0%, #2E7D32 55%, #388E3C 100%) !important;
+    border-right: none !important;
+    box-shadow: 4px 0 16px rgba(0,0,0,0.18) !important;
 }
 
 [data-testid="stSidebar"] h1,
 [data-testid="stSidebar"] h2,
 [data-testid="stSidebar"] h3 {
-    color: #1B5E20 !important;
+    color: #FFFFFF !important;
     font-weight: 700;
 }
 
 [data-testid="stSidebar"] label,
 [data-testid="stSidebar"] .stMarkdown p {
-    color: #558B2F !important;
+    color: rgba(255,255,255,0.85) !important;
     font-size: 11px !important;
     font-weight: 700 !important;
     text-transform: uppercase;
     letter-spacing: 0.8px;
 }
 
+[data-testid="stSidebar"] p,
+[data-testid="stSidebar"] span,
+[data-testid="stSidebar"] [data-testid="stCaptionContainer"] p {
+    color: rgba(255,255,255,0.8) !important;
+}
+
 [data-testid="stSidebar"] .stButton > button {
-    background-color: #FFFFFF;
-    color: #2E7D32 !important;
-    border: 1.5px solid #A5D6A7;
+    background-color: rgba(255,255,255,0.12);
+    color: #FFFFFF !important;
+    border: 1.5px solid rgba(255,255,255,0.25);
     border-radius: 10px;
     width: 100%;
     text-align: left;
@@ -106,32 +113,32 @@ h3 { font-size: 1.1rem  !important; font-weight: 600 !important; color: #1a3a5c 
     font-weight: 500;
     margin-bottom: 4px;
     transition: all 0.2s ease;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.15);
 }
 
 [data-testid="stSidebar"] .stButton > button:hover {
-    background-color: #E8F5E9 !important;
-    border-color: #2E7D32 !important;
-    color: #1B5E20 !important;
-    box-shadow: 0 2px 8px rgba(46,125,50,0.15);
+    background-color: rgba(255,255,255,0.22) !important;
+    border-color: rgba(255,255,255,0.55) !important;
+    color: #FFFFFF !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
     transform: translateX(2px);
 }
 
 [data-testid="stSidebar"] .stButton > button[kind="primary"] {
-    background: linear-gradient(135deg, #2E7D32, #43A047) !important;
+    background: rgba(255,255,255,0.25) !important;
     color: #FFFFFF !important;
-    border-color: #2E7D32 !important;
-    box-shadow: 0 3px 10px rgba(46,125,50,0.3);
+    border-color: rgba(255,255,255,0.55) !important;
+    box-shadow: 0 3px 10px rgba(0,0,0,0.2);
 }
 
 [data-testid="stSidebar"] hr {
-    border-color: #C8E6C9;
+    border-color: rgba(255,255,255,0.2);
     margin: 12px 0;
 }
 
 [data-testid="stSidebar"] .stAlert {
-    background-color: #F9FBE7;
-    border: 1px solid #C5E1A5;
+    background-color: rgba(0,0,0,0.15);
+    border: 1px solid rgba(255,255,255,0.2);
     border-radius: 8px;
     font-size: 12px;
 }

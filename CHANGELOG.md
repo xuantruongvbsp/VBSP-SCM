@@ -1,5 +1,8 @@
 # CHANGELOG
 
+## [2026-05-15] — Sửa chính tả 2 xã trong config
+- `config.py` — `Bầu Hàm` → `Bàu Hàm`; `Đăk Nhau` → `Đak Nhau` (cả PGD_XA_MAP lẫn XA_THON_MAP)
+
 ## [2026-05-15] — Thêm XA_THON_MAP và cập nhật PGD_XA_MAP
 - `config.py` — Thêm `XA_THON_MAP` (97 xã → danh sách thôn/ấp/khu phố, nguồn CN46_Danh muc thon_12-05-2026.xls) và `THON_TO_XA` (reverse lookup thôn → xã)
 - `config.py` — Bổ sung `"Xã Phú Thịnh"`, `"Xã Phú Đức"` vào `PGD_XA_MAP["PGD Bình Long"]`

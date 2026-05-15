@@ -452,8 +452,8 @@ def _section_b_giao(
     tong_giao_tw = df_edited["KH giao TW\n(triệu đồng)"].sum()
     tong_giao_dp = df_edited["KH giao ĐP\n(triệu đồng)"].sum()
     c1, c2 = st.columns(2)
-    c1.metric("Tổng KH giao TW", f"{tong_giao_tw:,.1f} tr.đ")
-    c2.metric("Tổng KH giao ĐP", f"{tong_giao_dp:,.1f} tr.đ")
+    c1.metric("Tổng KH giao TW\n(triệu đồng)", f"{tong_giao_tw:,.0f}")
+    c2.metric("Tổng KH giao ĐP\n(triệu đồng)", f"{tong_giao_dp:,.0f}")
 
     if st.button(
         f"💾 Lưu KH giao — {ten_chon}",

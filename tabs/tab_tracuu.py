@@ -300,14 +300,14 @@ def _render_bang(
     if COT_TONG_DU_NO in df_hien.columns:
         column_config[COT_TONG_DU_NO] = st.column_config.NumberColumn(
             "Tổng dư nợ",
-            format="%.0f ₫",
+            format="%.0f",
             help="Tổng dư nợ hiện tại"
         )
     
     if COT_DU_NO_QH in df_hien.columns:
         column_config[COT_DU_NO_QH] = st.column_config.NumberColumn(
             "Dư nợ quá hạn",
-            format="%.0f ₫",
+            format="%.0f",
             help="Dư nợ quá hạn (sẽ tô đỏ nếu > 0)"
         )
     

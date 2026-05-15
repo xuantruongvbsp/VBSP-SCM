@@ -19,7 +19,11 @@ from config import (
     TEMPLATES_DIR, TAG_MAP,
 )
 from auth import co_quyen_upload_pgd, is_cn_role, is_pgd_role, get_permissions, get_tab_permissions
-from data import danh_dau_khong_hd, danh_dau_khong_hd_cached, tong_hop_khong_hd, ds_chi_tiet_khong_hd
+from data import (
+    danh_dau_khong_hd, danh_dau_khong_hd_cached,
+    tong_hop_khong_hd, tong_hop_khong_hd_cached,
+    ds_chi_tiet_khong_hd,
+)
 from utils import (
     fmt,
     fmt_so,
@@ -66,7 +70,7 @@ def _render_don_doc(df: pd.DataFrame, pgd_user: str, role: str):
 
     # ── Bảng tổng hợp theo ĐVUT ───────────────────────────────────────────
     st.markdown("**Tổng hợp theo Hội đoàn thể (ĐVUT)**")
-    nhom_dvut = tong_hop_khong_hd(df_kh, nhom_theo="Tên ĐVUT")
+    nhom_dvut = tong_hop_khong_hd_cached(df_kh, nhom_theo="Tên ĐVUT")
     if not nhom_dvut.empty:
         hien_thi_dataframe_phan_trang(
             nhom_dvut,
@@ -76,7 +80,7 @@ def _render_don_doc(df: pd.DataFrame, pgd_user: str, role: str):
 
     # Bảng theo Xã
     st.markdown("**Tổng hợp theo Xã/Phường**")
-    nhom_xa = tong_hop_khong_hd(df_kh, nhom_theo="Tên xã")
+    nhom_xa = tong_hop_khong_hd_cached(df_kh, nhom_theo="Tên xã")
     if not nhom_xa.empty:
         hien_thi_dataframe_phan_trang(
             nhom_xa,

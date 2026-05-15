@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [2026-05-15] — Mở rộng tab Trạng thái hệ thống cho mọi role + thêm vào ws_operation
+- `workspaces/ws_management.py` — Xóa guard `if la_phan_he_cn(role_n)`, tab "Trạng thái hệ thống" hiển thị cho mọi role CN
+- `workspaces/ws_operation.py` — Thêm tab "Trạng thái hệ thống" vào nhóm Quản trị PGD
+- `tabs/tab_trang_thai_nguon.py` — Bỏ guard cứng CN/PGD; thêm sub-tab "Trạng thái PGD" kiểm tra file HSTD/NQ11/GQVL (✅/⚠️/❌) + audit log theo PGD
+- `docs/ARCHITECTURE.md` — Cập nhật danh sách tab ws_management, ws_operation
+- `docs/HUONG_DAN_PHAN_HE.md` — Cập nhật danh sách tab cho CN và PGD
+
 ## [2026-05-15] — Cải thiện Dashboard + Tab Tiến độ
 - `tabs/tab_tongquan.py` — fix màu 10 thẻ KPI (soft-indigo/blue/green/red/amber)
 - `tabs/tab_tongquan.py` — fix bug Nguồn TW/ĐP (so sánh float thay string)

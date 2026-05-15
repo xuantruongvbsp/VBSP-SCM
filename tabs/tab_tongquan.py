@@ -568,9 +568,9 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
             df_ct["du_no_tw"] = df_ct["ten_ct"].map(du_no_tw).fillna(0)
             df_ct["du_no_dp"] = df_ct["ten_ct"].map(du_no_dp).fillna(0)
 
-            # Chỉ số bổ sung: join từ df grouped riêng nếu cột tồn tại
+            # Chỉ số bổ sung: join từ _df_loc grouped riêng nếu cột tồn tại
             if COT_DU_NO_QH in df.columns:
-                df_ct2 = df.groupby(COT_TEN_CT)[COT_DU_NO_QH].sum().reset_index()
+                df_ct2 = _df_loc.groupby(COT_TEN_CT)[COT_DU_NO_QH].sum().reset_index()
                 df_ct2.columns = ["ten_ct", "du_no_qh"]
                 df_ct = df_ct.merge(df_ct2, on="ten_ct", how="left")
                 df_ct["du_no_qh"] = df_ct["du_no_qh"].fillna(0)
@@ -579,7 +579,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
 
             col_khoanh = "Dư nợ khoanh" if "Dư nợ khoanh" in df.columns else None
             if col_khoanh:
-                df_ct3 = df.groupby(COT_TEN_CT)[col_khoanh].sum().reset_index()
+                df_ct3 = _df_loc.groupby(COT_TEN_CT)[col_khoanh].sum().reset_index()
                 df_ct3.columns = ["ten_ct", "du_no_khoanh"]
                 df_ct = df_ct.merge(df_ct3, on="ten_ct", how="left")
                 df_ct["du_no_khoanh"] = df_ct["du_no_khoanh"].fillna(0)
@@ -588,17 +588,16 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
 
             col_gn = next((c for c in HSTD_DS_CHO_VAY_NAM_ALIASES if c in df.columns), None)
             if col_gn:
-                df_ct4 = df.groupby(COT_TEN_CT)[col_gn].sum().reset_index()
+                df_ct4 = _df_loc.groupby(COT_TEN_CT)[col_gn].sum().reset_index()
                 df_ct4.columns = ["ten_ct", "gn_nam"]
                 df_ct = df_ct.merge(df_ct4, on="ten_ct", how="left")
                 df_ct["gn_nam"] = df_ct["gn_nam"].fillna(0).replace([float('inf'), float('-inf')], 0)
-                col_gn = next((c for c in HSTD_DS_CHO_VAY_NAM_ALIASES if c in df.columns), None)
             else:
                 df_ct["gn_nam"] = 0
 
             cols_tn = [c for c in HSTD_THU_NO_NAM_ALIASES if c in df.columns]
             if cols_tn:
-                df_ct5 = df.groupby(COT_TEN_CT)[cols_tn].sum().sum(axis=1).reset_index()
+                df_ct5 = _df_loc.groupby(COT_TEN_CT)[cols_tn].sum().sum(axis=1).reset_index()
                 df_ct5.columns = ["ten_ct", "tn_nam"]
                 df_ct = df_ct.merge(df_ct5, on="ten_ct", how="left")
                 df_ct["tn_nam"] = df_ct["tn_nam"].fillna(0).replace([float('inf'), float('-inf')], 0)
@@ -607,8 +606,8 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
 
             # Hiển thị bảng
             df_hien = df_ct.rename(columns={"ten_ct": "Chương trình"}).copy()
-            df_hien["Số món vay"]         = df_hien["so_mon"]
-            df_hien["Số KH"]              = df_hien["so_kh"]
+            df_hien["Số món vay"]         = df_hien["so_mon"].apply(fmt_so)
+            df_hien["Số KH"]              = df_hien["so_kh"].apply(fmt_so)
             df_hien["Dư nợ (tỷ)"]        = df_hien["du_no"].apply(fmt_ty)
             df_hien["Nguồn TW (tỷ)"]     = df_hien["du_no_tw"].apply(fmt_ty)
             df_hien["Nguồn ĐP (tỷ)"]     = df_hien["du_no_dp"].apply(fmt_ty)

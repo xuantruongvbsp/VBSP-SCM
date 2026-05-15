@@ -266,6 +266,16 @@ def danh_dau_khong_hd_cached(df: "pd.DataFrame") -> "pd.DataFrame":
     return danh_dau_khong_hd(df)
 
 
+@st.cache_data(show_spinner=False, ttl=3600)
+def tong_hop_khong_hd_cached(df: "pd.DataFrame", nhom_theo: str = "Tên ĐVUT") -> "pd.DataFrame":
+    return tong_hop_khong_hd(df, nhom_theo=nhom_theo)
+
+
+@st.cache_data(show_spinner=False, ttl=3600)
+def canh_bao_migration_cached(df: "pd.DataFrame") -> "pd.DataFrame":
+    return canh_bao_migration(df)
+
+
 def tong_hop_khong_hd(df: "pd.DataFrame",
                       nhom_theo: str = "Tên ĐVUT") -> "pd.DataFrame":
     """

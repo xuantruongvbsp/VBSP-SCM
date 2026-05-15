@@ -1,5 +1,8 @@
 # CHANGELOG
 
+## [2026-05-16] — Fix NameError: render_den_han trong ws_management.py
+- `workspaces/ws_management.py` dòng ~174 — Thêm `from tabs.tab_den_han import render as render_den_han` vào `_render_canh_bao_no()` (import chỉ có trong `_render_canh_bao`, không lan sang hàm khác)
+
 ## [2026-05-16] — Thêm trang chủ (Home Dashboard) cho phân hệ PGD
 - `workspaces/ws_operation.py` dòng ~39 — Thêm import: `db`, `fmt_ty`, `pgd_slug`
 - `workspaces/ws_operation.py` dòng ~42–220 — Thêm hàm `_render_trang_chu()` với 4 vùng nội dung:

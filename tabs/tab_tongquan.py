@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 
 import streamlit as st
 import pandas as pd
+import db
 import plotly.express as px
 import plotly.graph_objects as go
 
@@ -1057,10 +1058,10 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                     "QH (triệu đồng)",
                     "Khoanh (triệu đồng)",
                     "Nợ xấu (triệu đồng)",
-                    "Lãi tồn (tỷ)",
-                    "Nợ ĐH năm (tỷ)",
-                    "DS Cho vay (tỷ)",
-                    "DS Thu nợ (tỷ)",
+                    "Lãi tồn (triệu đồng)",
+                    "Nợ ĐH năm (triệu đồng)",
+                    "DS Cho vay (triệu đồng)",
+                    "DS Thu nợ (triệu đồng)",
                 ]:
                     return vn(float(val), 3)
                 if col in ["Số KH", "Tổng Tổ", "Tốt", "Khá", "TB", "Yếu"]:
@@ -1174,6 +1175,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                             )
                         st.session_state[_ss_tqpgd] = _bytes
                         st.session_state[_ssf_tqpgd] = f"TQPGD_{datetime.now().strftime('%d%m%Y_%H%M')}.pdf"
+                        db.ghi_audit(username or "unknown", "xuat_pdf", f"TQPGD")
                     except Exception as _e:
                         import traceback
 

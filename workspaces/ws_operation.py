@@ -132,7 +132,7 @@ def _render_don_doc(df: pd.DataFrame, pgd_user: str, role: str):
 def _banner_canh_bao_khd(df_pgd: pd.DataFrame, role: str) -> None:
     if df_pgd is None or df_pgd.empty:
         return
-    df_kh = danh_dau_khong_hd(df_pgd)
+    df_kh = danh_dau_khong_hd_cached(df_pgd)
     n_khd = int(df_kh["is_3m_inactive"].sum()) if "is_3m_inactive" in df_kh.columns else 0
     if n_khd == 0:
         return
@@ -723,7 +723,7 @@ def _render_bao_cao_giao_ban(tab, **kwargs):
         st.markdown("**② Tổng hợp theo ĐVUT**")
         
         # Đánh dấu khách hàng 3 tháng không hoạt động
-        df_dgd_marked = danh_dau_khong_hd(df_dgd)
+        df_dgd_marked = danh_dau_khong_hd_cached(df_dgd)
         
         # Groupby theo Tên ĐVUT
         if "Tên ĐVUT" not in df_dgd.columns:

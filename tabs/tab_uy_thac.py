@@ -953,11 +953,12 @@ def _render_mau06(df: pd.DataFrame, pgd_user: str) -> None:
             options=ds_to_m06,
             key="m06_chon_to"
         )
-        can_bo_1  = f2.text_input("Cán bộ kiểm tra 1")
-        chuc_vu_1 = f2.text_input("Chức vụ 1")
-        can_bo_2  = f2.text_input("Cán bộ kiểm tra 2 (nếu có)")
+        can_bo_1  = f2.text_input("Cán bộ kiểm tra 1", key="m06_can_bo_1")
+        chuc_vu_1 = f2.text_input("Chức vụ 1", key="m06_chuc_vu_1")
+        can_bo_2  = f2.text_input("Cán bộ kiểm tra 2 (nếu có)", key="m06_can_bo_2")
         dia_ban   = f2.text_input("Địa bàn kiểm tra",
-                                   placeholder="Ấp..., xã...")
+                                   placeholder="Ấp..., xã...",
+                                   key="m06_dia_ban")
         ngay_kt   = f2.date_input("Ngày kiểm tra",
                                    value=date.today(), key="m06_ngay_kt")
         submitted = st.form_submit_button("📄 Tạo Word")

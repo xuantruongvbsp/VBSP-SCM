@@ -68,7 +68,7 @@ def _render_canh_bao(df: pd.DataFrame, ds_pgd_all: list):
               help="Lãi tồn 2–3 tháng, chưa đủ 3 tháng không hoạt động — cần đôn đốc ngay")
     tong_lai_khd = df_kh[df_kh.get("is_3m_inactive", False)][COT_LAI_TON].sum() \
                    if COT_LAI_TON in df_kh.columns else 0
-    k4.metric("Lãi tồn 3m KHĐ (tr.đ)",    vn(tong_lai_khd/1e6, 1))
+    k4.metric("Lãi tồn 3m KHĐ (triệu đồng)", vn(tong_lai_khd/1e6, 0))
 
     st.divider()
 
@@ -211,7 +211,7 @@ def _hien_thi_khd_tab(df_kh: pd.DataFrame, ds_pgd_all: list):
               delta=f"{tl_khd:.1f}%", delta_color="inverse" if tl_khd > 2 else "off")
     tong_lai = df_kh[df_kh.get("is_3m_inactive", False)][COT_LAI_TON].sum() \
                if COT_LAI_TON in df_kh.columns else 0
-    k3.metric("Lãi tồn (tr.đ)", vn(tong_lai / 1e6, 1))
+    k3.metric("Lãi tồn (triệu đồng)", vn(tong_lai / 1e6, 0))
 
     st.markdown("**📋 Tổng hợp theo PGD**")
     nhom_pgd = tong_hop_khong_hd(df_kh, nhom_theo=COT_TEN_PGD)
@@ -253,7 +253,7 @@ def _hien_thi_migration_tab(df_kh: pd.DataFrame, ds_pgd_all: list):
     k1, k2 = st.columns(2)
     k1.metric("⚠️ Số món cần theo dõi", fmt_so(amber_tong))
     tong_lai = df_amber[COT_LAI_TON].sum() if COT_LAI_TON in df_amber.columns else 0
-    k2.metric("Tổng lãi tồn (tr.đ)", vn(tong_lai / 1e6, 1))
+    k2.metric("Tổng lãi tồn (triệu đồng)", vn(tong_lai/1e6, 0))
 
     col_loc, col_xuat = st.columns([2, 1])
     with col_loc:

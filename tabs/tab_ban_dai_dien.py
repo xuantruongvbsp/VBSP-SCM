@@ -139,24 +139,24 @@ def _tong_hop_theo_pgd(df: pd.DataFrame) -> pd.DataFrame:
     out = pd.DataFrame()
     out[COT_TEN_PGD] = g[COT_TEN_PGD].astype(str)
     if "du_no" in g.columns:
-        out["Dư nợ (tỷ)"] = g["du_no"] / 1e9
+        out["Dư nợ (triệu đồng)"] = g["du_no"] / 1e6
     if "dth" in g.columns:
-        out["Trong hạn (tỷ)"] = g["dth"] / 1e9
+        out["Trong hạn (triệu đồng)"] = g["dth"] / 1e6
     if "dqh" in g.columns:
-        out["Quá hạn (tỷ)"] = g["dqh"] / 1e9
+        out["Quá hạn (triệu đồng)"] = g["dqh"] / 1e6
     if "nkh" in g.columns:
         out["Số KH"] = g["nkh"].astype(int)
     if "gn_nam" in g.columns:
-        out["GN năm (tỷ)"] = g["gn_nam"] / 1e9
+        out["GN năm (triệu đồng)"] = g["gn_nam"] / 1e6
 
-    if "Quá hạn (tỷ)" in out.columns and "Dư nợ (tỷ)" in out.columns:
+    if "Quá hạn (triệu đồng)" in out.columns and "Dư nợ (triệu đồng)" in out.columns:
         out["NQH%"] = (
-            out["Quá hạn (tỷ)"] / out["Dư nợ (tỷ)"].replace(0, float("nan")) * 100
+            out["Quá hạn (triệu đồng)"] / out["Dư nợ (triệu đồng)"].replace(0, float("nan")) * 100
         ).round(3).fillna(0)
     else:
         out["NQH%"] = 0.0
 
-    return out.sort_values("Dư nợ (tỷ)", ascending=False).reset_index(drop=True)
+    return out.sort_values("Dư nợ (triệu đồng)", ascending=False).reset_index(drop=True)
 
 
 def _render_tong_hop(df: pd.DataFrame, username: str) -> None:
@@ -196,12 +196,12 @@ def _render_tong_hop(df: pd.DataFrame, username: str) -> None:
     with col_xl:
         df_cn = pd.DataFrame(
             [
-                {"Chỉ tiêu": "Tổng dư nợ", "Giá trị": round(kpi["tdn"] / 1e9, 3)},
-                {"Chỉ tiêu": "Dư nợ trong hạn", "Giá trị": round(kpi["dth"] / 1e9, 3)},
-                {"Chỉ tiêu": "Dư nợ quá hạn", "Giá trị": round(kpi["dqh"] / 1e9, 3)},
+                {"Chỉ tiêu": "Tổng dư nợ", "Giá trị": round(kpi["tdn"] / 1e6, 3)},
+                {"Chỉ tiêu": "Dư nợ trong hạn", "Giá trị": round(kpi["dth"] / 1e6, 3)},
+                {"Chỉ tiêu": "Dư nợ quá hạn", "Giá trị": round(kpi["dqh"] / 1e6, 3)},
                 {"Chỉ tiêu": "Tỷ lệ NQH (%)", "Giá trị": round(kpi["tlqh"], 3)},
-                {"Chỉ tiêu": "Giải ngân trong năm", "Giá trị": round(kpi["gn_nam"] / 1e9, 3)},
-                {"Chỉ tiêu": "Thu nợ trong năm", "Giá trị": round(kpi["thu_nam"] / 1e9, 3)},
+                {"Chỉ tiêu": "Giải ngân trong năm", "Giá trị": round(kpi["gn_nam"] / 1e6, 3)},
+                {"Chỉ tiêu": "Thu nợ trong năm", "Giá trị": round(kpi["thu_nam"] / 1e6, 3)},
                 {"Chỉ tiêu": "Số hộ vay", "Giá trị": kpi["n_kh"]},
             ]
         )
@@ -228,7 +228,7 @@ def _render_tong_hop(df: pd.DataFrame, username: str) -> None:
                     df_pgd,
                     tieu_de=f"Tổng hợp tín dụng chính sách — {TEN_CHI_NHANH_HIEN_THI}",
                     nguoi_xuat=username,
-                    cols_tien=["Dư nợ (tỷ)", "Trong hạn (tỷ)", "Quá hạn (tỷ)"],
+                    cols_tien=["Dư nợ (triệu đồng)", "Trong hạn (triệu đồng)", "Quá hạn (triệu đồng)"],
                     prefix_file="BDD_TONGHOP",
                 )
                 st.download_button(
@@ -334,9 +334,9 @@ def _render_du_bao_von(df: pd.DataFrame) -> None:
         rows_room.append(
             {
                 "Mã key": ma_key,
-                "KH (tỷ)": round(kh_vnd / 1e9, 3),
-                "Đã GN (tỷ)": round(gn_ct / 1e9, 3),
-                "Room còn (tỷ)": round(room_con_lai / 1e9, 3),
+                "KH (triệu đồng)": round(kh_vnd / 1e6, 3),
+                "Đã GN (triệu đồng)": round(gn_ct / 1e6, 3),
+                "Room còn (triệu đồng)": round(room_con_lai / 1e6, 3),
                 "Tốc độ GN/ngày (tr)": round(toc_do_ct / 1e6, 1),
                 "Ngày hết room": f"{canh_bao} {round(ngay_het_room)} ngày" if ngay_het_room is not None else "— (chưa GN)",
             }

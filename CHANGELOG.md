@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## [2026-05-15] — Thêm XA_THON_MAP và cập nhật PGD_XA_MAP
+- `config.py` — Thêm `XA_THON_MAP` (97 xã → danh sách thôn/ấp/khu phố, nguồn CN46_Danh muc thon_12-05-2026.xls) và `THON_TO_XA` (reverse lookup thôn → xã)
+- `config.py` — Bổ sung `"Xã Phú Thịnh"`, `"Xã Phú Đức"` vào `PGD_XA_MAP["PGD Bình Long"]`
+- `config.py` — Sửa `"Phường Xuân Khánh"` → `"Phường Long Khánh"` trong `PGD_XA_MAP["PGD Long Khánh"]`
+
+## [2026-05-15] — Sidebar dark green NHCSXH brand
+- `app.py` dòng ~75 — Đổi sidebar từ trắng-xanh nhạt sang gradient xanh đậm `#1B5E20→#2E7D32→#388E3C`; chữ/icon trắng; nút bán trong suốt; thêm box-shadow
+
 ## [2026-05-15] — Tối ưu hiệu năng: cache danh_dau_khong_hd, bỏ cache_data.clear() thừa, tăng TTL
 - `data/hstd.py` — Thêm `danh_dau_khong_hd_cached()` với `@st.cache_data(ttl=3600)` tránh tính 4 lần/rerun
 - `data/__init__.py` — Export `danh_dau_khong_hd_cached`

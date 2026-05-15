@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## [2026-05-15] — Đồng bộ tên xã config với data HSTD thực tế
+- `config.py` — `Bầu Hàm` → `Bàu Hàm`; `Đak Lua` → `Dak Lua` (khớp spelling trong data)
+- `config.py` — giữ `Đăk Nhau` (data dùng ă, không phải a)
+- Kết quả: PGD_XA_MAP và XA_THON_MAP khớp 100% tên xã trong HSTD; mã PGD 22/22 đúng
+
 ## [2026-05-15] — Sửa chính tả 2 xã trong config
 - `config.py` — `Bầu Hàm` → `Bàu Hàm`; `Đăk Nhau` → `Đak Nhau` (cả PGD_XA_MAP lẫn XA_THON_MAP)
 

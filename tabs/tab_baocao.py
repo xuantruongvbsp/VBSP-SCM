@@ -305,8 +305,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
             loai_th = st.radio("Tổng hợp theo",
                 ["🏘️ Theo xã/thôn",
                  "🤝 Theo hội đoàn thể (ĐVUT)",
-                 "📌 Theo chương trình vay",
-                 "👤 Theo CBTD (sẽ bổ sung)"],
+                 "📌 Theo chương trình vay"],
                 horizontal=True, key="bc_loai_th")
 
             dbc_raw = None
@@ -464,11 +463,6 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                 except Exception as e:
                     st.error(f"Lỗi khi nhóm theo chương trình vay: {e}")
                     dbc_raw = None
-
-            # ── CBTD (chờ bổ sung) ──
-            elif loai_th == "👤 Theo CBTD (sẽ bổ sung)":
-                st.info("📋 Chức năng này sẽ bổ sung sau khi có dữ liệu CBTD phụ trách.")
-                st.caption("Nhân viên sẽ nhập danh sách CBTD và gán hồ sơ trong phần Kế hoạch PGD.")
 
             # Xuất tổng hợp
             if dbc_raw is not None:

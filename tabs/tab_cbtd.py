@@ -285,10 +285,9 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                         ).reset_index().sort_values("Tổng_dư_nợ", ascending=False)
                         th_ap["Mã thôn"] = th_ap["Mã thôn"].astype(str)
                         th_ap["Tổng dư nợ"] = th_ap["Tổng_dư_nợ"].apply(
-                            lambda x: f"{x/1e9:.3f} tỷ".replace(".",",") if x >= 1e9
-                            else f"{x/1e6:.1f} tr".replace(".",","))
+                            lambda x: f"{x/1e6:,.0f}".replace(",","X").replace(".",",").replace("X",".") if x > 0 else "—")
                         th_ap["Dư nợ QH"] = th_ap["Dư_nợ_QH"].apply(
-                            lambda x: f"{x/1e6:.1f} triệu".replace(".",",") if x > 0 else "—")
+                            lambda x: f"{x/1e6:,.0f}".replace(",","X").replace(".",",").replace("X",".") if x > 0 else "—")
                         th_ap["QH%"] = (th_ap["Dư_nợ_QH"]/th_ap["Tổng_dư_nợ"]*100).fillna(0).round(2)
                         hien_thi_dataframe_phan_trang(
                             th_ap[["Mã thôn","Tên thôn","Số_KH","Số_món_vay","Tổng dư nợ","Dư nợ QH","QH%"]],
@@ -519,15 +518,14 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
             st.markdown("**📊 Tổng hợp dư nợ theo CBTD**")
 
             def fmt_cbtd(x: float) -> str:
-                """Format số tiền cho báo cáo CBTD (tỷ/triệu)."""
+                """Format số tiền cho báo cáo CBTD (triệu đồng, 0 dp)."""
                 try:
                     x = float(x)
-                    if x >= 1e9:
-                        s = f"{x/1e9:,.3f}".replace(",","X").replace(".",",").replace("X",".")
-                        return f"{s.rstrip('0').rstrip(',') if ',' in s else s} tỷ"
-                    if x >= 1e6:
-                        return f"{x/1e6:,.1f} tr".replace(",","X").replace(".",",").replace("X",".")
-                    return f"{x:,.0f}".replace(",",".")
+                    if abs(x) > 0:
+                        trieu = x / 1_000_000
+                        s = f"{trieu:,.0f}".replace(",","X").replace(".",",").replace("X",".")
+                        return s
+                    return "—"
                 except Exception:
                     return "—"
 

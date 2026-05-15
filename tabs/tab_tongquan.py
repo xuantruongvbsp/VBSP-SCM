@@ -71,17 +71,17 @@ def _xuat_excel_tqpgd(df: pd.DataFrame, ten_file: str) -> bytes:
 
         COT_SO = [
             "Số KH",
-            "Dư nợ (tỷ)",
-            "QH (tỷ)",
+            "Dư nợ (triệu đồng)",
+            "QH (triệu đồng)",
             "TL QH %",
-            "Khoanh (tỷ)",
+            "Khoanh (triệu đồng)",
             "TL Khoanh %",
-            "Nợ xấu (tỷ)",
+            "Nợ xấu (triệu đồng)",
             "TL NPL %",
-            "Lãi tồn (tỷ)",
-            "Nợ ĐH năm (tỷ)",
-            "DS Cho vay (tỷ)",
-            "DS Thu nợ (tỷ)",
+            "Lãi tồn (triệu đồng)",
+            "Nợ ĐH năm (triệu đồng)",
+            "DS Cho vay (triệu đồng)",
+            "DS Thu nợ (triệu đồng)",
             "Tổng Tổ",
             "Tốt",
             "Khá",
@@ -212,25 +212,26 @@ def _tao_column_config_co_cau() -> dict[str, st.column_config.Column]:
 def _tao_column_config_pgd() -> dict[str, st.column_config.Column]:
     """
     Tạo column_config cho bảng tổng hợp theo PGD.
+    Đơn vị: triệu đồng (đã được ghi rõ trong tiêu đề cột).
     
     Returns:
         Dict cấu hình column cho st.dataframe
     """
     return {
-        "Dư nợ (tỷ)": st.column_config.NumberColumn(
-            "Dư nợ (tỷ)",
-            format="%.2f tỷ",
-            help="Tổng dư nợ tính bằng tỷ đồng"
+        "Dư nợ (triệu đồng)": st.column_config.NumberColumn(
+            "Dư nợ (triệu đồng)",
+            format="%.0f",
+            help="Tổng dư nợ tính bằng triệu đồng"
         ),
-        "QH (tỷ)": st.column_config.NumberColumn(
-            "QH (tỷ)",
-            format="%.3f tỷ",
-            help="Dư nợ quá hạn tính bằng tỷ đồng"
+        "QH (triệu đồng)": st.column_config.NumberColumn(
+            "QH (triệu đồng)",
+            format="%.0f",
+            help="Dư nợ quá hạn tính bằng triệu đồng"
         ),
-        "Khoanh (tỷ)": st.column_config.NumberColumn(
-            "Khoanh (tỷ)",
-            format="%.3f tỷ",
-            help="Dư nợ khoanh tính bằng tỷ đồng"
+        "Khoanh (triệu đồng)": st.column_config.NumberColumn(
+            "Khoanh (triệu đồng)",
+            format="%.0f",
+            help="Dư nợ khoanh tính bằng triệu đồng"
         ),
         "TL QH %": st.column_config.NumberColumn(
             "TL QH %",
@@ -242,25 +243,25 @@ def _tao_column_config_pgd() -> dict[str, st.column_config.Column]:
             format="%.2f%%",
             help="Tỷ lệ khoanh %"
         ),
-        "Lãi tồn (tỷ)": st.column_config.NumberColumn(
-            "Lãi tồn (tỷ)",
-            format="%.3f tỷ",
-            help="Lãi tồn tính bằng tỷ đồng"
+        "Lãi tồn (triệu đồng)": st.column_config.NumberColumn(
+            "Lãi tồn (triệu đồng)",
+            format="%.0f",
+            help="Lãi tồn tính bằng triệu đồng"
         ),
-        "Nợ ĐH năm (tỷ)": st.column_config.NumberColumn(
-            "Nợ ĐH năm (tỷ)",
-            format="%.3f tỷ",
-            help="Nợ đến hạn trong năm tính bằng tỷ đồng"
+        "Nợ ĐH năm (triệu đồng)": st.column_config.NumberColumn(
+            "Nợ ĐH năm (triệu đồng)",
+            format="%.0f",
+            help="Nợ đến hạn trong năm tính bằng triệu đồng"
         ),
-        "DS Cho vay (tỷ)": st.column_config.NumberColumn(
-            "DS Cho vay (tỷ)",
-            format="%.3f tỷ",
-            help="Doanh số cho vay trong năm tính bằng tỷ đồng"
+        "DS Cho vay (triệu đồng)": st.column_config.NumberColumn(
+            "DS Cho vay (triệu đồng)",
+            format="%.0f",
+            help="Doanh số cho vay trong năm tính bằng triệu đồng"
         ),
-        "DS Thu nợ (tỷ)": st.column_config.NumberColumn(
-            "DS Thu nợ (tỷ)",
-            format="%.3f tỷ",
-            help="Doanh số thu nợ trong năm tính bằng tỷ đồng"
+        "DS Thu nợ (triệu đồng)": st.column_config.NumberColumn(
+            "DS Thu nợ (triệu đồng)",
+            format="%.0f",
+            help="Doanh số thu nợ trong năm tính bằng triệu đồng"
         ),
     }
 
@@ -765,28 +766,28 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                         f"{', '.join(pgd_thieu_bang)}"
                     )
 
-            for cot in ["Dư nợ (tỷ)", "QH (tỷ)", "Khoanh (tỷ)"]:
+            for cot in ["Dư nợ (triệu đồng)", "QH (triệu đồng)", "Khoanh (triệu đồng)"]:
                 if cot in df_pgd.columns:
                     df_pgd[cot] = pd.to_numeric(df_pgd[cot], errors="coerce").fillna(0)
-            df_pgd["Dư nợ (tỷ)"] = (df_pgd["Dư nợ (tỷ)"] / 1e9).round(2)
-            df_pgd["QH (tỷ)"] = (df_pgd["QH (tỷ)"] / 1e9).round(3)
+            df_pgd["Dư nợ (triệu đồng)"] = (df_pgd["Dư nợ (triệu đồng)"] / 1e6).round(0)
+            df_pgd["QH (triệu đồng)"] = (df_pgd["QH (triệu đồng)"] / 1e6).round(0)
             if col_khoanh in df.columns:
-                df_pgd["Khoanh (tỷ)"] = (df_pgd["Khoanh (tỷ)"] / 1e9).round(3)
+                df_pgd["Khoanh (triệu đồng)"] = (df_pgd["Khoanh (triệu đồng)"] / 1e6).round(0)
             else:
-                df_pgd["Khoanh (tỷ)"] = 0.0
+                df_pgd["Khoanh (triệu đồng)"] = 0.0
 
-            # A) Lãi tồn (tỷ)
+            # A) Lãi tồn (triệu đồng)
             if COT_LAI_TON in df.columns:
                 _lai_ton = df.groupby(COT_TEN_PGD)[COT_LAI_TON].apply(
                     lambda x: pd.to_numeric(x, errors="coerce").fillna(0).sum()
-                ).reset_index(name="Lãi tồn (tỷ)")
-                _lai_ton["Lãi tồn (tỷ)"] = (_lai_ton["Lãi tồn (tỷ)"] / 1e9).round(3)
+                ).reset_index(name="Lãi tồn (triệu đồng)")
+                _lai_ton["Lãi tồn (triệu đồng)"] = (_lai_ton["Lãi tồn (triệu đồng)"] / 1e6).round(0)
                 df_pgd = df_pgd.merge(_lai_ton, on=COT_TEN_PGD, how="left")
             else:
-                df_pgd["Lãi tồn (tỷ)"] = 0.0
-            df_pgd["Lãi tồn (tỷ)"] = pd.to_numeric(df_pgd["Lãi tồn (tỷ)"], errors="coerce").fillna(0.0)
+                df_pgd["Lãi tồn (triệu đồng)"] = 0.0
+            df_pgd["Lãi tồn (triệu đồng)"] = pd.to_numeric(df_pgd["Lãi tồn (triệu đồng)"], errors="coerce").fillna(0.0)
 
-            # B) Nợ đến hạn trong năm (tỷ)
+            # B) Nợ đến hạn trong năm (triệu đồng)
             if COT_NGAY_DH in df.columns:
                 _df_dh = df.copy()
                 _df_dh[COT_NGAY_DH] = pd.to_datetime(_df_dh[COT_NGAY_DH], dayfirst=True, errors="coerce")
@@ -795,17 +796,17 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                     _df_dh[_mask]
                     .groupby(COT_TEN_PGD)[COT_TONG_DU_NO]
                     .apply(lambda x: pd.to_numeric(x, errors="coerce").fillna(0).sum())
-                    .reset_index(name="Nợ ĐH năm (tỷ)")
+                    .reset_index(name="Nợ ĐH năm (triệu đồng)")
                 )
-                _dh["Nợ ĐH năm (tỷ)"] = (_dh["Nợ ĐH năm (tỷ)"] / 1e9).round(3)
+                _dh["Nợ ĐH năm (triệu đồng)"] = (_dh["Nợ ĐH năm (triệu đồng)"] / 1e6).round(0)
                 df_pgd = df_pgd.merge(_dh, on=COT_TEN_PGD, how="left")
             else:
-                df_pgd["Nợ ĐH năm (tỷ)"] = 0.0
-            df_pgd["Nợ ĐH năm (tỷ)"] = pd.to_numeric(
-                df_pgd["Nợ ĐH năm (tỷ)"], errors="coerce"
+                df_pgd["Nợ ĐH năm (triệu đồng)"] = 0.0
+            df_pgd["Nợ ĐH năm (triệu đồng)"] = pd.to_numeric(
+                df_pgd["Nợ ĐH năm (triệu đồng)"], errors="coerce"
             ).fillna(0.0)
 
-            # C) Doanh số cho vay năm (tỷ) — ưu tiên tên chuẩn GQVL + alias
+            # C) Doanh số cho vay năm (triệu đồng) — ưu tiên tên chuẩn GQVL + alias
             _col_cv = next(
                 (c for c in HSTD_DS_CHO_VAY_NAM_ALIASES if c in df.columns),
                 None,
@@ -827,16 +828,16 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
             if _col_cv is not None:
                 _cv = df.groupby(COT_TEN_PGD)[_col_cv].apply(
                     lambda x: pd.to_numeric(x, errors="coerce").fillna(0).sum()
-                ).reset_index(name="DS Cho vay (tỷ)")
-                _cv["DS Cho vay (tỷ)"] = (_cv["DS Cho vay (tỷ)"] / 1e9).round(3)
+                ).reset_index(name="DS Cho vay (triệu đồng)")
+                _cv["DS Cho vay (triệu đồng)"] = (_cv["DS Cho vay (triệu đồng)"] / 1e6).round(0)
                 df_pgd = df_pgd.merge(_cv, on=COT_TEN_PGD, how="left")
             else:
-                df_pgd["DS Cho vay (tỷ)"] = 0.0
-            df_pgd["DS Cho vay (tỷ)"] = pd.to_numeric(
-                df_pgd["DS Cho vay (tỷ)"], errors="coerce"
+                df_pgd["DS Cho vay (triệu đồng)"] = 0.0
+            df_pgd["DS Cho vay (triệu đồng)"] = pd.to_numeric(
+                df_pgd["DS Cho vay (triệu đồng)"], errors="coerce"
             ).fillna(0.0)
 
-            # D) Doanh số thu nợ năm (tỷ)
+            # D) Doanh số thu nợ năm (triệu đồng)
             _thu_cols = [c for c in HSTD_THU_NO_NAM_ALIASES if c in df.columns]
             if not _thu_cols:
                 _thu_cols = [
@@ -860,20 +861,20 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                 for _c in _thu_cols:
                     _df_thu[_c] = pd.to_numeric(_df_thu[_c], errors="coerce").fillna(0)
                 _df_thu["_thu_no_nam"] = _df_thu[_thu_cols].sum(axis=1)
-                _thu = _df_thu.groupby(COT_TEN_PGD)["_thu_no_nam"].sum().reset_index(name="DS Thu nợ (tỷ)")
-                _thu["DS Thu nợ (tỷ)"] = (_thu["DS Thu nợ (tỷ)"] / 1e9).round(3)
+                _thu = _df_thu.groupby(COT_TEN_PGD)["_thu_no_nam"].sum().reset_index(name="DS Thu nợ (triệu đồng)")
+                _thu["DS Thu nợ (triệu đồng)"] = (_thu["DS Thu nợ (triệu đồng)"] / 1e6).round(0)
                 df_pgd = df_pgd.merge(_thu, on=COT_TEN_PGD, how="left")
             else:
-                df_pgd["DS Thu nợ (tỷ)"] = 0.0
-            df_pgd["DS Thu nợ (tỷ)"] = pd.to_numeric(
-                df_pgd["DS Thu nợ (tỷ)"], errors="coerce"
+                df_pgd["DS Thu nợ (triệu đồng)"] = 0.0
+            df_pgd["DS Thu nợ (triệu đồng)"] = pd.to_numeric(
+                df_pgd["DS Thu nợ (triệu đồng)"], errors="coerce"
             ).fillna(0.0)
 
             if _col_cv is None or not _thu_cols:
                 st.caption("⚠️ Không có cột DS Cho vay/Thu nợ trong HSTD")
 
-            df_pgd["TL QH %"] = ((df_pgd["QH (tỷ)"] / df_pgd["Dư nợ (tỷ)"].replace(0, pd.NA)) * 100).fillna(0).round(2)
-            df_pgd["TL Khoanh %"] = ((df_pgd["Khoanh (tỷ)"] / df_pgd["Dư nợ (tỷ)"].replace(0, pd.NA)) * 100).fillna(0).round(2)
+            df_pgd["TL QH %"] = ((df_pgd["QH (triệu đồng)"] / df_pgd["Dư nợ (triệu đồng)"].replace(0, pd.NA)) * 100).fillna(0).round(2)
+            df_pgd["TL Khoanh %"] = ((df_pgd["Khoanh (triệu đồng)"] / df_pgd["Dư nợ (triệu đồng)"].replace(0, pd.NA)) * 100).fillna(0).round(2)
 
             try:
                 ds_thang = ds_thang_nam()

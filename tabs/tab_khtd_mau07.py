@@ -237,8 +237,8 @@ def _cell_write(cell, text: str, bold: bool = False, italic: bool = False,
 
 
 def _fmt_delta(val: float) -> str:
-    """Định dạng tăng/giảm: +50,0 / −10,5 / 0 (chuẩn VN: . nghìn, , thập phân)."""
-    s = f"{abs(val):,.1f}".replace(",","X").replace(".",",").replace("X",".")
+    """Định dạng tăng/giảm: +50 / −10 / 0 (chuẩn VN: . nghìn, 0 dp)."""
+    s = f"{abs(val):,.0f}".replace(",","X").replace(".",",").replace("X",".")
     if val > 0:
         return f"+{s}"
     if val < 0:
@@ -247,10 +247,8 @@ def _fmt_delta(val: float) -> str:
 
 
 def _fmt_money(val: float) -> str:
-    """Định dạng tiền (chuẩn VN: . nghìn, , thập phân). VD: 2.500 hoặc 2.500,5"""
-    if val == int(val):
-        return f"{int(val):,}".replace(",",".")
-    return f"{val:,.1f}".replace(",","X").replace(".",",").replace("X",".")
+    """Định dạng tiền (chuẩn VN: . nghìn, 0 chữ số thập phân)."""
+    return f"{val:,.0f}".replace(",","X").replace(".",",").replace("X",".")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -532,9 +530,9 @@ def xuat_mau07_word(
     _set_cell_bg(merged_tc, "F5F5F5")
     _cell_write(merged_tc, "TỔNG CỘNG", bold=True, align="center", size=12)
     _set_cell_bg(tc[2], "F5F5F5")
-    _cell_write(tc[2], _fmt_delta(round(tong_delta, 1)), bold=True, align="right", size=12)
+    _cell_write(tc[2], _fmt_delta(round(tong_delta)), bold=True, align="right", size=12)
     _set_cell_bg(tc[3], "F5F5F5")
-    _cell_write(tc[3], _fmt_money(round(tong_kh, 1)),    bold=True, align="right", size=12)
+    _cell_write(tc[3], _fmt_money(round(tong_kh)),    bold=True, align="right", size=12)
     for c in [merged_tc, tc[2], tc[3]]:
         _set_cell_border_top_double(c)
 
@@ -704,9 +702,9 @@ def _update_total_row(df: pd.DataFrame, nam: int) -> pd.DataFrame:
 
     idx_total = df[df["_type"] == "total"].index
     if not idx_total.empty:
-        df.loc[idx_total[0], col_so_goc] = round(tong_so_goc, 1)
-        df.loc[idx_total[0], col_giao] = round(tong_giao, 1)
-        df.loc[idx_total[0], col_kh] = round(tong_kh, 1)
+        df.loc[idx_total[0], col_so_goc] = round(tong_so_goc)
+        df.loc[idx_total[0], col_giao] = round(tong_giao)
+        df.loc[idx_total[0], col_kh] = round(tong_kh)
 
     return df
 
@@ -1019,9 +1017,9 @@ def render(tab, **kwargs) -> None:
                 "Ấp/Thôn": st.column_config.TextColumn("Ấp/Thôn", width="medium"),
                 "Chương trình": st.column_config.TextColumn("Chương trình", width="large"),
                 "Nguồn vốn": st.column_config.TextColumn("NV", width="small"),
-                col_so_goc: st.column_config.NumberColumn("Số gốc\n(triệu)", format="%.1f", width="small"),
-                col_giao: st.column_config.NumberColumn("Giao tăng/giảm\n(triệu)", format="%.1f", width="medium", step=0.1),
-                col_kh: st.column_config.NumberColumn(f"Chỉ tiêu KH {nam_kh}\n(triệu)", format="%.1f", width="medium"),
+                col_so_goc: st.column_config.NumberColumn("Số gốc\n(triệu)", format="%.0f", width="small"),
+                col_giao: st.column_config.NumberColumn("Giao tăng/giảm\n(triệu)", format="%.0f", width="medium", step=1.0),
+                col_kh: st.column_config.NumberColumn(f"Chỉ tiêu KH {nam_kh}\n(triệu)", format="%.0f", width="medium"),
             },
             hide_index=True,
             use_container_width=True,
@@ -1035,7 +1033,7 @@ def render(tab, **kwargs) -> None:
                 if row.get("_type") == "data":
                     so_goc = row.get(col_so_goc) or 0
                     giao = row.get(col_giao) or 0
-                    edited_df.at[idx, col_kh] = round(so_goc + giao, 1)
+                    edited_df.at[idx, col_kh] = round(so_goc + giao)
 
             # Update tổng
             edited_df = _update_total_row(edited_df, nam_kh)
@@ -1046,13 +1044,13 @@ def render(tab, **kwargs) -> None:
                 tong_so_goc = total_row.iloc[0][col_so_goc]
                 tong_giao = total_row.iloc[0][col_giao]
                 tong_kh = total_row.iloc[0][col_kh]
-                _giao_str = (f"+{vn(tong_giao, 1)}" if tong_giao > 0 else vn(tong_giao, 1))
+                _giao_str = (f"+{vn(tong_giao, 0)}" if tong_giao > 0 else vn(tong_giao, 0))
                 st.markdown(
                     f"<div style='background:#e3f2fd;padding:10px 14px;border-radius:6px;"
                     f"font-weight:700;font-size:14px;margin-top:8px'>"
-                    f"📊 TỔNG CỘNG TOÀN XÃ: Số gốc {vn(tong_so_goc, 1)} · "
+                    f"📊 TỔNG CỘNG TOÀN XÃ: Số gốc {vn(tong_so_goc, 0)} · "
                     f"Giao tăng/giảm {_giao_str} · "
-                    f"Chỉ tiêu KH {vn(tong_kh, 1)} triệu đồng</div>",
+                    f"Chỉ tiêu KH {vn(tong_kh, 0)} triệu đồng</div>",
                     unsafe_allow_html=True,
                 )
 

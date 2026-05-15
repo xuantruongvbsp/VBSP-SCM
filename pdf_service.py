@@ -217,7 +217,7 @@ def xuat_pdf(
     h_font = header_font_size if n_cols <= 10 else max(font_size - 1, 7)
     header_cells = [
         Paragraph(
-            str(c).replace("_", " ").replace(" (tỷ)", "\n(tỷ)").replace(" %", "\n%"),
+            str(c).replace("_", " ").replace("(triệu đồng)", "\n(triệu đồng)").replace(" %", "\n%"),
             ParagraphStyle("th", fontName=fb, fontSize=h_font,
                            alignment=TA_CENTER, textColor=colors.white,
                            leading=h_font + 2)
@@ -234,9 +234,10 @@ def xuat_pdf(
                 num = float(val)
             else:
                 num = float(str(val).strip().replace(".", "").replace(",", "."))
-            if abs(num) >= 1_000_000:
-                return f"{vn(num / 1_000_000, 2)} tỷ"
-            return f"{vn(num / 1_000, 1)} triệu"
+            if abs(num) > 0:
+                trieu = num / 1_000_000
+                return f"{trieu:,.0f}".replace(",", "X").replace(".", ",").replace("X", ".")
+            return "0"
         except Exception:
             return str(val) if pd.notna(val) else ""
 

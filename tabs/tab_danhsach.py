@@ -74,29 +74,29 @@ def _tao_column_config_danh_sach(df: pd.DataFrame) -> dict[str, st.column_config
     
     if COT_MUC_VAY in df.columns:
         config[COT_MUC_VAY] = st.column_config.NumberColumn(
-            "Mức vay",
-            format="%.0f ₫",
+            "Mức vay\n(triệu đồng)",
+            format="%.0f",
             help="Mức vay ban đầu"
         )
     
     if COT_DU_NO_TH in df.columns:
         config[COT_DU_NO_TH] = st.column_config.NumberColumn(
-            "Dư nợ trong hạn",
-            format="%.0f ₫",
+            "Dư nợ trong hạn\n(triệu đồng)",
+            format="%.0f",
             help="Dư nợ chưa đến hạn thanh toán"
         )
     
     if COT_DU_NO_QH in df.columns:
         config[COT_DU_NO_QH] = st.column_config.NumberColumn(
-            "Dư nợ quá hạn",
-            format="%.0f ₫",
+            "Dư nợ quá hạn\n(triệu đồng)",
+            format="%.0f",
             help="Dư nợ quá hạn cần thu hồi"
         )
     
     if COT_TONG_DU_NO in df.columns:
         config[COT_TONG_DU_NO] = st.column_config.NumberColumn(
-            "Tổng dư nợ",
-            format="%.0f ₫",
+            "Tổng dư nợ\n(triệu đồng)",
+            format="%.0f",
             help="Tổng dư nợ hiện tại"
         )
     

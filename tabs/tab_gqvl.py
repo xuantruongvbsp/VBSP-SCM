@@ -34,62 +34,62 @@ def _tao_column_config_gqvl() -> dict[str, st.column_config.Column]:
     return {
         "Dư_nợ_TH": st.column_config.NumberColumn(
             "Dư nợ TH",
-            format="%.0f ₫",
+            format="%.0f",
             help="Dư nợ trong hạn"
         ),
         "Dư_nợ_QH": st.column_config.NumberColumn(
             "Dư nợ QH",
-            format="%.0f ₫",
+            format="%.0f",
             help="Dư nợ quá hạn"
         ),
         "Dư_nợ_khoanh": st.column_config.NumberColumn(
-            "Dư nợ khoanh",
-            format="%.0f ₫",
+            "Dư nợ khoanh\n(triệu đồng)",
+            format="%.0f",
             help="Dư nợ khoanh"
         ),
         "Tổng_dư_nợ": st.column_config.NumberColumn(
-            "Tổng dư nợ",
-            format="%.0f ₫",
+            "Tổng dư nợ\n(triệu đồng)",
+            format="%.0f",
             help="Tổng dư nợ"
         ),
         "Tổng_GN": st.column_config.NumberColumn(
             "Tổng GN",
-            format="%.0f ₫",
+            format="%.0f",
             help="Tổng giải ngân"
         ),
         "GN_năm_nay": st.column_config.NumberColumn(
             "GN năm nay",
-            format="%.0f ₫",
+            format="%.0f",
             help="Giải ngân trong năm"
         ),
         "TL_QH_%": st.column_config.NumberColumn(
             "TL QH %",
-            format="%.3f%%",
+            format="%.2f%%",
             help="Tỷ lệ quá hạn %"
         ),
         G_DU_NO_TH: st.column_config.NumberColumn(
             G_DU_NO_TH,
-            format="%.0f ₫",
+            format="%.0f",
             help="Dư nợ trong hạn"
         ),
         G_DU_NO_QH: st.column_config.NumberColumn(
             G_DU_NO_QH,
-            format="%.0f ₫",
+            format="%.0f",
             help="Dư nợ quá hạn"
         ),
         G_DU_NO_KH: st.column_config.NumberColumn(
             G_DU_NO_KH,
-            format="%.0f ₫",
+            format="%.0f",
             help="Dư nợ khoanh"
         ),
         G_TONG_GN: st.column_config.NumberColumn(
             G_TONG_GN,
-            format="%.0f ₫",
+            format="%.0f",
             help="Tổng giải ngân"
         ),
         G_GN_NAM: st.column_config.NumberColumn(
             G_GN_NAM,
-            format="%.0f ₫",
+            format="%.0f",
             help="Giải ngân năm"
         ),
     }
@@ -100,17 +100,17 @@ def _tao_column_config_nganh() -> dict[str, st.column_config.Column]:
     return {
         "Dư_nợ": st.column_config.NumberColumn(
             "Dư nợ",
-            format="%.0f ₫",
+            format="%.0f",
             help="Dư nợ"
         ),
         "NQH": st.column_config.NumberColumn(
             "NQH",
-            format="%.0f ₫",
+            format="%.0f",
             help="Nợ quá hạn"
         ),
         "GN_năm": st.column_config.NumberColumn(
             "GN năm",
-            format="%.0f ₫",
+            format="%.0f",
             help="Giải ngân năm"
         ),
         "Số_món": st.column_config.NumberColumn(

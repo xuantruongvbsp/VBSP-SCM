@@ -406,13 +406,13 @@ def _section_b_giao(
                     "Chương trình": ten_ct,
                     "Mã CT": ma_key,
                     "Nguồn": nguon,
-                    "KH đợt trước (tr.đ)": (
+                    "KH đợt trước\n(triệu đồng)": (
                         round(kh_prev.get("kh_moi_tw", 0) / 1e6, 1)
                         if nguon == "TW"
                         else round(kh_prev.get("kh_moi_dp", 0) / 1e6, 1)
                     ),
-                    "KH giao TW (tr.đ)": 0.0,
-                    "KH giao ĐP (tr.đ)": 0.0,
+                    "KH giao TW\n(triệu đồng)": 0.0,
+                    "KH giao ĐP\n(triệu đồng)": 0.0,
                 }
             )
     df_nhap = pd.DataFrame(rows_nhap)
@@ -426,14 +426,14 @@ def _section_b_giao(
                 "Chương trình": st.column_config.TextColumn(disabled=True),
                 "Mã CT": st.column_config.TextColumn(disabled=True),
                 "Nguồn": st.column_config.TextColumn(disabled=True),
-                "KH đợt trước (tr.đ)": st.column_config.NumberColumn(
+                "KH đợt trước\n(triệu đồng)": st.column_config.NumberColumn(
                     disabled=True, format="%.1f"
                 ),
-                "KH giao TW (tr.đ)": st.column_config.NumberColumn(
+                "KH giao TW\n(triệu đồng)": st.column_config.NumberColumn(
                     format="%.1f",
                     help="Nhập KH giao nguồn TW (triệu đồng)",
                 ),
-                "KH giao ĐP (tr.đ)": st.column_config.NumberColumn(
+                "KH giao ĐP\n(triệu đồng)": st.column_config.NumberColumn(
                     format="%.1f",
                     help="Nhập KH giao nguồn ĐP (triệu đồng)",
                 ),
@@ -449,8 +449,8 @@ def _section_b_giao(
         st.caption("*(Chế độ xem — không thực hiện nhập.)*")
         return
 
-    tong_giao_tw = df_edited["KH giao TW (tr.đ)"].sum()
-    tong_giao_dp = df_edited["KH giao ĐP (tr.đ)"].sum()
+    tong_giao_tw = df_edited["KH giao TW\n(triệu đồng)"].sum()
+    tong_giao_dp = df_edited["KH giao ĐP\n(triệu đồng)"].sum()
     c1, c2 = st.columns(2)
     c1.metric("Tổng KH giao TW", f"{tong_giao_tw:,.1f} tr.đ")
     c2.metric("Tổng KH giao ĐP", f"{tong_giao_dp:,.1f} tr.đ")
@@ -468,12 +468,12 @@ def _section_b_giao(
                     "ma_key": row["Mã CT"],
                     "ten_ct": row["Chương trình"],
                     "nguon": row["Nguồn"],
-                    "kh_tw": float(row["KH giao TW (tr.đ)"]),
+                    "kh_tw": float(row["KH giao TW\n(triệu đồng)"]),
                     "dc_tw": 0.0,
-                    "kh_moi_tw": float(row["KH giao TW (tr.đ)"]),
-                    "kh_dp": float(row["KH giao ĐP (tr.đ)"]),
+                    "kh_moi_tw": float(row["KH giao TW\n(triệu đồng)"]),
+                    "kh_dp": float(row["KH giao ĐP\n(triệu đồng)"]),
                     "dc_dp": 0.0,
-                    "kh_moi_dp": float(row["KH giao ĐP (tr.đ)"]),
+                    "kh_moi_dp": float(row["KH giao ĐP\n(triệu đồng)"]),
                     "ly_do": "",
                 }
             )

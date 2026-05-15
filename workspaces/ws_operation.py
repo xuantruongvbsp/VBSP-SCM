@@ -56,7 +56,7 @@ def _render_don_doc(df: pd.DataFrame, pgd_user: str, role: str):
               delta_color="inverse" if n_khd > 0 else "off")
     tong_lai = df_kh[df_kh.get("is_3m_inactive", False)][COT_LAI_TON].sum() \
                if COT_LAI_TON in df_kh.columns else 0
-    k3.metric("Lãi tồn cần thu (tr.đ)", vn(tong_lai/1e6, 1))
+    k3.metric("Lãi tồn cần thu (triệu đồng)", fmt(tong_lai))
 
     if n_khd == 0:
         st.success("✅ Không có món vay nào quá 3 tháng không hoạt động!")
@@ -123,7 +123,7 @@ def _render_don_doc(df: pd.DataFrame, pgd_user: str, role: str):
                       if COT_LAI_TON in df_dondoc.columns else 0
         st.caption(
             f"**{fmt_so(len(df_dondoc))}** món · "
-            f"Lãi tồn: **{vn(tong_lai_ds/1e6,1)}** triệu đồng"
+            f"Lãi tồn: **{fmt(tong_lai_ds)}** triệu đồng"
         )
     else:
         st.info("Không có hộ nào thỏa điều kiện.")
@@ -143,7 +143,7 @@ def _banner_canh_bao_khd(df_pgd: pd.DataFrame, role: str) -> None:
         ).sum() / 1e6
     st.warning(
         f"⚠️ **{fmt_so(n_khd)} món vay 3 tháng không hoạt động** · "
-        f"Dư nợ: **{du_no_khd:,.1f} triệu đồng** · "
+        f"Dư nợ: **{du_no_khd:,.0f} triệu đồng** · "
         f"Vào nhóm **🔍 Kiểm soát & Rủi ro → Tab Đôn đốc KHĐ** để xem chi tiết.",
         icon="🔴",
     )
@@ -830,8 +830,8 @@ def _render_bao_cao_giao_ban(tab, **kwargs):
         if ds_thon_dgd:
             khu_vuc_text += f" (gồm: {', '.join(ds_thon_dgd)})"
         
-        tom_tat = f"""Khu vực {khu_vuc_text}, xã {chon_xa}: Tổng dư nợ đạt {tong_dn:.1f} triệu đồng, với {fmt_so(so_kh)} khách hàng còn dư nợ, thông qua {so_to} Tổ TK&VV. Trong đó, nợ quá hạn {nqh:.1f} triệu đồng, tỷ lệ {tl_nqh:.2f}%; nợ khoanh {nkh:.1f} triệu đồng.
-Doanh số cho vay trong tháng: {ds_cv:.1f} triệu đồng; doanh số thu nợ trong tháng: {ds_thu:.1f} triệu đồng."""
+        tom_tat = f"""Khu vực {khu_vuc_text}, xã {chon_xa}: Tổng dư nợ đạt {tong_dn:,.0f} triệu đồng, với {fmt_so(so_kh)} khách hàng còn dư nợ, thông qua {so_to} Tổ TK&VV. Trong đó, nợ quá hạn {nqh:,.0f} triệu đồng, tỷ lệ {tl_nqh:.2f}%; nợ khoanh {nkh:,.0f} triệu đồng.
+Doanh số cho vay trong tháng: {ds_cv:,.0f} triệu đồng; doanh số thu nợ trong tháng: {ds_thu:,.0f} triệu đồng."""
         
         st.text_area("📋 Đoạn tóm tắt (copy vào báo cáo)", 
                      value=tom_tat, 

@@ -440,8 +440,8 @@ def _tab_khtd_chi_nhanh(
     so_ct_co_kh = sum(
         1 for mk in MA_KEYS_CO_KHTD if float(kh_cn.get(mk, 0.0)) > 0
     )
-    tong_kh_ty = (
-        sum(float(kh_cn.get(mk, 0.0)) for mk in MA_KEYS_CO_KHTD) / 1e12
+    tong_kh_trieu = (
+        sum(float(kh_cn.get(mk, 0.0)) for mk in MA_KEYS_CO_KHTD) / 1e6
     )
 
     if so_ct_co_kh == 0:
@@ -455,7 +455,7 @@ def _tab_khtd_chi_nhanh(
         icon = "🟡"
         noi_dung = (
             f"Đã nhập {so_ct_co_kh}/{tong_ct} chương trình · "
-            f"Tổng KH: {_fvn(tong_kh_ty, 3)} tỷ đồng"
+            f"Tổng KH: {_fvn(tong_kh_trieu, 0)} triệu đồng"
         )
     else:
         mau = "#e8f5e9"
@@ -673,7 +673,7 @@ def _tab_khtd_chi_nhanh(
                         )
                     elif cpth < 0:
                         cols_sub[col_cp_idx].markdown(
-                            _md_right(_fvn_form(cpth), "#c62828"), unsafe_allow_html=True
+                            _md_right(_fvn_form(cpth, 0), "#c62828"), unsafe_allow_html=True
                         )
                     elif cpth == 0:
                         cols_sub[col_cp_idx].markdown(
@@ -681,7 +681,7 @@ def _tab_khtd_chi_nhanh(
                         )
                     else:
                         cols_sub[col_cp_idx].markdown(
-                            _md_right(_fvn_form(cpth)), unsafe_allow_html=True
+                            _md_right(_fvn_form(cpth, 0)), unsafe_allow_html=True
                         )
                     # Các cột tổng để trống cho sub-dòng
                 continue  # Bỏ qua xử lý mặc định cho ma_ct == 3
@@ -740,7 +740,7 @@ def _tab_khtd_chi_nhanh(
                 cpth_tw = kh_tw_trieu - th_tw_trieu
                 if cpth_tw < 0:
                     cols[3].markdown(
-                        _md_right(_fvn_form(cpth_tw), "#c62828"),
+                        _md_right(_fvn_form(cpth_tw, 0), "#c62828"),
                         unsafe_allow_html=True,
                     )
                 elif cpth_tw == 0:
@@ -749,7 +749,7 @@ def _tab_khtd_chi_nhanh(
                     )
                 else:
                     cols[3].markdown(
-                        _md_right(_fvn_form(cpth_tw)), unsafe_allow_html=True
+                        _md_right(_fvn_form(cpth_tw, 0)), unsafe_allow_html=True
                     )
 
             if co_dp:
@@ -783,7 +783,7 @@ def _tab_khtd_chi_nhanh(
                 cpth_dp = kh_dp_trieu - th_dp_trieu
                 if cpth_dp < 0:
                     cols[6].markdown(
-                        _md_right(_fvn_form(cpth_dp), "#c62828"),
+                        _md_right(_fvn_form(cpth_dp, 0), "#c62828"),
                         unsafe_allow_html=True,
                     )
                 elif cpth_dp == 0:
@@ -792,7 +792,7 @@ def _tab_khtd_chi_nhanh(
                     )
                 else:
                     cols[6].markdown(
-                        _md_right(_fvn_form(cpth_dp)), unsafe_allow_html=True
+                        _md_right(_fvn_form(cpth_dp, 0)), unsafe_allow_html=True
                     )
 
             th_tong = th_tw_trieu + th_dp_trieu
@@ -807,7 +807,7 @@ def _tab_khtd_chi_nhanh(
                 )
             elif cpth_tong < 0:
                 cols[8].markdown(
-                    _md_right(_fvn_form(cpth_tong), "#c62828"),
+                    _md_right(_fvn_form(cpth_tong, 0), "#c62828"),
                     unsafe_allow_html=True,
                 )
             elif cpth_tong == 0:
@@ -816,7 +816,7 @@ def _tab_khtd_chi_nhanh(
                 )
             else:
                 cols[8].markdown(
-                    _md_right(_fvn_form(cpth_tong)), unsafe_allow_html=True
+                    _md_right(_fvn_form(cpth_tong, 0)), unsafe_allow_html=True
                 )
 
     tong_kh_trieu_hien_tai = 0.0
@@ -954,13 +954,13 @@ def _tab_khtd_chi_nhanh(
         _pt = lambda p: (f"{_fvn(p, 1)}%") if p is not None else "—"
         st.info(
             "💰 "
-            f"KH Trung ương: **{_fvn(tw_kh_d / 1e6, 1)}** triệu đồng · "
+            f"KH Trung ương: **{_fvn(tw_kh_d / 1e6, 0)}** triệu đồng · "
             f"Thực hiện: **{_fvn(tw_th_d / 1e6, 0)}** triệu đồng · "
             f"Đạt **{_pt(pt_tw)}**\n\n"
-            f"KH Địa phương: **{_fvn(dp_kh_d / 1e6, 1)}** triệu đồng · "
-            f"Thực hiện: **{_fvn(dp_th_d / 1e6, 0)}** triệu đồng · "
+            f"KH Địa phương: **{_fvn(dp_kh_d / 1e6, 0)}** triệu đồng · "
+             f"Thực hiện: **{_fvn(dp_th_d / 1e6, 0)}** triệu đồng · "
             f"Đạt **{_pt(pt_dp)}**\n\n"
-            f"Tổng cộng: KH **{_fvn(all_kh_d / 1e6, 1)}** triệu đồng · "
+            f"Tổng cộng: KH **{_fvn(all_kh_d / 1e6, 0)}** triệu đồng · "
             f"Thực hiện: **{_fvn(all_th_d / 1e6, 0)}** triệu đồng · "
             f"Đạt **{_pt(pt_all)}**"
         )

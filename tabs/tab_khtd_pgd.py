@@ -235,7 +235,7 @@ def _tao_column_config_khtd_pgd(cot_so: list[str]) -> dict[str, st.column_config
         "Chỉ Tiêu": st.column_config.TextColumn("Chỉ Tiêu", width="large"),
         "Cộng": st.column_config.NumberColumn(
             "Cộng",
-            format="%.1f triệu",
+            format="%.0f",
             help="Đơn vị: triệu đồng"
         ),
     }
@@ -243,7 +243,7 @@ def _tao_column_config_khtd_pgd(cot_so: list[str]) -> dict[str, st.column_config
         if col not in ("STT", "Chỉ Tiêu", "Cộng"):
             config[col] = st.column_config.NumberColumn(
                 col,
-                format="%.1f triệu",
+                format="%.0f",
                 help="Đơn vị: triệu đồng"
             )
     return config
@@ -261,7 +261,7 @@ def _tao_column_config_ss() -> dict[str, st.column_config.Column]:
     for col in trieu_cols:
         config[col] = st.column_config.NumberColumn(
             col,
-            format="%.1f",
+            format="%.0f",
             help="Đơn vị: triệu đồng"
         )
     config["Tỷ lệ TH %"] = st.column_config.NumberColumn(

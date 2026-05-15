@@ -29,12 +29,12 @@ _COLS_PCT = {"Tỷ_lệ_QH_%", "Tỷ_lệ_KHĐ_%", "QH%", "TL Nợ xấu %"}
 
 
 def _fmt_df(df: pd.DataFrame) -> pd.DataFrame:
-    """Cột tiền → số triệu đồng (VN format, 3 chữ số thập phân). Cột % → chuỗi VN."""
+    """Cột tiền → triệu đồng (VN format, 0 chữ số thập phân). Cột % → chuỗi VN."""
     d = df.copy()
     for col in d.columns:
         if col in _COLS_TIEN:
             d[col] = pd.to_numeric(d[col], errors="coerce").apply(
-                lambda x: vn(x / 1_000_000, 3) if pd.notna(x) else "—"
+                lambda x: vn(x / 1_000_000, 0) if pd.notna(x) else "—"
             )
         elif col in _COLS_PCT:
             d[col] = pd.to_numeric(d[col], errors="coerce").apply(
@@ -50,17 +50,13 @@ def _hien_thi_bc(df: pd.DataFrame, **kw) -> None:
 
 
 def _bc_fmt_metric(x: float) -> str:
-    """Format số tiền cho metric display (tỷ/triệu)."""
+    """Format số tiền cho metric display (triệu đồng, 0 dp)."""
     try:
         x = float(x)
-        if abs(x) >= 1e9:
-            s = f"{x/1e9:,.3f}".replace(",","X").replace(".",",").replace("X",".")
-            return f"{s.rstrip('0').rstrip(',') if ',' in s else s} tỷ"
-        if abs(x) >= 1e6:
-            s = f"{x/1e6:,.1f}".replace(",","X").replace(".",",").replace("X",".")
-            return f"{s} triệu"
         if abs(x) > 0:
-            return f"{x:,.0f}".replace(",",".")
+            trieu = x / 1_000_000
+            s = f"{trieu:,.0f}".replace(",","X").replace(".",",").replace("X",".")
+            return s
         return "—"
     except Exception:
         return "—"
@@ -409,7 +405,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                                    if COT_LAI_TON in df_dondoc.columns else 0
                         st.caption(
                             f"Tổng **{fmt_so(len(df_dondoc))}** món · "
-                            f"Lãi tồn: **{vn(tong_lai/1e6,1)}** triệu đồng"
+                            f"Lãi tồn: **{vn(tong_lai/1e6,0)}** triệu đồng"
                         )
                     else:
                         st.success("✅ Không có món vay nào quá 3 tháng không hoạt động.")

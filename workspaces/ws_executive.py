@@ -51,16 +51,14 @@ _COT_XA = "Tên xã"
 # HELPER — Format nội bộ
 # ═══════════════════════════════════════════════════════════════════════════════
 def _fmt(v) -> str:
-    """Format số tiền (đồng) → tỷ/triệu ngắn gọn dùng trong bảng (chuẩn VN: . nghìn, , thập phân)."""
+    """Format số tiền (đồng) → triệu đồng (chuẩn VN: . nghìn, , thập phân, 0 số lẻ)."""
     try:
         v = float(v)
-        if abs(v) >= 1e9:
-            s = f"{v/1e9:,.3f}".replace(",","X").replace(".",",").replace("X",".")
-            return f"{s.rstrip('0').rstrip(',')} tỷ"
-        if abs(v) >= 1e6:
-            s = f"{v/1e6:,.1f}".replace(",","X").replace(".",",").replace("X",".")
-            return f"{s} tr"
-        return f"{v:,.0f}".replace(",",".")
+        if abs(v) > 0:
+            trieu = v / 1_000_000
+            s = f"{trieu:,.0f}".replace(",","X").replace(".",",").replace("X",".")
+            return s
+        return "—"
     except Exception:
         return "—"
 
@@ -221,7 +219,7 @@ def _kpi_tang_truong(df_full: pd.DataFrame) -> None:
         if not cn.empty:
             prev = cn.iloc[0]
 
-    def _d(now, col, scale=1e9):
+    def _d(now, col, scale=1e6):
         if prev is None:
             return None
         return (now - float(prev.get(col, now) or now)) / scale
@@ -232,13 +230,13 @@ def _kpi_tang_truong(df_full: pd.DataFrame) -> None:
     c1.metric(
         "Tổng dư nợ",
         fmt_ty(tdn),
-        delta=f"{d_tdn:+.2f} tỷ" if d_tdn is not None else None,
+        delta=f"{d_tdn:+.0f} tr.đ" if d_tdn is not None else None,
         help="So với snapshot tháng trước",
     )
     c2.metric(
         "Dư nợ quá hạn",
         fmt_ty(dqh),
-        delta=f"{d_dqh:+.2f} tỷ" if d_dqh is not None else None,
+        delta=f"{d_dqh:+.0f} tr.đ" if d_dqh is not None else None,
         delta_color="inverse",
     )
     c3.metric("Tỷ lệ NQH", fmt_pct(tlqh))
@@ -283,7 +281,7 @@ def _heatmap_rui_ro_pgd(df_full: pd.DataFrame) -> None:
         )
         if prev_map:
             t["tt"] = t.apply(
-                lambda r: (r["du_no"] - prev_map.get(r[COT_TEN_PGD], r["du_no"])) / 1e9,
+                lambda r: (r["du_no"] - prev_map.get(r[COT_TEN_PGD], r["du_no"])) / 1e6,
                 axis=1,
             )
 
@@ -309,7 +307,7 @@ def _heatmap_rui_ro_pgd(df_full: pd.DataFrame) -> None:
 
     def nc(tl): return R if tl >= 2 else (AM if tl >= 0.5 else G)
 
-    hdrs = ["#", "PGD", "Dư nợ (tỷ)", "NQH%", "3T KHĐ", "Migration", "Tăng trưởng", "Điểm RR"]
+    hdrs = ["#", "PGD", "Dư nợ (triệu đồng)", "NQH%", "3T KHĐ", "Migration", "Tăng trưởng", "Điểm RR"]
     thead = "".join(
         f'<th style="background:{H};color:#fff;text-align:{"center" if i==0 else "left" if i==1 else "right"};padding:6px 8px;border:1px solid {BD};font-size:0.8rem">{h}</th>'
         for i, h in enumerate(hdrs)
@@ -321,7 +319,8 @@ def _heatmap_rui_ro_pgd(df_full: pd.DataFrame) -> None:
         tt_s = "—"
         if row["tt"] is not None:
             col = G if row["tt"] >= 0 else R
-            tt_s = f'<span style="color:{col}">{row["tt"]:+.2f} tỷ</span>'
+            tt_vn = f"{abs(row['tt']):,.0f}".replace(",","X").replace(".",",").replace("X",".")
+            tt_s = f'<span style="color:{col}">{"+" if row["tt"] >= 0 else "-"}{tt_vn}</span>'
         rows_h.append(
             "<tr>" + "".join(
                 [
@@ -454,42 +453,42 @@ def _render_heatmap_pgd(**kwargs) -> None:
         fig_bar.add_trace(go.Bar(
             name="Dư nợ trong hạn",
             y=t_pgd_sorted[COT_TEN_PGD],
-            x=t_pgd_sorted["Dư_nợ_TH"] / 1e9,
+            x=t_pgd_sorted["Dư_nợ_TH"] / 1e6,
             orientation="h",
             marker_color="#1565C0",
-            text=(t_pgd_sorted["Dư_nợ_TH"] / 1e9).apply(
-                lambda v: f"{v:,.2f}".replace(",","X").replace(".",",").replace("X",".") + " tỷ"
+            text=(t_pgd_sorted["Dư_nợ_TH"] / 1e6).apply(
+                lambda v: f"{v:,.0f}".replace(",","X").replace(".",",").replace("X",".")
             ),
             textposition="inside",
             insidetextanchor="middle",
             hovertemplate=(
                 "<b>%{y}</b><br>"
-                "Dư nợ trong hạn: %{x:,.3f} tỷ<extra></extra>"
+                "Dư nợ trong hạn: %{x:,.0f} triệu đồng<extra></extra>"
             ),
         ))
         fig_bar.add_trace(go.Bar(
             name="Nợ quá hạn",
             y=t_pgd_sorted[COT_TEN_PGD],
-            x=t_pgd_sorted["NQH"] / 1e9,
+            x=t_pgd_sorted["NQH"] / 1e6,
             orientation="h",
             marker_color="#C62828",
-            text=(t_pgd_sorted["NQH"] / 1e9).apply(
+            text=(t_pgd_sorted["NQH"] / 1e6).apply(
                 lambda v: (
-                    f"{v:,.3f}".replace(",","X").replace(".",",").replace("X",".") + " tỷ"
-                    if v >= 1e-3 else ""
+                    f"{v:,.0f}".replace(",","X").replace(".",",").replace("X",".")
+                    if v >= 1 else ""
                 )
             ),
             textposition="inside",
             hovertemplate=(
                 "<b>%{y}</b><br>"
-                "Nợ quá hạn: %{x:,.3f} tỷ<extra></extra>"
+                "Nợ quá hạn: %{x:,.0f} triệu đồng<extra></extra>"
             ),
         ))
         fig_bar.update_layout(
             barmode="stack",
             height=chieu_cao,
             margin=dict(l=0, r=80, t=20, b=10),
-            xaxis_title="Tỷ đồng",
+            xaxis_title="Triệu đồng",
             yaxis=dict(title=""),
             legend=dict(orientation="h", y=1.04, x=0),
             plot_bgcolor="rgba(0,0,0,0)",
@@ -504,9 +503,11 @@ def _render_heatmap_pgd(**kwargs) -> None:
 
     # ── TAB 2: Scatter Tổng dư nợ vs NQH ────────────────────────────────────
     elif _chart_active == chart_tab_names[1]:
+        t_pgd_chart = t_pgd.copy()
+        t_pgd_chart["Tổng_dư_nợ_tr"] = t_pgd_chart["Tổng_dư_nợ"] / 1e6
         fig_sc = px.scatter(
-            t_pgd,
-            x="Tổng_dư_nợ",
+            t_pgd_chart,
+            x="Tổng_dư_nợ_tr",
             y="TL_NQH",
             size="Số_KH",
             color="Trạng_thái",
@@ -518,13 +519,13 @@ def _render_heatmap_pgd(**kwargs) -> None:
             },
             hover_data={
                 COT_TEN_PGD:    True,
-                "Tổng_dư_nợ":   False,
+                "Tổng_dư_nợ_tr": True,
                 "Số_KH":        True,
                 "TL_NQH":       ":.3f",
                 "Trạng_thái":   True,
             },
             labels={
-                "Tổng_dư_nợ": "Tổng dư nợ (đồng)",
+                "Tổng_dư_nợ_tr": "Tổng dư nợ (triệu đồng)",
                 "TL_NQH":     "Tỷ lệ NQH (%)",
                 "Số_KH":      "Số khách hàng",
             },
@@ -553,7 +554,7 @@ def _render_heatmap_pgd(**kwargs) -> None:
         fig_sc.update_layout(
             height=420,
             margin=dict(l=0, r=20, t=20, b=10),
-            xaxis=dict(title="Tổng dư nợ (đồng)", tickformat=".3s"),
+            xaxis=dict(title="Tổng dư nợ (triệu đồng)", tickformat=",.0f"),
             yaxis=dict(title="Tỷ lệ NQH (%)"),
             legend=dict(title="Trạng thái", orientation="h", y=-0.18),
             plot_bgcolor="rgba(0,0,0,0)",
@@ -621,8 +622,8 @@ def _render_heatmap_pgd(**kwargs) -> None:
         df_display["TL_TH"]       = df_display["TL_TH"].apply(lambda x: f"{x:.1f}%")
         df_display["Số_KH"]       = df_display["Số_KH"].apply(fmt_so)
         df_display.columns = [
-            "PGD", "Tổng dư nợ (tỷ)", "Dư nợ trong hạn (tỷ)",
-            "Nợ quá hạn (tỷ)", "Tỷ lệ NQH", "Số KH", "Tỷ lệ TH", "Trạng thái",
+            "PGD", "Tổng dư nợ (triệu đồng)", "Dư nợ trong hạn (triệu đồng)",
+            "Nợ quá hạn (triệu đồng)", "Tỷ lệ NQH", "Số KH", "Tỷ lệ TH", "Trạng thái",
         ]
         hien_thi_dataframe_phan_trang(
             df_display,
@@ -811,7 +812,7 @@ def _canh_bao_migration(df_full: pd.DataFrame) -> None:
         delta_color="inverse",
     )
     c2.metric("⚠️ Cảnh báo (1–2.5 tháng)", f"{n_cb:,} món")
-    c3.metric("Tổng lãi tồn rủi ro", fmt_ty(tong_lai))
+    c3.metric("Tổng lãi tồn rủi ro (triệu đồng)", fmt_ty(tong_lai))
 
     if COT_TEN_PGD in df_mg.columns:
         top5 = (
@@ -907,13 +908,13 @@ def render(**kwargs) -> None:
             st.markdown("**📈 Tăng trưởng Dư nợ liên tháng (từ snapshot)**")
             _df_range = doc_snapshot_range(_ds_ky[-1], _ds_ky[0])
             if not _df_range.empty:
-                _df_range["du_no_ty"] = _df_range["tong_du_no"] / 1e9
+                _df_range["du_no_ty"] = _df_range["tong_du_no"] / 1e6
                 _fig_tt = px.line(
                     _df_range,
                     x="ky",
                     y="du_no_ty",
                     markers=True,
-                    labels={"ky": "Kỳ", "du_no_ty": "Dư nợ (tỷ đ)"},
+                    labels={"ky": "Kỳ", "du_no_ty": "Dư nợ (triệu đồng)"},
                 )
                 _fig_tt.update_layout(
                     height=260,

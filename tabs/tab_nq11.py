@@ -27,18 +27,18 @@ def _tao_column_config_nq11() -> dict[str, st.column_config.Column]:
     """
     return {
         "Dư_nợ_NQ11": st.column_config.NumberColumn(
-            "Dư nợ NQ11",
-            format="%.0f ₫",
+            "Dư nợ NQ11\n(triệu đồng)",
+            format="%.0f",
             help="Dư nợ Nghị Quyết 11"
         ),
         "Nợ_trong_hạn": st.column_config.NumberColumn(
-            "Nợ trong hạn",
-            format="%.0f ₫",
+            "Nợ trong hạn\n(triệu đồng)",
+            format="%.0f",
             help="Nợ trong hạn"
         ),
         "Nợ_quá_hạn": st.column_config.NumberColumn(
-            "Nợ quá hạn",
-            format="%.0f ₫",
+            "Nợ quá hạn\n(triệu đồng)",
+            format="%.0f",
             help="Nợ quá hạn"
         ),
         "Số_món": st.column_config.NumberColumn(
@@ -47,23 +47,23 @@ def _tao_column_config_nq11() -> dict[str, st.column_config.Column]:
             help="Số món vay"
         ),
         "Số tiền giải ngân": st.column_config.NumberColumn(
-            "Số tiền giải ngân",
-            format="%.0f ₫",
+            "Số tiền giải ngân\n(triệu đồng)",
+            format="%.0f",
             help="Số tiền giải ngân"
         ),
         "DNO NQ11": st.column_config.NumberColumn(
-            "DNO NQ11",
-            format="%.0f ₫",
+            "DNO NQ11\n(triệu đồng)",
+            format="%.0f",
             help="Dư nợ NQ11"
         ),
         "Nợ trong hạn": st.column_config.NumberColumn(
-            "Nợ trong hạn",
-            format="%.0f ₫",
+            "Nợ trong hạn\n(triệu đồng)",
+            format="%.0f",
             help="Nợ trong hạn"
         ),
         "Nợ quá hạn": st.column_config.NumberColumn(
-            "Nợ quá hạn",
-            format="%.0f ₫",
+            "Nợ quá hạn\n(triệu đồng)",
+            format="%.0f",
             help="Nợ quá hạn"
         ),
     }
@@ -89,15 +89,12 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
             st.subheader("📑 Dữ liệu Nghị Quyết 11 (NQ11)")
 
             def fmt_vn_tien(x: float) -> str:
-                """Format số tiền cho metric display."""
+                """Format số tiền cho metric display (triệu đồng, 0 dp)."""
                 try:
                     x = float(x)
-                    if x >= 1e9:
-                        return f"{x/1e9:,.3f} tỷ đồng".replace(",", "X").replace(".", ",").replace("X", ".")
-                    if x >= 1e6:
-                        return f"{x/1e6:,.1f} triệu đồng".replace(",", "X").replace(".", ",").replace("X", ".")
-                    if x > 0:
-                        return f"{x:,.0f} đồng".replace(",", ".")
+                    if abs(x) > 0:
+                        trieu = x / 1_000_000
+                        return f"{trieu:,.0f}".replace(",", "X").replace(".", ",").replace("X", ".")
                     return "—"
                 except Exception:
                     return "—"

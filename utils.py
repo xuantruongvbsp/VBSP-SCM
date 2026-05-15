@@ -109,9 +109,9 @@ def lay_config(key: str, fallback):
 def format_df_vn(df: pd.DataFrame) -> pd.DataFrame:
     """
     Tự động format tất cả cột số trong DataFrame sang chuẩn Việt Nam.
+    - Cột chứa tiền tệ (tỷ / triệu / đồng): định dạng VN, 0 chữ số thập phân
+    - Cột tỷ lệ %: 2 chữ số thập phân
     - Số nguyên lớn: dấu chấm phân cách hàng nghìn (1.234.567)
-    - Số thập phân: dấu phẩy cho thập phân (1.234,56)
-    - Cột tên chứa % / "tỷ lệ" / pct: thêm ký hiệu %
     """
     df = df.copy()
     for col in df.columns:
@@ -129,26 +129,11 @@ def format_df_vn(df: pd.DataFrame) -> pd.DataFrame:
                     else ""
                 )
             )
-        elif "tỷ" in col_lower:
-            df[col] = df[col].map(
-                lambda x: (
-                    f"{float(x):,.3f}".replace(",", "X").replace(".", ",").replace("X", ".")
-                    if pd.notna(x)
-                    else ""
-                )
-            )
-        elif "triệu" in col_lower:
-            df[col] = df[col].map(
-                lambda x: (
-                    f"{float(x):,.1f}".replace(",", "X").replace(".", ",").replace("X", ".")
-                    if pd.notna(x)
-                    else ""
-                )
-            )
         else:
+            # Cột tiền tệ hoặc số nguyên → 0 chữ số thập phân
             df[col] = df[col].map(
                 lambda x: (
-                    f"{float(x):,.0f}".replace(",", ".")
+                    f"{float(x):,.0f}".replace(",", "X").replace(".", ",").replace("X", ".")
                     if pd.notna(x)
                     else ""
                 )
@@ -210,58 +195,47 @@ def vn(x, d=1, show_sign: bool = False):
 
 
 def fmt_tien(x):
-    """Đồng → tỷ/triệu, định dạng VN."""
+    """Đồng → triệu đồng, định dạng VN (0 chữ số thập phân)."""
     try:
         x = float(x)
-        if abs(x) >= 1e9:
-            s = f"{x/1e9:,.3f}".replace(",","X").replace(".",",").replace("X",".")
-            return f"{s.rstrip('0').rstrip(',') if ',' in s else s} tỷ đồng"
-        if abs(x) >= 1e6:
-            s = f"{x/1e6:,.1f}".replace(",","X").replace(".",",").replace("X",".")
-            return f"{s} triệu đồng"
         if abs(x) > 0:
-            return f"{x:,.0f}".replace(",",".") + " đồng"
+            trieu = x / 1_000_000
+            s = f"{trieu:,.0f}".replace(",","X").replace(".",",").replace("X",".")
+            return s
         return "—"
     except:
         return "—"
 
 
 def fmt_ty(x):
-    """Đồng → tỷ ngắn gọn (dùng trong bảng so sánh Điện báo)."""
+    """Đồng → triệu đồng, định dạng VN (0 chữ số thập phân), không hậu tố.
+    Dùng trong bảng so sánh, header cột ghi rõ (triệu đồng)."""
     try:
         x = float(x)
         if x != x or x == float('inf') or x == float('-inf'):
             return "—"
-        ty = x / 1e9
-        if abs(ty) >= 1:
-            return f"{vn(ty, 3)} tỷ"
-        if abs(x) >= 1e6:
-            return f"{vn(x/1e6, 1)} triệu"
         if abs(x) > 0:
-            return f"{vn(x/1e6, 3)} triệu"
+            trieu = x / 1_000_000
+            s = f"{trieu:,.0f}".replace(",","X").replace(".",",").replace("X",".")
+            return s
         return "—"
     except:
         return "—"
 
 
-def fmt_bang_ty(x, so_le: int = 3) -> str:
+def fmt_bang_ty(x, so_le: int = 0) -> str:
     """
-    Format số tiền (đồng) → tỷ đồng, CỐ ĐỊNH đơn vị tỷ.
+    Format số tiền (đồng) → triệu đồng, CỐ ĐỊNH đơn vị triệu.
     Dùng trong cột bảng để đảm bảo đồng nhất đơn vị.
-    Ví dụ:
-        28_100_000_000 → "28,100"
-        190_000_000    → "0,190"
-        14_000_000     → "0,014"
-        0              → "—"
-    Tham số so_le: số chữ số thập phân (mặc định 3).
-    Header cột phải ghi rõ "(tỷ đồng)" hoặc "(tỷ)".
+    Header cột phải ghi rõ (triệu đồng).
+    Tham số so_le: số chữ số thập phân (mặc định 0).
     """
     try:
         x = float(x)
         if x == 0:
             return "—"
-        ty = x / 1e9
-        s = f"{ty:,.{so_le}f}".replace(",", "X").replace(".", ",").replace("X", ".")
+        trieu = x / 1_000_000
+        s = f"{trieu:,.{so_le}f}".replace(",", "X").replace(".", ",").replace("X", ".")
         return s
     except Exception:
         return "—"
@@ -277,7 +251,7 @@ def get_tab_context(tab):
 
 
 def fmt_cl(x):
-    """Chênh lệch tỷ có dấu + / -."""
+    """Chênh lệch triệu đồng có dấu + / -."""
     try:
         x = float(x)
         s = fmt_ty(x)
@@ -305,24 +279,18 @@ def fmt_so(x):
 
 def fmt(x):
     """
-    Format số tiền (đồng) → tỷ/triệu ngắn gọn.
+    Format số tiền (đồng) → triệu đồng, định dạng VN (0 chữ số thập phân).
     Dùng thay cho các _fmt() định nghĩa rải rác ở các tab.
-      >= 1 tỷ  → "1,234 tỷ"
-      >= 1 triệu → "123,4 triệu"
-      > 0      → "123.456"
+      >= 0      → "1.234.567" (triệu đồng, 0 số lẻ)
       0 / lỗi  → "—"
     Hỗ trợ số âm (dùng trong cột chênh lệch).
     """
     try:
         x = float(x)
-        if abs(x) >= 1e9:
-            s = f"{x/1e9:,.3f}".replace(",","X").replace(".",",").replace("X",".")
-            return f"{s.rstrip('0').rstrip(',')} tỷ"
-        if abs(x) >= 1e6:
-            s = f"{x/1e6:,.1f}".replace(",","X").replace(".",",").replace("X",".")
-            return f"{s} triệu"
         if abs(x) > 0:
-            return f"{x:,.0f}".replace(",",".")
+            trieu = x / 1_000_000
+            s = f"{trieu:,.0f}".replace(",","X").replace(".",",").replace("X",".")
+            return s
         return "—"
     except:
         return "—"

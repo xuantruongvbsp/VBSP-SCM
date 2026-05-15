@@ -68,9 +68,9 @@ def render(tab, **kwargs):
         def fmt_kh(x):
             try:
                 x = float(x)
-                if abs(x) >= 1e9: return f"{vn_kh(x/1e9,3)} tỷ"
-                if abs(x) >= 1e6: return f"{vn_kh(x/1e6,1)} triệu"
-                if abs(x) > 0:    return f"{vn_kh(x,0)}"
+                if abs(x) > 0:
+                    trieu = x / 1_000_000
+                    return f"{trieu:,.0f}".replace(",","X").replace(".",",").replace("X",".")
                 return "—"
             except: return "—"
 

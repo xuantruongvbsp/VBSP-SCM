@@ -187,10 +187,11 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
 
         def fmt_ty(x):
             try:
-                x = float(x); ty = x / 1e9
-                if abs(ty) >= 1: return f"{vfmt_cd(ty, 3)} tỷ"
-                if abs(x) >= 1e6: return f"{vfmt_cd(x/1e6,1)} triệu"
-                if abs(x) > 0: return f"{vfmt_cd(x/1e6,3)} triệu"
+                x = float(x)
+                if abs(x) > 0:
+                    trieu = x / 1_000_000
+                    s = f"{trieu:,.0f}".replace(",","X").replace(".",",").replace("X",".")
+                    return s
                 return "—"
             except: return "—"
 

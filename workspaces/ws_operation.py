@@ -19,7 +19,7 @@ from config import (
     TEMPLATES_DIR, TAG_MAP,
 )
 from auth import co_quyen_upload_pgd, is_cn_role, is_pgd_role, get_permissions, get_tab_permissions
-from data import danh_dau_khong_hd, tong_hop_khong_hd, ds_chi_tiet_khong_hd
+from data import danh_dau_khong_hd, danh_dau_khong_hd_cached, tong_hop_khong_hd, ds_chi_tiet_khong_hd
 from utils import (
     fmt,
     fmt_so,
@@ -44,7 +44,7 @@ def _render_don_doc(df: pd.DataFrame, pgd_user: str, role: str):
         st.warning("Chưa có dữ liệu."); return
 
     # Đánh dấu 3 tháng không hoạt động
-    df_kh = danh_dau_khong_hd(df)
+    df_kh = danh_dau_khong_hd_cached(df)
     n_khd = int(df_kh["is_3m_inactive"].sum()) if "is_3m_inactive" in df_kh.columns else 0
     n_tong = len(df_kh)
 

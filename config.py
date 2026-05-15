@@ -557,7 +557,7 @@ PGD_XA_MAP: dict[str, list[str]] = {
     ],
     "PGD Trảng Bom": [
         "Xã An Viễn", "Xã Hưng Thịnh", "Xã Trảng Bom",
-        "Xã Bầu Hàm", "Xã Bình Minh",
+        "Xã Bàu Hàm", "Xã Bình Minh",
     ],
     "PGD Long Khánh": [
         "Phường Bảo Vinh", "Phường Xuân Lập", "Phường Long Khánh",
@@ -602,7 +602,7 @@ PGD_XA_MAP: dict[str, list[str]] = {
         "Phường Phước Long", "Phường Phước Bình",
     ],
     "PGD Bù Đăng": [
-        "Xã Thọ Sơn", "Xã Bù Đăng", "Xã Đăk Nhau",
+        "Xã Thọ Sơn", "Xã Bù Đăng", "Xã Đak Nhau",
         "Xã Phước Sơn", "Xã Bom Bo", "Xã Nghĩa Trung",
     ],
     "PGD Đồng Phú": [
@@ -678,7 +678,7 @@ XA_THON_MAP: dict[str, list[str]] = {
     'Xã Bình Tân': ['Thôn Long Hưng 2', 'Thôn Long Hưng 3', 'Thôn Long Hưng 4', 'Thôn Long Hưng 5', 'Thôn Long Hưng 6', 'Thôn Long Hưng 7', 'Thôn Long Bình 1', 'Thôn Long Bình 3', 'Thôn Long Bình 4', 'Thôn Long Bình 5', 'Thôn Long Bình 6', 'Thôn Long Bình 7', 'Thôn Long Bình 8', 'Thôn Long Bình 9', 'Phước Tân', 'Phước Lộc', 'Phước Hòa', 'Phước Thịnh', 'Phước An', 'Bình Hiếu', 'Hiếu Phong', 'Thôn Long Hưng 1', 'Thôn Long Bình 2', 'Thôn Long Bình 11'],
     'Xã Bù Gia Mập': ['Đak Côn', 'Bù Dốt', 'Bù La', 'Bù Nga', 'Bù Lư', 'Bù Rên', 'Cầu Sắt', 'Đak á'],
     'Xã Bù Đăng': ['Thôn Hòa Đồng', 'Thôn Hưng Phát', 'Thôn Đoàn Kết', 'Thôn Đức Phong', 'Thôn Đức Lợi', 'Thôn Đức Thọ', 'Thôn Đức Thiện', 'Thôn Đức Hòa', 'Thôn Tân Hưng', 'Thôn Hưng Tân', 'Thôn Minh Hưng', 'Thôn Hưng Thịnh', 'Thôn Minh Tâm', 'Thôn Hưng Phú', 'Thôn Hưng Phước', 'Thôn Hưng Vượng', 'Thôn Tân Quang', 'Thôn Hưng Đăng', 'Thôn Vĩnh Thiện', 'Thôn Vĩnh Hòa', 'Thôn Thiện Minh', 'Thôn Thiện Tân'],
-    'Xã Bầu Hàm': ['Tân Hoa', 'Tân Hợp', 'Tân Việt', 'Cây Điều', 'Tân Lập 1', 'Tân Lập 2', 'Cây Điệp', 'Thuận Trường', 'Thuận Hòa', 'Thuận An', 'Trường An', 'Trung Tâm', 'Lợi Hà', 'Suối Tiên', 'Tân Thành'],
+    'Xã Bàu Hàm': ['Tân Hoa', 'Tân Hợp', 'Tân Việt', 'Cây Điều', 'Tân Lập 1', 'Tân Lập 2', 'Cây Điệp', 'Thuận Trường', 'Thuận Hòa', 'Thuận An', 'Trường An', 'Trung Tâm', 'Lợi Hà', 'Suối Tiên', 'Tân Thành'],
     'Xã Cẩm Mỹ': ['Suối Sóc', 'Cẩm Sơn', 'Đồng Tâm', 'Lò Than', 'Tân Xuân', 'Tân Bình', 'Tân Hoà', 'Tân Bảo', 'Tân Lập', 'Chính Nghĩa', 'Cam Tiên', 'Suối Cả', 'Suối Râm', 'Ấp 57', 'Láng Lớn', 'Duyên Lãng', 'Hoàn quân'],
     'Xã Dầu Giây': ['Ấp Lập Thành', 'Ấp Trần Hưng Đạo', 'Hưng Hiệp', 'Hưng Nghiã', 'Hưng Nhơn', 'ấp Lộ 25', 'ấp 9/4', 'Ngô quyền', 'Nguyễn Thái Học', 'ấp Lê Lợi', 'Ấp 3', 'Ấp 4', 'Ấp Phan Bội Châu', 'Ấp Trần Cao Vân', 'Ấp 1', 'Hưng Thạnh', 'Ấp 2'],
     'Xã Gia Kiệm': ['Nguyễn Huệ 1', 'Lê lợi 2', 'Bắc Sơn', 'Lạc Sơn', 'Đông Kim', 'Tây Nam', 'Võ Dõng 1', 'Võ Dõng 2', 'Võ Dõng 3', 'Phúc Nhạc 2', 'Tân Yên', 'Gia Yên', 'Nguyễn Huệ 2', 'Đông Bắc', 'Tây Kim', 'Nam Sơn', 'Phúc Nhạc 1'],
@@ -736,7 +736,7 @@ XA_THON_MAP: dict[str, list[str]] = {
     'Xã Xuân Định': ['Bảo Định', 'Bảo Thị', 'Nông Doanh', 'Tân Hạnh', 'Tân Mỹ', 'Hòa Bình', 'Hòa hợp', 'Bưng cần', 'Nam Hà', 'Chiến thắng'],
     'Xã Đa Kia': ['Thôn 6B', 'Thôn 4', 'Bình Giai', 'Thôn 1', 'Thôn 2A', 'Thôn 2B', 'Thôn 3A', 'Thôn 4A', 'Thôn 5A', 'Thôn 6A', 'Thôn 7', 'Thôn 8', 'Thôn 9', 'Thôn 2', 'Thôn 3', 'Thôn 5', 'Thôn 6', 'Bình Hà 1', 'Bình Thủy', 'Bình Tân', 'Bình Lợi', 'Bình Tiến 1', 'Bình tiến 2', 'Bình Hà 2', 'Bù Tam'],
     'Xã Đak Lua': ['Ấp 1', 'Ấp 2', 'Ấp 3', 'Ấp 4', 'ấp 5', 'Ấp 6', 'Ấp 7'],
-    'Xã Đăk Nhau': ['Đak Xuyên', 'Thống Nhất', 'Đăng Nhau', 'Đak La', 'Đặk Liên', 'Thôn 2', 'Thôn 3', 'Thôn 4', 'Thôn 5', 'Đăng lang', 'Thôn 1', 'Thôn 6', 'Đak Uý'],
+    'Xã Đak Nhau': ['Đak Xuyên', 'Thống Nhất', 'Đăng Nhau', 'Đak La', 'Đặk Liên', 'Thôn 2', 'Thôn 3', 'Thôn 4', 'Thôn 5', 'Đăng lang', 'Thôn 1', 'Thôn 6', 'Đak Uý'],
     'Xã Đăk Ơ': ['Bù Bưng', 'Thôn 3', 'Bù Khơn', 'Thôn 6', 'Thôn 7', 'Thôn 9', 'Đak U', 'Đak Lim', 'Thôn 4', 'Bù Ka', 'Thôn 10', 'Bù Xia'],
     'Xã Đại Phước': ['Câu kê', 'Cát lái', 'Phước lương', 'Rạch bảy', 'Bến ngự', 'Gông ông đông', 'Thị cầu', 'Bến cộ', 'Cù lao', 'Phước lý', 'Ấp 1', 'Ấp 3', 'Ấp 2', 'Phú tân', 'Bến Đình'],
     'Xã Định Quán': ['Ấp Gia Canh 1', 'Ấp Gia Canh 2', 'Ấp Gia Canh 7', 'Ấp Gia Canh 8', 'Ấp Gia Canh 9', 'Hiệp Quyết', 'Hiệp Tâm 1', 'Hiệp Tâm 2', 'Hiệp Lực', 'Hiệp Đồng', 'Hiệp Nghĩa', 'Hòa Thành', 'Hòa Thuận', 'Hòa Đồng', 'Hòa Hiệp', 'Ấp Phú Ngọc 2', 'Ấp Phú Ngọc 4', 'Ấp Phú Ngọc 5', 'Ấp Phú Ngọc 7', 'Ấp Gia Canh 5', 'Hiệp Nhất', 'Ấp Phú Ngọc 1', 'Ấp Gia Canh 3', 'Ấp 114', 'Hiệp Lợi', 'Hòa Trung', 'Ấp Phú Ngọc 3'],

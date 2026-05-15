@@ -11,5 +11,5 @@ gatherUsageStats = false
 
 [server]
 headless = true
-fileWatcherType = "watchdog"
+fileWatcherType = "poll"
 runOnSave = true

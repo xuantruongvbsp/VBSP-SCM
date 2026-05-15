@@ -20,9 +20,10 @@ from config import (
     NAM_HT, NAM_PREV, COT_LAI_TON,
 )
 from data import (doc_dienbao, db_lookup, db_nqh_con, ts_file,
-                  canh_bao_migration)
+                  canh_bao_migration, canh_bao_migration_cached)
 from data.khtd import doc_kehoach
-from data.hstd import danh_dau_khong_hd, tong_hop_khong_hd
+from data.hstd import (danh_dau_khong_hd, danh_dau_khong_hd_cached,
+                       tong_hop_khong_hd)
 from utils import (
     fmt,
     fmt_tien,
@@ -256,12 +257,12 @@ def _heatmap_rui_ro_pgd(df_full: pd.DataFrame) -> None:
     ).reset_index()
     t["tl_nqh"] = (t["dqh"] / t["du_no"].replace(0, float("nan")) * 100).round(3).fillna(0)
 
-    df_k = danh_dau_khong_hd(df_full)
+    df_k = danh_dau_khong_hd_cached(df_full)
     khd = df_k[df_k["is_3m_inactive"]].groupby(COT_TEN_PGD).size().reset_index(name="khd")
     t = t.merge(khd, on=COT_TEN_PGD, how="left")
     t["khd"] = t["khd"].fillna(0).astype(int)
 
-    df_mg = canh_bao_migration(df_full)
+    df_mg = canh_bao_migration_cached(df_full)
     mg = (
         df_mg.groupby(COT_TEN_PGD).size().reset_index(name="mg")
         if not df_mg.empty
@@ -796,7 +797,7 @@ def _canh_bao_migration(df_full: pd.DataFrame) -> None:
         st.info("Chưa có dữ liệu HSTD để phân tích.")
         return
 
-    df_mg = canh_bao_migration(df_full)
+    df_mg = canh_bao_migration_cached(df_full)
     if df_mg.empty:
         st.success("✅ Không có món vay nào có dấu hiệu rủi ro chuyển NQH.")
         return

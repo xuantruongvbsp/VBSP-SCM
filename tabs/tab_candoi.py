@@ -48,17 +48,17 @@ def _tao_column_config_candoi(
     return {
         f"31/12/{nam_prev}": st.column_config.NumberColumn(
             f"31/12/{nam_prev}",
-            format="%.0f ₫",
+            format="%.0f",
             help=f"Số liệu ngày 31/12/{nam_prev}"
         ),
         f"{nam_ht} (HT)": st.column_config.NumberColumn(
             f"{nam_ht} (HT)",
-            format="%.0f ₫",
+            format="%.0f",
             help=f"Số liệu hiện tại năm {nam_ht}"
         ),
         "Chênh lệch": st.column_config.NumberColumn(
             "Chênh lệch",
-            format="%.0f ₫",
+            format="%.0f",
             help="Chênh lệch giá trị"
         ),
         "Tỷ lệ %": st.column_config.NumberColumn(
@@ -68,12 +68,12 @@ def _tao_column_config_candoi(
         ),
         "NQH hiện tại": st.column_config.NumberColumn(
             "NQH hiện tại",
-            format="%.0f ₫",
+            format="%.0f",
             help="Nợ quá hạn hiện tại"
         ),
         "NQH 31/12": st.column_config.NumberColumn(
             "NQH 31/12",
-            format="%.0f ₫",
+            format="%.0f",
             help="Nợ quá hạn 31/12"
         ),
     }

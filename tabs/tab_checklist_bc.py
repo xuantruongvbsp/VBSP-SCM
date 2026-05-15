@@ -390,20 +390,20 @@ def _render_quan_tri(ds_config: list[dict], username: str, can_edit: bool) -> li
 
     st.divider()
     st.markdown("##### ➕ Thêm báo cáo mới")
-    with st.form("clbc_add_bc", clear_on_submit=True):
+    with st.form("clbc_add_bc", clear_on_submit=False):
         c1, c2 = st.columns([3, 1])
         with c1:
-            ten_moi = st.text_input("Tên báo cáo", value="")
+            ten_moi = st.text_input("Tên báo cáo", value="", key="clbc_ten")
         with c2:
-            ngay_han_moi = st.number_input("Ngày hạn", min_value=1, max_value=31, value=5, step=1)
+            ngay_han_moi = st.number_input("Ngày hạn", min_value=1, max_value=31, value=5, step=1, key="clbc_ngay_han")
         c3, c4, c5 = st.columns(3)
         with c3:
-            chu_ky_moi = st.selectbox("Chu kỳ", list(_CHU_KY.keys()), format_func=lambda x: _CHU_KY.get(x, x))
+            chu_ky_moi = st.selectbox("Chu kỳ", list(_CHU_KY.keys()), format_func=lambda x: _CHU_KY.get(x, x), key="clbc_chu_ky")
         with c4:
-            dv_moi = st.selectbox("Nơi nhận", list(_DON_VI_NHAN.keys()), format_func=lambda x: _DON_VI_NHAN.get(x, x))
+            dv_moi = st.selectbox("Nơi nhận", list(_DON_VI_NHAN.keys()), format_func=lambda x: _DON_VI_NHAN.get(x, x), key="clbc_dv")
         with c5:
-            nguoi_moi = st.text_input("Người phụ trách", value="")
-        mo_ta_moi = st.text_input("Mô tả / Tham chiếu", value="")
+            nguoi_moi = st.text_input("Người phụ trách", value="", key="clbc_nguoi")
+        mo_ta_moi = st.text_input("Mô tả / Tham chiếu", value="", key="clbc_mo_ta")
         submitted = st.form_submit_button("➕ Thêm", type="primary")
     if submitted:
         ten_moi = (ten_moi or "").strip()

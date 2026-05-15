@@ -314,6 +314,7 @@ executive
 | tab_candoi | Cân đối + điện báo |
 | tab_baocao | Xuất báo cáo |
 | tab_nhiem_vu | Giao nhiệm vụ |
+| tab_trang_thai_nguon | Trạng thái hệ thống (cho mọi role CN) |
 | tab_upload_khnv | Upload 22 file + merge |
 
 ### ws_operation (Hỗ trợ địa bàn — PGD)
@@ -326,6 +327,7 @@ executive
 | tab_nq11 | NQ11 PGD |
 | tab_cdtotkvv | Chấm điểm Tổ TK&VV |
 | tab_upload_pgd | Upload file riêng PGD |
+| tab_trang_thai_nguon | Trạng thái hệ thống (trạng thái upload PGD + audit) |
 | Document Hub (tích hợp trong ws_operation) | Trung tâm văn bản: Biên bản giao ban, Thông báo Kết luận (Word/PDF) |
 
 ---

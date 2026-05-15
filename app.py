@@ -102,9 +102,9 @@ h3 { font-size: 1.1rem  !important; font-weight: 600 !important; color: #1a3a5c 
 }
 
 [data-testid="stSidebar"] .stButton > button {
-    background-color: rgba(255,255,255,0.12);
+    background-color: #1565C0 !important;
     color: #FFFFFF !important;
-    border: 1.5px solid rgba(255,255,255,0.25);
+    border: 1.5px solid #0D47A1 !important;
     border-radius: 10px;
     width: 100%;
     text-align: left;
@@ -113,22 +113,23 @@ h3 { font-size: 1.1rem  !important; font-weight: 600 !important; color: #1a3a5c 
     font-weight: 500;
     margin-bottom: 4px;
     transition: all 0.2s ease;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
 }
 
 [data-testid="stSidebar"] .stButton > button:hover {
-    background-color: rgba(255,255,255,0.22) !important;
-    border-color: rgba(255,255,255,0.55) !important;
+    background-color: #1976D2 !important;
+    border-color: #1565C0 !important;
     color: #FFFFFF !important;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.25);
     transform: translateX(2px);
 }
 
 [data-testid="stSidebar"] .stButton > button[kind="primary"] {
-    background: rgba(255,255,255,0.25) !important;
+    background: #E65100 !important;
     color: #FFFFFF !important;
-    border-color: rgba(255,255,255,0.55) !important;
-    box-shadow: 0 3px 10px rgba(0,0,0,0.2);
+    border-color: #E65100 !important;
+    box-shadow: 0 3px 10px rgba(230,81,0,0.3);
+    font-weight: 600;
 }
 
 [data-testid="stSidebar"] hr {

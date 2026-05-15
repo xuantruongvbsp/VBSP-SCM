@@ -544,12 +544,14 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
         st.markdown("**📂 Cơ cấu dư nợ theo chương trình tín dụng**")
         if COT_TEN_CT in df.columns and COT_TONG_DU_NO in df.columns:
 
-            _nv = pd.to_numeric(df[COT_NGUON_VON], errors="coerce")
-            du_no_tw = df[_nv == 1].groupby(COT_TEN_CT)[COT_TONG_DU_NO].sum()
-            du_no_dp = df[_nv == 2].groupby(COT_TEN_CT)[COT_TONG_DU_NO].sum()
+            _df_loc = df[df[COT_TONG_DU_NO].fillna(0) > 0].copy()
+
+            _nv = pd.to_numeric(_df_loc[COT_NGUON_VON], errors="coerce")
+            du_no_tw = _df_loc[_nv == 1].groupby(COT_TEN_CT)[COT_TONG_DU_NO].sum()
+            du_no_dp = _df_loc[_nv == 2].groupby(COT_TEN_CT)[COT_TONG_DU_NO].sum()
 
             df_ct = (
-                df.groupby(COT_TEN_CT)
+                _df_loc.groupby(COT_TEN_CT)
                 .agg(
                     du_no   =(COT_TONG_DU_NO, "sum"),
                     so_mon  =(COT_SO_KU,      "nunique"),
@@ -559,7 +561,6 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                 .reset_index()
             )
             df_ct.columns = ["ten_ct", "du_no", "so_mon", "so_kh"]
-            df_ct = df_ct[df_ct["du_no"] > 0]
 
             tong = df_ct["du_no"].sum()
             df_ct["ty_trong"] = (df_ct["du_no"] / tong * 100).round(1) if tong > 0 else 0
@@ -606,8 +607,8 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
 
             # Hiển thị bảng
             df_hien = df_ct.rename(columns={"ten_ct": "Chương trình"}).copy()
-            df_hien["Số món vay"]         = df_hien["so_mon"].apply(fmt_so)
-            df_hien["Số KH"]              = df_hien["so_kh"].apply(fmt_so)
+            df_hien["Số món vay"]         = df_hien["so_mon"]
+            df_hien["Số KH"]              = df_hien["so_kh"]
             df_hien["Dư nợ (tỷ)"]        = df_hien["du_no"].apply(fmt_ty)
             df_hien["Nguồn TW (tỷ)"]     = df_hien["du_no_tw"].apply(fmt_ty)
             df_hien["Nguồn ĐP (tỷ)"]     = df_hien["du_no_dp"].apply(fmt_ty)

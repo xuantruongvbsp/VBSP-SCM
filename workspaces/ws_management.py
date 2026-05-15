@@ -812,7 +812,6 @@ def _render_quan_ly_template(df: pd.DataFrame):
 
 def _build_all_items(role: str, username: str, **kwargs) -> list:
     """Xây danh sách ALL_ITEMS — dùng chung cho sidebar và render."""
-    import streamlit as st
     df_full = kwargs.get("df_full")
     ds_pgd_all = kwargs.get("ds_pgd_all", [])
     can_upload = kwargs.get("can_upload", False)
@@ -851,7 +850,6 @@ def _build_all_items(role: str, username: str, **kwargs) -> list:
 
 def render_sidebar_menu(role: str, username: str, **kwargs):
     """Render menu ĐIỀU HÀNH — gọi từ app.py bên trong with st.sidebar."""
-    import streamlit as st
 
     GROUP_COLORS = {
         "Tổng quan":  {"bg": "#E6F1FB", "border": "#378ADD", "text": "#185FA5"},
@@ -1003,4 +1001,6 @@ def render(**kwargs):
     try:
         active_item["fn"]()
     except Exception as e:
+        import traceback
         st.error(f"Lỗi render: {e}")
+        st.code(traceback.format_exc())

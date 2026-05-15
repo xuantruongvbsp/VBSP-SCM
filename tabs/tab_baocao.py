@@ -21,8 +21,8 @@ if TYPE_CHECKING:
 
 
 _COLS_TIEN = {
-    COT_MUC_VAY, COT_DU_NO_TH, COT_DU_NO_QH, COT_TONG_DU_NO, COT_LAI_TON,
-    "Tổng_mức_vay", "Tổng_dư_nợ", "Dư_nợ_trong_hạn", "Dư_nợ_quá_hạn",
+    COT_DU_NO_TH, COT_DU_NO_QH, COT_TONG_DU_NO, COT_LAI_TON,
+    "Tổng_dư_nợ", "Dư_nợ_trong_hạn", "Dư_nợ_quá_hạn",
     "Lãi_tồn_KHĐ", "Dư nợ TH", "Dư nợ QH", "Nợ khoanh", "Tổng dư nợ", "Lãi tồn",
 }
 _COLS_PCT = {"Tỷ_lệ_QH_%", "Tỷ_lệ_KHĐ_%", "QH%", "TL Nợ xấu %"}
@@ -85,7 +85,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
             COT_TEN_PGD,"Tên xã","Tên thôn","Tên ĐVUT","Tên tổ",
             COT_MA_KH, COT_TEN_KH,"Số điện thoại","Địa chỉ",
             COT_SO_KU, COT_NGAY_VAY, COT_NGAY_DH, COT_THOI_HAN,
-            COT_LAI_SUAT, COT_MUC_VAY, COT_DU_NO_TH, COT_DU_NO_QH,
+            COT_LAI_SUAT, COT_DU_NO_TH, COT_DU_NO_QH,
             COT_TONG_DU_NO, COT_TEN_CT,"Nguồn vốn","Tên cấp QLV",
             COT_TINH_TRANG
         ] if c in df.columns]
@@ -314,7 +314,6 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                     dbc_raw = df_base.groupby(nhom).agg(
                         Số_KH          =(COT_MA_KH,"nunique"),
                         Số_món_vay     =(COT_SO_KU,"nunique"),
-                        Tổng_mức_vay   =(COT_MUC_VAY,"sum"),
                         Tổng_dư_nợ     =(COT_TONG_DU_NO,"sum"),
                         Dư_nợ_trong_hạn=(COT_DU_NO_TH,"sum"),
                         Dư_nợ_quá_hạn  =(COT_DU_NO_QH,"sum"),
@@ -339,7 +338,6 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                     dbc_raw = df_kh.groupby("Tên ĐVUT").agg(
                         Số_KH          =(COT_MA_KH,    "nunique"),
                         Số_món_vay     =(COT_SO_KU,    "nunique"),
-                        Tổng_mức_vay   =(COT_MUC_VAY,  "sum"),
                         Tổng_dư_nợ     =(COT_TONG_DU_NO,"sum"),
                         Dư_nợ_trong_hạn=(COT_DU_NO_TH, "sum"),
                         Dư_nợ_quá_hạn  =(COT_DU_NO_QH, "sum"),
@@ -433,7 +431,6 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                     agg_dict = {
                         "Số_KH":          (COT_MA_KH, "nunique"),
                         "Số_món_vay":     (COT_SO_KU, "nunique"),
-                        "Tổng_mức_vay":   (COT_MUC_VAY, "sum"),
                         "Tổng_dư_nợ":     (COT_TONG_DU_NO, "sum"),
                         "Dư_nợ_trong_hạn":(COT_DU_NO_TH, "sum"),
                         "Dư_nợ_quá_hạn":  (COT_DU_NO_QH, "sum"),
@@ -622,7 +619,6 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                         t_nv = df_ct.groupby("Nguồn vốn").agg(
                             Số_KH          =(COT_MA_KH,"nunique"),
                             Số_món_vay     =(COT_SO_KU,"nunique"),
-                            Tổng_mức_vay   =(COT_MUC_VAY,"sum"),
                             Tổng_dư_nợ     =(COT_TONG_DU_NO,"sum"),
                             Dư_nợ_trong_hạn=(COT_DU_NO_TH,"sum"),
                             Dư_nợ_quá_hạn  =(COT_DU_NO_QH,"sum"),
@@ -707,8 +703,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                             df=export_df,
                             tieu_de=f"Báo cáo — {loai_ct[2:].strip()}",
                             username=username or "unknown",
-                            cols_tien=[c for c in [COT_MUC_VAY, COT_DU_NO_TH,
-                                        COT_DU_NO_QH, COT_TONG_DU_NO]
+                            cols_tien=[c for c in [COT_DU_NO_TH, COT_DU_NO_QH, COT_TONG_DU_NO]
                                        if c in export_df.columns],
                             prefix_file="BC_CT",
                             key="pdf_bc_ct",

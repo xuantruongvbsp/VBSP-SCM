@@ -1,5 +1,8 @@
 # CHANGELOG
 
+## [2026-05-15] — Bỏ cột Tổng mức vay khỏi tab Báo cáo
+- `tabs/tab_baocao.py` — Xóa `Tổng_mức_vay` khỏi tất cả bảng tổng hợp (theo xã/thôn, ĐVUT, chương trình, nguồn vốn) và khỏi `COL_CHUNG` bảng chi tiết
+
 ## [2026-05-15] — Fix số KH / số món vay bị phồng trong tab Báo cáo
 - `tabs/tab_baocao.py` dòng ~158 — Lọc `df_base[COT_TONG_DU_NO] > 0` sau filter Mảng 1 (Tổng hợp)
 - `tabs/tab_baocao.py` dòng ~290 — Lọc `df_base[COT_TONG_DU_NO] > 0` sau filter Mảng 2 (Chi tiết)

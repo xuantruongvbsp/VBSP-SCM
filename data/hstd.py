@@ -260,6 +260,12 @@ def danh_dau_khong_hd(df: "pd.DataFrame") -> "pd.DataFrame":
     return df
 
 
+@st.cache_data(show_spinner=False, ttl=3600)
+def danh_dau_khong_hd_cached(df: "pd.DataFrame") -> "pd.DataFrame":
+    """Cache wrapper cho danh_dau_khong_hd — dùng thay thế khi gọi nhiều lần trong cùng rerun."""
+    return danh_dau_khong_hd(df)
+
+
 def tong_hop_khong_hd(df: "pd.DataFrame",
                       nhom_theo: str = "Tên ĐVUT") -> "pd.DataFrame":
     """

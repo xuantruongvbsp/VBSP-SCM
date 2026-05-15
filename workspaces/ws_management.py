@@ -517,15 +517,17 @@ def _render_ndt_dp(role: str, username: str) -> None:
     if can_edit:
         st.divider()
         st.markdown("##### ➕ Thêm mã mới")
-        with st.form("form_them_ndt", clear_on_submit=True):
+        with st.form("form_them_ndt", clear_on_submit=False):
             ma_moi = st.text_input(
                 "Mã NĐT đầy đủ",
                 placeholder="VD: INV0802140002662",
-                help="Lấy chính xác từ cột 'Mã nhà đầu tư' trong file GQVL"
+                help="Lấy chính xác từ cột 'Mã nhà đầu tư' trong file GQVL",
+                key="ndt_ma_moi"
             )
             ghi_chu_moi = st.text_input(
                 "Ghi chú",
-                placeholder="VD: UBND tỉnh Đồng Nai"
+                placeholder="VD: UBND tỉnh Đồng Nai",
+                key="ndt_ghi_chu"
             )
             submitted = st.form_submit_button("➕ Thêm", type="primary")
 

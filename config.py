@@ -514,8 +514,9 @@ DS_PGD = [
 
 # ── Mapping Mã PGD (6 số) ↔ Tên PGD (dùng để xác thực file NQ11) ─────────────
 # Mã "004601" là Hội sở Chi nhánh tỉnh (hardcode).
-# Các mã còn lại được lấy từ cột "Mã PGD" trong file NQ11 thực tế.
-# TODO: Xác nhận lại mã chính xác từ file NQ11/HSTD thực tế trên hệ thống.
+# Các mã được trích từ file NQ11 thực tế.
+# Ghi chú: Khi upload file NQ11 mới, nếu mã không khớp thì hệ thống sẽ báo lỗi
+# và không nhận diện được đơn vị — lúc đó cần cập nhật mapping này cho đúng.
 MA_PGD_MAP: dict[str, str] = {
     "004601": "Hội sở Chi nhánh tỉnh",
     "004602": "PGD Long Thành",

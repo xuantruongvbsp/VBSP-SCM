@@ -977,6 +977,7 @@ def render(**kwargs):
     ALL_ITEMS.append({"group": "Hành chính", "label": "Upload KH-NV", "icon": "upload", "fn": lambda: tab_upload_khnv.render(None, **kwargs)})
     if la_phan_he_cn(role_n):
         ALL_ITEMS.append({"group": "Hành chính", "label": "🔍 Trạng thái", "icon": "pulse", "fn": lambda: tab_trang_thai_nguon.render(None, **kwargs)})
+    st.sidebar.write(f"DEBUG role_n={role_n}, la_phan_he_cn={la_phan_he_cn(role_n)}, items={[x['label'] for x in ALL_ITEMS]}")
 
     # ── BƯỚC 3: Quản lý state menu item đang chọn ─────────────────────────
     if "ws_mgmt_menu" not in st.session_state:

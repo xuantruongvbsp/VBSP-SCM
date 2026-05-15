@@ -480,3 +480,22 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                 _render_card(df_kq.iloc[i], df_nq11, nq11_so_ku_set, gqvl_nq11_set)
                 if i < len(df_kq) - 1:
                     st.divider()
+
+        # ── Xuất Excel ──
+        st.divider()
+        cols_xuat = st.columns([1, 1, 4])
+        with cols_xuat[0]:
+            if st.button("📥 Xuất Excel", key="btn_xuat_tracuu", use_container_width=True):
+                sheets = {"Kết quả tra cứu": df_kq}
+                excel_bytes = xuat_excel(sheets)
+                st.session_state["_excel_tracuu_bytes"] = excel_bytes
+                st.session_state["_excel_tracuu_ten"] = f"tra_cuu_{len(df_kq)}_ket_qua.xlsx"
+
+        if st.session_state.get("_excel_tracuu_bytes"):
+            st.download_button(
+                "⬇ Tải Excel",
+                data=st.session_state["_excel_tracuu_bytes"],
+                file_name=st.session_state["_excel_tracuu_ten"],
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                key="dl_excel_tracuu",
+            )

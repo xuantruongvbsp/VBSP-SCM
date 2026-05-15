@@ -19,7 +19,7 @@ from config import (
     COT_NGAY_VAY, COT_THOI_HAN, COT_LAI_SUAT,
     TEMPLATES_DIR, TAG_MAP,
 )
-from auth import is_cn_role, is_pgd_role, get_permissions, normalize_role
+from auth import is_cn_role, is_pgd_role, get_permissions, normalize_role, la_phan_he_cn
 from data import (
     danh_dau_khong_hd, tong_hop_khong_hd,
     ds_chi_tiet_khong_hd, canh_bao_migration,
@@ -933,6 +933,7 @@ def render(**kwargs):
     from tabs import tab_xlrr_tong_hop
     from tabs import tab_upload_khnv
     from tabs import tab_audit_log
+    from tabs import tab_trang_thai_nguon
 
     role       = kwargs.get("role")
     df         = kwargs.get("df")
@@ -974,6 +975,8 @@ def render(**kwargs):
     if role_n == "admin_cn":
         ALL_ITEMS.append({"group": "Hành chính", "label": "Audit Log", "icon": "list", "fn": lambda: tab_audit_log.render(None, **kwargs)})
     ALL_ITEMS.append({"group": "Hành chính", "label": "Upload KH-NV", "icon": "upload", "fn": lambda: tab_upload_khnv.render(None, **kwargs)})
+    if la_phan_he_cn(role_n):
+        ALL_ITEMS.append({"group": "Hành chính", "label": "🔍 Trạng thái", "icon": "pulse", "fn": lambda: tab_trang_thai_nguon.render(None, **kwargs)})
 
     # ── BƯỚC 3: Quản lý state menu item đang chọn ─────────────────────────
     if "ws_mgmt_menu" not in st.session_state:

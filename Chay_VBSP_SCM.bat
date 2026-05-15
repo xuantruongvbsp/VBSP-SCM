@@ -1,6 +1,9 @@
 @echo off
 setlocal
+
 cd /d %~dp0
+taskkill /F /IM streamlit.exe >nul 2>&1
+taskkill /F /IM python.exe >nul 2>&1
 echo Dang khoi dong VBSP-SCM...
 set "PORT=8501"
 set "URL=http://127.0.0.1:%PORT%"

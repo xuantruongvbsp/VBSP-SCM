@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## [2026-05-16] — Thêm báo cáo Nợ Khoanh và Nợ Quá Hạn vào tab Báo cáo
+- `tabs/tab_baocao.py` dòng ~502 — Thêm 2 option radio "🔴 Danh sách nợ khoanh" và "🟠 Danh sách nợ quá hạn" vào Mảng 2
+- `tabs/tab_baocao.py` dòng ~677–755 — Nhánh nợ khoanh: lọc `Dư nợ khoanh > 0`, metrics + tổng hợp ĐVUT + danh sách chi tiết + export Excel
+- `tabs/tab_baocao.py` dòng ~718–755 — Nhánh nợ quá hạn: lọc `COT_DU_NO_QH > 0`, metrics (Số món/Dư nợ QH/Tỷ lệ) + tổng hợp ĐVUT + danh sách chi tiết + export Excel
+- `tabs/tab_baocao.py` dòng ~23 — Bổ sung `"Dư nợ khoanh"` và `"Nợ_khoanh"` vào `_COLS_TIEN` để `_fmt_df()` convert sang triệu đồng
+
 ## [2026-05-15] — Số tiền thuần trong bảng + dòng ĐVT: triệu đồng
 - `tabs/tab_baocao.py` — `_fmt_df()`: cột tiền → số triệu đồng thuần (VN format 3 chữ số TP), không còn "tỷ"/"triệu" trong ô
 - `tabs/tab_baocao.py` — Thêm `_hien_thi_bc()` wrapper: tự hiện `st.caption("ĐVT: triệu đồng")` trước mỗi bảng

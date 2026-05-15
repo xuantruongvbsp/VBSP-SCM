@@ -11,6 +11,7 @@ import os
 from io import BytesIO
 from datetime import date, datetime
 
+import db
 from config import (
     COT_TEN_KH, COT_MA_KH, COT_SO_KU, COT_TEN_CT,
     COT_DU_NO_QH, COT_TONG_DU_NO, COT_NGAY_DH,
@@ -24,8 +25,10 @@ from data import (
     tong_hop_khong_hd, tong_hop_khong_hd_cached,
     ds_chi_tiet_khong_hd,
 )
+from data.pgd import pgd_slug
 from utils import (
     fmt,
+    fmt_ty,
     fmt_so,
     vn,
     auto_fill_document,
@@ -34,6 +37,187 @@ from utils import (
     xuat_excel,
     hien_thi_dataframe_phan_trang,
 )
+
+
+def _render_trang_chu(tab, df_pgd: pd.DataFrame, role: str, pgd_user: str, kwargs: dict):
+    """
+    Trang chủ dashboard PGD — tổng quan KPI, shortcut, cảnh báo, nhiệm vụ.
+    """
+    ctx = tab if tab is not None else st.container()
+    with ctx:
+        st.subheader("🏠 Trang Chủ")
+
+        # ── Vùng A: Header ──────────────────────────────────────────────────
+        try:
+            col_info, col_btn = st.columns([3, 1])
+            with col_info:
+                ten_pgd = pgd_user or "Chi nhánh"
+                so_ho_so = len(df_pgd) if df_pgd is not None and not df_pgd.empty else 0
+                st.markdown(f"**{ten_pgd}** · {fmt_so(so_ho_so)} hồ sơ")
+            with col_btn:
+                if st.button("🔄 Làm mới", use_container_width=True, key="trang_chu_refresh"):
+                    st.rerun()
+        except Exception as e:
+            st.error(f"❌ Lỗi header: {e}")
+
+        # ── Vùng B: 4 KPI cards ────────────────────────────────────────────
+        try:
+            if df_pgd is None or df_pgd.empty:
+                st.warning("⚠️ Chưa có dữ liệu. Vui lòng upload file HSTD.")
+            else:
+                k1, k2, k3, k4 = st.columns(4)
+
+                # KPI 1: Tổng dư nợ
+                try:
+                    tong_dn = pd.to_numeric(df_pgd[COT_TONG_DU_NO], errors="coerce").sum() / 1e6
+                    k1.metric("💰 Tổng dư nợ", f"{fmt(tong_dn * 1e6)} triệu", help="Đơn vị: triệu đồng")
+                except Exception:
+                    k1.metric("💰 Tổng dư nợ", "—")
+
+                # KPI 2: Nợ quá hạn
+                try:
+                    nqh = pd.to_numeric(df_pgd[COT_DU_NO_QH], errors="coerce").sum() / 1e6
+                    pct_nqh = (nqh / (tong_dn or 1) * 100) if tong_dn > 0 else 0
+                    k2.metric("🔴 Nợ quá hạn", f"{fmt(nqh * 1e6)} triệu",
+                             delta=f"{pct_nqh:.1f}%" if pct_nqh > 0 else "0%",
+                             delta_color="inverse" if nqh > 0 else "off",
+                             help="Đơn vị: triệu đồng")
+                except Exception:
+                    k2.metric("🔴 Nợ quá hạn", "—")
+
+                # KPI 3: 3 tháng KHĐ
+                try:
+                    df_kh = danh_dau_khong_hd_cached(df_pgd)
+                    n_khd = int(df_kh["is_3m_inactive"].sum()) if "is_3m_inactive" in df_kh.columns else 0
+                    pct_khd = (n_khd / len(df_pgd) * 100) if len(df_pgd) > 0 else 0
+                    k3.metric("📅 3 tháng KHĐ", fmt_so(n_khd),
+                             delta=f"{pct_khd:.1f}%",
+                             delta_color="inverse" if n_khd > 0 else "off",
+                             help="Khoản hộ vay 3 tháng không hoạt động")
+                except Exception:
+                    k3.metric("📅 3 tháng KHĐ", "—")
+
+                # KPI 4: Tiến độ KHTD
+                try:
+                    slug = pgd_slug(pgd_user) if pgd_user else ""
+                    khtd_key = f"khtd_pgd_{slug}" if slug else None
+                    if khtd_key:
+                        khtd_data = db.doc_kv(khtd_key)
+                        if khtd_data and isinstance(khtd_data, dict):
+                            tong_kh = khtd_data.get("tong_kh", 0)
+                            tong_th = khtd_data.get("tong_th", 0)
+                            pct_tien_do = (tong_th / (tong_kh or 1) * 100) if tong_kh > 0 else 0
+                            k4.metric("📊 KHTD", f"{pct_tien_do:.0f}%",
+                                     delta="Thực hiện / Kế hoạch",
+                                     help="Tiến độ thực hiện KHTD")
+                        else:
+                            k4.metric("📊 KHTD", "—", help="Chưa có dữ liệu KHTD")
+                    else:
+                        k4.metric("📊 KHTD", "—")
+                except Exception:
+                    k4.metric("📊 KHTD", "—")
+
+        except Exception as e:
+            st.error(f"❌ Lỗi KPI: {e}")
+
+        st.divider()
+
+        # ── Vùng C: 2 cột ngang ────────────────────────────────────────────
+        col_left, col_right = st.columns([1, 1])
+
+        # Cột trái: Truy cập nhanh
+        with col_left:
+            st.markdown("**🚀 Truy cập nhanh**")
+            try:
+                shortcuts = [
+                    ("🔍", "Tra cứu hồ sơ", "Tìm kiếm chi tiết", "nghiep_vu_pgd", 2),
+                    ("📈", "Báo cáo chi tiết", "Xem báo cáo", "bao_cao_giao_ban", 0),
+                    ("⏰", "Đến hạn", "Khoản đến hạn", "nghiep_vu_pgd", 4),
+                    ("📝", "Giao ban xã", "Biên bản giao ban", "bao_cao_giao_ban", 2),
+                    ("🎯", "KHTD PGD", "Kế hoạch tín dụng", "ke_hoach_pgd", 0),
+                    ("🔔", "Đôn đốc KHĐ", "Khoản 3m KHĐ", "kiem_soat_rr", 0),
+                ]
+
+                for i in range(0, len(shortcuts), 2):
+                    s1, s2 = st.columns(2)
+
+                    if i < len(shortcuts):
+                        icon, title, desc, nhom, tab_idx = shortcuts[i]
+                        with s1:
+                            if st.button(f"{icon} {title}\n_{desc}_", use_container_width=True,
+                                       key=f"sc_1_{i}"):
+                                st.session_state["ws_op_nhom"] = nhom
+                                st.session_state["ws_op_jump_tab"] = tab_idx
+                                st.rerun()
+
+                    if i + 1 < len(shortcuts):
+                        icon, title, desc, nhom, tab_idx = shortcuts[i + 1]
+                        with s2:
+                            if st.button(f"{icon} {title}\n_{desc}_", use_container_width=True,
+                                       key=f"sc_1_{i+1}"):
+                                st.session_state["ws_op_nhom"] = nhom
+                                st.session_state["ws_op_jump_tab"] = tab_idx
+                                st.rerun()
+            except Exception as e:
+                st.error(f"❌ Lỗi shortcut: {e}")
+
+        # Cột phải: Cảnh báo + Nhiệm vụ
+        with col_right:
+            # Phần cảnh báo
+            st.markdown("**⚠️ Cảnh báo**")
+            try:
+                if df_pgd is None or df_pgd.empty:
+                    st.info("Không có dữ liệu để hiển thị cảnh báo.")
+                else:
+                    alerts = []
+
+                    # Cảnh báo NQH
+                    try:
+                        nqh_count = (pd.to_numeric(df_pgd[COT_DU_NO_QH], errors="coerce") > 0).sum()
+                        if nqh_count > 0:
+                            alerts.append(("🔴", f"NQH > 0: {fmt_so(nqh_count)} khoản", "danger", "bao_cao_giao_ban", 1))
+                    except Exception:
+                        pass
+
+                    # Cảnh báo 3m KHĐ
+                    try:
+                        df_kh = danh_dau_khong_hd_cached(df_pgd)
+                        khd_count = int(df_kh["is_3m_inactive"].sum()) if "is_3m_inactive" in df_kh.columns else 0
+                        if khd_count > 0:
+                            alerts.append(("📅", f"3m KHĐ: {fmt_so(khd_count)} khoản", "danger", "kiem_soat_rr", 0))
+                    except Exception:
+                        pass
+
+                    if alerts:
+                        for icon, text, color, nhom, tab_idx in alerts:
+                            if st.button(f"{icon} {text}", use_container_width=True, key=f"alert_{text}"):
+                                st.session_state["ws_op_nhom"] = nhom
+                                st.session_state["ws_op_jump_tab"] = tab_idx
+                                st.rerun()
+                    else:
+                        st.success("✅ Không có cảnh báo nào")
+            except Exception as e:
+                st.error(f"❌ Lỗi cảnh báo: {e}")
+
+            # Phần nhiệm vụ
+            st.markdown("**✅ Nhiệm vụ đang chờ**")
+            try:
+                nhiem_vu_list = db.doc_kv("nhiem_vu_list", [])
+                if not nhiem_vu_list:
+                    st.success("Không có nhiệm vụ nào đang chờ")
+                else:
+                    # Lọc nhiệm vụ của PGD hiện tại
+                    nv_pgd = [nv for nv in nhiem_vu_list
+                             if nv.get("pgd") == pgd_user and nv.get("trang_thai") != "hoan_thanh"]
+
+                    if not nv_pgd:
+                        st.success("Không có nhiệm vụ nào đang chờ")
+                    else:
+                        for nv in nv_pgd[:3]:
+                            st.caption(f"📌 {nv.get('tieu_de', '—')}")
+                            st.caption(f"Hạn: {nv.get('ngay_deadline', '—')}")
+            except Exception as e:
+                st.warning(f"⚠️ Không thể tải danh sách nhiệm vụ: {e}")
 
 
 def _render_don_doc(df: pd.DataFrame, pgd_user: str, role: str):
@@ -943,12 +1127,18 @@ def render(**kwargs):
 
     # ── Định nghĩa nhóm tab ─────────────────────────────────────────────
     CAC_NHOM = {
+        "trang_chu": {
+            "label": "🏠 Trang Chủ",
+            "tabs": [
+                ("🏠 Trang Chủ", lambda tab: _render_trang_chu(tab, df_pgd, role, pgd_user, kwargs)),
+            ],
+        },
         "nghiep_vu_pgd": {
             "label": "📋 Nghiệp vụ hàng ngày",
             "tabs": [
                 ("📊 Thông tin chung", lambda tab: tab_tongquan.render(tab, **_pgd_df_kwargs)),
-                ("� Tiến độ", lambda tab: tab_tien_do.render(tab, **kwargs)),
-                ("�🔍 Tra cứu hồ sơ", lambda tab: tab_tracuu.render(tab, **kwargs)),
+                ("📈 Tiến độ", lambda tab: tab_tien_do.render(tab, **kwargs)),
+                ("🔍 Tra cứu hồ sơ", lambda tab: tab_tracuu.render(tab, **kwargs)),
                 ("📋 Danh sách & Lọc", lambda tab: tab_danhsach.render(tab, **kwargs)),
                 ("⏰ Đến hạn", lambda tab: render_den_han(role=role, pgd_user=pgd_user)),
             ],
@@ -1026,7 +1216,13 @@ def render(**kwargs):
     ten_tabs = [t[0] for t in tabs_info]
     renderers = [t[1] for t in tabs_info]
 
+    # Kiểm tra nếu có yêu cầu nhảy tab từ shortcut
+    jump_idx = st.session_state.pop("ws_op_jump_tab", None)
+
     tabs_con = st.tabs(ten_tabs)
     for i, tab_c in enumerate(tabs_con):
         with tab_c:
             renderers[i](tab_c)
+            # Hiển thị gợi ý nếu user đặc biệt yêu cầu nhảy đến tab này
+            if jump_idx == i and jump_idx is not None:
+                st.toast(f"✨ Đã chuyển tới: {ten_tabs[i]}", icon="👆")

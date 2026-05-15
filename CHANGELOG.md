@@ -1,5 +1,15 @@
 # CHANGELOG
 
+## [2026-05-16] — Thêm trang chủ (Home Dashboard) cho phân hệ PGD
+- `workspaces/ws_operation.py` dòng ~39 — Thêm import: `db`, `fmt_ty`, `pgd_slug`
+- `workspaces/ws_operation.py` dòng ~42–220 — Thêm hàm `_render_trang_chu()` với 4 vùng nội dung:
+  * Vùng A (Header): Tên PGD, số hồ sơ, button Làm mới
+  * Vùng B (KPI): 4 cards — Tổng dư nợ, Nợ quá hạn, 3 tháng KHĐ, Tiến độ KHTD (từ db.doc_kv + fmt)
+  * Vùng C (Truy cập nhanh): 6 shortcut buttons → set session_state ["ws_op_nhom", "ws_op_jump_tab"] để nhảy tab
+  * Vùng D (Cảnh báo + Nhiệm vụ): Hiển thị NQH, 3m KHĐ, danh sách nhiệm vụ từ db.doc_kv("nhiem_vu_list")
+- `workspaces/ws_operation.py` dòng ~1119 — Thêm nhóm "trang_chu" ở đầu `CAC_NHOM` với tab "🏠 Trang Chủ"
+- `workspaces/ws_operation.py` dòng ~1220–1228 — Xử lý navigation: pop "ws_op_jump_tab", hiển thị st.toast() khi nhảy tab
+
 ## [2026-05-16] — Cache hàm nặng để giảm độ trễ chuyển tab
 - `data/hstd.py` dòng ~267 — Thêm `tong_hop_khong_hd_cached` và `canh_bao_migration_cached` với `@st.cache_data(ttl=3600)`
 - `data/__init__.py` — Export 2 cached wrapper mới

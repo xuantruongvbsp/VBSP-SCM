@@ -1135,25 +1135,25 @@ def _xuat_pdf_bao_cao_tien_do(ds_task, username):
                            textColor=colors.HexColor("#2E7D32"))
         ))
 
-        task_header_s = ParagraphStyle("task_h", fontName=fb, fontSize=10,
-                                       leading=14, spaceBefore=8, spaceAfter=2,
+        task_header_s = ParagraphStyle("task_h", fontName=fb, fontSize=12,
+                                       leading=16, spaceBefore=10, spaceAfter=3,
                                        textColor=colors.HexColor("#003D7A"))
-        task_meta_s = ParagraphStyle("task_m", fontName=fn, fontSize=8,
-                                     leading=11, spaceAfter=3, textColor=colors.grey)
-        pgd_group_s = ParagraphStyle("pgd_g", fontName=fb, fontSize=9,
-                                     leading=13, spaceBefore=4, spaceAfter=1,
+        task_meta_s = ParagraphStyle("task_m", fontName=fn, fontSize=10,
+                                     leading=14, spaceAfter=4, textColor=colors.grey)
+        pgd_group_s = ParagraphStyle("pgd_g", fontName=fb, fontSize=10,
+                                     leading=14, spaceBefore=4, spaceAfter=1,
                                      textColor=colors.HexColor("#2E7D32"))
-        xa_line_s = ParagraphStyle("xa_l", fontName=fn, fontSize=8,
-                                   leading=11, leftIndent=12)
-        th_s = ParagraphStyle("th", fontName=fb, fontSize=8,
+        xa_line_s = ParagraphStyle("xa_l", fontName=fn, fontSize=9,
+                                   leading=12, leftIndent=12)
+        th_s = ParagraphStyle("th", fontName=fb, fontSize=9,
                               alignment=TA_CENTER, textColor=colors.white,
-                              leading=10)
-        td_s = ParagraphStyle("td", fontName=fn, fontSize=8,
-                              leading=11, wordWrap="CJK")
-        td_c = ParagraphStyle("td_c", fontName=fn, fontSize=8,
-                              alignment=TA_CENTER, leading=11)
-        td_r = ParagraphStyle("td_r", fontName=fn, fontSize=8,
-                              alignment=TA_RIGHT, leading=11)
+                              leading=12)
+        td_s = ParagraphStyle("td", fontName=fn, fontSize=9,
+                              leading=12, wordWrap="CJK")
+        td_c = ParagraphStyle("td_c", fontName=fn, fontSize=9,
+                              alignment=TA_CENTER, leading=12)
+        td_r = ParagraphStyle("td_r", fontName=fn, fontSize=9,
+                              alignment=TA_RIGHT, leading=12)
 
         for i, t in enumerate(ds_task, 1):
             kq = _doc_ketqua_task(t["id"])
@@ -1179,7 +1179,7 @@ def _xuat_pdf_bao_cao_tien_do(ds_task, username):
                 task_header_s
             ))
             story.append(Paragraph(
-                f"Deadline: {t['ngay_deadline']} | Tiến độ: {pct}% | "
+                f"Thời hạn cuối cùng: {t['ngay_deadline']} | Tiến độ hoàn thành: {pct}% | "
                 f"{css_cls} | Loại: {loai_label} | {tag_cap} | "
                 f"Người PT: {nguoi_pt}",
                 task_meta_s
@@ -1193,6 +1193,7 @@ def _xuat_pdf_bao_cao_tien_do(ds_task, username):
                     Paragraph("Trạng thái", th_s),
                     Paragraph("Ghi chú", th_s),
                 ]]
+                row_status = []
                 for j, pgd in enumerate(pgd_order, 1):
                     r_pgd = next((r for r in kq if r["pgd"] == pgd), {})
                     tt = r_pgd.get("trang_thai", "chua_thuc_hien")
@@ -1209,6 +1210,7 @@ def _xuat_pdf_bao_cao_tien_do(ds_task, username):
                         Paragraph(tt_txt, td_c),
                         Paragraph(gc, td_s),
                     ])
+                    row_status.append(tt)
                 cw = [1.0 * cm, 5.0 * cm, 4.0 * cm, 7.0 * cm]
                 tbl = Table(tbl_data, colWidths=cw, repeatRows=1)
                 tbl.setStyle(TableStyle([
@@ -1219,6 +1221,17 @@ def _xuat_pdf_bao_cao_tien_do(ds_task, username):
                     ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
                     ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#BDBDBD")),
                 ]))
+                for r_idx, tt in enumerate(row_status, 1):
+                    if tt == "da_hoan_thanh":
+                        tbl.setStyle(TableStyle([
+                            ("TEXTCOLOR", (2, r_idx), (2, r_idx),
+                             colors.HexColor("#2E7D32"))
+                        ]))
+                    elif tt == "chua_thuc_hien":
+                        tbl.setStyle(TableStyle([
+                            ("TEXTCOLOR", (2, r_idx), (2, r_idx),
+                             colors.HexColor("#C62828"))
+                        ]))
                 for r_idx in range(1, len(tbl_data)):
                     if r_idx % 2 == 0:
                         tbl.setStyle(TableStyle([
@@ -1227,36 +1240,70 @@ def _xuat_pdf_bao_cao_tien_do(ds_task, username):
                         ]))
                 story.append(tbl)
             else:
-                from collections import OrderedDict
-                kq_by_pgd = OrderedDict()
-                for r in sorted(kq, key=lambda x: x["pgd"]):
-                    kq_by_pgd.setdefault(r["pgd"], []).append(r)
-
-                for pgd, items in kq_by_pgd.items():
-                    xong_pgd = sum(1 for r in items if r["trang_thai"] == "da_hoan_thanh")
-                    t_pgd = len(items)
-                    story.append(Paragraph(
-                        f"{pgd} ({xong_pgd}/{t_pgd} xã)",
-                        pgd_group_s
-                    ))
-                    for r in items:
-                        tt = r["trang_thai"]
-                        if tt == "da_hoan_thanh":
-                            sym = "✓"
-                            ngay_ht = r.get("ngay_hoan_thanh") or ""
-                            try:
-                                ngay_ht = datetime.strptime(
-                                    ngay_ht[:10], "%Y-%m-%d"
-                                ).strftime("%d/%m/%Y")
-                            except Exception:
-                                pass
-                            txt = f"  {sym} {r['ten_xa']}  —  {ngay_ht}"
-                        elif tt == "khong_ap_dung":
-                            txt = f"  — {r['ten_xa']}  —  N/A"
-                        else:
-                            txt = f"  ○ {r['ten_xa']}  —  Chưa thực hiện"
-                        story.append(Paragraph(txt, xa_line_s))
-                story.append(Spacer(1, 0.15 * cm))
+                tbl_data = [[
+                    Paragraph("STT", th_s),
+                    Paragraph("PGD", th_s),
+                    Paragraph("Xã / Phường", th_s),
+                    Paragraph("Trạng thái", th_s),
+                    Paragraph("Ghi chú", th_s),
+                ]]
+                row_status = []
+                for j, r in enumerate(
+                    sorted(kq, key=lambda x: (x["pgd"], x["ten_xa"])), 1
+                ):
+                    tt = r["trang_thai"]
+                    if tt == "da_hoan_thanh":
+                        tt_txt = "✅ Hoàn thành"
+                        ngay_ht = r.get("ngay_hoan_thanh") or ""
+                        try:
+                            ngay_ht = datetime.strptime(
+                                ngay_ht[:10], "%Y-%m-%d"
+                            ).strftime("%d/%m/%Y")
+                        except Exception:
+                            pass
+                        gc = ngay_ht
+                    elif tt == "khong_ap_dung":
+                        tt_txt = "➖ N/A"
+                        gc = ""
+                    else:
+                        tt_txt = "⬜ Chưa thực hiện"
+                        gc = ""
+                    tbl_data.append([
+                        Paragraph(str(j), td_c),
+                        Paragraph(r["pgd"], td_s),
+                        Paragraph(r["ten_xa"] or "", td_s),
+                        Paragraph(tt_txt, td_c),
+                        Paragraph(gc, td_s),
+                    ])
+                    row_status.append(tt)
+                cw = [1.0 * cm, 3.5 * cm, 4.5 * cm, 3.5 * cm, 5.5 * cm]
+                tbl = Table(tbl_data, colWidths=cw, repeatRows=1)
+                tbl.setStyle(TableStyle([
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#2E7D32")),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                    ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                    ("TOPPADDING", (0, 0), (-1, -1), 4),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+                    ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#BDBDBD")),
+                ]))
+                for r_idx, tt in enumerate(row_status, 1):
+                    if tt == "da_hoan_thanh":
+                        tbl.setStyle(TableStyle([
+                            ("TEXTCOLOR", (3, r_idx), (3, r_idx),
+                             colors.HexColor("#2E7D32"))
+                        ]))
+                    elif tt == "chua_thuc_hien":
+                        tbl.setStyle(TableStyle([
+                            ("TEXTCOLOR", (3, r_idx), (3, r_idx),
+                             colors.HexColor("#C62828"))
+                        ]))
+                for r_idx in range(1, len(tbl_data)):
+                    if r_idx % 2 == 0:
+                        tbl.setStyle(TableStyle([
+                            ("BACKGROUND", (0, r_idx), (-1, r_idx),
+                             colors.HexColor("#F5F5F5"))
+                        ]))
+                story.append(tbl)
 
             story.append(Spacer(1, 0.3 * cm))
             story.append(HRFlowable(width="60%", thickness=0.3,
@@ -1273,6 +1320,17 @@ def _xuat_pdf_bao_cao_tien_do(ds_task, username):
                            textColor=colors.HexColor("#C62828"))
         ))
 
+        p2_th = ParagraphStyle("p2_th", fontName=fb, fontSize=9,
+                                alignment=TA_CENTER, textColor=colors.white,
+                                leading=12)
+        p2_td = ParagraphStyle("p2_td", fontName=fn, fontSize=9,
+                               leading=12, wordWrap="CJK")
+        p2_td_c = ParagraphStyle("p2_td_c", fontName=fn, fontSize=9,
+                                 alignment=TA_CENTER, leading=12)
+        p2_td_r = ParagraphStyle("p2_td_r", fontName=fb, fontSize=9,
+                                 alignment=TA_CENTER, leading=12,
+                                 textColor=colors.HexColor("#C62828"))
+
         p2_count = 0
         for t in ds_task:
             if t["ngay_deadline"] >= hom_nay:
@@ -1287,34 +1345,73 @@ def _xuat_pdf_bao_cao_tien_do(ds_task, username):
             cap = t.get("cap_theo_doi", "xa")
 
             story.append(Paragraph(
-                f"▪ {t['tieu_de']} — Trễ {so_ngay_tre} ngày (deadline: {t['ngay_deadline']})",
-                ParagraphStyle("p2_task", fontName=fb, fontSize=9,
-                               leading=13, spaceBefore=6, spaceAfter=2,
+                f"▪ {t['tieu_de']} — Trễ {so_ngay_tre} ngày (thời hạn: {t['ngay_deadline']})",
+                ParagraphStyle("p2_task", fontName=fb, fontSize=10,
+                               leading=14, spaceBefore=8, spaceAfter=3,
                                textColor=colors.HexColor("#C62828"))
             ))
 
             if cap == "pgd":
-                for r in tre_list:
+                cols = ["STT", "PGD", "Số ngày trễ"]
+                tbl_data = [[Paragraph(c, p2_th) for c in cols]]
+                for j, r in enumerate(tre_list, 1):
                     p2_count += 1
-                    story.append(Paragraph(
-                        f"    {r['pgd']}",
-                        ParagraphStyle("p2_pgd", fontName=fn, fontSize=8,
-                                       leading=12, leftIndent=12,
-                                       textColor=colors.HexColor("#C62828"))
-                    ))
+                    tbl_data.append([
+                        Paragraph(str(j), p2_td_c),
+                        Paragraph(r["pgd"], p2_td),
+                        Paragraph(f"{so_ngay_tre} ngày", p2_td_r),
+                    ])
+                cw2 = [1.5 * cm, 10.0 * cm, 5.0 * cm]
+                tbl2 = Table(tbl_data, colWidths=cw2, repeatRows=1)
+                tbl2.setStyle(TableStyle([
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#C62828")),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                    ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                    ("TOPPADDING", (0, 0), (-1, -1), 4),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+                    ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#BDBDBD")),
+                ]))
+                for r_idx in range(1, len(tbl_data)):
+                    if r_idx % 2 == 0:
+                        tbl2.setStyle(TableStyle([
+                            ("BACKGROUND", (0, r_idx), (-1, r_idx),
+                             colors.HexColor("#FFEBEE"))
+                        ]))
+                story.append(tbl2)
             else:
+                cols = ["STT", "PGD", "Xã / Phường", "Số ngày trễ"]
+                tbl_data = [[Paragraph(c, p2_th) for c in cols]]
+                idx2 = 0
                 kq_by_pgd = {}
                 for r in tre_list:
                     kq_by_pgd.setdefault(r["pgd"], []).append(r)
                 for pgd, items in sorted(kq_by_pgd.items()):
-                    p2_count += 1
-                    ds_xa = ", ".join(r["ten_xa"] for r in items)
-                    story.append(Paragraph(
-                        f"    {pgd}: {ds_xa}",
-                        ParagraphStyle("p2_xa", fontName=fn, fontSize=8,
-                                       leading=12, leftIndent=12,
-                                       textColor=colors.HexColor("#C62828"))
-                    ))
+                    for r in items:
+                        idx2 += 1
+                        p2_count += 1
+                        tbl_data.append([
+                            Paragraph(str(idx2), p2_td_c),
+                            Paragraph(pgd, p2_td),
+                            Paragraph(r["ten_xa"], p2_td),
+                            Paragraph(f"{so_ngay_tre} ngày", p2_td_r),
+                        ])
+                cw2 = [1.0 * cm, 4.5 * cm, 6.5 * cm, 3.5 * cm]
+                tbl2 = Table(tbl_data, colWidths=cw2, repeatRows=1)
+                tbl2.setStyle(TableStyle([
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#C62828")),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                    ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                    ("TOPPADDING", (0, 0), (-1, -1), 4),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+                    ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#BDBDBD")),
+                ]))
+                for r_idx in range(1, len(tbl_data)):
+                    if r_idx % 2 == 0:
+                        tbl2.setStyle(TableStyle([
+                            ("BACKGROUND", (0, r_idx), (-1, r_idx),
+                             colors.HexColor("#FFEBEE"))
+                        ]))
+                story.append(tbl2)
 
         if p2_count > 0:
             story.append(Spacer(1, 0.5 * cm))
@@ -1331,6 +1428,32 @@ def _xuat_pdf_bao_cao_tien_do(ds_task, username):
                                alignment=TA_CENTER, spaceAfter=6,
                                textColor=colors.HexColor("#2E7D32"))
             ))
+
+        # ── Chữ ký ───────────────────────────────────────────────────
+        story.append(Spacer(1, 1.0 * cm))
+        story.append(HRFlowable(width="100%", thickness=0.5,
+                                color=colors.HexColor("#BDBDBD"), spaceAfter=6))
+        sig_style = ParagraphStyle("sig", fontName=fn, fontSize=10,
+                                   alignment=TA_CENTER, leading=14)
+        sig_bold = ParagraphStyle("sig_b", fontName=fb, fontSize=11,
+                                  alignment=TA_CENTER, leading=16)
+        sig_data = [[
+            Paragraph("Người lập", sig_bold),
+            Paragraph("Kiểm soát", sig_bold),
+            Paragraph("Giám đốc", sig_bold),
+        ], [
+            Paragraph("(Ký, ghi rõ họ tên)", sig_style),
+            Paragraph("(Ký, ghi rõ họ tên)", sig_style),
+            Paragraph("(Ký, ghi rõ họ tên)", sig_style),
+        ]]
+        sig_tbl = Table(sig_data, colWidths=[5.5*cm, 5.5*cm, 5.5*cm])
+        sig_tbl.setStyle(TableStyle([
+            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("TOPPADDING", (0, 0), (-1, -1), 20),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+        ]))
+        story.append(sig_tbl)
 
         # ── Footer ────────────────────────────────────────────────────
         def _on_page(canvas, _doc):

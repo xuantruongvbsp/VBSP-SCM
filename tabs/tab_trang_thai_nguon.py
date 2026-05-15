@@ -1,166 +1,185 @@
-"""Tab Trạng thái Nguồn dữ liệu — hiển thị trạng thái upload cho admin/manager.
+"""Tab "🔍 Trạng thái hệ thống" — hiển thị tổng quan trạng thái quy trình và audit log gần nhất.
 
-Sử dụng widget có sẵn từ:
-  - widgets/data_source_status.py  → render_widget_compact, render_detailed_status
-  - widgets/status_widget.py       → render_status_compact, render_priority_info
-  - data/pgd.py                    → doc_trang_thai_file, lay_trang_thai_upload_pgd
+Chỉ dành cho phân hệ Chi nhánh (la_phan_he_cn).
 """
+from __future__ import annotations
+import os
+
 import streamlit as st
 import pandas as pd
 
-from config import DS_PGD, DON_VI_CHI_NHANH
-from data.pgd import lay_trang_thai_upload_pgd, doc_trang_thai_file
+import db
+from config import CACHE_HSTD, CACHE_NQ11
+from auth import la_phan_he_cn, normalize_role
 from utils import format_df_vn
-from widgets.data_source_status import render_widget_compact, render_detailed_status
-from widgets.status_widget import render_priority_info
 
 
-def render_tab(role: str, username: str = "unknown") -> None:
-    """Entry point — hiển thị tab trạng thái nguồn dữ liệu.
+def render(tab=None, **kwargs) -> None:
+    role_raw = str(kwargs.get("role", "user") or "user")
+    username = str(kwargs.get("username", "unknown") or "unknown")
+    role = normalize_role(role_raw)
 
-    Args:
-        role: Vai trò người dùng (executive/admin_cn/manager_cn/admin/manager/...)
-        username: Tên đăng nhập (dùng để audit nếu cần)
-    """
-    st.subheader("📊 Trạng thái nguồn dữ liệu")
-    st.caption("Kiểm tra tình trạng upload file của tất cả đơn vị")
-
-    tab_tong_quan, tab_chi_tiet = st.tabs(["📋 Tổng quan", "🔍 Chi tiết theo PGD"])
-
-    with tab_tong_quan:
-        _render_tong_quan(role)
-
-    with tab_chi_tiet:
-        _render_chi_tiet_pgd()
-
-
-def _render_tong_quan(role: str) -> None:
-    """Hiển thị tổng quan trạng thái nguồn dữ liệu."""
-    st.markdown("### Tổng quan toàn Chi nhánh")
-
-    ds_don_vi = [DON_VI_CHI_NHANH] + DS_PGD
-    df_trang_thai = lay_trang_thai_upload_pgd(ds_don_vi)
-
-    if df_trang_thai.empty:
-        st.info("Chưa có dữ liệu upload từ任何 đơn vị.")
+    if not la_phan_he_cn(role):
+        st.warning("⛔ Chỉ tài khoản Chi nhánh mới xem được Trạng thái hệ thống.")
         return
 
-    thong_ke = _tinh_thong_ke(df_trang_thai)
+    ctx = tab if tab is not None else st.container()
+    with ctx:
+        st.subheader("� Trạng thái hệ thống")
 
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        st.metric("🏢 Tổng đơn vị", thong_ke["tong_don_vi"])
-    with col2:
-        st.metric("✅ Đã upload HSTD", thong_ke["da_upload_hstd"],
-                  delta=f"{thong_ke['ty_le_hstd']:.0f}%")
-    with col3:
-        st.metric("✅ Đã upload NQ11", thong_ke["da_upload_nq11"],
-                  delta=f"{thong_ke['ty_le_nq11']:.0f}%")
-    with col4:
-        st.metric("✅ Đã upload GQVL", thong_ke["da_upload_gqvl"],
-                  delta=f"{thong_ke['ty_le_gqvl']:.0f}%")
+        tab_tq, tab_audit = st.tabs(["� Tổng quan", "� Audit Log"])
 
-    st.markdown("### Chi tiết trạng thái từng đơn vị")
-    st.dataframe(
-        df_trang_thai,
-        use_container_width=True,
-        hide_index=True,
-        height=min(60 + len(df_trang_thai) * 38, 600),
-    )
+        with tab_tq:
+            _render_tong_quan()
 
-    st.markdown("### Ghi chú")
-    st.markdown("""
-    - ✅ **dd/mm**: File đã upload, số liệu mới
-    - ⚠️ **dd/mm (N ngày)**: File đã upload nhưng **N ngày chưa cập nhật** — cần kiểm tra
-    - ❌ **Chưa có**: Chưa upload file — cần upload gấp
-    """)
+        with tab_audit:
+            _render_audit_log()
 
 
-def _render_chi_tiet_pgd() -> None:
-    """Hiển thị chi tiết trạng thái theo từng PGD."""
-    st.markdown("### Trạng thái chi tiết theo PGD")
+# ═══════════════════════════════════════════════════════════════════════════════
+# Sub-tab 1: Tổng quan trạng thái quy trình
+# ═══════════════════════════════════════════════════════════════════════════════
 
-    danh_sach = [DON_VI_CHI_NHANH] + DS_PGD
-    pgd_chon = st.selectbox(
-        "Chọn đơn vị để xem chi tiết:",
-        danh_sach,
-        key="ttn_pgd_chon",
-    )
-
-    if not pgd_chon:
-        st.info("Vui lòng chọn đơn vị.")
-        return
-
-    st.markdown(f"#### {pgd_chon}")
-
-    cols = st.columns(3)
-    loai_labels = [
-        ("hstd", "📊 HSTD — Hồ sơ tín dụng"),
-        ("nq11", "📑 NQ11 — Sao kê Nghị quyết 11"),
-        ("gqvl", "📋 GQVL — Giải quyết việc làm"),
+def _render_tong_quan() -> None:
+    ds_quy_trinh = [
+        _lay_tt_khtd_cn(),
+        _lay_tt_merge_hstd(),
+        _lay_tt_merge_nq11(),
+        _lay_tt_merge_gqvl(),
+        _lay_tt_file_hstd(),
+        _lay_tt_file_nq11(),
     ]
 
-    for i, (loai, label) in enumerate(loai_labels):
-        with cols[i]:
-            tt = doc_trang_thai_file(pgd_chon, loai)
-            _hien_thi_trang_thai_card(loai, label, tt)
+    tong = len(ds_quy_trinh)
+    dang_ok = sum(1 for _, tt, _, _ in ds_quy_trinh if tt == "✅")
+    can_xu_ly = tong - dang_ok
 
-    st.markdown("---")
+    m1, m2, m3 = st.columns(3)
+    m1.metric("📌 Tổng check", tong)
+    m2.metric("✅ Đang OK", tong if dang_ok == tong else dang_ok)
+    m3.metric("⚠️ Cần xử lý", can_xu_ly)
 
-    if st.button("🔄 Làm mới trạng thái", key="ttn_refresh"):
-        st.cache_data.clear()
+    st.divider()
+
+    df = pd.DataFrame(
+        [
+            {"Quy trình": ten, "Trạng thái": tt, "Cập nhật lần cuối": lan_cuoi, "Ghi chú": ghi_chu}
+            for ten, tt, lan_cuoi, ghi_chu in ds_quy_trinh
+        ]
+    )
+
+    st.dataframe(df, use_container_width=True, hide_index=True)
+
+    if st.button("🔄 Làm mới", key="tttq_refresh"):
         st.rerun()
 
 
-def _hien_thi_trang_thai_card(loai: str, label: str, tt: dict) -> None:
-    """Hiển thị card trạng thái cho một loại file."""
-    st.markdown(f"**{label}**")
-
-    if not tt.get("co_file"):
-        st.error("❌ Chưa upload")
-        st.caption(f"File: `{loai}_latest.xlsx` chưa có trong thư mục PGD")
-        return
-
-    trang_thai = tt.get("canh_bao", "")
-    ngay_upload = tt.get("ngay_upload")
-    ngay_so_lieu = tt.get("ngay_so_lieu")
-    so_ngay_cu = tt.get("so_ngay_cu", 0)
-
-    if trang_thai == "ok":
-        st.success("🟢 Dữ liệu mới")
-    else:
-        st.warning(f"🟡 Dữ liệu cũ ({so_ngay_cu} ngày chưa cập nhật)")
-
-    if ngay_upload:
-        st.caption(f"📅 Upload: {ngay_upload.strftime('%d/%m/%Y %H:%M')}")
-
-    if ngay_so_lieu:
-        st.caption(f"📆 Số liệu: {ngay_so_lieu.strftime('%d/%m/%Y')}")
-    else:
-        st.caption("📆 Số liệu: Không xác định")
+def _lay_tt_khtd_cn() -> tuple:
+    """Kiểm tra KHTD Chi nhánh — key 'khtd_cn'."""
+    try:
+        val = db.doc_kv("khtd_cn")
+        if val is None:
+            return "KHTD Chi nhánh", "❌", "—", "Chưa có dữ liệu kế hoạch"
+        updated = val.get("updated_at", "—") if isinstance(val, dict) else "—"
+        return "KHTD Chi nhánh", "✅", str(updated), "Đã có kế hoạch"
+    except Exception as e:
+        return "KHTD Chi nhánh", "❌", "—", f"Lỗi đọc: {e}"
 
 
-def _tinh_thong_ke(df: pd.DataFrame) -> dict:
-    """Tính thống kê từ DataFrame trạng thái upload."""
-    tong = len(df)
-    if tong == 0:
-        return {
-            "tong_don_vi": 0,
-            "da_upload_hstd": 0, "ty_le_hstd": 0,
-            "da_upload_nq11": 0, "ty_le_nq11": 0,
-            "da_upload_gqvl": 0, "ty_le_gqvl": 0,
-        }
+def _lay_tt_merge(ten: str, key: str) -> tuple:
+    """Kiểm tra trạng thái merge HSTD/NQ11/GQVL."""
+    try:
+        val = db.doc_kv(key)
+        if val is None or not isinstance(val, dict):
+            return ten, "❌", "—", "Chưa merge"
+        so_pgd = val.get("so_pgd", 0)
+        updated = val.get("updated_at", "—")
+        return ten, "✅", str(updated), f"Đã merge {so_pgd} PGD"
+    except Exception as e:
+        return ten, "❌", "—", f"Lỗi đọc: {e}"
 
-    def dem_co_file(col: str) -> int:
-        return int(df[col].apply(lambda x: "✅" in str(x) or "⚠️" in str(x)).sum())
 
-    da_hstd = dem_co_file("HSTD")
-    da_nq11 = dem_co_file("NQ11")
-    da_gqvl = dem_co_file("GQVL")
+def _lay_tt_merge_hstd() -> tuple:
+    return _lay_tt_merge("Merge HSTD", "merge_meta_hstd")
 
-    return {
-        "tong_don_vi": tong,
-        "da_upload_hstd": da_hstd, "ty_le_hstd": da_hstd / tong * 100,
-        "da_upload_nq11": da_nq11, "ty_le_nq11": da_nq11 / tong * 100,
-        "da_upload_gqvl": da_gqvl, "ty_le_gqvl": da_gqvl / tong * 100,
-    }
+
+def _lay_tt_merge_nq11() -> tuple:
+    return _lay_tt_merge("Merge NQ11", "merge_meta_nq11")
+
+
+def _lay_tt_merge_gqvl() -> tuple:
+    return _lay_tt_merge("Merge GQVL", "merge_meta_gqvl")
+
+
+def _lay_tt_file_hstd() -> tuple:
+    """Kiểm tra file hstd.parquet."""
+    try:
+        if os.path.exists(CACHE_HSTD):
+            mtime = os.path.getmtime(CACHE_HSTD)
+            from datetime import datetime
+            return "File hstd.parquet", "✅", datetime.fromtimestamp(mtime).strftime("%Y-%m-%d %H:%M"), "Tồn tại"
+        return "File hstd.parquet", "❌", "—", "Chưa có file cache"
+    except Exception as e:
+        return "File hstd.parquet", "❌", "—", f"Lỗi: {e}"
+
+
+def _lay_tt_file_nq11() -> tuple:
+    """Kiểm tra file nq11.parquet."""
+    try:
+        if os.path.exists(CACHE_NQ11):
+            mtime = os.path.getmtime(CACHE_NQ11)
+            from datetime import datetime
+            return "File nq11.parquet", "✅", datetime.fromtimestamp(mtime).strftime("%Y-%m-%d %H:%M"), "Tồn tại"
+        return "File nq11.parquet", "❌", "—", "Chưa có file cache"
+    except Exception as e:
+        return "File nq11.parquet", "❌", "—", f"Lỗi: {e}"
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Sub-tab 2: Audit Log — 20 dòng gần nhất
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def _render_audit_log() -> None:
+    """Hiển thị 20 dòng audit gần nhất, có bộ lọc action."""
+    try:
+        with db.get_conn() as conn:
+            rows = conn.execute(
+                "SELECT DISTINCT action FROM audit_log ORDER BY action"
+            ).fetchall()
+        ds_action = ["Tất cả"] + [r["action"] for r in rows]
+    except Exception as e:
+        st.error(f"Không thể đọc danh sách action: {e}")
+        ds_action = ["Tất cả"]
+
+    action_chon = st.selectbox(
+        "Lọc theo hành động",
+        ds_action,
+        key="tttq_audit_action",
+    )
+
+    try:
+        sql = "SELECT ts, username, action, detail FROM audit_log"
+        params = []
+        if action_chon and action_chon != "Tất cả":
+            sql += " WHERE action = ?"
+            params.append(action_chon)
+        sql += " ORDER BY ts DESC LIMIT 20"
+
+        with db.get_conn() as conn:
+            rows = conn.execute(sql, params).fetchall()
+
+        if not rows:
+            st.info("Không có bản ghi audit log nào.")
+            return
+
+        df = pd.DataFrame(
+            rows,
+            columns=["Thời gian", "User", "Hành động", "Chi tiết"],
+        )
+        df = format_df_vn(df)
+
+        st.caption(f"Hiển thị {len(df)} bản ghi gần nhất")
+        st.dataframe(df, use_container_width=True, hide_index=True)
+
+    except Exception as e:
+        st.error(f"Lỗi đọc audit log: {e}")

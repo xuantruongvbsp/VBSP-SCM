@@ -491,13 +491,13 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                     lambda x: vn(x, 1) if x > 0 else ""
                 ),
                 textposition="outside",
-                hovertemplate="<b>%{x}</b><br>Dư nợ: %{y:.1f} triệu đ<extra></extra>",
+                hovertemplate="<b>%{x}</b><br>Dư nợ: %{y:.1f} triệu đồng<extra></extra>",
             ))
             fig2.add_hline(
                 y=binh_quan_no,
                 line_dash="dash",
                 line_color="gray",
-                annotation_text=f"Bình quân: {fmt_so(round(binh_quan_no, 0))} tr.đ",
+                annotation_text=f"Bình quân: {fmt_so(round(binh_quan_no, 0))} triệu đồng",
                 annotation_position="right",
             )
             fig2.add_vrect(
@@ -521,7 +521,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
             st.plotly_chart(fig2, use_container_width=True)
             st.caption(
                 f"📍 Phạm vi: **{ten_pham_vi}**  ·  "
-                f"🟢 Dưới bình quân ({fmt_so(round(binh_quan_no, 0))} tr.đ)  "
+                f"🟢 Dưới bình quân ({fmt_so(round(binh_quan_no, 0))} triệu đồng)  "
                 f"🔴 Trên bình quân — màu càng đậm càng lớn hơn bình quân"
             )
 

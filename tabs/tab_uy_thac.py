@@ -768,7 +768,7 @@ def _render_theo_dvut(df: pd.DataFrame) -> None:
     c1.metric("Hội đoàn thể", len(t))
     c2.metric("Tổng Tổ TK&VV", fmt_so(int(t.get("so_to", pd.Series([0])).sum())))
     c3.metric("Tổng KH", fmt_so(int(t.get("so_kh", pd.Series([0])).sum())))
-    c4.metric("Tổng dư nợ (tr.đ)", fmt(t.get("tong_dn", pd.Series([0])).sum()))
+    c4.metric("Tổng dư nợ (triệu đồng)", fmt(t.get("tong_dn", pd.Series([0])).sum()))
     st.divider()
     hien = t.rename(columns={
         COT_DVUT: "Hội đoàn thể", "so_to": "Số Tổ",
@@ -922,7 +922,7 @@ def _render_mau06(df: pd.DataFrame, pgd_user: str) -> None:
               if COT_TONG_DU_NO in df_m06.columns else 0
     ca, cb  = st.columns(2)
     ca.metric("Số món cần KT", fmt_so(len(df_m06)))
-    cb.metric("Tổng dư nợ (tr.đ)", fmt(tong_dn))
+    cb.metric("Tổng dư nợ (triệu đồng)", fmt(tong_dn))
     st.dataframe(df_m06, use_container_width=True,
                  hide_index=True, height=300)
 
@@ -1083,9 +1083,9 @@ def _render_mau15(df: pd.DataFrame, pgd_user: str) -> None:
     tong_tg  = df_to[COT_SO_DU_TG].sum() if COT_SO_DU_TG in df_to.columns else 0
     k1, k2, k3, k4 = st.columns(4)
     k1.metric("Số KH", fmt_so(len(df_to)))
-    k2.metric("Tổng nợ gốc (tr.đ)", fmt(tong_goc))
-    k3.metric("Tổng nợ lãi (tr.đ)", fmt(tong_lai))
-    k4.metric("Tổng TG TK (tr.đ)", fmt(tong_tg))
+    k2.metric("Tổng nợ gốc (triệu đồng)", fmt(tong_goc))
+    k3.metric("Tổng nợ lãi (triệu đồng)", fmt(tong_lai))
+    k4.metric("Tổng TG TK (triệu đồng)", fmt(tong_tg))
     st.dataframe(df_to, use_container_width=True, hide_index=True, height=350)
 
     # Tự động lấy xã và tổ trưởng từ Tổ đang chọn
@@ -1380,12 +1380,12 @@ def _render_bien_ban(df: pd.DataFrame, pgd_user: str) -> None:
             COT_DVUT: "Hội đoàn thể",
             "so_to": "Số Tổ TK&VV",
             "so_kh": "Số hộ vay",
-            "tong_dn": "Dư nợ (tr.đ)",
-            "nqh": "NQH (tr.đ)",
-            "lai_ton": "Lãi tồn (tr.đ)",
+            "tong_dn": "Dư nợ (triệu đồng)",
+            "nqh": "NQH (triệu đồng)",
+            "lai_ton": "Lãi tồn (triệu đồng)",
         }
     )
-    for col in ["Dư nợ (tr.đ)", "NQH (tr.đ)", "Lãi tồn (tr.đ)"]:
+    for col in ["Dư nợ (triệu đồng)", "NQH (triệu đồng)", "Lãi tồn (triệu đồng)"]:
         if col in hien.columns:
             hien[col] = hien[col].apply(fmt)
     st.dataframe(hien, use_container_width=True, hide_index=True)

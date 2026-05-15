@@ -269,7 +269,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                     mx1.metric("Số KH",      f"{df_xem[COT_MA_KH].nunique():,}".replace(",","."))
                     mx2.metric("Số món vay", f"{df_xem[COT_SO_KU].nunique():,}".replace(",","."))
                     mx3.metric("Tổng dư nợ",
-                        f"{tdn_xem/1e9:.3f} tỷ".replace(".",",") if tdn_xem >= 1e9
+                        f"{tdn_xem/1e6:,.0f}".replace(",","X").replace(".",",").replace("X",".") if tdn_xem >= 1e6
                         else f"{tdn_xem/1e6:.1f} triệu".replace(".",","))
                     mx4.metric("Tỷ lệ QH", f"{tlqh_xem:.2f}%",
                         delta="⚠" if tlqh_xem >= 2 else None, delta_color="inverse")

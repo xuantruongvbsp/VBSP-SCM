@@ -486,8 +486,8 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                     horizontal=True, key=f"cd_bd_nhom{key_sfx}")
                 items = BD_GROUPS[chon_bd]
                 ten_ng   = [i[0] for i in items]
-                val_ht_b = [db_lookup(db_ht_rows,   i[1])/1e9 for i in items]
-                val_pv_b = [db_lookup(db_prev_rows, i[1])/1e9 for i in items]
+                val_ht_b = [db_lookup(db_ht_rows,   i[1])/1e6 for i in items]
+                val_pv_b = [db_lookup(db_prev_rows, i[1])/1e6 for i in items]
 
                 fig_bd = go.Figure()
                 fig_bd.add_bar(name=f"31/12/{nam_prev}", x=ten_ng, y=val_pv_b,

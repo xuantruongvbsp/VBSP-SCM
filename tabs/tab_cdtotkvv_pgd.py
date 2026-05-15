@@ -642,7 +642,7 @@ def render(tab: DeltaGenerator, **kwargs) -> None:
                               if COT_TONG_DU_NO in df_ndh.columns else 0
                     c1, c2 = st.columns(2)
                     c1.metric("Số món đến hạn", fmt_so(len(df_ndh)))
-                    c2.metric("Tổng dư nợ (tr.đ)", fmt(tong_dn))
+                    c2.metric("Tổng dư nợ (triệu đồng)", fmt(tong_dn))
 
                     st.dataframe(df_ndh, use_container_width=True,
                                  hide_index=True)

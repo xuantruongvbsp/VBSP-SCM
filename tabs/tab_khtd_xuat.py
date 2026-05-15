@@ -35,7 +35,7 @@ def _hien_thi_bang_cn_readonly(
     df_loc: "pd.DataFrame | None" = None,
     username: str = "",
 ) -> None:
-    """Bảng tóm tắt KHTD Chi nhánh — HTML thuần: STT | Chỉ tiêu | KH (tỷ) | TH (tỷ) | TL% | Trạng thái."""
+    """Bảng tóm tắt KHTD Chi nhánh — HTML thuần: STT | Chỉ tiêu | KH (triệu đồng) | TH (triệu đồng) | TL% | Trạng thái."""
     from tabs.tab_khtd_nhap import _tinh_th_gqvl_phan_tang
 
     kh_d = dict(kh_cn or {})
@@ -133,8 +133,8 @@ def _hien_thi_bang_cn_readonly(
         stt: str, ten: str, kh_vnd: float, th_vnd: float, indent: str = ""
     ) -> None:
         nonlocal tong_kh, tong_th, so_ct_co_kh, stt_i
-        kh_v = kh_vnd / 1e9
-        th_v = th_vnd / 1e9
+        kh_v = kh_vnd / 1e6
+        th_v = th_vnd / 1e6
         tl = th_v / kh_v * 100 if kh_v > 0 else None
 
         if kh_v > 0 or th_v > 0:
@@ -170,8 +170,8 @@ def _hien_thi_bang_cn_readonly(
         kh_vnd = float(kh_d.get(sub_key, 0.0))
         th_vnd = float(th_d.get(sub_key, 0.0))
 
-        kh_v = kh_vnd / 1e9
-        th_v = th_vnd / 1e9
+        kh_v = kh_vnd / 1e6
+        th_v = th_vnd / 1e6
         tl = th_v / kh_v * 100 if kh_v > 0 else None
 
         if kh_v > 0 or th_v > 0:
@@ -240,16 +240,16 @@ def _hien_thi_bang_cn_readonly(
     tds_tong = (
         _td("", "center", "", TONG_BG, "bold") +
         _td("TỔNG CỘNG", "left", "", TONG_BG, "bold") +
-        _td(_fvn(tong_kh / 1e9, 3), "right", "", TONG_BG, "bold") +
-        _td(_fvn(tong_th / 1e9, 3), "right", "", TONG_BG, "bold") +
+        _td(_fvn(tong_kh / 1e6, 3), "right", "", TONG_BG, "bold") +
+        _td(_fvn(tong_th / 1e6, 3), "right", "", TONG_BG, "bold") +
         _td(f"{_fvn(tong_tl, 1)}%" if tong_tl is not None else "—", "right", _tl_color(tong_tl), TONG_BG, "bold") +
         _td(_tl_text(tong_tl), "left", _tl_color(tong_tl), TONG_BG, "bold")
     )
     html_rows.append(f"<tr>{tds_tong}</tr>")
 
     k1, k2, k3, k4 = st.columns(4)
-    k1.metric("Tổng KH (tỷ)", f"{_fvn(tong_kh / 1e9, 3)}")
-    k2.metric("Tổng TH (tỷ)", f"{_fvn(tong_th / 1e9, 3)}")
+    k1.metric("Tổng KH (triệu đồng)", f"{_fvn(tong_kh / 1e6, 3)}")
+    k2.metric("Tổng TH (triệu đồng)", f"{_fvn(tong_th / 1e6, 3)}")
     k3.metric(
         "Tỷ lệ đạt KH",
         f"{_fvn(tong_tl, 1)}%" if tong_tl is not None else "—",
@@ -486,8 +486,8 @@ def _tab_tien_do_kh_th() -> None:
                   and float(th_cn.get(mk, 0)) / float(kh_cn.get(mk, 1)) < 0.7)
 
     c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Tổng KH (tỷ)", f"{_fvn(tong_kh/1e9, 3)}")
-    c2.metric("Tổng TH (tỷ)", f"{_fvn(tong_th/1e9, 3)}")
+    c1.metric("Tổng KH (triệu đồng)", f"{_fvn(tong_kh/1e6, 0)}")
+    c2.metric("Tổng TH (triệu đồng)", f"{_fvn(tong_th/1e6, 0)}")
     c3.metric("Tỷ lệ CN", f"{_fvn(tl_cn, 1)}%",
               delta=f"{'✅' if tl_cn >= 95 else '⚠️'}")
     c4.metric("CT chưa đạt 95%", str(so_chua),
@@ -529,8 +529,8 @@ def _tab_tien_do_kh_th() -> None:
         rows_ct.append({
             "STT": "",
             "Chỉ tiêu": f"  {ten_ct}",
-            "KH (triệu đồng)": round(kh_val/1e9, 3) if kh_val else None,
-            "TH (triệu đồng)": round(th_val/1e9, 3) if th_val else None,
+            "KH (triệu đồng)": round(kh_val/1e6, 0) if kh_val else None,
+            "TH (triệu đồng)": round(th_val/1e6, 0) if th_val else None,
             "TL%": round(tl_val, 1) if tl_val is not None else None,
             "Trạng thái": trang_thai,
             "_nhom": False,
@@ -538,8 +538,8 @@ def _tab_tien_do_kh_th() -> None:
 
     rows_ct.append({
         "STT": "", "Chỉ tiêu": "TỔNG CỘNG",
-        "KH (triệu đồng)": round(tong_kh/1e9, 3),
-        "TH (triệu đồng)": round(tong_th/1e9, 3),
+        "KH (triệu đồng)": round(tong_kh/1e6, 0),
+        "TH (triệu đồng)": round(tong_th/1e6, 0),
         "TL%": round(tl_cn, 1),
         "Trạng thái": "🟢 Đạt" if tl_cn >= 95 else "🔴 Chậm",
         "_nhom": False,
@@ -562,8 +562,8 @@ def _tab_tien_do_kh_th() -> None:
         key="khtd_tien_do_ct",
         height=480,
         column_config={
-            "KH (triệu đồng)": st.column_config.NumberColumn(format="%.3f"),
-            "TH (triệu đồng)": st.column_config.NumberColumn(format="%.3f"),
+            "KH (triệu đồng)": st.column_config.NumberColumn(format="%.0f"),
+            "TH (triệu đồng)": st.column_config.NumberColumn(format="%.0f"),
             "TL%":     st.column_config.ProgressColumn(
                            min_value=0, max_value=100, format="%.1f%%"),
         },
@@ -599,8 +599,8 @@ def _tab_tien_do_kh_th() -> None:
         if tl_pgd < 95:
             rows_pgd.append({
                 "PGD": ten_pgd,
-                "TH (triệu đồng)": round(tong_th_pgd/1e9, 3),
-                "KH CN (tỷ)": round(tong_kh_pgd/1e9, 3),
+                "TH (triệu đồng)": round(tong_th_pgd/1e6, 0),
+                "KH CN (triệu đồng)": round(tong_kh_pgd/1e6, 0),
                 "TL%": round(tl_pgd, 1),
             })
 

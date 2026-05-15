@@ -278,9 +278,9 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                 # Biểu đồ
                 fig = go.Figure()
                 fig.add_bar(name="Dư nợ trong hạn", x=t_db[nhom],
-                            y=t_db["Dư_nợ_TH"]/1e9, marker_color="#1565C0")
+                            y=t_db["Dư_nợ_TH"]/1e6, marker_color="#1565C0")
                 fig.add_bar(name="Dư nợ quá hạn",   x=t_db[nhom],
-                            y=t_db["Dư_nợ_QH"]/1e9, marker_color="#C62828")
+                            y=t_db["Dư_nợ_QH"]/1e6, marker_color="#C62828")
                 fig.update_layout(
                     barmode="stack", height=320,
                     margin=dict(l=0,r=0,t=10,b=60),

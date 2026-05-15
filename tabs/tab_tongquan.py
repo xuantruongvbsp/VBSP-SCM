@@ -367,13 +367,13 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
         _n_mon_vay = fmt_so(n_mon_vay)
         _n_kh = fmt_so(n_kh)
         _bq_mon_kh = vn(n_mon_vay / n_kh, 1) if n_kh > 0 else "—"
-        _tdn = vn(tdn / 1e9, 3)
-        _tdn_delta = vn(max(tdn / 1e9 * 0.017, 0), 3)
-        _dth = vn(dth / 1e9, 3)
+        _tdn = vn(tdn / 1e6, 0)
+        _tdn_delta = vn(max(tdn / 1e6 * 0.017, 0), 0)
+        _dth = vn(dth / 1e6, 0)
         _dth_pct = vn(dth / tdn * 100 if tdn else 0, 3)
-        _dnk = vn(dnk / 1e9, 3)
+        _dnk = vn(dnk / 1e6, 0)
         _tlk = vn(tlk, 3)
-        _dqh = vn(dqh / 1e9, 3)
+        _dqh = vn(dqh / 1e6, 0)
         _tlq = vn(tlq, 3)
         _tl_no_xau = vn(tl_no_xau, 3)
         st.markdown(f"<div class='tq-caption'>Cập nhật: {ngay_cap_nhat} · {TEN_CHI_NHANH_HIEN_THI}</div>", unsafe_allow_html=True)
@@ -436,8 +436,8 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
         )
         st.caption(
             f"🔍 Kiểm tra cân đối: {_dth} tỷ (Trong hạn) "
-            f"+ {vn(dqh/1e9, 3)} tỷ (Quá hạn) "
-            f"+ {vn(dnk/1e9, 3)} tỷ (Khoanh) "
+            f"+ {vn(dqh/1e6, 0)} (Quá hạn) "
+            f"+ {vn(dnk/1e6, 0)} (Khoanh) "
             f"= {_tdn} tỷ ✅"
         )
         if os.path.exists(CACHE_HSTD):
@@ -609,21 +609,21 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
             df_hien = df_ct.rename(columns={"ten_ct": "Chương trình"}).copy()
             df_hien["Số món vay"]         = df_hien["so_mon"].apply(fmt_so)
             df_hien["Số KH"]              = df_hien["so_kh"].apply(fmt_so)
-            df_hien["Dư nợ (tỷ)"]        = df_hien["du_no"].apply(fmt_ty)
+            df_hien["Dư nợ (triệu đồng)"]        = df_hien["du_no"].apply(fmt_ty)
             df_hien["Nguồn TW (tỷ)"]     = df_hien["du_no_tw"].apply(fmt_ty)
             df_hien["Nguồn ĐP (tỷ)"]     = df_hien["du_no_dp"].apply(fmt_ty)
-            df_hien["Dư nợ QH (tỷ)"]     = df_hien["du_no_qh"].apply(fmt_ty)
+            df_hien["Dư nợ QH (triệu đồng)"]     = df_hien["du_no_qh"].apply(fmt_ty)
             ty_le_qh = ((df_hien["du_no_qh"] / df_hien["du_no"] * 100).round(2)) if (df_hien["du_no"] > 0).any() else pd.Series(0.0, index=df_hien.index)
             df_hien["Tỷ lệ QH %"]         = ty_le_qh.apply(lambda x: f"{x:.2f}".replace(".", ",") + "%")
-            df_hien["Dư nợ khoanh (tỷ)"] = df_hien["du_no_khoanh"].apply(fmt_ty)
+            df_hien["Dư nợ khoanh (triệu đồng)"] = df_hien["du_no_khoanh"].apply(fmt_ty)
             df_hien["Giải ngân năm (tỷ)"]= df_hien["gn_nam"].apply(fmt_ty)
             df_hien["Thu nợ năm (tỷ)"]   = df_hien["tn_nam"].apply(fmt_ty)
             df_hien["Tỷ trọng %"]         = df_hien["ty_trong"].apply(lambda x: f"{x:.1f}".replace(".", ",") + "%")
 
             cols_hien = [
                 "Chương trình", "Số món vay", "Số KH",
-                "Dư nợ (tỷ)", "Nguồn TW (tỷ)", "Nguồn ĐP (tỷ)",
-                "Dư nợ QH (tỷ)", "Tỷ lệ QH %", "Dư nợ khoanh (tỷ)",
+                "Dư nợ (triệu đồng)", "Nguồn TW (tỷ)", "Nguồn ĐP (tỷ)",
+                "Dư nợ QH (triệu đồng)", "Tỷ lệ QH %", "Dư nợ khoanh (triệu đồng)",
                 "Giải ngân năm (tỷ)", "Thu nợ năm (tỷ)", "Tỷ trọng %"
             ]
 
@@ -636,9 +636,9 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
 
             df_top10 = df_ct.nlargest(10, "du_no").copy()
             df_top10["label"] = df_top10["ten_ct"].str[:30]
-            df_top10["du_no_ty"] = df_top10["du_no"] / 1e9
-            df_top10["du_no_tw_ty"] = df_top10["du_no_tw"] / 1e9
-            df_top10["du_no_dp_ty"] = df_top10["du_no_dp"] / 1e9
+            df_top10["du_no_ty"] = df_top10["du_no"] / 1e6
+            df_top10["du_no_tw_ty"] = df_top10["du_no_tw"] / 1e6
+            df_top10["du_no_dp_ty"] = df_top10["du_no_dp"] / 1e6
             df_top10["du_no_tw_ty"] = df_top10["du_no_tw_ty"].where(df_top10["du_no_tw_ty"] > 0, 0)
             df_top10["du_no_dp_ty"] = df_top10["du_no_dp_ty"].where(df_top10["du_no_dp_ty"] > 0, 0)
             fig_ct = go.Figure()
@@ -732,18 +732,18 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
             )
             df_pgd = df_pgd.rename(
                 columns={
-                    "du_no": "Dư nợ (tỷ)",
+                    "du_no": "Dư nợ (triệu đồng)",
                     "so_kh": "Số KH",
-                    "nqh": "QH (tỷ)",
+                    "nqh": "QH (triệu đồng)",
                 }
             )
             if col_khoanh in df.columns:
                 _kh = df.groupby(COT_TEN_PGD, as_index=False).agg(
-                    **{"Khoanh (tỷ)": (col_khoanh, "sum")}
+                    **{"Khoanh (triệu đồng)": (col_khoanh, "sum")}
                 )
             else:
                 _kh = df.groupby(COT_TEN_PGD, as_index=False).agg(
-                    **{"Khoanh (tỷ)": (COT_MA_KH, "size")}
+                    **{"Khoanh (triệu đồng)": (COT_MA_KH, "size")}
                 )
             df_pgd = df_pgd.merge(_kh, on=COT_TEN_PGD, how="left")
 
@@ -927,16 +927,16 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
 
             # Tính TL QH% và TL Khoanh% cho từng PGD
             df_pgd["TL QH %"] = (
-                (df_pgd["QH (tỷ)"] / df_pgd["Dư nợ (tỷ)"].replace(0, pd.NA)) * 100
+                (df_pgd["QH (triệu đồng)"] / df_pgd["Dư nợ (triệu đồng)"].replace(0, pd.NA)) * 100
             ).fillna(0).round(2)
             df_pgd["TL Khoanh %"] = (
-                (df_pgd["Khoanh (tỷ)"] / df_pgd["Dư nợ (tỷ)"].replace(0, pd.NA)) * 100
+                (df_pgd["Khoanh (triệu đồng)"] / df_pgd["Dư nợ (triệu đồng)"].replace(0, pd.NA)) * 100
             ).fillna(0).round(2)
 
             # Tính Nợ xấu (NPL) = QH + Khoanh
-            df_pgd["Nợ xấu (tỷ)"] = (df_pgd["QH (tỷ)"] + df_pgd["Khoanh (tỷ)"]).round(3)
+            df_pgd["Nợ xấu (triệu đồng)"] = (df_pgd["QH (triệu đồng)"] + df_pgd["Khoanh (triệu đồng)"]).round(3)
             df_pgd["TL NPL %"] = (
-                (df_pgd["Nợ xấu (tỷ)"] / df_pgd["Dư nợ (tỷ)"].replace(0, pd.NA)) * 100
+                (df_pgd["Nợ xấu (triệu đồng)"] / df_pgd["Dư nợ (triệu đồng)"].replace(0, pd.NA)) * 100
             ).fillna(0).round(2)
 
             # Merge dữ liệu Tổ TK&VV theo PGD (nếu có)
@@ -961,11 +961,11 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
             cot_so = [c for c in df_pgd.columns if c != COT_TEN_PGD and pd.api.types.is_numeric_dtype(df_pgd[c])]
             for cot in cot_so:
                 tong[cot] = df_pgd[cot].sum()
-            du_no_tong_trieu = tong.get("Dư nợ (tỷ)", 0) * 1000
-            tong["TL QH %"] = round((tong.get("QH (tỷ)", 0) / tong.get("Dư nợ (tỷ)", 1) * 100), 2) if tong.get("Dư nợ (tỷ)", 0) else 0
-            tong["TL Khoanh %"] = round((tong.get("Khoanh (tỷ)", 0) / tong.get("Dư nợ (tỷ)", 1) * 100), 2) if tong.get("Dư nợ (tỷ)", 0) else 0
-            tong["Nợ xấu (tỷ)"] = round(tong.get("QH (tỷ)", 0) + tong.get("Khoanh (tỷ)", 0), 3)
-            tong["TL NPL %"] = round(tong["Nợ xấu (tỷ)"] / tong.get("Dư nợ (tỷ)", 1) * 100, 2) if tong.get("Dư nợ (tỷ)", 0) else 0
+            du_no_tong_trieu = tong.get("Dư nợ (triệu đồng)", 0) * 1000
+            tong["TL QH %"] = round((tong.get("QH (triệu đồng)", 0) / tong.get("Dư nợ (triệu đồng)", 1) * 100), 2) if tong.get("Dư nợ (triệu đồng)", 0) else 0
+            tong["TL Khoanh %"] = round((tong.get("Khoanh (triệu đồng)", 0) / tong.get("Dư nợ (triệu đồng)", 1) * 100), 2) if tong.get("Dư nợ (triệu đồng)", 0) else 0
+            tong["Nợ xấu (triệu đồng)"] = round(tong.get("QH (triệu đồng)", 0) + tong.get("Khoanh (triệu đồng)", 0), 3)
+            tong["TL NPL %"] = round(tong["Nợ xấu (triệu đồng)"] / tong.get("Dư nợ (triệu đồng)", 1) * 100, 2) if tong.get("Dư nợ (triệu đồng)", 0) else 0
             tong_clean = {k: (v if pd.notna(v) else 0) for k, v in tong.items()
                           if k != COT_TEN_PGD}
             tong_clean[COT_TEN_PGD] = "Toàn Chi nhánh"
@@ -1016,10 +1016,10 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
 
             cot_hien = [
                 COT_TEN_PGD,
-                "Số KH", "Dư nợ (tỷ)",
-                "QH (tỷ)", "TL QH %",
-                "Khoanh (tỷ)", "TL Khoanh %",
-                "Nợ xấu (tỷ)", "TL NPL %",
+                "Số KH", "Dư nợ (triệu đồng)",
+                "QH (triệu đồng)", "TL QH %",
+                "Khoanh (triệu đồng)", "TL Khoanh %",
+                "Nợ xấu (triệu đồng)", "TL NPL %",
                 "Lãi tồn (tỷ)",
                 "DS Cho vay (tỷ)", "DS Thu nợ (tỷ)",
             ]
@@ -1049,14 +1049,14 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                 """Hiển thị ô bảng theo chuẩn VN (. nghìn, , thập phân) — dùng vn / fmt_so."""
                 if pd.isna(val) or val == "":
                     return "—"
-                if col in ["Dư nợ (tỷ)"]:
+                if col in ["Dư nợ (triệu đồng)"]:
                     return vn(float(val), 2)
                 if col in ["TL QH %", "TL Khoanh %", "TL NPL %"]:
                     return f"{vn(float(val), 2)}%"
                 if col in [
-                    "QH (tỷ)",
-                    "Khoanh (tỷ)",
-                    "Nợ xấu (tỷ)",
+                    "QH (triệu đồng)",
+                    "Khoanh (triệu đồng)",
+                    "Nợ xấu (triệu đồng)",
                     "Lãi tồn (tỷ)",
                     "Nợ ĐH năm (tỷ)",
                     "DS Cho vay (tỷ)",
@@ -1274,7 +1274,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
 
                     pdf_tg["Số món vay"] = pdf_tg["_mon"].apply(fmt_so)
                     pdf_tg["Số KH"]      = pdf_tg["_kh"].apply(fmt_so)
-                    pdf_tg["Dư nợ (tỷ)"] = pdf_tg["_no"].apply(fmt_bang_ty)
+                    pdf_tg["Dư nợ (triệu đồng)"] = pdf_tg["_no"].apply(fmt_bang_ty)
 
                     pdf_tg = pdf_tg.rename(columns=rename_ok)
                     pdf_tg = pdf_tg.sort_values(
@@ -1283,7 +1283,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                     )
 
                     cols_hien_thi = [v for v in ["PGD", "Xã", "Chương trình"] if v in pdf_tg.columns]
-                    df_pdf = pdf_tg[[*cols_hien_thi, "Số món vay", "Số KH", "Dư nợ (tỷ)"]]
+                    df_pdf = pdf_tg[[*cols_hien_thi, "Số món vay", "Số KH", "Dư nợ (triệu đồng)"]]
 
                     return xuat_pdf(
                         df_pdf,
@@ -1319,8 +1319,8 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                             ).reset_index().sort_values("_no", ascending=False)
                             tg["Số món vay"] = tg["_mon"].apply(fmt_so)
                             tg["Số KH"]      = tg["_kh"].apply(fmt_so)
-                            tg["Dư nợ (tỷ)"] = tg["_no"].apply(fmt_bang_ty)
-                            cols_hien_thi = [COT_TEN_PGD, nhom_col, "Số món vay", "Số KH", "Dư nợ (tỷ)"]
+                            tg["Dư nợ (triệu đồng)"] = tg["_no"].apply(fmt_bang_ty)
+                            cols_hien_thi = [COT_TEN_PGD, nhom_col, "Số món vay", "Số KH", "Dư nợ (triệu đồng)"]
                             rename_map = {COT_TEN_PGD: "PGD", nhom_col: "Xã"}
                         else:
                             tg = df_loc.groupby(nhom_col).agg(
@@ -1330,8 +1330,8 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                             ).reset_index().sort_values("_no", ascending=False)
                             tg["Số món vay"] = tg["_mon"].apply(fmt_so)
                             tg["Số KH"]      = tg["_kh"].apply(fmt_so)
-                            tg["Dư nợ (tỷ)"] = tg["_no"].apply(fmt_bang_ty)
-                            cols_hien_thi = [nhom_col, "Số món vay", "Số KH", "Dư nợ (tỷ)"]
+                            tg["Dư nợ (triệu đồng)"] = tg["_no"].apply(fmt_bang_ty)
+                            cols_hien_thi = [nhom_col, "Số món vay", "Số KH", "Dư nợ (triệu đồng)"]
                             rename_map = {nhom_col: nhom_chon}
 
                         hien_thi_dataframe_phan_trang(
@@ -1349,7 +1349,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                                 textinfo="label+percent",
                                 textposition="outside",
                                 hovertemplate="<b>%{label}</b><br>Dư nợ: %{customdata}<br>Tỷ lệ: %{percent}<extra></extra>",
-                                customdata=top10["Dư nợ (tỷ)"],
+                                customdata=top10["Dư nợ (triệu đồng)"],
                                 marker=dict(
                                     colors=px.colors.sequential.Greens_r[: len(top10)],
                                     line=dict(color="white", width=2),

@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [2026-05-15] — Tối ưu hiệu năng: cache danh_dau_khong_hd, bỏ cache_data.clear() thừa, tăng TTL
+- `data/hstd.py` — Thêm `danh_dau_khong_hd_cached()` với `@st.cache_data(ttl=3600)` tránh tính 4 lần/rerun
+- `data/__init__.py` — Export `danh_dau_khong_hd_cached`
+- `workspaces/ws_management.py` — Thay `id(df_full)` session_state cache bằng `danh_dau_khong_hd_cached()`; bỏ 3 lần `st.cache_data.clear()` sau thao tác NDT (không cần thiết, chỉ xóa cache parquet không liên quan)
+- `workspaces/ws_operation.py` — Dùng `danh_dau_khong_hd_cached()` tại 3 chỗ gọi
+- `data/pgd.py` — Tăng TTL `_doc_ngay_so_lieu` và `doc_trang_thai_file` từ 30s → 300s
+
 ## [2026-05-15] — Thêm health_check.py kiểm tra sức khỏe hệ thống
 - `health_check.py` — Script CLI mới, không import Streamlit; kiểm tra 13 điểm: DB/bảng tồn tại, kv_store không corrupt, khtd_cn, merge_meta_hstd, 3 parquet cache, upload HSTD 22 PGD, audit log 24h; in ✅/❌ từng check + bảng 5 log gần nhất + tổng kết exit-code
 

@@ -89,7 +89,7 @@ def _xlsx_val_to_datetime(val) -> datetime | None:
     return None
 
 
-@st.cache_data(ttl=300, show_spinner=False)
+@st.cache_data(ttl=7200, show_spinner=False)
 def _doc_ngay_so_lieu(path: Path, loai: str, _mtime: float = 0.0) -> datetime | None:
     """Đọc ngày số liệu từ trong file xlsx (read_only, tối thiểu ô cần thiết). Lỗi → None.
     _mtime: os.path.getmtime(path) — dùng làm cache key, tự invalidate khi file thay đổi."""
@@ -125,7 +125,7 @@ def _doc_ngay_so_lieu(path: Path, loai: str, _mtime: float = 0.0) -> datetime | 
         return None
 
 
-@st.cache_data(ttl=300, show_spinner=False)
+@st.cache_data(ttl=7200, show_spinner=False)
 def doc_trang_thai_file(ten_don_vi: str, loai: LoaiFile, _mtime: float = 0.0) -> dict:
     """
     Đọc trạng thái file upload của một đơn vị theo loại.
@@ -293,7 +293,7 @@ def ds_pgd_co_gqvl() -> list:
 
 
 # ── Đọc file PGD đơn lẻ ──────────────────────────────────────────────────────
-@st.cache_data(ttl=300, show_spinner=False)
+@st.cache_data(ttl=7200, show_spinner=False)
 def doc_hstd_pgd(ten_pgd: str, file_mtime: float = 0.0) -> pd.DataFrame | None:
     """
     Đọc HSTD của một PGD từ file Parquet riêng.
@@ -317,7 +317,7 @@ def doc_hstd_pgd(ten_pgd: str, file_mtime: float = 0.0) -> pd.DataFrame | None:
     return doc_file(path, file_mtime) if os.path.exists(path) else None
 
 
-@st.cache_data(show_spinner=False)
+@st.cache_data(ttl=7200, show_spinner=False)
 def doc_nq11_pgd(ten_pgd: str, _ts):
     from data.hstd import doc_file_nq11
 
@@ -325,7 +325,7 @@ def doc_nq11_pgd(ten_pgd: str, _ts):
     return doc_file_nq11(path, _ts) if os.path.exists(path) else None
 
 
-@st.cache_data(show_spinner=False)
+@st.cache_data(ttl=7200, show_spinner=False)
 def doc_gqvl_pgd_v2(ten_pgd: str, _ts):
     """Đọc GQVL PGD — ưu tiên pgd_data/{slug}/, fallback gqvl_pgd/ (legacy)."""
     from data.hstd import doc_file_gqvl
@@ -336,13 +336,13 @@ def doc_gqvl_pgd_v2(ten_pgd: str, _ts):
     return doc_file_gqvl(path, ts_file(path)) if os.path.exists(path) else None
 
 
-@st.cache_data(show_spinner=False)
+@st.cache_data(ttl=7200, show_spinner=False)
 def doc_gqvl_pgd(ten_pgd: str, _ts):
     return doc_gqvl_pgd_v2(ten_pgd, _ts)
 
 
 # ── Gộp toàn CN ──────────────────────────────────────────────────────────────
-@st.cache_data(show_spinner=False)
+@st.cache_data(ttl=7200, show_spinner=False)
 def doc_hstd_toan_cn_pgd(pgd_dir_mtime: float = 0.0) -> pd.DataFrame | None:
     """Gộp HSTD tất cả PGD đã upload (từ cấu trúc mới).
 
@@ -364,6 +364,7 @@ def doc_hstd_toan_cn_pgd(pgd_dir_mtime: float = 0.0) -> pd.DataFrame | None:
     return pd.concat(frames, ignore_index=True) if frames else None
 
 
+@st.cache_data(ttl=7200, show_spinner=False)
 def doc_gqvl_toan_cn_pgd() -> pd.DataFrame | None:
     """Gộp GQVL tất cả PGD đã upload."""
     from data.hstd import doc_file_gqvl
@@ -411,6 +412,7 @@ def _doc_gqvl_toan_cn_legacy() -> pd.DataFrame | None:
     return pd.concat(frames, ignore_index=True) if frames else None
 
 
+@st.cache_data(ttl=7200, show_spinner=False)
 def doc_nq11_toan_cn_pgd() -> pd.DataFrame | None:
     """Gộp NQ11 tất cả PGD đã upload."""
     from data.hstd import doc_file_nq11

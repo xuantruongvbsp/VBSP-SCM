@@ -75,8 +75,8 @@ def _render_canh_bao(df: pd.DataFrame, ds_pgd_all: list):
         {"label": "Sắp chuyển KHĐ", "value": amber_tong, "icon": "⚠️", "suffix": "", "precision": 0,
          "delta_color": "off", "help": "Lãi tồn 2-3 tháng, cần đôn đốc ngay"},
         {"label": "Lãi tồn KHĐ", "value": tong_lai_khd, "icon": "💰", "suffix": "đồng", "precision": 0,
-         "help": "Tổng lãi tồn các món 3 tháng KHĐ"},
-    ], cols=4)
+          "help": "Tổng lãi tồn các món 3 tháng KHĐ"},
+     ], num_columns=4)
 
     st.divider()
 

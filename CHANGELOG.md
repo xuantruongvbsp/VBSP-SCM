@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [2026-05-16] — Fix 4 KPI DeltaCard trang chủ PGD
+- `workspaces/ws_operation.py` — Thêm import `PGD_XA_MAP`; thêm helper `_kpi_pgd_list(df_pgd, pgd_user)` dùng chung cho 2 chỗ render KPI
+- KPI 1/2: `value` → `fmt_ty()` (trước là raw VND float); bỏ `suffix="đồng"` (fmt_ty đã có đơn vị)
+- KPI 3: `value` → `fmt_so(n_khd)`; thêm `suffix="món"`; `precision` 0→1
+- KPI 4: Bỏ logic sai `khtd_pgd_{slug}.tong_kh/.tong_th` → đọc `khtd_xa` + lọc `PGD_XA_MAP[pgd_user]`; `delta=None` thay vì `delta=0` để ẩn delta hoàn toàn
+- Gộp 2 block KPI trùng (~74 và ~1235) thành 1 lời gọi `_kpi_pgd_list()`
+
 ## [2026-05-16] — Fix căn lề PDF bảng "Thông tin tổng quát theo PGD"
 - `pdf_service.py` — Thêm param `cols_right` vào `xuat_pdf()`: các cột trong danh sách này dùng `style_td_r` (TA_RIGHT) mà không re-format lại số (dữ liệu đã format sẵn). Thêm `elif col in set_right` trong vòng lặp data rows
 - `tabs/tab_tongquan.py` — Truyền `cols_right=[tất cả cột trừ "Đơn vị"]` khi gọi `xuat_pdf()` để số liệu căn phải, cột tên đơn vị căn trái

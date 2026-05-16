@@ -179,7 +179,7 @@ def _render_tong_quan(ds_config, trang_thai, nam, thang):
             ds_sap.append({"Báo cáo": bc.get("ten", ""), "Hạn": d_han.isoformat(), "Còn lại (ngày)": diff})
     if ds_sap:
         st.info("Báo cáo sắp đến hạn (≤3 ngày)")
-        st.dataframe(pd.DataFrame(ds_sap), hide_index=True, use_container_width=True)
+        st.dataframe(pd.DataFrame(ds_sap), hide_index=True, width='stretch')
 
 
 def _render_danh_sach(
@@ -470,7 +470,7 @@ def _render_xuat_excel(ds_config: list[dict], trang_thai: dict[str, dict], nam: 
         file_name=ten_file,
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         key="clbc_dl_excel",
-        use_container_width=True,
+        width='stretch',
     )
 
 

@@ -141,6 +141,36 @@ def render(tab: Optional[st.delta_generator.DeltaGenerator] = None, **kwargs) ->
         }
     )
 
+    # ── Xuất Excel / PDF ──
+    st.divider()
+    col_excel, col_pdf, _ = st.columns([1, 1, 5])
+    with col_excel:
+        if st.button("📥 Xuất Excel", key="btn_xuat_tdn", use_container_width=True, type="primary"):
+            sheets = {"Tiến độ nộp báo cáo": df_loc}
+            excel_bytes = xuat_excel(sheets)
+            st.session_state["_excel_tdn_bytes"] = excel_bytes
+            st.session_state["_excel_tdn_ten"] = f"tien_do_nop_{len(df_loc)}_dong.xlsx"
+
+    if st.session_state.get("_excel_tdn_bytes"):
+        st.download_button(
+            "⬇ Tải Excel",
+            data=st.session_state["_excel_tdn_bytes"],
+            file_name=st.session_state["_excel_tdn_ten"],
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            key="dl_excel_tdn",
+        )
+
+    with col_pdf:
+        from pdf_service import nut_xuat_pdf
+        nut_xuat_pdf(
+            df_loc,
+            "Tiến độ nộp báo cáo PGD",
+            st.session_state.get("txt_username", "unknown"),
+            cols_tien=[],
+            prefix_file="TienDoNop",
+            key="pdf_tdn",
+        )
+
     if ky_chon != "Tất cả":
         ds_tat_ca = [DON_VI_CHI_NHANH] + DS_PGD
         da_nop = df_loc["ten_pgd"].unique().tolist()

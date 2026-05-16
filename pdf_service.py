@@ -1293,7 +1293,7 @@ def nut_xuat_pdf_bao_cao(
             file_name=pdf_info["filename"],
             mime="application/pdf",
             key=f"{key}_dl",
-            use_container_width=True,
+            width='stretch',
         )
 
 

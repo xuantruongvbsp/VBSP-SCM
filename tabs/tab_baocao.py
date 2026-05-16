@@ -467,7 +467,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
             # Xuất tổng hợp
             if dbc_raw is not None:
                 st.divider()
-                if st.button("📥 Xuất tổng hợp Excel", key="btn_xuat_th"):
+                if st.button("📥 Xuất tổng hợp Excel", key="btn_xuat_th", type="primary"):
                     data_excel = xuat_bao_cao(
                         sheets={"Tổng hợp": dbc_raw},
                         tieu_de="Báo cáo tổng hợp",

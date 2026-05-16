@@ -24,6 +24,7 @@ from auth import la_phan_he_cn, normalize_role
 from config import (
     DS_PGD, DON_VI_CHI_NHANH, MA_PGD_MAP,
     baseline_path, baseline_cache, danh_sach_nam_baseline,
+    baseline_pgd_path, danh_sach_nam_baseline_pgd, trang_thai_baseline_pgd,
 )
 from data.pgd import (
     duong_dan_pgd,
@@ -1099,19 +1100,12 @@ def _render_xoa_du_lieu(role: str, username: str) -> None:
 # ── Upload Baseline 31/12 ─────────────────────────────────────────────────────
 
 def _render_upload_baseline(username: str) -> None:
-    """Expander upload file HSTD mốc 31/12 để dùng cho tab So sánh kỳ."""
+    """Expander upload file HSTD mốc 31/12 per-PGD để dùng cho tab So sánh kỳ."""
     with st.expander("📅 Upload mốc số liệu 31/12 (Baseline)", expanded=False):
         st.caption(
-            "File HSTD ngày 31/12 — dùng để so sánh tăng trưởng trong tab **So sánh kỳ**. "
+            "Upload file HSTD 31/12 của từng đơn vị — tab **So sánh kỳ** sẽ tự merge. "
             "Định dạng y hệt file HSTD thường (sheet BCQUERY, header dòng 5)."
         )
-
-        # Năm đã có
-        ds_nam_hien_co = danh_sach_nam_baseline()
-        if ds_nam_hien_co:
-            st.success(f"✅ Đã có baseline các năm: **{', '.join(str(n) for n in ds_nam_hien_co)}**")
-        else:
-            st.info("ℹ️ Chưa có file baseline nào.")
 
         from datetime import date as _date
         nam_mac_dinh = _date.today().year - 1
@@ -1124,43 +1118,54 @@ def _render_upload_baseline(username: str) -> None:
             step=1,
             key="upload_baseline_nam",
         )
+        nam = int(chon_nam)
 
-        f_bl = st.file_uploader(
-            f"File HSTD ngày 31/12/{chon_nam}",
-            type=["xlsx", "xls"],
-            key="upload_baseline_file",
-        )
+        # Trạng thái 22 đơn vị
+        trang_thai = trang_thai_baseline_pgd(nam)
+        da_co = sum(1 for v in trang_thai.values() if v)
+        tong = len(trang_thai)
 
-        if f_bl is None:
-            return
+        if da_co == tong:
+            st.success(f"✅ Đủ {tong}/{tong} đơn vị — baseline {nam} sẵn sàng.")
+        elif da_co > 0:
+            st.warning(f"⏳ Đã có {da_co}/{tong} đơn vị — còn thiếu {tong - da_co} đơn vị.")
+        else:
+            st.info(f"ℹ️ Chưa có đơn vị nào cho năm {nam}.")
 
-        if st.button("📤 Lưu Baseline", type="primary", key="btn_luu_baseline"):
-            file_bytes = f_bl.read()
-            if not file_bytes:
-                st.error("❌ File rỗng."); return
+        st.divider()
 
-            dest = baseline_path(int(chon_nam))
-            cache = baseline_cache(int(chon_nam))
-            try:
-                Path(dest).parent.mkdir(parents=True, exist_ok=True)
-                with open(dest, "wb") as fh:
-                    fh.write(file_bytes)
-
-                # Xóa cache parquet cũ để buộc đọc lại
-                if Path(cache).exists():
-                    Path(cache).unlink()
-
-                mb = len(file_bytes) / 1024 / 1024
-                db.ghi_audit(username, "upload_baseline",
-                             f"HSTD 31/12/{chon_nam} ({mb:.1f} MB)")
-                st.cache_data.clear()
-                st.success(
-                    f"✅ Đã lưu baseline **31/12/{chon_nam}** ({mb:.1f} MB). "
-                    f"Tab **So sánh kỳ** đã sẵn sàng sử dụng."
+        # Grid upload: 2 cột, mỗi dòng 1 đơn vị
+        ds_don_vi = [DON_VI_CHI_NHANH] + DS_PGD
+        col_l, col_r = st.columns(2)
+        for idx, don_vi in enumerate(ds_don_vi):
+            col = col_l if idx % 2 == 0 else col_r
+            with col:
+                co_file = trang_thai.get(don_vi, False)
+                nhan = f"{'✅' if co_file else '⬜'} {don_vi}"
+                f_up = st.file_uploader(
+                    nhan,
+                    type=["xlsx", "xls"],
+                    key=f"bl_{nam}_{idx}",
+                    label_visibility="visible",
                 )
-                st.rerun()
-            except Exception as e:
-                st.error(f"❌ Lỗi lưu file: {e}")
+                if f_up is not None:
+                    if st.button("Lưu", key=f"btn_bl_{nam}_{idx}", type="primary"):
+                        byt = f_up.read()
+                        if not byt:
+                            st.error("File rỗng.")
+                        else:
+                            dest = baseline_pgd_path(don_vi, nam)
+                            try:
+                                Path(dest).parent.mkdir(parents=True, exist_ok=True)
+                                with open(dest, "wb") as fh:
+                                    fh.write(byt)
+                                mb = len(byt) / 1024 / 1024
+                                db.ghi_audit(username, "upload_baseline",
+                                             f"HSTD 31/12/{nam} — {don_vi} ({mb:.1f} MB)")
+                                st.cache_data.clear()
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"❌ {e}")
 
 
 # ── Entry point ───────────────────────────────────────────────────────────────

@@ -1,5 +1,8 @@
 # CHANGELOG
 
+## [2026-05-16] — Fix import hàng loạt: cache invalidation + force re-import
+- `tabs/tab_upload_khnv.py` — Sửa cache `khnv_bulk_bytes` dùng `(tên, kích thước)` thay vì chỉ tên file để detect đúng khi upload cùng tên nhưng nội dung mới; thêm checkbox "Bắt buộc import lại" để ghi đè dù MD5 giống hệt; thêm style "🔁 Ghi đè" vào bảng so sánh; tách caption "Giống hệt" riêng khỏi "Bỏ qua"
+
 ## [2026-05-16] — Port 3 tính năng từ VSPPRO: Nợ khoanh, Top biến động, Radar+Ranking
 - `tabs/tab_no_khoanh.py` **TẠO MỚI** — Phân tích Nợ khoanh (port Khoanh.tsx): 4 KPI cards, heatmap đáo hạn theo năm, breakdown theo Chương trình / Xã / ĐVUT (bar chart + bảng), danh sách chi tiết + xuất Excel
 - `tabs/tab_so_sanh_ky.py` — Thêm `_render_top_bien_dong()` (Top N tăng/giảm theo chiều + chỉ tiêu, 2 biểu đồ bar ngang cạnh nhau) và `_render_radar_ranking()` (radar đa trục PGD + ranking horizontal bar) — port PeriodMovers.tsx + Compare.tsx

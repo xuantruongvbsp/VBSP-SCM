@@ -5,9 +5,10 @@ Tab Tập trung rủi ro & Chỉ số HHI — Phân hệ Chi nhánh.
 theo 3 chiều: Chương trình, Xã, PGD.
 
 HHI = Σ(Si²) × 10.000   (Si = tỷ trọng dư nợ nhóm i / tổng dư nợ)
-  < 1.500  → Phân tán tốt
-  1.500–2.500 → Tập trung vừa
+  < 1.000  → Đa dạng hóa tốt
+  1.000–2.500 → Tập trung vừa
   > 2.500  → Tập trung cao — cần kiểm soát
+Ngưỡng đồng bộ với services/hhi_service.py::danh_gia_hhi().
 """
 from __future__ import annotations
 
@@ -128,7 +129,7 @@ def _render_sub_ct(df_full: pd.DataFrame) -> None:
 
     fig = go.Figure(
         go.Bar(
-            y=top15[COT_TEN_CT].astype(str),
+            y=top15["_nhom"].astype(str),
             x=top15["ty_trong"],
             orientation="h",
             marker_color=top15["color"],

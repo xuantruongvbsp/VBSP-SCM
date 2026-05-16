@@ -12,6 +12,8 @@ from config import (
     COT_DU_NO_QH,
     COT_DU_NO_TH,
     COT_MA_KH,
+    COT_NGAY_SL,
+    COT_PHAN_LOAI,
     COT_SO_KU,
     COT_TEN_PGD,
     COT_TONG_DU_NO,
@@ -22,6 +24,8 @@ from config import (
 )
 from data.hstd import doc_baseline_merged
 from data.pgd import pgd_slug
+from services.hhi_service import danh_gia_hhi, tinh_hhi, tinh_hhi_breakdown
+from services.migration_service import danh_sach_ky, doc_snapshot, migration_matrix
 from utils import fmt_so, fmt_ty
 
 COT_DU_NO_KHOANH = "Dư nợ khoanh"
@@ -95,6 +99,123 @@ def _fmt_pct_vn(x: float) -> str:
     return f"{x:.2f}".replace(".", ",") + "%"
 
 
+def _ma_tran_chuyen_nhuong(ky_truoc: str, ky_sau: str) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Lấy ma trận chuyển nhóm nợ từ snapshot."""
+    matrix, chi_tiet = migration_matrix(ky_truoc, ky_sau)
+    return matrix, chi_tiet
+
+
+def _phan_loai_khach_hang(df_truoc: pd.DataFrame, df_sau: pd.DataFrame) -> pd.DataFrame:
+    """Phân loại khách hàng: Retained, Churned, New, Reactivated."""
+    if df_truoc.empty or df_sau.empty or COT_MA_KH not in df_truoc.columns:
+        return pd.DataFrame()
+
+    ma_kh_truoc = set(df_truoc[COT_MA_KH].astype(str).str.strip())
+    ma_kh_sau = set(df_sau[COT_MA_KH].astype(str).str.strip())
+
+    retained = len(ma_kh_truoc & ma_kh_sau)
+    churned = len(ma_kh_truoc - ma_kh_sau)
+    new = len(ma_kh_sau - ma_kh_truoc)
+
+    return pd.DataFrame([{
+        "Loại": "Tồn tại trước đó",
+        "Số hộ": fmt_so(retained),
+        "% KH trước": _fmt_pct_vn((retained / len(ma_kh_truoc) * 100) if ma_kh_truoc else 0),
+    }, {
+        "Loại": "Rời khỏi",
+        "Số hộ": fmt_so(churned),
+        "% KH trước": _fmt_pct_vn((churned / len(ma_kh_truoc) * 100) if ma_kh_truoc else 0),
+    }, {
+        "Loại": "Mới",
+        "Số hộ": fmt_so(new),
+        "% KH sau": _fmt_pct_vn((new / len(ma_kh_sau) * 100) if ma_kh_sau else 0),
+    }])
+
+
+def _phan_tich_par(df: pd.DataFrame) -> pd.DataFrame:
+    """Phân tích PAR (Portfolio at Risk) theo ngày quá hạn."""
+    if df.empty or COT_DU_NO_QH not in df.columns:
+        return pd.DataFrame()
+
+    tong_qh = df[COT_DU_NO_QH].sum() if COT_DU_NO_QH in df.columns else 0
+    tong_dn = df[COT_TONG_DU_NO].sum() if COT_TONG_DU_NO in df.columns else 0
+
+    par = (tong_qh / tong_dn * 100) if tong_dn > 0 else 0.0
+
+    return pd.DataFrame([{
+        "Chỉ tiêu": "PAR (Portfolio At Risk)",
+        "Dư nợ quá hạn": fmt_ty(tong_qh),
+        "Tổng dư nợ": fmt_ty(tong_dn),
+        "PAR %": _fmt_pct_vn(par),
+    }])
+
+
+def _phan_tich_hhi_pgd(df: pd.DataFrame) -> tuple[float, pd.DataFrame, str, str, str]:
+    """Tính HHI theo PGD — nồng độ rủi ro."""
+    if df.empty or COT_TEN_PGD not in df.columns or COT_TONG_DU_NO not in df.columns:
+        return 0.0, pd.DataFrame(), "N/A", "", ""
+
+    hhi = tinh_hhi(df, COT_TEN_PGD, COT_TONG_DU_NO)
+    breakdown = tinh_hhi_breakdown(df, COT_TEN_PGD, COT_TONG_DU_NO)
+
+    muc_do, icon, mau = danh_gia_hhi(hhi)
+
+    return hhi, breakdown, muc_do, icon, mau
+
+
+def _top_movers(
+    df_ht: pd.DataFrame,
+    df_bl: pd.DataFrame,
+    nhom_by: str = COT_TEN_PGD,
+    n: int = 5,
+) -> pd.DataFrame:
+    """Top N PGD với thay đổi lớn nhất về dư nợ và NQH."""
+    if df_ht.empty or df_bl.empty:
+        return pd.DataFrame()
+
+    if nhom_by not in df_ht.columns or nhom_by not in df_bl.columns:
+        return pd.DataFrame()
+
+    agg_ht = df_ht.groupby(nhom_by).agg({
+        COT_TONG_DU_NO: "sum",
+        COT_DU_NO_QH: "sum",
+    }).reset_index()
+    agg_ht["nqh_pct"] = (agg_ht[COT_DU_NO_QH] / agg_ht[COT_TONG_DU_NO] * 100).fillna(0)
+
+    agg_bl = df_bl.groupby(nhom_by).agg({
+        COT_TONG_DU_NO: "sum",
+        COT_DU_NO_QH: "sum",
+    }).reset_index()
+    agg_bl["nqh_pct"] = (agg_bl[COT_DU_NO_QH] / agg_bl[COT_TONG_DU_NO] * 100).fillna(0)
+
+    merged = agg_ht.merge(
+        agg_bl,
+        on=nhom_by,
+        how="outer",
+        suffixes=("_ht", "_bl"),
+    ).fillna(0)
+
+    merged["delta_dn"] = merged[f"{COT_TONG_DU_NO}_ht"] - merged[f"{COT_TONG_DU_NO}_bl"]
+    merged["delta_nqh"] = merged["nqh_pct_ht"] - merged["nqh_pct_bl"]
+    merged["pct_change"] = (
+        merged["delta_dn"] / merged[f"{COT_TONG_DU_NO}_bl"]
+        * 100
+    ).where(merged[f"{COT_TONG_DU_NO}_bl"] != 0, 0)
+
+    top = merged.nlargest(n, "delta_dn")
+
+    result = pd.DataFrame()
+    result[nhom_by] = top[nhom_by]
+    result["DN mốc"] = top[f"{COT_TONG_DU_NO}_bl"].apply(fmt_ty)
+    result["DN HT"] = top[f"{COT_TONG_DU_NO}_ht"].apply(fmt_ty)
+    result["Δ DN"] = top["delta_dn"].apply(lambda x: ("+" if x >= 0 else "") + fmt_ty(x))
+    result["% Thay đổi"] = top["pct_change"].apply(_fmt_pct_vn)
+    result["NQH mốc"] = top["nqh_pct_bl"].apply(_fmt_pct_vn)
+    result["NQH HT"] = top["nqh_pct_ht"].apply(_fmt_pct_vn)
+
+    return result
+
+
 def render(tab: DeltaGenerator = None, **kwargs) -> None:
     df       = kwargs.get("df")
     df_full  = kwargs.get("df_full", df)
@@ -117,9 +238,18 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
         # ── Chọn năm baseline ─────────────────────────────────────────────
         ds_nam = danh_sach_nam_baseline_pgd() or danh_sach_nam_baseline()
         if not ds_nam:
-            st.warning(
-                "⚠️ Chưa có file baseline 31/12 nào. "
-                "Vui lòng upload file **HSTD_3112_{năm}.XLSX** trong mục Quản trị."
+            st.warning("⚠️ Chưa có dữ liệu năm trước để so sánh.")
+            st.markdown(
+                """
+**Cách thêm dữ liệu mốc 31/12:**
+
+1. Vào menu **Hệ thống → Upload dữ liệu**
+2. Mở phần **📅 Upload mốc số liệu 31/12 (Baseline)**
+3. Chọn năm (ví dụ: 2025) và upload file HSTD của ngày 31/12 năm đó
+4. Quay lại tab này — dữ liệu so sánh sẽ hiện ra tự động
+
+> File cần upload có định dạng giống file HSTD thường (sheet **BCQUERY**, header dòng 5).
+                """
             )
             return
 
@@ -300,3 +430,138 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
             )
 
             st.dataframe(df_out, hide_index=True, use_container_width=True, height=520)
+
+        # ═══════════ MA TRẬN CHUYỂN NHÓM NỢ ═════════════════════════════════
+        st.divider()
+        with st.expander("📊 Ma trận chuyển nhóm nợ", expanded=False):
+            kys = danh_sach_ky()
+            if len(kys) >= 2:
+                ky_map = {k: k for k in kys}
+                ky_truoc = st.selectbox(
+                    "Kỳ trước",
+                    kys[1:],
+                    key=f"{key_prefix}mm_ky_truoc",
+                    format_func=lambda x: ky_map.get(x, x),
+                )
+                ky_sau = st.selectbox(
+                    "Kỳ sau",
+                    kys,
+                    key=f"{key_prefix}mm_ky_sau",
+                    format_func=lambda x: ky_map.get(x, x),
+                )
+
+                if ky_truoc and ky_sau and ky_truoc != ky_sau:
+                    matrix, chi_tiet = _ma_tran_chuyen_nhuong(ky_truoc, ky_sau)
+                    if not matrix.empty:
+                        st.subheader(f"Ma trận: {ky_truoc} → {ky_sau}")
+                        st.dataframe(matrix, use_container_width=True)
+
+                        if not chi_tiet.empty:
+                            with st.expander(
+                                f"📋 Chi tiết ({len(chi_tiet)} khoản)",
+                                expanded=False,
+                            ):
+                                st.dataframe(
+                                    chi_tiet,
+                                    hide_index=True,
+                                    use_container_width=True,
+                                    height=400,
+                                )
+                    else:
+                        st.info("Không đủ dữ liệu snapshot để so sánh.")
+            else:
+                st.info("Cần ít nhất 2 kỳ để hiển thị ma trận chuyển nhóm nợ.")
+
+        # ═══════════ PHÂN LOẠI KHÁCH HÀNG ═════════════════════════════════
+        st.divider()
+        with st.expander("👥 Phân loại khách hàng", expanded=False):
+            st.markdown(
+                "**Phân tích thay đổi nhóm khách hàng giữa hai kỳ:**"
+            )
+            df_lifecycle = _phan_loai_khach_hang(df_bl, df_ht)
+            if not df_lifecycle.empty:
+                st.dataframe(df_lifecycle, hide_index=True, use_container_width=True)
+            else:
+                st.info("Không đủ dữ liệu khách hàng để phân loại.")
+
+        # ═══════════ PHÂN TÍCH PAR ═════════════════════════════════════════
+        st.divider()
+        with st.expander("🎯 Phân tích PAR (Portfolio at Risk)", expanded=False):
+            st.markdown(
+                "**Portfolio at Risk (PAR)** — tỷ lệ dư nợ quá hạn so với tổng dư nợ"
+            )
+            c1, c2 = st.columns(2)
+
+            with c1:
+                st.subheader("Mốc 31/12")
+                df_par_bl = _phan_tich_par(df_bl)
+                if not df_par_bl.empty:
+                    st.dataframe(df_par_bl, hide_index=True, use_container_width=True)
+
+            with c2:
+                st.subheader("Hiện tại")
+                df_par_ht = _phan_tich_par(df_ht)
+                if not df_par_ht.empty:
+                    st.dataframe(df_par_ht, hide_index=True, use_container_width=True)
+
+        # ═══════════ PHÂN TÍCH HHI ═════════════════════════════════════════
+        st.divider()
+        with st.expander(
+            "🎲 Phân tích tập trung rủi ro (HHI Index)", expanded=False
+        ):
+            st.markdown(
+                "**Herfindahl-Hirschman Index (HHI)** — đo lường nồng độ rủi ro theo PGD"
+            )
+            c1, c2 = st.columns(2)
+
+            with c1:
+                st.subheader("Mốc 31/12")
+                hhi_bl, bd_bl, muc_bl, icon_bl, mau_bl = _phan_tich_hhi_pgd(df_bl)
+                col1, col2 = st.columns(2)
+                col1.metric(
+                    "HHI Score",
+                    f"{hhi_bl * 10000:.0f}",
+                    help="Thang 0–10000. Cao = rủi ro tập trung.",
+                )
+                col2.markdown(f"### {icon_bl} {muc_bl}")
+                if not bd_bl.empty:
+                    st.dataframe(
+                        bd_bl[["du_no", "ty_trong_pct", "dong_gop_hhi"]],
+                        hide_index=True,
+                        use_container_width=True,
+                        height=250,
+                    )
+
+            with c2:
+                st.subheader("Hiện tại")
+                hhi_ht, bd_ht, muc_ht, icon_ht, mau_ht = _phan_tich_hhi_pgd(df_ht)
+                col1, col2 = st.columns(2)
+                col1.metric(
+                    "HHI Score",
+                    f"{hhi_ht * 10000:.0f}",
+                    help="Thang 0–10000. Cao = rủi ro tập trung.",
+                )
+                col2.markdown(f"### {icon_ht} {muc_ht}")
+                if not bd_ht.empty:
+                    st.dataframe(
+                        bd_ht[["du_no", "ty_trong_pct", "dong_gop_hhi"]],
+                        hide_index=True,
+                        use_container_width=True,
+                        height=250,
+                    )
+
+        # ═══════════ TOP MOVERS ════════════════════════════════════════════
+        st.divider()
+        with st.expander("🚀 Top movers (PGD có thay đổi lớn nhất)", expanded=False):
+            top_n = st.slider(
+                "Số PGD hiển thị",
+                min_value=3,
+                max_value=10,
+                value=5,
+                key=f"{key_prefix}top_movers_n",
+            )
+            df_top = _top_movers(df_ht, df_bl, COT_TEN_PGD, n=top_n)
+            if not df_top.empty:
+                st.dataframe(df_top, hide_index=True, use_container_width=True)
+            else:
+                st.info("Không đủ dữ liệu để hiển thị top movers.")

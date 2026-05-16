@@ -1022,7 +1022,7 @@ def render(tab, **kwargs) -> None:
                 col_kh: st.column_config.NumberColumn(f"Chỉ tiêu KH {nam_kh}\n(triệu)", format="%.0f", width="medium"),
             },
             hide_index=True,
-            use_container_width=True,
+            width='stretch',
             height=600,
             key=f"m07_table_edit_{pgd_slug_key}_{xa_slug_key}_{nam_kh}",
         )

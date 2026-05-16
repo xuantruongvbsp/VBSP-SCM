@@ -1,5 +1,14 @@
 # CHANGELOG
 
+## [2026-05-16] — Tính năng nâng cao: Tab So sánh kỳ
+- `tabs/tab_so_sanh_ky.py` — Thêm 5 tính năng so sánh nâng cao:
+  1. **Ma trận chuyển nhóm nợ** (Nhóm nợ A/B/C/D): từ loan-level snapshots (`migration_service.migration_matrix`)
+  2. **Phân loại khách hàng** (Retained/Churned/New): phân tích lifecycle giữa 2 kỳ
+  3. **Phân tích PAR** (Portfolio at Risk): tỷ lệ dư nợ quá hạn
+  4. **Nồng độ rủi ro (HHI)** theo PGD: dùng Herfindahl-Hirschman Index + breakdown đóng góp (`hhi_service`)
+  5. **Top movers**: Top N PGD có thay đổi lớn nhất về DN/NQH (slider chọn N=3-10)
+- Widget key prefix động theo role/PGD để tránh DuplicateElementKey
+
 ## [2026-05-16] — Upload baseline 31/12 qua giao diện
 - `tabs/tab_upload_khnv.py` — Thêm expander "📅 Upload mốc số liệu 31/12 (Baseline)": chọn năm, upload file, lưu vào `data/baseline/`, xóa cache parquet, ghi audit
 

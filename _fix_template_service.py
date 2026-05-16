@@ -27,7 +27,7 @@ old = '''def nut_tai_word_va_pdf(
             mime="application/vnd.openxmlformats-officedocument"
                  ".wordprocessingml.document",
             key=f"{key_prefix}_dl_docx",
-            use_container_width=True,
+            width='stretch',
         )
     with col2:
         pdf_bytes = docx_to_pdf(docx_bytes)
@@ -38,7 +38,7 @@ old = '''def nut_tai_word_va_pdf(
                 file_name=f"{ten_file_goc}.pdf",
                 mime="application/pdf",
                 key=f"{key_prefix}_dl_pdf",
-                use_container_width=True,
+                width='stretch',
             )
         else:
             st.caption("⚠️ PDF: cần MS Word trên server")'''
@@ -81,7 +81,7 @@ def hien_thi_nut_tai(key_prefix: str) -> None:
             mime="application/vnd.openxmlformats-officedocument"
                  ".wordprocessingml.document",
             key=f"{key_prefix}_dl_docx",
-            use_container_width=True,
+            width='stretch',
         )
     with col2:
         pdf_bytes = st.session_state.get(f"_p_bytes_{key_prefix}")
@@ -92,7 +92,7 @@ def hien_thi_nut_tai(key_prefix: str) -> None:
                 file_name=f"{st.session_state.get(f'_f_name_{key_prefix}', 'file')}.pdf",
                 mime="application/pdf",
                 key=f"{key_prefix}_dl_pdf",
-                use_container_width=True,
+                width='stretch',
             )
         else:
             st.caption("⚠️ PDF: cần MS Word trên server")'''

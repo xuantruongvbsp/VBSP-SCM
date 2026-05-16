@@ -43,6 +43,22 @@ from components.loan_drawer import loan_detail_drawer
 from components.filter_bar import filter_bar, apply_filters
 from components.export_pdf import download_pdf_button, xuat_pdf_co_chart
 
+from tabs import (
+    tab_tongquan, tab_baocao,
+    tab_candoi, tab_cbtd, tab_khtd, tab_kehoach,
+    tab_nhiem_vu, tab_khtd_giao_dc, tab_kiem_soat,
+    tab_ban_dai_dien, tab_uy_thac,
+    tab_tien_do, tab_tien_do_nop,
+)
+from tabs import tab_checklist_bc
+from tabs import tab_xlrr_tong_hop
+from tabs import tab_upload_khnv
+from tabs import tab_audit_log
+from tabs import tab_trang_thai_nguon
+from tabs import tab_so_sanh_ky
+from tabs import tab_hhi
+from tabs import tab_no_khoanh
+
 
 def _render_canh_bao(df: pd.DataFrame, ds_pgd_all: list):
     """
@@ -1099,11 +1115,11 @@ def render(**kwargs):
     def _tab_so_sanh_ky_fn(**kw):
         tab_so_sanh_ky.render(None, **kw)
 
-    role       = kwargs.pop("role", None)
-    username   = kwargs.pop("username", "unknown")
-    df         = kwargs.pop("df", None)
-    df_full    = kwargs.pop("df_full", df)
-    ds_pgd_all = kwargs.pop("ds_pgd_all", [])
+    role       = kwargs.get("role")
+    username   = kwargs.get("username", "unknown")
+    df         = kwargs.get("df")
+    df_full    = kwargs.get("df_full", df)
+    ds_pgd_all = kwargs.get("ds_pgd_all", [])
     role_n = normalize_role(str(role or "user"))
     can_upload = get_permissions(role_n)["can_upload"]
     can_manage_users = get_permissions(role_n)["can_manage_users"]
@@ -1111,9 +1127,11 @@ def render(**kwargs):
     st.title("📋 Phòng KH-NV")
     st.caption("Giám sát chỉ tiêu · Cân đối vốn · Quản lý NQH · GQVL · Quản lý CBTD")
 
+    filtered_kw = {k: v for k, v in kwargs.items()
+                   if k not in ("role", "username", "df", "df_full", "ds_pgd_all")}
     ALL_ITEMS = _build_all_items(
         role, username,
-        can_upload=can_upload, **kwargs
+        can_upload=can_upload, **filtered_kw
     )
 
     # ── Navigation: điều hướng hoàn toàn qua sidebar (render_sidebar_menu) ──

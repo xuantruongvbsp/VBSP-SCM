@@ -12,12 +12,13 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import os
+from datetime import datetime
 
 from config import (
     COT_TEN_PGD, COT_MA_KH, COT_SO_KU, COT_TEN_KH,
     COT_DU_NO_QH, COT_TONG_DU_NO, COT_DU_NO_TH, COT_TEN_CT,
     COT_NGAY_SL, DB_HT_CACHE, DB_PREV_CACHE, FILE_PATH_DB, FILE_PATH_DB_PREV,
-    NAM_HT, NAM_PREV, COT_LAI_TON,
+    NAM_HT, NAM_PREV, COT_LAI_TON, COT_TEN_XA, COT_PHAN_LOAI,
 )
 from data import (doc_dienbao, db_lookup, db_nqh_con, ts_file,
                   canh_bao_migration, canh_bao_migration_cached)
@@ -35,8 +36,9 @@ from utils import (
     xuat_excel,
     ten_file_xuat,
 )
-from tabs import tab_khtd_giao_dc, tab_kiem_soat, tab_qd62, tab_tien_do
+from tabs import tab_khtd_giao_dc, tab_kiem_soat, tab_qd62, tab_tien_do, tab_so_sanh_ky
 from snapshot_service import doc_snapshot, doc_snapshot_range, danh_sach_ky
+from services.hhi_service import tinh_hhi, tinh_hhi_breakdown, danh_gia_hhi
 
 # ── Hằng số ngưỡng NQH ────────────────────────────────────────────────────────
 _NGUONG_AN_TOAN  = 1.0   # % — xanh lá
@@ -789,6 +791,197 @@ def _canh_bao_xa_nqh(df_full: pd.DataFrame) -> None:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# SECTION 4b — Giám sát Tập trung Rủi ro (HHI)
+# ═══════════════════════════════════════════════════════════════════════════════
+def _hhi_giam_sat(df_full: pd.DataFrame) -> None:
+    """Giám sát mức độ tập trung danh mục cho vay — HHI theo Xã và Chương trình."""
+    st.markdown("#### 🎯 Giám sát Tập trung Rủi ro — HHI")
+
+    if df_full is None or df_full.empty:
+        st.info("Chưa có dữ liệu để phân tích.")
+        return
+
+    cot_tien = COT_TONG_DU_NO if COT_TONG_DU_NO in df_full.columns else ""
+
+    if not cot_tien:
+        st.warning("Không tìm thấy cột Tổng dư nợ trong dữ liệu.")
+        return
+
+    # ── HHI theo Xã ────────────────────────────────────────────────────
+    hhi_xa = tinh_hhi(df_full, COT_TEN_XA, cot_tien) if COT_TEN_XA in df_full.columns else 0
+    # ── HHI theo Chương trình ──────────────────────────────────────────
+    hhi_ct = tinh_hhi(df_full, COT_TEN_CT, cot_tien) if COT_TEN_CT in df_full.columns else 0
+
+    muc_xa, icon_xa, mau_xa = danh_gia_hhi(hhi_xa)
+    muc_ct, icon_ct, mau_ct = danh_gia_hhi(hhi_ct)
+
+    c_xa, c_ct = st.columns(2)
+
+    with c_xa:
+        st.markdown(
+            f"**🏘️ Tập trung theo Xã**",
+            help="HHI càng cao → dư nợ tập trung vào ít xã → rủi ro địa lý",
+        )
+        st.markdown(
+            f"<span style='font-size:2.2rem;font-weight:800;color:{mau_xa}'>"
+            f"{hhi_xa * 10000:.0f}</span>",
+            unsafe_allow_html=True,
+        )
+        st.caption(f"{icon_xa} {muc_xa}")
+        st.progress(min(hhi_xa * 10000 / 5000, 1.0))
+
+    with c_ct:
+        st.markdown(
+            f"**📌 Tập trung theo Chương trình**",
+            help="HHI càng cao → dư nợ tập trung vào ít chương trình → rủi ro sản phẩm",
+        )
+        st.markdown(
+            f"<span style='font-size:2.2rem;font-weight:800;color:{mau_ct}'>"
+            f"{hhi_ct * 10000:.0f}</span>",
+            unsafe_allow_html=True,
+        )
+        st.caption(f"{icon_ct} {muc_ct}")
+        st.progress(min(hhi_ct * 10000 / 5000, 1.0))
+
+    # ── Thang tham chiếu ──────────────────────────────────────────────
+    st.caption(
+        "Thang HHI: **<1000** ✅ Đa dạng hóa tốt · "
+        "**1000–2500** ⚠️ Tập trung vừa · "
+        "**>2500** 🚨 Tập trung cao"
+    )
+
+    # ── Breakdown chi tiết ─────────────────────────────────────────────
+    with st.expander("📊 Xem chi tiết phân bổ", expanded=False):
+        tab_xa, tab_ct = st.tabs(["🏘️ Theo Xã", "📌 Theo Chương trình"])
+
+        with tab_xa:
+            if COT_TEN_XA in df_full.columns:
+                br = tinh_hhi_breakdown(df_full, COT_TEN_XA, cot_tien)
+                br.columns = ["Xã", "Dư nợ (đồng)", "Tỷ trọng %", "Đóng góp HHI"]
+                br["Dư nợ (triệu đồng)"] = (br["Dư nợ (đồng)"] / 1e6).round(0)
+                br["Dư nợ (triệu đồng)"] = br["Dư nợ (triệu đồng)"].apply(
+                    lambda x: f"{x:,.0f}".replace(",", ".")
+                )
+                st.dataframe(
+                    br[["Xã", "Dư nợ (triệu đồng)", "Tỷ trọng %", "Đóng góp HHI"]],
+                    hide_index=True,
+                    use_container_width=True,
+                )
+
+        with tab_ct:
+            if COT_TEN_CT in df_full.columns:
+                br = tinh_hhi_breakdown(df_full, COT_TEN_CT, cot_tien)
+                br.columns = ["Chương trình", "Dư nợ (đồng)", "Tỷ trọng %", "Đóng góp HHI"]
+                br["Dư nợ (triệu đồng)"] = (br["Dư nợ (đồng)"] / 1e6).round(0)
+                br["Dư nợ (triệu đồng)"] = br["Dư nợ (triệu đồng)"].apply(
+                    lambda x: f"{x:,.0f}".replace(",", ".")
+                )
+                st.dataframe(
+                    br[["Chương trình", "Dư nợ (triệu đồng)", "Tỷ trọng %", "Đóng góp HHI"]],
+                    hide_index=True,
+                    use_container_width=True,
+                )
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# SECTION 4c — Ma trận Chuyển dịch Nhóm nợ (Migration Matrix)
+# ═══════════════════════════════════════════════════════════════════════════════
+def _migration_matrix_section(df_full: pd.DataFrame, username: str) -> None:
+    st.markdown("#### 🔄 Ma trận Chuyển dịch Nhóm nợ (Migration Matrix)")
+
+    from services.migration_service import (
+        luu_snapshot as luu_snap_loan,
+        danh_sach_ky as ds_ky_loan,
+        migration_matrix as mig_mat,
+    )
+
+    ds_ky = ds_ky_loan()
+
+    # ── Nút chụp snapshot ────────────────────────────────────────────────
+    col_snap, col_info = st.columns([2, 3])
+    with col_snap:
+        ky_moi = ""
+        if COT_NGAY_SL in df_full.columns:
+            sl = df_full[COT_NGAY_SL].dropna()
+            if len(sl):
+                try:
+                    val = str(sl.iloc[0])
+                    if "/" in val:
+                        parts = val.split("/")
+                        ky_moi = f"{parts[2][:4]}-{parts[1].zfill(2)}"
+                except Exception:
+                    pass
+        if not ky_moi:
+            ky_moi = datetime.now().strftime("%Y-%m")
+
+        da_co = ky_moi in ds_ky
+        if st.button(
+            f"📸 Chụp Snapshot kỳ **{ky_moi}**",
+            type="primary",
+            disabled=da_co,
+            help="Đã có snapshot kỳ này" if da_co else "Lưu trạng thái hiện tại để so sánh",
+            key="btn_snap_loan",
+        ):
+            with st.spinner("⏳ Đang lưu snapshot..."):
+                ky = luu_snap_loan(df_full, username)
+            st.success(f"✅ Đã lưu snapshot kỳ **{ky}**")
+            st.rerun()
+
+    with col_info:
+        if ds_ky:
+            st.caption(f"📂 Các kỳ đã lưu: {', '.join(ds_ky[:5])}" + ("..." if len(ds_ky) > 5 else ""))
+        else:
+            st.caption("👆 Chưa có snapshot nào. Bấm nút bên trái để chụp kỳ đầu tiên.")
+
+    if len(ds_ky) < 2:
+        st.info("⏳ Cần **ít nhất 2 kỳ snapshot** để hiển thị Ma trận chuyển dịch. Hãy quay lại vào kỳ sau và chụp thêm snapshot.")
+        return
+
+    # ── Chọn 2 kỳ để so sánh ─────────────────────────────────────────────
+    ky_sau = ds_ky[0]
+    ky_truoc = ds_ky[1]
+
+    k1, k2 = st.columns(2)
+    with k1:
+        ky_truoc_chon = st.selectbox("Kỳ trước", ds_ky[1:], index=0, key="mig_ky_truoc")
+    with k2:
+        ky_sau_chon = st.selectbox("Kỳ sau", ds_ky[:-1], index=0, key="mig_ky_sau")
+
+    # ── Tính ma trận ────────────────────────────────────────────────────
+    matrix, chi_tiet = mig_mat(ky_truoc_chon, ky_sau_chon)
+
+    if matrix.empty:
+        st.warning("⚠️ Không đủ dữ liệu để tạo ma trận chuyển dịch.")
+        return
+
+    st.markdown("##### 📊 Ma trận Chuyển dịch Nhóm nợ")
+    st.caption(f"Từ **{ky_truoc_chon}** → **{ky_sau_chon}**")
+
+    # Style heatmap
+    def _mau_nen(val):
+        if val == 0:
+            return ""
+        ti_le = min(val / matrix.max().max(), 1.0)
+        r = int(255 - ti_le * 155)
+        g = int(255 - ti_le * 200)
+        return f"background-color:rgb({r},{g},200);color:{'#fff' if ti_le > 0.5 else '#333'}"
+
+    st.dataframe(
+        matrix.style.applymap(_mau_nen).format("{:.0f}"),
+        use_container_width=True,
+    )
+    st.caption(
+        "📖 Cách đọc: Hàng = Nhóm nợ kỳ trước · Cột = Nhóm nợ kỳ sau. "
+        "Đường chéo = số món giữ nguyên nhóm. Ô ngoài chéo = số món chuyển nhóm."
+    )
+
+    # Chi tiết món chuyển nhóm
+    if not chi_tiet.empty:
+        with st.expander(f"📋 Chi tiết các món chuyển nhóm ({len(chi_tiet)} món)", expanded=False):
+            st.dataframe(chi_tiet, hide_index=True, use_container_width=True)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # SECTION 5 — Cảnh báo Phân loại nợ Migration
 # ═══════════════════════════════════════════════════════════════════════════════
 def _canh_bao_migration(df_full: pd.DataFrame) -> None:
@@ -867,8 +1060,8 @@ def render(**kwargs) -> None:
     role = kwargs.get("role", "executive")
     username = kwargs.get("username", "unknown")
 
-    tab_phan_tich, tab_tien_do_ui, tab_kiem_soat_cn, tab_no_rui_ro_cn = st.tabs(
-        ["📊 Phân tích & cảnh báo", "📅 Tiến độ", "🔍 Kiểm soát CN", "💳 Nợ rủi ro QĐ62"]
+    tab_phan_tich, tab_tien_do_ui, tab_kiem_soat_cn, tab_no_rui_ro_cn, tab_so_sanh = st.tabs(
+        ["📊 Phân tích & cảnh báo", "📅 Tiến độ", "🔍 Kiểm soát CN", "💳 Nợ rủi ro QĐ62", "📈 So sánh kỳ"]
     )
 
     with tab_phan_tich:
@@ -884,7 +1077,12 @@ def render(**kwargs) -> None:
         st.divider()
 
         # ═══════════ 1. SỨC KHỎE TÍN DỤNG ═══════════════════════════════════
+        _the_suc_khoe(df_full)
+
         st.divider()
+
+        # ═══════════ 1b. GIÁM SÁT TẬP TRUNG RỦI RO (HHI) ═══════════════════
+        _hhi_giam_sat(df_full)
 
         st.divider()
 
@@ -942,6 +1140,10 @@ def render(**kwargs) -> None:
         st.subheader("🚨 Cảnh báo Phân loại nợ — Rủi ro chuyển NQH")
         _canh_bao_migration(df_full)
 
+        # ── Ma trận Chuyển dịch Nhóm nợ ─────────────────────────────────
+        st.divider()
+        _migration_matrix_section(df_full, username)
+
     with tab_tien_do_ui:
         tab_tien_do.render_tong_quan_only(tab_tien_do_ui, **kwargs)
 
@@ -950,3 +1152,6 @@ def render(**kwargs) -> None:
 
     with tab_no_rui_ro_cn:
         tab_qd62.render(mode="cn")
+
+    with tab_so_sanh:
+        tab_so_sanh_ky.render(tab_so_sanh, df=df_full, df_full=df_full, role=role, username=username)

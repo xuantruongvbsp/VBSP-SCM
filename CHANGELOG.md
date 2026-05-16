@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## [2026-05-16] — Mở rộng KPI cards từ 4 lên 8: thêm Số KU, DN khoanh, Lãi tồn TH, Mức vay BQ
+- `tabs/tab_so_sanh_ky.py` — Thêm hàng KPI thứ 2 (k5–k8): Số KU, Dư nợ khoanh, Lãi tồn TH, Mức vay BQ/hộ
+- `tabs/tab_so_sanh_ky.py` — `_agg_mot_pgd()` cập nhật tính thêm `lai_ton`, `muc_vay_bq`
+
 ## [2026-05-16] — Port thêm tính năng từ TypeScript: Explorer, Vintage NQH, Roll/Cure từ join trực tiếp
 - `services/period_compare.py` — **Tạo mới** — port logic từ `period-compare.ts`:
   - `join_by_loan(df_prev, df_curr)` → ghép cặp khế ước theo khóa (soKU + maKH)

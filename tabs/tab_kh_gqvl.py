@@ -152,7 +152,7 @@ def _hien_thi_bang_readonly(kh_data: dict, nam: int) -> None:
 
     st.dataframe(
         df,
-        use_container_width=True,
+        width='stretch',
         hide_index=True,
         column_config={
             "KH TW (tr)": st.column_config.NumberColumn(format="%d"),

@@ -1,5 +1,8 @@
 # CHANGELOG
 
+## [2026-05-16] — Upload baseline 31/12 qua giao diện
+- `tabs/tab_upload_khnv.py` — Thêm expander "📅 Upload mốc số liệu 31/12 (Baseline)": chọn năm, upload file, lưu vào `data/baseline/`, xóa cache parquet, ghi audit
+
 ## [2026-05-16] — Tính năng mới: Tab So sánh kỳ (hiện tại vs mốc 31/12)
 - `tabs/tab_so_sanh_ky.py` — Tạo mới: KPI cards + bảng chi tiết chỉ tiêu + bảng theo PGD (CN role), dùng baseline `doc_baseline_merged()`
 - `workspaces/ws_executive.py` — Thêm tab "📈 So sánh kỳ" (tab thứ 5)

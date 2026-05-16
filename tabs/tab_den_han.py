@@ -95,11 +95,12 @@ def render(role: str = None, **kwargs) -> None:
 
     df_nam = _loc_thang(df_tinh, 0, 12)
 
-    if df_nam.empty or COT_NGAY_DEN_HAN not in df_nam.columns:
+    if df_nam.empty:
         st.info("Không có khoản vay đến hạn trong 12 tháng tới.")
     else:
         df_nam = df_nam.copy()
-        df_nam["_ngay_dh"] = pd.to_datetime(df_nam[COT_NGAY_DEN_HAN], errors="coerce")
+        # Dùng "Ngày đến hạn" (đã parse đúng dayfirst=True) thay vì re-parse cột gốc
+        df_nam["_ngay_dh"] = pd.to_datetime(df_nam["Ngày đến hạn"], errors="coerce")
         df_nam["_thang_label"] = df_nam["_ngay_dh"].dt.strftime("%m/%Y")
         df_nam["_sort_key"] = df_nam["_ngay_dh"].dt.to_period("M")
 

@@ -1,412 +1,379 @@
-"""Tab CBTD — Quản lý Cán bộ Tín dụng."""
+"""Tab CBTD — Quản lý Cán bộ Tín dụng theo ĐGD.
+
+Schema mới (v2):
+    cbtd_data[ma_cb] = {
+        "ho_ten":     str,
+        "pgd":        str,          # PGD trực thuộc (không chéo PGD)
+        "ds_dgd":     list[str],    # Tên ĐGD phụ trách (2-4 ĐGD)
+        "dien_thoai": str,
+        "ghi_chu":    str,
+        "ngay_cap":   str,
+    }
+Thôn/ấp được suy ra động từ dgd_map[pgd][xa][dgd] — không lưu trực tiếp.
+"""
 from __future__ import annotations
 
 from io import BytesIO
-from datetime import datetime, date
-from typing import TYPE_CHECKING, Any
+from datetime import datetime
+from typing import TYPE_CHECKING
 
 import streamlit as st
 import pandas as pd
-import plotly.express as px
-import plotly.graph_objects as go
 
-from config import *
+import db
+from config import COT_MA_KH, COT_SO_KU, COT_TONG_DU_NO, COT_DU_NO_QH, DS_PGD, DON_VI_CHI_NHANH
 from auth import la_phan_he_cn, normalize_role
-from utils import xuat_excel, ten_file_xuat, hien_thi_dataframe_phan_trang
-from data.khtd import doc_cbtd, luu_cbtd
+from utils import xuat_excel, hien_thi_dataframe_phan_trang, fmt_so
+from data.khtd import doc_cbtd, luu_cbtd, lay_ap_tu_dgd_list, gan_cbtd_vao_df
 
 if TYPE_CHECKING:
     from streamlit.delta_generator import DeltaGenerator
 
+DS_PGD_ALL = [DON_VI_CHI_NHANH] + DS_PGD
 
-from utils import get_tab_context
 
-def render(tab: DeltaGenerator, **kwargs: dict) -> None:
-    """
-    Render tab Quản lý Cán bộ Tín dụng (CBTD).
-    
-    Args:
-        tab: Streamlit DeltaGenerator cho tab này
-        **kwargs: Chứa df, df_full, role, pgd_user, username, df_nq11
-    """
-    df = kwargs.get("df")
-    df_full = kwargs.get("df_full", df)
+def render(tab: DeltaGenerator = None, **kwargs) -> None:
+    df       = kwargs.get("df")
+    df_full  = kwargs.get("df_full", df)
     role_raw = str(kwargs.get("role", "user") or "user")
-    role = normalize_role(role_raw)
-    pgd_user = kwargs.get("pgd_user")
-    username = kwargs.get("username")
-    df_nq11 = kwargs.get("df_nq11")
+    role     = normalize_role(role_raw)
+    username = kwargs.get("username", "unknown")
 
     import streamlit as _st
-    _tab_ctx = tab if tab is not None else _st.container()
-    with _tab_ctx:
+    ctx = tab if tab is not None else _st.container()
+
+    with ctx:
         st.subheader("👔 Quản lý Cán bộ Tín dụng (CBTD)")
-        st.caption("Phân CBTD theo ấp/thôn. Mã CBTD là khóa chính. 1 CBTD có thể phụ trách nhiều ấp.")
+        st.caption("1 CBTD phụ trách 2–4 Điểm giao dịch (ĐGD) trong cùng PGD. "
+                   "Thôn/ấp được suy ra tự động từ cấu hình ĐGD.")
 
-        cbtd_data = doc_cbtd()
+        cbtd_data: dict = doc_cbtd()
+        dgd_map: dict   = db.doc_dgd_map() or {}
 
-        # ── Lấy danh sách ấp từ HSTD — giữ tất cả 86 ấp ──
-        if "Mã thôn" in df.columns and "Tên thôn" in df.columns and "Tên xã" in df.columns:
-            dm_ap = (df[["Mã thôn","Tên thôn","Tên xã"]]
-                     .drop_duplicates()
-                     .dropna(subset=["Mã thôn","Tên thôn","Tên xã"])
-                     .sort_values(["Tên xã","Mã thôn"])
-                     .reset_index(drop=True))
-            dm_ap["Mã thôn"] = dm_ap["Mã thôn"].astype(int).astype(str)
-            # Nhãn hiển thị: "Xã — Tên ấp"
-            dm_ap["Nhãn"] = dm_ap["Tên xã"] + " — " + dm_ap["Tên thôn"]
-            # Dict: mã thôn → nhãn
-            ma_to_nhan = dict(zip(dm_ap["Mã thôn"], dm_ap["Nhãn"]))
-            # Nhóm theo xã để hiển thị dễ chọn
-            ds_ap_options = dm_ap["Nhãn"].tolist()
-            ds_xa_list    = sorted(dm_ap["Tên xã"].unique().tolist())
-        else:
-            dm_ap = pd.DataFrame(columns=["Mã thôn","Tên thôn","Tên xã","Nhãn"])
-            ds_ap_options = []
-            ds_xa_list    = []
-            ma_to_nhan    = {}
+        if not dgd_map:
+            st.warning("⚠️ Chưa cấu hình Điểm giao dịch. "
+                       "Vào tab **📍 Điểm GD** để cấu hình trước.")
 
-        # Helper: mã thôn → nhãn và ngược lại
-        nhan_to_ma = {v:k for k,v in ma_to_nhan.items()}
+        # ── Dữ liệu tính toán chung ──────────────────────────────────────────
+        # Dict (pgd, dgd_name) → (ma_cb, ten_cb) — phát hiện trùng ĐGD
+        dgd_da_phan: dict[tuple[str, str], tuple[str, str]] = {}
+        for ma_cb, info in cbtd_data.items():
+            pgd_cb = info.get("pgd", "")
+            for dgd in info.get("ds_dgd", []):
+                dgd_da_phan[(pgd_cb, dgd)] = (ma_cb, info.get("ho_ten", ""))
 
-        def nhan_list(ma_list):
-            """Chuyển list mã thôn → list nhãn"""
-            return [ma_to_nhan.get(str(m), str(m)) for m in ma_list]
+        # ── Helpers ──────────────────────────────────────────────────────────
+        def _ds_dgd_cua_pgd(pgd: str) -> list[tuple[str, str]]:
+            """[(xa, dgd_name)] — toàn bộ ĐGD trong PGD (từ dgd_map)."""
+            xa_block = dgd_map.get(pgd, {})
+            return [
+                (xa, dgd_name)
+                for xa, dgd_block in xa_block.items()
+                if isinstance(dgd_block, dict)
+                for dgd_name in dgd_block.keys()
+            ]
 
-        def ma_list(nhan_l):
-            """Chuyển list nhãn → list mã thôn"""
-            return [nhan_to_ma.get(n, n) for n in nhan_l]
+        def _label_dgd(xa: str, dgd_name: str) -> str:
+            return f"{xa} — {dgd_name}"
 
-        # ══════════════════════════════════════════
-        # PHẦN XEM & TRA CỨU — 3 sub-tab
-        # ══════════════════════════════════════════
-        xem_tab1, xem_tab2, xem_tab3 = st.tabs([
-            "📋 Danh sách CBTD", "🗺️ Bản đồ ấp → CBTD", "🔎 Xem chi tiết CBTD"
+        def _ap_cua_dgd(pgd: str, dgd_name: str) -> list[str]:
+            """List ấp của một ĐGD từ dgd_map."""
+            for xa, dgd_block in dgd_map.get(pgd, {}).items():
+                if isinstance(dgd_block, dict) and dgd_name in dgd_block:
+                    return [str(a).strip() for a in (dgd_block[dgd_name] or []) if str(a).strip()]
+            return []
+
+        def _so_ap_cbtd(info: dict) -> int:
+            pgd = info.get("pgd", "")
+            ds_dgd = info.get("ds_dgd", [])
+            return len(lay_ap_tu_dgd_list(pgd, ds_dgd, dgd_map))
+
+        def _kiem_tra_trung_dgd(pgd: str, ds_dgd: list[str], bo_qua_ma: str | None = None) -> dict[str, str]:
+            """Trả về {dgd_name: 'ma_cb — ten_cb'} cho ĐGD đã bị chiếm."""
+            trung = {}
+            for dgd_name in ds_dgd:
+                found = dgd_da_phan.get((pgd, dgd_name))
+                if found and found[0] != bo_qua_ma:
+                    trung[dgd_name] = f"{found[0]} — {found[1]}"
+            return trung
+
+        def _fmt_tien(x: float) -> str:
+            try:
+                x = float(x)
+                if abs(x) > 0:
+                    return f"{x/1_000_000:,.0f}".replace(",","X").replace(".",",").replace("X",".")
+                return "—"
+            except Exception:
+                return "—"
+
+        # ════════════════════════════════════════════════════════════════════
+        # 3 SUB-TAB XEM
+        # ════════════════════════════════════════════════════════════════════
+        xem1, xem2, xem3 = st.tabs([
+            "📋 Danh sách CBTD",
+            "🗺️ Bản đồ ĐGD → CBTD",
+            "🔎 Chi tiết CBTD",
         ])
 
-        # Tính toán chung dùng cho cả 3 tab
-        ap_da_phan = set(
-            str(m) for info in cbtd_data.values() for m in info.get("ds_thon",[])
-        )
-        # Dict ngược: mã thôn → mã CBTD phụ trách
-        ap_to_cbtd = {}
-        for ma_cb, info_cb in cbtd_data.items():
-            for m in info_cb.get("ds_thon",[]):
-                ap_to_cbtd[str(m)] = (ma_cb, info_cb.get("ho_ten",""))
-
-        # ── SUB-TAB 1: Danh sách CBTD ──
-        with xem_tab1:
+        # ── SUB-TAB 1: Danh sách ─────────────────────────────────────────────
+        with xem1:
             if not cbtd_data:
-                st.info("Chưa có CBTD nào. Nhập mới bên dưới.")
+                st.info("Chưa có CBTD nào. Thêm mới bên dưới.")
             else:
-                # Metrics tóm tắt
-                c1,c2,c3 = st.columns(3)
+                tong_dgd = sum(len(i.get("ds_dgd", [])) for i in cbtd_data.values())
+                tong_ap  = sum(_so_ap_cbtd(i) for i in cbtd_data.values())
+                c1, c2, c3 = st.columns(3)
                 c1.metric("Số CBTD", len(cbtd_data))
-                c2.metric("Ấp đã phân công", len(ap_da_phan))
-                c3.metric("Ấp chưa phân công",
-                          len(dm_ap) - len(ap_da_phan),
-                          delta="⚠️ Còn sót" if len(dm_ap) - len(ap_da_phan) > 0 else None,
-                          delta_color="inverse")
+                c2.metric("Tổng ĐGD đã phân", tong_dgd)
+                c3.metric("Tổng ấp phụ trách", tong_ap)
 
-                # Bảng danh sách
-                rows_list = []
+                rows = []
                 for ma, info in cbtd_data.items():
-                    ap_nhan = nhan_list(info.get("ds_thon",[]))
-                    # Nhóm ấp theo xã cho gọn
-                    theo_xa = {}
-                    for n in ap_nhan:
-                        xa = n.split(" — ")[0] if " — " in n else "?"
-                        theo_xa.setdefault(xa, []).append(n.split(" — ")[-1])
-                    ap_tom_tat = " | ".join(
-                        f"{xa}({len(aps)}): {', '.join(aps[:3])}{'…' if len(aps)>3 else ''}"
-                        for xa, aps in theo_xa.items()
-                    )
-                    rows_list.append({
-                        "Mã CBTD":       ma,
-                        "Họ tên":        info.get("ho_ten",""),
-                        "Điện thoại":    info.get("dien_thoai","") or "—",
-                        "Số ấp":         len(info.get("ds_thon",[])),
-                        "Ấp phụ trách":  ap_tom_tat,
-                        "Ghi chú":       info.get("ghi_chu","") or "—",
-                        "Cập nhật":      info.get("ngay_cap",""),
+                    pgd_cb = info.get("pgd", "—")
+                    ds_dgd = info.get("ds_dgd", [])
+                    so_ap  = _so_ap_cbtd(info)
+                    dgd_tom_tat = " | ".join(ds_dgd[:4]) + ("…" if len(ds_dgd) > 4 else "")
+                    loai = "✅ Đầy đủ" if ds_dgd and pgd_cb != "—" else "⚠️ Cần cập nhật"
+                    rows.append({
+                        "Mã CBTD":    ma,
+                        "Họ tên":     info.get("ho_ten", ""),
+                        "PGD":        pgd_cb,
+                        "Điện thoại": info.get("dien_thoai", "") or "—",
+                        "Số ĐGD":    len(ds_dgd),
+                        "Số ấp":     so_ap,
+                        "ĐGD phụ trách": dgd_tom_tat or "—",
+                        "Trạng thái": loai,
+                        "Cập nhật":  info.get("ngay_cap", ""),
                     })
-                hien_thi_dataframe_phan_trang(
-                    pd.DataFrame(rows_list),
-                    key="cbtd_ds_ap_phan_cong",
+                hien_thi_dataframe_phan_trang(pd.DataFrame(rows), key="cbtd_ds")
+
+                # ĐGD chưa có CBTD
+                tong_dgd_cfg = sum(
+                    len(dgd_block)
+                    for xa_block in dgd_map.values()
+                    for dgd_block in xa_block.values()
+                    if isinstance(dgd_block, dict)
                 )
+                so_chua = tong_dgd_cfg - len(dgd_da_phan)
+                if so_chua > 0:
+                    with st.expander(f"⚠️ {so_chua} ĐGD chưa có CBTD phụ trách"):
+                        for pgd_k, xa_block in dgd_map.items():
+                            for xa_k, dgd_block in xa_block.items():
+                                if not isinstance(dgd_block, dict):
+                                    continue
+                                chua = [d for d in dgd_block if (pgd_k, d) not in dgd_da_phan]
+                                if chua:
+                                    st.caption(f"**{pgd_k} / {xa_k}:** {', '.join(chua)}")
 
-                # Cảnh báo ấp chưa phân công
-                chua_phan_ds = dm_ap[~dm_ap["Mã thôn"].isin(ap_da_phan)]
-                if not chua_phan_ds.empty:
-                    with st.expander(f"⚠️ {len(chua_phan_ds)} ấp chưa có CBTD phụ trách"):
-                        theo_xa_cp = {}
-                        for _, row_cp in chua_phan_ds.iterrows():
-                            theo_xa_cp.setdefault(row_cp["Tên xã"], []).append(row_cp["Tên thôn"])
-                        for xa_cp, aps_cp in sorted(theo_xa_cp.items()):
-                            st.caption(f"**{xa_cp}** ({len(aps_cp)}): {', '.join(aps_cp)}")
-
-        # ── SUB-TAB 2: Bản đồ ấp → CBTD ──
-        with xem_tab2:
-            st.caption("Toàn bộ ấp/thôn và CBTD phụ trách. Dễ kiểm tra trùng, thiếu.")
-
-            if dm_ap.empty:
-                st.warning("Không có dữ liệu ấp/thôn trong file HSTD.")
+        # ── SUB-TAB 2: Bản đồ ĐGD → CBTD ────────────────────────────────────
+        with xem2:
+            st.caption("Toàn bộ ĐGD và CBTD phụ trách. Dễ kiểm tra trùng, thiếu.")
+            if not dgd_map:
+                st.warning("Chưa có cấu hình ĐGD.")
             else:
-                # Bộ lọc
-                bf1, bf2 = st.columns([2,1])
-                with bf1:
-                    loc_xa_bd = st.selectbox("Lọc theo xã",
-                        ["Tất cả"] + ds_xa_list, key="bd_xa")
-                with bf2:
-                    loc_trang_thai = st.selectbox("Tình trạng phân công",
-                        ["Tất cả","✅ Đã phân công","⚠️ Chưa phân công"], key="bd_tt")
+                pgd_opts = ["Tất cả"] + [p for p in dgd_map if dgd_map[p]]
+                loc_pgd = st.selectbox("Lọc theo PGD", pgd_opts, key="bd_pgd")
+                loc_tt  = st.selectbox("Tình trạng",
+                    ["Tất cả", "✅ Đã phân", "⚠️ Chưa phân"], key="bd_tt")
 
-                # Build bảng đầy đủ
                 rows_bd = []
-                for _, row_ap in dm_ap.iterrows():
-                    ma_thon = str(row_ap["Mã thôn"])
-                    co_cbtd = ma_thon in ap_da_phan
-                    if ma_thon in ap_to_cbtd:
-                        ma_cb_ap, ten_cb_ap = ap_to_cbtd[ma_thon]
-                    else:
-                        ma_cb_ap, ten_cb_ap = "—", "—"
-                    rows_bd.append({
-                        "Xã":              row_ap["Tên xã"],
-                        "Ấp/Thôn":         row_ap["Tên thôn"],
-                        "Mã thôn":         ma_thon,
-                        "Mã CBTD":         ma_cb_ap,
-                        "Tên CBTD":        ten_cb_ap,
-                        "Tình trạng":      "✅ Đã phân" if co_cbtd else "⚠️ Chưa phân",
-                    })
+                for pgd_k, xa_block in dgd_map.items():
+                    if loc_pgd != "Tất cả" and pgd_k != loc_pgd:
+                        continue
+                    for xa_k, dgd_block in xa_block.items():
+                        if not isinstance(dgd_block, dict):
+                            continue
+                        for dgd_name, ap_list in dgd_block.items():
+                            assigned = dgd_da_phan.get((pgd_k, dgd_name))
+                            tt = "✅ Đã phân" if assigned else "⚠️ Chưa phân"
+                            if loc_tt != "Tất cả" and tt != loc_tt:
+                                continue
+                            rows_bd.append({
+                                "PGD":       pgd_k,
+                                "Xã":        xa_k,
+                                "ĐGD":       dgd_name,
+                                "Mã CBTD":   assigned[0] if assigned else "—",
+                                "Tên CBTD":  assigned[1] if assigned else "—",
+                                "Số ấp":     len(ap_list or []),
+                                "Tình trạng": tt,
+                            })
 
-                df_bd = pd.DataFrame(rows_bd)
-
-                # Áp lọc
-                if loc_xa_bd != "Tất cả":
-                    df_bd = df_bd[df_bd["Xã"] == loc_xa_bd]
-                if loc_trang_thai == "✅ Đã phân công":
-                    df_bd = df_bd[df_bd["Tình trạng"] == "✅ Đã phân"]
-                elif loc_trang_thai == "⚠️ Chưa phân công":
-                    df_bd = df_bd[df_bd["Tình trạng"] == "⚠️ Chưa phân"]
-
-                # Metrics sau lọc
-                m1, m2 = st.columns(2)
-                m1.metric("Tổng ấp hiển thị", len(df_bd))
-                m2.metric("Chưa phân công", len(df_bd[df_bd["Tình trạng"]=="⚠️ Chưa phân"]))
-
-                hien_thi_dataframe_phan_trang(
-                    df_bd.reset_index(drop=True),
-                    key="cbtd_bien_dong",
-                    height=420,
-                )
-
-                # Kiểm tra trùng ấp (ấp bị khai báo ở 2 CBTD)
-                kiem_tra_trung_all = {}
-                for ma_cb_t, info_cb_t in cbtd_data.items():
-                    for m_t in info_cb_t.get("ds_thon",[]):
-                        m_t = str(m_t)
-                        if m_t not in kiem_tra_trung_all:
-                            kiem_tra_trung_all[m_t] = []
-                        kiem_tra_trung_all[m_t].append(ma_cb_t)
-                trung_ap_list = {m: cbs for m, cbs in kiem_tra_trung_all.items() if len(cbs) > 1}
-                if trung_ap_list:
-                    st.error(f"⛔ Phát hiện **{len(trung_ap_list)} ấp bị trùng** — cần sửa ngay!")
-                    trung_rows = []
-                    for m_t, cbs_t in trung_ap_list.items():
-                        nhan_t = ma_to_nhan.get(m_t, m_t)
-                        trung_rows.append({
-                            "Ấp/Thôn": nhan_t,
-                            "Mã thôn": m_t,
-                            "CBTD đang giữ": " & ".join(
-                                f"{cb} ({cbtd_data[cb]['ho_ten']})" for cb in cbs_t if cb in cbtd_data
-                            ),
-                        })
-                    hien_thi_dataframe_phan_trang(
-                        pd.DataFrame(trung_rows),
-                        key="cbtd_ap_trung",
-                    )
+                if rows_bd:
+                    df_bd = pd.DataFrame(rows_bd)
+                    m1, m2 = st.columns(2)
+                    m1.metric("Tổng ĐGD", len(df_bd))
+                    m2.metric("Chưa phân CBTD", len(df_bd[df_bd["Tình trạng"]=="⚠️ Chưa phân"]))
+                    hien_thi_dataframe_phan_trang(df_bd, key="cbtd_bd_dgd", height=420)
                 else:
-                    st.success("✅ Không có ấp nào bị trùng CBTD")
+                    st.info("Không có ĐGD nào phù hợp bộ lọc.")
 
-        # ── SUB-TAB 3: Xem chi tiết từng CBTD ──
-        with xem_tab3:
+        # ── SUB-TAB 3: Chi tiết từng CBTD ────────────────────────────────────
+        with xem3:
             if not cbtd_data:
                 st.info("Chưa có CBTD nào.")
             else:
-                chon_xem = st.selectbox("Chọn CBTD để xem chi tiết",
-                    list(cbtd_data.keys()),
-                    format_func=lambda k: f"{k} — {cbtd_data[k]['ho_ten']} ({len(cbtd_data[k].get('ds_thon',[]))} ấp)",
-                    key="cbtd_chon_xem")
-                info_xem = cbtd_data[chon_xem]
-                ds_ma_xem = [str(m) for m in info_xem.get("ds_thon",[])]
-                ap_nhan_xem = nhan_list(ds_ma_xem)
+                opts_xem = {
+                    ma: f"{ma} — {info['ho_ten']} / {info.get('pgd','?')} "
+                        f"({len(info.get('ds_dgd',[]))} ĐGD)"
+                    for ma, info in cbtd_data.items()
+                }
+                chon = st.selectbox("Chọn CBTD", list(opts_xem.keys()),
+                                    format_func=lambda k: opts_xem[k],
+                                    key="cbtd_chon_xem")
+                info_xem = cbtd_data[chon]
+                pgd_xem  = info_xem.get("pgd", "")
+                ds_dgd_xem = info_xem.get("ds_dgd", [])
 
                 xv1, xv2, xv3 = st.columns(3)
                 xv1.markdown(f"👤 **{info_xem['ho_ten']}**")
-                xv2.markdown(f"📞 {info_xem.get('dien_thoai','—') or '—'}")
-                xv3.markdown(f"🗒️ {info_xem.get('ghi_chu','') or '—'}")
+                xv2.markdown(f"🏢 {pgd_xem or '—'}")
+                xv3.markdown(f"📞 {info_xem.get('dien_thoai','') or '—'}")
 
-                # Danh sách ấp phân theo xã
-                ap_theo_xa_xem = {}
-                for n in ap_nhan_xem:
-                    xa = n.split(" — ")[0] if " — " in n else "?"
-                    ap_theo_xa_xem.setdefault(xa, []).append(n.split(" — ")[-1])
-                with st.expander(f"📍 {len(ap_nhan_xem)} ấp phụ trách", expanded=True):
-                    for xa_x, aps_x in sorted(ap_theo_xa_xem.items()):
-                        st.caption(f"**{xa_x}** ({len(aps_x)}): {', '.join(aps_x)}")
+                if ds_dgd_xem and pgd_xem:
+                    with st.expander(f"📍 {len(ds_dgd_xem)} ĐGD phụ trách", expanded=True):
+                        for dgd_name in ds_dgd_xem:
+                            ap_list = _ap_cua_dgd(pgd_xem, dgd_name)
+                            st.caption(
+                                f"**{dgd_name}** ({len(ap_list)} ấp)"
+                                + (f": {', '.join(ap_list)}" if ap_list else "")
+                            )
+                else:
+                    st.warning("⚠️ CBTD này chưa được gán ĐGD (dữ liệu cũ). "
+                               "Dùng **Chỉnh sửa** để cập nhật.")
 
-                # Dữ liệu hồ sơ
-                if "Mã thôn" in df.columns and ds_ma_xem:
-                    mask_xem = df["Mã thôn"].astype(str).isin(ds_ma_xem)
-                    df_xem = df[mask_xem].copy()
-                    if "Hình thức vay" in df_xem.columns:
-                        df_xem = df_xem[df_xem["Hình thức vay"] != 1]
-                    tdn_xem = df_xem[COT_TONG_DU_NO].sum() if COT_TONG_DU_NO in df_xem.columns else 0
-                    dqh_xem = df_xem[COT_DU_NO_QH].sum()   if COT_DU_NO_QH   in df_xem.columns else 0
-                    tlqh_xem = (dqh_xem/tdn_xem*100) if tdn_xem > 0 else 0
+                # Dữ liệu hồ sơ từ HSTD
+                if df is not None and not df.empty and ds_dgd_xem and pgd_xem:
+                    df_cb_xem = gan_cbtd_vao_df(df, {chon: info_xem}, dgd_map)
+                    df_cb_xem = df_cb_xem[df_cb_xem["CBTD"] == chon].copy()
+                    if "Hình thức vay" in df_cb_xem.columns:
+                        df_cb_xem = df_cb_xem[df_cb_xem["Hình thức vay"] != 1]
 
-                    mx1,mx2,mx3,mx4 = st.columns(4)
-                    mx1.metric("Số KH",      f"{df_xem[COT_MA_KH].nunique():,}".replace(",","."))
-                    mx2.metric("Số món vay", f"{df_xem[COT_SO_KU].nunique():,}".replace(",","."))
-                    mx3.metric("Tổng dư nợ",
-                        f"{tdn_xem/1e6:,.0f}".replace(",","X").replace(".",",").replace("X",".") if tdn_xem >= 1e6
-                        else f"{tdn_xem/1e6:.1f} triệu".replace(".",","))
-                    mx4.metric("Tỷ lệ QH", f"{tlqh_xem:.2f}%",
-                        delta="⚠" if tlqh_xem >= 2 else None, delta_color="inverse")
+                    tdn = df_cb_xem[COT_TONG_DU_NO].sum() if COT_TONG_DU_NO in df_cb_xem.columns else 0
+                    dqh = df_cb_xem[COT_DU_NO_QH].sum()   if COT_DU_NO_QH   in df_cb_xem.columns else 0
+                    tlqh = (dqh/tdn*100) if tdn > 0 else 0
 
-                    # Bảng tổng hợp theo ấp
-                    if "Tên thôn" in df_xem.columns:
+                    mx1, mx2, mx3, mx4 = st.columns(4)
+                    mx1.metric("Số KH",      fmt_so(df_cb_xem[COT_MA_KH].nunique()) if COT_MA_KH in df_cb_xem.columns else "—")
+                    mx2.metric("Số món vay", fmt_so(df_cb_xem[COT_SO_KU].nunique()) if COT_SO_KU in df_cb_xem.columns else "—")
+                    mx3.metric("Tổng dư nợ (tr.đ)", _fmt_tien(tdn))
+                    mx4.metric("Tỷ lệ QH", f"{tlqh:.2f}%",
+                               delta="⚠" if tlqh >= 2 else None, delta_color="inverse")
+
+                    if "Tên thôn" in df_cb_xem.columns and "Tên xã" in df_cb_xem.columns:
                         st.markdown("**Tổng hợp theo ấp**")
-                        th_ap = df_xem.groupby(["Mã thôn","Tên thôn"]).agg(
-                            Số_KH      =(COT_MA_KH, "nunique"),
-                            Số_món_vay =(COT_SO_KU, "nunique"),
+                        th_ap = df_cb_xem.groupby(["Tên xã", "Tên thôn"]).agg(
+                            Số_KH       =(COT_MA_KH, "nunique"),
                             Tổng_dư_nợ =(COT_TONG_DU_NO, "sum"),
                             Dư_nợ_QH   =(COT_DU_NO_QH, "sum"),
                         ).reset_index().sort_values("Tổng_dư_nợ", ascending=False)
-                        th_ap["Mã thôn"] = th_ap["Mã thôn"].astype(str)
-                        th_ap["Tổng dư nợ"] = th_ap["Tổng_dư_nợ"].apply(
-                            lambda x: f"{x/1e6:,.0f}".replace(",","X").replace(".",",").replace("X",".") if x > 0 else "—")
-                        th_ap["Dư nợ QH"] = th_ap["Dư_nợ_QH"].apply(
-                            lambda x: f"{x/1e6:,.0f}".replace(",","X").replace(".",",").replace("X",".") if x > 0 else "—")
-                        th_ap["QH%"] = (th_ap["Dư_nợ_QH"]/th_ap["Tổng_dư_nợ"]*100).fillna(0).round(2)
+                        th_ap["Tổng dư nợ (tr.đ)"] = th_ap["Tổng_dư_nợ"].apply(_fmt_tien)
+                        th_ap["Dư nợ QH (tr.đ)"]   = th_ap["Dư_nợ_QH"].apply(_fmt_tien)
+                        th_ap["QH %"] = (th_ap["Dư_nợ_QH"]/th_ap["Tổng_dư_nợ"]*100).fillna(0).round(2)
                         hien_thi_dataframe_phan_trang(
-                            th_ap[["Mã thôn","Tên thôn","Số_KH","Số_món_vay","Tổng dư nợ","Dư nợ QH","QH%"]],
-                            key="cbtd_chi_tiet_ap",
+                            th_ap[["Tên xã","Tên thôn","Số_KH","Tổng dư nợ (tr.đ)","Dư nợ QH (tr.đ)","QH %"]],
+                            key="cbtd_ct_ap",
                         )
 
         st.divider()
 
-        # ── Helper: tìm ấp trùng với CBTD khác ──
-        def kiem_tra_trung_ap(ap_nhan_chon: list[str], bo_qua_ma: str | None = None) -> dict[str, str]:
-            """
-            Trả về dict {nhãn_ấp: mã_CBTD} cho các ấp đã bị chiếm.
-            
-            Args:
-                ap_nhan_chon: Danh sách nhãn ấp cần kiểm tra
-                bo_qua_ma: Mã CBTD bỏ qua (khi chỉnh sửa)
-            
-            Returns:
-                Dict ấp trùng → thông tin CBTD đang giữ
-            """
-            trung = {}
-            for ma, info in cbtd_data.items():
-                if ma == bo_qua_ma: continue
-                for m in info.get("ds_thon",[]):
-                    nhan = ma_to_nhan.get(str(m), str(m))
-                    if nhan in ap_nhan_chon:
-                        trung[nhan] = f"{ma} — {info['ho_ten']}"
-            return trung
-
-        # ── Thao tác (admin + manager) ──
+        # ════════════════════════════════════════════════════════════════════
+        # CRUD (admin + manager CN)
+        # ════════════════════════════════════════════════════════════════════
         if not la_phan_he_cn(role) or role == "executive":
-            st.caption("Chỉ Quản lý trở lên mới được quản lý CBTD.")
+            st.caption("Chỉ Quản lý Chi nhánh mới được thêm/sửa/xóa CBTD.")
         else:
             che_do = st.radio("Thao tác",
-                ["➕ Thêm mới","✏️ Chỉnh sửa","🗑️ Xóa"],
+                ["➕ Thêm mới", "✏️ Chỉnh sửa", "🗑️ Xóa"],
                 horizontal=True, key="cbtd_mode")
             st.divider()
 
-            # ══ THÊM MỚI ══
+            # ── THÊM MỚI ─────────────────────────────────────────────────────
             if che_do == "➕ Thêm mới":
                 st.markdown("**➕ Thêm CBTD mới**")
                 c1, c2 = st.columns(2)
+
                 with c1:
-                    ma_new  = st.text_input("Mã CBTD *",
-                        placeholder="vd: CB01",
-                        help="Mã duy nhất — không được trùng",
-                        key="cbtd_ma_new")
-                    ten_new = st.text_input("Họ và tên *",
-                        placeholder="vd: Nguyễn Văn A",
-                        key="cbtd_ten_new")
-                    dt_new  = st.text_input("Số điện thoại",
-                        key="cbtd_dt_new")
-                    gc_new  = st.text_input("Ghi chú",
-                        key="cbtd_gc_new")
+                    ma_new  = st.text_input("Mã CBTD *", placeholder="vd: CB01", key="cbtd_ma_new")
+                    ten_new = st.text_input("Họ và tên *", key="cbtd_ten_new")
+                    dt_new  = st.text_input("Số điện thoại", key="cbtd_dt_new")
+                    gc_new  = st.text_input("Ghi chú", key="cbtd_gc_new")
+                    pgd_new = st.selectbox("PGD trực thuộc *", DS_PGD_ALL, key="cbtd_pgd_new")
+
                 with c2:
-                    # Lọc theo xã trước để dễ chọn ấp
-                    loc_xa_new = st.selectbox("Lọc theo xã",
-                        ["Tất cả"] + ds_xa_list,
-                        key="cbtd_loc_xa_new")
-                    opts_new = ds_ap_options if loc_xa_new == "Tất cả" else \
-                               dm_ap[dm_ap["Tên xã"]==loc_xa_new]["Nhãn"].tolist()
-
-                    ap_new = st.multiselect(
-                        "Ấp/thôn phụ trách *",
-                        opts_new,
-                        help="Có thể chọn nhiều ấp, kể cả khác xã",
-                        key="cbtd_ap_new")
-
-                    if ap_new:
-                        # Kiểm tra trùng real-time
-                        trung_new = kiem_tra_trung_ap(ap_new)
-                        if trung_new:
-                            for ap_t, cb_t in trung_new.items():
-                                st.error(f"⛔ **{ap_t}** đã thuộc CBTD **{cb_t}**")
-                        else:
-                            st.success(f"✅ **{len(ap_new)}** ấp hợp lệ, chưa có CBTD nào phụ trách")
+                    dgd_opts_new = _ds_dgd_cua_pgd(pgd_new)
+                    if not dgd_opts_new:
+                        st.warning(f"PGD **{pgd_new}** chưa cấu hình ĐGD.")
+                        dgd_sel_new = []
                     else:
-                        st.caption("👆 Chọn ít nhất 1 ấp")
+                        labels_new = [_label_dgd(xa, d) for xa, d in dgd_opts_new]
+                        sel_labels = st.multiselect(
+                            "ĐGD phụ trách *",
+                            labels_new,
+                            help="1 CBTD phụ trách 2–4 ĐGD trong cùng PGD",
+                            key="cbtd_dgd_new")
+                        dgd_sel_new = [d for xa, d in dgd_opts_new
+                                       if _label_dgd(xa, d) in sel_labels]
 
-                if st.button("✅ Thêm CBTD", type="primary",
-                             width='stretch', key="btn_them_cbtd"):
+                        if dgd_sel_new:
+                            trung = _kiem_tra_trung_dgd(pgd_new, dgd_sel_new)
+                            if trung:
+                                for d, cb in trung.items():
+                                    st.error(f"⛔ **{d}** đã thuộc CBTD **{cb}**")
+                            else:
+                                # Preview ấp
+                                tong_ap_new = lay_ap_tu_dgd_list(pgd_new, dgd_sel_new, dgd_map)
+                                st.success(f"✅ {len(dgd_sel_new)} ĐGD hợp lệ → "
+                                           f"{len(tong_ap_new)} ấp/thôn phụ trách")
+                                with st.expander("Xem danh sách ấp"):
+                                    for xa_p, ap_p in sorted(tong_ap_new):
+                                        st.caption(f"• {xa_p} / {ap_p}")
+                        else:
+                            st.caption("👆 Chọn ít nhất 1 ĐGD")
+
+                if st.button("✅ Thêm CBTD", type="primary", key="btn_them_cbtd"):
                     err = []
-                    if not ma_new.strip():  err.append("Thiếu Mã CBTD")
-                    if not ten_new.strip(): err.append("Thiếu Họ tên")
-                    if not ap_new:          err.append("Chọn ít nhất 1 ấp")
+                    if not ma_new.strip():   err.append("Thiếu Mã CBTD")
+                    if not ten_new.strip():  err.append("Thiếu Họ tên")
+                    if not dgd_sel_new:      err.append("Chọn ít nhất 1 ĐGD")
                     if ma_new.strip().upper() in cbtd_data:
                         err.append(f"Mã **{ma_new.strip().upper()}** đã tồn tại")
-                    # Kiểm tra trùng ấp khi bấm lưu
-                    trung_new_luu = kiem_tra_trung_ap(ap_new)
-                    if trung_new_luu:
-                        for ap_t, cb_t in trung_new_luu.items():
-                            err.append(f"Ấp **{ap_t}** đã thuộc CBTD **{cb_t}** — bỏ bớt hoặc chuyển ấp đó sang CBTD này bằng cách sửa CBTD kia trước")
+                    trung_luu = _kiem_tra_trung_dgd(pgd_new, dgd_sel_new)
+                    if trung_luu:
+                        for d, cb in trung_luu.items():
+                            err.append(f"ĐGD **{d}** đã thuộc CBTD **{cb}**")
                     if err:
                         for e in err: st.error(f"❌ {e}")
                     else:
-                        cbtd_data[ma_new.strip().upper()] = {
+                        ma_key = ma_new.strip().upper()
+                        cbtd_data[ma_key] = {
                             "ho_ten":     ten_new.strip(),
+                            "pgd":        pgd_new,
+                            "ds_dgd":     dgd_sel_new,
                             "dien_thoai": dt_new.strip(),
-                            "ds_thon":    ma_list(ap_new),   # lưu mã thôn
                             "ghi_chu":    gc_new.strip(),
                             "ngay_cap":   datetime.today().strftime("%d/%m/%Y %H:%M"),
                         }
                         luu_cbtd(cbtd_data)
-                        st.success(f"✅ Đã thêm **{ma_new.strip().upper()}** — {ten_new.strip()} ({len(ap_new)} ấp)")
+                        db.ghi_audit(username, "luu_cbtd",
+                                     f"Thêm {ma_key} — {ten_new.strip()} "
+                                     f"({pgd_new}, {len(dgd_sel_new)} ĐGD)")
+                        st.success(f"✅ Đã thêm **{ma_key}** — {ten_new.strip()}")
                         st.rerun()
 
-            # ══ CHỈNH SỬA ══
+            # ── CHỈNH SỬA ────────────────────────────────────────────────────
             elif che_do == "✏️ Chỉnh sửa":
                 st.markdown("**✏️ Chỉnh sửa CBTD**")
                 if not cbtd_data:
                     st.info("Chưa có CBTD nào.")
                 else:
-                    chon_sua = st.selectbox("Chọn CBTD",
+                    chon_sua = st.selectbox(
+                        "Chọn CBTD",
                         list(cbtd_data.keys()),
-                        format_func=lambda k: f"{k} — {cbtd_data[k]['ho_ten']} ({len(cbtd_data[k].get('ds_thon',[]))} ấp)",
+                        format_func=lambda k: f"{k} — {cbtd_data[k]['ho_ten']} "
+                                              f"/ {cbtd_data[k].get('pgd','?')} "
+                                              f"({len(cbtd_data[k].get('ds_dgd',[]))} ĐGD)",
                         key="cbtd_chon_sua")
                     info_cu = cbtd_data[chon_sua]
-                    ap_cu_nhan  = nhan_list(info_cu.get("ds_thon",[]))
-                    ap_cu_valid = [n for n in ap_cu_nhan if n in ds_ap_options]
 
                     c1, c2 = st.columns(2)
                     with c1:
@@ -416,173 +383,167 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                             value=info_cu.get("dien_thoai",""), key="cbtd_dt_sua")
                         gc_sua  = st.text_input("Ghi chú",
                             value=info_cu.get("ghi_chu",""), key="cbtd_gc_sua")
-                        if ap_cu_valid:
-                            ap_theo_xa_cu = {}
-                            for n in ap_cu_valid:
-                                xa = n.split(" — ")[0] if " — " in n else "Khac"
-                                ap_theo_xa_cu.setdefault(xa,[]).append(n.split(" — ")[-1])
-                            st.caption("**Ấp hiện tại:**")
-                            for xa, aps in ap_theo_xa_cu.items():
-                                st.caption(f"- **{xa}** ({len(aps)}): {chr(44).join(aps)}")
+                        pgd_idx = DS_PGD_ALL.index(info_cu["pgd"]) if info_cu.get("pgd") in DS_PGD_ALL else 0
+                        pgd_sua = st.selectbox("PGD trực thuộc *",
+                            DS_PGD_ALL, index=pgd_idx, key="cbtd_pgd_sua")
 
                     with c2:
-                        st.markdown("**Chỉnh sửa ấp phụ trách**")
-                        st.caption("💡 Lọc theo xã để dễ chọn. Ấp xã khác vẫn được giữ lại.")
-                        loc_xa_sua = st.selectbox("Lọc theo xã",
-                            ["Tất cả"] + ds_xa_list, key="cbtd_loc_xa_sua")
-                        opts_sua = ds_ap_options if loc_xa_sua == "Tất cả" else \
-                                   dm_ap[dm_ap["Tên xã"]==loc_xa_sua]["Nhãn"].tolist()
-                        default_sua = [a for a in ap_cu_valid if a in opts_sua]
-                        ap_xa_dang_loc = st.multiselect(
-                            f"Ấp {'tất cả xã' if loc_xa_sua=='Tất cả' else loc_xa_sua}",
-                            opts_sua, default=default_sua, key="cbtd_ap_sua")
-                        ap_xa_khac  = [a for a in ap_cu_valid if a not in opts_sua]
-                        ap_tong_hop = sorted(set(ap_xa_khac + ap_xa_dang_loc))
-                        if ap_tong_hop:
-                            ap_theo_xa_moi = {}
-                            for n in ap_tong_hop:
-                                xa = n.split(" — ")[0] if " — " in n else "Khac"
-                                ap_theo_xa_moi.setdefault(xa,[]).append(n.split(" — ")[-1])
-                            tong_txt = " | ".join(
-                                f"{xa}({len(aps)}): {chr(44).join(aps)}"
-                                for xa, aps in ap_theo_xa_moi.items())
-                            st.info(f"Tổng sẽ lưu ({len(ap_tong_hop)} ấp): {tong_txt}")
-                            # Kiểm tra trùng real-time khi chỉnh sửa (bỏ qua chính CBTD đang sửa)
-                            trung_sua = kiem_tra_trung_ap(ap_tong_hop, bo_qua_ma=chon_sua)
-                            if trung_sua:
-                                for ap_t, cb_t in trung_sua.items():
-                                    st.error(f"⛔ **{ap_t}** đang thuộc CBTD **{cb_t}**")
+                        dgd_opts_sua = _ds_dgd_cua_pgd(pgd_sua)
+                        if not dgd_opts_sua:
+                            st.warning(f"PGD **{pgd_sua}** chưa cấu hình ĐGD.")
+                            dgd_sel_sua = []
+                        else:
+                            labels_sua = [_label_dgd(xa, d) for xa, d in dgd_opts_sua]
+                            ds_dgd_cu  = info_cu.get("ds_dgd", []) if pgd_sua == info_cu.get("pgd") else []
+                            default_labels = [_label_dgd(xa, d) for xa, d in dgd_opts_sua
+                                              if d in ds_dgd_cu]
+                            sel_labels_sua = st.multiselect(
+                                "ĐGD phụ trách *",
+                                labels_sua,
+                                default=default_labels,
+                                key="cbtd_dgd_sua")
+                            dgd_sel_sua = [d for xa, d in dgd_opts_sua
+                                           if _label_dgd(xa, d) in sel_labels_sua]
 
-                    if st.button("💾 Lưu thay đổi", type="primary",
-                                 width='stretch', key="btn_luu_sua"):
+                            if dgd_sel_sua:
+                                trung_sua = _kiem_tra_trung_dgd(pgd_sua, dgd_sel_sua, bo_qua_ma=chon_sua)
+                                if trung_sua:
+                                    for d, cb in trung_sua.items():
+                                        st.error(f"⛔ **{d}** đang thuộc CBTD **{cb}**")
+                                else:
+                                    tong_ap_sua = lay_ap_tu_dgd_list(pgd_sua, dgd_sel_sua, dgd_map)
+                                    st.info(f"✅ {len(dgd_sel_sua)} ĐGD → {len(tong_ap_sua)} ấp/thôn")
+
+                    if st.button("💾 Lưu thay đổi", type="primary", key="btn_luu_sua"):
                         if not ten_sua.strip():
                             st.error("❌ Họ tên không được để trống")
-                        elif not ap_tong_hop:
-                            st.error("❌ Chọn ít nhất 1 ấp")
+                        elif not dgd_sel_sua:
+                            st.error("❌ Chọn ít nhất 1 ĐGD")
                         else:
-                            # Chặn lưu nếu có ấp trùng
-                            trung_sua_luu = kiem_tra_trung_ap(ap_tong_hop, bo_qua_ma=chon_sua)
-                            thay_doi = False
-                            if trung_sua_luu:
-                                for ap_t, cb_t in trung_sua_luu.items():
-                                    st.error(f"❌ Ấp **{ap_t}** đang thuộc CBTD **{cb_t}** — cần bỏ ấp này hoặc sửa CBTD kia trước")
+                            trung_luu_sua = _kiem_tra_trung_dgd(pgd_sua, dgd_sel_sua, bo_qua_ma=chon_sua)
+                            if trung_luu_sua:
+                                for d, cb in trung_luu_sua.items():
+                                    st.error(f"❌ ĐGD **{d}** đang thuộc CBTD **{cb}**")
                             else:
-                                ma_moi = sorted(ma_list(ap_tong_hop))
-                                ma_cu  = sorted([str(m) for m in info_cu.get("ds_thon",[])])
-                                thay_doi = (
-                                    ten_sua.strip()  != info_cu.get("ho_ten","").strip()     or
-                                    dt_sua.strip()   != info_cu.get("dien_thoai","").strip() or
-                                    gc_sua.strip()   != info_cu.get("ghi_chu","").strip()    or
-                                    ma_moi           != ma_cu
+                                da_thay = (
+                                    ten_sua.strip() != info_cu.get("ho_ten","").strip() or
+                                    dt_sua.strip()  != info_cu.get("dien_thoai","").strip() or
+                                    gc_sua.strip()  != info_cu.get("ghi_chu","").strip() or
+                                    pgd_sua         != info_cu.get("pgd","") or
+                                    sorted(dgd_sel_sua) != sorted(info_cu.get("ds_dgd",[]))
                                 )
-                                if not thay_doi:
-                                    st.warning("⚠️ Không có dữ liệu gì thay đổi")
-                            if not trung_sua_luu and thay_doi:
-                                cbtd_data[chon_sua] = {
-                                    "ho_ten":     ten_sua.strip(),
-                                    "dien_thoai": dt_sua.strip(),
-                                    "ds_thon":    ma_list(ap_tong_hop),
-                                    "ghi_chu":    gc_sua.strip(),
-                                    "ngay_cap":   datetime.today().strftime("%d/%m/%Y %H:%M"),
-                                }
-                                luu_cbtd(cbtd_data)
-                                st.success(f"✅ Đã cập nhật **{chon_sua}** — {len(ap_tong_hop)} ấp")
-                                st.rerun()
+                                if not da_thay:
+                                    st.warning("⚠️ Không có gì thay đổi")
+                                else:
+                                    cbtd_data[chon_sua] = {
+                                        "ho_ten":     ten_sua.strip(),
+                                        "pgd":        pgd_sua,
+                                        "ds_dgd":     dgd_sel_sua,
+                                        "dien_thoai": dt_sua.strip(),
+                                        "ghi_chu":    gc_sua.strip(),
+                                        "ngay_cap":   datetime.today().strftime("%d/%m/%Y %H:%M"),
+                                    }
+                                    luu_cbtd(cbtd_data)
+                                    db.ghi_audit(username, "luu_cbtd",
+                                                 f"Sửa {chon_sua} — {pgd_sua}, {len(dgd_sel_sua)} ĐGD")
+                                    st.success(f"✅ Đã cập nhật **{chon_sua}**")
+                                    st.rerun()
 
-            # ══ XÓA ══
+            # ── XÓA ─────────────────────────────────────────────────────────
             elif che_do == "🗑️ Xóa":
                 st.markdown("**🗑️ Xóa CBTD**")
                 if not cbtd_data:
                     st.info("Chưa có CBTD nào.")
                 else:
-                    chon_xoa = st.selectbox("Chọn CBTD",
+                    chon_xoa = st.selectbox(
+                        "Chọn CBTD",
                         list(cbtd_data.keys()),
-                        format_func=lambda k: f"{k} — {cbtd_data[k]['ho_ten']} ({len(cbtd_data[k].get('ds_thon',[]))} ấp)",
+                        format_func=lambda k: f"{k} — {cbtd_data[k]['ho_ten']} "
+                                              f"/ {cbtd_data[k].get('pgd','?')}",
                         key="cbtd_chon_xoa")
                     info_xoa = cbtd_data[chon_xoa]
-                    ap_xoa_nhan = nhan_list(info_xoa.get("ds_thon",[]))
-                    st.warning(f"⚠️ Sắp xóa: **{chon_xoa}** — {info_xoa['ho_ten']}\n\n"
-                               f"Ấp phụ trách: {', '.join(ap_xoa_nhan)}")
+                    st.warning(
+                        f"⚠️ Sắp xóa: **{chon_xoa}** — {info_xoa['ho_ten']}\n\n"
+                        f"PGD: {info_xoa.get('pgd','?')} | "
+                        f"ĐGD: {', '.join(info_xoa.get('ds_dgd',[]))}"
+                    )
                     xn = st.checkbox("Xác nhận xóa", key="cbtd_xn_xoa")
                     if st.button("🗑️ Xóa", type="primary",
                                  disabled=not xn, key="btn_xoa_cbtd"):
                         del cbtd_data[chon_xoa]
                         luu_cbtd(cbtd_data)
+                        db.ghi_audit(username, "luu_cbtd", f"Xóa {chon_xoa}")
                         st.success(f"✅ Đã xóa **{chon_xoa}**")
                         st.rerun()
 
         st.divider()
 
-        # ── Báo cáo theo CBTD ──
-        if cbtd_data:
-            st.markdown("**📊 Tổng hợp dư nợ theo CBTD**")
+        # ════════════════════════════════════════════════════════════════════
+        # BÁO CÁO DƯ NỢ THEO CBTD
+        # ════════════════════════════════════════════════════════════════════
+        cbtd_co_dgd = {ma: info for ma, info in cbtd_data.items()
+                       if info.get("pgd") and info.get("ds_dgd")}
+        if not cbtd_co_dgd:
+            if cbtd_data:
+                st.info("ℹ️ Chưa có CBTD nào được gán ĐGD. "
+                        "Dùng **Chỉnh sửa** để cập nhật.")
+            return
 
-            def fmt_cbtd(x: float) -> str:
-                """Format số tiền cho báo cáo CBTD (triệu đồng, 0 dp)."""
-                try:
-                    x = float(x)
-                    if abs(x) > 0:
-                        trieu = x / 1_000_000
-                        s = f"{trieu:,.0f}".replace(",","X").replace(".",",").replace("X",".")
-                        return s
-                    return "—"
-                except Exception:
-                    return "—"
+        st.markdown("**📊 Tổng hợp dư nợ theo CBTD**")
 
-            rows_bc = []
-            for ma, info in cbtd_data.items():
-                ds_ma_thon = [str(m) for m in info.get("ds_thon",[])]
-                if not ds_ma_thon: continue
-                # Join theo Mã thôn, loại món vay trực tiếp (Hình thức vay=1)
-                mask = df["Mã thôn"].astype(str).isin(ds_ma_thon) \
-                       if "Mã thôn" in df.columns else pd.Series([False]*len(df))
-                df_cb = df[mask]
-                # Loại món vay trực tiếp khỏi báo cáo CBTD
-                if "Hình thức vay" in df_cb.columns:
-                    df_cb = df_cb[df_cb["Hình thức vay"] != 1]
-                if df_cb.empty: continue
+        if df is None or df.empty:
+            st.warning("Chưa có dữ liệu HSTD.")
+            return
 
-                tdn = df_cb[COT_TONG_DU_NO].sum() if COT_TONG_DU_NO in df_cb.columns else 0
-                dqh = df_cb[COT_DU_NO_QH].sum()   if COT_DU_NO_QH   in df_cb.columns else 0
-                rows_bc.append({
-                    "Mã CBTD":    ma,
-                    "Họ tên":     info["ho_ten"],
-                    "SĐT":        info.get("dien_thoai",""),
-                    "Số KH":      f"{df_cb[COT_MA_KH].nunique():,}".replace(",","."),
-                    "Số món vay": f"{df_cb[COT_SO_KU].nunique():,}".replace(",","."),
-                    "Tổng dư nợ": fmt_cbtd(tdn),
-                    "Dư nợ QH":   fmt_cbtd(dqh),
-                    "Tỷ lệ QH %": round(dqh/tdn*100, 2) if tdn else 0,
-                    "Số ấp":      len(ds_ma_thon),
-                })
+        # Join toàn bộ df với cbtd
+        df_joined = gan_cbtd_vao_df(df, cbtd_co_dgd, dgd_map)
+        if "Hình thức vay" in df_joined.columns:
+            df_joined = df_joined[df_joined["Hình thức vay"] != 1]
 
-            if rows_bc:
-                hien_thi_dataframe_phan_trang(
-                    pd.DataFrame(rows_bc),
-                    key="cbtd_tong_hop_bc",
-                )
+        rows_bc = []
+        for ma, info in cbtd_co_dgd.items():
+            df_cb = df_joined[df_joined["CBTD"] == ma]
+            if df_cb.empty:
+                continue
+            tdn = df_cb[COT_TONG_DU_NO].sum() if COT_TONG_DU_NO in df_cb.columns else 0
+            dqh = df_cb[COT_DU_NO_QH].sum()   if COT_DU_NO_QH   in df_cb.columns else 0
+            rows_bc.append({
+                "Mã CBTD":       ma,
+                "Họ tên":        info["ho_ten"],
+                "PGD":           info.get("pgd",""),
+                "SĐT":           info.get("dien_thoai",""),
+                "Số KH":         fmt_so(df_cb[COT_MA_KH].nunique()) if COT_MA_KH in df_cb.columns else "—",
+                "Số món vay":    fmt_so(df_cb[COT_SO_KU].nunique()) if COT_SO_KU in df_cb.columns else "—",
+                "Tổng dư nợ":   _fmt_tien(tdn),
+                "Dư nợ QH":     _fmt_tien(dqh),
+                "Tỷ lệ QH %":   round(dqh/tdn*100, 2) if tdn else 0,
+                "Số ĐGD":       len(info.get("ds_dgd",[])),
+                "Số ấp":        _so_ap_cbtd(info),
+            })
 
-                if st.button("📥 Xuất báo cáo CBTD", key="btn_xuat_cbtd"):
-                    buf = BytesIO()
-                    with pd.ExcelWriter(buf, engine="openpyxl") as w:
-                        pd.DataFrame(rows_bc).to_excel(w, index=False, sheet_name="Tổng hợp CBTD")
-                        for ma, info in cbtd_data.items():
-                            ds_ma = [str(m) for m in info.get("ds_thon",[])]
-                            mask2 = df["Mã thôn"].astype(str).isin(ds_ma) \
-                                    if "Mã thôn" in df.columns else pd.Series([False]*len(df))
-                            df_cb2 = df[mask2]
-                            if "Hình thức vay" in df_cb2.columns:
-                                df_cb2 = df_cb2[df_cb2["Hình thức vay"] != 1]
-                            if not df_cb2.empty:
-                                df_cb2.to_excel(w, index=False, sheet_name=f"CB_{ma}"[:31])
-                    st.session_state["_bytes_cbtd"] = buf.getvalue()
-                    st.session_state["_file_cbtd"] = f"BC_CBTD_{datetime.today().strftime('%d%m%Y')}.xlsx"
+        if not rows_bc:
+            st.info("Không có dữ liệu dư nợ cho CBTD nào (kiểm tra lại tên thôn trong ĐGD).")
+            return
 
-                if st.session_state.get("_bytes_cbtd"):
-                    st.download_button("⬇ Tải Excel",
-                        data=st.session_state["_bytes_cbtd"],
-                        file_name=st.session_state["_file_cbtd"],
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                        key="dl_cbtd")
+        hien_thi_dataframe_phan_trang(pd.DataFrame(rows_bc), key="cbtd_bc_tong_hop")
 
+        if st.button("📥 Xuất báo cáo CBTD", key="btn_xuat_cbtd"):
+            buf = BytesIO()
+            with pd.ExcelWriter(buf, engine="openpyxl") as w:
+                pd.DataFrame(rows_bc).to_excel(w, index=False, sheet_name="Tổng hợp CBTD")
+                for ma, info in cbtd_co_dgd.items():
+                    df_cb2 = df_joined[df_joined["CBTD"] == ma].copy()
+                    if not df_cb2.empty:
+                        df_cb2.drop(columns=["CBTD","Tên CBTD"], errors="ignore", inplace=True)
+                        df_cb2.to_excel(w, index=False, sheet_name=f"CB_{ma}"[:31])
+            st.session_state["_bytes_cbtd"] = buf.getvalue()
+            st.session_state["_file_cbtd"]  = f"BC_CBTD_{datetime.today().strftime('%d%m%Y')}.xlsx"
 
+        if st.session_state.get("_bytes_cbtd"):
+            st.download_button(
+                "⬇ Tải Excel",
+                data=st.session_state["_bytes_cbtd"],
+                file_name=st.session_state["_file_cbtd"],
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                key="dl_cbtd",
+            )

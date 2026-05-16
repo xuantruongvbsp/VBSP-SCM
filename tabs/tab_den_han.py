@@ -132,7 +132,7 @@ def render(role: str = None, **kwargs) -> None:
             df_bang["Tỷ trọng %"] = df_th_stats["pct"].apply(
                 lambda x: f"{x:.1f}".replace(".", ",") + "%"
             )
-            st.dataframe(df_bang, use_container_width=True, hide_index=True)
+            st.dataframe(df_bang, width='stretch', hide_index=True)
 
             # Đồ thị cột
             try:
@@ -155,7 +155,7 @@ def render(role: str = None, **kwargs) -> None:
                     margin=dict(t=20, b=40),
                     showlegend=False,
                 )
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width='stretch')
             except Exception as _e:
                 st.warning(f"Không thể vẽ đồ thị: {_e}")
 
@@ -193,7 +193,7 @@ def render(role: str = None, **kwargs) -> None:
         _th_agg["Dư nợ (triệu đồng)"] = (
             _th_agg["Dư nợ (triệu đồng)"] / 1e6
         ).round(0).apply(lambda x: f"{x:,.0f}".replace(",", "."))
-        st.dataframe(_th_agg, use_container_width=True, hide_index=True)
+        st.dataframe(_th_agg, width='stretch', hide_index=True)
 
     cols_hien_thi = [
         COT_TEN_PGD, COT_TEN_KH,
@@ -212,7 +212,7 @@ def render(role: str = None, **kwargs) -> None:
                 df_hien["Ngày đến hạn"] = pd.to_datetime(
                     df_hien["Ngày đến hạn"], errors="coerce"
                 ).dt.strftime("%d/%m/%Y").fillna("")
-            st.dataframe(df_hien, use_container_width=True, hide_index=True)
+            st.dataframe(df_hien, width='stretch', hide_index=True)
 
             COLS_CHI_TIET = [
                 COT_TEN_PGD, COT_TEN_KH, COT_TEN_CT,
@@ -250,7 +250,7 @@ def render(role: str = None, **kwargs) -> None:
                     file_name=ten_file_xuat(f"DenHan_{den_thang}thang"),
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     key="btn_xuat_den_han_excel",
-                    use_container_width=True,
+                    width='stretch',
                 )
 
             with col_pdf2:

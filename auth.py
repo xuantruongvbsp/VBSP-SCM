@@ -394,7 +394,7 @@ def hien_thi_login():
             if st.form_submit_button(
                 "🔐 Đăng nhập",
                 type="primary",
-                use_container_width=True,
+                width='stretch',
             ):
                 if not un or not pw:
                     st.error("Vui lòng nhập đầy đủ.")
@@ -460,7 +460,7 @@ def _render_cau_hinh_danh_muc(username: str) -> None:
                 label_visibility="collapsed"
             )
         with col_btn:
-            if st.button("➕ Thêm", key="btn_them_pgd", use_container_width=True):
+            if st.button("➕ Thêm", key="btn_them_pgd", width='stretch'):
                 ten_pgd = st_ten_pgd_moi.strip()
                 if not ten_pgd:
                     st.error("❌ Vui lòng nhập tên PGD.")
@@ -519,7 +519,7 @@ def _render_cau_hinh_danh_muc(username: str) -> None:
         col_save, col_reset = st.columns([3, 1])
         with col_save:
             if st.button("💾 Lưu danh sách PGD", key="btn_luu_ds_pgd",
-                         type="primary", use_container_width=True):
+                         type="primary", width='stretch'):
                 if not st.session_state.temp_ds_pgd:
                     st.error("❌ Danh sách PGD không được để trống.")
                 else:
@@ -531,7 +531,7 @@ def _render_cau_hinh_danh_muc(username: str) -> None:
         
         with col_reset:
             if st.button("🔄 Tải lại", key="btn_reload_ds_pgd",
-                        use_container_width=True,
+                        width='stretch',
                         help="Tải lại từ database, hủy các thay đổi chưa lưu"):
                 st.session_state.temp_ds_pgd = lay_config("ds_pgd", _DS_PGD_DEFAULT).copy()
                 st.info("🔄 Đã tải lại danh sách từ database.")
@@ -553,7 +553,7 @@ def _render_cau_hinh_danh_muc(username: str) -> None:
             help='Ví dụ: {"004602": "PGD Long Thành"}',
         )
         if st.button("💾 Lưu Mapping Mã PGD", key="btn_luu_ma_pgd",
-                     type="primary", use_container_width=True):
+                     type="primary", width='stretch'):
             try:
                 ma_pgd_moi = json.loads(ma_pgd_text)
                 if not isinstance(ma_pgd_moi, dict):
@@ -674,7 +674,7 @@ def _render_mapping_pgd_xa(username: str) -> None:
     with col_export:
         # Nút xuất Excel
         if st.button("📤 Xuất Excel", key="btn_xuat_pgd_xa", 
-                     use_container_width=True):
+                     width='stretch'):
             # Tạo DataFrame 2 cột: Tên PGD | Tên Xã
             rows_export = []
             for pgd, ds_xa in sorted(st.session_state.pgd_xa_map_draft.items()):
@@ -770,7 +770,7 @@ def _render_mapping_pgd_xa(username: str) -> None:
                 
                 with col_add_xa:
                     if st.button("➕ Thêm xã", key=f"xa_add_{slug}", 
-                                use_container_width=True):
+                                width='stretch'):
                         ten_xa_moi = st_ten_xa_moi.strip()
                         if not ten_xa_moi:
                             st.error("❌ Vui lòng nhập tên xã.")
@@ -791,7 +791,7 @@ def _render_mapping_pgd_xa(username: str) -> None:
                     st.caption(f"⚠️ Sẽ xóa tất cả {so_xa} xã khỏi {ten_pgd}")
                 
                 with col_del_all:
-                    with st.popover("🗑️ Xóa tất cả", use_container_width=True):
+                    with st.popover("🗑️ Xóa tất cả", width='stretch'):
                         st.warning(
                             f"Bạn có chắc chắn muốn xóa **{so_xa} xã** "
                             f"khỏi **{ten_pgd}** không?"
@@ -800,7 +800,7 @@ def _render_mapping_pgd_xa(username: str) -> None:
                             "✅ Xác nhận xóa",
                             key=f"xa_delall_{slug}",
                             type="primary",
-                            use_container_width=True
+                            width='stretch'
                         ):
                             st.session_state.pgd_xa_map_draft[ten_pgd] = []
                             st.success(f"✅ Đã xóa tất cả xã khỏi {ten_pgd}.")
@@ -818,7 +818,7 @@ def _render_mapping_pgd_xa(username: str) -> None:
             "💾 Lưu tất cả thay đổi",
             key="btn_luu_tat_ca_pgd_xa",
             type="primary",
-            use_container_width=True,
+            width='stretch',
             disabled=not co_thay_doi
         ):
             # Lưu vào kv_store key "config_pgd_xa_map"
@@ -845,7 +845,7 @@ def _render_mapping_pgd_xa(username: str) -> None:
         if st.button(
             "↩️ Reset về mặc định",
             key="btn_reset_ve_mac_dinh_pgd_xa",
-            use_container_width=True,
+            width='stretch',
             help="Khôi phục về cấu hình mặc định từ config.py"
         ):
             # Reset về PGD_XA_MAP từ config.py
@@ -863,7 +863,7 @@ def _render_mapping_pgd_xa(username: str) -> None:
         if st.button(
             "🔄 Tải lại",
             key="btn_tai_lai_pgd_xa",
-            use_container_width=True,
+            width='stretch',
             help="Tải lại từ database, hủy các thay đổi chưa lưu"
         ):
             # Tải lại từ kv_store
@@ -896,7 +896,7 @@ def render(tab, df_full, role, username):
                 for u, i in users.items()]
         st.dataframe(
             format_df_vn(pd.DataFrame(rows)),
-            use_container_width=True,
+            width='stretch',
             hide_index=True,
         )
 
@@ -920,7 +920,7 @@ def render(tab, df_full, role, username):
                     ["Tất cả (xem toàn bộ)"] + ds_pgd, key="ql_pgd")
                 st.info("💡 Mật khẩu được mã hóa tự động.")
             if st.form_submit_button("✅ Tạo tài khoản", type="primary",
-                                     use_container_width=True):
+                                     width='stretch'):
                 err = []
                 if not new_un:            err.append("Thiếu tên đăng nhập")
                 if not new_ht:            err.append("Thiếu họ tên")
@@ -959,7 +959,7 @@ def render(tab, df_full, role, username):
                 with st.form("doi_mk"):
                     mk1 = st.text_input("Mật khẩu mới", type="password")
                     mk2 = st.text_input("Nhập lại",     type="password")
-                    if st.form_submit_button("Đặt lại", use_container_width=True):
+                    if st.form_submit_button("Đặt lại", width='stretch'):
                         if len(mk1) < 6:  st.error("Mật khẩu ≥ 6 ký tự")
                         elif mk1 != mk2:  st.error("Không khớp")
                         else:
@@ -972,7 +972,7 @@ def render(tab, df_full, role, username):
                 st.warning(f"Sẽ xóa: **{chon_u}** — {users[chon_u]['ho_ten']}")
                 xn = st.checkbox("Tôi xác nhận muốn xóa")
                 if st.button("Xóa tài khoản", type="primary",
-                             disabled=not xn, use_container_width=True):
+                             disabled=not xn, width='stretch'):
                     del users[chon_u]
                     luu_users(users)
                     st.success(f"✅ Đã xóa **{chon_u}**")
@@ -1008,7 +1008,7 @@ def render(tab, df_full, role, username):
                         data=payload,
                         file_name=file_name,
                         mime="application/json",
-                        use_container_width=True,
+                        width='stretch',
                         on_click=lambda: db.ghi_audit(
                             _username, "export_kv_store", f"{len(records)} keys"
                         ),
@@ -1024,7 +1024,7 @@ def render(tab, df_full, role, username):
                     if st.button(
                         "📤 Restore kv_store",
                         type="primary",
-                        use_container_width=True,
+                        width='stretch',
                         key="btn_restore_kv_store",
                     ):
                         if up is None:

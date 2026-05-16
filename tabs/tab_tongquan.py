@@ -936,7 +936,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
 
             # Tính Nợ xấu (NPL) = QH + Khoanh
             df_pgd["Nợ xấu (triệu đồng)"] = (df_pgd["QH (triệu đồng)"] + df_pgd["Khoanh (triệu đồng)"]).round(3)
-            df_pgd["TL NPL %"] = (
+            df_pgd["Tỷ lệ Nợ xấu"] = (
                 (df_pgd["Nợ xấu (triệu đồng)"] / df_pgd["Dư nợ (triệu đồng)"].replace(0, pd.NA)) * 100
             ).fillna(0).round(2)
 
@@ -966,7 +966,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
             tong["TL QH %"] = round((tong.get("QH (triệu đồng)", 0) / tong.get("Dư nợ (triệu đồng)", 1) * 100), 2) if tong.get("Dư nợ (triệu đồng)", 0) else 0
             tong["TL Khoanh %"] = round((tong.get("Khoanh (triệu đồng)", 0) / tong.get("Dư nợ (triệu đồng)", 1) * 100), 2) if tong.get("Dư nợ (triệu đồng)", 0) else 0
             tong["Nợ xấu (triệu đồng)"] = round(tong.get("QH (triệu đồng)", 0) + tong.get("Khoanh (triệu đồng)", 0), 3)
-            tong["TL NPL %"] = round(tong["Nợ xấu (triệu đồng)"] / tong.get("Dư nợ (triệu đồng)", 1) * 100, 2) if tong.get("Dư nợ (triệu đồng)", 0) else 0
+            tong["Tỷ lệ Nợ xấu"] = round(tong["Nợ xấu (triệu đồng)"] / tong.get("Dư nợ (triệu đồng)", 1) * 100, 2) if tong.get("Dư nợ (triệu đồng)", 0) else 0
             tong_clean = {k: (v if pd.notna(v) else 0) for k, v in tong.items()
                           if k != COT_TEN_PGD}
             tong_clean[COT_TEN_PGD] = "Toàn Chi nhánh"
@@ -1020,7 +1020,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                 "Số KH", "Dư nợ (triệu đồng)",
                 "QH (triệu đồng)", "TL QH %",
                 "Khoanh (triệu đồng)", "TL Khoanh %",
-                "Nợ xấu (triệu đồng)", "TL NPL %",
+                "Nợ xấu (triệu đồng)", "Tỷ lệ Nợ xấu",
                 "Lãi tồn (tỷ)",
                 "DS Cho vay (tỷ)", "DS Thu nợ (tỷ)",
             ]
@@ -1052,7 +1052,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                     return "—"
                 if col in ["Dư nợ (triệu đồng)"]:
                     return vn(float(val), 2)
-                if col in ["TL QH %", "TL Khoanh %", "TL NPL %"]:
+                if col in ["TL QH %", "TL Khoanh %", "Tỷ lệ Nợ xấu"]:
                     return f"{vn(float(val), 2)}%"
                 if col in [
                     "QH (triệu đồng)",
@@ -1082,6 +1082,18 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
             # Bỏ nhóm có colspan=0
             NHOM_COT = [(n, s) for n, s in NHOM_COT if s > 0]
 
+            def _disp_col(col: str) -> str:
+                """Tên cột hiển thị 2 dòng: phần đơn vị xuống dòng."""
+                if col == COT_TEN_PGD:
+                    return "Đơn vị"
+                if col.endswith("(triệu đồng)"):
+                    return col[:-len("(triệu đồng)")].strip() + "<br/><span style='font-weight:normal;font-size:11px'>(Triệu đồng)</span>"
+                if col.endswith("(tỷ)"):
+                    return col[:-len("(tỷ)")].strip() + "<br/><span style='font-weight:normal;font-size:11px'>(Tỷ đồng)</span>"
+                if col == "Tỷ lệ Nợ xấu":
+                    return "Tỷ lệ<br/>Nợ xấu"
+                return col
+
             header1 = "".join(
                 f'<th colspan="{span}" style="background:#2E7D32;color:#fff;'
                 f'text-align:center;padding:7px 5px;border:1px solid #1B5E20;font-size:13px">'
@@ -1090,8 +1102,9 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
             )
             header2 = "".join(
                 f'<th style="background:#388E3C;color:#fff;text-align:center;'
-                f'padding:6px 5px;border:1px solid #1B5E20;font-size:13px;'
-                f'white-space:nowrap">{c if c != COT_TEN_PGD else "Đơn vị"}</th>'
+                f'padding:6px 4px;border:1px solid #1B5E20;font-size:12px;'
+                f'white-space:normal;min-width:60px;line-height:1.4">'
+                f'{_disp_col(c)}</th>'
                 for c in cot_hien
             )
 
@@ -1100,13 +1113,13 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                 is_last = row[COT_TEN_PGD] == "Toàn Chi nhánh"
                 bg = "#C8E6C9" if is_last else ("#F5F7FA" if i % 2 == 0 else "#FFFFFF")
                 fw = "bold" if is_last else "normal"
-                row_fs = "0.84rem" if is_last else "0.82rem"
+                row_fs = "0.92rem" if is_last else "0.90rem"
                 cells = "".join(
                     f'<td style="padding:6px 7px;border:1px solid #E0E0E0;'
                     f'text-align:{"left" if c == cot_hien[0] else "right"};'
                     f'font-weight:{fw};font-size:{row_fs};white-space:nowrap;'
                     f'{"color:#C62828;font-weight:800" if c == "TL QH %" and pd.to_numeric(row.get(c, 0), errors="coerce") > 0.5 else ""}'
-                    f'{"color:#C62828;font-weight:800" if c == "TL NPL %" and pd.to_numeric(row.get(c, 0), errors="coerce") > 0.3 else ""}'
+                    f'{"color:#C62828;font-weight:800" if c == "Tỷ lệ Nợ xấu" and pd.to_numeric(row.get(c, 0), errors="coerce") > 0.3 else ""}'
                     f'{"color:#C62828;font-weight:800" if c == "TL Khoanh %" and pd.to_numeric(row.get(c, 0), errors="coerce") > 1 else ""}'
                     f'">'
                     f'{_fmt_cell(row[c], c)}</td>'
@@ -1164,10 +1177,20 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                 _ssf_tqpgd = "_pdf_file_tqpgd"
                 if st.button("📄 Xuất PDF", key="btn_pdf_tqpgd", type="primary", width='stretch'):
                     try:
+                        # Đổi tên cột → 2 dòng cho header PDF (Reportlab Paragraph hỗ trợ <br/>)
+                        def _pdf_col(col: str) -> str:
+                            if col.endswith("(triệu đồng)"):
+                                return col[:-len("(triệu đồng)")].strip() + "<br/>(Triệu đồng)"
+                            if col.endswith("(tỷ)"):
+                                return col[:-len("(tỷ)")].strip() + "<br/>(Tỷ đồng)"
+                            if col == "Tỷ lệ Nợ xấu":
+                                return "Tỷ lệ<br/>Nợ xấu"
+                            return col
+                        df_pdf = df_export.rename(columns={c: _pdf_col(c) for c in df_export.columns})
 
                         with st.spinner("⏳ Đang tạo PDF..."):
                             _bytes = xuat_pdf(
-                                df_export,
+                                df_pdf,
                                 "Thông tin tổng quát theo PGD",
                                 username,
                                 cols_tien=[],

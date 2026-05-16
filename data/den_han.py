@@ -13,8 +13,11 @@ from config import (
     COT_TEN_PGD, COT_TEN_KH, COT_MA_KH,
     COT_TONG_DU_NO, COT_DU_NO_TH, COT_DU_NO_QH,
     COT_TEN_CT, COT_NGAY_DEN_HAN,
-    COT_TEN_XA,
+    COT_TEN_XA, COT_MA_CHUONG_TRINH, COT_THOI_HAN,
 )
+
+_COT_MA_QD   = "Mã Quyết định"
+_COT_TEN_DTTH = "Tên ĐTTH"
 
 
 def _parse_ngay(val):
@@ -36,6 +39,31 @@ def _parse_ngay(val):
         return None
 
 
+def _tinh_so_thang_gia_han(row) -> "int | None":
+    """Số tháng tối đa được gia hạn nợ theo quy định (làm tròn xuống)."""
+    ma_ct    = str(row.get(COT_MA_CHUONG_TRINH, "")).strip()
+    ma_qd    = str(row.get(_COT_MA_QD,          "")).strip()
+    ten_dtth = str(row.get(_COT_TEN_DTTH,        "")).strip()
+    thoi_han = pd.to_numeric(row.get(COT_THOI_HAN, None), errors="coerce")
+
+    if ma_ct == "02":
+        return None if pd.isna(thoi_han) else int(thoi_han) // 2
+
+    if ma_ct == "17":
+        return 30
+
+    if "29" in ma_qd or "54" in ma_qd:
+        if ten_dtth == "Hộ mới thoát nghèo":
+            return 0
+        if ten_dtth == "Hộ nghèo":
+            return 30
+
+    if pd.isna(thoi_han):
+        return None
+    thoi_han_int = int(thoi_han)
+    return 12 if thoi_han_int <= 12 else thoi_han_int // 2
+
+
 def tinh_den_han_df(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
     df["_ngay_dh"] = df[COT_NGAY_DEN_HAN].apply(_parse_ngay)
@@ -47,6 +75,7 @@ def tinh_den_han_df(df: pd.DataFrame) -> pd.DataFrame:
             if d is not None else None
         )
     )
+    df["Số tháng có thể gia hạn"] = df.apply(_tinh_so_thang_gia_han, axis=1)
     df.drop(columns=["_ngay_dh"], inplace=True)
     return df
 

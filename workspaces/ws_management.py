@@ -234,13 +234,15 @@ def _hien_thi_khd_tab(df_kh: pd.DataFrame, ds_pgd_all: list):
         df_chi_loc = ds_chi if loc_pgd == "Tất cả" else ds_chi[ds_chi[COT_TEN_PGD] == loc_pgd]
         with col_xuat:
             st.markdown("<br>", unsafe_allow_html=True)
-            buf = xuat_excel({"3mKHD": df_chi_loc})
-            st.download_button(
-                f"⬇️ Excel ({len(df_chi_loc)} món)", data=buf,
-                file_name=f"3mKHD_{datetime.now().strftime('%Y%m%d')}.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                key="khd_xuat",
-            )
+            if st.button(f"📥 Tạo Excel ({len(df_chi_loc)} món)", key="khd_xuat_btn"):
+                st.session_state["_khd_xuat_buf"] = xuat_excel({"3mKHD": df_chi_loc})
+            if st.session_state.get("_khd_xuat_buf"):
+                st.download_button(
+                    "⬇️ Tải về Excel", data=st.session_state["_khd_xuat_buf"],
+                    file_name=f"3mKHD_{datetime.now().strftime('%Y%m%d')}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    key="khd_xuat",
+                )
         hien_thi_dataframe_phan_trang(df_chi_loc, key="khd_chi", height=320)
 
 
@@ -264,13 +266,15 @@ def _hien_thi_migration_tab(df_kh: pd.DataFrame, ds_pgd_all: list):
     df_loc = df_amber if loc_pgd == "Tất cả" else df_amber[df_amber[COT_TEN_PGD] == loc_pgd]
     with col_xuat:
         st.markdown("<br>", unsafe_allow_html=True)
-        buf = xuat_excel({"Migration": df_loc})
-        st.download_button(
-            f"⬇️ Excel ({len(df_loc)} món)", data=buf,
-            file_name=f"Migration_{datetime.now().strftime('%Y%m%d')}.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            key="mg_xuat",
-        )
+        if st.button(f"📥 Tạo Excel ({len(df_loc)} món)", key="mg_xuat_btn"):
+            st.session_state["_mg_xuat_buf"] = xuat_excel({"Migration": df_loc})
+        if st.session_state.get("_mg_xuat_buf"):
+            st.download_button(
+                "⬇️ Tải về Excel", data=st.session_state["_mg_xuat_buf"],
+                file_name=f"Migration_{datetime.now().strftime('%Y%m%d')}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                key="mg_xuat",
+            )
     cols_hien = [c for c in [
         COT_TEN_PGD, "Tên xã", COT_DVUT, COT_TEN_KH, COT_SO_KU,
         COT_TEN_CT, COT_LAI_TON, COT_LAI_THANG, "so_thang_ton_uoc", "muc_canh_bao",

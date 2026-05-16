@@ -214,23 +214,24 @@ else:
 def kiem_tra_pdf_dependency() -> dict:
     """
     Kiểm tra trạng thái các thư viện cần cho PDF.
-    Trả về dict: { "reportlab": bool, "kaleido": bool, "font": bool, "messages": list[str] }
+    Trả về dict: { "reportlab": bool, "kaleido": bool, "font_ok": bool, "messages": list[str] }
     Dùng để hiển thị banner hướng dẫn trong UI.
     """
     msgs = []
     if not _REPORTLAB_READY:
         msgs.append("Thiếu **reportlab** → chạy: `pip install reportlab`")
-    else:
-        if not _FONT_REGISTERED:
-            msgs.append("⚠️ Font Times New Roman chưa được đăng ký — kiểm tra file `assets/times.ttf`")
+    font_file = next((p for p in [Path("assets/times.ttf"), Path("C:/Windows/Fonts/times.ttf")] if p.exists()), None)
+    font_ok = font_file is not None
+    if not font_ok:
+        msgs.append("⚠️ Không tìm thấy font **Times New Roman** — tiếng Việt trong PDF có thể bị lỗi. Cần file `times.ttf` trong thư mục `assets/`")
     if not _KALEIDO_READY:
         msgs.append("Thiếu **kaleido** (nhúng biểu đồ vào PDF) → chạy: `pip install kaleido`")
     return {
         "reportlab": _REPORTLAB_READY,
         "kaleido": _KALEIDO_READY,
-        "font": _FONT_REGISTERED,
+        "font": font_ok,
         "messages": msgs,
-        "ready": _REPORTLAB_READY and _KALEIDO_READY,
+        "ready": _REPORTLAB_READY and font_ok,
     }
 
 

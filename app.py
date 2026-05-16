@@ -53,9 +53,8 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# ── Global CSS (inject 1 lần) ─────────────────────────────────────────────────
-if "_css_injected" not in st.session_state:
-    st.markdown("""<style>
+# ── Global CSS (inject mỗi rerun — Streamlit xóa DOM sau mỗi lần click) ────────
+st.markdown("""<style>
 /* ── 1. TYPOGRAPHY ── */
 html, body, [class*="css"] {
     font-size: 15px !important;
@@ -373,7 +372,6 @@ hr { border: none !important; border-top: 1px solid #e2e8f0 !important; margin: 
     border-top-color: #2E7D32 !important;
 }
 </style>""", unsafe_allow_html=True)
-    st.session_state["_css_injected"] = True
 
 # ── Logo VBSP ────────────────────────────────────────────────────────────────
 

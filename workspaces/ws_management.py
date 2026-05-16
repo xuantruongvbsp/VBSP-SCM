@@ -38,6 +38,10 @@ from utils import (
 )
 from services.excel_service import xuat_excel_chuyen_nghiep, ten_file_xuat as excel_ten_file
 from pdf_service import render_huong_dan
+from components.delta_card import delta_card, kpi_row
+from components.loan_drawer import loan_detail_drawer
+from components.filter_bar import filter_bar, apply_filters
+from components.export_pdf import download_pdf_button, xuat_pdf_co_chart
 
 
 def _render_canh_bao(df: pd.DataFrame, ds_pgd_all: list):
@@ -62,16 +66,17 @@ def _render_canh_bao(df: pd.DataFrame, ds_pgd_all: list):
     amber_tong  = len(df_amber)
     tl_khd      = khd_tong / tong_mon * 100 if tong_mon > 0 else 0
 
-    k1, k2, k3, k4 = st.columns(4)
-    k1.metric("Tổng món vay",              fmt_so(tong_mon))
-    k2.metric("3 tháng không HĐ 🔴",       fmt_so(khd_tong),
-              delta=f"{tl_khd:.1f}% tổng món",
-              delta_color="inverse" if tl_khd > 2 else "off")
-    k3.metric("Sắp chuyển 3 tháng KHĐ ⚠️", fmt_so(amber_tong),
-              help="Lãi tồn 2–3 tháng, chưa đủ 3 tháng không hoạt động — cần đôn đốc ngay")
-    tong_lai_khd = df_kh[df_kh.get("is_3m_inactive", False)][COT_LAI_TON].sum() \
-                   if COT_LAI_TON in df_kh.columns else 0
-    k4.metric("Lãi tồn 3m KHĐ (triệu đồng)", vn(tong_lai_khd/1e6, 0))
+    kpi_row([
+        {"label": "Tổng món vay", "value": tong_mon, "icon": "📊", "suffix": "", "precision": 0,
+         "help": "Tổng số món vay toàn chi nhánh"},
+        {"label": "3 tháng KHĐ", "value": khd_tong, "icon": "🔴", "suffix": "", "precision": 0,
+         "delta": tl_khd, "delta_label": "% tổng món", "delta_color": "inverse" if tl_khd > 2 else "off",
+         "help": "Số món 3 tháng không hoạt động"},
+        {"label": "Sắp chuyển KHĐ", "value": amber_tong, "icon": "⚠️", "suffix": "", "precision": 0,
+         "delta_color": "off", "help": "Lãi tồn 2-3 tháng, cần đôn đốc ngay"},
+        {"label": "Lãi tồn KHĐ", "value": tong_lai_khd, "icon": "💰", "suffix": "đồng", "precision": 0,
+         "help": "Tổng lãi tồn các món 3 tháng KHĐ"},
+    ], cols=4)
 
     st.divider()
 

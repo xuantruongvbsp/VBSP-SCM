@@ -4,6 +4,10 @@
 - `services/kiem_soat_service.py` — thêm `import duckdb`; refactor `_tinh_to_sai_so_tv`: thay `groupby().agg()` bằng DuckDB GROUP BY + TRY_CAST; refactor `_tong_hop_vp_theo_pgd`: thay Python for loop bằng DuckDB GROUP BY + FILTER; refactor `_tong_hop_ghv_theo_pgd`: thay `groupby().agg()` bằng DuckDB
 - `tabs/tab_kiem_soat.py` — thêm `import duckdb`; refactor `_get_ks_cache`: xóa `df_nqh` copy trung gian, thay pandas filter+groupby NQH bằng 2 DuckDB query (tổng hợp PGD + chi tiết) với WHERE pushdown
 
+## [2026-05-17] — Tối ưu RAM: _load_hstd active_only filter cho CN role
+- `app.py` import thêm `COT_TONG_DU_NO, COT_DU_NO_QH` từ config
+- `app.py` `_load_hstd()` — thêm tham số `active_only: bool`; xây WHERE clause động tổng hợp cả `ten_pgd` lẫn `active_only`; CN role gọi với `active_only=True` → loại hồ sơ tất toán hoàn toàn (gốc = 0, QH = 0, khoanh = 0) ngay tại tầng `read_parquet`, giảm 30–60% RAM tùy dữ liệu; fix bổ sung `"Dư nợ khoanh"` vào điều kiện (thiếu ban đầu)
+
 ## [2026-05-17] — Tối ưu RAM: _load_hstd filter pushdown per-PGD
 - `app.py` `_load_hstd()` — thêm tham số `ten_pgd`; khi PGD role dùng `read_parquet() WHERE` filter ngay tại DuckDB thay vì load toàn bộ file; kết quả được `@st.cache_resource` cache riêng per-PGD
 - `app.py` dòng ~583 — xóa khối DESCRIBE + duckdb.query WHERE thủ công (không cached); thay bằng `_load_hstd(CACHE_HSTD, _hstd_ts, ten_pgd=pgd_user)`; DESCRIBE chỉ chạy khi df rỗng (error path)

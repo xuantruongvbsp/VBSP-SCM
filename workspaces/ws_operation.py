@@ -17,7 +17,7 @@ from config import (
     COT_DU_NO_QH, COT_TONG_DU_NO, COT_NGAY_DH,
     COT_TEN_PGD, COT_SDT, COT_DIA_CHI,
     COT_LAI_TON, COT_LAI_THANG, COT_DVUT, COT_TEN_XA,
-    TEMPLATES_DIR, TAG_MAP,
+    TEMPLATES_DIR, TAG_MAP, PGD_XA_MAP,
 )
 from auth import co_quyen_upload_pgd, is_cn_role, is_pgd_role, get_permissions, get_tab_permissions
 from data import (
@@ -43,6 +43,114 @@ from components.delta_card import delta_card, kpi_row
 from components.filter_bar import filter_bar, apply_filters
 from components.loan_drawer import loan_detail_drawer
 from components.export_pdf import download_pdf_button, xuat_pdf_co_chart
+
+
+# ── Helper: tính 4 KPI DeltaCard cho trang chủ PGD ──────────────────────────
+
+def _kpi_pgd_list(df_pgd: pd.DataFrame, pgd_user: str) -> list[dict]:
+    """Tính 4 KPI DeltaCard cho trang chủ / sidebar PGD.
+
+    Returns:
+        List dict (kwargs cho delta_card), tối đa 4 phần tử.
+    """
+    kpi: list[dict] = []
+    if df_pgd is None or df_pgd.empty:
+        return kpi
+
+    # ── Tính trước để dùng chung ───────────────────────────────────────────
+    tong_dn = (
+        pd.to_numeric(df_pgd[COT_TONG_DU_NO], errors="coerce").sum()
+        if COT_TONG_DU_NO in df_pgd.columns else 0.0
+    )
+    nqh_dn = (
+        pd.to_numeric(df_pgd[COT_DU_NO_QH], errors="coerce").sum()
+        if COT_DU_NO_QH in df_pgd.columns else 0.0
+    )
+
+    # ── KPI 1: Tổng dư nợ ─────────────────────────────────────────────────
+    try:
+        pct_nqh = (nqh_dn / tong_dn * 100) if tong_dn > 0 else 0.0
+        kpi.append({
+            "label":       "Tổng dư nợ",
+            "value":       fmt_ty(tong_dn),
+            "delta":       -pct_nqh,         # ↓ mũi tên xuống, inverse → xanh khi thấp
+            "delta_label": "% NQH",
+            "icon":        "💰",
+            "suffix":      "",
+            "precision":   2,
+            "help":        "Tổng dư nợ toàn PGD",
+            "delta_color": "inverse",
+        })
+    except Exception:
+        pass
+
+    # ── KPI 2: Nợ quá hạn ─────────────────────────────────────────────────
+    try:
+        ty_le_nqh = (nqh_dn / tong_dn * 100) if tong_dn > 0 else 0.0
+        kpi.append({
+            "label":       "Nợ quá hạn",
+            "value":       fmt_ty(nqh_dn),
+            "delta":       ty_le_nqh,         # ↑ mũi tên lên, inverse → đỏ khi cao
+            "delta_label": "% so dư nợ",
+            "icon":        "🔴",
+            "suffix":      "",
+            "precision":   2,
+            "help":        "Dư nợ quá hạn toàn PGD",
+            "delta_color": "inverse",
+        })
+    except Exception:
+        pass
+
+    # ── KPI 3: 3 tháng KHĐ ────────────────────────────────────────────────
+    try:
+        df_kh   = danh_dau_khong_hd_cached(df_pgd)
+        n_khd   = int(df_kh["is_3m_inactive"].sum()) if "is_3m_inactive" in df_kh.columns else 0
+        pct_khd = (n_khd / len(df_pgd) * 100) if len(df_pgd) > 0 else 0.0
+        kpi.append({
+            "label":       "3 tháng KHĐ",
+            "value":       fmt_so(n_khd),
+            "delta":       pct_khd,           # ↑ mũi tên lên, inverse → đỏ khi nhiều KHĐ
+            "delta_label": "% tổng hồ sơ",
+            "icon":        "📅",
+            "suffix":      "món",
+            "precision":   1,
+            "help":        "Khoản hộ vay 3 tháng không hoạt động",
+            "delta_color": "inverse",
+        })
+    except Exception:
+        pass
+
+    # ── KPI 4: Tiến độ KHTD ───────────────────────────────────────────────
+    try:
+        # khtd_xa: {ten_xa}|{ma_ct_key} → gia_tri_dong (VND)
+        kh_xa  = db.doc_kv("khtd_xa") or {}
+        ds_xa  = set(PGD_XA_MAP.get(pgd_user, []))
+        tong_kh = sum(
+            float(v)
+            for k, v in kh_xa.items()
+            if "|" in k and k.split("|", 1)[0] in ds_xa
+        ) if (kh_xa and ds_xa) else 0.0
+
+        if tong_kh > 0:
+            pct_khtd  = tong_dn / tong_kh * 100   # TH = tổng dư nợ PGD
+            khtd_val  = f"{pct_khtd:.0f}%"
+        else:
+            khtd_val  = "—"
+
+        kpi.append({
+            "label":       "KHTD",
+            "value":       khtd_val,
+            "delta":       None,              # không so sánh
+            "icon":        "📊",
+            "suffix":      "",
+            "precision":   0,
+            "help":        "Tiến độ thực hiện KHTD",
+            "delta_color": "off",
+        })
+    except Exception:
+        pass
+
+    return kpi
 
 
 def _render_trang_chu(tab, df_pgd: pd.DataFrame, role: str, pgd_user: str, kwargs: dict):
@@ -71,91 +179,9 @@ def _render_trang_chu(tab, df_pgd: pd.DataFrame, role: str, pgd_user: str, kwarg
             if df_pgd is None or df_pgd.empty:
                 st.warning("⚠️ Chưa có dữ liệu. Vui lòng upload file HSTD.")
             else:
-                kpi_data = []
-
-                # KPI 1: Tổng dư nợ
-                try:
-                    tong_dn = pd.to_numeric(df_pgd[COT_TONG_DU_NO], errors="coerce").sum()
-                    nqh_val = pd.to_numeric(df_pgd[COT_DU_NO_QH], errors="coerce").sum()
-                    pct_nqh = (nqh_val / tong_dn * 100) if tong_dn > 0 else 0
-                    kpi_data.append({
-                        "label": "Tổng dư nợ",
-                        "value": tong_dn,
-                        "delta": -pct_nqh,
-                        "delta_label": "% NQH",
-                        "icon": "💰",
-                        "suffix": "đồng",
-                        "precision": 0,
-                        "help": "Tổng dư nợ toàn PGD",
-                        "delta_color": "inverse",
-                    })
-                except Exception:
-                    pass
-
-                # KPI 2: Nợ quá hạn
-                try:
-                    nqh = pd.to_numeric(df_pgd[COT_DU_NO_QH], errors="coerce").sum()
-                    ty_le = (nqh / tong_dn * 100) if tong_dn > 0 else 0
-                    kpi_data.append({
-                        "label": "Nợ quá hạn",
-                        "value": nqh,
-                        "delta": ty_le,
-                        "delta_label": "% so dư nợ",
-                        "icon": "🔴",
-                        "suffix": "đồng",
-                        "precision": 0,
-                        "help": "Dư nợ quá hạn toàn PGD",
-                        "delta_color": "inverse",
-                    })
-                except Exception:
-                    pass
-
-                # KPI 3: 3 tháng KHĐ
-                try:
-                    df_kh = danh_dau_khong_hd_cached(df_pgd)
-                    n_khd = int(df_kh["is_3m_inactive"].sum()) if "is_3m_inactive" in df_kh.columns else 0
-                    pct_khd = (n_khd / len(df_pgd) * 100) if len(df_pgd) > 0 else 0
-                    kpi_data.append({
-                        "label": "3 tháng KHĐ",
-                        "value": n_khd,
-                        "delta": pct_khd,
-                        "delta_label": "% tổng hồ sơ",
-                        "icon": "📅",
-                        "suffix": "",
-                        "precision": 0,
-                        "help": "Khoản hộ vay 3 tháng không hoạt động",
-                        "delta_color": "inverse",
-                    })
-                except Exception:
-                    pass
-
-                # KPI 4: Tiến độ KHTD
-                try:
-                    slug = pgd_slug(pgd_user) if pgd_user else ""
-                    khtd_key = f"khtd_pgd_{slug}" if slug else None
-                    if khtd_key:
-                        khtd_data = db.doc_kv(khtd_key)
-                        if khtd_data and isinstance(khtd_data, dict):
-                            tong_kh = khtd_data.get("tong_kh", 0)
-                            tong_th = khtd_data.get("tong_th", 0)
-                            pct_tien_do = (tong_th / (tong_kh or 1) * 100) if tong_kh > 0 else 0
-                            kpi_data.append({
-                                "label": "KHTD",
-                                "value": f"{pct_tien_do:.0f}",
-                                "delta": 0,
-                                "delta_label": "% thực hiện",
-                                "icon": "📊",
-                                "suffix": "%",
-                                "precision": 0,
-                                "help": "Tiến độ thực hiện KHTD",
-                                "delta_color": "off",
-                            })
-                except Exception:
-                    pass
-
+                kpi_data = _kpi_pgd_list(df_pgd, pgd_user or "")
                 if kpi_data:
                     kpi_row(kpi_data, num_columns=4)
-
         except Exception as e:
             st.error(f"❌ Lỗi KPI: {e}")
 

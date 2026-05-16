@@ -116,9 +116,17 @@ header_font_size = font_size + 2
 2. Restart Streamlit: `Ctrl+C` → `streamlit run app.py`
 3. Kiểm tra selector — Streamlit hay đổi `data-testid` theo version
 
+### Sidebar mất màu sau khi click tab
+**Nguyên nhân:** CSS inject bọc trong guard `if "_css_injected" not in st.session_state:` → chỉ inject lần đầu, các rerun tiếp theo mất CSS.
+**Fix:** Bỏ guard, inject CSS vô điều kiện mỗi rerun trong `app.py`.
+
 ### Sidebar không có màu navy
 → CSS global chưa được inject hoặc bị override
 → Kiểm tra block `# ── Global CSS ──` trong `app.py`
+
+### Trang trắng sau khi dùng `width='stretch'`
+**Nguyên nhân:** Streamlit 1.57.0 chưa hỗ trợ tham số `width='stretch'` trong `st.dataframe()`.
+**Fix:** Dùng `use_container_width=True` thay thế.
 
 ### `st.columns` với 12 cột bị co hẹp, chữ nhỏ
 → Đây là giới hạn của Streamlit — dùng HTML table thuần thay thế cho phần hiển thị, giữ `st.columns` chỉ cho phần nhập liệu

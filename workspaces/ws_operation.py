@@ -38,7 +38,7 @@ from utils import (
     hien_thi_dataframe_phan_trang,
 )
 from services.excel_service import xuat_excel_chuyen_nghiep, ten_file_xuat as excel_ten_file
-from pdf_service import xuat_pdf
+from pdf_service import xuat_pdf, kiem_tra_pdf_dependency
 
 
 def _render_trang_chu(tab, df_pgd: pd.DataFrame, role: str, pgd_user: str, kwargs: dict):
@@ -1043,6 +1043,11 @@ Doanh số cho vay trong tháng: {ds_cv:,.0f} triệu đồng; doanh số thu n�
         
         # ④ Xuất báo cáo
         st.markdown("**④ Xuất báo cáo**")
+        
+        _pdf_dep = kiem_tra_pdf_dependency()
+        if not _pdf_dep["reportlab"]:
+            for msg in _pdf_dep["messages"]:
+                st.warning(msg)
         
         cols_xuat = [c for c in df_bang.columns if c != "Tỷ trọng %"] or list(df_bang.columns)
         

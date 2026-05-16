@@ -1,5 +1,8 @@
 # CHANGELOG
 
+## [2026-05-17] — Baseline 31/12: đổi upload 1 file CN → grid 22 PGD per-unit
+- `tabs/tab_upload_khnv.py` — import thêm `baseline_pgd_path, danh_sach_nam_baseline_pgd, trang_thai_baseline_pgd`; viết lại `_render_upload_baseline()`: hiện bảng trạng thái 22 đơn vị (✅/⬜), grid 2 cột file_uploader per-PGD, lưu vào `data/baseline_pgd/{slug}/HSTD_3112_{nam}.XLSX`; `doc_baseline_merged` tự merge khi tab So sánh kỳ cần
+
 ## [2026-05-17] — Fix: df/df_full không vào kwargs của _build_all_items → tab crash NoneType
 - `workspaces/ws_management.py` — thêm `df=df, df_full=df_full, ds_pgd_all=ds_pgd_all` vào lời gọi `_build_all_items()`; root cause: `filtered_kw` lọc 3 key này ra nhưng không truyền lại, mọi lambda dùng `**kwargs` nhận `df=None` → crash `'NoneType' object has no attribute 'columns'`
 

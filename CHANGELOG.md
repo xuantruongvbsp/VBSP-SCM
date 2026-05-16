@@ -1,5 +1,18 @@
 # CHANGELOG
 
+## [2026-05-16] — Port thêm tính năng từ TypeScript: Explorer, Vintage NQH, Roll/Cure từ join trực tiếp
+- `services/period_compare.py` — **Tạo mới** — port logic từ `period-compare.ts`:
+  - `join_by_loan(df_prev, df_curr)` → ghép cặp khế ước theo khóa (soKU + maKH)
+  - `classify_changes(df_joined)` → phân loại 8 loại biến động (mới/tất toán/chuyển xấu/cải thiện/tăng DN/giảm DN/gia hạn/không đổi)
+  - `roll_cure_rate(df_joined)` → roll rate / cure rate từ join trực tiếp (không cần snapshot)
+  - `vintage_nqh(df)` → NQH phân tích theo năm vay
+  - `par_breakdown(df)` → PAR30/PAR90/PAR180 theo ngày đáo hạn
+- `tabs/tab_so_sanh_ky.py` — Thêm 4 section mới:
+  - **Biến động khế ước** (Explorer): filter 8 loại, sắp theo |Δ DN|, tối đa 500 dòng
+  - **Roll rate / Cure rate** từ join trực tiếp (không cần snapshot riêng)
+  - **Vintage NQH**: NQH theo năm vay, so sánh mốc vs hiện tại
+  - Cập nhật PAR section → dùng PAR30/PAR90/PAR180 thay vì chỉ có 1 con số
+
 ## [2026-05-16] — Tính năng nâng cao: Tab So sánh kỳ
 - `tabs/tab_so_sanh_ky.py` — Thêm 5 tính năng so sánh nâng cao:
   1. **Ma trận chuyển nhóm nợ** (Nhóm nợ A/B/C/D): từ loan-level snapshots (`migration_service.migration_matrix`)

@@ -459,7 +459,8 @@ def merge_du_lieu_toan_cn(
     _cols_so_cn = [
         "Dư nợ trong hạn", "Dư nợ quá hạn", "Dư nợ khoanh",
         "Tổng giải ngân", "Giải ngân trong năm", "Dư tài khoản",
-        "Thời hạn vay", "Nguồn vốn",
+        "Thời hạn vay",
+        # "Nguồn vốn" là text "TW"/"ĐP" — KHÔNG ép numeric, sẽ thành NaN
         "Mức vay", "Tổng dư nợ", "Lãi tồn TH", "Lãi tồn QH",
         "Lãi DT trong tháng", "Gốc đã trả",
     ]

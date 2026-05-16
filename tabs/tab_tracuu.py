@@ -445,15 +445,17 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
     df_sk_gqvl  = kwargs.get("df_sk_gqvl")
     hstd_path   = kwargs.get("hstd_path")
     ts_hstd     = kwargs.get("ts_hstd", 0.0)
+    pgd_user    = kwargs.get("pgd_user")          # None = CN role
 
     # Tập hợp Số khế ước NQ11 có dư nợ > 0 (từ sao kê NQ11)
     nq11_so_ku_set  = _xay_nq11_set(df_nq11)
     # Tập hợp Số khế ước có ghi chú NQ11 trong sao kê GQVL (dùng cho món dư nợ = 0)
     gqvl_nq11_set   = _xay_gqvl_nq11_set(df_sk_gqvl)
 
-    # Chỉ giữ cột cần thiết → tiết kiệm RAM
-    # Đọc thẳng từ Parquet (không qua df đã lọc active_only) để tra cứu được cả
-    # khách hàng đã tất toán (Tổng dư nợ = 0).
+    # Chỉ giữ cột cần thiết → tiết kiệm RAM.
+    # CN role: đọc thẳng từ Parquet (bỏ qua active_only filter) để tra cứu được
+    # cả khách hàng đã tất toán (Tổng dư nợ = 0).
+    # PGD role: dùng df đã lọc theo PGD — không mở rộng phạm vi dữ liệu.
     COLS_CAN = [
         COT_TEN_PGD, COT_MA_KH, COT_TEN_KH, COT_CMND,
         COT_SO_KU, COT_SDT, COT_DIA_CHI, COT_TEN_TO, COT_TEN_XA, COT_TEN_THON,
@@ -463,10 +465,11 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
         COT_TEN_CT, COT_MA_CHUONG_TRINH, COT_TINH_TRANG,
         COT_NGUON_VON, COT_MA_NHA_DAU_TU,
     ]
+    _use_parquet = hstd_path and not pgd_user   # chỉ CN role mới đọc full parquet
     _tc_cache_key = f"tc_df_{ts_hstd}"
-    if st.session_state.get("_tc_cache_key") == _tc_cache_key:
+    if _use_parquet and st.session_state.get("_tc_cache_key") == _tc_cache_key:
         df_work = st.session_state["_tc_df_work"]
-    elif hstd_path:
+    elif _use_parquet:
         _schema = duckdb.query(
             f"SELECT column_name FROM (DESCRIBE SELECT * FROM read_parquet('{hstd_path}'))"
         ).df()["column_name"].tolist()

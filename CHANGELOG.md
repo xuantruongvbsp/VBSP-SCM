@@ -3,6 +3,9 @@
 ## [2026-05-16] — Tab đến hạn: khôi phục bảng tổng hợp PGD/Xã × Tháng
 - `tabs/tab_den_han.py` — Thêm lại bảng tổng hợp theo PGD/Xã × tháng đến hạn (tính từ `df_loc` đã cache, không gọi lại `tinh_den_han_df`)
 
+## [2026-05-16] — Fix: "Số tháng có thể gia hạn" không có dữ liệu
+- `data/den_han.py` — Thêm `_normalize_ma()` chuẩn hóa `'2.0'`→`'2'` (HSTD lưu mã CT dạng float string); thêm `_tinh_thoi_han_tu_ngay()` tính thời hạn vay từ `Ngày vay` - `Ngày ĐH theo hợp đồng` vì cột `Thời hạn vay` toàn null; sửa so sánh `== "02"` → `== "2"`
+
 ## [2026-05-16] — Tab đến hạn: tối ưu hiệu năng (vectorize + cache)
 - `data/den_han.py` — Vectorize `tinh_den_han_df`: bỏ `_parse_ngay` + row-by-row `apply`, dùng `pd.to_datetime` + `np.select` (~10-20x nhanh hơn trên 30k hàng)
 - `tabs/tab_den_han.py` — Thêm `@st.cache_data` cho `_doc_va_tinh_den_han(pgd_user, mtime)`, `_loc_thang()` helper; tránh gọi `tinh_den_han_df` 2 lần mỗi render

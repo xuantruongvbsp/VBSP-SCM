@@ -1232,6 +1232,96 @@ def render(**kwargs):
 
     _banner_canh_bao_khd(df_pgd, role)
 
+    # ── KPI Dashboard (4 cards) ─────────────────────────────────────────
+    try:
+        if df_pgd is not None and not df_pgd.empty:
+            kpi_data = []
+
+            try:
+                tong_dn = pd.to_numeric(df_pgd[COT_TONG_DU_NO], errors="coerce").sum()
+                nqh_val = pd.to_numeric(df_pgd[COT_DU_NO_QH], errors="coerce").sum()
+                pct_nqh = (nqh_val / tong_dn * 100) if tong_dn > 0 else 0
+                kpi_data.append({
+                    "label": "Tổng dư nợ",
+                    "value": tong_dn,
+                    "delta": -pct_nqh,
+                    "delta_label": "% NQH",
+                    "icon": "💰",
+                    "suffix": "đồng",
+                    "precision": 0,
+                    "help": "Tổng dư nợ toàn PGD",
+                    "delta_color": "inverse",
+                })
+            except Exception:
+                pass
+
+            try:
+                nqh = pd.to_numeric(df_pgd[COT_DU_NO_QH], errors="coerce").sum()
+                ty_le = (nqh / tong_dn * 100) if tong_dn > 0 else 0
+                kpi_data.append({
+                    "label": "Nợ quá hạn",
+                    "value": nqh,
+                    "delta": ty_le,
+                    "delta_label": "% so dư nợ",
+                    "icon": "🔴",
+                    "suffix": "đồng",
+                    "precision": 0,
+                    "help": "Dư nợ quá hạn toàn PGD",
+                    "delta_color": "inverse",
+                })
+            except Exception:
+                pass
+
+            try:
+                from data import danh_dau_khong_hd_cached as _ddkhd
+                df_kh = _ddkhd(df_pgd)
+                n_khd = int(df_kh["is_3m_inactive"].sum()) if "is_3m_inactive" in df_kh.columns else 0
+                pct_khd = (n_khd / len(df_pgd) * 100) if len(df_pgd) > 0 else 0
+                kpi_data.append({
+                    "label": "3 tháng KHĐ",
+                    "value": n_khd,
+                    "delta": pct_khd,
+                    "delta_label": "% tổng hồ sơ",
+                    "icon": "📅",
+                    "suffix": "",
+                    "precision": 0,
+                    "help": "Khoản hộ vay 3 tháng không hoạt động",
+                    "delta_color": "inverse",
+                })
+            except Exception:
+                pass
+
+            try:
+                from data.pgd import pgd_slug as _pgd_slug
+                slug = _pgd_slug(pgd_user) if pgd_user else ""
+                khtd_key = f"khtd_pgd_{slug}" if slug else None
+                if khtd_key:
+                    import db as _db
+                    khtd_data = _db.doc_kv(khtd_key)
+                    if khtd_data and isinstance(khtd_data, dict):
+                        tong_kh = khtd_data.get("tong_kh", 0)
+                        tong_th = khtd_data.get("tong_th", 0)
+                        pct_tien_do = (tong_th / (tong_kh or 1) * 100) if tong_kh > 0 else 0
+                        kpi_data.append({
+                            "label": "KHTD",
+                            "value": f"{pct_tien_do:.0f}",
+                            "delta": 0,
+                            "delta_label": "% thực hiện",
+                            "icon": "📊",
+                            "suffix": "%",
+                            "precision": 0,
+                            "help": "Tiến độ thực hiện KHTD",
+                            "delta_color": "off",
+                        })
+            except Exception:
+                pass
+
+            if kpi_data:
+                kpi_row(kpi_data, num_columns=4)
+                st.divider()
+    except Exception:
+        pass
+
     # ── Helpers render ──────────────────────────────────────────────────
     def _render_diem_gd_va_to_tkvv(tab_parent, **kw):
         with tab_parent:

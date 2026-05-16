@@ -128,7 +128,7 @@ def render(tab: Optional[st.delta_generator.DeltaGenerator] = None, **kwargs) ->
 
     st.dataframe(
         df_hien,
-        use_container_width=True,
+        width='stretch',
         hide_index=True,
         column_config={
             "File đính kèm": st.column_config.LinkColumn(
@@ -145,7 +145,7 @@ def render(tab: Optional[st.delta_generator.DeltaGenerator] = None, **kwargs) ->
     st.divider()
     col_excel, col_pdf, _ = st.columns([1, 1, 5])
     with col_excel:
-        if st.button("📥 Xuất Excel", key="btn_xuat_tdn", use_container_width=True, type="primary"):
+        if st.button("📥 Xuất Excel", key="btn_xuat_tdn", width='stretch', type="primary"):
             sheets = {"Tiến độ nộp báo cáo": df_loc}
             excel_bytes = xuat_excel(sheets)
             st.session_state["_excel_tdn_bytes"] = excel_bytes
@@ -180,5 +180,5 @@ def render(tab: Optional[st.delta_generator.DeltaGenerator] = None, **kwargs) ->
             st.dataframe(
                 pd.DataFrame({"Đơn vị chưa nộp": chua_nop}),
                 hide_index=True,
-                use_container_width=True,
+                width='stretch',
             )

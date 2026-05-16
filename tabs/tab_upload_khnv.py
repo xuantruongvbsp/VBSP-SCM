@@ -864,7 +864,7 @@ def _render_upload_hang_loat(role: str, username: str) -> None:
         )
         st.dataframe(
             styled,
-            use_container_width=True, hide_index=True,
+            width='stretch', hide_index=True,
         )
 
         co_the_import = [r for r in rows if r["co_the_import"]]
@@ -1345,7 +1345,7 @@ def render(tab=None, **kwargs) -> None:
             if st.button(
                 "🔄 Làm mới",
                 key="btn_refresh_trang_thai",
-                use_container_width=True,
+                width='stretch',
             ):
                 st.session_state.pop("trang_thai_upload_pgd", None)
                 st.rerun()

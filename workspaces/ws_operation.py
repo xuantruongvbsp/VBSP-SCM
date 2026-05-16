@@ -57,7 +57,7 @@ def _render_trang_chu(tab, df_pgd: pd.DataFrame, role: str, pgd_user: str, kwarg
                 so_ho_so = len(df_pgd) if df_pgd is not None and not df_pgd.empty else 0
                 st.markdown(f"**{ten_pgd}** · {fmt_so(so_ho_so)} hồ sơ")
             with col_btn:
-                if st.button("🔄 Làm mới", use_container_width=True, key="trang_chu_refresh"):
+                if st.button("🔄 Làm mới", width='stretch', key="trang_chu_refresh"):
                     st.rerun()
         except Exception as e:
             st.error(f"❌ Lỗi header: {e}")
@@ -146,7 +146,7 @@ def _render_trang_chu(tab, df_pgd: pd.DataFrame, role: str, pgd_user: str, kwarg
                     if i < len(shortcuts):
                         icon, title, desc, nhom, tab_idx = shortcuts[i]
                         with s1:
-                            if st.button(f"{icon} {title}\n_{desc}_", use_container_width=True,
+                            if st.button(f"{icon} {title}\n_{desc}_", width='stretch',
                                        key=f"sc_1_{i}"):
                                 st.session_state["ws_op_nhom"] = nhom
                                 st.session_state["ws_op_jump_tab"] = tab_idx
@@ -155,7 +155,7 @@ def _render_trang_chu(tab, df_pgd: pd.DataFrame, role: str, pgd_user: str, kwarg
                     if i + 1 < len(shortcuts):
                         icon, title, desc, nhom, tab_idx = shortcuts[i + 1]
                         with s2:
-                            if st.button(f"{icon} {title}\n_{desc}_", use_container_width=True,
+                            if st.button(f"{icon} {title}\n_{desc}_", width='stretch',
                                        key=f"sc_1_{i+1}"):
                                 st.session_state["ws_op_nhom"] = nhom
                                 st.session_state["ws_op_jump_tab"] = tab_idx
@@ -192,7 +192,7 @@ def _render_trang_chu(tab, df_pgd: pd.DataFrame, role: str, pgd_user: str, kwarg
 
                     if alerts:
                         for icon, text, color, nhom, tab_idx in alerts:
-                            if st.button(f"{icon} {text}", use_container_width=True, key=f"alert_{text}"):
+                            if st.button(f"{icon} {text}", width='stretch', key=f"alert_{text}"):
                                 st.session_state["ws_op_nhom"] = nhom
                                 st.session_state["ws_op_jump_tab"] = tab_idx
                                 st.rerun()
@@ -1082,7 +1082,7 @@ Doanh số cho vay trong tháng: {ds_cv:,.0f} triệu đồng; doanh số thu n�
                 file_name=f"GiaoBan_{chon_xa}_{datetime.now().strftime('%Y%m%d')}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 key="gb_download",
-                use_container_width=True,
+                width='stretch',
             )
         with col_pdf:
             cols_tien_gb = [c for c in ["Tổng dư nợ", "Nợ quá hạn", "Nợ khoanh", "Doanh số cho vay tháng", "Doanh số thu nợ tháng"] if c in df_bang.columns]
@@ -1101,7 +1101,7 @@ Doanh số cho vay trong tháng: {ds_cv:,.0f} triệu đồng; doanh số thu n�
                 file_name=f"GiaoBan_{chon_xa}_{datetime.now().strftime('%Y%m%d')}.pdf",
                 mime="application/pdf",
                 key="gb_pdf_download",
-                use_container_width=True,
+                width='stretch',
             )
 
 
@@ -1258,13 +1258,13 @@ def render(**kwargs):
                 yaxis=dict(title="Triệu đồng", tickformat=",.0f"),
                 legend=dict(orientation="h", y=1.08),
             )
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width='stretch')
 
             # Bảng dữ liệu
             with st.expander("📋 Xem bảng số liệu chi tiết", expanded=False):
                 df_show = df_dp[["thang_label", "so_mon", "tong_du_no_trieu", "du_kien_thu_goc_trieu"]].copy()
                 df_show.columns = ["Tháng", "Số món", "Tổng dư nợ (tr.đ)", "Dự kiến thu gốc (tr.đ)"]
-                st.dataframe(df_show, hide_index=True, use_container_width=True)
+                st.dataframe(df_show, hide_index=True, width='stretch')
 
             # Chọn tháng xem chi tiết
             st.markdown("**🔍 Xem chi tiết tháng cụ thể**")
@@ -1285,7 +1285,7 @@ def render(**kwargs):
                            "du_no_trieu": "Dư nợ (tr.đ)", "goc_ht_trieu": "Gốc/tháng (tr.đ)",
                            "ngay_vay": "Ngày vay", "ngay_dh": "Ngày ĐH"}
                 df_ct_show = df_ct_show.rename(columns={k: v for k, v in col_map.items() if k in df_ct_show.columns})
-                st.dataframe(df_ct_show, hide_index=True, use_container_width=True, height=300)
+                st.dataframe(df_ct_show, hide_index=True, width='stretch', height=300)
             else:
                 st.info("Không có khế ước nào đến hạn thu gốc trong tháng này.")
 
@@ -1354,11 +1354,11 @@ def render(**kwargs):
             )
             if nhom_ct:
                 fig.update_xaxes(tickangle=45)
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width='stretch')
 
             with st.expander("📋 Bảng số liệu", expanded=False):
                 df_show = pivot.reset_index() if nhom_ct else pivot.reset_index()
-                st.dataframe(df_show, hide_index=True, use_container_width=True)
+                st.dataframe(df_show, hide_index=True, width='stretch')
 
             if not nhom_ct:
                 st.caption("💡 Thêm dữ liệu cột Chương trình để xem heatmap chi tiết theo từng CT.")
@@ -1381,7 +1381,7 @@ def render(**kwargs):
                     ),
                     file_name=excel_ten_file("Heatmap_DaoHan"),
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    use_container_width=True,
+                    width='stretch',
                 )
 
     def _render_histogram_du_no(tab_parent, **kw) -> None:
@@ -1429,7 +1429,7 @@ def render(**kwargs):
             )
             fig.add_vline(x=df_hist[cot_tien].median(), line_dash="dash", line_color="#C62828",
                           annotation_text=f"Trung vị: {df_hist[cot_tien].median():,.0f}")
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width='stretch')
 
             col_s1, col_s2, col_s3 = st.columns(3)
             with col_s1:
@@ -1498,14 +1498,14 @@ def render(**kwargs):
                 font_family="Arial",
                 legend=dict(orientation="h", y=-0.1),
             )
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width='stretch')
 
             with st.expander("📋 Bảng số liệu", expanded=False):
                 df_ct = ct_group.reset_index()
                 df_ct.columns = ["Chương trình", "Dư nợ (đồng)"]
                 df_ct["Dư nợ (triệu)"] = (df_ct["Dư nợ (đồng)"] / 1e6).round(1)
                 df_ct["Tỷ trọng %"] = (df_ct["Dư nợ (đồng)"] / df_ct["Dư nợ (đồng)"].sum() * 100).round(1)
-                st.dataframe(df_ct, hide_index=True, use_container_width=True)
+                st.dataframe(df_ct, hide_index=True, width='stretch')
 
     def _render_mau_bieu_tab(tab_parent) -> None:
         with tab_parent:

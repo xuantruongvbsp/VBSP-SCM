@@ -1433,7 +1433,7 @@ def _hien_thi_chi_tiet(ds: list[dict]) -> None:
     ] if c in df_xem.columns]
     if "du_no" in df_xem.columns:
         df_xem["du_no"] = df_xem["du_no"].apply(lambda x: fmt(x) if pd.notna(x) else "")
-    st.dataframe(df_xem[cols_xem], use_container_width=True, hide_index=True)
+    st.dataframe(df_xem[cols_xem], width='stretch', hide_index=True)
 
 
 # ── Hàm tách từ render() — Bước 4: xuất 04/05 XLN + Tờ trình ─────────
@@ -1443,7 +1443,7 @@ def _render_04_05_tt(
 ) -> None:
     ngay_hom_nay = date.today()
     st.markdown(f"**📄 04/XLN — Tổng hợp đề nghị khoanh nợ ({nguon_label})**")
-    if st.button(f"📥 Xuất 04/XLN — {nguon_label}", use_container_width=True,
+    if st.button(f"📥 Xuất 04/XLN — {nguon_label}", width='stretch',
                  key=f"{key_prefix}_04xln"):
         if not ds_khoanh:
             st.warning("⚠️ Không có hồ sơ khoanh nợ.")
@@ -1456,7 +1456,7 @@ def _render_04_05_tt(
     hien_thi_nut_tai(f"{key_prefix}_04xln")
 
     st.markdown(f"**📄 05/XLN — Tổng hợp đề nghị xóa nợ ({nguon_label})**")
-    if st.button(f"📥 Xuất 05/XLN — {nguon_label}", use_container_width=True,
+    if st.button(f"📥 Xuất 05/XLN — {nguon_label}", width='stretch',
                  key=f"{key_prefix}_05xln"):
         if not ds_xoa:
             st.warning("⚠️ Không có hồ sơ xóa nợ.")
@@ -1470,7 +1470,7 @@ def _render_04_05_tt(
 
     ten_tt = "02/TT" if la_cn else "01/TT"
     st.markdown(f"**📄 Tờ trình {ten_tt} ({nguon_label})**")
-    if st.button(f"📥 Xuất Tờ trình — {nguon_label}", use_container_width=True,
+    if st.button(f"📥 Xuất Tờ trình — {nguon_label}", width='stretch',
                  key=f"{key_prefix}_tt"):
         if not ds_khoanh and not ds_xoa:
             st.warning("⚠️ Không có hồ sơ nào.")
@@ -1541,7 +1541,7 @@ def _render_luong_nhap_ho_so(
     df_editor.insert(0, "Chọn", False)
     edited = st.data_editor(
         df_editor,
-        use_container_width=True,
+        width='stretch',
         hide_index=True,
         height=300,
         column_config={"Chọn": st.column_config.CheckboxColumn("Chọn")},
@@ -1719,7 +1719,7 @@ def _render_luong_nhap_ho_so(
 
         col13_tw, col13_dp, col14_tw, col14_dp = st.columns(4)
         with col13_tw:
-            if st.button("📥 13/XLN\nTrung ương", use_container_width=True, key=f"{key_prefix}nrr_13xln_tw"):
+            if st.button("📥 13/XLN\nTrung ương", width='stretch', key=f"{key_prefix}nrr_13xln_tw"):
                 if not ds_khoanh_tw:
                     st.warning("⚠️ Không có hồ sơ khoanh nợ TW.")
                 else:
@@ -1730,7 +1730,7 @@ def _render_luong_nhap_ho_so(
                     nut_tai_word_va_pdf(docx_b, f"Mau13XLN_TW_{ten_pgd}_{date.today():%d%m%Y}", f"{key_prefix}nrr_13xln_tw")
             hien_thi_nut_tai(f"{key_prefix}nrr_13xln_tw")
         with col13_dp:
-            if st.button("📥 13/XLN\nĐịa phương", use_container_width=True, key=f"{key_prefix}nrr_13xln_dp"):
+            if st.button("📥 13/XLN\nĐịa phương", width='stretch', key=f"{key_prefix}nrr_13xln_dp"):
                 if not ds_khoanh_dp:
                     st.warning("⚠️ Không có hồ sơ khoanh nợ ĐP.")
                 else:
@@ -1741,7 +1741,7 @@ def _render_luong_nhap_ho_so(
                     nut_tai_word_va_pdf(docx_b, f"Mau13XLN_DP_{ten_pgd}_{date.today():%d%m%Y}", f"{key_prefix}nrr_13xln_dp")
             hien_thi_nut_tai(f"{key_prefix}nrr_13xln_dp")
         with col14_tw:
-            if st.button("📥 14/XLN\nTrung ương", use_container_width=True, key=f"{key_prefix}nrr_14xln_tw"):
+            if st.button("📥 14/XLN\nTrung ương", width='stretch', key=f"{key_prefix}nrr_14xln_tw"):
                 if not ds_xoa_tw:
                     st.warning("⚠️ Không có hồ sơ xóa nợ TW.")
                 else:
@@ -1752,7 +1752,7 @@ def _render_luong_nhap_ho_so(
                     nut_tai_word_va_pdf(docx_b, f"Mau14XLN_TW_{ten_pgd}_{date.today():%d%m%Y}", f"{key_prefix}nrr_14xln_tw")
             hien_thi_nut_tai(f"{key_prefix}nrr_14xln_tw")
         with col14_dp:
-            if st.button("📥 14/XLN\nĐịa phương", use_container_width=True, key=f"{key_prefix}nrr_14xln_dp"):
+            if st.button("📥 14/XLN\nĐịa phương", width='stretch', key=f"{key_prefix}nrr_14xln_dp"):
                 if not ds_xoa_dp:
                     st.warning("⚠️ Không có hồ sơ xóa nợ ĐP.")
                 else:
@@ -2028,7 +2028,7 @@ def _render_workspace_cn(tab, **kwargs) -> None:
 
             col13_tw, col13_dp, col14_tw, col14_dp = st.columns(4)
             with col13_tw:
-                if st.button("📥 13/XLN TW", use_container_width=True,
+                if st.button("📥 13/XLN TW", width='stretch',
                               key="cn_nrr_13tw"):
                     if not ds_kh_tw:
                         st.warning("⚠️ Không có hồ sơ khoanh nợ TW.")
@@ -2044,7 +2044,7 @@ def _render_workspace_cn(tab, **kwargs) -> None:
                 hien_thi_nut_tai("cn_nrr_13tw")
 
             with col13_dp:
-                if st.button("📥 13/XLN ĐP", use_container_width=True,
+                if st.button("📥 13/XLN ĐP", width='stretch',
                               key="cn_nrr_13dp"):
                     if not ds_kh_dp:
                         st.warning("⚠️ Không có hồ sơ khoanh nợ ĐP.")
@@ -2060,7 +2060,7 @@ def _render_workspace_cn(tab, **kwargs) -> None:
                 hien_thi_nut_tai("cn_nrr_13dp")
 
             with col14_tw:
-                if st.button("📥 14/XLN TW", use_container_width=True,
+                if st.button("📥 14/XLN TW", width='stretch',
                               key="cn_nrr_14tw"):
                     if not ds_xo_tw:
                         st.warning("⚠️ Không có hồ sơ xóa nợ TW.")
@@ -2076,7 +2076,7 @@ def _render_workspace_cn(tab, **kwargs) -> None:
                 hien_thi_nut_tai("cn_nrr_14tw")
 
             with col14_dp:
-                if st.button("📥 14/XLN ĐP", use_container_width=True,
+                if st.button("📥 14/XLN ĐP", width='stretch',
                               key="cn_nrr_14dp"):
                     if not ds_xo_dp:
                         st.warning("⚠️ Không có hồ sơ xóa nợ ĐP.")
@@ -2377,7 +2377,7 @@ def render(tab: DeltaGenerator, **kwargs) -> None:
                             data=pdf_docx,
                             file_name=f"{ten_pdf}.docx",
                             mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                            use_container_width=True,
+                            width='stretch',
                             key="xln_pdf_dl_docx",
                         )
                     with d2:
@@ -2387,7 +2387,7 @@ def render(tab: DeltaGenerator, **kwargs) -> None:
                                 data=pdf_bytes,
                                 file_name=f"{ten_pdf}.pdf",
                                 mime="application/pdf",
-                                use_container_width=True,
+                                width='stretch',
                                 key="xln_pdf_dl_pdf",
                             )
                         else:

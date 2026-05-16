@@ -307,7 +307,7 @@ def _bang_explorer(df_joined: pd.DataFrame, chon_nam: str, key_prefix: str) -> N
         df_out = df_out.loc[df_out.index.intersection(order)].reindex(order).dropna(how="all")
 
     st.caption(f"Hiển thị {min(len(df_out), 500)} / {len(df_cl)} khế ước")
-    st.dataframe(df_out.head(500), hide_index=True, use_container_width=True, height=420)
+    st.dataframe(df_out.head(500), hide_index=True, width='stretch', height=420)
 
 
 def _bang_vintage_nqh(df_ht: pd.DataFrame, df_bl: pd.DataFrame, chon_nam: str) -> None:
@@ -320,10 +320,10 @@ def _bang_vintage_nqh(df_ht: pd.DataFrame, df_bl: pd.DataFrame, chon_nam: str) -
         return
 
     if vt_ht.empty:
-        st.dataframe(vt_bl, hide_index=True, use_container_width=True)
+        st.dataframe(vt_bl, hide_index=True, width='stretch')
         return
     if vt_bl.empty:
-        st.dataframe(vt_ht, hide_index=True, use_container_width=True)
+        st.dataframe(vt_ht, hide_index=True, width='stretch')
         return
 
     merged = vt_ht.merge(vt_bl, on="Năm vay", how="outer", suffixes=("_ht", "_bl")).fillna(0)
@@ -339,7 +339,7 @@ def _bang_vintage_nqh(df_ht: pd.DataFrame, df_bl: pd.DataFrame, chon_nam: str) -
         lambda x: ("+" if x >= 0 else "") + _fmt_pct_vn(abs(x)).replace("%", "") + "%"
     )
 
-    st.dataframe(df_out, hide_index=True, use_container_width=True)
+    st.dataframe(df_out, hide_index=True, width='stretch')
 
 
 # ─── New visual helpers (port from PeriodOverview.tsx) ───────────────────────
@@ -416,7 +416,7 @@ def _chart_tang_truong(
         )
         .properties(height=340)
     )
-    st.altair_chart(chart, use_container_width=True)
+    st.altair_chart(chart, width='stretch')
 
 
 def _flow_diagram(
@@ -676,7 +676,7 @@ def _render_top_bien_dong(
             xaxis_title=_METRIC_OPTS[metric_sel],
             yaxis_title="",
         )
-        st.plotly_chart(fig, use_container_width=True, key=key)
+        st.plotly_chart(fig, width='stretch', key=key)
 
     col_tang, col_giam = st.columns(2)
     with col_tang:
@@ -701,7 +701,7 @@ def _render_top_bien_dong(
         out["Giá trị HT"]  = out[f"{metric_sel}_ht"].apply(_label)
         out["Δ thay đổi"]  = out["delta"].apply(_label)
         cols_show = [dim_sel, "Giá trị mốc", "Giá trị HT", "Δ thay đổi"]
-        st.dataframe(out[cols_show], hide_index=True, use_container_width=True)
+        st.dataframe(out[cols_show], hide_index=True, width='stretch')
 
 
 # ─── Radar + Ranking (VSPPRO Compare port) ───────────────────────────────────
@@ -800,7 +800,7 @@ def _render_radar_ranking(
             xaxis_title=xlab,
             yaxis_title="",
         )
-        st.plotly_chart(fig, use_container_width=True, key=f"{key_prefix}ranking_chart")
+        st.plotly_chart(fig, width='stretch', key=f"{key_prefix}ranking_chart")
 
     with r2:
         st.caption(
@@ -856,7 +856,7 @@ def _render_radar_ranking(
             height=420,
             margin=dict(t=40, b=20, l=40, r=160),
         )
-        st.plotly_chart(fig_r, use_container_width=True, key=f"{key_prefix}radar_chart")
+        st.plotly_chart(fig_r, width='stretch', key=f"{key_prefix}radar_chart")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1030,7 +1030,7 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                     "% thay đổi":      f"{sign}{pct:.2f}".replace(".", ",") + "%",
                 })
             df_ct = pd.DataFrame(data_ct)
-            st.dataframe(df_ct, hide_index=True, use_container_width=True)
+            st.dataframe(df_ct, hide_index=True, width='stretch')
 
         # ═══════════ TĂNG TRƯỞNG DƯ NỢ ══════════════════════════════════
         st.divider()
@@ -1187,7 +1187,7 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                 lambda x: ("+" if x >= 0 else "") + _fmt_pct_vn(abs(x)).replace("%", "") + "%"
             )
 
-            st.dataframe(df_out, hide_index=True, use_container_width=True, height=520)
+            st.dataframe(df_out, hide_index=True, width='stretch', height=520)
 
         # ═══════════ KPI THEO HỘI ĐOÀN THỂ (ĐVUT) ══════════════════════════
         st.divider()
@@ -1236,7 +1236,7 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                     ), axis=1
                 )
 
-                st.dataframe(df_out, hide_index=True, use_container_width=True, height=480)
+                st.dataframe(df_out, hide_index=True, width='stretch', height=480)
 
         # ═══════════ MA TRẬN CHUYỂN NHÓM NỢ ═════════════════════════════════
         st.divider()
@@ -1261,7 +1261,7 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                     matrix, chi_tiet = _ma_tran_chuyen_nhuong(ky_truoc, ky_sau)
                     if not matrix.empty:
                         st.subheader(f"Ma trận: {ky_truoc} → {ky_sau}")
-                        st.dataframe(matrix, use_container_width=True)
+                        st.dataframe(matrix, width='stretch')
 
                         if not chi_tiet.empty:
                             with st.expander(
@@ -1271,7 +1271,7 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                                 st.dataframe(
                                     chi_tiet,
                                     hide_index=True,
-                                    use_container_width=True,
+                                    width='stretch',
                                     height=400,
                                 )
                     else:
@@ -1285,7 +1285,7 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
             st.markdown("**Phân tích thay đổi nhóm khách hàng giữa hai kỳ:**")
             df_lifecycle = _phan_loai_khach_hang(df_bl, df_ht)
             if not df_lifecycle.empty:
-                st.dataframe(df_lifecycle, hide_index=True, use_container_width=True)
+                st.dataframe(df_lifecycle, hide_index=True, width='stretch')
             else:
                 st.info("Không đủ dữ liệu khách hàng để phân loại.")
 
@@ -1327,7 +1327,7 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                     st.dataframe(
                         bd_bl[["du_no", "ty_trong_pct", "dong_gop_hhi"]],
                         hide_index=True,
-                        use_container_width=True,
+                        width='stretch',
                         height=250,
                     )
 
@@ -1345,7 +1345,7 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                     st.dataframe(
                         bd_ht[["du_no", "ty_trong_pct", "dong_gop_hhi"]],
                         hide_index=True,
-                        use_container_width=True,
+                        width='stretch',
                         height=250,
                     )
 

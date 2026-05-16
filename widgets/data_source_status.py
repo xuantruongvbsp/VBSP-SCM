@@ -164,7 +164,7 @@ def render_detailed_status(pgd_user: Optional[str] = None,
             df_bao_cao = bao_cao_trang_thai_nguon()
             st.dataframe(
                 format_df_vn(df_bao_cao),
-                use_container_width=True,
+                width='stretch',
                 hide_index=True,
                 height=400,
             )

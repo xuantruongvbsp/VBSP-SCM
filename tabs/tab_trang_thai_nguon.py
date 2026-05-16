@@ -72,7 +72,7 @@ def _render_tong_quan() -> None:
         ]
     )
 
-    st.dataframe(df, use_container_width=True, hide_index=True)
+    st.dataframe(df, width='stretch', hide_index=True)
 
     if st.button("🔄 Làm mới", key="tttq_refresh"):
         st.rerun()
@@ -179,7 +179,7 @@ def _render_trang_thai_pgd(pgd_user: str | None, username: str) -> None:
         except Exception as e:
             rows.append({"Loại file": ten, "Trạng thái": "❌", "Cập nhật lần cuối": f"Lỗi: {e}"})
 
-    st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+    st.dataframe(pd.DataFrame(rows), width='stretch', hide_index=True)
 
     st.markdown("**📋 Hoạt động gần đây**")
     _tab_audit_log.render(None, mode="compact", force_allow=True, username_filter=pgd_user)

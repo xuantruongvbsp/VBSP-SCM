@@ -115,7 +115,7 @@ def _render_import(role: str, username: str, hn: str) -> None:
         file_name=f"mau_dgd_{pgd_slug(ten_pgd)}.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         key="dgd_imp_dl_mau",
-        use_container_width=True,
+        width='stretch',
     )
     up = st.file_uploader("File Excel (cột A–D: STT | Xã | ĐGD | Ấp/KP)", type=["xlsx", "xls"])
     if up:

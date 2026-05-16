@@ -100,7 +100,7 @@ def _chart_nhom(df: pd.DataFrame, nhom_col: str, key: str) -> None:
         xaxis_title="Dư nợ khoanh (VND)",
         yaxis_title="",
     )
-    st.plotly_chart(fig, use_container_width=True, key=key)
+    st.plotly_chart(fig, width='stretch', key=key)
 
 
 def _heatmap_dao_han(df: pd.DataFrame, key: str) -> None:
@@ -146,7 +146,7 @@ def _heatmap_dao_han(df: pd.DataFrame, key: str) -> None:
         margin=dict(t=10, b=30, l=40, r=20),
     )
     st.markdown("**📅 Phân bổ theo năm đáo hạn**")
-    st.plotly_chart(fig, use_container_width=True, key=key)
+    st.plotly_chart(fig, width='stretch', key=key)
 
 
 # ─── Render ───────────────────────────────────────────────────────────────────

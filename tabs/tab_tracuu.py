@@ -473,7 +473,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                 key="tc_keyword",
             )
         with sb2:
-            st.button("Tìm", type="primary", use_container_width=True)
+            st.button("Tìm", type="primary", width='stretch')
 
         # ── Filter buttons ──────────────────────────────────────────────────
         f_opts = ["Tất cả", "Nguồn TW", "Nguồn ĐP", "NQ11", "Quá hạn", "Mã NĐT"]
@@ -484,7 +484,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
         for i, f in enumerate(f_opts):
             is_active = st.session_state.tc_filter == f
             label = f"**{f}**" if is_active else f
-            if fc[i].button(label, key=f"fb_{i}", use_container_width=True):
+            if fc[i].button(label, key=f"fb_{i}", width='stretch'):
                 st.session_state.tc_filter = f
                 st.rerun()
         active_filter = st.session_state.tc_filter
@@ -577,7 +577,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
         st.divider()
         cols_xuat = st.columns([1, 1, 5])
         with cols_xuat[0]:
-            if st.button("📥 Xuất Excel", key="btn_xuat_tracuu", use_container_width=True, type="primary"):
+            if st.button("📥 Xuất Excel", key="btn_xuat_tracuu", width='stretch', type="primary"):
                 sheets = {"Kết quả tra cứu": df_kq}
                 excel_bytes = xuat_excel(sheets)
                 st.session_state["_excel_tracuu_bytes"] = excel_bytes

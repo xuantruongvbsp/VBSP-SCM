@@ -1,6 +1,6 @@
 # Codebase: VBSP-SCM
 
-**Generated:** 2026-05-16 19:30:00
+**Generated:** 2026-05-16 23:45:00
 
 ---
 
@@ -23,6 +23,8 @@ Hệ thống Quản trị Tín dụng Nội bộ cho **Ngân hàng Chính sách 
 ├── auth.py                    # 9-role RBAC, normalize_role()
 ├── config.py                  # MỌI hằng số: COT_*, DS_PGD, TAG_MAP, ROLE_MAP...
 ├── db.py                      # SQLite: kv_store, audit_log, users, baseline
+├── pdf_service.py              # PDF export (root) — nhiều tabs/workspaces import trực tiếp
+├── gen_dcgiam_sheet.py         # CLI: push dữ liệu GQVL giảm/điều chỉnh lên Google Sheet
 ├── utils.py                   # 20+ helper: fmt_so, fmt_tien, fmt_ty, fmt_pct...
 ├── snapshot_service.py        # HSTD snapshot versioning
 ├── alert_center.py            # Sidebar alerts (upload delay, inactive loans)
@@ -153,10 +155,11 @@ Hệ thống Quản trị Tín dụng Nội bộ cho **Ngân hàng Chính sách 
 │
 ├── .streamlit/
 │   └── config.toml
-├── cache/                     # Parquet cache (gitignored)
+├── cache/                     # Parquet cache runtime (auto-create): hstd.parquet, nq11.parquet, gqvl.parquet...
+├── pgd_data/                  # Upload theo từng PGD (runtime, có thể rỗng cho tới khi upload)
 ├── data/
-│   ├── qd/hdqt_tinh/          # PDF QĐ HĐQT tỉnh (63 files)
-│   └── *.xlsx                 # Source Excel files
+│   ├── qd/                    # PDF Quyết định (tạo khi upload; có thể rỗng)
+│   └── *.xlsx                 # Source Excel (HSTD/NQ11/GQVL/Điện báo/...)
 ├── assets/logo.png
 ├── logo.png, logo-vbsp.jpg
 └── docs/                      # Documentation

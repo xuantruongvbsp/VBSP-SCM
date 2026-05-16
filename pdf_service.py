@@ -66,6 +66,133 @@ FONT_BOLD = "TNR-Bold"
 FONT_ITALIC = "TNR-Italic"
 FONT_FALLBACK = "Helvetica"  # khi font chưa đăng ký được
 
+# ── Lề chuẩn NĐ30/2020/NĐ-CP (Điều 5 & Phụ lục I) ──────────────────────────
+_LEFT_MARGIN  = 3.0 * cm if _REPORTLAB_READY else 30   # 30mm — đóng gáy
+_RIGHT_MARGIN = 1.5 * cm if _REPORTLAB_READY else 15   # 15mm
+_TOP_MARGIN   = 2.0 * cm if _REPORTLAB_READY else 20   # 20mm
+_BOT_MARGIN   = 2.0 * cm if _REPORTLAB_READY else 20   # 20mm
+
+def _nd30_header(usable_w: float, fn: str, fb: str, fi: str) -> list:
+    """
+    Header văn bản chuẩn NĐ30/2020:
+    Cột trái (40%): Tên cơ quan + Số văn bản
+    Cột phải (60%): Quốc hiệu + Địa danh ngày tháng
+    """
+    from reportlab.lib.enums import TA_CENTER
+    ngay = datetime.now()
+    ngay_str = f"Đồng Nai, ngày {ngay.day} tháng {ngay.month} năm {ngay.year}"
+
+    w_l = usable_w * 0.40
+    w_r = usable_w * 0.60
+
+    st_coq  = ParagraphStyle("nd30_coq",  fontName=fb, fontSize=11,
+                              alignment=TA_CENTER, leading=16)
+    st_sovb = ParagraphStyle("nd30_sovb", fontName=fn, fontSize=11,
+                              alignment=TA_CENTER, leading=14)
+    st_qh   = ParagraphStyle("nd30_qh",   fontName=fb, fontSize=11,
+                              alignment=TA_CENTER, leading=15)
+    st_td   = ParagraphStyle("nd30_td",   fontName=fb, fontSize=13,
+                              alignment=TA_CENTER, leading=16)
+    st_ngay = ParagraphStyle("nd30_ngay", fontName=fi, fontSize=11,
+                              alignment=TA_CENTER, leading=14, spaceAfter=2)
+
+    tbl_l = Table([
+        [Paragraph("NGÂN HÀNG CHÍNH SÁCH XÃ HỘI", st_coq)],
+        [Paragraph("CHI NHÁNH TỈNH ĐỒNG NAI", st_coq)],
+        [HRFlowable(width=w_l * 0.55, thickness=1, color=colors.black, spaceAfter=2)],
+        [Paragraph("Số: &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/BC-SCM", st_sovb)],
+    ], colWidths=[w_l])
+    tbl_l.setStyle(TableStyle([
+        ("TOPPADDING",    (0, 0), (-1, -1), 1),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 1),
+        ("LEFTPADDING",   (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING",  (0, 0), (-1, -1), 0),
+        ("ALIGN",         (0, 0), (-1, -1), "CENTER"),
+    ]))
+
+    tbl_r = Table([
+        [Paragraph("CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM", st_qh)],
+        [Paragraph("Độc lập - Tự do - Hạnh phúc", st_td)],
+        [HRFlowable(width=w_r * 0.50, thickness=1, color=colors.black, spaceAfter=2)],
+        [Paragraph(ngay_str, st_ngay)],
+    ], colWidths=[w_r])
+    tbl_r.setStyle(TableStyle([
+        ("TOPPADDING",    (0, 0), (-1, -1), 1),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 1),
+        ("LEFTPADDING",   (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING",  (0, 0), (-1, -1), 0),
+        ("ALIGN",         (0, 0), (-1, -1), "CENTER"),
+    ]))
+
+    outer = Table([[tbl_l, tbl_r]], colWidths=[w_l, w_r])
+    outer.setStyle(TableStyle([
+        ("VALIGN",        (0, 0), (-1, -1), "TOP"),
+        ("TOPPADDING",    (0, 0), (-1, -1), 0),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+        ("LEFTPADDING",   (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING",  (0, 0), (-1, -1), 0),
+    ]))
+    return [outer, Spacer(1, 0.3 * cm)]
+
+
+def _nd30_chu_ky(usable_w: float, fn: str, fb: str, fi: str,
+                 noi_nhan: list[str] | None = None) -> list:
+    """
+    Phần ký chuẩn NĐ30: Nơi nhận (trái 40%) + Giám đốc (phải 60%).
+    """
+    from reportlab.lib.enums import TA_CENTER, TA_LEFT
+    noi_nhan = noi_nhan or [
+        "- Giám đốc Chi nhánh;",
+        "- Phòng KH-NV;",
+        "- Lưu: VT.",
+    ]
+    st_nn_title = ParagraphStyle("nn_title", fontName=fb,  fontSize=11,
+                                  alignment=TA_LEFT,   leading=15)
+    st_nn_item  = ParagraphStyle("nn_item",  fontName=fi,  fontSize=10,
+                                  alignment=TA_LEFT,   leading=14)
+    st_ky_title = ParagraphStyle("ky_title", fontName=fb,  fontSize=12,
+                                  alignment=TA_CENTER, leading=16)
+    st_ky_sub   = ParagraphStyle("ky_sub",   fontName=fi,  fontSize=10,
+                                  alignment=TA_CENTER, leading=13)
+
+    nn_cells = [[Paragraph("<b>Nơi nhận:</b>", st_nn_title)]]
+    for item in noi_nhan:
+        nn_cells.append([Paragraph(item, st_nn_item)])
+
+    ky_cells = [
+        [Paragraph("GIÁM ĐỐC", st_ky_title)],
+        [Paragraph("<i>(Ký, đóng dấu)</i>", st_ky_sub)],
+        [Spacer(1, 1.8 * cm)],
+    ]
+
+    w_l = usable_w * 0.40
+    w_r = usable_w * 0.60
+
+    tbl_nn = Table(nn_cells, colWidths=[w_l])
+    tbl_nn.setStyle(TableStyle([
+        ("TOPPADDING",    (0, 0), (-1, -1), 2),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+        ("LEFTPADDING",   (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING",  (0, 0), (-1, -1), 0),
+    ]))
+    tbl_ky = Table(ky_cells, colWidths=[w_r])
+    tbl_ky.setStyle(TableStyle([
+        ("ALIGN",         (0, 0), (-1, -1), "CENTER"),
+        ("TOPPADDING",    (0, 0), (-1, -1), 2),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+    ]))
+
+    outer = Table([[tbl_nn, tbl_ky]], colWidths=[w_l, w_r])
+    outer.setStyle(TableStyle([
+        ("VALIGN",        (0, 0), (-1, -1), "TOP"),
+        ("TOPPADDING",    (0, 0), (-1, -1), 0),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+        ("LEFTPADDING",   (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING",  (0, 0), (-1, -1), 0),
+    ]))
+    return [outer]
+
+
 if _REPORTLAB_READY:
     VBSP_GREEN = colors.HexColor("#2E7D32")
     VBSP_GREEN_LIGHT = colors.HexColor("#E8F5E9")
@@ -123,57 +250,34 @@ def xuat_pdf(
         dong_tong_cells = tong_row
 
     buf = BytesIO()
-    # Landscape nếu nhiều cột hoặc báo cáo TQPGD
     use_landscape = len(df.columns) >= 8 or prefix_file == "TQPGD"
     page_size = landscape(A4) if use_landscape else A4
-    margin = 1.0 * cm
+
+    # Lề chuẩn NĐ30 — landscape dùng lề đối xứng hơn
+    if use_landscape:
+        l_margin, r_margin = 2.0 * cm, 1.5 * cm
+    else:
+        l_margin, r_margin = _LEFT_MARGIN, _RIGHT_MARGIN
+    t_margin, b_margin = _TOP_MARGIN, _BOT_MARGIN
 
     doc = SimpleDocTemplate(
         buf,
         pagesize=page_size,
-        leftMargin=margin, rightMargin=margin,
-        topMargin=margin, bottomMargin=2 * cm,
+        leftMargin=l_margin, rightMargin=r_margin,
+        topMargin=t_margin,  bottomMargin=b_margin,
         title=tieu_de,
         author="VBSP-SCM",
     )
 
     fn = FONT_NORMAL if _FONT_REGISTERED else FONT_FALLBACK
-    fb = FONT_BOLD if _FONT_REGISTERED else FONT_FALLBACK
+    fb = FONT_BOLD   if _FONT_REGISTERED else FONT_FALLBACK
+    fi = FONT_ITALIC if _FONT_REGISTERED else FONT_FALLBACK
 
     story = []
-    usable_w = page_size[0] - 2 * margin
+    usable_w = page_size[0] - l_margin - r_margin
 
-    # ── 1. Header báo cáo ──────────────────────────────────────────────
-    logo_path = Path("assets/logo.png")
-    if logo_path.exists():
-        logo = RLImage(str(logo_path), width=2.2 * cm, height=2.2 * cm)
-        from reportlab.platypus import Table as RLTable
-        header_tbl = RLTable(
-            [[logo, Paragraph(
-                "NGÂN HÀNG CHÍNH SÁCH XÃ HỘI VIỆT NAM<br/>"
-                "<font size='10'>Chi nhánh tỉnh Đồng Nai</font>",
-                ParagraphStyle("hdr_txt", fontName=fb, fontSize=12,
-                               alignment=TA_CENTER, leading=16)
-            )]],
-            colWidths=[2.5 * cm, usable_w - 2.5 * cm]
-        )
-        header_tbl.setStyle(TableStyle([
-            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-            ("LEFTPADDING", (0, 0), (-1, -1), 0),
-            ("RIGHTPADDING", (0, 0), (-1, -1), 0),
-        ]))
-        story.append(header_tbl)
-    else:
-        story.append(Paragraph(
-            "NGÂN HÀNG CHÍNH SÁCH XÃ HỘI VIỆT NAM",
-            ParagraphStyle("bank", fontName=fb, fontSize=12,
-                           alignment=TA_CENTER, spaceAfter=2)
-        ))
-        story.append(Paragraph(
-            "CHI NHÁNH TỈNH ĐỒNG NAI",
-            ParagraphStyle("branch", fontName=fn, fontSize=11,
-                           alignment=TA_CENTER, spaceAfter=6)
-        ))
+    # ── 1. Header chuẩn NĐ30 ───────────────────────────────────────────
+    story.extend(_nd30_header(usable_w, fn, fb, fi))
     story.append(HRFlowable(width="100%", thickness=1.5,
                             color=VBSP_GREEN, spaceAfter=6))
     # Tiêu đề báo cáo
@@ -359,71 +463,17 @@ def xuat_pdf(
             ]))
     story.append(tbl)
 
-    # ── 3. Phần chữ ký ────────────────────────────────────────────────
-    story.append(Spacer(1, 1.5 * cm))
+    # ── 3. Phần chữ ký chuẩn NĐ30 ────────────────────────────────────
+    story.append(Spacer(1, 1.0 * cm))
+    story.extend(_nd30_chu_ky(usable_w, fn, fb, fi))
 
-    # Dòng ngày tháng căn phải
-    ngay_ky = datetime.now().strftime("Đồng Nai, ngày %d tháng %m năm %Y")
-    story.append(Paragraph(
-        ngay_ky,
-        ParagraphStyle("ngay_ky",
-            fontName=fn if _FONT_REGISTERED else FONT_FALLBACK,
-            fontSize=10,
-            alignment=TA_RIGHT,
-            spaceAfter=16,
-        )
-    ))
-
-    # Bảng 3 cột chữ ký
-    ky_style = ParagraphStyle("ky",
-        fontName=fb if _FONT_REGISTERED else FONT_FALLBACK,
-        fontSize=10,
-        alignment=TA_CENTER,
-    )
-    ky_sub_style = ParagraphStyle("ky_sub",
-        fontName=fn if _FONT_REGISTERED else FONT_FALLBACK,
-        fontSize=9,
-        alignment=TA_CENTER,
-        textColor=colors.grey,
-    )
-    gap_style = ParagraphStyle("gap",
-        fontName=fn if _FONT_REGISTERED else FONT_FALLBACK,
-        fontSize=10,
-    )
-
-    ky_data = [
-        [
-            Paragraph("NGƯỜI LẬP BIỂU", ky_style),
-            Paragraph("TRƯỞNG PHÒNG KH-NV", ky_style),
-            Paragraph("GIÁM ĐỐC", ky_style),
-        ],
-        [
-            Paragraph("<i>(Ký, ghi rõ họ tên)</i>", ky_sub_style),
-            Paragraph("<i>(Ký, ghi rõ họ tên)</i>", ky_sub_style),
-            Paragraph("<i>(Ký, đóng dấu)</i>", ky_sub_style),
-        ],
-        [
-            Paragraph(" \n\n\n", gap_style),
-            Paragraph(" \n\n\n", gap_style),
-            Paragraph(" \n\n\n", gap_style),
-        ],
-    ]
-
-    ky_tbl = Table(ky_data, colWidths=[usable_w / 3] * 3)
-    ky_tbl.setStyle(TableStyle([
-        ("ALIGN",      (0, 0), (-1, -1), "CENTER"),
-        ("VALIGN",     (0, 0), (-1, -1), "TOP"),
-        ("TOPPADDING", (0, 0), (-1, -1), 6),
-    ]))
-    story.append(ky_tbl)
-
-    # ── 4. Header/Footer mỗi trang (số trang) ─────────────────────────
+    # ── 4. Footer số trang mỗi trang ──────────────────────────────────
     def _on_page(canvas, _doc):
         canvas.saveState()
         canvas.setFont(fn if _FONT_REGISTERED else FONT_FALLBACK, 8)
         canvas.setFillColor(colors.grey)
         canvas.drawRightString(
-            page_size[0] - margin,
+            page_size[0] - r_margin,
             0.8 * cm,
             f"Trang {_doc.page}  |  VBSP-SCM  |  {ngay_str}"
         )
@@ -508,18 +558,18 @@ def xuat_pdf_group_header(
 
     ngay_str = datetime.now().strftime("%d/%m/%Y %H:%M")
     fn = FONT_NORMAL if _FONT_REGISTERED else FONT_FALLBACK
-    fb = FONT_BOLD if _FONT_REGISTERED else FONT_FALLBACK
+    fb = FONT_BOLD   if _FONT_REGISTERED else FONT_FALLBACK
+    fi = FONT_ITALIC if _FONT_REGISTERED else FONT_FALLBACK
 
     buf = BytesIO()
     page_size = A4
-    margin = 1.0 * cm
-    usable_w = page_size[0] - 2 * margin
+    usable_w = page_size[0] - _LEFT_MARGIN - _RIGHT_MARGIN
 
     doc = SimpleDocTemplate(
         buf,
         pagesize=page_size,
-        leftMargin=margin, rightMargin=margin,
-        topMargin=margin, bottomMargin=2 * cm,
+        leftMargin=_LEFT_MARGIN, rightMargin=_RIGHT_MARGIN,
+        topMargin=_TOP_MARGIN,   bottomMargin=_BOT_MARGIN,
         title=tieu_de,
         author="VBSP-SCM",
     )
@@ -538,33 +588,8 @@ def xuat_pdf_group_header(
 
     story: list = []
 
-    # ── Report Header ────────────────────────────────────────────────────────
-    logo_path = Path("assets/logo.png")
-    if logo_path.exists():
-        logo = RLImage(str(logo_path), width=2.0 * cm, height=2.0 * cm)
-        from reportlab.platypus import Table as RLTable
-        hdr_tbl = RLTable(
-            [[logo, Paragraph(
-                "NGÂN HÀNG CHÍNH SÁCH XÃ HỘI VIỆT NAM<br/>"
-                "<font size='9'>Chi nhánh tỉnh Đồng Nai</font>",
-                ParagraphStyle("rh_txt", fontName=fb, fontSize=11,
-                               alignment=TA_CENTER, leading=15)
-            )]],
-            colWidths=[2.3 * cm, usable_w - 2.3 * cm]
-        )
-        hdr_tbl.setStyle(TableStyle([
-            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-            ("LEFTPADDING", (0, 0), (-1, -1), 0),
-            ("RIGHTPADDING", (0, 0), (-1, -1), 0),
-        ]))
-        story.append(hdr_tbl)
-    else:
-        story.append(Paragraph(
-            "NGÂN HÀNG CHÍNH SÁCH XÃ HỘI VIỆT NAM — Chi nhánh tỉnh Đồng Nai",
-            ParagraphStyle("rh_txt2", fontName=fb, fontSize=11,
-                           alignment=TA_CENTER, spaceAfter=4)
-        ))
-
+    # ── Report Header chuẩn NĐ30 ────────────────────────────────────────────
+    story.extend(_nd30_header(usable_w, fn, fb, fi))
     story.append(HRFlowable(width="100%", thickness=1.5, color=VBSP_GREEN, spaceAfter=4))
     story.append(Paragraph(
         tieu_de.upper(),
@@ -759,44 +784,9 @@ def xuat_pdf_group_header(
     ]))
     story.append(rf_tbl)
 
-    # ── Chữ ký ────────────────────────────────────────────────────────────────
+    # ── Chữ ký chuẩn NĐ30 ────────────────────────────────────────────────────
     story.append(Spacer(1, 1.0 * cm))
-    story.append(Paragraph(
-        f"Đồng Nai, ngày {datetime.now().strftime('%d')} "
-        f"tháng {datetime.now().strftime('%m')} "
-        f"năm {datetime.now().strftime('%Y')}",
-        ParagraphStyle("rf_date", fontName=fn, fontSize=9,
-                       alignment=TA_RIGHT, spaceAfter=4)
-    ))
-    ky_data = [[
-        Paragraph("NGƯỜI LẬP BIỂU",
-                  ParagraphStyle("ky", fontName=fb, fontSize=9, alignment=TA_CENTER)),
-        Paragraph("KIỂM SOÁT",
-                  ParagraphStyle("ky", fontName=fb, fontSize=9, alignment=TA_CENTER)),
-        Paragraph("GIÁM ĐỐC",
-                  ParagraphStyle("ky", fontName=fb, fontSize=9, alignment=TA_CENTER)),
-    ], [
-        Paragraph("<i>(Ký, ghi rõ họ tên)</i>",
-                  ParagraphStyle("ky2", fontName=fn, fontSize=8,
-                                 alignment=TA_CENTER, textColor=colors.grey)),
-        Paragraph("<i>(Ký, ghi rõ họ tên)</i>",
-                  ParagraphStyle("ky2", fontName=fn, fontSize=8,
-                                 alignment=TA_CENTER, textColor=colors.grey)),
-        Paragraph("<i>(Ký, ghi rõ họ tên)</i>",
-                  ParagraphStyle("ky2", fontName=fn, fontSize=8,
-                                 alignment=TA_CENTER, textColor=colors.grey)),
-    ], [
-        Paragraph("&nbsp;", ParagraphStyle("gap", fontName=fn, fontSize=24)),
-        Paragraph("&nbsp;", ParagraphStyle("gap", fontName=fn, fontSize=24)),
-        Paragraph("&nbsp;", ParagraphStyle("gap", fontName=fn, fontSize=24)),
-    ]]
-    ky_tbl = Table(ky_data, colWidths=[usable_w / 3] * 3)
-    ky_tbl.setStyle(TableStyle([
-        ("ALIGN",      (0, 0), (-1, -1), "CENTER"),
-        ("VALIGN",     (0, 0), (-1, -1), "TOP"),
-        ("TOPPADDING", (0, 0), (-1, -1), 5),
-    ]))
-    story.append(ky_tbl)
+    story.extend(_nd30_chu_ky(usable_w, fn, fb, fi))
 
     # ── Số trang footer mỗi trang ────────────────────────────────────────────
     def _on_page(canvas, _doc):
@@ -804,7 +794,7 @@ def xuat_pdf_group_header(
         canvas.setFont(fn if _FONT_REGISTERED else FONT_FALLBACK, 7)
         canvas.setFillColor(colors.grey)
         canvas.drawRightString(
-            page_size[0] - margin, 0.7 * cm,
+            page_size[0] - _RIGHT_MARGIN, 0.7 * cm,
             f"Trang {_doc.page}  |  VBSP-SCM  |  {ngay_str}"
         )
         canvas.restoreState()

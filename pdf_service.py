@@ -1295,3 +1295,119 @@ def nut_xuat_pdf_bao_cao(
             key=f"{key}_dl",
             use_container_width=True,
         )
+
+
+def render_huong_dan() -> None:
+    """
+    Hướng dẫn cài đặt & cấu hình hệ thống — dùng chung cho CN và PGD.
+    """
+    _pdf_dep = kiem_tra_pdf_dependency()
+
+    st.subheader("Hướng dẫn cài đặt & Cấu hình")
+    st.caption("Áp dụng cho cả phân hệ Chi nhánh (CN) và Phòng Giao dịch (PGD)")
+
+    with st.expander("1. Cài đặt môi trường Python", expanded=True):
+        st.markdown("""
+        **Yêu cầu:** Python 3.10 trở lên
+
+        ```bash
+        # Kiểm tra phiên bản Python
+        python --version
+
+        # Tạo môi trường ảo (khuyến nghị)
+        python -m venv .venv
+
+        # Kích hoạt môi trường ảo
+        # Windows:
+        .venv\\Scripts\\activate
+        # Linux/Mac:
+        source .venv/bin/activate
+        ```
+        """)
+
+    with st.expander("2. Cài đặt thư viện", expanded=True):
+        st.markdown("""
+        ```bash
+        pip install -r requirements.txt
+        ```
+
+        **Thư viện PDF** (cài riêng nếu cần xuất PDF):
+
+        ```bash
+        pip install reportlab kaleido
+        ```
+        """)
+        if _pdf_dep["reportlab"]:
+            st.success(" reportlab: đã cài")
+        else:
+            st.error(" reportlab: chưa cài")
+        if _pdf_dep["kaleido"]:
+            st.success(" kaleido: đã cài")
+        else:
+            st.warning(" kaleido: chưa cài (chỉ cần nếu muốn nhúng biểu đồ vào PDF)")
+
+    with st.expander("3. Font chữ tiếng Việt cho PDF"):
+        st.markdown("""
+        Để xuất PDF có hỗ trợ tiếng Việt, cần file font **Times New Roman**:
+
+        - **Cách 1 (tự động):** Hệ thống tự tìm trong `C:/Windows/Fonts/times.ttf`
+        - **Cách 2 (thủ công):** Copy file `times.ttf` + `timesbd.ttf` vào thư mục `assets/` của dự án
+
+        ```bash
+        # Tạo thư mục assets nếu chưa có
+        mkdir assets
+        # Copy font từ Windows
+        copy C:\\Windows\\Fonts\\times.ttf assets\\
+        copy C:\\Windows\\Fonts\\timesbd.ttf assets\\
+        ```
+        """)
+        if _pdf_dep["font"]:
+            st.success(" Font Times New Roman: đã tìm thấy")
+        else:
+            st.warning(" Font Times New Roman: chưa tìm thấy — tiếng Việt trong PDF có thể bị lỗi")
+
+    with st.expander("4. Cấu hình dữ liệu ban đầu"):
+        st.markdown("""
+        **Dành cho CN:**
+        - File HSTD gốc đặt tại đường dẫn cấu hình trong `config.py` (biến `FILE_PATH`)
+        - Hoặc upload qua giao diện: tab **Upload dữ liệu**
+
+        **Dành cho PGD:**
+        - Upload file HSTD qua giao diện: tab **Quản trị PGD → Upload HSTD**
+        - Hệ thống tự động lưu vào thư mục `pgd_data/{slug}/`
+
+        **Dữ liệu mẫu:**
+        - File HSTD là file Excel (.xlsx) với các cột: Mã KH, Tên KH, Số KU, Tên CT, Dư nợ TH, Dư nợ QH, Tổng dư nợ, Ngày vay, Ngày ĐH,...
+        - File NQ11 là file Excel phục vụ báo cáo NQ11
+        """)
+
+    with st.expander("5. Chạy ứng dụng"):
+        st.markdown("""
+        ```bash
+        streamlit run app.py
+        ```
+
+        Ứng dụng sẽ mở tại: **http://localhost:8501**
+
+        **Phân quyền mặc định:**
+        - `executive` → Ban Giám đốc (dashboard vĩ mô)
+        - `admin_cn` / `manager_cn` → Phòng KH-NV Chi nhánh
+        - `admin_pgd` / `user_pgd` → Phòng Giao dịch
+        """)
+
+    with st.expander("6. Xử lý sự cố thường gặp"):
+        st.markdown("""
+        | Vấn đề | Nguyên nhân | Giải pháp |
+        |--------|-------------|-----------|
+        | `ModuleNotFoundError: No module named 'reportlab'` | Chưa cài reportlab | `pip install reportlab` |
+        | `ModuleNotFoundError: No module named 'kaleido'` | Chưa cài kaleido | `pip install kaleido` |
+        | PDF bị lỗi font, không dấu | Thiếu times.ttf | Copy font vào `assets/` |
+        | `StreamlitApp: No data` | Chưa upload HSTD | Upload file HSTD qua tab Quản trị |
+        | Lỗi `Permission denied` khi upload | Quyền thư mục | Chạy lại với quyền Admin |
+        """)
+
+    st.divider()
+    st.caption(
+        "Mọi thắc mắc vui lòng liên hệ Phòng KH-NV NHCSXH Chi nhánh Đồng Nai. "
+        f"Ngày xuất: {datetime.now().strftime('%d/%m/%Y %H:%M')}"
+    )

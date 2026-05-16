@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## [2026-05-16] — Fix "Nguồn vốn" toàn NaN sau khi merge GQVL
+- `services/upload_service.py` dòng ~462 — Bỏ `"Nguồn vốn"` khỏi `_cols_so_cn` trong bước chuẩn hóa schema sau concat; cột này chứa text "TW"/"ĐP" nên không được ép `pd.to_numeric()` (đã có comment cảnh báo ở `_clean` nhưng bị nhầm thêm vào danh sách số ở bước merge)
+- `cache/gqvl.parquet` + 22 `pgd_data/*/gqvl_latest.parquet` — Đã xóa cache bị hỏng, sẽ tự rebuild khi merge lại
+
 ## [2026-05-16] — Fix import hàng loạt: cache invalidation + force re-import
 - `tabs/tab_upload_khnv.py` — Sửa cache `khnv_bulk_bytes` dùng `(tên, kích thước)` thay vì chỉ tên file để detect đúng khi upload cùng tên nhưng nội dung mới; thêm checkbox "Bắt buộc import lại" để ghi đè dù MD5 giống hệt; thêm style "🔁 Ghi đè" vào bảng so sánh; tách caption "Giống hệt" riêng khỏi "Bỏ qua"
 

@@ -384,6 +384,53 @@ for i, tab_c in enumerate(tabs_con):
 
 ---
 
+## 9B. 🚫 NGUYÊN TẮC SINH TỬ — TRƯỚC KHI XOÁ BẤT KỲ FILE/THƯ MỤC NÀO
+
+> **TUYỆT ĐỐI CẤM xoá mà chưa kiểm tra reference. Vi phạm = mất dữ liệu thật, crash hệ thống.**
+
+### 🔴 ĐÃ TỪNG MẮC (2026-05-16) — bài học máu:
+
+| Hành động sai | Hậu quả | Lẽ ra phải làm |
+|---|---|---|
+| Xoá `pdf_service.py` (root) | 22 files import → crash toàn bộ nút Xuất PDF | **Grep `from pdf_service import`** → thấy 22 references → KHÔNG xoá |
+| Xoá `gen_dcgiam_sheet.py` | `tab_kh_gqvl.py` gọi `subprocess` → crash nút Generate GQVL | **Grep `gen_dcgiam_sheet`** → thấy 3 references → KHÔNG xoá |
+| Xoá `pgd_data/` (322 MB) | 37 files tham chiếu, toàn bộ dữ liệu PGD bốc hơi | **Grep `pgd_data` + `PGD_DATA_DIR`** → thấy 37 references → KHÔNG xoá |
+| Xoá `data/qd/` (242 MB) | Mất toàn bộ Quyết định PDF đã upload | **Grep `data/qd` + `QD_DIR`** → KHÔNG xoá |
+
+### 📋 QUY TRÌNH BẮT BUỘC TRƯỚC KHI XOÁ:
+
+```
+1. GREP toàn bộ codebase tìm tên file / tên thư mục
+   → Nếu có KẾT QUẢ: DỪNG — không xoá
+   → Chỉ xoá nếu 0 references
+
+2. Với file .py:
+   Grep "from <tên_file> import" + "import <tên_file>"
+
+3. Với file .xlsx / .pdf / .parquet:
+   Grep tên file đầy đủ + grep tên folder chứa nó
+
+4. Với thư mục dữ liệu (data/, pgd_data/, cache/...):
+   Grep CONSTANT dẫn đến nó (VD: PGD_DATA_DIR, CACHE_DIR, FILE_PATH_*)
+   → Nếu có import constant đó trong config.py: DỪNG
+
+5. Với file __pycache__ / .pyc:
+   → An toàn để xoá (Python tự sinh lại)
+   → Nhưng vẫn grep `.pyc` hoặc `__pycache__` cho chắc
+
+6. SAU KHI XOÁ: chạy compile check toàn bộ workspace + tabs
+```
+
+### ⚠️ GHI CHÚ QUAN TRỌNG:
+
+- **`pgd_data/`** và **`data/qd/`** là **dữ liệu thật**, không phải rác
+- **`cache/`** chứa file `.parquet` — được tạo từ `excel_to_parquet()`, xoá cache thì phải import lại từ Excel
+- File `.db-shm` và `.db-wal` trong root SQLite — rác, an toàn để xoá
+- File `__pycache__/` — an toàn để xoá (Python tự sinh lại)
+- **Tuyệt đối không xoá bất kỳ file `.py` nào ở root mà chưa grep**
+
+---
+
 ## 10. CÁC FILE LIÊN QUAN KHI TẠO TÍNH NĂNG MỚI
 
 | Muốn làm gì | Cần đọc file nào |

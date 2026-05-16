@@ -1099,10 +1099,11 @@ def render(**kwargs):
     def _tab_so_sanh_ky_fn(**kw):
         tab_so_sanh_ky.render(None, **kw)
 
-    role       = kwargs.get("role")
-    df         = kwargs.get("df")
-    df_full    = kwargs.get("df_full", df)
-    ds_pgd_all = kwargs.get("ds_pgd_all", [])
+    role       = kwargs.pop("role", None)
+    username   = kwargs.pop("username", "unknown")
+    df         = kwargs.pop("df", None)
+    df_full    = kwargs.pop("df_full", df)
+    ds_pgd_all = kwargs.pop("ds_pgd_all", [])
     role_n = normalize_role(str(role or "user"))
     can_upload = get_permissions(role_n)["can_upload"]
     can_manage_users = get_permissions(role_n)["can_manage_users"]
@@ -1110,9 +1111,8 @@ def render(**kwargs):
     st.title("📋 Phòng KH-NV")
     st.caption("Giám sát chỉ tiêu · Cân đối vốn · Quản lý NQH · GQVL · Quản lý CBTD")
 
-    # ── Dùng lại _build_all_items thay vì duplicate list ─────────────────
     ALL_ITEMS = _build_all_items(
-        role, kwargs.get("username", "unknown"),
+        role, username,
         can_upload=can_upload, **kwargs
     )
 

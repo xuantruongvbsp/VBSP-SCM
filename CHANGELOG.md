@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## [2026-05-16] — Tái thiết tab CBTD: phân công theo ĐGD thay vì mã thôn
+- `data/khtd.py` — Thêm 3 hàm: `lay_ap_tu_dgd_list()`, `xay_ap_to_cbtd_map()`, `gan_cbtd_vao_df()` — suy ra (xã, ấp) từ dgd_map và join HSTD qua (Tên xã, Tên thôn) lowercase
+- `tabs/tab_cbtd.py` — Viết lại toàn bộ (~550 dòng): schema mới `{ho_ten, pgd, ds_dgd, dien_thoai, ghi_chu, ngay_cap}`; UI gồm 3 sub-tab xem (Danh sách / Bản đồ ĐGD→CBTD / Chi tiết) + CRUD đầy đủ + báo cáo dư nợ theo CBTD; phát hiện trùng ĐGD real-time; preview ấp khi chọn ĐGD; backward-compat với data cũ
+
 ## [2026-05-16] — Cải tiến bảng "Thông tin tổng quát theo PGD"
 - `tabs/tab_tongquan.py` — Đổi tên cột `TL NPL %` → `Tỷ lệ Nợ xấu` trong toàn bộ logic tính toán, hiển thị, và điều kiện tô màu
 - `tabs/tab_tongquan.py` — Header bảng: thêm helper `_disp_col()` tách phần đơn vị `(Triệu đồng)` / `(Tỷ đồng)` xuống dòng 2; bỏ `white-space:nowrap`, thêm `min-width:60px`

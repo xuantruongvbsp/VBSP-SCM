@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [2026-05-16] — Tab đến hạn: khôi phục bảng tổng hợp PGD/Xã × Tháng
+- `tabs/tab_den_han.py` — Thêm lại bảng tổng hợp theo PGD/Xã × tháng đến hạn (tính từ `df_loc` đã cache, không gọi lại `tinh_den_han_df`)
+
+## [2026-05-16] — Tab đến hạn: tối ưu hiệu năng (vectorize + cache)
+- `data/den_han.py` — Vectorize `tinh_den_han_df`: bỏ `_parse_ngay` + row-by-row `apply`, dùng `pd.to_datetime` + `np.select` (~10-20x nhanh hơn trên 30k hàng)
+- `tabs/tab_den_han.py` — Thêm `@st.cache_data` cho `_doc_va_tinh_den_han(pgd_user, mtime)`, `_loc_thang()` helper; tránh gọi `tinh_den_han_df` 2 lần mỗi render
+
 ## [2026-05-16] — Tab đến hạn: thay cột "Tháng đến hạn còn lại" bằng "Số tháng được gia hạn nợ"
 - `data/den_han.py` — Thêm hàm `_tinh_so_thang_gia_han(row)` áp dụng quy định NHCSXH (CT02: ½TH, CT17: 30t, QĐ29/54 hộ nghèo: 30t, ≤12t: 12t, >12t: ½TH); thêm cột "Số tháng được gia hạn nợ" vào `tinh_den_han_df()`
 - `tabs/tab_den_han.py` — Thay "Tháng đến hạn còn lại" bằng "Số tháng được gia hạn nợ" trong `cols_hien_thi`, `COLS_CHI_TIET`, `_detail_pdf_cols`; đổi sort từ cột tháng còn lại sang "Ngày đến hạn"

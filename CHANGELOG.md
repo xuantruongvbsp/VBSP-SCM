@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## [2026-05-17] — Tối ưu RAM: _load_hstd filter pushdown per-PGD
+- `app.py` `_load_hstd()` — thêm tham số `ten_pgd`; khi PGD role dùng `read_parquet() WHERE` filter ngay tại DuckDB thay vì load toàn bộ file; kết quả được `@st.cache_resource` cache riêng per-PGD
+- `app.py` dòng ~583 — xóa khối DESCRIBE + duckdb.query WHERE thủ công (không cached); thay bằng `_load_hstd(CACHE_HSTD, _hstd_ts, ten_pgd=pgd_user)`; DESCRIBE chỉ chạy khi df rỗng (error path)
+
 ## [2026-05-17] — Fix upload hàng loạt: file_uploader không reset sau import
 - `tabs/tab_upload_khnv.py` dòng ~707 — thêm `khnv_bulk_uploader_ver` counter, đổi key thành `f"khnv_bulk_upload_{_ver}"` để widget reset về rỗng sau import
 - `tabs/tab_upload_khnv.py` dòng ~685 — sửa cleanup: tăng `khnv_bulk_uploader_ver`, pop `khnv_bulk_ids` (đúng tên) thay vì `khnv_bulk_names` (sai tên) và `khnv_bulk_upload` (không xóa được widget key)

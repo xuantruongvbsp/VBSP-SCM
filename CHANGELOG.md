@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## [2026-05-16] — Port 3 tính năng từ VSPPRO: Nợ khoanh, Top biến động, Radar+Ranking
+- `tabs/tab_no_khoanh.py` **TẠO MỚI** — Phân tích Nợ khoanh (port Khoanh.tsx): 4 KPI cards, heatmap đáo hạn theo năm, breakdown theo Chương trình / Xã / ĐVUT (bar chart + bảng), danh sách chi tiết + xuất Excel
+- `tabs/tab_so_sanh_ky.py` — Thêm `_render_top_bien_dong()` (Top N tăng/giảm theo chiều + chỉ tiêu, 2 biểu đồ bar ngang cạnh nhau) và `_render_radar_ranking()` (radar đa trục PGD + ranking horizontal bar) — port PeriodMovers.tsx + Compare.tsx
+- `workspaces/ws_management.py` — Thêm item "Nợ khoanh" (icon lock) vào group "Kiểm soát" + lazy import `tab_no_khoanh`
+
 ## [2026-05-16] — Thêm tính năng "Cảnh báo sớm NQH" (port từ VSPPRO)
 - `tabs/tab_canh_bao_som.py` **TẠO MỚI** — Module cảnh báo sớm: 2 KPI cards (Sắp đến hạn + KH không HĐ / Chuyển NQH trong tháng), toggle phạm vi Tháng/Quý/Năm, heatmap bar chart đáo hạn theo tháng, 2 sub-tabs danh sách chi tiết + xuất Excel
 - `workspaces/ws_management.py` — Thêm sub-tab "⚡ Cảnh báo sớm" (sub5) vào `_render_canh_bao_no()` cho phân hệ Chi nhánh

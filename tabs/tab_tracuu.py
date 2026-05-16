@@ -577,7 +577,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
         st.divider()
         cols_xuat = st.columns([1, 1, 5])
         with cols_xuat[0]:
-            if st.button("📥 Xuất Excel", key="btn_xuat_tracuu", width='stretch', type="primary"):
+            if st.button("📥 Xuất Excel", key="tracuu_btn_xuat_excel", width='stretch', type="primary"):
                 sheets = {"Kết quả tra cứu": df_kq}
                 excel_bytes = xuat_excel(sheets)
                 st.session_state["_excel_tracuu_bytes"] = excel_bytes
@@ -589,7 +589,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                 data=st.session_state["_excel_tracuu_bytes"],
                 file_name=st.session_state["_excel_tracuu_ten"],
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                key="dl_excel_tracuu",
+                key="tracuu_dl_excel",
             )
 
         with cols_xuat[1]:
@@ -599,5 +599,5 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                 st.session_state.get("txt_username", "unknown"),
                 cols_tien=[c for c in df_kq.columns if "tiền" in c.lower() or "dư nợ" in c.lower() or "số tiền" in c.lower() or "gn_" in c.lower() or "tn_" in c.lower()],
                 prefix_file="TraCuu",
-                key="pdf_tracuu",
+                key="tracuu_xuat_pdf",
             )

@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## [2026-05-16] — Thêm tab "Tập trung rủi ro & HHI" vào Phòng KH-NV
+- `tabs/tab_hhi.py` **TẠO MỚI** — Tab HHI: 3 KPI cards (Chương trình / Xã / PGD), thang giải thích, sub-tabs biểu đồ cột ngang + treemap + bảng tổng hợp, nút xuất Excel 3 sheet
+- `workspaces/ws_management.py` — Thêm `from tabs import tab_hhi` (lazy import), thêm item "Tập trung rủi ro & HHI" vào group "Kiểm soát" trong cả `_build_all_items()` lẫn `render()`
+
 ## [2026-05-16] — Refactor tab Mã NĐT ĐP thành 5 sub-tab; thêm field cap tinh/xa
 - `db.py` — `doc_ndt_dp_list()` bổ sung field `cap` backward-compat; `doc_ndt_dp_ma_list()` chỉ trả mã cấp tỉnh
 - `workspaces/ws_management.py` — Refactor `_render_ndt_dp()` thành 5 tab: Cấp Tỉnh / Cấp Xã/Khác / Thêm mới / Chỉnh sửa-Xóa / Phân tích; bỏ expander tác động; thêm dropdown phân loại cấp và nút Làm mới

@@ -209,23 +209,24 @@ def _render_upload_form(ten_dv: str, prefix: str, username: str) -> None:
     """Form upload 4 file theo đơn vị đã chọn."""
     st.markdown(f"##### 📤 Upload file cho: **{ten_dv}**")
 
+    _ver = st.session_state.setdefault(f"{prefix}_upload_ver", 0)
     c1, c2, c3, c4 = st.columns(4)
     with c1:
         st.caption("📊 HSTD Chi tiết")
         f_hstd = st.file_uploader("HSTD", type=["xlsx", "xls"],
-                                   key=f"{prefix}_hstd", label_visibility="collapsed")
+                                   key=f"{prefix}_hstd_{_ver}", label_visibility="collapsed")
     with c2:
         st.caption("📑 Sao kê NQ11")
         f_nq11 = st.file_uploader("NQ11", type=["xlsx", "xls"],
-                                   key=f"{prefix}_nq11", label_visibility="collapsed")
+                                   key=f"{prefix}_nq11_{_ver}", label_visibility="collapsed")
     with c3:
         st.caption("📋 Sao kê GQVL")
         f_gqvl = st.file_uploader("GQVL", type=["xlsx", "xls"],
-                                   key=f"{prefix}_gqvl", label_visibility="collapsed")
+                                   key=f"{prefix}_gqvl_{_ver}", label_visibility="collapsed")
     with c4:
         st.caption("🏆 Chấm điểm Tổ TK&VV")
         f_cdtotkvv = st.file_uploader("CDTOTKVV", type=["xlsx", "xls"],
-                                       key=f"{prefix}_cdtotkvv", label_visibility="collapsed")
+                                       key=f"{prefix}_cdtotkvv_{_ver}", label_visibility="collapsed")
 
     co_file = any(f is not None for f in [f_hstd, f_nq11, f_gqvl, f_cdtotkvv])
     if not co_file:
@@ -233,8 +234,9 @@ def _render_upload_form(ten_dv: str, prefix: str, username: str) -> None:
         return
 
     if st.button("📤 Upload", type="primary", key=f"{prefix}_btn_upload"):
-        _xu_ly_upload(ten_dv, username,
-                      f_hstd, f_nq11, f_gqvl, f_cdtotkvv, prefix)
+        with st.spinner("⏳ Đang xử lý file..."):
+            _xu_ly_upload(ten_dv, username,
+                          f_hstd, f_nq11, f_gqvl, f_cdtotkvv, prefix)
 
 
 def _xu_ly_upload(
@@ -350,6 +352,11 @@ def _xu_ly_upload(
         k: {"thanh_cong": v.thanh_cong, "thong_bao": v.thong_bao}
         for k, v in ket_qua_upload.items()
     }
+    # Reset file uploaders nếu có ít nhất 1 file upload thành công
+    if any(v.thanh_cong for v in ket_qua_upload.values()):
+        st.session_state[f"{prefix}_upload_ver"] = (
+            st.session_state.get(f"{prefix}_upload_ver", 0) + 1
+        )
     st.rerun()
 
 

@@ -975,7 +975,7 @@ def _build_all_items(role: str, username: str, **kwargs) -> list:
         {"group": "Giám sát",     "label": "Tiến độ PGD", "icon": "file", "fn": lambda: tab_tien_do_nop.render(None, **kwargs)},
         {"group": "Giám sát",     "label": "Cảnh báo NQH",     "icon": "alert-triangle", "fn": lambda: _render_canh_bao_no(df_full, ds_pgd_all, role, kwargs.get("username", "unknown"))},
         {"group": "Giám sát",     "label": "Giao & Theo dõi Nhiệm vụ", "icon": "check",  "fn": lambda: tab_nhiem_vu.render(None, **kwargs)},
-        {"group": "Giám sát",     "label": "So sánh kỳ",            "icon": "chart-line", "fn": None},
+        {"group": "Giám sát",     "label": "So sánh kỳ",            "icon": "chart-line", "fn": lambda: tab_so_sanh_ky.render(None, **kwargs)},
         {"group": "Kiểm soát",     "label": "Kiểm soát nội bộ",    "icon": "search",         "fn": lambda: tab_kiem_soat.render_tab(df_full, role, kwargs.get("username", "unknown"))},
         {"group": "Kiểm soát",     "label": "Xử lý nợ rủi ro",   "icon": "alert-circle",   "fn": lambda: tab_xlrr_tong_hop.render(None, **kwargs)},
         {"group": "Kiểm soát",     "label": "Cán bộ tín dụng",         "icon": "user",       "fn": lambda: tab_cbtd.render(None, **kwargs)},
@@ -1145,33 +1145,76 @@ def render(**kwargs):
     ALL_ITEMS.append({"group": "Hệ thống", "label": "Upload dữ liệu", "icon": "upload", "fn": lambda: tab_upload_khnv.render(None, **kwargs)})
     ALL_ITEMS.append({"group": "Hệ thống", "label": "Hướng dẫn", "icon": "book", "fn": lambda: render_huong_dan()})
 
-    # ── BƯỚC 3: Quản lý state menu item đang chọn ─────────────────────────
-    if "ws_mgmt_menu" not in st.session_state:
-        st.session_state["ws_mgmt_menu"] = ALL_ITEMS[0]["label"]
-
+    # ── Navigation lazy: Nhóm → Mục → chỉ render mục được chọn ───────────
     valid_labels = [x["label"] for x in ALL_ITEMS]
-    if st.session_state["ws_mgmt_menu"] not in valid_labels:
+
+    # Handle jump từ shortcut / nút điều hướng ngoài ws_management
+    jump_label = st.session_state.pop("ws_mgmt_jump", None)
+    if jump_label and jump_label in valid_labels:
+        st.session_state["ws_mgmt_menu"] = jump_label
+        st.toast(f"✨ Đã chuyển tới: {jump_label}", icon="👆")
+
+    # Khởi tạo / validate ws_mgmt_menu
+    if "ws_mgmt_menu" not in st.session_state or \
+            st.session_state["ws_mgmt_menu"] not in valid_labels:
         st.session_state["ws_mgmt_menu"] = ALL_ITEMS[0]["label"]
 
+    active_label = st.session_state["ws_mgmt_menu"]
 
-    # Bảng màu theo nhóm
-    GROUP_COLORS = {
-        "Giám sát":                    {"bg": "#E6F1FB", "border": "#378ADD", "text": "#185FA5"},
-        "Kiểm soát":                   {"bg": "#FCEBEB", "border": "#E24B4A", "text": "#A32D2D"},
-        "Kế hoạch và Thực hiện KHTD": {"bg": "#EAF3DE", "border": "#639922", "text": "#3B6D11"},
-        "Báo cáo":                     {"bg": "#FAEEDA", "border": "#BA7517", "text": "#854F0B"},
-        "Ủy Thác":                     {"bg": "#EEEDFE", "border": "#7F77DD", "text": "#3C3489"},
-        "Hệ thống":                    {"bg": "#F1EFE8", "border": "#888780", "text": "#5F5E5A"},
-    }
-
-    # ── BƯỚC 3: Render nội dung (không cần col_content nữa) ────────────────
-    active_item = next(
-        (x for x in ALL_ITEMS if x["label"] == st.session_state["ws_mgmt_menu"]),
-        ALL_ITEMS[0]
+    # Nhóm thứ tự xuất hiện đầu tiên (giữ thứ tự)
+    groups_ordered = list(dict.fromkeys(x["group"] for x in ALL_ITEMS))
+    active_group = next(
+        (x["group"] for x in ALL_ITEMS if x["label"] == active_label),
+        groups_ordered[0],
     )
-    try:
-        active_item["fn"]()
-    except Exception as e:
-        import traceback
-        st.error(f"Lỗi render: {e}")
-        st.code(traceback.format_exc())
+
+    # ── Level 1: radio chọn nhóm ──────────────────────────────────────────
+    # Đồng bộ với sidebar (sidebar đã set ws_mgmt_menu → suy ra active_group)
+    st.session_state["ws_mgmt_group_radio"] = active_group
+    sel_group = st.radio(
+        "Nhóm",
+        groups_ordered,
+        horizontal=True,
+        key="ws_mgmt_group_radio",
+        label_visibility="collapsed",
+    )
+
+    # ── Level 2: radio chọn mục trong nhóm ───────────────────────────────
+    items_in_group = [x for x in ALL_ITEMS if x["group"] == sel_group]
+    item_labels    = [x["label"] for x in items_in_group]
+    item_key       = f"ws_mgmt_item_{sel_group}"
+
+    # Pre-select item nếu đến từ sidebar hoặc jump
+    if active_label in item_labels:
+        st.session_state[item_key] = item_labels.index(active_label)
+    elif item_key not in st.session_state:
+        st.session_state[item_key] = 0
+
+    sel_idx = st.radio(
+        "Mục",
+        range(len(item_labels)),
+        format_func=lambda i: item_labels[i],
+        horizontal=True,
+        key=item_key,
+        label_visibility="collapsed",
+    )
+    sel_label = item_labels[sel_idx]
+
+    # Ghi ngược lại ws_mgmt_menu để sidebar highlight đúng
+    st.session_state["ws_mgmt_menu"] = sel_label
+
+    st.divider()
+
+    # ── Render DUY NHẤT mục đang chọn ────────────────────────────────────
+    active_item = next((x for x in ALL_ITEMS if x["label"] == sel_label), None)
+    if active_item:
+        fn = active_item.get("fn")
+        if callable(fn):
+            try:
+                fn()
+            except Exception as e:
+                import traceback
+                st.error(f"❌ Lỗi render **{sel_label}**: {e}")
+                st.code(traceback.format_exc())
+        else:
+            st.info(f"Tính năng **{sel_label}** đang được phát triển.")

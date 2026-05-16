@@ -38,7 +38,7 @@ from config import (
 )
 from data.pgd import pgd_slug
 from auth import la_phan_he_cn, la_phan_he_pgd, normalize_role
-from utils import fmt, fmt_bang_ty, hien_thi_dataframe_phan_trang, xuat_excel
+from utils import fmt, fmt_bang_ty, fmt_ngay, hien_thi_dataframe_phan_trang, xuat_excel
 from services.template_service import (
     docx_bytes_to_pdf,
     nut_tai_word_va_pdf,
@@ -1621,7 +1621,7 @@ def _render_luong_nhap_ho_so(
                 "ten_ct":  str(row_full.get(COT_TEN_CT, "")),
                 "du_no":   _num(row_full.get(COT_TONG_DU_NO, 0) or 0),
                 "dia_chi": str(row_full.get(COT_DIA_CHI, "")),
-                "ngay_vay": str(row_full.get(COT_NGAY_VAY, "")),
+                "ngay_vay": fmt_ngay(row_full.get(COT_NGAY_VAY, "")),
                 "du_no_goc": _num(row_full.get(COT_TONG_DU_NO, 0) or 0),
                 "lai_ton": _num(row_full.get(COT_LAI_TON, 0) or 0),
                 "nguon_von": int(row_full.get(COT_NGUON_VON, 0) or 0),
@@ -1664,7 +1664,7 @@ def _render_luong_nhap_ho_so(
                 "ten_kh":    str(row_full.get(COT_TEN_KH, "")),
                 "dia_chi":   str(row_full.get(COT_DIA_CHI, "")),
                 "so_ku":     so_ku_r,
-                "ngay_vay":  str(row_full.get(COT_NGAY_VAY, "")),
+                "ngay_vay":  fmt_ngay(row_full.get(COT_NGAY_VAY, "")),
                 "du_no_goc": float(row_full.get(COT_TONG_DU_NO, 0) or 0),
                 "lai_ton":   float(row_full.get(COT_LAI_TON, 0) or 0),
                 "bien_phap": bien_phap,

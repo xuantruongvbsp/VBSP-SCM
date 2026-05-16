@@ -980,6 +980,9 @@ def _render_quan_ly_template(df: pd.DataFrame):
 
 def _build_all_items(role: str, username: str, **kwargs) -> list:
     """Xây danh sách ALL_ITEMS — dùng chung cho sidebar và render."""
+    # Đảm bảo mọi lambda dùng **kwargs đều có đủ role và username
+    kwargs.setdefault("role", role)
+    kwargs.setdefault("username", username)
     df_full = kwargs.get("df_full")
     ds_pgd_all = kwargs.get("ds_pgd_all", [])
     can_upload = kwargs.get("can_upload", False)

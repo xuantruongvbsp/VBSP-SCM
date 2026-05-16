@@ -288,7 +288,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                     legend=dict(orientation="h", y=1.08),
                     plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
                 )
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width='stretch')
 
                 # Bảng - dùng column_config thay vì apply format
                 hien_thi_dataframe_phan_trang(
@@ -322,7 +322,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                     coloraxis_showscale=False,
                     plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
                 )
-                st.plotly_chart(fig2, use_container_width=True)
+                st.plotly_chart(fig2, width='stretch')
 
                 hien_thi_dataframe_phan_trang(
                     t_ng[[G_TEN_NGANH, "Số_món", "Dư_nợ", "NQH", "GN_năm"]],
@@ -356,7 +356,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                             yaxis=dict(title="",autorange="reversed"),
                             xaxis_title="", coloraxis_showscale=False,
                             plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)")
-                        st.plotly_chart(fig3, use_container_width=True)
+                        st.plotly_chart(fig3, width='stretch')
 
                     # Danh sách chi tiết NQH
                     cols_qh = [c for c in [G_TEN_XA, G_TEN_THON, G_TEN_TO,

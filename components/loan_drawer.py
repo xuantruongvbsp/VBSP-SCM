@@ -2,11 +2,31 @@
 
 from __future__ import annotations
 
-import json
 from typing import Any
 
 import pandas as pd
 import streamlit as st
+
+from config import (
+    COT_MA_KH,
+    COT_TEN_KH,
+    COT_SO_KU,
+    COT_TEN_CT,
+    COT_NGAY_VAY,
+    COT_NGAY_DEN_HAN,
+    COT_TONG_DU_NO,
+    COT_DU_NO_TH,
+    COT_DU_NO_QH,
+    COT_LAI_TON,
+    COT_LAI_TON_QH,
+    COT_PHAN_LOAI,
+    COT_TEN_PGD,
+    COT_TEN_XA,
+    COT_TEN_TO,
+    COT_SDT,
+    COT_DIA_CHI,
+    COT_CMND,
+)
 
 _DRAWER_HTML = """<div id="loan-drawer-overlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.3);z-index:999998;" onclick="closeLoanDrawer()"></div>
 <div id="loan-drawer" style="display:none;position:fixed;top:0;right:-600px;width:580px;height:100vh;background:white;box-shadow:-4px 0 24px rgba(0,0,0,0.15);z-index:999999;overflow-y:auto;transition:right 0.3s ease;padding:0;">
@@ -80,7 +100,7 @@ def _field_groups() -> list[dict]:
                 ("Tên KH", COT_TEN_KH),
                 ("Địa chỉ", COT_DIA_CHI),
                 ("Số CMND/CCCD", COT_CMND),
-                ("Số điện thoại", COT_DIEN_THOAI),
+                ("Số điện thoại", COT_SDT),
             ],
         },
         {
@@ -105,8 +125,7 @@ def _field_groups() -> list[dict]:
             "fields": [
                 ("PGD", COT_TEN_PGD),
                 ("Xã", COT_TEN_XA),
-                ("Tổ TK&VV", COT_TEN_TKVV),
-                ("Cán bộ", COT_CBQL),
+                ("Tổ TK&VV", COT_TEN_TO),
             ],
         },
     ]

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import os
 
+import altair as alt
 import pandas as pd
 import streamlit as st
 from streamlit.delta_generator import DeltaGenerator
@@ -11,14 +12,19 @@ from auth import la_phan_he_cn, normalize_role
 from config import (
     COT_DU_NO_QH,
     COT_DU_NO_TH,
+    COT_DVUT,
     COT_LAI_TON,
+    COT_LAI_TON_QH,
     COT_MA_KH,
     COT_NGAY_SL,
     COT_NGAY_VAY,
+    COT_NGUON_VON,
     COT_PHAN_LOAI,
     COT_SO_KU,
+    COT_TEN_CT,
     COT_TEN_KH,
     COT_TEN_PGD,
+    COT_TEN_XA,
     COT_TONG_DU_NO,
     HSTD_DS_CHO_VAY_NAM_ALIASES,
     baseline_pgd_path,
@@ -42,6 +48,12 @@ from utils import fmt_so, fmt_ty
 
 COT_DU_NO_KHOANH = "Dư nợ khoanh"
 
+_DIM_OPTIONS = [
+    (COT_TEN_CT,     "Chương trình tín dụng"),
+    (COT_NGUON_VON,  "Nguồn vốn"),
+    (COT_TEN_XA,     "Xã"),
+]
+
 
 def _agg_mot_pgd(df: pd.DataFrame) -> dict:
     """Tổng hợp các chỉ tiêu chính cho 1 DataFrame (1 PGD hoặc toàn CN)."""
@@ -49,20 +61,20 @@ def _agg_mot_pgd(df: pd.DataFrame) -> dict:
         return {
             "tong_du_no": 0, "du_no_th": 0, "du_no_qh": 0,
             "du_no_khoanh": 0, "so_ho": 0, "so_ku": 0, "gn_nam": 0,
+            "tong_lai_ton": 0,
         }
     col_gn = next((c for c in HSTD_DS_CHO_VAY_NAM_ALIASES if c in df.columns), None)
-    tong_dn = df[COT_TONG_DU_NO].sum() if COT_TONG_DU_NO in df.columns else 0
-    so_ho   = int(df[COT_MA_KH].nunique()) if COT_MA_KH in df.columns else 0
+    lai_th  = df[COT_LAI_TON].sum()    if COT_LAI_TON    in df.columns else 0
+    lai_qh  = df[COT_LAI_TON_QH].sum() if COT_LAI_TON_QH in df.columns else 0
     return {
-        "tong_du_no":    tong_dn,
-        "du_no_th":      df[COT_DU_NO_TH].sum()   if COT_DU_NO_TH   in df.columns else 0,
-        "du_no_qh":      df[COT_DU_NO_QH].sum()   if COT_DU_NO_QH   in df.columns else 0,
-        "du_no_khoanh":  df[COT_DU_NO_KHOANH].sum() if COT_DU_NO_KHOANH in df.columns else 0,
-        "so_ho":         so_ho,
-        "so_ku":         int(df[COT_SO_KU].nunique()) if COT_SO_KU in df.columns else 0,
-        "gn_nam":        df[col_gn].sum() if col_gn else 0,
-        "lai_ton":       df[COT_LAI_TON].sum() if COT_LAI_TON in df.columns else 0,
-        "muc_vay_bq":    (tong_dn / so_ho) if so_ho > 0 else 0,
+        "tong_du_no":    df[COT_TONG_DU_NO].sum()    if COT_TONG_DU_NO   in df.columns else 0,
+        "du_no_th":      df[COT_DU_NO_TH].sum()      if COT_DU_NO_TH     in df.columns else 0,
+        "du_no_qh":      df[COT_DU_NO_QH].sum()      if COT_DU_NO_QH     in df.columns else 0,
+        "du_no_khoanh":  df[COT_DU_NO_KHOANH].sum()  if COT_DU_NO_KHOANH in df.columns else 0,
+        "so_ho":         int(df[COT_MA_KH].nunique()) if COT_MA_KH        in df.columns else 0,
+        "so_ku":         int(df[COT_SO_KU].nunique()) if COT_SO_KU        in df.columns else 0,
+        "gn_nam":        df[col_gn].sum()             if col_gn                         else 0,
+        "tong_lai_ton":  lai_th + lai_qh,
     }
 
 
@@ -89,7 +101,6 @@ def _agg_theo_pgd(df: pd.DataFrame) -> pd.DataFrame:
     except Exception:
         return pd.DataFrame()
 
-    # Hàng tổng
     tong = {COT_TEN_PGD: "⬛ Tổng Chi nhánh"}
     for col in result.columns:
         if col != COT_TEN_PGD:
@@ -245,7 +256,6 @@ def _bang_explorer(df_joined: pd.DataFrame, chon_nam: str, key_prefix: str) -> N
     if "_change_type" not in df_cl.columns:
         return
 
-    # Filter chips
     all_label = f"Tất cả ({len(df_cl)})"
     type_counts = df_cl["_change_label"].value_counts()
     options = [all_label] + [
@@ -265,7 +275,6 @@ def _bang_explorer(df_joined: pd.DataFrame, chon_nam: str, key_prefix: str) -> N
     else:
         df_show = df_cl
 
-    # Cột hiển thị
     col_map = {
         COT_SO_KU + "_curr": "Số KƯ",
         COT_MA_KH + "_curr": "Mã KH",
@@ -281,7 +290,6 @@ def _bang_explorer(df_joined: pd.DataFrame, chon_nam: str, key_prefix: str) -> N
 
     df_out = df_show[list(available.keys())].rename(columns=available).copy()
 
-    # Format tiền
     for col_src, col_dst in available.items():
         if col_src in (
             COT_TONG_DU_NO + "_prev",
@@ -294,7 +302,6 @@ def _bang_explorer(df_joined: pd.DataFrame, chon_nam: str, key_prefix: str) -> N
                 lambda x: ("+" if x >= 0 else "") + fmt_ty(x)
             )
 
-    # Sắp xếp theo |Δ DN| giảm dần, tối đa 500 dòng
     if "_du_no_delta" in df_show.columns:
         order = df_show["_du_no_delta"].abs().nlargest(500).index
         df_out = df_out.loc[df_out.index.intersection(order)].reindex(order).dropna(how="all")
@@ -335,6 +342,212 @@ def _bang_vintage_nqh(df_ht: pd.DataFrame, df_bl: pd.DataFrame, chon_nam: str) -
     st.dataframe(df_out, hide_index=True, use_container_width=True)
 
 
+# ─── New visual helpers (port from PeriodOverview.tsx) ───────────────────────
+
+def _chart_tang_truong(
+    df_bl: pd.DataFrame,
+    df_ht: pd.DataFrame,
+    dim: str,
+    label_bl: str,
+    label_ht: str,
+    key_prefix: str,
+) -> None:
+    """Grouped bar chart tăng trưởng dư nợ theo dimension, prev vs curr."""
+    if COT_TONG_DU_NO not in df_bl.columns or COT_TONG_DU_NO not in df_ht.columns:
+        st.info("Không đủ dữ liệu để vẽ biểu đồ.")
+        return
+    if dim not in df_bl.columns and dim not in df_ht.columns:
+        st.info(f"Cột '{dim}' không có trong dữ liệu.")
+        return
+
+    def _group(df: pd.DataFrame) -> pd.DataFrame:
+        if dim not in df.columns:
+            return pd.DataFrame(columns=[dim, "dn"])
+        g = df.groupby(dim, dropna=False)[COT_TONG_DU_NO].sum().reset_index()
+        g.columns = [dim, "dn"]
+        g[dim] = g[dim].fillna("—").astype(str)
+        return g
+
+    g_bl = _group(df_bl)
+    g_ht = _group(df_ht)
+
+    all_vals = sorted(
+        set(g_bl[dim].tolist()) | set(g_ht[dim].tolist()),
+    )
+    focus = st.selectbox(
+        "Tập trung vào",
+        ["Tất cả"] + all_vals,
+        key=f"{key_prefix}chart_focus_{dim}",
+    )
+    if focus != "Tất cả":
+        g_bl = g_bl[g_bl[dim] == focus]
+        g_ht = g_ht[g_ht[dim] == focus]
+
+    g_bl = g_bl.assign(Ky=label_bl)
+    g_ht = g_ht.assign(Ky=label_ht)
+    combined = pd.concat([g_bl, g_ht], ignore_index=True)
+    combined["dn_ty"] = combined["dn"] / 1e9
+
+    if combined.empty or combined["dn_ty"].sum() == 0:
+        st.info("Không có dữ liệu để hiển thị.")
+        return
+
+    chart = (
+        alt.Chart(combined)
+        .mark_bar()
+        .encode(
+            x=alt.X(f"{dim}:N", title=None, sort="-y",
+                    axis=alt.Axis(labelAngle=-35, labelLimit=200)),
+            y=alt.Y("dn_ty:Q", title="Dư nợ (tỷ đồng)"),
+            color=alt.Color(
+                "Ky:N",
+                scale=alt.Scale(
+                    domain=[label_bl, label_ht],
+                    range=["#94a3b8", "#2563eb"],
+                ),
+                legend=alt.Legend(title="Kỳ"),
+            ),
+            xOffset="Ky:N",
+            tooltip=[
+                alt.Tooltip(f"{dim}:N", title=dim),
+                alt.Tooltip("Ky:N", title="Kỳ"),
+                alt.Tooltip("dn_ty:Q", title="Dư nợ (tỷ)", format=",.3f"),
+            ],
+        )
+        .properties(height=340)
+    )
+    st.altair_chart(chart, use_container_width=True)
+
+
+def _flow_diagram(
+    prev_label: str,
+    curr_label: str,
+    prev_total: int,
+    curr_total: int,
+    left_label: str,
+    left_count: int,
+    mid_label: str,
+    mid_count: int,
+    right_label: str,
+    right_count: int,
+    badge: str = "",
+) -> None:
+    """Visual flow diagram dạng 3-box (port từ FlowDiagram.tsx)."""
+    h1, h2, h3 = st.columns([2, 1, 2])
+    with h1:
+        st.markdown(
+            f"<div style='text-align:center'>"
+            f"<div style='font-size:10px;text-transform:uppercase;color:#64748b;letter-spacing:.05em'>{prev_label}</div>"
+            f"<div style='font-size:1.6rem;font-weight:700;color:#0f172a'>{fmt_so(prev_total)}</div>"
+            f"</div>",
+            unsafe_allow_html=True,
+        )
+    with h2:
+        st.markdown(
+            "<div style='text-align:center;color:#94a3b8;font-size:1.2rem;padding-top:18px'>→</div>",
+            unsafe_allow_html=True,
+        )
+    with h3:
+        st.markdown(
+            f"<div style='text-align:center'>"
+            f"<div style='font-size:10px;text-transform:uppercase;color:#1d4ed8;letter-spacing:.05em'>{curr_label}</div>"
+            f"<div style='font-size:1.6rem;font-weight:700;color:#1e3a8a'>{fmt_so(curr_total)}</div>"
+            f"</div>",
+            unsafe_allow_html=True,
+        )
+
+    st.markdown("<div style='margin:8px 0'></div>", unsafe_allow_html=True)
+
+    _CELL = (
+        "<div style='border-radius:8px;padding:10px 6px;text-align:center;"
+        "background:{bg};color:{fg};outline:1px solid {border};'>"
+        "<div style='font-size:10px;font-weight:600;text-transform:uppercase;"
+        "letter-spacing:.05em;opacity:.8'>{label}</div>"
+        "<div style='font-size:1.3rem;font-weight:700'>{count}</div>"
+        "{badge}"
+        "</div>"
+    )
+    badge_html = (
+        f"<div style='font-size:10px;font-weight:600;margin-top:2px'>{badge}</div>"
+        if badge else ""
+    )
+    b1, b2, b3 = st.columns(3)
+    b1.markdown(
+        _CELL.format(bg="#f1f5f9", fg="#475569", border="#e2e8f0",
+                     label=left_label, count=fmt_so(left_count), badge=""),
+        unsafe_allow_html=True,
+    )
+    b2.markdown(
+        _CELL.format(bg="#dbeafe", fg="#1e40af", border="#bfdbfe",
+                     label=mid_label, count=fmt_so(mid_count), badge=badge_html),
+        unsafe_allow_html=True,
+    )
+    b3.markdown(
+        _CELL.format(bg="#d1fae5", fg="#065f46", border="#a7f3d0",
+                     label=right_label, count=fmt_so(right_count), badge=""),
+        unsafe_allow_html=True,
+    )
+
+
+def _quality_bars(
+    snap_bl: dict,
+    snap_ht: dict,
+    label_bl: str,
+    label_ht: str,
+) -> None:
+    """Stacked bar Trong hạn / Quá hạn / Khoanh cho 2 kỳ (port từ QualityStackedBars.tsx)."""
+    max_total = max(snap_bl.get("total", 0), snap_ht.get("total", 0), 1)
+
+    def _row(label: str, snap: dict) -> None:
+        total = snap.get("total", 0)
+        th = snap.get("trong_han", 0)
+        qh = snap.get("qua_han", 0)
+        kh = snap.get("khoanh", 0)
+
+        width_pct = (total / max_total * 100) if max_total > 0 else 0
+        th_pct = (th / total * 100) if total > 0 else 0
+        qh_pct = (qh / total * 100) if total > 0 else 0
+        kh_pct = (kh / total * 100) if total > 0 else 0
+
+        st.markdown(
+            f"<div style='margin-bottom:2px;display:flex;justify-content:space-between'>"
+            f"<span style='font-size:12px;font-weight:600;color:#334155'>{label}</span>"
+            f"<span style='font-size:11px;color:#64748b'>{fmt_ty(total)}</span>"
+            f"</div>",
+            unsafe_allow_html=True,
+        )
+        seg_th = (
+            f"<div style='width:{th_pct:.2f}%;background:#34d399;height:100%' "
+            f"title='Trong hạn {fmt_ty(th)}'></div>"
+        ) if th_pct > 0 else ""
+        seg_qh = (
+            f"<div style='width:{qh_pct:.2f}%;background:#f43f5e;height:100%' "
+            f"title='Quá hạn {fmt_ty(qh)}'></div>"
+        ) if qh_pct > 0 else ""
+        seg_kh = (
+            f"<div style='width:{kh_pct:.2f}%;background:#fbbf24;height:100%' "
+            f"title='Khoanh {fmt_ty(kh)}'></div>"
+        ) if kh_pct > 0 else ""
+        st.markdown(
+            f"<div style='position:relative;height:28px;background:#f1f5f9;border-radius:6px;overflow:hidden'>"
+            f"<div style='position:absolute;inset:0;display:flex;width:{width_pct:.2f}%'>"
+            f"{seg_th}{seg_qh}{seg_kh}"
+            f"</div></div>"
+            f"<div style='display:grid;grid-template-columns:1fr 1fr 1fr;font-size:10px;color:#64748b;margin-top:3px'>"
+            f"<span>Trong hạn: <strong style='color:#059669'>{_fmt_pct_vn(th_pct)}</strong></span>"
+            f"<span style='text-align:center'>Quá hạn: <strong style='color:#e11d48'>{_fmt_pct_vn(qh_pct)}</strong></span>"
+            f"<span style='text-align:right'>Khoanh: <strong style='color:#d97706'>{_fmt_pct_vn(kh_pct)}</strong></span>"
+            f"</div>",
+            unsafe_allow_html=True,
+        )
+
+    _row(label_bl, snap_bl)
+    st.markdown("<div style='margin:12px 0'></div>", unsafe_allow_html=True)
+    _row(label_ht, snap_ht)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+
 def render(tab: DeltaGenerator = None, **kwargs) -> None:
     df       = kwargs.get("df")
     df_full  = kwargs.get("df_full", df)
@@ -345,7 +558,6 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
 
     ctx = tab if tab is not None else st.container()
 
-    # prefix để tránh DuplicateElementKey
     if pgd_mode and pgd_user:
         key_prefix = f"pgd_{pgd_slug(pgd_user)}_"
     else:
@@ -387,13 +599,11 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
             st.warning(f"⚠️ Chưa có dữ liệu baseline 31/12/{chon_nam}.")
             return
 
-        # Lọc theo PGD nếu là pgd_mode
         if pgd_mode and pgd_user and COT_TEN_PGD in df_bl_full.columns:
             df_bl = df_bl_full[df_bl_full[COT_TEN_PGD] == pgd_user].copy()
         else:
             df_bl = df_bl_full
 
-        # df hiện tại
         df_ht = df if pgd_mode else df_full
         if df_ht is None or df_ht.empty:
             st.warning("⚠️ Chưa có dữ liệu HSTD hiện tại.")
@@ -403,93 +613,99 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
         agg_ht = _agg_mot_pgd(df_ht)
         agg_bl = _agg_mot_pgd(df_bl)
 
-        # Join cấp độ khế ước (dùng cho Explorer, roll/cure, vintage)
         df_joined = join_by_loan(df_bl, df_ht)
 
-        # Ngày số liệu hiện tại
         ngay_sl = ""
         if "Ngày số liệu" in df_ht.columns:
             sl = df_ht["Ngày số liệu"].dropna()
             if len(sl):
                 ngay_sl = str(sl.iloc[0])
 
+        label_bl = f"31/12/{chon_nam}"
+        label_ht = ngay_sl or "Hiện tại"
+
         st.caption(
-            f"**Kỳ hiện tại:** {ngay_sl or 'N/A'} &nbsp;|&nbsp; "
-            f"**Mốc so sánh:** 31/12/{chon_nam}"
+            f"**Kỳ hiện tại:** {label_ht} &nbsp;|&nbsp; "
+            f"**Mốc so sánh:** {label_bl}"
         )
         st.divider()
 
-        # ═══════════ KPI CARDS ════════════════════════════════════════════
-        st.markdown("**📊 Chỉ tiêu tổng hợp**")
-        k1, k2, k3, k4 = st.columns(4)
+        # ═══════════ 8 KPI CARDS ═════════════════════════════════════════
+        st.markdown("**📊 8 chỉ tiêu cốt lõi · Δ giữa hai kỳ**")
 
         tl_nqh_ht = _tl_nqh(agg_ht["du_no_qh"], agg_ht["tong_du_no"])
         tl_nqh_bl = _tl_nqh(agg_bl["du_no_qh"], agg_bl["tong_du_no"])
+        muc_vay_bq_ht = agg_ht["tong_du_no"] / agg_ht["so_ho"] if agg_ht["so_ho"] > 0 else 0
+        muc_vay_bq_bl = agg_bl["tong_du_no"] / agg_bl["so_ho"] if agg_bl["so_ho"] > 0 else 0
 
-        k1.metric(
+        # Hàng 1 — tăng trưởng
+        r1c1, r1c2, r1c3, r1c4 = st.columns(4)
+        r1c1.metric(
             "Tổng dư nợ",
             fmt_ty(agg_ht["tong_du_no"]),
             delta=_delta_str(agg_ht["tong_du_no"], agg_bl["tong_du_no"]),
-            help=f"Mốc 31/12/{chon_nam}: {fmt_ty(agg_bl['tong_du_no'])}",
+            help=f"Mốc {label_bl}: {fmt_ty(agg_bl['tong_du_no'])}",
         )
-        k2.metric(
-            "Dư nợ quá hạn",
-            fmt_ty(agg_ht["du_no_qh"]),
-            delta=_delta_str(agg_ht["du_no_qh"], agg_bl["du_no_qh"]),
-            delta_color="inverse",
-            help=f"Mốc 31/12/{chon_nam}: {fmt_ty(agg_bl['du_no_qh'])}",
+        r1c2.metric(
+            "Số khế ước",
+            fmt_so(agg_ht["so_ku"]),
+            delta=_delta_str(agg_ht["so_ku"], agg_bl["so_ku"], unit="so"),
+            help=f"Mốc {label_bl}: {fmt_so(agg_bl['so_ku'])}",
         )
-        k3.metric(
+        r1c3.metric(
+            "Số hộ vay",
+            fmt_so(agg_ht["so_ho"]),
+            delta=_delta_str(agg_ht["so_ho"], agg_bl["so_ho"], unit="so"),
+            help=f"Mốc {label_bl}: {fmt_so(agg_bl['so_ho'])}",
+        )
+        r1c4.metric(
+            "Mức vay BQ/KH",
+            fmt_ty(muc_vay_bq_ht),
+            delta=_delta_str(muc_vay_bq_ht, muc_vay_bq_bl),
+            help=f"Mốc {label_bl}: {fmt_ty(muc_vay_bq_bl)}",
+        )
+
+        # Hàng 2 — rủi ro
+        r2c1, r2c2, r2c3, r2c4 = st.columns(4)
+        r2c1.metric(
             "Tỷ lệ NQH",
             _fmt_pct_vn(tl_nqh_ht),
             delta=_fmt_pct_vn(tl_nqh_ht - tl_nqh_bl),
             delta_color="inverse",
-            help=f"Mốc 31/12/{chon_nam}: {_fmt_pct_vn(tl_nqh_bl)}",
+            help=f"Mốc {label_bl}: {_fmt_pct_vn(tl_nqh_bl)}",
         )
-        k4.metric(
-            "Số hộ vay",
-            fmt_so(agg_ht["so_ho"]),
-            delta=_delta_str(agg_ht["so_ho"], agg_bl["so_ho"], unit="so"),
-            help=f"Mốc 31/12/{chon_nam}: {fmt_so(agg_bl['so_ho'])}",
+        r2c2.metric(
+            "Dư nợ quá hạn",
+            fmt_ty(agg_ht["du_no_qh"]),
+            delta=_delta_str(agg_ht["du_no_qh"], agg_bl["du_no_qh"]),
+            delta_color="inverse",
+            help=f"Mốc {label_bl}: {fmt_ty(agg_bl['du_no_qh'])}",
         )
-
-        k5, k6, k7, k8 = st.columns(4)
-        k5.metric(
-            "Số khế ước",
-            fmt_so(agg_ht["so_ku"]),
-            delta=_delta_str(agg_ht["so_ku"], agg_bl["so_ku"], unit="so"),
-            help=f"Mốc 31/12/{chon_nam}: {fmt_so(agg_bl['so_ku'])}",
-        )
-        k6.metric(
+        r2c3.metric(
             "Dư nợ khoanh",
             fmt_ty(agg_ht["du_no_khoanh"]),
             delta=_delta_str(agg_ht["du_no_khoanh"], agg_bl["du_no_khoanh"]),
             delta_color="inverse",
-            help=f"Mốc 31/12/{chon_nam}: {fmt_ty(agg_bl['du_no_khoanh'])}",
+            help=f"Mốc {label_bl}: {fmt_ty(agg_bl['du_no_khoanh'])}",
         )
-        k7.metric(
+        r2c4.metric(
             "Lãi tồn TH",
             fmt_ty(agg_ht["lai_ton"]),
             delta=_delta_str(agg_ht["lai_ton"], agg_bl["lai_ton"]),
             delta_color="inverse",
-            help=f"Mốc 31/12/{chon_nam}: {fmt_ty(agg_bl['lai_ton'])}",
-        )
-        k8.metric(
-            "Mức vay BQ / hộ",
-            fmt_ty(agg_ht["muc_vay_bq"]),
-            delta=_delta_str(agg_ht["muc_vay_bq"], agg_bl["muc_vay_bq"]),
-            help=f"Mốc 31/12/{chon_nam}: {fmt_ty(agg_bl['muc_vay_bq'])}",
+            help=f"Mốc {label_bl}: {fmt_ty(agg_bl['lai_ton'])}",
         )
 
         st.divider()
 
-        # ── Chỉ tiêu chi tiết ─────────────────────────────────────────────
+        # ── Chi tiết chỉ tiêu ─────────────────────────────────────────────
         with st.expander("📋 Chi tiết chỉ tiêu", expanded=True):
             rows = [
                 ("Tổng dư nợ",         agg_bl["tong_du_no"],   agg_ht["tong_du_no"],   "ty"),
                 ("  Dư nợ trong hạn",  agg_bl["du_no_th"],     agg_ht["du_no_th"],     "ty"),
                 ("  Dư nợ quá hạn",    agg_bl["du_no_qh"],     agg_ht["du_no_qh"],     "ty"),
                 ("  Dư nợ khoanh",     agg_bl["du_no_khoanh"], agg_ht["du_no_khoanh"], "ty"),
+                ("  Lãi tồn TH",       agg_bl["lai_ton"],      agg_ht["lai_ton"],      "ty"),
                 ("Giải ngân trong năm",agg_bl["gn_nam"],       agg_ht["gn_nam"],       "ty"),
                 ("Số hộ vay",          agg_bl["so_ho"],        agg_ht["so_ho"],        "so"),
                 ("Số khế ước",         agg_bl["so_ku"],        agg_ht["so_ku"],        "so"),
@@ -501,13 +717,114 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                 sign = "+" if delta >= 0 else ""
                 data_ct.append({
                     "Chỉ tiêu": ten,
-                    f"Mốc 31/12/{chon_nam}": fmt_ty(bl_val) if unit == "ty" else fmt_so(int(bl_val)),
-                    "Hiện tại":              fmt_ty(ht_val) if unit == "ty" else fmt_so(int(ht_val)),
-                    "Chênh lệch":            f"{sign}{fmt_ty(delta)}" if unit == "ty" else f"{sign}{fmt_so(int(delta))}",
-                    "% thay đổi":            f"{sign}{pct:.2f}".replace(".", ",") + "%",
+                    f"Mốc {label_bl}": fmt_ty(bl_val) if unit == "ty" else fmt_so(int(bl_val)),
+                    "Hiện tại":        fmt_ty(ht_val) if unit == "ty" else fmt_so(int(ht_val)),
+                    "Chênh lệch":      f"{sign}{fmt_ty(delta)}" if unit == "ty" else f"{sign}{fmt_so(int(delta))}",
+                    "% thay đổi":      f"{sign}{pct:.2f}".replace(".", ",") + "%",
                 })
             df_ct = pd.DataFrame(data_ct)
             st.dataframe(df_ct, hide_index=True, use_container_width=True)
+
+        # ═══════════ TĂNG TRƯỞNG DƯ NỢ ══════════════════════════════════
+        st.divider()
+        st.markdown("**📊 Tăng trưởng dư nợ**")
+
+        dim_labels = {col: lbl for col, lbl in _DIM_OPTIONS}
+        dim_sel = st.radio(
+            "Phân tích theo",
+            options=[col for col, _ in _DIM_OPTIONS],
+            format_func=lambda x: dim_labels[x],
+            horizontal=True,
+            key=f"{key_prefix}chart_dim",
+        )
+        _chart_tang_truong(df_bl, df_ht, dim_sel, label_bl, label_ht, key_prefix)
+
+        # ═══════════ VÒNG ĐỜI KHẾ ƯỚC / KHÁCH HÀNG ═════════════════════
+        st.divider()
+        st.markdown("**🔄 Vòng đời danh mục**")
+
+        # Tính loan lifecycle
+        prev_total_loans = agg_bl["so_ku"]
+        curr_total_loans = agg_ht["so_ku"]
+        prev_col = COT_SO_KU + "_prev"
+        curr_col = COT_SO_KU + "_curr"
+        if (
+            not df_joined.empty
+            and prev_col in df_joined.columns
+            and curr_col in df_joined.columns
+        ):
+            retained_loans = int(
+                df_joined[[prev_col, curr_col]].notna().all(axis=1).sum()
+            )
+        else:
+            retained_loans = min(prev_total_loans, curr_total_loans)
+        closed_loans = max(0, prev_total_loans - retained_loans)
+        new_loans    = max(0, curr_total_loans - retained_loans)
+
+        # Tính customer lifecycle
+        ma_kh_bl = (
+            set(df_bl[COT_MA_KH].astype(str).str.strip())
+            if COT_MA_KH in df_bl.columns else set()
+        )
+        ma_kh_ht = (
+            set(df_ht[COT_MA_KH].astype(str).str.strip())
+            if COT_MA_KH in df_ht.columns else set()
+        )
+        prev_total_cust = len(ma_kh_bl)
+        curr_total_cust = len(ma_kh_ht)
+        retained_cust   = len(ma_kh_bl & ma_kh_ht)
+        churned_cust    = len(ma_kh_bl - ma_kh_ht)
+        new_cust        = len(ma_kh_ht - ma_kh_bl)
+
+        lc1, lc2 = st.columns(2)
+        with lc1:
+            st.markdown("**Khế ước**")
+            _flow_diagram(
+                prev_label=f"KƯ {label_bl}",
+                curr_label=f"KƯ {label_ht}",
+                prev_total=prev_total_loans,
+                curr_total=curr_total_loans,
+                left_label="Đã tất toán",
+                left_count=closed_loans,
+                mid_label="Duy trì",
+                mid_count=retained_loans,
+                right_label="Khế ước mới",
+                right_count=new_loans,
+            )
+        with lc2:
+            st.markdown("**Khách hàng**")
+            _flow_diagram(
+                prev_label=f"KH {label_bl}",
+                curr_label=f"KH {label_ht}",
+                prev_total=prev_total_cust,
+                curr_total=curr_total_cust,
+                left_label="Đã rời danh mục",
+                left_count=churned_cust,
+                mid_label="Còn vay",
+                mid_count=retained_cust,
+                right_label="Khách hàng mới",
+                right_count=new_cust,
+            )
+
+        # ═══════════ CHẤT LƯỢNG DƯ NỢ ════════════════════════════════════
+        st.divider()
+        st.markdown("**📐 Cơ cấu chất lượng dư nợ**")
+
+        def _snap(agg: dict) -> dict:
+            total = agg["tong_du_no"]
+            th = agg["du_no_th"]
+            qh = agg["du_no_qh"]
+            kh = agg["du_no_khoanh"]
+            if th == 0 and total > 0:
+                th = max(0.0, total - qh - kh)
+            return {"trong_han": th, "qua_han": qh, "khoanh": kh, "total": total}
+
+        _quality_bars(
+            snap_bl=_snap(agg_bl),
+            snap_ht=_snap(agg_ht),
+            label_bl=f"Kỳ trước · {label_bl}",
+            label_ht=f"Kỳ sau · {label_ht}",
+        )
 
         # ═══════════ BẢNG THEO PGD (chỉ CN role) ═════════════════════════
         if la_phan_he_cn(role) and not pgd_mode:
@@ -521,7 +838,6 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                 st.info("Không đủ dữ liệu để so sánh theo PGD.")
                 return
 
-            # Merge theo tên PGD
             df_merge = df_pgd_ht.merge(
                 df_pgd_bl,
                 on=COT_TEN_PGD,
@@ -529,7 +845,6 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                 suffixes=("_ht", "_bl"),
             ).fillna(0)
 
-            # Tính delta
             df_merge["Δ Dư nợ"] = df_merge["tong_du_no_ht"] - df_merge["tong_du_no_bl"]
             df_merge["Δ DN %"]  = df_merge.apply(
                 lambda r: (r["Δ Dư nợ"] / r["tong_du_no_bl"] * 100) if r["tong_du_no_bl"] != 0 else 0.0,
@@ -544,33 +859,19 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
             df_merge["Δ NQH"] = df_merge["NQH HT"] - df_merge["NQH mốc"]
             df_merge["Δ Hộ"]  = (df_merge["so_ho_ht"] - df_merge["so_ho_bl"]).astype(int)
 
-            # Cột hiển thị — format kiểu VN
-            cols_show = {
-                COT_TEN_PGD:                        "Tên PGD",
-                f"DN mốc 31/12/{chon_nam}":         "DN mốc 31/12",
-                "DN hiện tại":                      "DN hiện tại",
-                "±DN":                              "±DN",
-                "±DN%":                             "±DN%",
-                f"Hộ mốc 31/12/{chon_nam}":         "Hộ mốc 31/12",
-                "Hộ HT":                            "Hộ HT",
-                "±Hộ":                              "±Hộ",
-                "NQH mốc":                          "NQH mốc",
-                "NQH HT":                           "NQH HT",
-                "±NQH":                             "±NQH",
-            }
             df_out = pd.DataFrame()
-            df_out["Tên PGD"]                    = df_merge[COT_TEN_PGD]
-            df_out[f"DN mốc 31/12/{chon_nam}"]   = df_merge["tong_du_no_bl"].apply(fmt_ty)
-            df_out["DN hiện tại"]                = df_merge["tong_du_no_ht"].apply(fmt_ty)
-            df_out["±DN"]                        = df_merge["Δ Dư nợ"].apply(
+            df_out["Tên PGD"]              = df_merge[COT_TEN_PGD]
+            df_out[f"DN mốc {label_bl}"]   = df_merge["tong_du_no_bl"].apply(fmt_ty)
+            df_out["DN hiện tại"]          = df_merge["tong_du_no_ht"].apply(fmt_ty)
+            df_out["±DN"]                  = df_merge["Δ Dư nợ"].apply(
                 lambda x: ("+" if x >= 0 else "") + fmt_ty(x)
             )
             df_out["±DN%"] = df_merge["Δ DN %"].apply(
                 lambda x: ("+" if x >= 0 else "") + f"{x:.2f}".replace(".", ",") + "%"
             )
-            df_out[f"Hộ mốc 31/12/{chon_nam}"]  = df_merge["so_ho_bl"].apply(lambda x: fmt_so(int(x)))
-            df_out["Hộ HT"]                     = df_merge["so_ho_ht"].apply(lambda x: fmt_so(int(x)))
-            df_out["±Hộ"]                       = df_merge["Δ Hộ"].apply(
+            df_out[f"Hộ mốc {label_bl}"]   = df_merge["so_ho_bl"].apply(lambda x: fmt_so(int(x)))
+            df_out["Hộ HT"]               = df_merge["so_ho_ht"].apply(lambda x: fmt_so(int(x)))
+            df_out["±Hộ"]                  = df_merge["Δ Hộ"].apply(
                 lambda x: ("+" if x >= 0 else "") + fmt_so(x)
             )
             df_out["NQH mốc"]  = df_merge["NQH mốc"].apply(_fmt_pct_vn)
@@ -625,9 +926,7 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
         # ═══════════ PHÂN LOẠI KHÁCH HÀNG ═════════════════════════════════
         st.divider()
         with st.expander("👥 Phân loại khách hàng", expanded=False):
-            st.markdown(
-                "**Phân tích thay đổi nhóm khách hàng giữa hai kỳ:**"
-            )
+            st.markdown("**Phân tích thay đổi nhóm khách hàng giữa hai kỳ:**")
             df_lifecycle = _phan_loai_khach_hang(df_bl, df_ht)
             if not df_lifecycle.empty:
                 st.dataframe(df_lifecycle, hide_index=True, use_container_width=True)
@@ -642,8 +941,8 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
             )
             c1, c2 = st.columns(2)
             with c1:
-                st.markdown(f"**Mốc 31/12/{chon_nam}**")
-                _bang_par(df_bl, f"Mốc 31/12/{chon_nam}")
+                st.markdown(f"**Mốc {label_bl}**")
+                _bang_par(df_bl, f"Mốc {label_bl}")
             with c2:
                 st.markdown("**Hiện tại**")
                 _bang_par(df_ht, "Hiện tại")

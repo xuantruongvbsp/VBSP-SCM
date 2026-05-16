@@ -484,7 +484,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
         for i, f in enumerate(f_opts):
             is_active = st.session_state.tc_filter == f
             label = f"**{f}**" if is_active else f
-            if fc[i].button(label, key=f"fb_{i}", width='stretch'):
+            if fc[i].button(label, key=f"tracuu_filter_btn_{i}", width='stretch'):
                 st.session_state.tc_filter = f
                 st.rerun()
         active_filter = st.session_state.tc_filter
@@ -547,7 +547,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
 
         # Chế độ xem
         mode = st.radio("Chế độ xem", ["📋 Bảng rút gọn", "🃏 Card chi tiết"],
-                        horizontal=True, key="tc_mode")
+                        horizontal=True, key="tracuu_mode")
         st.divider()
 
         if mode == "📋 Bảng rút gọn":

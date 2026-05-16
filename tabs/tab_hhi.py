@@ -146,7 +146,7 @@ def _render_sub_ct(df_full: pd.DataFrame) -> None:
         height=max(400, len(top15) * 34 + 100),
         margin=dict(l=20, r=90, t=50, b=30),
     )
-    st.plotly_chart(fig, use_container_width=True, key="hhi_ct_chart")
+    st.plotly_chart(fig, width='stretch', key="hhi_ct_chart")
 
     st.markdown("**Bảng tổng hợp Chương trình**")
     df_ct = _bang_tap_trung(df_full, COT_TEN_CT)
@@ -205,7 +205,7 @@ def _render_sub_xa(df_full: pd.DataFrame) -> None:
             )
         )
         fig_xa.update_layout(height=520)
-        st.plotly_chart(fig_xa, use_container_width=True, key="hhi_xa_treemap")
+        st.plotly_chart(fig_xa, width='stretch', key="hhi_xa_treemap")
 
     st.markdown("**Bảng tổng hợp Xã**")
     df_xa = _bang_tap_trung(df_full, COT_TEN_XA, extra_cols=[COT_TEN_PGD])

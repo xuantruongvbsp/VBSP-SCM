@@ -1188,12 +1188,15 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                             return col
                         df_pdf = df_export.rename(columns={c: _pdf_col(c) for c in df_export.columns})
 
+                        # Các cột số → căn phải (dữ liệu đã format sẵn thành string)
+                        _cols_right_pdf = [c for c in df_pdf.columns if c != "Đơn vị"]
                         with st.spinner("⏳ Đang tạo PDF..."):
                             _bytes = xuat_pdf(
                                 df_pdf,
                                 "Thông tin tổng quát theo PGD",
                                 username,
                                 cols_tien=[],
+                                cols_right=_cols_right_pdf,
                                 prefix_file="TQPGD",
                             )
                         st.session_state[_ss_tqpgd] = _bytes

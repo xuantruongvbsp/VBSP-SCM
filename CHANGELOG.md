@@ -1,5 +1,22 @@
 # CHANGELOG
 
+## [2026-05-17] — Fix upload hàng loạt: file_uploader không reset sau import
+- `tabs/tab_upload_khnv.py` dòng ~707 — thêm `khnv_bulk_uploader_ver` counter, đổi key thành `f"khnv_bulk_upload_{_ver}"` để widget reset về rỗng sau import
+- `tabs/tab_upload_khnv.py` dòng ~685 — sửa cleanup: tăng `khnv_bulk_uploader_ver`, pop `khnv_bulk_ids` (đúng tên) thay vì `khnv_bulk_names` (sai tên) và `khnv_bulk_upload` (không xóa được widget key)
+
+## [2026-05-16] — Tối ưu tốc độ load: cache alert, status, CSS, dedup ALL_ITEMS
+- `alert_center.py` — `_kiem_tra_khong_hoat_dong()`: thêm session_state cache 5 phút, tránh chạy `tong_hop_khong_hd(df_full)` mỗi rerun
+- `widgets/status_widget.py` — tách `_kiem_tra_trang_thai()` với session_state cache 60s, tránh 3×`os.path.getmtime` mỗi rerun
+- `workspaces/ws_management.py` `render()` — dùng `_build_all_items()` thay vì build lại 22-lambda list
+- `app.py` — bọc 317-dòng CSS vào `@st.cache_resource` `_get_global_css()`; di chuyển `st.set_page_config` ra đúng vị trí sau CSS function
+
+## [2026-05-16] — Fix ws_management: xóa 2 radio nav trùng trong render()
+- `workspaces/ws_management.py` dòng ~1148 — xóa `st.radio` Level 1 (nhóm) và Level 2 (mục) trong `render()` vì sidebar `render_sidebar_menu()` đã xử lý điều hướng; `render()` giờ chỉ đọc `ws_mgmt_menu` từ session_state và render thẳng content
+
+## [2026-05-16] — Tối ưu RAM: DuckDB read_parquet cho khtd_service & du_phong_service
+- `services/khtd_service.py` — thêm `COT_TEN_PGD` vào import; refactor `tinh_kh_dau_nam` thay Pandas groupby bằng DuckDB query (hỗ trợ `parquet_path`/`ten_pgd` kwargs để lọc PGD ngay trong `read_parquet`); `tao_dot_giao_dau_nam` thêm optional `parquet_path` kwarg
+- `services/du_phong_service.py` — thêm `import duckdb`; refactor `du_phong_dong_tien` và `du_phong_chi_tiet` thay `iterrows()` loop bằng DuckDB SQL dùng `UNNEST(RANGE(so_thang))` để mở rộng tháng, hỗ trợ `parquet_path`/`ten_pgd` kwargs
+
 ## [2026-05-16] — Refactor ws_executive.py: áp dụng Lazy-loading 2 tầng (radio Nhóm → Mục)
 - `workspaces/ws_executive.py` dòng ~1328 — thay `st.tabs()` 6 tab eager bằng radio 2 tầng (`ws_exec_group_radio` / `ws_exec_item_{group}`), chỉ render mục active
 - `workspaces/ws_executive.py` — thêm 6 section wrapper: `_render_suc_khoe_tong_quan`, `_render_tien_do_va_kh`, `_render_so_sanh_xep_hang_pgd`, `_render_nqh_xa_canh_bao`, `_render_migration_section`, `_render_pdf_section`

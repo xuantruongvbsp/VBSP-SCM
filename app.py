@@ -46,15 +46,10 @@ def _load_nq11(cache_path: str, _ts: float) -> pd.DataFrame:
     return duckdb.query(f"SELECT * FROM '{cache_path}'").df()
 
 
-# ── Page config ───────────────────────────────────────────────────────────────
-st.set_page_config(
-    page_title="VBSP-SCM | Tín dụng Nội bộ",
-    page_icon="🏦", layout="wide",
-    initial_sidebar_state="expanded",
-)
-
-# ── Global CSS (inject mỗi rerun — Streamlit xóa DOM sau mỗi lần click) ────────
-st.markdown("""<style>
+@st.cache_resource(show_spinner=False)
+def _get_global_css() -> str:
+    """Cache chuỗi CSS 317 dòng — tránh tạo lại string mỗi rerun."""
+    return """<style>
 /* ── 1. TYPOGRAPHY ── */
 html, body, [class*="css"] {
     font-size: 15px !important;
@@ -371,7 +366,18 @@ hr { border: none !important; border-top: 1px solid #e2e8f0 !important; margin: 
 [data-testid="stSpinner"] > div {
     border-top-color: #2E7D32 !important;
 }
-</style>""", unsafe_allow_html=True)
+</style>"""
+
+
+# ── Page config ───────────────────────────────────────────────────────────────
+st.set_page_config(
+    page_title="VBSP-SCM | Tín dụng Nội bộ",
+    page_icon="🏦", layout="wide",
+    initial_sidebar_state="expanded",
+)
+
+# ── Global CSS (inject mỗi rerun — Streamlit xóa DOM sau mỗi lần click) ────────
+st.markdown(_get_global_css(), unsafe_allow_html=True)
 
 # ── Logo VBSP ────────────────────────────────────────────────────────────────
 

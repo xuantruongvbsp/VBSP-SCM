@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from datetime import datetime, date
 
+import duckdb
 import pandas as pd
 from dateutil.relativedelta import relativedelta
 
@@ -14,9 +15,12 @@ from config import (
 
 
 def du_phong_dong_tien(
-    df: pd.DataFrame,
+    df: pd.DataFrame | None = None,
     tu_thang: date | None = None,
     den_thang: date | None = None,
+    *,
+    parquet_path: str | None = None,
+    ten_pgd: str | None = None,
 ) -> pd.DataFrame:
     """
     Tính dòng tiền dự kiến thu nợ gốc theo tiến độ hợp đồng cho từng tháng.
@@ -25,131 +29,221 @@ def du_phong_dong_tien(
     phân bổ đều theo số tháng từ Ngày vay → Ngày ĐH theo Gia hạn.
     Chỉ tính các tháng nằm trong khoảng tu_thang → den_thang.
 
+    Ưu tiên parquet_path: DuckDB đọc thẳng từ Parquet, lọc PGD, mở rộng
+    tháng bằng UNNEST(RANGE()) — không load toàn bộ dữ liệu vào RAM.
+    Fallback df: DuckDB query trên in-memory DataFrame.
+
     Returns:
-        DataFrame với cột: thang, so_mon, tong_du_no, du_kien_thu_goc, du_no_th, du_no_qh
+        DataFrame với cột: thang, so_mon, tong_du_no, du_kien_thu_goc,
+                           du_kien_thu_goc_trieu, tong_du_no_trieu, thang_label
     """
-    if df.empty:
-        return pd.DataFrame()
-
-    need_cols = [COT_NGAY_VAY, COT_NGAY_DH, COT_MUC_VAY, COT_TONG_DU_NO]
-    missing = [c for c in need_cols if c not in df.columns]
-    if missing:
-        return pd.DataFrame()
-
-    df = df[df[COT_TONG_DU_NO] > 0].copy()
-    if len(df) == 0:
-        return pd.DataFrame()
-
-    df[COT_NGAY_VAY] = pd.to_datetime(df[COT_NGAY_VAY], dayfirst=True, errors="coerce")
-    df[COT_NGAY_DH] = pd.to_datetime(df[COT_NGAY_DH], dayfirst=True, errors="coerce")
-
-    df = df.dropna(subset=[COT_NGAY_VAY, COT_NGAY_DH])
-    df["_so_thang"] = (
-        (df[COT_NGAY_DH].dt.year - df[COT_NGAY_VAY].dt.year) * 12
-        + (df[COT_NGAY_DH].dt.month - df[COT_NGAY_VAY].dt.month)
-    ).clip(lower=1)
-
-    df["_goc_hang_thang"] = df[COT_MUC_VAY] / df["_so_thang"]
-
     hom_nay = datetime.now().date()
     if tu_thang is None:
         tu_thang = date(hom_nay.year, hom_nay.month, 1)
     if den_thang is None:
         den_thang = tu_thang + relativedelta(months=12)
 
-    thang_hien_tai = date(hom_nay.year, hom_nay.month, 1)
+    # ── Xây dựng nguồn dữ liệu cho DuckDB ──────────────────────────────
+    if parquet_path:
+        where_pgd = f'AND "{COT_TEN_PGD}" = \'{ten_pgd}\'' if ten_pgd else ""
+        src_clause = f"read_parquet('{parquet_path}')"
+        src_filter = f"{where_pgd}"
+        date_expr_vay = (
+            f"COALESCE("
+            f"TRY_CAST(\"{COT_NGAY_VAY}\" AS DATE),"
+            f"TRY_STRPTIME(CAST(\"{COT_NGAY_VAY}\" AS VARCHAR), '%d/%m/%Y')"
+            f")"
+        )
+        date_expr_dh = (
+            f"COALESCE("
+            f"TRY_CAST(\"{COT_NGAY_DH}\" AS DATE),"
+            f"TRY_STRPTIME(CAST(\"{COT_NGAY_DH}\" AS VARCHAR), '%d/%m/%Y')"
+            f")"
+        )
+    else:
+        if df is None or df.empty:
+            return pd.DataFrame()
+        need_cols = [COT_NGAY_VAY, COT_NGAY_DH, COT_MUC_VAY, COT_TONG_DU_NO]
+        if any(c not in df.columns for c in need_cols):
+            return pd.DataFrame()
+        # Chuẩn hoá ngày trước — DuckDB không parse dayfirst
+        df = df.copy()
+        df[COT_NGAY_VAY] = pd.to_datetime(df[COT_NGAY_VAY], dayfirst=True, errors="coerce")
+        df[COT_NGAY_DH]  = pd.to_datetime(df[COT_NGAY_DH],  dayfirst=True, errors="coerce")
+        con = duckdb.connect()
+        con.register("src_df", df)
+        src_clause  = "src_df"
+        src_filter  = ""
+        date_expr_vay = f"TRY_CAST(\"{COT_NGAY_VAY}\" AS DATE)"
+        date_expr_dh  = f"TRY_CAST(\"{COT_NGAY_DH}\"  AS DATE)"
 
-    records = []
-    for _, row in df.iterrows():
-        ngay_vay = row[COT_NGAY_VAY].date()
-        ngay_dh = row[COT_NGAY_DH].date()
-        goc_ht = row["_goc_hang_thang"]
-        du_no = row[COT_TONG_DU_NO]
+    sql = f"""
+        WITH base AS (
+            SELECT
+                COALESCE(CAST("{COT_SO_KU}"      AS VARCHAR), '') AS so_ku,
+                TRY_CAST("{COT_TONG_DU_NO}" AS DOUBLE)            AS tong_du_no,
+                {date_expr_vay}                                    AS ngay_vay,
+                {date_expr_dh}                                     AS ngay_dh,
+                TRY_CAST("{COT_MUC_VAY}"    AS DOUBLE)            AS muc_vay
+            FROM {src_clause}
+            WHERE TRY_CAST("{COT_TONG_DU_NO}" AS DOUBLE) > 0
+              {src_filter}
+        ),
+        calc AS (
+            SELECT *,
+                GREATEST(1, DATEDIFF('month', ngay_vay, ngay_dh)) AS so_thang,
+                muc_vay / GREATEST(1, DATEDIFF('month', ngay_vay, ngay_dh)) AS goc_ht
+            FROM base
+            WHERE ngay_vay IS NOT NULL AND ngay_dh IS NOT NULL
+        ),
+        expanded AS (
+            SELECT
+                DATE_TRUNC('month', ngay_vay + (i * INTERVAL '1 month'))::DATE AS thang,
+                so_ku, tong_du_no, goc_ht
+            FROM (SELECT *, UNNEST(RANGE(so_thang)) AS i FROM calc)
+        )
+        SELECT
+            thang,
+            COUNT(*)            AS so_mon,
+            SUM(tong_du_no)     AS tong_du_no,
+            SUM(goc_ht)         AS du_kien_thu_goc
+        FROM expanded
+        WHERE thang BETWEEN ? AND ?
+        GROUP BY thang
+        ORDER BY thang
+    """
 
-        for i in range(int(row["_so_thang"])):
-            thang_moc = ngay_vay + relativedelta(months=i)
-            thang_key = date(thang_moc.year, thang_moc.month, 1)
-
-            if thang_key < tu_thang or thang_key > den_thang:
-                continue
-
-            da_qua = thang_key <= thang_hien_tai
-
-            records.append({
-                "thang": thang_key,
-                "so_ku": row.get(COT_SO_KU, ""),
-                "ma_kh": row.get(COT_MA_KH, ""),
-                "ten_kh": row.get(COT_TEN_KH, ""),
-                "du_no_hien_tai": du_no,
-                "du_kien_thu_goc": goc_ht,
-                "da_qua": da_qua,
-            })
-
-    if not records:
+    try:
+        if parquet_path:
+            tong_hop = duckdb.execute(sql, [tu_thang, den_thang]).df()
+        else:
+            tong_hop = con.execute(sql, [tu_thang, den_thang]).df()
+    except Exception:
         return pd.DataFrame()
 
-    df_thang = pd.DataFrame(records)
-
-    tong_hop = df_thang.groupby("thang").agg(
-        so_mon=("so_ku", "count"),
-        tong_du_no=("du_no_hien_tai", "sum"),
-        du_kien_thu_goc=("du_kien_thu_goc", "sum"),
-    ).reset_index()
+    if tong_hop.empty:
+        return pd.DataFrame()
 
     tong_hop["du_kien_thu_goc_trieu"] = (tong_hop["du_kien_thu_goc"] / 1e6).round(1)
-    tong_hop["tong_du_no_trieu"] = (tong_hop["tong_du_no"] / 1e6).round(1)
-    tong_hop["thang_label"] = tong_hop["thang"].apply(lambda d: d.strftime("%m/%Y"))
-
+    tong_hop["tong_du_no_trieu"]       = (tong_hop["tong_du_no"]      / 1e6).round(1)
+    tong_hop["thang_label"]            = tong_hop["thang"].apply(lambda d: d.strftime("%m/%Y"))
     return tong_hop
 
 
 def du_phong_chi_tiet(
-    df: pd.DataFrame,
-    thang: date,
+    df: pd.DataFrame | None = None,
+    thang: date | None = None,
+    *,
+    parquet_path: str | None = None,
+    ten_pgd: str | None = None,
 ) -> pd.DataFrame:
-    """Danh sách chi tiết các khế ước đến hạn thu gốc trong tháng cụ thể."""
-    if df.empty:
+    """
+    Danh sách chi tiết các khế ước đến hạn thu gốc trong tháng cụ thể.
+
+    Ưu tiên parquet_path: DuckDB đọc thẳng từ Parquet với lọc PGD.
+    Fallback df: DuckDB query trên in-memory DataFrame.
+    """
+    if thang is None:
         return pd.DataFrame()
 
-    need_cols = [COT_NGAY_VAY, COT_NGAY_DH, COT_MUC_VAY, COT_TONG_DU_NO]
-    missing = [c for c in need_cols if c not in df.columns]
-    if missing:
+    thang_dau = date(thang.year, thang.month, 1)
+
+    # ── Xây dựng nguồn dữ liệu cho DuckDB ──────────────────────────────
+    if parquet_path:
+        where_pgd = f'AND "{COT_TEN_PGD}" = \'{ten_pgd}\'' if ten_pgd else ""
+        src_clause = f"read_parquet('{parquet_path}')"
+        src_filter = where_pgd
+        date_expr_vay = (
+            f"COALESCE("
+            f"TRY_CAST(\"{COT_NGAY_VAY}\" AS DATE),"
+            f"TRY_STRPTIME(CAST(\"{COT_NGAY_VAY}\" AS VARCHAR), '%d/%m/%Y')"
+            f")"
+        )
+        date_expr_dh = (
+            f"COALESCE("
+            f"TRY_CAST(\"{COT_NGAY_DH}\" AS DATE),"
+            f"TRY_STRPTIME(CAST(\"{COT_NGAY_DH}\" AS VARCHAR), '%d/%m/%Y')"
+            f")"
+        )
+    else:
+        if df is None or df.empty:
+            return pd.DataFrame()
+        need_cols = [COT_NGAY_VAY, COT_NGAY_DH, COT_MUC_VAY, COT_TONG_DU_NO]
+        if any(c not in df.columns for c in need_cols):
+            return pd.DataFrame()
+        df = df.copy()
+        df[COT_NGAY_VAY] = pd.to_datetime(df[COT_NGAY_VAY], dayfirst=True, errors="coerce")
+        df[COT_NGAY_DH]  = pd.to_datetime(df[COT_NGAY_DH],  dayfirst=True, errors="coerce")
+        con = duckdb.connect()
+        con.register("src_df", df)
+        src_clause  = "src_df"
+        src_filter  = ""
+        date_expr_vay = f"TRY_CAST(\"{COT_NGAY_VAY}\" AS DATE)"
+        date_expr_dh  = f"TRY_CAST(\"{COT_NGAY_DH}\"  AS DATE)"
+
+    # Các cột tuỳ chọn — chỉ select khi có trong nguồn
+    opt_cols = {
+        "ma_kh":   COT_MA_KH,
+        "ten_kh":  COT_TEN_KH,
+        "ten_pgd": COT_TEN_PGD,
+        "ten_xa":  COT_TEN_XA,
+        "ten_ct":  COT_TEN_CT,
+    }
+    # Luôn include tất cả — nếu cột không tồn tại DuckDB trả NULL
+    opt_select = "\n".join(
+        f"            COALESCE(CAST(\"{col}\" AS VARCHAR), '') AS {alias},"
+        for alias, col in opt_cols.items()
+    )
+
+    sql = f"""
+        WITH base AS (
+            SELECT
+                COALESCE(CAST("{COT_SO_KU}"      AS VARCHAR), '') AS so_ku,
+                {opt_select}
+                TRY_CAST("{COT_TONG_DU_NO}" AS DOUBLE)            AS tong_du_no,
+                {date_expr_vay}                                    AS ngay_vay,
+                {date_expr_dh}                                     AS ngay_dh,
+                TRY_CAST("{COT_MUC_VAY}"    AS DOUBLE)            AS muc_vay
+            FROM {src_clause}
+            WHERE TRY_CAST("{COT_TONG_DU_NO}" AS DOUBLE) > 0
+              {src_filter}
+        ),
+        calc AS (
+            SELECT *,
+                GREATEST(1, DATEDIFF('month', ngay_vay, ngay_dh)) AS so_thang,
+                muc_vay / GREATEST(1, DATEDIFF('month', ngay_vay, ngay_dh)) AS goc_ht
+            FROM base
+            WHERE ngay_vay IS NOT NULL AND ngay_dh IS NOT NULL
+        ),
+        expanded AS (
+            SELECT
+                DATE_TRUNC('month', ngay_vay + (i * INTERVAL '1 month'))::DATE AS thang_exp,
+                so_ku, ma_kh, ten_kh, ten_pgd, ten_xa, ten_ct,
+                tong_du_no, goc_ht, ngay_vay, ngay_dh
+            FROM (SELECT *, UNNEST(RANGE(so_thang)) AS i FROM calc)
+        )
+        SELECT
+            so_ku, ma_kh, ten_kh, ten_pgd, ten_xa, ten_ct,
+            tong_du_no                                    AS du_no,
+            goc_ht                                        AS goc_hang_thang,
+            strftime(ngay_vay, '%d/%m/%Y')                AS ngay_vay,
+            strftime(ngay_dh,  '%d/%m/%Y')                AS ngay_dh
+        FROM expanded
+        WHERE thang_exp = ?
+        ORDER BY so_ku
+    """
+
+    try:
+        if parquet_path:
+            df_ct = duckdb.execute(sql, [thang_dau]).df()
+        else:
+            df_ct = con.execute(sql, [thang_dau]).df()
+    except Exception:
         return pd.DataFrame()
 
-    df = df[df[COT_TONG_DU_NO] > 0].copy()
-    df[COT_NGAY_VAY] = pd.to_datetime(df[COT_NGAY_VAY], dayfirst=True, errors="coerce")
-    df[COT_NGAY_DH] = pd.to_datetime(df[COT_NGAY_DH], dayfirst=True, errors="coerce")
-    df = df.dropna(subset=[COT_NGAY_VAY, COT_NGAY_DH])
-
-    results = []
-    for _, row in df.iterrows():
-        ngay_vay = row[COT_NGAY_VAY].date()
-        ngay_dh = row[COT_NGAY_DH].date()
-        so_thang = max(1, (ngay_dh.year - ngay_vay.year) * 12 + (ngay_dh.month - ngay_vay.month))
-        goc_ht = row[COT_MUC_VAY] / so_thang
-
-        for i in range(so_thang):
-            thang_moc = ngay_vay + relativedelta(months=i)
-            thang_key = date(thang_moc.year, thang_moc.month, 1)
-            if thang_key == thang:
-                results.append({
-                    "so_ku": row.get(COT_SO_KU, ""),
-                    "ma_kh": row.get(COT_MA_KH, ""),
-                    "ten_kh": row.get(COT_TEN_KH, ""),
-                    "ten_pgd": row.get(COT_TEN_PGD, ""),
-                    "ten_xa": row.get(COT_TEN_XA, ""),
-                    "ten_ct": row.get(COT_TEN_CT, ""),
-                    "du_no": row[COT_TONG_DU_NO],
-                    "goc_hang_thang": goc_ht,
-                    "ngay_vay": ngay_vay.strftime("%d/%m/%Y"),
-                    "ngay_dh": ngay_dh.strftime("%d/%m/%Y"),
-                })
-                break
-
-    if not results:
+    if df_ct.empty:
         return pd.DataFrame()
 
-    df_ct = pd.DataFrame(results)
-    df_ct["du_no_trieu"] = (df_ct["du_no"] / 1e6).round(1)
+    df_ct["du_no_trieu"]  = (df_ct["du_no"]          / 1e6).round(1)
     df_ct["goc_ht_trieu"] = (df_ct["goc_hang_thang"] / 1e6).round(1)
     return df_ct

@@ -17,6 +17,7 @@ from config import (
     COT_MA_CHUONG_TRINH,
     COT_NGUON_VON,
     COT_TONG_DU_NO,
+    COT_TEN_PGD,
     DS_PGD,
     DON_VI_CHI_NHANH,
     GQVL_MA_KEY_GIAO,
@@ -153,42 +154,73 @@ def lay_kh_dot_truoc(
     return out
 
 
-def tinh_kh_dau_nam(df_hstd: pd.DataFrame) -> dict[str, dict[str, float]]:
-    """Tổng dư nợ HSTD theo ma_key (VND). Thiếu cột → {}."""
-    try:
-        if df_hstd is None or df_hstd.empty:
-            return {}
-        if (
-            COT_MA_CHUONG_TRINH not in df_hstd.columns
-            or COT_NGUON_VON not in df_hstd.columns
-            or COT_TONG_DU_NO not in df_hstd.columns
-        ):
-            return {}
+def tinh_kh_dau_nam(
+    df_hstd: pd.DataFrame | None = None,
+    *,
+    parquet_path: str | None = None,
+    ten_pgd: str | None = None,
+) -> dict[str, dict[str, float]]:
+    """
+    Tổng dư nợ HSTD theo ma_key (VND). Thiếu cột → {}.
 
-        g = (
-            df_hstd.groupby([COT_MA_CHUONG_TRINH, COT_NGUON_VON], dropna=False)[
-                COT_TONG_DU_NO
+    Ưu tiên parquet_path: DuckDB đọc thẳng từ file, lọc PGD ngay trong SQL.
+    Fallback df_hstd: DuckDB query trên in-memory DataFrame.
+    """
+    import duckdb
+
+    try:
+        if parquet_path:
+            where_parts = [
+                f'"{COT_MA_CHUONG_TRINH}" IS NOT NULL',
+                f'"{COT_NGUON_VON}" IS NOT NULL',
             ]
-            .sum()
-            .reset_index()
-        )
+            params: list = []
+            if ten_pgd:
+                where_parts.append(f'"{COT_TEN_PGD}" = ?')
+                params.append(ten_pgd)
+            sql = f"""
+                SELECT
+                    TRY_CAST("{COT_MA_CHUONG_TRINH}" AS INTEGER) AS ma_ct,
+                    TRY_CAST("{COT_NGUON_VON}"        AS INTEGER) AS nv,
+                    SUM(COALESCE(TRY_CAST("{COT_TONG_DU_NO}" AS DOUBLE), 0)) AS tong_vnd
+                FROM read_parquet('{parquet_path}')
+                WHERE {" AND ".join(where_parts)}
+                GROUP BY ma_ct, nv
+            """
+            rows = duckdb.execute(sql, params).fetchall()
+        else:
+            if df_hstd is None or df_hstd.empty:
+                return {}
+            missing = {COT_MA_CHUONG_TRINH, COT_NGUON_VON, COT_TONG_DU_NO} - set(df_hstd.columns)
+            if missing:
+                return {}
+            con = duckdb.connect()
+            con.register("t", df_hstd)
+            sql = f"""
+                SELECT
+                    TRY_CAST("{COT_MA_CHUONG_TRINH}" AS INTEGER) AS ma_ct,
+                    TRY_CAST("{COT_NGUON_VON}"        AS INTEGER) AS nv,
+                    SUM(COALESCE(TRY_CAST("{COT_TONG_DU_NO}" AS DOUBLE), 0)) AS tong_vnd
+                FROM t
+                WHERE "{COT_MA_CHUONG_TRINH}" IS NOT NULL
+                  AND "{COT_NGUON_VON}" IS NOT NULL
+                GROUP BY ma_ct, nv
+            """
+            rows = con.execute(sql).fetchall()
+
         out: dict[str, dict[str, float]] = {}
-        for _, row in g.iterrows():
-            try:
-                ma_ct = int(float(row[COT_MA_CHUONG_TRINH]))
-                nv = int(float(row[COT_NGUON_VON]))
-            except (TypeError, ValueError):
+        for ma_ct, nv, tong_vnd in rows:
+            if ma_ct is None or nv is None:
                 continue
-            mk = _LOOKUP_MA_KEY.get((ma_ct, nv))
+            mk = _LOOKUP_MA_KEY.get((int(ma_ct), int(nv)))
             if not mk:
                 continue
-            tong_vnd = float(pd.to_numeric(row[COT_TONG_DU_NO], errors="coerce") or 0.0)
             if mk not in out:
                 out[mk] = {"kh_moi_tw": 0.0, "kh_moi_dp": 0.0}
-            if nv == 1:
-                out[mk]["kh_moi_tw"] += tong_vnd
-            elif nv == 2:
-                out[mk]["kh_moi_dp"] += tong_vnd
+            if int(nv) == 1:
+                out[mk]["kh_moi_tw"] += float(tong_vnd or 0.0)
+            elif int(nv) == 2:
+                out[mk]["kh_moi_dp"] += float(tong_vnd or 0.0)
         return out
     except Exception:
         return {}
@@ -580,9 +612,11 @@ def duyet(
 def tao_dot_giao_dau_nam(
     nam: int,
     username: str,
-    df_hstd: pd.DataFrame,
+    df_hstd: pd.DataFrame | None = None,
+    *,
+    parquet_path: str | None = None,
 ) -> dict[str, KetQuaUpload]:
-    kh_base = tinh_kh_dau_nam(df_hstd)
+    kh_base = tinh_kh_dau_nam(df_hstd, parquet_path=parquet_path)
     loi_chung = KetQuaUpload(
         False,
         "❌ Không tính được KH đầu năm từ HSTD (thiếu cột hoặc không có dữ liệu).",

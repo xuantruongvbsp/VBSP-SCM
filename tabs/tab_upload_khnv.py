@@ -682,9 +682,12 @@ def _xu_ly_import_folder(danh_sach: list[dict], username: str) -> None:
 
     st.session_state.pop("folder_scan_result", None)
     st.session_state.pop("folder_scan_meta", None)
-    st.session_state.pop("khnv_bulk_upload", None)
+    # Reset file_uploader bằng cách tăng version → widget recreate rỗng
+    st.session_state["khnv_bulk_uploader_ver"] = (
+        st.session_state.get("khnv_bulk_uploader_ver", 0) + 1
+    )
     st.session_state.pop("khnv_bulk_bytes", None)
-    st.session_state.pop("khnv_bulk_names", None)
+    st.session_state.pop("khnv_bulk_ids", None)
     st.rerun()
 
 
@@ -704,11 +707,15 @@ def _render_upload_hang_loat(role: str, username: str) -> None:
         )
 
         # ── Multi-file uploader ───────────────────────────────────────
+        # Dùng version counter để reset widget sau import thành công.
+        # Streamlit không cho xóa session_state key của widget trực tiếp;
+        # cách duy nhất reset file_uploader là thay đổi key của nó.
+        _ver = st.session_state.setdefault("khnv_bulk_uploader_ver", 0)
         uploaded = st.file_uploader(
             "Chọn file",
             type=["xlsx", "xls"],
             accept_multiple_files=True,
-            key="khnv_bulk_upload",
+            key=f"khnv_bulk_upload_{_ver}",
             label_visibility="collapsed",
         )
 

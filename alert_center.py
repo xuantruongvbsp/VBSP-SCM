@@ -42,13 +42,23 @@ def _kiem_tra_upload_tre() -> list[str]:
     return canh_bao
 
 
+_KHD_CACHE_TTL = 300  # 5 phút
+
+
 def _kiem_tra_khong_hoat_dong(df_full, pgd_filter: str | None = None) -> list[str]:
     """
     Trả về danh sách cảnh báo hộ 3 tháng không hoạt động.
-    Dùng hàm tong_hop_khong_hd() từ hstd.py.
+    Kết quả cache 5 phút trong session_state — tránh tính lại toàn bộ HSTD mỗi rerun.
     """
     if df_full is None or df_full.empty:
         return []
+
+    cache_key = f"_alert_khd_{pgd_filter or 'all'}"
+    now = datetime.now()
+    cached = st.session_state.get(cache_key)
+    if cached and (now - cached["ts"]).total_seconds() < _KHD_CACHE_TTL:
+        return cached["data"]
+
     try:
         from hstd import tong_hop_khong_hd
         from config import COT_TEN_PGD
@@ -57,13 +67,15 @@ def _kiem_tra_khong_hoat_dong(df_full, pgd_filter: str | None = None) -> list[st
             df_loc = df_full[df_full[COT_TEN_PGD] == pgd_filter]
         tong_hop = tong_hop_khong_hd(df_loc, nhom_theo=COT_TEN_PGD)
         if tong_hop.empty:
-            return []
-        tong_mon = int(tong_hop["Món_3m_KHĐ"].sum())
-        if tong_mon > 0:
-            return [f"**{tong_mon} món vay** ≥ 3 tháng không hoạt động"]
-        return []
+            result: list[str] = []
+        else:
+            tong_mon = int(tong_hop["Món_3m_KHĐ"].sum())
+            result = [f"**{tong_mon} món vay** ≥ 3 tháng không hoạt động"] if tong_mon > 0 else []
     except Exception:
-        return []
+        result = []
+
+    st.session_state[cache_key] = {"data": result, "ts": now}
+    return result
 
 
 def render_alert_sidebar(

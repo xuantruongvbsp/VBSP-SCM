@@ -1110,42 +1110,13 @@ def render(**kwargs):
     st.title("📋 Phòng KH-NV")
     st.caption("Giám sát chỉ tiêu · Cân đối vốn · Quản lý NQH · GQVL · Quản lý CBTD")
 
-    # ── BƯỚC 1: Xây danh sách tất cả menu items ───────────────────────────
-    ALL_ITEMS = [
-        {"group": "Giám sát",     "label": "Tổng quan CN",            "icon": "chart-bar",      "fn": lambda: tab_tongquan.render(None, **kwargs)},
-        {"group": "Giám sát",     "label": "Tiến độ Công việc",       "icon": "calendar",       "fn": lambda: tab_tien_do.render(None, **kwargs)},
-        {"group": "Giám sát",     "label": "Tiến độ PGD",             "icon": "file",           "fn": lambda: tab_tien_do_nop.render(None, **kwargs)},
-        {"group": "Giám sát",     "label": "Cảnh báo NQH",            "icon": "alert-triangle", "fn": lambda: _render_canh_bao_no(df_full, ds_pgd_all, role, kwargs.get("username", "unknown"))},
-        {"group": "Giám sát",     "label": "Giao & Theo dõi Nhiệm vụ","icon": "check",          "fn": lambda: tab_nhiem_vu.render(None, **kwargs)},
-        {"group": "Giám sát",     "label": "So sánh kỳ",              "icon": "chart-line",     "fn": lambda: _tab_so_sanh_ky_fn(**kwargs)},
-        {"group": "Kiểm soát",    "label": "Kiểm soát nội bộ",        "icon": "search",         "fn": lambda: tab_kiem_soat.render_tab(df_full, role, kwargs.get("username", "unknown"))},
-        {"group": "Kiểm soát",    "label": "Xử lý nợ rủi ro",        "icon": "alert-circle",   "fn": lambda: tab_xlrr_tong_hop.render(None, **kwargs)},
-        {"group": "Kiểm soát",    "label": "Cán bộ tín dụng",         "icon": "user",           "fn": lambda: tab_cbtd.render(None, **kwargs)},
-        {"group": "Kiểm soát",    "label": "Tập trung rủi ro & HHI",  "icon": "chart-pie",      "fn": lambda: tab_hhi.render(None, **kwargs)},
-        {"group": "Kiểm soát",    "label": "Nợ khoanh",                "icon": "lock",           "fn": lambda: tab_no_khoanh.render(None, **kwargs)},
-        {"group": "Kế hoạch và Thực hiện KHTD", "label": "Kế hoạch tín dụng",   "icon": "file-text",  "fn": lambda: tab_khtd.render(None, **dict(kwargs, khtd_mode="cn"))},
-        {"group": "Kế hoạch và Thực hiện KHTD", "label": "Giao & Điều chỉnh KH","icon": "upload",     "fn": lambda: tab_khtd_giao_dc.render(None, **kwargs)},
-        {"group": "Kế hoạch và Thực hiện KHTD", "label": "Cân đối - Điện báo",  "icon": "chart-line", "fn": lambda: tab_kehoach.render(None, **kwargs)},
-        {"group": "Kế hoạch và Thực hiện KHTD", "label": "Điện báo",            "icon": "antenna",    "fn": lambda: tab_candoi.render(None, **kwargs)},
-        {"group": "Báo cáo",      "label": "Báo cáo tín dụng",        "icon": "file",           "fn": lambda: tab_baocao.render(None, **kwargs)},
-        {"group": "Báo cáo",      "label": "Checklist định kỳ",       "icon": "calendar-check", "fn": lambda: tab_checklist_bc.render(None, **kwargs)},
-        {"group": "Ủy Thác",      "label": "Ban Đại Diện HĐQT",       "icon": "building",       "fn": lambda: tab_ban_dai_dien.render(None, cap="tinh", **kwargs)},
-        {"group": "Ủy Thác",      "label": "Ủy thác CT-XH",           "icon": "handshake",      "fn": lambda: tab_uy_thac.render(None, **kwargs)},
-        {"group": "Ủy Thác",      "label": "Điểm GD & Tổ TK&VV",     "icon": "map-pin",        "fn": lambda: _render_dgd_to_tkvv(None, **kwargs)},
-    ]
+    # ── Dùng lại _build_all_items thay vì duplicate list ─────────────────
+    ALL_ITEMS = _build_all_items(
+        role, kwargs.get("username", "unknown"),
+        can_upload=can_upload, **kwargs
+    )
 
-    # Thêm theo điều kiện (giống logic cũ)
-    if can_upload:
-        ALL_ITEMS.append({"group": "Hệ thống", "label": "Template văn bản", "icon": "template", "fn": lambda: _render_quan_ly_template(df_full)})
-    if role_n in ("admin_cn", "manager_cn"):
-        ALL_ITEMS.append({"group": "Hệ thống", "label": "Mã NĐT địa phương", "icon": "building-bank", "fn": lambda: _render_ndt_dp(role_n, kwargs.get("username", "unknown"))})
-    if role_n == "admin_cn":
-        ALL_ITEMS.append({"group": "Hệ thống", "label": "Nhật ký hệ thống", "icon": "list", "fn": lambda: tab_audit_log.render(None, **kwargs)})
-    ALL_ITEMS.append({"group": "Hệ thống", "label": "Trạng thái hệ thống", "icon": "pulse", "fn": lambda: tab_trang_thai_nguon.render(None, **kwargs)})
-    ALL_ITEMS.append({"group": "Hệ thống", "label": "Upload dữ liệu", "icon": "upload", "fn": lambda: tab_upload_khnv.render(None, **kwargs)})
-    ALL_ITEMS.append({"group": "Hệ thống", "label": "Hướng dẫn", "icon": "book", "fn": lambda: render_huong_dan()})
-
-    # ── Navigation lazy: Nhóm → Mục → chỉ render mục được chọn ───────────
+    # ── Navigation: điều hướng hoàn toàn qua sidebar (render_sidebar_menu) ──
     valid_labels = [x["label"] for x in ALL_ITEMS]
 
     # Handle jump từ shortcut / nút điều hướng ngoài ws_management
@@ -1161,52 +1132,8 @@ def render(**kwargs):
 
     active_label = st.session_state["ws_mgmt_menu"]
 
-    # Nhóm thứ tự xuất hiện đầu tiên (giữ thứ tự)
-    groups_ordered = list(dict.fromkeys(x["group"] for x in ALL_ITEMS))
-    active_group = next(
-        (x["group"] for x in ALL_ITEMS if x["label"] == active_label),
-        groups_ordered[0],
-    )
-
-    # ── Level 1: radio chọn nhóm ──────────────────────────────────────────
-    # Đồng bộ với sidebar (sidebar đã set ws_mgmt_menu → suy ra active_group)
-    st.session_state["ws_mgmt_group_radio"] = active_group
-    sel_group = st.radio(
-        "Nhóm",
-        groups_ordered,
-        horizontal=True,
-        key="ws_mgmt_group_radio",
-        label_visibility="collapsed",
-    )
-
-    # ── Level 2: radio chọn mục trong nhóm ───────────────────────────────
-    items_in_group = [x for x in ALL_ITEMS if x["group"] == sel_group]
-    item_labels    = [x["label"] for x in items_in_group]
-    item_key       = f"ws_mgmt_item_{sel_group}"
-
-    # Pre-select item nếu đến từ sidebar hoặc jump
-    if active_label in item_labels:
-        st.session_state[item_key] = item_labels.index(active_label)
-    elif item_key not in st.session_state:
-        st.session_state[item_key] = 0
-
-    sel_idx = st.radio(
-        "Mục",
-        range(len(item_labels)),
-        format_func=lambda i: item_labels[i],
-        horizontal=True,
-        key=item_key,
-        label_visibility="collapsed",
-    )
-    sel_label = item_labels[sel_idx]
-
-    # Ghi ngược lại ws_mgmt_menu để sidebar highlight đúng
-    st.session_state["ws_mgmt_menu"] = sel_label
-
-    st.divider()
-
     # ── Render DUY NHẤT mục đang chọn ────────────────────────────────────
-    active_item = next((x for x in ALL_ITEMS if x["label"] == sel_label), None)
+    active_item = next((x for x in ALL_ITEMS if x["label"] == active_label), None)
     if active_item:
         fn = active_item.get("fn")
         if callable(fn):
@@ -1214,7 +1141,7 @@ def render(**kwargs):
                 fn()
             except Exception as e:
                 import traceback
-                st.error(f"❌ Lỗi render **{sel_label}**: {e}")
+                st.error(f"❌ Lỗi render **{active_label}**: {e}")
                 st.code(traceback.format_exc())
         else:
-            st.info(f"Tính năng **{sel_label}** đang được phát triển.")
+            st.info(f"Tính năng **{active_label}** đang được phát triển.")

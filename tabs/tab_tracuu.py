@@ -135,6 +135,93 @@ def _nv_str(val) -> str:
     return NGUON_VON_LABEL.get(val, NGUON_VON_LABEL.get(str(val), str(val)))
 
 
+_NHOM_TRUONG = {
+    "👤 Khách hàng": [
+        "Họ tên khách hàng", "Mã khách hàng", "CMND/CCCD", "Ngày sinh",
+        "Giới tính", "Số điện thoại", "Địa chỉ", "Dân tộc",
+        "Tên HSSV", "Tên vợ/chồng",
+    ],
+    "📄 Khoản vay": [
+        "Số khế ước", "Mã khế ước", "Ngày vay", "Ngày ĐH theo Gia hạn",
+        "Ngày ĐH theo hợp đồng", "Ngày đáo hạn", "Thời hạn vay",
+        "Lãi suất", "Mức vay", "Mã món vay", "Số tiền giải ngân",
+    ],
+    "💰 Dư nợ & Tài chính": [
+        "Tổng dư nợ", "Dư nợ trong hạn", "Dư nợ quá hạn",
+        "Dư nợ khoanh", "Gốc đã trả", "Lãi đã trả",
+        "Lãi tồn", "Lãi DT trong tháng", "Lãi tồn TH",
+        "Giải ngân trong năm", "Thu nợ trong năm",
+    ],
+    "📋 Đơn vị & Chương trình": [
+        "Tên PGD", "Tên xã", "Tên thôn", "Tên ĐVUT", "Tên tổ",
+        "Tên chương trình", "Mã chương trình", "Nguồn vốn",
+        "Mã nhà đầu tư", "Tên cấp QLV",
+    ],
+    "⚙️ Trạng thái & Phân loại": [
+        "Tình trạng món vay", "Phân loại", "Phân loại NV",
+        "Ngày số liệu", "Ngày giao dịch gần nhất",
+    ],
+}
+
+
+def _render_full_record(hs: pd.Series) -> None:
+    """
+    Hiển thị toàn bộ trường dữ liệu gốc của 1 hồ sơ,
+    phân nhóm theo nghiệp vụ VBSP.
+    """
+    da_hien = set()
+    nhom_con_lai = {}
+
+    for ten_nhom, cac_cot in _NHOM_TRUONG.items():
+        cac_cot_ton_tai = []
+        for cot in cac_cot:
+            tim = _tim_cot_trong_series(hs, cot)
+            if tim:
+                cac_cot_ton_tai.append(tim)
+                da_hien.add(tim)
+        if cac_cot_ton_tai:
+            nhom_con_lai[ten_nhom] = cac_cot_ton_tai
+
+    # Thu thập các cột chưa phân nhóm
+    cac_cot_khac = [c for c in hs.index if c not in da_hien and pd.notna(hs[c]) and str(hs[c]).strip() not in ("", "nan")]
+    if cac_cot_khac:
+        nhom_con_lai["📋 Khác"] = cac_cot_khac
+
+    for ten_nhom, cac_cot in nhom_con_lai.items():
+        st.markdown(f"**{ten_nhom}**")
+        rows = []
+        for cot in cac_cot:
+            v = hs.get(cot)
+            if pd.isna(v) or str(v).strip() in ("", "nan"):
+                continue
+            s = str(v).strip()
+            if len(s) > 80:
+                s = s[:80] + "..."
+            rows.append((cot, s))
+
+        if rows:
+            html = '<div style="display:grid;grid-template-columns:140px 1fr;gap:2px 10px;font-size:0.82rem;padding:4px 0 10px 8px">'
+            for lbl, val in rows:
+                html += (
+                    f'<span style="color:#666;font-weight:500">{lbl}</span>'
+                    f'<span style="color:#111">{val}</span>'
+                )
+            html += "</div>"
+            st.markdown(html, unsafe_allow_html=True)
+
+
+def _tim_cot_trong_series(hs: pd.Series, cot_mong_muon: str) -> str | None:
+    """Tìm cột trong Series: khớp chính xác trước, sau đó fuzzy."""
+    if cot_mong_muon in hs.index:
+        return cot_mong_muon
+    kl = cot_mong_muon.lower().replace(" ", "").replace("_", "")
+    for c in hs.index:
+        cl = c.lower().replace(" ", "").replace("_", "")
+        if cl == kl or cot_mong_muon.lower() in c.lower() or c.lower() in cot_mong_muon.lower():
+            return c
+    return None
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # CARD CHI TIẾT
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -232,6 +319,10 @@ def _render_card(
             )
         else:
             st.caption("**Dư nợ quá hạn:** —")
+
+    # ── Xem toàn bộ hồ sơ gốc ─────────────────────────────────────────
+    with st.expander("📋 Xem toàn bộ hồ sơ gốc (tất cả trường dữ liệu)", expanded=False):
+        _render_full_record(hs)
 
     # Chi tiết NQ11 từ file NQ11
     if nq11 and df_nq11 is not None and len(df_nq11):

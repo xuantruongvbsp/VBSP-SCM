@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [2026-05-16] — Port PeriodOverview.tsx: 8 KPI, growth chart, flow diagram, quality bars
+- `tabs/tab_so_sanh_ky.py` — KPI 4→8 cards (2 hàng: tăng trưởng + rủi ro)
+- `tabs/tab_so_sanh_ky.py` — Thêm `_chart_tang_truong()`: grouped bar Altair theo chương trình/nguồn vốn/xã
+- `tabs/tab_so_sanh_ky.py` — Thêm `_flow_diagram()`: visual flow boxes vòng đời KU và KH
+- `tabs/tab_so_sanh_ky.py` — Thêm `_quality_bars()`: stacked bar Trong hạn/Quá hạn/Khoanh 2 kỳ
+- `tabs/tab_so_sanh_ky.py` — Import thêm COT_LAI_TON, COT_TEN_CT, COT_NGUON_VON, COT_TEN_XA, altair
+
 ## [2026-05-16] — Mở rộng KPI cards từ 4 lên 8: thêm Số KU, DN khoanh, Lãi tồn TH, Mức vay BQ
 - `tabs/tab_so_sanh_ky.py` — Thêm hàng KPI thứ 2 (k5–k8): Số KU, Dư nợ khoanh, Lãi tồn TH, Mức vay BQ/hộ
 - `tabs/tab_so_sanh_ky.py` — `_agg_mot_pgd()` cập nhật tính thêm `lai_ton`, `muc_vay_bq`

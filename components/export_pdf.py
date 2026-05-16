@@ -55,6 +55,74 @@ VBSP_GREEN_LIGHT = colors.HexColor("#E8F5E9")
 ROW_ALT = colors.HexColor("#F5F5F5")
 BORDER_COLOR = colors.HexColor("#BDBDBD")
 
+LOGO_CANDIDATES = [
+    Path(__file__).parent.parent / "assets" / "logo.png",
+    Path(__file__).parent.parent / "logo.png",
+    Path(__file__).parent.parent / "logo-vbsp.jpg",
+]
+
+
+def _tim_logo() -> str | None:
+    for p in LOGO_CANDIDATES:
+        if p.exists():
+            return str(p)
+    return None
+
+
+def _ve_header(elements: list, tieu_de: str, nguoi_xuat: str, usable_w: float):
+    """Vẽ header báo cáo PDF: logo NHCSXH + tiêu đề + meta."""
+    from reportlab.platypus import Table as RLTable
+
+    logo_path = _tim_logo()
+    style_bank = ParagraphStyle(
+        "BankName", fontName=FONT_BOLD, fontSize=11,
+        alignment=TA_CENTER, leading=15,
+    )
+    style_branch = ParagraphStyle(
+        "BranchName", fontName=FONT_NORMAL, fontSize=9,
+        alignment=TA_CENTER, leading=12, spaceAfter=2,
+    )
+    style_meta = ParagraphStyle(
+        "Meta", fontName=FONT_NORMAL, fontSize=8,
+        alignment=TA_CENTER, textColor=colors.gray, spaceAfter=6,
+    )
+    style_report_title = ParagraphStyle(
+        "ReportTitle", fontName=FONT_BOLD, fontSize=13,
+        alignment=TA_CENTER, textColor=VBSP_GREEN, spaceAfter=6,
+    )
+
+    bank_text = ("NGÂN HÀNG CHÍNH SÁCH XÃ HỘI VIỆT NAM<br/>"
+                 "<font size='9'>Chi nhánh tỉnh Đồng Nai</font>")
+
+    if logo_path:
+        try:
+            logo = RLImage(logo_path, width=2.0 * cm, height=2.0 * cm)
+            header_tbl = RLTable(
+                [[logo, Paragraph(bank_text, style_bank)]],
+                colWidths=[2.4 * cm, usable_w - 2.4 * cm],
+            )
+            header_tbl.setStyle(TableStyle([
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+            ]))
+            elements.append(header_tbl)
+        except Exception:
+            elements.append(Paragraph(bank_text, style_bank))
+    else:
+        elements.append(Paragraph(bank_text, style_bank))
+
+    elements.append(HRFlowable(
+        width="100%", thickness=1.5, color=VBSP_GREEN, spaceAfter=4,
+    ))
+    elements.append(Paragraph(tieu_de.upper(), style_report_title))
+    now_str = datetime.now().strftime("%d/%m/%Y %H:%M")
+    elements.append(Paragraph(
+        f"Ngày xuất: {now_str}  |  Người xuất: {nguoi_xuat}",
+        style_meta,
+    ))
+    elements.append(Spacer(1, 4))
+
 
 def fig_to_bytes(fig: go.Figure, width: int = 800, height: int = 400) -> bytes | None:
     """Chuyển Plotly figure thành PNG bytes để nhúng vào PDF."""
@@ -142,12 +210,10 @@ def xuat_pdf_co_chart(
 
     elements = []
 
-    # ── Header ──
-    elements.append(Paragraph(tieu_de, style_title))
-    if them_ngay_xuat:
-        now_str = datetime.now().strftime("%d/%m/%Y %H:%M")
-        elements.append(Paragraph(f"Ngày xuất: {now_str} · Người xuất: {nguoi_xuat}", style_sub))
-    elements.append(Spacer(1, 6))
+    # ── Header (Logo NHCSXH + Tiêu đề) ──
+    margin = 1.5 * cm
+    usable_w = page_size[0] - 2 * margin
+    _ve_header(elements, tieu_de, nguoi_xuat, usable_w)
 
     # ── Biểu đồ ──
     if figs:

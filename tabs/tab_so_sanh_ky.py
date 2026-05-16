@@ -11,6 +11,7 @@ from auth import la_phan_he_cn, normalize_role
 from config import (
     COT_DU_NO_QH,
     COT_DU_NO_TH,
+    COT_LAI_TON,
     COT_MA_KH,
     COT_NGAY_SL,
     COT_NGAY_VAY,
@@ -50,14 +51,18 @@ def _agg_mot_pgd(df: pd.DataFrame) -> dict:
             "du_no_khoanh": 0, "so_ho": 0, "so_ku": 0, "gn_nam": 0,
         }
     col_gn = next((c for c in HSTD_DS_CHO_VAY_NAM_ALIASES if c in df.columns), None)
+    tong_dn = df[COT_TONG_DU_NO].sum() if COT_TONG_DU_NO in df.columns else 0
+    so_ho   = int(df[COT_MA_KH].nunique()) if COT_MA_KH in df.columns else 0
     return {
-        "tong_du_no":    df[COT_TONG_DU_NO].sum() if COT_TONG_DU_NO in df.columns else 0,
+        "tong_du_no":    tong_dn,
         "du_no_th":      df[COT_DU_NO_TH].sum()   if COT_DU_NO_TH   in df.columns else 0,
         "du_no_qh":      df[COT_DU_NO_QH].sum()   if COT_DU_NO_QH   in df.columns else 0,
         "du_no_khoanh":  df[COT_DU_NO_KHOANH].sum() if COT_DU_NO_KHOANH in df.columns else 0,
-        "so_ho":         int(df[COT_MA_KH].nunique()) if COT_MA_KH in df.columns else 0,
+        "so_ho":         so_ho,
         "so_ku":         int(df[COT_SO_KU].nunique()) if COT_SO_KU in df.columns else 0,
         "gn_nam":        df[col_gn].sum() if col_gn else 0,
+        "lai_ton":       df[COT_LAI_TON].sum() if COT_LAI_TON in df.columns else 0,
+        "muc_vay_bq":    (tong_dn / so_ho) if so_ho > 0 else 0,
     }
 
 
@@ -446,6 +451,34 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
             fmt_so(agg_ht["so_ho"]),
             delta=_delta_str(agg_ht["so_ho"], agg_bl["so_ho"], unit="so"),
             help=f"Mốc 31/12/{chon_nam}: {fmt_so(agg_bl['so_ho'])}",
+        )
+
+        k5, k6, k7, k8 = st.columns(4)
+        k5.metric(
+            "Số khế ước",
+            fmt_so(agg_ht["so_ku"]),
+            delta=_delta_str(agg_ht["so_ku"], agg_bl["so_ku"], unit="so"),
+            help=f"Mốc 31/12/{chon_nam}: {fmt_so(agg_bl['so_ku'])}",
+        )
+        k6.metric(
+            "Dư nợ khoanh",
+            fmt_ty(agg_ht["du_no_khoanh"]),
+            delta=_delta_str(agg_ht["du_no_khoanh"], agg_bl["du_no_khoanh"]),
+            delta_color="inverse",
+            help=f"Mốc 31/12/{chon_nam}: {fmt_ty(agg_bl['du_no_khoanh'])}",
+        )
+        k7.metric(
+            "Lãi tồn TH",
+            fmt_ty(agg_ht["lai_ton"]),
+            delta=_delta_str(agg_ht["lai_ton"], agg_bl["lai_ton"]),
+            delta_color="inverse",
+            help=f"Mốc 31/12/{chon_nam}: {fmt_ty(agg_bl['lai_ton'])}",
+        )
+        k8.metric(
+            "Mức vay BQ / hộ",
+            fmt_ty(agg_ht["muc_vay_bq"]),
+            delta=_delta_str(agg_ht["muc_vay_bq"], agg_bl["muc_vay_bq"]),
+            help=f"Mốc 31/12/{chon_nam}: {fmt_ty(agg_bl['muc_vay_bq'])}",
         )
 
         st.divider()

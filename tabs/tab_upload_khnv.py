@@ -21,7 +21,10 @@ import streamlit as st
 
 import db
 from auth import la_phan_he_cn, normalize_role
-from config import DS_PGD, DON_VI_CHI_NHANH, MA_PGD_MAP
+from config import (
+    DS_PGD, DON_VI_CHI_NHANH, MA_PGD_MAP,
+    baseline_path, baseline_cache, danh_sach_nam_baseline,
+)
 from data.pgd import (
     duong_dan_pgd,
     kiem_tra_file_ton_tai_pgd,
@@ -1066,6 +1069,73 @@ def _render_xoa_du_lieu(role: str, username: str) -> None:
                     _thuc_hien_xoa(DS_DON_VI, loai_xoa, username)
 
 
+# ── Upload Baseline 31/12 ─────────────────────────────────────────────────────
+
+def _render_upload_baseline(username: str) -> None:
+    """Expander upload file HSTD mốc 31/12 để dùng cho tab So sánh kỳ."""
+    with st.expander("📅 Upload mốc số liệu 31/12 (Baseline)", expanded=False):
+        st.caption(
+            "File HSTD ngày 31/12 — dùng để so sánh tăng trưởng trong tab **So sánh kỳ**. "
+            "Định dạng y hệt file HSTD thường (sheet BCQUERY, header dòng 5)."
+        )
+
+        # Năm đã có
+        ds_nam_hien_co = danh_sach_nam_baseline()
+        if ds_nam_hien_co:
+            st.success(f"✅ Đã có baseline các năm: **{', '.join(str(n) for n in ds_nam_hien_co)}**")
+        else:
+            st.info("ℹ️ Chưa có file baseline nào.")
+
+        from datetime import date as _date
+        nam_mac_dinh = _date.today().year - 1
+
+        chon_nam = st.number_input(
+            "Năm cần upload (31/12/năm)",
+            min_value=2020,
+            max_value=_date.today().year,
+            value=nam_mac_dinh,
+            step=1,
+            key="upload_baseline_nam",
+        )
+
+        f_bl = st.file_uploader(
+            f"File HSTD ngày 31/12/{chon_nam}",
+            type=["xlsx", "xls"],
+            key="upload_baseline_file",
+        )
+
+        if f_bl is None:
+            return
+
+        if st.button("📤 Lưu Baseline", type="primary", key="btn_luu_baseline"):
+            file_bytes = f_bl.read()
+            if not file_bytes:
+                st.error("❌ File rỗng."); return
+
+            dest = baseline_path(int(chon_nam))
+            cache = baseline_cache(int(chon_nam))
+            try:
+                Path(dest).parent.mkdir(parents=True, exist_ok=True)
+                with open(dest, "wb") as fh:
+                    fh.write(file_bytes)
+
+                # Xóa cache parquet cũ để buộc đọc lại
+                if Path(cache).exists():
+                    Path(cache).unlink()
+
+                mb = len(file_bytes) / 1024 / 1024
+                db.ghi_audit(username, "upload_baseline",
+                             f"HSTD 31/12/{chon_nam} ({mb:.1f} MB)")
+                st.cache_data.clear()
+                st.success(
+                    f"✅ Đã lưu baseline **31/12/{chon_nam}** ({mb:.1f} MB). "
+                    f"Tab **So sánh kỳ** đã sẵn sàng sử dụng."
+                )
+                st.rerun()
+            except Exception as e:
+                st.error(f"❌ Lỗi lưu file: {e}")
+
+
 # ── Entry point ───────────────────────────────────────────────────────────────
 
 @st.fragment
@@ -1145,6 +1215,8 @@ def render(tab=None, **kwargs) -> None:
         _render_upload_hang_loat(role, username)
 
         _render_xoa_du_lieu(role, username)
+
+        _render_upload_baseline(username)
 
         with st.expander("🔄 Tổng hợp toàn Chi nhánh thủ công",
                          expanded=False):

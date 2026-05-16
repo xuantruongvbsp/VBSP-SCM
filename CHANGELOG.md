@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## [2026-05-17] — Tối ưu RAM/đa luồng: DuckDB cho kiem_soat_service + tab_kiem_soat
+- `services/kiem_soat_service.py` — thêm `import duckdb`; refactor `_tinh_to_sai_so_tv`: thay `groupby().agg()` bằng DuckDB GROUP BY + TRY_CAST; refactor `_tong_hop_vp_theo_pgd`: thay Python for loop bằng DuckDB GROUP BY + FILTER; refactor `_tong_hop_ghv_theo_pgd`: thay `groupby().agg()` bằng DuckDB
+- `tabs/tab_kiem_soat.py` — thêm `import duckdb`; refactor `_get_ks_cache`: xóa `df_nqh` copy trung gian, thay pandas filter+groupby NQH bằng 2 DuckDB query (tổng hợp PGD + chi tiết) với WHERE pushdown
+
 ## [2026-05-17] — Tối ưu RAM: _load_hstd filter pushdown per-PGD
 - `app.py` `_load_hstd()` — thêm tham số `ten_pgd`; khi PGD role dùng `read_parquet() WHERE` filter ngay tại DuckDB thay vì load toàn bộ file; kết quả được `@st.cache_resource` cache riêng per-PGD
 - `app.py` dòng ~583 — xóa khối DESCRIBE + duckdb.query WHERE thủ công (không cached); thay bằng `_load_hstd(CACHE_HSTD, _hstd_ts, ten_pgd=pgd_user)`; DESCRIBE chỉ chạy khi df rỗng (error path)

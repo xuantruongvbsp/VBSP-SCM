@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [2026-05-16] — Lazy navigation ws_management: radio Nhóm → Mục
+- `workspaces/ws_management.py` — Thêm 2 tầng `st.radio` (Nhóm + Mục) ngay trong content, thay thế cách dùng sidebar-only để chọn mục; `render()` vẫn chỉ gọi đúng 1 `fn()` duy nhất
+- `workspaces/ws_management.py` — Hỗ trợ `ws_mgmt_jump` (session_state): nút điều hướng từ nơi khác có thể set key này để jump đến mục chỉ định kèm toast thông báo
+- `workspaces/ws_management.py` — Đồng bộ 2 chiều: sidebar click → radio pre-select đúng nhóm+mục; radio chọn → sidebar highlight đúng qua `ws_mgmt_menu`
+- `workspaces/ws_management.py` `_build_all_items` — Fix "So sánh kỳ" `fn=None` → `fn=lambda: tab_so_sanh_ky.render(None, **kwargs)`
+- `workspaces/ws_management.py` `render()` — Xoá GROUP_COLORS duplicate (chỉ dùng trong `render_sidebar_menu`)
+
 ## [2026-05-16] — Tối ưu hiệu năng: lazy tab rendering ws_operation
 - `workspaces/ws_operation.py` — Thay `st.tabs` + loop-tất-cả bằng `st.radio` + chỉ render tab đang chọn; trước đây mỗi rerun chạy song song tất cả renderer (tab_tongquan, tab_tien_do, tab_so_sanh_ky, heatmap, histogram, donut... tổng 10+ hàm nặng)
 - `workspaces/ws_operation.py` — Xử lý jump_idx (shortcut từ Trang Chủ) qua `session_state[tab_key]` trước khi radio render

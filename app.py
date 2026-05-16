@@ -36,12 +36,12 @@ from widgets.status_widget import render_status_compact
 from alert_center import render_alert_sidebar
 
 
-@st.cache_data(show_spinner=False, ttl=3600)  # tự xóa sau 1 giờ
+@st.cache_resource(show_spinner=False, ttl=3600)
 def _load_hstd(cache_path: str, _ts: float) -> pd.DataFrame:
     return duckdb.query(f"SELECT * FROM '{cache_path}'").df()
 
 
-@st.cache_data(show_spinner=False, ttl=3600)  # tự xóa sau 1 giờ
+@st.cache_resource(show_spinner=False, ttl=3600)
 def _load_nq11(cache_path: str, _ts: float) -> pd.DataFrame:
     return duckdb.query(f"SELECT * FROM '{cache_path}'").df()
 
@@ -53,8 +53,9 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# ── Global CSS ───────────────────────────────────────────────────────────────
-st.markdown("""<style>
+# ── Global CSS (inject 1 lần) ─────────────────────────────────────────────────
+if "_css_injected" not in st.session_state:
+    st.markdown("""<style>
 /* ── 1. TYPOGRAPHY ── */
 html, body, [class*="css"] {
     font-size: 15px !important;
@@ -291,6 +292,7 @@ hr { border: none !important; border-top: 1px solid #e2e8f0 !important; margin: 
     box-shadow: 0 2px 8px rgba(0,0,0,0.05) !important;
 }
 </style>""", unsafe_allow_html=True)
+    st.session_state["_css_injected"] = True
 
 # ── Logo VBSP ────────────────────────────────────────────────────────────────
 

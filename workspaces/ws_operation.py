@@ -1731,13 +1731,31 @@ def render(**kwargs):
     ten_tabs = [t[0] for t in tabs_info]
     renderers = [t[1] for t in tabs_info]
 
-    # Kiểm tra nếu có yêu cầu nhảy tab từ shortcut
-    jump_idx = st.session_state.pop("ws_op_jump_tab", None)
+    # ── Lazy tab — chỉ render tab đang chọn, không chạy tất cả ──────────
+    # (Streamlit st.tabs chạy ALL renderers mỗi rerun → dùng radio thay thế)
+    tab_key = f"ws_op_tab_{key_chon}"
 
-    tabs_con = st.tabs(ten_tabs)
-    for i, tab_c in enumerate(tabs_con):
-        with tab_c:
-            renderers[i](tab_c)
-            # Hiển thị gợi ý nếu user đặc biệt yêu cầu nhảy đến tab này
-            if jump_idx == i and jump_idx is not None:
-                st.toast(f"✨ Đã chuyển tới: {ten_tabs[i]}", icon="👆")
+    # Nhảy tab từ shortcut: ghi index vào session_state trước khi radio render
+    jump_idx = st.session_state.pop("ws_op_jump_tab", None)
+    if jump_idx is not None and 0 <= jump_idx < len(ten_tabs):
+        st.session_state[tab_key] = jump_idx
+        st.toast(f"✨ Đã chuyển tới: {ten_tabs[jump_idx]}", icon="👆")
+
+    # Khởi tạo nếu chưa có
+    if tab_key not in st.session_state:
+        st.session_state[tab_key] = 0
+
+    # Radio làm tab selector — ẩn label, nằm ngang
+    sel_idx = st.radio(
+        "Tab",
+        options=range(len(ten_tabs)),
+        format_func=lambda i: ten_tabs[i],
+        horizontal=True,
+        key=tab_key,
+        label_visibility="collapsed",
+    )
+
+    st.divider()
+
+    # Chỉ gọi renderer của tab đang active
+    renderers[sel_idx](None)

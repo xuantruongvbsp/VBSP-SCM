@@ -48,7 +48,7 @@ def render(role: str = None, **kwargs) -> None:
         )
         return
 
-    col1, col2, col3 = st.columns(3)
+    col1, col2 = st.columns(2)
     with col1:
         den_thang = st.slider(
             "Xem trước (tháng)", min_value=1, max_value=12,
@@ -57,10 +57,6 @@ def render(role: str = None, **kwargs) -> None:
         nhom_theo = st.radio(
             "Nhóm theo", ["PGD", "Xã"],
             horizontal=True, key="den_han_nhom")
-    with col3:
-        nguong = st.number_input(
-            "Ngưỡng tập trung (%)", min_value=10, max_value=80,
-            value=30, step=5, key="den_han_nguong") / 100
 
     df_loc = loc_den_han_trong(df, tu_thang=0, den_thang=den_thang)
     nhom_key = "pgd" if nhom_theo == "PGD" else "xa"
@@ -68,49 +64,80 @@ def render(role: str = None, **kwargs) -> None:
     tong_khoan = len(df_loc)
     tong_tien = df_loc[COT_TONG_DU_NO].sum() if tong_khoan > 0 else 0
     so_pgd = df_loc[COT_TEN_PGD].nunique() if tong_khoan > 0 else 0
-    ds_cb = canh_bao_tap_trung(df, nguong_ty_le=nguong)
 
-    c1, c2, c3, c4 = st.columns(4)
+    c1, c2, c3 = st.columns(3)
     c1.metric("Số khoản đến hạn", fmt_so(tong_khoan))
     c2.metric("Tổng dư nợ đến hạn", fmt_ty(tong_tien))
     c3.metric("Số PGD liên quan", so_pgd)
-    c4.metric("⚠️ Điểm tập trung", len(ds_cb),
-              delta_color="inverse" if ds_cb else "off")
 
-    if ds_cb:
-        st.divider()
-        st.markdown("#### ⚠️ Điểm tập trung rủi ro đến hạn")
-        for item in ds_cb:
-            icon = "🔴" if item["muc_do"] == "high" else "🟡"
-            with st.container(border=True):
-                pc1, pc2, pc3, pc4 = st.columns([3, 2, 2, 2])
-                pc1.markdown(
-                    f"{icon} **{item['pgd']}**  \n"
-                    f"Tháng: `{item['thang']}`"
-                )
-                pc2.metric("Đến hạn", fmt_ty(item["tong_den_han"]))
-                pc3.metric("Tổng PGD", fmt_ty(item["tong_pgd"]))
-                pc4.metric("Tỷ lệ", f"{item['ty_le']*100:.1f}%")
-
+    # ── Bảng thống kê + đồ thị theo tháng (toàn năm) ────────────────────────
     st.divider()
-    st.markdown("#### 📅 Chi tiết theo tháng")
-    df_th = tong_hop_den_han(df, nhom_theo=nhom_key)
+    st.markdown("#### 📊 Thống kê theo tháng — Dư nợ đến hạn trong năm")
 
-    if df_th.empty:
-        st.info("Không có khoản vay đến hạn trong khoảng thời gian đã chọn.")
+    df_nam = loc_den_han_trong(df, tu_thang=0, den_thang=12)
+
+    if df_nam.empty or COT_NGAY_DEN_HAN not in df_nam.columns:
+        st.info("Không có khoản vay đến hạn trong 12 tháng tới.")
     else:
-        try:
-            df_pivot = df_th.pivot_table(
-                index=df_th.columns[0],
-                columns="Tháng",
-                values="tong_du_no",
-                aggfunc="sum",
-                fill_value=0,
+        df_nam = df_nam.copy()
+        df_nam["_ngay_dh"] = pd.to_datetime(df_nam[COT_NGAY_DEN_HAN], errors="coerce")
+        df_nam["_thang_label"] = df_nam["_ngay_dh"].dt.strftime("%m/%Y")
+        df_nam["_sort_key"] = df_nam["_ngay_dh"].dt.to_period("M")
+
+        df_th_stats = (
+            df_nam.dropna(subset=["_thang_label"])
+            .groupby(["_sort_key", "_thang_label"], sort=True)
+            .agg(
+                so_khoan=(COT_TONG_DU_NO, "count"),
+                du_no=(COT_TONG_DU_NO, "sum"),
             )
-            df_display = df_pivot.map(lambda x: fmt_ty(x) if x > 0 else "—")
-            st.dataframe(df_display, use_container_width=True)
-        except Exception:
-            st.dataframe(df_th, use_container_width=True, hide_index=True)
+            .reset_index()
+            .sort_values("_sort_key")
+        )
+
+        if not df_th_stats.empty:
+            tong_du_no_nam = df_th_stats["du_no"].sum()
+            df_th_stats["pct"] = (
+                df_th_stats["du_no"] / tong_du_no_nam * 100
+                if tong_du_no_nam > 0 else 0
+            ).round(1)
+
+            # Bảng thống kê
+            df_bang = df_th_stats[["_thang_label", "so_khoan", "du_no", "pct"]].copy()
+            df_bang.columns = ["Tháng", "Số khoản", "Dư nợ (triệu đồng)", "Tỷ trọng %"]
+            df_bang["Số khoản"] = df_bang["Số khoản"].apply(fmt_so)
+            df_bang["Dư nợ (triệu đồng)"] = (
+                df_th_stats["du_no"] / 1e6
+            ).round(0).apply(lambda x: f"{x:,.0f}".replace(",", "."))
+            df_bang["Tỷ trọng %"] = df_th_stats["pct"].apply(
+                lambda x: f"{x:.1f}".replace(".", ",") + "%"
+            )
+            st.dataframe(df_bang, use_container_width=True, hide_index=True)
+
+            # Đồ thị cột
+            try:
+                import plotly.graph_objects as go
+                du_no_trieu = (df_th_stats["du_no"] / 1e6).round(0)
+                fig = go.Figure(go.Bar(
+                    x=df_th_stats["_thang_label"],
+                    y=du_no_trieu,
+                    text=du_no_trieu.apply(
+                        lambda x: f"{x:,.0f}".replace(",", ".")
+                    ),
+                    textposition="outside",
+                    marker_color="#3B82F6",
+                    hovertemplate="<b>%{x}</b><br>Dư nợ: %{y:,.0f} triệu<extra></extra>",
+                ))
+                fig.update_layout(
+                    xaxis_title="Tháng đến hạn",
+                    yaxis_title="Dư nợ (triệu đồng)",
+                    height=350,
+                    margin=dict(t=20, b=40),
+                    showlegend=False,
+                )
+                st.plotly_chart(fig, use_container_width=True)
+            except Exception as _e:
+                st.warning(f"Không thể vẽ đồ thị: {_e}")
 
     cols_hien_thi = [
         COT_TEN_PGD, COT_TEN_KH,

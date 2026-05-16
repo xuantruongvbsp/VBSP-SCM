@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## [2026-05-16] — Tối ưu hiệu năng: lazy tab rendering ws_operation
+- `workspaces/ws_operation.py` — Thay `st.tabs` + loop-tất-cả bằng `st.radio` + chỉ render tab đang chọn; trước đây mỗi rerun chạy song song tất cả renderer (tab_tongquan, tab_tien_do, tab_so_sanh_ky, heatmap, histogram, donut... tổng 10+ hàm nặng)
+- `workspaces/ws_operation.py` — Xử lý jump_idx (shortcut từ Trang Chủ) qua `session_state[tab_key]` trước khi radio render
+
 ## [2026-05-16] — Fix 4 KPI DeltaCard trang chủ PGD
 - `workspaces/ws_operation.py` — Thêm import `PGD_XA_MAP`; thêm helper `_kpi_pgd_list(df_pgd, pgd_user)` dùng chung cho 2 chỗ render KPI
 - KPI 1/2: `value` → `fmt_ty()` (trước là raw VND float); bỏ `suffix="đồng"` (fmt_ty đã có đơn vị)

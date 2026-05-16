@@ -29,6 +29,7 @@ from config import (
     COT_TONG_DU_NO,
 )
 from data import canh_bao_migration_cached, danh_dau_khong_hd_cached
+from services.hhi_service import tinh_hhi as _hhi_raw, tinh_hhi_breakdown
 from utils import fmt_so, fmt_ty, hien_thi_dataframe_phan_trang, xuat_excel
 
 
@@ -39,24 +40,25 @@ def _tinh_hhi(
     nhom_col: str,
     du_no_col: str = COT_TONG_DU_NO,
 ) -> float:
-    """HHI = Σ(Si²) × 10.000 với Si = dư nợ nhóm / tổng dư nợ."""
-    if nhom_col not in df.columns or du_no_col not in df.columns:
+    """Wrapper trả về HHI trên thang ×10.000 — dùng hhi_service bên dưới."""
+    if nhom_col not in df.columns:
         return 0.0
-    group = df.groupby(nhom_col)[du_no_col].sum()
-    total = group.sum()
-    if total == 0:
-        return 0.0
-    shares = group / total
-    return round(float((shares ** 2).sum() * 10_000), 1)
+    return round(_hhi_raw(df, nhom_col, du_no_col) * 10_000, 1)
 
 
 def _nhan_xet_hhi(hhi: float) -> tuple[str, str]:
-    """Trả về (nhãn ngưỡng, delta_color cho st.metric)."""
-    if hhi < 1_500:
-        return "🟢 Phân tán tốt", "normal"
+    """Trả về (nhãn ngưỡng, delta_color cho st.metric).
+
+    Ngưỡng đồng bộ với services/hhi_service.py::danh_gia_hhi():
+      < 1.000  → Đa dạng hóa tốt
+      1.000–2.500 → Tập trung vừa
+      > 2.500  → Tập trung cao
+    """
+    if hhi < 1_000:
+        return "✅ Đa dạng hóa tốt", "normal"
     if hhi < 2_500:
-        return "🟡 Tập trung vừa", "off"
-    return "🔴 Tập trung cao", "inverse"
+        return "⚠️ Tập trung vừa", "off"
+    return "🚨 Tập trung cao", "inverse"
 
 
 def _bang_tap_trung(
@@ -108,18 +110,17 @@ def _bang_tap_trung(
 
 def _render_sub_ct(df_full: pd.DataFrame) -> None:
     """Sub-tab: biểu đồ cột ngang top 15 + bảng theo Chương trình."""
-    # Tổng hợp dư nợ theo chương trình
-    agg_ct = (
-        df_full.groupby(COT_TEN_CT, dropna=False)[COT_TONG_DU_NO]
-        .sum()
-        .reset_index(name="tong_du_no")
-    )
-    total_ct = agg_ct["tong_du_no"].sum()
-    agg_ct["ty_trong"] = (
-        agg_ct["tong_du_no"] / total_ct * 100 if total_ct > 0 else 0.0
-    )
-    agg_ct = agg_ct.sort_values("tong_du_no", ascending=False)
-    top15 = agg_ct.head(15).copy()
+    # Dùng tinh_hhi_breakdown() từ hhi_service thay vì tính lại
+    br = tinh_hhi_breakdown(df_full, COT_TEN_CT, COT_TONG_DU_NO)
+    if br.empty:
+        st.info("Không có dữ liệu chương trình.")
+        return
+
+    br = br.rename(columns={
+        COT_TEN_CT: "_nhom",
+        "ty_trong_pct": "ty_trong",
+    })
+    top15 = br.head(15).copy()
 
     top15["color"] = top15["ty_trong"].apply(
         lambda x: "#E53935" if x >= 25 else ("#FFA000" if x >= 10 else "#43A047")
@@ -327,9 +328,9 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
         # ── SECTION 2: Thang giải thích ───────────────────────────────────
         st.info(
             "**Thang HHI:**   "
-            "🟢 **< 1.500** — Phân tán tốt   |   "
-            "🟡 **1.500 – 2.500** — Tập trung vừa   |   "
-            "🔴 **> 2.500** — Tập trung cao, cần kiểm soát"
+            "✅ **< 1.000** — Đa dạng hóa tốt   |   "
+            "⚠️ **1.000 – 2.500** — Tập trung vừa   |   "
+            "🚨 **> 2.500** — Tập trung cao, cần kiểm soát"
         )
 
         st.divider()

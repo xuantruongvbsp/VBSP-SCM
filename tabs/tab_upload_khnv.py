@@ -11,6 +11,7 @@ Giao diện:
   - Tự động merge toàn CN sau khi lưu HSTD/NQ11/GQVL
   - Bảng trạng thái 22 hàng × 5 cột
 """
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from io import BytesIO
 import hashlib
 import os
@@ -239,13 +240,72 @@ def _render_upload_form(ten_dv: str, prefix: str, username: str) -> None:
                           f_hstd, f_nq11, f_gqvl, f_cdtotkvv, prefix)
 
 
+def _xu_ly_mot_file_khnv(
+    loai: str,
+    ten_file: str,
+    ten_hien: str,
+    file_bytes: bytes,
+    ten_dv: str,
+) -> tuple[str, KetQuaUpload, bool, tuple[str, str] | None]:
+    """
+    Xử lý một file: kiểm tra → DQ → lưu. Chạy trong thread riêng.
+    Trả về (loai, ket_qua, can_merge, (action, audit_detail) | None).
+    Không gọi st.* hay db.* — thread-safe.
+    """
+    from data.pgd import luu_file_pgd as _luu_pgd
+
+    mb = len(file_bytes) / 1024 / 1024
+
+    ok_kt, msg_kt = kiem_tra_file(ten_file, file_bytes)
+    if not ok_kt:
+        return loai, KetQuaUpload(False, msg_kt), False, None
+
+    khop, msg_khop = _kiem_tra_don_vi(file_bytes, loai, ten_dv)
+    if not khop:
+        return loai, KetQuaUpload(False, msg_khop), False, None
+
+    _, _msg_dq, bao_cao_dq = danh_gia_chat_luong_file_upload(loai, file_bytes)
+    dq_pct = bao_cao_dq.get("ti_le_dat_chuan", 0)
+
+    try:
+        if loai == "cdtotkvv":
+            from data.cdtotkvv import doc_thang_nam_tu_file
+            from data.pgd import luu_file_pgd_voi_lich_su
+
+            thang_tu_file = doc_thang_nam_tu_file(file_bytes)
+            if thang_tu_file:
+                path = luu_file_pgd_voi_lich_su(ten_dv, loai, file_bytes, thang_tu_file)
+                msg = (
+                    f"✅ {ten_hien} ({mb:.1f} MB) · Tháng {thang_tu_file} · DQ {dq_pct}%"
+                )
+            else:
+                path = _luu_pgd(ten_dv, loai, file_bytes)
+                msg = (
+                    f"✅ {ten_hien} ({mb:.1f} MB) "
+                    f"· ⚠️ Không đọc được tháng từ file · DQ {dq_pct}%"
+                )
+            audit = (
+                "upload_pgd_khnv",
+                f"CDTOTKVV — {ten_dv} tháng={thang_tu_file or 'unknown'} ({mb:.1f} MB)",
+            )
+            return loai, KetQuaUpload(True, msg, path), False, audit
+        else:
+            path = _luu_pgd(ten_dv, loai, file_bytes)
+            can_merge = loai in ("hstd", "nq11", "gqvl")
+            msg = f"✅ {ten_hien} ({mb:.1f} MB) · DQ {dq_pct}%"
+            audit = ("upload_pgd_khnv", f"{loai.upper()} — {ten_dv} ({mb:.1f} MB)")
+            return loai, KetQuaUpload(True, msg, path), can_merge, audit
+    except Exception as e:
+        return loai, KetQuaUpload(False, f"Lỗi lưu: {e}"), False, None
+
+
 def _xu_ly_upload(
     ten_dv: str,
     username: str,
     f_hstd, f_nq11, f_gqvl, f_cdtotkvv,
     prefix: str,
 ) -> None:
-    """Xử lý upload, kiểm tra đơn vị, lưu file và merge toàn CN."""
+    """Xử lý upload song song 4 file rồi ghi audit và merge."""
     danh_sach_file = [
         ("hstd",     f_hstd,     "📊 HSTD"),
         ("nq11",     f_nq11,     "📑 NQ11"),
@@ -253,78 +313,36 @@ def _xu_ly_upload(
         ("cdtotkvv", f_cdtotkvv, "🏆 CDTOTKVV"),
     ]
 
+    # Đọc bytes trong main thread (đã in-memory, nhanh) trước khi vào thread
+    file_data = [
+        (loai, f_obj.name, ten_hien, f_obj.read())
+        for loai, f_obj, ten_hien in danh_sach_file
+        if f_obj is not None
+    ]
+
     ket_qua_upload: dict[str, KetQuaUpload] = {}
     can_merge = False
+    audit_records: list[tuple[str, str]] = []
 
-    for loai, f_obj, ten_hien in danh_sach_file:
-        if f_obj is None:
-            continue
+    # Xử lý song song — I/O-bound nên thread hiệu quả
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        futures = {
+            executor.submit(
+                _xu_ly_mot_file_khnv, loai, ten_file, ten_hien, fbytes, ten_dv
+            ): loai
+            for loai, ten_file, ten_hien, fbytes in file_data
+        }
+        for future in as_completed(futures):
+            loai_r, kq_r, cm_r, audit_r = future.result()
+            ket_qua_upload[loai_r] = kq_r
+            if cm_r:
+                can_merge = True
+            if audit_r:
+                audit_records.append(audit_r)
 
-        file_bytes = f_obj.read()
-
-        # Kiểm tra cơ bản
-        ok_kt, msg_kt = kiem_tra_file(f_obj.name, file_bytes)
-        if not ok_kt:
-            ket_qua_upload[loai] = KetQuaUpload(False, msg_kt)
-            continue
-
-        # Kiểm tra tên đơn vị trong file
-        khop, msg_khop = _kiem_tra_don_vi(file_bytes, loai, ten_dv)
-        if not khop:
-            ket_qua_upload[loai] = KetQuaUpload(False, msg_khop)
-            continue
-
-        # Kiểm tra chất lượng dữ liệu tập trung
-        _, _msg_dq, bao_cao_dq = danh_gia_chat_luong_file_upload(loai, file_bytes)
-        # DQ chỉ cảnh báo, không chặn upload
-
-        # Lưu file (không tự động merge ở đây, merge sau khi tất cả xong)
-        from data.pgd import luu_file_pgd as _luu_pgd
-        try:
-            mb = len(file_bytes) / 1024 / 1024
-            if loai == "cdtotkvv":
-                from data.cdtotkvv import doc_thang_nam_tu_file
-                from data.pgd import luu_file_pgd_voi_lich_su
-
-                thang_tu_file = doc_thang_nam_tu_file(file_bytes)
-                if thang_tu_file:
-                    # Tự động nhận diện được tháng -> lưu có lịch sử
-                    path = luu_file_pgd_voi_lich_su(
-                        ten_dv, loai, file_bytes, thang_tu_file
-                    )
-                    ket_qua_upload[loai] = KetQuaUpload(
-                        True,
-                        f"✅ {ten_hien} ({mb:.1f} MB) "
-                        f"· Tháng {thang_tu_file} · DQ {bao_cao_dq.get('ti_le_dat_chuan', 0)}%",
-                        path,
-                    )
-                else:
-                    # Không đọc được tháng -> fallback lưu latest bình thường
-                    path = _luu_pgd(ten_dv, loai, file_bytes)
-                    ket_qua_upload[loai] = KetQuaUpload(
-                        True,
-                        f"✅ {ten_hien} ({mb:.1f} MB) "
-                        f"· ⚠️ Không đọc được tháng từ file · DQ {bao_cao_dq.get('ti_le_dat_chuan', 0)}%",
-                        path,
-                    )
-                db.ghi_audit(
-                    username, "upload_pgd_khnv",
-                    f"CDTOTKVV — {ten_dv} "
-                    f"tháng={thang_tu_file or 'unknown'} ({mb:.1f} MB)"
-                )
-            else:
-                path = _luu_pgd(ten_dv, loai, file_bytes)
-                db.ghi_audit(username, "upload_pgd_khnv",
-                             f"{loai.upper()} — {ten_dv} ({mb:.1f} MB)")
-                ket_qua_upload[loai] = KetQuaUpload(
-                    True,
-                    f"✅ {ten_hien} ({mb:.1f} MB) · DQ {bao_cao_dq.get('ti_le_dat_chuan', 0)}%",
-                    path,
-                )
-                if loai in ("hstd", "nq11", "gqvl"):
-                    can_merge = True
-        except Exception as e:
-            ket_qua_upload[loai] = KetQuaUpload(False, f"Lỗi lưu: {e}")
+    # Ghi audit tuần tự sau khi tất cả thread xong
+    for action, detail in audit_records:
+        db.ghi_audit(username, action, detail)
 
     # Hiển thị kết quả từng file trước rerun (sẽ mất sau rerun)
     cols = st.columns(4)

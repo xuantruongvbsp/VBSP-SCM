@@ -323,5 +323,5 @@ def download_pdf_button(
         file_name=filename,
         mime="application/pdf",
         key=key,
-        use_container_width=True,
+        width="stretch",
     )

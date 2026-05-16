@@ -152,7 +152,7 @@ def hien_thi_dataframe_phan_trang(df, so_dong_moi_trang=500, key="df", **kwargs)
     except ImportError:
         Styler = None  # type: ignore[misc, assignment]
 
-    opts = {"use_container_width": True, "hide_index": True}
+    opts = {"width": "stretch", "hide_index": True}
     opts.update(kwargs)
 
     if Styler is not None and isinstance(df, Styler):

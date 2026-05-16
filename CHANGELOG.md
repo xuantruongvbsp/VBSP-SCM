@@ -1,5 +1,15 @@
 # CHANGELOG
 
+## [2026-05-17] — Upload KH-NV: song song hóa xử lý 4 file bằng ThreadPoolExecutor
+- `tabs/tab_upload_khnv.py` — tách `_xu_ly_mot_file_khnv()` module-level (thread-safe: không gọi st.* / db.*); `_xu_ly_upload()` dùng `ThreadPoolExecutor(max_workers=4)` để xử lý song song → thời gian giảm từ N×parse xuống còn max(parse) thay vì tổng; ghi audit tuần tự sau khi tất cả thread xong
+
+## [2026-05-17] — Dọn warning: use_container_width → width + suppress openpyxl
+- `app.py` — thêm `warnings.filterwarnings` suppress UserWarning openpyxl "no default style"
+- `utils.py` dòng ~155 — `use_container_width: True` → `width: "stretch"` trong `hien_thi_dataframe_phan_trang()`
+- `components/export_pdf.py` — `use_container_width=True` → `width="stretch"` trong `st.download_button`
+- `components/filter_bar.py` — 2 chỗ `use_container_width=True` → `width="stretch"` trong `st.button`
+- `components/movers.py` — `use_container_width=True` → `width="stretch"` trong `st.dataframe`
+
 ## [2026-05-17] — Upload UX: tự reset file uploader sau upload thành công + spinner
 - `tabs/tab_upload_khnv.py` `_render_upload_form()` — thêm version counter vào key file_uploader, widget tự reset rỗng sau upload thành công; thêm `st.spinner()` khi xử lý
 - `tabs/tab_upload_khnv.py` `_xu_ly_upload()` — tăng version counter khi có ít nhất 1 file upload thành công

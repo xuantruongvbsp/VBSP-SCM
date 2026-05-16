@@ -4,8 +4,17 @@ Kiến trúc 3 Không gian làm việc: Executive | Management | Operation
 """
 import os
 import time
+import warnings
 from datetime import datetime, date
 import streamlit as st
+
+# Suppress harmless openpyxl warning for Excel files without default style
+warnings.filterwarnings(
+    "ignore",
+    message="Workbook contains no default style",
+    category=UserWarning,
+    module="openpyxl",
+)
 
 import duckdb
 import pandas as pd

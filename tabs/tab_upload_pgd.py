@@ -206,25 +206,37 @@ def _kiem_tra_don_vi(file_bytes: bytes, loai: str, ten_dv_chon: str) -> tuple[bo
 
 def _render_upload_form(ten_dv: str, prefix: str, username: str) -> None:
     """Form upload 4 file cho đơn vị. Không merge toàn CN (việc của KH-NV)."""
+    # Hiển thị kết quả upload từ lần trước (lưu qua session_state vì rerun xóa UI)
+    prev_kq = st.session_state.pop(f"{prefix}_ket_qua", None)
+    if prev_kq:
+        for msg in prev_kq:
+            if msg.startswith("✅"):
+                st.success(msg)
+            elif msg.startswith("❌"):
+                st.error(msg)
+            else:
+                st.warning(msg)
+
     st.markdown(f"##### 📤 Upload file cho: **{ten_dv}**")
 
+    _ver = st.session_state.setdefault(f"{prefix}_upload_ver", 0)
     c1, c2, c3, c4 = st.columns(4)
     with c1:
         st.caption("📊 HSTD Chi tiết")
         f_hstd = st.file_uploader("HSTD", type=["xlsx", "xls"],
-                                   key=f"{prefix}_hstd", label_visibility="collapsed")
+                                   key=f"{prefix}_hstd_{_ver}", label_visibility="collapsed")
     with c2:
         st.caption("📑 Sao kê NQ11")
         f_nq11 = st.file_uploader("NQ11", type=["xlsx", "xls"],
-                                   key=f"{prefix}_nq11", label_visibility="collapsed")
+                                   key=f"{prefix}_nq11_{_ver}", label_visibility="collapsed")
     with c3:
         st.caption("📋 Sao kê GQVL")
         f_gqvl = st.file_uploader("GQVL", type=["xlsx", "xls"],
-                                   key=f"{prefix}_gqvl", label_visibility="collapsed")
+                                   key=f"{prefix}_gqvl_{_ver}", label_visibility="collapsed")
     with c4:
         st.caption("🏆 Chấm điểm Tổ TK&VV")
         f_cdtotkvv = st.file_uploader("CDTOTKVV", type=["xlsx", "xls"],
-                                       key=f"{prefix}_cdtotkvv", label_visibility="collapsed")
+                                       key=f"{prefix}_cdtotkvv_{_ver}", label_visibility="collapsed")
 
     co_file = any(f is not None for f in [f_hstd, f_nq11, f_gqvl, f_cdtotkvv])
     if not co_file:
@@ -232,14 +244,16 @@ def _render_upload_form(ten_dv: str, prefix: str, username: str) -> None:
         return
 
     if st.button("📤 Upload", type="primary", key=f"{prefix}_btn_upload"):
-        _xu_ly_upload(ten_dv, username,
-                      f_hstd, f_nq11, f_gqvl, f_cdtotkvv)
+        with st.spinner("⏳ Đang xử lý file..."):
+            _xu_ly_upload(ten_dv, username,
+                          f_hstd, f_nq11, f_gqvl, f_cdtotkvv, prefix)
 
 
 def _xu_ly_upload(
     ten_dv: str,
     username: str,
     f_hstd, f_nq11, f_gqvl, f_cdtotkvv,
+    prefix: str,
 ) -> None:
     """Xử lý upload, kiểm tra đơn vị, lưu file."""
     danh_sach_file = [
@@ -250,6 +264,7 @@ def _xu_ly_upload(
     ]
 
     co_luu_thanh_cong = False
+    msgs: list[str] = []
 
     for loai, f_obj in danh_sach_file:
         if f_obj is None:
@@ -261,19 +276,19 @@ def _xu_ly_upload(
         ok_kt, msg_kt = kiem_tra_file(f_obj.name, file_bytes)
         if not ok_kt:
             nhan_kt = NHAN_LOAI.get(loai, loai.upper())
-            st.error(f"❌ {nhan_kt}: {msg_kt}")
+            msgs.append(f"❌ {nhan_kt}: {msg_kt}")
             continue
 
         # Kiểm tra loại file (sheet name)
         ok_loai, msg_loai = _kiem_tra_loai_file(file_bytes, loai)
         if not ok_loai:
-            st.error(msg_loai)
+            msgs.append(f"❌ {msg_loai}")
             continue
 
         # Kiểm tra tên đơn vị trong file
         khop, msg_khop = _kiem_tra_don_vi(file_bytes, loai, ten_dv)
         if not khop:
-            st.warning(msg_khop)
+            msgs.append(f"⚠️ {msg_khop}")
             continue
 
         path_excel = duong_dan_pgd(ten_dv, loai)
@@ -296,7 +311,7 @@ def _xu_ly_upload(
                 "upload_pgd_dia_ban",
                 f"{loai.upper()} — {ten_dv} ({mb:.1f} MB)",
             )
-            st.success(f"✅ Đã lưu **{nhan}** — {ten_dv}")
+            msgs.append(f"✅ Đã lưu **{nhan}** — {ten_dv} ({mb:.1f} MB)")
 
             meta_dq = lay_meta_chat_luong(loai)
             bao_cao = meta_dq.get("bao_cao", []) if meta_dq else []
@@ -308,25 +323,30 @@ def _xu_ly_upload(
 
             if don_vi_loi:
                 r = don_vi_loi[0]
-                st.warning(
-                    f"⚠️ **Dữ liệu đã lưu nhưng có {r['so_loi']} vấn đề chất lượng "
-                    f"cần kiểm tra:**\n\n"
+                msgs.append(
+                    f"⚠️ **Dữ liệu {nhan} đã lưu nhưng có {r['so_loi']} vấn đề "
+                    f"chất lượng cần kiểm tra:**\n\n"
                     + "\n".join(f"• {e}" for e in r.get("errors", []))
                     + "\n\n_Dữ liệu vẫn được hệ thống sử dụng bình thường._"
                 )
         else:
-            st.error(
+            msgs.append(
                 f"❌ **Không thể lưu {nhan}** — {ten_dv}\n\n"
                 f"{kq.thong_bao}\n\n"
                 "_Vui lòng kiểm tra lại file và thử upload lại._"
             )
 
     if co_luu_thanh_cong:
-        st.success(
-            "✅ Đã upload thành công. "
-            "Phòng KH-NV sẽ tổng hợp dữ liệu toàn Chi nhánh."
+        msgs.append(
+            "✅ Upload hoàn tất. Phòng KH-NV sẽ tổng hợp dữ liệu toàn Chi nhánh."
+        )
+        # Reset file uploaders bằng version counter
+        st.session_state[f"{prefix}_upload_ver"] = (
+            st.session_state.get(f"{prefix}_upload_ver", 0) + 1
         )
 
+    # Lưu kết quả vào session để hiển thị sau rerun
+    st.session_state[f"{prefix}_ket_qua"] = msgs
     st.cache_data.clear()
     st.rerun()
 

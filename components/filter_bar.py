@@ -42,14 +42,14 @@ def filter_bar(
     with col_toggle:
         if st.button(
             "🔍 Bộ lọc" if not expanded else "🔍 Ẩn bộ lọc",
-            use_container_width=True,
+            width="stretch",
             key=f"{key_prefix}_toggle",
         ):
             st.session_state[f"{key_prefix}_expanded"] = not expanded
             st.rerun()
 
     with col_clear:
-        if st.button("🔄 Xóa", use_container_width=True, key=f"{key_prefix}_clear"):
+        if st.button("🔄 Xóa", width="stretch", key=f"{key_prefix}_clear"):
             for f in filters:
                 key = f"{key_prefix}_{f['field']}"
                 st.session_state.pop(key, None)

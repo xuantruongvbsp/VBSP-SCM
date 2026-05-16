@@ -321,6 +321,6 @@ def movers_analysis(
                 "Dư nợ kỳ này": r["curr_tong_du_no"],
             })
         df_show = pd.DataFrame(rows)
-        st.dataframe(df_show, use_container_width=True, hide_index=True)
+        st.dataframe(df_show, width="stretch", hide_index=True)
 
     return results

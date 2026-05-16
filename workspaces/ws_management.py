@@ -448,60 +448,133 @@ def _render_ndt_dp(role: str, username: str) -> None:
     """Tab quản lý Mã Nhà đầu tư Địa phương — dùng phân tầng GQVL ĐP."""
     from db import doc_ndt_dp_list, ghi_kv, ghi_audit
 
-    st.subheader("🏦 Mã Nhà đầu tư Địa phương — Cấp tỉnh")
+    st.subheader("🏦 Mã Nhà đầu tư Địa phương")
     st.info(
         "ℹ️ **Cách dùng:** Mã NĐT lấy chính xác từ cột **'Mã nhà đầu tư'** trong file sao kê GQVL — "
-        "món vay có mã khớp với danh sách dưới đây được xếp vào **GQVL ĐP Cấp tỉnh**, còn lại là **Cấp xã/khác**. "
-        "Chỉ **Admin CN** mới có thể thêm hoặc xóa mã."
+        "món vay có mã khớp với danh sách **Cấp Tỉnh** được xếp vào GQVL ĐP Cấp tỉnh, "
+        "còn lại là Cấp xã/khác. Chỉ **Admin CN** mới có thể thêm hoặc xóa mã."
     )
 
-    ds = doc_ndt_dp_list()   # list[dict] {"ma", "ghi_chu"}
+    ds       = doc_ndt_dp_list()   # list[dict] {"ma", "ghi_chu", "cap"}
     can_edit = normalize_role(str(role or "user")) == "admin_cn"
 
-    # Hiển thị bảng hiện tại
-    if ds:
-        for i, item in enumerate(ds):
-            c1, c2, c3, c4 = st.columns([3, 4, 1, 1])
-            c1.code(item["ma"])
-            edit_key = f"edit_ndt_{i}"
-            if st.session_state.get(edit_key) and can_edit:
-                ghi_chu_moi = c2.text_input(
+    ds_tinh = [x for x in ds if x.get("cap", "tinh") == "tinh"]
+    ds_xa   = [x for x in ds if x.get("cap", "tinh") == "xa"]
+
+    _CAP_OPTS = ["Cấp Tỉnh 🏛️", "Cấp Xã/Khác 🏘️"]
+    _CAP_TO   = {"Cấp Tỉnh 🏛️": "tinh", "Cấp Xã/Khác 🏘️": "xa"}
+    _CAP_FROM = {"tinh": "Cấp Tỉnh 🏛️", "xa": "Cấp Xã/Khác 🏘️"}
+
+    _t1, _t2, _t3, _t4 = st.tabs([
+        "🏛️ Cấp Tỉnh",
+        "🏘️ Cấp Xã/Khác",
+        "➕ Thêm mới",
+        "✏️ Chỉnh sửa / Xóa",
+    ])
+
+    # ── Tab 1: Cấp Tỉnh (đọc) ────────────────────────────────────────────────
+    with _t1:
+        if ds_tinh:
+            for item in ds_tinh:
+                c1, c2 = st.columns([3, 5])
+                c1.code(item["ma"])
+                c2.markdown(item.get("ghi_chu", ""))
+        else:
+            st.info("Chưa có mã nào ở cấp Tỉnh.")
+
+    # ── Tab 2: Cấp Xã/Khác (đọc) ─────────────────────────────────────────────
+    with _t2:
+        if ds_xa:
+            for item in ds_xa:
+                c1, c2 = st.columns([3, 5])
+                c1.code(item["ma"])
+                c2.markdown(item.get("ghi_chu", ""))
+        else:
+            st.info("Chưa có mã nào được đăng ký ở cấp Xã/Khác.")
+
+    # ── Tab 3: Thêm mới ───────────────────────────────────────────────────────
+    with _t3:
+        if not can_edit:
+            st.warning("⚠️ Chỉ Admin CN mới có thể thêm mã.")
+        else:
+            with st.form("form_them_ndt", clear_on_submit=True):
+                ma_them = st.text_input(
+                    "Mã NĐT đầy đủ",
+                    placeholder="VD: INV0802140002662",
+                    help="Lấy chính xác từ cột 'Mã nhà đầu tư' trong file GQVL",
+                    key="ndt_ma_them",
+                )
+                ghi_chu_them = st.text_input(
+                    "Ghi chú",
+                    placeholder="VD: UBND tỉnh Đồng Nai",
+                    key="ndt_gc_them",
+                )
+                cap_them = st.selectbox(
+                    "Phân loại cấp",
+                    _CAP_OPTS,
+                    help="Cấp Tỉnh: vốn UBND tỉnh/ủy thác đầu tư cấp tỉnh. Cấp Xã/Khác: vốn cấp huyện/xã.",
+                    key="ndt_cap_them",
+                )
+                submitted_them = st.form_submit_button("➕ Thêm", type="primary")
+
+            if submitted_them:
+                ma_them = ma_them.strip()
+                if not ma_them:
+                    st.error("Vui lòng nhập mã NĐT.")
+                elif any(x["ma"] == ma_them for x in ds):
+                    st.warning(f"Mã **{ma_them}** đã có trong danh sách.")
+                else:
+                    cap_val = _CAP_TO[cap_them]
+                    ds_moi  = ds + [{"ma": ma_them, "ghi_chu": ghi_chu_them.strip(), "cap": cap_val}]
+                    ghi_kv("ndt_dp_list", ds_moi, username)
+                    ghi_audit(username, "them_ndt_dp",
+                              f"Thêm mã {ma_them} — {ghi_chu_them} ({cap_them})")
+                    st.success(f"✅ Đã thêm mã **{ma_them}** vào {cap_them}")
+                    st.rerun()
+
+    # ── Tab 4: Chỉnh sửa / Xóa ───────────────────────────────────────────────
+    with _t4:
+        if not can_edit:
+            st.warning("⚠️ Chỉ Admin CN mới có thể chỉnh sửa / xóa mã.")
+        elif not ds:
+            st.info("Chưa có mã nào.")
+        else:
+            st.caption("Chỉnh sửa ghi chú hoặc đổi phân loại cấp, nhấn 💾 để lưu từng dòng.")
+            for i, item in enumerate(ds):
+                c1, c2, c3, c4, c5 = st.columns([3, 3, 2, 1, 1])
+                c1.code(item["ma"])
+                gc_edit = c2.text_input(
                     "Ghi chú",
                     value=item.get("ghi_chu", "") or "",
-                    key=f"ndt_note_{i}",
+                    key=f"ndt_gc_{i}",
                     label_visibility="collapsed",
                 )
-                if c3.button("💾", key=f"luu_ndt_{i}", help="Lưu"):
-                    ghi_chu_cu = item.get("ghi_chu", "") or ""
-                    ghi_chu_moi = (ghi_chu_moi or "").strip()
-                    if ghi_chu_moi != ghi_chu_cu:
-                        ds_moi = [dict(x) for x in ds]
-                        ds_moi[i]["ghi_chu"] = ghi_chu_moi
-                        ghi_kv("ndt_dp_list", ds_moi, username)
-                        ghi_audit(username, "sua_ndt_dp",
-                                  f"Sửa mã {item['ma']}: {ghi_chu_cu} → {ghi_chu_moi}")
-                    st.session_state.pop(edit_key, None)
+                cap_current = _CAP_FROM.get(item.get("cap", "tinh"), _CAP_OPTS[0])
+                cap_edit = c3.selectbox(
+                    "Cấp",
+                    _CAP_OPTS,
+                    index=_CAP_OPTS.index(cap_current),
+                    key=f"ndt_cap_{i}",
+                    label_visibility="collapsed",
+                )
+                if c4.button("💾", key=f"luu_ndt_{i}", help="Lưu thay đổi"):
+                    ds_moi = [dict(x) for x in ds]
+                    ds_moi[i]["ghi_chu"] = (gc_edit or "").strip()
+                    ds_moi[i]["cap"]     = _CAP_TO[cap_edit]
+                    ghi_kv("ndt_dp_list", ds_moi, username)
+                    ghi_audit(username, "sua_ndt_dp",
+                              f"Sửa mã {item['ma']} → ghi chú: {gc_edit}, cấp: {cap_edit}")
                     st.rerun()
-            else:
-                c2.text(item.get("ghi_chu", ""))
-            if can_edit:
-                if c3.button("✏️", key=f"sua_ndt_{i}", help="Sửa ghi chú"):
-                    st.session_state[edit_key] = True
-                    st.rerun()
-                if c4.button("🗑️", key=f"xoa_ndt_{i}",
+                if c5.button("🗑️", key=f"xoa_ndt_{i}",
                              disabled=(len(ds) <= 1),
-                             help="Không thể xóa mã duy nhất"):
+                             help="Không thể xóa khi chỉ còn 1 mã"):
                     ds_moi = [x for j, x in enumerate(ds) if j != i]
                     ghi_kv("ndt_dp_list", ds_moi, username)
-                    ghi_audit(username, "xoa_ndt_dp",
-                              f"Xóa mã {item['ma']}")
+                    ghi_audit(username, "xoa_ndt_dp", f"Xóa mã {item['ma']}")
                     st.rerun()
-    else:
-        st.info("Chưa có mã nào.")
 
-    if not can_edit:
-        st.caption("⚠️ Chỉ admin mới có thể thêm/xóa.")
-
+    # ── Impact analysis ────────────────────────────────────────────────────────
+    st.divider()
     with st.expander("📊 Xem tác động lên dữ liệu GQVL hiện tại", expanded=False):
         try:
             from pathlib import Path
@@ -514,92 +587,67 @@ def _render_ndt_dp(role: str, username: str) -> None:
                 df_gqvl = pd.read_parquet(gqvl_path)
                 if ("Nguồn vốn" not in df_gqvl.columns) or (COT_MA_NDT not in df_gqvl.columns):
                     st.warning("File GQVL không có đủ cột để phân tích.")
+                elif df_gqvl["Nguồn vốn"].isna().all():
+                    st.warning(
+                        "⚠️ Cột 'Nguồn vốn' trong cache GQVL toàn NaN — "
+                        "dữ liệu cũ bị lỗi định dạng. Vui lòng upload lại file GQVL."
+                    )
                 else:
-                    nv_col = df_gqvl["Nguồn vốn"] if "Nguồn vốn" in df_gqvl.columns else None
-                    if nv_col is not None and nv_col.isna().all():
-                        st.warning(
-                            "⚠️ Cột 'Nguồn vốn' trong cache GQVL toàn NaN — "
-                            "dữ liệu cũ bị lỗi định dạng. Vui lòng upload lại "
-                            "file GQVL để cập nhật cache."
-                        )
-                    else:
-                        df_dp = df_gqvl[df_gqvl["Nguồn vốn"] == "ĐP"].copy()
-                        ma_ndt_str = df_dp[COT_MA_NDT].astype(str).str.strip()
-                        ndt_list = [x.get("ma", "") for x in (ds or [])]
-                        mask_cap_tinh = ma_ndt_str.isin(ndt_list)
+                    df_dp = df_gqvl[df_gqvl["Nguồn vốn"] == "ĐP"].copy()
+                    ma_ndt_str     = df_dp[COT_MA_NDT].astype(str).str.strip()
+                    ndt_tinh_list  = [x["ma"] for x in ds_tinh]
+                    mask_cap_tinh  = ma_ndt_str.isin(ndt_tinh_list)
+                    ghi_chu_map    = {x["ma"]: x.get("ghi_chu", "") for x in ds}
 
-                        p1, p2, p3 = st.columns(3)
-                        p1.metric("Tổng món ĐP", fmt_so(len(df_dp)))
-                        p2.metric("→ Cấp tỉnh 🏛️", fmt_so(int(mask_cap_tinh.sum())))
-                        p3.metric("→ Cấp xã/khác 🏘️", fmt_so(int((~mask_cap_tinh).sum())))
+                    p1, p2, p3 = st.columns(3)
+                    p1.metric("Tổng món ĐP",       fmt_so(len(df_dp)))
+                    p2.metric("→ Cấp tỉnh 🏛️",    fmt_so(int(mask_cap_tinh.sum())))
+                    p3.metric("→ Cấp xã/khác 🏘️", fmt_so(int((~mask_cap_tinh).sum())))
 
-                        ghi_chu_map = {x.get("ma", ""): x.get("ghi_chu", "") for x in (ds or [])}
-                        agg_kwargs: dict = {"Số món": ("Mã NĐT / Nhóm", "count")}
-                        if "Dư nợ trong hạn" in df_dp.columns:
-                            agg_kwargs["Dư nợ TH (tỷ)"] = ("Dư nợ trong hạn", "sum")
-                        df_preview = (
-                            df_dp.assign(
-                                **{"Mã NĐT / Nhóm": ma_ndt_str.where(mask_cap_tinh, "Cấp xã/khác")}
-                            )
-                            .groupby("Mã NĐT / Nhóm")
-                            .agg(**agg_kwargs)
-                            .reset_index()
-                        )
-                        if "Dư nợ TH (tỷ)" in df_preview.columns:
-                            df_preview["Dư nợ TH (tỷ)"] = df_preview["Dư nợ TH (tỷ)"].apply(fmt_ty)
-                        df_preview["Ghi chú"] = df_preview["Mã NĐT / Nhóm"].map(
-                            lambda m: ghi_chu_map.get(m, "")
-                        )
-                        st.dataframe(df_preview, hide_index=True, use_container_width=True)
+                    agg_kw: dict = {"Số món": ("Mã NĐT / Nhóm", "count")}
+                    if "Dư nợ trong hạn" in df_dp.columns:
+                        agg_kw["Dư nợ TH (tỷ)"] = ("Dư nợ trong hạn", "sum")
+                    df_pv = (
+                        df_dp
+                        .assign(**{"Mã NĐT / Nhóm": ma_ndt_str.where(mask_cap_tinh, "Cấp xã/khác")})
+                        .groupby("Mã NĐT / Nhóm")
+                        .agg(**agg_kw)
+                        .reset_index()
+                    )
+                    if "Dư nợ TH (tỷ)" in df_pv.columns:
+                        df_pv["Dư nợ TH (tỷ)"] = df_pv["Dư nợ TH (tỷ)"].apply(fmt_ty)
+                    df_pv["Ghi chú"] = df_pv["Mã NĐT / Nhóm"].map(
+                        lambda m: ghi_chu_map.get(m, "")
+                    )
+                    st.dataframe(df_pv, hide_index=True, use_container_width=True)
         except Exception as e:
             st.warning(f"Không thể phân tích tác động GQVL: {e}")
 
-    if can_edit:
-        st.divider()
-        st.markdown("##### ➕ Thêm mã mới")
-        with st.form("form_them_ndt", clear_on_submit=False):
-            ma_moi = st.text_input(
-                "Mã NĐT đầy đủ",
-                placeholder="VD: INV0802140002662",
-                help="Lấy chính xác từ cột 'Mã nhà đầu tư' trong file GQVL",
-                key="ndt_ma_moi"
+    # ── Xuất Excel + Làm mới ─────────────────────────────────────────────────
+    col_xl, col_rf = st.columns([3, 1])
+    with col_xl:
+        if st.button("📥 Xuất danh sách Excel", key="export_ndt_dp"):
+            import io
+            df_export = pd.DataFrame([
+                {"Mã NĐT": x["ma"],
+                 "Ghi chú": x.get("ghi_chu", ""),
+                 "Phân loại cấp": _CAP_FROM.get(x.get("cap", "tinh"), "Cấp Tỉnh 🏛️")}
+                for x in ds
+            ])
+            buf = io.BytesIO()
+            df_export.to_excel(buf, index=False)
+            st.download_button(
+                "💾 Tải về",
+                data=buf.getvalue(),
+                file_name="danh_sach_ndt_dp.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                key="dl_ndt_dp",
             )
-            ghi_chu_moi = st.text_input(
-                "Ghi chú",
-                placeholder="VD: UBND tỉnh Đồng Nai",
-                key="ndt_ghi_chu"
-            )
-            submitted = st.form_submit_button("➕ Thêm", type="primary")
-
-        if submitted:
-            ma_moi = ma_moi.strip()
-            if not ma_moi:
-                st.error("Vui lòng nhập mã NĐT.")
-            elif any(x["ma"] == ma_moi for x in ds):
-                st.warning(f"Mã {ma_moi} đã có trong danh sách.")
-            else:
-                ds_moi = ds + [{"ma": ma_moi, "ghi_chu": ghi_chu_moi.strip()}]
-                ghi_kv("ndt_dp_list", ds_moi, username)
-                ghi_audit(username, "them_ndt_dp",
-                          f"Thêm mã {ma_moi} — {ghi_chu_moi}")
-                st.success(f"✅ Đã thêm mã {ma_moi}")
-                st.rerun()
-
-    st.divider()
-    if st.button("📥 Xuất danh sách Excel", key="export_ndt_dp"):
-        import io
-
-        df_export = pd.DataFrame(ds or [], columns=["ma", "ghi_chu"])
-        df_export.columns = ["Mã NĐT", "Ghi chú"]
-        buf = io.BytesIO()
-        df_export.to_excel(buf, index=False)
-        st.download_button(
-            "💾 Tải về",
-            data=buf.getvalue(),
-            file_name="danh_sach_ndt_dp.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            key="dl_ndt_dp",
-        )
+    with col_rf:
+        if st.button("🔄 Làm mới", key="btn_refresh_ndt_dp", use_container_width=True,
+                     help="Xóa cache và tải lại dữ liệu GQVL"):
+            st.cache_data.clear()
+            st.rerun()
 
 
 def _render_quan_ly_template(df: pd.DataFrame):

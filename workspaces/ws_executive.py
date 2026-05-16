@@ -37,7 +37,7 @@ from utils import (
     ten_file_xuat,
 )
 from services.excel_service import ExcelReport, xuat_excel_chuyen_nghiep, ten_file_xuat as excel_ten_file
-from pdf_service import xuat_pdf_bao_cao, xuat_pdf
+from pdf_service import xuat_pdf_bao_cao, xuat_pdf, kiem_tra_pdf_dependency
 from tabs import tab_khtd_giao_dc, tab_kiem_soat, tab_qd62, tab_tien_do, tab_so_sanh_ky
 from snapshot_service import doc_snapshot, doc_snapshot_range, danh_sach_ky
 from services.hhi_service import tinh_hhi, tinh_hhi_breakdown, danh_gia_hhi
@@ -1462,6 +1462,13 @@ def render(**kwargs) -> None:
         st.divider()
         st.markdown("### 📄 Xuất báo cáo PDF đầy đủ")
         st.caption("Báo cáo tổng hợp: KPI + Bảng dữ liệu — chuẩn NĐ30/2020")
+
+        _pdf_dep = kiem_tra_pdf_dependency()
+        if not _pdf_dep["ready"]:
+            for msg in _pdf_dep["messages"]:
+                st.warning(msg)
+        elif not _pdf_dep["kaleido"]:
+            st.info("ℹ️ Nhúng biểu đồ tự động vào PDF cần `pip install kaleido`. Hiện tại chỉ xuất KPI + bảng.")
 
         username = kwargs.get("username", "unknown")
         df_pdf = df_full.copy() if df_full is not None else pd.DataFrame()

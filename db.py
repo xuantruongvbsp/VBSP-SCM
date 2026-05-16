@@ -493,23 +493,26 @@ def migrate_pgd_bien_hoa() -> None:
 
 def doc_ndt_dp_list() -> list[dict]:
     """
-    Đọc danh sách Mã NĐT cấp tỉnh từ kv_store.
-    Mỗi phần tử: {"ma": "INV0802140002662", "ghi_chu": "UBND tỉnh Đồng Nai"}
+    Đọc danh sách Mã NĐT địa phương từ kv_store.
+    Mỗi phần tử: {"ma": "INV...", "ghi_chu": "...", "cap": "tinh"|"xa"}
     Fallback về seed data nếu chưa có.
     """
     val = doc_kv("ndt_dp_list")
     if val and isinstance(val, list) and len(val) > 0:
+        # Đảm bảo backward compat: bổ sung "cap" nếu phần tử cũ chưa có
+        for item in val:
+            item.setdefault("cap", "tinh")
         return val
     # Seed mặc định
     return [
-        {"ma": "INV0802140002662", "ghi_chu": "UBND tỉnh Đồng Nai"},
-        {"ma": "INV0603170027393", "ghi_chu": "Nguồn vốn cho vay đào tạo nghề"},
+        {"ma": "INV0802140002662", "ghi_chu": "UBND tỉnh Đồng Nai",              "cap": "tinh"},
+        {"ma": "INV0603170027393", "ghi_chu": "Nguồn vốn cho vay đào tạo nghề",  "cap": "tinh"},
     ]
 
 
 def doc_ndt_dp_ma_list() -> list[str]:
-    """Trả về chỉ list mã (str) để dùng trong phân tầng."""
-    return [item["ma"] for item in doc_ndt_dp_list()]
+    """Trả về list mã Cấp Tỉnh (str) để dùng trong phân tầng GQVL."""
+    return [item["ma"] for item in doc_ndt_dp_list() if item.get("cap", "tinh") == "tinh"]
 
 
 # Khởi tạo DB, migrate dữ liệu cũ, sau đó seed cấu hình động

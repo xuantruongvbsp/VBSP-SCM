@@ -36,6 +36,7 @@ from utils import (
     xuat_excel,
     ten_file_xuat,
 )
+from services.excel_service import ExcelReport, xuat_excel_chuyen_nghiep, ten_file_xuat as excel_ten_file
 from tabs import tab_khtd_giao_dc, tab_kiem_soat, tab_qd62, tab_tien_do, tab_so_sanh_ky
 from snapshot_service import doc_snapshot, doc_snapshot_range, danh_sach_ky
 from services.hhi_service import tinh_hhi, tinh_hhi_breakdown, danh_gia_hhi
@@ -633,14 +634,38 @@ def _render_heatmap_pgd(**kwargs) -> None:
             key="exec_suc_khoe_pgd",
             hide_index=False,
         )
-        # Nút xuất Excel
-        st.download_button(
-            label="⬇️ Xuất Excel",
-            data=xuat_excel({"Sức khỏe PGD": df_display}),
-            file_name=ten_file_xuat("SucKhoe_PGD"),
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            use_container_width=True,
-        )
+        # Nút xuất Excel chuyên nghiệp
+        kpi_suc_khoe = [
+            ("Tổng PGD",                fmt_so(len(df_xh)), ""),
+            ("Tổng dư nợ",              fmt_bang_ty(df_xh["Tổng_dư_nợ"].sum()), ""),
+            ("Tổng NQH",                fmt_bang_ty(df_xh["NQH"].sum()), ""),
+            ("TL NQH b/q",              f"{df_xh['TL_NQH'].mean():.2f}%", ""),
+            ("Số KH vay",               fmt_so(df_xh["Số_KH"].sum()), ""),
+        ]
+        col1, col2 = st.columns([1, 1])
+        with col1:
+            st.download_button(
+                label="⬇️ Xuất Excel (chuyên nghiệp)",
+                type="primary",
+                data=xuat_excel_chuyen_nghiep(
+                    df=df_display,
+                    title="Báo cáo Sức khỏe Tín dụng theo PGD",
+                    subtitle="Phân hệ Chi nhánh",
+                    nguoi_xuat=st.session_state.get("txt_username", ""),
+                    kpi_items=kpi_suc_khoe,
+                ),
+                file_name=excel_ten_file("SucKhoe_PGD"),
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True,
+            )
+        with col2:
+            st.download_button(
+                label="⬇️ Xuất Excel (cơ bản)",
+                data=xuat_excel({"Sức khỏe PGD": df_display}),
+                file_name=ten_file_xuat("SucKhoe_PGD"),
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True,
+            )
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -1029,6 +1054,282 @@ def _canh_bao_migration(df_full: pd.DataFrame) -> None:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# SECTION 6 — RADAR SO SÁNH PGD ĐA CHIỀU
+# ═══════════════════════════════════════════════════════════════════════════════
+def _radar_compare_pgd(df_full: pd.DataFrame) -> None:
+    import plotly.graph_objects as go
+    import plotly.express as px
+
+    st.markdown("#### 📊 So sánh PGD đa chiều (Radar)")
+    if df_full is None or df_full.empty:
+        st.info("Chưa có dữ liệu.")
+        return
+
+    cot_tien = COT_TONG_DU_NO if COT_TONG_DU_NO in df_full.columns else COT_DU_NO_TH
+    if COT_TEN_PGD not in df_full.columns:
+        st.warning("Không có thông tin PGD để so sánh.")
+        return
+
+    pgd_list = df_full[COT_TEN_PGD].dropna().unique()
+    if len(pgd_list) < 2:
+        st.info("Cần ít nhất 2 PGD để so sánh.")
+        return
+
+    max_pgd = 8
+    if len(pgd_list) > max_pgd:
+        pgd_list = pgd_list[:max_pgd]
+
+    categories = ["Dư nợ", "Tỷ lệ QH", "Lãi tồn b/q", "Dư nợ b/q món", "Số KH"]
+    data_radar = []
+    for pgd in pgd_list:
+        grp = df_full[df_full[COT_TEN_PGD] == pgd]
+        du_no = grp[cot_tien].sum() if cot_tien in grp.columns else 0
+        nqh = grp[COT_DU_NO_QH].sum() if COT_DU_NO_QH in grp.columns else 0
+        tl_qh = (nqh / du_no * 100) if du_no > 0 else 0
+        lai_ton = grp[COT_LAI_TON].sum() if COT_LAI_TON in grp.columns else 0
+        lai_ton_bq = lai_ton / len(grp) if len(grp) > 0 else 0
+        dn_bq_mon = du_no / len(grp) if len(grp) > 0 else 0
+        so_kh = grp[COT_MA_KH].nunique() if COT_MA_KH in grp.columns else 0
+
+        data_radar.append({
+            "PGD": pgd,
+            "Dư nợ": du_no,
+            "Tỷ lệ QH": tl_qh,
+            "Lãi tồn b/q": lai_ton_bq,
+            "Dư nợ b/q món": dn_bq_mon,
+            "Số KH": so_kh,
+        })
+
+    df_radar = pd.DataFrame(data_radar)
+
+    # Chuẩn hoá Min-Max cho từng chỉ tiêu
+    df_norm = df_radar.copy()
+    norm_cols = [c for c in categories if c in df_norm.columns]
+    for col in norm_cols:
+        _min = df_norm[col].min()
+        _max = df_norm[col].max()
+        if _max - _min > 0:
+            df_norm[col] = (df_norm[col] - _min) / (_max - _min)
+        else:
+            df_norm[col] = 0.5
+
+    COLORS_RADAR = px.colors.qualitative.Set2
+    fig = go.Figure()
+    for i, (_, row) in enumerate(df_norm.iterrows()):
+        values = [row[c] for c in norm_cols]
+        values += [values[0]]
+        theta = [c for c in norm_cols] + [norm_cols[0]]
+        fig.add_trace(go.Scatterpolar(
+            r=values,
+            theta=theta,
+            name=df_radar.iloc[i]["PGD"],
+            line_color=COLORS_RADAR[i % len(COLORS_RADAR)],
+            fill="toself",
+            opacity=0.3,
+        ))
+
+    fig.update_layout(
+        polar=dict(radialaxis=dict(visible=True, range=[0, 1])),
+        height=400,
+        margin=dict(l=60, r=40, t=10, b=20),
+        font_family="Arial",
+        legend=dict(orientation="h", yanchor="bottom", y=-0.25, xanchor="center", x=0.5),
+    )
+
+    col_chart, col_table = st.columns([2, 1])
+    with col_chart:
+        st.plotly_chart(fig, use_container_width=True)
+    with col_table:
+        st.dataframe(
+            df_radar.round(1),
+            column_config={
+                "Dư nợ": st.column_config.NumberColumn("Dư nợ", format="%.0f"),
+                "Tỷ lệ QH": st.column_config.NumberColumn("TL QH %", format="%.2f"),
+                "Lãi tồn b/q": st.column_config.NumberColumn("Lãi tồn b/q", format="%.0f"),
+                "Dư nợ b/q món": st.column_config.NumberColumn("DN b/q món", format="%.0f"),
+                "Số KH": st.column_config.NumberColumn("Số KH", format="%.0f"),
+            },
+            hide_index=True,
+            use_container_width=True,
+            height=200,
+        )
+
+    # Export
+    st.download_button(
+        label="⬇️ Xuất Excel",
+        type="primary",
+        data=xuat_excel_chuyen_nghiep(
+            df=df_radar,
+            title="So sánh PGD đa chiều (Radar)",
+            kpi_items=[("Số PGD so sánh", fmt_so(len(pgd_list)), ""),
+                       ("Chỉ tiêu", ", ".join(norm_cols), "")],
+        ),
+        file_name=excel_ten_file("Radar_SoSanh_PGD"),
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        use_container_width=True,
+    )
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# SECTION 7 — WATERFALL BIẾN ĐỘNG DƯ NỢ
+# ═══════════════════════════════════════════════════════════════════════════════
+def _waterfall_du_no(df_full: pd.DataFrame) -> None:
+    import plotly.graph_objects as go
+
+    st.markdown("#### 📈 Biến động Dư nợ (Waterfall)")
+    if df_full is None or df_full.empty:
+        st.info("Chưa có dữ liệu.")
+        return
+
+    cot_tien = COT_TONG_DU_NO if COT_TONG_DU_NO in df_full.columns else COT_DU_NO_TH
+    cot_nqh = COT_DU_NO_QH if COT_DU_NO_QH in df_full.columns else None
+
+    tong_dn = df_full[cot_tien].sum() if cot_tien in df_full.columns else 0
+    nqh = df_full[cot_nqh].sum() if cot_nqh and cot_nqh in df_full.columns else 0
+    th = tong_dn - nqh
+
+    # Nhóm theo chương trình
+    if COT_TEN_CT in df_full.columns:
+        ct_groups = df_full.groupby(COT_TEN_CT)[cot_tien].sum().sort_values(ascending=False)
+        top_ct = ct_groups.head(6)
+        khac = ct_groups.iloc[6:].sum()
+    else:
+        top_ct = pd.Series({"Không có CT": tong_dn})
+        khac = 0
+
+    labels = list(top_ct.index)
+    values = [round(v) for v in top_ct.values]
+    if khac > 0:
+        labels.append("Khác")
+        values.append(round(khac))
+
+    total = round(tong_dn)
+
+    # Waterfall: [TH, NQH, CT1, CT2, ..., Tổng]
+    fig = go.Figure(go.Waterfall(
+        name="Dư nợ",
+        orientation="v",
+        measure=["relative", "relative"] + ["relative"] * len(values) + ["total"],
+        x=["Trong hạn", "Quá hạn"] + labels + ["Tổng dư nợ"],
+        y=[round(th), round(nqh)] + values + [total],
+        text=[fmt_ty(v / 1e6) + "tr" for v in [round(th), round(nqh)] + values + [total]],
+        textposition="outside",
+        connector={"line": {"color": "rgb(63, 63, 63)"}},
+        increasing={"marker": {"color": "#2E7D32"}},
+        decreasing={"marker": {"color": "#C62828"}},
+        totals={"marker": {"color": "#1565C0"}},
+    ))
+
+    fig.update_layout(
+        height=400,
+        margin=dict(l=40, r=20, t=20, b=60),
+        font_family="Arial",
+        xaxis_tickangle=-45,
+        plot_bgcolor="rgba(0,0,0,0)",
+        paper_bgcolor="rgba(0,0,0,0)",
+    )
+
+    col_chart, col_info = st.columns([2, 1])
+    with col_chart:
+        st.plotly_chart(fig, use_container_width=True)
+    with col_info:
+        st.metric("Tổng dư nợ", fmt_ty(tong_dn / 1e6) + " tr")
+        st.metric("Trong hạn", fmt_ty(th / 1e6) + " tr", delta_color="normal")
+        st.metric("Quá hạn", fmt_ty(nqh / 1e6) + " tr", delta_color="inverse")
+        st.caption("Waterfall thể hiện cấu trúc dư nợ: trong hạn, quá hạn, và đóng góp theo chương trình.")
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# SECTION 8 — RANKING PGD (LOLLIPOP)
+# ═══════════════════════════════════════════════════════════════════════════════
+def _ranking_pgd(df_full: pd.DataFrame) -> None:
+    st.markdown("#### 🏆 Bảng xếp hạng PGD")
+    if df_full is None or df_full.empty or COT_TEN_PGD not in df_full.columns:
+        st.info("Chưa có dữ liệu hoặc không có thông tin PGD.")
+        return
+
+    import plotly.graph_objects as go
+
+    cot_tien = COT_TONG_DU_NO if COT_TONG_DU_NO in df_full.columns else COT_DU_NO_TH
+    cot_nqh = COT_DU_NO_QH if COT_DU_NO_QH in df_full.columns else None
+
+    ranking = df_full.groupby(COT_TEN_PGD).agg(
+        Dư_nợ=(cot_tien, "sum"),
+        NQH=(cot_nqh, "sum") if cot_nqh else (cot_tien, lambda x: 0),
+        Số_KH=(COT_MA_KH, "nunique") if COT_MA_KH in df_full.columns else (cot_tien, "count"),
+    ).reset_index()
+
+    ranking.columns = ["PGD", "Dư_nợ", "NQH", "Số_KH"]
+    ranking["TL_NQH"] = (ranking["NQH"] / ranking["Dư_nợ"] * 100).round(2)
+    ranking["Dư_nợ_tr"] = (ranking["Dư_nợ"] / 1e6).round(0)
+    ranking = ranking.sort_values("Dư_nợ", ascending=True).reset_index(drop=True)
+
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(
+        x=ranking["Dư_nợ_tr"],
+        y=ranking["PGD"],
+        mode="markers+lines",
+        marker=dict(
+            size=12,
+            color=ranking["Dư_nợ_tr"],
+            colorscale="Blues",
+            showscale=True,
+            colorbar=dict(title="Dư nợ (tr)"),
+        ),
+        line=dict(color="lightgray", width=2),
+        text=ranking["Dư_nợ_tr"].apply(lambda x: f"{x:,.0f} tr"),
+        textposition="middle right",
+        hovertemplate="<b>%{y}</b><br>Dư nợ: %{x:,.0f} tr<extra></extra>",
+    ))
+
+    fig.update_layout(
+        title="Xếp hạng PGD theo Dư nợ",
+        xaxis_title="Dư nợ (triệu đồng)",
+        yaxis=dict(autorange="reversed"),
+        height=max(300, len(ranking) * 35 + 60),
+        margin=dict(l=10, r=40, t=30, b=10),
+        font_family="Arial",
+        plot_bgcolor="rgba(0,0,0,0)",
+        paper_bgcolor="rgba(0,0,0,0)",
+        hovermode="y",
+    )
+
+    col1, col2 = st.columns([2, 1])
+    with col1:
+        st.plotly_chart(fig, use_container_width=True)
+    with col2:
+        st.dataframe(
+            ranking.sort_values("Dư_nợ", ascending=False).reset_index(drop=True),
+            column_config={
+                "PGD": "PGD",
+                "Dư_nợ_tr": st.column_config.NumberColumn("Dư nợ (tr)", format="%.0f"),
+                "TL_NQH": st.column_config.NumberColumn("TL NQH %", format="%.2f"),
+                "Số_KH": st.column_config.NumberColumn("Số KH", format="%.0f"),
+            },
+            hide_index=True,
+            use_container_width=True,
+            height=200,
+        )
+
+    st.download_button(
+        label="⬇️ Xuất Excel",
+        type="primary",
+        data=xuat_excel_chuyen_nghiep(
+            df=ranking.sort_values("Dư_nợ", ascending=False).reset_index(drop=True),
+            title="Bảng xếp hạng PGD",
+            kpi_items=[
+                ("Tổng PGD", fmt_so(len(ranking)), ""),
+                ("Dư nợ toàn CN", fmt_ty(ranking["Dư_nợ"].sum() / 1e6), "triệu đồng"),
+                ("PGD dẫn đầu", ranking.sort_values("Dư_nợ", ascending=False).iloc[0]["PGD"], ""),
+            ],
+        ),
+        file_name=excel_ten_file("XepHang_PGD"),
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        use_container_width=True,
+    )
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # ENTRY POINT — render()
 # ═══════════════════════════════════════════════════════════════════════════════
 def render(**kwargs) -> None:
@@ -1143,6 +1444,18 @@ def render(**kwargs) -> None:
         # ── Ma trận Chuyển dịch Nhóm nợ ─────────────────────────────────
         st.divider()
         _migration_matrix_section(df_full, username)
+
+        # ── Radar So sánh PGD ─────────────────────────────────────────
+        with st.expander("📊 So sánh PGD đa chiều (Radar)", expanded=False):
+            _radar_compare_pgd(df_full)
+
+        # ── Waterfall Biến động Dư nợ ─────────────────────────────────
+        with st.expander("📈 Biến động Dư nợ (Waterfall)", expanded=False):
+            _waterfall_du_no(df_full)
+
+        # ── Bảng xếp hạng PGD ─────────────────────────────────────────
+        with st.expander("🏆 Bảng xếp hạng PGD", expanded=False):
+            _ranking_pgd(df_full)
 
     with tab_tien_do_ui:
         tab_tien_do.render_tong_quan_only(tab_tien_do_ui, **kwargs)

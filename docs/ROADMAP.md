@@ -31,6 +31,33 @@
 
 ---
 
+## Tính năng đang thảo luận — chờ làm rõ nghiệp vụ
+
+### CBTD ↔ ĐGD Integration
+**Vấn đề:** Hai hệ thống hiện tại độc lập:
+```
+CBTD  →  [Mã thôn]     (flat list, kv_store key="cbtd")
+PGD-Xã → ĐGD → [Ấp]   (kv_store key="dgd_map")
+```
+Thực tế nghiệp vụ cần: `CBTD → [ĐGD] → [Ấp/Thôn]`
+
+**Hướng đề xuất:**
+- Thêm `ds_dgd` vào `cbtd_data` → tự động suy ra `ds_thon` từ `dgd_map`
+- Thêm hàm `gan_cbtd_vao_df(df, cbtd_data)` → join `Mã thôn` → cột `"CBTD"` → biểu đồ dư nợ theo CBTD
+
+**Files liên quan:** `tabs/tab_cbtd.py`, `tabs/tab_diem_gd_pgd.py`, `data/khtd.py`, `db.py`, `data/dgd_helpers.py`
+
+**Câu hỏi nghiệp vụ còn mở (chưa implement cho đến khi có câu trả lời):**
+1. 1 CBTD phụ trách bao nhiêu ĐGD? Có thay đổi theo tháng không?
+2. 1 ĐGD có thể do nhiều CBTD cùng phụ trách không?
+3. CBTD gán vào ĐGD → phụ trách toàn bộ thôn hay chỉ một phần?
+4. CBTD có thể chéo PGD không?
+5. File HSTD có cột CBTD sẵn không hay chỉ suy từ `"Mã thôn"`?
+6. Danh sách CBTD lấy từ đâu (nhập tay hay từ hệ thống)?
+7. Mục tiêu dùng CBTD để làm gì (báo cáo hiệu suất, lọc dư nợ, phân công địa bàn)?
+
+---
+
 ## Ghi chú kỹ thuật còn mở
 
 - GSheet ID: `DCGIAM_SHEET_ID = 15Ev2rTv6khLFaMpAiMwqJCVC_33ocJ-6cp016RGNkYk`

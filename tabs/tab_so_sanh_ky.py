@@ -546,6 +546,32 @@ def _quality_bars(
     _row(label_ht, snap_ht)
 
 
+def _agg_theo_dvut(df: pd.DataFrame) -> pd.DataFrame:
+    """Tổng hợp chỉ tiêu theo Hội đoàn thể (ĐVUT), thêm hàng tổng."""
+    if df is None or df.empty or COT_DVUT not in df.columns:
+        return pd.DataFrame()
+
+    agg_spec: dict = {
+        "tong_du_no": (COT_TONG_DU_NO, "sum"),
+        "du_no_qh":   (COT_DU_NO_QH, "sum"),
+        "so_ho":      (COT_MA_KH, "nunique"),
+        "so_ku":      (COT_SO_KU, "nunique"),
+    }
+    if COT_DU_NO_KHOANH in df.columns:
+        agg_spec["du_no_khoanh"] = (COT_DU_NO_KHOANH, "sum")
+
+    try:
+        result = df.groupby(COT_DVUT).agg(**agg_spec).reset_index()
+    except Exception:
+        return pd.DataFrame()
+
+    tong = {COT_DVUT: "⬛ Tổng"}
+    for col in result.columns:
+        if col != COT_DVUT:
+            tong[col] = result[col].sum()
+    return pd.concat([result, pd.DataFrame([tong])], ignore_index=True)
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 
 def render(tab: DeltaGenerator = None, **kwargs) -> None:
@@ -630,85 +656,79 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
         )
         st.divider()
 
-        # ═══════════ 8 KPI CARDS ═════════════════════════════════════════
-        st.markdown("**📊 8 chỉ tiêu cốt lõi · Δ giữa hai kỳ**")
+        # ═══════════ 12 KPI CARDS (3 hàng × 4) ══════════════════════════
+        st.markdown("**📊 Chỉ tiêu cốt lõi · Δ giữa hai kỳ**")
 
-        tl_nqh_ht = _tl_nqh(agg_ht["du_no_qh"], agg_ht["tong_du_no"])
-        tl_nqh_bl = _tl_nqh(agg_bl["du_no_qh"], agg_bl["tong_du_no"])
-        muc_vay_bq_ht = agg_ht["tong_du_no"] / agg_ht["so_ho"] if agg_ht["so_ho"] > 0 else 0
-        muc_vay_bq_bl = agg_bl["tong_du_no"] / agg_bl["so_ho"] if agg_bl["so_ho"] > 0 else 0
+        tl_nqh_ht   = _tl_nqh(agg_ht["du_no_qh"], agg_ht["tong_du_no"])
+        tl_nqh_bl   = _tl_nqh(agg_bl["du_no_qh"], agg_bl["tong_du_no"])
+        tl_kh_ht    = _tl_nqh(agg_ht["du_no_khoanh"], agg_ht["tong_du_no"])
+        tl_kh_bl    = _tl_nqh(agg_bl["du_no_khoanh"], agg_bl["tong_du_no"])
+        no_xau_ht   = agg_ht["du_no_qh"] + agg_ht["du_no_khoanh"]
+        no_xau_bl   = agg_bl["du_no_qh"] + agg_bl["du_no_khoanh"]
+        tl_nx_ht    = _tl_nqh(no_xau_ht, agg_ht["tong_du_no"])
+        tl_nx_bl    = _tl_nqh(no_xau_bl, agg_bl["tong_du_no"])
+        muc_vay_ht  = agg_ht["tong_du_no"] / agg_ht["so_ho"] if agg_ht["so_ho"] > 0 else 0
+        muc_vay_bl  = agg_bl["tong_du_no"] / agg_bl["so_ho"] if agg_bl["so_ho"] > 0 else 0
 
         # Hàng 1 — tăng trưởng
         r1c1, r1c2, r1c3, r1c4 = st.columns(4)
-        r1c1.metric(
-            "Tổng dư nợ",
-            fmt_ty(agg_ht["tong_du_no"]),
-            delta=_delta_str(agg_ht["tong_du_no"], agg_bl["tong_du_no"]),
-            help=f"Mốc {label_bl}: {fmt_ty(agg_bl['tong_du_no'])}",
-        )
-        r1c2.metric(
-            "Số khế ước",
-            fmt_so(agg_ht["so_ku"]),
-            delta=_delta_str(agg_ht["so_ku"], agg_bl["so_ku"], unit="so"),
-            help=f"Mốc {label_bl}: {fmt_so(agg_bl['so_ku'])}",
-        )
-        r1c3.metric(
-            "Số hộ vay",
-            fmt_so(agg_ht["so_ho"]),
-            delta=_delta_str(agg_ht["so_ho"], agg_bl["so_ho"], unit="so"),
-            help=f"Mốc {label_bl}: {fmt_so(agg_bl['so_ho'])}",
-        )
-        r1c4.metric(
-            "Mức vay BQ/KH",
-            fmt_ty(muc_vay_bq_ht),
-            delta=_delta_str(muc_vay_bq_ht, muc_vay_bq_bl),
-            help=f"Mốc {label_bl}: {fmt_ty(muc_vay_bq_bl)}",
-        )
+        r1c1.metric("Tổng dư nợ", fmt_ty(agg_ht["tong_du_no"]),
+                    delta=_delta_str(agg_ht["tong_du_no"], agg_bl["tong_du_no"]),
+                    help=f"Mốc {label_bl}: {fmt_ty(agg_bl['tong_du_no'])}")
+        r1c2.metric("Số khế ước", fmt_so(agg_ht["so_ku"]),
+                    delta=_delta_str(agg_ht["so_ku"], agg_bl["so_ku"], unit="so"),
+                    help=f"Mốc {label_bl}: {fmt_so(agg_bl['so_ku'])}")
+        r1c3.metric("Số hộ vay", fmt_so(agg_ht["so_ho"]),
+                    delta=_delta_str(agg_ht["so_ho"], agg_bl["so_ho"], unit="so"),
+                    help=f"Mốc {label_bl}: {fmt_so(agg_bl['so_ho'])}")
+        r1c4.metric("Mức vay BQ/KH", fmt_ty(muc_vay_ht),
+                    delta=_delta_str(muc_vay_ht, muc_vay_bl),
+                    help=f"Mốc {label_bl}: {fmt_ty(muc_vay_bl)}")
 
-        # Hàng 2 — rủi ro
+        # Hàng 2 — NQH & khoanh
         r2c1, r2c2, r2c3, r2c4 = st.columns(4)
-        r2c1.metric(
-            "Tỷ lệ NQH",
-            _fmt_pct_vn(tl_nqh_ht),
-            delta=_fmt_pct_vn(tl_nqh_ht - tl_nqh_bl),
-            delta_color="inverse",
-            help=f"Mốc {label_bl}: {_fmt_pct_vn(tl_nqh_bl)}",
-        )
-        r2c2.metric(
-            "Dư nợ quá hạn",
-            fmt_ty(agg_ht["du_no_qh"]),
-            delta=_delta_str(agg_ht["du_no_qh"], agg_bl["du_no_qh"]),
-            delta_color="inverse",
-            help=f"Mốc {label_bl}: {fmt_ty(agg_bl['du_no_qh'])}",
-        )
-        r2c3.metric(
-            "Dư nợ khoanh",
-            fmt_ty(agg_ht["du_no_khoanh"]),
-            delta=_delta_str(agg_ht["du_no_khoanh"], agg_bl["du_no_khoanh"]),
-            delta_color="inverse",
-            help=f"Mốc {label_bl}: {fmt_ty(agg_bl['du_no_khoanh'])}",
-        )
-        r2c4.metric(
-            "Lãi tồn TH",
-            fmt_ty(agg_ht["lai_ton"]),
-            delta=_delta_str(agg_ht["lai_ton"], agg_bl["lai_ton"]),
-            delta_color="inverse",
-            help=f"Mốc {label_bl}: {fmt_ty(agg_bl['lai_ton'])}",
-        )
+        r2c1.metric("Tỷ lệ NQH", _fmt_pct_vn(tl_nqh_ht),
+                    delta=_fmt_pct_vn(tl_nqh_ht - tl_nqh_bl), delta_color="inverse",
+                    help=f"Mốc {label_bl}: {_fmt_pct_vn(tl_nqh_bl)}")
+        r2c2.metric("Dư nợ quá hạn", fmt_ty(agg_ht["du_no_qh"]),
+                    delta=_delta_str(agg_ht["du_no_qh"], agg_bl["du_no_qh"]), delta_color="inverse",
+                    help=f"Mốc {label_bl}: {fmt_ty(agg_bl['du_no_qh'])}")
+        r2c3.metric("Dư nợ khoanh", fmt_ty(agg_ht["du_no_khoanh"]),
+                    delta=_delta_str(agg_ht["du_no_khoanh"], agg_bl["du_no_khoanh"]), delta_color="inverse",
+                    help=f"Mốc {label_bl}: {fmt_ty(agg_bl['du_no_khoanh'])}")
+        r2c4.metric("Tỷ lệ DN khoanh", _fmt_pct_vn(tl_kh_ht),
+                    delta=_fmt_pct_vn(tl_kh_ht - tl_kh_bl), delta_color="inverse",
+                    help=f"Mốc {label_bl}: {_fmt_pct_vn(tl_kh_bl)}")
+
+        # Hàng 3 — Nợ xấu & lãi tồn
+        r3c1, r3c2, r3c3, r3c4 = st.columns(4)
+        r3c1.metric("Nợ xấu (QH + Khoanh)", fmt_ty(no_xau_ht),
+                    delta=_delta_str(no_xau_ht, no_xau_bl), delta_color="inverse",
+                    help=f"Mốc {label_bl}: {fmt_ty(no_xau_bl)}")
+        r3c2.metric("Tỷ lệ Nợ xấu", _fmt_pct_vn(tl_nx_ht),
+                    delta=_fmt_pct_vn(tl_nx_ht - tl_nx_bl), delta_color="inverse",
+                    help=f"Mốc {label_bl}: {_fmt_pct_vn(tl_nx_bl)}")
+        r3c3.metric("Tổng lãi tồn (TH+QH)", fmt_ty(agg_ht["tong_lai_ton"]),
+                    delta=_delta_str(agg_ht["tong_lai_ton"], agg_bl["tong_lai_ton"]), delta_color="inverse",
+                    help=f"Mốc {label_bl}: {fmt_ty(agg_bl['tong_lai_ton'])}")
+        r3c4.metric("Giải ngân trong năm", fmt_ty(agg_ht["gn_nam"]),
+                    delta=_delta_str(agg_ht["gn_nam"], agg_bl["gn_nam"]),
+                    help=f"Mốc {label_bl}: {fmt_ty(agg_bl['gn_nam'])}")
 
         st.divider()
 
         # ── Chi tiết chỉ tiêu ─────────────────────────────────────────────
         with st.expander("📋 Chi tiết chỉ tiêu", expanded=True):
             rows = [
-                ("Tổng dư nợ",         agg_bl["tong_du_no"],   agg_ht["tong_du_no"],   "ty"),
-                ("  Dư nợ trong hạn",  agg_bl["du_no_th"],     agg_ht["du_no_th"],     "ty"),
-                ("  Dư nợ quá hạn",    agg_bl["du_no_qh"],     agg_ht["du_no_qh"],     "ty"),
-                ("  Dư nợ khoanh",     agg_bl["du_no_khoanh"], agg_ht["du_no_khoanh"], "ty"),
-                ("  Lãi tồn TH",       agg_bl["lai_ton"],      agg_ht["lai_ton"],      "ty"),
-                ("Giải ngân trong năm",agg_bl["gn_nam"],       agg_ht["gn_nam"],       "ty"),
-                ("Số hộ vay",          agg_bl["so_ho"],        agg_ht["so_ho"],        "so"),
-                ("Số khế ước",         agg_bl["so_ku"],        agg_ht["so_ku"],        "so"),
+                ("Tổng dư nợ",           agg_bl["tong_du_no"],    agg_ht["tong_du_no"],    "ty"),
+                ("  Dư nợ trong hạn",    agg_bl["du_no_th"],      agg_ht["du_no_th"],      "ty"),
+                ("  Dư nợ quá hạn",      agg_bl["du_no_qh"],      agg_ht["du_no_qh"],      "ty"),
+                ("  Dư nợ khoanh",       agg_bl["du_no_khoanh"],  agg_ht["du_no_khoanh"],  "ty"),
+                ("Nợ xấu (QH + Khoanh)", no_xau_bl,               no_xau_ht,               "ty"),
+                ("Tổng lãi tồn (TH+QH)", agg_bl["tong_lai_ton"],  agg_ht["tong_lai_ton"],  "ty"),
+                ("Giải ngân trong năm",  agg_bl["gn_nam"],        agg_ht["gn_nam"],        "ty"),
+                ("Số hộ vay",            agg_bl["so_ho"],         agg_ht["so_ho"],         "so"),
+                ("Số khế ước",           agg_bl["so_ku"],         agg_ht["so_ku"],         "so"),
             ]
             data_ct = []
             for ten, bl_val, ht_val, unit in rows:
@@ -881,6 +901,55 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
             )
 
             st.dataframe(df_out, hide_index=True, use_container_width=True, height=520)
+
+        # ═══════════ KPI THEO HỘI ĐOÀN THỂ (ĐVUT) ══════════════════════════
+        st.divider()
+        with st.expander("🏛️ So sánh theo Hội đoàn thể (ĐVUT)", expanded=False):
+            df_dvut_ht = _agg_theo_dvut(df_ht)
+            df_dvut_bl = _agg_theo_dvut(df_bl)
+
+            if df_dvut_ht.empty or df_dvut_bl.empty:
+                st.info("Không có cột Tên ĐVUT trong dữ liệu.")
+            else:
+                df_dvut = df_dvut_ht.merge(
+                    df_dvut_bl, on=COT_DVUT, how="outer",
+                    suffixes=("_ht", "_bl"),
+                ).fillna(0)
+
+                no_xau_dvut_ht = df_dvut["du_no_qh_ht"] + df_dvut.get("du_no_khoanh_ht", pd.Series(0, index=df_dvut.index)).fillna(0)
+                no_xau_dvut_bl = df_dvut["du_no_qh_bl"] + df_dvut.get("du_no_khoanh_bl", pd.Series(0, index=df_dvut.index)).fillna(0)
+
+                df_out = pd.DataFrame()
+                df_out["Hội đoàn thể"]      = df_dvut[COT_DVUT]
+                df_out[f"DN mốc {label_bl}"] = df_dvut["tong_du_no_bl"].apply(fmt_ty)
+                df_out["DN hiện tại"]        = df_dvut["tong_du_no_ht"].apply(fmt_ty)
+                df_out["±DN"] = (df_dvut["tong_du_no_ht"] - df_dvut["tong_du_no_bl"]).apply(
+                    lambda x: ("+" if x >= 0 else "") + fmt_ty(x)
+                )
+                df_out["±DN%"] = df_dvut.apply(
+                    lambda r: ("+" if r["tong_du_no_ht"] >= r["tong_du_no_bl"] else "")
+                    + f"{(r['tong_du_no_ht'] - r['tong_du_no_bl']) / r['tong_du_no_bl'] * 100:.2f}".replace(".", ",") + "%"
+                    if r["tong_du_no_bl"] != 0 else "—", axis=1,
+                )
+                df_out["Hộ mốc"]   = df_dvut["so_ho_bl"].apply(lambda x: fmt_so(int(x)))
+                df_out["Hộ HT"]    = df_dvut["so_ho_ht"].apply(lambda x: fmt_so(int(x)))
+                df_out["±Hộ"] = (df_dvut["so_ho_ht"] - df_dvut["so_ho_bl"]).apply(
+                    lambda x: ("+" if x >= 0 else "") + fmt_so(int(x))
+                )
+                df_out["NQH mốc"]  = df_dvut.apply(
+                    lambda r: _fmt_pct_vn(_tl_nqh(r["du_no_qh_bl"], r["tong_du_no_bl"])), axis=1
+                )
+                df_out["NQH HT"]   = df_dvut.apply(
+                    lambda r: _fmt_pct_vn(_tl_nqh(r["du_no_qh_ht"], r["tong_du_no_ht"])), axis=1
+                )
+                df_out["Nợ xấu HT"]    = no_xau_dvut_ht.apply(fmt_ty)
+                df_out["TL Nợ xấu HT"] = df_dvut.apply(
+                    lambda r: _fmt_pct_vn(
+                        _tl_nqh(r["du_no_qh_ht"] + r.get("du_no_khoanh_ht", 0), r["tong_du_no_ht"])
+                    ), axis=1
+                )
+
+                st.dataframe(df_out, hide_index=True, use_container_width=True, height=480)
 
         # ═══════════ MA TRẬN CHUYỂN NHÓM NỢ ═════════════════════════════════
         st.divider()

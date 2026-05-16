@@ -1095,23 +1095,6 @@ def render(**kwargs):
     if _wl:
         st.warning(_wl)
 
-    # ── Lazy import tab modules ──────────────────────────────────────────
-    from tabs import (
-        tab_tongquan, tab_baocao,
-        tab_candoi, tab_cbtd, tab_khtd, tab_kehoach,
-        tab_nhiem_vu, tab_khtd_giao_dc, tab_kiem_soat,
-        tab_ban_dai_dien, tab_uy_thac,
-        tab_tien_do, tab_tien_do_nop,
-    )
-    from tabs import tab_checklist_bc
-    from tabs import tab_xlrr_tong_hop
-    from tabs import tab_upload_khnv
-    from tabs import tab_audit_log
-    from tabs import tab_trang_thai_nguon
-    from tabs import tab_so_sanh_ky
-    from tabs import tab_hhi
-    from tabs import tab_no_khoanh
-
     def _tab_so_sanh_ky_fn(**kw):
         tab_so_sanh_ky.render(None, **kw)
 

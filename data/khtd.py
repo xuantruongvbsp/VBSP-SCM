@@ -73,6 +73,75 @@ def luu_cbtd(data: dict):
     _kv_set("cbtd", data)
 
 
+# ── CBTD ↔ ĐGD helpers ───────────────────────────────────────────────────────
+
+def lay_ap_tu_dgd_list(pgd: str, ds_dgd: list, dgd_map: dict) -> list[tuple[str, str]]:
+    """Trả về list (ten_xa, ten_ap) từ ds_dgd trong dgd_map của một PGD.
+
+    Args:
+        pgd: Tên PGD (key trong dgd_map)
+        ds_dgd: Danh sách tên ĐGD mà CBTD phụ trách
+        dgd_map: Dict {pgd: {xa: {dgd_name: [ap_list]}}}
+    Returns:
+        List (ten_xa, ten_ap) — dùng để join với HSTD qua cột Tên xã + Tên thôn
+    """
+    result = []
+    xa_block = (dgd_map or {}).get(pgd, {})
+    for ten_xa, dgd_block in xa_block.items():
+        if not isinstance(dgd_block, dict):
+            continue
+        for dgd_name, ap_list in dgd_block.items():
+            if dgd_name in ds_dgd:
+                for ap in (ap_list or []):
+                    ap_s = str(ap).strip()
+                    if ap_s:
+                        result.append((ten_xa, ap_s))
+    return result
+
+
+def xay_ap_to_cbtd_map(cbtd_data: dict, dgd_map: dict) -> dict:
+    """Xây dict (xa_lower, ap_lower) → (ma_cb, ten_cb) để join với HSTD.
+
+    1 ĐGD = 1 CBTD nên không có trùng. Key đầu tiên thắng nếu có xung đột.
+    """
+    result: dict[tuple[str, str], tuple[str, str]] = {}
+    for ma_cb, info in (cbtd_data or {}).items():
+        pgd = info.get("pgd", "")
+        ds_dgd = info.get("ds_dgd", [])
+        if not pgd or not ds_dgd:
+            continue
+        for ten_xa, ten_ap in lay_ap_tu_dgd_list(pgd, ds_dgd, dgd_map):
+            key = (ten_xa.lower().strip(), ten_ap.lower().strip())
+            if key not in result:
+                result[key] = (ma_cb, info.get("ho_ten", ""))
+    return result
+
+
+def gan_cbtd_vao_df(
+    df,
+    cbtd_data: dict,
+    dgd_map: dict,
+    col_xa: str = "Tên xã",
+    col_thon: str = "Tên thôn",
+):
+    """Thêm cột 'CBTD' (mã) và 'Tên CBTD' vào df. Join qua (Tên xã, Tên thôn).
+
+    Nếu không tìm được khớp, giá trị là None.
+    """
+    df = df.copy()
+    ap_map = xay_ap_to_cbtd_map(cbtd_data, dgd_map)
+    if not ap_map or col_xa not in df.columns or col_thon not in df.columns:
+        df["CBTD"] = None
+        df["Tên CBTD"] = None
+        return df
+    xa_s = df[col_xa].fillna("").astype(str).str.strip().str.lower()
+    thon_s = df[col_thon].fillna("").astype(str).str.strip().str.lower()
+    keys = list(zip(xa_s, thon_s))
+    df["CBTD"]     = [ap_map.get(k, (None, None))[0] for k in keys]
+    df["Tên CBTD"] = [ap_map.get(k, (None, None))[1] for k in keys]
+    return df
+
+
 # ── Đọc file phụ lục QĐ UBND tỉnh ────────────────────────────────────────────
 _LA_MA = {
     'I','II','III','IV','V','VI','VII','VIII','IX','X',

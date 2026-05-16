@@ -292,14 +292,25 @@ def _render_don_doc(df: pd.DataFrame, pgd_user: str, role: str):
     with col_xuat:
         st.markdown("<br>", unsafe_allow_html=True)
         if not df_dondoc.empty:
-            buf = xuat_excel({"Đôn đốc 3m KHĐ": df_dondoc})
+            from services.excel_service import xuat_excel_chuyen_nghiep, ten_file_xuat as excel_ten_file
+            kpi_don_doc = [
+                ("Số hộ KHĐ", fmt_so(len(df_dondoc)), f"Lọc: {chon_dvut}"),
+            ]
+            if COT_LAI_TON in df_dondoc.columns:
+                kpi_don_doc.append(("Lãi tồn", fmt_ty(df_dondoc[COT_LAI_TON].sum()), "triệu đồng"))
             st.download_button(
-                label=f"⬇️ Xuất Excel ({len(df_dondoc)} hộ)",
-                data=buf,
-                file_name=f"DonDoc_3m_{chon_dvut}_{datetime.now().strftime('%Y%m%d')}.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                key="op_xuat_khd",
+                label=f"⬇️ Xuất Excel chuyên nghiệp ({len(df_dondoc)} hộ)",
                 type="primary",
+                data=xuat_excel_chuyen_nghiep(
+                    df=df_dondoc,
+                    title="Danh sách Đôn đốc 3 tháng KHĐ",
+                    subtitle=f"PGD: {pgd_user} - {chon_dvut}",
+                    nguoi_xuat=st.session_state.get("txt_username", ""),
+                    kpi_items=kpi_don_doc,
+                ),
+                file_name=excel_ten_file("DonDoc_3m_KHD"),
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                key="op_xuat_khd_pro",
             )
 
     if not df_dondoc.empty:
@@ -1032,26 +1043,32 @@ Doanh số cho vay trong tháng: {ds_cv:,.0f} triệu đồng; doanh số thu n�
         # ④ Xuất Excel
         st.markdown("**④ Xuất Excel**")
         
-        if st.button("⬇️ Xuất Excel", type="primary", key="gb_xuat_excel"):
-            try:
-                buf = xuat_excel({"Giao ban": df_bang})
-                # Tạo tên file với thông tin điểm giao dịch
-                ten_file_safe = (ten_dgd or chon_xa).replace("/", "_").replace("\\", "_")
-                ten_file = f"GiaoBan_{chon_xa}_{ten_file_safe}_{datetime.now().strftime('%Y%m%d')}.xlsx"
-                st.session_state["_bytes_gb"] = buf
-                st.session_state["_file_gb"] = ten_file
-                st.success(f"✅ Đã tạo file Excel: **{ten_file}**")
-            except Exception as e:
-                st.error(f"❌ Lỗi xuất Excel: {e}")
-
-        if st.session_state.get("_bytes_gb"):
-            st.download_button(
-                label=f"📥 Tải về {st.session_state['_file_gb']}",
-                data=st.session_state["_bytes_gb"],
-                file_name=st.session_state["_file_gb"],
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                key="gb_download"
-            )
+        cols_xuat = [c for c in df_bang.columns if c != "Tỷ trọng %"] or list(df_bang.columns)
+        
+        st.download_button(
+            label="⬇️ Xuất Excel chuyên nghiệp",
+            type="primary",
+            data=xuat_excel_chuyen_nghiep(
+                df=df_bang,
+                title="Báo cáo Giao ban",
+                subtitle=f"Xã {chon_xa} · {ten_dgd or ''} · {datetime.now().strftime('%d/%m/%Y')}",
+                nguoi_xuat=st.session_state.get("txt_username", ""),
+                columns=cols_xuat,
+                kpi_items=[
+                    ("📍 Điểm GD", ten_dgd or chon_xa, ""),
+                    ("💰 Tổng dư nợ", fmt_ty(tong_dn * 1e6) if tong_dn > 0 else "—", "triệu đồng"),
+                    ("👥 Số khách hàng", fmt_so(so_kh) if so_kh > 0 else "—", ""),
+                    ("🔴 Nợ quá hạn", fmt_ty(nqh * 1e6) if nqh > 0 else "—", "triệu đồng"),
+                    ("📊 Tỷ lệ NQH", f"{tl_nqh:.2f}%" if tl_nqh > 0 else "0%", ""),
+                    ("� Doanh số cho vay", fmt_ty(ds_cv * 1e6) if ds_cv > 0 else "—", "triệu đồng"),
+                    ("📉 Doanh số thu nợ", fmt_ty(ds_thu * 1e6) if ds_thu > 0 else "—", "triệu đồng"),
+                ],
+            ),
+            file_name=f"GiaoBan_{chon_xa}_{datetime.now().strftime('%Y%m%d')}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            key="gb_download",
+            use_container_width=True,
+        )
 
 
 def render(**kwargs):
@@ -1333,6 +1350,129 @@ def render(**kwargs):
                     use_container_width=True,
                 )
 
+    def _render_histogram_du_no(tab_parent, **kw) -> None:
+        with tab_parent:
+            import plotly.express as px
+
+            df_loc = kw.get("df")
+            st.subheader("📊 Histogram — Phân bố Dư nợ theo Khoản vay")
+
+            if df_loc is None or df_loc.empty:
+                st.info("Chưa có dữ liệu HSTD.")
+                return
+
+            cot_tien = COT_TONG_DU_NO if COT_TONG_DU_NO in df_loc.columns else (COT_DU_NO_TH if COT_DU_NO_TH in df_loc.columns else None)
+            if cot_tien is None:
+                st.warning("Không tìm thấy cột dư nợ.")
+                return
+
+            df_hist = df_loc.copy()
+            df_hist[cot_tien] = pd.to_numeric(df_hist[cot_tien], errors="coerce").fillna(0)
+            df_hist = df_hist[df_hist[cot_tien] > 0]
+
+            if df_hist.empty:
+                st.info("Không có dữ liệu dư nợ dương.")
+                return
+
+            max_val = df_hist[cot_tien].max()
+            bins = st.slider("Số khoảng (bins)", min_value=5, max_value=50, value=20, key="hist_bins")
+
+            fig = px.histogram(
+                df_hist,
+                x=cot_tien,
+                nbins=bins,
+                labels={cot_tien: "Dư nợ (đồng)"},
+                title="Phân bố dư nợ",
+                color_discrete_sequence=["#2E7D32"],
+            )
+            fig.update_layout(
+                height=400,
+                margin=dict(l=0, r=20, t=40, b=0),
+                font_family="Arial",
+                xaxis=dict(tickformat=",.0f"),
+                yaxis=dict(title="Số khoản vay"),
+                bargap=0.05,
+            )
+            fig.add_vline(x=df_hist[cot_tien].median(), line_dash="dash", line_color="#C62828",
+                          annotation_text=f"Trung vị: {df_hist[cot_tien].median():,.0f}")
+            st.plotly_chart(fig, use_container_width=True)
+
+            col_s1, col_s2, col_s3 = st.columns(3)
+            with col_s1:
+                st.metric("Trung bình", fmt_ty(df_hist[cot_tien].mean()), help="Dư nợ bình quân/khoản")
+            with col_s2:
+                st.metric("Trung vị", fmt_ty(df_hist[cot_tien].median()), help="Dư nợ trung vị")
+            with col_s3:
+                st.metric("Tổng số khoản", fmt_so(len(df_hist)), help="Số khoản vay có dư nợ")
+
+    def _render_donut_co_cau(tab_parent, **kw) -> None:
+        with tab_parent:
+            import plotly.graph_objects as go
+
+            df_loc = kw.get("df")
+            st.subheader("🍩 Donut — Cơ cấu Dư nợ theo Chương trình")
+
+            if df_loc is None or df_loc.empty:
+                st.info("Chưa có dữ liệu HSTD.")
+                return
+
+            nhom_ct = COT_TEN_CT if COT_TEN_CT in df_loc.columns else None
+            if nhom_ct is None:
+                st.warning("Không tìm thấy cột Chương trình.")
+                return
+
+            cot_tien = COT_TONG_DU_NO if COT_TONG_DU_NO in df_loc.columns else (COT_DU_NO_TH if COT_DU_NO_TH in df_loc.columns else None)
+            if cot_tien is None:
+                st.warning("Không tìm thấy cột dư nợ.")
+                return
+
+            df_donut = df_loc.copy()
+            df_donut[cot_tien] = pd.to_numeric(df_donut[cot_tien], errors="coerce").fillna(0)
+            df_donut = df_donut[df_donut[cot_tien] > 0]
+
+            if df_donut.empty:
+                st.info("Không có dữ liệu dư nợ dương.")
+                return
+
+            ct_group = df_donut.groupby(nhom_ct)[cot_tien].sum().sort_values(ascending=False)
+
+            top_n = st.slider("Hiển thị Top N chương trình", min_value=3, max_value=10, value=5, key="donut_top")
+            ct_show = ct_group.head(top_n)
+            ct_others = ct_group.iloc[top_n:].sum() if len(ct_group) > top_n else 0
+
+            labels = list(ct_show.index)
+            values = [v / 1e6 for v in ct_show.values]
+            if ct_others > 0:
+                labels.append("Khác")
+                values.append(ct_others / 1e6)
+
+            colors = ["#2E7D32", "#1565C0", "#F9A825", "#C62828", "#6A1B9A",
+                      "#00838F", "#E65100", "#4E342E", "#37474F", "#827717"]
+
+            fig = go.Figure(data=[go.Pie(
+                labels=labels,
+                values=values,
+                hole=0.4,
+                marker=dict(colors=colors[:len(labels)]),
+                textinfo="label+percent",
+                texttemplate="%{label}<br>%{percent:.1f}%",
+                hovertemplate="<b>%{label}</b><br>Dư nợ: %{value:,.0f} tr.đ<br>Tỷ trọng: %{percent:.1f}%<extra></extra>",
+            )])
+            fig.update_layout(
+                height=450,
+                margin=dict(l=0, r=0, t=10, b=0),
+                font_family="Arial",
+                legend=dict(orientation="h", y=-0.1),
+            )
+            st.plotly_chart(fig, use_container_width=True)
+
+            with st.expander("📋 Bảng số liệu", expanded=False):
+                df_ct = ct_group.reset_index()
+                df_ct.columns = ["Chương trình", "Dư nợ (đồng)"]
+                df_ct["Dư nợ (triệu)"] = (df_ct["Dư nợ (đồng)"] / 1e6).round(1)
+                df_ct["Tỷ trọng %"] = (df_ct["Dư nợ (đồng)"] / df_ct["Dư nợ (đồng)"].sum() * 100).round(1)
+                st.dataframe(df_ct, hide_index=True, use_container_width=True)
+
     def _render_mau_bieu_tab(tab_parent) -> None:
         with tab_parent:
             _init_gb2_session_for_doc_hub(kwargs)
@@ -1364,6 +1504,8 @@ def render(**kwargs):
                 ("⏰ Đến hạn", lambda tab: render_den_han(role=role, pgd_user=pgd_user)),
                 ("📈 Dự phóng Dòng tiền", lambda tab: _render_du_phong_dong_tien(tab, **_pgd_df_kwargs)),
                 ("🔥 Heatmap Đáo hạn", lambda tab: _render_heatmap_dao_han(tab, **_pgd_df_kwargs)),
+                ("📊 Histogram Dư nợ", lambda tab: _render_histogram_du_no(tab, **_pgd_df_kwargs)),
+                ("🍩 Cơ cấu CT", lambda tab: _render_donut_co_cau(tab, **_pgd_df_kwargs)),
                 ("📊 So sánh kỳ", lambda tab: tab_so_sanh_ky.render(
                     tab, df=df, df_full=df_full, role=role, username=username,
                     pgd_user=pgd_user, pgd_mode=True,

@@ -826,6 +826,7 @@ def _build_all_items(role: str, username: str, **kwargs) -> list:
         {"group": "Giám sát",     "label": "Tiến độ PGD", "icon": "file", "fn": lambda: tab_tien_do_nop.render(None, **kwargs)},
         {"group": "Giám sát",     "label": "Cảnh báo NQH",     "icon": "alert-triangle", "fn": lambda: _render_canh_bao_no(df_full, ds_pgd_all, role, kwargs.get("username", "unknown"))},
         {"group": "Giám sát",     "label": "Giao & Theo dõi Nhiệm vụ", "icon": "check",  "fn": lambda: tab_nhiem_vu.render(None, **kwargs)},
+        {"group": "Giám sát",     "label": "So sánh kỳ",            "icon": "chart-line", "fn": None},
         {"group": "Kiểm soát",     "label": "Kiểm soát nội bộ",    "icon": "search",         "fn": lambda: tab_kiem_soat.render_tab(df_full, role, kwargs.get("username", "unknown"))},
         {"group": "Kiểm soát",     "label": "Xử lý nợ rủi ro",   "icon": "alert-circle",   "fn": lambda: tab_xlrr_tong_hop.render(None, **kwargs)},
         {"group": "Kiểm soát",     "label": "Cán bộ tín dụng",    "icon": "user",           "fn": lambda: tab_cbtd.render(None, **kwargs)},

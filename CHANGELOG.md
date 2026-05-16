@@ -1,5 +1,15 @@
 # CHANGELOG
 
+## [2026-05-16] — Tối ưu hoá performance: nén parquet, TTL cache, cache hàm toan_cn
+- `data/core.py` — `excel_to_parquet()`: thêm `compression_level=9` cho zstd (giảm ~70% dung lượng parquet)
+- `services/upload_service.py` — merge toan_cn: thêm `compression_level=9` khi ghi `hstd/nq11/gqvl.parquet`
+- `data/hstd.py` — Tất cả `@st.cache_data` không có TTL → thêm `ttl=7200`; ttl=3600 → 7200; thêm `compression_level=9` cho CACHE_GQVL và CACHE_SK_GQVL
+- `data/pgd.py` — `ttl=300` → `ttl=7200` cho tất cả decorator; thêm `@st.cache_data(ttl=7200)` cho `doc_gqvl_toan_cn_pgd()` và `doc_nq11_toan_cn_pgd()` (trước đây không cached)
+
+## [2026-05-16] — Fix deprecation warnings: use_container_width + dayfirst
+- `utils.py` dòng 155 — Đổi `use_container_width=True` → `width='stretch'` trong `hien_thi_dataframe_phan_trang()` (Streamlit API mới)
+- `data/hstd.py` dòng 238–240 — Thêm `dayfirst=True` vào 3 lần gọi `pd.to_datetime()` cho cột ngày định dạng DD/MM/YYYY
+
 ## [2026-05-16] — Fix "Nguồn vốn" toàn NaN sau khi merge GQVL
 - `services/upload_service.py` dòng ~462 — Bỏ `"Nguồn vốn"` khỏi `_cols_so_cn` trong bước chuẩn hóa schema sau concat; cột này chứa text "TW"/"ĐP" nên không được ép `pd.to_numeric()` (đã có comment cảnh báo ở `_clean` nhưng bị nhầm thêm vào danh sách số ở bước merge)
 - `cache/gqvl.parquet` + 22 `pgd_data/*/gqvl_latest.parquet` — Đã xóa cache bị hỏng, sẽ tự rebuild khi merge lại

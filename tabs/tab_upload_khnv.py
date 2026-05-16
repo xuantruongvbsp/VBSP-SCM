@@ -171,10 +171,20 @@ def _kiem_tra_don_vi(file_bytes: bytes, loai: str, ten_dv_chon: str) -> tuple[bo
 # ── Bảng trạng thái upload ────────────────────────────────────────────────────
 
 def _hien_thi_bang_trang_thai() -> None:
-    """Bảng trạng thái 22 hàng × 5 cột: Đơn vị | HSTD | NQ11 | GQVL | CDTOTKVV."""
+    """Bảng trạng thái 22 hàng × 6 cột: Đơn vị | HSTD | NQ11 | GQVL | CDTOTKVV | 31/12/YYYY."""
+    from datetime import date as _date
     df_tt = st.session_state.get(
         "trang_thai_upload_pgd",
         lay_trang_thai_upload_pgd(DS_DON_VI),
+    ).copy()
+
+    # Thêm cột baseline 31/12 — hiển thị năm gần nhất có dữ liệu
+    ds_nam_bl = danh_sach_nam_baseline_pgd()
+    nam_bl = ds_nam_bl[0] if ds_nam_bl else (_date.today().year - 1)
+    tt_bl = trang_thai_baseline_pgd(nam_bl)
+    col_bl = f"31/12/{nam_bl}"
+    df_tt[col_bl] = df_tt["Đơn vị"].map(
+        lambda dv: "✅ Có" if tt_bl.get(dv, False) else "❌ Chưa có"
     )
 
     # Tô màu badge theo tiền tố: ✅ xanh | ⚠️ vàng | ❌ đỏ
@@ -188,7 +198,7 @@ def _hien_thi_bang_trang_thai() -> None:
             return "background-color: #f8d7da; color: #721c24"
         return ""
 
-    cols_loai = ["HSTD", "NQ11", "GQVL", "CDTOTKVV"]
+    cols_loai = ["HSTD", "NQ11", "GQVL", "CDTOTKVV", col_bl]
     styled = df_tt.style.map(style_trang_thai, subset=cols_loai)
     hien_thi_dataframe_phan_trang(styled, key="upload_khnv_trang_thai", height=800)
 
@@ -1100,7 +1110,7 @@ def _render_xoa_du_lieu(role: str, username: str) -> None:
 # ── Upload Baseline 31/12 ─────────────────────────────────────────────────────
 
 def _render_upload_baseline(username: str) -> None:
-    """Expander upload file HSTD mốc 31/12 per-PGD để dùng cho tab So sánh kỳ."""
+    """Expander upload file HSTD mốc 31/12 per-PGD — hỗ trợ bulk upload."""
     with st.expander("📅 Upload mốc số liệu 31/12 (Baseline)", expanded=False):
         st.caption(
             "Upload file HSTD 31/12 của từng đơn vị — tab **So sánh kỳ** sẽ tự merge. "
@@ -1120,52 +1130,208 @@ def _render_upload_baseline(username: str) -> None:
         )
         nam = int(chon_nam)
 
-        # Trạng thái 22 đơn vị
+        # ── Trạng thái 22 đơn vị ─────────────────────────────────────
         trang_thai = trang_thai_baseline_pgd(nam)
         da_co = sum(1 for v in trang_thai.values() if v)
         tong = len(trang_thai)
 
         if da_co == tong:
-            st.success(f"✅ Đủ {tong}/{tong} đơn vị — baseline {nam} sẵn sàng.")
+            st.success(f"✅ Đủ {tong}/{tong} đơn vị — baseline {nam} sẵn sàng cho tab So sánh kỳ.")
         elif da_co > 0:
-            st.warning(f"⏳ Đã có {da_co}/{tong} đơn vị — còn thiếu {tong - da_co} đơn vị.")
+            thieu = [dv for dv, co in trang_thai.items() if not co]
+            st.warning(f"⏳ Đã có **{da_co}/{tong}** đơn vị. Còn thiếu: {', '.join(thieu)}.")
         else:
             st.info(f"ℹ️ Chưa có đơn vị nào cho năm {nam}.")
 
         st.divider()
 
-        # Grid upload: 2 cột, mỗi dòng 1 đơn vị
-        ds_don_vi = [DON_VI_CHI_NHANH] + DS_PGD
-        col_l, col_r = st.columns(2)
-        for idx, don_vi in enumerate(ds_don_vi):
-            col = col_l if idx % 2 == 0 else col_r
-            with col:
-                co_file = trang_thai.get(don_vi, False)
-                nhan = f"{'✅' if co_file else '⬜'} {don_vi}"
-                f_up = st.file_uploader(
-                    nhan,
-                    type=["xlsx", "xls"],
-                    key=f"bl_{nam}_{idx}",
-                    label_visibility="visible",
-                )
-                if f_up is not None:
-                    if st.button("Lưu", key=f"btn_bl_{nam}_{idx}", type="primary"):
-                        byt = f_up.read()
-                        if not byt:
-                            st.error("File rỗng.")
-                        else:
-                            dest = baseline_pgd_path(don_vi, nam)
+        # ── Import hàng loạt: chọn file hoặc quét thư mục ──────────────
+        st.markdown("**📦 Import hàng loạt** — hệ thống tự nhận diện PGD từ nội dung file")
+
+        tab_file, tab_folder = st.tabs(["📂 Chọn file", "📁 Quét thư mục"])
+
+        with tab_file:
+            st.info(
+                "**Cách chọn nhiều file:**  \n"
+                "• Windows: giữ **Ctrl** rồi click từng file, hoặc **Ctrl+A** "
+                "để chọn tất cả trong thư mục  \n"
+                "• Mac: giữ **⌘ Cmd** rồi click từng file"
+            )
+            _bl_ver = st.session_state.setdefault("bl_bulk_ver", 0)
+            uploaded = st.file_uploader(
+                "Chọn file baseline",
+                type=["xlsx", "xls"],
+                accept_multiple_files=True,
+                key=f"bl_bulk_{nam}_{_bl_ver}",
+                label_visibility="collapsed",
+            )
+            if uploaded:
+                _bl_ids_now = [(f.name, f.size) for f in uploaded]
+                if st.session_state.get("_bl_ids") != _bl_ids_now:
+                    st.session_state["_bl_ids"] = _bl_ids_now
+                    st.session_state["_bl_bytes"] = {f.name: f.read() for f in uploaded}
+
+        with tab_folder:
+            st.caption("Nhập đường dẫn thư mục chứa file HSTD 31/12 trên máy tính.")
+            thu_muc = st.text_input(
+                "Đường dẫn thư mục",
+                placeholder=r"Ví dụ: D:\Data\HSTD_3112_2025",
+                key="bl_folder_path",
+                label_visibility="collapsed",
+            )
+            if st.button("🔍 Quét thư mục", key="btn_bl_scan_folder"):
+                if not thu_muc or not os.path.isdir(thu_muc):
+                    st.error("❌ Thư mục không tồn tại.")
+                else:
+                    files = [f for f in Path(thu_muc).iterdir()
+                             if f.suffix.lower() in (".xlsx", ".xls")]
+                    if not files:
+                        st.warning("⚠️ Không có file Excel nào trong thư mục.")
+                    else:
+                        _bm: dict[str, bytes] = {}
+                        for f in files:
                             try:
-                                Path(dest).parent.mkdir(parents=True, exist_ok=True)
-                                with open(dest, "wb") as fh:
-                                    fh.write(byt)
-                                mb = len(byt) / 1024 / 1024
-                                db.ghi_audit(username, "upload_baseline",
-                                             f"HSTD 31/12/{nam} — {don_vi} ({mb:.1f} MB)")
-                                st.cache_data.clear()
-                                st.rerun()
-                            except Exception as e:
-                                st.error(f"❌ {e}")
+                                _bm[f.name] = f.read_bytes()
+                            except Exception:
+                                pass
+                        st.session_state["_bl_bytes"] = _bm
+                        st.session_state["_bl_ids"] = [(k, len(v)) for k, v in _bm.items()]
+                        st.success(f"✅ Tìm thấy {len(_bm)} file.")
+                        st.rerun()
+
+        bytes_map: dict[str, bytes] = st.session_state.get("_bl_bytes", {})
+        if not bytes_map:
+            st.caption("Chưa có file nào.")
+            return
+
+        # ── Tùy chọn ─────────────────────────────────────────────────
+        buoc_import = st.checkbox(
+            "🔁 Bắt buộc import lại (kể cả file giống hệt trên đĩa)",
+            value=False,
+            key="bl_force_import",
+        )
+
+        # ── Nhận diện + so sánh MD5 ──────────────────────────────────
+        rows: list[dict] = []
+        ds_don_vi_chuan = set([DON_VI_CHI_NHANH] + DS_PGD)
+        seen: dict[str, int] = {}
+
+        with st.spinner("🔍 Đang nhận diện file..."):
+            for ten_file, data in bytes_map.items():
+                ten_pgd = _tim_ten_pgd_tu_noi_dung(data, "hstd")
+                if ten_pgd:
+                    ten_pgd = _chuan_hoa_ten(ten_pgd)
+
+                if not ten_pgd or ten_pgd not in ds_don_vi_chuan:
+                    rows.append({
+                        "ten_file": ten_file, "ten_pgd": ten_pgd or "❓",
+                        "nhan_dien": False, "trang_thai": "❓ Không rõ PGD",
+                        "so_sanh": "—", "co_the_import": False, "data": data,
+                    })
+                    continue
+
+                dk = ten_pgd
+                if dk in seen:
+                    rows[seen[dk]]["trang_thai"] = "⚠️ Trùng — bỏ qua (giữ file sau)"
+                    rows[seen[dk]]["co_the_import"] = False
+                    tt = "⚠️ Trùng — sẽ import (file này)"
+                else:
+                    tt = "✅ Sẵn sàng"
+
+                dest = baseline_pgd_path(ten_pgd, nam)
+                if not os.path.exists(dest):
+                    so_sanh = "🆕 Chưa có"
+                    md5_ok = True
+                else:
+                    giong = _md5_bytes(data) == _md5_file(dest)
+                    if giong:
+                        so_sanh = "🔁 Ghi đè" if buoc_import else "✅ Giống hệt"
+                        md5_ok = buoc_import
+                    else:
+                        so_sanh = "🔄 Có thay đổi"
+                        md5_ok = True
+
+                co_the_import = tt in ("✅ Sẵn sàng", "⚠️ Trùng — sẽ import (file này)") and md5_ok
+                seen[dk] = len(rows)
+                rows.append({
+                    "ten_file": ten_file, "ten_pgd": ten_pgd,
+                    "nhan_dien": True, "trang_thai": tt,
+                    "so_sanh": so_sanh, "co_the_import": co_the_import, "data": data,
+                })
+
+        # ── Preview table ─────────────────────────────────────────────
+        so_trung = sum(1 for r in rows if "Trùng" in r.get("trang_thai", ""))
+        if so_trung:
+            st.warning(f"⚠️ Có **{so_trung}** file trùng đơn vị — hệ thống giữ file cuối.")
+
+        def _style_tt(v: str) -> str:
+            if v.startswith("✅"): return "background-color:#d4edda;color:#155724;font-weight:bold"
+            if v.startswith("⚠️"): return "background-color:#fff3cd;color:#856404"
+            if v.startswith("❓"): return "background-color:#f8d7da;color:#721c24"
+            return ""
+
+        def _style_ss(v: str) -> str:
+            if v.startswith("🆕"): return "background-color:#d4edda;color:#155724;font-weight:bold"
+            if v.startswith("🔄"): return "background-color:#fff3cd;color:#856404;font-weight:bold"
+            if v.startswith("🔁"): return "background-color:#cce5ff;color:#004085;font-weight:bold"
+            if v.startswith("✅"): return "background-color:#e9ecef;color:#495057"
+            return ""
+
+        df_preview = pd.DataFrame([
+            {"Tên file": r["ten_file"], "Đơn vị": r["ten_pgd"],
+             "So sánh": r["so_sanh"], "Trạng thái": r["trang_thai"]}
+            for r in rows
+        ])
+        st.dataframe(
+            df_preview.style.map(_style_tt, subset=["Trạng thái"]).map(_style_ss, subset=["So sánh"]),
+            width="stretch", hide_index=True,
+        )
+
+        co_the_import = [r for r in rows if r["co_the_import"]]
+        khong_nd     = [r for r in rows if not r["nhan_dien"]]
+        giong_het    = [r for r in rows if r["nhan_dien"] and not r["co_the_import"]
+                        and r.get("so_sanh", "").startswith("✅")]
+        st.caption(
+            f"📊 Tổng **{len(rows)}** file · "
+            f"✅ Sẵn sàng **{len(co_the_import)}** · "
+            f"⏩ Giống hệt **{len(giong_het)}** · "
+            f"❓ Không nhận diện **{len(khong_nd)}**"
+        )
+
+        if not co_the_import:
+            st.warning("⚠️ Không có file nào hợp lệ để import.")
+            return
+
+        if st.button(
+            f"📥 Import {len(co_the_import)} file baseline {nam}",
+            type="primary",
+            key="btn_luu_bulk_baseline",
+        ):
+            thanh_cong, that_bai = 0, []
+            for r in co_the_import:
+                dest = baseline_pgd_path(r["ten_pgd"], nam)
+                try:
+                    Path(dest).parent.mkdir(parents=True, exist_ok=True)
+                    with open(dest, "wb") as fh:
+                        fh.write(r["data"])
+                    mb = len(r["data"]) / 1024 / 1024
+                    db.ghi_audit(username, "upload_baseline",
+                                 f"HSTD 31/12/{nam} — {r['ten_pgd']} ({mb:.1f} MB)")
+                    thanh_cong += 1
+                except Exception as e:
+                    that_bai.append(f"{r['ten_pgd']}: {e}")
+
+            st.cache_data.clear()
+            if thanh_cong:
+                st.success(f"✅ Đã lưu {thanh_cong}/{len(co_the_import)} đơn vị baseline {nam}.")
+            if that_bai:
+                st.error("❌ Lỗi:\n" + "\n".join(that_bai))
+
+            _bl_ver_new = st.session_state.get("bl_bulk_ver", 0) + 1
+            st.session_state["bl_bulk_ver"] = _bl_ver_new
+            st.session_state.pop("_bl_ids", None)
+            st.session_state.pop("_bl_bytes", None)
+            st.rerun()
 
 
 # ── Entry point ───────────────────────────────────────────────────────────────

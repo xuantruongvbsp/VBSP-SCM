@@ -184,38 +184,64 @@ header[data-testid="stHeader"] {
     color: #1a3a5c !important; padding: 12px 16px !important;
 }
 
-/* ── 7. METRIC (KPI card) ── */
+/* ── 7. METRIC (KPI card) — accent border trái theo delta ── */
 [data-testid="stMetric"] {
     background: white !important;
     border: 1px solid #e2e8f0 !important;
+    border-left: 4px solid #2E7D32 !important;
     border-radius: 12px !important;
     padding: 16px 20px !important;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.05) !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06) !important;
+    transition: box-shadow 0.2s, transform 0.15s !important;
+}
+[data-testid="stMetric"]:hover {
+    box-shadow: 0 4px 16px rgba(46,125,50,0.13) !important;
+    transform: translateY(-1px) !important;
 }
 [data-testid="stMetric"] label {
-    font-size: 0.8rem !important; color: #6b7a8d !important;
-    font-weight: 500 !important; text-transform: uppercase !important;
-    letter-spacing: 0.5px !important;
+    font-size: 0.78rem !important; color: #6b7a8d !important;
+    font-weight: 600 !important; text-transform: uppercase !important;
+    letter-spacing: 0.6px !important;
 }
 [data-testid="stMetricValue"] {
     font-size: 1.6rem !important; font-weight: 700 !important;
-    color: #0d2137 !important;
+    color: #0d2137 !important; letter-spacing: -0.5px !important;
+}
+/* delta đỏ → accent đỏ, delta xanh → accent xanh */
+[data-testid="stMetric"]:has([data-testid="stMetricDelta"] svg[data-icon="arrow-down-right"]) {
+    border-left-color: #c62828 !important;
+}
+[data-testid="stMetric"]:has([data-testid="stMetricDelta"] svg[data-icon="arrow-up-right"]) {
+    border-left-color: #2E7D32 !important;
 }
 
-/* ── 8. DATAFRAME ── */
+/* ── 8. DATAFRAME — header đậm + hover row ── */
 [data-testid="stDataFrame"] {
     border-radius: 10px !important; overflow: hidden !important;
-    border: 1px solid #e2e8f0 !important;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.06) !important;
+    border: 1px solid #d4e2d4 !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.07) !important;
 }
 [data-testid="stDataFrame"] th {
-    background: #2E7D32 !important; color: white !important;
-    font-size: 0.85rem !important; font-weight: 600 !important;
-    padding: 10px 12px !important; letter-spacing: 0.3px !important;
+    background: linear-gradient(135deg, #1B5E20 0%, #2E7D32 100%) !important;
+    color: white !important;
+    font-size: 0.84rem !important; font-weight: 700 !important;
+    padding: 10px 14px !important; letter-spacing: 0.4px !important;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.2) !important;
+    border-bottom: 2px solid #1B5E20 !important;
 }
 [data-testid="stDataFrame"] td {
-    font-size: 0.9rem !important; padding: 8px 12px !important;
+    font-size: 0.9rem !important; padding: 8px 14px !important;
     border-bottom: 1px solid #f1f5f9 !important;
+    transition: background 0.15s !important;
+}
+[data-testid="stDataFrame"] tr:hover td {
+    background: #f0f7f0 !important;
+}
+[data-testid="stDataFrame"] tr:nth-child(even) td {
+    background: #fafcfa !important;
+}
+[data-testid="stDataFrame"] tr:nth-child(even):hover td {
+    background: #f0f7f0 !important;
 }
 
 /* ── 9. INPUT / SELECTBOX / NUMBER INPUT ── */
@@ -265,11 +291,40 @@ header[data-testid="stHeader"] {
     box-shadow: 0 4px 14px rgba(46,125,50,0.4) !important;
 }
 
-/* ── 11. ALERT / INFO / WARNING / SUCCESS ── */
+/* ── 11. ALERT — badge nhỏ gọn, có border-left màu ── */
 [data-testid="stAlert"] {
-    border-radius: 10px !important; font-size: 0.92rem !important;
-    border: none !important; padding: 12px 16px !important;
+    border-radius: 8px !important;
+    font-size: 0.88rem !important;
+    padding: 10px 14px !important;
+    border: none !important;
+    border-left: 4px solid transparent !important;
+    margin: 6px 0 !important;
 }
+div[data-testid="stAlert"][data-baseweb="notification"][kind="info"],
+div[data-testid="stAlert"] > div[class*="info"] {
+    background: #e8f4fd !important;
+    border-left-color: #1976D2 !important;
+    color: #0d47a1 !important;
+}
+div[data-testid="stAlert"] > div[class*="success"],
+[data-testid="stAlert"][kind="success"] {
+    background: #e8f5e9 !important;
+    border-left-color: #2E7D32 !important;
+    color: #1b5e20 !important;
+}
+div[data-testid="stAlert"] > div[class*="warning"],
+[data-testid="stAlert"][kind="warning"] {
+    background: #fff8e1 !important;
+    border-left-color: #f57f17 !important;
+    color: #e65100 !important;
+}
+div[data-testid="stAlert"] > div[class*="error"],
+[data-testid="stAlert"][kind="error"] {
+    background: #fce4ec !important;
+    border-left-color: #c62828 !important;
+    color: #b71c1c !important;
+}
+[data-testid="stAlert"] p { font-size: 0.88rem !important; margin: 0 !important; }
 
 /* ── 12. ROLE BADGES ── */
 .role-executive { background:#ede7f6; color:#4527a0; padding:3px 12px;
@@ -290,6 +345,32 @@ hr { border: none !important; border-top: 1px solid #e2e8f0 !important; margin: 
     border: 1px solid #e2e8f0 !important;
     padding: 20px !important;
     box-shadow: 0 2px 8px rgba(0,0,0,0.05) !important;
+}
+
+/* ── 15. SCROLLBAR tùy chỉnh ── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 4px; }
+::-webkit-scrollbar-thumb { background: #a5c8a7; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #2E7D32; }
+
+/* ── 16. PROGRESS BAR ── */
+[data-testid="stProgressBar"] > div > div {
+    background: linear-gradient(90deg, #2E7D32, #66BB6A) !important;
+    border-radius: 4px !important;
+}
+
+/* ── 17. SELECTBOX / MULTISELECT chip ── */
+[data-testid="stMultiSelect"] span[data-baseweb="tag"] {
+    background: #e8f5e9 !important;
+    color: #1b5e20 !important;
+    border: 1px solid #a5d6a7 !important;
+    border-radius: 20px !important;
+    font-size: 0.82rem !important;
+}
+
+/* ── 18. SPINNER ── */
+[data-testid="stSpinner"] > div {
+    border-top-color: #2E7D32 !important;
 }
 </style>""", unsafe_allow_html=True)
     st.session_state["_css_injected"] = True

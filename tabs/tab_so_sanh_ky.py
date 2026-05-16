@@ -572,6 +572,293 @@ def _agg_theo_dvut(df: pd.DataFrame) -> pd.DataFrame:
     return pd.concat([result, pd.DataFrame([tong])], ignore_index=True)
 
 
+# ─── Top biến động (VSPPRO PeriodMovers) ─────────────────────────────────────
+
+_METRIC_OPTS = {
+    "du_no":   "Tổng dư nợ",
+    "nqh_pct": "Tỷ lệ NQH%",
+    "so_ku":   "Số khế ước",
+}
+_DIM_BIEN_DONG = [
+    (COT_TEN_PGD, "PGD"),
+    (COT_TEN_XA,  "Xã"),
+    (COT_TEN_CT,  "Chương trình"),
+    (COT_DVUT,    "Hội đoàn thể"),
+]
+
+
+def _group_bien_dong(df: pd.DataFrame, dim: str) -> pd.DataFrame:
+    """Tổng hợp df theo dim: du_no, du_no_qh, so_ku, nqh_pct."""
+    if dim not in df.columns:
+        return pd.DataFrame(columns=[dim, "du_no", "du_no_qh", "so_ku", "nqh_pct"])
+    cols: dict = {"du_no_qh": (COT_DU_NO_QH, "sum"), "so_ku": (COT_SO_KU, "nunique")}
+    if COT_TONG_DU_NO in df.columns:
+        cols["du_no"] = (COT_TONG_DU_NO, "sum")
+    g = df.groupby(dim, dropna=False).agg(**cols).reset_index()
+    if "du_no" not in g.columns:
+        g["du_no"] = 0
+    g["nqh_pct"] = (g["du_no_qh"] / g["du_no"].replace(0, float("nan")) * 100).fillna(0)
+    return g
+
+
+def _render_top_bien_dong(
+    df_bl: pd.DataFrame,
+    df_ht: pd.DataFrame,
+    label_bl: str,
+    label_ht: str,
+    key_prefix: str,
+) -> None:
+    """
+    Top biến động 2 kỳ — VSPPRO PeriodMovers port.
+    Hiển thị Top N tăng / Top N giảm theo chiều và chỉ tiêu.
+    """
+    try:
+        import plotly.graph_objects as go
+    except ImportError:
+        st.info("Cần cài plotly để xem biểu đồ Top biến động.")
+        return
+
+    dim_labels = {k: v for k, v in _DIM_BIEN_DONG}
+    c1, c2, c3 = st.columns([2, 2, 1])
+    with c1:
+        dim_sel = st.selectbox(
+            "Phân tích theo chiều",
+            [k for k, _ in _DIM_BIEN_DONG],
+            format_func=lambda x: dim_labels.get(x, x),
+            key=f"{key_prefix}tbdong_dim",
+        )
+    with c2:
+        metric_sel = st.selectbox(
+            "Chỉ tiêu so sánh",
+            list(_METRIC_OPTS.keys()),
+            format_func=lambda x: _METRIC_OPTS[x],
+            key=f"{key_prefix}tbdong_metric",
+        )
+    with c3:
+        n = st.slider("Top N", 3, 10, 5, key=f"{key_prefix}tbdong_n")
+
+    if df_bl.empty or df_ht.empty:
+        st.info("Không đủ dữ liệu để hiển thị top biến động.")
+        return
+
+    g_ht = _group_bien_dong(df_ht, dim_sel)
+    g_bl = _group_bien_dong(df_bl, dim_sel)
+
+    merged = g_ht.merge(g_bl, on=dim_sel, how="outer", suffixes=("_ht", "_bl")).fillna(0)
+    merged["delta"] = merged[f"{metric_sel}_ht"] - merged[f"{metric_sel}_bl"]
+    merged = merged[merged[dim_sel].astype(str).str.strip() != ""]
+
+    top_tang  = merged.nlargest(n, "delta")
+    top_giam  = merged.nsmallest(n, "delta")
+
+    def _label(val: float) -> str:
+        sign = "+" if val >= 0 else ""
+        if metric_sel == "du_no":
+            return sign + fmt_ty(val)
+        if metric_sel == "nqh_pct":
+            return sign + f"{val:.2f}".replace(".", ",") + " pp"
+        return sign + fmt_so(int(val))
+
+    def _make_bar(df_top: pd.DataFrame, color: str, key: str) -> None:
+        if df_top.empty:
+            return
+        fig = go.Figure(go.Bar(
+            y=df_top[dim_sel].astype(str),
+            x=df_top["delta"],
+            orientation="h",
+            marker_color=color,
+            text=df_top["delta"].apply(_label),
+            textposition="outside",
+        ))
+        fig.update_layout(
+            height=max(220, n * 38 + 60),
+            margin=dict(t=10, b=20, l=10, r=70),
+            xaxis_title=_METRIC_OPTS[metric_sel],
+            yaxis_title="",
+        )
+        st.plotly_chart(fig, use_container_width=True, key=key)
+
+    col_tang, col_giam = st.columns(2)
+    with col_tang:
+        st.markdown(f"**📈 Top {n} tăng mạnh — {_METRIC_OPTS[metric_sel]}**")
+        _make_bar(
+            top_tang.sort_values("delta", ascending=True),
+            "#2e7d32",
+            f"{key_prefix}tbdong_tang",
+        )
+    with col_giam:
+        st.markdown(f"**📉 Top {n} giảm mạnh — {_METRIC_OPTS[metric_sel]}**")
+        _make_bar(
+            top_giam.sort_values("delta", ascending=False),
+            "#c62828",
+            f"{key_prefix}tbdong_giam",
+        )
+
+    # Bảng tổng hợp
+    with st.expander(f"📋 Bảng đầy đủ ({_METRIC_OPTS[metric_sel]})", expanded=False):
+        out = merged.sort_values("delta", ascending=False).copy()
+        out["Giá trị mốc"] = out[f"{metric_sel}_bl"].apply(_label)
+        out["Giá trị HT"]  = out[f"{metric_sel}_ht"].apply(_label)
+        out["Δ thay đổi"]  = out["delta"].apply(_label)
+        cols_show = [dim_sel, "Giá trị mốc", "Giá trị HT", "Δ thay đổi"]
+        st.dataframe(out[cols_show], hide_index=True, use_container_width=True)
+
+
+# ─── Radar + Ranking (VSPPRO Compare port) ───────────────────────────────────
+
+def _render_radar_ranking(
+    df_ht: pd.DataFrame,
+    key_prefix: str,
+) -> None:
+    """
+    Ranking horizontal bar + Radar đa trục so sánh PGD.
+    Port từ VSPPRO Compare.tsx.
+    """
+    try:
+        import plotly.graph_objects as go
+        import numpy as np
+    except ImportError:
+        st.info("Cần cài plotly để xem biểu đồ Radar/Ranking.")
+        return
+
+    if df_ht.empty or COT_TEN_PGD not in df_ht.columns:
+        st.info("Cần dữ liệu theo PGD để hiển thị biểu đồ.")
+        return
+
+    # Tổng hợp theo PGD
+    agg: dict = {"so_ku": (COT_SO_KU, "nunique")}
+    if COT_TONG_DU_NO in df_ht.columns:
+        agg["du_no"] = (COT_TONG_DU_NO, "sum")
+    if COT_DU_NO_QH in df_ht.columns:
+        agg["du_no_qh"] = (COT_DU_NO_QH, "sum")
+    if COT_LAI_TON in df_ht.columns:
+        agg["lai_ton"] = (COT_LAI_TON, "sum")
+    if COT_MA_KH in df_ht.columns:
+        agg["so_ho"] = (COT_MA_KH, "nunique")
+
+    g = df_ht.groupby(COT_TEN_PGD, dropna=False).agg(**agg).reset_index()
+    if "du_no" not in g.columns:
+        g["du_no"] = 0
+    if "du_no_qh" not in g.columns:
+        g["du_no_qh"] = 0
+    g["nqh_pct"] = (g["du_no_qh"] / g["du_no"].replace(0, float("nan")) * 100).fillna(0)
+    tong_cn = g["du_no"].sum()
+    g["ty_trong_pct"] = (g["du_no"] / tong_cn * 100).fillna(0) if tong_cn > 0 else 0
+
+    # ── Sub-tabs Ranking / Radar ──────────────────────────────────────────
+    r1, r2 = st.tabs(["📊 Xếp hạng PGD", "🕸️ Radar đa chiều"])
+
+    with r1:
+        metric_rank = st.selectbox(
+            "Xếp hạng theo",
+            ["du_no", "nqh_pct", "so_ku", "ty_trong_pct"],
+            format_func=lambda x: {
+                "du_no": "Tổng dư nợ",
+                "nqh_pct": "Tỷ lệ NQH%",
+                "so_ku": "Số khế ước",
+                "ty_trong_pct": "Tỷ trọng DN%",
+            }[x],
+            key=f"{key_prefix}rank_metric",
+        )
+        g_sorted = g.sort_values(metric_rank, ascending=True)
+
+        if metric_rank == "du_no":
+            text_vals = g_sorted["du_no"].apply(fmt_ty)
+            xlab = "Tỷ đồng"
+        elif metric_rank == "nqh_pct":
+            text_vals = g_sorted["nqh_pct"].apply(
+                lambda x: f"{x:.2f}".replace(".", ",") + "%"
+            )
+            xlab = "Tỷ lệ NQH%"
+        elif metric_rank == "so_ku":
+            text_vals = g_sorted["so_ku"].apply(fmt_so)
+            xlab = "Số khế ước"
+        else:
+            text_vals = g_sorted["ty_trong_pct"].apply(
+                lambda x: f"{x:.1f}".replace(".", ",") + "%"
+            )
+            xlab = "Tỷ trọng%"
+
+        # Màu: đỏ nếu NQH trên trung bình, xanh ngược lại
+        if metric_rank == "nqh_pct":
+            avg = g["nqh_pct"].mean()
+            colors = ["#c62828" if v > avg else "#1565c0" for v in g_sorted["nqh_pct"]]
+        else:
+            colors = "#1565c0"
+
+        fig = go.Figure(go.Bar(
+            y=g_sorted[COT_TEN_PGD].astype(str),
+            x=g_sorted[metric_rank],
+            orientation="h",
+            marker_color=colors,
+            text=text_vals,
+            textposition="outside",
+        ))
+        fig.update_layout(
+            height=max(420, len(g_sorted) * 26 + 80),
+            margin=dict(t=10, b=30, l=10, r=90),
+            xaxis_title=xlab,
+            yaxis_title="",
+        )
+        st.plotly_chart(fig, use_container_width=True, key=f"{key_prefix}ranking_chart")
+
+    with r2:
+        st.caption(
+            "Mỗi trục = 1 chỉ tiêu (chuẩn hóa về [0,1]). "
+            "Polygon lớn hơn = hiệu suất tốt hơn (trừ NQH — polygon nhỏ hơn = tốt hơn)."
+        )
+        n_top = st.slider(
+            "Hiển thị top N PGD theo dư nợ",
+            3, min(10, len(g)), min(8, len(g)),
+            key=f"{key_prefix}radar_n",
+        )
+        top_pgd = g.nlargest(n_top, "du_no")
+
+        kpis = ["du_no", "so_ku", "ty_trong_pct"]
+        kpi_labels = ["Dư nợ", "Số KƯ", "Tỷ trọng%"]
+        if "lai_ton" in g.columns:
+            kpis.append("lai_ton")
+            kpi_labels.append("Lãi tồn")
+        kpis.append("nqh_pct")
+        kpi_labels.append("NQH% (inv)")
+
+        # Normalize [0,1], invert NQH
+        def _norm(series: pd.Series, invert: bool = False) -> pd.Series:
+            mn, mx = series.min(), series.max()
+            if mx == mn:
+                return pd.Series(0.5, index=series.index)
+            n = (series - mn) / (mx - mn)
+            return 1 - n if invert else n
+
+        top_pgd = top_pgd.copy()
+        for kpi in kpis:
+            if kpi in top_pgd.columns:
+                inv = kpi == "nqh_pct"
+                top_pgd[f"_n_{kpi}"] = _norm(top_pgd[kpi], invert=inv).values
+
+        fig_r = go.Figure()
+        theta = kpi_labels + [kpi_labels[0]]
+
+        for _, row in top_pgd.iterrows():
+            r_vals = [row.get(f"_n_{k}", 0) for k in kpis]
+            r_vals += [r_vals[0]]
+            fig_r.add_trace(go.Scatterpolar(
+                r=r_vals,
+                theta=theta,
+                fill="toself",
+                opacity=0.35,
+                name=str(row[COT_TEN_PGD]),
+            ))
+
+        fig_r.update_layout(
+            polar=dict(radialaxis=dict(visible=True, range=[0, 1])),
+            legend=dict(orientation="v", x=1.05),
+            height=420,
+            margin=dict(t=40, b=20, l=40, r=160),
+        )
+        st.plotly_chart(fig_r, use_container_width=True, key=f"{key_prefix}radar_chart")
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 
 def render(tab: DeltaGenerator = None, **kwargs) -> None:
@@ -1062,21 +1349,21 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                         height=250,
                     )
 
-        # ═══════════ TOP MOVERS ════════════════════════════════════════════
+        # ═══════════ TOP BIẾN ĐỘNG (VSPPRO PeriodMovers) ═════════════════
         st.divider()
-        with st.expander("🚀 Top movers (PGD có thay đổi lớn nhất)", expanded=False):
-            top_n = st.slider(
-                "Số PGD hiển thị",
-                min_value=3,
-                max_value=10,
-                value=5,
-                key=f"{key_prefix}top_movers_n",
-            )
-            df_top = _top_movers(df_ht, df_bl, COT_TEN_PGD, n=top_n)
-            if not df_top.empty:
-                st.dataframe(df_top, hide_index=True, use_container_width=True)
-            else:
-                st.info("Không đủ dữ liệu để hiển thị top movers.")
+        with st.expander(
+            "🚀 Top biến động — so sánh tăng/giảm theo chiều và chỉ tiêu",
+            expanded=False,
+        ):
+            _render_top_bien_dong(df_bl, df_ht, label_bl, label_ht, key_prefix)
+
+        # ═══════════ RADAR & RANKING (VSPPRO Compare) ════════════════════
+        st.divider()
+        with st.expander(
+            "🕸️ Radar & Ranking — so sánh đa chiều PGD",
+            expanded=False,
+        ):
+            _render_radar_ranking(df_ht, key_prefix)
 
         # ═══════════ BIẾN ĐỘNG KHẾƯỚC (EXPLORER) ════════════════════════
         st.divider()

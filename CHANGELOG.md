@@ -3,6 +3,9 @@
 ## [2026-05-16] — Tab đến hạn: khôi phục bảng tổng hợp PGD/Xã × Tháng
 - `tabs/tab_den_han.py` — Thêm lại bảng tổng hợp theo PGD/Xã × tháng đến hạn (tính từ `df_loc` đã cache, không gọi lại `tinh_den_han_df`)
 
+## [2026-05-16] — Fix: tháng 1-2-3/2027 không hiện trong biểu đồ đến hạn
+- `tabs/tab_den_han.py` — Biểu đồ tháng re-parse `COT_NGAY_DEN_HAN` thiếu `dayfirst=True` → ngày dạng `'18/01/2027'` bị NaT, ngày có day≤12 bị đổi sang tháng khác; sửa bằng cách dùng cột `"Ngày đến hạn"` (đã parse đúng trong `tinh_den_han_df`)
+
 ## [2026-05-16] — Fix: "Số tháng có thể gia hạn" không có dữ liệu
 - `data/den_han.py` — Thêm `_normalize_ma()` chuẩn hóa `'2.0'`→`'2'` (HSTD lưu mã CT dạng float string); thêm `_tinh_thoi_han_tu_ngay()` tính thời hạn vay từ `Ngày vay` - `Ngày ĐH theo hợp đồng` vì cột `Thời hạn vay` toàn null; sửa so sánh `== "02"` → `== "2"`
 

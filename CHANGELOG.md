@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## [2026-05-16] — Fix Nguồn vốn GQVL bị convert NaN; bổ sung cột dư nợ trong impact analysis
+- `services/upload_service.py` dòng ~359 — Bỏ "Nguồn vốn" khỏi `_cols_so` GQVL (text "TW"/"ĐP", không phải số)
+- `workspaces/ws_management.py` dòng ~518 — Thêm stale-cache warning + cột "Dư nợ TH (tỷ)" trong expander tác động NDT DP
+
 ## [2026-05-16] — KPI 12 cards + section ĐVUT + Nợ xấu + Tổng lãi tồn
 - `tabs/tab_so_sanh_ky.py` — Mở rộng KPI thành 3 hàng × 4 cards (12 chỉ tiêu):
   - Hàng 1: Tổng DN, Số KU, Số hộ, Mức vay BQ/KH

@@ -559,7 +559,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                 opts = (df_kq[COT_TEN_KH].astype(str) + "  —  " +
                         df_kq[COT_SO_KU].astype(str)) if COT_SO_KU in df_kq.columns \
                        else df_kq[COT_TEN_KH].astype(str)
-                chon = st.selectbox("Chọn hồ sơ", opts.tolist(), key="tc_sel")
+                chon = st.selectbox("Chọn hồ sơ", opts.tolist(), key="tracuu_select_ho_so")
                 _render_card(df_kq.iloc[opts.tolist().index(chon)],
                              df_nq11, nq11_so_ku_set, gqvl_nq11_set)
 

@@ -224,7 +224,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
             _ss_pdf = "_pdf_bytes_baocao_phancap"
             _ssf_pdf = "_pdf_file_baocao_phancap"
 
-            if st.button("📄 Xuất PDF phân cấp", key="btn_pdf_bc_phancap", type="secondary"):
+            if st.button("📄 Xuất PDF phân cấp", key="btn_pdf_bc_phancap", type="primary"):
                 if _missing_cols:
                     st.warning(f"⚠️ Thiếu cột dữ liệu để xuất PDF: {', '.join(_missing_cols)}")
                 elif df_pdf.empty:

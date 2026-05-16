@@ -1,5 +1,17 @@
 # CHANGELOG
 
+## [2026-05-17] — Bảng trạng thái 22 đơn vị: thêm cột 31/12/YYYY baseline
+- `tabs/tab_upload_khnv.py` `_hien_thi_bang_trang_thai()` — thêm cột `31/12/{nam}` hiển thị ✅/❌ baseline per-PGD; tự chọn năm gần nhất có dữ liệu (fallback năm trước)
+
+## [2026-05-17] — Baseline 31/12: UI import đồng nhất với Import hàng loạt 4 file
+- `tabs/tab_upload_khnv.py` `_render_upload_baseline()` — viết lại bulk section theo đúng pattern Import hàng loạt: 2 tab (Chọn file / Quét thư mục), checkbox force import, MD5 check so sánh file đã có, styled preview table (Tên file / Đơn vị / So sánh / Trạng thái), summary caption, nút Import, reset uploader sau import
+
+## [2026-05-17] — Baseline 31/12: thêm tab "Quét thư mục" bên cạnh "Chọn file"
+- `tabs/tab_upload_khnv.py` `_render_upload_baseline()` — tách bulk upload thành 2 tab: "📁 Quét thư mục" (nhập đường dẫn server, quét .xlsx/.xls tự động) và "📂 Chọn file" (multi-file uploader giữ Ctrl); cả 2 dùng chung bytes_map → preview → nút Lưu
+
+## [2026-05-17] — Baseline 31/12: bulk upload hàng loạt, tự nhận diện PGD
+- `tabs/tab_upload_khnv.py` — viết lại `_render_upload_baseline()`: bulk multi-file uploader với version counter reset; nhận diện PGD bằng `_tim_ten_pgd_tu_noi_dung(data, "hstd")`; preview table (File / Đơn vị / Trạng thái); lưu song song vào `baseline_pgd_path(don_vi, nam)`; hiển thị trạng thái 22 đơn vị (✅/⬜) theo năm
+
 ## [2026-05-17] — Baseline 31/12: đổi upload 1 file CN → grid 22 PGD per-unit
 - `tabs/tab_upload_khnv.py` — import thêm `baseline_pgd_path, danh_sach_nam_baseline_pgd, trang_thai_baseline_pgd`; viết lại `_render_upload_baseline()`: hiện bảng trạng thái 22 đơn vị (✅/⬜), grid 2 cột file_uploader per-PGD, lưu vào `data/baseline_pgd/{slug}/HSTD_3112_{nam}.XLSX`; `doc_baseline_merged` tự merge khi tab So sánh kỳ cần
 

@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## [2026-05-16] — Refactor tab Mã NĐT ĐP thành 4 sub-tab; thêm field cap tinh/xa
+- `db.py` — `doc_ndt_dp_list()` bổ sung field `cap` backward-compat; `doc_ndt_dp_ma_list()` chỉ trả mã cấp tỉnh
+- `workspaces/ws_management.py` — Refactor `_render_ndt_dp()` thành 4 tab: Cấp Tỉnh / Cấp Xã/Khác / Thêm mới / Chỉnh sửa-Xóa; thêm dropdown phân loại cấp; nút Làm mới dữ liệu
+
 ## [2026-05-16] — Fix Nguồn vốn GQVL bị convert NaN; bổ sung cột dư nợ trong impact analysis
 - `services/upload_service.py` dòng ~359 — Bỏ "Nguồn vốn" khỏi `_cols_so` GQVL (text "TW"/"ĐP", không phải số)
 - `workspaces/ws_management.py` dòng ~518 — Thêm stale-cache warning + cột "Dư nợ TH (tỷ)" trong expander tác động NDT DP

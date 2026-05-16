@@ -1,6 +1,6 @@
 # Codebase: VBSP-SCM
 
-**Generated:** 2026-05-16 23:45:00
+**Generated:** 2026-05-16 23:55:00
 
 ---
 
@@ -19,7 +19,7 @@ Hệ thống Quản trị Tín dụng Nội bộ cho **Ngân hàng Chính sách 
 ## 2. CẤU TRÚC THƯ MỤC
 
 ```
-├── app.py                     # Entry point, routing, normalize_role
+├── app.py                     # Entry point; DuckDB read_parquet filter-pushdown theo PGD để giảm RAM
 ├── auth.py                    # 9-role RBAC, normalize_role()
 ├── config.py                  # MỌI hằng số: COT_*, DS_PGD, TAG_MAP, ROLE_MAP...
 ├── db.py                      # SQLite: kv_store, audit_log, users, baseline

@@ -975,6 +975,7 @@ def _build_all_items(role: str, username: str, **kwargs) -> list:
         {"group": "Kiểm soát",     "label": "Xử lý nợ rủi ro",   "icon": "alert-circle",   "fn": lambda: tab_xlrr_tong_hop.render(None, **kwargs)},
         {"group": "Kiểm soát",     "label": "Cán bộ tín dụng",         "icon": "user",       "fn": lambda: tab_cbtd.render(None, **kwargs)},
         {"group": "Kiểm soát",     "label": "Tập trung rủi ro & HHI",  "icon": "chart-pie",  "fn": lambda: tab_hhi.render(None, **kwargs)},
+        {"group": "Kiểm soát",     "label": "Nợ khoanh",                "icon": "lock",       "fn": lambda: tab_no_khoanh.render(None, **kwargs)},
         {"group": "Kế hoạch và Thực hiện KHTD", "label": "Kế hoạch tín dụng", "icon": "file-text",  "fn": lambda: tab_khtd.render(None, **dict(kwargs, khtd_mode="cn"))},
         {"group": "Kế hoạch và Thực hiện KHTD", "label": "Giao & Điều chỉnh KH", "icon": "upload", "fn": lambda: tab_khtd_giao_dc.render(None, **kwargs)},
         {"group": "Kế hoạch và Thực hiện KHTD", "label": "Cân đối - Điện báo", "icon": "chart-line", "fn": lambda: tab_kehoach.render(None, **kwargs)},
@@ -1088,6 +1089,7 @@ def render(**kwargs):
     from tabs import tab_trang_thai_nguon
     from tabs import tab_so_sanh_ky
     from tabs import tab_hhi
+    from tabs import tab_no_khoanh
 
     def _tab_so_sanh_ky_fn(**kw):
         tab_so_sanh_ky.render(None, **kw)
@@ -1115,6 +1117,7 @@ def render(**kwargs):
         {"group": "Kiểm soát",    "label": "Xử lý nợ rủi ro",        "icon": "alert-circle",   "fn": lambda: tab_xlrr_tong_hop.render(None, **kwargs)},
         {"group": "Kiểm soát",    "label": "Cán bộ tín dụng",         "icon": "user",           "fn": lambda: tab_cbtd.render(None, **kwargs)},
         {"group": "Kiểm soát",    "label": "Tập trung rủi ro & HHI",  "icon": "chart-pie",      "fn": lambda: tab_hhi.render(None, **kwargs)},
+        {"group": "Kiểm soát",    "label": "Nợ khoanh",                "icon": "lock",           "fn": lambda: tab_no_khoanh.render(None, **kwargs)},
         {"group": "Kế hoạch và Thực hiện KHTD", "label": "Kế hoạch tín dụng",   "icon": "file-text",  "fn": lambda: tab_khtd.render(None, **dict(kwargs, khtd_mode="cn"))},
         {"group": "Kế hoạch và Thực hiện KHTD", "label": "Giao & Điều chỉnh KH","icon": "upload",     "fn": lambda: tab_khtd_giao_dc.render(None, **kwargs)},
         {"group": "Kế hoạch và Thực hiện KHTD", "label": "Cân đối - Điện báo",  "icon": "chart-line", "fn": lambda: tab_kehoach.render(None, **kwargs)},

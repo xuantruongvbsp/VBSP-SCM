@@ -1,5 +1,19 @@
 # CHANGELOG
 
+## [2026-05-16] — Cải tiến bảng "Thông tin tổng quát theo PGD"
+- `tabs/tab_tongquan.py` — Đổi tên cột `TL NPL %` → `Tỷ lệ Nợ xấu` trong toàn bộ logic tính toán, hiển thị, và điều kiện tô màu
+- `tabs/tab_tongquan.py` — Header bảng: thêm helper `_disp_col()` tách phần đơn vị `(Triệu đồng)` / `(Tỷ đồng)` xuống dòng 2; bỏ `white-space:nowrap`, thêm `min-width:60px`
+- `tabs/tab_tongquan.py` — Data cells: tăng font-size từ `0.82/0.84rem` lên `0.90/0.92rem`
+- `tabs/tab_tongquan.py` — PDF: thêm `_pdf_col()` đổi tên cột thành 2 dòng (`<br/>`) trước khi truyền vào `xuat_pdf()`
+
+## [2026-05-16] — Fix định dạng ngày trong PDF báo cáo tiến độ công việc
+- `tabs/tab_tien_do.py` — Import `fmt_ngay`; thay `t['ngay_deadline']` (ISO `YYYY-MM-DD`) bằng `fmt_ngay(...)` ở 2 chỗ trong `_xuat_pdf_bao_cao_tien_do()` (dòng ~1177, ~1323) và `ngay_bat_dau`/`deadline` trong `_xuat_pdf_tien_do()` (dòng ~1553)
+
+## [2026-05-16] — Fix định dạng ngày trong PDF: Timestamp → dd/mm/yyyy
+- `utils.py` — Thêm hàm `fmt_ngay(val)`: chuyển Timestamp/date/string sang `dd/mm/yyyy`, trả về `""` nếu không parse được
+- `tabs/tab_no_rui_ro.py` dòng ~1624, ~1667 — Thay `str(row_full.get(COT_NGAY_VAY))` bằng `fmt_ngay(...)` khi lưu vào kv_store; trước đây Timestamp ra `"2023-05-15 00:00:00"` trong Word/PDF
+- `pdf_service.py` — Thêm hàm `_str_val(val)` xử lý Timestamp → `dd/mm/yyyy`; thay thế `str(val)` ở 3 chỗ render cell (dòng ~429, ~763, ~1189) để toàn bộ cột ngày trong PDF hiển thị đúng định dạng VN
+
 ## [2026-05-16] — Nâng cấp UI: KPI accent, hover table, alert badge, scrollbar, spinner
 - `app.py` CSS — KPI card: thêm border-left 4px xanh/đỏ theo delta, hover lift animation
 - `app.py` CSS — Dataframe: header gradient đậm hơn + text-shadow, zebra stripe, hover row xanh nhạt

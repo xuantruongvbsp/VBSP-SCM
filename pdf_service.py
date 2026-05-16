@@ -5,6 +5,29 @@ import pandas as pd
 import streamlit as st
 from config import COT_MA_KH, COT_TONG_DU_NO
 
+
+def _str_val(val) -> str:
+    """Chuyển giá trị ô sang chuỗi, xử lý đúng Timestamp → dd/mm/yyyy."""
+    if val is None or (isinstance(val, float) and pd.isna(val)):
+        return ""
+    if isinstance(val, pd.Timestamp):
+        return val.strftime("%d/%m/%Y") if not pd.isna(val) else ""
+    try:
+        if pd.isna(val):
+            return ""
+    except (TypeError, ValueError):
+        pass
+    s = str(val)
+    # Pandas string mặc định cho Timestamp: "YYYY-MM-DD HH:MM:SS" hoặc "YYYY-MM-DD"
+    import re as _re
+    if _re.match(r"^\d{4}-\d{2}-\d{2}( 00:00:00)?$", s):
+        try:
+            ts = pd.to_datetime(s)
+            return ts.strftime("%d/%m/%Y")
+        except Exception:
+            pass
+    return s
+
 try:
     from reportlab.lib import colors
     from reportlab.lib.pagesizes import A4, landscape
@@ -403,9 +426,9 @@ def xuat_pdf(
                     txt = _fmt_tien_pdf(val)
                     cells.append(Paragraph(txt, style_td_r))
                 except (ValueError, TypeError):
-                    cells.append(Paragraph(str(val), style_td_r))
+                    cells.append(Paragraph(_str_val(val), style_td_r))
             else:
-                cells.append(Paragraph(str(val) if val != "" else "", style_td))
+                cells.append(Paragraph(_str_val(val), style_td))
         table_data.append(cells)
 
     if dong_tong_cells is not None:
@@ -737,9 +760,9 @@ def xuat_pdf_group_header(
                         txt = fmt_so(float(val))
                         cells.append(Paragraph(txt, _st_right))
                     except (ValueError, TypeError):
-                        cells.append(Paragraph(str(val) if pd.notna(val) else "", _st_right))
+                        cells.append(Paragraph(_str_val(val), _st_right))
                 else:
-                    cells.append(Paragraph(str(val) if pd.notna(val) else "", _st_normal))
+                    cells.append(Paragraph(_str_val(val), _st_normal))
             detail_data.append(cells)
 
         det_tbl = Table(detail_data, colWidths=det_widths, repeatRows=1)
@@ -1163,9 +1186,9 @@ def xuat_pdf_bao_cao(
                     txt = f"{trieu:,.0f}".replace(",", "X").replace(".", ",").replace("X", ".")
                     cells.append(Paragraph(txt, style_td_r))
                 except (ValueError, TypeError):
-                    cells.append(Paragraph(str(val), style_td_r))
+                    cells.append(Paragraph(_str_val(val), style_td_r))
             else:
-                cells.append(Paragraph(str(val) if val != "" else "", style_td))
+                cells.append(Paragraph(_str_val(val), style_td))
         table_data.append(cells)
 
     if dong_tong_cells is not None:

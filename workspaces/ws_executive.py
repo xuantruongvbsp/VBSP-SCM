@@ -37,7 +37,7 @@ from utils import (
     ten_file_xuat,
 )
 from services.excel_service import ExcelReport, xuat_excel_chuyen_nghiep, ten_file_xuat as excel_ten_file
-from pdf_service import xuat_pdf_bao_cao, xuat_pdf, kiem_tra_pdf_dependency
+from pdf_service import xuat_pdf_bao_cao, xuat_pdf, kiem_tra_pdf_dependency, render_huong_dan
 from tabs import tab_khtd_giao_dc, tab_kiem_soat, tab_qd62, tab_tien_do, tab_so_sanh_ky
 from snapshot_service import doc_snapshot, doc_snapshot_range, danh_sach_ky
 from services.hhi_service import tinh_hhi, tinh_hhi_breakdown, danh_gia_hhi
@@ -1362,8 +1362,8 @@ def render(**kwargs) -> None:
     role = kwargs.get("role", "executive")
     username = kwargs.get("username", "unknown")
 
-    tab_phan_tich, tab_tien_do_ui, tab_kiem_soat_cn, tab_no_rui_ro_cn, tab_so_sanh = st.tabs(
-        ["📊 Phân tích & cảnh báo", "📅 Tiến độ", "🔍 Kiểm soát CN", "💳 Nợ rủi ro QĐ62", "📈 So sánh kỳ"]
+    tab_phan_tich, tab_tien_do_ui, tab_kiem_soat_cn, tab_no_rui_ro_cn, tab_so_sanh, tab_huong_dan = st.tabs(
+        ["📊 Phân tích & cảnh báo", "📅 Tiến độ", "🔍 Kiểm soát CN", "💳 Nợ rủi ro QĐ62", "📈 So sánh kỳ", "📖 Hướng dẫn"]
     )
 
     with tab_phan_tich:
@@ -1533,3 +1533,6 @@ def render(**kwargs) -> None:
 
     with tab_so_sanh:
         tab_so_sanh_ky.render(tab_so_sanh, df=df_full, df_full=df_full, role=role, username=username)
+
+    with tab_huong_dan:
+        render_huong_dan()

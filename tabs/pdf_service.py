@@ -1,4 +1,4 @@
-from io import BytesIO
+﻿from io import BytesIO
 from datetime import datetime
 from pathlib import Path
 import pandas as pd
@@ -27,9 +27,9 @@ def _dang_ky_font():
     global _FONT_REGISTERED
     if _FONT_REGISTERED:
         return
-    # Tìm font theo thứ tự ưu tiên:
-    # 1. File .ttf trong thư mục assets/ của project
-    # 2. Font hệ thống Windows C:/Windows/Fonts/
+    # TÃ¬m font theo thá»© tá»± Æ°u tiÃªn:
+    # 1. File .ttf trong thÆ° má»¥c assets/ cá»§a project
+    # 2. Font há»‡ thá»‘ng Windows C:/Windows/Fonts/
     import os
     import warnings
     from pathlib import Path
@@ -48,16 +48,16 @@ def _dang_ky_font():
     if bold:
         pdfmetrics.registerFont(TTFont("TNR-Bold", str(bold)))
 
-    # Fallback nếu không có Times: dùng Helvetica (ASCII only, báo lỗi)
+    # Fallback náº¿u khÃ´ng cÃ³ Times: dÃ¹ng Helvetica (ASCII only, bÃ¡o lá»—i)
     if not regular:
-        warnings.warn("Không tìm thấy times.ttf — tiếng Việt có thể bị lỗi font.")
+        warnings.warn("KhÃ´ng tÃ¬m tháº¥y times.ttf â€” tiáº¿ng Viá»‡t cÃ³ thá»ƒ bá»‹ lá»—i font.")
 
     _FONT_REGISTERED = True
 
 
-FONT_NORMAL = "TNR"       # dùng sau khi _dang_ky_font() đã chạy
+FONT_NORMAL = "TNR"       # dÃ¹ng sau khi _dang_ky_font() Ä‘Ã£ cháº¡y
 FONT_BOLD = "TNR-Bold"
-FONT_FALLBACK = "Helvetica"  # khi font chưa đăng ký được
+FONT_FALLBACK = "Helvetica"  # khi font chÆ°a Ä‘Äƒng kÃ½ Ä‘Æ°á»£c
 
 if _REPORTLAB_READY:
     VBSP_GREEN = colors.HexColor("#2E7D32")
@@ -76,16 +76,16 @@ def xuat_pdf(
     tieu_de: str,
     nguoi_xuat: str,
     cols_tien: list[str] | None = None,
-    don_vi_tien: str = "đồng",
+    don_vi_tien: str = "Ä‘á»“ng",
     prefix_file: str = "",
     them_dong_tong: bool = True,
 ) -> bytes:
     if not _REPORTLAB_READY:
-        raise ImportError("Chưa cài thư viện reportlab. Chạy: pip install reportlab")
+        raise ImportError("ChÆ°a cÃ i thÆ° viá»‡n reportlab. Cháº¡y: pip install reportlab")
     """
-    Xuất DataFrame ra PDF chuẩn in A4, hỗ trợ tiếng Việt.
-    Tự động landscape nếu số cột >= 8 hoặc prefix_file == "TQPGD".
-    Trả về bytes để dùng với st.download_button.
+    Xuáº¥t DataFrame ra PDF chuáº©n in A4, há»— trá»£ tiáº¿ng Viá»‡t.
+    Tá»± Ä‘á»™ng landscape náº¿u sá»‘ cá»™t >= 8 hoáº·c prefix_file == "TQPGD".
+    Tráº£ vá» bytes Ä‘á»ƒ dÃ¹ng vá»›i st.download_button.
     """
     _dang_ky_font()
     from utils import fmt_so
@@ -102,11 +102,11 @@ def xuat_pdf(
                 except Exception:
                     tong_row[col] = ""
             else:
-                tong_row[col] = "TỔNG CỘNG" if list(df.columns).index(col) == 0 else ""
+                tong_row[col] = "Tá»”NG Cá»˜NG" if list(df.columns).index(col) == 0 else ""
         dong_tong_cells = tong_row
 
     buf = BytesIO()
-    # Landscape nếu nhiều cột hoặc báo cáo TQPGD
+    # Landscape náº¿u nhiá»u cá»™t hoáº·c bÃ¡o cÃ¡o TQPGD
     use_landscape = len(df.columns) >= 8 or prefix_file == "TQPGD"
     page_size = landscape(A4) if use_landscape else A4
     margin = 1.0 * cm
@@ -126,15 +126,15 @@ def xuat_pdf(
     story = []
     usable_w = page_size[0] - 2 * margin
 
-    # ── 1. Header báo cáo ──────────────────────────────────────────────
+    # â”€â”€ 1. Header bÃ¡o cÃ¡o â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     logo_path = Path("assets/logo.png")
     if logo_path.exists():
         logo = RLImage(str(logo_path), width=2.2 * cm, height=2.2 * cm)
         from reportlab.platypus import Table as RLTable
         header_tbl = RLTable(
             [[logo, Paragraph(
-                "NGÂN HÀNG CHÍNH SÁCH XÃ HỘI VIỆT NAM<br/>"
-                "<font size='10'>Chi nhánh tỉnh Đồng Nai</font>",
+                "NGÃ‚N HÃ€NG CHÃNH SÃCH XÃƒ Há»˜I VIá»†T NAM<br/>"
+                "<font size='10'>Chi nhÃ¡nh tá»‰nh Äá»“ng Nai</font>",
                 ParagraphStyle("hdr_txt", fontName=fb, fontSize=12,
                                alignment=TA_CENTER, leading=16)
             )]],
@@ -148,12 +148,12 @@ def xuat_pdf(
         story.append(header_tbl)
     else:
         story.append(Paragraph(
-            "NGÂN HÀNG CHÍNH SÁCH XÃ HỘI VIỆT NAM",
+            "NGÃ‚N HÃ€NG CHÃNH SÃCH XÃƒ Há»˜I VIá»†T NAM",
             ParagraphStyle("bank", fontName=fb, fontSize=12,
                            alignment=TA_CENTER, spaceAfter=2)
         ))
         story.append(Paragraph(
-            "CHI NHÁNH TỈNH ĐỒNG NAI",
+            "CHI NHÃNH Tá»ˆNH Äá»’NG NAI",
             ParagraphStyle("branch", fontName=fn, fontSize=11,
                            alignment=TA_CENTER, spaceAfter=6)
         ))
@@ -166,15 +166,15 @@ def xuat_pdf(
     ))
     ngay_str = datetime.now().strftime("%d/%m/%Y %H:%M")
     story.append(Paragraph(
-        f"Ngày xuất: {ngay_str}  |  Người xuất: {nguoi_xuat}",
+        f"NgÃ y xuáº¥t: {ngay_str}  |  NgÆ°á»i xuáº¥t: {nguoi_xuat}",
         ParagraphStyle("meta", fontName=fn, fontSize=9, alignment=TA_CENTER,
                        textColor=colors.grey, spaceAfter=12)
     ))
 
-    # ── 2. Bảng dữ liệu ───────────────────────────────────────────────
+    # â”€â”€ 2. Báº£ng dá»¯ liá»‡u â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     n_cols = len(df.columns)
     
-    # Tự động co font size theo số cột
+    # Tá»± Ä‘á»™ng co font size theo sá»‘ cá»™t
     if n_cols <= 6:
         font_size = 11
     elif n_cols <= 10:
@@ -195,7 +195,7 @@ def xuat_pdf(
     ]
     table_data = [header_cells]
 
-    # Data rows — format số tiền
+    # Data rows â€” format sá»‘ tiá»n
     for _, row in df.iterrows():
         cells = []
         for col in df.columns:
@@ -237,9 +237,9 @@ def xuat_pdf(
                     ParagraphStyle("tong_r", fontName=fb,
                                    fontSize=font_size, alignment=TA_RIGHT)
                 )
-            elif val == "TỔNG CỘNG":
+            elif val == "Tá»”NG Cá»˜NG":
                 p = Paragraph(
-                    "<b>TỔNG CỘNG</b>",
+                    "<b>Tá»”NG Cá»˜NG</b>",
                     ParagraphStyle("tong_lbl", fontName=fb,
                                    fontSize=font_size, alignment=TA_CENTER)
                 )
@@ -258,19 +258,19 @@ def xuat_pdf(
             c = str(col_name).lower()
             if c in ("stt",):
                 return 0.5
-            if any(k in c for k in ("tiêu chí", "tieu chi")):
+            if any(k in c for k in ("tiÃªu chÃ­", "tieu chi")):
                 return 2.5
-            if any(k in c for k in ("tổ trưởng", "to truong")):
+            if any(k in c for k in ("tá»• trÆ°á»Ÿng", "to truong")):
                 return 2.0
-            if any(k in c for k in ("xếp loại", "xep loai")):
+            if any(k in c for k in ("xáº¿p loáº¡i", "xep loai")):
                 return 1.2
-            if any(k in c for k in ("mã tổ", "ma to")):
+            if any(k in c for k in ("mÃ£ tá»•", "ma to")):
                 return 1.0
-            if any(k in c for k in ("chỉ tiêu", "đơn vị", "chi tiêu", "chương trình", "ten")):
+            if any(k in c for k in ("chá»‰ tiÃªu", "Ä‘Æ¡n vá»‹", "chi tiÃªu", "chÆ°Æ¡ng trÃ¬nh", "ten")):
                 return 3.0
-            if any(k in c for k in ("tỷ lệ", "tl ", "%")):
+            if any(k in c for k in ("tá»· lá»‡", "tl ", "%")):
                 return 0.8
-            if any(k in c for k in ("còn", "con ")):
+            if any(k in c for k in ("cÃ²n", "con ")):
                 return 1.0
             return 1.2
 
@@ -282,7 +282,7 @@ def xuat_pdf(
 
     tbl = Table(table_data, colWidths=col_widths, repeatRows=1)
 
-    # Style bảng
+    # Style báº£ng
     style_cmds = [
         ("BACKGROUND", (0, 0), (-1, 0), VBSP_GREEN),
         ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
@@ -292,16 +292,16 @@ def xuat_pdf(
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
         ("TOPPADDING", (0, 0), (-1, -1), 6),
         ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
-        # Border toàn bảng
+        # Border toÃ n báº£ng
         ("GRID", (0, 0), (-1, -1), 0.5, BORDER_COLOR),
         ("BOX", (0, 0), (-1, -1), 1, VBSP_GREEN),
     ]
-    # Xen kẽ màu dòng
+    # Xen káº½ mÃ u dÃ²ng
     for r in range(1, len(table_data)):
         if r % 2 == 0:
             style_cmds.append(("BACKGROUND", (0, r), (-1, r), ROW_ALT))
 
-    # Style dòng tổng cộng (dòng cuối)
+    # Style dÃ²ng tá»•ng cá»™ng (dÃ²ng cuá»‘i)
     if dong_tong_cells is not None:
         last_row = len(table_data) - 1
         style_cmds.extend([
@@ -313,30 +313,30 @@ def xuat_pdf(
     tbl.setStyle(TableStyle(style_cmds))
     for ci, col in enumerate(df.columns):
         c = str(col).lower()
-        if c not in ("stt", "chỉ tiêu", "đơn vị", "chi tiêu", "chương trình"):
+        if c not in ("stt", "chá»‰ tiÃªu", "Ä‘Æ¡n vá»‹", "chi tiÃªu", "chÆ°Æ¡ng trÃ¬nh"):
             tbl.setStyle(TableStyle([
                 ("ALIGN", (ci, 1), (ci, -1), "RIGHT")
             ]))
     story.append(tbl)
 
-    # ── 3. Phần chữ ký ────────────────────────────────────────────────
+    # â”€â”€ 3. Pháº§n chá»¯ kÃ½ â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     story.append(Spacer(1, 1.5 * cm))
     story.append(Paragraph(
-        f"Đồng Nai, ngày {datetime.now().strftime('%d')} "
-        f"tháng {datetime.now().strftime('%m')} "
-        f"năm {datetime.now().strftime('%Y')}",
+        f"Äá»“ng Nai, ngÃ y {datetime.now().strftime('%d')} "
+        f"thÃ¡ng {datetime.now().strftime('%m')} "
+        f"nÄƒm {datetime.now().strftime('%Y')}",
         ParagraphStyle("date_sign", fontName=fn, fontSize=10,
                        alignment=TA_RIGHT, spaceAfter=6)
     ))
 
     ky_data = [[
-        Paragraph("NGƯỜI LẬP BIỂU", ParagraphStyle("ky", fontName=fb, fontSize=10, alignment=TA_CENTER)),
-        Paragraph("KIỂM SOÁT", ParagraphStyle("ky", fontName=fb, fontSize=10, alignment=TA_CENTER)),
-        Paragraph("GIÁM ĐỐC", ParagraphStyle("ky", fontName=fb, fontSize=10, alignment=TA_CENTER)),
+        Paragraph("NGÆ¯á»œI Láº¬P BIá»‚U", ParagraphStyle("ky", fontName=fb, fontSize=10, alignment=TA_CENTER)),
+        Paragraph("KIá»‚M SOÃT", ParagraphStyle("ky", fontName=fb, fontSize=10, alignment=TA_CENTER)),
+        Paragraph("GIÃM Äá»C", ParagraphStyle("ky", fontName=fb, fontSize=10, alignment=TA_CENTER)),
     ], [
-        Paragraph("<i>(Ký, ghi rõ họ tên)</i>", ParagraphStyle("ky2", fontName=fn, fontSize=9, alignment=TA_CENTER, textColor=colors.grey)),
-        Paragraph("<i>(Ký, ghi rõ họ tên)</i>", ParagraphStyle("ky2", fontName=fn, fontSize=9, alignment=TA_CENTER, textColor=colors.grey)),
-        Paragraph("<i>(Ký, ghi rõ họ tên)</i>", ParagraphStyle("ky2", fontName=fn, fontSize=9, alignment=TA_CENTER, textColor=colors.grey)),
+        Paragraph("<i>(KÃ½, ghi rÃµ há» tÃªn)</i>", ParagraphStyle("ky2", fontName=fn, fontSize=9, alignment=TA_CENTER, textColor=colors.grey)),
+        Paragraph("<i>(KÃ½, ghi rÃµ há» tÃªn)</i>", ParagraphStyle("ky2", fontName=fn, fontSize=9, alignment=TA_CENTER, textColor=colors.grey)),
+        Paragraph("<i>(KÃ½, ghi rÃµ há» tÃªn)</i>", ParagraphStyle("ky2", fontName=fn, fontSize=9, alignment=TA_CENTER, textColor=colors.grey)),
     ], [
         Paragraph(" \n\n\n", ParagraphStyle("gap", fontSize=10)),
         Paragraph(" \n\n\n", ParagraphStyle("gap", fontSize=10)),
@@ -350,7 +350,7 @@ def xuat_pdf(
     ]))
     story.append(ky_tbl)
 
-    # ── 4. Header/Footer mỗi trang (số trang) ─────────────────────────
+    # â”€â”€ 4. Header/Footer má»—i trang (sá»‘ trang) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     def _on_page(canvas, _doc):
         canvas.saveState()
         canvas.setFont(fn if _FONT_REGISTERED else FONT_FALLBACK, 8)
@@ -377,11 +377,11 @@ def xuat_pdf_bang(
     prefix_file: str = "",
 ) -> bytes:
     """
-    Xuất một bảng DataFrame ra PDF (wrapper gọi `xuat_pdf`).
-    Ghép phụ đề vào tiêu đề khi có `tieu_de_phu`.
+    Xuáº¥t má»™t báº£ng DataFrame ra PDF (wrapper gá»i `xuat_pdf`).
+    GhÃ©p phá»¥ Ä‘á» vÃ o tiÃªu Ä‘á» khi cÃ³ `tieu_de_phu`.
     """
     if tieu_de_phu:
-        tieu_de_day_du = f"{tieu_de} — {tieu_de_phu}"
+        tieu_de_day_du = f"{tieu_de} â€” {tieu_de_phu}"
     else:
         tieu_de_day_du = tieu_de
     return xuat_pdf(
@@ -402,28 +402,28 @@ def nut_xuat_pdf(
     key: str = "btn_pdf",
 ) -> None:
     """
-    Render nút 'Xuất PDF' + download_button inline trong Streamlit tab.
-    Dùng session_state để tránh lỗi data=None khi nhiều instance cùng render.
-    Gọi: nut_xuat_pdf(export_df, "Báo cáo dư nợ", username,
+    Render nÃºt 'Xuáº¥t PDF' + download_button inline trong Streamlit tab.
+    DÃ¹ng session_state Ä‘á»ƒ trÃ¡nh lá»—i data=None khi nhiá»u instance cÃ¹ng render.
+    Gá»i: nut_xuat_pdf(export_df, "BÃ¡o cÃ¡o dÆ° ná»£", username,
                       cols_tien=[COT_TONG_DU_NO, COT_DU_NO_QH])
     """
     ss_key      = f"_pdf_bytes_{key}"
     ss_file_key = f"_pdf_file_{key}"
 
-    if st.button("📄 Xuất PDF", key=key, type="secondary"):
+    if st.button("ðŸ“„ Xuáº¥t PDF", key=key, type="primary"):
         try:
-            with st.spinner("Đang tạo PDF..."):
+            with st.spinner("Äang táº¡o PDF..."):
                 pdf_bytes = xuat_pdf(df, tieu_de, username, cols_tien, prefix_file=prefix_file)
             st.session_state[ss_key]      = pdf_bytes
             st.session_state[ss_file_key] = f"{prefix_file}_{datetime.now().strftime('%d%m%Y_%H%M')}.pdf"
         except Exception as e:
             st.session_state[ss_key] = None
-            st.error(f"❌ Lỗi tạo PDF: {e}")
+            st.error(f"âŒ Lá»—i táº¡o PDF: {e}")
 
     pdf_data = st.session_state.get(ss_key)
     if pdf_data is not None:
         st.download_button(
-            label="⬇ Tải file PDF",
+            label="â¬‡ Táº£i file PDF",
             data=pdf_data,
             file_name=st.session_state.get(ss_file_key, f"{prefix_file}.pdf"),
             mime="application/pdf",

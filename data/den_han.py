@@ -2,7 +2,7 @@
 Module tính ngày đến hạn khoản vay từ hstd.parquet.
 KHÔNG import streamlit — dùng pandas + thư viện chuẩn.
 """
-from datetime import date, datetime
+from datetime import date
 from dateutil.relativedelta import relativedelta
 
 import pandas as pd
@@ -20,63 +20,45 @@ _COT_MA_QD   = "Mã Quyết định"
 _COT_TEN_DTTH = "Tên ĐTTH"
 
 
-def _parse_ngay(val):
-    if val is None or (isinstance(val, float) and pd.isna(val)):
-        return None
-    try:
-        if isinstance(val, date):
-            return val
-        if isinstance(val, datetime):
-            return val.date()
-        if isinstance(val, str):
-            for fmt in ("%d/%m/%Y", "%Y-%m-%d", "%m/%d/%Y"):
-                try:
-                    return datetime.strptime(val, fmt).date()
-                except ValueError:
-                    continue
-        return None
-    except Exception:
-        return None
+def _tinh_so_thang_gia_han_vec(df: pd.DataFrame) -> pd.Series:
+    """Vectorized: số tháng tối đa được gia hạn theo quy định NHCSXH."""
+    idx = df.index
 
+    def _str_col(name: str) -> pd.Series:
+        return (df[name].astype(str).str.strip()
+                if name in df.columns else pd.Series("", index=idx))
 
-def _tinh_so_thang_gia_han(row) -> "int | None":
-    """Số tháng tối đa được gia hạn nợ theo quy định (làm tròn xuống)."""
-    ma_ct    = str(row.get(COT_MA_CHUONG_TRINH, "")).strip()
-    ma_qd    = str(row.get(_COT_MA_QD,          "")).strip()
-    ten_dtth = str(row.get(_COT_TEN_DTTH,        "")).strip()
-    thoi_han = pd.to_numeric(row.get(COT_THOI_HAN, None), errors="coerce")
+    ma_ct    = _str_col(COT_MA_CHUONG_TRINH)
+    ma_qd    = _str_col(_COT_MA_QD)
+    ten_dtth = _str_col(_COT_TEN_DTTH)
+    thoi_han = pd.to_numeric(
+        df[COT_THOI_HAN] if COT_THOI_HAN in df.columns else pd.Series(np.nan, index=idx),
+        errors="coerce",
+    )
+    th_half = thoi_han.fillna(0) // 2
+    m_qd = ma_qd.str.contains("29", na=False) | ma_qd.str.contains("54", na=False)
 
-    if ma_ct == "02":
-        return None if pd.isna(thoi_han) else int(thoi_han) // 2
-
-    if ma_ct == "17":
-        return 30
-
-    if "29" in ma_qd or "54" in ma_qd:
-        if ten_dtth == "Hộ mới thoát nghèo":
-            return 0
-        if ten_dtth == "Hộ nghèo":
-            return 30
-
-    if pd.isna(thoi_han):
-        return None
-    thoi_han_int = int(thoi_han)
-    return 12 if thoi_han_int <= 12 else thoi_han_int // 2
+    # np.select: first matching condition wins (highest priority first)
+    conditions = [
+        (ma_ct == "02") & thoi_han.notna(),
+        ma_ct == "17",
+        m_qd & (ten_dtth == "Hộ mới thoát nghèo"),
+        m_qd & (ten_dtth == "Hộ nghèo"),
+        thoi_han.notna() & (thoi_han <= 12),
+        thoi_han.notna() & (thoi_han > 12),
+    ]
+    choices = [th_half, 30, 0, 30, 12, th_half]
+    return pd.Series(np.select(conditions, choices, default=np.nan), index=idx).astype("Int64")
 
 
 def tinh_den_han_df(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
-    df["_ngay_dh"] = df[COT_NGAY_DEN_HAN].apply(_parse_ngay)
-    df["Ngày đến hạn"] = df["_ngay_dh"]
+    ngay_ts = pd.to_datetime(df[COT_NGAY_DEN_HAN], dayfirst=True, errors="coerce")
+    df["Ngày đến hạn"] = ngay_ts.dt.date.where(ngay_ts.notna())
     today = date.today()
-    df["Tháng đến hạn còn lại"] = df["_ngay_dh"].apply(
-        lambda d: (
-            relativedelta(d, today).months + relativedelta(d, today).years * 12
-            if d is not None else None
-        )
-    )
-    df["Số tháng có thể gia hạn"] = df.apply(_tinh_so_thang_gia_han, axis=1)
-    df.drop(columns=["_ngay_dh"], inplace=True)
+    months_diff = (ngay_ts.dt.year - today.year) * 12 + (ngay_ts.dt.month - today.month)
+    df["Tháng đến hạn còn lại"] = months_diff.where(ngay_ts.notna()).astype("Int64")
+    df["Số tháng có thể gia hạn"] = _tinh_so_thang_gia_han_vec(df)
     return df
 
 

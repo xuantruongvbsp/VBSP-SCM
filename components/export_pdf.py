@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from io import BytesIO
 from datetime import datetime
+from pathlib import Path
 from typing import Sequence
 
 import pandas as pd
@@ -19,6 +20,7 @@ try:
         SimpleDocTemplate, Table, TableStyle, Paragraph,
         Spacer, HRFlowable, Image as RLImage, PageBreak,
     )
+    from reportlab.platypus import Table as RLTable
     from reportlab.pdfbase import pdfmetrics
     from reportlab.pdfbase.ttfonts import TTFont
     from reportlab.lib.enums import TA_CENTER, TA_RIGHT, TA_LEFT

@@ -37,6 +37,7 @@ from utils import (
     hien_thi_dataframe_phan_trang,
 )
 from services.excel_service import xuat_excel_chuyen_nghiep, ten_file_xuat as excel_ten_file
+from pdf_service import render_huong_dan
 
 
 def _render_canh_bao(df: pd.DataFrame, ds_pgd_all: list):
@@ -985,6 +986,7 @@ def _build_all_items(role: str, username: str, **kwargs) -> list:
         ALL_ITEMS.append({"group": "Hệ thống", "label": "Nhật ký hệ thống", "icon": "list", "fn": lambda: tab_audit_log.render(None, **kwargs)})
     ALL_ITEMS.append({"group": "Hệ thống", "label": "Trạng thái hệ thống", "icon": "pulse", "fn": lambda: tab_trang_thai_nguon.render(None, **kwargs)})
     ALL_ITEMS.append({"group": "Hệ thống", "label": "Upload dữ liệu", "icon": "upload", "fn": lambda: tab_upload_khnv.render(None, **kwargs)})
+    ALL_ITEMS.append({"group": "Hệ thống", "label": "Hướng dẫn", "icon": "book", "fn": lambda: render_huong_dan()})
 
     return ALL_ITEMS
 
@@ -1123,6 +1125,7 @@ def render(**kwargs):
         ALL_ITEMS.append({"group": "Hệ thống", "label": "Nhật ký hệ thống", "icon": "list", "fn": lambda: tab_audit_log.render(None, **kwargs)})
     ALL_ITEMS.append({"group": "Hệ thống", "label": "Trạng thái hệ thống", "icon": "pulse", "fn": lambda: tab_trang_thai_nguon.render(None, **kwargs)})
     ALL_ITEMS.append({"group": "Hệ thống", "label": "Upload dữ liệu", "icon": "upload", "fn": lambda: tab_upload_khnv.render(None, **kwargs)})
+    ALL_ITEMS.append({"group": "Hệ thống", "label": "Hướng dẫn", "icon": "book", "fn": lambda: render_huong_dan()})
 
     # ── BƯỚC 3: Quản lý state menu item đang chọn ─────────────────────────
     if "ws_mgmt_menu" not in st.session_state:

@@ -4,6 +4,7 @@ from __future__ import annotations
 import unicodedata
 from typing import TYPE_CHECKING
 
+import duckdb
 import streamlit as st
 import pandas as pd
 
@@ -434,7 +435,7 @@ def _render_bang(
 def render(tab: DeltaGenerator, **kwargs: dict) -> None:
     """
     Render tab Tra cứu hồ sơ.
-    
+
     Args:
         tab: Streamlit DeltaGenerator cho tab này
         **kwargs: Chứa df (HSTD), df_nq11 (sao kê NQ11), df_sk_gqvl (sao kê GQVL)
@@ -442,6 +443,8 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
     df          = kwargs.get("df")
     df_nq11     = kwargs.get("df_nq11")
     df_sk_gqvl  = kwargs.get("df_sk_gqvl")
+    hstd_path   = kwargs.get("hstd_path")
+    ts_hstd     = kwargs.get("ts_hstd", 0.0)
 
     # Tập hợp Số khế ước NQ11 có dư nợ > 0 (từ sao kê NQ11)
     nq11_so_ku_set  = _xay_nq11_set(df_nq11)
@@ -449,6 +452,8 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
     gqvl_nq11_set   = _xay_gqvl_nq11_set(df_sk_gqvl)
 
     # Chỉ giữ cột cần thiết → tiết kiệm RAM
+    # Đọc thẳng từ Parquet (không qua df đã lọc active_only) để tra cứu được cả
+    # khách hàng đã tất toán (Tổng dư nợ = 0).
     COLS_CAN = [
         COT_TEN_PGD, COT_MA_KH, COT_TEN_KH, COT_CMND,
         COT_SO_KU, COT_SDT, COT_DIA_CHI, COT_TEN_TO, COT_TEN_XA, COT_TEN_THON,
@@ -458,7 +463,22 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
         COT_TEN_CT, COT_MA_CHUONG_TRINH, COT_TINH_TRANG,
         COT_NGUON_VON, COT_MA_NHA_DAU_TU,
     ]
-    df_work = df[[c for c in COLS_CAN if c in df.columns]].copy()
+    _tc_cache_key = f"tc_df_{ts_hstd}"
+    if st.session_state.get("_tc_cache_key") == _tc_cache_key:
+        df_work = st.session_state["_tc_df_work"]
+    elif hstd_path:
+        _schema = duckdb.query(
+            f"SELECT column_name FROM (DESCRIBE SELECT * FROM read_parquet('{hstd_path}'))"
+        ).df()["column_name"].tolist()
+        _cols_exist = [c for c in COLS_CAN if c in _schema]
+        _cols_sql = ", ".join(f'"{c}"' for c in _cols_exist)
+        df_work = duckdb.query(
+            f"SELECT {_cols_sql} FROM read_parquet('{hstd_path}')"
+        ).df()
+        st.session_state["_tc_df_work"] = df_work
+        st.session_state["_tc_cache_key"] = _tc_cache_key
+    else:
+        df_work = df[[c for c in COLS_CAN if c in df.columns]].copy()
 
     _tab_ctx = tab if tab is not None else __import__('streamlit').container()
     with _tab_ctx:

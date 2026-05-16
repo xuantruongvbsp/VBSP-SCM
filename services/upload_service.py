@@ -356,7 +356,8 @@ def merge_du_lieu_toan_cn(
                     _cols_so = [
                         "Dư nợ trong hạn", "Dư nợ quá hạn", "Dư nợ khoanh",
                         "Tổng giải ngân", "Giải ngân trong năm", "Dư tài khoản",
-                        "Thời hạn vay", "Nguồn vốn",
+                        "Thời hạn vay",
+                        # "Nguồn vốn" là text "TW"/"ĐP" — không chuyển sang numeric
                     ]
                     for col in _cols_so:
                         if col in d.columns:

@@ -745,6 +745,7 @@ def main():
                 pgd_xa_map=_pgd_xa_map,
                 ds_pgd_all=_ds_pgd_all,
                 ts_hstd=ts_file(CACHE_HSTD) if os.path.exists(CACHE_HSTD) else 0.0,
+                hstd_path=CACHE_HSTD if os.path.exists(CACHE_HSTD) else None,
             )
             st.session_state["_ctx"] = ctx
             st.session_state["_ctx_cache_key"] = _data_version

@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## [2026-05-16] — Tính năng mới: Tab So sánh kỳ (hiện tại vs mốc 31/12)
+- `tabs/tab_so_sanh_ky.py` — Tạo mới: KPI cards + bảng chi tiết chỉ tiêu + bảng theo PGD (CN role), dùng baseline `doc_baseline_merged()`
+- `workspaces/ws_executive.py` — Thêm tab "📈 So sánh kỳ" (tab thứ 5)
+- `workspaces/ws_management.py` — Thêm menu item "So sánh kỳ" nhóm Giám sát
+- `workspaces/ws_operation.py` — Thêm tab "📊 So sánh kỳ" vào nhóm "Nghiệp vụ hàng ngày" (pgd_mode=True)
+
 ## [2026-05-16] — Tab đến hạn: khôi phục bảng tổng hợp PGD/Xã × Tháng
 - `tabs/tab_den_han.py` — Thêm lại bảng tổng hợp theo PGD/Xã × tháng đến hạn (tính từ `df_loc` đã cache, không gọi lại `tinh_den_han_df`)
 

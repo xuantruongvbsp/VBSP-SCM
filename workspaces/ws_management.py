@@ -36,6 +36,7 @@ from utils import (
     auto_fill_document,
     hien_thi_dataframe_phan_trang,
 )
+from services.excel_service import xuat_excel_chuyen_nghiep, ten_file_xuat as excel_ten_file
 
 
 def _render_canh_bao(df: pd.DataFrame, ds_pgd_all: list):
@@ -398,14 +399,34 @@ def _hien_thi_nqh_tab(df_kh: pd.DataFrame, username: str):
     cols_chi = [c for c in cols_mong_muon if c and c in df_nqh.columns]
     df_nqh_chi = df_nqh[cols_chi].reset_index(drop=True)
 
-    st.markdown("**Danh sach chi tiet**")
-    buf = xuat_excel({"NQH": df_nqh_chi})
-    st.download_button(
-        f"Xuat Excel ({len(df_nqh_chi)} ho so)", data=buf,
-        file_name=f"DS_NQH_{datetime.now().strftime('%Y%m%d')}.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        key="nqh_xuat",
-    )
+    st.markdown("**Danh sách chi tiết**")
+    col1, col2 = st.columns([1, 1])
+    with col1:
+        st.download_button(
+            label="⬇️ Xuất Excel (chuyên nghiệp)",
+            type="primary",
+            data=xuat_excel_chuyen_nghiep(
+                df=df_nqh_chi,
+                title="Danh sách Nợ quá hạn - QDD62",
+                subtitle="Phân hệ Chi nhánh",
+                nguoi_xuat=st.session_state.get("txt_username", ""),
+                kpi_items=[
+                    ("Số hồ sơ", fmt_so(len(df_nqh_chi)), ""),
+                    ("PGD liên quan", fmt_so(df_nqh_chi[COT_TEN_PGD].nunique()), "") if COT_TEN_PGD in df_nqh_chi.columns else ("", "", ""),
+                ],
+            ),
+            file_name=excel_ten_file("DS_NQH_QDD62"),
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            key="nqh_xuat_pro",
+        )
+    with col2:
+        buf = xuat_excel({"NQH": df_nqh_chi})
+        st.download_button(
+            f"⬇️ Excel cơ bản ({len(df_nqh_chi)} hồ sơ)", data=buf,
+            file_name=f"DS_NQH_{datetime.now().strftime('%Y%m%d')}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            key="nqh_xuat",
+        )
     hien_thi_dataframe_phan_trang(df_nqh_chi, key="nqh_chi", height=360)
 
 def _render_dgd_to_tkvv(tab_parent=None, **kw):

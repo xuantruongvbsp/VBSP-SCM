@@ -368,7 +368,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                         st.caption("👆 Chọn ít nhất 1 ấp")
 
                 if st.button("✅ Thêm CBTD", type="primary",
-                             use_container_width=True, key="btn_them_cbtd"):
+                             width='stretch', key="btn_them_cbtd"):
                     err = []
                     if not ma_new.strip():  err.append("Thiếu Mã CBTD")
                     if not ten_new.strip(): err.append("Thiếu Họ tên")
@@ -454,7 +454,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                                     st.error(f"⛔ **{ap_t}** đang thuộc CBTD **{cb_t}**")
 
                     if st.button("💾 Lưu thay đổi", type="primary",
-                                 use_container_width=True, key="btn_luu_sua"):
+                                 width='stretch', key="btn_luu_sua"):
                         if not ten_sua.strip():
                             st.error("❌ Họ tên không được để trống")
                         elif not ap_tong_hop:

@@ -118,7 +118,7 @@ def _render_compact(username_filter: str | None = None) -> None:
         df = format_df_vn(df)
 
         st.caption(f"Hiển thị {len(df)} bản ghi gần nhất")
-        st.dataframe(df, use_container_width=True, hide_index=True)
+        st.dataframe(df, width='stretch', hide_index=True)
 
     except Exception as e:
         st.error(f"Lỗi đọc: {e}")
@@ -166,7 +166,7 @@ def _render_full(role: str, username_filter: str | None = None) -> None:
     st.divider()
     st.dataframe(
         df.drop(columns=["ID"]),
-        use_container_width=True,
+        width='stretch',
         hide_index=True,
         column_config={
             "Thời gian": st.column_config.TextColumn(width="medium"),

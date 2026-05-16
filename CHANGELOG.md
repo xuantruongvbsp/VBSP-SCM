@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## [2026-05-16] — Tab đến hạn: thay cột "Tháng đến hạn còn lại" bằng "Số tháng được gia hạn nợ"
+- `data/den_han.py` — Thêm hàm `_tinh_so_thang_gia_han(row)` áp dụng quy định NHCSXH (CT02: ½TH, CT17: 30t, QĐ29/54 hộ nghèo: 30t, ≤12t: 12t, >12t: ½TH); thêm cột "Số tháng được gia hạn nợ" vào `tinh_den_han_df()`
+- `tabs/tab_den_han.py` — Thay "Tháng đến hạn còn lại" bằng "Số tháng được gia hạn nợ" trong `cols_hien_thi`, `COLS_CHI_TIET`, `_detail_pdf_cols`; đổi sort từ cột tháng còn lại sang "Ngày đến hạn"
+
 ## [2026-05-16] — Fix NameError: render_den_han trong ws_management.py
 - `workspaces/ws_management.py` dòng ~174 — Thêm `from tabs.tab_den_han import render as render_den_han` vào `_render_canh_bao_no()` (import chỉ có trong `_render_canh_bao`, không lan sang hàm khác)
 

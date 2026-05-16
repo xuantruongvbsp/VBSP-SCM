@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## [2026-05-17] — Upload UX: tự reset file uploader sau upload thành công + spinner
+- `tabs/tab_upload_khnv.py` `_render_upload_form()` — thêm version counter vào key file_uploader, widget tự reset rỗng sau upload thành công; thêm `st.spinner()` khi xử lý
+- `tabs/tab_upload_khnv.py` `_xu_ly_upload()` — tăng version counter khi có ít nhất 1 file upload thành công
+- `tabs/tab_upload_pgd.py` `_render_upload_form()` — thêm version counter vào key file_uploader + hiển thị kết quả upload từ session_state (bền qua rerun); thêm `st.spinner()`
+- `tabs/tab_upload_pgd.py` `_xu_ly_upload()` — thêm param `prefix`, gom kết quả vào `msgs[]`, lưu vào session_state trước rerun thay vì gọi `st.success/error` trực tiếp (bị xóa bởi rerun); reset version counter khi thành công
+
 ## [2026-05-17] — Bảng trạng thái 22 đơn vị: thêm cột 31/12/YYYY baseline
 - `tabs/tab_upload_khnv.py` `_hien_thi_bang_trang_thai()` — thêm cột `31/12/{nam}` hiển thị ✅/❌ baseline per-PGD; tự chọn năm gần nhất có dữ liệu (fallback năm trước)
 

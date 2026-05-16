@@ -362,6 +362,30 @@ def _render_don_doc(df: pd.DataFrame, pgd_user: str, role: str):
             f"**{fmt_so(len(df_dondoc))}** món · "
             f"Lãi tồn: **{fmt(tong_lai_ds)}** triệu đồng"
         )
+
+        # ── LoanDetailDrawer ───────────────────────────────────────────
+        st.divider()
+        st.markdown("**🔍 Tra cứu chi tiết khoản vay**")
+        cols_chon = [c for c in [COT_SO_KU, COT_TEN_KH, COT_MA_KH] if c in df_dondoc.columns]
+        if cols_chon:
+            df_chon = df_dondoc.copy()
+            df_chon["_hien_thi"] = df_chon[cols_chon[0]].astype(str)
+            if len(cols_chon) > 1:
+                for c in cols_chon[1:]:
+                    df_chon["_hien_thi"] += " | " + df_chon[c].astype(str)
+            options = dict(zip(df_chon["_hien_thi"], df_dondoc.index))
+            selected_label = st.selectbox(
+                "Chọn khoản vay để xem chi tiết",
+                options=list(options.keys()),
+                key="op_khd_chon_drawer",
+            )
+            if selected_label:
+                row_idx = options[selected_label]
+                row_data = df_dondoc.loc[row_idx]
+                loan_detail_drawer(
+                    df_dondoc, row_id=row_idx,
+                    key_suffix=f"op_khd_{row_idx}",
+                )
     else:
         st.info("Không có hộ nào thỏa điều kiện.")
 
@@ -1122,22 +1146,34 @@ Doanh số cho vay trong tháng: {ds_cv:,.0f} triệu đồng; doanh số thu n�
             )
         with col_pdf:
             cols_tien_gb = [c for c in ["Tổng dư nợ", "Nợ quá hạn", "Nợ khoanh", "Doanh số cho vay tháng", "Doanh số thu nợ tháng"] if c in df_bang.columns]
-            st.download_button(
-                label="Xuất PDF",
-                type="secondary",
-                data=xuat_pdf(
-                    df=df_bang,
-                    tieu_de=f"Báo cáo Giao ban - {chon_xa}",
-                    nguoi_xuat=st.session_state.get("txt_username", ""),
-                    cols_tien=cols_tien_gb,
-                    prefix_file="GiaoBan",
-                    them_dong_tong=False,
-                    tieu_de_phu=f"Điểm GD: {ten_dgd or chon_xa}",
-                ),
-                file_name=f"GiaoBan_{chon_xa}_{datetime.now().strftime('%Y%m%d')}.pdf",
-                mime="application/pdf",
-                key="gb_pdf_download",
-                width='stretch',
+            import plotly.express as px
+            df_chart = df_bang[df_bang["Tên ĐVUT"] != "CỘNG"].copy()
+            fig_list = []
+            if not df_chart.empty and "Tổng dư nợ" in df_chart.columns:
+                fig_dn = px.bar(
+                    df_chart, x="Tên ĐVUT", y="Tổng dư nợ",
+                    title="Tổng dư nợ theo ĐVUT",
+                    text_auto=".1s", color_discrete_sequence=["#2E7D32"],
+                )
+                fig_dn.update_layout(xaxis_title="", yaxis_title="Triệu đồng")
+                fig_list.append((fig_dn, "Tổng dư nợ theo ĐVUT"))
+            if "Nợ quá hạn" in df_chart.columns:
+                fig_nqh = px.bar(
+                    df_chart, x="Tên ĐVUT", y="Nợ quá hạn",
+                    title="Nợ quá hạn theo ĐVUT",
+                    text_auto=".1s", color_discrete_sequence=["#E53935"],
+                )
+                fig_nqh.update_layout(xaxis_title="", yaxis_title="Triệu đồng")
+                fig_list.append((fig_nqh, "Nợ quá hạn theo ĐVUT"))
+
+            download_pdf_button(
+                df=df_bang,
+                tieu_de=f"Báo cáo Giao ban - {chon_xa}",
+                nguoi_xuat=st.session_state.get("txt_username", ""),
+                figs=fig_list if fig_list else None,
+                cols_tien=cols_tien_gb,
+                prefix_file="GiaoBan",
+                them_dong_tong=False,
             )
 
 

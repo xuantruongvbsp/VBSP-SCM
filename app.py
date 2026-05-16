@@ -15,6 +15,7 @@ from config import (
     FILE_PATH_SK_GQVL, CACHE_SK_GQVL,
     TEN_FILE, TEN_FILE_NQ11, TEN_FILE_DB, TEN_FILE_DB_PREV,
     COT_TEN_PGD, COT_MA_KH, COT_NGAY_SL, WORKSPACE_MAP,
+    COT_TONG_DU_NO, COT_DU_NO_QH,
     CACHE_HSTD, CACHE_NQ11, DON_VI_CHI_NHANH,
     DS_PGD as _DS_PGD_DEFAULT,
     PGD_XA_MAP as _PGD_XA_MAP_DEFAULT,
@@ -37,20 +38,39 @@ from alert_center import render_alert_sidebar
 
 
 @st.cache_resource(show_spinner=False, ttl=3600)
-def _load_hstd(cache_path: str, _ts: float, ten_pgd: str | None = None) -> pd.DataFrame:
+def _load_hstd(
+    cache_path: str,
+    _ts: float,
+    ten_pgd: str | None = None,
+    active_only: bool = False,
+) -> pd.DataFrame:
     """
-    Load HSTD từ Parquet.
-    - ten_pgd=None  → load toàn bộ (CN role), cache 1 bản dùng chung.
-    - ten_pgd=<str> → filter pushdown tại read_parquet, cache riêng per-PGD;
-                      không kéo toàn bộ file vào RAM cho PGD user.
+    Load HSTD từ Parquet với filter pushdown tại tầng đĩa cứng.
+
+    Cache key = (cache_path, _ts, ten_pgd, active_only) → mỗi tổ hợp dùng chung
+    1 bản trong @st.cache_resource (không nhân bản theo session).
+
+    - ten_pgd=None,  active_only=False → toàn bộ (hiếm dùng)
+    - ten_pgd=None,  active_only=True  → CN role: chỉ hồ sơ còn dư nợ, giảm 30–60% RAM
+    - ten_pgd=<str>, active_only=False → PGD role: lọc theo PGD, cache riêng per-PGD
+    - ten_pgd=<str>, active_only=True  → PGD role + active filter
     """
+    clauses: list[str] = []
     if ten_pgd:
         pgd_safe = ten_pgd.replace("'", "''")
-        return duckdb.query(
-            f"SELECT * FROM read_parquet('{cache_path}') "
-            f"WHERE \"{COT_TEN_PGD}\" = '{pgd_safe}'"
-        ).df()
-    return duckdb.query(f"SELECT * FROM read_parquet('{cache_path}')").df()
+        clauses.append(f'"{COT_TEN_PGD}" = \'{pgd_safe}\'')
+    if active_only:
+        # Loại hồ sơ đã tất toán hoàn toàn: gốc = 0, QH = 0, khoanh = 0
+        clauses.append(
+            f'(COALESCE(TRY_CAST("{COT_TONG_DU_NO}" AS DOUBLE), 0) > 0'
+            f' OR COALESCE(TRY_CAST("{COT_DU_NO_QH}" AS DOUBLE), 0) > 0'
+            f' OR COALESCE(TRY_CAST("Dư nợ khoanh" AS DOUBLE), 0) > 0)'
+        )
+
+    where_sql = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+    return duckdb.query(
+        f"SELECT * FROM read_parquet('{cache_path}') {where_sql}"
+    ).df()
 
 
 @st.cache_resource(show_spinner=False, ttl=3600)
@@ -593,7 +613,7 @@ def main():
 
             from auth import la_phan_he_cn
             if la_phan_he_cn(role) or not pgd_user:
-                df_full = _load_hstd(CACHE_HSTD, _hstd_ts)
+                df_full = _load_hstd(CACHE_HSTD, _hstd_ts, active_only=True)
                 df = df_full
             else:
                 # PGD role: filter pushdown tại read_parquet, cached per-PGD

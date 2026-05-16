@@ -483,7 +483,7 @@ def merge_du_lieu_toan_cn(
         if os.path.exists(cache_path):
             shutil.copy2(cache_path, bak_path)
         try:
-            df_toan_cn.to_parquet(cache_path, index=False, engine="pyarrow", compression="zstd")
+            df_toan_cn.to_parquet(cache_path, index=False, engine="pyarrow", compression="zstd", compression_level=9)
         except Exception as e:
             _u_merge = st.session_state.get("username", "unknown")
             db.ghi_audit(_u_merge, "merge_loi_dtype",

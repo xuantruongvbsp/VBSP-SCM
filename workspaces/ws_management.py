@@ -449,10 +449,10 @@ def _render_ndt_dp(role: str, username: str) -> None:
     from db import doc_ndt_dp_list, ghi_kv, ghi_audit
 
     st.subheader("🏦 Mã Nhà đầu tư Địa phương — Cấp tỉnh")
-    st.caption(
-        "Danh sách này dùng để phân loại nguồn vốn ĐP trong file GQVL. "
-        "Món vay nào có Mã NĐT khớp chính xác (exact match) với 1 mã trong "
-        "danh sách → xếp vào GQVL ĐP Cấp tỉnh. Còn lại → Cấp xã/khác."
+    st.info(
+        "ℹ️ **Cách dùng:** Mã NĐT lấy chính xác từ cột **'Mã nhà đầu tư'** trong file sao kê GQVL — "
+        "món vay có mã khớp với danh sách dưới đây được xếp vào **GQVL ĐP Cấp tỉnh**, còn lại là **Cấp xã/khác**. "
+        "Chỉ **Admin CN** mới có thể thêm hoặc xóa mã."
     )
 
     ds = doc_ndt_dp_list()   # list[dict] {"ma", "ghi_chu"}
@@ -515,30 +515,42 @@ def _render_ndt_dp(role: str, username: str) -> None:
                 if ("Nguồn vốn" not in df_gqvl.columns) or (COT_MA_NDT not in df_gqvl.columns):
                     st.warning("File GQVL không có đủ cột để phân tích.")
                 else:
-                    df_dp = df_gqvl[df_gqvl["Nguồn vốn"] == "ĐP"].copy()
-                    ma_ndt_str = df_dp[COT_MA_NDT].astype(str).str.strip()
-                    ndt_list = [x.get("ma", "") for x in (ds or [])]
-                    mask_cap_tinh = ma_ndt_str.isin(ndt_list)
-
-                    p1, p2, p3 = st.columns(3)
-                    p1.metric("Tổng món ĐP", fmt_so(len(df_dp)))
-                    p2.metric("→ Cấp tỉnh 🏛️", fmt_so(int(mask_cap_tinh.sum())))
-                    p3.metric("→ Cấp xã/khác 🏘️", fmt_so(int((~mask_cap_tinh).sum())))
-
-                    df_preview = (
-                        df_dp.assign(
-                            _ma_label=ma_ndt_str.where(mask_cap_tinh, "Cấp xã/khác"),
+                    nv_col = df_gqvl["Nguồn vốn"] if "Nguồn vốn" in df_gqvl.columns else None
+                    if nv_col is not None and nv_col.isna().all():
+                        st.warning(
+                            "⚠️ Cột 'Nguồn vốn' trong cache GQVL toàn NaN — "
+                            "dữ liệu cũ bị lỗi định dạng. Vui lòng upload lại "
+                            "file GQVL để cập nhật cache."
                         )
-                        .groupby("_ma_label")
-                        .size()
-                        .reset_index(name="Số món")
-                        .rename(columns={"_ma_label": "Mã NĐT / Nhóm"})
-                    )
-                    ghi_chu_map = {x.get("ma", ""): x.get("ghi_chu", "") for x in (ds or [])}
-                    df_preview["Ghi chú"] = df_preview["Mã NĐT / Nhóm"].map(
-                        lambda m: ghi_chu_map.get(m, "")
-                    )
-                    st.dataframe(df_preview, hide_index=True, use_container_width=True)
+                    else:
+                        df_dp = df_gqvl[df_gqvl["Nguồn vốn"] == "ĐP"].copy()
+                        ma_ndt_str = df_dp[COT_MA_NDT].astype(str).str.strip()
+                        ndt_list = [x.get("ma", "") for x in (ds or [])]
+                        mask_cap_tinh = ma_ndt_str.isin(ndt_list)
+
+                        p1, p2, p3 = st.columns(3)
+                        p1.metric("Tổng món ĐP", fmt_so(len(df_dp)))
+                        p2.metric("→ Cấp tỉnh 🏛️", fmt_so(int(mask_cap_tinh.sum())))
+                        p3.metric("→ Cấp xã/khác 🏘️", fmt_so(int((~mask_cap_tinh).sum())))
+
+                        ghi_chu_map = {x.get("ma", ""): x.get("ghi_chu", "") for x in (ds or [])}
+                        agg_kwargs: dict = {"Số món": ("Mã NĐT / Nhóm", "count")}
+                        if "Dư nợ trong hạn" in df_dp.columns:
+                            agg_kwargs["Dư nợ TH (tỷ)"] = ("Dư nợ trong hạn", "sum")
+                        df_preview = (
+                            df_dp.assign(
+                                **{"Mã NĐT / Nhóm": ma_ndt_str.where(mask_cap_tinh, "Cấp xã/khác")}
+                            )
+                            .groupby("Mã NĐT / Nhóm")
+                            .agg(**agg_kwargs)
+                            .reset_index()
+                        )
+                        if "Dư nợ TH (tỷ)" in df_preview.columns:
+                            df_preview["Dư nợ TH (tỷ)"] = df_preview["Dư nợ TH (tỷ)"].apply(fmt_ty)
+                        df_preview["Ghi chú"] = df_preview["Mã NĐT / Nhóm"].map(
+                            lambda m: ghi_chu_map.get(m, "")
+                        )
+                        st.dataframe(df_preview, hide_index=True, use_container_width=True)
         except Exception as e:
             st.warning(f"Không thể phân tích tác động GQVL: {e}")
 

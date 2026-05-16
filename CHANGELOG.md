@@ -1,5 +1,19 @@
 # CHANGELOG
 
+## [2026-05-16] — Chuẩn hóa key Streamlit widget ws_operation: tất cả widget nhập liệu ghi lại session_state
+- `workspaces/ws_operation.py` — Rà soát 28 Streamlit widget (selectbox, radio, multiselect, text_input, text_area, number_input, date_input, slider)
+- **Ưu tiên 1 (đã fix):** 3 widget thiếu `key=` hoàn toàn → thêm key
+- **Ưu tiên 2 (đã fix):** 13 widget có `key=` nhưng sai format (`dh_*`, `tb_*`, `gb*`, `gn_*`, `dp_*`, `hist_*`, `donut_*`) → đổi thành `op_[tab]_[biến]` (prefix `op_` = Operation)
+- **Chi tiết sửa:**
+  - `_render_doc_hub()`: `dh_doi_tuong` → `op_dh_doi_tuong`; `dh_kw` → `op_dh_kw`; `dh_hs_sel` → `op_dh_hs_sel`; `dh_xa` → `op_dh_xa`; `dh_mau_sel` → `op_dh_mau_sel`; `dh_xuat_mode` → `op_dh_xuat_mode`
+  - `_render_thong_bao_ket_luan()`: `tb_chon_xa` → `op_tb_chon_xa`; `tb_ten_dgd` → `op_tb_ten_dgd`; `tb_ngay_hop` → `op_tb_ngay_hop`; `tb_so_van_ban` → `op_tb_so_van_ban`; `tb_ten_nguoi_ky` → `op_tb_ten_nguoi_ky`; `gn_*` → `op_gn_*`; `tb_chinh_sach` → `op_tb_chinh_sach`; `tb_ton_tai` → `op_tb_ton_tai`; `tb_nhiem_vu` → `op_tb_nhiem_vu`
+  - `_render_bien_ban_giao_ban()`: `gb2_xa` → `op_gb2_xa`; `gb2_nam` → `op_gb2_nam`; `gb2_gn` → `op_gb2_gn`
+  - `_render_bao_cao_giao_ban()`: `gb_pgd` → `op_gb_pgd`; `gb_xa` → `op_gb_xa`; `gb_dgd` → `op_gb_dgd`; `gb_tom_tat` → `op_gb_tom_tat`
+  - `_render_du_phong_dong_tien()`: `dp_xa` → `op_dp_xa`; `dp_ct` → `op_dp_ct`; `dp_thang_xem` → `op_dp_thang_xem`
+  - `_render_histogram_du_no()`: `hist_bins` → `op_hist_bins`
+  - `_render_donut_co_cau()`: `donut_top` → `op_donut_top`
+- **Tác dụng:** Fix lazy-rendering: khi user đổi tab, widget vẫn nhớ giá trị cũ qua session_state thay vì bị reset
+
 ## [2026-05-16] — Lazy navigation ws_management: radio Nhóm → Mục
 - `workspaces/ws_management.py` — Thêm 2 tầng `st.radio` (Nhóm + Mục) ngay trong content, thay thế cách dùng sidebar-only để chọn mục; `render()` vẫn chỉ gọi đúng 1 `fn()` duy nhất
 - `workspaces/ws_management.py` — Hỗ trợ `ws_mgmt_jump` (session_state): nút điều hướng từ nơi khác có thể set key này để jump đến mục chỉ định kèm toast thông báo

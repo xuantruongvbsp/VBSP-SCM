@@ -465,14 +465,14 @@ def _render_doc_hub(df: pd.DataFrame, df_nq11, role: str):
     doi_tuong = st.radio(
         "Chọn đối tượng xuất văn bản",
         ["Từng hồ sơ khách hàng", "Theo Xã/Phường (xuất hàng loạt)"],
-        horizontal=True, key="dh_doi_tuong", label_visibility="collapsed",
+        horizontal=True, key="op_dh_doi_tuong", label_visibility="collapsed",
     )
 
     df_chon = None
 
     if doi_tuong == "Từng hồ sơ khách hàng":
         kw = st.text_input("🔍 Tìm khách hàng",
-                           placeholder="Tên KH hoặc Số khế ước...", key="dh_kw")
+                           placeholder="Tên KH hoặc Số khế ước...", key="op_dh_kw")
         if kw:
             mask = df[[c for c in [COT_TEN_KH, COT_SO_KU, COT_MA_KH] if c in df.columns]]\
                      .astype(str).apply(lambda c: c.str.contains(kw, case=False, na=False)).any(axis=1)
@@ -484,7 +484,7 @@ def _render_doc_hub(df: pd.DataFrame, df_nq11, role: str):
                         df_tim[COT_SO_KU].astype(str)) if COT_SO_KU in df_tim.columns \
                        else df_tim[COT_TEN_KH].astype(str)
                 chon = st.multiselect("Chọn hồ sơ (có thể chọn nhiều)",
-                                      opts.tolist(), key="dh_hs_sel")
+                                      opts.tolist(), key="op_dh_hs_sel")
                 if chon:
                     idx_list = [opts.tolist().index(c) for c in chon]
                     df_chon  = df_tim.iloc[idx_list].reset_index(drop=True)
@@ -493,7 +493,7 @@ def _render_doc_hub(df: pd.DataFrame, df_nq11, role: str):
         COT_XA = "Tên xã"
         if COT_XA in df.columns:
             ds_xa   = sorted(df[COT_XA].dropna().unique().tolist())
-            chon_xa = st.selectbox("Chọn Xã/Phường", ds_xa, key="dh_xa")
+            chon_xa = st.selectbox("Chọn Xã/Phường", ds_xa, key="op_dh_xa")
             df_chon = df[df[COT_XA] == chon_xa].copy()
             st.info(f"Xã **{chon_xa}**: **{len(df_chon)}** hồ sơ")
         else:
@@ -507,7 +507,7 @@ def _render_doc_hub(df: pd.DataFrame, df_nq11, role: str):
     ten_mau_list  = [t[0] for t in templates]
     path_mau_list = [t[1] for t in templates]
     chon_mau_list = st.multiselect("Chọn 1 hoặc nhiều mẫu biểu",
-                                   ten_mau_list, key="dh_mau_sel")
+                                   ten_mau_list, key="op_dh_mau_sel")
 
     with st.expander("📋 Xem tất cả mẫu biểu & tag hỗ trợ"):
         for ten, path in templates:
@@ -529,7 +529,7 @@ def _render_doc_hub(df: pd.DataFrame, df_nq11, role: str):
     che_do_xuat = st.radio(
         "Chế độ xuất",
         ["Mỗi hồ sơ 1 file riêng", "Gộp tất cả vào 1 file (hàng loạt)"],
-        horizontal=True, key="dh_xuat_mode",
+        horizontal=True, key="op_dh_xuat_mode",
     ) if len(df_chon) > 1 else "Mỗi hồ sơ 1 file riêng"
 
     dh_ss_key = "_dh_docx_hub"
@@ -637,7 +637,7 @@ def _render_thong_bao_ket_luan(tab, **kwargs):
             "Chọn xã / điểm giao dịch",
             ds_xa,
             index=ds_xa.index(default_xa) if default_xa in ds_xa else 0,
-            key="tb_chon_xa",
+            key="op_tb_chon_xa",
         )
         st.session_state["gb2_xa"] = chon_xa
 
@@ -658,21 +658,21 @@ def _render_thong_bao_ket_luan(tab, **kwargs):
             tb_dgd = st.text_input(
                 "Tên điểm giao dịch",
                 value=chon_xa,
-                key="tb_ten_dgd",
+                key="op_tb_ten_dgd",
                 help="Mặc định là tên xã, chỉnh lại nếu khác",
             )
-            tb_ngay = st.date_input("Ngày họp", value=date.today(), key="tb_ngay_hop")
+            tb_ngay = st.date_input("Ngày họp", value=date.today(), key="op_tb_ngay_hop")
         with col_b:
             tb_so_vb = st.text_input(
                 "Số văn bản",
                 placeholder="VD: 05",
-                key="tb_so_van_ban",
+                key="op_tb_so_van_ban",
                 help="Phần số trong 'Số: .../TB-KLGB'",
             )
             tb_ten_ky = st.text_input(
                 "Tên người ký",
                 placeholder="VD: Nguyễn Văn A",
-                key="tb_ten_nguoi_ky",
+                key="op_tb_ten_nguoi_ky",
                 help="Tên Phó Giám đốc ký văn bản",
             )
 
@@ -717,7 +717,7 @@ def _render_thong_bao_ket_luan(tab, **kwargs):
                         value=0.0,
                         step=1.0,
                         format="%.0f",
-                        key=f"gn_{dvut}_{to}_{ct}",
+                        key=f"op_gn_{dvut}_{to}_{ct}",
                         help="Triệu đồng",
                     )
                     if val > 0:
@@ -730,19 +730,19 @@ def _render_thong_bao_ket_luan(tab, **kwargs):
             "I. Chính sách mới trong tháng",
             placeholder="Để trống nếu không có chính sách mới...",
             height=100,
-            key="tb_chinh_sach",
+            key="op_tb_chinh_sach",
         )
         tb_tt = st.text_area(
             "II.2 Tồn tại, hạn chế",
             placeholder="Nêu cụ thể tồn tại của Hội, Tổ, khách hàng...",
             height=120,
-            key="tb_ton_tai",
+            key="op_tb_ton_tai",
         )
         tb_nv = st.text_area(
             "III. Nhiệm vụ tháng tiếp theo",
             placeholder="Kế hoạch kiểm tra, xử lý nợ xấu, nội dung khác...",
             height=120,
-            key="tb_nhiem_vu",
+            key="op_tb_nhiem_vu",
         )
 
         if st.button("🖨️ Xuất Thông báo Kết luận Word", type="primary", key="tb_xuat"):
@@ -848,7 +848,7 @@ def _render_bien_ban_giao_ban(tab, **kwargs):
         # 1. Chọn xã thuộc PGD
         ds_xa = sorted(df["Tên xã"].dropna().unique().tolist())
         chon_xa = st.selectbox("Chọn xã / điểm giao dịch", ds_xa,
-                               key="gb2_xa")
+                               key="op_gb2_xa")
 
         # 2. Chọn năm mốc so sánh — dùng doc_baseline_merged() để tổng hợp từ 22 đơn vị
         ds_nam = danh_sach_nam_baseline_pgd()
@@ -863,7 +863,7 @@ def _render_bien_ban_giao_ban(tab, **kwargs):
             chon_nam = st.selectbox(
                 "So sánh với mốc năm", ds_nam,
                 format_func=lambda n: f"31/12/{n}",
-                key="gb2_nam")
+                key="op_gb2_nam")
             # Đọc dữ liệu đã merge từ tất cả đơn vị
             fp_check = baseline_pgd_path(DON_VI_CHI_NHANH if not pgd_user else pgd_user, chon_nam)
             _ts = os.path.getmtime(fp_check) if os.path.exists(fp_check) else 0
@@ -874,7 +874,7 @@ def _render_bien_ban_giao_ban(tab, **kwargs):
             st.caption("Để trống nếu chưa có kế hoạch.")
             gn_tong = st.number_input(
                 "Tổng giải ngân dự kiến (triệu đồng)", min_value=0.0,
-                step=1.0, key="gb2_gn")
+                step=1.0, key="op_gb2_gn")
             # Đơn giản: nhập 1 số tổng — code điền vào dòng Cộng
             # Nếu sau này cần chi tiết theo Tổ thì mở rộng thêm
 
@@ -946,7 +946,7 @@ def _render_bao_cao_giao_ban(tab, **kwargs):
             if COT_TEN_PGD in df.columns:
                 ds_pgd = sorted(df[COT_TEN_PGD].dropna().unique().tolist())
                 if ds_pgd:
-                    chon_pgd = st.selectbox("Chọn Phòng Giao dịch", ds_pgd, key="gb_pgd")
+                    chon_pgd = st.selectbox("Chọn Phòng Giao dịch", ds_pgd, key="op_gb_pgd")
                     df_filtered = df[df[COT_TEN_PGD] == chon_pgd].copy()
         
         # Chọn Xã
@@ -955,7 +955,7 @@ def _render_bao_cao_giao_ban(tab, **kwargs):
             if not ds_xa:
                 st.warning("Không có dữ liệu xã nào trong PGD được chọn.")
                 return
-            chon_xa = st.selectbox("Chọn Xã/Phường", ds_xa, key="gb_xa")
+            chon_xa = st.selectbox("Chọn Xã/Phường", ds_xa, key="op_gb_xa")
             df_xa = df_filtered[df_filtered["Tên xã"] == chon_xa].copy()
         else:
             st.warning("Không tìm thấy cột 'Tên xã' trong dữ liệu.")
@@ -993,7 +993,7 @@ def _render_bao_cao_giao_ban(tab, **kwargs):
             df_dgd = df_xa.copy()
             ten_dgd = chon_xa
         else:
-            chon_dgd = st.selectbox("📍 Điểm giao dịch", ds_dgd, key="gb_dgd")
+            chon_dgd = st.selectbox("📍 Điểm giao dịch", ds_dgd, key="op_gb_dgd")
             ds_thon_dgd = dgd_map[current_pgd][chon_xa][chon_dgd]
             ten_dgd = chon_dgd
             st.caption(f"Quản lý: {', '.join(ds_thon_dgd)}")
@@ -1125,10 +1125,10 @@ def _render_bao_cao_giao_ban(tab, **kwargs):
         tom_tat = f"""Khu vực {khu_vuc_text}, xã {chon_xa}: Tổng dư nợ đạt {tong_dn:,.0f} triệu đồng, với {fmt_so(so_kh)} khách hàng còn dư nợ, thông qua {so_to} Tổ TK&VV. Trong đó, nợ quá hạn {nqh:,.0f} triệu đồng, tỷ lệ {tl_nqh:.2f}%; nợ khoanh {nkh:,.0f} triệu đồng.
 Doanh số cho vay trong tháng: {ds_cv:,.0f} triệu đồng; doanh số thu nợ trong tháng: {ds_thu:,.0f} triệu đồng."""
         
-        st.text_area("📋 Đoạn tóm tắt (copy vào báo cáo)", 
-                     value=tom_tat, 
-                     height=150, 
-                     key="gb_tom_tat")
+        st.text_area("📋 Đoạn tóm tắt (copy vào báo cáo)",
+                     value=tom_tat,
+                     height=150,
+                     key="op_gb_tom_tat")
         
         st.divider()
         
@@ -1297,10 +1297,10 @@ def render(**kwargs):
             col_xa, col_ct = st.columns(2)
             with col_xa:
                 ds_xa = ["Tất cả"] + sorted(df_loc[COT_TEN_XA].dropna().unique().tolist()) if COT_TEN_XA in df_loc.columns else ["Tất cả"]
-                loc_xa = st.selectbox("🏘️ Xã", ds_xa, key="dp_xa")
+                loc_xa = st.selectbox("🏘️ Xã", ds_xa, key="op_dp_xa")
             with col_ct:
                 ds_ct = ["Tất cả"] + sorted(df_loc[COT_TEN_CT].dropna().unique().tolist()) if COT_TEN_CT in df_loc.columns else ["Tất cả"]
-                loc_ct = st.selectbox("📌 Chương trình", ds_ct, key="dp_ct")
+                loc_ct = st.selectbox("📌 Chương trình", ds_ct, key="op_dp_ct")
 
             df_work = df_loc.copy()
             if loc_xa != "Tất cả" and COT_TEN_XA in df_work.columns:
@@ -1381,7 +1381,7 @@ def render(**kwargs):
             thang_xem = st.selectbox(
                 "Chọn tháng",
                 df_dp["thang_label"].tolist(),
-                key="dp_thang_xem",
+                key="op_dp_thang_xem",
             )
             thang_date = df_dp[df_dp["thang_label"] == thang_xem]["thang"].iloc[0]
 
@@ -1519,7 +1519,7 @@ def render(**kwargs):
                 return
 
             max_val = df_hist[cot_tien].max()
-            bins = st.slider("Số khoảng (bins)", min_value=5, max_value=50, value=20, key="hist_bins")
+            bins = st.slider("Số khoảng (bins)", min_value=5, max_value=50, value=20, key="op_hist_bins")
 
             fig = px.histogram(
                 df_hist,
@@ -1580,7 +1580,7 @@ def render(**kwargs):
 
             ct_group = df_donut.groupby(nhom_ct)[cot_tien].sum().sort_values(ascending=False)
 
-            top_n = st.slider("Hiển thị Top N chương trình", min_value=3, max_value=10, value=5, key="donut_top")
+            top_n = st.slider("Hiển thị Top N chương trình", min_value=3, max_value=10, value=5, key="op_donut_top")
             ct_show = ct_group.head(top_n)
             ct_others = ct_group.iloc[top_n:].sum() if len(ct_group) > top_n else 0
 

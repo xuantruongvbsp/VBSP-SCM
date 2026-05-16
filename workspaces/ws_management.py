@@ -450,10 +450,63 @@ def _render_ndt_dp(role: str, username: str) -> None:
 
     st.subheader("🏦 Mã Nhà đầu tư Địa phương")
     st.info(
-        "ℹ️ **Cách dùng:** Mã NĐT lấy chính xác từ cột **'Mã nhà đầu tư'** trong file sao kê GQVL — "
-        "món vay có mã khớp với danh sách **Cấp Tỉnh** được xếp vào GQVL ĐP Cấp tỉnh, "
-        "còn lại là Cấp xã/khác. Chỉ **Admin CN** mới có thể thêm hoặc xóa mã."
+        "ℹ️ Mã NĐT lấy chính xác từ cột **'Mã nhà đầu tư'** trong file sao kê GQVL — "
+        "món vay khớp với danh sách **Cấp Tỉnh** → xếp vào GQVL ĐP Cấp tỉnh, còn lại → Cấp xã/khác. "
+        "Chỉ **Admin CN** mới có thể thêm / sửa / xóa."
     )
+
+    with st.expander("📖 Hướng dẫn sử dụng", expanded=False):
+        st.markdown("""
+### Mục đích
+
+Hệ thống phân loại mỗi món vay **Nguồn vốn ĐP (Địa phương)** thành 2 tầng:
+
+| Tầng | Điều kiện | Ví dụ |
+|---|---|---|
+| **GQVL ĐP — Cấp tỉnh** | Mã NĐT của món vay **có trong danh sách Cấp Tỉnh** | UBND tỉnh Đồng Nai |
+| **GQVL ĐP — Cấp xã/khác** | Mã NĐT **không có** trong danh sách | Vốn huyện, xã, tổ chức khác |
+
+Danh sách này ảnh hưởng trực tiếp đến báo cáo **phân tầng GQVL** và tab **Phân tích** bên dưới.
+
+---
+
+### Các tab chức năng
+
+**🏛️ Cấp Tỉnh** — Xem danh sách mã đang được xếp vào nhóm Cấp tỉnh.
+
+**🏘️ Cấp Xã/Khác** — Xem danh sách mã đang được xếp vào nhóm Cấp xã/khác.
+
+**➕ Thêm mới** *(chỉ Admin CN)*
+1. Mở file sao kê GQVL → tìm cột **"Mã nhà đầu tư"**
+2. Copy chính xác mã (dạng `INV` + dãy số, ví dụ `INV0802140002662`)
+3. Dán vào ô **Mã NĐT đầy đủ**, điền ghi chú, chọn **Phân loại cấp** rồi nhấn **➕ Thêm**
+
+**✏️ Chỉnh sửa / Xóa** *(chỉ Admin CN)*
+- Sửa ghi chú hoặc đổi phân loại cấp → nhấn 💾 để lưu từng dòng
+- Nhấn 🗑️ để xóa (không thể xóa khi chỉ còn 1 mã)
+
+**📊 Phân tích**
+- Hiển thị ngay tác động lên dữ liệu GQVL đang có trong cache:
+  3 metric tổng quan + bảng chi tiết từng mã (số món, dư nợ trong hạn, dư nợ quá hạn)
+
+---
+
+### Sau khi thêm / sửa / xóa mã
+
+> ⚠️ Thay đổi danh sách **chưa tự động cập nhật** dữ liệu phân tầng cũ.
+> Để áp dụng: upload lại file GQVL **hoặc** nhấn **🔄 Làm mới** để tải lại cache,
+> sau đó vào tab **📊 Phân tích** kiểm tra kết quả.
+
+---
+
+### Ai được làm gì?
+
+| Thao tác | Admin CN | Manager CN | Xem |
+|---|:---:|:---:|:---:|
+| Xem danh sách & phân tích | ✅ | ✅ | ✅ |
+| Thêm / Sửa / Xóa mã | ✅ | — | — |
+| Xuất Excel | ✅ | ✅ | ✅ |
+        """)
 
     ds       = doc_ndt_dp_list()   # list[dict] {"ma", "ghi_chu", "cap"}
     can_edit = normalize_role(str(role or "user")) == "admin_cn"

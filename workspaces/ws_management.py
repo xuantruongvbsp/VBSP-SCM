@@ -1117,6 +1117,7 @@ def render(**kwargs):
                    if k not in ("role", "username", "df", "df_full", "ds_pgd_all")}
     ALL_ITEMS = _build_all_items(
         role, username,
+        df=df, df_full=df_full, ds_pgd_all=ds_pgd_all,
         can_upload=can_upload, **filtered_kw
     )
 

@@ -37,8 +37,20 @@ from alert_center import render_alert_sidebar
 
 
 @st.cache_resource(show_spinner=False, ttl=3600)
-def _load_hstd(cache_path: str, _ts: float) -> pd.DataFrame:
-    return duckdb.query(f"SELECT * FROM '{cache_path}'").df()
+def _load_hstd(cache_path: str, _ts: float, ten_pgd: str | None = None) -> pd.DataFrame:
+    """
+    Load HSTD từ Parquet.
+    - ten_pgd=None  → load toàn bộ (CN role), cache 1 bản dùng chung.
+    - ten_pgd=<str> → filter pushdown tại read_parquet, cache riêng per-PGD;
+                      không kéo toàn bộ file vào RAM cho PGD user.
+    """
+    if ten_pgd:
+        pgd_safe = ten_pgd.replace("'", "''")
+        return duckdb.query(
+            f"SELECT * FROM read_parquet('{cache_path}') "
+            f"WHERE \"{COT_TEN_PGD}\" = '{pgd_safe}'"
+        ).df()
+    return duckdb.query(f"SELECT * FROM read_parquet('{cache_path}')").df()
 
 
 @st.cache_resource(show_spinner=False, ttl=3600)
@@ -584,14 +596,15 @@ def main():
                 df_full = _load_hstd(CACHE_HSTD, _hstd_ts)
                 df = df_full
             else:
-                _hstd_cols = duckdb.query(f"DESCRIBE SELECT * FROM '{CACHE_HSTD}'").df()["column_name"].tolist()
-                if COT_TEN_PGD not in _hstd_cols:
-                    st.error("Lỗi dữ liệu: Không tìm thấy cột 'Tên PGD' trong file gốc để phân quyền. Vui lòng liên hệ Admin.")
-                    st.stop()
-                df = duckdb.query(
-                    f"SELECT * FROM '{CACHE_HSTD}' WHERE \"{COT_TEN_PGD}\" = '{pgd_user}'"
-                ).df()
+                # PGD role: filter pushdown tại read_parquet, cached per-PGD
+                df = _load_hstd(CACHE_HSTD, _hstd_ts, ten_pgd=pgd_user)
                 if df.empty:
+                    _hstd_cols = duckdb.query(
+                        f"DESCRIBE SELECT * FROM read_parquet('{CACHE_HSTD}')"
+                    ).df()["column_name"].tolist()
+                    if COT_TEN_PGD not in _hstd_cols:
+                        st.error("Lỗi dữ liệu: Không tìm thấy cột 'Tên PGD' trong file gốc để phân quyền. Vui lòng liên hệ Admin.")
+                        st.stop()
                     st.warning(f"Không có dữ liệu PGD: {pgd_user}"); st.stop()
                 df_full = df
 

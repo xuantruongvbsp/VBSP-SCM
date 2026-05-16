@@ -277,6 +277,23 @@ def fmt_so(x):
         return "—"
 
 
+def fmt_ngay(val) -> str:
+    """Chuyển giá trị ngày (Timestamp, date, string) sang dd/mm/yyyy.
+    Trả về chuỗi rỗng nếu không parse được."""
+    if val is None:
+        return ""
+    try:
+        import pandas as _pd
+        if isinstance(val, _pd.Timestamp):
+            return val.strftime("%d/%m/%Y") if not _pd.isna(val) else ""
+        ts = _pd.to_datetime(val, dayfirst=True, errors="coerce")
+        if _pd.notna(ts):
+            return ts.strftime("%d/%m/%Y")
+    except Exception:
+        pass
+    return str(val) if val else ""
+
+
 def fmt(x):
     """
     Format số tiền (đồng) → triệu đồng, định dạng VN (0 chữ số thập phân).

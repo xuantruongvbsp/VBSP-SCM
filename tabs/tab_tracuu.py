@@ -470,10 +470,10 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
             tu_khoa = st.text_input(
                 "keyword", label_visibility="collapsed",
                 placeholder="🔍  Tên KH · CMND/CCCD · Số khế ước · Tên HSSV · Tên vợ/chồng...",
-                key="tc_keyword",
+                key="tracuu_keyword",
             )
         with sb2:
-            st.button("Tìm", type="primary", width='stretch')
+            st.button("Tìm", type="primary", width='stretch', key="tracuu_btn_tim")
 
         # ── Filter buttons ──────────────────────────────────────────────────
         f_opts = ["Tất cả", "Nguồn TW", "Nguồn ĐP", "NQ11", "Quá hạn", "Mã NĐT"]

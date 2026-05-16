@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## [2026-05-16] — Fix căn lề PDF bảng "Thông tin tổng quát theo PGD"
+- `pdf_service.py` — Thêm param `cols_right` vào `xuat_pdf()`: các cột trong danh sách này dùng `style_td_r` (TA_RIGHT) mà không re-format lại số (dữ liệu đã format sẵn). Thêm `elif col in set_right` trong vòng lặp data rows
+- `tabs/tab_tongquan.py` — Truyền `cols_right=[tất cả cột trừ "Đơn vị"]` khi gọi `xuat_pdf()` để số liệu căn phải, cột tên đơn vị căn trái
+
 ## [2026-05-16] — Tái thiết tab CBTD: phân công theo ĐGD thay vì mã thôn
 - `data/khtd.py` — Thêm 3 hàm: `lay_ap_tu_dgd_list()`, `xay_ap_to_cbtd_map()`, `gan_cbtd_vao_df()` — suy ra (xã, ấp) từ dgd_map và join HSTD qua (Tên xã, Tên thôn) lowercase
 - `tabs/tab_cbtd.py` — Viết lại toàn bộ (~550 dòng): schema mới `{ho_ten, pgd, ds_dgd, dien_thoai, ghi_chu, ngay_cap}`; UI gồm 3 sub-tab xem (Danh sách / Bản đồ ĐGD→CBTD / Chi tiết) + CRUD đầy đủ + báo cáo dư nợ theo CBTD; phát hiện trùng ĐGD real-time; preview ấp khi chọn ĐGD; backward-compat với data cũ

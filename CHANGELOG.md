@@ -1,5 +1,14 @@
 # CHANGELOG
 
+## [2026-05-16] — KPI 12 cards + section ĐVUT + Nợ xấu + Tổng lãi tồn
+- `tabs/tab_so_sanh_ky.py` — Mở rộng KPI thành 3 hàng × 4 cards (12 chỉ tiêu):
+  - Hàng 1: Tổng DN, Số KU, Số hộ, Mức vay BQ/KH
+  - Hàng 2: Tỷ lệ NQH, DN QH, DN khoanh, Tỷ lệ DN khoanh *(mới)*
+  - Hàng 3: Nợ xấu (QH+Khoanh), Tỷ lệ Nợ xấu, Tổng lãi tồn (TH+QH), Giải ngân *(mới)*
+- `tabs/tab_so_sanh_ky.py` — Thay "Lãi tồn TH" → "Tổng lãi tồn" = COT_LAI_TON + COT_LAI_TON_QH
+- `tabs/tab_so_sanh_ky.py` — Thêm section "🏛️ So sánh theo Hội đoàn thể (ĐVUT)" với bảng đầy đủ: DN/±DN/Hộ/NQH/Nợ xấu theo từng ĐVUT + hàng tổng
+- `tabs/tab_so_sanh_ky.py` — Thêm `_agg_theo_dvut()` helper; import thêm COT_DVUT, COT_LAI_TON_QH
+
 ## [2026-05-16] — Port PeriodOverview.tsx: 8 KPI, growth chart, flow diagram, quality bars
 - `tabs/tab_so_sanh_ky.py` — KPI 4→8 cards (2 hàng: tăng trưởng + rủi ro)
 - `tabs/tab_so_sanh_ky.py` — Thêm `_chart_tang_truong()`: grouped bar Altair theo chương trình/nguồn vốn/xã

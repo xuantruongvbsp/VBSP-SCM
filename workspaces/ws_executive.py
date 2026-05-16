@@ -41,6 +41,7 @@ from pdf_service import xuat_pdf_bao_cao, xuat_pdf, kiem_tra_pdf_dependency, ren
 from tabs import tab_khtd_giao_dc, tab_kiem_soat, tab_qd62, tab_tien_do, tab_so_sanh_ky
 from snapshot_service import doc_snapshot, doc_snapshot_range, danh_sach_ky
 from services.hhi_service import tinh_hhi, tinh_hhi_breakdown, danh_gia_hhi
+from components.delta_card import delta_card, kpi_row
 
 # ── Hằng số ngưỡng NQH ────────────────────────────────────────────────────────
 _NGUONG_AN_TOAN  = 1.0   # % — xanh lá
@@ -167,29 +168,15 @@ def _render_metric_cards(**kwargs) -> None:
     icon = kwargs["icon"]
 
     st.markdown(f"### {icon} Chỉ số Tín dụng")
-    r1c1, r1c2 = st.columns(2)
-    r2c1, r2c2 = st.columns(2)
 
-    r1c1.metric(
-        label="💰 Tổng dư nợ",
-        value=fmt_tien(tdn),
-    )
-    r1c2.metric(
-        label="✅ Dư nợ trong hạn",
-        value=fmt_tien(dth),
-        help="Dư nợ chưa đến hạn thanh toán",
-    )
-    r2c1.metric(
-        label="⚠️ Nợ quá hạn",
-        value=fmt_ty(dqh),
-        delta=(f"{icon} {tinh_trang}" if dqh > 0 else "✅ Không có NQH"),
-        delta_color="inverse" if tlqh >= _NGUONG_AN_TOAN else "normal",
-    )
-    r2c2.metric(
-        label="👥 Số khách hàng",
-        value=fmt_so(n_kh),
-        help=f"Tổng {fmt_so(n_hs)} hồ sơ trong hệ thống",
-    )
+    kpi_row([
+        {"label": "Tổng dư nợ", "value": tdn, "icon": "💰", "suffix": "đồng", "precision": 0, "help": "Tổng dư nợ toàn chi nhánh"},
+        {"label": "Dư nợ trong hạn", "value": dth, "icon": "✅", "suffix": "đồng", "precision": 0, "help": "Dư nợ chưa đến hạn thanh toán"},
+        {"label": "Nợ quá hạn", "value": dqh, "icon": "⚠️", "suffix": "đồng", "precision": 0,
+         "delta": tlqh, "delta_label": "% NQH", "delta_color": "inverse" if tlqh >= _NGUONG_AN_TOAN else "normal",
+         "help": f"{tinh_trang}" if dqh > 0 else "✅ Không có NQH"},
+        {"label": "Số khách hàng", "value": n_kh, "icon": "👥", "suffix": "", "precision": 0, "help": f"Tổng {fmt_so(n_hs)} hồ sơ trong hệ thống"},
+    ], cols=4)
 
     st.markdown("---")
     pct_th = dth / tdn * 100 if tdn > 0 else 100
@@ -232,20 +219,28 @@ def _kpi_tang_truong(df_full: pd.DataFrame) -> None:
     c1, c2, c3, c4 = st.columns(4)
     d_tdn = _d(tdn, "tong_du_no")
     d_dqh = _d(dqh, "du_no_qh")
-    c1.metric(
-        "Tổng dư nợ",
-        fmt_ty(tdn),
-        delta=f"{d_tdn:+.0f} tr.đ" if d_tdn is not None else None,
-        help="So với snapshot tháng trước",
-    )
-    c2.metric(
-        "Dư nợ quá hạn",
-        fmt_ty(dqh),
-        delta=f"{d_dqh:+.0f} tr.đ" if d_dqh is not None else None,
-        delta_color="inverse",
-    )
-    c3.metric("Tỷ lệ NQH", fmt_pct(tlqh))
-    c4.metric("Số hộ vay", fmt_so(nkh))
+
+    with c1:
+        delta_card("Tổng dư nợ", tdn,
+                    delta=d_tdn, delta_label="so với tháng trước",
+                    suffix="đồng", precision=0, help="So với snapshot tháng trước",
+                    key="exe_tdn")
+    with c2:
+        delta_card("Dư nợ quá hạn", dqh,
+                    delta=d_dqh, delta_label="so với tháng trước",
+                    delta_color="inverse",
+                    suffix="đồng", precision=0, help="So với snapshot tháng trước",
+                    key="exe_dqh")
+    with c3:
+        delta_card("Tỷ lệ NQH", f"{tlqh:.2f}",
+                    delta=0, delta_label="%",
+                    delta_color="off",
+                    suffix="%", precision=2,
+                    key="exe_tlqh")
+    with c4:
+        delta_card("Số hộ vay", n_kh,
+                    suffix="", precision=0,
+                    key="exe_nkh")
 
 
 def _heatmap_rui_ro_pgd(df_full: pd.DataFrame) -> None:

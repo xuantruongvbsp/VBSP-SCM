@@ -37,6 +37,7 @@ from utils import (
     ten_file_xuat,
 )
 from services.excel_service import ExcelReport, xuat_excel_chuyen_nghiep, ten_file_xuat as excel_ten_file
+from pdf_service import xuat_pdf_bao_cao, xuat_pdf
 from tabs import tab_khtd_giao_dc, tab_kiem_soat, tab_qd62, tab_tien_do, tab_so_sanh_ky
 from snapshot_service import doc_snapshot, doc_snapshot_range, danh_sach_ky
 from services.hhi_service import tinh_hhi, tinh_hhi_breakdown, danh_gia_hhi
@@ -1456,6 +1457,63 @@ def render(**kwargs) -> None:
         # ── Bảng xếp hạng PGD ─────────────────────────────────────────
         with st.expander("🏆 Bảng xếp hạng PGD", expanded=False):
             _ranking_pgd(df_full)
+
+        # ── PDF FULL REPORT ────────────────────────────────────────────
+        st.divider()
+        st.markdown("### 📄 Xuất báo cáo PDF đầy đủ")
+        st.caption("Báo cáo tổng hợp: KPI + Bảng dữ liệu — chuẩn NĐ30/2020")
+
+        username = kwargs.get("username", "unknown")
+        df_pdf = df_full.copy() if df_full is not None else pd.DataFrame()
+        _kpi_items = []
+        if df_full is not None and not df_full.empty:
+            tdn = float(df_full[COT_TONG_DU_NO].sum()) if COT_TONG_DU_NO in df_full.columns else 0
+            dqh = float(df_full[COT_DU_NO_QH].sum()) if COT_DU_NO_QH in df_full.columns else 0
+            nkh = int(df_full[COT_MA_KH].nunique()) if COT_MA_KH in df_full.columns else 0
+            tlqh = dqh / tdn * 100 if tdn > 0 else 0
+            _kpi_items = [
+                ("Số khế ước", fmt_so(len(df_full)), ""),
+                ("Số khách hàng", fmt_so(nkh), ""),
+                ("Tổng dư nợ", fmt_ty(tdn), ""),
+                ("Dư nợ quá hạn", fmt_ty(dqh), "accent"),
+                ("Tỷ lệ NQH", fmt_pct(tlqh), "accent"),
+                ("Dư nợ trong hạn", fmt_ty(tdn - dqh), ""),
+            ]
+
+        col_pdf1, col_pdf2 = st.columns([1, 1])
+        with col_pdf1:
+            cols_tien_pdf = [c for c in [COT_TONG_DU_NO, COT_DU_NO_QH, COT_DU_NO_TH, COT_LAI_TON] if c in df_pdf.columns]
+            st.download_button(
+                label="📄 Xuất PDF báo cáo đầy đủ",
+                type="primary",
+                data=xuat_pdf_bao_cao(
+                    df=df_pdf,
+                    tieu_de="Báo cáo Sức khỏe Tín dụng Toàn Chi nhánh",
+                    nguoi_xuat=username,
+                    kpi_items=_kpi_items,
+                    cols_tien=cols_tien_pdf,
+                    tieu_de_phu=f"Ngày số liệu: {df_full[COT_NGAY_SL].iloc[0] if COT_NGAY_SL in df_full.columns else '—'}",
+                ),
+                file_name=f"BaoCao_SucKhoeTD_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
+                mime="application/pdf",
+                use_container_width=True,
+                key="pdf_sk_full",
+            )
+        with col_pdf2:
+            st.download_button(
+                label="📄 PDF bảng dữ liệu (đơn giản)",
+                data=xuat_pdf(
+                    df=df_pdf,
+                    tieu_de="Báo cáo Sức khỏe Tín dụng",
+                    nguoi_xuat=username,
+                    cols_tien=cols_tien_pdf,
+                    prefix_file="SKTD",
+                ),
+                file_name=f"SKTD_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
+                mime="application/pdf",
+                use_container_width=True,
+                key="pdf_sk_simple",
+            )
 
     with tab_tien_do_ui:
         tab_tien_do.render_tong_quan_only(tab_tien_do_ui, **kwargs)

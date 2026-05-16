@@ -21,6 +21,12 @@ try:
 except ImportError:
     _REPORTLAB_READY = False
 
+try:
+    import kaleido
+    _KALEIDO_READY = True
+except ImportError:
+    _KALEIDO_READY = False
+
 _FONT_REGISTERED = False
 
 
@@ -203,6 +209,29 @@ else:
     VBSP_GREEN_LIGHT = None
     ROW_ALT = None
     BORDER_COLOR = None
+
+
+def kiem_tra_pdf_dependency() -> dict:
+    """
+    Kiểm tra trạng thái các thư viện cần cho PDF.
+    Trả về dict: { "reportlab": bool, "kaleido": bool, "font": bool, "messages": list[str] }
+    Dùng để hiển thị banner hướng dẫn trong UI.
+    """
+    msgs = []
+    if not _REPORTLAB_READY:
+        msgs.append("Thiếu **reportlab** → chạy: `pip install reportlab`")
+    else:
+        if not _FONT_REGISTERED:
+            msgs.append("⚠️ Font Times New Roman chưa được đăng ký — kiểm tra file `assets/times.ttf`")
+    if not _KALEIDO_READY:
+        msgs.append("Thiếu **kaleido** (nhúng biểu đồ vào PDF) → chạy: `pip install kaleido`")
+    return {
+        "reportlab": _REPORTLAB_READY,
+        "kaleido": _KALEIDO_READY,
+        "font": _FONT_REGISTERED,
+        "messages": msgs,
+        "ready": _REPORTLAB_READY and _KALEIDO_READY,
+    }
 
 
 def xuat_pdf(

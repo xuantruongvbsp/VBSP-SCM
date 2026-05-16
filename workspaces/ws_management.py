@@ -465,11 +465,12 @@ def _render_ndt_dp(role: str, username: str) -> None:
     _CAP_TO   = {"Cấp Tỉnh 🏛️": "tinh", "Cấp Xã/Khác 🏘️": "xa"}
     _CAP_FROM = {"tinh": "Cấp Tỉnh 🏛️", "xa": "Cấp Xã/Khác 🏘️"}
 
-    _t1, _t2, _t3, _t4 = st.tabs([
+    _t1, _t2, _t3, _t4, _t5 = st.tabs([
         "🏛️ Cấp Tỉnh",
         "🏘️ Cấp Xã/Khác",
         "➕ Thêm mới",
         "✏️ Chỉnh sửa / Xóa",
+        "📊 Phân tích",
     ])
 
     # ── Tab 1: Cấp Tỉnh (đọc) ────────────────────────────────────────────────
@@ -573,16 +574,15 @@ def _render_ndt_dp(role: str, username: str) -> None:
                     ghi_audit(username, "xoa_ndt_dp", f"Xóa mã {item['ma']}")
                     st.rerun()
 
-    # ── Impact analysis ────────────────────────────────────────────────────────
-    st.divider()
-    with st.expander("📊 Xem tác động lên dữ liệu GQVL hiện tại", expanded=False):
+    # ── Tab 5: Phân tích ─────────────────────────────────────────────────────
+    with _t5:
         try:
             from pathlib import Path
             from config import CACHE_DIR, COT_MA_NDT
 
             gqvl_path = Path(CACHE_DIR) / "gqvl.parquet"
             if not gqvl_path.exists():
-                st.info("Chưa có dữ liệu GQVL. Upload file để xem tác động.")
+                st.info("Chưa có dữ liệu GQVL. Upload file để xem phân tích.")
             else:
                 df_gqvl = pd.read_parquet(gqvl_path)
                 if ("Nguồn vốn" not in df_gqvl.columns) or (COT_MA_NDT not in df_gqvl.columns):
@@ -593,32 +593,34 @@ def _render_ndt_dp(role: str, username: str) -> None:
                         "dữ liệu cũ bị lỗi định dạng. Vui lòng upload lại file GQVL."
                     )
                 else:
-                    df_dp = df_gqvl[df_gqvl["Nguồn vốn"] == "ĐP"].copy()
-                    ma_ndt_str     = df_dp[COT_MA_NDT].astype(str).str.strip()
-                    ndt_tinh_list  = [x["ma"] for x in ds_tinh]
-                    mask_cap_tinh  = ma_ndt_str.isin(ndt_tinh_list)
-                    ghi_chu_map    = {x["ma"]: x.get("ghi_chu", "") for x in ds}
+                    df_dp         = df_gqvl[df_gqvl["Nguồn vốn"] == "ĐP"].copy()
+                    ma_ndt_str    = df_dp[COT_MA_NDT].astype(str).str.strip()
+                    ndt_tinh_list = [x["ma"] for x in ds_tinh]
+                    mask_tinh     = ma_ndt_str.isin(ndt_tinh_list)
+                    ghi_chu_map   = {x["ma"]: x.get("ghi_chu", "") for x in ds}
 
                     p1, p2, p3 = st.columns(3)
                     p1.metric("Tổng món ĐP",       fmt_so(len(df_dp)))
-                    p2.metric("→ Cấp tỉnh 🏛️",    fmt_so(int(mask_cap_tinh.sum())))
-                    p3.metric("→ Cấp xã/khác 🏘️", fmt_so(int((~mask_cap_tinh).sum())))
+                    p2.metric("→ Cấp tỉnh 🏛️",    fmt_so(int(mask_tinh.sum())))
+                    p3.metric("→ Cấp xã/khác 🏘️", fmt_so(int((~mask_tinh).sum())))
 
-                    agg_kw: dict = {"Số món": ("Mã NĐT / Nhóm", "count")}
+                    st.divider()
+                    agg_kw: dict = {"Số món": ("Nhóm", "count")}
                     if "Dư nợ trong hạn" in df_dp.columns:
                         agg_kw["Dư nợ TH (tỷ)"] = ("Dư nợ trong hạn", "sum")
+                    if "Dư nợ quá hạn" in df_dp.columns:
+                        agg_kw["Dư nợ QH (tỷ)"] = ("Dư nợ quá hạn", "sum")
                     df_pv = (
                         df_dp
-                        .assign(**{"Mã NĐT / Nhóm": ma_ndt_str.where(mask_cap_tinh, "Cấp xã/khác")})
-                        .groupby("Mã NĐT / Nhóm")
+                        .assign(Nhóm=ma_ndt_str.where(mask_tinh, "— Cấp xã/khác"))
+                        .groupby("Nhóm")
                         .agg(**agg_kw)
                         .reset_index()
                     )
-                    if "Dư nợ TH (tỷ)" in df_pv.columns:
-                        df_pv["Dư nợ TH (tỷ)"] = df_pv["Dư nợ TH (tỷ)"].apply(fmt_ty)
-                    df_pv["Ghi chú"] = df_pv["Mã NĐT / Nhóm"].map(
-                        lambda m: ghi_chu_map.get(m, "")
-                    )
+                    for col in ("Dư nợ TH (tỷ)", "Dư nợ QH (tỷ)"):
+                        if col in df_pv.columns:
+                            df_pv[col] = df_pv[col].apply(fmt_ty)
+                    df_pv["Ghi chú"] = df_pv["Nhóm"].map(lambda m: ghi_chu_map.get(m, ""))
                     st.dataframe(df_pv, hide_index=True, use_container_width=True)
         except Exception as e:
             st.warning(f"Không thể phân tích tác động GQVL: {e}")

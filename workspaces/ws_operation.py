@@ -38,6 +38,7 @@ from utils import (
     hien_thi_dataframe_phan_trang,
 )
 from services.excel_service import xuat_excel_chuyen_nghiep, ten_file_xuat as excel_ten_file
+from pdf_service import xuat_pdf
 
 
 def _render_trang_chu(tab, df_pgd: pd.DataFrame, role: str, pgd_user: str, kwargs: dict):
@@ -1040,35 +1041,56 @@ Doanh số cho vay trong tháng: {ds_cv:,.0f} triệu đồng; doanh số thu n�
         
         st.divider()
         
-        # ④ Xuất Excel
-        st.markdown("**④ Xuất Excel**")
+        # ④ Xuất báo cáo
+        st.markdown("**④ Xuất báo cáo**")
         
         cols_xuat = [c for c in df_bang.columns if c != "Tỷ trọng %"] or list(df_bang.columns)
         
-        st.download_button(
-            label="⬇️ Xuất Excel chuyên nghiệp",
-            type="primary",
-            data=xuat_excel_chuyen_nghiep(
-                df=df_bang,
-                title="Báo cáo Giao ban",
-                subtitle=f"Xã {chon_xa} · {ten_dgd or ''} · {datetime.now().strftime('%d/%m/%Y')}",
-                nguoi_xuat=st.session_state.get("txt_username", ""),
-                columns=cols_xuat,
-                kpi_items=[
-                    ("📍 Điểm GD", ten_dgd or chon_xa, ""),
-                    ("💰 Tổng dư nợ", fmt_ty(tong_dn * 1e6) if tong_dn > 0 else "—", "triệu đồng"),
-                    ("👥 Số khách hàng", fmt_so(so_kh) if so_kh > 0 else "—", ""),
-                    ("🔴 Nợ quá hạn", fmt_ty(nqh * 1e6) if nqh > 0 else "—", "triệu đồng"),
-                    ("📊 Tỷ lệ NQH", f"{tl_nqh:.2f}%" if tl_nqh > 0 else "0%", ""),
-                    ("� Doanh số cho vay", fmt_ty(ds_cv * 1e6) if ds_cv > 0 else "—", "triệu đồng"),
-                    ("📉 Doanh số thu nợ", fmt_ty(ds_thu * 1e6) if ds_thu > 0 else "—", "triệu đồng"),
-                ],
-            ),
-            file_name=f"GiaoBan_{chon_xa}_{datetime.now().strftime('%Y%m%d')}.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            key="gb_download",
-            use_container_width=True,
-        )
+        col_excel, col_pdf = st.columns([1, 1])
+        with col_excel:
+            st.download_button(
+                label="⬇️ Xuất Excel chuyên nghiệp",
+                type="primary",
+                data=xuat_excel_chuyen_nghiep(
+                    df=df_bang,
+                    title="Báo cáo Giao ban",
+                    subtitle=f"Xã {chon_xa} · {ten_dgd or ''} · {datetime.now().strftime('%d/%m/%Y')}",
+                    nguoi_xuat=st.session_state.get("txt_username", ""),
+                    columns=cols_xuat,
+                    kpi_items=[
+                        ("Điểm GD", ten_dgd or chon_xa, ""),
+                        ("Tổng dư nợ", fmt_ty(tong_dn * 1e6) if tong_dn > 0 else "—", "triệu đồng"),
+                        ("Số khách hàng", fmt_so(so_kh) if so_kh > 0 else "—", ""),
+                        ("Nợ quá hạn", fmt_ty(nqh * 1e6) if nqh > 0 else "—", "triệu đồng"),
+                        ("Tỷ lệ NQH", f"{tl_nqh:.2f}%" if tl_nqh > 0 else "0%", ""),
+                        ("Doanh số cho vay", fmt_ty(ds_cv * 1e6) if ds_cv > 0 else "—", "triệu đồng"),
+                        ("Doanh số thu nợ", fmt_ty(ds_thu * 1e6) if ds_thu > 0 else "—", "triệu đồng"),
+                    ],
+                ),
+                file_name=f"GiaoBan_{chon_xa}_{datetime.now().strftime('%Y%m%d')}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                key="gb_download",
+                use_container_width=True,
+            )
+        with col_pdf:
+            cols_tien_gb = [c for c in ["Tổng dư nợ", "Nợ quá hạn", "Nợ khoanh", "Doanh số cho vay tháng", "Doanh số thu nợ tháng"] if c in df_bang.columns]
+            st.download_button(
+                label="Xuất PDF",
+                type="secondary",
+                data=xuat_pdf(
+                    df=df_bang,
+                    tieu_de=f"Báo cáo Giao ban - {chon_xa}",
+                    nguoi_xuat=st.session_state.get("txt_username", ""),
+                    cols_tien=cols_tien_gb,
+                    prefix_file="GiaoBan",
+                    them_dong_tong=False,
+                    tieu_de_phu=f"Điểm GD: {ten_dgd or chon_xa}",
+                ),
+                file_name=f"GiaoBan_{chon_xa}_{datetime.now().strftime('%Y%m%d')}.pdf",
+                mime="application/pdf",
+                key="gb_pdf_download",
+                use_container_width=True,
+            )
 
 
 def render(**kwargs):

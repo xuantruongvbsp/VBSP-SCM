@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## [2026-05-16] — Thêm tính năng "Cảnh báo sớm NQH" (port từ VSPPRO)
+- `tabs/tab_canh_bao_som.py` **TẠO MỚI** — Module cảnh báo sớm: 2 KPI cards (Sắp đến hạn + KH không HĐ / Chuyển NQH trong tháng), toggle phạm vi Tháng/Quý/Năm, heatmap bar chart đáo hạn theo tháng, 2 sub-tabs danh sách chi tiết + xuất Excel
+- `workspaces/ws_management.py` — Thêm sub-tab "⚡ Cảnh báo sớm" (sub5) vào `_render_canh_bao_no()` cho phân hệ Chi nhánh
+- `workspaces/ws_operation.py` — Thêm `_render_canh_bao_som_pgd()` + item "⚡ Cảnh báo sớm" vào group "Kiểm soát & Rủi ro" cho phân hệ PGD
+
 ## [2026-05-16] — Thêm tab "Tập trung rủi ro & HHI" vào Phòng KH-NV
 - `tabs/tab_hhi.py` **TẠO MỚI** — Tab HHI: 3 KPI cards (Chương trình / Xã / PGD), thang giải thích, sub-tabs biểu đồ cột ngang + treemap + bảng tổng hợp, nút xuất Excel 3 sheet
 - `workspaces/ws_management.py` — Thêm `from tabs import tab_hhi` (lazy import), thêm item "Tập trung rủi ro & HHI" vào group "Kiểm soát" trong cả `_build_all_items()` lẫn `render()`

@@ -330,6 +330,13 @@ def _render_don_doc(df: pd.DataFrame, pgd_user: str, role: str):
         st.info("Không có hộ nào thỏa điều kiện.")
 
 
+def _render_canh_bao_som_pgd(tab, **kwargs) -> None:
+    """Cảnh báo sớm NQH cho phân hệ PGD."""
+    from tabs import tab_canh_bao_som
+
+    tab_canh_bao_som.render(tab, **kwargs)
+
+
 def _banner_canh_bao_khd(df_pgd: pd.DataFrame, role: str) -> None:
     if df_pgd is None or df_pgd.empty:
         return
@@ -1563,6 +1570,7 @@ def render(**kwargs):
             "label": "🔍 Kiểm soát & Rủi ro",
             "tabs": [
                 ("🔔 Đôn đốc KHĐ", lambda tab: _render_don_doc(df_pgd, pgd_user or pgd_filter or "", role)),
+                ("⚡ Cảnh báo sớm", lambda tab: _render_canh_bao_som_pgd(tab, **kwargs)),
                 ("💳 Nợ rủi ro QĐ62", lambda tab: tab_qd62.render(
                     mode="pgd", pgd_filter=pgd_user or pgd_filter
                 )),

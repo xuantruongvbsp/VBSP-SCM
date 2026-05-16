@@ -459,7 +459,10 @@ def main():
         if role in ["admin","manager","executive"] or la_phan_he_cn(role) or la_phan_he_pgd(role):
             st.divider()
             if st.button("🔄 Làm mới cache", use_container_width=True):
-                st.cache_data.clear(); st.rerun()
+                st.cache_data.clear()
+                for k in ["_ctx", "_ctx_cache_key", "_pgd_map_cache_ts", "_pgd_xa_map_cached", "_ds_pgd_all_cached", "df_full"]:
+                    st.session_state.pop(k, None)
+                st.rerun()
 
         if role in ["admin", "admin_cn", "admin_pgd"]:
             st.divider()
@@ -475,152 +478,165 @@ def main():
             st.rerun()
 
     # ── Load dữ liệu (ưu tiên Upload PGD cho workspace Operation) ────────────────
-    with st.spinner("⏳ Đang tải dữ liệu, vui lòng chờ..."):
-        ws_hien_tai = st.session_state.workspace
+    ws_hien_tai = st.session_state.workspace
 
-        # Ưu tiên CACHE_HSTD (merge từ 22 PGD upload).
-        if not os.path.exists(CACHE_HSTD):
-            if os.path.exists(FILE_PATH):
-                doc_file(FILE_PATH, ts_file(FILE_PATH))
-            else:
-                st.warning("⚠️ Chưa có dữ liệu HSTD. Vui lòng upload qua tab Upload.")
-                st.stop()
+    _hstd_ts = ts_file(CACHE_HSTD) if os.path.exists(CACHE_HSTD) else 0.0
+    _nq11_ts = ts_file(CACHE_NQ11) if os.path.exists(CACHE_NQ11) else 0.0
+    _gqvl_ts = ts_file(FILE_PATH_SK_GQVL) if os.path.exists(FILE_PATH_SK_GQVL) else 0.0
+    _data_version = f"{ws_hien_tai}|{role}|{pgd_user}|{_hstd_ts}|{_nq11_ts}|{_gqvl_ts}"
 
-        from auth import la_phan_he_cn
-        if la_phan_he_cn(role) or not pgd_user:
-            df_full = _load_hstd(CACHE_HSTD, ts_file(CACHE_HSTD))
-            df = df_full
-        else:
-            _hstd_cols = duckdb.query(f"DESCRIBE SELECT * FROM '{CACHE_HSTD}'").df()["column_name"].tolist()
-            if COT_TEN_PGD not in _hstd_cols:
-                st.error("Lỗi dữ liệu: Không tìm thấy cột 'Tên PGD' trong file gốc để phân quyền. Vui lòng liên hệ Admin.")
-                st.stop()
-            df = duckdb.query(
-                f"SELECT * FROM '{CACHE_HSTD}' WHERE \"{COT_TEN_PGD}\" = '{pgd_user}'"
-            ).df()
-            if df.empty:
-                st.warning(f"Không có dữ liệu PGD: {pgd_user}"); st.stop()
-            df_full = df
-
-        if ws_hien_tai == "operation":
-            if role == "user" and pgd_user:
-                path_hstd_pgd = duong_dan_pgd(pgd_user, "hstd")
-                if os.path.exists(path_hstd_pgd):
-                    df_pgd = doc_hstd_pgd(pgd_user, ts_file(path_hstd_pgd))
-                    if df_pgd is not None and not df_pgd.empty:
-                        df = df_pgd
-                    else:
-                        st.warning(f"⚠️ File Upload HSTD của `{pgd_user}` rỗng, "
-                                   f"tạm dùng dữ liệu Phòng KH-NV.")
+    if st.session_state.get("_ctx_cache_key") != _data_version:
+        with st.spinner("⏳ Đang tải dữ liệu, vui lòng chờ..."):
+            if not os.path.exists(CACHE_HSTD):
+                if os.path.exists(FILE_PATH):
+                    doc_file(FILE_PATH, ts_file(FILE_PATH))
                 else:
-                    st.info(f"ℹ️ `{pgd_user}` chưa upload HSTD — "
-                            f"tạm dùng dữ liệu từ Phòng KH-NV.")
-            elif role in ("admin", "manager"):
-                from pathlib import Path
-                from config import PGD_DATA_DIR
-                _pgd_hstd_mtime = max(
-                    (ts_file(str(d / "hstd_latest.xlsx"))
-                     for d in Path(PGD_DATA_DIR).iterdir()
-                     if d.is_dir() and (d / "hstd_latest.xlsx").exists()),
-                    default=0.0,
-                )
-                df_op = doc_hstd_toan_cn_pgd(_pgd_hstd_mtime)
-                if df_op is not None and not df_op.empty:
-                    df = df_op
-        else:
-            df = df_full
-            # KHÔNG clear cache ở đây — cache chỉ xóa khi upload file mới
+                    st.warning("⚠️ Chưa có dữ liệu HSTD. Vui lòng upload qua tab Upload.")
+                    st.stop()
 
-        df_nq11 = None
-        if ws_hien_tai == "operation":
-            if role == "user" and pgd_user:
-                path_nq11_pgd = duong_dan_pgd(pgd_user, "nq11")
-                if os.path.exists(path_nq11_pgd):
-                    df_nq11 = doc_nq11_pgd(pgd_user, ts_file(path_nq11_pgd))
+            from auth import la_phan_he_cn
+            if la_phan_he_cn(role) or not pgd_user:
+                df_full = _load_hstd(CACHE_HSTD, _hstd_ts)
+                df = df_full
             else:
-                df_nq11 = doc_nq11_toan_cn_pgd()
-
-        if df_nq11 is None and os.path.exists(FILE_PATH_NQ11):
-            if not os.path.exists(CACHE_NQ11):
-                doc_file_nq11(FILE_PATH_NQ11, ts_file(FILE_PATH_NQ11))
-            if role == "user" and pgd_user:
-                _nq11_cache = st.session_state.get("nq11_pgd_cache")
-                _nq11_ts = ts_file(CACHE_NQ11)
-                if (
-                    _nq11_cache
-                    and _nq11_cache.get("ts_nq11") == _nq11_ts
-                    and _nq11_cache.get("pgd_user") == pgd_user
-                ):
-                    df_nq11 = _nq11_cache["data"]
-                else:
-                    makh_df = df[[COT_MA_KH]].dropna().astype(str).drop_duplicates()
-                    if not makh_df.empty:
-                        df_nq11 = duckdb.query(
-                            f"SELECT n.* FROM '{CACHE_NQ11}' n "
-                            f"JOIN makh_df m ON CAST(n.\"Mã khách hàng\" AS VARCHAR) = m[\"{COT_MA_KH}\"]"
-                        ).df()
-                    else:
-                        df_nq11 = pd.DataFrame()
-                    st.session_state["nq11_pgd_cache"] = {
-                        "data": df_nq11,
-                        "ts_nq11": _nq11_ts,
-                        "pgd_user": pgd_user,
-                    }
-            else:
-                df_nq11 = _load_nq11(CACHE_NQ11, ts_file(CACHE_NQ11))
-
-        df_sk_gqvl = None
-        if os.path.exists(FILE_PATH_SK_GQVL):
-            df_sk_gqvl = doc_file_sk_gqvl(FILE_PATH_SK_GQVL, ts_file(FILE_PATH_SK_GQVL))
-
-        _map_cache_ts = ts_file(CACHE_HSTD) if os.path.exists(CACHE_HSTD) else 0.0
-        if st.session_state.get("_pgd_map_cache_ts") != _map_cache_ts:
-            if role == "user" and os.path.exists(CACHE_HSTD):
-                _df_ref = duckdb.query(
-                    f"SELECT DISTINCT \"{COT_TEN_PGD}\", \"Tên xã\" FROM '{CACHE_HSTD}'"
+                _hstd_cols = duckdb.query(f"DESCRIBE SELECT * FROM '{CACHE_HSTD}'").df()["column_name"].tolist()
+                if COT_TEN_PGD not in _hstd_cols:
+                    st.error("Lỗi dữ liệu: Không tìm thấy cột 'Tên PGD' trong file gốc để phân quyền. Vui lòng liên hệ Admin.")
+                    st.stop()
+                df = duckdb.query(
+                    f"SELECT * FROM '{CACHE_HSTD}' WHERE \"{COT_TEN_PGD}\" = '{pgd_user}'"
                 ).df()
+                if df.empty:
+                    st.warning(f"Không có dữ liệu PGD: {pgd_user}"); st.stop()
+                df_full = df
+
+            if ws_hien_tai == "operation":
+                if role == "user" and pgd_user:
+                    path_hstd_pgd = duong_dan_pgd(pgd_user, "hstd")
+                    if os.path.exists(path_hstd_pgd):
+                        df_pgd = doc_hstd_pgd(pgd_user, ts_file(path_hstd_pgd))
+                        if df_pgd is not None and not df_pgd.empty:
+                            df = df_pgd
+                        else:
+                            st.warning(f"⚠️ File Upload HSTD của `{pgd_user}` rỗng, "
+                                       f"tạm dùng dữ liệu Phòng KH-NV.")
+                    else:
+                        st.info(f"ℹ️ `{pgd_user}` chưa upload HSTD — "
+                                f"tạm dùng dữ liệu từ Phòng KH-NV.")
+                elif role in ("admin", "manager"):
+                    from pathlib import Path
+                    from config import PGD_DATA_DIR
+                    _pgd_hstd_mtime = max(
+                        (ts_file(str(d / "hstd_latest.xlsx"))
+                         for d in Path(PGD_DATA_DIR).iterdir()
+                         if d.is_dir() and (d / "hstd_latest.xlsx").exists()),
+                        default=0.0,
+                    )
+                    df_op = doc_hstd_toan_cn_pgd(_pgd_hstd_mtime)
+                    if df_op is not None and not df_op.empty:
+                        df = df_op
             else:
-                _df_ref = df_full
+                df = df_full
 
-            _pgd_xa_map = {}
-            if COT_TEN_PGD in _df_ref.columns and "Tên xã" in _df_ref.columns:
-                for pgd, xa in _df_ref[[COT_TEN_PGD, "Tên xã"]].dropna().drop_duplicates().values:
-                    _pgd_xa_map[str(xa).strip()] = str(pgd).strip()
-            _ds_pgd_all = sorted(_df_ref[COT_TEN_PGD].dropna().unique().tolist()) \
-                          if COT_TEN_PGD in _df_ref.columns else []
+            df_nq11 = None
+            if ws_hien_tai == "operation":
+                if role == "user" and pgd_user:
+                    path_nq11_pgd = duong_dan_pgd(pgd_user, "nq11")
+                    if os.path.exists(path_nq11_pgd):
+                        df_nq11 = doc_nq11_pgd(pgd_user, ts_file(path_nq11_pgd))
+                else:
+                    df_nq11 = doc_nq11_toan_cn_pgd()
 
-            _kv_ds_pgd = lay_config("ds_pgd",    _DS_PGD_DEFAULT)
-            _kv_pgd_xa = lay_config("pgd_xa_map", _PGD_XA_MAP_DEFAULT)
+            if df_nq11 is None and os.path.exists(FILE_PATH_NQ11):
+                if not os.path.exists(CACHE_NQ11):
+                    doc_file_nq11(FILE_PATH_NQ11, ts_file(FILE_PATH_NQ11))
+                if role == "user" and pgd_user:
+                    _nq11_cache = st.session_state.get("nq11_pgd_cache")
+                    _nq11_ts = ts_file(CACHE_NQ11)
+                    if (
+                        _nq11_cache
+                        and _nq11_cache.get("ts_nq11") == _nq11_ts
+                        and _nq11_cache.get("pgd_user") == pgd_user
+                    ):
+                        df_nq11 = _nq11_cache["data"]
+                    else:
+                        makh_df = df[[COT_MA_KH]].dropna().astype(str).drop_duplicates()
+                        if not makh_df.empty:
+                            df_nq11 = duckdb.query(
+                                f"SELECT n.* FROM '{CACHE_NQ11}' n "
+                                f"JOIN makh_df m ON CAST(n.\"Mã khách hàng\" AS VARCHAR) = m[\"{COT_MA_KH}\"]"
+                            ).df()
+                        else:
+                            df_nq11 = pd.DataFrame()
+                        st.session_state["nq11_pgd_cache"] = {
+                            "data": df_nq11,
+                            "ts_nq11": _nq11_ts,
+                            "pgd_user": pgd_user,
+                        }
+                else:
+                    df_nq11 = _load_nq11(CACHE_NQ11, _nq11_ts)
 
-            if _kv_ds_pgd:
-                _ds_pgd_all = sorted(set(_ds_pgd_all) | set(_kv_ds_pgd))
+            df_sk_gqvl = None
+            if os.path.exists(FILE_PATH_SK_GQVL):
+                df_sk_gqvl = doc_file_sk_gqvl(FILE_PATH_SK_GQVL, _gqvl_ts)
 
-            if isinstance(_kv_pgd_xa, dict):
-                for _pgd, _ds_xa in _kv_pgd_xa.items():
-                    for _xa in (_ds_xa or []):
-                        _xa = str(_xa).strip()
-                        if _xa and _xa not in _pgd_xa_map:
-                            _pgd_xa_map[_xa] = str(_pgd).strip()
+            _map_cache_ts = _hstd_ts
+            if st.session_state.get("_pgd_map_cache_ts") != _map_cache_ts:
+                if role == "user" and os.path.exists(CACHE_HSTD):
+                    _df_ref = duckdb.query(
+                        f"SELECT DISTINCT \"{COT_TEN_PGD}\", \"Tên xã\" FROM '{CACHE_HSTD}'"
+                    ).df()
+                else:
+                    _df_ref = df_full
 
-            st.session_state["_pgd_map_cache_ts"]  = _map_cache_ts
-            st.session_state["_pgd_xa_map_cached"] = _pgd_xa_map
-            st.session_state["_ds_pgd_all_cached"] = _ds_pgd_all
-        else:
-            _pgd_xa_map = st.session_state["_pgd_xa_map_cached"]
-            _ds_pgd_all = st.session_state["_ds_pgd_all_cached"]
+                _pgd_xa_map = {}
+                if COT_TEN_PGD in _df_ref.columns and "Tên xã" in _df_ref.columns:
+                    for pgd, xa in _df_ref[[COT_TEN_PGD, "Tên xã"]].dropna().drop_duplicates().values:
+                        _pgd_xa_map[str(xa).strip()] = str(pgd).strip()
+                _ds_pgd_all = sorted(_df_ref[COT_TEN_PGD].dropna().unique().tolist()) \
+                              if COT_TEN_PGD in _df_ref.columns else []
 
-        ctx = dict(
-            df=df,
-            df_full=df_full,
-            role=role,
-            pgd_user=pgd_user,
-            username=username,
-            df_nq11=df_nq11,
-            df_sk_gqvl=df_sk_gqvl,
-            pgd_xa_map=_pgd_xa_map,
-            ds_pgd_all=_ds_pgd_all,
-            ts_hstd=ts_file(CACHE_HSTD) if os.path.exists(CACHE_HSTD) else 0.0,
-        )
+                _kv_ds_pgd = lay_config("ds_pgd",    _DS_PGD_DEFAULT)
+                _kv_pgd_xa = lay_config("pgd_xa_map", _PGD_XA_MAP_DEFAULT)
+
+                if _kv_ds_pgd:
+                    _ds_pgd_all = sorted(set(_ds_pgd_all) | set(_kv_ds_pgd))
+
+                if isinstance(_kv_pgd_xa, dict):
+                    for _pgd, _ds_xa in _kv_pgd_xa.items():
+                        for _xa in (_ds_xa or []):
+                            _xa = str(_xa).strip()
+                            if _xa and _xa not in _pgd_xa_map:
+                                _pgd_xa_map[_xa] = str(_pgd).strip()
+
+                st.session_state["_pgd_map_cache_ts"]  = _map_cache_ts
+                st.session_state["_pgd_xa_map_cached"] = _pgd_xa_map
+                st.session_state["_ds_pgd_all_cached"] = _ds_pgd_all
+            else:
+                _pgd_xa_map = st.session_state["_pgd_xa_map_cached"]
+                _ds_pgd_all = st.session_state["_ds_pgd_all_cached"]
+
+            ctx = dict(
+                df=df,
+                df_full=df_full,
+                role=role,
+                pgd_user=pgd_user,
+                username=username,
+                df_nq11=df_nq11,
+                df_sk_gqvl=df_sk_gqvl,
+                pgd_xa_map=_pgd_xa_map,
+                ds_pgd_all=_ds_pgd_all,
+                ts_hstd=ts_file(CACHE_HSTD) if os.path.exists(CACHE_HSTD) else 0.0,
+            )
+            st.session_state["_ctx"] = ctx
+            st.session_state["_ctx_cache_key"] = _data_version
+            st.session_state["df_full"] = df_full
+    else:
+        ctx = st.session_state["_ctx"]
+        df_full = ctx["df_full"]
+
+    _pgd_xa_map = ctx["pgd_xa_map"]
+    _ds_pgd_all = ctx["ds_pgd_all"]
 
     # ── Render workspace ──────────────────────────────────────────────────────────
     ws = st.session_state.workspace

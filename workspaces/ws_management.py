@@ -173,21 +173,23 @@ def _render_canh_bao(df: pd.DataFrame, ds_pgd_all: list):
 
 
 def _render_canh_bao_no(df_full: pd.DataFrame, ds_pgd_all: list, role: str, username: str):
-    """Cảnh báo nợ — 4 sub-tab: Đến hạn, 3 tháng KHĐ, Migration, Nợ QH phát sinh."""
+    """Cảnh báo nợ — 5 sub-tab: Đến hạn, 3 tháng KHĐ, Migration, Nợ QH phát sinh, Cảnh báo sớm."""
     from tabs.tab_den_han import render as render_den_han
+    from tabs import tab_canh_bao_som
 
-    sub1, sub2, sub3, sub4 = st.tabs([
+    sub1, sub2, sub3, sub4, sub5 = st.tabs([
         "⏰ Đến hạn",
         "🔴 3 tháng KHĐ",
         "🚨 Migration (đủ chuẩn → NQH)",
         "📋 Nợ QH phát sinh",
+        "⚡ Cảnh báo sớm",
     ])
 
     with sub1:
         render_den_han(role=role)
 
     if df_full is None or df_full.empty:
-        for tab in [sub2, sub3, sub4]:
+        for tab in [sub2, sub3, sub4, sub5]:
             with tab:
                 st.warning("Chưa có dữ liệu HSTD.")
         return
@@ -202,6 +204,11 @@ def _render_canh_bao_no(df_full: pd.DataFrame, ds_pgd_all: list, role: str, user
 
     with sub4:
         _hien_thi_nqh_tab(df_kh, username)
+
+    with sub5:
+        tab_canh_bao_som._render_canh_bao(
+            df_kh, ds_pgd_all, key_prefix="cn_", la_cn=True
+        )
 
 
 def _hien_thi_khd_tab(df_kh: pd.DataFrame, ds_pgd_all: list):

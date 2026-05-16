@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## [2026-05-16] — Nâng cấp UI: KPI accent, hover table, alert badge, scrollbar, spinner
+- `app.py` CSS — KPI card: thêm border-left 4px xanh/đỏ theo delta, hover lift animation
+- `app.py` CSS — Dataframe: header gradient đậm hơn + text-shadow, zebra stripe, hover row xanh nhạt
+- `app.py` CSS — Alert: compact border-left theo loại (info/success/warning/error), nền tông màu riêng
+- `app.py` CSS — Scrollbar 6px mỏng màu xanh NHCSXH, multiselect chip xanh, spinner xanh, progress bar gradient
+
 ## [2026-05-16] — Tối ưu hoá performance: nén parquet, TTL cache, cache hàm toan_cn
 - `data/core.py` — `excel_to_parquet()`: thêm `compression_level=9` cho zstd (giảm ~70% dung lượng parquet)
 - `services/upload_service.py` — merge toan_cn: thêm `compression_level=9` khi ghi `hstd/nq11/gqvl.parquet`

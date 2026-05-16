@@ -176,7 +176,7 @@ def _render_metric_cards(**kwargs) -> None:
          "delta": tlqh, "delta_label": "% NQH", "delta_color": "inverse" if tlqh >= _NGUONG_AN_TOAN else "normal",
          "help": f"{tinh_trang}" if dqh > 0 else "✅ Không có NQH"},
         {"label": "Số khách hàng", "value": n_kh, "icon": "👥", "suffix": "", "precision": 0, "help": f"Tổng {fmt_so(n_hs)} hồ sơ trong hệ thống"},
-    ], cols=4)
+    ], num_columns=4)
 
     st.markdown("---")
     pct_th = dth / tdn * 100 if tdn > 0 else 100
@@ -238,7 +238,7 @@ def _kpi_tang_truong(df_full: pd.DataFrame) -> None:
                     suffix="%", precision=2,
                     key="exe_tlqh")
     with c4:
-        delta_card("Số hộ vay", n_kh,
+        delta_card("Số hộ vay", nkh,
                     suffix="", precision=0,
                     key="exe_nkh")
 

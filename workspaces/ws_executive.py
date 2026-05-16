@@ -1326,8 +1326,243 @@ def _ranking_pgd(df_full: pd.DataFrame) -> None:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# SECTION WRAPPERS — gom logic thành từng mục menu độc lập
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def _render_suc_khoe_tong_quan(df_full: pd.DataFrame) -> None:
+    """KPI tăng trưởng + Bảng rủi ro PGD + Đồng hồ sức khỏe tín dụng."""
+    _kpi_tang_truong(df_full)
+    st.divider()
+    st.markdown("**🗺️ Bảng Rủi ro Tổng hợp theo PGD**")
+    _heatmap_rui_ro_pgd(df_full)
+    st.divider()
+    _the_suc_khoe(df_full)
+
+
+def _render_tien_do_va_kh(df_full: pd.DataFrame, **kwargs) -> None:
+    """Top 10 CT + Tiến độ KH + Tăng trưởng liên tháng + Tiến độ tổng quan."""
+    st.markdown("**📌 Top 10 Chương trình tín dụng theo dư nợ**")
+    _render_bieu_do_tron(df_full=df_full)
+    st.divider()
+    _tien_do_ke_hoach()
+
+    _ds_ky = danh_sach_ky()
+    if len(_ds_ky) >= 2:
+        st.divider()
+        st.markdown("**📈 Tăng trưởng Dư nợ liên tháng (từ snapshot)**")
+        _df_range = doc_snapshot_range(_ds_ky[-1], _ds_ky[0])
+        if not _df_range.empty:
+            _df_range["du_no_ty"] = _df_range["tong_du_no"] / 1e6
+            _fig_tt = px.line(
+                _df_range,
+                x="ky",
+                y="du_no_ty",
+                markers=True,
+                labels={"ky": "Kỳ", "du_no_ty": "Dư nợ (triệu đồng)"},
+            )
+            _fig_tt.update_layout(
+                height=260,
+                margin=dict(l=0, r=20, t=10, b=10),
+                plot_bgcolor="rgba(0,0,0,0)",
+                paper_bgcolor="rgba(0,0,0,0)",
+                font_family="Arial",
+            )
+            st.plotly_chart(_fig_tt, width='stretch')
+
+    st.divider()
+    tab_tien_do.render_tong_quan_only(None, **kwargs)
+
+
+def _render_so_sanh_xep_hang_pgd(df_full: pd.DataFrame) -> None:
+    """Biểu đồ so sánh PGD + Bảng xếp hạng + Radar + Waterfall."""
+    _render_heatmap_pgd(df_full=df_full)
+    st.divider()
+    with st.expander("🏆 Bảng xếp hạng PGD", expanded=True):
+        _ranking_pgd(df_full)
+    with st.expander("📊 So sánh PGD đa chiều (Radar)", expanded=False):
+        _radar_compare_pgd(df_full)
+    with st.expander("📈 Biến động Dư nợ (Waterfall)", expanded=False):
+        _waterfall_du_no(df_full)
+
+
+def _render_nqh_xa_canh_bao(df_full: pd.DataFrame) -> None:
+    """Cảnh báo xã/phường có NQH tăng đột biến."""
+    st.markdown("**⚠️ Cảnh báo: Xã/Phường có NQH tăng đột biến**")
+    st.caption("So sánh dữ liệu HSTD hiện tại với kỳ trước (nếu có)")
+    _canh_bao_xa_nqh(df_full)
+
+
+def _render_migration_section(df_full: pd.DataFrame, username: str) -> None:
+    """Cảnh báo migration + Ma trận chuyển dịch nhóm nợ."""
+    st.subheader("🚨 Cảnh báo Phân loại nợ — Rủi ro chuyển NQH")
+    _canh_bao_migration(df_full)
+    st.divider()
+    _migration_matrix_section(df_full, username)
+
+
+def _render_pdf_section(df_full: pd.DataFrame, username: str) -> None:
+    """Xuất báo cáo PDF đầy đủ."""
+    st.markdown("### 📄 Xuất báo cáo PDF đầy đủ")
+    st.caption("Báo cáo tổng hợp: KPI + Bảng dữ liệu — chuẩn NĐ30/2020")
+
+    _pdf_dep = kiem_tra_pdf_dependency()
+    if not _pdf_dep["ready"]:
+        for msg in _pdf_dep["messages"]:
+            st.warning(msg)
+    elif not _pdf_dep["kaleido"]:
+        st.info("ℹ️ Nhúng biểu đồ tự động vào PDF cần `pip install kaleido`. Hiện tại chỉ xuất KPI + bảng.")
+
+    df_pdf = df_full.copy() if df_full is not None else pd.DataFrame()
+    _kpi_items = []
+    if df_full is not None and not df_full.empty:
+        tdn = float(df_full[COT_TONG_DU_NO].sum()) if COT_TONG_DU_NO in df_full.columns else 0
+        dqh = float(df_full[COT_DU_NO_QH].sum()) if COT_DU_NO_QH in df_full.columns else 0
+        nkh = int(df_full[COT_MA_KH].nunique()) if COT_MA_KH in df_full.columns else 0
+        tlqh = dqh / tdn * 100 if tdn > 0 else 0
+        _kpi_items = [
+            ("Số khế ước", fmt_so(len(df_full)), ""),
+            ("Số khách hàng", fmt_so(nkh), ""),
+            ("Tổng dư nợ", fmt_ty(tdn), ""),
+            ("Dư nợ quá hạn", fmt_ty(dqh), "accent"),
+            ("Tỷ lệ NQH", fmt_pct(tlqh), "accent"),
+            ("Dư nợ trong hạn", fmt_ty(tdn - dqh), ""),
+        ]
+
+    cols_tien_pdf = [c for c in [COT_TONG_DU_NO, COT_DU_NO_QH, COT_DU_NO_TH, COT_LAI_TON] if c in df_pdf.columns]
+    col_pdf1, col_pdf2 = st.columns([1, 1])
+    with col_pdf1:
+        st.download_button(
+            label="📄 Xuất PDF báo cáo đầy đủ",
+            type="primary",
+            data=xuat_pdf_bao_cao(
+                df=df_pdf,
+                tieu_de="Báo cáo Sức khỏe Tín dụng Toàn Chi nhánh",
+                nguoi_xuat=username,
+                kpi_items=_kpi_items,
+                cols_tien=cols_tien_pdf,
+                tieu_de_phu=f"Ngày số liệu: {df_full[COT_NGAY_SL].iloc[0] if COT_NGAY_SL in df_full.columns else '—'}",
+            ),
+            file_name=f"BaoCao_SucKhoeTD_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
+            mime="application/pdf",
+            width='stretch',
+            key="pdf_sk_full",
+        )
+    with col_pdf2:
+        st.download_button(
+            label="📄 PDF bảng dữ liệu (đơn giản)",
+            data=xuat_pdf(
+                df=df_pdf,
+                tieu_de="Báo cáo Sức khỏe Tín dụng",
+                nguoi_xuat=username,
+                cols_tien=cols_tien_pdf,
+                prefix_file="SKTD",
+            ),
+            file_name=f"SKTD_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
+            mime="application/pdf",
+            width='stretch',
+            key="pdf_sk_simple",
+        )
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# MENU BUILDER — dùng chung cho sidebar và render()
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def _build_exec_items(df_full, role: str, username: str, **kwargs) -> list:
+    """Xây danh sách ALL_ITEMS cho workspace Lãnh đạo."""
+    return [
+        {"group": "Tổng quan",       "label": "Sức khỏe tín dụng",          "fn": lambda: _render_suc_khoe_tong_quan(df_full)},
+        {"group": "Tổng quan",       "label": "Tiến độ & Kế hoạch",         "fn": lambda: _render_tien_do_va_kh(df_full, **kwargs)},
+        {"group": "Tổng quan",       "label": "So sánh PGD",                 "fn": lambda: _render_so_sanh_xep_hang_pgd(df_full)},
+        {"group": "Cảnh báo rủi ro", "label": "HHI — Tập trung rủi ro",     "fn": lambda: _hhi_giam_sat(df_full)},
+        {"group": "Cảnh báo rủi ro", "label": "NQH theo Xã",                "fn": lambda: _render_nqh_xa_canh_bao(df_full)},
+        {"group": "Cảnh báo rủi ro", "label": "Migration & Chuyển dịch nợ", "fn": lambda: _render_migration_section(df_full, username)},
+        {"group": "Kiểm soát",       "label": "Kiểm soát CN",                "fn": lambda: tab_kiem_soat.render_tab(df_full, role, username)},
+        {"group": "Kiểm soát",       "label": "Nợ rủi ro QĐ62",             "fn": lambda: tab_qd62.render(mode="cn")},
+        {"group": "Kiểm soát",       "label": "Giao & Điều chỉnh KHTD",     "fn": lambda: tab_khtd_giao_dc.render(None, **kwargs)},
+        {"group": "Báo cáo",         "label": "So sánh kỳ",                 "fn": lambda: tab_so_sanh_ky.render(None, df=df_full, df_full=df_full, role=role, username=username)},
+        {"group": "Báo cáo",         "label": "Xuất PDF báo cáo",           "fn": lambda: _render_pdf_section(df_full, username)},
+        {"group": "Hệ thống",        "label": "Hướng dẫn",                  "fn": lambda: render_huong_dan()},
+    ]
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# SIDEBAR MENU — gọi từ app.py bên trong with st.sidebar
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def render_sidebar_menu(role: str, username: str, **kwargs) -> None:
+    """Render menu LÃNH ĐẠO — gọi từ app.py bên trong with st.sidebar."""
+
+    GROUP_COLORS = {
+        "Tổng quan":         {"bg": "#E6F1FB", "border": "#378ADD", "text": "#185FA5"},
+        "Cảnh báo rủi ro":   {"bg": "#FCEBEB", "border": "#E24B4A", "text": "#A32D2D"},
+        "Kiểm soát":         {"bg": "#EAF3DE", "border": "#639922", "text": "#3B6D11"},
+        "Báo cáo":           {"bg": "#FAEEDA", "border": "#BA7517", "text": "#854F0B"},
+        "Hệ thống":          {"bg": "#F1EFE8", "border": "#888780", "text": "#5F5E5A"},
+    }
+
+    df_full = kwargs.get("df_full")
+    all_items = _build_exec_items(df_full, role, username, **kwargs)
+    if not all_items:
+        return
+
+    if "ws_exec_menu" not in st.session_state:
+        st.session_state["ws_exec_menu"] = all_items[0]["label"]
+
+    valid_labels = [x["label"] for x in all_items]
+    if st.session_state["ws_exec_menu"] not in valid_labels:
+        st.session_state["ws_exec_menu"] = all_items[0]["label"]
+
+    st.markdown(
+        "<p style='font-size:12px;font-weight:500;"
+        "color:#444;margin-bottom:4px'>MENU LÃNH ĐẠO</p>",
+        unsafe_allow_html=True,
+    )
+
+    current_group = None
+    for item in all_items:
+        grp = item["group"]
+        clr = GROUP_COLORS.get(grp, {"bg": "#F1EFE8", "border": "#888", "text": "#444"})
+
+        if grp != current_group:
+            current_group = grp
+            st.markdown(
+                f"<p style='font-size:10px;font-weight:500;"
+                f"color:{clr['text']};text-transform:uppercase;"
+                f"letter-spacing:0.06em;padding:10px 4px 2px;margin:0'>"
+                f"{grp}</p>",
+                unsafe_allow_html=True,
+            )
+
+        is_active = st.session_state["ws_exec_menu"] == item["label"]
+
+        if is_active:
+            st.markdown(
+                f"<div style='"
+                f"background:#185FA5;"
+                f"border-left:2px solid #0D3F73;"
+                f"color:#FFFFFF;"
+                f"font-size:13px;font-weight:600;"
+                f"padding:6px 8px 6px 10px;"
+                f"border-radius:0 5px 5px 0;"
+                f"margin-bottom:2px'>"
+                f"{item['label']}</div>",
+                unsafe_allow_html=True,
+            )
+        else:
+            if st.button(
+                item["label"],
+                key=f"exec_menu_{item['label']}",
+                width='stretch',
+            ):
+                st.session_state["ws_exec_menu"] = item["label"]
+                st.rerun()
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # ENTRY POINT — render()
 # ═══════════════════════════════════════════════════════════════════════════════
+
 def render(**kwargs) -> None:
     """
     Điểm vào của Workspace Lãnh đạo.
@@ -1337,8 +1572,10 @@ def render(**kwargs) -> None:
     df      : DataFrame đã lọc theo PGD/xã đang chọn (sidebar)
     df_full : DataFrame toàn chi nhánh (không lọc) — dùng cho KPI tổng
     """
-    df      = kwargs.get("df")
-    df_full = kwargs.get("df_full", df)
+    df       = kwargs.get("df")
+    df_full  = kwargs.get("df_full", df)
+    role     = kwargs.get("role", "executive")
+    username = kwargs.get("username", "unknown")
 
     # ── Header ────────────────────────────────────────────────────────────────
     st.title("📊 Tổng Quan Chi Nhánh")
@@ -1354,180 +1591,79 @@ def render(**kwargs) -> None:
         st.warning("⚠️ Chưa có dữ liệu HSTD. Vui lòng upload file trong tab Quản trị.")
         return
 
-    role = kwargs.get("role", "executive")
-    username = kwargs.get("username", "unknown")
+    # ── BƯỚC 1: Xây danh sách tất cả menu items ───────────────────────────
+    ALL_ITEMS = _build_exec_items(df_full, role, username, **kwargs)
 
-    tab_phan_tich, tab_tien_do_ui, tab_kiem_soat_cn, tab_no_rui_ro_cn, tab_so_sanh, tab_huong_dan = st.tabs(
-        ["📊 Phân tích & cảnh báo", "📅 Tiến độ", "🔍 Kiểm soát CN", "💳 Nợ rủi ro QĐ62", "📈 So sánh kỳ", "📖 Hướng dẫn"]
+    # ── Navigation lazy: Nhóm → Mục → chỉ render mục được chọn ───────────
+    valid_labels = [x["label"] for x in ALL_ITEMS]
+
+    # Handle jump từ shortcut / nút điều hướng ngoài ws_executive
+    jump_label = st.session_state.pop("ws_exec_jump", None)
+    if jump_label and jump_label in valid_labels:
+        st.session_state["ws_exec_menu"] = jump_label
+        st.toast(f"✨ Đã chuyển tới: {jump_label}", icon="👆")
+
+    # Khởi tạo / validate ws_exec_menu
+    if "ws_exec_menu" not in st.session_state or \
+            st.session_state["ws_exec_menu"] not in valid_labels:
+        st.session_state["ws_exec_menu"] = ALL_ITEMS[0]["label"]
+
+    active_label = st.session_state["ws_exec_menu"]
+
+    # Nhóm thứ tự xuất hiện đầu tiên (giữ thứ tự)
+    groups_ordered = list(dict.fromkeys(x["group"] for x in ALL_ITEMS))
+    active_group = next(
+        (x["group"] for x in ALL_ITEMS if x["label"] == active_label),
+        groups_ordered[0],
     )
 
-    with tab_phan_tich:
-        # ═══════════ 0. KPI TĂNG TRƯỞNG ══════════════════════════════════════
-        _kpi_tang_truong(df_full)
+    # ── Level 1: radio chọn nhóm ──────────────────────────────────────────
+    # Đồng bộ với sidebar (sidebar đã set ws_exec_menu → suy ra active_group)
+    st.session_state["ws_exec_group_radio"] = active_group
+    sel_group = st.radio(
+        "Nhóm",
+        groups_ordered,
+        horizontal=True,
+        key="ws_exec_group_radio",
+        label_visibility="collapsed",
+    )
 
-        st.divider()
+    # ── Level 2: radio chọn mục trong nhóm ───────────────────────────────
+    items_in_group = [x for x in ALL_ITEMS if x["group"] == sel_group]
+    item_labels    = [x["label"] for x in items_in_group]
+    item_key       = f"ws_exec_item_{sel_group}"
 
-        # ═══════════ 0b. HEATMAP RỦI RO PGD ══════════════════════════════════
-        st.markdown("**🗺️ Bảng Rủi ro Tổng hợp theo PGD**")
-        _heatmap_rui_ro_pgd(df_full)
+    # Pre-select item nếu đến từ sidebar hoặc jump
+    if active_label in item_labels:
+        st.session_state[item_key] = item_labels.index(active_label)
+    elif item_key not in st.session_state:
+        st.session_state[item_key] = 0
 
-        st.divider()
+    sel_idx = st.radio(
+        "Mục",
+        range(len(item_labels)),
+        format_func=lambda i: item_labels[i],
+        horizontal=True,
+        key=item_key,
+        label_visibility="collapsed",
+    )
+    sel_label = item_labels[sel_idx]
 
-        # ═══════════ 1. SỨC KHỎE TÍN DỤNG ═══════════════════════════════════
-        _the_suc_khoe(df_full)
+    # Ghi ngược lại ws_exec_menu để sidebar highlight đúng
+    st.session_state["ws_exec_menu"] = sel_label
 
-        st.divider()
+    st.divider()
 
-        # ═══════════ 1b. GIÁM SÁT TẬP TRUNG RỦI RO (HHI) ═══════════════════
-        _hhi_giam_sat(df_full)
-
-        st.divider()
-
-        # ═══════════ 3. BIỂU ĐỒ SO SÁNH PGD (giữ nguyên) ════════════════════
-        _render_heatmap_pgd(df_full=df_full)
-
-        st.divider()
-
-        # ═══════════ 4. TOP CT + TIẾN ĐỘ KH (giữ nguyên) ════════════════════
-        st.markdown("**📌 Top 10 Chương trình tín dụng theo dư nợ**")
-        _render_bieu_do_tron(df_full=df_full)
-
-        st.divider()
-
-        _tien_do_ke_hoach()
-
-        st.divider()
-
-        # ═══════════ 4b. TĂNG TRƯỞNG LIÊN THÁNG ══════════════════════════════
-        _ds_ky = danh_sach_ky()
-        if len(_ds_ky) >= 2:
-            st.markdown("**📈 Tăng trưởng Dư nợ liên tháng (từ snapshot)**")
-            _df_range = doc_snapshot_range(_ds_ky[-1], _ds_ky[0])
-            if not _df_range.empty:
-                _df_range["du_no_ty"] = _df_range["tong_du_no"] / 1e6
-                _fig_tt = px.line(
-                    _df_range,
-                    x="ky",
-                    y="du_no_ty",
-                    markers=True,
-                    labels={"ky": "Kỳ", "du_no_ty": "Dư nợ (triệu đồng)"},
-                )
-                _fig_tt.update_layout(
-                    height=260,
-                    margin=dict(l=0, r=20, t=10, b=10),
-                    plot_bgcolor="rgba(0,0,0,0)",
-                    paper_bgcolor="rgba(0,0,0,0)",
-                    font_family="Arial",
-                )
-                st.plotly_chart(_fig_tt, width='stretch')
-            st.divider()
-
-        # ═══════════ 6-7. CẢNH BÁO (giữ nguyên) ════════════════════════════
-        st.markdown("**⚠️ Cảnh báo: Xã/Phường có NQH tăng đột biến**")
-        st.caption("So sánh dữ liệu HSTD hiện tại với kỳ trước (nếu có)")
-        _canh_bao_xa_nqh(df_full)
-
-        st.divider()
-
-        with st.expander("📋 Giao & Điều chỉnh KHTD", expanded=False):
-            tab_khtd_giao_dc.render(None, **kwargs)
-
-        st.divider()
-
-        st.subheader("🚨 Cảnh báo Phân loại nợ — Rủi ro chuyển NQH")
-        _canh_bao_migration(df_full)
-
-        # ── Ma trận Chuyển dịch Nhóm nợ ─────────────────────────────────
-        st.divider()
-        _migration_matrix_section(df_full, username)
-
-        # ── Radar So sánh PGD ─────────────────────────────────────────
-        with st.expander("📊 So sánh PGD đa chiều (Radar)", expanded=False):
-            _radar_compare_pgd(df_full)
-
-        # ── Waterfall Biến động Dư nợ ─────────────────────────────────
-        with st.expander("📈 Biến động Dư nợ (Waterfall)", expanded=False):
-            _waterfall_du_no(df_full)
-
-        # ── Bảng xếp hạng PGD ─────────────────────────────────────────
-        with st.expander("🏆 Bảng xếp hạng PGD", expanded=False):
-            _ranking_pgd(df_full)
-
-        # ── PDF FULL REPORT ────────────────────────────────────────────
-        st.divider()
-        st.markdown("### 📄 Xuất báo cáo PDF đầy đủ")
-        st.caption("Báo cáo tổng hợp: KPI + Bảng dữ liệu — chuẩn NĐ30/2020")
-
-        _pdf_dep = kiem_tra_pdf_dependency()
-        if not _pdf_dep["ready"]:
-            for msg in _pdf_dep["messages"]:
-                st.warning(msg)
-        elif not _pdf_dep["kaleido"]:
-            st.info("ℹ️ Nhúng biểu đồ tự động vào PDF cần `pip install kaleido`. Hiện tại chỉ xuất KPI + bảng.")
-
-        username = kwargs.get("username", "unknown")
-        df_pdf = df_full.copy() if df_full is not None else pd.DataFrame()
-        _kpi_items = []
-        if df_full is not None and not df_full.empty:
-            tdn = float(df_full[COT_TONG_DU_NO].sum()) if COT_TONG_DU_NO in df_full.columns else 0
-            dqh = float(df_full[COT_DU_NO_QH].sum()) if COT_DU_NO_QH in df_full.columns else 0
-            nkh = int(df_full[COT_MA_KH].nunique()) if COT_MA_KH in df_full.columns else 0
-            tlqh = dqh / tdn * 100 if tdn > 0 else 0
-            _kpi_items = [
-                ("Số khế ước", fmt_so(len(df_full)), ""),
-                ("Số khách hàng", fmt_so(nkh), ""),
-                ("Tổng dư nợ", fmt_ty(tdn), ""),
-                ("Dư nợ quá hạn", fmt_ty(dqh), "accent"),
-                ("Tỷ lệ NQH", fmt_pct(tlqh), "accent"),
-                ("Dư nợ trong hạn", fmt_ty(tdn - dqh), ""),
-            ]
-
-        col_pdf1, col_pdf2 = st.columns([1, 1])
-        with col_pdf1:
-            cols_tien_pdf = [c for c in [COT_TONG_DU_NO, COT_DU_NO_QH, COT_DU_NO_TH, COT_LAI_TON] if c in df_pdf.columns]
-            st.download_button(
-                label="📄 Xuất PDF báo cáo đầy đủ",
-                type="primary",
-                data=xuat_pdf_bao_cao(
-                    df=df_pdf,
-                    tieu_de="Báo cáo Sức khỏe Tín dụng Toàn Chi nhánh",
-                    nguoi_xuat=username,
-                    kpi_items=_kpi_items,
-                    cols_tien=cols_tien_pdf,
-                    tieu_de_phu=f"Ngày số liệu: {df_full[COT_NGAY_SL].iloc[0] if COT_NGAY_SL in df_full.columns else '—'}",
-                ),
-                file_name=f"BaoCao_SucKhoeTD_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
-                mime="application/pdf",
-                width='stretch',
-                key="pdf_sk_full",
-            )
-        with col_pdf2:
-            st.download_button(
-                label="📄 PDF bảng dữ liệu (đơn giản)",
-                data=xuat_pdf(
-                    df=df_pdf,
-                    tieu_de="Báo cáo Sức khỏe Tín dụng",
-                    nguoi_xuat=username,
-                    cols_tien=cols_tien_pdf,
-                    prefix_file="SKTD",
-                ),
-                file_name=f"SKTD_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
-                mime="application/pdf",
-                width='stretch',
-                key="pdf_sk_simple",
-            )
-
-    with tab_tien_do_ui:
-        tab_tien_do.render_tong_quan_only(tab_tien_do_ui, **kwargs)
-
-    with tab_kiem_soat_cn:
-        tab_kiem_soat.render_tab(df_full, role, username)
-
-    with tab_no_rui_ro_cn:
-        tab_qd62.render(mode="cn")
-
-    with tab_so_sanh:
-        tab_so_sanh_ky.render(tab_so_sanh, df=df_full, df_full=df_full, role=role, username=username)
-
-    with tab_huong_dan:
-        render_huong_dan()
+    # ── Render DUY NHẤT mục đang chọn ────────────────────────────────────
+    active_item = next((x for x in ALL_ITEMS if x["label"] == sel_label), None)
+    if active_item:
+        fn = active_item.get("fn")
+        if callable(fn):
+            try:
+                fn()
+            except Exception as e:
+                import traceback
+                st.error(f"❌ Lỗi render **{sel_label}**: {e}")
+                st.code(traceback.format_exc())
+        else:
+            st.info(f"Tính năng **{sel_label}** đang được phát triển.")

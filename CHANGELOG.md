@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## [2026-05-16] — Refactor ws_executive.py: áp dụng Lazy-loading 2 tầng (radio Nhóm → Mục)
+- `workspaces/ws_executive.py` dòng ~1328 — thay `st.tabs()` 6 tab eager bằng radio 2 tầng (`ws_exec_group_radio` / `ws_exec_item_{group}`), chỉ render mục active
+- `workspaces/ws_executive.py` — thêm 6 section wrapper: `_render_suc_khoe_tong_quan`, `_render_tien_do_va_kh`, `_render_so_sanh_xep_hang_pgd`, `_render_nqh_xa_canh_bao`, `_render_migration_section`, `_render_pdf_section`
+- `workspaces/ws_executive.py` — thêm `_build_exec_items()` (5 nhóm / 12 mục) và `render_sidebar_menu()` đồng bộ 2 chiều với `ws_exec_menu` / `ws_exec_jump`
+
 ## [2026-05-16] — Chuẩn hóa key Streamlit widget ws_operation: tất cả widget nhập liệu ghi lại session_state
 - `workspaces/ws_operation.py` — Rà soát 28 Streamlit widget (selectbox, radio, multiselect, text_input, text_area, number_input, date_input, slider)
 - **Ưu tiên 1 (đã fix):** 3 widget thiếu `key=` hoàn toàn → thêm key

@@ -13,8 +13,10 @@ from config import (
     COT_DU_NO_TH,
     COT_MA_KH,
     COT_NGAY_SL,
+    COT_NGAY_VAY,
     COT_PHAN_LOAI,
     COT_SO_KU,
+    COT_TEN_KH,
     COT_TEN_PGD,
     COT_TONG_DU_NO,
     HSTD_DS_CHO_VAY_NAM_ALIASES,
@@ -26,6 +28,15 @@ from data.hstd import doc_baseline_merged
 from data.pgd import pgd_slug
 from services.hhi_service import danh_gia_hhi, tinh_hhi, tinh_hhi_breakdown
 from services.migration_service import danh_sach_ky, doc_snapshot, migration_matrix
+from services.period_compare import (
+    CHANGE_LABELS,
+    CHANGE_TYPES,
+    classify_changes,
+    join_by_loan,
+    par_breakdown,
+    roll_cure_rate,
+    vintage_nqh,
+)
 from utils import fmt_so, fmt_ty
 
 COT_DU_NO_KHOANH = "Dư nợ khoanh"
@@ -132,22 +143,25 @@ def _phan_loai_khach_hang(df_truoc: pd.DataFrame, df_sau: pd.DataFrame) -> pd.Da
     }])
 
 
-def _phan_tich_par(df: pd.DataFrame) -> pd.DataFrame:
-    """Phân tích PAR (Portfolio at Risk) theo ngày quá hạn."""
-    if df.empty or COT_DU_NO_QH not in df.columns:
-        return pd.DataFrame()
-
-    tong_qh = df[COT_DU_NO_QH].sum() if COT_DU_NO_QH in df.columns else 0
-    tong_dn = df[COT_TONG_DU_NO].sum() if COT_TONG_DU_NO in df.columns else 0
-
-    par = (tong_qh / tong_dn * 100) if tong_dn > 0 else 0.0
-
-    return pd.DataFrame([{
-        "Chỉ tiêu": "PAR (Portfolio At Risk)",
-        "Dư nợ quá hạn": fmt_ty(tong_qh),
-        "Tổng dư nợ": fmt_ty(tong_dn),
-        "PAR %": _fmt_pct_vn(par),
-    }])
+def _bang_par(df: pd.DataFrame, label: str) -> None:
+    """Hiển thị PAR30/90/180 cho 1 DataFrame."""
+    p = par_breakdown(df)
+    c1, c2, c3 = st.columns(3)
+    c1.metric(
+        "PAR30",
+        _fmt_pct_vn(p["par30_pct"] * 100),
+        help=f"DN > 30 ngày QH: {fmt_ty(p['par30'])}",
+    )
+    c2.metric(
+        "PAR90",
+        _fmt_pct_vn(p["par90_pct"] * 100),
+        help=f"DN > 90 ngày QH: {fmt_ty(p['par90'])}",
+    )
+    c3.metric(
+        "PAR180",
+        _fmt_pct_vn(p["par180_pct"] * 100),
+        help=f"DN > 180 ngày QH: {fmt_ty(p['par180'])}",
+    )
 
 
 def _phan_tich_hhi_pgd(df: pd.DataFrame) -> tuple[float, pd.DataFrame, str, str, str]:
@@ -214,6 +228,106 @@ def _top_movers(
     result["NQH HT"] = top["nqh_pct_ht"].apply(_fmt_pct_vn)
 
     return result
+
+
+def _bang_explorer(df_joined: pd.DataFrame, chon_nam: str, key_prefix: str) -> None:
+    """Bảng khế ước biến động — filter theo loại thay đổi."""
+    if df_joined.empty:
+        st.info("Không đủ dữ liệu để hiển thị biến động khế ước.")
+        return
+
+    df_cl = classify_changes(df_joined)
+    if "_change_type" not in df_cl.columns:
+        return
+
+    # Filter chips
+    all_label = f"Tất cả ({len(df_cl)})"
+    type_counts = df_cl["_change_label"].value_counts()
+    options = [all_label] + [
+        f"{lbl} ({type_counts.get(lbl, 0)})"
+        for lbl in CHANGE_LABELS
+        if type_counts.get(lbl, 0) > 0
+    ]
+    choice = st.selectbox(
+        "Lọc loại biến động",
+        options,
+        key=f"{key_prefix}explorer_filter",
+    )
+
+    if choice != all_label:
+        lbl_filter = choice.rsplit(" (", 1)[0]
+        df_show = df_cl[df_cl["_change_label"] == lbl_filter]
+    else:
+        df_show = df_cl
+
+    # Cột hiển thị
+    col_map = {
+        COT_SO_KU + "_curr": "Số KƯ",
+        COT_MA_KH + "_curr": "Mã KH",
+        COT_TEN_KH + "_curr": "Tên KH",
+        COT_TEN_PGD + "_curr": "Tên PGD",
+        "_change_label": "Loại biến động",
+        COT_TONG_DU_NO + "_prev": f"DN mốc 31/12/{chon_nam}",
+        COT_TONG_DU_NO + "_curr": "DN hiện tại",
+        "_du_no_delta": "Δ DN",
+        COT_DU_NO_QH + "_curr": "DN QH hiện tại",
+    }
+    available = {k: v for k, v in col_map.items() if k in df_show.columns}
+
+    df_out = df_show[list(available.keys())].rename(columns=available).copy()
+
+    # Format tiền
+    for col_src, col_dst in available.items():
+        if col_src in (
+            COT_TONG_DU_NO + "_prev",
+            COT_TONG_DU_NO + "_curr",
+            COT_DU_NO_QH + "_curr",
+        ):
+            df_out[col_dst] = df_show[col_src].fillna(0).apply(fmt_ty)
+        elif col_src == "_du_no_delta":
+            df_out[col_dst] = df_show[col_src].apply(
+                lambda x: ("+" if x >= 0 else "") + fmt_ty(x)
+            )
+
+    # Sắp xếp theo |Δ DN| giảm dần, tối đa 500 dòng
+    if "_du_no_delta" in df_show.columns:
+        order = df_show["_du_no_delta"].abs().nlargest(500).index
+        df_out = df_out.loc[df_out.index.intersection(order)].reindex(order).dropna(how="all")
+
+    st.caption(f"Hiển thị {min(len(df_out), 500)} / {len(df_cl)} khế ước")
+    st.dataframe(df_out.head(500), hide_index=True, use_container_width=True, height=420)
+
+
+def _bang_vintage_nqh(df_ht: pd.DataFrame, df_bl: pd.DataFrame, chon_nam: str) -> None:
+    """Bảng Vintage NQH: so sánh tỷ lệ NQH theo năm vay giữa mốc và hiện tại."""
+    vt_ht = vintage_nqh(df_ht)
+    vt_bl = vintage_nqh(df_bl)
+
+    if vt_ht.empty and vt_bl.empty:
+        st.info("Không có cột ngày vay để phân tích vintage.")
+        return
+
+    if vt_ht.empty:
+        st.dataframe(vt_bl, hide_index=True, use_container_width=True)
+        return
+    if vt_bl.empty:
+        st.dataframe(vt_ht, hide_index=True, use_container_width=True)
+        return
+
+    merged = vt_ht.merge(vt_bl, on="Năm vay", how="outer", suffixes=("_ht", "_bl")).fillna(0)
+    merged = merged.sort_values("Năm vay")
+
+    df_out = pd.DataFrame()
+    df_out["Năm vay"] = merged["Năm vay"]
+    df_out["DN mốc"] = merged["tong_du_no_bl"].apply(fmt_ty)
+    df_out["NQH mốc"] = (merged["Tỷ lệ NQH_bl"] * 100).apply(_fmt_pct_vn)
+    df_out["DN hiện tại"] = merged["tong_du_no_ht"].apply(fmt_ty)
+    df_out["NQH HT"] = (merged["Tỷ lệ NQH_ht"] * 100).apply(_fmt_pct_vn)
+    df_out["Δ NQH"] = ((merged["Tỷ lệ NQH_ht"] - merged["Tỷ lệ NQH_bl"]) * 100).apply(
+        lambda x: ("+" if x >= 0 else "") + _fmt_pct_vn(abs(x)).replace("%", "") + "%"
+    )
+
+    st.dataframe(df_out, hide_index=True, use_container_width=True)
 
 
 def render(tab: DeltaGenerator = None, **kwargs) -> None:
@@ -283,6 +397,9 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
         # ── Tổng hợp toàn bộ ─────────────────────────────────────────────
         agg_ht = _agg_mot_pgd(df_ht)
         agg_bl = _agg_mot_pgd(df_bl)
+
+        # Join cấp độ khế ước (dùng cho Explorer, roll/cure, vintage)
+        df_joined = join_by_loan(df_bl, df_ht)
 
         # Ngày số liệu hiện tại
         ngay_sl = ""
@@ -488,21 +605,15 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
         st.divider()
         with st.expander("🎯 Phân tích PAR (Portfolio at Risk)", expanded=False):
             st.markdown(
-                "**Portfolio at Risk (PAR)** — tỷ lệ dư nợ quá hạn so với tổng dư nợ"
+                "**PAR30/PAR90/PAR180** — tỷ lệ dư nợ có ngày đáo hạn > 30/90/180 ngày"
             )
             c1, c2 = st.columns(2)
-
             with c1:
-                st.subheader("Mốc 31/12")
-                df_par_bl = _phan_tich_par(df_bl)
-                if not df_par_bl.empty:
-                    st.dataframe(df_par_bl, hide_index=True, use_container_width=True)
-
+                st.markdown(f"**Mốc 31/12/{chon_nam}**")
+                _bang_par(df_bl, f"Mốc 31/12/{chon_nam}")
             with c2:
-                st.subheader("Hiện tại")
-                df_par_ht = _phan_tich_par(df_ht)
-                if not df_par_ht.empty:
-                    st.dataframe(df_par_ht, hide_index=True, use_container_width=True)
+                st.markdown("**Hiện tại**")
+                _bang_par(df_ht, "Hiện tại")
 
         # ═══════════ PHÂN TÍCH HHI ═════════════════════════════════════════
         st.divider()
@@ -565,3 +676,42 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                 st.dataframe(df_top, hide_index=True, use_container_width=True)
             else:
                 st.info("Không đủ dữ liệu để hiển thị top movers.")
+
+        # ═══════════ BIẾN ĐỘNG KHẾƯỚC (EXPLORER) ════════════════════════
+        st.divider()
+        with st.expander("🔍 Biến động khế ước chi tiết", expanded=False):
+            st.markdown(
+                "Phân loại **8 loại biến động** cấp độ khế ước giữa mốc và hiện tại. "
+                "Sắp xếp theo |Δ dư nợ| giảm dần."
+            )
+            _bang_explorer(df_joined, chon_nam, key_prefix)
+
+        # ═══════════ ROLL RATE / CURE RATE (từ join trực tiếp) ══════════
+        st.divider()
+        with st.expander("📊 Roll rate / Cure rate", expanded=False):
+            rc = roll_cure_rate(df_joined)
+            st.markdown(
+                "**Roll rate** = tỷ lệ dư nợ Trong hạn ở kỳ trước chuyển sang Quá hạn kỳ này.  \n"
+                "**Cure rate** = tỷ lệ dư nợ Quá hạn ở kỳ trước phục hồi về Trong hạn kỳ này."
+            )
+            r1, r2 = st.columns(2)
+            r1.metric(
+                "Roll rate",
+                _fmt_pct_vn(rc["roll_rate"] * 100),
+                help=f"DN TH kỳ trước: {fmt_ty(rc['base_th_prev'])} | Số KƯ roll: {fmt_so(rc['roll_count'])}",
+                delta_color="inverse",
+            )
+            r2.metric(
+                "Cure rate",
+                _fmt_pct_vn(rc["cure_rate"] * 100),
+                help=f"DN QH kỳ trước: {fmt_ty(rc['base_qh_prev'])} | Số KƯ cure: {fmt_so(rc['cure_count'])}",
+            )
+
+        # ═══════════ VINTAGE NQH ════════════════════════════════════════
+        st.divider()
+        with st.expander("📅 Vintage NQH (theo năm vay)", expanded=False):
+            st.markdown(
+                "Tỷ lệ NQH phân tích theo **năm phát sinh khoản vay** — "
+                "cho thấy nhóm vintage nào có rủi ro cao nhất."
+            )
+            _bang_vintage_nqh(df_ht, df_bl, chon_nam)

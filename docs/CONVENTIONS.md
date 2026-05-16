@@ -218,7 +218,8 @@ if co_quyen_upload_pgd(role):  # admin_pgd, manager_pgd
 
 ### Quy tắc CSS
 
-- Inject CSS **một lần** trong `app.py` — không inject trong tab
+- Inject CSS trong `app.py` **mỗi rerun** — **KHÔNG** bọc trong `if "_css_injected" not in st.session_state:` (guard đó làm CSS biến mất sau khi click tab vì Streamlit rerun không inject lại)
+- Không inject CSS trong tab
 - Bảng ≥ 8 cột → HTML thuần + `st.markdown(unsafe_allow_html=True)`
 - Không hardcode chuỗi tên chương trình — dùng config constants
 - Tiền tệ: luôn dùng `fmt_ty()` chia `/1e12`, không `/1e9`
@@ -227,4 +228,5 @@ if co_quyen_upload_pgd(role):  # admin_pgd, manager_pgd
 
 - prefix widget unique khi `pgd_mode=True` → tránh `DuplicateElementKey`
 - `len(tab_names) == len(_tab_renderers)` nếu sửa `ws_*.py`
-- Dùng `st.cache_data(ttl=3600)` cho dữ liệu lớn (HSTD)
+- Dùng `st.cache_data(ttl=7200)` cho dữ liệu lớn (HSTD, GQVL, NQ11)
+- **Streamlit 1.57.0:** `width='stretch'` chưa hỗ trợ → dùng `use_container_width=True`

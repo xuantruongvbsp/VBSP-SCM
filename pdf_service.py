@@ -267,6 +267,7 @@ def xuat_pdf(
     prefix_file: str = "",
     them_dong_tong: bool = True,
     tieu_de_phu: str = "",
+    cols_right: list[str] | None = None,
 ) -> bytes:
     """
     Xuất DataFrame ra PDF chuẩn in A4, hỗ trợ tiếng Việt.
@@ -411,6 +412,7 @@ def xuat_pdf(
     style_td_r = ParagraphStyle("td_r", fontName=fn, fontSize=font_size, alignment=TA_RIGHT)
     cols_list = list(df.columns)
     set_tien = set(cols_tien or [])
+    set_right = set(cols_right or []) | set_tien   # cols cần căn phải (không re-format)
     
     # Chuyển df sang list of lists một lần (tránh overhead iterrows)
     arr = df.fillna("").values.tolist()
@@ -427,6 +429,9 @@ def xuat_pdf(
                     cells.append(Paragraph(txt, style_td_r))
                 except (ValueError, TypeError):
                     cells.append(Paragraph(_str_val(val), style_td_r))
+            elif col in set_right:
+                # Đã format sẵn (string), chỉ cần căn phải
+                cells.append(Paragraph(_str_val(val), style_td_r))
             else:
                 cells.append(Paragraph(_str_val(val), style_td))
         table_data.append(cells)

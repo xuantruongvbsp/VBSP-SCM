@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Callable
 
+import duckdb
 import pandas as pd
 import streamlit as st
 
@@ -156,16 +157,20 @@ def _tinh_to_sai_so_tv(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
     if col_nunique is None:
         return pd.DataFrame(), pd.DataFrame()
 
-    agg_map: dict[str, tuple] = {
-        "Số_thành_viên": (col_nunique, "nunique"),
-        "Tổng_dư_nợ": (COT_TONG_DU_NO, "sum"),
-    }
+    gb_sql  = ", ".join(f'"{c}"' for c in gb_keys)
+    agg_parts = [
+        f'COUNT(DISTINCT "{col_nunique}") AS "Số_thành_viên"',
+        f'SUM(TRY_CAST("{COT_TONG_DU_NO}" AS DOUBLE)) AS "Tổng_dư_nợ"',
+    ]
     if COT_DU_NO_TH in df_active.columns:
-        agg_map["Dư_nợ_TH"] = (COT_DU_NO_TH, "sum")
+        agg_parts.append(f'SUM(TRY_CAST("{COT_DU_NO_TH}" AS DOUBLE)) AS "Dư_nợ_TH"')
     if COT_DU_NO_QH in df_active.columns:
-        agg_map["Dư_nợ_QH"] = (COT_DU_NO_QH, "sum")
+        agg_parts.append(f'SUM(TRY_CAST("{COT_DU_NO_QH}" AS DOUBLE)) AS "Dư_nợ_QH"')
+    agg_sql = ", ".join(agg_parts)
 
-    df_to = df_active.groupby(gb_keys, dropna=False).agg(**agg_map).reset_index()
+    df_to = duckdb.query(
+        f'SELECT {gb_sql}, {agg_sql} FROM df_active GROUP BY {gb_sql}'
+    ).df()
     if "Dư_nợ_TH" not in df_to.columns:
         df_to["Dư_nợ_TH"] = 0.0
     if "Dư_nợ_QH" not in df_to.columns:
@@ -309,23 +314,21 @@ def _tong_hop_vp_theo_pgd(df_vp: pd.DataFrame) -> pd.DataFrame:
     if df_vp is None or df_vp.empty or COT_TEN_PGD not in df_vp.columns:
         return pd.DataFrame()
     ten_to = "Tên tổ"
-    rows: list[dict] = []
-    for pgd, grp in df_vp.groupby(COT_TEN_PGD, dropna=False):
-        n_to = (
-            int(grp[ten_to].nunique())
-            if ten_to in grp.columns
-            else len(grp)
-        )
-        rows.append(
-            {
-                COT_TEN_PGD: pgd,
-                "Số_tổ_vi_phạm": n_to,
-                "Tổ_thiếu_TV": int((grp["Số_thành_viên"] < DUOI_TV).sum()),
-                "Tổ_vượt_TV": int((grp["Số_thành_viên"] > TREN_TV).sum()),
-                "Tổng_dư_nợ": grp["Tổng_dư_nợ"].sum(),
-            }
-        )
-    return pd.DataFrame(rows)
+    n_to_expr = (
+        f'COUNT(DISTINCT "{ten_to}")'
+        if ten_to in df_vp.columns
+        else "COUNT(*)"
+    )
+    return duckdb.query(f"""
+        SELECT
+            "{COT_TEN_PGD}",
+            {n_to_expr}                                                     AS "Số_tổ_vi_phạm",
+            COUNT(*) FILTER (WHERE "Số_thành_viên" < {DUOI_TV})            AS "Tổ_thiếu_TV",
+            COUNT(*) FILTER (WHERE "Số_thành_viên" > {TREN_TV})            AS "Tổ_vượt_TV",
+            SUM(TRY_CAST("Tổng_dư_nợ" AS DOUBLE))                          AS "Tổng_dư_nợ"
+        FROM df_vp
+        GROUP BY "{COT_TEN_PGD}"
+    """).df()
 
 
 def _tong_hop_ghv_theo_pgd(df_gv: pd.DataFrame) -> pd.DataFrame:
@@ -338,15 +341,15 @@ def _tong_hop_ghv_theo_pgd(df_gv: pd.DataFrame) -> pd.DataFrame:
         or COT_DU_NO_TH not in df_gv.columns
     ):
         return pd.DataFrame()
-    return (
-        df_gv.groupby(COT_TEN_PGD, dropna=False)
-        .agg(
-            Số_món=(COT_DU_NO_TH, "size"),
-            Dư_nợ_TH=(COT_DU_NO_TH, "sum"),
-            Vượt_max=("Vượt (tháng)", "max"),
-        )
-        .reset_index()
-    )
+    return duckdb.query(f"""
+        SELECT
+            "{COT_TEN_PGD}",
+            COUNT(*)                                            AS "Số_món",
+            SUM(TRY_CAST("{COT_DU_NO_TH}" AS DOUBLE))         AS "Dư_nợ_TH",
+            MAX("Vượt (tháng)")                                AS "Vượt_max"
+        FROM df_gv
+        GROUP BY "{COT_TEN_PGD}"
+    """).df()
 
 
 def _ks_html_metric_card(

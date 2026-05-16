@@ -11,7 +11,7 @@ import streamlit as st
 import db
 from auth import normalize_role
 from config import DS_PGD, DON_VI_CHI_NHANH, PGD_XA_MAP, ROLES_PHAN_HE_CN
-from utils import get_tab_context
+from utils import get_tab_context, fmt_ngay
 
 DS_PGD_ALL = [DON_VI_CHI_NHANH] + DS_PGD
 
@@ -1174,7 +1174,7 @@ def _xuat_pdf_bao_cao_tien_do(ds_task, username):
                 task_header_s
             ))
             story.append(Paragraph(
-                f"Thời hạn cuối cùng: {t['ngay_deadline']} | Tiến độ hoàn thành: {pct}% | "
+                f"Thời hạn cuối cùng: {fmt_ngay(t['ngay_deadline'])} | Tiến độ hoàn thành: {pct}% | "
                 f"{css_cls} | Loại: {loai_label} | {tag_cap} | "
                 f"Người PT: {nguoi_pt}",
                 task_meta_s
@@ -1320,7 +1320,7 @@ def _xuat_pdf_bao_cao_tien_do(ds_task, username):
             cap = t.get("cap_theo_doi", "xa")
 
             story.append(Paragraph(
-                f"▪ {t['tieu_de']} — Trễ {so_ngay_tre} ngày (thời hạn: {t['ngay_deadline']})",
+                f"▪ {t['tieu_de']} — Trễ {so_ngay_tre} ngày (thời hạn: {fmt_ngay(t['ngay_deadline'])})",
                 ParagraphStyle("p2_task", fontName=fb, fontSize=11,
                                leading=15, spaceBefore=8, spaceAfter=3,
                                textColor=colors.HexColor("#C62828"))
@@ -1550,7 +1550,7 @@ def _xuat_pdf_tien_do(task, ds_kq, username):
         story.append(Paragraph(
             f"Loại: {loai} | Ưu tiên: {uu_tien} | "
             f"Người phụ trách: {task.get('nguoi_phu_trach') or '—'} | "
-            f"Từ ngày: {task.get('ngay_bat_dau') or '—'} → Thời hạn: {deadline}",
+            f"Từ ngày: {fmt_ngay(task.get('ngay_bat_dau')) or '—'} → Thời hạn: {fmt_ngay(deadline)}",
             normal_style,
         ))
         story.append(Paragraph(

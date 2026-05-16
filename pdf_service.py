@@ -1,4 +1,4 @@
-from io import BytesIO
+﻿from io import BytesIO
 from datetime import datetime
 from pathlib import Path
 import pandas as pd
@@ -820,7 +820,7 @@ def nut_xuat_pdf(
     """
     ss_key = f"_pdf_bytes_{key}"
 
-    if st.button("📄 Xuất PDF", key=key):
+    if st.button("📄 Xuất PDF", key=key, type="primary"):
         try:
             with st.spinner("⏳ Đang tạo PDF..."):
                 pdf_bytes = xuat_pdf(df, tieu_de, username, cols_tien, prefix_file=prefix_file, tieu_de_phu=tieu_de_phu)

@@ -223,7 +223,7 @@ def _render_tong_hop(df: pd.DataFrame, username: str) -> None:
         try:
             from pdf_service import xuat_pdf
 
-            if st.button("📄 Xuất PDF", use_container_width=True, key="bdd_xuat_pdf"):
+            if st.button("📄 Xuất PDF", use_container_width=True, key="bdd_xuat_pdf", type="primary"):
                 pdf_bytes = xuat_pdf(
                     df_pgd,
                     tieu_de=f"Tổng hợp tín dụng chính sách — {TEN_CHI_NHANH_HIEN_THI}",

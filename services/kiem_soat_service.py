@@ -484,7 +484,7 @@ def _xuat_pdf_btn(
     ss_key      = f"_pdf_bytes_{key}"
     ss_file_key = f"_pdf_file_{key}"
 
-    if st.button("📄 Xuất PDF", key=key, type="secondary"):
+    if st.button("📄 Xuất PDF", key=key, type="primary"):
         try:
             with st.spinner("Đang tạo PDF..."):
                 pdf_bytes = xuat_pdf(

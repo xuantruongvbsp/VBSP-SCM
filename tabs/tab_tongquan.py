@@ -1162,7 +1162,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
             with col_pdf:
                 _ss_tqpgd = "_pdf_bytes_tqpgd"
                 _ssf_tqpgd = "_pdf_file_tqpgd"
-                if st.button("📄 Xuất PDF", key="btn_pdf_tqpgd", type="secondary", use_container_width=True):
+                if st.button("📄 Xuất PDF", key="btn_pdf_tqpgd", type="primary", use_container_width=True):
                     try:
 
                         with st.spinner("⏳ Đang tạo PDF..."):
@@ -1414,7 +1414,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
 
                             with col_pdf:
                                 if st.button("📄 Xuất PDF", key=f"pdf_den_han_{key_prefix}",
-                                             type="secondary", use_container_width=True):
+                                             type="primary", use_container_width=True):
                                     with st.spinner("⏳ Đang tạo PDF..."):
                                         pdf_bytes = _build_pdf_den_han(
                                             df_loc, label, loc_pgd, loc_ct, loc_xa, username, key_prefix

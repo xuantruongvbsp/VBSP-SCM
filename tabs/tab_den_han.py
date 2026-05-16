@@ -325,7 +325,7 @@ def render(role: str = None, **kwargs) -> None:
     else:
         _detail_pdf_cols = [nhom_col_pdf] + [c for c in _detail_pdf_cols if c != nhom_col_pdf]
 
-    if st.button("📄 Xuất PDF Group Header", key="btn_pdf_den_han_group", type="secondary"):
+    if st.button("📄 Xuất PDF Group Header", key="btn_pdf_den_han_group", type="primary"):
         if df_pdf.empty:
             st.warning("⚠️ Không có dữ liệu sau khi lọc để xuất PDF.")
         else:

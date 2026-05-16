@@ -643,7 +643,7 @@ def _tab_tien_do_kh_th() -> None:
 
     with col_pdf:
         _ss_pdf = "_pdf_tien_do_kh_th"
-        if st.button("📄 Xuất PDF", key="btn_xuat_tien_do_pdf"):
+        if st.button("📄 Xuất PDF", key="btn_xuat_tien_do_pdf", type="primary"):
             try:
                 with st.spinner("⏳ Đang tạo PDF..."):
                     pdf_bytes = xuat_pdf(

@@ -682,7 +682,7 @@ def _render_thong_bao_ket_luan(tab, **kwargs):
                 key="tb_dl_word",
             )
 
-        if st.session_state.get("tb_data") and st.button("📄 Xuất PDF", type="secondary", key="tb_xuat_pdf"):
+        if st.session_state.get("tb_data") and st.button("📄 Xuất PDF", type="primary", key="tb_xuat_pdf"):
             try:
                 import tempfile, os
                 from docx2pdf import convert

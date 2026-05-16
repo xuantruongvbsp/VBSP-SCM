@@ -359,6 +359,158 @@ def _render_cn(username: str, role: str) -> None:
     tong_lai_loc = int(df_loc["du_no_lai"].sum()) if "du_no_lai" in df_loc.columns else 0
     st.caption(f"**Tổng cộng:** Gốc {fmt_ty(tong_goc_loc)} | Lãi {fmt_ty(tong_lai_loc)} | {len(df_loc)} hồ sơ")
 
+    # ── B2. Chọn món vay lập danh sách tổng ─────────────────────────────
+    st.markdown("---")
+    st.markdown("#### 🧺 Chọn món vay lập danh sách tổng toàn CN")
+    st.caption(
+        "Chọn thủ công các món vay từ từng PGD để lập danh sách tổng hợp. "
+        "Danh sách này dùng để báo cáo, trình duyệt lên Hội sở."
+    )
+
+    if "_qd62_cn_ds_tong_ids" not in st.session_state:
+        st.session_state["_qd62_cn_ds_tong_ids"] = set()
+
+    ds_pgd_mv = sorted(df_all["pgd"].dropna().unique().tolist())
+    pgd_mv = st.selectbox("🔎 Chọn PGD để thêm món vay", ds_pgd_mv, key="qd62_cn_mv_pgd")
+
+    df_mv_pgd = df_all[df_all["pgd"] == pgd_mv].copy()
+
+    if df_mv_pgd.empty:
+        st.info(f"PGD **{pgd_mv}** chưa có hồ sơ QĐ62 nào.")
+    else:
+        da_co = st.session_state["_qd62_cn_ds_tong_ids"]
+        opts_mv = {}
+        for _, r in df_mv_pgd.iterrows():
+            rid = r["id"]
+            da_chon = "✅ " if rid in da_co else ""
+            nhan = (
+                f"{da_chon}{r.get('ho_ten', '?')} | "
+                f"Gốc {fmt_ty(r.get('du_no_goc', 0))} | "
+                f"{r.get('xa', '')} | "
+                f"{_badge(r.get('trang_thai', ''))}"
+            )
+            opts_mv[rid] = nhan
+
+        chon_mv = st.multiselect(
+            f"Tích chọn món vay từ **{pgd_mv}** để thêm vào danh sách tổng",
+            options=list(opts_mv.keys()),
+            format_func=lambda k: opts_mv[k],
+            key=f"qd62_cn_mv_sel_{pgd_slug(pgd_mv)}",
+            help="Món đã thêm có đánh dấu ✅. Chọn xong bấm nút bên dưới.",
+        )
+
+        c_add, c_info = st.columns([1, 3])
+        with c_add:
+            if st.button(
+                f"➕ Thêm {len(chon_mv)} món vào DS tổng",
+                key=f"qd62_cn_add_{pgd_slug(pgd_mv)}",
+                type="primary",
+                disabled=len(chon_mv) == 0,
+            ):
+                da_co.update(chon_mv)
+                st.session_state["_qd62_cn_ds_tong_ids"] = da_co
+                st.success(f"✅ Đã thêm {len(chon_mv)} món từ {pgd_mv}")
+                st.rerun()
+        with c_info:
+            st.caption(
+                f"📊 **{pgd_mv}**: {len(df_mv_pgd)} món · "
+                f"Đã chọn trong DS tổng: "
+                f"**{sum(1 for rid in df_mv_pgd['id'] if rid in da_co)}** món"
+            )
+
+    # ── B3. Danh sách tổng đã chọn ──────────────────────────────────────
+    st.markdown("---")
+    ds_tong_ids = st.session_state["_qd62_cn_ds_tong_ids"]
+
+    col_ds_h, col_ds_act = st.columns([3, 1])
+    with col_ds_h:
+        st.markdown(f"#### 📋 Danh sách tổng đã chọn ({len(ds_tong_ids)} món)")
+    with col_ds_act:
+        if ds_tong_ids and st.button("🗑️ Xoá hết", key="qd62_cn_clear_all", type="secondary"):
+            st.session_state["_qd62_cn_ds_tong_ids"] = set()
+            st.rerun()
+
+    if not ds_tong_ids:
+        st.info("👆 Chưa có món vay nào được chọn. Hãy chọn PGD và tích món vay bên trên.")
+    else:
+        df_tong = df_all[df_all["id"].isin(ds_tong_ids)].copy()
+
+        tong_pgd = df_tong.groupby("pgd").agg(
+            So_mon=("id", "count"),
+            Tong_goc=("du_no_goc", "sum"),
+            Tong_lai=("du_no_lai", "sum"),
+        ).reset_index()
+        tong_pgd["Tong_goc"] = tong_pgd["Tong_goc"].apply(lambda x: fmt_ty(x) if x else "—")
+        tong_pgd["Tong_lai"] = tong_pgd["Tong_lai"].apply(lambda x: fmt_ty(x) if x else "—")
+
+        st.caption("**Tổng hợp theo PGD:**")
+        st.dataframe(tong_pgd, hide_index=True, use_container_width=True)
+
+        df_tong_show = df_tong.copy()
+        if "du_no_goc" in df_tong_show.columns:
+            df_tong_show["du_no_goc"] = df_tong_show["du_no_goc"].apply(lambda x: fmt_ty(x) if x else "—")
+        if "du_no_lai" in df_tong_show.columns:
+            df_tong_show["du_no_lai"] = df_tong_show["du_no_lai"].apply(lambda x: fmt_ty(x) if x else "—")
+        if "trang_thai" in df_tong_show.columns:
+            df_tong_show["trang_thai"] = df_tong_show["trang_thai"].apply(_badge)
+        if "file_dinh_kem" in df_tong_show.columns:
+            df_tong_show["file_dinh_kem"] = df_tong_show["file_dinh_kem"].apply(lambda x: "📎 Có" if x else "—")
+
+        cot_hien_tong = [c for c in ["pgd", "ho_ten", "xa", "chuong_trinh", "du_no_goc",
+                                       "du_no_lai", "ly_do", "trang_thai",
+                                       "file_dinh_kem", "ngay_lap"] if c in df_tong_show.columns]
+        df_tong_show = df_tong_show[cot_hien_tong]
+        df_tong_show.index = range(1, len(df_tong_show) + 1)
+        df_tong_show.index.name = "STT"
+
+        st.dataframe(df_tong_show, use_container_width=True, height=350)
+
+        tong_g = int(df_tong["du_no_goc"].sum()) if "du_no_goc" in df_tong.columns else 0
+        tong_l = int(df_tong["du_no_lai"].sum()) if "du_no_lai" in df_tong.columns else 0
+        st.caption(f"**Tổng DS đã chọn:** Gốc {fmt_ty(tong_g)} | Lãi {fmt_ty(tong_l)} | {len(df_tong)} món")
+
+        with st.expander("🗑️ Xoá từng món khỏi danh sách tổng", expanded=False):
+            ids_co_xoa = sorted(ds_tong_ids)
+            ten_xoa = {}
+            for rid in ids_co_xoa:
+                match = df_all[df_all["id"] == rid]
+                if not match.empty:
+                    r = match.iloc[0]
+                    ten_xoa[rid] = f"{r.get('pgd','')} — {r.get('ho_ten','?')} | Gốc {fmt_ty(r.get('du_no_goc',0))}"
+            id_xoa = st.selectbox(
+                "Chọn món cần xoá",
+                options=list(ten_xoa.keys()),
+                format_func=lambda k: ten_xoa.get(k, k),
+                key="qd62_cn_xoa_mv",
+            )
+            if st.button("🗑️ Xoá món đã chọn", key="qd62_cn_btn_xoa_mv", type="secondary"):
+                ds_tong_ids.discard(id_xoa)
+                st.session_state["_qd62_cn_ds_tong_ids"] = ds_tong_ids
+                db.ghi_audit(username, "qd62_cn_xoa_mv_tong",
+                             f"Xoá món {id_xoa} khỏi DS tổng")
+                st.rerun()
+
+        if st.button("📥 Xuất Excel danh sách tổng đã chọn", key="qd62_cn_export_tong", type="primary"):
+            output = BytesIO()
+            with pd.ExcelWriter(output, engine="openpyxl") as writer:
+                df_tong.to_excel(writer, sheet_name="DS_Tong_CN", index=False)
+                tong_pgd.to_excel(writer, sheet_name="Tong_hop_theo_PGD", index=False)
+            output.seek(0)
+            ten_file = f"QD62_DS_Tong_CN_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+            st.session_state["_bytes_qd62_tong"] = output.getvalue()
+            st.session_state["_file_qd62_tong"] = ten_file
+            db.ghi_audit(username, "qd62_cn_xuat_ds_tong",
+                         f"Xuất DS tổng {len(df_tong)} món")
+
+        if st.session_state.get("_bytes_qd62_tong"):
+            st.download_button(
+                "⬇️ Tải Excel DS tổng",
+                data=st.session_state["_bytes_qd62_tong"],
+                file_name=st.session_state.get("_file_qd62_tong", "QD62_DS_Tong.xlsx"),
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                key="qd62_cn_dl_tong",
+            )
+
     # ── C. Panel kiểm soát ───────────────────────────────────────────────
     st.markdown("---")
     st.markdown("#### ✅ Duyệt hồ sơ")

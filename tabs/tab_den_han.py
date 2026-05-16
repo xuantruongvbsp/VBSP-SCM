@@ -59,6 +59,7 @@ def render(role: str = None, **kwargs) -> None:
             horizontal=True, key="den_han_nhom")
 
     df_loc = loc_den_han_trong(df, tu_thang=0, den_thang=den_thang)
+    df_loc = df_loc[pd.to_numeric(df_loc[COT_TONG_DU_NO], errors="coerce").fillna(0) > 0]
     nhom_key = "pgd" if nhom_theo == "PGD" else "xa"
 
     tong_khoan = len(df_loc)
@@ -150,19 +151,25 @@ def render(role: str = None, **kwargs) -> None:
         if df_loc.empty:
             st.info("Không có dữ liệu.")
         else:
-            st.dataframe(
-                df_loc[cols_hien_thi].sort_values("Tháng đến hạn còn lại"),
-                use_container_width=True, hide_index=True,
-            )
+            # Convert ngày sang dd/mm/yyyy để hiển thị
+            df_hien = df_loc[cols_hien_thi].sort_values("Tháng đến hạn còn lại").copy()
+            if "Ngày đến hạn" in df_hien.columns:
+                df_hien["Ngày đến hạn"] = pd.to_datetime(
+                    df_hien["Ngày đến hạn"], errors="coerce"
+                ).dt.strftime("%d/%m/%Y").fillna("")
+            st.dataframe(df_hien, use_container_width=True, hide_index=True)
 
-            # Xác định chế độ xuất: tab này không có bộ lọc PGD/CT/Xã tường minh
-            # → luôn xuất chi tiết, nhưng thêm sheet tổng hợp theo nhom_theo
             COLS_CHI_TIET = [
                 COT_TEN_PGD, COT_TEN_KH, COT_TEN_CT,
                 COT_TONG_DU_NO, "Ngày đến hạn", "Tháng đến hạn còn lại",
             ]
             cols_ok = [c for c in COLS_CHI_TIET if c in df_loc.columns]
             df_chi_tiet = df_loc[cols_ok].sort_values("Tháng đến hạn còn lại").reset_index(drop=True)
+            # Convert ngày trong file xuất
+            if "Ngày đến hạn" in df_chi_tiet.columns:
+                df_chi_tiet["Ngày đến hạn"] = pd.to_datetime(
+                    df_chi_tiet["Ngày đến hạn"], errors="coerce"
+                ).dt.strftime("%d/%m/%Y").fillna("")
 
             # Sheet tổng hợp theo nhom_theo (pgd hoặc xa)
             nhom_col_dt = COT_TEN_PGD if nhom_theo == "PGD" else "Tên xã"
@@ -234,6 +241,10 @@ def render(role: str = None, **kwargs) -> None:
 
     # Áp dụng bộ lọc PDF
     df_pdf = df_loc.copy()
+    if "Ngày đến hạn" in df_pdf.columns:
+        df_pdf["Ngày đến hạn"] = pd.to_datetime(
+            df_pdf["Ngày đến hạn"], errors="coerce"
+        ).dt.strftime("%d/%m/%Y").fillna("")
     if loc_pgd_pdf and COT_TEN_PGD in df_pdf.columns:
         df_pdf = df_pdf[df_pdf[COT_TEN_PGD] == loc_pgd_pdf]
     if loc_ct_pdf and COT_TEN_CT in df_pdf.columns:

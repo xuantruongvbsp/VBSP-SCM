@@ -42,6 +42,7 @@ from pdf_service import xuat_pdf, kiem_tra_pdf_dependency, render_huong_dan
 from components.delta_card import delta_card, kpi_row
 from components.filter_bar import filter_bar, apply_filters
 from components.loan_drawer import loan_detail_drawer
+from components.export_pdf import download_pdf_button, xuat_pdf_co_chart
 
 
 def _render_trang_chu(tab, df_pgd: pd.DataFrame, role: str, pgd_user: str, kwargs: dict):
@@ -153,7 +154,7 @@ def _render_trang_chu(tab, df_pgd: pd.DataFrame, role: str, pgd_user: str, kwarg
                     pass
 
                 if kpi_data:
-                    kpi_row(kpi_data, cols=4)
+                    kpi_row(kpi_data, num_columns=4)
 
         except Exception as e:
             st.error(f"❌ Lỗi KPI: {e}")
@@ -382,10 +383,7 @@ def _render_don_doc(df: pd.DataFrame, pgd_user: str, role: str):
             if selected_label:
                 row_idx = options[selected_label]
                 row_data = df_dondoc.loc[row_idx]
-                loan_detail_drawer(
-                    df_dondoc, row_id=row_idx,
-                    key_suffix=f"op_khd_{row_idx}",
-                )
+                loan_detail_drawer(row_data)
     else:
         st.info("Không có hộ nào thỏa điều kiện.")
 
@@ -1167,13 +1165,18 @@ Doanh số cho vay trong tháng: {ds_cv:,.0f} triệu đồng; doanh số thu n�
                 fig_list.append((fig_nqh, "Nợ quá hạn theo ĐVUT"))
 
             download_pdf_button(
-                df=df_bang,
-                tieu_de=f"Báo cáo Giao ban - {chon_xa}",
-                nguoi_xuat=st.session_state.get("txt_username", ""),
-                figs=fig_list if fig_list else None,
-                cols_tien=cols_tien_gb,
-                prefix_file="GiaoBan",
-                them_dong_tong=False,
+                pdf_bytes=xuat_pdf_co_chart(
+                    df=df_bang,
+                    tieu_de=f"Báo cáo Giao ban - {chon_xa}",
+                    nguoi_xuat=st.session_state.get("txt_username", ""),
+                    figs=fig_list if fig_list else None,
+                    cols_tien=cols_tien_gb,
+                    prefix_file="GiaoBan",
+                    them_dong_tong=False,
+                ),
+                filename=f"GiaoBan_{chon_xa}_{datetime.now().strftime('%Y%m%d')}.pdf",
+                label=f"📥 Tải PDF ({len(df_bang)} dòng)",
+                key="gb_pdf_download_v2",
             )
 
 

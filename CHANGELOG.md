@@ -1,5 +1,8 @@
 # CHANGELOG
 
+## [2026-05-17] — Fix: df/df_full không vào kwargs của _build_all_items → tab crash NoneType
+- `workspaces/ws_management.py` — thêm `df=df, df_full=df_full, ds_pgd_all=ds_pgd_all` vào lời gọi `_build_all_items()`; root cause: `filtered_kw` lọc 3 key này ra nhưng không truyền lại, mọi lambda dùng `**kwargs` nhận `df=None` → crash `'NoneType' object has no attribute 'columns'`
+
 ## [2026-05-17] — Fix: admin bị block ở Upload KH-NV do thiếu role trong kwargs
 - `workspaces/ws_management.py` `_build_all_items()` dòng ~983 — thêm `kwargs.setdefault("role", role)` và `kwargs.setdefault("username", username)` ngay đầu hàm; root cause: `filtered_kw` lọc bỏ `role` trước khi truyền vào `_build_all_items`, các lambda dùng `**kwargs` không có `role` → tab nhận `role=""` → bị block sai
 

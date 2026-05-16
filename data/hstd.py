@@ -14,7 +14,7 @@ from config import (
 
 
 # ── HSTD ─────────────────────────────────────────────────────────────────────
-@st.cache_data(show_spinner=False)
+@st.cache_data(ttl=7200, show_spinner=False)
 def doc_file(fp: str, _ts) -> pd.DataFrame:
     """Đọc file HSTD (BCQUERY sheet, header dòng 4).
     Không chạy kiem_tra_chat_luong ở đây — merge_du_lieu_toan_cn đã chạy DQ rồi.
@@ -26,7 +26,7 @@ def doc_file(fp: str, _ts) -> pd.DataFrame:
         return pd.read_excel(fp, sheet_name="BCQUERY", header=4).iloc[:, 1:].dropna(how="all")
 
 
-@st.cache_data(show_spinner="Đang tải dữ liệu mốc 31/12...")
+@st.cache_data(ttl=7200, show_spinner="Đang tải dữ liệu mốc 31/12...")
 def doc_baseline(nam: int, _ts=0) -> pd.DataFrame | None:
     """Đọc HSTD mốc 31/12 theo năm. Trả None nếu chưa có file."""
     from config import baseline_path, baseline_cache
@@ -40,7 +40,7 @@ def doc_baseline(nam: int, _ts=0) -> pd.DataFrame | None:
         return pd.read_excel(fp, sheet_name="BCQUERY", header=4).iloc[:, 1:].dropna(how="all")
 
 
-@st.cache_data(show_spinner=False)
+@st.cache_data(ttl=7200, show_spinner=False)
 def doc_baseline_pgd(ten_pgd: str, nam: int, _ts=0) -> pd.DataFrame | None:
     """Đọc HSTD mốc 31/12 của một PGD cụ thể."""
     from config import baseline_path_pgd, CACHE_DIR
@@ -55,7 +55,7 @@ def doc_baseline_pgd(ten_pgd: str, nam: int, _ts=0) -> pd.DataFrame | None:
         return pd.read_excel(fp, sheet_name="BCQUERY", header=4).iloc[:, 1:].dropna(how="all")
 
 
-@st.cache_data(show_spinner="Đang tổng hợp mốc 31/12...")
+@st.cache_data(ttl=7200, show_spinner="Đang tổng hợp mốc 31/12...")
 def doc_baseline_merged(nam: int, _ts=0) -> pd.DataFrame | None:
     """
     Đọc và merge HSTD mốc 31/12 từ tất cả đơn vị đã upload.
@@ -81,7 +81,7 @@ def doc_baseline_merged(nam: int, _ts=0) -> pd.DataFrame | None:
 
 
 # ── NQ11 ─────────────────────────────────────────────────────────────────────
-@st.cache_data(show_spinner=False)
+@st.cache_data(ttl=7200, show_spinner=False)
 def doc_file_nq11(fp: str, _ts) -> pd.DataFrame:
     """Đọc file sao kê NQ11 (BCQUERY sheet, header dòng 4)."""
     def clean(df): return df.iloc[:, 1:].dropna(how="all")
@@ -93,7 +93,7 @@ def doc_file_nq11(fp: str, _ts) -> pd.DataFrame:
 
 
 # ── GQVL ─────────────────────────────────────────────────────────────────────
-@st.cache_data(show_spinner=False)
+@st.cache_data(ttl=7200, show_spinner=False)
 def doc_file_gqvl(fp: str, _ts) -> pd.DataFrame:
     """Đọc file sao kê GQVL, chuẩn hoá tên cột."""
     try:
@@ -103,7 +103,7 @@ def doc_file_gqvl(fp: str, _ts) -> pd.DataFrame:
             df = df.iloc[:, 1:].dropna(how="all").iloc[1:]
             df = df.rename(columns=GQVL_COT_MAP).reset_index(drop=True)
             df = kiem_tra_chat_luong(df, "gqvl").df
-            df.to_parquet(CACHE_GQVL, index=False)
+            df.to_parquet(CACHE_GQVL, index=False, compression='zstd', compression_level=9)
         return pd.read_parquet(CACHE_GQVL)
     except Exception:
         df = pd.read_excel(fp, sheet_name="Sheet1", header=7)
@@ -113,7 +113,7 @@ def doc_file_gqvl(fp: str, _ts) -> pd.DataFrame:
 
 
 # ── SK GQVL (tra NQ11 cho món vay dư nợ = 0) ─────────────────────────────────
-@st.cache_data(show_spinner=False)
+@st.cache_data(ttl=7200, show_spinner=False)
 def doc_file_sk_gqvl(fp: str, _ts) -> pd.DataFrame:
     """
     Đọc file sao kê GQVL chi tiết (SK_GQVL_du_lieu_tho.xlsx).
@@ -128,14 +128,14 @@ def doc_file_sk_gqvl(fp: str, _ts) -> pd.DataFrame:
     try:
         os.makedirs(os.path.dirname(CACHE_SK_GQVL), exist_ok=True)
         if ts_file(CACHE_SK_GQVL) < ts_file(fp):
-            _doc(fp).to_parquet(CACHE_SK_GQVL, index=False)
+            _doc(fp).to_parquet(CACHE_SK_GQVL, index=False, compression='zstd', compression_level=9)
         return pd.read_parquet(CACHE_SK_GQVL)
     except Exception:
         return _doc(fp)
 
 
 # ── ĐIỆN BÁO ─────────────────────────────────────────────────────────────────
-@st.cache_data(show_spinner=False)
+@st.cache_data(ttl=7200, show_spinner=False)
 def doc_dienbao(fp: str, _ts) -> list:
     """
     Đọc file Điện báo 2 cột (Chỉ tiêu / Giá trị).
@@ -260,18 +260,18 @@ def danh_dau_khong_hd(df: "pd.DataFrame") -> "pd.DataFrame":
     return df
 
 
-@st.cache_data(show_spinner=False, ttl=3600)
+@st.cache_data(show_spinner=False, ttl=7200)
 def danh_dau_khong_hd_cached(df: "pd.DataFrame") -> "pd.DataFrame":
     """Cache wrapper cho danh_dau_khong_hd — dùng thay thế khi gọi nhiều lần trong cùng rerun."""
     return danh_dau_khong_hd(df)
 
 
-@st.cache_data(show_spinner=False, ttl=3600)
+@st.cache_data(show_spinner=False, ttl=7200)
 def tong_hop_khong_hd_cached(df: "pd.DataFrame", nhom_theo: str = "Tên ĐVUT") -> "pd.DataFrame":
     return tong_hop_khong_hd(df, nhom_theo=nhom_theo)
 
 
-@st.cache_data(show_spinner=False, ttl=3600)
+@st.cache_data(show_spinner=False, ttl=7200)
 def canh_bao_migration_cached(df: "pd.DataFrame") -> "pd.DataFrame":
     return canh_bao_migration(df)
 

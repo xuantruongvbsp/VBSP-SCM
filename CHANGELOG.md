@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## [2026-05-17] — Fix tra cứu: bỏ active_only filter cho tab Tra cứu hồ sơ
+- `app.py` ctx dict — thêm `hstd_path=CACHE_HSTD` để truyền đường dẫn Parquet xuống tab
+- `tabs/tab_tracuu.py` — thêm `import duckdb`; thay `df_work = df[COLS_CAN].copy()` bằng DuckDB query thẳng từ Parquet với column projection COLS_CAN, cache vào session_state theo `ts_hstd`; fallback về `df` nếu không có `hstd_path` → khách hàng tất toán (dư nợ = 0) xuất hiện trở lại trong kết quả tra cứu
+
 ## [2026-05-17] — Tối ưu RAM/đa luồng: DuckDB cho kiem_soat_service + tab_kiem_soat
 - `services/kiem_soat_service.py` — thêm `import duckdb`; refactor `_tinh_to_sai_so_tv`: thay `groupby().agg()` bằng DuckDB GROUP BY + TRY_CAST; refactor `_tong_hop_vp_theo_pgd`: thay Python for loop bằng DuckDB GROUP BY + FILTER; refactor `_tong_hop_ghv_theo_pgd`: thay `groupby().agg()` bằng DuckDB
 - `tabs/tab_kiem_soat.py` — thêm `import duckdb`; refactor `_get_ks_cache`: xóa `df_nqh` copy trung gian, thay pandas filter+groupby NQH bằng 2 DuckDB query (tổng hợp PGD + chi tiết) với WHERE pushdown

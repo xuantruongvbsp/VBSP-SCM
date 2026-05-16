@@ -190,7 +190,7 @@ def _render_tong_hop(df: pd.DataFrame, username: str) -> None:
         st.info("Không đủ dữ liệu để tổng hợp theo PGD.")
         return
 
-    st.dataframe(df_pgd, use_container_width=True, hide_index=True)
+    st.dataframe(df_pgd, width='stretch', hide_index=True)
 
     col_xl, col_pdf = st.columns([1, 1])
     with col_xl:
@@ -216,14 +216,14 @@ def _render_tong_hop(df: pd.DataFrame, username: str) -> None:
             data=xl_bytes,
             file_name=ten_file_xuat("BDD_TONGHOP"),
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            use_container_width=True,
+            width='stretch',
         )
 
     with col_pdf:
         try:
             from pdf_service import xuat_pdf
 
-            if st.button("📄 Xuất PDF", use_container_width=True, key="bdd_xuat_pdf", type="primary"):
+            if st.button("📄 Xuất PDF", width='stretch', key="bdd_xuat_pdf", type="primary"):
                 pdf_bytes = xuat_pdf(
                     df_pgd,
                     tieu_de=f"Tổng hợp tín dụng chính sách — {TEN_CHI_NHANH_HIEN_THI}",
@@ -236,7 +236,7 @@ def _render_tong_hop(df: pd.DataFrame, username: str) -> None:
                     data=pdf_bytes,
                     file_name=ten_file_xuat("BDD_TONGHOP", "pdf"),
                     mime="application/pdf",
-                    use_container_width=True,
+                    width='stretch',
                     key="bdd_dl_pdf",
                 )
         except Exception as e:
@@ -343,7 +343,7 @@ def _render_du_bao_von(df: pd.DataFrame) -> None:
         )
 
     if rows_room:
-        st.dataframe(pd.DataFrame(rows_room), use_container_width=True, hide_index=True)
+        st.dataframe(pd.DataFrame(rows_room), width='stretch', hide_index=True)
     else:
         st.info("Không có dữ liệu để dự báo room.")
 
@@ -520,7 +520,7 @@ def _render_van_ban(role: str, username: str) -> None:
                         file_name=f.get("filename") or "van_ban",
                         mime=f.get("mime") or "application/octet-stream",
                         key=f"vb_dl_{v.get('id', i)}",
-                        use_container_width=True,
+                        width='stretch',
                     )
                 except Exception:
                     st.caption("Không đọc được file đã lưu.")

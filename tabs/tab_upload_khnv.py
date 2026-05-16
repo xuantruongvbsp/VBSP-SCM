@@ -730,11 +730,21 @@ def _render_upload_hang_loat(role: str, username: str) -> None:
                     return loai
             return None
 
+        # ── Tùy chọn import ──────────────────────────────────────────
+        buoc_import = st.checkbox(
+            "🔁 Bắt buộc import lại (kể cả file giống hệt trên đĩa)",
+            value=False,
+            key="khnv_force_import",
+            help="Tích vào khi muốn ghi đè dù nội dung file không thay đổi.",
+        )
+
         # ── Xây dựng danh sách rows để preview ───────────────────────
+        # Dùng (tên, kích thước) làm khóa cache — tránh dùng bytes cũ khi upload
+        # cùng tên nhưng nội dung mới (cache invalidation by size + name)
         cache_key = "khnv_bulk_bytes"
-        file_names_now = [f.name for f in uploaded]
-        if st.session_state.get("khnv_bulk_names") != file_names_now:
-            st.session_state["khnv_bulk_names"] = file_names_now
+        file_ids_now = [(f.name, f.size) for f in uploaded]
+        if st.session_state.get("khnv_bulk_ids") != file_ids_now:
+            st.session_state["khnv_bulk_ids"] = file_ids_now
             st.session_state[cache_key] = {f.name: f.read() for f in uploaded}
 
         bytes_map: dict[str, bytes] = st.session_state.get(cache_key, {})
@@ -786,12 +796,18 @@ def _render_upload_hang_loat(role: str, username: str) -> None:
                 if not os.path.exists(path_ht):
                     so_sanh = "🆕 Chưa có"
                     md5_co_the_import = True
-                elif _md5_bytes(data) != _md5_file(path_ht):
-                    so_sanh = "🔄 Có thay đổi"
-                    md5_co_the_import = True
                 else:
-                    so_sanh = "✅ Giống hệt"
-                    md5_co_the_import = False
+                    da_giong = _md5_bytes(data) == _md5_file(path_ht)
+                    if da_giong:
+                        if buoc_import:
+                            so_sanh = "🔁 Ghi đè"
+                            md5_co_the_import = True
+                        else:
+                            so_sanh = "✅ Giống hệt"
+                            md5_co_the_import = False
+                    else:
+                        so_sanh = "🔄 Có thay đổi"
+                        md5_co_the_import = True
 
                 co_the_import = co_the_import and md5_co_the_import
 
@@ -827,6 +843,8 @@ def _render_upload_hang_loat(role: str, username: str) -> None:
                 return "background-color:#d4edda;color:#155724;font-weight:bold"
             if val.startswith("🔄"):
                 return "background-color:#fff3cd;color:#856404;font-weight:bold"
+            if val.startswith("🔁"):
+                return "background-color:#cce5ff;color:#004085;font-weight:bold"
             if val.startswith("✅"):
                 return "background-color:#e9ecef;color:#495057"
             return ""
@@ -852,12 +870,14 @@ def _render_upload_hang_loat(role: str, username: str) -> None:
         co_the_import = [r for r in rows if r["co_the_import"]]
         khong_nhan_dien = [r for r in rows if not r["nhan_dien"]]
         trung = [r for r in rows
-                 if "Trùng" in r["trang_thai"] and not r["co_the_import"]]
-        bo_qua = [r for r in rows if not r["co_the_import"] and r["nhan_dien"]]
+                 if "Trùng" in r.get("trang_thai", "") and not r["co_the_import"]]
+        giong_het = [r for r in rows
+                     if r.get("nhan_dien") and not r["co_the_import"]
+                     and r.get("so_sanh", "").startswith("✅")]
         st.caption(
             f"📊 Tổng **{len(rows)}** file · "
             f"✅ Sẵn sàng **{len(co_the_import)}** · "
-            f"⏩ Bỏ qua **{len(bo_qua)}** (giống hệt) · "
+            f"⏩ Giống hệt **{len(giong_het)}** · "
             f"❓ Không nhận diện **{len(khong_nhan_dien)}** · "
             f"⚠️ Trùng bỏ qua **{len(trung)}**"
         )

@@ -1,5 +1,8 @@
 # CHANGELOG
 
+## [2026-05-17] — Fix: admin bị block ở Upload KH-NV do thiếu role trong kwargs
+- `workspaces/ws_management.py` `_build_all_items()` dòng ~983 — thêm `kwargs.setdefault("role", role)` và `kwargs.setdefault("username", username)` ngay đầu hàm; root cause: `filtered_kw` lọc bỏ `role` trước khi truyền vào `_build_all_items`, các lambda dùng `**kwargs` không có `role` → tab nhận `role=""` → bị block sai
+
 ## [2026-05-17] — Fix tra cứu: bỏ active_only filter cho tab Tra cứu hồ sơ
 - `app.py` ctx dict — thêm `hstd_path=CACHE_HSTD` để truyền đường dẫn Parquet xuống tab
 - `tabs/tab_tracuu.py` — thêm `import duckdb`; extract `pgd_user` từ kwargs; thêm flag `_use_parquet = hstd_path and not pgd_user` — chỉ CN role đọc full parquet (bỏ qua active_only), PGD role vẫn dùng `df` đã lọc theo PGD của mình; cache df_work vào session_state theo `ts_hstd`; kết quả: CN tra cứu được khách hàng tất toán, PGD không bị mở rộng phạm vi dữ liệu

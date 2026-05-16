@@ -38,7 +38,7 @@ from utils import (
     hien_thi_dataframe_phan_trang,
 )
 from services.excel_service import xuat_excel_chuyen_nghiep, ten_file_xuat as excel_ten_file
-from pdf_service import xuat_pdf, kiem_tra_pdf_dependency
+from pdf_service import xuat_pdf, kiem_tra_pdf_dependency, render_huong_dan
 
 
 def _render_trang_chu(tab, df_pgd: pd.DataFrame, role: str, pgd_user: str, kwargs: dict):
@@ -1578,6 +1578,7 @@ def render(**kwargs):
                 ("📤 Upload Dữ liệu", lambda tab: tab_upload_pgd.render(tab, **kwargs)),
                 ("📤 Upload HSTD", lambda tab: tab_upload_pgd.render(tab, **kwargs)),
                 ("🔍 Trạng thái hệ thống", lambda tab: tab_trang_thai_nguon.render(tab, **kwargs)),
+                ("📖 Hướng dẫn", lambda tab: render_huong_dan()),
             ],
         },
     }

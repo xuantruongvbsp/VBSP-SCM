@@ -1,5 +1,8 @@
 # CHANGELOG
 
+## [2026-05-17] — Cảnh báo NQH / Đến hạn: gộp tổng theo Xã/PGD, thêm bar chart màu
+- `tabs/tab_den_han.py` dòng ~162 — bỏ groupby theo tháng, gom tổng luôn + bar chart ngang gradient xanh
+
 ## [2026-05-17] — Tab Tổng quan: gộp 4 tab tháng → slider, đổi biểu đồ Pie → bar màu
 - `tabs/tab_tongquan.py` — xóa 4 sub-tab (1/3/6 tháng / Trong năm), thay bằng select_slider
 - `tabs/tab_tongquan.py` — đổi Donut Pie → horizontal bar chart với color gradient xanh lá

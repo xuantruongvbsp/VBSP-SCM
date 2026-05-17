@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## [2026-05-17] — Tối ưu tốc độ load tab: cache parquet/CDTOTKVV
+- `tabs/tab_tongquan.py` dòng ~485, ~954 — thay `doc_cdtotkvv_toan_cn_pgd()` (đọc 22 file Excel mỗi lần render) bằng `tong_hop_tu_pgd_data()` (đã có `@st.cache_data`)
+- `tabs/tab_ban_dai_dien.py` — thêm `@st.cache_data(show_spinner=False)` cho `_doc_hstd()` với `_ts: float` để bust cache khi parquet thay đổi; thêm `import os` và `from data.core import ts_file`
+- `tabs/tab_khtd_xuat.py` — thêm `_doc_hstd_cached()` và `_doc_gqvl_cached()` cached với `_ts`; thay 3 lần `pd.read_parquet()` trực tiếp bằng các hàm này; thêm `import os` và `from data.core import ts_file`
+- `tabs/tab_khtd.py` — thêm `@st.cache_data(show_spinner=False)` cho `_doc_gqvl_parquet()` với `_ts: float`; import `CACHE_GQVL` và `ts_file`; cập nhật call site truyền timestamp
+
 ## [2026-05-17] — Fix bảng trạng thái 22 đơn vị không cập nhật sau upload đơn lẻ
 - `tabs/tab_upload_khnv.py` `_xu_ly_upload()` — thêm `pop("trang_thai_upload_pgd")` sau upload thành công; trước đây bảng 22 đơn vị đọc từ session_state cũ sau rerun nên vẫn hiện ❌/⚠️ dù file đã lưu xong (bulk import đã làm đúng, single upload còn thiếu bước này)
 

@@ -1,5 +1,8 @@
 # CHANGELOG
 
+## [2026-05-17] — Cảnh báo NQH / Nợ rủi ro: thêm card Tổng dư nợ nhóm 1–<3 tháng
+- `workspaces/ws_management.py` dòng ~289 — thêm metric "Tổng dư nợ (1–<3 tháng rủi ro)"
+
 ## [2026-05-17] — Cảnh báo NQH / Đến hạn: thêm nhóm Hội đoàn thể vào Tổng hợp
 - `tabs/tab_den_han.py` — import COT_DVUT, radio "Nhóm theo" thêm option "Hội đoàn thể"
 

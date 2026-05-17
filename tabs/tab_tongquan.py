@@ -556,7 +556,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                 _df_loc.groupby(COT_TEN_CT)
                 .agg(
                     du_no   =(COT_TONG_DU_NO, "sum"),
-                    so_mon  =(COT_SO_KU,      "nunique"),
+                    so_mon  =(COT_TONG_DU_NO, "count"),  # count rows = số món vay
                     so_kh   =(COT_MA_KH,      "nunique"),
                 )
                 .sort_values("du_no", ascending=False)

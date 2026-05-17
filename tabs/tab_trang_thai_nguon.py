@@ -239,7 +239,6 @@ def _render_merge_cache(la_cn: bool) -> None:
     try:
         from utils import lay_config
         ds_kv = lay_config("ds_pgd", [])
-        ds_config = DS_PGD
         if not ds_kv:
             st.info("ℹ️ kv_store chưa có ds_pgd — đang dùng config.py mặc định.")
         elif set(ds_kv) != set(DS_PGD):

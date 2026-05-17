@@ -1,5 +1,8 @@
 # CHANGELOG
 
+## [2026-05-17] — Cảnh báo NQH / Nợ QH phát sinh: đổi filter → selectbox chọn tháng số liệu
+- `workspaces/ws_management.py` — bỏ radio Kỳ hiện tại/Toàn thời gian, thay bằng selectbox tháng MM/YYYY
+
 ## [2026-05-17] — Cảnh báo NQH / Nợ rủi ro: thêm card Tổng dư nợ nhóm 1–<3 tháng
 - `workspaces/ws_management.py` dòng ~289 — thêm metric "Tổng dư nợ (1–<3 tháng rủi ro)"
 

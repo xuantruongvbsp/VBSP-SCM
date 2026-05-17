@@ -1,12 +1,14 @@
-"""Check hardcoded column names in staged Python files.
+"""Check hardcoded column names in staged/changed Python files.
 
 Pre-commit hook script — reads COT_* constants from config.py,
-scans staged .py files for hardcoded Vietnamese column name strings
-that should use COT_* constants instead.
+scans added/changed lines in staged .py files for hardcoded
+Vietnamese column name strings that should use COT_* constants.
 
 Usage:
-    python scripts/check_hardcode_cols.py [list_of_files...]
+    python scripts/check_hardcode_cols.py [--full] [list_of_files...]
 
+    Default: checks only DIFF lines (git diff --cached).
+    --full  : checks entire files (for manual audit).
     If no files given, reads from ``git diff --cached --name-only``.
 
 Exit code 0 = clean, 1 = violations found.
@@ -124,7 +126,99 @@ def _is_display_context(line: str) -> bool:
     return False
 
 
-def check_files(file_paths: list[str], cot_map: dict[str, str]) -> list[str]:
+def _parse_diff_added_lines(file_path: str) -> dict[int, str]:
+    """Get {line_number: content} for lines added in staged diff."""
+    try:
+        out = subprocess.check_output(
+            ["git", "diff", "--cached", "-U0", "--", file_path],
+            cwd=str(PROJECT_ROOT),
+            text=True,
+            stderr=subprocess.DEVNULL,
+        )
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return {}
+
+    added: dict[int, str] = {}
+    current_new = 0
+
+    for line in out.splitlines():
+        if line.startswith("@@"):
+            parts = line.split(" ")
+            new_part = parts[2] if len(parts) >= 3 else ""
+            if new_part.startswith("+"):
+                num = new_part[1:].split(",")[0]
+                current_new = int(num)
+            continue
+
+        if line.startswith("+") and not line.startswith("+++"):
+            added[current_new] = line[1:]
+            current_new += 1
+        elif line.startswith("-"):
+            pass
+        elif line.startswith("\\"):
+            pass
+        else:
+            current_new += 1
+
+    return added
+
+
+def _is_docstring_line(stripped: str) -> bool:
+    return (
+        stripped.startswith('"""')
+        or stripped.endswith('"""')
+        or '"""' in stripped
+        or stripped.startswith("'")
+    )
+
+
+def _should_skip_line(stripped: str, line: str) -> bool:
+    if not stripped:
+        return True
+    if stripped.startswith("#"):
+        return True
+    if stripped.startswith("import ") or stripped.startswith("from "):
+        return True
+    if "COT_" in stripped:
+        return True
+    if _is_exempt(line):
+        return True
+    if _is_docstring_line(stripped):
+        return True
+    if _is_display_context(stripped):
+        return True
+    return False
+
+
+def check_diff(cot_map: dict[str, str]) -> list[str]:
+    file_paths = _get_staged_files()
+    if not file_paths:
+        return []
+
+    search_re = _build_search_pattern(cot_map)
+    violations: list[str] = []
+
+    for fp in file_paths:
+        added_lines = _parse_diff_added_lines(fp)
+        if not added_lines:
+            continue
+
+        for li, line_text in added_lines.items():
+            stripped = line_text.strip()
+            if _should_skip_line(stripped, line_text):
+                continue
+
+            for m in search_re.finditer(stripped):
+                col_name = m.group(1)
+                cot_name = cot_map.get(col_name, "???")
+                violation = f"  {fp}:{li}: hardcoded \"{col_name}\" — use {cot_name}"
+                violations.append(violation)
+                break
+
+    return violations
+
+
+def check_full(file_paths: list[str], cot_map: dict[str, str]) -> list[str]:
     search_re = _build_search_pattern(cot_map)
     violations: list[str] = []
 
@@ -146,15 +240,8 @@ def check_files(file_paths: list[str], cot_map: dict[str, str]) -> list[str]:
                 continue
             if stripped.startswith("import ") or stripped.startswith("from "):
                 continue
-            if stripped.startswith('"""'):
-                in_docstring = not in_docstring
-                if stripped.endswith('"""') and len(stripped) > 6:
-                    in_docstring = False
-                continue
             if '"""' in stripped:
                 in_docstring = not in_docstring
-                continue
-            if stripped.startswith("'"):
                 continue
             if in_docstring:
                 continue
@@ -162,12 +249,12 @@ def check_files(file_paths: list[str], cot_map: dict[str, str]) -> list[str]:
                 continue
             if _is_exempt(line):
                 continue
+            if _is_display_context(stripped):
+                continue
 
             for m in search_re.finditer(stripped):
                 col_name = m.group(1)
                 cot_name = cot_map.get(col_name, "???")
-                if _is_display_context(stripped):
-                    continue
                 violation = f"  {fp}:{li}: hardcoded \"{col_name}\" — use {cot_name}"
                 violations.append(violation)
                 break
@@ -177,8 +264,11 @@ def check_files(file_paths: list[str], cot_map: dict[str, str]) -> list[str]:
 
 def main() -> int:
     args = sys.argv[1:]
-    if args:
-        file_paths = [p for p in args if p.endswith(".py")]
+    use_full = "--full" in args
+    file_args = [a for a in args if a != "--full" and a.endswith(".py")]
+
+    if file_args:
+        file_paths = file_args
     else:
         file_paths = _get_staged_files()
 
@@ -186,7 +276,11 @@ def main() -> int:
         return 0
 
     cot_map = _compute_cot_map()
-    violations = check_files(file_paths, cot_map)
+
+    if use_full:
+        violations = check_full(file_paths, cot_map)
+    else:
+        violations = check_diff(cot_map)
 
     if violations:
         print("❌ HARDCODE COLUMN NAMES DETECTED:")

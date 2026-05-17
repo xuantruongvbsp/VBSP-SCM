@@ -407,7 +407,7 @@ def _render_nguoi_dung() -> None:
 
 
 # ── Sub-tab 5: Hệ thống ──────────────────────────────────────────────────
-def _render_he_thong() -> None:
+def _render_he_thong(la_cn: bool = False) -> None:
     st.subheader("💾 Tài nguyên Hệ thống")
 
     # ── Dung lượng ổ đĩa ─────────────────────────────────────────────────
@@ -418,16 +418,16 @@ def _render_he_thong() -> None:
         pct_used = used / total * 100
 
         c1, c2, c3 = st.columns(3)
-        c1.metric("Tổng", f"{total / 1e9:.1f} GB")
-        c2.metric("Đã dùng", f"{used / 1e9:.1f} GB", f"{pct_used:.0f}%")
-        c3.metric("Còn trống", f"{free / 1e9:.1f} GB")
+        c1.metric("Tổng", f"{total / 1e9:.1f} GB")  # noqa
+        c2.metric("Đã dùng", f"{used / 1e9:.1f} GB", f"{pct_used:.0f}%")  # noqa
+        c3.metric("Còn trống", f"{free / 1e9:.1f} GB")  # noqa
 
         if pct_used > 90:
             st.error("❌ Ổ đĩa gần đầy (>90%) — cần dọn dẹp ngay!")
         elif pct_used > 75:
             st.warning(f"⚠️ Ổ đĩa đã dùng {pct_used:.0f}% — nên theo dõi")
         else:
-            st.success(f"✅ Ổ đĩa còn {free / 1e9:.1f} GB trống")
+            st.success(f"✅ Ổ đĩa còn {free / 1e9:.1f} GB trống")  # noqa
     except Exception as e:
         st.error(f"Lỗi đọc dung lượng: {e}")
 
@@ -525,6 +525,101 @@ def _render_he_thong() -> None:
                 st.dataframe(df_td, use_container_width=True, hide_index=True, height=200)
     except Exception as e:
         st.error(f"Lỗi kiểm tra nhiệm vụ quá hạn: {e}")
+
+    # ── Backup thủ công ──────────────────────────────────────────────────────
+    st.markdown("#### 🗄️ Backup dữ liệu")
+
+    if la_cn:
+        col_btn, col_info = st.columns([1, 3])
+        with col_btn:
+            if st.button("🗄️ Backup ngay", key="btn_backup_now",
+                         type="primary"):
+                with st.spinner("Đang backup..."):
+                    try:
+                        from backup_service import chay_backup
+                        ket_qua = chay_backup()
+                        db.ghi_audit(
+                            st.session_state.get("username", "unknown"),
+                            "manual_backup",
+                            f"ky={ket_qua['ky']} "
+                            f"db={'ok' if ket_qua['db_ok'] else 'loi'} "
+                            f"parquet={ket_qua['parquet']} "
+                            f"pgd={ket_qua['pgd_xlsx']}",
+                        )
+                        if ket_qua["db_ok"]:
+                            st.success(
+                                f"✅ Backup thành công — kỳ **{ket_qua['ky']}**\n\n"
+                                f"DB ✅ · Parquet: {ket_qua['parquet']} file"
+                                f" · PGD: {ket_qua['pgd_xlsx']} file"
+                            )
+                        else:
+                            st.error("❌ Backup DB thất bại — xem backup.log")
+                    except Exception as e:
+                        st.error(f"❌ Lỗi backup: {e}")
+        with col_info:
+            st.caption(
+                "Backup gồm: SQLite DB · Parquet cache · File xlsx PGD\n\n"
+                "Lưu vào: `backups/YYYYMMDD_HHMMSS/` · Giữ 7 bản gần nhất"
+            )
+    else:
+        st.info("ℹ️ Chỉ Admin/Manager Chi nhánh mới có thể thực hiện backup.")
+
+    # ── Danh sách backup đã có ───────────────────────────────────────────
+    st.markdown("##### 📁 Các bản backup hiện có")
+    try:
+        from backup_service import BACKUP_DIR
+        from pathlib import Path
+        bk_dir = Path(BACKUP_DIR)
+        if not bk_dir.exists():
+            st.info("Chưa có bản backup nào.")
+        else:
+            ds_bk = sorted(
+                [d for d in bk_dir.iterdir()
+                 if d.is_dir() and len(d.name) == 15
+                 and d.name[8] == "_"],
+                reverse=True,
+            )
+            if not ds_bk:
+                st.info("Chưa có bản backup nào.")
+            else:
+                rows = []
+                for d in ds_bk:
+                    # Tính tổng dung lượng thư mục
+                    total = sum(
+                        f.stat().st_size
+                        for f in d.rglob("*") if f.is_file()
+                    )
+                    size_str = (
+                        f"{total/1e6:.1f} MB" if total >= 1e6
+                        else f"{total/1e3:.0f} KB"
+                    )
+                    # Parse tên thư mục YYYYMMDD_HHMMSS
+                    try:
+                        from datetime import datetime
+                        dt = datetime.strptime(d.name, "%Y%m%d_%H%M%S")
+                        ngay = dt.strftime("%d/%m/%Y %H:%M")
+                    except Exception:
+                        ngay = d.name
+                    # Đếm số file
+                    n_files = sum(1 for _ in d.rglob("*") if _.is_file())
+                    rows.append({
+                        "Kỳ backup": ngay,
+                        "Thư mục": d.name,
+                        "Số file": n_files,
+                        "Dung lượng": size_str,
+                        "DB": "✅" if (d / "vbsp_scm.db").exists() else "❌",
+                        "Parquet": "✅" if (d / "cache").exists() else "❌",
+                        "PGD xlsx": "✅" if (d / "pgd_data").exists() else "❌",
+                    })
+                df_bk = pd.DataFrame(rows)
+                st.caption(f"Tổng cộng **{len(ds_bk)}** bản backup")
+                st.dataframe(
+                    df_bk,
+                    use_container_width=True,
+                    hide_index=True,
+                )
+    except Exception as e:
+        st.error(f"Lỗi đọc danh sách backup: {e}")
 
 
 # ── Sub-tab 6: Audit Log ──────────────────────────────────────────────────
@@ -633,7 +728,7 @@ def render(tab=None, **kwargs) -> None:
             with tabs[3]:
                 _render_nguoi_dung()
             with tabs[4]:
-                _render_he_thong()
+                _render_he_thong(la_cn=la_cn)
             with tabs[5]:
                 _render_audit(la_cn=True, username=username)
         else:

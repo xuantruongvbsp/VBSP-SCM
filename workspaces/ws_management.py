@@ -1185,7 +1185,9 @@ def render_sidebar_menu(role: str, username: str, **kwargs):
     if "ws_mgmt_menu" not in st.session_state:
         st.session_state["ws_mgmt_menu"] = all_items[0]["label"]
 
-    valid_labels = [x["label"] for x in all_items]
+    valid_labels = [x["label"] for x in all_items] + [
+        c["label"] for x in all_items for c in x.get("children", [])
+    ]
     if st.session_state["ws_mgmt_menu"] not in valid_labels:
         st.session_state["ws_mgmt_menu"] = all_items[0]["label"]
 
@@ -1207,32 +1209,88 @@ def render_sidebar_menu(role: str, username: str, **kwargs):
                 f"color:{clr['text']};text-transform:uppercase;"
                 f"letter-spacing:0.06em;padding:10px 4px 2px;margin:0'>"
                 f"{grp}</p>",
-                unsafe_allow_html=True
+                unsafe_allow_html=True,
             )
 
-        is_active = st.session_state["ws_mgmt_menu"] == item["label"]
+        children = item.get("children", [])
+        active_label = st.session_state.get("ws_mgmt_menu", "")
 
-        if is_active:
+        if children:
+            child_labels = [c["label"] for c in children]
+            is_child_active = active_label in child_labels
+            open_key = f"ws_mgmt_acc_{item['label']}"
+
+            if is_child_active and not st.session_state.get(open_key):
+                st.session_state[open_key] = True
+
+            is_open = st.session_state.get(open_key, False)
+
+            parent_style = (
+                "background:#FF8A50;border-left:2px solid #E65100;color:#FFFFFF;"
+                if is_child_active
+                else f"background:{clr['bg']};border-left:2px solid {clr['border']};color:{clr['text']};"
+            )
+            arrow = "▾" if is_open else "▸"
             st.markdown(
-                f"<div style='"
-                f"background:#E65100;"
-                f"border-left:2px solid #BF360C;"
-                f"color:#FFFFFF;"
-                f"font-size:13px;font-weight:600;"
-                f"padding:6px 8px 6px 10px;"
-                f"border-radius:0 5px 5px 0;"
-                f"margin-bottom:2px'>"
-                f"{item['label']}</div>",
-                unsafe_allow_html=True
+                f"<div style='{parent_style}font-size:13px;font-weight:600;"
+                f"padding:6px 8px 6px 10px;border-radius:0 5px 5px 0;"
+                f"margin-bottom:2px'>{arrow} {item['label']}</div>",
+                unsafe_allow_html=True,
             )
-        else:
             if st.button(
-                item["label"],
-                key=f"menu_{item['label']}",
-                width='stretch',
+                f"{arrow} {item['label']}",
+                key=f"menu_acc_{item['label']}",
+                width="stretch",
             ):
-                st.session_state["ws_mgmt_menu"] = item["label"]
+                st.session_state[open_key] = not is_open
                 st.rerun()
+
+            if is_open:
+                for child in children:
+                    is_child_sel = active_label == child["label"]
+                    if is_child_sel:
+                        st.markdown(
+                            f"<div style='background:#E65100;"
+                            f"border-left:2px solid #BF360C;"
+                            f"color:#FFFFFF;font-size:12px;font-weight:600;"
+                            f"padding:5px 8px 5px 22px;"
+                            f"border-radius:0 5px 5px 0;margin-bottom:2px'>"
+                            f"● {child['label']}</div>",
+                            unsafe_allow_html=True,
+                        )
+                    else:
+                        if st.button(
+                            f"  {child['label']}",
+                            key=f"menu_child_{child['label']}",
+                            width="stretch",
+                        ):
+                            st.session_state["ws_mgmt_menu"] = child["label"]
+                            st.rerun()
+
+        else:
+            is_active = active_label == item["label"]
+
+            if is_active:
+                st.markdown(
+                    f"<div style='"
+                    f"background:#E65100;"
+                    f"border-left:2px solid #BF360C;"
+                    f"color:#FFFFFF;"
+                    f"font-size:13px;font-weight:600;"
+                    f"padding:6px 8px 6px 10px;"
+                    f"border-radius:0 5px 5px 0;"
+                    f"margin-bottom:2px'>"
+                    f"{item['label']}</div>",
+                    unsafe_allow_html=True,
+                )
+            else:
+                if st.button(
+                    item["label"],
+                    key=f"menu_{item['label']}",
+                    width='stretch',
+                ):
+                    st.session_state["ws_mgmt_menu"] = item["label"]
+                    st.rerun()
 
 
 def render(**kwargs):
@@ -1264,7 +1322,9 @@ def render(**kwargs):
     )
 
     # ── Navigation: điều hướng hoàn toàn qua sidebar (render_sidebar_menu) ──
-    valid_labels = [x["label"] for x in ALL_ITEMS]
+    valid_labels = [x["label"] for x in ALL_ITEMS] + [
+        c["label"] for x in ALL_ITEMS for c in x.get("children", [])
+    ]
 
     # Handle jump từ shortcut / nút điều hướng ngoài ws_management
     jump_label = st.session_state.pop("ws_mgmt_jump", None)
@@ -1281,14 +1341,28 @@ def render(**kwargs):
 
     # ── Render DUY NHẤT mục đang chọn ────────────────────────────────────
     active_item = next((x for x in ALL_ITEMS if x["label"] == active_label), None)
-    if active_item:
-        fn = active_item.get("fn")
-        if callable(fn):
-            try:
-                fn()
-            except Exception as e:
-                import traceback
-                st.error(f"❌ Lỗi render **{active_label}**: {e}")
-                st.code(traceback.format_exc())
-        else:
+    if active_item and active_item.get("fn"):
+        try:
+            active_item["fn"]()
+        except Exception as e:
+            import traceback
+            st.error(f"❌ Lỗi render **{active_label}**: {e}")
+            st.code(traceback.format_exc())
+    else:
+        # Tìm trong children (accordion)
+        found_child = False
+        for parent in ALL_ITEMS:
+            for child in parent.get("children", []):
+                if child["label"] == active_label:
+                    try:
+                        child["fn"]()
+                    except Exception as e:
+                        import traceback
+                        st.error(f"❌ Lỗi render **{active_label}**: {e}")
+                        st.code(traceback.format_exc())
+                    found_child = True
+                    break
+            if found_child:
+                break
+        if not found_child:
             st.info(f"Tính năng **{active_label}** đang được phát triển.")

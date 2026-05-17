@@ -46,22 +46,22 @@ def _tao_column_config_nq11() -> dict[str, st.column_config.Column]:
             format="%d",
             help="Số món vay"
         ),
-        "Số tiền giải ngân": st.column_config.NumberColumn(
+        COT_NQ11_SO_TIEN_GN: st.column_config.NumberColumn(
             "Số tiền giải ngân\n(triệu đồng)",
             format="%.0f",
             help="Số tiền giải ngân"
         ),
-        "DNO NQ11": st.column_config.NumberColumn(
+        COT_DNO_NQ11: st.column_config.NumberColumn(
             "DNO NQ11\n(triệu đồng)",
             format="%.0f",
             help="Dư nợ NQ11"
         ),
-        "Nợ trong hạn": st.column_config.NumberColumn(
+        COT_NQ11_NO_TH: st.column_config.NumberColumn(
             "Nợ trong hạn\n(triệu đồng)",
             format="%.0f",
             help="Nợ trong hạn"
         ),
-        "Nợ quá hạn": st.column_config.NumberColumn(
+        COT_NQ11_NO_QH: st.column_config.NumberColumn(
             "Nợ quá hạn\n(triệu đồng)",
             format="%.0f",
             help="Nợ quá hạn"
@@ -105,11 +105,11 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
             else:
                 # ── Chỉ số tổng quan ──
                 tong_mon     = len(df_nq11)
-                co_nq11      = df_nq11[df_nq11["DNO NQ11"] > 0]
-                khong_nq11   = df_nq11[df_nq11["DNO NQ11"] == 0]
-                tong_dno_nq11= co_nq11["DNO NQ11"].sum()
-                tong_no_th   = df_nq11["Nợ trong hạn"].sum()  if "Nợ trong hạn"  in df_nq11.columns else 0
-                tong_no_qh   = df_nq11["Nợ quá hạn"].sum()   if "Nợ quá hạn"    in df_nq11.columns else 0
+                co_nq11      = df_nq11[df_nq11[COT_DNO_NQ11] > 0]
+                khong_nq11   = df_nq11[df_nq11[COT_DNO_NQ11] == 0]
+                tong_dno_nq11= co_nq11[COT_DNO_NQ11].sum()
+                tong_no_th   = df_nq11[COT_NQ11_NO_TH].sum()  if COT_NQ11_NO_TH in df_nq11.columns else 0
+                tong_no_qh   = df_nq11[COT_NQ11_NO_QH].sum()  if COT_NQ11_NO_QH in df_nq11.columns else 0
 
                 c1,c2,c3,c4,c5 = st.columns(5)
                 c1.metric("Tổng số món",       f"{tong_mon:,}".replace(",","."))
@@ -127,42 +127,41 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                         loai_loc = st.selectbox("Lọc theo NQ11",
                             ["Tất cả", "Chỉ món có NQ11", "Chỉ món không có NQ11"], key="nq11_loai")
                     with lf2:
-                        if "Tên chương trình" in df_nq11.columns:
-                            ds_ct_nq = ["Tất cả"] + sorted(df_nq11["Tên chương trình"].dropna().unique().tolist())
+                        if COT_TEN_CT in df_nq11.columns:
+                            ds_ct_nq = ["Tất cả"] + sorted(df_nq11[COT_TEN_CT].dropna().unique().tolist())
                             loc_ct   = st.selectbox("Chương trình", ds_ct_nq, key="nq11_ct")
                         else: loc_ct = "Tất cả"
                     with lf3:
-                        if "Tên xã" in df_nq11.columns:
-                            ds_xa = ["Tất cả"] + sorted(df_nq11["Tên xã"].dropna().unique().tolist())
+                        if COT_TEN_XA in df_nq11.columns:
+                            ds_xa = ["Tất cả"] + sorted(df_nq11[COT_TEN_XA].dropna().unique().tolist())
                             loc_xa = st.selectbox("Xã", ds_xa, key="nq11_xa")
                         else: loc_xa = "Tất cả"
 
                 # Áp dụng lọc
                 df_loc_nq = df_nq11.copy()
-                if loai_loc == "Chỉ món có NQ11":      df_loc_nq = df_loc_nq[df_loc_nq["DNO NQ11"] > 0]
-                elif loai_loc == "Chỉ món không có NQ11": df_loc_nq = df_loc_nq[df_loc_nq["DNO NQ11"] == 0]
-                if loc_ct != "Tất cả" and "Tên chương trình" in df_loc_nq.columns:
-                    df_loc_nq = df_loc_nq[df_loc_nq["Tên chương trình"] == loc_ct]
-                if loc_xa != "Tất cả" and "Tên xã" in df_loc_nq.columns:
-                    df_loc_nq = df_loc_nq[df_loc_nq["Tên xã"] == loc_xa]
+                if loai_loc == "Chỉ món có NQ11":      df_loc_nq = df_loc_nq[df_loc_nq[COT_DNO_NQ11] > 0]
+                elif loai_loc == "Chỉ món không có NQ11": df_loc_nq = df_loc_nq[df_loc_nq[COT_DNO_NQ11] == 0]
+                if loc_ct != "Tất cả" and COT_TEN_CT in df_loc_nq.columns:
+                    df_loc_nq = df_loc_nq[df_loc_nq[COT_TEN_CT] == loc_ct]
+                if loc_xa != "Tất cả" and COT_TEN_XA in df_loc_nq.columns:
+                    df_loc_nq = df_loc_nq[df_loc_nq[COT_TEN_XA] == loc_xa]
 
                 # Tóm tắt sau lọc
                 m1,m2,m3 = st.columns(3)
                 m1.metric("Số món hiển thị",  f"{len(df_loc_nq):,}".replace(",","."))
-                m2.metric("Dư nợ NQ11",       fmt_vn_tien(df_loc_nq["DNO NQ11"].sum()))
-                m3.metric("Nợ trong hạn",     fmt_vn_tien(df_loc_nq["Nợ trong hạn"].sum() if "Nợ trong hạn" in df_loc_nq.columns else 0))
+                m2.metric("Dư nợ NQ11",       fmt_vn_tien(df_loc_nq[COT_DNO_NQ11].sum()))
+                m3.metric("Nợ trong hạn",     fmt_vn_tien(df_loc_nq[COT_NQ11_NO_TH].sum() if COT_NQ11_NO_TH in df_loc_nq.columns else 0))
 
                 # ── Bảng tổng hợp theo chương trình ──
                 st.divider()
                 st.markdown("**📊 Tổng hợp theo chương trình**")
-                if "Tên chương trình" in df_loc_nq.columns:
-                    th_ct = df_loc_nq.groupby("Tên chương trình").agg(
-                        Số_món        = ("Mã khách hàng", "count"),
-                        Dư_nợ_NQ11    = ("DNO NQ11",      "sum"),
-                        Nợ_trong_hạn  = ("Nợ trong hạn",  "sum"),
-                        Nợ_quá_hạn    = ("Nợ quá hạn",    "sum"),
+                if COT_TEN_CT in df_loc_nq.columns:
+                    th_ct = df_loc_nq.groupby(COT_TEN_CT).agg(
+                        Số_món        = (COT_NQ11_MA_KH, "count"),
+                        Dư_nợ_NQ11    = (COT_DNO_NQ11,   "sum"),
+                        Nợ_trong_hạn  = (COT_NQ11_NO_TH, "sum"),
+                        Nợ_quá_hạn    = (COT_NQ11_NO_QH, "sum"),
                     ).sort_values("Dư_nợ_NQ11", ascending=False).reset_index()
-                    # Dùng column_config thay vì apply format
                     hien_thi_dataframe_phan_trang(
                         th_ct,
                         key="nq11_th_ct",
@@ -173,10 +172,10 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                 st.divider()
                 st.markdown("**📋 Danh sách chi tiết**")
                 cot_hien_nq = [c for c in [
-                    "Tên xã","Tên thôn","Mã khách hàng","Tên khách hàng",
-                    "Số điện thoại","Số khế ước","Tên chương trình",
-                    "Số tiền giải ngân","Nợ trong hạn","Nợ quá hạn","DNO NQ11",
-                    "Đến hạn sau cùng","Ngày báo cáo"
+                    COT_TEN_XA, COT_TEN_THON, COT_NQ11_MA_KH, COT_NQ11_TEN_KH,
+                    COT_SDT, COT_SO_KU, COT_TEN_CT,
+                    COT_NQ11_SO_TIEN_GN, COT_NQ11_NO_TH, COT_NQ11_NO_QH, COT_DNO_NQ11,
+                    COT_NQ11_DEN_HAN_SC, COT_NQ11_NGAY_BC
                 ] if c in df_loc_nq.columns]
 
                 # Hiển thị với column_config thay vì apply format
@@ -199,7 +198,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                         df_loc_nq[cot_hien_nq].to_excel(w, index=False, sheet_name="Chi tiết")
                         # Sheet 3: Chỉ món NQ11
                         if loai_loc != "Chỉ món không có NQ11":
-                            df_loc_nq[df_loc_nq["DNO NQ11"]>0][cot_hien_nq].to_excel(
+                            df_loc_nq[df_loc_nq[COT_DNO_NQ11]>0][cot_hien_nq].to_excel(
                                 w, index=False, sheet_name="Chỉ món NQ11")
                     st.session_state["_bytes_nq11"] = buf.getvalue()
                     st.session_state["_file_nq11"] = f"NQ11_{datetime.today().strftime('%d%m%Y')}.xlsx"

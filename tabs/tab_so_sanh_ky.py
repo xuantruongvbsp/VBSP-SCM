@@ -10,6 +10,7 @@ from streamlit.delta_generator import DeltaGenerator
 
 from auth import la_phan_he_cn, normalize_role
 from config import (
+    COT_DU_NO_KHOANH,
     COT_DU_NO_QH,
     COT_DU_NO_TH,
     COT_DVUT,
@@ -46,7 +47,6 @@ from services.period_compare import (
 )
 from utils import fmt_so, fmt_ty
 
-COT_DU_NO_KHOANH = "Dư nợ khoanh"
 
 _DIM_OPTIONS = [
     (COT_TEN_CT,     "Chương trình tín dụng"),

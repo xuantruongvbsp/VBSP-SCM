@@ -170,9 +170,9 @@ def _render_metric_cards(**kwargs) -> None:
     st.markdown(f"### {icon} Chỉ số Tín dụng")
 
     kpi_row([
-        {"label": "Tổng dư nợ", "value": tdn, "icon": "💰", "suffix": "đồng", "precision": 0, "help": "Tổng dư nợ toàn chi nhánh"},
-        {"label": "Dư nợ trong hạn", "value": dth, "icon": "✅", "suffix": "đồng", "precision": 0, "help": "Dư nợ chưa đến hạn thanh toán"},
-        {"label": "Nợ quá hạn", "value": dqh, "icon": "⚠️", "suffix": "đồng", "precision": 0,
+        {"label": "Tổng dư nợ", "value": tdn, "icon": "💰", "suffix": "đồng", "precision": 0, "help": "Tổng dư nợ toàn chi nhánh"},  # noqa: COT
+        {"label": "Dư nợ trong hạn", "value": dth, "icon": "✅", "suffix": "đồng", "precision": 0, "help": "Dư nợ chưa đến hạn thanh toán"},  # noqa: COT
+        {"label": "Nợ quá hạn", "value": dqh, "icon": "⚠️", "suffix": "đồng", "precision": 0,  # noqa: COT
          "delta": tlqh, "delta_label": "% NQH", "delta_color": "inverse" if tlqh >= _NGUONG_AN_TOAN else "normal",
          "help": f"{tinh_trang}" if dqh > 0 else "✅ Không có NQH"},
         {"label": "Số khách hàng", "value": n_kh, "icon": "👥", "suffix": "", "precision": 0, "help": f"Tổng {fmt_so(n_hs)} hồ sơ trong hệ thống"},
@@ -221,7 +221,7 @@ def _kpi_tang_truong(df_full: pd.DataFrame) -> None:
     d_dqh = _d(dqh, "du_no_qh")
 
     with c1:
-        delta_card("Tổng dư nợ", tdn,
+        delta_card("Tổng dư nợ", tdn,  # noqa: COT
                     delta=d_tdn, delta_label="so với tháng trước",
                     suffix="đồng", precision=0, help="So với snapshot tháng trước",
                     key="exe_tdn")
@@ -451,7 +451,7 @@ def _render_heatmap_pgd(**kwargs) -> None:
         fig_bar = go.Figure()
 
         fig_bar.add_trace(go.Bar(
-            name="Dư nợ trong hạn",
+            name="Dư nợ trong hạn",  # noqa: COT
             y=t_pgd_sorted[COT_TEN_PGD],
             x=t_pgd_sorted["Dư_nợ_TH"] / 1e6,
             orientation="h",
@@ -467,7 +467,7 @@ def _render_heatmap_pgd(**kwargs) -> None:
             ),
         ))
         fig_bar.add_trace(go.Bar(
-            name="Nợ quá hạn",
+            name="Nợ quá hạn",  # noqa: COT
             y=t_pgd_sorted[COT_TEN_PGD],
             x=t_pgd_sorted["NQH"] / 1e6,
             orientation="h",
@@ -633,7 +633,7 @@ def _render_heatmap_pgd(**kwargs) -> None:
         # Nút xuất Excel chuyên nghiệp
         kpi_suc_khoe = [
             ("Tổng PGD",                fmt_so(len(df_xh)), ""),
-            ("Tổng dư nợ",              fmt_bang_ty(df_xh["Tổng_dư_nợ"].sum()), ""),
+            ("Tổng dư nợ",              fmt_bang_ty(df_xh["Tổng_dư_nợ"].sum()), ""),  # noqa: COT
             ("Tổng NQH",                fmt_bang_ty(df_xh["NQH"].sum()), ""),
             ("TL NQH b/q",              f"{df_xh['TL_NQH'].mean():.2f}%", ""),
             ("Số KH vay",               fmt_so(df_xh["Số_KH"].sum()), ""),
@@ -717,7 +717,7 @@ def _tien_do_ke_hoach() -> None:
 
     db_rows = doc_dienbao(path_ht, ts_file(path_ht))
     CT_QUAN_TRONG = [
-        "Tổng dư nợ", "Dư nợ Kế hoạch A", "Dư nợ Kế hoạch B",
+        "Tổng dư nợ", "Dư nợ Kế hoạch A", "Dư nợ Kế hoạch B",  # noqa: COT
         "Tổng huy động vốn", "Nguồn vốn cân đối từ TW (KHA)",
     ]
     rows_kh = []

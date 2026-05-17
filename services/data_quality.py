@@ -14,11 +14,20 @@ from typing import Any
 import pandas as pd
 
 from config import (
+    COT_DU_NO_QH,
+    COT_DU_NO_TH,
+    COT_GQVL_DU_NO_KHOANH,
+    COT_GQVL_MA_PGD,
     COT_MA_CHUONG_TRINH,
+    COT_NGUON_VON,
+    COT_NQ11_DU_NO,
+    COT_NQ11_MA_KH,
+    COT_NQ11_SO_TIEN,
     COT_SO_KU,
     COT_TEN_CT,
     COT_TEN_PGD,
     COT_TEN_XA,
+    COT_TONG_DU_NO,
     DON_VI_CHI_NHANH,
     DS_PGD,
     MA_PGD_MAP,
@@ -33,28 +42,28 @@ SchemaRule = dict[str, Any]
 CANONICAL_SCHEMA: dict[str, SchemaRule] = {
     "hstd": {
         "required_columns": [COT_TEN_PGD, COT_TEN_XA],
-        "numeric_columns": ["Dư nợ trong hạn", "Dư nợ quá hạn", "Tổng dư nợ", "Nguồn vốn"],
-        "unique_columns": [],  # Số khế ước hợp lệ khi trùng: 1 KH vay nhiều CT
-        "domain_columns": {"Nguồn vốn": {1, 2, "1", "2", 1.0, 2.0}},
+        "numeric_columns": [COT_DU_NO_TH, COT_DU_NO_QH, COT_TONG_DU_NO, COT_NGUON_VON],
+        "unique_columns": [],
+        "domain_columns": {COT_NGUON_VON: {1, 2, "1", "2", 1.0, 2.0}},
         "rename_map": {},
     },
     "nq11": {
-        "required_columns": ["Mã khách hàng"],
-        "numeric_columns": ["Số tiền", "Dư nợ"],
+        "required_columns": [COT_NQ11_MA_KH],
+        "numeric_columns": [COT_NQ11_SO_TIEN, COT_NQ11_DU_NO],
         "unique_columns": [],
         "domain_columns": {},
         "rename_map": {},
     },
     "gqvl": {
-        "required_columns": ["Mã PGD", COT_TEN_XA],
-        "numeric_columns": ["Dư nợ trong hạn", "Dư nợ quá hạn", "Dư nợ khoanh"],
-        "unique_columns": [],  # Số khế ước hợp lệ khi trùng
-        "domain_columns": {"Nguồn vốn": {"TW", "ĐP"}},  # Giá trị thực tế trong file
+        "required_columns": [COT_GQVL_MA_PGD, COT_TEN_XA],
+        "numeric_columns": [COT_DU_NO_TH, COT_DU_NO_QH, COT_GQVL_DU_NO_KHOANH],
+        "unique_columns": [],
+        "domain_columns": {COT_NGUON_VON: {"TW", "ĐP"}},
         "rename_map": {},
     },
     "pgd": {
         "required_columns": [COT_SO_KU, COT_TEN_PGD],
-        "numeric_columns": ["Dư nợ trong hạn", "Dư nợ quá hạn", "Tổng dư nợ"],
+        "numeric_columns": [COT_DU_NO_TH, COT_DU_NO_QH, COT_TONG_DU_NO],
         "unique_columns": [COT_SO_KU],
         "domain_columns": {},
         "rename_map": {},
@@ -102,11 +111,11 @@ def kiem_tra_du_no_am(df: pd.DataFrame, loai: str) -> list[str]:
     errors = []
     
     if loai == "hstd":
-        cot_can_kiem_tra = ["Dư nợ trong hạn", "Dư nợ quá hạn", "Tổng dư nợ"]
+        cot_can_kiem_tra = [COT_DU_NO_TH, COT_DU_NO_QH, COT_TONG_DU_NO]
     elif loai == "nq11":
-        cot_can_kiem_tra = ["Dư nợ"]
+        cot_can_kiem_tra = [COT_NQ11_DU_NO]
     elif loai == "gqvl":
-        cot_can_kiem_tra = ["Dư nợ trong hạn", "Dư nợ quá hạn", "Dư nợ khoanh"]
+        cot_can_kiem_tra = [COT_DU_NO_TH, COT_DU_NO_QH, COT_GQVL_DU_NO_KHOANH]
     else:
         return []
     
@@ -220,9 +229,9 @@ def chuan_hoa_ma_don_vi(df: pd.DataFrame) -> pd.DataFrame:
     """Chuẩn hóa tên PGD từ mã PGD và chuẩn hóa xã về đúng PGD."""
     out = df.copy()
 
-    if "Mã PGD" in out.columns and COT_TEN_PGD not in out.columns:
+    if COT_GQVL_MA_PGD in out.columns and COT_TEN_PGD not in out.columns:
         out[COT_TEN_PGD] = (
-            out["Mã PGD"]
+            out[COT_GQVL_MA_PGD]
             .astype(str)
             .str.replace(".0", "", regex=False)
             .str.zfill(6)

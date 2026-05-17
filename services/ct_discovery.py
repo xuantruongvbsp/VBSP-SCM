@@ -194,11 +194,11 @@ def _phan_tang_gqvl(row: pd.Series, ndt_dp_list: list[str] | None = None) -> str
     Trả về ma_key: 3_TW_NHCSXH | 3_TW_NSNN | 3_DP_TINH | 3_DP_XA
     Hoặc None nếu không xác định được.
     """
-    nguon_von = str(row.get("Nguồn vốn", "")).strip()
+    nguon_von = str(row.get(COT_NGUON_VON, "")).strip()
 
     # ── TW: phân biệt bằng Phân loại NV ──────────────────────────────────────
     if nguon_von == "TW":
-        pl_val = row.get("Phân loại NV")
+        pl_val = row.get(COT_PL_NV)
         try:
             pl = int(float(pl_val)) if pd.notna(pl_val) else 0
         except (TypeError, ValueError):
@@ -213,7 +213,7 @@ def _phan_tang_gqvl(row: pd.Series, ndt_dp_list: list[str] | None = None) -> str
 
     # ── ĐP: phân biệt bằng Mã nhà đầu tư ─────────────────────────────────────
     if nguon_von == "ĐP":
-        ma_ndt_raw = row.get("Mã nhà đầu tư")
+        ma_ndt_raw = row.get(COT_MA_NDT)
         ma_ndt = str(ma_ndt_raw).strip() if pd.notna(ma_ndt_raw) else ""
 
         # Exact match: kiểm tra chính xác ma_ndt có trong danh sách không
@@ -247,7 +247,7 @@ def _quet_gqvl(
     ndt_dp_list: list[str] = doc_ndt_dp_ma_list()
 
     # Tạo map Số khế ước → Tên PGD từ HSTD để join
-    ku_col = "Số khế ước"
+    ku_col = COT_SO_KU
     if COT_TEN_PGD in df_hstd.columns and ku_col in df_hstd.columns:
         pgd_map: dict[Any, str] = (
             df_hstd[[ku_col, COT_TEN_PGD]]

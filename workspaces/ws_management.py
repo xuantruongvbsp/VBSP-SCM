@@ -342,64 +342,46 @@ def _tim_cot(df: pd.DataFrame, *cac_ten: str) -> str | None:
 
 
 def _hien_thi_nqh_tab(df_kh: pd.DataFrame, username: str):
-    """Sub-tab: No qua han phat sinh - pre-filter NQH, bo loc thoi gian bang Ngay so lieu."""
+    """Sub-tab: N\u1ee3 QH ph\u00e1t sinh \u2014 l\u1ecdc theo th\u00e1ng c\u1ee7a Ng\u00e0y s\u1ed1 li\u1ec7u."""
 
-    cot_nqh = _tim_cot(df_kh, "D\u01b0 n\u1ee3 qu\u00e1 h\u1ea1n", "N\u1ee3 qu\u00e1 h\u1ea1n")
+    cot_nqh     = _tim_cot(df_kh, "D\u01b0 n\u1ee3 qu\u00e1 h\u1ea1n", "N\u1ee3 qu\u00e1 h\u1ea1n")
     cot_ngay_sl = _tim_cot(df_kh, "Ng\u00e0y s\u1ed1 li\u1ec7u")
 
     if cot_nqh and cot_nqh in df_kh.columns:
         mask_nqh = pd.to_numeric(df_kh[cot_nqh], errors="coerce").fillna(0) > 0
         df_nqh_all = df_kh[mask_nqh].copy()
     else:
-        st.warning("Khong tim thay cot du no qua han trong du lieu.")
+        st.warning("Kh\u00f4ng t\u00ecm th\u1ea5y c\u1ed9t d\u01b0 n\u1ee3 qu\u00e1 h\u1ea1n trong d\u1eef li\u1ec7u.")
         df_nqh_all = pd.DataFrame()
 
     if df_nqh_all.empty:
-        st.success("Khong co no qua han phat sinh.")
+        st.success("\u2705 Kh\u00f4ng c\u00f3 n\u1ee3 qu\u00e1 h\u1ea1n ph\u00e1t sinh.")
         return
 
-    # Kiem tra CQH columns co gia tri > 0 khong
-    cot_cqh_thang = _tim_cot(df_nqh_all, "Chuy\u1ec3n QH trong th\u00e1ng", "Chuy\u1ec3n n\u1ee3 QH trong th\u00e1ng")
-    co_cqh = False
-    if cot_cqh_thang and cot_cqh_thang in df_nqh_all.columns:
-        if pd.to_numeric(df_nqh_all[cot_cqh_thang], errors="coerce").fillna(0).sum() > 0:
-            co_cqh = True
-
-    # Xay dung tuy chon loc
-    lua_chon = {}
-    if co_cqh:
-        lua_chon["Trong thang"] = ("cqh", cot_cqh_thang)
+    # L\u1ecdc theo th\u00e1ng c\u1ee7a Ng\u00e0y s\u1ed1 li\u1ec7u
     if cot_ngay_sl and cot_ngay_sl in df_nqh_all.columns:
-        lua_chon["Ky hien tai"] = ("date", cot_ngay_sl)
-    lua_chon["Toan thoi gian"] = ("all", None)
+        _ngay = pd.to_datetime(df_nqh_all[cot_ngay_sl], errors="coerce")
+        df_nqh_all["_thang_sl"] = _ngay.dt.to_period("M")
+        ds_thang = sorted(df_nqh_all["_thang_sl"].dropna().unique(), reverse=True)
+        ds_thang_label = {p: f"Th\u00e1ng {p.month:02d}/{p.year}" for p in ds_thang}
+        options = ["T\u1ea5t c\u1ea3"] + [ds_thang_label[p] for p in ds_thang]
+        chon_thang = st.selectbox(
+            "\ud83d\udcc5 L\u1ecdc theo th\u00e1ng s\u1ed1 li\u1ec7u",
+            options=options,
+            index=1 if len(options) > 1 else 0,
+            key="nqh_loc_thang",
+        )
+        if chon_thang != "T\u1ea5t c\u1ea3":
+            period_chon = next((p for p, lb in ds_thang_label.items() if lb == chon_thang), None)
+            if period_chon:
+                df_nqh_all = df_nqh_all[df_nqh_all["_thang_sl"] == period_chon]
+    else:
+        st.caption("\u26a0\ufe0f Kh\u00f4ng c\u00f3 c\u1ed9t Ng\u00e0y s\u1ed1 li\u1ec7u \u2014 hi\u1ec3n th\u1ecb to\u00e0n b\u1ed9 NQH.")
 
-    ds_lua_chon = list(lua_chon.keys())
-    mac_dinh = 0 if co_cqh else (ds_lua_chon.index("Toan thoi gian") if "Toan thoi gian" in ds_lua_chon else 0)
-
-    chon = st.radio(
-        "Loc theo thoi gian",
-        ds_lua_chon,
-        index=mac_dinh,
-        horizontal=True,
-        key="nqh_loc_tg",
-    )
-    loai_loc, cot_loc = lua_chon[chon]
-
-    # Ap dung loc
-    df_nqh = df_nqh_all.copy()
-    if loai_loc == "cqh" and cot_loc and cot_loc in df_nqh.columns:
-        mask_cqh = pd.to_numeric(df_nqh[cot_loc], errors="coerce").fillna(0) > 0
-        df_nqh = df_nqh[mask_cqh]
-    elif loai_loc == "date" and cot_ngay_sl and cot_ngay_sl in df_nqh.columns:
-        ngay_sl = pd.to_datetime(df_nqh[cot_ngay_sl], errors="coerce")
-        from dateutil.relativedelta import relativedelta
-        moc = ngay_sl.max()
-        if pd.notna(moc):
-            dau_ky = moc - relativedelta(months=1)
-            df_nqh = df_nqh[ngay_sl >= dau_ky]
+    df_nqh = df_nqh_all.drop(columns=["_thang_sl"], errors="ignore").copy()
 
     if df_nqh.empty:
-        st.info("Khong co ho so NQH trong ky da chon. Chon 'Toan thoi gian' de xem tat ca.")
+        st.info("Kh\u00f4ng c\u00f3 h\u1ed3 s\u01a1 NQH trong th\u00e1ng \u0111\u00e3 ch\u1ecdn.")
         return
 
     # Metrics

@@ -49,7 +49,7 @@ from tabs import (
     tab_nhiem_vu, tab_khtd_giao_dc, tab_kiem_soat,
     tab_ban_dai_dien, tab_uy_thac,
     tab_tien_do, tab_tien_do_nop,
-    tab_phoi_hop_pgd,
+    tab_phoi_hop_pgd, tab_khtd_xuat,
 )
 from tabs import tab_checklist_bc
 from tabs import tab_xlrr_tong_hop
@@ -1100,6 +1100,7 @@ def _build_all_items(role: str, username: str, **kwargs) -> list:
         {"group": "Kế hoạch và Thực hiện KHTD", "label": "Giao & Điều chỉnh KH", "icon": "upload", "fn": lambda: tab_khtd_giao_dc.render(None, **kwargs)},
         {"group": "Kế hoạch và Thực hiện KHTD", "label": "Cân đối - Điện báo", "icon": "chart-line", "fn": lambda: tab_kehoach.render(None, **kwargs)},
         {"group": "Kế hoạch và Thực hiện KHTD", "label": "Điện báo",            "icon": "antenna",    "fn": lambda: tab_candoi.render(None, **kwargs)},
+        {"group": "Kế hoạch và Thực hiện KHTD", "label": "Xuất báo cáo KHTD",  "icon": "file-export", "fn": lambda: tab_khtd_xuat.render_xuat_baocao(role=kwargs.get("role", ""), username=kwargs.get("username", ""), df_full=kwargs.get("df"))},
         {"group": "Báo cáo",       "label": "Báo cáo tín dụng", "icon": "file",           "fn": lambda: tab_baocao.render(None, **kwargs)},
         {"group": "Báo cáo",       "label": "Checklist định kỳ", "icon": "calendar-check", "fn": lambda: tab_checklist_bc.render(None, **kwargs)},
         {"group": "Ủy Thác",       "label": "Ban Đại Diện HĐQT", "icon": "building",       "fn": lambda: tab_ban_dai_dien.render(None, cap="tinh", **kwargs)},

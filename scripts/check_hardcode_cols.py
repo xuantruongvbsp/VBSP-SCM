@@ -287,7 +287,7 @@ def main() -> int:
         violations = check_diff(cot_map)
 
     if violations:
-        print("❌ HARDCODE COLUMN NAMES DETECTED:")
+        print("[HARDCODE VIOLATIONS]")
         print("-" * 62)
         for v in violations:
             print(v)

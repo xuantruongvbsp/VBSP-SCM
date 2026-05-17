@@ -33,9 +33,10 @@ exit_code=$?
 if [ $exit_code -ne 0 ]; then
     echo ""
     echo "============================================"
-    echo "  COMMIT BI TU CHOI."
-    echo "  Vui long fix hardcoded column names truoc."
-    echo "  Option: them  # noqa: COT  de bo qua."
+    echo "  COMMIT BLOCKED."
+    echo "  Hardcoded column names detected."
+    echo "  Fix: use COT_* from config.py"
+    echo "  Suppress: add  # noqa: COT"
     echo "============================================"
     echo ""
 fi

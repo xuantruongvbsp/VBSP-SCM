@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## [2026-05-17] — Thêm menu item "Xuất báo cáo KHTD" vào ws_management.py
+- `workspaces/ws_management.py` dòng 52 — thêm `tab_khtd_xuat` vào import block từ tabs
+- `workspaces/ws_management.py` dòng 1103 — thêm menu item "Xuất báo cáo KHTD" trong group "Kế hoạch và Thực hiện KHTD" gọi `tab_khtd_xuat.render_xuat_baocao()` với tham số role, username, df_full
+
 ## [2026-05-17] — Chuẩn hóa định dạng ngày trong tab_tien_do.py
 - `tabs/tab_tien_do.py` dòng 197, 242, 248, 428, 650, 683–686, 1013 — thay tất cả ISO date thô bằng `fmt_ngay()` trong UI (chart, caption, dataframe, selectbox label)
 

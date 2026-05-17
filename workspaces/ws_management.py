@@ -991,7 +991,7 @@ def _build_all_items(role: str, username: str, **kwargs) -> list:
     ALL_ITEMS = [
         {"group": "Giám sát",     "label": "Tổng quan CN", "icon": "chart-bar",      "fn": lambda: tab_tongquan.render(None, **kwargs)},
         {"group": "Giám sát",     "label": "Tiến độ Công việc", "icon": "calendar",       "fn": lambda: tab_tien_do.render(None, **kwargs)},
-        {"group": "Giám sát",     "label": "Tiến độ PGD", "icon": "file", "fn": lambda: tab_tien_do_nop.render(None, **kwargs)},
+        {"group": "Giám sát",     "label": "Tiến độ Báo cáo của PGD", "icon": "file", "fn": lambda: tab_tien_do_nop.render(None, **kwargs)},
         {"group": "Giám sát",     "label": "Cảnh báo NQH",     "icon": "alert-triangle", "fn": lambda: _render_canh_bao_no(df_full, ds_pgd_all, role, kwargs.get("username", "unknown"))},
         {"group": "Giám sát",     "label": "Giao & Theo dõi Nhiệm vụ", "icon": "check",  "fn": lambda: tab_nhiem_vu.render(None, **kwargs)},
         {"group": "Giám sát",     "label": "So sánh kỳ",            "icon": "chart-line", "fn": lambda: tab_so_sanh_ky.render(None, **kwargs)},

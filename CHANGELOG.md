@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## [2026-05-17] — Thêm UI backup vào tab_trang_thai_nguon.py
+- `tabs/tab_trang_thai_nguon.py` hàm `_render_he_thong()` — thêm tham số `la_cn: bool = False` để kiểm soát quyền xem/bấm backup
+- `tabs/tab_trang_thai_nguon.py` hàm `_render_he_thong()` — thêm section "Backup dữ liệu": nút "Backup ngay" (chỉ cho admin_cn/manager_cn), audit log, danh sách 7 bản backup gần nhất với dung lượng/số file/trạng thái từng thành phần (DB/Parquet/PGD xlsx)
+- `tabs/tab_trang_thai_nguon.py` hàm `render()` dòng 636 — truyền `la_cn=la_cn` khi gọi `_render_he_thong()`
+
 ## [2026-05-17] — Chuyển "Cảnh báo NQH" thành accordion trong sidebar ws_management
 - `workspaces/ws_management.py` hàm `_build_all_items()` — thay item "Cảnh báo NQH" (fn) bằng item có `children` (5 nhánh con với default-arg lambda tránh late binding)
 - `workspaces/ws_management.py` hàm mới `_render_canh_bao_no_sub()` — dispatch 5 nhánh con theo `idx` (0=Đến hạn, 1=3tháng KHĐ, 2=Migration, 3=NQH phát sinh, 4=Cảnh báo sớm)

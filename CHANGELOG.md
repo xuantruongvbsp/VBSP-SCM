@@ -1,5 +1,8 @@
 # CHANGELOG
 
+## [2026-05-17] — Chuẩn hóa định dạng ngày trong tab_tien_do.py
+- `tabs/tab_tien_do.py` dòng 197, 242, 248, 428, 650, 683–686, 1013 — thay tất cả ISO date thô bằng `fmt_ngay()` trong UI (chart, caption, dataframe, selectbox label)
+
 ## [2026-05-17] — Nâng cấp tab_khtd_xuat.py: preview + Excel 23 sheet
 - `tabs/tab_khtd_xuat.py` dòng 12 — thêm `PGD_XA_MAP`, `DON_VI_CHI_NHANH` vào import config; xóa import `ExcelReport`
 - `tabs/tab_khtd_xuat.py` hàm `xuat_khtd_theo_xa()` — xuất 23 sheet: tổng CN + 22 đơn vị (Hội sở CN tỉnh + 21 PGD) lọc theo `PGD_XA_MAP`

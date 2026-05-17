@@ -929,8 +929,8 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
         df_joined = join_by_loan(df_bl, df_ht)
 
         ngay_sl = ""
-        if "Ngày số liệu" in df_ht.columns:
-            sl = df_ht["Ngày số liệu"].dropna()
+        if COT_NGAY_SL in df_ht.columns:
+            sl = df_ht[COT_NGAY_SL].dropna()
             if len(sl):
                 ngay_sl = str(sl.iloc[0])
 

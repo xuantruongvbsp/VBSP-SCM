@@ -336,7 +336,7 @@ def _render_snapshot() -> None:
         st.success(f"✅ Snapshot mới nhất: **{rows[0][0]}** ({rows[0][1]} đơn vị)")
 
         df_snap = pd.DataFrame(rows, columns=["Kỳ", "Số đơn vị", "Tổng dư nợ (VND)", "Tạo lúc"])
-        df_snap["Tổng dư nợ (tỷ đ)"] = (df_snap["Tổng dư nợ (VND)"] / 1e9).round(1)
+        df_snap["Tổng dư nợ (tỷ đ)"] = (df_snap["Tổng dư nợ (VND)"] / 1e12).round(1)
         df_snap = df_snap.drop(columns=["Tổng dư nợ (VND)"])
         st.dataframe(df_snap, use_container_width=True, hide_index=True)
 
@@ -384,18 +384,23 @@ def _render_nguoi_dung() -> None:
         else:
             st.success("✅ Tất cả tài khoản PGD đã được gán đơn vị")
 
-        # Kiểm tra tài khoản chưa đặt mật khẩu (còn mật khẩu mặc định "admin123")
-        rows_default_pw = conn.execute(
-            """
-            SELECT COUNT(*) FROM users
-            WHERE password = 'admin123'
-            """
-        ).fetchone()
-        if rows_default_pw and rows_default_pw[0] > 0:
-            st.warning(
-                f"⚠️ Có **{rows_default_pw[0]}** tài khoản vẫn dùng "
-                "mật khẩu mặc định `admin123` — nên đổi ngay."
-            )
+        # Kiểm tra tài khoản mới tạo chưa đổi mật khẩu (ngay_doi_mk IS NULL)
+        try:
+            rows_chua_doi = conn.execute(
+                """
+                SELECT COUNT(*) FROM users
+                WHERE ngay_doi_mk IS NULL
+                  AND role NOT IN ('executive')
+                """
+            ).fetchone()
+            if rows_chua_doi and rows_chua_doi[0] > 0:
+                st.warning(
+                    f"⚠️ Có **{rows_chua_doi[0]}** tài khoản chưa đổi mật khẩu lần đầu."
+                )
+            else:
+                st.success("✅ Tất cả tài khoản đã đổi mật khẩu ít nhất 1 lần")
+        except Exception:
+            pass  # Bảng users có thể chưa có cột ngay_doi_mk — bỏ qua
 
     except Exception as e:
         st.error(f"Lỗi đọc dữ liệu người dùng: {e}")

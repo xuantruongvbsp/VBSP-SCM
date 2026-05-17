@@ -42,6 +42,9 @@ from config import (
     CDTOTKVV_DIR,
     TEN_FILE_GQVL, FILE_PATH_GQVL, CACHE_GQVL, CACHE_HSTD, CACHE_NQ11,
     DS_PGD, DON_VI_CHI_NHANH, GQVL_COT_MAP, COT_TEN_PGD,
+    COT_DU_NO_TH, COT_DU_NO_QH, COT_DU_NO_KHOANH, COT_THOI_HAN,
+    COT_MUC_VAY, COT_TONG_DU_NO, COT_LAI_TON, COT_LAI_TON_QH,
+    COT_LAI_THANG, COT_GOC_TRA,
     UPLOAD_CANH_BAO_NGAY,
 )
 
@@ -354,9 +357,9 @@ def merge_du_lieu_toan_cn(
                     d = df.iloc[:, 1:].dropna(how="all").iloc[1:]
                     d = d.rename(columns=GQVL_COT_MAP).reset_index(drop=True)
                     _cols_so = [
-                        "Dư nợ trong hạn", "Dư nợ quá hạn", "Dư nợ khoanh",
+                        COT_DU_NO_TH, COT_DU_NO_QH, COT_DU_NO_KHOANH,
                         "Tổng giải ngân", "Giải ngân trong năm", "Dư tài khoản",
-                        "Thời hạn vay",
+                        COT_THOI_HAN,
                         # "Nguồn vốn" là text "TW"/"ĐP" — không chuyển sang numeric
                     ]
                     for col in _cols_so:
@@ -457,12 +460,12 @@ def merge_du_lieu_toan_cn(
 
     # Ép kiểu thủ công để tránh DataType(null) từ PyArrow
     _cols_so_cn = [
-        "Dư nợ trong hạn", "Dư nợ quá hạn", "Dư nợ khoanh",
+        COT_DU_NO_TH, COT_DU_NO_QH, COT_DU_NO_KHOANH,
         "Tổng giải ngân", "Giải ngân trong năm", "Dư tài khoản",
-        "Thời hạn vay",
+        COT_THOI_HAN,
         # "Nguồn vốn" là text "TW"/"ĐP" — KHÔNG ép numeric, sẽ thành NaN
-        "Mức vay", "Tổng dư nợ", "Lãi tồn TH", "Lãi tồn QH",
-        "Lãi DT trong tháng", "Gốc đã trả",
+        COT_MUC_VAY, COT_TONG_DU_NO, COT_LAI_TON, COT_LAI_TON_QH,
+        COT_LAI_THANG, COT_GOC_TRA,
     ]
     for col in _cols_so_cn:
         if col in df_toan_cn.columns:

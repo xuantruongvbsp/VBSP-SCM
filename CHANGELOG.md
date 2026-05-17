@@ -1,5 +1,8 @@
 # CHANGELOG
 
+## [2026-05-17] — Thêm checkbox số công văn trong UI xuất PDF tab NQH
+- `workspaces/ws_management.py` dòng ~508–526 — checkbox "Có số công văn": khi check hiện 2 ô (text_input Số hiệu + selectbox Loại văn bản); khi không check bỏ qua, PDF xuất không có số
+
 ## [2026-05-17] — Thêm tham số so_hieu và loai_van_ban cho xuat_pdf_group_header
 - `pdf_service.py` hàm `xuat_pdf_group_header` — thêm `so_hieu` (hiện dưới tên cơ quan khi có) và `loai_van_ban` (hiện trên tiêu đề khi có); cả 2 mặc định rỗng = không hiện
 

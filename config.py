@@ -326,6 +326,22 @@ COT_PHAN_LOAI  = "Phân loại"
 # Ngày giao dịch gần nhất (KU_NGAYGDGN từ core banking — cột 130 HSTD)
 COT_NGAY_GDGN = "Ngày giao dịch gần nhất"
 
+# ── Cột dữ liệu NQ11 (khác tên so với HSTD) ──────────────────────────────────
+COT_DNO_NQ11        = "DNO NQ11"
+COT_NQ11_NO_TH      = "Nợ trong hạn"
+COT_NQ11_NO_QH      = "Nợ quá hạn"
+COT_NQ11_MA_KH      = "Mã khách hàng"
+COT_NQ11_TEN_KH     = "Tên khách hàng"
+COT_NQ11_SO_TIEN    = "Số tiền"
+COT_NQ11_DU_NO      = "Dư nợ"
+COT_NQ11_SO_TIEN_GN = "Số tiền giải ngân"
+COT_NQ11_DEN_HAN_SC = "Đến hạn sau cùng"
+COT_NQ11_NGAY_BC    = "Ngày báo cáo"
+
+# ── Cột dữ liệu GQVL ────────────────────────────────────────────────────────
+COT_GQVL_MA_PGD         = "Mã PGD"
+COT_GQVL_DU_NO_KHOANH   = "Dư nợ khoanh"
+
 # Ngưỡng cảnh báo "không hoạt động": lãi tồn > N tháng lãi dự thu
 NGUONG_KHONG_HĐ_THANG = 3   # 3 tháng
 

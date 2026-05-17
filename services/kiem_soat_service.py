@@ -31,6 +31,7 @@ from config import (
     COT_NGAY_VAY,
     COT_THOI_HAN,
     COT_NGUON_VON,
+    COT_TEN_TO,
     COT_MA_CHUONG_TRINH,
     COT_NGAY_DH_HD,
 )
@@ -111,12 +112,12 @@ def _tinh_to_sai_so_tv(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
         else:
             df_active = pd.concat(parts, ignore_index=True)
 
-    # Loại món vay trực tiếp (không qua tổ TK&VV): cần có "Tên tổ" hoặc ĐVUT
-    co_ten_to = "Tên tổ" in df_active.columns
+    # Loại món vay trực tiếp (không qua tổ TK&VV): cần có COT_TEN_TO hoặc ĐVUT
+    co_ten_to = COT_TEN_TO in df_active.columns
     co_ten_dvut = COT_DVUT in df_active.columns
     if co_ten_to and co_ten_dvut:
-        ten_ok = df_active["Tên tổ"].notna() & (
-            df_active["Tên tổ"].astype(str).str.strip() != ""
+        ten_ok = df_active[COT_TEN_TO].notna() & (
+            df_active[COT_TEN_TO].astype(str).str.strip() != ""
         )
         dvut_ok = df_active[COT_DVUT].notna() & (
             df_active[COT_DVUT].astype(str).str.strip() != ""
@@ -125,8 +126,8 @@ def _tinh_to_sai_so_tv(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
         df_active = df_active.loc[mask_co_to]
     elif co_ten_to:
         df_active = df_active.loc[
-            df_active["Tên tổ"].notna()
-            & (df_active["Tên tổ"].astype(str).str.strip() != "")
+            df_active[COT_TEN_TO].notna()
+            & (df_active[COT_TEN_TO].astype(str).str.strip() != "")
         ]
     elif co_ten_dvut:
         df_active = df_active.loc[
@@ -143,7 +144,7 @@ def _tinh_to_sai_so_tv(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
             COT_TEN_PGD,
             COT_TEN_XA,
             COT_TEN_THON,
-            "Tên tổ",
+            COT_TEN_TO,
             COT_DVUT,
         )
         if c in df_active.columns
@@ -313,7 +314,7 @@ def _tong_hop_vp_theo_pgd(df_vp: pd.DataFrame) -> pd.DataFrame:
     """Bảng tổng hợp vi phạm theo PGD."""
     if df_vp is None or df_vp.empty or COT_TEN_PGD not in df_vp.columns:
         return pd.DataFrame()
-    ten_to = "Tên tổ"
+    ten_to = COT_TEN_TO
     n_to_expr = (
         f'COUNT(DISTINCT "{ten_to}")'
         if ten_to in df_vp.columns
@@ -808,7 +809,7 @@ def render_to_sai_so_tv(
             COT_TEN_XA,
             COT_TEN_THON,
             COT_DVUT,
-            "Tên tổ",
+            COT_TEN_TO,
             "Số_thành_viên",
             "Tổng_dư_nợ",
             "Dư_nợ_TH",
@@ -924,9 +925,9 @@ def render_gia_han_vuot(
     with c2:
         st.markdown(
             _ks_html_metric_card(
-                "Tổng dư nợ",
+                "Tổng dư nợ",  # noqa: COT
                 fmt_so(tong_dn_th),
-                "Dư nợ trong hạn",
+                "Dư nợ trong hạn",  # noqa: COT
                 "#FFF3E0",
                 "#E65100",
                 "#E65100",

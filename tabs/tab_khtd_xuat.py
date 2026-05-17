@@ -9,7 +9,7 @@ import pandas as pd
 import streamlit as st
 from openpyxl.styles import Font, PatternFill
 
-from config import TEN_CHINH_THUC_CT, CHUONG_TRINH_KHTD, DS_PGD, COT_TEN_PGD, CACHE_HSTD, CACHE_GQVL, XA_TO_PGD
+from config import TEN_CHINH_THUC_CT, CHUONG_TRINH_KHTD, DS_PGD, COT_TEN_PGD, CACHE_HSTD, CACHE_GQVL, XA_TO_PGD, PGD_XA_MAP, DON_VI_CHI_NHANH
 from data.core import ts_file
 
 
@@ -29,7 +29,6 @@ def _doc_gqvl_cached(_ts: float = 0) -> pd.DataFrame:
         return pd.DataFrame()
 from pdf_service import xuat_pdf
 from utils import hien_thi_dataframe_phan_trang, xuat_excel, ten_file_xuat
-from services.excel_service import ExcelReport
 
 from tabs.tab_khtd import (
     KV_KEY_CN,
@@ -724,16 +723,43 @@ def xuat_khtd_theo_xa(role: str, username: str, df_full: "pd.DataFrame | None" =
     col_order = ["Xã/Phường", "PGD"] + [ten for _, ten in ct_tw + ct_dp] + ["Tổng"]
     df_xa = pd.DataFrame(rows_data, columns=col_order)
 
-    nam_hien_tai = datetime.now().year
+    # ── Dùng xuat_excel() từ utils.py để build multi-sheet (23 sheet) ──────
+    DS_TT_22 = [DON_VI_CHI_NHANH] + DS_PGD
 
-    rpt = ExcelReport(
-        title="Kế hoạch Tín dụng theo Xã",
-        subtitle=f"Năm {nam_hien_tai} — Đơn vị: triệu đồng",
-        nguoi_xuat=username or "VBSP-SCM",
-    )
-    rpt.add_kpi("Tổng số xã có kế hoạch", f"{so_xa_co_kh}/{len(ds_xa)}")
-    rpt.add_sheet("KHTD theo Xã", df_xa)
-    return rpt.build()
+    sheets: dict[str, pd.DataFrame] = {}
+
+    # Sheet 1: Tổng hợp toàn CN (giữ cả dòng TỔNG CHI NHÁNH)
+    sheets["Tổng hợp CN"] = df_xa
+
+    # Sheet 2..23: từng đơn vị trong DS_TT_22 (22 đơn vị)
+    df_xa_chi = df_xa[df_xa["Xã/Phường"] != "TỔNG CHI NHÁNH"].copy()
+
+    for ten_dv in DS_TT_22:
+        ds_xa_dv = PGD_XA_MAP.get(ten_dv, [])
+        if not ds_xa_dv:
+            continue
+        df_dv = df_xa_chi[df_xa_chi["Xã/Phường"].isin(ds_xa_dv)].copy()
+        if df_dv.empty:
+            continue
+
+        # Thêm dòng tổng đơn vị
+        row_tong: dict = {"Xã/Phường": f"TỔNG {ten_dv}", "PGD": ""}
+        for col in col_order[2:]:  # bỏ 2 cột đầu Xã/Phường và PGD
+            row_tong[col] = round(float(df_dv[col].sum()), 1)
+        df_dv = pd.concat(
+            [df_dv, pd.DataFrame([row_tong])],
+            ignore_index=True
+        )
+
+        # Tên sheet: tối đa 31 ký tự (giới hạn Excel)
+        ten_sheet = (
+            ten_dv.replace("Hội sở Chi nhánh tỉnh", "Hội sở CN tỉnh")
+                  .replace("PGD ", "")
+                  .strip()[:31]
+        )
+        sheets[ten_sheet] = df_dv
+
+    return xuat_excel(sheets)
 
 
 def render_xuat_baocao(role: str = "", username: str = "", df_full: "pd.DataFrame | None" = None) -> None:
@@ -746,6 +772,40 @@ def render_xuat_baocao(role: str = "", username: str = "", df_full: "pd.DataFram
     st.divider()
     st.subheader("📍 Xuất KHTD theo Xã")
     st.caption("Bảng tổng hợp kế hoạch tín dụng phân bổ đến từng xã/phường — đơn vị: triệu đồng")
+
+    with st.expander("👁️ Xem trước dữ liệu", expanded=False):
+        try:
+            kh_xa_prev = _doc_kv(KV_KEY_XA)
+            if not kh_xa_prev:
+                st.info("Chưa có dữ liệu kế hoạch xã.")
+            else:
+                ct_all = [(mk, ten) for mk, _, ten, nv, _ in CHUONG_TRINH_KHTD]
+                rows_prev = []
+                for ten_xa, ten_dv in sorted(XA_TO_PGD.items()):
+                    row = {"Xã/Phường": ten_xa, "Đơn vị": ten_dv}
+                    tong = 0.0
+                    for mk, ten_ct in ct_all:
+                        v = round(float(kh_xa_prev.get(f"{ten_xa}|{mk}", 0)) / 1e6, 1)
+                        row[ten_ct] = v
+                        tong += v
+                    row["Tổng"] = round(tong, 1)
+                    if tong > 0:
+                        rows_prev.append(row)
+                if rows_prev:
+                    col_order_prev = ["Xã/Phường", "Đơn vị"] + [t for _, t in ct_all] + ["Tổng"]
+                    df_prev = pd.DataFrame(rows_prev, columns=col_order_prev)
+                    so_xa = len(df_prev)
+                    tong_all = df_prev["Tổng"].sum()
+                    st.caption(
+                        f"**{so_xa}** xã/phường có kế hoạch · "
+                        f"Tổng: **{tong_all:,.1f}** triệu đồng"
+                    )
+                    st.dataframe(df_prev, use_container_width=True,
+                                 hide_index=True, height=300)
+                else:
+                    st.info("Chưa có xã/phường nào được giao kế hoạch.")
+        except Exception as e:
+            st.warning(f"Không thể xem trước: {e}")
 
     col1, col2 = st.columns([1, 3])
     with col1:

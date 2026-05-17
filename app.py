@@ -561,7 +561,7 @@ def main():
         st.divider()
         # Widget trạng thái nguồn dữ liệu ưu tiên PGD
         try:
-            render_status_compact(pgd_user if role == "user" else None)
+            render_status_compact(pgd_user if la_phan_he_pgd(role) else None)
         except Exception as e:
             # Fallback về hiển thị file cũ nếu có lỗi
             st.caption("📊 Trạng thái file hệ thống:")
@@ -583,7 +583,7 @@ def main():
 
         from auth import la_phan_he_cn, la_phan_he_pgd
 
-        if role in ["admin","manager","executive"] or la_phan_he_cn(role) or la_phan_he_pgd(role):
+        if la_phan_he_cn(role) or la_phan_he_pgd(role):
             st.divider()
             if st.button("🔄 Làm mới cache", width='stretch'):
                 st.cache_data.clear()
@@ -591,7 +591,7 @@ def main():
                     st.session_state.pop(k, None)
                 st.rerun()
 
-        if role in ["admin", "admin_cn", "admin_pgd"]:
+        if normalize_role(role) in ("admin_cn", "admin_pgd"):
             st.divider()
             if st.button("👥 Quản lý Users", width='stretch'):
                 st.session_state.workspace = "admin_users"; st.rerun()
@@ -639,7 +639,7 @@ def main():
                 df_full = df
 
             if ws_hien_tai == "operation":
-                if role == "user" and pgd_user:
+                if la_phan_he_pgd(role) and pgd_user:
                     path_hstd_pgd = duong_dan_pgd(pgd_user, "hstd")
                     if os.path.exists(path_hstd_pgd):
                         df_pgd = doc_hstd_pgd(pgd_user, ts_file(path_hstd_pgd))
@@ -668,7 +668,7 @@ def main():
 
             df_nq11 = None
             if ws_hien_tai == "operation":
-                if role == "user" and pgd_user:
+                if la_phan_he_pgd(role) and pgd_user:
                     path_nq11_pgd = duong_dan_pgd(pgd_user, "nq11")
                     if os.path.exists(path_nq11_pgd):
                         df_nq11 = doc_nq11_pgd(pgd_user, ts_file(path_nq11_pgd))
@@ -678,7 +678,7 @@ def main():
             if df_nq11 is None and os.path.exists(FILE_PATH_NQ11):
                 if not os.path.exists(CACHE_NQ11):
                     doc_file_nq11(FILE_PATH_NQ11, ts_file(FILE_PATH_NQ11))
-                if role == "user" and pgd_user:
+                if la_phan_he_pgd(role) and pgd_user:
                     _nq11_cache = st.session_state.get("nq11_pgd_cache")
                     _nq11_ts = ts_file(CACHE_NQ11)
                     if (
@@ -710,7 +710,7 @@ def main():
 
             _map_cache_ts = _hstd_ts
             if st.session_state.get("_pgd_map_cache_ts") != _map_cache_ts:
-                if role == "user" and os.path.exists(CACHE_HSTD):
+                if la_phan_he_pgd(role) and os.path.exists(CACHE_HSTD):
                     _df_ref = duckdb.query(
                         f"SELECT DISTINCT \"{COT_TEN_PGD}\", \"Tên xã\" FROM '{CACHE_HSTD}'"
                     ).df()

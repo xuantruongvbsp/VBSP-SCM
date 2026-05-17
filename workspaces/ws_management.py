@@ -359,24 +359,42 @@ def _hien_thi_nqh_tab(df_kh: pd.DataFrame, username: str):
         return
 
     # L\u1ecdc theo th\u00e1ng c\u1ee7a Ng\u00e0y s\u1ed1 li\u1ec7u
+    _col_thang, _col_dvut = st.columns(2)
     if cot_ngay_sl and cot_ngay_sl in df_nqh_all.columns:
         _ngay = pd.to_datetime(df_nqh_all[cot_ngay_sl], errors="coerce")
         df_nqh_all["_thang_sl"] = _ngay.dt.to_period("M")
         ds_thang = sorted(df_nqh_all["_thang_sl"].dropna().unique(), reverse=True)
         ds_thang_label = {p: f"Th\u00e1ng {p.month:02d}/{p.year}" for p in ds_thang}
         options = ["T\u1ea5t c\u1ea3"] + [ds_thang_label[p] for p in ds_thang]
-        chon_thang = st.selectbox(
-            "📅 L\u1ecdc theo th\u00e1ng s\u1ed1 li\u1ec7u",
-            options=options,
-            index=1 if len(options) > 1 else 0,
-            key="nqh_loc_thang",
-        )
+        with _col_thang:
+            chon_thang = st.selectbox(
+                "📅 L\u1ecdc theo th\u00e1ng s\u1ed1 li\u1ec7u",
+                options=options,
+                index=1 if len(options) > 1 else 0,
+                key="nqh_loc_thang",
+            )
         if chon_thang != "T\u1ea5t c\u1ea3":
             period_chon = next((p for p, lb in ds_thang_label.items() if lb == chon_thang), None)
             if period_chon:
                 df_nqh_all = df_nqh_all[df_nqh_all["_thang_sl"] == period_chon]
     else:
-        st.caption("\u26a0\ufe0f Kh\u00f4ng c\u00f3 c\u1ed9t Ng\u00e0y s\u1ed1 li\u1ec7u \u2014 hi\u1ec3n th\u1ecb to\u00e0n b\u1ed9 NQH.")
+        with _col_thang:
+            st.caption("\u26a0\ufe0f Kh\u00f4ng c\u00f3 c\u1ed9t Ng\u00e0y s\u1ed1 li\u1ec7u \u2014 hi\u1ec3n th\u1ecb to\u00e0n b\u1ed9 NQH.")
+
+    # L\u1ecdc theo H\u1ed9i \u0111o\u00e0n th\u1ec3 (\u0110VUT)
+    cot_dvut_nqh = _tim_cot(df_nqh_all, "T\u00ean \u0110VUT")
+    with _col_dvut:
+        if cot_dvut_nqh and cot_dvut_nqh in df_nqh_all.columns:
+            ds_dvut = sorted(df_nqh_all[cot_dvut_nqh].dropna().unique().tolist())
+            chon_dvut = st.selectbox(
+                "🤝 L\u1ecdc theo H\u1ed9i \u0111o\u00e0n th\u1ec3",
+                options=["T\u1ea5t c\u1ea3"] + ds_dvut,
+                key="nqh_loc_dvut",
+            )
+            if chon_dvut != "T\u1ea5t c\u1ea3":
+                df_nqh_all = df_nqh_all[df_nqh_all[cot_dvut_nqh] == chon_dvut]
+        else:
+            st.caption("\u26a0\ufe0f Kh\u00f4ng c\u00f3 c\u1ed9t T\u00ean \u0110VUT trong d\u1eef li\u1ec7u.")
 
     df_nqh = df_nqh_all.drop(columns=["_thang_sl"], errors="ignore").copy()
 

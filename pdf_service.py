@@ -703,9 +703,16 @@ def xuat_pdf_group_header(
     # ── Header NĐ 30 ─────────────────────────────────────────────────────────
     from reportlab.platypus import Table as RLTable
     col_w = usable_w / 2
-    co_quan_left = Paragraph(
+
+    co_quan_html = (
         "<b>NGÂN HÀNG CHÍNH SÁCH XÃ HỘI VIỆT NAM</b><br/>"
-        "<b>Chi nhánh tỉnh Đồng Nai</b>",
+        "<b>Chi nhánh tỉnh Đồng Nai</b>"
+    )
+    if so_hieu:
+        co_quan_html += f"<br/><font size='9'>{so_hieu}</font>"
+
+    co_quan_left = Paragraph(
+        co_quan_html,
         ParagraphStyle("co_quan", fontName=fb, fontSize=10,
                        alignment=TA_LEFT, leading=14),
     )
@@ -727,6 +734,12 @@ def xuat_pdf_group_header(
     story.append(nd30_hdr)
     story.append(Spacer(1, 0.3 * cm))
 
+    if loai_van_ban:
+        story.append(Paragraph(
+            loai_van_ban.upper(),
+            ParagraphStyle("loai_vb", fontName=fb, fontSize=10,
+                           alignment=TA_CENTER, spaceAfter=2),
+        ))
     story.append(Paragraph(
         day_du_tieu_de.upper(),
         ParagraphStyle("title3", fontName=fb, fontSize=11, alignment=TA_CENTER,

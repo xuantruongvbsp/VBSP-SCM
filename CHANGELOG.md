@@ -1,5 +1,8 @@
 # CHANGELOG
 
+## [2026-05-17] — Thêm dropdown lọc Hội đoàn thể trong tab Nợ QH phát sinh
+- `workspaces/ws_management.py` dòng ~362–397 — thêm `st.columns(2)`, đặt filter tháng cột trái, thêm selectbox "Lọc theo Hội đoàn thể" cột phải (lọc theo `Tên ĐVUT`)
+
 ## [2026-05-17] — Fix UnicodeEncodeError surrogate emoji trong Cảnh báo NQH
 - `workspaces/ws_management.py` dòng ~369 — thay chuỗi surrogate `📅` bằng ký tự emoji đúng `📅`
 

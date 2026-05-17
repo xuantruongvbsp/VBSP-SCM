@@ -202,7 +202,7 @@ def _render_canh_bao_no(df_full: pd.DataFrame, ds_pgd_all: list, role: str, user
     sub1, sub2, sub3, sub4, sub5 = st.tabs([
         "⏰ Đến hạn",
         "🔴 3 tháng KHĐ",
-        "🚨 Migration (đủ chuẩn → NQH)",
+        "🚨 Nợ bình thường → Nợ rủi ro",
         "📋 Nợ QH phát sinh",
         "⚡ Cảnh báo sớm",
     ])

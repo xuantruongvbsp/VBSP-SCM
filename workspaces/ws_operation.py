@@ -71,7 +71,7 @@ def _kpi_pgd_list(df_pgd: pd.DataFrame, pgd_user: str) -> list[dict]:
     try:
         pct_nqh = (nqh_dn / tong_dn * 100) if tong_dn > 0 else 0.0
         kpi.append({
-            "label":       "Tổng dư nợ",
+            "label":       "Tổng dư nợ",  # noqa: COT
             "value":       fmt_ty(tong_dn),
             "delta":       -pct_nqh,         # ↓ mũi tên xuống, inverse → xanh khi thấp
             "delta_label": "% NQH",
@@ -88,7 +88,7 @@ def _kpi_pgd_list(df_pgd: pd.DataFrame, pgd_user: str) -> list[dict]:
     try:
         ty_le_nqh = (nqh_dn / tong_dn * 100) if tong_dn > 0 else 0.0
         kpi.append({
-            "label":       "Nợ quá hạn",
+            "label":       "Nợ quá hạn",  # noqa: COT
             "value":       fmt_ty(nqh_dn),
             "delta":       ty_le_nqh,         # ↑ mũi tên lên, inverse → đỏ khi cao
             "delta_label": "% so dư nợ",
@@ -319,7 +319,7 @@ def _render_don_doc(df: pd.DataFrame, pgd_user: str, role: str):
 
     # ── Bảng tổng hợp theo ĐVUT ───────────────────────────────────────────
     st.markdown("**Tổng hợp theo Hội đoàn thể (ĐVUT)**")
-    nhom_dvut = tong_hop_khong_hd_cached(df_kh, nhom_theo="Tên ĐVUT")
+    nhom_dvut = tong_hop_khong_hd_cached(df_kh, nhom_theo=COT_DVUT)
     if not nhom_dvut.empty:
         hien_thi_dataframe_phan_trang(
             nhom_dvut,
@@ -329,7 +329,7 @@ def _render_don_doc(df: pd.DataFrame, pgd_user: str, role: str):
 
     # Bảng theo Xã
     st.markdown("**Tổng hợp theo Xã/Phường**")
-    nhom_xa = tong_hop_khong_hd_cached(df_kh, nhom_theo="Tên xã")
+    nhom_xa = tong_hop_khong_hd_cached(df_kh, nhom_theo=COT_TEN_XA)
     if not nhom_xa.empty:
         hien_thi_dataframe_phan_trang(
             nhom_xa,
@@ -345,12 +345,12 @@ def _render_don_doc(df: pd.DataFrame, pgd_user: str, role: str):
 
     with col_loc:
         ds_dvut = ["Tất cả"]
-        if "Tên ĐVUT" in df_kh.columns:
-            ds_dvut += sorted(df_kh["Tên ĐVUT"].dropna().unique().tolist())
+        if COT_DVUT in df_kh.columns:
+            ds_dvut += sorted(df_kh[COT_DVUT].dropna().unique().tolist())
         chon_dvut = st.selectbox("Lọc Hội đoàn thể", ds_dvut, key="op_khd_dvut")
 
     gia_tri = None if chon_dvut == "Tất cả" else chon_dvut
-    df_dondoc = ds_chi_tiet_khong_hd(df_kh, nhom_theo="Tên ĐVUT",
+    df_dondoc = ds_chi_tiet_khong_hd(df_kh, nhom_theo=COT_DVUT,
                                       gia_tri_nhom=gia_tri)
 
     with col_xuat:
@@ -490,7 +490,7 @@ def _render_doc_hub(df: pd.DataFrame, df_nq11, role: str):
                     df_chon  = df_tim.iloc[idx_list].reset_index(drop=True)
                     st.info(f"Đã chọn **{len(df_chon)}** hồ sơ")
     else:
-        COT_XA = "Tên xã"
+        COT_XA = COT_TEN_XA
         if COT_XA in df.columns:
             ds_xa   = sorted(df[COT_XA].dropna().unique().tolist())
             chon_xa = st.selectbox("Chọn Xã/Phường", ds_xa, key="op_dh_xa")
@@ -582,9 +582,9 @@ def _init_gb2_session_for_doc_hub(kwargs: dict) -> None:
         return
     if is_pgd_role(role) and pgd_user and COT_TEN_PGD in df.columns:
         df = df[df[COT_TEN_PGD] == pgd_user].copy()
-    if "Tên xã" not in df.columns:
+    if COT_TEN_XA not in df.columns:
         return
-    ds_xa = sorted(df["Tên xã"].dropna().unique().tolist())
+    ds_xa = sorted(df[COT_TEN_XA].dropna().unique().tolist())
     if not ds_xa:
         return
     if "gb2_xa" not in st.session_state or st.session_state.gb2_xa not in ds_xa:
@@ -625,7 +625,7 @@ def _render_thong_bao_ket_luan(tab, **kwargs):
         if is_pgd_role(role) and pgd_user and COT_TEN_PGD in df.columns:
             df = df[df[COT_TEN_PGD] == pgd_user].copy()
 
-        ds_xa = sorted(df["Tên xã"].dropna().unique().tolist())
+        ds_xa = sorted(df[COT_TEN_XA].dropna().unique().tolist())
         if not ds_xa:
             st.warning("Không có cột Tên xã.")
             return
@@ -678,7 +678,7 @@ def _render_thong_bao_ket_luan(tab, **kwargs):
 
         # Preview số liệu tự động
         from config import COT_LAI_TON_QH, COT_SO_DU_TG
-        df_xa_preview = df[df["Tên xã"] == chon_xa].copy()
+        df_xa_preview = df[df[COT_TEN_XA] == chon_xa].copy()
         if not df_xa_preview.empty:
             dn_prev = pd.to_numeric(df_xa_preview[COT_TONG_DU_NO], errors="coerce").sum() / 1e6
             nqh_prev = pd.to_numeric(df_xa_preview[COT_DU_NO_QH], errors="coerce").sum() / 1e6
@@ -746,7 +746,7 @@ def _render_thong_bao_ket_luan(tab, **kwargs):
         )
 
         if st.button("🖨️ Xuất Thông báo Kết luận Word", type="primary", key="tb_xuat"):
-            df_xa_tb = df[df["Tên xã"] == chon_xa].copy()
+            df_xa_tb = df[df[COT_TEN_XA] == chon_xa].copy()
             try:
                 data = xuat_thong_bao_ket_luan_giao_ban(
                     df_xa=df_xa_tb,
@@ -846,7 +846,7 @@ def _render_bien_ban_giao_ban(tab, **kwargs):
             return
 
         # 1. Chọn xã thuộc PGD
-        ds_xa = sorted(df["Tên xã"].dropna().unique().tolist())
+        ds_xa = sorted(df[COT_TEN_XA].dropna().unique().tolist())
         chon_xa = st.selectbox("Chọn xã / điểm giao dịch", ds_xa,
                                key="op_gb2_xa")
 
@@ -886,7 +886,7 @@ def _render_bien_ban_giao_ban(tab, **kwargs):
             return
 
         if st.button("🖨️ Xuất Biên bản Word", type="primary", key="gb2_xuat"):
-            df_xa = df[df["Tên xã"] == chon_xa].copy()
+            df_xa = df[df[COT_TEN_XA] == chon_xa].copy()
             gn_input = {"__tong__": gn_tong * 1_000_000} if gn_tong > 0 else None
             try:
                 data = xuat_bien_ban_giao_ban(
@@ -950,13 +950,13 @@ def _render_bao_cao_giao_ban(tab, **kwargs):
                     df_filtered = df[df[COT_TEN_PGD] == chon_pgd].copy()
         
         # Chọn Xã
-        if "Tên xã" in df_filtered.columns:
-            ds_xa = sorted(df_filtered["Tên xã"].dropna().unique().tolist())
+        if COT_TEN_XA in df_filtered.columns:
+            ds_xa = sorted(df_filtered[COT_TEN_XA].dropna().unique().tolist())
             if not ds_xa:
                 st.warning("Không có dữ liệu xã nào trong PGD được chọn.")
                 return
             chon_xa = st.selectbox("Chọn Xã/Phường", ds_xa, key="op_gb_xa")
-            df_xa = df_filtered[df_filtered["Tên xã"] == chon_xa].copy()
+            df_xa = df_filtered[df_filtered[COT_TEN_XA] == chon_xa].copy()
         else:
             st.warning("Không tìm thấy cột 'Tên xã' trong dữ liệu.")
             return
@@ -1018,7 +1018,7 @@ def _render_bao_cao_giao_ban(tab, **kwargs):
         df_dgd_marked = danh_dau_khong_hd_cached(df_dgd)
         
         # Groupby theo Tên ĐVUT
-        if "Tên ĐVUT" not in df_dgd.columns:
+        if COT_DVUT not in df_dgd.columns:
             st.warning("Không tìm thấy cột 'Tên ĐVUT' trong dữ liệu.")
             return
         
@@ -1059,8 +1059,8 @@ def _render_bao_cao_giao_ban(tab, **kwargs):
             if data_col in df_dgd.columns:
                 valid_agg_dict[data_col] = agg_func
         
-        if valid_agg_dict and "Tên ĐVUT" in df_dgd.columns:
-            df_bang = df_dgd.groupby("Tên ĐVUT").agg(valid_agg_dict).reset_index()
+        if valid_agg_dict and COT_DVUT in df_dgd.columns:
+            df_bang = df_dgd.groupby(COT_DVUT).agg(valid_agg_dict).reset_index()
             
             # Đổi tên cột về tên hiển thị
             rename_dict = {}
@@ -1070,16 +1070,16 @@ def _render_bao_cao_giao_ban(tab, **kwargs):
             df_bang = df_bang.rename(columns=rename_dict)
         else:
             # Tạo DataFrame rỗng với cấu trúc cơ bản
-            df_bang = pd.DataFrame({"Tên ĐVUT": []})
+            df_bang = pd.DataFrame({COT_DVUT: []})
         
         # Tính tỷ trọng %
         if "Tổng dư nợ" in df_bang.columns and df_bang["Tổng dư nợ"].sum() > 0:
             df_bang["Tỷ trọng %"] = (df_bang["Tổng dư nợ"] / df_bang["Tổng dư nợ"].sum() * 100).round(1)
         
         # Thêm dòng Cộng
-        dong_cong = {"Tên ĐVUT": "CỘNG"}
+        dong_cong = {COT_DVUT: "CỘNG"}
         for col in df_bang.columns:
-            if col != "Tên ĐVUT":
+            if col != COT_DVUT:
                 if col == "Tỷ trọng %":
                     dong_cong[col] = 100.0
                 else:
@@ -1105,7 +1105,7 @@ def _render_bao_cao_giao_ban(tab, **kwargs):
         st.markdown("**③ Tóm tắt báo cáo**")
         
         # Lấy các số liệu từ dòng Cộng
-        dong_cong_data = df_bang[df_bang["Tên ĐVUT"] == "CỘNG"].iloc[0]
+        dong_cong_data = df_bang[df_bang[COT_DVUT] == "CỘNG"].iloc[0]
         
         tong_dn = dong_cong_data.get("Tổng dư nợ", 0) / 1e6
         so_kh = int(dong_cong_data.get("Số KH", 0))
@@ -1171,11 +1171,11 @@ Doanh số cho vay trong tháng: {ds_cv:,.0f} triệu đồng; doanh số thu n�
         with col_pdf:
             cols_tien_gb = [c for c in ["Tổng dư nợ", "Nợ quá hạn", "Nợ khoanh", "Doanh số cho vay tháng", "Doanh số thu nợ tháng"] if c in df_bang.columns]
             import plotly.express as px
-            df_chart = df_bang[df_bang["Tên ĐVUT"] != "CỘNG"].copy()
+            df_chart = df_bang[df_bang[COT_DVUT] != "CỘNG"].copy()
             fig_list = []
             if not df_chart.empty and "Tổng dư nợ" in df_chart.columns:
                 fig_dn = px.bar(
-                    df_chart, x="Tên ĐVUT", y="Tổng dư nợ",
+                    df_chart, x=COT_DVUT, y="Tổng dư nợ",
                     title="Tổng dư nợ theo ĐVUT",
                     text_auto=".1s", color_discrete_sequence=["#2E7D32"],
                 )
@@ -1183,7 +1183,7 @@ Doanh số cho vay trong tháng: {ds_cv:,.0f} triệu đồng; doanh số thu n�
                 fig_list.append((fig_dn, "Tổng dư nợ theo ĐVUT"))
             if "Nợ quá hạn" in df_chart.columns:
                 fig_nqh = px.bar(
-                    df_chart, x="Tên ĐVUT", y="Nợ quá hạn",
+                    df_chart, x=COT_DVUT, y="Nợ quá hạn",
                     title="Nợ quá hạn theo ĐVUT",
                     text_auto=".1s", color_discrete_sequence=["#E53935"],
                 )
@@ -1327,8 +1327,8 @@ def render(**kwargs):
 
             c1, c2, c3 = st.columns(3)
             c1.metric("📊 Số tháng dự phóng", f"{len(df_dp)} tháng")
-            c2.metric("✅ Đã qua (dự kiến)", f"{tong_goc_qua/1e9:,.1f} tỷ")
-            c3.metric("🔮 Tương lai (dự kiến)", f"{tong_goc_lai/1e9:,.1f} tỷ")
+            c2.metric("✅ Đã qua (dự kiến)", fmt_ty(tong_goc_qua))
+            c3.metric("🔮 Tương lai (dự kiến)", fmt_ty(tong_goc_lai))
 
             st.divider()
 

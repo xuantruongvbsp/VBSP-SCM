@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## [2026-05-17] — Bổ sung 3 kiểm tra vào tab_trang_thai_nguon
+- `tabs/tab_trang_thai_nguon.py` `_render_merge_cache()` — thêm kiểm tra đồng bộ DS_PGD giữa kv_store và config.py
+- `tabs/tab_trang_thai_nguon.py` `_render_tep_nguon()` — thêm kiểm tra đồng nhất ngày số liệu giữa các PGD (dùng DuckDB)
+- `tabs/tab_trang_thai_nguon.py` `_render_he_thong()` — thêm kiểm tra nhiệm vụ và tiến độ task quá hạn
+
 ## [2026-05-17] — Fix đếm số KH theo CTTD bỏ sót KH tất toán
 - `tabs/tab_tongquan.py` dòng ~549 — tính `so_kh` từ `df` gốc thay vì `_df_loc` (đã lọc dư nợ > 0), ghi đè sau khi groupby để không bỏ sót KH có dư nợ = 0
 

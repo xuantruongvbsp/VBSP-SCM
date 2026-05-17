@@ -1,0 +1,396 @@
+=== SCAN RESULT: 22 files with potential hardcoded column names ===
+
+--- tab_ban_dai_dien.py --- (6 hits)
+  L 179: c2.metric("Dư nợ trong hạn", fmt_ty(kpi["dth"]))
+         (hardcode: "Dư nợ trong hạn")
+  L 203: {"Chỉ tiêu": "Dư nợ trong hạn", "Giá trị": round(kpi["dth"] / 1e6, 3)},
+         (hardcode: "Dư nợ trong hạn")
+  L 180: c3.metric("Dư nợ quá hạn", fmt_ty(kpi["dqh"]))
+         (hardcode: "Dư nợ quá hạn")
+  L 204: {"Chỉ tiêu": "Dư nợ quá hạn", "Giá trị": round(kpi["dqh"] / 1e6, 3)},
+         (hardcode: "Dư nợ quá hạn")
+  L 178: c1.metric("Tổng dư nợ", fmt_ty(kpi["tdn"]))
+         (hardcode: "Tổng dư nợ")
+  L 202: {"Chỉ tiêu": "Tổng dư nợ", "Giá trị": round(kpi["tdn"] / 1e6, 3)},
+         (hardcode: "Tổng dư nợ")
+
+--- tab_baocao.py --- (36 hits)
+  L  27: "Dư nợ khoanh", "Nợ_khoanh",
+         (hardcode: "Dư nợ khoanh")
+  L  26: "Lãi_tồn_KHĐ", "Dư nợ TH", "Dư nợ QH", "Nợ khoanh", "Tổng dư nợ", "Lãi tồn",
+         (hardcode: "Tổng dư nợ")
+  L 203: / df_pdf["Tổng dư nợ"].replace(0, float("nan"))
+         (hardcode: "Tổng dư nợ")
+  L 217: "Tổng dư nợ",
+         (hardcode: "Tổng dư nợ")
+  L 255: "Tổng dư nợ",
+         (hardcode: "Tổng dư nợ")
+  L 418: loc_nv = st.selectbox("Nguồn vốn",
+         (hardcode: "Nguồn vốn")
+  L 427: if loc_nv == "1 - Trung ương (TW)" and "Nguồn vốn" in df_ct_th.columns:
+         (hardcode: "Nguồn vốn")
+  L 428: df_ct_th = df_ct_th[df_ct_th["Nguồn vốn"] == 1]
+         (hardcode: "Nguồn vốn")
+  L 429: elif loc_nv == "2 - Địa phương (ĐP)" and "Nguồn vốn" in df_ct_th.columns:
+         (hardcode: "Nguồn vốn")
+  L 430: df_ct_th = df_ct_th[df_ct_th["Nguồn vốn"] == 2]
+         (hardcode: "Nguồn vốn")
+  L 612: if "Nguồn vốn" in df_ct.columns:
+         (hardcode: "Nguồn vốn")
+  L 613: chon_nv = st.radio("Nguồn vốn",
+         (hardcode: "Nguồn vốn")
+  L 619: t_nv = df_ct.groupby("Nguồn vốn").agg(
+         (hardcode: "Nguồn vốn")
+  L 626: t_nv["Nguồn vốn"] = t_nv["Nguồn vốn"].map({1:"1 - TW",2:"2 - ĐP"}).fillna(t_nv["
+         (hardcode: "Nguồn vốn")
+  L 640: df_nv = df_ct[df_ct["Nguồn vốn"] == nv_val]
+         (hardcode: "Nguồn vốn")
+  L 338: if "Tên ĐVUT" in df_base.columns:
+         (hardcode: "Tên ĐVUT")
+  L 342: dbc_raw = df_kh.groupby("Tên ĐVUT").agg(
+         (hardcode: "Tên ĐVUT")
+  L 356: khd = tong_hop_khong_hd(df_kh, nhom_theo="Tên ĐVUT")
+         (hardcode: "Tên ĐVUT")
+  L 359: khd[["Tên ĐVUT", "Món_3m_KHĐ",
+         (hardcode: "Tên ĐVUT")
+  L 361: on="Tên ĐVUT", how="left"
+         (hardcode: "Tên ĐVUT")
+  L 375: ds_dvut = sorted(df_kh["Tên ĐVUT"].dropna().unique().tolist())
+         (hardcode: "Tên ĐVUT")
+  L 385: df_kh, nhom_theo="Tên ĐVUT", gia_tri_nhom=gia_tri)
+         (hardcode: "Tên ĐVUT")
+  L 515: ["Tất cả"]+sorted(df_base["Tên ĐVUT"].dropna().unique().tolist())
+         (hardcode: "Tên ĐVUT")
+  L 516: if "Tên ĐVUT" in df_base.columns else ["Tất cả"],
+         (hardcode: "Tên ĐVUT")
+  L 526: if loc_dvut_ct != "Tất cả" and "Tên ĐVUT"     in df_ct.columns: df_ct = df_ct[df
+         (hardcode: "Tên ĐVUT")
+  L 697: if "Tên ĐVUT" in df_kh_rpt.columns:
+         (hardcode: "Tên ĐVUT")
+  L 703: df_kh_rpt.groupby("Tên ĐVUT").agg(**_agg_kh)
+         (hardcode: "Tên ĐVUT")
+  L 731: if "Tên ĐVUT" in df_qh_rpt.columns:
+         (hardcode: "Tên ĐVUT")
+  L 734: df_qh_rpt.groupby("Tên ĐVUT").agg(
+         (hardcode: "Tên ĐVUT")
+  L 316: nhom = "Tên xã" if cap_xa == "Theo xã" else "Tên thôn"
+         (hardcode: "Tên thôn")
+  L 316: nhom = "Tên xã" if cap_xa == "Theo xã" else "Tên thôn"
+         (hardcode: "Tên xã")
+  L 510: ["Tất cả"]+sorted(df_base["Tên xã"].dropna().unique().tolist())
+         (hardcode: "Tên xã")
+  L 511: if "Tên xã" in df_base.columns else ["Tất cả"],
+         (hardcode: "Tên xã")
+  L 525: if loc_xa_ct   != "Tất cả" and "Tên xã"       in df_ct.columns: df_ct = df_ct[df
+         (hardcode: "Tên xã")
+  L 585: if "Tên xã" in df_ct2.columns:
+         (hardcode: "Tên xã")
+  L 587: t_xa = df_ct2.groupby("Tên xã").agg(
+         (hardcode: "Tên xã")
+
+--- tab_candoi.py --- (7 hits)
+  L 242: tong_dn_ht   = db_lookup(db_ht_rows,   "Tổng dư nợ")
+         (hardcode: "Tổng dư nợ")
+  L 257: tong_dn_pv  = db_lookup(db_prev_rows, "Tổng dư nợ")
+         (hardcode: "Tổng dư nợ")
+  L 279: m1.metric("Tổng dư nợ",  fmt_ty(tong_dn_ht))
+         (hardcode: "Tổng dư nợ")
+  L 454: ("Tổng dư nợ",    "Tổng dư nợ"),
+         (hardcode: "Tổng dư nợ")
+  L 306: ["Tất cả","Nguồn vốn","Dư nợ KHA","Dư nợ KHB","Vốn an toàn & quỹ"],
+         (hardcode: "Nguồn vốn")
+  L 310: "Nguồn vốn":       ["Nguồn vốn","Tổng huy động","Tiền gửi","UTĐT"],
+         (hardcode: "Nguồn vốn")
+  L 448: "Nguồn vốn": [
+         (hardcode: "Nguồn vốn")
+
+--- tab_cbtd.py --- (3 hits)
+  L 298: dt_new  = st.text_input("Số điện thoại", key="cbtd_dt_new")
+         (hardcode: "Số điện thoại")
+  L 382: dt_sua  = st.text_input("Số điện thoại",
+         (hardcode: "Số điện thoại")
+  L 517: "Tổng dư nợ":   _fmt_tien(tdn),
+         (hardcode: "Tổng dư nợ")
+
+--- tab_danhsach.py --- (9 hits)
+  L 210: ("Dư nợ quá hạn", fmt_tien(tong_dqh), "#D32F2F", "⚠️"),
+         (hardcode: "Dư nợ quá hạn")
+  L  45: tong_khoanh = _dl["Dư nợ khoanh"].sum() if "Dư nợ khoanh" in _dl.columns else 0
+         (hardcode: "Dư nợ khoanh")
+  L 211: ("Dư nợ khoanh", fmt_tien(tong_khoanh), "#7B1FA2", "🔒"),
+         (hardcode: "Dư nợ khoanh")
+  L 209: ("Tổng dư nợ", fmt_tien(tong_dn), "#388E3C", "💰"),
+         (hardcode: "Tổng dư nợ")
+  L 138: ds_dvut = ["Tất cả"] + sorted(df["Tên ĐVUT"].dropna().unique().tolist()) \
+         (hardcode: "Tên ĐVUT")
+  L 139: if "Tên ĐVUT" in df.columns else ["Tất cả"]
+         (hardcode: "Tên ĐVUT")
+  L 156: if cdvut != "Tất cả" and "Tên ĐVUT" in df.columns:
+         (hardcode: "Tên ĐVUT")
+  L 157: _masks.append(df["Tên ĐVUT"]  == cdvut)
+         (hardcode: "Tên ĐVUT")
+  L 105: "Lãi suất",
+         (hardcode: "Lãi suất")
+
+--- tab_diem_gd_pgd.py --- (1 hits)
+  L 525: st.warning("Không tìm thấy cột 'Tên xã' trong dữ liệu.")
+         (hardcode: "Tên xã")
+
+--- tab_gqvl.py --- (26 hits)
+  L  38: help="Dư nợ trong hạn"
+         (hardcode: "Dư nợ trong hạn")
+  L  73: help="Dư nợ trong hạn"
+         (hardcode: "Dư nợ trong hạn")
+  L 134: G_DU_NO_TH   = "Dư nợ trong hạn"
+         (hardcode: "Dư nợ trong hạn")
+  L 244: k3.metric("Dư nợ trong hạn",    fmt(du_no_th))
+         (hardcode: "Dư nợ trong hạn")
+  L 280: fig.add_bar(name="Dư nợ trong hạn", x=t_db[nhom],
+         (hardcode: "Dư nợ trong hạn")
+  L  43: help="Dư nợ quá hạn"
+         (hardcode: "Dư nợ quá hạn")
+  L  78: help="Dư nợ quá hạn"
+         (hardcode: "Dư nợ quá hạn")
+  L 135: G_DU_NO_QH   = "Dư nợ quá hạn"
+         (hardcode: "Dư nợ quá hạn")
+  L 245: k4.metric("Dư nợ quá hạn",      fmt(du_no_qh),
+         (hardcode: "Dư nợ quá hạn")
+  L 282: fig.add_bar(name="Dư nợ quá hạn",   x=t_db[nhom],
+         (hardcode: "Dư nợ quá hạn")
+  L 138: G_MA_NHA_DAU_TU = "Mã nhà đầu tư"
+         (hardcode: "Mã nhà đầu tư")
+  L 133: G_THOI_HAN   = "Thời hạn vay"
+         (hardcode: "Thời hạn vay")
+  L  48: help="Dư nợ khoanh"
+         (hardcode: "Dư nợ khoanh")
+  L  83: help="Dư nợ khoanh"
+         (hardcode: "Dư nợ khoanh")
+  L 136: G_DU_NO_KH   = "Dư nợ khoanh"
+         (hardcode: "Dư nợ khoanh")
+  L  53: help="Tổng dư nợ"
+         (hardcode: "Tổng dư nợ")
+  L 243: k2.metric("Tổng dư nợ",         fmt(tong_dn))
+         (hardcode: "Tổng dư nợ")
+  L 415: m2.metric("Tổng dư nợ",
+         (hardcode: "Tổng dư nợ")
+  L 127: G_SO_KU      = "Số khế ước"
+         (hardcode: "Số khế ước")
+  L 137: G_NGUON_VON  = "Nguồn vốn"
+         (hardcode: "Nguồn vốn")
+  L 400: loc_nv = st.selectbox("Nguồn vốn",
+         (hardcode: "Nguồn vốn")
+  L 131: G_NGAY_VAY   = "Ngày vay"
+         (hardcode: "Ngày vay")
+  L 129: G_TEN_THON   = "Tên thôn"
+         (hardcode: "Tên thôn")
+  L 128: G_TEN_XA     = "Tên xã"
+         (hardcode: "Tên xã")
+  L 126: G_TEN_KH     = "Tên KH"
+         (hardcode: "Tên KH")
+  L 125: G_MA_KH      = "Mã KH"
+         (hardcode: "Mã KH")
+
+--- tab_kh_gqvl.py --- (1 hits)
+  L 146: rows.append({"Tên PGD": ten_pgd, "KH TW (tr)": kh_tw, "KH ĐP (tr)": kh_dp, "Tổng
+         (hardcode: "Tên PGD")
+
+--- tab_khtd.py --- (2 hits)
+  L 395: ma = str(row.get("Mã nhà đầu tư", "")).strip()
+         (hardcode: "Mã nhà đầu tư")
+  L 381: nv  = str(row.get("Nguồn vốn", "")).strip()
+         (hardcode: "Nguồn vốn")
+
+--- tab_khtd_mau07.py --- (10 hits)
+  L 131: ("Mã chương trình", col_mact), ("Nguồn vốn", col_nv), ("Tổng dư nợ", col_dn)
+         (hardcode: "Mã chương trình")
+  L 131: ("Mã chương trình", col_mact), ("Nguồn vốn", col_nv), ("Tổng dư nợ", col_dn)
+         (hardcode: "Tổng dư nợ")
+  L 131: ("Mã chương trình", col_mact), ("Nguồn vốn", col_nv), ("Tổng dư nợ", col_dn)
+         (hardcode: "Nguồn vốn")
+  L 612: "Nguồn vốn": "",
+         (hardcode: "Nguồn vốn")
+  L 659: "Nguồn vốn": nguon_von,
+         (hardcode: "Nguồn vốn")
+  L 671: "Nguồn vốn": "",
+         (hardcode: "Nguồn vốn")
+  L1019: disabled=["Ấp/Thôn", "Chương trình", "Nguồn vốn", col_so_goc, col_kh],
+         (hardcode: "Nguồn vốn")
+  L1025: "Nguồn vốn": st.column_config.TextColumn("NV", width="small"),
+         (hardcode: "Nguồn vốn")
+  L 130: ("Tên xã", col_xa), ("Tên thôn", col_thon),
+         (hardcode: "Tên thôn")
+  L 130: ("Tên xã", col_xa), ("Tên thôn", col_thon),
+         (hardcode: "Tên xã")
+
+--- tab_khtd_nhap.py --- (4 hits)
+  L  90: mandt = df.get("Mã nhà đầu tư", pd.Series(dtype=str)).fillna("").astype(str)
+         (hardcode: "Mã nhà đầu tư")
+  L 294: "Nguồn vốn": nv,
+         (hardcode: "Nguồn vốn")
+  L1111: "Nguồn vốn": nv_label,
+         (hardcode: "Nguồn vốn")
+  L1120: "Nguồn vốn": "",
+         (hardcode: "Nguồn vốn")
+
+--- tab_khtd_pgd.py --- (1 hits)
+  L 582: "Nguồn vốn",
+         (hardcode: "Nguồn vốn")
+
+--- tab_khtd_xuat.py --- (1 hits)
+  L 360: "Nguồn vốn": nguon_von,
+         (hardcode: "Nguồn vốn")
+
+--- tab_no_khoanh.py --- (2 hits)
+  L  61: nhom["Dư nợ khoanh"] = nhom["du_no_khoanh"].apply(fmt_ty)
+         (hardcode: "Dư nợ khoanh")
+  L  63: return nhom[[nhom_col, "Số món", "Dư nợ khoanh", "Tỷ trọng%"]]
+         (hardcode: "Dư nợ khoanh")
+
+--- tab_no_rui_ro.py --- (4 hits)
+  L1679: f"(cột 'Nguồn vốn' trong HSTD gốc bị trống hoặc sai). "
+         (hardcode: "Nguồn vốn")
+  L1927: nv_t2 = st.selectbox("Nguồn vốn",
+         (hardcode: "Nguồn vốn")
+  L 746: _set_cell(h0[4], "Ngày vay", bold=True)
+         (hardcode: "Ngày vay")
+  L 958: _set_cell(h0[4], "Ngày vay", bold=True)
+         (hardcode: "Ngày vay")
+
+--- tab_so_sanh_ky.py --- (13 hits)
+  L 980: r2c2.metric("Dư nợ quá hạn", fmt_ty(agg_ht["du_no_qh"]),
+         (hardcode: "Dư nợ quá hạn")
+  L 932: if "Ngày số liệu" in df_ht.columns:
+         (hardcode: "Ngày số liệu")
+  L 933: sl = df_ht["Ngày số liệu"].dropna()
+         (hardcode: "Ngày số liệu")
+  L 983: r2c3.metric("Dư nợ khoanh", fmt_ty(agg_ht["du_no_khoanh"]),
+         (hardcode: "Dư nợ khoanh")
+  L 578: "du_no":   "Tổng dư nợ",
+         (hardcode: "Tổng dư nợ")
+  L 756: "du_no": "Tổng dư nợ",
+         (hardcode: "Tổng dư nợ")
+  L 962: r1c1.metric("Tổng dư nợ", fmt_ty(agg_ht["tong_du_no"]),
+         (hardcode: "Tổng dư nợ")
+  L1010: ("Tổng dư nợ",           agg_bl["tong_du_no"],    agg_ht["tong_du_no"],    "ty")
+         (hardcode: "Tổng dư nợ")
+  L 580: "so_ku":   "Số khế ước",
+         (hardcode: "Số khế ước")
+  L 758: "so_ku": "Số khế ước",
+         (hardcode: "Số khế ước")
+  L 775: xlab = "Số khế ước"
+         (hardcode: "Số khế ước")
+  L 965: r1c2.metric("Số khế ước", fmt_so(agg_ht["so_ku"]),
+         (hardcode: "Số khế ước")
+  L1018: ("Số khế ước",           agg_bl["so_ku"],         agg_ht["so_ku"],         "so")
+         (hardcode: "Số khế ước")
+
+--- tab_tongquan.py --- (5 hits)
+  L 345: "Dư nợ khoanh",
+         (hardcode: "Dư nợ khoanh")
+  L 586: col_khoanh = "Dư nợ khoanh" if "Dư nợ khoanh" in df.columns else None
+         (hardcode: "Dư nợ khoanh")
+  L 685: col_khoanh = "Dư nợ khoanh"
+         (hardcode: "Dư nợ khoanh")
+  L1343: c3.metric("Tổng dư nợ", fmt(tong_no))
+         (hardcode: "Tổng dư nợ")
+  L1245: "Xã":           "Tên xã",
+         (hardcode: "Tên xã")
+
+--- tab_tracuu.py --- (34 hits)
+  L 163: "Ngày số liệu", "Ngày giao dịch gần nhất",
+         (hardcode: "Ngày giao dịch gần nhất")
+  L 147: "Ngày ĐH theo hợp đồng", "Ngày đáo hạn", "Thời hạn vay",
+         (hardcode: "Ngày ĐH theo hợp đồng")
+  L 146: "Số khế ước", "Mã khế ước", "Ngày vay", "Ngày ĐH theo Gia hạn",
+         (hardcode: "Ngày ĐH theo Gia hạn")
+  L 162: "Tình trạng món vay", "Phân loại", "Phân loại NV",
+         (hardcode: "Tình trạng món vay")
+  L 153: "Lãi tồn", "Lãi DT trong tháng", "Lãi tồn TH",
+         (hardcode: "Lãi DT trong tháng")
+  L 158: "Tên chương trình", "Mã chương trình", "Nguồn vốn",
+         (hardcode: "Tên chương trình")
+  L 158: "Tên chương trình", "Mã chương trình", "Nguồn vốn",
+         (hardcode: "Mã chương trình")
+  L 151: "Tổng dư nợ", "Dư nợ trong hạn", "Dư nợ quá hạn",
+         (hardcode: "Dư nợ trong hạn")
+  L 151: "Tổng dư nợ", "Dư nợ trong hạn", "Dư nợ quá hạn",
+         (hardcode: "Dư nợ quá hạn")
+  L 402: "Dư nợ quá hạn",
+         (hardcode: "Dư nợ quá hạn")
+  L 142: "Giới tính", "Số điện thoại", "Địa chỉ", "Dân tộc",
+         (hardcode: "Số điện thoại")
+  L 159: "Mã nhà đầu tư", "Tên cấp QLV",
+         (hardcode: "Mã nhà đầu tư")
+  L 147: "Ngày ĐH theo hợp đồng", "Ngày đáo hạn", "Thời hạn vay",
+         (hardcode: "Thời hạn vay")
+  L 163: "Ngày số liệu", "Ngày giao dịch gần nhất",
+         (hardcode: "Ngày số liệu")
+  L 152: "Dư nợ khoanh", "Gốc đã trả", "Lãi đã trả",
+         (hardcode: "Dư nợ khoanh")
+  L 151: "Tổng dư nợ", "Dư nợ trong hạn", "Dư nợ quá hạn",
+         (hardcode: "Tổng dư nợ")
+  L 395: "Tổng dư nợ",
+         (hardcode: "Tổng dư nợ")
+  L 153: "Lãi tồn", "Lãi DT trong tháng", "Lãi tồn TH",
+         (hardcode: "Lãi tồn TH")
+  L  76: col_ku = "Số khế ước"
+         (hardcode: "Số khế ước")
+  L  97: col_ku = "Số khế ước"
+         (hardcode: "Số khế ước")
+  L 146: "Số khế ước", "Mã khế ước", "Ngày vay", "Ngày ĐH theo Gia hạn",
+         (hardcode: "Số khế ước")
+  L 332: for col_nq in ["Số khế ước", "Mã khách hàng"]:
+         (hardcode: "Số khế ước")
+  L 152: "Dư nợ khoanh", "Gốc đã trả", "Lãi đã trả",
+         (hardcode: "Gốc đã trả")
+  L 162: "Tình trạng món vay", "Phân loại", "Phân loại NV",
+         (hardcode: "Phân loại")
+  L 158: "Tên chương trình", "Mã chương trình", "Nguồn vốn",
+         (hardcode: "Nguồn vốn")
+  L 157: "Tên PGD", "Tên xã", "Tên thôn", "Tên ĐVUT", "Tên tổ",
+         (hardcode: "Tên ĐVUT")
+  L 146: "Số khế ước", "Mã khế ước", "Ngày vay", "Ngày ĐH theo Gia hạn",
+         (hardcode: "Ngày vay")
+  L 148: "Lãi suất", "Mức vay", "Mã món vay", "Số tiền giải ngân",
+         (hardcode: "Lãi suất")
+  L 157: "Tên PGD", "Tên xã", "Tên thôn", "Tên ĐVUT", "Tên tổ",
+         (hardcode: "Tên thôn")
+  L 148: "Lãi suất", "Mức vay", "Mã món vay", "Số tiền giải ngân",
+         (hardcode: "Mức vay")
+  L 142: "Giới tính", "Số điện thoại", "Địa chỉ", "Dân tộc",
+         (hardcode: "Địa chỉ")
+  L 157: "Tên PGD", "Tên xã", "Tên thôn", "Tên ĐVUT", "Tên tổ",
+         (hardcode: "Tên PGD")
+  L 157: "Tên PGD", "Tên xã", "Tên thôn", "Tên ĐVUT", "Tên tổ",
+         (hardcode: "Tên tổ")
+  L 157: "Tên PGD", "Tên xã", "Tên thôn", "Tên ĐVUT", "Tên tổ",
+         (hardcode: "Tên xã")
+
+--- tab_trang_thai_nguon.py --- (1 hits)
+  L 200: df_dates = pd.DataFrame(rows, columns=["Đơn vị", "Ngày số liệu"])
+         (hardcode: "Ngày số liệu")
+
+--- tab_upload_khnv.py --- (6 hits)
+  L  97: HSTD/GQVL : header=4, cột "Tên PGD" (sheet BCQUERY / Sheet1)
+         (hardcode: "Tên PGD")
+  L 389: HSTD     : sheet BCQUERY, header row 5 có cột 'Tên PGD'
+         (hardcode: "Tên PGD")
+  L 390: NQ11     : sheet BCQUERY, header row 5 không có 'Tên PGD', có 'Mã ĐVUT'
+         (hardcode: "Tên PGD")
+  L 472: HSTD/NQ11: sheet BCQUERY, header ở dòng 5 (pandas header=4), 1 dòng dữ liệu, cột
+         (hardcode: "Tên PGD")
+  L 486: usecols=["Tên PGD"],
+         (hardcode: "Tên PGD")
+  L  98: NQ11       : header=4, cột "Mã PGD" → tra MA_PGD_MAP
+         (hardcode: "Mã PGD")
+
+--- tab_upload_pgd.py --- (2 hits)
+  L  54: HSTD/GQVL : header=4, cột "Tên PGD"
+         (hardcode: "Tên PGD")
+  L  55: NQ11       : header=4, cột "Mã PGD" → tra MA_PGD_MAP
+         (hardcode: "Mã PGD")
+
+--- tab_uy_thac.py --- (1 hits)
+  L1308: so_ku = c1.text_input("Số khế ước", key="xm_sku")
+         (hardcode: "Số khế ước")
+

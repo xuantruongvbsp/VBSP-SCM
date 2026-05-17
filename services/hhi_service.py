@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import pandas as pd
 
+from config import COT_TONG_DU_NO
+
 
 def tinh_hhi(
     df: pd.DataFrame,
@@ -94,7 +96,7 @@ def danh_gia_hhi(hhi: float) -> tuple[str, str, str]:
 
 
 def _tim_cot_tien(df: pd.DataFrame) -> str:
-    for c in ["Tổng dư nợ", "Dư nợ", "Tổng_dư_nợ", "du_no"]:
+    for c in [COT_TONG_DU_NO, "Dư nợ", "Tổng_dư_nợ", "du_no"]:
         if c in df.columns:
             return c
     return ""

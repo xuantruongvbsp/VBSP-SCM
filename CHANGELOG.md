@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## [2026-05-17] — Chuyển "Cảnh báo NQH" thành accordion trong sidebar ws_management
+- `workspaces/ws_management.py` hàm `_build_all_items()` — thay item "Cảnh báo NQH" (fn) bằng item có `children` (5 nhánh con với default-arg lambda tránh late binding)
+- `workspaces/ws_management.py` hàm mới `_render_canh_bao_no_sub()` — dispatch 5 nhánh con theo `idx` (0=Đến hạn, 1=3tháng KHĐ, 2=Migration, 3=NQH phát sinh, 4=Cảnh báo sớm)
+- `workspaces/ws_management.py` hàm `render_sidebar_menu()` — accordion logic: nút cha toggle `ws_mgmt_acc_*`, nhánh con highlight active, `valid_labels` gồm cả child labels
+- `workspaces/ws_management.py` hàm `render()` — `valid_labels` mở rộng, dispatch tìm cả trong children khi `active_item` không có `fn`
+
 ## [2026-05-17] — Thêm menu item "Xuất báo cáo KHTD" vào ws_management.py
 - `workspaces/ws_management.py` dòng 52 — thêm `tab_khtd_xuat` vào import block từ tabs
 - `workspaces/ws_management.py` dòng 1103 — thêm menu item "Xuất báo cáo KHTD" trong group "Kế hoạch và Thực hiện KHTD" gọi `tab_khtd_xuat.render_xuat_baocao()` với tham số role, username, df_full

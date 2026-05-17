@@ -1374,38 +1374,37 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                         )
 
                         if nhom_col in df_loc.columns and len(tg) > 0:
-                            top_n = min(15, len(tg))
-                            top10 = tg.nlargest(top_n, "_no").sort_values("_no")
+                            top10 = tg.nlargest(10, "_no")
 
-                            fig = px.bar(
-                                top10,
-                                x="_no",
-                                y=nhom_col,
-                                orientation="h",
-                                color="_no",
-                                color_continuous_scale=[
-                                    [0.0, "#C8E6C9"],
-                                    [0.4, "#4CAF50"],
-                                    [1.0, "#1B5E20"],
-                                ],
-                                text="Dư nợ (triệu đồng)",
-                                labels={"_no": "Dư nợ", nhom_col: nhom_chon},
-                                height=max(320, top_n * 38),
-                            )
-                            fig.update_traces(
+                            fig = go.Figure(go.Pie(
+                                labels=top10[nhom_col],
+                                values=top10["_no"],
+                                hole=0.5,
+                                textinfo="label+percent",
                                 textposition="outside",
-                                hovertemplate="<b>%{y}</b><br>Dư nợ: %{text}<extra></extra>",
-                            )
+                                hovertemplate="<b>%{label}</b><br>Dư nợ: %{customdata}<br>Tỷ lệ: %{percent}<extra></extra>",
+                                customdata=top10["Dư nợ (triệu đồng)"],
+                                marker=dict(
+                                    colors=px.colors.sequential.Greens_r[: len(top10)],
+                                    line=dict(color="white", width=2),
+                                ),
+                            ))
+
                             fig.update_layout(
-                                title=f"Top {top_n} {nhom_chon} — dư nợ đến hạn cao nhất",
-                                coloraxis_showscale=False,
-                                xaxis=dict(showticklabels=False, title=""),
-                                yaxis=dict(title=""),
-                                margin=dict(l=10, r=130, t=50, b=10),
+                                title=f"Top 10 {nhom_chon} có dư nợ đến hạn cao nhất",
+                                height=450,
+                                annotations=[dict(
+                                    text=f"<b>{fmt(tong_no)}</b><br>Tổng dư nợ",
+                                    x=0.5, y=0.5,
+                                    font=dict(size=13),
+                                    showarrow=False,
+                                )],
+                                legend=dict(orientation="v", x=1.05, y=0.5),
+                                margin=dict(l=0, r=150, t=50, b=0),
                                 paper_bgcolor="rgba(0,0,0,0)",
-                                plot_bgcolor="rgba(0,0,0,0)",
                             )
-                            st.plotly_chart(fig, width='stretch', key=f"bar_den_han_{key_prefix}")
+
+                            st.plotly_chart(fig, width='stretch', key=f"pie_den_han_{key_prefix}")
 
                         if tg is not None:
                             st.divider()

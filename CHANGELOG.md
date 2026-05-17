@@ -1,5 +1,14 @@
 # CHANGELOG
 
+## [2026-05-17] — Nâng cấp tab_khtd_xuat.py: preview + Excel 23 sheet
+- `tabs/tab_khtd_xuat.py` dòng 12 — thêm `PGD_XA_MAP`, `DON_VI_CHI_NHANH` vào import config; xóa import `ExcelReport`
+- `tabs/tab_khtd_xuat.py` hàm `xuat_khtd_theo_xa()` — xuất 23 sheet: tổng CN + 22 đơn vị (Hội sở CN tỉnh + 21 PGD) lọc theo `PGD_XA_MAP`
+- `tabs/tab_khtd_xuat.py` hàm `render_xuat_baocao()` — expander preview dùng `XA_TO_PGD.items()`, cột "Đơn vị" thay "PGD"
+
+## [2026-05-17] — Sửa 2 lỗi trong tab_trang_thai_nguon.py
+- `tabs/tab_trang_thai_nguon.py` dòng 339 — sửa đơn vị tiền tệ: `/1e9` → `/1e12` (VND → tỷ đồng)
+- `tabs/tab_trang_thai_nguon.py` dòng 387–398 — xóa check plaintext password, thay bằng check `ngay_doi_mk IS NULL` (bcrypt-safe)
+
 ## [2026-05-17] — Thêm checkbox số công văn trong UI xuất PDF tab NQH
 - `workspaces/ws_management.py` dòng ~508–526 — checkbox "Có số công văn": khi check hiện 2 ô (text_input Số hiệu + selectbox Loại văn bản); khi không check bỏ qua, PDF xuất không có số
 

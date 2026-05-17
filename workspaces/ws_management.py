@@ -233,6 +233,39 @@ def _render_canh_bao_no(df_full: pd.DataFrame, ds_pgd_all: list, role: str, user
         )
 
 
+def _render_canh_bao_no_sub(
+    df_full: pd.DataFrame,
+    ds_pgd_all: list,
+    role: str,
+    username: str,
+    idx: int,
+) -> None:
+    """Render 1 trong 5 nhánh con Cảnh báo NQH theo idx."""
+    from tabs.tab_den_han import render as render_den_han
+    from tabs import tab_canh_bao_som
+
+    if idx == 0:
+        render_den_han(role=role)
+        return
+
+    if df_full is None or df_full.empty:
+        st.warning("Chưa có dữ liệu HSTD.")
+        return
+
+    df_kh = danh_dau_khong_hd_cached(df_full)
+
+    if idx == 1:
+        _hien_thi_khd_tab(df_kh, ds_pgd_all)
+    elif idx == 2:
+        _hien_thi_migration_tab(df_kh, ds_pgd_all)
+    elif idx == 3:
+        _hien_thi_nqh_tab(df_kh, username)
+    elif idx == 4:
+        tab_canh_bao_som._render_canh_bao(
+            df_kh, ds_pgd_all, key_prefix="cn_", la_cn=True
+        )
+
+
 def _hien_thi_khd_tab(df_kh: pd.DataFrame, ds_pgd_all: list):
     """Sub-tab: 3 tháng không hoạt động."""
     khd_tong = int(df_kh["is_3m_inactive"].sum()) if "is_3m_inactive" in df_kh.columns else 0
@@ -1088,7 +1121,18 @@ def _build_all_items(role: str, username: str, **kwargs) -> list:
         {"group": "Phối hợp với PGD", "label": "Tiến độ Công việc",        "icon": "calendar",  "fn": lambda: tab_tien_do.render(None, **kwargs)},
         {"group": "Phối hợp với PGD", "label": "Tiến độ Báo cáo của PGD", "icon": "file",      "fn": lambda: tab_tien_do_nop.render(None, **kwargs)},
         {"group": "Giám sát",     "label": "Tổng quan CN", "icon": "chart-bar",      "fn": lambda: tab_tongquan.render(None, **kwargs)},
-        {"group": "Giám sát",     "label": "Cảnh báo NQH",     "icon": "alert-triangle", "fn": lambda: _render_canh_bao_no(df_full, ds_pgd_all, role, kwargs.get("username", "unknown"))},
+        {
+            "group": "Giám sát",
+            "label": "Cảnh báo NQH",
+            "icon": "alert-triangle",
+            "children": [
+                {"label": "⏰ Đến hạn",         "fn": lambda df_full=df_full, ds_pgd_all=ds_pgd_all, role=role, username=kwargs.get("username", "unknown"), idx=0: _render_canh_bao_no_sub(df_full, ds_pgd_all, role, username, idx)},
+                {"label": "🔴 3 tháng KHĐ",     "fn": lambda df_full=df_full, ds_pgd_all=ds_pgd_all, role=role, username=kwargs.get("username", "unknown"), idx=1: _render_canh_bao_no_sub(df_full, ds_pgd_all, role, username, idx)},
+                {"label": "🚨 Nợ BT → Rủi ro",  "fn": lambda df_full=df_full, ds_pgd_all=ds_pgd_all, role=role, username=kwargs.get("username", "unknown"), idx=2: _render_canh_bao_no_sub(df_full, ds_pgd_all, role, username, idx)},
+                {"label": "📋 Nợ QH phát sinh", "fn": lambda df_full=df_full, ds_pgd_all=ds_pgd_all, role=role, username=kwargs.get("username", "unknown"), idx=3: _render_canh_bao_no_sub(df_full, ds_pgd_all, role, username, idx)},
+                {"label": "⚡ Cảnh báo sớm",    "fn": lambda df_full=df_full, ds_pgd_all=ds_pgd_all, role=role, username=kwargs.get("username", "unknown"), idx=4: _render_canh_bao_no_sub(df_full, ds_pgd_all, role, username, idx)},
+            ],
+        },
         {"group": "Giám sát",     "label": "Giao & Theo dõi Nhiệm vụ", "icon": "check",  "fn": lambda: tab_nhiem_vu.render(None, **kwargs)},
         {"group": "Giám sát",     "label": "So sánh kỳ",            "icon": "chart-line", "fn": lambda: tab_so_sanh_ky.render(None, **kwargs)},
         {"group": "Kiểm soát",     "label": "Kiểm soát nội bộ",    "icon": "search",         "fn": lambda: tab_kiem_soat.render_tab(df_full, role, kwargs.get("username", "unknown"))},

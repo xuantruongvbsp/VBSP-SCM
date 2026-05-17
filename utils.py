@@ -527,14 +527,14 @@ def _tinh_so_lieu_klgb(df: "pd.DataFrame") -> dict:
 
     # 3 tháng không hoạt động — tổng hợp theo ĐVUT
     df_kh = danh_dau_khong_hd(df)
-    khd   = tong_hop_khong_hd(df_kh, nhom_theo="Tên ĐVUT")
+    khd   = tong_hop_khong_hd(df_kh, nhom_theo=COT_DVUT)
 
     # Điền từng ĐVUT theo đúng tên thực tế trong file HSTD
     tong_3m = 0
     for ten_dvut_thuc, tag_key in DVUT_TAG_KEY.items():
         so_mon = 0
-        if not khd.empty and "Tên ĐVUT" in khd.columns:
-            r = khd[khd["Tên ĐVUT"].str.lower() == ten_dvut_thuc.lower()]
+        if not khd.empty and COT_DVUT in khd.columns:
+            r = khd[khd[COT_DVUT].str.lower() == ten_dvut_thuc.lower()]
             so_mon = int(r["Món_3m_KHĐ"].sum()) if not r.empty else 0
         so_lieu[tag_key] = str(so_mon)
         tong_3m += so_mon

@@ -20,6 +20,7 @@ import duckdb
 import pandas as pd
 
 from config import (
+    COT_DU_NO_KHOANH,
     FILE_PATH, FILE_PATH_NQ11, FILE_PATH_DB, FILE_PATH_DB_PREV,
     FILE_PATH_SK_GQVL, CACHE_SK_GQVL,
     TEN_FILE, TEN_FILE_NQ11, TEN_FILE_DB, TEN_FILE_DB_PREV,
@@ -73,7 +74,7 @@ def _load_hstd(
         clauses.append(
             f'(COALESCE(TRY_CAST("{COT_TONG_DU_NO}" AS DOUBLE), 0) > 0'
             f' OR COALESCE(TRY_CAST("{COT_DU_NO_QH}" AS DOUBLE), 0) > 0'
-            f' OR COALESCE(TRY_CAST("Dư nợ khoanh" AS DOUBLE), 0) > 0)'
+            f' OR COALESCE(TRY_CAST("{COT_DU_NO_KHOANH}" AS DOUBLE), 0) > 0)'
         )
 
     where_sql = f"WHERE {' AND '.join(clauses)}" if clauses else ""

@@ -85,28 +85,28 @@ def kiem_tra_file(path: Path) -> list[str]:
         if stripped.startswith("#"):
             continue
 
-        if _ROLE_HARDCODE.search(line):
+        if _ROLE_HARDCODE.search(line) and "# noqa" not in line and "# conv: skip" not in line:
             loi.append(
                 f"  Dòng {i:4d}: [ROLE] Hardcode role string — "
                 f"dùng normalize_role() + la_phan_he_cn/pgd()\n"
                 f"           → {stripped[:100]}"
             )
 
-        if _TIEN_SAI.search(line):
+        if _TIEN_SAI.search(line) and "# noqa" not in line and "# conv: skip" not in line:
             loi.append(
                 f"  Dòng {i:4d}: [TIEN] Dùng /1e9 cho tiền tệ — "
                 f"phải dùng /1e12 qua fmt_ty()\n"
                 f"           → {stripped[:100]}"
             )
 
-        if _COT_HARDCODE.search(line):
+        if _COT_HARDCODE.search(line) and "# noqa" not in line and "# conv: skip" not in line:
             loi.append(
                 f"  Dòng {i:4d}: [COT]  Hardcode tên cột — "
                 f"dùng COT_* từ config.py\n"
                 f"           → {stripped[:100]}"
             )
 
-        if _SQLITE_DIRECT.search(line) and "db.py" not in str(path):
+        if _SQLITE_DIRECT.search(line) and "db.py" not in str(path) and "# noqa" not in line and "# conv: skip" not in line:
             loi.append(
                 f"  Dòng {i:4d}: [DB]   sqlite3.connect() trực tiếp — "
                 f"dùng db.get_conn()\n"

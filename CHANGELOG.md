@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## [2026-05-17] — Tạo 2 file test mới cho upload_service và snapshot_service
+- `tests/test_upload_service.py` — 11 test case: KetQuaUpload (4), kiem_tra_file (6), kiem_tra_file_he_thong (3); dùng mock không cần file/DB thật
+- `tests/test_snapshot_service.py` — 18 test case: _ky_tu_df (4), luu_snapshot (6), doc_snapshot (3), doc_snapshot_range (2), danh_sach_ky (3), xoa_snapshot (2); dùng SQLite in-memory
+- Tên cột fixture khớp với COT_* thực tế trong config.py
+
 ## [2026-05-17] — Tạo pre-commit hook kiểm tra convention VBSP-SCM
 - `scripts/check_conventions.py` — kiểm tra: role hardcode, tiền tệ sai đơn vị, cột hardcode, sqlite3.connect() trực tiếp, ghi_kv không có ghi_audit
 - `.git/hooks/pre-commit` — thay thế bằng hook mới gọi `check_conventions.py` trên staged *.py files; exit 1 nếu có vi phạm, `git commit --no-verify` để bỏ qua

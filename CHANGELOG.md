@@ -1,5 +1,8 @@
 # CHANGELOG
 
+## [2026-05-17] — Fix bảng trạng thái 22 đơn vị không cập nhật sau upload đơn lẻ
+- `tabs/tab_upload_khnv.py` `_xu_ly_upload()` — thêm `pop("trang_thai_upload_pgd")` sau upload thành công; trước đây bảng 22 đơn vị đọc từ session_state cũ sau rerun nên vẫn hiện ❌/⚠️ dù file đã lưu xong (bulk import đã làm đúng, single upload còn thiếu bước này)
+
 ## [2026-05-17] — Upload KH-NV: song song hóa xử lý 4 file bằng ThreadPoolExecutor
 - `tabs/tab_upload_khnv.py` — tách `_xu_ly_mot_file_khnv()` module-level (thread-safe: không gọi st.* / db.*); `_xu_ly_upload()` dùng `ThreadPoolExecutor(max_workers=4)` để xử lý song song → thời gian giảm từ N×parse xuống còn max(parse) thay vì tổng; ghi audit tuần tự sau khi tất cả thread xong
 

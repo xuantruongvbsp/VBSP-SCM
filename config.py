@@ -256,14 +256,20 @@ GQVL_COT_MAP = {
 
 # HSTD — DS cho vay / thu nợ trong năm (tab Tổng quan bảng PGD; khớp GQVL + alias Excel)
 HSTD_DS_CHO_VAY_NAM_ALIASES = (
-    GQVL_COT_MAP["Giải ngân trong năm"],
+    GQVL_COT_MAP["Giải ngân trong năm"],  # "Giải ngân trong năm"
     "Giải ngân Năm",
     "Giải ngân năm",
+    "Doanh số cho vay năm",
+    "Doanh số CV năm",
+    "Cho vay trong năm",
 )
 HSTD_THU_NO_NAM_ALIASES = (
+    "Thu nợ trong năm",   # tên thực tế trong HSTD BCQUERY
     "Thu nợ TH Năm",
     "Thu nợ QH Năm",
     "Thu nợ Khoanh Năm",
+    "Doanh số thu nợ năm",
+    "Thu nợ năm",
 )
 
 DB_HT_CACHE   = str(CACHE_DIR / "dienbao_ht.xlsx")

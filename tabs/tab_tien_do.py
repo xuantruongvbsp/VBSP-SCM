@@ -194,7 +194,7 @@ def _render_tong_quan(tab, **kwargs):
                 "Đầu việc": t["tieu_de"][:35],
                 "% Hoàn thành": round(xong / tong * 100) if tong else 0,
                 "Ưu tiên": UU_TIEN.get(t["uu_tien"], ""),
-                "Thời hạn": t["ngay_deadline"],
+                "Thời hạn": fmt_ngay(t["ngay_deadline"]),
             })
         df_chart = pd.DataFrame(chart_rows)
         color_map = {
@@ -239,13 +239,13 @@ def _render_tong_quan(tab, **kwargs):
                 st.caption(
                     f"**{pgd_dd}** — {task_sel['tieu_de']} · "
                     f"Hoàn thành: **{xong}/{len(kq_xa)}** · "
-                    f"Thời hạn: {task_sel['ngay_deadline']}"
+                    f"Thời hạn: {fmt_ngay(task_sel['ngay_deadline'])}"
                 )
                 df_xa = pd.DataFrame([
                     {
                         "Xã / Phường": r["ten_xa"],
                         "Trạng thái": TS_KQ_LABEL.get(r["trang_thai"], r["trang_thai"]),
-                        "Ngày HT": r.get("ngay_hoan_thanh") or "—",
+                        "Ngày HT": fmt_ngay(r.get("ngay_hoan_thanh")) or "—",
                         "Ghi chú": r.get("ghi_chu") or "",
                         "Người nhập": r.get("nguoi_nhap") or "",
                     }
@@ -425,7 +425,7 @@ def _render_quan_ly_task(tab, **kwargs):
         def _fmt_task(task_id: int) -> str:
             t = task_map.get(task_id) or {}
             stt = "[ĐANG]" if t.get("trang_thai") == "dang_theo_doi" else "[ĐÓNG]"
-            return f"{stt} {t.get('tieu_de','')} · {t.get('ngay_deadline','')}"
+            return f"{stt} {t.get('tieu_de','')} · {fmt_ngay(t.get('ngay_deadline',''))}"
 
         task_id = st.selectbox(
             "Chọn đầu việc",
@@ -647,7 +647,7 @@ def _render_cap_nhat(tab, **kwargs):
         with st.container(border=True):
             st.markdown("**① CHỌN ĐẦU VIỆC**")
 
-            task_opts = {t["id"]: f"{t['tieu_de']} · ⏰ {t['ngay_deadline']}"
+            task_opts = {t["id"]: f"{t['tieu_de']} · ⏰ {fmt_ngay(t['ngay_deadline'])}"
                          for t in ds_task}
             task_id = st.selectbox(
                 "Đầu việc",
@@ -680,10 +680,10 @@ def _render_cap_nhat(tab, **kwargs):
             st.caption(
                 f"**{task['tieu_de']}** · {tag_nd} · "
                 f"{LOAI_TASK.get(task['loai'], task['loai'])} · "
-                f"Thời hạn: **{task['ngay_deadline']}** · "
+                f"Thời hạn: **{fmt_ngay(task['ngay_deadline'])}** · "
                 f"{UU_TIEN.get(task['uu_tien'], '')}"
                 + (f" · Người PT: {nguoi_pt}" if nguoi_pt else "")
-                + (f" · Từ: {ngay_bd}" if ngay_bd else "")
+                + (f" · Từ: {fmt_ngay(ngay_bd)}" if ngay_bd else "")
             )
             if badge:
                 st.markdown(f"**{badge}**")
@@ -1010,7 +1010,7 @@ def _render_xuat(tab, **kwargs):
             def _fmt_task_pdf(task_id):
                 t = task_map_pdf.get(task_id) or {}
                 stt = "[ĐANG]" if t.get("trang_thai") == "dang_theo_doi" else "[ĐÓNG]"
-                return f"{stt} {t.get('tieu_de','')} · {t.get('ngay_deadline','')}"
+                return f"{stt} {t.get('tieu_de','')} · {fmt_ngay(t.get('ngay_deadline',''))}"
 
             task_id_pdf = st.selectbox(
                 "Chọn đầu việc",

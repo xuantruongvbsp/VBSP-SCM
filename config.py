@@ -325,6 +325,7 @@ COT_DVUT       = "Tên ĐVUT"
 COT_PHAN_LOAI  = "Phân loại"
 # Ngày giao dịch gần nhất (KU_NGAYGDGN từ core banking — cột 130 HSTD)
 COT_NGAY_GDGN = "Ngày giao dịch gần nhất"
+COT_HINH_THUC_VAY = "Hình thức vay"      # hình thức vay (1=NHCSXH, 2=ủy thác,...)
 
 # ── Cột dữ liệu NQ11 (khác tên so với HSTD) ──────────────────────────────────
 COT_DNO_NQ11        = "DNO NQ11"

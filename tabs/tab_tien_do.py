@@ -327,21 +327,30 @@ Bỏ chọn nếu chỉ áp dụng cho một số PGD cụ thể.
                     key="tao_task_nguoi_pt",
                 )
             with c2:
-                deadline = st.date_input("Thời hạn hoàn thành *", value=date.today(),
+                deadline = st.date_input("Ngày kết thúc *", value=date.today(),
                                           key="tao_task_deadline")
                 ngay_bat_dau = st.date_input(
                     "Ngày bắt đầu",
                     value=date.today(),
                     key="tao_task_ngay_bat_dau",
                 )
-                pgd_chon = st.multiselect(
-                    "Áp dụng cho đơn vị",
-                    DS_PGD_ALL, default=DS_PGD_ALL,
-                    placeholder="Mặc định: tất cả 22 đơn vị",
-                    key="tao_task_pgd",
-                )
+
+            st.markdown("**Áp dụng cho đơn vị**")
+            _cc1, _cc2, _cc3 = st.columns(3)
+            pgd_chon = []
+            for _i, _pgd in enumerate(DS_PGD_ALL):
+                with [_cc1, _cc2, _cc3][_i % 3]:
+                    if st.checkbox(_pgd, value=True, key=f"tao_task_pgd_{_i}"):
+                        pgd_chon.append(_pgd)
 
             ds_preview = pgd_chon or DS_PGD_ALL
+            _so_chon = len(pgd_chon)
+            _so_bo = len(DS_PGD_ALL) - _so_chon
+            _thong_ke = f"✅ **{_so_chon}** đơn vị được chọn"
+            if _so_bo > 0:
+                _khong_chon = [p for p in DS_PGD_ALL if p not in pgd_chon]
+                _thong_ke += f" · ❌ **{_so_bo}** không chọn: {', '.join(_khong_chon)}"
+            st.caption(_thong_ke)
             if loai_theo_doi == "pgd":
                 st.caption(f"🏢 {len(ds_preview)} đơn vị — theo dõi cấp PGD")
             else:
@@ -351,7 +360,6 @@ Bỏ chọn nếu chỉ áp dụng cho một số PGD cụ thể.
                 st.caption(
                     f"📍 {len(ds_preview)} đơn vị · {tong_xa_preview} xã/phường"
                 )
-            ghi_chu = st.text_area("Ghi chú thêm", height=68, key="tao_task_ghi_chu")
             submitted = st.form_submit_button("💾 Tạo đầu việc", type="primary")
 
         if submitted:
@@ -372,7 +380,7 @@ Bỏ chọn nếu chỉ áp dụng cho một số PGD cụ thể.
                          deadline.isoformat(), ds_pgd_json,
                          loai, uu_tien, username,
                          datetime.now().isoformat(),
-                         ghi_chu.strip() or None,
+                         None,
                          loai_theo_doi,
                          ngay_bat_dau.isoformat(),
                          nguoi_phu_trach.strip() or None),
@@ -474,7 +482,7 @@ def _render_quan_ly_task(tab, **kwargs):
                 key=f"td_sua_uu_tien_{task_id}",
             )
             deadline = st.date_input(
-                "Thời hạn hoàn thành *",
+                "Ngày kết thúc *",
                 value=deadline_default,
                 key=f"td_sua_deadline_{task_id}",
             )
@@ -1664,7 +1672,7 @@ def render(tab, **kwargs):
             return
 
         t1, t2, t3, t4, t5 = st.tabs([
-            "📊 Tổng quan", "➕ Tạo đầu việc", "✏️ Chỉnh sửa & Xóa đầu việc",
+            "📊 Tổng quan", "➕ Tạo đầu việc mới", "✏️ Chỉnh sửa & Xóa đầu việc",
             "📋 Cập nhật tiến độ", "📤 Xuất báo cáo",
         ])
         with t1:

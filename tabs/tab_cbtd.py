@@ -21,7 +21,7 @@ import streamlit as st
 import pandas as pd
 
 import db
-from config import COT_MA_KH, COT_SO_KU, COT_TONG_DU_NO, COT_DU_NO_QH, DS_PGD, DON_VI_CHI_NHANH
+from config import COT_HINH_THUC_VAY, COT_MA_KH, COT_SO_KU, COT_TEN_THON, COT_TEN_XA, COT_TONG_DU_NO, COT_DU_NO_QH, DS_PGD, DON_VI_CHI_NHANH
 from auth import la_phan_he_cn, normalize_role
 from utils import xuat_excel, hien_thi_dataframe_phan_trang, fmt_so
 from data.khtd import doc_cbtd, luu_cbtd, lay_ap_tu_dgd_list, gan_cbtd_vao_df
@@ -245,8 +245,8 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                 if df is not None and not df.empty and ds_dgd_xem and pgd_xem:
                     df_cb_xem = gan_cbtd_vao_df(df, {chon: info_xem}, dgd_map)
                     df_cb_xem = df_cb_xem[df_cb_xem["CBTD"] == chon].copy()
-                    if "Hình thức vay" in df_cb_xem.columns:
-                        df_cb_xem = df_cb_xem[df_cb_xem["Hình thức vay"] != 1]
+                    if COT_HINH_THUC_VAY in df_cb_xem.columns:
+                        df_cb_xem = df_cb_xem[df_cb_xem[COT_HINH_THUC_VAY] != 1]
 
                     tdn = df_cb_xem[COT_TONG_DU_NO].sum() if COT_TONG_DU_NO in df_cb_xem.columns else 0
                     dqh = df_cb_xem[COT_DU_NO_QH].sum()   if COT_DU_NO_QH   in df_cb_xem.columns else 0
@@ -259,9 +259,9 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                     mx4.metric("Tỷ lệ QH", f"{tlqh:.2f}%",
                                delta="⚠" if tlqh >= 2 else None, delta_color="inverse")
 
-                    if "Tên thôn" in df_cb_xem.columns and "Tên xã" in df_cb_xem.columns:
+                    if COT_TEN_THON in df_cb_xem.columns and COT_TEN_XA in df_cb_xem.columns:
                         st.markdown("**Tổng hợp theo ấp**")
-                        th_ap = df_cb_xem.groupby(["Tên xã", "Tên thôn"]).agg(
+                        th_ap = df_cb_xem.groupby([COT_TEN_XA, COT_TEN_THON]).agg(
                             Số_KH       =(COT_MA_KH, "nunique"),
                             Tổng_dư_nợ =(COT_TONG_DU_NO, "sum"),
                             Dư_nợ_QH   =(COT_DU_NO_QH, "sum"),
@@ -270,7 +270,7 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                         th_ap["Dư nợ QH (tr.đ)"]   = th_ap["Dư_nợ_QH"].apply(_fmt_tien)
                         th_ap["QH %"] = (th_ap["Dư_nợ_QH"]/th_ap["Tổng_dư_nợ"]*100).fillna(0).round(2)
                         hien_thi_dataframe_phan_trang(
-                            th_ap[["Tên xã","Tên thôn","Số_KH","Tổng dư nợ (tr.đ)","Dư nợ QH (tr.đ)","QH %"]],
+                            th_ap[[COT_TEN_XA, COT_TEN_THON, "Số_KH", "Tổng dư nợ (tr.đ)", "Dư nợ QH (tr.đ)", "QH %"]],
                             key="cbtd_ct_ap",
                         )
 
@@ -497,8 +497,8 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
 
         # Join toàn bộ df với cbtd
         df_joined = gan_cbtd_vao_df(df, cbtd_co_dgd, dgd_map)
-        if "Hình thức vay" in df_joined.columns:
-            df_joined = df_joined[df_joined["Hình thức vay"] != 1]
+        if COT_HINH_THUC_VAY in df_joined.columns:
+            df_joined = df_joined[df_joined[COT_HINH_THUC_VAY] != 1]
 
         rows_bc = []
         for ma, info in cbtd_co_dgd.items():

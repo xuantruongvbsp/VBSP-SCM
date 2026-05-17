@@ -1,5 +1,26 @@
 # CHANGELOG
 
+## [2026-05-17] — Tab Tổng quan: gộp 4 tab tháng → slider, đổi biểu đồ Pie → bar màu
+- `tabs/tab_tongquan.py` — xóa 4 sub-tab (1/3/6 tháng / Trong năm), thay bằng select_slider
+- `tabs/tab_tongquan.py` — đổi Donut Pie → horizontal bar chart với color gradient xanh lá
+
+## [2026-05-17] — Chuyển Tiến độ Công việc & Tiến độ Báo cáo vào nhóm Phối hợp với PGD
+- `workspaces/ws_management.py` — di chuyển 2 item từ nhóm Giám sát sang nhóm Phối hợp với PGD
+
+## [2026-05-17] — Thêm phân hệ "Phối hợp với PGD" vào MENU ĐIỀU HÀNH
+- `tabs/tab_phoi_hop_pgd.py` — tạo mới: CRUD phiếu phối hợp CN↔PGD, lưu kv_store
+- `workspaces/ws_management.py` dòng 51 — import tab_phoi_hop_pgd
+- `workspaces/ws_management.py` dòng ~1011 — thêm group "Phối hợp với PGD" ngang hàng Giám sát/Ủy Thác
+- `workspaces/ws_management.py` dòng ~1038 — thêm màu xanh lá cho group mới vào GROUP_COLORS
+
+## [2026-05-17] — Form tạo đầu việc: xóa Ghi chú thêm, đổi Áp dụng cho đơn vị sang checkbox
+- `tabs/tab_tien_do.py` dòng ~337 — xóa multiselect "Áp dụng cho đơn vị", thay bằng lưới checkbox 3 cột
+- `tabs/tab_tien_do.py` dòng ~354 — xóa field "Ghi chú thêm"
+
+## [2026-05-17] — Đổi tên tab và nhãn field trong tab Tiến độ Công việc
+- `tabs/tab_tien_do.py` dòng 1667 — tab "➕ Tạo đầu việc" → "➕ Tạo đầu việc mới"
+- `tabs/tab_tien_do.py` dòng 330, 477 — nhãn field "Thời hạn hoàn thành" → "Ngày kết thúc"
+
 ## [2026-05-17] — Đổi tên tab menu "Tiến độ PGD" thành "Tiến độ Báo cáo của PGD"
 - `workspaces/ws_management.py` dòng 994 — đổi label
 

@@ -563,13 +563,16 @@ def _lay_ds_ma_key_co_du_lieu(
 
     # Từ df_full (HSTD hiện tại)
     if df_full is not None and not df_full.empty:
-        required_cols = ["Tên xã", "Tên thôn", "Mã chương trình", "Nguồn vốn"]
-        if all(col in df_full.columns for col in required_cols):
-            df_xa = df_full[df_full["Tên xã"] == ten_xa].copy()
-            df_xa = df_xa.dropna(subset=["Mã chương trình", "Nguồn vốn"])
+        col_xa  = next((c for c in [COT_TEN_XA, "Tên xã"] if c in df_full.columns), None)
+        col_thon = next((c for c in [COT_TEN_THON, "Tên thôn"] if c in df_full.columns), None)
+        col_mact = next((c for c in [COT_MA_CHUONG_TRINH, "Mã chương trình"] if c in df_full.columns), None)
+        col_nv   = next((c for c in [COT_NGUON_VON, "Nguồn vốn"] if c in df_full.columns), None)
+        if col_xa and col_mact and col_nv:
+            df_xa = df_full[df_full[col_xa] == ten_xa].copy()
+            df_xa = df_xa.dropna(subset=[col_mact, col_nv])
             for _, row in df_xa.iterrows():
-                ma_ct = int(row["Mã chương trình"])
-                nguon_von_code = int(row["Nguồn vốn"])
+                ma_ct = int(row[col_mact])
+                nguon_von_code = int(row[col_nv])
                 ma_key = MAKEY_BY_MACT_NV.get((ma_ct, nguon_von_code))
                 if ma_key:
                     ds_ma_key.add(ma_key)
@@ -796,9 +799,10 @@ def render(tab, **kwargs) -> None:
                 ten_xa_mapping[xa_pgd] = mapped
 
         # Fuzzy matching (chuẩn hóa) cho các xã chưa có mapping
+        cot_xa_full = next((c for c in [COT_TEN_XA, "Tên xã"] if df_full is not None and c in df_full.columns), None)
         if df_full is not None and isinstance(df_full, pd.DataFrame) and not df_full.empty:
-            if "Tên xã" in df_full.columns:
-                ds_xa_co_data = df_full["Tên xã"].dropna().unique()
+            if cot_xa_full:
+                ds_xa_co_data = df_full[cot_xa_full].dropna().unique()
                 for xa_pgd in ds_xa_pgd:
                     if xa_pgd in ten_xa_mapping:
                         continue
@@ -816,8 +820,8 @@ def render(tab, **kwargs) -> None:
             if st.query_params.get("debug") == "1":
                 with st.expander("🔍 Debug: Mapping xã", expanded=False):
                     st.write("**Từ PGD_XA_MAP:**", ds_xa_pgd)
-                    if df_full is not None and "Tên xã" in df_full.columns:
-                        st.write("**Trong HSTD:**", sorted(df_full["Tên xã"].dropna().unique().tolist())[:20])
+                    if cot_xa_full:
+                        st.write("**Trong HSTD:**", sorted(df_full[cot_xa_full].dropna().unique().tolist())[:20])
                     st.write("**Mapping:**", ten_xa_mapping if ten_xa_mapping else "(Tất cả tên khớp trực tiếp)")
 
             xa_chon_raw = st.selectbox("Chọn Xã/Phường", ds_xa_pgd, key="m07_xa")
@@ -827,8 +831,8 @@ def render(tab, **kwargs) -> None:
             xa_chon = ten_xa_mapping.get(xa_chon_raw, xa_chon_raw)
             if st.query_params.get("debug") == "1" and xa_chon != xa_chon_raw:
                 st.caption(f"📌 Mapping: '{xa_chon_raw}' → '{xa_chon}' (trong HSTD)")
-            elif df_full is not None and "Tên xã" in df_full.columns:
-                ds_xa_co_data = df_full["Tên xã"].dropna().unique()
+            elif cot_xa_full:
+                ds_xa_co_data = df_full[cot_xa_full].dropna().unique()
                 if xa_chon not in ds_xa_co_data:
                     st.warning(f"⚠️ Xã '{xa_chon}' không tìm thấy trong HSTD. Kiểm tra XA_NAME_MAP hoặc tên xã.")
 
@@ -942,9 +946,11 @@ def render(tab, **kwargs) -> None:
         # Nguồn 3: Từ HSTD hiện tại (df_full) - đã lấy từ kwargs ở trên
         ds_ap_from_hstd_current = set()
         if df_full is not None and isinstance(df_full, pd.DataFrame) and not df_full.empty:
-            if "Tên xã" in df_full.columns and "Tên thôn" in df_full.columns:
-                df_xa_full = df_full[df_full["Tên xã"] == xa_chon]
-                ap_list = df_xa_full["Tên thôn"].dropna().astype(str).str.strip()
+            col_xa_hstd = next((c for c in [COT_TEN_XA, "Tên xã"] if c in df_full.columns), None)
+            col_thon_hstd = next((c for c in [COT_TEN_THON, "Tên thôn"] if c in df_full.columns), None)
+            if col_xa_hstd and col_thon_hstd:
+                df_xa_full = df_full[df_full[col_xa_hstd] == xa_chon]
+                ap_list = df_xa_full[col_thon_hstd].dropna().astype(str).str.strip()
                 ds_ap_from_hstd_current = set(ap_list[ap_list != ""].unique())
 
         # Nguồn 4: Từ lịch sử

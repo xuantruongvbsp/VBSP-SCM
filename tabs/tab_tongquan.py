@@ -1231,12 +1231,6 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                 hn       = pd.Timestamp.today().normalize()
                 cuoi_nam = pd.Timestamp(hn.year, 12, 31)
 
-                MOC = {
-                    "1 tháng":   hn + pd.Timedelta(days=30),
-                    "3 tháng":   hn + pd.Timedelta(days=90),
-                    "6 tháng":   hn + pd.Timedelta(days=180),
-                    "Trong năm": cuoi_nam,
-                }
 
                 # Lựa chọn nhóm tổng hợp
                 nhom_chon = st.radio(
@@ -1271,7 +1265,8 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                         else:
                             dt_theo_pgd = dt
 
-                        ds_xa = sorted(dt_theo_pgd["Tên xã"].dropna().unique()) if "Tên xã" in dt_theo_pgd.columns else []
+                        cot_xa = next((c for c in [COT_TEN_XA, "Tên xã"] if c in dt_theo_pgd.columns), None)
+                        ds_xa = sorted(dt_theo_pgd[cot_xa].dropna().unique()) if cot_xa else []
                         loc_xa = st.multiselect("Lọc Xã", options=ds_xa, default=[], key="tq_loc_xa")
 
                 # Áp dụng bộ lọc vào dt trước khi lọc theo mốc thời gian
@@ -1280,11 +1275,18 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                     dt_loc = dt_loc[dt_loc[COT_TEN_PGD].isin(loc_pgd)]
                 if loc_ct:
                     dt_loc = dt_loc[dt_loc[COT_TEN_CT].isin(loc_ct)]
-                if loc_xa:
-                    dt_loc = dt_loc[dt_loc["Tên xã"].isin(loc_xa)]
+                if loc_xa and cot_xa:
+                    dt_loc = dt_loc[dt_loc[cot_xa].isin(loc_xa)]
 
                 # Loại bỏ hồ sơ dư nợ = 0
                 dt_loc = dt_loc[dt_loc[COT_TONG_DU_NO].fillna(0) > 0]
+
+                MOC = {
+                    "1 tháng":   hn + pd.Timedelta(days=30),
+                    "3 tháng":   hn + pd.Timedelta(days=90),
+                    "6 tháng":   hn + pd.Timedelta(days=180),
+                    "Trong năm": cuoi_nam,
+                }
 
                 tab_1m, tab_3m, tab_6m, tab_nam = st.tabs([
                     "📅 1 tháng", "📅 3 tháng", "📅 6 tháng", "📅 Trong năm"
@@ -1292,10 +1294,10 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
 
                 def _build_pdf_den_han(df_loc, label, loc_pgd, loc_ct, loc_xa, username, key_prefix):
                     """Build PDF bytes: luôn groupby [PGD, Xã, Chương trình], bộ lọc chỉ thu hẹp input."""
-                    COLS_GROUP = [COT_TEN_PGD, "Tên xã", COT_TEN_CT]
+                    COLS_GROUP = [COT_TEN_PGD, COT_TEN_XA, COT_TEN_CT]
                     cols_ok = [c for c in COLS_GROUP if c in df_loc.columns]
 
-                    RENAME_MAP = {COT_TEN_PGD: "PGD", "Tên xã": "Xã", COT_TEN_CT: "Chương trình"}
+                    RENAME_MAP = {COT_TEN_PGD: "PGD", COT_TEN_XA: "Xã", COT_TEN_CT: "Chương trình"}
                     rename_ok = {k: v for k, v in RENAME_MAP.items() if k in df_loc.columns}
 
                     pdf_tg = df_loc.groupby(cols_ok).agg(
@@ -1372,37 +1374,38 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                         )
 
                         if nhom_col in df_loc.columns and len(tg) > 0:
-                            top10 = tg.nlargest(10, "_no")
+                            top_n = min(15, len(tg))
+                            top10 = tg.nlargest(top_n, "_no").sort_values("_no")
 
-                            fig = go.Figure(go.Pie(
-                                labels=top10[nhom_col],
-                                values=top10["_no"],
-                                hole=0.5,
-                                textinfo="label+percent",
-                                textposition="outside",
-                                hovertemplate="<b>%{label}</b><br>Dư nợ: %{customdata}<br>Tỷ lệ: %{percent}<extra></extra>",
-                                customdata=top10["Dư nợ (triệu đồng)"],
-                                marker=dict(
-                                    colors=px.colors.sequential.Greens_r[: len(top10)],
-                                    line=dict(color="white", width=2),
-                                ),
-                            ))
-
-                            fig.update_layout(
-                                title=f"Top 10 {nhom_chon} có dư nợ đến hạn cao nhất",
-                                height=450,
-                                annotations=[dict(
-                                    text=f"<b>{fmt(tong_no)}</b><br>Tổng dư nợ",
-                                    x=0.5, y=0.5,
-                                    font=dict(size=13),
-                                    showarrow=False,
-                                )],
-                                legend=dict(orientation="v", x=1.05, y=0.5),
-                                margin=dict(l=0, r=150, t=50, b=0),
-                                paper_bgcolor="rgba(0,0,0,0)",
+                            fig = px.bar(
+                                top10,
+                                x="_no",
+                                y=nhom_col,
+                                orientation="h",
+                                color="_no",
+                                color_continuous_scale=[
+                                    [0.0, "#C8E6C9"],
+                                    [0.4, "#4CAF50"],
+                                    [1.0, "#1B5E20"],
+                                ],
+                                text="Dư nợ (triệu đồng)",
+                                labels={"_no": "Dư nợ", nhom_col: nhom_chon},
+                                height=max(320, top_n * 38),
                             )
-
-                            st.plotly_chart(fig, width='stretch', key=f"pie_den_han_{key_prefix}")
+                            fig.update_traces(
+                                textposition="outside",
+                                hovertemplate="<b>%{y}</b><br>Dư nợ: %{text}<extra></extra>",
+                            )
+                            fig.update_layout(
+                                title=f"Top {top_n} {nhom_chon} — dư nợ đến hạn cao nhất",
+                                coloraxis_showscale=False,
+                                xaxis=dict(showticklabels=False, title=""),
+                                yaxis=dict(title=""),
+                                margin=dict(l=10, r=130, t=50, b=10),
+                                paper_bgcolor="rgba(0,0,0,0)",
+                                plot_bgcolor="rgba(0,0,0,0)",
+                            )
+                            st.plotly_chart(fig, width='stretch', key=f"bar_den_han_{key_prefix}")
 
                         if tg is not None:
                             st.divider()

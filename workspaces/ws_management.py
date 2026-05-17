@@ -49,6 +49,7 @@ from tabs import (
     tab_nhiem_vu, tab_khtd_giao_dc, tab_kiem_soat,
     tab_ban_dai_dien, tab_uy_thac,
     tab_tien_do, tab_tien_do_nop,
+    tab_phoi_hop_pgd,
 )
 from tabs import tab_checklist_bc
 from tabs import tab_xlrr_tong_hop
@@ -989,9 +990,9 @@ def _build_all_items(role: str, username: str, **kwargs) -> list:
     role_n = normalize_role(str(role or "user"))
 
     ALL_ITEMS = [
+        {"group": "Phối hợp với PGD", "label": "Tiến độ Công việc",        "icon": "calendar",  "fn": lambda: tab_tien_do.render(None, **kwargs)},
+        {"group": "Phối hợp với PGD", "label": "Tiến độ Báo cáo của PGD", "icon": "file",      "fn": lambda: tab_tien_do_nop.render(None, **kwargs)},
         {"group": "Giám sát",     "label": "Tổng quan CN", "icon": "chart-bar",      "fn": lambda: tab_tongquan.render(None, **kwargs)},
-        {"group": "Giám sát",     "label": "Tiến độ Công việc", "icon": "calendar",       "fn": lambda: tab_tien_do.render(None, **kwargs)},
-        {"group": "Giám sát",     "label": "Tiến độ Báo cáo của PGD", "icon": "file", "fn": lambda: tab_tien_do_nop.render(None, **kwargs)},
         {"group": "Giám sát",     "label": "Cảnh báo NQH",     "icon": "alert-triangle", "fn": lambda: _render_canh_bao_no(df_full, ds_pgd_all, role, kwargs.get("username", "unknown"))},
         {"group": "Giám sát",     "label": "Giao & Theo dõi Nhiệm vụ", "icon": "check",  "fn": lambda: tab_nhiem_vu.render(None, **kwargs)},
         {"group": "Giám sát",     "label": "So sánh kỳ",            "icon": "chart-line", "fn": lambda: tab_so_sanh_ky.render(None, **kwargs)},
@@ -1007,7 +1008,7 @@ def _build_all_items(role: str, username: str, **kwargs) -> list:
         {"group": "Báo cáo",       "label": "Báo cáo tín dụng", "icon": "file",           "fn": lambda: tab_baocao.render(None, **kwargs)},
         {"group": "Báo cáo",       "label": "Checklist định kỳ", "icon": "calendar-check", "fn": lambda: tab_checklist_bc.render(None, **kwargs)},
         {"group": "Ủy Thác",       "label": "Ban Đại Diện HĐQT", "icon": "building",       "fn": lambda: tab_ban_dai_dien.render(None, cap="tinh", **kwargs)},
-        {"group": "Ủy Thác",       "label": "Ủy thác CT-XH",     "icon": "handshake",      "fn": lambda: tab_uy_thac.render(None, **kwargs)},
+        {"group": "Ủy Thác",       "label": "Hội - Đoàn thể ủy thác", "icon": "handshake", "fn": lambda: tab_uy_thac.render(None, **kwargs)},
         {"group": "Ủy Thác",       "label": "Điểm GD & Tổ TK&VV", "icon": "map-pin",        "fn": lambda: _render_dgd_to_tkvv(None, **kwargs)},
     ]
 
@@ -1033,6 +1034,7 @@ def render_sidebar_menu(role: str, username: str, **kwargs):
         "Kế hoạch và Thực hiện KHTD": {"bg": "#EAF3DE", "border": "#639922", "text": "#3B6D11"},
         "Báo cáo":                     {"bg": "#FAEEDA", "border": "#BA7517", "text": "#854F0B"},
         "Ủy Thác":                     {"bg": "#EEEDFE", "border": "#7F77DD", "text": "#3C3489"},
+        "Phối hợp với PGD":            {"bg": "#E6F5EE", "border": "#27AE60", "text": "#1A7340"},
         "Hệ thống":                    {"bg": "#F1EFE8", "border": "#888780", "text": "#5F5E5A"},
     }
 

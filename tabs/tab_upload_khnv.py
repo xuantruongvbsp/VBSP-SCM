@@ -375,6 +375,8 @@ def _xu_ly_upload(
         st.session_state[f"{prefix}_upload_ver"] = (
             st.session_state.get(f"{prefix}_upload_ver", 0) + 1
         )
+        # Xóa cache bảng trạng thái để hiển thị đúng sau rerun
+        st.session_state.pop("trang_thai_upload_pgd", None)
     st.rerun()
 
 

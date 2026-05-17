@@ -1,5 +1,8 @@
 # CHANGELOG
 
+## [2026-05-17] — Đổi tên tab menu "Tiến độ PGD" thành "Tiến độ Báo cáo của PGD"
+- `workspaces/ws_management.py` dòng 994 — đổi label
+
 ## [2026-05-17] — Bổ sung 3 kiểm tra vào tab_trang_thai_nguon
 - `tabs/tab_trang_thai_nguon.py` `_render_merge_cache()` — thêm kiểm tra đồng bộ DS_PGD giữa kv_store và config.py
 - `tabs/tab_trang_thai_nguon.py` `_render_tep_nguon()` — thêm kiểm tra đồng nhất ngày số liệu giữa các PGD (dùng DuckDB)

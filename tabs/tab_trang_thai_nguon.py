@@ -1,185 +1,648 @@
-"""Tab "🔍 Trạng thái hệ thống" — hiển thị tổng quan trạng thái quy trình, audit log và trạng thái PGD."""
-from __future__ import annotations
-import os
-from datetime import datetime, timedelta
+"""
+tab_trang_thai_nguon.py
+───────────────────────
+Trạng thái Nguồn dữ liệu — Health Check toàn diện hệ thống VBSP-SCM.
 
-import streamlit as st
+Hiển thị trong:
+  - ws_management : toàn bộ 22 đơn vị + health check CN
+  - ws_operation  : chỉ PGD được phân công + audit cá nhân
+
+Sub-tabs:
+  1. 📂 Tệp nguồn       — Trạng thái upload 22 đơn vị (HSTD / NQ11 / GQVL)
+  2. 🔗 Merge & Cache   — merge_meta + parquet integrity (columns, duplicate)
+  3. 📸 Snapshot        — Danh sách kỳ snapshot HSTD
+  4. 👥 Người dùng      — User PGD thiếu pgd, tổng số tài khoản
+  5. 💾 Hệ thống        — Dung lượng ổ đĩa, quyền ghi thư mục
+  6. 📋 Audit log       — 100 thao tác gần nhất (có lọc)
+"""
+
+from __future__ import annotations
+
+import os
+import shutil
+from datetime import datetime
+from pathlib import Path
+
 import pandas as pd
+import streamlit as st
 
 import db
-from config import CACHE_HSTD, CACHE_NQ11
-from auth import la_phan_he_cn, normalize_role
-from tabs import tab_audit_log as _tab_audit_log
+from auth import la_phan_he_cn, la_phan_he_pgd, normalize_role
+from config import (
+    CACHE_DIR,
+    CACHE_GQVL,
+    CACHE_HSTD,
+    CACHE_NQ11,
+    COT_MA_KH,
+    COT_NGAY_SL,
+    COT_SO_KU,
+    COT_TEN_PGD,
+    COT_TONG_DU_NO,
+    DON_VI_CHI_NHANH,
+    DS_PGD,
+    FILE_PATH,
+    FILE_PATH_GQVL,
+    FILE_PATH_NQ11,
+    GQVL_PGD_DIR,
+    PGD_DATA_DIR,
+)
+from utils import fmt_ngay, get_tab_context
+
+# ── Hằng số nội bộ ─────────────────────────────────────────────────────────
+_DS_LOAI_FILE = ["hstd", "nq11", "gqvl"]
+
+_REQUIRED_COLS_HSTD = [
+    COT_TEN_PGD,
+    COT_MA_KH,
+    COT_SO_KU,
+    COT_TONG_DU_NO,
+    COT_NGAY_SL,
+]
+
+_CACHE_MAP = {
+    "HSTD": CACHE_HSTD,
+    "NQ11": CACHE_NQ11,
+    "GQVL": CACHE_GQVL,
+}
+
+_SOURCE_MAP = {
+    "HSTD": FILE_PATH,
+    "NQ11": FILE_PATH_NQ11,
+    "GQVL": FILE_PATH_GQVL,
+}
 
 
+# ── Helpers ─────────────────────────────────────────────────────────────────
+
+def _ts_fmt(fp: str | Path) -> str:
+    """Trả về chuỗi thời gian sửa đổi file, hoặc '—' nếu không tồn tại."""
+    try:
+        ts = os.path.getmtime(str(fp))
+        return datetime.fromtimestamp(ts).strftime("%d/%m/%Y %H:%M")
+    except Exception:
+        return "—"
+
+
+def _size_fmt(fp: str | Path) -> str:
+    """Trả về dung lượng file dạng KB/MB, hoặc '—'."""
+    try:
+        sz = os.path.getsize(str(fp))
+        if sz >= 1_048_576:
+            return f"{sz / 1_048_576:.1f} MB"
+        return f"{sz / 1024:.0f} KB"
+    except Exception:
+        return "—"
+
+
+def _pgd_slug_local(ten_pgd: str) -> str:
+    """Slug đơn giản không phụ thuộc import vòng."""
+    try:
+        from data.pgd import pgd_slug
+        return pgd_slug(ten_pgd)
+    except Exception:
+        import re, unicodedata
+        s = unicodedata.normalize("NFD", ten_pgd.lower())
+        s = "".join(c for c in s if unicodedata.category(c) != "Mn")
+        return re.sub(r"[^a-z0-9]+", "_", s).strip("_")
+
+
+def _pgd_hstd_path(ten_pgd: str) -> Path:
+    return PGD_DATA_DIR / _pgd_slug_local(ten_pgd) / "hstd_latest.xlsx"
+
+
+def _pgd_nq11_path(ten_pgd: str) -> Path:
+    slug = _pgd_slug_local(ten_pgd)
+    return PGD_DATA_DIR / slug / "nq11_latest.xlsx"
+
+
+def _pgd_gqvl_path(ten_pgd: str) -> Path:
+    slug = _pgd_slug_local(ten_pgd)
+    return GQVL_PGD_DIR / f"gqvl_{slug}.xlsx"
+
+
+# ── Sub-tab 1: Tệp nguồn ─────────────────────────────────────────────────
+def _render_tep_nguon(la_cn: bool, pgd_user: str | None) -> None:
+    st.subheader("📂 Trạng thái tệp nguồn")
+
+    if la_cn:
+        # ── File toàn CN (data/) ──────────────────────────────────────────
+        st.markdown("#### 📁 File trung tâm (Phòng KH-NV upload)")
+        rows_cn = []
+        for loai, fp in _SOURCE_MAP.items():
+            exists = os.path.exists(fp)
+            rows_cn.append({
+                "Loại": loai,
+                "Đường dẫn": os.path.basename(fp),
+                "Trạng thái": "✅ Có" if exists else "❌ Thiếu",
+                "Cập nhật lần cuối": _ts_fmt(fp) if exists else "—",
+                "Dung lượng": _size_fmt(fp) if exists else "—",
+            })
+        df_cn = pd.DataFrame(rows_cn)
+        st.dataframe(df_cn, use_container_width=True, hide_index=True)
+
+        st.markdown("#### 🏢 Upload riêng từng đơn vị (22 đơn vị)")
+        ds_all = [DON_VI_CHI_NHANH] + DS_PGD
+    else:
+        ds_all = [pgd_user] if pgd_user else []
+
+    rows_pgd = []
+    for dv in ds_all:
+        p_hstd = _pgd_hstd_path(dv)
+        p_nq11 = _pgd_nq11_path(dv)
+        p_gqvl = _pgd_gqvl_path(dv)
+        rows_pgd.append({
+            "Đơn vị": dv,
+            "HSTD": "✅" if p_hstd.exists() else "❌",
+            "HSTD cập nhật": _ts_fmt(p_hstd) if p_hstd.exists() else "—",
+            "NQ11": "✅" if p_nq11.exists() else "❌",
+            "NQ11 cập nhật": _ts_fmt(p_nq11) if p_nq11.exists() else "—",
+            "GQVL": "✅" if p_gqvl.exists() else "❌",
+            "GQVL cập nhật": _ts_fmt(p_gqvl) if p_gqvl.exists() else "—",
+        })
+
+    df_pgd = pd.DataFrame(rows_pgd)
+
+    if la_cn:
+        co_hstd = (df_pgd["HSTD"] == "✅").sum()
+        co_nq11 = (df_pgd["NQ11"] == "✅").sum()
+        co_gqvl = (df_pgd["GQVL"] == "✅").sum()
+        total = len(ds_all)
+        c1, c2, c3 = st.columns(3)
+        c1.metric("HSTD có file", f"{co_hstd}/{total}")
+        c2.metric("NQ11 có file", f"{co_nq11}/{total}")
+        c3.metric("GQVL có file", f"{co_gqvl}/{total}")
+
+    st.dataframe(df_pgd, use_container_width=True, hide_index=True)
+
+    # ── Kiểm tra đồng nhất ngày số liệu ──────────────────────────────────
+    if la_cn and os.path.exists(CACHE_HSTD):
+        st.markdown("#### 📅 Kiểm tra Ngày số liệu")
+        try:
+            import duckdb
+            con = duckdb.connect()
+            rows = con.execute(f"""
+                SELECT "{COT_TEN_PGD}", MAX("{COT_NGAY_SL}") as ngay_sl
+                FROM read_parquet('{CACHE_HSTD}')
+                GROUP BY "{COT_TEN_PGD}"
+                ORDER BY ngay_sl DESC
+            """).fetchall()
+            con.close()
+            if rows:
+                dates = [r[1] for r in rows if r[1]]
+                unique_dates = set(dates)
+                if len(unique_dates) <= 1:
+                    st.success(f"✅ Toàn bộ PGD đồng nhất ngày số liệu: **{dates[0] if dates else '—'}**")
+                else:
+                    st.warning(
+                        f"⚠️ Ngày số liệu không đồng nhất — "
+                        f"có **{len(unique_dates)}** mốc khác nhau"
+                    )
+                    df_dates = pd.DataFrame(rows, columns=["Đơn vị", "Ngày số liệu"])
+                    st.dataframe(df_dates, use_container_width=True, hide_index=True, height=250)
+        except Exception as e:
+            st.error(f"Lỗi kiểm tra ngày số liệu: {e}")
+
+
+# ── Sub-tab 2: Merge & Cache ──────────────────────────────────────────────
+def _render_merge_cache(la_cn: bool) -> None:
+    st.subheader("🔗 Merge & Parquet Cache")
+
+    # ── Trạng thái merge_meta ────────────────────────────────────────────
+    st.markdown("#### ⚙️ Trạng thái Merge")
+    loai_merge = ["hstd", "nq11", "gqvl"]
+    rows_merge = []
+    for loai in loai_merge:
+        meta = db.doc_kv(f"merge_meta_{loai}")
+        if meta:
+            rows_merge.append({
+                "Loại": loai.upper(),
+                "Trạng thái": "✅ Đã merge",
+                "Thời gian merge": meta.get("thoi_gian", "—"),
+                "Số PGD": meta.get("so_pgd", "—"),
+                "Người thực hiện": meta.get("updated_by", meta.get("nguoi_dung", "—")),
+            })
+        else:
+            rows_merge.append({
+                "Loại": loai.upper(),
+                "Trạng thái": "❌ Chưa merge",
+                "Thời gian merge": "—",
+                "Số PGD": "—",
+                "Người thực hiện": "—",
+            })
+    st.dataframe(pd.DataFrame(rows_merge), use_container_width=True, hide_index=True)
+
+    if not la_cn:
+        return
+
+    # ── Kiểm tra đồng bộ cấu hình DS_PGD ────────────────────────────────
+    st.markdown("#### 🔄 Đồng bộ cấu hình DS_PGD")
+    try:
+        from utils import lay_config
+        ds_kv = lay_config("ds_pgd", [])
+        ds_config = DS_PGD
+        if not ds_kv:
+            st.info("ℹ️ kv_store chưa có ds_pgd — đang dùng config.py mặc định.")
+        elif set(ds_kv) != set(DS_PGD):
+            only_kv = set(ds_kv) - set(DS_PGD)
+            only_cfg = set(DS_PGD) - set(ds_kv)
+            msg = []
+            if only_kv:
+                msg.append(f"Chỉ trong kv_store: {sorted(only_kv)}")
+            if only_cfg:
+                msg.append(f"Chỉ trong config.py: {sorted(only_cfg)}")
+            st.warning("⚠️ DS_PGD không đồng bộ — " + " | ".join(msg))
+        else:
+            st.success(f"✅ DS_PGD đồng bộ — {len(DS_PGD)} đơn vị")
+    except Exception as e:
+        st.error(f"Lỗi kiểm tra cấu hình: {e}")
+
+    # ── Kiểm tra parquet integrity ───────────────────────────────────────
+    st.markdown("#### 📦 Kiểm tra Parquet Cache")
+    try:
+        import duckdb
+
+        for ten, path in _CACHE_MAP.items():
+            with st.expander(f"{ten} — `{os.path.basename(path)}`", expanded=(ten == "HSTD")):
+                if not os.path.exists(path):
+                    st.warning(f"⚠️ File cache chưa tồn tại: `{path}`")
+                    continue
+
+                st.caption(f"Cập nhật: {_ts_fmt(path)}  |  Dung lượng: {_size_fmt(path)}")
+
+                try:
+                    con = duckdb.connect()
+                    # Kiểm tra cột bắt buộc (chỉ HSTD)
+                    if ten == "HSTD":
+                        actual_cols = con.execute(
+                            f"SELECT * FROM read_parquet('{path}') LIMIT 0"
+                        ).df().columns.tolist()
+                        missing = [c for c in _REQUIRED_COLS_HSTD if c not in actual_cols]
+                        if missing:
+                            st.error(f"❌ Thiếu cột bắt buộc: {missing}")
+                        else:
+                            st.success(f"✅ Đủ {len(_REQUIRED_COLS_HSTD)} cột bắt buộc")
+
+                        # Kiểm tra duplicate (Mã KH + Số khế ước)
+                        dup_count = con.execute(f"""
+                            SELECT COUNT(*) FROM (
+                                SELECT "{COT_MA_KH}", "{COT_SO_KU}", COUNT(*) as cnt
+                                FROM read_parquet('{path}')
+                                GROUP BY "{COT_MA_KH}", "{COT_SO_KU}"
+                                HAVING COUNT(*) > 1
+                            )
+                        """).fetchone()[0]
+                        if dup_count > 0:
+                            st.warning(
+                                f"⚠️ Có **{dup_count:,}** cặp (Mã KH, Số khế ước) "
+                                f"xuất hiện nhiều hơn 1 lần"
+                            )
+                        else:
+                            st.success("✅ Không có bản ghi trùng lặp")
+
+                    # Số dòng tổng
+                    total_rows = con.execute(
+                        f"SELECT COUNT(*) FROM read_parquet('{path}')"
+                    ).fetchone()[0]
+                    st.info(f"📊 Tổng số dòng: **{total_rows:,}**")
+                    con.close()
+
+                except Exception as e:
+                    st.error(f"Lỗi đọc parquet: {e}")
+
+    except ImportError:
+        st.warning("⚠️ Cần cài `duckdb` để kiểm tra parquet integrity.")
+
+
+# ── Sub-tab 3: Snapshot ───────────────────────────────────────────────────
+def _render_snapshot() -> None:
+    st.subheader("📸 Snapshot HSTD")
+    try:
+        conn = db.get_conn()
+        rows = conn.execute(
+            """
+            SELECT ky, COUNT(DISTINCT ten_pgd) as so_pgd,
+                   SUM(tong_du_no) as tong_du_no,
+                   MIN(created_at) as tao_luc
+            FROM hstd_snapshot
+            GROUP BY ky
+            ORDER BY ky DESC
+            LIMIT 24
+            """
+        ).fetchall()
+
+        if not rows:
+            st.warning("❌ Chưa có snapshot nào. Dữ liệu lịch sử sẽ trống trước khi upload lần đầu.")
+            return
+
+        st.success(f"✅ Snapshot mới nhất: **{rows[0][0]}** ({rows[0][1]} đơn vị)")
+
+        df_snap = pd.DataFrame(rows, columns=["Kỳ", "Số đơn vị", "Tổng dư nợ (VND)", "Tạo lúc"])
+        df_snap["Tổng dư nợ (tỷ đ)"] = (df_snap["Tổng dư nợ (VND)"] / 1e9).round(1)
+        df_snap = df_snap.drop(columns=["Tổng dư nợ (VND)"])
+        st.dataframe(df_snap, use_container_width=True, hide_index=True)
+
+    except Exception as e:
+        st.error(f"Lỗi đọc snapshot: {e}")
+
+
+# ── Sub-tab 4: Người dùng ─────────────────────────────────────────────────
+def _render_nguoi_dung() -> None:
+    st.subheader("👥 Trạng thái Tài khoản")
+    try:
+        conn = db.get_conn()
+
+        # Tổng hợp theo role
+        rows_role = conn.execute(
+            "SELECT role, COUNT(*) as so_luong FROM users GROUP BY role ORDER BY role"
+        ).fetchall()
+        if rows_role:
+            df_role = pd.DataFrame(rows_role, columns=["Role", "Số tài khoản"])
+            c1, c2 = st.columns([1, 2])
+            with c1:
+                st.metric("Tổng tài khoản", sum(r[1] for r in rows_role))
+            with c2:
+                st.dataframe(df_role, use_container_width=True, hide_index=True)
+
+        # User PGD role nhưng không có pgd gán
+        rows_no_pgd = conn.execute(
+            """
+            SELECT username, role, ho_ten
+            FROM users
+            WHERE role IN ('user_pgd','admin_pgd','manager_pgd','user')
+              AND (pgd IS NULL OR pgd = '')
+            ORDER BY username
+            """
+        ).fetchall()
+
+        st.markdown("#### ⚠️ User PGD chưa được gán đơn vị")
+        if rows_no_pgd:
+            df_no_pgd = pd.DataFrame(rows_no_pgd, columns=["Username", "Role", "Họ tên"])
+            st.warning(
+                f"Có **{len(rows_no_pgd)}** tài khoản PGD chưa có đơn vị — "
+                "sẽ không thể truy cập dữ liệu."
+            )
+            st.dataframe(df_no_pgd, use_container_width=True, hide_index=True)
+        else:
+            st.success("✅ Tất cả tài khoản PGD đã được gán đơn vị")
+
+        # Kiểm tra tài khoản chưa đặt mật khẩu (còn mật khẩu mặc định "admin123")
+        rows_default_pw = conn.execute(
+            """
+            SELECT COUNT(*) FROM users
+            WHERE password = 'admin123'
+            """
+        ).fetchone()
+        if rows_default_pw and rows_default_pw[0] > 0:
+            st.warning(
+                f"⚠️ Có **{rows_default_pw[0]}** tài khoản vẫn dùng "
+                "mật khẩu mặc định `admin123` — nên đổi ngay."
+            )
+
+    except Exception as e:
+        st.error(f"Lỗi đọc dữ liệu người dùng: {e}")
+
+
+# ── Sub-tab 5: Hệ thống ──────────────────────────────────────────────────
+def _render_he_thong() -> None:
+    st.subheader("💾 Tài nguyên Hệ thống")
+
+    # ── Dung lượng ổ đĩa ─────────────────────────────────────────────────
+    st.markdown("#### 💿 Dung lượng ổ đĩa")
+    try:
+        from config import BASE_DIR
+        total, used, free = shutil.disk_usage(str(BASE_DIR))
+        pct_used = used / total * 100
+
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Tổng", f"{total / 1e9:.1f} GB")
+        c2.metric("Đã dùng", f"{used / 1e9:.1f} GB", f"{pct_used:.0f}%")
+        c3.metric("Còn trống", f"{free / 1e9:.1f} GB")
+
+        if pct_used > 90:
+            st.error("❌ Ổ đĩa gần đầy (>90%) — cần dọn dẹp ngay!")
+        elif pct_used > 75:
+            st.warning(f"⚠️ Ổ đĩa đã dùng {pct_used:.0f}% — nên theo dõi")
+        else:
+            st.success(f"✅ Ổ đĩa còn {free / 1e9:.1f} GB trống")
+    except Exception as e:
+        st.error(f"Lỗi đọc dung lượng: {e}")
+
+    # ── Quyền ghi thư mục ────────────────────────────────────────────────
+    st.markdown("#### 🔐 Quyền ghi thư mục")
+    try:
+        from config import BASE_DIR, TEMPLATES_DIR
+        dirs_to_check = {
+            "Cache": CACHE_DIR,
+            "PGD Data": PGD_DATA_DIR,
+            "GQVL PGD": GQVL_PGD_DIR,
+            "Templates": TEMPLATES_DIR,
+        }
+        rows_perm = []
+        for ten, d in dirs_to_check.items():
+            exists = os.path.exists(str(d))
+            writable = os.access(str(d), os.W_OK) if exists else False
+            rows_perm.append({
+                "Thư mục": ten,
+                "Đường dẫn": str(d),
+                "Tồn tại": "✅" if exists else "❌",
+                "Quyền ghi": "✅" if writable else "❌",
+            })
+        st.dataframe(
+            pd.DataFrame(rows_perm),
+            use_container_width=True,
+            hide_index=True,
+        )
+    except Exception as e:
+        st.error(f"Lỗi kiểm tra quyền thư mục: {e}")
+
+    # ── Kích thước audit_log ──────────────────────────────────────────────
+    st.markdown("#### 📝 Audit Log")
+    try:
+        conn = db.get_conn()
+        total_audit = conn.execute("SELECT COUNT(*) FROM audit_log").fetchone()[0]
+        if total_audit > 50_000:
+            st.warning(
+                f"⚠️ Audit log có **{total_audit:,}** dòng — "
+                "có thể ảnh hưởng hiệu năng, nên cân nhắc archive."
+            )
+        else:
+            st.success(f"✅ Audit log: **{total_audit:,}** dòng")
+    except Exception as e:
+        st.error(f"Lỗi đọc audit log: {e}")
+
+    # ── Kiểm tra credentials Google Sheets ───────────────────────────────
+    st.markdown("#### 🔑 Tích hợp Google Sheets")
+    try:
+        from config import BASE_DIR as _bd
+        creds_path = _bd / "credentials.json"
+        if creds_path.exists():
+            st.success(f"✅ `credentials.json` tồn tại ({_size_fmt(creds_path)})")
+        else:
+            st.info("ℹ️ Không tìm thấy `credentials.json` — tính năng Google Sheets bị tắt hoặc chưa cấu hình.")
+    except Exception:
+        pass
+
+    # ── Kiểm tra nhiệm vụ quá hạn ────────────────────────────────────────
+    st.markdown("#### ⏰ Nhiệm vụ quá hạn")
+    try:
+        from datetime import date
+        hom_nay = date.today().strftime("%Y-%m-%d")
+        conn = db.get_conn()
+
+        qh_nv = conn.execute("""
+            SELECT id, tieu_de, pgd, ngay_deadline, trang_thai
+            FROM nhiem_vu
+            WHERE ngay_deadline IS NOT NULL
+              AND ngay_deadline < ?
+              AND trang_thai != 'hoan_thanh'
+            ORDER BY ngay_deadline ASC
+            LIMIT 20
+        """, (hom_nay,)).fetchall()
+
+        qh_td = conn.execute("""
+            SELECT id, ten_task, ngay_deadline, trang_thai
+            FROM tien_do_task
+            WHERE ngay_deadline < ?
+              AND trang_thai NOT IN ('hoan_thanh', 'da_bao_cao')
+            ORDER BY ngay_deadline ASC
+            LIMIT 20
+        """, (hom_nay,)).fetchall()
+
+        if not qh_nv and not qh_td:
+            st.success("✅ Không có nhiệm vụ hoặc tiến độ nào quá hạn")
+        else:
+            if qh_nv:
+                st.warning(f"⚠️ **{len(qh_nv)}** nhiệm vụ quá hạn")
+                df_nv = pd.DataFrame(qh_nv, columns=["ID", "Tiêu đề", "PGD", "Deadline", "Trạng thái"])
+                st.dataframe(df_nv, use_container_width=True, hide_index=True, height=200)
+            if qh_td:
+                st.warning(f"⚠️ **{len(qh_td)}** tiến độ task quá hạn")
+                df_td = pd.DataFrame(qh_td, columns=["ID", "Tên task", "Deadline", "Trạng thái"])
+                st.dataframe(df_td, use_container_width=True, hide_index=True, height=200)
+    except Exception as e:
+        st.error(f"Lỗi kiểm tra nhiệm vụ quá hạn: {e}")
+
+
+# ── Sub-tab 6: Audit Log ──────────────────────────────────────────────────
+def _render_audit(la_cn: bool, username: str | None) -> None:
+    st.subheader("📋 Audit Log")
+
+    try:
+        conn = db.get_conn()
+
+        # Bộ lọc
+        col_f1, col_f2, col_f3 = st.columns([2, 2, 1])
+        with col_f1:
+            filter_user = st.text_input(
+                "Lọc theo username",
+                value="" if la_cn else (username or ""),
+                placeholder="Để trống = tất cả",
+                key="audit_filter_user",
+                disabled=(not la_cn),
+            )
+        with col_f2:
+            filter_action = st.text_input(
+                "Lọc theo action",
+                placeholder="Ví dụ: upload, ghi_kv...",
+                key="audit_filter_action",
+            )
+        with col_f3:
+            limit = st.selectbox("Số dòng", [50, 100, 200, 500], key="audit_limit")
+
+        # Build query
+        wheres = []
+        params: list = []
+        if filter_user.strip():
+            wheres.append("username LIKE ?")
+            params.append(f"%{filter_user.strip()}%")
+        if filter_action.strip():
+            wheres.append("action LIKE ?")
+            params.append(f"%{filter_action.strip()}%")
+        if not la_cn and username:
+            wheres.append("username = ?")
+            params.append(username)
+
+        where_clause = f"WHERE {' AND '.join(wheres)}" if wheres else ""
+        rows = conn.execute(
+            f"SELECT ts, username, action, detail FROM audit_log "
+            f"{where_clause} ORDER BY ts DESC LIMIT ?",
+            params + [limit],
+        ).fetchall()
+
+        if rows:
+            df_audit = pd.DataFrame(rows, columns=["Thời gian", "Username", "Action", "Chi tiết"])
+            st.caption(f"Hiển thị {len(df_audit):,} dòng gần nhất")
+            st.dataframe(df_audit, use_container_width=True, hide_index=True, height=420)
+        else:
+            st.info("Không có kết quả phù hợp.")
+
+    except Exception as e:
+        st.error(f"Lỗi đọc audit log: {e}")
+
+
+# ── Entry point ──────────────────────────────────────────────────────────────
 def render(tab=None, **kwargs) -> None:
-    role_raw = str(kwargs.get("role", "user") or "user")
-    username = str(kwargs.get("username", "unknown") or "unknown")
-    role = normalize_role(role_raw)
-    pgd_user = kwargs.get("pgd_user")
+    """
+    render(tab, role=..., username=..., pgd_user=...)
 
-    ctx = tab if tab is not None else st.container()
+    Parameters
+    ----------
+    tab      : st.tab context hoặc None (fallback st.container)
+    role     : chuỗi role người dùng
+    username : username đang đăng nhập
+    pgd_user : tên PGD (chỉ dành cho PGD role)
+    """
+    ctx = get_tab_context(tab)
     with ctx:
-        st.subheader("🔍 Trạng thái hệ thống")
+        role = normalize_role(str(kwargs.get("role") or "user"))
+        username: str = kwargs.get("username") or st.session_state.get("username", "unknown")
+        pgd_user: str | None = kwargs.get("pgd_user") or st.session_state.get(
+            "user_info", {}
+        ).get("pgd")
 
         la_cn = la_phan_he_cn(role)
+
+        st.title("🔍 Trạng thái Nguồn dữ liệu")
         if la_cn:
-            if pgd_user:
-                tab_tq, tab_audit, tab_pgd = st.tabs(["📊 Tổng quan", "📋 Lịch sử giao dịch", "🏢 Trạng thái PGD"])
-            else:
-                tab_tq, tab_audit = st.tabs(["📊 Tổng quan", "📋 Lịch sử giao dịch"])
-            with tab_tq:
-                _render_tong_quan()
-            with tab_audit:
-                _tab_audit_log.render(None, mode="compact", force_allow=True)
+            st.caption("Giám sát toàn diện 22 đơn vị · Merge · Parquet · Snapshot · Người dùng · Hệ thống")
         else:
-            tab_pgd = st.tabs(["🏢 Trạng thái PGD"])[0]
+            dv_hien_thi = pgd_user or "PGD của bạn"
+            st.caption(f"Trạng thái upload và hoạt động — {dv_hien_thi}")
 
-        if not la_cn or pgd_user:
-            with tab_pgd if la_cn else tab_pgd:
-                _render_trang_thai_pgd(pgd_user, username)
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# Sub-tab 1: Tổng quan trạng thái quy trình
-# ═══════════════════════════════════════════════════════════════════════════════
-
-def _render_tong_quan() -> None:
-    ds_quy_trinh = [
-        _lay_tt_khtd_cn(),
-        _lay_tt_merge_hstd(),
-        _lay_tt_merge_nq11(),
-        _lay_tt_merge_gqvl(),
-        _lay_tt_file_hstd(),
-        _lay_tt_file_nq11(),
-    ]
-
-    tong = len(ds_quy_trinh)
-    dang_ok = sum(1 for _, tt, _, _ in ds_quy_trinh if tt == "✅")
-    can_xu_ly = tong - dang_ok
-
-    m1, m2, m3 = st.columns(3)
-    m1.metric("📌 Tổng check", tong)
-    m2.metric("✅ Đang OK", tong if dang_ok == tong else dang_ok)
-    m3.metric("⚠️ Cần xử lý", can_xu_ly)
-
-    st.divider()
-
-    df = pd.DataFrame(
-        [
-            {"Quy trình": ten, "Trạng thái": tt, "Cập nhật lần cuối": lan_cuoi, "Ghi chú": ghi_chu}
-            for ten, tt, lan_cuoi, ghi_chu in ds_quy_trinh
-        ]
-    )
-
-    st.dataframe(df, width='stretch', hide_index=True)
-
-    if st.button("🔄 Làm mới", key="tttq_refresh"):
-        st.rerun()
-
-
-def _lay_tt_khtd_cn() -> tuple:
-    """Kiểm tra KHTD Chi nhánh — key 'khtd_cn'."""
-    try:
-        val = db.doc_kv("khtd_cn")
-        if val is None:
-            return "KHTD Chi nhánh", "❌", "—", "Chưa có dữ liệu kế hoạch"
-        updated = val.get("updated_at", "—") if isinstance(val, dict) else "—"
-        return "KHTD Chi nhánh", "✅", str(updated), "Đã có kế hoạch"
-    except Exception as e:
-        return "KHTD Chi nhánh", "❌", "—", f"Lỗi đọc: {e}"
-
-
-def _lay_tt_merge(ten: str, key: str) -> tuple:
-    """Kiểm tra trạng thái merge HSTD/NQ11/GQVL."""
-    try:
-        val = db.doc_kv(key)
-        if val is None or not isinstance(val, dict):
-            return ten, "❌", "—", "Chưa merge"
-        so_pgd = val.get("so_pgd", 0)
-        updated = val.get("updated_at", "—")
-        return ten, "✅", str(updated), f"Đã merge {so_pgd} PGD"
-    except Exception as e:
-        return ten, "❌", "—", f"Lỗi đọc: {e}"
-
-
-def _lay_tt_merge_hstd() -> tuple:
-    return _lay_tt_merge("Merge HSTD", "merge_meta_hstd")
-
-
-def _lay_tt_merge_nq11() -> tuple:
-    return _lay_tt_merge("Merge NQ11", "merge_meta_nq11")
-
-
-def _lay_tt_merge_gqvl() -> tuple:
-    return _lay_tt_merge("Merge GQVL", "merge_meta_gqvl")
-
-
-def _lay_tt_file_hstd() -> tuple:
-    """Kiểm tra file hstd.parquet."""
-    try:
-        if os.path.exists(CACHE_HSTD):
-            mtime = os.path.getmtime(CACHE_HSTD)
-            from datetime import datetime
-            return "File hstd.parquet", "✅", datetime.fromtimestamp(mtime).strftime("%Y-%m-%d %H:%M"), "Tồn tại"
-        return "File hstd.parquet", "❌", "—", "Chưa có file cache"
-    except Exception as e:
-        return "File hstd.parquet", "❌", "—", f"Lỗi: {e}"
-
-
-def _lay_tt_file_nq11() -> tuple:
-    """Kiểm tra file nq11.parquet."""
-    try:
-        if os.path.exists(CACHE_NQ11):
-            mtime = os.path.getmtime(CACHE_NQ11)
-            from datetime import datetime
-            return "File nq11.parquet", "✅", datetime.fromtimestamp(mtime).strftime("%Y-%m-%d %H:%M"), "Tồn tại"
-        return "File nq11.parquet", "❌", "—", "Chưa có file cache"
-    except Exception as e:
-        return "File nq11.parquet", "❌", "—", f"Lỗi: {e}"
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# Sub-tab 2: Lịch sử giao dịch — dùng tab_audit_log (compact mode)
-# ═══════════════════════════════════════════════════════════════════════════════
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# Sub-tab 3: Trạng thái PGD — kiểm tra file upload của một PGD
-# ═══════════════════════════════════════════════════════════════════════════════
-
-def _render_trang_thai_pgd(pgd_user: str | None, username: str) -> None:
-    """Hiển thị trạng thái upload file của PGD."""
-    pgd_user = pgd_user or username
-    st.markdown(f"**Trạng thái upload — {pgd_user}**")
-
-    from data.pgd import duong_dan_pgd
-
-    ds_file = [
-        ("HSTD", "hstd"),
-        ("NQ11", "nq11"),
-        ("GQVL", "gqvl"),
-    ]
-
-    rows = []
-    for ten, loai in ds_file:
-        try:
-            path = duong_dan_pgd(pgd_user, loai)
-            if os.path.exists(path):
-                mtime = os.path.getmtime(path)
-                lan_cuoi = datetime.fromtimestamp(mtime).strftime("%Y-%m-%d %H:%M")
-                tuoi = datetime.now() - datetime.fromtimestamp(mtime)
-                if tuoi < timedelta(days=7):
-                    tt = "✅"
-                else:
-                    tt = "⚠️"
-                rows.append({"Loại file": ten, "Trạng thái": tt, "Cập nhật lần cuối": lan_cuoi})
-            else:
-                rows.append({"Loại file": ten, "Trạng thái": "❌", "Cập nhật lần cuối": "Chưa upload"})
-        except Exception as e:
-            rows.append({"Loại file": ten, "Trạng thái": "❌", "Cập nhật lần cuối": f"Lỗi: {e}"})
-
-    st.dataframe(pd.DataFrame(rows), width='stretch', hide_index=True)
-
-    st.markdown("**📋 Hoạt động gần đây**")
-    _tab_audit_log.render(None, mode="compact", force_allow=True, username_filter=pgd_user)
+        # ── Xác định sub-tabs theo role ──────────────────────────────────
+        if la_cn:
+            tab_labels = [
+                "📂 Tệp nguồn",
+                "🔗 Merge & Cache",
+                "📸 Snapshot",
+                "👥 Người dùng",
+                "💾 Hệ thống",
+                "📋 Audit Log",
+            ]
+            tabs = st.tabs(tab_labels)
+            with tabs[0]:
+                _render_tep_nguon(la_cn=True, pgd_user=None)
+            with tabs[1]:
+                _render_merge_cache(la_cn=True)
+            with tabs[2]:
+                _render_snapshot()
+            with tabs[3]:
+                _render_nguoi_dung()
+            with tabs[4]:
+                _render_he_thong()
+            with tabs[5]:
+                _render_audit(la_cn=True, username=username)
+        else:
+            # PGD chỉ thấy tệp nguồn của mình + audit cá nhân
+            tab_labels = [
+                "📂 Tệp nguồn",
+                "🔗 Merge",
+                "📋 Audit Log",
+            ]
+            tabs = st.tabs(tab_labels)
+            with tabs[0]:
+                _render_tep_nguon(la_cn=False, pgd_user=pgd_user)
+            with tabs[1]:
+                _render_merge_cache(la_cn=False)
+            with tabs[2]:
+                _render_audit(la_cn=False, username=username)

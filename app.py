@@ -776,7 +776,7 @@ def main():
         workspaces.ws_management.render(**ctx)
     elif ws == "operation":
         workspaces.ws_operation.render(**ctx)
-    elif ws == "admin_users" and role == "admin":
+    elif ws == "admin_users" and normalize_role(role) == "admin_cn":
         st.title("👥 Quản lý người dùng")
         class _FakeTab:
             def __enter__(self): return self

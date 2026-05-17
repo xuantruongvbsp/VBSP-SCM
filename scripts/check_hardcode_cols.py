@@ -98,6 +98,8 @@ def _get_staged_files() -> list[str]:
             ["git", "diff", "--cached", "--name-only", "--diff-filter=ACM"],
             cwd=str(PROJECT_ROOT),
             text=True,
+            encoding="utf-8",
+            errors="replace",
             stderr=subprocess.DEVNULL,
         )
     except (subprocess.CalledProcessError, FileNotFoundError):
@@ -133,6 +135,8 @@ def _parse_diff_added_lines(file_path: str) -> dict[int, str]:
             ["git", "diff", "--cached", "-U0", "--", file_path],
             cwd=str(PROJECT_ROOT),
             text=True,
+            encoding="utf-8",
+            errors="replace",
             stderr=subprocess.DEVNULL,
         )
     except (subprocess.CalledProcessError, FileNotFoundError):

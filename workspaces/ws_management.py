@@ -366,7 +366,7 @@ def _hien_thi_nqh_tab(df_kh: pd.DataFrame, username: str):
         ds_thang_label = {p: f"Th\u00e1ng {p.month:02d}/{p.year}" for p in ds_thang}
         options = ["T\u1ea5t c\u1ea3"] + [ds_thang_label[p] for p in ds_thang]
         chon_thang = st.selectbox(
-            "\ud83d\udcc5 L\u1ecdc theo th\u00e1ng s\u1ed1 li\u1ec7u",
+            "📅 L\u1ecdc theo th\u00e1ng s\u1ed1 li\u1ec7u",
             options=options,
             index=1 if len(options) > 1 else 0,
             key="nqh_loc_thang",

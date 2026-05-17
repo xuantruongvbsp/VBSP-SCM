@@ -120,11 +120,11 @@ def tinh_du_no_ap_baseline(_df_baseline: pd.DataFrame, ten_xa: str) -> dict:
         return {}
     try:
         df = _df_baseline.copy()
-        col_xa   = next((c for c in [COT_TEN_XA,   "Tên xã"]   if c in df.columns), None)
-        col_thon = next((c for c in [COT_TEN_THON,  "Tên thôn"] if c in df.columns), None)
-        col_mact = next((c for c in [COT_MA_CHUONG_TRINH, "Mã chương trình"] if c in df.columns), None)
-        col_nv   = next((c for c in [COT_NGUON_VON, "Nguồn vốn"] if c in df.columns), None)
-        col_dn   = next((c for c in [COT_TONG_DU_NO, "Tổng dư nợ"] if c in df.columns), None)
+        col_xa   = COT_TEN_XA if COT_TEN_XA in df.columns else None
+        col_thon = COT_TEN_THON if COT_TEN_THON in df.columns else None
+        col_mact = COT_MA_CHUONG_TRINH if COT_MA_CHUONG_TRINH in df.columns else None
+        col_nv   = COT_NGUON_VON if COT_NGUON_VON in df.columns else None
+        col_dn   = COT_TONG_DU_NO if COT_TONG_DU_NO in df.columns else None
 
         missing = [name for name, val in [
             ("Tên xã", col_xa), ("Tên thôn", col_thon),
@@ -563,10 +563,10 @@ def _lay_ds_ma_key_co_du_lieu(
 
     # Từ df_full (HSTD hiện tại)
     if df_full is not None and not df_full.empty:
-        col_xa  = next((c for c in [COT_TEN_XA, "Tên xã"] if c in df_full.columns), None)
-        col_thon = next((c for c in [COT_TEN_THON, "Tên thôn"] if c in df_full.columns), None)
-        col_mact = next((c for c in [COT_MA_CHUONG_TRINH, "Mã chương trình"] if c in df_full.columns), None)
-        col_nv   = next((c for c in [COT_NGUON_VON, "Nguồn vốn"] if c in df_full.columns), None)
+        col_xa  = COT_TEN_XA if COT_TEN_XA in df_full.columns else None
+        col_thon = COT_TEN_THON if COT_TEN_THON in df_full.columns else None
+        col_mact = COT_MA_CHUONG_TRINH if COT_MA_CHUONG_TRINH in df_full.columns else None
+        col_nv   = COT_NGUON_VON if COT_NGUON_VON in df_full.columns else None
         if col_xa and col_mact and col_nv:
             df_xa = df_full[df_full[col_xa] == ten_xa].copy()
             df_xa = df_xa.dropna(subset=[col_mact, col_nv])
@@ -799,7 +799,7 @@ def render(tab, **kwargs) -> None:
                 ten_xa_mapping[xa_pgd] = mapped
 
         # Fuzzy matching (chuẩn hóa) cho các xã chưa có mapping
-        cot_xa_full = next((c for c in [COT_TEN_XA, "Tên xã"] if df_full is not None and c in df_full.columns), None)
+        cot_xa_full = COT_TEN_XA if df_full is not None and COT_TEN_XA in df_full.columns else None
         if df_full is not None and isinstance(df_full, pd.DataFrame) and not df_full.empty:
             if cot_xa_full:
                 ds_xa_co_data = df_full[cot_xa_full].dropna().unique()
@@ -896,8 +896,8 @@ def render(tab, **kwargs) -> None:
                 # Vẫn hiển thị debug để chẩn đoán
                 with st.expander("🔍 Debug baseline", expanded=True):
                     st.write(f"**Cột trong file:** {list(df_baseline.columns[:15])}")
-                    if COT_TEN_XA in df_baseline.columns or "Tên xã" in df_baseline.columns:
-                        col_xa_debug = COT_TEN_XA if COT_TEN_XA in df_baseline.columns else "Tên xã"
+                    if COT_TEN_XA in df_baseline.columns:
+                        col_xa_debug = COT_TEN_XA
                         ds_xa_debug = sorted(df_baseline[col_xa_debug].dropna().unique().tolist())
                         st.write(f"**Danh sách xã trong baseline ({len(ds_xa_debug)} xã):** {ds_xa_debug[:10]}")
                         st.caption(f"Đang tìm xã: **'{xa_chon}'** — kiểm tra tên có khớp không")
@@ -936,8 +936,8 @@ def render(tab, **kwargs) -> None:
         # Nguồn 2: Từ df_baseline (HSTD 31/12)
         ds_ap_from_baseline_df = set()
         if co_baseline and df_baseline is not None and not df_baseline.empty:
-            col_xa_bl = next((c for c in [COT_TEN_XA, "Tên xã"] if c in df_baseline.columns), None)
-            col_thon_bl = next((c for c in [COT_TEN_THON, "Tên thôn"] if c in df_baseline.columns), None)
+            col_xa_bl = COT_TEN_XA if COT_TEN_XA in df_baseline.columns else None
+            col_thon_bl = COT_TEN_THON if COT_TEN_THON in df_baseline.columns else None
             if col_xa_bl and col_thon_bl:
                 df_xa_bl = df_baseline[df_baseline[col_xa_bl] == xa_chon]
                 ap_list = df_xa_bl[col_thon_bl].dropna().astype(str).str.strip()
@@ -946,8 +946,8 @@ def render(tab, **kwargs) -> None:
         # Nguồn 3: Từ HSTD hiện tại (df_full) - đã lấy từ kwargs ở trên
         ds_ap_from_hstd_current = set()
         if df_full is not None and isinstance(df_full, pd.DataFrame) and not df_full.empty:
-            col_xa_hstd = next((c for c in [COT_TEN_XA, "Tên xã"] if c in df_full.columns), None)
-            col_thon_hstd = next((c for c in [COT_TEN_THON, "Tên thôn"] if c in df_full.columns), None)
+            col_xa_hstd = COT_TEN_XA if COT_TEN_XA in df_full.columns else None
+            col_thon_hstd = COT_TEN_THON if COT_TEN_THON in df_full.columns else None
             if col_xa_hstd and col_thon_hstd:
                 df_xa_full = df_full[df_full[col_xa_hstd] == xa_chon]
                 ap_list = df_xa_full[col_thon_hstd].dropna().astype(str).str.strip()

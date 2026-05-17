@@ -1,5 +1,8 @@
 # CHANGELOG
 
+## [2026-05-17] — Fix UnicodeEncodeError surrogate emoji trong Cảnh báo NQH
+- `workspaces/ws_management.py` dòng ~369 — thay chuỗi surrogate `📅` bằng ký tự emoji đúng `📅`
+
 ## [2026-05-17] — Cảnh báo NQH / Nợ QH phát sinh: đổi filter → selectbox chọn tháng số liệu
 - `workspaces/ws_management.py` — bỏ radio Kỳ hiện tại/Toàn thời gian, thay bằng selectbox tháng MM/YYYY
 

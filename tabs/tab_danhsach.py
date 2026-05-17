@@ -42,7 +42,7 @@ def _cache_kpi_danhsach(
         n_kh_dn = n_kh
     tong_dn = _dl[cot_tdn].sum() if cot_tdn in _dl.columns else 0
     tong_dqh = _dl[cot_dqh].sum() if cot_dqh in _dl.columns else 0
-    tong_khoanh = _dl["Dư nợ khoanh"].sum() if "Dư nợ khoanh" in _dl.columns else 0
+    tong_khoanh = _dl[COT_DU_NO_KHOANH].sum() if COT_DU_NO_KHOANH in _dl.columns else 0
     if len(_dl) <= 100_000:
         from data import danh_dau_khong_hd
 
@@ -135,8 +135,8 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                         if COT_TEN_XA in df.columns else ["Tất cả"]
                 cxa = st.selectbox("Xã", ds_xa, key="loc_xa")
             with f2:
-                ds_dvut = ["Tất cả"] + sorted(df["Tên ĐVUT"].dropna().unique().tolist()) \
-                          if "Tên ĐVUT" in df.columns else ["Tất cả"]
+                ds_dvut = ["Tất cả"] + sorted(df[COT_DVUT].dropna().unique().tolist()) \
+                          if COT_DVUT in df.columns else ["Tất cả"]
                 cdvut = st.selectbox("Hội đoàn thể", ds_dvut, key="loc_dvut")
             with f3:
                 ds_to = ["Tất cả"] + sorted(df[COT_TEN_TO].dropna().unique().tolist()) \
@@ -153,8 +153,8 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
             _masks.append(df[COT_TEN_PGD] == pgd_user)
         if cxa   != "Tất cả" and COT_TEN_XA  in df.columns:
             _masks.append(df[COT_TEN_XA]  == cxa)
-        if cdvut != "Tất cả" and "Tên ĐVUT" in df.columns:
-            _masks.append(df["Tên ĐVUT"]  == cdvut)
+        if cdvut != "Tất cả" and COT_DVUT in df.columns:
+            _masks.append(df[COT_DVUT]  == cdvut)
         if cto   != "Tất cả" and COT_TEN_TO  in df.columns:
             _masks.append(df[COT_TEN_TO]  == cto)
         if cct   != "Tất cả" and COT_TEN_CT  in df.columns:

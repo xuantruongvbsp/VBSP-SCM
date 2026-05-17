@@ -159,7 +159,7 @@ def render(role: str = None, **kwargs) -> None:
             except Exception as _e:
                 st.warning(f"Không thể vẽ đồ thị: {_e}")
 
-    # ── Tổng hợp đến hạn theo PGD/Xã × Tháng ────────────────────────────────
+    # ── Tổng hợp đến hạn theo PGD/Xã ─────────────────────────────────────────
     st.divider()
     tieu_de_nhom = "PGD" if nhom_theo == "PGD" else "Xã"
     st.markdown(f"#### 📋 Tổng hợp theo {tieu_de_nhom} — {den_thang} tháng tới")
@@ -168,32 +168,56 @@ def render(role: str = None, **kwargs) -> None:
     if df_loc.empty or cot_nhom_th not in df_loc.columns:
         st.info("Không có dữ liệu trong khoảng thời gian đã chọn.")
     else:
-        _df_th = df_loc.copy()
-        _df_th["_thang_label"] = pd.to_datetime(
-            _df_th["Ngày đến hạn"], errors="coerce"
-        ).dt.strftime("Tháng %m/%Y")
-        _df_th["_sort_key"] = pd.to_datetime(
-            _df_th["Ngày đến hạn"], errors="coerce"
-        ).dt.to_period("M")
         _th_agg = (
-            _df_th[_df_th["_thang_label"].notna()]
-            .groupby([cot_nhom_th, "_sort_key", "_thang_label"], sort=False)
+            df_loc.groupby(cot_nhom_th, sort=False)
             .agg(
                 **{
-                    "Số khoản": (COT_MA_KH if COT_MA_KH in _df_th.columns else cot_nhom_th, "count"),
-                    "Dư nợ (triệu đồng)": (COT_TONG_DU_NO, "sum"),
+                    "Số khoản": (COT_MA_KH if COT_MA_KH in df_loc.columns else cot_nhom_th, "count"),
+                    "_du_no": (COT_TONG_DU_NO, "sum"),
                 }
             )
             .reset_index()
-            .sort_values([cot_nhom_th, "_sort_key"])
-            .drop(columns=["_sort_key"])
-            .rename(columns={cot_nhom_th: tieu_de_nhom, "_thang_label": "Tháng đến hạn"})
+            .sort_values("_du_no", ascending=False)
+            .rename(columns={cot_nhom_th: tieu_de_nhom})
         )
         _th_agg["Số khoản"] = _th_agg["Số khoản"].apply(fmt_so)
         _th_agg["Dư nợ (triệu đồng)"] = (
-            _th_agg["Dư nợ (triệu đồng)"] / 1e6
+            _th_agg["_du_no"] / 1e6
         ).round(0).apply(lambda x: f"{x:,.0f}".replace(",", "."))
-        st.dataframe(_th_agg, width='stretch', hide_index=True)
+
+        st.dataframe(
+            _th_agg[[tieu_de_nhom, "Số khoản", "Dư nợ (triệu đồng)"]],
+            width='stretch', hide_index=True,
+        )
+
+        # Biểu đồ bar ngang có màu gradient
+        try:
+            import plotly.express as _px
+            _top = _th_agg.nlargest(min(20, len(_th_agg)), "_du_no").sort_values("_du_no")
+            _fig = _px.bar(
+                _top,
+                x="_du_no",
+                y=tieu_de_nhom,
+                orientation="h",
+                color="_du_no",
+                color_continuous_scale=[[0.0, "#C8E6C9"], [0.5, "#43A047"], [1.0, "#1B5E20"]],
+                text="Dư nợ (triệu đồng)",
+                labels={"_du_no": "Dư nợ", tieu_de_nhom: tieu_de_nhom},
+                height=max(300, len(_top) * 36),
+            )
+            _fig.update_traces(textposition="outside",
+                               hovertemplate="<b>%{y}</b><br>Dư nợ: %{text}<extra></extra>")
+            _fig.update_layout(
+                coloraxis_showscale=False,
+                xaxis=dict(showticklabels=False, title=""),
+                yaxis_title="",
+                margin=dict(l=10, r=130, t=20, b=10),
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+            )
+            st.plotly_chart(_fig, width='stretch', key=f"bar_nhom_{nhom_key}")
+        except Exception as _e:
+            st.caption(f"Không thể vẽ biểu đồ: {_e}")
 
     cols_hien_thi = [
         COT_TEN_PGD, COT_TEN_KH,

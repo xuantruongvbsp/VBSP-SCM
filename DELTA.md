@@ -177,3 +177,9 @@ Upload flow:
 - `scripts/setup_hooks.py`: cài đặt Git pre-commit hook cho team
 - `.git/hooks/pre-commit`: Git hook tự động chạy `check_hardcode_cols.py` khi commit
 - `.trae/rules/rules.md`: section 10 — hướng dẫn pre-commit hook
+- `app.py`: SQL `"Dư nợ khoanh"` → `COT_DU_NO_KHOANH` + import
+- `utils.py`: `"Tên ĐVUT"` → `COT_DVUT` (3 hits)
+- `workspaces/ws_operation.py`: `"Tên ĐVUT"` (x14) + `"Tên xã"` (x12) → `COT_*`
+- `workspaces/ws_management.py`: `"Nguồn vốn"`, `"Dư nợ trong hạn"`, `"Dư nợ quá hạn"`, `"Tên ĐVUT"` → `COT_*` + imports
+- `workspaces/ws_executive.py`: thêm `# noqa: COT` cho display labels (8 vị trí)
+- `components/movers.py`: thêm `# noqa: COT` cho UI label dict

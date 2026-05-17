@@ -286,10 +286,21 @@ def _hien_thi_migration_tab(df_kh: pd.DataFrame, ds_pgd_all: list):
         st.success("✅ Không có món vay nào có dấu hiệu rủi ro chuyển NQH.")
         return
 
-    k1, k2 = st.columns(2)
+    # Lọc nhóm 1 ≤ so_thang_ton_uoc < 3
+    if "so_thang_ton_uoc" in df_amber.columns:
+        _so_thang = pd.to_numeric(df_amber["so_thang_ton_uoc"], errors="coerce")
+        _mask_13 = (_so_thang >= 1) & (_so_thang < 3)
+        _df_13 = df_amber[_mask_13]
+        _tong_dn_13 = _df_13[COT_TONG_DU_NO].sum() if COT_TONG_DU_NO in _df_13.columns else 0
+    else:
+        _df_13 = pd.DataFrame()
+        _tong_dn_13 = 0
+
+    k1, k2, k3 = st.columns(3)
     k1.metric("⚠️ Số món cần theo dõi", fmt_so(amber_tong))
     tong_lai = df_amber[COT_LAI_TON].sum() if COT_LAI_TON in df_amber.columns else 0
     k2.metric("Tổng lãi tồn (triệu đồng)", vn(tong_lai/1e6, 0))
+    k3.metric("Tổng dư nợ (1–<3 tháng rủi ro)", fmt_ty(_tong_dn_13))
 
     col_loc, col_xuat = st.columns([2, 1])
     with col_loc:

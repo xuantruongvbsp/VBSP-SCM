@@ -137,8 +137,8 @@ class TestFmtPct:
         assert fmt_pct(87.5) == "+87,5%"
 
     def test_fmt_pct_am(self):
-        """-10.0 → '-10,0%' (âm có dấu -)"""
-        assert fmt_pct(-10.0) == "-10,0%"
+        """-10.0 → '-10%' (âm có dấu -; vn() rstrip số 0 ở cuối)"""
+        assert fmt_pct(-10.0) == "-10%"
 
     def test_fmt_pct_0(self):
         """0 → '0%' (trường hợp đặc biệt)"""

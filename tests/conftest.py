@@ -11,6 +11,10 @@ sys.modules["streamlit"] = mock_st
 sys.modules["streamlit.components.v1"] = MagicMock()
 sys.modules["streamlit.components"] = MagicMock()
 
+# Mock streamlit.delta_generator (dùng trong tab_so_sanh_ky.py)
+sys.modules["streamlit.delta_generator"] = MagicMock()
+sys.modules["streamlit.delta_generator"].DeltaGenerator = MagicMock()
+
 # Thêm thư mục gốc vào sys.path để import được các module gốc
 ROOT_DIR = Path(__file__).parent.parent
 if str(ROOT_DIR) not in sys.path:

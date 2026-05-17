@@ -1592,7 +1592,8 @@ def render(**kwargs) -> None:
         return
 
     # ── BƯỚC 1: Xây danh sách tất cả menu items ───────────────────────────
-    ALL_ITEMS = _build_exec_items(df_full, role, username, **kwargs)
+    _kw = {k: v for k, v in kwargs.items() if k not in ("df", "df_full", "role", "username")}
+    ALL_ITEMS = _build_exec_items(df_full, role, username, **_kw)
 
     # ── Navigation lazy: Nhóm → Mục → chỉ render mục được chọn ───────────
     valid_labels = [x["label"] for x in ALL_ITEMS]

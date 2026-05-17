@@ -3,6 +3,9 @@
 ## [2026-05-17] — Fix bảng trạng thái 22 đơn vị không cập nhật sau upload đơn lẻ
 - `tabs/tab_upload_khnv.py` `_xu_ly_upload()` — thêm `pop("trang_thai_upload_pgd")` sau upload thành công; trước đây bảng 22 đơn vị đọc từ session_state cũ sau rerun nên vẫn hiện ❌/⚠️ dù file đã lưu xong (bulk import đã làm đúng, single upload còn thiếu bước này)
 
+## [2026-05-17] — Fix TypeError: _build_exec_items() got multiple values for df_full
+- `workspaces/ws_executive.py` dòng ~1595 — lọc `df`, `df_full`, `role`, `username` ra khỏi kwargs trước khi unpack vào `_build_exec_items()`; các key này đã được truyền positional nên có trong kwargs gây "multiple values"
+
 ## [2026-05-17] — Merge KH-NV: giảm thời gian từ ~10 phút xuống ~1 phút
 - `data/core.py` `excel_to_parquet()` — `compression_level=9` → `3`; zstd level 9 chậm hơn level 3 tới 5-10x khi ghi, kích thước file chỉ chênh ~5%
 - `services/upload_service.py` `merge_du_lieu_toan_cn()` — (1) `compression_level=9` → `3` cho parquet CN; (2) vectorize string cleanup: thay for-loop per-column bằng `apply(lambda s: s.str.strip())` trên tất cả str cols cùng lúc; (3) chuyển `luu_snapshot` ra ngoài `_MERGE_LOCK` và chạy trong daemon thread → không block luồng chính sau khi ghi parquet xong

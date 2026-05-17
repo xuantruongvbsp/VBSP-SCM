@@ -10,6 +10,7 @@ tab_ban_dai_dien.py — Ban Đại Diện HĐQT
 from __future__ import annotations
 
 import base64
+import os
 from datetime import datetime, date
 from io import BytesIO
 from typing import Any
@@ -32,6 +33,7 @@ from config import (
     NAM_HT,
     CACHE_HSTD,
 )
+from data.core import ts_file
 from utils import (
     fmt_ty,
     fmt_bang_ty,
@@ -52,8 +54,9 @@ _THU_NO_TH_NAM = ("Thu nợ TH Năm", "Thu nợ TH trong năm")
 _THU_NO_QH_NAM = ("Thu nợ QH Năm", "Thu nợ QH trong năm")
 
 
-def _doc_hstd() -> pd.DataFrame | None:
-    """Đọc HSTD từ cache parquet."""
+@st.cache_data(show_spinner=False)
+def _doc_hstd(_ts: float = 0) -> pd.DataFrame | None:
+    """Đọc HSTD từ cache parquet. _ts dùng để bust cache khi file thay đổi."""
     try:
         return pd.read_parquet(CACHE_HSTD)
     except Exception:
@@ -564,7 +567,7 @@ def render(tab, cap: str = "xa", **kwargs) -> None:
         st.header(f"🏛️ Ban Đại Diện HĐQT cấp {cap_hien}")
         st.caption("Tổng hợp số liệu · Dự báo vốn · Quản lý họp · Lưu trữ văn bản")
 
-        df = df_full if df_full is not None and not getattr(df_full, "empty", True) else _doc_hstd()
+        df = df_full if df_full is not None and not getattr(df_full, "empty", True) else _doc_hstd(ts_file(CACHE_HSTD))
         if df is None or df.empty:
             st.warning("⚠️ Chưa có dữ liệu HSTD. Vui lòng merge HSTD để sử dụng các chức năng tổng hợp/dự báo.")
             return

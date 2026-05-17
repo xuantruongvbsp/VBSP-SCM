@@ -33,8 +33,9 @@ from config import (
     CHUONG_TRINH_KHTD, TEN_CHINH_THUC_CT,
     COT_MA_CHUONG_TRINH, COT_NGUON_VON, COT_TONG_DU_NO, COT_DU_NO_TH,
     COT_TEN_CT, COT_TEN_PGD,
-    DS_PGD, PGD_XA_MAP,
+    DS_PGD, PGD_XA_MAP, CACHE_GQVL,
 )
+from data.core import ts_file
 
 if TYPE_CHECKING:
     from streamlit.delta_generator import DeltaGenerator
@@ -404,15 +405,13 @@ from tabs.tab_khtd_xuat import render_xuat_baocao
 
 
 # ── Helper đọc GQVL parquet toàn CN ─────────────────────────────────────────
-def _doc_gqvl_parquet() -> "pd.DataFrame | None":
-    """Đọc GQVL từ cache parquet nếu có."""
-    from pathlib import Path
-    from config import CACHE_DIR
-    gqvl_parquet = Path(CACHE_DIR) / "gqvl.parquet"
-    if not gqvl_parquet.exists():
+@st.cache_data(show_spinner=False)
+def _doc_gqvl_parquet(_ts: float = 0) -> "pd.DataFrame | None":
+    """Đọc GQVL từ cache parquet nếu có. _ts bust cache khi file thay đổi."""
+    if not os.path.exists(CACHE_GQVL):
         return None
     try:
-        return pd.read_parquet(gqvl_parquet)
+        return pd.read_parquet(CACHE_GQVL)
     except Exception:
         return None
 
@@ -432,7 +431,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
     username = kwargs.get("username", "unknown")
     df_full = kwargs.get("df_full")
     # Đọc GQVL toàn CN để tính TH phân tầng 4 nhóm
-    df_gqvl = _doc_gqvl_parquet()
+    df_gqvl = _doc_gqvl_parquet(ts_file(CACHE_GQVL))
 
     import streamlit as _st
     _tab_ctx = tab if tab is not None else _st.container()
@@ -453,4 +452,4 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
         with tab_xa:
             render_nhap_pgd(role, username, df_full)
         with tab_cb:
-            render_xuat_baocao()
+            render_xuat_baocao(role, username, df_full)

@@ -1,6 +1,7 @@
 """Xuất báo cáo / export cho tab Kế hoạch Tín dụng."""
 from __future__ import annotations
 
+import os
 from datetime import datetime
 from io import BytesIO
 
@@ -8,9 +9,27 @@ import pandas as pd
 import streamlit as st
 from openpyxl.styles import Font, PatternFill
 
-from config import TEN_CHINH_THUC_CT, CHUONG_TRINH_KHTD, DS_PGD, COT_TEN_PGD, CACHE_HSTD, CACHE_GQVL
+from config import TEN_CHINH_THUC_CT, CHUONG_TRINH_KHTD, DS_PGD, COT_TEN_PGD, CACHE_HSTD, CACHE_GQVL, XA_TO_PGD
+from data.core import ts_file
+
+
+@st.cache_data(show_spinner=False)
+def _doc_hstd_cached(_ts: float = 0) -> pd.DataFrame:
+    try:
+        return pd.read_parquet(CACHE_HSTD)
+    except Exception:
+        return pd.DataFrame()
+
+
+@st.cache_data(show_spinner=False)
+def _doc_gqvl_cached(_ts: float = 0) -> pd.DataFrame:
+    try:
+        return pd.read_parquet(CACHE_GQVL)
+    except Exception:
+        return pd.DataFrame()
 from pdf_service import xuat_pdf
 from utils import hien_thi_dataframe_phan_trang, xuat_excel, ten_file_xuat
+from services.excel_service import ExcelReport
 
 from tabs.tab_khtd import (
     KV_KEY_CN,
@@ -41,10 +60,7 @@ def _hien_thi_bang_cn_readonly(
     kh_d = dict(kh_cn or {})
     th_d = dict(th_cn or {})
 
-    try:
-        df_gqvl = pd.read_parquet(CACHE_GQVL)
-    except Exception:
-        df_gqvl = pd.DataFrame()
+    df_gqvl = _doc_gqvl_cached(ts_file(CACHE_GQVL))
     th_gqvl = _tinh_th_gqvl_phan_tang(df_gqvl)
     for sk, sv in th_gqvl.items():
         if sv:
@@ -456,18 +472,14 @@ def _tab_tien_do_kh_th() -> None:
         st.warning("⚠️ Chưa có KH Chi nhánh. Vào tab **🏛️ KHTD Chi nhánh** nhập trước.")
         return
 
-    try:
-        df_hstd = pd.read_parquet(CACHE_HSTD)
-    except Exception:
+    df_hstd = _doc_hstd_cached(ts_file(CACHE_HSTD))
+    if df_hstd.empty:
         st.warning("⚠️ Chưa có dữ liệu HSTD. Upload file trước.")
         return
 
     th_cn = _tinh_thuc_hien_theo_ct(df_hstd)
 
-    try:
-        df_gqvl = pd.read_parquet(CACHE_GQVL)
-    except Exception:
-        df_gqvl = pd.DataFrame()
+    df_gqvl = _doc_gqvl_cached(ts_file(CACHE_GQVL))
 
     th_gqvl = _tinh_th_gqvl_phan_tang(df_gqvl)
     for sub_key, val in th_gqvl.items():
@@ -666,10 +678,94 @@ def _tab_tien_do_kh_th() -> None:
             )
 
 
-def render_xuat_baocao() -> None:
+def xuat_khtd_theo_xa(role: str, username: str, df_full: "pd.DataFrame | None" = None) -> bytes:
+    """Xuất Excel Kế hoạch Tín dụng theo Xã — ma trận Xã × Chương trình."""
+    kh_xa = _doc_kv(KV_KEY_XA)
+    kh_cn = _doc_kv(KV_KEY_CN)
+
+    ds_xa = sorted(XA_TO_PGD.keys())
+
+    ct_tw = [(mk, ten) for mk, _, ten, nv, _ in CHUONG_TRINH_KHTD if nv == "TW"]
+    ct_dp = [(mk, ten) for mk, _, ten, nv, _ in CHUONG_TRINH_KHTD if nv == "DP"]
+
+    def _lookup(ten_xa: str, ma_key: str) -> float:
+        val = kh_xa.get(f"{ten_xa}|{ma_key}", None)
+        if val is not None:
+            return float(val)
+        return 0.0
+
+    def _cn_val(ma_key: str) -> float:
+        return float(kh_cn.get(ma_key, 0.0))
+
+    rows_data = []
+    so_xa_co_kh = 0
+    for ten_xa in ds_xa:
+        pgd = XA_TO_PGD.get(ten_xa, "")
+        row = {"Xã/Phường": ten_xa, "PGD": pgd}
+        tong_xa = 0.0
+        for mk, ten_ct in ct_tw + ct_dp:
+            trieu = round(_lookup(ten_xa, mk) / 1_000_000, 1)
+            row[ten_ct] = trieu
+            tong_xa += trieu
+        row["Tổng"] = round(tong_xa, 1)
+        if tong_xa > 0:
+            so_xa_co_kh += 1
+        rows_data.append(row)
+
+    row_tong_cn = {"Xã/Phường": "TỔNG CHI NHÁNH", "PGD": ""}
+    tong_cn_all = 0.0
+    for mk, ten_ct in ct_tw + ct_dp:
+        trieu = round(_cn_val(mk) / 1_000_000, 1)
+        row_tong_cn[ten_ct] = trieu
+        tong_cn_all += trieu
+    row_tong_cn["Tổng"] = round(tong_cn_all, 1)
+    rows_data.append(row_tong_cn)
+
+    col_order = ["Xã/Phường", "PGD"] + [ten for _, ten in ct_tw + ct_dp] + ["Tổng"]
+    df_xa = pd.DataFrame(rows_data, columns=col_order)
+
+    nam_hien_tai = datetime.now().year
+
+    rpt = ExcelReport(
+        title="Kế hoạch Tín dụng theo Xã",
+        subtitle=f"Năm {nam_hien_tai} — Đơn vị: triệu đồng",
+        nguoi_xuat=username or "VBSP-SCM",
+    )
+    rpt.add_kpi("Tổng số xã có kế hoạch", f"{so_xa_co_kh}/{len(ds_xa)}")
+    rpt.add_sheet("KHTD theo Xã", df_xa)
+    return rpt.build()
+
+
+def render_xuat_baocao(role: str = "", username: str = "", df_full: "pd.DataFrame | None" = None) -> None:
     sub1, sub2 = st.tabs(["📊 Chênh lệch phân bổ", "🎯 Tiến độ KH vs TH"])
     with sub1:
         _tab_canh_bao_chenh_lech()
     with sub2:
         _tab_tien_do_kh_th()
+
+    st.divider()
+    st.subheader("📍 Xuất KHTD theo Xã")
+    st.caption("Bảng tổng hợp kế hoạch tín dụng phân bổ đến từng xã/phường — đơn vị: triệu đồng")
+
+    col1, col2 = st.columns([1, 3])
+    with col1:
+        if st.button("📥 Xuất Excel KHTD/Xã", key="btn_xuat_khtd_xa"):
+            with st.spinner("Đang tạo file..."):
+                try:
+                    excel_bytes = xuat_khtd_theo_xa(role, username, df_full)
+                    ten_file = ten_file_xuat("KHTD_theo_Xa")
+                    st.session_state["_bytes_khtd_xa"] = excel_bytes
+                    st.session_state["_file_khtd_xa"] = ten_file
+                    st.success(f"✅ Đã tạo: {ten_file}")
+                except Exception as e:
+                    st.error(f"❌ Lỗi khi tạo file: {e}")
+
+    if st.session_state.get("_bytes_khtd_xa"):
+        st.download_button(
+            label="⬇️ Tải file Excel",
+            data=st.session_state["_bytes_khtd_xa"],
+            file_name=st.session_state.get("_file_khtd_xa", "KHTD_theo_Xa.xlsx"),
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            key="dl_khtd_xa",
+        )
 

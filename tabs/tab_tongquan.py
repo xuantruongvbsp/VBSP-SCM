@@ -482,8 +482,8 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                         break
             # Fallback: gộp trực tiếp từ pgd_data nếu ds_thang không có gì
             if df_to_raw is None or df_to_raw.empty:
-                from data.cdtotkvv import doc_cdtotkvv_toan_cn_pgd
-                df_to_raw = doc_cdtotkvv_toan_cn_pgd()
+                from data.cdtotkvv import tong_hop_tu_pgd_data
+                df_to_raw = tong_hop_tu_pgd_data()
                 thang_hien = None
             if df_to_raw is not None and not df_to_raw.empty:
                 th = tong_hop_theo_pgd(df_to_raw)
@@ -951,8 +951,8 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                             _df_to_pgd_map = tong_hop_theo_pgd(_df_to_r)
                             break
                 if _df_to_pgd_map is None or _df_to_pgd_map.empty:
-                    from data.cdtotkvv import doc_cdtotkvv_toan_cn_pgd
-                    _df_raw_pgd = doc_cdtotkvv_toan_cn_pgd()
+                    from data.cdtotkvv import tong_hop_tu_pgd_data
+                    _df_raw_pgd = tong_hop_tu_pgd_data()
                     if _df_raw_pgd is not None and not _df_raw_pgd.empty:
                         _df_to_pgd_map = tong_hop_theo_pgd(_df_raw_pgd)
             except Exception:

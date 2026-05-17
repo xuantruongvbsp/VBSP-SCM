@@ -108,7 +108,7 @@ def _render_canh_bao(df: pd.DataFrame, ds_pgd_all: list):
         )
 
     st.markdown("**📋 Tổng hợp theo Hội đoàn thể (ĐVUT)**")
-    nhom_dvut = tong_hop_khong_hd_cached(df_kh, nhom_theo="Tên ĐVUT")
+    nhom_dvut = tong_hop_khong_hd_cached(df_kh, nhom_theo=COT_DVUT)
     if not nhom_dvut.empty:
         hien_thi_dataframe_phan_trang(
             nhom_dvut,
@@ -286,7 +286,7 @@ def _hien_thi_khd_tab(df_kh: pd.DataFrame, ds_pgd_all: list):
         hien_thi_dataframe_phan_trang(nhom_pgd, key="khd_pgd", height=280)
 
     st.markdown("**📋 Tổng hợp theo Hội đoàn thể**")
-    nhom_dvut = tong_hop_khong_hd_cached(df_kh, nhom_theo="Tên ĐVUT")
+    nhom_dvut = tong_hop_khong_hd_cached(df_kh, nhom_theo=COT_DVUT)
     if not nhom_dvut.empty:
         hien_thi_dataframe_phan_trang(nhom_dvut, key="khd_dvut", height=220)
 
@@ -789,22 +789,22 @@ Danh sách này ảnh hưởng trực tiếp đến báo cáo **phân tầng GQV
     with _t5:
         try:
             from pathlib import Path
-            from config import CACHE_DIR, COT_MA_NDT
+            from config import CACHE_DIR, COT_MA_NDT, COT_NGUON_VON, COT_DU_NO_TH, COT_DU_NO_QH
 
             gqvl_path = Path(CACHE_DIR) / "gqvl.parquet"
             if not gqvl_path.exists():
                 st.info("Chưa có dữ liệu GQVL. Upload file để xem phân tích.")
             else:
                 df_gqvl = pd.read_parquet(gqvl_path)
-                if ("Nguồn vốn" not in df_gqvl.columns) or (COT_MA_NDT not in df_gqvl.columns):
+                if (COT_NGUON_VON not in df_gqvl.columns) or (COT_MA_NDT not in df_gqvl.columns):
                     st.warning("File GQVL không có đủ cột để phân tích.")
-                elif df_gqvl["Nguồn vốn"].isna().all():
+                elif df_gqvl[COT_NGUON_VON].isna().all():
                     st.warning(
                         "⚠️ Cột 'Nguồn vốn' trong cache GQVL toàn NaN — "
                         "dữ liệu cũ bị lỗi định dạng. Vui lòng upload lại file GQVL."
                     )
                 else:
-                    df_dp         = df_gqvl[df_gqvl["Nguồn vốn"] == "ĐP"].copy()
+                    df_dp         = df_gqvl[df_gqvl[COT_NGUON_VON] == "ĐP"].copy()
                     ma_ndt_str    = df_dp[COT_MA_NDT].astype(str).str.strip()
                     ndt_tinh_list = [x["ma"] for x in ds_tinh]
                     mask_tinh     = ma_ndt_str.isin(ndt_tinh_list)
@@ -817,10 +817,10 @@ Danh sách này ảnh hưởng trực tiếp đến báo cáo **phân tầng GQV
 
                     st.divider()
                     agg_kw: dict = {"Số món": ("Nhóm", "count")}
-                    if "Dư nợ trong hạn" in df_dp.columns:
-                        agg_kw["Dư nợ TH (tỷ)"] = ("Dư nợ trong hạn", "sum")
-                    if "Dư nợ quá hạn" in df_dp.columns:
-                        agg_kw["Dư nợ QH (tỷ)"] = ("Dư nợ quá hạn", "sum")
+                    if COT_DU_NO_TH in df_dp.columns:
+                        agg_kw["Dư nợ TH (tỷ)"] = (COT_DU_NO_TH, "sum")
+                    if COT_DU_NO_QH in df_dp.columns:
+                        agg_kw["Dư nợ QH (tỷ)"] = (COT_DU_NO_QH, "sum")
                     df_pv = (
                         df_dp
                         .assign(Nhóm=ma_ndt_str.where(mask_tinh, "— Cấp xã/khác"))

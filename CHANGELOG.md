@@ -1,5 +1,8 @@
 # CHANGELOG
 
+## [2026-05-17] — Cảnh báo NQH / Đến hạn: thêm nhóm Hội đoàn thể vào Tổng hợp
+- `tabs/tab_den_han.py` — import COT_DVUT, radio "Nhóm theo" thêm option "Hội đoàn thể"
+
 ## [2026-05-17] — Cảnh báo NQH / Đến hạn: gộp tổng theo Xã/PGD, thêm bar chart màu
 - `tabs/tab_den_han.py` dòng ~162 — bỏ groupby theo tháng, gom tổng luôn + bar chart ngang gradient xanh
 

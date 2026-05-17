@@ -505,6 +505,26 @@ def _hien_thi_nqh_tab(df_kh: pd.DataFrame, username: str):
     ]
     _detail_pdf_nqh = list(dict.fromkeys(c for c in _detail_pdf_nqh if c and c in df_nqh_chi.columns))
 
+    # Checkbox s\u1ed1 c\u00f4ng v\u0103n
+    co_so_cv = st.checkbox("C\u00f3 s\u1ed1 c\u00f4ng v\u0103n", key="nqh_co_so_cv")
+    _so_hieu_nqh = ""
+    _loai_vb_nqh = ""
+    if co_so_cv:
+        _cv_col1, _cv_col2 = st.columns(2)
+        with _cv_col1:
+            _so_hieu_nqh = st.text_input(
+                "S\u1ed1 hi\u1ec7u",
+                placeholder="V\u00ed d\u1ee5: S\u1ed1: 123/NHCS-KHNV",
+                key="nqh_so_hieu",
+            )
+        with _cv_col2:
+            _loai_vb_nqh = st.selectbox(
+                "Lo\u1ea1i v\u0103n b\u1ea3n",
+                options=["", "B\u00c1O C\u00c1O", "DANH S\u00c1CH", "BI\u00caN B\u1ea2N", "TH\u00d4NG B\u00c1O"],
+                format_func=lambda x: "(Ch\u1ecdn lo\u1ea1i)" if x == "" else x,
+                key="nqh_loai_vb",
+            )
+
     if st.button("📄 Xuất PDF Group Header", key="btn_pdf_nqh_group", type="primary"):
         if df_nqh_chi.empty:
             st.warning("⚠️ Kh\u00f4ng c\u00f3 d\u1eef li\u1ec7u \u0111\u1ec3 xu\u1ea5t PDF.")
@@ -517,6 +537,8 @@ def _hien_thi_nqh_tab(df_kh: pd.DataFrame, username: str):
                         nhom_theo=nhom_col_nqh,
                         nguoi_xuat=username,
                         cols_tien=[cot_nqh, cot_tong_dn] if cot_tong_dn else [cot_nqh],
+                        so_hieu=_so_hieu_nqh,
+                        loai_van_ban=_loai_vb_nqh,
                     )
                 st.session_state["_pdf_bytes_nqh"] = _pdf_bytes_nqh
             except Exception as _e:

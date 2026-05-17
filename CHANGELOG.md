@@ -1,5 +1,15 @@
 # CHANGELOG
 
+## [2026-05-17] — Cải tiến xuat_pdf_group_header: NĐ 30, dòng Cộng, chữ ký
+- `pdf_service.py` hàm `xuat_pdf_group_header` — đổi header sang chuẩn NĐ 30 (tên cơ quan trái, quốc hiệu phải, không số công văn); thêm dòng Cộng cuối mỗi nhóm (tổng cols_tien, nền xanh nhạt); thêm khối chữ ký Người lập biểu / Kiểm soát / Giám đốc cuối trang
+
+## [2026-05-17] — Thêm xuất PDF Group Header cho tab Nợ QH phát sinh
+- `workspaces/ws_management.py` dòng ~484–533 — thêm block xuất PDF: radio nhóm theo (PGD / Hội đoàn thể / Chương trình), nút "Xuất PDF Group Header", nút tải file PDF
+- `workspaces/ws_management.py` dòng 40 — thêm `xuat_pdf_group_header` vào import từ `pdf_service`
+
+## [2026-05-17] — Thêm dropdown lọc PGD trước danh sách chi tiết NQH
+- `workspaces/ws_management.py` dòng ~443–452 — thêm selectbox "Lọc theo PGD" sau filter ĐVUT, lọc `df_nqh_chi` trước khi hiển thị bảng và nút xuất Excel
+
 ## [2026-05-17] — Thêm dropdown lọc Hội đoàn thể trong tab Nợ QH phát sinh
 - `workspaces/ws_management.py` dòng ~362–397 — thêm `st.columns(2)`, đặt filter tháng cột trái, thêm selectbox "Lọc theo Hội đoàn thể" cột phải (lọc theo `Tên ĐVUT`)
 

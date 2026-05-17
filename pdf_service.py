@@ -657,6 +657,8 @@ def xuat_pdf_group_header(
     loc_pgd: str | None = None,
     loc_ct: str | None = None,
     loc_xa: str | None = None,
+    so_hieu: str = "",        # "Số: 123/NHCS-KHNV" — để trống = không hiện
+    loai_van_ban: str = "",   # "BÁO CÁO" / "DANH SÁCH" / "BIÊN BẢN"... — hiện trên tiêu đề
 ) -> bytes:
     if not _REPORTLAB_READY:
         raise ImportError("Chưa cài thư viện reportlab. Chạy: pip install reportlab")
@@ -696,38 +698,44 @@ def xuat_pdf_group_header(
 
     story = []
     usable_w = page_size[0] - 2 * margin
+    ngay_str = datetime.now().strftime("%d/%m/%Y %H:%M")
 
-    logo_path = Path("assets/logo.png")
-    if logo_path.exists():
-        logo = RLImage(str(logo_path), width=1.8 * cm, height=1.8 * cm)
-        from reportlab.platypus import Table as RLTable
-        header_tbl = RLTable(
-            [[logo, Paragraph(
-                "NGÂN HÀNG CHÍNH SÁCH XÃ HỘI VIỆT NAM<br/>"
-                "<font size='9'>Chi nhánh tỉnh Đồng Nai</font>",
-                ParagraphStyle("hdr3", fontName=fb, fontSize=11,
-                               alignment=TA_CENTER, leading=14)
-            )]],
-            colWidths=[2.0 * cm, usable_w - 2.0 * cm]
-        )
-        header_tbl.setStyle(TableStyle([
-            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-            ("LEFTPADDING", (0, 0), (-1, -1), 0),
-            ("RIGHTPADDING", (0, 0), (-1, -1), 0),
-        ]))
-        story.append(header_tbl)
-
+    # ── Header NĐ 30 ─────────────────────────────────────────────────────────
+    from reportlab.platypus import Table as RLTable
+    col_w = usable_w / 2
+    co_quan_left = Paragraph(
+        "<b>NGÂN HÀNG CHÍNH SÁCH XÃ HỘI VIỆT NAM</b><br/>"
+        "<b>Chi nhánh tỉnh Đồng Nai</b>",
+        ParagraphStyle("co_quan", fontName=fb, fontSize=10,
+                       alignment=TA_LEFT, leading=14),
+    )
+    quoc_hieu_right = Paragraph(
+        "<b>CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</b><br/>"
+        "<b>Độc lập - Tự do - Hạnh phúc</b><br/>"
+        "<font size='9'>───────────────────</font>",
+        ParagraphStyle("quoc_hieu", fontName=fb, fontSize=10,
+                       alignment=TA_CENTER, leading=14),
+    )
+    nd30_hdr = RLTable([[co_quan_left, quoc_hieu_right]],
+                       colWidths=[col_w, col_w])
+    nd30_hdr.setStyle(TableStyle([
+        ("VALIGN",        (0, 0), (-1, -1), "TOP"),
+        ("LEFTPADDING",   (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING",  (0, 0), (-1, -1), 0),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+    ]))
+    story.append(nd30_hdr)
     story.append(Spacer(1, 0.3 * cm))
+
     story.append(Paragraph(
         day_du_tieu_de.upper(),
         ParagraphStyle("title3", fontName=fb, fontSize=11, alignment=TA_CENTER,
-                       textColor=VBSP_GREEN, spaceAfter=2)
+                       textColor=VBSP_GREEN, spaceAfter=2),
     ))
-    ngay_str = datetime.now().strftime("%d/%m/%Y %H:%M")
     story.append(Paragraph(
         f"Ngày xuất: {ngay_str}  |  Người xuất: {nguoi_xuat or 'VBSP-SCM'}",
         ParagraphStyle("meta3", fontName=fn, fontSize=8, alignment=TA_CENTER,
-                       textColor=colors.grey, spaceAfter=8)
+                       textColor=colors.grey, spaceAfter=8),
     ))
 
     if df.empty:
@@ -779,22 +787,84 @@ def xuat_pdf_group_header(
                     cells.append(p)
                 table_data.append(cells)
 
+            # Dòng Cộng
+            cong_cells = []
+            for ci, col in enumerate(nhom_df.columns):
+                if col in cols_tien:
+                    try:
+                        tong = pd.to_numeric(nhom_df[col], errors="coerce").sum()
+                        cong_cells.append(Paragraph(
+                            fmt_so(tong),
+                            ParagraphStyle("cong_r", fontName=fb, fontSize=font_size,
+                                           alignment=TA_RIGHT),
+                        ))
+                    except Exception:
+                        cong_cells.append(Paragraph("", ParagraphStyle("cong", fontName=fb, fontSize=font_size)))
+                elif ci == 0:
+                    cong_cells.append(Paragraph(
+                        "Cộng",
+                        ParagraphStyle("cong_lbl", fontName=fb, fontSize=font_size,
+                                       alignment=TA_LEFT),
+                    ))
+                else:
+                    cong_cells.append(Paragraph("", ParagraphStyle("cong", fontName=fb, fontSize=font_size)))
+            table_data.append(cong_cells)
+
             col_widths = [usable_w / n_cols] * n_cols if n_cols else [usable_w]
             tbl = Table(table_data, colWidths=col_widths, repeatRows=1)
+            last_r = len(table_data) - 1
             style_cmds = [
-                ("BACKGROUND", (0, 0), (-1, 0), VBSP_GREEN),
-                ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-                ("FONTNAME", (0, 0), (-1, 0), fb),
-                ("FONTSIZE", (0, 0), (-1, 0), hdr_font_size),
-                ("ALIGN", (0, 0), (-1, 0), "CENTER"),
-                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-                ("GRID", (0, 0), (-1, -1), 0.5, BORDER_COLOR),
+                ("BACKGROUND", (0, 0),       (-1, 0),       VBSP_GREEN),
+                ("TEXTCOLOR",  (0, 0),       (-1, 0),       colors.white),
+                ("FONTNAME",   (0, 0),       (-1, 0),       fb),
+                ("FONTSIZE",   (0, 0),       (-1, 0),       hdr_font_size),
+                ("ALIGN",      (0, 0),       (-1, 0),       "CENTER"),
+                ("VALIGN",     (0, 0),       (-1, -1),      "MIDDLE"),
+                ("GRID",       (0, 0),       (-1, -1),      0.5, BORDER_COLOR),
+                # Dòng Cộng
+                ("BACKGROUND", (0, last_r),  (-1, last_r),  VBSP_GREEN_LIGHT),
+                ("FONTNAME",   (0, last_r),  (-1, last_r),  fb),
+                ("LINEABOVE",  (0, last_r),  (-1, last_r),  1.5, VBSP_GREEN),
             ]
-            for r in range(1, len(table_data)):
+            for r in range(1, last_r):
                 if r % 2 == 0:
                     style_cmds.append(("BACKGROUND", (0, r), (-1, r), ROW_ALT))
             tbl.setStyle(TableStyle(style_cmds))
             story.append(tbl)
+
+    # ── Chữ ký ───────────────────────────────────────────────────────────────
+    story.append(Spacer(1, 1.0 * cm))
+    story.append(Paragraph(
+        f"Đồng Nai, ngày {datetime.now().strftime('%d')} "
+        f"tháng {datetime.now().strftime('%m')} "
+        f"năm {datetime.now().strftime('%Y')}",
+        ParagraphStyle("date_sign3", fontName=fn, fontSize=10,
+                       alignment=TA_RIGHT, spaceAfter=6),
+    ))
+    ky_data = [
+        [
+            Paragraph("NGƯỜI LẬP BIỂU", ParagraphStyle("ky3a", fontName=fb, fontSize=10, alignment=TA_CENTER)),
+            Paragraph("KIỂM SOÁT",       ParagraphStyle("ky3b", fontName=fb, fontSize=10, alignment=TA_CENTER)),
+            Paragraph("GIÁM ĐỐC",        ParagraphStyle("ky3c", fontName=fb, fontSize=10, alignment=TA_CENTER)),
+        ],
+        [
+            Paragraph("<i>(Ký, ghi rõ họ tên)</i>", ParagraphStyle("ky3d", fontName=fn, fontSize=9, alignment=TA_CENTER, textColor=colors.grey)),
+            Paragraph("<i>(Ký, ghi rõ họ tên)</i>", ParagraphStyle("ky3e", fontName=fn, fontSize=9, alignment=TA_CENTER, textColor=colors.grey)),
+            Paragraph("<i>(Ký, ghi rõ họ tên)</i>", ParagraphStyle("ky3f", fontName=fn, fontSize=9, alignment=TA_CENTER, textColor=colors.grey)),
+        ],
+        [
+            Paragraph(" \n\n\n", ParagraphStyle("gap3a", fontSize=10)),
+            Paragraph(" \n\n\n", ParagraphStyle("gap3b", fontSize=10)),
+            Paragraph(" \n\n\n", ParagraphStyle("gap3c", fontSize=10)),
+        ],
+    ]
+    ky_tbl = Table(ky_data, colWidths=[usable_w / 3] * 3)
+    ky_tbl.setStyle(TableStyle([
+        ("ALIGN",      (0, 0), (-1, -1), "CENTER"),
+        ("VALIGN",     (0, 0), (-1, -1), "TOP"),
+        ("TOPPADDING", (0, 0), (-1, -1), 6),
+    ]))
+    story.append(ky_tbl)
 
     def _on_page(canvas, _doc):
         canvas.saveState()

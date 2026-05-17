@@ -33,7 +33,7 @@ from config import (
     CHUONG_TRINH_KHTD, TEN_CHINH_THUC_CT,
     COT_MA_CHUONG_TRINH, COT_NGUON_VON, COT_TONG_DU_NO, COT_DU_NO_TH,
     COT_TEN_CT, COT_TEN_PGD,
-    DS_PGD, PGD_XA_MAP, CACHE_GQVL,
+    DS_PGD, PGD_XA_MAP, CACHE_GQVL, COT_MA_NHA_DAU_TU,
 )
 from data.core import ts_file
 
@@ -378,7 +378,7 @@ def _tinh_th_gqvl_phan_tang(df_gqvl: "pd.DataFrame | None") -> dict[str, float]:
     ndt_list = doc_ndt_dp_ma_list()
 
     for _, row in df_gqvl.iterrows():
-        nv  = str(row.get("Nguồn vốn", "")).strip()
+        nv  = str(row.get(COT_NGUON_VON, "")).strip()
         dn  = float(pd.to_numeric(row.get(col_dn, 0), errors="coerce") or 0)
         if dn == 0:
             continue
@@ -392,7 +392,7 @@ def _tinh_th_gqvl_phan_tang(df_gqvl: "pd.DataFrame | None") -> dict[str, float]:
             elif pl == 1:
                 result["3_TW_NSNN"]   += dn
         elif nv == "ĐP":
-            ma = str(row.get("Mã nhà đầu tư", "")).strip()
+            ma = str(row.get(COT_MA_NHA_DAU_TU, "")).strip()
             if ma in ndt_list:
                 result["3_DP_TINH"] += dn
             else:

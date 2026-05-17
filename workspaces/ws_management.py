@@ -37,7 +37,7 @@ from utils import (
     hien_thi_dataframe_phan_trang,
 )
 from services.excel_service import xuat_excel_chuyen_nghiep, ten_file_xuat as excel_ten_file
-from pdf_service import render_huong_dan
+from pdf_service import render_huong_dan, xuat_pdf_group_header
 from components.delta_card import delta_card, kpi_row
 from components.loan_drawer import loan_detail_drawer
 from components.filter_bar import filter_bar, apply_filters
@@ -440,6 +440,17 @@ def _hien_thi_nqh_tab(df_kh: pd.DataFrame, username: str):
     cols_chi = [c for c in cols_mong_muon if c and c in df_nqh.columns]
     df_nqh_chi = df_nqh[cols_chi].reset_index(drop=True)
 
+    # L\u1ecdc theo PGD tr\u01b0\u1edbc khi hi\u1ec3n th\u1ecb chi ti\u1ebft
+    if cot_pgd and cot_pgd in df_nqh_chi.columns:
+        ds_pgd_nqh = ["T\u1ea5t c\u1ea3"] + sorted(df_nqh_chi[cot_pgd].dropna().unique().tolist())
+        chon_pgd = st.selectbox(
+            "🏦 L\u1ecdc theo PGD",
+            options=ds_pgd_nqh,
+            key="nqh_loc_pgd",
+        )
+        if chon_pgd != "T\u1ea5t c\u1ea3":
+            df_nqh_chi = df_nqh_chi[df_nqh_chi[cot_pgd] == chon_pgd].reset_index(drop=True)
+
     st.markdown("**Danh sách chi tiết**")
     col1, col2 = st.columns([1, 1])
     with col1:
@@ -469,6 +480,57 @@ def _hien_thi_nqh_tab(df_kh: pd.DataFrame, username: str):
             key="nqh_xuat",
         )
     hien_thi_dataframe_phan_trang(df_nqh_chi, key="nqh_chi", height=360)
+
+    # ── Xuất PDF Group Header ────────────────────────
+    st.divider()
+    st.markdown("‏#### 📄 Xuất PDF Báo cáo Nợ quá hạn")
+
+    _nhom_col_map_nqh = {
+        "PGD":              cot_pgd,
+        "H\u1ed9i \u0111o\u00e0n th\u1ec3": cot_dvut_nqh if cot_dvut_nqh and cot_dvut_nqh in df_nqh_chi.columns else cot_pgd,
+        "Ch\u01b0\u01a1ng tr\u00ecnh":   _tim_cot(df_nqh_chi, "T\u00ean ch\u01b0\u01a1ng tr\u00ecnh"),
+    }
+    nhom_pdf_nqh = st.radio(
+        "Nh\u00f3m theo (PDF)",
+        options=list(_nhom_col_map_nqh.keys()),
+        horizontal=True,
+        key="nqh_nhom_pdf",
+    )
+    nhom_col_nqh = _nhom_col_map_nqh[nhom_pdf_nqh] or cot_pgd
+
+    _detail_pdf_nqh = [
+        nhom_col_nqh, cot_pgd, "T\u00ean KH", cot_so_ku, "T\u00ean ch\u01b0\u01a1ng tr\u00ecnh",
+        cot_nqh, cot_tong_dn,
+        "Ng\u00e0y \u0110H theo h\u1ee3p \u0111\u1ed3ng", "Ng\u00e0y \u0110H theo Gia h\u1ea1n",
+    ]
+    _detail_pdf_nqh = list(dict.fromkeys(c for c in _detail_pdf_nqh if c and c in df_nqh_chi.columns))
+
+    if st.button("📄 Xuất PDF Group Header", key="btn_pdf_nqh_group", type="primary"):
+        if df_nqh_chi.empty:
+            st.warning("⚠️ Kh\u00f4ng c\u00f3 d\u1eef li\u1ec7u \u0111\u1ec3 xu\u1ea5t PDF.")
+        else:
+            try:
+                with st.spinner("⏳ \u0110ang t\u1ea1o PDF..."):
+                    _pdf_bytes_nqh = xuat_pdf_group_header(
+                        df=df_nqh_chi[_detail_pdf_nqh].sort_values(nhom_col_nqh, na_position="last"),
+                        tieu_de="Danh s\u00e1ch N\u1ee3 qu\u00e1 h\u1ea1n - QDD62",
+                        nhom_theo=nhom_col_nqh,
+                        nguoi_xuat=username,
+                        cols_tien=[cot_nqh, cot_tong_dn] if cot_tong_dn else [cot_nqh],
+                    )
+                st.session_state["_pdf_bytes_nqh"] = _pdf_bytes_nqh
+            except Exception as _e:
+                st.session_state["_pdf_bytes_nqh"] = None
+                st.error(f"\u274c L\u1ed7i t\u1ea1o PDF: {_e}")
+
+    if st.session_state.get("_pdf_bytes_nqh"):
+        st.download_button(
+            label="⬇ Tải file PDF",
+            data=st.session_state["_pdf_bytes_nqh"],
+            file_name=f"DS_NQH_{datetime.now().strftime('%d%m%Y_%H%M')}.pdf",
+            mime="application/pdf",
+            key="btn_pdf_nqh_dl",
+        )
 
 def _render_dgd_to_tkvv(tab_parent=None, **kw):
     """Sub-tab Điểm GD & Tổ TK&VV — nested tabs."""

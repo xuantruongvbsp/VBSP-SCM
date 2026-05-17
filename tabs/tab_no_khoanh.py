@@ -58,9 +58,9 @@ def _bang_theo_nhom(df: pd.DataFrame, nhom_col: str) -> pd.DataFrame:
     nhom["Tỷ trọng%"] = (nhom["du_no_khoanh"] / tong * 100).round(1).apply(
         lambda x: f"{x:.1f}".replace(".", ",") + "%"
     ) if tong > 0 else "0%"
-    nhom["Dư nợ khoanh"] = nhom["du_no_khoanh"].apply(fmt_ty)
+    nhom[COT_DU_NO_KHOANH] = nhom["du_no_khoanh"].apply(fmt_ty)
     nhom = nhom.rename(columns={"so_mon": "Số món"})
-    return nhom[[nhom_col, "Số món", "Dư nợ khoanh", "Tỷ trọng%"]]
+    return nhom[[nhom_col, "Số món", COT_DU_NO_KHOANH, "Tỷ trọng%"]]
 
 
 def _chart_nhom(df: pd.DataFrame, nhom_col: str, key: str) -> None:

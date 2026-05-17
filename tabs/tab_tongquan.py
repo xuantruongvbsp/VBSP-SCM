@@ -342,7 +342,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
             COT_TONG_DU_NO,
             COT_DU_NO_TH,
             COT_DU_NO_QH,
-            "Dư nợ khoanh",
+            COT_DU_NO_KHOANH,
             COT_SO_KU,
             COT_MA_KH,
         )
@@ -583,7 +583,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
             else:
                 df_ct["du_no_qh"] = 0
 
-            col_khoanh = "Dư nợ khoanh" if "Dư nợ khoanh" in df.columns else None
+            col_khoanh = COT_DU_NO_KHOANH if COT_DU_NO_KHOANH in df.columns else None
             if col_khoanh:
                 df_ct3 = _df_loc.groupby(COT_TEN_CT)[col_khoanh].sum().reset_index()
                 df_ct3.columns = ["ten_ct", "du_no_khoanh"]
@@ -682,7 +682,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
 
         st.markdown("**🟢 Thông tin tổng quát theo PGD**")
         if COT_TEN_PGD in df.columns:
-            col_khoanh = "Dư nợ khoanh"
+            col_khoanh = COT_DU_NO_KHOANH
             # Chỉ lấy các cột cần dùng trong tab Tổng quan (từ đoạn PGD trở đi), không copy toàn bộ
             COT_CAN = [
                 COT_TEN_PGD,
@@ -1242,7 +1242,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                 NHOM_COT = {
                     "Chương trình": COT_TEN_CT,
                     "PGD":          COT_TEN_PGD,
-                    "Xã":           "Tên xã",
+                    "Xã":           COT_TEN_XA,
                 }
                 nhom_col = NHOM_COT[nhom_chon]
 

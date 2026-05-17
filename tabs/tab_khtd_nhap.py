@@ -60,7 +60,7 @@ def _tinh_th_gqvl_phan_tang(df_gqvl: pd.DataFrame) -> dict[str, float]:
     - DP + còn lại → "cap_xa"
     """
     from config import GQVL_PHAN_TANG, COT_PL_NV, MA_NDT_CAP_TINH_DUOI
-    from config import COT_NGUON_VON, COT_TONG_DU_NO, COT_DU_NO_TH
+    from config import COT_NGUON_VON, COT_TONG_DU_NO, COT_DU_NO_TH, COT_MA_NHA_DAU_TU
 
     result = {row[3]: 0.0 for row in GQVL_PHAN_TANG}
     result.setdefault("3_TW_NHCSXH", 0.0)
@@ -87,7 +87,7 @@ def _tinh_th_gqvl_phan_tang(df_gqvl: pd.DataFrame) -> dict[str, float]:
         nv = nv.fillna(0)
 
     plnv = pd.to_numeric(df.get(COT_PL_NV, pd.Series(dtype=object)), errors="coerce").fillna(0)
-    mandt = df.get("Mã nhà đầu tư", pd.Series(dtype=str)).fillna("").astype(str)
+    mandt = df.get(COT_MA_NHA_DAU_TU, pd.Series(dtype=str)).fillna("").astype(str)
     dn = pd.to_numeric(df[col_dn], errors="coerce").fillna(0)
 
     mask_tw = nv == 1

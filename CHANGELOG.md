@@ -1,5 +1,8 @@
 # CHANGELOG
 
+## [2026-05-17] — Thêm tham số so_hieu và loai_van_ban cho xuat_pdf_group_header
+- `pdf_service.py` hàm `xuat_pdf_group_header` — thêm `so_hieu` (hiện dưới tên cơ quan khi có) và `loai_van_ban` (hiện trên tiêu đề khi có); cả 2 mặc định rỗng = không hiện
+
 ## [2026-05-17] — Cải tiến xuat_pdf_group_header: NĐ 30, dòng Cộng, chữ ký
 - `pdf_service.py` hàm `xuat_pdf_group_header` — đổi header sang chuẩn NĐ 30 (tên cơ quan trái, quốc hiệu phải, không số công văn); thêm dòng Cộng cuối mỗi nhóm (tổng cols_tien, nền xanh nhạt); thêm khối chữ ký Người lập biểu / Kiểm soát / Giám đốc cuối trang
 

@@ -87,11 +87,11 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
         st.subheader("📈 Báo cáo")
 
         COL_CHUNG = [c for c in [
-            COT_TEN_PGD,"Tên xã","Tên thôn","Tên ĐVUT","Tên tổ",
-            COT_MA_KH, COT_TEN_KH,"Số điện thoại","Địa chỉ",
+            COT_TEN_PGD,COT_TEN_XA,COT_TEN_THON,COT_DVUT,COT_TEN_TO,
+            COT_MA_KH, COT_TEN_KH,COT_SDT,COT_DIA_CHI,
             COT_SO_KU, COT_NGAY_VAY, COT_NGAY_DH, COT_THOI_HAN,
             COT_LAI_SUAT, COT_DU_NO_TH, COT_DU_NO_QH,
-            COT_TONG_DU_NO, COT_TEN_CT,"Nguồn vốn","Tên cấp QLV",
+            COT_TONG_DU_NO, COT_TEN_CT,COT_NGUON_VON,"Tên cấp QLV",
             COT_TINH_TRANG
         ] if c in df.columns]
 
@@ -162,8 +162,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
             if COT_TONG_DU_NO in df_base.columns:
                 df_base = df_base[df_base[COT_TONG_DU_NO] > 0]
 
-            COT_DU_NO_KHOANH = "Dư nợ khoanh"
-
+            
             _required_cols = [
                 COT_TEN_PGD,
                 COT_TEN_XA,
@@ -313,7 +312,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
             # ── Xã / thôn ──
             if loai_th == "🏘️ Theo xã/thôn":
                 cap_xa = st.radio("Cấp", ["Theo xã","Theo thôn/ấp"], horizontal=True, key="bc_cap_xa")
-                nhom = "Tên xã" if cap_xa == "Theo xã" else "Tên thôn"
+                nhom = COT_TEN_XA if cap_xa == "Theo xã" else COT_TEN_THON
                 if nhom in df_base.columns:
                     dbc_raw = df_base.groupby(nhom).agg(
                         Số_KH          =(COT_MA_KH,"nunique"),
@@ -335,11 +334,11 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
 
             # ── ĐVUT ──
             elif loai_th == "🤝 Theo hội đoàn thể (ĐVUT)":
-                if "Tên ĐVUT" in df_base.columns:
+                if COT_DVUT in df_base.columns:
                     # Đánh dấu 3 tháng không hoạt động
                     df_kh = danh_dau_khong_hd(df_base)
 
-                    dbc_raw = df_kh.groupby("Tên ĐVUT").agg(
+                    dbc_raw = df_kh.groupby(COT_DVUT).agg(
                         Số_KH          =(COT_MA_KH,    "nunique"),
                         Số_món_vay     =(COT_SO_KU,    "nunique"),
                         Tổng_dư_nợ     =(COT_TONG_DU_NO,"sum"),
@@ -353,12 +352,12 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                     ).round(2).fillna(0)
 
                     # Tổng hợp 3 tháng không hoạt động theo ĐVUT
-                    khd = tong_hop_khong_hd(df_kh, nhom_theo="Tên ĐVUT")
+                    khd = tong_hop_khong_hd(df_kh, nhom_theo=COT_DVUT)
                     if not khd.empty:
                         dbc_raw = dbc_raw.merge(
-                            khd[["Tên ĐVUT", "Món_3m_KHĐ",
+                            khd[[COT_DVUT, "Món_3m_KHĐ",
                                  "Lãi_tồn_KHĐ", "Tỷ_lệ_KHĐ_%"]],
-                            on="Tên ĐVUT", how="left"
+                            on=COT_DVUT, how="left"
                         ).fillna(0)
                         dbc_raw["Món_3m_KHĐ"] = dbc_raw["Món_3m_KHĐ"].astype(int)
 
@@ -372,7 +371,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                     st.markdown("**📋 Danh sách hộ cần đôn đốc (3 tháng không hoạt động)**")
                     col_dvut, col_xuat = st.columns([2, 1])
                     with col_dvut:
-                        ds_dvut = sorted(df_kh["Tên ĐVUT"].dropna().unique().tolist())
+                        ds_dvut = sorted(df_kh[COT_DVUT].dropna().unique().tolist())
                         chon_dvut = st.selectbox(
                             "Lọc theo Hội đoàn thể",
                             ["Tất cả"] + ds_dvut,
@@ -382,7 +381,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                         st.markdown("<br>", unsafe_allow_html=True)
                         gia_tri = None if chon_dvut == "Tất cả" else chon_dvut
                         df_dondoc = ds_chi_tiet_khong_hd(
-                            df_kh, nhom_theo="Tên ĐVUT", gia_tri_nhom=gia_tri)
+                            df_kh, nhom_theo=COT_DVUT, gia_tri_nhom=gia_tri)
 
                         if not df_dondoc.empty:
                             buf = xuat_excel({"Đôn đốc 3m KHĐ": df_dondoc})
@@ -415,7 +414,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                 # Lọc thêm nguồn vốn
                 col_f1, col_f2 = st.columns(2)
                 with col_f1:
-                    loc_nv = st.selectbox("Nguồn vốn",
+                    loc_nv = st.selectbox(COT_NGUON_VON,
                         ["Tất cả","1 - Trung ương (TW)","2 - Địa phương (ĐP)"],
                         key="bc_th_nv")
                 with col_f2:
@@ -424,10 +423,10 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                         key="bc_th_ct") if COT_TEN_CT in df_base.columns else "Tất cả"
 
                 df_ct_th = df_base.copy()
-                if loc_nv == "1 - Trung ương (TW)" and "Nguồn vốn" in df_ct_th.columns:
-                    df_ct_th = df_ct_th[df_ct_th["Nguồn vốn"] == 1]
-                elif loc_nv == "2 - Địa phương (ĐP)" and "Nguồn vốn" in df_ct_th.columns:
-                    df_ct_th = df_ct_th[df_ct_th["Nguồn vốn"] == 2]
+                if loc_nv == "1 - Trung ương (TW)" and COT_NGUON_VON in df_ct_th.columns:
+                    df_ct_th = df_ct_th[df_ct_th[COT_NGUON_VON] == 1]
+                elif loc_nv == "2 - Địa phương (ĐP)" and COT_NGUON_VON in df_ct_th.columns:
+                    df_ct_th = df_ct_th[df_ct_th[COT_NGUON_VON] == 2]
                 if loc_ct_th != "Tất cả" and COT_TEN_CT in df_ct_th.columns:
                     df_ct_th = df_ct_th[df_ct_th[COT_TEN_CT] == loc_ct_th]
 
@@ -507,13 +506,13 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                     d1, d2, d3 = st.columns(3)
                     with d1:
                         loc_xa_ct = st.selectbox("Xã",
-                            ["Tất cả"]+sorted(df_base["Tên xã"].dropna().unique().tolist())
-                            if "Tên xã" in df_base.columns else ["Tất cả"],
+                            ["Tất cả"]+sorted(df_base[COT_TEN_XA].dropna().unique().tolist())
+                            if COT_TEN_XA in df_base.columns else ["Tất cả"],
                             key="bc_ct_xa")
                     with d2:
                         loc_dvut_ct = st.selectbox("Hội đoàn thể",
-                            ["Tất cả"]+sorted(df_base["Tên ĐVUT"].dropna().unique().tolist())
-                            if "Tên ĐVUT" in df_base.columns else ["Tất cả"],
+                            ["Tất cả"]+sorted(df_base[COT_DVUT].dropna().unique().tolist())
+                            if COT_DVUT in df_base.columns else ["Tất cả"],
                             key="bc_ct_dvut")
                     with d3:
                         loc_tt_ct = st.selectbox("Tình trạng",
@@ -522,8 +521,8 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                             key="bc_ct_tt")
 
                 df_ct = df_base.copy()
-                if loc_xa_ct   != "Tất cả" and "Tên xã"       in df_ct.columns: df_ct = df_ct[df_ct["Tên xã"]       == loc_xa_ct]
-                if loc_dvut_ct != "Tất cả" and "Tên ĐVUT"     in df_ct.columns: df_ct = df_ct[df_ct["Tên ĐVUT"]     == loc_dvut_ct]
+                if loc_xa_ct   != "Tất cả" and COT_TEN_XA       in df_ct.columns: df_ct = df_ct[df_ct[COT_TEN_XA]       == loc_xa_ct]
+                if loc_dvut_ct != "Tất cả" and COT_DVUT     in df_ct.columns: df_ct = df_ct[df_ct[COT_DVUT]     == loc_dvut_ct]
                 if loc_tt_ct   != "Tất cả" and COT_TINH_TRANG in df_ct.columns: df_ct = df_ct[df_ct[COT_TINH_TRANG] == loc_tt_ct]
 
                 m1,m2,m3 = st.columns(3)
@@ -582,9 +581,9 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                             if df_ct2[COT_TONG_DU_NO].sum() > 0 else "—")
 
                         # Tổng hợp theo xã
-                        if "Tên xã" in df_ct2.columns:
+                        if COT_TEN_XA in df_ct2.columns:
                             st.markdown("**Tổng hợp theo xã**")
-                            t_xa = df_ct2.groupby("Tên xã").agg(
+                            t_xa = df_ct2.groupby(COT_TEN_XA).agg(
                                 Số_hồ_sơ=(COT_MA_KH, "nunique"),
                                 Tổng_dư_nợ=(COT_TONG_DU_NO, "sum"),
                                 Dư_nợ_QH=(COT_DU_NO_QH, "sum"),
@@ -609,21 +608,21 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
 
                 # ── Theo nguồn vốn ──
                 elif loai_ct == "🏦 Theo nguồn vốn":
-                    if "Nguồn vốn" in df_ct.columns:
-                        chon_nv = st.radio("Nguồn vốn",
+                    if COT_NGUON_VON in df_ct.columns:
+                        chon_nv = st.radio(COT_NGUON_VON,
                             ["Tổng hợp cả 2","1 - Trung ương (TW)","2 - Địa phương (ĐP)"],
                             horizontal=True, key="bc_nv_chon")
 
                         # Tổng hợp so sánh TW vs ĐP
                         st.markdown("**Tổng hợp so sánh nguồn vốn**")
-                        t_nv = df_ct.groupby("Nguồn vốn").agg(
+                        t_nv = df_ct.groupby(COT_NGUON_VON).agg(
                             Số_KH          =(COT_MA_KH,"nunique"),
                             Số_món_vay     =(COT_SO_KU,"nunique"),
                             Tổng_dư_nợ     =(COT_TONG_DU_NO,"sum"),
                             Dư_nợ_trong_hạn=(COT_DU_NO_TH,"sum"),
                             Dư_nợ_quá_hạn  =(COT_DU_NO_QH,"sum"),
                         ).reset_index()
-                        t_nv["Nguồn vốn"] = t_nv["Nguồn vốn"].map({1:"1 - TW",2:"2 - ĐP"}).fillna(t_nv["Nguồn vốn"].astype(str))
+                        t_nv[COT_NGUON_VON] = t_nv[COT_NGUON_VON].map({1:"1 - TW",2:"2 - ĐP"}).fillna(t_nv[COT_NGUON_VON].astype(str))
                         t_nv["Tỷ_lệ_QH_%"] = (
                             t_nv["Dư_nợ_quá_hạn"]
                             / t_nv["Tổng_dư_nợ"].replace(0, float("nan"))
@@ -637,7 +636,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                         # Lọc và hiển thị chi tiết
                         if chon_nv != "Tổng hợp cả 2":
                             nv_val = 1 if "TW" in chon_nv else 2
-                            df_nv = df_ct[df_ct["Nguồn vốn"] == nv_val]
+                            df_nv = df_ct[df_ct[COT_NGUON_VON] == nv_val]
                             st.divider()
 
                             # Tổng hợp theo chương trình
@@ -670,19 +669,19 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
 
                 # ── Cột dùng chung cho 2 báo cáo DSML ──
                 _COL_DSML = [c for c in [
-                    COT_TEN_PGD, "Tên xã", "Tên ĐVUT", "Tên tổ",
-                    COT_MA_KH, COT_TEN_KH, "Số điện thoại",
+                    COT_TEN_PGD, COT_TEN_XA, COT_DVUT, COT_TEN_TO,
+                    COT_MA_KH, COT_TEN_KH, COT_SDT,
                     COT_SO_KU, COT_TEN_CT, COT_NGAY_VAY, COT_NGAY_DH,
-                    COT_TONG_DU_NO, COT_DU_NO_QH, "Dư nợ khoanh", COT_LAI_TON, "Nguồn vốn",
+                    COT_TONG_DU_NO, COT_DU_NO_QH, COT_DU_NO_KHOANH, COT_LAI_TON, COT_NGUON_VON,
                 ] if c in df_ct.columns]
 
                 # ── Nợ khoanh ──
                 if loai_ct == "🔴 Danh sách nợ khoanh":
-                    _COT_KHOANH = "Dư nợ khoanh"
+                    _COT_KHOANH = COT_DU_NO_KHOANH
                     if _COT_KHOANH not in df_ct.columns or df_ct[_COT_KHOANH].sum() == 0:
                         st.info("✅ Không có nợ khoanh trong phạm vi đã lọc.")
                     else:
-                        _sort_kh = [c for c in ["Tên ĐVUT", "Tên tổ", COT_TEN_KH] if c in df_ct.columns]
+                        _sort_kh = [c for c in [COT_DVUT, COT_TEN_TO, COT_TEN_KH] if c in df_ct.columns]
                         df_kh_rpt = (
                             df_ct[df_ct[_COT_KHOANH] > 0]
                             .sort_values(_sort_kh).reset_index(drop=True)
@@ -694,13 +693,13 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                             _bc_fmt_metric(df_kh_rpt[COT_LAI_TON].sum())
                             if COT_LAI_TON in df_kh_rpt.columns else "—")
 
-                        if "Tên ĐVUT" in df_kh_rpt.columns:
+                        if COT_DVUT in df_kh_rpt.columns:
                             st.markdown("**Tổng hợp theo hội đoàn thể**")
                             _agg_kh = {"Số_món": (COT_MA_KH, "count"), "Nợ_khoanh": (_COT_KHOANH, "sum")}
                             if COT_LAI_TON in df_kh_rpt.columns:
                                 _agg_kh["Lãi_tồn"] = (COT_LAI_TON, "sum")
                             t_kh = (
-                                df_kh_rpt.groupby("Tên ĐVUT").agg(**_agg_kh)
+                                df_kh_rpt.groupby(COT_DVUT).agg(**_agg_kh)
                                 .sort_values("Nợ_khoanh", ascending=False).reset_index()
                             )
                             _hien_thi_bc(_fmt_df(t_kh), key="bc_kh_dvut")
@@ -711,7 +710,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
 
                 # ── Nợ quá hạn ──
                 elif loai_ct == "🟠 Danh sách nợ quá hạn":
-                    _sort_qh = [c for c in ["Tên ĐVUT", "Tên tổ", COT_TEN_KH] if c in df_ct.columns]
+                    _sort_qh = [c for c in [COT_DVUT, COT_TEN_TO, COT_TEN_KH] if c in df_ct.columns]
                     df_qh_rpt = (
                         df_ct[df_ct[COT_DU_NO_QH] > 0]
                         .sort_values(_sort_qh).reset_index(drop=True)
@@ -728,10 +727,10 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                         )
                         c3.metric("Tỷ lệ QH", f"{_tl_qh:.2f}%".replace(".", ","))
 
-                        if "Tên ĐVUT" in df_qh_rpt.columns:
+                        if COT_DVUT in df_qh_rpt.columns:
                             st.markdown("**Tổng hợp theo hội đoàn thể**")
                             t_qh = (
-                                df_qh_rpt.groupby("Tên ĐVUT").agg(
+                                df_qh_rpt.groupby(COT_DVUT).agg(
                                     Số_món=(COT_MA_KH, "count"),
                                     Tổng_dư_nợ=(COT_TONG_DU_NO, "sum"),
                                     Dư_nợ_QH=(COT_DU_NO_QH, "sum"),

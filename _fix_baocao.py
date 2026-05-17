@@ -256,13 +256,20 @@ if old in content:
     changes += 1
     print('10g. Fixed sort_qh')
 
-# Lines 731-734
-old = 'if "Tên ĐVUT" in df_qh_rpt.columns:\n                                df_qh_rpt.groupby("Tên ĐVUT").agg('
-new = 'if COT_DVUT in df_qh_rpt.columns:\n                                df_qh_rpt.groupby(COT_DVUT).agg('
+# Lines 731-734: separate replacements
+old = 'if "Tên ĐVUT" in df_qh_rpt.columns:'
+new = 'if COT_DVUT in df_qh_rpt.columns:'
 if old in content:
     content = content.replace(old, new, 1)
     changes += 1
-    print('10h. Fixed Tên ĐVUT qh groupby')
+    print('10h. Fixed Tên ĐVUT qh if')
+
+old = 'df_qh_rpt.groupby("Tên ĐVUT").agg('
+new = 'df_qh_rpt.groupby(COT_DVUT).agg('
+if old in content:
+    content = content.replace(old, new, 1)
+    changes += 1
+    print('10i. Fixed Tên ĐVUT qh groupby')
 
 with open(path, 'w', encoding='utf-8') as f:
     f.write(content)

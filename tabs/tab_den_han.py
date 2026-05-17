@@ -16,7 +16,7 @@ from auth import la_phan_he_pgd
 from config import (
     CACHE_HSTD, COT_TEN_PGD, COT_TEN_KH, COT_TEN_CT,
     COT_TONG_DU_NO, COT_NGAY_DEN_HAN, COT_MA_KH, COT_TEN_XA,
-    COT_SO_KU,
+    COT_SO_KU, COT_DVUT,
 )
 from data.den_han import tinh_den_han_df
 from pdf_service import xuat_pdf_group_header, nut_xuat_pdf
@@ -73,12 +73,12 @@ def render(role: str = None, **kwargs) -> None:
             value=6, key="den_han_slider")
     with col2:
         nhom_theo = st.radio(
-            "Nhóm theo", ["PGD", "Xã"],
+            "Nhóm theo", ["PGD", "Xã", "Hội đoàn thể"],
             horizontal=True, key="den_han_nhom")
 
     df_loc = _loc_thang(df_tinh, 0, den_thang)
     df_loc = df_loc[pd.to_numeric(df_loc[COT_TONG_DU_NO], errors="coerce").fillna(0) > 0]
-    nhom_key = "pgd" if nhom_theo == "PGD" else "xa"
+    nhom_key = "pgd" if nhom_theo == "PGD" else ("dvut" if nhom_theo == "Hội đoàn thể" else "xa")
 
     tong_khoan = len(df_loc)
     tong_tien = df_loc[COT_TONG_DU_NO].sum() if tong_khoan > 0 else 0
@@ -159,12 +159,13 @@ def render(role: str = None, **kwargs) -> None:
             except Exception as _e:
                 st.warning(f"Không thể vẽ đồ thị: {_e}")
 
-    # ── Tổng hợp đến hạn theo PGD/Xã ─────────────────────────────────────────
+    # ── Tổng hợp đến hạn theo PGD/Xã/Hội đoàn thể ───────────────────────────
     st.divider()
-    tieu_de_nhom = "PGD" if nhom_theo == "PGD" else "Xã"
+    NHOM_COT_MAP = {"PGD": COT_TEN_PGD, "Xã": COT_TEN_XA, "Hội đoàn thể": COT_DVUT}
+    tieu_de_nhom = nhom_theo
+    cot_nhom_th  = NHOM_COT_MAP[nhom_theo]
     st.markdown(f"#### 📋 Tổng hợp theo {tieu_de_nhom} — {den_thang} tháng tới")
 
-    cot_nhom_th = COT_TEN_PGD if nhom_theo == "PGD" else COT_TEN_XA
     if df_loc.empty or cot_nhom_th not in df_loc.columns:
         st.info("Không có dữ liệu trong khoảng thời gian đã chọn.")
     else:

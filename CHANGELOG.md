@@ -1,5 +1,15 @@
 # CHANGELOG
 
+## [2026-05-17] — Tạo pre-commit hook kiểm tra convention VBSP-SCM
+- `scripts/check_conventions.py` — kiểm tra: role hardcode, tiền tệ sai đơn vị, cột hardcode, sqlite3.connect() trực tiếp, ghi_kv không có ghi_audit
+- `.git/hooks/pre-commit` — thay thế bằng hook mới gọi `check_conventions.py` trên staged *.py files; exit 1 nếu có vi phạm, `git commit --no-verify` để bỏ qua
+- Cần chạy 1 lần: `chmod +x .git/hooks/pre-commit` (Git Bash) hoặc tự động trên Windows
+
+## [2026-05-17] — Thêm trang "Executive Summary" vào ws_executive.py
+- `workspaces/ws_executive.py` imports — thêm `import db`, `COT_NGAY_DH`, `CHUONG_TRINH_KHTD`
+- `workspaces/ws_executive.py` hàm mới `_render_executive_summary()` — 6 KPI delta cards, gauge NQH + trạng thái, 4 loại cảnh báo rủi ro tổng hợp, mini heatmap PGD
+- `workspaces/ws_executive.py` `_build_exec_items()` — thêm item "📊 Tổng hợp" là phần tử đầu tiên trong group "Tổng quan"
+
 ## [2026-05-17] — Thêm UI backup vào tab_trang_thai_nguon.py
 - `tabs/tab_trang_thai_nguon.py` hàm `_render_he_thong()` — thêm tham số `la_cn: bool = False` để kiểm soát quyền xem/bấm backup
 - `tabs/tab_trang_thai_nguon.py` hàm `_render_he_thong()` — thêm section "Backup dữ liệu": nút "Backup ngay" (chỉ cho admin_cn/manager_cn), audit log, danh sách 7 bản backup gần nhất với dung lượng/số file/trạng thái từng thành phần (DB/Parquet/PGD xlsx)

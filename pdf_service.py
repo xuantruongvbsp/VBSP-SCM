@@ -78,6 +78,8 @@ def xuat_pdf(
 ) -> bytes:
     if not _REPORTLAB_READY:
         raise ImportError("Chưa cài thư viện reportlab. Chạy: pip install reportlab")
+    if df is None or df.empty or len(df.columns) == 0:
+        raise ValueError("Không có dữ liệu để xuất PDF")
     _dang_ky_font()
     from utils import fmt_so
 

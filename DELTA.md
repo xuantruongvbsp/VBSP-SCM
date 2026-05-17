@@ -160,3 +160,20 @@ Upload flow:
 - `tab_checklist_bc.py`: checklist deadline báo cáo via kv_store
 - `tab_xlrr_tong_hop.py`: XLRR consolidated 4 sub-tab
 - B7 refactor: normalize_role() thay hardcoded role check trong 6+ file
+- `config.py`: thêm `COT_DU_NO_KHOANH` constant
+- `tabs/tab_baocao.py`: refactor hardcode tên cột → `COT_*` constants (~40 replacements)
+- `tabs/tab_danhsach.py`: hardcode `"Tên ĐVUT"`, `"Dư nợ khoanh"` → `COT_*`
+- `tabs/tab_khtd_mau07.py`: xóa fallback patterns, dùng `COT_*` trực tiếp
+- `tabs/tab_so_sanh_ky.py`: hardcode `"Ngày số liệu"`, `"Dư nợ khoanh"` → `COT_*`
+- `tabs/tab_khtd.py`: `row.get("Nguồn vốn")`, `row.get("Mã nhà đầu tư")` → `COT_*`
+- `tabs/tab_khtd_nhap.py`: `df.get("Mã nhà đầu tư")` → `COT_MA_NHA_DAU_TU`
+- `tabs/tab_no_khoanh.py`: `nhom["Dư nợ khoanh"]` → `COT_DU_NO_KHOANH`
+- `tabs/tab_tongquan.py`: `"Dư nợ khoanh"`, `"Tên xã"` → `COT_*`
+- `services/ct_discovery.py`: `row.get("Nguồn vốn")`, `row.get("Phân loại NV")`, `row.get("Mã nhà đầu tư")` → `COT_*`
+- `services/hhi_service.py`: `"Tổng dư nợ"` → `COT_TONG_DU_NO` + thêm import
+- `services/kiem_soat_service.py`: `"Tên tổ"` (x9) → `COT_TEN_TO` + thêm import
+- `services/upload_service.py`: `_cols_so` list → 10 `COT_*` constants + imports
+- `scripts/check_hardcode_cols.py`: script kiểm tra hardcode column names (diff mode + full mode)
+- `scripts/setup_hooks.py`: cài đặt Git pre-commit hook cho team
+- `.git/hooks/pre-commit`: Git hook tự động chạy `check_hardcode_cols.py` khi commit
+- `.trae/rules/rules.md`: section 10 — hướng dẫn pre-commit hook

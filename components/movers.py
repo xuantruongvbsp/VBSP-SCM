@@ -33,7 +33,7 @@ DIMENSION_OPTIONS: list[dict[str, Any]] = [
 ]
 
 METRIC_OPTIONS: list[dict[str, Any]] = [
-    {"key": "tong_du_no", "label": "Tổng dư nợ",  "unit": "tien"},
+    {"key": "tong_du_no", "label": "Tổng dư nợ",  "unit": "tien"},  # noqa: COT
     {"key": "ty_le_nqh",  "label": "Tỷ lệ NQH",   "unit": "ty_le"},
     {"key": "roll_rate",  "label": "Roll rate",    "unit": "ty_le"},
 ]

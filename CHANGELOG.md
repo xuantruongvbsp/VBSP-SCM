@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## [2026-05-17] — Fix bảng "Cơ cấu dư nợ": số món vay sai, GN/TN năm ko hiện
+- `tabs/tab_tongquan.py` dòng ~558 — đổi `so_mon = (COT_SO_KU, "nunique")` → `(COT_TONG_DU_NO, "count")` để tránh miss row khi Số khế ước null
+- `config.py` `HSTD_DS_CHO_VAY_NAM_ALIASES` — bổ sung aliases: `"Doanh số cho vay năm"`, `"Doanh số CV năm"`, `"Cho vay trong năm"`
+- `config.py` `HSTD_THU_NO_NAM_ALIASES` — thêm đầu danh sách: `"Thu nợ trong năm"` (tên thực tế trong HSTD BCQUERY theo tab_tracuu), `"Doanh số thu nợ năm"`, `"Thu nợ năm"`
+
 ## [2026-05-17] — Tối ưu tốc độ load tab: cache parquet/CDTOTKVV
 - `tabs/tab_tongquan.py` dòng ~485, ~954 — thay `doc_cdtotkvv_toan_cn_pgd()` (đọc 22 file Excel mỗi lần render) bằng `tong_hop_tu_pgd_data()` (đã có `@st.cache_data`)
 - `tabs/tab_ban_dai_dien.py` — thêm `@st.cache_data(show_spinner=False)` cho `_doc_hstd()` với `_ts: float` để bust cache khi parquet thay đổi; thêm `import os` và `from data.core import ts_file`

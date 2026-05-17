@@ -3,6 +3,10 @@
 ## [2026-05-17] — Fix bảng trạng thái 22 đơn vị không cập nhật sau upload đơn lẻ
 - `tabs/tab_upload_khnv.py` `_xu_ly_upload()` — thêm `pop("trang_thai_upload_pgd")` sau upload thành công; trước đây bảng 22 đơn vị đọc từ session_state cũ sau rerun nên vẫn hiện ❌/⚠️ dù file đã lưu xong (bulk import đã làm đúng, single upload còn thiếu bước này)
 
+## [2026-05-17] — Merge KH-NV: giảm thời gian từ ~10 phút xuống ~1 phút
+- `data/core.py` `excel_to_parquet()` — `compression_level=9` → `3`; zstd level 9 chậm hơn level 3 tới 5-10x khi ghi, kích thước file chỉ chênh ~5%
+- `services/upload_service.py` `merge_du_lieu_toan_cn()` — (1) `compression_level=9` → `3` cho parquet CN; (2) vectorize string cleanup: thay for-loop per-column bằng `apply(lambda s: s.str.strip())` trên tất cả str cols cùng lúc; (3) chuyển `luu_snapshot` ra ngoài `_MERGE_LOCK` và chạy trong daemon thread → không block luồng chính sau khi ghi parquet xong
+
 ## [2026-05-17] — Upload KH-NV: song song hóa xử lý 4 file bằng ThreadPoolExecutor
 - `tabs/tab_upload_khnv.py` — tách `_xu_ly_mot_file_khnv()` module-level (thread-safe: không gọi st.* / db.*); `_xu_ly_upload()` dùng `ThreadPoolExecutor(max_workers=4)` để xử lý song song → thời gian giảm từ N×parse xuống còn max(parse) thay vì tổng; ghi audit tuần tự sau khi tất cả thread xong
 

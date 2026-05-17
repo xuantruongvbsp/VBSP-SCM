@@ -467,23 +467,20 @@ def merge_du_lieu_toan_cn(
     for col in _cols_so_cn:
         if col in df_toan_cn.columns:
             df_toan_cn[col] = pd.to_numeric(df_toan_cn[col], errors="coerce")
-    for col in df_toan_cn.columns:
-        if col not in _cols_so_cn:
-            df_toan_cn[col] = (
-                df_toan_cn[col]
-                .astype(object)
-                .where(df_toan_cn[col].notna(), other="")
-                .astype(str)
-                .str.strip()
-                .replace({"nan": "", "None": "", "<NA>": ""})
-            )
-    
+    # Vectorize string cleanup: xử lý tất cả cột text cùng lúc thay vì loop từng cột
+    _str_cols = [c for c in df_toan_cn.columns if c not in _cols_so_cn]
+    if _str_cols:
+        _tmp = df_toan_cn[_str_cols].fillna("").astype(str)
+        _tmp = _tmp.apply(lambda s: s.str.strip())
+        _tmp = _tmp.replace({"nan": "", "None": "", "<NA>": "", "NaT": ""})
+        df_toan_cn[_str_cols] = _tmp
+
     with _MERGE_LOCK[loai]:
         bak_path = cache_path + ".bak"
         if os.path.exists(cache_path):
             shutil.copy2(cache_path, bak_path)
         try:
-            df_toan_cn.to_parquet(cache_path, index=False, engine="pyarrow", compression="zstd", compression_level=9)
+            df_toan_cn.to_parquet(cache_path, index=False, engine="pyarrow", compression="zstd", compression_level=3)
         except Exception as e:
             _u_merge = st.session_state.get("username", "unknown")
             db.ghi_audit(_u_merge, "merge_loi_dtype",
@@ -493,14 +490,6 @@ def merge_du_lieu_toan_cn(
             raise
         if os.path.exists(bak_path):
             os.remove(bak_path)
-
-        # Auto-snapshot sau mỗi lần merge HSTD thành công
-        if loai == "hstd":
-            try:
-                from snapshot_service import luu_snapshot as _luu_snap
-                _luu_snap(df_toan_cn, st.session_state.get("username", "system"))
-            except Exception:
-                pass  # Không block luồng chính nếu snapshot lỗi
 
         username = st.session_state.get("username", "unknown")
 
@@ -532,6 +521,21 @@ def merge_du_lieu_toan_cn(
             },
             username,
         )
+
+    # Auto-snapshot NGOÀI lock — chạy background thread để không block luồng chính
+    if loai == "hstd":
+        import threading as _threading
+        _snap_user = st.session_state.get("username", "system")
+        _snap_df = df_toan_cn.copy()
+
+        def _snap_bg() -> None:
+            try:
+                from snapshot_service import luu_snapshot as _luu_snap
+                _luu_snap(_snap_df, _snap_user)
+            except Exception:
+                pass
+
+        _threading.Thread(target=_snap_bg, daemon=True).start()
 
     return KetQuaUpload(
         True,

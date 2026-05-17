@@ -30,7 +30,7 @@ def excel_to_parquet(
         )
         if post_fn:
             df = post_fn(df)
-        df.to_parquet(parquet_path, index=False, engine='pyarrow', compression='zstd', compression_level=9)
+        df.to_parquet(parquet_path, index=False, engine='pyarrow', compression='zstd', compression_level=3)
     return pd.read_parquet(parquet_path, engine='pyarrow')
 
 

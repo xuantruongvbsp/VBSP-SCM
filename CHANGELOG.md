@@ -1,6 +1,9 @@
 # CHANGELOG
 
-## [2026-05-18] — Đổi sidebar từ xanh đậm sang trắng
+## [2026-05-19] — Đổi sidebar: nền xanh dương sáng #64B5F6, nút xanh lá cây chữ trắng
+- `app.py` dòng ~131–225 — Sidebar background #64B5F6, text xanh đậm, button #2E7D32 chữ trắng, hover #1B5E20
+
+## [2026-05-19] — Đổi sidebar: nền xanh dương sáng #64B5F6, nút xanh dương chữ trắng
 - `app.py` dòng ~131–220 — Sidebar background #FFFFFF, border xám nhạt, text xám/xanh đậm, button xanh lá nhạt
 
 ## [2026-05-18] — Rà soát toàn bộ codebase: thêm format="DD/MM/YYYY" cho tất cả st.date_input

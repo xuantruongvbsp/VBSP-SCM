@@ -128,23 +128,23 @@ h3 { font-size: 1.1rem  !important; font-weight: 600 !important; color: #1a3a5c 
 [data-testid="stAppViewContainer"] > .main { background: #f0f4f8 !important; }
 .block-container { padding: 1.5rem 2rem 2rem !important; max-width: 1400px !important; }
 
-/* ── 3. SIDEBAR — White ── */
+/* ── 3. SIDEBAR — Light Blue ── */
 [data-testid="stSidebar"] {
-    background: #FFFFFF !important;
-    border-right: 1px solid #e0e0e0 !important;
-    box-shadow: 4px 0 12px rgba(0,0,0,0.06) !important;
+    background: #64B5F6 !important;
+    border-right: 1px solid #42A5F5 !important;
+    box-shadow: 4px 0 12px rgba(0,0,0,0.1) !important;
 }
 
 [data-testid="stSidebar"] h1,
 [data-testid="stSidebar"] h2,
 [data-testid="stSidebar"] h3 {
-    color: #1B5E20 !important;
+    color: #0D47A1 !important;
     font-weight: 700;
 }
 
 [data-testid="stSidebar"] label,
 [data-testid="stSidebar"] .stMarkdown p {
-    color: #546e7a !important;
+    color: #0D47A1 !important;
     font-size: 11px !important;
     font-weight: 700 !important;
     text-transform: uppercase;
@@ -154,13 +154,13 @@ h3 { font-size: 1.1rem  !important; font-weight: 600 !important; color: #1a3a5c 
 [data-testid="stSidebar"] p,
 [data-testid="stSidebar"] span,
 [data-testid="stSidebar"] [data-testid="stCaptionContainer"] p {
-    color: #37474f !important;
+    color: #0D47A1 !important;
 }
 
 [data-testid="stSidebar"] .stButton > button {
-    background-color: #f1f8e9 !important;
-    color: #2E7D32 !important;
-    border: 1.5px solid #a5d6a7 !important;
+    background-color: #2E7D32 !important;
+    color: #FFFFFF !important;
+    border: 1.5px solid #1B5E20 !important;
     border-radius: 10px;
     width: 100%;
     text-align: left;
@@ -169,22 +169,22 @@ h3 { font-size: 1.1rem  !important; font-weight: 600 !important; color: #1a3a5c 
     font-weight: 500;
     margin-bottom: 4px;
     transition: all 0.2s ease;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.15);
 }
 
 [data-testid="stSidebar"] .stButton > button:hover {
-    background-color: #e8f5e9 !important;
-    border-color: #66bb6a !important;
-    color: #1B5E20 !important;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.10);
+    background-color: #1B5E20 !important;
+    border-color: #1B5E20 !important;
+    color: #FFFFFF !important;
+    box-shadow: 0 3px 10px rgba(0,0,0,0.2);
     transform: translateX(2px);
 }
 
 [data-testid="stSidebar"] .stButton > button[kind="primary"] {
-    background: #E65100 !important;
+    background: #1B5E20 !important;
     color: #FFFFFF !important;
-    border-color: #E65100 !important;
-    box-shadow: 0 3px 10px rgba(230,81,0,0.3);
+    border-color: #1B5E20 !important;
+    box-shadow: 0 3px 10px rgba(27,94,32,0.35);
     font-weight: 600;
 }
 
@@ -195,10 +195,10 @@ h3 { font-size: 1.1rem  !important; font-weight: 600 !important; color: #1a3a5c 
 
 /* Tab con trong sidebar (bọc trong st.columns) */
 [data-testid="stSidebar"] [data-testid="column"] .stButton > button {
-    background-color: #f5f5f5 !important;
-    color: #2E7D32 !important;
+    background-color: #2E7D32 !important;
+    color: #FFFFFF !important;
     font-weight: 600 !important;
-    border: 1px solid #c8e6c9 !important;
+    border: 1px solid #1B5E20 !important;
     font-size: 13px !important;
     padding: 7px 12px !important;
     margin-bottom: 3px !important;
@@ -206,15 +206,15 @@ h3 { font-size: 1.1rem  !important; font-weight: 600 !important; color: #1a3a5c 
     transform: none !important;
 }
 [data-testid="stSidebar"] [data-testid="column"] .stButton > button:hover {
-    background-color: #e8f5e9 !important;
-    border-color: #81c784 !important;
-    color: #1B5E20 !important;
+    background-color: #1B5E20 !important;
+    border-color: #1B5E20 !important;
+    color: #FFFFFF !important;
     transform: none !important;
 }
 
 [data-testid="stSidebar"] .stAlert {
-    background-color: #f9fbe7;
-    border: 1px solid #dcedc8;
+    background-color: #C8E6C9;
+    border: 1px solid #81C784;
     border-radius: 8px;
     font-size: 12px;
 }

@@ -5,7 +5,10 @@ from io import BytesIO
 import db
 from config import DS_PGD, DON_VI_CHI_NHANH
 from data.pgd import pgd_slug
-from utils import fmt_ty, fmt_so, get_tab_context
+from utils import fmt_ty, fmt_so
+from tabs.base_tab import TabContext
+
+# ── Constants ─────────────────────────────────────────────────────────────
 from auth import normalize_role
 
 TRANG_THAI_QD62 = {

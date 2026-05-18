@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## [2026-05-19] — QLNK: cập nhật LY_DO_KHOANH_QD62 + thêm LY_DO_KHOANH_LABEL
+- `config.py` — thay thế `LY_DO_KHOANH_QD62` (11 mục, tách k1/k2 theo mức thiệt hại), thêm `LY_DO_KHOANH_LABEL` (nhãn rút gọn)
+
+## [2026-05-19] — QLNK: thêm LY_DO_KHOANH_QD62 vào config.py
+- `config.py` dòng ~506 — thêm dict `LY_DO_KHOANH_QD62` (9 mục k1→k_bs) sau `KV_PREFIX_NO_RUI_RO`
+
 ## [2026-05-19] — QLNK: thêm 2 bảng SQLite + 6 hàm CRUD vào db.py
 - `db.py` dòng ~166–213 — DDL: `qlnk_ket_qua` (4 index), `qlnk_bo_sung` (1 index)
 - `db.py` dòng ~584–829 — 6 hàm CRUD: `luu_ket_qua_kiem_tra`, `phe_duyet_ket_qua`, `mo_phe_duyet`, `doc_ket_qua_kiem_tra`, `luu_bo_sung_mon_vay`, `doc_bo_sung_mon_vay`

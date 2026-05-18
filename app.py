@@ -116,35 +116,35 @@ html, body, [class*="css"] {
     font-size: 15px !important;
     font-family: "Inter", "Segoe UI", system-ui, sans-serif !important;
     line-height: 1.65 !important;
-    color: #1e2a3a !important;
+    color: #E0E6ED !important;
 }
-h1 { font-size: 1.55rem !important; font-weight: 700 !important; color: #0d2137 !important; letter-spacing: -0.3px !important; }
-h2 { font-size: 1.3rem  !important; font-weight: 700 !important; color: #0d2137 !important; }
-h3 { font-size: 1.1rem  !important; font-weight: 600 !important; color: #1a3a5c !important; }
-[data-testid="stMarkdownContainer"] p  { font-size: 0.97rem !important; color: #2c3e50 !important; }
-[data-testid="stCaptionContainer"]  p  { font-size: 0.84rem !important; color: #6b7a8d !important; }
+h1 { font-size: 1.55rem !important; font-weight: 700 !important; color: #F0F4F8 !important; letter-spacing: -0.3px !important; }
+h2 { font-size: 1.3rem  !important; font-weight: 700 !important; color: #F0F4F8 !important; }
+h3 { font-size: 1.1rem  !important; font-weight: 600 !important; color: #D0DCE8 !important; }
+[data-testid="stMarkdownContainer"] p  { font-size: 0.97rem !important; color: #CBD5E1 !important; }
+[data-testid="stCaptionContainer"]  p  { font-size: 0.84rem !important; color: #94A3B8 !important; }
 
 /* ── 2. NỀN TỔNG THỂ ── */
-[data-testid="stAppViewContainer"] > .main { background: #f0f4f8 !important; }
+[data-testid="stAppViewContainer"] > .main { background: #FFFFFF !important; }
 .block-container { padding: 1.5rem 2rem 2rem !important; max-width: 1400px !important; }
 
-/* ── 3. SIDEBAR — Light Blue ── */
+/* ── 3. SIDEBAR — Navy Dark ── */
 [data-testid="stSidebar"] {
-    background: #64B5F6 !important;
-    border-right: 1px solid #42A5F5 !important;
-    box-shadow: 4px 0 12px rgba(0,0,0,0.1) !important;
+    background: #1A1D2E !important;
+    border-right: 1px solid #2A2D3E !important;
+    box-shadow: 4px 0 12px rgba(0,0,0,0.3) !important;
 }
 
 [data-testid="stSidebar"] h1,
 [data-testid="stSidebar"] h2,
 [data-testid="stSidebar"] h3 {
-    color: #0D47A1 !important;
+    color: #E0E6ED !important;
     font-weight: 700;
 }
 
 [data-testid="stSidebar"] label,
 [data-testid="stSidebar"] .stMarkdown p {
-    color: #0D47A1 !important;
+    color: #94A3B8 !important;
     font-size: 11px !important;
     font-weight: 700 !important;
     text-transform: uppercase;
@@ -154,22 +154,51 @@ h3 { font-size: 1.1rem  !important; font-weight: 600 !important; color: #1a3a5c 
 [data-testid="stSidebar"] p,
 [data-testid="stSidebar"] span,
 [data-testid="stSidebar"] [data-testid="stCaptionContainer"] p {
-    color: #0D47A1 !important;
+    color: #CBD5E1 !important;
 }
 
-[data-testid="stSidebar"] .stButton > button {
+/* FORCE white text on ALL buttons in sidebar */
+[data-testid="stSidebar"] .stButton > button,
+[data-testid="stSidebar"] [data-testid="stButton"] button,
+[data-testid="stSidebar"] button,
+[data-testid="stSidebar"] div[data-testid="stHorizontalBlock"] button {
+    color: #FFFFFF !important;
+    font-weight: 700 !important;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.3) !important;
+}
+
+/* Ensure Streamlit doesn't override with inline styles */
+[data-testid="stSidebar"] .stButton > button span,
+[data-testid="stSidebar"] .stButton > button p,
+[data-testid="stSidebar"] button span,
+[data-testid="stSidebar"] button p {
+    color: #FFFFFF !important;
+    font-weight: 700 !important;
+}
+
+/* Target Streamlit's button p elements specifically */
+section[data-testid="stSidebar"] p,
+[data-testid="stSidebarContent"] p,
+[data-testid="stSidebar"] [data-testid="stButton"] p {
+    color: inherit;
+}
+
+[data-testid="stSidebar"] .stButton > button,
+[data-testid="stSidebar"] [data-testid="stButton"] button {
     background-color: #2E7D32 !important;
     color: #FFFFFF !important;
     border: 1.5px solid #1B5E20 !important;
     border-radius: 10px;
     width: 100%;
     text-align: left;
-    padding: 10px 16px;
-    font-size: 14px;
-    font-weight: 500;
-    margin-bottom: 4px;
+    padding: 12px 18px !important;
+    font-size: 15px !important;
+    font-weight: 700 !important;
+    margin-bottom: 6px;
     transition: all 0.2s ease;
     box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+    text-shadow: 0 1px 2px rgba(0,0,0,0.2) !important;
+    letter-spacing: 0.3px;
 }
 
 [data-testid="stSidebar"] .stButton > button:hover {
@@ -185,19 +214,21 @@ h3 { font-size: 1.1rem  !important; font-weight: 600 !important; color: #1a3a5c 
     color: #FFFFFF !important;
     border-color: #1B5E20 !important;
     box-shadow: 0 3px 10px rgba(27,94,32,0.35);
-    font-weight: 600;
+    font-weight: 700;
 }
 
 [data-testid="stSidebar"] hr {
-    border-color: #e0e0e0;
+    border-color: #2A2D3E;
     margin: 12px 0;
 }
 
 /* Tab con trong sidebar (bọc trong st.columns) */
-[data-testid="stSidebar"] [data-testid="column"] .stButton > button {
+[data-testid="stSidebar"] [data-testid="column"] .stButton > button,
+[data-testid="stSidebar"] section .stButton > button,
+[data-testid="stSidebar"] div[data-testid="stHorizontalBlock"] .stButton > button {
     background-color: #2E7D32 !important;
     color: #FFFFFF !important;
-    font-weight: 600 !important;
+    font-weight: 700 !important;
     border: 1px solid #1B5E20 !important;
     font-size: 13px !important;
     padding: 7px 12px !important;
@@ -205,7 +236,8 @@ h3 { font-size: 1.1rem  !important; font-weight: 600 !important; color: #1a3a5c 
     box-shadow: none !important;
     transform: none !important;
 }
-[data-testid="stSidebar"] [data-testid="column"] .stButton > button:hover {
+[data-testid="stSidebar"] [data-testid="column"] .stButton > button:hover,
+[data-testid="stSidebar"] section .stButton > button:hover {
     background-color: #1B5E20 !important;
     border-color: #1B5E20 !important;
     color: #FFFFFF !important;
@@ -213,73 +245,73 @@ h3 { font-size: 1.1rem  !important; font-weight: 600 !important; color: #1a3a5c 
 }
 
 [data-testid="stSidebar"] .stAlert {
-    background-color: #C8E6C9;
-    border: 1px solid #81C784;
+    background-color: #1E2130;
+    border: 1px solid #2A2D3E;
     border-radius: 8px;
     font-size: 12px;
 }
 
 /* ── 4. Main area ── */
 .main .block-container {
-    background-color: #FAFAFA;
+    background-color: #FFFFFF;
     padding-top: 1.5rem;
 }
 
 header[data-testid="stHeader"] {
-    background-color: #FFFFFF;
-    border-bottom: 2px solid #C8E6C9;
+    background-color: #1E2130;
+    border-bottom: 2px solid #1B5E20;
 }
 
 /* ── 5. TABS ── */
-[data-testid="stTabs"] { background: white !important; border-radius: 12px !important;
-    padding: 0 8px !important; box-shadow: 0 1px 4px rgba(0,0,0,0.08) !important; }
+[data-testid="stTabs"] { background: #1E2130 !important; border-radius: 12px !important;
+    padding: 0 8px !important; box-shadow: 0 1px 4px rgba(0,0,0,0.2) !important; }
 [data-testid="stTabs"] button[role="tab"] {
     font-size: 0.88rem !important; font-weight: 600 !important;
-    padding: 10px 16px !important; color: #5a6a7a !important;
+    padding: 10px 16px !important; color: #94A3B8 !important;
     border-radius: 0 !important; transition: color 0.2s !important;
 }
 [data-testid="stTabs"] button[role="tab"][aria-selected="true"] {
-    color: #2E7D32 !important;
-    border-bottom: 3px solid #2E7D32 !important;
+    color: #66BB6A !important;
+    border-bottom: 3px solid #66BB6A !important;
     background: transparent !important;
 }
-[data-testid="stTabs"] button[role="tab"]:hover { color: #2E7D32 !important; }
+[data-testid="stTabs"] button[role="tab"]:hover { color: #66BB6A !important; }
 
 /* ── 6. EXPANDER (card-style) ── */
 [data-testid="stExpander"] {
-    background: white !important;
-    border: 1px solid #e2e8f0 !important;
+    background: #1E2130 !important;
+    border: 1px solid #2A2D3E !important;
     border-radius: 12px !important;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.06) !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2) !important;
     margin-bottom: 12px !important;
 }
 [data-testid="stExpander"] summary {
     font-size: 0.95rem !important; font-weight: 600 !important;
-    color: #1a3a5c !important; padding: 12px 16px !important;
+    color: #D0DCE8 !important; padding: 12px 16px !important;
 }
 
 /* ── 7. METRIC (KPI card) — accent border trái theo delta ── */
 [data-testid="stMetric"] {
-    background: white !important;
-    border: 1px solid #e2e8f0 !important;
+    background: #1E2130 !important;
+    border: 1px solid #2A2D3E !important;
     border-left: 4px solid #2E7D32 !important;
     border-radius: 12px !important;
     padding: 16px 20px !important;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.06) !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2) !important;
     transition: box-shadow 0.2s, transform 0.15s !important;
 }
 [data-testid="stMetric"]:hover {
-    box-shadow: 0 4px 16px rgba(46,125,50,0.13) !important;
+    box-shadow: 0 4px 16px rgba(46,125,50,0.2) !important;
     transform: translateY(-1px) !important;
 }
 [data-testid="stMetric"] label {
-    font-size: 0.78rem !important; color: #6b7a8d !important;
+    font-size: 0.78rem !important; color: #94A3B8 !important;
     font-weight: 600 !important; text-transform: uppercase !important;
     letter-spacing: 0.6px !important;
 }
 [data-testid="stMetricValue"] {
     font-size: 1.6rem !important; font-weight: 700 !important;
-    color: #0d2137 !important; letter-spacing: -0.5px !important;
+    color: #F0F4F8 !important; letter-spacing: -0.5px !important;
 }
 /* delta đỏ → accent đỏ, delta xanh → accent xanh */
 [data-testid="stMetric"]:has([data-testid="stMetricDelta"] svg[data-icon="arrow-down-right"]) {
@@ -292,8 +324,8 @@ header[data-testid="stHeader"] {
 /* ── 8. DATAFRAME — header đậm + hover row ── */
 [data-testid="stDataFrame"] {
     border-radius: 10px !important; overflow: hidden !important;
-    border: 1px solid #d4e2d4 !important;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.07) !important;
+    border: 1px solid #2A2D3E !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2) !important;
 }
 [data-testid="stDataFrame"] th {
     background: linear-gradient(135deg, #1B5E20 0%, #2E7D32 100%) !important;
@@ -305,17 +337,17 @@ header[data-testid="stHeader"] {
 }
 [data-testid="stDataFrame"] td {
     font-size: 0.9rem !important; padding: 8px 14px !important;
-    border-bottom: 1px solid #f1f5f9 !important;
+    border-bottom: 1px solid #2A2D3E !important;
     transition: background 0.15s !important;
 }
 [data-testid="stDataFrame"] tr:hover td {
-    background: #f0f7f0 !important;
+    background: #1E2130 !important;
 }
 [data-testid="stDataFrame"] tr:nth-child(even) td {
-    background: #fafcfa !important;
+    background: #161922 !important;
 }
 [data-testid="stDataFrame"] tr:nth-child(even):hover td {
-    background: #f0f7f0 !important;
+    background: #1E2130 !important;
 }
 
 /* ── 9. INPUT / SELECTBOX / NUMBER INPUT ── */
@@ -324,36 +356,36 @@ header[data-testid="stHeader"] {
 [data-testid="stTextInput"]  label,
 [data-testid="stFileUploader"] label {
     font-size: 0.88rem !important; font-weight: 600 !important;
-    color: #3d5166 !important; margin-bottom: 4px !important;
+    color: #94A3B8 !important; margin-bottom: 4px !important;
 }
 [data-testid="stNumberInput"] input,
 [data-testid="stTextInput"]   input {
-    border: 1.5px solid #d0d9e4 !important;
+    border: 1.5px solid #2A2D3E !important;
     border-radius: 8px !important;
     font-size: 0.95rem !important;
     padding: 8px 12px !important;
-    background: #fafcff !important;
+    background: #262730 !important;
     transition: border-color 0.2s, box-shadow 0.2s !important;
 }
 [data-testid="stNumberInput"] input:focus,
 [data-testid="stTextInput"]   input:focus {
-    border-color: #2E7D32 !important;
-    box-shadow: 0 0 0 3px rgba(46,125,50,0.12) !important;
+    border-color: #66BB6A !important;
+    box-shadow: 0 0 0 3px rgba(46,125,50,0.2) !important;
     outline: none !important;
-    background: white !important;
+    background: #1E2130 !important;
 }
 
 /* ── 10. BUTTON ── */
 .stButton > button {
     font-size: 0.9rem !important; font-weight: 600 !important;
     padding: 8px 20px !important; border-radius: 8px !important;
-    border: 1.5px solid #d0d9e4 !important;
-    background: white !important; color: #2c3e50 !important;
+    border: 1.5px solid #2A2D3E !important;
+    background: #262730 !important; color: #CBD5E1 !important;
     transition: all 0.2s !important;
 }
 .stButton > button:hover {
-    border-color: #2E7D32 !important; color: #2E7D32 !important;
-    box-shadow: 0 2px 8px rgba(46,125,50,0.15) !important;
+    border-color: #66BB6A !important; color: #66BB6A !important;
+    box-shadow: 0 2px 8px rgba(46,125,50,0.2) !important;
 }
 .stButton > button[kind="primary"] {
     background: linear-gradient(135deg, #2E7D32, #43A047) !important;
@@ -376,56 +408,56 @@ header[data-testid="stHeader"] {
 }
 div[data-testid="stAlert"][data-baseweb="notification"][kind="info"],
 div[data-testid="stAlert"] > div[class*="info"] {
-    background: #e8f4fd !important;
-    border-left-color: #1976D2 !important;
-    color: #0d47a1 !important;
+    background: #0D2137 !important;
+    border-left-color: #42A5F5 !important;
+    color: #90CAF9 !important;
 }
 div[data-testid="stAlert"] > div[class*="success"],
 [data-testid="stAlert"][kind="success"] {
-    background: #e8f5e9 !important;
+    background: #0D2818 !important;
     border-left-color: #2E7D32 !important;
-    color: #1b5e20 !important;
+    color: #81C784 !important;
 }
 div[data-testid="stAlert"] > div[class*="warning"],
 [data-testid="stAlert"][kind="warning"] {
-    background: #fff8e1 !important;
-    border-left-color: #f57f17 !important;
-    color: #e65100 !important;
+    background: #2D1F0D !important;
+    border-left-color: #F57F17 !important;
+    color: #FFD54F !important;
 }
 div[data-testid="stAlert"] > div[class*="error"],
 [data-testid="stAlert"][kind="error"] {
-    background: #fce4ec !important;
+    background: #2D0D14 !important;
     border-left-color: #c62828 !important;
-    color: #b71c1c !important;
+    color: #EF9A9A !important;
 }
 [data-testid="stAlert"] p { font-size: 0.88rem !important; margin: 0 !important; }
 
 /* ── 12. ROLE BADGES ── */
-.role-executive { background:#ede7f6; color:#4527a0; padding:3px 12px;
+.role-executive { background:#2D2B55; color:#B39DDB; padding:3px 12px;
     border-radius:20px; font-size:.82rem; font-weight:700; }
-.role-admin     { background:#e8f5e9; color:#1b5e20; padding:3px 12px;
+.role-admin     { background:#0D2818; color:#81C784; padding:3px 12px;
     border-radius:20px; font-size:.82rem; font-weight:600; }
-.role-manager   { background:#fff8e1; color:#e65100; padding:3px 12px;
+.role-manager   { background:#2D1F0D; color:#FFD54F; padding:3px 12px;
     border-radius:20px; font-size:.82rem; font-weight:600; }
-.role-user      { background:#e3f2fd; color:#0d47a1; padding:3px 12px;
+.role-user      { background:#0D2137; color:#90CAF9; padding:3px 12px;
     border-radius:20px; font-size:.82rem; font-weight:600; }
 
 /* ── 13. DIVIDER ── */
-hr { border: none !important; border-top: 1px solid #e2e8f0 !important; margin: 1rem 0 !important; }
+hr { border: none !important; border-top: 1px solid #2A2D3E !important; margin: 1rem 0 !important; }
 
 /* ── 14. FORM ── */
 [data-testid="stForm"] {
-    background: white !important; border-radius: 12px !important;
-    border: 1px solid #e2e8f0 !important;
+    background: #1E2130 !important; border-radius: 12px !important;
+    border: 1px solid #2A2D3E !important;
     padding: 20px !important;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.05) !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2) !important;
 }
 
 /* ── 15. SCROLLBAR tùy chỉnh ── */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 4px; }
-::-webkit-scrollbar-thumb { background: #a5c8a7; border-radius: 4px; }
-::-webkit-scrollbar-thumb:hover { background: #2E7D32; }
+::-webkit-scrollbar-track { background: #1E2130; border-radius: 4px; }
+::-webkit-scrollbar-thumb { background: #2E7D32; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #66BB6A; }
 
 /* ── 16. PROGRESS BAR ── */
 [data-testid="stProgressBar"] > div > div {
@@ -435,16 +467,16 @@ hr { border: none !important; border-top: 1px solid #e2e8f0 !important; margin: 
 
 /* ── 17. SELECTBOX / MULTISELECT chip ── */
 [data-testid="stMultiSelect"] span[data-baseweb="tag"] {
-    background: #e8f5e9 !important;
-    color: #1b5e20 !important;
-    border: 1px solid #a5d6a7 !important;
+    background: #0D2818 !important;
+    color: #81C784 !important;
+    border: 1px solid #2E7D32 !important;
     border-radius: 20px !important;
     font-size: 0.82rem !important;
 }
 
 /* ── 18. SPINNER ── */
 [data-testid="stSpinner"] > div {
-    border-top-color: #2E7D32 !important;
+    border-top-color: #66BB6A !important;
 }
 </style>"""
 

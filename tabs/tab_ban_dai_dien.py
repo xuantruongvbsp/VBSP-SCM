@@ -562,7 +562,8 @@ def render(tab, cap: str = "xa", **kwargs) -> None:
     username = kwargs.get("username", "unknown")
     df_full = kwargs.get("df_full") or kwargs.get("df")
 
-    with get_tab_context(tab):
+    ctx = TabContext(tab, **kwargs)
+    with ctx:
         cap_hien = "tỉnh" if cap == "tinh" else "huyện"
         st.header(f"🏛️ Ban Đại Diện HĐQT cấp {cap_hien}")
         st.caption("Tổng hợp số liệu · Dự báo vốn · Quản lý họp · Lưu trữ văn bản")

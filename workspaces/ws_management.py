@@ -1126,7 +1126,6 @@ def _build_all_items(role: str, username: str, **kwargs) -> list:
             "label": "Cảnh báo NQH",
             "icon": "alert-triangle",
             "children": [
-                {"label": "⏰ Đến hạn",         "fn": lambda df_full=df_full, ds_pgd_all=ds_pgd_all, role=role, username=kwargs.get("username", "unknown"), idx=0: _render_canh_bao_no_sub(df_full, ds_pgd_all, role, username, idx)},
                 {"label": "🔴 3 tháng KHĐ",     "fn": lambda df_full=df_full, ds_pgd_all=ds_pgd_all, role=role, username=kwargs.get("username", "unknown"), idx=1: _render_canh_bao_no_sub(df_full, ds_pgd_all, role, username, idx)},
                 {"label": "🚨 Nợ BT → Rủi ro",  "fn": lambda df_full=df_full, ds_pgd_all=ds_pgd_all, role=role, username=kwargs.get("username", "unknown"), idx=2: _render_canh_bao_no_sub(df_full, ds_pgd_all, role, username, idx)},
                 {"label": "📋 Nợ QH phát sinh", "fn": lambda df_full=df_full, ds_pgd_all=ds_pgd_all, role=role, username=kwargs.get("username", "unknown"), idx=3: _render_canh_bao_no_sub(df_full, ds_pgd_all, role, username, idx)},
@@ -1145,7 +1144,15 @@ def _build_all_items(role: str, username: str, **kwargs) -> list:
         {"group": "Kế hoạch và Thực hiện KHTD", "label": "Cân đối - Điện báo", "icon": "chart-line", "fn": lambda: tab_kehoach.render(None, **kwargs)},
         {"group": "Kế hoạch và Thực hiện KHTD", "label": "Điện báo",            "icon": "antenna",    "fn": lambda: tab_candoi.render(None, **kwargs)},
         {"group": "Kế hoạch và Thực hiện KHTD", "label": "Xuất báo cáo KHTD",  "icon": "file-export", "fn": lambda: tab_khtd_xuat.render_xuat_baocao(role=kwargs.get("role", ""), username=kwargs.get("username", ""), df_full=kwargs.get("df"))},
-        {"group": "Báo cáo",       "label": "Báo cáo tín dụng", "icon": "file",           "fn": lambda: tab_baocao.render(None, **kwargs)},
+        {
+            "group": "Báo cáo",
+            "label": "Báo cáo tín dụng",
+            "icon": "file",
+            "children": [
+                {"label": "📊 Báo cáo tín dụng", "fn": lambda: tab_baocao.render(None, **kwargs)},
+                {"label": "⏰ Nợ Đến Hạn",        "fn": lambda df_full=df_full, ds_pgd_all=ds_pgd_all, role=role, username=kwargs.get("username", "unknown"), idx=0: _render_canh_bao_no_sub(df_full, ds_pgd_all, role, username, idx)},
+            ],
+        },
         {"group": "Báo cáo",       "label": "Checklist định kỳ", "icon": "calendar-check", "fn": lambda: tab_checklist_bc.render(None, **kwargs)},
         {"group": "Ủy Thác",       "label": "Ban Đại Diện HĐQT", "icon": "building",       "fn": lambda: tab_ban_dai_dien.render(None, cap="tinh", **kwargs)},
         {"group": "Ủy Thác",       "label": "Hội - Đoàn thể ủy thác", "icon": "handshake", "fn": lambda: tab_uy_thac.render(None, **kwargs)},
@@ -1225,18 +1232,7 @@ def render_sidebar_menu(role: str, username: str, **kwargs):
 
             is_open = st.session_state.get(open_key, False)
 
-            parent_style = (
-                "background:#FF8A50;border-left:2px solid #E65100;color:#FFFFFF;"
-                if is_child_active
-                else f"background:{clr['bg']};border-left:2px solid {clr['border']};color:{clr['text']};"
-            )
             arrow = "▾" if is_open else "▸"
-            st.markdown(
-                f"<div style='{parent_style}font-size:13px;font-weight:600;"
-                f"padding:6px 8px 6px 10px;border-radius:0 5px 5px 0;"
-                f"margin-bottom:2px'>{arrow} {item['label']}</div>",
-                unsafe_allow_html=True,
-            )
             if st.button(
                 f"{arrow} {item['label']}",
                 key=f"menu_acc_{item['label']}",
@@ -1251,31 +1247,23 @@ def render_sidebar_menu(role: str, username: str, **kwargs):
                     if is_child_sel:
                         st.markdown(
                             f"<div style='background:#E65100;"
-                            f"border-left:2px solid #BF360C;"
-                            f"color:#FFFFFF;font-size:12px;font-weight:600;"
-                            f"padding:5px 8px 5px 22px;"
+                            f"border-left:4px solid #BF360C;"
+                            f"color:#FFFFFF;font-size:12px;font-weight:700;"
+                            f"padding:6px 8px 6px 20px;"
                             f"border-radius:0 5px 5px 0;margin-bottom:2px'>"
                             f"● {child['label']}</div>",
                             unsafe_allow_html=True,
                         )
                     else:
-                        st.markdown(
-                            f"<div style='background:rgba(255,255,255,0.07);"
-                            f"border-left:2px solid rgba(255,255,255,0.2);"
-                            f"color:rgba(255,255,255,0.65);font-size:12px;"
-                            f"padding:5px 8px 5px 22px;"
-                            f"border-radius:0 5px 5px 0;margin-bottom:2px;"
-                            f"pointer-events:none'>"
-                            f"↳ {child['label']}</div>",
-                            unsafe_allow_html=True,
-                        )
-                        if st.button(
-                            f"↳ {child['label']}",
-                            key=f"menu_child_{child['label']}",
-                            width="stretch",
-                        ):
-                            st.session_state["ws_mgmt_menu"] = child["label"]
-                            st.rerun()
+                        _, col = st.columns([0.06, 0.94])
+                        with col:
+                            if st.button(
+                                child["label"],
+                                key=f"menu_child_{child['label']}",
+                                width="stretch",
+                            ):
+                                st.session_state["ws_mgmt_menu"] = child["label"]
+                                st.rerun()
 
         else:
             is_active = active_label == item["label"]

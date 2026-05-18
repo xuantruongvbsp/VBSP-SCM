@@ -774,6 +774,10 @@ def _render_cap_nhat(tab, **kwargs):
             confirm_key = f"_td_confirm_save_{task_id}_{pgd_sel}"
             editor_key = f"td_editor_{task_id}_{pgd_sel}"
 
+            an_da_ht = st.toggle("Ẩn đơn vị đã hoàn thành", key=f"td_an_ht_{task_id}_{pgd_sel}")
+
+            editor_key = f"td_editor_{task_id}_{pgd_sel}_{an_da_ht}"
+
             def _parse_date(val):
                 if not val:
                     return None
@@ -781,6 +785,10 @@ def _render_cap_nhat(tab, **kwargs):
                     return pd.to_datetime(val).date()
                 except Exception:
                     return None
+
+            kq_hien_thi = kq_list
+            if an_da_ht:
+                kq_hien_thi = [r for r in kq_list if r["trang_thai"] != "da_hoan_thanh"]
 
             df_edit = pd.DataFrame([
                 {
@@ -790,7 +798,7 @@ def _render_cap_nhat(tab, **kwargs):
                     "Ngày hoàn thành": _parse_date(r.get("ngay_hoan_thanh")),
                     "Ghi chú": r.get("ghi_chu") or "",
                 }
-                for r in kq_list
+                for r in kq_hien_thi
             ])
 
             # Action bar: Lưu + Hoàn tác + thống kê
@@ -848,12 +856,16 @@ def _render_cap_nhat(tab, **kwargs):
                 if st.button("↩️ Hoàn tác", width='stretch',
                              key=f"_td_undo_{task_id}_{pgd_sel}"):
                     for k in list(st.session_state.keys()):
-                        if k.startswith(editor_key) or k.startswith(confirm_key) or k.endswith("_data"):
+                        if k.startswith(editor_key) or k.startswith(confirm_key):
                             st.session_state.pop(k, None)
                     st.rerun()
             with c_info:
-                st.caption(f"✅ {xong} · ⬜ {tong - xong} · {pct}% · "
-                           f"Tick ☑ để đánh dấu hoàn thành")
+                ht = tong - xong
+                _thong_ke = f"✅ {xong} · ⬜ {ht} · {pct}%"
+                if an_da_ht:
+                    _thong_ke += f" · 👁 Đang ẩn {xong} đã hoàn thành"
+                _thong_ke += " · Tick ☑ để đánh dấu hoàn thành"
+                st.caption(_thong_ke)
 
             # Data editor — cache dữ liệu vào session_state để nút lưu dùng được
             edited = st.data_editor(
@@ -1148,8 +1160,20 @@ def _render_xuat(tab, **kwargs):
 
             def _fmt_task_pdf(task_id):
                 t = task_map_pdf.get(task_id) or {}
-                stt = "[ĐANG]" if t.get("trang_thai") == "dang_theo_doi" else "[ĐÓNG]"
-                return f"{stt} {t.get('tieu_de','')} · {fmt_ngay(t.get('ngay_deadline',''))}"
+                if t.get("trang_thai") == "dang_theo_doi":
+                    try:
+                        dl = date.fromisoformat(t.get("ngay_deadline", ""))
+                        stt = "⚠️ Đã hết hạn" if dl < date.today() else "🟢 Đang thực hiện"
+                    except Exception:
+                        stt = "🟢 Đang thực hiện"
+                else:
+                    stt = "🔒 Đã đóng"
+                parts = [stt, t.get("tieu_de", "")]
+                ngay_bd = t.get("ngay_bat_dau")
+                if ngay_bd:
+                    parts.append(f"BĐ: {fmt_ngay(ngay_bd)}")
+                parts.append(f"KT: {fmt_ngay(t.get('ngay_deadline', ''))}")
+                return " · ".join(parts)
 
             task_id_pdf = st.selectbox(
                 "Chọn đầu việc",

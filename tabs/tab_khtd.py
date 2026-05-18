@@ -416,26 +416,19 @@ def _doc_gqvl_parquet(_ts: float = 0) -> "pd.DataFrame | None":
         return None
 
 
-from utils import get_tab_context
+from tabs.base_tab import TabContext
+
 
 # ── Entry point ───────────────────────────────────────────────────────────────
 def render(tab: DeltaGenerator, **kwargs: dict) -> None:
-    """
-    Render tab Kế hoạch Tín dụng.
-    
-    Args:
-        tab: Streamlit DeltaGenerator cho tab này
-        **kwargs: Chứa role, username, df_full
-    """
-    role = kwargs.get("role", "user")
-    username = kwargs.get("username", "unknown")
-    df_full = kwargs.get("df_full")
+    ctx = TabContext(tab, **kwargs)
+    role = ctx.role_norm
+    username = ctx.username
+    df_full = ctx.df_full
     # Đọc GQVL toàn CN để tính TH phân tầng 4 nhóm
     df_gqvl = _doc_gqvl_parquet(ts_file(CACHE_GQVL))
 
-    import streamlit as _st
-    _tab_ctx = tab if tab is not None else _st.container()
-    with _tab_ctx:
+    with ctx:
         st.title("🏛️ Kế hoạch Tín dụng — Phòng KH-NV")
         st.caption(
             "Quản lý KHTD cấp Chi nhánh và phân bổ xuống Xã · "

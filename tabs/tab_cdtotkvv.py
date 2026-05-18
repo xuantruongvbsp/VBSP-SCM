@@ -604,7 +604,7 @@ def _sub_phan_tich_chat_luong(username: str, cdto_mode: str, pgd_user: str) -> N
             key="cdtotkvv_tieu_chi_tru_diem",
             column_config={
                 "Tiêu chí": st.column_config.TextColumn("Tiêu chí"),
-                "Điểm tối đa": st.column_config.NumberColumn("Điểm tối đa", format="%d"),
+                "Điểm tối đa": st.column_config.NumberColumn("Điểm tối đa", format=",.0f"),
             },
         )
     else:

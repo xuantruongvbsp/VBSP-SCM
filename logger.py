@@ -22,9 +22,6 @@ def _configure_root() -> None:
         return
 
     root = logging.getLogger()
-    if root.handlers:
-        _root_configured = True
-        return
 
     root.setLevel(logging.DEBUG)
 

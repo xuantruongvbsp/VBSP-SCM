@@ -424,8 +424,20 @@ def _render_quan_ly_task(tab, **kwargs):
 
         def _fmt_task(task_id: int) -> str:
             t = task_map.get(task_id) or {}
-            stt = "[ĐANG]" if t.get("trang_thai") == "dang_theo_doi" else "[ĐÓNG]"
-            return f"{stt} {t.get('tieu_de','')} · {fmt_ngay(t.get('ngay_deadline',''))}"
+            if t.get("trang_thai") == "dang_theo_doi":
+                try:
+                    dl = date.fromisoformat(t.get("ngay_deadline", ""))
+                    stt = "⚠️ Đã hết hạn" if dl < date.today() else "🟢 Đang thực hiện"
+                except Exception:
+                    stt = "🟢 Đang thực hiện"
+            else:
+                stt = "🔒 Đã đóng"
+            parts = [stt, t.get("tieu_de", "")]
+            ngay_bd = t.get("ngay_bat_dau")
+            if ngay_bd:
+                parts.append(f"BĐ: {fmt_ngay(ngay_bd)}")
+            parts.append(f"KT: {fmt_ngay(t.get('ngay_deadline', ''))}")
+            return " · ".join(parts)
 
         task_id = st.selectbox(
             "Chọn đầu việc",
@@ -647,8 +659,21 @@ def _render_cap_nhat(tab, **kwargs):
         with st.container(border=True):
             st.markdown("**① CHỌN ĐẦU VIỆC**")
 
-            task_opts = {t["id"]: f"{t['tieu_de']} · ⏰ {fmt_ngay(t['ngay_deadline'])}"
-                         for t in ds_task}
+            hom_nay = date.today()
+            def _fmt_cap_nhat_opt(t):
+                try:
+                    dl = date.fromisoformat(t["ngay_deadline"])
+                    stt = "⚠️ Đã hết hạn" if dl < hom_nay else "🟢 Đang thực hiện"
+                except Exception:
+                    stt = "🟢 Đang thực hiện"
+                ngay_bd = t.get("ngay_bat_dau")
+                parts = [stt, t["tieu_de"]]
+                if ngay_bd:
+                    parts.append(f"BĐ: {fmt_ngay(ngay_bd)}")
+                parts.append(f"⏰ KT: {fmt_ngay(t['ngay_deadline'])}")
+                return " · ".join(parts)
+
+            task_opts = {t["id"]: _fmt_cap_nhat_opt(t) for t in ds_task}
             task_id = st.selectbox(
                 "Đầu việc",
                 list(task_opts.keys()),
@@ -662,31 +687,35 @@ def _render_cap_nhat(tab, **kwargs):
             cap_theo_doi = task.get("cap_theo_doi", "xa")
             tag_nd = "🏢 Chung PGD" if cap_theo_doi == "pgd" else "🏘️ Chi tiết xã"
             nguoi_pt = task.get("nguoi_phu_trach") or ""
-            ngay_bd = task.get("ngay_bat_dau") or ""
 
-            # Badge deadline màu
-            hom_nay = date.today()
             try:
                 deadline_date = date.fromisoformat(task["ngay_deadline"])
                 if deadline_date < hom_nay:
-                    badge = "🔴 Quá hạn"
+                    badge = "⚠️ Đã hết hạn"
                 elif (deadline_date - hom_nay).days <= 3:
                     badge = "🟠 Sắp hết hạn (≤ 3 ngày)"
                 else:
-                    badge = "🟢 Còn hạn"
+                    badge = "🟢 Đang thực hiện"
             except Exception:
                 badge = ""
 
             st.caption(
-                f"**{task['tieu_de']}** · {tag_nd} · "
+                f"**{task['tieu_de']}** · "
+                f"{badge} · "
+                f"{tag_nd} · "
                 f"{LOAI_TASK.get(task['loai'], task['loai'])} · "
-                f"Thời hạn: **{fmt_ngay(task['ngay_deadline'])}** · "
                 f"{UU_TIEN.get(task['uu_tien'], '')}"
-                + (f" · Người PT: {nguoi_pt}" if nguoi_pt else "")
-                + (f" · Từ: {fmt_ngay(ngay_bd)}" if ngay_bd else "")
             )
+            c1, c2, c3 = st.columns(3)
+            with c1:
+                st.caption(f"📅 Ngày bắt đầu: **{fmt_ngay(task.get('ngay_bat_dau') or '—')}**")
+            with c2:
+                st.caption(f"⏰ Ngày kết thúc: **{fmt_ngay(task['ngay_deadline'])}**")
+            with c3:
+                if nguoi_pt:
+                    st.caption(f"👤 Người PT: **{nguoi_pt}**")
             if badge:
-                st.markdown(f"**{badge}**")
+                st.info(badge)
             if task.get("mo_ta"):
                 st.info(task["mo_ta"])
 

@@ -267,7 +267,8 @@ def _tao_column_config_pgd() -> dict[str, st.column_config.Column]:
     }
 
 
-from utils import get_tab_context
+from tabs.base_tab import TabContext
+
 
 def render(tab: DeltaGenerator, **kwargs: dict) -> None:
     """

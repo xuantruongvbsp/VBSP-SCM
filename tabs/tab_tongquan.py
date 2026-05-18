@@ -271,24 +271,17 @@ from tabs.base_tab import TabContext
 
 
 def render(tab: DeltaGenerator, **kwargs: dict) -> None:
-    """
-    Render tab Tổng quan.
-    
-    Args:
-        tab: Streamlit DeltaGenerator cho tab này
-        **kwargs: Chứa df, df_full, role, pgd_user, username, df_nq11
-    """
+    ctx = TabContext(tab, **kwargs)
     df       = kwargs.get("df")
-    df_full  = kwargs.get("df_full", df)
-    role     = kwargs.get("role")
-    pgd_user = kwargs.get("pgd_user") or ""
+    df_full  = ctx.df_full or df
+    role     = ctx.role_norm
+    pgd_user = ctx.pgd_user
     pgd_filter = kwargs.get("pgd_filter") or pgd_user
-    username = kwargs.get("username")
+    username = ctx.username
     df_nq11  = kwargs.get("df_nq11")
     ts = kwargs.get("ts_hstd", 0.0)
 
-    _tab_ctx = tab if tab is not None else st.container()
-    with _tab_ctx:
+    with ctx:
         st.markdown(
             """
             <style>

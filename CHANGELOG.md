@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## [2026-05-18] — Fix lỗi "Mixing dicts with non-Series" khi xác nhận lưu tiến độ
+- `tabs/tab_tien_do.py` dòng ~813 — fix: thay vì đọc `editor_key` (trả về state dict `{"edited_rows":...}` gây crash `pd.DataFrame()`) hoặc `_data` (bị ghi đè stale sau `st.rerun()`), nay đọc state dict rồi áp `edited_rows` lên `df_edit.copy()` để lấy DataFrame đúng với edits của user
+
+## [2026-05-18] — Fix lỗi tick/bỏ chọn trong Cập nhật tiến độ — đọc trực tiếp từ session_state thay vì cache
+- `tabs/tab_tien_do.py` dòng ~813 — fix: đọc `edited` từ `st.session_state.get(editor_key)` (state thật của data_editor) thay vì `st.session_state.get(f"{editor_key}_data")` (cache cũ chỉ được cập nhật cuối render); nguyên nhân: `st.rerun()` trong handler "Lưu thay đổi" dừng script ngay lập tức nên `_data` không kịp cập nhật edits mới nhất → "✅ Xác nhận" đọc stale data → DB ghi đúng nhưng display không thay đổi
+
 ## [2026-05-18] — Nâng cấp Tab Điểm Giao Dịch — thêm trường + tìm kiếm + xuất khẩu
 - `tabs/tab_quan_ly_dgd.py` — thêm `_normalize_entry()`, `_dgd_to_rows()` (backward compat list→dict); thêm tab "🔍 Tìm kiếm" đầu tiên với lọc PGD/Xã + tìm nhanh + xuất Excel/PDF; form Thêm mới & Xem & Sửa bổ sung 4 trường: Địa chỉ, Người phụ trách, SĐT, Lịch GD; lưu dict thay vì list
 - `tabs/tab_diem_gd_pgd.py` — tương tự, scope chỉ PGD đăng nhập; thêm `_render_tim_kiem_pgd()`
@@ -11,6 +17,8 @@
 - `tabs/tab_tien_do.py` dòng ~777 — thêm `st.toggle("Ẩn đơn vị đã hoàn thành")` sau progress bar; khi bật, `kq_hien_thi` chỉ gồm đơn vị `chua_thuc_hien`, data editor chỉ hiện đơn vị chưa làm
 - `tabs/tab_tien_do.py` dòng ~863 — cập nhật caption `c_info` hiển thị `👁 Đang ẩn N đã hoàn thành` khi toggle bật
 - `tabs/tab_tien_do.py` dòng ~779 — fix: gắn `an_da_ht` vào `editor_key` để tránh xung đột session state khi toggle bật/tắt (key cũ không đổi → Streamlit reset checkbox về mặc định khi data shape thay đổi)
+- `tabs/tab_tien_do.py` dòng ~842 — fix: sau lưu, `st.session_state.pop(editor_key)` để xóa state cũ của `st.data_editor`, tránh hiển thị stale state sau khi DB đã được cập nhật
+- `tabs/tab_tien_do.py` dòng ~860 — fix: Hoàn tác dùng `base = f"td_editor_{task_id}_{pgd_sel}"` thay vì `editor_key` để xóa cả 2 state toggle ON/OFF
 
 ## [2026-05-18] — Tab Tiến độ: sửa dropdown chọn đầu việc — thêm ngày BĐ/KT + trạng thái rõ ràng
 - `tabs/tab_tien_do.py` dòng ~430–445 — `_fmt_task()`: thay `[ĐANG]`/`[ĐÓNG]` → `🟢 Đang thực hiện`/`⚠️ Đã hết hạn`/`🔒 Đã đóng`; thêm `BĐ: {ngày bắt đầu}` và `KT: {ngày kết thúc}` vào dòng dropdown

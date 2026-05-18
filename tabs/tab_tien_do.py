@@ -11,7 +11,7 @@ import streamlit as st
 import db
 from auth import normalize_role
 from config import DS_PGD, DON_VI_CHI_NHANH, PGD_XA_MAP, ROLES_PHAN_HE_CN
-from utils import get_tab_context, fmt_ngay
+from utils import fmt_ngay
 
 DS_PGD_ALL = [DON_VI_CHI_NHANH] + DS_PGD
 
@@ -1751,25 +1751,19 @@ def _xuat_pdf_tien_do(task, ds_kq, username):
 
 
 
+from tabs.base_tab import TabContext
+
+
 def render(tab, **kwargs):
-    role = kwargs.get("role")
-    pgd_user = kwargs.get("pgd_user")
-
-    role_n = normalize_role(str(role or "user"))
-    can_manage = (role_n in ROLES_PHAN_HE_CN) and (role_n != "executive")
-    is_exec = role_n == "executive"
-    is_pgd_view = (role_n not in ROLES_PHAN_HE_CN) and bool(pgd_user)
-
-    import streamlit as _st
-    _tab_ctx = tab if tab is not None else _st.container()
-    with _tab_ctx:
+    ctx = TabContext(tab, **kwargs)
+    with ctx:
         st.subheader("📅 Tiến độ Công việc Hàng ngày")
 
-        if is_exec:
+        if ctx.is_exec:
             _render_tong_quan(tab, **kwargs)
             return
 
-        if is_pgd_view:
+        if ctx.is_pgd:
             t1, t2 = st.tabs(["📊 Tổng quan", "📋 Cập nhật tiến độ"])
             with t1:
                 _render_tong_quan(t1, **kwargs)
@@ -1777,7 +1771,7 @@ def render(tab, **kwargs):
                 _render_cap_nhat(t2, **kwargs)
             return
 
-        if not can_manage:
+        if not ctx.is_cn:
             _render_tong_quan(tab, **kwargs)
             return
 
@@ -1798,7 +1792,7 @@ def render(tab, **kwargs):
 
 
 def render_tong_quan_only(tab, **kwargs):
-    _tab_ctx = tab if tab is not None else __import__('streamlit').container()
-    with _tab_ctx:
+    ctx = TabContext(tab, **kwargs)
+    with ctx:
         st.subheader("📅 Tiến độ Công việc Hàng ngày")
         _render_tong_quan(tab, **kwargs)

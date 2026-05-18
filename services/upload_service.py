@@ -29,6 +29,9 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 import db
+from logger import get_logger
+
+logger = get_logger(__name__)
 from utils import fmt_so, vn
 from data.core import ts_file, excel_to_parquet
 from data.pgd import duong_dan_pgd
@@ -118,6 +121,7 @@ def danh_gia_chat_luong_file_upload(loai: str, file_bytes: bytes) -> tuple[bool,
             kq.report,
         )
     except Exception as e:
+        logger.error("danh_gia_chat_luong_file_upload: không đọc được file %s — %s", loai, e, exc_info=True)
         return False, f"Không thể đọc file để đánh giá chất lượng: {e}", {}
 
 
@@ -304,6 +308,7 @@ def merge_du_lieu_toan_cn(
         return KetQuaUpload(False, f"merge_du_lieu_toan_cn không hỗ trợ loai='{loai}'")
 
     tat_ca_dv = ds_pgd if ds_pgd is not None else ([DON_VI_CHI_NHANH] + DS_PGD)
+    logger.info("merge_du_lieu_toan_cn: bắt đầu loai=%s, %d đơn vị", loai, len(tat_ca_dv))
     frames: list[pd.DataFrame] = []
     pgd_da_merge: list[str] = []
     pgd_cu: list[str] = []       # đơn vị dùng số liệu cũ (quá ngưỡng)
@@ -393,6 +398,7 @@ def merge_du_lieu_toan_cn(
             ten_pgd, df, canh_bao_str = future.result()
             if canh_bao_str:
                 pgd_loi.append(f"{ten_pgd}: {canh_bao_str}")
+                logger.warning("merge_du_lieu_toan_cn: PGD lỗi đọc file — %s: %s", ten_pgd, canh_bao_str)
                 db.ghi_audit(
                     _u,
                     "merge_toan_cn_pgd_loi",
@@ -416,7 +422,11 @@ def merge_du_lieu_toan_cn(
         if qua_nguong:
             pgd_cu.append(ten_pgd)
 
+    if pgd_cu:
+        logger.warning("merge_du_lieu_toan_cn: %d PGD dùng số liệu cũ — %s", len(pgd_cu), ", ".join(pgd_cu))
+
     if not frames:
+        logger.warning("merge_du_lieu_toan_cn: không có frames nào để gộp, loai=%s", loai)
         return KetQuaUpload(
             False,
             f"Không có đơn vị nào có file {loai.upper()} để gộp."
@@ -439,7 +449,7 @@ def merge_du_lieu_toan_cn(
                 try:
                     df[col] = pd.to_numeric(df[col], errors="ignore")
                 except Exception:
-                    pass
+                    logger.debug("merge_du_lieu_toan_cn: không ép numeric được cột '%s'", col)
                 if df[col].dtype == object:
                     df[col] = df[col].astype(str).replace("nan", "")
         normalized.append(df[all_cols])
@@ -485,6 +495,7 @@ def merge_du_lieu_toan_cn(
         try:
             df_toan_cn.to_parquet(cache_path, index=False, engine="pyarrow", compression="zstd", compression_level=3)
         except Exception as e:
+            logger.error("merge_du_lieu_toan_cn: lỗi ghi parquet, rollback — %s", e, exc_info=True)
             _u_merge = st.session_state.get("username", "unknown")
             db.ghi_audit(_u_merge, "merge_loi_dtype",
                          f"{loai.upper()} — {str(e)[:200]}")
@@ -497,6 +508,10 @@ def merge_du_lieu_toan_cn(
         username = st.session_state.get("username", "unknown")
 
         canh_bao = f" | {len(pgd_loi)} PGD lỗi" if pgd_loi else ""
+        logger.info(
+            "merge_du_lieu_toan_cn: hoàn thành loai=%s, %d dòng, %d PGD%s",
+            loai, len(df_toan_cn), len(pgd_da_merge), canh_bao,
+        )
         db.ghi_audit(
             username,
             "merge_toan_cn",
@@ -535,8 +550,8 @@ def merge_du_lieu_toan_cn(
             try:
                 from snapshot_service import luu_snapshot as _luu_snap
                 _luu_snap(_snap_df, _snap_user)
-            except Exception:
-                pass
+            except Exception as _exc:
+                logger.error("snapshot background thread thất bại — %s", _exc, exc_info=True)
 
         _threading.Thread(target=_snap_bg, daemon=True).start()
 
@@ -624,7 +639,8 @@ def luu_pgd_file(ten_pgd: str, loai: str, file_bytes: bytes) -> KetQuaUpload:
                         break
                 if thang_nam:
                     break
-    except Exception:
+    except Exception as e:
+        logger.debug("luu_pgd_file: không đọc được ngày tháng từ file %s/%s — %s", ten_pgd, loai, e)
         thang_nam = None
 
     # Chỉ lưu lịch sử cho CDTOTKVV (dữ liệu theo tháng)
@@ -639,8 +655,8 @@ def luu_pgd_file(ten_pgd: str, loai: str, file_bytes: bytes) -> KetQuaUpload:
             path_version = _Path(str(thu_muc_pgd(ten_pgd))) / f"{loai}_{suffix}.xlsx"
             if not path_version.exists():
                 path_version.write_bytes(file_bytes)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("luu_pgd_file: lỗi lưu lịch sử CDTOTKVV %s/%s — %s", ten_pgd, suffix, e)
 
     if thang_nam:
         if loai == "cdtotkvv":

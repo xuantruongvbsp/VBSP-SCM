@@ -209,3 +209,5 @@ Upload flow:
 - `tabs/tab_ban_dai_dien.py`: fix ValueError "truth value of DataFrame is ambiguous" — thay `kwargs.get("df_full") or kwargs.get("df")` bằng check None/empty
 - `tabs/tab_no_khoanh.py`: Mở rộng 2 sub-tab mới d5 "Kiểm tra" và d6 "Báo cáo" — form nhập kết quả kiểm tra (Mẫu 01/QLNK), lưu tạm/phê duyệt, báo cáo M08/M09/M10 + tiến độ kiểm tra theo PGD
 - `workspaces/ws_operation.py`: Thêm tab "🔒 Nợ khoanh" vào nhóm Kiểm soát & Rủi ro — gọi tab_no_khoanh.render() với df=df_pgd, df_full=None
+- `workspaces/ws_management.py` + `workspaces/ws_operation.py`: Đồng bộ tên 15 tab giống nhau giữa CN và PGD — thêm emoji + thống nhất tên gọi (Thông tin chung, Tiến độ công việc, Báo cáo tín dụng, Điện báo, Nhiệm vụ, So sánh kỳ, Nợ khoanh, Giao & ĐC KHTD, Ban Đại Diện, Ủy thác, Trạng thái hệ thống, Hướng dẫn)
+- `tabs/tab_no_khoanh.py`: Fix lỗi `username` not defined trong render() + sửa anti-pattern 5 expander xuất Word (Mẫu KH, 01–04/QLNK) — dùng `nut_tai_word_va_pdf()` + `hien_thi_nut_tai()` từ template_service thay vì `st.download_button` inline trong `if st.button()`

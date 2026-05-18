@@ -124,28 +124,21 @@ def _lay_nqh_con(rows: list[dict], ten_cha: str) -> float:
     return 0.0
 
 
-from utils import get_tab_context
+from tabs.base_tab import TabContext
+
 
 def render(tab: DeltaGenerator, **kwargs: dict) -> None:
-    """
-    Render tab Cân đối Nguồn vốn & Sử dụng vốn.
-
-    Args:
-        tab: Streamlit DeltaGenerator cho tab này
-        **kwargs: Chứa df, df_full, role, pgd_user, username, df_nq11, pgd_mode
-    """
+    ctx = TabContext(tab, **kwargs)
     df        = kwargs.get("df")
-    df_full   = kwargs.get("df_full", df)
-    role      = kwargs.get("role")
-    pgd_user  = kwargs.get("pgd_user")
-    username  = kwargs.get("username")
+    df_full   = ctx.df_full or df
+    role      = ctx.role_norm
+    pgd_user  = ctx.pgd_user
+    username  = ctx.username
     df_nq11   = kwargs.get("df_nq11")
     pgd_mode  = kwargs.get("pgd_mode", False)
 
     if pgd_mode and not pgd_user:
-        import streamlit as _st
-        _tab_ctx = tab if tab is not None else _st.container()
-        with _tab_ctx:
+        with ctx:
             st.error("Không xác định được PGD.")
         return
 
@@ -160,9 +153,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
     store_ht = path_dien_ht if pgd_mode else DB_HT_CACHE
     store_prev = path_dien_prev if pgd_mode else DB_PREV_CACHE
 
-    import streamlit as _st
-    _tab_ctx = tab if tab is not None else _st.container()
-    with _tab_ctx:
+    with ctx:
         nam_ht   = str(datetime.today().year)
         nam_prev = str(datetime.today().year - 1)
 

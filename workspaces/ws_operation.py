@@ -1617,18 +1617,10 @@ def render(**kwargs):
                 df_ct["Tỷ trọng %"] = (df_ct["Dư nợ (đồng)"] / df_ct["Dư nợ (đồng)"].sum() * 100).round(1)
                 st.dataframe(df_ct, hide_index=True, width='stretch')
 
-    def _render_mau_bieu_tab(tab_parent) -> None:
+    def _render_doc_hub_tab(tab_parent) -> None:
         with tab_parent:
             _init_gb2_session_for_doc_hub(kwargs)
-            doc_t1, doc_t2, doc_t3 = st.tabs(
-                ["📄 Trung tâm mẫu biểu", "📋 Biên bản giao ban", "📢 Thông báo kết luận"]
-            )
-            with doc_t1:
-                _render_doc_hub(df, df_nq11, role)
-            with doc_t2:
-                _render_bien_ban_giao_ban(doc_t2, **kwargs)
-            with doc_t3:
-                _render_thong_bao_ket_luan(doc_t3, **kwargs)
+            _render_doc_hub(df, df_nq11, role)
 
     # ── Định nghĩa nhóm tab ─────────────────────────────────────────────
     CAC_NHOM = {
@@ -1664,7 +1656,9 @@ def render(**kwargs):
                     tab, **{**kwargs, "pgd_mode": True, "df": df, "df_full": df}
                 )),
                 ("📝 Báo cáo Giao ban", lambda tab: _render_bao_cao_giao_ban(tab, **kwargs)),
-                ("📄 Mẫu biểu", lambda tab: _render_mau_bieu_tab(tab)),
+                ("📄 Trung tâm mẫu biểu",       lambda tab: _render_doc_hub_tab(tab)),
+                ("📋 Biên bản giao ban",         lambda tab: _render_bien_ban_giao_ban(tab, **kwargs)),
+                ("📢 Thông báo kết luận",        lambda tab: _render_thong_bao_ket_luan(tab, **kwargs)),
             ],
         },
         "ke_hoach_pgd": {
@@ -1684,7 +1678,8 @@ def render(**kwargs):
                 ("💳 Nợ rủi ro QĐ62", lambda tab: tab_qd62.render(
                     mode="pgd", pgd_filter=pgd_user or pgd_filter
                 )),
-                ("📍 Điểm GD & Tổ TK&VV", lambda tab: _render_diem_gd_va_to_tkvv(tab, **kwargs)),
+                ("📍 Điểm Giao Dịch", lambda tab: tab_diem_gd_pgd.render(tab, **kwargs)),
+                ("🏘️ Tổ TK&VV",       lambda tab: tab_cdtotkvv_pgd.render(tab, **kwargs)),
                 ("🏛️ Ban Đại Diện", lambda tab: tab_ban_dai_dien.render(tab, cap="xa", **kwargs)),
                 ("🤝 Ủy thác", lambda tab: tab_uy_thac.render(tab, **kwargs)),
             ],

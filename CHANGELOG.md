@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## [2026-05-19] — Dark/Light Mode: Semantic Token System
+- `utils_theme.py` — refactor hoàn toàn: 2 bộ color token `_DARK`/`_LIGHT` theo shadcn/Linear pattern, `get_theme_css(theme)` sinh CSS đầy đủ
+- `app.py` — xóa `_get_global_css()` (~370 dòng cũ), thay bằng `get_theme_css(theme)` + `init_theme()`, nút toggle ở sidebar trước "Đăng xuất"
+- Sidebar luôn giữ dark (tạo contrast đẹp với content area)
+- Lưu preference vào `kv_store` (key `theme_{username}`)
+
 ## [2026-05-19] — Đổi màu nền main area thành trắng
 - `app.py` dòng ~128, ~256 — CSS `.main` & `.block-container`: background #0E1117 → #FFFFFF
 

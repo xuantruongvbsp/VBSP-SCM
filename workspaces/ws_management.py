@@ -1232,14 +1232,29 @@ def render_sidebar_menu(role: str, username: str, **kwargs):
 
             is_open = st.session_state.get(open_key, False)
 
-            arrow = "▾" if is_open else "▸"
-            if st.button(
-                f"{arrow} {item['label']}",
-                key=f"menu_acc_{item['label']}",
-                width="stretch",
-            ):
-                st.session_state[open_key] = not is_open
-                st.rerun()
+            if is_child_active:
+                # Parent highlight cam khi child đang active — không toggle
+                st.markdown(
+                    f"<div style='"
+                    f"background:#E65100;"
+                    f"border-left:2px solid #BF360C;"
+                    f"color:#FFFFFF;"
+                    f"font-size:13px;font-weight:600;"
+                    f"padding:6px 8px 6px 10px;"
+                    f"border-radius:0 5px 5px 0;"
+                    f"margin-bottom:2px'>"
+                    f"▾ {item['label']}</div>",
+                    unsafe_allow_html=True,
+                )
+            else:
+                arrow = "▾" if is_open else "▸"
+                if st.button(
+                    f"{arrow} {item['label']}",
+                    key=f"menu_acc_{item['label']}",
+                    width="stretch",
+                ):
+                    st.session_state[open_key] = not is_open
+                    st.rerun()
 
             if is_open:
                 for child in children:

@@ -173,123 +173,52 @@ def _heatmap_dao_han(df: pd.DataFrame, key: str) -> None:
     st.plotly_chart(fig, width='stretch', key=key)
 
 
-# ─── Word helpers (QLNK theo CV 368) ─────────────────────────────────────────
+# ─── PDF helpers (QLNK theo CV 368) ──────────────────────────────────────────
 
-def _qlnk_doc() -> _Document:
-    doc = _Document()
-    s = doc.sections[0]
-    s.top_margin = _Cm(2); s.bottom_margin = _Cm(2)
-    s.left_margin = _Cm(3); s.right_margin = _Cm(2)
-    doc.styles['Normal'].font.name = 'Times New Roman'
-    doc.styles['Normal'].font.size = _Pt(12)
-    return doc
+_FONT_QLNK = False
 
+def _dang_ky_font_qlnk():
+    global _FONT_QLNK
+    if _FONT_QLNK or not _REPORTLAB_READY:
+        return
+    candidates = [
+        Path("C:/Windows/Fonts/times.ttf"),
+        Path("C:/Windows/Fonts/timesbd.ttf"),
+    ]
+    regular = next((p for p in [candidates[0]] if p.exists()), None)
+    bold = next((p for p in [candidates[1]] if p.exists()), None)
+    if regular:
+        pdfmetrics.registerFont(TTFont("TNR", str(regular)))
+    if bold:
+        pdfmetrics.registerFont(TTFont("TNR-Bold", str(bold)))
+    _FONT_QLNK = True
 
-def _qlnk_run(p, text: str, bold=False, italic=False, size=12):
-    run = p.add_run(str(text))
-    run.font.name = 'Times New Roman'
-    run.font.size = _Pt(size)
-    run.bold = bold
-    run.italic = italic
-    return run
+if _REPORTLAB_READY:
+    _VBSP_GREEN = colors.HexColor("#2E7D32")
+    _VBSP_GREEN_LIGHT = colors.HexColor("#E8F5E9")
+    _ROW_ALT = colors.HexColor("#F5F5F5")
+    _BORDER_COLOR = colors.HexColor("#BDBDBD")
+    _HEADER_BG = colors.HexColor("#D9D9D9")
+    _RED = colors.HexColor("#C62828")
+else:
+    _VBSP_GREEN = _VBSP_GREEN_LIGHT = _ROW_ALT = _BORDER_COLOR = _HEADER_BG = _RED = None
 
-
-def _qlnk_par(container, text="", bold=False, italic=False, size=12, align=None):
-    p = container.add_paragraph()
-    if text:
-        _qlnk_run(p, text, bold=bold, italic=italic, size=size)
-    if align:
-        p.alignment = align
-    return p
-
-
-def _qlnk_cell(cell, text="", bold=False, italic=False, size=11, align=None):
-    cell.text = ""
-    p = cell.paragraphs[0]
-    _qlnk_run(p, str(text), bold=bold, italic=italic, size=size)
-    if align:
-        p.alignment = align
+_FN = "TNR"
+_FB = "TNR-Bold"
 
 
-def _qlnk_bg(cell, hex_color: str):
-    tcPr = cell._tc.get_or_add_tcPr()
-    shd = _OxmlElem('w:shd')
-    shd.set(_qn('w:val'), 'clear')
-    shd.set(_qn('w:color'), 'auto')
-    shd.set(_qn('w:fill'), hex_color)
-    tcPr.append(shd)
-
-
-def _qlnk_no_border(tbl):
-    tblPr = tbl._tbl.get_or_add_tblPr()
-    tblBorders = _OxmlElem('w:tblBorders')
-    for nm in ('top', 'left', 'bottom', 'right', 'insideH', 'insideV'):
-        b = _OxmlElem(f'w:{nm}')
-        b.set(_qn('w:val'), 'none')
-        b.set(_qn('w:sz'), '0')
-        b.set(_qn('w:space'), '0')
-        b.set(_qn('w:color'), 'auto')
-        tblBorders.append(b)
-    tblPr.append(tblBorders)
-
-
-def _qlnk_header2col(doc, tren: str, duoi: str):
-    """Header 2 cột: đơn vị (trái) | quốc hiệu (phải)."""
-    tbl = doc.add_table(rows=1, cols=2)
-    tbl.style = 'Table Grid'
-    _qlnk_no_border(tbl)
-    cl, cr = tbl.rows[0].cells
-
-    cl.text = ""
-    for line, bold in [(tren, True), (duoi, False), ("─────────────────────", False)]:
-        p = cl.add_paragraph(line)
-        if p.runs:
-            p.runs[0].font.name = 'Times New Roman'
-            p.runs[0].font.size = _Pt(12)
-            p.runs[0].bold = bold
-        p.alignment = _WD_ALIGN.CENTER
-
-    cr.text = ""
-    for line, bold, italic in [
-        ("CỘNG HOÀ XÃ HỘI CHỦ NGHĨA VIỆT NAM", True, False),
-        ("Độc lập - Tự do - Hạnh phúc", False, True),
-        ("─────────────────────", False, False),
+def _tim_logo_qlnk() -> str | None:
+    for p in [
+        Path(__file__).parent.parent / "assets" / "logo.png",
+        Path(__file__).parent.parent / "logo-vbsp.jpg",
+        Path(__file__).parent.parent / "logo.png",
     ]:
-        p = cr.add_paragraph(line)
-        if p.runs:
-            p.runs[0].font.name = 'Times New Roman'
-            p.runs[0].font.size = _Pt(12)
-            p.runs[0].bold = bold
-            p.runs[0].italic = italic
-        p.alignment = _WD_ALIGN.CENTER
-
-
-def _qlnk_sig(doc, titles: list):
-    """Khối chữ ký N cột."""
-    tbl = doc.add_table(rows=1, cols=len(titles))
-    tbl.style = 'Table Grid'
-    _qlnk_no_border(tbl)
-    for cell, title in zip(tbl.rows[0].cells, titles):
-        cell.text = ""
-        p1 = cell.add_paragraph(title)
-        if p1.runs:
-            p1.runs[0].font.name = 'Times New Roman'
-            p1.runs[0].font.size = _Pt(12)
-            p1.runs[0].bold = True
-        p1.alignment = _WD_ALIGN.CENTER
-        for _ in range(4):
-            pb = cell.add_paragraph()
-            pb.alignment = _WD_ALIGN.CENTER
-        p_ky = cell.add_paragraph("(Ký, ghi rõ họ tên)")
-        if p_ky.runs:
-            p_ky.runs[0].font.name = 'Times New Roman'
-            p_ky.runs[0].font.size = _Pt(11)
-            p_ky.runs[0].italic = True
-        p_ky.alignment = _WD_ALIGN.CENTER
+        if p.exists():
+            return str(p)
+    return None
 
 
 def _qlnk_add_months(dt_str: str, months: int) -> str:
-    """Cộng số tháng vào ngày dd/mm/yyyy → dd/mm/yyyy."""
     try:
         import calendar as _cal
         from datetime import date as _date
@@ -305,86 +234,243 @@ def _qlnk_add_months(dt_str: str, months: int) -> str:
 
 
 def _qlnk_fmt_k(val) -> str:
-    """VND → ngàn đồng (chỉ số, không kèm đơn vị)."""
     try:
         return f"{int(round(float(val) / 1000)):,}"
     except (TypeError, ValueError):
         return "............"
 
 
-def _qlnk_bytes(doc) -> bytes:
-    buf = _io.BytesIO()
-    doc.save(buf)
-    return buf.getvalue()
+def _qlnk_fmt_dong(val) -> str:
+    try:
+        return f"{int(round(float(val))):,}"
+    except (TypeError, ValueError):
+        return "............"
 
 
-def _tao_word_ke_hoach_kt(ke_hoach: dict, ds_mon_vay: list) -> bytes:
-    """Tạo Word Kế hoạch kiểm tra nợ khoanh."""
-    doc = _qlnk_doc()
+# ── Common PDF styles ──
+
+def _style_bank_name() -> ParagraphStyle:
+    return ParagraphStyle("BankName", fontName=_FB, fontSize=12,
+                          alignment=TA_CENTER, leading=16)
+
+def _style_bank_branch() -> ParagraphStyle:
+    return ParagraphStyle("BranchName", fontName=_FN, fontSize=10,
+                          alignment=TA_CENTER, leading=13, spaceAfter=2)
+
+def _style_doc_title() -> ParagraphStyle:
+    return ParagraphStyle("DocTitle", fontName=_FB, fontSize=15,
+                          alignment=TA_CENTER, textColor=_VBSP_GREEN,
+                          spaceBefore=4, spaceAfter=4, leading=18)
+
+def _style_doc_sub() -> ParagraphStyle:
+    return ParagraphStyle("DocSub", fontName=_FN, fontSize=10,
+                          alignment=TA_CENTER, spaceAfter=6, leading=13)
+
+def _style_body() -> ParagraphStyle:
+    return ParagraphStyle("Body", fontName=_FN, fontSize=12,
+                          alignment=TA_LEFT, leading=20, spaceAfter=2)
+
+def _style_body_bold() -> ParagraphStyle:
+    return ParagraphStyle("BodyBold", fontName=_FB, fontSize=12,
+                          alignment=TA_LEFT, leading=20, spaceAfter=2)
+
+def _style_italic() -> ParagraphStyle:
+    return ParagraphStyle("Italic", fontName=_FN, fontSize=10,
+                          alignment=TA_CENTER, leading=13)
+
+def _style_table_header(font_size=9) -> ParagraphStyle:
+    return ParagraphStyle("TH", fontName=_FB, fontSize=font_size,
+                          alignment=TA_CENTER, textColor=colors.white, leading=12)
+
+def _style_table_cell(font_size=9, align=TA_CENTER) -> ParagraphStyle:
+    return ParagraphStyle("TC", fontName=_FN, fontSize=font_size,
+                          alignment=align, leading=12, wordWrap="CJK")
+
+def _style_table_cell_left(font_size=9) -> ParagraphStyle:
+    return _style_table_cell(font_size, TA_LEFT)
+
+def _style_sig_title() -> ParagraphStyle:
+    return ParagraphStyle("SigTitle", fontName=_FB, fontSize=11,
+                          alignment=TA_CENTER, leading=14)
+
+def _style_sig_sub() -> ParagraphStyle:
+    return ParagraphStyle("SigSub", fontName=_FN, fontSize=9,
+                          alignment=TA_CENTER, leading=12, textColor=colors.grey)
+
+def _style_date_right() -> ParagraphStyle:
+    return ParagraphStyle("DateRight", fontName=_FN, fontSize=11,
+                          alignment=TA_RIGHT, leading=14, spaceAfter=4)
+
+def _style_meta_label() -> ParagraphStyle:
+    return ParagraphStyle("MetaLabel", fontName=_FB, fontSize=10,
+                          alignment=TA_LEFT, leading=13, spaceAfter=2)
+
+
+# ── PDF layout helpers ──
+
+def _ve_header_pdf(elements, usable_w: float, tieu_de: str,
+                   don_vi_tren: str = "", don_vi_duoi: str = "",
+                   co_quoc_hieu: bool = True):
+    logo_path = _tim_logo_qlnk()
+    bank_html = ("NGÂN HÀNG CHÍNH SÁCH XÃ HỘI VIỆT NAM<br/>"
+                 "<font size='10'>Chi nhánh tỉnh Đồng Nai</font>")
+
+    left_html = ""
+    if don_vi_tren:
+        left_html += f"<b>{don_vi_tren}</b>"
+    if don_vi_duoi:
+        left_html += f"<br/>{don_vi_duoi}"
+    left_html += "<br/>─────────────────────" if left_html else ""
+
+    right_html = ""
+    if co_quoc_hieu:
+        right_html = (
+            "<b>CỘNG HOÀ XÃ HỘI CHỦ NGHĨA VIỆT NAM</b><br/>"
+            "<i>Độc lập - Tự do - Hạnh phúc</i><br/>"
+            "─────────────────────"
+        )
+
+    if logo_path and left_html and right_html:
+        try:
+            logo = RLImage(logo_path, width=2.0 * cm, height=2.0 * cm)
+            mid_w = usable_w - 2.4 * cm
+            left_w = mid_w * 0.55
+            right_w = mid_w * 0.45
+            inner = Table(
+                [[Paragraph(left_html, _style_body()),
+                  Paragraph(right_html, _style_body())]],
+                colWidths=[left_w, right_w],
+            )
+            inner.setStyle(TableStyle([
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+            ]))
+            header_tbl = Table(
+                [[logo, inner]],
+                colWidths=[2.4 * cm, mid_w],
+            )
+            header_tbl.setStyle(TableStyle([
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+            ]))
+            elements.append(header_tbl)
+        except Exception:
+            elements.append(Paragraph(bank_html, _style_bank_name()))
+            if left_html:
+                elements.append(Paragraph(left_html, _style_bank_branch()))
+    else:
+        elements.append(Paragraph(bank_html, _style_bank_name()))
+        if left_html:
+            elements.append(Paragraph(left_html, _style_bank_branch()))
+
+    elements.append(HRFlowable(width="100%", thickness=1.5,
+                               color=_VBSP_GREEN, spaceAfter=4))
+    elements.append(Paragraph(tieu_de.upper(), _style_doc_title()))
+    elements.append(Spacer(1, 4))
+
+
+def _ve_footer_pdf(elements, usable_w: float, signatures: list[str],
+                   ngay_str: str = None):
+    if ngay_str:
+        elements.append(Spacer(1, 8))
+        elements.append(Paragraph(ngay_str, _style_date_right()))
+    elements.append(Spacer(1, 8))
+
+    n = len(signatures)
+    cols_w = [usable_w / n] * n
+
+    sig_data = []
+    sig_data.append([Paragraph(s, _style_sig_title()) for s in signatures])
+    sig_data.append([Paragraph("<i>(Ký, ghi rõ họ tên)</i>", _style_sig_sub())
+                     for _ in signatures])
+    sig_data.append([Paragraph("<br/><br/><br/>", _style_body())
+                     for _ in signatures])
+
+    sig_tbl = Table(sig_data, colWidths=cols_w)
+    sig_tbl.setStyle(TableStyle([
+        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("TOPPADDING", (0, 0), (-1, -1), 4),
+        ("LEFTPADDING", (0, 0), (-1, -1), 4),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+    ]))
+    elements.append(sig_tbl)
+
+
+def _dong_ten_nd(nd: str = "") -> str:
+    try:
+        from datetime import date
+        today = date.today()
+        return f"Đồng Nai, ngày {today.day} tháng {today.month} năm {today.year}"
+    except Exception:
+        return nd or "Đồng Nai, ngày ... tháng ... năm ..."
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  5 hàm xuất PDF — thay thế _tao_word_* cũ
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def _xuat_pdf_mau_kh(ke_hoach: dict, ds_mon_vay: list,
+                     can_bo_kt: str = "", noi_dung: str = "") -> bytes:
+    _dang_ky_font_qlnk()
     ten_pgd    = ke_hoach.get("ten_pgd")       or "............"
     ten_xa     = ke_hoach.get("ten_xa")        or "............"
     ngay_kt    = ke_hoach.get("ngay_kiem_tra") or "............"
     thanh_phan = ke_hoach.get("thanh_phan")    or []
 
-    _qlnk_header2col(doc,
-                     tren=f"PHÒNG GIAO DỊCH {ten_pgd.upper()}",
-                     duoi="TỔ TÍN DỤNG")
-    _qlnk_par(doc)
-    _qlnk_par(doc, "KẾ HOẠCH KIỂM TRA KHOANH NỢ",
-              bold=True, size=14, align=_WD_ALIGN.CENTER)
-    _qlnk_par(doc, "(Theo CV 368/NHCS-QLN ngày 17/01/2024)",
-              italic=True, size=11, align=_WD_ALIGN.CENTER)
-    _qlnk_par(doc)
+    buf = BytesIO()
+    margin = 2.0 * cm
+    doc = SimpleDocTemplate(buf, pagesize=A4,
+                            leftMargin=margin, rightMargin=margin,
+                            topMargin=margin, bottomMargin=2 * cm)
+    usable_w = A4[0] - 2 * margin
+    elements = []
 
-    p_kg = doc.add_paragraph()
-    _qlnk_run(p_kg, "Kính gửi: ", bold=True)
-    _qlnk_run(p_kg, f"Giám đốc Phòng giao dịch {ten_pgd}")
-    _qlnk_par(doc)
+    _ve_header_pdf(elements, usable_w,
+                   tieu_de="KẾ HOẠCH KIỂM TRA KHOANH NỢ",
+                   don_vi_tren=f"PHÒNG GIAO DỊCH {ten_pgd.upper()}",
+                   don_vi_duoi="TỔ TÍN DỤNG")
+    elements.append(Paragraph("(Theo CV 368/NHCS-QLN ngày 17/01/2024)",
+                              _style_italic()))
 
-    for cb_text in [
+    elements.append(Spacer(1, 8))
+    elements.append(Paragraph(
+        f"<b>Kính gửi:</b> Giám đốc Phòng giao dịch {ten_pgd}",
+        _style_body()))
+    elements.append(Paragraph(
         "Căn cứ Công văn số 368/NHCS-QLN ngày 17/01/2024 của Ngân hàng Chính sách xã hội "
         "về việc hướng dẫn quản lý nợ khoanh;",
+        _style_body()))
+    elements.append(Paragraph(
         "Căn cứ kết quả rà soát các khoản nợ khoanh tại đơn vị;",
-    ]:
-        p = doc.add_paragraph(cb_text)
-        if p.runs:
-            p.runs[0].font.name = 'Times New Roman'
-    _qlnk_par(doc)
+        _style_body()))
+    elements.append(Spacer(1, 4))
 
-    _qlnk_par(doc, "I. NỘI DUNG KIỂM TRA", bold=True)
-    p_tg = doc.add_paragraph(f"1. Thời gian kiểm tra: Ngày {ngay_kt} tại {ten_xa}, {ten_pgd}")
-    if p_tg.runs:
-        p_tg.runs[0].font.name = 'Times New Roman'
-
-    p_tp = doc.add_paragraph("2. Thành phần đoàn kiểm tra:")
-    if p_tp.runs:
-        p_tp.runs[0].font.name = 'Times New Roman'
+    elements.append(Paragraph("<b>I. NỘI DUNG KIỂM TRA</b>", _style_body_bold()))
+    elements.append(Paragraph(
+        f"1. Thời gian kiểm tra: Ngày {ngay_kt} tại {ten_xa}, {ten_pgd}",
+        _style_body()))
+    elements.append(Paragraph("2. Thành phần đoàn kiểm tra:", _style_body()))
     for tp in (thanh_phan or [{"Họ và tên": "............", "Chức vụ/Đơn vị": "............"}]):
-        ten  = tp.get("Họ và tên") or tp.get("ten")     or "............"
+        ten = tp.get("Họ và tên") or tp.get("ten") or "............"
         chuc = tp.get("Chức vụ/Đơn vị") or tp.get("chuc_vu") or "............"
-        pt = doc.add_paragraph(f"    - {ten}, {chuc}")
-        if pt.runs:
-            pt.runs[0].font.name = 'Times New Roman'
+        elements.append(Paragraph(f"    - {ten}, {chuc}", _style_body()))
+    elements.append(Paragraph("3. Đối tượng kiểm tra:", _style_body()))
+    if noi_dung:
+        elements.append(Paragraph(f"    {noi_dung}", _style_body()))
 
-    p_dt = doc.add_paragraph("3. Đối tượng kiểm tra:")
-    if p_dt.runs:
-        p_dt.runs[0].font.name = 'Times New Roman'
+    headers = ["STT", "Khách hàng", "Tổ trưởng", "Chương trình vay",
+               "Ngày BĐ khoanh", "Thời gian khoanh", "Lý do khoanh nợ"]
+    ncols = len(headers)
+    col_widths = [0.8 * cm, 3.8 * cm, 3.0 * cm, 3.0 * cm, 2.5 * cm, 2.2 * cm, 3.5 * cm]
 
-    headers_kh = [
-        "STT", "Khách hàng", "Tổ trưởng", "Chương trình vay",
-        "Ngày BĐ khoanh", "Thời gian khoanh", "Lý do khoanh nợ",
-    ]
-    tbl_kh = doc.add_table(rows=1, cols=len(headers_kh))
-    tbl_kh.style = 'Table Grid'
-    for i, h in enumerate(headers_kh):
-        _qlnk_cell(tbl_kh.rows[0].cells[i], h, bold=True, size=10, align=_WD_ALIGN.CENTER)
-        _qlnk_bg(tbl_kh.rows[0].cells[i], "D9D9D9")
-
+    table_data = [[Paragraph(h, _style_table_header(9)) for h in headers]]
     for idx, mon in enumerate(ds_mon_vay or [], 1):
-        r = tbl_kh.add_row()
         ly_do_ma = mon.get("ly_do_khoanh", "")
         ly_do_hl = LY_DO_KHOANH_LABEL.get(ly_do_ma, ly_do_ma or "............")
-        st_val   = mon.get("so_thang_khoanh")
+        st_val = mon.get("so_thang_khoanh")
         vals = [
             str(idx),
             mon.get("ten_kh")              or "............",
@@ -394,97 +480,97 @@ def _tao_word_ke_hoach_kt(ke_hoach: dict, ds_mon_vay: list) -> bytes:
             (f"{st_val} tháng" if st_val else "............"),
             ly_do_hl,
         ]
-        for i, v in enumerate(vals):
-            _qlnk_cell(r.cells[i], v, size=10,
-                       align=_WD_ALIGN.CENTER if i == 0 else None)
+        table_data.append([Paragraph(v, _style_table_cell(9)) for v in vals])
 
-    _qlnk_par(doc)
-    _qlnk_sig(doc, ["Người lập kế hoạch", "Giám Đốc"])
-    return _qlnk_bytes(doc)
+    style_cmds = [
+        ("BACKGROUND", (0, 0), (-1, 0), _HEADER_BG),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.black),
+        ("GRID", (0, 0), (-1, -1), 0.5, _BORDER_COLOR),
+        ("BOX", (0, 0), (-1, -1), 1, _VBSP_GREEN),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("TOPPADDING", (0, 0), (-1, -1), 4),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+    ]
+    for r in range(1, len(table_data)):
+        if r % 2 == 0:
+            style_cmds.append(("BACKGROUND", (0, r), (-1, r), _ROW_ALT))
+
+    tbl = Table(table_data, colWidths=col_widths, repeatRows=1)
+    tbl.setStyle(TableStyle(style_cmds))
+    elements.append(tbl)
+
+    _ve_footer_pdf(elements, usable_w,
+                   signatures=["Người lập kế hoạch", "Giám Đốc"],
+                   ngay_str=_dong_ten_nd())
+
+    doc.build(elements)
+    buf.seek(0)
+    return buf.getvalue()
 
 
-def _tao_word_01qlnk(ke_hoach: dict, ds_ket_qua: list) -> bytes:
-    """Tạo Phiếu kiểm tra nợ khoanh (Mẫu số 01/QLNK)."""
-    doc = _qlnk_doc()
+def _xuat_pdf_mau_01qlnk(ke_hoach: dict, ds_ket_qua: list,
+                         ket_luan: str = "") -> bytes:
+    _dang_ky_font_qlnk()
     ten_pgd    = ke_hoach.get("ten_pgd")       or "............"
     ten_xa     = ke_hoach.get("ten_xa")        or "............"
     ngay_kt    = ke_hoach.get("ngay_kiem_tra") or "............"
     thanh_phan = ke_hoach.get("thanh_phan")    or []
 
-    hdr = doc.add_table(rows=1, cols=2)
-    hdr.style = 'Table Grid'
-    _qlnk_no_border(hdr)
-    cl, cr = hdr.rows[0].cells
+    buf = BytesIO()
+    margin = 1.5 * cm
+    doc = SimpleDocTemplate(buf, pagesize=landscape(A4),
+                            leftMargin=margin, rightMargin=margin,
+                            topMargin=margin, bottomMargin=1.5 * cm)
+    usable_w = landscape(A4)[0] - 2 * margin
+    elements = []
 
-    cl.text = ""
-    for line, bold in [
-        ("NGÂN HÀNG CHÍNH SÁCH XÃ HỘI TỈNH", True),
-        (f"PHÒNG GIAO DỊCH {ten_pgd.upper()}", True),
-        ("─────────────────────", False),
-    ]:
-        p = cl.add_paragraph(line)
-        if p.runs:
-            p.runs[0].font.name = 'Times New Roman'
-            p.runs[0].font.size = _Pt(12)
-            p.runs[0].bold = bold
-        p.alignment = _WD_ALIGN.CENTER
-
-    cr.text = ""
-    p_ms = cr.add_paragraph("Mẫu số: 01/QLNK")
-    if p_ms.runs:
-        p_ms.runs[0].font.name = 'Times New Roman'
-        p_ms.runs[0].italic = True
-    p_ms.alignment = _WD_ALIGN.RIGHT
-
-    _qlnk_par(doc)
-    _qlnk_par(doc, "PHIẾU KIỂM TRA NỢ KHOANH",
-              bold=True, size=14, align=_WD_ALIGN.CENTER)
-    _qlnk_par(doc, "(Đơn vị tính: ngàn đồng)",
-              italic=True, size=11, align=_WD_ALIGN.CENTER)
-    _qlnk_par(doc)
+    _ve_header_pdf(elements, usable_w,
+                   tieu_de="PHIẾU KIỂM TRA NỢ KHOANH",
+                   don_vi_tren="NGÂN HÀNG CHÍNH SÁCH XÃ HỘI TỈNH",
+                   don_vi_duoi=f"PHÒNG GIAO DỊCH {ten_pgd.upper()}")
+    elements.append(Paragraph(
+        "<font size='8'><i>Mẫu số: 01/QLNK</i></font>",
+        ParagraphStyle("MS", fontName=_FN, fontSize=8,
+                       alignment=TA_RIGHT, leading=10)))
+    elements.append(Paragraph("(Đơn vị tính: ngàn đồng)", _style_italic()))
 
     cb_list = [
         (tp.get("Họ và tên") or "............",
          tp.get("Chức vụ/Đơn vị") or "............")
         for tp in (thanh_phan or [{}])
     ]
-    p_tt = doc.add_paragraph(
-        "Tổ trưởng: ............    Tổ chức Chính trị - Xã hội: ............"
-    )
-    if p_tt.runs:
-        p_tt.runs[0].font.name = 'Times New Roman'
+    elements.append(Paragraph(
+        "Tổ trưởng: ............    Tổ chức Chính trị - Xã hội: ............",
+        _style_body()))
     for i, (ten, chuc) in enumerate(cb_list[:2]):
-        prefix = "Họ và tên cán bộ kiểm tra: 1." if i == 0 else f"{'':>42}2."
-        p_cb = doc.add_paragraph(f"{prefix} {ten}    Chức vụ: {chuc}")
-        if p_cb.runs:
-            p_cb.runs[0].font.name = 'Times New Roman'
-    p_tb = doc.add_paragraph(
-        f"Thời điểm kiểm tra: {ngay_kt}    Địa bàn kiểm tra: {ten_xa}"
-    )
-    if p_tb.runs:
-        p_tb.runs[0].font.name = 'Times New Roman'
-    _qlnk_par(doc)
+        prefix = "Họ và tên cán bộ kiểm tra: 1." if i == 0 else (
+            "                                 2.")
+        elements.append(Paragraph(
+            f"{prefix} {ten}    Chức vụ: {chuc}", _style_body()))
+    elements.append(Paragraph(
+        f"Thời điểm kiểm tra: {ngay_kt}    Địa bàn kiểm tra: {ten_xa}",
+        _style_body()))
+    elements.append(Spacer(1, 6))
 
-    # Bảng 17 cột với 2 dòng header
     N = 17
-    tbl = doc.add_table(rows=2, cols=N)
-    tbl.style = 'Table Grid'
-    hdr0, hdr1 = tbl.rows[0], tbl.rows[1]
+    col_w = [
+        1.0 * cm, 2.8 * cm, 2.0 * cm,
+        1.5 * cm, 1.5 * cm, 1.5 * cm, 1.8 * cm, 1.8 * cm,
+        1.5 * cm, 1.5 * cm, 1.5 * cm,
+        2.0 * cm, 2.0 * cm, 1.6 * cm,
+        1.5 * cm, 1.5 * cm, 1.5 * cm,
+    ]
 
-    for ci, label in enumerate(["STT", "Họ và tên", "Mã món vay"]):
-        hdr0.cells[ci].merge(hdr1.cells[ci])
-        _qlnk_cell(hdr0.cells[ci], label, bold=True, size=9, align=_WD_ALIGN.CENTER)
-        _qlnk_bg(hdr0.cells[ci], "D9D9D9")
+    fs = 7
+    th = _style_table_header(fs)
+    tc = _style_table_cell(fs)
 
-    hdr0.cells[3].merge(hdr0.cells[7])
-    _qlnk_cell(hdr0.cells[3], "PHẦN THEO DÕI TẠI NH",
-               bold=True, size=9, align=_WD_ALIGN.CENTER)
-    _qlnk_bg(hdr0.cells[3], "D9D9D9")
-
-    hdr0.cells[8].merge(hdr0.cells[16])
-    _qlnk_cell(hdr0.cells[8], "PHẦN KIỂM TRA THỰC TẾ TẠI KHÁCH HÀNG",
-               bold=True, size=9, align=_WD_ALIGN.CENTER)
-    _qlnk_bg(hdr0.cells[8], "D9D9D9")
+    row0 = [Paragraph("STT", th), Paragraph("Họ và tên", th),
+            Paragraph("Mã món vay", th)]
+    row0 += [Paragraph("PHẦN THEO DÕI TẠI NH", th)]
+    row0 += [Paragraph("", th)] * 4
+    row0 += [Paragraph("PHẦN KIỂM TRA THỰC TẾ TẠI KHÁCH HÀNG", th)]
+    row0 += [Paragraph("", th)] * 8
 
     sub_h = [
         "Dư nợ gốc", "Dư nợ gốc khoanh", "Số tiền lãi còn nợ NH",
@@ -493,18 +579,32 @@ def _tao_word_01qlnk(ke_hoach: dict, ds_ket_qua: list) -> bytes:
         "Thực trạng DA", "Tình hình KH", "Khả năng TN",
         "KH cam kết TN", "Chênh lệch", "Ký xác nhận KH",
     ]
-    for i, h in enumerate(sub_h):
-        c = hdr1.cells[i + 3]
-        _qlnk_cell(c, h, bold=True, size=9, align=_WD_ALIGN.CENTER)
-        _qlnk_bg(c, "D9D9D9")
+
+    header_data = [
+        [row0[0], row0[1], row0[2]] + [row0[3]] * 5 + [row0[8]] * 9,
+        [Paragraph("", th), Paragraph("", th), Paragraph("", th)]
+        + [Paragraph(h, th) for h in sub_h],
+    ]
+
+    style_cmds = []
+    for ci in range(N):
+        style_cmds.append(("BACKGROUND", (ci, 0), (ci, 0), _HEADER_BG))
+        style_cmds.append(("BACKGROUND", (ci, 1), (ci, 1), _HEADER_BG))
+        style_cmds.append(("TEXTCOLOR", (ci, 0), (ci, 1), colors.black))
+    style_cmds.append(("SPAN", (3, 0), (7, 0)))
+    style_cmds.append(("SPAN", (8, 0), (16, 0)))
+    style_cmds.append(("GRID", (0, 0), (-1, -1), 0.5, _BORDER_COLOR))
+    style_cmds.append(("BOX", (0, 0), (-1, -1), 1, _VBSP_GREEN))
+    style_cmds.append(("VALIGN", (0, 0), (-1, -1), "MIDDLE"))
+    style_cmds.append(("TOPPADDING", (0, 0), (-1, -1), 2))
+    style_cmds.append(("BOTTOMPADDING", (0, 0), (-1, -1), 2))
 
     for stt, r in enumerate(ds_ket_qua or [], 1):
-        bdk      = r.get("ngay_bat_dau_khoanh") or ""
+        bdk = r.get("ngay_bat_dau_khoanh") or ""
         so_thang = r.get("so_thang_khoanh")
-        ngay_hh  = (_qlnk_add_months(bdk, int(so_thang))
-                    if (bdk and so_thang) else "............")
-        dr = tbl.add_row()
-        vals = [
+        ngay_hh = (_qlnk_add_months(bdk, int(so_thang))
+                   if (bdk and so_thang) else "............")
+        row = [Paragraph(v, tc) for v in [
             str(stt),
             r.get("ten_kh")               or "............",
             r.get("ma_mon_vay")           or "............",
@@ -522,67 +622,41 @@ def _tao_word_01qlnk(ke_hoach: dict, ds_ket_qua: list) -> bytes:
             r.get("cam_ket_tra_no")       or "............",
             _qlnk_fmt_k(r.get("chenh_lech")),
             "",
-        ]
-        for i, v in enumerate(vals):
-            _qlnk_cell(dr.cells[i], v, size=9,
-                       align=_WD_ALIGN.CENTER if i == 0 else None)
+        ]]
+        header_data.append(row)
 
-    _qlnk_par(doc)
-    p_nx = doc.add_paragraph(
-        "Kiểm tra thực tế được ..... Khách hàng; Số tiền ............"
-    )
-    if p_nx.runs:
-        p_nx.runs[0].font.name = 'Times New Roman'
-    _qlnk_par(doc)
-    _qlnk_sig(doc, [
-        "ĐẠI DIỆN NHCSXH",
-        "BQL TỔ TK&VV",
-        "ĐẠI DIỆN CT-XH",
-        "TRƯỞNG THÔN",
-        "ĐẠI DIỆN UBND",
-    ])
-    return _qlnk_bytes(doc)
+    for r in range(2, len(header_data)):
+        if r % 2 == 0:
+            for ci in range(N):
+                style_cmds.append(("BACKGROUND", (ci, r), (ci, r), _ROW_ALT))
+
+    tbl = Table(header_data, colWidths=col_w, repeatRows=2)
+    tbl.setStyle(TableStyle(style_cmds))
+    elements.append(tbl)
+
+    elements.append(Spacer(1, 8))
+    elements.append(Paragraph(
+        f"<b>Nhận xét:</b> Kiểm tra thực tế được ..... Khách hàng; "
+        f"Số tiền ............",
+        _style_body()))
+    if ket_luan:
+        elements.append(Paragraph(f"<b>Kết luận:</b> {ket_luan}", _style_body()))
+
+    _ve_footer_pdf(elements, usable_w, signatures=[
+        "ĐẠI DIỆN NHCSXH", "BQL TỔ TK&VV",
+        "ĐẠI DIỆN CT-XH", "TRƯỞNG THÔN", "ĐẠI DIỆN UBND",
+    ], ngay_str=_dong_ten_nd())
+
+    doc.build(elements)
+    buf.seek(0)
+    return buf.getvalue()
 
 
-def _tao_word_02qlnk(row: dict) -> bytes:
-    """Tạo Cam kết trả nợ (Mẫu số 02/QLNK)."""
-    doc = _qlnk_doc()
-
-    hdr = doc.add_table(rows=1, cols=2)
-    hdr.style = 'Table Grid'
-    _qlnk_no_border(hdr)
-    cl, cr = hdr.rows[0].cells
-
-    cl.text = ""
-    p_ms = cl.add_paragraph("Mẫu số: 02/QLNK")
-    if p_ms.runs:
-        p_ms.runs[0].font.name = 'Times New Roman'
-        p_ms.runs[0].italic = True
-
-    cr.text = ""
-    for line, bold, italic in [
-        ("CỘNG HOÀ XÃ HỘI CHỦ NGHĨA VIỆT NAM", True, False),
-        ("Độc lập - Tự do - Hạnh phúc", False, True),
-        ("─────────────────────", False, False),
-        ("..............., ngày ..... tháng ..... năm .....", False, True),
-    ]:
-        p = cr.add_paragraph(line)
-        if p.runs:
-            p.runs[0].font.name = 'Times New Roman'
-            p.runs[0].font.size = _Pt(12)
-            p.runs[0].bold = bold
-            p.runs[0].italic = italic
-        p.alignment = _WD_ALIGN.CENTER
-
-    _qlnk_par(doc)
-    _qlnk_par(doc, "CAM KẾT TRẢ NỢ", bold=True, size=14, align=_WD_ALIGN.CENTER)
-    _qlnk_par(doc)
-
-    p_kg = doc.add_paragraph()
-    _qlnk_run(p_kg, "Kính gửi: ", bold=True)
-    _qlnk_run(p_kg, "Ngân hàng Chính sách xã hội")
-    _qlnk_par(doc)
-
+def _xuat_pdf_mau_02qlnk(row: dict,
+                         so_tien_cam_ket: str = "",
+                         thoi_han: str = "",
+                         phuong_thuc: str = "") -> bytes:
+    _dang_ky_font_qlnk()
     ten_kh  = row.get("ten_kh") or row.get(COT_TEN_KH) or "............"
     dia_chi = row.get("ten_xa") or row.get(COT_TEN_XA) or row.get("dia_chi") or "............"
     so_cccd = row.get("so_cmnd") or row.get("so_cccd") or "............"
@@ -597,241 +671,263 @@ def _tao_word_02qlnk(row: dict) -> bytes:
     except (TypeError, ValueError):
         du_goc_f = lai_f = tong_no = 0
 
+    buf = BytesIO()
+    margin = 2.5 * cm
+    doc = SimpleDocTemplate(buf, pagesize=A4,
+                            leftMargin=margin, rightMargin=margin,
+                            topMargin=2 * cm, bottomMargin=2 * cm)
+    usable_w = A4[0] - 2 * margin
+    elements = []
+
+    _ve_header_pdf(elements, usable_w,
+                   tieu_de="CAM KẾT TRẢ NỢ",
+                   don_vi_tren="",
+                   don_vi_duoi="")
+
+    elements.append(Paragraph(
+        "<font size='8'><i>Mẫu số: 02/QLNK</i></font>",
+        ParagraphStyle("MS", fontName=_FN, fontSize=8,
+                       alignment=TA_RIGHT, leading=10)))
+    elements.append(Paragraph(
+        "<i>..............., ngày ..... tháng ..... năm .....</i>",
+        ParagraphStyle("DateBl", fontName=_FN, fontSize=10,
+                       alignment=TA_RIGHT, leading=13, spaceAfter=8)))
+
+    elements.append(Paragraph(
+        "<b>Kính gửi:</b> Ngân hàng Chính sách xã hội", _style_body()))
+
     for line in [
         f"Tôi tên: {ten_kh}    Năm sinh: ............    SĐT: ............",
         f"Số CCCD/CMND: {so_cccd}    Địa chỉ: {dia_chi}",
-        f"Thành viên Tổ TK&VV: {ten_to}",
+        f"Thành viên Tổ TK&amp;VV: {ten_to}",
         f"Theo HĐTD số: {so_ku}",
         f"Hiện còn nợ số tiền: {tong_no:,.0f} đồng "
         f"(gốc: {du_goc_f:,.0f} đồng, lãi: {lai_f:,.0f} đồng)",
-        "",
+    ]:
+        elements.append(Paragraph(line, _style_body()))
+
+    elements.append(Spacer(1, 4))
+    elements.append(Paragraph(
         "Tôi cam kết sẽ trả nợ cho Ngân hàng theo kế hoạch cụ thể:",
-        "    - Thời gian: ............",
-        "    - Số tiền: ............",
-        "    - Địa điểm: ............",
-        "",
-        "Tôi xin cam kết thực hiện đúng như trên.",
-    ]:
-        p = doc.add_paragraph(line)
-        if p.runs:
-            p.runs[0].font.name = 'Times New Roman'
+        _style_body()))
 
-    _qlnk_par(doc)
-    _qlnk_sig(doc, [
-        "Người vay",
-        "ĐD BQL Tổ TK&VV",
-        "ĐD CT-XH/Trưởng thôn",
-        "ĐD NHCSXH",
+    tho = thoi_han or "............"
+    tien = so_tien_cam_ket or "............"
+    pt = phuong_thuc or "............"
+    for l in [
+        f"    - Thời gian: {tho}",
+        f"    - Số tiền: {tien}",
+        f"    - Địa điểm: {pt}",
+    ]:
+        elements.append(Paragraph(l, _style_body()))
+
+    elements.append(Spacer(1, 4))
+    elements.append(Paragraph(
+        "Tôi xin cam kết thực hiện đúng như trên.", _style_body()))
+
+    _ve_footer_pdf(elements, usable_w, signatures=[
+        "Người vay", "ĐD BQL Tổ TK&amp;VV",
+        "ĐD CT-XH/Trưởng thôn", "ĐD NHCSXH",
     ])
-    return _qlnk_bytes(doc)
+
+    doc.build(elements)
+    buf.seek(0)
+    return buf.getvalue()
 
 
-def _tao_word_03qlnk(ten_pgd: str, ten_to: str, ds_het_han: list) -> bytes:
-    """Tạo Danh sách món vay hết thời gian khoanh nợ (Mẫu số 03/QLNK)."""
-    doc = _qlnk_doc()
+def _xuat_pdf_mau_03qlnk(ten_pgd: str, ten_to: str, ds_het_han: list,
+                         ghi_chu: str = "") -> bytes:
+    _dang_ky_font_qlnk()
+    buf = BytesIO()
+    margin = 1.5 * cm
+    doc = SimpleDocTemplate(buf, pagesize=A4,
+                            leftMargin=margin, rightMargin=margin,
+                            topMargin=margin, bottomMargin=2 * cm)
+    usable_w = A4[0] - 2 * margin
+    elements = []
 
-    hdr = doc.add_table(rows=1, cols=2)
-    hdr.style = 'Table Grid'
-    _qlnk_no_border(hdr)
-    cl, cr = hdr.rows[0].cells
+    _ve_header_pdf(elements, usable_w,
+                   tieu_de="DANH SÁCH MÓN VAY HẾT THỜI GIAN KHOANH NỢ",
+                   don_vi_tren="CHI NHÁNH NHCSXH TỈNH ĐỒNG NAI",
+                   don_vi_duoi=f"PHÒNG GIAO DỊCH {(ten_pgd or '').upper()}")
+    elements.append(Paragraph(
+        "<font size='8'><i>Mẫu số: 03/QLNK</i></font>",
+        ParagraphStyle("MS", fontName=_FN, fontSize=8,
+                       alignment=TA_RIGHT, leading=10)))
+    elements.append(Paragraph("(Đơn vị tính: đồng)", _style_italic()))
 
-    cl.text = ""
-    for line, bold in [
-        ("CHI NHÁNH NHCSXH TỈNH ĐỒNG NAI", True),
-        (f"PHÒNG GIAO DỊCH {(ten_pgd or '').upper()}", True),
-        ("─────────────────────", False),
-    ]:
-        p = cl.add_paragraph(line)
-        if p.runs:
-            p.runs[0].font.name = 'Times New Roman'
-            p.runs[0].font.size = _Pt(12)
-            p.runs[0].bold = bold
-        p.alignment = _WD_ALIGN.CENTER
-
-    cr.text = ""
-    p_ms = cr.add_paragraph("Mẫu số: 03/QLNK")
-    if p_ms.runs:
-        p_ms.runs[0].font.name = 'Times New Roman'
-        p_ms.runs[0].italic = True
-    p_ms.alignment = _WD_ALIGN.RIGHT
-
-    _qlnk_par(doc)
-    _qlnk_par(doc, "DANH SÁCH MÓN VAY HẾT THỜI GIAN KHOANH NỢ",
-              bold=True, size=14, align=_WD_ALIGN.CENTER)
-    _qlnk_par(doc, "(Đơn vị tính: đồng)", italic=True, size=11, align=_WD_ALIGN.CENTER)
-    _qlnk_par(doc)
-
-    for line in [
-        "Từ ngày ............  đến ngày ............",
+    elements.append(Spacer(1, 4))
+    elements.append(Paragraph(
+        "Từ ngày ............  đến ngày ............", _style_body()))
+    elements.append(Paragraph(
         f"Tên tổ trưởng: {ten_to or '............'}    Mã tổ: ............",
-    ]:
-        p = doc.add_paragraph(line)
-        if p.runs:
-            p.runs[0].font.name = 'Times New Roman'
-    _qlnk_par(doc)
+        _style_body()))
+    if ghi_chu:
+        elements.append(Paragraph(
+            f"<i>Ghi chú: {ghi_chu}</i>",
+            ParagraphStyle("Note", fontName=_FN, fontSize=10,
+                           alignment=TA_LEFT, leading=14,
+                           textColor=colors.grey)))
 
     headers03 = [
         "STT", "Khách hàng", "Mã món vay",
         "Ngày được khoanh nợ", "Ngày hết hạn khoanh",
         "Nợ gốc hết hạn khoanh (đồng)", "Ngày đến hạn trả nợ cuối cùng",
     ]
-    tbl = doc.add_table(rows=1, cols=len(headers03))
-    tbl.style = 'Table Grid'
-    for i, h in enumerate(headers03):
-        _qlnk_cell(tbl.rows[0].cells[i], h, bold=True, size=10, align=_WD_ALIGN.CENTER)
-        _qlnk_bg(tbl.rows[0].cells[i], "D9D9D9")
+    ncols = len(headers03)
+    col_w03 = [0.8 * cm, 4.0 * cm, 2.5 * cm, 2.5 * cm, 2.5 * cm, 3.5 * cm, 3.0 * cm]
+    th03 = _style_table_header(9)
+    tc03 = _style_table_cell(9)
 
+    table_data = [[Paragraph(h, th03) for h in headers03]]
     tong_no_goc = 0
     for stt, row in enumerate(ds_het_han or [], 1):
-        dr = tbl.add_row()
         du_no = row.get(COT_DU_NO_KHOANH) or row.get("du_no_goc_khoanh") or 0
         try:
             du_no_f = float(du_no)
         except (TypeError, ValueError):
             du_no_f = 0
         tong_no_goc += du_no_f
-        bdk   = row.get("ngay_bat_dau_khoanh") or "............"
+        bdk = row.get("ngay_bat_dau_khoanh") or "............"
         so_th = row.get("so_thang_khoanh")
-        hh    = (_qlnk_add_months(bdk, int(so_th))
-                 if (bdk != "............" and so_th) else "............")
-        vals = [
+        hh = (_qlnk_add_months(bdk, int(so_th))
+              if (bdk != "............" and so_th) else "............")
+        table_data.append([Paragraph(v, tc03) for v in [
             str(stt),
             row.get(COT_TEN_KH) or row.get("ten_kh") or "............",
             row.get(COT_SO_KU)  or row.get("ma_mon_vay") or "............",
-            bdk,
-            hh,
-            f"{du_no_f:,.0f}",
+            bdk, hh,
+            _qlnk_fmt_dong(du_no_f),
             row.get(COT_NGAY_DH) or row.get("ngay_den_han") or "............",
-        ]
-        for i, v in enumerate(vals):
-            _qlnk_cell(dr.cells[i], v, size=10,
-                       align=_WD_ALIGN.CENTER if i == 0 else None)
+        ]])
 
-    r_cong = tbl.add_row()
-    _qlnk_cell(r_cong.cells[0], "Cộng:", bold=True, size=10, align=_WD_ALIGN.CENTER)
-    _qlnk_cell(r_cong.cells[5], f"{tong_no_goc:,.0f}", bold=True, size=10)
+    table_data.append([
+        Paragraph("<b>Cộng:</b>",
+                  ParagraphStyle("THB", fontName=_FB, fontSize=9, alignment=TA_CENTER)),
+        Paragraph("", tc03), Paragraph("", tc03), Paragraph("", tc03), Paragraph("", tc03),
+        Paragraph(f"<b>{_qlnk_fmt_dong(tong_no_goc)}</b>",
+                  ParagraphStyle("THB", fontName=_FB, fontSize=9, alignment=TA_CENTER)),
+        Paragraph("", tc03),
+    ])
 
-    _qlnk_par(doc)
-    _qlnk_sig(doc, ["Lập biểu", "Kiểm soát", "Giám đốc"])
-    return _qlnk_bytes(doc)
+    style_cmds03 = [
+        ("BACKGROUND", (0, 0), (-1, 0), _HEADER_BG),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.black),
+        ("GRID", (0, 0), (-1, -1), 0.5, _BORDER_COLOR),
+        ("BOX", (0, 0), (-1, -1), 1, _VBSP_GREEN),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("TOPPADDING", (0, 0), (-1, -1), 4),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+    ]
+    for r in range(1, len(table_data) - 1):
+        if r % 2 == 0:
+            style_cmds03.append(("BACKGROUND", (0, r), (-1, r), _ROW_ALT))
+    last_row = len(table_data) - 1
+    style_cmds03.append(("BACKGROUND", (0, last_row), (-1, last_row), _VBSP_GREEN_LIGHT))
+    style_cmds03.append(("FONTNAME", (0, last_row), (-1, last_row), _FB))
+    style_cmds03.append(("LINEABOVE", (0, last_row), (-1, last_row), 1.5, _VBSP_GREEN))
+
+    tbl = Table(table_data, colWidths=col_w03, repeatRows=1)
+    tbl.setStyle(TableStyle(style_cmds03))
+    elements.append(tbl)
+
+    _ve_footer_pdf(elements, usable_w,
+                   signatures=["Lập biểu", "Kiểm soát", "Giám đốc"],
+                   ngay_str=_dong_ten_nd())
+
+    doc.build(elements)
+    buf.seek(0)
+    return buf.getvalue()
 
 
-def _tao_word_04qlnk(row_hstd: dict, row_bs: dict, ten_pgd: str) -> bytes:
-    """Tạo Thông báo nợ hết thời gian khoanh nợ (Mẫu số 04/QLNK)."""
-    doc = _qlnk_doc()
-
-    hdr = doc.add_table(rows=1, cols=2)
-    hdr.style = 'Table Grid'
-    _qlnk_no_border(hdr)
-    cl, cr = hdr.rows[0].cells
-
-    cl.text = ""
-    for line, bold in [
-        ("NGÂN HÀNG CHÍNH SÁCH XÃ HỘI", True),
-        (f"CHI NHÁNH / PGD {(ten_pgd or '').upper()}", True),
-        ("─────────────────────", False),
-    ]:
-        p = cl.add_paragraph(line)
-        if p.runs:
-            p.runs[0].font.name = 'Times New Roman'
-            p.runs[0].font.size = _Pt(12)
-            p.runs[0].bold = bold
-        p.alignment = _WD_ALIGN.CENTER
-
-    cr.text = ""
-    p_ms = cr.add_paragraph("Mẫu số: 04/QLNK")
-    if p_ms.runs:
-        p_ms.runs[0].font.name = 'Times New Roman'
-        p_ms.runs[0].italic = True
-    p_ms.alignment = _WD_ALIGN.RIGHT
-
-    _qlnk_par(doc)
-    _qlnk_par(doc, "CỘNG HOÀ XÃ HỘI CHỦ NGHĨA VIỆT NAM",
-              bold=True, align=_WD_ALIGN.CENTER)
-    _qlnk_par(doc, "Độc lập - Tự do - Hạnh phúc",
-              italic=True, align=_WD_ALIGN.CENTER)
-    _qlnk_par(doc, "─────────────────────", align=_WD_ALIGN.CENTER)
-    _qlnk_par(doc, "..............., ngày ..... tháng ..... năm .....",
-              italic=True, align=_WD_ALIGN.RIGHT)
-    _qlnk_par(doc)
-    _qlnk_par(doc, "THÔNG BÁO NỢ HẾT THỜI GIAN KHOANH NỢ",
-              bold=True, size=14, align=_WD_ALIGN.CENTER)
-    _qlnk_par(doc)
-
+def _xuat_pdf_mau_04qlnk(row_hstd: dict, row_bs: dict, ten_pgd: str,
+                         noi_dung: str = "", han_cuoi: str = "") -> bytes:
+    _dang_ky_font_qlnk()
     ten_kh  = row_hstd.get(COT_TEN_KH) or row_hstd.get("ten_kh") or "............"
     dia_chi = row_hstd.get(COT_TEN_XA) or row_hstd.get("dia_chi") or "............"
-
-    p_kg = doc.add_paragraph()
-    _qlnk_run(p_kg, "Kính gửi: ", bold=True)
-    _qlnk_run(p_kg, f"Ông/Bà {ten_kh}, địa chỉ: {dia_chi}")
-    _qlnk_par(doc)
-
-    so_qd    = row_bs.get("so_quyet_dinh_khoanh") or "............"
-    bdk      = row_bs.get("ngay_bat_dau_khoanh")  or "............"
+    so_qd   = row_bs.get("so_quyet_dinh_khoanh") or "............"
+    bdk     = row_bs.get("ngay_bat_dau_khoanh")  or "............"
     so_thang = row_bs.get("so_thang_khoanh")
-    ngay_hh  = (_qlnk_add_months(bdk, int(so_thang))
-                if (bdk != "............" and so_thang) else "............")
-
+    ngay_hh = (_qlnk_add_months(bdk, int(so_thang))
+               if (bdk != "............" and so_thang) else "............")
     du_goc = row_hstd.get(COT_DU_NO_KHOANH) or row_hstd.get("du_no_goc_khoanh") or 0
-    lai    = row_hstd.get("Lãi tồn TH") or row_hstd.get("so_tien_lai_con_no") or 0
+    lai = row_hstd.get("Lãi tồn TH") or row_hstd.get("so_tien_lai_con_no") or 0
     try:
         du_goc_f = float(du_goc)
-        lai_f    = float(lai)
-        tong_no  = du_goc_f + lai_f
+        lai_f = float(lai)
+        tong_no = du_goc_f + lai_f
     except (TypeError, ValueError):
         du_goc_f = lai_f = tong_no = 0
+
+    buf = BytesIO()
+    margin = 2.5 * cm
+    doc = SimpleDocTemplate(buf, pagesize=A4,
+                            leftMargin=margin, rightMargin=margin,
+                            topMargin=2 * cm, bottomMargin=2 * cm)
+    usable_w = A4[0] - 2 * margin
+    elements = []
+
+    _ve_header_pdf(elements, usable_w,
+                   tieu_de="THÔNG BÁO NỢ HẾT THỜI GIAN KHOANH NỢ",
+                   don_vi_tren="NGÂN HÀNG CHÍNH SÁCH XÃ HỘI",
+                   don_vi_duoi=f"CHI NHÁNH / PGD {(ten_pgd or '').upper()}")
+
+    elements.append(Paragraph(
+        "<font size='8'><i>Mẫu số: 04/QLNK</i></font>",
+        ParagraphStyle("MS", fontName=_FN, fontSize=8,
+                       alignment=TA_RIGHT, leading=10)))
+    elements.append(Paragraph(
+        "<i>..............., ngày ..... tháng ..... năm .....</i>",
+        ParagraphStyle("DateBl", fontName=_FN, fontSize=10,
+                       alignment=TA_RIGHT, leading=13, spaceAfter=8)))
+
+    elements.append(Paragraph(
+        f"<b>Kính gửi:</b> Ông/Bà {ten_kh}, địa chỉ: {dia_chi}",
+        _style_body()))
 
     for line in [
         f"Căn cứ Quyết định số {so_qd} của Hội đồng quản trị "
         "Ngân hàng Chính sách xã hội;",
-        "",
         f"Ngân hàng Chính sách xã hội thông báo khoản vay có số tiền vay "
-        f"được khoanh nợ của Ông/Bà hết thời gian khoanh nợ vào ngày {ngay_hh}.",
-        "",
+        f"được khoanh nợ của Ông/Bà hết thời gian khoanh nợ vào ngày "
+        f"{han_cuoi or ngay_hh}.",
         f"Tổng số dư nợ: {tong_no:,.0f} đồng, trong đó gốc: {du_goc_f:,.0f} đồng, "
         f"lãi: {lai_f:,.0f} đồng.",
-        "",
         "Ngân hàng Chính sách xã hội sẽ tiếp tục thực hiện tính lãi của khoản vay "
         "theo thỏa thuận trong Hợp đồng tín dụng kể từ ngày hết thời gian khoanh nợ.",
-        "",
         "Ngân hàng Chính sách xã hội thông báo để Ông/Bà biết và chuẩn bị nguồn "
         "trả nợ cho Ngân hàng.",
     ]:
-        p = doc.add_paragraph(line)
-        if p.runs:
-            p.runs[0].font.name = 'Times New Roman'
+        elements.append(Paragraph(line, _style_body()))
 
-    _qlnk_par(doc)
+    elements.append(Spacer(1, 12))
 
-    sig_tbl = doc.add_table(rows=1, cols=2)
-    sig_tbl.style = 'Table Grid'
-    _qlnk_no_border(sig_tbl)
+    nr_data = [
+        [Paragraph("<b>Nơi nhận:</b><br/>- Như kính gửi;<br/>- Lưu.",
+                   ParagraphStyle("NR", fontName=_FN, fontSize=11,
+                                  alignment=TA_LEFT, leading=16)),
+         Paragraph("<b>GIÁM ĐỐC</b><br/><br/><br/><br/>"
+                   "<i>(Ký, đóng dấu, ghi rõ họ tên)</i>",
+                   ParagraphStyle("GD", fontName=_FN, fontSize=11,
+                                  alignment=TA_CENTER, leading=16))],
+    ]
+    nr_tbl = Table(nr_data, colWidths=[usable_w * 0.5, usable_w * 0.5])
+    nr_tbl.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+    ]))
+    if noi_dung:
+        elements.append(Paragraph(
+            f"<i>Ghi chú: {noi_dung}</i>",
+            ParagraphStyle("Note", fontName=_FN, fontSize=10,
+                           alignment=TA_LEFT, leading=14,
+                           textColor=colors.grey, spaceAfter=4)))
+    elements.append(nr_tbl)
 
-    nr_cell = sig_tbl.rows[0].cells[0]
-    nr_cell.text = ""
-    for line, bold in [("Nơi nhận:", True), ("- Như kính gửi;", False), ("- Lưu.", False)]:
-        p = nr_cell.add_paragraph(line)
-        if p.runs:
-            p.runs[0].font.name = 'Times New Roman'
-            p.runs[0].font.size = _Pt(12)
-            p.runs[0].bold = bold
-
-    gd_cell = sig_tbl.rows[0].cells[1]
-    gd_cell.text = ""
-    for text, bold, italic in [
-        ("GIÁM ĐỐC", True, False),
-        ("", False, False), ("", False, False), ("", False, False), ("", False, False),
-        ("(Ký, đóng dấu, ghi rõ họ tên)", False, True),
-    ]:
-        p = gd_cell.add_paragraph(text)
-        if p.runs:
-            p.runs[0].font.name = 'Times New Roman'
-            p.runs[0].font.size = _Pt(12)
-            p.runs[0].bold = bold
-            p.runs[0].italic = italic
-        p.alignment = _WD_ALIGN.CENTER
-
-    return _qlnk_bytes(doc)
+    doc.build(elements)
+    buf.seek(0)
+    return buf.getvalue()
 
 
 # ─── Render ───────────────────────────────────────────────────────────────────
@@ -1726,19 +1822,45 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                                 "so_thang_khoanh":     bs_ku.get("so_thang_khoanh", ""),
                                 "ly_do_khoanh":        bs_ku.get("ly_do_khoanh", ""),
                             })
-                    if st.button("📄 Tạo Word Kế hoạch KT",
-                                 key=f"{key_prefix}mb_kh_tao"):
+                    c_kh1, c_kh2 = st.columns(2)
+                    with c_kh1:
+                        can_bo_kt_kh = st.text_input(
+                            "Cán bộ kiểm tra", username,
+                            key=f"{key_prefix}mb_kh_cb",
+                        )
+                    with c_kh2:
+                        noi_dung_kh = st.text_area(
+                            "Nội dung bổ sung", max_chars=300,
+                            key=f"{key_prefix}mb_kh_nd",
+                        )
+                    st.caption(
+                        f"� {len(ds_mon_detail)} món vay trong kế hoạch "
+                        f"tại {kh_sel.get('ten_xa', '')}"
+                    )
+                    if st.button("📥 Xuất PDF Kế hoạch KT",
+                                 key=f"{key_prefix}mb_kh_tao", type="primary"):
                         try:
-                            buf_kh = _tao_word_ke_hoach_kt(kh_sel, ds_mon_detail)
-                            ten_file = (
-                                f"QLNK_KeHoachKT_"
-                                f"{kh_sel.get('ten_xa', '')}_"
-                                f"{kh_sel.get('ngay_kiem_tra', '')}"
+                            pdf_kh = _xuat_pdf_mau_kh(
+                                kh_sel, ds_mon_detail,
+                                can_bo_kt=can_bo_kt_kh, noi_dung=noi_dung_kh,
                             )
-                            nut_tai_word_va_pdf(buf_kh, ten_file, f"{key_prefix}mb_kh")
+                            st.session_state[f"{key_prefix}mb_kh_pdf"] = pdf_kh
+                            st.session_state[f"{key_prefix}mb_kh_fn"] = (
+                                f"QLNK_KH_{kh_sel.get('ten_xa', '')}_"
+                                f"{kh_sel.get('ngay_kiem_tra', '')}.pdf"
+                            )
                         except Exception as e_kh:
-                            st.error(f"❌ Lỗi tạo Word: {e_kh}")
-                    hien_thi_nut_tai(f"{key_prefix}mb_kh")
+                            st.error(f"❌ Lỗi tạo PDF: {e_kh}")
+                    pdf_kh_data = st.session_state.get(f"{key_prefix}mb_kh_pdf")
+                    if pdf_kh_data:
+                        st.download_button(
+                            "⬇️ Tải PDF",
+                            data=pdf_kh_data,
+                            file_name=st.session_state.get(f"{key_prefix}mb_kh_fn",
+                                                           "QLNK_KH.pdf"),
+                            mime="application/pdf",
+                            key=f"{key_prefix}mb_kh_dl",
+                        )
 
             with st.expander("📝 Mẫu 01/QLNK — Phiếu kiểm tra nợ khoanh", expanded=False):
                 rows_kh_01 = db.doc_ke_hoach_kiem_tra(ten_pgd=pgd_f, trang_thai="da_duyet")
@@ -1763,19 +1885,32 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                         if r.get("ma_mon_vay") in ds_ku_01
                     ]
                     st.info(f"Số món đã có kết quả KT: {len(rows_kq_01)}/{len(ds_ku_01)}")
-                    if st.button("📄 Tạo Word 01/QLNK",
-                                 key=f"{key_prefix}mb_01_tao"):
+                    ket_luan_01 = st.text_area(
+                        "Kết luận bổ sung", max_chars=500,
+                        key=f"{key_prefix}mb_01_kl",
+                    )
+                    if st.button("� Xuất PDF Mẫu 01/QLNK",
+                                 key=f"{key_prefix}mb_01_tao", type="primary"):
                         try:
-                            buf_01 = _tao_word_01qlnk(kh_01, rows_kq_01)
-                            ten_file = (
-                                f"QLNK_01_"
-                                f"{kh_01.get('ten_xa', '')}_"
-                                f"{kh_01.get('ngay_kiem_tra', '')}"
+                            pdf_01 = _xuat_pdf_mau_01qlnk(kh_01, rows_kq_01,
+                                                           ket_luan=ket_luan_01)
+                            st.session_state[f"{key_prefix}mb_01_pdf"] = pdf_01
+                            st.session_state[f"{key_prefix}mb_01_fn"] = (
+                                f"QLNK_01_{kh_01.get('ten_xa', '')}_"
+                                f"{kh_01.get('ngay_kiem_tra', '')}.pdf"
                             )
-                            nut_tai_word_va_pdf(buf_01, ten_file, f"{key_prefix}mb_01")
                         except Exception as e_01:
-                            st.error(f"❌ Lỗi tạo Word: {e_01}")
-                    hien_thi_nut_tai(f"{key_prefix}mb_01")
+                            st.error(f"❌ Lỗi tạo PDF: {e_01}")
+                    pdf_01_data = st.session_state.get(f"{key_prefix}mb_01_pdf")
+                    if pdf_01_data:
+                        st.download_button(
+                            "⬇️ Tải PDF",
+                            data=pdf_01_data,
+                            file_name=st.session_state.get(f"{key_prefix}mb_01_fn",
+                                                           "QLNK_01.pdf"),
+                            mime="application/pdf",
+                            key=f"{key_prefix}mb_01_dl",
+                        )
 
             with st.expander("📝 Mẫu 02/QLNK — Cam kết trả nợ", expanded=False):
                 rows_co_kn = [
@@ -1806,20 +1941,48 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                             and not df_kh[df_kh[COT_SO_KU] == ku_02].empty)
                         else {}
                     )
-                    if st.button("📄 Tạo Word 02/QLNK",
-                                 key=f"{key_prefix}mb_02_tao"):
+                    row_02_merged = {**rows_hstd_02, **bs_02, **row_02}
+                    c02a, c02b, c02c = st.columns(3)
+                    with c02a:
+                        tien_ck = st.text_input(
+                            "Số tiền cam kết", key=f"{key_prefix}mb_02_tien",
+                        )
+                    with c02b:
+                        han_ck = st.text_input(
+                            "Thời hạn", key=f"{key_prefix}mb_02_han",
+                        )
+                    with c02c:
+                        pt_ck = st.selectbox(
+                            "Phương thức",
+                            ["Trả 1 lần", "Trả góp", "Khác"],
+                            key=f"{key_prefix}mb_02_pt",
+                        )
+                    if st.button("📥 Xuất PDF Mẫu 02/QLNK",
+                                 key=f"{key_prefix}mb_02_tao", type="primary"):
                         try:
-                            row_02_merged = {**rows_hstd_02, **bs_02, **row_02}
-                            buf_02 = _tao_word_02qlnk(row_02_merged)
+                            pdf_02 = _xuat_pdf_mau_02qlnk(
+                                row_02_merged,
+                                so_tien_cam_ket=tien_ck,
+                                thoi_han=han_ck,
+                                phuong_thuc=pt_ck,
+                            )
                             ngay_str_02 = str(row_02.get("ngay_kiem_tra", "")).replace("/", "")
-                            nut_tai_word_va_pdf(
-                                buf_02,
-                                f"QLNK_02_{row_02.get('ten_kh', '')}_{ngay_str_02}",
-                                f"{key_prefix}mb_02",
+                            st.session_state[f"{key_prefix}mb_02_pdf"] = pdf_02
+                            st.session_state[f"{key_prefix}mb_02_fn"] = (
+                                f"QLNK_02_{row_02.get('ten_kh', '')}_{ngay_str_02}.pdf"
                             )
                         except Exception as e_02:
-                            st.error(f"❌ Lỗi tạo Word: {e_02}")
-                    hien_thi_nut_tai(f"{key_prefix}mb_02")
+                            st.error(f"❌ Lỗi tạo PDF: {e_02}")
+                    pdf_02_data = st.session_state.get(f"{key_prefix}mb_02_pdf")
+                    if pdf_02_data:
+                        st.download_button(
+                            "⬇️ Tải PDF",
+                            data=pdf_02_data,
+                            file_name=st.session_state.get(f"{key_prefix}mb_02_fn",
+                                                           "QLNK_02.pdf"),
+                            mime="application/pdf",
+                            key=f"{key_prefix}mb_02_dl",
+                        )
 
             with st.expander(
                 "📝 Mẫu 03/QLNK — Danh sách hết thời gian khoanh nợ", expanded=False
@@ -1856,20 +2019,35 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                     if to_03 != "— Tất cả —" and COT_TEN_TO in df_03.columns:
                         df_03 = df_03[df_03[COT_TEN_TO] == to_03]
                     st.info(f"{len(df_03)} món trong phạm vi đã chọn.")
-                    if st.button("📄 Tạo Word 03/QLNK", key=f"{key_prefix}mb_03_tao"):
+                    ghi_chu_03 = st.text_area(
+                        "Ghi chú", max_chars=300,
+                        key=f"{key_prefix}mb_03_gc",
+                    )
+                    if st.button("� Xuất PDF Mẫu 03/QLNK",
+                                 key=f"{key_prefix}mb_03_tao", type="primary"):
                         try:
                             ten_to_03 = to_03 if to_03 != "— Tất cả —" else ""
-                            buf_03 = _tao_word_03qlnk(
-                                pgd_03 or "", ten_to_03, df_03.to_dict("records")
+                            pdf_03 = _xuat_pdf_mau_03qlnk(
+                                pgd_03 or "", ten_to_03,
+                                df_03.to_dict("records"),
+                                ghi_chu=ghi_chu_03,
                             )
-                            nut_tai_word_va_pdf(
-                                buf_03,
-                                f"QLNK_03_{pgd_03}_{ten_to_03}",
-                                f"{key_prefix}mb_03",
+                            st.session_state[f"{key_prefix}mb_03_pdf"] = pdf_03
+                            st.session_state[f"{key_prefix}mb_03_fn"] = (
+                                f"QLNK_03_{pgd_03}_{ten_to_03}.pdf"
                             )
                         except Exception as e_03:
-                            st.error(f"❌ Lỗi tạo Word: {e_03}")
-                    hien_thi_nut_tai(f"{key_prefix}mb_03")
+                            st.error(f"❌ Lỗi tạo PDF: {e_03}")
+                    pdf_03_data = st.session_state.get(f"{key_prefix}mb_03_pdf")
+                    if pdf_03_data:
+                        st.download_button(
+                            "⬇️ Tải PDF",
+                            data=pdf_03_data,
+                            file_name=st.session_state.get(f"{key_prefix}mb_03_fn",
+                                                           "QLNK_03.pdf"),
+                            mime="application/pdf",
+                            key=f"{key_prefix}mb_03_dl",
+                        )
 
             with st.expander(
                 "📝 Mẫu 04/QLNK — Thông báo hết thời gian khoanh nợ", expanded=False
@@ -1894,14 +2072,34 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                         str(row_04_hstd.get(COT_TEN_PGD, pgd_user or ""))
                         if COT_TEN_PGD in row_04_hstd else (pgd_user or "")
                     )
-                    if st.button("📄 Tạo Word 04/QLNK", key=f"{key_prefix}mb_04_tao"):
+                    noi_dung_04 = st.text_area(
+                        "Nội dung thông báo bổ sung", max_chars=500,
+                        key=f"{key_prefix}mb_04_nd",
+                    )
+                    han_cuoi_04 = st.text_input(
+                        "Hạn cuối trả nợ",
+                        key=f"{key_prefix}mb_04_hc",
+                    )
+                    if st.button("� Xuất PDF Mẫu 04/QLNK",
+                                 key=f"{key_prefix}mb_04_tao", type="primary"):
                         try:
-                            buf_04 = _tao_word_04qlnk(row_04_hstd, bs_04, ten_pgd_04)
-                            nut_tai_word_va_pdf(
-                                buf_04,
-                                f"QLNK_04_{row_04_hstd.get(COT_TEN_KH, '')}_{ku_04}",
-                                f"{key_prefix}mb_04",
+                            pdf_04 = _xuat_pdf_mau_04qlnk(
+                                row_04_hstd, bs_04, ten_pgd_04,
+                                noi_dung=noi_dung_04, han_cuoi=han_cuoi_04,
+                            )
+                            st.session_state[f"{key_prefix}mb_04_pdf"] = pdf_04
+                            st.session_state[f"{key_prefix}mb_04_fn"] = (
+                                f"QLNK_04_{row_04_hstd.get(COT_TEN_KH, '')}_{ku_04}.pdf"
                             )
                         except Exception as e_04:
-                            st.error(f"❌ Lỗi tạo Word: {e_04}")
-                    hien_thi_nut_tai(f"{key_prefix}mb_04")
+                            st.error(f"❌ Lỗi tạo PDF: {e_04}")
+                    pdf_04_data = st.session_state.get(f"{key_prefix}mb_04_pdf")
+                    if pdf_04_data:
+                        st.download_button(
+                            "⬇️ Tải PDF",
+                            data=pdf_04_data,
+                            file_name=st.session_state.get(f"{key_prefix}mb_04_fn",
+                                                           "QLNK_04.pdf"),
+                            mime="application/pdf",
+                            key=f"{key_prefix}mb_04_dl",
+                        )

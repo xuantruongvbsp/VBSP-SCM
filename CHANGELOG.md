@@ -1,5 +1,8 @@
 # CHANGELOG
 
+## [2026-05-19] — Fix: loại bỏ filter COT_DU_NO_KHOANH khỏi _load_hstd
+- `app.py` dòng 87–93, 97–101 — xóa filter trên "Dư nợ khoanh" vì cột này không tồn tại trong HSTD parquet
+
 ## [2026-05-19] — QLNK: thêm section "📄 Xuất mẫu biểu" vào sub-tab d7
 - `tabs/tab_no_khoanh.py` dòng ~29 — thêm 6 import docx/io
 - `tabs/tab_no_khoanh.py` dòng 165–780 — thêm 10 helper `_qlnk_*` + 5 hàm `_tao_word_ke_hoach_kt`, `_tao_word_01qlnk`, `_tao_word_02qlnk`, `_tao_word_03qlnk`, `_tao_word_04qlnk`

@@ -32,6 +32,7 @@ from utils import (
     fmt_pct,
     fmt_so,
     fmt_bang_ty,
+    vn,
     hien_thi_dataframe_phan_trang,
     xuat_excel,
     ten_file_xuat,
@@ -221,25 +222,25 @@ def _kpi_tang_truong(df_full: pd.DataFrame) -> None:
     d_dqh = _d(dqh, "du_no_qh")
 
     with c1:
-        delta_card("Tổng dư nợ", tdn,  # noqa: COT
-                    delta=d_tdn, delta_label="so với tháng trước",
-                    suffix="đồng", precision=0, help="So với snapshot tháng trước",
+        delta_card("Tổng dư nợ", fmt_ty(tdn),  # noqa: COT
+                    delta=d_tdn, delta_label="triệu so tháng trước",
+                    suffix="triệu đ", precision=0, help="So với snapshot tháng trước",
                     key="exe_tdn")
     with c2:
-        delta_card("Dư nợ quá hạn", dqh,
-                    delta=d_dqh, delta_label="so với tháng trước",
+        delta_card("Dư nợ quá hạn", fmt_ty(dqh),
+                    delta=d_dqh, delta_label="triệu so tháng trước",
                     delta_color="inverse",
-                    suffix="đồng", precision=0, help="So với snapshot tháng trước",
+                    suffix="triệu đ", precision=0, help="So với snapshot tháng trước",
                     key="exe_dqh")
     with c3:
-        delta_card("Tỷ lệ NQH", f"{tlqh:.2f}",
+        delta_card("Tỷ lệ NQH", vn(tlqh, 2),
                     delta=0, delta_label="%",
                     delta_color="off",
                     suffix="%", precision=2,
                     key="exe_tlqh")
     with c4:
-        delta_card("Số hộ vay", nkh,
-                    suffix="", precision=0,
+        delta_card("Số hộ vay", fmt_so(nkh),
+                    suffix="hộ", precision=0,
                     key="exe_nkh")
 
 
@@ -1619,8 +1620,12 @@ def render(**kwargs) -> None:
     )
 
     # ── Level 1: radio chọn nhóm ──────────────────────────────────────────
-    # Đồng bộ với sidebar (sidebar đã set ws_exec_menu → suy ra active_group)
-    st.session_state["ws_exec_group_radio"] = active_group
+    # Force-set chỉ khi jump từ sidebar, hoặc chưa init / giá trị không hợp lệ
+    # KHÔNG force-set mỗi lần render — sẽ override click của user
+    if jump_label or \
+            "ws_exec_group_radio" not in st.session_state or \
+            st.session_state["ws_exec_group_radio"] not in groups_ordered:
+        st.session_state["ws_exec_group_radio"] = active_group
     sel_group = st.radio(
         "Nhóm",
         groups_ordered,
@@ -1634,8 +1639,9 @@ def render(**kwargs) -> None:
     item_labels    = [x["label"] for x in items_in_group]
     item_key       = f"ws_exec_item_{sel_group}"
 
-    # Pre-select item nếu đến từ sidebar hoặc jump
-    if active_label in item_labels:
+    # Pre-select item chỉ khi jump từ sidebar, hoặc chưa init key này
+    # KHÔNG force-set mỗi lần render — sẽ override click của user
+    if jump_label and active_label in item_labels:
         st.session_state[item_key] = item_labels.index(active_label)
     elif item_key not in st.session_state:
         st.session_state[item_key] = 0

@@ -810,8 +810,15 @@ def _render_cap_nhat(tab, **kwargs):
                     with c_ok:
                         if st.button("✅ Xác nhận", type="primary", width='stretch',
                                      key=f"{confirm_key}_ok"):
-                            edited = st.session_state.get(f"{editor_key}_data")
-                            if edited is None or len(edited) == 0:
+                            state = st.session_state.get(editor_key, {})
+                            edited = df_edit.copy()
+                            if isinstance(state, dict):
+                                for row_idx, changes in state.get("edited_rows", {}).items():
+                                    for col, val in changes.items():
+                                        edited.at[int(row_idx), col] = val
+                            elif isinstance(state, pd.DataFrame):
+                                edited = state
+                            if edited.empty:
                                 st.session_state.pop(confirm_key, None)
                                 st.rerun()
                             count = 0
@@ -838,6 +845,7 @@ def _render_cap_nhat(tab, **kwargs):
                                     st.warning(f"Lỗi {ten_xa_dv}: {e}")
                             db.ghi_audit(username, "tien_do_cap_nhat_xa",
                                          f"Task '{task['tieu_de']}' · {count} {label_dv}")
+                            st.session_state.pop(editor_key, None)
                             st.session_state.pop(confirm_key, None)
                             st.session_state.pop(f"{editor_key}_data", None)
                             st.toast(f"✅ Đã lưu {count} {label_dv}.")
@@ -855,8 +863,9 @@ def _render_cap_nhat(tab, **kwargs):
             with c_reset:
                 if st.button("↩️ Hoàn tác", width='stretch',
                              key=f"_td_undo_{task_id}_{pgd_sel}"):
+                    base = f"td_editor_{task_id}_{pgd_sel}"
                     for k in list(st.session_state.keys()):
-                        if k.startswith(editor_key) or k.startswith(confirm_key):
+                        if k.startswith(base) or k.startswith(confirm_key):
                             st.session_state.pop(k, None)
                     st.rerun()
             with c_info:

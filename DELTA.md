@@ -208,3 +208,4 @@ Upload flow:
 - `tests/test_period_compare.py`: viết mới toàn bộ — 5 test class, 23 test method cho join_by_loan, classify_changes, roll_cure_rate, vintage_nqh, par_breakdown
 - `tabs/tab_ban_dai_dien.py`: fix ValueError "truth value of DataFrame is ambiguous" — thay `kwargs.get("df_full") or kwargs.get("df")` bằng check None/empty
 - `tabs/tab_no_khoanh.py`: Mở rộng 2 sub-tab mới d5 "Kiểm tra" và d6 "Báo cáo" — form nhập kết quả kiểm tra (Mẫu 01/QLNK), lưu tạm/phê duyệt, báo cáo M08/M09/M10 + tiến độ kiểm tra theo PGD
+- `workspaces/ws_operation.py`: Thêm tab "🔒 Nợ khoanh" vào nhóm Kiểm soát & Rủi ro — gọi tab_no_khoanh.render() với df=df_pgd, df_full=None

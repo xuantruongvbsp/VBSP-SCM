@@ -213,6 +213,7 @@ class TestParBreakdown:
             COT_NGAY_SL: "2025-06-10",
         })
         df[COT_NGAY_DH] = pd.to_datetime(df[COT_NGAY_DH])
+        df[COT_NGAY_SL] = pd.to_datetime(df[COT_NGAY_SL])
         par = par_breakdown(df)
         assert par["par30"] == 600.0
         assert par["par90"] == 300.0

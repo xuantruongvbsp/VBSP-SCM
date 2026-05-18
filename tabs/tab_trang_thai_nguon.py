@@ -46,7 +46,7 @@ from config import (
     GQVL_PGD_DIR,
     PGD_DATA_DIR,
 )
-from utils import fmt_ngay, get_tab_context
+from tabs.base_tab import TabContext
 
 # ── Hằng số nội bộ ─────────────────────────────────────────────────────────
 _DS_LOAI_FILE = ["hstd", "nq11", "gqvl"]

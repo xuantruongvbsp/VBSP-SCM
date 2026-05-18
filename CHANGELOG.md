@@ -1,5 +1,18 @@
 # CHANGELOG
 
+## [2026-05-18] — Chuyển "Nợ Đến Hạn" sang tab con của "Báo cáo tín dụng"
+- `workspaces/ws_management.py` dòng ~1128–1148 — xóa "⏰ Đến hạn" khỏi children của "Cảnh báo NQH"; chuyển "Báo cáo tín dụng" thành parent với 2 children: "📊 Báo cáo tín dụng" và "⏰ Nợ Đến Hạn"
+
+## [2026-05-18] — Sửa sidebar menu ws_management: bỏ double-render, tab con trắng chữ đen
+- `workspaces/ws_management.py` dòng ~1228–1278 — xóa markdown overlay cho parent items và inactive children; xóa CSS inject (gây "tab trắng" trống); bọc child buttons trong `st.columns([0.06, 0.94])` để phân biệt với parent buttons qua CSS
+- `app.py` dòng ~185 — thêm CSS `[data-testid="column"] .stButton > button` trong sidebar: nền trắng `#FFFFFF`, chữ đen `#1a1a1a`, font-weight 700 cho tab con
+
+## [2026-05-18] — Sửa delta_card format số với dấu phân cách hàng nghìn kiểu VN
+- `components/delta_card.py` — thêm hàm `_fmt_vn_num()` format số int/float tự động với dấu `.` phân cách hàng nghìn (kiểu Việt Nam); áp dụng cho tham số `value` trong `delta_card()`. Sửa lỗi Số khách hàng hiển thị "213343" thay vì "213.343"
+
+## [2026-05-18] — Tắt UserWarning parse ngày trong utils.py
+- `utils.py` dòng 289 — `fmt_ngay()`: đổi `dayfirst=True` → `dayfirst=False` để khớp định dạng ISO `%Y-%m-%d` từ pandas/SQLite, tránh warning lặp lại
+
 ## [2026-05-18] — Sửa tab navigation không chuyển được trong ws_executive
 - `workspaces/ws_executive.py` dòng ~1622–1642 — bỏ force-set `ws_exec_group_radio` và `item_key` mỗi lần render; chỉ force-set khi `jump_label` (sidebar jump) hoặc chưa init — tránh override click của user
 

@@ -4,7 +4,6 @@ from datetime import datetime, date, timedelta
 from io import BytesIO
 import uuid
 import db
-from utils import get_tab_context
 from auth import normalize_role
 
 _KEY_CONFIG = "checklist_bc_config"

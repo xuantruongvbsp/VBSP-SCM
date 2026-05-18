@@ -1,11 +1,17 @@
 # CHANGELOG
 
+## [2026-05-18] — Tối ưu RAM: thay DuckDB bằng PyArrow trong _load_hstd()
+- `app.py` dòng ~81 — thay `duckdb.query(...).df()` bằng `pd.read_parquet(filters=pa_filters)`; peak RAM giảm từ 97.6MB → 3.1MB (ratio 7×→2.2×); filter active_only dùng PyArrow OR-filter syntax thay vì DuckDB COALESCE/TRY_CAST (an toàn vì cột dư nợ đã xác nhận là int64 trong parquet)
+
 ## [2026-05-18] — Chuyển "Nợ Đến Hạn" sang tab con của "Báo cáo tín dụng"
 - `workspaces/ws_management.py` dòng ~1128–1148 — xóa "⏰ Đến hạn" khỏi children của "Cảnh báo NQH"; chuyển "Báo cáo tín dụng" thành parent với 2 children: "📊 Báo cáo tín dụng" và "⏰ Nợ Đến Hạn"
 
 ## [2026-05-18] — Sửa sidebar menu ws_management: bỏ double-render, tab con trắng chữ đen
 - `workspaces/ws_management.py` dòng ~1228–1278 — xóa markdown overlay cho parent items và inactive children; xóa CSS inject (gây "tab trắng" trống); bọc child buttons trong `st.columns([0.06, 0.94])` để phân biệt với parent buttons qua CSS
 - `app.py` dòng ~185 — thêm CSS `[data-testid="column"] .stButton > button` trong sidebar: nền trắng `#FFFFFF`, chữ đen `#1a1a1a`, font-weight 700 cho tab con
+
+## [2026-05-18] — Fix logger.py: file handler bị bỏ qua khi Streamlit có sẵn root handlers
+- `logger.py` — bỏ check `if root.handlers: return` trong `_configure_root()`; lý do Streamlit tự thêm handler vào root logger khi chạy, khiến file handler không bao giờ được gắn → `logs/app.log` không được ghi. Fix: luôn tạo file handler bất kể root đã có handler chưa.
 
 ## [2026-05-18] — Sửa delta_card format số với dấu phân cách hàng nghìn kiểu VN
 - `components/delta_card.py` — thêm hàm `_fmt_vn_num()` format số int/float tự động với dấu `.` phân cách hàng nghìn (kiểu Việt Nam); áp dụng cho tham số `value` trong `delta_card()`. Sửa lỗi Số khách hàng hiển thị "213343" thay vì "213.343"

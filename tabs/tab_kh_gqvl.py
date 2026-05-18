@@ -155,9 +155,9 @@ def _hien_thi_bang_readonly(kh_data: dict, nam: int) -> None:
         width='stretch',
         hide_index=True,
         column_config={
-            "KH TW (tr)": st.column_config.NumberColumn(format="%d"),
-            "KH ĐP (tr)": st.column_config.NumberColumn(format="%d"),
-            "Tổng (tr)": st.column_config.NumberColumn(format="%d"),
+            "KH TW (tr)": st.column_config.NumberColumn(format=",.0f"),
+            "KH ĐP (tr)": st.column_config.NumberColumn(format=",.0f"),
+            "Tổng (tr)": st.column_config.NumberColumn(format=",.0f"),
         },
     )
 

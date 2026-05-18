@@ -410,22 +410,22 @@ def _tab_canh_bao_chenh_lech() -> None:
     column_config_cb: dict[str, st.column_config.Column] = {
         "Chi nhánh (triệu)": st.column_config.NumberColumn(
             "Chi nhánh (triệu)",
-            format="%.1f",
+            format=",.1f",
             help="Kế hoạch Chi nhánh (triệu đồng)"
         ),
         "Tổng xã (triệu)": st.column_config.NumberColumn(
             "Tổng xã (triệu)",
-            format="%.1f",
+            format=",.1f",
             help="Tổng kế hoạch xã (triệu đồng)"
         ),
         "Chênh lệch (triệu)": st.column_config.NumberColumn(
             "Chênh lệch (triệu)",
-            format="%.1f",
+            format=",.1f",
             help="Chênh lệch (triệu đồng)"
         ),
         "Tỷ lệ phân bổ %": st.column_config.NumberColumn(
             "Tỷ lệ phân bổ %",
-            format="%.1f%%",
+            format=".1f",
             help="Tỷ lệ phân bổ %"
         ),
     }
@@ -573,10 +573,10 @@ def _tab_tien_do_kh_th() -> None:
         key="khtd_tien_do_ct",
         height=480,
         column_config={
-            "KH (triệu đồng)": st.column_config.NumberColumn(format="%.0f"),
-            "TH (triệu đồng)": st.column_config.NumberColumn(format="%.0f"),
+            "KH (triệu đồng)": st.column_config.NumberColumn(format=",.0f"),
+            "TH (triệu đồng)": st.column_config.NumberColumn(format=",.0f"),
             "TL%":     st.column_config.ProgressColumn(
-                           min_value=0, max_value=100, format="%.1f%%"),
+                           min_value=0, max_value=100, format=".1f"),
         },
     )
 
@@ -623,7 +623,7 @@ def _tab_tien_do_kh_th() -> None:
             hide_index=True,
             column_config={
                 "TL%": st.column_config.ProgressColumn(
-                    min_value=0, max_value=100, format="%.1f%%"),
+                    min_value=0, max_value=100, format=".1f"),
             },
         )
     else:

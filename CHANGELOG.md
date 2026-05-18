@@ -1,9 +1,18 @@
 # CHANGELOG
 
-## [2026-05-19] — Đổi sidebar: nền xanh dương sáng #64B5F6, nút xanh lá cây chữ trắng
-- `app.py` dòng ~131–225 — Sidebar background #64B5F6, text xanh đậm, button #2E7D32 chữ trắng, hover #1B5E20
+## [2026-05-19] — Đổi màu nền main area thành trắng
+- `app.py` dòng ~128, ~256 — CSS `.main` & `.block-container`: background #0E1117 → #FFFFFF
 
-## [2026-05-19] — Đổi sidebar: nền xanh dương sáng #64B5F6, nút xanh dương chữ trắng
+## [2026-05-19] — Fix cột Số món vay & Số KH trong "Cơ cấu dư nợ theo chương trình"
+- `tabs/tab_tongquan.py` dòng ~550–563 — Tính "Số món vay" từ df gốc (không lọc dư nợ > 0) để không bỏ sót dòng tất toán. Thêm `_so_mon_by_ct` và map vào `df_ct["so_mon"]` tương tự như "Số KH"
+
+## [2026-05-19] — Tăng size chữ menu điều hành + tab sidebar
+- `app.py` — tăng button sidebar: font-size 14→15px, padding 10→12px, margin-bottom 4→6px
+- `ws_management.py` — tăng font "MENU ĐIỀU HÀNH" 12→14px đậm, group label 10→11px đậm, active items 13→14px, padding lớn hơn
+
+## [2026-05-19] — Fix chữ nút sidebar: thêm CSS force white + text-shadow
+
+## [2026-05-19] — Đổi sidebar: nền xanh dương sáng #64B5F6, nút xanh lá chữ trắng đậm
 - `app.py` dòng ~131–220 — Sidebar background #FFFFFF, border xám nhạt, text xám/xanh đậm, button xanh lá nhạt
 
 ## [2026-05-18] — Rà soát toàn bộ codebase: thêm format="DD/MM/YYYY" cho tất cả st.date_input

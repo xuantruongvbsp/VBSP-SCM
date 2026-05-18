@@ -199,12 +199,12 @@ def _tao_column_config_co_cau() -> dict[str, st.column_config.Column]:
     return {
         "Số món vay": st.column_config.NumberColumn(
             "Số món vay",
-            format="%d",
+            format=",.0f",
             help="Tổng số món vay đang hoạt động",
         ),
         "Số KH": st.column_config.NumberColumn(
             "Số KH",
-            format="%d",
+            format=",.0f",
             help="Tổng số khách hàng duy nhất",
         ),
     }
@@ -214,54 +214,54 @@ def _tao_column_config_pgd() -> dict[str, st.column_config.Column]:
     """
     Tạo column_config cho bảng tổng hợp theo PGD.
     Đơn vị: triệu đồng (đã được ghi rõ trong tiêu đề cột).
-    
+
     Returns:
         Dict cấu hình column cho st.dataframe
     """
     return {
         "Dư nợ (triệu đồng)": st.column_config.NumberColumn(
             "Dư nợ (triệu đồng)",
-            format="%.0f",
+            format=",.0f",
             help="Tổng dư nợ tính bằng triệu đồng"
         ),
         "QH (triệu đồng)": st.column_config.NumberColumn(
             "QH (triệu đồng)",
-            format="%.0f",
+            format=",.0f",
             help="Dư nợ quá hạn tính bằng triệu đồng"
         ),
         "Khoanh (triệu đồng)": st.column_config.NumberColumn(
             "Khoanh (triệu đồng)",
-            format="%.0f",
+            format=",.0f",
             help="Dư nợ khoanh tính bằng triệu đồng"
         ),
         "TL QH %": st.column_config.NumberColumn(
             "TL QH %",
-            format="%.2f%%",
+            format=".2%",
             help="Tỷ lệ quá hạn %"
         ),
         "TL Khoanh %": st.column_config.NumberColumn(
             "TL Khoanh %",
-            format="%.2f%%",
+            format=".2%",
             help="Tỷ lệ khoanh %"
         ),
         "Lãi tồn (triệu đồng)": st.column_config.NumberColumn(
             "Lãi tồn (triệu đồng)",
-            format="%.0f",
+            format=",.0f",
             help="Lãi tồn tính bằng triệu đồng"
         ),
         "Nợ ĐH năm (triệu đồng)": st.column_config.NumberColumn(
             "Nợ ĐH năm (triệu đồng)",
-            format="%.0f",
+            format=",.0f",
             help="Nợ đến hạn trong năm tính bằng triệu đồng"
         ),
         "DS Cho vay (triệu đồng)": st.column_config.NumberColumn(
             "DS Cho vay (triệu đồng)",
-            format="%.0f",
+            format=",.0f",
             help="Doanh số cho vay trong năm tính bằng triệu đồng"
         ),
         "DS Thu nợ (triệu đồng)": st.column_config.NumberColumn(
             "DS Thu nợ (triệu đồng)",
-            format="%.0f",
+            format=",.0f",
             help="Doanh số thu nợ trong năm tính bằng triệu đồng"
         ),
     }
@@ -273,7 +273,7 @@ from tabs.base_tab import TabContext
 def render(tab: DeltaGenerator, **kwargs: dict) -> None:
     ctx = TabContext(tab, **kwargs)
     df       = kwargs.get("df")
-    df_full  = ctx.df_full or df
+    df_full  = ctx.df_full if ctx.df_full is not None and not ctx.df_full.empty else df
     role     = ctx.role_norm
     pgd_user = ctx.pgd_user
     pgd_filter = kwargs.get("pgd_filter") or pgd_user
@@ -1037,7 +1037,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
             # Thêm các cột số nguyên
             for cot in ["Số KH", "Tổng Tổ", "Tốt", "Khá", "TB", "Yếu"]:
                 if cot in df_pgd.columns:
-                    column_config_pgd[cot] = st.column_config.NumberColumn(cot, format="%d")
+                    column_config_pgd[cot] = st.column_config.NumberColumn(cot, format=",.0f")
 
             # ── Bảng HTML có header nhóm cột ─────────────────────────────
             df_show = df_pgd[cot_hien].copy()
@@ -1049,7 +1049,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                 if pd.isna(val) or val == "":
                     return "—"
                 if col in ["Dư nợ (triệu đồng)"]:
-                    return vn(float(val), 2)
+                    return vn(float(val) / 1000, 2)
                 if col in ["TL QH %", "TL Khoanh %", "Tỷ lệ Nợ xấu"]:
                     return f"{vn(float(val), 2)}%"
                 if col in [
@@ -1084,6 +1084,8 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                 """Tên cột hiển thị 2 dòng: phần đơn vị xuống dòng."""
                 if col == COT_TEN_PGD:
                     return "Đơn vị"
+                if col == "Dư nợ (triệu đồng)":
+                    return "Dư nợ<br/><span style='font-weight:normal;font-size:11px'>(Tỷ đồng)</span>"
                 if col.endswith("(triệu đồng)"):
                     return col[:-len("(triệu đồng)")].strip() + "<br/><span style='font-weight:normal;font-size:11px'>(Triệu đồng)</span>"
                 if col.endswith("(tỷ)"):

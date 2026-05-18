@@ -69,7 +69,7 @@ from tabs.base_tab import TabContext
 def render(tab: DeltaGenerator, **kwargs: dict) -> None:
     ctx = TabContext(tab, **kwargs)
     df = kwargs.get("df")
-    df_full = ctx.df_full or df
+    df_full = ctx.df_full if ctx.df_full is not None and not ctx.df_full.empty else df
     role = ctx.role_norm
     pgd_user = ctx.pgd_user
     username = ctx.username

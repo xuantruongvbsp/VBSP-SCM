@@ -1259,8 +1259,18 @@ def render_sidebar_menu(role: str, username: str, **kwargs):
                             unsafe_allow_html=True,
                         )
                     else:
+                        st.markdown(
+                            f"<div style='background:rgba(255,255,255,0.07);"
+                            f"border-left:2px solid rgba(255,255,255,0.2);"
+                            f"color:rgba(255,255,255,0.65);font-size:12px;"
+                            f"padding:5px 8px 5px 22px;"
+                            f"border-radius:0 5px 5px 0;margin-bottom:2px;"
+                            f"pointer-events:none'>"
+                            f"↳ {child['label']}</div>",
+                            unsafe_allow_html=True,
+                        )
                         if st.button(
-                            f"  {child['label']}",
+                            f"↳ {child['label']}",
                             key=f"menu_child_{child['label']}",
                             width="stretch",
                         ):

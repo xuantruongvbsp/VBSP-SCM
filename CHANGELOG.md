@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## [2026-05-18] — Phân biệt tab nhánh trong sidebar ws_management
+- `workspaces/ws_management.py` dòng ~1262 — tab nhánh chưa active: thêm markdown overlay indent 22px + màu trắng mờ 65% + ký tự ↳, giữ nguyên style active (● cam đậm)
+
+## [2026-05-18] — Thêm RAM benchmark (tracemalloc) vào app.py
+- `app.py` dòng ~654 — đo RAM sau khi `_load_hstd()` xong, ghi vào `logs/app.log` qua logger `app.ram`; log format: `role= pgd= rows= current=MB peak=MB`
+
 ## [2026-05-18] — Thêm logging chuẩn cho upload_service và snapshot_service
 - `logger.py` — TẠO MỚI: `get_logger(__name__)` ghi ra `logs/app.log` (xoay vòng 5MB×3) + console WARNING+
 - `app.py` — thêm `logging.basicConfig()` fallback + kích hoạt `get_logger` ngay khi khởi động

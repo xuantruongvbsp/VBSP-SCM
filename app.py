@@ -653,6 +653,14 @@ def main():
                     st.warning(f"Không có dữ liệu PGD: {pgd_user}"); st.stop()
                 df_full = df
 
+            _cur_mb, _peak_mb = (v / 1024 / 1024 for v in _tm.get_traced_memory())
+            _tm.stop()
+            _app_logger = __import__("logger").get_logger("app.ram")
+            _app_logger.info(
+                "load_hstd: role=%s pgd=%s rows=%d current=%.1fMB peak=%.1fMB",
+                role, pgd_user or "CN", len(df), _cur_mb, _peak_mb,
+            )
+
             if ws_hien_tai == "operation":
                 if la_phan_he_pgd(role) and pgd_user:
                     path_hstd_pgd = duong_dan_pgd(pgd_user, "hstd")

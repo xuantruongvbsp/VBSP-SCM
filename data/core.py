@@ -5,6 +5,10 @@ from typing import Callable
 import duckdb
 import pandas as pd
 
+from logger import get_logger
+
+logger = get_logger(__name__)
+
 
 def ts_file(fp: str) -> float:
     """Timestamp file — 0 nếu không tồn tại."""
@@ -25,12 +29,16 @@ def excel_to_parquet(
     """
     os.makedirs(os.path.dirname(parquet_path), exist_ok=True)
     if ts_file(parquet_path) < ts_file(excel_path):
-        df = pd.read_excel(
-            excel_path, sheet_name=sheet, header=header,
-        )
-        if post_fn:
-            df = post_fn(df)
-        df.to_parquet(parquet_path, index=False, engine='pyarrow', compression='zstd', compression_level=3)
+        try:
+            df = pd.read_excel(
+                excel_path, sheet_name=sheet, header=header,
+            )
+            if post_fn:
+                df = post_fn(df)
+            df.to_parquet(parquet_path, index=False, engine='pyarrow', compression='zstd', compression_level=3)
+        except Exception as e:
+            logger.error("excel_to_parquet: lỗi xử lý file %s → %s — %s", excel_path, parquet_path, e, exc_info=True)
+            raise
     return pd.read_parquet(parquet_path, engine='pyarrow')
 
 

@@ -182,7 +182,8 @@ def doc_snapshot(ky: str) -> pd.DataFrame:
                 (ky,)
             ).fetchall()
         return pd.DataFrame([dict(r) for r in rows]) if rows else pd.DataFrame()
-    except Exception:
+    except Exception as e:
+        logger.error("doc_snapshot: lỗi đọc snapshot kỳ %s — %s", ky, e, exc_info=True)
         return pd.DataFrame()
 
 
@@ -199,7 +200,8 @@ def doc_snapshot_range(tu_ky: str, den_ky: str) -> pd.DataFrame:
                 (tu_ky, den_ky),
             ).fetchall()
         return pd.DataFrame([dict(r) for r in rows]) if rows else pd.DataFrame()
-    except Exception:
+    except Exception as e:
+        logger.error("doc_snapshot_range: lỗi đọc snapshot từ %s đến %s — %s", tu_ky, den_ky, e, exc_info=True)
         return pd.DataFrame()
 
 
@@ -211,7 +213,8 @@ def danh_sach_ky() -> list[str]:
                 "SELECT DISTINCT ky FROM hstd_snapshot ORDER BY ky DESC"
             ).fetchall()
         return [r["ky"] for r in rows]
-    except Exception:
+    except Exception as e:
+        logger.error("danh_sach_ky: lỗi đọc danh sách kỳ snapshot — %s", e, exc_info=True)
         return []
 
 
@@ -222,4 +225,5 @@ def xoa_snapshot(ky: str, username: str) -> None:
             conn.commit()
         db.ghi_audit(username, "xoa_snapshot", f"Đã xóa snapshot kỳ {ky}")
     except Exception as e:
+        logger.error("xoa_snapshot: lỗi xóa snapshot kỳ %s — %s", ky, e, exc_info=True)
         db.ghi_audit(username, "xoa_snapshot_loi", str(e))

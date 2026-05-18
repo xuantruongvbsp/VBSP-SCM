@@ -382,8 +382,6 @@ def merge_du_lieu_toan_cn(
             df[COT_TEN_PGD] = ten_pgd
             return ten_pgd, df, None
         except Exception as e:
-            return ten_pgd, None, str(e)
-        except Exception as e:
             logger.error("merge_du_lieu_toan_cn: lỗi đọc file PGD %s/%s — %s", ten_pgd, loai, e, exc_info=True)
             return ten_pgd, None, str(e)
 
@@ -553,8 +551,8 @@ def merge_du_lieu_toan_cn(
             try:
                 from snapshot_service import luu_snapshot as _luu_snap
                 _luu_snap(_snap_df, _snap_user)
-            except Exception as _exc:
-                logger.error("snapshot background thread thất bại — %s", _exc, exc_info=True)
+            except Exception as e:
+                logger.error("auto-snapshot background thread thất bại — %s", e, exc_info=True)
 
         _threading.Thread(target=_snap_bg, daemon=True).start()
 

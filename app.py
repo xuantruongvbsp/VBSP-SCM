@@ -2,11 +2,24 @@
 VBSP-SCM — Hệ thống Quản trị & Tác nghiệp Tín dụng Nội bộ
 Kiến trúc 3 Không gian làm việc: Executive | Management | Operation
 """
+import logging
 import os
 import time
 import warnings
 from datetime import datetime, date
 import streamlit as st
+
+# Khởi tạo logging ngay khi app.py được import — đảm bảo logs/app.log tồn tại
+# trước khi bất kỳ module nào khác gọi get_logger()
+logging.basicConfig(
+    level=logging.WARNING,
+    format="%(asctime)s [%(levelname)s] %(name)s — %(message)s",
+)
+try:
+    from logger import get_logger as _get_logger  # noqa: F401 — kích hoạt file handler
+    _get_logger(__name__)
+except Exception:
+    pass
 
 # Suppress harmless openpyxl warning for Excel files without default style
 warnings.filterwarnings(

@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## [2026-05-19] — Fix convention vi phạm role check trong tab_no_khoanh.py
+- `tabs/tab_no_khoanh.py` dòng 12 — thêm import `co_quyen_upload_pgd`
+- `tabs/tab_no_khoanh.py` dòng 320, 528 — thay `role in ["manager_pgd", "admin_pgd"]` bằng `co_quyen_upload_pgd(role)`
+
 ## [2026-05-19] — QLNK: thêm tab "Kế hoạch" vào tab_no_khoanh.py
 - `tabs/tab_no_khoanh.py` dòng ~25 — thêm import `LY_DO_KHOANH_QD62`, `LY_DO_KHOANH_LABEL`
 - `tabs/tab_no_khoanh.py` dòng ~250 — đổi 6 → 7 tab, thêm "📅 Kế hoạch" (d5)

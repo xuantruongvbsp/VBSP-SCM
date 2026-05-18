@@ -68,7 +68,8 @@ def _load_hstd(
     active_only: bool = False,
 ) -> pd.DataFrame:
     """
-    Load HSTD từ Parquet với filter pushdown tại tầng đĩa cứng.
+    Load HSTD từ Parquet với PyArrow filter pushdown — không dùng DuckDB engine
+    để tránh peak RAM 7× do DuckDB buffer + Arrow intermediate + pandas tồn tại cùng lúc.
 
     Cache key = (cache_path, _ts, ten_pgd, active_only) → mỗi tổ hợp dùng chung
     1 bản trong @st.cache_resource (không nhân bản theo session).
@@ -78,22 +79,27 @@ def _load_hstd(
     - ten_pgd=<str>, active_only=False → PGD role: lọc theo PGD, cache riêng per-PGD
     - ten_pgd=<str>, active_only=True  → PGD role + active filter
     """
-    clauses: list[str] = []
-    if ten_pgd:
-        pgd_safe = ten_pgd.replace("'", "''")
-        clauses.append(f'"{COT_TEN_PGD}" = \'{pgd_safe}\'')
-    if active_only:
-        # Loại hồ sơ đã tất toán hoàn toàn: gốc = 0, QH = 0, khoanh = 0
-        clauses.append(
-            f'(COALESCE(TRY_CAST("{COT_TONG_DU_NO}" AS DOUBLE), 0) > 0'
-            f' OR COALESCE(TRY_CAST("{COT_DU_NO_QH}" AS DOUBLE), 0) > 0'
-            f' OR COALESCE(TRY_CAST("{COT_DU_NO_KHOANH}" AS DOUBLE), 0) > 0)'
-        )
+    # PyArrow filter syntax: outer list = OR, inner list = AND
+    # Cột dư nợ đã xác nhận là int64 trong parquet → không cần TRY_CAST
+    # Null int64 > 0 → False trong PyArrow (giống COALESCE(..., 0) > 0)
+    pa_filters: list | None = None
+    if ten_pgd and active_only:
+        pgd_clause = (COT_TEN_PGD, "==", ten_pgd)
+        pa_filters = [
+            [pgd_clause, (COT_TONG_DU_NO, ">", 0)],
+            [pgd_clause, (COT_DU_NO_QH, ">", 0)],
+            [pgd_clause, (COT_DU_NO_KHOANH, ">", 0)],
+        ]
+    elif ten_pgd:
+        pa_filters = [[(COT_TEN_PGD, "==", ten_pgd)]]
+    elif active_only:
+        pa_filters = [
+            [(COT_TONG_DU_NO, ">", 0)],
+            [(COT_DU_NO_QH, ">", 0)],
+            [(COT_DU_NO_KHOANH, ">", 0)],
+        ]
 
-    where_sql = f"WHERE {' AND '.join(clauses)}" if clauses else ""
-    return duckdb.query(
-        f"SELECT * FROM read_parquet('{cache_path}') {where_sql}"
-    ).df()
+    return pd.read_parquet(cache_path, filters=pa_filters)
 
 
 @st.cache_resource(show_spinner=False, ttl=3600)

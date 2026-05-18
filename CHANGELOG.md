@@ -1,5 +1,8 @@
 # CHANGELOG
 
+## [2026-05-18] — Highlight cam parent accordion khi child active trong ws_management sidebar
+- `workspaces/ws_management.py` dòng ~1225 — khi `is_child_active=True`, thay `st.button()` bằng markdown div cam (cùng style tab đơn active); parent tự mở và highlight mà không toggle; khi không có child active vẫn giữ button toggle bình thường
+
 ## [2026-05-18] — Tối ưu RAM: thay DuckDB bằng PyArrow trong _load_hstd()
 - `app.py` dòng ~81 — thay `duckdb.query(...).df()` bằng `pd.read_parquet(filters=pa_filters)`; peak RAM giảm từ 97.6MB → 3.1MB (ratio 7×→2.2×); filter active_only dùng PyArrow OR-filter syntax thay vì DuckDB COALESCE/TRY_CAST (an toàn vì cột dư nợ đã xác nhận là int64 trong parquet)
 

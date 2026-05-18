@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## [2026-05-18] — Thêm logging chuẩn cho upload_service và snapshot_service
+- `logger.py` — TẠO MỚI: `get_logger(__name__)` ghi ra `logs/app.log` (xoay vòng 5MB×3) + console WARNING+
+- `app.py` — thêm `logging.basicConfig()` fallback + kích hoạt `get_logger` ngay khi khởi động
+- `services/upload_service.py` — thêm `logger`; log INFO bắt đầu/hoàn thành merge, WARNING PGD lỗi/cũ, ERROR rollback parquet; sửa `_snap_bg()` từ `except: pass` → `logger.error(..., exc_info=True)`
+- `snapshot_service.py` — thêm `logger`; log INFO bắt đầu/hoàn thành lưu snapshot, ERROR khi thất bại
+
 ## [2026-05-17] — Tạo 2 file test mới cho upload_service và snapshot_service
 - `tests/test_upload_service.py` — 11 test case: KetQuaUpload (4), kiem_tra_file (6), kiem_tra_file_he_thong (3); dùng mock không cần file/DB thật
 - `tests/test_snapshot_service.py` — 18 test case: _ky_tu_df (4), luu_snapshot (6), doc_snapshot (3), doc_snapshot_range (2), danh_sach_ky (3), xoa_snapshot (2); dùng SQLite in-memory

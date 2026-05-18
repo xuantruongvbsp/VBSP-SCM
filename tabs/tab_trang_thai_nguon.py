@@ -691,15 +691,13 @@ def render(tab=None, **kwargs) -> None:
     username : username đang đăng nhập
     pgd_user : tên PGD (chỉ dành cho PGD role)
     """
-    ctx = get_tab_context(tab)
+    ctx = TabContext(tab, **kwargs)
     with ctx:
-        role = normalize_role(str(kwargs.get("role") or "user"))
-        username: str = kwargs.get("username") or st.session_state.get("username", "unknown")
-        pgd_user: str | None = kwargs.get("pgd_user") or st.session_state.get(
-            "user_info", {}
-        ).get("pgd")
+        role = ctx.role_norm
+        username = ctx.username
+        pgd_user = ctx.pgd_user
 
-        la_cn = la_phan_he_cn(role)
+        la_cn = ctx.is_cn
 
         st.title("🔍 Trạng thái Nguồn dữ liệu")
         if la_cn:

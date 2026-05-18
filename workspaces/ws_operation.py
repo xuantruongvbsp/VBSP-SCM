@@ -1635,7 +1635,7 @@ def render(**kwargs):
             "label": "📋 Nghiệp vụ hàng ngày",
             "tabs": [
                 ("📊 Thông tin chung", lambda tab: tab_tongquan.render(tab, **_pgd_df_kwargs)),
-                ("📈 Tiến độ", lambda tab: tab_tien_do.render(tab, **kwargs)),
+                ("📈 Tiến độ công việc", lambda tab: tab_tien_do.render(tab, **kwargs)),
                 ("🔍 Tra cứu hồ sơ", lambda tab: tab_tracuu.render(tab, **kwargs)),
                 ("📋 Danh sách & Lọc", lambda tab: tab_danhsach.render(tab, **kwargs)),
                 ("⏰ Đến hạn", lambda tab: render_den_han(role=role, pgd_user=pgd_user)),
@@ -1652,8 +1652,8 @@ def render(**kwargs):
         "bao_cao_giao_ban": {
             "label": "📈 Báo cáo & Giao ban",
             "tabs": [
-                ("📈 Báo cáo chi tiết", lambda tab: tab_baocao.render(tab, **_pgd_df_kwargs)),
-                ("📡 Điện Báo", lambda tab: tab_candoi.render(
+                ("📊 Báo cáo tín dụng", lambda tab: tab_baocao.render(tab, **_pgd_df_kwargs)),
+                ("📡 Điện báo", lambda tab: tab_candoi.render(
                     tab, **{**kwargs, "pgd_mode": True, "df": df, "df_full": df}
                 )),
                 ("📝 Báo cáo Giao ban", lambda tab: _render_bao_cao_giao_ban(tab, **kwargs)),

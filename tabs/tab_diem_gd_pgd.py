@@ -27,10 +27,50 @@ from data.dgd_helpers import (
     trang_thai_pgd_vs_map,
 )
 from data.pgd import pgd_slug
-from utils import fmt_so, hien_thi_dataframe_phan_trang, pick_hstd_column
+from utils import fmt_so, hien_thi_dataframe_phan_trang, pick_hstd_column, xuat_excel
 
 if TYPE_CHECKING:
     from streamlit.delta_generator import DeltaGenerator
+
+
+def _normalize_entry(val: Any) -> dict:
+    """Backward compat: list → dict với đủ 5 trường."""
+    if isinstance(val, list):
+        return {"thon": val, "dia_chi": "", "nguoi_phu_trach": "", "sdt": "", "lich_gd": ""}
+    if isinstance(val, dict):
+        return {
+            "thon": val.get("thon", []),
+            "dia_chi": val.get("dia_chi", ""),
+            "nguoi_phu_trach": val.get("nguoi_phu_trach", ""),
+            "sdt": val.get("sdt", ""),
+            "lich_gd": val.get("lich_gd", ""),
+        }
+    return {"thon": [], "dia_chi": "", "nguoi_phu_trach": "", "sdt": "", "lich_gd": ""}
+
+
+def _dgd_to_rows_pgd(dgd_map: dict, pgd_user: str) -> list[dict]:
+    """Flatten dgd_map → list dicts, chỉ lấy nhánh của pgd_user."""
+    rows: list[dict] = []
+    pgd_key = _resolve_pgd_key(pgd_user)
+    xa_dict = dgd_map.get(pgd_key, {})
+    if not isinstance(xa_dict, dict):
+        return rows
+    for xa, dgd_dict in xa_dict.items():
+        if not isinstance(dgd_dict, dict):
+            continue
+        for ten, entry in dgd_dict.items():
+            e = _normalize_entry(entry)
+            rows.append({
+                "Xã": xa,
+                "Tên ĐGD": ten,
+                "Địa chỉ": e["dia_chi"],
+                "Người phụ trách": e["nguoi_phu_trach"],
+                "SĐT": e["sdt"],
+                "Lịch GD": e["lich_gd"],
+                "Số thôn/ấp": len(e["thon"]),
+                "Thôn/Ấp": ", ".join(e["thon"]),
+            })
+    return rows
 
 
 def _resolve_pgd_key(pgd_user: str) -> str:
@@ -48,6 +88,70 @@ def _hostname() -> str:
         return socket.gethostname()
     except Exception:
         return "unknown"
+
+
+def _render_tim_kiem_pgd(dgd_map: dict, pgd_user: str, username: str) -> None:
+    st.markdown("### 🔍 Tìm kiếm Điểm giao dịch")
+    rows = _dgd_to_rows_pgd(dgd_map, pgd_user)
+    if not rows:
+        st.info("Chưa có dữ liệu điểm giao dịch nào cho PGD của bạn.")
+        return
+
+    df_all = pd.DataFrame(rows)
+
+    c1, c2 = st.columns([3, 2])
+    with c1:
+        q = st.text_input(
+            "🔍 Tìm nhanh", key="dgd_pgd_search_q",
+            placeholder="Tên ĐGD, xã, người phụ trách, SĐT...",
+        )
+    with c2:
+        xa_opts = ["(Tất cả)"] + sorted(df_all["Xã"].unique().tolist())
+        fil_xa = st.selectbox("Lọc Xã/Phường", xa_opts, key="dgd_pgd_search_xa")
+
+    df_f = df_all.copy()
+    if fil_xa != "(Tất cả)":
+        df_f = df_f[df_f["Xã"] == fil_xa]
+    if q.strip():
+        kw = q.strip().lower()
+        mask = (
+            df_f["Tên ĐGD"].str.lower().str.contains(kw, na=False)
+            | df_f["Xã"].str.lower().str.contains(kw, na=False)
+            | df_f["Người phụ trách"].str.lower().str.contains(kw, na=False)
+            | df_f["SĐT"].str.lower().str.contains(kw, na=False)
+        )
+        df_f = df_f[mask]
+
+    st.caption(f"Tìm thấy **{len(df_f)}** điểm giao dịch")
+    cols_show = ["Xã", "Tên ĐGD", "Địa chỉ", "Người phụ trách", "SĐT", "Lịch GD", "Số thôn/ấp"]
+    hien_thi_dataframe_phan_trang(
+        df_f[cols_show] if not df_f.empty else pd.DataFrame(columns=cols_show),
+        key="dgd_pgd_search_tbl",
+        height=400,
+    )
+
+    if not df_f.empty:
+        c_e, c_p = st.columns(2)
+        with c_e:
+            buf = xuat_excel({"Điểm GD": df_f})
+            st.download_button(
+                "📥 Xuất Excel", data=buf,
+                file_name=f"danh_sach_dgd_{pgd_slug(pgd_user)}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                key="dgd_pgd_search_dl_excel",
+            )
+        with c_p:
+            try:
+                from pdf_service import xuat_pdf
+                pdf_bytes = xuat_pdf(df_f[cols_show], "DANH SÁCH ĐIỂM GIAO DỊCH", username)
+                st.download_button(
+                    "📄 Xuất PDF", data=pdf_bytes,
+                    file_name=f"danh_sach_dgd_{pgd_slug(pgd_user)}.pdf",
+                    mime="application/pdf",
+                    key="dgd_pgd_search_dl_pdf",
+                )
+            except Exception as e:
+                st.caption(f"Xuất PDF: {e}")
 
 
 def _render_import_pgd(
@@ -181,18 +285,18 @@ def _render_import_pgd(
 
     thon_da_gan: set[str] = {
         str(t).strip()
-        for dgd, thon_list in xa_hien_co.items()
+        for dgd, raw_entry in xa_hien_co.items()
         if dgd != ten_dgd_typed
-        for t in (thon_list or [])
+        for t in _normalize_entry(raw_entry)["thon"]
         if str(t).strip() and str(t).strip().lower() != "nan"
     }
     pool_kha_dung = [t for t in pool_imp if t not in thon_da_gan]
 
     if xa_hien_co:
         st.markdown(f"**ĐGD hiện có tại {chon_xa_imp}:**")
-        for dgd_name, thon_list in list(xa_hien_co.items()):
-            tl = thon_list if isinstance(thon_list, list) else []
-            ap_txt = ", ".join(str(x).strip() for x in tl if str(x).strip()) or "(chưa gán thôn)"
+        for dgd_name, raw_entry in list(xa_hien_co.items()):
+            e = _normalize_entry(raw_entry)
+            ap_txt = ", ".join(str(x).strip() for x in e["thon"] if str(x).strip()) or "(chưa gán thôn)"
             slug_x = re.sub(r"\W+", "_", str(dgd_name))[:80]
             col_dgd, col_xoa = st.columns([5, 1])
             with col_dgd:
@@ -230,6 +334,19 @@ def _render_import_pgd(
     if not pool_imp:
         st.caption("⚠️ Chưa có danh sách thôn — kiểm tra lại file HSTD của PGD này.")
 
+    dia_chi_imp = st.text_input(
+        "Địa chỉ chi tiết", key="dgd_pgd_op_imp_dia_chi", placeholder="123 đường ABC, KP 5"
+    )
+    nguoi_pt_imp = st.text_input(
+        "Người phụ trách", key="dgd_pgd_op_imp_nguoi_pt", placeholder="Nguyễn Văn A"
+    )
+    sdt_imp = st.text_input(
+        "Số điện thoại", key="dgd_pgd_op_imp_sdt", placeholder="0901234567"
+    )
+    lich_gd_imp = st.text_input(
+        "Lịch giao dịch", key="dgd_pgd_op_imp_lich_gd", placeholder="T2, T4, T6 / 08:00–11:00"
+    )
+
     if st.button("➕ Thêm Điểm giao dịch", key="dgd_pgd_op_imp_btn_them", type="primary"):
         if not ten_dgd_typed:
             st.error("❌ Vui lòng nhập tên Điểm giao dịch.")
@@ -237,21 +354,24 @@ def _render_import_pgd(
             st.error(f"❌ ĐGD '{ten_dgd_typed}' đã tồn tại tại {chon_xa_imp}.")
         else:
             dup_b: list[str] = []
-            for other, lst in xa_hien_co.items():
-                if not isinstance(lst, list):
-                    continue
+            for other, raw_e in xa_hien_co.items():
+                thon_other = _normalize_entry(raw_e)["thon"]
                 for t in chon_thon_imp:
-                    if t in lst:
+                    if t in thon_other:
                         dup_b.append(f"{t} → {other}")
             if dup_b:
-                st.error(
-                    "❌ Trùng thôn/ấp với ĐGD khác: " + ", ".join(dup_b)
-                )
+                st.error("❌ Trùng thôn/ấp với ĐGD khác: " + ", ".join(dup_b))
             else:
                 try:
                     m = copy.deepcopy(db.doc_dgd_map())
                     cur = m.setdefault(_resolve_pgd_key(pgd_user), {}).setdefault(chon_xa_imp, {})
-                    cur[ten_dgd_typed] = [str(t).strip() for t in chon_thon_imp]
+                    cur[ten_dgd_typed] = {
+                        "thon": [str(t).strip() for t in chon_thon_imp],
+                        "dia_chi": dia_chi_imp.strip(),
+                        "nguoi_phu_trach": nguoi_pt_imp.strip(),
+                        "sdt": sdt_imp.strip(),
+                        "lich_gd": lich_gd_imp.strip(),
+                    }
                     db.luu_dgd_map(m, username)
                     db.ghi_audit(
                         username,
@@ -310,9 +430,8 @@ def _render_xem_sua_pgd(
     st.markdown(f"**ĐGD tại {chon_xa}**")
 
     for ten_dgd in list(xa_dgd.keys()):
-        ds_thon = xa_dgd.get(ten_dgd, [])
-        if not isinstance(ds_thon, list):
-            ds_thon = []
+        e = _normalize_entry(xa_dgd.get(ten_dgd))
+        ds_thon = e["thon"]
         sid = re.sub(r"\W+", "_", ten_dgd)[:40]
         with st.expander(f"📍 {ten_dgd}", expanded=False):
             ten_moi = st.text_input(
@@ -325,6 +444,23 @@ def _render_xem_sua_pgd(
                 options=pool,
                 default=[t for t in ds_thon if t in pool],
                 key=f"dgd_pgd_op_th_{sid}_{ten_pgd}_{chon_xa}",
+            )
+            dia_chi_val = st.text_input(
+                "Địa chỉ chi tiết", value=e["dia_chi"],
+                key=f"dgd_pgd_op_dc_{sid}_{ten_pgd}_{chon_xa}",
+            )
+            nguoi_pt_val = st.text_input(
+                "Người phụ trách", value=e["nguoi_phu_trach"],
+                key=f"dgd_pgd_op_pt_{sid}_{ten_pgd}_{chon_xa}",
+            )
+            sdt_val = st.text_input(
+                "Số điện thoại", value=e["sdt"],
+                key=f"dgd_pgd_op_sdt_{sid}_{ten_pgd}_{chon_xa}",
+            )
+            lich_gd_val = st.text_input(
+                "Lịch giao dịch", value=e["lich_gd"],
+                key=f"dgd_pgd_op_lich_{sid}_{ten_pgd}_{chon_xa}",
+                placeholder="T2, T4, T6 / 08:00–11:00",
             )
             c_s, c_d = st.columns(2)
             with c_s:
@@ -346,13 +482,12 @@ def _render_xem_sua_pgd(
                         st.error("Tên ĐGD mới đã tồn tại.")
                     else:
                         dup_m: list[str] = []
-                        for other, lst in xa_dgd.items():
+                        for other, raw_e in xa_dgd.items():
                             if other == ten_dgd:
                                 continue
-                            if not isinstance(lst, list):
-                                continue
+                            thon_other = _normalize_entry(raw_e)["thon"]
                             for t in thon_sel:
-                                if t in lst:
+                                if t in thon_other:
                                     dup_m.append(f"{t} → {other}")
                         if dup_m:
                             st.error(
@@ -366,7 +501,13 @@ def _render_xem_sua_pgd(
                                 )
                                 if tm != ten_dgd:
                                     del cur[ten_dgd]
-                                cur[tm] = list(thon_sel)
+                                cur[tm] = {
+                                    "thon": list(thon_sel),
+                                    "dia_chi": dia_chi_val.strip(),
+                                    "nguoi_phu_trach": nguoi_pt_val.strip(),
+                                    "sdt": sdt_val.strip(),
+                                    "lich_gd": lich_gd_val.strip(),
+                                }
                                 db.luu_dgd_map(m, username)
                                 db.ghi_audit(
                                     username,
@@ -426,6 +567,12 @@ def _render_xem_sua_pgd(
         placeholder="Ví dụ: Điểm GD 1",
     )
     st_thon = st.multiselect("Chọn thôn/ấp", pool, key="dgd_pgd_op_add_thon")
+    st_dia_chi = st.text_input("Địa chỉ chi tiết", key="dgd_pgd_op_add_dia_chi")
+    st_nguoi_pt = st.text_input("Người phụ trách", key="dgd_pgd_op_add_nguoi_pt")
+    st_sdt = st.text_input("Số điện thoại", key="dgd_pgd_op_add_sdt")
+    st_lich_gd = st.text_input(
+        "Lịch giao dịch", key="dgd_pgd_op_add_lich_gd", placeholder="T2, T4, T6 / 08:00–11:00"
+    )
     if st.button("💾 Lưu ĐGD mới", type="primary", key="dgd_pgd_op_add_btn"):
         if not st_ten.strip():
             st.error("Vui lòng nhập tên điểm giao dịch.")
@@ -435,11 +582,10 @@ def _render_xem_sua_pgd(
             st.error("Tên điểm giao dịch đã tồn tại.")
         else:
             dup_a: list[str] = []
-            for _dgd, lst in xa_dgd.items():
-                if not isinstance(lst, list):
-                    continue
+            for _dgd, raw_e in xa_dgd.items():
+                thon_other = _normalize_entry(raw_e)["thon"]
                 for t in st_thon:
-                    if t in lst:
+                    if t in thon_other:
                         dup_a.append(f"{t} ({_dgd})")
             if dup_a:
                 st.error(
@@ -449,7 +595,13 @@ def _render_xem_sua_pgd(
                 try:
                     m = copy.deepcopy(db.doc_dgd_map())
                     cur = m.setdefault(ten_pgd, {}).setdefault(chon_xa, {})
-                    cur[st_ten.strip()] = list(st_thon)
+                    cur[st_ten.strip()] = {
+                        "thon": list(st_thon),
+                        "dia_chi": st_dia_chi.strip(),
+                        "nguoi_phu_trach": st_nguoi_pt.strip(),
+                        "sdt": st_sdt.strip(),
+                        "lich_gd": st_lich_gd.strip(),
+                    }
                     db.luu_dgd_map(m, username)
                     db.ghi_audit(
                         username,
@@ -477,9 +629,8 @@ def _render_tong_quan_pgd(pgd_user: str) -> None:
     for xa_d in block.values():
         if isinstance(xa_d, dict):
             so_dgd += len(xa_d)
-            for lst in xa_d.values():
-                if isinstance(lst, list):
-                    so_ap += len(lst)
+            for entry in xa_d.values():
+                so_ap += len(_normalize_entry(entry)["thon"])
     stt, note = trang_thai_pgd_vs_map(pgd_user, dgd_map)
     df_o = pd.DataFrame(
         [
@@ -535,9 +686,12 @@ def render(tab: "DeltaGenerator", **kwargs: dict) -> None:
                 return
 
         hn = _hostname()
-        t_imp, t_edit, t_sum = st.tabs(
-            ["📥 Import từ file", "🗺️ Xem & Sửa", "📋 Tổng quan"]
+        t_search, t_imp, t_edit, t_sum = st.tabs(
+            ["🔍 Tìm kiếm", "📥 Import từ file", "🗺️ Xem & Sửa", "📋 Tổng quan"]
         )
+
+        with t_search:
+            _render_tim_kiem_pgd(db.doc_dgd_map(), pgd_user, username)
 
         with t_imp:
             _render_import_pgd(pgd_user, username, hn, df_pgd)

@@ -546,21 +546,23 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
             du_no_tw = _df_loc[_nv == 1].groupby(COT_TEN_CT)[COT_TONG_DU_NO].sum()
             du_no_dp = _df_loc[_nv == 2].groupby(COT_TEN_CT)[COT_TONG_DU_NO].sum()
 
-            # so_kh tính từ df gốc (không lọc dư nợ > 0) để không bỏ sót KH tất toán
+            # so_kh + so_mon tính từ df gốc (không lọc dư nợ > 0) để không bỏ sót KH/dòng tất toán
             _so_kh_by_ct = df.groupby(COT_TEN_CT)[COT_MA_KH].nunique()
+            _so_mon_by_ct = df.groupby(COT_TEN_CT)[COT_MA_KH].count()
 
             df_ct = (
                 _df_loc.groupby(COT_TEN_CT)
                 .agg(
                     du_no   =(COT_TONG_DU_NO, "sum"),
-                    so_mon  =(COT_TONG_DU_NO, "count"),  # count rows = số món vay
-                    so_kh   =(COT_MA_KH,      "nunique"),
+                    so_mon  =(COT_TONG_DU_NO, "count"),  # temp, sẽ bị ghi đè
+                    so_kh   =(COT_MA_KH,      "nunique"),  # temp, sẽ bị ghi đè
                 )
                 .sort_values("du_no", ascending=False)
                 .reset_index()
             )
             df_ct.columns = ["ten_ct", "du_no", "so_mon", "so_kh"]
             df_ct["so_kh"] = df_ct["ten_ct"].map(_so_kh_by_ct).fillna(0).astype(int)
+            df_ct["so_mon"] = df_ct["ten_ct"].map(_so_mon_by_ct).fillna(0).astype(int)
 
             tong = df_ct["du_no"].sum()
             df_ct["ty_trong"] = (df_ct["du_no"] / tong * 100).round(1) if tong > 0 else 0

@@ -187,6 +187,25 @@ h3 { font-size: 1.1rem  !important; font-weight: 600 !important; color: #1a3a5c 
     margin: 12px 0;
 }
 
+/* Tab con trong sidebar (bọc trong st.columns) */
+[data-testid="stSidebar"] [data-testid="column"] .stButton > button {
+    background-color: #FFFFFF !important;
+    color: #1a1a1a !important;
+    font-weight: 700 !important;
+    border: 1px solid #D0D0D0 !important;
+    font-size: 13px !important;
+    padding: 7px 12px !important;
+    margin-bottom: 3px !important;
+    box-shadow: none !important;
+    transform: none !important;
+}
+[data-testid="stSidebar"] [data-testid="column"] .stButton > button:hover {
+    background-color: #F5F7FF !important;
+    border-color: #BDBDBD !important;
+    color: #1a1a1a !important;
+    transform: none !important;
+}
+
 [data-testid="stSidebar"] .stAlert {
     background-color: rgba(0,0,0,0.15);
     border: 1px solid rgba(255,255,255,0.2);

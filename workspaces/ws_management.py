@@ -1124,11 +1124,11 @@ def _build_all_items(role: str, username: str, **kwargs) -> list:
             "label": "Tiến độ Công việc",
             "icon": "calendar",
             "children": [
-                {"label": "📅 Tiến độ Công việc",        "fn": lambda: tab_tien_do.render(None, **kwargs)},
+                {"label": "� Tiến độ công việc",        "fn": lambda: tab_tien_do.render(None, **kwargs)},
                 {"label": "📋 Tiến độ Báo cáo của PGD", "fn": lambda: tab_tien_do_nop.render(None, **kwargs)},
             ],
         },
-        {"group": "Giám sát",     "label": "Tổng quan CN", "icon": "chart-bar",      "fn": lambda: tab_tongquan.render(None, **kwargs)},
+        {"group": "Giám sát",     "label": "📊 Thông tin chung", "icon": "chart-bar",      "fn": lambda: tab_tongquan.render(None, **kwargs)},
         {
             "group": "Giám sát",
             "label": "Cảnh báo NQH",
@@ -1140,17 +1140,17 @@ def _build_all_items(role: str, username: str, **kwargs) -> list:
                 {"label": "⚡ Cảnh báo sớm",    "fn": lambda df_full=df_full, ds_pgd_all=ds_pgd_all, role=role, username=kwargs.get("username", "unknown"), idx=4: _render_canh_bao_no_sub(df_full, ds_pgd_all, role, username, idx)},
             ],
         },
-        {"group": "Giám sát",     "label": "Giao & Theo dõi Nhiệm vụ", "icon": "check",  "fn": lambda: tab_nhiem_vu.render(None, **kwargs)},
-        {"group": "Giám sát",     "label": "So sánh kỳ",            "icon": "chart-line", "fn": lambda: tab_so_sanh_ky.render(None, **kwargs)},
+        {"group": "Giám sát",     "label": "✅ Nhiệm vụ", "icon": "check",  "fn": lambda: tab_nhiem_vu.render(None, **kwargs)},
+        {"group": "Giám sát",     "label": "📊 So sánh kỳ",            "icon": "chart-line", "fn": lambda: tab_so_sanh_ky.render(None, **kwargs)},
         {"group": "Kiểm soát",     "label": "Kiểm soát nội bộ",    "icon": "search",         "fn": lambda: tab_kiem_soat.render_tab(df_full, role, kwargs.get("username", "unknown"))},
         {"group": "Kiểm soát",     "label": "Xử lý nợ rủi ro",   "icon": "alert-circle",   "fn": lambda: tab_xlrr_tong_hop.render(None, **kwargs)},
         {"group": "Kiểm soát",     "label": "Cán bộ tín dụng",         "icon": "user",       "fn": lambda: tab_cbtd.render(None, **kwargs)},
         {"group": "Kiểm soát",     "label": "Tập trung rủi ro & HHI",  "icon": "chart-pie",  "fn": lambda: tab_hhi.render(None, **kwargs)},
-        {"group": "Kiểm soát",     "label": "Nợ khoanh",                "icon": "lock",       "fn": lambda: tab_no_khoanh.render(None, **kwargs)},
+        {"group": "Kiểm soát",     "label": "🔒 Nợ khoanh",                "icon": "lock",       "fn": lambda: tab_no_khoanh.render(None, **kwargs)},
         {"group": "Kế hoạch và Thực hiện KHTD", "label": "Kế hoạch tín dụng", "icon": "file-text",  "fn": lambda: tab_khtd.render(None, **dict(kwargs, khtd_mode="cn"))},
-        {"group": "Kế hoạch và Thực hiện KHTD", "label": "Giao & Điều chỉnh KH", "icon": "upload", "fn": lambda: tab_khtd_giao_dc.render(None, **kwargs)},
+        {"group": "Kế hoạch và Thực hiện KHTD", "label": "📋 Giao & ĐC KHTD", "icon": "upload", "fn": lambda: tab_khtd_giao_dc.render(None, **kwargs)},
         {"group": "Kế hoạch và Thực hiện KHTD", "label": "Cân đối - Điện báo", "icon": "chart-line", "fn": lambda: tab_kehoach.render(None, **kwargs)},
-        {"group": "Kế hoạch và Thực hiện KHTD", "label": "Điện báo",            "icon": "antenna",    "fn": lambda: tab_candoi.render(None, **kwargs)},
+        {"group": "Kế hoạch và Thực hiện KHTD", "label": "📡 Điện báo",            "icon": "antenna",    "fn": lambda: tab_candoi.render(None, **kwargs)},
         {"group": "Kế hoạch và Thực hiện KHTD", "label": "Xuất báo cáo KHTD",  "icon": "file-export", "fn": lambda: tab_khtd_xuat.render_xuat_baocao(role=kwargs.get("role", ""), username=kwargs.get("username", ""), df_full=kwargs.get("df"))},
         {
             "group": "Báo cáo",
@@ -1162,8 +1162,8 @@ def _build_all_items(role: str, username: str, **kwargs) -> list:
             ],
         },
         {"group": "Báo cáo",       "label": "Checklist định kỳ", "icon": "calendar-check", "fn": lambda: tab_checklist_bc.render(None, **kwargs)},
-        {"group": "Ủy Thác",       "label": "Ban Đại Diện HĐQT", "icon": "building",       "fn": lambda: tab_ban_dai_dien.render(None, cap="tinh", **kwargs)},
-        {"group": "Ủy Thác",       "label": "Hội - Đoàn thể ủy thác", "icon": "handshake", "fn": lambda: tab_uy_thac.render(None, **kwargs)},
+        {"group": "Ủy Thác",       "label": "🏛️ Ban Đại Diện", "icon": "building",       "fn": lambda: tab_ban_dai_dien.render(None, cap="tinh", **kwargs)},
+        {"group": "Ủy Thác",       "label": "🤝 Ủy thác", "icon": "handshake", "fn": lambda: tab_uy_thac.render(None, **kwargs)},
         {
             "group": "Ủy Thác",
             "label": "Điểm GD & Tổ TK&VV",
@@ -1181,9 +1181,9 @@ def _build_all_items(role: str, username: str, **kwargs) -> list:
         ALL_ITEMS.append({"group": "Hệ thống", "label": "Mã NĐT địa phương", "icon": "building-bank", "fn": lambda: _render_ndt_dp(role_n, kwargs.get("username", "unknown"))})
     if role_n == "admin_cn":
         ALL_ITEMS.append({"group": "Hệ thống", "label": "Nhật ký hệ thống", "icon": "list", "fn": lambda: tab_audit_log.render(None, **kwargs)})
-    ALL_ITEMS.append({"group": "Hệ thống", "label": "Trạng thái hệ thống", "icon": "pulse", "fn": lambda: tab_trang_thai_nguon.render(None, **kwargs)})
+    ALL_ITEMS.append({"group": "Hệ thống", "label": "🔍 Trạng thái hệ thống", "icon": "pulse", "fn": lambda: tab_trang_thai_nguon.render(None, **kwargs)})
     ALL_ITEMS.append({"group": "Hệ thống", "label": "Upload dữ liệu", "icon": "upload", "fn": lambda: tab_upload_khnv.render(None, **kwargs)})
-    ALL_ITEMS.append({"group": "Hệ thống", "label": "Hướng dẫn", "icon": "book", "fn": lambda: render_huong_dan()})
+    ALL_ITEMS.append({"group": "Hệ thống", "label": "📖 Hướng dẫn", "icon": "book", "fn": lambda: render_huong_dan()})
 
     return ALL_ITEMS
 

@@ -1215,8 +1215,8 @@ def render_sidebar_menu(role: str, username: str, **kwargs):
         st.session_state["ws_mgmt_menu"] = all_items[0]["label"]
 
     st.markdown(
-        "<p style='font-size:12px;font-weight:500;"
-        "color:#444;margin-bottom:4px'>MENU ĐIỀU HÀNH</p>",
+        "<p style='font-size:14px;font-weight:700;"
+        "color:#0D47A1;margin-bottom:6px'>MENU ĐIỀU HÀNH</p>",
         unsafe_allow_html=True
     )
 
@@ -1228,9 +1228,9 @@ def render_sidebar_menu(role: str, username: str, **kwargs):
         if grp != current_group:
             current_group = grp
             st.markdown(
-                f"<p style='font-size:10px;font-weight:500;"
+                f"<p style='font-size:11px;font-weight:700;"
                 f"color:{clr['text']};text-transform:uppercase;"
-                f"letter-spacing:0.06em;padding:10px 4px 2px;margin:0'>"
+                f"letter-spacing:0.06em;padding:12px 4px 4px;margin:0'>"
                 f"{grp}</p>",
                 unsafe_allow_html=True,
             )
@@ -1253,12 +1253,12 @@ def render_sidebar_menu(role: str, username: str, **kwargs):
                 st.markdown(
                     f"<div style='"
                     f"background:#E65100;"
-                    f"border-left:2px solid #BF360C;"
+                    f"border-left:3px solid #BF360C;"
                     f"color:#FFFFFF;"
-                    f"font-size:13px;font-weight:600;"
-                    f"padding:6px 8px 6px 10px;"
-                    f"border-radius:0 5px 5px 0;"
-                    f"margin-bottom:2px'>"
+                    f"font-size:14px;font-weight:700;"
+                    f"padding:10px 12px 10px 14px;"
+                    f"border-radius:0 6px 6px 0;"
+                    f"margin-bottom:4px'>"
                     f"▾ {item['label']}</div>",
                     unsafe_allow_html=True,
                 )
@@ -1279,9 +1279,9 @@ def render_sidebar_menu(role: str, username: str, **kwargs):
                         st.markdown(
                             f"<div style='background:#E65100;"
                             f"border-left:4px solid #BF360C;"
-                            f"color:#FFFFFF;font-size:12px;font-weight:700;"
-                            f"padding:6px 8px 6px 20px;"
-                            f"border-radius:0 5px 5px 0;margin-bottom:2px'>"
+                            f"color:#FFFFFF;font-size:13px;font-weight:700;"
+                            f"padding:8px 10px 8px 22px;"
+                            f"border-radius:0 6px 6px 0;margin-bottom:3px'>"
                             f"● {child['label']}</div>",
                             unsafe_allow_html=True,
                         )
@@ -1303,12 +1303,12 @@ def render_sidebar_menu(role: str, username: str, **kwargs):
                 st.markdown(
                     f"<div style='"
                     f"background:#E65100;"
-                    f"border-left:2px solid #BF360C;"
+                    f"border-left:3px solid #BF360C;"
                     f"color:#FFFFFF;"
-                    f"font-size:13px;font-weight:600;"
-                    f"padding:6px 8px 6px 10px;"
-                    f"border-radius:0 5px 5px 0;"
-                    f"margin-bottom:2px'>"
+                    f"font-size:14px;font-weight:700;"
+                    f"padding:10px 12px 10px 14px;"
+                    f"border-radius:0 6px 6px 0;"
+                    f"margin-bottom:4px'>"
                     f"{item['label']}</div>",
                     unsafe_allow_html=True,
                 )

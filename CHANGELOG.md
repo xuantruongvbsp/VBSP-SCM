@@ -1,7 +1,9 @@
 # CHANGELOG
 
-## [2026-05-19] — Fix: loại bỏ filter COT_DU_NO_KHOANH khỏi _load_hstd
-- `app.py` dòng 87–93, 97–101 — xóa filter trên "Dư nợ khoanh" vì cột này không tồn tại trong HSTD parquet
+## [2026-05-19] — Fix: đọc TẤT CẢ cột từ HSTD parquet (175 cột) cho tab Nợ khoanh
+- `app.py` dòng 72–97 — thay PyArrow filter bằng DuckDB (PyArrow filter chỉ đọc cột được reference → bỏ sót 169 cột)
+- `cache/hstd.parquet` — xóa cache cũ để buộc merge lại với tất cả 175 cột
+- Các cột "Dư nợ khoanh", "Ngày hết hạn Khoanh", "Tên tổ" giờ có trong HSTD
 
 ## [2026-05-19] — QLNK: thêm section "📄 Xuất mẫu biểu" vào sub-tab d7
 - `tabs/tab_no_khoanh.py` dòng ~29 — thêm 6 import docx/io

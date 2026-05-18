@@ -69,38 +69,35 @@ def _load_hstd(
     active_only: bool = False,
 ) -> pd.DataFrame:
     """
-    Load HSTD từ Parquet với PyArrow filter pushdown — không dùng DuckDB engine
-    để tránh peak RAM 7× do DuckDB buffer + Arrow intermediate + pandas tồn tại cùng lúc.
+    Load HSTD từ Parquet bằng DuckDB — đọc TẤT CẢ cột + filter rows.
+    (PyArrow filters chỉ đọc cột được reference → bỏ sót cột khác).
 
     Cache key = (cache_path, _ts, ten_pgd, active_only) → mỗi tổ hợp dùng chung
     1 bản trong @st.cache_resource (không nhân bản theo session).
 
-    - ten_pgd=None,  active_only=False → toàn bộ (hiếm dùng)
-    - ten_pgd=None,  active_only=True  → CN role: chỉ hồ sơ còn dư nợ, giảm 30–60% RAM
-    - ten_pgd=<str>, active_only=False → PGD role: lọc theo PGD, cache riêng per-PGD
+    - ten_pgd=None,  active_only=False → toàn bộ
+    - ten_pgd=None,  active_only=True  → CN role: chỉ hồ sơ còn dư nợ
+    - ten_pgd=<str>, active_only=False → PGD role: lọc theo PGD
     - ten_pgd=<str>, active_only=True  → PGD role + active filter
     """
-    # PyArrow filter syntax: outer list = OR, inner list = AND
-    # Cột dư nợ đã xác nhận là int64 trong parquet → không cần TRY_CAST
-    # Null int64 > 0 → False trong PyArrow (giống COALESCE(..., 0) > 0)
-    pa_filters: list | None = None
-    if ten_pgd and active_only:
-        pgd_clause = (COT_TEN_PGD, "==", ten_pgd)
-        pa_filters = [
-            [pgd_clause, (COT_TONG_DU_NO, ">", 0)],
-            [pgd_clause, (COT_DU_NO_QH, ">", 0)],
-            [pgd_clause, (COT_DU_NO_KHOANH, ">", 0)],
-        ]
-    elif ten_pgd:
-        pa_filters = [[(COT_TEN_PGD, "==", ten_pgd)]]
-    elif active_only:
-        pa_filters = [
-            [(COT_TONG_DU_NO, ">", 0)],
-            [(COT_DU_NO_QH, ">", 0)],
-            [(COT_DU_NO_KHOANH, ">", 0)],
-        ]
+    import duckdb
 
-    return pd.read_parquet(cache_path, filters=pa_filters)
+    sql = f'SELECT * FROM "{cache_path}"'
+    where_clauses = []
+
+    if ten_pgd:
+        where_clauses.append(f'"{COT_TEN_PGD}" = \'{ten_pgd}\'')
+
+    if active_only:
+        where_clauses.append(f'("{COT_TONG_DU_NO}" > 0 OR "{COT_DU_NO_QH}" > 0 OR "{COT_DU_NO_KHOANH}" > 0)')
+
+    if where_clauses:
+        sql += ' WHERE ' + ' AND '.join(where_clauses)
+
+    try:
+        return duckdb.query(sql).df()
+    except Exception:
+        return pd.DataFrame()
 
 
 @st.cache_resource(show_spinner=False, ttl=3600)

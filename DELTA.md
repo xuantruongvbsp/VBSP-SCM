@@ -161,6 +161,9 @@ Upload flow:
 - `tabs/tab_tien_do.py`: Xóa toàn bộ mục "🔴 Báo cáo trễ hạn" cũ (nút PDF trễ hạn + Excel trễ hạn + metric cards) và xóa hàm `_xuat_pdf_tre_han()` (~245 dòng) — chức năng đã có trong Phần 2 của PDF báo cáo tiến độ mới
 - `.streamlit/config.toml`: Đổi `fileWatcherType = "watchdog"` → `"poll"` để Streamlit tự động reload khi sửa bất kỳ file .py (không chỉ app.py)
 - `tabs/tab_tien_do.py`: Thêm `_xuat_excel_tien_do()` — thay thế `pd.ExcelWriter` trần bằng openpyxl styling: header xanh `#003D7A` chữ trắng bold, border `#BDBDBD`, xen kẽ dòng xanh nhạt `#EEF4FB`, auto-width cột, number format `#,##0` cho cột số, `0.0"%"` cho Tỷ lệ HT%, font Times New Roman; đổi nhãn nút tải "⬇ Tải Excel báo cáo tiến độ"
+- `tabs/base_tab.py` **(MỚI)**: Thêm `TabContext` class — base context cho mọi tab render; centralizes kwargs extraction (`role`, `username`, `pgd_user`, `df_full`), role normalization, tab container fallback (`tab if tab is not None else st.container()`), và các property tiện lợi (`is_cn`, `is_exec`, `is_pgd`, `role_norm`)
+- `tabs/tab_tien_do.py`: Refactor `render()` và `render_tong_quan_only()` dùng `TabContext` — thay `normalize_role()` + `_tab_ctx` manual bằng `ctx = TabContext(tab, **kwargs); with ctx:`
+- `tabs/tab_baocao.py`: Refactor `render()` dùng `TabContext` — giảm 10 dòng setup code, thay `normalize_role()` bằng `ctx.role_norm`
 
 ## [17/05/2026]
 - `tabs/tab_trang_thai_nguon.py`: Implement mới hoàn toàn — 6 sub-tab health check mức B (tệp nguồn, merge & cache, snapshot, người dùng, hệ thống, audit log)

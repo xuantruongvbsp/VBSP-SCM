@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## [2026-05-19] — QLNK: thêm 2 bảng SQLite + 6 hàm CRUD vào db.py
+- `db.py` dòng ~166–213 — DDL: `qlnk_ket_qua` (4 index), `qlnk_bo_sung` (1 index)
+- `db.py` dòng ~584–829 — 6 hàm CRUD: `luu_ket_qua_kiem_tra`, `phe_duyet_ket_qua`, `mo_phe_duyet`, `doc_ket_qua_kiem_tra`, `luu_bo_sung_mon_vay`, `doc_bo_sung_mon_vay`
+
 ## [2026-05-19] — Dark/Light Mode: Semantic Token System
 - `utils_theme.py` — refactor hoàn toàn: 2 bộ color token `_DARK`/`_LIGHT` theo shadcn/Linear pattern, `get_theme_css(theme)` sinh CSS đầy đủ
 - `app.py` — xóa `_get_global_css()` (~370 dòng cũ), thay bằng `get_theme_css(theme)` + `init_theme()`, nút toggle ở sidebar trước "Đăng xuất"

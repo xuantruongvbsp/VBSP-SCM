@@ -150,6 +150,17 @@ Upload flow:
 
 ## CHANGELOG
 
+## [15/05/2026]
+- `tabs/tab_tien_do.py`: Thêm nút "📄 Xuất PDF báo cáo tiến độ" (sub-tab Xuất báo cáo) — tạo 1 file PDF 2 phần (Phần 1: Tiến độ theo đầu việc, Phần 2: Báo cáo trễ hạn) dùng Times New Roman + Table grid
+- `tabs/tab_tien_do.py`: `_xuat_pdf_bao_cao_tien_do()` — hỗ trợ 2 mẫu theo `cap_theo_doi`: `pgd` (bảng 4 cột: STT/PDG/Trạng thái/Ghi chú) và `xa` (bảng 5 cột: STT/PGD/Xã/Trạng thái/Ghi chú) với xen kẽ dòng, grid xám
+- `tabs/tab_tien_do.py`: Phần 2 (trễ hạn) dùng Table grid giống Phần 1, header đỏ `#C62828`, xen kẽ hồng `#FFEBEE`
+- `tabs/tab_tien_do.py`: Thêm màu sắc cột Trạng thái — `td_green` `#2E7D32` cho Hoàn thành, `td_red` `#C62828` cho Chưa thực hiện (dùng ParagraphStyle riêng, không dùng TableStyle TEXTCOLOR vì không hoạt động với Paragraph)
+- `tabs/tab_tien_do.py`: Đổi nhãn metadata: "Deadline" → "Thời hạn cuối cùng", "Tiến độ" → "Tiến độ hoàn thành"; tăng font size (header 13, meta 11, table 11, p2 11, chữ ký 12)
+- `tabs/tab_tien_do.py`: Thêm chữ ký cuối báo cáo: Người lập, Kiểm soát, Giám đốc (ký, ghi rõ họ tên, đóng dấu)
+- `tabs/tab_tien_do.py`: Tăng colWidths cột STT, PGD để tên PGD không bị xuống dòng (pgd 4 cột: 1.5/7.0/3.5/6.0cm, xa 5 cột: 1.2/5.2/4.3/3.3/4.0cm)
+- `tabs/tab_tien_do.py`: Xóa toàn bộ mục "🔴 Báo cáo trễ hạn" cũ (nút PDF trễ hạn + Excel trễ hạn + metric cards) và xóa hàm `_xuat_pdf_tre_han()` (~245 dòng) — chức năng đã có trong Phần 2 của PDF báo cáo tiến độ mới
+- `.streamlit/config.toml`: Đổi `fileWatcherType = "watchdog"` → `"poll"` để Streamlit tự động reload khi sửa bất kỳ file .py (không chỉ app.py)
+
 ## [17/05/2026]
 - `tabs/tab_trang_thai_nguon.py`: Implement mới hoàn toàn — 6 sub-tab health check mức B (tệp nguồn, merge & cache, snapshot, người dùng, hệ thống, audit log)
 - `ws_management.py`: refactor `render_sidebar_menu()` + `_build_all_items()`

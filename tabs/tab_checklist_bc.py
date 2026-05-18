@@ -4,7 +4,7 @@ from datetime import datetime, date, timedelta
 from io import BytesIO
 import uuid
 import db
-from auth import normalize_role
+from tabs.base_tab import TabContext
 
 _KEY_CONFIG = "checklist_bc_config"
 _TRANG_THAI = {
@@ -474,21 +474,16 @@ def _render_xuat_excel(ds_config: list[dict], trang_thai: dict[str, dict], nam: 
 
 
 def render(tab=None, **kwargs) -> None:
-    import streamlit as st
-    if tab is not None:
-        _ctx = tab
-    else:
-        _ctx = st.container()
-    with _ctx:
-        role_raw = str(kwargs.get("role", "user") or "user")
-        role = normalize_role(role_raw)
-        username = kwargs.get("username", "unknown")
-        can_edit = role in ("admin_cn", "manager_cn")
+    ctx = TabContext(tab, **kwargs)
+    role = ctx.role_norm
+    username = ctx.username
+    can_edit = role in ("admin_cn", "manager_cn")
 
+    with ctx:
         st.title("✅ Checklist báo cáo định kỳ")
         st.caption("Theo dõi hạn nộp báo cáo tháng/quý/năm và trạng thái thực hiện.")
 
-        if role not in ("admin_cn", "manager_cn"):
+        if not can_edit:
             st.warning("Bạn không có quyền truy cập checklist báo cáo.")
             return
 

@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## [2026-05-19] — QLNK: thêm section "📄 Xuất mẫu biểu" vào sub-tab d7
+- `tabs/tab_no_khoanh.py` dòng ~29 — thêm 6 import docx/io
+- `tabs/tab_no_khoanh.py` dòng 165–780 — thêm 10 helper `_qlnk_*` + 5 hàm `_tao_word_ke_hoach_kt`, `_tao_word_01qlnk`, `_tao_word_02qlnk`, `_tao_word_03qlnk`, `_tao_word_04qlnk`
+- `tabs/tab_no_khoanh.py` dòng ~1675 — thêm UI xuất 5 mẫu Word vào cuối `with d7:`
+
 ## [2026-05-19] — Fix convention vi phạm role check trong tab_no_khoanh.py
 - `tabs/tab_no_khoanh.py` dòng 12 — thêm import `co_quyen_upload_pgd`
 - `tabs/tab_no_khoanh.py` dòng 320, 528 — thay `role in ["manager_pgd", "admin_pgd"]` bằng `co_quyen_upload_pgd(role)`

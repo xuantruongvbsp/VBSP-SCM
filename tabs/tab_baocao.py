@@ -14,7 +14,7 @@ from services import xuat_bao_cao, ten_file_bao_cao
 from pdf_service import nut_xuat_pdf
 from data import (danh_dau_khong_hd, tong_hop_khong_hd, ds_chi_tiet_khong_hd)
 from tabs import tab_nq11
-from auth import la_phan_he_pgd, la_phan_he_cn, normalize_role
+from auth import la_phan_he_pgd, la_phan_he_cn
 
 if TYPE_CHECKING:
     from streamlit.delta_generator import DeltaGenerator
@@ -63,27 +63,19 @@ def _bc_fmt_metric(x: float) -> str:
         return "—"
 
 
-from utils import get_tab_context
+from tabs.base_tab import TabContext
+
 
 def render(tab: DeltaGenerator, **kwargs: dict) -> None:
-    """
-    Render tab Báo cáo.
-    
-    Args:
-        tab: Streamlit DeltaGenerator cho tab này
-        **kwargs: Chứa df, df_full, role, pgd_user, username, df_nq11
-    """
+    ctx = TabContext(tab, **kwargs)
     df = kwargs.get("df")
-    df_full = kwargs.get("df_full", df)
-    role_raw = str(kwargs.get("role", "user") or "user")
-    role = normalize_role(role_raw)
-    pgd_user = kwargs.get("pgd_user")
-    username = kwargs.get("username")
+    df_full = ctx.df_full or df
+    role = ctx.role_norm
+    pgd_user = ctx.pgd_user
+    username = ctx.username
     df_nq11 = kwargs.get("df_nq11")
 
-    import streamlit as _st
-    _tab_ctx = tab if tab is not None else _st.container()
-    with _tab_ctx:
+    with ctx:
         st.subheader("📈 Báo cáo")
 
         COL_CHUNG = [c for c in [

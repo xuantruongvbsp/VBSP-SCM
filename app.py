@@ -635,6 +635,8 @@ def main():
                     st.stop()
 
             from auth import la_phan_he_cn
+            import tracemalloc as _tm
+            _tm.start()
             if la_phan_he_cn(role) or not pgd_user:
                 df_full = _load_hstd(CACHE_HSTD, _hstd_ts, active_only=True)
                 df = df_full

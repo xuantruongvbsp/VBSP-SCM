@@ -198,3 +198,8 @@ Upload flow:
 - `workspaces/ws_management.py`: `"Nguồn vốn"`, `"Dư nợ trong hạn"`, `"Dư nợ quá hạn"`, `"Tên ĐVUT"` → `COT_*` + imports
 - `workspaces/ws_executive.py`: thêm `# noqa: COT` cho display labels (8 vị trí)
 - `components/movers.py`: thêm `# noqa: COT` cho UI label dict
+
+## [19/05/2026]
+- `scripts/check_conventions.py`: thêm encoding fix cho Windows — `import os` + `os.environ.setdefault("PYTHONIOENCODING", "utf-8")` + `sys.stdout.reconfigure(encoding="utf-8", errors="replace")`
+- `scripts/check_conventions.py`: sửa typo `fromfrom __future__ import annotations` → `from __future__ import annotations`; xóa duplicate `os.environ.setdefault()`
+- Dọn temp files: xóa `_fix_final.py`, `_fix_noqa.py`, `_fix_noqa2.py`, `_refix.py`

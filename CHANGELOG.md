@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## [2026-05-18] — Sửa tab navigation không chuyển được trong ws_executive
+- `workspaces/ws_executive.py` dòng ~1622–1642 — bỏ force-set `ws_exec_group_radio` và `item_key` mỗi lần render; chỉ force-set khi `jump_label` (sidebar jump) hoặc chưa init — tránh override click của user
+
+## [2026-05-18] — Sửa định dạng số KPI trong ws_executive (Tổng quan Chi nhánh)
+- `workspaces/ws_executive.py` dòng ~224 — hàm `_kpi_tang_truong()`: sửa `tdn`/`dqh` từ VND thô → `fmt_ty()` + suffix "triệu đ"; `nkh` → `fmt_so()` + suffix "hộ"; `tlqh` → `vn(tlqh, 2)` (dấu phẩy VN); thêm `vn` vào import utils
+
 ## [2026-05-18] — Phân biệt tab nhánh trong sidebar ws_management
 - `workspaces/ws_management.py` dòng ~1262 — tab nhánh chưa active: thêm markdown overlay indent 22px + màu trắng mờ 65% + ký tự ↳, giữ nguyên style active (● cam đậm)
 

@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## [2026-05-19] — QLNK: thêm tab "Kế hoạch" vào tab_no_khoanh.py
+- `tabs/tab_no_khoanh.py` dòng ~25 — thêm import `LY_DO_KHOANH_QD62`, `LY_DO_KHOANH_LABEL`
+- `tabs/tab_no_khoanh.py` dòng ~250 — đổi 6 → 7 tab, thêm "📅 Kế hoạch" (d5)
+- Đổi tên biến: d5 (Kiểm tra) → d6, d6 (Báo cáo) → d7
+- Thêm block `with d5:` — Form lập kế hoạch + danh sách kế hoạch
+
 ## [2026-05-19] — QLNK: cập nhật LY_DO_KHOANH_QD62 + thêm LY_DO_KHOANH_LABEL
 - `config.py` — thay thế `LY_DO_KHOANH_QD62` (11 mục, tách k1/k2 theo mức thiệt hại), thêm `LY_DO_KHOANH_LABEL` (nhãn rút gọn)
 

@@ -27,13 +27,25 @@ from config import (
 )
 from utils import fmt_so, fmt_ty, hien_thi_dataframe_phan_trang, xuat_excel
 import db
-import io as _io
-from docx import Document as _Document
-from docx.enum.text import WD_ALIGN_PARAGRAPH as _WD_ALIGN
-from docx.oxml import OxmlElement as _OxmlElem
-from docx.oxml.ns import qn as _qn
-from docx.shared import Cm as _Cm, Pt as _Pt
-from services.template_service import nut_tai_word_va_pdf, hien_thi_nut_tai
+from io import BytesIO
+from datetime import datetime
+from pathlib import Path
+
+try:
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import A4, landscape
+    from reportlab.lib.units import cm
+    from reportlab.lib.styles import ParagraphStyle
+    from reportlab.platypus import (
+        SimpleDocTemplate, Table, TableStyle, Paragraph,
+        Spacer, HRFlowable, Image as RLImage,
+    )
+    from reportlab.pdfbase import pdfmetrics
+    from reportlab.pdfbase.ttfonts import TTFont
+    from reportlab.lib.enums import TA_CENTER, TA_RIGHT, TA_LEFT
+    _REPORTLAB_READY = True
+except ImportError:
+    _REPORTLAB_READY = False
 
 COT_DU_NO_KHOANH = "Dư nợ khoanh"
 COT_NGAY_HH_KHOANH = "Ngày hết hạn Khoanh"

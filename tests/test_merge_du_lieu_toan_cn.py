@@ -567,7 +567,7 @@ class TestMergeRollback:
 
         write_call_count = {"n": 0}
 
-        def _fake_to_parquet(path, **kwargs):
+        def _fake_to_parquet(self_or_path, path_or_none=None, **kwargs):
             write_call_count["n"] += 1
             raise OSError("Disk full simulation")
 

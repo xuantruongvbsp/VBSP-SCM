@@ -564,6 +564,270 @@ def doc_ndt_dp_ma_list() -> list[str]:
     return [item["ma"] for item in doc_ndt_dp_list() if item.get("cap", "tinh") == "tinh"]
 
 
+# ══════════════════════════════════════════════════════════════════════════════
+# QLNK — Quản lý nợ khoanh
+# ══════════════════════════════════════════════════════════════════════════════
+
+_QLNK_KQ_COLS = [
+    "id", "ma_mon_vay", "ten_pgd", "ten_xa", "ten_to_tkv", "ten_kh",
+    "ngay_bat_dau_khoanh", "so_thang_khoanh", "so_quyet_dinh_khoanh",
+    "ngay_kiem_tra", "can_bo_kiem_tra",
+    "du_no_goc", "du_no_goc_khoanh", "so_tien_lai_con_no",
+    "du_no_goc_thuc_te", "du_no_khoanh_thuc_te", "so_tien_lai_thuc_te",
+    "chenh_lech", "ly_do_chenh_lech",
+    "thuc_trang_du_an", "tinh_hinh_khach_hang", "kha_nang_tra_no", "cam_ket_tra_no",
+    "trang_thai", "nguoi_nhap", "nguoi_phe_duyet", "ngay_phe_duyet",
+    "created_at", "updated_at",
+]
+
+
+def luu_ket_qua_kiem_tra(data: dict, username: str) -> int:
+    """
+    Insert hoặc update kết quả kiểm tra nợ khoanh.
+    - Nếu data có "id" và id tồn tại, trang_thai != 'da_phe_duyet' → UPDATE.
+    - Ngược lại → INSERT mới.
+    - Tự tính chenh_lech = du_no_goc_khoanh - du_no_khoanh_thuc_te
+      khi data không truyền chenh_lech (hoặc = 0) mà 2 giá trị kia khác 0.
+    - Ghi audit_log sau khi ghi thành công.
+    - Trả về id (int) của record vừa insert/update.
+    """
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    # Tự tính chenh_lech nếu cần
+    khoanh = float(data.get("du_no_goc_khoanh") or 0)
+    thuc_te = float(data.get("du_no_khoanh_thuc_te") or 0)
+    chenh_lech = float(data.get("chenh_lech") or 0)
+    if chenh_lech == 0 and (khoanh != 0 or thuc_te != 0):
+        chenh_lech = round(khoanh - thuc_te, 2)
+
+    try:
+        with get_conn() as conn:
+            record_id = data.get("id")
+            existing = None
+            if record_id:
+                existing = conn.execute(
+                    "SELECT id, trang_thai FROM qlnk_ket_qua WHERE id = ?",
+                    (record_id,),
+                ).fetchone()
+
+            if existing and existing["trang_thai"] != "da_phe_duyet":
+                # UPDATE
+                conn.execute(
+                    """UPDATE qlnk_ket_qua SET
+                        ma_mon_vay=?, ten_pgd=?, ten_xa=?, ten_to_tkv=?, ten_kh=?,
+                        ngay_bat_dau_khoanh=?, so_thang_khoanh=?, so_quyet_dinh_khoanh=?,
+                        ngay_kiem_tra=?, can_bo_kiem_tra=?,
+                        du_no_goc=?, du_no_goc_khoanh=?, so_tien_lai_con_no=?,
+                        du_no_goc_thuc_te=?, du_no_khoanh_thuc_te=?, so_tien_lai_thuc_te=?,
+                        chenh_lech=?, ly_do_chenh_lech=?,
+                        thuc_trang_du_an=?, tinh_hinh_khach_hang=?,
+                        kha_nang_tra_no=?, cam_ket_tra_no=?,
+                        trang_thai=?, nguoi_nhap=?, updated_at=?
+                    WHERE id=?""",
+                    (
+                        data.get("ma_mon_vay"), data.get("ten_pgd"),
+                        data.get("ten_xa"), data.get("ten_to_tkv"), data.get("ten_kh"),
+                        data.get("ngay_bat_dau_khoanh"), data.get("so_thang_khoanh"),
+                        data.get("so_quyet_dinh_khoanh"),
+                        data.get("ngay_kiem_tra"), data.get("can_bo_kiem_tra"),
+                        float(data.get("du_no_goc") or 0),
+                        khoanh,
+                        float(data.get("so_tien_lai_con_no") or 0),
+                        float(data.get("du_no_goc_thuc_te") or 0),
+                        thuc_te,
+                        float(data.get("so_tien_lai_thuc_te") or 0),
+                        chenh_lech, data.get("ly_do_chenh_lech"),
+                        data.get("thuc_trang_du_an"), data.get("tinh_hinh_khach_hang"),
+                        data.get("kha_nang_tra_no"), data.get("cam_ket_tra_no"),
+                        data.get("trang_thai", "luu_tam"), username, now,
+                        record_id,
+                    ),
+                )
+                conn.commit()
+                result_id = record_id
+            else:
+                # INSERT
+                cur = conn.execute(
+                    """INSERT INTO qlnk_ket_qua (
+                        ma_mon_vay, ten_pgd, ten_xa, ten_to_tkv, ten_kh,
+                        ngay_bat_dau_khoanh, so_thang_khoanh, so_quyet_dinh_khoanh,
+                        ngay_kiem_tra, can_bo_kiem_tra,
+                        du_no_goc, du_no_goc_khoanh, so_tien_lai_con_no,
+                        du_no_goc_thuc_te, du_no_khoanh_thuc_te, so_tien_lai_thuc_te,
+                        chenh_lech, ly_do_chenh_lech,
+                        thuc_trang_du_an, tinh_hinh_khach_hang,
+                        kha_nang_tra_no, cam_ket_tra_no,
+                        trang_thai, nguoi_nhap, updated_at
+                    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                    (
+                        data.get("ma_mon_vay"), data.get("ten_pgd"),
+                        data.get("ten_xa"), data.get("ten_to_tkv"), data.get("ten_kh"),
+                        data.get("ngay_bat_dau_khoanh"), data.get("so_thang_khoanh"),
+                        data.get("so_quyet_dinh_khoanh"),
+                        data.get("ngay_kiem_tra"), data.get("can_bo_kiem_tra"),
+                        float(data.get("du_no_goc") or 0),
+                        khoanh,
+                        float(data.get("so_tien_lai_con_no") or 0),
+                        float(data.get("du_no_goc_thuc_te") or 0),
+                        thuc_te,
+                        float(data.get("so_tien_lai_thuc_te") or 0),
+                        chenh_lech, data.get("ly_do_chenh_lech"),
+                        data.get("thuc_trang_du_an"), data.get("tinh_hinh_khach_hang"),
+                        data.get("kha_nang_tra_no"), data.get("cam_ket_tra_no"),
+                        data.get("trang_thai", "luu_tam"), username, now,
+                    ),
+                )
+                conn.commit()
+                result_id = cur.lastrowid
+
+        ghi_audit(
+            username, "luu_ket_qua_kiem_tra",
+            f"ma_mon_vay={data.get('ma_mon_vay')}, trang_thai={data.get('trang_thai', 'luu_tam')}",
+        )
+        return result_id
+    except Exception:
+        raise
+
+
+def phe_duyet_ket_qua(record_id: int, username: str) -> bool:
+    """
+    Chuyển trang_thai → 'da_phe_duyet'.
+    Chỉ hợp lệ khi trang_thai hiện tại là 'luu_tam' hoặc 'mo_phe_duyet'.
+    Trả về True nếu thành công, False nếu không tìm thấy hoặc không hợp lệ.
+    """
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    try:
+        with get_conn() as conn:
+            row = conn.execute(
+                "SELECT trang_thai FROM qlnk_ket_qua WHERE id = ?", (record_id,)
+            ).fetchone()
+            if not row or row["trang_thai"] not in ("luu_tam", "mo_phe_duyet"):
+                return False
+            conn.execute(
+                """UPDATE qlnk_ket_qua
+                   SET trang_thai='da_phe_duyet', nguoi_phe_duyet=?,
+                       ngay_phe_duyet=?, updated_at=?
+                   WHERE id=?""",
+                (username, now, now, record_id),
+            )
+            conn.commit()
+        ghi_audit(username, "phe_duyet_ket_qua", f"id={record_id}")
+        return True
+    except Exception:
+        return False
+
+
+def mo_phe_duyet(record_id: int, username: str) -> bool:
+    """
+    Chuyển trang_thai từ 'da_phe_duyet' → 'mo_phe_duyet'.
+    Xóa nguoi_phe_duyet và ngay_phe_duyet (NULL).
+    Trả về True/False, không raise exception.
+    """
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    try:
+        with get_conn() as conn:
+            row = conn.execute(
+                "SELECT trang_thai FROM qlnk_ket_qua WHERE id = ?", (record_id,)
+            ).fetchone()
+            if not row or row["trang_thai"] != "da_phe_duyet":
+                return False
+            conn.execute(
+                """UPDATE qlnk_ket_qua
+                   SET trang_thai='mo_phe_duyet', nguoi_phe_duyet=NULL,
+                       ngay_phe_duyet=NULL, updated_at=?
+                   WHERE id=?""",
+                (now, record_id),
+            )
+            conn.commit()
+        ghi_audit(username, "mo_phe_duyet_ket_qua", f"id={record_id}")
+        return True
+    except Exception:
+        return False
+
+
+def doc_ket_qua_kiem_tra(
+    ten_pgd: str = None,
+    ma_mon_vay: str = None,
+    trang_thai: str = None,
+) -> list[dict]:
+    """
+    Đọc danh sách kết quả kiểm tra nợ khoanh.
+    Lọc AND theo ten_pgd / ma_mon_vay / trang_thai nếu được truyền (None = bỏ qua).
+    Trả về list[dict] ORDER BY ngay_kiem_tra DESC, id DESC.
+    """
+    try:
+        clauses, params = [], []
+        if ten_pgd is not None:
+            clauses.append("ten_pgd = ?")
+            params.append(ten_pgd)
+        if ma_mon_vay is not None:
+            clauses.append("ma_mon_vay = ?")
+            params.append(ma_mon_vay)
+        if trang_thai is not None:
+            clauses.append("trang_thai = ?")
+            params.append(trang_thai)
+
+        where = ("WHERE " + " AND ".join(clauses)) if clauses else ""
+        sql = f"""SELECT {', '.join(_QLNK_KQ_COLS)}
+                  FROM qlnk_ket_qua {where}
+                  ORDER BY ngay_kiem_tra DESC, id DESC"""
+        with get_conn() as conn:
+            rows = conn.execute(sql, params).fetchall()
+        return [dict(r) for r in rows]
+    except Exception:
+        return []
+
+
+def luu_bo_sung_mon_vay(
+    ma_mon_vay: str,
+    ten_pgd: str,
+    data: dict,
+    username: str,
+) -> None:
+    """
+    Upsert thông tin bổ sung cho 1 món vay vào qlnk_bo_sung.
+    Mỗi ma_mon_vay có đúng 1 dòng (UNIQUE).
+    Không raise exception — lỗi chỉ ghi audit.
+    """
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    try:
+        with get_conn() as conn:
+            conn.execute(
+                """INSERT OR REPLACE INTO qlnk_bo_sung
+                   (ma_mon_vay, ten_pgd,
+                    ngay_bat_dau_khoanh, so_thang_khoanh, so_quyet_dinh_khoanh,
+                    ghi_chu, nguoi_cap_nhat, updated_at)
+                   VALUES (?,?,?,?,?,?,?,?)""",
+                (
+                    ma_mon_vay, ten_pgd,
+                    data.get("ngay_bat_dau_khoanh"),
+                    data.get("so_thang_khoanh"),
+                    data.get("so_quyet_dinh_khoanh"),
+                    data.get("ghi_chu"),
+                    username, now,
+                ),
+            )
+            conn.commit()
+        ghi_audit(username, "luu_bo_sung_mon_vay", f"ma_mon_vay={ma_mon_vay}")
+    except Exception as e:
+        ghi_audit(username, "loi_luu_bo_sung_mon_vay", f"ma_mon_vay={ma_mon_vay}, err={e}")
+
+
+def doc_bo_sung_mon_vay(ma_mon_vay: str) -> dict | None:
+    """
+    Đọc thông tin bổ sung của 1 món vay từ qlnk_bo_sung.
+    Trả về dict hoặc None nếu chưa có / lỗi.
+    """
+    try:
+        with get_conn() as conn:
+            row = conn.execute(
+                "SELECT * FROM qlnk_bo_sung WHERE ma_mon_vay = ?", (ma_mon_vay,)
+            ).fetchone()
+        return dict(row) if row else None
+    except Exception:
+        return None
+
+
 # Khởi tạo DB, migrate dữ liệu cũ, sau đó seed cấu hình động
 init_db()
 migrate_from_json()

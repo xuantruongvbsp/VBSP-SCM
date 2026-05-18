@@ -203,3 +203,5 @@ Upload flow:
 - `scripts/check_conventions.py`: thêm encoding fix cho Windows — `import os` + `os.environ.setdefault("PYTHONIOENCODING", "utf-8")` + `sys.stdout.reconfigure(encoding="utf-8", errors="replace")`
 - `scripts/check_conventions.py`: sửa typo `fromfrom __future__ import annotations` → `from __future__ import annotations`; xóa duplicate `os.environ.setdefault()`
 - Dọn temp files: xóa `_fix_final.py`, `_fix_noqa.py`, `_fix_noqa2.py`, `_refix.py`
+- `.streamlit/config.toml`: đổi theme `light` → `dark` (nền tối `#0E1117`, chữ trắng `#FFFFFF`, primary `#42A5F5`)
+- `app.py`: rewrite toàn bộ CSS (18 section) từ light theme → dark theme — sidebar navy `#1A1D2E`, main area `#0E1117`, card `#1E2130`, border `#2A2D3E`, chữ sáng `#CBD5E1`/`#F0F4F8`; giữ nguyên màu xanh `#2E7D32` accent

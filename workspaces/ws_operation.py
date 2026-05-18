@@ -1220,6 +1220,7 @@ def render(**kwargs):
         tab_tongquan, tab_tien_do, tab_baocao,
         tab_nq11, tab_candoi, tab_uy_thac, tab_qd62,
         tab_trang_thai_nguon, tab_so_sanh_ky,
+        tab_no_khoanh,
     )
     from tabs.tab_den_han import render as render_den_han
 

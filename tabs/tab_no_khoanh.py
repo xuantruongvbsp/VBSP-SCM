@@ -9,7 +9,7 @@ import pandas as pd
 import streamlit as st
 from streamlit.delta_generator import DeltaGenerator
 
-from auth import la_phan_he_cn, normalize_role
+from auth import la_phan_he_cn, normalize_role, get_permissions
 from config import (
     COT_DU_NO_QH,
     COT_DVUT,
@@ -24,8 +24,11 @@ from config import (
     DS_PGD,
 )
 from utils import fmt_so, fmt_ty, hien_thi_dataframe_phan_trang, xuat_excel
+import db
 
 COT_DU_NO_KHOANH = "Dư nợ khoanh"
+COT_NGAY_HH_KHOANH = "Ngày hết hạn Khoanh"
+COT_TEN_TO = "Tên tổ"
 
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -242,11 +245,13 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
         st.divider()
 
         # ── Sub-tabs ──────────────────────────────────────────────────────
-        d1, d2, d3, d4 = st.tabs([
+        d1, d2, d3, d4, d5, d6 = st.tabs([
             "📋 Theo Chương trình",
             "🏘️ Theo Xã",
             "🤝 Theo Hội đoàn thể",
             "📄 Danh sách chi tiết",
+            "✏️ Kiểm tra",
+            "📊 Báo cáo",
         ])
 
         for dtab, nhom_col, tag, label in [

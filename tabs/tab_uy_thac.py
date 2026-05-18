@@ -1405,16 +1405,15 @@ def _render_bien_ban(df: pd.DataFrame, pgd_user: str) -> None:
 # ENTRY POINT
 # ══════════════════════════════════════════════════════════════════════════════
 
-from utils import get_tab_context
+from tabs.base_tab import TabContext
 
 def render(tab: DeltaGenerator, **kwargs) -> None:
     """Entry point — dùng chung cho ws_operation và ws_management."""
+    ctx = TabContext(tab, **kwargs)
     df       = kwargs.get("df")
-    pgd_user = kwargs.get("pgd_user", "")
+    pgd_user = ctx.pgd_user
 
-    import streamlit as _st
-    _tab_ctx = tab if tab is not None else _st.container()
-    with _tab_ctx:
+    with ctx:
         st.subheader("🤝 Ủy thác — Hội đoàn thể")
         st.caption(
             "Theo dõi hoạt động ủy thác và các mẫu biểu kiểm tra "

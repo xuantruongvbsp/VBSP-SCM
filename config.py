@@ -505,6 +505,35 @@ NGUYEN_NHAN_RR = [
 # ── KV key prefix cho Nợ rủi ro ──────────────────────────────────────────────
 KV_PREFIX_NO_RUI_RO = "no_rui_ro_"
 
+# ── Lý do khoanh nợ theo QĐ62 (dùng trong QLNK) ─────────────────────────────
+LY_DO_KHOANH_QD62 = {
+    "k1_3nam":  "K1 — Thiên tai, dịch bệnh (thiệt hại 40–79%, khoanh 3 năm)",
+    "k1_5nam":  "K1 — Thiên tai, dịch bệnh (thiệt hại 80–100%, khoanh 5 năm)",
+    "k2_3nam":  "K2 — Nhà nước thay đổi chính sách (thiệt hại 40–79%, khoanh 3 năm)",
+    "k2_5nam":  "K2 — Nhà nước thay đổi chính sách (thiệt hại 80–100%, khoanh 5 năm)",
+    "k2_cham":  "K2 — Rủi ro K1/K2 nhưng xử lý chậm (khoanh 3 năm)",
+    "k3":       "K3 — Biến động kinh tế - chính trị - xã hội (khoanh 3 năm)",
+    "k4a":      "K4a — Mắc bệnh hiểm nghèo/tâm thần/mất NLHVDS/suy giảm KNLĐ ≥81%/chết/mất tích",
+    "k4b":      "K4b — Bị bệnh cần chữa trị dài ngày (danh mục TT 46/2016/TT-BYT)",
+    "k4c":      "K4c — Vắng mặt tại nơi cư trú ≥2 năm, không có thông tin xác thực",
+    "k5":       "K5 — Có bản án/QĐ Tòa án, chưa đủ điều kiện thi hành án (khoanh 3 năm)",
+    "k_bs":     "Khoanh nợ bổ sung — Hết hạn khoanh, chưa có khả năng trả nợ",
+}
+
+LY_DO_KHOANH_LABEL = {
+    "k1_3nam":  "K1 — Thiên tai/dịch bệnh (3 năm)",
+    "k1_5nam":  "K1 — Thiên tai/dịch bệnh (5 năm)",
+    "k2_3nam":  "K2 — Thay đổi chính sách (3 năm)",
+    "k2_5nam":  "K2 — Thay đổi chính sách (5 năm)",
+    "k2_cham":  "K2 — Xử lý chậm (3 năm)",
+    "k3":       "K3 — Biến động KT-CT-XH",
+    "k4a":      "K4a — Bệnh hiểm nghèo/chết/mất tích",
+    "k4b":      "K4b — Bệnh chữa trị dài ngày",
+    "k4c":      "K4c — Vắng mặt ≥2 năm",
+    "k5":       "K5 — Bản án/QĐ Tòa án",
+    "k_bs":     "Khoanh bổ sung",
+}
+
 # ── Thông tin đơn vị ─────────────────────────────────────────────────────────
 # "Hội sở Chi nhánh tỉnh" = PGD địa bàn Biên Hòa (key nội bộ, khớp cột Tên PGD trong HSTD)
 # TEN_CHI_NHANH_HIEN_THI = nhãn hiển thị toàn Chi nhánh trên UI

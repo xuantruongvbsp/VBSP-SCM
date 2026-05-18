@@ -17,6 +17,12 @@ import pandas as pd
 
 import db
 try:
+    from logger import get_logger
+    logger = get_logger(__name__)
+except Exception:
+    import logging
+    logger = logging.getLogger(__name__)
+try:
     from upload_service import KetQuaUpload
 except Exception:
     from services.upload_service import KetQuaUpload
@@ -126,6 +132,7 @@ def luu_snapshot(df_full: pd.DataFrame, username: str) -> KetQuaUpload:
     rows.append(_agg(df, "__CN__", "ALL", "ALL"))
 
     so_dong = 0
+    logger.info("luu_snapshot: bắt đầu kỳ=%s, %d dòng tổng hợp", ky, len(rows))
     try:
         with db.get_conn() as conn:
             for (pgd, ct, nv, tdn, dth, dqh, dnk, so_ho, so_ku, gn_nam) in rows:
@@ -153,9 +160,11 @@ def luu_snapshot(df_full: pd.DataFrame, username: str) -> KetQuaUpload:
                 )
                 so_dong += 1
             conn.commit()
+        logger.info("luu_snapshot: hoàn thành kỳ=%s, đã ghi %d dòng", ky, so_dong)
         db.ghi_audit(username, "luu_snapshot", f"Kỳ {ky} — {so_dong} dòng")
         return KetQuaUpload(True, f"✅ Đã lưu snapshot kỳ **{ky}** ({so_dong} dòng tổng hợp)")
     except Exception as e:
+        logger.error("luu_snapshot: thất bại kỳ=%s — %s", ky, e, exc_info=True)
         db.ghi_audit(username, "luu_snapshot_loi", str(e))
         return KetQuaUpload(False, f"❌ Lỗi lưu snapshot: {e}")
 

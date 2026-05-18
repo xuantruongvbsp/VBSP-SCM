@@ -1,5 +1,23 @@
 # CHANGELOG
 
+## [2026-05-18] — Nâng cấp Tab Điểm Giao Dịch — thêm trường + tìm kiếm + xuất khẩu
+- `tabs/tab_quan_ly_dgd.py` — thêm `_normalize_entry()`, `_dgd_to_rows()` (backward compat list→dict); thêm tab "🔍 Tìm kiếm" đầu tiên với lọc PGD/Xã + tìm nhanh + xuất Excel/PDF; form Thêm mới & Xem & Sửa bổ sung 4 trường: Địa chỉ, Người phụ trách, SĐT, Lịch GD; lưu dict thay vì list
+- `tabs/tab_diem_gd_pgd.py` — tương tự, scope chỉ PGD đăng nhập; thêm `_render_tim_kiem_pgd()`
+
+## [2026-05-18] — Nâng cấp tab Tiến độ Báo cáo của PGD — deadline + trạng thái + role
+- `tabs/tab_tien_do_nop.py` — viết lại toàn bộ: thêm 3 sub-tab (Tổng quan / Danh sách nộp / Cài đặt deadline); deadline lưu kv_store key `bao_cao_deadline_config`; phân loại 🟢 Đúng hạn / 🟡 Trễ / 🔴 Chưa nộp; ma trận PGD × Loại báo cáo; role-based (admin_cn/manager_cn thấy tab Cài đặt; PGD chỉ thấy dữ liệu của mình)
+
+## [2026-05-18] — Tab Tiến độ: thêm toggle Ẩn đơn vị đã hoàn thành trong Cập nhật tiến độ
+- `tabs/tab_tien_do.py` dòng ~777 — thêm `st.toggle("Ẩn đơn vị đã hoàn thành")` sau progress bar; khi bật, `kq_hien_thi` chỉ gồm đơn vị `chua_thuc_hien`, data editor chỉ hiện đơn vị chưa làm
+- `tabs/tab_tien_do.py` dòng ~863 — cập nhật caption `c_info` hiển thị `👁 Đang ẩn N đã hoàn thành` khi toggle bật
+- `tabs/tab_tien_do.py` dòng ~779 — fix: gắn `an_da_ht` vào `editor_key` để tránh xung đột session state khi toggle bật/tắt (key cũ không đổi → Streamlit reset checkbox về mặc định khi data shape thay đổi)
+
+## [2026-05-18] — Tab Tiến độ: sửa dropdown chọn đầu việc — thêm ngày BĐ/KT + trạng thái rõ ràng
+- `tabs/tab_tien_do.py` dòng ~430–445 — `_fmt_task()`: thay `[ĐANG]`/`[ĐÓNG]` → `🟢 Đang thực hiện`/`⚠️ Đã hết hạn`/`🔒 Đã đóng`; thêm `BĐ: {ngày bắt đầu}` và `KT: {ngày kết thúc}` vào dòng dropdown
+- `tabs/tab_tien_do.py` dòng ~660–680 — `_render_cap_nhat()` dropdown `① CHỌN ĐẦU VIỆC`: thêm `_fmt_cap_nhat_opt()` hiển thị trạng thái + ngày BĐ + ngày KT
+- `tabs/tab_tien_do.py` dòng ~690–720 — info section sau chọn đầu việc: tách ngày BĐ, ngày KT ra 3 cột riêng, badge `🔴 Quá hạn` → `⚠️ Đã hết hạn`, `🟢 Còn hạn` → `🟢 Đang thực hiện`
+- `tabs/tab_tien_do.py` dòng ~1149–1165 — `_fmt_task_pdf()` trong Xuất báo cáo: đồng bộ format mới
+
 ## [2026-05-18] — Highlight cam parent accordion khi child active trong ws_management sidebar
 - `workspaces/ws_management.py` dòng ~1225 — khi `is_child_active=True`, thay `st.button()` bằng markdown div cam (cùng style tab đơn active); parent tự mở và highlight mà không toggle; khi không có child active vẫn giữ button toggle bình thường
 

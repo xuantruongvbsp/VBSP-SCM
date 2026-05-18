@@ -162,6 +162,55 @@ def init_db():
             );
             CREATE INDEX IF NOT EXISTS idx_snapshot_ky     ON hstd_snapshot(ky);
             CREATE INDEX IF NOT EXISTS idx_snapshot_pgd    ON hstd_snapshot(ky, ten_pgd);
+
+            CREATE TABLE IF NOT EXISTS qlnk_ket_qua (
+                id                      INTEGER PRIMARY KEY AUTOINCREMENT,
+                ma_mon_vay              TEXT    NOT NULL,
+                ten_pgd                 TEXT    NOT NULL,
+                ten_xa                  TEXT,
+                ten_to_tkv              TEXT,
+                ten_kh                  TEXT,
+                ngay_bat_dau_khoanh     TEXT,
+                so_thang_khoanh         INTEGER,
+                so_quyet_dinh_khoanh    TEXT,
+                ngay_kiem_tra           TEXT    NOT NULL,
+                can_bo_kiem_tra         TEXT,
+                du_no_goc               REAL    DEFAULT 0,
+                du_no_goc_khoanh        REAL    DEFAULT 0,
+                so_tien_lai_con_no      REAL    DEFAULT 0,
+                du_no_goc_thuc_te       REAL    DEFAULT 0,
+                du_no_khoanh_thuc_te    REAL    DEFAULT 0,
+                so_tien_lai_thuc_te     REAL    DEFAULT 0,
+                chenh_lech              REAL    DEFAULT 0,
+                ly_do_chenh_lech        TEXT,
+                thuc_trang_du_an        TEXT,
+                tinh_hinh_khach_hang    TEXT,
+                kha_nang_tra_no         TEXT,
+                cam_ket_tra_no          TEXT,
+                trang_thai              TEXT    NOT NULL DEFAULT 'luu_tam',
+                nguoi_nhap              TEXT    NOT NULL,
+                nguoi_phe_duyet         TEXT,
+                ngay_phe_duyet          TEXT,
+                created_at              TEXT    NOT NULL DEFAULT (datetime('now','localtime')),
+                updated_at              TEXT    NOT NULL DEFAULT (datetime('now','localtime'))
+            );
+            CREATE INDEX IF NOT EXISTS idx_qlnk_kq_ma_mon  ON qlnk_ket_qua(ma_mon_vay);
+            CREATE INDEX IF NOT EXISTS idx_qlnk_kq_pgd     ON qlnk_ket_qua(ten_pgd);
+            CREATE INDEX IF NOT EXISTS idx_qlnk_kq_ngay_kt ON qlnk_ket_qua(ngay_kiem_tra);
+            CREATE INDEX IF NOT EXISTS idx_qlnk_kq_tt      ON qlnk_ket_qua(trang_thai);
+
+            CREATE TABLE IF NOT EXISTS qlnk_bo_sung (
+                id                      INTEGER PRIMARY KEY AUTOINCREMENT,
+                ma_mon_vay              TEXT    NOT NULL UNIQUE,
+                ten_pgd                 TEXT    NOT NULL,
+                ngay_bat_dau_khoanh     TEXT,
+                so_thang_khoanh         INTEGER,
+                so_quyet_dinh_khoanh    TEXT,
+                ghi_chu                 TEXT,
+                nguoi_cap_nhat          TEXT,
+                updated_at              TEXT    NOT NULL DEFAULT (datetime('now','localtime'))
+            );
+            CREATE INDEX IF NOT EXISTS idx_qlnk_bs_ma ON qlnk_bo_sung(ma_mon_vay);
         """)
         try:
             conn.execute(

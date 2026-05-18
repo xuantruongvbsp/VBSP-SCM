@@ -128,23 +128,23 @@ h3 { font-size: 1.1rem  !important; font-weight: 600 !important; color: #1a3a5c 
 [data-testid="stAppViewContainer"] > .main { background: #f0f4f8 !important; }
 .block-container { padding: 1.5rem 2rem 2rem !important; max-width: 1400px !important; }
 
-/* ── 3. SIDEBAR — Dark Green NHCSXH ── */
+/* ── 3. SIDEBAR — White ── */
 [data-testid="stSidebar"] {
-    background: linear-gradient(180deg, #1B5E20 0%, #2E7D32 55%, #388E3C 100%) !important;
-    border-right: none !important;
-    box-shadow: 4px 0 16px rgba(0,0,0,0.18) !important;
+    background: #FFFFFF !important;
+    border-right: 1px solid #e0e0e0 !important;
+    box-shadow: 4px 0 12px rgba(0,0,0,0.06) !important;
 }
 
 [data-testid="stSidebar"] h1,
 [data-testid="stSidebar"] h2,
 [data-testid="stSidebar"] h3 {
-    color: #FFFFFF !important;
+    color: #1B5E20 !important;
     font-weight: 700;
 }
 
 [data-testid="stSidebar"] label,
 [data-testid="stSidebar"] .stMarkdown p {
-    color: rgba(255,255,255,0.85) !important;
+    color: #546e7a !important;
     font-size: 11px !important;
     font-weight: 700 !important;
     text-transform: uppercase;
@@ -154,13 +154,13 @@ h3 { font-size: 1.1rem  !important; font-weight: 600 !important; color: #1a3a5c 
 [data-testid="stSidebar"] p,
 [data-testid="stSidebar"] span,
 [data-testid="stSidebar"] [data-testid="stCaptionContainer"] p {
-    color: rgba(255,255,255,0.8) !important;
+    color: #37474f !important;
 }
 
 [data-testid="stSidebar"] .stButton > button {
-    background-color: #1565C0 !important;
-    color: #FFFFFF !important;
-    border: 1.5px solid #0D47A1 !important;
+    background-color: #f1f8e9 !important;
+    color: #2E7D32 !important;
+    border: 1.5px solid #a5d6a7 !important;
     border-radius: 10px;
     width: 100%;
     text-align: left;
@@ -173,10 +173,10 @@ h3 { font-size: 1.1rem  !important; font-weight: 600 !important; color: #1a3a5c 
 }
 
 [data-testid="stSidebar"] .stButton > button:hover {
-    background-color: #1976D2 !important;
-    border-color: #1565C0 !important;
-    color: #FFFFFF !important;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+    background-color: #e8f5e9 !important;
+    border-color: #66bb6a !important;
+    color: #1B5E20 !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.10);
     transform: translateX(2px);
 }
 
@@ -189,16 +189,16 @@ h3 { font-size: 1.1rem  !important; font-weight: 600 !important; color: #1a3a5c 
 }
 
 [data-testid="stSidebar"] hr {
-    border-color: rgba(255,255,255,0.2);
+    border-color: #e0e0e0;
     margin: 12px 0;
 }
 
 /* Tab con trong sidebar (bọc trong st.columns) */
 [data-testid="stSidebar"] [data-testid="column"] .stButton > button {
-    background-color: rgba(255,255,255,0.10) !important;
-    color: #FFFFFF !important;
+    background-color: #f5f5f5 !important;
+    color: #2E7D32 !important;
     font-weight: 600 !important;
-    border: 1px solid rgba(255,255,255,0.25) !important;
+    border: 1px solid #c8e6c9 !important;
     font-size: 13px !important;
     padding: 7px 12px !important;
     margin-bottom: 3px !important;
@@ -206,15 +206,15 @@ h3 { font-size: 1.1rem  !important; font-weight: 600 !important; color: #1a3a5c 
     transform: none !important;
 }
 [data-testid="stSidebar"] [data-testid="column"] .stButton > button:hover {
-    background-color: rgba(255,255,255,0.20) !important;
-    border-color: rgba(255,255,255,0.45) !important;
-    color: #FFFFFF !important;
+    background-color: #e8f5e9 !important;
+    border-color: #81c784 !important;
+    color: #1B5E20 !important;
     transform: none !important;
 }
 
 [data-testid="stSidebar"] .stAlert {
-    background-color: rgba(0,0,0,0.15);
-    border: 1px solid rgba(255,255,255,0.2);
+    background-color: #f9fbe7;
+    border: 1px solid #dcedc8;
     border-radius: 8px;
     font-size: 12px;
 }

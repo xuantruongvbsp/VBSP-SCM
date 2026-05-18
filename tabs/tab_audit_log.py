@@ -131,12 +131,14 @@ def _render_full(role: str, username_filter: str | None = None) -> None:
         ngay_tu = st.date_input(
             "Từ ngày",
             value=datetime.today() - timedelta(days=7),
+            format="DD/MM/YYYY",
             key="audit_tu",
         ).strftime("%Y-%m-%d")
     with c2:
         ngay_den = st.date_input(
             "Đến ngày",
             value=datetime.today(),
+            format="DD/MM/YYYY",
             key="audit_den",
         ).strftime("%Y-%m-%d")
     with c3:

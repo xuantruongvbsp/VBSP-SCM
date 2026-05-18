@@ -1,5 +1,18 @@
 # CHANGELOG
 
+## [2026-05-18] — Đổi sidebar từ xanh đậm sang trắng
+- `app.py` dòng ~131–220 — Sidebar background #FFFFFF, border xám nhạt, text xám/xanh đậm, button xanh lá nhạt
+
+## [2026-05-18] — Rà soát toàn bộ codebase: thêm format="DD/MM/YYYY" cho tất cả st.date_input
+- `tabs/tab_tien_do.py` — đã có `format="DD/MM/YYYY"` cho toàn bộ 7 widget từ đợt trước
+- `tabs/tab_phoi_hop_pgd.py` — thêm format cho 4 widget (Ngày giao, Ngày kết thúc × 2 form)
+- `tabs/tab_no_rui_ro.py` — thêm format cho 8 widget (Ngày rủi ro, Ngày ký QĐ, Từ ngày, Đến ngày × 3 form + Ngày lập)
+- `tabs/tab_audit_log.py` — thêm format cho 2 widget (Từ ngày, Đến ngày)
+- `tabs/tab_nhiem_vu.py` — thêm format cho 1 widget (Ngày deadline)
+- `tabs/tab_tien_do_nop.py` — thêm format cho 1 widget (Deadline)
+- `workspaces/ws_operation.py` — thêm format cho 1 widget (Ngày họp)
+- Nguyên nhân: Streamlit mặc định hiển thị date_input theo locale hệ thống (MM/DD/YYYY) nếu không set format
+
 ## [2026-05-18] — Fix lỗi "Mixing dicts with non-Series" khi xác nhận lưu tiến độ
 - `tabs/tab_tien_do.py` dòng ~813 — fix: thay vì đọc `editor_key` (trả về state dict `{"edited_rows":...}` gây crash `pd.DataFrame()`) hoặc `_data` (bị ghi đè stale sau `st.rerun()`), nay đọc state dict rồi áp `edited_rows` lên `df_edit.copy()` để lấy DataFrame đúng với edits của user
 

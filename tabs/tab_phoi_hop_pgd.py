@@ -72,8 +72,8 @@ def _render_tao_moi(username: str) -> None:
                                             placeholder="Họ tên cán bộ theo dõi",
                                             key="ph_cb_pt")
         with c2:
-            ngay_giao = st.date_input("Ngày giao", value=date.today(), key="ph_ngay_giao")
-            ngay_ket_thuc = st.date_input("Ngày kết thúc", value=date.today(), key="ph_ngay_kt")
+            ngay_giao = st.date_input("Ngày giao", value=date.today(), format="DD/MM/YYYY", key="ph_ngay_giao")
+            ngay_ket_thuc = st.date_input("Ngày kết thúc", value=date.today(), format="DD/MM/YYYY", key="ph_ngay_kt")
 
         st.markdown("**Đơn vị PGD liên quan**")
         _cc1, _cc2, _cc3 = st.columns(3)
@@ -264,8 +264,8 @@ def _render_chinh_sua(username: str) -> None:
                 ngay_kt_def = date.fromisoformat(item.get("ngay_ket_thuc") or date.today().isoformat())
             except Exception:
                 ngay_kt_def = date.today()
-            ngay_giao = st.date_input("Ngày giao", value=ngay_giao_def)
-            ngay_ket_thuc = st.date_input("Ngày kết thúc", value=ngay_kt_def)
+            ngay_giao = st.date_input("Ngày giao", value=ngay_giao_def, format="DD/MM/YYYY")
+            ngay_ket_thuc = st.date_input("Ngày kết thúc", value=ngay_kt_def, format="DD/MM/YYYY")
         noi_dung = st.text_area("Ghi chú", value=item.get("noi_dung") or "", height=80)
         submitted = st.form_submit_button("💾 Lưu thay đổi", type="primary")
 

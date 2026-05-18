@@ -279,7 +279,7 @@ def _render_nhap_moi(tab, **kwargs):
             c3, c4 = st.columns(2)
             with c3:
                 ngay_deadline = st.date_input(
-                    "Ngày deadline", value=None, key="nhap_moi_deadline"
+                    "Ngày deadline", value=None, format="DD/MM/YYYY", key="nhap_moi_deadline"
                 )
             with c4:
                 st.markdown("<br>", unsafe_allow_html=True)

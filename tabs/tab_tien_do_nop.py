@@ -349,9 +349,8 @@ def _render_cai_dat(df: pd.DataFrame, deadline_cfg: dict, username: str) -> None
 
     dl_moi = st.date_input(
         f"Deadline — **{loai_chon}** / kỳ **{ky_chon}**",
-        value=dl_default,
+        value=dl_default, format="DD/MM/YYYY",
         key="cd_dl_input",
-        format="DD/MM/YYYY",
     )
 
     if st.button("💾 Lưu deadline", key="cd_btn_luu", type="primary"):

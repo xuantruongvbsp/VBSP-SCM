@@ -1993,13 +1993,13 @@ def _render_workspace_cn(tab, **kwargs) -> None:
                                             key="cn_nrr_so_qd")
                 with c2:
                     ngay_qd = st.date_input("Ngày ký", value=date.today(),
-                                             key="cn_nrr_ngay_qd")
+                                             format="DD/MM/YYYY", key="cn_nrr_ngay_qd")
                 with c3:
                     ngay_bd = st.date_input("Từ ngày", value=date.today(),
-                                             key="cn_nrr_ngay_bd")
+                                             format="DD/MM/YYYY", key="cn_nrr_ngay_bd")
                 with c4:
                     ngay_kt = st.date_input("Đến ngày", value=date.today(),
-                                             key="cn_nrr_ngay_kt")
+                                             format="DD/MM/YYYY", key="cn_nrr_ngay_kt")
 
             thang_ht = datetime.now().month
             nam_ht   = datetime.now().year

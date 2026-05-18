@@ -112,7 +112,7 @@ def _render_tong_quan(tab, **kwargs):
         c1, c2, c3 = st.columns([2, 1, 1])
         with c1:
             ngay_loc = st.date_input("Thời hạn đến ngày",
-                                     value=date.today(), key="td_ngay")
+                                     value=date.today(), format="DD/MM/YYYY", key="td_ngay")
         with c2:
             loai_loc = st.selectbox("Lọc loại", ["Tất cả"] + list(LOAI_TASK.values()),
                                     key="td_loai")
@@ -328,10 +328,11 @@ Bỏ chọn nếu chỉ áp dụng cho một số PGD cụ thể.
                 )
             with c2:
                 deadline = st.date_input("Ngày kết thúc *", value=date.today(),
-                                          key="tao_task_deadline")
+                                          format="DD/MM/YYYY", key="tao_task_deadline")
                 ngay_bat_dau = st.date_input(
                     "Ngày bắt đầu",
                     value=date.today(),
+                    format="DD/MM/YYYY",
                     key="tao_task_ngay_bat_dau",
                 )
 
@@ -496,6 +497,7 @@ def _render_quan_ly_task(tab, **kwargs):
             deadline = st.date_input(
                 "Ngày kết thúc *",
                 value=deadline_default,
+                format="DD/MM/YYYY",
                 key=f"td_sua_deadline_{task_id}",
             )
             ghi_chu = st.text_area(
@@ -520,6 +522,7 @@ def _render_quan_ly_task(tab, **kwargs):
             ngay_bat_dau = st.date_input(
                 "Ngày bắt đầu",
                 value=ngay_bat_dau_val,
+                format="DD/MM/YYYY",
                 key=f"td_sua_ngay_bat_dau_{task_id}",
             )
             cap_theo_doi_keys = ["xa", "pgd"]
@@ -1019,9 +1022,9 @@ def _render_xuat(tab, **kwargs):
 
         c1, c2 = st.columns(2)
         with c1:
-            tu_ngay = st.date_input("Thời hạn từ", value=date.today(), key="td_x1")
+            tu_ngay = st.date_input("Thời hạn từ", value=date.today(), format="DD/MM/YYYY", key="td_x1")
         with c2:
-            den_ngay = st.date_input("Thời hạn đến", value=date.today(), key="td_x2")
+            den_ngay = st.date_input("Thời hạn đến", value=date.today(), format="DD/MM/YYYY", key="td_x2")
 
         SS_PDF_BAOCAO = "_td_pdf_baocao"
 

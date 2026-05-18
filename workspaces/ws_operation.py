@@ -661,7 +661,7 @@ def _render_thong_bao_ket_luan(tab, **kwargs):
                 key="op_tb_ten_dgd",
                 help="Mặc định là tên xã, chỉnh lại nếu khác",
             )
-            tb_ngay = st.date_input("Ngày họp", value=date.today(), key="op_tb_ngay_hop")
+            tb_ngay = st.date_input("Ngày họp", value=date.today(), format="DD/MM/YYYY", key="op_tb_ngay_hop")
         with col_b:
             tb_so_vb = st.text_input(
                 "Số văn bản",

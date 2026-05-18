@@ -5,6 +5,15 @@ from __future__ import annotations
 import streamlit as st
 
 
+def _fmt_vn_num(val: str | float | int) -> str:
+    """Format số với dấu phân cách hàng nghìn kiểu Việt Nam (dấu chấm)."""
+    if isinstance(val, (int, float)):
+        if val == int(val):
+            return f"{int(val):,}".replace(",", ".")
+        return f"{val:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    return str(val)
+
+
 def delta_card(
     label: str,
     value: str | float | int,
@@ -33,7 +42,8 @@ def delta_card(
         key: Key cho Streamlit widget
         use_container_width: Tự động giãn chiều rộng
     """
-    display_value = f"{icon} {value}" if icon else str(value)
+    _value_str = _fmt_vn_num(value)
+    display_value = f"{icon} {_value_str}" if icon else _value_str
     if suffix:
         display_value = f"{display_value} {suffix}"
 

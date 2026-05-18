@@ -9,9 +9,7 @@ from utils import fmt_ty, fmt_so
 from tabs.base_tab import TabContext
 
 # ── Constants ─────────────────────────────────────────────────────────────
-from auth import normalize_role
-
-TRANG_THAI_QD62 = {
+_TRANG_THAI_QD62 = {
     "cho_duyet": "🟡 Chờ duyệt",
     "da_duyet":  "🟢 Đã duyệt",
     "tu_choi":   "🔴 Không duyệt",
@@ -267,24 +265,13 @@ def _render_xuat_bao_cao(df_qd62: pd.DataFrame, df_no_rr: pd.DataFrame) -> None:
 
 def render(tab=None, **kwargs) -> None:
     """Render Dashboard XLRR tổng hợp."""
-    role_raw = str(kwargs.get("role", "user") or "user")
-    role = normalize_role(role_raw)
-    if role not in ("admin_cn", "manager_cn"):
-        if tab is not None:
-            _ctx = tab
-        else:
-            import streamlit as _st
-            _ctx = _st.container()
-        with _ctx:
+    ctx = TabContext(tab, **kwargs)
+    if ctx.role_norm not in ("admin_cn", "manager_cn"):
+        with ctx:
             st.warning("Bạn không có quyền truy cập Dashboard XLRR tổng hợp.")
         return
 
-    if tab is not None:
-        _ctx = tab
-    else:
-        import streamlit as _st
-        _ctx = _st.container()
-    with _ctx:
+    with ctx:
         st.title("🔴 Quản lý Xử lý Rủi ro (XLRR)")
         st.caption("Tổng hợp hồ sơ QĐ62 và nợ rủi ro từ HSTD toàn Chi nhánh.")
 

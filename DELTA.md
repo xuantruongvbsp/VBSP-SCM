@@ -205,3 +205,5 @@ Upload flow:
 - Dọn temp files: xóa `_fix_final.py`, `_fix_noqa.py`, `_fix_noqa2.py`, `_refix.py`
 - `.streamlit/config.toml`: đổi theme `light` → `dark` (nền tối `#0E1117`, chữ trắng `#FFFFFF`, primary `#42A5F5`)
 - `app.py`: rewrite toàn bộ CSS (18 section) từ light theme → dark theme — sidebar navy `#1A1D2E`, main area `#0E1117`, card `#1E2130`, border `#2A2D3E`, chữ sáng `#CBD5E1`/`#F0F4F8`; giữ nguyên màu xanh `#2E7D32` accent
+- `tests/test_period_compare.py`: viết mới toàn bộ — 5 test class, 23 test method cho join_by_loan, classify_changes, roll_cure_rate, vintage_nqh, par_breakdown
+- `tabs/tab_ban_dai_dien.py`: fix ValueError "truth value of DataFrame is ambiguous" — thay `kwargs.get("df_full") or kwargs.get("df")` bằng check None/empty

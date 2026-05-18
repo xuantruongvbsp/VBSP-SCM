@@ -383,6 +383,9 @@ def merge_du_lieu_toan_cn(
             return ten_pgd, df, None
         except Exception as e:
             return ten_pgd, None, str(e)
+        except Exception as e:
+            logger.error("merge_du_lieu_toan_cn: lỗi đọc file PGD %s/%s — %s", ten_pgd, loai, e, exc_info=True)
+            return ten_pgd, None, str(e)
 
     from concurrent.futures import ThreadPoolExecutor, as_completed
 

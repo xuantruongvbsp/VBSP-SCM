@@ -560,7 +560,8 @@ def _render_van_ban(role: str, username: str) -> None:
 def render(tab, cap: str = "xa", **kwargs) -> None:
     role = kwargs.get("role", "user")
     username = kwargs.get("username", "unknown")
-    df_full = kwargs.get("df_full") or kwargs.get("df")
+    v = kwargs.get("df_full")
+    df_full = v if v is not None and not getattr(v, "empty", True) else kwargs.get("df")
 
     ctx = TabContext(tab, **kwargs)
     with ctx:

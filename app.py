@@ -195,10 +195,10 @@ h3 { font-size: 1.1rem  !important; font-weight: 600 !important; color: #1a3a5c 
 
 /* Tab con trong sidebar (bọc trong st.columns) */
 [data-testid="stSidebar"] [data-testid="column"] .stButton > button {
-    background-color: #FFFFFF !important;
-    color: #1a1a1a !important;
-    font-weight: 700 !important;
-    border: 1px solid #D0D0D0 !important;
+    background-color: rgba(255,255,255,0.10) !important;
+    color: #FFFFFF !important;
+    font-weight: 600 !important;
+    border: 1px solid rgba(255,255,255,0.25) !important;
     font-size: 13px !important;
     padding: 7px 12px !important;
     margin-bottom: 3px !important;
@@ -206,9 +206,9 @@ h3 { font-size: 1.1rem  !important; font-weight: 600 !important; color: #1a3a5c 
     transform: none !important;
 }
 [data-testid="stSidebar"] [data-testid="column"] .stButton > button:hover {
-    background-color: #F5F7FF !important;
-    border-color: #BDBDBD !important;
-    color: #1a1a1a !important;
+    background-color: rgba(255,255,255,0.20) !important;
+    border-color: rgba(255,255,255,0.45) !important;
+    color: #FFFFFF !important;
     transform: none !important;
 }
 

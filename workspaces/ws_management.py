@@ -52,6 +52,7 @@ from tabs import (
     tab_phoi_hop_pgd, tab_khtd_xuat,
 )
 from tabs import tab_checklist_bc
+from tabs import tab_quan_ly_dgd, tab_cdtotkvv
 from tabs import tab_xlrr_tong_hop
 from tabs import tab_upload_khnv
 from tabs import tab_audit_log
@@ -1118,8 +1119,15 @@ def _build_all_items(role: str, username: str, **kwargs) -> list:
     role_n = normalize_role(str(role or "user"))
 
     ALL_ITEMS = [
-        {"group": "Phối hợp với PGD", "label": "Tiến độ Công việc",        "icon": "calendar",  "fn": lambda: tab_tien_do.render(None, **kwargs)},
-        {"group": "Phối hợp với PGD", "label": "Tiến độ Báo cáo của PGD", "icon": "file",      "fn": lambda: tab_tien_do_nop.render(None, **kwargs)},
+        {
+            "group": "Phối hợp với PGD",
+            "label": "Tiến độ Công việc",
+            "icon": "calendar",
+            "children": [
+                {"label": "📅 Tiến độ Công việc",        "fn": lambda: tab_tien_do.render(None, **kwargs)},
+                {"label": "📋 Tiến độ Báo cáo của PGD", "fn": lambda: tab_tien_do_nop.render(None, **kwargs)},
+            ],
+        },
         {"group": "Giám sát",     "label": "Tổng quan CN", "icon": "chart-bar",      "fn": lambda: tab_tongquan.render(None, **kwargs)},
         {
             "group": "Giám sát",
@@ -1156,7 +1164,15 @@ def _build_all_items(role: str, username: str, **kwargs) -> list:
         {"group": "Báo cáo",       "label": "Checklist định kỳ", "icon": "calendar-check", "fn": lambda: tab_checklist_bc.render(None, **kwargs)},
         {"group": "Ủy Thác",       "label": "Ban Đại Diện HĐQT", "icon": "building",       "fn": lambda: tab_ban_dai_dien.render(None, cap="tinh", **kwargs)},
         {"group": "Ủy Thác",       "label": "Hội - Đoàn thể ủy thác", "icon": "handshake", "fn": lambda: tab_uy_thac.render(None, **kwargs)},
-        {"group": "Ủy Thác",       "label": "Điểm GD & Tổ TK&VV", "icon": "map-pin",        "fn": lambda: _render_dgd_to_tkvv(None, **kwargs)},
+        {
+            "group": "Ủy Thác",
+            "label": "Điểm GD & Tổ TK&VV",
+            "icon": "map-pin",
+            "children": [
+                {"label": "📍 Điểm Giao Dịch", "fn": lambda: tab_quan_ly_dgd.render(None, **kwargs)},
+                {"label": "🏘️ Tổ TK&VV",       "fn": lambda: tab_cdtotkvv.render(None, **dict(kwargs, cdto_mode="cn"))},
+            ],
+        },
     ]
 
     if can_upload:
@@ -1273,7 +1289,7 @@ def render_sidebar_menu(role: str, username: str, **kwargs):
                         _, col = st.columns([0.06, 0.94])
                         with col:
                             if st.button(
-                                child["label"],
+                                f"↳ {child['label']}",
                                 key=f"menu_child_{child['label']}",
                                 width="stretch",
                             ):

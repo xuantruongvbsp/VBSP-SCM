@@ -114,8 +114,8 @@ st.set_page_config(
 )
 
 # ── Theme init + CSS ────────────────────────────────────────────────────────────
-theme = init_theme()
-st.markdown(get_theme_css(theme), unsafe_allow_html=True)
+init_theme()
+st.markdown(get_theme_css(), unsafe_allow_html=True)
 
 # ── Logo VBSP ────────────────────────────────────────────────────────────────
 

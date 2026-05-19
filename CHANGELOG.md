@@ -1,5 +1,8 @@
 # CHANGELOG
 
+## [2026-05-19] — tab_tracuu: bổ sung Ngày sinh, Ngày cấp CMND, Nơi cấp CMND
+- `tabs/tab_tracuu.py` — import 3 constant mới; thêm vào `COLS_CAN` để đọc từ parquet; thêm vào `_NHOM_TRUONG["👤 Khách hàng"]`
+
 ## [2026-05-19] — Chuẩn mẫu PDF Cam kết trả nợ (Mẫu 02/QLNK)
 - `tabs/tab_no_khoanh.py` — cập nhật `_xuat_pdf_mau_02qlnk()` theo bố cục mẫu; tự điền thêm SĐT/địa chỉ/Ngày sinh/Ngày cấp+Nơi cấp CMND/ĐVUT/Tổ (fallback dấu chấm) và chỉnh câu kết “... trước pháp luật./”
 

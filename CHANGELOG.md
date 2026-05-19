@@ -1,5 +1,8 @@
 # CHANGELOG
 
+## [2026-05-19] — Chuẩn mẫu PDF Cam kết trả nợ (Mẫu 02/QLNK)
+- `tabs/tab_no_khoanh.py` — cập nhật `_xuat_pdf_mau_02qlnk()` theo bố cục mẫu; tự điền thêm SĐT/địa chỉ/Ngày sinh/Ngày cấp+Nơi cấp CMND/ĐVUT/Tổ (fallback dấu chấm) và chỉnh câu kết “... trước pháp luật./”
+
 ## [2026-05-19] — Fix lỗi tab Ban Đại Diện: TypeError truediv on str dtype
 - `tabs/tab_ban_dai_dien.py` dòng ~142 — thêm helper `_num()` dùng `pd.to_numeric(errors='coerce')` cho tất cả cột số trong `_tong_hop_theo_pgd()` trước khi chia 1e6
 

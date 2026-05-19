@@ -61,6 +61,41 @@ from alert_center import render_alert_sidebar
 from utils_theme import init_theme, get_theme_css
 
 
+def _toi_uu_dtype(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Giảm working memory của DataFrame sau khi load:
+      - string cột ≤ 200 giá trị duy nhất → category  (10–20× nhỏ hơn)
+      - float64 → float32 cho cột số thực              (~50% nhỏ hơn)
+      - int64   → int32/int16 nếu giá trị vừa           (~50% nhỏ hơn)
+    Không đụng cột tiền tệ lớn (>1e9) để tránh overflow float32.
+    """
+    NGUONG_CATEGORY = 200
+
+    for col in df.select_dtypes(include="object").columns:
+        try:
+            if df[col].nunique(dropna=False) <= NGUONG_CATEGORY:
+                df[col] = df[col].astype("category")
+        except Exception:
+            pass
+
+    for col in df.select_dtypes(include="float64").columns:
+        try:
+            col_max = df[col].abs().max(skipna=True)
+            # Giữ float64 cho cột tiền tệ lớn (VND) để không mất độ chính xác
+            if pd.isna(col_max) or col_max < 1e9:
+                df[col] = df[col].astype("float32")
+        except Exception:
+            pass
+
+    for col in df.select_dtypes(include="int64").columns:
+        try:
+            df[col] = pd.to_numeric(df[col], downcast="integer")
+        except Exception:
+            pass
+
+    return df
+
+
 @st.cache_resource(show_spinner=False, ttl=3600)
 def _load_hstd(
     cache_path: str,
@@ -95,7 +130,10 @@ def _load_hstd(
         sql += ' WHERE ' + ' AND '.join(where_clauses)
 
     try:
-        return duckdb.query(sql).df()
+        # self_destruct=True: Arrow giải phóng từng cột khi pandas nhận → peak thấp hơn
+        arrow_tbl = duckdb.query(sql).arrow()
+        df = arrow_tbl.to_pandas(self_destruct=True)
+        return _toi_uu_dtype(df)
     except Exception:
         return pd.DataFrame()
 

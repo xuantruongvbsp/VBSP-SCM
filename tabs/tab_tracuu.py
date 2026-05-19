@@ -13,7 +13,8 @@ from config import (
     COT_NGAY_VAY, COT_NGAY_DH, COT_THOI_HAN, COT_LAI_SUAT,
     COT_MUC_VAY, COT_DU_NO_TH, COT_DU_NO_QH, COT_TONG_DU_NO,
     COT_TEN_CT, COT_TINH_TRANG, COT_DIA_CHI, COT_SDT, COT_GOC_TRA,
-    COT_CMND, COT_TEN_TO, COT_TEN_XA, COT_TEN_THON,
+    COT_CMND, COT_NGAY_SINH, COT_NGAY_CAP_CMND, COT_NOI_CAP_CMND,
+    COT_TEN_TO, COT_TEN_XA, COT_TEN_THON,
     COT_NGUON_VON, COT_MA_NHA_DAU_TU, COT_MA_CHUONG_TRINH,
     COT_TEN_HSSV, COT_TEN_VC,
     NGUON_VON_LABEL,
@@ -138,7 +139,8 @@ def _nv_str(val) -> str:
 
 _NHOM_TRUONG = {
     "👤 Khách hàng": [
-        "Họ tên khách hàng", "Mã khách hàng", "CMND/CCCD", "Ngày sinh",
+        "Họ tên khách hàng", "Mã khách hàng", "CMND/CCCD",
+        COT_NGAY_SINH, COT_NGAY_CAP_CMND, COT_NOI_CAP_CMND,
         "Giới tính", "Số điện thoại", "Địa chỉ", "Dân tộc",
         "Tên HSSV", "Tên vợ/chồng",
     ],
@@ -458,6 +460,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
     # PGD role: dùng df đã lọc theo PGD — không mở rộng phạm vi dữ liệu.
     COLS_CAN = [
         COT_TEN_PGD, COT_MA_KH, COT_TEN_KH, COT_CMND,
+        COT_NGAY_SINH, COT_NGAY_CAP_CMND, COT_NOI_CAP_CMND,
         COT_SO_KU, COT_SDT, COT_DIA_CHI, COT_TEN_TO, COT_TEN_XA, COT_TEN_THON,
         COT_TEN_HSSV, COT_TEN_VC,
         COT_NGAY_VAY, COT_NGAY_DH, COT_THOI_HAN, COT_LAI_SUAT,

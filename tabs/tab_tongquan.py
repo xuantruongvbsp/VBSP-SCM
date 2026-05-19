@@ -195,6 +195,158 @@ def _cache_heatmap_pgd(
     )
 
 
+@st.cache_data(ttl=120, show_spinner=False)
+def _cache_co_cau_ct(
+    _df: pd.DataFrame,
+    ts: float,
+    pgd_filter: str,
+    col_khoanh: str,
+    col_gn: str,
+    cols_tn_key: str,
+) -> pd.DataFrame:
+    """Cache groupby chương trình tín dụng — trả về df_ct raw (số nguyên VND).
+    Dùng ts + pgd_filter làm cache key; _df có underscore để Streamlit bỏ qua hash."""
+    _ = (ts, pgd_filter)
+    _df_loc = _df[_df[COT_TONG_DU_NO].fillna(0) > 0].copy()
+
+    _nv = pd.to_numeric(_df_loc.get(COT_NGUON_VON, pd.Series(dtype="float64")), errors="coerce")
+    du_no_tw = _df_loc[_nv == 1].groupby(COT_TEN_CT)[COT_TONG_DU_NO].sum()
+    du_no_dp = _df_loc[_nv == 2].groupby(COT_TEN_CT)[COT_TONG_DU_NO].sum()
+
+    _so_kh_by_ct  = _df.groupby(COT_TEN_CT)[COT_MA_KH].nunique()
+    _so_mon_by_ct = _df.groupby(COT_TEN_CT)[COT_MA_KH].count()
+
+    df_ct = (
+        _df_loc.groupby(COT_TEN_CT)
+        .agg(du_no=(COT_TONG_DU_NO, "sum"), _tmp=(COT_TONG_DU_NO, "count"))
+        .sort_values("du_no", ascending=False)
+        .reset_index()
+    )
+    df_ct = df_ct.rename(columns={"COT_TEN_CT": "ten_ct"})
+    df_ct.columns = ["ten_ct", "du_no", "_tmp"]
+    df_ct["so_kh"]  = df_ct["ten_ct"].map(_so_kh_by_ct).fillna(0).astype(int)
+    df_ct["so_mon"] = df_ct["ten_ct"].map(_so_mon_by_ct).fillna(0).astype(int)
+    df_ct.drop(columns=["_tmp"], inplace=True)
+
+    tong = df_ct["du_no"].sum()
+    df_ct["ty_trong"] = (df_ct["du_no"] / tong * 100).round(1) if tong > 0 else 0.0
+    df_ct["du_no_tw"] = df_ct["ten_ct"].map(du_no_tw).fillna(0)
+    df_ct["du_no_dp"] = df_ct["ten_ct"].map(du_no_dp).fillna(0)
+
+    if COT_DU_NO_QH in _df.columns:
+        _qh = _df_loc.groupby(COT_TEN_CT)[COT_DU_NO_QH].sum().reset_index()
+        _qh.columns = ["ten_ct", "du_no_qh"]
+        df_ct = df_ct.merge(_qh, on="ten_ct", how="left")
+    else:
+        df_ct["du_no_qh"] = 0.0
+    df_ct["du_no_qh"] = df_ct["du_no_qh"].fillna(0)
+
+    if col_khoanh and col_khoanh in _df.columns:
+        _nk = _df_loc.groupby(COT_TEN_CT)[col_khoanh].sum().reset_index()
+        _nk.columns = ["ten_ct", "du_no_khoanh"]
+        df_ct = df_ct.merge(_nk, on="ten_ct", how="left")
+    else:
+        df_ct["du_no_khoanh"] = 0.0
+    df_ct["du_no_khoanh"] = df_ct["du_no_khoanh"].fillna(0)
+
+    if col_gn and col_gn in _df.columns:
+        _gn = _df_loc.groupby(COT_TEN_CT)[col_gn].sum().reset_index()
+        _gn.columns = ["ten_ct", "gn_nam"]
+        df_ct = df_ct.merge(_gn, on="ten_ct", how="left")
+    else:
+        df_ct["gn_nam"] = 0.0
+    df_ct["gn_nam"] = df_ct["gn_nam"].fillna(0).replace([float("inf"), float("-inf")], 0)
+
+    cols_tn = [c for c in cols_tn_key.split(",") if c and c in _df.columns]
+    if cols_tn:
+        _tn = _df_loc.groupby(COT_TEN_CT)[cols_tn].sum().sum(axis=1).reset_index()
+        _tn.columns = ["ten_ct", "tn_nam"]
+        df_ct = df_ct.merge(_tn, on="ten_ct", how="left")
+    else:
+        df_ct["tn_nam"] = 0.0
+    df_ct["tn_nam"] = df_ct["tn_nam"].fillna(0).replace([float("inf"), float("-inf")], 0)
+
+    return df_ct
+
+
+@st.cache_data(ttl=120, show_spinner=False)
+def _cache_tqpgd_extended(
+    _df: pd.DataFrame,
+    ts: float,
+    pgd_filter: str,
+    col_khoanh: str,
+    col_cv: str,
+    cols_thu_key: str,
+    nam_ht: str,
+) -> pd.DataFrame:
+    """Cache toàn bộ bảng tổng quan PGD (đã merge các cột bổ sung) — trả về số VND thô.
+    Lọc/format thực hiện bên ngoài để không phình cache."""
+    _ = (ts, pgd_filter, nam_ht)
+    df_pgd = _df.groupby(COT_TEN_PGD, as_index=False).agg(
+        du_no=(COT_TONG_DU_NO, "sum"),
+        so_kh=(COT_MA_KH, "nunique"),
+        nqh=(COT_DU_NO_QH, "sum"),
+    )
+
+    if col_khoanh and col_khoanh in _df.columns:
+        _kh = _df.groupby(COT_TEN_PGD, as_index=False).agg(**{col_khoanh: (col_khoanh, "sum")})
+    else:
+        _kh = _df.groupby(COT_TEN_PGD, as_index=False).agg(**{"khoanh_tmp": (COT_MA_KH, "size")})
+        col_khoanh = "khoanh_tmp"
+    df_pgd = df_pgd.merge(_kh, on=COT_TEN_PGD, how="left")
+    df_pgd = df_pgd.rename(columns={col_khoanh: "du_no_khoanh"})
+    df_pgd["du_no_khoanh"] = pd.to_numeric(df_pgd["du_no_khoanh"], errors="coerce").fillna(0)
+
+    if COT_LAI_TON in _df.columns:
+        _lt = (
+            _df.groupby(COT_TEN_PGD)[COT_LAI_TON]
+            .apply(lambda x: pd.to_numeric(x, errors="coerce").fillna(0).sum())
+            .reset_index(name="lai_ton")
+        )
+        df_pgd = df_pgd.merge(_lt, on=COT_TEN_PGD, how="left")
+    else:
+        df_pgd["lai_ton"] = 0.0
+    df_pgd["lai_ton"] = pd.to_numeric(df_pgd["lai_ton"], errors="coerce").fillna(0)
+
+    if COT_NGAY_DH in _df.columns:
+        _df_dh = _df[[COT_TEN_PGD, COT_NGAY_DH, COT_TONG_DU_NO]].copy()
+        _df_dh[COT_NGAY_DH] = pd.to_datetime(_df_dh[COT_NGAY_DH], dayfirst=True, errors="coerce")
+        _mask = _df_dh[COT_NGAY_DH].dt.year == int(nam_ht)
+        _dh = (
+            _df_dh[_mask]
+            .groupby(COT_TEN_PGD)[COT_TONG_DU_NO]
+            .apply(lambda x: pd.to_numeric(x, errors="coerce").fillna(0).sum())
+            .reset_index(name="no_dh_nam")
+        )
+        df_pgd = df_pgd.merge(_dh, on=COT_TEN_PGD, how="left")
+    else:
+        df_pgd["no_dh_nam"] = 0.0
+    df_pgd["no_dh_nam"] = pd.to_numeric(df_pgd["no_dh_nam"], errors="coerce").fillna(0)
+
+    if col_cv and col_cv in _df.columns:
+        _cv = (
+            _df.groupby(COT_TEN_PGD)[col_cv]
+            .apply(lambda x: pd.to_numeric(x, errors="coerce").fillna(0).sum())
+            .reset_index(name="ds_cho_vay")
+        )
+        df_pgd = df_pgd.merge(_cv, on=COT_TEN_PGD, how="left")
+    else:
+        df_pgd["ds_cho_vay"] = 0.0
+    df_pgd["ds_cho_vay"] = pd.to_numeric(df_pgd["ds_cho_vay"], errors="coerce").fillna(0)
+
+    cols_thu = [c for c in cols_thu_key.split(",") if c and c in _df.columns]
+    if cols_thu:
+        _thu = _df.groupby(COT_TEN_PGD)[cols_thu].apply(
+            lambda x: pd.to_numeric(x.stack(), errors="coerce").fillna(0).sum()
+        ).reset_index(name="ds_thu_no")
+        df_pgd = df_pgd.merge(_thu, on=COT_TEN_PGD, how="left")
+    else:
+        df_pgd["ds_thu_no"] = 0.0
+    df_pgd["ds_thu_no"] = pd.to_numeric(df_pgd["ds_thu_no"], errors="coerce").fillna(0)
+
+    return df_pgd
+
+
 def _tao_column_config_co_cau() -> dict[str, st.column_config.Column]:
     return {
         "Số món vay": st.column_config.NumberColumn(
@@ -540,71 +692,13 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
         st.markdown("**📂 Cơ cấu dư nợ theo chương trình tín dụng**")
         if COT_TEN_CT in df.columns and COT_TONG_DU_NO in df.columns:
 
-            _df_loc = df[df[COT_TONG_DU_NO].fillna(0) > 0].copy()
-
-            _nv = pd.to_numeric(_df_loc[COT_NGUON_VON], errors="coerce")
-            du_no_tw = _df_loc[_nv == 1].groupby(COT_TEN_CT)[COT_TONG_DU_NO].sum()
-            du_no_dp = _df_loc[_nv == 2].groupby(COT_TEN_CT)[COT_TONG_DU_NO].sum()
-
-            # so_kh + so_mon tính từ df gốc (không lọc dư nợ > 0) để không bỏ sót KH/dòng tất toán
-            _so_kh_by_ct = df.groupby(COT_TEN_CT)[COT_MA_KH].nunique()
-            _so_mon_by_ct = df.groupby(COT_TEN_CT)[COT_MA_KH].count()
-
-            df_ct = (
-                _df_loc.groupby(COT_TEN_CT)
-                .agg(
-                    du_no   =(COT_TONG_DU_NO, "sum"),
-                    so_mon  =(COT_TONG_DU_NO, "count"),  # temp, sẽ bị ghi đè
-                    so_kh   =(COT_MA_KH,      "nunique"),  # temp, sẽ bị ghi đè
-                )
-                .sort_values("du_no", ascending=False)
-                .reset_index()
+            _col_khoanh_ct = COT_DU_NO_KHOANH if COT_DU_NO_KHOANH in df.columns else ""
+            _col_gn_ct = next((c for c in HSTD_DS_CHO_VAY_NAM_ALIASES if c in df.columns), "")
+            _cols_tn_ct = ",".join(c for c in HSTD_THU_NO_NAM_ALIASES if c in df.columns)
+            df_ct = _cache_co_cau_ct(
+                df, ts, str(pgd_filter), _col_khoanh_ct, _col_gn_ct, _cols_tn_ct
             )
-            df_ct.columns = ["ten_ct", "du_no", "so_mon", "so_kh"]
-            df_ct["so_kh"] = df_ct["ten_ct"].map(_so_kh_by_ct).fillna(0).astype(int)
-            df_ct["so_mon"] = df_ct["ten_ct"].map(_so_mon_by_ct).fillna(0).astype(int)
-
-            tong = df_ct["du_no"].sum()
-            df_ct["ty_trong"] = (df_ct["du_no"] / tong * 100).round(1) if tong > 0 else 0
-
-            df_ct["du_no_tw"] = df_ct["ten_ct"].map(du_no_tw).fillna(0)
-            df_ct["du_no_dp"] = df_ct["ten_ct"].map(du_no_dp).fillna(0)
-
-            # Chỉ số bổ sung: join từ _df_loc grouped riêng nếu cột tồn tại
-            if COT_DU_NO_QH in df.columns:
-                df_ct2 = _df_loc.groupby(COT_TEN_CT)[COT_DU_NO_QH].sum().reset_index()
-                df_ct2.columns = ["ten_ct", "du_no_qh"]
-                df_ct = df_ct.merge(df_ct2, on="ten_ct", how="left")
-                df_ct["du_no_qh"] = df_ct["du_no_qh"].fillna(0)
-            else:
-                df_ct["du_no_qh"] = 0
-
-            col_khoanh = COT_DU_NO_KHOANH if COT_DU_NO_KHOANH in df.columns else None
-            if col_khoanh:
-                df_ct3 = _df_loc.groupby(COT_TEN_CT)[col_khoanh].sum().reset_index()
-                df_ct3.columns = ["ten_ct", "du_no_khoanh"]
-                df_ct = df_ct.merge(df_ct3, on="ten_ct", how="left")
-                df_ct["du_no_khoanh"] = df_ct["du_no_khoanh"].fillna(0)
-            else:
-                df_ct["du_no_khoanh"] = 0
-
-            col_gn = next((c for c in HSTD_DS_CHO_VAY_NAM_ALIASES if c in df.columns), None)
-            if col_gn:
-                df_ct4 = _df_loc.groupby(COT_TEN_CT)[col_gn].sum().reset_index()
-                df_ct4.columns = ["ten_ct", "gn_nam"]
-                df_ct = df_ct.merge(df_ct4, on="ten_ct", how="left")
-                df_ct["gn_nam"] = df_ct["gn_nam"].fillna(0).replace([float('inf'), float('-inf')], 0)
-            else:
-                df_ct["gn_nam"] = 0
-
-            cols_tn = [c for c in HSTD_THU_NO_NAM_ALIASES if c in df.columns]
-            if cols_tn:
-                df_ct5 = _df_loc.groupby(COT_TEN_CT)[cols_tn].sum().sum(axis=1).reset_index()
-                df_ct5.columns = ["ten_ct", "tn_nam"]
-                df_ct = df_ct.merge(df_ct5, on="ten_ct", how="left")
-                df_ct["tn_nam"] = df_ct["tn_nam"].fillna(0).replace([float('inf'), float('-inf')], 0)
-            else:
-                df_ct["tn_nam"] = 0
+            col_khoanh = _col_khoanh_ct or None
 
             # Hiển thị bảng
             # fmt_ty: VND → triệu đồng (chia /1_000_000). Tên cột phải ghi "(triệu đồng)"
@@ -722,32 +816,56 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                 ):
                     cot_lay.append(c)
             df = df[cot_lay]
-            df_pgd = _cache_heatmap_pgd(
-                df,
-                ts,
-                pgd_user,
-                pgd_filter,
-                COT_TEN_PGD,
-                COT_TONG_DU_NO,
-                COT_MA_KH,
-                COT_DU_NO_QH,
-            )
-            df_pgd = df_pgd.rename(
-                columns={
-                    "du_no": "Dư nợ (triệu đồng)",
-                    "so_kh": "Số KH",
-                    "nqh": "QH (triệu đồng)",
-                }
-            )
-            if col_khoanh in df.columns:
-                _kh = df.groupby(COT_TEN_PGD, as_index=False).agg(
-                    **{"Khoanh (triệu đồng)": (col_khoanh, "sum")}
+            # Resolve column lookups để làm cache key
+            _col_cv_pgd = next((c for c in HSTD_DS_CHO_VAY_NAM_ALIASES if c in df.columns), None)
+            if _col_cv_pgd is None:
+                _col_cv_pgd = next(
+                    (c for c in df.columns
+                     if "giải ngân" in str(c).replace("\n", " ").lower()
+                     and "tháng" not in str(c).lower()
+                     and ("trong năm" in str(c).replace("\n", " ").lower()
+                          or str(c).strip().lower().endswith("năm"))),
+                    None,
                 )
-            else:
-                _kh = df.groupby(COT_TEN_PGD, as_index=False).agg(
-                    **{"Khoanh (triệu đồng)": (COT_MA_KH, "size")}
-                )
-            df_pgd = df_pgd.merge(_kh, on=COT_TEN_PGD, how="left")
+            _thu_cols_pgd = [c for c in HSTD_THU_NO_NAM_ALIASES if c in df.columns]
+            if not _thu_cols_pgd:
+                _thu_cols_pgd = [
+                    c for c in df.columns
+                    if "thu nợ" in str(c).replace("\n", " ").lower()
+                    and "tháng" not in str(c).lower()
+                    and (
+                        "trong năm" in str(c).replace("\n", " ").lower()
+                        or ("năm" in str(c).lower()
+                            and any(x in str(c).replace("\n", " ").lower()
+                                    for x in ("th ", "qh ", "khoanh")))
+                    )
+                ]
+
+            df_pgd_raw = _cache_tqpgd_extended(
+                df, ts, str(pgd_filter),
+                col_khoanh if col_khoanh and col_khoanh in df.columns else "",
+                _col_cv_pgd or "",
+                ",".join(_thu_cols_pgd),
+                str(NAM_HT),
+            )
+            df_pgd = df_pgd_raw.rename(columns={
+                "du_no":        "Dư nợ (triệu đồng)",
+                "so_kh":        "Số KH",
+                "nqh":          "QH (triệu đồng)",
+                "du_no_khoanh": "Khoanh (triệu đồng)",
+                "lai_ton":      "Lãi tồn (triệu đồng)",
+                "no_dh_nam":    "Nợ ĐH năm (triệu đồng)",
+                "ds_cho_vay":   "DS Cho vay (triệu đồng)",
+                "ds_thu_no":    "DS Thu nợ (triệu đồng)",
+            })
+            _cols_trieu = [
+                "Dư nợ (triệu đồng)", "QH (triệu đồng)", "Khoanh (triệu đồng)",
+                "Lãi tồn (triệu đồng)", "Nợ ĐH năm (triệu đồng)",
+                "DS Cho vay (triệu đồng)", "DS Thu nợ (triệu đồng)",
+            ]
+            for _c in _cols_trieu:
+                if _c in df_pgd.columns:
+                    df_pgd[_c] = (pd.to_numeric(df_pgd[_c], errors="coerce").fillna(0) / 1e6).round(0)
 
             # Bổ sung PGD trong DS_PGD nhưng không có dòng trong df → hiển thị với giá trị 0
             pgd_co_trong_bang = set(df_pgd[COT_TEN_PGD].tolist())
@@ -768,112 +886,10 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                         f"{', '.join(pgd_thieu_bang)}"
                     )
 
-            for cot in ["Dư nợ (triệu đồng)", "QH (triệu đồng)", "Khoanh (triệu đồng)"]:
-                if cot in df_pgd.columns:
-                    df_pgd[cot] = pd.to_numeric(df_pgd[cot], errors="coerce").fillna(0)
-            df_pgd["Dư nợ (triệu đồng)"] = (df_pgd["Dư nợ (triệu đồng)"] / 1e6).round(0)
-            df_pgd["QH (triệu đồng)"] = (df_pgd["QH (triệu đồng)"] / 1e6).round(0)
-            if col_khoanh in df.columns:
-                df_pgd["Khoanh (triệu đồng)"] = (df_pgd["Khoanh (triệu đồng)"] / 1e6).round(0)
-            else:
-                df_pgd["Khoanh (triệu đồng)"] = 0.0
-
-            # A) Lãi tồn (triệu đồng)
-            if COT_LAI_TON in df.columns:
-                _lai_ton = df.groupby(COT_TEN_PGD)[COT_LAI_TON].apply(
-                    lambda x: pd.to_numeric(x, errors="coerce").fillna(0).sum()
-                ).reset_index(name="Lãi tồn (triệu đồng)")
-                _lai_ton["Lãi tồn (triệu đồng)"] = (_lai_ton["Lãi tồn (triệu đồng)"] / 1e6).round(0)
-                df_pgd = df_pgd.merge(_lai_ton, on=COT_TEN_PGD, how="left")
-            else:
-                df_pgd["Lãi tồn (triệu đồng)"] = 0.0
-            df_pgd["Lãi tồn (triệu đồng)"] = pd.to_numeric(df_pgd["Lãi tồn (triệu đồng)"], errors="coerce").fillna(0.0)
-
-            # B) Nợ đến hạn trong năm (triệu đồng)
-            if COT_NGAY_DH in df.columns:
-                _df_dh = df.copy()
-                _df_dh[COT_NGAY_DH] = pd.to_datetime(_df_dh[COT_NGAY_DH], dayfirst=True, errors="coerce")
-                _mask = _df_dh[COT_NGAY_DH].dt.year == int(NAM_HT)
-                _dh = (
-                    _df_dh[_mask]
-                    .groupby(COT_TEN_PGD)[COT_TONG_DU_NO]
-                    .apply(lambda x: pd.to_numeric(x, errors="coerce").fillna(0).sum())
-                    .reset_index(name="Nợ ĐH năm (triệu đồng)")
-                )
-                _dh["Nợ ĐH năm (triệu đồng)"] = (_dh["Nợ ĐH năm (triệu đồng)"] / 1e6).round(0)
-                df_pgd = df_pgd.merge(_dh, on=COT_TEN_PGD, how="left")
-            else:
-                df_pgd["Nợ ĐH năm (triệu đồng)"] = 0.0
-            df_pgd["Nợ ĐH năm (triệu đồng)"] = pd.to_numeric(
-                df_pgd["Nợ ĐH năm (triệu đồng)"], errors="coerce"
-            ).fillna(0.0)
-
-            # C) Doanh số cho vay năm (triệu đồng) — ưu tiên tên chuẩn GQVL + alias
-            _col_cv = next(
-                (c for c in HSTD_DS_CHO_VAY_NAM_ALIASES if c in df.columns),
-                None,
-            )
-            if _col_cv is None:
-                _col_cv = next(
-                    (
-                        c
-                        for c in df.columns
-                        if "giải ngân" in str(c).replace("\n", " ").lower()
-                        and "tháng" not in str(c).lower()
-                        and (
-                            "trong năm" in str(c).replace("\n", " ").lower()
-                            or str(c).strip().lower().endswith("năm")
-                        )
-                    ),
-                    None,
-                )
-            if _col_cv is not None:
-                _cv = df.groupby(COT_TEN_PGD)[_col_cv].apply(
-                    lambda x: pd.to_numeric(x, errors="coerce").fillna(0).sum()
-                ).reset_index(name="DS Cho vay (triệu đồng)")
-                _cv["DS Cho vay (triệu đồng)"] = (_cv["DS Cho vay (triệu đồng)"] / 1e6).round(0)
-                df_pgd = df_pgd.merge(_cv, on=COT_TEN_PGD, how="left")
-            else:
-                df_pgd["DS Cho vay (triệu đồng)"] = 0.0
-            df_pgd["DS Cho vay (triệu đồng)"] = pd.to_numeric(
-                df_pgd["DS Cho vay (triệu đồng)"], errors="coerce"
-            ).fillna(0.0)
-
-            # D) Doanh số thu nợ năm (triệu đồng)
-            _thu_cols = [c for c in HSTD_THU_NO_NAM_ALIASES if c in df.columns]
-            if not _thu_cols:
-                _thu_cols = [
-                    c
-                    for c in df.columns
-                    if "thu nợ" in str(c).replace("\n", " ").lower()
-                    and "tháng" not in str(c).lower()
-                    and (
-                        "trong năm" in str(c).replace("\n", " ").lower()
-                        or (
-                            "năm" in str(c).lower()
-                            and any(
-                                x in str(c).replace("\n", " ").lower()
-                                for x in ("th ", "qh ", "khoanh")
-                            )
-                        )
-                    )
-                ]
-            if _thu_cols:
-                _df_thu = df.copy()
-                for _c in _thu_cols:
-                    _df_thu[_c] = pd.to_numeric(_df_thu[_c], errors="coerce").fillna(0)
-                _df_thu["_thu_no_nam"] = _df_thu[_thu_cols].sum(axis=1)
-                _thu = _df_thu.groupby(COT_TEN_PGD)["_thu_no_nam"].sum().reset_index(name="DS Thu nợ (triệu đồng)")
-                _thu["DS Thu nợ (triệu đồng)"] = (_thu["DS Thu nợ (triệu đồng)"] / 1e6).round(0)
-                df_pgd = df_pgd.merge(_thu, on=COT_TEN_PGD, how="left")
-            else:
-                df_pgd["DS Thu nợ (triệu đồng)"] = 0.0
-            df_pgd["DS Thu nợ (triệu đồng)"] = pd.to_numeric(
-                df_pgd["DS Thu nợ (triệu đồng)"], errors="coerce"
-            ).fillna(0.0)
-
-            if _col_cv is None or not _thu_cols:
+            if not _col_cv_pgd or not _thu_cols_pgd:
                 st.caption("⚠️ Không có cột DS Cho vay/Thu nợ trong HSTD")
+            _col_cv = _col_cv_pgd
+            _thu_cols = _thu_cols_pgd
 
             df_pgd["TL QH %"] = ((df_pgd["QH (triệu đồng)"] / df_pgd["Dư nợ (triệu đồng)"].replace(0, pd.NA)) * 100).fillna(0).round(2)
             df_pgd["TL Khoanh %"] = ((df_pgd["Khoanh (triệu đồng)"] / df_pgd["Dư nợ (triệu đồng)"].replace(0, pd.NA)) * 100).fillna(0).round(2)

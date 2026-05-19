@@ -1121,16 +1121,7 @@ def _build_all_items(role: str, username: str, **kwargs) -> list:
 
     ALL_ITEMS = [
         {"group": "Thông tin chung", "label": "📊 Thông tin chung", "icon": "info-circle", "fn": lambda: tab_tongquan.render(None, **kwargs)},
-        {
-            "group": "Phối hợp với PGD",
-            "label": "Tiến độ Công việc",
-            "icon": "calendar",
-            "children": [
-                {"label": "📅 Tiến độ công việc", "fn": lambda: tab_tien_do.render(None, **kwargs)},
-            ],
-        },
-        {"group": "Phối hợp với PGD", "label": "📋 Quản lý Báo cáo", "icon": "file-text", "fn": lambda: tab_quan_ly_bc.render(None, **kwargs)},
-        {"group": "Phối hợp với PGD", "label": "📌 Quản lý Nhiệm vụ PGD", "icon": "check", "fn": lambda: tab_nhiem_vu.render(None, **kwargs)},
+        {"group": "Phối hợp với PGD", "label": "📊 Quản lý Công việc & Nhiệm vụ", "icon": "layout", "fn": lambda: tab_quan_ly_cv.render(None, **kwargs)},
         {
             "group": "Giám sát",
             "label": "Cảnh báo NQH",

@@ -40,6 +40,7 @@ from utils import (
 from services.excel_service import ExcelReport, xuat_excel_chuyen_nghiep, ten_file_xuat as excel_ten_file
 from pdf_service import xuat_pdf_bao_cao, xuat_pdf, kiem_tra_pdf_dependency, render_huong_dan
 from tabs import tab_khtd_giao_dc, tab_kiem_soat, tab_qd62, tab_tien_do, tab_so_sanh_ky
+from tabs import tab_qlnk_dashboard
 from snapshot_service import doc_snapshot, doc_snapshot_range, danh_sach_ky
 from services.hhi_service import tinh_hhi, tinh_hhi_breakdown, danh_gia_hhi
 from components.delta_card import delta_card, kpi_row
@@ -1478,6 +1479,7 @@ def _build_exec_items(df_full, role: str, username: str, **kwargs) -> list:
         {"group": "Cảnh báo rủi ro", "label": "HHI — Tập trung rủi ro",     "fn": lambda: _hhi_giam_sat(df_full)},
         {"group": "Cảnh báo rủi ro", "label": "NQH theo Xã",                "fn": lambda: _render_nqh_xa_canh_bao(df_full)},
         {"group": "Cảnh báo rủi ro", "label": "Migration & Chuyển dịch nợ", "fn": lambda: _render_migration_section(df_full, username)},
+        {"group": "Cảnh báo rủi ro", "label": "📊 Tổng hợp nợ khoanh",     "fn": lambda: tab_qlnk_dashboard.render(None, **kwargs)},
         {"group": "Kiểm soát",       "label": "Kiểm soát CN",                "fn": lambda: tab_kiem_soat.render_tab(df_full, role, username)},
         {"group": "Kiểm soát",       "label": "Nợ rủi ro QĐ62",             "fn": lambda: tab_qd62.render(mode="cn")},
         {"group": "Kiểm soát",       "label": "Giao & Điều chỉnh KHTD",     "fn": lambda: tab_khtd_giao_dc.render(None, **kwargs)},

@@ -1,5 +1,8 @@
 # CHANGELOG
 
+## [2026-05-19] — Bổ sung CONVENTIONS.md: role table, pgd_mode, component API
+- `CONVENTIONS.md` — thêm bảng 7 role đầy đủ (bao gồm chuyenvien_cn); thêm pgd_mode pattern; thêm component API signatures chuẩn (kpi_row, download_pdf_button, loan_detail_drawer, filter_bar)
+
 ## [2026-05-19] — Viết CONVENTIONS.md từ STABLE.md + CHANGELOG
 - `CONVENTIONS.md` — tạo mới: 9 lỗi bị cấm, conventions tích cực, checklist trước khi sinh code
 

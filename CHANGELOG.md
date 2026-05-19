@@ -1,5 +1,26 @@
 # CHANGELOG
 
+## [2026-05-19] — Fix: cache không được xóa sau khi merge 22 PGD
+- `tabs/tab_upload_khnv.py` dòng ~1501 và ~1392 — thêm xóa session_state keys (`_ctx`, `_ctx_cache_key`, `df_full`...) sau merge để buộc app.py reload data mới từ parquet; trước đây chỉ `cache_data.clear()` không đủ vì `_load_hstd` dùng `@st.cache_resource`
+
+## [2026-05-19] — Fix: merge_du_lieu_toan_cn lỗi fillna("") trên ArrowDtype(int64)
+- `services/upload_service.py` dòng ~487 — trước `fillna("")`, convert ArrowDtype columns về `object` để tránh lỗi `pyarrow.lib.ArrowInvalid: Could not convert '' with type str: tried to convert to int64`
+
+## [2026-05-19] — Phase 4: Cảnh báo nợ khoanh sắp hết hạn + badge sidebar + shortcut jump
+- `alert_center.py` — Task 4.1: thêm `canh_bao_no_khoanh_sap_het_han(df_kh)` parse ngày, tính `con_lai`, phân loại ≤30 ngày (khan) vs 31-180 ngày (cảnh báo); Task 4.2: thêm `render_badge_no_khoanh_sap_het_han()` + `_get_khoanh_alert_data()` cache 600s; tích hợp vào `render_alert_sidebar()` hiển thị 🔴/🟠 nút bấm badge
+- `alert_center.py` — Task 4.3: click badge → set `st.session_state.ws_mgmt_jump = "🔒 Nợ khoanh"` + `st.session_state._qlnk_filter = "sap_het_han"` → `st.rerun()`
+- `tabs/tab_no_khoanh.py` — Task 4.3: pop `_qlnk_filter`, nếu `== "sap_het_han"` → hiển thị bảng M03 lọc món có `con_lai ≤ 180`, sắp xếp theo ngày còn lại
+- `app.py` — không cần sửa vì `render_alert_sidebar()` đã được gọi sẵn trong sidebar
+
+## [2026-05-19] — Fix: KPI tab Nợ khoanh sai khi lọc theo PGD
+- `tabs/tab_no_khoanh.py` — đảo thứ tự: filter PGD thực hiện TRƯỚC khi tính KPI
+- KPI (Số món, Số hộ, Tổng khoanh) nay tính từ `df_kh` đã filter; tỷ lệ khoanh/tổng dùng `use_df_scope` cùng scope PGD
+
+## [2026-05-19] — Phase 3 Task 3.1+3.2: Dashboard Tổng hợp Nợ khoanh
+- `tabs/tab_qlnk_dashboard.py` — **TẠO MỚI**: Dashboard KPI + biểu đồ tròn lý do khoanh (Plotly) + cột ngang dư nợ theo PGD + Top 10 món khoanh lớn nhất; KPI: Tổng món khoanh, Tỷ lệ kiểm tra, Sắp hết hạn, Dư nợ khoanh; dùng `db.doc_bo_sung_mon_vay()` để lấy lý do khoanh từ qlnk_bo_sung
+- `workspaces/ws_management.py` — thêm `tab_qlnk_dashboard` import; thêm menu "📊 Tổng hợp nợ khoanh" vào nhóm Kiểm soát
+- `workspaces/ws_executive.py` — thêm `tab_qlnk_dashboard` import; thêm menu "📊 Tổng hợp nợ khoanh" vào nhóm Cảnh báo rủi ro
+
 ## [2026-05-19] — Fix: Thêm hàm stub doc_ke_hoach_kiem_tra(), luu_ke_hoach_kiem_tra(), duyet_ke_hoach() vào db.py
 - `db.py` — 3 hàm stub (trả về [] hoặc True) để tránh ModuleNotFoundError khi render tab Nợ khoanh
 - Các hàm này chưa có implementation đầy đủ — TODO trong PR tiếp theo

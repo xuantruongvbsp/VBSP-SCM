@@ -1111,8 +1111,8 @@ def _build_all_items(role: str, username: str, **kwargs) -> list:
     role_n = normalize_role(str(role or "user"))
 
     ALL_ITEMS = [
-        {"group": "Thông tin chung", "label": "📊 Thông tin chung", "icon": "info-circle", "fn": lambda: tab_tongquan.render(None, **kwargs)},
-        {"group": "Phối hợp với PGD", "label": "📊 Quản lý Công việc & Nhiệm vụ", "icon": "layout", "fn": lambda: tab_quan_ly_cv.render(None, **kwargs)},
+        {"group": "Thông tin chung", "label": "📊 Thông tin chung", "icon": "info-circle", "fn": lambda: _get_tab("tab_tongquan").render(None, **kwargs)},
+        {"group": "Phối hợp với PGD", "label": "📊 Quản lý Công việc & Nhiệm vụ", "icon": "layout", "fn": lambda: _get_tab("tab_quan_ly_cv").render(None, **kwargs)},
         {
             "group": "Giám sát",
             "label": "Cảnh báo NQH",

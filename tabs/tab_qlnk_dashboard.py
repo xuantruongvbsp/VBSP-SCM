@@ -124,7 +124,7 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
 
     ctx = tab if tab is not None else st.container()
     with ctx:
-        st.subheader("📊 Tổng hợp Nợ khoanh")
+        st.subheader("📊 Chuyên Đề Nợ Khoanh — Tổng hợp")
         st.caption(
             "Dashboard tổng quan tình hình nợ khoanh toàn Chi nhánh. "
             "KPI · Biểu đồ lý do khoanh · Dư nợ theo PGD · Top 10 món lớn nhất."
@@ -228,7 +228,7 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
             else:
                 st.info(
                     "Chưa có dữ liệu phân loại lý do khoanh. "
-                    "Vào tab **🔒 Nợ khoanh → Kế hoạch → Bổ sung** để nhập."
+                    "Vào tab **🔒 Chuyên Đề Nợ Khoanh → Kế hoạch → Bổ sung** để nhập."
                 )
 
         with c_bar:

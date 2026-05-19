@@ -1390,6 +1390,8 @@ def _fragment_merge_toan_cn():
                     st.session_state.pop(f"can_merge_{loai}", None)
 
                 st.cache_data.clear()
+                for _k in ["_ctx", "_ctx_cache_key", "_pgd_map_cache_ts", "_pgd_xa_map_cached", "_ds_pgd_all_cached", "df_full"]:
+                    st.session_state.pop(_k, None)
 
                 username = st.session_state.get("username", "unknown")
                 db.ghi_audit(username, "merge_toan_cn",
@@ -1499,6 +1501,8 @@ def render(tab=None, **kwargs) -> None:
                     progress_bar.progress(1.0, text="✅ Hoàn tất!")
                     status_text.empty()
                     st.cache_data.clear()
+                    for _k in ["_ctx", "_ctx_cache_key", "_pgd_map_cache_ts", "_pgd_xa_map_cached", "_ds_pgd_all_cached", "df_full"]:
+                        st.session_state.pop(_k, None)
 
                     db.ghi_audit(
                         username,

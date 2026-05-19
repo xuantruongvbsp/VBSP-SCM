@@ -1657,7 +1657,7 @@ def _render_mau01_cv368(
     # ── Lọc món cần kiểm tra ────────────────────────────────────────────────
     da_co_mau02: set[str] = {
         item.get("so_ku", "")
-        for r in db.doc_mau_bieu_cv368(ten_pgd=pgd, loai_mau="MAU_02")
+        for r in _cached_mau_bieu_cv368(ten_pgd=pgd, loai_mau="MAU_02")
         for item in (r["noi_dung"].get("ds_mon") or [{"so_ku": r["noi_dung"].get("so_ku", "")}])
     }
     df_mon_kh = df_kh.copy()
@@ -2357,7 +2357,7 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
         # nhom="tongquan" | "cv368" | None (hiện cả 7 tab khi gọi standalone)
         nhom = kwargs.get("nhom")
         pgd_filter_bc = None if la_phan_he_cn(role) else pgd_user
-        rows_all_kt = db.doc_ket_qua_kiem_tra(ten_pgd=pgd_filter_bc)
+        rows_all_kt = _cached_ket_qua_kiem_tra(ten_pgd=pgd_filter_bc)
         da_kiem_tra_set = {r["ma_mon_vay"] for r in rows_all_kt}
 
         if nhom != "cv368":
@@ -2816,9 +2816,9 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
 
                     st.markdown("**Thông tin khoanh** *(bổ sung 1 lần nếu chưa có)*")
                     bs_data = (
-                        db.doc_bo_sung_mon_vay(chon_ku)
-                        if chon_ku and chon_ku != "— Chọn —" else None
-                    )
+                            _cached_bo_sung_mon_vay(chon_ku)
+                            if chon_ku and chon_ku != "— Chọn —" else None
+                        )
                     c3, c4, c5 = st.columns(3)
                     with c3:
                         ngay_bdk = st.text_input(
@@ -3409,7 +3409,7 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
             pgd_f = pgd_filter_bc
 
             with st.expander("📝 Kế hoạch kiểm tra nợ khoanh", expanded=False):
-                rows_kh_mb = db.doc_ke_hoach_kiem_tra(ten_pgd=pgd_f)
+                rows_kh_mb = _cached_ke_hoach_kiem_tra(ten_pgd=pgd_f)
                 if not rows_kh_mb:
                     st.info("ℹ️ Chưa có kế hoạch nào. Nhập kế hoạch ở phần trên.")
                 else:
@@ -3431,7 +3431,7 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                             df_kh[df_kh[COT_SO_KU] == ku]
                             if COT_SO_KU in df_kh.columns else pd.DataFrame()
                         )
-                        bs_ku = db.doc_bo_sung_mon_vay(str(ku)) or {}
+                        bs_ku = _cached_bo_sung_mon_vay(str(ku)) or {}
                         if not rows_hstd_ku.empty:
                             r_ku = rows_hstd_ku.iloc[0]
                             ds_mon_detail.append({
@@ -3483,7 +3483,7 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                         )
 
             with st.expander("📝 Mẫu 01/QLNK — Phiếu kiểm tra nợ khoanh", expanded=False):
-                rows_kh_01 = db.doc_ke_hoach_kiem_tra(ten_pgd=pgd_f, trang_thai="da_duyet")
+                rows_kh_01 = _cached_ke_hoach_kiem_tra(ten_pgd=pgd_f, trang_thai="da_duyet")
                 if not rows_kh_01:
                     st.info("ℹ️ Chưa có kế hoạch đã duyệt.")
                 else:
@@ -3499,7 +3499,7 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                     kh_01    = options_kh_01[chon_kh_01]
                     ds_ku_01 = kh_01.get("ds_mon_vay") or []
                     rows_kq_01 = [
-                        r for r in db.doc_ket_qua_kiem_tra(
+                        r for r in _cached_ket_qua_kiem_tra(
                             ten_pgd=pgd_f, trang_thai="da_phe_duyet"
                         )
                         if r.get("ma_mon_vay") in ds_ku_01
@@ -3534,7 +3534,7 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
 
             with st.expander("📝 Mẫu 02/QLNK — Cam kết trả nợ", expanded=False):
                 rows_co_kn = [
-                    r for r in db.doc_ket_qua_kiem_tra(
+                    r for r in _cached_ket_qua_kiem_tra(
                         ten_pgd=pgd_f, trang_thai="da_phe_duyet"
                     )
                     if r.get("kha_nang_tra_no") == "co"
@@ -3553,7 +3553,7 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                         key=f"{key_prefix}mb_02_sel",
                     )
                     row_02 = options_02[chon_02]
-                    bs_02  = db.doc_bo_sung_mon_vay(row_02.get("ma_mon_vay", "")) or {}
+                    bs_02  = _cached_bo_sung_mon_vay(row_02.get("ma_mon_vay", "")) or {}
                     ku_02  = row_02.get("ma_mon_vay", "")
                     rows_hstd_02 = (
                         df_kh[df_kh[COT_SO_KU] == ku_02].iloc[0].to_dict()
@@ -3719,7 +3719,7 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                     )
                     row_04_hstd = options_04[chon_04]
                     ku_04 = str(row_04_hstd.get(COT_SO_KU, ""))
-                    bs_04 = db.doc_bo_sung_mon_vay(ku_04) or {}
+                    bs_04 = _cached_bo_sung_mon_vay(ku_04) or {}
                     ten_pgd_04 = (
                         str(row_04_hstd.get(COT_TEN_PGD, pgd_user or ""))
                         if COT_TEN_PGD in row_04_hstd else (pgd_user or "")

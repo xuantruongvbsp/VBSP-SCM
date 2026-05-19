@@ -61,6 +61,25 @@ except ImportError:
 _fmt_dong = lambda x: fmt_so(float(x)) + " đồng" if x not in (None, "", float("nan")) else "0 đồng"
 
 
+# ─── Cached DB wrappers (TTL 60s) ────────────────────────────────────────────
+
+@st.cache_data(ttl=60, show_spinner=False)
+def _cached_ket_qua_kiem_tra(ten_pgd, trang_thai=None):
+    return db.doc_ket_qua_kiem_tra(ten_pgd=ten_pgd, trang_thai=trang_thai)
+
+@st.cache_data(ttl=60, show_spinner=False)
+def _cached_ke_hoach_kiem_tra(ten_pgd, trang_thai=None, nam=None):
+    return db.doc_ke_hoach_kiem_tra(ten_pgd=ten_pgd, trang_thai=trang_thai, nam=nam)
+
+@st.cache_data(ttl=60, show_spinner=False)
+def _cached_mau_bieu_cv368(ten_pgd=None, loai_mau=None, nam=None):
+    return db.doc_mau_bieu_cv368(ten_pgd=ten_pgd, loai_mau=loai_mau, nam=nam)
+
+@st.cache_data(ttl=30, show_spinner=False)
+def _cached_bo_sung_mon_vay(ma_mon_vay):
+    return db.doc_bo_sung_mon_vay(ma_mon_vay)
+
+
 # ─── Helpers ──────────────────────────────────────────────────────────────────
 
 def _loc_khoanh(df: pd.DataFrame) -> pd.DataFrame:
@@ -1570,6 +1589,633 @@ def _xuat_pdf_ke_hoach_kt(
     return buf.getvalue()
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+#  CV 368: Drill-down module — 3 mẫu biểu (Mẫu 01 / 02 / 03)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _render_mau01_cv368(
+    df_kh: pd.DataFrame,
+    pgd: str,
+    pgd_slug_val: str,
+    nam: int,
+    username: str,
+    key_prefix: str,
+    xem_id: int | None,
+) -> None:
+    """Mẫu 01 — Kế hoạch kiểm tra nợ khoanh."""
+    st.markdown("#### 📋 Mẫu 01 — Kế hoạch kiểm tra")
+
+    # ── Chế độ xem lại ───────────────────────────────────────────────────────
+    if xem_id is not None:
+        rec = db.doc_mau_bieu_cv368_by_id(xem_id)
+        if rec is None:
+            st.error("Không tìm thấy bản ghi.")
+            return
+        nd = rec["noi_dung"]
+        st.info(f"🗒️ Đang xem Mẫu 01 — Đợt {rec.get('dot')}/{rec.get('nam')} — ID #{rec['id']}")
+        c1, c2, c3 = st.columns(3)
+        c1.text_input("PGD", value=rec.get("ten_pgd", ""), disabled=True, key=f"{key_prefix}m01v_pgd")
+        c2.number_input("Năm", value=int(rec.get("nam", nam)), disabled=True, key=f"{key_prefix}m01v_nam", step=1)
+        c3.number_input("Đợt", value=int(rec.get("dot", 1)), disabled=True, key=f"{key_prefix}m01v_dot", step=1)
+        tp_v = nd.get("thanh_phan_doan") or []
+        if tp_v:
+            st.markdown("**Thành phần đoàn:**")
+            st.dataframe(pd.DataFrame(tp_v), use_container_width=True, hide_index=True)
+        ds_mon_v = nd.get("ds_mon") or []
+        if ds_mon_v:
+            st.markdown("**Danh sách món vay:**")
+            hien_thi_dataframe_phan_trang(pd.DataFrame(ds_mon_v), key=f"{key_prefix}m01v_tbl", height=320)
+        if st.button("📄 In lại PDF Mẫu 01", key=f"{key_prefix}m01v_pdf_btn", type="primary"):
+            if not _REPORTLAB_READY:
+                st.error("❌ Cần cài reportlab.")
+            else:
+                try:
+                    noi_dung_pdf = {
+                        "ten_pgd": rec.get("ten_pgd", pgd),
+                        "nam": int(rec.get("nam", nam)),
+                        "dot": int(rec.get("dot", 1)),
+                        "thanh_phan": nd.get("thanh_phan_doan") or [],
+                        "ds_mon": nd.get("ds_mon") or [],
+                    }
+                    pdf_b = _xuat_pdf_ke_hoach_kt(noi_dung_pdf)
+                    st.session_state[f"{key_prefix}m01_pdf_buf"] = pdf_b
+                    st.session_state[f"{key_prefix}m01_pdf_fn"] = (
+                        f"Mau01_KH_KiemTra_{pgd_slug_val}_{rec.get('nam')}_Dot{rec.get('dot', 1)}.pdf"
+                    )
+                except Exception as _e:
+                    st.error(f"❌ Lỗi tạo PDF: {_e}")
+        if st.session_state.get(f"{key_prefix}m01_pdf_buf"):
+            st.download_button(
+                "⬇️ Tải PDF Mẫu 01",
+                data=st.session_state[f"{key_prefix}m01_pdf_buf"],
+                file_name=st.session_state.get(f"{key_prefix}m01_pdf_fn", "Mau01.pdf"),
+                mime="application/pdf",
+                key=f"{key_prefix}m01v_dl",
+            )
+        return
+
+    # ── Lọc món cần kiểm tra ────────────────────────────────────────────────
+    da_co_mau02: set[str] = {
+        item.get("so_ku", "")
+        for r in db.doc_mau_bieu_cv368(ten_pgd=pgd, loai_mau="MAU_02")
+        for item in (r["noi_dung"].get("ds_mon") or [{"so_ku": r["noi_dung"].get("so_ku", "")}])
+    }
+    df_mon_kh = df_kh.copy()
+    if COT_NGAY_HH_KHOANH in df_mon_kh.columns:
+        _hh_s = pd.to_datetime(df_mon_kh[COT_NGAY_HH_KHOANH], dayfirst=True, errors="coerce")
+        df_mon_kh = df_mon_kh[_hh_s.dt.year == nam].copy()
+    if COT_SO_KU in df_mon_kh.columns and da_co_mau02:
+        df_mon_kh = df_mon_kh[~df_mon_kh[COT_SO_KU].isin(da_co_mau02)].copy()
+
+    st.metric("📦 Số món cần kiểm tra", f"{len(df_mon_kh)} món")
+
+    if df_mon_kh.empty:
+        st.info(f"ℹ️ Không có món vay nào hết hạn khoanh trong năm {nam} (hoặc đã có Mẫu 02 đầy đủ).")
+        return
+
+    # ── Form header ───────────────────────────────────────────────────────────
+    c1, c2, c3 = st.columns(3)
+    c1.text_input("PGD", value=pgd, disabled=True, key=f"{key_prefix}m01_pgd")
+    c2.number_input("Năm", value=nam, disabled=True, key=f"{key_prefix}m01_nam", step=1)
+    c3.text_input("Cán bộ lập", value=username, disabled=True, key=f"{key_prefix}m01_canbo")
+
+    c4, c5 = st.columns(2)
+    dot_kh = c4.number_input("Đợt kiểm tra *", min_value=1, max_value=12, value=1, step=1, key=f"{key_prefix}m01_dot")
+    ngay_lap_kh = c5.date_input("Ngày lập dự kiến", value=datetime.now().date(), key=f"{key_prefix}m01_ngay_lap")
+
+    st.markdown("**Thành phần đoàn kiểm tra**")
+    df_tp = st.data_editor(
+        pd.DataFrame([{"Họ và tên": username, "Chức vụ": "CBTD"}, {"Họ và tên": "", "Chức vụ": ""}]),
+        num_rows="dynamic", key=f"{key_prefix}m01_tp_doan",
+        use_container_width=True, hide_index=True,
+    )
+    ghi_chu_m01 = st.text_area("Ghi chú", key=f"{key_prefix}m01_ghi_chu", max_chars=500)
+
+    # ── Bảng chọn món vay ─────────────────────────────────────────────────────
+    st.markdown("**Danh sách món vay cần kiểm tra**")
+    _cols_fix = [c for c in [COT_TEN_TO, COT_TEN_XA, COT_TEN_KH, COT_SO_KU, COT_DU_NO_KHOANH, COT_NGAY_HH_KHOANH]
+                 if c in df_mon_kh.columns]
+    df_edit = df_mon_kh[_cols_fix].copy().reset_index(drop=True)
+    if COT_DU_NO_KHOANH in df_edit.columns:
+        df_edit[COT_DU_NO_KHOANH] = pd.to_numeric(df_edit[COT_DU_NO_KHOANH], errors="coerce").fillna(0).apply(_fmt_dong)
+    df_edit.insert(0, "✓ Chọn", True)
+    df_edit["Ngày KT dự kiến"] = ""
+    df_edit["Ghi chú KT"] = ""
+
+    df_edited = st.data_editor(
+        df_edit,
+        key=f"{key_prefix}m01_bchon",
+        use_container_width=True,
+        height=min(45 + len(df_edit) * 35, 520),
+        disabled=_cols_fix,
+        column_config={
+            "✓ Chọn": st.column_config.CheckboxColumn("✓", default=True, width="small"),
+            "Ngày KT dự kiến": st.column_config.TextColumn(
+                "Ngày KT dự kiến",
+                help="Nhập dd/mm/yyyy. Phải trong vòng 120 ngày trước hết hạn khoanh.",
+                max_chars=12,
+            ),
+        },
+        hide_index=True,
+    )
+
+    # Validate ngày KT
+    for _, _rv in df_edited.iterrows():
+        if not _rv.get("✓ Chọn", False):
+            continue
+        _ngay_kt_s = str(_rv.get("Ngày KT dự kiến", "") or "").strip()
+        _ngay_hh_s = str(_rv.get(COT_NGAY_HH_KHOANH, "") or "").strip()
+        if _ngay_kt_s and _ngay_hh_s:
+            try:
+                _dkt = pd.to_datetime(_ngay_kt_s, dayfirst=True, errors="coerce")
+                _dhh = pd.to_datetime(_ngay_hh_s, dayfirst=True, errors="coerce")
+                if pd.notna(_dkt) and pd.notna(_dhh):
+                    _delta = (_dhh - _dkt).days
+                    if not (0 <= _delta <= 120):
+                        st.warning(f"⚠️ {_rv.get(COT_TEN_KH, '')}: Ngày KT cách HH khoanh {_delta} ngày (ngoài 0–120)")
+            except Exception:
+                pass
+
+    col_b1, col_b2, _ = st.columns([1, 1, 4])
+    luu_m01 = col_b1.button("💾 Lưu Mẫu 01", key=f"{key_prefix}m01_luu", use_container_width=True)
+    xuat_m01 = col_b2.button("📄 Xuất PDF", key=f"{key_prefix}m01_xuat", use_container_width=True)
+
+    if luu_m01 or xuat_m01:
+        ds_mon_save = [
+            {
+                "so_ku": str(_re.get(COT_SO_KU, "") or ""),
+                "ten_kh": str(_re.get(COT_TEN_KH, "") or ""),
+                "ten_xa": str(_re.get(COT_TEN_XA, "") or ""),
+                "ten_to": str(_re.get(COT_TEN_TO, "") or ""),
+                "du_no_khoanh": str(_re.get(COT_DU_NO_KHOANH, "") or ""),
+                "ngay_hh_khoanh": str(_re.get(COT_NGAY_HH_KHOANH, "") or ""),
+                "ngay_kt_du_kien": str(_re.get("Ngày KT dự kiến", "") or ""),
+                "ghi_chu": str(_re.get("Ghi chú KT", "") or ""),
+            }
+            for _, _re in df_edited.iterrows()
+            if _re.get("✓ Chọn", False)
+        ]
+        tp_list = df_tp[df_tp["Họ và tên"].str.strip() != ""].to_dict("records") if not df_tp.empty else []
+        noi_dung_save = {
+            "ten_pgd": pgd, "nam": nam, "dot": int(dot_kh),
+            "ngay_lap": ngay_lap_kh.isoformat(),
+            "thanh_phan_doan": tp_list,
+            "ghi_chu": ghi_chu_m01,
+            "ds_mon": ds_mon_save,
+        }
+        if luu_m01:
+            _mb_id = db.luu_mau_bieu_cv368("MAU_01", pgd, nam, int(dot_kh), noi_dung_save, username, ghi_chu_m01)
+            st.session_state[f"{key_prefix}mau01_mb_id"] = _mb_id
+            st.success(f"✅ Đã lưu Mẫu 01 — Đợt {dot_kh}/{nam} (ID #{_mb_id})")
+            st.rerun()
+        if xuat_m01:
+            if not _REPORTLAB_READY:
+                st.error("❌ Cần cài reportlab.")
+            else:
+                try:
+                    noi_dung_pdf = {**noi_dung_save, "thanh_phan": tp_list}
+                    _pdf_b = _xuat_pdf_ke_hoach_kt(noi_dung_pdf)
+                    st.session_state[f"{key_prefix}m01_pdf_buf"] = _pdf_b
+                    st.session_state[f"{key_prefix}m01_pdf_fn"] = (
+                        f"Mau01_KH_KiemTra_{pgd_slug_val}_{nam}_Dot{int(dot_kh)}.pdf"
+                    )
+                except Exception as _e:
+                    st.error(f"❌ Lỗi tạo PDF: {_e}")
+
+    if st.session_state.get(f"{key_prefix}m01_pdf_buf"):
+        st.download_button(
+            "⬇️ Tải PDF Mẫu 01",
+            data=st.session_state[f"{key_prefix}m01_pdf_buf"],
+            file_name=st.session_state.get(f"{key_prefix}m01_pdf_fn", "Mau01.pdf"),
+            mime="application/pdf",
+            key=f"{key_prefix}m01_dl",
+        )
+
+
+def _render_mau02_cv368(
+    df_kh: pd.DataFrame,
+    pgd: str,
+    pgd_slug_val: str,
+    nam: int,
+    username: str,
+    key_prefix: str,
+    xem_id: int | None,
+) -> None:
+    """Mẫu 02 — Cam kết trả nợ."""
+    st.markdown("#### ✍️ Mẫu 02 — Cam kết trả nợ")
+
+    # ── Chế độ xem lại ───────────────────────────────────────────────────────
+    if xem_id is not None:
+        rec = db.doc_mau_bieu_cv368_by_id(xem_id)
+        if rec is None:
+            st.error("Không tìm thấy bản ghi.")
+            return
+        nd = rec["noi_dung"]
+        st.info(f"🗒️ Đang xem Mẫu 02 — {nd.get('ten_kh', '')} — ID #{rec['id']}")
+        c1, c2 = st.columns(2)
+        c1.text_input("Khách hàng", value=nd.get("ten_kh", ""), disabled=True, key=f"{key_prefix}m02v_kh")
+        c1.text_input("Số KU", value=nd.get("so_ku", ""), disabled=True, key=f"{key_prefix}m02v_ku")
+        c2.text_input("Số tiền cam kết", value=nd.get("so_tien_cam_ket", ""), disabled=True, key=f"{key_prefix}m02v_tien")
+        c2.text_input("Thời hạn", value=nd.get("thoi_han", ""), disabled=True, key=f"{key_prefix}m02v_han")
+        c2.text_input("Phương thức", value=nd.get("phuong_thuc", ""), disabled=True, key=f"{key_prefix}m02v_pt")
+        if st.button("📄 In lại PDF Mẫu 02", key=f"{key_prefix}m02v_pdf_btn", type="primary"):
+            if not _REPORTLAB_READY:
+                st.error("❌ Cần cài reportlab.")
+            else:
+                try:
+                    _pdf_b = _xuat_pdf_mau_02qlnk(
+                        nd,
+                        so_tien_cam_ket=nd.get("so_tien_cam_ket", ""),
+                        thoi_han=nd.get("thoi_han", ""),
+                        phuong_thuc=nd.get("phuong_thuc", ""),
+                    )
+                    st.session_state[f"{key_prefix}m02_pdf_buf"] = _pdf_b
+                    _slug_kh = "".join(c for c in nd.get("ten_kh", "KH") if c.isalnum() or c == "_")
+                    st.session_state[f"{key_prefix}m02_pdf_fn"] = f"Mau02_CamKet_{_slug_kh}.pdf"
+                except Exception as _e:
+                    st.error(f"❌ Lỗi tạo PDF: {_e}")
+        if st.session_state.get(f"{key_prefix}m02_pdf_buf"):
+            st.download_button(
+                "⬇️ Tải PDF Mẫu 02",
+                data=st.session_state[f"{key_prefix}m02_pdf_buf"],
+                file_name=st.session_state.get(f"{key_prefix}m02_pdf_fn", "Mau02.pdf"),
+                mime="application/pdf",
+                key=f"{key_prefix}m02v_dl",
+            )
+        return
+
+    # ── Danh sách đã có Mẫu 02 ───────────────────────────────────────────────
+    da_co_mau02: set[str] = {
+        item.get("so_ku", "")
+        for r in db.doc_mau_bieu_cv368(ten_pgd=pgd, loai_mau="MAU_02")
+        for item in (r["noi_dung"].get("ds_mon") or [{"so_ku": r["noi_dung"].get("so_ku", "")}])
+    }
+
+    if df_kh.empty or COT_SO_KU not in df_kh.columns:
+        st.info("ℹ️ Chưa có dữ liệu nợ khoanh.")
+        return
+
+    options_ku = {
+        f"{r.get(COT_TEN_KH, '')} — {r.get(COT_SO_KU, '')}" + (
+            "  ✓ đã có Mẫu 02" if str(r.get(COT_SO_KU, "")) in da_co_mau02 else ""
+        ): dict(r)
+        for _, r in df_kh.iterrows()
+        if r.get(COT_SO_KU)
+    }
+    if not options_ku:
+        st.info("ℹ️ Không có món vay nào.")
+        return
+
+    chon_label = st.selectbox("Chọn khách hàng / số khế ước", list(options_ku.keys()), key=f"{key_prefix}m02_sel")
+    row_chon = options_ku[chon_label]
+
+    st.markdown("**Thông tin khách hàng** *(từ HSTD)*")
+    c1, c2 = st.columns(2)
+    c1.text_input("Họ tên KH", value=str(row_chon.get(COT_TEN_KH, "") or ""), disabled=True, key=f"{key_prefix}m02_ten_kh")
+    c1.text_input("Số CMND/CCCD", value=str(row_chon.get(COT_CMND, "") or ""), disabled=True, key=f"{key_prefix}m02_cmnd")
+    c1.text_input("Tổ TK&VV", value=str(row_chon.get(COT_TEN_TO, "") or ""), disabled=True, key=f"{key_prefix}m02_ten_to")
+    c1.text_input("Số KU", value=str(row_chon.get(COT_SO_KU, "") or ""), disabled=True, key=f"{key_prefix}m02_so_ku")
+    c2.text_input("Ngày sinh", value=str(row_chon.get(COT_NGAY_SINH, "") or ""), disabled=True, key=f"{key_prefix}m02_ngaysinh")
+    c2.text_input("Địa chỉ", value=str(row_chon.get(COT_DIA_CHI, "") or ""), disabled=True, key=f"{key_prefix}m02_diachi")
+    _dn_kh_v = float(pd.to_numeric(row_chon.get(COT_DU_NO_KHOANH, 0), errors="coerce") or 0)
+    c2.text_input("Dư nợ khoanh", value=_fmt_dong(_dn_kh_v), disabled=True, key=f"{key_prefix}m02_dnkh")
+    c2.text_input("Ngày HH khoanh", value=str(row_chon.get(COT_NGAY_HH_KHOANH, "") or ""), disabled=True, key=f"{key_prefix}m02_hh")
+
+    st.markdown("**Cam kết trả nợ**")
+    c3, c4, c5 = st.columns(3)
+    so_tien_ck = c3.text_input("Số tiền cam kết (đồng)", key=f"{key_prefix}m02_tien_ck")
+    thoi_han_ck = c4.text_input("Thời hạn cam kết", placeholder="VD: 6 tháng kể từ...", key=f"{key_prefix}m02_thoi_han")
+    phuong_thuc_ck = c5.text_input("Phương thức trả", placeholder="VD: Trả 1 lần", key=f"{key_prefix}m02_pt")
+    ghi_chu_m02 = st.text_area("Ghi chú", key=f"{key_prefix}m02_ghi_chu", max_chars=500)
+
+    col_b1, col_b2, _ = st.columns([1, 1, 4])
+    luu_m02 = col_b1.button("💾 Lưu Mẫu 02", key=f"{key_prefix}m02_luu", use_container_width=True)
+    xuat_m02 = col_b2.button("📄 Xuất PDF", key=f"{key_prefix}m02_xuat", use_container_width=True)
+
+    if luu_m02 or xuat_m02:
+        so_ku_val = str(row_chon.get(COT_SO_KU, "") or "")
+        ten_kh_val = str(row_chon.get(COT_TEN_KH, "") or "")
+        noi_dung_save = {
+            "so_ku": so_ku_val, "ten_kh": ten_kh_val,
+            "ten_xa": str(row_chon.get(COT_TEN_XA, "") or ""),
+            "ten_to": str(row_chon.get(COT_TEN_TO, "") or ""),
+            "ten_pgd": pgd,
+            COT_CMND: str(row_chon.get(COT_CMND, "") or ""),
+            COT_NGAY_SINH: str(row_chon.get(COT_NGAY_SINH, "") or ""),
+            COT_DIA_CHI: str(row_chon.get(COT_DIA_CHI, "") or ""),
+            COT_DU_NO_KHOANH: _dn_kh_v,
+            COT_NGAY_HH_KHOANH: str(row_chon.get(COT_NGAY_HH_KHOANH, "") or ""),
+            COT_TEN_TO: str(row_chon.get(COT_TEN_TO, "") or ""),
+            COT_DVUT: str(row_chon.get(COT_DVUT, "") or ""),
+            COT_TEN_CT: str(row_chon.get(COT_TEN_CT, "") or ""),
+            "so_tien_cam_ket": so_tien_ck,
+            "thoi_han": thoi_han_ck,
+            "phuong_thuc": phuong_thuc_ck,
+            "ghi_chu": ghi_chu_m02,
+            "ds_mon": [{"so_ku": so_ku_val}],
+        }
+        if luu_m02:
+            _mb_id = db.luu_mau_bieu_cv368("MAU_02", pgd, nam, 1, noi_dung_save, username, ghi_chu_m02)
+            st.success(f"✅ Đã lưu Mẫu 02 — KH: {ten_kh_val} (ID #{_mb_id})")
+            st.rerun()
+        if xuat_m02:
+            if not _REPORTLAB_READY:
+                st.error("❌ Cần cài reportlab.")
+            else:
+                try:
+                    row_pdf = {**dict(row_chon), **noi_dung_save}
+                    _pdf_b = _xuat_pdf_mau_02qlnk(row_pdf, so_tien_cam_ket=so_tien_ck, thoi_han=thoi_han_ck, phuong_thuc=phuong_thuc_ck)
+                    st.session_state[f"{key_prefix}m02_pdf_buf"] = _pdf_b
+                    _slug_kh = "".join(c for c in ten_kh_val if c.isalnum() or c == "_")
+                    ngay_str = datetime.now().strftime("%d%m%Y")
+                    st.session_state[f"{key_prefix}m02_pdf_fn"] = f"Mau02_CamKet_{_slug_kh}_{ngay_str}.pdf"
+                except Exception as _e:
+                    st.error(f"❌ Lỗi tạo PDF: {_e}")
+
+    if st.session_state.get(f"{key_prefix}m02_pdf_buf"):
+        st.download_button(
+            "⬇️ Tải PDF Mẫu 02",
+            data=st.session_state[f"{key_prefix}m02_pdf_buf"],
+            file_name=st.session_state.get(f"{key_prefix}m02_pdf_fn", "Mau02.pdf"),
+            mime="application/pdf",
+            key=f"{key_prefix}m02_dl",
+        )
+
+
+def _render_mau03_cv368(
+    df_kh: pd.DataFrame,
+    pgd: str,
+    pgd_slug_val: str,
+    nam: int,
+    username: str,
+    key_prefix: str,
+    xem_id: int | None,
+) -> None:
+    """Mẫu 03 — Biên bản kiểm tra nợ khoanh."""
+    st.markdown("#### 📄 Mẫu 03 — Biên bản kiểm tra")
+
+    # ── Chế độ xem lại ───────────────────────────────────────────────────────
+    if xem_id is not None:
+        rec = db.doc_mau_bieu_cv368_by_id(xem_id)
+        if rec is None:
+            st.error("Không tìm thấy bản ghi.")
+            return
+        nd = rec["noi_dung"]
+        st.info(f"🗒️ Đang xem Mẫu 03 — Đợt {rec.get('dot')}/{rec.get('nam')} — ID #{rec['id']}")
+        ds_mon_v = nd.get("ds_mon") or []
+        if ds_mon_v:
+            hien_thi_dataframe_phan_trang(pd.DataFrame(ds_mon_v), key=f"{key_prefix}m03v_tbl", height=320)
+        if st.button("📄 In lại PDF Mẫu 03", key=f"{key_prefix}m03v_pdf_btn", type="primary"):
+            if not _REPORTLAB_READY:
+                st.error("❌ Cần cài reportlab.")
+            else:
+                try:
+                    _pdf_b = _xuat_pdf_bb_kt_cv368(nd)
+                    st.session_state[f"{key_prefix}m03_pdf_buf"] = _pdf_b
+                    st.session_state[f"{key_prefix}m03_pdf_fn"] = (
+                        f"Mau03_BB_KiemTra_{pgd_slug_val}_{rec.get('nam')}_Dot{rec.get('dot', 1)}.pdf"
+                    )
+                except Exception as _e:
+                    st.error(f"❌ Lỗi tạo PDF: {_e}")
+        if st.session_state.get(f"{key_prefix}m03_pdf_buf"):
+            st.download_button(
+                "⬇️ Tải PDF Mẫu 03",
+                data=st.session_state[f"{key_prefix}m03_pdf_buf"],
+                file_name=st.session_state.get(f"{key_prefix}m03_pdf_fn", "Mau03.pdf"),
+                mime="application/pdf",
+                key=f"{key_prefix}m03v_dl",
+            )
+        return
+
+    # ── Load Mẫu 01 đã lưu ───────────────────────────────────────────────────
+    rows_mau01 = db.doc_mau_bieu_cv368(ten_pgd=pgd, loai_mau="MAU_01", nam=nam)
+    if not rows_mau01:
+        st.warning("⚠️ Cần lập Mẫu 01 trước. Chưa có Mẫu 01 nào được lưu cho năm này.")
+        return
+
+    options_m01 = {
+        f"Đợt {r.get('dot')}/{r.get('nam')} — ID #{r['id']} — {str(r.get('created_at', ''))[:10]}": r
+        for r in rows_mau01
+    }
+    chon_m01_label = st.selectbox("Chọn Mẫu 01 tham chiếu", list(options_m01.keys()), key=f"{key_prefix}m03_sel_m01")
+    mau01_sel = options_m01[chon_m01_label]
+    nd_m01 = mau01_sel.get("noi_dung") or {}
+    ds_mon_m01 = nd_m01.get("ds_mon") or []
+    dot_from_m01 = mau01_sel.get("dot", 1)
+
+    if not ds_mon_m01:
+        st.warning("⚠️ Mẫu 01 này không có danh sách món vay.")
+        return
+
+    c1, c2, c3 = st.columns(3)
+    c1.text_input("PGD", value=pgd, disabled=True, key=f"{key_prefix}m03_pgd")
+    c2.number_input("Năm", value=nam, disabled=True, key=f"{key_prefix}m03_nam", step=1)
+    c3.number_input("Đợt", value=int(dot_from_m01), disabled=True, key=f"{key_prefix}m03_dot", step=1)
+    ngay_kt_thuc_te = st.date_input("Ngày kiểm tra thực tế *", value=datetime.now().date(), key=f"{key_prefix}m03_ngay_kt")
+
+    st.markdown("**Thành phần đoàn**")
+    tp_default = nd_m01.get("thanh_phan_doan") or [{"Họ và tên": username, "Chức vụ": "CBTD"}]
+    df_tp_m03 = st.data_editor(
+        pd.DataFrame(tp_default),
+        num_rows="dynamic", key=f"{key_prefix}m03_tp_doan",
+        use_container_width=True, hide_index=True,
+    )
+    ghi_chu_m03 = st.text_area("Ghi chú", key=f"{key_prefix}m03_ghi_chu", max_chars=500)
+
+    st.markdown("**Kết quả kiểm tra từng món vay**")
+    _cols_fix_m03 = ["Tên tổ", "Tên KH", "Số KU", "Dư nợ khoanh", "Ngày HH khoanh"]
+    df_mon_edit = pd.DataFrame([{
+        "✓ KT": True,
+        "Tên tổ": item.get("ten_to", ""),
+        "Tên KH": item.get("ten_kh", ""),
+        "Số KU": item.get("so_ku", ""),
+        "Dư nợ khoanh": item.get("du_no_khoanh", ""),
+        "Ngày HH khoanh": item.get("ngay_hh_khoanh", ""),
+        "Kết quả KT": "",
+        "Khả năng TN": "",
+        "Cam kết TN": "",
+        "Ghi chú": "",
+    } for item in ds_mon_m01])
+
+    df_mon_edited = st.data_editor(
+        df_mon_edit,
+        key=f"{key_prefix}m03_bmon",
+        use_container_width=True,
+        height=min(45 + len(df_mon_edit) * 35, 560),
+        disabled=_cols_fix_m03,
+        column_config={
+            "✓ KT": st.column_config.CheckboxColumn("✓ KT", default=True, width="small"),
+            "Kết quả KT": st.column_config.SelectboxColumn(
+                "Kết quả KT",
+                options=["Đủ điều kiện", "Không đủ ĐK", "Vắng mặt", "Khác"],
+                required=False,
+            ),
+            "Khả năng TN": st.column_config.SelectboxColumn(
+                "Khả năng TN",
+                options=["Có", "Không", "Chưa xác định"],
+                required=False,
+            ),
+        },
+        hide_index=True,
+    )
+
+    col_b1, col_b2, _ = st.columns([1, 1, 4])
+    luu_m03 = col_b1.button("💾 Lưu Mẫu 03", key=f"{key_prefix}m03_luu", use_container_width=True)
+    xuat_m03 = col_b2.button("📄 Xuất PDF", key=f"{key_prefix}m03_xuat", use_container_width=True)
+
+    if luu_m03 or xuat_m03:
+        ds_mon_kq = [
+            {
+                "ten_to": str(_re.get("Tên tổ", "") or ""),
+                "ten_kh": str(_re.get("Tên KH", "") or ""),
+                "so_ku": str(_re.get("Số KU", "") or ""),
+                "du_no_khoanh": str(_re.get("Dư nợ khoanh", "") or ""),
+                "ngay_hh_khoanh": str(_re.get("Ngày HH khoanh", "") or ""),
+                "ket_qua_kt": str(_re.get("Kết quả KT", "") or ""),
+                "kha_nang_tn": str(_re.get("Khả năng TN", "") or ""),
+                "cam_ket_tn": str(_re.get("Cam kết TN", "") or ""),
+                "ghi_chu": str(_re.get("Ghi chú", "") or ""),
+            }
+            for _, _re in df_mon_edited.iterrows()
+            if _re.get("✓ KT", True)
+        ]
+        tp_m03_list = df_tp_m03[df_tp_m03["Họ và tên"].str.strip() != ""].to_dict("records") if not df_tp_m03.empty else []
+        noi_dung_save = {
+            "ten_pgd": pgd, "nam": nam, "dot": int(dot_from_m01),
+            "ngay_kiem_tra": str(ngay_kt_thuc_te),
+            "thanh_phan_doan": tp_m03_list,
+            "ghi_chu": ghi_chu_m03,
+            "ds_mon": ds_mon_kq,
+            "mau01_id": mau01_sel.get("id"),
+        }
+        if luu_m03:
+            _mb_id = db.luu_mau_bieu_cv368("MAU_03", pgd, nam, int(dot_from_m01), noi_dung_save, username, ghi_chu_m03)
+            st.success(f"✅ Đã lưu Mẫu 03 — Đợt {dot_from_m01}/{nam} (ID #{_mb_id})")
+            st.rerun()
+        if xuat_m03:
+            if not _REPORTLAB_READY:
+                st.error("❌ Cần cài reportlab.")
+            else:
+                try:
+                    _pdf_b = _xuat_pdf_bb_kt_cv368(noi_dung_save)
+                    st.session_state[f"{key_prefix}m03_pdf_buf"] = _pdf_b
+                    st.session_state[f"{key_prefix}m03_pdf_fn"] = (
+                        f"Mau03_BB_KiemTra_{pgd_slug_val}_{nam}_Dot{int(dot_from_m01)}.pdf"
+                    )
+                except Exception as _e:
+                    st.error(f"❌ Lỗi tạo PDF: {_e}")
+
+    if st.session_state.get(f"{key_prefix}m03_pdf_buf"):
+        st.download_button(
+            "⬇️ Tải PDF Mẫu 03",
+            data=st.session_state[f"{key_prefix}m03_pdf_buf"],
+            file_name=st.session_state.get(f"{key_prefix}m03_pdf_fn", "Mau03.pdf"),
+            mime="application/pdf",
+            key=f"{key_prefix}m03_dl",
+        )
+
+
+def _render_cv368_kt(
+    df_kh: pd.DataFrame,
+    role: str,
+    pgd_user: str | None,
+    username: str,
+    key_prefix: str,
+) -> None:
+    """UI drill-down 3 mẫu biểu theo CV 368/NHCS-QLN."""
+    from data.pgd import pgd_slug as _pgd_slug_fn
+    nam_hien = datetime.now().year
+
+    # ── Xác định PGD hiện tại ─────────────────────────────────────────────────
+    if la_phan_he_cn(role):
+        pgd_hien_tai = st.selectbox(
+            "📍 Chọn PGD",
+            ["— Chọn —"] + DS_PGD,
+            key=f"{key_prefix}cv368_pgd",
+        )
+        if pgd_hien_tai == "— Chọn —":
+            st.info("ℹ️ Chọn PGD để bắt đầu.")
+            return
+    else:
+        pgd_hien_tai = pgd_user or ""
+        if not pgd_hien_tai:
+            st.warning("⚠️ Không xác định được PGD.")
+            return
+        st.info(f"PGD: **{pgd_hien_tai}**")
+
+    # Lọc df_kh theo PGD
+    if pgd_hien_tai and COT_TEN_PGD in df_kh.columns:
+        df_kh_pgd = df_kh[df_kh[COT_TEN_PGD] == pgd_hien_tai].copy()
+    else:
+        df_kh_pgd = df_kh.copy()
+
+    pgd_slug_val = _pgd_slug_fn(pgd_hien_tai)
+
+    if df_kh_pgd.empty:
+        st.info("ℹ️ Chưa có dữ liệu nợ khoanh cho PGD này.")
+        return
+
+    # ── Layout 2 cột ──────────────────────────────────────────────────────────
+    col_left, col_right = st.columns([3, 7])
+
+    with col_left:
+        st.markdown("#### 🗂️ Chọn mẫu biểu")
+        loai_mau_label = st.radio(
+            "Chọn mẫu",
+            [
+                "📋 Mẫu 01 — Kế hoạch kiểm tra",
+                "✍️ Mẫu 02 — Cam kết trả nợ",
+                "📄 Mẫu 03 — Biên bản kiểm tra",
+            ],
+            key=f"{key_prefix}chon_loai_mau",
+            label_visibility="collapsed",
+        )
+        _loai_map = {
+            "📋 Mẫu 01 — Kế hoạch kiểm tra": "MAU_01",
+            "✍️ Mẫu 02 — Cam kết trả nợ": "MAU_02",
+            "📄 Mẫu 03 — Biên bản kiểm tra": "MAU_03",
+        }
+        loai_mau_hien = _loai_map[loai_mau_label]
+
+        # Reset xem_id khi đổi mẫu
+        if st.session_state.get(f"{key_prefix}_prev_loai") != loai_mau_hien:
+            st.session_state.pop(f"{key_prefix}mb_xem_id", None)
+            st.session_state[f"{key_prefix}_prev_loai"] = loai_mau_hien
+
+        st.markdown("---")
+        st.markdown("##### 📋 Lịch sử")
+        if st.button("➕ Tạo mới", key=f"{key_prefix}ls_moi", use_container_width=True):
+            st.session_state.pop(f"{key_prefix}mb_xem_id", None)
+            st.rerun()
+
+        lich_su = db.doc_mau_bieu_cv368(ten_pgd=pgd_hien_tai, loai_mau=loai_mau_hien)
+        if not lich_su:
+            st.caption("Chưa có bản ghi nào.")
+        else:
+            _cur_xem = st.session_state.get(f"{key_prefix}mb_xem_id")
+            for _r in lich_su[:10]:
+                _ngay = str(_r.get("created_at", ""))[:10]
+                _lbl = f"Đợt {_r.get('dot')}/{_r.get('nam')} — {_ngay}"
+                if st.button(
+                    f"{'🔵' if _cur_xem == _r['id'] else '🗒️'} {_lbl}",
+                    key=f"{key_prefix}ls_btn_{_r['id']}",
+                    use_container_width=True,
+                ):
+                    st.session_state[f"{key_prefix}mb_xem_id"] = _r["id"]
+                    st.rerun()
+            if len(lich_su) > 10:
+                st.caption(f"+ {len(lich_su) - 10} bản ghi khác")
+
+    with col_right:
+        _xem_id = st.session_state.get(f"{key_prefix}mb_xem_id")
+        if loai_mau_hien == "MAU_01":
+            _render_mau01_cv368(df_kh_pgd, pgd_hien_tai, pgd_slug_val, nam_hien, username, key_prefix, _xem_id)
+        elif loai_mau_hien == "MAU_02":
+            _render_mau02_cv368(df_kh_pgd, pgd_hien_tai, pgd_slug_val, nam_hien, username, key_prefix, _xem_id)
+        else:
+            _render_mau03_cv368(df_kh_pgd, pgd_hien_tai, pgd_slug_val, nam_hien, username, key_prefix, _xem_id)
+
+
 # ─── Render ───────────────────────────────────────────────────────────────────
 
 def render(tab: DeltaGenerator = None, **kwargs) -> None:
@@ -2393,7 +3039,7 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
             }
             pgd_filter = None if la_phan_he_cn(role) else pgd_user
 
-            rows_kt = db.doc_ket_qua_kiem_tra(
+            rows_kt = _cached_ket_qua_kiem_tra(
                 ten_pgd=pgd_filter,
                 trang_thai=tt_map[loc_tt],
             )

@@ -905,6 +905,22 @@ def doc_bo_sung_mon_vay(ma_mon_vay: str) -> dict | None:
         return None
 
 
+def doc_bo_sung_nhieu_mon_vay(ds_ma: list[str]) -> dict[str, dict]:
+    """Đọc qlnk_bo_sung cho nhiều món vay cùng lúc — tránh N+1 query."""
+    if not ds_ma:
+        return {}
+    try:
+        placeholders = ",".join("?" * len(ds_ma))
+        with get_conn() as conn:
+            rows = conn.execute(
+                f"SELECT * FROM qlnk_bo_sung WHERE ma_mon_vay IN ({placeholders})",
+                list(ds_ma),
+            ).fetchall()
+        return {r["ma_mon_vay"]: dict(r) for r in rows}
+    except Exception:
+        return {}
+
+
 def duyet_ke_hoach(kehoach_id: int, username: str = "system") -> bool:
     """Duyệt kế hoạch kiểm tra (luu_tam → da_duyet)."""
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")

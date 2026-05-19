@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [2026-05-19] — Đồng bộ CONVENTIONS.md vào Trae rules
+- `.trae/rules/rules.md` — append toàn bộ nội dung CONVENTIONS.md (9 lỗi bị cấm + patterns) vào cuối file rules
+
+## [2026-05-19] — Merge docs/CONVENTIONS.md vào root, xóa bản trùng
+- `CONVENTIONS.md` (root) — bổ sung: bảng 9 roles + compat, audit action table đầy đủ, fmt examples kèm công thức /1e12, CSS/UI guidelines, Streamlit version notes
+- `docs/CONVENTIONS.md` — xóa (đã merge toàn bộ nội dung vào root)
+
 ## [2026-05-19] — Bổ sung CONVENTIONS.md: role table, pgd_mode, component API
 - `CONVENTIONS.md` — thêm bảng 7 role đầy đủ (bao gồm chuyenvien_cn); thêm pgd_mode pattern; thêm component API signatures chuẩn (kpi_row, download_pdf_button, loan_detail_drawer, filter_bar)
 

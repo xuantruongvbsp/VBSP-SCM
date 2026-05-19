@@ -607,32 +607,33 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                 df_ct["tn_nam"] = 0
 
             # Hiển thị bảng
+            # fmt_ty: VND → triệu đồng (chia /1_000_000). Tên cột phải ghi "(triệu đồng)"
             df_hien = df_ct.rename(columns={"ten_ct": "Chương trình"}).copy()
-            df_hien["Số món vay"]         = df_hien["so_mon"].apply(fmt_so)
-            df_hien["Số KH"]              = df_hien["so_kh"].apply(fmt_so)
-            df_hien["Dư nợ (triệu đồng)"]        = df_hien["du_no"].apply(fmt_ty)
-            df_hien["Nguồn TW (tỷ)"]     = df_hien["du_no_tw"].apply(fmt_ty)
-            df_hien["Nguồn ĐP (tỷ)"]     = df_hien["du_no_dp"].apply(fmt_ty)
-            df_hien["Dư nợ QH (triệu đồng)"]     = df_hien["du_no_qh"].apply(fmt_ty)
+            df_hien["Số món vay"]              = df_hien["so_mon"].apply(fmt_so)
+            df_hien["Số KH"]                   = df_hien["so_kh"].apply(fmt_so)
+            df_hien["Dư nợ (triệu đồng)"]      = df_hien["du_no"].apply(fmt_ty)
+            df_hien["Nguồn TW (triệu đồng)"]   = df_hien["du_no_tw"].apply(fmt_ty)
+            df_hien["Nguồn ĐP (triệu đồng)"]   = df_hien["du_no_dp"].apply(fmt_ty)
+            df_hien["Dư nợ QH (triệu đồng)"]   = df_hien["du_no_qh"].apply(fmt_ty)
             ty_le_qh = ((df_hien["du_no_qh"] / df_hien["du_no"] * 100).round(2)) if (df_hien["du_no"] > 0).any() else pd.Series(0.0, index=df_hien.index)
-            df_hien["Tỷ lệ QH %"]         = ty_le_qh.apply(lambda x: f"{x:.2f}".replace(".", ",") + "%")
+            df_hien["Tỷ lệ QH %"]              = ty_le_qh.apply(lambda x: f"{x:.2f}".replace(".", ",") + "%")
             df_hien["Dư nợ khoanh (triệu đồng)"] = df_hien["du_no_khoanh"].apply(fmt_ty)
-            df_hien["Giải ngân năm (tỷ)"]= df_hien["gn_nam"].apply(fmt_ty)
-            df_hien["Thu nợ năm (tỷ)"]   = df_hien["tn_nam"].apply(fmt_ty)
-            df_hien["Tỷ trọng %"]         = df_hien["ty_trong"].apply(lambda x: f"{x:.1f}".replace(".", ",") + "%")
+            df_hien["Giải ngân năm (triệu đồng)"] = df_hien["gn_nam"].apply(fmt_ty)
+            df_hien["Thu nợ năm (triệu đồng)"] = df_hien["tn_nam"].apply(fmt_ty)
+            df_hien["Tỷ trọng %"]              = df_hien["ty_trong"].apply(lambda x: f"{x:.1f}".replace(".", ",") + "%")
 
             cols_hien = [
                 "Chương trình", "Số món vay", "Số KH",
-                "Dư nợ (triệu đồng)", "Nguồn TW (tỷ)", "Nguồn ĐP (tỷ)",
+                "Dư nợ (triệu đồng)", "Nguồn TW (triệu đồng)", "Nguồn ĐP (triệu đồng)",
                 "Dư nợ QH (triệu đồng)", "Tỷ lệ QH %", "Dư nợ khoanh (triệu đồng)",
-                "Giải ngân năm (tỷ)", "Thu nợ năm (tỷ)", "Tỷ trọng %"
+                "Giải ngân năm (triệu đồng)", "Thu nợ năm (triệu đồng)", "Tỷ trọng %"
             ]
 
+            # Tất cả cột đã convert sang string qua fmt_ty/fmt_so → không dùng column_config
             st.dataframe(
                 df_hien[cols_hien],
-                width='stretch',
+                use_container_width=True,
                 hide_index=True,
-                column_config=_tao_column_config_co_cau(),
             )
 
             df_top10 = df_ct.nlargest(10, "du_no").copy()
@@ -668,13 +669,13 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
             fig_ct.update_layout(
                 barmode="stack",
                 title="📊 Top 10 chương trình theo dư nợ",
-                xaxis_title="Dư nợ (tỷ đồng)",
+                xaxis_title="Dư nợ (triệu đồng)",
                 yaxis=dict(autorange="reversed"),
                 height=max(350, len(df_top10) * 35),
                 margin=dict(l=10, r=40, t=40, b=10),
                 legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
             )
-            st.plotly_chart(fig_ct, width='stretch', key="ct_bar_top10")
+            st.plotly_chart(fig_ct, use_container_width=True, key="ct_bar_top10")
 
         st.markdown("**🟢 Thông tin tổng quát theo PGD**")
         if COT_TEN_PGD in df.columns:

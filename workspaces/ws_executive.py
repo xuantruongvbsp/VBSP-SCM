@@ -7,6 +7,7 @@ Dành cho Ban Giám đốc — Dashboard vĩ mô "Sức Khỏe Tín Dụng" toà
   • Biểu đồ tăng trưởng & so sánh sức khỏe giữa các Phòng giao dịch
   • Tiến độ kế hoạch, cảnh báo NQH đột biến theo Xã, cảnh báo migration
 """
+import importlib
 import streamlit as st
 import pandas as pd
 import plotly.express as px
@@ -39,11 +40,17 @@ from utils import (
 )
 from services.excel_service import ExcelReport, xuat_excel_chuyen_nghiep, ten_file_xuat as excel_ten_file
 from pdf_service import xuat_pdf_bao_cao, xuat_pdf, kiem_tra_pdf_dependency, render_huong_dan
-from tabs import tab_khtd_giao_dc, tab_kiem_soat, tab_qd62, tab_tien_do, tab_so_sanh_ky
-from tabs import tab_qlnk_dashboard
 from snapshot_service import doc_snapshot, doc_snapshot_range, danh_sach_ky
 from services.hhi_service import tinh_hhi, tinh_hhi_breakdown, danh_gia_hhi
 from components.delta_card import delta_card, kpi_row
+
+_TAB_CACHE: dict = {}
+
+def _lazy_tab(name: str):
+    """Import tab module only on first use — cached permanently."""
+    if name not in _TAB_CACHE:
+        _TAB_CACHE[name] = importlib.import_module(f"tabs.{name}")
+    return _TAB_CACHE[name]
 
 # ── Hằng số ngưỡng NQH ────────────────────────────────────────────────────────
 _NGUONG_AN_TOAN  = 1.0   # % — xanh lá
@@ -1372,7 +1379,7 @@ def _render_tien_do_va_kh(df_full: pd.DataFrame, **kwargs) -> None:
             st.plotly_chart(_fig_tt, use_container_width=True)
 
     st.divider()
-    tab_tien_do.render_tong_quan_only(None, **kwargs)
+    _lazy_tab("tab_tien_do").render_tong_quan_only(None, **kwargs)
 
 
 def _render_so_sanh_xep_hang_pgd(df_full: pd.DataFrame) -> None:
@@ -1479,11 +1486,11 @@ def _build_exec_items(df_full, role: str, username: str, **kwargs) -> list:
         {"group": "Cảnh báo rủi ro", "label": "HHI — Tập trung rủi ro",     "fn": lambda: _hhi_giam_sat(df_full)},
         {"group": "Cảnh báo rủi ro", "label": "NQH theo Xã",                "fn": lambda: _render_nqh_xa_canh_bao(df_full)},
         {"group": "Cảnh báo rủi ro", "label": "Migration & Chuyển dịch nợ", "fn": lambda: _render_migration_section(df_full, username)},
-        {"group": "Cảnh báo rủi ro", "label": "📊 Tổng hợp nợ khoanh",     "fn": lambda: tab_qlnk_dashboard.render(None, **kwargs)},
-        {"group": "Kiểm soát",       "label": "Kiểm soát CN",                "fn": lambda: tab_kiem_soat.render_tab(df_full, role, username)},
-        {"group": "Kiểm soát",       "label": "Nợ rủi ro QĐ62",             "fn": lambda: tab_qd62.render(mode="cn")},
-        {"group": "Kiểm soát",       "label": "Giao & Điều chỉnh KHTD",     "fn": lambda: tab_khtd_giao_dc.render(None, **kwargs)},
-        {"group": "Báo cáo",         "label": "So sánh kỳ",                 "fn": lambda: tab_so_sanh_ky.render(None, df=df_full, df_full=df_full, role=role, username=username)},
+        {"group": "Cảnh báo rủi ro", "label": "📊 Tổng hợp nợ khoanh",     "fn": lambda: _lazy_tab("tab_qlnk_dashboard").render(None, **kwargs)},
+        {"group": "Kiểm soát",       "label": "Kiểm soát CN",                "fn": lambda: _lazy_tab("tab_kiem_soat").render_tab(df_full, role, username)},
+        {"group": "Kiểm soát",       "label": "Nợ rủi ro QĐ62",             "fn": lambda: _lazy_tab("tab_qd62").render(mode="cn")},
+        {"group": "Kiểm soát",       "label": "Giao & Điều chỉnh KHTD",     "fn": lambda: _lazy_tab("tab_khtd_giao_dc").render(None, **kwargs)},
+        {"group": "Báo cáo",         "label": "So sánh kỳ",                 "fn": lambda: _lazy_tab("tab_so_sanh_ky").render(None, df=df_full, df_full=df_full, role=role, username=username)},
         {"group": "Báo cáo",         "label": "Xuất PDF báo cáo",           "fn": lambda: _render_pdf_section(df_full, username)},
         {"group": "Hệ thống",        "label": "Hướng dẫn",                  "fn": lambda: render_huong_dan()},
     ]

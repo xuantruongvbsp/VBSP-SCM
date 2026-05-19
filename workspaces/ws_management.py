@@ -591,8 +591,8 @@ def _render_dgd_to_tkvv(tab_parent=None, **kw):
         ctx = st.container()
     with ctx:
         _sub1, _sub2 = st.tabs(["📍 Điểm Giao Dịch", "🏘️ Tổ TK&VV"])
-        tab_quan_ly_dgd.render(_sub1, **kw)
-        tab_cdtotkvv.render(_sub2, **dict(kw, cdto_mode="cn"))
+        _get_tab("tab_quan_ly_dgd").render(_sub1, **kw)
+        _get_tab("tab_cdtotkvv").render(_sub2, **dict(kw, cdto_mode="cn"))
 
 
 def _render_ndt_dp(role: str, username: str) -> None:

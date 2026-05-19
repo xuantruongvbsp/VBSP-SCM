@@ -1,5 +1,18 @@
 # CHANGELOG
 
+## [2026-05-19] — Fix báo cáo GQVL TW gắn MĐT không tìm thấy cột PL NV
+- `services/kiem_soat_service.py` — thêm import `COT_PL_NV`; đổi hardcode `"PL NV"` → `COT_PL_NV` ("Phân loại NV") vì cột đã được rename khi merge
+
+## [2026-05-19] — Chuyển "Nhiệm vụ PGD" sang nhóm "Phối hợp với PGD"
+- `workspaces/ws_management.py` — đổi group "📌 Nhiệm vụ PGD" từ "Giám sát" sang "Phối hợp với PGD", ngang cấp với "Tiến độ Công việc" và "Quản lý Báo cáo định kỳ"
+
+## [2026-05-19] — Tạo tab_quan_ly_bc, tái cấu trúc menu Báo cáo
+- `tabs/tab_quan_ly_bc.py` — tạo mới: wrapper 2 sub-tab "📥 BC từ PGD" (tab_tien_do_nop) + "📤 BC lên cấp trên" (tab_checklist_bc)
+- `workspaces/ws_management.py` — thêm import tab_quan_ly_bc; xóa child "Tiến độ Báo cáo của PGD" khỏi accordion; xóa "Checklist định kỳ"; thêm "📋 Quản lý Báo cáo định kỳ" vào nhóm "Phối hợp với PGD"; đổi "✅ Nhiệm vụ" → "📌 Nhiệm vụ PGD"
+
+## [2026-05-19] — Tách "Thông tin chung" lên đầu menu Điều hành
+- `workspaces/ws_management.py` — đưa "📊 Thông tin chung" lên vị trí đầu tiên trong ALL_ITEMS (mặc định khi mở app); xóa bản duplicate "📊 Giám sát" cũng render tab_tongquan; sửa icon emoji "Tiến độ công việc"
+
 ## [2026-05-19] — Fix DuplicateElementKey menu sidebar ws_management
 - `workspaces/ws_management.py` dòng ~1132 — xóa item trùng label "📊 Thông tin chung" (group "Thông tin chung" là bản duplicate cũ, giữ lại bản trong group "Giám sát")
 

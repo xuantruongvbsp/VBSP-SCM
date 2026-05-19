@@ -36,6 +36,7 @@ from config import (
     COT_TEN_TO,
     COT_MA_CHUONG_TRINH,
     COT_NGAY_DH_HD,
+    COT_PL_NV,
 )
 from pdf_service import xuat_pdf
 from services.report_service import ten_file_bao_cao
@@ -240,7 +241,7 @@ def render_gqvl_tw_gan_mandt(cache: dict[str, Any], pgd_chon: str, username: str
         st.warning("Chưa có dữ liệu HSTD.")
         return
 
-    col_plnv = "PL NV"
+    col_plnv = COT_PL_NV
     required_cols = [
         COT_MA_CHUONG_TRINH,
         COT_NGUON_VON,

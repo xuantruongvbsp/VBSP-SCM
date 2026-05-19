@@ -1,0 +1,193 @@
+DANH SÁCH TOÀN BỘ TAB — DỰ ÁN VBSP-SCM
+============================================================
+Ngày tạo: 2026-05-19
+Format: Tên code / file → Tên hiển thị (icon + text)
+
+============================================================
+I. WORKSPACE ĐIỀU HÀNH (ws_management.py)
+    Menu sidebar — render từng mục đơn lẻ theo ws_mgmt_menu
+============================================================
+
+  ── THÔNG TIN CHUNG ──────────────────────────────────────
+  tab_tongquan.py         📊 Thông tin chung
+
+  ── PHỐI HỢP VỚI PGD ─────────────────────────────────────
+  tab_tien_do.py          📅 Tiến độ công việc  (accordion con)
+  tab_quan_ly_bc.py       📋 Quản lý Báo cáo định kỳ
+
+  ── GIÁM SÁT ─────────────────────────────────────────────
+  (inline lambda)         🔴 3 tháng KHĐ          (accordion "Cảnh báo NQH")
+  (inline lambda)         🚨 Nợ BT → Rủi ro       (accordion "Cảnh báo NQH")
+  (inline lambda)         📋 Nợ QH phát sinh      (accordion "Cảnh báo NQH")
+  (inline lambda)         ⚡ Cảnh báo sớm          (accordion "Cảnh báo NQH")
+  tab_nhiem_vu.py         📌 Nhiệm vụ PGD
+  tab_so_sanh_ky.py       📊 So sánh kỳ
+
+  ── KIỂM SOÁT ────────────────────────────────────────────
+  tab_kiem_soat.py        Kiểm soát nội bộ
+    (droplist: 🔴 Rủi ro tín dụng)      3 tháng không hoạt động
+    (droplist: 🔴 Rủi ro tín dụng)      Nợ quá hạn phát sinh
+    (droplist: 🔍 Giám sát nội bộ)      Tổ có số thành viên không đúng quy định
+    (droplist: 🔍 Giám sát nội bộ)      Gia hạn vượt quy định
+    (droplist: 🔍 Giám sát nội bộ)      Rà soát GQVL TW – Gắn MANDT
+    (droplist: 📊 Tiến độ hoạt động)    (chưa có báo cáo)
+    (droplist: 🎯 Kế hoạch — Thực hiện) (chưa có báo cáo)
+    (droplist: 📁 Khác)                 (chưa có báo cáo)
+  tab_xlrr_tong_hop.py    Xử lý nợ rủi ro
+  tab_cbtd.py             Cán bộ tín dụng
+  tab_hhi.py              Tập trung rủi ro & HHI
+  tab_no_khoanh.py        📊 Tổng quan Nợ Khoanh          (accordion "Chuyên Đề Nợ Khoanh")
+  tab_no_khoanh.py        🔒 Quản lý Nợ Khoanh theo CV 368 (accordion "Chuyên Đề Nợ Khoanh")
+
+  ── KẾ HOẠCH VÀ THỰC HIỆN KHTD ──────────────────────────
+  tab_khtd.py             Kế hoạch tín dụng
+  tab_khtd_giao_dc.py     📋 Giao & ĐC KHTD
+  tab_kehoach.py          Cân đối - Điện báo
+  tab_candoi.py           📡 Điện báo
+  tab_khtd_xuat.py        Xuất báo cáo KHTD
+
+  ── BÁO CÁO ──────────────────────────────────────────────
+  tab_baocao.py           📊 Báo cáo tín dụng   (accordion "Báo cáo tín dụng")
+  (inline lambda)         ⏰ Nợ Đến Hạn         (accordion "Báo cáo tín dụng")
+
+  ── ỦY THÁC ──────────────────────────────────────────────
+  tab_ban_dai_dien.py     🏛️ Ban Đại Diện
+  tab_uy_thac.py          🤝 Ủy thác
+  tab_quan_ly_dgd.py      📍 Điểm Giao Dịch     (accordion "Điểm GD & Tổ TK&VV")
+  tab_cdtotkvv.py         🏘️ Tổ TK&VV           (accordion "Điểm GD & Tổ TK&VV")
+
+  ── HỆ THỐNG ─────────────────────────────────────────────
+  (inline)                Template văn bản        (khi can_upload)
+  (inline)                Mã NĐT địa phương       (khi admin_cn/manager_cn)
+  tab_audit_log.py        Nhật ký hệ thống         (khi admin_cn)
+  tab_trang_thai_nguon.py 🔍 Trạng thái hệ thống
+  tab_upload_khnv.py      Upload dữ liệu
+  (inline)                📖 Hướng dẫn
+
+
+============================================================
+II. WORKSPACE TÁC NGHIỆP — PGD (ws_operation.py)
+    Nhóm tab ngang + subtabs dọc bên trong mỗi nhóm
+============================================================
+
+  ── 🏠 TRANG CHỦ ─────────────────────────────────────────
+  (inline)                🏠 Trang Chủ
+
+  ── 📋 NGHIỆP VỤ HÀNG NGÀY ──────────────────────────────
+  tab_tongquan.py         📊 Thông tin chung
+  tab_tien_do.py          📈 Tiến độ công việc
+  tab_tracuu.py           🔍 Tra cứu hồ sơ
+  tab_danhsach.py         📋 Danh sách & Lọc
+  tab_den_han.py          ⏰ Đến hạn
+  (inline)                📈 Dự phóng Dòng tiền
+  (inline)                🔥 Heatmap Đáo hạn
+  (inline)                📊 Histogram Dư nợ
+  (inline)                🍩 Cơ cấu CT
+  tab_so_sanh_ky.py       📊 So sánh kỳ
+
+  ── 📈 BÁO CÁO & GIAO BAN ───────────────────────────────
+  tab_baocao.py           📊 Báo cáo tín dụng
+  tab_candoi.py           📡 Điện báo
+  (inline)                📝 Báo cáo Giao ban
+  (inline)                📄 Trung tâm mẫu biểu
+  (inline)                📋 Biên bản giao ban
+  (inline)                📢 Thông báo kết luận
+
+  ── 🎯 KẾ HOẠCH PGD ─────────────────────────────────────
+  tab_khtd_pgd.py         🎯 KHTD
+  tab_khtd_giao_dc.py     📋 Giao & ĐC KHTD
+  tab_khtd_mau07.py       📋 Mẫu 07 Giao KH
+  tab_nq11.py             📋 NQ11
+
+  ── 🔍 KIỂM SOÁT & RỦI RO ───────────────────────────────
+  (inline)                🔔 Đôn đốc KHĐ
+  (inline)                ⚡ Cảnh báo sớm
+  tab_qd62.py             💳 Nợ rủi ro QĐ62
+  tab_diem_gd_pgd.py      📍 Điểm Giao Dịch
+  tab_cdtotkvv_pgd.py     🏘️ Tổ TK&VV
+  tab_ban_dai_dien.py     🏛️ Ban Đại Diện
+  tab_uy_thac.py          🤝 Ủy thác
+  tab_no_khoanh.py        📊 Tổng quan Nợ Khoanh
+  tab_no_khoanh.py        🔒 Quản lý Nợ Khoanh CV 368
+
+  ── ⚙️ QUẢN TRỊ PGD ──────────────────────────────────────
+  tab_nhiem_vu.py         ✅ Nhiệm vụ
+  tab_upload_pgd.py       📤 Upload Dữ liệu
+  tab_trang_thai_nguon.py 🔍 Trạng thái hệ thống
+  (inline)                📖 Hướng dẫn
+
+
+============================================================
+III. WORKSPACE LÃNH ĐẠO (ws_executive.py)
+     Menu sidebar — render từng mục đơn lẻ
+============================================================
+
+  ── TỔNG QUAN ────────────────────────────────────────────
+  (inline)                Sức khỏe tín dụng
+  (inline)                Tiến độ & Kế hoạch
+  (inline)                So sánh PGD
+
+  ── CẢNH BÁO RỦI RO ─────────────────────────────────────
+  (inline)                HHI — Tập trung rủi ro
+  (inline)                NQH theo Xã
+  (inline)                Migration & Chuyển dịch nợ
+  tab_qlnk_dashboard.py   📊 Tổng hợp nợ khoanh
+
+  ── KIỂM SOÁT ────────────────────────────────────────────
+  tab_kiem_soat.py        Kiểm soát CN   (cùng cơ chế droplist như trên)
+  tab_qd62.py             Nợ rủi ro QĐ62
+  tab_khtd_giao_dc.py     Giao & Điều chỉnh KHTD
+
+  ── BÁO CÁO ──────────────────────────────────────────────
+  tab_so_sanh_ky.py       So sánh kỳ
+  (inline)                Xuất PDF báo cáo
+
+  ── HỆ THỐNG ─────────────────────────────────────────────
+  (inline)                Hướng dẫn
+
+
+============================================================
+IV. SUB-TAB CHI TIẾT TRONG TỪNG MODULE
+============================================================
+
+  tab_baocao.py (Báo cáo tín dụng):
+    📋 Báo cáo chi tiết
+    📑 NQ11
+
+  tab_no_khoanh.py (Tổng quan Nợ Khoanh — nhom="tongquan"):
+    📊 Tổng quan
+    📋 Theo Chương trình
+    🏘️ Theo Xã
+    🤝 Theo Hội đoàn thể
+    📄 Danh sách chi tiết
+
+  tab_no_khoanh.py (Quản lý Nợ Khoanh CV 368 — nhom="cv368"):
+    📋 Kiểm tra nợ khoanh (theo CV 368)
+    📊 Báo cáo
+
+  tab_tien_do.py (CN role):
+    📊 Tổng quan
+    ➕ Tạo đầu việc mới
+    ✏️ Chỉnh sửa & Xóa đầu việc
+    📋 Cập nhật tiến độ
+    📤 Xuất báo cáo
+
+  tab_tien_do.py (PGD role):
+    📊 Tổng quan
+    📋 Cập nhật tiến độ
+
+  ws_management _render_canh_bao_no() sub-tabs:
+    ⏰ Đến hạn
+    🔴 3 tháng KHĐ
+    🚨 Nợ bình thường → Nợ rủi ro
+    📋 Nợ QH phát sinh
+    ⚡ Cảnh báo sớm
+
+  ws_executive _render_so_sanh_xep_hang_pgd() sub-tabs:
+    🏘️ Theo Xã
+    📌 Theo Chương trình
+
+
+============================================================
+TỔNG CỘNG: ~60+ tab hiển thị trên toàn hệ thống
+(3 workspace × các nhóm × tab/sub-tab/droplist)

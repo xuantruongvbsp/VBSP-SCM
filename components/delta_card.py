@@ -64,6 +64,7 @@ def delta_card(
             delta=delta_str,
             delta_color=delta_color if delta is not None else "off",
             help=help,
+            border=True,
         )
 
     if help:

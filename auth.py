@@ -149,6 +149,11 @@ def la_admin_cn(role: str) -> bool:
     return normalize_role(role) in ("admin_cn", "admin")
 
 
+def la_executive(role: str) -> bool:
+    """Kiểm tra role là Ban Giám đốc (chỉ đọc, không upload/nhập liệu)."""
+    return normalize_role(role) == "executive"
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # PHÂN QUYỀN TAB — WORKSPACE OPERATION (PGD)
 # ═══════════════════════════════════════════════════════════════════════════════

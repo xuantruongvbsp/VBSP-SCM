@@ -199,6 +199,12 @@ Upload flow:
 - `workspaces/ws_executive.py`: thêm `# noqa: COT` cho display labels (8 vị trí)
 - `components/movers.py`: thêm `# noqa: COT` cho UI label dict
 
+## [19/05/2026] — Hoàn thiện tab Nợ khoanh từ A-Z
+- `db.py`: Thêm bảng `qlnk_ke_hoach` (13 cột + 3 index) vào `_init_db()`; thêm migration silent cho 3 cột mới; thay thế 3 stub functions (`doc_ke_hoach_kiem_tra`, `luu_ke_hoach_kiem_tra`, `duyet_ke_hoach`) bằng SQLite thật — hoàn thiện luồng d5 Kế hoạch và d7 Báo cáo Mẫu KH
+- `tabs/tab_no_khoanh.py`: Import + dùng `get_tab_context(tab)` thay `tab if tab is not None else st.container()`
+- `tabs/tab_no_khoanh.py` + `db.py`: **Redesign toàn bộ d5 Kế hoạch** — kế hoạch phân công cả năm: chọn năm + PGD → load toàn bộ món khoanh → data_editor điền ngày KT dự kiến từng món (không validate 120 ngày ở đây) → lưu JSON `ds_phan_cong`; schema `qlnk_ke_hoach` dùng `nam INTEGER` + `ds_phan_cong JSON`
+- `tabs/tab_no_khoanh.py`: Mẫu 03/QLNK — viết lại hoàn toàn `_xuat_pdf_mau_03qlnk()` khớp mẫu thực tế: header 2 cột (đơn vị | Mẫu số), tiêu đề + khoảng thời gian, "Đơn vị ủy thác", gộp dòng theo khách hàng (SPAN dọc STT+Tên KH cho KH nhiều món), lọc `< 120 ngày`; UI thêm input Từ ngày/Đến ngày/Mã tổ/ĐVUT
+
 ## [19/05/2026]
 - `scripts/check_conventions.py`: thêm encoding fix cho Windows — `import os` + `os.environ.setdefault("PYTHONIOENCODING", "utf-8")` + `sys.stdout.reconfigure(encoding="utf-8", errors="replace")`
 - `scripts/check_conventions.py`: sửa typo `fromfrom __future__ import annotations` → `from __future__ import annotations`; xóa duplicate `os.environ.setdefault()`

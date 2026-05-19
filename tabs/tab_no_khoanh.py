@@ -13,11 +13,13 @@ from auth import la_phan_he_cn, normalize_role, get_permissions, co_quyen_upload
 from config import (
     COT_CMND,
     COT_DIA_CHI,
+    COT_DU_NO_KHOANH,
     COT_DU_NO_QH,
     COT_DVUT,
     COT_MA_KH,
     COT_NGAY_CAP_CMND,
     COT_NGAY_DH,
+    COT_NGAY_HH_KHOANH,
     COT_NGAY_SINH,
     COT_NOI_CAP_CMND,
     COT_SDT,
@@ -25,6 +27,7 @@ from config import (
     COT_TEN_CT,
     COT_TEN_KH,
     COT_TEN_PGD,
+    COT_TEN_TO,
     COT_TEN_XA,
     COT_TONG_DU_NO,
     DON_VI_CHI_NHANH,
@@ -54,10 +57,6 @@ try:
     _REPORTLAB_READY = True
 except ImportError:
     _REPORTLAB_READY = False
-
-COT_DU_NO_KHOANH = "Dư nợ khoanh"
-COT_NGAY_HH_KHOANH = "Ngày hết hạn Khoanh"
-COT_TEN_TO = "Tên tổ"
 
 _fmt_dong = lambda x: fmt_so(float(x)) + " đồng" if x not in (None, "", float("nan")) else "0 đồng"
 
@@ -811,9 +810,134 @@ def _xuat_pdf_mau_02qlnk(row: dict,
     return buf.getvalue()
 
 
-def _xuat_pdf_mau_03qlnk(ten_pgd: str, ten_to: str, ds_het_han: list,
-                         tu_ngay: str = "", den_ngay: str = "",
-                         ma_to: str = "", don_vi_uy_thac: str = "") -> bytes:
+def _xuat_pdf_bb_kt_cv368(noi_dung: dict) -> bytes:
+    _dang_ky_font_qlnk()
+    pgd = str(noi_dung.get("ten_pgd") or "")
+    try:
+        nam = int(noi_dung.get("nam") or datetime.now().year)
+    except Exception:
+        nam = datetime.now().year
+    dot = noi_dung.get("dot")
+    ngay_kt = str(noi_dung.get("ngay_kiem_tra") or "")[:10]
+    ds_mon = noi_dung.get("ds_mon") or []
+
+    buf = BytesIO()
+    margin = 1.5 * cm
+    doc = SimpleDocTemplate(
+        buf,
+        pagesize=landscape(A4),
+        leftMargin=margin,
+        rightMargin=margin,
+        topMargin=1.2 * cm,
+        bottomMargin=2 * cm,
+    )
+    usable_w = landscape(A4)[0] - 2 * margin
+    elements = []
+
+    _sN = ParagraphStyle("bbN", fontName=_FN, fontSize=10, leading=14)
+    _sR = ParagraphStyle("bbR", fontName=_FN, fontSize=10, leading=14, alignment=TA_RIGHT)
+    left_html = (
+        "NGÂN HÀNG CHÍNH SÁCH XÃ HỘI<br/>"
+        "Chi nhánh tỉnh Đồng Nai<br/>"
+        f"<b>Phòng giao dịch {pgd}</b><br/>"
+        "─────────────────────"
+    )
+    right_html = (
+        "<b>CỘNG HOÀ XÃ HỘI CHỦ NGHĨA VIỆT NAM</b><br/>"
+        "<i>Độc lập - Tự do - Hạnh phúc</i><br/>"
+        "─────────────────────<br/>"
+        f"{_dong_ten_nd()}"
+    )
+    hdr_tbl = Table(
+        [[Paragraph(left_html, _sN), Paragraph(right_html, _sR)]],
+        colWidths=[usable_w * 0.55, usable_w * 0.45],
+    )
+    hdr_tbl.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP")]))
+    elements.append(hdr_tbl)
+    elements.append(Spacer(1, 10))
+
+    elements.append(Paragraph(
+        "BIÊN BẢN KIỂM TRA NỢ KHOANH",
+        ParagraphStyle("BBTitle", fontName=_FB, fontSize=14, leading=18, alignment=TA_CENTER, textColor=_VBSP_GREEN),
+    ))
+    elements.append(Spacer(1, 6))
+    if dot:
+        elements.append(Paragraph(f"<b>Đợt:</b> {dot} &nbsp;&nbsp; <b>Năm:</b> {nam}", _style_body()))
+    else:
+        elements.append(Paragraph(f"<b>Năm:</b> {nam}", _style_body()))
+    if ngay_kt:
+        elements.append(Paragraph(f"<b>Ngày kiểm tra:</b> {ngay_kt}", _style_body()))
+    elements.append(Paragraph(
+        "<i>Căn cứ: Công văn số 368/NHCS-QLN ngày 17/01/2024 của NHCSXH</i>",
+        _style_body(),
+    ))
+    elements.append(Spacer(1, 8))
+
+    th = _style_table_header(8)
+    tc = _style_table_cell(8)
+    tcL = _style_table_cell_left(8)
+    col_hdrs = [
+        "STT", "Tên tổ TK&VV", "Tên KH", "Số KU", "Dư nợ (đồng)",
+        "Ngày HH khoanh", "Kết quả KT", "Khả năng TN", "Cam kết TN", "Ghi chú",
+    ]
+    col_w = [
+        0.8 * cm, 3.2 * cm, 3.8 * cm, 2.4 * cm, 2.8 * cm,
+        2.2 * cm, 2.5 * cm, 2.2 * cm, 3.0 * cm, 3.0 * cm,
+    ]
+    table_data = [[Paragraph(h, th) for h in col_hdrs]]
+    tbl_cmds = [
+        ("BACKGROUND", (0, 0), (-1, 0), _VBSP_GREEN),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+        ("GRID", (0, 0), (-1, -1), 0.5, _BORDER_COLOR),
+        ("BOX", (0, 0), (-1, -1), 1.0, _VBSP_GREEN),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("TOPPADDING", (0, 0), (-1, -1), 3),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+    ]
+
+    for idx, item in enumerate(ds_mon, 1):
+        du_no_raw = item.get("du_no_khoanh", 0)
+        try:
+            du_no_v = float(str(du_no_raw).replace(" đồng", "").replace(".", "").replace(",", "").strip())
+        except Exception:
+            du_no_v = 0.0
+        table_data.append([
+            Paragraph(str(idx), tc),
+            Paragraph(str(item.get("ten_to") or ""), tcL),
+            Paragraph(str(item.get("ten_kh") or ""), tcL),
+            Paragraph(str(item.get("so_ku") or ""), tc),
+            Paragraph(_qlnk_fmt_dong(du_no_v), tc),
+            Paragraph(str(item.get("ngay_hh_khoanh") or ""), tc),
+            Paragraph(str(item.get("ket_qua_kt") or ""), tcL),
+            Paragraph(str(item.get("kha_nang_tn") or ""), tc),
+            Paragraph(str(item.get("cam_ket_tn") or ""), tcL),
+            Paragraph(str(item.get("ghi_chu") or ""), tcL),
+        ])
+        if idx % 2 == 0:
+            tbl_cmds.append(("BACKGROUND", (0, idx), (-1, idx), _ROW_ALT))
+
+    tbl = Table(table_data, colWidths=col_w, repeatRows=1)
+    tbl.setStyle(TableStyle(tbl_cmds))
+    elements.append(tbl)
+    elements.append(Spacer(1, 10))
+
+    _ve_footer_pdf(elements, usable_w, signatures=["NGƯỜI LẬP", "GIÁM ĐỐC"], ngay_str=_dong_ten_nd())
+    doc.build(elements)
+    buf.seek(0)
+    return buf.getvalue()
+
+
+def _xuat_pdf_mau_03qlnk(
+    ten_pgd: str | dict,
+    ten_to: str = "",
+    ds_het_han: list | None = None,
+    tu_ngay: str = "",
+    den_ngay: str = "",
+    ma_to: str = "",
+    don_vi_uy_thac: str = "",
+) -> bytes:
+    if isinstance(ten_pgd, dict) and ds_het_han is None:
+        return _xuat_pdf_bb_kt_cv368(ten_pgd)
     _dang_ky_font_qlnk()
     buf    = BytesIO()
     margin = 1.5 * cm
@@ -823,7 +947,7 @@ def _xuat_pdf_mau_03qlnk(ten_pgd: str, ten_to: str, ds_het_han: list,
     usable_w = landscape(A4)[0] - 2 * margin
     elements = []
 
-    # ── Header: 2 cột (đơn vị | mẫu số) ─────────────────────────────────────
+    ds_het_han = ds_het_han or []
     _sB = ParagraphStyle("hB", fontName=_FB, fontSize=10, leading=14)
     _sN = ParagraphStyle("hN", fontName=_FN, fontSize=10, leading=14)
     _sR = ParagraphStyle("hR", fontName=_FN, fontSize=9,  leading=13, alignment=TA_RIGHT)
@@ -1261,10 +1385,32 @@ def _xuat_pdf_m10(ds_luu_tam: list, ten_pgd: str = "") -> bytes:
     return buf.getvalue()
 
 
-def _xuat_pdf_ke_hoach_kt(data_kh: dict, ds_phan_cong: list,
-                           thanh_phan: dict, ten_pgd: str, nam: int) -> bytes:
+def _xuat_pdf_ke_hoach_kt(
+    noi_dung_or_data_kh: dict,
+    ds_phan_cong: list | None = None,
+    thanh_phan: dict | None = None,
+    ten_pgd: str | None = None,
+    nam: int | None = None,
+) -> bytes:
     """Xuất PDF Kế hoạch kiểm tra nợ khoanh theo NĐ 30/2020."""
     from itertools import groupby as _groupby
+    if ds_phan_cong is None and thanh_phan is None and ten_pgd is None and nam is None:
+        nd = noi_dung_or_data_kh or {}
+        ten_pgd = str(nd.get("ten_pgd") or "")
+        try:
+            nam = int(nd.get("nam") or datetime.now().year)
+        except Exception:
+            nam = datetime.now().year
+        thanh_phan = nd.get("thanh_phan") or nd.get("thanh_phan_tham_gia") or {}
+        ds_phan_cong = nd.get("ds_mon") or nd.get("ds_phan_cong") or []
+    else:
+        ds_phan_cong = ds_phan_cong or []
+        thanh_phan = thanh_phan or {}
+        ten_pgd = ten_pgd or ""
+        try:
+            nam = int(nam or datetime.now().year)
+        except Exception:
+            nam = datetime.now().year
     _dang_ky_font_qlnk()
     buf    = BytesIO()
     margin = 1.8 * cm

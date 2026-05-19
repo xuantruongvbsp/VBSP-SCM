@@ -174,6 +174,7 @@ def init_db():
                 so_thang_khoanh         INTEGER,
                 so_quyet_dinh_khoanh    TEXT,
                 ngay_kiem_tra           TEXT    NOT NULL,
+                ngay_het_han_khoanh     TEXT,
                 can_bo_kiem_tra         TEXT,
                 du_no_goc               REAL    DEFAULT 0,
                 du_no_goc_khoanh        REAL    DEFAULT 0,
@@ -233,6 +234,12 @@ def init_db():
         try:
             conn.execute(
                 "ALTER TABLE tien_do_task ADD COLUMN nguoi_phu_trach TEXT"
+            )
+        except sqlite3.OperationalError:
+            pass
+        try:
+            conn.execute(
+                "ALTER TABLE qlnk_ket_qua ADD COLUMN ngay_het_han_khoanh TEXT"
             )
         except sqlite3.OperationalError:
             pass
@@ -571,7 +578,7 @@ def doc_ndt_dp_ma_list() -> list[str]:
 _QLNK_KQ_COLS = [
     "id", "ma_mon_vay", "ten_pgd", "ten_xa", "ten_to_tkv", "ten_kh",
     "ngay_bat_dau_khoanh", "so_thang_khoanh", "so_quyet_dinh_khoanh",
-    "ngay_kiem_tra", "can_bo_kiem_tra",
+    "ngay_kiem_tra", "ngay_het_han_khoanh", "can_bo_kiem_tra",
     "du_no_goc", "du_no_goc_khoanh", "so_tien_lai_con_no",
     "du_no_goc_thuc_te", "du_no_khoanh_thuc_te", "so_tien_lai_thuc_te",
     "chenh_lech", "ly_do_chenh_lech",
@@ -616,7 +623,7 @@ def luu_ket_qua_kiem_tra(data: dict, username: str) -> int:
                     """UPDATE qlnk_ket_qua SET
                         ma_mon_vay=?, ten_pgd=?, ten_xa=?, ten_to_tkv=?, ten_kh=?,
                         ngay_bat_dau_khoanh=?, so_thang_khoanh=?, so_quyet_dinh_khoanh=?,
-                        ngay_kiem_tra=?, can_bo_kiem_tra=?,
+                        ngay_kiem_tra=?, ngay_het_han_khoanh=?, can_bo_kiem_tra=?,
                         du_no_goc=?, du_no_goc_khoanh=?, so_tien_lai_con_no=?,
                         du_no_goc_thuc_te=?, du_no_khoanh_thuc_te=?, so_tien_lai_thuc_te=?,
                         chenh_lech=?, ly_do_chenh_lech=?,
@@ -629,7 +636,8 @@ def luu_ket_qua_kiem_tra(data: dict, username: str) -> int:
                         data.get("ten_xa"), data.get("ten_to_tkv"), data.get("ten_kh"),
                         data.get("ngay_bat_dau_khoanh"), data.get("so_thang_khoanh"),
                         data.get("so_quyet_dinh_khoanh"),
-                        data.get("ngay_kiem_tra"), data.get("can_bo_kiem_tra"),
+                        data.get("ngay_kiem_tra"), data.get("ngay_het_han_khoanh"),
+                        data.get("can_bo_kiem_tra"),
                         float(data.get("du_no_goc") or 0),
                         khoanh,
                         float(data.get("so_tien_lai_con_no") or 0),
@@ -651,20 +659,21 @@ def luu_ket_qua_kiem_tra(data: dict, username: str) -> int:
                     """INSERT INTO qlnk_ket_qua (
                         ma_mon_vay, ten_pgd, ten_xa, ten_to_tkv, ten_kh,
                         ngay_bat_dau_khoanh, so_thang_khoanh, so_quyet_dinh_khoanh,
-                        ngay_kiem_tra, can_bo_kiem_tra,
+                        ngay_kiem_tra, ngay_het_han_khoanh, can_bo_kiem_tra,
                         du_no_goc, du_no_goc_khoanh, so_tien_lai_con_no,
                         du_no_goc_thuc_te, du_no_khoanh_thuc_te, so_tien_lai_thuc_te,
                         chenh_lech, ly_do_chenh_lech,
                         thuc_trang_du_an, tinh_hinh_khach_hang,
                         kha_nang_tra_no, cam_ket_tra_no,
                         trang_thai, nguoi_nhap, updated_at
-                    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                     (
                         data.get("ma_mon_vay"), data.get("ten_pgd"),
                         data.get("ten_xa"), data.get("ten_to_tkv"), data.get("ten_kh"),
                         data.get("ngay_bat_dau_khoanh"), data.get("so_thang_khoanh"),
                         data.get("so_quyet_dinh_khoanh"),
-                        data.get("ngay_kiem_tra"), data.get("can_bo_kiem_tra"),
+                        data.get("ngay_kiem_tra"), data.get("ngay_het_han_khoanh"),
+                        data.get("can_bo_kiem_tra"),
                         float(data.get("du_no_goc") or 0),
                         khoanh,
                         float(data.get("so_tien_lai_con_no") or 0),
@@ -826,6 +835,48 @@ def doc_bo_sung_mon_vay(ma_mon_vay: str) -> dict | None:
         return dict(row) if row else None
     except Exception:
         return None
+
+
+def doc_ke_hoach_kiem_tra(ten_pgd: str = None,
+                          trang_thai: str = None) -> list[dict]:
+    """
+    Đọc danh sách kế hoạch kiểm tra từ kv_store.
+    Lọc AND theo ten_pgd / trang_thai nếu được truyền (None = bỏ qua).
+    Trả về list[dict] với fields: id, ten_pgd, ten_xa, ten_to_tkv, ngay_kiem_tra,
+                                   ds_mon_vay, trang_thai, nguoi_lap, nguoi_duyet
+    Hiện tại: stub trả về []
+    """
+    try:
+        # TODO: Đọc từ kv_store("kehoach_kiem_tra", "kehoach_kiem_tra_pgd_*", v.v.)
+        # Tạm stub vì chưa có storage rõ ràng
+        return []
+    except Exception:
+        return []
+
+
+def luu_ke_hoach_kiem_tra(data: dict, username: str = "system") -> None:
+    """
+    Lưu kế hoạch kiểm tra vào kv_store.
+    Hiện tại: stub, không làm gì
+    """
+    try:
+        # TODO: Ghi vào kv_store với key "kehoach_kiem_tra*"
+        ghi_audit(username, "luu_ke_hoach_kiem_tra", "stub")
+    except Exception:
+        pass
+
+
+def duyet_ke_hoach(kehoach_id: int, username: str = "system") -> bool:
+    """
+    Duyệt/phê duyệt kế hoạch kiểm tra.
+    Hiện tại: stub trả về True
+    """
+    try:
+        # TODO: Cập nhật trang_thai -> 'da_duyet' trong storage
+        ghi_audit(username, "duyet_ke_hoach", f"id={kehoach_id}")
+        return True
+    except Exception:
+        return False
 
 
 # Khởi tạo DB, migrate dữ liệu cũ, sau đó seed cấu hình động

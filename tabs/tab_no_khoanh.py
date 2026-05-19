@@ -1441,7 +1441,7 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
 
     ctx = get_tab_context(tab)
     with ctx:
-        st.subheader("🔒 Phân tích Nợ khoanh")
+        st.subheader("🔒 Chuyên Đề Nợ Khoanh")
         st.caption(
             "Khoản vay đang trong giai đoạn khoanh nợ theo QĐ 62/2015/QĐ-TTg. "
             "Phân tích theo Chương trình / Xã / Hội đoàn thể."

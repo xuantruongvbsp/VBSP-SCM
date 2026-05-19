@@ -192,17 +192,14 @@ header[data-testid="stHeader"] {{
 }}
 
 /* ── 7. METRIC / KPI CARD ── */
+/* border=True → Streamlit dùng secondaryBackgroundColor tự động; chỉ tùy chỉnh thêm */
 [data-testid="stMetric"] {{
-    background: {c['surface']} !important;
-    border: 1px solid {c['border']} !important;
     border-left: 4px solid {c['accent']} !important;
-    border-radius: 12px !important;
-    padding: 16px 20px !important;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.06) !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.12) !important;
     transition: box-shadow 0.2s, transform 0.15s !important;
 }}
 [data-testid="stMetric"]:hover {{
-    box-shadow: 0 4px 16px rgba(46,125,50,0.15) !important;
+    box-shadow: 0 4px 16px rgba(46,125,50,0.2) !important;
     transform: translateY(-1px) !important;
 }}
 [data-testid="stMetric"] label {{

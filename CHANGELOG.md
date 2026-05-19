@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## [2026-05-20] — Fix KPI card nền trắng chữ trắng trong dark theme
+- `components/delta_card.py` dòng ~61 — thêm `border=True` vào `st.metric()`: Streamlit 1.57 mới có param này, tự apply `secondaryBackgroundColor` (#1E2130) làm nền card
+- `utils_theme.py` dòng ~195 — bỏ `background`/`border`/`border-radius`/`padding` override (nay do Streamlit native xử lý); giữ `border-left` accent + `box-shadow`
+
 ## [2026-05-20] — Fix chữ đen trong dark theme (heatmap + sidebar labels)
 - `workspaces/ws_executive.py` dòng ~297 — đổi màu bảng heatmap PGD: row bg `#fff`→`#1E2130`, border `#d1d5db`→`#2A2D3E`, text NQH/RR sáng hơn; chữ row mặc định thêm `color:#E0E6ED`
 - `workspaces/ws_executive.py` dòng ~187 — span `color:#1565C0` → `#90CAF9` (đọc được trên nền tối)

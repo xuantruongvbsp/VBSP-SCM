@@ -70,7 +70,7 @@ def delta_card(
         with col2:
             st.markdown(
                 f'<div style="padding-top:6px;cursor:help;" title="{help}">'
-                f'<span style="color:#6b7a8d;font-size:14px;">ⓘ</span></div>',
+                f'<span style="color:#94A3B8;font-size:14px;">ⓘ</span></div>',
                 unsafe_allow_html=True,
             )
 
@@ -82,7 +82,7 @@ def info_popover(content: str):
         content: Nội dung giải thích (hỗ trợ Markdown)
     """
     st.markdown(
-        f'<span style="cursor:help;color:#6b7a8d;font-size:13px;border-bottom:1px dashed #ccc;" '
+        f'<span style="cursor:help;color:#94A3B8;font-size:13px;border-bottom:1px dashed #2A2D3E;" '
         f'title="{content}">ⓘ</span>',
         unsafe_allow_html=True,
     )

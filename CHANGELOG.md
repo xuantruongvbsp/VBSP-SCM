@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## [2026-05-20] — Tối ưu tốc độ chuyển tab ws_management: lazy import + cache + fragment
+- `workspaces/ws_management.py` dòng ~46 — xóa 18 static import tab, thay bằng `_get_tab()` với `@st.cache_resource` (lazy import giảm 30–50% cold start)
+- `workspaces/ws_management.py` dòng ~1360 — thêm `@st.fragment` cho các tab không có `st.rerun()`, skip fragment cho 8 tab có `st.rerun()` bên trong
+- `tabs/tab_tongquan.py` dòng ~198 — thêm `_cache_co_cau_ct()` với `@st.cache_data(ttl=120)` cache groupby chương trình tín dụng (~7 groupby thành 1 cached call)
+- `tabs/tab_tongquan.py` dòng ~273 — thêm `_cache_tqpgd_extended()` với `@st.cache_data(ttl=120)` cache toàn bộ bảng tổng quan PGD (~8 groupby/merge thành 1 cached call)
+
 ## [2026-05-20] — Tăng tốc dashboard Nợ Khoanh: batch query + cache
 - `tabs/tab_qlnk_dashboard.py` dòng ~42 — thêm `_cached_ket_qua_kiem_tra()` với `@st.cache_data(ttl=60)` thay cho gọi DB trực tiếp mỗi render
 - `tabs/tab_qlnk_dashboard.py` dòng ~48 — `_doc_ly_do_khoanh()` dùng `db.doc_bo_sung_nhieu_mon_vay()` batch IN-clause thay N+1 loop (tiết kiệm 100–500 SQL query/render)

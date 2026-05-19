@@ -148,7 +148,7 @@ def _jump_to_khoanh():
     st.session_state._qlnk_filter = "sap_het_han"
     ws = st.session_state.get("workspace", "operation")
     if ws == "management":
-        st.session_state.ws_mgmt_jump = "🔒 Nợ khoanh"
+        st.session_state.ws_mgmt_jump = "🔒 Chuyên Đề Nợ Khoanh"
     elif ws == "executive":
         st.session_state.ws_exec_jump = "📊 Tổng hợp nợ khoanh"
     else:

@@ -22,7 +22,7 @@ import pandas as pd
 
 import db
 from config import COT_HINH_THUC_VAY, COT_MA_KH, COT_SO_KU, COT_TEN_THON, COT_TEN_XA, COT_TONG_DU_NO, COT_DU_NO_QH, DS_PGD, DON_VI_CHI_NHANH
-from auth import la_phan_he_cn, normalize_role
+from auth import la_phan_he_cn, la_executive, normalize_role
 from utils import xuat_excel, hien_thi_dataframe_phan_trang, fmt_so
 from data.khtd import doc_cbtd, luu_cbtd, lay_ap_tu_dgd_list, gan_cbtd_vao_df
 
@@ -279,7 +279,7 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
         # ════════════════════════════════════════════════════════════════════
         # CRUD (admin + manager CN)
         # ════════════════════════════════════════════════════════════════════
-        if not la_phan_he_cn(role) or role == "executive":
+        if not la_phan_he_cn(role) or la_executive(role):
             st.caption("Chỉ Quản lý Chi nhánh mới được thêm/sửa/xóa CBTD.")
         else:
             che_do = st.radio("Thao tác",

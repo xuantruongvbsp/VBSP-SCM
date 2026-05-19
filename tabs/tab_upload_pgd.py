@@ -2,8 +2,8 @@
 Tab Upload Dữ liệu — Hỗ trợ địa bàn (PGD tự upload file của mình).
 ──────────────────────────────────────────────────────────────────────
 Quyền:
-  role == "user"              → không có selectbox, chỉ thấy đơn vị pgd_user
-  role in ("admin","manager") → có selectbox chọn đơn vị
+  PGD role (user_pgd/manager_pgd/admin_pgd) → không có selectbox, chỉ thấy đơn vị pgd_user
+  CN role  (admin_cn/manager_cn/...)        → có selectbox chọn đơn vị
 
 Giao diện: giống tab_upload_khnv nhưng không có nút merge thủ công trên tab.
 Lưu file qua luu_pgd_file — HSTD/NQ11/GQVL có gộp toàn CN tự động theo service.

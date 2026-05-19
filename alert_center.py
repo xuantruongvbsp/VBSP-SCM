@@ -189,12 +189,12 @@ def render_alert_sidebar(
     canh_bao: list[str] = []
 
     # Cảnh báo upload trễ — chỉ admin/manager mới thấy
-    from auth import is_cn_role, is_pgd_role
-    if is_cn_role(role) or role in ["admin", "manager"]:
+    from auth import la_phan_he_cn, la_phan_he_pgd
+    if la_phan_he_cn(role):
         canh_bao += _kiem_tra_upload_tre()
 
     # Cảnh báo 3 tháng không hoạt động
-    pgd_filter = pgd_user if is_pgd_role(role) else None
+    pgd_filter = pgd_user if la_phan_he_pgd(role) else None
     canh_bao += _kiem_tra_khong_hoat_dong(df_full, pgd_filter)
 
     # Cảnh báo nợ khoanh sắp hết hạn

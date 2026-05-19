@@ -57,7 +57,7 @@ def hstd_path(ten_pgd: str) -> Path:
 
 
 def _con() -> sqlite3.Connection:
-    conn = sqlite3.connect(DB_PATH, timeout=10)
+    conn = sqlite3.connect(DB_PATH, timeout=10)  # noqa: DB — health_check chạy độc lập, không qua app context
     conn.row_factory = sqlite3.Row
     return conn
 

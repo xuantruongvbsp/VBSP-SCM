@@ -492,13 +492,13 @@ def _tab_khtd_chi_nhanh(
     hr1 = st.columns(_colw)
     hr1[0].markdown(_khtd_cn_hdr_cell("", "#f0f4fa"), unsafe_allow_html=True)
     hr1[1].markdown(
-        _khtd_cn_hdr_cell("NGUỒN VỐN TRUNG ƯƠNG", "#bbdefb", "#1565c0"),
+        _khtd_cn_hdr_cell("NGUỒN VỐN TRUNG ƯƠNG", "#0D2137", "#1565c0"),
         unsafe_allow_html=True,
     )
     for j in (2, 3):
         hr1[j].markdown(_khtd_cn_hdr_cell("", "#bbdefb"), unsafe_allow_html=True)
     hr1[4].markdown(
-        _khtd_cn_hdr_cell("NGUỒN VỐN ĐỊA PHƯƠNG", "#c8e6c9", "#2e7d32"),
+        _khtd_cn_hdr_cell("NGUỒN VỐN ĐỊA PHƯƠNG", "#c8e6c9", "#81C784"),
         unsafe_allow_html=True,
     )
     for j in (5, 6):
@@ -669,7 +669,7 @@ def _tab_khtd_chi_nhanh(
                     cpth = kh_inp - th_trieu
                     if kh_inp == 0:
                         cols_sub[col_cp_idx].markdown(
-                            _md_right("—", "#9e9e9e"), unsafe_allow_html=True
+                            _md_right("—", "#64748B"), unsafe_allow_html=True
                         )
                     elif cpth < 0:
                         cols_sub[col_cp_idx].markdown(

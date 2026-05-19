@@ -39,16 +39,26 @@ def _loc_khoanh(df: pd.DataFrame) -> pd.DataFrame:
     return df[du_kh > 0].copy()
 
 
+@st.cache_data(ttl=60)
+def _cached_ket_qua_kiem_tra() -> set:
+    import db
+    rows = db.doc_ket_qua_kiem_tra()
+    return {r["ma_mon_vay"] for r in rows} if rows else set()
+
+
 def _doc_ly_do_khoanh(df_kh: pd.DataFrame) -> pd.Series | None:
-    """Tổng hợp lý do khoanh từ qlnk_bo_sung, fallback về cột dữ liệu nếu có."""
+    """Tổng hợp lý do khoanh từ qlnk_bo_sung — dùng batch query, tránh N+1."""
     import db
     if df_kh.empty or COT_SO_KU not in df_kh.columns:
         return None
+    ds_ma = [str(ku) for ku in df_kh[COT_SO_KU].dropna().unique()]
+    if not ds_ma:
+        return None
+    bo_sung_map = db.doc_bo_sung_nhieu_mon_vay(ds_ma)
     counts: dict[str, int] = {}
-    for ku in df_kh[COT_SO_KU].dropna().unique():
-        bs = db.doc_bo_sung_mon_vay(str(ku))
-        if bs and bs.get("ly_do_khoanh"):
-            ld = bs["ly_do_khoanh"]
+    for bs in bo_sung_map.values():
+        ld = bs.get("ly_do_khoanh")
+        if ld:
             counts[ld] = counts.get(ld, 0) + 1
     if not counts:
         return None
@@ -166,9 +176,7 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                 (ngay_hh.notna() & (ngay_hh.dt.date <= hom_nay)).sum()
             )
 
-        import db
-        rows_kt = db.doc_ket_qua_kiem_tra()
-        da_kiem_tra_set = {r["ma_mon_vay"] for r in rows_kt} if rows_kt else set()
+        da_kiem_tra_set = _cached_ket_qua_kiem_tra()
         so_mon_da_kt = 0
         if COT_SO_KU in df_kh.columns and not df_kh.empty:
             so_mon_da_kt = int(df_kh[COT_SO_KU].astype(str).isin(da_kiem_tra_set).sum())

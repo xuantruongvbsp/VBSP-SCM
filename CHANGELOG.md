@@ -1,5 +1,18 @@
 # CHANGELOG
 
+## [2026-05-20] — Fix ValueError "truth value of DataFrame ambiguous" tab Nợ Khoanh
+- `tabs/tab_no_khoanh.py` dòng 834 — đổi `kwargs.get("df_full") or df` → `df if _df_full is None else _df_full`; `or` không dùng được với DataFrame
+
+## [2026-05-20] — Tăng tốc merge thủ công (string cleanup vectorized)
+- `services/upload_service.py` dòng ~485 — thay per-cell Python loop `to_numpy + list comprehension` bằng `astype(str).str.strip() + where()` vectorized; nhanh hơn ~30× với HSTD 50k+ dòng
+
+## [2026-05-20] — Xóa dead code kế hoạch kiểm tra (old flow trước CV368)
+- `tabs/tab_no_khoanh.py` dòng 51–53 — xóa `_cached_ke_hoach_kiem_tra()`: wrapper không có caller nào
+- `db.py` — xóa `doc_ke_hoach_kiem_tra()` và `luu_ke_hoach_kiem_tra()`: cả hai đã được thay thế bởi `luu_mau_bieu_cv368` / `doc_mau_bieu_cv368`; giữ `luu_ket_qua_kiem_tra` vì QLNK_06 vẫn cần
+
+## [2026-05-20] — Fix tab "Chuyên đề nợ khoanh" báo không có dữ liệu HSTD
+- `tabs/tab_no_khoanh.py` dòng 838 — đổi `kwargs.get("df_full", df)` → `kwargs.get("df_full") or df`: khi `df_full=None` truyền tường minh (ws_operation PGD mode), fallback đúng về `df` thay vì giữ `None`
+
 ## [2026-05-20] — Fix KPI card nền trắng chữ trắng trong dark theme
 - `components/delta_card.py` dòng ~61 — thêm `border=True` vào `st.metric()`: Streamlit 1.57 mới có param này, tự apply `secondaryBackgroundColor` (#1E2130) làm nền card
 - `utils_theme.py` dòng ~195 — bỏ `background`/`border`/`border-radius`/`padding` override (nay do Streamlit native xử lý); giữ `border-left` accent + `box-shadow`

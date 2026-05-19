@@ -49,10 +49,6 @@ def _cached_ket_qua_kiem_tra(ten_pgd, trang_thai=None):
     return db.doc_ket_qua_kiem_tra(ten_pgd=ten_pgd, trang_thai=trang_thai)
 
 @st.cache_data(ttl=60, show_spinner=False)
-def _cached_ke_hoach_kiem_tra(ten_pgd, trang_thai=None, nam=None):
-    return db.doc_ke_hoach_kiem_tra(ten_pgd=ten_pgd, trang_thai=trang_thai, nam=nam)
-
-@st.cache_data(ttl=60, show_spinner=False)
 def _cached_mau_bieu_cv368(ten_pgd=None, loai_mau=None, nam=None):
     return db.doc_mau_bieu_cv368(ten_pgd=ten_pgd, loai_mau=loai_mau, nam=nam)
 
@@ -835,7 +831,8 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
     Dùng được ở cả phân hệ CN (truyền df_full) và PGD.
     """
     df       = kwargs.get("df")
-    df_full  = kwargs.get("df_full", df)
+    _df_full = kwargs.get("df_full")
+    df_full  = df if _df_full is None else _df_full
     role_raw = str(kwargs.get("role", "user") or "user")
     role     = normalize_role(role_raw)
     pgd_user = kwargs.get("pgd_user")

@@ -17,7 +17,7 @@ import pandas as pd
 from openpyxl.styles import Font, PatternFill
 
 import db
-from auth import la_phan_he_cn, normalize_role
+from auth import la_phan_he_cn, la_executive, normalize_role
 from utils import hien_thi_dataframe_phan_trang
 
 from config import (

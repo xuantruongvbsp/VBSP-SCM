@@ -223,6 +223,13 @@ Upload flow:
 ## [19/05/2026] — tab_tracuu: bổ sung cột Ngày sinh, Ngày cấp/Nơi cấp CMND
 - `tabs/tab_tracuu.py`: import `COT_NGAY_SINH`, `COT_NGAY_CAP_CMND`, `COT_NOI_CAP_CMND` từ config; thêm 3 cột vào `COLS_CAN` (đọc từ parquet khi tra cứu); thêm vào `_NHOM_TRUONG["👤 Khách hàng"]` để hiện trong bộ lọc cột
 
+## [19/05/2026] — Đổi tên tab Nợ Khoanh → Chuyên Đề Nợ Khoanh toàn hệ thống
+- `workspaces/ws_management.py`: label sidebar `"🔒 Nợ Khoanh"` → `"🔒 Chuyên Đề Nợ Khoanh"`
+- `workspaces/ws_operation.py`: label tab PGD `"🔒 Nợ khoanh"` → `"🔒 Chuyên Đề Nợ Khoanh"`
+- `alert_center.py`: `ws_mgmt_jump` key cập nhật khớp label mới
+- `tabs/tab_no_khoanh.py`: subheader `"🔒 Phân tích Nợ khoanh"` → `"🔒 Chuyên Đề Nợ Khoanh"`
+- `tabs/tab_qlnk_dashboard.py`: subheader + hint text cập nhật tên mới
+
 ## [19/05/2026] — Mẫu 02/QLNK tự điền từ HSTD (năm sinh, CMND, chương trình)
 - `config.py`: Thêm 3 constant — `COT_NGAY_SINH = "Ngày sinh"`, `COT_NGAY_CAP_CMND = "Ngày cấp CMND"`, `COT_NOI_CAP_CMND = "Nơi cấp CMND"`
 - `tabs/tab_no_khoanh.py`: `_xuat_pdf_mau_02qlnk()` — import 3 constant mới; tự rút năm sinh từ `COT_NGAY_SINH`; điền ngày cấp + nơi cấp CMND; điền tên chương trình vay vốn; các trường SĐT/địa chỉ/tổ/ĐVUT đã có từ trước

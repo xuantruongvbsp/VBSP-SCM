@@ -58,7 +58,7 @@ import workspaces
 import db
 from widgets.status_widget import render_status_compact
 from alert_center import render_alert_sidebar
-from utils_theme import init_theme, toggle_theme, get_theme_css
+from utils_theme import init_theme, get_theme_css
 
 
 @st.cache_resource(show_spinner=False, ttl=3600)
@@ -293,12 +293,6 @@ def main():
                 st.session_state.workspace = "admin_users"; st.rerun()
 
         st.divider()
-        # Theme toggle
-        theme_icon = "🌙 Chế độ tối" if st.session_state.theme == "light" else "☀️ Chế độ sáng"
-        if st.button(theme_icon, use_container_width=True):
-            toggle_theme()
-            st.rerun()
-
         if st.button("🚪 Đăng xuất", use_container_width=True):
             for k in ["logged_in","user_info","username","workspace"]:
                 st.session_state[k] = False if k=="logged_in" else None

@@ -1,5 +1,22 @@
 # CHANGELOG
 
+## [2026-05-19] — Đổi tên tab "Nợ Khoanh" → "Chuyên Đề Nợ Khoanh" toàn hệ thống
+- `workspaces/ws_management.py` dòng ~1150 — label menu sidebar: `"🔒 Nợ Khoanh"` → `"🔒 Chuyên Đề Nợ Khoanh"`
+- `workspaces/ws_operation.py` dòng ~1686 — label tab PGD: `"🔒 Nợ khoanh"` → `"🔒 Chuyên Đề Nợ Khoanh"`
+- `alert_center.py` dòng ~151 — `ws_mgmt_jump` key khớp label mới
+- `tabs/tab_no_khoanh.py` dòng ~1444 — subheader: `"🔒 Phân tích Nợ khoanh"` → `"🔒 Chuyên Đề Nợ Khoanh"`
+- `tabs/tab_qlnk_dashboard.py` dòng ~127,231 — subheader và hint text cập nhật tên mới
+
+## [2026-05-19] — Kiểm soát: Thêm báo cáo GQVL TW gắn MANDT
+- `tabs/tab_kiem_soat.py` — thêm tab "📋 Báo cáo giám sát nội bộ" và sub-tab "🧾 Rà soát GQVL TW – Gắn MANDT"; KPI + bảng + xuất Excel; lọc theo điều kiện CT=3, NV=1, PL NV=02, có MANDT, OPEN; PGD role tự lọc theo PGD
+
+## [2026-05-19] — Đổi tên tab "Nợ Khoanh" → "Chuyên Đề Nợ Khoanh" toàn hệ thống
+- `workspaces/ws_management.py` dòng ~1150 — label menu sidebar: `"🔒 Nợ Khoanh"` → `"🔒 Chuyên Đề Nợ Khoanh"`
+- `workspaces/ws_operation.py` dòng ~1686 — label tab PGD: `"🔒 Nợ khoanh"` → `"🔒 Chuyên Đề Nợ Khoanh"`
+- `alert_center.py` dòng ~151 — `ws_mgmt_jump` key khớp label mới
+- `tabs/tab_no_khoanh.py` dòng ~1444 — subheader: `"🔒 Phân tích Nợ khoanh"` → `"🔒 Chuyên Đề Nợ Khoanh"`
+- `tabs/tab_qlnk_dashboard.py` dòng ~127,231 — subheader và hint text cập nhật tên mới
+
 ## [2026-05-19] — tab_tracuu: bổ sung Ngày sinh, Ngày cấp CMND, Nơi cấp CMND
 - `tabs/tab_tracuu.py` — import 3 constant mới; thêm vào `COLS_CAN` để đọc từ parquet; thêm vào `_NHOM_TRUONG["👤 Khách hàng"]`
 

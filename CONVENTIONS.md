@@ -24,17 +24,19 @@ if la_phan_he_cn(role): ...   # executive, admin_cn, manager_cn, chuyenvien_cn
 if la_phan_he_pgd(role): ...  # admin_pgd, manager_pgd, user_pgd
 ```
 
-**Role đầy đủ (7 role, 2 cấp):**
+**Role đầy đủ (9 role, 2 cấp):**
 
-| Cấp | Role | Ghi chú |
-|---|---|---|
-| CN | `executive` | Chỉ đọc |
-| CN | `admin_cn` / `admin` | Toàn quyền |
-| CN | `manager_cn` / `manager` | Upload + giao chỉ tiêu |
-| CN | `chuyenvien_cn` | Tác nghiệp, không quản lý user |
-| PGD | `admin_pgd` | Upload + quản lý user PGD |
-| PGD | `manager_pgd` | Upload + nhập kế hoạch |
-| PGD | `user_pgd` / `user` | Tác nghiệp PGD |
+| Cấp | Role | Tương thích cũ | Quyền chính |
+|---|---|---|---|
+| CN | `executive` | — | Chỉ đọc dashboard vĩ mô |
+| CN | `admin_cn` | `admin` | Toàn quyền CN (users, config, upload, merge) |
+| CN | `manager_cn` | `manager` | Upload CN, giao chỉ tiêu, xem báo cáo |
+| CN | `chuyenvien_cn` | — | Tác nghiệp, không quản lý user |
+| PGD | `admin_pgd` | — | Upload HSTD + quản lý user PGD + giao nhiệm vụ |
+| PGD | `manager_pgd` | — | Upload HSTD + nhập kế hoạch + xem báo cáo |
+| PGD | `user_pgd` | `user` | Tác nghiệp, chỉ thấy PGD mình |
+
+Routing: CN roles → `ws_management` / `ws_executive` | PGD roles → `ws_operation`
 
 ---
 
@@ -51,12 +53,16 @@ def _fmt(x): return f"{x/1e9:.3f}"   # tự định nghĩa
 # Lưu trữ  → VND nguyên (× 1_000_000 khi nhập)
 # Hiển thị → fmt_ty(x)  (chia /1e12, ra chuỗi VN)
 
-from utils import fmt_ty, fmt_tien, fmt_so
-fmt_ty(gia_tri_vnd)      # → "1.234,560 tỷ"
-fmt_tien(gia_tri_vnd)    # → "1.234 triệu"
+from utils import fmt, fmt_ty, fmt_tien, fmt_pct, fmt_so
+
+fmt_ty(13_199_000_000_000)  # → "13.199"      (chia /1e12, ra tỷ)
+fmt_tien(12_000_000)        # → "12,0 triệu đồng"
+fmt_pct(0.856)              # → "85,6%"
+fmt_so(1234)                # → "1.234"
+fmt(1_500_000_000)          # → "1,5 tỷ"      (tự chọn triệu/tỷ)
 ```
 
-> `fmt_ty` chia `/1e12` (không phải `/1e9`). Không dùng `NumberColumn` trong `st.dataframe` vì Streamlit hiển thị kiểu Mỹ.
+> `fmt_ty` chia `/1e12` — **không phải `/1e9`**. Không dùng `NumberColumn` trong `st.dataframe` vì Streamlit hiển thị kiểu Mỹ. Trong dataframe: convert cột → string bằng `.apply(fmt_ty)` trước khi hiển thị.
 
 ---
 
@@ -108,6 +114,19 @@ db.ghi_kv(key, value, username)
 db.ghi_kv(key, value, username)
 db.ghi_audit(username, "ten_action", "mô tả chi tiết")
 ```
+
+**Action chuẩn (snake_case):**
+
+| Action | Khi nào |
+|---|---|
+| `login` / `login_failed` | Đăng nhập thành công / thất bại |
+| `luu_khtd_cn` / `luu_khtd_pgd` | Lưu kế hoạch tín dụng |
+| `upload_hstd` / `upload_nq11` / `upload_gqvl` | Upload file dữ liệu |
+| `upload_dienbao` | Upload file Điện báo |
+| `merge_hstd` / `merge_nq11` / `merge_gqvl` | Merge toàn CN |
+| `luu_no_rui_ro` / `luu_no_rui_ro_cn` | Lưu hồ sơ rủi ro |
+| `xuat_bieu_cn` / `xuat_01xln` / `xuat_02xln` | Xuất biểu mẫu |
+| `update_config` / `cap_nhat_ds_pgd` | Cập nhật cấu hình |
 
 ---
 
@@ -328,6 +347,44 @@ TEN_CHI_NHANH_HIEN_THI  # "Chi nhánh NHCSXH tỉnh Đồng Nai" → dùng để
 - [ ] Sau khi lưu thành công: có `st.cache_data.clear()`
 - [ ] Upload file đi qua `upload_service.py`, không hardcode đường dẫn
 - [ ] Widget key có prefix unique khi hàm render được gọi nhiều lần
+
+---
+
+---
+
+## PHẦN 3b — CSS & UI
+
+### Inject CSS — KHÔNG dùng guard session_state
+
+```python
+# ❌ SAI — CSS biến mất sau khi click tab (Streamlit rerun không inject lại)
+if "_css_injected" not in st.session_state:
+    st.markdown("<style>...</style>", unsafe_allow_html=True)
+    st.session_state["_css_injected"] = True
+
+# ✅ ĐÚNG — inject mỗi rerun, đặt trong app.py
+st.markdown("<style>...</style>", unsafe_allow_html=True)
+```
+
+- Chỉ inject CSS trong `app.py` — **không inject trong tab**
+- Bảng ≥ 8 cột → HTML thuần + `st.markdown(unsafe_allow_html=True)`
+
+### Màu sắc chuẩn
+
+| Mục đích | Màu | Mã hex |
+|---|---|---|
+| VBSP brand / success | Xanh lá | `#4CAF50` / `#388E3C` |
+| Cảnh báo | Vàng cam | `#FFA726` / `#F57C00` |
+| Nguy hiểm | Đỏ | `#EF5350` / `#D32F2F` |
+| Thông tin | Xanh dương | `#42A5F5` / `#1565C0` |
+| Nền chính | Xám nhạt | `#f0f4f8` |
+| Sidebar | Gradient | `#0a1628 → #1a3a5c` |
+
+### Streamlit version notes
+
+- `width='stretch'` chưa hỗ trợ (Streamlit 1.57.0) → dùng `use_container_width=True`
+- `st.cache_data(ttl=7200)` cho dữ liệu lớn (HSTD, GQVL, NQ11)
+- `len(tab_names) == len(_tab_renderers)` phải bằng nhau khi sửa `ws_*.py`
 
 ---
 

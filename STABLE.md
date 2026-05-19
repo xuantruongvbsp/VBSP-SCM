@@ -87,6 +87,10 @@ COT_MA_NHA_DAU_TU     = "Mã nhà đầu tư"
 COT_MA_CHUONG_TRINH   = "Mã chương trình"
 COT_TEN_HSSV          = "Họ tên HSSV"
 COT_TEN_VC            = "Họ tên vợ/chồng"
+COT_PL_NV             = "Phân loại NV"       # rename từ "PL NV" khi merge
+COT_NGAY_SINH         = "Ngày sinh"
+COT_NGAY_CAP_CMND     = "Ngày cấp CMND"
+COT_NOI_CAP_CMND      = "Nơi cấp CMND"
 
 # ── Risk/Activity ──
 COT_LAI_TON     = "Lãi tồn TH"

@@ -1,0 +1,103 @@
+        with d_kt:
+            pgd_hien_tai = pgd_user or ""
+            if la_phan_he_cn(role):
+                ds_pgd_chon = sorted(df_kh[COT_TEN_PGD].dropna().unique().tolist()) if COT_TEN_PGD in df_kh.columns else DS_PGD
+                if ds_pgd_chon:
+                    pgd_hien_tai = st.selectbox(
+                        "Chọn PGD", ds_pgd_chon,
+                        key=f"{key_prefix}cv368_pgd",
+                    )
+                else:
+                    st.warning("Không có dữ liệu PGD.")
+                    return
+
+            mb_xem_id = st.session_state.get(f"{key_prefix}cv368_mb_xem_id")
+            loai_mau_chon = st.session_state.get(f"{key_prefix}cv368_loai_mau", "MAU_01")
+
+            col_left, col_right = st.columns([3, 7])
+
+            with col_left:
+                loai_label_map = {
+                    "MAU_01": "📋 Mẫu 01 — Kế hoạch kiểm tra",
+                    "MAU_02": "✍️ Mẫu 02 — Cam kết trả nợ",
+                    "MAU_03": "📄 Mẫu 03 — Biên bản kiểm tra",
+                }
+                label_to_loai = {v: k for k, v in loai_label_map.items()}
+                idx_default = list(loai_label_map.keys()).index(loai_mau_chon) if loai_mau_chon in loai_label_map else 0
+
+                loai_chon_label = st.radio(
+                    "🗂️ Chọn mẫu biểu",
+                    list(loai_label_map.values()),
+                    index=idx_default,
+                    key=f"{key_prefix}cv368_chon_loai_mau_radio",
+                )
+                loai_mau = label_to_loai[loai_chon_label]
+
+                # ── Lịch sử ──
+                st.divider()
+                st.caption("📋 Lịch sử đã lưu")
+                rows_ls = db.doc_mau_bieu_cv368(
+                    ten_pgd=pgd_hien_tai, loai_mau=loai_mau,
+                )
+                if rows_ls:
+                    for r in rows_ls[:10]:
+                        ngay_str = (r.get("ngay_lap") or r.get("created_at") or "")[:10]
+                        dot_str = r.get("dot", "")
+                        nam_str = r.get("nam", "")
+                        label_ls = f"{loai_mau} — Đợt {dot_str}/{nam_str} — {ngay_str}"
+                        if st.button(
+                            label_ls, key=f"{key_prefix}cv368_mb_ls_{r['id']}",
+                            use_container_width=True,
+                        ):
+                            st.session_state[f"{key_prefix}cv368_mb_xem_id"] = r["id"]
+                            st.session_state[f"{key_prefix}cv368_loai_mau"] = r.get("loai_mau", loai_mau)
+                            st.rerun()
+                    if len(rows_ls) > 10:
+                        st.caption(f"(Còn {len(rows_ls) - 10} bản ghi cũ hơn)")
+                else:
+                    st.caption("Chưa có bản ghi nào")
+
+                if st.button("➕ Tạo mới", key=f"{key_prefix}cv368_tao_moi", use_container_width=True):
+                    st.session_state.pop(f"{key_prefix}cv368_mb_xem_id", None)
+                    st.session_state[f"{key_prefix}cv368_loai_mau"] = loai_mau
+                    st.rerun()
+
+            with col_right:
+                if mb_xem_id:
+                    rec = db.doc_mau_bieu_cv368_by_id(mb_xem_id)
+                    if rec:
+                        nd = rec.get("noi_dung") or {}
+                        st.info(f"🏛️ {rec.get('loai_mau')} — {rec.get('ten_pgd')} — "
+                                f"Đợt {rec.get('dot', '')}/{rec.get('nam', '')} — "
+                                f"{rec.get('ngay_lap','')[:10]}")
+                        st.caption(f"Người lập: {rec.get('nguoi_lap','')}")
+
+                        _render_mau_view(
+                            loai_mau=rec.get("loai_mau", ""),
+                            noi_dung=nd,
+                            rec=rec,
+                            key_prefix_kt=f"{key_prefix}cv368_",
+                            username=username,
+                        )
+                        if st.button("↩️ Quay lại tạo mới", key=f"{key_prefix}cv368_back"):
+                            st.session_state.pop(f"{key_prefix}cv368_mb_xem_id", None)
+                            st.rerun()
+                else:
+                    if loai_mau == "MAU_01":
+                        _render_cv368_mau_01(
+                            df_kh=df_kh, pgd_hien_tai=pgd_hien_tai,
+                            key_prefix_kt=f"{key_prefix}cv368_m01_",
+                            username=username, role=role,
+                        )
+                    elif loai_mau == "MAU_02":
+                        _render_cv368_mau_02(
+                            df_kh=df_kh, pgd_hien_tai=pgd_hien_tai,
+                            key_prefix_kt=f"{key_prefix}cv368_m02_",
+                            username=username, role=role,
+                        )
+                    elif loai_mau == "MAU_03":
+                        _render_cv368_mau_03(
+                            df_kh=df_kh, pgd_hien_tai=pgd_hien_tai,
+                            key_prefix_kt=f"{key_prefix}cv368_m03_",
+                            username=username, role=role,
+                        )

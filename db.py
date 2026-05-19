@@ -234,6 +234,21 @@ def init_db():
             );
             CREATE INDEX IF NOT EXISTS idx_qlnk_kh_pgd  ON qlnk_ke_hoach(ten_pgd);
             CREATE INDEX IF NOT EXISTS idx_qlnk_kh_tt   ON qlnk_ke_hoach(trang_thai);
+
+            CREATE TABLE IF NOT EXISTS mau_bieu_cv368 (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                loai_mau    TEXT NOT NULL,
+                ten_pgd     TEXT NOT NULL,
+                nam         INTEGER NOT NULL,
+                dot         INTEGER DEFAULT 1,
+                noi_dung    TEXT NOT NULL,
+                nguoi_lap   TEXT,
+                ngay_lap    TEXT,
+                ghi_chu     TEXT,
+                created_at  TEXT DEFAULT (datetime('now','localtime'))
+            );
+            CREATE INDEX IF NOT EXISTS idx_mbcv368_pgd_loai_nam
+                ON mau_bieu_cv368(ten_pgd, loai_mau, nam);
         """)
         try:
             conn.execute(
@@ -268,6 +283,12 @@ def init_db():
         try:
             conn.execute(
                 "ALTER TABLE tien_do_task ADD COLUMN cbtd_bien_hoa TEXT DEFAULT ''"
+            )
+        except sqlite3.OperationalError:
+            pass
+        try:
+            conn.execute(
+                "ALTER TABLE mau_bieu_cv368 ADD COLUMN ghi_chu TEXT"
             )
         except sqlite3.OperationalError:
             pass
@@ -975,6 +996,74 @@ def duyet_ke_hoach(kehoach_id: int, username: str = "system") -> bool:
     except Exception as e:
         ghi_audit(username, "loi_duyet_ke_hoach", str(e))
         return False
+
+
+def luu_mau_bieu_cv368(loai_mau, ten_pgd, nam, dot, noi_dung_dict,
+                       nguoi_lap, ghi_chu="") -> int:
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    nd_json = json.dumps(noi_dung_dict, ensure_ascii=False)
+    try:
+        with get_conn() as conn:
+            cur = conn.execute(
+                """INSERT INTO mau_bieu_cv368
+                   (loai_mau, ten_pgd, nam, dot, noi_dung, nguoi_lap, ngay_lap, ghi_chu, created_at)
+                   VALUES (?,?,?,?,?,?,?,?,?)""",
+                (loai_mau, ten_pgd, int(nam), int(dot), nd_json, nguoi_lap, now, ghi_chu, now),
+            )
+            conn.commit()
+            rec_id = cur.lastrowid
+        ghi_audit(nguoi_lap, "luu_mau_bieu_cv368",
+                  f"{loai_mau} PGD={ten_pgd} nam={nam} dot={dot}")
+        return rec_id or 0
+    except Exception as e:
+        ghi_audit(nguoi_lap, "loi_luu_mau_bieu_cv368", str(e))
+        return 0
+
+
+def doc_mau_bieu_cv368(ten_pgd=None, loai_mau=None, nam=None) -> list[dict]:
+    conds, params = [], []
+    if ten_pgd:
+        conds.append("ten_pgd = ?"); params.append(ten_pgd)
+    if loai_mau:
+        conds.append("loai_mau = ?"); params.append(loai_mau)
+    if nam:
+        conds.append("nam = ?"); params.append(int(nam))
+    where = ("WHERE " + " AND ".join(conds)) if conds else ""
+    try:
+        with get_conn() as conn:
+            rows = conn.execute(
+                f"SELECT * FROM mau_bieu_cv368 {where} ORDER BY created_at DESC",
+                params,
+            ).fetchall()
+        result = []
+        for r in rows:
+            d = dict(r)
+            try:
+                d["noi_dung"] = json.loads(d.get("noi_dung") or "{}")
+            except Exception:
+                d["noi_dung"] = {}
+            result.append(d)
+        return result
+    except Exception:
+        return []
+
+
+def doc_mau_bieu_cv368_by_id(mb_id: int) -> dict | None:
+    try:
+        with get_conn() as conn:
+            row = conn.execute(
+                "SELECT * FROM mau_bieu_cv368 WHERE id = ?", (int(mb_id),)
+            ).fetchone()
+        if row is None:
+            return None
+        d = dict(row)
+        try:
+            d["noi_dung"] = json.loads(d.get("noi_dung") or "{}")
+        except Exception:
+            d["noi_dung"] = {}
+        return d
+    except Exception:
+        return None
 
 
 # Khởi tạo DB, migrate dữ liệu cũ, sau đó seed cấu hình động

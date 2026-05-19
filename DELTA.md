@@ -34,6 +34,7 @@
 │   ├── tab_upload_khnv.py, tab_upload_pgd.py
 │   ├── tab_ban_dai_dien.py      # 4 sub-tab: KPI, dự báo vốn, họp BĐD, sổ công văn
 │   ├── tab_tien_do_nop.py       # Tiến độ nộp PGD từ GSheet
+│   ├── tab_quan_ly_bc.py        # Wrapper: 📥 BC từ PGD + 📤 BC lên cấp trên
 │   ├── tab_checklist_bc.py      # Checklist deadline báo cáo (kv_store)
 │   ├── tab_xlrr_tong_hop.py     # XLRR 4 sub-tab
 │   ├── tab_trang_thai_nguon.py  # Health check 6 sub-tab (mức B)
@@ -66,9 +67,20 @@
 
 ## KIẾN TRÚC WORKSPACE
 
-### ws_management (CN role)
+### ws_management (CN role) — sidebar _build_all_items()
 ```
-Nhóm tab: Tổng quan | Kế hoạch | Tín dụng | Báo cáo | Điều hành | Hệ thống
+THÔNG TIN CHUNG   → 📊 Thông tin chung (mặc định khi mở app)
+PHỐI HỢP VỚI PGD → Tiến độ Công việc ▸ (📅 Tiến độ công việc)
+                  → 📋 Quản lý Báo cáo định kỳ (tab_quan_ly_bc)
+                  → 📌 Nhiệm vụ PGD
+GIÁM SÁT          → Cảnh báo NQH ▸ | 📊 So sánh kỳ
+KIỂM SOÁT         → Kiểm soát nội bộ | Xử lý nợ rủi ro | Cán bộ tín dụng
+                  → Tập trung rủi ro & HHI | 🔒 Chuyên Đề Nợ Khoanh ▸
+KẾ HOẠCH KHTD     → Kế hoạch tín dụng | Giao & ĐC KHTD | Cân đối - Điện báo
+                  → 📡 Điện báo | Xuất báo cáo KHTD
+BÁO CÁO           → Báo cáo tín dụng ▸ (📊 Báo cáo tín dụng | ⏰ Nợ Đến Hạn)
+ỦY THÁC           → 🏛️ Ban Đại Diện | 🤝 Ủy thác | Điểm GD & Tổ TK&VV ▸
+HỆ THỐNG          → Template | Mã NĐT | Nhật ký | Trạng thái | Upload | Hướng dẫn
 ```
 
 ### ws_operation (PGD role)
@@ -123,6 +135,7 @@ Upload flow:
 |---|---|
 | Thêm tab PGD | `tabs/tab_*.py` + `ws_operation.py` |
 | Thêm tab toàn CN | `tabs/tab_*.py` + `ws_management.py` |
+| Tab wrapper 2 sub-module | `tabs/tab_quan_ly_bc.py` — pattern wrapper gọi render() con |
 | Sửa merge 22 PGD | `upload_service.py` → `merge_du_lieu_toan_cn()` |
 | Thêm chương trình TD | `config.py` → `CHUONG_TRINH_KHTD` |
 | Thêm PGD mới | `config.py` → `DS_PGD`, `MA_PGD_MAP`, `PGD_XA_MAP` |
@@ -149,6 +162,13 @@ Upload flow:
 ---
 
 ## CHANGELOG
+
+## [19/05/2026] — tab_tien_do, ws_management, tab_quan_ly_bc, kiem_soat fix
+- `tabs/tab_tien_do.py`: form tạo/sửa task — section "Áp dụng cho đơn vị" tách Phần A "🏢 Phòng giao dịch trực thuộc" + Phần B "🏛️ Hội sở CN tỉnh"; caption tổng quan + hướng dẫn từng phần; nhãn "CB Biên Hòa" → "Hội sở CN tỉnh" toàn bộ UI
+- `tabs/tab_tien_do.py`: drill-down thêm "— Tất cả —" đầu selectbox; khi chọn hiển thị toàn bộ bản ghi kèm cột "Đơn vị"
+- `tabs/tab_quan_ly_bc.py` **(MỚI)**: wrapper thuần — 2 sub-tab "📥 BC từ PGD" (tab_tien_do_nop) + "📤 BC lên cấp trên" (tab_checklist_bc); dùng get_tab_context(tab)
+- `workspaces/ws_management.py`: fix DuplicateElementKey — xóa bản duplicate "📊 Thông tin chung"; đưa "Thông tin chung" lên đầu ALL_ITEMS (mục mặc định); thêm "📋 Quản lý Báo cáo định kỳ" vào nhóm "Phối hợp với PGD"; chuyển "📌 Nhiệm vụ PGD" từ "Giám sát" sang "Phối hợp với PGD"
+- `services/kiem_soat_service.py`: thêm import `COT_PL_NV`; đổi hardcode `"PL NV"` → `COT_PL_NV` ("Phân loại NV") — fix báo cáo GQVL TW gắn MĐT không tìm thấy cột
 
 ## [19/05/2026]
 - `tabs/tab_tien_do.py` form tạo/sửa task: thêm caption tổng quan, tách Phần A (🏢 PGD huyện/thị xã) + Phần B (🏛️ Hội sở CN tỉnh), đổi nhãn text_input "Cán bộ KH-NV phụ trách", caption hướng dẫn sau từng phần

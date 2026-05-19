@@ -31,7 +31,7 @@ from config import (
 )
 from data import canh_bao_migration_cached, danh_dau_khong_hd_cached
 from services.hhi_service import tinh_hhi as _hhi_raw, tinh_hhi_breakdown
-from utils import fmt_so, fmt_ty, hien_thi_dataframe_phan_trang, xuat_excel
+from utils import fmt_so, fmt_ty, hien_thi_dataframe_phan_trang, xuat_excel, lazy_tabs
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────

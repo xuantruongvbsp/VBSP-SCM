@@ -51,7 +51,7 @@ from tabs import (
     tab_tien_do, tab_tien_do_nop,
     tab_phoi_hop_pgd, tab_khtd_xuat,
 )
-from tabs import tab_checklist_bc, tab_quan_ly_bc
+from tabs import tab_checklist_bc, tab_quan_ly_bc, tab_quan_ly_cv
 from tabs import tab_quan_ly_dgd, tab_cdtotkvv
 from tabs import tab_xlrr_tong_hop
 from tabs import tab_upload_khnv

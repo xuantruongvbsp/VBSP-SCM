@@ -1,5 +1,18 @@
 # CHANGELOG
 
+## [2026-05-20] — Hoàn tất xóa Block 3 trong tab_no_khoanh.py
+- `tabs/tab_no_khoanh.py` dòng ~1372-1721 — xóa hoàn toàn block `with d_kt:` thứ ba (show_mb + 4 expander xuất PDF QLNK cũ); tab giờ chỉ dùng `_render_cv368_kt()` mới
+
+## [2026-05-19] — Gộp ba with d_kt: thành một lời gọi _render_cv368_kt()
+- `tabs/tab_no_khoanh.py` dòng ~1058 — thay thế Block 1 (kế hoạch kiểm tra), Block 2 (nhập kết quả KT) và Block 3 (xuất mẫu biểu) bằng một `with d_kt: _render_cv368_kt(...)` duy nhất
+
+## [2026-05-19] — Chuyển "Cán bộ tín dụng" xuống cuối nhóm Ủy Thác
+- `workspaces/ws_management.py` — di chuyển "👤 Cán bộ tín dụng" xuống sau "Điểm GD & Tổ TK&VV"
+
+## [2026-05-19] — Tối ưu RAM load HSTD
+- `app.py` — thêm `_toi_uu_dtype()`: category string ≤200 unique, float32 cho cột nhỏ, downcast int
+- `app.py` — `_load_hstd`: đổi `.df()` → `.arrow().to_pandas(self_destruct=True)` + áp dụng `_toi_uu_dtype`
+
 ## [2026-05-19] — Baseline 31/12 hỗ trợ 4 loại file + nút tổng hợp thủ công
 - `config.py` — thêm `baseline_pgd_path_loai()`, `trang_thai_baseline_pgd_loai()`, `baseline_cache_loai()`, hằng `LOAI_BASELINE`; cập nhật `danh_sach_nam_baseline_pgd()` quét cả 4 loại
 - `services/upload_service.py` — thêm `merge_baseline_toan_cn(loai, nam)` gộp 22 đơn vị baseline → parquet cache

@@ -287,3 +287,13 @@ Upload flow:
 - `tabs/pdf_no_khoanh.py`: Fix missing imports — thêm `from config import (... 17 COT_* + LY_DO_KHOANH_LABEL)`, `from utils import fmt_so` + `_fmt_dong` lambda; test thực tế: 5 hàm PDF tạo file 100-113KB OK với font TNR + logo NHCSXH
 - `tabs/tab_no_khoanh.py`: Fix `SyntaxError: keyword argument repeated: use_container_width` trên `st.dataframe()` line 961
 - `tabs/tab_no_khoanh.py`: Đổi 8 → 7 st.tabs; gộp d5 (Kế hoạch) + d6 (Kiểm tra) + mẫu biểu vào tab mới "📋 Kiểm tra nợ khoanh (theo CV 368)"; d_bc "📊 Báo cáo" giữ M08/M09/QLNK_06/M10/Tiến độ; `pgd_filter_bc`/`rows_all_kt`/`da_kiem_tra_set` chuyển trước `st.tabs`
+
+## [19/05/2026] — Khóa Dark Mode toàn hệ thống + sửa 14 vị trí màu hardcode
+- `utils_theme.py`: Xóa `_LIGHT` tokens + `toggle_theme()` + `_tokens()`; `get_theme_css()` không nhận param; `init_theme()` luôn trả `"dark"`; bỏ `import db`
+- `app.py`: Xóa nút toggle `🌙/☀️` khỏi sidebar; bỏ `toggle_theme` import; `get_theme_css()` không param
+- `components/loan_drawer.py`: Drawer `background:#1E2130` + text `#E0E6ED` + label `#94A3B8` + border `#2A2D3E` + group title `#66BB6A` + hover `#0D2818`
+- `components/delta_card.py`: Info icon `#6b7a8d` → `#94A3B8`, border `#ccc` → `#2A2D3E`
+- `components/movers.py`: 7 hardcoded colors → dark: bg `#0D2818`/`#2D0D14`, border `#66BB6A`/`#EF5350`, text `#94A3B8`/`#81C784`/`#EF9A9A`, kpi box `#1E2130`
+- `tabs/tab_tracuu.py`: 8 hardcoded colors → dark: label `#94A3B8`, value `#E0E6ED`, card bg `#1E2130`, badge `#1B5E20/#2D0D14`, NQH `#2D0D14/#EF9A9A`, border `#EF5350/#42A5F5`
+- `tabs/tab_khtd_nhap.py`: ~30 hardcoded header colors → dark: TW `#0D2137/#90CAF9`, DP `#0D2818/#81C784`, Tổng `#2D1F0D/#FFD54F`, empty `#262B3D`, muted `#64748B`, text `#E0E6ED`
+- `.streamlit/config.toml`: `base="dark"` giữ nguyên — toàn bộ app chỉ dark mode

@@ -458,7 +458,7 @@ def _tab_khtd_chi_nhanh(
             f"Tổng KH: {_fvn(tong_kh_trieu, 0)} triệu đồng"
         )
     else:
-        mau = "#e8f5e9"
+        mau = "#0D2818"
         vien = "#4caf50"
         icon = "🟢"
         noi_dung = (
@@ -490,68 +490,68 @@ def _tab_khtd_chi_nhanh(
 
     _colw = [3, 1, 1, 1, 1, 1, 1, 1, 1]
     hr1 = st.columns(_colw)
-    hr1[0].markdown(_khtd_cn_hdr_cell("", "#f0f4fa"), unsafe_allow_html=True)
+    hr1[0].markdown(_khtd_cn_hdr_cell("", "#262B3D"), unsafe_allow_html=True)
     hr1[1].markdown(
-        _khtd_cn_hdr_cell("NGUỒN VỐN TRUNG ƯƠNG", "#0D2137", "#1565c0"),
+        _khtd_cn_hdr_cell("NGUỒN VỐN TRUNG ƯƠNG", "#0D2137", "#90CAF9"),
         unsafe_allow_html=True,
     )
     for j in (2, 3):
-        hr1[j].markdown(_khtd_cn_hdr_cell("", "#bbdefb"), unsafe_allow_html=True)
+        hr1[j].markdown(_khtd_cn_hdr_cell("", "#0D2137"), unsafe_allow_html=True)
     hr1[4].markdown(
-        _khtd_cn_hdr_cell("NGUỒN VỐN ĐỊA PHƯƠNG", "#c8e6c9", "#81C784"),
+        _khtd_cn_hdr_cell("NGUỒN VỐN ĐỊA PHƯƠNG", "#0D2818", "#81C784"),
         unsafe_allow_html=True,
     )
     for j in (5, 6):
-        hr1[j].markdown(_khtd_cn_hdr_cell("", "#c8e6c9"), unsafe_allow_html=True)
+        hr1[j].markdown(_khtd_cn_hdr_cell("", "#0D2818"), unsafe_allow_html=True)
     hr1[7].markdown(
-        _khtd_cn_hdr_cell("TỔNG CỘNG", "#ffe0b2", "#e65100"),
+        _khtd_cn_hdr_cell("TỔNG CỘNG", "#2D1F0D", "#FFD54F"),
         unsafe_allow_html=True,
     )
-    hr1[8].markdown(_khtd_cn_hdr_cell("", "#ffe0b2"), unsafe_allow_html=True)
+    hr1[8].markdown(_khtd_cn_hdr_cell("", "#2D1F0D"), unsafe_allow_html=True)
 
     hr2 = st.columns(_colw)
     hr2[0].markdown(
-        _khtd_cn_hdr_cell("Chương trình", "#f0f4fa", "#37474f"),
+        _khtd_cn_hdr_cell("Chương trình", "#262B3D", "#E0E6ED"),
         unsafe_allow_html=True,
     )
     hr2[1].markdown(
         _khtd_cn_hdr_cell(
-            "Kế hoạch Trung ương (triệu đồng)", "#e3f2fd", "#1565c0", bold=True
+            "Kế hoạch Trung ương (triệu đồng)", "#0D2137", "#90CAF9", bold=True
         ),
         unsafe_allow_html=True,
     )
     hr2[2].markdown(
         _khtd_cn_hdr_cell(
-            "Thực hiện Trung ương (triệu đồng)", "#e3f2fd", "#1565c0", bold=True
+            "Thực hiện Trung ương (triệu đồng)", "#0D2137", "#90CAF9", bold=True
         ),
         unsafe_allow_html=True,
     )
     hr2[3].markdown(
         _khtd_cn_hdr_cell(
             "Còn phải thực hiện Trung ương (triệu đồng)",
-            "#e3f2fd",
-            "#1565c0",
+            "#0D2137",
+            "#90CAF9",
             bold=True,
         ),
         unsafe_allow_html=True,
     )
     hr2[4].markdown(
         _khtd_cn_hdr_cell(
-            "Kế hoạch Địa phương (triệu đồng)", "#e8f5e9", "#2e7d32", bold=True
+            "Kế hoạch Địa phương (triệu đồng)", "#0D2818", "#81C784", bold=True
         ),
         unsafe_allow_html=True,
     )
     hr2[5].markdown(
         _khtd_cn_hdr_cell(
-            "Thực hiện Địa phương (triệu đồng)", "#e8f5e9", "#2e7d32", bold=True
+            "Thực hiện Địa phương (triệu đồng)", "#0D2818", "#81C784", bold=True
         ),
         unsafe_allow_html=True,
     )
     hr2[6].markdown(
         _khtd_cn_hdr_cell(
             "Còn phải thực hiện Địa phương (triệu đồng)",
-            "#e8f5e9",
-            "#2e7d32",
+            "#0D2818",
+            "#81C784",
             bold=True,
         ),
         unsafe_allow_html=True,
@@ -560,7 +560,7 @@ def _tab_khtd_chi_nhanh(
         _khtd_cn_hdr_cell(
             "Thực hiện cả hai nguồn (triệu đồng)",
             "#fff3e0",
-            "#e65100",
+            "#FFD54F",
             bold=True,
         ),
         unsafe_allow_html=True,
@@ -569,7 +569,7 @@ def _tab_khtd_chi_nhanh(
         _khtd_cn_hdr_cell(
             "Còn phải thực hiện Tổng cộng (triệu đồng)",
             "#fff3e0",
-            "#e65100",
+            "#FFD54F",
             bold=True,
         ),
         unsafe_allow_html=True,
@@ -578,7 +578,7 @@ def _tab_khtd_chi_nhanh(
     def _fvn_form(x: float, d: int = 1) -> str:
         return f"{float(x):,.{d}f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
-    def _md_right(val: str, color: str = "#212121") -> str:
+    def _md_right(val: str, color: str = "#E0E6ED") -> str:
         return (
             f"<div style='text-align:right;color:{color};font-size:0.88rem;"
             f"padding:2px 0'>{val}</div>"
@@ -677,7 +677,7 @@ def _tab_khtd_chi_nhanh(
                         )
                     elif cpth == 0:
                         cols_sub[col_cp_idx].markdown(
-                            _md_right("0 ✓", "#2e7d32"), unsafe_allow_html=True
+                            _md_right("0 ✓", "#81C784"), unsafe_allow_html=True
                         )
                     else:
                         cols_sub[col_cp_idx].markdown(
@@ -734,7 +734,7 @@ def _tab_khtd_chi_nhanh(
             )
             if kh_tw_trieu == 0:
                 cols[3].markdown(
-                    _md_right("—", "#9e9e9e"), unsafe_allow_html=True
+                    _md_right("—", "#64748B"), unsafe_allow_html=True
                 )
             else:
                 cpth_tw = kh_tw_trieu - th_tw_trieu
@@ -745,7 +745,7 @@ def _tab_khtd_chi_nhanh(
                     )
                 elif cpth_tw == 0:
                     cols[3].markdown(
-                        _md_right("0,0 ✓", "#2e7d32"), unsafe_allow_html=True
+                        _md_right("0,0 ✓", "#81C784"), unsafe_allow_html=True
                     )
                 else:
                     cols[3].markdown(
@@ -777,7 +777,7 @@ def _tab_khtd_chi_nhanh(
             )
             if kh_dp_trieu == 0:
                 cols[6].markdown(
-                    _md_right("—", "#9e9e9e"), unsafe_allow_html=True
+                    _md_right("—", "#64748B"), unsafe_allow_html=True
                 )
             else:
                 cpth_dp = kh_dp_trieu - th_dp_trieu
@@ -788,7 +788,7 @@ def _tab_khtd_chi_nhanh(
                     )
                 elif cpth_dp == 0:
                     cols[6].markdown(
-                        _md_right("0,0 ✓", "#2e7d32"), unsafe_allow_html=True
+                        _md_right("0,0 ✓", "#81C784"), unsafe_allow_html=True
                     )
                 else:
                     cols[6].markdown(
@@ -803,7 +803,7 @@ def _tab_khtd_chi_nhanh(
             cpth_tong = kh_tong - th_tong
             if kh_tong == 0:
                 cols[8].markdown(
-                    _md_right("—", "#9e9e9e"), unsafe_allow_html=True
+                    _md_right("—", "#64748B"), unsafe_allow_html=True
                 )
             elif cpth_tong < 0:
                 cols[8].markdown(
@@ -812,7 +812,7 @@ def _tab_khtd_chi_nhanh(
                 )
             elif cpth_tong == 0:
                 cols[8].markdown(
-                    _md_right("0,0 ✓", "#2e7d32"), unsafe_allow_html=True
+                    _md_right("0,0 ✓", "#81C784"), unsafe_allow_html=True
                 )
             else:
                 cols[8].markdown(
@@ -1207,45 +1207,45 @@ def _tab_khtd_theo_xa(role: str, username: str, df_full: "pd.DataFrame | None") 
 
     # ── Header dòng 1 ──
     hr1 = st.columns(_colw_xa)
-    hr1[0].markdown(_khtd_cn_hdr_cell("", "#f0f4fa"), unsafe_allow_html=True)
+    hr1[0].markdown(_khtd_cn_hdr_cell("", "#262B3D"), unsafe_allow_html=True)
     hr1[1].markdown(
-        _khtd_cn_hdr_cell("NGUỒN VỐN TRUNG ƯƠNG", "#bbdefb", "#1565c0"),
+        _khtd_cn_hdr_cell("NGUỒN VỐN TRUNG ƯƠNG", "#0D2137", "#90CAF9"),
         unsafe_allow_html=True,
     )
-    hr1[2].markdown(_khtd_cn_hdr_cell("", "#bbdefb"), unsafe_allow_html=True)
+    hr1[2].markdown(_khtd_cn_hdr_cell("", "#0D2137"), unsafe_allow_html=True)
     hr1[3].markdown(
-        _khtd_cn_hdr_cell("NGUỒN VỐN ĐỊA PHƯƠNG", "#c8e6c9", "#2e7d32"),
+        _khtd_cn_hdr_cell("NGUỒN VỐN ĐỊA PHƯƠNG", "#0D2818", "#81C784"),
         unsafe_allow_html=True,
     )
-    hr1[4].markdown(_khtd_cn_hdr_cell("", "#c8e6c9"), unsafe_allow_html=True)
+    hr1[4].markdown(_khtd_cn_hdr_cell("", "#0D2818"), unsafe_allow_html=True)
 
     # ── Header dòng 2 ──
     hr2 = st.columns(_colw_xa)
     hr2[0].markdown(
-        _khtd_cn_hdr_cell("Chương trình", "#f0f4fa", "#37474f", bold=True),
+        _khtd_cn_hdr_cell("Chương trình", "#262B3D", "#E0E6ED", bold=True),
         unsafe_allow_html=True,
     )
     hr2[1].markdown(
         _khtd_cn_hdr_cell(
-            "Kế hoạch Trung ương (triệu đồng)", "#e3f2fd", "#1565c0", bold=True
+            "Kế hoạch Trung ương (triệu đồng)", "#0D2137", "#90CAF9", bold=True
         ),
         unsafe_allow_html=True,
     )
     hr2[2].markdown(
         _khtd_cn_hdr_cell(
-            "Thực hiện TW (triệu đồng)", "#e3f2fd", "#1565c0", bold=True
+            "Thực hiện TW (triệu đồng)", "#0D2137", "#90CAF9", bold=True
         ),
         unsafe_allow_html=True,
     )
     hr2[3].markdown(
         _khtd_cn_hdr_cell(
-            "Kế hoạch Địa phương (triệu đồng)", "#e8f5e9", "#2e7d32", bold=True
+            "Kế hoạch Địa phương (triệu đồng)", "#0D2818", "#81C784", bold=True
         ),
         unsafe_allow_html=True,
     )
     hr2[4].markdown(
         _khtd_cn_hdr_cell(
-            "Thực hiện ĐP (triệu đồng)", "#e8f5e9", "#2e7d32", bold=True
+            "Thực hiện ĐP (triệu đồng)", "#0D2818", "#81C784", bold=True
         ),
         unsafe_allow_html=True,
     )

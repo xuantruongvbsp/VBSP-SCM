@@ -582,6 +582,103 @@ def merge_du_lieu_toan_cn(
     )
 
 
+# ── Tổng hợp baseline 31/12 toàn Chi nhánh ───────────────────────────────────
+
+def merge_baseline_toan_cn(loai: str, nam: int) -> KetQuaUpload:
+    """
+    Gộp file baseline 31/12 của tất cả 22 đơn vị thành 1 parquet cache.
+    Đọc data/baseline_pgd/{slug}/{LOAI}_3112_{nam}.XLSX → concat → cache.
+
+    loai: "hstd" | "nq11" | "gqvl" | "cdtotkvv"
+    """
+    from config import baseline_pgd_path_loai, baseline_cache_loai
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    tat_ca_dv = [DON_VI_CHI_NHANH] + DS_PGD
+
+    def _doc_mot(ten_pgd: str) -> tuple[str, pd.DataFrame | None, str | None]:
+        path = baseline_pgd_path_loai(ten_pgd, nam, loai)
+        if not Path(path).exists():
+            return ten_pgd, None, None
+        try:
+            path_pq = str(Path(path).with_suffix(".parquet"))
+            if loai in ("hstd", "nq11"):
+                def _clean(df: pd.DataFrame) -> pd.DataFrame:
+                    return df.iloc[:, 1:].dropna(how="all")
+                df = excel_to_parquet(path, path_pq, sheet="BCQUERY", header=4, post_fn=_clean)
+            elif loai == "gqvl":
+                def _clean(df: pd.DataFrame) -> pd.DataFrame:
+                    d = df.iloc[:, 1:].dropna(how="all").iloc[1:]
+                    d = d.rename(columns=GQVL_COT_MAP).reset_index(drop=True)
+                    for col in [COT_DU_NO_TH, COT_DU_NO_QH, COT_DU_NO_KHOANH,
+                                "Tổng giải ngân", "Giải ngân trong năm", COT_THOI_HAN]:
+                        if col in d.columns:
+                            d[col] = pd.to_numeric(d[col], errors="coerce")
+                    return d
+                df = excel_to_parquet(path, path_pq, sheet="Sheet1", header=7, post_fn=_clean)
+            else:
+                df = pd.read_excel(path, header=7)
+                df = df.dropna(how="all")
+            df[COT_TEN_PGD] = ten_pgd
+            return ten_pgd, df, None
+        except Exception as e:
+            logger.error("merge_baseline_toan_cn: lỗi đọc %s/%s/%d — %s", ten_pgd, loai, nam, e)
+            return ten_pgd, None, str(e)
+
+    frames: list[pd.DataFrame] = []
+    da_merge: list[str] = []
+    loi: list[str] = []
+
+    tong = len(tat_ca_dv)
+    prog = st.progress(0, text=f"⏳ Đang đọc baseline {loai.upper()} 31/12/{nam}...")
+    da_xong = 0
+
+    with ThreadPoolExecutor(max_workers=8) as ex:
+        futures = {ex.submit(_doc_mot, dv): dv for dv in tat_ca_dv}
+        for future in as_completed(futures):
+            da_xong += 1
+            prog.progress(
+                min(1.0, da_xong / max(tong, 1)),
+                text=f"⏳ Đang đọc {da_xong}/{tong} đơn vị...",
+            )
+            ten_pgd, df, err = future.result()
+            if err:
+                loi.append(f"{ten_pgd}: {err}")
+            elif df is not None:
+                frames.append(df)
+                da_merge.append(ten_pgd)
+
+    prog.empty()
+
+    if not frames:
+        return KetQuaUpload(
+            False,
+            f"❌ Không có đơn vị nào có file baseline {loai.upper()} 31/12/{nam}.",
+        )
+
+    df_all = pd.concat(frames, ignore_index=True)
+
+    cache_path = baseline_cache_loai(nam, loai)
+    os.makedirs(os.path.dirname(os.path.abspath(cache_path)), exist_ok=True)
+    df_all.to_parquet(cache_path, index=False, engine="pyarrow", compression="zstd", compression_level=3)
+
+    username = st.session_state.get("username", "unknown")
+    db.ghi_audit(
+        username,
+        "merge_baseline",
+        f"{loai.upper()} 31/12/{nam} — {fmt_so(len(df_all))} dòng, {len(da_merge)} đơn vị"
+        + (f" | {len(loi)} lỗi" if loi else ""),
+    )
+
+    return KetQuaUpload(
+        True,
+        f"✅ Tổng hợp baseline **{loai.upper()}** 31/12/{nam}: "
+        f"**{len(da_merge)}** đơn vị · **{fmt_so(len(df_all))}** dòng"
+        + (f" ⚠️ {len(loi)} lỗi" if loi else ""),
+        cache_path,
+    )
+
+
 # ── Lưu file theo PGD ─────────────────────────────────────────────────────────
 
 def luu_pgd_file(ten_pgd: str, loai: str, file_bytes: bytes) -> KetQuaUpload:

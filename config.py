@@ -76,11 +76,30 @@ def baseline_pgd_path(ten_don_vi: str, nam: int) -> str:
     return str(d / f"HSTD_3112_{nam}.XLSX")
 
 
+def baseline_pgd_path_loai(ten_don_vi: str, nam: int, loai: str) -> str:
+    """Đường dẫn file baseline 31/12 theo đơn vị và loại: data/baseline_pgd/{slug}/{LOAI}_3112_{nam}.XLSX"""
+    from data.pgd import pgd_slug
+    slug = pgd_slug(ten_don_vi)
+    d = BASELINE_PGD_DIR / slug
+    d.mkdir(parents=True, exist_ok=True)
+    return str(d / f"{loai.upper()}_3112_{nam}.XLSX")
+
+
+LOAI_BASELINE = ("hstd", "nq11", "gqvl", "cdtotkvv")
+
+
 def danh_sach_nam_baseline_pgd() -> list[int]:
     """Quét BASELINE_PGD_DIR tìm tất cả năm đã có ít nhất 1 đơn vị upload."""
     if not BASELINE_PGD_DIR.exists():
         return []
     years = set()
+    for loai in LOAI_BASELINE:
+        for f in BASELINE_PGD_DIR.rglob(f"{loai.upper()}_3112_*.XLSX"):
+            try:
+                years.add(int(f.stem.split("_")[-1]))
+            except ValueError:
+                pass
+    # Giữ tương thích với tên file cũ HSTD_3112_*.XLSX
     for f in BASELINE_PGD_DIR.rglob("HSTD_3112_*.XLSX"):
         try:
             years.add(int(f.stem.split("_")[-1]))
@@ -90,9 +109,20 @@ def danh_sach_nam_baseline_pgd() -> list[int]:
 
 
 def trang_thai_baseline_pgd(nam: int) -> dict[str, bool]:
-    """Trả về {ten_don_vi: co_file} cho 22 đơn vị theo năm."""
+    """Trả về {ten_don_vi: co_file_hstd} cho 22 đơn vị theo năm."""
     ds = [DON_VI_CHI_NHANH] + DS_PGD
     return {dv: os.path.exists(baseline_pgd_path(dv, nam)) for dv in ds}
+
+
+def trang_thai_baseline_pgd_loai(nam: int, loai: str) -> dict[str, bool]:
+    """Trả về {ten_don_vi: co_file} cho 22 đơn vị theo năm và loại."""
+    ds = [DON_VI_CHI_NHANH] + DS_PGD
+    return {dv: os.path.exists(baseline_pgd_path_loai(dv, nam, loai)) for dv in ds}
+
+
+def baseline_cache_loai(nam: int, loai: str) -> str:
+    """Đường dẫn cache parquet tổng hợp baseline theo năm và loại."""
+    return str(CACHE_DIR / f"{loai.lower()}_baseline_{nam}.parquet")
 
 
 # Giữ lại hàm cũ để tương thích (sẽ xóa sau khi migrate xong)

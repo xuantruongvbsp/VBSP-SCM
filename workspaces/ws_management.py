@@ -60,6 +60,7 @@ from tabs import tab_trang_thai_nguon
 from tabs import tab_so_sanh_ky
 from tabs import tab_hhi
 from tabs import tab_no_khoanh
+from tabs import tab_qlnk_dashboard
 
 
 def _render_canh_bao(df: pd.DataFrame, ds_pgd_all: list):
@@ -1147,6 +1148,7 @@ def _build_all_items(role: str, username: str, **kwargs) -> list:
         {"group": "Kiểm soát",     "label": "Cán bộ tín dụng",         "icon": "user",       "fn": lambda: tab_cbtd.render(None, **kwargs)},
         {"group": "Kiểm soát",     "label": "Tập trung rủi ro & HHI",  "icon": "chart-pie",  "fn": lambda: tab_hhi.render(None, **kwargs)},
         {"group": "Kiểm soát",     "label": "🔒 Nợ khoanh",                "icon": "lock",       "fn": lambda: tab_no_khoanh.render(None, **kwargs)},
+        {"group": "Kiểm soát",     "label": "📊 Tổng hợp nợ khoanh",    "icon": "chart-pie",  "fn": lambda: tab_qlnk_dashboard.render(None, **kwargs)},
         {"group": "Kế hoạch và Thực hiện KHTD", "label": "Kế hoạch tín dụng", "icon": "file-text",  "fn": lambda: tab_khtd.render(None, **dict(kwargs, khtd_mode="cn"))},
         {"group": "Kế hoạch và Thực hiện KHTD", "label": "📋 Giao & ĐC KHTD", "icon": "upload", "fn": lambda: tab_khtd_giao_dc.render(None, **kwargs)},
         {"group": "Kế hoạch và Thực hiện KHTD", "label": "Cân đối - Điện báo", "icon": "chart-line", "fn": lambda: tab_kehoach.render(None, **kwargs)},

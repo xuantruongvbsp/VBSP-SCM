@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## [2026-05-19] — Gộp 3 tab thành "Quản lý Công việc & Nhiệm vụ"
+- `tabs/tab_quan_ly_cv.py` — tạo mới: wrapper gộp tab_tien_do + tab_nhiem_vu + tab_quan_ly_bc thành 3 sub-tab
+- `workspaces/ws_management.py` — thay 3 dòng menu riêng lẻ bằng 1 mục "📊 Quản lý Công việc & Nhiệm vụ"
+
 ## [2026-05-19] — Đổi tên 2 mục menu ws_management
 - `workspaces/ws_management.py` dòng ~1132 — "Quản lý Báo cáo định kỳ" → "Quản lý Báo cáo"; "Nhiệm vụ PGD" → "Quản lý Nhiệm vụ PGD"
 

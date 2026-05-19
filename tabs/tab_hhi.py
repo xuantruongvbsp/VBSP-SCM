@@ -336,31 +336,27 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
 
         st.divider()
 
-        # ── SECTION 3: Sub-tabs chi tiết ──────────────────────────────────
-        sub1, sub2, sub3 = st.tabs([
-            "📊 Theo Chương trình",
-            "🗺️ Theo Xã",
-            "🏢 Theo PGD",
-        ])
-
-        with sub1:
-            if COT_TEN_CT not in df_full.columns:
-                st.warning("Không tìm thấy cột Tên chương trình trong dữ liệu.")
-            else:
-                _render_sub_ct(df_full)
-
-        with sub2:
-            missing = [c for c in [COT_TEN_XA, COT_TEN_PGD] if c not in df_full.columns]
-            if missing:
-                st.warning(f"Thiếu cột: {', '.join(missing)}")
-            else:
-                _render_sub_xa(df_full)
-
-        with sub3:
-            if COT_TEN_PGD not in df_full.columns:
-                st.warning("Không tìm thấy cột Tên PGD trong dữ liệu.")
-            else:
-                _render_sub_pgd(df_full)
+        lazy_tabs(
+            ["📊 Theo Chương trình", "🗺️ Theo Xã", "🏢 Theo PGD"],
+            [
+                lambda: (
+                    st.warning("Không tìm thấy cột Tên chương trình trong dữ liệu.")
+                    if COT_TEN_CT not in df_full.columns
+                    else _render_sub_ct(df_full)
+                ),
+                lambda: (
+                    st.warning(f"Thiếu cột: {', '.join([c for c in [COT_TEN_XA, COT_TEN_PGD] if c not in df_full.columns])}")
+                    if any(c not in df_full.columns for c in [COT_TEN_XA, COT_TEN_PGD])
+                    else _render_sub_xa(df_full)
+                ),
+                lambda: (
+                    st.warning("Không tìm thấy cột Tên PGD trong dữ liệu.")
+                    if COT_TEN_PGD not in df_full.columns
+                    else _render_sub_pgd(df_full)
+                ),
+            ],
+            key="hhi",
+        )
 
         st.divider()
 

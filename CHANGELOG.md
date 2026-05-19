@@ -1,5 +1,22 @@
 # CHANGELOG
 
+## [2026-05-19] — Fix: Thêm hàm stub doc_ke_hoach_kiem_tra(), luu_ke_hoach_kiem_tra(), duyet_ke_hoach() vào db.py
+- `db.py` — 3 hàm stub (trả về [] hoặc True) để tránh ModuleNotFoundError khi render tab Nợ khoanh
+- Các hàm này chưa có implementation đầy đủ — TODO trong PR tiếp theo
+
+## [2026-05-19] — Phase 2: Hoàn thiện báo cáo QLNK_06, M10 (Haiku + reportlab)
+- `tabs/tab_no_khoanh.py` dòng ~933–1105 — thêm 2 hàm PDF: `_xuat_pdf_qlnk_06()` (báo cáo tổng hợp, 19 cột), `_xuat_pdf_m10()` (danh sách chưa nhập)
+- `tabs/tab_no_khoanh.py` dòng ~1706–1843 — thêm QLNK_06 expander: filter PGD + date range, hiển thị 18 cột, format tiền, xuất Excel/PDF
+- `tabs/tab_no_khoanh.py` dòng ~1845–1902 — fix M10: đổi tên → "M10_QLNK", thêm cột so_ku, format "du_no_goc_khoanh" từ đồng → triệu đồng, thêm xuất PDF
+
+## [2026-05-19] — DB migration: thêm cột ngay_het_han_khoanh vào qlnk_ket_qua
+- `db.py` dòng ~177 — thêm `ngay_het_han_khoanh TEXT` vào DDL `CREATE TABLE qlnk_ket_qua`
+- `db.py` dòng ~240 — thêm `ALTER TABLE qlnk_ket_qua ADD COLUMN ngay_het_han_khoanh TEXT` migration (idempotent)
+- `db.py` `_QLNK_KQ_COLS` — thêm `ngay_het_han_khoanh` vào list cột đọc
+- `db.py` `luu_ket_qua_kiem_tra()` — thêm cột vào cả UPDATE và INSERT
+- `config.py` dòng ~304 — thêm constant `COT_NGAY_HH_KHOANH = "Ngày hết hạn Khoanh"` (trước chỉ định nghĩa local trong tab)
+- `tabs/tab_no_khoanh.py` `data_dict` — lấy `ngay_het_han_khoanh` từ `row_chon` (HSTD) thay vì bỏ trống
+
 ## [2026-05-19] — Fix: đọc TẤT CẢ cột từ HSTD parquet (175 cột) cho tab Nợ khoanh
 - `app.py` dòng 72–97 — thay PyArrow filter bằng DuckDB (PyArrow filter chỉ đọc cột được reference → bỏ sót 169 cột)
 - `cache/hstd.parquet` — xóa cache cũ để buộc merge lại với tất cả 175 cột

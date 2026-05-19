@@ -20,9 +20,21 @@ from auth import normalize_role, la_phan_he_cn, la_phan_he_pgd
 from auth import co_quyen_upload_pgd, co_quyen_quan_ly_user_pgd
 
 role = normalize_role(str(kwargs.get("role") or "user"))
-if la_phan_he_cn(role): ...   # executive, admin_cn, manager_cn
+if la_phan_he_cn(role): ...   # executive, admin_cn, manager_cn, chuyenvien_cn
 if la_phan_he_pgd(role): ...  # admin_pgd, manager_pgd, user_pgd
 ```
+
+**Role đầy đủ (7 role, 2 cấp):**
+
+| Cấp | Role | Ghi chú |
+|---|---|---|
+| CN | `executive` | Chỉ đọc |
+| CN | `admin_cn` / `admin` | Toàn quyền |
+| CN | `manager_cn` / `manager` | Upload + giao chỉ tiêu |
+| CN | `chuyenvien_cn` | Tác nghiệp, không quản lý user |
+| PGD | `admin_pgd` | Upload + quản lý user PGD |
+| PGD | `manager_pgd` | Upload + nhập kế hoạch |
+| PGD | `user_pgd` / `user` | Tác nghiệp PGD |
 
 ---
 
@@ -247,6 +259,48 @@ if changes:
     st.cache_data.clear()
     st.session_state.pop(editor_key, None)  # reset stale state
     st.rerun()
+```
+
+---
+
+### pgd_mode — pattern song song 2 phân hệ
+
+```python
+pgd_mode = kwargs.get("pgd_mode", False)
+pgd_user = kwargs.get("pgd_user")
+
+if pgd_mode:
+    path      = duong_dan_pgd(pgd_user, "loai_file")
+    key       = f"kehoach_pgd_{pgd_slug(pgd_user)}"
+    key_prefix = f"pgd_{pgd_slug(pgd_user)}_"   # tránh DuplicateElementKey
+else:
+    path      = DB_HT_CACHE   # toàn CN
+    key       = "kehoach"
+    key_prefix = "cn_"
+```
+
+---
+
+### Component API — signatures chuẩn
+
+```python
+# delta_card / kpi_row
+from components.delta_card import kpi_row, delta_card
+kpi_row(items, num_columns=4)          # ❌ SAI: cols=4
+
+# export_pdf
+from components.export_pdf import download_pdf_button, xuat_pdf_co_chart
+pdf_bytes = xuat_pdf_co_chart(df, tieu_de, nguoi_xuat)
+download_pdf_button(pdf_bytes, filename="bao_cao.pdf", key="btn_pdf")
+# ❌ SAI: download_pfb_button(df=df, tieu_de=...)
+
+# loan_drawer
+from components.loan_drawer import loan_detail_drawer
+loan_detail_drawer(row=df.iloc[0])     # ❌ SAI: loan_detail_drawer(df, row_id=0)
+
+# filter_bar — KHÔNG dùng "filter" làm tên biến (shadow built-in)
+filters = [{"field": COT_TEN_XA, "label": "Xã", "type": "select"}]
+filter_values = filter_bar(df, filters, key_prefix="fb_")
 ```
 
 ---

@@ -142,7 +142,7 @@ def _render_mover_item(
 
     arrow = "▲" if is_improved else "▼"
     color_class = "improved" if is_improved else "declined"
-    bg = "#e8f5e9" if is_improved else "#ffebee"
+    bg = "#0D2818" if is_improved else "#2D0D14"
 
     delta_str = _format_value(abs_delta, unit)
     if pct is not None:
@@ -153,15 +153,15 @@ def _render_mover_item(
 
     st.markdown(f"""
     <div style="padding:8px 12px;margin:4px 0;border-radius:8px;background:{bg};
-                border-left:4px solid {'#4caf50' if is_improved else '#f44336'};">
+                border-left:4px solid {'#66BB6A' if is_improved else '#EF5350'};">
         <div style="display:flex;justify-content:space-between;align-items:center;">
             <strong>#{rank}</strong>
             <strong>{item["key"]}</strong>
             <span style="font-size:1.1em;font-weight:600;">{metric_str}</span>
         </div>
-        <div style="display:flex;justify-content:space-between;font-size:0.85em;color:#666;margin-top:4px;">
+        <div style="display:flex;justify-content:space-between;font-size:0.85em;color:#94A3B8;margin-top:4px;">
             <span>Kỳ trước: {prev_str}</span>
-            <span style="color:{'#2e7d32' if is_improved else '#c62828'};">
+            <span style="color:{'#81C784' if is_improved else '#EF9A9A'};">
                 {arrow} {delta_str}
             </span>
         </div>
@@ -172,9 +172,9 @@ def _render_mover_item(
 def _render_kpi_box(label: str, value: float, unit: str, color: str):
     val_str = _format_value(value, unit)
     st.markdown(f"""
-    <div style="text-align:center;padding:10px;background:{color}15;
-                border-radius:10px;border:1px solid {color}30;">
-        <div style="font-size:0.8em;color:#666;">{label}</div>
+    <div style="text-align:center;padding:10px;background:#1E2130;
+                border-radius:10px;border:1px solid #2A2D3E;">
+        <div style="font-size:0.8em;color:#94A3B8;">{label}</div>
         <div style="font-size:1.3em;font-weight:700;color:{color};">{val_str}</div>
     </div>
     """, unsafe_allow_html=True)

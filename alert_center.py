@@ -129,20 +129,31 @@ def render_badge_no_khoanh_sap_het_han(df_full) -> None:
     if data['so_khan'] > 0:
         if st.sidebar.button(
             f"🔴 {data['so_khan']} món hết hạn khoanh",
-            key="alert_khoanh_khan",
+            key="alert_khoanh_khan_2",
         ):
-            st.session_state.ws_mgmt_jump = "🔒 Nợ khoanh"
-            st.session_state._qlnk_filter = "sap_het_han"
+            _jump_to_khoanh()
             st.rerun()
 
     if data['so_canh_bao'] > 0:
         if st.sidebar.button(
             f"🟠 {data['so_canh_bao']} món sắp hết hạn khoanh",
-            key="alert_khoanh_canh_bao",
+            key="alert_khoanh_canh_bao_2",
         ):
-            st.session_state.ws_mgmt_jump = "🔒 Nợ khoanh"
-            st.session_state._qlnk_filter = "sap_het_han"
+            _jump_to_khoanh()
             st.rerun()
+
+
+def _jump_to_khoanh():
+    """Set session state để nhảy đến tab Nợ khoanh phù hợp workspace hiện tại."""
+    st.session_state._qlnk_filter = "sap_het_han"
+    ws = st.session_state.get("workspace", "operation")
+    if ws == "management":
+        st.session_state.ws_mgmt_jump = "🔒 Nợ khoanh"
+    elif ws == "executive":
+        st.session_state.ws_exec_jump = "📊 Tổng hợp nợ khoanh"
+    else:
+        st.session_state.ws_op_nhom = "kiem_soat_rr"
+        st.session_state.ws_op_jump_tab = 7
 
 
 _KHOANH_ALERT_CACHE_TTL = 600
@@ -204,8 +215,7 @@ def render_alert_sidebar(
                 f"🔴 {khoanh_data['so_khan']} món hết hạn khoanh",
                 key="alert_khoanh_khan",
             ):
-                st.session_state.ws_mgmt_jump = "🔒 Nợ khoanh"
-                st.session_state._qlnk_filter = "sap_het_han"
+                _jump_to_khoanh()
                 st.rerun()
 
         if khoanh_data['so_canh_bao'] > 0:
@@ -213,6 +223,5 @@ def render_alert_sidebar(
                 f"🟠 {khoanh_data['so_canh_bao']} món sắp hết hạn khoanh",
                 key="alert_khoanh_canh_bao",
             ):
-                st.session_state.ws_mgmt_jump = "🔒 Nợ khoanh"
-                st.session_state._qlnk_filter = "sap_het_han"
+                _jump_to_khoanh()
                 st.rerun()

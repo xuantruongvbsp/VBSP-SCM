@@ -25,7 +25,9 @@ from auth import la_phan_he_cn, normalize_role
 from config import (
     DS_PGD, DON_VI_CHI_NHANH, MA_PGD_MAP,
     baseline_path, baseline_cache, danh_sach_nam_baseline,
-    baseline_pgd_path, danh_sach_nam_baseline_pgd, trang_thai_baseline_pgd,
+    baseline_pgd_path, baseline_pgd_path_loai,
+    danh_sach_nam_baseline_pgd, trang_thai_baseline_pgd, trang_thai_baseline_pgd_loai,
+    LOAI_BASELINE,
 )
 from data.pgd import (
     duong_dan_pgd,
@@ -37,6 +39,7 @@ from services.upload_service import (
     kiem_tra_file,
     lay_meta_merge,
     merge_du_lieu_toan_cn,
+    merge_baseline_toan_cn,
     danh_gia_chat_luong_file_upload,
 )
 from utils import fmt_so, hien_thi_dataframe_phan_trang

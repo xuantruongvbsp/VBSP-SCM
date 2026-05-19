@@ -212,6 +212,24 @@ def init_db():
                 updated_at              TEXT    NOT NULL DEFAULT (datetime('now','localtime'))
             );
             CREATE INDEX IF NOT EXISTS idx_qlnk_bs_ma ON qlnk_bo_sung(ma_mon_vay);
+
+            CREATE TABLE IF NOT EXISTS qlnk_ke_hoach (
+                id                INTEGER PRIMARY KEY AUTOINCREMENT,
+                ten_pgd           TEXT NOT NULL,
+                nam               INTEGER NOT NULL DEFAULT 0,
+                thanh_phan_doan   TEXT NOT NULL DEFAULT '[]',
+                ds_phan_cong      TEXT NOT NULL DEFAULT '[]',
+                ghi_chu           TEXT,
+                trang_thai        TEXT NOT NULL DEFAULT 'luu_tam',
+                nguoi_lap         TEXT NOT NULL,
+                nguoi_duyet       TEXT,
+                ngay_duyet        TEXT,
+                created_at        TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+                updated_at        TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+            );
+            CREATE INDEX IF NOT EXISTS idx_qlnk_kh_pgd  ON qlnk_ke_hoach(ten_pgd);
+            CREATE INDEX IF NOT EXISTS idx_qlnk_kh_ngay ON qlnk_ke_hoach(ngay_kiem_tra);
+            CREATE INDEX IF NOT EXISTS idx_qlnk_kh_tt   ON qlnk_ke_hoach(trang_thai);
         """)
         try:
             conn.execute(
@@ -243,6 +261,18 @@ def init_db():
             )
         except sqlite3.OperationalError:
             pass
+        for _col, _typ in [
+            ("nguoi_duyet",   "TEXT"),
+            ("ngay_duyet",    "TEXT"),
+            ("ghi_chu",       "TEXT"),
+            ("nam",           "INTEGER NOT NULL DEFAULT 0"),
+            ("ds_phan_cong",  "TEXT NOT NULL DEFAULT '[]'"),
+            ("thanh_phan_doan", "TEXT NOT NULL DEFAULT '[]'"),
+        ]:
+            try:
+                conn.execute(f"ALTER TABLE qlnk_ke_hoach ADD COLUMN {_col} {_typ}")
+            except sqlite3.OperationalError:
+                pass
         conn.commit()
 
 
@@ -837,45 +867,90 @@ def doc_bo_sung_mon_vay(ma_mon_vay: str) -> dict | None:
         return None
 
 
-def doc_ke_hoach_kiem_tra(ten_pgd: str = None,
-                          trang_thai: str = None) -> list[dict]:
-    """
-    Đọc danh sách kế hoạch kiểm tra từ kv_store.
-    Lọc AND theo ten_pgd / trang_thai nếu được truyền (None = bỏ qua).
-    Trả về list[dict] với fields: id, ten_pgd, ten_xa, ten_to_tkv, ngay_kiem_tra,
-                                   ds_mon_vay, trang_thai, nguoi_lap, nguoi_duyet
-    Hiện tại: stub trả về []
-    """
+def doc_ke_hoach_kiem_tra(ten_pgd: str = None, trang_thai: str = None,
+                          nam: int = None) -> list[dict]:
+    """Đọc kế hoạch kiểm tra năm từ qlnk_ke_hoach."""
+    conds, params = [], []
+    if ten_pgd:
+        conds.append("ten_pgd = ?"); params.append(ten_pgd)
+    if trang_thai:
+        conds.append("trang_thai = ?"); params.append(trang_thai)
+    if nam:
+        conds.append("nam = ?"); params.append(nam)
+    where = ("WHERE " + " AND ".join(conds)) if conds else ""
     try:
-        # TODO: Đọc từ kv_store("kehoach_kiem_tra", "kehoach_kiem_tra_pgd_*", v.v.)
-        # Tạm stub vì chưa có storage rõ ràng
-        return []
+        with get_conn() as conn:
+            rows = conn.execute(
+                f"SELECT * FROM qlnk_ke_hoach {where} ORDER BY nam DESC, id DESC",
+                params,
+            ).fetchall()
+        result = []
+        for r in rows:
+            d = dict(r)
+            for _fld in ("ds_phan_cong", "thanh_phan_doan"):
+                try:
+                    d[_fld] = json.loads(d.get(_fld) or "[]")
+                except Exception:
+                    d[_fld] = []
+            result.append(d)
+        return result
     except Exception:
         return []
 
 
-def luu_ke_hoach_kiem_tra(data: dict, username: str = "system") -> None:
-    """
-    Lưu kế hoạch kiểm tra vào kv_store.
-    Hiện tại: stub, không làm gì
-    """
+def luu_ke_hoach_kiem_tra(data: dict, username: str = "system") -> int:
+    """Upsert kế hoạch kiểm tra năm vào qlnk_ke_hoach. Trả về id bản ghi."""
+    now        = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    ds_pc      = json.dumps(data.get("ds_phan_cong") or [], ensure_ascii=False)
+    tp_doan    = json.dumps(data.get("thanh_phan_doan") or [], ensure_ascii=False)
+    rec_id     = data.get("id")
+    ten_pgd    = data.get("ten_pgd", "")
+    nam        = int(data.get("nam") or 0)
     try:
-        # TODO: Ghi vào kv_store với key "kehoach_kiem_tra*"
-        ghi_audit(username, "luu_ke_hoach_kiem_tra", "stub")
-    except Exception:
-        pass
+        with get_conn() as conn:
+            if rec_id:
+                conn.execute(
+                    """UPDATE qlnk_ke_hoach
+                       SET ten_pgd=?, nam=?, ds_phan_cong=?, thanh_phan_doan=?,
+                           ghi_chu=?, updated_at=?
+                       WHERE id=? AND trang_thai != 'da_duyet'""",
+                    (ten_pgd, nam, ds_pc, tp_doan, data.get("ghi_chu"), now, rec_id),
+                )
+            else:
+                cur = conn.execute(
+                    """INSERT INTO qlnk_ke_hoach
+                       (ten_pgd, nam, ds_phan_cong, thanh_phan_doan,
+                        ghi_chu, trang_thai, nguoi_lap, updated_at)
+                       VALUES (?,?,?,?,?, 'luu_tam', ?,?)""",
+                    (ten_pgd, nam, ds_pc, tp_doan,
+                     data.get("ghi_chu"), username, now),
+                )
+                rec_id = cur.lastrowid
+            conn.commit()
+        ghi_audit(username, "luu_ke_hoach_kiem_tra", f"id={rec_id} pgd={ten_pgd} nam={nam}")
+        return rec_id or 0
+    except Exception as e:
+        ghi_audit(username, "loi_luu_ke_hoach_kiem_tra", str(e))
+        return 0
 
 
 def duyet_ke_hoach(kehoach_id: int, username: str = "system") -> bool:
-    """
-    Duyệt/phê duyệt kế hoạch kiểm tra.
-    Hiện tại: stub trả về True
-    """
+    """Duyệt kế hoạch kiểm tra (luu_tam → da_duyet)."""
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     try:
-        # TODO: Cập nhật trang_thai -> 'da_duyet' trong storage
-        ghi_audit(username, "duyet_ke_hoach", f"id={kehoach_id}")
-        return True
-    except Exception:
+        with get_conn() as conn:
+            cur = conn.execute(
+                """UPDATE qlnk_ke_hoach
+                   SET trang_thai='da_duyet', nguoi_duyet=?, ngay_duyet=?, updated_at=?
+                   WHERE id=? AND trang_thai IN ('luu_tam', 'mo_phe_duyet')""",
+                (username, now, now, kehoach_id),
+            )
+            conn.commit()
+            ok = cur.rowcount > 0
+        ghi_audit(username, "duyet_ke_hoach", f"id={kehoach_id} ok={ok}")
+        return ok
+    except Exception as e:
+        ghi_audit(username, "loi_duyet_ke_hoach", str(e))
         return False
 
 

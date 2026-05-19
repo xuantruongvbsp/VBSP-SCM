@@ -930,6 +930,205 @@ def _xuat_pdf_mau_04qlnk(row_hstd: dict, row_bs: dict, ten_pgd: str,
     return buf.getvalue()
 
 
+def _xuat_pdf_qlnk_06(ds_ket_qua: list, ten_pgd: str = "",
+                      ngay_tu: str = "", ngay_den: str = "") -> bytes:
+    """Báo cáo kết quả kiểm tra nợ khoanh — QLNK_06"""
+    _dang_ky_font_qlnk()
+    buf = BytesIO()
+    margin = 1.0 * cm
+    doc = SimpleDocTemplate(buf, pagesize=A4,
+                            leftMargin=margin, rightMargin=margin,
+                            topMargin=margin, bottomMargin=1.5 * cm)
+    usable_w = A4[0] - 2 * margin
+    elements = []
+
+    _ve_header_pdf(elements, usable_w,
+                   tieu_de="BÁO CÁO KẾT QUẢ KIỂM TRA NỢ KHOANH",
+                   don_vi_tren="CHI NHÁNH NHCSXH TỈNH ĐỒNG NAI",
+                   don_vi_duoi=f"PHÒNG GIAO DỊCH {(ten_pgd or '').upper()}")
+    elements.append(Paragraph(
+        "<font size='7'><i>QLNK_06</i></font>",
+        ParagraphStyle("MS", fontName=_FN, fontSize=7,
+                       alignment=TA_RIGHT, leading=8)))
+
+    if ngay_tu or ngay_den:
+        elements.append(Paragraph(
+            f"Từ ngày {ngay_tu or '..........'}  đến ngày {ngay_den or '..........'}",
+            _style_body()))
+    elements.append(Spacer(1, 3))
+
+    headers = [
+        "STT", "Mã KH", "Tên KH", "Tên PGD", "Tên CT",
+        "Số KU", "Ngày BĐ KH", "Thời gian", "Ngày HH KH",
+        "Dư nợ gốc", "Dư nợ gốc KH", "Chênh lệch",
+        "TT dự án", "TH KH", "KN TN", "CK TN",
+        "Trang thái", "Kiểm tra", "Lưu",
+    ]
+    ncols = len(headers)
+    col_widths = [0.4*cm] * 19  # Tương đối bằng nhau, scaled down
+
+    th = _style_table_header(6)
+    tc = _style_table_cell(6)
+
+    table_data = [[Paragraph(h, th) for h in headers]]
+    for stt, row in enumerate(ds_ket_qua or [], 1):
+        try:
+            du_no_goc = float(row.get("du_no_goc") or 0)
+            du_no_kh = float(row.get("du_no_goc_khoanh") or 0)
+            chenh = float(row.get("chenh_lech") or 0)
+        except (TypeError, ValueError):
+            du_no_goc = du_no_kh = chenh = 0
+
+        so_thang = row.get("so_thang_khoanh") or ""
+        bdk = row.get("ngay_bat_dau_khoanh") or ""
+        ngay_hh = (_qlnk_add_months(bdk, int(so_thang)) if bdk and so_thang else "")
+
+        table_data.append([Paragraph(v, tc) for v in [
+            str(stt),
+            row.get("ma_mon_vay", "")[:8] or "",
+            (row.get("ten_kh", "") or "")[:15],
+            (row.get("ten_pgd", "") or "")[:12],
+            (row.get("ten_ct", "") or "")[:10] if row.get("ten_ct") else "",
+            row.get("so_ku", "")[:6] or "",
+            bdk,
+            f"{so_thang} tháng" if so_thang else "",
+            ngay_hh,
+            f"{int(du_no_goc/1e6)}" if du_no_goc else "",
+            f"{int(du_no_kh/1e6)}" if du_no_kh else "",
+            f"{int(chenh/1e6)}" if chenh else "",
+            ("Bình thường" if not row.get("thuc_trang_du_an") else
+             row.get("thuc_trang_du_an", "")[:10]),
+            ("Bình thường" if not row.get("tinh_hinh_khach_hang") else
+             row.get("tinh_hinh_khach_hang", "")[:10]),
+            ("Có" if row.get("kha_nang_tra_no") == "co" else "Không"),
+            ("Có" if row.get("cam_ket_tra_no") == "co" else "Không"),
+            ("✓ PD" if row.get("trang_thai") == "da_phe_duyet" else
+             ("○ TT" if row.get("trang_thai") == "luu_tam" else "")),
+            (row.get("can_bo_kiem_tra", "") or "")[:10],
+            (row.get("nguoi_nhap", "") or "")[:10],
+        ]])
+
+    style_cmds = [
+        ("BACKGROUND", (0, 0), (-1, 0), _HEADER_BG),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.black),
+        ("GRID", (0, 0), (-1, -1), 0.5, _BORDER_COLOR),
+        ("BOX", (0, 0), (-1, -1), 1, _VBSP_GREEN),
+        ("VALIGN", (0, 0), (-1, -1), "CENTER"),
+        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+        ("FONTSIZE", (0, 0), (-1, -1), 6),
+        ("TOPPADDING", (0, 0), (-1, -1), 2),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+    ]
+    for r in range(1, len(table_data)):
+        if r % 2 == 0:
+            style_cmds.append(("BACKGROUND", (0, r), (-1, r), _ROW_ALT))
+
+    tbl = Table(table_data, colWidths=col_widths, repeatRows=1)
+    tbl.setStyle(TableStyle(style_cmds))
+    elements.append(tbl)
+
+    _ve_footer_pdf(elements, usable_w,
+                   signatures=["Lập biểu", "Kiểm soát", "Giám đốc"],
+                   ngay_str=_dong_ten_nd())
+
+    doc.build(elements)
+    buf.seek(0)
+    return buf.getvalue()
+
+
+def _xuat_pdf_m10(ds_luu_tam: list, ten_pgd: str = "") -> bytes:
+    """M10 — Danh sách món vay chưa nhập kết quả kiểm tra"""
+    _dang_ky_font_qlnk()
+    buf = BytesIO()
+    margin = 1.2 * cm
+    doc = SimpleDocTemplate(buf, pagesize=A4,
+                            leftMargin=margin, rightMargin=margin,
+                            topMargin=margin, bottomMargin=1.8 * cm)
+    usable_w = A4[0] - 2 * margin
+    elements = []
+
+    _ve_header_pdf(elements, usable_w,
+                   tieu_de="DANH SÁCH MÓN VAY CHƯA NHẬP KẾT QUẢ KIỂM TRA",
+                   don_vi_tren="CHI NHÁNH NHCSXH TỈNH ĐỒNG NAI",
+                   don_vi_duoi=f"PHÒNG GIAO DỊCH {(ten_pgd or '').upper()}")
+    elements.append(Paragraph(
+        "<font size='8'><i>M10_QLNK</i></font>",
+        ParagraphStyle("MS", fontName=_FN, fontSize=8,
+                       alignment=TA_RIGHT, leading=10)))
+    elements.append(Paragraph("(Đơn vị tính: đồng)", _style_italic()))
+    elements.append(Spacer(1, 4))
+
+    headers_m10 = [
+        "STT", "Mã KH", "Tên KH", "Tên PGD", "Số KU",
+        "Dư nợ khoanh", "Ngày lưu", "Người nhập",
+    ]
+    col_w_m10 = [0.6*cm, 1.5*cm, 3.0*cm, 3.5*cm, 1.8*cm,
+                 2.2*cm, 1.8*cm, 2.5*cm]
+
+    th_m10 = _style_table_header(8)
+    tc_m10 = _style_table_cell(8)
+
+    table_data = [[Paragraph(h, th_m10) for h in headers_m10]]
+    tong_no = 0
+    for stt, row in enumerate(ds_luu_tam or [], 1):
+        try:
+            du_no = float(row.get("du_no_goc_khoanh") or 0)
+        except (TypeError, ValueError):
+            du_no = 0
+        tong_no += du_no
+
+        table_data.append([Paragraph(v, tc_m10) for v in [
+            str(stt),
+            row.get("ma_mon_vay", "")[:10] or "",
+            (row.get("ten_kh", "") or "")[:25],
+            (row.get("ten_pgd", "") or "")[:20],
+            row.get("so_ku", "")[:8] or "",
+            _qlnk_fmt_dong(du_no),
+            row.get("ngay_kiem_tra", "") or "............",
+            (row.get("nguoi_nhap", "") or "")[:15],
+        ]])
+
+    # Dòng cộng
+    table_data.append([
+        Paragraph("<b>Cộng:</b>",
+                  ParagraphStyle("THB", fontName=_FB, fontSize=8, alignment=TA_CENTER)),
+        Paragraph("", tc_m10), Paragraph("", tc_m10), Paragraph("", tc_m10),
+        Paragraph("", tc_m10),
+        Paragraph(f"<b>{_qlnk_fmt_dong(tong_no)}</b>",
+                  ParagraphStyle("THB", fontName=_FB, fontSize=8, alignment=TA_CENTER)),
+        Paragraph("", tc_m10), Paragraph("", tc_m10),
+    ])
+
+    style_m10 = [
+        ("BACKGROUND", (0, 0), (-1, 0), _HEADER_BG),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.black),
+        ("GRID", (0, 0), (-1, -1), 0.5, _BORDER_COLOR),
+        ("BOX", (0, 0), (-1, -1), 1, _VBSP_GREEN),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("TOPPADDING", (0, 0), (-1, -1), 4),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+    ]
+    for r in range(1, len(table_data) - 1):
+        if r % 2 == 0:
+            style_m10.append(("BACKGROUND", (0, r), (-1, r), _ROW_ALT))
+    last_row = len(table_data) - 1
+    style_m10.append(("BACKGROUND", (0, last_row), (-1, last_row), _VBSP_GREEN_LIGHT))
+    style_m10.append(("FONTNAME", (0, last_row), (-1, last_row), _FB))
+    style_m10.append(("LINEABOVE", (0, last_row), (-1, last_row), 1.5, _VBSP_GREEN))
+
+    tbl_m10 = Table(table_data, colWidths=col_w_m10, repeatRows=1)
+    tbl_m10.setStyle(TableStyle(style_m10))
+    elements.append(tbl_m10)
+
+    _ve_footer_pdf(elements, usable_w,
+                   signatures=["Lập biểu", "Kiểm soát", "Giám đốc"],
+                   ngay_str=_dong_ten_nd())
+
+    doc.build(elements)
+    buf.seek(0)
+    return buf.getvalue()
+
+
 # ─── Render ───────────────────────────────────────────────────────────────────
 
 def render(tab: DeltaGenerator = None, **kwargs) -> None:
@@ -1516,6 +1715,10 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                                 "so_thang_khoanh": so_thang_kh or None,
                                 "so_quyet_dinh_khoanh": so_qd,
                                 "ngay_kiem_tra": str(ngay_kt),
+                                "ngay_het_han_khoanh": (
+                                    str(row_chon.get(COT_NGAY_HH_KHOANH, "") or "")
+                                    if row_chon is not None else ""
+                                ),
                                 "can_bo_kiem_tra": can_bo,
                                 "du_no_goc": du_no_goc,
                                 "du_no_goc_khoanh": du_no_goc_kh,
@@ -1696,34 +1899,182 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                             key=f"{key_prefix}bc_m09_dl",
                         )
 
-            with st.expander("📋 M10 — Danh sách chưa nhập kết quả (lưu tạm)"):
+            with st.expander("📊 QLNK_06 — Báo cáo kết quả kiểm tra nợ khoanh", expanded=False):
+                st.markdown("**Bộ lọc**")
+                col_f1, col_f2, col_f3 = st.columns(3)
+                with col_f1:
+                    pgd_f06 = st.selectbox(
+                        "PGD",
+                        options=["— Tất cả —"] + (
+                            sorted([r.get("ten_pgd", "") for r in rows_all_kt
+                                    if r.get("ten_pgd")]) if rows_all_kt else []
+                        ),
+                        key=f"{key_prefix}bc_06_pgd",
+                    )
+                with col_f2:
+                    ngay_tu_06 = st.text_input(
+                        "Từ ngày (dd/mm/yyyy)",
+                        key=f"{key_prefix}bc_06_tu",
+                    )
+                with col_f3:
+                    ngay_den_06 = st.text_input(
+                        "Đến ngày (dd/mm/yyyy)",
+                        key=f"{key_prefix}bc_06_den",
+                    )
+
+                # Lọc dữ liệu
+                df_06 = pd.DataFrame(rows_all_kt) if rows_all_kt else pd.DataFrame()
+                if not df_06.empty:
+                    if pgd_f06 != "— Tất cả —":
+                        df_06 = df_06[df_06["ten_pgd"] == pgd_f06]
+
+                    # Lọc ngày nếu có
+                    if ngay_tu_06 or ngay_den_06:
+                        from datetime import datetime as dt
+                        try:
+                            if ngay_tu_06:
+                                tu_dt = dt.strptime(ngay_tu_06.strip(), "%d/%m/%Y").date()
+                                df_06 = df_06[
+                                    (df_06["ngay_kiem_tra"] >= str(tu_dt)) |
+                                    (df_06["ngay_kiem_tra"].isna())
+                                ]
+                            if ngay_den_06:
+                                den_dt = dt.strptime(ngay_den_06.strip(), "%d/%m/%Y").date()
+                                df_06 = df_06[
+                                    (df_06["ngay_kiem_tra"] <= str(den_dt)) |
+                                    (df_06["ngay_kiem_tra"].isna())
+                                ]
+                        except ValueError:
+                            st.warning("⚠️ Định dạng ngày không hợp lệ (dd/mm/yyyy)")
+
+                if df_06.empty:
+                    st.info("ℹ️ Không có dữ liệu kiểm tra phù hợp.")
+                else:
+                    st.metric("Số bản ghi", fmt_so(len(df_06)))
+
+                    cols_06 = [c for c in [
+                        "ma_mon_vay", "ten_pgd", "ten_kh", "ten_ct",
+                        "du_no_goc", "du_no_goc_khoanh", "du_no_goc_thuc_te",
+                        "du_no_khoanh_thuc_te", "chenh_lech",
+                        "thuc_trang_du_an", "tinh_hinh_khach_hang",
+                        "kha_nang_tra_no", "cam_ket_tra_no",
+                        "trang_thai", "ngay_kiem_tra", "can_bo_kiem_tra",
+                        "nguoi_nhap", "nguoi_phe_duyet",
+                    ] if c in df_06.columns]
+
+                    df_06_display = df_06[cols_06].copy()
+                    # Format tiền
+                    for col in ["du_no_goc", "du_no_goc_khoanh", "du_no_goc_thuc_te",
+                                "du_no_khoanh_thuc_te", "chenh_lech"]:
+                        if col in df_06_display.columns:
+                            df_06_display[col] = (
+                                df_06_display[col]
+                                .apply(lambda x: fmt_ty(float(x) or 0) if x else "0")
+                            )
+
+                    hien_thi_dataframe_phan_trang(
+                        df_06_display,
+                        key=f"{key_prefix}bc_06_tbl",
+                        height=350,
+                    )
+
+                    col_06_1, col_06_2 = st.columns(2)
+                    with col_06_1:
+                        if st.button("📥 Xuất QLNK_06 Excel", key=f"{key_prefix}bc_06_xuat"):
+                            st.session_state[f"_{key_prefix}qlnk06_buf"] = xuat_excel(
+                                {"QLNK_06": df_06[cols_06]}
+                            )
+                    with col_06_2:
+                        if st.button("📄 Xuất QLNK_06 PDF", key=f"{key_prefix}bc_06_pdf"):
+                            try:
+                                pgd_pdf_06 = (pgd_f06 if pgd_f06 != "— Tất cả —" else "")
+                                pdf_06 = _xuat_pdf_qlnk_06(
+                                    df_06.to_dict("records"),
+                                    ten_pgd=pgd_pdf_06,
+                                    ngay_tu=ngay_tu_06,
+                                    ngay_den=ngay_den_06
+                                )
+                                st.session_state[f"_{key_prefix}qlnk06_pdf"] = pdf_06
+                            except Exception as e:
+                                st.error(f"❌ Lỗi xuất PDF: {e}")
+
+                    if st.session_state.get(f"_{key_prefix}qlnk06_buf"):
+                        st.download_button(
+                            "⬇️ Tải QLNK_06 Excel",
+                            data=st.session_state[f"_{key_prefix}qlnk06_buf"],
+                            file_name="QLNK_06.xlsx",
+                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                            key=f"{key_prefix}bc_06_dl",
+                        )
+                    if st.session_state.get(f"_{key_prefix}qlnk06_pdf"):
+                        st.download_button(
+                            "⬇️ Tải QLNK_06 PDF",
+                            data=st.session_state[f"_{key_prefix}qlnk06_pdf"],
+                            file_name="QLNK_06.pdf",
+                            mime="application/pdf",
+                            key=f"{key_prefix}bc_06_pdf_dl",
+                        )
+
+            with st.expander("📋 M10_QLNK — Danh sách món vay chưa nhập kết quả kiểm tra"):
                 rows_m10 = [
                     r for r in rows_all_kt
                     if r.get("trang_thai") == "luu_tam"
                 ]
-                df_m10 = pd.DataFrame(rows_m10)
+                df_m10 = pd.DataFrame(rows_m10) if rows_m10 else pd.DataFrame()
                 st.metric("Số bản ghi lưu tạm", fmt_so(len(df_m10)))
                 if not df_m10.empty:
+                    # Chỉ show các cột quan trọng, format tiền và ngày
                     cols_m10 = [c for c in [
-                        "id", "ma_mon_vay", "ten_pgd", "ten_kh",
-                        "ngay_kiem_tra", "nguoi_nhap",
+                        "ma_mon_vay", "ten_pgd", "ten_kh", "so_ku",
+                        "du_no_goc_khoanh", "ngay_kiem_tra", "nguoi_nhap",
                     ] if c in df_m10.columns]
+
+                    df_m10_display = df_m10[cols_m10].copy()
+                    # Format cột tiền từ đồng → triệu đồng
+                    if "du_no_goc_khoanh" in df_m10_display.columns:
+                        df_m10_display["du_no_goc_khoanh"] = (
+                            df_m10_display["du_no_goc_khoanh"]
+                            .apply(lambda x: fmt_ty(float(x) or 0) if x else "0")
+                        )
+
                     hien_thi_dataframe_phan_trang(
-                        df_m10[cols_m10],
+                        df_m10_display,
                         key=f"{key_prefix}bc_m10_tbl",
                         height=300,
                     )
-                    if st.button("📥 Xuất M10 Excel", key=f"{key_prefix}bc_m10_xuat"):
-                        st.session_state[f"_{key_prefix}m10_buf"] = xuat_excel(
-                            {"M10_LuuTam": df_m10[cols_m10]}
-                        )
+
+                    col_ex1, col_ex2 = st.columns(2)
+                    with col_ex1:
+                        if st.button("📥 Xuất M10 Excel", key=f"{key_prefix}bc_m10_xuat"):
+                            st.session_state[f"_{key_prefix}m10_buf"] = xuat_excel(
+                                {"M10_LuuTam": df_m10[cols_m10]}
+                            )
+                    with col_ex2:
+                        if st.button("📄 Xuất M10 PDF", key=f"{key_prefix}bc_m10_pdf"):
+                            pgd_pdf = pgd_filter_bc or ""
+                            try:
+                                pdf_m10 = _xuat_pdf_m10(
+                                    df_m10.to_dict("records"), ten_pgd=pgd_pdf
+                                )
+                                st.session_state[f"_{key_prefix}m10_pdf"] = pdf_m10
+                            except Exception as e:
+                                st.error(f"❌ Lỗi xuất PDF: {e}")
+
                     if st.session_state.get(f"_{key_prefix}m10_buf"):
                         st.download_button(
-                            "⬇️ Tải M10",
+                            "⬇️ Tải M10 Excel",
                             data=st.session_state[f"_{key_prefix}m10_buf"],
                             file_name="M10_LuuTam.xlsx",
                             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                             key=f"{key_prefix}bc_m10_dl",
+                        )
+                    if st.session_state.get(f"_{key_prefix}m10_pdf"):
+                        st.download_button(
+                            "⬇️ Tải M10 PDF",
+                            data=st.session_state[f"_{key_prefix}m10_pdf"],
+                            file_name="M10_LuuTam.pdf",
+                            mime="application/pdf",
+                            key=f"{key_prefix}bc_m10_pdf_dl",
                         )
 
             with st.expander("📊 Tiến độ kiểm tra theo PGD"):

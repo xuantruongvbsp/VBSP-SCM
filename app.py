@@ -233,7 +233,7 @@ def main():
             is_active = st.session_state.workspace == ws_key
             if st.button(
                 f"{'▶ ' if is_active else '   '}{WS_LABELS.get(ws_key, ws_key)}",
-                key=f"ws_{ws_key}", width='stretch',
+                key=f"ws_{ws_key}", use_container_width=True,
                 type="primary" if is_active else "secondary",
             ):
                 st.session_state.workspace = ws_key
@@ -281,7 +281,7 @@ def main():
 
         if la_phan_he_cn(role) or la_phan_he_pgd(role):
             st.divider()
-            if st.button("🔄 Làm mới cache", width='stretch'):
+            if st.button("🔄 Làm mới cache", use_container_width=True):
                 st.cache_data.clear()
                 for k in ["_ctx", "_ctx_cache_key", "_pgd_map_cache_ts", "_pgd_xa_map_cached", "_ds_pgd_all_cached", "df_full"]:
                     st.session_state.pop(k, None)
@@ -289,17 +289,17 @@ def main():
 
         if normalize_role(role) in ("admin_cn", "admin_pgd"):
             st.divider()
-            if st.button("👥 Quản lý Users", width='stretch'):
+            if st.button("👥 Quản lý Users", use_container_width=True):
                 st.session_state.workspace = "admin_users"; st.rerun()
 
         st.divider()
         # Theme toggle
         theme_icon = "🌙 Chế độ tối" if st.session_state.theme == "light" else "☀️ Chế độ sáng"
-        if st.button(theme_icon, width='stretch'):
+        if st.button(theme_icon, use_container_width=True):
             toggle_theme()
             st.rerun()
 
-        if st.button("🚪 Đăng xuất", width='stretch'):
+        if st.button("🚪 Đăng xuất", use_container_width=True):
             for k in ["logged_in","user_info","username","workspace"]:
                 st.session_state[k] = False if k=="logged_in" else None
             st.session_state.username = ""

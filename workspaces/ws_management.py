@@ -1160,7 +1160,6 @@ def _build_all_items(role: str, username: str, **kwargs) -> list:
                 {"label": "⏰ Nợ Đến Hạn",        "fn": lambda df_full=df_full, ds_pgd_all=ds_pgd_all, role=role, username=kwargs.get("username", "unknown"), idx=0: _render_canh_bao_no_sub(df_full, ds_pgd_all, role, username, idx)},
             ],
         },
-        {"group": "Ủy Thác",       "label": "👤 Cán bộ tín dụng",         "icon": "user",       "fn": lambda: tab_cbtd.render(None, **kwargs)},
         {"group": "Ủy Thác",       "label": "🏛️ Ban Đại Diện", "icon": "building",       "fn": lambda: tab_ban_dai_dien.render(None, cap="tinh", **kwargs)},
         {"group": "Ủy Thác",       "label": "🤝 Ủy thác", "icon": "handshake", "fn": lambda: tab_uy_thac.render(None, **kwargs)},
         {
@@ -1172,6 +1171,7 @@ def _build_all_items(role: str, username: str, **kwargs) -> list:
                 {"label": "🏘️ Tổ TK&VV",       "fn": lambda: tab_cdtotkvv.render(None, **dict(kwargs, cdto_mode="cn"))},
             ],
         },
+        {"group": "Ủy Thác",       "label": "👤 Cán bộ tín dụng",         "icon": "user",       "fn": lambda: tab_cbtd.render(None, **kwargs)},
     ]
 
     if can_upload:

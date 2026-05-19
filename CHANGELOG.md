@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## [2026-05-19] — Baseline 31/12 hỗ trợ 4 loại file + nút tổng hợp thủ công
+- `config.py` — thêm `baseline_pgd_path_loai()`, `trang_thai_baseline_pgd_loai()`, `baseline_cache_loai()`, hằng `LOAI_BASELINE`; cập nhật `danh_sach_nam_baseline_pgd()` quét cả 4 loại
+- `services/upload_service.py` — thêm `merge_baseline_toan_cn(loai, nam)` gộp 22 đơn vị baseline → parquet cache
+- `tabs/tab_upload_khnv.py` — mục baseline nhận diện cả 4 loại (HSTD/NQ11/GQVL/CDTOTKVV), hiển thị trạng thái 4 loại, lưu theo `baseline_pgd_path_loai`; thêm expander tổng hợp thủ công baseline
+
 ## [2026-05-19] — Fix vi phạm convention: tab_gqvl, tab_baocao, tab_khtd_pgd, tab_hhi
 - `auth.py` — thêm helper `la_executive(role)`
 - `tabs/tab_gqvl.py`, `tab_baocao.py`, `tab_khtd_pgd.py` — thay `role != "executive"` → `not la_executive(role)`

@@ -1,6 +1,7 @@
 DANH SÁCH TOÀN BỘ TAB — DỰ ÁN VBSP-SCM
 ============================================================
 Ngày tạo: 2026-05-19
+Cập nhật:  2026-05-19
 Format: Tên code / file → Tên hiển thị (icon + text)
 
 ============================================================
@@ -62,6 +63,12 @@ I. WORKSPACE ĐIỀU HÀNH (ws_management.py)
   tab_audit_log.py        Nhật ký hệ thống         (khi admin_cn)
   tab_trang_thai_nguon.py 🔍 Trạng thái hệ thống
   tab_upload_khnv.py      Upload dữ liệu
+    (inline)                📦 Import hàng loạt (4 loại: HSTD/NQ11/GQVL/CDTOTKVV, tự nhận diện PGD)
+    (inline)                🗑️ Xóa dữ liệu PGD
+    (inline)                📅 Upload mốc số liệu 31/12 (Baseline)
+                              — 4 loại file, tự nhận diện loại + PGD
+                              — 🔄 Tổng hợp thủ công baseline (multiselect loại)
+    (inline)                🔄 Tổng hợp toàn Chi nhánh thủ công
   (inline)                📖 Hướng dẫn
 
 

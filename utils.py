@@ -630,3 +630,50 @@ def pick_hstd_column(df: pd.DataFrame, *candidates: str) -> str | None:
             if col_s.lower() == key.lower():
                 return col_orig
     return None
+
+
+def lazy_tabs(labels: list[str], renderers: list, key: str = "lt",
+              horizontal: bool = True) -> None:
+    """
+    Thay thế st.tabs() — chỉ render tab đang active, không chạy tất cả.
+
+    Args:
+        labels: Danh sách tên tab hiển thị
+        renderers: Danh sách callable, nhận 1 tham số (tab container) hoặc 0
+        key: Prefix cho session_state key
+        horizontal: Hiển thị radio ngang (True) hay dọc (False)
+    """
+    import streamlit as st
+
+    if not labels:
+        return
+    if len(renderers) != len(labels):
+        renderers = renderers[:len(labels)]
+
+    tab_key = f"_{key}_idx"
+
+    if tab_key not in st.session_state or st.session_state[tab_key] >= len(labels):
+        st.session_state[tab_key] = 0
+
+    sel_idx = st.radio(
+        "Tab",
+        options=range(len(labels)),
+        format_func=lambda i: labels[i],
+        horizontal=horizontal,
+        key=tab_key,
+        label_visibility="collapsed",
+    )
+
+    st.divider()
+
+    renderer = renderers[sel_idx]
+    if callable(renderer):
+        import inspect
+        try:
+            sig = inspect.signature(renderer)
+            if len(sig.parameters) > 0:
+                renderer(st.container())
+            else:
+                renderer()
+        except (ValueError, TypeError):
+            renderer()

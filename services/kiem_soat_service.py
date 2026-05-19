@@ -306,7 +306,7 @@ def render_gqvl_tw_gan_mandt(cache: dict[str, Any], pgd_chon: str, username: str
         if c in df_view.columns:
             df_view[c] = pd.to_numeric(df_view[c], errors="coerce").fillna(0).apply(fmt_ty)
 
-    st.dataframe(df_view, width='stretch', hide_index=True, height=420)
+    st.dataframe(df_view, use_container_width=True, hide_index=True, height=420)
 
     ngay_sl = ""
     if COT_NGAY_SL in df_src.columns:

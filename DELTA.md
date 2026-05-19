@@ -284,4 +284,6 @@ Upload flow:
 - `tabs/tab_no_khoanh.py`: Lazy-load section "Xuất mẫu biểu theo CV 368" — wrap 5 expander trong `st.checkbox("📄 Hiện mẫu biểu xuất PDF", value=False)` để skip toàn bộ DB queries + UI khi chưa check
 - `tabs/pdf_no_khoanh.py`: **Tách module mới** — move toàn bộ PDF helpers + 9 hàm `_xuat_pdf_*()` (~1386 dòng) từ `tab_no_khoanh.py` sang file riêng; `tab_no_khoanh.py` giảm từ 3764 → 2378 dòng
 - `tabs/tab_no_khoanh.py`: Remove `try/except reportlab` + `BytesIO`/`Path` import; thay bằng `from tabs.pdf_no_khoanh import (...)`
+- `tabs/pdf_no_khoanh.py`: Fix missing imports — thêm `from config import (... 17 COT_* + LY_DO_KHOANH_LABEL)`, `from utils import fmt_so` + `_fmt_dong` lambda; test thực tế: 5 hàm PDF tạo file 100-113KB OK với font TNR + logo NHCSXH
+- `tabs/tab_no_khoanh.py`: Fix `SyntaxError: keyword argument repeated: use_container_width` trên `st.dataframe()` line 961
 - `tabs/tab_no_khoanh.py`: Đổi 8 → 7 st.tabs; gộp d5 (Kế hoạch) + d6 (Kiểm tra) + mẫu biểu vào tab mới "📋 Kiểm tra nợ khoanh (theo CV 368)"; d_bc "📊 Báo cáo" giữ M08/M09/QLNK_06/M10/Tiến độ; `pgd_filter_bc`/`rows_all_kt`/`da_kiem_tra_set` chuyển trước `st.tabs`

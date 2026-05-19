@@ -220,6 +220,13 @@ Upload flow:
 - `tabs/tab_no_khoanh.py`: **Chuyển toàn bộ 5 biểu mẫu từ python-docx → reportlab PDF** — xóa ~650 dòng code Word `_qlnk_*` helpers + `_tao_word_*` + import `docx`/`template_service`; thêm reportlab PDF engine: đăng ký font TNR, header logo NHCSXH + quốc hiệu, style body/table/signature, 5 hàm `_xuat_pdf_mau_*` (KH, 01–04/QLNK) với Times New Roman 12-13pt, line-spacing 1.3-1.5, bảng xanh #2E7D32 xen kẽ dòng, chữ ký chuyên nghiệp, không phụ thuộc MS Word
 - `tabs/tab_no_khoanh.py`: Sửa 5 expander UI: nút "📄 Tạo Word" → "📥 Xuất PDF", thêm form editable tối giản (Cán bộ KT, Nội dung bổ sung, Kết luận, Số tiền cam kết/thời hạn/phương thức, Ghi chú, Hạn cuối), lưu PDF vào session_state + download button
 
+## [19/05/2026] — tab_tracuu: bổ sung cột Ngày sinh, Ngày cấp/Nơi cấp CMND
+- `tabs/tab_tracuu.py`: import `COT_NGAY_SINH`, `COT_NGAY_CAP_CMND`, `COT_NOI_CAP_CMND` từ config; thêm 3 cột vào `COLS_CAN` (đọc từ parquet khi tra cứu); thêm vào `_NHOM_TRUONG["👤 Khách hàng"]` để hiện trong bộ lọc cột
+
+## [19/05/2026] — Mẫu 02/QLNK tự điền từ HSTD (năm sinh, CMND, chương trình)
+- `config.py`: Thêm 3 constant — `COT_NGAY_SINH = "Ngày sinh"`, `COT_NGAY_CAP_CMND = "Ngày cấp CMND"`, `COT_NOI_CAP_CMND = "Nơi cấp CMND"`
+- `tabs/tab_no_khoanh.py`: `_xuat_pdf_mau_02qlnk()` — import 3 constant mới; tự rút năm sinh từ `COT_NGAY_SINH`; điền ngày cấp + nơi cấp CMND; điền tên chương trình vay vốn; các trường SĐT/địa chỉ/tổ/ĐVUT đã có từ trước
+
 ## [19/05/2026] — Fix tab Ban Đại Diện: TypeError truediv on PyArrow string dtype
 - `tabs/tab_ban_dai_dien.py`: `_tong_hop_theo_pgd()` — thêm `_num()` helper (`pd.to_numeric(errors='coerce').fillna(0)`) cho du_no/dth/dqh/nkh/gn_nam sau groupby, tránh lỗi khi cột nguồn có dtype PyArrow large_string
 

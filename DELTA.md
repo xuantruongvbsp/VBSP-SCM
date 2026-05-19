@@ -278,4 +278,10 @@ Upload flow:
 - `tabs/tab_no_khoanh.py`: Import `tab_qlnk_dashboard`; đổi 7 → 8 st.tabs; thêm d0 "📊 Tổng quan" gọi `tab_qlnk_dashboard.render(d0, **kwargs)`
 - `workspaces/ws_management.py`: Xóa cấu trúc `children` 2 mục Nợ Khoanh → 1 entry "🔒 Nợ Khoanh" duy nhất gọi `tab_no_khoanh.render()`
 - `Chay_VBSP_SCM.bat`: Xóa `taskkill`, xóa `--server.fileWatcherType none` (bật lại watchdog auto-reload), thay poll loop 60s bằng `timeout /t 3`
+
+## [19/05/2026] — Tối ưu tốc độ load tab Nợ khoanh (#1-#3)
+- `tabs/tab_no_khoanh.py`: Thêm 4 cached wrapper `@st.cache_data(ttl=60)` — `_cached_ket_qua_kiem_tra`, `_cached_ke_hoach_kiem_tra`, `_cached_mau_bieu_cv368` (60s), `_cached_bo_sung_mon_vay` (30s); thay tất cả 16 `db.doc_*()` read call trong render() và `_render_mau*()` bằng cached version
+- `tabs/tab_no_khoanh.py`: Lazy-load section "Xuất mẫu biểu theo CV 368" — wrap 5 expander trong `st.checkbox("📄 Hiện mẫu biểu xuất PDF", value=False)` để skip toàn bộ DB queries + UI khi chưa check
+- `tabs/pdf_no_khoanh.py`: **Tách module mới** — move toàn bộ PDF helpers + 9 hàm `_xuat_pdf_*()` (~1386 dòng) từ `tab_no_khoanh.py` sang file riêng; `tab_no_khoanh.py` giảm từ 3764 → 2378 dòng
+- `tabs/tab_no_khoanh.py`: Remove `try/except reportlab` + `BytesIO`/`Path` import; thay bằng `from tabs.pdf_no_khoanh import (...)`
 - `tabs/tab_no_khoanh.py`: Đổi 8 → 7 st.tabs; gộp d5 (Kế hoạch) + d6 (Kiểm tra) + mẫu biểu vào tab mới "📋 Kiểm tra nợ khoanh (theo CV 368)"; d_bc "📊 Báo cáo" giữ M08/M09/QLNK_06/M10/Tiến độ; `pgd_filter_bc`/`rows_all_kt`/`da_kiem_tra_set` chuyển trước `st.tabs`

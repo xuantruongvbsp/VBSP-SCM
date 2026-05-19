@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## [2026-05-19] — Fix vi phạm convention: tab_gqvl, tab_baocao, tab_khtd_pgd, tab_hhi
+- `auth.py` — thêm helper `la_executive(role)`
+- `tabs/tab_gqvl.py`, `tab_baocao.py`, `tab_khtd_pgd.py` — thay `role != "executive"` → `not la_executive(role)`
+- `tabs/tab_hhi.py` — thay `/1e9` → `/1_000_000`; đổi `tong_du_no_ty` → `tong_du_no_trieu`; cập nhật chart label "(triệu đồng)"
+- `tabs/tab_baocao.py` — thêm `# noqa: COT` cho cột display name sau agg rename
+
 ## [2026-05-19] — Fix vi phạm convention: tab_kehoach role == "executive"
 - `auth.py` — thêm helper `la_executive(role)`
 - `tabs/tab_kehoach.py` — import `la_executive`; thay 2 lần `role == "executive"` → `la_executive(role)`

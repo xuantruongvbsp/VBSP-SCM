@@ -305,6 +305,9 @@ COT_NGAY_HH_KHOANH = "Ngày hết hạn Khoanh"
 
 # ── Tên cột bổ sung (tra cứu nâng cao) ──────────────────────────────────────
 COT_CMND          = "Số CMND"           # hoặc CCCD
+COT_NGAY_SINH     = "Ngày sinh"
+COT_NGAY_CAP_CMND = "Ngày cấp CMND"
+COT_NOI_CAP_CMND  = "Nơi cấp CMND"
 COT_TEN_TO        = "Tên tổ"
 COT_TEN_XA        = "Tên xã"
 COT_TEN_THON      = "Tên thôn"

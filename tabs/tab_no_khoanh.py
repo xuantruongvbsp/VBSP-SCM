@@ -1847,7 +1847,7 @@ def _render_mau02_cv368(
     # ── Danh sách đã có Mẫu 02 ───────────────────────────────────────────────
     da_co_mau02: set[str] = {
         item.get("so_ku", "")
-        for r in db.doc_mau_bieu_cv368(ten_pgd=pgd, loai_mau="MAU_02")
+        for r in _cached_mau_bieu_cv368(ten_pgd=pgd, loai_mau="MAU_02")
         for item in (r["noi_dung"].get("ds_mon") or [{"so_ku": r["noi_dung"].get("so_ku", "")}])
     }
 
@@ -2645,7 +2645,7 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                         ten_pgd_kh_cur = pgd_kh if la_phan_he_cn(role) else (pgd_user or "")
                         _rows_kh_pdf = []
                         if not (la_phan_he_cn(role) and pgd_kh == "— Chọn —"):
-                            _rows_kh_pdf = db.doc_ke_hoach_kiem_tra(
+                            _rows_kh_pdf = _cached_ke_hoach_kiem_tra(
                                 ten_pgd=ten_pgd_kh_cur, nam=int(nam_kh),
                             )
 
@@ -2726,7 +2726,7 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                 )
             tt_map_kh = {"Tất cả": None, "Chờ duyệt": "luu_tam", "Đã duyệt": "da_duyet"}
 
-            rows_kh = db.doc_ke_hoach_kiem_tra(
+            rows_kh = _cached_ke_hoach_kiem_tra(
                 ten_pgd=pgd_filter_kh,
                 trang_thai=tt_map_kh[loc_tt_kh],
                 nam=int(nam_loc),
@@ -3402,356 +3402,363 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                         )
 
         with d_kt:
-            # ── Xuất mẫu biểu ────────────────────────────────────────────────
+            # ── Xuất mẫu biểu (lazy-load) ────────────────────────────────
             st.divider()
-            st.markdown("### 📄 Xuất mẫu biểu theo CV 368")
-
-            pgd_f = pgd_filter_bc
-
-            with st.expander("📝 Kế hoạch kiểm tra nợ khoanh", expanded=False):
-                rows_kh_mb = _cached_ke_hoach_kiem_tra(ten_pgd=pgd_f)
-                if not rows_kh_mb:
-                    st.info("ℹ️ Chưa có kế hoạch nào. Nhập kế hoạch ở phần trên.")
-                else:
-                    options_kh_mb = {
-                        f"ID {r['id']} — {r['ten_xa']} — {r['ngay_kiem_tra']} "
-                        f"({r['trang_thai']})": r
-                        for r in rows_kh_mb
-                    }
-                    chon_kh_mb = st.selectbox(
-                        "Chọn kế hoạch",
-                        list(options_kh_mb.keys()),
-                        key=f"{key_prefix}mb_kh_sel",
-                    )
-                    kh_sel = options_kh_mb[chon_kh_mb]
-                    ds_mon_kh = kh_sel.get("ds_mon_vay") or []
-                    ds_mon_detail = []
-                    for ku in ds_mon_kh:
-                        rows_hstd_ku = (
-                            df_kh[df_kh[COT_SO_KU] == ku]
-                            if COT_SO_KU in df_kh.columns else pd.DataFrame()
+            show_mb = st.checkbox(
+                "📄 Hiện mẫu biểu xuất PDF (bấm để tải)",
+                value=False,
+                key=f"{key_prefix}show_mb",
+                help="Tải mẫu biểu QLNK: Kế hoạch, Phiếu KT, Cam kết, Danh sách HH, Thông báo HH",
+            )
+            if show_mb:
+                st.markdown("### 📄 Xuất mẫu biểu theo CV 368")
+    
+                pgd_f = pgd_filter_bc
+    
+                with st.expander("📝 Kế hoạch kiểm tra nợ khoanh", expanded=False):
+                    rows_kh_mb = _cached_ke_hoach_kiem_tra(ten_pgd=pgd_f)
+                    if not rows_kh_mb:
+                        st.info("ℹ️ Chưa có kế hoạch nào. Nhập kế hoạch ở phần trên.")
+                    else:
+                        options_kh_mb = {
+                            f"ID {r['id']} — {r['ten_xa']} — {r['ngay_kiem_tra']} "
+                            f"({r['trang_thai']})": r
+                            for r in rows_kh_mb
+                        }
+                        chon_kh_mb = st.selectbox(
+                            "Chọn kế hoạch",
+                            list(options_kh_mb.keys()),
+                            key=f"{key_prefix}mb_kh_sel",
                         )
-                        bs_ku = _cached_bo_sung_mon_vay(str(ku)) or {}
-                        if not rows_hstd_ku.empty:
-                            r_ku = rows_hstd_ku.iloc[0]
-                            ds_mon_detail.append({
-                                "ten_kh":              str(r_ku.get(COT_TEN_KH, "")),
-                                "ten_to_truong":       str(r_ku.get(COT_TEN_TO, "")),
-                                "ten_ct":              str(r_ku.get(COT_TEN_CT, "")),
-                                "ngay_bat_dau_khoanh": bs_ku.get("ngay_bat_dau_khoanh", ""),
-                                "so_thang_khoanh":     bs_ku.get("so_thang_khoanh", ""),
-                                "ly_do_khoanh":        bs_ku.get("ly_do_khoanh", ""),
-                            })
-                    c_kh1, c_kh2 = st.columns(2)
-                    with c_kh1:
-                        can_bo_kt_kh = st.text_input(
-                            "Cán bộ kiểm tra", username,
-                            key=f"{key_prefix}mb_kh_cb",
-                        )
-                    with c_kh2:
-                        noi_dung_kh = st.text_area(
-                            "Nội dung bổ sung", max_chars=300,
-                            key=f"{key_prefix}mb_kh_nd",
-                        )
-                    st.caption(
-                        f"� {len(ds_mon_detail)} món vay trong kế hoạch "
-                        f"tại {kh_sel.get('ten_xa', '')}"
-                    )
-                    if st.button("📥 Xuất PDF Kế hoạch KT",
-                                 key=f"{key_prefix}mb_kh_tao", type="primary"):
-                        try:
-                            pdf_kh = _xuat_pdf_mau_kh(
-                                kh_sel, ds_mon_detail,
-                                can_bo_kt=can_bo_kt_kh, noi_dung=noi_dung_kh,
+                        kh_sel = options_kh_mb[chon_kh_mb]
+                        ds_mon_kh = kh_sel.get("ds_mon_vay") or []
+                        ds_mon_detail = []
+                        for ku in ds_mon_kh:
+                            rows_hstd_ku = (
+                                df_kh[df_kh[COT_SO_KU] == ku]
+                                if COT_SO_KU in df_kh.columns else pd.DataFrame()
                             )
-                            st.session_state[f"{key_prefix}mb_kh_pdf"] = pdf_kh
-                            st.session_state[f"{key_prefix}mb_kh_fn"] = (
-                                f"QLNK_KH_{kh_sel.get('ten_xa', '')}_"
-                                f"{kh_sel.get('ngay_kiem_tra', '')}.pdf"
+                            bs_ku = _cached_bo_sung_mon_vay(str(ku)) or {}
+                            if not rows_hstd_ku.empty:
+                                r_ku = rows_hstd_ku.iloc[0]
+                                ds_mon_detail.append({
+                                    "ten_kh":              str(r_ku.get(COT_TEN_KH, "")),
+                                    "ten_to_truong":       str(r_ku.get(COT_TEN_TO, "")),
+                                    "ten_ct":              str(r_ku.get(COT_TEN_CT, "")),
+                                    "ngay_bat_dau_khoanh": bs_ku.get("ngay_bat_dau_khoanh", ""),
+                                    "so_thang_khoanh":     bs_ku.get("so_thang_khoanh", ""),
+                                    "ly_do_khoanh":        bs_ku.get("ly_do_khoanh", ""),
+                                })
+                        c_kh1, c_kh2 = st.columns(2)
+                        with c_kh1:
+                            can_bo_kt_kh = st.text_input(
+                                "Cán bộ kiểm tra", username,
+                                key=f"{key_prefix}mb_kh_cb",
                             )
-                        except Exception as e_kh:
-                            st.error(f"❌ Lỗi tạo PDF: {e_kh}")
-                    pdf_kh_data = st.session_state.get(f"{key_prefix}mb_kh_pdf")
-                    if pdf_kh_data:
-                        st.download_button(
-                            "⬇️ Tải PDF",
-                            data=pdf_kh_data,
-                            file_name=st.session_state.get(f"{key_prefix}mb_kh_fn",
-                                                           "QLNK_KH.pdf"),
-                            mime="application/pdf",
-                            key=f"{key_prefix}mb_kh_dl",
+                        with c_kh2:
+                            noi_dung_kh = st.text_area(
+                                "Nội dung bổ sung", max_chars=300,
+                                key=f"{key_prefix}mb_kh_nd",
+                            )
+                        st.caption(
+                            f"� {len(ds_mon_detail)} món vay trong kế hoạch "
+                            f"tại {kh_sel.get('ten_xa', '')}"
                         )
-
-            with st.expander("📝 Mẫu 01/QLNK — Phiếu kiểm tra nợ khoanh", expanded=False):
-                rows_kh_01 = _cached_ke_hoach_kiem_tra(ten_pgd=pgd_f, trang_thai="da_duyet")
-                if not rows_kh_01:
-                    st.info("ℹ️ Chưa có kế hoạch đã duyệt.")
-                else:
-                    options_kh_01 = {
-                        f"ID {r['id']} — {r['ten_xa']} — {r['ngay_kiem_tra']}": r
-                        for r in rows_kh_01
-                    }
-                    chon_kh_01 = st.selectbox(
-                        "Chọn kế hoạch",
-                        list(options_kh_01.keys()),
-                        key=f"{key_prefix}mb_01_sel",
-                    )
-                    kh_01    = options_kh_01[chon_kh_01]
-                    ds_ku_01 = kh_01.get("ds_mon_vay") or []
-                    rows_kq_01 = [
+                        if st.button("📥 Xuất PDF Kế hoạch KT",
+                                     key=f"{key_prefix}mb_kh_tao", type="primary"):
+                            try:
+                                pdf_kh = _xuat_pdf_mau_kh(
+                                    kh_sel, ds_mon_detail,
+                                    can_bo_kt=can_bo_kt_kh, noi_dung=noi_dung_kh,
+                                )
+                                st.session_state[f"{key_prefix}mb_kh_pdf"] = pdf_kh
+                                st.session_state[f"{key_prefix}mb_kh_fn"] = (
+                                    f"QLNK_KH_{kh_sel.get('ten_xa', '')}_"
+                                    f"{kh_sel.get('ngay_kiem_tra', '')}.pdf"
+                                )
+                            except Exception as e_kh:
+                                st.error(f"❌ Lỗi tạo PDF: {e_kh}")
+                        pdf_kh_data = st.session_state.get(f"{key_prefix}mb_kh_pdf")
+                        if pdf_kh_data:
+                            st.download_button(
+                                "⬇️ Tải PDF",
+                                data=pdf_kh_data,
+                                file_name=st.session_state.get(f"{key_prefix}mb_kh_fn",
+                                                               "QLNK_KH.pdf"),
+                                mime="application/pdf",
+                                key=f"{key_prefix}mb_kh_dl",
+                            )
+    
+                with st.expander("📝 Mẫu 01/QLNK — Phiếu kiểm tra nợ khoanh", expanded=False):
+                    rows_kh_01 = _cached_ke_hoach_kiem_tra(ten_pgd=pgd_f, trang_thai="da_duyet")
+                    if not rows_kh_01:
+                        st.info("ℹ️ Chưa có kế hoạch đã duyệt.")
+                    else:
+                        options_kh_01 = {
+                            f"ID {r['id']} — {r['ten_xa']} — {r['ngay_kiem_tra']}": r
+                            for r in rows_kh_01
+                        }
+                        chon_kh_01 = st.selectbox(
+                            "Chọn kế hoạch",
+                            list(options_kh_01.keys()),
+                            key=f"{key_prefix}mb_01_sel",
+                        )
+                        kh_01    = options_kh_01[chon_kh_01]
+                        ds_ku_01 = kh_01.get("ds_mon_vay") or []
+                        rows_kq_01 = [
+                            r for r in _cached_ket_qua_kiem_tra(
+                                ten_pgd=pgd_f, trang_thai="da_phe_duyet"
+                            )
+                            if r.get("ma_mon_vay") in ds_ku_01
+                        ]
+                        st.info(f"Số món đã có kết quả KT: {len(rows_kq_01)}/{len(ds_ku_01)}")
+                        ket_luan_01 = st.text_area(
+                            "Kết luận bổ sung", max_chars=500,
+                            key=f"{key_prefix}mb_01_kl",
+                        )
+                        if st.button("� Xuất PDF Mẫu 01/QLNK",
+                                     key=f"{key_prefix}mb_01_tao", type="primary"):
+                            try:
+                                pdf_01 = _xuat_pdf_mau_01qlnk(kh_01, rows_kq_01,
+                                                               ket_luan=ket_luan_01)
+                                st.session_state[f"{key_prefix}mb_01_pdf"] = pdf_01
+                                st.session_state[f"{key_prefix}mb_01_fn"] = (
+                                    f"QLNK_01_{kh_01.get('ten_xa', '')}_"
+                                    f"{kh_01.get('ngay_kiem_tra', '')}.pdf"
+                                )
+                            except Exception as e_01:
+                                st.error(f"❌ Lỗi tạo PDF: {e_01}")
+                        pdf_01_data = st.session_state.get(f"{key_prefix}mb_01_pdf")
+                        if pdf_01_data:
+                            st.download_button(
+                                "⬇️ Tải PDF",
+                                data=pdf_01_data,
+                                file_name=st.session_state.get(f"{key_prefix}mb_01_fn",
+                                                               "QLNK_01.pdf"),
+                                mime="application/pdf",
+                                key=f"{key_prefix}mb_01_dl",
+                            )
+    
+                with st.expander("📝 Mẫu 02/QLNK — Cam kết trả nợ", expanded=False):
+                    rows_co_kn = [
                         r for r in _cached_ket_qua_kiem_tra(
                             ten_pgd=pgd_f, trang_thai="da_phe_duyet"
                         )
-                        if r.get("ma_mon_vay") in ds_ku_01
+                        if r.get("kha_nang_tra_no") == "co"
                     ]
-                    st.info(f"Số món đã có kết quả KT: {len(rows_kq_01)}/{len(ds_ku_01)}")
-                    ket_luan_01 = st.text_area(
-                        "Kết luận bổ sung", max_chars=500,
-                        key=f"{key_prefix}mb_01_kl",
-                    )
-                    if st.button("� Xuất PDF Mẫu 01/QLNK",
-                                 key=f"{key_prefix}mb_01_tao", type="primary"):
-                        try:
-                            pdf_01 = _xuat_pdf_mau_01qlnk(kh_01, rows_kq_01,
-                                                           ket_luan=ket_luan_01)
-                            st.session_state[f"{key_prefix}mb_01_pdf"] = pdf_01
-                            st.session_state[f"{key_prefix}mb_01_fn"] = (
-                                f"QLNK_01_{kh_01.get('ten_xa', '')}_"
-                                f"{kh_01.get('ngay_kiem_tra', '')}.pdf"
+                    if not rows_co_kn:
+                        st.info("ℹ️ Chưa có khách hàng nào được xác nhận có khả năng trả nợ.")
+                    else:
+                        options_02 = {
+                            f"{r.get('ten_kh', '')} — {r.get('ma_mon_vay', '')} "
+                            f"— {r.get('ngay_kiem_tra', '')}": r
+                            for r in rows_co_kn
+                        }
+                        chon_02 = st.selectbox(
+                            "Chọn khách hàng",
+                            list(options_02.keys()),
+                            key=f"{key_prefix}mb_02_sel",
+                        )
+                        row_02 = options_02[chon_02]
+                        bs_02  = _cached_bo_sung_mon_vay(row_02.get("ma_mon_vay", "")) or {}
+                        ku_02  = row_02.get("ma_mon_vay", "")
+                        rows_hstd_02 = (
+                            df_kh[df_kh[COT_SO_KU] == ku_02].iloc[0].to_dict()
+                            if (COT_SO_KU in df_kh.columns
+                                and not df_kh[df_kh[COT_SO_KU] == ku_02].empty)
+                            else {}
+                        )
+                        row_02_merged = {**rows_hstd_02, **bs_02, **row_02}
+                        c02a, c02b, c02c = st.columns(3)
+                        with c02a:
+                            tien_ck = st.text_input(
+                                "Số tiền cam kết", key=f"{key_prefix}mb_02_tien",
                             )
-                        except Exception as e_01:
-                            st.error(f"❌ Lỗi tạo PDF: {e_01}")
-                    pdf_01_data = st.session_state.get(f"{key_prefix}mb_01_pdf")
-                    if pdf_01_data:
-                        st.download_button(
-                            "⬇️ Tải PDF",
-                            data=pdf_01_data,
-                            file_name=st.session_state.get(f"{key_prefix}mb_01_fn",
-                                                           "QLNK_01.pdf"),
-                            mime="application/pdf",
-                            key=f"{key_prefix}mb_01_dl",
-                        )
-
-            with st.expander("📝 Mẫu 02/QLNK — Cam kết trả nợ", expanded=False):
-                rows_co_kn = [
-                    r for r in _cached_ket_qua_kiem_tra(
-                        ten_pgd=pgd_f, trang_thai="da_phe_duyet"
-                    )
-                    if r.get("kha_nang_tra_no") == "co"
-                ]
-                if not rows_co_kn:
-                    st.info("ℹ️ Chưa có khách hàng nào được xác nhận có khả năng trả nợ.")
-                else:
-                    options_02 = {
-                        f"{r.get('ten_kh', '')} — {r.get('ma_mon_vay', '')} "
-                        f"— {r.get('ngay_kiem_tra', '')}": r
-                        for r in rows_co_kn
-                    }
-                    chon_02 = st.selectbox(
-                        "Chọn khách hàng",
-                        list(options_02.keys()),
-                        key=f"{key_prefix}mb_02_sel",
-                    )
-                    row_02 = options_02[chon_02]
-                    bs_02  = _cached_bo_sung_mon_vay(row_02.get("ma_mon_vay", "")) or {}
-                    ku_02  = row_02.get("ma_mon_vay", "")
-                    rows_hstd_02 = (
-                        df_kh[df_kh[COT_SO_KU] == ku_02].iloc[0].to_dict()
-                        if (COT_SO_KU in df_kh.columns
-                            and not df_kh[df_kh[COT_SO_KU] == ku_02].empty)
-                        else {}
-                    )
-                    row_02_merged = {**rows_hstd_02, **bs_02, **row_02}
-                    c02a, c02b, c02c = st.columns(3)
-                    with c02a:
-                        tien_ck = st.text_input(
-                            "Số tiền cam kết", key=f"{key_prefix}mb_02_tien",
-                        )
-                    with c02b:
-                        han_ck = st.text_input(
-                            "Thời hạn", key=f"{key_prefix}mb_02_han",
-                        )
-                    with c02c:
-                        pt_ck = st.selectbox(
-                            "Phương thức",
-                            ["Trả 1 lần", "Trả góp", "Khác"],
-                            key=f"{key_prefix}mb_02_pt",
-                        )
-                    if st.button("📥 Xuất PDF Mẫu 02/QLNK",
-                                 key=f"{key_prefix}mb_02_tao", type="primary"):
-                        try:
-                            pdf_02 = _xuat_pdf_mau_02qlnk(
-                                row_02_merged,
-                                so_tien_cam_ket=tien_ck,
-                                thoi_han=han_ck,
-                                phuong_thuc=pt_ck,
+                        with c02b:
+                            han_ck = st.text_input(
+                                "Thời hạn", key=f"{key_prefix}mb_02_han",
                             )
-                            ngay_str_02 = str(row_02.get("ngay_kiem_tra", "")).replace("/", "")
-                            st.session_state[f"{key_prefix}mb_02_pdf"] = pdf_02
-                            st.session_state[f"{key_prefix}mb_02_fn"] = (
-                                f"QLNK_02_{row_02.get('ten_kh', '')}_{ngay_str_02}.pdf"
+                        with c02c:
+                            pt_ck = st.selectbox(
+                                "Phương thức",
+                                ["Trả 1 lần", "Trả góp", "Khác"],
+                                key=f"{key_prefix}mb_02_pt",
                             )
-                        except Exception as e_02:
-                            st.error(f"❌ Lỗi tạo PDF: {e_02}")
-                    pdf_02_data = st.session_state.get(f"{key_prefix}mb_02_pdf")
-                    if pdf_02_data:
-                        st.download_button(
-                            "⬇️ Tải PDF",
-                            data=pdf_02_data,
-                            file_name=st.session_state.get(f"{key_prefix}mb_02_fn",
-                                                           "QLNK_02.pdf"),
-                            mime="application/pdf",
-                            key=f"{key_prefix}mb_02_dl",
-                        )
-
-            with st.expander(
-                "📝 Mẫu 03/QLNK — Danh sách hết thời gian khoanh nợ", expanded=False
-            ):
-                if df_kh.empty:
-                    st.info("ℹ️ Không có dữ liệu nợ khoanh.")
-                else:
-                    col_p03, col_t03 = st.columns(2)
-                    with col_p03:
-                        ds_pgd_03 = (
-                            sorted(df_kh[COT_TEN_PGD].dropna().unique().tolist())
-                            if (la_phan_he_cn(role) and COT_TEN_PGD in df_kh.columns)
-                            else [pgd_user or ""]
-                        )
-                        pgd_03 = (
-                            st.selectbox("PGD", ds_pgd_03, key=f"{key_prefix}mb_03_pgd")
-                            if len(ds_pgd_03) > 1 else ds_pgd_03[0]
-                        )
-                    with col_t03:
-                        df_03 = (
-                            df_kh[df_kh[COT_TEN_PGD] == pgd_03]
-                            if (COT_TEN_PGD in df_kh.columns and pgd_03)
-                            else df_kh
-                        )
-                        ds_to_03 = (
-                            sorted(df_03[COT_TEN_TO].dropna().unique().tolist())
-                            if COT_TEN_TO in df_03.columns else []
-                        )
-                        to_03 = st.selectbox(
-                            "Tổ TK&VV",
-                            ["— Tất cả —"] + ds_to_03,
-                            key=f"{key_prefix}mb_03_to",
-                        )
-                    if to_03 != "— Tất cả —" and COT_TEN_TO in df_03.columns:
-                        df_03 = df_03[df_03[COT_TEN_TO] == to_03]
-
-                    # Lọc < 120 ngày trước hết hạn
-                    col_nd03, col_ck03 = st.columns([2, 3])
-                    with col_nd03:
-                        ngay_tinh_03 = st.date_input(
-                            "Ngày tính",
-                            value=datetime.now().date(),
-                            key=f"{key_prefix}mb_03_ngay",
-                        )
-                    with col_ck03:
-                        loc_120 = st.checkbox(
-                            "Chỉ lấy món hết hạn trong vòng 120 ngày",
-                            value=True,
-                            key=f"{key_prefix}mb_03_loc120",
-                        )
-                    if loc_120 and COT_NGAY_HH_KHOANH in df_03.columns:
-                        _ref = pd.Timestamp(ngay_tinh_03)
-                        _hh  = pd.to_datetime(df_03[COT_NGAY_HH_KHOANH], dayfirst=True, errors="coerce")
-                        df_03 = df_03[(_hh - _ref).dt.days < 120].copy()
-
-                    st.info(f"**{len(df_03)} món** trong phạm vi đã chọn.")
-
-                    # Thông tin bổ sung cho mẫu
-                    c03a, c03b = st.columns(2)
-                    with c03a:
-                        tu_ngay_03  = st.text_input("Từ ngày", placeholder="dd/mm/yyyy",
-                                                    key=f"{key_prefix}mb_03_tu")
-                        ma_to_03    = st.text_input("Mã tổ", key=f"{key_prefix}mb_03_ma_to")
-                    with c03b:
-                        den_ngay_03 = st.text_input("Đến ngày", placeholder="dd/mm/yyyy",
-                                                    key=f"{key_prefix}mb_03_den")
-                        dvut_03     = st.text_input("Đơn vị ủy thác",
-                                                    key=f"{key_prefix}mb_03_dvut")
-
-                    if st.button("📄 Xuất PDF Mẫu 03/QLNK",
-                                 key=f"{key_prefix}mb_03_tao", type="primary"):
-                        try:
-                            ten_to_03 = to_03 if to_03 != "— Tất cả —" else ""
-                            pdf_03 = _xuat_pdf_mau_03qlnk(
-                                pgd_03 or "", ten_to_03,
-                                df_03.to_dict("records"),
-                                tu_ngay=tu_ngay_03,
-                                den_ngay=den_ngay_03,
-                                ma_to=ma_to_03,
-                                don_vi_uy_thac=dvut_03,
+                        if st.button("📥 Xuất PDF Mẫu 02/QLNK",
+                                     key=f"{key_prefix}mb_02_tao", type="primary"):
+                            try:
+                                pdf_02 = _xuat_pdf_mau_02qlnk(
+                                    row_02_merged,
+                                    so_tien_cam_ket=tien_ck,
+                                    thoi_han=han_ck,
+                                    phuong_thuc=pt_ck,
+                                )
+                                ngay_str_02 = str(row_02.get("ngay_kiem_tra", "")).replace("/", "")
+                                st.session_state[f"{key_prefix}mb_02_pdf"] = pdf_02
+                                st.session_state[f"{key_prefix}mb_02_fn"] = (
+                                    f"QLNK_02_{row_02.get('ten_kh', '')}_{ngay_str_02}.pdf"
+                                )
+                            except Exception as e_02:
+                                st.error(f"❌ Lỗi tạo PDF: {e_02}")
+                        pdf_02_data = st.session_state.get(f"{key_prefix}mb_02_pdf")
+                        if pdf_02_data:
+                            st.download_button(
+                                "⬇️ Tải PDF",
+                                data=pdf_02_data,
+                                file_name=st.session_state.get(f"{key_prefix}mb_02_fn",
+                                                               "QLNK_02.pdf"),
+                                mime="application/pdf",
+                                key=f"{key_prefix}mb_02_dl",
                             )
-                            st.session_state[f"{key_prefix}mb_03_pdf"] = pdf_03
-                            st.session_state[f"{key_prefix}mb_03_fn"] = (
-                                f"QLNK_03_{pgd_03}_{ten_to_03}.pdf"
+    
+                with st.expander(
+                    "📝 Mẫu 03/QLNK — Danh sách hết thời gian khoanh nợ", expanded=False
+                ):
+                    if df_kh.empty:
+                        st.info("ℹ️ Không có dữ liệu nợ khoanh.")
+                    else:
+                        col_p03, col_t03 = st.columns(2)
+                        with col_p03:
+                            ds_pgd_03 = (
+                                sorted(df_kh[COT_TEN_PGD].dropna().unique().tolist())
+                                if (la_phan_he_cn(role) and COT_TEN_PGD in df_kh.columns)
+                                else [pgd_user or ""]
                             )
-                        except Exception as e_03:
-                            st.error(f"❌ Lỗi tạo PDF: {e_03}")
-                    pdf_03_data = st.session_state.get(f"{key_prefix}mb_03_pdf")
-                    if pdf_03_data:
-                        st.download_button(
-                            "⬇️ Tải PDF",
-                            data=pdf_03_data,
-                            file_name=st.session_state.get(f"{key_prefix}mb_03_fn",
-                                                           "QLNK_03.pdf"),
-                            mime="application/pdf",
-                            key=f"{key_prefix}mb_03_dl",
+                            pgd_03 = (
+                                st.selectbox("PGD", ds_pgd_03, key=f"{key_prefix}mb_03_pgd")
+                                if len(ds_pgd_03) > 1 else ds_pgd_03[0]
+                            )
+                        with col_t03:
+                            df_03 = (
+                                df_kh[df_kh[COT_TEN_PGD] == pgd_03]
+                                if (COT_TEN_PGD in df_kh.columns and pgd_03)
+                                else df_kh
+                            )
+                            ds_to_03 = (
+                                sorted(df_03[COT_TEN_TO].dropna().unique().tolist())
+                                if COT_TEN_TO in df_03.columns else []
+                            )
+                            to_03 = st.selectbox(
+                                "Tổ TK&VV",
+                                ["— Tất cả —"] + ds_to_03,
+                                key=f"{key_prefix}mb_03_to",
+                            )
+                        if to_03 != "— Tất cả —" and COT_TEN_TO in df_03.columns:
+                            df_03 = df_03[df_03[COT_TEN_TO] == to_03]
+    
+                        # Lọc < 120 ngày trước hết hạn
+                        col_nd03, col_ck03 = st.columns([2, 3])
+                        with col_nd03:
+                            ngay_tinh_03 = st.date_input(
+                                "Ngày tính",
+                                value=datetime.now().date(),
+                                key=f"{key_prefix}mb_03_ngay",
+                            )
+                        with col_ck03:
+                            loc_120 = st.checkbox(
+                                "Chỉ lấy món hết hạn trong vòng 120 ngày",
+                                value=True,
+                                key=f"{key_prefix}mb_03_loc120",
+                            )
+                        if loc_120 and COT_NGAY_HH_KHOANH in df_03.columns:
+                            _ref = pd.Timestamp(ngay_tinh_03)
+                            _hh  = pd.to_datetime(df_03[COT_NGAY_HH_KHOANH], dayfirst=True, errors="coerce")
+                            df_03 = df_03[(_hh - _ref).dt.days < 120].copy()
+    
+                        st.info(f"**{len(df_03)} món** trong phạm vi đã chọn.")
+    
+                        # Thông tin bổ sung cho mẫu
+                        c03a, c03b = st.columns(2)
+                        with c03a:
+                            tu_ngay_03  = st.text_input("Từ ngày", placeholder="dd/mm/yyyy",
+                                                        key=f"{key_prefix}mb_03_tu")
+                            ma_to_03    = st.text_input("Mã tổ", key=f"{key_prefix}mb_03_ma_to")
+                        with c03b:
+                            den_ngay_03 = st.text_input("Đến ngày", placeholder="dd/mm/yyyy",
+                                                        key=f"{key_prefix}mb_03_den")
+                            dvut_03     = st.text_input("Đơn vị ủy thác",
+                                                        key=f"{key_prefix}mb_03_dvut")
+    
+                        if st.button("📄 Xuất PDF Mẫu 03/QLNK",
+                                     key=f"{key_prefix}mb_03_tao", type="primary"):
+                            try:
+                                ten_to_03 = to_03 if to_03 != "— Tất cả —" else ""
+                                pdf_03 = _xuat_pdf_mau_03qlnk(
+                                    pgd_03 or "", ten_to_03,
+                                    df_03.to_dict("records"),
+                                    tu_ngay=tu_ngay_03,
+                                    den_ngay=den_ngay_03,
+                                    ma_to=ma_to_03,
+                                    don_vi_uy_thac=dvut_03,
+                                )
+                                st.session_state[f"{key_prefix}mb_03_pdf"] = pdf_03
+                                st.session_state[f"{key_prefix}mb_03_fn"] = (
+                                    f"QLNK_03_{pgd_03}_{ten_to_03}.pdf"
+                                )
+                            except Exception as e_03:
+                                st.error(f"❌ Lỗi tạo PDF: {e_03}")
+                        pdf_03_data = st.session_state.get(f"{key_prefix}mb_03_pdf")
+                        if pdf_03_data:
+                            st.download_button(
+                                "⬇️ Tải PDF",
+                                data=pdf_03_data,
+                                file_name=st.session_state.get(f"{key_prefix}mb_03_fn",
+                                                               "QLNK_03.pdf"),
+                                mime="application/pdf",
+                                key=f"{key_prefix}mb_03_dl",
+                            )
+    
+                with st.expander(
+                    "📝 Mẫu 04/QLNK — Thông báo hết thời gian khoanh nợ", expanded=False
+                ):
+                    if df_kh.empty or COT_SO_KU not in df_kh.columns:
+                        st.info("ℹ️ Không có dữ liệu nợ khoanh.")
+                    else:
+                        options_04 = {
+                            f"{r.get(COT_TEN_KH, '')} — {r.get(COT_SO_KU, '')}": r.to_dict()
+                            for _, r in df_kh.iterrows()
+                            if r.get(COT_SO_KU)
+                        }
+                        chon_04 = st.selectbox(
+                            "Chọn khách hàng",
+                            list(options_04.keys()),
+                            key=f"{key_prefix}mb_04_sel",
                         )
-
-            with st.expander(
-                "📝 Mẫu 04/QLNK — Thông báo hết thời gian khoanh nợ", expanded=False
-            ):
-                if df_kh.empty or COT_SO_KU not in df_kh.columns:
-                    st.info("ℹ️ Không có dữ liệu nợ khoanh.")
-                else:
-                    options_04 = {
-                        f"{r.get(COT_TEN_KH, '')} — {r.get(COT_SO_KU, '')}": r.to_dict()
-                        for _, r in df_kh.iterrows()
-                        if r.get(COT_SO_KU)
-                    }
-                    chon_04 = st.selectbox(
-                        "Chọn khách hàng",
-                        list(options_04.keys()),
-                        key=f"{key_prefix}mb_04_sel",
-                    )
-                    row_04_hstd = options_04[chon_04]
-                    ku_04 = str(row_04_hstd.get(COT_SO_KU, ""))
-                    bs_04 = _cached_bo_sung_mon_vay(ku_04) or {}
-                    ten_pgd_04 = (
-                        str(row_04_hstd.get(COT_TEN_PGD, pgd_user or ""))
-                        if COT_TEN_PGD in row_04_hstd else (pgd_user or "")
-                    )
-                    noi_dung_04 = st.text_area(
-                        "Nội dung thông báo bổ sung", max_chars=500,
-                        key=f"{key_prefix}mb_04_nd",
-                    )
-                    han_cuoi_04 = st.text_input(
-                        "Hạn cuối trả nợ",
-                        key=f"{key_prefix}mb_04_hc",
-                    )
-                    if st.button("� Xuất PDF Mẫu 04/QLNK",
-                                 key=f"{key_prefix}mb_04_tao", type="primary"):
-                        try:
-                            pdf_04 = _xuat_pdf_mau_04qlnk(
-                                row_04_hstd, bs_04, ten_pgd_04,
-                                noi_dung=noi_dung_04, han_cuoi=han_cuoi_04,
-                            )
-                            st.session_state[f"{key_prefix}mb_04_pdf"] = pdf_04
-                            st.session_state[f"{key_prefix}mb_04_fn"] = (
-                                f"QLNK_04_{row_04_hstd.get(COT_TEN_KH, '')}_{ku_04}.pdf"
-                            )
-                        except Exception as e_04:
-                            st.error(f"❌ Lỗi tạo PDF: {e_04}")
-                    pdf_04_data = st.session_state.get(f"{key_prefix}mb_04_pdf")
-                    if pdf_04_data:
-                        st.download_button(
-                            "⬇️ Tải PDF",
-                            data=pdf_04_data,
-                            file_name=st.session_state.get(f"{key_prefix}mb_04_fn",
-                                                           "QLNK_04.pdf"),
-                            mime="application/pdf",
-                            key=f"{key_prefix}mb_04_dl",
+                        row_04_hstd = options_04[chon_04]
+                        ku_04 = str(row_04_hstd.get(COT_SO_KU, ""))
+                        bs_04 = _cached_bo_sung_mon_vay(ku_04) or {}
+                        ten_pgd_04 = (
+                            str(row_04_hstd.get(COT_TEN_PGD, pgd_user or ""))
+                            if COT_TEN_PGD in row_04_hstd else (pgd_user or "")
                         )
+                        noi_dung_04 = st.text_area(
+                            "Nội dung thông báo bổ sung", max_chars=500,
+                            key=f"{key_prefix}mb_04_nd",
+                        )
+                        han_cuoi_04 = st.text_input(
+                            "Hạn cuối trả nợ",
+                            key=f"{key_prefix}mb_04_hc",
+                        )
+                        if st.button("� Xuất PDF Mẫu 04/QLNK",
+                                     key=f"{key_prefix}mb_04_tao", type="primary"):
+                            try:
+                                pdf_04 = _xuat_pdf_mau_04qlnk(
+                                    row_04_hstd, bs_04, ten_pgd_04,
+                                    noi_dung=noi_dung_04, han_cuoi=han_cuoi_04,
+                                )
+                                st.session_state[f"{key_prefix}mb_04_pdf"] = pdf_04
+                                st.session_state[f"{key_prefix}mb_04_fn"] = (
+                                    f"QLNK_04_{row_04_hstd.get(COT_TEN_KH, '')}_{ku_04}.pdf"
+                                )
+                            except Exception as e_04:
+                                st.error(f"❌ Lỗi tạo PDF: {e_04}")
+                        pdf_04_data = st.session_state.get(f"{key_prefix}mb_04_pdf")
+                        if pdf_04_data:
+                            st.download_button(
+                                "⬇️ Tải PDF",
+                                data=pdf_04_data,
+                                file_name=st.session_state.get(f"{key_prefix}mb_04_fn",
+                                                               "QLNK_04.pdf"),
+                                mime="application/pdf",
+                                key=f"{key_prefix}mb_04_dl",
+                            )

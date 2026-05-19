@@ -43,24 +43,15 @@ from components.loan_drawer import loan_detail_drawer
 from components.filter_bar import filter_bar, apply_filters
 from components.export_pdf import download_pdf_button, xuat_pdf_co_chart
 
-from tabs import (
-    tab_tongquan, tab_baocao,
-    tab_candoi, tab_cbtd, tab_khtd, tab_kehoach,
-    tab_nhiem_vu, tab_khtd_giao_dc, tab_kiem_soat,
-    tab_ban_dai_dien, tab_uy_thac,
-    tab_tien_do, tab_tien_do_nop,
-    tab_phoi_hop_pgd, tab_khtd_xuat,
-)
-from tabs import tab_checklist_bc, tab_quan_ly_bc, tab_quan_ly_cv
-from tabs import tab_quan_ly_dgd, tab_cdtotkvv
-from tabs import tab_xlrr_tong_hop
-from tabs import tab_upload_khnv
-from tabs import tab_audit_log
-from tabs import tab_trang_thai_nguon
-from tabs import tab_so_sanh_ky
-from tabs import tab_hhi
-from tabs import tab_no_khoanh
-from tabs import tab_qlnk_dashboard
+@st.cache_resource
+def _get_tab(name: str):
+    """Lazy import tab module — chỉ load khi lần đầu dùng, cache cho lần sau."""
+    import importlib
+    try:
+        return importlib.import_module(f"tabs.{name}")
+    except ModuleNotFoundError:
+        import tabs
+        return getattr(tabs, name)
 
 
 def _render_canh_bao(df: pd.DataFrame, ds_pgd_all: list):

@@ -150,6 +150,10 @@ Upload flow:
 
 ## CHANGELOG
 
+## [19/05/2026]
+- `tabs/tab_tien_do.py` form tạo/sửa task: thêm caption tổng quan, tách Phần A (🏢 PGD huyện/thị xã) + Phần B (🏛️ Hội sở CN tỉnh), đổi nhãn text_input "Cán bộ KH-NV phụ trách", caption hướng dẫn sau từng phần
+- `tabs/tab_tien_do.py` nhãn bảng/info/Excel: "CB Biên Hòa" → "Hội sở CN tỉnh" (bảng tổng quan, info task, sheet Excel báo cáo)
+
 ## [15/05/2026]
 - `tabs/tab_tien_do.py`: Thêm nút "📄 Xuất PDF báo cáo tiến độ" (sub-tab Xuất báo cáo) — tạo 1 file PDF 2 phần (Phần 1: Tiến độ theo đầu việc, Phần 2: Báo cáo trễ hạn) dùng Times New Roman + Table grid
 - `tabs/tab_tien_do.py`: `_xuat_pdf_bao_cao_tien_do()` — hỗ trợ 2 mẫu theo `cap_theo_doi`: `pgd` (bảng 4 cột: STT/PDG/Trạng thái/Ghi chú) và `xa` (bảng 5 cột: STT/PGD/Xã/Trạng thái/Ghi chú) với xen kẽ dòng, grid xám
@@ -222,6 +226,12 @@ Upload flow:
 
 ## [19/05/2026] — tab_tracuu: bổ sung cột Ngày sinh, Ngày cấp/Nơi cấp CMND
 - `tabs/tab_tracuu.py`: import `COT_NGAY_SINH`, `COT_NGAY_CAP_CMND`, `COT_NOI_CAP_CMND` từ config; thêm 3 cột vào `COLS_CAN` (đọc từ parquet khi tra cứu); thêm vào `_NHOM_TRUONG["👤 Khách hàng"]` để hiện trong bộ lọc cột
+
+## [19/05/2026] — Chuyên Đề Nợ Khoanh: dropdown 2 nhóm (Tổng quan / CV368)
+- `tabs/tab_no_khoanh.py`: kwarg `nhom` điều khiển hiển thị; d0/loop/d4 guard; early return khi nhom="tongquan"
+- `workspaces/ws_management.py`: `children` pattern 2 mục — xổ xuống như Cảnh báo NQH
+- `workspaces/ws_operation.py`: 2 tuple tab riêng thay 1
+- `alert_center.py`: ws_mgmt_jump → "🔒 Quản lý Nợ Khoanh theo CV 368"
 
 ## [19/05/2026] — Đổi tên tab Nợ Khoanh → Chuyên Đề Nợ Khoanh toàn hệ thống
 - `workspaces/ws_management.py`: label sidebar `"🔒 Nợ Khoanh"` → `"🔒 Chuyên Đề Nợ Khoanh"`

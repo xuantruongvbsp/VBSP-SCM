@@ -103,6 +103,11 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                 st.warning("⚠️ Chưa có file dữ liệu NQ11.")
                 st.info(f"Vui lòng đặt file vào: {FILE_PATH_NQ11} rồi bấm Làm mới dữ liệu.")
             else:
+                df_nq11 = df_nq11.copy()
+                for _c in [COT_DNO_NQ11, COT_NQ11_NO_TH, COT_NQ11_NO_QH, COT_NQ11_SO_TIEN, COT_NQ11_DU_NO, COT_NQ11_SO_TIEN_GN]:
+                    if _c in df_nq11.columns:
+                        df_nq11[_c] = pd.to_numeric(df_nq11[_c], errors="coerce").fillna(0)
+
                 # ── Chỉ số tổng quan ──
                 tong_mon     = len(df_nq11)
                 co_nq11      = df_nq11[df_nq11[COT_DNO_NQ11] > 0]

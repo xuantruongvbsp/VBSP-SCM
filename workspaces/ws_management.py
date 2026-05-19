@@ -1129,7 +1129,8 @@ def _build_all_items(role: str, username: str, **kwargs) -> list:
                 {"label": "📋 Tiến độ Báo cáo của PGD", "fn": lambda: tab_tien_do_nop.render(None, **kwargs)},
             ],
         },
-        {"group": "Giám sát",     "label": "📊 Thông tin chung", "icon": "chart-bar",      "fn": lambda: tab_tongquan.render(None, **kwargs)},
+        {"group": "Thông tin chung", "label": "📊 Thông tin chung", "icon": "info-circle", "fn": lambda: tab_tongquan.render(None, **kwargs)},
+        {"group": "Giám sát",     "label": "📊 Giám sát", "icon": "chart-bar",      "fn": lambda: tab_tongquan.render(None, **kwargs)},
         {
             "group": "Giám sát",
             "label": "Cảnh báo NQH",
@@ -1207,6 +1208,7 @@ def render_sidebar_menu(role: str, username: str, **kwargs):
         "Báo cáo":                     {"bg": "#FAEEDA", "border": "#BA7517", "text": "#854F0B"},
         "Ủy Thác":                     {"bg": "#EEEDFE", "border": "#7F77DD", "text": "#3C3489"},
         "Phối hợp với PGD":            {"bg": "#E6F5EE", "border": "#27AE60", "text": "#1A7340"},
+        "Thông tin chung":             {"bg": "#E3F2FD", "border": "#1976D2", "text": "#0D47A1"},
         "Hệ thống":                    {"bg": "#F1EFE8", "border": "#888780", "text": "#5F5E5A"},
     }
 

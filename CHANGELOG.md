@@ -1,5 +1,26 @@
 # CHANGELOG
 
+## [2026-05-19] — Fix DuplicateElementKey menu sidebar ws_management
+- `workspaces/ws_management.py` dòng ~1132 — xóa item trùng label "📊 Thông tin chung" (group "Thông tin chung" là bản duplicate cũ, giữ lại bản trong group "Giám sát")
+
+## [2026-05-19] — Drill-down thêm option "Tất cả", đổi nhãn "PGD trực thuộc"
+- `tabs/tab_tien_do.py` dòng ~253 — selectbox drill-down thêm "— Tất cả —" đầu danh sách; khi chọn Tất cả hiển thị toàn bộ bản ghi kèm cột "Đơn vị"; caption/info dùng label động
+- `tabs/tab_tien_do.py` — đổi nhãn "Phòng giao dịch huyện/thị xã" → "Phòng giao dịch trực thuộc" (form tạo + sửa task)
+
+## [2026-05-19] — Cải tiến UI section "Áp dụng cho đơn vị" trong form tạo/sửa đầu việc
+- `tabs/tab_tien_do.py` dòng ~379 — thêm caption tổng quan, tách nhãn Phần A (PGD huyện/thị xã) + Phần B (Hội sở CN tỉnh), di chuyển caption thống kê sau lưới checkbox, thêm caption hướng dẫn từng phần
+- `tabs/tab_tien_do.py` dòng ~602 — áp dụng cấu trúc tương tự cho form sửa task; gộp caption "Danh sách không đổi" vào caption PGD
+- `tabs/tab_tien_do.py` — đổi nhãn "CB Biên Hòa" → "Hội sở CN tỉnh" ở bảng tổng quan, info task, sheet Excel xuất báo cáo
+
+## [2026-05-19] — Fix TypeError tab NQ11: Invalid comparison between dtype=str and int
+- `tabs/tab_nq11.py` dòng ~108 — thêm `pd.to_numeric()` cho các cột số (DNO, nợ TH, nợ QH, số tiền, dư nợ, GN) sau khi load df_nq11 để tránh lỗi ArrowDtype string so sánh với int
+
+## [2026-05-19] — Chuyên Đề Nợ Khoanh: tách 2 children dropdown (Tổng quan / Quản lý CV368)
+- `tabs/tab_no_khoanh.py` dòng ~1564 — thêm kwarg `nhom` ("tongquan"/"cv368"/None); tách st.tabs() theo nhom; guard d0/loop/d4; early return trước d_kt khi nhom="tongquan"
+- `workspaces/ws_management.py` dòng ~1150 — đổi item đơn thành `children` 2 mục: "📊 Tổng quan Nợ Khoanh" và "🔒 Quản lý Nợ Khoanh theo CV 368" (dropdown xổ xuống như Cảnh báo NQH)
+- `workspaces/ws_operation.py` dòng ~1687 — tách 1 tuple thành 2 tuple riêng tương ứng
+- `alert_center.py` dòng ~151 — cập nhật `ws_mgmt_jump` trỏ đúng child label CV368
+
 ## [2026-05-19] — Tiến độ: thêm CB KH-NV phụ trách + CB Biên Hòa cho từng đầu việc
 - `db.py` — migration thêm cột `nguoi_thuc_hien_cn`, `cbtd_bien_hoa` vào `tien_do_task`
 - `tabs/tab_tien_do.py` — form tạo/sửa: thêm "👤 Cán bộ phòng KH-NV phụ trách" và section "🏛️ Địa bàn Biên Hòa"; lưu DB; sync dòng "Địa bàn Biên Hòa" vào `tien_do_ketqua`; tổng quan/xuất Excel/PDF/cập nhật tiến độ hiển thị & xử lý tương ứng
@@ -12,7 +33,7 @@
 - `tabs/tab_qlnk_dashboard.py` dòng ~127,231 — subheader và hint text cập nhật tên mới
 
 ## [2026-05-19] — Kiểm soát: Thêm báo cáo GQVL TW gắn MANDT
-- `tabs/tab_kiem_soat.py` — thêm tab "📋 Báo cáo giám sát nội bộ" và sub-tab "🧾 Rà soát GQVL TW – Gắn MANDT"; KPI + bảng + xuất Excel; lọc theo điều kiện CT=3, NV=1, PL NV=02, có MANDT, OPEN; PGD role tự lọc theo PGD
+- `services/kiem_soat_service.py` — thêm báo cáo "🧾 Rà soát GQVL TW – Gắn MANDT" vào droplist nhóm "🔍 Giám sát nội bộ"; KPI + bảng + xuất Excel; lọc CT=3, NV=1, PL NV=02, có MANDT, OPEN
 
 ## [2026-05-19] — Fix lỗi ws_operation: tab None gây crash context manager
 - `workspaces/ws_operation.py` — thay `with tab_parent:` bằng `with get_tab_context(tab_parent):` cho các renderer (Histogram/Donut/...) để chạy được khi tab=None

@@ -31,13 +31,15 @@ from config import (
     COT_NGAY_VAY,
     COT_THOI_HAN,
     COT_NGUON_VON,
+    COT_NGAY_SL,
+    COT_MA_NHA_DAU_TU,
     COT_TEN_TO,
     COT_MA_CHUONG_TRINH,
     COT_NGAY_DH_HD,
 )
 from pdf_service import xuat_pdf
 from services.report_service import ten_file_bao_cao
-from utils import fmt_so, xuat_excel, hien_thi_dataframe_phan_trang
+from utils import fmt_ngay, fmt_so, fmt_ty, xuat_excel, hien_thi_dataframe_phan_trang
 
 DUOI_TV = 5
 TREN_TV = 60
@@ -230,6 +232,98 @@ def _tinh_ngaygh_dp(row: pd.Series) -> pd.Timestamp:
     if thoi_han <= 12:
         return ngay_dh + pd.DateOffset(months=12)
     return ngay_dh + pd.DateOffset(months=int(thoi_han / 2))
+
+
+def render_gqvl_tw_gan_mandt(cache: dict[str, Any], pgd_chon: str, username: str, readonly: bool) -> None:
+    df_src = cache.get("df_kh")
+    if df_src is None or getattr(df_src, "empty", True):
+        st.warning("Chưa có dữ liệu HSTD.")
+        return
+
+    col_plnv = "PL NV"
+    required_cols = [
+        COT_MA_CHUONG_TRINH,
+        COT_NGUON_VON,
+        col_plnv,
+        COT_MA_NHA_DAU_TU,
+        COT_TINH_TRANG,
+    ]
+    missing = [c for c in required_cols if c not in df_src.columns]
+    if missing:
+        if col_plnv in missing:
+            st.warning("Dữ liệu chưa có cột PL NV")
+            return
+        st.warning("Thiếu cột trong dữ liệu: " + ", ".join(missing))
+        return
+
+    d = df_src.copy()
+    s_ma_ct = d[COT_MA_CHUONG_TRINH].astype(str).str.strip().str.replace(r"\.0+$", "", regex=True).str.lstrip("0")
+    s_nv = d[COT_NGUON_VON].astype(str).str.strip().str.replace(r"\.0+$", "", regex=True)
+    s_pl = d[col_plnv].astype(str).str.strip().str.zfill(2)
+    s_tt = d[COT_TINH_TRANG].astype(str).str.strip()
+    s_mandt = d[COT_MA_NHA_DAU_TU]
+
+    mask = (
+        (s_ma_ct == "3")
+        & (s_nv == "1")
+        & (s_pl == "02")
+        & (s_mandt.notna() & (s_mandt.astype(str).str.strip() != ""))
+        & (s_tt == "OPEN")
+    )
+    d = d.loc[mask].copy()
+
+    if pgd_chon and pgd_chon != "Tất cả" and COT_TEN_PGD in d.columns:
+        d = d[d[COT_TEN_PGD].astype(str).str.strip() == str(pgd_chon).strip()].copy()
+
+    if d.empty:
+        st.info("Không có món vay GQVL TW gắn MANDT")
+        return
+
+    so_mon = d[COT_SO_KU].nunique() if COT_SO_KU in d.columns else len(d)
+    du_no_tong = pd.to_numeric(d.get(COT_TONG_DU_NO), errors="coerce").fillna(0).sum()
+    so_kh = d[COT_MA_KH].nunique() if COT_MA_KH in d.columns else 0
+    so_pgd = d[COT_TEN_PGD].nunique() if COT_TEN_PGD in d.columns else 0
+
+    k1, k2, k3, k4 = st.columns(4)
+    k1.metric("Tổng số món", fmt_so(so_mon))
+    k2.metric("Tổng dư nợ", fmt_ty(du_no_tong))
+    k3.metric("Số khách hàng", fmt_so(so_kh))
+    k4.metric("Số PGD có phát sinh", fmt_so(so_pgd))
+
+    cols_show = [
+        COT_TEN_PGD, COT_TEN_XA, COT_MA_KH, COT_TEN_KH,
+        COT_SO_KU, COT_DU_NO_TH, COT_DU_NO_QH, COT_TONG_DU_NO,
+        COT_MA_NHA_DAU_TU, col_plnv,
+    ]
+    cols_present = [c for c in cols_show if c in d.columns]
+    df_view = d[cols_present].copy()
+    sort_cols = [c for c in (COT_TEN_PGD, COT_TEN_XA, COT_MA_KH) if c in df_view.columns]
+    if sort_cols:
+        df_view = df_view.sort_values(sort_cols, kind="mergesort")
+
+    for c in (COT_DU_NO_TH, COT_DU_NO_QH, COT_TONG_DU_NO):
+        if c in df_view.columns:
+            df_view[c] = pd.to_numeric(df_view[c], errors="coerce").fillna(0).apply(fmt_ty)
+
+    st.dataframe(df_view, width='stretch', hide_index=True, height=420)
+
+    ngay_sl = ""
+    if COT_NGAY_SL in df_src.columns:
+        s = df_src[COT_NGAY_SL].dropna()
+        if len(s):
+            ngay_sl = fmt_ngay(s.iloc[0])
+    ngay_sl = (ngay_sl or "").replace("/", "")
+    if not ngay_sl:
+        ngay_sl = datetime.now().strftime("%Y%m%d")
+
+    excel_bytes = xuat_excel({"GQVL_TW_MANDT": d[cols_present]})
+    st.download_button(
+        "⬇️ Xuất Excel",
+        data=excel_bytes,
+        file_name=f"GQVL_TW_MANDT_{ngay_sl}.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        key="ks_gqvl_tw_mandt_xlsx",
+    )
 
 
 def _tinh_gia_han_vuot(df: pd.DataFrame) -> pd.DataFrame:
@@ -1083,5 +1177,14 @@ BAO_CAO_REGISTRY: dict[str, BaoCaoMeta] = {
         render_fn=render_gia_han_vuot,
         cols_tien=[COT_TONG_DU_NO, COT_DU_NO_TH],
         prefix_pdf="KSD_GH_VUOT",
+    ),
+    "gqvl_tw_mandt": BaoCaoMeta(
+        ma="gqvl_tw_mandt",
+        ten="Rà soát GQVL TW – Gắn MANDT",
+        nhom="kiem_toan",
+        mo_ta="Lọc món vay GQVL nguồn vốn TW, PL NV=02, có MANDT, tình trạng OPEN.",
+        render_fn=render_gqvl_tw_gan_mandt,
+        cols_tien=[COT_DU_NO_TH, COT_DU_NO_QH, COT_TONG_DU_NO],
+        prefix_pdf="KSD_GQVL_MANDT",
     ),
 }

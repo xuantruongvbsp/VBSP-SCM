@@ -288,12 +288,6 @@ def init_db():
             pass
         try:
             conn.execute(
-                "ALTER TABLE mau_bieu_cv368 ADD COLUMN ghi_chu TEXT"
-            )
-        except sqlite3.OperationalError:
-            pass
-        try:
-            conn.execute(
                 "ALTER TABLE qlnk_ket_qua ADD COLUMN ngay_het_han_khoanh TEXT"
             )
         except sqlite3.OperationalError:

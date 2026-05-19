@@ -139,18 +139,21 @@ def _tong_hop_theo_pgd(df: pd.DataFrame) -> pd.DataFrame:
 
     g = df.groupby(COT_TEN_PGD, dropna=False).agg(**agg_kwargs).reset_index()
 
+    def _num(col):
+        return pd.to_numeric(g[col], errors="coerce").fillna(0)
+
     out = pd.DataFrame()
     out[COT_TEN_PGD] = g[COT_TEN_PGD].astype(str)
     if "du_no" in g.columns:
-        out["Dư nợ (triệu đồng)"] = g["du_no"] / 1e6
+        out["Dư nợ (triệu đồng)"] = _num("du_no") / 1e6
     if "dth" in g.columns:
-        out["Trong hạn (triệu đồng)"] = g["dth"] / 1e6
+        out["Trong hạn (triệu đồng)"] = _num("dth") / 1e6
     if "dqh" in g.columns:
-        out["Quá hạn (triệu đồng)"] = g["dqh"] / 1e6
+        out["Quá hạn (triệu đồng)"] = _num("dqh") / 1e6
     if "nkh" in g.columns:
-        out["Số KH"] = g["nkh"].astype(int)
+        out["Số KH"] = _num("nkh").astype(int)
     if "gn_nam" in g.columns:
-        out["GN năm (triệu đồng)"] = g["gn_nam"] / 1e6
+        out["GN năm (triệu đồng)"] = _num("gn_nam") / 1e6
 
     if "Quá hạn (triệu đồng)" in out.columns and "Dư nợ (triệu đồng)" in out.columns:
         out["NQH%"] = (

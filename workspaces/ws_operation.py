@@ -1683,7 +1683,7 @@ def render(**kwargs):
                 ("🏘️ Tổ TK&VV",       lambda tab: tab_cdtotkvv_pgd.render(tab, **kwargs)),
                 ("🏛️ Ban Đại Diện", lambda tab: tab_ban_dai_dien.render(tab, cap="xa", **kwargs)),
                 ("🤝 Ủy thác", lambda tab: tab_uy_thac.render(tab, **kwargs)),
-                ("🔒 Nợ khoanh", lambda tab: tab_no_khoanh.render(
+                ("🔒 Chuyên Đề Nợ Khoanh", lambda tab: tab_no_khoanh.render(
                     tab,
                     df=df_pgd,
                     df_full=None,

@@ -11,10 +11,16 @@ from streamlit.delta_generator import DeltaGenerator
 
 from auth import la_phan_he_cn, normalize_role, get_permissions, co_quyen_upload_pgd
 from config import (
+    COT_CMND,
+    COT_DIA_CHI,
     COT_DU_NO_QH,
     COT_DVUT,
     COT_MA_KH,
+    COT_NGAY_CAP_CMND,
     COT_NGAY_DH,
+    COT_NGAY_SINH,
+    COT_NOI_CAP_CMND,
+    COT_SDT,
     COT_SO_KU,
     COT_TEN_CT,
     COT_TEN_KH,
@@ -663,11 +669,28 @@ def _xuat_pdf_mau_02qlnk(row: dict,
                          phuong_thuc: str = "") -> bytes:
     _dang_ky_font_qlnk()
     ten_kh  = row.get("ten_kh") or row.get(COT_TEN_KH) or "............"
-    dia_chi = row.get("dia_chi") or row.get("ten_xa") or row.get(COT_TEN_XA) or "............"
-    so_cccd = row.get("so_cmnd") or row.get("so_cccd") or "............"
-    ten_to  = row.get("ten_to_tkv") or row.get(COT_TEN_TO) or "............"
+    dia_chi = (
+        row.get(COT_DIA_CHI)
+        or row.get("dia_chi")
+        or row.get(COT_TEN_XA)
+        or row.get("ten_xa")
+        or "............"
+    )
+    sdt = row.get(COT_SDT) or row.get("sdt") or row.get("so_dien_thoai") or "............"
+    so_cccd = row.get(COT_CMND) or row.get("so_cmnd") or row.get("so_cccd") or "............"
+    ngay_sinh_raw = row.get(COT_NGAY_SINH)
+    try:
+        ngay_sinh_dt = pd.to_datetime(ngay_sinh_raw, dayfirst=True, errors="coerce")
+        nam_sinh = str(int(ngay_sinh_dt.year)) if pd.notna(ngay_sinh_dt) else "............"
+    except Exception:
+        nam_sinh = "............"
+    ngay_cap_cmnd = row.get(COT_NGAY_CAP_CMND) or "....../....../......"
+    noi_cap_cmnd  = row.get(COT_NOI_CAP_CMND)  or "...................."
+    ten_to  = row.get(COT_TEN_TO) or row.get("ten_to_tkv") or row.get("ten_to") or "............"
+    dvut = row.get(COT_DVUT) or row.get("dvut") or "............"
     ten_pgd = row.get("ten_pgd") or row.get(COT_TEN_PGD) or "............"
     so_ku   = row.get("ma_mon_vay") or row.get(COT_SO_KU) or "............"
+    ten_ct = row.get(COT_TEN_CT) or "......................................................"
     du_goc  = row.get("du_no_goc_khoanh") or row.get(COT_DU_NO_KHOANH) or 0
     lai     = row.get("so_tien_lai_con_no") or 0
     try:
@@ -707,14 +730,14 @@ def _xuat_pdf_mau_02qlnk(row: dict,
     ))
 
     lines = [
-        f"Tôi tên là: {ten_kh}..........................................................    Năm sinh: ............",
-        "Số điện thoại liên hệ: .........................................................",
-        f"Số CCCD: {so_cccd}.............., ngày cấp ....../....../......, nơi cấp ....................",
+        f"Tôi tên là: {ten_kh}..........................................................    Năm sinh: {nam_sinh}",
+        f"Số điện thoại liên hệ: {sdt}.........................................................",
+        f"Số CCCD: {so_cccd}.............., ngày cấp {ngay_cap_cmnd}, nơi cấp {noi_cap_cmnd}",
         f"Địa chỉ cư trú: {dia_chi}.................................................................",
-        "Là thành viên của Tổ TK&VV do ông (bà) .............................. làm tổ trưởng,",
-        "thuộc tổ chức Hội ........................................................ quản lý.",
+        f"Là thành viên của Tổ TK&VV {ten_to} do ông (bà) .............................. làm tổ trưởng,",
+        f"thuộc tổ chức Hội {dvut}........................................................ quản lý.",
         f"Theo Hợp đồng tín dụng (Sổ Vay vốn) số {so_ku}.............., ngày....../....../...... tôi có",
-        f"dư nợ vay vốn chương trình...................................................... tại",
+        f"dư nợ vay vốn chương trình {ten_ct} tại",
         f"Phòng giao dịch NHCSXH {ten_pgd}.............., tỉnh: ..............",
         f"Đến ngày ....../....../......, tôi còn nợ Ngân hàng Chính sách xã hội (NHCSXH) số tiền "
         f"{_fmt_dong(tong_no)}, trong đó: Số tiền gốc: {_fmt_dong(du_goc_f)}; "
@@ -739,7 +762,7 @@ def _xuat_pdf_mau_02qlnk(row: dict,
     elements.append(Spacer(1, 4))
     elements.append(Paragraph(
         "Nếu tôi không thực hiện đúng như cam kết này, tôi xin hoàn toàn chịu trách nhiệm "
-        "trước NHCSXH, trước pháp luật/.",
+        "trước NHCSXH, trước pháp luật./",
         _style_body(),
     ))
 

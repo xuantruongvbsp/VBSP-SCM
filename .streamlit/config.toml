@@ -11,6 +11,9 @@ gatherUsageStats = false
 
 [server]
 headless = true
-fileWatcherType = "poll"
+fileWatcherType = "watchdog"
 runOnSave = true
 folderWatchBlacklist = ["cache", "pgd_data", "data/baseline", "data/baseline_pgd", "__pycache__", ".git"]
+
+[client]
+showErrorDetails = true

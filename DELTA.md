@@ -219,3 +219,19 @@ Upload flow:
 - `tabs/tab_no_khoanh.py`: Fix lỗi `username` not defined trong render() + sửa anti-pattern 5 expander xuất Word (Mẫu KH, 01–04/QLNK) — dùng `nut_tai_word_va_pdf()` + `hien_thi_nut_tai()` từ template_service thay vì `st.download_button` inline trong `if st.button()`
 - `tabs/tab_no_khoanh.py`: **Chuyển toàn bộ 5 biểu mẫu từ python-docx → reportlab PDF** — xóa ~650 dòng code Word `_qlnk_*` helpers + `_tao_word_*` + import `docx`/`template_service`; thêm reportlab PDF engine: đăng ký font TNR, header logo NHCSXH + quốc hiệu, style body/table/signature, 5 hàm `_xuat_pdf_mau_*` (KH, 01–04/QLNK) với Times New Roman 12-13pt, line-spacing 1.3-1.5, bảng xanh #2E7D32 xen kẽ dòng, chữ ký chuyên nghiệp, không phụ thuộc MS Word
 - `tabs/tab_no_khoanh.py`: Sửa 5 expander UI: nút "📄 Tạo Word" → "📥 Xuất PDF", thêm form editable tối giản (Cán bộ KT, Nội dung bổ sung, Kết luận, Số tiền cam kết/thời hạn/phương thức, Ghi chú, Hạn cuối), lưu PDF vào session_state + download button
+
+## [19/05/2026] — Fix tab Ban Đại Diện: TypeError truediv on PyArrow string dtype
+- `tabs/tab_ban_dai_dien.py`: `_tong_hop_theo_pgd()` — thêm `_num()` helper (`pd.to_numeric(errors='coerce').fillna(0)`) cho du_no/dth/dqh/nkh/gn_nam sau groupby, tránh lỗi khi cột nguồn có dtype PyArrow large_string
+
+## [19/05/2026] — Xuất PDF Kế hoạch kiểm tra nợ khoanh (theo NĐ 30)
+- `tabs/tab_no_khoanh.py`: Thêm `_xuat_pdf_ke_hoach_kt(data_kh, ds_phan_cong, thanh_phan, ten_pgd, nam)` — PDF A4 dọc (≤20 món) hoặc landscape (>20 món); header 2 cột NĐ 30 (NHCSXH + CHXHCNVN); bảng phân công 8 cột gộp SPAN theo tên tổ; dòng tổng cộng; thành phần tham gia 5 mục; footer ký duyệt NGƯỜI LẬP / GIÁM ĐỐC
+- `tabs/tab_no_khoanh.py`: Expander "Lập / cập nhật kế hoạch": thêm section "📋 Thành phần tham gia kiểm tra" (5 text_input: NHCSXH, Ban QL tổ prefill từ tổ trưởng, CT-XH, Trưởng thôn, UBND xã) + nút "📄 Xuất PDF Kế hoạch" (hiện khi `_rows_kh_pdf` không rỗng hoặc `df_kh_form` có dữ liệu); session state key `kh_pdf_buf`
+
+## [19/05/2026] — Cải tiến tab Nợ Khoanh (heatmap, đơn vị, merge menu, cấu trúc sub-tab)
+- `tabs/tab_no_khoanh.py`: `_heatmap_dao_han()` đổi tiêu đề → "Phân bổ theo năm hết hạn khoanh nợ", data source COT_NGAY_DH → COT_NGAY_HH_KHOANH
+- `tabs/tab_no_khoanh.py`: Chuẩn hóa tên PGD runtime — thay "Đồng Nai"/"CN Đồng Nai"/"Hội sở" → `DON_VI_CHI_NHANH` sau khi lọc `df_kh`
+- `tabs/tab_no_khoanh.py`: Thêm `_fmt_dong` lambda dùng `fmt_so()` — bảng tổng hợp hiển thị "triệu đồng" (cột đổi tên), bảng chi tiết hiển thị "X.XXX.XXX đồng"
+- `tabs/tab_no_khoanh.py`: Import `tab_qlnk_dashboard`; đổi 7 → 8 st.tabs; thêm d0 "📊 Tổng quan" gọi `tab_qlnk_dashboard.render(d0, **kwargs)`
+- `workspaces/ws_management.py`: Xóa cấu trúc `children` 2 mục Nợ Khoanh → 1 entry "🔒 Nợ Khoanh" duy nhất gọi `tab_no_khoanh.render()`
+- `Chay_VBSP_SCM.bat`: Xóa `taskkill`, xóa `--server.fileWatcherType none` (bật lại watchdog auto-reload), thay poll loop 60s bằng `timeout /t 3`
+- `tabs/tab_no_khoanh.py`: Đổi 8 → 7 st.tabs; gộp d5 (Kế hoạch) + d6 (Kiểm tra) + mẫu biểu vào tab mới "📋 Kiểm tra nợ khoanh (theo CV 368)"; d_bc "📊 Báo cáo" giữ M08/M09/QLNK_06/M10/Tiến độ; `pgd_filter_bc`/`rows_all_kt`/`da_kiem_tra_set` chuyển trước `st.tabs`

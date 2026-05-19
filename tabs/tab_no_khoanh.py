@@ -21,11 +21,13 @@ from config import (
     COT_TEN_PGD,
     COT_TEN_XA,
     COT_TONG_DU_NO,
+    DON_VI_CHI_NHANH,
     DS_PGD,
     LY_DO_KHOANH_QD62,
     LY_DO_KHOANH_LABEL,
 )
 from utils import fmt_so, fmt_ty, get_tab_context, hien_thi_dataframe_phan_trang, xuat_excel
+from tabs import tab_qlnk_dashboard
 import db
 from io import BytesIO
 from datetime import datetime
@@ -50,6 +52,8 @@ except ImportError:
 COT_DU_NO_KHOANH = "Dư nợ khoanh"
 COT_NGAY_HH_KHOANH = "Ngày hết hạn Khoanh"
 COT_TEN_TO = "Tên tổ"
+
+_fmt_dong = lambda x: fmt_so(float(x)) + " đồng" if x not in (None, "", float("nan")) else "0 đồng"
 
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -82,9 +86,10 @@ def _bang_theo_nhom(df: pd.DataFrame, nhom_col: str) -> pd.DataFrame:
     nhom["Tỷ trọng%"] = (nhom["du_no_khoanh"] / tong * 100).round(1).apply(
         lambda x: f"{x:.1f}".replace(".", ",") + "%"
     ) if tong > 0 else "0%"
-    nhom[COT_DU_NO_KHOANH] = nhom["du_no_khoanh"].apply(fmt_ty)
+    _COL_DN = "Dư nợ khoanh (triệu đồng)"
+    nhom[_COL_DN] = nhom["du_no_khoanh"].apply(fmt_ty)
     nhom = nhom.rename(columns={"so_mon": "Số món"})
-    return nhom[[nhom_col, "Số món", COT_DU_NO_KHOANH, "Tỷ trọng%"]]
+    return nhom[[nhom_col, "Số món", _COL_DN, "Tỷ trọng%"]]
 
 
 def _chart_nhom(df: pd.DataFrame, nhom_col: str, key: str) -> None:
@@ -128,19 +133,19 @@ def _chart_nhom(df: pd.DataFrame, nhom_col: str, key: str) -> None:
 
 
 def _heatmap_dao_han(df: pd.DataFrame, key: str) -> None:
-    """Bar chart phân bổ khoanh theo tháng đáo hạn."""
+    """Bar chart phân bổ khoanh theo năm hết hạn khoanh nợ."""
     try:
         import plotly.graph_objects as go
     except ImportError:
         return
 
-    if COT_NGAY_DH not in df.columns or df.empty:
+    if COT_NGAY_HH_KHOANH not in df.columns or df.empty:
         return
 
-    ngay_dh = pd.to_datetime(df[COT_NGAY_DH], errors="coerce", dayfirst=True)
+    ngay_hh = pd.to_datetime(df[COT_NGAY_HH_KHOANH], errors="coerce", dayfirst=True)
     df = df.copy()
     df["_du_kh"] = pd.to_numeric(df[COT_DU_NO_KHOANH], errors="coerce").fillna(0)
-    df["_ym"] = ngay_dh.dt.to_period("Y").astype(str)  # nhóm theo năm
+    df["_ym"] = ngay_hh.dt.to_period("Y").astype(str)  # nhóm theo năm
 
     nhom = (
         df.groupby("_ym")
@@ -164,12 +169,12 @@ def _heatmap_dao_han(df: pd.DataFrame, key: str) -> None:
         hoverinfo="x+text",
     ))
     fig.update_layout(
-        xaxis_title="Năm đáo hạn",
+        xaxis_title="Năm hết hạn khoanh nợ",
         yaxis_title="Số khoản khoanh",
         height=260,
         margin=dict(t=10, b=30, l=40, r=20),
     )
-    st.markdown("**📅 Phân bổ theo năm đáo hạn**")
+    st.markdown("**📅 Phân bổ theo năm hết hạn khoanh nợ**")
     st.plotly_chart(fig, width='stretch', key=key)
 
 
@@ -658,9 +663,10 @@ def _xuat_pdf_mau_02qlnk(row: dict,
                          phuong_thuc: str = "") -> bytes:
     _dang_ky_font_qlnk()
     ten_kh  = row.get("ten_kh") or row.get(COT_TEN_KH) or "............"
-    dia_chi = row.get("ten_xa") or row.get(COT_TEN_XA) or row.get("dia_chi") or "............"
+    dia_chi = row.get("dia_chi") or row.get("ten_xa") or row.get(COT_TEN_XA) or "............"
     so_cccd = row.get("so_cmnd") or row.get("so_cccd") or "............"
     ten_to  = row.get("ten_to_tkv") or row.get(COT_TEN_TO) or "............"
+    ten_pgd = row.get("ten_pgd") or row.get(COT_TEN_PGD) or "............"
     so_ku   = row.get("ma_mon_vay") or row.get(COT_SO_KU) or "............"
     du_goc  = row.get("du_no_goc_khoanh") or row.get(COT_DU_NO_KHOANH) or 0
     lai     = row.get("so_tien_lai_con_no") or 0
@@ -679,56 +685,103 @@ def _xuat_pdf_mau_02qlnk(row: dict,
     usable_w = A4[0] - 2 * margin
     elements = []
 
-    _ve_header_pdf(elements, usable_w,
-                   tieu_de="CAM KẾT TRẢ NỢ",
-                   don_vi_tren="",
-                   don_vi_duoi="")
+    s_right_8 = ParagraphStyle("r8", fontName=_FN, fontSize=9, leading=12, alignment=TA_RIGHT)
+    s_center = ParagraphStyle("c", fontName=_FN, fontSize=11, leading=14, alignment=TA_CENTER)
+    s_center_b = ParagraphStyle("cb", fontName=_FB, fontSize=11, leading=14, alignment=TA_CENTER)
+    s_title = ParagraphStyle("t", fontName=_FB, fontSize=13, leading=18, alignment=TA_CENTER, spaceAfter=10)
+
+    elements.append(Paragraph("<i>Mẫu số 02/QLNK</i>", s_right_8))
+    elements.append(Paragraph(
+        "<b>CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</b><br/>"
+        "<i>Độc lập - Tự do - Hạnh phúc</i><br/>"
+        "────────────────────────────",
+        s_center_b,
+    ))
+    elements.append(Paragraph("..............., ngày ..... tháng ..... năm 20.....", s_right_8))
+    elements.append(Spacer(1, 6))
+    elements.append(Paragraph("CAM KẾT TRẢ NỢ", s_title))
 
     elements.append(Paragraph(
-        "<font size='8'><i>Mẫu số: 02/QLNK</i></font>",
-        ParagraphStyle("MS", fontName=_FN, fontSize=8,
-                       alignment=TA_RIGHT, leading=10)))
-    elements.append(Paragraph(
-        "<i>..............., ngày ..... tháng ..... năm .....</i>",
-        ParagraphStyle("DateBl", fontName=_FN, fontSize=10,
-                       alignment=TA_RIGHT, leading=13, spaceAfter=8)))
+        "<b>Kính gửi:</b> Ngân hàng Chính sách xã hội ....................................",
+        _style_body(),
+    ))
 
-    elements.append(Paragraph(
-        "<b>Kính gửi:</b> Ngân hàng Chính sách xã hội", _style_body()))
-
-    for line in [
-        f"Tôi tên: {ten_kh}    Năm sinh: ............    SĐT: ............",
-        f"Số CCCD/CMND: {so_cccd}    Địa chỉ: {dia_chi}",
-        f"Thành viên Tổ TK&amp;VV: {ten_to}",
-        f"Theo HĐTD số: {so_ku}",
-        f"Hiện còn nợ số tiền: {tong_no:,.0f} đồng "
-        f"(gốc: {du_goc_f:,.0f} đồng, lãi: {lai_f:,.0f} đồng)",
-    ]:
+    lines = [
+        f"Tôi tên là: {ten_kh}..........................................................    Năm sinh: ............",
+        "Số điện thoại liên hệ: .........................................................",
+        f"Số CCCD: {so_cccd}.............., ngày cấp ....../....../......, nơi cấp ....................",
+        f"Địa chỉ cư trú: {dia_chi}.................................................................",
+        "Là thành viên của Tổ TK&VV do ông (bà) .............................. làm tổ trưởng,",
+        "thuộc tổ chức Hội ........................................................ quản lý.",
+        f"Theo Hợp đồng tín dụng (Sổ Vay vốn) số {so_ku}.............., ngày....../....../...... tôi có",
+        f"dư nợ vay vốn chương trình...................................................... tại",
+        f"Phòng giao dịch NHCSXH {ten_pgd}.............., tỉnh: ..............",
+        f"Đến ngày ....../....../......, tôi còn nợ Ngân hàng Chính sách xã hội (NHCSXH) số tiền "
+        f"{_fmt_dong(tong_no)}, trong đó: Số tiền gốc: {_fmt_dong(du_goc_f)}; "
+        f"Số tiền lãi: {_fmt_dong(lai_f)}.",
+        "Tôi cam kết trả nợ số tiền còn nợ NHCSXH theo kế hoạch cụ thể sau:",
+    ]
+    for line in lines:
         elements.append(Paragraph(line, _style_body()))
 
-    elements.append(Spacer(1, 4))
-    elements.append(Paragraph(
-        "Tôi cam kết sẽ trả nợ cho Ngân hàng theo kế hoạch cụ thể:",
-        _style_body()))
-
-    tho = thoi_han or "............"
-    tien = so_tien_cam_ket or "............"
-    pt = phuong_thuc or "............"
-    for l in [
-        f"    - Thời gian: {tho}",
-        f"    - Số tiền: {tien}",
-        f"    - Địa điểm: {pt}",
-    ]:
-        elements.append(Paragraph(l, _style_body()))
+    elements.append(Spacer(1, 2))
+    if so_tien_cam_ket or thoi_han or phuong_thuc:
+        if thoi_han:
+            elements.append(Paragraph(f"{thoi_han}", _style_body()))
+        if so_tien_cam_ket:
+            elements.append(Paragraph(f"{so_tien_cam_ket}", _style_body()))
+        if phuong_thuc:
+            elements.append(Paragraph(f"{phuong_thuc}", _style_body()))
+    else:
+        for _ in range(4):
+            elements.append(Paragraph("....................................................................................", _style_body()))
 
     elements.append(Spacer(1, 4))
     elements.append(Paragraph(
-        "Tôi xin cam kết thực hiện đúng như trên.", _style_body()))
+        "Nếu tôi không thực hiện đúng như cam kết này, tôi xin hoàn toàn chịu trách nhiệm "
+        "trước NHCSXH, trước pháp luật/.",
+        _style_body(),
+    ))
 
-    _ve_footer_pdf(elements, usable_w, signatures=[
-        "Người vay", "ĐD BQL Tổ TK&amp;VV",
-        "ĐD CT-XH/Trưởng thôn", "ĐD NHCSXH",
-    ])
+    elements.append(Spacer(1, 10))
+    elements.append(Paragraph("Ngày ..... tháng ...... năm ......", _style_date_right()))
+    sig_borrow = Table(
+        [[Paragraph("<b>Người vay</b><br/><i>(Ký ghi rõ họ tên, hoặc điểm chỉ)</i>", s_center)]],
+        colWidths=[usable_w],
+    )
+    sig_borrow.setStyle(TableStyle([
+        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("TOPPADDING", (0, 0), (-1, -1), 2),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+    ]))
+    elements.append(sig_borrow)
+    elements.append(Spacer(1, 28))
+
+    sig_tbl = Table(
+        [[
+            Paragraph("<b>Đại diện Ban quản lý<br/>Tổ TK&VV</b>", s_center),
+            Paragraph("<b>Đại diện Tổ chức CT-<br/>XH/Trưởng thôn</b>", s_center),
+            Paragraph("<b>Đại diện NHCSXH</b>", s_center),
+        ], [
+            Paragraph("<i>(Ký, ghi rõ họ tên)</i>", s_center),
+            Paragraph("<i>(Ký, ghi rõ họ tên, đóng dấu<br/>(nếu có))</i>", s_center),
+            Paragraph("<i>(Ký, ghi rõ họ tên, đóng dấu<br/>(nếu có))</i>", s_center),
+        ], [
+            Paragraph("<br/><br/><br/>", _style_body()),
+            Paragraph("<br/><br/><br/>", _style_body()),
+            Paragraph("<br/><br/><br/>", _style_body()),
+        ]],
+        colWidths=[usable_w / 3] * 3,
+    )
+    sig_tbl.setStyle(TableStyle([
+        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("TOPPADDING", (0, 0), (-1, -1), 4),
+        ("LEFTPADDING", (0, 0), (-1, -1), 4),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+    ]))
+    elements.append(sig_tbl)
 
     doc.build(elements)
     buf.seek(0)
@@ -1185,6 +1238,169 @@ def _xuat_pdf_m10(ds_luu_tam: list, ten_pgd: str = "") -> bytes:
     return buf.getvalue()
 
 
+def _xuat_pdf_ke_hoach_kt(data_kh: dict, ds_phan_cong: list,
+                           thanh_phan: dict, ten_pgd: str, nam: int) -> bytes:
+    """Xuất PDF Kế hoạch kiểm tra nợ khoanh theo NĐ 30/2020."""
+    from itertools import groupby as _groupby
+    _dang_ky_font_qlnk()
+    buf    = BytesIO()
+    margin = 1.8 * cm
+    use_ls = len(ds_phan_cong) > 20
+    psz    = landscape(A4) if use_ls else A4
+    doc    = SimpleDocTemplate(buf, pagesize=psz,
+                               leftMargin=margin, rightMargin=margin,
+                               topMargin=1.5 * cm, bottomMargin=2 * cm)
+    usable_w = psz[0] - 2 * margin
+    elements = []
+
+    # ── Header 2 cột ─────────────────────────────────────────────────────────
+    _sN  = ParagraphStyle("khN",  fontName=_FN, fontSize=10, leading=14)
+    _sR  = ParagraphStyle("khR",  fontName=_FN, fontSize=10, leading=14, alignment=TA_RIGHT)
+    left_html = (
+        f"NGÂN HÀNG CHÍNH SÁCH XÃ HỘI<br/>"
+        f"Chi nhánh tỉnh Đồng Nai<br/>"
+        f"<b>Phòng giao dịch {ten_pgd}</b><br/>"
+        f"─────────────────────<br/>"
+        f"Số: ......./KH-PGD"
+    )
+    right_html = (
+        f"<b>CỘNG HOÀ XÃ HỘI CHỦ NGHĨA VIỆT NAM</b><br/>"
+        f"<i>Độc lập - Tự do - Hạnh phúc</i><br/>"
+        f"─────────────────────<br/>"
+        f"{_dong_ten_nd()}"
+    )
+    hdr_tbl = Table(
+        [[Paragraph(left_html, _sN), Paragraph(right_html, _sR)]],
+        colWidths=[usable_w * 0.55, usable_w * 0.45],
+    )
+    hdr_tbl.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP")]))
+    elements.append(hdr_tbl)
+    elements.append(Spacer(1, 10))
+
+    # ── Tiêu đề ───────────────────────────────────────────────────────────────
+    elements.append(Paragraph(
+        f"KẾ HOẠCH KIỂM TRA NỢ KHOANH NĂM {nam}",
+        ParagraphStyle("KHTitle", fontName=_FB, fontSize=14, leading=18,
+                       alignment=TA_CENTER, textColor=_VBSP_GREEN),
+    ))
+    elements.append(Spacer(1, 6))
+
+    # ── Thông tin chung ───────────────────────────────────────────────────────
+    elements.append(Paragraph(
+        "<i>Căn cứ: Công văn số 368/NHCS-QLN ngày 17/01/2024 của NHCSXH</i>",
+        _style_body(),
+    ))
+    elements.append(Paragraph(
+        f"<b>PGD:</b> {ten_pgd} &nbsp;&nbsp; <b>Năm:</b> {nam}",
+        _style_body(),
+    ))
+    elements.append(Spacer(1, 8))
+
+    # ── Bảng kế hoạch ─────────────────────────────────────────────────────────
+    col_hdrs = [
+        "STT", "Tên tổ TK&VV", "Tên khách hàng", "Số khế ước",
+        "Dư nợ khoanh (đồng)", "Ngày HH khoanh", "Ngày KT dự kiến", "Ghi chú",
+    ]
+    th  = _style_table_header(8)
+    tc  = _style_table_cell(8)
+    tcL = _style_table_cell_left(8)
+    if use_ls:
+        col_w = [0.8*cm, 3.5*cm, 4.5*cm, 2.8*cm, 3.2*cm, 2.5*cm, 2.5*cm, 3.0*cm]
+    else:
+        col_w = [0.7*cm, 3.0*cm, 3.8*cm, 2.5*cm, 2.8*cm, 2.2*cm, 2.2*cm, 2.3*cm]
+
+    table_data = [[Paragraph(h, th) for h in col_hdrs]]
+    tbl_cmds = [
+        ("BACKGROUND",    (0, 0), (-1, 0), _VBSP_GREEN),
+        ("TEXTCOLOR",     (0, 0), (-1, 0), colors.white),
+        ("GRID",          (0, 0), (-1, -1), 0.5, _BORDER_COLOR),
+        ("BOX",           (0, 0), (-1, -1), 1.0, _VBSP_GREEN),
+        ("VALIGN",        (0, 0), (-1, -1), "MIDDLE"),
+        ("TOPPADDING",    (0, 0), (-1, -1), 3),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+    ]
+
+    def _parse_dn(raw) -> float:
+        try:
+            return float(str(raw).replace(" đồng", "").replace(".", "").replace(",", "").strip())
+        except (ValueError, TypeError):
+            return 0.0
+
+    stt        = 0
+    tong_dn    = 0.0
+    row_idx    = 1
+    sorted_pc  = sorted(ds_phan_cong,
+                        key=lambda x: (x.get("ten_to") or "", x.get("ten_xa") or ""))
+    for to_name, group_items in _groupby(sorted_pc, key=lambda x: x.get("ten_to") or ""):
+        items = list(group_items)
+        span_start = row_idx
+        for i, item in enumerate(items):
+            stt  += 1
+            dn_v  = _parse_dn(item.get("du_no_khoanh", 0))
+            tong_dn += dn_v
+            table_data.append([
+                Paragraph(str(stt), tc),
+                Paragraph(to_name if i == 0 else "", tcL),
+                Paragraph(item.get("ten_kh") or "", tcL),
+                Paragraph(item.get("so_ku") or "", tc),
+                Paragraph(_qlnk_fmt_dong(dn_v), tc),
+                Paragraph(item.get("ngay_hh_khoanh") or "", tc),
+                Paragraph(item.get("ngay_kt_du_kien") or "", tc),
+                Paragraph(item.get("ghi_chu") or "", tcL),
+            ])
+            row_idx += 1
+        if len(items) > 1:
+            tbl_cmds.append(("SPAN",   (1, span_start), (1, row_idx - 1)))
+            tbl_cmds.append(("VALIGN", (1, span_start), (1, row_idx - 1), "MIDDLE"))
+        for ri in range(span_start, row_idx):
+            if (ri - 1) % 2 == 0:
+                tbl_cmds.append(("BACKGROUND", (0, ri), (-1, ri), _ROW_ALT))
+
+    _sTB = ParagraphStyle("sTB", fontName=_FB, fontSize=8, alignment=TA_CENTER, leading=11)
+    table_data.append([
+        Paragraph("", tc),
+        Paragraph("<b>TỔNG CỘNG</b>", _sTB),
+        Paragraph("", tc),
+        Paragraph(f"<b>{stt} món</b>", _sTB),
+        Paragraph(f"<b>{_qlnk_fmt_dong(tong_dn)}</b>", _sTB),
+        Paragraph("", tc), Paragraph("", tc), Paragraph("", tc),
+    ])
+    last = len(table_data) - 1
+    tbl_cmds += [
+        ("BACKGROUND", (0, last), (-1, last), _VBSP_GREEN_LIGHT),
+        ("FONTNAME",   (0, last), (-1, last), _FB),
+        ("LINEABOVE",  (0, last), (-1, last), 1.5, _VBSP_GREEN),
+    ]
+
+    tbl = Table(table_data, colWidths=col_w, repeatRows=1)
+    tbl.setStyle(TableStyle(tbl_cmds))
+    elements.append(tbl)
+    elements.append(Spacer(1, 10))
+
+    # ── Thành phần tham gia kiểm tra ─────────────────────────────────────────
+    elements.append(Paragraph("<b>Thành phần tham gia kiểm tra:</b>", _style_body_bold()))
+    for idx, (label, val) in enumerate([
+        ("Đại diện NHCSXH",                   thanh_phan.get("dai_dien_nhcsxh", "")),
+        ("Đại diện Ban quản lý Tổ TK&VV",     f"Ông/Bà {thanh_phan.get('to_tkv', '')}"),
+        ("Đại diện tổ chức CT-XH",            thanh_phan.get("ct_xh", "")),
+        ("Trưởng thôn",                        thanh_phan.get("truong_thon", "")),
+        ("Đại diện UBND xã",                   thanh_phan.get("ubnd_xa", "")),
+    ], 1):
+        elements.append(Paragraph(
+            f"{idx}. {label}: {val or '............'}",
+            _style_body(),
+        ))
+    elements.append(Spacer(1, 10))
+
+    # ── Footer ký duyệt ───────────────────────────────────────────────────────
+    _ve_footer_pdf(elements, usable_w,
+                   signatures=["NGƯỜI LẬP KẾ HOẠCH", "GIÁM ĐỐC"],
+                   ngay_str=_dong_ten_nd())
+    doc.build(elements)
+    buf.seek(0)
+    return buf.getvalue()
+
+
 # ─── Render ───────────────────────────────────────────────────────────────────
 
 def render(tab: DeltaGenerator = None, **kwargs) -> None:
@@ -1221,6 +1437,16 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
             return
 
         df_kh = _loc_khoanh(use_df)
+
+        # Chuẩn hóa tên PGD: alias cũ trong data → tên nội bộ chuẩn
+        if COT_TEN_PGD in df_kh.columns:
+            _pgd_alias = {
+                "Đồng Nai": DON_VI_CHI_NHANH,
+                "Chi nhánh Đồng Nai": DON_VI_CHI_NHANH,
+                "CN Đồng Nai": DON_VI_CHI_NHANH,
+                "Hội sở": DON_VI_CHI_NHANH,
+            }
+            df_kh[COT_TEN_PGD] = df_kh[COT_TEN_PGD].replace(_pgd_alias)
 
         if df_kh.empty:
             st.success("✅ Hiện không có món vay nào đang khoanh nợ.")
@@ -1273,8 +1499,8 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
         tl_khoanh = tong_khoanh / tong_du_no * 100 if tong_du_no > 0 else 0
 
         k1, k2, k3, k4 = st.columns(4)
-        k1.metric("🔒 Số món khoanh", fmt_so(so_mon))
-        k2.metric("👤 Số hộ", fmt_so(so_ho))
+        k1.metric("🔒 Số món khoanh", fmt_so(so_mon) + " món")
+        k2.metric("👤 Số hộ", fmt_so(so_ho) + " hộ")
         k3.metric("💰 Tổng dư nợ khoanh", fmt_ty(tong_khoanh))
         k4.metric(
             "📊 Tỷ lệ khoanh / tổng DN",
@@ -1313,15 +1539,22 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                 st.success("✅ Không có món nào sắp hết hạn khoanh.")
 
         # ── Sub-tabs ──────────────────────────────────────────────────────
-        d1, d2, d3, d4, d5, d6, d7 = st.tabs([
+        pgd_filter_bc = None if la_phan_he_cn(role) else pgd_user
+        rows_all_kt = db.doc_ket_qua_kiem_tra(ten_pgd=pgd_filter_bc)
+        da_kiem_tra_set = {r["ma_mon_vay"] for r in rows_all_kt}
+
+        d0, d1, d2, d3, d4, d_kt, d_bc = st.tabs([
+            "📊 Tổng quan",
             "📋 Theo Chương trình",
             "🏘️ Theo Xã",
             "🤝 Theo Hội đoàn thể",
             "📄 Danh sách chi tiết",
-            "📅 Kế hoạch",
-            "✏️ Kiểm tra",
+            "📋 Kiểm tra nợ khoanh (theo CV 368)",
             "📊 Báo cáo",
         ])
+
+        with d0:
+            tab_qlnk_dashboard.render(d0, **kwargs)
 
         for dtab, nhom_col, tag, label in [
             (d1, COT_TEN_CT,  "ct",   "Chương trình"),
@@ -1352,12 +1585,12 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
             if COT_DU_NO_KHOANH in df_hien.columns:
                 df_hien[COT_DU_NO_KHOANH] = (
                     pd.to_numeric(df_hien[COT_DU_NO_KHOANH], errors="coerce")
-                    .apply(fmt_ty)
+                    .fillna(0).apply(_fmt_dong)
                 )
             if COT_DU_NO_QH in df_hien.columns:
                 df_hien[COT_DU_NO_QH] = (
                     pd.to_numeric(df_hien[COT_DU_NO_QH], errors="coerce")
-                    .apply(fmt_ty)
+                    .fillna(0).apply(_fmt_dong)
                 )
 
             hien_thi_dataframe_phan_trang(
@@ -1380,7 +1613,7 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                     key=f"{key_prefix}khoanh_dl",
                 )
 
-        with d5:
+        with d_kt:
             perms = get_permissions(role)
             co_quyen_nhap  = perms.get("can_upload") or perms.get("upload")
             co_quyen_duyet = la_phan_he_cn(role) or co_quyen_upload_pgd(role)
@@ -1443,7 +1676,7 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                         df_edit = df_kh_form[_cols_co_dinh].copy().reset_index(drop=True)
                         df_edit[COT_DU_NO_KHOANH] = (
                             pd.to_numeric(df_edit[COT_DU_NO_KHOANH], errors="coerce")
-                            .fillna(0).apply(fmt_ty)
+                            .fillna(0).apply(_fmt_dong)
                         )
                         df_edit["Ngày KT dự kiến"] = ""
                         df_edit["Ghi chú"]         = ""
@@ -1542,6 +1775,106 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                                 except Exception as e:
                                     st.error(f"❌ Lỗi: {e}")
 
+                        # ── Thành phần tham gia + Xuất PDF ───────────────────
+                        st.markdown("---")
+                        st.markdown("**📋 Thành phần tham gia kiểm tra**")
+                        _to_list_str = (
+                            ", ".join(sorted(
+                                df_kh_form[COT_TEN_TO].dropna().unique().tolist()
+                            ))
+                            if COT_TEN_TO in df_kh_form.columns else ""
+                        )
+                        c_tp1, c_tp2 = st.columns(2)
+                        with c_tp1:
+                            dai_dien_nhcsxh = st.text_input(
+                                "Đại diện NHCSXH", value=username,
+                                key=f"{key_prefix}kh_dd_nhcsxh",
+                            )
+                            dai_dien_ct_xh = st.text_input(
+                                "Đại diện tổ chức CT-XH",
+                                placeholder="Hội Phụ nữ / Hội Nông dân / ...",
+                                key=f"{key_prefix}kh_dd_ctxh",
+                            )
+                            truong_thon = st.text_input(
+                                "Trưởng thôn", value="Ông/Bà ............",
+                                key=f"{key_prefix}kh_truong_thon",
+                            )
+                        with c_tp2:
+                            to_tkv = st.text_input(
+                                "Đại diện Ban quản lý Tổ TK&VV", value=_to_list_str,
+                                key=f"{key_prefix}kh_to_tkv",
+                            )
+                            ubnd_xa = st.text_input(
+                                "Đại diện UBND xã", value="",
+                                key=f"{key_prefix}kh_ubnd_xa",
+                            )
+
+                        ten_pgd_kh_cur = pgd_kh if la_phan_he_cn(role) else (pgd_user or "")
+                        _rows_kh_pdf = []
+                        if not (la_phan_he_cn(role) and pgd_kh == "— Chọn —"):
+                            _rows_kh_pdf = db.doc_ke_hoach_kiem_tra(
+                                ten_pgd=ten_pgd_kh_cur, nam=int(nam_kh),
+                            )
+
+                        if _rows_kh_pdf or not df_kh_form.empty:
+                            if st.button(
+                                "📄 Xuất PDF Kế hoạch", key=f"{key_prefix}kh_pdf_btn",
+                                type="primary",
+                            ):
+                                if not _REPORTLAB_READY:
+                                    st.error("❌ Cần cài reportlab để xuất PDF.")
+                                else:
+                                    if _rows_kh_pdf:
+                                        _ds_pc_pdf = _rows_kh_pdf[0].get("ds_phan_cong") or []
+                                    else:
+                                        _ku_hh_map_pdf = {}
+                                        if (COT_SO_KU in df_kh_form.columns
+                                                and COT_NGAY_HH_KHOANH in df_kh_form.columns):
+                                            _ku_hh_map_pdf = {
+                                                str(r[COT_SO_KU] or ""): str(r[COT_NGAY_HH_KHOANH] or "")
+                                                for _, r in df_kh_form.iterrows()
+                                            }
+                                        _ds_pc_pdf = [
+                                            {
+                                                "so_ku":           str(re_.get(COT_SO_KU, "") or ""),
+                                                "ten_kh":          str(re_.get(COT_TEN_KH, "") or ""),
+                                                "ten_xa":          str(re_.get(COT_TEN_XA, "") or ""),
+                                                "ten_to":          str(re_.get(COT_TEN_TO, "") or ""),
+                                                "ngay_hh_khoanh":  _ku_hh_map_pdf.get(str(re_.get(COT_SO_KU, "") or ""), ""),
+                                                "du_no_khoanh":    str(re_.get(COT_DU_NO_KHOANH, "") or ""),
+                                                "ngay_kt_du_kien": str(re_.get("Ngày KT dự kiến", "") or ""),
+                                                "ghi_chu":         str(re_.get("Ghi chú", "") or ""),
+                                            }
+                                            for _, re_ in df_edited.iterrows()
+                                        ]
+                                    _thanh_phan_pdf = {
+                                        "dai_dien_nhcsxh": dai_dien_nhcsxh,
+                                        "to_tkv":          to_tkv,
+                                        "ct_xh":           dai_dien_ct_xh,
+                                        "truong_thon":     truong_thon,
+                                        "ubnd_xa":         ubnd_xa,
+                                    }
+                                    try:
+                                        st.session_state[f"{key_prefix}kh_pdf_buf"] = (
+                                            _xuat_pdf_ke_hoach_kt(
+                                                {}, _ds_pc_pdf, _thanh_phan_pdf,
+                                                ten_pgd_kh_cur, int(nam_kh),
+                                            )
+                                        )
+                                    except Exception as _e_kh_pdf:
+                                        st.error(f"❌ Lỗi tạo PDF: {_e_kh_pdf}")
+
+                            if st.session_state.get(f"{key_prefix}kh_pdf_buf"):
+                                st.download_button(
+                                    "⬇️ Tải PDF Kế hoạch",
+                                    data=st.session_state[f"{key_prefix}kh_pdf_buf"],
+                                    file_name=(
+                                        f"KH_KiemTra_NK_{ten_pgd_kh_cur}_{int(nam_kh)}.pdf"
+                                    ),
+                                    mime="application/pdf",
+                                    key=f"{key_prefix}kh_pdf_dl",
+                                )
+
             # ── B: Danh sách kế hoạch đã lập ─────────────────────────────────
             st.markdown("### 📋 Danh sách kế hoạch đã lập")
 
@@ -1599,7 +1932,8 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                         st.success("Đã duyệt.") if ok else st.error("Không thể duyệt.")
                         st.rerun()
 
-        with d6:
+        with d_kt:
+            st.divider()
             perms = get_permissions(role)
             co_quyen_nhap = perms.get("can_upload")
             co_quyen_duyet = la_phan_he_cn(role) or co_quyen_upload_pgd(role)
@@ -1929,12 +2263,8 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                              else st.error("Không thể mở."))
                             st.rerun()
 
-        with d7:
+        with d_bc:
             st.markdown("### 📊 Báo cáo Quản lý Nợ khoanh")
-
-            pgd_filter_bc = None if la_phan_he_cn(role) else pgd_user
-            rows_all_kt = db.doc_ket_qua_kiem_tra(ten_pgd=pgd_filter_bc)
-            da_kiem_tra_set = {r["ma_mon_vay"] for r in rows_all_kt}
 
             with st.expander(
                 "📋 M08 — Danh sách món vay chưa kiểm tra", expanded=True
@@ -1944,15 +2274,21 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                 else:
                     df_chua_kt = df_kh.copy()
 
-                st.metric("Số món chưa kiểm tra", fmt_so(len(df_chua_kt)))
+                st.metric("Số món chưa kiểm tra", fmt_so(len(df_chua_kt)) + " món")
 
                 if not df_chua_kt.empty:
                     cols_m08 = [c for c in [
                         COT_TEN_PGD, COT_TEN_XA, COT_TEN_KH, COT_SO_KU,
                         COT_DU_NO_KHOANH, COT_NGAY_HH_KHOANH,
                     ] if c in df_chua_kt.columns]
+                    df_m08_display = df_chua_kt[cols_m08].copy()
+                    if COT_DU_NO_KHOANH in df_m08_display.columns:
+                        df_m08_display[COT_DU_NO_KHOANH] = (
+                            pd.to_numeric(df_m08_display[COT_DU_NO_KHOANH], errors="coerce")
+                            .fillna(0).apply(_fmt_dong)
+                        )
                     hien_thi_dataframe_phan_trang(
-                        df_chua_kt[cols_m08],
+                        df_m08_display,
                         key=f"{key_prefix}bc_m08_tbl",
                         height=320,
                     )
@@ -1976,7 +2312,7 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                     and r.get("kha_nang_tra_no") == "co"
                 ]
                 df_m09 = pd.DataFrame(rows_m09)
-                st.metric("Số món có KN trả nợ", fmt_so(len(df_m09)))
+                st.metric("Số món có KN trả nợ", fmt_so(len(df_m09)) + " món")
                 if not df_m09.empty:
                     cols_m09 = [c for c in [
                         "ma_mon_vay", "ten_pgd", "ten_kh",
@@ -2051,7 +2387,7 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                 if df_06.empty:
                     st.info("ℹ️ Không có dữ liệu kiểm tra phù hợp.")
                 else:
-                    st.metric("Số bản ghi", fmt_so(len(df_06)))
+                    st.metric("Số bản ghi", fmt_so(len(df_06)) + " bản ghi")
 
                     cols_06 = [c for c in [
                         "ma_mon_vay", "ten_pgd", "ten_kh", "ten_ct",
@@ -2064,13 +2400,12 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                     ] if c in df_06.columns]
 
                     df_06_display = df_06[cols_06].copy()
-                    # Format tiền
                     for col in ["du_no_goc", "du_no_goc_khoanh", "du_no_goc_thuc_te",
                                 "du_no_khoanh_thuc_te", "chenh_lech"]:
                         if col in df_06_display.columns:
                             df_06_display[col] = (
                                 df_06_display[col]
-                                .apply(lambda x: fmt_ty(float(x) or 0) if x else "0")
+                                .apply(lambda x: _fmt_dong(float(x)) if x else "0 đồng")
                             )
 
                     hien_thi_dataframe_phan_trang(
@@ -2122,7 +2457,7 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                     if r.get("trang_thai") == "luu_tam"
                 ]
                 df_m10 = pd.DataFrame(rows_m10) if rows_m10 else pd.DataFrame()
-                st.metric("Số bản ghi lưu tạm", fmt_so(len(df_m10)))
+                st.metric("Số bản ghi lưu tạm", fmt_so(len(df_m10)) + " bản ghi")
                 if not df_m10.empty:
                     # Chỉ show các cột quan trọng, format tiền và ngày
                     cols_m10 = [c for c in [
@@ -2131,11 +2466,10 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                     ] if c in df_m10.columns]
 
                     df_m10_display = df_m10[cols_m10].copy()
-                    # Format cột tiền từ đồng → triệu đồng
                     if "du_no_goc_khoanh" in df_m10_display.columns:
                         df_m10_display["du_no_goc_khoanh"] = (
                             df_m10_display["du_no_goc_khoanh"]
-                            .apply(lambda x: fmt_ty(float(x) or 0) if x else "0")
+                            .apply(lambda x: _fmt_dong(float(x)) if x else "0 đồng")
                         )
 
                     hien_thi_dataframe_phan_trang(
@@ -2234,6 +2568,7 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                             key=f"{key_prefix}bc_td_dl",
                         )
 
+        with d_kt:
             # ── Xuất mẫu biểu ────────────────────────────────────────────────
             st.divider()
             st.markdown("### 📄 Xuất mẫu biểu theo CV 368")
@@ -2243,7 +2578,7 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
             with st.expander("📝 Kế hoạch kiểm tra nợ khoanh", expanded=False):
                 rows_kh_mb = db.doc_ke_hoach_kiem_tra(ten_pgd=pgd_f)
                 if not rows_kh_mb:
-                    st.info("ℹ️ Chưa có kế hoạch nào. Vào tab 📅 Kế hoạch để lập.")
+                    st.info("ℹ️ Chưa có kế hoạch nào. Nhập kế hoạch ở phần trên.")
                 else:
                     options_kh_mb = {
                         f"ID {r['id']} — {r['ten_xa']} — {r['ngay_kiem_tra']} "

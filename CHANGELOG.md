@@ -1,5 +1,54 @@
 # CHANGELOG
 
+## [2026-05-19] — Fix lỗi tab Ban Đại Diện: TypeError truediv on str dtype
+- `tabs/tab_ban_dai_dien.py` dòng ~142 — thêm helper `_num()` dùng `pd.to_numeric(errors='coerce')` cho tất cả cột số trong `_tong_hop_theo_pgd()` trước khi chia 1e6
+
+## [2026-05-19] — Thêm xuất PDF Kế hoạch kiểm tra nợ khoanh (theo NĐ 30)
+- `tabs/tab_no_khoanh.py` — thêm `_xuat_pdf_ke_hoach_kt()`: PDF A4/landscape (>20 món), header 2 cột NĐ 30, bảng phân công gộp nhóm tổ có SPAN, thành phần tham gia, footer ký duyệt
+- `tabs/tab_no_khoanh.py` — expander "Lập kế hoạch": thêm section "Thành phần tham gia kiểm tra" (5 text_input) + nút "📄 Xuất PDF Kế hoạch" (hiện khi có dữ liệu hoặc kế hoạch đã lưu)
+
+## [2026-05-19] — Gộp Kế hoạch + Kiểm tra + Mẫu biểu thành tab "Kiểm tra nợ khoanh (theo CV 368)"
+- `tabs/tab_no_khoanh.py` — đổi 8 → 7 st.tabs; gộp d5 (Kế hoạch) + d6 (Kiểm tra) + mẫu biểu vào d_kt "📋 Kiểm tra nợ khoanh (theo CV 368)"; d_bc "📊 Báo cáo" giữ M08/M09/QLNK_06/M10/Tiến độ; pgd_filter_bc/rows_all_kt/da_kiem_tra_set chuyển trước st.tabs
+
+## [2026-05-19] — Gộp tab_qlnk_dashboard vào tab_no_khoanh làm sub-tab Tổng quan
+- `tabs/tab_no_khoanh.py` — import tab_qlnk_dashboard; đổi 7 → 8 st.tabs, thêm d0 "📊 Tổng quan" gọi tab_qlnk_dashboard.render()
+- `workspaces/ws_management.py` — xóa cấu trúc children 2 mục → 1 entry "🔒 Nợ Khoanh" duy nhất
+
+## [2026-05-19] — Gộp 2 mục Nợ Khoanh thành 1 tab trong ws_management
+- `workspaces/ws_management.py` dòng ~1150 — xóa cấu trúc "children" 2 mục riêng; thay bằng 1 entry "🔒 Nợ Khoanh" gọi cả tab_qlnk_dashboard lẫn tab_no_khoanh trong cùng 1 fn
+
+## [2026-05-19] — Thêm đơn vị vào card metric tại tab Nợ khoanh & Tổng hợp nợ khoanh
+- `tabs/tab_no_khoanh.py` dòng ~1295 — 4 KPI cards: "Số món khoanh" → thêm " món", "Số hộ" → thêm " hộ"
+- `tabs/tab_no_khoanh.py` dòng ~1962, 2000 — "Số món chưa kiểm tra" / "Số món có KN trả nợ" → thêm " món"
+- `tabs/tab_no_khoanh.py` dòng ~2075, 2145 — "Số bản ghi" / "Số bản ghi lưu tạm" → thêm " bản ghi"
+- `tabs/tab_qlnk_dashboard.py` dòng ~179, 188 — "Tổng món khoanh" → thêm " món"; "Sắp hết hạn khoanh" → thêm " món"
+
+## [2026-05-19] — Cập nhật Chay_VBSP_SCM.bat: bỏ taskkill, bật watchdog, đơn giản hóa khởi động
+- `Chay_VBSP_SCM.bat` — xóa taskkill python/streamlit; bỏ --server.fileWatcherType none (bật lại watchdog auto-reload); thay vòng poll 60s bằng timeout /t 3 rồi mở browser
+
+## [2026-05-19] — Gộp tab Nợ khoanh & Tổng hợp nợ khoanh thành tab phụ của Chuyên đề Nợ Khoanh
+- `workspaces/ws_management.py` dòng ~1148 — thay 2 item riêng "🔒 Nợ khoanh" và "📊 Tổng hợp nợ khoanh" bằng 1 parent item "🔒 Chuyên đề Nợ Khoanh" có children; giữ nguyên hàm render, chỉ tổ chức lại menu sidebar
+
+## [2026-05-19] — Chuẩn đơn vị tiền tệ bảng tổng hợp/chi tiết tab Nợ Khoanh
+- `tabs/tab_no_khoanh.py` dòng ~88 — `_bang_theo_nhom`: đổi tên cột thành "Dư nợ khoanh (triệu đồng)" để rõ đơn vị trong bảng d1/d2/d3
+- `tabs/tab_no_khoanh.py` dòng ~1459 — d5 Kế hoạch data_editor: đổi fmt_ty → _fmt_dong vì đây là danh sách từng món
+
+## [2026-05-19] — Fix: _fmt_dong dùng fmt_so thay vì fmt để hiện đủ số đồng
+- `tabs/tab_no_khoanh.py` dòng ~56 — `_fmt_dong`: đổi `fmt()` (chia 1M ra triệu) → `fmt_so()` (giữ nguyên số, chỉ format dấu chấm); kết quả: "44.000.000 đồng" thay vì "44 đồng"
+
+## [2026-05-19] — Fix: db.py thiếu cột ngay_kiem_tra trong bảng qlnk_ke_hoach (lần 2)
+- `db.py` dòng ~233 — tách `CREATE INDEX idx_qlnk_kh_ngay` ra khỏi `executescript` để tránh lỗi khi bảng cũ chưa có cột
+- `db.py` dòng ~278 — đặt CREATE INDEX sau ALTER TABLE migration, wrapped trong try-except
+
+## [2026-05-19] — Đổi format tiền danh sách chi tiết Nợ Khoanh sang đơn vị đồng
+- `tabs/tab_no_khoanh.py` — thêm helper `_fmt_dong` (fmt + " đồng"); áp dụng cho d4 (Danh sách chi tiết), M08, M10, QLNK_06; bảng tổng hợp Theo CT/Xã/DVUT giữ nguyên fmt_ty
+
+## [2026-05-19] — Chuẩn hóa tên PGD "Đồng Nai" → "Hội sở Chi nhánh tỉnh" trong tab Nợ Khoanh
+- `tabs/tab_no_khoanh.py` dòng ~1223 — thêm bước replace alias sau `_loc_khoanh()`: "Đồng Nai", "Chi nhánh Đồng Nai", "CN Đồng Nai", "Hội sở" đều map về `DON_VI_CHI_NHANH`; import thêm `DON_VI_CHI_NHANH` từ config
+
+## [2026-05-19] — Đổi trục biểu đồ phân bổ nợ khoanh sang năm hết hạn khoanh nợ
+- `tabs/tab_no_khoanh.py` dòng ~130 — `_heatmap_dao_han()`: đổi cột nguồn từ `COT_NGAY_DH` (ngày đáo hạn) sang `COT_NGAY_HH_KHOANH` ("Ngày hết hạn Khoanh"); cập nhật tiêu đề chart và label markdown
+
 ## [2026-05-19] — Fix: cache không được xóa sau khi merge 22 PGD
 - `tabs/tab_upload_khnv.py` dòng ~1501 và ~1392 — thêm xóa session_state keys (`_ctx`, `_ctx_cache_key`, `df_full`...) sau merge để buộc app.py reload data mới từ parquet; trước đây chỉ `cache_data.clear()` không đủ vì `_load_hstd` dùng `@st.cache_resource`
 

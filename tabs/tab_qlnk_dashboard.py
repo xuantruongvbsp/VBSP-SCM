@@ -175,7 +175,7 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
         tl_kiem_tra = so_mon_da_kt / so_mon_khoanh * 100 if so_mon_khoanh > 0 else 0
 
         k1, k2, k3, k4 = st.columns(4)
-        k1.metric("🔒 Tổng món khoanh", fmt_so(so_mon_khoanh))
+        k1.metric("🔒 Tổng món khoanh", fmt_so(so_mon_khoanh) + " món")
         k2.metric(
             "✅ Tỷ lệ kiểm tra",
             f"{tl_kiem_tra:.1f}".replace(".", ",") + "%",
@@ -183,7 +183,7 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
         )
         k3.metric(
             "⏰ Sắp hết hạn khoanh",
-            fmt_so(so_mon_sap_het_han),
+            fmt_so(so_mon_sap_het_han) + " món",
             delta="Cần rà soát" if so_mon_sap_het_han > 0 else None,
             delta_color="inverse" if so_mon_sap_het_han > 0 else "off",
         )

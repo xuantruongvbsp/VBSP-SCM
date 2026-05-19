@@ -7,6 +7,7 @@
 
 # --- Core UI ---
 streamlit>=1.35.0
+watchdog>=4.0.0
 
 # --- Data & Analytics ---
 pandas>=2.2.0

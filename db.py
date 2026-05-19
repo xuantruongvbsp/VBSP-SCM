@@ -220,6 +220,7 @@ def init_db():
                 thanh_phan_doan   TEXT NOT NULL DEFAULT '[]',
                 ds_phan_cong      TEXT NOT NULL DEFAULT '[]',
                 ghi_chu           TEXT,
+                ngay_kiem_tra     TEXT,
                 trang_thai        TEXT NOT NULL DEFAULT 'luu_tam',
                 nguoi_lap         TEXT NOT NULL,
                 nguoi_duyet       TEXT,
@@ -228,7 +229,6 @@ def init_db():
                 updated_at        TEXT NOT NULL DEFAULT (datetime('now','localtime'))
             );
             CREATE INDEX IF NOT EXISTS idx_qlnk_kh_pgd  ON qlnk_ke_hoach(ten_pgd);
-            CREATE INDEX IF NOT EXISTS idx_qlnk_kh_ngay ON qlnk_ke_hoach(ngay_kiem_tra);
             CREATE INDEX IF NOT EXISTS idx_qlnk_kh_tt   ON qlnk_ke_hoach(trang_thai);
         """)
         try:
@@ -268,11 +268,18 @@ def init_db():
             ("nam",           "INTEGER NOT NULL DEFAULT 0"),
             ("ds_phan_cong",  "TEXT NOT NULL DEFAULT '[]'"),
             ("thanh_phan_doan", "TEXT NOT NULL DEFAULT '[]'"),
+            ("ngay_kiem_tra", "TEXT"),
         ]:
             try:
                 conn.execute(f"ALTER TABLE qlnk_ke_hoach ADD COLUMN {_col} {_typ}")
             except sqlite3.OperationalError:
                 pass
+        try:
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_qlnk_kh_ngay ON qlnk_ke_hoach(ngay_kiem_tra)"
+            )
+        except sqlite3.OperationalError:
+            pass
         conn.commit()
 
 

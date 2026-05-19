@@ -1166,42 +1166,13 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
 
         df_kh = _loc_khoanh(use_df)
 
-        # ── KPI tổng quan ─────────────────────────────────────────────────
-        tong_du_no = (
-            pd.to_numeric(use_df[COT_TONG_DU_NO], errors="coerce").sum()
-            if COT_TONG_DU_NO in use_df.columns else 0
-        )
-        tong_khoanh = (
-            pd.to_numeric(use_df[COT_DU_NO_KHOANH], errors="coerce").fillna(0).sum()
-        )
-        so_mon = (
-            df_kh[COT_SO_KU].nunique() if (not df_kh.empty and COT_SO_KU in df_kh.columns)
-            else len(df_kh)
-        )
-        so_ho = (
-            df_kh[COT_MA_KH].nunique() if (not df_kh.empty and COT_MA_KH in df_kh.columns)
-            else 0
-        )
-        tl_khoanh = tong_khoanh / tong_du_no * 100 if tong_du_no > 0 else 0
-
-        k1, k2, k3, k4 = st.columns(4)
-        k1.metric("🔒 Số món khoanh", fmt_so(so_mon))
-        k2.metric("👤 Số hộ", fmt_so(so_ho))
-        k3.metric("💰 Tổng dư nợ khoanh", fmt_ty(tong_khoanh))
-        k4.metric(
-            "📊 Tỷ lệ khoanh / tổng DN",
-            f"{tl_khoanh:.2f}".replace(".", ",") + "%",
-            delta=f"{tl_khoanh:.2f}".replace(".", ",") + "%" if tl_khoanh > 0 else None,
-            delta_color="inverse" if tl_khoanh > 2 else "off",
-        )
-
         if df_kh.empty:
             st.success("✅ Hiện không có món vay nào đang khoanh nợ.")
             return
 
         st.divider()
 
-        # ── Lọc PGD (CN only) ─────────────────────────────────────────────
+        # ── Lọc PGD (CN only) — thực hiện TRƯỚC khi tính KPI ─────────────
         key_prefix = "cn_"
         if la_phan_he_cn(role):
             col_f, _ = st.columns([2, 4])
@@ -1217,10 +1188,73 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
             from data.pgd import pgd_slug
             key_prefix = f"pgd_{pgd_slug(pgd_user)}_" if pgd_user else "pgd_"
 
+        # ── KPI tổng quan — tính từ df_kh (đã qua filter PGD) ─────────────
+        # tong_du_no: toàn bộ dư nợ cùng scope — lọc use_df theo PGD đã chọn
+        _pgd_filter_kpi = (
+            st.session_state.get("khoanh_pgd_loc")
+            if la_phan_he_cn(role) else pgd_user
+        )
+        if _pgd_filter_kpi and _pgd_filter_kpi != "Tất cả" and COT_TEN_PGD in use_df.columns:
+            use_df_scope = use_df[use_df[COT_TEN_PGD] == _pgd_filter_kpi]
+        else:
+            use_df_scope = use_df
+
+        tong_du_no = (
+            pd.to_numeric(use_df_scope[COT_TONG_DU_NO], errors="coerce").sum()
+            if COT_TONG_DU_NO in use_df_scope.columns else 0
+        )
+        tong_khoanh = (
+            pd.to_numeric(df_kh[COT_DU_NO_KHOANH], errors="coerce").fillna(0).sum()
+        )
+        so_mon = (
+            df_kh[COT_SO_KU].nunique() if COT_SO_KU in df_kh.columns
+            else len(df_kh)
+        )
+        so_ho = (
+            df_kh[COT_MA_KH].nunique() if COT_MA_KH in df_kh.columns
+            else 0
+        )
+        tl_khoanh = tong_khoanh / tong_du_no * 100 if tong_du_no > 0 else 0
+
+        k1, k2, k3, k4 = st.columns(4)
+        k1.metric("🔒 Số món khoanh", fmt_so(so_mon))
+        k2.metric("👤 Số hộ", fmt_so(so_ho))
+        k3.metric("💰 Tổng dư nợ khoanh", fmt_ty(tong_khoanh))
+        k4.metric(
+            "📊 Tỷ lệ khoanh / tổng DN",
+            f"{tl_khoanh:.2f}".replace(".", ",") + "%",
+            delta=f"{tl_khoanh:.2f}".replace(".", ",") + "%" if tl_khoanh > 0 else None,
+            delta_color="inverse" if tl_khoanh > 2 else "off",
+        )
+
         # ── Heatmap đáo hạn ───────────────────────────────────────────────
         _heatmap_dao_han(df_kh, key=f"{key_prefix}khoanh_hm")
 
         st.divider()
+
+        # ── Lọc món sắp hết hạn khoanh (từ sidebar badge) ────────────────
+        _qlnk_filter = st.session_state.pop('_qlnk_filter', None)
+        if _qlnk_filter == 'sap_het_han':
+            from alert_center import canh_bao_no_khoanh_sap_het_han
+            data_hh = canh_bao_no_khoanh_sap_het_han(df_kh)
+            ds_hh = data_hh['chi_tiet_khan'] + data_hh['chi_tiet_canh_bao']
+            if ds_hh:
+                st.markdown("#### 🔍 Sắp hết hạn khoanh (M03)")
+                st.caption(
+                    f"🔴 {data_hh['so_khan']} món hết hạn ≤30 ngày · "
+                    f"🟠 {data_hh['so_canh_bao']} món sắp hết hạn ≤180 ngày"
+                )
+                df_show = pd.DataFrame(ds_hh)
+                if 'con_lai' in df_show.columns:
+                    df_show = df_show.sort_values('con_lai')
+                    df_show['Hạn còn (ngày)'] = df_show['con_lai']
+                    df_show = df_show.drop(columns=['con_lai'], errors='ignore')
+                st.dataframe(
+                    df_show, width='stretch', hide_index=True,
+                    use_container_width=True,
+                )
+            else:
+                st.success("✅ Không có món nào sắp hết hạn khoanh.")
 
         # ── Sub-tabs ──────────────────────────────────────────────────────
         d1, d2, d3, d4, d5, d6, d7 = st.tabs([

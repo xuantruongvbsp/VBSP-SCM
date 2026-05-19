@@ -1129,8 +1129,8 @@ def _build_all_items(role: str, username: str, **kwargs) -> list:
                 {"label": "📅 Tiến độ công việc", "fn": lambda: tab_tien_do.render(None, **kwargs)},
             ],
         },
-        {"group": "Phối hợp với PGD", "label": "📋 Quản lý Báo cáo định kỳ", "icon": "file-text", "fn": lambda: tab_quan_ly_bc.render(None, **kwargs)},
-        {"group": "Phối hợp với PGD", "label": "📌 Nhiệm vụ PGD", "icon": "check", "fn": lambda: tab_nhiem_vu.render(None, **kwargs)},
+        {"group": "Phối hợp với PGD", "label": "📋 Quản lý Báo cáo", "icon": "file-text", "fn": lambda: tab_quan_ly_bc.render(None, **kwargs)},
+        {"group": "Phối hợp với PGD", "label": "📌 Quản lý Nhiệm vụ PGD", "icon": "check", "fn": lambda: tab_nhiem_vu.render(None, **kwargs)},
         {
             "group": "Giám sát",
             "label": "Cảnh báo NQH",

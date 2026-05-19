@@ -25,7 +25,7 @@ from config import (
     LY_DO_KHOANH_QD62,
     LY_DO_KHOANH_LABEL,
 )
-from utils import fmt_so, fmt_ty, hien_thi_dataframe_phan_trang, xuat_excel
+from utils import fmt_so, fmt_ty, get_tab_context, hien_thi_dataframe_phan_trang, xuat_excel
 import db
 from io import BytesIO
 from datetime import datetime
@@ -736,104 +736,160 @@ def _xuat_pdf_mau_02qlnk(row: dict,
 
 
 def _xuat_pdf_mau_03qlnk(ten_pgd: str, ten_to: str, ds_het_han: list,
-                         ghi_chu: str = "") -> bytes:
+                         tu_ngay: str = "", den_ngay: str = "",
+                         ma_to: str = "", don_vi_uy_thac: str = "") -> bytes:
     _dang_ky_font_qlnk()
-    buf = BytesIO()
+    buf    = BytesIO()
     margin = 1.5 * cm
-    doc = SimpleDocTemplate(buf, pagesize=A4,
-                            leftMargin=margin, rightMargin=margin,
-                            topMargin=margin, bottomMargin=2 * cm)
-    usable_w = A4[0] - 2 * margin
+    doc    = SimpleDocTemplate(buf, pagesize=landscape(A4),
+                               leftMargin=margin, rightMargin=margin,
+                               topMargin=1.2 * cm, bottomMargin=2 * cm)
+    usable_w = landscape(A4)[0] - 2 * margin
     elements = []
 
-    _ve_header_pdf(elements, usable_w,
-                   tieu_de="DANH SÁCH MÓN VAY HẾT THỜI GIAN KHOANH NỢ",
-                   don_vi_tren="CHI NHÁNH NHCSXH TỈNH ĐỒNG NAI",
-                   don_vi_duoi=f"PHÒNG GIAO DỊCH {(ten_pgd or '').upper()}")
-    elements.append(Paragraph(
-        "<font size='8'><i>Mẫu số: 03/QLNK</i></font>",
-        ParagraphStyle("MS", fontName=_FN, fontSize=8,
-                       alignment=TA_RIGHT, leading=10)))
-    elements.append(Paragraph("(Đơn vị tính: đồng)", _style_italic()))
+    # ── Header: 2 cột (đơn vị | mẫu số) ─────────────────────────────────────
+    _sB = ParagraphStyle("hB", fontName=_FB, fontSize=10, leading=14)
+    _sN = ParagraphStyle("hN", fontName=_FN, fontSize=10, leading=14)
+    _sR = ParagraphStyle("hR", fontName=_FN, fontSize=9,  leading=13, alignment=TA_RIGHT)
+    hdr_tbl = Table(
+        [[
+            Paragraph(
+                f"CHI NHÁNH TỈNH ĐỒNG NAI<br/>"
+                f"PHÒNG GIAO DỊCH {(ten_pgd or '').upper()}",
+                _sB,
+            ),
+            Paragraph("Mẫu số 03/QLNK", _sR),
+        ]],
+        colWidths=[usable_w * 0.7, usable_w * 0.3],
+    )
+    hdr_tbl.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP")]))
+    elements.append(hdr_tbl)
+    elements.append(Spacer(1, 8))
 
+    # ── Tiêu đề ───────────────────────────────────────────────────────────────
+    _sTitle = ParagraphStyle("T", fontName=_FB, fontSize=13, alignment=TA_CENTER, leading=18)
+    _sSub   = ParagraphStyle("S", fontName=_FN, fontSize=10, alignment=TA_CENTER, leading=14)
+    elements.append(Paragraph("DANH SÁCH MÓN VAY HẾT THỜI GIAN KHOANH NỢ", _sTitle))
+    tu_str  = tu_ngay  or "....... tháng ....... năm ......."
+    den_str = den_ngay or "....... tháng ....... năm ......."
+    elements.append(Paragraph(f"Từ ngày {tu_str} đến ngày {den_str}", _sSub))
+    elements.append(Spacer(1, 6))
+
+    # ── Thông tin tổ ─────────────────────────────────────────────────────────
+    ten_to_str = ten_to or "................................"
+    ma_to_str  = ma_to  or ".................."
+    dvut_str   = don_vi_uy_thac or ""
+    elements.append(Paragraph(
+        f"Tên tổ trưởng: <b>{ten_to_str}</b>&nbsp;&nbsp;&nbsp;&nbsp;Mã tổ: <b>{ma_to_str}</b>",
+        _sN,
+    ))
+    elements.append(Paragraph(f"Đơn vị ủy thác: <b>{dvut_str}</b>", _sN))
+
+    # ── Đơn vị tính ──────────────────────────────────────────────────────────
+    elements.append(Paragraph(
+        "Đơn vị tính: đồng",
+        ParagraphStyle("DVT", fontName=_FN, fontSize=9, alignment=TA_RIGHT, leading=12),
+    ))
     elements.append(Spacer(1, 4))
-    elements.append(Paragraph(
-        "Từ ngày ............  đến ngày ............", _style_body()))
-    elements.append(Paragraph(
-        f"Tên tổ trưởng: {ten_to or '............'}    Mã tổ: ............",
-        _style_body()))
-    if ghi_chu:
-        elements.append(Paragraph(
-            f"<i>Ghi chú: {ghi_chu}</i>",
-            ParagraphStyle("Note", fontName=_FN, fontSize=10,
-                           alignment=TA_LEFT, leading=14,
-                           textColor=colors.grey)))
 
+    # ── Bảng dữ liệu (gộp theo khách hàng) ──────────────────────────────────
     headers03 = [
         "STT", "Khách hàng", "Mã món vay",
         "Ngày được khoanh nợ", "Ngày hết hạn khoanh",
         "Nợ gốc hết hạn khoanh (đồng)", "Ngày đến hạn trả nợ cuối cùng",
     ]
-    ncols = len(headers03)
-    col_w03 = [0.8 * cm, 4.0 * cm, 2.5 * cm, 2.5 * cm, 2.5 * cm, 3.5 * cm, 3.0 * cm]
+    col_w03 = [1.0*cm, 5.5*cm, 3.2*cm, 3.5*cm, 3.5*cm, 4.5*cm, 4.0*cm]
     th03 = _style_table_header(9)
     tc03 = _style_table_cell(9)
+    tcL  = _style_table_cell_left(9)
 
-    table_data = [[Paragraph(h, th03) for h in headers03]]
-    tong_no_goc = 0
-    for stt, row in enumerate(ds_het_han or [], 1):
-        du_no = row.get(COT_DU_NO_KHOANH) or row.get("du_no_goc_khoanh") or 0
-        try:
-            du_no_f = float(du_no)
-        except (TypeError, ValueError):
-            du_no_f = 0
-        tong_no_goc += du_no_f
-        bdk = row.get("ngay_bat_dau_khoanh") or "............"
-        so_th = row.get("so_thang_khoanh")
-        hh = (_qlnk_add_months(bdk, int(so_th))
-              if (bdk != "............" and so_th) else "............")
-        table_data.append([Paragraph(v, tc03) for v in [
-            str(stt),
-            row.get(COT_TEN_KH) or row.get("ten_kh") or "............",
-            row.get(COT_SO_KU)  or row.get("ma_mon_vay") or "............",
-            bdk, hh,
-            _qlnk_fmt_dong(du_no_f),
-            row.get(COT_NGAY_DH) or row.get("ngay_den_han") or "............",
-        ]])
+    table_data   = [[Paragraph(h, th03) for h in headers03]]
+    merge_cmds   = []   # SPAN commands cho gộp dòng KH
+    tong_no_goc  = 0.0
 
+    # Gộp theo tên khách hàng
+    from collections import OrderedDict
+    nhom_kh: dict = OrderedDict()
+    for row in (ds_het_han or []):
+        kh = row.get(COT_TEN_KH) or row.get("ten_kh") or "............"
+        nhom_kh.setdefault(kh, []).append(row)
+
+    stt        = 0
+    data_row_i = 1  # index dòng trong table_data (bỏ header)
+    for kh_name, loans in nhom_kh.items():
+        stt += 1
+        for loan_i, row in enumerate(loans):
+            du_no = row.get(COT_DU_NO_KHOANH) or row.get("du_no_goc_khoanh") or 0
+            try:
+                du_no_f = float(du_no)
+            except (TypeError, ValueError):
+                du_no_f = 0.0
+            tong_no_goc += du_no_f
+
+            hh_raw = row.get(COT_NGAY_HH_KHOANH) or row.get("ngay_het_han_khoanh") or ""
+            bdk    = row.get("ngay_bat_dau_khoanh") or ""
+            so_th  = row.get("so_thang_khoanh")
+            # Ưu tiên dùng cột HH trực tiếp; fallback tính từ BĐK + số tháng
+            if not hh_raw and bdk and so_th:
+                hh_raw = _qlnk_add_months(bdk, int(so_th))
+            hh_str  = hh_raw  or "............"
+            bdk_str = bdk     or "............"
+            dh_str  = row.get(COT_NGAY_DH) or row.get("ngay_den_han") or "............"
+
+            table_data.append([
+                Paragraph(str(stt) if loan_i == 0 else "", tc03),
+                Paragraph(kh_name  if loan_i == 0 else "", tcL),
+                Paragraph(str(row.get(COT_SO_KU) or row.get("ma_mon_vay") or "............"), tc03),
+                Paragraph(bdk_str, tc03),
+                Paragraph(hh_str,  tc03),
+                Paragraph(_qlnk_fmt_dong(du_no_f), tc03),
+                Paragraph(dh_str,  tc03),
+            ])
+
+            # SPAN dọc cho cột STT và Khách hàng nếu KH có nhiều món
+            if loan_i == 0 and len(loans) > 1:
+                r_start = data_row_i
+                r_end   = data_row_i + len(loans) - 1
+                merge_cmds += [
+                    ("SPAN", (0, r_start), (0, r_end)),
+                    ("SPAN", (1, r_start), (1, r_end)),
+                ]
+            data_row_i += 1
+
+    # Dòng Cộng
+    last_row = len(table_data)
     table_data.append([
+        Paragraph("", tc03),
         Paragraph("<b>Cộng:</b>",
-                  ParagraphStyle("THB", fontName=_FB, fontSize=9, alignment=TA_CENTER)),
-        Paragraph("", tc03), Paragraph("", tc03), Paragraph("", tc03), Paragraph("", tc03),
+                  ParagraphStyle("CB", fontName=_FB, fontSize=9, alignment=TA_LEFT, leading=12)),
+        Paragraph("", tc03), Paragraph("", tc03), Paragraph("", tc03),
         Paragraph(f"<b>{_qlnk_fmt_dong(tong_no_goc)}</b>",
-                  ParagraphStyle("THB", fontName=_FB, fontSize=9, alignment=TA_CENTER)),
+                  ParagraphStyle("CB2", fontName=_FB, fontSize=9, alignment=TA_CENTER, leading=12)),
         Paragraph("", tc03),
     ])
 
     style_cmds03 = [
-        ("BACKGROUND", (0, 0), (-1, 0), _HEADER_BG),
-        ("TEXTCOLOR", (0, 0), (-1, 0), colors.black),
-        ("GRID", (0, 0), (-1, -1), 0.5, _BORDER_COLOR),
-        ("BOX", (0, 0), (-1, -1), 1, _VBSP_GREEN),
-        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-        ("TOPPADDING", (0, 0), (-1, -1), 4),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
-    ]
-    for r in range(1, len(table_data) - 1):
-        if r % 2 == 0:
-            style_cmds03.append(("BACKGROUND", (0, r), (-1, r), _ROW_ALT))
-    last_row = len(table_data) - 1
-    style_cmds03.append(("BACKGROUND", (0, last_row), (-1, last_row), _VBSP_GREEN_LIGHT))
-    style_cmds03.append(("FONTNAME", (0, last_row), (-1, last_row), _FB))
-    style_cmds03.append(("LINEABOVE", (0, last_row), (-1, last_row), 1.5, _VBSP_GREEN))
+        ("BACKGROUND",    (0, 0),  (-1, 0),        _HEADER_BG),
+        ("GRID",          (0, 0),  (-1, -1),        0.5, _BORDER_COLOR),
+        ("BOX",           (0, 0),  (-1, -1),        1,   colors.black),
+        ("VALIGN",        (0, 0),  (-1, -1),        "MIDDLE"),
+        ("TOPPADDING",    (0, 0),  (-1, -1),        3),
+        ("BOTTOMPADDING", (0, 0),  (-1, -1),        3),
+        ("BACKGROUND",    (0, last_row), (-1, last_row), _VBSP_GREEN_LIGHT),
+        ("LINEABOVE",     (0, last_row), (-1, last_row), 1, colors.black),
+    ] + merge_cmds
 
     tbl = Table(table_data, colWidths=col_w03, repeatRows=1)
     tbl.setStyle(TableStyle(style_cmds03))
     elements.append(tbl)
+    elements.append(Spacer(1, 10))
 
-    _ve_footer_pdf(elements, usable_w,
-                   signatures=["Lập biểu", "Kiểm soát", "Giám đốc"],
-                   ngay_str=_dong_ten_nd())
+    # ── Chữ ký ───────────────────────────────────────────────────────────────
+    _ve_footer_pdf(
+        elements, usable_w,
+        signatures=["Lập biểu", "KIỂM SOÁT", "GIÁM ĐỐC"],
+        ngay_str=_dong_ten_nd(),
+    )
 
     doc.build(elements)
     buf.seek(0)
@@ -1144,7 +1200,7 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
     pgd_user = kwargs.get("pgd_user")
     username = kwargs.get("username", "unknown")
 
-    ctx = tab if tab is not None else st.container()
+    ctx = get_tab_context(tab)
     with ctx:
         st.subheader("🔒 Phân tích Nợ khoanh")
         st.caption(
@@ -1326,208 +1382,219 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
 
         with d5:
             perms = get_permissions(role)
-            co_quyen_nhap  = perms.get("upload") or perms.get("nhap_ke_hoach")
+            co_quyen_nhap  = perms.get("can_upload") or perms.get("upload")
             co_quyen_duyet = la_phan_he_cn(role) or co_quyen_upload_pgd(role)
             pgd_filter_kh  = None if la_phan_he_cn(role) else pgd_user
 
-            # ── A: Form lập kế hoạch ──────────────────────────────────────────
-            with st.expander("➕ Lập kế hoạch kiểm tra mới", expanded=False):
+            # ── A: Form lập kế hoạch cả năm ──────────────────────────────────
+            with st.expander("➕ Lập / cập nhật kế hoạch kiểm tra cả năm", expanded=False):
                 if not co_quyen_nhap:
                     st.warning("⚠️ Bạn không có quyền lập kế hoạch kiểm tra.")
                 else:
-                    c1, c2, c3 = st.columns(3)
+                    c1, c2 = st.columns([1, 2])
                     with c1:
-                        # Danh sách xã từ df_kh (đã lọc du_no_khoanh > 0)
-                        ds_xa = sorted(df_kh[COT_TEN_XA].dropna().unique().tolist()) \
-                                if COT_TEN_XA in df_kh.columns else []
-                        xa_chon = st.selectbox(
-                            "Xã/Phường *",
-                            ["— Chọn —"] + ds_xa,
-                            key=f"{key_prefix}kh_xa",
+                        nam_kh = st.number_input(
+                            "Năm kế hoạch *",
+                            min_value=2020, max_value=2035,
+                            value=datetime.now().year, step=1,
+                            key=f"{key_prefix}kh_nam",
                         )
                     with c2:
-                        # Lọc tổ TK&VV theo xã đã chọn
-                        if xa_chon != "— Chọn —" and COT_TEN_TO in df_kh.columns:
-                            ds_to = sorted(
-                                df_kh[df_kh[COT_TEN_XA] == xa_chon][COT_TEN_TO]
-                                .dropna().unique().tolist()
+                        if la_phan_he_cn(role):
+                            pgd_kh = st.selectbox(
+                                "PGD *", ["— Chọn —"] + DS_PGD,
+                                key=f"{key_prefix}kh_pgd",
                             )
                         else:
-                            ds_to = []
-                        to_chon = st.selectbox(
-                            "Tổ TK&VV",
-                            ["— Tất cả —"] + ds_to,
-                            key=f"{key_prefix}kh_to",
+                            pgd_kh = pgd_user or ""
+                            st.info(f"PGD: **{pgd_kh}**")
+
+                    # Lọc toàn bộ món khoanh hết hạn trong năm đã chọn
+                    df_kh_form = df_kh.copy()
+                    if la_phan_he_cn(role) and pgd_kh != "— Chọn —":
+                        if COT_TEN_PGD in df_kh_form.columns:
+                            df_kh_form = df_kh_form[df_kh_form[COT_TEN_PGD] == pgd_kh]
+                    elif not la_phan_he_cn(role) and pgd_user:
+                        if COT_TEN_PGD in df_kh_form.columns:
+                            df_kh_form = df_kh_form[df_kh_form[COT_TEN_PGD] == pgd_user]
+
+                    if COT_NGAY_HH_KHOANH in df_kh_form.columns:
+                        _hh_s = pd.to_datetime(
+                            df_kh_form[COT_NGAY_HH_KHOANH], dayfirst=True, errors="coerce"
                         )
-                    with c3:
-                        ngay_kh = st.date_input(
-                            "Ngày kiểm tra dự kiến *",
-                            key=f"{key_prefix}kh_ngay",
-                        )
+                        df_kh_form = df_kh_form[_hh_s.dt.year == int(nam_kh)].copy()
 
-                    # Thành phần đoàn kiểm tra
-                    st.markdown("**Thành phần đoàn kiểm tra**")
-                    df_tp_default = pd.DataFrame([
-                        {"Họ và tên": username, "Chức vụ/Đơn vị": "CBTD"},
-                        {"Họ và tên": "",       "Chức vụ/Đơn vị": ""},
-                    ])
-                    df_tp = st.data_editor(
-                        df_tp_default,
-                        num_rows="dynamic",
-                        key=f"{key_prefix}kh_thanh_phan",
-                        use_container_width=True,
-                    )
-
-                    # Chọn món vay đưa vào kế hoạch
-                    st.markdown("**Chọn món vay kiểm tra**")
-                    df_loc_kh = df_kh.copy()
-                    if xa_chon != "— Chọn —" and COT_TEN_XA in df_loc_kh.columns:
-                        df_loc_kh = df_loc_kh[df_loc_kh[COT_TEN_XA] == xa_chon]
-                    if to_chon != "— Tất cả —" and COT_TEN_TO in df_loc_kh.columns:
-                        df_loc_kh = df_loc_kh[df_loc_kh[COT_TEN_TO] == to_chon]
-
-                    if df_loc_kh.empty or COT_SO_KU not in df_loc_kh.columns:
-                        st.info("ℹ️ Không có món vay khoanh nào trong phạm vi đã chọn.")
-                        ds_chon = []
+                    if df_kh_form.empty:
+                        _pgd_s = f" của {pgd_kh}" if (la_phan_he_cn(role) and pgd_kh != "— Chọn —") else ""
+                        st.info(f"ℹ️ Không có món vay khoanh nào hết hạn trong năm {int(nam_kh)}{_pgd_s}.")
                     else:
-                        # Label: "TênKH — SốKU — LýDoKhoanh"
-                        def _label_mon(row):
-                            bs = db.doc_bo_sung_mon_vay(str(row.get(COT_SO_KU, "")))
-                            ly_do_ma = bs.get("ly_do_khoanh", "") if bs else ""
-                            ly_do_str = LY_DO_KHOANH_LABEL.get(ly_do_ma, "Chưa xác định lý do")
-                            return (
-                                f"{row.get(COT_TEN_KH, '')} — "
-                                f"{row.get(COT_SO_KU, '')} — "
-                                f"{ly_do_str}"
-                            )
-                        options_mon = df_loc_kh.apply(_label_mon, axis=1).tolist()
-                        ku_list     = df_loc_kh[COT_SO_KU].tolist()
-                        label_to_ku = dict(zip(options_mon, ku_list))
-
-                        chon_labels = st.multiselect(
-                            f"Chọn món vay ({len(df_loc_kh)} món trong phạm vi)",
-                            options=options_mon,
-                            key=f"{key_prefix}kh_ds_mon",
+                        st.info(
+                            f"📋 **{len(df_kh_form)} món vay** hết hạn khoanh trong năm {int(nam_kh)}. "
+                            "Điền **Ngày KT dự kiến** cho từng món "
+                            "(bắt buộc trong vòng **120 ngày** trước ngày hết hạn khoanh)."
                         )
-                        ds_chon = [label_to_ku[l] for l in chon_labels]
 
-                    ghi_chu_kh = st.text_area(
-                        "Ghi chú",
-                        key=f"{key_prefix}kh_ghi_chu",
-                        max_chars=500,
-                    )
+                        # Bảng phân công — data_editor (chỉ 2 cột được chỉnh)
+                        _cols_co_dinh = [c for c in [
+                            COT_TEN_XA, COT_TEN_TO, COT_TEN_KH,
+                            COT_SO_KU, COT_DU_NO_KHOANH, COT_NGAY_HH_KHOANH,
+                        ] if c in df_kh_form.columns]
 
-                    col_b1, col_b2, _ = st.columns([1, 1, 4])
-                    with col_b1:
-                        luu_kh_btn = st.button(
-                            "💾 Lưu kế hoạch",
-                            key=f"{key_prefix}kh_luu",
+                        df_edit = df_kh_form[_cols_co_dinh].copy().reset_index(drop=True)
+                        df_edit[COT_DU_NO_KHOANH] = (
+                            pd.to_numeric(df_edit[COT_DU_NO_KHOANH], errors="coerce")
+                            .fillna(0).apply(fmt_ty)
+                        )
+                        df_edit["Ngày KT dự kiến"] = ""
+                        df_edit["Ghi chú"]         = ""
+
+                        df_edited = st.data_editor(
+                            df_edit,
+                            key=f"{key_prefix}kh_phan_cong",
+                            use_container_width=True,
+                            height=min(45 + len(df_edit) * 35, 520),
+                            disabled=_cols_co_dinh,
+                            column_config={
+                                "Ngày KT dự kiến": st.column_config.TextColumn(
+                                    "Ngày KT dự kiến",
+                                    help="Nhập dạng dd/mm/yyyy. Phải ≤ 120 ngày trước HH khoanh.",
+                                    max_chars=12,
+                                ),
+                            },
+                        )
+
+                        # Thành phần đoàn
+                        st.markdown("**Thành phần đoàn kiểm tra**")
+                        df_tp = st.data_editor(
+                            pd.DataFrame([
+                                {"Họ và tên": username, "Chức vụ": "CBTD"},
+                                {"Họ và tên": "",       "Chức vụ": ""},
+                            ]),
+                            num_rows="dynamic",
+                            key=f"{key_prefix}kh_tp_doan",
                             use_container_width=True,
                         )
-                    with col_b2:
-                        duyet_kh_btn = st.button(
-                            "✅ Duyệt luôn",
-                            key=f"{key_prefix}kh_duyet_luon",
-                            disabled=not co_quyen_duyet,
-                            use_container_width=True,
+
+                        ghi_chu_kh = st.text_area(
+                            "Ghi chú chung", key=f"{key_prefix}kh_ghi_chu", max_chars=500,
                         )
 
-                    if luu_kh_btn or duyet_kh_btn:
-                        loi_kh = []
-                        if xa_chon == "— Chọn —":
-                            loi_kh.append("Chưa chọn xã")
-                        if not ngay_kh:
-                            loi_kh.append("Chưa nhập ngày kiểm tra")
-                        if not ds_chon:
-                            loi_kh.append("Chưa chọn món vay nào")
-                        if loi_kh:
-                            for l in loi_kh:
-                                st.error(f"❌ {l}")
-                        else:
-                            thanh_phan_list = df_tp[
-                                df_tp["Họ và tên"].str.strip() != ""
-                            ].to_dict("records")
-                            ten_pgd_kh = (
-                                str(df_kh[df_kh[COT_TEN_XA] == xa_chon][COT_TEN_PGD].iloc[0])
-                                if (COT_TEN_PGD in df_kh.columns and xa_chon != "— Chọn —"
-                                    and not df_kh[df_kh[COT_TEN_XA] == xa_chon].empty)
-                                else (pgd_user or "")
+                        col_b1, col_b2, _ = st.columns([1, 1, 4])
+                        with col_b1:
+                            luu_kh_btn = st.button(
+                                "💾 Lưu kế hoạch", key=f"{key_prefix}kh_luu",
+                                use_container_width=True,
                             )
-                            data_kh = {
-                                "ten_pgd":       ten_pgd_kh,
-                                "ten_xa":        xa_chon,
-                                "ten_to_tkv":    to_chon if to_chon != "— Tất cả —" else "",
-                                "ngay_kiem_tra": str(ngay_kh),
-                                "thanh_phan":    thanh_phan_list,
-                                "ds_mon_vay":    ds_chon,
-                                "ghi_chu":       ghi_chu_kh,
-                                "trang_thai":    "cho_duyet",
-                            }
-                            try:
-                                kh_id = db.luu_ke_hoach_kiem_tra(data_kh, username)
-                                if duyet_kh_btn:
-                                    db.duyet_ke_hoach(kh_id, username)
-                                st.cache_data.clear()
-                                label_kh = "lưu và duyệt" if duyet_kh_btn else "lưu"
-                                st.success(f"✅ Đã {label_kh} kế hoạch kiểm tra.")
-                                st.rerun()
-                            except Exception as e:
-                                st.error(f"❌ Lỗi: {e}")
+                        with col_b2:
+                            duyet_kh_btn = st.button(
+                                "✅ Duyệt luôn", key=f"{key_prefix}kh_duyet_luon",
+                                disabled=not co_quyen_duyet, use_container_width=True,
+                            )
+
+                        if luu_kh_btn or duyet_kh_btn:
+                            loi_kh = []
+                            if la_phan_he_cn(role) and pgd_kh == "— Chọn —":
+                                loi_kh.append("Chưa chọn PGD")
+
+                            # Build ds_phan_cong
+                            ku_hh_map = {}
+                            if COT_SO_KU in df_kh_form.columns and COT_NGAY_HH_KHOANH in df_kh_form.columns:
+                                ku_hh_map = {
+                                    str(r[COT_SO_KU] or ""): str(r[COT_NGAY_HH_KHOANH] or "")
+                                    for _, r in df_kh_form.iterrows()
+                                }
+                            ds_phan_cong = []
+                            for _, row_e in df_edited.iterrows():
+                                so_ku     = str(row_e.get(COT_SO_KU, "") or "")
+                                ngay_kt_s = str(row_e.get("Ngày KT dự kiến", "") or "").strip()
+                                hh_raw    = ku_hh_map.get(so_ku, "")
+                                ds_phan_cong.append({
+                                    "so_ku":           so_ku,
+                                    "ten_kh":          str(row_e.get(COT_TEN_KH, "") or ""),
+                                    "ten_xa":          str(row_e.get(COT_TEN_XA, "") or ""),
+                                    "ten_to":          str(row_e.get(COT_TEN_TO, "") or ""),
+                                    "ngay_hh_khoanh":  hh_raw,
+                                    "du_no_khoanh":    str(row_e.get(COT_DU_NO_KHOANH, "") or ""),
+                                    "ngay_kt_du_kien": ngay_kt_s,
+                                    "ghi_chu":         str(row_e.get("Ghi chú", "") or ""),
+                                })
+
+                            if loi_kh:
+                                for _l in loi_kh:
+                                    st.error(f"❌ {_l}")
+                            else:
+                                tp_list    = df_tp[df_tp["Họ và tên"].str.strip() != ""].to_dict("records")
+                                ten_pgd_kh = pgd_kh if la_phan_he_cn(role) else (pgd_user or "")
+                                data_kh = {
+                                    "ten_pgd":         ten_pgd_kh,
+                                    "nam":             int(nam_kh),
+                                    "thanh_phan_doan": tp_list,
+                                    "ds_phan_cong":    ds_phan_cong,
+                                    "ghi_chu":         ghi_chu_kh,
+                                }
+                                try:
+                                    kh_id = db.luu_ke_hoach_kiem_tra(data_kh, username)
+                                    if duyet_kh_btn:
+                                        db.duyet_ke_hoach(kh_id, username)
+                                    label_kh = "lưu và duyệt" if duyet_kh_btn else "lưu"
+                                    st.success(f"✅ Đã {label_kh} kế hoạch kiểm tra năm {int(nam_kh)}.")
+                                    st.rerun()
+                                except Exception as e:
+                                    st.error(f"❌ Lỗi: {e}")
 
             # ── B: Danh sách kế hoạch đã lập ─────────────────────────────────
-            st.markdown("### 📋 Danh sách kế hoạch kiểm tra")
+            st.markdown("### 📋 Danh sách kế hoạch đã lập")
 
-            col_fkh, _ = st.columns([2, 4])
-            with col_fkh:
+            cf1, cf2, _ = st.columns([1, 2, 3])
+            with cf1:
+                nam_loc = st.number_input(
+                    "Năm", min_value=2020, max_value=2035,
+                    value=datetime.now().year, step=1,
+                    key=f"{key_prefix}kh_loc_nam",
+                )
+            with cf2:
                 loc_tt_kh = st.selectbox(
                     "Trạng thái",
                     ["Tất cả", "Chờ duyệt", "Đã duyệt"],
                     key=f"{key_prefix}kh_loc_tt",
                 )
-            tt_map_kh = {
-                "Tất cả":   None,
-                "Chờ duyệt": "cho_duyet",
-                "Đã duyệt":  "da_duyet",
-            }
+            tt_map_kh = {"Tất cả": None, "Chờ duyệt": "luu_tam", "Đã duyệt": "da_duyet"}
 
             rows_kh = db.doc_ke_hoach_kiem_tra(
                 ten_pgd=pgd_filter_kh,
                 trang_thai=tt_map_kh[loc_tt_kh],
+                nam=int(nam_loc),
             )
 
             if not rows_kh:
                 st.info("ℹ️ Chưa có kế hoạch nào.")
             else:
                 df_kh_list = pd.DataFrame([{
-                    "ID":          r["id"],
-                    "PGD":         r["ten_pgd"],
-                    "Xã":          r["ten_xa"],
-                    "Tổ TK&VV":    r.get("ten_to_tkv", ""),
-                    "Ngày KT":     r["ngay_kiem_tra"],
-                    "Số món":      len(r.get("ds_mon_vay") or []),
-                    "Trạng thái":  r["trang_thai"],
-                    "Người lập":   r["nguoi_lap"],
-                    "Người duyệt": r.get("nguoi_duyet", ""),
+                    "ID":            r["id"],
+                    "PGD":           r["ten_pgd"],
+                    "Năm":           r.get("nam", ""),
+                    "Tổng món":      len(r.get("ds_phan_cong") or []),
+                    "Đã điền ngày":  sum(
+                        1 for x in (r.get("ds_phan_cong") or [])
+                        if x.get("ngay_kt_du_kien", "").strip()
+                    ),
+                    "Trạng thái":    r["trang_thai"],
+                    "Người lập":     r["nguoi_lap"],
+                    "Người duyệt":   r.get("nguoi_duyet", ""),
+                    "Ngày duyệt":    r.get("ngay_duyet", ""),
                 } for r in rows_kh])
 
                 hien_thi_dataframe_phan_trang(
-                    df_kh_list,
-                    key=f"{key_prefix}kh_list_tbl",
-                    height=320,
+                    df_kh_list, key=f"{key_prefix}kh_list_tbl", height=320,
                 )
 
                 if co_quyen_duyet:
                     st.markdown("**Duyệt kế hoạch theo ID:**")
                     kh_id_action = st.number_input(
-                        "ID kế hoạch",
-                        min_value=1, step=1,
+                        "ID kế hoạch", min_value=1, step=1,
                         key=f"{key_prefix}kh_action_id",
                     )
-                    if st.button(
-                        "✅ Duyệt kế hoạch này",
-                        key=f"{key_prefix}kh_duyet_id",
-                        use_container_width=False,
-                    ):
+                    if st.button("✅ Duyệt kế hoạch này", key=f"{key_prefix}kh_duyet_id"):
                         ok = db.duyet_ke_hoach(int(kh_id_action), username)
                         st.success("Đã duyệt.") if ok else st.error("Không thể duyệt.")
                         st.rerun()
@@ -2403,19 +2470,51 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                         )
                     if to_03 != "— Tất cả —" and COT_TEN_TO in df_03.columns:
                         df_03 = df_03[df_03[COT_TEN_TO] == to_03]
-                    st.info(f"{len(df_03)} món trong phạm vi đã chọn.")
-                    ghi_chu_03 = st.text_area(
-                        "Ghi chú", max_chars=300,
-                        key=f"{key_prefix}mb_03_gc",
-                    )
-                    if st.button("� Xuất PDF Mẫu 03/QLNK",
+
+                    # Lọc < 120 ngày trước hết hạn
+                    col_nd03, col_ck03 = st.columns([2, 3])
+                    with col_nd03:
+                        ngay_tinh_03 = st.date_input(
+                            "Ngày tính",
+                            value=datetime.now().date(),
+                            key=f"{key_prefix}mb_03_ngay",
+                        )
+                    with col_ck03:
+                        loc_120 = st.checkbox(
+                            "Chỉ lấy món hết hạn trong vòng 120 ngày",
+                            value=True,
+                            key=f"{key_prefix}mb_03_loc120",
+                        )
+                    if loc_120 and COT_NGAY_HH_KHOANH in df_03.columns:
+                        _ref = pd.Timestamp(ngay_tinh_03)
+                        _hh  = pd.to_datetime(df_03[COT_NGAY_HH_KHOANH], dayfirst=True, errors="coerce")
+                        df_03 = df_03[(_hh - _ref).dt.days < 120].copy()
+
+                    st.info(f"**{len(df_03)} món** trong phạm vi đã chọn.")
+
+                    # Thông tin bổ sung cho mẫu
+                    c03a, c03b = st.columns(2)
+                    with c03a:
+                        tu_ngay_03  = st.text_input("Từ ngày", placeholder="dd/mm/yyyy",
+                                                    key=f"{key_prefix}mb_03_tu")
+                        ma_to_03    = st.text_input("Mã tổ", key=f"{key_prefix}mb_03_ma_to")
+                    with c03b:
+                        den_ngay_03 = st.text_input("Đến ngày", placeholder="dd/mm/yyyy",
+                                                    key=f"{key_prefix}mb_03_den")
+                        dvut_03     = st.text_input("Đơn vị ủy thác",
+                                                    key=f"{key_prefix}mb_03_dvut")
+
+                    if st.button("📄 Xuất PDF Mẫu 03/QLNK",
                                  key=f"{key_prefix}mb_03_tao", type="primary"):
                         try:
                             ten_to_03 = to_03 if to_03 != "— Tất cả —" else ""
                             pdf_03 = _xuat_pdf_mau_03qlnk(
                                 pgd_03 or "", ten_to_03,
                                 df_03.to_dict("records"),
-                                ghi_chu=ghi_chu_03,
+                                tu_ngay=tu_ngay_03,
+                                den_ngay=den_ngay_03,
+                                ma_to=ma_to_03,
+                                don_vi_uy_thac=dvut_03,
                             )
                             st.session_state[f"{key_prefix}mb_03_pdf"] = pdf_03
                             st.session_state[f"{key_prefix}mb_03_fn"] = (

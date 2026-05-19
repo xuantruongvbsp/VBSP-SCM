@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [2026-05-19] — Fix vi phạm convention trong widgets/data_source_status.py
+- `widgets/data_source_status.py` — thay `role == "user"` và `role in ["admin", "manager"]` bằng `normalize_role()` + `la_phan_he_pgd()`
+
+## [2026-05-19] — Fix triệt để bảng Cơ cấu dư nợ + 193 lỗi width='stretch' toàn dự án
+- `tabs/tab_tongquan.py` — fix 4 bug: (1) `width='stretch'` → `use_container_width=True`; (2) tên cột đơn vị sai "(tỷ)" → "(triệu đồng)" cho TW, ĐP, Giải ngân, Thu nợ; (3) chart xaxis_title sai; (4) bỏ `column_config` vô dụng trên cột string
+- **37 file toàn dự án** — thay 193 lần `width='stretch'` → `use_container_width=True` (Streamlit 1.57.0 không hỗ trợ `width='stretch'`)
+
 ## [2026-05-19] — Gộp 3 tab thành "Quản lý Công việc & Nhiệm vụ"
 - `tabs/tab_quan_ly_cv.py` — tạo mới: wrapper gộp tab_tien_do + tab_nhiem_vu + tab_quan_ly_bc thành 3 sub-tab
 - `workspaces/ws_management.py` — thay 3 dòng menu riêng lẻ bằng 1 mục "📊 Quản lý Công việc & Nhiệm vụ"

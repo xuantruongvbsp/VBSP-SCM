@@ -6,6 +6,30 @@ from io import BytesIO
 from datetime import datetime
 from pathlib import Path
 
+from config import (
+    COT_CMND,
+    COT_DIA_CHI,
+    COT_DU_NO_KHOANH,
+    COT_DVUT,
+    COT_NGAY_CAP_CMND,
+    COT_NGAY_DH,
+    COT_NGAY_HH_KHOANH,
+    COT_NGAY_SINH,
+    COT_NOI_CAP_CMND,
+    COT_SDT,
+    COT_SO_KU,
+    COT_TEN_CT,
+    COT_TEN_KH,
+    COT_TEN_PGD,
+    COT_TEN_TO,
+    COT_TEN_XA,
+    LY_DO_KHOANH_LABEL,
+)
+
+from utils import fmt_so
+
+_fmt_dong = lambda x: fmt_so(float(x)) + " đồng" if x not in (None, "", float("nan")) else "0 đồng"
+
 _REPORTLAB_READY = False
 try:
     from reportlab.lib import colors

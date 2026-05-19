@@ -1,5 +1,8 @@
 # CHANGELOG
 
+## [2026-05-19] — Viết CONVENTIONS.md từ STABLE.md + CHANGELOG
+- `CONVENTIONS.md` — tạo mới: 9 lỗi bị cấm, conventions tích cực, checklist trước khi sinh code
+
 ## [2026-05-19] — Fix báo cáo GQVL TW gắn MĐT không tìm thấy cột PL NV
 - `services/kiem_soat_service.py` — thêm import `COT_PL_NV`; đổi hardcode `"PL NV"` → `COT_PL_NV` ("Phân loại NV") vì cột đã được rename khi merge
 

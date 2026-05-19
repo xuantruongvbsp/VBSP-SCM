@@ -411,7 +411,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                                 xaxis_title="", yaxis=dict(title="",autorange="reversed"),
                                 coloraxis_showscale=False,
                                 plot_bgcolor="rgba(0,0,0,0)",paper_bgcolor="rgba(0,0,0,0)")
-                            st.plotly_chart(fig_t, width='stretch')
+                            st.plotly_chart(fig_t, use_container_width=True)
                     with c_giam:
                         st.markdown("**📉 Giảm mạnh nhất (top 8)**")
                         top_giam = df_ct_loc[df_ct_loc["_ht"] < df_ct_loc["_pv"]]\
@@ -427,7 +427,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                                 xaxis_title="", yaxis=dict(title="",autorange="reversed"),
                                 coloraxis_showscale=False,
                                 plot_bgcolor="rgba(0,0,0,0)",paper_bgcolor="rgba(0,0,0,0)")
-                            st.plotly_chart(fig_g, width='stretch')
+                            st.plotly_chart(fig_g, use_container_width=True)
 
         with cd_tab5:
             if db_ht_rows is None:
@@ -480,7 +480,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                     legend=dict(orientation="h", y=1.08),
                     plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
                 )
-                st.plotly_chart(fig_bd, width='stretch')
+                st.plotly_chart(fig_bd, use_container_width=True)
 
         st.divider()
 

@@ -294,7 +294,7 @@ def _render_xuat_to_khong_dat_tieu_chi(
                 a.metric("Điểm TB", f"{df_s['Điểm đạt được'].mean():.1f}")
                 b.metric("Điểm thấp nhất", f"{df_s['Điểm đạt được'].min():.1f}")
                 c.metric("Điểm cao nhất", f"{df_s['Điểm đạt được'].max():.1f}")
-                st.dataframe(df_s.head(20), width='stretch', height=360)
+                st.dataframe(df_s.head(20), use_container_width=True, height=360)
                 if len(df_s) > 20:
                     st.caption(f"Hiển thị 20/{len(df_s)} tổ, tải Excel/PDF để xem đầy đủ.")
 
@@ -310,7 +310,7 @@ def _render_xuat_to_khong_dat_tieu_chi(
                 data=excel_bytes,
                 file_name=ten_file_xuat(f"To_khong_dat_{slug}"),
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                width='stretch',
+                use_container_width=True,
                 key="xuat_tc_excel",
             )
         with col_pdf:
@@ -331,7 +331,7 @@ def _render_xuat_to_khong_dat_tieu_chi(
                     data=pdf_bytes,
                     file_name=f"To_khong_dat_{slug}_{ts}.pdf",
                     mime="application/pdf",
-                    width='stretch',
+                    use_container_width=True,
                     key="xuat_tc_pdf",
                 )
             except Exception as e_pdf:
@@ -339,7 +339,7 @@ def _render_xuat_to_khong_dat_tieu_chi(
                     "📄 Xuất PDF",
                     disabled=True,
                     help=f"Không tạo được PDF: {e_pdf}",
-                    width='stretch',
+                    use_container_width=True,
                     key="xuat_tc_pdf_na",
                 )
 
@@ -468,7 +468,7 @@ def _sub_tong_hop(username: str) -> None:
 
     col_pie, col_bang = st.columns([1, 2])
     with col_pie:
-        st.plotly_chart(fig_pie, width='stretch')
+        st.plotly_chart(fig_pie, use_container_width=True)
     with col_bang:
         st.markdown("**Bảng tổng hợp theo Phòng giao dịch**")
         hien_thi_dataframe_phan_trang(
@@ -675,7 +675,7 @@ def _sub_phan_tich_chat_luong(username: str, cdto_mode: str, pgd_user: str) -> N
                     # Update colors for xếp loại categories
                     fig.update_traces(marker_color="#1f77b4")  # Default blue for comparison
                     
-                    st.plotly_chart(fig, width='stretch')
+                    st.plotly_chart(fig, use_container_width=True)
                 
         except Exception as e:
             st.warning(f"Lỗi đọc dữ liệu tháng so sánh: {e}")
@@ -741,7 +741,7 @@ def _sub_ban_do_chat_luong(username: str, cdto_mode: str, pgd_user: str) -> None
                 title="Kích vào ô để drill-down · Đỏ = Tổ Yếu cần chấn chỉnh"
             )
             
-            st.plotly_chart(fig_tree, width='stretch')
+            st.plotly_chart(fig_tree, use_container_width=True)
         else:
             st.warning("Không có dữ liệu đầy đủ để vẽ treemap.")
     else:
@@ -1038,7 +1038,7 @@ def _sub_xu_huong(username: str, cdto_mode: str, pgd_user: str) -> None:
         hovermode="x unified"
     )
     
-    st.plotly_chart(fig_line, width='stretch')
+    st.plotly_chart(fig_line, use_container_width=True)
 
     st.divider()
 
@@ -1093,7 +1093,7 @@ def _sub_xu_huong(username: str, cdto_mode: str, pgd_user: str) -> None:
                 )
                 
                 fig_pgd.update_layout(height=400)
-                st.plotly_chart(fig_pgd, width='stretch')
+                st.plotly_chart(fig_pgd, use_container_width=True)
 
         st.divider()
 

@@ -292,7 +292,7 @@ def _sub_phan_tich(pgd_user: str, username: str) -> None:
                     title="So sánh xếp loại 2 tháng",
                 )
                 fig.update_traces(marker_color="#1f77b4")
-                st.plotly_chart(fig, width='stretch')
+                st.plotly_chart(fig, use_container_width=True)
     else:
         st.info(
             "Cần ít nhất **2 tháng** đã lưu trong lịch sử upload (file cdtotkvv_YYYY_MM.xlsx) "
@@ -467,7 +467,7 @@ def _sub_xu_huong(pgd_user: str, _username: str) -> None:
         legend=dict(orientation="h", y=1.02),
         hovermode="x unified",
     )
-    st.plotly_chart(fig_line, width='stretch')
+    st.plotly_chart(fig_line, use_container_width=True)
 
     st.divider()
     st.markdown("**Điểm trung bình & tỷ lệ Tốt / Yếu theo tháng**")
@@ -516,7 +516,7 @@ def _sub_xu_huong(pgd_user: str, _username: str) -> None:
         legend=dict(orientation="h", y=1.05),
         hovermode="x unified",
     )
-    st.plotly_chart(fig_ty, width='stretch')
+    st.plotly_chart(fig_ty, use_container_width=True)
 
     st.divider()
     st.markdown("**Cảnh báo xu hướng xấu**")
@@ -644,7 +644,7 @@ def render(tab: DeltaGenerator, **kwargs) -> None:
                     c1.metric("Số món đến hạn", fmt_so(len(df_ndh)))
                     c2.metric("Tổng dư nợ (triệu đồng)", fmt(tong_dn))
 
-                    st.dataframe(df_ndh, width='stretch',
+                    st.dataframe(df_ndh, use_container_width=True,
                                  hide_index=True)
 
                     # Xuất Excel

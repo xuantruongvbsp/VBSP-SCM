@@ -198,7 +198,7 @@ def _heatmap_thang(df_soon: pd.DataFrame, key_prefix: str) -> None:
         margin=dict(t=20, b=30, l=40, r=20),
     )
     st.markdown("**📅 Phân bổ theo tháng đáo hạn**")
-    st.plotly_chart(fig, width='stretch', key=f"{key_prefix}som_hm_bar")
+    st.plotly_chart(fig, use_container_width=True, key=f"{key_prefix}som_hm_bar")
 
 
 # ─── Render core ──────────────────────────────────────────────────────────────

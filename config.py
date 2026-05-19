@@ -300,7 +300,8 @@ COT_DIA_CHI    = "Địa chỉ"
 COT_SDT        = "Số điện thoại"
 COT_NGAY_SL       = "Ngày số liệu"
 COT_GOC_TRA       = "Gốc đã trả"
-COT_DU_NO_KHOANH  = "Dư nợ khoanh"
+COT_DU_NO_KHOANH    = "Dư nợ khoanh"
+COT_NGAY_HH_KHOANH = "Ngày hết hạn Khoanh"
 
 # ── Tên cột bổ sung (tra cứu nâng cao) ──────────────────────────────────────
 COT_CMND          = "Số CMND"           # hoặc CCCD

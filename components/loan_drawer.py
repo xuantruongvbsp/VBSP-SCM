@@ -28,13 +28,13 @@ from config import (
     COT_CMND,
 )
 
-_DRAWER_HTML = """<div id="loan-drawer-overlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.3);z-index:999998;" onclick="closeLoanDrawer()"></div>
-<div id="loan-drawer" style="display:none;position:fixed;top:0;right:-600px;width:580px;height:100vh;background:white;box-shadow:-4px 0 24px rgba(0,0,0,0.15);z-index:999999;overflow-y:auto;transition:right 0.3s ease;padding:0;">
+_DRAWER_HTML = """<div id="loan-drawer-overlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:999998;" onclick="closeLoanDrawer()"></div>
+<div id="loan-drawer" style="display:none;position:fixed;top:0;right:-600px;width:580px;height:100vh;background:#1E2130;box-shadow:-4px 0 24px rgba(0,0,0,0.4);z-index:999999;overflow-y:auto;transition:right 0.3s ease;padding:0;">
   <div style="position:sticky;top:0;background:#2E7D32;color:white;padding:16px 20px;display:flex;align-items:center;justify-content:space-between;z-index:10;">
     <span style="font-weight:700;font-size:16px;" id="drawer-title">Chi tiết khoản vay</span>
     <button onclick="closeLoanDrawer()" style="background:none;border:none;color:white;font-size:24px;cursor:pointer;padding:0 4px;">&times;</button>
   </div>
-  <div id="drawer-content" style="padding:16px 20px 40px;font-size:14px;color:#333;"></div>
+  <div id="drawer-content" style="padding:16px 20px 40px;font-size:14px;color:#E0E6ED;"></div>
 </div>
 <script>
 function openLoanDrawer(htmlContent, title) {
@@ -82,9 +82,9 @@ def _render_field(name: str, value: Any, fmt: str | None = None) -> str:
 
     return (
         f'<div style="display:flex;justify-content:space-between;padding:6px 0;'
-        f'border-bottom:1px solid #f0f0f0;">'
-        f'<span style="color:#666;font-size:13px;">{name}</span>'
-        f'<span style="font-weight:600;font-size:13px;color:#222;">{display}</span>'
+        f'border-bottom:1px solid #2A2D3E;">'
+        f'<span style="color:#94A3B8;font-size:13px;">{name}</span>'
+        f'<span style="font-weight:600;font-size:13px;color:#E0E6ED;">{display}</span>'
         f'</div>'
     )
 
@@ -159,8 +159,8 @@ def loan_detail_drawer(
         fields = group.get("fields", []) + (extra_fields or [])
 
         html_parts.append(
-            f'<div style="font-weight:700;font-size:14px;color:#2E7D32;'
-            f'margin:12px 0 6px;padding-bottom:4px;border-bottom:2px solid #E8F5E9;">'
+            f'<div style="font-weight:700;font-size:14px;color:#66BB6A;'
+            f'margin:12px 0 6px;padding-bottom:4px;border-bottom:2px solid #1B5E20;">'
             f'{title}</div>'
         )
 
@@ -180,10 +180,10 @@ def loan_detail_drawer(
 
     st.markdown(
         f'<button onclick="openLoanDrawer(\'{safe_html}\', \'{safe_title}\')" '
-        f'style="background:none;border:1px solid #2E7D32;border-radius:6px;'
-        f'color:#2E7D32;padding:4px 12px;font-size:13px;cursor:pointer;'
+        f'style="background:none;border:1px solid #66BB6A;border-radius:6px;'
+        f'color:#66BB6A;padding:4px 12px;font-size:13px;cursor:pointer;'
         f'transition:all 0.2s;" '
-        f'onmouseover="this.style.background=\'#E8F5E9\'" '
+        f'onmouseover="this.style.background=\'#0D2818\'" '
         f'onmouseout="this.style.background=\'transparent\'">'
         f'📄 Chi tiết</button>',
         unsafe_allow_html=True,

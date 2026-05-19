@@ -184,7 +184,7 @@ def _render_metric_cards(**kwargs) -> None:
     pct_th = dth / tdn * 100 if tdn > 0 else 100
     st.markdown(
         f"**Tỷ lệ Dư nợ trong hạn:** "
-        f"<span style='color:#1565C0;font-weight:bold'>{pct_th:.1f}%</span> "
+        f"<span style='color:#90CAF9;font-weight:bold'>{pct_th:.1f}%</span> "
         f"&nbsp;|&nbsp; **NQH:** "
         f"<span style='color:{mau};font-weight:bold'>{tlqh:.3f}%</span>",
         unsafe_allow_html=True,
@@ -294,11 +294,11 @@ def _heatmap_rui_ro_pgd(df_full: pd.DataFrame) -> None:
     ).round(1)
     t = t.sort_values("rr", ascending=False).reset_index(drop=True)
 
-    BD = "#d1d5db"; H = "#003D7A"; W = "#fff"; A = "#f8fafc"
-    R = "#dc2626"; AM = "#d97706"; G = "#16a34a"; GR = "#9ca3af"
+    BD = "#2A2D3E"; H = "#1B5E20"; W = "#1E2130"; A = "#161922"; TX = "#E0E6ED"
+    R = "#EF9A9A"; AM = "#FFCC80"; G = "#A5D6A7"; GR = "#94A3B8"
 
     def td(v, al="right", c="", bg="", fw=""):
-        s = f"text-align:{al};padding:5px 8px;border:1px solid {BD};font-size:0.8rem;white-space:nowrap"
+        s = f"text-align:{al};padding:5px 8px;border:1px solid {BD};font-size:0.8rem;white-space:nowrap;color:{TX}"
         if c:
             s += f";color:{c}"
         if bg:
@@ -345,7 +345,7 @@ def _heatmap_rui_ro_pgd(df_full: pd.DataFrame) -> None:
   <thead><tr>{thead}</tr></thead>
   <tbody>{"".join(rows_h)}</tbody>
 </table>
-<p style="font-size:0.75rem;color:#6b7280;margin:4px 0 0">
+<p style="font-size:0.75rem;color:#94A3B8;margin:4px 0 0">
 NQH%: <span style="color:{G}">■</span>&lt;0.5% &nbsp;
 <span style="color:{AM}">■</span>0.5–2% &nbsp;
 <span style="color:{R}">■</span>≥2% &nbsp;·&nbsp;
@@ -1497,11 +1497,11 @@ def render_sidebar_menu(role: str, username: str, **kwargs) -> None:
     """Render menu LÃNH ĐẠO — gọi từ app.py bên trong with st.sidebar."""
 
     GROUP_COLORS = {
-        "Tổng quan":         {"bg": "#E6F1FB", "border": "#378ADD", "text": "#185FA5"},
-        "Cảnh báo rủi ro":   {"bg": "#FCEBEB", "border": "#E24B4A", "text": "#A32D2D"},
-        "Kiểm soát":         {"bg": "#EAF3DE", "border": "#639922", "text": "#3B6D11"},
-        "Báo cáo":           {"bg": "#FAEEDA", "border": "#BA7517", "text": "#854F0B"},
-        "Hệ thống":          {"bg": "#F1EFE8", "border": "#888780", "text": "#5F5E5A"},
+        "Tổng quan":         {"bg": "#0D2137", "border": "#64B5F6", "text": "#90CAF9"},
+        "Cảnh báo rủi ro":   {"bg": "#2D0D14", "border": "#EF9A9A", "text": "#F48FB1"},
+        "Kiểm soát":         {"bg": "#0D2818", "border": "#A5D6A7", "text": "#A5D6A7"},
+        "Báo cáo":           {"bg": "#2D1F0D", "border": "#FFCC80", "text": "#FFD54F"},
+        "Hệ thống":          {"bg": "#1E2130", "border": "#94A3B8", "text": "#B0BEC5"},
     }
 
     df_full = kwargs.get("df_full")
@@ -1518,7 +1518,7 @@ def render_sidebar_menu(role: str, username: str, **kwargs) -> None:
 
     st.markdown(
         "<p style='font-size:12px;font-weight:500;"
-        "color:#444;margin-bottom:4px'>MENU LÃNH ĐẠO</p>",
+        "color:#94A3B8;margin-bottom:4px'>MENU LÃNH ĐẠO</p>",
         unsafe_allow_html=True,
     )
 

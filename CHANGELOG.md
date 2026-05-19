@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## [2026-05-20] — Fix chữ đen trong dark theme (heatmap + sidebar labels)
+- `workspaces/ws_executive.py` dòng ~297 — đổi màu bảng heatmap PGD: row bg `#fff`→`#1E2130`, border `#d1d5db`→`#2A2D3E`, text NQH/RR sáng hơn; chữ row mặc định thêm `color:#E0E6ED`
+- `workspaces/ws_executive.py` dòng ~187 — span `color:#1565C0` → `#90CAF9` (đọc được trên nền tối)
+- `workspaces/ws_executive.py` dòng ~348,1500,1521 — footnote gray `#6b7280`→`#94A3B8`; GROUP_COLORS & header sidebar đổi sang tone sáng dark-mode
+- `workspaces/ws_management.py` dòng ~1193,1219 — GROUP_COLORS & header "MENU ĐIỀU HÀNH" đổi sang tone sáng dark-mode
+
 ## [2026-05-20] — Hoàn tất xóa Block 3 trong tab_no_khoanh.py
 - `tabs/tab_no_khoanh.py` dòng ~1372-1721 — xóa hoàn toàn block `with d_kt:` thứ ba (show_mb + 4 expander xuất PDF QLNK cũ); tab giờ chỉ dùng `_render_cv368_kt()` mới
 

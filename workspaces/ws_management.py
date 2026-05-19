@@ -1191,14 +1191,14 @@ def render_sidebar_menu(role: str, username: str, **kwargs):
     """Render menu ĐIỀU HÀNH — gọi từ app.py bên trong with st.sidebar."""
 
     GROUP_COLORS = {
-        "Giám sát":                    {"bg": "#E6F1FB", "border": "#378ADD", "text": "#185FA5"},
-        "Kiểm soát":                   {"bg": "#FCEBEB", "border": "#E24B4A", "text": "#A32D2D"},
-        "Kế hoạch và Thực hiện KHTD": {"bg": "#EAF3DE", "border": "#639922", "text": "#3B6D11"},
-        "Báo cáo":                     {"bg": "#FAEEDA", "border": "#BA7517", "text": "#854F0B"},
-        "Ủy Thác":                     {"bg": "#EEEDFE", "border": "#7F77DD", "text": "#3C3489"},
-        "Phối hợp với PGD":            {"bg": "#E6F5EE", "border": "#27AE60", "text": "#1A7340"},
-        "Thông tin chung":             {"bg": "#E3F2FD", "border": "#1976D2", "text": "#0D47A1"},
-        "Hệ thống":                    {"bg": "#F1EFE8", "border": "#888780", "text": "#5F5E5A"},
+        "Giám sát":                    {"bg": "#0D2137", "border": "#64B5F6", "text": "#90CAF9"},
+        "Kiểm soát":                   {"bg": "#2D0D14", "border": "#EF9A9A", "text": "#F48FB1"},
+        "Kế hoạch và Thực hiện KHTD": {"bg": "#0D2818", "border": "#A5D6A7", "text": "#A5D6A7"},
+        "Báo cáo":                     {"bg": "#2D1F0D", "border": "#FFCC80", "text": "#FFD54F"},
+        "Ủy Thác":                     {"bg": "#1A1040", "border": "#CE93D8", "text": "#CE93D8"},
+        "Phối hợp với PGD":            {"bg": "#0D2818", "border": "#80CBC4", "text": "#80CBC4"},
+        "Thông tin chung":             {"bg": "#0D2137", "border": "#90CAF9", "text": "#90CAF9"},
+        "Hệ thống":                    {"bg": "#1E2130", "border": "#94A3B8", "text": "#B0BEC5"},
     }
 
     all_items = _build_all_items(role, username, **kwargs)
@@ -1216,7 +1216,7 @@ def render_sidebar_menu(role: str, username: str, **kwargs):
 
     st.markdown(
         "<p style='font-size:14px;font-weight:700;"
-        "color:#0D47A1;margin-bottom:6px'>MENU ĐIỀU HÀNH</p>",
+        "color:#94A3B8;margin-bottom:6px'>MENU ĐIỀU HÀNH</p>",
         unsafe_allow_html=True
     )
 

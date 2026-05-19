@@ -481,13 +481,23 @@ def merge_du_lieu_toan_cn(
     for col in _cols_so_cn:
         if col in df_toan_cn.columns:
             df_toan_cn[col] = pd.to_numeric(df_toan_cn[col], errors="coerce")
-    # Vectorize string cleanup: xử lý tất cả cột text cùng lúc thay vì loop từng cột
+    # String cleanup — dùng to_numpy(dtype=object) để bypass hoàn toàn ArrowDtype
     _str_cols = [c for c in df_toan_cn.columns if c not in _cols_so_cn]
-    if _str_cols:
-        _tmp = df_toan_cn[_str_cols].fillna("").astype(str)
-        _tmp = _tmp.apply(lambda s: s.str.strip())
-        _tmp = _tmp.replace({"nan": "", "None": "", "<NA>": "", "NaT": ""})
-        df_toan_cn[_str_cols] = _tmp
+    _BAD_VALS = {"nan", "None", "<NA>", "NaT"}
+    for _c in _str_cols:
+        try:
+            # to_numpy trả về ndarray Python object, NA → None, bỏ qua Arrow backend
+            arr = df_toan_cn[_c].to_numpy(dtype=object, na_value=None)
+            df_toan_cn[_c] = pd.array(
+                [
+                    "" if (v is None)
+                    else ("" if str(v).strip() in _BAD_VALS else str(v).strip())
+                    for v in arr
+                ],
+                dtype=object,
+            )
+        except Exception:
+            pass
 
     with _MERGE_LOCK[loai]:
         bak_path = cache_path + ".bak"

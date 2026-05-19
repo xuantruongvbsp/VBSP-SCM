@@ -209,7 +209,10 @@ def _cache_co_cau_ct(
     _ = (ts, pgd_filter)
     _df_loc = _df[_df[COT_TONG_DU_NO].fillna(0) > 0].copy()
 
-    _nv = pd.to_numeric(_df_loc.get(COT_NGUON_VON, pd.Series(dtype="float64")), errors="coerce")
+    if COT_NGUON_VON in _df_loc.columns:
+        _nv = pd.to_numeric(_df_loc[COT_NGUON_VON], errors="coerce")
+    else:
+        _nv = pd.Series(0, index=_df_loc.index, dtype="float64")
     du_no_tw = _df_loc[_nv == 1].groupby(COT_TEN_CT)[COT_TONG_DU_NO].sum()
     du_no_dp = _df_loc[_nv == 2].groupby(COT_TEN_CT)[COT_TONG_DU_NO].sum()
 
@@ -222,7 +225,6 @@ def _cache_co_cau_ct(
         .sort_values("du_no", ascending=False)
         .reset_index()
     )
-    df_ct = df_ct.rename(columns={"COT_TEN_CT": "ten_ct"})
     df_ct.columns = ["ten_ct", "du_no", "_tmp"]
     df_ct["so_kh"]  = df_ct["ten_ct"].map(_so_kh_by_ct).fillna(0).astype(int)
     df_ct["so_mon"] = df_ct["ten_ct"].map(_so_mon_by_ct).fillna(0).astype(int)

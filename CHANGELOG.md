@@ -1,5 +1,8 @@
 # CHANGELOG
 
+## [2026-05-19] — Đổi tên 2 mục menu ws_management
+- `workspaces/ws_management.py` dòng ~1132 — "Quản lý Báo cáo định kỳ" → "Quản lý Báo cáo"; "Nhiệm vụ PGD" → "Quản lý Nhiệm vụ PGD"
+
 ## [2026-05-19] — Đồng bộ CONVENTIONS.md vào Trae rules
 - `.trae/rules/rules.md` — append toàn bộ nội dung CONVENTIONS.md (9 lỗi bị cấm + patterns) vào cuối file rules
 

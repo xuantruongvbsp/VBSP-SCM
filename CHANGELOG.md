@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## [2026-05-20] — Tăng tốc dashboard Nợ Khoanh: batch query + cache
+- `tabs/tab_qlnk_dashboard.py` dòng ~42 — thêm `_cached_ket_qua_kiem_tra()` với `@st.cache_data(ttl=60)` thay cho gọi DB trực tiếp mỗi render
+- `tabs/tab_qlnk_dashboard.py` dòng ~48 — `_doc_ly_do_khoanh()` dùng `db.doc_bo_sung_nhieu_mon_vay()` batch IN-clause thay N+1 loop (tiết kiệm 100–500 SQL query/render)
+- `db.py` — `doc_bo_sung_nhieu_mon_vay()` batch query đã thêm session trước
+
 ## [2026-05-20] — Fix ValueError "truth value of DataFrame ambiguous" tab Nợ Khoanh
 - `tabs/tab_no_khoanh.py` dòng 834 — đổi `kwargs.get("df_full") or df` → `df if _df_full is None else _df_full`; `or` không dùng được với DataFrame
 

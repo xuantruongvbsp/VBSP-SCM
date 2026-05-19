@@ -11,7 +11,7 @@ import streamlit as st
 import db
 from auth import normalize_role, la_admin_cn
 from config import DS_PGD, DON_VI_CHI_NHANH, PGD_XA_MAP, ROLES_PHAN_HE_CN
-from utils import fmt_ngay
+from utils import fmt_ngay, lazy_tabs
 
 DS_PGD_ALL = [DON_VI_CHI_NHANH] + DS_PGD
 _PGD_BIEN_HOA = "Địa bàn Biên Hòa"
@@ -1995,31 +1995,32 @@ def render(tab, **kwargs):
             return
 
         if ctx.is_pgd:
-            t1, t2 = st.tabs(["📊 Tổng quan", "📋 Cập nhật tiến độ"])
-            with t1:
-                _render_tong_quan(t1, **kwargs)
-            with t2:
-                _render_cap_nhat(t2, **kwargs)
+            lazy_tabs(
+                ["📊 Tổng quan", "📋 Cập nhật tiến độ"],
+                [
+                    lambda: _render_tong_quan(st.container(), **kwargs),
+                    lambda: _render_cap_nhat(st.container(), **kwargs),
+                ],
+                key="td_pgd",
+            )
             return
 
         if not ctx.is_cn:
             _render_tong_quan(tab, **kwargs)
             return
 
-        t1, t2, t3, t4, t5 = st.tabs([
-            "📊 Tổng quan", "➕ Tạo đầu việc mới", "✏️ Chỉnh sửa & Xóa đầu việc",
-            "📋 Cập nhật tiến độ", "📤 Xuất báo cáo",
-        ])
-        with t1:
-            _render_tong_quan(t1, **kwargs)
-        with t2:
-            _render_tao_task(t2, **kwargs)
-        with t3:
-            _render_quan_ly_task(t3, **kwargs)
-        with t4:
-            _render_cap_nhat(t4, **kwargs)
-        with t5:
-            _render_xuat(t5, **kwargs)
+        lazy_tabs(
+            ["📊 Tổng quan", "➕ Tạo đầu việc mới", "✏️ Chỉnh sửa & Xóa đầu việc",
+             "📋 Cập nhật tiến độ", "📤 Xuất báo cáo"],
+            [
+                lambda: _render_tong_quan(st.container(), **kwargs),
+                lambda: _render_tao_task(st.container(), **kwargs),
+                lambda: _render_quan_ly_task(st.container(), **kwargs),
+                lambda: _render_cap_nhat(st.container(), **kwargs),
+                lambda: _render_xuat(st.container(), **kwargs),
+            ],
+            key="td_cn",
+        )
 
 
 def render_tong_quan_only(tab, **kwargs):

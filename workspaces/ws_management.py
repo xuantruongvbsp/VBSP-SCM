@@ -834,7 +834,7 @@ Danh sách này ảnh hưởng trực tiếp đến báo cáo **phân tầng GQV
                         if col in df_pv.columns:
                             df_pv[col] = df_pv[col].apply(fmt_ty)
                     df_pv["Ghi chú"] = df_pv["Nhóm"].map(lambda m: ghi_chu_map.get(m, ""))
-                    st.dataframe(df_pv, hide_index=True, width='stretch')
+                    st.dataframe(df_pv, hide_index=True, use_container_width=True)
         except Exception as e:
             st.warning(f"Không thể phân tích tác động GQVL: {e}")
 
@@ -859,7 +859,7 @@ Danh sách này ảnh hưởng trực tiếp đến báo cáo **phân tầng GQV
                 key="dl_ndt_dp",
             )
     with col_rf:
-        if st.button("🔄 Làm mới", key="btn_refresh_ndt_dp", width='stretch',
+        if st.button("🔄 Làm mới", key="btn_refresh_ndt_dp", use_container_width=True,
                      help="Xóa cache và tải lại dữ liệu GQVL"):
             st.cache_data.clear()
             st.rerun()
@@ -1316,7 +1316,7 @@ def render_sidebar_menu(role: str, username: str, **kwargs):
                 if st.button(
                     item["label"],
                     key=f"menu_{item['label']}",
-                    width='stretch',
+                    use_container_width=True,
                 ):
                     st.session_state["ws_mgmt_menu"] = item["label"]
                     st.rerun()

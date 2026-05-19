@@ -993,7 +993,7 @@ def _tab_khtd_chi_nhanh(
                 })
                 st.dataframe(
                     df_hist_display[["Thời điểm", "Người sửa", "Ghi chú"]],
-                    width='stretch',
+                    use_container_width=True,
                     hide_index=True,
                 )
 
@@ -1155,7 +1155,7 @@ def _tab_khtd_theo_xa(role: str, username: str, df_full: "pd.DataFrame | None") 
     
     with col_btn:
         st.markdown("<br>", unsafe_allow_html=True)
-        xuat_pdf_clicked = st.button("🖨️ Xuất PDF", width='stretch', type="primary")
+        xuat_pdf_clicked = st.button("🖨️ Xuất PDF", use_container_width=True, type="primary")
 
     # ── Upload Excel hàng loạt ────────────────────────────────────────────
     with st.expander("📤 Upload Excel kế hoạch hàng loạt", expanded=False):

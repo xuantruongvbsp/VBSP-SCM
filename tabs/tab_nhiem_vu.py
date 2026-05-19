@@ -180,7 +180,7 @@ def _render_danh_sach_manager(tab, **kwargs):
         # ── Xuất PDF ──
         col_pdf, _ = st.columns([1, 5])
         with col_pdf:
-            if st.button("📥 Xuất PDF", key="btn_xuat_pdf_nv", width='stretch', type="primary"):
+            if st.button("📥 Xuất PDF", key="btn_xuat_pdf_nv", use_container_width=True, type="primary"):
                 pdf_bytes = _xuat_pdf_nhiem_vu(ds_nv, chu_ky, ky)
                 st.session_state["_pdf_nv_bytes"] = pdf_bytes
                 st.session_state["_pdf_nv_ten"] = f"danh_sach_nhiem_vu_{chu_ky}_{ky}.pdf"

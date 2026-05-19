@@ -778,7 +778,7 @@ def _render_theo_dvut(df: pd.DataFrame) -> None:
     for col in ["Dư nợ (tỷ)", "NQH (tỷ)", "Lãi tồn (tỷ)"]:
         if col in hien.columns:
             hien[col] = hien[col].apply(fmt_bang_ty)
-    st.dataframe(hien, width='stretch', hide_index=True)
+    st.dataframe(hien, use_container_width=True, hide_index=True)
 
 
 def _render_ke_hoach(df: pd.DataFrame, pgd_user: str) -> None:
@@ -923,7 +923,7 @@ def _render_mau06(df: pd.DataFrame, pgd_user: str) -> None:
     ca, cb  = st.columns(2)
     ca.metric("Số món cần KT", fmt_so(len(df_m06)))
     cb.metric("Tổng dư nợ (triệu đồng)", fmt(tong_dn))
-    st.dataframe(df_m06, width='stretch',
+    st.dataframe(df_m06, use_container_width=True,
                  hide_index=True, height=300)
 
     # Form thông tin người kiểm tra
@@ -1086,7 +1086,7 @@ def _render_mau15(df: pd.DataFrame, pgd_user: str) -> None:
     k2.metric("Tổng nợ gốc (triệu đồng)", fmt(tong_goc))
     k3.metric("Tổng nợ lãi (triệu đồng)", fmt(tong_lai))
     k4.metric("Tổng TG TK (triệu đồng)", fmt(tong_tg))
-    st.dataframe(df_to, width='stretch', hide_index=True, height=350)
+    st.dataframe(df_to, use_container_width=True, hide_index=True, height=350)
 
     # Tự động lấy xã và tổ trưởng từ Tổ đang chọn
     xa_cua_to = ""
@@ -1388,7 +1388,7 @@ def _render_bien_ban(df: pd.DataFrame, pgd_user: str) -> None:
     for col in ["Dư nợ (triệu đồng)", "NQH (triệu đồng)", "Lãi tồn (triệu đồng)"]:
         if col in hien.columns:
             hien[col] = hien[col].apply(fmt)
-    st.dataframe(hien, width='stretch', hide_index=True)
+    st.dataframe(hien, use_container_width=True, hide_index=True)
 
     buf = xuat_excel({"Tổng hợp ủy thác": df_th})
     ten_file = f"TongHopUyThac_{pgd_user}_{date.today().strftime('%d%m%Y')}.xlsx"

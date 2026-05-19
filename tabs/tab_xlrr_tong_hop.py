@@ -138,7 +138,7 @@ def _render_tong_quan(df_qd62: pd.DataFrame, df_no_rr: pd.DataFrame) -> None:
             ),
         })
     df_pgd = pd.DataFrame(ds_rows)
-    st.dataframe(df_pgd, hide_index=True, width='stretch')
+    st.dataframe(df_pgd, hide_index=True, use_container_width=True)
 
 
 def _render_qd62(df_qd62: pd.DataFrame) -> None:
@@ -183,7 +183,7 @@ def _render_qd62(df_qd62: pd.DataFrame) -> None:
             "trang_thai", "ngay_lap"
         ] if c in df_show.columns
     ]
-    st.dataframe(df_show[cot_hien], hide_index=True, width='stretch', height=400)
+    st.dataframe(df_show[cot_hien], hide_index=True, use_container_width=True, height=400)
     st.caption(
         f"Tổng: **{len(df_loc)}** hồ sơ | "
         f"Dư nợ gốc: **{fmt_ty(df_loc['du_no_goc'].sum() if 'du_no_goc' in df_loc.columns else 0)}**"
@@ -227,7 +227,7 @@ def _render_no_rr(df_no_rr: pd.DataFrame) -> None:
             "bien_phap", "nguyen_nhan", "ngay_rr"
         ] if c in df_show.columns
     ]
-    st.dataframe(df_show[cot_hien], hide_index=True, width='stretch', height=400)
+    st.dataframe(df_show[cot_hien], hide_index=True, use_container_width=True, height=400)
     st.caption(
         f"Tổng: **{len(df_loc)}** hồ sơ | "
         f"Dư nợ: **{fmt_ty(df_loc['du_no'].sum() if 'du_no' in df_loc.columns else 0)}**"

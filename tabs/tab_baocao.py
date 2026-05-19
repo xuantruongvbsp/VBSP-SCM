@@ -14,7 +14,7 @@ from services import xuat_bao_cao, ten_file_bao_cao
 from pdf_service import nut_xuat_pdf
 from data import (danh_dau_khong_hd, tong_hop_khong_hd, ds_chi_tiet_khong_hd)
 from tabs import tab_nq11
-from auth import la_phan_he_pgd, la_phan_he_cn
+from auth import la_phan_he_pgd, la_phan_he_cn, la_executive
 
 if TYPE_CHECKING:
     from streamlit.delta_generator import DeltaGenerator
@@ -191,7 +191,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
 
                 df_pdf["TL Nợ xấu %"] = (
                     (df_pdf["Dư nợ QH"] + df_pdf["Nợ khoanh"])
-                    / df_pdf["Tổng dư nợ"].replace(0, float("nan"))
+                    / df_pdf["Tổng dư nợ"].replace(0, float("nan"))  # noqa: COT — tên display sau agg rename
                     * 100
                 ).round(2).fillna(0)
 
@@ -270,7 +270,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                     key="btn_pdf_bc_phancap_dl",
                 )
         else:
-            if (la_phan_he_cn(role) and role != "executive") and COT_TEN_PGD in df.columns:
+            if (la_phan_he_cn(role) and not la_executive(role)) and COT_TEN_PGD in df.columns:
                 loc_pgd_bc = st.selectbox(
                     "📍 PGD",
                     ["Tất cả"] + sorted(df[COT_TEN_PGD].dropna().unique().tolist()),
@@ -281,7 +281,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                 st.markdown(f"📍 PGD: **{loc_pgd_bc}**")
 
             df_base = df.copy()
-            if (la_phan_he_cn(role) and role != "executive") and loc_pgd_bc != "Tất cả":
+            if (la_phan_he_cn(role) and not la_executive(role)) and loc_pgd_bc != "Tất cả":
                 df_base = df_base[df_base[COT_TEN_PGD] == loc_pgd_bc]
             elif la_phan_he_pgd(role) and pgd_user:
                 df_base = df_base[df_base[COT_TEN_PGD] == loc_pgd_bc] if loc_pgd_bc != "Tất cả" else df_base

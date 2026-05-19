@@ -20,7 +20,7 @@ import plotly.graph_objects as go
 import streamlit as st
 from streamlit.delta_generator import DeltaGenerator
 
-from auth import normalize_role
+from auth import normalize_role, la_executive
 from config import (
     COT_DU_NO_QH,
     COT_MA_KH,
@@ -146,7 +146,7 @@ def _render_sub_ct(df_full: pd.DataFrame) -> None:
         height=max(400, len(top15) * 34 + 100),
         margin=dict(l=20, r=90, t=50, b=30),
     )
-    st.plotly_chart(fig, width='stretch', key="hhi_ct_chart")
+    st.plotly_chart(fig, use_container_width=True, key="hhi_ct_chart")
 
     st.markdown("**Bảng tổng hợp Chương trình**")
     df_ct = _bang_tap_trung(df_full, COT_TEN_CT)
@@ -179,20 +179,20 @@ def _render_sub_xa(df_full: pd.DataFrame) -> None:
 
     # Bỏ dòng dư nợ = 0 (treemap không hỗ trợ value=0)
     agg_xa = agg_xa[agg_xa["tong_du_no"] > 0].copy()
-    agg_xa["tong_du_no_ty"] = agg_xa["tong_du_no"] / 1e9
+    agg_xa["tong_du_no_trieu"] = agg_xa["tong_du_no"] / 1_000_000
 
     if not agg_xa.empty:
         midpoint = float(agg_xa["tl_nqh_pct"].median())
         fig_xa = px.treemap(
             agg_xa,
             path=[px.Constant("Chi nhánh"), COT_TEN_PGD, COT_TEN_XA],
-            values="tong_du_no_ty",
+            values="tong_du_no_trieu",
             color="tl_nqh_pct",
             color_continuous_scale=["#43A047", "#FFA000", "#E53935"],
             color_continuous_midpoint=midpoint,
             title="Dư nợ theo Xã — màu nền = tỷ lệ NQH%",
             labels={
-                "tong_du_no_ty": "Dư nợ (tỷ đồng)",
+                "tong_du_no_trieu": "Dư nợ (triệu đồng)",
                 "tl_nqh_pct": "NQH%",
             },
         )
@@ -205,7 +205,7 @@ def _render_sub_xa(df_full: pd.DataFrame) -> None:
             )
         )
         fig_xa.update_layout(height=520)
-        st.plotly_chart(fig_xa, width='stretch', key="hhi_xa_treemap")
+        st.plotly_chart(fig_xa, use_container_width=True, key="hhi_xa_treemap")
 
     st.markdown("**Bảng tổng hợp Xã**")
     df_xa = _bang_tap_trung(df_full, COT_TEN_XA, extra_cols=[COT_TEN_PGD])

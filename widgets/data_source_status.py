@@ -12,6 +12,7 @@ Không dùng ngôn ngữ "ưu tiên / fallback" — hai luồng hoàn toàn tác
 import streamlit as st
 from typing import Optional
 from datetime import datetime
+from auth import la_phan_he_pgd, normalize_role
 
 from config import DS_PGD, CACHE_HSTD
 from utils import format_df_vn
@@ -52,9 +53,10 @@ def render_widget_compact(pgd_user: Optional[str] = None, role: str = "user",
             st.sidebar.info("📤 Dữ liệu địa bàn")
         return
 
-    if role == "user" and pgd_user:
+    role_n = normalize_role(str(role or "user"))
+    if la_phan_he_pgd(role_n) and pgd_user:
         _render_pgd_status(pgd_user)
-    elif role in ["admin", "manager"]:
+    elif not la_phan_he_pgd(role_n):
         _render_admin_overview()
     else:
         st.sidebar.info("📤 Dữ liệu địa bàn")
@@ -164,7 +166,7 @@ def render_detailed_status(pgd_user: Optional[str] = None,
             df_bao_cao = bao_cao_trang_thai_nguon()
             st.dataframe(
                 format_df_vn(df_bao_cao),
-                width='stretch',
+                use_container_width=True,
                 hide_index=True,
                 height=400,
             )

@@ -206,8 +206,8 @@ def _render_full_record(hs: pd.Series) -> None:
             html = '<div style="display:grid;grid-template-columns:140px 1fr;gap:2px 10px;font-size:0.82rem;padding:4px 0 10px 8px">'
             for lbl, val in rows:
                 html += (
-                    f'<span style="color:#666;font-weight:500">{lbl}</span>'
-                    f'<span style="color:#111">{val}</span>'
+                    f'<span style="color:#94A3B8;font-weight:500">{lbl}</span>'
+                    f'<span style="color:#E0E6ED">{val}</span>'
                 )
             html += "</div>"
             st.markdown(html, unsafe_allow_html=True)
@@ -254,12 +254,12 @@ def _render_card(
 
     # Tiêu đề
     ten_kh   = str(hs.get(COT_TEN_KH, "—"))
-    badge_nq = ' <span style="background:#fff3e0;color:#e65100;border:1px solid #ffb74d;border-radius:10px;padding:1px 7px;font-size:.75rem;font-weight:700">✨ NQ11</span>' if nq11 else ""
-    badge_qh = ' <span style="background:#ffebee;color:#c62828;border:1px solid #ef9a9a;border-radius:10px;padding:1px 7px;font-size:.75rem;font-weight:700">⚠️ Quá hạn</span>' if dqh > 0 else ""
-    border   = "#c62828" if dqh > 0 else "#1565c0"
+    badge_nq = ' <span style="background:#1B5E20;color:#81C784;border:1px solid #2E7D32;border-radius:10px;padding:1px 7px;font-size:.75rem;font-weight:700">✨ NQ11</span>' if nq11 else ""
+    badge_qh = ' <span style="background:#2D0D14;color:#EF9A9A;border:1px solid #C62828;border-radius:10px;padding:1px 7px;font-size:.75rem;font-weight:700">⚠️ Quá hạn</span>' if dqh > 0 else ""
+    border   = "#EF5350" if dqh > 0 else "#42A5F5"
 
     st.markdown(
-        f'<div style="background:#f8f9fa;border-radius:12px;padding:14px 18px;'
+        f'<div style="background:#1E2130;border-radius:12px;padding:14px 18px;'
         f'border-left:4px solid {border};margin-bottom:6px">'
         f'<span style="font-size:1.05rem;font-weight:700">{ten_kh}</span>'
         f'{badge_nq}{badge_qh}</div>',
@@ -285,7 +285,7 @@ def _render_card(
         st.markdown("**📄 Khoản vay**")
         ct_html = ten_ct + (badge_nq if nq11 else "")
         st.markdown(f"**Chương trình:** {ct_html}", unsafe_allow_html=True)
-        nv_color = "#e65100" if la_dp else "#1565c0"
+        nv_color = "#FFB74D" if la_dp else "#42A5F5"
         st.markdown(
             f'**Nguồn vốn:** <span style="color:{nv_color};font-weight:600">{_nv_str(nv_val)}</span>',
             unsafe_allow_html=True,
@@ -315,9 +315,9 @@ def _render_card(
         # NQH — tô đỏ
         if dqh > 0:
             st.markdown(
-                f'<div style="background:#ffebee;border-radius:8px;padding:6px 10px;margin-top:4px">'
+                f'<div style="background:#2D0D14;border-radius:8px;padding:6px 10px;margin-top:4px">'
                 f'⚠️ <b>Dư nợ quá hạn:</b> '
-                f'<span style="color:#c62828;font-weight:700">{fmt_tien(dqh)}</span></div>',
+                f'<span style="color:#EF9A9A;font-weight:700">{fmt_tien(dqh)}</span></div>',
                 unsafe_allow_html=True,
             )
         else:
@@ -499,7 +499,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                 key="tracuu_keyword",
             )
         with sb2:
-            st.button("Tìm", type="primary", width='stretch', key="tracuu_btn_tim")
+            st.button("Tìm", type="primary", use_container_width=True, key="tracuu_btn_tim")
 
         # ── Filter buttons ──────────────────────────────────────────────────
         f_opts = ["Tất cả", "Nguồn TW", "Nguồn ĐP", "NQ11", "Quá hạn", "Mã NĐT"]
@@ -510,7 +510,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
         for i, f in enumerate(f_opts):
             is_active = st.session_state.tc_filter == f
             label = f"**{f}**" if is_active else f
-            if fc[i].button(label, key=f"tracuu_filter_btn_{i}", width='stretch'):
+            if fc[i].button(label, key=f"tracuu_filter_btn_{i}", use_container_width=True):
                 st.session_state.tc_filter = f
                 st.rerun()
         active_filter = st.session_state.tc_filter
@@ -603,7 +603,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
         st.divider()
         cols_xuat = st.columns([1, 1, 5])
         with cols_xuat[0]:
-            if st.button("📥 Xuất Excel", key="tracuu_btn_xuat_excel", width='stretch', type="primary"):
+            if st.button("📥 Xuất Excel", key="tracuu_btn_xuat_excel", use_container_width=True, type="primary"):
                 sheets = {"Kết quả tra cứu": df_kq}
                 excel_bytes = xuat_excel(sheets)
                 st.session_state["_excel_tracuu_bytes"] = excel_bytes

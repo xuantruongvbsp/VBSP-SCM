@@ -153,7 +153,7 @@ def _gauge_nqh(tlqh: float) -> go.Figure:
 def _render_gauge_du_no(**kwargs) -> None:
     """Đồng hồ đo Tỷ lệ NQH (gauge Plotly)."""
     tlqh = kwargs["tlqh"]
-    st.plotly_chart(_gauge_nqh(tlqh), width='stretch')
+    st.plotly_chart(_gauge_nqh(tlqh), use_container_width=True)
 
 
 @st.fragment
@@ -497,7 +497,7 @@ def _render_heatmap_pgd(**kwargs) -> None:
             paper_bgcolor="rgba(0,0,0,0)",
             font_family="Arial",
         )
-        st.plotly_chart(fig_bar, width='stretch')
+        st.plotly_chart(fig_bar, use_container_width=True)
         st.caption(
             "📌 Cột xanh = Dư nợ trong hạn · Cột đỏ = Nợ quá hạn. "
             "Sắp xếp theo Tổng dư nợ tăng dần."
@@ -563,7 +563,7 @@ def _render_heatmap_pgd(**kwargs) -> None:
             paper_bgcolor="rgba(0,0,0,0)",
             font_family="Arial",
         )
-        st.plotly_chart(fig_sc, width='stretch')
+        st.plotly_chart(fig_sc, use_container_width=True)
         st.caption(
             "💡 Kích thước bong bóng = Số khách hàng. "
             "PGD lý tưởng nằm ở góc phải dưới (dư nợ cao, NQH thấp)."
@@ -606,7 +606,7 @@ def _render_heatmap_pgd(**kwargs) -> None:
             paper_bgcolor="rgba(0,0,0,0)",
             font_family="Arial",
         )
-        st.plotly_chart(fig_nqh, width='stretch')
+        st.plotly_chart(fig_nqh, use_container_width=True)
 
     # ── Bảng xếp hạng đầy đủ ─────────────────────────────────────────────────
     st.divider()
@@ -654,7 +654,7 @@ def _render_heatmap_pgd(**kwargs) -> None:
                 ),
                 file_name=excel_ten_file("SucKhoe_PGD"),
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                width='stretch',
+                use_container_width=True,
             )
         with col2:
             st.download_button(
@@ -662,7 +662,7 @@ def _render_heatmap_pgd(**kwargs) -> None:
                 data=xuat_excel({"Sức khỏe PGD": df_display}),
                 file_name=ten_file_xuat("SucKhoe_PGD"),
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                width='stretch',
+                use_container_width=True,
             )
 
 
@@ -705,7 +705,7 @@ def _render_bieu_do_tron(**kwargs) -> None:
         paper_bgcolor="rgba(0,0,0,0)",
         font_family="Arial",
     )
-    st.plotly_chart(fig, width='stretch')
+    st.plotly_chart(fig, use_container_width=True)
 
 
 def _tien_do_ke_hoach() -> None:
@@ -752,7 +752,7 @@ def _tien_do_ke_hoach() -> None:
         paper_bgcolor="rgba(0,0,0,0)",
         font_family="Arial",
     )
-    st.plotly_chart(fig, width='stretch')
+    st.plotly_chart(fig, use_container_width=True)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -810,7 +810,7 @@ def _canh_bao_xa_nqh(df_full: pd.DataFrame) -> None:
         paper_bgcolor="rgba(0,0,0,0)",
         font_family="Arial",
     )
-    st.plotly_chart(fig, width='stretch')
+    st.plotly_chart(fig, use_container_width=True)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -888,7 +888,7 @@ def _hhi_giam_sat(df_full: pd.DataFrame) -> None:
                 st.dataframe(
                     br[["Xã", "Dư nợ (triệu đồng)", "Tỷ trọng %", "Đóng góp HHI"]],
                     hide_index=True,
-                    width='stretch',
+                    use_container_width=True,
                 )
 
         with tab_ct:
@@ -902,7 +902,7 @@ def _hhi_giam_sat(df_full: pd.DataFrame) -> None:
                 st.dataframe(
                     br[["Chương trình", "Dư nợ (triệu đồng)", "Tỷ trọng %", "Đóng góp HHI"]],
                     hide_index=True,
-                    width='stretch',
+                    use_container_width=True,
                 )
 
 
@@ -991,7 +991,7 @@ def _migration_matrix_section(df_full: pd.DataFrame, username: str) -> None:
 
     st.dataframe(
         matrix.style.applymap(_mau_nen).format("{:.0f}"),
-        width='stretch',
+        use_container_width=True,
     )
     st.caption(
         "📖 Cách đọc: Hàng = Nhóm nợ kỳ trước · Cột = Nhóm nợ kỳ sau. "
@@ -1001,7 +1001,7 @@ def _migration_matrix_section(df_full: pd.DataFrame, username: str) -> None:
     # Chi tiết món chuyển nhóm
     if not chi_tiet.empty:
         with st.expander(f"📋 Chi tiết các món chuyển nhóm ({len(chi_tiet)} món)", expanded=False):
-            st.dataframe(chi_tiet, hide_index=True, width='stretch')
+            st.dataframe(chi_tiet, hide_index=True, use_container_width=True)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -1136,7 +1136,7 @@ def _radar_compare_pgd(df_full: pd.DataFrame) -> None:
 
     col_chart, col_table = st.columns([2, 1])
     with col_chart:
-        st.plotly_chart(fig, width='stretch')
+        st.plotly_chart(fig, use_container_width=True)
     with col_table:
         st.dataframe(
             df_radar.round(1),
@@ -1148,7 +1148,7 @@ def _radar_compare_pgd(df_full: pd.DataFrame) -> None:
                 "Số KH": st.column_config.NumberColumn("Số KH", format=",.0f"),
             },
             hide_index=True,
-            width='stretch',
+            use_container_width=True,
             height=200,
         )
 
@@ -1164,7 +1164,7 @@ def _radar_compare_pgd(df_full: pd.DataFrame) -> None:
         ),
         file_name=excel_ten_file("Radar_SoSanh_PGD"),
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        width='stretch',
+        use_container_width=True,
     )
 
 
@@ -1229,7 +1229,7 @@ def _waterfall_du_no(df_full: pd.DataFrame) -> None:
 
     col_chart, col_info = st.columns([2, 1])
     with col_chart:
-        st.plotly_chart(fig, width='stretch')
+        st.plotly_chart(fig, use_container_width=True)
     with col_info:
         st.metric("Tổng dư nợ", fmt_ty(tong_dn / 1e6) + " tr")
         st.metric("Trong hạn", fmt_ty(th / 1e6) + " tr", delta_color="normal")
@@ -1294,7 +1294,7 @@ def _ranking_pgd(df_full: pd.DataFrame) -> None:
 
     col1, col2 = st.columns([2, 1])
     with col1:
-        st.plotly_chart(fig, width='stretch')
+        st.plotly_chart(fig, use_container_width=True)
     with col2:
         st.dataframe(
             ranking.sort_values("Dư_nợ", ascending=False).reset_index(drop=True),
@@ -1305,7 +1305,7 @@ def _ranking_pgd(df_full: pd.DataFrame) -> None:
                 "Số_KH": st.column_config.NumberColumn("Số KH", format=",.0f"),
             },
             hide_index=True,
-            width='stretch',
+            use_container_width=True,
             height=200,
         )
 
@@ -1323,7 +1323,7 @@ def _ranking_pgd(df_full: pd.DataFrame) -> None:
         ),
         file_name=excel_ten_file("XepHang_PGD"),
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        width='stretch',
+        use_container_width=True,
     )
 
 
@@ -1369,7 +1369,7 @@ def _render_tien_do_va_kh(df_full: pd.DataFrame, **kwargs) -> None:
                 paper_bgcolor="rgba(0,0,0,0)",
                 font_family="Arial",
             )
-            st.plotly_chart(_fig_tt, width='stretch')
+            st.plotly_chart(_fig_tt, use_container_width=True)
 
     st.divider()
     tab_tien_do.render_tong_quan_only(None, **kwargs)
@@ -1446,7 +1446,7 @@ def _render_pdf_section(df_full: pd.DataFrame, username: str) -> None:
             ),
             file_name=f"BaoCao_SucKhoeTD_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
             mime="application/pdf",
-            width='stretch',
+            use_container_width=True,
             key="pdf_sk_full",
         )
     with col_pdf2:
@@ -1461,7 +1461,7 @@ def _render_pdf_section(df_full: pd.DataFrame, username: str) -> None:
             ),
             file_name=f"SKTD_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
             mime="application/pdf",
-            width='stretch',
+            use_container_width=True,
             key="pdf_sk_simple",
         )
 
@@ -1556,7 +1556,7 @@ def render_sidebar_menu(role: str, username: str, **kwargs) -> None:
             if st.button(
                 item["label"],
                 key=f"exec_menu_{item['label']}",
-                width='stretch',
+                use_container_width=True,
             ):
                 st.session_state["ws_exec_menu"] = item["label"]
                 st.rerun()

@@ -11,7 +11,7 @@ from data import doc_dienbao, db_lookup, ts_file
 from data.khtd import doc_kehoach, luu_kehoach
 from data.pgd import duong_dan_pgd, pgd_slug
 from services import kiem_tra_file
-from auth import la_phan_he_cn, normalize_role
+from auth import la_phan_he_cn, la_executive, normalize_role
 from utils import (
     fmt,
     fmt_tien,
@@ -113,7 +113,7 @@ def render(tab, **kwargs):
 
         with col_up:
             st.markdown("**📤 Upload file kế hoạch Excel**")
-            if not la_phan_he_cn(role) or role == "executive":
+            if not la_phan_he_cn(role) or la_executive(role):
                 st.info("Chỉ Quản lý trở lên mới upload được.")
             else:
                 st.caption("Cấu trúc: Cột A = Tên chỉ tiêu, Cột B = Giá trị (đồng)")
@@ -148,7 +148,7 @@ def render(tab, **kwargs):
 
         with col_nhap:
             st.markdown("**✏️ Nhập kế hoạch thủ công**")
-            if not la_phan_he_cn(role) or role == "executive":
+            if not la_phan_he_cn(role) or la_executive(role):
                 st.caption("Chỉ Quản lý trở lên mới nhập được.")
             else:
                 with st.form(f"nhap_kh_{prefix}"):
@@ -248,7 +248,7 @@ def render(tab, **kwargs):
                 coloraxis_showscale=False,
                 plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
             )
-            st.plotly_chart(fig, width='stretch')
+            st.plotly_chart(fig, use_container_width=True)
 
         # Xuất Excel
         st.divider()

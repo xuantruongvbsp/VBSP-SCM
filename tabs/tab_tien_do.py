@@ -9,7 +9,7 @@ import plotly.express as px
 import streamlit as st
 
 import db
-from auth import normalize_role
+from auth import normalize_role, la_admin_cn
 from config import DS_PGD, DON_VI_CHI_NHANH, PGD_XA_MAP, ROLES_PHAN_HE_CN
 from utils import fmt_ngay
 
@@ -190,7 +190,7 @@ def _render_tong_quan(tab, **kwargs):
             }
             for t in ds_task
         ])
-        st.dataframe(df_task_list, width='stretch', hide_index=True, height=340)
+        st.dataframe(df_task_list, use_container_width=True, hide_index=True, height=340)
 
         st.divider()
 
@@ -215,7 +215,7 @@ def _render_tong_quan(tab, **kwargs):
             bang_rows.append(row)
 
         df_pgd = pd.DataFrame(bang_rows)
-        st.dataframe(df_pgd, width='stretch', hide_index=True, height=620)
+        st.dataframe(df_pgd, use_container_width=True, hide_index=True, height=620)
 
         st.divider()
 
@@ -246,7 +246,7 @@ def _render_tong_quan(tab, **kwargs):
         )
         fig.update_traces(texttemplate="%{text}%", textposition="outside")
         fig.update_layout(margin=dict(l=10, r=40, t=30, b=10))
-        st.plotly_chart(fig, width='stretch', key="td_chart_tongquan")
+        st.plotly_chart(fig, use_container_width=True, key="td_chart_tongquan")
 
         st.divider()
 
@@ -299,7 +299,7 @@ def _render_tong_quan(tab, **kwargs):
                     }
                     for r in kq_xa
                 ])
-                st.dataframe(df_xa[_cols], width='stretch', hide_index=True)
+                st.dataframe(df_xa[_cols], use_container_width=True, hide_index=True)
 
 
 def _render_tao_task(tab, **kwargs):
@@ -718,7 +718,7 @@ def _render_quan_ly_task(tab, **kwargs):
         c1, c2, c3 = st.columns([1.2, 1.2, 1.6])
         with c1:
             if task.get("trang_thai") == "dang_theo_doi":
-                if st.button("🔒 Đóng đầu việc", key=f"td_dong_{task_id}", width='stretch'):
+                if st.button("🔒 Đóng đầu việc", key=f"td_dong_{task_id}", use_container_width=True):
                     try:
                         with db.get_conn() as conn:
                             conn.execute(
@@ -736,7 +736,7 @@ def _render_quan_ly_task(tab, **kwargs):
                     except Exception as e:
                         st.error(f"Lỗi: {e}")
             else:
-                if st.button("🔓 Mở lại", key=f"td_mo_lai_{task_id}", width='stretch'):
+                if st.button("🔓 Mở lại", key=f"td_mo_lai_{task_id}", use_container_width=True):
                     try:
                         with db.get_conn() as conn:
                             conn.execute(
@@ -754,16 +754,16 @@ def _render_quan_ly_task(tab, **kwargs):
                     except Exception as e:
                         st.error(f"Lỗi: {e}")
 
-        if role == "admin_cn":
+        if la_admin_cn(role):
             confirm_key = f"_td_xoa_confirm_{task_id}"
             with c3:
                 if not st.session_state.get(confirm_key):
-                    if st.button("🗑️ Xóa vĩnh viễn", key=f"td_xoa_{task_id}", width='stretch'):
+                    if st.button("🗑️ Xóa vĩnh viễn", key=f"td_xoa_{task_id}", use_container_width=True):
                         st.session_state[confirm_key] = True
                         st.rerun()
                 else:
                     st.warning("⚠️ Hành động này không thể hoàn tác.")
-                    if st.button("Xác nhận xóa", key=f"td_xoa_ok_{task_id}", type="primary", width='stretch'):
+                    if st.button("Xác nhận xóa", key=f"td_xoa_ok_{task_id}", type="primary", use_container_width=True):
                         try:
                             with db.get_conn() as conn:
                                 conn.execute("DELETE FROM tien_do_ketqua WHERE task_id=?", (task_id,))
@@ -954,7 +954,7 @@ def _render_cap_nhat(tab, **kwargs):
                     st.warning("⚠️ Xác nhận lưu?")
                     c_ok, c_huy = st.columns(2)
                     with c_ok:
-                        if st.button("✅ Xác nhận", type="primary", width='stretch',
+                        if st.button("✅ Xác nhận", type="primary", use_container_width=True,
                                      key=f"{confirm_key}_ok"):
                             state = st.session_state.get(editor_key, {})
                             edited = df_edit.copy()
@@ -997,17 +997,17 @@ def _render_cap_nhat(tab, **kwargs):
                             st.toast(f"✅ Đã lưu {count} {label_dv}.")
                             st.rerun()
                     with c_huy:
-                        if st.button("❌ Hủy", width='stretch',
+                        if st.button("❌ Hủy", use_container_width=True,
                                      key=f"{confirm_key}_cancel"):
                             st.session_state.pop(confirm_key, None)
                             st.rerun()
                 else:
-                    if st.button("💾 Lưu thay đổi", type="primary", width='stretch',
+                    if st.button("💾 Lưu thay đổi", type="primary", use_container_width=True,
                                  key=f"{confirm_key}_btn"):
                         st.session_state[confirm_key] = True
                         st.rerun()
             with c_reset:
-                if st.button("↩️ Hoàn tác", width='stretch',
+                if st.button("↩️ Hoàn tác", use_container_width=True,
                              key=f"_td_undo_{task_id}_{pgd_sel}"):
                     base = f"td_editor_{task_id}_{pgd_sel}"
                     for k in list(st.session_state.keys()):
@@ -1037,7 +1037,7 @@ def _render_cap_nhat(tab, **kwargs):
                     "Ghi chú": st.column_config.TextColumn(width="large"),
                 },
                 hide_index=True,
-                width='stretch',
+                use_container_width=True,
                 key=editor_key,
             )
             st.session_state[f"{editor_key}_data"] = edited
@@ -1196,7 +1196,7 @@ def _render_xuat(tab, **kwargs):
                 file_name=_p["filename"],
                 mime="application/pdf",
                 key="td_pdf_baocao_dl",
-                width='stretch',
+                use_container_width=True,
             )
 
         if st.button("📥 Tạo Excel", type="primary", key="td_btn_tao"):
@@ -1295,7 +1295,7 @@ def _render_xuat(tab, **kwargs):
                     data=payload["data"],
                     file_name=payload["filename"],
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    width='stretch',
+                    use_container_width=True,
                     key="td_xuat_dl",
                 )
             with col_clear:
@@ -1367,7 +1367,7 @@ def _render_xuat(tab, **kwargs):
                     file_name=st.session_state.get("_td_pdf_file", "TienDo.pdf"),
                     mime="application/pdf",
                     key="td_pdf_dl",
-                    width='stretch',
+                    use_container_width=True,
                 )
 
 

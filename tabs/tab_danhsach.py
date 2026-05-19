@@ -226,7 +226,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
             )
         with sc2:
             st.markdown('<div class="vbsp-btn">', unsafe_allow_html=True)
-            if st.button("✕ Xóa", key="clear_search", width='stretch'):
+            if st.button("✕ Xóa", key="clear_search", use_container_width=True):
                 st.session_state["search_kh"] = ""
                 st.rerun()
             st.markdown("</div>", unsafe_allow_html=True)
@@ -474,7 +474,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                 height=350,
                 margin=dict(t=50, b=30, l=40, r=80),
             )
-            st.plotly_chart(fig1, width='stretch')
+            st.plotly_chart(fig1, use_container_width=True)
             st.caption(
                 f"📍 Phạm vi: **{ten_pham_vi}**  ·  "
                 f"🟢 Dưới bình quân ({binh_quan_mon:.0f} món)  "
@@ -518,7 +518,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                 height=350,
                 margin=dict(t=50, b=30, l=40, r=100),
             )
-            st.plotly_chart(fig2, width='stretch')
+            st.plotly_chart(fig2, use_container_width=True)
             st.caption(
                 f"📍 Phạm vi: **{ten_pham_vi}**  ·  "
                 f"🟢 Dưới bình quân ({fmt_so(round(binh_quan_no, 0))} triệu đồng)  "

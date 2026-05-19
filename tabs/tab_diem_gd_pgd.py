@@ -180,7 +180,7 @@ def _render_import_pgd(
         file_name=f"mau_dgd_{pgd_slug(pgd_user)}.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         key="dgd_pgd_op_imp_dl_mau",
-        width='stretch',
+        use_container_width=True,
     )
     up = st.file_uploader(
         "File Excel (cột A–D: STT | Xã | ĐGD | Ấp/KP)",

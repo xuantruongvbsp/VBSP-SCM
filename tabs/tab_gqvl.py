@@ -18,7 +18,7 @@ from data import (ts_file, doc_file_gqvl,
                   doc_gqvl_pgd, ds_pgd_co_gqvl, duong_dan_gqvl_pgd)
 from services import luu_pgd_file
 from utils import fmt, fmt_bang_ty, fmt_ty, fmt_so, vn, xuat_excel, hien_thi_dataframe_phan_trang
-from auth import la_phan_he_cn, normalize_role
+from auth import la_phan_he_cn, la_executive, normalize_role
 
 if TYPE_CHECKING:
     from streamlit.delta_generator import DeltaGenerator
@@ -171,7 +171,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                 )
             with upc2:
                 # Chọn PGD để lưu
-                if (la_phan_he_cn(role) and role != "executive") and COT_TEN_PGD in kwargs.get("df_full", pd.DataFrame()).columns:
+                if (la_phan_he_cn(role) and not la_executive(role)) and COT_TEN_PGD in kwargs.get("df_full", pd.DataFrame()).columns:
                     ds_pgd_all = sorted(kwargs["df_full"][COT_TEN_PGD].dropna().unique().tolist())
                     pgd_up = st.selectbox("Lưu cho PGD", ds_pgd_all, key="gqvl_pgd_up")
                 else:
@@ -197,7 +197,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
             st.info("👆 Upload file GQVL của PGD bên trên để xem số liệu.")
             return
 
-        if la_phan_he_cn(role) and role != "executive":
+        if la_phan_he_cn(role) and not la_executive(role):
             pgd_xem = st.selectbox("📍 Xem PGD", ["Tất cả"] + pgd_da_up, key="gqvl_pgd_xem")
         else:
             pgd_xem = pgd_user or pgd_da_up[0]
@@ -288,7 +288,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                     legend=dict(orientation="h", y=1.08),
                     plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
                 )
-                st.plotly_chart(fig, width='stretch')
+                st.plotly_chart(fig, use_container_width=True)
 
                 # Bảng - dùng column_config thay vì apply format
                 hien_thi_dataframe_phan_trang(
@@ -322,7 +322,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                     coloraxis_showscale=False,
                     plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
                 )
-                st.plotly_chart(fig2, width='stretch')
+                st.plotly_chart(fig2, use_container_width=True)
 
                 hien_thi_dataframe_phan_trang(
                     t_ng[[G_TEN_NGANH, "Số_món", "Dư_nợ", "NQH", "GN_năm"]],
@@ -356,7 +356,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                             yaxis=dict(title="",autorange="reversed"),
                             xaxis_title="", coloraxis_showscale=False,
                             plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)")
-                        st.plotly_chart(fig3, width='stretch')
+                        st.plotly_chart(fig3, use_container_width=True)
 
                     # Danh sách chi tiết NQH
                     cols_qh = [c for c in [G_TEN_XA, G_TEN_THON, G_TEN_TO,

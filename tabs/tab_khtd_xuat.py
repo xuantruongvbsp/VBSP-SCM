@@ -619,7 +619,7 @@ def _tab_tien_do_kh_th() -> None:
         df_pgd_cb = pd.DataFrame(rows_pgd).sort_values("TL%")
         st.dataframe(
             df_pgd_cb,
-            width='stretch',
+            use_container_width=True,
             hide_index=True,
             column_config={
                 "TL%": st.column_config.ProgressColumn(

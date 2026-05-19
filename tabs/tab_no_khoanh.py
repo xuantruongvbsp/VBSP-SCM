@@ -134,7 +134,7 @@ def _chart_nhom(df: pd.DataFrame, nhom_col: str, key: str) -> None:
         xaxis_title="Dư nợ khoanh (VND)",
         yaxis_title="",
     )
-    st.plotly_chart(fig, width='stretch', key=key)
+    st.plotly_chart(fig, use_container_width=True, key=key)
 
 
 def _heatmap_dao_han(df: pd.DataFrame, key: str) -> None:
@@ -180,7 +180,7 @@ def _heatmap_dao_han(df: pd.DataFrame, key: str) -> None:
         margin=dict(t=10, b=30, l=40, r=20),
     )
     st.markdown("**📅 Phân bổ theo năm hết hạn khoanh nợ**")
-    st.plotly_chart(fig, width='stretch', key=key)
+    st.plotly_chart(fig, use_container_width=True, key=key)
 
 
 from tabs.pdf_no_khoanh import (
@@ -957,8 +957,7 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                     df_show['Hạn còn (ngày)'] = df_show['con_lai']
                     df_show = df_show.drop(columns=['con_lai'], errors='ignore')
                 st.dataframe(
-                    df_show, width='stretch', hide_index=True,
-                    use_container_width=True,
+                    df_show, use_container_width=True, hide_index=True,
                 )
             else:
                 st.success("✅ Không có món nào sắp hết hạn khoanh.")

@@ -1157,7 +1157,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
             col_ex, col_pdf = st.columns(2)
 
             with col_ex:
-                if st.button("📥 Xuất Excel", key="btn_excel_tqpgd", width='stretch'):
+                if st.button("📥 Xuất Excel", key="btn_excel_tqpgd", use_container_width=True):
                     try:
                         _ten_excel = ten_file_xuat("TQPGD")
                         buf = _xuat_excel_tqpgd(df_show, _ten_excel)
@@ -1172,13 +1172,13 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                         file_name=st.session_state.get("_excel_file_tqpgd", "TQPGD.xlsx"),
                         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                         key="btn_excel_tqpgd_dl",
-                        width='stretch',
+                        use_container_width=True,
                     )
 
             with col_pdf:
                 _ss_tqpgd = "_pdf_bytes_tqpgd"
                 _ssf_tqpgd = "_pdf_file_tqpgd"
-                if st.button("📄 Xuất PDF", key="btn_pdf_tqpgd", type="primary", width='stretch'):
+                if st.button("📄 Xuất PDF", key="btn_pdf_tqpgd", type="primary", use_container_width=True):
                     try:
                         # Đổi tên cột → 2 dòng cho header PDF (Reportlab Paragraph hỗ trợ <br/>)
                         def _pdf_col(col: str) -> str:
@@ -1219,7 +1219,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                         file_name=st.session_state.get(_ssf_tqpgd, "TQPGD.pdf"),
                         mime="application/pdf",
                         key="btn_pdf_tqpgd_dl",
-                        width='stretch',
+                        use_container_width=True,
                     )
         st.divider()
         st.subheader("🔔 Hồ sơ đến hạn — Tổng hợp")
@@ -1403,7 +1403,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                                 paper_bgcolor="rgba(0,0,0,0)",
                             )
 
-                            st.plotly_chart(fig, width='stretch', key=f"pie_den_han_{key_prefix}")
+                            st.plotly_chart(fig, use_container_width=True, key=f"pie_den_han_{key_prefix}")
 
                         if tg is not None:
                             st.divider()
@@ -1439,13 +1439,13 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                                     data=excel_bytes,
                                     file_name=ten_file_xuat(f"HoSoDenHan_{key_prefix}"),
                                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                                    width='stretch',
+                                    use_container_width=True,
                                     key=f"excel_den_han_{key_prefix}",
                                 )
 
                             with col_pdf:
                                 if st.button("📄 Xuất PDF", key=f"pdf_den_han_{key_prefix}",
-                                             type="primary", width='stretch'):
+                                             type="primary", use_container_width=True):
                                     with st.spinner("⏳ Đang tạo PDF..."):
                                         pdf_bytes = _build_pdf_den_han(
                                             df_loc, label, loc_pgd, loc_ct, loc_xa, username, key_prefix
@@ -1463,7 +1463,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                                     file_name=st.session_state.get(ss_file_key, f"HoSoDenHan_{key_prefix}.pdf"),
                                     mime="application/pdf",
                                     key=f"dl_den_han_{key_prefix}",
-                                    width='stretch',
+                                    use_container_width=True,
                                 )
                     else:
                         st.caption(f"⚠️ Không có cột '{nhom_chon}' trong dữ liệu")

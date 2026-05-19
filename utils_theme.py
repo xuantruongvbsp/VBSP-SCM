@@ -1,13 +1,11 @@
 """
-Theme management — dark/light mode.
+Theme management — Dark mode only.
 Color system dựa theo Semantic Token Pattern (shadcn/Linear style).
-Mỗi token có cặp: surface + text-on-surface.
 """
 import streamlit as st
-import db
 
-# ── Semantic Color Tokens ─────────────────────────────────────────────────────
-_DARK = {
+# ── Semantic Color Tokens (Dark Only) ────────────────────────────────────────
+_TOKENS = {
     # Surfaces (elevation low → high)
     "bg":           "#0F1117",   # main canvas
     "bg_subtle":    "#161922",   # row stripe / subtle area
@@ -54,65 +52,14 @@ _DARK = {
     "chip_bg":      "#0D2818", "chip_text": "#81C784", "chip_border": "#2E7D32",
 }
 
-_LIGHT = {
-    # Surfaces
-    "bg":           "#F8FAFC",   # warm off-white (không phải pure white — bớt chói)
-    "bg_subtle":    "#F1F5F9",   # row stripe
-    "surface":      "#FFFFFF",   # card, expander, metric
-    "surface_hi":   "#F7F7F9",   # input bg, hover
-    "overlay":      "#FFFFFF",   # popover
-    # Borders
-    "border":       "#E2E8F0",
-    "border_focus": "#16A34A",
-    # Text
-    "text":         "#1E293B",   # primary body
-    "text_sub":     "#64748B",   # secondary / labels
-    "text_muted":   "#94A3B8",   # captions
-    "text_heading": "#0F172A",   # h1/h2
-    # Sidebar (giữ dark sidebar — tạo contrast đẹp)
-    "sidebar_bg":   "#1A1D2E",
-    "sidebar_text": "#E0E6ED",
-    "sidebar_sub":  "#94A3B8",
-    "sidebar_border":"#2A2D3E",
-    # Header
-    "header_bg":    "#FFFFFF",
-    "header_border":"#E2E8F0",
-    # Accent
-    "accent":       "#16A34A",
-    "accent_hi":    "#15803D",
-    "accent_soft":  "#DCFCE7",
-    "accent_text":  "#166534",
-    "accent_glow":  "#22C55E",
-    # Semantic
-    "success_bg":   "#F0FDF4", "success_text": "#166534", "success_border": "#86EFAC",
-    "info_bg":      "#EFF6FF", "info_text":    "#1D4ED8", "info_border":    "#93C5FD",
-    "warn_bg":      "#FFFBEB", "warn_text":    "#92400E", "warn_border":    "#FCD34D",
-    "error_bg":     "#FEF2F2", "error_text":   "#991B1B", "error_border":   "#FCA5A5",
-    # DataTable
-    "table_header": "linear-gradient(135deg,#15803D 0%,#16A34A 100%)",
-    "table_hover":  "#F0FDF4",
-    "table_stripe": "#F8FAFC",
-    # Scrollbar
-    "scroll_track": "#F1F5F9",
-    "scroll_thumb": "#CBD5E1",
-    "scroll_hover": "#94A3B8",
-    # Misc
-    "spinner":      "#16A34A",
-    "chip_bg":      "#DCFCE7", "chip_text": "#166534", "chip_border": "#86EFAC",
-}
 
-
-def _tokens(t: str) -> dict:
-    return _DARK if t == "dark" else _LIGHT
-
-
-def get_theme_css(theme: str = "dark") -> str:
-    """Trả về CSS đầy đủ cho theme được chọn."""
-    c = _tokens(theme)
+def get_theme_css() -> str:
+    """Trả về CSS đầy đủ cho dark theme."""
+    c = _TOKENS
 
     return f"""<style>
 /* ══════════════════════════════════════════════════════════════
-   VBSP-SCM UI — Theme: {theme.upper()}
+   VBSP-SCM UI — Theme: DARK
    Semantic Token System  (shadcn / Linear pattern)
 ══════════════════════════════════════════════════════════════ */
 
@@ -420,17 +367,7 @@ hr {{ border: none !important; border-top: 1px solid {c['border']} !important; m
 
 
 def init_theme() -> str:
-    """Init theme từ kv_store cho user hiện tại."""
-    username = st.session_state.get("username", "unknown")
-    if "theme" not in st.session_state:
-        st.session_state.theme = db.doc_kv(f"theme_{username}") or "dark"
-    return st.session_state.theme
+    """Init theme — always dark."""
+    st.session_state.theme = "dark"
+    return "dark"
 
-
-def toggle_theme():
-    """Toggle dark ↔ light và lưu vào kv_store."""
-    new_theme = "light" if st.session_state.theme == "dark" else "dark"
-    st.session_state.theme = new_theme
-    username = st.session_state.get("username", "unknown")
-    db.ghi_kv(f"theme_{username}", new_theme, username)
-    db.ghi_audit(username, "doi_theme", f"Chuyển sang chế độ {new_theme}")

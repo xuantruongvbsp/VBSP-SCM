@@ -561,7 +561,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
         st.caption("Hỗ trợ địa bàn · Xem tổng hợp KH theo Xã × Chương trình")
 
         # ── Xác định PGD hiển thị ─────────────────────────────────────────
-        if la_phan_he_cn(role) and role != "executive":
+        if la_phan_he_cn(role) and not la_executive(role):
             pgd_hien_tai: str = st.selectbox(
                 "Chọn PGD", DS_PGD, key="khtd_pgd_sel_admin"
             )

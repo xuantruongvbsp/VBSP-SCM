@@ -247,7 +247,7 @@ def _render_pgd(pgd_filter: str, username: str) -> None:
         df_show.index = range(1, len(df_show) + 1)
         df_show.index.name = "STT"
 
-        st.dataframe(df_show, width='stretch', height=400)
+        st.dataframe(df_show, use_container_width=True, height=400)
 
         # Nút xoá cho hồ sơ "chờ duyệt"
         st.markdown("**Xoá hồ sơ (chỉ hồ sơ Chờ duyệt)**")
@@ -352,7 +352,7 @@ def _render_cn(username: str, role: str) -> None:
     df_show.index = range(1, len(df_show) + 1)
     df_show.index.name = "STT"
 
-    st.dataframe(df_show, width='stretch', height=400)
+    st.dataframe(df_show, use_container_width=True, height=400)
 
     # Dòng tổng cộng
     tong_goc_loc = int(df_loc["du_no_goc"].sum()) if "du_no_goc" in df_loc.columns else 0
@@ -444,7 +444,7 @@ def _render_cn(username: str, role: str) -> None:
         tong_pgd["Tong_lai"] = tong_pgd["Tong_lai"].apply(lambda x: fmt_ty(x) if x else "—")
 
         st.caption("**Tổng hợp theo PGD:**")
-        st.dataframe(tong_pgd, hide_index=True, width='stretch')
+        st.dataframe(tong_pgd, hide_index=True, use_container_width=True)
 
         df_tong_show = df_tong.copy()
         if "du_no_goc" in df_tong_show.columns:
@@ -463,7 +463,7 @@ def _render_cn(username: str, role: str) -> None:
         df_tong_show.index = range(1, len(df_tong_show) + 1)
         df_tong_show.index.name = "STT"
 
-        st.dataframe(df_tong_show, width='stretch', height=350)
+        st.dataframe(df_tong_show, use_container_width=True, height=350)
 
         tong_g = int(df_tong["du_no_goc"].sum()) if "du_no_goc" in df_tong.columns else 0
         tong_l = int(df_tong["du_no_lai"].sum()) if "du_no_lai" in df_tong.columns else 0
@@ -547,7 +547,7 @@ def _render_cn(username: str, role: str) -> None:
 
                 c_duyet, c_tu_choi = st.columns(2)
                 with c_duyet:
-                    if st.button(f"✅ Duyệt", key=f"qd62_duyet_{r['id']}", width='stretch'):
+                    if st.button(f"✅ Duyệt", key=f"qd62_duyet_{r['id']}", use_container_width=True):
                         ds_cap_nhat = _doc_ds(slug_chon)
                         for rr in ds_cap_nhat:
                             if rr.get("id") == r["id"]:
@@ -562,7 +562,7 @@ def _render_cn(username: str, role: str) -> None:
                         st.success(f"✅ Đã duyệt: {r.get('ho_ten','')}")
                         st.rerun()
                 with c_tu_choi:
-                    if st.button(f"❌ Không duyệt", key=f"qd62_tu_choi_{r['id']}", width='stretch'):
+                    if st.button(f"❌ Không duyệt", key=f"qd62_tu_choi_{r['id']}", use_container_width=True):
                         ds_cap_nhat = _doc_ds(slug_chon)
                         for rr in ds_cap_nhat:
                             if rr.get("id") == r["id"]:

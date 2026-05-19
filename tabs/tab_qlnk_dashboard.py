@@ -70,7 +70,7 @@ def _pie_ly_do(series: pd.Series, key: str) -> None:
         height=380,
         legend=dict(orientation="h", yanchor="bottom", y=-0.3),
     )
-    st.plotly_chart(fig, width='stretch', key=key)
+    st.plotly_chart(fig, use_container_width=True, key=key)
 
 
 def _bar_pgd(df_kh: pd.DataFrame, key: str) -> None:
@@ -111,7 +111,7 @@ def _bar_pgd(df_kh: pd.DataFrame, key: str) -> None:
         xaxis_title="Dư nợ khoanh (VND)",
         yaxis_title="",
     )
-    st.plotly_chart(fig, width='stretch', key=key)
+    st.plotly_chart(fig, use_container_width=True, key=key)
 
 
 def render(tab: DeltaGenerator = None, **kwargs) -> None:
@@ -259,9 +259,8 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
 
             st.dataframe(
                 df_show,
-                width='stretch',
-                hide_index=True,
                 use_container_width=True,
+                hide_index=True,
             )
         else:
             st.info("Không đủ cột dữ liệu để hiển thị.")

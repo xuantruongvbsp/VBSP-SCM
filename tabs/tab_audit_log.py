@@ -4,7 +4,7 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta
 import db
-from auth import normalize_role
+from auth import normalize_role, la_admin_cn
 from utils import format_df_vn
 
 ACTION_NHOM = {
@@ -58,7 +58,7 @@ def render(tab=None, **kwargs) -> None:
     role_raw = str(kwargs.get("role", "user") or "user")
     role = normalize_role(role_raw)
 
-    if not force_allow and role != "admin_cn":
+    if not force_allow and not la_admin_cn(role):
         st.warning("⛔ Chỉ Admin mới có quyền xem Lịch sử giao dịch.")
         return
 
@@ -118,7 +118,7 @@ def _render_compact(username_filter: str | None = None) -> None:
         df = format_df_vn(df)
 
         st.caption(f"Hiển thị {len(df)} bản ghi gần nhất")
-        st.dataframe(df, width='stretch', hide_index=True)
+        st.dataframe(df, use_container_width=True, hide_index=True)
 
     except Exception as e:
         st.error(f"Lỗi đọc: {e}")
@@ -168,7 +168,7 @@ def _render_full(role: str, username_filter: str | None = None) -> None:
     st.divider()
     st.dataframe(
         df.drop(columns=["ID"]),
-        width='stretch',
+        use_container_width=True,
         hide_index=True,
         column_config={
             "Thời gian": st.column_config.TextColumn(width="medium"),

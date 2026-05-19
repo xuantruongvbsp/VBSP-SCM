@@ -1,5 +1,14 @@
 # CHANGELOG
 
+## [2026-05-19] — Fix vi phạm convention: tab_kehoach role == "executive"
+- `auth.py` — thêm helper `la_executive(role)`
+- `tabs/tab_kehoach.py` — import `la_executive`; thay 2 lần `role == "executive"` → `la_executive(role)`
+
+## [2026-05-19] — Fix vi phạm convention: auth.py, tab_tien_do, tab_so_sanh_ky
+- `auth.py` — thêm helper `la_admin_cn(role)`; fix `row["Tên PGD"]` → `row[COT_TEN_PGD]`; fix `role == "admin"` → `la_admin_cn(role)` (dòng 990)
+- `tabs/tab_tien_do.py` — import `la_admin_cn`; thay `role == "admin_cn"` → `la_admin_cn(role)`
+- `tabs/tab_so_sanh_ky.py` — thay `/1e9` → `/1_000_000`; đổi `dn_ty` → `dn_trieu`; cập nhật axis title "(triệu đồng)"
+
 ## [2026-05-19] — Fix vi phạm convention trong widgets/data_source_status.py
 - `widgets/data_source_status.py` — thay `role == "user"` và `role in ["admin", "manager"]` bằng `normalize_role()` + `la_phan_he_pgd()`
 

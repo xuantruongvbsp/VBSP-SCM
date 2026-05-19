@@ -36,6 +36,7 @@ from utils import (
     quet_templates,
     xuat_excel,
     hien_thi_dataframe_phan_trang,
+    get_tab_context,
 )
 from services.excel_service import xuat_excel_chuyen_nghiep, ten_file_xuat as excel_ten_file
 from pdf_service import xuat_pdf, kiem_tra_pdf_dependency, render_huong_dan
@@ -1270,13 +1271,13 @@ def render(**kwargs):
 
     # ── Helpers render ──────────────────────────────────────────────────
     def _render_diem_gd_va_to_tkvv(tab_parent, **kw):
-        with tab_parent:
+        with get_tab_context(tab_parent):
             _sub1, _sub2 = st.tabs(["📍 Điểm Giao Dịch", "🏘️ Tổ TK&VV"])
             tab_diem_gd_pgd.render(_sub1, **kw)
             tab_cdtotkvv_pgd.render(_sub2, **kw)
 
     def _render_du_phong_dong_tien(tab_parent, **kw) -> None:
-        with tab_parent:
+        with get_tab_context(tab_parent):
             from services.du_phong_service import du_phong_dong_tien, du_phong_chi_tiet
             from dateutil.relativedelta import relativedelta
 
@@ -1401,7 +1402,7 @@ def render(**kwargs):
                 st.info("Không có khế ước nào đến hạn thu gốc trong tháng này.")
 
     def _render_heatmap_dao_han(tab_parent, **kw) -> None:
-        with tab_parent:
+        with get_tab_context(tab_parent):
             import plotly.express as px
             from dateutil.relativedelta import relativedelta
 
@@ -1496,7 +1497,7 @@ def render(**kwargs):
                 )
 
     def _render_histogram_du_no(tab_parent, **kw) -> None:
-        with tab_parent:
+        with get_tab_context(tab_parent):
             import plotly.express as px
 
             df_loc = kw.get("df")
@@ -1551,7 +1552,7 @@ def render(**kwargs):
                 st.metric("Tổng số khoản", fmt_so(len(df_hist)), help="Số khoản vay có dư nợ")
 
     def _render_donut_co_cau(tab_parent, **kw) -> None:
-        with tab_parent:
+        with get_tab_context(tab_parent):
             import plotly.graph_objects as go
 
             df_loc = kw.get("df")
@@ -1619,7 +1620,7 @@ def render(**kwargs):
                 st.dataframe(df_ct, hide_index=True, width='stretch')
 
     def _render_doc_hub_tab(tab_parent) -> None:
-        with tab_parent:
+        with get_tab_context(tab_parent):
             _init_gb2_session_for_doc_hub(kwargs)
             _render_doc_hub(df, df_nq11, role)
 

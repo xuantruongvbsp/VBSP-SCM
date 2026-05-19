@@ -1147,8 +1147,15 @@ def _build_all_items(role: str, username: str, **kwargs) -> list:
         {"group": "Kiểm soát",     "label": "Xử lý nợ rủi ro",   "icon": "alert-circle",   "fn": lambda: tab_xlrr_tong_hop.render(None, **kwargs)},
         {"group": "Kiểm soát",     "label": "Cán bộ tín dụng",         "icon": "user",       "fn": lambda: tab_cbtd.render(None, **kwargs)},
         {"group": "Kiểm soát",     "label": "Tập trung rủi ro & HHI",  "icon": "chart-pie",  "fn": lambda: tab_hhi.render(None, **kwargs)},
-        {"group": "Kiểm soát", "label": "🔒 Chuyên Đề Nợ Khoanh", "icon": "lock",
-         "fn": lambda: tab_no_khoanh.render(None, **kwargs)},
+        {
+            "group": "Kiểm soát",
+            "label": "🔒 Chuyên Đề Nợ Khoanh",
+            "icon": "lock",
+            "children": [
+                {"label": "📊 Tổng quan Nợ Khoanh",          "fn": lambda: tab_no_khoanh.render(None, **{**kwargs, "nhom": "tongquan"})},
+                {"label": "🔒 Quản lý Nợ Khoanh theo CV 368", "fn": lambda: tab_no_khoanh.render(None, **{**kwargs, "nhom": "cv368"})},
+            ],
+        },
         {"group": "Kế hoạch và Thực hiện KHTD", "label": "Kế hoạch tín dụng", "icon": "file-text",  "fn": lambda: tab_khtd.render(None, **dict(kwargs, khtd_mode="cn"))},
         {"group": "Kế hoạch và Thực hiện KHTD", "label": "📋 Giao & ĐC KHTD", "icon": "upload", "fn": lambda: tab_khtd_giao_dc.render(None, **kwargs)},
         {"group": "Kế hoạch và Thực hiện KHTD", "label": "Cân đối - Điện báo", "icon": "chart-line", "fn": lambda: tab_kehoach.render(None, **kwargs)},

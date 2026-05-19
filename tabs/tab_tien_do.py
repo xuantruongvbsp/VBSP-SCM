@@ -14,6 +14,7 @@ from config import DS_PGD, DON_VI_CHI_NHANH, PGD_XA_MAP, ROLES_PHAN_HE_CN
 from utils import fmt_ngay
 
 DS_PGD_ALL = [DON_VI_CHI_NHANH] + DS_PGD
+_PGD_BIEN_HOA = "Địa bàn Biên Hòa"
 
 LOAI_TASK = {
     "chung":            "📋 Công việc chung",
@@ -76,6 +77,24 @@ def _khoi_tao_ketqua_task(task_id: int, ds_pgd_task: list[str],
                VALUES (?, ?, ?, 'chua_thuc_hien', ?)""",
             rows,
         )
+        conn.commit()
+
+
+def _sync_bien_hoa_ketqua(task_id: int, cbtd_bien_hoa: str, loai_noi_dung: str) -> None:
+    val = str(cbtd_bien_hoa or "").strip()
+    with db.get_conn() as conn:
+        if val:
+            conn.execute(
+                """INSERT OR IGNORE INTO tien_do_ketqua
+                   (task_id, pgd, ten_xa, trang_thai, loai_noi_dung)
+                   VALUES (?, ?, ?, 'chua_thuc_hien', ?)""",
+                (task_id, _PGD_BIEN_HOA, _PGD_BIEN_HOA, loai_noi_dung),
+            )
+        else:
+            conn.execute(
+                "DELETE FROM tien_do_ketqua WHERE task_id=? AND ten_xa=?",
+                (task_id, _PGD_BIEN_HOA),
+            )
         conn.commit()
 
 
@@ -156,6 +175,22 @@ def _render_tong_quan(tab, **kwargs):
                   f"{round(tong_xong/tong_xa*100) if tong_xa else 0}%")
         c3.metric("🔴 Trễ hạn", tong_tre, delta_color="inverse")
         c4.metric("⬜ Chưa báo cáo", tong_xa - tong_xong - tong_tre)
+
+        st.markdown("#### 📋 Danh sách đầu việc")
+        df_task_list = pd.DataFrame([
+            {
+                "Đầu việc": t.get("tieu_de", ""),
+                "Thời hạn": fmt_ngay(t.get("ngay_deadline", "")),
+                "Loại": LOAI_TASK.get(t.get("loai", ""), t.get("loai", "")),
+                "Người phụ trách": t.get("nguoi_phu_trach") or "",
+                "CB KH-NV phụ trách": t.get("nguoi_thuc_hien_cn") or "",
+                "CB Biên Hòa": t.get("cbtd_bien_hoa") or "",
+                "Ưu tiên": UU_TIEN.get(t.get("uu_tien", ""), t.get("uu_tien", "")),
+                "Theo dõi": "Chung PGD" if t.get("cap_theo_doi") == "pgd" else "Chi tiết xã",
+            }
+            for t in ds_task
+        ])
+        st.dataframe(df_task_list, width='stretch', hide_index=True, height=340)
 
         st.divider()
 
@@ -326,6 +361,11 @@ Bỏ chọn nếu chỉ áp dụng cho một số PGD cụ thể.
                     height=68,
                     key="tao_task_nguoi_pt",
                 )
+                nguoi_thuc_hien_cn = st.text_input(
+                    "👤 Cán bộ phòng KH-NV phụ trách",
+                    placeholder="Họ tên cán bộ KH-NV phụ trách nội dung này...",
+                    key="tao_task_nguoi_thuc_hien_cn",
+                )
             with c2:
                 deadline = st.date_input("Ngày kết thúc *", value=date.today(),
                                           format="DD/MM/YYYY", key="tao_task_deadline")
@@ -336,20 +376,30 @@ Bỏ chọn nếu chỉ áp dụng cho một số PGD cụ thể.
                     key="tao_task_ngay_bat_dau",
                 )
 
-            st.markdown("**Áp dụng cho đơn vị**")
+            st.markdown("**📋 Áp dụng cho đơn vị**")
+            st.caption("🏢 Phòng giao dịch huyện")
             _cc1, _cc2, _cc3 = st.columns(3)
             pgd_chon = []
-            for _i, _pgd in enumerate(DS_PGD_ALL):
-                with [_cc1, _cc2, _cc3][_i % 3]:
+            for _j, _pgd in enumerate(DS_PGD):
+                _i = _j + 1
+                with [_cc1, _cc2, _cc3][_j % 3]:
                     if st.checkbox(_pgd, value=True, key=f"tao_task_pgd_{_i}"):
                         pgd_chon.append(_pgd)
 
-            ds_preview = pgd_chon or DS_PGD_ALL
+            st.divider()
+            st.caption("🏛️ Địa bàn Biên Hòa (Hội sở tỉnh)")
+            cbtd_bien_hoa = st.text_input(
+                "Cán bộ KH-NV phụ trách địa bàn Biên Hòa",
+                placeholder="Họ tên CBTD Hội sở phụ trách...",
+                key="tao_task_cbtd_bien_hoa",
+            )
+
+            ds_preview = pgd_chon or DS_PGD
             _so_chon = len(pgd_chon)
-            _so_bo = len(DS_PGD_ALL) - _so_chon
+            _so_bo = len(DS_PGD) - _so_chon
             _thong_ke = f"✅ **{_so_chon}** đơn vị được chọn"
             if _so_bo > 0:
-                _khong_chon = [p for p in DS_PGD_ALL if p not in pgd_chon]
+                _khong_chon = [p for p in DS_PGD if p not in pgd_chon]
                 _thong_ke += f" · ❌ **{_so_bo}** không chọn: {', '.join(_khong_chon)}"
             st.caption(_thong_ke)
             if loai_theo_doi == "pgd":
@@ -367,7 +417,7 @@ Bỏ chọn nếu chỉ áp dụng cho một số PGD cụ thể.
             if not tieu_de.strip():
                 st.error("Vui lòng nhập tên đầu việc.")
                 return
-            pgd_luu = pgd_chon or DS_PGD_ALL
+            pgd_luu = pgd_chon or DS_PGD
             ds_pgd_json = json.dumps(pgd_luu, ensure_ascii=False)
             try:
                 with db.get_conn() as conn:
@@ -375,8 +425,9 @@ Bỏ chọn nếu chỉ áp dụng cho một số PGD cụ thể.
                         """INSERT INTO tien_do_task
                            (tieu_de, mo_ta, ngay_deadline, ds_pgd, loai,
                             uu_tien, nguoi_tao, ngay_tao, trang_thai, ghi_chu,
-                            cap_theo_doi, ngay_bat_dau, nguoi_phu_trach)
-                           VALUES (?,?,?,?,?,?,?,?,'dang_theo_doi',?,?,?,?)""",
+                            cap_theo_doi, ngay_bat_dau, nguoi_phu_trach, nguoi_thuc_hien_cn,
+                            cbtd_bien_hoa)
+                           VALUES (?,?,?,?,?,?,?,?,'dang_theo_doi',?,?,?,?,?,?)""",
                         (tieu_de.strip(), mo_ta.strip() or None,
                          deadline.isoformat(), ds_pgd_json,
                          loai, uu_tien, username,
@@ -384,13 +435,16 @@ Bỏ chọn nếu chỉ áp dụng cho một số PGD cụ thể.
                          None,
                          loai_theo_doi,
                          ngay_bat_dau.isoformat(),
-                         nguoi_phu_trach.strip() or None),
+                         nguoi_phu_trach.strip() or None,
+                         str(nguoi_thuc_hien_cn).strip(),
+                         str(cbtd_bien_hoa).strip()),
                     )
                     task_id = cur.lastrowid
                     conn.commit()
 
                 loai_noi_dung = "chung_pgd" if loai_theo_doi == "pgd" else "chi_tiet_xa"
                 _khoi_tao_ketqua_task(task_id, pgd_luu, loai_theo_doi, loai_noi_dung)
+                _sync_bien_hoa_ketqua(task_id, cbtd_bien_hoa, loai_noi_dung)
 
                 so_xa = (
                     sum(len(PGD_XA_MAP.get(p, [])) for p in pgd_luu)
@@ -400,7 +454,8 @@ Bỏ chọn nếu chỉ áp dụng cho một số PGD cụ thể.
                              f"'{tieu_de}' · thời hạn={deadline} · "
                              f"{len(pgd_luu)} PGD · "
                              f"{so_xa} đơn vị {loai_theo_doi} · "
-                             f"cap_theo_doi={loai_theo_doi}")
+                             f"cap_theo_doi={loai_theo_doi} · "
+                             f"cbtd_bien_hoa={str(cbtd_bien_hoa).strip()}")
                 st.toast(f"✅ Đã tạo: {tieu_de}")
                 st.rerun()
             except Exception as e:
@@ -512,6 +567,12 @@ def _render_quan_ly_task(tab, **kwargs):
                 height=68,
                 key=f"td_sua_nguoi_pt_{task_id}",
             )
+            nguoi_thuc_hien_cn = st.text_input(
+                "👤 Cán bộ phòng KH-NV phụ trách",
+                value=str(task.get("nguoi_thuc_hien_cn") or ""),
+                placeholder="Họ tên cán bộ KH-NV phụ trách nội dung này...",
+                key=f"td_sua_nguoi_thuc_hien_cn_{task_id}",
+            )
             ngay_bat_dau_val = date.today()
             try:
                 ngay_bat_dau_val = date.fromisoformat(
@@ -538,9 +599,28 @@ def _render_quan_ly_task(tab, **kwargs):
                 key=f"td_sua_cap_theo_doi_{task_id}",
             )
 
-            st.caption(
-                "Danh sách PGD không thể thay đổi sau khi tạo. Nếu cần, hãy đóng đầu việc này và tạo mới."
+            st.markdown("**📋 Áp dụng cho đơn vị**")
+            st.caption("🏢 Phòng giao dịch huyện")
+            ds_pgd_task = json.loads(task.get("ds_pgd") or "[]") or DS_PGD
+            _c1, _c2, _c3 = st.columns(3)
+            for _j, _pgd in enumerate(DS_PGD):
+                _i = _j + 1
+                with [_c1, _c2, _c3][_j % 3]:
+                    st.checkbox(
+                        _pgd,
+                        value=_pgd in ds_pgd_task,
+                        key=f"td_sua_pgd_{task_id}_{_i}",
+                        disabled=True,
+                    )
+            st.divider()
+            st.caption("🏛️ Địa bàn Biên Hòa (Hội sở tỉnh)")
+            cbtd_bien_hoa = st.text_input(
+                "Cán bộ KH-NV phụ trách địa bàn Biên Hòa",
+                value=str(task.get("cbtd_bien_hoa") or ""),
+                placeholder="Họ tên CBTD Hội sở phụ trách...",
+                key=f"td_sua_cbtd_bien_hoa_{task_id}",
             )
+            st.caption("Danh sách PGD không thể thay đổi sau khi tạo. Nếu cần, hãy đóng đầu việc này và tạo mới.")
 
             submitted = st.form_submit_button("💾 Lưu thay đổi", type="primary")
 
@@ -554,7 +634,9 @@ def _render_quan_ly_task(tab, **kwargs):
                         """UPDATE tien_do_task
                            SET tieu_de=?, mo_ta=?, ngay_deadline=?, loai=?,
                                uu_tien=?, ghi_chu=?,
-                               cap_theo_doi=?, ngay_bat_dau=?, nguoi_phu_trach=?
+                               cap_theo_doi=?, ngay_bat_dau=?, nguoi_phu_trach=?,
+                               nguoi_thuc_hien_cn=?,
+                               cbtd_bien_hoa=?
                            WHERE id=?""",
                         (
                             str(tieu_de).strip(),
@@ -566,14 +648,23 @@ def _render_quan_ly_task(tab, **kwargs):
                             cap_theo_doi,
                             ngay_bat_dau.isoformat(),
                             str(nguoi_phu_trach).strip() or None,
+                            str(nguoi_thuc_hien_cn).strip(),
+                            str(cbtd_bien_hoa).strip(),
                             task_id,
                         ),
                     )
                     conn.commit()
+                loai_noi_dung = "chung_pgd" if cap_theo_doi == "pgd" else "chi_tiet_xa"
+                _sync_bien_hoa_ketqua(task_id, cbtd_bien_hoa, loai_noi_dung)
                 db.ghi_audit(
                     username,
                     "tien_do_sua_task",
                     f"ID={task_id} · '{str(tieu_de).strip()}' · thời hạn={deadline}",
+                )
+                db.ghi_audit(
+                    username,
+                    "sua_task",
+                    f"Task #{task_id}: cbtd_bien_hoa={str(cbtd_bien_hoa).strip()}",
                 )
                 st.toast("✅ Đã lưu thay đổi.")
                 st.rerun()
@@ -690,6 +781,8 @@ def _render_cap_nhat(tab, **kwargs):
             cap_theo_doi = task.get("cap_theo_doi", "xa")
             tag_nd = "🏢 Chung PGD" if cap_theo_doi == "pgd" else "🏘️ Chi tiết xã"
             nguoi_pt = task.get("nguoi_phu_trach") or ""
+            nguoi_thuc_hien_cn = task.get("nguoi_thuc_hien_cn") or ""
+            cbtd_bien_hoa = task.get("cbtd_bien_hoa") or ""
 
             try:
                 deadline_date = date.fromisoformat(task["ngay_deadline"])
@@ -717,6 +810,10 @@ def _render_cap_nhat(tab, **kwargs):
             with c3:
                 if nguoi_pt:
                     st.caption(f"👤 Người PT: **{nguoi_pt}**")
+            if nguoi_thuc_hien_cn:
+                st.caption(f"👤 Cán bộ KH-NV phụ trách: {nguoi_thuc_hien_cn}")
+            if cbtd_bien_hoa:
+                st.caption(f"🏛️ CB KH-NV phụ trách Biên Hòa: {cbtd_bien_hoa}")
             if badge:
                 st.info(badge)
             if task.get("mo_ta"):
@@ -732,7 +829,9 @@ def _render_cap_nhat(tab, **kwargs):
             else:
                 with st.container(border=True):
                     st.markdown("**② CHỌN PHẠM VI**")
-                    ds_pgd_task = json.loads(task.get("ds_pgd") or "[]") or DS_PGD_ALL
+                    ds_pgd_task = json.loads(task.get("ds_pgd") or "[]") or DS_PGD
+                    if cbtd_bien_hoa:
+                        ds_pgd_task = list(ds_pgd_task) + [_PGD_BIEN_HOA]
                     pgd_sel = st.selectbox(
                         "Đơn vị PGD",
                         options=ds_pgd_task,
@@ -963,7 +1062,7 @@ def _xuat_excel_tien_do(df_tonghop, df_matran, df_ct) -> bytes:
         ws_th = writer.sheets["Tổng hợp"]
         _style_sheet(
             ws_th,
-            col_left={"Đầu việc", "Loại", "Người phụ trách"},
+            col_left={"Đầu việc", "Loại", "Người phụ trách", "CB KH-NV phụ trách", "CB Biên Hòa"},
             col_right={"Số PGD", "Tổng xã", "Đã hoàn thành", "Chưa thực hiện", "Trễ hạn", "N/A"},
             col_center={"STT", "Ưu tiên", "Thời hạn", "Loại theo dõi", "Ngày bắt đầu"},
             col_pct={"Tỷ lệ HT%"},
@@ -1096,6 +1195,8 @@ def _render_xuat(tab, **kwargs):
                     "Loại theo dõi": "Chung PGD" if t.get("cap_theo_doi") == "pgd" else "Chi tiết xã",
                     "Ngày bắt đầu": t.get("ngay_bat_dau") or "",
                     "Người phụ trách": t.get("nguoi_phu_trach") or "",
+                    "CB KH-NV phụ trách": t.get("nguoi_thuc_hien_cn") or "",
+                    "CB Biên Hòa": t.get("cbtd_bien_hoa") or "",
                 })
             df_tonghop = pd.DataFrame(summary_rows)
 
@@ -1335,6 +1436,16 @@ def _xuat_pdf_bao_cao_tien_do(ds_task, username):
 
         for i, t in enumerate(ds_task, 1):
             kq = _doc_ketqua_task(t["id"])
+            cbtd_bien_hoa = str(t.get("cbtd_bien_hoa") or "").strip()
+            if cbtd_bien_hoa and not any(r.get("ten_xa") == _PGD_BIEN_HOA for r in kq):
+                kq = list(kq or [])
+                kq.append({
+                    "pgd": _PGD_BIEN_HOA,
+                    "ten_xa": _PGD_BIEN_HOA,
+                    "trang_thai": "chua_thuc_hien",
+                    "ngay_hoan_thanh": None,
+                    "ghi_chu": "",
+                })
             xong = sum(1 for r in kq if r["trang_thai"] == "da_hoan_thanh")
             tong = len(kq)
             pct = round(xong / tong * 100) if tong else 0
@@ -1364,7 +1475,7 @@ def _xuat_pdf_bao_cao_tien_do(ds_task, username):
             ))
 
             if cap == "pgd":
-                pgd_order = sorted(set(r["pgd"] for r in kq))
+                pgd_order = sorted(set(r["pgd"] for r in kq), key=lambda x: (x == _PGD_BIEN_HOA, x))
                 tbl_data = [[
                     Paragraph("STT", th_s),
                     Paragraph("PGD", th_s),
@@ -1660,11 +1771,22 @@ def _xuat_pdf_tien_do(task, ds_kq, username):
             pdfmetrics.registerFont(TTFont("ArialUni-Bold", arialbd_path))
             FONT_BOLD = "ArialUni-Bold"
 
+        ds_kq = list(ds_kq or [])
+        cbtd_bien_hoa = str(task.get("cbtd_bien_hoa") or "").strip()
+        if cbtd_bien_hoa and not any(r.get("ten_xa") == _PGD_BIEN_HOA for r in ds_kq):
+            ds_kq.append({
+                "pgd": _PGD_BIEN_HOA,
+                "ten_xa": _PGD_BIEN_HOA,
+                "trang_thai": "chua_thuc_hien",
+                "ngay_hoan_thanh": None,
+                "ghi_chu": "",
+            })
+
         kq_theo_pgd = {}
         for r in sorted(ds_kq, key=lambda x: x["pgd"]):
             kq_theo_pgd.setdefault(r["pgd"], []).append(r)
 
-        pgd_order = sorted(kq_theo_pgd.keys())
+        pgd_order = sorted(kq_theo_pgd.keys(), key=lambda x: (x == _PGD_BIEN_HOA, x))
 
         TS_LABEL = {
             "chua_thuc_hien": "○",

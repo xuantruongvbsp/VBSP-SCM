@@ -1562,28 +1562,42 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                 st.success("✅ Không có món nào sắp hết hạn khoanh.")
 
         # ── Sub-tabs ──────────────────────────────────────────────────────
+        # nhom="tongquan" | "cv368" | None (hiện cả 7 tab khi gọi standalone)
+        nhom = kwargs.get("nhom")
         pgd_filter_bc = None if la_phan_he_cn(role) else pgd_user
         rows_all_kt = db.doc_ket_qua_kiem_tra(ten_pgd=pgd_filter_bc)
         da_kiem_tra_set = {r["ma_mon_vay"] for r in rows_all_kt}
 
-        d0, d1, d2, d3, d4, d_kt, d_bc = st.tabs([
-            "📊 Tổng quan",
-            "📋 Theo Chương trình",
-            "🏘️ Theo Xã",
-            "🤝 Theo Hội đoàn thể",
-            "📄 Danh sách chi tiết",
-            "📋 Kiểm tra nợ khoanh (theo CV 368)",
-            "📊 Báo cáo",
-        ])
+        if nhom != "cv368":
+            d0, d1, d2, d3, d4 = st.tabs([
+                "📊 Tổng quan",
+                "📋 Theo Chương trình",
+                "🏘️ Theo Xã",
+                "🤝 Theo Hội đoàn thể",
+                "📄 Danh sách chi tiết",
+            ])
+        else:
+            d0 = d1 = d2 = d3 = d4 = None
 
-        with d0:
-            tab_qlnk_dashboard.render(d0, **kwargs)
+        if nhom != "tongquan":
+            d_kt, d_bc = st.tabs([
+                "📋 Kiểm tra nợ khoanh (theo CV 368)",
+                "📊 Báo cáo",
+            ])
+        else:
+            d_kt = d_bc = None
+
+        if d0 is not None:
+            with d0:
+                tab_qlnk_dashboard.render(d0, **kwargs)
 
         for dtab, nhom_col, tag, label in [
             (d1, COT_TEN_CT,  "ct",   "Chương trình"),
             (d2, COT_TEN_XA,  "xa",   "Xã"),
             (d3, COT_DVUT,    "dvut", "Hội đoàn thể"),
         ]:
+            if dtab is None:
+                continue
             with dtab:
                 if nhom_col not in df_kh.columns:
                     st.info(f"Không có cột {label} trong dữ liệu.")
@@ -1598,43 +1612,47 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                             bng, key=f"{key_prefix}khoanh_{tag}_tbl", height=320
                         )
 
-        with d4:
-            cols_hien = [c for c in [
-                COT_TEN_PGD, COT_TEN_XA, COT_DVUT, COT_TEN_KH, COT_SO_KU,
-                COT_TEN_CT, COT_DU_NO_KHOANH, COT_DU_NO_QH, COT_NGAY_DH,
-            ] if c in df_kh.columns]
+        if d4 is not None:
+            with d4:
+                cols_hien = [c for c in [
+                    COT_TEN_PGD, COT_TEN_XA, COT_DVUT, COT_TEN_KH, COT_SO_KU,
+                    COT_TEN_CT, COT_DU_NO_KHOANH, COT_DU_NO_QH, COT_NGAY_DH,
+                ] if c in df_kh.columns]
 
-            df_hien = df_kh[cols_hien].copy()
-            if COT_DU_NO_KHOANH in df_hien.columns:
-                df_hien[COT_DU_NO_KHOANH] = (
-                    pd.to_numeric(df_hien[COT_DU_NO_KHOANH], errors="coerce")
-                    .fillna(0).apply(_fmt_dong)
-                )
-            if COT_DU_NO_QH in df_hien.columns:
-                df_hien[COT_DU_NO_QH] = (
-                    pd.to_numeric(df_hien[COT_DU_NO_QH], errors="coerce")
-                    .fillna(0).apply(_fmt_dong)
+                df_hien = df_kh[cols_hien].copy()
+                if COT_DU_NO_KHOANH in df_hien.columns:
+                    df_hien[COT_DU_NO_KHOANH] = (
+                        pd.to_numeric(df_hien[COT_DU_NO_KHOANH], errors="coerce")
+                        .fillna(0).apply(_fmt_dong)
+                    )
+                if COT_DU_NO_QH in df_hien.columns:
+                    df_hien[COT_DU_NO_QH] = (
+                        pd.to_numeric(df_hien[COT_DU_NO_QH], errors="coerce")
+                        .fillna(0).apply(_fmt_dong)
+                    )
+
+                hien_thi_dataframe_phan_trang(
+                    df_hien, key=f"{key_prefix}khoanh_chitiet", height=420
                 )
 
-            hien_thi_dataframe_phan_trang(
-                df_hien, key=f"{key_prefix}khoanh_chitiet", height=420
-            )
+                if st.button(
+                    f"📥 Xuất Excel ({len(df_kh)} món)",
+                    key=f"{key_prefix}khoanh_xuat",
+                ):
+                    st.session_state[f"_{key_prefix}khoanh_buf"] = xuat_excel(
+                        {"Nợ khoanh": df_hien}
+                    )
+                if st.session_state.get(f"_{key_prefix}khoanh_buf"):
+                    st.download_button(
+                        "⬇️ Tải về Excel",
+                        data=st.session_state[f"_{key_prefix}khoanh_buf"],
+                        file_name="NoKhoanh.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        key=f"{key_prefix}khoanh_dl",
+                    )
 
-            if st.button(
-                f"📥 Xuất Excel ({len(df_kh)} món)",
-                key=f"{key_prefix}khoanh_xuat",
-            ):
-                st.session_state[f"_{key_prefix}khoanh_buf"] = xuat_excel(
-                    {"Nợ khoanh": df_hien}
-                )
-            if st.session_state.get(f"_{key_prefix}khoanh_buf"):
-                st.download_button(
-                    "⬇️ Tải về Excel",
-                    data=st.session_state[f"_{key_prefix}khoanh_buf"],
-                    file_name="NoKhoanh.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    key=f"{key_prefix}khoanh_dl",
-                )
+        if nhom == "tongquan":
+            return
 
         with d_kt:
             perms = get_permissions(role)

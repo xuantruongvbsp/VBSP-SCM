@@ -124,7 +124,11 @@ def init_db():
                 ngay_tao      TEXT NOT NULL,
                 trang_thai    TEXT NOT NULL DEFAULT 'dang_theo_doi',
                 ghi_chu       TEXT,
-                cap_theo_doi  TEXT NOT NULL DEFAULT 'xa'
+                cap_theo_doi  TEXT NOT NULL DEFAULT 'xa',
+                ngay_bat_dau  TEXT,
+                nguoi_phu_trach TEXT,
+                nguoi_thuc_hien_cn TEXT DEFAULT '',
+                cbtd_bien_hoa TEXT DEFAULT ''
             );
             CREATE INDEX IF NOT EXISTS idx_tiendo_deadline ON tien_do_task(ngay_deadline);
             CREATE TABLE IF NOT EXISTS tien_do_ketqua (
@@ -252,6 +256,18 @@ def init_db():
         try:
             conn.execute(
                 "ALTER TABLE tien_do_task ADD COLUMN nguoi_phu_trach TEXT"
+            )
+        except sqlite3.OperationalError:
+            pass
+        try:
+            conn.execute(
+                "ALTER TABLE tien_do_task ADD COLUMN nguoi_thuc_hien_cn TEXT DEFAULT ''"
+            )
+        except sqlite3.OperationalError:
+            pass
+        try:
+            conn.execute(
+                "ALTER TABLE tien_do_task ADD COLUMN cbtd_bien_hoa TEXT DEFAULT ''"
             )
         except sqlite3.OperationalError:
             pass

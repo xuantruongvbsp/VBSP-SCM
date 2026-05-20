@@ -36,8 +36,11 @@ tmp_*.txt
 .DS_Store
 Thumbs.db
 
-# Trae AI
-.trae/
+# Trae AI — chỉ ignore settings/cache, KHÔNG ignore rules
+.trae/settings/
+.trae/cache/
+.trae/*.json
+# .trae/rules/ được commit để đồng bộ rules giữa các máy
 
 # File Excel tạm khi mở
 ~$*.xlsx

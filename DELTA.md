@@ -297,3 +297,8 @@ Upload flow:
 - `tabs/tab_tracuu.py`: 8 hardcoded colors â†’ dark: label `#94A3B8`, value `#E0E6ED`, card bg `#1E2130`, badge `#1B5E20/#2D0D14`, NQH `#2D0D14/#EF9A9A`, border `#EF5350/#42A5F5`
 - `tabs/tab_khtd_nhap.py`: ~30 hardcoded header colors â†’ dark: TW `#0D2137/#90CAF9`, DP `#0D2818/#81C784`, Tá»•ng `#2D1F0D/#FFD54F`, empty `#262B3D`, muted `#64748B`, text `#E0E6ED`
 - `.streamlit/config.toml`: `base="dark"` giá»¯ nguyÃªn â€” toÃ n bá»™ app chá»‰ dark mode
+
+## [20/05/2026] (Batch 2)
+- 	abs/tab_tongquan.py: Thay st.tabs 4 sub-tabs dáo h?n b?ng lazy_tabs()  ch? render 1 tab
+- 	abs/tab_baocao.py: Thay st.tabs Báo cáo chi ti?t / NQ11 b?ng st.radio  ch? render tab du?c ch?n
+- workspaces/ws_operation.py: Xóa eager import 21 tab module kh?i ender(), dùng _lazy_tab() lazy-load

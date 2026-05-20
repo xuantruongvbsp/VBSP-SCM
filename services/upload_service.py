@@ -57,6 +57,8 @@ _MERGE_LOCK: dict[str, threading.Lock] = {
     "gqvl": threading.Lock(),
 }
 
+_BAD_VALS = {"nan", "None", "<NA>", "NaT"}
+
 # ── Hằng số kiểm tra ─────────────────────────────────────────────────────────
 
 EXTS_CHOPHEP: set[str] = {".xlsx", ".xls", ".XLSX", ".XLS"}
@@ -481,14 +483,23 @@ def merge_du_lieu_toan_cn(
     for col in _cols_so_cn:
         if col in df_toan_cn.columns:
             df_toan_cn[col] = pd.to_numeric(df_toan_cn[col], errors="coerce")
-    # String cleanup — chỉ xử lý 17 cột object dtype, fillna('') là đủ
-    # Tránh astype(str).str.strip() trên 164 cột × 349K dòng (27s → 0.7s)
-    _str_cols_obj = [
-        c for c in df_toan_cn.columns
-        if c not in _cols_so_cn and df_toan_cn[c].dtype == object
-    ]
-    if _str_cols_obj:
-        df_toan_cn[_str_cols_obj] = df_toan_cn[_str_cols_obj].fillna("")
+    # Chuẩn hóa dtype cột chuỗi: ép toàn bộ về str đồng nhất
+    # Xử lý mixed type (int + str rỗng) → tránh ArrowInvalid khi ghi parquet
+    _str_cols = [c for c in df_toan_cn.columns if c not in _cols_so_cn]
+    if _str_cols:
+        for col in _str_cols:
+            df_toan_cn[col] = df_toan_cn[col].apply(
+                lambda v: (
+                    ""
+                    if v is None
+                    else (
+                        ""
+                        if str(v).strip() in _BAD_VALS
+                        else str(int(v)) if isinstance(v, float) and v == int(v)
+                        else str(v).strip()
+                    )
+                )
+            )
 
     with _MERGE_LOCK[loai]:
         bak_path = cache_path + ".bak"

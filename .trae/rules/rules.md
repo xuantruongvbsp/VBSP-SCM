@@ -246,6 +246,7 @@ def la_executive(role: str) -> bool
 def la_admin_cn(role: str) -> bool
 def la_chuyen_vien_cn(role: str) -> bool
 def co_quyen_upload_pgd(role: str) -> bool
+def co_quyen_quan_ly_user_pgd(role: str) -> bool
 def co_quyen_giao_nhiem_vu(role: str) -> bool
 def get_permissions(role: str) -> dict
 ```
@@ -271,6 +272,9 @@ db.ghi_kv("key", value, username)   # ghi
 | `merge_meta_{loai}` | Metadata merge hstd/nq11/gqvl |
 | `no_rui_ro_{slug}_{yyyy}_{mm}` | Hồ sơ rủi ro |
 | `kehoach` / `kehoach_pgd_{slug}` | KH Điện báo |
+| `dgd_map` | Điểm giao dịch toàn CN |
+| `kh_gqvl_cn_{nam}` | KH GQVL Chi nhánh |
+| `kh_gqvl_pgd_{slug}_{nam}` | KH GQVL theo PGD |
 
 `slug` = `pgd_slug(ten_pgd)` từ `data/pgd.py`
 

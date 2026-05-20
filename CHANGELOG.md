@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## [2026-05-20] — Sub-tab "Tiến độ thực hiện" thay thế "Giao việc PGD" trong Nội bộ Phòng KH-NV
+- `tabs/tab_khnv_noi_bo.py` — thêm hàm `_render_tien_do_thuc_hien()`: tổng hợp tự động từ `khnv_phan_cong_list`, không cần nhập liệu thêm
+- `tabs/tab_khnv_noi_bo.py` — hiển thị: bộ lọc (tháng deadline / năm / cán bộ), 5 metric tổng quan, progress bar màu theo % từng cán bộ (đỏ <30 / cam 30–70 / xanh ≥70 / lá 100%), badge trễ hạn, bảng chi tiết, nút Xuất PDF
+- `tabs/tab_khnv_noi_bo.py` `render()` — đổi label từ "📌 Giao việc PGD" → "📊 Tiến độ thực hiện"; thay `tab_tien_do.render()` bằng `_render_tien_do_thuc_hien()`
+- `tabs/tab_khnv_noi_bo.py` — xóa import `tab_tien_do`; thêm import `defaultdict`
+
 ## [2026-05-20] — Nút PDF luôn hiển thị trong tab Nội bộ Phòng KH-NV (disabled khi trống)
 - `tabs/tab_khnv_noi_bo.py` sub-tab 📋 Phân công cán bộ — nút "📥 Xuất PDF" luôn render trước danh sách; disabled (`st.button disabled=True`) khi chưa có task; active (download button) khi có dữ liệu
 - `tabs/tab_khnv_noi_bo.py` sub-tab 📅 Lịch công tác — tương tự: disabled khi `ds` rỗng (toàn bộ) hoặc `ds_loc` rỗng (tháng lọc không có sự kiện)

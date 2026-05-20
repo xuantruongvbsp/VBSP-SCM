@@ -142,6 +142,9 @@ def _cache_kpi_tongquan(
     cot_ma_kh: str,
 ) -> dict:
     _ = (ts, pgd_user, pgd_filter)  # tham gia cache key; tránh unused-argument
+    for _c in [cot_tdn, cot_dth, cot_dqh, cot_nk]:
+        if _c and _c in _df.columns and hasattr(_df[_c], 'cat'):
+            _df[_c] = pd.to_numeric(_df[_c].astype(str), errors="coerce").fillna(0)
     tdn = _df[cot_tdn].sum() if cot_tdn in _df.columns else 0
     dth = _df[cot_dth].sum() if cot_dth in _df.columns else 0
     dqh = _df[cot_dqh].sum() if cot_dqh in _df.columns else 0
@@ -209,6 +212,18 @@ def _cache_co_cau_ct(
     Dùng ts + pgd_filter làm cache key; _df có underscore để Streamlit bỏ qua hash."""
     _ = (ts, pgd_filter)
     _df_loc = _df[_df[COT_TONG_DU_NO].fillna(0) > 0].copy()
+
+    _COLS_TO_SUM = [COT_TONG_DU_NO, COT_DU_NO_QH, COT_DU_NO_KHOANH, COT_NGUON_VON]
+    if col_khoanh:
+        _COLS_TO_SUM.append(col_khoanh)
+    if col_gn:
+        _COLS_TO_SUM.append(col_gn)
+    _COLS_TO_SUM = list(set(_COLS_TO_SUM))
+    for _c in _COLS_TO_SUM:
+        if _c in _df_loc.columns and hasattr(_df_loc[_c], 'cat'):
+            _df_loc[_c] = pd.to_numeric(_df_loc[_c].astype(str), errors="coerce").fillna(0)
+        elif _c in _df.columns and hasattr(_df[_c], 'cat'):
+            _df[_c] = pd.to_numeric(_df[_c].astype(str), errors="coerce").fillna(0)
 
     if COT_NGUON_VON in _df_loc.columns:
         _nv = pd.to_numeric(_df_loc[COT_NGUON_VON], errors="coerce")
@@ -294,6 +309,15 @@ def _cache_tqpgd_extended(
     """Cache toàn bộ bảng tổng quan PGD (đã merge các cột bổ sung) — trả về số VND thô.
     Lọc/format thực hiện bên ngoài để không phình cache."""
     _ = (ts, pgd_filter, nam_ht)
+    _COLS_TO_SUM_PGD = [COT_TONG_DU_NO, COT_DU_NO_QH, COT_LAI_TON]
+    if col_khoanh:
+        _COLS_TO_SUM_PGD.append(col_khoanh)
+    if col_cv:
+        _COLS_TO_SUM_PGD.append(col_cv)
+    for _c in set(_COLS_TO_SUM_PGD):
+        if _c in _df.columns and hasattr(_df[_c], 'cat'):
+            _df[_c] = pd.to_numeric(_df[_c].astype(str), errors="coerce").fillna(0)
+
     df_pgd = _df.groupby(COT_TEN_PGD, as_index=False).agg(
         du_no=(COT_TONG_DU_NO, "sum"),
         so_kh=(COT_MA_KH, "nunique"),

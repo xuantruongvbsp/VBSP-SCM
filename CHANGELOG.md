@@ -14,8 +14,11 @@
 - `tabs/tab_tongquan.py` dòng ~212 — fix `_df_loc.get(COT_NGUON_VON, Series())` → crash index alignment khi cột thiếu; thay bằng `if col in columns` với fallback `Series(0, index=_df_loc.index)`
 - `tabs/tab_tongquan.py` dòng ~225 — xóa dead code `rename(columns={"COT_TEN_CT": "ten_ct"})` (rename literal string không đổi tên cột)
 
-## [2026-05-20] — Fix _cache_co_cau_ct: category type does not support sum operations
-- `tabs/tab_tongquan.py` dòng ~263-271 — 3 groupby sum (`col_khoanh`, `col_gn`, `cols_tn`) dùng `.apply(lambda x: pd.to_numeric(x, errors="coerce").sum())` thay vì `.sum()` trực tiếp; nguyên nhân: Parquet đọc cột giải ngân/thu nợ dạng Categorical, pandas không sum được
+## [2026-05-20] — Fix _cache_co_cau_ct/tqpgd_extended: category type does not support sum operations
+- `tabs/tab_tongquan.py` dòng ~214-224 — thêm `_COLS_TO_SUM` convert category→numeric ở đầu `_cache_co_cau_ct` cho tất cả cột sẽ bị sum
+- `tabs/tab_tongquan.py` dòng ~146-149 — thêm convert category→numeric ở đầu `_cache_kpi_tongquan`
+- `tabs/tab_tongquan.py` dòng ~316-324 — thêm `_COLS_TO_SUM_PGD` convert category→numeric ở đầu `_cache_tqpgd_extended`
+- Nguyên nhân gốc: 3 cached function dùng `.sum()`/`.agg(..., "sum")` trên DataFrame có cột dtype `category` (do đọc từ Parquet), pandas CategoricalArray không hỗ trợ sum
 
 ## [2026-05-20] — Tối ưu tốc độ chuyển tab ws_management: lazy import + cache
 - `workspaces/ws_management.py` dòng ~46 — xóa 18 static import tab, thay bằng `_get_tab()` với `@st.cache_resource` (lazy import giảm 30–50% cold start)

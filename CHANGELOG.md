@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## [2026-05-20] — Nút PDF luôn hiển thị trong tab Nội bộ Phòng KH-NV (disabled khi trống)
+- `tabs/tab_khnv_noi_bo.py` sub-tab 📋 Phân công cán bộ — nút "📥 Xuất PDF" luôn render trước danh sách; disabled (`st.button disabled=True`) khi chưa có task; active (download button) khi có dữ liệu
+- `tabs/tab_khnv_noi_bo.py` sub-tab 📅 Lịch công tác — tương tự: disabled khi `ds` rỗng (toàn bộ) hoặc `ds_loc` rỗng (tháng lọc không có sự kiện)
+
 ## [2026-05-20] — Fix dark mode: chữ bảng tổng hợp PGD tối + footnote đổi sang opacity
 - `tabs/tab_tongquan.py` dòng ~1186 — thêm `color:#1a202c` vào `<tr>` style để chữ đen rõ trên nền sáng (#F5F7FA/#FFFFFF/#C8E6C9) ở dark mode
 - `tabs/tab_tongquan.py` dòng ~1197 — đổi `<p style="color:#6B7280">` → `<div style="opacity:0.65">` để footnote hiển thị đúng màu theo theme

@@ -235,9 +235,9 @@ def danh_dau_khong_hd(df: "pd.DataFrame") -> "pd.DataFrame":
     )
 
     if co_the_dung_ngay:
-        ngay_sl = pd.to_datetime(df[COT_NGAY_SL], errors="coerce", dayfirst=True)
-        ngay_gdgn = pd.to_datetime(df[COT_NGAY_GDGN], errors="coerce", dayfirst=True)
-        ngay_vay = pd.to_datetime(df[COT_NGAY_VAY], errors="coerce", dayfirst=True) if COT_NGAY_VAY in df.columns else pd.Series(pd.NaT, index=df.index)
+        ngay_sl = pd.to_datetime(df[COT_NGAY_SL].astype(object), errors="coerce", dayfirst=True)
+        ngay_gdgn = pd.to_datetime(df[COT_NGAY_GDGN].astype(object), errors="coerce", dayfirst=True)
+        ngay_vay = pd.to_datetime(df[COT_NGAY_VAY].astype(object), errors="coerce", dayfirst=True) if COT_NGAY_VAY in df.columns else pd.Series(pd.NaT, index=df.index)
         ref = ngay_gdgn.where(ngay_gdgn.notna(), ngay_vay)
         days = (ngay_sl - ref).dt.days
         so_thang = days.astype(float) / 30.44

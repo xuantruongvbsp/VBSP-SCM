@@ -143,8 +143,8 @@ def _cache_kpi_tongquan(
 ) -> dict:
     _ = (ts, pgd_user, pgd_filter)  # tham gia cache key; tránh unused-argument
     for _c in [cot_tdn, cot_dth, cot_dqh, cot_nk]:
-        if _c and _c in _df.columns and hasattr(_df[_c], 'cat'):
-            _df[_c] = pd.to_numeric(_df[_c].astype(str), errors="coerce").fillna(0)
+        if _c and _c in _df.columns:
+            _df[_c] = pd.to_numeric(_df[_c], errors="coerce").fillna(0)
     tdn = _df[cot_tdn].sum() if cot_tdn in _df.columns else 0
     dth = _df[cot_dth].sum() if cot_dth in _df.columns else 0
     dqh = _df[cot_dqh].sum() if cot_dqh in _df.columns else 0
@@ -192,6 +192,9 @@ def _cache_heatmap_pgd(
     cot_dqh: str,
 ) -> pd.DataFrame:
     _ = (ts, pgd_user, pgd_filter)  # tham gia cache key; tránh unused-argument
+    for _c in [cot_tdn, cot_dqh]:
+        if _c and _c in _df.columns:
+            _df[_c] = pd.to_numeric(_df[_c], errors="coerce").fillna(0)
     return _df.groupby(cot_pgd, as_index=False).agg(
         du_no=(cot_tdn, "sum"),
         so_kh=(cot_ma_kh, "nunique"),
@@ -220,10 +223,8 @@ def _cache_co_cau_ct(
         _COLS_TO_SUM.append(col_gn)
     _COLS_TO_SUM = list(set(_COLS_TO_SUM))
     for _c in _COLS_TO_SUM:
-        if _c in _df_loc.columns and hasattr(_df_loc[_c], 'cat'):
-            _df_loc[_c] = pd.to_numeric(_df_loc[_c].astype(str), errors="coerce").fillna(0)
-        elif _c in _df.columns and hasattr(_df[_c], 'cat'):
-            _df[_c] = pd.to_numeric(_df[_c].astype(str), errors="coerce").fillna(0)
+        if _c in _df_loc.columns:
+            _df_loc[_c] = pd.to_numeric(_df_loc[_c].astype(object), errors="coerce").fillna(0)
 
     if COT_NGUON_VON in _df_loc.columns:
         _nv = pd.to_numeric(_df_loc[COT_NGUON_VON], errors="coerce")
@@ -252,7 +253,11 @@ def _cache_co_cau_ct(
     df_ct["du_no_dp"] = df_ct["ten_ct"].map(du_no_dp).fillna(0)
 
     if COT_DU_NO_QH in _df.columns:
-        _qh = _df_loc.groupby(COT_TEN_CT)[COT_DU_NO_QH].sum().reset_index()
+        _qh = (
+            _df_loc.groupby(COT_TEN_CT)[COT_DU_NO_QH]
+            .apply(lambda x: pd.to_numeric(x, errors="coerce").sum())
+            .reset_index()
+        )
         _qh.columns = ["ten_ct", "du_no_qh"]
         df_ct = df_ct.merge(_qh, on="ten_ct", how="left")
     else:
@@ -264,6 +269,7 @@ def _cache_co_cau_ct(
             _df_loc.groupby(COT_TEN_CT)[col_khoanh]
             .apply(lambda x: pd.to_numeric(x, errors="coerce").sum())
             .reset_index(name="du_no_khoanh")
+            .rename(columns={COT_TEN_CT: "ten_ct"})
         )
         df_ct = df_ct.merge(_nk, on="ten_ct", how="left")
     else:
@@ -275,6 +281,7 @@ def _cache_co_cau_ct(
             _df_loc.groupby(COT_TEN_CT)[col_gn]
             .apply(lambda x: pd.to_numeric(x, errors="coerce").sum())
             .reset_index(name="gn_nam")
+            .rename(columns={COT_TEN_CT: "ten_ct"})
         )
         df_ct = df_ct.merge(_gn, on="ten_ct", how="left")
     else:
@@ -287,6 +294,7 @@ def _cache_co_cau_ct(
             _df_loc.groupby(COT_TEN_CT)[cols_tn]
             .apply(lambda x: pd.to_numeric(x.stack(), errors="coerce").sum())
             .reset_index(name="tn_nam")
+            .rename(columns={COT_TEN_CT: "ten_ct"})
         )
         df_ct = df_ct.merge(_tn, on="ten_ct", how="left")
     else:
@@ -315,8 +323,8 @@ def _cache_tqpgd_extended(
     if col_cv:
         _COLS_TO_SUM_PGD.append(col_cv)
     for _c in set(_COLS_TO_SUM_PGD):
-        if _c in _df.columns and hasattr(_df[_c], 'cat'):
-            _df[_c] = pd.to_numeric(_df[_c].astype(str), errors="coerce").fillna(0)
+        if _c in _df.columns:
+            _df[_c] = pd.to_numeric(_df[_c], errors="coerce").fillna(0)
 
     df_pgd = _df.groupby(COT_TEN_PGD, as_index=False).agg(
         du_no=(COT_TONG_DU_NO, "sum"),
@@ -475,18 +483,17 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
             <style>
             .tq-caption{color:#4b5563;font-size:0.96rem;margin:-6px 0 14px 0}
             .tq-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:14px}
-            .tq-card{border-radius:10px;padding:12px 14px;border:1px solid #e0e7ef;background:#f8fafc;min-height:84px;position:relative;overflow:hidden}
-            .tq-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--tq-color,#6366f1)}
-            .tq-card h4{margin:0 0 6px 0;font-size:0.95rem;font-weight:600;color:#374151}
-            .tq-card .val{font-size:2.05rem;line-height:1.05;font-weight:700;color:#111827;margin:0}
-            .tq-card .sub{font-size:0.88rem;color:#4b5563;margin-top:3px}
-            .tq-card .sub.up{color:#1f7a35;font-weight:600}
-            .tq-card.soft-blue{background:#eff6ff;border-color:#bfdbfe;--tq-color:#3b82f6}
-            .tq-card.soft-indigo{background:#eef2ff;border-color:#c7d2fe;--tq-color:#6366f1}
-            .tq-card.soft-green{background:#f0fdf4;border-color:#bbf7d0;--tq-color:#22c55e}
-            .tq-card.soft-red{background:#fef2f2;border-color:#fecaca;--tq-color:#ef4444}
-            .tq-card.soft-amber{background:#fffbeb;border-color:#fde68a;--tq-color:#f59e0b}
-            .tq-card.soft-purple{background:#faf5ff;border-color:#e9d5ff;--tq-color:#a855f7}
+            .tq-card{border-radius:10px;padding:12px 10px 10px;border:1px solid transparent;min-height:90px;text-align:center}
+            .tq-card h4{margin:0 0 2px 0;font-size:0.83rem;font-weight:600;color:inherit !important}
+            .tq-card .val{font-size:2rem !important;line-height:1 !important;font-weight:700 !important;margin:2px 0 4px;display:block;color:inherit !important}
+            .tq-card .sub{font-size:0.83rem;margin-top:2px;color:inherit !important}
+            .tq-card .sub.up{font-weight:600}
+            .tq-card.soft-blue{background:#dbeafe !important;border-color:#93c5fd;color:#1e3a6e !important}
+            .tq-card.soft-indigo{background:#e0e7ff !important;border-color:#a5b4fc;color:#312e81 !important}
+            .tq-card.soft-green{background:#dcfce7 !important;border-color:#86efac;color:#14532d !important}
+            .tq-card.soft-red{background:#fee2e2 !important;border-color:#fca5a5;color:#7f1d1d !important}
+            .tq-card.soft-amber{background:#fef3c7 !important;border-color:#fcd34d;color:#78350f !important}
+            .tq-card.soft-purple{background:#ede9fe !important;border-color:#c4b5fd;color:#4c1d95 !important}
             .totkvv-wrap{border:1px solid #e5e7eb;border-radius:12px;padding:12px 14px;margin:4px 0 8px 0;background:#fff}
             .totkvv-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
             .totkvv-title{font-size:1.02rem;font-weight:700;color:#202938}

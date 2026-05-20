@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## [2026-05-20] — Review & update rules.md + 3 file .md mới
+- `.trae/rules/rules.md` — sửa 6 điểm: thêm 19 COT_* constants, sửa `movers_analysis` (thiếu 3 params), sửa `pgd_slug` (utils→data/pgd), thêm 3 utils functions (`auto_audit`, `auto_fill_batch`, `lazy_tabs`), sửa `get_permissions` (bỏ pgd_user), thêm 3 auth functions (`la_chuyen_vien_cn`, `co_quyen_giao_nhiem_vu`, `la_admin_cn`)
+- `BUGMAP.md` — tạo mới: bản đồ lỗi A→I (12 bugs), template ghi nhận bug, lệnh debug nhanh
+- `FILE_INDEX.md` — tạo mới: index dòng cho 7 file lớn (upload_service, ws_management, ws_operation, tab_no_khoanh, tab_no_rui_ro, ws_executive, config/auth/db/utils/data)
+- `PROMPT_TEMPLATE.md` — tạo mới: 5 template (bugfix, thêm tính năng, upload, báo cáo, fix UI) + checklist
+
 ## [2026-05-20] — Fix lỗi "Sức khỏe tín dụng": cannot subtract DatetimeArray from Categorical
 - `data/hstd.py` dòng ~238-240 — thêm `.astype(object)` trước `pd.to_datetime()` cho 3 cột ngày (`COT_NGAY_SL`, `COT_NGAY_GDGN`, `COT_NGAY_VAY`); nguyên nhân: Parquet cache lưu cột ngày dạng Categorical, pandas không tự convert sang datetime khi subtract
 

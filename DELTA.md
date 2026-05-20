@@ -4,6 +4,11 @@
 
 ---
 
+## [2026-05-20] Fix danh_dau_khong_hd — Categorical date columns
+- `data/hstd.py` hàm `danh_dau_khong_hd()` dòng ~238: cột ngày trong df có thể là Categorical (do Parquet cache); thêm `.astype(object)` trước `pd.to_datetime()` cho `COT_NGAY_SL`, `COT_NGAY_GDGN`, `COT_NGAY_VAY`
+
+---
+
 ## CẤU TRÚC THƯ MỤC HIỆN TẠI
 
 ```

@@ -62,6 +62,11 @@ _CHUC_VU_LABEL = {
     "vp2":  "👔 Phó phòng Vị trí 2",
     "cbtd": "🧑‍💼 Cán bộ Tín dụng",
 }
+_CHUC_VU_SHORT = {
+    "vp1":  "Phó Phòng VT1",
+    "vp2":  "Phó Phòng VT2",
+    "cbtd": "Cán bộ Tín dụng",
+}
 # Tập nguoi_thuc_hien trong _MAU_GIAO_VIEC phù hợp với từng chức vụ
 _CHUC_VU_TASK_FILTER = {
     "vp1":  {"Phó phòng (VT 1)", "Phó phòng (VT 1 & VT 2)",
@@ -600,7 +605,7 @@ def _render_task_card(cv: dict, ds: list, today: date,
             with _ec2:
                 _uu_idx = _UU_TIEN.index(cv.get("uu_tien", "binh_thuong")) \
                           if cv.get("uu_tien") in _UU_TIEN else 2
-                new_uu = st.selectbox("Ưu tiên", _UU_TIEN,
+                new_uu = st.selectbox("Mức độ", _UU_TIEN,
                                       index=_uu_idx,
                                       format_func=lambda x: _UU_TIEN_LABEL.get(x, x),
                                       key=f"{key_prefix}uu_edit_{k}")
@@ -609,7 +614,7 @@ def _render_task_card(cv: dict, ds: list, today: date,
                           if cv.get("ngay_deadline") else today
             except ValueError:
                 _dl_val = today
-            new_dl = st.date_input("Deadline", value=_dl_val,
+            new_dl = st.date_input("Thời gian hoàn thành", value=_dl_val,
                                    key=f"{key_prefix}dl_edit_{k}")
             new_gc = st.text_area("Ghi chú kết quả",
                                   value=cv.get("ghi_chu_ket_qua", ""),
@@ -661,21 +666,61 @@ def _render_nhan_su(role_n: str, username: str) -> None:
     if not can_bo:
         st.info("ℹ️ Chưa có cán bộ. Thêm cán bộ để bắt đầu phân công.")
     else:
+        edit_id = st.session_state.get("_edit_cb_id", None)
         for chuc_vu, label in _CHUC_VU_LABEL.items():
             nhom_cb = [c for c in can_bo if c["chuc_vu"] == chuc_vu]
             if not nhom_cb:
                 continue
             st.markdown(f"**{label}**")
             for cb in nhom_cb:
-                col_ten, col_xoa = st.columns([6, 1])
-                col_ten.write(f"👤 {cb['ho_ten']}")
-                if co_quyen:
-                    if col_xoa.button("🗑️", key=f"xoa_cb_{cb['id']}",
-                                      help="Xóa cán bộ này"):
-                        can_bo.remove(cb)
-                        _ghi_ds(KHNV_CAN_BO, can_bo, username,
-                                "khnv_xoa_can_bo", f"Xóa cán bộ: {cb['ho_ten']}")
-                        st.rerun()
+                if edit_id == cb["id"]:
+                    with st.container(border=True):
+                        ho_ten_moi = st.text_input(
+                            "Họ và tên", value=cb["ho_ten"], key=f"edit_cb_ten_{cb['id']}"
+                        )
+                        cv_keys = list(_CHUC_VU_LABEL.keys())
+                        cv_idx = cv_keys.index(cb["chuc_vu"]) if cb["chuc_vu"] in cv_keys else 0
+                        chuc_vu_moi = st.selectbox(
+                            "Chức vụ / Vị trí",
+                            cv_keys,
+                            index=cv_idx,
+                            format_func=lambda x: _CHUC_VU_LABEL[x],
+                            key=f"edit_cb_cv_{cb['id']}",
+                        )
+                        c1, c2, _ = st.columns([1, 1, 4])
+                        if c1.button("💾 Lưu", key=f"save_cb_{cb['id']}", type="primary",
+                                      use_container_width=True):
+                            if ho_ten_moi.strip():
+                                cb["ho_ten"] = ho_ten_moi.strip()
+                                cb["chuc_vu"] = chuc_vu_moi
+                                _ghi_ds(KHNV_CAN_BO, can_bo, username,
+                                        "khnv_sua_can_bo", f"Sửa cán bộ: {cb['ho_ten']}")
+                                st.session_state.pop("_edit_cb_id", None)
+                                st.rerun()
+                            else:
+                                st.error("Vui lòng nhập họ và tên.")
+                        if c2.button("❌ Hủy", key=f"cancel_cb_{cb['id']}",
+                                      use_container_width=True):
+                            st.session_state.pop("_edit_cb_id", None)
+                            st.rerun()
+                else:
+                    col_ten, col_sua, col_xoa = st.columns([5, 1, 1])
+                    col_ten.write(f"👤 {cb['ho_ten']}")
+                    if co_quyen:
+                        if col_sua.button(
+                            "✏️", key=f"sua_cb_{cb['id']}",
+                            help=f"Chỉnh sửa {cb['ho_ten']}",
+                        ):
+                            st.session_state["_edit_cb_id"] = cb["id"]
+                            st.rerun()
+                        if col_xoa.button(
+                            "🗑️", key=f"xoa_cb_{cb['id']}",
+                            help="Xóa cán bộ này",
+                        ):
+                            can_bo.remove(cb)
+                            _ghi_ds(KHNV_CAN_BO, can_bo, username,
+                                    "khnv_xoa_can_bo", f"Xóa cán bộ: {cb['ho_ten']}")
+                            st.rerun()
 
     if co_quyen:
         st.divider()
@@ -727,7 +772,7 @@ def _render_phan_cong_v2(role_n: str, username: str) -> None:
             st.warning("⚠️ Chưa có cán bộ. Vào tab **Nhân sự & Chức vụ** để thêm trước.")
         else:
             with st.expander("➕ Giao việc từ danh sách mẫu", expanded=not ds):
-                options_cb = [(c["id"], f"{c['ho_ten']} — {_CHUC_VU_LABEL[c['chuc_vu']]}") for c in can_bo_list]
+                options_cb = [(c["id"], f"{c['ho_ten']} - {_CHUC_VU_SHORT.get(c['chuc_vu'], c['chuc_vu'])}") for c in can_bo_list]
                 id_to_label = dict(options_cb)
                 sel_id = st.selectbox(
                     "① Cán bộ thực hiện",
@@ -752,15 +797,17 @@ def _render_phan_cong_v2(role_n: str, username: str) -> None:
                     sel_mau = mau_loc[sel_td_idx]
                     st.caption(f"📝 {sel_mau['mo_ta']}")
 
-                    _fc1, _fc2 = st.columns(2)
+                    _fc1, _fc2, _fc3 = st.columns(3)
                     with _fc1:
-                        dl = st.date_input("Deadline", value=today, key="pc2_dl")
-                    with _fc2:
                         uu_sel = st.selectbox(
-                            "Ưu tiên", _UU_TIEN,
+                            "Mức độ", _UU_TIEN,
                             format_func=lambda x: _UU_TIEN_LABEL[x],
                             index=2, key="pc2_uu",
                         )
+                    with _fc2:
+                        ngay_giao_sel = st.date_input("Ngày giao", value=today, key="pc2_ngay_giao")
+                    with _fc3:
+                        dl = st.date_input("Thời gian hoàn thành", value=today, key="pc2_dl")
 
                     if st.button("➕ Thêm đầu việc này", type="primary",
                                  key="pc2_btn_add", use_container_width=True):
@@ -773,7 +820,7 @@ def _render_phan_cong_v2(role_n: str, username: str) -> None:
                             "nhom": sel_mau["nhom"],
                             "uu_tien": uu_sel,
                             "trang_thai": "chua_lam",
-                            "ngay_giao": today.isoformat(),
+                            "ngay_giao": ngay_giao_sel.isoformat(),
                             "ngay_deadline": dl.isoformat(),
                             "ghi_chu_ket_qua": "",
                             "ngay_hoan_thanh": None,
@@ -781,39 +828,6 @@ def _render_phan_cong_v2(role_n: str, username: str) -> None:
                         _ghi_ds(KHNV_PHAN_CONG, ds, username, "khnv_giao_viec",
                                 f"Giao: {sel_mau['tieu_de']} → {sel_cb['ho_ten']}")
                         st.success("✅ Đã thêm!")
-                        st.rerun()
-
-        # ── Form giao việc thủ công ──
-        with st.expander("✍️ Giao việc thủ công", expanded=False):
-            with st.form("form_phan_cong_manual", clear_on_submit=True):
-                tieu_de = st.text_input("Tiêu đề *")
-                mo_ta   = st.text_area("Mô tả / hướng dẫn")
-                nguoi   = st.text_input("Người thực hiện *")
-                uu_tien = st.selectbox("Ưu tiên", _UU_TIEN,
-                                       format_func=lambda x: _UU_TIEN_LABEL[x])
-                _mc1, _mc2 = st.columns(2)
-                ngay_giao     = _mc1.date_input("Ngày giao",  value=today)
-                ngay_deadline = _mc2.date_input("Deadline *", value=today)
-                if st.form_submit_button("🚀 Giao việc", type="primary"):
-                    if not tieu_de.strip() or not nguoi.strip():
-                        st.error("Vui lòng nhập Tiêu đề và Người thực hiện.")
-                    else:
-                        ds.append({
-                            "id": str(uuid4()),
-                            "tieu_de": tieu_de.strip(),
-                            "mo_ta": mo_ta.strip(),
-                            "nguoi_thuc_hien": nguoi.strip(),
-                            "nhom": "📌 Thêm thủ công",
-                            "uu_tien": uu_tien,
-                            "trang_thai": "chua_lam",
-                            "ngay_giao": ngay_giao.isoformat(),
-                            "ngay_deadline": ngay_deadline.isoformat(),
-                            "ghi_chu_ket_qua": "",
-                            "ngay_hoan_thanh": None,
-                        })
-                        _ghi_ds(KHNV_PHAN_CONG, ds, username, "khnv_giao_viec",
-                                f"Giao: {tieu_de.strip()} → {nguoi.strip()}")
-                        st.success("✅ Đã giao việc!")
                         st.rerun()
 
         # ── Nút tải toàn bộ 38 đầu việc mẫu ──
@@ -923,82 +937,516 @@ def _render_tien_do_edit(role_n: str, username: str) -> None:
 
 
 # ──────────────────────────────────────────────
-# TAB 4: 📄 In báo cáo
+# TAB 4: 📄 In báo cáo — helpers Word NĐ30/2020
 # ──────────────────────────────────────────────
 
 
+def _xuat_bc_phan_cong(ds: list, thang: int, nam: int, ten_truong_phong: str = "") -> bytes:
+    """Tạo Word 'DANH SÁCH PHÂN CÔNG VÀ GIAO VIỆC' chuẩn NĐ30/2020."""
+    import io
+    from datetime import date as _date
+    from docx import Document
+    from docx.shared import Cm, Pt
+    from docx.enum.text import WD_ALIGN_PARAGRAPH
+    from docx.enum.table import WD_TABLE_ALIGNMENT
+    from docx.oxml.ns import qn
+    from docx.oxml import OxmlElement
+
+    def _set_font(run, bold: bool = False, size: int = 13) -> None:
+        run.font.name = "Times New Roman"
+        run.font.size = Pt(size)
+        run.font.bold = bold
+        try:
+            rPr = run._r.get_or_add_rPr()
+            rFonts = rPr.get_or_add_rFonts()
+            rFonts.set(qn("w:eastAsia"), "Times New Roman")
+        except Exception:
+            pass
+
+    def _remove_borders(table) -> None:
+        for row in table.rows:
+            for cell in row.cells:
+                tc = cell._tc
+                tcPr = tc.get_or_add_tcPr()
+                for old in tcPr.findall(qn("w:tcBorders")):
+                    tcPr.remove(old)
+                tcBorders = OxmlElement("w:tcBorders")
+                for side in ("top", "left", "bottom", "right", "insideH", "insideV"):
+                    el = OxmlElement(f"w:{side}")
+                    el.set(qn("w:val"), "nil")
+                    tcBorders.append(el)
+                tcPr.append(tcBorders)
+
+    def _shade_cell(cell, fill: str = "BDD7EE") -> None:
+        tc = cell._tc
+        tcPr = tc.get_or_add_tcPr()
+        shd = OxmlElement("w:shd")
+        shd.set(qn("w:val"), "clear")
+        shd.set(qn("w:color"), "auto")
+        shd.set(qn("w:fill"), fill)
+        tcPr.append(shd)
+
+    doc = Document()
+    sec = doc.sections[0]
+    sec.page_width = Cm(21)
+    sec.page_height = Cm(29.7)
+    sec.left_margin = Cm(3)
+    sec.right_margin = Cm(2)
+    sec.top_margin = Cm(2)
+    sec.bottom_margin = Cm(2)
+    doc.styles["Normal"].font.name = "Times New Roman"
+    doc.styles["Normal"].font.size = Pt(13)
+
+    today = _date.today()
+
+    # ── Header 2 cột ──
+    hdr = doc.add_table(rows=1, cols=2)
+    _remove_borders(hdr)
+    cell_l = hdr.rows[0].cells[0]
+    for i, (txt, bold) in enumerate([
+        ("NGÂN HÀNG CHÍNH SÁCH XÃ HỘI", True),
+        ("Chi nhánh tỉnh Đồng Nai", False),
+        ("Phòng KH-NV", False),
+        ("──────────────", False),
+        ("Số:      /BC-KHNV", False),
+    ]):
+        p = cell_l.paragraphs[0] if i == 0 else cell_l.add_paragraph()
+        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        _set_font(p.add_run(txt), bold=bold, size=12 if i == 0 else 11)
+
+    cell_r = hdr.rows[0].cells[1]
+    for i, (txt, bold) in enumerate([
+        ("CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM", True),
+        ("Độc lập - Tự do - Hạnh phúc", True),
+        ("──────────────────────────", False),
+        (f"Đồng Nai, ngày {today.day} tháng {today.month} năm {today.year}", False),
+    ]):
+        p = cell_r.paragraphs[0] if i == 0 else cell_r.add_paragraph()
+        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        _set_font(p.add_run(txt), bold=bold, size=11)
+
+    doc.add_paragraph()
+
+    # ── Tiêu đề ──
+    p = doc.add_paragraph()
+    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    _set_font(p.add_run("DANH SÁCH PHÂN CÔNG VÀ GIAO VIỆC"), bold=True, size=14)
+
+    p = doc.add_paragraph()
+    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    _set_font(p.add_run(f"Tháng {thang} năm {nam}"), size=13)
+
+    doc.add_paragraph()
+
+    # ── Bảng dữ liệu: 8 cột ──
+    _uu = {"khan_cap": "Khẩn cấp", "quan_trong": "Quan trọng", "binh_thuong": "Bình thường"}
+    _cv = {"vp1": "Phó Phòng VT1", "vp2": "Phó Phòng VT2", "cbtd": "Cán bộ TD"}
+    headers = ["STT", "Nhóm việc", "Đầu việc", "Người thực hiện",
+               "Chức vụ", "Mức độ", "Ngày giao", "Thời gian\nhoàn thành"]
+    widths_cm = [0.8, 2.5, 4.0, 2.5, 1.8, 1.6, 1.7, 1.7]  # tổng ≈ 16.6cm
+
+    tbl = doc.add_table(rows=1, cols=8)
+    tbl.style = "Table Grid"
+    tbl.alignment = WD_TABLE_ALIGNMENT.CENTER
+    for i, w in enumerate(widths_cm):
+        for cell in tbl.columns[i].cells:
+            cell.width = Cm(w)
+
+    hdr_row = tbl.rows[0]
+    for i, h in enumerate(headers):
+        cell = hdr_row.cells[i]
+        p = cell.paragraphs[0]
+        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        _set_font(p.add_run(h), bold=True, size=11)
+        _shade_cell(cell)
+
+    for stt, item in enumerate(ds, 1):
+        row = tbl.add_row()
+        cv_code = item.get("chuc_vu", "")
+        vals = [
+            str(stt),
+            item.get("nhom", ""),
+            item.get("tieu_de", ""),
+            item.get("nguoi_thuc_hien", ""),
+            _cv.get(cv_code, cv_code),
+            _uu.get(item.get("uu_tien", ""), ""),
+            item.get("ngay_giao", ""),
+            item.get("ngay_deadline", ""),
+        ]
+        CENTER_COLS = {0, 5, 6, 7}
+        for i, val in enumerate(vals):
+            p = row.cells[i].paragraphs[0]
+            p.alignment = (WD_ALIGN_PARAGRAPH.CENTER if i in CENTER_COLS
+                           else WD_ALIGN_PARAGRAPH.LEFT)
+            _set_font(p.add_run(val), size=11)
+
+    # ── Footer 2 cột ──
+    doc.add_paragraph()
+    foot = doc.add_table(rows=3, cols=2)
+    _remove_borders(foot)
+    foot_data = [
+        ("Người lập",          "TRƯỞNG PHÒNG KH-NV"),
+        ("(Ký, ghi rõ họ tên)", "(Ký, ghi rõ họ tên)"),
+        ("",                   ten_truong_phong),
+    ]
+    foot_bold = [(False, True), (False, False), (False, True)]
+    for i, ((txt_l, txt_r), (bl, br)) in enumerate(zip(foot_data, foot_bold)):
+        pl = foot.rows[i].cells[0].paragraphs[0]
+        pl.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        _set_font(pl.add_run(txt_l), bold=bl, size=12)
+        pr = foot.rows[i].cells[1].paragraphs[0]
+        pr.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        _set_font(pr.add_run(txt_r), bold=br, size=12)
+
+    buf = io.BytesIO()
+    doc.save(buf)
+    return buf.getvalue()
+
+
+def _xuat_bc_tien_do(ds: list, thang: int, nam: int, ten_truong_phong: str = "") -> bytes:
+    """Tạo Word 'BÁO CÁO TIẾN ĐỘ THỰC HIỆN CÔNG VIỆC' chuẩn NĐ30/2020."""
+    import io
+    from datetime import date as _date
+    from docx import Document
+    from docx.shared import Cm, Pt
+    from docx.enum.text import WD_ALIGN_PARAGRAPH
+    from docx.enum.table import WD_TABLE_ALIGNMENT
+    from docx.oxml.ns import qn
+    from docx.oxml import OxmlElement
+
+    def _set_font(run, bold: bool = False, size: int = 13) -> None:
+        run.font.name = "Times New Roman"
+        run.font.size = Pt(size)
+        run.font.bold = bold
+        try:
+            rPr = run._r.get_or_add_rPr()
+            rFonts = rPr.get_or_add_rFonts()
+            rFonts.set(qn("w:eastAsia"), "Times New Roman")
+        except Exception:
+            pass
+
+    def _remove_borders(table) -> None:
+        for row in table.rows:
+            for cell in row.cells:
+                tc = cell._tc
+                tcPr = tc.get_or_add_tcPr()
+                for old in tcPr.findall(qn("w:tcBorders")):
+                    tcPr.remove(old)
+                tcBorders = OxmlElement("w:tcBorders")
+                for side in ("top", "left", "bottom", "right", "insideH", "insideV"):
+                    el = OxmlElement(f"w:{side}")
+                    el.set(qn("w:val"), "nil")
+                    tcBorders.append(el)
+                tcPr.append(tcBorders)
+
+    def _shade_cell(cell, fill: str = "BDD7EE") -> None:
+        tc = cell._tc
+        tcPr = tc.get_or_add_tcPr()
+        shd = OxmlElement("w:shd")
+        shd.set(qn("w:val"), "clear")
+        shd.set(qn("w:color"), "auto")
+        shd.set(qn("w:fill"), fill)
+        tcPr.append(shd)
+
+    _tt_map = {"chua_lam": "Chưa làm", "dang_lam": "Đang làm",
+               "hoan_thanh": "Hoàn thành", "tre_han": "Trễ hạn"}
+    _uu_map = {"khan_cap": "Khẩn cấp", "quan_trong": "Quan trọng", "binh_thuong": "Bình thường"}
+
+    doc = Document()
+    sec = doc.sections[0]
+    sec.page_width = Cm(21)
+    sec.page_height = Cm(29.7)
+    sec.left_margin = Cm(3)
+    sec.right_margin = Cm(2)
+    sec.top_margin = Cm(2)
+    sec.bottom_margin = Cm(2)
+    doc.styles["Normal"].font.name = "Times New Roman"
+    doc.styles["Normal"].font.size = Pt(13)
+
+    today = _date.today()
+
+    # ── Header 2 cột ──
+    hdr = doc.add_table(rows=1, cols=2)
+    _remove_borders(hdr)
+    cell_l = hdr.rows[0].cells[0]
+    for i, (txt, bold) in enumerate([
+        ("NGÂN HÀNG CHÍNH SÁCH XÃ HỘI", True),
+        ("Chi nhánh tỉnh Đồng Nai", False),
+        ("Phòng KH-NV", False),
+        ("──────────────", False),
+        ("Số:      /BC-KHNV", False),
+    ]):
+        p = cell_l.paragraphs[0] if i == 0 else cell_l.add_paragraph()
+        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        _set_font(p.add_run(txt), bold=bold, size=12 if i == 0 else 11)
+
+    cell_r = hdr.rows[0].cells[1]
+    for i, (txt, bold) in enumerate([
+        ("CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM", True),
+        ("Độc lập - Tự do - Hạnh phúc", True),
+        ("──────────────────────────", False),
+        (f"Đồng Nai, ngày {today.day} tháng {today.month} năm {today.year}", False),
+    ]):
+        p = cell_r.paragraphs[0] if i == 0 else cell_r.add_paragraph()
+        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        _set_font(p.add_run(txt), bold=bold, size=11)
+
+    doc.add_paragraph()
+
+    # ── Tiêu đề ──
+    p = doc.add_paragraph()
+    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    _set_font(p.add_run("BÁO CÁO TIẾN ĐỘ THỰC HIỆN CÔNG VIỆC"), bold=True, size=14)
+
+    p = doc.add_paragraph()
+    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    _set_font(p.add_run(f"Tháng {thang} năm {nam}"), size=13)
+
+    doc.add_paragraph()
+
+    # ── I. TỔNG QUAN ──
+    p = doc.add_paragraph()
+    _set_font(p.add_run("I. TỔNG QUAN"), bold=True, size=13)
+
+    tong = len(ds)
+    ht   = sum(1 for x in ds if x.get("trang_thai") == "hoan_thanh")
+    dang = sum(1 for x in ds if x.get("trang_thai") == "dang_lam")
+    chua = sum(1 for x in ds if x.get("trang_thai") == "chua_lam")
+    tre  = sum(1 for x in ds if x.get("trang_thai") == "tre_han")
+    pct  = f"{ht / tong * 100:.0f}" if tong > 0 else "0"
+
+    p = doc.add_paragraph()
+    _set_font(p.add_run(
+        f"Tổng số đầu việc: {tong}  |  Đã hoàn thành: {ht} ({pct}%)  |  "
+        f"Đang thực hiện: {dang}  |  Chưa làm: {chua}  |  Trễ hạn: {tre}"
+    ), size=13)
+
+    doc.add_paragraph()
+
+    # ── II. CHI TIẾT ──
+    p = doc.add_paragraph()
+    _set_font(p.add_run("II. CHI TIẾT"), bold=True, size=13)
+
+    headers = ["STT", "Đầu việc", "Người thực hiện", "Mức độ",
+               "Ngày giao", "Thời gian\nhoàn thành", "Trạng thái", "Ghi chú"]
+    widths_cm = [0.8, 3.6, 2.5, 1.8, 1.8, 2.0, 1.8, 2.3]  # tổng ≈ 16.6cm
+
+    tbl = doc.add_table(rows=1, cols=8)
+    tbl.style = "Table Grid"
+    tbl.alignment = WD_TABLE_ALIGNMENT.CENTER
+    for i, w in enumerate(widths_cm):
+        for cell in tbl.columns[i].cells:
+            cell.width = Cm(w)
+
+    hdr_row = tbl.rows[0]
+    for i, h in enumerate(headers):
+        cell = hdr_row.cells[i]
+        p = cell.paragraphs[0]
+        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        _set_font(p.add_run(h), bold=True, size=11)
+        _shade_cell(cell)
+
+    for stt, item in enumerate(ds, 1):
+        row = tbl.add_row()
+        vals = [
+            str(stt),
+            item.get("tieu_de", ""),
+            item.get("nguoi_thuc_hien", ""),
+            _uu_map.get(item.get("uu_tien", ""), ""),
+            item.get("ngay_giao", ""),
+            item.get("ngay_deadline", ""),
+            _tt_map.get(item.get("trang_thai", ""), ""),
+            item.get("ghi_chu_ket_qua", ""),
+        ]
+        CENTER_COLS = {0, 3, 4, 5, 6}
+        for i, val in enumerate(vals):
+            p = row.cells[i].paragraphs[0]
+            p.alignment = (WD_ALIGN_PARAGRAPH.CENTER if i in CENTER_COLS
+                           else WD_ALIGN_PARAGRAPH.LEFT)
+            _set_font(p.add_run(val), size=11)
+
+    # ── Footer 2 cột ──
+    doc.add_paragraph()
+    foot = doc.add_table(rows=3, cols=2)
+    _remove_borders(foot)
+    foot_data = [
+        ("Người lập",           "TRƯỞNG PHÒNG KH-NV"),
+        ("(Ký, ghi rõ họ tên)", "(Ký, ghi rõ họ tên)"),
+        ("",                    ten_truong_phong),
+    ]
+    foot_bold = [(False, True), (False, False), (False, True)]
+    for i, ((txt_l, txt_r), (bl, br)) in enumerate(zip(foot_data, foot_bold)):
+        pl = foot.rows[i].cells[0].paragraphs[0]
+        pl.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        _set_font(pl.add_run(txt_l), bold=bl, size=12)
+        pr = foot.rows[i].cells[1].paragraphs[0]
+        pr.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        _set_font(pr.add_run(txt_r), bold=br, size=12)
+
+    buf = io.BytesIO()
+    doc.save(buf)
+    return buf.getvalue()
+
+
 def _render_bao_cao(role_n: str, username: str, **kwargs) -> None:
-    """Tab báo cáo: PDF tiến độ, Excel phân công, checklist cấp trên."""
+    """Tab báo cáo: Word/PDF phân công, Word/PDF tiến độ, Excel, Checklist."""
     ds = _doc_ds(KHNV_PHAN_CONG)
+    today = date.today()
 
     st.markdown("### 📄 Xuất báo cáo")
 
-    col_a, col_b = st.columns(2)
+    # ── Tham số chung (tháng/năm/tên trưởng phòng) ──
+    col_p1, col_p2, col_p3 = st.columns(3)
+    with col_p1:
+        thang_bc = st.number_input("Tháng báo cáo", min_value=1, max_value=12,
+                                   value=today.month, step=1, key="bc_thang")
+    with col_p2:
+        nam_bc = st.number_input("Năm báo cáo", min_value=2020, max_value=2099,
+                                 value=today.year, step=1, key="bc_nam")
+    with col_p3:
+        ten_tp = st.text_input("Tên Trưởng phòng", value="", key="bc_ten_tp",
+                               placeholder="Nguyễn Văn A")
 
-    # PDF tiến độ
-    with col_a:
-        st.markdown("**📊 Báo cáo tiến độ thực hiện (PDF)**")
-        if ds:
-            _tt_map = {
-                "chua_lam": "Chưa làm", "dang_lam": "Đang làm",
-                "hoan_thanh": "Hoàn thành", "tre_han": "Trễ hạn",
-            }
-            _df_td = pd.DataFrame([{
-                "Tiêu đề": c.get("tieu_de", ""),
-                "Người TH": c.get("nguoi_thuc_hien", ""),
-                "Trạng thái": _tt_map.get(c.get("trang_thai", ""), ""),
-                "Deadline": c.get("ngay_deadline", ""),
-                "Ghi chú": c.get("ghi_chu_ket_qua", ""),
-            } for c in ds])
-            _pdf_td = xuat_pdf_co_chart(
-                _df_td, "Tiến độ thực hiện - Phòng KH-NV", username,
-                them_dong_tong=False, cols_tien=None,
-            )
-            download_pdf_button(_pdf_td, "tien_do_khnv.pdf",
-                                "🖨️ Xuất PDF tiến độ", key="bc_pdf_td")
-            ghi_audit(username, "xuat_bieu_cn", "Xuất PDF tiến độ Phòng KH-NV")
-        else:
-            st.button("🖨️ Xuất PDF tiến độ", disabled=True,
-                      key="bc_pdf_td_dis", use_container_width=True)
-            st.caption("Chưa có dữ liệu phân công.")
+    st.divider()
 
-    # Excel phân công
-    with col_b:
-        st.markdown("**📋 Xuất Excel danh sách phân công**")
-        if ds:
-            _uu_map = {
-                "khan_cap": "Khẩn cấp",
-                "quan_trong": "Quan trọng",
-                "binh_thuong": "Bình thường",
-            }
-            _tt_map2 = {
-                "chua_lam": "Chưa làm", "dang_lam": "Đang làm",
-                "hoan_thanh": "Hoàn thành", "tre_han": "Trễ hạn",
-            }
-            _df_xls = pd.DataFrame([{
-                "Tiêu đề": c.get("tieu_de", ""),
-                "Nhóm": c.get("nhom", ""),
-                "Người TH": c.get("nguoi_thuc_hien", ""),
-                "Ưu tiên": _uu_map.get(c.get("uu_tien", ""), ""),
-                "Ngày giao": c.get("ngay_giao", ""),
-                "Deadline": c.get("ngay_deadline", ""),
-                "Trạng thái": _tt_map2.get(c.get("trang_thai", ""), ""),
-                "Ghi chú": c.get("ghi_chu_ket_qua", ""),
-            } for c in ds])
-            _xl_bytes = xuat_excel({"Phân công": _df_xls})
+    # ── Phần 1: Danh sách phân công và giao việc ──
+    st.markdown("**📋 1. Báo cáo danh sách phân công và giao việc**")
+    if ds:
+        col1a, col1b = st.columns(2)
+        with col1a:
+            docx_pc = _xuat_bc_phan_cong(ds, int(thang_bc), int(nam_bc), ten_tp)
             st.download_button(
-                "📥 Tải Excel phân công",
-                data=_xl_bytes,
-                file_name="phan_cong_khnv.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                key="bc_excel_dl",
+                "📄 Xuất Word",
+                data=docx_pc,
+                file_name=f"phan_cong_t{int(thang_bc)}_{int(nam_bc)}.docx",
+                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                key="bc_dl_pc_word",
                 use_container_width=True,
             )
-            ghi_audit(username, "xuat_bieu_cn", "Xuất Excel phân công Phòng KH-NV")
-        else:
-            st.button("📥 Tải Excel phân công", disabled=True,
-                      key="bc_excel_dis", use_container_width=True)
-            st.caption("Chưa có dữ liệu phân công.")
+        with col1b:
+            if st.button("🖨️ Xuất PDF", key="bc_btn_pc_pdf", use_container_width=True):
+                try:
+                    import tempfile
+                    import os as _os
+                    from docx2pdf import convert  # conv: skip
+                    _bytes = _xuat_bc_phan_cong(ds, int(thang_bc), int(nam_bc), ten_tp)
+                    with tempfile.NamedTemporaryFile(suffix=".docx", delete=False) as _f:
+                        _f.write(_bytes)
+                        _tmp_docx = _f.name
+                    _tmp_pdf = _tmp_docx.replace(".docx", ".pdf")
+                    try:
+                        convert(_tmp_docx, _tmp_pdf)
+                        st.session_state["_bc_pc_pdf"] = open(_tmp_pdf, "rb").read()
+                        ghi_audit(username, "xuat_bieu_cn",
+                                  f"Xuất PDF phân công T{int(thang_bc)}/{int(nam_bc)}")
+                    finally:
+                        _os.unlink(_tmp_docx)
+                        if _os.path.exists(_tmp_pdf):
+                            _os.unlink(_tmp_pdf)
+                except ImportError:
+                    st.warning("⚠️ Cần cài đặt MS Word để xuất PDF. "
+                               "Hãy tải file Word và tự chuyển đổi.")
+                except Exception as _e:
+                    st.warning(f"⚠️ Không thể xuất PDF: {_e}. "
+                               "Hãy tải file Word để chuyển đổi thủ công.")
+            if "_bc_pc_pdf" in st.session_state:
+                st.download_button(
+                    "📥 Tải PDF phân công",
+                    data=st.session_state["_bc_pc_pdf"],
+                    file_name=f"phan_cong_t{int(thang_bc)}_{int(nam_bc)}.pdf",
+                    mime="application/pdf",
+                    key="bc_dl_pc_pdf",
+                    use_container_width=True,
+                )
+    else:
+        st.caption("Chưa có dữ liệu phân công.")
+
+    st.divider()
+
+    # ── Phần 2: Báo cáo tiến độ thực hiện ──
+    st.markdown("**📊 2. Báo cáo tiến độ thực hiện công việc**")
+    if ds:
+        col2a, col2b = st.columns(2)
+        with col2a:
+            docx_td = _xuat_bc_tien_do(ds, int(thang_bc), int(nam_bc), ten_tp)
+            st.download_button(
+                "📄 Xuất Word",
+                data=docx_td,
+                file_name=f"tien_do_t{int(thang_bc)}_{int(nam_bc)}.docx",
+                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                key="bc_dl_td_word",
+                use_container_width=True,
+            )
+        with col2b:
+            if st.button("🖨️ Xuất PDF", key="bc_btn_td_pdf", use_container_width=True):
+                try:
+                    import tempfile
+                    import os as _os
+                    from docx2pdf import convert  # conv: skip
+                    _bytes = _xuat_bc_tien_do(ds, int(thang_bc), int(nam_bc), ten_tp)
+                    with tempfile.NamedTemporaryFile(suffix=".docx", delete=False) as _f:
+                        _f.write(_bytes)
+                        _tmp_docx = _f.name
+                    _tmp_pdf = _tmp_docx.replace(".docx", ".pdf")
+                    try:
+                        convert(_tmp_docx, _tmp_pdf)
+                        st.session_state["_bc_td_pdf"] = open(_tmp_pdf, "rb").read()
+                        ghi_audit(username, "xuat_bieu_cn",
+                                  f"Xuất PDF tiến độ T{int(thang_bc)}/{int(nam_bc)}")
+                    finally:
+                        _os.unlink(_tmp_docx)
+                        if _os.path.exists(_tmp_pdf):
+                            _os.unlink(_tmp_pdf)
+                except ImportError:
+                    st.warning("⚠️ Cần cài đặt MS Word để xuất PDF. "
+                               "Hãy tải file Word và tự chuyển đổi.")
+                except Exception as _e:
+                    st.warning(f"⚠️ Không thể xuất PDF: {_e}. "
+                               "Hãy tải file Word để chuyển đổi thủ công.")
+            if "_bc_td_pdf" in st.session_state:
+                st.download_button(
+                    "📥 Tải PDF tiến độ",
+                    data=st.session_state["_bc_td_pdf"],
+                    file_name=f"tien_do_t{int(thang_bc)}_{int(nam_bc)}.pdf",
+                    mime="application/pdf",
+                    key="bc_dl_td_pdf",
+                    use_container_width=True,
+                )
+    else:
+        st.caption("Chưa có dữ liệu phân công.")
+
+    st.divider()
+
+    # ── Phần 3: Excel + Checklist ──
+    st.markdown("**📋 3. Xuất Excel danh sách phân công**")
+    if ds:
+        _uu_map = {"khan_cap": "Khẩn cấp", "quan_trong": "Quan trọng", "binh_thuong": "Bình thường"}
+        _tt_map = {"chua_lam": "Chưa làm", "dang_lam": "Đang làm",
+                   "hoan_thanh": "Hoàn thành", "tre_han": "Trễ hạn"}
+        _df_xls = pd.DataFrame([{
+            "Tiêu đề": c.get("tieu_de", ""),
+            "Nhóm": c.get("nhom", ""),
+            "Người TH": c.get("nguoi_thuc_hien", ""),
+            "Mức độ": _uu_map.get(c.get("uu_tien", ""), ""),
+            "Ngày giao": c.get("ngay_giao", ""),
+            "Thời gian hoàn thành": c.get("ngay_deadline", ""),
+            "Trạng thái": _tt_map.get(c.get("trang_thai", ""), ""),
+            "Ghi chú": c.get("ghi_chu_ket_qua", ""),
+        } for c in ds])
+        _xl_bytes = xuat_excel({"Phân công": _df_xls})
+        st.download_button(
+            "📥 Tải Excel phân công",
+            data=_xl_bytes,
+            file_name="phan_cong_khnv.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            key="bc_excel_dl",
+            use_container_width=True,
+        )
+        ghi_audit(username, "xuat_bieu_cn", "Xuất Excel phân công Phòng KH-NV")
+    else:
+        st.button("📥 Tải Excel phân công", disabled=True,
+                  key="bc_excel_dis", use_container_width=True)
+        st.caption("Chưa có dữ liệu phân công.")
 
     st.divider()
     st.markdown("### 📤 Checklist Báo cáo cấp trên")
@@ -1229,28 +1677,30 @@ def _render_thong_tin_dau_viec() -> None:
     """Bảng tham chiếu tĩnh: đầu việc Trưởng phòng TP01–TP17 + 38 việc cấp dưới."""
 
     # ── Phần 1: Đầu việc Trưởng phòng ──
-    st.markdown("## 📌 Bảng đầu việc của Trưởng phòng KH-NVTD")
+    st.markdown(
+        "<h2 style='color:#1e3a5f;margin-bottom:4px'>📌 Bảng đầu việc của Trưởng phòng KH-NVTD</h2>"
+    )
     st.caption("17 đầu việc chính (TP01–TP17) — chỉ đọc, dùng để tra cứu và tham chiếu")
 
     rows_tp = ""
     for t in _MAU_GIAO_VIEC_TP:
         rows_tp += (
-            f"<tr style='border-bottom:1px solid #e5e7eb'>"
-            f"<td style='padding:7px 10px;white-space:nowrap;font-weight:700;color:#1e3a5f'>{t['ma']}</td>"
-            f"<td style='padding:7px 10px'>{t['tieu_de']}</td>"
-            f"<td style='padding:7px 10px;color:#374151;font-size:0.82rem'>{t['mo_ta']}</td>"
-            f"<td style='padding:7px 10px;white-space:nowrap;color:#6b7280;font-size:0.82rem'>{t['tan_suat']}</td>"
+            f"<tr style='border-bottom:1px solid #d1d5db'>"
+            f"<td style='padding:10px 12px;white-space:nowrap;font-weight:700;color:#1e3a5f;font-size:0.95rem'>{t['ma']}</td>"
+            f"<td style='padding:10px 12px;font-weight:600;color:#111827;font-size:0.95rem'>{t['tieu_de']}</td>"
+            f"<td style='padding:10px 12px;color:#374151;font-size:0.9rem;line-height:1.5'>{t['mo_ta']}</td>"
+            f"<td style='padding:10px 12px;white-space:nowrap;color:#6366f1;font-weight:600;font-size:0.9rem'>{t['tan_suat']}</td>"
             f"</tr>"
         )
     st.markdown(
-        f"""<div style="overflow-x:auto;margin-bottom:24px">
-        <table style="width:100%;border-collapse:collapse;font-size:0.85rem">
+        f"""<div style="overflow-x:auto;margin-bottom:28px">
+        <table style="width:100%;border-collapse:collapse;font-size:0.92rem">
           <thead>
-            <tr style="background:#1e3a5f;color:white">
-              <th style="padding:9px 10px;text-align:left;white-space:nowrap">Mã</th>
-              <th style="padding:9px 10px;text-align:left">Đầu việc</th>
-              <th style="padding:9px 10px;text-align:left">Mô tả chi tiết</th>
-              <th style="padding:9px 10px;text-align:left">Tần suất</th>
+            <tr style="background:linear-gradient(135deg,#1e3a5f,#2d5a87);color:white">
+              <th style="padding:12px 12px;text-align:left;white-space:nowrap;font-size:0.95rem">Mã</th>
+              <th style="padding:12px 12px;text-align:left;font-size:0.95rem">Đầu việc</th>
+              <th style="padding:12px 12px;text-align:left;font-size:0.95rem">Mô tả chi tiết</th>
+              <th style="padding:12px 12px;text-align:left;font-size:0.95rem">Tần suất</th>
             </tr>
           </thead>
           <tbody>{rows_tp}</tbody>
@@ -1261,7 +1711,10 @@ def _render_thong_tin_dau_viec() -> None:
     st.divider()
 
     # ── Phần 2: Bảng giao việc cấp dưới (38 việc) ──
-    st.markdown("## 📋 Bảng giao việc cấp dưới (38 đầu việc nhóm I–VIII)")
+    st.markdown(
+        "<h2 style='color:#1e3a5f;margin-bottom:4px'>📋 Bảng giao việc cấp dưới "
+        "<span style='font-size:0.9rem;font-weight:400;color:#6b7280'>(38 đầu việc nhóm I–VIII)</span></h2>"
+    )
     st.caption("Phó phòng VP1, VP2 và Cán bộ TD tại Hội sở")
 
     nhom_groups: dict = {}
@@ -1270,26 +1723,39 @@ def _render_thong_tin_dau_viec() -> None:
         nhom_groups.setdefault(nh, []).append((idx, t))
 
     for nhom_name, items in dict(sorted(nhom_groups.items())).items():
-        st.markdown(f"### {nhom_name}")
+        nhom_stt = nhom_name.split(".")[0] if "." in nhom_name else ""
+        st.markdown(
+            f"<h3 style='color:#2d5a87;margin:20px 0 8px 0;font-size:1.05rem'>"
+            f"<span style='display:inline-block;background:#1e3a5f;color:white;"
+            f"border-radius:6px;padding:2px 12px;margin-right:8px;font-size:0.9rem'>"
+            f"{nhom_stt}</span> {nhom_name.split('. ', 1)[1] if '. ' in nhom_name else nhom_name}</h3>",
+            unsafe_allow_html=True,
+        )
         rows = ""
         for stt, t in items:
+            mo = t.get("mo_ta", "")
+            parts = mo.split("·")
+            thoi_han = parts[0].replace("⏱", "").strip() if len(parts) > 0 else ""
+            san_pham = parts[1].replace("📄", "").strip() if len(parts) > 1 else ""
             rows += (
                 f"<tr style='border-bottom:1px solid #e5e7eb'>"
-                f"<td style='padding:6px 8px;text-align:center;color:#6b7280;width:40px'>{stt}</td>"
-                f"<td style='padding:6px 8px'>{t['tieu_de']}</td>"
-                f"<td style='padding:6px 8px;white-space:nowrap;color:#1d4ed8;font-size:0.82rem'>{t['nguoi_thuc_hien']}</td>"
-                f"<td style='padding:6px 8px;color:#374151;font-size:0.8rem'>{t['mo_ta']}</td>"
+                f"<td style='padding:8px 10px;text-align:center;color:#6b7280;width:44px;font-size:0.88rem'>{stt}</td>"
+                f"<td style='padding:8px 10px;font-weight:500;color:#111827;font-size:0.93rem;line-height:1.5'>{t['tieu_de']}</td>"
+                f"<td style='padding:8px 10px;white-space:nowrap;color:#2563eb;font-weight:600;font-size:0.88rem'>{t['nguoi_thuc_hien']}</td>"
+                f"<td style='padding:8px 10px;white-space:nowrap;color:#7c3aed;font-size:0.88rem'>{thoi_han}</td>"
+                f"<td style='padding:8px 10px;color:#059669;font-weight:500;font-size:0.88rem;line-height:1.4'>{san_pham}</td>"
                 f"</tr>"
             )
         st.markdown(
-            f"""<div style="overflow-x:auto;margin-bottom:16px">
-            <table style="width:100%;border-collapse:collapse;font-size:0.85rem">
+            f"""<div style="overflow-x:auto;margin-bottom:24px;border-radius:10px;border:1px solid #e5e7eb;padding:2px">
+            <table style="width:100%;border-collapse:collapse;font-size:0.92rem">
               <thead>
-                <tr style="background:#f3f4f6">
-                  <th style="padding:6px 8px;width:40px">STT</th>
-                  <th style="padding:6px 8px;text-align:left">Đầu việc</th>
-                  <th style="padding:6px 8px;text-align:left">Người thực hiện</th>
-                  <th style="padding:6px 8px;text-align:left">Thời hạn / Sản phẩm</th>
+                <tr style="background:#f0f4f8;border-bottom:2px solid #cbd5e1">
+                  <th style="padding:10px 10px;width:44px;text-align:center;font-size:0.9rem;color:#374151">STT</th>
+                  <th style="padding:10px 10px;text-align:left;font-size:0.9rem;color:#374151">Đầu việc</th>
+                  <th style="padding:10px 10px;text-align:left;font-size:0.9rem;color:#374151">Người thực hiện</th>
+                  <th style="padding:10px 10px;text-align:left;font-size:0.9rem;color:#374151">Thời hạn</th>
+                  <th style="padding:10px 10px;text-align:left;font-size:0.9rem;color:#374151">Sản phẩm</th>
                 </tr>
               </thead>
               <tbody>{rows}</tbody>

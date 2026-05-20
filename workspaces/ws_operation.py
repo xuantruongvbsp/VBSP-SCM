@@ -319,7 +319,7 @@ def _render_don_doc(df: pd.DataFrame, pgd_user: str, role: str):
               delta_color="inverse" if n_khd > 0 else "off")
     tong_lai = df_kh[df_kh.get("is_3m_inactive", False)][COT_LAI_TON].sum() \
                if COT_LAI_TON in df_kh.columns else 0
-    k3.metric("Lãi tồn cần thu (triệu đồng)", fmt(tong_lai))
+    k3.metric("Lãi tồn cần thu (đồng)", fmt(tong_lai))
 
     if n_khd == 0:
         st.success("✅ Không có món vay nào quá 3 tháng không hoạt động!")

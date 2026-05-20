@@ -271,7 +271,7 @@ def _hien_thi_khd_tab(df_kh: pd.DataFrame, ds_pgd_all: list):
               delta=f"{tl_khd:.1f}%", delta_color="inverse" if tl_khd > 2 else "off")
     tong_lai = df_kh[df_kh.get("is_3m_inactive", False)][COT_LAI_TON].sum() \
                if COT_LAI_TON in df_kh.columns else 0
-    k3.metric("Lãi tồn (triệu đồng)", vn(tong_lai / 1e6, 0))
+    k3.metric("Lãi tồn (đồng)", fmt(tong_lai))
 
     st.markdown("**📋 Tổng hợp theo PGD**")
     nhom_pgd = tong_hop_khong_hd_cached(df_kh, nhom_theo=COT_TEN_PGD)

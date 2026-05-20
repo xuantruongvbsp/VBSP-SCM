@@ -1293,9 +1293,9 @@ def _render_bao_cao(role_n: str, username: str, **kwargs) -> None:
 
     # ── Phần 1: Danh sách phân công và giao việc ──
     st.markdown("**📋 1. Báo cáo danh sách phân công và giao việc**")
-    if ds:
-        col1a, col1b = st.columns(2)
-        with col1a:
+    col1a, col1b = st.columns(2)
+    with col1a:
+        if ds:
             docx_pc = _xuat_bc_phan_cong(ds, int(thang_bc), int(nam_bc), ten_tp)
             st.download_button(
                 "📄 Xuất Word",
@@ -1305,7 +1305,11 @@ def _render_bao_cao(role_n: str, username: str, **kwargs) -> None:
                 key="bc_dl_pc_word",
                 use_container_width=True,
             )
-        with col1b:
+        else:
+            st.button("📄 Xuất Word", disabled=True, key="bc_dl_pc_word_dis",
+                      use_container_width=True)
+    with col1b:
+        if ds:
             if st.button("🖨️ Xuất PDF", key="bc_btn_pc_pdf", use_container_width=True):
                 try:
                     import tempfile
@@ -1340,16 +1344,19 @@ def _render_bao_cao(role_n: str, username: str, **kwargs) -> None:
                     key="bc_dl_pc_pdf",
                     use_container_width=True,
                 )
-    else:
-        st.caption("Chưa có dữ liệu phân công.")
+        else:
+            st.button("🖨️ Xuất PDF", disabled=True, key="bc_btn_pc_pdf_dis",
+                      use_container_width=True)
+    if not ds:
+        st.caption("⚠️ Chưa có dữ liệu phân công. Vào tab Phân công để thêm.")
 
     st.divider()
 
     # ── Phần 2: Báo cáo tiến độ thực hiện ──
     st.markdown("**📊 2. Báo cáo tiến độ thực hiện công việc**")
-    if ds:
-        col2a, col2b = st.columns(2)
-        with col2a:
+    col2a, col2b = st.columns(2)
+    with col2a:
+        if ds:
             docx_td = _xuat_bc_tien_do(ds, int(thang_bc), int(nam_bc), ten_tp)
             st.download_button(
                 "📄 Xuất Word",
@@ -1359,7 +1366,11 @@ def _render_bao_cao(role_n: str, username: str, **kwargs) -> None:
                 key="bc_dl_td_word",
                 use_container_width=True,
             )
-        with col2b:
+        else:
+            st.button("📄 Xuất Word", disabled=True, key="bc_dl_td_word_dis",
+                      use_container_width=True)
+    with col2b:
+        if ds:
             if st.button("🖨️ Xuất PDF", key="bc_btn_td_pdf", use_container_width=True):
                 try:
                     import tempfile
@@ -1394,12 +1405,15 @@ def _render_bao_cao(role_n: str, username: str, **kwargs) -> None:
                     key="bc_dl_td_pdf",
                     use_container_width=True,
                 )
-    else:
-        st.caption("Chưa có dữ liệu phân công.")
+        else:
+            st.button("🖨️ Xuất PDF", disabled=True, key="bc_btn_td_pdf_dis",
+                      use_container_width=True)
+    if not ds:
+        st.caption("⚠️ Chưa có dữ liệu phân công. Vào tab Phân công để thêm.")
 
     st.divider()
 
-    # ── Phần 3: Excel + Checklist ──
+    # ── Phần 3: Excel ──
     st.markdown("**📋 3. Xuất Excel danh sách phân công**")
     if ds:
         _uu_map = {"khan_cap": "Khẩn cấp", "quan_trong": "Quan trọng", "binh_thuong": "Bình thường"}
@@ -1428,7 +1442,7 @@ def _render_bao_cao(role_n: str, username: str, **kwargs) -> None:
     else:
         st.button("📥 Tải Excel phân công", disabled=True,
                   key="bc_excel_dis", use_container_width=True)
-        st.caption("Chưa có dữ liệu phân công.")
+        st.caption("⚠️ Chưa có dữ liệu phân công. Vào tab Phân công để thêm.")
 
 
 

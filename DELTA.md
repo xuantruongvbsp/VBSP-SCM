@@ -4,6 +4,15 @@
 
 ---
 
+## [2026-05-20] Thêm nút "Xuất PDF" cho Phân công cán bộ và Lịch công tác
+- `tabs/tab_khnv_noi_bo.py` — thêm import `xuat_pdf_co_chart`, `download_pdf_button` từ `components.export_pdf`
+- `tabs/tab_khnv_noi_bo.py` sub-tab 📋 Phân công cán bộ: thêm nút "📥 Xuất PDF" — chuyển list dict → DataFrame (Tiêu đề, Người thực hiện, Mức ưu tiên, Ngày giao, Deadline, Trạng thái, Ghi chú) → `xuat_pdf_co_chart` với `them_dong_tong=False`
+- `tabs/tab_khnv_noi_bo.py` sub-tab 📅 Lịch công tác: thêm nút "📥 Xuất PDF" — xuất danh sách đã lọc theo tháng/năm/loại (Ngày, Loại, Tiêu đề, Địa điểm, Thành viên, Ghi chú, Trạng thái)
+
+## [2026-05-20] Fix dark mode bảng tổng hợp PGD (tab_tongquan)
+- `tabs/tab_tongquan.py` dòng ~1186: thêm `color:#1a202c` vào `<tr style="background:{bg}">` → chữ đen rõ trên nền sáng ở dark mode
+- `tabs/tab_tongquan.py` dòng ~1197: `<p style="color:#6B7280">` → `<div style="opacity:0.65">` để footnote thích ứng dark/light theme
+
 ## [2026-05-20] Fix danh_dau_khong_hd — Categorical date columns
 - `data/hstd.py` hàm `danh_dau_khong_hd()` dòng ~238: cột ngày trong df có thể là Categorical (do Parquet cache); thêm `.astype(object)` trước `pd.to_datetime()` cho `COT_NGAY_SL`, `COT_NGAY_GDGN`, `COT_NGAY_VAY`
 
@@ -38,6 +47,7 @@
 │   ├── tab_baocao.py, tab_nhiem_vu.py, tab_tien_do.py
 │   ├── tab_upload_khnv.py, tab_upload_pgd.py
 │   ├── tab_ban_dai_dien.py      # 4 sub-tab: KPI, dự báo vốn, họp BĐD, sổ công văn
+│   ├── tab_khnv_noi_bo.py       # 4 sub-tab: Phân công cán bộ, Lịch công tác, BC cấp trên, Giao việc PGD
 │   ├── tab_tien_do_nop.py       # Tiến độ nộp PGD từ GSheet
 │   ├── tab_quan_ly_bc.py        # Wrapper: 📥 BC từ PGD + 📤 BC lên cấp trên
 │   ├── tab_checklist_bc.py      # Checklist deadline báo cáo (kv_store)
@@ -309,4 +319,5 @@ Upload flow:
 ## [20/05/2026] (Batch 2)
 - 	abs/tab_tongquan.py: Thay st.tabs 4 sub-tabs d�o h?n b?ng lazy_tabs()  ch? render 1 tab
 - 	abs/tab_baocao.py: Thay st.tabs B�o c�o chi ti?t / NQ11 b?ng st.radio  ch? render tab du?c ch?n
-- workspaces/ws_operation.py: X�a eager import 21 tab module kh?i ender(), d�ng _lazy_tab() lazy-load
+- workspaces/ws_operation.py: X�a eager import 21 tab module kh?i 
+ender(), d�ng _lazy_tab() lazy-load

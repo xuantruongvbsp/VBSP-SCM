@@ -1,5 +1,8 @@
 # CHANGELOG
 
+## [2026-05-20] — Sửa bảng "Thông tin tổng quát theo PGD" — mất cột Giải ngân/Thu nợ/Nợ ĐH năm
+- `tabs/tab_tongquan.py` `cot_hien` dòng ~1080 — sửa `"Lãi tồn (tỷ)"` → `"Lãi tồn (triệu đồng)"`, `"DS Cho vay (tỷ)"` → `"DS Cho vay (triệu đồng)"`, `"DS Thu nợ (tỷ)"` → `"DS Thu nợ (triệu đồng)"`; thêm `"Nợ ĐH năm (triệu đồng)"` — nguyên nhân: tên cột sau rename là `(triệu đồng)` nhưng `cot_hien` khai báo `(tỷ)` nên bị filter mất
+
 ## [2026-05-20] — Redesign tab Nội bộ Phòng KH-NV: 4 tab → 3 tab + quick status buttons
 - `tabs/tab_khnv_noi_bo.py` `render()` — giảm từ 4 sub-tab → 3 sub-tab; bỏ "📊 Tiến độ thực hiện" riêng
 - `tabs/tab_khnv_noi_bo.py` — thêm hàm `_render_mini_tien_do(ds, today)`: 4 metrics ngang + compact progress bars mỗi cán bộ; hiển thị ở đầu tab Phân công khi có dữ liệu

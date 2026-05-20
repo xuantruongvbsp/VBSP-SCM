@@ -426,9 +426,7 @@ def _render_don_doc(df: pd.DataFrame, pgd_user: str, role: str):
 
 def _render_canh_bao_som_pgd(tab, **kwargs) -> None:
     """Cảnh báo sớm NQH cho phân hệ PGD."""
-    from tabs import tab_canh_bao_som
-
-    tab_canh_bao_som.render(tab, **kwargs)
+    _lazy_tab("tab_canh_bao_som").render(tab, **kwargs)
 
 
 def _banner_canh_bao_khd(df_pgd: pd.DataFrame, role: str) -> None:
@@ -1269,8 +1267,8 @@ def render(**kwargs):
     def _render_diem_gd_va_to_tkvv(tab_parent, **kw):
         with get_tab_context(tab_parent):
             _sub1, _sub2 = st.tabs(["📍 Điểm Giao Dịch", "🏘️ Tổ TK&VV"])
-            tab_diem_gd_pgd.render(_sub1, **kw)
-            tab_cdtotkvv_pgd.render(_sub2, **kw)
+            _lazy_tab("tab_diem_gd_pgd").render(_sub1, **kw)
+            _lazy_tab("tab_cdtotkvv_pgd").render(_sub2, **kw)
 
     def _render_du_phong_dong_tien(tab_parent, **kw) -> None:
         with get_tab_context(tab_parent):
@@ -1631,16 +1629,16 @@ def render(**kwargs):
         "nghiep_vu_pgd": {
             "label": "📋 Nghiệp vụ hàng ngày",
             "tabs": [
-                ("📊 Thông tin chung", lambda tab: tab_tongquan.render(tab, **_pgd_df_kwargs)),
-                ("📈 Tiến độ công việc", lambda tab: tab_tien_do.render(tab, **kwargs)),
-                ("🔍 Tra cứu hồ sơ", lambda tab: tab_tracuu.render(tab, **kwargs)),
-                ("📋 Danh sách & Lọc", lambda tab: tab_danhsach.render(tab, **kwargs)),
-                ("⏰ Đến hạn", lambda tab: render_den_han(role=role, pgd_user=pgd_user)),
+                ("📊 Thông tin chung", lambda tab: _lazy_tab("tab_tongquan").render(tab, **_pgd_df_kwargs)),
+                ("📈 Tiến độ công việc", lambda tab: _lazy_tab("tab_tien_do").render(tab, **kwargs)),
+                ("🔍 Tra cứu hồ sơ", lambda tab: _lazy_tab("tab_tracuu").render(tab, **kwargs)),
+                ("📋 Danh sách & Lọc", lambda tab: _lazy_tab("tab_danhsach").render(tab, **kwargs)),
+                ("⏰ Đến hạn", lambda tab: _lazy_tab("tab_den_han").render(tab, role=role, pgd_user=pgd_user)),
                 ("📈 Dự phóng Dòng tiền", lambda tab: _render_du_phong_dong_tien(tab, **_pgd_df_kwargs)),
                 ("🔥 Heatmap Đáo hạn", lambda tab: _render_heatmap_dao_han(tab, **_pgd_df_kwargs)),
                 ("📊 Histogram Dư nợ", lambda tab: _render_histogram_du_no(tab, **_pgd_df_kwargs)),
                 ("🍩 Cơ cấu CT", lambda tab: _render_donut_co_cau(tab, **_pgd_df_kwargs)),
-                ("📊 So sánh kỳ", lambda tab: tab_so_sanh_ky.render(
+                ("📊 So sánh kỳ", lambda tab: _lazy_tab("tab_so_sanh_ky").render(
                     tab, df=df, df_full=df_full, role=role, username=username,
                     pgd_user=pgd_user, pgd_mode=True,
                 )),
@@ -1649,8 +1647,8 @@ def render(**kwargs):
         "bao_cao_giao_ban": {
             "label": "📈 Báo cáo & Giao ban",
             "tabs": [
-                ("📊 Báo cáo tín dụng", lambda tab: tab_baocao.render(tab, **_pgd_df_kwargs)),
-                ("📡 Điện báo", lambda tab: tab_candoi.render(
+                ("📊 Báo cáo tín dụng", lambda tab: _lazy_tab("tab_baocao").render(tab, **_pgd_df_kwargs)),
+                ("📡 Điện báo", lambda tab: _lazy_tab("tab_candoi").render(
                     tab, **{**kwargs, "pgd_mode": True, "df": df, "df_full": df}
                 )),
                 ("📝 Báo cáo Giao ban", lambda tab: _render_bao_cao_giao_ban(tab, **kwargs)),
@@ -1662,10 +1660,10 @@ def render(**kwargs):
         "ke_hoach_pgd": {
             "label": "🎯 Kế hoạch PGD",
             "tabs": [
-                ("🎯 KHTD", lambda tab: tab_khtd_pgd.render(tab, **kwargs)),
-                ("📋 Giao & ĐC KHTD", lambda tab: tab_khtd_giao_dc.render(tab, **kwargs)),
-                ("📋 Mẫu 07 Giao KH", lambda tab: tab_khtd_mau07.render(tab, **kwargs)),
-                ("📋 NQ11", lambda tab: tab_nq11.render(tab, **_pgd_df_kwargs)),
+                ("🎯 KHTD", lambda tab: _lazy_tab("tab_khtd_pgd").render(tab, **kwargs)),
+                ("📋 Giao & ĐC KHTD", lambda tab: _lazy_tab("tab_khtd_giao_dc").render(tab, **kwargs)),
+                ("📋 Mẫu 07 Giao KH", lambda tab: _lazy_tab("tab_khtd_mau07").render(tab, **kwargs)),
+                ("📋 NQ11", lambda tab: _lazy_tab("tab_nq11").render(tab, **_pgd_df_kwargs)),
             ],
         },
         "kiem_soat_rr": {
@@ -1673,14 +1671,14 @@ def render(**kwargs):
             "tabs": [
                 ("🔔 Đôn đốc KHĐ", lambda tab: _render_don_doc(df_pgd, pgd_user or pgd_filter or "", role)),
                 ("⚡ Cảnh báo sớm", lambda tab: _render_canh_bao_som_pgd(tab, **kwargs)),
-                ("💳 Nợ rủi ro QĐ62", lambda tab: tab_qd62.render(
+                ("💳 Nợ rủi ro QĐ62", lambda tab: _lazy_tab("tab_qd62").render(
                     mode="pgd", pgd_filter=pgd_user or pgd_filter
                 )),
-                ("📍 Điểm Giao Dịch", lambda tab: tab_diem_gd_pgd.render(tab, **kwargs)),
-                ("🏘️ Tổ TK&VV",       lambda tab: tab_cdtotkvv_pgd.render(tab, **kwargs)),
-                ("🏛️ Ban Đại Diện", lambda tab: tab_ban_dai_dien.render(tab, cap="xa", **kwargs)),
-                ("🤝 Ủy thác", lambda tab: tab_uy_thac.render(tab, **kwargs)),
-                ("📊 Tổng quan Nợ Khoanh", lambda tab: tab_no_khoanh.render(
+                ("📍 Điểm Giao Dịch", lambda tab: _lazy_tab("tab_diem_gd_pgd").render(tab, **kwargs)),
+                ("🏘️ Tổ TK&VV",       lambda tab: _lazy_tab("tab_cdtotkvv_pgd").render(tab, **kwargs)),
+                ("🏛️ Ban Đại Diện", lambda tab: _lazy_tab("tab_ban_dai_dien").render(tab, cap="xa", **kwargs)),
+                ("🤝 Ủy thác", lambda tab: _lazy_tab("tab_uy_thac").render(tab, **kwargs)),
+                ("📊 Tổng quan Nợ Khoanh", lambda tab: _lazy_tab("tab_no_khoanh").render(
                     tab,
                     df=df_pgd,
                     df_full=None,
@@ -1689,7 +1687,7 @@ def render(**kwargs):
                     pgd_user=pgd_user,
                     nhom="tongquan",
                 )),
-                ("🔒 Quản lý Nợ Khoanh CV 368", lambda tab: tab_no_khoanh.render(
+                ("🔒 Quản lý Nợ Khoanh CV 368", lambda tab: _lazy_tab("tab_no_khoanh").render(
                     tab,
                     df=df_pgd,
                     df_full=None,
@@ -1703,10 +1701,10 @@ def render(**kwargs):
         "quan_tri_pgd": {
             "label": "⚙️ Quản trị PGD",
             "tabs": [
-                ("✅ Nhiệm vụ", lambda tab: tab_nhiem_vu.render(tab, **kwargs)),
-                ("📤 Upload Dữ liệu", lambda tab: tab_upload_pgd.render(tab, **kwargs)),
-                ("📤 Upload HSTD", lambda tab: tab_upload_pgd.render(tab, **kwargs)),
-                ("🔍 Trạng thái hệ thống", lambda tab: tab_trang_thai_nguon.render(tab, **kwargs)),
+                ("✅ Nhiệm vụ", lambda tab: _lazy_tab("tab_nhiem_vu").render(tab, **kwargs)),
+                ("📤 Upload Dữ liệu", lambda tab: _lazy_tab("tab_upload_pgd").render(tab, **kwargs)),
+                ("📤 Upload HSTD", lambda tab: _lazy_tab("tab_upload_pgd").render(tab, **kwargs)),
+                ("🔍 Trạng thái hệ thống", lambda tab: _lazy_tab("tab_trang_thai_nguon").render(tab, **kwargs)),
                 ("📖 Hướng dẫn", lambda tab: render_huong_dan()),
             ],
         },

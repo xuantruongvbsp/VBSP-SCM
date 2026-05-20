@@ -1,5 +1,8 @@
 # CHANGELOG
 
+## [2026-05-20] — Fix lỗi "Sức khỏe tín dụng": cannot subtract DatetimeArray from Categorical
+- `data/hstd.py` dòng ~238-240 — thêm `.astype(object)` trước `pd.to_datetime()` cho 3 cột ngày (`COT_NGAY_SL`, `COT_NGAY_GDGN`, `COT_NGAY_VAY`); nguyên nhân: Parquet cache lưu cột ngày dạng Categorical, pandas không tự convert sang datetime khi subtract
+
 ## [2026-05-20] — Fix lỗi Tổng Quan Chi Nhánh trắng: _load_hstd trả về DataFrame rỗng
 - `app.py` dòng ~134 — `duckdb.query().arrow()` trả về `RecordBatchReader` (không có `.to_pandas()`), bị catch thầm lặng → `pd.DataFrame()` rỗng; fix: đổi sang `.to_arrow_table().to_pandas(self_destruct=True)`
 

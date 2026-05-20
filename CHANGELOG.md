@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## [2026-05-20] — Fix bug _cache_co_cau_ct: COT_NGUON_VON alignment crash
+- `tabs/tab_tongquan.py` dòng ~212 — fix `_df_loc.get(COT_NGUON_VON, Series())` → crash index alignment khi cột thiếu; thay bằng `if col in columns` với fallback `Series(0, index=_df_loc.index)`
+- `tabs/tab_tongquan.py` dòng ~225 — xóa dead code `rename(columns={"COT_TEN_CT": "ten_ct"})` (rename literal string không đổi tên cột)
+
 ## [2026-05-20] — Tối ưu tốc độ chuyển tab ws_management: lazy import + cache
 - `workspaces/ws_management.py` dòng ~46 — xóa 18 static import tab, thay bằng `_get_tab()` với `@st.cache_resource` (lazy import giảm 30–50% cold start)
 - `tabs/tab_tongquan.py` dòng ~198 — thêm `_cache_co_cau_ct()` với `@st.cache_data(ttl=120)` cache groupby chương trình tín dụng (~7 groupby thành 1 cached call)

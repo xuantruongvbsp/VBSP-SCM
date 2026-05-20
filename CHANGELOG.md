@@ -1,7 +1,7 @@
 # CHANGELOG
 
-## [2026-05-20] — Fix TypeError _render_bao_cao(): username passed twice
-- `tabs/tab_khnv_noi_bo.py` dòng ~1337 — lọc `username` và `role` khỏi `**kwargs` trước khi truyền vào `_render_bao_cao()` để tránh conflict giữa tham số vị trí và `**kwargs` (do `_build_all_items()` đã set `kwargs["username"]`)
+## [2026-05-20] — Fix TypeError _render_bao_cao(): username passed twice (v2: pop thay filter)
+- `tabs/tab_khnv_noi_bo.py` dòng ~1337 — dùng `_kw = dict(kwargs); _kw.pop("username",None); _kw.pop("role",None)` thay vì dict comprehension filter (do `_build_all_items()` đã set `kwargs["username"]`, cần `pop()` triệt để trước `**` unpack)
 
 ## [2026-05-20] — Xóa dead code column_config trong tab_tongquan
 - `tabs/tab_tongquan.py` — xóa `_tao_column_config_co_cau()` và `_tao_column_config_pgd()`: được định nghĩa nhưng không bao giờ được gọi/truyền vào `st.dataframe()`

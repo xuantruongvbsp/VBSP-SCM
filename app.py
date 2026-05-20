@@ -131,7 +131,7 @@ def _load_hstd(
 
     try:
         # self_destruct=True: Arrow giải phóng từng cột khi pandas nhận → peak thấp hơn
-        arrow_tbl = duckdb.query(sql).arrow()
+        arrow_tbl = duckdb.query(sql).to_arrow_table()
         df = arrow_tbl.to_pandas(self_destruct=True)
         return _toi_uu_dtype(df)
     except Exception:

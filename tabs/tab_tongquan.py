@@ -329,6 +329,7 @@ def _cache_tqpgd_extended(
     df_pgd = _df.groupby(COT_TEN_PGD, as_index=False).agg(
         du_no=(COT_TONG_DU_NO, "sum"),
         so_kh=(COT_MA_KH, "nunique"),
+        so_mon=(COT_SO_KU, "nunique"),
         nqh=(COT_DU_NO_QH, "sum"),
     )
 
@@ -389,78 +390,6 @@ def _cache_tqpgd_extended(
     df_pgd["ds_thu_no"] = pd.to_numeric(df_pgd["ds_thu_no"], errors="coerce").fillna(0)
 
     return df_pgd
-
-
-def _tao_column_config_co_cau() -> dict[str, st.column_config.Column]:
-    return {
-        "Số món vay": st.column_config.NumberColumn(
-            "Số món vay",
-            format=",.0f",
-            help="Tổng số món vay đang hoạt động",
-        ),
-        "Số KH": st.column_config.NumberColumn(
-            "Số KH",
-            format=",.0f",
-            help="Tổng số khách hàng duy nhất",
-        ),
-    }
-
-
-def _tao_column_config_pgd() -> dict[str, st.column_config.Column]:
-    """
-    Tạo column_config cho bảng tổng hợp theo PGD.
-    Đơn vị: triệu đồng (đã được ghi rõ trong tiêu đề cột).
-
-    Returns:
-        Dict cấu hình column cho st.dataframe
-    """
-    return {
-        "Dư nợ (triệu đồng)": st.column_config.NumberColumn(
-            "Dư nợ (triệu đồng)",
-            format=",.0f",
-            help="Tổng dư nợ tính bằng triệu đồng"
-        ),
-        "QH (triệu đồng)": st.column_config.NumberColumn(
-            "QH (triệu đồng)",
-            format=",.0f",
-            help="Dư nợ quá hạn tính bằng triệu đồng"
-        ),
-        "Khoanh (triệu đồng)": st.column_config.NumberColumn(
-            "Khoanh (triệu đồng)",
-            format=",.0f",
-            help="Dư nợ khoanh tính bằng triệu đồng"
-        ),
-        "TL QH %": st.column_config.NumberColumn(
-            "TL QH %",
-            format=".2%",
-            help="Tỷ lệ quá hạn %"
-        ),
-        "TL Khoanh %": st.column_config.NumberColumn(
-            "TL Khoanh %",
-            format=".2%",
-            help="Tỷ lệ khoanh %"
-        ),
-        "Lãi tồn (triệu đồng)": st.column_config.NumberColumn(
-            "Lãi tồn (triệu đồng)",
-            format=",.0f",
-            help="Lãi tồn tính bằng triệu đồng"
-        ),
-        "Nợ ĐH năm (triệu đồng)": st.column_config.NumberColumn(
-            "Nợ ĐH năm (triệu đồng)",
-            format=",.0f",
-            help="Nợ đến hạn trong năm tính bằng triệu đồng"
-        ),
-        "DS Cho vay (triệu đồng)": st.column_config.NumberColumn(
-            "DS Cho vay (triệu đồng)",
-            format=",.0f",
-            help="Doanh số cho vay trong năm tính bằng triệu đồng"
-        ),
-        "DS Thu nợ (triệu đồng)": st.column_config.NumberColumn(
-            "DS Thu nợ (triệu đồng)",
-            format=",.0f",
-            help="Doanh số thu nợ trong năm tính bằng triệu đồng"
-        ),
-    }
 
 
 from tabs.base_tab import TabContext
@@ -762,9 +691,14 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                 "Giải ngân năm (triệu đồng)", "Thu nợ năm (triệu đồng)", "Tỷ trọng %"
             ]
 
-            # Tất cả cột đã convert sang string qua fmt_ty/fmt_so → không dùng column_config
+            _col_cfg = {}
+            for col in cols_hien:
+                if "(triệu đồng)" in col:
+                    base = col.replace(" (triệu đồng)", "")
+                    _col_cfg[col] = st.column_config.TextColumn(f"{base}\n(triệu đồng)")
             st.dataframe(
                 df_hien[cols_hien],
+                column_config=_col_cfg if _col_cfg else None,
                 use_container_width=True,
                 hide_index=True,
             )
@@ -890,6 +824,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
             df_pgd = df_pgd_raw.rename(columns={
                 "du_no":        "Dư nợ (triệu đồng)",
                 "so_kh":        "Số KH",
+                "so_mon":       "Số món vay",
                 "nqh":          "QH (triệu đồng)",
                 "du_no_khoanh": "Khoanh (triệu đồng)",
                 "lai_ton":      "Lãi tồn (triệu đồng)",
@@ -1073,7 +1008,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
 
             cot_hien = [
                 COT_TEN_PGD,
-                "Số KH", "Dư nợ (triệu đồng)",
+                "Số món vay", "Số KH", "Dư nợ (triệu đồng)",
                 "QH (triệu đồng)", "TL QH %",
                 "Khoanh (triệu đồng)", "TL Khoanh %",
                 "Nợ xấu (triệu đồng)", "Tỷ lệ Nợ xấu",
@@ -1091,13 +1026,6 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
             if not df_hoi_so.empty:
                 df_pgd = pd.concat([df_hoi_so, df_pgd], ignore_index=True)
             
-            # Xây dựng column_config cho bảng PGD
-            column_config_pgd = _tao_column_config_pgd()
-            # Thêm các cột số nguyên
-            for cot in ["Số KH", "Tổng Tổ", "Tốt", "Khá", "TB", "Yếu"]:
-                if cot in df_pgd.columns:
-                    column_config_pgd[cot] = st.column_config.NumberColumn(cot, format=",.0f")
-
             # ── Bảng HTML có header nhóm cột ─────────────────────────────
             df_show = df_pgd[cot_hien].copy()
             # Đánh dấu dòng tổng (dòng cuối)
@@ -1121,7 +1049,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                     "DS Thu nợ (triệu đồng)",
                 ]:
                     return vn(float(val), 3)
-                if col in ["Số KH", "Tổng Tổ", "Tốt", "Khá", "TB", "Yếu"]:
+                if col in ["Số món vay", "Số KH", "Tổng Tổ", "Tốt", "Khá", "TB", "Yếu"]:
                     try:
                         return fmt_so(val)
                     except Exception:
@@ -1131,7 +1059,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
             # Header nhóm
             NHOM_COT = [
                 ("", 1),                    # Tên PGD
-                ("Dư nợ", 2),               # Số KH, Dư nợ (tỷ)
+                ("Dư nợ", 3),               # Số món vay, Số KH, Dư nợ (tỷ)
                 ("Chất lượng nợ", 7),       # QH, TL QH, Khoanh, TL Khoanh, Nợ xấu, TL NPL, Lãi tồn
                 ("Kế hoạch năm", 3),        # Nợ ĐH, DS Cho vay, DS Thu nợ
                 ("Tổ TK&VV", len([c for c in ["Tổng Tổ", "Tốt", "Khá", "TB", "Yếu"] if c in df_pgd.columns])),

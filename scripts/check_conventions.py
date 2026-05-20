@@ -26,12 +26,11 @@ _ROLE_HARDCODE = re.compile(
     r'|\brole\s+in\s+\[',
 )
 
-# 2. Chia tiền tệ sai đơn vị /1e9
-# Cho phép: /1e6 (triệu), /1e12 (tỷ qua fmt_ty)
-# Cấm: /1e9, / 1e9, /1_000_000_000
-_TIEN_SAI = re.compile(
-    r'/\s*1e9\b|/\s*1_000_000_000\b'
-)
+# 2. (Đã xóa) Rule /1e9 bị loại bỏ vì sai về toán:
+# 1 tỷ VND = 1e9, nên /1e9 là ĐÚNG để hiển thị tỷ đồng.
+# fmt_ty() chia /1e6 → triệu đồng (dùng cho cột bảng có header "(triệu đồng)").
+# vn(x / 1e9, 3) + " tỷ" → tỷ đồng (dùng cho metric/card inline).
+_TIEN_SAI = re.compile(r'(?!x)x')  # pattern không bao giờ khớp
 
 # 3. Hardcode tên cột tiếng Việt thay vì dùng COT_*
 # Cấm: df["Tổng dư nợ"], df['Dư nợ quá hạn'], v.v.
@@ -89,13 +88,6 @@ def kiem_tra_file(path: Path) -> list[str]:
             loi.append(
                 f"  Dòng {i:4d}: [ROLE] Hardcode role string — "
                 f"dùng normalize_role() + la_phan_he_cn/pgd()\n"
-                f"           → {stripped[:100]}"
-            )
-
-        if _TIEN_SAI.search(line) and "# noqa" not in line and "# conv: skip" not in line:
-            loi.append(
-                f"  Dòng {i:4d}: [TIEN] Dùng /1e9 cho tiền tệ — "
-                f"phải dùng /1e12 qua fmt_ty()\n"
                 f"           → {stripped[:100]}"
             )
 

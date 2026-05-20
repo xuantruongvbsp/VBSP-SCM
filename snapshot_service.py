@@ -457,13 +457,38 @@ def luu_cdtotkvv_snapshot(df_cdtotkvv: pd.DataFrame, ky: str, username: str) -> 
     if df_cdtotkvv is None or df_cdtotkvv.empty:
         return KetQuaUpload(False, "Không có dữ liệu CDTOTKVV để tạo snapshot.")
 
-    # Dùng tong_hop_theo_pgd() để tổng hợp
-    try:
-        from data.cdtotkvv import tong_hop_theo_pgd
-    except Exception as e:
-        return KetQuaUpload(False, f"❌ Không import được data.cdtotkvv: {e}")
+    # Inline aggregation — không dùng tong_hop_theo_pgd() (có @st.cache_data)
+    # vì hàm này có thể được gọi từ background thread
+    _XEP_TOT = "Tốt"
+    _XEP_KHA = "Khá"
+    _XEP_TB  = "Trung bình"
+    _XEP_YEU = "Yếu"
 
-    df_pgd = tong_hop_theo_pgd(df_cdtotkvv)
+    df_src = df_cdtotkvv.copy()
+    if "tong_diem" in df_src.columns:
+        df_src["tong_diem"] = pd.to_numeric(df_src["tong_diem"], errors="coerce").fillna(0.0)
+
+    if "ten_dv" not in df_src.columns:
+        df_src["ten_dv"] = df_src.get("ma_dv", "?")
+    if "ma_dv" not in df_src.columns:
+        df_src["ma_dv"] = "?"
+
+    grp_key = ["ma_dv", "ten_dv"]
+    nhom = df_src.groupby(grp_key, as_index=False)
+    df_pgd = nhom.agg(tong_to=("stt", "count"), tong_diem_tb=("tong_diem", "mean"))
+    for col_name, xep_val in [("to_tot", _XEP_TOT), ("to_kha", _XEP_KHA),
+                               ("to_tb", _XEP_TB), ("to_yeu", _XEP_YEU)]:
+        if "xep_loai" in df_src.columns:
+            sub = df_src[df_src["xep_loai"] == xep_val]
+        else:
+            sub = df_src.iloc[:0]
+        if not sub.empty:
+            sub_cnt = sub.groupby(grp_key, as_index=False).agg(**{col_name: ("stt", "count")})
+            df_pgd = df_pgd.merge(sub_cnt, on=grp_key, how="left")
+        if col_name not in df_pgd.columns:
+            df_pgd[col_name] = 0
+        df_pgd[col_name] = df_pgd[col_name].fillna(0).astype(int)
+
     if df_pgd is None or df_pgd.empty:
         return KetQuaUpload(False, "Không tổng hợp được CDTOTKVV theo PGD.")
 
@@ -488,7 +513,7 @@ def luu_cdtotkvv_snapshot(df_cdtotkvv: pd.DataFrame, ky: str, username: str) -> 
         int(df_pgd["to_kha"].sum()),
         int(df_pgd["to_tb"].sum()),
         int(df_pgd["to_yeu"].sum()),
-        float(df_cdtotkvv["tong_diem"].mean()) if "tong_diem" in df_cdtotkvv.columns else 0.0,
+        float(df_src["tong_diem"].mean()) if "tong_diem" in df_src.columns else 0.0,
     ))
 
     so_dong = 0

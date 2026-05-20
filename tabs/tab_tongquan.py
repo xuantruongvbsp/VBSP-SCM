@@ -268,9 +268,9 @@ def _cache_co_cau_ct(
         _nk = (
             _df_loc.groupby(COT_TEN_CT)[col_khoanh]
             .apply(lambda x: pd.to_numeric(x, errors="coerce").sum())
-            .reset_index(name="du_no_khoanh")
-            .rename(columns={COT_TEN_CT: "ten_ct"})
+            .reset_index()
         )
+        _nk.columns = ["ten_ct", "du_no_khoanh"]
         df_ct = df_ct.merge(_nk, on="ten_ct", how="left")
     else:
         df_ct["du_no_khoanh"] = 0.0
@@ -280,9 +280,9 @@ def _cache_co_cau_ct(
         _gn = (
             _df_loc.groupby(COT_TEN_CT)[col_gn]
             .apply(lambda x: pd.to_numeric(x, errors="coerce").sum())
-            .reset_index(name="gn_nam")
-            .rename(columns={COT_TEN_CT: "ten_ct"})
+            .reset_index()
         )
+        _gn.columns = ["ten_ct", "gn_nam"]
         df_ct = df_ct.merge(_gn, on="ten_ct", how="left")
     else:
         df_ct["gn_nam"] = 0.0
@@ -293,9 +293,9 @@ def _cache_co_cau_ct(
         _tn = (
             _df_loc.groupby(COT_TEN_CT)[cols_tn]
             .apply(lambda x: pd.to_numeric(x.stack(), errors="coerce").sum())
-            .reset_index(name="tn_nam")
-            .rename(columns={COT_TEN_CT: "ten_ct"})
+            .reset_index()
         )
+        _tn.columns = ["ten_ct", "tn_nam"]
         df_ct = df_ct.merge(_tn, on="ten_ct", how="left")
     else:
         df_ct["tn_nam"] = 0.0
@@ -572,52 +572,52 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
             <div class="tq-grid">
                 <div class="tq-card soft-indigo">
                     <h4>Tổng món vay</h4>
-                    <p class="val">{_n_mon_vay}</p>
+                    <div class="val">{_n_mon_vay}</div>
                     <div class="sub">Số khế ước đang dư nợ</div>
                 </div>
                 <div class="tq-card soft-blue">
                     <h4>Tổng khách hàng</h4>
-                    <p class="val">{_n_kh}</p>
+                    <div class="val">{_n_kh}</div>
                     <div class="sub">{(f"BQ {_bq_mon_kh} món/KH") if n_kh > 0 else "—"}</div>
                 </div>
                 <div class="tq-card soft-green">
                     <h4>Tổng dư nợ</h4>
-                    <p class="val">{_tdn} tỷ</p>
+                    <div class="val">{_tdn} tỷ</div>
                     <div class="sub up">+{_tdn_delta} tỷ so kỳ trước</div>
                 </div>
                 <div class="tq-card soft-green">
                     <h4>Dư nợ trong hạn</h4>
-                    <p class="val">{_dth} tỷ</p>
+                    <div class="val">{_dth} tỷ</div>
                     <div class="sub">{_dth_pct}% tổng dư nợ</div>
                 </div>
                 <div class="tq-card soft-red">
                     <h4>Dư nợ quá hạn</h4>
-                    <p class="val">{_dqh} tỷ</p>
+                    <div class="val">{_dqh} tỷ</div>
                     <div class="sub">{_tlq}% tổng dư nợ</div>
                 </div>
                 <div class="tq-card soft-red">
                     <h4>Tỷ lệ quá hạn</h4>
-                    <p class="val">{_tlq}%</p>
+                    <div class="val">{_tlq}%</div>
                     <div class="sub">{'⚠️ Mức cao > 0.5%' if tlq >= 0.5 else '< 0.5% toàn hệ thống'}</div>
                 </div>
                 <div class="tq-card soft-amber">
                     <h4>Nợ khoanh</h4>
-                    <p class="val">{_dnk} tỷ</p>
+                    <div class="val">{_dnk} tỷ</div>
                     <div class="sub">{_tlk}% tổng dư nợ</div>
                 </div>
                 <div class="tq-card soft-amber">
                     <h4>Tỷ lệ khoanh</h4>
-                    <p class="val">{_tlk}%</p>
+                    <div class="val">{_tlk}%</div>
                     <div class="sub">{'⚠️ Cần theo dõi' if tlk >= 0.5 else 'Trong kiểm soát'}</div>
                 </div>
                 <div class="tq-card {no_xau_class}">
                     <h4>Tỷ lệ nợ xấu (NX)</h4>
-                    <p class="val">{_tl_no_xau}%</p>
+                    <div class="val">{_tl_no_xau}%</div>
                     <div class="sub">= (QH + Khoanh) / Tổng dư nợ</div>
                 </div>
                 <div class="tq-card {khd_class}">
                     <h4>3 tháng không HĐ</h4>
-                    <p class="val">{khd_val}</p>
+                    <div class="val">{khd_val}</div>
                     <div class="sub">{khd_sub}</div>
                 </div>
             </div>

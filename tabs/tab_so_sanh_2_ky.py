@@ -714,8 +714,6 @@ def _render_cdtotkvv_section(ky1: str, ky2: str, pgd_mode: bool, pgd_user: str |
               help=f"Kỳ {sel_k1}: {float(a1.get('diem_tb', 0)):.2f} điểm")
 
     # Bảng so sánh cơ cấu xếp loại
-    so_to1 = float(a1.get("so_to", 1)) or 1
-    so_to2 = float(a2.get("so_to", 1)) or 1
     cat_rows = [
         ("Tổng số tổ",      float(a1.get("so_to",  0)), float(a2.get("so_to",  0)), False),
         ("Tổ xếp loại Tốt", float(a1.get("so_tot", 0)), float(a2.get("so_tot", 0)), False),

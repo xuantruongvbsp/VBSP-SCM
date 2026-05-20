@@ -4,12 +4,35 @@
 
 ---
 
+## [2026-05-20] Redesign tab Nội bộ Phòng KH-NV — 4 tab → 3 tab, quick status
+- `tabs/tab_khnv_noi_bo.py` — giảm từ 4 → 3 sub-tab; bỏ "Tiến độ thực hiện" riêng
+- Thêm `_render_mini_tien_do(ds, today)`: 4 metrics + compact bars per cán bộ, hiện ở đầu tab Phân công
+- Thêm quick status buttons (🔴/🟡/✅) inline trong task card — 1 click, không cần expander
+- Xóa `_render_tien_do_thuc_hien()` (~180 dòng)
+- File giảm từ ~990 → ~840 dòng
+
+## [2026-05-20] Drill-down list — 32 đầu việc theo 8 nhóm I→VIII
+- `tabs/tab_khnv_noi_bo.py` — `_MAU_GIAO_VIEC`: thêm field `"nhom"` cho 32 entries (8 giá trị: I–VIII)
+- `tabs/tab_khnv_noi_bo.py` — `_tai_mau_giao_viec_v2`: closure `_nhom_ref[0]` → `_mk()` tự gán `nhom` mà không cần đổi signature các `_mk(...)` call sites
+- `tabs/tab_khnv_noi_bo.py` — `_render_phan_cong()`: gom nhóm bằng `nhom_groups` dict sorted; mỗi nhóm = `st.expander` với header stats (ht/total ✅, %, ⛔ trễ); task thêm thủ công (nhom="") → nhóm "📌 Thêm thủ công" ở cuối
+
+## [2026-05-20] Chỉnh sửa toàn bộ thông tin đầu việc trong Phân công cán bộ
+- `tabs/tab_khnv_noi_bo.py` — expander "✏️ Chỉnh sửa / Cập nhật": với admin_cn/manager_cn thêm Tiêu đề, Mô tả, Người thực hiện, Ưu tiên, Deadline; trạng thái + ghi chú mọi người cập nhật được
+- Nút đổi thành "💾 Lưu thay đổi"; logic lưu tách biệt: ghi info-fields chỉ khi `co_quyen_ghi`
+
+## [2026-05-20] Hướng B hoàn chỉnh — expander "Tải thêm từ mẫu" cuối trang Phân công cán bộ
+- `tabs/tab_khnv_noi_bo.py` `_render_phan_cong()` — thêm expander "⚙️ Tải thêm từ mẫu" (collapsed) sau for-loop, chỉ khi `ds` đã có dữ liệu và `co_quyen_ghi`
+- Form: VP1/VP2 text_input + 6 CB TD (3 cols) + live count ước tính + nút "✅ Tải thêm" (primary)
+- Widget keys dùng suffix `b` để tránh DuplicateElementKey với empty-state form (seed_vp1 → seed_vp1b, …)
+- Kết quả: empty-state = seed form nổi bật trên cùng; has-data = seed form ẩn nhỏ cuối trang ✅
+
 ## [2026-05-20] Thêm nút "Xuất PDF" cho Phân công cán bộ và Lịch công tác
 - `tabs/tab_khnv_noi_bo.py` — thêm import `xuat_pdf_co_chart`, `download_pdf_button` từ `components.export_pdf`
 - `tabs/tab_khnv_noi_bo.py` sub-tab 📋 Phân công cán bộ: thêm nút "📥 Xuất PDF" — chuyển list dict → DataFrame (Tiêu đề, Người thực hiện, Mức ưu tiên, Ngày giao, Deadline, Trạng thái, Ghi chú) → `xuat_pdf_co_chart` với `them_dong_tong=False`
 - `tabs/tab_khnv_noi_bo.py` sub-tab 📅 Lịch công tác: thêm nút "📥 Xuất PDF" — xuất danh sách đã lọc theo tháng/năm/loại (Ngày, Loại, Tiêu đề, Địa điểm, Thành viên, Ghi chú, Trạng thái)
 
-## [2026-05-20] Tải 32 đầu việc mẫu vào Phân công cán bộ
+## [2026-05-20] Tải đầu việc mẫu — nhân bản CB TD theo tên thực tế
+- `tabs/tab_khnv_noi_bo.py` — `_tinh_so_task()` + `_tai_mau_giao_viec_v2()`: nhân bản task "Cán bộ TD" × N người; form 2 ô VP + 6 ô CB TD + live count ước tính task
 - `tabs/tab_khnv_noi_bo.py` — `_MAU_GIAO_VIEC` (32 task, 8 nhóm), `_tai_mau_giao_viec()`, nút tải mẫu trong `_render_phan_cong()` (nổi bật khi trống / expander khi đã có data)
 
 ## [2026-05-20] Sub-tab "📊 Tiến độ thực hiện" trong Nội bộ Phòng KH-NV

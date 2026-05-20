@@ -7,8 +7,8 @@
 ## [2026-05-20] — UI: card "Tổng quan danh mục" to rõ hơn, căn giữa như "Xếp loại tổ"
 - `tabs/tab_tongquan.py` dòng ~486-497 — tăng `.val` font-size `2.05rem→2.4rem`; thêm `text-align:center`; đậm màu nền soft-* (dbeafe/dcfce7/fee2e2/fef3c7...); thêm CSS variable `--tq-num`/`--tq-label` cho màu số và nhãn theo scheme màu; thu nhỏ h4 xuống `0.82rem` để số nổi bật hơn
 
-## [2026-05-20] — Fix lỗi "Thông tin chung": KeyError 'ten_ct' khi merge _nk/_gn/_tn
-- `tabs/tab_tongquan.py` dòng ~272,283,296 — thêm `.rename(columns={COT_TEN_CT: "ten_ct"})` sau `reset_index(name=...)` cho `_nk`, `_gn`, `_tn`; nguyên nhân: `COT_TEN_CT="Tên chương trình"` ≠ `"ten_ct"`, merge `on="ten_ct"` không tìm thấy cột trong các sub-DataFrame
+## [2026-05-20] — Fix lỗi "Thông tin chung": KeyError 'ten_ct' (lần 2 — dùng positional columns thay vì .rename)
+- `tabs/tab_tongquan.py` dòng ~268,277,291 — đổi `.reset_index(name=...).rename(columns={COT_TEN_CT: "ten_ct"})` → `.reset_index()` + gán `_nk.columns = ["ten_ct", "du_no_khoanh"]` positionally (giống pattern `_qh`); nguyên nhân: `.rename()` silently bỏ qua key không match (cột sau groupby/reset_index có tên khác `COT_TEN_CT` trong edge case), dẫn đến thiếu cột `"ten_ct"` khi merge
 
 ## [2026-05-20] — Tạo tab "Nội bộ Phòng KH-NV" (tab_khnv_noi_bo.py)
 - `tabs/tab_khnv_noi_bo.py` (tạo mới) — 4 sub-tab: 📋 Phân công cán bộ, 📅 Lịch công tác, 📤 Báo cáo cấp trên (wrapper), 📌 Giao việc PGD (wrapper)

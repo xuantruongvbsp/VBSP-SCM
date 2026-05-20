@@ -1299,38 +1299,6 @@ def _render_mau06(df: pd.DataFrame, pgd_user: str) -> None:
         if COT_LAI_TON in df_xuat.columns and COT_LAI_TON_QH in df_xuat.columns:
             df_xuat["Nợ lãi"] = (df_xuat[COT_LAI_TON].fillna(0) +
                                   df_xuat[COT_LAI_TON_QH].fillna(0))
-        # Build context cho template
-        ds_kh = []
-        for i, (_, row) in enumerate(df_xuat.iterrows(), 1):
-            ds_kh.append({
-                "stt":      i,
-                "ten_kh":  str(row.get(COT_TEN_KH, "")),
-                "so_ku":   str(row.get(COT_SO_KU, "")),
-                "ten_ct":  str(row.get(COT_TEN_CT, "")),
-                "muc_vay": fmt(row.get(COT_MUC_VAY, 0)),
-                "du_no":   fmt(row.get(COT_TONG_DU_NO, 0)),
-                "muc_dich": str(row.get("Mục đích sử dụng vốn vay", "")),
-                "no_lai":  fmt(row.get("Nợ lãi", 0)),
-            })
-        context = {
-            "don_vi_kt":   don_vi_kt,
-            "ten_xa":      ten_xa,
-            "ten_to":      ten_to,
-            "can_bo_1":    can_bo_1,
-            "chuc_vu_1":   chuc_vu_1,
-            "can_bo_2":    can_bo_2,
-            "dia_ban":     dia_ban,
-            "ngay_kt":     ngay_kt.strftime("%d/%m/%Y"),
-            "ngay":        ngay_kt.day,
-            "thang":       ngay_kt.month,
-            "nam":         ngay_kt.year,
-            "so_kh_kt":    len(df_xuat),
-            "ds_kh":       ds_kh,
-            "tong_muc_vay": fmt(df_xuat[COT_MUC_VAY].sum()
-                               if COT_MUC_VAY in df_xuat.columns else 0),
-            "tong_du_no":  fmt(df_xuat[COT_TONG_DU_NO].sum()
-                               if COT_TONG_DU_NO in df_xuat.columns else 0),
-        }
         loai_word = "06" if "06/TD" in loai_mau else "06A"
         with st.spinner("Đang tạo file..."):
             du_lieu_word = {
@@ -1459,37 +1427,6 @@ def _render_mau15(df: pd.DataFrame, pgd_user: str) -> None:
         submitted = st.form_submit_button("📄 Tạo Word")
 
     if submitted:
-        # Build context cho template Mẫu 15/TD
-        context = {
-            "pgd":         pgd,
-            "ten_xa":      ten_xa,
-            "ten_to":      chon_to,
-            "to_truong":   to_truong,
-            "ma_to":       ma_to,
-            "dia_chi":     dia_chi,
-            "can_bo_kt":   can_bo_kt,
-            "ngay_chot":   ngay_chot.strftime("%d/%m/%Y"),
-            "ngay":        ngay_chot.day,
-            "thang":       ngay_chot.month,
-            "nam":         ngay_chot.year,
-            "tong_du_no":  fmt(tong_goc),
-            "tong_lai":    fmt(tong_lai),
-            "tong_tg":     fmt(tong_tg),
-            "so_kh":       len(df_to),
-            "ds_kh": [
-                {
-                    "stt":    i,
-                    "ten_kh": str(row.get(COT_TEN_KH, "")),
-                    "ten_ct": str(row.get(COT_TEN_CT, "")),
-                    "so_ku":  str(row.get(COT_SO_KU, "")),
-                    "du_no":  fmt(row.get(COT_TONG_DU_NO, 0)),
-                    "lai":    fmt(row.get("Nợ lãi", 0)),
-                    "tg":     fmt(row.get(COT_SO_DU_TG, 0)),
-                }
-                for i, (_, row) in enumerate(df_to.iterrows(), 1)
-            ],
-        }
-
         with st.spinner("Đang tạo file..."):
             du_lieu_word = {
                 "pgd": pgd,

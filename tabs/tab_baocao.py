@@ -478,12 +478,19 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
         # MẢNG 2: CHI TIẾT
         # ══════════════════════════════
         else:
-            sub_bc, sub_nq11 = st.tabs(["📋 Báo cáo chi tiết", "📑 NQ11"])
+            _tab_bc_ct = st.radio(
+                "Chế độ xem",
+                ["📋 Báo cáo chi tiết", "📑 NQ11"],
+                horizontal=True,
+                key="bc_ct_tab",
+                label_visibility="collapsed",
+            )
+            st.divider()
 
-            with sub_nq11:
-                tab_nq11.render(sub_nq11, **kwargs)
-
-            with sub_bc:
+            if _tab_bc_ct == "📑 NQ11":
+                tab_nq11.render(st.container(), **kwargs)
+            else:
+                with st.container():
                 loai_ct = st.radio("Loại chi tiết",
                     ["📋 Danh sách theo tiêu chí lọc",
                      "⏰ Hồ sơ đến hạn / quá hạn",

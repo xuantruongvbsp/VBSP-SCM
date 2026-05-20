@@ -1,5 +1,8 @@
 # CHANGELOG
 
+## [2026-05-20] — Header 2 dòng cho bảng Cơ cấu dư nợ theo chương trình tín dụng
+- `tabs/tab_tongquan.py` dòng ~767 — thêm `column_config` với `TextColumn(label="Dư nợ\n(triệu đồng)")` cho 8 cột tiền tệ, giảm độ rộng cột bằng cách tách đơn vị xuống dòng 2
+
 ## [2026-05-20] — Seed script + giải thích nguyên nhân mất dữ liệu HSTD khi pull GitHub
 - `seed_hstd_data.py` (mới) — script sinh dữ liệu HSTD mẫu (660 dòng, 36 cột, 22 đơn vị); chạy `python seed_hstd_data.py` sau pull GitHub để app hoạt động ngay, không báo thiếu dữ liệu
 - `seed_hstd_data.py` — ghi đồng thời Excel (`data/HSTD_Du_lieu_tho.xlsx`) + Parquet cache (`cache/hstd.parquet`)

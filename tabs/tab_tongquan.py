@@ -245,16 +245,22 @@ def _cache_co_cau_ct(
     df_ct["du_no_qh"] = df_ct["du_no_qh"].fillna(0)
 
     if col_khoanh and col_khoanh in _df.columns:
-        _nk = _df_loc.groupby(COT_TEN_CT)[col_khoanh].sum().reset_index()
-        _nk.columns = ["ten_ct", "du_no_khoanh"]
+        _nk = (
+            _df_loc.groupby(COT_TEN_CT)[col_khoanh]
+            .apply(lambda x: pd.to_numeric(x, errors="coerce").sum())
+            .reset_index(name="du_no_khoanh")
+        )
         df_ct = df_ct.merge(_nk, on="ten_ct", how="left")
     else:
         df_ct["du_no_khoanh"] = 0.0
     df_ct["du_no_khoanh"] = df_ct["du_no_khoanh"].fillna(0)
 
     if col_gn and col_gn in _df.columns:
-        _gn = _df_loc.groupby(COT_TEN_CT)[col_gn].sum().reset_index()
-        _gn.columns = ["ten_ct", "gn_nam"]
+        _gn = (
+            _df_loc.groupby(COT_TEN_CT)[col_gn]
+            .apply(lambda x: pd.to_numeric(x, errors="coerce").sum())
+            .reset_index(name="gn_nam")
+        )
         df_ct = df_ct.merge(_gn, on="ten_ct", how="left")
     else:
         df_ct["gn_nam"] = 0.0
@@ -262,8 +268,11 @@ def _cache_co_cau_ct(
 
     cols_tn = [c for c in cols_tn_key.split(",") if c and c in _df.columns]
     if cols_tn:
-        _tn = _df_loc.groupby(COT_TEN_CT)[cols_tn].sum().sum(axis=1).reset_index()
-        _tn.columns = ["ten_ct", "tn_nam"]
+        _tn = (
+            _df_loc.groupby(COT_TEN_CT)[cols_tn]
+            .apply(lambda x: pd.to_numeric(x.stack(), errors="coerce").sum())
+            .reset_index(name="tn_nam")
+        )
         df_ct = df_ct.merge(_tn, on="ten_ct", how="left")
     else:
         df_ct["tn_nam"] = 0.0

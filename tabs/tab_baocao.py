@@ -490,7 +490,6 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
             if _tab_bc_ct == "📑 NQ11":
                 tab_nq11.render(st.container(), **kwargs)
             else:
-                with st.container():
                 loai_ct = st.radio("Loại chi tiết",
                     ["📋 Danh sách theo tiêu chí lọc",
                      "⏰ Hồ sơ đến hạn / quá hạn",

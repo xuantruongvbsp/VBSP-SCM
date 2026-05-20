@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## [2026-05-20] — Fix tổng hợp thủ công chậm/treo: string cleanup 27s → 0.7s
+- `services/upload_service.py` dòng ~484 — thay `for _c in _str_cols: astype(str).str.strip()` (164 cột × 349K dòng = 27s) bằng `df[obj_cols].fillna('')` (17 cột object = 0.7s, nhanh hơn 38×)
+- Root cause: cột non-object (157/174 cột) bị xử lý thừa; `.astype(str)` allocate string mới toàn bộ DataFrame cho mỗi cột
+
 ## [2026-05-20] — Fix bug _cache_co_cau_ct: COT_NGUON_VON alignment crash
 - `tabs/tab_tongquan.py` dòng ~212 — fix `_df_loc.get(COT_NGUON_VON, Series())` → crash index alignment khi cột thiếu; thay bằng `if col in columns` với fallback `Series(0, index=_df_loc.index)`
 - `tabs/tab_tongquan.py` dòng ~225 — xóa dead code `rename(columns={"COT_TEN_CT": "ten_ct"})` (rename literal string không đổi tên cột)

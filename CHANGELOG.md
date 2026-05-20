@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## [2026-05-21] — Mở rộng tab So sánh 2 kỳ: NQ11 + GQVL + Chất lượng tổ
+- `db.py` dòng ~168 — thêm 3 bảng mới: `nq11_snapshot`, `gqvl_snapshot`, `cdtotkvv_snapshot` với index tương ứng
+- `snapshot_service.py` — thêm `luu_nq11_snapshot()`, `doc_nq11_snapshot()`, `danh_sach_ky_nq11()`, `luu_gqvl_snapshot()`, `doc_gqvl_snapshot()`, `danh_sach_ky_gqvl()`, `luu_cdtotkvv_snapshot()`, `doc_cdtotkvv_snapshot()`, `danh_sach_ky_cdtotkvv()`
+- `services/upload_service.py` dòng ~549 — cải tiến auto-snapshot: NQ11 trigger sau merge NQ11, GQVL trigger sau merge GQVL, CDTOTKVV trigger cùng HSTD (đọc latest từ pgd_data)
+- `tabs/tab_so_sanh_2_ky.py` — thêm 3 expander: "📋 So sánh NQ11", "💼 So sánh GQVL", "🏆 So sánh chất lượng Tổ TK&VV"; mỗi phần có KPI cards + bảng 5 cột; CDTOTKVV thêm pie chart cơ cấu xếp loại
+
 ## [2026-05-21] — Thêm tab So sánh 2 kỳ snapshot
 - `tabs/tab_so_sanh_2_ky.py` — tạo mới: chọn 2 kỳ snapshot bất kỳ, 6 KPI cards, bảng 8 chỉ tiêu, bảng/chart theo PGD (CN), xuất Excel
 - `workspaces/ws_management.py` dòng ~1129 — mount "🔄 So sánh 2 kỳ" nhóm "Giám sát"

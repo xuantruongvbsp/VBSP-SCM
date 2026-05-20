@@ -18,7 +18,6 @@ from auth import normalize_role, la_phan_he_cn
 from db import doc_kv, ghi_kv, ghi_audit
 from utils import get_tab_context, xuat_excel
 from components.export_pdf import xuat_pdf_co_chart, download_pdf_button
-from tabs import tab_checklist_bc
 
 # ──────────────────────────────────────────────
 # HẰNG SỐ & NHÃN
@@ -830,23 +829,6 @@ def _render_phan_cong_v2(role_n: str, username: str) -> None:
                         st.success("✅ Đã thêm!")
                         st.rerun()
 
-        # ── Nút tải toàn bộ 38 đầu việc mẫu ──
-        if can_bo_list:
-            with st.expander("⚙️ Tải toàn bộ 38 đầu việc mẫu", expanded=not ds):
-                vp1_cb = next((c["ho_ten"] for c in can_bo_list if c["chuc_vu"] == "vp1"), "—")
-                vp2_cb = next((c["ho_ten"] for c in can_bo_list if c["chuc_vu"] == "vp2"), "—")
-                cbtd_list = [c["ho_ten"] for c in can_bo_list if c["chuc_vu"] == "cbtd"]
-                _est = _tinh_so_task(vp1_cb, vp2_cb, cbtd_list)
-                st.caption(
-                    f"Sẽ gán: VP1 → **{vp1_cb}**, VP2 → **{vp2_cb}**, "
-                    f"CBTD → {', '.join(cbtd_list) or '—'}  "
-                    f"· Ước tính: **{_est} task**"
-                )
-                if ds:
-                    st.warning("⚠️ Danh sách đang có dữ liệu — task mẫu sẽ được **thêm vào cuối**.")
-                if st.button("✅ Tải toàn bộ đầu việc mẫu", type="primary",
-                             key="pc2_btn_seed", use_container_width=True):
-                    _tai_mau_tu_kv(ds, username)
 
     # ── Danh sách task gom nhóm theo chức vụ ──
     if not ds:
@@ -1448,9 +1430,6 @@ def _render_bao_cao(role_n: str, username: str, **kwargs) -> None:
                   key="bc_excel_dis", use_container_width=True)
         st.caption("Chưa có dữ liệu phân công.")
 
-    st.divider()
-    st.markdown("### 📤 Checklist Báo cáo cấp trên")
-    tab_checklist_bc.render(None, **kwargs)
 
 
 # ──────────────────────────────────────────────
@@ -1715,7 +1694,7 @@ def _render_thong_tin_dau_viec() -> None:
         "<h2 style='color:#1e3a5f;margin-bottom:4px'>📋 Bảng giao việc cấp dưới "
         "<span style='font-size:0.9rem;font-weight:400;color:#6b7280'>(38 đầu việc nhóm I–VIII)</span></h2>"
     )
-    st.caption("Phó phòng VP1, VP2 và Cán bộ TD tại Hội sở")
+    st.caption("Phó phòng VT1, VT2 và Cán bộ TD tại Hội sở")
 
     nhom_groups: dict = {}
     for idx, t in enumerate(_MAU_GIAO_VIEC, start=1):

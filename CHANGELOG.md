@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## [2026-05-20] — Fix dark mode: chữ bảng tổng hợp PGD tối + footnote đổi sang opacity
+- `tabs/tab_tongquan.py` dòng ~1186 — thêm `color:#1a202c` vào `<tr>` style để chữ đen rõ trên nền sáng (#F5F7FA/#FFFFFF/#C8E6C9) ở dark mode
+- `tabs/tab_tongquan.py` dòng ~1197 — đổi `<p style="color:#6B7280">` → `<div style="opacity:0.65">` để footnote hiển thị đúng màu theo theme
+
 ## [2026-05-20] — Thêm nút "Xuất PDF" cho Phân công cán bộ và Lịch công tác
 - `tabs/tab_khnv_noi_bo.py` dòng ~19 — thêm import `xuat_pdf_co_chart`, `download_pdf_button` từ `components.export_pdf`
 - `tabs/tab_khnv_noi_bo.py` dòng ~117-136 — thêm nút "📥 Xuất PDF" trong sub-tab 📋 Phân công cán bộ: chuyển list dict → DataFrame (Tiêu đề, Người thực hiện, Mức ưu tiên, Ngày giao, Deadline, Trạng thái, Ghi chú) → `xuat_pdf_co_chart` với `them_dong_tong=False`

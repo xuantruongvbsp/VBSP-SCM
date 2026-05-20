@@ -9,6 +9,9 @@
 - `tabs/tab_khnv_noi_bo.py` sub-tab 📋 Phân công cán bộ: thêm nút "📥 Xuất PDF" — chuyển list dict → DataFrame (Tiêu đề, Người thực hiện, Mức ưu tiên, Ngày giao, Deadline, Trạng thái, Ghi chú) → `xuat_pdf_co_chart` với `them_dong_tong=False`
 - `tabs/tab_khnv_noi_bo.py` sub-tab 📅 Lịch công tác: thêm nút "📥 Xuất PDF" — xuất danh sách đã lọc theo tháng/năm/loại (Ngày, Loại, Tiêu đề, Địa điểm, Thành viên, Ghi chú, Trạng thái)
 
+## [2026-05-20] Nút PDF luôn hiển thị trong tab Nội bộ Phòng KH-NV
+- `tabs/tab_khnv_noi_bo.py` — cả 2 sub-tab (Phân công cán bộ + Lịch công tác): nút "📥 Xuất PDF" luôn render, `disabled=True` khi chưa có dữ liệu, active khi có; tháng lọc không có sự kiện → disabled
+
 ## [2026-05-20] Fix dark mode bảng tổng hợp PGD (tab_tongquan)
 - `tabs/tab_tongquan.py` dòng ~1186: thêm `color:#1a202c` vào `<tr style="background:{bg}">` → chữ đen rõ trên nền sáng ở dark mode
 - `tabs/tab_tongquan.py` dòng ~1197: `<p style="color:#6B7280">` → `<div style="opacity:0.65">` để footnote thích ứng dark/light theme

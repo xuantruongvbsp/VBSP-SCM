@@ -1,6 +1,28 @@
 # CHANGELOG
 
-## [2026-05-20] — Tải 32 đầu việc mẫu vào Phân công cán bộ (Nội bộ Phòng KH-NV)
+## [2026-05-20] — Redesign tab Nội bộ Phòng KH-NV: 4 tab → 3 tab + quick status buttons
+- `tabs/tab_khnv_noi_bo.py` `render()` — giảm từ 4 sub-tab → 3 sub-tab; bỏ "📊 Tiến độ thực hiện" riêng
+- `tabs/tab_khnv_noi_bo.py` — thêm hàm `_render_mini_tien_do(ds, today)`: 4 metrics ngang + compact progress bars mỗi cán bộ; hiển thị ở đầu tab Phân công khi có dữ liệu
+- `tabs/tab_khnv_noi_bo.py` `_render_phan_cong()` — gọi `_render_mini_tien_do()` sau guard; thêm 3 quick status buttons (🔴 Chưa làm / 🟡 Đang làm / ✅ Xong) inline trong mỗi task card — 1 click thay vì mở expander
+- `tabs/tab_khnv_noi_bo.py` — xóa hàm `_render_tien_do_thuc_hien()` (~180 dòng), logic tích hợp vào mini dashboard
+
+## [2026-05-20] — Drill-down list: hiển thị 32 đầu việc theo 8 nhóm có thể thu/mở
+- `tabs/tab_khnv_noi_bo.py` `_MAU_GIAO_VIEC` — thêm trường `"nhom"` cho cả 32 entry (I-VIII), task thêm thủ công giữ nhom="" → hiện là "📌 Thêm thủ công"
+- `tabs/tab_khnv_noi_bo.py` `_tai_mau_giao_viec_v2` — thêm `_nhom_ref = [""]` closure; `_mk()` đọc `_nhom_ref[0]`; đầu vòng lặp gán `_nhom_ref[0] = t.get("nhom", "")`
+- `tabs/tab_khnv_noi_bo.py` `_render_phan_cong()` — thay flat for-loop bằng `nhom_groups` dict (insertion-order sorted I→VIII→📌); mỗi nhóm là `st.expander` với header: tên nhóm · N/Tổng ✅ (X%) · ⛔ N trễ
+
+## [2026-05-20] — Chỉnh sửa toàn bộ thông tin đầu việc trong Phân công cán bộ
+- `tabs/tab_khnv_noi_bo.py` `_render_phan_cong()` — đổi expander "📝 Cập nhật" → "✏️ Chỉnh sửa / Cập nhật"; thêm các trường chỉnh sửa cho admin_cn/manager_cn: Tiêu đề, Mô tả, Người thực hiện, Ưu tiên, Deadline; trạng thái + ghi chú mọi người vẫn cập nhật được; widget keys: `td_edit_`, `mota_edit_`, `nguoi_edit_`, `uu_edit_`, `dl_edit_` theo task id
+
+## [2026-05-20] — Hoàn thiện Hướng B: expander "Tải thêm từ mẫu" ẩn cuối trang Phân công cán bộ
+- `tabs/tab_khnv_noi_bo.py` `_render_phan_cong()` — thêm khối `if ds and co_quyen_ghi:` sau for-loop: expander "⚙️ Tải thêm từ mẫu" (collapsed, ở cuối), chứa form VP1/VP2 + 6 CB TD + live count + nút "✅ Tải thêm"; widget keys suffix `b` (`seed_vp1b`, `seed_vp2b`, `seed_cb_b_1…6`, `btn_seed_bottom`) tránh DuplicateElementKey với form trống-state
+
+## [2026-05-20] — Đổi ký hiệu VP → VT trong tab Nội bộ Phòng KH-NV
+- `tabs/tab_khnv_noi_bo.py` — replace_all "VP 1" → "VT 1", "VP 2" → "VT 2" (dữ liệu mẫu, logic matching, label form, fallback tên)
+
+## [2026-05-20] — Tải đầu việc mẫu với nhân bản Cán bộ TD theo tên thực tế
+- `tabs/tab_khnv_noi_bo.py` — thay `_tai_mau_giao_viec()` bằng `_tinh_so_task()` + `_tai_mau_giao_viec_v2(vp1, vp2, cbtd_list)`: nhân bản task "Cán bộ TD" × N người, xử lý đủ 8 pattern chức vụ (VP1, VP2, VP1&2, Cán bộ TD, VP1+TD, VP2+TD, VP1&2+TD, Tất cả)
+- `tabs/tab_khnv_noi_bo.py` `_render_phan_cong()` — form nhập tên: 2 ô VP1/VP2 + 6 ô CB TD (3 cột); live count ước tính số task sau nhân bản; expander mở sẵn khi ds trống
 - `tabs/tab_khnv_noi_bo.py` — thêm hằng số `_MAU_GIAO_VIEC` (32 đầu việc từ Bảng giao việc Trưởng phòng KH-NVTD, chia 8 nhóm I–VIII)
 - `tabs/tab_khnv_noi_bo.py` — thêm hàm `_tai_mau_giao_viec(ds, username)`: append 32 task vào list + ghi_kv + audit `khnv_tai_mau_giao_viec`
 - `tabs/tab_khnv_noi_bo.py` `_render_phan_cong()` — thêm nút "📥 Tải 32 đầu việc mẫu": nổi bật (primary) khi ds rỗng, ẩn trong expander khi ds đã có dữ liệu; chỉ hiện với admin_cn/manager_cn

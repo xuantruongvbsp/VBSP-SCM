@@ -1,5 +1,16 @@
 # CHANGELOG
 
+## [2026-05-21] — Bổ sung quy trình kiểm tra VB 727 cho tab Hội đoàn thể
+- `tabs/tab_uy_thac.py` dòng ~755 — Thêm hàm `_parse_date`, `_xoa_border_table`
+- `tabs/tab_uy_thac.py` dòng ~770 — Thêm `_tao_word_bb_ct_cx` (Mẫu 02/BB-CT & 03/BB-CX theo VB 727/HD-NHCS)
+- `tabs/tab_uy_thac.py` dòng ~940 — Thêm `_tao_word_bc_th` (Mẫu 04/BC-TH — Báo cáo tổng hợp)
+- `tabs/tab_uy_thac.py` dòng ~1731 — Thêm `_render_bb_ct_cx`: nhập + lưu biên bản KT CT-XH cấp tỉnh/xã vào kv_store, xuất Word
+- `tabs/tab_uy_thac.py` dòng ~1900 — Thêm `_render_theo_doi_bc_th`: theo dõi tiến độ xử lý kiến nghị + xuất Mẫu 04/BC-TH
+- `tabs/tab_uy_thac.py` dòng ~2106 — Cập nhật `render()` từ 5 → 7 sub-tab (thêm "📝 Biên bản CT-XH" và "📊 Theo dõi & BC-TH")
+
+## [2026-05-21] — Tối ưu: xóa eager import 17 modules khỏi tabs/__init__.py
+- `tabs/__init__.py` — Xóa `from tabs import (tab_tongquan, ..., tab_tien_do)` (17 modules); thay bằng docstring 1 dòng. Các module này đã được lazy import qua `importlib.import_module()` từ workspaces từ 2026-05-14, nhưng `__init__.py` vẫn giữ eager import cũ gây tốn ~0.5-1.5s mỗi lần chạm package. Tiết kiệm I/O khi chuyển workspace/tab.
+
 ## [2026-05-21] — Mở rộng tab So sánh 2 kỳ: NQ11 + GQVL + Chất lượng tổ
 - `db.py` dòng ~168 — thêm 3 bảng mới: `nq11_snapshot`, `gqvl_snapshot`, `cdtotkvv_snapshot` với index tương ứng
 - `snapshot_service.py` — thêm `luu_nq11_snapshot()`, `doc_nq11_snapshot()`, `danh_sach_ky_nq11()`, `luu_gqvl_snapshot()`, `doc_gqvl_snapshot()`, `danh_sach_ky_gqvl()`, `luu_cdtotkvv_snapshot()`, `doc_cdtotkvv_snapshot()`, `danh_sach_ky_cdtotkvv()`

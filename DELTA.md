@@ -9,6 +9,10 @@
 - `tabs/tab_khnv_noi_bo.py` sub-tab 📋 Phân công cán bộ: thêm nút "📥 Xuất PDF" — chuyển list dict → DataFrame (Tiêu đề, Người thực hiện, Mức ưu tiên, Ngày giao, Deadline, Trạng thái, Ghi chú) → `xuat_pdf_co_chart` với `them_dong_tong=False`
 - `tabs/tab_khnv_noi_bo.py` sub-tab 📅 Lịch công tác: thêm nút "📥 Xuất PDF" — xuất danh sách đã lọc theo tháng/năm/loại (Ngày, Loại, Tiêu đề, Địa điểm, Thành viên, Ghi chú, Trạng thái)
 
+## [2026-05-20] Sub-tab "📊 Tiến độ thực hiện" trong Nội bộ Phòng KH-NV
+- `tabs/tab_khnv_noi_bo.py` — thay "Giao việc PGD" (wrapper tab_tien_do) bằng `_render_tien_do_thuc_hien()`: tổng hợp tự động từ `khnv_phan_cong_list`
+- Gồm: filter tháng/năm/cán bộ, 5 metric, progress bar màu theo % (đỏ/cam/xanh/lá), badge trễ hạn, bảng chi tiết, PDF export
+
 ## [2026-05-20] Nút PDF luôn hiển thị trong tab Nội bộ Phòng KH-NV
 - `tabs/tab_khnv_noi_bo.py` — cả 2 sub-tab (Phân công cán bộ + Lịch công tác): nút "📥 Xuất PDF" luôn render, `disabled=True` khi chưa có dữ liệu, active khi có; tháng lọc không có sự kiện → disabled
 

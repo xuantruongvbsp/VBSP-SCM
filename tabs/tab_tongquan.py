@@ -27,6 +27,7 @@ from utils import (
     xuat_excel,
     ten_file_xuat,
     hien_thi_dataframe_phan_trang,
+    lazy_tabs,
 )
 from data.pgd import ds_pgd_co_file
 from data.cdtotkvv import doc_cdtotkvv, ds_thang_nam, tong_hop_theo_pgd
@@ -1305,10 +1306,6 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                     "Trong năm": cuoi_nam,
                 }
 
-                tab_1m, tab_3m, tab_6m, tab_nam = st.tabs([
-                    "📅 1 tháng", "📅 3 tháng", "📅 6 tháng", "📅 Trong năm"
-                ])
-
                 def _build_pdf_den_han(df_loc, label, loc_pgd, loc_ct, loc_xa, username, key_prefix):
                     """Build PDF bytes: luôn groupby [PGD, Xã, Chương trình], bộ lọc chỉ thu hẹp input."""
                     COLS_GROUP = [COT_TEN_PGD, COT_TEN_XA, COT_TEN_CT]
@@ -1486,11 +1483,19 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                     else:
                         st.caption(f"⚠️ Không có cột '{nhom_chon}' trong dữ liệu")
 
-                for (label, den), tab_ui in zip(MOC.items(),
-                                                [tab_1m, tab_3m, tab_6m, tab_nam]):
-                    with tab_ui:
-                        df_moc = dt_loc[(dt_loc[COT_NGAY_DH] >= hn) & (dt_loc[COT_NGAY_DH] <= den)]
-                        _bang_den_han(df_moc, label, label.replace(" ", "_"))
+                _moc_labels = list(MOC.keys())
+                _moc_values = list(MOC.values())
+                lazy_tabs(
+                    [f"📅 {lbl}" for lbl in _moc_labels],
+                    [
+                        lambda _den=den, _lbl=lbl, _key=lbl.replace(" ", "_"): _bang_den_han(
+                            dt_loc[(dt_loc[COT_NGAY_DH] >= hn) & (dt_loc[COT_NGAY_DH] <= _den)],
+                            _lbl, _key,
+                        )
+                        for den, lbl in zip(_moc_values, _moc_labels)
+                    ],
+                    key="tq_den_han",
+                )
 
             except Exception as e:
                 st.error(f"Lỗi xử lý đến hạn: {e}")

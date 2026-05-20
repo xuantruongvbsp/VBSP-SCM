@@ -1,7 +1,7 @@
 """Tab Ủy thác — Theo dõi Hội đoàn thể và các mẫu biểu kiểm tra."""
 from __future__ import annotations
-import io, pickle
-from datetime import date, timedelta
+import io, pickle, uuid
+from datetime import date, datetime, timedelta
 import pandas as pd
 import streamlit as st
 from docx import Document
@@ -10,17 +10,18 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.enum.table import WD_ALIGN_VERTICAL
 from streamlit.delta_generator import DeltaGenerator
 
+import db
+from auth import la_phan_he_cn, normalize_role
+from data.pgd import pgd_slug
 from config import (
     COT_TEN_PGD, COT_TEN_KH, COT_SO_KU, COT_TEN_CT,
     COT_TONG_DU_NO, COT_DU_NO_QH, COT_LAI_TON, COT_LAI_TON_QH,
     COT_SO_DU_TG, COT_NGAY_VAY, COT_TEN_TO, COT_DVUT,
     COT_TEN_XA, COT_TEN_THON, COT_MUC_VAY,
-    TEN_CHI_NHANH_HIEN_THI,
+    TEN_CHI_NHANH_HIEN_THI, DS_PGD,
 )
 from utils import fmt, fmt_bang_ty, fmt_so, xuat_excel
-from services.template_service import (
-    docx_bytes_to_pdf,
-)
+from services.template_service import docx_bytes_to_pdf
 
 # ── Hằng số ──────────────────────────────────────────────────────────────────
 DVUT_ORDER = [
@@ -749,6 +750,332 @@ def _tao_word_bien_ban_xac_minh(du_lieu: dict) -> bytes:
     return buf.getvalue()
 
 
+# ── Helpers ───────────────────────────────────────────────────────────────────
+
+def _parse_date(s: str | None) -> date:
+    if not s:
+        return date.today()
+    try:
+        return datetime.strptime(s, "%Y-%m-%d").date()
+    except Exception:
+        return date.today()
+
+
+def _xoa_border_table(tbl) -> None:
+    from docx.oxml.ns import qn
+    from docx.oxml import OxmlElement
+    for cell in tbl.rows[0].cells:
+        tc = cell._tc
+        tcPr = tc.get_or_add_tcPr()
+        tcBorders = OxmlElement("w:tcBorders")
+        for bn in ["top", "left", "bottom", "right"]:
+            b = OxmlElement(f"w:{bn}")
+            b.set(qn("w:val"), "none")
+            tcBorders.append(b)
+        tcPr.append(tcBorders)
+
+
+# ── Mẫu 02/BB-CT & 03/BB-CX ──────────────────────────────────────────────────
+
+def _tao_word_bb_ct_cx(du_lieu: dict, cap: str = "tinh") -> bytes:
+    """Mẫu 02/BB-CT (cap='tinh') hoặc 03/BB-CX (cap='xa')."""
+    from docx.oxml.ns import qn
+    from docx.oxml import OxmlElement
+
+    doc = Document()
+    _style_doc(doc)
+    for section in doc.sections:
+        section.top_margin    = Cm(2)
+        section.bottom_margin = Cm(2)
+        section.left_margin   = Cm(3)
+        section.right_margin  = Cm(2)
+        section.page_width    = Cm(21)
+        section.page_height   = Cm(29.7)
+
+    # Header 2 cột (không border)
+    tbl_h = doc.add_table(rows=1, cols=2)
+    tbl_h.style = "Table Grid"
+    _xoa_border_table(tbl_h)
+    cell_l = tbl_h.rows[0].cells[0]
+    p_l = cell_l.paragraphs[0]
+    p_l.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    r_l = p_l.add_run("ĐƠN VỊ KIỂM TRA\n")
+    r_l.bold = True
+    r_l2 = p_l.add_run((du_lieu.get("don_vi_kt") or "").upper())
+    r_l2.bold = True
+
+    cell_r = tbl_h.rows[0].cells[1]
+    p_r = cell_r.paragraphs[0]
+    p_r.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    p_r.add_run("CỘNG HOÀ XÃ HỘI CHỦ NGHĨA VIỆT NAM").bold = True
+    p_r2 = cell_r.add_paragraph("Độc lập - Tự do - Hạnh phúc")
+    p_r2.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    if p_r2.runs:
+        p_r2.runs[0].bold = True
+    ngay_kt = du_lieu.get("ngay_kt", date.today())
+    if isinstance(ngay_kt, str):
+        ngay_kt = _parse_date(ngay_kt)
+    p_r3 = cell_r.add_paragraph(
+        f"{du_lieu.get('dia_danh', '')}, ngày {ngay_kt.day} tháng {ngay_kt.month} năm {ngay_kt.year}"
+    )
+    p_r3.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    doc.add_paragraph()
+
+    # Tiêu đề
+    ten_cap = "cấp tỉnh" if cap == "tinh" else "cấp xã"
+    so_hieu = "02/BB-CT" if cap == "tinh" else "03/BB-CX"
+    title = doc.add_paragraph()
+    title.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    run_t = title.add_run(
+        f"BIÊN BẢN KIỂM TRA\n"
+        f"Hoạt động nhận ủy thác với NHCSXH của tổ chức CT-XH {ten_cap}"
+    )
+    run_t.bold = True
+    run_t.font.size = Pt(13)
+
+    doc.add_paragraph(
+        f"Hôm nay, ngày {ngay_kt.day} tháng {ngay_kt.month} năm {ngay_kt.year}, chúng tôi gồm:"
+    )
+    doc.add_paragraph(
+        f"ĐOÀN KIỂM TRA: {du_lieu.get('don_vi_kt', '')}\n"
+        f"- Ông (bà): {du_lieu.get('truong_doan', '')}   Chức vụ: Trưởng đoàn\n"
+        f"- Ông (bà): {du_lieu.get('can_bo_2', '')}   Chức vụ: {du_lieu.get('chuc_vu_2', '')}"
+    )
+    doc.add_paragraph(
+        f"ĐƠN VỊ ĐƯỢC KIỂM TRA: {du_lieu.get('ten_don_vi', '')}\n"
+        f"- Ông (bà): {du_lieu.get('dai_dien_dc', '')}   Chức vụ: {du_lieu.get('chuc_vu_dc', '')}"
+    )
+    doc.add_paragraph(
+        f"Cùng tiến hành kiểm tra việc thực hiện các nội dung công việc được ủy thác của "
+        f"{du_lieu.get('ten_don_vi', '')}, thống nhất kết quả kiểm tra như sau:"
+    )
+
+    # I. Kết quả hoạt động ủy thác
+    p_i = doc.add_paragraph("I. KẾT QUẢ HOẠT ĐỘNG ỦY THÁC")
+    p_i.runs[0].bold = True
+    doc.add_paragraph(
+        f"(Đến thời điểm {ngay_kt.strftime('%d/%m/%Y')})\n"
+        "- Tổng số Tổ TK&VV do Hội quản lý: ........... tổ\n"
+        "- Tổng số khách hàng vay vốn: ........... người\n"
+        "- Tổng dư nợ nhận ủy thác: ........... triệu đồng\n"
+        "  Trong đó: Nợ quá hạn ........... (tỷ lệ .......%), Nợ khoanh ..........."
+    )
+
+    # II. Kết quả thực hiện nội dung nhận ủy thác
+    ten_khoan = "khoản 1" if cap == "tinh" else "khoản 2"
+    p_ii = doc.add_paragraph(
+        f"II. KẾT QUẢ THỰC HIỆN CÁC NỘI DUNG NHẬN ỦY THÁC CỦA TỔ CHỨC CT-XH {ten_cap.upper()}"
+    )
+    p_ii.runs[0].bold = True
+    doc.add_paragraph(
+        f"Đoàn kiểm tra thực hiện kiểm tra theo nội dung kiểm tra, giám sát tại {ten_khoan} "
+        f"Phụ lục I văn bản số 727/HD-NHCS ngày 11/02/2026. Cụ thể:"
+    )
+
+    muc_noi_dung = [
+        ("tuyen_truyen",    "1. Công tác tuyên truyền, vận động"),
+        ("kiem_tra_giam_sat", "2. Công tác kiểm tra, giám sát hoạt động ủy thác"),
+        ("tap_huan",        "3. Công tác tập huấn"),
+        ("phoi_hop_nhcs",   "4. Hoạt động phối hợp thực hiện cùng NHCSXH"),
+    ]
+    if cap == "tinh":
+        muc_noi_dung.append(("trach_nhiem", "5. Trách nhiệm của tổ chức CT-XH cấp tỉnh"))
+
+    for field_key, ten_muc in muc_noi_dung:
+        p_muc = doc.add_paragraph(ten_muc)
+        p_muc.runs[0].bold = True
+        data = du_lieu.get(field_key) or {}
+        doc.add_paragraph(f"a) Kết quả đạt được\n{data.get('ket_qua', '.....')}")
+        doc.add_paragraph(f"b) Tồn tại\n{data.get('ton_tai', '.....')}")
+
+    # III. Đánh giá, Nhận xét, Kiến nghị
+    p_iii = doc.add_paragraph("III. ĐÁNH GIÁ, NHẬN XÉT CỦA ĐOÀN KIỂM TRA")
+    p_iii.runs[0].bold = True
+    han_str = du_lieu.get("han_hoan_thanh", "....../....../20......")
+    if han_str and len(han_str) == 10 and han_str[4] == "-":
+        try:
+            han_str = datetime.strptime(han_str, "%Y-%m-%d").strftime("%d/%m/%Y")
+        except Exception:
+            pass
+    doc.add_paragraph(
+        f"1. Ưu điểm\n{du_lieu.get('uu_diem', '.....')}\n\n"
+        f"2. Tồn tại\n{du_lieu.get('ton_tai_chung', '.....')}\n\n"
+        f"3. Kiến nghị của Đoàn kiểm tra\n{du_lieu.get('kien_nghi', '.....')}\n\n"
+        f"Đơn vị được kiểm tra hoàn thành các kiến nghị và báo cáo kết quả "
+        f"trước ngày {han_str}."
+    )
+
+    # IV. Ý kiến đơn vị được kiểm tra
+    p_iv = doc.add_paragraph("IV. Ý KIẾN CỦA ĐƠN VỊ ĐƯỢC KIỂM TRA")
+    p_iv.runs[0].bold = True
+    doc.add_paragraph(du_lieu.get("y_kien_don_vi_dc", ".....") or ".....")
+
+    doc.add_paragraph(
+        "Biên bản được lập thành 02 bản "
+        "(01 bản lưu Đoàn kiểm tra, 01 bản lưu Đơn vị được kiểm tra)."
+    )
+
+    # Ký tên
+    doc.add_paragraph()
+    ky = doc.add_table(rows=1, cols=2)
+    ky.style = "Table Grid"
+    _xoa_border_table(ky)
+    p_kl = ky.rows[0].cells[0].paragraphs[0]
+    p_kl.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    p_kl.add_run("TRƯỞNG ĐOÀN KIỂM TRA\n(Ký, ghi rõ họ tên)\n\n\n\n").bold = True
+    p_kl.add_run(du_lieu.get("truong_doan", ""))
+    p_kr = ky.rows[0].cells[1].paragraphs[0]
+    p_kr.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    p_kr.add_run("ĐƠN VỊ ĐƯỢC KIỂM TRA\n(Ký tên, đóng dấu)\n\n\n\n").bold = True
+    p_kr.add_run(du_lieu.get("dai_dien_dc", ""))
+
+    buf = io.BytesIO()
+    doc.save(buf)
+    return buf.getvalue()
+
+
+# ── Mẫu 04/BC-TH ─────────────────────────────────────────────────────────────
+
+def _tao_word_bc_th(du_lieu: dict, ds_bien_ban: list) -> bytes:
+    """Mẫu 04/BC-TH — Báo cáo tổng hợp kết quả kiểm tra."""
+    from docx.oxml.ns import qn
+    from docx.oxml import OxmlElement
+
+    doc = Document()
+    _style_doc(doc)
+    for section in doc.sections:
+        section.top_margin    = Cm(2)
+        section.bottom_margin = Cm(2)
+        section.left_margin   = Cm(3)
+        section.right_margin  = Cm(2)
+        section.page_width    = Cm(21)
+        section.page_height   = Cm(29.7)
+
+    ngay_bc = du_lieu.get("ngay_bc", date.today())
+    if isinstance(ngay_bc, str):
+        ngay_bc = _parse_date(ngay_bc)
+
+    tbl_h = doc.add_table(rows=1, cols=2)
+    tbl_h.style = "Table Grid"
+    _xoa_border_table(tbl_h)
+    cell_l = tbl_h.rows[0].cells[0]
+    cell_l.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+    cell_l.paragraphs[0].add_run(
+        f"ĐƠN VỊ KIỂM TRA\n{(du_lieu.get('don_vi_kt') or '').upper()}"
+    ).bold = True
+    cell_r = tbl_h.rows[0].cells[1]
+    p_r = cell_r.paragraphs[0]
+    p_r.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    p_r.add_run("CỘNG HOÀ XÃ HỘI CHỦ NGHĨA VIỆT NAM").bold = True
+    p_r2 = cell_r.add_paragraph("Độc lập - Tự do - Hạnh phúc")
+    p_r2.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    if p_r2.runs:
+        p_r2.runs[0].bold = True
+    p_r3 = cell_r.add_paragraph(
+        f"{du_lieu.get('dia_danh', '')}, ngày {ngay_bc.day} "
+        f"tháng {ngay_bc.month} năm {ngay_bc.year}"
+    )
+    p_r3.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    doc.add_paragraph()
+
+    title = doc.add_paragraph()
+    title.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    run_t = title.add_run("BÁO CÁO TỔNG HỢP\nKết quả kiểm tra hoạt động nhận ủy thác cho vay")
+    run_t.bold = True
+    run_t.font.size = Pt(13)
+    doc.add_paragraph()
+
+    # I. Thành phần
+    p_i = doc.add_paragraph("I. THÀNH PHẦN")
+    p_i.runs[0].bold = True
+    doc.add_paragraph(
+        f"1. Đoàn kiểm tra: {du_lieu.get('don_vi_kt', '')}\n"
+        f"   Trưởng đoàn: {du_lieu.get('truong_doan', '')}\n"
+        f"2. Cấp ủy, chính quyền địa phương (nếu có): {du_lieu.get('cap_uy', '')}"
+    )
+
+    # II. Thời gian, địa điểm, đơn vị được kiểm tra
+    p_ii = doc.add_paragraph("II. THỜI GIAN, ĐỊA ĐIỂM, ĐƠN VỊ ĐƯỢC KIỂM TRA")
+    p_ii.runs[0].bold = True
+    tbl_dv = doc.add_table(rows=1, cols=4)
+    tbl_dv.style = "Table Grid"
+    for i, h in enumerate(["STT", "Thời gian", "Đơn vị được kiểm tra", "Địa điểm"]):
+        c = tbl_dv.rows[0].cells[i]
+        c.text = h
+        if c.paragraphs[0].runs:
+            c.paragraphs[0].runs[0].bold = True
+            c.paragraphs[0].runs[0].font.size = Pt(10)
+        c.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+    for idx, bb in enumerate(ds_bien_ban, 1):
+        ngay_str = bb.get("ngay_kt", "")
+        try:
+            ngay_str = datetime.strptime(ngay_str, "%Y-%m-%d").strftime("%d/%m/%Y")
+        except Exception:
+            pass
+        r = tbl_dv.add_row()
+        r.cells[0].text = str(idx)
+        r.cells[1].text = ngay_str
+        r.cells[2].text = bb.get("ten_don_vi", "")
+        r.cells[3].text = bb.get("dia_danh", "")
+        for cell in r.cells:
+            if cell.paragraphs and cell.paragraphs[0].runs:
+                cell.paragraphs[0].runs[0].font.size = Pt(10)
+    doc.add_paragraph()
+
+    # III. Nội dung kiểm tra
+    p_iii = doc.add_paragraph("III. NỘI DUNG KIỂM TRA")
+    p_iii.runs[0].bold = True
+    doc.add_paragraph(
+        du_lieu.get("noi_dung_kt",
+                    "Theo Phụ lục I văn bản số 727/HD-NHCS ngày 11/02/2026.")
+    )
+
+    # IV. Kết quả kiểm tra
+    p_iv = doc.add_paragraph("IV. KẾT QUẢ KIỂM TRA")
+    p_iv.runs[0].bold = True
+    doc.add_paragraph("1. Đánh giá, nhận xét của Đoàn kiểm tra").runs[0].bold = True
+    doc.add_paragraph(
+        f"a) Đối với tổ chức CT-XH được kiểm tra\n{du_lieu.get('nx_ctxh', '.....')}\n\n"
+        f"b) Đối với Tổ TK&VV\n{du_lieu.get('nx_to', '.....')}\n\n"
+        f"c) Đối với tổ viên Tổ TK&VV\n{du_lieu.get('nx_to_vien', '.....')}"
+    )
+    doc.add_paragraph("2. Kiến nghị của Đoàn kiểm tra").runs[0].bold = True
+    doc.add_paragraph(
+        f"a) Đối với tổ chức CT-XH được kiểm tra\n{du_lieu.get('kn_ctxh', '.....')}\n\n"
+        f"b) Đối với Tổ TK&VV\n{du_lieu.get('kn_to', '.....')}\n\n"
+        f"c) Đối với tổ viên Tổ TK&VV\n{du_lieu.get('kn_to_vien', '.....')}\n\n"
+        f"d) Đối với NHCSXH\n{du_lieu.get('kn_nhcs', '.....')}\n\n"
+        f"đ) Đối với tổ chức CT-XH cấp trên\n{du_lieu.get('kn_cap_tren', '.....')}"
+    )
+    doc.add_paragraph("3. Kiến nghị của Đơn vị được kiểm tra").runs[0].bold = True
+    doc.add_paragraph(
+        f"a) Đối với NHCSXH\n.....\n\nb) Đối với tổ chức CT-XH cấp trên\n....."
+    )
+
+    # VI. Tài liệu kèm theo
+    p_vi = doc.add_paragraph("VI. TÀI LIỆU KÈM THEO (nếu có)")
+    p_vi.runs[0].bold = True
+    doc.add_paragraph(
+        f"1. Phiếu kiểm tra sử dụng vốn vay (mẫu 06/TD, 06A/TD): ............... phiếu.\n"
+        f"2. Danh sách đối chiếu (mẫu 15/TD): ...................... danh sách.\n"
+        f"3. Biên bản kiểm tra tổ chức CT-XH: {len(ds_bien_ban)} biên bản."
+    )
+
+    doc.add_paragraph()
+    ky = doc.add_table(rows=1, cols=1)
+    ky.style = "Table Grid"
+    _xoa_border_table(ky)
+    p_ky = ky.rows[0].cells[0].paragraphs[0]
+    p_ky.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    p_ky.add_run("TRƯỞNG ĐOÀN KIỂM TRA\n(Ký, ghi rõ họ tên)\n\n\n\n").bold = True
+    p_ky.add_run(du_lieu.get("truong_doan", ""))
+
+    buf = io.BytesIO()
+    doc.save(buf)
+    return buf.getvalue()
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # SUB-TAB RENDERERS
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1401,6 +1728,416 @@ def _render_bien_ban(df: pd.DataFrame, pgd_user: str) -> None:
     )
 
 
+def _render_bb_ct_cx(df: pd.DataFrame, pgd_user: str | None,
+                     username: str, role: str) -> None:
+    """Sub-tab 3 — Nhập + lưu Mẫu 02/BB-CT và 03/BB-CX với theo dõi tiến độ."""
+    st.markdown("#### 📝 Biên bản kiểm tra tổ chức CT-XH (Mẫu 02/BB-CT & 03/BB-CX)")
+    st.caption(
+        "Nhập kết quả kiểm tra và lưu vào hệ thống để theo dõi tiến độ xử lý kiến nghị. "
+        "Xuất Word/PDF trực tiếp từ dữ liệu đã lưu."
+    )
+
+    loai_sel = st.radio(
+        "Loại biên bản",
+        ["02/BB-CT — Tổ chức CT-XH cấp tỉnh", "03/BB-CX — Tổ chức CT-XH cấp xã"],
+        horizontal=True, key="bbct_loai",
+    )
+    cap = "tinh" if "CT" in loai_sel else "xa"
+    kv_prefix = "ut_bbct" if cap == "tinh" else "ut_bbcx"
+
+    c_nam, c_pgd = st.columns(2)
+    nam = int(c_nam.number_input(
+        "Năm", value=date.today().year,
+        min_value=2020, max_value=2035, step=1, key="bbct_nam",
+    ))
+
+    if pgd_user:
+        scope = pgd_user
+        c_pgd.info(f"Đơn vị: **{pgd_user}**")
+    else:
+        scope = c_pgd.selectbox(
+            "PGD / Đơn vị quản lý hồ sơ",
+            options=DS_PGD, key="bbct_pgd_sel",
+        )
+
+    slug = pgd_slug(scope) if scope else "cn"
+    kv_key = f"{kv_prefix}_{slug}_{nam}"
+
+    ds_luu: list = db.doc_kv(kv_key) or []
+
+    # ── Danh sách biên bản đã lưu ──────────────────────────────────────────
+    if ds_luu:
+        so_hieu_mau = "02/BB-CT" if cap == "tinh" else "03/BB-CX"
+        st.markdown(f"##### Biên bản {so_hieu_mau} đã lưu — {scope} ({nam})")
+        for bb in reversed(ds_luu):
+            tt = bb.get("trang_thai", "cho_xu_ly")
+            tt_label = {
+                "cho_xu_ly": "🔴 Chờ xử lý",
+                "da_xu_ly": "✅ Đã xử lý",
+                "khong_ton_tai": "🟢 Không tồn tại",
+            }.get(tt, tt)
+            ngay_str = bb.get("ngay_kt", "")
+            ten_dv = bb.get("ten_don_vi", "")
+            with st.expander(
+                f"[{so_hieu_mau}] {ngay_str} — {ten_dv} | {tt_label}"
+            ):
+                col_i1, col_i2 = st.columns(2)
+                col_i1.markdown(f"**Đơn vị KT:** {bb.get('don_vi_kt', '')}")
+                col_i1.markdown(f"**Trưởng đoàn:** {bb.get('truong_doan', '')}")
+                col_i2.markdown(f"**Đại diện được KT:** {bb.get('dai_dien_dc', '')}")
+                col_i2.markdown(f"**Hạn hoàn thành:** {bb.get('han_hoan_thanh', '')}")
+                if bb.get("kien_nghi"):
+                    st.markdown(f"**Kiến nghị:** {bb['kien_nghi']}")
+                if bb.get("ket_qua_xu_ly"):
+                    st.markdown(f"**Kết quả xử lý:** {bb['ket_qua_xu_ly']}")
+
+                rec_id = bb.get("id", "")
+                ten_file = (
+                    f"{'BB_CT' if cap == 'tinh' else 'BB_CX'}"
+                    f"_{ten_dv[:20].replace(' ', '_')}"
+                    f"_{ngay_str.replace('-', '')}"
+                )
+                ss_key = f"bbct_bytes_{rec_id}"
+                if st.button("📄 Tạo Word / PDF", key=f"bbct_gen_{rec_id}"):
+                    st.session_state[ss_key] = _tao_word_bb_ct_cx(
+                        bb, cap=bb.get("loai_cap", cap)
+                    )
+                if ss_key in st.session_state:
+                    docx_b = st.session_state[ss_key]
+                    col_e1, col_e2 = st.columns(2)
+                    with col_e1:
+                        st.download_button(
+                            "⬇️ Tải Word",
+                            data=docx_b,
+                            file_name=ten_file + ".docx",
+                            mime="application/vnd.openxmlformats-officedocument"
+                                 ".wordprocessingml.document",
+                            key=f"bbct_dl_{rec_id}",
+                        )
+                    with col_e2:
+                        pdf_b = docx_bytes_to_pdf(docx_b)
+                        if pdf_b:
+                            st.download_button(
+                                "⬇️ Tải PDF",
+                                data=pdf_b,
+                                file_name=ten_file + ".pdf",
+                                mime="application/pdf",
+                                key=f"bbct_pdf_{rec_id}",
+                            )
+        st.divider()
+
+    # ── Form nhập biên bản mới ─────────────────────────────────────────────
+    so_hieu_label = "02/BB-CT" if cap == "tinh" else "03/BB-CX"
+    st.markdown(f"##### Nhập biên bản {so_hieu_label} mới")
+
+    with st.form(f"form_bb_{cap}_moi", clear_on_submit=True):
+        st.markdown("**Thông tin chung**")
+        fc1, fc2 = st.columns(2)
+        dvut      = fc1.selectbox("Hội đoàn thể kiểm tra", DVUT_ORDER,  key=f"bbct_dvut_{cap}")
+        don_vi_kt = fc1.text_input("Tên đơn vị kiểm tra (đầy đủ)",      key=f"bbct_dvkt_{cap}")
+        ten_don_vi = fc1.text_input("Đơn vị được kiểm tra",              key=f"bbct_dvdc_{cap}",
+                                    placeholder="Hội ... xã/tỉnh ...")
+        ngay_kt    = fc2.date_input("Ngày kiểm tra", value=date.today(), key=f"bbct_ngay_{cap}")
+        truong_doan = fc2.text_input("Trưởng đoàn kiểm tra",             key=f"bbct_td_{cap}")
+        can_bo_2   = fc2.text_input("Cán bộ kiểm tra 2 (nếu có)",       key=f"bbct_cb2_{cap}")
+        dai_dien_dc = fc2.text_input("Đại diện đơn vị được kiểm tra",   key=f"bbct_dddc_{cap}")
+        chuc_vu_dc = fc2.text_input("Chức vụ đại diện",                  key=f"bbct_cvdc_{cap}")
+
+        st.markdown("**II. Kết quả thực hiện (theo Phụ lục I VB 727)**")
+        muc_list = [
+            ("tuyen_truyen",    "1. Công tác tuyên truyền, vận động"),
+            ("kiem_tra_giam_sat", "2. Công tác kiểm tra, giám sát"),
+            ("tap_huan",        "3. Công tác tập huấn"),
+            ("phoi_hop_nhcs",   "4. Hoạt động phối hợp với NHCSXH"),
+        ]
+        if cap == "tinh":
+            muc_list.append(("trach_nhiem", "5. Trách nhiệm của tổ chức CT-XH cấp tỉnh"))
+
+        nd_results: dict[str, dict] = {}
+        for field_key, ten_muc in muc_list:
+            st.markdown(f"*{ten_muc}*")
+            mc1, mc2 = st.columns(2)
+            kq = mc1.text_area("a) Kết quả", height=60, key=f"bbct_{field_key}_kq_{cap}")
+            tt_nd = mc2.text_area("b) Tồn tại", height=60, key=f"bbct_{field_key}_tt_{cap}")
+            nd_results[field_key] = {"ket_qua": kq, "ton_tai": tt_nd}
+
+        st.markdown("**III. Đánh giá, Nhận xét & Kiến nghị**")
+        ek1, ek2 = st.columns(2)
+        uu_diem     = ek1.text_area("Ưu điểm",        height=80, key=f"bbct_uu_{cap}")
+        ton_tai_ch  = ek2.text_area("Tồn tại chung",  height=80, key=f"bbct_tt_{cap}")
+        kien_nghi   = st.text_area("Kiến nghị",       height=80, key=f"bbct_kn_{cap}")
+
+        hk1, hk2 = st.columns(2)
+        han_ht = hk1.date_input("Hạn hoàn thành kiến nghị",
+                                  value=date.today(), key=f"bbct_han_{cap}")
+        tt_sel = hk2.selectbox(
+            "Trạng thái tồn tại",
+            options=["cho_xu_ly", "khong_ton_tai"],
+            format_func=lambda x: {
+                "cho_xu_ly": "🔴 Có tồn tại — chờ xử lý",
+                "khong_ton_tai": "🟢 Không có tồn tại",
+            }.get(x, x),
+            key=f"bbct_tt_select_{cap}",
+        )
+        y_kien = st.text_area("IV. Ý kiến đơn vị được kiểm tra", height=60,
+                               key=f"bbct_ykien_{cap}")
+        submitted = st.form_submit_button("💾 Lưu biên bản", type="primary")
+
+    if submitted:
+        new_id = uuid.uuid4().hex[:8]
+        record = {
+            "id":           new_id,
+            "kv_key":       kv_key,
+            "loai":         "CT" if cap == "tinh" else "CX",
+            "loai_cap":     cap,
+            "ngay_kt":      ngay_kt.strftime("%Y-%m-%d"),
+            "dvut":         dvut,
+            "don_vi_kt":    don_vi_kt,
+            "ten_don_vi":   ten_don_vi,
+            "truong_doan":  truong_doan,
+            "can_bo_2":     can_bo_2,
+            "dai_dien_dc":  dai_dien_dc,
+            "chuc_vu_dc":   chuc_vu_dc,
+            "dia_danh":     scope,
+            **nd_results,
+            "uu_diem":       uu_diem,
+            "ton_tai_chung": ton_tai_ch,
+            "kien_nghi":     kien_nghi,
+            "han_hoan_thanh": han_ht.strftime("%Y-%m-%d"),
+            "trang_thai":    tt_sel,
+            "y_kien_don_vi_dc": y_kien,
+            "ket_qua_xu_ly": "",
+            "ngay_cap_nhat": date.today().strftime("%Y-%m-%d"),
+            "nguoi_cap_nhat": username,
+        }
+        db.ghi_kv(kv_key, ds_luu + [record], username)
+        loai_str = "bb_ct" if cap == "tinh" else "bb_cx"
+        db.ghi_audit(username, f"luu_{loai_str}",
+                      f"Mẫu {'02/BB-CT' if cap == 'tinh' else '03/BB-CX'} — "
+                      f"{ten_don_vi} ngày {ngay_kt.strftime('%d/%m/%Y')}")
+        st.success(
+            f"✅ Đã lưu biên bản {'02/BB-CT' if cap == 'tinh' else '03/BB-CX'} — {ten_don_vi}"
+        )
+        st.rerun()
+
+
+def _render_theo_doi_bc_th(pgd_user: str | None,
+                            username: str, role: str) -> None:
+    """Sub-tab 7 — Theo dõi tiến độ xử lý kiến nghị + xuất Mẫu 04/BC-TH."""
+    st.markdown("#### 📊 Theo dõi tiến độ & Báo cáo tổng hợp (Mẫu 04/BC-TH)")
+
+    # ── Section 1: Theo dõi ────────────────────────────────────────────────
+    st.markdown("##### I. Theo dõi tiến độ xử lý kiến nghị")
+
+    tc1, tc2, tc3 = st.columns(3)
+    nam_td = int(tc1.number_input(
+        "Năm", value=date.today().year,
+        min_value=2020, max_value=2035, step=1, key="td_nam",
+    ))
+    loai_td = tc2.selectbox(
+        "Loại", ["Tất cả", "BB-CT (cấp tỉnh)", "BB-CX (cấp xã)"], key="td_loai"
+    )
+    tt_td = tc3.selectbox(
+        "Trạng thái",
+        ["Tất cả", "Chờ xử lý", "Đã xử lý", "Không tồn tại"],
+        key="td_tt",
+    )
+
+    # Load records
+    all_records: list[dict] = []
+    if pgd_user:
+        slug = pgd_slug(pgd_user)
+        for pref in ["ut_bbct", "ut_bbcx"]:
+            recs = db.doc_kv(f"{pref}_{slug}_{nam_td}") or []
+            all_records.extend(recs)
+    else:
+        for pref in ["ut_bbct", "ut_bbcx"]:
+            all_kv: dict = db.doc_kv_prefix(f"{pref}_") or {}
+            for key, recs in all_kv.items():
+                if key.endswith(f"_{nam_td}") and isinstance(recs, list):
+                    all_records.extend(recs)
+
+    # Filter theo loại
+    if "BB-CT" in loai_td:
+        all_records = [r for r in all_records if r.get("loai") == "CT"]
+    elif "BB-CX" in loai_td:
+        all_records = [r for r in all_records if r.get("loai") == "CX"]
+
+    # Filter theo trạng thái
+    tt_map = {"Chờ xử lý": "cho_xu_ly", "Đã xử lý": "da_xu_ly",
+              "Không tồn tại": "khong_ton_tai"}
+    if tt_td != "Tất cả":
+        all_records = [r for r in all_records if r.get("trang_thai") == tt_map.get(tt_td)]
+
+    if not all_records:
+        st.info("Chưa có biên bản nào trong kỳ này.")
+    else:
+        rows = []
+        for r in sorted(all_records, key=lambda x: x.get("ngay_kt", ""), reverse=True):
+            tt = r.get("trang_thai", "cho_xu_ly")
+            tt_label = {
+                "cho_xu_ly": "🔴 Chờ xử lý",
+                "da_xu_ly": "✅ Đã xử lý",
+                "khong_ton_tai": "🟢 Không tồn tại",
+            }.get(tt, tt)
+            mau_so = "02/BB-CT" if r.get("loai") == "CT" else "03/BB-CX"
+            kn_text = r.get("kien_nghi") or ""
+            rows.append({
+                "ID": r.get("id", ""),
+                "Mẫu số": mau_so,
+                "Ngày KT": r.get("ngay_kt", ""),
+                "Đơn vị được KT": r.get("ten_don_vi", ""),
+                "Kiến nghị": kn_text[:80] + "..." if len(kn_text) > 80 else kn_text,
+                "Hạn hoàn thành": r.get("han_hoan_thanh", ""),
+                "Trạng thái": tt_label,
+                "Kết quả xử lý": r.get("ket_qua_xu_ly", ""),
+            })
+        df_td = pd.DataFrame(rows)
+        st.dataframe(
+            df_td.drop(columns=["ID"]),
+            use_container_width=True, hide_index=True,
+        )
+
+        # Cập nhật trạng thái (chỉ CN role)
+        if la_phan_he_cn(role):
+            st.markdown("**Cập nhật trạng thái xử lý:**")
+            cho_xu_ly = [r for r in all_records if r.get("trang_thai") == "cho_xu_ly"]
+            if not cho_xu_ly:
+                st.success("✅ Tất cả kiến nghị đã được xử lý.")
+            else:
+                opt_map = {
+                    f"{r.get('ngay_kt','')} — {r.get('ten_don_vi','')} [{r.get('id','')}]": r
+                    for r in cho_xu_ly
+                }
+                chon_label = st.selectbox(
+                    "Chọn biên bản cần cập nhật",
+                    options=[""] + list(opt_map.keys()),
+                    key="td_chon_label",
+                )
+                if chon_label:
+                    target = opt_map[chon_label]
+                    ket_qua_xl = st.text_area(
+                        "Kết quả xử lý", height=60, key="td_kq_xl"
+                    )
+                    if st.button("✅ Đánh dấu đã xử lý", key="td_btn_xl"):
+                        kv_key_t = target.get("kv_key", "")
+                        if kv_key_t:
+                            ds_cur = db.doc_kv(kv_key_t) or []
+                            updated = [
+                                {**rec,
+                                 "trang_thai": "da_xu_ly",
+                                 "ket_qua_xu_ly": ket_qua_xl,
+                                 "ngay_cap_nhat": date.today().strftime("%Y-%m-%d"),
+                                 "nguoi_cap_nhat": username}
+                                if rec.get("id") == target.get("id")
+                                else rec
+                                for rec in ds_cur
+                            ]
+                            db.ghi_kv(kv_key_t, updated, username)
+                            db.ghi_audit(
+                                username, "cap_nhat_trang_thai_bb",
+                                f"ID {target.get('id')} — {target.get('ten_don_vi','')} → Đã xử lý"
+                            )
+                            st.success("✅ Đã cập nhật trạng thái!")
+                            st.rerun()
+
+    st.divider()
+
+    # ── Section 2: Xuất BC-TH ──────────────────────────────────────────────
+    st.markdown("##### II. Xuất Báo cáo tổng hợp (Mẫu 04/BC-TH)")
+
+    all_for_bc: list[dict] = []
+    if pgd_user:
+        slug = pgd_slug(pgd_user)
+        for pref in ["ut_bbct", "ut_bbcx"]:
+            recs = db.doc_kv(f"{pref}_{slug}_{nam_td}") or []
+            all_for_bc.extend(recs)
+    else:
+        for pref in ["ut_bbct", "ut_bbcx"]:
+            all_kv2: dict = db.doc_kv_prefix(f"{pref}_") or {}
+            for key, recs in all_kv2.items():
+                if key.endswith(f"_{nam_td}") and isinstance(recs, list):
+                    all_for_bc.extend(recs)
+
+    if not all_for_bc:
+        st.info("Không có biên bản nào để lập báo cáo tổng hợp.")
+        return
+
+    opt_bc = {
+        f"[{'02/BB-CT' if r.get('loai')=='CT' else '03/BB-CX'}] "
+        f"{r.get('ngay_kt','')} — {r.get('ten_don_vi','')}": r
+        for r in all_for_bc
+    }
+    chon_bc = st.multiselect(
+        "Chọn biên bản đưa vào báo cáo tổng hợp",
+        options=list(opt_bc.keys()), key="bcth_chon",
+    )
+    if not chon_bc:
+        st.info("Chọn ít nhất 1 biên bản để tạo báo cáo.")
+        return
+
+    ds_chon = [opt_bc[k] for k in chon_bc]
+
+    with st.form("form_bc_th"):
+        st.markdown("**Thông tin báo cáo:**")
+        bc1, bc2 = st.columns(2)
+        don_vi_kt_bc  = bc1.text_input("Đơn vị kiểm tra", key="bcth_dvkt")
+        truong_doan_bc = bc1.text_input("Trưởng đoàn kiểm tra", key="bcth_td")
+        cap_uy        = bc1.text_input("Cấp ủy, chính quyền tham dự (nếu có)", key="bcth_capuy")
+        dia_danh_bc   = bc2.text_input("Địa danh ký", placeholder="Biên Hòa", key="bcth_dd")
+        ngay_bc       = bc2.date_input("Ngày báo cáo", value=date.today(), key="bcth_ngay")
+        noi_dung_kt   = st.text_area(
+            "III. Nội dung kiểm tra",
+            value="Theo Phụ lục I văn bản số 727/HD-NHCS ngày 11/02/2026.",
+            height=60, key="bcth_ndkt",
+        )
+        st.markdown("**IV. Đánh giá & Kiến nghị:**")
+        r1, r2 = st.columns(2)
+        nx_ctxh    = r1.text_area("Nhận xét đối với CT-XH",       height=60, key="bcth_nx_ctxh")
+        nx_to      = r2.text_area("Nhận xét đối với Tổ TK&VV",    height=60, key="bcth_nx_to")
+        nx_to_vien = r1.text_area("Nhận xét đối với tổ viên",     height=60, key="bcth_nx_tov")
+        kn_ctxh    = r2.text_area("Kiến nghị với CT-XH",          height=60, key="bcth_kn_ctxh")
+        kn_nhcs    = r1.text_area("Kiến nghị với NHCSXH",         height=60, key="bcth_kn_nhcs")
+        kn_cap_tren = r2.text_area("Kiến nghị với CT-XH cấp trên", height=60, key="bcth_kn_ct")
+        submitted_bc = st.form_submit_button("📄 Tạo Báo cáo tổng hợp Word", type="primary")
+
+    if submitted_bc:
+        du_lieu_bc = {
+            "don_vi_kt": don_vi_kt_bc, "truong_doan": truong_doan_bc,
+            "dia_danh": dia_danh_bc, "ngay_bc": ngay_bc, "cap_uy": cap_uy,
+            "noi_dung_kt": noi_dung_kt,
+            "nx_ctxh": nx_ctxh, "nx_to": nx_to, "nx_to_vien": nx_to_vien,
+            "kn_ctxh": kn_ctxh, "kn_nhcs": kn_nhcs, "kn_cap_tren": kn_cap_tren,
+        }
+        with st.spinner("Đang tạo file..."):
+            docx_bytes = _tao_word_bc_th(du_lieu_bc, ds_chon)
+        ten_file = f"BaoCaoTH_UyThac_{nam_td}"
+        bc_c1, bc_c2 = st.columns(2)
+        with bc_c1:
+            st.download_button(
+                "⬇️ Tải Word (.docx)",
+                data=docx_bytes,
+                file_name=ten_file + ".docx",
+                mime="application/vnd.openxmlformats-officedocument"
+                     ".wordprocessingml.document",
+                key="bcth_dl_docx",
+            )
+        with bc_c2:
+            pdf_bc = docx_bytes_to_pdf(docx_bytes)
+            if pdf_bc:
+                st.download_button(
+                    "⬇️ Tải PDF",
+                    data=pdf_bc,
+                    file_name=ten_file + ".pdf",
+                    mime="application/pdf",
+                    key="bcth_dl_pdf",
+                )
+            else:
+                st.caption("⚠️ PDF không khả dụng — cần MS Word trên server")
+        db.ghi_audit(username, "xuat_bc_th",
+                      f"Báo cáo tổng hợp năm {nam_td} — {len(ds_chon)} biên bản")
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # ENTRY POINT
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1412,6 +2149,8 @@ def render(tab: DeltaGenerator, **kwargs) -> None:
     ctx = TabContext(tab, **kwargs)
     df       = kwargs.get("df")
     pgd_user = ctx.pgd_user
+    username = kwargs.get("username", "unknown")
+    role     = normalize_role(str(kwargs.get("role", "user") or "user"))
 
     with ctx:
         st.subheader("🤝 Ủy thác — Hội đoàn thể")
@@ -1419,16 +2158,19 @@ def render(tab: DeltaGenerator, **kwargs) -> None:
             "Theo dõi hoạt động ủy thác và các mẫu biểu kiểm tra "
             "theo văn bản 727/HD-NHCS."
         )
-        sub1, sub2, sub3, sub4, sub5 = st.tabs([
+        sub1, sub2, sub3, sub4, sub5, sub6, sub7 = st.tabs([
             "📊 Theo Hội đoàn thể",
-            "📋 Kế hoạch kiểm tra",
+            "📋 Kế hoạch (01/KH)",
+            "📝 Biên bản CT-XH",
             "📋 Mẫu 06/TD & 06A/TD",
             "📋 Mẫu 15/TD",
             "📋 Biên bản & Báo cáo",
+            "📊 Theo dõi & BC-TH",
         ])
         with sub1: _render_theo_dvut(df)
         with sub2: _render_ke_hoach(df, pgd_user)
-        with sub3: _render_mau06(df, pgd_user)
-        with sub4: _render_mau15(df, pgd_user)
-        with sub5:
-            _render_bien_ban(df, pgd_user)
+        with sub3: _render_bb_ct_cx(df, pgd_user, username, role)
+        with sub4: _render_mau06(df, pgd_user)
+        with sub5: _render_mau15(df, pgd_user)
+        with sub6: _render_bien_ban(df, pgd_user)
+        with sub7: _render_theo_doi_bc_th(pgd_user, username, role)

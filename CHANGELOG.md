@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## [2026-05-20] — Sửa rule check_conventions sai toán + cập nhật CLAUDE.md tiền tệ
+- `scripts/check_conventions.py` — xóa rule `_TIEN_SAI` cấm `/1e9`: rule sai về toán (1 tỷ = 1e9, `fmt_ty()` chia 1e6 → triệu, không phải tỷ)
+- `CLAUDE.md` — sửa bảng tiền tệ: tách rõ `fmt_ty()` (bảng /1e6 → triệu đồng) vs `vn(x/1e9,3)+"tỷ"` (metric/card inline)
+
 ## [2026-05-20] — Header 2 dòng cho bảng Cơ cấu dư nợ theo chương trình tín dụng
 - `tabs/tab_tongquan.py` dòng ~767 — thêm `column_config` với `TextColumn(label="Dư nợ\n(triệu đồng)")` cho 8 cột tiền tệ, giảm độ rộng cột bằng cách tách đơn vị xuống dòng 2
 

@@ -38,6 +38,7 @@ services/
   khtd_service.py           ← giao & điều chỉnh KHTD
   kiem_soat_service.py      ← kiểm soát Chi nhánh
 tabs/tab_*.py               ← mỗi file = 1 tab UI
+tabs/tab_khnv_noi_bo.py     ← Quản lý nội bộ Phòng KH-NV
 workspaces/
   ws_executive.py           ← BGĐ — chỉ đọc
   ws_management.py          ← Phòng KH-NV — toàn CN
@@ -275,6 +276,8 @@ db.ghi_kv("key", value, username)   # ghi
 | `dgd_map` | Điểm giao dịch toàn CN |
 | `kh_gqvl_cn_{nam}` | KH GQVL Chi nhánh |
 | `kh_gqvl_pgd_{slug}_{nam}` | KH GQVL theo PGD |
+| `khnv_phan_cong_list` | Phân công cán bộ nội bộ Phòng KH-NV |
+| `khnv_lich_list` | Lịch công tác Phòng KH-NV |
 
 `slug` = `pgd_slug(ten_pgd)` từ `data/pgd.py`
 

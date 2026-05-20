@@ -2,11 +2,12 @@
 1. Phân công cán bộ
 2. Lịch công tác
 3. Báo cáo cấp trên (wrapper)
-4. Giao việc PGD (wrapper)
+4. Tiến độ thực hiện (tổng hợp tự động từ Phân công cán bộ)
 """
 
 from uuid import uuid4
 from datetime import date, datetime, timedelta
+from collections import defaultdict
 
 import streamlit as st
 import pandas as pd
@@ -15,7 +16,7 @@ from auth import normalize_role, la_phan_he_cn
 from db import doc_kv, ghi_kv, ghi_audit
 from utils import get_tab_context
 from components.export_pdf import xuat_pdf_co_chart, download_pdf_button
-from tabs import tab_checklist_bc, tab_tien_do
+from tabs import tab_checklist_bc
 
 LOAI_LICH = {
     "hop": "🗓️ Họp",
@@ -425,12 +426,198 @@ def _render_lich_cong_tac(tab, role_n: str, username: str):
 
 
 # ──────────────────────────────────────────────
+# SUB-TAB 4: 📊 Tiến độ thực hiện
+# ──────────────────────────────────────────────
+
+
+def _render_tien_do_thuc_hien(tab, role_n: str, username: str):
+    """Tổng hợp tiến độ thực hiện cán bộ — tự động từ dữ liệu Phân công cán bộ."""
+    today = date.today()
+    ds = _doc_ds(KHNV_PHAN_CONG)
+
+    st.markdown("### 📊 Tiến độ thực hiện cán bộ Phòng KH-NV")
+
+    # ── Bộ lọc ──
+    col_f1, col_f2, col_f3 = st.columns([1, 1, 2])
+    with col_f1:
+        thang_opt = ["Tất cả"] + list(range(1, 13))
+        thang_loc = st.selectbox(
+            "Tháng (deadline)", thang_opt,
+            index=today.month,  # mặc định = tháng hiện tại
+            format_func=lambda x: "Tất cả" if x == "Tất cả" else f"Tháng {x}",
+            key="td_thang",
+        )
+    with col_f2:
+        nam_opts = list(range(today.year - 1, today.year + 2))
+        nam_loc = st.selectbox(
+            "Năm", nam_opts, index=nam_opts.index(today.year), key="td_nam",
+        )
+    with col_f3:
+        ds_nguoi = sorted({c.get("nguoi_thuc_hien", "") for c in ds if c.get("nguoi_thuc_hien")})
+        nguoi_loc = st.selectbox("Cán bộ", ["Tất cả"] + ds_nguoi, key="td_nguoi")
+
+    # ── Lọc ──
+    ds_loc = list(ds)
+    if thang_loc != "Tất cả":
+        filtered = []
+        for c in ds_loc:
+            try:
+                dl = date.fromisoformat(c.get("ngay_deadline", ""))
+                if dl.month == int(thang_loc) and dl.year == nam_loc:
+                    filtered.append(c)
+            except (ValueError, TypeError):
+                pass
+        ds_loc = filtered
+    if nguoi_loc != "Tất cả":
+        ds_loc = [c for c in ds_loc if c.get("nguoi_thuc_hien") == nguoi_loc]
+
+    # ── Tổng hợp per-person ──
+    stats: dict = defaultdict(lambda: {
+        "total": 0, "hoan_thanh": 0, "dang_lam": 0, "chua_lam": 0, "tre_han": 0,
+    })
+    for c in ds_loc:
+        nguoi = c.get("nguoi_thuc_hien") or "Không rõ"
+        tt = c.get("trang_thai", "chua_lam")
+        stats[nguoi]["total"] += 1
+
+        is_overdue = False
+        if tt in ("chua_lam", "dang_lam"):
+            try:
+                dl = date.fromisoformat(c.get("ngay_deadline", ""))
+                is_overdue = dl < today
+            except (ValueError, TypeError):
+                pass
+
+        if tt == "hoan_thanh":
+            stats[nguoi]["hoan_thanh"] += 1
+        elif tt == "tre_han" or is_overdue:
+            stats[nguoi]["tre_han"] += 1
+        elif tt == "dang_lam":
+            stats[nguoi]["dang_lam"] += 1
+        else:
+            stats[nguoi]["chua_lam"] += 1
+
+    # Build summary DataFrame
+    rows = []
+    for nguoi, s in sorted(stats.items()):
+        pct = round(s["hoan_thanh"] / s["total"] * 100, 1) if s["total"] else 0.0
+        rows.append({
+            "Cán bộ": nguoi,
+            "Tổng": s["total"],
+            "✅ Xong": s["hoan_thanh"],
+            "🟡 Đang làm": s["dang_lam"],
+            "🔴 Chưa làm": s["chua_lam"],
+            "⛔ Trễ hạn": s["tre_han"],
+            "Tỷ lệ (%)": pct,
+        })
+    df_summary = pd.DataFrame(rows) if rows else pd.DataFrame()
+
+    # ── Nút Xuất PDF — luôn hiển thị ──
+    col_pdf, _ = st.columns([1, 5])
+    with col_pdf:
+        if not df_summary.empty:
+            _pdf_bytes = xuat_pdf_co_chart(
+                df_summary, "Tiến độ thực hiện cán bộ Phòng KH-NV", username,
+                them_dong_tong=False, cols_tien=None,
+            )
+            download_pdf_button(_pdf_bytes, "tien_do_can_bo.pdf",
+                                "📥 Xuất PDF", key="td_pdf")
+        else:
+            st.button("📥 Xuất PDF", disabled=True, key="td_pdf_dis",
+                      use_container_width=True)
+
+    if not ds:
+        st.info("ℹ️ Chưa có việc nào. Hãy giao việc trong tab 📋 Phân công cán bộ trước.")
+        return
+    if not ds_loc:
+        st.info("ℹ️ Không có dữ liệu phù hợp với bộ lọc đã chọn.")
+        return
+
+    # ── Metrics tổng quan ──
+    total_all  = sum(s["total"]       for s in stats.values())
+    ht_all     = sum(s["hoan_thanh"]  for s in stats.values())
+    dl_all     = sum(s["dang_lam"]    for s in stats.values())
+    tre_all    = sum(s["tre_han"]     for s in stats.values())
+    pct_all    = round(ht_all / total_all * 100, 1) if total_all else 0.0
+
+    m1, m2, m3, m4, m5 = st.columns(5)
+    m1.metric("📋 Tổng việc",    total_all)
+    m2.metric("✅ Hoàn thành",   ht_all)
+    m3.metric("🟡 Đang làm",    dl_all)
+    m4.metric("⛔ Trễ hạn",     tre_all,
+              delta=f"-{tre_all}" if tre_all else None,
+              delta_color="inverse")
+    m5.metric("📈 Tỷ lệ chung", f"{pct_all}%")
+
+    st.divider()
+
+    # ── Progress bars từng cán bộ ──
+    st.markdown("#### Tiến độ từng cán bộ")
+
+    bars_html = ""
+    for row in rows:
+        nguoi = row["Cán bộ"]
+        pct   = row["Tỷ lệ (%)"]
+        ht    = row["✅ Xong"]
+        total = row["Tổng"]
+        tre   = row["⛔ Trễ hạn"]
+        dl_   = row["🟡 Đang làm"]
+        cl    = row["🔴 Chưa làm"]
+
+        if pct == 100:
+            bar_color = "#22c55e"   # xanh lá
+        elif pct >= 70:
+            bar_color = "#3b82f6"   # xanh dương
+        elif pct >= 30:
+            bar_color = "#f59e0b"   # cam
+        else:
+            bar_color = "#ef4444"   # đỏ
+
+        alert_badge = (
+            f'<span style="background:#fee2e2;color:#b91c1c;'
+            f'font-size:0.75rem;padding:1px 7px;border-radius:999px;'
+            f'font-weight:700;margin-left:6px">⛔ {tre} trễ</span>'
+            if tre > 0 else ""
+        )
+        stats_txt = (
+            f'<span>✅ {ht} xong</span>'
+            f'<span style="margin-left:10px">🟡 {dl_} làm</span>'
+            f'<span style="margin-left:10px">🔴 {cl} chưa</span>'
+            + (f'<span style="margin-left:10px;color:#b91c1c;font-weight:600">⛔ {tre} trễ</span>' if tre > 0 else "")
+        )
+        bars_html += f"""
+        <div style="margin:12px 0 4px">
+          <div style="display:flex;align-items:center;margin-bottom:4px">
+            <span style="font-weight:700;font-size:0.97rem">{nguoi}</span>
+            {alert_badge}
+            <span style="margin-left:auto;font-size:0.85rem;opacity:0.7">{ht}/{total} &nbsp;({pct}%)</span>
+          </div>
+          <div style="background:#e5e7eb;border-radius:6px;height:14px;overflow:hidden">
+            <div style="background:{bar_color};width:{pct}%;height:100%;border-radius:6px"></div>
+          </div>
+          <div style="display:flex;gap:0;margin-top:4px;font-size:0.79rem;opacity:0.7">
+            {stats_txt}
+          </div>
+        </div>
+        """
+    st.markdown(bars_html, unsafe_allow_html=True)
+
+    st.divider()
+
+    # ── Bảng chi tiết ──
+    st.markdown("#### Bảng chi tiết")
+    df_display = df_summary.copy()
+    df_display["Tỷ lệ (%)"] = df_display["Tỷ lệ (%)"].apply(lambda x: f"{x:.1f}%")
+    st.dataframe(df_display, hide_index=True, use_container_width=True)
+
+
+# ──────────────────────────────────────────────
 # RENDER CHÍNH
 # ──────────────────────────────────────────────
 
 
 def render(tab=None, **kwargs):
-    """4 sub-tab: Phân công cán bộ, Lịch công tác, Báo cáo cấp trên, Giao việc PGD.
+    """4 sub-tab: Phân công cán bộ, Lịch công tác, Báo cáo cấp trên, Tiến độ thực hiện.
 
     Chỉ khả dụng cho phòng KH-NV (admin_cn, manager_cn, chuyenvien_cn, executive).
     """
@@ -448,7 +635,7 @@ def render(tab=None, **kwargs):
             "📋 Phân công cán bộ",
             "📅 Lịch công tác",
             "📤 Báo cáo cấp trên",
-            "📌 Giao việc PGD",
+            "📊 Tiến độ thực hiện",
         ])
         with t1:
             _render_phan_cong(t1, role_n, username)
@@ -457,4 +644,4 @@ def render(tab=None, **kwargs):
         with t3:
             tab_checklist_bc.render(t3, **kwargs)
         with t4:
-            tab_tien_do.render(t4, **kwargs)
+            _render_tien_do_thuc_hien(t4, role_n, username)

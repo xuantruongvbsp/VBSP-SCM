@@ -434,3 +434,4 @@ Thêm lên ĐẦU FILE, dùng ngày thực tế, KHÔNG xóa entry cũ.
 | `ARCHITECTURE.md` | Quan hệ import giữa các module |
 | `TROUBLESHOOTING.md` | Lỗi vận hành thường gặp |
 | `CHANGELOG.md` | Lịch sử thay đổi |
+| `BACKLOG.md` | Yêu cầu người dùng — đã làm & sẽ làm |

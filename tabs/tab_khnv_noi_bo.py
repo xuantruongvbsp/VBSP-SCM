@@ -43,6 +43,50 @@ _UU_TIEN_LABEL = {
 KHNV_PHAN_CONG = "khnv_phan_cong_list"
 KHNV_LICH = "khnv_lich_list"
 
+# 32 đầu việc mẫu — Bảng giao việc Trưởng phòng KH-NVTD
+_MAU_GIAO_VIEC = [
+    # I. CÔNG TÁC QUẢN LÝ CHUNG & ĐIỀU HÀNH
+    {"tieu_de": "Tổng hợp kế hoạch công tác tháng của Phòng, báo cáo Trưởng phòng",                          "nguoi_thuc_hien": "Phó phòng (VP 1)",                      "mo_ta": "⏱ 25 hàng tháng · 📄 Dự thảo kế hoạch"},
+    {"tieu_de": "Theo dõi, đôn đốc tiến độ công việc; tổng hợp phiếu giao việc",                             "nguoi_thuc_hien": "Phó phòng (VP 1)",                      "mo_ta": "⏱ Hàng tuần · 📄 Báo cáo chiều thứ Sáu"},
+    {"tieu_de": "Phân công cán bộ đi giao dịch xã theo lịch cố định",                                        "nguoi_thuc_hien": "Phó phòng (VP 1)",                      "mo_ta": "⏱ Trước 20 hàng tháng · 📄 Danh sách phân công"},
+    {"tieu_de": "Kiểm soát, ký nháy các văn bản do Phòng soạn thảo",                                         "nguoi_thuc_hien": "Phó phòng (VP 1 & VP 2)",               "mo_ta": "⏱ Trong ngày · 📄 Văn bản trình Giám đốc"},
+    # II. CÔNG TÁC TÍN DỤNG & CHO VAY
+    {"tieu_de": "Thẩm định và phê duyệt các khoản vay theo phân quyền trên hệ thống Intellect",              "nguoi_thuc_hien": "Phó phòng (VP 1)",                      "mo_ta": "⏱ Trong 2 ngày kể từ khi nhận hồ sơ · 📄 Kết quả thẩm định"},
+    {"tieu_de": "Tổng hợp nhu cầu vay vốn hộ nghèo, cận nghèo, đối tượng chính sách tại địa bàn TP",        "nguoi_thuc_hien": "Phó phòng (VP 1)",                      "mo_ta": "⏱ Hàng quý · 📄 Báo cáo đề xuất bổ sung vốn"},
+    {"tieu_de": "Triển khai cho vay: HTTVL, hộ nghèo, cận nghèo, nhà ở xã hội, HS-SV, XKLĐ,...",            "nguoi_thuc_hien": "Cán bộ TD (theo địa bàn)",              "mo_ta": "⏱ Theo kế hoạch giải ngân · 📄 Hồ sơ giải ngân đúng quy trình"},
+    {"tieu_de": "Tập hợp, kiểm tra hồ sơ vay từ Tổ TK&VV, trình lãnh đạo phê duyệt",                        "nguoi_thuc_hien": "Cán bộ TD",                             "mo_ta": "⏱ Hàng tuần · 📄 Hồ sơ hợp lệ"},
+    {"tieu_de": "Xây dựng kế hoạch tín dụng năm của các xã, phường, trình Trưởng BĐD HĐQT TP phê duyệt",    "nguoi_thuc_hien": "Phó phòng (VP 1)",                      "mo_ta": "⏱ Quý IV hàng năm · 📄 Kế hoạch được phê duyệt"},
+    # III. CÔNG TÁC NGUỒN VỐN & QUỸ
+    {"tieu_de": "Theo dõi biến động quỹ an toàn chi trả, đề xuất bổ sung hoặc điều chuyển",                  "nguoi_thuc_hien": "Phó phòng (VP 2)",                      "mo_ta": "⏱ Hàng ngày · 📄 Điện chuyển vốn kịp thời"},
+    {"tieu_de": "Huy động tiền gửi tiết kiệm từ tổ chức, cá nhân trên địa bàn",                              "nguoi_thuc_hien": "Phó phòng (VP 2) + Cán bộ TD",          "mo_ta": "⏱ Hàng tháng · 📄 Báo cáo kết quả huy động"},
+    {"tieu_de": "Quản lý nguồn vốn nhận ủy thác từ UBND tỉnh, các tổ chức",                                  "nguoi_thuc_hien": "Phó phòng (VP 2)",                      "mo_ta": "⏱ Thường xuyên · 📄 Sổ theo dõi, báo cáo đối chiếu"},
+    # IV. XỬ LÝ NỢ RỦI RO & QUẢN LÝ NỢ
+    {"tieu_de": "Hướng dẫn, đôn đốc các đơn vị lập hồ sơ xử lý nợ rủi ro",                                  "nguoi_thuc_hien": "Phó phòng (VP 2)",                      "mo_ta": "⏱ Theo phát sinh · 📄 Hồ sơ đầy đủ, đúng quy định"},
+    {"tieu_de": "Kiểm tra, tổng hợp hồ sơ nợ rủi ro toàn tỉnh, trình cấp thẩm quyền",                       "nguoi_thuc_hien": "Phó phòng (VP 2)",                      "mo_ta": "⏱ Hàng quý · 📄 Tờ trình kèm hồ sơ"},
+    {"tieu_de": "Thông báo công khai kết quả xử lý nợ rủi ro tại địa bàn thành phố",                         "nguoi_thuc_hien": "Phó phòng (VP 2)",                      "mo_ta": "⏱ Sau khi được phê duyệt · 📄 Biên bản, thông báo"},
+    {"tieu_de": "Đôn đốc thu nợ đến hạn, quá hạn; lập danh sách nợ chây ỳ",                                  "nguoi_thuc_hien": "Cán bộ TD",                             "mo_ta": "⏱ Hàng tháng · 📄 Báo cáo nợ chi tiết"},
+    # V. ỦY THÁC QUA TỔ CHỨC CT-XH & TỔ TK&VV
+    {"tieu_de": "Tham mưu ký Văn bản liên tịch, Hợp đồng ủy thác với các tổ chức CT-XH",                    "nguoi_thuc_hien": "Phó phòng (VP 1)",                      "mo_ta": "⏱ Khi có thay đổi · 📄 Hợp đồng đã ký"},
+    {"tieu_de": "Tổ chức họp giao ban với các tổ chức CT-XH cấp tỉnh, thành phố",                            "nguoi_thuc_hien": "Phó phòng (VP 2)",                      "mo_ta": "⏱ Định kỳ (2 tháng/lần) · 📄 Biên bản, thông báo kết luận"},
+    {"tieu_de": "Đánh giá chất lượng hoạt động Tổ TK&VV; đề xuất củng cố tổ yếu kém",                       "nguoi_thuc_hien": "Cán bộ TD (theo địa bàn)",              "mo_ta": "⏱ Hàng tháng · 📄 Bảng xếp loại Tổ"},
+    {"tieu_de": "Tham gia sinh hoạt Tổ TK&VV theo lịch; kiểm tra sổ sách của Tổ",                            "nguoi_thuc_hien": "Cán bộ TD",                             "mo_ta": "⏱ Hàng tháng · 📄 Biên bản kiểm tra"},
+    # VI. GIAO DỊCH XÃ & KIỂM TRA CƠ SỞ
+    {"tieu_de": "Tham mưu tổ chức phiên giao dịch xã đúng lịch, an toàn",                                    "nguoi_thuc_hien": "Phó phòng (VP 1)",                      "mo_ta": "⏱ Theo lịch cố định · 📄 Báo cáo sau phiên giao dịch"},
+    {"tieu_de": "Kiểm tra, giám sát hoạt động tại Điểm giao dịch xã; tỷ lệ giải ngân, thu nợ, thu lãi",      "nguoi_thuc_hien": "Phó phòng (VP 1) + Cán bộ TD",          "mo_ta": "⏱ Hàng quý · 📄 Báo cáo đánh giá"},
+    {"tieu_de": "Kiểm tra sử dụng vốn vay 100% món vay trong vòng 30 ngày sau giải ngân",                    "nguoi_thuc_hien": "Cán bộ TD",                             "mo_ta": "⏱ Hàng tháng · 📄 Mẫu 06/TD"},
+    {"tieu_de": "Mở hòm thư góp ý, tổng hợp ý kiến khách hàng tại Điểm giao dịch xã",                       "nguoi_thuc_hien": "Cán bộ TD",                             "mo_ta": "⏱ Hàng tháng · 📄 Báo cáo tham mưu giải quyết"},
+    # VII. BÁO CÁO THỐNG KÊ & TỔNG HỢP
+    {"tieu_de": "Tổng hợp báo cáo thống kê tín dụng toàn tỉnh gửi NHCSXH TW, NHNN, các sở ngành",           "nguoi_thuc_hien": "Phó phòng (VP 2)",                      "mo_ta": "⏱ Trước ngày 10 hàng tháng · 📄 Báo cáo đầy đủ biểu"},
+    {"tieu_de": "Dự thảo Nghị quyết, báo cáo kết quả hoạt động của BĐD HĐQT tỉnh",                          "nguoi_thuc_hien": "Phó phòng (VP 2)",                      "mo_ta": "⏱ Theo kỳ họp · 📄 Nghị quyết trình ký"},
+    {"tieu_de": "Kiểm soát, chỉnh sửa các cảnh báo trên chương trình TTBC-IMS",                              "nguoi_thuc_hien": "Cán bộ TD",                             "mo_ta": "⏱ Hàng tuần · 📄 Báo cáo kết quả chỉnh sửa"},
+    {"tieu_de": "Chấm điểm 05 chuyên đề thi đua của chi nhánh",                                              "nguoi_thuc_hien": "Phó phòng (VP 1)",                      "mo_ta": "⏱ Hàng quý · 📄 Bảng chấm điểm"},
+    # VIII. ĐÀO TẠO, TẬP HUẤN & CÔNG TÁC KHÁC
+    {"tieu_de": "Dự thảo kế hoạch, tài liệu tập huấn nghiệp vụ cho cán bộ trong và ngoài ngành",             "nguoi_thuc_hien": "Phó phòng (VP 2)",                      "mo_ta": "⏱ Quý II hàng năm · 📄 Kế hoạch, tài liệu"},
+    {"tieu_de": "Tham gia tập huấn, bồi dưỡng nghiệp vụ khi được phân công",                                 "nguoi_thuc_hien": "Cán bộ TD",                             "mo_ta": "⏱ Theo yêu cầu · 📄 Giấy chứng nhận (nếu có)"},
+    {"tieu_de": "Làm thư ký giúp việc cho thành viên BĐD HĐQT các cấp khi kiểm tra địa bàn",                 "nguoi_thuc_hien": "Phó phòng (VP 1 & VP 2), Cán bộ TD",    "mo_ta": "⏱ Theo phân công · 📄 Biên bản kiểm tra"},
+    {"tieu_de": "Thực hiện nhiệm vụ đột xuất do Trưởng phòng / Ban Giám đốc giao",                           "nguoi_thuc_hien": "Tất cả cán bộ",                         "mo_ta": "⏱ Theo yêu cầu · 📄 Báo cáo hoàn thành"},
+]
+
 
 def _doc_ds(key: str) -> list:
     """Đọc danh sách từ kv_store, trả về list rỗng nếu chưa có."""
@@ -55,6 +99,31 @@ def _ghi_ds(key: str, ds: list, username: str, action: str, mo_ta: str):
     ghi_kv(key, ds, username)
     ghi_audit(username, action, mo_ta)
     st.cache_data.clear()
+
+
+def _tai_mau_giao_viec(ds: list, username: str) -> None:
+    """Thêm 32 đầu việc mẫu vào danh sách phân công, lưu kv_store."""
+    today_str = date.today().isoformat()
+    new_tasks = [
+        {
+            "id": str(uuid4()),
+            "tieu_de": t["tieu_de"],
+            "mo_ta": t["mo_ta"],
+            "nguoi_thuc_hien": t["nguoi_thuc_hien"],
+            "uu_tien": "binh_thuong",
+            "trang_thai": "chua_lam",
+            "ngay_giao": today_str,
+            "ngay_deadline": "",
+            "ghi_chu_ket_qua": "",
+            "ngay_hoan_thanh": None,
+        }
+        for t in _MAU_GIAO_VIEC
+    ]
+    ds.extend(new_tasks)
+    _ghi_ds(KHNV_PHAN_CONG, ds, username, "khnv_tai_mau_giao_viec",
+            f"Tải 32 đầu việc mẫu (Bảng giao việc Trưởng phòng KH-NVTD)")
+    st.success(f"✅ Đã tải {len(new_tasks)} đầu việc mẫu vào danh sách!")
+    st.rerun()
 
 
 # ──────────────────────────────────────────────
@@ -100,6 +169,21 @@ def _render_phan_cong(tab, role_n: str, username: str):
                                 f"Giao: {tieu_de.strip()} → {nguoi.strip()}")
                         st.success("✅ Đã giao việc thành công!")
                         st.rerun()
+
+    # ── Tải dữ liệu mẫu (chỉ admin_cn / manager_cn) ──
+    if co_quyen_ghi:
+        if not ds:
+            st.info("💡 Danh sách đang trống. Bấm bên dưới để tải sẵn **32 đầu việc mẫu** từ Bảng giao việc Trưởng phòng KH-NVTD.")
+            col_seed, _ = st.columns([2, 4])
+            with col_seed:
+                if st.button("📥 Tải 32 đầu việc mẫu", type="primary",
+                             key="btn_seed_tasks", use_container_width=True):
+                    _tai_mau_giao_viec(ds, username)
+        else:
+            with st.expander("📥 Tải đầu việc mẫu (thêm vào cuối danh sách)", expanded=False):
+                st.caption(f"Thêm 32 đầu việc từ Bảng giao việc chuẩn vào cuối danh sách hiện tại ({len(ds)} việc).")
+                if st.button("✅ Xác nhận thêm 32 đầu việc mẫu", key="btn_seed_append"):
+                    _tai_mau_giao_viec(ds, username)
 
     # ── Bảng danh sách ──
     # Sắp xếp: chưa làm / đang làm lên trước

@@ -163,6 +163,9 @@ Upload flow:
 
 ## CHANGELOG
 
+## [20/05/2026] — Fix _load_hstd: arrow() → to_arrow_table()
+- `app.py` dòng ~134 — `duckdb.query().arrow()` trả về `RecordBatchReader` (không có `.to_pandas()`); catch Exception thầm lặng → ws_executive hiển thị "Chưa có dữ liệu HSTD"; fix: đổi sang `.to_arrow_table().to_pandas(self_destruct=True)`
+
 ## [19/05/2026] — tab_tien_do, ws_management, tab_quan_ly_bc, kiem_soat fix
 - `tabs/tab_tien_do.py`: form tạo/sửa task — section "Áp dụng cho đơn vị" tách Phần A "🏢 Phòng giao dịch trực thuộc" + Phần B "🏛️ Hội sở CN tỉnh"; caption tổng quan + hướng dẫn từng phần; nhãn "CB Biên Hòa" → "Hội sở CN tỉnh" toàn bộ UI
 - `tabs/tab_tien_do.py`: drill-down thêm "— Tất cả —" đầu selectbox; khi chọn hiển thị toàn bộ bản ghi kèm cột "Đơn vị"
@@ -299,6 +302,6 @@ Upload flow:
 - `.streamlit/config.toml`: `base="dark"` giữ nguyên — toàn bộ app chỉ dark mode
 
 ## [20/05/2026] (Batch 2)
-- 	abs/tab_tongquan.py: Thay st.tabs 4 sub-tabs d�o h?n b?ng lazy_tabs()  ch? render 1 tab
-- 	abs/tab_baocao.py: Thay st.tabs B�o c�o chi ti?t / NQ11 b?ng st.radio  ch? render tab du?c ch?n
-- workspaces/ws_operation.py: X�a eager import 21 tab module kh?i ender(), d�ng _lazy_tab() lazy-load
+- 	abs/tab_tongquan.py: Thay st.tabs 4 sub-tabs d�o h?n b?ng lazy_tabs()  ch? render 1 tab
+- 	abs/tab_baocao.py: Thay st.tabs B�o c�o chi ti?t / NQ11 b?ng st.radio  ch? render tab du?c ch?n
+- workspaces/ws_operation.py: X�a eager import 21 tab module kh?i ender(), d�ng _lazy_tab() lazy-load

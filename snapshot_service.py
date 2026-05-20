@@ -218,6 +218,329 @@ def danh_sach_ky() -> list[str]:
         return []
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# NQ11 SNAPSHOT
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _ky_tu_nq11(df: pd.DataFrame) -> str:
+    """Suy ra kỳ 'YYYY-MM' từ cột Ngày báo cáo của NQ11."""
+    try:
+        from config import COT_NQ11_NGAY_BC
+        if COT_NQ11_NGAY_BC in df.columns:
+            sl = df[COT_NQ11_NGAY_BC].dropna()
+            if len(sl):
+                val = str(sl.iloc[0])
+                if "/" in val:
+                    parts = val.split("/")
+                    if len(parts) == 3:
+                        return f"{parts[2][:4]}-{parts[1].zfill(2)}"
+                dt = pd.to_datetime(val, errors="coerce")
+                if pd.notna(dt):
+                    return dt.strftime("%Y-%m")
+    except Exception:
+        pass
+    return datetime.now().strftime("%Y-%m")
+
+
+def luu_nq11_snapshot(df_nq11: pd.DataFrame, username: str) -> KetQuaUpload:
+    """Tổng hợp df_nq11 (NQ11 toàn CN) → lưu vào nq11_snapshot.
+    INSERT OR REPLACE — chạy lại cùng kỳ sẽ ghi đè.
+    Lưu 2 loại: tổng theo PGD + tổng CN ('__CN__').
+    """
+    if df_nq11 is None or df_nq11.empty:
+        return KetQuaUpload(False, "Không có dữ liệu NQ11 để tạo snapshot.")
+
+    from config import (
+        COT_TEN_PGD, COT_DNO_NQ11, COT_NQ11_NO_TH, COT_NQ11_NO_QH,
+        COT_NQ11_MA_KH, COT_NQ11_SO_TIEN_GN, COT_NQ11_NGAY_BC,
+        DON_VI_CHI_NHANH,
+    )
+
+    ky = _ky_tu_nq11(df_nq11)
+
+    # Lấy ngày báo cáo
+    ngay_bc = None
+    if COT_NQ11_NGAY_BC in df_nq11.columns:
+        sl = df_nq11[COT_NQ11_NGAY_BC].dropna()
+        if len(sl):
+            ngay_bc = str(sl.iloc[0])
+
+    df = df_nq11.copy()
+
+    # Ép kiểu cột số
+    for col in (COT_DNO_NQ11, COT_NQ11_NO_TH, COT_NQ11_NO_QH, COT_NQ11_SO_TIEN_GN):
+        if col not in df.columns:
+            df[col] = 0.0
+        df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0.0)
+
+    if COT_TEN_PGD not in df.columns:
+        df[COT_TEN_PGD] = DON_VI_CHI_NHANH
+    if COT_NQ11_MA_KH not in df.columns:
+        df[COT_NQ11_MA_KH] = ""
+
+    gn_col = COT_NQ11_SO_TIEN_GN if COT_NQ11_SO_TIEN_GN in df.columns else None
+
+    def _agg_nq11(grp_df, pgd_val):
+        return (
+            pgd_val,
+            float(grp_df[COT_DNO_NQ11].sum()),
+            float(grp_df[COT_NQ11_NO_TH].sum()),
+            float(grp_df[COT_NQ11_NO_QH].sum()),
+            int(grp_df[COT_NQ11_MA_KH].nunique()),
+            float(grp_df[gn_col].sum()) if gn_col else 0.0,
+        )
+
+    rows = []
+    for pgd, g in df.groupby(COT_TEN_PGD, dropna=False):
+        rows.append(_agg_nq11(g, str(pgd)))
+    rows.append(_agg_nq11(df, "__CN__"))
+
+    so_dong = 0
+    try:
+        with db.get_conn() as conn:
+            for (pgd, tdn, nth, nqh, so_kh, gn) in rows:
+                conn.execute(
+                    """INSERT OR REPLACE INTO nq11_snapshot
+                       (ky, ten_pgd, tong_du_no, no_th, no_qh, so_kh, gn_nam, ngay_bc, created_by)
+                       VALUES (?,?,?,?,?,?,?,?,?)""",
+                    (ky, pgd, tdn, nth, nqh, so_kh, gn, ngay_bc, username),
+                )
+                so_dong += 1
+            conn.commit()
+        logger.info("luu_nq11_snapshot: kỳ=%s, %d dòng", ky, so_dong)
+        db.ghi_audit(username, "luu_nq11_snapshot", f"Kỳ {ky} — {so_dong} dòng")
+        return KetQuaUpload(True, f"✅ Đã lưu NQ11 snapshot kỳ **{ky}** ({so_dong} dòng)")
+    except Exception as e:
+        logger.error("luu_nq11_snapshot: thất bại kỳ=%s — %s", ky, e, exc_info=True)
+        return KetQuaUpload(False, f"❌ Lỗi lưu NQ11 snapshot: {e}")
+
+
+def doc_nq11_snapshot(ky: str) -> pd.DataFrame:
+    """Tổng theo PGD của 1 kỳ NQ11."""
+    try:
+        with db.get_conn() as conn:
+            rows = conn.execute(
+                """SELECT ten_pgd, tong_du_no, no_th, no_qh, so_kh, gn_nam, ngay_bc
+                   FROM nq11_snapshot
+                   WHERE ky=?
+                   ORDER BY ten_pgd""",
+                (ky,)
+            ).fetchall()
+        return pd.DataFrame([dict(r) for r in rows]) if rows else pd.DataFrame()
+    except Exception as e:
+        logger.error("doc_nq11_snapshot: lỗi kỳ %s — %s", ky, e, exc_info=True)
+        return pd.DataFrame()
+
+
+def danh_sach_ky_nq11() -> list[str]:
+    """Danh sách kỳ đã có NQ11 snapshot, mới → cũ."""
+    try:
+        with db.get_conn() as conn:
+            rows = conn.execute(
+                "SELECT DISTINCT ky FROM nq11_snapshot ORDER BY ky DESC"
+            ).fetchall()
+        return [r["ky"] for r in rows]
+    except Exception as e:
+        logger.error("danh_sach_ky_nq11: %s", e, exc_info=True)
+        return []
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# GQVL SNAPSHOT
+# ─────────────────────────────────────────────────────────────────────────────
+
+def luu_gqvl_snapshot(df_gqvl: pd.DataFrame, username: str) -> KetQuaUpload:
+    """Tổng hợp df_gqvl (GQVL toàn CN, sau khi đã rename cột) → lưu vào gqvl_snapshot.
+    INSERT OR REPLACE — chạy lại cùng kỳ sẽ ghi đè.
+    Lưu 2 loại: tổng theo PGD + tổng CN ('__CN__').
+    """
+    if df_gqvl is None or df_gqvl.empty:
+        return KetQuaUpload(False, "Không có dữ liệu GQVL để tạo snapshot.")
+
+    from config import COT_TEN_PGD, DON_VI_CHI_NHANH
+
+    _COL_TH    = "Dư nợ trong hạn"
+    _COL_QH    = "Dư nợ quá hạn"
+    _COL_KH    = "Dư nợ khoanh"
+    _COL_MA_KH = "Mã KH"
+    _COL_GN    = "Giải ngân trong năm"
+
+    ky = datetime.now().strftime("%Y-%m")
+
+    df = df_gqvl.copy()
+
+    for col in (_COL_TH, _COL_QH, _COL_KH, _COL_GN):
+        if col not in df.columns:
+            df[col] = 0.0
+        df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0.0)
+
+    if COT_TEN_PGD not in df.columns:
+        df[COT_TEN_PGD] = DON_VI_CHI_NHANH
+    if _COL_MA_KH not in df.columns:
+        df[_COL_MA_KH] = ""
+
+    def _agg_gqvl(grp_df, pgd_val):
+        return (
+            pgd_val,
+            float(grp_df[_COL_TH].sum()),
+            float(grp_df[_COL_QH].sum()),
+            float(grp_df[_COL_KH].sum()),
+            int(grp_df[_COL_MA_KH].nunique()),
+            float(grp_df[_COL_GN].sum()),
+        )
+
+    rows = []
+    for pgd, g in df.groupby(COT_TEN_PGD, dropna=False):
+        rows.append(_agg_gqvl(g, str(pgd)))
+    rows.append(_agg_gqvl(df, "__CN__"))
+
+    so_dong = 0
+    try:
+        with db.get_conn() as conn:
+            for (pgd, dth, dqh, dkh, so_kh, gn) in rows:
+                conn.execute(
+                    """INSERT OR REPLACE INTO gqvl_snapshot
+                       (ky, ten_pgd, dn_th, dn_qh, dn_khoanh, so_kh, gn_nam, created_by)
+                       VALUES (?,?,?,?,?,?,?,?)""",
+                    (ky, pgd, dth, dqh, dkh, so_kh, gn, username),
+                )
+                so_dong += 1
+            conn.commit()
+        logger.info("luu_gqvl_snapshot: kỳ=%s, %d dòng", ky, so_dong)
+        db.ghi_audit(username, "luu_gqvl_snapshot", f"Kỳ {ky} — {so_dong} dòng")
+        return KetQuaUpload(True, f"✅ Đã lưu GQVL snapshot kỳ **{ky}** ({so_dong} dòng)")
+    except Exception as e:
+        logger.error("luu_gqvl_snapshot: thất bại kỳ=%s — %s", ky, e, exc_info=True)
+        return KetQuaUpload(False, f"❌ Lỗi lưu GQVL snapshot: {e}")
+
+
+def doc_gqvl_snapshot(ky: str) -> pd.DataFrame:
+    """Tổng theo PGD của 1 kỳ GQVL."""
+    try:
+        with db.get_conn() as conn:
+            rows = conn.execute(
+                """SELECT ten_pgd, dn_th, dn_qh, dn_khoanh, so_kh, gn_nam
+                   FROM gqvl_snapshot
+                   WHERE ky=?
+                   ORDER BY ten_pgd""",
+                (ky,)
+            ).fetchall()
+        return pd.DataFrame([dict(r) for r in rows]) if rows else pd.DataFrame()
+    except Exception as e:
+        logger.error("doc_gqvl_snapshot: lỗi kỳ %s — %s", ky, e, exc_info=True)
+        return pd.DataFrame()
+
+
+def danh_sach_ky_gqvl() -> list[str]:
+    """Danh sách kỳ đã có GQVL snapshot, mới → cũ."""
+    try:
+        with db.get_conn() as conn:
+            rows = conn.execute(
+                "SELECT DISTINCT ky FROM gqvl_snapshot ORDER BY ky DESC"
+            ).fetchall()
+        return [r["ky"] for r in rows]
+    except Exception as e:
+        logger.error("danh_sach_ky_gqvl: %s", e, exc_info=True)
+        return []
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# CDTOTKVV SNAPSHOT
+# ─────────────────────────────────────────────────────────────────────────────
+
+def luu_cdtotkvv_snapshot(df_cdtotkvv: pd.DataFrame, ky: str, username: str) -> KetQuaUpload:
+    """Tổng hợp df_cdtotkvv (CDTOTKVV toàn CN) → lưu vào cdtotkvv_snapshot.
+    ky: 'YYYY-MM' — thường lấy cùng kỳ với HSTD snapshot.
+    INSERT OR REPLACE — chạy lại cùng kỳ sẽ ghi đè.
+    Lưu 2 loại: tổng theo PGD + tổng CN ('__CN__').
+    """
+    if df_cdtotkvv is None or df_cdtotkvv.empty:
+        return KetQuaUpload(False, "Không có dữ liệu CDTOTKVV để tạo snapshot.")
+
+    # Dùng tong_hop_theo_pgd() để tổng hợp
+    try:
+        from data.cdtotkvv import tong_hop_theo_pgd
+    except Exception as e:
+        return KetQuaUpload(False, f"❌ Không import được data.cdtotkvv: {e}")
+
+    df_pgd = tong_hop_theo_pgd(df_cdtotkvv)
+    if df_pgd is None or df_pgd.empty:
+        return KetQuaUpload(False, "Không tổng hợp được CDTOTKVV theo PGD.")
+
+    rows = []
+    for _, row in df_pgd.iterrows():
+        pgd_name = str(row.get("ten_dv", "")).strip() or str(row.get("ma_dv", ""))
+        rows.append((
+            pgd_name,
+            int(row.get("tong_to", 0)),
+            int(row.get("to_tot", 0)),
+            int(row.get("to_kha", 0)),
+            int(row.get("to_tb", 0)),
+            int(row.get("to_yeu", 0)),
+            float(row.get("tong_diem_tb", 0.0)),
+        ))
+
+    # Thêm hàng tổng CN
+    rows.append((
+        "__CN__",
+        int(df_pgd["tong_to"].sum()),
+        int(df_pgd["to_tot"].sum()),
+        int(df_pgd["to_kha"].sum()),
+        int(df_pgd["to_tb"].sum()),
+        int(df_pgd["to_yeu"].sum()),
+        float(df_cdtotkvv["tong_diem"].mean()) if "tong_diem" in df_cdtotkvv.columns else 0.0,
+    ))
+
+    so_dong = 0
+    try:
+        with db.get_conn() as conn:
+            for (pgd, so_to, so_tot, so_kha, so_tb, so_yeu, diem_tb) in rows:
+                conn.execute(
+                    """INSERT OR REPLACE INTO cdtotkvv_snapshot
+                       (ky, ten_pgd, so_to, so_tot, so_kha, so_tb, so_yeu, diem_tb, created_by)
+                       VALUES (?,?,?,?,?,?,?,?,?)""",
+                    (ky, pgd, so_to, so_tot, so_kha, so_tb, so_yeu, diem_tb, username),
+                )
+                so_dong += 1
+            conn.commit()
+        logger.info("luu_cdtotkvv_snapshot: kỳ=%s, %d dòng", ky, so_dong)
+        db.ghi_audit(username, "luu_cdtotkvv_snapshot", f"Kỳ {ky} — {so_dong} dòng")
+        return KetQuaUpload(True, f"✅ Đã lưu CDTOTKVV snapshot kỳ **{ky}** ({so_dong} dòng)")
+    except Exception as e:
+        logger.error("luu_cdtotkvv_snapshot: thất bại kỳ=%s — %s", ky, e, exc_info=True)
+        return KetQuaUpload(False, f"❌ Lỗi lưu CDTOTKVV snapshot: {e}")
+
+
+def doc_cdtotkvv_snapshot(ky: str) -> pd.DataFrame:
+    """Tổng theo PGD của 1 kỳ CDTOTKVV."""
+    try:
+        with db.get_conn() as conn:
+            rows = conn.execute(
+                """SELECT ten_pgd, so_to, so_tot, so_kha, so_tb, so_yeu, diem_tb
+                   FROM cdtotkvv_snapshot
+                   WHERE ky=?
+                   ORDER BY ten_pgd""",
+                (ky,)
+            ).fetchall()
+        return pd.DataFrame([dict(r) for r in rows]) if rows else pd.DataFrame()
+    except Exception as e:
+        logger.error("doc_cdtotkvv_snapshot: lỗi kỳ %s — %s", ky, e, exc_info=True)
+        return pd.DataFrame()
+
+
+def danh_sach_ky_cdtotkvv() -> list[str]:
+    """Danh sách kỳ đã có CDTOTKVV snapshot, mới → cũ."""
+    try:
+        with db.get_conn() as conn:
+            rows = conn.execute(
+                "SELECT DISTINCT ky FROM cdtotkvv_snapshot ORDER BY ky DESC"
+            ).fetchall()
+        return [r["ky"] for r in rows]
+    except Exception as e:
+        logger.error("danh_sach_ky_cdtotkvv: %s", e, exc_info=True)
+        return []
+
+
 def xoa_snapshot(ky: str, username: str) -> None:
     try:
         with db.get_conn() as conn:

@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## [2026-05-21] — Thêm tab So sánh 2 kỳ snapshot
+- `tabs/tab_so_sanh_2_ky.py` — tạo mới: chọn 2 kỳ snapshot bất kỳ, 6 KPI cards, bảng 8 chỉ tiêu, bảng/chart theo PGD (CN), xuất Excel
+- `workspaces/ws_management.py` dòng ~1129 — mount "🔄 So sánh 2 kỳ" nhóm "Giám sát"
+- `workspaces/ws_executive.py` dòng ~1494 — mount "🔄 So sánh 2 kỳ" nhóm "Báo cáo"
+- `workspaces/ws_operation.py` dòng ~1645 — mount "🔄 So sánh 2 kỳ" với `pgd_mode=True`
+
 ## [2026-05-20] — Thêm nút chỉnh sửa cán bộ trong tab Nhân sự & Chức vụ
 - `tabs/tab_khnv_noi_bo.py` `_render_nhan_su()` — thêm nút ✏️ (chỉnh sửa) bên cạnh tên từng cán bộ
 - Khi bấm ✏️: hiện form inline với text input tên + selectbox chức vụ + nút 💾 Lưu / ❌ Hủy

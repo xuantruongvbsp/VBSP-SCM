@@ -1642,6 +1642,10 @@ def render(**kwargs):
                     tab, df=df, df_full=df_full, role=role, username=username,
                     pgd_user=pgd_user, pgd_mode=True,
                 )),
+                ("🔄 So sánh 2 kỳ", lambda tab: _lazy_tab("tab_so_sanh_2_ky").render(
+                    tab, role=role, username=username,
+                    pgd_user=pgd_user, pgd_mode=True,
+                )),
             ],
         },
         "bao_cao_giao_ban": {

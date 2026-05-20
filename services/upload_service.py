@@ -485,10 +485,15 @@ def merge_du_lieu_toan_cn(
             df_toan_cn[col] = pd.to_numeric(df_toan_cn[col], errors="coerce")
     # Chuẩn hóa dtype cột chuỗi: ép toàn bộ về str đồng nhất
     # Xử lý mixed type (int + str rỗng) → tránh ArrowInvalid khi ghi parquet
+    # category columns → astype(object) trước, nếu không apply() giữ nguyên
+    # category dtype và pd.to_datetime() downstream sẽ lỗi
     _str_cols = [c for c in df_toan_cn.columns if c not in _cols_so_cn]
     if _str_cols:
         for col in _str_cols:
-            df_toan_cn[col] = df_toan_cn[col].apply(
+            ser = df_toan_cn[col]
+            if isinstance(ser.dtype, pd.CategoricalDtype):
+                ser = ser.astype(object)
+            df_toan_cn[col] = ser.apply(
                 lambda v: (
                     ""
                     if v is None

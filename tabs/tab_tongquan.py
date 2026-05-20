@@ -1077,8 +1077,9 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                 "QH (triệu đồng)", "TL QH %",
                 "Khoanh (triệu đồng)", "TL Khoanh %",
                 "Nợ xấu (triệu đồng)", "Tỷ lệ Nợ xấu",
-                "Lãi tồn (tỷ)",
-                "DS Cho vay (tỷ)", "DS Thu nợ (tỷ)",
+                "Lãi tồn (triệu đồng)",
+                "Nợ ĐH năm (triệu đồng)",
+                "DS Cho vay (triệu đồng)", "DS Thu nợ (triệu đồng)",
             ]
             cot_hien += [c for c in ["Tổng Tổ", "Tốt", "Khá", "TB", "Yếu"] if c in df_pgd.columns]
             cot_hien = [c for c in cot_hien if c in df_pgd.columns]

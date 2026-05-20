@@ -1,14 +1,19 @@
 # CHANGELOG
 
+## [2026-05-20] — Thêm nút "Xuất PDF" cho Phân công cán bộ và Lịch công tác
+- `tabs/tab_khnv_noi_bo.py` dòng ~19 — thêm import `xuat_pdf_co_chart`, `download_pdf_button` từ `components.export_pdf`
+- `tabs/tab_khnv_noi_bo.py` dòng ~117-136 — thêm nút "📥 Xuất PDF" trong sub-tab 📋 Phân công cán bộ: chuyển list dict → DataFrame (Tiêu đề, Người thực hiện, Mức ưu tiên, Ngày giao, Deadline, Trạng thái, Ghi chú) → `xuat_pdf_co_chart` với `them_dong_tong=False`
+- `tabs/tab_khnv_noi_bo.py` dòng ~306-330 — thêm nút "📥 Xuất PDF" trong sub-tab 📅 Lịch công tác: tương tự, xuất danh sách đã lọc theo tháng/năm/loại (Ngày, Loại, Tiêu đề, Địa điểm, Thành viên, Ghi chú, Trạng thái)
+
+## [2026-05-20] — Fix lỗi "Thông tin chung": KeyError 'ten_ct' (lần 3 — .rename dùng _nk.columns[0] thay vì positional)
+- `tabs/tab_tongquan.py` dòng ~260,273,286,299 — đổi `_nk.columns = ["ten_ct", "..."]` → `_nk = _nk.rename(columns={_nk.columns[0]: "ten_ct", _nk.columns[1]: "..."})` cho cả 4 sub-DataFrame (_qh, _nk, _gn, _tn); nguyên nhân lần 2 (positional columns) vẫn fail nếu `_nk` không có đúng 2 cột; `.rename()` với `_nk.columns[0]` dùng tên cột thực tế từ DataFrame nên luôn match
+
 ## [2026-05-20] — Fix số tiền card "Tổng quan danh mục" sai 1000 lần (/1e6 → /1e9)
 - `tabs/tab_tongquan.py` dòng ~560-566 — đổi `vn(x / 1e6, 0)` → `vn(x / 1e9, 3)` cho `tdn`, `dth`, `dqh`, `dnk`, `tdn_delta`; nguyên nhân: dữ liệu lưu VND thô, chia 1e6 ra triệu nhưng label ghi "tỷ" → sai 1000 lần
 - `tabs/tab_tongquan.py` dòng ~549 — `khd_sub = fmt(dn_3m)` → `vn(dn_3m / 1e9, 3) + " tỷ đồng"` để có đơn vị
 
 ## [2026-05-20] — UI: card "Tổng quan danh mục" to rõ hơn, căn giữa như "Xếp loại tổ"
 - `tabs/tab_tongquan.py` dòng ~486-497 — tăng `.val` font-size `2.05rem→2.4rem`; thêm `text-align:center`; đậm màu nền soft-* (dbeafe/dcfce7/fee2e2/fef3c7...); thêm CSS variable `--tq-num`/`--tq-label` cho màu số và nhãn theo scheme màu; thu nhỏ h4 xuống `0.82rem` để số nổi bật hơn
-
-## [2026-05-20] — Fix lỗi "Thông tin chung": KeyError 'ten_ct' (lần 2 — dùng positional columns thay vì .rename)
-- `tabs/tab_tongquan.py` dòng ~268,277,291 — đổi `.reset_index(name=...).rename(columns={COT_TEN_CT: "ten_ct"})` → `.reset_index()` + gán `_nk.columns = ["ten_ct", "du_no_khoanh"]` positionally (giống pattern `_qh`); nguyên nhân: `.rename()` silently bỏ qua key không match (cột sau groupby/reset_index có tên khác `COT_TEN_CT` trong edge case), dẫn đến thiếu cột `"ten_ct"` khi merge
 
 ## [2026-05-20] — Tạo tab "Nội bộ Phòng KH-NV" (tab_khnv_noi_bo.py)
 - `tabs/tab_khnv_noi_bo.py` (tạo mới) — 4 sub-tab: 📋 Phân công cán bộ, 📅 Lịch công tác, 📤 Báo cáo cấp trên (wrapper), 📌 Giao việc PGD (wrapper)

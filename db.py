@@ -167,6 +167,56 @@ def init_db():
             CREATE INDEX IF NOT EXISTS idx_snapshot_ky     ON hstd_snapshot(ky);
             CREATE INDEX IF NOT EXISTS idx_snapshot_pgd    ON hstd_snapshot(ky, ten_pgd);
 
+            CREATE TABLE IF NOT EXISTS nq11_snapshot (
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                ky           TEXT    NOT NULL,
+                ten_pgd      TEXT    NOT NULL DEFAULT '__CN__',
+                tong_du_no   REAL    NOT NULL DEFAULT 0,
+                no_th        REAL    NOT NULL DEFAULT 0,
+                no_qh        REAL    NOT NULL DEFAULT 0,
+                so_kh        INTEGER NOT NULL DEFAULT 0,
+                gn_nam       REAL    NOT NULL DEFAULT 0,
+                ngay_bc      TEXT,
+                created_at   TEXT    NOT NULL DEFAULT (datetime('now','localtime')),
+                created_by   TEXT    NOT NULL DEFAULT 'system',
+                UNIQUE(ky, ten_pgd)
+            );
+            CREATE INDEX IF NOT EXISTS idx_nq11_snap_ky  ON nq11_snapshot(ky);
+            CREATE INDEX IF NOT EXISTS idx_nq11_snap_pgd ON nq11_snapshot(ky, ten_pgd);
+
+            CREATE TABLE IF NOT EXISTS gqvl_snapshot (
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                ky           TEXT    NOT NULL,
+                ten_pgd      TEXT    NOT NULL DEFAULT '__CN__',
+                dn_th        REAL    NOT NULL DEFAULT 0,
+                dn_qh        REAL    NOT NULL DEFAULT 0,
+                dn_khoanh    REAL    NOT NULL DEFAULT 0,
+                so_kh        INTEGER NOT NULL DEFAULT 0,
+                gn_nam       REAL    NOT NULL DEFAULT 0,
+                created_at   TEXT    NOT NULL DEFAULT (datetime('now','localtime')),
+                created_by   TEXT    NOT NULL DEFAULT 'system',
+                UNIQUE(ky, ten_pgd)
+            );
+            CREATE INDEX IF NOT EXISTS idx_gqvl_snap_ky  ON gqvl_snapshot(ky);
+            CREATE INDEX IF NOT EXISTS idx_gqvl_snap_pgd ON gqvl_snapshot(ky, ten_pgd);
+
+            CREATE TABLE IF NOT EXISTS cdtotkvv_snapshot (
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                ky           TEXT    NOT NULL,
+                ten_pgd      TEXT    NOT NULL DEFAULT '__CN__',
+                so_to        INTEGER NOT NULL DEFAULT 0,
+                so_tot       INTEGER NOT NULL DEFAULT 0,
+                so_kha       INTEGER NOT NULL DEFAULT 0,
+                so_tb        INTEGER NOT NULL DEFAULT 0,
+                so_yeu       INTEGER NOT NULL DEFAULT 0,
+                diem_tb      REAL    NOT NULL DEFAULT 0,
+                created_at   TEXT    NOT NULL DEFAULT (datetime('now','localtime')),
+                created_by   TEXT    NOT NULL DEFAULT 'system',
+                UNIQUE(ky, ten_pgd)
+            );
+            CREATE INDEX IF NOT EXISTS idx_cdtotkvv_snap_ky  ON cdtotkvv_snapshot(ky);
+            CREATE INDEX IF NOT EXISTS idx_cdtotkvv_snap_pgd ON cdtotkvv_snapshot(ky, ten_pgd);
+
             CREATE TABLE IF NOT EXISTS qlnk_ket_qua (
                 id                      INTEGER PRIMARY KEY AUTOINCREMENT,
                 ma_mon_vay              TEXT    NOT NULL,

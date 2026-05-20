@@ -258,7 +258,7 @@ def _cache_co_cau_ct(
             .apply(lambda x: pd.to_numeric(x, errors="coerce").sum())
             .reset_index()
         )
-        _qh.columns = ["ten_ct", "du_no_qh"]
+        _qh = _qh.rename(columns={_qh.columns[0]: "ten_ct", _qh.columns[1]: "du_no_qh"})
         df_ct = df_ct.merge(_qh, on="ten_ct", how="left")
     else:
         df_ct["du_no_qh"] = 0.0
@@ -270,7 +270,7 @@ def _cache_co_cau_ct(
             .apply(lambda x: pd.to_numeric(x, errors="coerce").sum())
             .reset_index()
         )
-        _nk.columns = ["ten_ct", "du_no_khoanh"]
+        _nk = _nk.rename(columns={_nk.columns[0]: "ten_ct", _nk.columns[1]: "du_no_khoanh"})
         df_ct = df_ct.merge(_nk, on="ten_ct", how="left")
     else:
         df_ct["du_no_khoanh"] = 0.0
@@ -282,7 +282,7 @@ def _cache_co_cau_ct(
             .apply(lambda x: pd.to_numeric(x, errors="coerce").sum())
             .reset_index()
         )
-        _gn.columns = ["ten_ct", "gn_nam"]
+        _gn = _gn.rename(columns={_gn.columns[0]: "ten_ct", _gn.columns[1]: "gn_nam"})
         df_ct = df_ct.merge(_gn, on="ten_ct", how="left")
     else:
         df_ct["gn_nam"] = 0.0
@@ -295,7 +295,7 @@ def _cache_co_cau_ct(
             .apply(lambda x: pd.to_numeric(x.stack(), errors="coerce").sum())
             .reset_index()
         )
-        _tn.columns = ["ten_ct", "tn_nam"]
+        _tn = _tn.rename(columns={_tn.columns[0]: "ten_ct", _tn.columns[1]: "tn_nam"})
         df_ct = df_ct.merge(_tn, on="ten_ct", how="left")
     else:
         df_ct["tn_nam"] = 0.0
@@ -483,17 +483,13 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
             <style>
             .tq-caption{color:#4b5563;font-size:0.96rem;margin:-6px 0 14px 0}
             .tq-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:14px}
-            .tq-card{border-radius:10px;padding:12px 10px 10px;border:1px solid transparent;min-height:90px;text-align:center}
-            .tq-card h4{margin:0 0 2px 0;font-size:0.83rem;font-weight:600;color:inherit !important}
-            .tq-card .val{font-size:2rem !important;line-height:1 !important;font-weight:700 !important;margin:2px 0 4px;display:block;color:inherit !important}
-            .tq-card .sub{font-size:0.83rem;margin-top:2px;color:inherit !important}
-            .tq-card .sub.up{font-weight:600}
-            .tq-card.soft-blue{background:#dbeafe !important;border-color:#93c5fd;color:#1e3a6e !important}
-            .tq-card.soft-indigo{background:#e0e7ff !important;border-color:#a5b4fc;color:#312e81 !important}
-            .tq-card.soft-green{background:#dcfce7 !important;border-color:#86efac;color:#14532d !important}
-            .tq-card.soft-red{background:#fee2e2 !important;border-color:#fca5a5;color:#7f1d1d !important}
-            .tq-card.soft-amber{background:#fef3c7 !important;border-color:#fcd34d;color:#78350f !important}
-            .tq-card.soft-purple{background:#ede9fe !important;border-color:#c4b5fd;color:#4c1d95 !important}
+            .tq-card{border-radius:10px;padding:12px 10px 10px;border:1px solid #d1d5db;min-height:90px;text-align:center}
+            .tq-card.soft-blue{background:#dbeafe;border-color:#93c5fd}
+            .tq-card.soft-indigo{background:#e0e7ff;border-color:#a5b4fc}
+            .tq-card.soft-green{background:#dcfce7;border-color:#86efac}
+            .tq-card.soft-red{background:#fee2e2;border-color:#fca5a5}
+            .tq-card.soft-amber{background:#fef3c7;border-color:#fcd34d}
+            .tq-card.soft-purple{background:#ede9fe;border-color:#c4b5fd}
             .totkvv-wrap{border:1px solid #e5e7eb;border-radius:12px;padding:12px 14px;margin:4px 0 8px 0;background:#fff}
             .totkvv-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
             .totkvv-title{font-size:1.02rem;font-weight:700;color:#202938}
@@ -546,7 +542,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
         tlq = (dqh / tdn * 100) if tdn > 0 else 0
         tlk = (dnk / tdn * 100) if tdn > 0 else 0
         khd_val = f"{fmt_so(n_3m)} món"
-        khd_sub = fmt(dn_3m) if dn_3m > 0 else "Chưa có dư nợ"
+        khd_sub = f"{vn(dn_3m / 1e9, 3)} tỷ đồng" if dn_3m > 0 else "Chưa có dư nợ"
         khd_class = "soft-red" if n_3m > 0 else "soft-green"
 
         tl_no_xau = ((dqh + dnk) / tdn * 100) if tdn > 0 else 0
@@ -557,13 +553,13 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
         _n_mon_vay = fmt_so(n_mon_vay)
         _n_kh = fmt_so(n_kh)
         _bq_mon_kh = vn(n_mon_vay / n_kh, 1) if n_kh > 0 else "—"
-        _tdn = vn(tdn / 1e6, 0)
-        _tdn_delta = vn(max(tdn / 1e6 * 0.017, 0), 0)
-        _dth = vn(dth / 1e6, 0)
+        _tdn = vn(tdn / 1e9, 3)
+        _tdn_delta = vn(max(tdn / 1e9 * 0.017, 0), 3)
+        _dth = vn(dth / 1e9, 3)
         _dth_pct = vn(dth / tdn * 100 if tdn else 0, 3)
-        _dnk = vn(dnk / 1e6, 0)
+        _dnk = vn(dnk / 1e9, 3)
         _tlk = vn(tlk, 3)
-        _dqh = vn(dqh / 1e6, 0)
+        _dqh = vn(dqh / 1e9, 3)
         _tlq = vn(tlq, 3)
         _tl_no_xau = vn(tl_no_xau, 3)
         st.markdown(f"<div class='tq-caption'>Cập nhật: {ngay_cap_nhat} · {TEN_CHI_NHANH_HIEN_THI}</div>", unsafe_allow_html=True)
@@ -571,54 +567,54 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
             f"""
             <div class="tq-grid">
                 <div class="tq-card soft-indigo">
-                    <h4>Tổng món vay</h4>
-                    <div class="val">{_n_mon_vay}</div>
-                    <div class="sub">Số khế ước đang dư nợ</div>
+                    <div style="font-size:0.82rem;font-weight:600;color:#312e81;margin:0 0 4px">Tổng món vay</div>
+                    <div style="font-size:2rem;font-weight:700;line-height:1;color:#1e1b4b;margin:0 0 4px">{_n_mon_vay}</div>
+                    <div style="font-size:0.82rem;color:#4338ca">Số khế ước đang dư nợ</div>
                 </div>
                 <div class="tq-card soft-blue">
-                    <h4>Tổng khách hàng</h4>
-                    <div class="val">{_n_kh}</div>
-                    <div class="sub">{(f"BQ {_bq_mon_kh} món/KH") if n_kh > 0 else "—"}</div>
+                    <div style="font-size:0.82rem;font-weight:600;color:#1e3a6e;margin:0 0 4px">Tổng khách hàng</div>
+                    <div style="font-size:2rem;font-weight:700;line-height:1;color:#1e3a6e;margin:0 0 4px">{_n_kh}</div>
+                    <div style="font-size:0.82rem;color:#1e40af">{(f"BQ {_bq_mon_kh} món/KH") if n_kh > 0 else "—"}</div>
                 </div>
                 <div class="tq-card soft-green">
-                    <h4>Tổng dư nợ</h4>
-                    <div class="val">{_tdn} tỷ</div>
-                    <div class="sub up">+{_tdn_delta} tỷ so kỳ trước</div>
+                    <div style="font-size:0.82rem;font-weight:600;color:#14532d;margin:0 0 4px">Tổng dư nợ</div>
+                    <div style="font-size:2rem;font-weight:700;line-height:1;color:#14532d;margin:0 0 4px">{_tdn} tỷ</div>
+                    <div style="font-size:0.82rem;color:#15803d;font-weight:600">+{_tdn_delta} tỷ so kỳ trước</div>
                 </div>
                 <div class="tq-card soft-green">
-                    <h4>Dư nợ trong hạn</h4>
-                    <div class="val">{_dth} tỷ</div>
-                    <div class="sub">{_dth_pct}% tổng dư nợ</div>
+                    <div style="font-size:0.82rem;font-weight:600;color:#14532d;margin:0 0 4px">Dư nợ trong hạn</div>
+                    <div style="font-size:2rem;font-weight:700;line-height:1;color:#14532d;margin:0 0 4px">{_dth} tỷ</div>
+                    <div style="font-size:0.82rem;color:#166534">{_dth_pct}% tổng dư nợ</div>
                 </div>
                 <div class="tq-card soft-red">
-                    <h4>Dư nợ quá hạn</h4>
-                    <div class="val">{_dqh} tỷ</div>
-                    <div class="sub">{_tlq}% tổng dư nợ</div>
+                    <div style="font-size:0.82rem;font-weight:600;color:#7f1d1d;margin:0 0 4px">Dư nợ quá hạn</div>
+                    <div style="font-size:2rem;font-weight:700;line-height:1;color:#7f1d1d;margin:0 0 4px">{_dqh} tỷ</div>
+                    <div style="font-size:0.82rem;color:#991b1b">{_tlq}% tổng dư nợ</div>
                 </div>
                 <div class="tq-card soft-red">
-                    <h4>Tỷ lệ quá hạn</h4>
-                    <div class="val">{_tlq}%</div>
-                    <div class="sub">{'⚠️ Mức cao > 0.5%' if tlq >= 0.5 else '< 0.5% toàn hệ thống'}</div>
+                    <div style="font-size:0.82rem;font-weight:600;color:#7f1d1d;margin:0 0 4px">Tỷ lệ quá hạn</div>
+                    <div style="font-size:2rem;font-weight:700;line-height:1;color:#7f1d1d;margin:0 0 4px">{_tlq}%</div>
+                    <div style="font-size:0.82rem;color:#991b1b">{'⚠️ Mức cao > 0.5%' if tlq >= 0.5 else '< 0.5% toàn hệ thống'}</div>
                 </div>
                 <div class="tq-card soft-amber">
-                    <h4>Nợ khoanh</h4>
-                    <div class="val">{_dnk} tỷ</div>
-                    <div class="sub">{_tlk}% tổng dư nợ</div>
+                    <div style="font-size:0.82rem;font-weight:600;color:#78350f;margin:0 0 4px">Nợ khoanh</div>
+                    <div style="font-size:2rem;font-weight:700;line-height:1;color:#78350f;margin:0 0 4px">{_dnk} tỷ</div>
+                    <div style="font-size:0.82rem;color:#92400e">{_tlk}% tổng dư nợ</div>
                 </div>
                 <div class="tq-card soft-amber">
-                    <h4>Tỷ lệ khoanh</h4>
-                    <div class="val">{_tlk}%</div>
-                    <div class="sub">{'⚠️ Cần theo dõi' if tlk >= 0.5 else 'Trong kiểm soát'}</div>
+                    <div style="font-size:0.82rem;font-weight:600;color:#78350f;margin:0 0 4px">Tỷ lệ khoanh</div>
+                    <div style="font-size:2rem;font-weight:700;line-height:1;color:#78350f;margin:0 0 4px">{_tlk}%</div>
+                    <div style="font-size:0.82rem;color:#92400e">{'⚠️ Cần theo dõi' if tlk >= 0.5 else 'Trong kiểm soát'}</div>
                 </div>
                 <div class="tq-card {no_xau_class}">
-                    <h4>Tỷ lệ nợ xấu (NX)</h4>
-                    <div class="val">{_tl_no_xau}%</div>
-                    <div class="sub">= (QH + Khoanh) / Tổng dư nợ</div>
+                    <div style="font-size:0.82rem;font-weight:600;color:#7f1d1d;margin:0 0 4px">Tỷ lệ nợ xấu (NX)</div>
+                    <div style="font-size:2rem;font-weight:700;line-height:1;color:#7f1d1d;margin:0 0 4px">{_tl_no_xau}%</div>
+                    <div style="font-size:0.82rem;color:#991b1b">= (QH + Khoanh) / Tổng dư nợ</div>
                 </div>
                 <div class="tq-card {khd_class}">
-                    <h4>3 tháng không HĐ</h4>
-                    <div class="val">{khd_val}</div>
-                    <div class="sub">{khd_sub}</div>
+                    <div style="font-size:0.82rem;font-weight:600;color:#7f1d1d;margin:0 0 4px">3 tháng không HĐ</div>
+                    <div style="font-size:2rem;font-weight:700;line-height:1;color:#7f1d1d;margin:0 0 4px">{khd_val}</div>
+                    <div style="font-size:0.82rem;color:#991b1b">{khd_sub}</div>
                 </div>
             </div>
             """,
@@ -626,8 +622,8 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
         )
         st.caption(
             f"🔍 Kiểm tra cân đối: {_dth} tỷ (Trong hạn) "
-            f"+ {vn(dqh/1e6, 0)} (Quá hạn) "
-            f"+ {vn(dnk/1e6, 0)} (Khoanh) "
+            f"+ {vn(dqh/1e9, 3)} (Quá hạn) "
+            f"+ {vn(dnk/1e9, 3)} (Khoanh) "
             f"= {_tdn} tỷ ✅"
         )
         if os.path.exists(CACHE_HSTD):

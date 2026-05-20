@@ -1,5 +1,18 @@
 # CHANGELOG
 
+## [2026-05-20] — Fix TypeError _render_bao_cao(): username passed twice
+- `tabs/tab_khnv_noi_bo.py` dòng ~1337 — lọc `username` và `role` khỏi `**kwargs` trước khi truyền vào `_render_bao_cao()` để tránh conflict giữa tham số vị trí và `**kwargs` (do `_build_all_items()` đã set `kwargs["username"]`)
+
+## [2026-05-20] — Xóa dead code column_config trong tab_tongquan
+- `tabs/tab_tongquan.py` — xóa `_tao_column_config_co_cau()` và `_tao_column_config_pgd()`: được định nghĩa nhưng không bao giờ được gọi/truyền vào `st.dataframe()`
+- `tabs/tab_tongquan.py` dòng ~1101 — xóa đoạn build `column_config_pgd` (dead code, bảng PGD dùng HTML table)
+
+## [2026-05-20] — Bổ sung cột "Số món vay" vào bảng Thông tin tổng quát theo PGD
+- `tabs/tab_tongquan.py` `_cache_tqpgd_extended()` dòng ~332 — thêm `so_mon=(COT_SO_KU, "nunique")` vào groupby
+- `tabs/tab_tongquan.py` `cot_hien` dòng ~1084 — thêm `"Số món vay"` trước `"Số KH"`, `NHOM_COT` "Dư nợ" colspan 2→3
+- `tabs/tab_tongquan.py` `_fmt_cell` dòng ~1132 — thêm `"Số món vay"` vào nhóm cột số nguyên không định dạng tiền
+- `tabs/tab_tongquan.py` `column_config_pgd` dòng ~1105 — thêm `"Số món vay"` vào NumberColumn format `,.0f`
+
 ## [2026-05-20] — Sửa rule check_conventions sai toán + cập nhật CLAUDE.md tiền tệ
 - `scripts/check_conventions.py` — xóa rule `_TIEN_SAI` cấm `/1e9`: rule sai về toán (1 tỷ = 1e9, `fmt_ty()` chia 1e6 → triệu, không phải tỷ)
 - `CLAUDE.md` — sửa bảng tiền tệ: tách rõ `fmt_ty()` (bảng /1e6 → triệu đồng) vs `vn(x/1e9,3)+"tỷ"` (metric/card inline)

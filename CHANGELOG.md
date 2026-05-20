@@ -1,5 +1,25 @@
 # CHANGELOG
 
+## [2026-05-20] — Thêm nút chỉnh sửa cán bộ trong tab Nhân sự & Chức vụ
+- `tabs/tab_khnv_noi_bo.py` `_render_nhan_su()` — thêm nút ✏️ (chỉnh sửa) bên cạnh tên từng cán bộ
+- Khi bấm ✏️: hiện form inline với text input tên + selectbox chức vụ + nút 💾 Lưu / ❌ Hủy
+- Layout: `[tên (5)] [✏️ (1)] [🗑️ (1)]` thay vì `[tên (6)] [🗑️ (1)]`
+
+## [2026-05-20] — Nâng cấp UX Phân Công Công Việc + Báo cáo NĐ30
+- `tabs/tab_khnv_noi_bo.py` dòng ~65 — thêm `_CHUC_VU_SHORT` hiển thị selectbox gọn: "Nguyễn A - Phó Phòng VT1"
+- `tabs/tab_khnv_noi_bo.py` `_render_phan_cong_v2` — đổi format selectbox cán bộ từ emoji dài sang `_CHUC_VU_SHORT`
+- `tabs/tab_khnv_noi_bo.py` `_render_phan_cong_v2` — xóa expander "✍️ Giao việc thủ công"; form nhanh đổi 2 cols → 3 cols (Mức độ / Ngày giao / Thời gian hoàn thành)
+- `tabs/tab_khnv_noi_bo.py` `_render_phan_cong_v2` — đổi label "Ưu tiên" → "Mức độ", "Deadline" → "Thời gian hoàn thành"; thêm `ngay_giao` vào form
+- `tabs/tab_khnv_noi_bo.py` `_render_task_card` — đổi label "Ưu tiên" → "Mức độ", "Deadline" → "Thời gian hoàn thành" trong expander Chỉnh sửa
+- `tabs/tab_khnv_noi_bo.py` — thêm `_xuat_bc_phan_cong()`: Word chuẩn NĐ30, bảng 8 cột, font TNR 13pt, margin A4
+- `tabs/tab_khnv_noi_bo.py` — thêm `_xuat_bc_tien_do()`: Word chuẩn NĐ30, tóm tắt I/II + bảng 8 cột
+- `tabs/tab_khnv_noi_bo.py` `_render_bao_cao` — viết lại 3 phần: (1) BC Phân công Word+PDF, (2) BC Tiến độ Word+PDF, (3) Excel (header đổi "Mức độ"/"Thời gian hoàn thành") + Checklist
+
+## [2026-05-20] — Cải thiện giao diện Tab Thông tin đầu việc Phòng KH-NV
+- `tabs/tab_khnv_noi_bo.py` `_render_thong_tin_dau_viec()` — font to hơn (0.92–0.95rem), header gradient, màu chữ tương phản hơn
+- `tabs/tab_khnv_noi_bo.py` cấp dưới — tách cột "Thời hạn / Sản phẩm" → 2 cột riêng: Thời hạn (tím) + Sản phẩm (xanh lá) bằng cách parse `mo_ta` tại render
+- `tabs/tab_khnv_noi_bo.py` cấp dưới — thêm border-radius, border cho khung bảng, nhóm badge nền xanh đậm
+
 ## [2026-05-20] — Fix TypeError _render_bao_cao(): username passed twice (v2: pop thay filter)
 - `tabs/tab_khnv_noi_bo.py` dòng ~1337 — dùng `_kw = dict(kwargs); _kw.pop("username",None); _kw.pop("role",None)` thay vì dict comprehension filter (do `_build_all_items()` đã set `kwargs["username"]`, cần `pop()` triệt để trước `**` unpack)
 

@@ -445,16 +445,6 @@ def merge_du_lieu_toan_cn(
         for col in all_cols:
             if col not in df.columns:
                 df[col] = pd.NA
-        for col in df.columns:
-            if df[col].dtype == object or str(df[col].dtype) in (
-                "null", "ArrowDtype(null)", "large_string[pyarrow]"
-            ):
-                try:
-                    df[col] = pd.to_numeric(df[col], errors="ignore")
-                except Exception:
-                    logger.debug("merge_du_lieu_toan_cn: không ép numeric được cột '%s'", col)
-                if df[col].dtype == object:
-                    df[col] = df[col].astype(str).replace("nan", "")
         normalized.append(df[all_cols])
     frames = normalized
 
@@ -493,17 +483,15 @@ def merge_du_lieu_toan_cn(
             ser = df_toan_cn[col]
             if isinstance(ser.dtype, pd.CategoricalDtype):
                 ser = ser.astype(object)
-            df_toan_cn[col] = ser.apply(
-                lambda v: (
-                    ""
-                    if v is None
-                    else (
-                        ""
-                        if str(v).strip() in _BAD_VALS
-                        else str(int(v)) if isinstance(v, float) and v == int(v)
-                        else str(v).strip()
-                    )
-                )
+            # Xử lý float nguyên (ví dụ mã KH 12345.0 → "12345") vectorized
+            if ser.dtype == object:
+                _num = pd.to_numeric(ser, errors="coerce")
+                _whole = _num.notna() & (_num % 1 == 0) & ser.notna()
+                if _whole.any():
+                    ser = ser.copy()
+                    ser.loc[_whole] = _num.loc[_whole].astype("int64").astype(str)
+            df_toan_cn[col] = (
+                ser.fillna("").astype(str).str.strip().replace(list(_BAD_VALS), "")
             )
 
     with _MERGE_LOCK[loai]:

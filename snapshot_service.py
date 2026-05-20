@@ -465,11 +465,14 @@ def luu_cdtotkvv_snapshot(df_cdtotkvv: pd.DataFrame, ky: str, username: str) -> 
     _XEP_YEU = "Yếu"
 
     df_src = df_cdtotkvv.copy()
-    if "tong_diem" in df_src.columns:
-        df_src["tong_diem"] = pd.to_numeric(df_src["tong_diem"], errors="coerce").fillna(0.0)
-
+    # Chuẩn hóa cột bắt buộc
+    if "tong_diem" not in df_src.columns:
+        df_src["tong_diem"] = 0.0
+    df_src["tong_diem"] = pd.to_numeric(df_src["tong_diem"], errors="coerce").fillna(0.0)
+    if "stt" not in df_src.columns:
+        df_src["stt"] = range(len(df_src))
     if "ten_dv" not in df_src.columns:
-        df_src["ten_dv"] = df_src.get("ma_dv", "?")
+        df_src["ten_dv"] = df_src["ma_dv"] if "ma_dv" in df_src.columns else "?"
     if "ma_dv" not in df_src.columns:
         df_src["ma_dv"] = "?"
 

@@ -4,30 +4,26 @@
 
 ---
 
-## [2026-05-20] Redesign tab Nội bộ Phòng KH-NV — 4 tab → 3 tab, quick status
-- `tabs/tab_khnv_noi_bo.py` — giảm từ 4 → 3 sub-tab; bỏ "Tiến độ thực hiện" riêng
-- Thêm `_render_mini_tien_do(ds, today)`: 4 metrics + compact bars per cán bộ, hiện ở đầu tab Phân công
-- Thêm quick status buttons (🔴/🟡/✅) inline trong task card — 1 click, không cần expander
-- Xóa `_render_tien_do_thuc_hien()` (~180 dòng)
-- File giảm từ ~990 → ~840 dòng
+## [2026-05-20] Redesign tab Nội bộ KH-NV — kiến trúc 6 tab theo luồng 5 bước
 
-## [2026-05-20] Drill-down list — 32 đầu việc theo 8 nhóm I→VIII
-- `tabs/tab_khnv_noi_bo.py` — `_MAU_GIAO_VIEC`: thêm field `"nhom"` cho 32 entries (8 giá trị: I–VIII)
-- `tabs/tab_khnv_noi_bo.py` — `_tai_mau_giao_viec_v2`: closure `_nhom_ref[0]` → `_mk()` tự gán `nhom` mà không cần đổi signature các `_mk(...)` call sites
-- `tabs/tab_khnv_noi_bo.py` — `_render_phan_cong()`: gom nhóm bằng `nhom_groups` dict sorted; mỗi nhóm = `st.expander` với header stats (ht/total ✅, %, ⛔ trễ); task thêm thủ công (nhom="") → nhóm "📌 Thêm thủ công" ở cuối
-
-## [2026-05-20] Chỉnh sửa toàn bộ thông tin đầu việc trong Phân công cán bộ
-- `tabs/tab_khnv_noi_bo.py` — expander "✏️ Chỉnh sửa / Cập nhật": với admin_cn/manager_cn thêm Tiêu đề, Mô tả, Người thực hiện, Ưu tiên, Deadline; trạng thái + ghi chú mọi người cập nhật được
-- Nút đổi thành "💾 Lưu thay đổi"; logic lưu tách biệt: ghi info-fields chỉ khi `co_quyen_ghi`
-
-## [2026-05-20] Hướng B hoàn chỉnh — expander "Tải thêm từ mẫu" cuối trang Phân công cán bộ
-- `tabs/tab_khnv_noi_bo.py` `_render_phan_cong()` — thêm expander "⚙️ Tải thêm từ mẫu" (collapsed) sau for-loop, chỉ khi `ds` đã có dữ liệu và `co_quyen_ghi`
-- Form: VP1/VP2 text_input + 6 CB TD (3 cols) + live count ước tính + nút "✅ Tải thêm" (primary)
-- Widget keys dùng suffix `b` để tránh DuplicateElementKey với empty-state form (seed_vp1 → seed_vp1b, …)
-- Kết quả: empty-state = seed form nổi bật trên cùng; has-data = seed form ẩn nhỏ cuối trang ✅
-
-## [2026-05-20] Thêm nút "Xuất PDF" cho Phân công cán bộ và Lịch công tác
-- `tabs/tab_khnv_noi_bo.py` — thêm import `xuat_pdf_co_chart`, `download_pdf_button` từ `components.export_pdf`
+### tab_khnv_noi_bo.py — thay đổi toàn diện (~840 → ~1 100 dòng)
+- `render()`: 3 sub-tab → 6 sub-tab: 👥 Nhân sự / 📋 Phân công / 📊 Tiến độ / 📄 Báo cáo / 📅 Lịch / 📖 Thông tin đầu việc
+- **Hằng số mới**: `KHNV_CAN_BO = "khnv_can_bo_list"` — lưu danh sách cán bộ `{id, ho_ten, chuc_vu: "vp1"|"vp2"|"cbtd"}`
+- **Hằng số mới**: `_CHUC_VU_MAP`, `_CHUC_VU_LABEL`, `_CHUC_VU_TASK_FILTER` — mapping chức vụ ↔ nhãn ↔ đầu việc phù hợp
+- **Dữ liệu mở rộng**: `_MAU_GIAO_VIEC` 32 → 38 đầu việc (bổ sung: chấm công VP2, KHTD toàn tỉnh VP2, lưu giữ hồ sơ NRR VP2, báo cáo hoạt động VP2, dự toán VP2, tổ GDLĐ VP1+VP2+CBTD)
+- **Dữ liệu mới**: `_MAU_GIAO_VIEC_TP` — 17 đầu việc Trưởng phòng TP01–TP17 (tĩnh, chỉ tham chiếu)
+- **Hàm mới** `_render_nhan_su(role_n, username)`: Tab 1 — thêm/xóa cán bộ, gom nhóm VP1/VP2/CBTD
+- **Hàm mới** `_render_task_card(cv, ds, today, role_n, username, key_prefix)`: helper chung cho Tab 2+3 — 4 cols + quick buttons (🔴/🟡/✅) + expander Chỉnh sửa/Xóa
+- **Hàm mới** `_render_phan_cong_v2(role_n, username)`: Tab 2 — dropdown cán bộ → đầu việc lọc theo chức vụ; gom nhóm theo vị trí (VP1/VP2/CBTD/📌); nút tải 38 mẫu từ KHNV_CAN_BO; form thủ công giữ nguyên
+- **Hàm mới** `_render_tien_do_edit(role_n, username)`: Tab 3 — mini dashboard + bộ lọc tt/người + task cards
+- **Hàm mới** `_render_bao_cao(role_n, username, **kwargs)`: Tab 4 — PDF tiến độ + Excel download + checklist cấp trên (wrapper tab_checklist_bc)
+- **Hàm mới** `_render_thong_tin_dau_viec()`: Tab 6 — HTML table tĩnh TP01–TP17 + 38 đầu việc gom nhóm I–VIII
+- **Hàm mới** `_tai_mau_tu_kv(ds, username)`: wrapper đọc từ KHNV_CAN_BO → gọi `_tai_mau_giao_viec_v2`
+- **Hàm mới** `_guess_chuc_vu(cv)`: fallback đoán chức vụ từ `nguoi_thuc_hien` cũ → backward-compatible
+- **Hàm mới** `_safe_date_lt(date_str, ref)`: helper parse date an toàn
+- **Xóa**: `_render_phan_cong()` (thay bởi v2 + task_card)
+- **Backward compat**: task cũ không có field `chuc_vu` → `_guess_chuc_vu()` tự suy luận, không cần migration
+- Import thêm: `xuat_excel` từ `utils`; `_tai_mau_giao_viec_v2` giờ tạo task có thêm field `chuc_vu`
 - `tabs/tab_khnv_noi_bo.py` sub-tab 📋 Phân công cán bộ: thêm nút "📥 Xuất PDF" — chuyển list dict → DataFrame (Tiêu đề, Người thực hiện, Mức ưu tiên, Ngày giao, Deadline, Trạng thái, Ghi chú) → `xuat_pdf_co_chart` với `them_dong_tong=False`
 - `tabs/tab_khnv_noi_bo.py` sub-tab 📅 Lịch công tác: thêm nút "📥 Xuất PDF" — xuất danh sách đã lọc theo tháng/năm/loại (Ngày, Loại, Tiêu đề, Địa điểm, Thành viên, Ghi chú, Trạng thái)
 

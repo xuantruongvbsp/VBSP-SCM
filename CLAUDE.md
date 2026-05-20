@@ -528,6 +528,7 @@ Thêm entry mới lên **ĐẦU FILE** `CHANGELOG.md` (ngay sau dòng `# CHANGEL
 | `ROLES.md` | Cần phân quyền chi tiết theo role mới |
 | `TROUBLESHOOTING.md` | Gặp lỗi thường gặp về dữ liệu, cache, upload |
 | `CHANGELOG.md` | Lịch sử thay đổi |
+| `BACKLOG.md` | Yêu cầu người dùng — đã làm & sẽ làm |
 | `ROADMAP.md` | Sprint + backlog |
 | `TEMPLATES.md` | Hướng dẫn quản lý template Word |
 | `HUONG_DAN_PHAN_HE.md` | Hướng dẫn sử dụng theo phân hệ |

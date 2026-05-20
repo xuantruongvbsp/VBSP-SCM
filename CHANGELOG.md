@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## [2026-05-20] — Tối ưu hiệu năng merge_du_lieu_toan_cn: bỏ apply lambda + bỏ to_numeric thừa
+- `services/upload_service.py` dòng ~440 — bỏ vòng `pd.to_numeric(errors="ignore")` trên từng frame×cột trong schema normalization (không cần thiết, cột số đã xử lý trong `_clean()`)
+- `services/upload_service.py` dòng ~490 — thay `.apply(lambda v: ...)` Python-level trên toàn `df_toan_cn` bằng pipeline vectorized: `pd.to_numeric` để detect float nguyên, `.fillna("").astype(str).str.strip().replace()` cho cột chuỗi
+
 ## [2026-05-20] — Redesign tab Nội bộ KH-NV: kiến trúc 6 tab + bảng tham chiếu đầu việc
 - `tabs/tab_khnv_noi_bo.py` `render()` — đổi 3 sub-tab → 6 sub-tab: Nhân sự & Chức vụ / Phân công / Tiến độ / Báo cáo / Lịch / Thông tin đầu việc
 - `tabs/tab_khnv_noi_bo.py` — thêm `KHNV_CAN_BO`, `_CHUC_VU_MAP/LABEL/TASK_FILTER` — mapping chức vụ → đầu việc

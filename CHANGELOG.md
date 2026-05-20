@@ -1,5 +1,19 @@
 # CHANGELOG
 
+## [2026-05-20] — Redesign tab Nội bộ KH-NV: kiến trúc 6 tab + bảng tham chiếu đầu việc
+- `tabs/tab_khnv_noi_bo.py` `render()` — đổi 3 sub-tab → 6 sub-tab: Nhân sự & Chức vụ / Phân công / Tiến độ / Báo cáo / Lịch / Thông tin đầu việc
+- `tabs/tab_khnv_noi_bo.py` — thêm `KHNV_CAN_BO`, `_CHUC_VU_MAP/LABEL/TASK_FILTER` — mapping chức vụ → đầu việc
+- `tabs/tab_khnv_noi_bo.py` — mở rộng `_MAU_GIAO_VIEC` từ 32 → 38 đầu việc (thêm nhóm I, II, IV, VII×2, VIII)
+- `tabs/tab_khnv_noi_bo.py` — thêm `_MAU_GIAO_VIEC_TP`: 17 đầu việc Trưởng phòng TP01–TP17 (dữ liệu tĩnh)
+- `tabs/tab_khnv_noi_bo.py` — thêm hàm `_render_nhan_su()`: Tab 1 quản lý danh sách cán bộ (VP1/VP2/CBTD)
+- `tabs/tab_khnv_noi_bo.py` — thêm hàm `_render_task_card()`: helper dùng chung Tab 2+3 (card + quick buttons + edit/xóa)
+- `tabs/tab_khnv_noi_bo.py` — thêm hàm `_render_phan_cong_v2()`: Tab 2 với dropdown cán bộ → đầu việc theo chức vụ, gom nhóm theo vị trí
+- `tabs/tab_khnv_noi_bo.py` — thêm hàm `_render_tien_do_edit()`: Tab 3 với bộ lọc trạng thái/người + quick buttons
+- `tabs/tab_khnv_noi_bo.py` — thêm hàm `_render_bao_cao()`: Tab 4 PDF tiến độ + Excel + checklist cấp trên
+- `tabs/tab_khnv_noi_bo.py` — thêm hàm `_render_thong_tin_dau_viec()`: Tab 6 bảng HTML tĩnh TP01–TP17 + 38 việc nhóm I–VIII
+- `tabs/tab_khnv_noi_bo.py` — thêm `_tai_mau_tu_kv()`: wrapper tải mẫu từ KHNV_CAN_BO; xóa `_render_phan_cong()` cũ
+- `utils.py` import `xuat_excel` thêm vào tab_khnv_noi_bo.py; file tăng từ ~840 → ~1 100 dòng
+
 ## [2026-05-20] — Sửa bảng "Thông tin tổng quát theo PGD" — mất cột Giải ngân/Thu nợ/Nợ ĐH năm
 - `tabs/tab_tongquan.py` `cot_hien` dòng ~1080 — sửa `"Lãi tồn (tỷ)"` → `"Lãi tồn (triệu đồng)"`, `"DS Cho vay (tỷ)"` → `"DS Cho vay (triệu đồng)"`, `"DS Thu nợ (tỷ)"` → `"DS Thu nợ (triệu đồng)"`; thêm `"Nợ ĐH năm (triệu đồng)"` — nguyên nhân: tên cột sau rename là `(triệu đồng)` nhưng `cot_hien` khai báo `(tỷ)` nên bị filter mất
 

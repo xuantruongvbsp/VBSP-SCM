@@ -3,6 +3,7 @@ Không gian Tác nghiệp (Operation View)
 ────────────────────────────────────────
 Dành cho CBTD — Tra cứu chi tiết + Document Hub (Trung tâm văn bản tự động).
 """
+import importlib
 import socket
 
 import streamlit as st
@@ -44,6 +45,14 @@ from components.delta_card import delta_card, kpi_row
 from components.filter_bar import filter_bar, apply_filters
 from components.loan_drawer import loan_detail_drawer
 from components.export_pdf import download_pdf_button, xuat_pdf_co_chart
+
+_TAB_CACHE: dict = {}
+
+def _lazy_tab(name: str):
+    """Import tab module only on first use — cached permanently."""
+    if name not in _TAB_CACHE:
+        _TAB_CACHE[name] = importlib.import_module(f"tabs.{name}")
+    return _TAB_CACHE[name]
 
 
 # ── Helper: tính 4 KPI DeltaCard cho trang chủ PGD ──────────────────────────
@@ -1211,19 +1220,6 @@ def render(**kwargs):
     _wl = st.session_state.pop("_data_load_warning", None)
     if _wl:
         st.warning(_wl)
-
-    # ── Lazy import tab modules ──────────────────────────────────────────
-    from tabs import (
-        tab_tracuu, tab_danhsach,
-        tab_khtd_pgd, tab_nhiem_vu, tab_upload_pgd,
-        tab_cdtotkvv_pgd, tab_khtd_mau07, tab_khtd_giao_dc,
-        tab_diem_gd_pgd, tab_ban_dai_dien,
-        tab_tongquan, tab_tien_do, tab_baocao,
-        tab_nq11, tab_candoi, tab_uy_thac, tab_qd62,
-        tab_trang_thai_nguon, tab_so_sanh_ky,
-        tab_no_khoanh,
-    )
-    from tabs.tab_den_han import render as render_den_han
 
     df = kwargs.get("df")
     df_nq11 = kwargs.get("df_nq11")

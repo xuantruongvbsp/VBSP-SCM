@@ -14,6 +14,7 @@ import pandas as pd
 from auth import normalize_role, la_phan_he_cn
 from db import doc_kv, ghi_kv, ghi_audit
 from utils import get_tab_context
+from components.export_pdf import xuat_pdf_co_chart, download_pdf_button
 from tabs import tab_checklist_bc, tab_tien_do
 
 LOAI_LICH = {
@@ -111,6 +112,31 @@ def _render_phan_cong(tab, role_n: str, username: str):
     ))
 
     st.markdown("### 📋 Danh sách phân công")
+
+    # ── Xuất PDF ──
+    if ds:
+        _uu_map = {"khan_cap": "Khẩn cấp", "quan_trong": "Quan trọng", "binh_thuong": "Bình thường"}
+        _tt_map = {"chua_lam": "Chưa làm", "dang_lam": "Đang làm", "hoan_thanh": "Hoàn thành", "tre_han": "Trễ hạn"}
+        _df_pc = pd.DataFrame([
+            {
+                "Tiêu đề": c.get("tieu_de", ""),
+                "Người thực hiện": c.get("nguoi_thuc_hien", ""),
+                "Mức ưu tiên": _uu_map.get(c.get("uu_tien", ""), c.get("uu_tien", "")),
+                "Ngày giao": c.get("ngay_giao", ""),
+                "Deadline": c.get("ngay_deadline", ""),
+                "Trạng thái": _tt_map.get(c.get("trang_thai", ""), c.get("trang_thai", "")),
+                "Ghi chú": c.get("ghi_chu_ket_qua", ""),
+            }
+            for c in ds
+        ])
+        _pdf_bytes = xuat_pdf_co_chart(
+            _df_pc, "Phân công cán bộ - Phòng KH-NV", username,
+            them_dong_tong=False, cols_tien=None,
+        )
+        col_pdf, _ = st.columns([1, 5])
+        with col_pdf:
+            download_pdf_button(_pdf_bytes, "phan_cong_can_bo.pdf",
+                                "📥 Xuất PDF", key="pdf_phan_cong")
 
     today = date.today()
     for i, cv in enumerate(ds_sorted):
@@ -275,6 +301,31 @@ def _render_lich_cong_tac(tab, role_n: str, username: str):
         ds_loc.append(ev)
 
     ds_loc.sort(key=lambda x: x.get("ngay", ""))
+
+    # ── Xuất PDF ──
+    if ds_loc:
+        _loai_map = {k: v.replace("🗓️ ", "").replace("🔍 ", "").replace("✈️ ", "").replace("🎓 ", "").replace("📌 ", "") for k, v in LOAI_LICH.items()}
+        _tt_lich = {"sap_dien_ra": "Sắp diễn ra", "da_hoan_thanh": "Đã hoàn thành", "huy_bo": "Hủy bỏ"}
+        _df_lich = pd.DataFrame([
+            {
+                "Ngày": e.get("ngay", ""),
+                "Loại": _loai_map.get(e.get("loai", ""), e.get("loai", "")),
+                "Tiêu đề": e.get("tieu_de", ""),
+                "Địa điểm": e.get("dia_diem", ""),
+                "Thành viên": e.get("thanh_vien", ""),
+                "Ghi chú": e.get("ghi_chu", ""),
+                "Trạng thái": _tt_lich.get(e.get("trang_thai", ""), e.get("trang_thai", "")),
+            }
+            for e in ds_loc
+        ])
+        _pdf_bytes = xuat_pdf_co_chart(
+            _df_lich, "Lịch công tác Phòng KH-NV", username,
+            them_dong_tong=False, cols_tien=None,
+        )
+        col_pdf, _ = st.columns([1, 5])
+        with col_pdf:
+            download_pdf_button(_pdf_bytes, "lich_cong_tac.pdf",
+                                "📥 Xuất PDF", key="pdf_lich")
 
     # ── Bảng ──
     st.markdown("### 📅 Lịch công tác trong tháng")

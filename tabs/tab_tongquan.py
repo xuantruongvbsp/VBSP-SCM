@@ -481,7 +481,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
         st.markdown(
             """
             <style>
-            .tq-caption{color:#4b5563;font-size:0.96rem;margin:-6px 0 14px 0}
+            .tq-caption{font-size:0.96rem;margin:-6px 0 14px 0;opacity:0.75}
             .tq-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:14px}
             .tq-card{border-radius:10px;padding:12px 10px 10px;border:1px solid #d1d5db;min-height:90px;text-align:center}
             .tq-card.soft-blue{background:#dbeafe;border-color:#93c5fd}
@@ -1183,7 +1183,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                     f'{_fmt_cell(row[c], c)}</td>'
                     for c in cot_hien
                 )
-                rows_html += f'<tr style="background:{bg}">{cells}</tr>\n'
+                rows_html += f'<tr style="background:{bg};color:#1a202c">{cells}</tr>\n'
 
             html_table = f"""
             <div style="overflow-x:auto;margin:8px 0">
@@ -1194,9 +1194,9 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
               </thead>
               <tbody>{rows_html}</tbody>
             </table>
-            <p style="font-size:0.78rem;color:#6B7280;margin:4px 0">
+            <div style="font-size:0.78rem;opacity:0.65;margin:4px 0">
               * Đơn vị: Dư nợ = tỷ đồng | Các cột tiền khác = triệu đồng
-            </p>
+            </div>
             </div>
             """
             st.markdown(html_table, unsafe_allow_html=True)

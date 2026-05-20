@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## [2026-05-20] — Tải 32 đầu việc mẫu vào Phân công cán bộ (Nội bộ Phòng KH-NV)
+- `tabs/tab_khnv_noi_bo.py` — thêm hằng số `_MAU_GIAO_VIEC` (32 đầu việc từ Bảng giao việc Trưởng phòng KH-NVTD, chia 8 nhóm I–VIII)
+- `tabs/tab_khnv_noi_bo.py` — thêm hàm `_tai_mau_giao_viec(ds, username)`: append 32 task vào list + ghi_kv + audit `khnv_tai_mau_giao_viec`
+- `tabs/tab_khnv_noi_bo.py` `_render_phan_cong()` — thêm nút "📥 Tải 32 đầu việc mẫu": nổi bật (primary) khi ds rỗng, ẩn trong expander khi ds đã có dữ liệu; chỉ hiện với admin_cn/manager_cn
+
 ## [2026-05-20] — Sub-tab "Tiến độ thực hiện" thay thế "Giao việc PGD" trong Nội bộ Phòng KH-NV
 - `tabs/tab_khnv_noi_bo.py` — thêm hàm `_render_tien_do_thuc_hien()`: tổng hợp tự động từ `khnv_phan_cong_list`, không cần nhập liệu thêm
 - `tabs/tab_khnv_noi_bo.py` — hiển thị: bộ lọc (tháng deadline / năm / cán bộ), 5 metric tổng quan, progress bar màu theo % từng cán bộ (đỏ <30 / cam 30–70 / xanh ≥70 / lá 100%), badge trễ hạn, bảng chi tiết, nút Xuất PDF

@@ -97,6 +97,31 @@ COT_MA_CHUONG_TRINH   = "Mã chương trình"
 COT_PL_NV             = "Phân loại NV"    # KHÔNG hardcode "PL NV"
 COT_MA_NHA_DAU_TU     = "Mã nhà đầu tư"
 
+# Personal
+COT_NGAY_SINH       = "Ngày sinh"
+COT_NGAY_CAP_CMND  = "Ngày cấp CMND"
+COT_NOI_CAP_CMND   = "Nơi cấp CMND"
+COT_NGAY_HH_KHOANH = "Ngày hết hạn khoanh"
+COT_TEN_HSSV       = "Họ tên HSSV"
+COT_TEN_VC         = "Họ tên vợ/chồng"
+COT_HINH_THUC_VAY  = "Hình thức vay"
+
+# NQ11
+COT_DNO_NQ11       = "Dư nợ gốc NQ11"
+COT_NQ11_NO_TH     = "Nợ trong hạn NQ11"
+COT_NQ11_NO_QH     = "Nợ quá hạn NQ11"
+COT_NQ11_MA_KH     = "Mã KH NQ11"
+COT_NQ11_TEN_KH    = "Tên KH NQ11"
+COT_NQ11_SO_TIEN   = "Số tiền NQ11"
+COT_NQ11_DU_NO     = "Dư nợ NQ11"
+COT_NQ11_SO_TIEN_GN = "Số tiền giải ngân NQ11"
+COT_NQ11_DEN_HAN_SC = "Đến hạn sổ cuối NQ11"
+COT_NQ11_NGAY_BC   = "Ngày báo cáo NQ11"
+
+# GQVL
+COT_GQVL_MA_PGD       = "Mã PGD GQVL"
+COT_GQVL_DU_NO_KHOANH = "Dư nợ khoanh GQVL"
+
 # Risk/Activity
 COT_LAI_TON    = "Lãi tồn TH"
 COT_LAI_TON_QH = "Lãi tồn QH"
@@ -181,6 +206,9 @@ def movers_analysis(
     df_prev: pd.DataFrame | None = None,
     top_n: int = 10,
     key_prefix: str = "mover",
+    on_select_dimension=None,
+    on_select_metric=None,
+    show_title: bool = True,
 ): ...
 ```
 
@@ -195,12 +223,16 @@ def fmt_ty(x) -> str           # "1.234,560 tỷ"
 def fmt_pct(x) -> str          # "12,34%"
 def fmt(x) -> str              # "1.234.567.890"
 def vn(s: str) -> str          # normalize tiếng Việt
-def pgd_slug(ten: str) -> str  # "PGD Biên Hòa" → "bien_hoa"
 def get_tab_context(tab)       # fallback st.container() khi tab=None
 def hien_thi_dataframe_phan_trang(df, key, page_size=50): ...
 def xuat_excel(sheets: dict, ten_file: str) -> bytes: ...
 def auto_fill_document(template_path, tag_map, output_path): ...
+def auto_audit(action: str = "", clear_cache: bool = True): ...
+def auto_fill_batch(df_rows, template_path, tag_map, ...): ...
+def lazy_tabs(labels: list[str], renderers: list, key: str = "lt"): ...
 ```
+
+⚠️ `pgd_slug()` ở `data/pgd.py` (KHÔNG phải utils)
 
 ---
 
@@ -212,8 +244,10 @@ def la_phan_he_cn(role: str) -> bool      # executive/admin_cn/manager_cn/admin/
 def la_phan_he_pgd(role: str) -> bool     # admin_pgd/manager_pgd/user_pgd/user
 def la_executive(role: str) -> bool
 def la_admin_cn(role: str) -> bool
+def la_chuyen_vien_cn(role: str) -> bool
 def co_quyen_upload_pgd(role: str) -> bool
-def get_permissions(role: str, pgd_user=None) -> dict
+def co_quyen_giao_nhiem_vu(role: str) -> bool
+def get_permissions(role: str) -> dict
 ```
 
 ---
@@ -392,7 +426,7 @@ Thêm lên ĐẦU FILE, dùng ngày thực tế, KHÔNG xóa entry cũ.
 |---|---|
 | `CLAUDE.md` | Convention đầy đủ, luồng dữ liệu, pattern chuẩn |
 | `BUGMAP.md` | Gặp lỗi — tra trước khi debug |
-| `FILE_INDEX.md` | Cần biết hàm X ở dòng mấy |
+| ~~`FILE_INDEX.md`~~ | *(đã xóa)* |
 | `ARCHITECTURE.md` | Quan hệ import giữa các module |
 | `TROUBLESHOOTING.md` | Lỗi vận hành thường gặp |
 | `CHANGELOG.md` | Lịch sử thay đổi |

@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## [2026-05-20] — Seed script + giải thích nguyên nhân mất dữ liệu HSTD khi pull GitHub
+- `seed_hstd_data.py` (mới) — script sinh dữ liệu HSTD mẫu (660 dòng, 36 cột, 22 đơn vị); chạy `python seed_hstd_data.py` sau pull GitHub để app hoạt động ngay, không báo thiếu dữ liệu
+- `seed_hstd_data.py` — ghi đồng thời Excel (`data/HSTD_Du_lieu_tho.xlsx`) + Parquet cache (`cache/hstd.parquet`)
+- Nguyên nhân: `.gitignore` loại trừ `cache/`, `data/`, `pgd_data/`, `*.xlsx` nên khi pull sang máy mới không có file dữ liệu
+
 ## [2026-05-20] — Tối ưu hiệu năng merge_du_lieu_toan_cn: bỏ apply lambda + bỏ to_numeric thừa
 - `services/upload_service.py` dòng ~440 — bỏ vòng `pd.to_numeric(errors="ignore")` trên từng frame×cột trong schema normalization (không cần thiết, cột số đã xử lý trong `_clean()`)
 - `services/upload_service.py` dòng ~490 — thay `.apply(lambda v: ...)` Python-level trên toàn `df_toan_cn` bằng pipeline vectorized: `pd.to_numeric` để detect float nguyên, `.fillna("").astype(str).str.strip().replace()` cho cột chuỗi

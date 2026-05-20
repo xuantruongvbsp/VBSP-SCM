@@ -74,6 +74,8 @@ def _toi_uu_dtype(df: pd.DataFrame) -> pd.DataFrame:
     for col in df.select_dtypes(include="object").columns:
         try:
             if df[col].nunique(dropna=False) <= NGUONG_CATEGORY:
+                if col.lower().startswith("ngày"):
+                    continue
                 df[col] = df[col].astype("category")
         except Exception:
             pass

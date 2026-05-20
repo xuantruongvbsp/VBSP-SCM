@@ -547,19 +547,67 @@ def merge_du_lieu_toan_cn(
         )
 
     # Auto-snapshot NGOÀI lock — chạy background thread để không block luồng chính
-    if loai == "hstd":
-        import threading as _threading
-        _snap_user = st.session_state.get("username", "system")
-        _snap_df = df_toan_cn.copy()
+    import threading as _threading
+    _snap_user = st.session_state.get("username", "system")
+    _snap_df = df_toan_cn.copy()
 
+    if loai == "hstd":
         def _snap_bg() -> None:
             try:
                 from snapshot_service import luu_snapshot as _luu_snap
                 _luu_snap(_snap_df, _snap_user)
             except Exception as e:
-                logger.error("auto-snapshot background thread thất bại — %s", e, exc_info=True)
+                logger.error("auto-snapshot HSTD background thread thất bại — %s", e, exc_info=True)
+            # Sau HSTD snapshot, thử lưu CDTOTKVV snapshot cùng kỳ
+            try:
+                import pandas as _pd
+                from datetime import datetime as _dt_cls
+                from config import COT_NGAY_SL as _COT_NGAY_SL
+                from data.cdtotkvv import doc_cdtotkvv_toan_cn_pgd as _doc_cdtot
+                from snapshot_service import luu_cdtotkvv_snapshot as _luu_cdtot
+                # Xác định kỳ từ HSTD df
+                _ky_str = _dt_cls.now().strftime("%Y-%m")
+                if _COT_NGAY_SL in _snap_df.columns:
+                    _sl = _snap_df[_COT_NGAY_SL].dropna()
+                    if len(_sl):
+                        _val = str(_sl.iloc[0])
+                        try:
+                            if "/" in _val:
+                                _p = _val.split("/")
+                                _ky_str = f"{_p[2][:4]}-{_p[1].zfill(2)}"
+                            else:
+                                _dt_tmp = _pd.to_datetime(_val, errors="coerce")
+                                if _pd.notna(_dt_tmp):
+                                    _ky_str = _dt_tmp.strftime("%Y-%m")
+                        except Exception:
+                            pass
+                _df_cdtot = _doc_cdtot()
+                if _df_cdtot is not None and not _df_cdtot.empty:
+                    _luu_cdtot(_df_cdtot, _ky_str, _snap_user)
+            except Exception as e:
+                logger.error("auto-snapshot CDTOTKVV background thread thất bại — %s", e, exc_info=True)
 
         _threading.Thread(target=_snap_bg, daemon=True).start()
+
+    elif loai == "nq11":
+        def _snap_nq11_bg() -> None:
+            try:
+                from snapshot_service import luu_nq11_snapshot as _luu_nq11
+                _luu_nq11(_snap_df, _snap_user)
+            except Exception as e:
+                logger.error("auto-snapshot NQ11 background thread thất bại — %s", e, exc_info=True)
+
+        _threading.Thread(target=_snap_nq11_bg, daemon=True).start()
+
+    elif loai == "gqvl":
+        def _snap_gqvl_bg() -> None:
+            try:
+                from snapshot_service import luu_gqvl_snapshot as _luu_gqvl
+                _luu_gqvl(_snap_df, _snap_user)
+            except Exception as e:
+                logger.error("auto-snapshot GQVL background thread thất bại — %s", e, exc_info=True)
+
+        _threading.Thread(target=_snap_gqvl_bg, daemon=True).start()
 
     return KetQuaUpload(
         True,

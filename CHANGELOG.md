@@ -1,5 +1,28 @@
 # CHANGELOG
 
+## [2026-05-20] — Fix số tiền card "Tổng quan danh mục" sai 1000 lần (/1e6 → /1e9)
+- `tabs/tab_tongquan.py` dòng ~560-566 — đổi `vn(x / 1e6, 0)` → `vn(x / 1e9, 3)` cho `tdn`, `dth`, `dqh`, `dnk`, `tdn_delta`; nguyên nhân: dữ liệu lưu VND thô, chia 1e6 ra triệu nhưng label ghi "tỷ" → sai 1000 lần
+- `tabs/tab_tongquan.py` dòng ~549 — `khd_sub = fmt(dn_3m)` → `vn(dn_3m / 1e9, 3) + " tỷ đồng"` để có đơn vị
+
+## [2026-05-20] — UI: card "Tổng quan danh mục" to rõ hơn, căn giữa như "Xếp loại tổ"
+- `tabs/tab_tongquan.py` dòng ~486-497 — tăng `.val` font-size `2.05rem→2.4rem`; thêm `text-align:center`; đậm màu nền soft-* (dbeafe/dcfce7/fee2e2/fef3c7...); thêm CSS variable `--tq-num`/`--tq-label` cho màu số và nhãn theo scheme màu; thu nhỏ h4 xuống `0.82rem` để số nổi bật hơn
+
+## [2026-05-20] — Fix lỗi "Thông tin chung": KeyError 'ten_ct' khi merge _nk/_gn/_tn
+- `tabs/tab_tongquan.py` dòng ~272,283,296 — thêm `.rename(columns={COT_TEN_CT: "ten_ct"})` sau `reset_index(name=...)` cho `_nk`, `_gn`, `_tn`; nguyên nhân: `COT_TEN_CT="Tên chương trình"` ≠ `"ten_ct"`, merge `on="ten_ct"` không tìm thấy cột trong các sub-DataFrame
+
+## [2026-05-20] — Tạo tab "Nội bộ Phòng KH-NV" (tab_khnv_noi_bo.py)
+- `tabs/tab_khnv_noi_bo.py` (tạo mới) — 4 sub-tab: 📋 Phân công cán bộ, 📅 Lịch công tác, 📤 Báo cáo cấp trên (wrapper), 📌 Giao việc PGD (wrapper)
+- `tabs/tab_khnv_noi_bo.py` — kv_store keys: `khnv_phan_cong_list` + `khnv_lich_list`, audit đầy đủ, phân quyền admin_cn/manager_cn toàn quyền, chuyenvien_cn/executive chỉ xem + cập nhật trạng thái
+- `workspaces/ws_management.py` dòng ~1116 — thêm item `🗂️ Nội bộ Phòng KH-NV` vào nhóm "Phối hợp với PGD"
+
+## [2026-05-20] — Fix lỗi "Thông tin chung": category sum — lần 4 (COT_DU_NO_QH sót conversion + thêm .astype(object))
+- `tabs/tab_tongquan.py` dòng ~227 — thêm `.astype(object)` trong vòng lặp `_COLS_TO_SUM` (cùng pattern fix `hstd.py`): Categorical không bị strip nếu thiếu bước này
+- `tabs/tab_tongquan.py` dòng ~256 — đổi `.groupby()[COT_DU_NO_QH].sum()` → `.apply(lambda x: pd.to_numeric(x, errors="coerce").sum())` nhất quán với `col_khoanh`/`col_gn`
+
+## [2026-05-20] — Fix lỗi "category type does not support sum operations" lần 3 (tận gốc)
+- `tabs/tab_tongquan.py` — 4 cached function (`_cache_kpi_tongquan`, `_cache_heatmap_pgd`, `_cache_co_cau_ct`, `_cache_tqpgd_extended`): bỏ `hasattr(..., 'cat')`, dùng `pd.to_numeric` không điều kiện; `hasattr` không detect được category dtype trong 1 số trường hợp Parquet edge case
+- `tabs/tab_tongquan.py` — thêm convert numeric cho `_cache_heatmap_pgd` (trước đây chưa có convert nào)
+
 ## [2026-05-20] — Đổi đơn vị KPI "3 tháng không hoạt động" từ triệu → đồng
 - `workspaces/ws_management.py` dòng ~272 — `k3.metric("Lãi tồn (triệu đồng)", vn(tong_lai/1e6, 0))` → `k3.metric("Lãi tồn (đồng)", fmt(tong_lai))`: bỏ chia 1e6, đổi label
 - `workspaces/ws_operation.py` dòng ~320 — `k3.metric("Lãi tồn cần thu (triệu đồng)", fmt(tong_lai))` → `k3.metric("Lãi tồn cần thu (đồng)", fmt(tong_lai))`: sửa label cho đúng (giá trị đã là VND raw)

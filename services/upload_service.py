@@ -481,15 +481,18 @@ def merge_du_lieu_toan_cn(
     for col in _cols_so_cn:
         if col in df_toan_cn.columns:
             df_toan_cn[col] = pd.to_numeric(df_toan_cn[col], errors="coerce")
-    # String cleanup — vectorized (thay per-cell Python loop cũ, nhanh hơn ~30×)
-    _str_cols = [c for c in df_toan_cn.columns if c not in _cols_so_cn]
-    _BAD_VALS = {"nan", "None", "<NA>", "NaT"}
-    for _c in _str_cols:
-        try:
-            s = df_toan_cn[_c].astype(str).str.strip()
-            df_toan_cn[_c] = s.where(~s.isin(_BAD_VALS), "")
-        except Exception:
-            pass
+    # String cleanup — chỉ xử lý cột object dtype, dùng fillna + batch replace
+    # Tránh astype(str).str.strip() trên 164 cột × 349K dòng (~25s → <1s)
+    _str_cols_obj = [
+        c for c in df_toan_cn.columns
+        if c not in _cols_so_cn and df_toan_cn[c].dtype == object
+    ]
+    if _str_cols_obj:
+        df_toan_cn[_str_cols_obj] = (
+            df_toan_cn[_str_cols_obj]
+            .fillna("")
+            .replace({"nan": "", "None": "", "<NA>": "", "NaT": ""})
+        )
 
     with _MERGE_LOCK[loai]:
         bak_path = cache_path + ".bak"

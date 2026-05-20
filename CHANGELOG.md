@@ -1,5 +1,8 @@
 # CHANGELOG
 
+## [2026-05-20] — Fix lỗi Tổng Quan Chi Nhánh trắng: _load_hstd trả về DataFrame rỗng
+- `app.py` dòng ~134 — `duckdb.query().arrow()` trả về `RecordBatchReader` (không có `.to_pandas()`), bị catch thầm lặng → `pd.DataFrame()` rỗng; fix: đổi sang `.to_arrow_table().to_pandas(self_destruct=True)`
+
 ## [2026-05-20] — Fix tổng hợp thủ công chậm/treo: string cleanup 27s → 0.7s
 - `services/upload_service.py` dòng ~484 — thay `for _c in _str_cols: astype(str).str.strip()` (164 cột × 349K dòng = 27s) bằng `df[obj_cols].fillna('')` (17 cột object = 0.7s, nhanh hơn 38×)
 - Root cause: cột non-object (157/174 cột) bị xử lý thừa; `.astype(str)` allocate string mới toàn bộ DataFrame cho mỗi cột

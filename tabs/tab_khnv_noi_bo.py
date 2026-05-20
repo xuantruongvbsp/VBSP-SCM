@@ -101,42 +101,45 @@ def _render_phan_cong(tab, role_n: str, username: str):
                         st.rerun()
 
     # ── Bảng danh sách ──
-    if not ds:
-        st.info("ℹ️ Chưa có việc nào được giao.")
-        return
-
     # Sắp xếp: chưa làm / đang làm lên trước
     ds_sorted = sorted(ds, key=lambda x: (
         0 if x.get("trang_thai") in ("chua_lam", "dang_lam") else 1,
         x.get("ngay_deadline", ""),
-    ))
+    )) if ds else []
 
     st.markdown("### 📋 Danh sách phân công")
 
-    # ── Xuất PDF ──
-    if ds:
-        _uu_map = {"khan_cap": "Khẩn cấp", "quan_trong": "Quan trọng", "binh_thuong": "Bình thường"}
-        _tt_map = {"chua_lam": "Chưa làm", "dang_lam": "Đang làm", "hoan_thanh": "Hoàn thành", "tre_han": "Trễ hạn"}
-        _df_pc = pd.DataFrame([
-            {
-                "Tiêu đề": c.get("tieu_de", ""),
-                "Người thực hiện": c.get("nguoi_thuc_hien", ""),
-                "Mức ưu tiên": _uu_map.get(c.get("uu_tien", ""), c.get("uu_tien", "")),
-                "Ngày giao": c.get("ngay_giao", ""),
-                "Deadline": c.get("ngay_deadline", ""),
-                "Trạng thái": _tt_map.get(c.get("trang_thai", ""), c.get("trang_thai", "")),
-                "Ghi chú": c.get("ghi_chu_ket_qua", ""),
-            }
-            for c in ds
-        ])
-        _pdf_bytes = xuat_pdf_co_chart(
-            _df_pc, "Phân công cán bộ - Phòng KH-NV", username,
-            them_dong_tong=False, cols_tien=None,
-        )
-        col_pdf, _ = st.columns([1, 5])
-        with col_pdf:
+    # ── Xuất PDF — luôn hiển thị, disabled khi chưa có dữ liệu ──
+    col_pdf, _ = st.columns([1, 5])
+    with col_pdf:
+        if ds:
+            _uu_map = {"khan_cap": "Khẩn cấp", "quan_trong": "Quan trọng", "binh_thuong": "Bình thường"}
+            _tt_map = {"chua_lam": "Chưa làm", "dang_lam": "Đang làm", "hoan_thanh": "Hoàn thành", "tre_han": "Trễ hạn"}
+            _df_pc = pd.DataFrame([
+                {
+                    "Tiêu đề": c.get("tieu_de", ""),
+                    "Người thực hiện": c.get("nguoi_thuc_hien", ""),
+                    "Mức ưu tiên": _uu_map.get(c.get("uu_tien", ""), c.get("uu_tien", "")),
+                    "Ngày giao": c.get("ngay_giao", ""),
+                    "Deadline": c.get("ngay_deadline", ""),
+                    "Trạng thái": _tt_map.get(c.get("trang_thai", ""), c.get("trang_thai", "")),
+                    "Ghi chú": c.get("ghi_chu_ket_qua", ""),
+                }
+                for c in ds
+            ])
+            _pdf_bytes = xuat_pdf_co_chart(
+                _df_pc, "Phân công cán bộ - Phòng KH-NV", username,
+                them_dong_tong=False, cols_tien=None,
+            )
             download_pdf_button(_pdf_bytes, "phan_cong_can_bo.pdf",
                                 "📥 Xuất PDF", key="pdf_phan_cong")
+        else:
+            st.button("📥 Xuất PDF", disabled=True, key="pdf_phan_cong_dis",
+                      use_container_width=True)
+
+    if not ds:
+        st.info("ℹ️ Chưa có việc nào được giao.")
+        return
 
     today = date.today()
     for i, cv in enumerate(ds_sorted):
@@ -274,6 +277,10 @@ def _render_lich_cong_tac(tab, role_n: str, username: str):
                         st.rerun()
 
     if not ds:
+        col_pdf, _ = st.columns([1, 5])
+        with col_pdf:
+            st.button("📥 Xuất PDF", disabled=True, key="pdf_lich_dis_empty",
+                      use_container_width=True)
         st.info("ℹ️ Chưa có lịch công tác nào.")
         return
 
@@ -302,30 +309,33 @@ def _render_lich_cong_tac(tab, role_n: str, username: str):
 
     ds_loc.sort(key=lambda x: x.get("ngay", ""))
 
-    # ── Xuất PDF ──
-    if ds_loc:
-        _loai_map = {k: v.replace("🗓️ ", "").replace("🔍 ", "").replace("✈️ ", "").replace("🎓 ", "").replace("📌 ", "") for k, v in LOAI_LICH.items()}
-        _tt_lich = {"sap_dien_ra": "Sắp diễn ra", "da_hoan_thanh": "Đã hoàn thành", "huy_bo": "Hủy bỏ"}
-        _df_lich = pd.DataFrame([
-            {
-                "Ngày": e.get("ngay", ""),
-                "Loại": _loai_map.get(e.get("loai", ""), e.get("loai", "")),
-                "Tiêu đề": e.get("tieu_de", ""),
-                "Địa điểm": e.get("dia_diem", ""),
-                "Thành viên": e.get("thanh_vien", ""),
-                "Ghi chú": e.get("ghi_chu", ""),
-                "Trạng thái": _tt_lich.get(e.get("trang_thai", ""), e.get("trang_thai", "")),
-            }
-            for e in ds_loc
-        ])
-        _pdf_bytes = xuat_pdf_co_chart(
-            _df_lich, "Lịch công tác Phòng KH-NV", username,
-            them_dong_tong=False, cols_tien=None,
-        )
-        col_pdf, _ = st.columns([1, 5])
-        with col_pdf:
+    # ── Xuất PDF — luôn hiển thị, disabled khi tháng lọc không có dữ liệu ──
+    col_pdf, _ = st.columns([1, 5])
+    with col_pdf:
+        if ds_loc:
+            _loai_map = {k: v.replace("🗓️ ", "").replace("🔍 ", "").replace("✈️ ", "").replace("🎓 ", "").replace("📌 ", "") for k, v in LOAI_LICH.items()}
+            _tt_lich = {"sap_dien_ra": "Sắp diễn ra", "da_hoan_thanh": "Đã hoàn thành", "huy_bo": "Hủy bỏ"}
+            _df_lich = pd.DataFrame([
+                {
+                    "Ngày": e.get("ngay", ""),
+                    "Loại": _loai_map.get(e.get("loai", ""), e.get("loai", "")),
+                    "Tiêu đề": e.get("tieu_de", ""),
+                    "Địa điểm": e.get("dia_diem", ""),
+                    "Thành viên": e.get("thanh_vien", ""),
+                    "Ghi chú": e.get("ghi_chu", ""),
+                    "Trạng thái": _tt_lich.get(e.get("trang_thai", ""), e.get("trang_thai", "")),
+                }
+                for e in ds_loc
+            ])
+            _pdf_bytes = xuat_pdf_co_chart(
+                _df_lich, "Lịch công tác Phòng KH-NV", username,
+                them_dong_tong=False, cols_tien=None,
+            )
             download_pdf_button(_pdf_bytes, "lich_cong_tac.pdf",
                                 "📥 Xuất PDF", key="pdf_lich")
+        else:
+            st.button("📥 Xuất PDF", disabled=True, key="pdf_lich_dis",
+                      use_container_width=True)
 
     # ── Bảng ──
     st.markdown("### 📅 Lịch công tác trong tháng")

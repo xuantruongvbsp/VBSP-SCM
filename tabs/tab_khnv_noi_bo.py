@@ -1333,7 +1333,7 @@ def render(tab=None, **kwargs):
         with t3:
             _render_tien_do_edit(role_n, username)
         with t4:
-            _render_bao_cao(role_n, username, **kwargs)
+            _render_bao_cao(role_n, username, **{k: v for k, v in kwargs.items() if k not in ("username", "role")})
         with t5:
             _render_lich_cong_tac(t5, role_n, username)
         with t6:

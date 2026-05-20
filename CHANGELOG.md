@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## [2026-05-20] — Đổi đơn vị KPI "3 tháng không hoạt động" từ triệu → đồng
+- `workspaces/ws_management.py` dòng ~272 — `k3.metric("Lãi tồn (triệu đồng)", vn(tong_lai/1e6, 0))` → `k3.metric("Lãi tồn (đồng)", fmt(tong_lai))`: bỏ chia 1e6, đổi label
+- `workspaces/ws_operation.py` dòng ~320 — `k3.metric("Lãi tồn cần thu (triệu đồng)", fmt(tong_lai))` → `k3.metric("Lãi tồn cần thu (đồng)", fmt(tong_lai))`: sửa label cho đúng (giá trị đã là VND raw)
+
 ## [2026-05-20] — Review & update rules.md + 3 file .md mới
 - `.trae/rules/rules.md` — sửa 6 điểm: thêm 19 COT_* constants, sửa `movers_analysis` (thiếu 3 params), sửa `pgd_slug` (utils→data/pgd), thêm 3 utils functions (`auto_audit`, `auto_fill_batch`, `lazy_tabs`), sửa `get_permissions` (bỏ pgd_user), thêm 3 auth functions (`la_chuyen_vien_cn`, `co_quyen_giao_nhiem_vu`, `la_admin_cn`)
 - `BUGMAP.md` — tạo mới: bản đồ lỗi A→I (12 bugs), template ghi nhận bug, lệnh debug nhanh

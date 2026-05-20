@@ -210,14 +210,16 @@ st.cache_data.clear()
 |---|---|---|
 | Nhập liệu | Triệu đồng | `number_input` hiển thị triệu |
 | Lưu trữ | VND (`× 1_000_000`) | Ghi vào kv_store / DataFrame |
-| Hiển thị | `fmt_ty()` | Tự chia `/1e9`, ra chuỗi VN |
+| Hiển thị (bảng) | `fmt_ty()` | Chia `/1e6` → **triệu đồng**, header cột phải ghi "(triệu đồng)" |
+| Hiển thị (metric/card) | `vn(x / 1e9, 3) + " tỷ"` | Chia `/1e9` → **tỷ đồng** inline |
 
 ```python
 from utils import fmt, fmt_tien, fmt_ty, fmt_pct, fmt_so
 
-fmt_ty(gia_tri_vnd)      # → "1.234,560 tỷ"  ← chuẩn VN
-fmt(gia_tri_vnd)         # → "1.234.567.890"
-fmt_so(so_luong)         # → "1.234"
+fmt_ty(gia_tri_vnd)                 # → "1.235" (triệu đồng, dùng cho cột bảng có header "(triệu đồng)")
+vn(gia_tri_vnd / 1e9, 3) + " tỷ"  # → "1,235 tỷ" (metric/card inline) ← chuẩn VN
+fmt(gia_tri_vnd)                   # → "1.234.567.890"
+fmt_so(so_luong)                   # → "1.234"
 ```
 
 **Quy tắc format số — LUÔN dùng kiểu Việt Nam:**

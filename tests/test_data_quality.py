@@ -135,7 +135,9 @@ class TestKiemTraSoTienGiaiNgan:
 
 class TestKiemTraMaDonViHopLe:
     def test_pgd_hop_le(self):
-        df = pd.DataFrame({COT_TEN_PGD: ["Phòng giao dịch Biên Hòa"]})
+        from config import DS_PGD
+        pgd = DS_PGD[0] if DS_PGD else "PGD Test"
+        df = pd.DataFrame({COT_TEN_PGD: [pgd]})
         errors = kiem_tra_ma_don_vi_hop_le(df)
         assert len(errors) == 0
 

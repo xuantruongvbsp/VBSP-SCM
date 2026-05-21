@@ -1,5 +1,5 @@
 {
-  "exported_at": "2026-05-21T20:56:13.999821",
+  "exported_at": "2026-05-22T06:39:59.468879",
   "version": 2,
   "tables": {
     "users": [],
@@ -41,42 +41,6 @@
         "updated_by": "admin"
       },
       {
-        "key": "merge_meta_hstd",
-        "value": "{\"thoi_gian\": \"2026-05-20T19:53:09.734279\", \"so_pgd\": 22, \"so_dong\": 349398, \"pgd_cu\": []}",
-        "updated_at": "2026-05-20T19:53:09.760627",
-        "updated_by": "admin"
-      },
-      {
-        "key": "data_quality_meta_hstd",
-        "value": "{\"thoi_gian\": \"2026-05-20T19:53:09.774049\", \"bao_cao\": [], \"tong_so_loi\": 0, \"tong_dong\": 0}",
-        "updated_at": "2026-05-20T19:53:09.774572",
-        "updated_by": "admin"
-      },
-      {
-        "key": "merge_meta_nq11",
-        "value": "{\"thoi_gian\": \"2026-05-20T19:53:25.526390\", \"so_pgd\": 12, \"so_dong\": 172037, \"pgd_cu\": []}",
-        "updated_at": "2026-05-20T19:53:25.526581",
-        "updated_by": "admin"
-      },
-      {
-        "key": "data_quality_meta_nq11",
-        "value": "{\"thoi_gian\": \"2026-05-20T19:53:25.526937\", \"bao_cao\": [], \"tong_so_loi\": 0, \"tong_dong\": 0}",
-        "updated_at": "2026-05-20T19:53:25.527087",
-        "updated_by": "admin"
-      },
-      {
-        "key": "merge_meta_gqvl",
-        "value": "{\"thoi_gian\": \"2026-05-20T19:54:18.344984\", \"so_pgd\": 22, \"so_dong\": 95791, \"pgd_cu\": []}",
-        "updated_at": "2026-05-20T19:54:18.345237",
-        "updated_by": "admin"
-      },
-      {
-        "key": "data_quality_meta_gqvl",
-        "value": "{\"thoi_gian\": \"2026-05-20T19:54:18.345633\", \"bao_cao\": [], \"tong_so_loi\": 0, \"tong_dong\": 0}",
-        "updated_at": "2026-05-20T19:54:18.346032",
-        "updated_by": "admin"
-      },
-      {
         "key": "khnv_can_bo_list",
         "value": "[{\"id\": \"78bfdd42-02b4-40ee-9acc-a9ddfd9fa73f\", \"ho_ten\": \"Nguyễn Văn A\", \"chuc_vu\": \"vp1\"}]",
         "updated_at": "2026-05-21T10:07:43.923452",
@@ -87,6 +51,42 @@
         "value": "{\"Nguồn vốn cân đối từ TW (KHA)\": 0}",
         "updated_at": "2026-05-21T17:49:59.460622",
         "updated_by": "system"
+      },
+      {
+        "key": "merge_meta_hstd",
+        "value": "{\"thoi_gian\": \"2026-05-21T21:12:22.797316\", \"so_pgd\": 22, \"so_dong\": 349398, \"pgd_cu\": [\"Hội sở Chi nhánh tỉnh\", \"PGD Vĩnh Cửu\", \"PGD Tân Phú\", \"PGD Định Quán\", \"PGD Xuân Lộc\", \"PGD Trảng Bom\", \"PGD Long Khánh\", \"PGD Long Thành\", \"PGD Cẩm Mỹ\", \"PGD Nhơn Trạch\", \"PGD Lộc Ninh\", \"PGD Thống Nhất\", \"PGD Phước Long\", \"PGD Bù Đăng\", \"PGD Bình Long\", \"PGD Bình Phước\", \"PGD Chơn Thành\", \"PGD Đồng Phú\", \"PGD Bù Đốp\", \"PGD Phú Riềng\", \"PGD Bù Gia Mập\", \"PGD Hớn Quản\"]}",
+        "updated_at": "2026-05-21T21:12:22.805343",
+        "updated_by": "admin"
+      },
+      {
+        "key": "data_quality_meta_hstd",
+        "value": "{\"thoi_gian\": \"2026-05-21T21:12:22.806839\", \"bao_cao\": [], \"tong_so_loi\": 0, \"tong_dong\": 0}",
+        "updated_at": "2026-05-21T21:12:22.807146",
+        "updated_by": "admin"
+      },
+      {
+        "key": "merge_meta_nq11",
+        "value": "{\"thoi_gian\": \"2026-05-21T21:12:31.726448\", \"so_pgd\": 12, \"so_dong\": 172037, \"pgd_cu\": [\"PGD Vĩnh Cửu\", \"PGD Tân Phú\", \"PGD Xuân Lộc\", \"PGD Long Thành\", \"PGD Định Quán\", \"PGD Trảng Bom\", \"PGD Thống Nhất\", \"Hội sở Chi nhánh tỉnh\", \"PGD Long Khánh\", \"PGD Cẩm Mỹ\", \"PGD Nhơn Trạch\", \"PGD Bình Long\"]}",
+        "updated_at": "2026-05-21T21:12:31.731589",
+        "updated_by": "admin"
+      },
+      {
+        "key": "data_quality_meta_nq11",
+        "value": "{\"thoi_gian\": \"2026-05-21T21:12:31.732148\", \"bao_cao\": [], \"tong_so_loi\": 0, \"tong_dong\": 0}",
+        "updated_at": "2026-05-21T21:12:31.737835",
+        "updated_by": "admin"
+      },
+      {
+        "key": "merge_meta_gqvl",
+        "value": "{\"thoi_gian\": \"2026-05-21T21:12:36.671542\", \"so_pgd\": 22, \"so_dong\": 95791, \"pgd_cu\": []}",
+        "updated_at": "2026-05-21T21:12:36.671802",
+        "updated_by": "admin"
+      },
+      {
+        "key": "data_quality_meta_gqvl",
+        "value": "{\"thoi_gian\": \"2026-05-21T21:12:36.672065\", \"bao_cao\": [], \"tong_so_loi\": 0, \"tong_dong\": 0}",
+        "updated_at": "2026-05-21T21:12:36.672199",
+        "updated_by": "admin"
       }
     ],
     "nhiem_vu": [],

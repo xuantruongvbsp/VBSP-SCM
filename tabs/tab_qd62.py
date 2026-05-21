@@ -16,7 +16,7 @@ from config import DS_PGD, PGD_XA_MAP, PGD_DATA_DIR
 from data.pgd import pgd_slug, thu_muc_pgd
 from utils import fmt_ty
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # ── Lý do rủi ro theo QĐ62 ──────────────────────────────────────────────────
 LY_DO_RUI_RO = [

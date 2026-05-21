@@ -1,12 +1,16 @@
 # CHANGELOG
 
-## [2026-05-21] — Logging + tests cho kiem_soat, khtd, rui_ro_aggregation, word_xln
-- `services/kiem_soat_service.py` — thêm `logger = get_logger(__name__)`; wrap DuckDB query trong `_tinh_to_sai_so_tv()` bằng try/except với `logger.error(..., exc_info=True)`
-- `services/khtd_service.py` — thêm `logger = get_logger(__name__)`; thêm `logger.error` vào 4 `except Exception` quan trọng: `tinh_kh_dau_nam`, `doc_tu_sheet`, `push_kh_len_sheet` (mở Sheet + ghi Sheet), `luu_dot_khtd`
-- `tests/test_rui_ro_aggregation.py` — file mới: 11 tests cho `_loc_theo_nguon` + `_tong_hop_no`
-- `tests/test_kiem_soat_service.py` — file mới: 20 tests cho `_tinh_ngaygh_dp`, `_tinh_to_sai_so_tv`, `_fmt_so_cell`, `_ks_html_metric_card`, `_tong_hop_vp_theo_pgd`, `_tong_hop_ghv_theo_pgd`
-- `tests/test_word_xln_service.py` — file mới: 24 tests cho `_pgd_plain`, `_pgd_line`, `_num`, `_tao_word_01xln` + smoke test 6 mẫu còn lại (02/04/05/13/14 + 2 Tờ trình)
-- Tổng: 421 → 510 tests (420 → 509 passed, 1 pre-existing fail trong `test_data_quality`)
+## [2026-05-21] — Unit tests: +63 tests cho 4 service (data_quality, report, kiem_soat, rui_ro)
+- `tests/test_data_quality.py` — file mới: 26 tests (_safe_series, chuan_hoa_ten_cot, kiem_tra_du_no_am, kiem_tra_so_tien_giai_ngan, kiem_tra_ma_don_vi_hop_le, chuan_hoa_ma_don_vi, kiem_tra_chat_luong, tong_hop_bao_cao_chat_luong)
+- `tests/test_report_service.py` — file mới: 9 tests (ten_file_bao_cao, xuat_bao_cao, xuat_sheet_don) — verify Excel bytes đầu ra
+- `tests/test_kiem_soat_service.py` — file mới: 20 tests (_tinh_ngaygh_dp 9 nhánh, _fmt_so_cell, _ks_html_metric_card, _tong_hop_vp_theo_pgd, _tong_hop_ghv_theo_pgd)
+- `tests/test_rui_ro_aggregation.py` — file mới: 8 tests (_loc_theo_nguon 4 edge cases, _tong_hop_no 4 edge cases)
+- Tổng: 421 → 515 tests; `pytest -q` → 515 passed trong 38s
+
+## [2026-05-21] — Logging + test_word_xln_service
+- `services/kiem_soat_service.py` — wrap DuckDB query trong `_tinh_to_sai_so_tv()` bằng try/except + `logger.error(..., exc_info=True)`
+- `services/khtd_service.py` — `logger = get_logger(__name__)`; thêm `logger.error` vào 4 except: `tinh_kh_dau_nam`, `doc_tu_sheet`, `push_kh_len_sheet` (×2), `luu_dot_khtd`
+- `tests/test_word_xln_service.py` — file mới: 24 tests (`_pgd_plain`, `_pgd_line`, `_num`, `_tao_word_01xln` + smoke 6 mẫu: 02/04/05/13/14 + 2 Tờ trình)
 
 ## [2026-05-21] — Unit tests: +57 tests cho 3 service core (HHI, So sánh kỳ, Nợ khoanh)
 - `tests/test_hhi_service.py` — file mới: 17 tests (tinh_hhi, tinh_hhi_breakdown, danh_gia_hhi) — edge cases: phân tán đều, tập trung hoàn toàn, tổng=0, thiếu cột, df rỗng

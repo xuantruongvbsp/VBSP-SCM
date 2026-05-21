@@ -15,6 +15,9 @@ from pdf_service import nut_xuat_pdf
 from data import (danh_dau_khong_hd, tong_hop_khong_hd, ds_chi_tiet_khong_hd)
 from tabs import tab_nq11
 from auth import la_phan_he_pgd, la_phan_he_cn, la_executive
+from logger import get_logger
+
+logger = get_logger(__name__)
 
 if TYPE_CHECKING:
     from streamlit.delta_generator import DeltaGenerator
@@ -60,6 +63,7 @@ def _bc_fmt_metric(x: float) -> str:
             return s
         return "—"
     except Exception:
+        logger.error("Lỗi format số: x=%s", x, exc_info=True)
         return "—"
 
 
@@ -256,10 +260,8 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                             f"PDF phân cấp — {tieu_de_phu}",
                         )
                     except Exception as _e:
-                        import traceback
-
+                        logger.error("Lỗi tạo PDF phân cấp: %s", _e, exc_info=True)
                         st.error(f"❌ Lỗi tạo PDF: {_e}")
-                        st.code(traceback.format_exc())
 
             if st.session_state.get(_ss_pdf):
                 st.download_button(

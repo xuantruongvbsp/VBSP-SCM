@@ -104,8 +104,9 @@ def cap_nhat_ketqua_bulk(
     pgd_sel: str,
     rows: list[dict],
     username: str,
-) -> int:
+) -> tuple[int, list[tuple[str, str]]]:
     count = 0
+    errors: list[tuple[str, str]] = []
     for r in rows:
         ten_xa_dv = str(r.get("ten_xa") or "").strip()
         if not ten_xa_dv:
@@ -122,9 +123,12 @@ def cap_nhat_ketqua_bulk(
                 ngay_ht = None
         ghi_chu = str(r.get("ghi_chu") or "").strip() or None
         pgd_val = ten_xa_dv if cap_theo_doi == "pgd" else pgd_sel
-        upsert_ketqua_xa(task_id, ten_xa_dv, pgd_val, trang_thai, ngay_ht, ghi_chu, username)
-        count += 1
-    return count
+        try:
+            upsert_ketqua_xa(task_id, ten_xa_dv, pgd_val, trang_thai, ngay_ht, ghi_chu, username)
+            count += 1
+        except Exception as e:
+            errors.append((ten_xa_dv, str(e)))
+    return count, errors
 
 
 def tao_task(
@@ -233,4 +237,3 @@ def xoa_task(task_id: int) -> None:
         conn.execute("DELETE FROM tien_do_ketqua WHERE task_id=?", (task_id,))
         conn.execute("DELETE FROM tien_do_task WHERE id=?", (task_id,))
         conn.commit()
-

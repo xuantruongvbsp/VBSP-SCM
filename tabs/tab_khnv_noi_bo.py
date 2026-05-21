@@ -16,6 +16,7 @@ import pandas as pd
 
 from auth import normalize_role, la_phan_he_cn
 from db import doc_kv, ghi_kv, ghi_audit
+from services import khnv_noi_bo_service
 from utils import get_tab_context, xuat_excel
 from components.export_pdf import xuat_pdf_co_chart, download_pdf_button
 
@@ -312,14 +313,12 @@ _MAU_GIAO_VIEC_TP = [
 
 def _doc_ds(key: str) -> list:
     """Đọc danh sách từ kv_store, trả về list rỗng nếu chưa có."""
-    val = doc_kv(key)
-    return val if isinstance(val, list) else []
+    return khnv_noi_bo_service.doc_ds(key)
 
 
 def _ghi_ds(key: str, ds: list, username: str, action: str, mo_ta: str):
     """Ghi danh sách + audit."""
-    ghi_kv(key, ds, username)
-    ghi_audit(username, action, mo_ta)
+    khnv_noi_bo_service.ghi_ds(key, ds, username, action, mo_ta)
     st.cache_data.clear()
 
 
@@ -1471,8 +1470,8 @@ def _render_lich_cong_tac(tab, role_n: str, username: str):
             except (ValueError, KeyError):
                 pass
     if changed:
-        ghi_kv(KHNV_LICH, ds, username)
-        ghi_audit(username, "khnv_tu_dong_cap_nhat_lich", "Tự động cập nhật trạng thái lịch đã qua")
+        _ghi_ds(KHNV_LICH, ds, username, "khnv_tu_dong_cap_nhat_lich",
+                "Tự động cập nhật trạng thái lịch đã qua")
 
     # ── Form thêm sự kiện ──
     if co_quyen_ghi:

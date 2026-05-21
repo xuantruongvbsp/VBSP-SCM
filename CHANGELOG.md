@@ -1,5 +1,20 @@
 # CHANGELOG
 
+## [2026-05-21] — Refactor: gom kv/audit tab KH-NV nội bộ sang service
+- `services/khnv_noi_bo_service.py` — chuẩn hóa đọc/ghi danh sách kv_store (kèm audit)
+- `tabs/tab_khnv_noi_bo.py` — chuyển _doc_ds/_ghi_ds sang gọi service, đồng nhất cập nhật lịch qua _ghi_ds
+- `tests/test_khnv_noi_bo_service.py` — thêm smoke tests cho service
+
+## [2026-05-21] — Refactor: gom kv/audit nợ rủi ro sang service
+- `services/no_rui_ro_service.py` — chuẩn hóa key `no_rui_ro_*` + đọc/lưu/xóa hồ sơ (kèm audit)
+- `tabs/tab_no_rui_ro.py` — chuyển thao tác kv_store sang gọi `no_rui_ro_service` + fix lỗi thiếu import trong `_bo_border_cell()`
+- `tests/test_no_rui_ro_service.py` — thêm smoke tests cho `no_rui_ro_service`
+
+## [2026-05-21] — Refactor: tách DB/logic tab Tiến độ sang service
+- `services/tien_do_service.py` — gom các thao tác DB cho Tiến độ (doc task/kết quả, tạo/sửa/xóa task, bulk update kết quả)
+- `tabs/tab_tien_do.py` — chuyển thao tác DB sang gọi `tien_do_service` (giữ nguyên UI)
+- `tests/test_tien_do_service.py` — thêm smoke tests cho `tien_do_service`
+
 ## [2026-05-21] — Refactor: tách hàm tạo Word/PDF tab Ủy thác sang template_service
 - `services/template_service.py` — thêm các hàm `tao_word_uythac_*` để gom logic tạo Word (Kế hoạch, M06, M15, M16, BB-CT/CX, BC-TH, BB xác minh)
 - `tabs/tab_uy_thac.py` — bỏ khối WORD EXPORT FUNCTIONS khỏi tab, chuyển sang gọi `tao_word_uythac_*`, dọn import docx khỏi UI

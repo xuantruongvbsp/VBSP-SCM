@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## [2026-05-21] — Thêm tính năng Backup / Restore Database
+- `db.py` — thêm `backup_db_bytes()`: checkpoint WAL rồi trả về bytes file .db
+- `db.py` — thêm `restore_db_bytes()`: ghi DB mới từ bytes, xóa WAL/SHM cũ, đóng connection
+- `app.py` — thêm expander "🗄️ Backup / Restore DB" trong sidebar (chỉ admin_cn): nút Tạo Backup → download file, file_uploader Restore → ghi đè DB + clear cache + rerun
+
+## [2026-05-21] — Tab Ủy thác: chọn PGD/(Tất cả) + droplist xã/phường cho 01/KH
+- `tabs/tab_uy_thac.py` dòng ~1306 — Sub-tab "📋 Kế hoạch (01/KH)": thêm selectbox chọn PGD/(Tất cả) (CN), lọc danh sách Tổ & xã/phường theo PGD, chuẩn hóa widget key theo prefix để tránh trùng key
+
 ## [2026-05-21] — Viết lại Mẫu 06/TD đúng theo VB 727/HD-NHCS
 - `tabs/tab_uy_thac.py` dòng ~373 — Viết lại hoàn toàn `_tao_word_mau06`: header 3 cột (Đơn vị KT | Quốc hiệu + Tiêu đề | Mẫu số + liên), cán bộ 2 dòng với "Ông (bà): ... Chức vụ:", "Đơn vị tính" căn phải, bảng 15 cột với 3 dòng header (nhóm PHẦN GHI/PHẦN KT + tên cột + sub-header Vào việc/Đúng MĐ/Sai MĐ), nhận xét chi tiết với đúng/sai MĐ, ký tên không in tên CB
 - `tabs/tab_uy_thac.py` dòng ~1380 — Cập nhật form Mẫu 06/TD: thêm chuc_vu_2, thêm 8 trường nhận xét (tình hình phương án, số KH đúng/sai MĐ, số tiền, tỷ trọng, biện pháp xử lý)

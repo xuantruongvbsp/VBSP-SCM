@@ -1,0 +1,317 @@
+VBSP-SCM Health Check + Test Run
+Thoi gian: 21/05/2026  9:45:03.60
+========================================
+
+VBSP-SCM Health Check  —  21/05/2026 09:45:04
+DB   : D:\VBSP-SCM\vbsp_scm.db
+Root : D:\VBSP-SCM
+
+1. Cơ sở dữ liệu SQLite
+  ─────────────────────────
+  ✅ File vbsp_scm.db tồn tại  →  D:\VBSP-SCM\vbsp_scm.db
+  ✅ Kết nối SQLite
+  ✅ Bảng 'kv_store' tồn tại
+  ✅ Bảng 'users' tồn tại
+  ✅ Bảng 'audit_log' tồn tại
+
+2. kv_store — toàn vẹn & dữ liệu nghiệp vụ
+  ────────────────────────────────────────────
+  ✅ Không có key kv_store bị corrupt  →  13 key, tất cả hợp lệ
+  ❌ khtd_cn tồn tại  →  Chưa nhập KHTD Chi nhánh
+  ✅ merge HSTD đã chạy  →  Lần cuối: 2026-05-19T10:05:48.037424 | 22 PGD
+  ℹ  Tổng số key trong kv_store: 13
+
+3. Parquet cache
+  ──────────────────
+  ✅ hstd.parquet tồn tại  →  29.7 MB | cập nhật 19/05 10:05 (48h trước)
+  ✅ nq11.parquet tồn tại  →  2.5 MB | cập nhật 19/05 10:05 (48h trước)
+  ✅ gqvl.parquet tồn tại  →  0.1 MB | cập nhật 19/05 10:05 (48h trước)
+
+4. Upload file PGD — hstd_latest.xlsx
+  ───────────────────────────────────────
+  ✅ Tất cả 22 đơn vị đã upload HSTD  →  22/22 đã có file
+    ⚠  File cũ > 3 ngày: Hội sở Chi nhánh tỉnh (7d)
+    ⚠  File cũ > 3 ngày: PGD Long Thành (7d)
+    ⚠  File cũ > 3 ngày: PGD Trảng Bom (7d)
+    ⚠  File cũ > 3 ngày: PGD Long Khánh (7d)
+    ⚠  File cũ > 3 ngày: PGD Xuân Lộc (7d)
+    ⚠  File cũ > 3 ngày: PGD Định Quán (7d)
+    ⚠  File cũ > 3 ngày: PGD Vĩnh Cửu (7d)
+    ⚠  File cũ > 3 ngày: PGD Tân Phú (7d)
+    ⚠  File cũ > 3 ngày: PGD Thống Nhất (7d)
+    ⚠  File cũ > 3 ngày: PGD Cẩm Mỹ (7d)
+    ⚠  File cũ > 3 ngày: PGD Nhơn Trạch (7d)
+    ⚠  File cũ > 3 ngày: PGD Bình Long (7d)
+    ⚠  File cũ > 3 ngày: PGD Lộc Ninh (7d)
+    ⚠  File cũ > 3 ngày: PGD Bình Phước (7d)
+    ⚠  File cũ > 3 ngày: PGD Phước Long (7d)
+    ⚠  File cũ > 3 ngày: PGD Bù Đăng (7d)
+    ⚠  File cũ > 3 ngày: PGD Đồng Phú (7d)
+    ⚠  File cũ > 3 ngày: PGD Chơn Thành (7d)
+    ⚠  File cũ > 3 ngày: PGD Bù Đốp (7d)
+    ⚠  File cũ > 3 ngày: PGD Bù Gia Mập (7d)
+    ⚠  File cũ > 3 ngày: PGD Phú Riềng (7d)
+    ⚠  File cũ > 3 ngày: PGD Hớn Quản (7d)
+
+5. Audit log 24h gần nhất
+  ───────────────────────────
+  ✅ Có hoạt động trong 24h  →  50 log trong 24h | tổng cộng 466
+
+  Thời gian              User             Action                   Detail
+  ────────────────────────────────────────────────────────────────────────────────────────
+  2026-05-20T18:17:30    system           seed_configs             seeded dynamic configs vào kv_store
+  2026-05-20T18:05:55    system           seed_configs             seeded dynamic configs vào kv_store
+  2026-05-20T17:36:15    system           seed_configs             seeded dynamic configs vào kv_store
+  2026-05-20T17:33:59    system           seed_configs             seeded dynamic configs vào kv_store
+  2026-05-20T17:33:46    system           seed_configs             seeded dynamic configs vào kv_store
+
+════════════════════════════════════════════════════════
+TỔNG KẾT
+════════════════════════════════════════════════════════
+  Tổng checks : 13
+  Đạt        : 12
+  Lỗi        : 1
+
+    ✗ khtd_cn tồn tại
+════════════════════════════════════════════════════════
+============================= test session starts =============================
+platform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\Users\Administrator\AppData\Local\Programs\Python\Python314\python.exe
+cachedir: .pytest_cache
+rootdir: D:\VBSP-SCM
+configfile: pytest.ini
+plugins: anyio-4.13.0
+collecting ... collected 226 items
+
+tests/test_auth.py::TestNormalizeRole::test_normalize_role_map[admin-admin_cn] PASSED [  0%]
+tests/test_auth.py::TestNormalizeRole::test_normalize_role_map[manager-manager_cn] PASSED [  0%]
+tests/test_auth.py::TestNormalizeRole::test_normalize_role_map[user-user_pgd] PASSED [  1%]
+tests/test_auth.py::TestNormalizeRole::test_normalize_role_map[admin_cn-admin_cn] PASSED [  1%]
+tests/test_auth.py::TestNormalizeRole::test_normalize_role_map[executive-executive] PASSED [  2%]
+tests/test_auth.py::TestNormalizeRole::test_normalize_role_map[user_pgd-user_pgd] PASSED [  2%]
+tests/test_auth.py::TestNormalizeRole::test_normalize_role_map[manager_cn-manager_cn] PASSED [  3%]
+tests/test_auth.py::TestNormalizeRole::test_normalize_role_map[chuyenvien_cn-chuyenvien_cn] PASSED [  3%]
+tests/test_auth.py::TestNormalizeRole::test_normalize_role_map[admin_pgd-admin_pgd] PASSED [  3%]
+tests/test_auth.py::TestNormalizeRole::test_normalize_role_map[manager_pgd-manager_pgd] PASSED [  4%]
+tests/test_auth.py::TestNormalizeRole::test_normalize_role_unknown PASSED [  4%]
+tests/test_auth.py::TestIsCnRole::test_is_cn_role[executive-True] PASSED [  5%]
+tests/test_auth.py::TestIsCnRole::test_is_cn_role[admin_cn-True] PASSED  [  5%]
+tests/test_auth.py::TestIsCnRole::test_is_cn_role[manager_cn-True] PASSED [  6%]
+tests/test_auth.py::TestIsCnRole::test_is_cn_role[chuyenvien_cn-True] PASSED [  6%]
+tests/test_auth.py::TestIsCnRole::test_is_cn_role[admin-True] PASSED     [  7%]
+tests/test_auth.py::TestIsCnRole::test_is_cn_role[manager-True] PASSED   [  7%]
+tests/test_auth.py::TestIsCnRole::test_is_cn_role[user_pgd-False] PASSED [  7%]
+tests/test_auth.py::TestIsCnRole::test_is_cn_role[admin_pgd-False] PASSED [  8%]
+tests/test_auth.py::TestIsCnRole::test_is_cn_role[manager_pgd-False] PASSED [  8%]
+tests/test_auth.py::TestIsCnRole::test_is_cn_role[user-False] PASSED     [  9%]
+tests/test_auth.py::TestIsCnRole::test_la_phan_he_cn_alias PASSED        [  9%]
+tests/test_auth.py::TestIsPgdRole::test_is_pgd_role[user_pgd-True] PASSED [ 10%]
+tests/test_auth.py::TestIsPgdRole::test_is_pgd_role[admin_pgd-True] PASSED [ 10%]
+tests/test_auth.py::TestIsPgdRole::test_is_pgd_role[manager_pgd-True] PASSED [ 11%]
+tests/test_auth.py::TestIsPgdRole::test_is_pgd_role[user-True] PASSED    [ 11%]
+tests/test_auth.py::TestIsPgdRole::test_is_pgd_role[executive-False] PASSED [ 11%]
+tests/test_auth.py::TestIsPgdRole::test_is_pgd_role[admin_cn-False] PASSED [ 12%]
+tests/test_auth.py::TestIsPgdRole::test_is_pgd_role[manager_cn-False] PASSED [ 12%]
+tests/test_auth.py::TestIsPgdRole::test_is_pgd_role[admin-False] PASSED  [ 13%]
+tests/test_auth.py::TestIsPgdRole::test_la_phan_he_pgd_alias PASSED      [ 13%]
+tests/test_auth.py::TestCoQuyenUploadPgd::test_co_quyen_upload_pgd[admin_pgd-True] PASSED [ 14%]
+tests/test_auth.py::TestCoQuyenUploadPgd::test_co_quyen_upload_pgd[manager_pgd-True] PASSED [ 14%]
+tests/test_auth.py::TestCoQuyenUploadPgd::test_co_quyen_upload_pgd[user_pgd-False] PASSED [ 15%]
+tests/test_auth.py::TestCoQuyenUploadPgd::test_co_quyen_upload_pgd[admin_cn-False] PASSED [ 15%]
+tests/test_auth.py::TestCoQuyenUploadPgd::test_co_quyen_upload_pgd[executive-False] PASSED [ 15%]
+tests/test_auth.py::TestCoQuyenUploadPgd::test_co_quyen_upload_pgd[admin-False] PASSED [ 16%]
+tests/test_auth.py::TestCoQuyenUploadPgd::test_co_quyen_upload_pgd[user-False] PASSED [ 16%]
+tests/test_auth.py::TestCoQuyenQuanLyUserPgd::test_co_quyen_quan_ly_user_pgd[admin_pgd-True] PASSED [ 17%]
+tests/test_auth.py::TestCoQuyenQuanLyUserPgd::test_co_quyen_quan_ly_user_pgd[manager_pgd-False] PASSED [ 17%]
+tests/test_auth.py::TestCoQuyenQuanLyUserPgd::test_co_quyen_quan_ly_user_pgd[user_pgd-False] PASSED [ 18%]
+tests/test_auth.py::TestCoQuyenQuanLyUserPgd::test_co_quyen_quan_ly_user_pgd[admin_cn-False] PASSED [ 18%]
+tests/test_auth.py::TestCoQuyenGiaoNhiemVu::test_co_quyen_giao_nhiem_vu[admin_pgd-True] PASSED [ 19%]
+tests/test_auth.py::TestCoQuyenGiaoNhiemVu::test_co_quyen_giao_nhiem_vu[manager_pgd-True] PASSED [ 19%]
+tests/test_auth.py::TestCoQuyenGiaoNhiemVu::test_co_quyen_giao_nhiem_vu[admin_cn-True] PASSED [ 19%]
+tests/test_auth.py::TestCoQuyenGiaoNhiemVu::test_co_quyen_giao_nhiem_vu[manager_cn-True] PASSED [ 20%]
+tests/test_auth.py::TestCoQuyenGiaoNhiemVu::test_co_quyen_giao_nhiem_vu[chuyenvien_cn-True] PASSED [ 20%]
+tests/test_auth.py::TestCoQuyenGiaoNhiemVu::test_co_quyen_giao_nhiem_vu[user_pgd-False] PASSED [ 21%]
+tests/test_auth.py::TestCoQuyenGiaoNhiemVu::test_co_quyen_giao_nhiem_vu[executive-False] PASSED [ 21%]
+tests/test_auth.py::TestCoQuyenGiaoNhiemVu::test_co_quyen_giao_nhiem_vu[user-False] PASSED [ 22%]
+tests/test_auth.py::TestLaChuyenVienCn::test_la_chuyen_vien_cn[chuyenvien_cn-True] PASSED [ 22%]
+tests/test_auth.py::TestLaChuyenVienCn::test_la_chuyen_vien_cn[admin_cn-False] PASSED [ 23%]
+tests/test_auth.py::TestLaChuyenVienCn::test_la_chuyen_vien_cn[manager_cn-False] PASSED [ 23%]
+tests/test_auth.py::TestLaChuyenVienCn::test_la_chuyen_vien_cn[user_pgd-False] PASSED [ 23%]
+tests/test_auth.py::TestGetPermissions::test_get_permissions[executive-expected0] PASSED [ 24%]
+tests/test_auth.py::TestGetPermissions::test_get_permissions[admin_cn-expected1] PASSED [ 24%]
+tests/test_auth.py::TestGetPermissions::test_get_permissions[user_pgd-expected2] PASSED [ 25%]
+tests/test_auth.py::TestGetPermissions::test_get_permissions[admin_pgd-expected3] PASSED [ 25%]
+tests/test_auth.py::TestGetPermissions::test_get_permissions[manager_pgd-expected4] PASSED [ 26%]
+tests/test_auth.py::TestRoleMap::test_role_map_has_all_old_roles PASSED  [ 26%]
+tests/test_auth.py::TestRoleMap::test_role_map_preserves_new_roles PASSED [ 26%]
+tests/test_auth.py::TestRolesCnPgd::test_roles_cn_contains_expected PASSED [ 27%]
+tests/test_auth.py::TestRolesCnPgd::test_roles_pgd_contains_expected PASSED [ 27%]
+tests/test_config.py::TestTimTenXaTrongHstd::test_tim_ten_xa_trong_hstd[X\xe3 La Ng\xe0-La Ng\xe0] PASSED [ 28%]
+tests/test_config.py::TestTimTenXaTrongHstd::test_tim_ten_xa_trong_hstd[X\xe3 Ph\xfa H\xf2a-Ph\xfa H\xf2a] PASSED [ 28%]
+tests/test_config.py::TestTimTenXaTrongHstd::test_tim_ten_xa_trong_hstd[X\xe3 B\xecnh Minh-B\xecnh Minh] PASSED [ 29%]
+tests/test_config.py::TestTimTenXaTrongHstd::test_tim_ten_xa_trong_hstd[Ph\u01b0\u1eddng Trung D\u0169ng-Trung D\u0169ng] PASSED [ 29%]
+tests/test_config.py::TestTimTenXaTrongHstd::test_tim_ten_xa_trong_hstd[Th\u1ecb tr\u1ea5n V\u0129nh An-V\u0129nh An] PASSED [ 30%]
+tests/test_config.py::TestTimTenXaTrongHstd::test_tim_ten_xa_trong_hstd[TT Gia Ray-Gia Ray] PASSED [ 30%]
+tests/test_config.py::TestTimTenXaTrongHstd::test_tim_ten_xa_trong_hstd[Kh\xf4ng c\xf3 prefix-Kh\xf4ng c\xf3 prefix] PASSED [ 30%]
+tests/test_config.py::TestDsPgd::test_ds_pgd_length PASSED               [ 31%]
+tests/test_config.py::TestDsPgd::test_ds_pgd_khong_chua_ho_so_cn PASSED  [ 31%]
+tests/test_config.py::TestMaPgdMap::test_ma_pgd_map_is_dict PASSED       [ 32%]
+tests/test_config.py::TestMaPgdMap::test_ma_pgd_map_values_are_strings PASSED [ 32%]
+tests/test_config.py::TestMaPgdMap::test_ma_pgd_map_has_ho_so_cn PASSED  [ 33%]
+tests/test_currency.py::TestFmtTy::test_1_ty PASSED                      [ 33%]
+tests/test_currency.py::TestFmtTy::test_100_ty PASSED                    [ 34%]
+tests/test_currency.py::TestFmtTy::test_zero PASSED                      [ 34%]
+tests/test_currency.py::TestFmtTy::test_none_or_nan PASSED               [ 34%]
+tests/test_currency.py::TestFmtTy::test_khong_dung_1e9 PASSED            [ 35%]
+tests/test_currency.py::TestFmtTien::test_1_trieu PASSED                 [ 35%]
+tests/test_currency.py::TestFmtTien::test_10_trieu PASSED                [ 36%]
+tests/test_currency.py::TestFmtTien::test_zero PASSED                    [ 36%]
+tests/test_currency.py::TestFmtSo::test_1000 PASSED                      [ 37%]
+tests/test_currency.py::TestFmtSo::test_so_lon PASSED                    [ 37%]
+tests/test_currency.py::TestFmtSo::test_zero PASSED                      [ 38%]
+tests/test_currency.py::TestFmtPct::test_0_5 PASSED                      [ 38%]
+tests/test_currency.py::TestFmtPct::test_zero PASSED                     [ 38%]
+tests/test_currency.py::TestFmtPct::test_none PASSED                     [ 39%]
+tests/test_db.py::TestKvRoundtrip::test_ghi_doc_kv_dict PASSED           [ 39%]
+tests/test_db.py::TestKvRoundtrip::test_ghi_doc_kv_khong_doi_kieu_so PASSED [ 40%]
+tests/test_db.py::TestKvRoundtrip::test_doc_kv_key_khong_ton_tai PASSED  [ 40%]
+tests/test_db.py::TestKvRoundtrip::test_doc_kv_key_khong_ton_tai_default PASSED [ 41%]
+tests/test_db.py::TestKvOverwrite::test_ghi_kv_overwrite PASSED          [ 41%]
+tests/test_db.py::TestAudit::test_ghi_audit_khong_crash PASSED           [ 42%]
+tests/test_db.py::TestAudit::test_ghi_audit_co_record PASSED             [ 42%]
+tests/test_db.py::TestListKvPrefix::test_list_kv_prefix PASSED           [ 42%]
+tests/test_db.py::TestListKvPrefix::test_list_kv_prefix_no_match PASSED  [ 43%]
+tests/test_merge_du_lieu_toan_cn.py::TestMergeLoaiKhongHoTro::test_cdtotkvv_bi_tu_choi PASSED [ 43%]
+tests/test_merge_du_lieu_toan_cn.py::TestMergeLoaiKhongHoTro::test_ten_loai_rac_bi_tu_choi PASSED [ 44%]
+tests/test_merge_du_lieu_toan_cn.py::TestMergeLoaiKhongHoTro::test_loai_trong_bi_tu_choi PASSED [ 44%]
+tests/test_merge_du_lieu_toan_cn.py::TestMergeKhongCoFile::test_khong_pgd_nao_co_file PASSED [ 45%]
+tests/test_merge_du_lieu_toan_cn.py::TestMergeKhongCoFile::test_ds_pgd_rong PASSED [ 45%]
+tests/test_merge_du_lieu_toan_cn.py::TestMergeMotPGD::test_thanh_cong_ghi_parquet PASSED [ 46%]
+tests/test_merge_du_lieu_toan_cn.py::TestMergeMotPGD::test_ket_qua_chua_ten_don_vi_va_so_dong PASSED [ 46%]
+tests/test_merge_du_lieu_toan_cn.py::TestMergeMotPGD::test_duong_dan_tra_ve_la_cache_path PASSED [ 46%]
+tests/test_merge_du_lieu_toan_cn.py::TestMergeNhieuPGD::test_concat_nhieu_pgd_dung_so_dong PASSED [ 47%]
+tests/test_merge_du_lieu_toan_cn.py::TestMergeNhieuPGD::test_cot_ten_pgd_duoc_gan_dung PASSED [ 47%]
+tests/test_merge_du_lieu_toan_cn.py::TestMergePGDLoi::test_1_loi_1_ok_van_thanh_cong PASSED [ 48%]
+tests/test_merge_du_lieu_toan_cn.py::TestMergePGDLoi::test_tat_ca_loi_tra_ve_that_bai PASSED [ 48%]
+tests/test_merge_du_lieu_toan_cn.py::TestMergePGDLoi::test_audit_log_ghi_pgd_loi PASSED [ 49%]
+tests/test_merge_du_lieu_toan_cn.py::TestMergePGDCu::test_pgd_cu_duoc_them_vao_meta PASSED [ 49%]
+tests/test_merge_du_lieu_toan_cn.py::TestMergeSchemaNormalize::test_pgd_thieu_cot_duoc_fill_na PASSED [ 50%]
+tests/test_merge_du_lieu_toan_cn.py::TestMergeSchemaNormalize::test_cot_so_duoc_ep_kieu_numeric PASSED [ 50%]
+tests/test_merge_du_lieu_toan_cn.py::TestMergeSchemaNormalize::test_nguon_von_khong_bi_ep_numeric PASSED [ 50%]
+tests/test_merge_du_lieu_toan_cn.py::TestMergeRollback::test_file_bak_duoc_khoi_phuc_khi_to_parquet_loi PASSED [ 51%]
+tests/test_merge_du_lieu_toan_cn.py::TestMergeMetaGhiVaoKV::test_meta_key_dung_loai PASSED [ 51%]
+tests/test_merge_du_lieu_toan_cn.py::TestMergeMetaGhiVaoKV::test_meta_chua_cac_truong_can_thiet PASSED [ 52%]
+tests/test_merge_du_lieu_toan_cn.py::TestMergeMetaGhiVaoKV::test_meta_so_pgd_dung_so_luong PASSED [ 52%]
+tests/test_merge_du_lieu_toan_cn.py::TestMergeAuditLog::test_audit_ghi_sau_thanh_cong PASSED [ 53%]
+tests/test_merge_du_lieu_toan_cn.py::TestMergeAuditLog::test_audit_detail_chua_loai_va_so_dong PASSED [ 53%]
+tests/test_merge_du_lieu_toan_cn.py::TestMergeGQVL::test_gqvl_thanh_cong PASSED [ 53%]
+tests/test_merge_du_lieu_toan_cn.py::TestMergeGQVL::test_gqvl_nguon_von_khong_bi_ep_numeric PASSED [ 54%]
+tests/test_merge_du_lieu_toan_cn.py::TestMergeConcurrency::test_merge_dong_thoi_2_luong_khong_corrupt_file PASSED [ 54%]
+tests/test_pdf_service.py::TestXuatPdf::test_xuat_pdf_tra_ve_bytes PASSED [ 55%]
+tests/test_pdf_service.py::TestXuatPdf::test_xuat_pdf_co_cot_tien PASSED [ 55%]
+tests/test_pdf_service.py::TestXuatPdf::test_xuat_pdf_df_rong PASSED     [ 56%]
+tests/test_pdf_service.py::TestXuatPdf::test_xuat_pdf_bang_tra_ve_bytes PASSED [ 56%]
+tests/test_pdf_service.py::TestXuatPdf::test_reportlab_chua_cai PASSED   [ 57%]
+tests/test_period_compare.py::TestJoinByLoan::test_join_on_key PASSED    [ 57%]
+tests/test_period_compare.py::TestJoinByLoan::test_join_with_extra_columns PASSED [ 57%]
+tests/test_period_compare.py::TestJoinByLoan::test_both_empty PASSED     [ 58%]
+tests/test_period_compare.py::TestJoinByLoan::test_status_columns_added PASSED [ 58%]
+tests/test_period_compare.py::TestClassifyChanges::test_classify_new_loan PASSED [ 59%]
+tests/test_period_compare.py::TestClassifyChanges::test_classify_closed PASSED [ 59%]
+tests/test_period_compare.py::TestClassifyChanges::test_classify_worsened PASSED [ 60%]
+tests/test_period_compare.py::TestClassifyChanges::test_classify_improved PASSED [ 60%]
+tests/test_period_compare.py::TestClassifyChanges::test_classify_extended PASSED [ 61%]
+tests/test_period_compare.py::TestClassifyChanges::test_classify_increased PASSED [ 61%]
+tests/test_period_compare.py::TestClassifyChanges::test_classify_decreased PASSED [ 61%]
+tests/test_period_compare.py::TestClassifyChanges::test_classify_unchanged PASSED [ 62%]
+tests/test_period_compare.py::TestClassifyChanges::test_extra_columns PASSED [ 62%]
+tests/test_period_compare.py::TestClassifyChanges::test_empty_input PASSED [ 63%]
+tests/test_period_compare.py::TestRollCureRate::test_basic PASSED        [ 63%]
+tests/test_period_compare.py::TestRollCureRate::test_empty_input PASSED  [ 64%]
+tests/test_period_compare.py::TestRollCureRate::test_new_closed_ignored PASSED [ 64%]
+tests/test_period_compare.py::TestVintageNQH::test_basic PASSED          [ 65%]
+tests/test_period_compare.py::TestVintageNQH::test_empty_input PASSED    [ 65%]
+tests/test_period_compare.py::TestVintageNQH::test_missing_ngay_vay PASSED [ 65%]
+tests/test_period_compare.py::TestParBreakdown::test_basic PASSED        [ 66%]
+tests/test_period_compare.py::TestParBreakdown::test_empty_input PASSED  [ 66%]
+tests/test_period_compare.py::TestParBreakdown::test_no_ngay_sl PASSED   [ 67%]
+tests/test_smoke_snapshot.py::test_smoke_imports PASSED                  [ 67%]
+tests/test_smoke_snapshot.py::test_snapshot_roundtrip PASSED             [ 68%]
+tests/test_snapshot_service.py::TestKyTuDf::test_ngay_dang_viet PASSED   [ 68%]
+tests/test_snapshot_service.py::TestKyTuDf::test_ngay_dang_iso PASSED    [ 69%]
+tests/test_snapshot_service.py::TestKyTuDf::test_khong_co_cot PASSED     [ 69%]
+tests/test_snapshot_service.py::TestKyTuDf::test_gia_tri_null PASSED     [ 69%]
+tests/test_snapshot_service.py::TestLuuSnapshot::test_luu_thanh_cong PASSED [ 70%]
+tests/test_snapshot_service.py::TestLuuSnapshot::test_luu_co_dong_tong_pgd PASSED [ 70%]
+tests/test_snapshot_service.py::TestLuuSnapshot::test_luu_co_dong_cn PASSED [ 71%]
+tests/test_snapshot_service.py::TestLuuSnapshot::test_upsert_cung_ky PASSED [ 71%]
+tests/test_snapshot_service.py::TestLuuSnapshot::test_df_rong_tra_false PASSED [ 72%]
+tests/test_snapshot_service.py::TestLuuSnapshot::test_df_none_tra_false PASSED [ 72%]
+tests/test_snapshot_service.py::TestDocSnapshot::test_doc_sau_luu PASSED [ 73%]
+tests/test_snapshot_service.py::TestDocSnapshot::test_ky_khong_ton_tai PASSED [ 73%]
+tests/test_snapshot_service.py::TestDocSnapshot::test_chi_lay_ma_ct_all PASSED [ 73%]
+tests/test_snapshot_service.py::TestDocSnapshotRange::test_range_mot_ky PASSED [ 74%]
+tests/test_snapshot_service.py::TestDocSnapshotRange::test_range_khong_co_du_lieu PASSED [ 74%]
+tests/test_snapshot_service.py::TestDanhSachKy::test_rong_khi_chua_co PASSED [ 75%]
+tests/test_snapshot_service.py::TestDanhSachKy::test_co_ky_sau_luu PASSED [ 75%]
+tests/test_snapshot_service.py::TestDanhSachKy::test_thu_tu_moi_truoc PASSED [ 76%]
+tests/test_snapshot_service.py::TestXoaSnapshot::test_xoa_thanh_cong PASSED [ 76%]
+tests/test_snapshot_service.py::TestXoaSnapshot::test_xoa_ky_khong_ton_tai PASSED [ 76%]
+tests/test_upload_service.py::TestKetQuaUpload::test_thanh_cong_true PASSED [ 77%]
+tests/test_upload_service.py::TestKetQuaUpload::test_that_bai PASSED     [ 77%]
+tests/test_upload_service.py::TestKetQuaUpload::test_hien_thi_thanh_cong PASSED [ 78%]
+tests/test_upload_service.py::TestKetQuaUpload::test_hien_thi_that_bai PASSED [ 78%]
+tests/test_upload_service.py::TestKiemTraFile::test_file_hop_le PASSED   [ 79%]
+tests/test_upload_service.py::TestKiemTraFile::test_dinh_dang_sai PASSED [ 79%]
+tests/test_upload_service.py::TestKiemTraFile::test_file_qua_nho PASSED  [ 80%]
+tests/test_upload_service.py::TestKiemTraFile::test_extension_xls_hop_le PASSED [ 80%]
+tests/test_upload_service.py::TestKiemTraFile::test_ten_file_khong_co_extension PASSED [ 80%]
+tests/test_upload_service.py::TestKiemTraFile::test_custom_exts_chophep PASSED [ 81%]
+tests/test_upload_service.py::TestKiemTraFileHeThong::test_ten_file_hop_le PASSED [ 81%]
+tests/test_upload_service.py::TestKiemTraFileHeThong::test_ten_file_sai PASSED [ 82%]
+tests/test_upload_service.py::TestKiemTraFileHeThong::test_dinh_dang_sai_uu_tien_truoc PASSED [ 82%]
+tests/test_utils.py::TestFmtTy::test_fmt_ty_1_trieu PASSED               [ 83%]
+tests/test_utils.py::TestFmtTy::test_fmt_ty_1_ty PASSED                  [ 83%]
+tests/test_utils.py::TestFmtTy::test_fmt_ty_1_nghin_ty PASSED            [ 84%]
+tests/test_utils.py::TestFmtTy::test_fmt_ty_so_0 PASSED                  [ 84%]
+tests/test_utils.py::TestFmtTy::test_fmt_ty_so_am PASSED                 [ 84%]
+tests/test_utils.py::TestFmtTy::test_fmt_ty_none PASSED                  [ 85%]
+tests/test_utils.py::TestFmtTy::test_fmt_ty_nan PASSED                   [ 85%]
+tests/test_utils.py::TestFmtTy::test_fmt_ty_inf PASSED                   [ 86%]
+tests/test_utils.py::TestFmtTy::test_fmt_ty_chuoi_abc PASSED             [ 86%]
+tests/test_utils.py::TestFmt::test_fmt_1_trieu PASSED                    [ 87%]
+tests/test_utils.py::TestFmt::test_fmt_0 PASSED                          [ 87%]
+tests/test_utils.py::TestFmt::test_fmt_so_am PASSED                      [ 88%]
+tests/test_utils.py::TestFmtBangTy::test_fmt_bang_ty_1_ty PASSED         [ 88%]
+tests/test_utils.py::TestFmtBangTy::test_fmt_bang_ty_0 PASSED            [ 88%]
+tests/test_utils.py::TestFmtBangTy::test_fmt_bang_ty_so_le PASSED        [ 89%]
+tests/test_utils.py::TestFmtBangTy::test_fmt_bang_ty_abc PASSED          [ 89%]
+tests/test_utils.py::TestFmtTien::test_fmt_tien_1_trieu PASSED           [ 90%]
+tests/test_utils.py::TestFmtTien::test_fmt_tien_0 PASSED                 [ 90%]
+tests/test_utils.py::TestFmtTien::test_fmt_tien_abc PASSED               [ 91%]
+tests/test_utils.py::TestFmtSo::test_fmt_so_binh_thuong PASSED           [ 91%]
+tests/test_utils.py::TestFmtSo::test_fmt_so_0 PASSED                     [ 92%]
+tests/test_utils.py::TestFmtSo::test_fmt_so_abc PASSED                   [ 92%]
+tests/test_utils.py::TestFmtPct::test_fmt_pct_duong PASSED               [ 92%]
+tests/test_utils.py::TestFmtPct::test_fmt_pct_am PASSED                  [ 93%]
+tests/test_utils.py::TestFmtPct::test_fmt_pct_0 PASSED                   [ 93%]
+tests/test_utils.py::TestFmtPct::test_fmt_pct_abc PASSED                 [ 94%]
+tests/test_utils.py::TestVn::test_vn_co_thap_phan PASSED                 [ 94%]
+tests/test_utils.py::TestVn::test_vn_so_nguyen PASSED                    [ 95%]
+tests/test_utils.py::TestVn::test_vn_abc PASSED                          [ 95%]
+tests/test_utils.py::TestNormColHeader::test_norm_col_header_nbsp PASSED [ 96%]
+tests/test_utils.py::TestNormColHeader::test_norm_col_header_thin_space PASSED [ 96%]
+tests/test_utils.py::TestNormColHeader::test_norm_col_header_trim PASSED [ 96%]
+tests/test_utils.py::TestFmtCl::test_fmt_cl_duong PASSED                 [ 97%]
+tests/test_utils.py::TestFmtCl::test_fmt_cl_am PASSED                    [ 97%]
+tests/test_utils.py::TestFmtCl::test_fmt_cl_0 PASSED                     [ 98%]
+tests/test_utils.py::TestFmtCl::test_fmt_cl_abc PASSED                   [ 98%]
+tests/test_utils.py::TestFmtTl::test_fmt_tl_binh_thuong PASSED           [ 99%]
+tests/test_utils.py::TestFmtTl::test_fmt_tl_ca_hai_bang_0 PASSED         [ 99%]
+tests/test_utils.py::TestFmtTl::test_fmt_tl_mau_so_0 PASSED              [100%]
+
+============================= 226 passed in 2.38s =============================
+ERROR: usage: python.exe C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Scripts\pytest [options] [file_or_dir] [file_or_dir] [...]
+python.exe C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Scripts\pytest: error: unrecognized arguments: --cov=. --cov-report=term-missing
+  inifile: D:\VBSP-SCM\pytest.ini
+  rootdir: D:\VBSP-SCM
+

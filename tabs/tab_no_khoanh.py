@@ -179,7 +179,7 @@ def _heatmap_dao_han(df: pd.DataFrame, key: str) -> None:
     st.plotly_chart(fig, use_container_width=True, key=key)
 
 
-from tabs.pdf_no_khoanh import (
+from services.pdf_no_khoanh_service import (
     _REPORTLAB_READY, _VBSP_GREEN, _VBSP_GREEN_LIGHT, _ROW_ALT, _BORDER_COLOR, _HEADER_BG, _RED,
     _FN, _FB,
     _dang_ky_font_qlnk, _tim_logo_qlnk,

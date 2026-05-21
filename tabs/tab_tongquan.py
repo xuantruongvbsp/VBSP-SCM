@@ -409,7 +409,7 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                         unsafe_allow_html=True,
                 )
                 st.divider()
-        except Exception as e:
+        except Exception as e:  # conv: skip
             logger.error("Lỗi trong khối except: %s", e, exc_info=True)
             pass
 
@@ -447,16 +447,37 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                 "Giải ngân năm (triệu đồng)", "Thu nợ năm (triệu đồng)", "Tỷ trọng %"
             ]
 
-            _col_cfg = {}
-            for col in cols_hien:
+            def _ct_header(col: str) -> str:
+                if col == "Chương trình":
+                    return col
                 if "(triệu đồng)" in col:
                     base = col.replace(" (triệu đồng)", "")
-                    _col_cfg[col] = st.column_config.TextColumn(f"{base}\n(triệu đồng)")
-            st.dataframe(
-                df_hien[cols_hien],
-                column_config=_col_cfg if _col_cfg else None,
-                use_container_width=True,
-                hide_index=True,
+                    return f"{base}<br/><span style='font-weight:normal;font-size:11px'>(Triệu đồng)</span>"
+                return col
+
+            _ct_headers = "".join(
+                f'<th style="background:#2E7D32;color:#fff;text-align:center;'
+                f'padding:6px 5px;border:1px solid #1B5E20;font-size:12px;'
+                f'white-space:normal;min-width:{80 if col != "Chương trình" else 130}px;line-height:1.4">'
+                f'{_ct_header(col)}</th>'
+                for col in cols_hien
+            )
+            _ct_rows = ""
+            for i, (_, row) in enumerate(df_hien[cols_hien].iterrows()):
+                bg = "#F5F7FA" if i % 2 == 0 else "#FFFFFF"
+                cells = "".join(
+                    f'<td style="padding:5px 6px;border:1px solid #E0E0E0;'
+                    f'text-align:{"left" if c == cols_hien[0] else "right"};'
+                    f'font-size:0.88rem;white-space:nowrap">'
+                    f'{row[c]}</td>'
+                    for c in cols_hien
+                )
+                _ct_rows += f'<tr style="background:{bg}">{cells}</tr>\n'
+            st.markdown(
+                f'<table style="width:100%;border-collapse:collapse;font-family:inherit;margin:8px 0">'
+                f'<thead><tr>{_ct_headers}</tr></thead>'
+                f'<tbody>{_ct_rows}</tbody></table>',
+                unsafe_allow_html=True,
             )
 
             df_top10 = df_ct.nlargest(10, "du_no").copy()
@@ -810,7 +831,7 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                 if col in ["Số món vay", "Số KH", "Tổng Tổ", "Tốt", "Khá", "TB", "Yếu"]:
                     try:
                         return fmt_so(val)
-                    except Exception as e:
+                    except Exception as e:  # conv: skip
                         logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                         return str(val)
                 return str(val)
@@ -906,7 +927,7 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                         buf = _xuat_excel_tqpgd(df_show, _ten_excel)
                         st.session_state["_excel_bytes_tqpgd"] = buf
                         st.session_state["_excel_file_tqpgd"] = _ten_excel
-                    except Exception as e:
+                    except Exception as e:  # conv: skip
                         logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                         st.error(f"❌ Lỗi xuất Excel: {e}")
                 if st.session_state.get("_excel_bytes_tqpgd"):
@@ -1235,7 +1256,7 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                     key="tq_den_han",
                 )
 
-            except Exception as e:
+            except Exception as e:  # conv: skip
                 logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                 st.error(f"Lỗi xử lý đến hạn: {e}")
 

@@ -4,6 +4,9 @@
 - `tabs/tab_uy_thac.py` — danh sách “Địa danh (xã/phường)” ưu tiên từ `PGD_XA_MAP` (kể cả khi df thiếu xã), và key_prefix bám theo PGD chọn để tránh state lỗi khi đổi PGD
 - `tabs/tab_uy_thac.py` — chuẩn hóa widget keys theo `pgd_slug(pgd_user)` cho Mẫu 06, Mẫu 15, Biên bản/Báo cáo, BB-CT/CX, Theo dõi/BC-TH (tránh trùng key giữa workspace/đổi PGD)
 - `tabs/tab_uy_thac.py` — bổ sung chọn PGD (hoặc Tất cả) cho Mẫu 06, Mẫu 15, Biên bản/Báo cáo; đồng nhất lọc theo df_src và đặt tên file export theo slug PGD
+- `tabs/tab_uy_thac.py` — render fallback: nếu kwargs df rỗng thì dùng df_full hoặc đọc trực tiếp `CACHE_HSTD` để tránh báo “Chưa có dữ liệu HSTD” sai
+- `tabs/tab_uy_thac.py` — guard cache HSTD template (<15 cột) và cảnh báo rõ khi thiếu cột `COT_TEN_TO` (tránh hiện “Không có Tổ” sai)
+- `tabs/tab_uy_thac.py` — Mẫu 06: cảnh báo rõ khi HSTD thiếu cột `COT_NGAY_VAY` hoặc cache chưa đầy đủ (<15 cột)
 
 ## [2026-05-21] — Dọn dẹp: archive 2 file orphan sai vị trí trong tabs/
 - `tabs/pdf_no_khoanh.py` → `_archive/pdf_no_khoanh_tabs_old.py` (bản sao y hệt services/pdf_no_khoanh_service.py, không ai import)

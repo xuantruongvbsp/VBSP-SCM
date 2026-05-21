@@ -1,5 +1,5 @@
 {
-  "exported_at": "2026-05-21T15:11:40.555048",
+  "exported_at": "2026-05-21T19:42:17.923601",
   "version": 2,
   "tables": {
     "users": [],
@@ -81,6 +81,12 @@
         "value": "[{\"id\": \"78bfdd42-02b4-40ee-9acc-a9ddfd9fa73f\", \"ho_ten\": \"Nguyễn Văn A\", \"chuc_vu\": \"vp1\"}]",
         "updated_at": "2026-05-21T10:07:43.923452",
         "updated_by": "admin"
+      },
+      {
+        "key": "kehoach",
+        "value": "{\"Nguồn vốn cân đối từ TW (KHA)\": 0}",
+        "updated_at": "2026-05-21T17:49:59.460622",
+        "updated_by": "system"
       }
     ],
     "nhiem_vu": [],

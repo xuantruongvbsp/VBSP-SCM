@@ -3,8 +3,83 @@ import sys
 from pathlib import Path
 from unittest.mock import MagicMock
 
+
+def _noop_cache(*args, **kwargs):
+    """No-op cache decorator — trả về function gốc, không cache gì cả."""
+    if args and callable(args[0]):
+        func = args[0]
+        func.clear = lambda: None
+        return func
+    def _decorator(f):
+        f.clear = lambda: None
+        return f
+    return _decorator
+_noop_cache.clear = lambda: None  # cho st.cache_data.clear()
+
+
+def _mock_selectbox(label, options=None, index=None, **kwargs):
+    """Mock st.selectbox() — trả về item đầu tiên của options."""
+    if options is not None:
+        if isinstance(options, (list, tuple)) and len(options) > 0:
+            return options[0]
+        try:
+            return options[0]
+        except (TypeError, IndexError, KeyError):
+            return 0
+    return 0
+
+
+def _mock_multiselect(label, options=None, default=None, **kwargs):
+    """Mock st.multiselect() — trả về list rỗng."""
+    return []
+
+
+def _mock_date_input(label, value=None, **kwargs):
+    """Mock st.date_input() — trả về hôm nay."""
+    from datetime import date
+    return date.today()
+
+
+def _mock_columns(columns_arg, *args, **kwargs):
+    """Mock st.columns() — trả về list Mock theo số lượng cột yêu cầu."""
+    n = columns_arg if isinstance(columns_arg, int) else len(columns_arg)
+    return [MagicMock() for _ in range(n)]
+
+
+def _mock_tabs(labels, *args, **kwargs):
+    """Mock st.tabs() — trả về list Mock theo số lượng tab."""
+    return [MagicMock() for _ in range(len(labels))]
+
+
+class _SessionState(dict):
+    """Dict hỗ trợ cả attribute access (st.session_state.foo = ...)."""
+    def __getattr__(self, name):
+        try:
+            return self[name]
+        except KeyError:
+            raise AttributeError(name)
+    def __setattr__(self, name, value):
+        self[name] = value
+
+
 # Mock streamlit TRƯỚC khi import bất kỳ module nào của dự án
 mock_st = MagicMock()
+mock_st.cache_data = _noop_cache
+mock_st.cache_resource = _noop_cache
+mock_st.columns = _mock_columns
+mock_st.tabs = _mock_tabs
+mock_st.selectbox = _mock_selectbox
+mock_st.multiselect = _mock_multiselect
+mock_st.date_input = _mock_date_input
+mock_st.text_input = lambda label=None, **kw: ""
+mock_st.number_input = lambda label=None, **kw: 0
+mock_st.text_area = lambda label=None, **kw: ""
+mock_st.slider = lambda label=None, **kw: 0
+mock_st.radio = lambda label=None, options=None, **kw: (options[0] if options and len(options) > 0 else "")
+mock_st.checkbox = lambda label=None, **kw: False
+mock_st.file_uploader = lambda label=None, **kw: type("FakeFile", (), {"read": lambda self: b"mock", "name": "mock.xlsx"})()
+mock_st.container = lambda **kw: MagicMock()
+mock_st.empty = lambda **kw: MagicMock()
 sys.modules["streamlit"] = mock_st
 
 # Mock streamlit.components.v1

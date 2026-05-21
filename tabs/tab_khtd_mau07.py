@@ -246,7 +246,7 @@ def render(tab, **kwargs) -> None:
                 _ts2 = os.path.getmtime(fp2) if os.path.exists(fp2) else 0
                 df_baseline = doc_baseline(nam_baseline, _ts=_ts2)
                 co_baseline = df_baseline is not None and not df_baseline.empty
-        except Exception:
+        except Exception as e:
             logger.error("Lỗi trong khối except: %s", e, exc_info=True)
             co_baseline = False
 

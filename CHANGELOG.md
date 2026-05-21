@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## [2026-05-21] — Xử lý toàn bộ vấn đề làm việc 2 máy
+- `db.py` — mở rộng export/import cover 10 bảng: users, kv_store, nhiem_vu, nhiem_vu_ketqua, tien_do_task, tien_do_ketqua, qlnk_*, mau_bieu_cv368 (format v2, tương thích ngược v1)
+- `db.py` — `luu_kv_sync_project/doc_kv_sync_project` trả về dict {bảng: count}
+- `app.py` — sidebar hiển thị chi tiết số bản ghi từng bảng sau Lưu/Đồng bộ
+- `app.py` — kiểm tra parquet schema sau load: < 15 cột → báo lỗi rõ ràng thay vì hiện 0
+- `app.py` — note "Không sync qua GitHub: pgd_data, credentials.json"
+- `.gitignore` — giữ cấu trúc thư mục pgd_data/ nhưng ignore file Excel/Parquet bên trong
+
 ## [2026-05-21] — Bổ sung checklist rà soát sau task
 - `.trae/rules/rules.md` — thêm mục 10.1 “Rà soát sau khi xong task” để kiểm tra thay đổi đã được gắn vào đúng chức năng (call site, compile, convention, audit/cache)
 

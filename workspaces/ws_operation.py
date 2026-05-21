@@ -191,7 +191,7 @@ def _render_trang_chu(tab, df_pgd: pd.DataFrame, role: str, pgd_user: str, kwarg
             with col_btn:
                 if st.button("🔄 Làm mới", use_container_width=True, key="trang_chu_refresh"):
                     st.rerun()
-        except Exception as e:
+        except Exception as e:  # conv: skip
             logger.error("Lỗi trong khối except: %s", e, exc_info=True)
             st.error(f"❌ Lỗi header: {e}")
 
@@ -203,7 +203,7 @@ def _render_trang_chu(tab, df_pgd: pd.DataFrame, role: str, pgd_user: str, kwarg
                 kpi_data = _kpi_pgd_list(df_pgd, pgd_user or "")
                 if kpi_data:
                     kpi_row(kpi_data, num_columns=4)
-        except Exception as e:
+        except Exception as e:  # conv: skip
             logger.error("Lỗi trong khối except: %s", e, exc_info=True)
             st.error(f"❌ Lỗi KPI: {e}")
 
@@ -245,7 +245,7 @@ def _render_trang_chu(tab, df_pgd: pd.DataFrame, role: str, pgd_user: str, kwarg
                                 st.session_state["ws_op_nhom"] = nhom
                                 st.session_state["ws_op_jump_tab"] = tab_idx
                                 st.rerun()
-            except Exception as e:
+            except Exception as e:  # conv: skip
                 logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                 st.error(f"❌ Lỗi shortcut: {e}")
 
@@ -286,7 +286,7 @@ def _render_trang_chu(tab, df_pgd: pd.DataFrame, role: str, pgd_user: str, kwarg
                                 st.rerun()
                     else:
                         st.success("✅ Không có cảnh báo nào")
-            except Exception as e:
+            except Exception as e:  # conv: skip
                 logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                 st.error(f"❌ Lỗi cảnh báo: {e}")
 
@@ -307,7 +307,7 @@ def _render_trang_chu(tab, df_pgd: pd.DataFrame, role: str, pgd_user: str, kwarg
                         for nv in nv_pgd[:3]:
                             st.caption(f"📌 {nv.get('tieu_de', '—')}")
                             st.caption(f"Hạn: {nv.get('ngay_deadline', '—')}")
-            except Exception as e:
+            except Exception as e:  # conv: skip
                 logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                 st.warning(f"⚠️ Không thể tải danh sách nhiệm vụ: {e}")
 
@@ -577,7 +577,7 @@ def _render_doc_hub(df: pd.DataFrame, df_nq11, role: str):
                     data  = auto_fill_batch(df_chon, str(path_mau), TAG_MAP)
                     results.append((f"⬇ {ten_mau} — {len(df_chon)} hồ sơ (gộp)", data, fname, f"dl_batch_{ten_mau}"))
                 st.success(f"✅ Đã tạo: **{ten_mau}**")
-            except Exception as e:
+            except Exception as e:  # conv: skip
                 logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                 st.error(f"Lỗi tạo {ten_mau}: {e}")
         st.session_state[dh_ss_key] = results
@@ -799,7 +799,7 @@ def _render_thong_bao_ket_luan(tab, **kwargs):
                 st.session_state["tb_ten_file"] = ten_file
                 st.success("✅ Đã tạo Thông báo Kết luận! Nhấn nút bên dưới để tải về.")
 
-            except Exception as e:
+            except Exception as e:  # conv: skip
                 logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                 st.error(f"❌ Lỗi tạo file: {e}")
 
@@ -929,7 +929,7 @@ def _render_bien_ban_giao_ban(tab, **kwargs):
                 st.session_state["_bytes_gb2"] = data
                 st.session_state["_file_gb2"] = ten_file
                 st.success("✅ Đã tạo biên bản! Nhấn nút bên dưới để tải về.")
-            except Exception as e:
+            except Exception as e:  # conv: skip
                 logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                 st.error(f"❌ Lỗi xuất file: {e}")
                 st.exception(e)
@@ -1665,10 +1665,6 @@ def render(**kwargs):
                     tab, df=df, df_full=df_full, role=role, username=username,
                     pgd_user=pgd_user, pgd_mode=True,
                 )),
-                ("🔄 So sánh 2 kỳ", lambda tab: _lazy_tab("tab_so_sanh_2_ky").render(
-                    tab, role=role, username=username,
-                    pgd_user=pgd_user, pgd_mode=True,
-                )),
             ],
         },
         "bao_cao_giao_ban": {
@@ -1690,6 +1686,7 @@ def render(**kwargs):
                 ("🎯 KHTD", lambda tab: _lazy_tab("tab_khtd_pgd").render(tab, **kwargs)),
                 ("📋 Giao & ĐC KHTD", lambda tab: _lazy_tab("tab_khtd_giao_dc").render(tab, **kwargs)),
                 ("📋 Mẫu 07 Giao KH", lambda tab: _lazy_tab("tab_khtd_mau07").render(tab, **kwargs)),
+                ("🔭 Xây dựng KHTD TL", lambda tab: _lazy_tab("tab_xay_dung_khtd").render(tab, **kwargs)),
                 ("📋 NQ11", lambda tab: _lazy_tab("tab_nq11").render(tab, **_pgd_df_kwargs)),
             ],
         },

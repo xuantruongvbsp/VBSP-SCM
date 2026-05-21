@@ -1,5 +1,14 @@
 # CHANGELOG
 
+## [2026-05-21] — Viết lại Mẫu 06/TD đúng theo VB 727/HD-NHCS
+- `tabs/tab_uy_thac.py` dòng ~373 — Viết lại hoàn toàn `_tao_word_mau06`: header 3 cột (Đơn vị KT | Quốc hiệu + Tiêu đề | Mẫu số + liên), cán bộ 2 dòng với "Ông (bà): ... Chức vụ:", "Đơn vị tính" căn phải, bảng 15 cột với 3 dòng header (nhóm PHẦN GHI/PHẦN KT + tên cột + sub-header Vào việc/Đúng MĐ/Sai MĐ), nhận xét chi tiết với đúng/sai MĐ, ký tên không in tên CB
+- `tabs/tab_uy_thac.py` dòng ~1380 — Cập nhật form Mẫu 06/TD: thêm chuc_vu_2, thêm 8 trường nhận xét (tình hình phương án, số KH đúng/sai MĐ, số tiền, tỷ trọng, biện pháp xử lý)
+
+## [2026-05-21] — Viết lại Mẫu 16/TD đúng theo VB 727/HD-NHCS
+- `tabs/tab_uy_thac.py` dòng ~538 — Viết lại hoàn toàn `_tao_word_mau16`: tiêu đề đúng "Hoạt động của Tổ Tiết kiệm và vay vốn", thêm phần mở đầu (Hôm nay ngày.../Đoàn KT/Đơn vị được KT), Section I (4 chỉ tiêu tình hình Tổ tự điền từ HSTD), Section II (2 bảng checklist theo khoản 3 Phụ lục I VB 727), Section III (Ưu điểm/Tồn tại/Kiến nghị), ký tên đúng TRƯỞNG ĐOÀN | TỔ TRƯỞNG
+- `tabs/tab_uy_thac.py` dòng ~1490 — Cập nhật form Mẫu 16/TD: thêm trường Thôn, Hội đoàn thể, Tổ trưởng (auto), Tổ phó, 2 cán bộ kiểm tra, Tỷ lệ NQH, Xếp loại Tổ, Ưu điểm/Tồn tại/Kiến nghị, Số phiếu kèm theo
+- `tabs/tab_uy_thac.py` dòng 10 — Xóa import `WD_ALIGN_VERTICAL` không còn dùng
+
 ## [2026-05-21] — Chuẩn hóa tất cả định dạng ngày hiển thị sang dd/mm/yyyy
 - `tabs/tab_uy_thac.py` dòng ~23 — Thêm `fmt_ngay` vào import; dòng ~1722, ~1730, ~1933, ~1936, ~1954, ~2013 — 6 điểm hiển thị ngày (expander label, markdown hạn hoàn thành, dataframe, selectbox) dùng `fmt_ngay()` thay vì raw `%Y-%m-%d`
 - `tabs/tab_checklist_bc.py` dòng ~8 — Thêm `from utils import fmt_ngay`; dòng ~291, ~450 — `st.write()` và dataframe "Ngày cập nhật" dùng `fmt_ngay()` thay vì raw `%Y-%m-%d %H:%M`

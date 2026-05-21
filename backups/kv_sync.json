@@ -1,0 +1,95 @@
+{
+  "exported_at": "2026-05-21T15:11:40.555048",
+  "version": 2,
+  "tables": {
+    "users": [],
+    "kv_store": [
+      {
+        "key": "ds_pgd",
+        "value": "[\"PGD Long Thành\", \"PGD Trảng Bom\", \"PGD Long Khánh\", \"PGD Xuân Lộc\", \"PGD Định Quán\", \"PGD Vĩnh Cửu\", \"PGD Tân Phú\", \"PGD Thống Nhất\", \"PGD Cẩm Mỹ\", \"PGD Nhơn Trạch\", \"PGD Bình Long\", \"PGD Lộc Ninh\", \"PGD Bình Phước\", \"PGD Phước Long\", \"PGD Bù Đăng\", \"PGD Đồng Phú\", \"PGD Chơn Thành\", \"PGD Bù Đốp\", \"PGD Bù Gia Mập\", \"PGD Phú Riềng\", \"PGD Hớn Quản\"]",
+        "updated_at": "2026-05-12T22:16:29.870705",
+        "updated_by": "system"
+      },
+      {
+        "key": "ma_pgd_map",
+        "value": "{\"004601\": \"Hội sở Chi nhánh tỉnh\", \"004602\": \"PGD Long Thành\", \"004603\": \"PGD Trảng Bom\", \"004604\": \"PGD Long Khánh\", \"004605\": \"PGD Xuân Lộc\", \"004606\": \"PGD Định Quán\", \"004607\": \"PGD Vĩnh Cửu\", \"004608\": \"PGD Tân Phú\", \"004609\": \"PGD Thống Nhất\", \"004610\": \"PGD Cẩm Mỹ\", \"004611\": \"PGD Nhơn Trạch\", \"005024\": \"PGD Bình Long\", \"005025\": \"PGD Lộc Ninh\", \"005026\": \"PGD Bình Phước\", \"005027\": \"PGD Phước Long\", \"005028\": \"PGD Bù Đăng\", \"005029\": \"PGD Đồng Phú\", \"005034\": \"PGD Chơn Thành\", \"005036\": \"PGD Bù Đốp\", \"005037\": \"PGD Bù Gia Mập\", \"005038\": \"PGD Phú Riềng\", \"005039\": \"PGD Hớn Quản\"}",
+        "updated_at": "2026-05-12T22:16:29.870832",
+        "updated_by": "system"
+      },
+      {
+        "key": "pgd_xa_map",
+        "value": "{\"Hội sở Chi nhánh tỉnh\": [\"Phường Phước Tân\", \"Phường Biên Hòa\", \"Phường Trấn Biên\", \"Phường Long Hưng\", \"Phường Long Bình\", \"Phường Trảng Dài\", \"Phường Tam Phước\", \"Phường Hố Nai\", \"Phường Tam Hiệp\"], \"PGD Long Thành\": [\"Xã Phước Thái\", \"Xã An Phước\", \"Xã Bình An\", \"Xã Long Thành\", \"Xã Long Phước\"], \"PGD Trảng Bom\": [\"Xã An Viễn\", \"Xã Hưng Thịnh\", \"Xã Trảng Bom\", \"Xã Bầu Hàm\", \"Xã Bình Minh\"], \"PGD Long Khánh\": [\"Phường Bảo Vinh\", \"Phường Xuân Lập\", \"Phường Xuân Khánh\", \"Phường Bình Lộc\", \"Phường Hàng Gòn\"], \"PGD Xuân Lộc\": [\"Xã Xuân Thành\", \"Xã Xuân Bắc\", \"Xã Xuân Định\", \"Xã Xuân Lộc\", \"Xã Xuân Phú\", \"Xã Xuân Hòa\"], \"PGD Định Quán\": [\"Xã Phú Vinh\", \"Xã Định Quán\", \"Xã Thanh Sơn\", \"Xã Phú Hòa\", \"Xã La Ngà\"], \"PGD Vĩnh Cửu\": [\"Xã Tân An\", \"Phường Tân Triều\", \"Xã Trị An\", \"Xã Phú Lý\"], \"PGD Tân Phú\": [\"Xã Phú Lâm\", \"Xã Nam Cát Tiên\", \"Xã Tân Phú\", \"Xã Tà Lài\", \"Xã Đak Lua\"], \"PGD Thống Nhất\": [\"Xã Dầu Giây\", \"Xã Thống Nhất\", \"Xã Gia Kiệm\"], \"PGD Cẩm Mỹ\": [\"Xã Xuân Quế\", \"Xã Xuân Đường\", \"Xã Cẩm Mỹ\", \"Xã Xuân Đông\", \"Xã Sông Ray\"], \"PGD Nhơn Trạch\": [\"Xã Đại Phước\", \"Xã Nhơn Trạch\", \"Xã Phước An\"], \"PGD Bình Long\": [\"Phường An Lộc\", \"Phường Bình Long\"], \"PGD Lộc Ninh\": [\"Xã Lộc Tấn\", \"Xã Lộc Thạnh\", \"Xã Lộc Thành\", \"Xã Lộc Quang\", \"Xã Lộc Ninh\", \"Xã Lộc Hưng\"], \"PGD Bình Phước\": [\"Phường Đồng Xoài\", \"Phường Bình Phước\"], \"PGD Phước Long\": [\"Phường Phước Long\", \"Phường Phước Bình\"], \"PGD Bù Đăng\": [\"Xã Thọ Sơn\", \"Xã Bù Đăng\", \"Xã Đăk Nhau\", \"Xã Phước Sơn\", \"Xã Bom Bo\", \"Xã Nghĩa Trung\"], \"PGD Đồng Phú\": [\"Xã Thuận Lợi\", \"Xã Đồng Phú\", \"Xã Đồng Tâm\", \"Xã Tân Lợi\"], \"PGD Chơn Thành\": [\"Phường Minh Hưng\", \"Xã Nha Bích\", \"Phường Chơn Thành\"], \"PGD Bù Đốp\": [\"Xã Hưng Phước\", \"Xã Thiện Hưng\", \"Xã Tân Tiến\"], \"PGD Bù Gia Mập\": [\"Xã Bù Gia Mập\", \"Xã Phú Nghĩa\", \"Xã Đa Kia\", \"Xã Đăk Ơ\"], \"PGD Phú Riềng\": [\"Xã Bình Tân\", \"Xã Long Hà\", \"Xã Phú Trung\", \"Xã Phú Riềng\"], \"PGD Hớn Quản\": [\"Xã Minh Đức\", \"Xã Tân Hưng\", \"Xã Tân Khai\", \"Xã Tân Quan\"]}",
+        "updated_at": "2026-05-12T22:16:29.870972",
+        "updated_by": "system"
+      },
+      {
+        "key": "chuong_trinh_khtd",
+        "value": "[[\"1_TW\", 1, \"Cho vay ưu đãi hộ nghèo\", \"TW\", \"hộ nghèo\"], [\"2_TW\", 2, \"Cho vay học sinh, sinh viên có hoàn cảnh khó khăn\", \"TW\", \"học sinh sinh viên\"], [\"3_TW_NHCSXH\", 3, \"GQVL TW — NHCSXH huy động\", \"TW\", \"GQVL\"], [\"3_TW_NSNN\", 3, \"GQVL TW — NSNN/Quỹ QG TW\", \"TW\", \"GQVL\"], [\"4_TW\", 4, \"Cho vay ĐTCS đi lao động có thời hạn ở nước ngoài\", \"TW\", \"xuất khẩu lao động\"], [\"6_TW\", 6, \"Cho vay nước sạch và vệ sinh môi trường nông thôn\", \"TW\", \"nước sạch\"], [\"7_TW\", 7, \"Cho vay hộ nghèo về nhà ở\", \"TW\", \"nhà ở hộ nghèo\"], [\"9_TW\", 9, \"Cho vay hộ mới thoát nghèo theo QĐ 28\", \"TW\", \"mới thoát nghèo\"], [\"12_TW\", 12, \"Cho vay nhà ở xã hội theo Nghị định số 100\", \"TW\", \"nhà ở xã hội\"], [\"17_TW\", 17, \"Cho vay hộ đồng bào DTTS nghèo, đời sống khó khăn theo QĐ 755\", \"TW\", \"dân tộc thiểu số\"], [\"19_TW\", 19, \"Cho vay hộ cận nghèo theo QĐ 15\", \"TW\", \"hộ cận nghèo\"], [\"26_TW\", 26, \"Cho vay người chấp hành xong án phạt tù\", \"TW\", \"chấp hành xong án\"], [\"10_TW\", 10, \"Cho vay hộ gia đình SXKD tại vùng khó khăn\", \"TW\", \"sxkd vùng khó khăn\"], [\"15_TW\", 15, \"Cho vay thương nhân vùng khó khăn\", \"TW\", \"thương nhân vùng khó khăn\"], [\"21_TW\", 21, \"Cho vay hộ Dân tộc thiểu số QĐ 2085/2016\", \"TW\", \"dân tộc thiểu số qđ 2085\"], [\"25_TW\", 25, \"Cho vay vùng dân tộc thiểu số và miền núi\", \"TW\", \"vùng dân tộc thiểu số miền núi\"], [\"99_TW\", 99, \"Cho vay khác\", \"TW\", \"cho vay khác\"], [\"1_DP\", 1, \"Cho vay ưu đãi hộ nghèo (ĐP)\", \"DP\", \"hộ nghèo\"], [\"2_DP\", 2, \"Cho vay học sinh, sinh viên (ĐP)\", \"DP\", \"học sinh sinh viên\"], [\"3_DP_TINH\", 3, \"GQVL ĐP — Cấp tỉnh\", \"DP\", \"GQVL\"], [\"3_DP_XA\", 3, \"GQVL ĐP — Cấp xã/khác\", \"DP\", \"GQVL\"], [\"6_DP\", 6, \"Cho vay nước sạch và VSMT NT (ĐP)\", \"DP\", \"nước sạch\"], [\"9_DP\", 9, \"Cho vay hộ mới thoát nghèo theo QĐ 28 (ĐP)\", \"DP\", \"mới thoát nghèo\"], [\"12_DP\", 12, \"Cho vay nhà ở xã hội theo Nghị định số 100 (ĐP)\", \"DP\", \"nhà ở xã hội\"], [\"17_DP\", 17, \"Cho vay hộ đồng bào DTTS nghèo theo QĐ 755 (ĐP)\", \"DP\", \"dân tộc thiểu số\"], [\"26_DP\", 26, \"Cho vay người chấp hành xong án phạt tù (ĐP)\", \"DP\", \"chấp hành xong án\"], [\"19_DP\", 19, \"Cho vay hộ cận nghèo (ĐP)\", \"DP\", \"hộ cận nghèo\"], [\"10_DP\", 10, \"Cho vay hộ gia đình SXKD tại vùng khó khăn (ĐP)\", \"DP\", \"sxkd vùng khó khăn\"], [\"15_DP\", 15, \"Cho vay thương nhân vùng khó khăn (ĐP)\", \"DP\", \"thương nhân vùng khó khăn\"], [\"21_DP\", 21, \"Cho vay hộ Dân tộc thiểu số QĐ 2085/2016 (ĐP)\", \"DP\", \"dân tộc thiểu số qđ 2085\"], [\"25_DP\", 25, \"Cho vay vùng dân tộc thiểu số và miền núi (ĐP)\", \"DP\", \"vùng dân tộc thiểu số miền núi\"], [\"99_DP\", 99, \"Cho vay khác (ĐP)\", \"DP\", \"cho vay khác\"]]",
+        "updated_at": "2026-05-12T22:16:29.871135",
+        "updated_by": "system"
+      },
+      {
+        "key": "checklist_bc_config",
+        "value": "[{\"id\": \"bc_001\", \"ten\": \"Báo cáo dư nợ tháng\", \"chu_ky\": \"thang\", \"ngay_han\": 5, \"don_vi_nhan\": \"TW\", \"mo_ta\": \"Phụ lục 06/ĐGXL\", \"nguoi_phu_trach\": \"\"}, {\"id\": \"bc_002\", \"ten\": \"Báo cáo chất lượng tín dụng\", \"chu_ky\": \"thang\", \"ngay_han\": 7, \"don_vi_nhan\": \"TW\", \"mo_ta\": \"Phụ lục 07/ĐGXL\", \"nguoi_phu_trach\": \"\"}, {\"id\": \"bc_003\", \"ten\": \"Báo cáo NQH tháng\", \"chu_ky\": \"thang\", \"ngay_han\": 5, \"don_vi_nhan\": \"tinh\", \"mo_ta\": \"BC NQH gửi UBND tỉnh\", \"nguoi_phu_trach\": \"\"}, {\"id\": \"bc_004\", \"ten\": \"Báo cáo NQ11\", \"chu_ky\": \"thang\", \"ngay_han\": 10, \"don_vi_nhan\": \"TW\", \"mo_ta\": \"BC NQ11/NQ-CP\", \"nguoi_phu_trach\": \"\"}, {\"id\": \"bc_005\", \"ten\": \"Báo cáo quý — tổng hợp KHTD\", \"chu_ky\": \"quy\", \"ngay_han\": 10, \"don_vi_nhan\": \"TW\", \"mo_ta\": \"BC kết quả thực hiện KHTD quý\", \"nguoi_phu_trach\": \"\"}, {\"id\": \"bc_006\", \"ten\": \"Báo cáo thi đua 5 chuyên đề\", \"chu_ky\": \"quy\", \"ngay_han\": 15, \"don_vi_nhan\": \"TW\", \"mo_ta\": \"Chấm điểm thi đua theo 5 chuyên đề\", \"nguoi_phu_trach\": \"\"}, {\"id\": \"bc_007\", \"ten\": \"Báo cáo tổng kết năm\", \"chu_ky\": \"nam\", \"ngay_han\": 20, \"don_vi_nhan\": \"TW\", \"mo_ta\": \"BC tổng kết hoạt động tín dụng năm\", \"nguoi_phu_trach\": \"\"}, {\"id\": \"bc_008\", \"ten\": \"Báo cáo kế hoạch năm sau\", \"chu_ky\": \"nam\", \"ngay_han\": 30, \"don_vi_nhan\": \"TW\", \"mo_ta\": \"Xây dựng KHTD năm kế tiếp\", \"nguoi_phu_trach\": \"\"}]",
+        "updated_at": "2026-05-14T06:08:50.180904",
+        "updated_by": "admin"
+      },
+      {
+        "key": "theme_admin",
+        "value": "\"dark\"",
+        "updated_at": "2026-05-19T21:34:06.460597",
+        "updated_by": "admin"
+      },
+      {
+        "key": "merge_meta_hstd",
+        "value": "{\"thoi_gian\": \"2026-05-20T19:53:09.734279\", \"so_pgd\": 22, \"so_dong\": 349398, \"pgd_cu\": []}",
+        "updated_at": "2026-05-20T19:53:09.760627",
+        "updated_by": "admin"
+      },
+      {
+        "key": "data_quality_meta_hstd",
+        "value": "{\"thoi_gian\": \"2026-05-20T19:53:09.774049\", \"bao_cao\": [], \"tong_so_loi\": 0, \"tong_dong\": 0}",
+        "updated_at": "2026-05-20T19:53:09.774572",
+        "updated_by": "admin"
+      },
+      {
+        "key": "merge_meta_nq11",
+        "value": "{\"thoi_gian\": \"2026-05-20T19:53:25.526390\", \"so_pgd\": 12, \"so_dong\": 172037, \"pgd_cu\": []}",
+        "updated_at": "2026-05-20T19:53:25.526581",
+        "updated_by": "admin"
+      },
+      {
+        "key": "data_quality_meta_nq11",
+        "value": "{\"thoi_gian\": \"2026-05-20T19:53:25.526937\", \"bao_cao\": [], \"tong_so_loi\": 0, \"tong_dong\": 0}",
+        "updated_at": "2026-05-20T19:53:25.527087",
+        "updated_by": "admin"
+      },
+      {
+        "key": "merge_meta_gqvl",
+        "value": "{\"thoi_gian\": \"2026-05-20T19:54:18.344984\", \"so_pgd\": 22, \"so_dong\": 95791, \"pgd_cu\": []}",
+        "updated_at": "2026-05-20T19:54:18.345237",
+        "updated_by": "admin"
+      },
+      {
+        "key": "data_quality_meta_gqvl",
+        "value": "{\"thoi_gian\": \"2026-05-20T19:54:18.345633\", \"bao_cao\": [], \"tong_so_loi\": 0, \"tong_dong\": 0}",
+        "updated_at": "2026-05-20T19:54:18.346032",
+        "updated_by": "admin"
+      },
+      {
+        "key": "khnv_can_bo_list",
+        "value": "[{\"id\": \"78bfdd42-02b4-40ee-9acc-a9ddfd9fa73f\", \"ho_ten\": \"Nguyễn Văn A\", \"chuc_vu\": \"vp1\"}]",
+        "updated_at": "2026-05-21T10:07:43.923452",
+        "updated_by": "admin"
+      }
+    ],
+    "nhiem_vu": [],
+    "nhiem_vu_ketqua": [],
+    "tien_do_task": [],
+    "tien_do_ketqua": [],
+    "qlnk_ket_qua": [],
+    "qlnk_bo_sung": [],
+    "qlnk_ke_hoach": [],
+    "mau_bieu_cv368": []
+  }
+}

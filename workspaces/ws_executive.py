@@ -1499,7 +1499,6 @@ def _build_exec_items(df_full, role: str, username: str, **kwargs) -> list:
         {"group": "Kiểm soát",       "label": "Nợ rủi ro QĐ62",             "fn": lambda: _lazy_tab("tab_qd62").render(mode="cn")},
         {"group": "Kiểm soát",       "label": "Giao & Điều chỉnh KHTD",     "fn": lambda: _lazy_tab("tab_khtd_giao_dc").render(None, **kwargs)},
         {"group": "Báo cáo",         "label": "So sánh kỳ",                 "fn": lambda: _lazy_tab("tab_so_sanh_ky").render(None, df=df_full, df_full=df_full, role=role, username=username)},
-        {"group": "Báo cáo",         "label": "🔄 So sánh 2 kỳ",           "fn": lambda: _lazy_tab("tab_so_sanh_2_ky").render(None, df=df_full, df_full=df_full, role=role, username=username)},
         {"group": "Báo cáo",         "label": "Xuất PDF báo cáo",           "fn": lambda: _render_pdf_section(df_full, username)},
         {"group": "Hệ thống",        "label": "Hướng dẫn",                  "fn": lambda: render_huong_dan()},
     ]
@@ -1686,7 +1685,7 @@ def render(**kwargs) -> None:
         if callable(fn):
             try:
                 fn()
-            except Exception as e:
+            except Exception as e:  # conv: skip
                 logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                 import traceback
 

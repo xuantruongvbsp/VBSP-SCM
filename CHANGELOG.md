@@ -1,5 +1,17 @@
 # CHANGELOG
 
+## [2026-05-21] — Chuẩn hóa tất cả định dạng ngày hiển thị sang dd/mm/yyyy
+- `tabs/tab_uy_thac.py` dòng ~23 — Thêm `fmt_ngay` vào import; dòng ~1722, ~1730, ~1933, ~1936, ~1954, ~2013 — 6 điểm hiển thị ngày (expander label, markdown hạn hoàn thành, dataframe, selectbox) dùng `fmt_ngay()` thay vì raw `%Y-%m-%d`
+- `tabs/tab_checklist_bc.py` dòng ~8 — Thêm `from utils import fmt_ngay`; dòng ~291, ~450 — `st.write()` và dataframe "Ngày cập nhật" dùng `fmt_ngay()` thay vì raw `%Y-%m-%d %H:%M`
+- `tabs/tab_uy_thac.py` dòng ~1722 — Tách `ngay_hien_thi = fmt_ngay(ngay_str)` giữ `ngay_str` gốc cho tên file (không ảnh hưởng logic xuất)
+- Các file nội bộ (db.py audit, SQL query, tên file, period key) giữ `%Y-%m-%d` / `%Y%m%d` vì cần sort/comparison
+
+## [2026-05-21] — Fix nút xuất báo cáo tab Ủy thác
+- `tabs/tab_uy_thac.py` dòng ~1302 — Xóa `context` dict dead code trong `_render_mau06` (tàn tích template Jinja, không dùng)
+- `tabs/tab_uy_thac.py` dòng ~1461 — Xóa `context` dict dead code trong `_render_mau15` (cùng lý do)
+- `tabs/tab_uy_thac.py` dòng ~1657 — Excel xuất `hien` thay vì `df_th` để tên cột đúng tiếng Việt; thêm `db.ghi_audit()` sau khi tải
+- `tabs/tab_uy_thac.py` dòng ~1817 — PDF trong `_render_bb_ct_cx`: thêm `st.spinner` + fallback caption khi PDF không khả dụng
+
 ## [2026-05-21] — Bổ sung quy trình kiểm tra VB 727 cho tab Hội đoàn thể
 - `tabs/tab_uy_thac.py` dòng ~755 — Thêm hàm `_parse_date`, `_xoa_border_table`
 - `tabs/tab_uy_thac.py` dòng ~770 — Thêm `_tao_word_bb_ct_cx` (Mẫu 02/BB-CT & 03/BB-CX theo VB 727/HD-NHCS)

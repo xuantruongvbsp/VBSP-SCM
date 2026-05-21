@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import re
+from io import BytesIO
 from datetime import datetime
 from pathlib import Path
 
@@ -150,3 +151,104 @@ def tao_df_mau_khtd_cn() -> pd.DataFrame:
             "KH (triệu đồng)": 0.0,
         })
     return pd.DataFrame(rows)
+
+
+def doc_excel_khtd_cn_upload(
+    file_bytes: bytes,
+    ma_keys_co_khtd: set[str],
+) -> tuple[dict[str, float], int, list[str]]:
+    """
+    Đọc Excel upload KHTD Chi nhánh → dict ma_key → số VND.
+    Return: (patch_vnd, so_dong_hop_le, ds_ma_ct_bo_qua).
+    Raise ValueError với thông báo người dùng nếu thiếu cột bắt buộc hoặc không đọc được file.
+    """
+    try:
+        df_up = pd.read_excel(BytesIO(file_bytes), header=0)
+    except Exception as e:
+        raise ValueError(f"Không đọc được file Excel: {e}") from e
+
+    ten_cot = {str(c).strip(): c for c in df_up.columns}
+    if "Mã CT" not in ten_cot:
+        raise ValueError(
+            "Không tìm thấy cột Mã CT trong file. Vui lòng dùng đúng file mẫu Excel và giữ nguyên tên các cột."
+        )
+
+    col_kh = ten_cot.get("KH (triệu đồng)")
+    if col_kh is None:
+        for t, c in ten_cot.items():
+            tl = t.lower()
+            if "kh" in tl and ("triệu" in t or "trieu" in tl):
+                col_kh = c
+                break
+    if col_kh is None:
+        raise ValueError(
+            "Không tìm thấy cột KH (triệu đồng). Vui lòng dùng file mẫu và không đổi tên cột KH."
+        )
+
+    col_ma = ten_cot["Mã CT"]
+    out: dict[str, float] = {}
+    bo_qua: list[str] = []
+    for _, row in df_up.iterrows():
+        ma_key = str(row[col_ma]).strip()
+        if not ma_key or ma_key.lower() == "nan":
+            continue
+        if ma_key not in ma_keys_co_khtd:
+            bo_qua.append(ma_key)
+            continue
+        v = row[col_kh]
+        if pd.isna(v):
+            continue
+        try:
+            kh_trieu = float(v)
+        except (TypeError, ValueError):
+            continue
+        if kh_trieu == 0:
+            continue
+        out[ma_key] = kh_trieu * 1_000_000
+    return out, len(out), bo_qua
+
+
+def doc_excel_khtd_xa_upload(
+    file_bytes: bytes,
+    ds_xa_hop_le: set[str],
+    ma_keys_co_khtd: set[str],
+) -> tuple[dict[str, float], int, list[str]]:
+    """
+    Đọc Excel upload hàng loạt KHTD theo xã.
+    Cấu trúc file: cột 1=Tên xã, cột 2=Mã CT, cột 3=Giá trị (triệu đồng).
+    Return: (updates_vnd, so_dong_hop_le, ds_canh_bao).
+    """
+    try:
+        df_up = pd.read_excel(BytesIO(file_bytes), header=0)
+    except Exception as e:
+        raise ValueError(f"Lỗi đọc file Excel: {e}") from e
+
+    updates: dict[str, float] = {}
+    canh_bao: list[str] = []
+    dem = 0
+    for _, row in df_up.iterrows():
+        ten_xa = str(row.iloc[0]).strip() if len(row) > 0 else ""
+        ma_ct = str(row.iloc[1]).strip() if len(row) > 1 else ""
+        v = row.iloc[2] if len(row) > 2 else None
+
+        if not ten_xa or ten_xa.lower() == "nan":
+            continue
+        if ds_xa_hop_le and ten_xa not in ds_xa_hop_le:
+            canh_bao.append(f"Xã không thuộc PGD: {ten_xa}")
+            continue
+        if not ma_ct or ma_ct.lower() == "nan":
+            continue
+        if ma_ct not in ma_keys_co_khtd:
+            canh_bao.append(f"Mã CT không hợp lệ: {ma_ct}")
+            continue
+        if v is None or pd.isna(v):
+            continue
+        try:
+            val_trieu = float(v)
+        except (TypeError, ValueError):
+            continue
+        if val_trieu <= 0:
+            continue
+        updates[f"{ten_xa}|{ma_ct}"] = val_trieu * 1_000_000
+        dem += 1
+    return updates, dem, canh_bao

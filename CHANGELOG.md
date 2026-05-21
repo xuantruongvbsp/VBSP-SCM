@@ -1,5 +1,14 @@
 # CHANGELOG
 
+## [2026-05-22] — Fix lỗi PDF: thiếu TA_LEFT trong import reportlab
+- `pdf_service.py` dòng ~31 — thêm `TA_LEFT` vào import `from reportlab.lib.enums`
+
+## [2026-05-22] — Gộp "So sánh kỳ" + "So sánh 2 kỳ" thành 1 tab với 2 sub-tab
+- `tabs/tab_so_sanh_ky.py` dòng ~666 — đổi `render()` → `render_moc_nam()`; thêm `render()` mới bọc 2 sub-tab (So sánh mốc năm | So sánh 2 kỳ)
+- `workspaces/ws_management.py` dòng ~1141 — xóa entry "🔄 So sánh 2 kỳ" riêng lẻ
+- `workspaces/ws_operation.py` dòng ~1668 — xóa tuple entry tab_so_sanh_2_ky
+- `workspaces/ws_executive.py` dòng ~1502 — xóa entry "🔄 So sánh 2 kỳ"
+
 ## [2026-05-21] — Xây dựng KHTD tương lai: bổ sung 3 loại (1 năm / 3 năm / 5 năm)
 - `services/khtd_import_service.py` — thêm tham số `loai` vào tất cả hàm; kv key mới: `khtd_xd_{loai}_*`
 - `tabs/tab_xay_dung_khtd.py` — thêm radio "1 năm / 3 năm / 5 năm"; Biểu 02C và Thuyết minh dùng nested year-tabs; Tổng hợp CN so sánh đa năm

@@ -1,5 +1,10 @@
 """Tab Theo dõi chỉ tiêu Giải quyết Việc làm (GQVL)."""
+
+
 from __future__ import annotations
+
+from logger import get_logger
+logger = get_logger(__name__)
 
 from io import BytesIO
 from datetime import datetime
@@ -19,6 +24,7 @@ from data import (ts_file, doc_file_gqvl,
 from services import luu_pgd_file
 from utils import fmt, fmt_bang_ty, fmt_ty, fmt_so, vn, xuat_excel, hien_thi_dataframe_phan_trang
 from auth import la_phan_he_cn, la_executive, normalize_role
+
 
 if TYPE_CHECKING:
     from streamlit.delta_generator import DeltaGenerator
@@ -207,8 +213,6 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
         try:
             if pgd_xem == "Tất cả":
                 from data import doc_gqvl_toan_cn
-from logger import get_logger
-logger = get_logger(__name__)
 
                 df = doc_gqvl_toan_cn()
                 if df is None:

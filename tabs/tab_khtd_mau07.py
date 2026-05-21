@@ -10,6 +10,11 @@ Ghi chú:
   - Số gốc lũy kế: lần 1 = baseline HSTD 31/12; lần 2+ = KH lần trước.
   - Data DB chỉ lưu "Chỉ tiêu KH" (float triệu đồng), không lưu giao +/−.
 """
+
+
+from logger import get_logger
+logger = get_logger(__name__)
+
 from datetime import datetime
 
 import pandas as pd
@@ -47,6 +52,7 @@ from services.khtd_mau07_service import (
     TEN_BY_MAKEY,
 )
 from utils import vn, hien_thi_dataframe_phan_trang, get_tab_context
+
 
 # ── Hằng số ───────────────────────────────────────────────────────────────────
 _NAM_KH_DEFAULT = int(NAM_HT)
@@ -227,8 +233,6 @@ def render(tab, **kwargs) -> None:
             )
             from data.hstd import doc_baseline_merged, doc_baseline
 
-from logger import get_logger
-logger = get_logger(__name__)
 
             ds_nam_bl = danh_sach_nam_baseline_pgd()
             if nam_baseline in ds_nam_bl:

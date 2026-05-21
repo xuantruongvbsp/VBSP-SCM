@@ -1,5 +1,10 @@
 """Xuất báo cáo / export cho tab Kế hoạch Tín dụng."""
+
+
 from __future__ import annotations
+
+from logger import get_logger
+logger = get_logger(__name__)
 
 import os
 from datetime import datetime
@@ -33,6 +38,7 @@ from pdf_service import xuat_pdf
 from utils import hien_thi_dataframe_phan_trang, xuat_excel, ten_file_xuat
 
 from tabs.tab_khtd import (
+
     KV_KEY_CN,
     KV_KEY_XA,
     MA_KEYS_CO_KHTD,
@@ -462,8 +468,6 @@ def _tab_tien_do_kh_th() -> None:
     """Dashboard cảnh báo tiến độ KH vs TH thực hiện theo PGD."""
     from tabs.tab_khtd_nhap import _tinh_th_gqvl_phan_tang
 
-from logger import get_logger
-logger = get_logger(__name__)
 
     st.subheader("🎯 Tiến độ Kế hoạch vs Thực hiện")
     st.caption(

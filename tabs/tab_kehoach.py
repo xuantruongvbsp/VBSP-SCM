@@ -1,4 +1,9 @@
 """Tab Kế hoạch Chi nhánh vs Thực hiện"""
+
+
+from logger import get_logger
+logger = get_logger(__name__)
+
 import streamlit as st
 import pandas as pd
 import plotly.express as px
@@ -25,6 +30,7 @@ from utils import (
 
 
 from tabs.base_tab import TabContext
+
 
 def render(tab, **kwargs):
     ctx = TabContext(tab, **kwargs)
@@ -128,8 +134,6 @@ def render(tab, **kwargs):
                     else:
                         try:
                             from io import BytesIO
-from logger import get_logger
-logger = get_logger(__name__)
 
                             df_up = pd.read_excel(BytesIO(file_bytes), header=None)
                             new_kh = {}

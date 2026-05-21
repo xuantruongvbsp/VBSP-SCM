@@ -275,6 +275,7 @@ def luu_dienbao(
             )
 
     except Exception as e:
+        logger.error("Lỗi trong khối except: %s", e, exc_info=True)
         return KetQuaUpload(False, f"❌ Không đọc được file {ten_hien}: {e}")
 
     _ghi_va_xoa_cache(duong_dan, file_bytes)
@@ -580,6 +581,7 @@ def merge_du_lieu_toan_cn(
                                 if _pd.notna(_dt_tmp):
                                     _ky_str = _dt_tmp.strftime("%Y-%m")
                         except Exception:
+                            logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                             pass
                 _df_cdtot = _doc_cdtot()
                 if _df_cdtot is not None and not _df_cdtot.empty:
@@ -791,6 +793,7 @@ def luu_pgd_file(ten_pgd: str, loai: str, file_bytes: bytes) -> KetQuaUpload:
                 if thang_nam:
                     break
     except Exception as e:
+        logger.error("Lỗi trong khối except: %s", e, exc_info=True)
         logger.debug("luu_pgd_file: không đọc được ngày tháng từ file %s/%s — %s", ten_pgd, loai, e)
         thang_nam = None
 
@@ -807,6 +810,7 @@ def luu_pgd_file(ten_pgd: str, loai: str, file_bytes: bytes) -> KetQuaUpload:
             if not path_version.exists():
                 path_version.write_bytes(file_bytes)
         except Exception as e:
+            logger.error("Lỗi trong khối except: %s", e, exc_info=True)
             logger.debug("luu_pgd_file: lỗi lưu lịch sử CDTOTKVV %s/%s — %s", ten_pgd, suffix, e)
 
     if thang_nam:
@@ -870,6 +874,7 @@ def format_caption_merge(loai: str) -> str | None:
         thoi_gian = datetime.fromisoformat(meta["thoi_gian"])
         thoi_gian_str = thoi_gian.strftime("%H:%M %d/%m")
     except Exception:
+        logger.error("Lỗi trong khối except: %s", e, exc_info=True)
         thoi_gian_str = str(meta.get("thoi_gian", ""))
 
     so_pgd  = meta.get("so_pgd", 0)

@@ -5,6 +5,11 @@ Dành cho:
   - manager / admin : tạo nhiệm vụ, xem danh sách, hậu kiểm duyệt kết quả
   - user (CBTD)     : xem nhiệm vụ được giao, nhập & cập nhật kết quả
 """
+
+
+from logger import get_logger
+logger = get_logger(__name__)
+
 import streamlit as st
 import db
 from datetime import datetime
@@ -553,6 +558,7 @@ def _render_nhap_ket_qua(tab, **kwargs):
 
 from tabs.base_tab import TabContext
 
+
 def render(tab, **kwargs):
     """Render tab Quản lý Nhiệm vụ — phân nhánh theo role."""
     ctx = TabContext(tab, **kwargs)
@@ -593,8 +599,6 @@ def _xuat_pdf_nhiem_vu(ds_nv: list, chu_ky: str, ky: str) -> bytes:
     from reportlab.pdfbase.ttfonts import TTFont
     import os
 
-from logger import get_logger
-logger = get_logger(__name__)
 
     buf = io.BytesIO()
 

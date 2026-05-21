@@ -1,5 +1,10 @@
 """Tab Cân đối."""
+
+
 from __future__ import annotations
+
+from logger import get_logger
+logger = get_logger(__name__)
 
 import os
 import socket
@@ -26,9 +31,7 @@ from data import ts_file, doc_dienbao, db_lookup
 from data.pgd import duong_dan_pgd, pgd_slug
 from services import luu_dienbao
 from tabs import tab_kehoach
-from logger import get_logger
 
-logger = get_logger(__name__)
 
 if TYPE_CHECKING:
     from streamlit.delta_generator import DeltaGenerator
@@ -128,6 +131,7 @@ def _lay_nqh_con(rows: list[dict], ten_cha: str) -> float:
 
 
 from tabs.base_tab import TabContext
+
 
 
 def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:

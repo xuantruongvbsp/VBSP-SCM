@@ -16,7 +16,12 @@ Sub-tabs:
   6. 📋 Audit log       — 100 thao tác gần nhất (có lọc)
 """
 
+
+
 from __future__ import annotations
+
+from logger import get_logger
+logger = get_logger(__name__)
 
 import os
 import shutil
@@ -47,6 +52,7 @@ from config import (
     PGD_DATA_DIR,
 )
 from tabs.base_tab import TabContext
+
 
 # ── Hằng số nội bộ ─────────────────────────────────────────────────────────
 _DS_LOAI_FILE = ["hstd", "nq11", "gqvl"]
@@ -611,8 +617,6 @@ def _render_he_thong(la_cn: bool = False) -> None:
                     # Parse tên thư mục YYYYMMDD_HHMMSS
                     try:
                         from datetime import datetime
-from logger import get_logger
-logger = get_logger(__name__)
 
                         dt = datetime.strptime(d.name, "%Y%m%d_%H%M%S")
                         ngay = dt.strftime("%d/%m/%Y %H:%M")

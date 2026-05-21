@@ -3,6 +3,11 @@ Không gian Tác nghiệp (Operation View)
 ────────────────────────────────────────
 Dành cho CBTD — Tra cứu chi tiết + Document Hub (Trung tâm văn bản tự động).
 """
+
+
+from logger import get_logger
+logger = get_logger(__name__)
+
 import importlib
 import socket
 
@@ -45,6 +50,7 @@ from components.delta_card import delta_card, kpi_row
 from components.filter_bar import filter_bar, apply_filters
 from components.loan_drawer import loan_detail_drawer
 from components.export_pdf import download_pdf_button, xuat_pdf_co_chart
+
 
 _TAB_CACHE: dict = {}
 
@@ -1565,8 +1571,6 @@ def render(**kwargs):
         with get_tab_context(tab_parent):
             import plotly.graph_objects as go
 
-from logger import get_logger
-logger = get_logger(__name__)
 
             df_loc = kw.get("df")
             st.subheader("🍩 Donut — Cơ cấu Dư nợ theo Chương trình")

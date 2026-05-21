@@ -3,7 +3,12 @@
 Đọc dữ liệu từ khtd_xa ({ten_xa|ma_ct: gia_tri_dong}), hiển thị bảng
 tổng hợp hàng=xã, cột=chương trình cho PGD được chọn, có dòng tổng và xuất Excel.
 """
+
+
 from __future__ import annotations
+
+from logger import get_logger
+logger = get_logger(__name__)
 
 import re
 from io import BytesIO
@@ -26,6 +31,7 @@ from services.khtd_nhap_service import (
 )
 
 from config import (
+
     CHUONG_TRINH_KHTD, TEN_CHINH_THUC_CT,
     COT_TEN_PGD, COT_TEN_CT, COT_MA_CHUONG_TRINH, COT_NGUON_VON, COT_TONG_DU_NO, COT_DU_NO_TH,
     DS_PGD, PGD_XA_MAP,
@@ -34,8 +40,6 @@ from config import (
 if TYPE_CHECKING:
     from streamlit.delta_generator import DeltaGenerator
 
-from logger import get_logger
-logger = get_logger(__name__)
 
 # ── Hằng số ──────────────────────────────────────────────────────────────────
 KV_KEY_XA   = "khtd_xa"

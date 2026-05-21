@@ -20,11 +20,13 @@ try:
     from logger import get_logger
     logger = get_logger(__name__)
 except Exception:
+    logger.error("Lỗi trong khối except: %s", e, exc_info=True)
     import logging
     logger = logging.getLogger(__name__)
 try:
     from upload_service import KetQuaUpload
 except Exception:
+    logger.error("Lỗi trong khối except: %s", e, exc_info=True)
     from services.upload_service import KetQuaUpload
 from config import (
     COT_MA_CHUONG_TRINH,
@@ -57,6 +59,7 @@ def _ky_tu_df(df: pd.DataFrame) -> str:
                 if pd.notna(dt):
                     return dt.strftime("%Y-%m")
             except Exception:
+                logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                 pass
     return datetime.now().strftime("%Y-%m")
 
@@ -238,6 +241,7 @@ def _ky_tu_nq11(df: pd.DataFrame) -> str:
                 if pd.notna(dt):
                     return dt.strftime("%Y-%m")
     except Exception:
+        logger.error("Lỗi trong khối except: %s", e, exc_info=True)
         pass
     return datetime.now().strftime("%Y-%m")
 

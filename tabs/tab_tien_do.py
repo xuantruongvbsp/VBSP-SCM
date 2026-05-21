@@ -1,4 +1,9 @@
+
+
 from __future__ import annotations
+
+from logger import get_logger
+logger = get_logger(__name__)
 
 import json
 from datetime import datetime, date
@@ -1181,8 +1186,7 @@ def _render_xuat(tab, **kwargs):
 from tabs.base_tab import TabContext
 
 
-from logger import get_logger
-logger = get_logger(__name__)
+
 
 def render(tab, **kwargs):
     ctx = TabContext(tab, **kwargs)

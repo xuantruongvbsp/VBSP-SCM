@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from logger import get_logger
+logger = get_logger(__name__)
+
 import json
 from datetime import date, datetime
 
@@ -120,6 +123,7 @@ def cap_nhat_ketqua_bulk(
             try:
                 ngay_ht = date.fromisoformat(str(ngay_ht)).isoformat()
             except Exception:
+                logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                 ngay_ht = None
         ghi_chu = str(r.get("ghi_chu") or "").strip() or None
         pgd_val = ten_xa_dv if cap_theo_doi == "pgd" else pgd_sel
@@ -127,6 +131,7 @@ def cap_nhat_ketqua_bulk(
             upsert_ketqua_xa(task_id, ten_xa_dv, pgd_val, trang_thai, ngay_ht, ghi_chu, username)
             count += 1
         except Exception as e:
+            logger.error("Lỗi trong khối except: %s", e, exc_info=True)
             errors.append((ten_xa_dv, str(e)))
     return count, errors
 

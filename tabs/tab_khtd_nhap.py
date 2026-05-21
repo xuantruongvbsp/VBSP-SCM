@@ -1,5 +1,10 @@
 """Nhập dữ liệu cho tab Kế hoạch Tín dụng (Chi nhánh + theo Xã/PGD)."""
+
+
 from __future__ import annotations
+
+from logger import get_logger
+logger = get_logger(__name__)
 
 import json
 from pathlib import Path
@@ -33,8 +38,7 @@ from tabs.tab_khtd import (
 )
 from tabs.tab_khtd_xuat import _hien_thi_bang_cn_readonly
 from services.khtd_nhap_service import (
-from logger import get_logger
-logger = get_logger(__name__)
+
 
     clean_sheet_name as _clean_sheet_name,
     tinh_th_gqvl_phan_tang as _tinh_th_gqvl_phan_tang,

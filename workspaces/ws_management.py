@@ -4,6 +4,11 @@ Không gian Điều hành (Management View)
 Dành cho Lãnh đạo phòng KH-NV — Giám sát NQH theo địa bàn,
 quản lý chỉ tiêu, cân đối nguồn vốn.
 """
+
+
+from logger import get_logger
+logger = get_logger(__name__)
+
 import os
 from datetime import datetime
 from pathlib import Path
@@ -42,6 +47,7 @@ from components.delta_card import delta_card, kpi_row
 from components.loan_drawer import loan_detail_drawer
 from components.filter_bar import filter_bar, apply_filters
 from components.export_pdf import download_pdf_button, xuat_pdf_co_chart
+
 
 @st.cache_resource
 def _get_tab(name: str):
@@ -1388,8 +1394,6 @@ def render(**kwargs):
                     except Exception as e:
                         logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                         import traceback
-from logger import get_logger
-logger = get_logger(__name__)
 
                         st.error(f"❌ Lỗi render **{active_label}**: {e}")
                         st.code(traceback.format_exc())

@@ -1,5 +1,10 @@
 """Tab quản lý Điểm Giao Dịch (dgd_map) — Phân hệ ws_management."""
+
+
 from __future__ import annotations
+
+from logger import get_logger
+logger = get_logger(__name__)
 
 import copy
 import re
@@ -27,6 +32,7 @@ from data.dgd_helpers import (
 )
 from data.pgd import pgd_slug
 from utils import fmt_so, hien_thi_dataframe_phan_trang, xuat_excel
+
 
 if TYPE_CHECKING:
     from streamlit.delta_generator import DeltaGenerator
@@ -198,8 +204,6 @@ def _render_tim_kiem(dgd_map: dict, username: str = "unknown") -> None:
         with c_p:
             try:
                 from pdf_service import xuat_pdf
-from logger import get_logger
-logger = get_logger(__name__)
 
                 pdf_bytes = xuat_pdf(df_f[cols_show], "DANH SÁCH ĐIỂM GIAO DỊCH", username)
                 st.download_button(

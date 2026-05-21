@@ -9,6 +9,11 @@ Hai luồng dữ liệu độc lập:
 
 Không dùng ngôn ngữ "ưu tiên / fallback" — hai luồng hoàn toàn tách biệt.
 """
+
+
+from logger import get_logger
+logger = get_logger(__name__)
+
 import streamlit as st
 from typing import Optional
 from datetime import datetime
@@ -16,6 +21,7 @@ from auth import la_phan_he_pgd, normalize_role
 
 from config import DS_PGD, CACHE_HSTD
 from utils import format_df_vn
+
 try:
     from services.data_priority_service import (
         lay_thong_tin_nguon_hien_tai,
@@ -175,8 +181,6 @@ def render_detailed_status(pgd_user: Optional[str] = None,
             )
         elif pgd_user:
             from services.data_priority_service import hien_thi_trang_thai_nguon_widget
-from logger import get_logger
-logger = get_logger(__name__)
 
             hien_thi_trang_thai_nguon_widget(pgd_user)
         else:

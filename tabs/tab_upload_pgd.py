@@ -12,6 +12,11 @@ Bảng trạng thái:
   user   → 1 hàng (đơn vị của mình)
   admin/manager → 22 hàng (toàn Chi nhánh)
 """
+
+
+from logger import get_logger
+logger = get_logger(__name__)
+
 from io import BytesIO
 
 import pandas as pd
@@ -29,9 +34,8 @@ from services.upload_service import (
     luu_pgd_file,
 )
 from auth import co_quyen_upload_pgd, la_phan_he_pgd, normalize_role
-from logger import get_logger
 
-logger = get_logger(__name__)
+
 # data_priority_service và _render_upload_hang_loat đã được tách ra
 # theo kiến trúc 2 luồng độc lập (xem HUONG_DAN_NGUON_DU_LIEU.md)
 

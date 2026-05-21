@@ -1,5 +1,10 @@
 """Tab Tổng quan."""
+
+
 from __future__ import annotations
+
+from logger import get_logger
+logger = get_logger(__name__)
 
 import logging
 import os
@@ -142,6 +147,7 @@ def _cache_tqpgd_extended(
 
 
 from tabs.base_tab import TabContext
+
 
 
 def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
@@ -947,8 +953,6 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                         logger.error("Lỗi trong khối except: %s", _e, exc_info=True)
                         import traceback
 
-from logger import get_logger
-logger = get_logger(__name__)
 
                         st.session_state[_ss_tqpgd] = None
                         st.error(f"❌ Lỗi: {_e}")

@@ -1,6 +1,9 @@
 """Service: các hàm thuần túy cho tab Tổng quan (không có st.* calls)."""
 from __future__ import annotations
 
+from logger import get_logger
+logger = get_logger(__name__)
+
 import logging
 from io import BytesIO
 
@@ -41,6 +44,7 @@ def tinh_kpi_tongquan(
             else 0
         )
     except Exception as e:
+        logger.error("Lỗi trong khối except: %s", e, exc_info=True)
         n_3m = 0
         dn_3m = 0
         logging.warning("[tongquan_kpi] danh_dau_khong_hd lỗi: %s", e)

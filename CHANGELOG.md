@@ -1,5 +1,16 @@
 # CHANGELOG
 
+## [2026-05-21] — LOGGER: bổ sung tiếp services/ + snapshot_service (13 except blocks)
+- `snapshot_service.py` — thêm logger.error(..., exc_info=True) sau 4 except blocks
+- `services/upload_service.py` — thêm logger.error(..., exc_info=True) sau 5 except blocks
+- `services/uy_thac_service.py` — thêm logger.error(..., exc_info=True) sau 1 except block
+- `services/tien_do_service.py` — thêm `from logger import get_logger` + logger.error(..., exc_info=True) sau 2 except blocks
+- `services/tongquan_service.py` — thêm `from logger import get_logger` + logger.error(..., exc_info=True) sau 1 except block
+
+## [2026-05-21] — LOGGER: thêm logger.error(..., exc_info=True) + import vào 29 file
+- `tabs/*.py`, `workspaces/*.py`, `widgets/data_source_status.py` — tất cả file: thêm `from logger import get_logger` và `logger = get_logger(__name__)`; mọi `except Exception as e:` được bổ sung `logger.error(... , exc_info=True)` trong block (không còn file-level LOGGER warning)
+- Danh sách 29 file: `tab_audit_log`, `tab_ban_dai_dien`, `tab_candoi`, `tab_cdtotkvv`, `tab_cdtotkvv_pgd`, `tab_diem_gd_pgd`, `tab_gqvl`, `tab_kehoach`, `tab_khtd`, `tab_khtd_giao_dc`, `tab_khtd_mau07`, `tab_khtd_nhap`, `tab_khtd_pgd`, `tab_khtd_xuat`, `tab_nhiem_vu`, `tab_no_khoanh`, `tab_qd62`, `tab_quan_ly_dgd`, `tab_tien_do`, `tab_tien_do_nop`, `tab_tongquan`, `tab_trang_thai_nguon`, `tab_upload_khnv`, `tab_upload_pgd`, `tab_uy_thac`, `data_source_status`, `ws_executive`, `ws_management`, `ws_operation`
+
 ## [2026-05-21] — Refactor: Ủy thác tách builder payload + gom download UI helper
 - `services/uy_thac_service.py` — thêm 6 builder payload functions thuần (build_payload_ke_hoach, build_payload_mau06, build_payload_mau15, build_payload_mau16, build_payload_bb_xac_minh, build_payload_bc_th) để tách khỏi tab
 - `tabs/tab_uy_thac.py` — thêm `_download_word_pdf_pair()` helper thay thế 6 lần lặp inline Word+PDF download buttons; tất cả _render_* giờ gọi builder từ service

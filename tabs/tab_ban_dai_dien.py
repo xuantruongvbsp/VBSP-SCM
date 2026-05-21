@@ -7,7 +7,12 @@ tab_ban_dai_dien.py — Ban Đại Diện HĐQT
   4. Lưu trữ văn bản    — upload & quản lý file văn bản (lưu kv_store)
 """
 
+
+
 from __future__ import annotations
+
+from logger import get_logger
+logger = get_logger(__name__)
 
 import base64
 import os
@@ -44,6 +49,8 @@ from utils import (
     ten_file_xuat,
 )
 from tabs.base_tab import TabContext
+
+
 
 _KV_HOP = "bdd_hop_list"
 _KV_VBAN = "bdd_van_ban_list"
@@ -231,8 +238,6 @@ def _render_tong_hop(df: pd.DataFrame, username: str) -> None:
         try:
             from pdf_service import xuat_pdf
 
-from logger import get_logger
-logger = get_logger(__name__)
 
             if st.button("📄 Xuất PDF", use_container_width=True, key="bdd_xuat_pdf", type="primary"):
                 pdf_bytes = xuat_pdf(

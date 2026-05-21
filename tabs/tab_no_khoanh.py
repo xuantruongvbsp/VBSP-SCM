@@ -3,7 +3,12 @@
 Port từ VSPPRO Khoanh.tsx.
 KPI cards + breakdown theo Chương trình / Xã / ĐVUT + danh sách chi tiết.
 """
+
+
 from __future__ import annotations
+
+from logger import get_logger
+logger = get_logger(__name__)
 
 import pandas as pd
 import streamlit as st
@@ -148,6 +153,7 @@ def _heatmap_dao_han(df: pd.DataFrame, key: str) -> None:
 
 
 from services.pdf_no_khoanh_service import (
+
     _REPORTLAB_READY, _VBSP_GREEN, _VBSP_GREEN_LIGHT, _ROW_ALT, _BORDER_COLOR, _HEADER_BG, _RED,
     _FN, _FB,
     _dang_ky_font_qlnk, _tim_logo_qlnk,
@@ -1141,8 +1147,6 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                     # Lọc ngày nếu có
                     if ngay_tu_06 or ngay_den_06:
                         from datetime import datetime as dt
-from logger import get_logger
-logger = get_logger(__name__)
 
                         try:
                             if ngay_tu_06:

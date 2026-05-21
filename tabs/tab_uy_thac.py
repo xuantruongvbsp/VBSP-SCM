@@ -1,5 +1,10 @@
 """Tab Ủy thác — Theo dõi Hội đoàn thể và các mẫu biểu kiểm tra."""
+
+
 from __future__ import annotations
+from logger import get_logger
+logger = get_logger(__name__)
+
 import io, os, pickle, uuid
 from datetime import date, datetime, timedelta
 import pandas as pd
@@ -10,7 +15,6 @@ import db
 from auth import la_phan_he_cn, normalize_role
 from data.core import ts_file
 from data.pgd import pgd_slug
-from logger import get_logger
 from config import (
     COT_TEN_PGD, COT_TEN_KH, COT_SO_KU, COT_TEN_CT,
     COT_TONG_DU_NO, COT_DU_NO_QH, COT_LAI_TON, COT_LAI_TON_QH,
@@ -55,7 +59,6 @@ DVUT_ORDER = [
     "Đoàn thanh niên",
 ]
 
-logger = get_logger(__name__)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1180,6 +1183,7 @@ def _render_theo_doi_bc_th(pgd_user: str | None,
 # ══════════════════════════════════════════════════════════════════════════════
 
 from tabs.base_tab import TabContext
+
 
 def render(tab: DeltaGenerator | None = None, **kwargs) -> None:
     """Entry point — dùng chung cho ws_operation và ws_management."""

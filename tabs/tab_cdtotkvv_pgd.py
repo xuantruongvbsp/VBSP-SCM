@@ -1,7 +1,12 @@
 """
 Tab Chấm điểm Tổ TK&VV — ws_operation: chỉ dữ liệu upload của PGD (pgd_data).
 """
+
+
 from __future__ import annotations
+
+from logger import get_logger
+logger = get_logger(__name__)
 
 import os
 import re
@@ -29,6 +34,7 @@ from data.cdtotkvv import (
 from data.core import ts_file
 from data.pgd import duong_dan_pgd, luu_file_pgd_voi_lich_su
 from utils import fmt, fmt_bang_ty, fmt_so, hien_thi_dataframe_phan_trang, ten_file_xuat, xuat_excel
+
 
 if TYPE_CHECKING:
     from streamlit.delta_generator import DeltaGenerator
@@ -610,8 +616,6 @@ def render(tab: DeltaGenerator | None = None, **kwargs) -> None:
             from datetime import date, timedelta
             from config import COT_NGAY_DH, COT_TEN_TO, COT_TONG_DU_NO
 
-from logger import get_logger
-logger = get_logger(__name__)
 
             st.markdown("#### 📅 Nợ đến hạn trong 30 ngày tới")
 

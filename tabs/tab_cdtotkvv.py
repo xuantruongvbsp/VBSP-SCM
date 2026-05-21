@@ -7,7 +7,12 @@ Sub-tab 3: Phân tích Chất lượng - KPI và bảng tiêu chí bị trừ đ
 Sub-tab 4: Bản đồ Chất lượng - Treemap và Heatmap không dùng folium.
 Sub-tab 5: Xu hướng - Timeline và cảnh báo xu hướng xấu.
 """
+
+
 from __future__ import annotations
+
+from logger import get_logger
+logger = get_logger(__name__)
 
 import re
 import socket
@@ -31,6 +36,7 @@ from services.cdtotkvv_service import (
     fmt_xuat_to_khong_dat_vn as _fmt_xuat_to_khong_dat_vn,
 )
 from data.cdtotkvv import (
+
     doc_cdtotkvv, ds_thang_nam, tong_hop_theo_pgd,
     _XEP_LOAI_TOT, _XEP_LOAI_KHA, _XEP_LOAI_TB, _XEP_LOAI_YEU
 )
@@ -235,8 +241,6 @@ def _render_xuat_to_khong_dat_tieu_chi(
         logger.error("Lỗi trong khối except: %s", e, exc_info=True)
         import traceback
 
-from logger import get_logger
-logger = get_logger(__name__)
 
         st.error(f"❌ Lỗi khi xử lý xuất tổ không đạt tiêu chí: {e}")
         with st.expander("Chi tiết lỗi (debug)", expanded=False):

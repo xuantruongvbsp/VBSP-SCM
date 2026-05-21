@@ -7,6 +7,11 @@ Dành cho Ban Giám đốc — Dashboard vĩ mô "Sức Khỏe Tín Dụng" toà
   • Biểu đồ tăng trưởng & so sánh sức khỏe giữa các Phòng giao dịch
   • Tiến độ kế hoạch, cảnh báo NQH đột biến theo Xã, cảnh báo migration
 """
+
+
+from logger import get_logger
+logger = get_logger(__name__)
+
 import importlib
 import streamlit as st
 import pandas as pd
@@ -43,6 +48,7 @@ from pdf_service import xuat_pdf_bao_cao, xuat_pdf, kiem_tra_pdf_dependency, ren
 from snapshot_service import doc_snapshot, doc_snapshot_range, danh_sach_ky
 from services.hhi_service import tinh_hhi, tinh_hhi_breakdown, danh_gia_hhi
 from components.delta_card import delta_card, kpi_row
+
 
 _TAB_CACHE: dict = {}
 
@@ -1683,8 +1689,6 @@ def render(**kwargs) -> None:
             except Exception as e:
                 logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                 import traceback
-from logger import get_logger
-logger = get_logger(__name__)
 
                 st.error(f"❌ Lỗi render **{sel_label}**: {e}")
                 st.code(traceback.format_exc())

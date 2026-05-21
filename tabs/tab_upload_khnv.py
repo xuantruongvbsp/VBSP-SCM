@@ -11,6 +11,11 @@ Giao diện:
   - Tự động merge toàn CN sau khi lưu HSTD/NQ11/GQVL
   - Bảng trạng thái 22 hàng × 5 cột
 """
+
+
+from logger import get_logger
+logger = get_logger(__name__)
+
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from io import BytesIO
 import os
@@ -43,6 +48,7 @@ from services.upload_service import (
 )
 from utils import fmt_so, hien_thi_dataframe_phan_trang
 from services.file_detection_service import (
+
     DS_DON_VI,
     md5_bytes as _md5_bytes,
     md5_file as _md5_file,
@@ -1160,8 +1166,6 @@ def _fragment_merge_toan_cn():
             try:
                 from services.upload_service import merge_du_lieu_toan_cn
 
-from logger import get_logger
-logger = get_logger(__name__)
 
                 for loai in ("hstd", "nq11", "gqvl"):
                     if st.session_state.get(f"can_merge_{loai}", False):

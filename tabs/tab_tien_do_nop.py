@@ -1,5 +1,10 @@
 """Tiến độ nộp báo cáo định kỳ của các PGD — đọc từ Google Sheets."""
+
+
 from __future__ import annotations
+
+from logger import get_logger
+logger = get_logger(__name__)
 
 from datetime import date
 from pathlib import Path
@@ -12,6 +17,7 @@ import db
 from auth import la_phan_he_cn, normalize_role
 from config import DS_PGD, DON_VI_CHI_NHANH
 from utils import xuat_excel
+
 
 SHEET_ID = "15Ev2rTv6khLFaMpAiMwqJCVC_33ocJ-6cp016RGNkYk"
 SHEET_TAB = "TIENDO_BAOCAO"
@@ -320,8 +326,6 @@ def _render_danh_sach(df: pd.DataFrame, deadline_cfg: dict, is_cn: bool, pgd_use
         )
     with col_pdf:
         from pdf_service import nut_xuat_pdf
-from logger import get_logger
-logger = get_logger(__name__)
 
         nut_xuat_pdf(
             df_loc,

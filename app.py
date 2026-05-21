@@ -345,26 +345,40 @@ def main():
 
             if st.button("💾 Lưu vào Project", use_container_width=True,
                          key="btn_save_kv_project",
-                         help="Xuất dữ liệu → backups/kv_sync.json (commit được lên GitHub)"):
-                _n = db.luu_kv_sync_project()
-                db.ghi_audit(username, "export_kv_sync", f"Xuất {_n} bản ghi → backups/kv_sync.json")
-                st.success(f"✅ Đã lưu {_n} bản ghi — nhớ commit GitHub Desktop")
+                         help="Xuất tất cả bảng → backups/kv_sync.json (commit được lên GitHub)"):
+                _counts = db.luu_kv_sync_project()
+                _total = sum(_counts.values())
+                db.ghi_audit(username, "export_kv_sync",
+                             f"Xuất {_total} bản ghi / {len(_counts)} bảng → backups/kv_sync.json")
+                st.success(f"✅ Đã lưu {_total} bản ghi — nhớ commit GitHub Desktop")
+                _labels = {"users":"👤","kv_store":"🗂️","nhiem_vu":"📋","tien_do_task":"📊","qlnk_ket_qua":"🔒"}
+                for _t, _n in _counts.items():
+                    if _n > 0:
+                        st.caption(f"{_labels.get(_t,'•')} {_t}: {_n}")
 
             if _sync_exists:
                 if st.button("🔄 Đồng bộ từ Project", use_container_width=True,
                              key="btn_load_kv_project", type="primary",
-                             help="Import dữ liệu từ backups/kv_sync.json vừa pull về"):
-                    _n = db.doc_kv_sync_project()
-                    db.ghi_audit(username, "import_kv_sync", f"Import {_n} bản ghi từ backups/kv_sync.json")
+                             help="Import tất cả bảng từ backups/kv_sync.json vừa pull về"):
+                    _counts = db.doc_kv_sync_project()
+                    _total = sum(_counts.values())
+                    db.ghi_audit(username, "import_kv_sync",
+                                 f"Import {_total} bản ghi / {len(_counts)} bảng từ backups/kv_sync.json")
                     st.cache_data.clear()
                     for _k in [k for k in list(st.session_state.keys())
                                if k not in ("logged_in", "user_info", "username",
                                             "workspace", "role")]:
                         st.session_state.pop(_k, None)
-                    st.success(f"✅ Đồng bộ {_n} bản ghi! Đang tải lại...")
+                    st.success(f"✅ Đồng bộ {_total} bản ghi! Đang tải lại...")
                     st.rerun()
             else:
                 st.caption("⚠️ Chưa có file sync — pull GitHub trước")
+            st.divider()
+            st.caption(
+                "ℹ️ **Không sync qua GitHub:**\n"
+                "- `pgd_data/` — re-upload sau khi pull\n"
+                "- `credentials.json` — copy thủ công 1 lần"
+            )
 
         st.divider()
         if st.button("🚪 Đăng xuất", use_container_width=True):
@@ -397,6 +411,17 @@ def main():
             if la_phan_he_cn(role) or not pgd_user:
                 df_full = _load_hstd(CACHE_HSTD, _hstd_ts, active_only=True)
                 df = df_full
+                # Kiểm tra schema — parquet từ file template chỉ có ~6 cột
+                # (xảy ra khi cache bị xóa và app fallback đọc raw Excel)
+                _MIN_COLS = 15
+                if not df_full.empty and len(df_full.columns) < _MIN_COLS:
+                    st.error(
+                        f"⚠️ **Dữ liệu HSTD không đầy đủ** — cache chỉ có {len(df_full.columns)} cột "
+                        f"(cần ≥ {_MIN_COLS} cột). "
+                        "Cache đang dùng file template, không phải dữ liệu thực tế.\n\n"
+                        "**Cách sửa:** Vào tab **📤 Upload HSTD** → upload lại file HSTD → Merge."
+                    )
+                    st.stop()
             else:
                 # PGD role: filter pushdown tại read_parquet, cached per-PGD
                 df = _load_hstd(CACHE_HSTD, _hstd_ts, ten_pgd=pgd_user)

@@ -51,7 +51,7 @@ from components.export_pdf import download_pdf_button, xuat_pdf_co_chart
 
 @st.cache_resource
 def _get_tab(name: str):
-    """Lazy import tab module — chỉ load khi lần đầu dùng, cache cho lần sau."""
+    """Import tab module — dùng sys.modules cache của Python, tự invalidate khi Streamlit hot-reload."""
     import importlib
     try:
         return importlib.import_module(f"tabs.{name}")

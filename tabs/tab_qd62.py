@@ -1,11 +1,11 @@
 """Theo dõi nợ rủi ro QĐ62/QĐ-HĐQT NHCSXH — 2 luồng PGD (nhập) và Chi nhánh (kiểm soát)."""
 from __future__ import annotations
 
-import logging
 import os
 from datetime import datetime
 from io import BytesIO
 from pathlib import Path
+from logger import get_logger
 
 import pandas as pd
 import streamlit as st
@@ -183,7 +183,7 @@ def _render_pgd(pgd_filter: str, username: str) -> None:
                     with open(duong_dan, "wb") as f:
                         f.write(file_ho_so.getbuffer())
                 except Exception as e:
-                    logger.error(f"Lỗi lưu file đính kèm QĐ62: {e}")
+                    logger.error("Lỗi lưu file đính kèm QĐ62: %s", e, exc_info=True)
                     st.error(f"⚠️ Không thể lưu file đính kèm: {e}")
                     st.stop()
 

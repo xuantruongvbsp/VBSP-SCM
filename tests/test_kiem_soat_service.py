@@ -52,6 +52,9 @@ def _df_to_base(n_tv: int = 10, ten_to: str = "Tổ 01", ten_pgd: str = "PGD A")
     return pd.DataFrame(rows)
 
 
+_COT_NGAY_DH_HD = "Ngày ĐH theo hợp đồng"  # COT_NGAY_DH_HD
+
+
 def _row_ngaygh(
     ma_ct: str = "01",
     ngay_dh: str = "01/01/2025",
@@ -63,7 +66,7 @@ def _row_ngaygh(
 ) -> pd.Series:
     return pd.Series({
         COT_MA_CHUONG_TRINH: ma_ct,
-        "Ngày hết hạn hợp đồng": ngay_dh,
+        _COT_NGAY_DH_HD: ngay_dh,   # ← key đúng
         COT_THOI_HAN: thoi_han,
         "Ngày ra trường": ngay_rt,
         "Ngày GN đầu tiên": ngay_gn1,

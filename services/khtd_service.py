@@ -320,7 +320,8 @@ def tinh_kh_dau_nam(
             elif int(nv) == 2:
                 out[mk]["kh_moi_dp"] += float(tong_vnd or 0.0)
         return out
-    except Exception:
+    except Exception as exc:
+        logger.error("tinh_kh_dau_nam: lỗi tổng hợp dư nợ HSTD — %s", exc, exc_info=True)
         return {}
 
 

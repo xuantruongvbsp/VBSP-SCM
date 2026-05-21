@@ -51,6 +51,102 @@ def reset_conn() -> None:
 atexit.register(_close_thread_conn)
 
 
+_KV_SYNC_PATH = Path(__file__).parent / "backups" / "kv_sync.json"
+
+
+def export_kv_json() -> str:
+    """Xuất toàn bộ kv_store thành JSON string (text, git-friendly).
+    Dùng để lưu vào backups/kv_sync.json rồi commit GitHub."""
+    try:
+        with get_conn() as conn:
+            rows = conn.execute(
+                "SELECT key, value, updated_at, updated_by FROM kv_store ORDER BY key"
+            ).fetchall()
+        data = {
+            "exported_at": datetime.now().isoformat(),
+            "kv_store": [
+                {"key": r["key"], "value": r["value"],
+                 "updated_at": r["updated_at"], "updated_by": r["updated_by"]}
+                for r in rows
+            ],
+        }
+        return json.dumps(data, ensure_ascii=False, indent=2)
+    except Exception as e:
+        return json.dumps({"error": str(e)})
+
+
+def import_kv_json(json_str: str, username: str = "sync") -> int:
+    """Import (merge) kv_store từ JSON string.
+    Dùng INSERT OR REPLACE — giữ bản ghi mới nhất, không xóa key chỉ có trên máy này.
+    Trả về số bản ghi đã import."""
+    data = json.loads(json_str)
+    entries = data.get("kv_store", [])
+    count = 0
+    try:
+        with get_conn() as conn:
+            for entry in entries:
+                conn.execute(
+                    """INSERT OR REPLACE INTO kv_store (key, value, updated_at, updated_by)
+                       VALUES (?, ?, ?, ?)""",
+                    (entry["key"], entry["value"],
+                     entry.get("updated_at"), entry.get("updated_by", username)),
+                )
+                count += 1
+            conn.commit()
+    except Exception:
+        pass
+    return count
+
+
+def luu_kv_sync_project() -> int:
+    """Xuất kv_store → backups/kv_sync.json trong thư mục project.
+    File này KHÔNG bị .gitignore → commit được lên GitHub."""
+    _KV_SYNC_PATH.parent.mkdir(parents=True, exist_ok=True)
+    json_str = export_kv_json()
+    _KV_SYNC_PATH.write_text(json_str, encoding="utf-8")
+    data = json.loads(json_str)
+    return len(data.get("kv_store", []))
+
+
+def doc_kv_sync_project() -> int | None:
+    """Import kv_store từ backups/kv_sync.json (nếu tồn tại).
+    Trả về số bản ghi import được, hoặc None nếu file chưa có."""
+    if not _KV_SYNC_PATH.exists():
+        return None
+    json_str = _KV_SYNC_PATH.read_text(encoding="utf-8")
+    return import_kv_json(json_str)
+
+
+def backup_db_bytes() -> bytes:
+    """Checkpoint WAL về main file rồi đọc toàn bộ database thành bytes.
+    Dùng cho tính năng Backup/Restore trong sidebar — đảm bảo mọi dữ liệu
+    đang nằm trong WAL đều được flush vào file .db trước khi đọc."""
+    try:
+        with get_conn() as conn:
+            conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+    except Exception:
+        pass
+    with open(get_db_path(), "rb") as f:
+        return f.read()
+
+
+def restore_db_bytes(data: bytes) -> None:
+    """Ghi database mới từ bytes, dọn WAL/SHM cũ, đóng connection thread hiện tại.
+    Sau khi gọi hàm này: gọi st.cache_data.clear() + st.rerun() để tải lại."""
+    db_path = get_db_path()
+    _close_thread_conn()
+    # Xóa WAL/SHM để tránh conflict với file db mới
+    for ext in ("-wal", "-shm"):
+        p = db_path + ext
+        try:
+            if os.path.exists(p):
+                os.remove(p)
+        except OSError:
+            pass
+    with open(db_path, "wb") as f:
+        f.write(data)
+
+
 def init_db():
     with get_conn() as conn:
         conn.executescript("""

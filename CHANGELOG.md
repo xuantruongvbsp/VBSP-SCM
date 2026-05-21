@@ -9,6 +9,14 @@
 - `tabs/tab_tongquan.py` — cache wrapper gọi sang service (giữ nguyên UI)
 - `tests/test_tongquan_service.py` — thêm smoke tests cho các hàm tính toán
 
+## [2026-05-21] — KHTD: chuẩn hóa parse Excel sang service + fix banner tổng KH
+- `services/khtd_nhap_service.py` — thêm parse Excel (`doc_excel_khtd_cn_upload`, `doc_excel_khtd_xa_upload`) + lưu PDF xã (`luu_pdf_khtd_xa`) (pure, không st.*)
+- `tabs/tab_khtd_nhap.py` — dùng service để parse Excel/lưu PDF, fix lỗi biến `tong_kh_ty` khi nhập đủ CT, ghi audit khi xuất PDF
+- `tests/test_khtd_nhap_service.py` — thêm smoke tests cho parse Excel + lưu PDF
+- `services/khtd_mau07_service.py` — bổ sung `tinh_du_no_ap_baseline` (pure) để tái sử dụng và dễ test
+- `tabs/tab_khtd_mau07.py` — chuẩn hóa render(tab=None) bằng `get_tab_context()` + normalize role
+- `tests/test_khtd_mau07_service.py` — thêm smoke tests cho Mẫu 07 (slug/key/baseline/build table/word bytes)
+
 ## [2026-05-21] — Refactor: tách logic thuần ra services/ (loạt lớn — 9 tab)
 - `services/file_detection_service.py` — tạo mới: nhận diện loại file, đọc tên đơn vị, MD5, alias (từ tab_upload_khnv)
 - `tabs/tab_upload_khnv.py` — ~1 640 → ~1 332 dòng (-308): bỏ 10 hàm/hằng đã tách

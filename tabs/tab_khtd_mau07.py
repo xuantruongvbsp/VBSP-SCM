@@ -10,14 +10,13 @@ Ghi chú:
   - Số gốc lũy kế: lần 1 = baseline HSTD 31/12; lần 2+ = KH lần trước.
   - Data DB chỉ lưu "Chỉ tiêu KH" (float triệu đồng), không lưu giao +/−.
 """
-import os
 from datetime import datetime
 
 import pandas as pd
 import streamlit as st
 
 import db
-from auth import la_phan_he_pgd
+from auth import la_phan_he_pgd, normalize_role
 from config import (
     COT_MA_CHUONG_TRINH,
     COT_NGUON_VON,
@@ -39,6 +38,7 @@ from services.khtd_mau07_service import (
     _doc_kv_dict,
     _doc_kv_list,
     _luu_kv,
+    tinh_du_no_ap_baseline as _svc_tinh_du_no_ap_baseline,
     lay_so_goc_cho_ap,
     _sync_khtd_xa,
     _lay_ds_ma_key_co_du_lieu,
@@ -48,7 +48,7 @@ from services.khtd_mau07_service import (
     xuat_mau07_word,
     TEN_BY_MAKEY,
 )
-from utils import vn, hien_thi_dataframe_phan_trang
+from utils import vn, hien_thi_dataframe_phan_trang, get_tab_context
 
 # ── Hằng số ───────────────────────────────────────────────────────────────────
 _NAM_KH_DEFAULT = int(NAM_HT)
@@ -62,47 +62,7 @@ _BG_DP = "#fff8e1"
 # ══════════════════════════════════════════════════════════════════════════════
 @st.cache_data(show_spinner=False)
 def tinh_du_no_ap_baseline(_df_baseline: pd.DataFrame, ten_xa: str) -> dict:
-    """Từ HSTD 31/12 tính dư nợ theo ấp × chương trình × nguồn vốn.
-
-    Returns: {"{ten_thon}|{ma_key}": du_no_trieu}
-    """
-    if _df_baseline is None or _df_baseline.empty:
-        return {}
-    try:
-        df = _df_baseline.copy()
-        col_xa   = COT_TEN_XA if COT_TEN_XA in df.columns else None
-        col_thon = COT_TEN_THON if COT_TEN_THON in df.columns else None
-        col_mact = COT_MA_CHUONG_TRINH if COT_MA_CHUONG_TRINH in df.columns else None
-        col_nv   = COT_NGUON_VON if COT_NGUON_VON in df.columns else None
-        col_dn   = COT_TONG_DU_NO if COT_TONG_DU_NO in df.columns else None
-
-        missing = [name for name, val in [
-            ("Tên xã", col_xa), ("Tên thôn", col_thon),
-            ("Mã chương trình", col_mact), ("Nguồn vốn", col_nv), ("Tổng dư nợ", col_dn)
-        ] if not val]
-        if missing:
-            return {"_err": f"Thiếu cột: {missing}"}
-
-        df = df[df[col_xa] == ten_xa].copy()
-        if df.empty:
-            return {"_err": f"Xã '{ten_xa}' không có trong baseline"}
-
-        df = df.dropna(subset=[col_thon, col_mact, col_nv])
-        df[col_dn]   = pd.to_numeric(df[col_dn],   errors="coerce").fillna(0)
-        df[col_mact] = pd.to_numeric(df[col_mact], errors="coerce").fillna(0).astype(int)
-        df[col_nv]   = pd.to_numeric(df[col_nv],   errors="coerce").fillna(0).astype(int)
-
-        result = {}
-        for (ten_thon, ma_ct, nv_int), grp in df.groupby([col_thon, col_mact, col_nv]):
-            du_no = grp[col_dn].sum()
-            if du_no <= 0:
-                continue
-            ma_key = MAKEY_BY_MACT_NV.get((int(ma_ct), int(nv_int)))
-            if ma_key:
-                result[f"{str(ten_thon).strip()}|{ma_key}"] = round(du_no / 1_000_000, 1)
-        return result
-    except Exception as e:
-        return {"_err": str(e)}
+    return _svc_tinh_du_no_ap_baseline(_df_baseline, ten_xa)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -157,12 +117,12 @@ def _render_lich_su(lich_su: list) -> None:
 # ══════════════════════════════════════════════════════════════════════════════
 def render(tab, **kwargs) -> None:
     """Entry point — render tab Mẫu 07."""
-    role     = kwargs.get("role", "user")
+    role = normalize_role(str(kwargs.get("role", "user") or "user"))
     username = kwargs.get("username", "system")
     pgd_user = kwargs.get("pgd_user")
 
-    _tab_ctx = tab if tab is not None else __import__('streamlit').container()
-    with _tab_ctx:
+    ctx = get_tab_context(tab)
+    with ctx:
         st.subheader("📋 Mẫu 07 — Giao/Điều chỉnh Chỉ tiêu KHTD theo Ấp/Thôn")
         st.caption("Biểu số 07/NHCS-KH · Theo CV 7064 · Số QĐ & ngày tháng để trống cho UBND xã điền khi ký")
 

@@ -252,3 +252,28 @@ def doc_excel_khtd_xa_upload(
         updates[f"{ten_xa}|{ma_ct}"] = val_trieu * 1_000_000
         dem += 1
     return updates, dem, canh_bao
+
+
+def luu_pdf_khtd_xa(
+    pdf_bytes: bytes,
+    thu_muc: str,
+    *,
+    pgd: str,
+    xa: str,
+    now: datetime | None = None,
+) -> Path:
+    if not pdf_bytes:
+        raise ValueError("PDF trống.")
+    if not thu_muc:
+        raise ValueError("Chưa nhập thư mục lưu PDF.")
+    p = Path(str(thu_muc).strip())
+    if not p.exists() or not p.is_dir():
+        raise ValueError(f"Thư mục không tồn tại: {p}")
+
+    ts = (now or datetime.now()).strftime("%Y%m%d_%H%M")
+    pgd_safe = re.sub(r"[\\/*?\"<>|:]", "_", str(pgd or "").strip())[:40]
+    xa_safe = re.sub(r"[\\/*?\"<>|:]", "_", str(xa or "").strip())[:40]
+    ten_file = f"KHTD_{pgd_safe}_{xa_safe}_{ts}.pdf".strip("_")
+    duong_dan = p / ten_file
+    duong_dan.write_bytes(pdf_bytes)
+    return duong_dan

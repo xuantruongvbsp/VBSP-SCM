@@ -2,14 +2,11 @@
 from __future__ import annotations
 
 import json
-from io import BytesIO
 from pathlib import Path
 from datetime import datetime
 
 import pandas as pd
 import streamlit as st
-import os
-from datetime import datetime
 
 import db
 from auth import get_permissions, normalize_role
@@ -45,6 +42,7 @@ from services.khtd_nhap_service import (
     tao_df_mau_khtd_cn as _tao_df_mau_khtd_cn,
     doc_excel_khtd_cn_upload as _svc_doc_excel_khtd_cn_upload,
     doc_excel_khtd_xa_upload as _svc_doc_excel_khtd_xa_upload,
+    luu_pdf_khtd_xa as _svc_luu_pdf_khtd_xa,
 )
 
 
@@ -282,6 +280,7 @@ def _tab_khtd_chi_nhanh(
     tong_kh_trieu = (
         sum(float(kh_cn.get(mk, 0.0)) for mk in MA_KEYS_CO_KHTD) / 1e6
     )
+    tong_kh_ty = tong_kh_trieu / 1000.0
 
     if so_ct_co_kh == 0:
         mau = "#fff3cd"
@@ -1009,19 +1008,22 @@ def _tab_khtd_theo_xa(role: str, username: str, df_full: "pd.DataFrame | None") 
         )
         if file_up:
             try:
-                df_up = pd.read_excel(BytesIO(file_up.read()), header=0)
-                dem = 0
-                for _, row in df_up.iterrows():
-                    ten_xa = str(row.iloc[0]).strip()
-                    ma_ct  = str(row.iloc[1]).strip()
-                    val    = float(row.iloc[2]) * 1_000_000 if pd.notna(row.iloc[2]) else 0.0
-                    if ten_xa and ma_ct and val > 0:
-                        kh_xa[f"{ten_xa}|{ma_ct}"] = val
-                        dem += 1
+                updates, dem, canh_bao = _svc_doc_excel_khtd_xa_upload(
+                    file_up.getvalue(),
+                    ds_xa_hop_le=set(danh_sach_xa),
+                    ma_keys_co_khtd=set(MA_KEYS_CO_KHTD),
+                )
+                kh_xa.update(updates)
                 if _luu_kv(KV_KEY_XA, kh_xa, username):
                     db.ghi_audit(username, "upload_khtd_xa",
                                  f"{dem} chỉ tiêu từ Excel")
                     st.success(f"✅ Đã lưu {dem} chỉ tiêu kế hoạch xã từ file Excel!")
+                    if canh_bao:
+                        st.warning(
+                            f"⚠️ Có {len(canh_bao)} dòng bị bỏ qua:\n- "
+                            + "\n- ".join(canh_bao[:8])
+                            + ("\n- …" if len(canh_bao) > 8 else "")
+                        )
                     st.rerun()
             except Exception as e:
                 st.error(f"Lỗi đọc file Excel: {e}")
@@ -1261,17 +1263,21 @@ def _tab_khtd_theo_xa(role: str, username: str, df_full: "pd.DataFrame | None") 
                         prefix_file="KHTD"
                     )
                     
-                    # Option A: Lưu vào thư mục nếu có đường dẫn hợp lệ
-                    if pdf_folder and os.path.exists(pdf_folder):
-                        ten_file = f"KHTD_{xa_chon}_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf"
-                        duong_dan_file = os.path.join(pdf_folder, ten_file)
-                        with open(duong_dan_file, "wb") as f:
-                            f.write(pdf_bytes)
-                        st.success(f"✅ Đã lưu PDF: {duong_dan_file}")
+                    if pdf_folder:
+                        try:
+                            dp = _svc_luu_pdf_khtd_xa(
+                                pdf_bytes,
+                                pdf_folder,
+                                pgd=pgd_chon,
+                                xa=xa_chon,
+                            )
+                            st.success(f"✅ Đã lưu PDF: {dp}")
+                        except Exception as _e:
+                            st.warning(f"⚠️ Không lưu được PDF vào thư mục: {_e}")
                     
-                    # Option B: Download button fallback
                     st.session_state["_pdf_bytes_khtd_xa"] = pdf_bytes
                     st.session_state["_pdf_file_khtd_xa"] = f"KHTD_{xa_chon}_{datetime.now().strftime('%Y%m%d')}.pdf"
+                    db.ghi_audit(username, "xuat_bieu_cn", f"KHTD xã — PGD: {pgd_chon} — Xã: {xa_chon}")
                     
                 except Exception as e:
                     st.session_state["_pdf_bytes_khtd_xa"] = None

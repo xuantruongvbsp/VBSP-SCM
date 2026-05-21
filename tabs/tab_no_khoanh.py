@@ -37,6 +37,10 @@ from config import (
 )
 from utils import fmt_so, fmt_ty, get_tab_context, hien_thi_dataframe_phan_trang, xuat_excel
 from tabs import tab_qlnk_dashboard
+from services.no_khoanh_service import (
+    loc_khoanh as _loc_khoanh,
+    bang_theo_nhom as _bang_theo_nhom,
+)
 import db
 from datetime import datetime
 _fmt_dong = lambda x: fmt_so(float(x)) + " đồng" if x not in (None, "", float("nan")) else "0 đồng"
@@ -55,42 +59,6 @@ def _cached_mau_bieu_cv368(ten_pgd=None, loai_mau=None, nam=None):
 @st.cache_data(ttl=30, show_spinner=False)
 def _cached_bo_sung_mon_vay(ma_mon_vay):
     return db.doc_bo_sung_mon_vay(ma_mon_vay)
-
-
-# ─── Helpers ──────────────────────────────────────────────────────────────────
-
-def _loc_khoanh(df: pd.DataFrame) -> pd.DataFrame:
-    """Lọc các món vay đang khoanh nợ (Dư nợ khoanh > 0)."""
-    if COT_DU_NO_KHOANH not in df.columns:
-        return pd.DataFrame()
-    du_kh = pd.to_numeric(df[COT_DU_NO_KHOANH], errors="coerce").fillna(0)
-    return df[du_kh > 0].copy()
-
-
-def _bang_theo_nhom(df: pd.DataFrame, nhom_col: str) -> pd.DataFrame:
-    """Bảng tổng hợp: nhóm | Số món | Dư nợ khoanh | Tỷ trọng%."""
-    if nhom_col not in df.columns or df.empty:
-        return pd.DataFrame()
-
-    du_kh = pd.to_numeric(df[COT_DU_NO_KHOANH], errors="coerce").fillna(0)
-    df = df.copy()
-    df["_du_kh"] = du_kh
-
-    nhom = (
-        df.groupby(nhom_col)
-        .agg(so_mon=(COT_SO_KU, "nunique"), du_no_khoanh=("_du_kh", "sum"))
-        .reset_index()
-        .sort_values("du_no_khoanh", ascending=False)
-    )
-
-    tong = nhom["du_no_khoanh"].sum()
-    nhom["Tỷ trọng%"] = (nhom["du_no_khoanh"] / tong * 100).round(1).apply(
-        lambda x: f"{x:.1f}".replace(".", ",") + "%"
-    ) if tong > 0 else "0%"
-    _COL_DN = "Dư nợ khoanh (triệu đồng)"
-    nhom[_COL_DN] = nhom["du_no_khoanh"].apply(fmt_ty)
-    nhom = nhom.rename(columns={"so_mon": "Số món"})
-    return nhom[[nhom_col, "Số món", _COL_DN, "Tỷ trọng%"]]
 
 
 def _chart_nhom(df: pd.DataFrame, nhom_col: str, key: str) -> None:

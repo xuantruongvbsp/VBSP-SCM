@@ -101,6 +101,57 @@ def _luu_kv(key: str, data, username: str) -> bool:
 # BUSINESS LOGIC
 # ══════════════════════════════════════════════════════════════════════════════
 
+def tinh_du_no_ap_baseline(df_baseline: pd.DataFrame, ten_xa: str) -> dict:
+    """Từ HSTD 31/12 tính dư nợ theo ấp × chương trình × nguồn vốn.
+
+    Returns: {"{ten_thon}|{ma_key}": du_no_trieu} hoặc {"_err": "..."}.
+    """
+    if df_baseline is None or df_baseline.empty:
+        return {}
+    try:
+        df = df_baseline.copy()
+        col_xa = COT_TEN_XA if COT_TEN_XA in df.columns else None
+        col_thon = COT_TEN_THON if COT_TEN_THON in df.columns else None
+        col_mact = COT_MA_CHUONG_TRINH if COT_MA_CHUONG_TRINH in df.columns else None
+        col_nv = COT_NGUON_VON if COT_NGUON_VON in df.columns else None
+        col_dn = COT_TONG_DU_NO if COT_TONG_DU_NO in df.columns else None
+
+        missing = [
+            name
+            for name, val in [
+                ("Tên xã", col_xa),
+                ("Tên thôn", col_thon),
+                ("Mã chương trình", col_mact),
+                ("Nguồn vốn", col_nv),
+                ("Tổng dư nợ", col_dn),
+            ]
+            if not val
+        ]
+        if missing:
+            return {"_err": f"Thiếu cột: {missing}"}
+
+        df = df[df[col_xa] == ten_xa].copy()
+        if df.empty:
+            return {"_err": f"Xã '{ten_xa}' không có trong baseline"}
+
+        df = df.dropna(subset=[col_thon, col_mact, col_nv])
+        df[col_dn] = pd.to_numeric(df[col_dn], errors="coerce").fillna(0)
+        df[col_mact] = pd.to_numeric(df[col_mact], errors="coerce").fillna(0).astype(int)
+        df[col_nv] = pd.to_numeric(df[col_nv], errors="coerce").fillna(0).astype(int)
+
+        result: dict[str, float] = {}
+        for (ten_thon, ma_ct, nv_int), grp in df.groupby([col_thon, col_mact, col_nv]):
+            du_no = float(grp[col_dn].sum())
+            if du_no <= 0:
+                continue
+            ma_key = MAKEY_BY_MACT_NV.get((int(ma_ct), int(nv_int)))
+            if ma_key:
+                result[f"{str(ten_thon).strip()}|{ma_key}"] = round(du_no / 1_000_000, 1)
+        return result
+    except Exception as e:
+        return {"_err": str(e)}
+
+
 def lay_so_goc_cho_ap(ten_ap: str, ma_key: str, du_no_baseline: dict, lich_su: list) -> float:
     """Số gốc lũy kế: lần 1 = baseline 31/12, lần 2+ = KH lần trước."""
     composite = f"{ten_ap}|{ma_key}"

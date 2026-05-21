@@ -4,6 +4,7 @@ Dịch vụ KHTD — Giao KHTD & Điều chỉnh KHTD: Google Sheet, kv_store, d
 from __future__ import annotations
 
 import re
+import unicodedata
 from datetime import datetime
 from typing import Any
 
@@ -34,6 +35,100 @@ for _mk, _mct, _ten, _nv, _match in CHUONG_TRINH_KHTD:
     _nv_int = 1 if _nv == "TW" else 2
     if (_mct, _nv_int) not in _LOOKUP_MA_KEY:
         _LOOKUP_MA_KEY[(_mct, _nv_int)] = _mk
+
+
+def ghi_kv_va_audit(
+    key: str,
+    value,
+    *,
+    username: str,
+    action: str,
+    mo_ta: str,
+) -> None:
+    db.ghi_kv(key, value, username)
+    db.ghi_audit(username, action, mo_ta)
+
+
+def _action_luu_khtd_from_key(key: str) -> str:
+    if key == "khtd_cn":
+        return "luu_khtd_cn"
+    if key == "khtd_xa":
+        return "luu_khtd_cn"
+    if key.startswith("khtd_ap_"):
+        return "luu_khtd_mau07"
+    return "luu_kv"
+
+
+def luu_khtd_dict(key: str, data: dict, username: str) -> None:
+    action = _action_luu_khtd_from_key(key)
+    ghi_kv_va_audit(
+        key,
+        data,
+        username=username,
+        action=action,
+        mo_ta=f"key={key}, {len(data)} items",
+    )
+
+
+def _slug_text(text: str) -> str:
+    s = unicodedata.normalize("NFD", str(text or "").strip().lower())
+    s = "".join(c for c in s if unicodedata.category(c) != "Mn")
+    return re.sub(r"[^a-z0-9]+", "_", s).strip("_")
+
+
+def kv_key_mau07(pgd: str, xa: str) -> tuple[str, str]:
+    pgd_s = _slug_text(pgd)
+    xa_s = _slug_text(xa)
+    return f"khtd_ap_{pgd_s}_{xa_s}", f"khtd_ap_lich_su_{pgd_s}_{xa_s}"
+
+
+def _sync_khtd_xa_from_ap(xa: str, data_ap: dict, username: str) -> None:
+    kv_xa = db.doc_kv("khtd_xa")
+    kv_xa = kv_xa if isinstance(kv_xa, dict) else {}
+    tong: dict[str, float] = {}
+    for composite, gia_tri in data_ap.items():
+        parts = str(composite).split("|", 1)
+        if len(parts) != 2:
+            continue
+        mk = parts[1]
+        k = f"{xa}|{mk}"
+        tong[k] = round(tong.get(k, 0.0) + float(gia_tri), 1)
+    kv_xa.update(tong)
+    ghi_kv_va_audit(
+        "khtd_xa",
+        kv_xa,
+        username=username,
+        action="luu_khtd_mau07",
+        mo_ta=f"sync khtd_xa — Xã: {xa} ({len(tong)} items)",
+    )
+
+
+def luu_khtd_mau07(
+    *,
+    pgd: str,
+    xa: str,
+    data_nhap: dict,
+    lich_su_moi: list,
+    username: str,
+    loai_van_ban: str,
+    lan_moi: int,
+) -> None:
+    kv_key_ht, kv_key_ls = kv_key_mau07(pgd, xa)
+    ghi_kv_va_audit(
+        kv_key_ht,
+        data_nhap,
+        username=username,
+        action="luu_khtd_mau07",
+        mo_ta=f"{loai_van_ban} lần {lan_moi} — {xa} ({pgd}) — data",
+    )
+    ghi_kv_va_audit(
+        kv_key_ls,
+        lich_su_moi,
+        username=username,
+        action="luu_khtd_mau07",
+        mo_ta=f"{loai_van_ban} lần {lan_moi} — {xa} ({pgd}) — lịch sử",
+    )
+    _sync_khtd_xa_from_ap(xa, data_nhap, username)
 
 
 def _get_sheet_client() -> Any:

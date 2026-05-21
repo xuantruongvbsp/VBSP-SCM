@@ -15,6 +15,9 @@ from services import khtd_service
 from services.khtd_service import LOAI_DIEU_CHINH, LOAI_GIAO
 from utils import fmt_tien, hien_thi_dataframe_phan_trang, xuat_excel
 from auth import la_phan_he_pgd, normalize_role
+from logger import get_logger
+
+logger = get_logger(__name__)
 
 _SS = "khtd_gdc_"
 
@@ -244,6 +247,7 @@ def _section_a(
                     f"[{_hostname()}] session · {len(df_31_12)} dòng",
                 )
             except Exception as e:
+                logger.error("Không đọc được file HSTD 31/12: %s", e, exc_info=True)
                 db.ghi_audit(
                     username,
                     "upload_khtd_hstd_3112_loi",

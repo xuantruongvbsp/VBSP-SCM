@@ -53,64 +53,95 @@ atexit.register(_close_thread_conn)
 
 _KV_SYNC_PATH = Path(__file__).parent / "backups" / "kv_sync.json"
 
+# Bảng được sync qua GitHub — thứ tự: parent trước child (FK)
+# Bỏ: audit_log, kv_history (log máy), *_snapshot (lớn, tự tái tạo)
+_SYNC_TABLES = [
+    "users",
+    "kv_store",
+    "nhiem_vu",
+    "nhiem_vu_ketqua",
+    "tien_do_task",
+    "tien_do_ketqua",
+    "qlnk_ket_qua",
+    "qlnk_bo_sung",
+    "qlnk_ke_hoach",
+    "mau_bieu_cv368",
+]
+
 
 def export_kv_json() -> str:
-    """Xuất toàn bộ kv_store thành JSON string (text, git-friendly).
-    Dùng để lưu vào backups/kv_sync.json rồi commit GitHub."""
+    """Xuất tất cả bảng business data thành JSON text (git-friendly).
+    Bao gồm: users, kv_store, nhiem_vu, tien_do, qlnk, mau_bieu.
+    Bỏ qua: audit_log, kv_history, *_snapshot (log/lớn, tự tái tạo)."""
+    result: dict = {
+        "exported_at": datetime.now().isoformat(),
+        "version": 2,
+        "tables": {},
+    }
     try:
         with get_conn() as conn:
-            rows = conn.execute(
-                "SELECT key, value, updated_at, updated_by FROM kv_store ORDER BY key"
-            ).fetchall()
-        data = {
-            "exported_at": datetime.now().isoformat(),
-            "kv_store": [
-                {"key": r["key"], "value": r["value"],
-                 "updated_at": r["updated_at"], "updated_by": r["updated_by"]}
-                for r in rows
-            ],
-        }
-        return json.dumps(data, ensure_ascii=False, indent=2)
+            for table in _SYNC_TABLES:
+                try:
+                    rows = conn.execute(f'SELECT * FROM "{table}"').fetchall()
+                    result["tables"][table] = [dict(r) for r in rows]
+                except Exception:
+                    result["tables"][table] = []
     except Exception as e:
-        return json.dumps({"error": str(e)})
+        result["error"] = str(e)
+    return json.dumps(result, ensure_ascii=False, indent=2)
 
 
-def import_kv_json(json_str: str, username: str = "sync") -> int:
-    """Import (merge) kv_store từ JSON string.
-    Dùng INSERT OR REPLACE — giữ bản ghi mới nhất, không xóa key chỉ có trên máy này.
-    Trả về số bản ghi đã import."""
+def import_kv_json(json_str: str, username: str = "sync") -> dict[str, int]:
+    """Import (merge) tất cả bảng từ JSON — INSERT OR REPLACE.
+    Tương thích ngược với format v1 (chỉ có kv_store).
+    Trả về dict {tên_bảng: số_bản_ghi_đã_import}."""
     data = json.loads(json_str)
-    entries = data.get("kv_store", [])
-    count = 0
+    # Tương thích format v1 (chỉ có key "kv_store")
+    if "tables" in data:
+        tables_data: dict = data["tables"]
+    else:
+        tables_data = {"kv_store": data.get("kv_store", [])}
+
+    counts: dict[str, int] = {}
     try:
         with get_conn() as conn:
-            for entry in entries:
-                conn.execute(
-                    """INSERT OR REPLACE INTO kv_store (key, value, updated_at, updated_by)
-                       VALUES (?, ?, ?, ?)""",
-                    (entry["key"], entry["value"],
-                     entry.get("updated_at"), entry.get("updated_by", username)),
-                )
-                count += 1
-            conn.commit()
+            for table in _SYNC_TABLES:
+                rows = tables_data.get(table, [])
+                if not rows:
+                    counts[table] = 0
+                    continue
+                count = 0
+                for row in rows:
+                    cols = ", ".join(f'"{c}"' for c in row.keys())
+                    placeholders = ", ".join("?" * len(row))
+                    try:
+                        conn.execute(
+                            f'INSERT OR REPLACE INTO "{table}" ({cols}) VALUES ({placeholders})',
+                            list(row.values()),
+                        )
+                        count += 1
+                    except Exception:
+                        pass
+                conn.commit()
+                counts[table] = count
     except Exception:
         pass
-    return count
+    return counts
 
 
-def luu_kv_sync_project() -> int:
-    """Xuất kv_store → backups/kv_sync.json trong thư mục project.
-    File này KHÔNG bị .gitignore → commit được lên GitHub."""
+def luu_kv_sync_project() -> dict[str, int]:
+    """Xuất tất cả bảng → backups/kv_sync.json (git-tracked).
+    Trả về dict {tên_bảng: số_bản_ghi}."""
     _KV_SYNC_PATH.parent.mkdir(parents=True, exist_ok=True)
     json_str = export_kv_json()
     _KV_SYNC_PATH.write_text(json_str, encoding="utf-8")
     data = json.loads(json_str)
-    return len(data.get("kv_store", []))
+    return {t: len(rows) for t, rows in data.get("tables", {}).items()}
 
 
-def doc_kv_sync_project() -> int | None:
-    """Import kv_store từ backups/kv_sync.json (nếu tồn tại).
-    Trả về số bản ghi import được, hoặc None nếu file chưa có."""
+def doc_kv_sync_project() -> dict[str, int] | None:
+    """Import tất cả bảng từ backups/kv_sync.json (nếu tồn tại).
+    Trả về dict {tên_bảng: số_bản_ghi}, hoặc None nếu file chưa có."""
     if not _KV_SYNC_PATH.exists():
         return None
     json_str = _KV_SYNC_PATH.read_text(encoding="utf-8")

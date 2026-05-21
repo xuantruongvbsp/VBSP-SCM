@@ -9,6 +9,7 @@ from config import (
     COT_DVUT,
     COT_LAI_TON,
     COT_MUC_VAY,
+    COT_NGAY_VAY,
     COT_SO_DU_TG,
     COT_SO_KU,
     COT_TEN_CT,
@@ -17,6 +18,7 @@ from config import (
     COT_TEN_XA,
     COT_TONG_DU_NO,
 )
+from services.uy_thac_service import loc_mau06, loc_mau15, tinh_theo_dvut
 from services.template_service import (
     tao_word_uythac_bb_ct_cx,
     tao_word_uythac_bb_xac_minh,
@@ -215,3 +217,39 @@ def test_tao_word_uythac_bc_th_smoke() -> None:
     b = tao_word_uythac_bc_th(du_lieu, ds_bb)
     _assert_docx_bytes(b)
 
+
+def test_tinh_theo_dvut_smoke() -> None:
+    df = pd.DataFrame(
+        [
+            {COT_DVUT: "Hội liên hiệp phụ nữ", COT_TEN_TO: "T1", COT_SO_KU: "KU1", COT_TONG_DU_NO: 10},
+            {COT_DVUT: "Hội nông dân", COT_TEN_TO: "T2", COT_SO_KU: "KU2", COT_TONG_DU_NO: 20},
+            {COT_DVUT: "Khác", COT_TEN_TO: "T3", COT_SO_KU: "KU3", COT_TONG_DU_NO: 30},
+        ]
+    )
+    t = tinh_theo_dvut(df, dvut_order=["Hội nông dân", "Hội liên hiệp phụ nữ"])
+    assert list(t[COT_DVUT]) == ["Hội nông dân", "Hội liên hiệp phụ nữ", "Khác"]
+    assert int(t.loc[t[COT_DVUT] == "Hội nông dân", "tong_dn"].iloc[0]) == 20
+
+
+def test_loc_mau06_filters_and_sorts() -> None:
+    df = pd.DataFrame(
+        [
+            {COT_NGAY_VAY: "2026-05-01", COT_TEN_KH: "A", COT_SO_KU: "KU1"},
+            {COT_NGAY_VAY: "2026-05-20", COT_TEN_KH: "B", COT_SO_KU: "KU2"},
+            {COT_NGAY_VAY: "2026-04-30", COT_TEN_KH: "C", COT_SO_KU: "KU3"},
+        ]
+    )
+    out = loc_mau06(df, ngay_tu="2026-05-01", ngay_den="2026-05-31")
+    assert list(out[COT_SO_KU]) == ["KU2", "KU1"]
+
+
+def test_loc_mau15_computes_no_lai() -> None:
+    df = pd.DataFrame(
+        [
+            {COT_TEN_TO: "Tổ 1", COT_TEN_KH: "A", COT_LAI_TON: 1, COT_LAI_TON_QH: 2, COT_SO_DU_TG: 0},
+            {COT_TEN_TO: "Tổ 2", COT_TEN_KH: "B", COT_LAI_TON: 10, COT_LAI_TON_QH: 20, COT_SO_DU_TG: 0},
+        ]
+    )
+    out = loc_mau15(df, ten_to="Tổ 1")
+    assert len(out) == 1
+    assert float(out["Nợ lãi"].iloc[0]) == 3.0

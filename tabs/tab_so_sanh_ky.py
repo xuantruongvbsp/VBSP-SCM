@@ -664,6 +664,16 @@ def _render_radar_ranking(
 # ─────────────────────────────────────────────────────────────────────────────
 
 def render(tab: DeltaGenerator = None, **kwargs) -> None:
+    """Entry point: 2 sub-tab So sánh mốc năm / So sánh 2 kỳ."""
+    import importlib
+    ctx = tab if tab is not None else st.container()
+    with ctx:
+        s1, s2 = st.tabs(["📊 So sánh mốc năm", "🔄 So sánh 2 kỳ"])
+        render_moc_nam(s1, **kwargs)
+        importlib.import_module("tabs.tab_so_sanh_2_ky").render(s2, **kwargs)
+
+
+def render_moc_nam(tab: DeltaGenerator = None, **kwargs) -> None:
     df       = kwargs.get("df")
     df_full  = kwargs.get("df_full", df)
     role_raw = str(kwargs.get("role", "user") or "user")

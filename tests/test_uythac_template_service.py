@@ -8,6 +8,7 @@ from config import (
     COT_DU_NO_QH,
     COT_DVUT,
     COT_LAI_TON,
+    COT_LAI_TON_QH,
     COT_MUC_VAY,
     COT_NGAY_VAY,
     COT_SO_DU_TG,

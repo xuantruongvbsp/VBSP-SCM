@@ -13,8 +13,13 @@ env/
 cache/*.parquet
 cache/
 
-# Dữ liệu upload của PGD — không commit
-pgd_data/
+# Dữ liệu upload của PGD — Excel/Parquet không commit (lớn, nhạy cảm)
+pgd_data/**/*.parquet
+pgd_data/**/*.xlsx
+pgd_data/**/*.XLSX
+# Nhưng cho phép commit thư mục con để git giữ cấu trúc
+!pgd_data/
+!pgd_data/*/
 
 # Bảo mật — Google Service Account key
 credentials.json

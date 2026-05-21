@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## [2026-05-22] — Bỏ _TAB_CACHE trong workspace: dùng sys.modules thay thế
+- `workspaces/ws_operation.py` — xóa `_TAB_CACHE`, `_lazy_tab()` gọi thẳng `importlib.import_module()`
+- `workspaces/ws_executive.py` — xóa `_TAB_CACHE`, tương tự
+- `workspaces/ws_management.py` — cập nhật docstring `_get_tab()` cho chính xác
+
 ## [2026-05-22] — Fix lỗi PDF: thiếu TA_LEFT trong import reportlab
 - `pdf_service.py` dòng ~31 — thêm `TA_LEFT` vào import `from reportlab.lib.enums`
 

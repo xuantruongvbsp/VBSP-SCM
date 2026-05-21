@@ -4,6 +4,49 @@
 
 ---
 
+## [2026-05-21] Dọn dẹp: archive 2 file orphan trong tabs/
+- `tabs/pdf_no_khoanh.py` → `_archive/` — bản sao y hệt `services/pdf_no_khoanh_service.py`, không ai import
+- `tabs/kiem_soat_service.py` → `_archive/` — phiên bản cũ (34 KB), `services/kiem_soat_service.py` đã là bản cập nhật (38 KB)
+- `tab_no_khoanh.py` và `tab_kiem_soat.py` compile OK sau khi dọn
+
+---
+
+## [2026-05-21] Refactor loạt lớn — tách logic thuần vào services/
+
+### Services mới tạo
+| Service | Nguồn gốc | Nội dung |
+|---|---|---|
+| `services/file_detection_service.py` | `tab_upload_khnv` | Nhận diện loại file, đọc tên đơn vị, MD5, TEN_DV_ALIAS |
+| `services/word_xln_service.py` | `tab_no_rui_ro` | 18 hàm tạo Word XLN (01/02/04/05/13/14 + Tờ trình PGD/CN) |
+| `services/rui_ro_aggregation.py` | `tab_no_rui_ro` | `_loc_theo_nguon`, `_tong_hop_no` |
+| `services/task_data_service.py` | `tab_tien_do` | `_doc_tasks`, `_doc_ketqua_task`, `_sync_bien_hoa_ketqua`, etc. |
+| `services/tien_do_pdf_service.py` | `tab_tien_do` | `_xuat_pdf_bao_cao_tien_do`, `_xuat_pdf_tien_do` + reportlab helpers |
+| `services/pdf_no_khoanh_service.py` | `tabs/pdf_no_khoanh.py` | Toàn bộ module reportlab QLNK (không đổi nội dung) |
+| `services/so_sanh_ky_service.py` | `tab_so_sanh_ky` | 11 hàm: `agg_mot_pgd`, `agg_theo_pgd`, `delta_str`, `top_movers`, `phan_tich_hhi_pgd`, ... |
+| `services/cdtotkvv_service.py` | `tab_cdtotkvv` | 5 hàm: `tong_hop_tu_pgd_data`, `bang_trang_thai_cdtotkvv`, `loc_df`, ... |
+| `services/tongquan_service.py` | `tab_tongquan` | `xuat_excel_tqpgd` |
+| `services/khtd_nhap_service.py` | `tab_khtd_nhap` | 7 hàm: `clean_sheet_name`, `tao_df_mau_khtd_cn`, `luu_meta_qd`, `luu_file_qd`, ... |
+| `services/khtd_mau07_service.py` | `tab_khtd_mau07` | 21 hàm: slug/KV helpers, `xuat_mau07_word`, `TEN_BY_MAKEY`, ... |
+
+### Tabs giảm dòng
+| Tab | Trước | Sau | Giảm |
+|---|---|---|---|
+| `tab_no_rui_ro.py` | 2 411 | ~1 067 | -1 344 (-56%) |
+| `tab_tien_do.py` | 1 962 | ~1 323 | -639 (-33%) |
+| `tab_khnv_noi_bo.py` | 1 802 | ~1 455 | -347 (-19%) |
+| `tab_upload_khnv.py` | ~1 640 | ~1 332 | -308 (-19%) |
+| `tab_so_sanh_ky.py` | 1 405 | ~1 207 | -198 (-14%) |
+| `tab_cdtotkvv.py` | 1 217 | ~1 097 | -120 (-10%) |
+| `tab_khtd_mau07.py` | ~1 100 | ~880 | -220 (-20%) |
+
+### Pattern áp dụng
+- Hàm **không có `st.*`** → tách vào `services/`
+- Import lại với alias giữ nguyên tên (VD: `from services.X import func as _func`) — call sites không đổi
+- Hàm có `@st.cache_data` hoặc gọi `st.*` → giữ nguyên trong tab
+- Tất cả file đều pass `python -m py_compile`
+
+---
+
 ## [2026-05-20] Redesign tab Nội bộ KH-NV — kiến trúc 6 tab theo luồng 5 bước
 
 ### tab_khnv_noi_bo.py — thay đổi toàn diện (~840 → ~1 100 dòng)
@@ -67,6 +110,18 @@
 │   ├── ct_discovery.py, excel_service.py, khtd_service.py
 │   ├── hhi_service.py, kiem_soat_service.py, period_compare.py
 │   ├── du_phong_service.py, data_quality.py, migration_service.py
+│   ├── file_detection_service.py  ← nhận diện loại file upload
+│   ├── word_xln_service.py        ← Word XLN (01/02/04/05/13/14 + Tờ trình)
+│   ├── rui_ro_aggregation.py      ← tổng hợp nợ rủi ro
+│   ├── task_data_service.py       ← DB helpers cho tiến độ công việc
+│   ├── tien_do_pdf_service.py     ← PDF báo cáo tiến độ
+│   ├── pdf_no_khoanh_service.py   ← reportlab PDF QLNK
+│   ├── so_sanh_ky_service.py      ← tổng hợp so sánh kỳ
+│   ├── cdtotkvv_service.py        ← dữ liệu CDTOTKVV
+│   ├── tongquan_service.py        ← Excel tổng quan PGD
+│   ├── khtd_nhap_service.py       ← nhập KHTD, lưu meta QĐ
+│   ├── khtd_mau07_service.py      ← Word mẫu 07 + KV helpers
+│   ├── khnv_noi_bo_service.py     ← Word NĐ30/2020 + KV phân công/lịch
 │
 ├── tabs/                        # 40+ tabs
 │   ├── tab_tongquan.py, tab_tracuu.py, tab_candoi.py

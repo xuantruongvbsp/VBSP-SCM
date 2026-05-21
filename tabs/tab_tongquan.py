@@ -33,6 +33,7 @@ from data.pgd import ds_pgd_co_file
 from data.cdtotkvv import doc_cdtotkvv, ds_thang_nam, tong_hop_theo_pgd
 from pdf_service import nut_xuat_pdf, xuat_pdf
 from services.upload_service import format_caption_merge
+from services import tongquan_service as _tqsvc
 from services.tongquan_service import xuat_excel_tqpgd as _xuat_excel_tqpgd
 
 if TYPE_CHECKING:
@@ -53,41 +54,14 @@ def _cache_kpi_tongquan(
     cot_ma_kh: str,
 ) -> dict:
     _ = (ts, pgd_user, pgd_filter)  # tham gia cache key; tránh unused-argument
-    for _c in [cot_tdn, cot_dth, cot_dqh, cot_nk]:
-        if _c and _c in _df.columns:
-            _df[_c] = pd.to_numeric(_df[_c], errors="coerce").fillna(0)
-    tdn = _df[cot_tdn].sum() if cot_tdn in _df.columns else 0
-    dth = _df[cot_dth].sum() if cot_dth in _df.columns else 0
-    dqh = _df[cot_dqh].sum() if cot_dqh in _df.columns else 0
-    dnk = _df[cot_nk].sum() if cot_nk in _df.columns else 0
-    n_mon_vay = _df[cot_ku].nunique() if cot_ku in _df.columns else len(_df)
-    n_kh = _df[cot_ma_kh].nunique() if cot_ma_kh in _df.columns else 0
-    try:
-        from data import danh_dau_khong_hd
-
-        df_kh = danh_dau_khong_hd(_df)
-        n_3m = int(df_kh["is_3m_inactive"].sum()) if "is_3m_inactive" in df_kh.columns else 0
-        dn_3m = (
-            df_kh.loc[df_kh["is_3m_inactive"], cot_tdn].sum()
-            if ("is_3m_inactive" in df_kh.columns and cot_tdn in df_kh.columns)
-            else 0
-        )
-    except Exception as e:
-        n_3m = 0
-        dn_3m = 0
-        logging.warning(
-            "[tongquan_kpi] danh_dau_khong_hd lỗi: %s",
-            e,
-        )
-    return dict(
-        tdn=tdn,
-        dth=dth,
-        dqh=dqh,
-        dnk=dnk,
-        n_mon_vay=n_mon_vay,
-        n_kh=n_kh,
-        n_3m=n_3m,
-        dn_3m=dn_3m,
+    return _tqsvc.tinh_kpi_tongquan(
+        _df,
+        cot_tdn=cot_tdn,
+        cot_dth=cot_dth,
+        cot_dqh=cot_dqh,
+        cot_nk=cot_nk,
+        cot_ku=cot_ku,
+        cot_ma_kh=cot_ma_kh,
     )
 
 
@@ -103,13 +77,12 @@ def _cache_heatmap_pgd(
     cot_dqh: str,
 ) -> pd.DataFrame:
     _ = (ts, pgd_user, pgd_filter)  # tham gia cache key; tránh unused-argument
-    for _c in [cot_tdn, cot_dqh]:
-        if _c and _c in _df.columns:
-            _df[_c] = pd.to_numeric(_df[_c], errors="coerce").fillna(0)
-    return _df.groupby(cot_pgd, as_index=False).agg(
-        du_no=(cot_tdn, "sum"),
-        so_kh=(cot_ma_kh, "nunique"),
-        nqh=(cot_dqh, "sum"),
+    return _tqsvc.tinh_heatmap_pgd(
+        _df,
+        cot_pgd=cot_pgd,
+        cot_tdn=cot_tdn,
+        cot_ma_kh=cot_ma_kh,
+        cot_dqh=cot_dqh,
     )
 
 
@@ -125,94 +98,18 @@ def _cache_co_cau_ct(
     """Cache groupby chương trình tín dụng — trả về df_ct raw (số nguyên VND).
     Dùng ts + pgd_filter làm cache key; _df có underscore để Streamlit bỏ qua hash."""
     _ = (ts, pgd_filter)
-    _df_loc = _df[_df[COT_TONG_DU_NO].fillna(0) > 0].copy()
-
-    _COLS_TO_SUM = [COT_TONG_DU_NO, COT_DU_NO_QH, COT_DU_NO_KHOANH, COT_NGUON_VON]
-    if col_khoanh:
-        _COLS_TO_SUM.append(col_khoanh)
-    if col_gn:
-        _COLS_TO_SUM.append(col_gn)
-    _COLS_TO_SUM = list(set(_COLS_TO_SUM))
-    for _c in _COLS_TO_SUM:
-        if _c in _df_loc.columns:
-            _df_loc[_c] = pd.to_numeric(_df_loc[_c].astype(object), errors="coerce").fillna(0)
-
-    if COT_NGUON_VON in _df_loc.columns:
-        _nv = pd.to_numeric(_df_loc[COT_NGUON_VON], errors="coerce")
-    else:
-        _nv = pd.Series(0, index=_df_loc.index, dtype="float64")
-    du_no_tw = _df_loc[_nv == 1].groupby(COT_TEN_CT)[COT_TONG_DU_NO].sum()
-    du_no_dp = _df_loc[_nv == 2].groupby(COT_TEN_CT)[COT_TONG_DU_NO].sum()
-
-    _so_kh_by_ct  = _df.groupby(COT_TEN_CT)[COT_MA_KH].nunique()
-    _so_mon_by_ct = _df.groupby(COT_TEN_CT)[COT_MA_KH].count()
-
-    df_ct = (
-        _df_loc.groupby(COT_TEN_CT)
-        .agg(du_no=(COT_TONG_DU_NO, "sum"), _tmp=(COT_TONG_DU_NO, "count"))
-        .sort_values("du_no", ascending=False)
-        .reset_index()
+    return _tqsvc.tinh_co_cau_ct(
+        _df,
+        col_khoanh=col_khoanh,
+        col_gn=col_gn,
+        cols_tn_key=cols_tn_key,
+        cot_ten_ct=COT_TEN_CT,
+        cot_tdn=COT_TONG_DU_NO,
+        cot_dqh=COT_DU_NO_QH,
+        cot_dnk=COT_DU_NO_KHOANH,
+        cot_nv=COT_NGUON_VON,
+        cot_ma_kh=COT_MA_KH,
     )
-    df_ct.columns = ["ten_ct", "du_no", "_tmp"]
-    df_ct["so_kh"]  = df_ct["ten_ct"].map(_so_kh_by_ct).fillna(0).astype(int)
-    df_ct["so_mon"] = df_ct["ten_ct"].map(_so_mon_by_ct).fillna(0).astype(int)
-    df_ct.drop(columns=["_tmp"], inplace=True)
-
-    tong = df_ct["du_no"].sum()
-    df_ct["ty_trong"] = (df_ct["du_no"] / tong * 100).round(1) if tong > 0 else 0.0
-    df_ct["du_no_tw"] = df_ct["ten_ct"].map(du_no_tw).fillna(0)
-    df_ct["du_no_dp"] = df_ct["ten_ct"].map(du_no_dp).fillna(0)
-
-    if COT_DU_NO_QH in _df.columns:
-        _qh = (
-            _df_loc.groupby(COT_TEN_CT)[COT_DU_NO_QH]
-            .apply(lambda x: pd.to_numeric(x, errors="coerce").sum())
-            .reset_index()
-        )
-        _qh = _qh.rename(columns={_qh.columns[0]: "ten_ct", _qh.columns[1]: "du_no_qh"})
-        df_ct = df_ct.merge(_qh, on="ten_ct", how="left")
-    else:
-        df_ct["du_no_qh"] = 0.0
-    df_ct["du_no_qh"] = df_ct["du_no_qh"].fillna(0)
-
-    if col_khoanh and col_khoanh in _df.columns:
-        _nk = (
-            _df_loc.groupby(COT_TEN_CT)[col_khoanh]
-            .apply(lambda x: pd.to_numeric(x, errors="coerce").sum())
-            .reset_index()
-        )
-        _nk = _nk.rename(columns={_nk.columns[0]: "ten_ct", _nk.columns[1]: "du_no_khoanh"})
-        df_ct = df_ct.merge(_nk, on="ten_ct", how="left")
-    else:
-        df_ct["du_no_khoanh"] = 0.0
-    df_ct["du_no_khoanh"] = df_ct["du_no_khoanh"].fillna(0)
-
-    if col_gn and col_gn in _df.columns:
-        _gn = (
-            _df_loc.groupby(COT_TEN_CT)[col_gn]
-            .apply(lambda x: pd.to_numeric(x, errors="coerce").sum())
-            .reset_index()
-        )
-        _gn = _gn.rename(columns={_gn.columns[0]: "ten_ct", _gn.columns[1]: "gn_nam"})
-        df_ct = df_ct.merge(_gn, on="ten_ct", how="left")
-    else:
-        df_ct["gn_nam"] = 0.0
-    df_ct["gn_nam"] = df_ct["gn_nam"].fillna(0).replace([float("inf"), float("-inf")], 0)
-
-    cols_tn = [c for c in cols_tn_key.split(",") if c and c in _df.columns]
-    if cols_tn:
-        _tn = (
-            _df_loc.groupby(COT_TEN_CT)[cols_tn]
-            .apply(lambda x: pd.to_numeric(x.stack(), errors="coerce").sum())
-            .reset_index()
-        )
-        _tn = _tn.rename(columns={_tn.columns[0]: "ten_ct", _tn.columns[1]: "tn_nam"})
-        df_ct = df_ct.merge(_tn, on="ten_ct", how="left")
-    else:
-        df_ct["tn_nam"] = 0.0
-    df_ct["tn_nam"] = df_ct["tn_nam"].fillna(0).replace([float("inf"), float("-inf")], 0)
-
-    return df_ct
 
 
 @st.cache_data(ttl=120, show_spinner=False)
@@ -228,79 +125,20 @@ def _cache_tqpgd_extended(
     """Cache toàn bộ bảng tổng quan PGD (đã merge các cột bổ sung) — trả về số VND thô.
     Lọc/format thực hiện bên ngoài để không phình cache."""
     _ = (ts, pgd_filter, nam_ht)
-    _COLS_TO_SUM_PGD = [COT_TONG_DU_NO, COT_DU_NO_QH, COT_LAI_TON]
-    if col_khoanh:
-        _COLS_TO_SUM_PGD.append(col_khoanh)
-    if col_cv:
-        _COLS_TO_SUM_PGD.append(col_cv)
-    for _c in set(_COLS_TO_SUM_PGD):
-        if _c in _df.columns:
-            _df[_c] = pd.to_numeric(_df[_c], errors="coerce").fillna(0)
-
-    df_pgd = _df.groupby(COT_TEN_PGD, as_index=False).agg(
-        du_no=(COT_TONG_DU_NO, "sum"),
-        so_kh=(COT_MA_KH, "nunique"),
-        so_mon=(COT_SO_KU, "nunique"),
-        nqh=(COT_DU_NO_QH, "sum"),
+    return _tqsvc.tinh_tqpgd_extended(
+        _df,
+        col_khoanh=col_khoanh,
+        col_cv=col_cv,
+        cols_thu_key=cols_thu_key,
+        nam_ht=nam_ht,
+        cot_pgd=COT_TEN_PGD,
+        cot_tdn=COT_TONG_DU_NO,
+        cot_dqh=COT_DU_NO_QH,
+        cot_lai_ton=COT_LAI_TON,
+        cot_ngay_dh=COT_NGAY_DH,
+        cot_ma_kh=COT_MA_KH,
+        cot_so_ku=COT_SO_KU,
     )
-
-    if col_khoanh and col_khoanh in _df.columns:
-        _kh = _df.groupby(COT_TEN_PGD, as_index=False).agg(**{col_khoanh: (col_khoanh, "sum")})
-    else:
-        _kh = _df.groupby(COT_TEN_PGD, as_index=False).agg(**{"khoanh_tmp": (COT_MA_KH, "size")})
-        col_khoanh = "khoanh_tmp"
-    df_pgd = df_pgd.merge(_kh, on=COT_TEN_PGD, how="left")
-    df_pgd = df_pgd.rename(columns={col_khoanh: "du_no_khoanh"})
-    df_pgd["du_no_khoanh"] = pd.to_numeric(df_pgd["du_no_khoanh"], errors="coerce").fillna(0)
-
-    if COT_LAI_TON in _df.columns:
-        _lt = (
-            _df.groupby(COT_TEN_PGD)[COT_LAI_TON]
-            .apply(lambda x: pd.to_numeric(x, errors="coerce").fillna(0).sum())
-            .reset_index(name="lai_ton")
-        )
-        df_pgd = df_pgd.merge(_lt, on=COT_TEN_PGD, how="left")
-    else:
-        df_pgd["lai_ton"] = 0.0
-    df_pgd["lai_ton"] = pd.to_numeric(df_pgd["lai_ton"], errors="coerce").fillna(0)
-
-    if COT_NGAY_DH in _df.columns:
-        _df_dh = _df[[COT_TEN_PGD, COT_NGAY_DH, COT_TONG_DU_NO]].copy()
-        _df_dh[COT_NGAY_DH] = pd.to_datetime(_df_dh[COT_NGAY_DH], dayfirst=True, errors="coerce")
-        _mask = _df_dh[COT_NGAY_DH].dt.year == int(nam_ht)
-        _dh = (
-            _df_dh[_mask]
-            .groupby(COT_TEN_PGD)[COT_TONG_DU_NO]
-            .apply(lambda x: pd.to_numeric(x, errors="coerce").fillna(0).sum())
-            .reset_index(name="no_dh_nam")
-        )
-        df_pgd = df_pgd.merge(_dh, on=COT_TEN_PGD, how="left")
-    else:
-        df_pgd["no_dh_nam"] = 0.0
-    df_pgd["no_dh_nam"] = pd.to_numeric(df_pgd["no_dh_nam"], errors="coerce").fillna(0)
-
-    if col_cv and col_cv in _df.columns:
-        _cv = (
-            _df.groupby(COT_TEN_PGD)[col_cv]
-            .apply(lambda x: pd.to_numeric(x, errors="coerce").fillna(0).sum())
-            .reset_index(name="ds_cho_vay")
-        )
-        df_pgd = df_pgd.merge(_cv, on=COT_TEN_PGD, how="left")
-    else:
-        df_pgd["ds_cho_vay"] = 0.0
-    df_pgd["ds_cho_vay"] = pd.to_numeric(df_pgd["ds_cho_vay"], errors="coerce").fillna(0)
-
-    cols_thu = [c for c in cols_thu_key.split(",") if c and c in _df.columns]
-    if cols_thu:
-        _thu = _df.groupby(COT_TEN_PGD)[cols_thu].apply(
-            lambda x: pd.to_numeric(x.stack(), errors="coerce").fillna(0).sum()
-        ).reset_index(name="ds_thu_no")
-        df_pgd = df_pgd.merge(_thu, on=COT_TEN_PGD, how="left")
-    else:
-        df_pgd["ds_thu_no"] = 0.0
-    df_pgd["ds_thu_no"] = pd.to_numeric(df_pgd["ds_thu_no"], errors="coerce").fillna(0)
-
-    return df_pgd
 
 
 from tabs.base_tab import TabContext
@@ -1120,8 +958,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
         st.subheader("🔔 Hồ sơ đến hạn — Tổng hợp")
         if COT_NGAY_DH in df.columns:
             try:
-                dt = df.copy()
-                dt[COT_NGAY_DH] = pd.to_datetime(dt[COT_NGAY_DH], dayfirst=True, errors="coerce")
+                dt = _tqsvc.chuan_hoa_ngay(df, COT_NGAY_DH, dayfirst=True)
                 hn       = pd.Timestamp.today().normalize()
                 cuoi_nam = pd.Timestamp(hn.year, 12, 31)
 
@@ -1164,16 +1001,16 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                         loc_xa = st.multiselect("Lọc Xã", options=ds_xa, default=[], key="tq_loc_xa")
 
                 # Áp dụng bộ lọc vào dt trước khi lọc theo mốc thời gian
-                dt_loc = dt.copy()
-                if loc_pgd:
-                    dt_loc = dt_loc[dt_loc[COT_TEN_PGD].isin(loc_pgd)]
-                if loc_ct:
-                    dt_loc = dt_loc[dt_loc[COT_TEN_CT].isin(loc_ct)]
-                if loc_xa and cot_xa:
-                    dt_loc = dt_loc[dt_loc[cot_xa].isin(loc_xa)]
-
-                # Loại bỏ hồ sơ dư nợ = 0
-                dt_loc = dt_loc[dt_loc[COT_TONG_DU_NO].fillna(0) > 0]
+                dt_loc = _tqsvc.ap_dung_loc_ket_hop(
+                    dt,
+                    cot_pgd=COT_TEN_PGD,
+                    cot_ct=COT_TEN_CT,
+                    cot_xa=cot_xa,
+                    loc_pgd=loc_pgd,
+                    loc_ct=loc_ct,
+                    loc_xa=loc_xa,
+                )
+                dt_loc = _tqsvc.loc_du_no_duong(dt_loc, COT_TONG_DU_NO)
 
                 MOC = {
                     "1 tháng":   hn + pd.Timedelta(days=30),
@@ -1190,11 +1027,13 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                     RENAME_MAP = {COT_TEN_PGD: "PGD", COT_TEN_XA: "Xã", COT_TEN_CT: "Chương trình"}
                     rename_ok = {k: v for k, v in RENAME_MAP.items() if k in df_loc.columns}
 
-                    pdf_tg = df_loc.groupby(cols_ok).agg(
-                        _mon=(COT_SO_KU,      "nunique"),
-                        _kh =(COT_MA_KH,      "nunique"),
-                        _no =(COT_TONG_DU_NO, "sum"),
-                    ).reset_index()
+                    pdf_tg = _tqsvc.tong_hop_den_han(
+                        df_loc,
+                        group_cols=cols_ok,
+                        cot_so_ku=COT_SO_KU,
+                        cot_ma_kh=COT_MA_KH,
+                        cot_tdn=COT_TONG_DU_NO,
+                    )
 
                     pdf_tg["Số món vay"] = pdf_tg["_mon"].apply(fmt_so)
                     pdf_tg["Số KH"]      = pdf_tg["_kh"].apply(fmt_so)
@@ -1223,9 +1062,15 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                         st.success(f"✅ Không có món vay đến hạn {label}")
                         return
 
-                    tong_no  = df_loc[COT_TONG_DU_NO].fillna(0).sum()
-                    tong_mon = df_loc[COT_SO_KU].nunique()
-                    tong_kh  = df_loc[COT_MA_KH].nunique()
+                    _tong = _tqsvc.tong_chi_tieu_den_han(
+                        df_loc,
+                        cot_tdn=COT_TONG_DU_NO,
+                        cot_so_ku=COT_SO_KU,
+                        cot_ma_kh=COT_MA_KH,
+                    )
+                    tong_no = _tong["tong_no"]
+                    tong_mon = _tong["tong_mon"]
+                    tong_kh = _tong["tong_kh"]
 
                     c1, c2, c3 = st.columns(3)
                     c1.metric("Số món vay", fmt_so(tong_mon))
@@ -1236,22 +1081,26 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
 
                     if nhom_col in df_loc.columns:
                         if nhom_chon == "Xã" and COT_TEN_PGD in df_loc.columns:
-                            tg = df_loc.groupby([COT_TEN_PGD, nhom_col]).agg(
-                                _mon=(COT_SO_KU,      "nunique"),
-                                _kh =(COT_MA_KH,      "nunique"),
-                                _no =(COT_TONG_DU_NO, "sum"),
-                            ).reset_index().sort_values("_no", ascending=False)
+                            tg = _tqsvc.tong_hop_den_han(
+                                df_loc,
+                                group_cols=[COT_TEN_PGD, nhom_col],
+                                cot_so_ku=COT_SO_KU,
+                                cot_ma_kh=COT_MA_KH,
+                                cot_tdn=COT_TONG_DU_NO,
+                            ).sort_values("_no", ascending=False)
                             tg["Số món vay"] = tg["_mon"].apply(fmt_so)
                             tg["Số KH"]      = tg["_kh"].apply(fmt_so)
                             tg["Dư nợ (triệu đồng)"] = tg["_no"].apply(fmt_bang_ty)
                             cols_hien_thi = [COT_TEN_PGD, nhom_col, "Số món vay", "Số KH", "Dư nợ (triệu đồng)"]
                             rename_map = {COT_TEN_PGD: "PGD", nhom_col: "Xã"}
                         else:
-                            tg = df_loc.groupby(nhom_col).agg(
-                                _mon=(COT_SO_KU,      "nunique"),
-                                _kh =(COT_MA_KH,      "nunique"),
-                                _no =(COT_TONG_DU_NO, "sum"),
-                            ).reset_index().sort_values("_no", ascending=False)
+                            tg = _tqsvc.tong_hop_den_han(
+                                df_loc,
+                                group_cols=[nhom_col],
+                                cot_so_ku=COT_SO_KU,
+                                cot_ma_kh=COT_MA_KH,
+                                cot_tdn=COT_TONG_DU_NO,
+                            ).sort_values("_no", ascending=False)
                             tg["Số món vay"] = tg["_mon"].apply(fmt_so)
                             tg["Số KH"]      = tg["_kh"].apply(fmt_so)
                             tg["Dư nợ (triệu đồng)"] = tg["_no"].apply(fmt_bang_ty)
@@ -1365,7 +1214,7 @@ def render(tab: DeltaGenerator, **kwargs: dict) -> None:
                     [f"📅 {lbl}" for lbl in _moc_labels],
                     [
                         lambda _den=den, _lbl=lbl, _key=lbl.replace(" ", "_"): _bang_den_han(
-                            dt_loc[(dt_loc[COT_NGAY_DH] >= hn) & (dt_loc[COT_NGAY_DH] <= _den)],
+                            _tqsvc.loc_den_han(dt_loc, cot_ngay_dh=COT_NGAY_DH, tu_ngay=hn, den_ngay=_den),
                             _lbl, _key,
                         )
                         for den, lbl in zip(_moc_values, _moc_labels)

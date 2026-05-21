@@ -1,5 +1,14 @@
 # CHANGELOG
 
+## [2026-05-21] — Dọn dẹp: archive 2 file orphan sai vị trí trong tabs/
+- `tabs/pdf_no_khoanh.py` → `_archive/pdf_no_khoanh_tabs_old.py` (bản sao y hệt services/pdf_no_khoanh_service.py, không ai import)
+- `tabs/kiem_soat_service.py` → `_archive/kiem_soat_service_tabs_old.py` (phiên bản cũ 34 KB; services/ đã có bản cập nhật 38 KB)
+
+## [2026-05-21] — Refactor: đưa logic tính toán Tổng quan vào tongquan_service
+- `services/tongquan_service.py` — thêm hàm tính KPI/heatmap/cơ cấu CT/tổng quan PGD + helper lọc/tổng hợp “Hồ sơ đến hạn” (pure, không phụ thuộc st.*)
+- `tabs/tab_tongquan.py` — cache wrapper gọi sang service (giữ nguyên UI)
+- `tests/test_tongquan_service.py` — thêm smoke tests cho các hàm tính toán
+
 ## [2026-05-21] — Refactor: tách logic thuần ra services/ (loạt lớn — 9 tab)
 - `services/file_detection_service.py` — tạo mới: nhận diện loại file, đọc tên đơn vị, MD5, alias (từ tab_upload_khnv)
 - `tabs/tab_upload_khnv.py` — ~1 640 → ~1 332 dòng (-308): bỏ 10 hàm/hằng đã tách

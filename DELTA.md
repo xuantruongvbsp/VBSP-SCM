@@ -4,6 +4,25 @@
 
 ---
 
+## [2026-05-21] Logging + test coverage cho services quan trọng
+
+### Logging thêm vào
+| Service | Nơi thêm |
+|---|---|
+| `kiem_soat_service.py` | `get_logger(__name__)` + `logger.error` trong `_tinh_to_sai_so_tv` (DuckDB query) |
+| `khtd_service.py` | `get_logger(__name__)` + `logger.error` trong `tinh_kh_dau_nam`, `doc_tu_sheet`, `push_kh_len_sheet` (×2), `luu_dot_khtd` |
+
+### Tests mới
+| File | Số tests | Covers |
+|---|---|---|
+| `test_rui_ro_aggregation.py` | 11 | `_loc_theo_nguon`, `_tong_hop_no` |
+| `test_kiem_soat_service.py` | 20 | `_tinh_ngaygh_dp`, `_tinh_to_sai_so_tv`, `_fmt_so_cell`, `_ks_html_metric_card`, `_tong_hop_vp/ghv_theo_pgd` |
+| `test_word_xln_service.py` | 24 | `_pgd_plain`, `_pgd_line`, `_num`, `_tao_word_01xln` + smoke 6 mẫu |
+
+- Tổng: 421 → 510 tests (509 passed; 1 pre-existing fail `test_data_quality::test_pgd_hop_le`)
+
+---
+
 ## [2026-05-21] Dọn dẹp: archive 2 file orphan trong tabs/
 - `tabs/pdf_no_khoanh.py` → `_archive/` — bản sao y hệt `services/pdf_no_khoanh_service.py`, không ai import
 - `tabs/kiem_soat_service.py` → `_archive/` — phiên bản cũ (34 KB), `services/kiem_soat_service.py` đã là bản cập nhật (38 KB)

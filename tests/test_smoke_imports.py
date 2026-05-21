@@ -214,16 +214,17 @@ class TestSmokeRender:
     def test_render(self, module_name: str, monkeypatch: pytest.MonkeyPatch) -> None:
         from config import (
             COT_DIA_CHI, COT_DU_NO_KHOANH, COT_DU_NO_QH, COT_DU_NO_TH,
-            COT_GOC_TRA, COT_LAI_SUAT, COT_MA_KH, COT_MUC_VAY,
+            COT_GOC_TRA, COT_LAI_SUAT, COT_MA_CHUONG_TRINH,
+            COT_MA_KH, COT_MUC_VAY,
             COT_NGAY_DH, COT_NGAY_SL, COT_NGAY_VAY, COT_SO_KU,
-            COT_TEN_CHUONG_TRINH, COT_TEN_KH, COT_TEN_PGD, COT_TEN_TO,
+            COT_TEN_KH, COT_TEN_PGD, COT_TEN_TO,
             COT_TEN_XA, COT_THOI_HAN, COT_TINH_TRANG, COT_TONG_DU_NO,
             COT_PL_NV, COT_NGUON_VON, COT_SDT, COT_CMND,
         )
         SAMPLE_COLS = [
             COT_MA_KH, COT_TEN_KH, COT_SO_KU, COT_NGAY_VAY, COT_NGAY_DH,
             COT_THOI_HAN, COT_LAI_SUAT, COT_MUC_VAY, COT_DU_NO_TH,
-            COT_DU_NO_QH, COT_TONG_DU_NO, COT_DU_NO_KHOANH, COT_TEN_CHUONG_TRINH,
+            COT_DU_NO_QH, COT_TONG_DU_NO, COT_DU_NO_KHOANH, COT_MA_CHUONG_TRINH,
             COT_TINH_TRANG, COT_DIA_CHI, COT_SDT, COT_TEN_TO, COT_TEN_XA,
             COT_NGUON_VON, COT_PL_NV, COT_CMND, COT_GOC_TRA, COT_NGAY_SL,
             COT_TEN_PGD,

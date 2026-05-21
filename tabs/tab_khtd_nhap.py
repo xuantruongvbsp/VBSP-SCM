@@ -43,6 +43,8 @@ from services.khtd_nhap_service import (
     luu_meta_qd as _svc_luu_meta_qd,
     luu_file_qd as _svc_luu_file_qd,
     tao_df_mau_khtd_cn as _tao_df_mau_khtd_cn,
+    doc_excel_khtd_cn_upload as _svc_doc_excel_khtd_cn_upload,
+    doc_excel_khtd_xa_upload as _svc_doc_excel_khtd_xa_upload,
 )
 
 
@@ -179,65 +181,21 @@ def _section_van_ban_qd_cn(role: str, username: str) -> None:
 
 
 def _doc_excel_khtd_cn_upload(file_bytes: bytes) -> tuple[dict[str, float], int, list[str]] | None:
-    """
-    Đọc Excel upload → dict ma_key → số đồng.
-    Trả về None nếu thiếu cột bắt buộc hoặc không đọc được file.
-    """
     try:
-        df_up = pd.read_excel(BytesIO(file_bytes), header=0)
-    except Exception as e:
-        st.error(f"Không đọc được file Excel: {e}")
-        return None
-
-    ten_cot = {str(c).strip(): c for c in df_up.columns}
-    if "Mã CT" not in ten_cot:
-        st.error(
-            "Không tìm thấy cột **Mã CT** trong file. Vui lòng dùng đúng file mẫu "
-            "(nút **⬇️ Tải file mẫu Excel** phía trên) và giữ nguyên tên các cột."
+        out, dem, bo_qua = _svc_doc_excel_khtd_cn_upload(
+            file_bytes,
+            ma_keys_co_khtd=set(MA_KEYS_CO_KHTD),
         )
+    except ValueError as e:
+        st.error(str(e))
         return None
-
-    col_kh = ten_cot.get("KH (triệu đồng)")
-    if col_kh is None:
-        for t, c in ten_cot.items():
-            tl = t.lower()
-            if "kh" in tl and ("triệu" in t or "trieu" in tl):
-                col_kh = c
-                break
-    if col_kh is None:
-        st.error(
-            "Không tìm thấy cột **KH (triệu đồng)**. Vui lòng dùng file mẫu và không đổi tên cột KH."
-        )
-        return None
-
-    col_ma = ten_cot["Mã CT"]
-    out: dict[str, float] = {}
-    bo_qua: list[str] = []
-    for _, row in df_up.iterrows():
-        ma_key = str(row[col_ma]).strip()
-        if not ma_key or ma_key.lower() == "nan":
-            continue
-        if ma_key not in MA_KEYS_CO_KHTD:
-            bo_qua.append(ma_key)
-            continue
-        v = row[col_kh]
-        if pd.isna(v):
-            continue
-        try:
-            kh_trieu = float(v)
-        except (TypeError, ValueError):
-            continue
-        if kh_trieu == 0:
-            continue
-        out[ma_key] = kh_trieu * 1_000_000
-
     if bo_qua:
         st.warning(
             f"Bỏ qua **{len(bo_qua)}** dòng có Mã CT không thuộc danh mục KHTD: "
             f"{', '.join(sorted(set(bo_qua))[:12])}"
             + ("…" if len(set(bo_qua)) > 12 else "")
         )
-    return out, len(out), bo_qua
+    return out, dem, bo_qua
 
 
 def _tab_khtd_chi_nhanh(

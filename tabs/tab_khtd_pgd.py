@@ -6,7 +6,6 @@ tổng hợp hàng=xã, cột=chương trình cho PGD được chọn, có dòng
 from __future__ import annotations
 
 import re
-import json
 from io import BytesIO
 from pathlib import Path
 from datetime import datetime
@@ -19,6 +18,12 @@ from openpyxl.styles import Font, PatternFill
 import db
 from auth import la_phan_he_cn, la_executive, normalize_role
 from utils import hien_thi_dataframe_phan_trang
+from services.khtd_nhap_service import (
+    format_kich_thuoc as _svc_format_kich_thuoc,
+    doc_meta_qd as _svc_doc_meta_qd,
+    luu_meta_qd as _svc_luu_meta_qd,
+    luu_file_qd as _svc_luu_file_qd,
+)
 
 from config import (
     CHUONG_TRINH_KHTD, TEN_CHINH_THUC_CT,
@@ -51,62 +56,22 @@ def _pgd_slug(ten_pgd: str) -> str:
 
 
 def _format_kich_thuoc(byte_count: int) -> str:
-    """Định dạng dung lượng file thành chuỗi dễ đọc."""
-    if byte_count >= 1_048_576:
-        return f"{byte_count / 1_048_576:.1f} MB"
-    return f"{byte_count / 1024:.1f} KB"
+    return _svc_format_kich_thuoc(byte_count)
 
 
 def _doc_meta_qd(kv_key: str) -> list[dict]:
-    """Đọc danh sách metadata file QĐ từ kv_store."""
-    try:
-        with db.get_conn() as conn:
-            row = conn.execute(
-                "SELECT value FROM kv_store WHERE key=?", (kv_key,)
-            ).fetchone()
-            if row:
-                val = json.loads(row["value"])
-                return val if isinstance(val, list) else []
-    except Exception:
-        pass
-    return []
+    return _svc_doc_meta_qd(kv_key)
 
 
 def _luu_meta_qd(kv_key: str, danh_sach: list[dict], username: str) -> None:
-    """Ghi danh sách metadata file QĐ vào kv_store."""
     try:
-        with db.get_conn() as conn:
-            conn.execute(
-                "INSERT OR REPLACE INTO kv_store (key, value, updated_at, updated_by) "
-                "VALUES (?,?,?,?)",
-                (kv_key, json.dumps(danh_sach, ensure_ascii=False),
-                 datetime.now().isoformat(), username),
-            )
-            conn.commit()
+        _svc_luu_meta_qd(kv_key, danh_sach, username)
     except Exception as e:
         st.error(f"Lỗi lưu metadata file QĐ: {e}")
 
 
 def _luu_file_qd(uploaded, thu_muc: Path, kv_key: str, username: str) -> Path:
-    """Lưu file mới với timestamp prefix, cập nhật metadata trong kv_store."""
-    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    ten_goc = uploaded.name
-    ten_luu = f"{ts}_{ten_goc}"
-    thu_muc.mkdir(parents=True, exist_ok=True)
-    duong_dan = thu_muc / ten_luu
-    noi_dung = uploaded.getvalue()
-    duong_dan.write_bytes(noi_dung)
-
-    danh_sach = _doc_meta_qd(kv_key)
-    danh_sach.append({
-        "ten_file":     ten_goc,
-        "duong_dan":    str(duong_dan),
-        "ngay_upload":  datetime.now().strftime("%d/%m/%Y %H:%M"),
-        "nguoi_upload": username,
-        "kich_thuoc":   len(noi_dung),
-    })
-    _luu_meta_qd(kv_key, danh_sach, username)
-    return duong_dan
+    return _svc_luu_file_qd(uploaded, thu_muc, kv_key, username)
 
 
 def _hien_thi_lich_su_qd(kv_key: str, nhan: str, role: str, username: str) -> None:
@@ -235,7 +200,7 @@ def _tao_column_config_khtd_pgd(cot_so: list[str]) -> dict[str, st.column_config
         "Chỉ Tiêu": st.column_config.TextColumn("Chỉ Tiêu", width="large"),
         "Cộng": st.column_config.NumberColumn(
             "Cộng",
-            format="%.0f",
+            format=",.0f",
             help="Đơn vị: triệu đồng"
         ),
     }
@@ -243,7 +208,7 @@ def _tao_column_config_khtd_pgd(cot_so: list[str]) -> dict[str, st.column_config
         if col not in ("STT", "Chỉ Tiêu", "Cộng"):
             config[col] = st.column_config.NumberColumn(
                 col,
-                format="%.0f",
+                format=",.0f",
                 help="Đơn vị: triệu đồng"
             )
     return config
@@ -261,12 +226,12 @@ def _tao_column_config_ss() -> dict[str, st.column_config.Column]:
     for col in trieu_cols:
         config[col] = st.column_config.NumberColumn(
             col,
-            format="%.0f",
+            format=",.0f",
             help="Đơn vị: triệu đồng"
         )
     config["Tỷ lệ TH %"] = st.column_config.NumberColumn(
         "Tỷ lệ TH %",
-        format="%.1f%%",
+        format=".1%",
         help="Tỷ lệ thực hiện %"
     )
     return config
@@ -279,14 +244,8 @@ def _doc_khtd_xa() -> dict[str, Any]:
     Returns:
         Dict chứa dữ liệu kế hoạch xã
     """
-    try:
-        with db.get_conn() as conn:
-            row = conn.execute(
-                "SELECT value FROM kv_store WHERE key=?", (KV_KEY_XA,)
-            ).fetchone()
-            return json.loads(row["value"]) if row else {}
-    except Exception:
-        return {}
+    val = db.doc_kv(KV_KEY_XA)
+    return val if isinstance(val, dict) else {}
 
 
 def _fmt_vn(x, d: int = 1) -> str:

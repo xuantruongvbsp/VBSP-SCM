@@ -133,8 +133,6 @@ def render(tab, **kwargs):
                         st.error(msg)
                     else:
                         try:
-                            from io import BytesIO
-
                             df_up = pd.read_excel(BytesIO(file_bytes), header=None)
                             new_kh = {}
                             for _, row in df_up.iterrows():

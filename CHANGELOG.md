@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## [2026-05-21] — Ủy thác: fix Mẫu 15/TD báo "Chưa có dữ liệu HSTD" khi cache < 15 cột
+- `tabs/tab_uy_thac.py` dòng ~1418 — `render()` entry point: không set `df = pd.DataFrame()` khi cache < 15 cột nữa, vẫn truyền cache xuống sub-tab để hiển thị lỗi cụ thể
+- `tabs/tab_uy_thac.py` dòng ~537 — `_render_mau15()`: thêm kiểm tra `len(df.columns) < 15` giống `_render_mau06` để báo "cache chưa đầy đủ" thay vì "Chưa có dữ liệu HSTD"
+- `tabs/tab_uy_thac.py` — Xóa hàm `_hstd_cache_hop_le()` không còn dùng
+
 ## [2026-05-21] — Ủy thác: ổn định lọc PGD + dropdown xã/phường cho Kế hoạch (01/KH)
 - `tabs/tab_uy_thac.py` — danh sách “Địa danh (xã/phường)” ưu tiên từ `PGD_XA_MAP` (kể cả khi df thiếu xã), và key_prefix bám theo PGD chọn để tránh state lỗi khi đổi PGD
 - `tabs/tab_uy_thac.py` — chuẩn hóa widget keys theo `pgd_slug(pgd_user)` cho Mẫu 06, Mẫu 15, Biên bản/Báo cáo, BB-CT/CX, Theo dõi/BC-TH (tránh trùng key giữa workspace/đổi PGD)

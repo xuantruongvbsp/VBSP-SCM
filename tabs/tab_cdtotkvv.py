@@ -23,42 +23,17 @@ import db
 from auth import la_phan_he_cn, la_phan_he_pgd
 from utils import fmt_so, xuat_excel, ten_file_xuat, hien_thi_dataframe_phan_trang
 from services import luu_cdtotkvv, KetQuaUpload
+from services.cdtotkvv_service import (
+    tong_hop_tu_pgd_data,
+    bang_trang_thai_cdtotkvv as _bang_trang_thai_cdtotkvv,
+    loc_df as _loc_df,
+    cdtotkvv_ten_sheet_excel as _cdtotkvv_ten_sheet_excel,
+    fmt_xuat_to_khong_dat_vn as _fmt_xuat_to_khong_dat_vn,
+)
 from data.cdtotkvv import (
     doc_cdtotkvv, ds_thang_nam, tong_hop_theo_pgd,
     _XEP_LOAI_TOT, _XEP_LOAI_KHA, _XEP_LOAI_TB, _XEP_LOAI_YEU
 )
-from data.pgd import duong_dan_pgd as _duong_dan_pgd
-from config import CDTOTKVV_DATA_ROW_START, CDTOTKVV_COLS as _CDTOTKVV_COLS
-
-
-def tong_hop_tu_pgd_data() -> "pd.DataFrame | None":
-    """Đọc cdtotkvv_latest.xlsx từ pgd_data/{slug}/ của tất cả đơn vị, concat lại."""
-    import os, pandas as _pd
-    from config import DS_PGD as _DS_PGD, DON_VI_CHI_NHANH as _DON_VI_CN
-    tat_ca_dv = [_DON_VI_CN] + _DS_PGD
-    frames = []
-    for ten_dv in tat_ca_dv:
-        try:
-            dd = _duong_dan_pgd(ten_dv, "cdtotkvv")
-            if not dd or not os.path.exists(dd):
-                continue
-            df = _pd.read_excel(dd, engine="openpyxl", header=None,
-                                skiprows=CDTOTKVV_DATA_ROW_START)
-            df = df.iloc[:, :len(_CDTOTKVV_COLS)].copy()
-            df.columns = _CDTOTKVV_COLS
-            df = df[_pd.to_numeric(df["stt"], errors="coerce").notna()].reset_index(drop=True)
-            if not df.empty:
-                frames.append(df)
-        except Exception:
-            continue
-    return _pd.concat(frames, ignore_index=True) if frames else None
-from config import CDTOTKVV_COLS, DS_PGD, DON_VI_CHI_NHANH
-from data.pgd import doc_trang_thai_file
-
-if TYPE_CHECKING:
-    from streamlit.delta_generator import DeltaGenerator
-
-_RE_THANG_NAM = re.compile(r"^(0[1-9]|1[0-2])/\d{4}$")
 
 # Điểm tối đa / nhãn tiêu chí — dùng chung bảng phân tích & xuất Excel Tổ không đạt
 _CDTOTKVV_DIEM_TOI_DA: dict[str, int] = {
@@ -77,101 +52,6 @@ _CDTOTKVV_TEN_HIEN_THI: dict[str, str] = {
     "diem_ds_tg": "Số dư tiền gửi tăng thêm",
     "diem_nqh": "Tỷ lệ nợ quá hạn",
 }
-
-
-def _bang_trang_thai_cdtotkvv() -> pd.DataFrame:
-    """
-    Tạo bảng trạng thái CDTOTKVV cho 22 đơn vị (Chi nhánh + 21 PGD).
-    Trả về DataFrame với cột: Đơn vị, Trạng thái, Cập nhật lần cuối
-    """
-    # Danh sách 22 đơn vị
-    tat_ca_dv = [DON_VI_CHI_NHANH] + DS_PGD
-    
-    rows = []
-    for ten_dv in tat_ca_dv:
-        trang_thai_info = doc_trang_thai_file(ten_dv, "cdtotkvv")
-        
-        if not trang_thai_info["co_file"]:
-            trang_thai = "❌ Chưa có"
-            cap_nhat = "—"
-        else:
-            ngay_upload = trang_thai_info["ngay_upload"]
-            so_ngay_cu = trang_thai_info["so_ngay_cu"]
-            
-            if trang_thai_info["canh_bao"] == "ok":
-                trang_thai = f"✅ {ngay_upload.strftime('%d/%m')}"
-            else:
-                trang_thai = f"⚠️ {ngay_upload.strftime('%d/%m')} ({so_ngay_cu} ngày)"
-            
-            cap_nhat = ngay_upload.strftime('%d/%m/%Y %H:%M')
-        
-        rows.append({
-            "Đơn vị": ten_dv,
-            "Trạng thái": trang_thai,
-            "Cập nhật lần cuối": cap_nhat
-        })
-    
-    return pd.DataFrame(rows)
-
-
-def _loc_df(df, mode: str, pgd_user: str):
-    """
-    Lọc dữ liệu theo chế độ hiển thị:
-    - mode "cn": toàn Chi nhánh (dùng cho ws_management)
-    - mode "pgd": chỉ PGD mình (dùng cho ws_operation)
-    """
-    if df is None or df.empty:
-        return df
-    if mode == "pgd" and pgd_user:
-        # Lọc theo cả ma_dv và ten_dv
-        if "ma_dv" in df.columns and "ten_dv" in df.columns:
-            # Thử lọc theo ten_dv trước (PGD names)
-            mask_ten = df["ten_dv"].astype(str).str.strip().str.lower() == pgd_user.strip().lower()
-            # Nếu không match tên, thử theo mã
-            if not mask_ten.any():
-                mask_ma = df["ma_dv"].astype(str).str.strip().str.lower() == pgd_user.strip().lower()
-                return df[mask_ma]
-            return df[mask_ten]
-        elif "ten_dv" in df.columns:
-            return df[df["ten_dv"].astype(str).str.strip().str.lower() == pgd_user.strip().lower()]
-        elif "ma_dv" in df.columns:
-            return df[df["ma_dv"].astype(str).str.strip().str.lower() == pgd_user.strip().lower()]
-    return df  # mode "cn" → trả về toàn bộ
-
-
-def _cdtotkvv_ten_sheet_excel(ten_hien_thi: str, da_dung: set[str]) -> str:
-    """Tên sheet Excel ≤31 ký tự, không ký tự cấm, không trùng."""
-    forbidden = set("[]:*?/\\")
-    base = "".join("_" if c in forbidden else c for c in ten_hien_thi).strip() or "Tieu_chi"
-    base = base[:28]
-    ten = base[:31]
-    n = 1
-    while ten in da_dung:
-        hau_to = f"_{n}"
-        ten = (base[: 31 - len(hau_to)]).rstrip("_") + hau_to
-        n += 1
-    da_dung.add(ten)
-    return ten
-
-
-def _fmt_xuat_to_khong_dat_vn(df: pd.DataFrame) -> pd.DataFrame:
-    """Bản sao DataFrame đã format số/tiền chuẩn VN cho Excel/PDF (không dùng cho thống kê .mean())."""
-    out = df.copy()
-    if "Dư nợ" in out.columns:
-        out["Dư nợ"] = pd.to_numeric(out["Dư nợ"], errors="coerce").map(
-            lambda v: fmt_so(v) if pd.notna(v) else "—"
-        )
-    if "Số dư TK" in out.columns:
-        out["Số dư TK"] = pd.to_numeric(out["Số dư TK"], errors="coerce").map(
-            lambda v: fmt_so(v) if pd.notna(v) else "—"
-        )
-    for cot in ("Điểm đạt được", "Điểm tối đa", "Thiếu", "Tổng điểm"):
-        if cot not in out.columns:
-            continue
-        out[cot] = out[cot].apply(
-            lambda v: fmt_so(int(round(float(v)))) if pd.notna(v) and v != "" else "—"
-        )
-    return out
 
 
 def _render_xuat_to_khong_dat_tieu_chi(

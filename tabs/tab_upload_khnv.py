@@ -316,7 +316,7 @@ def _xu_ly_import_folder(danh_sach: list[dict], username: str) -> None:
                 text=f"⏳ Đọc file {i + 1}/{len(danh_sach_import)}...",
             )
 
-    def _ghi(r: dict, data: bytes) -> tuple[dict, str | None]:
+    def _ghi(r: dict, data: bytes) -> tuple[dict, str | None, tuple[str, str] | None]:
         try:
             if r["loai"] == "cdtotkvv":
                 from data.cdtotkvv import doc_thang_nam_tu_file
@@ -328,48 +328,48 @@ def _xu_ly_import_folder(danh_sach: list[dict], username: str) -> None:
                     luu_file_pgd_voi_lich_su(
                         r["ten_pgd"], r["loai"], data, thang
                     )
-                    db.ghi_audit(
-                        username,
+                    audit = (
                         "folder_import_file",
-                        f"CDTOTKVV — {r['ten_pgd']} "
-                        f"tháng={thang} ({r['ten_file']})",
+                        f"CDTOTKVV — {r['ten_pgd']} tháng={thang} ({r['ten_file']})",
                     )
                 else:
                     # Không đọc được tháng → lưu latest, cảnh báo
                     _ghi_file_pgd(r["ten_pgd"], r["loai"], data)
-                    db.ghi_audit(
-                        username,
+                    audit = (
                         "folder_import_file",
-                        f"CDTOTKVV — {r['ten_pgd']} "
-                        f"tháng=unknown ({r['ten_file']})",
+                        f"CDTOTKVV — {r['ten_pgd']} tháng=unknown ({r['ten_file']})",
                     )
                     # Ghi chú vào row để hiển thị cảnh báo sau
                     r["canh_bao"] = "⚠️ Không đọc được tháng — chỉ lưu latest"
             else:
                 _ghi_file_pgd(r["ten_pgd"], r["loai"], data)
-                db.ghi_audit(
-                    username,
+                audit = (
                     "folder_import_file",
                     f"{r['loai'].upper()} — {r['ten_pgd']} ({r['ten_file']})",
                 )
-            return r, None
+            return r, None, audit
         except Exception as e:
-            return r, str(e)
+            return r, str(e), None
 
     if tat_ca_bytes:
+        audit_records: list[tuple[str, str]] = []
         with ThreadPoolExecutor(max_workers=8) as ex:
             futures = {ex.submit(_ghi, r, data): r for r, data in tat_ca_bytes}
             for i, future in enumerate(as_completed(futures)):
-                r, err = future.result()
+                r, err, audit = future.result()
                 if err:
                     that_bai.append(f"{r['ten_file']}: {err}")
                 else:
                     thanh_cong.append(r)
                     loai_da_luu.add(r["loai"])
+                    if audit:
+                        audit_records.append(audit)
                 progress.progress(
                     0.4 + ((i + 1) / len(tat_ca_bytes)) * 0.4,
                     text=f"💾 Lưu file {i + 1}/{len(tat_ca_bytes)}...",
                 )
+        for action, detail in audit_records:
+            db.ghi_audit(username, action, detail)
 
     loai_can_merge = sorted(loai_da_luu & {"hstd", "nq11", "gqvl"})
     ket_qua_merge: list[dict] = []

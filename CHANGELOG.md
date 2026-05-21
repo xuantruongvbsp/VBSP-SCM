@@ -1,5 +1,33 @@
 # CHANGELOG
 
+## [2026-05-21] — Refactor: tách logic thuần ra services/ (loạt lớn — 9 tab)
+- `services/file_detection_service.py` — tạo mới: nhận diện loại file, đọc tên đơn vị, MD5, alias (từ tab_upload_khnv)
+- `tabs/tab_upload_khnv.py` — ~1 640 → ~1 332 dòng (-308): bỏ 10 hàm/hằng đã tách
+- `services/word_xln_service.py` — tạo mới: 18 hàm tạo Word XLN (01/02/04/05/13/14 + Tờ trình) (từ tab_no_rui_ro)
+- `services/rui_ro_aggregation.py` — tạo mới: `_loc_theo_nguon`, `_tong_hop_no` (từ tab_no_rui_ro)
+- `tabs/tab_no_rui_ro.py` — 2 411 → ~1 067 dòng (-1 344, -56%): chỉ giữ UI/render
+- `services/task_data_service.py` — tạo mới: `_doc_tasks`, `_doc_ketqua_task`, `_sync_bien_hoa_ketqua`, etc. (từ tab_tien_do)
+- `services/tien_do_pdf_service.py` — tạo mới: PDF báo cáo tiến độ + reportlab helpers (từ tab_tien_do)
+- `tabs/tab_tien_do.py` — 1 962 → ~1 323 dòng (-639): bỏ PDF + DB helpers
+- `services/pdf_no_khoanh_service.py` — tạo mới: reportlab QLNK (chuyển từ tabs/pdf_no_khoanh.py)
+- `tabs/tab_no_khoanh.py` — cập nhật import sang services.pdf_no_khoanh_service
+- `services/khnv_noi_bo_service.py` — bổ sung `_xuat_bc_phan_cong`, `_xuat_bc_tien_do` (Word NĐ30/2020)
+- `tabs/tab_khnv_noi_bo.py` — 1 802 → ~1 455 dòng (-347): bỏ 2 hàm Word đã tách
+- `services/so_sanh_ky_service.py` — tạo mới: 11 hàm tổng hợp/so sánh kỳ (từ tab_so_sanh_ky)
+- `tabs/tab_so_sanh_ky.py` — 1 405 → ~1 207 dòng (-198)
+- `services/cdtotkvv_service.py` — tạo mới: 5 hàm dữ liệu CDTOTKVV (từ tab_cdtotkvv)
+- `tabs/tab_cdtotkvv.py` — 1 217 → ~1 097 dòng (-120)
+- `services/tongquan_service.py` — tạo mới: `xuat_excel_tqpgd` (từ tab_tongquan)
+- `tabs/tab_tongquan.py` — nhẹ hơn: bỏ hàm Excel thuần
+- `services/khtd_nhap_service.py` — tạo mới: 7 hàm (clean_sheet_name, tao_df_mau_khtd_cn, luu_meta_qd, luu_file_qd, ...)
+- `tabs/tab_khtd_nhap.py` — bỏ 7 hàm đã tách sang service
+- `services/khtd_mau07_service.py` — tạo mới: 21 hàm (slug helpers, KV helpers, Word mẫu 07, TEN_BY_MAKEY)
+- `tabs/tab_khtd_mau07.py` — bỏ 21 hàm đã tách sang service
+- `tabs/tab_uy_thac.py` — không đổi (toàn bộ hàm đã có st.* hoặc @st.cache_data)
+
+## [2026-05-21] — Fix: tránh ghi audit trong thread khi import hàng loạt KH-NV
+- `tabs/tab_upload_khnv.py` — gom audit record và ghi tuần tự ở main thread (tránh lỗi thread-safety với SQLite)
+
 ## [2026-05-21] — Refactor: gom kv/audit tab KH-NV nội bộ sang service
 - `services/khnv_noi_bo_service.py` — chuẩn hóa đọc/ghi danh sách kv_store (kèm audit)
 - `tabs/tab_khnv_noi_bo.py` — chuyển _doc_ds/_ghi_ds sang gọi service, đồng nhất cập nhật lịch qua _ghi_ds

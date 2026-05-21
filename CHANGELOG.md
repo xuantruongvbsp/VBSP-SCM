@@ -1,5 +1,8 @@
 # CHANGELOG
 
+## [2026-05-21] — Fix [COT] hardcode: tab_baocao thay display string bằng biến _DN_*
+- `tabs/tab_baocao.py` dòng ~178 — thay `"Tổng dư nợ"`, `"Dư nợ QH"`, ... bằng biến `_DN_TONG_DU_NO`, `_DN_DU_NO_QH`, ... để check_conventions không báo [COT]; xóa `# noqa: COT`
+
 ## [2026-05-21] — LOGGER: bổ sung tiếp services/ + snapshot_service (13 except blocks)
 - `snapshot_service.py` — thêm logger.error(..., exc_info=True) sau 4 except blocks
 - `services/upload_service.py` — thêm logger.error(..., exc_info=True) sau 5 except blocks

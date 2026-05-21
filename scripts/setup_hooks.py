@@ -15,33 +15,95 @@ HOOKS = {
     "pre-commit": """#!/bin/sh
 # ============================================================
 # VBSP-SCM Pre-commit Hook
-# Kiem tra hardcoded column names truoc khi commit.
-# Goi scripts/check_hardcode_cols.py de quet staged files.
+# Kiem tra nhanh truoc khi commit:
+# - py_compile (bat loi syntax)
+# - check_hardcode_cols.py (hardcode COT_*)
+# - check_conventions.py (role/render/logger/audit, v.v.)
 # ============================================================
 
 PROJECT_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-CHECKER="$PROJECT_ROOT/scripts/check_hardcode_cols.py"
+CHECK_COLS="$PROJECT_ROOT/scripts/check_hardcode_cols.py"
+CHECK_CONV="$PROJECT_ROOT/scripts/check_conventions.py"
 
-if [ ! -f "$CHECKER" ]; then
-    echo "[pre-commit] WARNING: $CHECKER not found, skipping hardcode check"
-    exit 0
-fi
+staged_py_files() {
+    git diff --cached --name-only --diff-filter=ACM | grep -E '\\.py$' || true
+}
 
-python "$CHECKER" "$@"
+run_py_compile() {
+    files="$(staged_py_files)"
+    if [ -z "$files" ]; then
+        return 0
+    fi
+    python - <<'PY'
+import os
+import py_compile
+import subprocess
+
+out = subprocess.check_output(
+    ["git", "diff", "--cached", "--name-only", "--diff-filter=ACM"],
+    text=True,
+    encoding="utf-8",
+    errors="replace",
+)
+files = [f.strip() for f in out.splitlines() if f.strip().endswith(".py")]
+for f in files:
+    py_compile.compile(f, doraise=True)
+print("[pre-commit] py_compile: OK")
+PY
+}
+
+run_py_compile
 exit_code=$?
-
 if [ $exit_code -ne 0 ]; then
     echo ""
     echo "============================================"
     echo "  COMMIT BLOCKED."
-    echo "  Hardcoded column names detected."
-    echo "  Fix: use COT_* from config.py"
-    echo "  Suppress: add  # noqa: COT"
+    echo "  Python syntax/compile error detected."
     echo "============================================"
     echo ""
+    exit $exit_code
 fi
 
-exit $exit_code
+if [ -f "$CHECK_COLS" ]; then
+    python "$CHECK_COLS" "$@"
+    exit_code=$?
+    if [ $exit_code -ne 0 ]; then
+        echo ""
+        echo "============================================"
+        echo "  COMMIT BLOCKED."
+        echo "  Hardcoded column names detected."
+        echo "  Fix: use COT_* from config.py"
+        echo "  Suppress: add  # noqa: COT"
+        echo "============================================"
+        echo ""
+        exit $exit_code
+    fi
+else
+    echo "[pre-commit] WARNING: $CHECK_COLS not found, skipping hardcode check"
+fi
+
+if [ -f "$CHECK_CONV" ]; then
+    files="$(staged_py_files)"
+    if [ -n "$files" ]; then
+        python "$CHECK_CONV" $files
+        exit_code=$?
+        if [ $exit_code -ne 0 ]; then
+            echo ""
+            echo "============================================"
+            echo "  COMMIT BLOCKED."
+            echo "  Convention violations detected."
+            echo "  Fix: follow VBSP-SCM rules (role/COT/audit/logger/render)."
+            echo "  Suppress line: add  # conv: skip  (sparingly)"
+            echo "============================================"
+            echo ""
+            exit $exit_code
+        fi
+    fi
+else
+    echo "[pre-commit] WARNING: $CHECK_CONV not found, skipping convention check"
+fi
+
+exit 0
 """,
 }
 

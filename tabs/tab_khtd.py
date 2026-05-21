@@ -20,6 +20,7 @@ import pandas as pd
 from openpyxl.styles import Font, PatternFill
 
 import db
+from services import khtd_service
 from utils import (
     xuat_excel,
     ten_file_xuat,
@@ -113,8 +114,7 @@ def _luu_kv(key: str, data: dict[str, Any], username: str) -> bool:
         True nếu lưu thành công
     """
     try:
-        db.ghi_kv(key, data, username)
-        db.ghi_audit(username, "luu_kv", f"key={key}, {len(data)} items")
+        khtd_service.luu_khtd_dict(key, data, username)
         return True
     except Exception as e:
         st.error(f"Lỗi lưu dữ liệu (key={key}): {e}")

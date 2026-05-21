@@ -20,7 +20,7 @@ from config import (
     COT_TEN_XA, COT_TEN_THON, COT_MUC_VAY,
     TEN_CHI_NHANH_HIEN_THI, DS_PGD,
 )
-from utils import fmt, fmt_bang_ty, fmt_so, xuat_excel
+from utils import fmt, fmt_bang_ty, fmt_ngay, fmt_so, xuat_excel
 from services.template_service import docx_bytes_to_pdf
 
 # ── Hằng số ──────────────────────────────────────────────────────────────────
@@ -1654,15 +1654,20 @@ def _render_bien_ban(df: pd.DataFrame, pgd_user: str) -> None:
             hien[col] = hien[col].apply(fmt)
     st.dataframe(hien, use_container_width=True, hide_index=True)
 
-    buf = xuat_excel({"Tổng hợp ủy thác": df_th})
+    buf = xuat_excel({"Tổng hợp ủy thác": hien})
     ten_file = f"TongHopUyThac_{pgd_user}_{date.today().strftime('%d%m%Y')}.xlsx"
-    st.download_button(
+    if st.download_button(
         "📥 Tải Excel",
         data=buf,
         file_name=ten_file,
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         key="th_dl",
-    )
+    ):
+        db.ghi_audit(
+            st.session_state.get("username", "unknown"),
+            "xuat_bieu_cn",
+            f"Tổng hợp ủy thác — {pgd_user}",
+        )
 
 
 def _render_bb_ct_cx(df: pd.DataFrame, pgd_user: str | None,
@@ -1714,15 +1719,16 @@ def _render_bb_ct_cx(df: pd.DataFrame, pgd_user: str | None,
                 "khong_ton_tai": "🟢 Không tồn tại",
             }.get(tt, tt)
             ngay_str = bb.get("ngay_kt", "")
+            ngay_hien_thi = fmt_ngay(ngay_str)
             ten_dv = bb.get("ten_don_vi", "")
             with st.expander(
-                f"[{so_hieu_mau}] {ngay_str} — {ten_dv} | {tt_label}"
+                f"[{so_hieu_mau}] {ngay_hien_thi} — {ten_dv} | {tt_label}"
             ):
                 col_i1, col_i2 = st.columns(2)
                 col_i1.markdown(f"**Đơn vị KT:** {bb.get('don_vi_kt', '')}")
                 col_i1.markdown(f"**Trưởng đoàn:** {bb.get('truong_doan', '')}")
                 col_i2.markdown(f"**Đại diện được KT:** {bb.get('dai_dien_dc', '')}")
-                col_i2.markdown(f"**Hạn hoàn thành:** {bb.get('han_hoan_thanh', '')}")
+                col_i2.markdown(f"**Hạn hoàn thành:** {fmt_ngay(bb.get('han_hoan_thanh', ''))}")
                 if bb.get("kien_nghi"):
                     st.markdown(f"**Kiến nghị:** {bb['kien_nghi']}")
                 if bb.get("ket_qua_xu_ly"):
@@ -1752,7 +1758,8 @@ def _render_bb_ct_cx(df: pd.DataFrame, pgd_user: str | None,
                             key=f"bbct_dl_{rec_id}",
                         )
                     with col_e2:
-                        pdf_b = docx_bytes_to_pdf(docx_b)
+                        with st.spinner("Đang tạo PDF..."):
+                            pdf_b = docx_bytes_to_pdf(docx_b)
                         if pdf_b:
                             st.download_button(
                                 "⬇️ Tải PDF",
@@ -1761,6 +1768,8 @@ def _render_bb_ct_cx(df: pd.DataFrame, pgd_user: str | None,
                                 mime="application/pdf",
                                 key=f"bbct_pdf_{rec_id}",
                             )
+                        else:
+                            st.caption("⚠️ PDF không khả dụng — cần MS Word trên server")
         st.divider()
 
     # ── Form nhập biên bản mới ─────────────────────────────────────────────
@@ -1922,10 +1931,10 @@ def _render_theo_doi_bc_th(pgd_user: str | None,
             rows.append({
                 "ID": r.get("id", ""),
                 "Mẫu số": mau_so,
-                "Ngày KT": r.get("ngay_kt", ""),
+                "Ngày KT": fmt_ngay(r.get("ngay_kt", "")),
                 "Đơn vị được KT": r.get("ten_don_vi", ""),
                 "Kiến nghị": kn_text[:80] + "..." if len(kn_text) > 80 else kn_text,
-                "Hạn hoàn thành": r.get("han_hoan_thanh", ""),
+                "Hạn hoàn thành": fmt_ngay(r.get("han_hoan_thanh", "")),
                 "Trạng thái": tt_label,
                 "Kết quả xử lý": r.get("ket_qua_xu_ly", ""),
             })
@@ -1943,7 +1952,7 @@ def _render_theo_doi_bc_th(pgd_user: str | None,
                 st.success("✅ Tất cả kiến nghị đã được xử lý.")
             else:
                 opt_map = {
-                    f"{r.get('ngay_kt','')} — {r.get('ten_don_vi','')} [{r.get('id','')}]": r
+                    f"{fmt_ngay(r.get('ngay_kt',''))} — {r.get('ten_don_vi','')} [{r.get('id','')}]": r
                     for r in cho_xu_ly
                 }
                 chon_label = st.selectbox(
@@ -2002,7 +2011,7 @@ def _render_theo_doi_bc_th(pgd_user: str | None,
 
     opt_bc = {
         f"[{'02/BB-CT' if r.get('loai')=='CT' else '03/BB-CX'}] "
-        f"{r.get('ngay_kt','')} — {r.get('ten_don_vi','')}": r
+        f"{fmt_ngay(r.get('ngay_kt',''))} — {r.get('ten_don_vi','')}": r
         for r in all_for_bc
     }
     chon_bc = st.multiselect(

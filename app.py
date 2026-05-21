@@ -332,6 +332,48 @@ def main():
             if st.button("👥 Quản lý Users", use_container_width=True):
                 st.session_state.workspace = "admin_users"; st.rerun()
 
+        if normalize_role(role) in ("admin_cn", "admin"):
+            st.divider()
+            with st.expander("🗄️ Backup / Restore DB"):
+                # ── Backup ────────────────────────────────────────────────
+                if st.button("📦 Tạo Backup", use_container_width=True, key="btn_mk_backup"):
+                    _bk = db.backup_db_bytes()
+                    st.session_state["_bk_bytes"] = _bk
+                    st.session_state["_bk_ts"] = datetime.now().strftime("%Y%m%d_%H%M")
+                if st.session_state.get("_bk_bytes"):
+                    st.download_button(
+                        f"⬇️ Tải về ({st.session_state.get('_bk_ts', '')})",
+                        data=st.session_state["_bk_bytes"],
+                        file_name=f"vbsp_scm_{st.session_state['_bk_ts']}.db",
+                        mime="application/octet-stream",
+                        key="dl_bk_db",
+                    )
+                st.divider()
+                # ── Restore ───────────────────────────────────────────────
+                _up = st.file_uploader(
+                    "📥 Restore từ file backup",
+                    type=["db"],
+                    key="up_restore_db",
+                    help="Chọn file vbsp_scm_YYYYMMDD_HHMM.db đã backup trước đó",
+                )
+                if _up:
+                    if st.button(
+                        "⚠️ Xác nhận ghi đè DB hiện tại",
+                        key="btn_restore_db",
+                        type="primary",
+                        use_container_width=True,
+                    ):
+                        db.restore_db_bytes(_up.read())
+                        st.cache_data.clear()
+                        st.cache_resource.clear()
+                        # Xóa session cache, giữ lại thông tin đăng nhập
+                        for _k in [k for k in list(st.session_state.keys())
+                                   if k not in ("logged_in", "user_info", "username",
+                                                "workspace", "role")]:
+                            st.session_state.pop(_k, None)
+                        st.success("✅ Restore thành công! Đang tải lại...")
+                        st.rerun()
+
         st.divider()
         if st.button("🚪 Đăng xuất", use_container_width=True):
             for k in ["logged_in","user_info","username","workspace"]:

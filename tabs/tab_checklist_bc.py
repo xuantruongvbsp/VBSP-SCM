@@ -5,6 +5,7 @@ from io import BytesIO
 import uuid
 import db
 from tabs.base_tab import TabContext
+from utils import fmt_ngay
 
 _KEY_CONFIG = "checklist_bc_config"
 _TRANG_THAI = {
@@ -287,7 +288,7 @@ def _render_danh_sach(
                     )
                 with col_meta:
                     st.caption("Cập nhật")
-                    st.write(rec.get("ngay_cap_nhat") or "—")
+                    st.write(fmt_ngay(rec.get("ngay_cap_nhat")) or "—")
                     st.write(rec.get("nguoi_cap_nhat") or "—")
 
                 if can_edit:
@@ -446,7 +447,7 @@ def _render_xuat_excel(ds_config: list[dict], trang_thai: dict[str, dict], nam: 
             "Nơi nhận": _DON_VI_NHAN.get(bc.get("don_vi_nhan"), bc.get("don_vi_nhan")),
             "Ngày hạn": d_han.isoformat() if d_han else "",
             "Trạng thái": _TRANG_THAI.get(rec.get("trang_thai", "chua_lam"), rec.get("trang_thai", "chua_lam")),
-            "Ngày cập nhật": rec.get("ngay_cap_nhat", ""),
+            "Ngày cập nhật": fmt_ngay(rec.get("ngay_cap_nhat", "")),
             "Người cập nhật": rec.get("nguoi_cap_nhat", ""),
             "Ghi chú": rec.get("ghi_chu", ""),
             "Mô tả": bc.get("mo_ta", ""),

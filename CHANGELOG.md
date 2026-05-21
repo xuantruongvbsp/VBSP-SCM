@@ -1,5 +1,8 @@
 # CHANGELOG
 
+## [2026-05-21] — Git hook: pre-commit chạy py_compile + convention checks
+- `scripts/setup_hooks.py` — pre-commit hook chạy thêm `py_compile` cho staged *.py (bắt lỗi syntax sớm) và chạy `scripts/check_conventions.py` sau `check_hardcode_cols.py` để chặn commit khi vi phạm role/COT/audit/logger/render
+
 ## [2026-05-21] — Unit tests: +67 tests cho 4 service (period_compare, du_phong, cdtotkvv, kiem_soat mở rộng)
 - `tests/test_period_compare.py` — file mới: 29 tests (_derive_status, _status_series, _loan_key_series, join_by_loan, roll_cure_rate, classify_changes, vintage_nqh, par_breakdown) — cover toàn bộ pipeline so sánh kỳ cấp khế ước
 - `tests/test_du_phong_service.py` — file mới: 11 tests (du_phong_dong_tien 8 edge cases, du_phong_chi_tiet 3 edge cases) — duckdb in-memory

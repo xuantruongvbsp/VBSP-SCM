@@ -641,9 +641,76 @@ def _render_he_thong(la_cn: bool = False) -> None:
                     use_container_width=True,
                     hide_index=True,
                 )
+
+                # Nút tải zip từng bản
+                st.markdown("**⬇️ Tải bản backup về máy (để chuyển sang máy khác)**")
+                for d in ds_bk:
+                    try:
+                        dt_lbl = datetime.strptime(d.name, "%Y%m%d_%H%M%S").strftime("%d/%m/%Y %H:%M:%S")
+                    except Exception:
+                        dt_lbl = d.name
+                    if st.button(f"⬇️ Tải  {dt_lbl}", key=f"btn_dl_{d.name}"):
+                        with st.spinner("Đang nén..."):
+                            try:
+                                from backup_service import zip_ban_backup
+                                zip_bytes = zip_ban_backup(d.name)
+                                st.download_button(
+                                    label=f"💾 Lưu file  backup_{d.name}.zip",
+                                    data=zip_bytes,
+                                    file_name=f"backup_{d.name}.zip",
+                                    mime="application/zip",
+                                    key=f"dl_{d.name}",
+                                )
+                            except Exception as e:
+                                st.error(f"❌ Lỗi nén: {e}")
+
     except Exception as e:
         logger.error("Lỗi trong khối except: %s", e, exc_info=True)
         st.error(f"Lỗi đọc danh sách backup: {e}")
+
+    # ── Phục hồi từ file zip ─────────────────────────────────────────────────
+    if la_cn:
+        st.markdown("---")
+        st.markdown("#### 📤 Phục hồi từ bản backup (máy khác chuyển sang)")
+        st.caption(
+            "Upload file `backup_YYYYMMDD_HHMMSS.zip` đã tải từ máy kia. "
+            "App sẽ ghi đè DB + cache + file PGD rồi tải lại dữ liệu tự động."
+        )
+        uploaded = st.file_uploader(
+            "Chọn file zip backup",
+            type=["zip"],
+            key="fu_restore_zip",
+        )
+        if uploaded is not None:
+            col_r1, col_r2 = st.columns([1, 3])
+            with col_r1:
+                if st.button("🔄 Phục hồi ngay", key="btn_restore_now", type="primary"):
+                    with st.spinner("Đang phục hồi..."):
+                        try:
+                            from backup_service import phuc_hoi_backup
+                            kq = phuc_hoi_backup(uploaded.read())
+                            db.ghi_audit(
+                                st.session_state.get("username", "unknown"),
+                                "restore_backup",
+                                f"db={'ok' if kq['db_ok'] else 'loi'} "
+                                f"parquet={kq['parquet']} pgd={kq['pgd_xlsx']}",
+                            )
+                            if kq["db_ok"]:
+                                st.success(
+                                    f"✅ Phục hồi thành công!\n\n"
+                                    f"DB ✅ · Parquet: {kq['parquet']} file"
+                                    f" · PGD: {kq['pgd_xlsx']} file"
+                                )
+                                if kq["loi"]:
+                                    st.warning("Một số lỗi nhỏ:\n" + "\n".join(kq["loi"]))
+                                st.info("💡 Nhấn **F5** hoặc reload trang để thấy dữ liệu mới.")
+                            else:
+                                st.error("❌ Phục hồi DB thất bại:\n" + "\n".join(kq["loi"]))
+                        except Exception as e:
+                            logger.error("Lỗi phuc hoi backup: %s", e, exc_info=True)
+                            st.error(f"❌ Lỗi: {e}")
+            with col_r2:
+                st.caption(f"File: `{uploaded.name}` · {uploaded.size // 1024} KB")
 
 
 # ── Sub-tab 6: Audit Log ──────────────────────────────────────────────────

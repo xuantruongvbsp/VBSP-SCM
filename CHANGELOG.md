@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## [2026-05-21] — Refactor: Ủy thác tách logic thuần + KV helpers ra uy_thac_service
+- `services/uy_thac_service.py` — thêm hàm thuần tính tổng hợp DVUT, lọc Mẫu 06/15, kiểm tra dữ liệu Tổ; chuẩn hóa helper KV key + đọc/lưu/cập nhật trạng thái biên bản (kèm audit)
+- `tabs/tab_uy_thac.py` — dùng service cho phần xử lý dữ liệu/KV; bổ sung logger.error(..., exc_info=True) thay cho UI nuốt lỗi; render(tab=None) theo chuẩn TabContext
+- `tests/test_uythac_template_service.py` — thêm smoke tests cho các hàm xử lý dữ liệu ủy thác (tinh_theo_dvut/loc_mau06/loc_mau15)
+
 ## [2026-05-21] — Ủy thác: fix Mẫu 15/TD báo "Chưa có dữ liệu HSTD" khi cache < 15 cột
 - `tabs/tab_uy_thac.py` dòng ~1418 — `render()` entry point: không set `df = pd.DataFrame()` khi cache < 15 cột nữa, vẫn truyền cache xuống sub-tab để hiển thị lỗi cụ thể
 - `tabs/tab_uy_thac.py` dòng ~537 — `_render_mau15()`: thêm kiểm tra `len(df.columns) < 15` giống `_render_mau06` để báo "cache chưa đầy đủ" thay vì "Chưa có dữ liệu HSTD"

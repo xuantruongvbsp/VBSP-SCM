@@ -15,7 +15,6 @@ from datetime import datetime
 import pandas as pd
 import streamlit as st
 
-import db
 from auth import la_phan_he_pgd, normalize_role
 from config import (
     COT_MA_CHUONG_TRINH,
@@ -30,6 +29,7 @@ from config import (
     tim_ten_xa_trong_hstd,
 )
 from tabs.tab_khtd import MAKEY_BY_MACT_NV
+from services import khtd_service
 from services.khtd_mau07_service import (
     _slug,
     _chuan_hoa_ten,
@@ -37,10 +37,8 @@ from services.khtd_mau07_service import (
     _kv_key_ls,
     _doc_kv_dict,
     _doc_kv_list,
-    _luu_kv,
     tinh_du_no_ap_baseline as _svc_tinh_du_no_ap_baseline,
     lay_so_goc_cho_ap,
-    _sync_khtd_xa,
     _lay_ds_ma_key_co_du_lieu,
     _build_table_data,
     _extract_data_from_edited_df,
@@ -472,20 +470,21 @@ def render(tab, **kwargs) -> None:
                     "username": username,
                     "data":     data_nhap,
                 }
-                ok1 = _luu_kv(kv_key_ht, data_nhap, username)
-                ok2 = _luu_kv(kv_key_ls, lich_su + [entry], username)
-                _sync_khtd_xa(xa_chon_raw, data_nhap, username)
-                db.ghi_audit(
-                    username,
-                    "luu_khtd_mau07",
-                    f"{loai_van_ban} lần {lan_moi} — {xa_chon_raw} ({pgd_chon})",
-                )
-                if ok1 and ok2:
+                try:
+                    khtd_service.luu_khtd_mau07(
+                        pgd=pgd_chon,
+                        xa=xa_chon_raw,
+                        data_nhap=data_nhap,
+                        lich_su_moi=lich_su + [entry],
+                        username=username,
+                        loai_van_ban=loai_van_ban,
+                        lan_moi=lan_moi,
+                    )
                     st.success(f"✅ Đã lưu lần {lan_moi} thành công!")
                     st.cache_data.clear()
                     st.rerun()
-                else:
-                    st.error("❌ Lỗi khi lưu dữ liệu. Vui lòng thử lại.")
+                except Exception as e:
+                    st.error(f"❌ Lỗi khi lưu dữ liệu: {e}")
 
         # ── Xử lý Xuất Word ───────────────────────────────────────────────────
         if btn_word:

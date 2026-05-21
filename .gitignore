@@ -9,6 +9,9 @@ env/
 *.db-wal
 *.db-shm
 
+# Backup data (tạo bởi backup_service.py)
+backups/
+
 # Parquet cache
 cache/*.parquet
 cache/

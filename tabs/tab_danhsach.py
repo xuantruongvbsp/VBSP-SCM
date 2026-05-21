@@ -110,7 +110,7 @@ def _tao_column_config_danh_sach(df: pd.DataFrame) -> dict[str, st.column_config
     return config
 
 
-def render(tab: DeltaGenerator, **kwargs: dict) -> None:
+def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
     """
     Render tab Danh sách & Lọc.
     

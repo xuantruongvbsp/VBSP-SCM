@@ -434,7 +434,7 @@ def _render_bang(
 # ENTRY POINT
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def render(tab: DeltaGenerator, **kwargs: dict) -> None:
+def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
     """
     Render tab Tra cứu hồ sơ.
 

@@ -208,3 +208,156 @@ def cap_nhat_trang_thai_bien_ban(
         db.ghi_audit(username, "cap_nhat_trang_thai_bb", f"ID {rec_id} → Đã xử lý")
     return True
 
+
+# ══════════════════════════════════════════════════════════════════════════════
+# BUILDER PAYLOAD FUNCTIONS — Thuần, không đụng UI
+# ══════════════════════════════════════════════════════════════════════════════
+
+def build_payload_ke_hoach(
+    don_vi_kt: str, so_vb: str, dia_danh: str,
+    nam_kh: int, ngay_ky: date, chu_tich: str,
+    muc_dich: str, yeu_cau: str, noi_dung_kt: str,
+    thanh_phan: str, noi_dung_gs: str, phan_cong_gs: str,
+    to_chuc: str, ds_to: list,
+) -> tuple[dict, str]:
+    context = {
+        "don_vi_kt": don_vi_kt, "so_vb": so_vb,
+        "dia_danh": dia_danh, "nam_kh": nam_kh,
+        "ngay_ky": ngay_ky.strftime("%d/%m/%Y"),
+        "ngay": ngay_ky.day, "thang": ngay_ky.month, "nam": ngay_ky.year,
+        "muc_dich": muc_dich, "yeu_cau": yeu_cau,
+        "noi_dung_kt": noi_dung_kt, "thanh_phan": thanh_phan,
+        "noi_dung_gs": noi_dung_gs, "phan_cong_gs": phan_cong_gs,
+        "to_chuc": to_chuc, "chu_tich": chu_tich,
+        "so_to": len(ds_to), "ds_to": ds_to,
+        "ngay_ky": ngay_ky,
+    }
+    ten_file = (
+        f"KH_KiemTra_UyThac_{nam_kh}_"
+        f"{don_vi_kt[:20].replace(' ','_')}"
+    )
+    return context, ten_file
+
+
+def build_payload_mau06(
+    don_vi_kt: str, ten_xa: str, ten_to: str,
+    can_bo_1: str, chuc_vu_1: str, can_bo_2: str, chuc_vu_2: str,
+    dia_ban: str, ngay_kt: date,
+    nhan_xet_chung: str,
+    so_kh_dung: str, so_tien_dung: str, ty_trong_dung: str,
+    so_kh_sai: str, so_tien_sai: str, ty_trong_sai: str,
+    bien_phap: str,
+    df_m06: pd.DataFrame, pgd_scope: str,
+) -> tuple[dict, pd.DataFrame, str]:
+    df_xuat = df_m06.copy()
+    if ten_to and COT_TEN_TO in df_xuat.columns:
+        df_xuat = df_xuat[df_xuat[COT_TEN_TO] == ten_to]
+    if COT_LAI_TON in df_xuat.columns and COT_LAI_TON_QH in df_xuat.columns:
+        df_xuat["Nợ lãi"] = df_xuat[COT_LAI_TON].fillna(0) + df_xuat[COT_LAI_TON_QH].fillna(0)
+    du_lieu_word = {
+        "don_vi_kt": don_vi_kt,
+        "ten_xa": ten_xa, "ten_to": ten_to,
+        "can_bo_1": can_bo_1, "chuc_vu_1": chuc_vu_1,
+        "can_bo_2": can_bo_2, "chuc_vu_2": chuc_vu_2,
+        "dia_ban": dia_ban, "ngay_kt": ngay_kt,
+        "nhan_xet_chung": nhan_xet_chung,
+        "so_kh_dung": so_kh_dung, "so_tien_dung": so_tien_dung,
+        "ty_trong_dung": ty_trong_dung,
+        "so_kh_sai": so_kh_sai, "so_tien_sai": so_tien_sai,
+        "ty_trong_sai": ty_trong_sai,
+        "bien_phap": bien_phap,
+    }
+    slug = pgd_slug(pgd_scope) if pgd_scope else "cn"
+    ten_file = f"Mau06TD_{slug}_{ngay_kt.strftime('%d%m%Y')}"
+    return du_lieu_word, df_xuat, ten_file
+
+
+def build_payload_mau15(
+    pgd: str, ten_xa: str, ten_to: str, to_truong: str,
+    ma_to: str, dia_chi: str, can_bo_kt: str,
+    ngay_chot: date, pgd_scope: str,
+) -> tuple[dict, str]:
+    du_lieu_word = {
+        "pgd": pgd, "ten_xa": ten_xa, "ten_to": ten_to,
+        "to_truong": to_truong, "ma_to": ma_to,
+        "dia_chi": dia_chi, "can_bo_kt": can_bo_kt,
+        "ngay_chot": ngay_chot,
+    }
+    ten_file = (
+        f"Mau15TD_{ten_to.replace(' ','_')}_"
+        f"{ngay_chot.strftime('%d%m%Y')}"
+    )
+    return du_lieu_word, ten_file
+
+
+def build_payload_mau16(
+    don_vi_kt: str, ten_xa: str, ten_thon: str, ten_to: str,
+    hoi_doan_the: str, to_truong: str, to_pho: str,
+    can_bo_1: str, chuc_vu_1: str, can_bo_2: str, chuc_vu_2: str,
+    ngay_kt: date,
+    ty_le_nqh: str, xep_loai_to: str, so_kh_kt_thuc_te: str,
+    uu_diem: str, ton_tai: str, kien_nghi: str, so_phieu_kem_theo: str,
+    df_src: pd.DataFrame,
+) -> tuple[dict, pd.DataFrame, str]:
+    df_xuat = df_src.copy()
+    if ten_xa and COT_TEN_XA in df_xuat.columns:
+        df_xuat = df_xuat[df_xuat[COT_TEN_XA] == ten_xa]
+    if ten_to and COT_TEN_TO in df_xuat.columns:
+        df_xuat = df_xuat[df_xuat[COT_TEN_TO] == ten_to]
+    du_lieu = {
+        "don_vi_kt": don_vi_kt,
+        "ten_xa": ten_xa, "ten_thon": ten_thon,
+        "ten_to": ten_to, "hoi_doan_the": hoi_doan_the,
+        "to_truong": to_truong, "to_pho": to_pho,
+        "can_bo_1": can_bo_1, "chuc_vu_1": chuc_vu_1,
+        "can_bo_2": can_bo_2, "chuc_vu_2": chuc_vu_2,
+        "ngay_kt": ngay_kt,
+        "ty_le_nqh": ty_le_nqh, "xep_loai_to": xep_loai_to,
+        "so_kh_kt_thuc_te": so_kh_kt_thuc_te,
+        "uu_diem": uu_diem, "ton_tai": ton_tai,
+        "kien_nghi": kien_nghi,
+        "so_phieu_kem_theo": so_phieu_kem_theo,
+    }
+    to_slug = (ten_to or "TatCa").replace(" ", "_")
+    ten_file = f"Mau16TD_{to_slug}_{ngay_kt.strftime('%d%m%Y')}"
+    return du_lieu, df_xuat, ten_file
+
+
+def build_payload_bb_xac_minh(
+    ten_kh: str, so_ku: str, so_tien: float,
+    ly_do: str, bien_phap: str, can_bo_lap: str,
+    ngay_lap: date, pgd_scope: str,
+) -> tuple[dict, str]:
+    du_lieu = {
+        "ten_kh": ten_kh, "so_ku": so_ku,
+        "so_tien": f"{so_tien:,.1f}",
+        "ly_do": ly_do, "bien_phap": bien_phap,
+        "can_bo_lap": can_bo_lap,
+        "ngay_lap": ngay_lap,
+        "ngay": ngay_lap.day, "thang": ngay_lap.month, "nam": ngay_lap.year,
+    }
+    slug = pgd_slug(pgd_scope) if pgd_scope else "cn"
+    ten_file = (
+        f"BBXacMinh_{so_ku}_{slug}_"
+        f"{ngay_lap.strftime('%d%m%Y')}"
+    )
+    return du_lieu, ten_file
+
+
+def build_payload_bc_th(
+    don_vi_kt: str, truong_doan: str, cap_uy: str,
+    dia_danh: str, ngay_bc: date, noi_dung_kt: str,
+    nx_ctxh: str, nx_to: str, nx_to_vien: str,
+    kn_ctxh: str, kn_nhcs: str, kn_cap_tren: str,
+    nam_td: int,
+) -> tuple[dict, str]:
+    du_lieu_bc = {
+        "don_vi_kt": don_vi_kt, "truong_doan": truong_doan,
+        "dia_danh": dia_danh, "ngay_bc": ngay_bc, "cap_uy": cap_uy,
+        "noi_dung_kt": noi_dung_kt,
+        "nx_ctxh": nx_ctxh, "nx_to": nx_to, "nx_to_vien": nx_to_vien,
+        "kn_ctxh": kn_ctxh, "kn_nhcs": kn_nhcs, "kn_cap_tren": kn_cap_tren,
+    }
+    ten_file = f"BaoCaoTH_UyThac_{nam_td}"
+    return du_lieu_bc, ten_file
+

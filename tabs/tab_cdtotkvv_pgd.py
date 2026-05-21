@@ -567,7 +567,7 @@ def _tinh_no_den_han(_df_bytes: bytes, ngay_tu: str, ngay_den: str) -> bytes:
     return pickle.dumps(result)
 
 
-def render(tab: DeltaGenerator, **kwargs) -> None:
+def render(tab: DeltaGenerator | None = None, **kwargs) -> None:
     role = kwargs.get("role", "user")
     username = kwargs.get("username", "unknown")
     pgd_user = kwargs.get("pgd_user", "")

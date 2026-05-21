@@ -144,7 +144,7 @@ def _cache_tqpgd_extended(
 from tabs.base_tab import TabContext
 
 
-def render(tab: DeltaGenerator, **kwargs: dict) -> None:
+def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
     ctx = TabContext(tab, **kwargs)
     df       = kwargs.get("df")
     df_full  = ctx.df_full if ctx.df_full is not None and not ctx.df_full.empty else df

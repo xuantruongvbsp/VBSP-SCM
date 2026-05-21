@@ -142,7 +142,7 @@ G_GN_NAM     = "Giải ngân trong năm"
 G_DU_TK      = "Dư tài khoản"
 G_NQ11       = "NQ11"
 
-def render(tab: DeltaGenerator, **kwargs: dict) -> None:
+def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
     """
     Render tab Theo dõi chỉ tiêu GQVL.
     

@@ -45,7 +45,7 @@ def _loc_thang(df_tinh: pd.DataFrame, tu_thang: int, den_thang: int) -> pd.DataF
     return df_tinh[mask].copy()
 
 
-def render(role: str = None, **kwargs) -> None:
+def render(tab=None, role: str = None, **kwargs) -> None:
     st.subheader("⏰ Cảnh báo Khoản vay Đến hạn")
     st.caption("Phân tích dư nợ đến hạn trong N tháng tới dựa trên HSTD hiện tại.")
 

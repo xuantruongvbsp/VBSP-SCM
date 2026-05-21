@@ -1,4 +1,4 @@
-﻿"""Xử lý nợ rủi ro theo QĐ 62/2015/QĐ-TTg — 5 bước: lọc, chọn, nhập, xuất, xem lại."""
+"""Xử lý nợ rủi ro theo QĐ 62/2015/QĐ-TTg — 5 bước: lọc, chọn, nhập, xuất, xem lại."""
 from __future__ import annotations
 
 from datetime import date, datetime
@@ -759,7 +759,7 @@ def _render_workspace_cn(tab, **kwargs) -> None:
                 hien_thi_nut_tai("cn_nrr_14dp")
 
 
-def render(tab: DeltaGenerator, **kwargs) -> None:
+def render(tab: DeltaGenerator | None = None, **kwargs) -> None:
     df = kwargs.get("df")
     role_raw = str(kwargs.get("role", "user") or "user")
     role = normalize_role(role_raw)

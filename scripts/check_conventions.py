@@ -27,9 +27,6 @@ _ROLE_HARDCODE = re.compile(
 )
 
 # 2. (Đã xóa) Rule /1e9 bị loại bỏ vì sai về toán:
-# 1 tỷ VND = 1e9, nên /1e9 là ĐÚNG để hiển thị tỷ đồng.
-# fmt_ty() chia /1e6 → triệu đồng (dùng cho cột bảng có header "(triệu đồng)").
-# vn(x / 1e9, 3) + " tỷ" → tỷ đồng (dùng cho metric/card inline).
 _TIEN_SAI = re.compile(r'(?!x)x')  # pattern không bao giờ khớp
 
 # 3. Hardcode tên cột tiếng Việt thay vì dùng COT_*
@@ -52,6 +49,29 @@ _GHI_AUDIT = re.compile(r'\bghi_audit\s*\(')
 _SQLITE_DIRECT = re.compile(
     r'sqlite3\.connect\s*\('
 )
+
+# 6. render() signature — thiếu tab=None default
+# Cấm: def render(tab: DeltaGenerator, **kwargs)
+# Cho phép: def render(tab=None, **kwargs) hoặc tab: DeltaGenerator | None = None
+_RENDER_NO_NONE = re.compile(
+    r'def render\(tab\s*:\s*DeltaGenerator(?!\s*\|\s*None)(?!\s*=\s*None)'
+)
+
+# 7. render() — tham số đầu tiên không phải tab
+# Cấm: def render(role: str = None, ...
+# Cấm: def render(mode: str, ...
+_RENDER_FIRST_PARAM = re.compile(
+    r'def render\((?:role|mode|cap)\s*:'
+)
+
+# 8. except Exception mà không có exc_info=True trong file (tabs/*)
+# Warning nếu file có except Exception nhưng không dùng exc_info=True
+_EXCEPT_EXC = re.compile(r'except\s+Exception\s+as\s+e\s*:')
+_EXC_INFO   = re.compile(r'exc_info\s*=\s*True')
+
+# 9. Thiếu logger import — file tabs/ có except Exception nhưng không import logger
+_GET_LOGGER  = re.compile(r'get_logger\s*\(')
+_FROM_LOGGER = re.compile(r'from\s+logger\s+import')
 
 # ── Các thư mục/file bỏ qua ─────────────────────────────────────────────────
 _SKIP_DIRS  = {"_archive", ".git", "__pycache__", "node_modules",
@@ -84,24 +104,45 @@ def kiem_tra_file(path: Path) -> list[str]:
         if stripped.startswith("#"):
             continue
 
-        if _ROLE_HARDCODE.search(line) and "# noqa" not in line and "# conv: skip" not in line:
+        if _ROLE_HARDCODE.search(line) and "# conv: skip" not in line:
             loi.append(
                 f"  Dòng {i:4d}: [ROLE] Hardcode role string — "
                 f"dùng normalize_role() + la_phan_he_cn/pgd()\n"
                 f"           → {stripped[:100]}"
             )
 
-        if _COT_HARDCODE.search(line) and "# noqa" not in line and "# conv: skip" not in line:
+        if _COT_HARDCODE.search(line) and "# conv: skip" not in line:
             loi.append(
                 f"  Dòng {i:4d}: [COT]  Hardcode tên cột — "
                 f"dùng COT_* từ config.py\n"
                 f"           → {stripped[:100]}"
             )
 
-        if _SQLITE_DIRECT.search(line) and "db.py" not in str(path) and "# noqa" not in line and "# conv: skip" not in line:
+        if _SQLITE_DIRECT.search(line) and "db.py" not in str(path) and "# conv: skip" not in line:
             loi.append(
                 f"  Dòng {i:4d}: [DB]   sqlite3.connect() trực tiếp — "
                 f"dùng db.get_conn()\n"
+                f"           → {stripped[:100]}"
+            )
+
+        if _RENDER_NO_NONE.search(line) and "# conv: skip" not in line:
+            loi.append(
+                f"  Dòng {i:4d}: [RENDER] render(tab: DeltaGenerator) thiếu = None — "
+                f"thêm | None = None\n"
+                f"           → {stripped[:100]}"
+            )
+
+        if _RENDER_FIRST_PARAM.search(line) and "# conv: skip" not in line:
+            loi.append(
+                f"  Dòng {i:4d}: [RENDER] Tham số đầu tiên của render() phải là tab — "
+                f"dùng render(tab=None, **kwargs)\n"
+                f"           → {stripped[:100]}"
+            )
+
+        if _EXCEPT_EXC.search(line) and "# conv: skip" not in line:
+            loi.append(
+                f"  Dòng {i:4d}: [LOGGER] except Exception as e: — "
+                f"dùng logger.error(... , exc_info=True)\n"
                 f"           → {stripped[:100]}"
             )
 
@@ -111,6 +152,22 @@ def kiem_tra_file(path: Path) -> list[str]:
             f"  [AUDIT] File có ghi_kv() nhưng không có ghi_audit() — "
             f"kiểm tra lại audit log"
         )
+
+    # Kiểm tra except Exception nhưng không có exc_info=True trong file
+    is_tab_file = "tabs" in path.parts
+    if is_tab_file and _EXCEPT_EXC.search(content) and not _EXC_INFO.search(content):
+        loi.append(
+            f"  [LOGGER] File có except Exception nhưng không có exc_info=True — "
+            f"thêm logger.error(..., exc_info=True) để truy vết stacktrace"
+        )
+
+    # Kiểm tra except Exception nhưng thiếu import logger
+    if is_tab_file and _EXCEPT_EXC.search(content):
+        if not _GET_LOGGER.search(content) and not _FROM_LOGGER.search(content):
+            loi.append(
+                f"  [LOGGER] File có except Exception nhưng thiếu `from logger import get_logger` — "
+                f"thêm import và dùng logger.error()"
+            )
 
     return loi
 

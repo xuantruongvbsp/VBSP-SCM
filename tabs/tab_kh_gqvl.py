@@ -15,7 +15,7 @@ from config import DS_PGD
 from data.pgd import pgd_slug
 
 
-def render(role: str = None, **kwargs) -> None:
+def render(tab=None, role: str = None, **kwargs) -> None:
     username = st.session_state.get("username", "unknown")
 
     st.markdown("## 📋 Kế hoạch GQVL Chi nhánh")

@@ -1037,7 +1037,7 @@ def _sub_xu_huong(username: str, cdto_mode: str, pgd_user: str) -> None:
     else:
         st.info("Cần ít nhất 3 tháng dữ liệu để phát hiện xu hướng.")
 
-def render(tab: DeltaGenerator, **kwargs) -> None:
+def render(tab: DeltaGenerator | None = None, **kwargs) -> None:
     """
     Render tab Chấm điểm Tổ TK&VV.
 

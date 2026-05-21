@@ -500,7 +500,7 @@ def _xay_dung_bang_pgd(pgd: str, kh_xa: dict, ds_ct_loc: list[tuple[str, str]]) 
 
 
 # ── Entry point ───────────────────────────────────────────────────────────────
-def render(tab: DeltaGenerator, **kwargs: dict) -> None:
+def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
     """
     Render tab KHTD cấp PGD.
     

@@ -613,7 +613,7 @@ def _render_cn(username: str, role: str) -> None:
 # ENTRY POINT
 # ══════════════════════════════════════════════════════════════════════════════
 
-def render(mode: str, pgd_filter: str | None = None) -> None:
+def render(tab=None, mode: str = "cn", pgd_filter: str | None = None) -> None:
     """
     Điểm vào chính cho tab QĐ62.
 

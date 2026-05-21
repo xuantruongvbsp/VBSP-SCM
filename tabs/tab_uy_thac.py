@@ -20,6 +20,12 @@ from config import (
 )
 from utils import fmt, fmt_bang_ty, fmt_ngay, fmt_so, xuat_excel
 from services.uy_thac_service import (
+    build_payload_bc_th,
+    build_payload_bb_xac_minh,
+    build_payload_ke_hoach,
+    build_payload_mau06,
+    build_payload_mau15,
+    build_payload_mau16,
     cap_nhat_trang_thai_bien_ban,
     co_du_lieu_to,
     doc_bien_ban_theo_nam,
@@ -83,6 +89,36 @@ def _doc_hstd_cached(_ts: float = 0) -> pd.DataFrame:
         return pd.read_parquet(CACHE_HSTD)
     except Exception:
         return pd.DataFrame()
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# UI HELPERS
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _download_word_pdf_pair(docx_bytes: bytes, ten_file: str, key_prefix: str) -> None:
+    col1, col2 = st.columns(2)
+    with col1:
+        st.download_button(
+            "⬇️ Tải Word (.docx)",
+            data=docx_bytes,
+            file_name=ten_file + ".docx",
+            mime="application/vnd.openxmlformats-officedocument"
+                 ".wordprocessingml.document",
+            key=f"{key_prefix}docx",
+        )
+    with col2:
+        with st.spinner("Đang tạo PDF..."):
+            pdf_bytes = docx_bytes_to_pdf(docx_bytes)
+        if pdf_bytes:
+            st.download_button(
+                "⬇️ Tải PDF",
+                data=pdf_bytes,
+                file_name=ten_file + ".pdf",
+                mime="application/pdf",
+                key=f"{key_prefix}pdf",
+            )
+        else:
+            st.caption("⚠️ PDF không khả dụng — cần MS Word trên server")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -251,55 +287,17 @@ def _render_ke_hoach(df: pd.DataFrame, pgd_user: str, role: str) -> None:
         submitted = st.form_submit_button("📄 Tạo Word")
 
     if submitted:
-        # Build context cho template Kế hoạch kiểm tra
-        context = {
-            "don_vi_kt":   don_vi_kt,
-            "so_vb":       so_vb,
-            "dia_danh":    dia_danh,
-            "nam_kh":      int(nam_kh),
-            "ngay_ky":     ngay_ky.strftime("%d/%m/%Y"),
-            "ngay":        ngay_ky.day,
-            "thang":       ngay_ky.month,
-            "nam":         ngay_ky.year,
-            "muc_dich":    muc_dich,
-            "yeu_cau":     yeu_cau,
-            "noi_dung_kt": noi_dung_kt,
-            "thanh_phan":  thanh_phan,
-            "noi_dung_gs": noi_dung_gs,
-            "phan_cong_gs": phan_cong_gs,
-            "to_chuc":     to_chuc,
-            "chu_tich":    chu_tich,
-            "so_to":       len(ds_to),
-            "ds_to":       ds_to,
-        }
-
+        context, ten_file = build_payload_ke_hoach(
+            don_vi_kt=don_vi_kt, so_vb=so_vb, dia_danh=dia_danh,
+            nam_kh=int(nam_kh), ngay_ky=ngay_ky, chu_tich=chu_tich,
+            muc_dich=muc_dich, yeu_cau=yeu_cau,
+            noi_dung_kt=noi_dung_kt, thanh_phan=thanh_phan,
+            noi_dung_gs=noi_dung_gs, phan_cong_gs=phan_cong_gs,
+            to_chuc=to_chuc, ds_to=ds_to,
+        )
         with st.spinner("Đang tạo file..."):
-            du_lieu_word = {**context, "ngay_ky": ngay_ky}
-            docx_bytes = tao_word_uythac_ke_hoach(du_lieu_word, ds_to)
-        ten_file = f"KH_KiemTra_UyThac_{int(nam_kh)}_{don_vi_kt[:20].replace(' ','_')}"
-        col1, col2 = st.columns(2)
-        with col1:
-            st.download_button(
-                "⬇️ Tải Word (.docx)",
-                data=docx_bytes,
-                file_name=ten_file + ".docx",
-                mime="application/vnd.openxmlformats-officedocument"
-                     ".wordprocessingml.document",
-                key=f"{key_prefix}kh_docx",
-            )
-        with col2:
-            with st.spinner("Đang tạo PDF..."):
-                pdf_bytes = docx_bytes_to_pdf(docx_bytes)
-            if pdf_bytes:
-                st.download_button(
-                    "⬇️ Tải PDF",
-                    data=pdf_bytes,
-                    file_name=ten_file + ".pdf",
-                    mime="application/pdf",
-                    key=f"{key_prefix}kh_pdf",
-                )
-            else:
-                st.caption("⚠️ PDF không khả dụng — cần MS Word trên server")
+            docx_bytes = tao_word_uythac_ke_hoach(context, ds_to)
+        _download_word_pdf_pair(docx_bytes, ten_file, f"{key_prefix}kh_")
 
 
 def _render_mau06(df: pd.DataFrame, pgd_user: str | None) -> None:
@@ -429,61 +427,24 @@ def _render_mau06(df: pd.DataFrame, pgd_user: str | None) -> None:
         submitted = st.form_submit_button("📄 Tạo Word")
 
     if submitted:
-        df_xuat = df_m06.copy()
-        if ten_to:
-            df_xuat = df_xuat[df_xuat[COT_TEN_TO] == ten_to] \
-                      if COT_TEN_TO in df_xuat.columns else df_xuat
-        # Tính Nợ lãi
-        if COT_LAI_TON in df_xuat.columns and COT_LAI_TON_QH in df_xuat.columns:
-            df_xuat["Nợ lãi"] = (df_xuat[COT_LAI_TON].fillna(0) +
-                                  df_xuat[COT_LAI_TON_QH].fillna(0))
         loai_word = "06" if "06/TD" in loai_mau else "06A"
+        du_lieu_word, df_xuat, ten_file = build_payload_mau06(
+            don_vi_kt=don_vi_kt, ten_xa=ten_xa, ten_to=ten_to,
+            can_bo_1=can_bo_1, chuc_vu_1=chuc_vu_1,
+            can_bo_2=can_bo_2, chuc_vu_2=chuc_vu_2,
+            dia_ban=dia_ban, ngay_kt=ngay_kt,
+            nhan_xet_chung=nhan_xet_chung,
+            so_kh_dung=so_kh_dung, so_tien_dung=so_tien_dung,
+            ty_trong_dung=ty_trong_dung,
+            so_kh_sai=so_kh_sai, so_tien_sai=so_tien_sai,
+            ty_trong_sai=ty_trong_sai,
+            bien_phap=bien_phap,
+            df_m06=df_m06,
+            pgd_scope=pgd_chon or pgd_user or "ToanCN",
+        )
         with st.spinner("Đang tạo file..."):
-            du_lieu_word = {
-                "don_vi_kt":      don_vi_kt,
-                "ten_xa":         ten_xa,
-                "ten_to":         ten_to,
-                "can_bo_1":       can_bo_1,
-                "chuc_vu_1":      chuc_vu_1,
-                "can_bo_2":       can_bo_2,
-                "chuc_vu_2":      chuc_vu_2,
-                "dia_ban":        dia_ban,
-                "ngay_kt":        ngay_kt,
-                "nhan_xet_chung": nhan_xet_chung,
-                "so_kh_dung":     so_kh_dung,
-                "so_tien_dung":   so_tien_dung,
-                "ty_trong_dung":  ty_trong_dung,
-                "so_kh_sai":      so_kh_sai,
-                "so_tien_sai":    so_tien_sai,
-                "ty_trong_sai":   ty_trong_sai,
-                "bien_phap":      bien_phap,
-            }
             docx_bytes = tao_word_uythac_mau06(du_lieu_word, df_xuat, loai=loai_word)
-        pgd_scope = pgd_chon or pgd_user or "ToanCN"
-        ten_file = f"Mau06TD_{pgd_slug(pgd_scope)}_{ngay_kt.strftime('%d%m%Y')}"
-        col1, col2 = st.columns(2)
-        with col1:
-            st.download_button(
-                "⬇️ Tải Word (.docx)",
-                data=docx_bytes,
-                file_name=ten_file + ".docx",
-                mime="application/vnd.openxmlformats-officedocument"
-                     ".wordprocessingml.document",
-                key=f"{key_prefix}docx",
-            )
-        with col2:
-            with st.spinner("Đang tạo PDF..."):
-                pdf_bytes = docx_bytes_to_pdf(docx_bytes)
-            if pdf_bytes:
-                st.download_button(
-                    "⬇️ Tải PDF",
-                    data=pdf_bytes,
-                    file_name=ten_file + ".pdf",
-                    mime="application/pdf",
-                    key=f"{key_prefix}pdf",
-                )
-            else:
-                st.caption("⚠️ PDF không khả dụng — cần MS Word trên server")
+        _download_word_pdf_pair(docx_bytes, ten_file, f"{key_prefix}06_")
 
 
 def _render_mau15(df: pd.DataFrame, pgd_user: str | None) -> None:
@@ -628,41 +589,14 @@ def _render_mau15(df: pd.DataFrame, pgd_user: str | None) -> None:
 
     if submitted:
         with st.spinner("Đang tạo file..."):
-            du_lieu_word = {
-                "pgd": pgd,
-                "ten_xa": ten_xa,
-                "ten_to": chon_to,
-                "to_truong": to_truong,
-                "ma_to": ma_to,
-                "dia_chi": dia_chi,
-                "can_bo_kt": can_bo_kt,
-                "ngay_chot": ngay_chot,
-            }
-            docx_bytes = tao_word_uythac_mau15(du_lieu_word, df_to)
-        ten_file = f"Mau15TD_{chon_to.replace(' ','_')}_{ngay_chot.strftime('%d%m%Y')}"
-        col1, col2 = st.columns(2)
-        with col1:
-            st.download_button(
-                "⬇️ Tải Word (.docx)",
-                data=docx_bytes,
-                file_name=ten_file + ".docx",
-                mime="application/vnd.openxmlformats-officedocument"
-                     ".wordprocessingml.document",
-                key=f"{key_prefix}docx",
+            du_lieu_word, ten_file = build_payload_mau15(
+                pgd=pgd, ten_xa=ten_xa, ten_to=chon_to,
+                to_truong=to_truong, ma_to=ma_to,
+                dia_chi=dia_chi, can_bo_kt=can_bo_kt,
+                ngay_chot=ngay_chot, pgd_scope=pgd_chon or pgd_user or "",
             )
-        with col2:
-            with st.spinner("Đang tạo PDF..."):
-                pdf_bytes = docx_bytes_to_pdf(docx_bytes)
-            if pdf_bytes:
-                st.download_button(
-                    "⬇️ Tải PDF",
-                    data=pdf_bytes,
-                    file_name=ten_file + ".pdf",
-                    mime="application/pdf",
-                    key=f"{key_prefix}pdf",
-                )
-            else:
-                st.caption("⚠️ PDF không khả dụng — cần MS Word trên server")
+            docx_bytes = tao_word_uythac_mau15(du_lieu_word, df_to)
+        _download_word_pdf_pair(docx_bytes, ten_file, f"{key_prefix}15_")
 
 
 def _render_bien_ban(df: pd.DataFrame, pgd_user: str | None) -> None:
@@ -785,62 +719,22 @@ def _render_bien_ban(df: pd.DataFrame, pgd_user: str | None) -> None:
             submitted_m16 = st.form_submit_button("📄 Tạo Word", type="primary")
 
         if submitted_m16:
-            df_xuat = df_src.copy()
-            if ten_xa and COT_TEN_XA in df_xuat.columns:
-                df_xuat = df_xuat[df_xuat[COT_TEN_XA] == ten_xa]
-            if ten_to and COT_TEN_TO in df_xuat.columns:
-                df_xuat = df_xuat[df_xuat[COT_TEN_TO] == ten_to]
-
-            du_lieu = {
-                "don_vi_kt":        don_vi_kt,
-                "ten_xa":           ten_xa,
-                "ten_thon":         ten_thon,
-                "ten_to":           ten_to,
-                "hoi_doan_the":     hoi_doan_the,
-                "to_truong":        to_truong,
-                "to_pho":           to_pho,
-                "can_bo_1":         can_bo_1,
-                "chuc_vu_1":        chuc_vu_1,
-                "can_bo_2":         can_bo_2,
-                "chuc_vu_2":        chuc_vu_2,
-                "ngay_kt":          ngay_kt,
-                "ty_le_nqh":        ty_le_nqh,
-                "xep_loai_to":      xep_loai_to,
-                "so_kh_kt_thuc_te": so_kh_kt,
-                "uu_diem":          uu_diem,
-                "ton_tai":          ton_tai,
-                "kien_nghi":        kien_nghi,
-                "so_phieu_kem_theo": so_phieu,
-            }
-
+            du_lieu, df_xuat, ten_file = build_payload_mau16(
+                don_vi_kt=don_vi_kt, ten_xa=ten_xa, ten_thon=ten_thon,
+                ten_to=ten_to, hoi_doan_the=hoi_doan_the,
+                to_truong=to_truong, to_pho=to_pho,
+                can_bo_1=can_bo_1, chuc_vu_1=chuc_vu_1,
+                can_bo_2=can_bo_2, chuc_vu_2=chuc_vu_2,
+                ngay_kt=ngay_kt,
+                ty_le_nqh=ty_le_nqh, xep_loai_to=xep_loai_to,
+                so_kh_kt_thuc_te=so_kh_kt,
+                uu_diem=uu_diem, ton_tai=ton_tai,
+                kien_nghi=kien_nghi, so_phieu_kem_theo=so_phieu,
+                df_src=df_src,
+            )
             with st.spinner("Đang tạo file..."):
                 docx_bytes = tao_word_uythac_mau16(du_lieu, df_xuat)
-            ten_to_file = (ten_to or "TatCa").replace(" ", "_")
-            ten_file = f"Mau16TD_{ten_to_file}_{ngay_kt.strftime('%d%m%Y')}"
-
-            col1, col2 = st.columns(2)
-            with col1:
-                st.download_button(
-                    "⬇️ Tải Word (.docx)",
-                    data=docx_bytes,
-                    file_name=ten_file + ".docx",
-                    mime="application/vnd.openxmlformats-officedocument"
-                    ".wordprocessingml.document",
-                    key=f"{key_prefix}m16_docx",
-                )
-            with col2:
-                with st.spinner("Đang tạo PDF..."):
-                    pdf_bytes = docx_bytes_to_pdf(docx_bytes)
-                if pdf_bytes:
-                    st.download_button(
-                        "⬇️ Tải PDF",
-                        data=pdf_bytes,
-                        file_name=ten_file + ".pdf",
-                        mime="application/pdf",
-                        key=f"{key_prefix}m16_pdf",
-                    )
-                else:
-                    st.caption("⚠️ PDF không khả dụng — cần MS Word trên server")
+            _download_word_pdf_pair(docx_bytes, ten_file, f"{key_prefix}m16_")
 
         return
 
@@ -862,47 +756,15 @@ def _render_bien_ban(df: pd.DataFrame, pgd_user: str | None) -> None:
             submitted_xm = st.form_submit_button("📄 Tạo Word", type="primary")
 
         if submitted_xm:
-            du_lieu = {
-                "ten_kh": ten_kh,
-                "so_ku": so_ku,
-                "so_tien": f"{so_tien:,.1f}",
-                "ly_do": ly_do,
-                "bien_phap": bien_phap,
-                "can_bo_lap": can_bo_lap,
-                "pgd_user": pgd_user,
-                "ngay_lap": ngay_lap,
-                "ngay": ngay_lap.day,
-                "thang": ngay_lap.month,
-                "nam": ngay_lap.year,
-            }
+            du_lieu, ten_file = build_payload_bb_xac_minh(
+                ten_kh=ten_kh, so_ku=so_ku, so_tien=so_tien,
+                ly_do=ly_do, bien_phap=bien_phap,
+                can_bo_lap=can_bo_lap, ngay_lap=ngay_lap,
+                pgd_scope=pgd_chon or pgd_user or "ToanCN",
+            )
             with st.spinner("Đang tạo file..."):
                 docx_bytes = tao_word_uythac_bb_xac_minh(du_lieu)
-            pgd_scope = pgd_chon or pgd_user or "ToanCN"
-            ten_file = f"BBXacMinh_{so_ku}_{pgd_slug(pgd_scope)}_{ngay_lap.strftime('%d%m%Y')}"
-
-            col1, col2 = st.columns(2)
-            with col1:
-                st.download_button(
-                    "⬇️ Tải Word (.docx)",
-                    data=docx_bytes,
-                    file_name=ten_file + ".docx",
-                    mime="application/vnd.openxmlformats-officedocument"
-                    ".wordprocessingml.document",
-                    key=f"{key_prefix}xm_docx",
-                )
-            with col2:
-                with st.spinner("Đang tạo PDF..."):
-                    pdf_bytes = docx_bytes_to_pdf(docx_bytes)
-                if pdf_bytes:
-                    st.download_button(
-                        "⬇️ Tải PDF",
-                        data=pdf_bytes,
-                        file_name=ten_file + ".pdf",
-                        mime="application/pdf",
-                        key=f"{key_prefix}xm_pdf",
-                    )
-                else:
-                    st.caption("⚠️ PDF không khả dụng — cần MS Word trên server")
+            _download_word_pdf_pair(docx_bytes, ten_file, f"{key_prefix}xm_")
         return
 
     try:
@@ -1297,38 +1159,17 @@ def _render_theo_doi_bc_th(pgd_user: str | None,
         submitted_bc = st.form_submit_button("📄 Tạo Báo cáo tổng hợp Word", type="primary")
 
     if submitted_bc:
-        du_lieu_bc = {
-            "don_vi_kt": don_vi_kt_bc, "truong_doan": truong_doan_bc,
-            "dia_danh": dia_danh_bc, "ngay_bc": ngay_bc, "cap_uy": cap_uy,
-            "noi_dung_kt": noi_dung_kt,
-            "nx_ctxh": nx_ctxh, "nx_to": nx_to, "nx_to_vien": nx_to_vien,
-            "kn_ctxh": kn_ctxh, "kn_nhcs": kn_nhcs, "kn_cap_tren": kn_cap_tren,
-        }
+        du_lieu_bc, ten_file = build_payload_bc_th(
+            don_vi_kt=don_vi_kt_bc, truong_doan=truong_doan_bc,
+            cap_uy=cap_uy, dia_danh=dia_danh_bc, ngay_bc=ngay_bc,
+            noi_dung_kt=noi_dung_kt,
+            nx_ctxh=nx_ctxh, nx_to=nx_to, nx_to_vien=nx_to_vien,
+            kn_ctxh=kn_ctxh, kn_nhcs=kn_nhcs, kn_cap_tren=kn_cap_tren,
+            nam_td=nam_td,
+        )
         with st.spinner("Đang tạo file..."):
             docx_bytes = tao_word_uythac_bc_th(du_lieu_bc, ds_chon)
-        ten_file = f"BaoCaoTH_UyThac_{nam_td}"
-        bc_c1, bc_c2 = st.columns(2)
-        with bc_c1:
-            st.download_button(
-                "⬇️ Tải Word (.docx)",
-                data=docx_bytes,
-                file_name=ten_file + ".docx",
-                mime="application/vnd.openxmlformats-officedocument"
-                     ".wordprocessingml.document",
-                key=f"{key_prefix}bcth_dl_docx",
-            )
-        with bc_c2:
-            pdf_bc = docx_bytes_to_pdf(docx_bytes)
-            if pdf_bc:
-                st.download_button(
-                    "⬇️ Tải PDF",
-                    data=pdf_bc,
-                    file_name=ten_file + ".pdf",
-                    mime="application/pdf",
-                    key=f"{key_prefix}bcth_dl_pdf",
-                )
-            else:
-                st.caption("⚠️ PDF không khả dụng — cần MS Word trên server")
+        _download_word_pdf_pair(docx_bytes, ten_file, f"{key_prefix}bcth_")
         db.ghi_audit(username, "xuat_bc_th",
                       f"Báo cáo tổng hợp năm {nam_td} — {len(ds_chon)} biên bản")
 

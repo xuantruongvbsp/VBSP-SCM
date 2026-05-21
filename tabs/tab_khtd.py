@@ -420,7 +420,7 @@ from tabs.base_tab import TabContext
 
 
 # ── Entry point ───────────────────────────────────────────────────────────────
-def render(tab: DeltaGenerator, **kwargs: dict) -> None:
+def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
     ctx = TabContext(tab, **kwargs)
     role = ctx.role_norm
     username = ctx.username

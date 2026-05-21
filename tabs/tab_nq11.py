@@ -69,7 +69,7 @@ def _tao_column_config_nq11() -> dict[str, st.column_config.Column]:
     }
 
 
-def render(tab: DeltaGenerator, **kwargs: dict) -> None:
+def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
     """
     Render tab NQ11.
     

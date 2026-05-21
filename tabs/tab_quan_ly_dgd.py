@@ -98,7 +98,7 @@ def _df_hstd(kwargs: dict[str, Any]) -> pd.DataFrame:
     return df if isinstance(df, pd.DataFrame) else pd.DataFrame()
 
 
-def render(tab: DeltaGenerator, **kwargs: Any) -> None:
+def render(tab: DeltaGenerator | None = None, **kwargs: Any) -> None:
     role = kwargs.get("role", "user")
     username = kwargs.get("username", "unknown")
     df_h = _df_hstd(kwargs)

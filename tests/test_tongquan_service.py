@@ -14,6 +14,7 @@ from config import (
     COT_NGUON_VON,
     COT_SO_KU,
     COT_TEN_CT,
+    COT_TEN_XA,
     COT_TEN_PGD,
     COT_TONG_DU_NO,
 )

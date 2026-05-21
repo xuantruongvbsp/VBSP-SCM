@@ -3,6 +3,8 @@ import sys
 from pathlib import Path
 from unittest.mock import MagicMock
 
+import pandas as pd
+
 
 def _noop_cache(*args, **kwargs):
     """No-op cache decorator — trả về function gốc, không cache gì cả."""
@@ -77,9 +79,41 @@ mock_st.text_area = lambda label=None, **kw: ""
 mock_st.slider = lambda label=None, **kw: 0
 mock_st.radio = lambda label=None, options=None, **kw: (options[0] if options and len(options) > 0 else "")
 mock_st.checkbox = lambda label=None, **kw: False
-mock_st.file_uploader = lambda label=None, **kw: type("FakeFile", (), {"read": lambda self: b"mock", "name": "mock.xlsx"})()
+class _FakeFile:
+    """File giả có size, seek, read, name — hỗ trợ for-loop (accept_multiple_files)."""
+    def __init__(self):
+        self.name = "mock.xlsx"
+        self.size = 0
+        self._data = b"mock"
+        self._pos = 0
+    def read(self, n=-1):
+        if n == -1:
+            return self._data
+        return self._data[:n]
+    def seek(self, offset, whence=0):
+        if whence == 0:
+            self._pos = offset
+        elif whence == 1:
+            self._pos += offset
+        elif whence == 2:
+            self._pos = len(self._data) + offset
+        return self._pos
+    def __iter__(self):
+        return iter([self])
+
+mock_st.file_uploader = lambda label=None, **kw: None
+mock_st.data_editor = lambda data=None, **kw: pd.DataFrame() if data is None else (data.copy() if isinstance(data, pd.DataFrame) else data)
+mock_st.dataframe = lambda data=None, **kw: None
+mock_st.button = lambda label=None, **kw: False
+mock_st.form_submit_button = lambda label=None, **kw: False
+mock_st.download_button = lambda *a, **kw: None
 mock_st.container = lambda **kw: MagicMock()
 mock_st.empty = lambda **kw: MagicMock()
+mock_st.expander = lambda label=None, **kw: MagicMock()
+mock_st.sidebar = MagicMock()
+mock_st.sidebar.selectbox = lambda label=None, options=None, **kw: (options[0] if options and len(options) > 0 else "")
+mock_st.sidebar.radio = lambda label=None, options=None, **kw: (options[0] if options and len(options) > 0 else "")
+mock_st.sidebar.checkbox = lambda label=None, **kw: False
 sys.modules["streamlit"] = mock_st
 
 # Mock streamlit.components.v1

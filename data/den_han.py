@@ -77,6 +77,8 @@ def _tinh_so_thang_gia_han_vec(df: pd.DataFrame) -> pd.Series:
 
 
 def tinh_den_han_df(df: pd.DataFrame) -> pd.DataFrame:
+    if df.empty:
+        return df
     df = df.copy()
     ngay_ts = pd.to_datetime(df[COT_NGAY_DEN_HAN], dayfirst=True, errors="coerce")
     df["Ngày đến hạn"] = ngay_ts.dt.date.where(ngay_ts.notna())

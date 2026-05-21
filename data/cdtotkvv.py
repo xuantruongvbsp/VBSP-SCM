@@ -91,6 +91,8 @@ def doc_cdtotkvv_path(duong_dan: str, _ts) -> pd.DataFrame | None:
         header=None,
         skiprows=CDTOTKVV_DATA_ROW_START,
     )
+    if df.empty:
+        return None
     df = df.iloc[:, : len(CDTOTKVV_COLS)].copy()
     df.columns = CDTOTKVV_COLS
     df = df[pd.to_numeric(df["stt"], errors="coerce").notna()].reset_index(drop=True)

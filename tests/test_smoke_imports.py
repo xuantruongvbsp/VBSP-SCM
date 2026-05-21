@@ -131,6 +131,8 @@ def _try_render(mod: object, module_name: str, monkeypatch: pytest.MonkeyPatch, 
     monkeypatch.setattr("db.doc_kv_prefix", lambda prefix: {})
     monkeypatch.setattr("db.ghi_kv", lambda key, value, username: None)
     monkeypatch.setattr("db.ghi_audit", lambda username, action, desc: None)
+    monkeypatch.setattr("pandas.read_parquet", lambda *a, **kw: pd.DataFrame())
+    monkeypatch.setattr("pandas.read_excel", lambda *a, **kw: pd.DataFrame())
 
     import streamlit as st
     st.session_state = _SessionState({"username": "tester", "role": "admin_cn"})
@@ -214,12 +216,15 @@ class TestSmokeRender:
     def test_render(self, module_name: str, monkeypatch: pytest.MonkeyPatch) -> None:
         from config import (
             COT_DIA_CHI, COT_DU_NO_KHOANH, COT_DU_NO_QH, COT_DU_NO_TH,
-            COT_GOC_TRA, COT_LAI_SUAT, COT_MA_CHUONG_TRINH,
+            COT_DNO_NQ11, COT_GOC_TRA, COT_LAI_SUAT, COT_MA_CHUONG_TRINH,
             COT_MA_KH, COT_MUC_VAY,
             COT_NGAY_DH, COT_NGAY_SL, COT_NGAY_VAY, COT_SO_KU,
             COT_TEN_KH, COT_TEN_PGD, COT_TEN_TO,
             COT_TEN_XA, COT_THOI_HAN, COT_TINH_TRANG, COT_TONG_DU_NO,
             COT_PL_NV, COT_NGUON_VON, COT_SDT, COT_CMND,
+            COT_NQ11_NO_TH, COT_NQ11_NO_QH, COT_NQ11_MA_KH,
+            COT_NQ11_TEN_KH, COT_NQ11_SO_TIEN, COT_NQ11_DU_NO,
+            COT_NQ11_SO_TIEN_GN, COT_NQ11_DEN_HAN_SC, COT_NQ11_NGAY_BC,
         )
         SAMPLE_COLS = [
             COT_MA_KH, COT_TEN_KH, COT_SO_KU, COT_NGAY_VAY, COT_NGAY_DH,
@@ -228,6 +233,13 @@ class TestSmokeRender:
             COT_TINH_TRANG, COT_DIA_CHI, COT_SDT, COT_TEN_TO, COT_TEN_XA,
             COT_NGUON_VON, COT_PL_NV, COT_CMND, COT_GOC_TRA, COT_NGAY_SL,
             COT_TEN_PGD,
+            # GQVL columns (some have no COT_* alias)
+            "Giải ngân trong năm", "Tổng giải ngân",
+            # NQ11 columns
+            COT_DNO_NQ11, COT_NQ11_NO_TH, COT_NQ11_NO_QH,
+            COT_NQ11_MA_KH, COT_NQ11_TEN_KH, COT_NQ11_SO_TIEN,
+            COT_NQ11_DU_NO, COT_NQ11_SO_TIEN_GN,
+            COT_NQ11_DEN_HAN_SC, COT_NQ11_NGAY_BC,
         ]
         sample_df = pd.DataFrame({c: pd.Series(dtype="object") for c in SAMPLE_COLS})
         render_kwargs = {

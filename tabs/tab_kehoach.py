@@ -220,17 +220,21 @@ def render(tab, **kwargs):
             })
 
         df_ss = pd.DataFrame(rows_ss)
+        if df_ss.empty:
+            st.info("📝 Không có dữ liệu để hiển thị.")
+            return
 
         # Metrics tóm tắt
-        co_kh = df_ss[df_ss["_kh"] > 0]
-        if len(co_kh):
-            avg_tl = co_kh["_tl"].mean()
-            dat_kh = len(co_kh[co_kh["_tl"] >= 100])
-            chua   = len(co_kh[co_kh["_tl"] < 100])
-            s1, s2, s3 = st.columns(3)
-            s1.metric("Tỷ lệ TH bình quân",    f"{vn_kh(avg_tl,1)}%")
-            s2.metric("Chỉ tiêu đạt KH (≥100%)", str(dat_kh))
-            s3.metric("Chỉ tiêu chưa đạt",       str(chua))
+        if "_kh" in df_ss.columns:
+            co_kh = df_ss[df_ss["_kh"] > 0]
+            if len(co_kh):
+                avg_tl = co_kh["_tl"].mean()
+                dat_kh = len(co_kh[co_kh["_tl"] >= 100])
+                chua   = len(co_kh[co_kh["_tl"] < 100])
+                s1, s2, s3 = st.columns(3)
+                s1.metric("Tỷ lệ TH bình quân",    f"{vn_kh(avg_tl,1)}%")
+                s2.metric("Chỉ tiêu đạt KH (≥100%)", str(dat_kh))
+                s3.metric("Chỉ tiêu chưa đạt",       str(chua))
 
         cols_hien = ["Chỉ tiêu", "Kế hoạch", "Thực hiện", "Còn lại", "Tỷ lệ %"]
         hien_thi_dataframe_phan_trang(
@@ -240,7 +244,9 @@ def render(tab, **kwargs):
         )
 
         # Biểu đồ top 10 chưa đạt
-        chua_dat = df_ss[(df_ss["_kh"] > 0) & (df_ss["_tl"] < 100)].nsmallest(10, "_tl")
+        chua_dat = pd.DataFrame()
+        if "_kh" in df_ss.columns and "_tl" in df_ss.columns:
+            chua_dat = df_ss[(df_ss["_kh"] > 0) & (df_ss["_tl"] < 100)].nsmallest(10, "_tl")
         if len(chua_dat):
             st.divider()
             st.markdown("**📉 Top 10 chỉ tiêu thực hiện thấp nhất**")

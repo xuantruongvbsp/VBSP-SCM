@@ -409,7 +409,7 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                         unsafe_allow_html=True,
                 )
                 st.divider()
-        except Exception:
+        except Exception as e:
             logger.error("Lỗi trong khối except: %s", e, exc_info=True)
             pass
 
@@ -810,7 +810,7 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                 if col in ["Số món vay", "Số KH", "Tổng Tổ", "Tốt", "Khá", "TB", "Yếu"]:
                     try:
                         return fmt_so(val)
-                    except Exception:
+                    except Exception as e:
                         logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                         return str(val)
                 return str(val)

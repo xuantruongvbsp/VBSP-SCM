@@ -340,6 +340,7 @@ def doc_tu_sheet(pgd_slug: str) -> tuple[list[dict], list[str]]:
         rows = ws.get_values()
     except Exception as e:
         err = f"[{pgd_slug}] Không đọc được Sheet: {e}"
+        logger.error("doc_tu_sheet [%s]: %s", pgd_slug, e, exc_info=True)
         return [], [err]
 
     for i, row in enumerate(rows[2:], start=3):
@@ -446,6 +447,7 @@ def luu_dot(
         )
     except Exception as e:
         msg = f"❌ Lưu KHTD thất bại: {e}"
+        logger.error("luu_dot_khtd [%s]: %s", key, e, exc_info=True)
         db.ghi_audit(username, "luu_dot_khtd_error", f"{key} · {e}")
         return KetQuaUpload(False, msg, "")
 
@@ -465,6 +467,7 @@ def push_kh_len_sheet(
         rows = ws.get_values()
     except Exception as e:
         msg = f"❌ Không mở được Sheet: {e}"
+        logger.error("push_kh_len_sheet [%s]: mở Sheet lỗi — %s", pgd_slug, e, exc_info=True)
         db.ghi_audit(username, "push_khtd_sheet_loi", f"{pgd_slug} · {e}")
         return KetQuaUpload(False, msg, "")
 
@@ -511,6 +514,7 @@ def push_kh_len_sheet(
         )
     except Exception as e:
         msg = f"❌ Ghi Sheet thất bại: {e}"
+        logger.error("push_kh_len_sheet [%s]: ghi Sheet lỗi — %s", pgd_slug, e, exc_info=True)
         db.ghi_audit(username, "push_khtd_sheet_error", str(e))
         return KetQuaUpload(False, msg, "")
 

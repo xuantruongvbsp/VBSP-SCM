@@ -52,13 +52,9 @@ from components.loan_drawer import loan_detail_drawer
 from components.export_pdf import download_pdf_button, xuat_pdf_co_chart
 
 
-_TAB_CACHE: dict = {}
-
 def _lazy_tab(name: str):
-    """Import tab module only on first use — cached permanently."""
-    if name not in _TAB_CACHE:
-        _TAB_CACHE[name] = importlib.import_module(f"tabs.{name}")
-    return _TAB_CACHE[name]
+    """Import tab module — dùng sys.modules cache của Python, tự invalidate khi Streamlit hot-reload."""
+    return importlib.import_module(f"tabs.{name}")
 
 
 # ── Helper: tính 4 KPI DeltaCard cho trang chủ PGD ──────────────────────────

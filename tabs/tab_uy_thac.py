@@ -10,6 +10,7 @@ import db
 from auth import la_phan_he_cn, normalize_role
 from data.core import ts_file
 from data.pgd import pgd_slug
+from logger import get_logger
 from config import (
     COT_TEN_PGD, COT_TEN_KH, COT_SO_KU, COT_TEN_CT,
     COT_TONG_DU_NO, COT_DU_NO_QH, COT_LAI_TON, COT_LAI_TON_QH,
@@ -18,6 +19,17 @@ from config import (
     TEN_CHI_NHANH_HIEN_THI, DS_PGD, PGD_XA_MAP, CACHE_HSTD,
 )
 from utils import fmt, fmt_bang_ty, fmt_ngay, fmt_so, xuat_excel
+from services.uy_thac_service import (
+    cap_nhat_trang_thai_bien_ban,
+    co_du_lieu_to,
+    doc_bien_ban_theo_nam,
+    doc_ds_bien_ban,
+    kv_key_bb_ct_cx,
+    loc_mau06,
+    loc_mau15,
+    luu_bien_ban,
+    tinh_theo_dvut,
+)
 from services.template_service import (
     docx_bytes_to_pdf,
     tao_word_uythac_bb_ct_cx,
@@ -37,6 +49,8 @@ DVUT_ORDER = [
     "Đoàn thanh niên",
 ]
 
+logger = get_logger(__name__)
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 # CACHE FUNCTIONS
@@ -45,58 +59,22 @@ DVUT_ORDER = [
 @st.cache_data(show_spinner=False, ttl=300)
 def _tinh_theo_dvut(_df_bytes: bytes) -> bytes:
     df = pickle.loads(_df_bytes)
-    if COT_DVUT not in df.columns:
-        return pickle.dumps(pd.DataFrame())
-    agg = {}
-    if COT_TEN_TO      in df.columns: agg["so_to"]   = (COT_TEN_TO,     "nunique")
-    if COT_SO_KU       in df.columns: agg["so_kh"]   = (COT_SO_KU,      "nunique")
-    if COT_TONG_DU_NO  in df.columns: agg["tong_dn"] = (COT_TONG_DU_NO, "sum")
-    if COT_DU_NO_QH    in df.columns: agg["nqh"]     = (COT_DU_NO_QH,   "sum")
-    if COT_LAI_TON     in df.columns: agg["lai_ton"] = (COT_LAI_TON,    "sum")
-    if not agg:
-        return pickle.dumps(pd.DataFrame())
-    t = df.groupby(COT_DVUT).agg(**agg).reset_index()
-    t["_ord"] = t[COT_DVUT].apply(
-        lambda x: DVUT_ORDER.index(x) if x in DVUT_ORDER else 99)
-    return pickle.dumps(t.sort_values("_ord").drop(columns="_ord"))
+    t = tinh_theo_dvut(df, dvut_order=DVUT_ORDER)
+    return pickle.dumps(t)
 
 
 @st.cache_data(show_spinner=False, ttl=300)
 def _loc_mau06(_df_bytes: bytes, ngay_tu: str, ngay_den: str) -> bytes:
     df = pickle.loads(_df_bytes)
-    if COT_NGAY_VAY not in df.columns:
-        return pickle.dumps(pd.DataFrame())
-    ngay_vay = pd.to_datetime(df[COT_NGAY_VAY], errors="coerce")
-    mask = (ngay_vay >= pd.Timestamp(ngay_tu)) & \
-           (ngay_vay <= pd.Timestamp(ngay_den))
-    cols = [c for c in [
-        COT_TEN_TO, COT_DVUT, COT_TEN_XA, COT_TEN_KH,
-        COT_SO_KU, COT_TEN_CT, COT_NGAY_VAY, COT_MUC_VAY,
-        COT_TONG_DU_NO, COT_DU_NO_QH, COT_LAI_TON,
-    ] if c in df.columns]
-    result = df.loc[mask, cols].copy()
-    return pickle.dumps(result.sort_values(COT_NGAY_VAY, ascending=False))
+    result = loc_mau06(df, ngay_tu=ngay_tu, ngay_den=ngay_den)
+    return pickle.dumps(result)
 
 
 @st.cache_data(show_spinner=False, ttl=300)
 def _loc_mau15(_df_bytes: bytes, ten_to: str) -> bytes:
     df = pickle.loads(_df_bytes)
-    if COT_TEN_TO not in df.columns:
-        return pickle.dumps(pd.DataFrame())
-    df_to = df[df[COT_TEN_TO] == ten_to].copy()
-    # Tính nợ lãi = Lãi tồn TH + Lãi tồn QH
-    if COT_LAI_TON in df_to.columns and COT_LAI_TON_QH in df_to.columns:
-        df_to["Nợ lãi"] = df_to[COT_LAI_TON].fillna(0) + \
-                           df_to[COT_LAI_TON_QH].fillna(0)
-    elif COT_LAI_TON in df_to.columns:
-        df_to["Nợ lãi"] = df_to[COT_LAI_TON].fillna(0)
-    else:
-        df_to["Nợ lãi"] = 0
-    cols = [c for c in [
-        COT_TEN_KH, COT_TEN_CT, COT_SO_KU,
-        COT_TONG_DU_NO, "Nợ lãi", COT_SO_DU_TG,
-    ] if c in df_to.columns or c == "Nợ lãi"]
-    return pickle.dumps(df_to[cols].reset_index(drop=True))
+    df_to = loc_mau15(df, ten_to=ten_to)
+    return pickle.dumps(df_to)
 
 
 @st.cache_data(show_spinner=False, ttl=300)
@@ -105,29 +83,6 @@ def _doc_hstd_cached(_ts: float = 0) -> pd.DataFrame:
         return pd.read_parquet(CACHE_HSTD)
     except Exception:
         return pd.DataFrame()
-
-
-def _co_du_lieu_to(df: pd.DataFrame) -> bool:
-    if df is None or df.empty:
-        return False
-    if COT_TEN_TO not in df.columns:
-        return False
-    s = df[COT_TEN_TO]
-    if s is None:
-        return False
-    try:
-        return s.dropna().astype(str).str.strip().replace("", pd.NA).dropna().size > 0
-    except Exception:
-        return False
-
-
-def _hstd_cache_hop_le(df: pd.DataFrame) -> bool:
-    if df is None or df.empty:
-        return False
-    if len(df.columns) < 15:
-        return False
-    bat_buoc = [COT_TEN_TO, COT_DVUT, COT_TEN_XA]
-    return all(c in df.columns for c in bat_buoc)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -141,7 +96,9 @@ def _render_theo_dvut(df: pd.DataFrame) -> None:
     try:
         t = pickle.loads(_tinh_theo_dvut(pickle.dumps(df)))
     except Exception as e:
-        st.error(f"Lỗi: {e}"); return
+        logger.error("_render_theo_dvut: lỗi tính thống kê DVUT — %s", e, exc_info=True)
+        st.error("⚠️ Có lỗi khi tính thống kê theo Hội đoàn thể.")
+        return
     if t.empty:
         st.info("Không có dữ liệu."); return
 
@@ -402,7 +359,9 @@ def _render_mau06(df: pd.DataFrame, pgd_user: str | None) -> None:
         raw    = _loc_mau06(pickle.dumps(df_src), str(ngay_tu), str(ngay_den))
         df_m06 = pickle.loads(raw)
     except Exception as e:
-        st.error(f"Lỗi: {e}"); return
+        logger.error("_render_mau06: lỗi lọc dữ liệu Mẫu 06 — %s", e, exc_info=True)
+        st.error("⚠️ Có lỗi khi lọc dữ liệu Mẫu 06/TD.")
+        return
 
     if df_m06.empty:
         st.success("✅ Không có món vay nào cần kiểm tra."); return
@@ -533,6 +492,13 @@ def _render_mau15(df: pd.DataFrame, pgd_user: str | None) -> None:
     key_prefix_base = f"uyt_m15_{pgd_slug(pgd_user) if pgd_user else 'cn'}_"
     if df is None or df.empty:
         st.warning("Chưa có dữ liệu HSTD."); return
+    if len(df.columns) < 15:
+        st.error(
+            f"⚠️ Dữ liệu HSTD cache chưa đầy đủ (chỉ {len(df.columns)} cột) — "
+            "không thể lập Mẫu 15/TD.\n\n"
+            "Cần upload/merge lại file HSTD đúng để tạo cache đầy đủ."
+        )
+        return
     if COT_TEN_TO not in df.columns:
         st.warning(f"Thiếu cột '{COT_TEN_TO}' trong dữ liệu HSTD — không thể lập Mẫu 15/TD.")
         return
@@ -562,7 +528,7 @@ def _render_mau15(df: pd.DataFrame, pgd_user: str | None) -> None:
         df_src = df[df[COT_TEN_PGD] == pgd_chon].copy()
 
     # Chọn Tổ TK&VV
-    if not _co_du_lieu_to(df_src):
+    if not co_du_lieu_to(df_src):
         st.warning(f"Không có dữ liệu '{COT_TEN_TO}' trong phạm vi đã chọn.")
         return
     ds_to = (
@@ -599,7 +565,9 @@ def _render_mau15(df: pd.DataFrame, pgd_user: str | None) -> None:
     try:
         df_to = pickle.loads(_loc_mau15(pickle.dumps(df_src), chon_to))
     except Exception as e:
-        st.error(f"Lỗi: {e}"); return
+        logger.error("_render_mau15: lỗi lọc dữ liệu Mẫu 15 — %s", e, exc_info=True)
+        st.error("⚠️ Có lỗi khi lọc dữ liệu Mẫu 15/TD.")
+        return
 
     if df_to.empty:
         st.info(f"Không có dữ liệu cho Tổ **{chon_to}**."); return
@@ -940,7 +908,8 @@ def _render_bien_ban(df: pd.DataFrame, pgd_user: str | None) -> None:
     try:
         df_th = pickle.loads(_tinh_theo_dvut(pickle.dumps(df_src)))
     except Exception as e:
-        st.error(f"Lỗi: {e}")
+        logger.error("_render_bien_ban: lỗi tính tổng hợp DVUT — %s", e, exc_info=True)
+        st.error("⚠️ Có lỗi khi tính tổng hợp theo Hội đoàn thể.")
         df_th = pd.DataFrame()
 
     if df_th.empty:
@@ -995,7 +964,6 @@ def _render_bb_ct_cx(df: pd.DataFrame, pgd_user: str | None,
         horizontal=True, key=f"{key_prefix_base}loai",
     )
     cap = "tinh" if "CT" in loai_sel else "xa"
-    kv_prefix = "ut_bbct" if cap == "tinh" else "ut_bbcx"
 
     c_nam, c_pgd = st.columns(2)
     nam = int(c_nam.number_input(
@@ -1013,10 +981,9 @@ def _render_bb_ct_cx(df: pd.DataFrame, pgd_user: str | None,
         )
 
     key_prefix = f"{key_prefix_base}{pgd_slug(scope) if scope else 'cn'}_"
-    slug = pgd_slug(scope) if scope else "cn"
-    kv_key = f"{kv_prefix}_{slug}_{nam}"
+    kv_key = kv_key_bb_ct_cx(cap=cap, scope=scope, nam=nam)
 
-    ds_luu: list = db.doc_kv(kv_key) or []
+    ds_luu: list = doc_ds_bien_ban(kv_key)
 
     # ── Danh sách biên bản đã lưu ──────────────────────────────────────────
     if ds_luu:
@@ -1167,11 +1134,7 @@ def _render_bb_ct_cx(df: pd.DataFrame, pgd_user: str | None,
             "ngay_cap_nhat": date.today().strftime("%Y-%m-%d"),
             "nguoi_cap_nhat": username,
         }
-        db.ghi_kv(kv_key, ds_luu + [record], username)
-        loai_str = "bb_ct" if cap == "tinh" else "bb_cx"
-        db.ghi_audit(username, f"luu_{loai_str}",
-                      f"Mẫu {'02/BB-CT' if cap == 'tinh' else '03/BB-CX'} — "
-                      f"{ten_don_vi} ngày {ngay_kt.strftime('%d/%m/%Y')}")
+        luu_bien_ban(kv_key=kv_key, ds_hien_tai=ds_luu, record=record, username=username)
         st.success(
             f"✅ Đã lưu biên bản {'02/BB-CT' if cap == 'tinh' else '03/BB-CX'} — {ten_don_vi}"
         )
@@ -1203,18 +1166,7 @@ def _render_theo_doi_bc_th(pgd_user: str | None,
     )
 
     # Load records
-    all_records: list[dict] = []
-    if pgd_user:
-        slug = pgd_slug(pgd_user)
-        for pref in ["ut_bbct", "ut_bbcx"]:
-            recs = db.doc_kv(f"{pref}_{slug}_{nam_td}") or []
-            all_records.extend(recs)
-    else:
-        for pref in ["ut_bbct", "ut_bbcx"]:
-            all_kv: dict = db.doc_kv_prefix(f"{pref}_") or {}
-            for key, recs in all_kv.items():
-                if key.endswith(f"_{nam_td}") and isinstance(recs, list):
-                    all_records.extend(recs)
+    all_records: list[dict] = doc_bien_ban_theo_nam(nam=nam_td, pgd_user=pgd_user)
 
     # Filter theo loại
     if "BB-CT" in loai_td:
@@ -1281,24 +1233,18 @@ def _render_theo_doi_bc_th(pgd_user: str | None,
                     if st.button("✅ Đánh dấu đã xử lý", key=f"{key_prefix}btn_xl"):
                         kv_key_t = target.get("kv_key", "")
                         if kv_key_t:
-                            ds_cur = db.doc_kv(kv_key_t) or []
-                            updated = [
-                                {**rec,
-                                 "trang_thai": "da_xu_ly",
-                                 "ket_qua_xu_ly": ket_qua_xl,
-                                 "ngay_cap_nhat": date.today().strftime("%Y-%m-%d"),
-                                 "nguoi_cap_nhat": username}
-                                if rec.get("id") == target.get("id")
-                                else rec
-                                for rec in ds_cur
-                            ]
-                            db.ghi_kv(kv_key_t, updated, username)
-                            db.ghi_audit(
-                                username, "cap_nhat_trang_thai_bb",
-                                f"ID {target.get('id')} — {target.get('ten_don_vi','')} → Đã xử lý"
+                            ok = cap_nhat_trang_thai_bien_ban(
+                                kv_key=kv_key_t,
+                                rec_id=str(target.get("id", "")),
+                                ket_qua_xu_ly=ket_qua_xl,
+                                username=username,
+                                ten_don_vi=str(target.get("ten_don_vi", "") or ""),
                             )
-                            st.success("✅ Đã cập nhật trạng thái!")
-                            st.rerun()
+                            if ok:
+                                st.success("✅ Đã cập nhật trạng thái!")
+                                st.rerun()
+                            else:
+                                st.error("⚠️ Không tìm thấy biên bản để cập nhật (dữ liệu có thể đã thay đổi).")
 
     st.divider()
 
@@ -1306,17 +1252,7 @@ def _render_theo_doi_bc_th(pgd_user: str | None,
     st.markdown("##### II. Xuất Báo cáo tổng hợp (Mẫu 04/BC-TH)")
 
     all_for_bc: list[dict] = []
-    if pgd_user:
-        slug = pgd_slug(pgd_user)
-        for pref in ["ut_bbct", "ut_bbcx"]:
-            recs = db.doc_kv(f"{pref}_{slug}_{nam_td}") or []
-            all_for_bc.extend(recs)
-    else:
-        for pref in ["ut_bbct", "ut_bbcx"]:
-            all_kv2: dict = db.doc_kv_prefix(f"{pref}_") or {}
-            for key, recs in all_kv2.items():
-                if key.endswith(f"_{nam_td}") and isinstance(recs, list):
-                    all_for_bc.extend(recs)
+    all_for_bc = doc_bien_ban_theo_nam(nam=nam_td, pgd_user=pgd_user)
 
     if not all_for_bc:
         st.info("Không có biên bản nào để lập báo cáo tổng hợp.")
@@ -1403,7 +1339,7 @@ def _render_theo_doi_bc_th(pgd_user: str | None,
 
 from tabs.base_tab import TabContext
 
-def render(tab: DeltaGenerator, **kwargs) -> None:
+def render(tab: DeltaGenerator | None = None, **kwargs) -> None:
     """Entry point — dùng chung cho ws_operation và ws_management."""
     ctx = TabContext(tab, **kwargs)
     _df_full = kwargs.get("df_full")
@@ -1413,7 +1349,7 @@ def render(tab: DeltaGenerator, **kwargs) -> None:
         df = df_full
     if (df is None or getattr(df, "empty", True)) and os.path.exists(CACHE_HSTD):
         df_cache = _doc_hstd_cached(ts_file(CACHE_HSTD))
-        df = df_cache if _hstd_cache_hop_le(df_cache) else pd.DataFrame()
+        df = df_cache
     pgd_user = ctx.pgd_user
     username = kwargs.get("username", "unknown")
     role     = normalize_role(str(kwargs.get("role", "user") or "user"))

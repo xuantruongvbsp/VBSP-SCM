@@ -1303,58 +1303,124 @@ def _render_theo_dvut(df: pd.DataFrame) -> None:
     st.dataframe(hien, use_container_width=True, hide_index=True)
 
 
-def _render_ke_hoach(df: pd.DataFrame, pgd_user: str) -> None:
+def _render_ke_hoach(df: pd.DataFrame, pgd_user: str, role: str) -> None:
     st.markdown("#### 📋 Kế hoạch kiểm tra giám sát ủy thác")
     st.caption("Hội đoàn thể cấp xã lập (PGD) hoặc cấp tỉnh lập (CN). "
                "Danh sách Tổ TK&VV tự động lấy từ hệ thống.")
 
-    # Lấy danh sách Tổ từ df
-    ds_to = []
-    if df is not None and not df.empty:
-        grp = [c for c in [COT_DVUT, COT_TEN_XA, COT_TEN_TO] if c in df.columns]
-        if grp:
-            ds_to = (df[grp].drop_duplicates()
-                     .sort_values(grp).to_dict("records"))
+    if df is None or df.empty:
+        st.warning("Chưa có dữ liệu.")
+        return
 
-    with st.form("form_ke_hoach_kt"):
+    if (not la_phan_he_cn(role)) and not pgd_user:
+        st.error("Không xác định được PGD.")
+        return
+
+    key_prefix = f"uyt_kh_{pgd_slug(pgd_user) if pgd_user else 'cn'}_"
+
+    if pgd_user and not la_phan_he_cn(role):
+        st.info(f"PGD: **{pgd_user}**")
+        pgd_chon = pgd_user
+    else:
+        if COT_TEN_PGD in df.columns:
+            ds_pgd = sorted(df[COT_TEN_PGD].dropna().unique().tolist())
+        else:
+            ds_pgd = DS_PGD
+        pgd_opt = st.selectbox(
+            "Chọn PGD",
+            options=["(Tất cả)"] + ds_pgd,
+            key=f"{key_prefix}pgd",
+        )
+        pgd_chon = None if pgd_opt == "(Tất cả)" else pgd_opt
+
+    df_src = df
+    if pgd_chon and COT_TEN_PGD in df.columns:
+        df_src = df[df[COT_TEN_PGD] == pgd_chon].copy()
+
+    # Lấy danh sách Tổ từ df đã lọc
+    ds_to = []
+    grp = [c for c in [COT_DVUT, COT_TEN_XA, COT_TEN_TO] if c in df_src.columns]
+    if grp:
+        ds_to = (
+            df_src[grp]
+            .drop_duplicates()
+            .sort_values(grp)
+            .to_dict("records")
+        )
+
+    with st.form(f"{key_prefix}form"):
         c1, c2 = st.columns(2)
         don_vi_kt = c1.selectbox(
             "Hội đoàn thể kiểm tra",
             options=DVUT_ORDER,
-            key="kh_don_vi_kt"
+            key=f"{key_prefix}don_vi_kt",
         )
-        so_vb      = c1.text_input("Số văn bản", placeholder="VD: 12/KH-HND")
-        ds_xa_kh = sorted(df[COT_TEN_XA].dropna().unique().tolist()) \
-                   if df is not None and COT_TEN_XA in df.columns else []
-        dia_danh = c1.selectbox(
-            "Địa danh (xã/phường)",
-            options=ds_xa_kh,
-            key="kh_dia_danh",
-            help="Xã/phường nơi Hội đóng trụ sở — dùng làm địa danh ký văn bản"
+        so_vb = c1.text_input(
+            "Số văn bản",
+            placeholder="VD: 12/KH-HND",
+            key=f"{key_prefix}so_vb",
         )
+        ds_xa_kh = (
+            sorted(df_src[COT_TEN_XA].dropna().unique().tolist())
+            if COT_TEN_XA in df_src.columns
+            else []
+        )
+        if ds_xa_kh:
+            dia_danh = c1.selectbox(
+                "Địa danh (xã/phường)",
+                options=ds_xa_kh,
+                key=f"{key_prefix}dia_danh",
+                help="Xã/phường nơi Hội đóng trụ sở — dùng làm địa danh ký văn bản",
+            )
+        else:
+            dia_danh = c1.text_input(
+                "Địa danh (xã/phường)",
+                placeholder="Nhập xã/phường...",
+                key=f"{key_prefix}dia_danh_txt",
+            )
         nam_kh     = c2.number_input("Năm kế hoạch",
                                       value=date.today().year,
-                                      min_value=2020, max_value=2035, step=1)
-        ngay_ky    = c2.date_input("Ngày ký", value=date.today())
-        chu_tich   = c2.text_input("Chủ tịch ký",
-                                    placeholder="Họ và tên Chủ tịch Hội")
+                                      min_value=2020, max_value=2035, step=1,
+                                      key=f"{key_prefix}nam_kh")
+        ngay_ky = c2.date_input("Ngày ký", value=date.today(), key=f"{key_prefix}ngay_ky")
+        chu_tich = c2.text_input(
+            "Chủ tịch ký",
+            placeholder="Họ và tên Chủ tịch Hội",
+            key=f"{key_prefix}chu_tich",
+        )
 
         st.markdown("**I. Mục đích, yêu cầu**")
-        muc_dich   = st.text_area("Mục đích", height=70)
-        yeu_cau    = st.text_area("Yêu cầu", height=70)
+        muc_dich   = st.text_area("Mục đích", height=70, key=f"{key_prefix}muc_dich")
+        yeu_cau    = st.text_area("Yêu cầu", height=70, key=f"{key_prefix}yeu_cau")
 
         st.markdown("**II. Kế hoạch kiểm tra**")
-        noi_dung_kt = st.text_area("Nội dung, thời hiệu kiểm tra", height=70)
-        thanh_phan  = st.text_area("Thành phần Đoàn kiểm tra", height=60)
+        noi_dung_kt = st.text_area(
+            "Nội dung, thời hiệu kiểm tra",
+            height=70,
+            key=f"{key_prefix}noi_dung_kt",
+        )
+        thanh_phan  = st.text_area(
+            "Thành phần Đoàn kiểm tra",
+            height=60,
+            key=f"{key_prefix}thanh_phan",
+        )
         st.info(f"📋 Hệ thống tìm thấy **{len(ds_to)}** Tổ TK&VV "
                 f"— sẽ tự động điền vào bảng Đối tượng kiểm tra.")
 
         st.markdown("**III. Kế hoạch giám sát**")
-        noi_dung_gs  = st.text_area("Nội dung, thời hiệu giám sát", height=70)
-        phan_cong_gs = st.text_area("Phân công cán bộ giám sát", height=60)
+        noi_dung_gs  = st.text_area(
+            "Nội dung, thời hiệu giám sát",
+            height=70,
+            key=f"{key_prefix}noi_dung_gs",
+        )
+        phan_cong_gs = st.text_area(
+            "Phân công cán bộ giám sát",
+            height=60,
+            key=f"{key_prefix}phan_cong_gs",
+        )
 
         st.markdown("**IV. Tổ chức thực hiện**")
-        to_chuc = st.text_area("Tổ chức thực hiện", height=60)
+        to_chuc = st.text_area("Tổ chức thực hiện", height=60, key=f"{key_prefix}to_chuc")
 
         submitted = st.form_submit_button("📄 Tạo Word")
 
@@ -2390,7 +2456,7 @@ def render(tab: DeltaGenerator, **kwargs) -> None:
             "📊 Theo dõi & BC-TH",
         ])
         with sub1: _render_theo_dvut(df)
-        with sub2: _render_ke_hoach(df, pgd_user)
+        with sub2: _render_ke_hoach(df, pgd_user, role)
         with sub3: _render_bb_ct_cx(df, pgd_user, username, role)
         with sub4: _render_mau06(df, pgd_user)
         with sub5: _render_mau15(df, pgd_user)

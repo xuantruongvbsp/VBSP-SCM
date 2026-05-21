@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## [2026-05-21] — Sửa header bảng "Cơ cấu dư nợ theo chương trình tín dụng" thành 2 dòng
+- `tabs/tab_tongquan.py` dòng 449-458 — sửa logic `_col_cfg` để các cột có "(triệu đồng)" có header 2 dòng, riêng cột "Dư nợ (triệu đồng)" hiển thị "(Tỷ đồng)" vì giá trị được chia 1000
+- `tabs/tab_tongquan.py` dòng 833-836 — sửa `_disp_col()` để cột "Dư nợ" hiển thị "(Tỷ đồng)" thay vì "(Triệu đồng)" cho nhất quán với logic chia 1000
+- `tabs/tab_tongquan.py` dòng 931-934 — sửa `_pdf_col()` để xuất PDF cũng hiển thị "(Tỷ đồng)" cho cột "Dư nợ"
+
 ## [2026-05-21] — Git hook: pre-commit chạy py_compile + convention checks
 - `scripts/setup_hooks.py` — pre-commit hook chạy thêm `py_compile` cho staged *.py (bắt lỗi syntax sớm) và chạy `scripts/check_conventions.py` sau `check_hardcode_cols.py` để chặn commit khi vi phạm role/COT/audit/logger/render
 

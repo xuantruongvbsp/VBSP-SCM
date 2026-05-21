@@ -337,27 +337,27 @@ def main():
             _sync_path = os.path.join(os.path.dirname(__file__), "backups", "kv_sync.json")
             _sync_exists = os.path.exists(_sync_path)
 
-            st.markdown("**🗄️ Đồng bộ dữ liệu giữa 2 máy**")
+            st.markdown("**🗄️ Sao lưu / Phục hồi dữ liệu**")
             st.caption(
-                "① Máy này → nhấn **Lưu** → commit GitHub\n\n"
-                "② Máy kia → pull GitHub → nhấn **Đồng bộ**"
+                "① Máy này → nhấn **Sao lưu** → commit GitHub\n\n"
+                "② Máy kia → pull GitHub → nhấn **Phục hồi**"
             )
 
-            if st.button("💾 Lưu vào Project", use_container_width=True,
+            if st.button("💾 Sao lưu", use_container_width=True,
                          key="btn_save_kv_project",
                          help="Xuất tất cả bảng → backups/kv_sync.json (commit được lên GitHub)"):
                 _counts = db.luu_kv_sync_project()
                 _total = sum(_counts.values())
                 db.ghi_audit(username, "export_kv_sync",
                              f"Xuất {_total} bản ghi / {len(_counts)} bảng → backups/kv_sync.json")
-                st.success(f"✅ Đã lưu {_total} bản ghi — nhớ commit GitHub Desktop")
+                st.success(f"✅ Đã sao lưu {_total} bản ghi — nhớ commit GitHub Desktop")
                 _labels = {"users":"👤","kv_store":"🗂️","nhiem_vu":"📋","tien_do_task":"📊","qlnk_ket_qua":"🔒"}
                 for _t, _n in _counts.items():
                     if _n > 0:
                         st.caption(f"{_labels.get(_t,'•')} {_t}: {_n}")
 
             if _sync_exists:
-                if st.button("🔄 Đồng bộ từ Project", use_container_width=True,
+                if st.button("🔄 Phục hồi", use_container_width=True,
                              key="btn_load_kv_project", type="primary",
                              help="Import tất cả bảng từ backups/kv_sync.json vừa pull về"):
                     _counts = db.doc_kv_sync_project()
@@ -369,10 +369,10 @@ def main():
                                if k not in ("logged_in", "user_info", "username",
                                             "workspace", "role")]:
                         st.session_state.pop(_k, None)
-                    st.success(f"✅ Đồng bộ {_total} bản ghi! Đang tải lại...")
+                    st.success(f"✅ Phục hồi {_total} bản ghi! Đang tải lại...")
                     st.rerun()
             else:
-                st.caption("⚠️ Chưa có file sync — pull GitHub trước")
+                st.caption("⚠️ Chưa có bản sao lưu — pull GitHub trước")
             st.divider()
             st.caption(
                 "ℹ️ **Không sync qua GitHub:**\n"

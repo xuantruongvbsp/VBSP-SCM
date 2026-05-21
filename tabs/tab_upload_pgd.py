@@ -29,6 +29,9 @@ from services.upload_service import (
     luu_pgd_file,
 )
 from auth import co_quyen_upload_pgd, la_phan_he_pgd, normalize_role
+from logger import get_logger
+
+logger = get_logger(__name__)
 # data_priority_service và _render_upload_hang_loat đã được tách ra
 # theo kiến trúc 2 luồng độc lập (xem HUONG_DAN_NGUON_DU_LIEU.md)
 
@@ -299,6 +302,7 @@ def _xu_ly_upload(
         try:
             kq = luu_pgd_file(ten_dv, loai, file_bytes)
         except Exception as e:
+            logger.error("Lỗi upload file %s cho %s: %s", loai, ten_dv, e, exc_info=True)
             kq = KetQuaUpload(False, f"Lỗi lưu: {e}")
 
         nhan = NHAN_LOAI.get(loai, loai.upper())

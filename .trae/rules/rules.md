@@ -425,6 +425,32 @@ Thêm lên ĐẦU FILE, dùng ngày thực tế, KHÔNG xóa entry cũ.
 □ CHANGELOG.md đã cập nhật
 ```
 
+### 10.1 Rà soát sau khi xong task (đảm bảo đã “ghi vào chức năng”)
+
+```
+□ Xác nhận điểm gắn (entry point):
+  - Nếu sửa tab: render() gọi đúng hàm mới / signature mới
+  - Nếu thêm UI: label/keys mới xuất hiện trong đúng sub-tab/workspace
+
+□ Grep theo “dấu vết” của task:
+  - Tên hàm mới, key_prefix, label UI, hoặc tên biến chính
+  - Đảm bảo có ít nhất 1 call site từ render()/workspace/tab
+
+□ Compile check đúng file đã sửa:
+  python -c "import py_compile; py_compile.compile('path/to/file.py', doraise=True); print('OK')"
+
+□ Convention check (nếu task có sửa code logic/UI):
+  python scripts/check_conventions.py path/to/file.py
+
+□ Nếu có ghi dữ liệu (db.ghi_kv):
+  - Có db.ghi_audit() ngay sau đó
+  - Có st.cache_data.clear() (nếu thao tác upload/lưu file/cache)
+
+□ Nếu task là bugfix:
+  - Có case tái hiện (ít nhất bằng grep/log hoặc đường đi UI)
+  - Đảm bảo nhánh lỗi cũ không còn reachable (hoặc đã được handle rõ ràng)
+```
+
 ---
 
 ## 11. Tài liệu tham chiếu (tự đọc khi cần)

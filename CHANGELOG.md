@@ -1,9 +1,15 @@
 # CHANGELOG
 
-## [2026-05-21] — Thêm tính năng Backup / Restore Database
-- `db.py` — thêm `backup_db_bytes()`: checkpoint WAL rồi trả về bytes file .db
-- `db.py` — thêm `restore_db_bytes()`: ghi DB mới từ bytes, xóa WAL/SHM cũ, đóng connection
-- `app.py` — thêm expander "🗄️ Backup / Restore DB" trong sidebar (chỉ admin_cn): nút Tạo Backup → download file, file_uploader Restore → ghi đè DB + clear cache + rerun
+## [2026-05-21] — Bổ sung checklist rà soát sau task
+- `.trae/rules/rules.md` — thêm mục 10.1 “Rà soát sau khi xong task” để kiểm tra thay đổi đã được gắn vào đúng chức năng (call site, compile, convention, audit/cache)
+
+## [2026-05-21] — Đồng bộ dữ liệu qua GitHub (thay thế copy thủ công)
+- `db.py` — thêm `export_kv_json()` / `import_kv_json()`: xuất/nhập toàn bộ kv_store thành JSON text
+- `db.py` — thêm `luu_kv_sync_project()`: lưu ra `backups/kv_sync.json` (git-tracked)
+- `db.py` — thêm `doc_kv_sync_project()`: import từ `backups/kv_sync.json` nếu tồn tại
+- `db.py` — thêm `backup_db_bytes()` / `restore_db_bytes()`: backup/restore file .db binary (WAL-safe)
+- `app.py` — thêm expander "🗄️ Đồng bộ dữ liệu" trong sidebar (admin_cn): nút Lưu vào Project + Đồng bộ từ Project
+- `backups/.gitkeep` — tạo thư mục backups/ được track bởi git
 
 ## [2026-05-21] — Tab Ủy thác: chọn PGD/(Tất cả) + droplist xã/phường cho 01/KH
 - `tabs/tab_uy_thac.py` dòng ~1306 — Sub-tab "📋 Kế hoạch (01/KH)": thêm selectbox chọn PGD/(Tất cả) (CN), lọc danh sách Tổ & xã/phường theo PGD, chuẩn hóa widget key theo prefix để tránh trùng key

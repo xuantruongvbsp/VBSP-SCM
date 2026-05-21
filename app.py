@@ -334,45 +334,37 @@ def main():
 
         if normalize_role(role) in ("admin_cn", "admin"):
             st.divider()
-            with st.expander("🗄️ Backup / Restore DB"):
-                # ── Backup ────────────────────────────────────────────────
-                if st.button("📦 Tạo Backup", use_container_width=True, key="btn_mk_backup"):
-                    _bk = db.backup_db_bytes()
-                    st.session_state["_bk_bytes"] = _bk
-                    st.session_state["_bk_ts"] = datetime.now().strftime("%Y%m%d_%H%M")
-                if st.session_state.get("_bk_bytes"):
-                    st.download_button(
-                        f"⬇️ Tải về ({st.session_state.get('_bk_ts', '')})",
-                        data=st.session_state["_bk_bytes"],
-                        file_name=f"vbsp_scm_{st.session_state['_bk_ts']}.db",
-                        mime="application/octet-stream",
-                        key="dl_bk_db",
-                    )
-                st.divider()
-                # ── Restore ───────────────────────────────────────────────
-                _up = st.file_uploader(
-                    "📥 Restore từ file backup",
-                    type=["db"],
-                    key="up_restore_db",
-                    help="Chọn file vbsp_scm_YYYYMMDD_HHMM.db đã backup trước đó",
-                )
-                if _up:
-                    if st.button(
-                        "⚠️ Xác nhận ghi đè DB hiện tại",
-                        key="btn_restore_db",
-                        type="primary",
-                        use_container_width=True,
-                    ):
-                        db.restore_db_bytes(_up.read())
-                        st.cache_data.clear()
-                        st.cache_resource.clear()
-                        # Xóa session cache, giữ lại thông tin đăng nhập
-                        for _k in [k for k in list(st.session_state.keys())
-                                   if k not in ("logged_in", "user_info", "username",
-                                                "workspace", "role")]:
-                            st.session_state.pop(_k, None)
-                        st.success("✅ Restore thành công! Đang tải lại...")
-                        st.rerun()
+            _sync_path = os.path.join(os.path.dirname(__file__), "backups", "kv_sync.json")
+            _sync_exists = os.path.exists(_sync_path)
+
+            st.markdown("**🗄️ Đồng bộ dữ liệu giữa 2 máy**")
+            st.caption(
+                "① Máy này → nhấn **Lưu** → commit GitHub\n\n"
+                "② Máy kia → pull GitHub → nhấn **Đồng bộ**"
+            )
+
+            if st.button("💾 Lưu vào Project", use_container_width=True,
+                         key="btn_save_kv_project",
+                         help="Xuất dữ liệu → backups/kv_sync.json (commit được lên GitHub)"):
+                _n = db.luu_kv_sync_project()
+                db.ghi_audit(username, "export_kv_sync", f"Xuất {_n} bản ghi → backups/kv_sync.json")
+                st.success(f"✅ Đã lưu {_n} bản ghi — nhớ commit GitHub Desktop")
+
+            if _sync_exists:
+                if st.button("🔄 Đồng bộ từ Project", use_container_width=True,
+                             key="btn_load_kv_project", type="primary",
+                             help="Import dữ liệu từ backups/kv_sync.json vừa pull về"):
+                    _n = db.doc_kv_sync_project()
+                    db.ghi_audit(username, "import_kv_sync", f"Import {_n} bản ghi từ backups/kv_sync.json")
+                    st.cache_data.clear()
+                    for _k in [k for k in list(st.session_state.keys())
+                               if k not in ("logged_in", "user_info", "username",
+                                            "workspace", "role")]:
+                        st.session_state.pop(_k, None)
+                    st.success(f"✅ Đồng bộ {_n} bản ghi! Đang tải lại...")
+                    st.rerun()
+            else:
+                st.caption("⚠️ Chưa có file sync — pull GitHub trước")
 
         st.divider()
         if st.button("🚪 Đăng xuất", use_container_width=True):

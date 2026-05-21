@@ -26,6 +26,9 @@ from data import ts_file, doc_dienbao, db_lookup
 from data.pgd import duong_dan_pgd, pgd_slug
 from services import luu_dienbao
 from tabs import tab_kehoach
+from logger import get_logger
+
+logger = get_logger(__name__)
 
 if TYPE_CHECKING:
     from streamlit.delta_generator import DeltaGenerator
@@ -197,12 +200,14 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
             try:
                 db_ht_rows = doc_dienbao(path_ht, ts_file(path_ht))
             except Exception as e:
+                logger.error("Lỗi đọc file Điện báo hiện tại: %s", e, exc_info=True)
                 st.error(f"Lỗi đọc file Điện báo hiện tại: {e}")
 
         if path_prev and os.path.exists(path_prev):
             try:
                 db_prev_rows = doc_dienbao(path_prev, ts_file(path_prev))
             except Exception as e:
+                logger.error("Lỗi đọc file Điện báo 31/12: %s", e, exc_info=True)
                 st.error(f"Lỗi đọc file Điện báo 31/12: {e}")
 
         def build_row(ten_hien: str, val_ht: float, val_pv: float, la_con: bool = False) -> dict[str, Any]:
@@ -509,6 +514,7 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                         st.success("✅ Hoàn thành — Điện báo hiện tại đã sẵn sàng!")
                         st.cache_data.clear()
                 except Exception as e:
+                    logger.error("Upload điện báo hiện tại: %s", e, exc_info=True)
                     u = st.session_state.get("username", "unknown")
                     db.ghi_audit(
                         u,
@@ -546,6 +552,7 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                         st.success("✅ Hoàn thành — Điện báo 31/12 đã sẵn sàng!")
                         st.cache_data.clear()
                 except Exception as e:
+                    logger.error("Upload điện báo 31/12: %s", e, exc_info=True)
                     u = st.session_state.get("username", "unknown")
                     db.ghi_audit(
                         u,

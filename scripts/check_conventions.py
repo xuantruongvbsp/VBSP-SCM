@@ -75,7 +75,7 @@ _FROM_LOGGER = re.compile(r'from\s+logger\s+import')
 
 # ── Các thư mục/file bỏ qua ─────────────────────────────────────────────────
 _SKIP_DIRS  = {"_archive", ".git", "__pycache__", "node_modules",
-               "khtd-targets-app", "tests", "scripts"}
+               "khtd-targets-app", "tests", "scripts", ".venv", ".ruff_cache"}
 _SKIP_FILES = {"check_conventions.py", "backup_service.py"}
 
 

@@ -180,7 +180,7 @@ def _render_canh_bao(df: pd.DataFrame, ds_pgd_all: list):
                 st.session_state["_bytes_kl"] = data
                 st.session_state["_file_kl"] = fname
                 st.success("✅ Đã tạo xong — nhấn nút bên dưới để tải về.")
-            except Exception as e:
+            except Exception as e:  # conv: skip
                 logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                 st.error(f"Lỗi tạo KL giao ban: {e}")
 
@@ -834,7 +834,7 @@ Danh sách này ảnh hưởng trực tiếp đến báo cáo **phân tầng GQV
                             df_pv[col] = df_pv[col].apply(fmt_ty)
                     df_pv["Ghi chú"] = df_pv["Nhóm"].map(lambda m: ghi_chu_map.get(m, ""))
                     st.dataframe(df_pv, hide_index=True, use_container_width=True)
-        except Exception as e:
+        except Exception as e:  # conv: skip
             logger.error("Lỗi trong khối except: %s", e, exc_info=True)
             st.warning(f"Không thể phân tích tác động GQVL: {e}")
 
@@ -945,7 +945,7 @@ def _render_quan_ly_template(df: pd.DataFrame):
                         # Reload để hiển thị file mới
                         st.rerun()
                         
-                    except Exception as e:
+                    except Exception as e:  # conv: skip
                         logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                         st.error(f"❌ Lỗi lưu file: {e}")
 
@@ -1004,7 +1004,7 @@ def _render_quan_ly_template(df: pd.DataFrame):
                         file_to_delete.unlink()  # Xóa file
                         st.success(f"✅ Đã xóa: {file_to_delete.name}")
                         st.rerun()
-                    except Exception as e:
+                    except Exception as e:  # conv: skip
                         logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                         st.error(f"❌ Không thể xóa file: {e}")
 
@@ -1106,7 +1106,7 @@ def _render_quan_ly_template(df: pd.DataFrame):
                 
                 st.success("✅ Test thành công! Nhấn nút trên để tải file Word.")
                 
-            except Exception as e:
+            except Exception as e:  # conv: skip
                 logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                 st.error(f"❌ Lỗi test template: {e}")
                 st.exception(e)  # Debug info
@@ -1138,7 +1138,6 @@ def _build_all_items(role: str, username: str, **kwargs) -> list:
             ],
         },
         {"group": "Giám sát",     "label": "📊 So sánh kỳ",            "icon": "chart-line", "fn": lambda: _get_tab("tab_so_sanh_ky").render(None, **kwargs)},
-        {"group": "Giám sát",     "label": "🔄 So sánh 2 kỳ",          "icon": "git-compare", "fn": lambda: _get_tab("tab_so_sanh_2_ky").render(None, **kwargs)},
         {"group": "Kiểm soát",     "label": "Kiểm soát nội bộ",    "icon": "search",         "fn": lambda: _get_tab("tab_kiem_soat").render_tab(df_full, role, kwargs.get("username", "unknown"))},
         {"group": "Kiểm soát",     "label": "Xử lý nợ rủi ro",   "icon": "alert-circle",   "fn": lambda: _get_tab("tab_xlrr_tong_hop").render(None, **kwargs)},
         {"group": "Kiểm soát",     "label": "Tập trung rủi ro & HHI",  "icon": "chart-pie",  "fn": lambda: _get_tab("tab_hhi").render(None, **kwargs)},
@@ -1156,6 +1155,7 @@ def _build_all_items(role: str, username: str, **kwargs) -> list:
         {"group": "Kế hoạch và Thực hiện KHTD", "label": "Cân đối - Điện báo", "icon": "chart-line", "fn": lambda: _get_tab("tab_kehoach").render(None, **kwargs)},
         {"group": "Kế hoạch và Thực hiện KHTD", "label": "📡 Điện báo",            "icon": "antenna",    "fn": lambda: _get_tab("tab_candoi").render(None, **kwargs)},
         {"group": "Kế hoạch và Thực hiện KHTD", "label": "Xuất báo cáo KHTD",  "icon": "file-export", "fn": lambda: _get_tab("tab_khtd_xuat").render_xuat_baocao(role=kwargs.get("role", ""), username=kwargs.get("username", ""), df_full=kwargs.get("df"))},
+        {"group": "Kế hoạch và Thực hiện KHTD", "label": "🔭 Xây dựng KHTD tương lai", "icon": "calendar-plus", "fn": lambda: _get_tab("tab_xay_dung_khtd").render(None, **kwargs)},
         {
             "group": "Báo cáo",
             "label": "Báo cáo tín dụng",
@@ -1378,7 +1378,7 @@ def render(**kwargs):
     if active_item and active_item.get("fn"):
         try:
             active_item["fn"]()
-        except Exception as e:
+        except Exception as e:  # conv: skip
             logger.error("Lỗi trong khối except: %s", e, exc_info=True)
             import traceback
             st.error(f"❌ Lỗi render **{active_label}**: {e}")
@@ -1391,7 +1391,7 @@ def render(**kwargs):
                 if child["label"] == active_label:
                     try:
                         child["fn"]()
-                    except Exception as e:
+                    except Exception as e:  # conv: skip
                         logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                         import traceback
 

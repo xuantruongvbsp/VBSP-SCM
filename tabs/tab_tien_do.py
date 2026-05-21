@@ -11,6 +11,7 @@ import streamlit as st
 import db
 from auth import normalize_role, la_admin_cn
 from config import DS_PGD, DON_VI_CHI_NHANH, PGD_XA_MAP, ROLES_PHAN_HE_CN
+from services import tien_do_service
 from utils import fmt_ngay, lazy_tabs
 
 DS_PGD_ALL = [DON_VI_CHI_NHANH] + DS_PGD
@@ -43,83 +44,36 @@ UU_TIEN_ORDER = {"khan_cap": 0, "quan_trong": 1, "binh_thuong": 2}
 
 
 def _doc_tasks(chi_dang_theo_doi: bool = True) -> list[dict]:
-    with db.get_conn() as conn:
-        sql = "SELECT * FROM tien_do_task"
-        if chi_dang_theo_doi:
-            sql += " WHERE trang_thai = 'dang_theo_doi'"
-        sql += " ORDER BY ngay_deadline ASC"
-        return [dict(r) for r in conn.execute(sql).fetchall()]
+    return tien_do_service.doc_tasks(chi_dang_theo_doi)
 
 
 def _doc_ketqua_task(task_id: int) -> list[dict]:
-    with db.get_conn() as conn:
-        return [dict(r) for r in conn.execute(
-            "SELECT * FROM tien_do_ketqua WHERE task_id=? ORDER BY pgd, ten_xa",
-            (task_id,),
-        ).fetchall()]
+    return tien_do_service.doc_ketqua_task(task_id)
 
 
-def _khoi_tao_ketqua_task(task_id: int, ds_pgd_task: list[str],
-                           cap_theo_doi: str = "xa",
-                           loai_noi_dung: str = "chi_tiet_xa") -> None:
-    rows = []
-    if cap_theo_doi == "pgd":
-        for pgd in ds_pgd_task:
-            rows.append((task_id, pgd, pgd, loai_noi_dung))
-    else:
-        for pgd in ds_pgd_task:
-            for xa in PGD_XA_MAP.get(pgd, []):
-                rows.append((task_id, pgd, xa, loai_noi_dung))
-    with db.get_conn() as conn:
-        conn.executemany(
-            """INSERT OR IGNORE INTO tien_do_ketqua
-               (task_id, pgd, ten_xa, trang_thai, loai_noi_dung)
-               VALUES (?, ?, ?, 'chua_thuc_hien', ?)""",
-            rows,
-        )
-        conn.commit()
+def _khoi_tao_ketqua_task(
+    task_id: int,
+    ds_pgd_task: list[str],
+    cap_theo_doi: str = "xa",
+    loai_noi_dung: str = "chi_tiet_xa",
+) -> None:
+    tien_do_service.khoi_tao_ketqua_task(task_id, ds_pgd_task, cap_theo_doi, loai_noi_dung)
 
 
 def _sync_bien_hoa_ketqua(task_id: int, cbtd_bien_hoa: str, loai_noi_dung: str) -> None:
-    val = str(cbtd_bien_hoa or "").strip()
-    with db.get_conn() as conn:
-        if val:
-            conn.execute(
-                """INSERT OR IGNORE INTO tien_do_ketqua
-                   (task_id, pgd, ten_xa, trang_thai, loai_noi_dung)
-                   VALUES (?, ?, ?, 'chua_thuc_hien', ?)""",
-                (task_id, _PGD_BIEN_HOA, _PGD_BIEN_HOA, loai_noi_dung),
-            )
-        else:
-            conn.execute(
-                "DELETE FROM tien_do_ketqua WHERE task_id=? AND ten_xa=?",
-                (task_id, _PGD_BIEN_HOA),
-            )
-        conn.commit()
+    tien_do_service.sync_bien_hoa_ketqua(task_id, cbtd_bien_hoa, loai_noi_dung)
 
 
 def _upsert_ketqua_xa(
-    task_id: int, ten_xa: str, pgd: str,
-    trang_thai: str, ngay_ht: str | None,
-    ghi_chu: str | None, username: str,
+    task_id: int,
+    ten_xa: str,
+    pgd: str,
+    trang_thai: str,
+    ngay_ht: str | None,
+    ghi_chu: str | None,
+    username: str,
 ) -> None:
-    now = datetime.now().isoformat()
-    with db.get_conn() as conn:
-        conn.execute(
-            """INSERT INTO tien_do_ketqua
-               (task_id, pgd, ten_xa, trang_thai, ngay_hoan_thanh,
-                ghi_chu, nguoi_nhap, ngay_nhap)
-               VALUES (?,?,?,?,?,?,?,?)
-               ON CONFLICT(task_id, ten_xa) DO UPDATE SET
-                 trang_thai      = excluded.trang_thai,
-                 ngay_hoan_thanh = excluded.ngay_hoan_thanh,
-                 ghi_chu         = excluded.ghi_chu,
-                 nguoi_nhap      = excluded.nguoi_nhap,
-                 ngay_nhap       = excluded.ngay_nhap""",
-            (task_id, pgd, ten_xa, trang_thai,
-             ngay_ht, ghi_chu, username, now),
-        )
-        conn.commit()
+    tien_do_service.upsert_ketqua_xa(task_id, ten_xa, pgd, trang_thai, ngay_ht, ghi_chu, username)
 
 
 def _render_tong_quan(tab, **kwargs):

@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## [2026-05-21] — Xây dựng KHTD tương lai: bổ sung 3 loại (1 năm / 3 năm / 5 năm)
+- `services/khtd_import_service.py` — thêm tham số `loai` vào tất cả hàm; kv key mới: `khtd_xd_{loai}_*`
+- `tabs/tab_xay_dung_khtd.py` — thêm radio "1 năm / 3 năm / 5 năm"; Biểu 02C và Thuyết minh dùng nested year-tabs; Tổng hợp CN so sánh đa năm
+
 ## [2026-05-21] — Tính năng mới: Xây dựng KHTD tương lai (2026–2030)
 - `config.py` — thêm `BIEU_01C_XD_MA_KEY`, `BIEU_02C_THUYET_MINH_XD`, `THUYET_MINH_LABELS`
 - `services/khtd_import_service.py` — tạo mới: import Biểu 01C/02C, lưu thuyết minh, tổng hợp CN

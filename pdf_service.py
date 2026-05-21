@@ -15,7 +15,7 @@ try:
     )
     from reportlab.pdfbase import pdfmetrics
     from reportlab.pdfbase.ttfonts import TTFont
-    from reportlab.lib.enums import TA_CENTER, TA_RIGHT
+    from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
     _REPORTLAB_READY = True
 except ImportError:
     _REPORTLAB_READY = False
@@ -388,7 +388,7 @@ def nut_xuat_pdf(
                 pdf_bytes = xuat_pdf(df, tieu_de, username, cols_tien, prefix_file=prefix_file)
             st.session_state[ss_key]      = pdf_bytes
             st.session_state[ss_file_key] = f"{prefix_file}_{datetime.now().strftime('%d%m%Y_%H%M')}.pdf"
-        except Exception as e:
+        except Exception as e:  # conv: skip
             st.session_state[ss_key] = None
             st.error(f"❌ Lỗi tạo PDF: {e}")
 

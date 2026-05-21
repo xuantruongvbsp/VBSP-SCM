@@ -7,7 +7,6 @@ import streamlit as st
 from docx import Document
 from docx.shared import Pt, Cm, RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH
-from docx.enum.table import WD_ALIGN_VERTICAL
 from streamlit.delta_generator import DeltaGenerator
 
 import db
@@ -373,161 +372,257 @@ def _tao_word_mau15(du_lieu: dict, df_to: pd.DataFrame) -> bytes:
 
 def _tao_word_mau06(du_lieu: dict, df_m06: pd.DataFrame,
                     loai: str = "06") -> bytes:
-    """Tạo file Word Mẫu 06/TD hoặc 06A/TD."""
+    """Tạo file Word Mẫu 06/TD — Phiếu kiểm tra sử dụng vốn vay (VB 727/HD-NHCS)."""
+    from docx.oxml.ns import qn
+    from docx.oxml import OxmlElement
+
     doc = Document()
     _style_doc(doc)
     for section in doc.sections:
-        section.top_margin    = Cm(2)
-        section.bottom_margin = Cm(2)
-        section.left_margin   = Cm(2)
-        section.right_margin  = Cm(1.5)
+        section.top_margin    = Cm(1.5)
+        section.bottom_margin = Cm(1.3)
+        section.left_margin   = Cm(1.8)
+        section.right_margin  = Cm(2.0)
         section.page_width    = Cm(29.7)
         section.page_height   = Cm(21)
 
-    # Header
-    tbl_h = doc.add_table(rows=1, cols=2)
+    def _xoa_border_row(tbl):
+        for cell in tbl.rows[0].cells:
+            tc = cell._tc
+            tcPr = tc.get_or_add_tcPr()
+            tcBorders = OxmlElement("w:tcBorders")
+            for bn in ["top", "left", "bottom", "right"]:
+                b = OxmlElement(f"w:{bn}")
+                b.set(qn("w:val"), "none")
+                tcBorders.append(b)
+            tcPr.append(tcBorders)
+
+    def _cell_text(cell, text, bold=False, size=10, align=None):
+        p = cell.paragraphs[0]
+        if align:
+            p.alignment = align
+        r = p.add_run(text)
+        r.bold = bold
+        r.font.size = Pt(size)
+
+    # ── Header 3 cột (không border) ──────────────────────────────────────────
+    tbl_h = doc.add_table(rows=1, cols=3)
     tbl_h.style = "Table Grid"
-    from docx.oxml.ns import qn
-    from docx.oxml import OxmlElement
-    for cell in tbl_h.rows[0].cells:
-        tc = cell._tc
-        tcPr = tc.get_or_add_tcPr()
-        tcBorders = OxmlElement("w:tcBorders")
-        for bn in ["top","left","bottom","right"]:
-            b = OxmlElement(f"w:{bn}")
-            b.set(qn("w:val"), "none")
-            tcBorders.append(b)
-        tcPr.append(tcBorders)
+    _xoa_border_row(tbl_h)
 
-    tbl_h.rows[0].cells[0].text = (
-        f"Đơn vị kiểm tra: {du_lieu.get('don_vi_kt','')}\n"
-        f"{du_lieu.get('ten_xa','')}"
-    )
-    p_r = tbl_h.rows[0].cells[1].paragraphs[0]
-    p_r.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-    p_r.add_run(f"Mẫu số: {loai}/TD\nLập 02 liên:\n"
-                "- 01 liên chính lưu NH;\n"
-                "- 01 liên phô tô lưu Đ.v k.tra")
+    # Cột trái: Đơn vị kiểm tra
+    _cell_text(tbl_h.rows[0].cells[0],
+               f"Đơn vị kiểm tra: {du_lieu.get('don_vi_kt', '')}", size=11)
 
-    # Tiêu đề
-    title = doc.add_paragraph()
-    title.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    title.add_run("PHIẾU KIỂM TRA SỬ DỤNG VỐN VAY").bold = True
+    # Cột giữa: Quốc hiệu + Tiêu đề phiếu
+    c1 = tbl_h.rows[0].cells[1]
+    p1 = c1.paragraphs[0]
+    p1.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    r1 = p1.add_run("CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM")
+    r1.bold = True; r1.font.size = Pt(12)
+    p1b = c1.add_paragraph("Độc lập - Tự do - Hạnh phúc")
+    p1b.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    if p1b.runs: p1b.runs[0].bold = True
+    p1c = c1.add_paragraph("PHIẾU KIỂM TRA SỬ DỤNG VỐN VAY")
+    p1c.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    if p1c.runs:
+        p1c.runs[0].bold = True
+        p1c.runs[0].font.size = Pt(13)
 
-    # Thông tin đoàn kiểm tra
+    # Cột phải: Mẫu số + hướng dẫn lưu liên
+    c2 = tbl_h.rows[0].cells[2]
+    p2 = c2.paragraphs[0]
+    p2.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    r2 = p2.add_run(f"Mẫu số {loai}/TD")
+    r2.bold = True; r2.font.size = Pt(11)
+    for txt in ["    Lập 02 liên:", "- 01 liên chính lưu NH;",
+                "- 01 liên phô tô lưu Đ.v k.tra."]:
+        p_tmp = c2.add_paragraph(txt)
+        p_tmp.runs[0].font.size = Pt(10) if p_tmp.runs else None
+
+    # ── Cán bộ kiểm tra ──────────────────────────────────────────────────────
     ngay_kt = du_lieu.get("ngay_kt", date.today())
-    doc.add_paragraph(
-        f"Người kiểm tra: 1. {du_lieu.get('can_bo_1','')}   "
-        f"Chức vụ: {du_lieu.get('chuc_vu_1','')}\n"
-        f"                        2. {du_lieu.get('can_bo_2','')}   "
-        f"Chức vụ: {du_lieu.get('chuc_vu_2','')}"
+    p_cb1 = doc.add_paragraph()
+    p_cb1.add_run("Họ và tên cán bộ kiểm tra: \t1. Ông (bà): ")
+    p_cb1.add_run(
+        f"{du_lieu.get('can_bo_1', '')}   Chức vụ: {du_lieu.get('chuc_vu_1', '')}"
     )
+    p_cb2 = doc.add_paragraph(
+        f"\t2. Ông (bà): {du_lieu.get('can_bo_2', '')}   "
+        f"Chức vụ: {du_lieu.get('chuc_vu_2', '')}"
+    )
+
+    # ── Thời điểm / Địa bàn / Tổ ─────────────────────────────────────────────
     doc.add_paragraph(
         f"Thời điểm kiểm tra: ............   "
-        f"Địa bàn kiểm tra: {du_lieu.get('dia_ban','')}   "
-        f"Tổ TK&VV: {du_lieu.get('ten_to','')}"
+        f"Địa bàn kiểm tra: {du_lieu.get('dia_ban', '')}   "
+        f"Tổ TK&VV: {du_lieu.get('ten_to', '')}"
     )
-    doc.add_paragraph("Đơn vị tính: triệu đồng")
+
+    # ── Đơn vị tính (căn phải) ───────────────────────────────────────────────
+    p_dvt = doc.add_paragraph("Đơn vị tính: triệu đồng")
+    p_dvt.alignment = WD_ALIGN_PARAGRAPH.RIGHT
 
     if loai == "06":
-        # Mẫu 06 — bảng nhiều KH
-        headers = [
-            "STT", "Họ và tên người vay",
-            "Mã khoản vay", "Chương trình cho vay",
-            "Số tiền giải ngân", "Dư nợ đến ngày KT",
-            "Mục đích sử dụng vốn",
-            "Tổng tiền thực nhận", "Dư nợ thực tế",
-            "Vào việc", "Số tiền đúng MĐ", "Số tiền sai MĐ",
-            "Hiệu quả ĐT", "Nợ lãi", "Chữ ký KH",
-        ]
-        tbl = doc.add_table(rows=1, cols=len(headers))
+        # ── Bảng 15 cột — 3 dòng header + dữ liệu + Cộng ────────────────────
+        n_data = len(df_m06)
+        tbl = doc.add_table(rows=3 + n_data + 1, cols=15)
         tbl.style = "Table Grid"
-        for i, h in enumerate(headers):
-            c = tbl.rows[0].cells[i]
-            c.text = h
-            c.paragraphs[0].runs[0].bold = True
-            c.paragraphs[0].runs[0].font.size = Pt(8)
-            c.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
 
+        # Dòng 0: 2 nhóm cột (merged ngang)
+        r0 = tbl.rows[0]
+        r0.cells[0].merge(r0.cells[6])
+        r0.cells[7].merge(r0.cells[14])
+        for ci, txt in [(0, "PHẦN GHI THEO HỒ SƠ CHO VAY"),
+                        (7, "PHẦN KIỂM TRA THỰC TẾ TẠI KHÁCH HÀNG")]:
+            r0.cells[ci].text = txt
+            r0.cells[ci].paragraphs[0].runs[0].bold = True
+            r0.cells[ci].paragraphs[0].runs[0].font.size = Pt(8)
+            r0.cells[ci].paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+        # Dòng 1: tên cột; cols 9-11 merged = "Thực tế sử dụng"
+        r1 = tbl.rows[1]
+        r1.cells[9].merge(r1.cells[11])
+        col1_names = [
+            (0, "STT"), (1, "Họ và tên người vay"), (2, "Mã khoản vay"),
+            (3, "Chương trình cho vay"), (4, "Số tiền giải ngân (tr.đ)"),
+            (5, "Dư nợ đến ngày KT (tr.đ)"), (6, "Mục đích sử dụng vốn"),
+            (7, "Tổng tiền thực nhận (tr.đ)"), (8, "Dư nợ thực tế (tr.đ)"),
+            (9, "Thực tế sử dụng vốn"), (12, "Hiệu quả ĐT"), (13, "Nợ lãi (tr.đ)"),
+            (14, "Chữ ký KH"),
+        ]
+        for ci, name in col1_names:
+            r1.cells[ci].text = name
+            r1.cells[ci].paragraphs[0].runs[0].bold = True
+            r1.cells[ci].paragraphs[0].runs[0].font.size = Pt(8)
+            r1.cells[ci].paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+        # Dòng 2: sub-header cho cột 9-11
+        r2 = tbl.rows[2]
+        for ci, name in [(9, "Vào việc"), (10, "Đúng MĐ"), (11, "Sai MĐ")]:
+            r2.cells[ci].text = name
+            r2.cells[ci].paragraphs[0].runs[0].bold = True
+            r2.cells[ci].paragraphs[0].runs[0].font.size = Pt(8)
+            r2.cells[ci].paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+        # Dữ liệu
         tong_gn = tong_dn = 0
-        for idx, row in df_m06.iterrows():
-            r = tbl.add_row()
+        for seq, (_, row) in enumerate(df_m06.iterrows()):
+            r = tbl.rows[3 + seq]
             gn = float(row.get(COT_MUC_VAY, 0) or 0)
             dn = float(row.get(COT_TONG_DU_NO, 0) or 0)
             tong_gn += gn
             tong_dn += dn
-            vals = [
-                str(idx + 1),
-                str(row.get(COT_TEN_KH, "")),
-                str(row.get(COT_SO_KU, "")),
-                str(row.get(COT_TEN_CT, "")),
-                f"{gn:,.0f}", f"{dn:,.0f}",
-                str(row.get("Mục đích sử dụng vốn vay", "")),
-                "", "", "", "", "", "", "", "",
-            ]
-            for i, v in enumerate(vals):
-                r.cells[i].text = v
-                r.cells[i].paragraphs[0].runs[0].font.size = Pt(8)
+            vals = {
+                0: str(seq + 1),
+                1: str(row.get(COT_TEN_KH, "")),
+                2: str(row.get(COT_SO_KU, "")),
+                3: str(row.get(COT_TEN_CT, "")),
+                4: fmt_bang_ty(gn),
+                5: fmt_bang_ty(dn),
+                6: str(row.get("Mục đích sử dụng vốn vay", "")),
+            }
+            for ci, v in vals.items():
+                r.cells[ci].text = v
+                if r.cells[ci].paragraphs[0].runs:
+                    r.cells[ci].paragraphs[0].runs[0].font.size = Pt(8)
 
-        # Dòng cộng
-        r_c = tbl.add_row()
+        # Dòng Cộng
+        r_c = tbl.rows[3 + n_data]
         r_c.cells[0].merge(r_c.cells[3])
         r_c.cells[0].text = "Cộng"
         r_c.cells[0].paragraphs[0].runs[0].bold = True
-        r_c.cells[4].text = f"{tong_gn:,.0f}"
-        r_c.cells[5].text = f"{tong_dn:,.0f}"
+        r_c.cells[0].paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+        for ci, v in [(4, fmt_bang_ty(tong_gn)), (5, fmt_bang_ty(tong_dn))]:
+            r_c.cells[ci].text = v
+            if r_c.cells[ci].paragraphs[0].runs:
+                r_c.cells[ci].paragraphs[0].runs[0].font.size = Pt(9)
 
     else:
         # Mẫu 06A — từng KH riêng lẻ, lấy KH đầu tiên
         if not df_m06.empty:
             row = df_m06.iloc[0]
+            gn = float(row.get(COT_MUC_VAY, 0) or 0)
+            dn = float(row.get(COT_TONG_DU_NO, 0) or 0)
+            lai = float(row.get("Nợ lãi", 0) or 0)
+            tg  = float(row.get(COT_SO_DU_TG, 0) or 0)
             doc.add_paragraph(
-                f"Họ và tên: {row.get(COT_TEN_KH,'')}\n"
-                f"Mã khoản vay: {row.get(COT_SO_KU,'')}\n"
-                f"Chương trình: {row.get(COT_TEN_CT,'')}\n"
-                f"Số tiền giải ngân: {row.get(COT_MUC_VAY,0):,.0f} đồng\n"
-                f"Dư nợ gốc: {row.get(COT_TONG_DU_NO,0):,.0f} đồng\n"
-                f"Nợ lãi: {row.get('Nợ lãi',0):,.0f} đồng\n"
-                f"Số dư tiền gửi TK: {row.get(COT_SO_DU_TG,0):,.0f} đồng"
+                f"Họ và tên: {row.get(COT_TEN_KH, '')}\n"
+                f"Mã khoản vay: {row.get(COT_SO_KU, '')}\n"
+                f"Chương trình: {row.get(COT_TEN_CT, '')}\n"
+                f"Số tiền giải ngân: {fmt_bang_ty(gn)} triệu đồng\n"
+                f"Dư nợ gốc: {fmt_bang_ty(dn)} triệu đồng\n"
+                f"Nợ lãi: {fmt_bang_ty(lai)} triệu đồng\n"
+                f"Số dư tiền gửi TK: {fmt_bang_ty(tg)} triệu đồng"
             )
-            doc.add_paragraph("Mục đích vay vốn: "
-                               + str(row.get("Mục đích sử dụng vốn vay","")))
-            doc.add_paragraph("Thực tế sử dụng vốn:\n"
-                               "- Sử dụng đúng mục đích: ............... đồng\n"
-                               "- Sử dụng sai mục đích: ................. đồng")
+            doc.add_paragraph(
+                "Mục đích vay vốn: " + str(row.get("Mục đích sử dụng vốn vay", ""))
+            )
+            doc.add_paragraph(
+                "Thực tế sử dụng vốn:\n"
+                "- Sử dụng đúng mục đích: ............... triệu đồng\n"
+                "- Sử dụng sai mục đích: ................. triệu đồng"
+            )
             doc.add_paragraph("Hiệu quả đầu tư: ................................")
             doc.add_paragraph("Khả năng trả nợ: ................................")
 
-    # Nhận xét
-    doc.add_paragraph(
-        "\nNhận xét:\n"
-        "1. Tình hình thực hiện phương án: ........................................\n"
-        "2. Kiểm tra, đối chiếu thực tế được ........ KH, số tiền ........ đồng.\n"
-        "Biện pháp xử lý: ............................................................"
-    )
+    # ── Nhận xét ─────────────────────────────────────────────────────────────
+    p_nx = doc.add_paragraph()
+    p_nx.add_run("Nhận xét:").bold = True
 
-    # Ký tên
+    nhan_xet_chung = du_lieu.get("nhan_xet_chung", "")
+    so_kh_kt       = du_lieu.get("so_kh_kt", len(df_m06))
+    tong_tien_kt   = du_lieu.get(
+        "tong_tien_kt",
+        df_m06[COT_TONG_DU_NO].sum() if COT_TONG_DU_NO in df_m06.columns else 0,
+    )
+    so_kh_dung    = du_lieu.get("so_kh_dung", "")
+    so_tien_dung  = du_lieu.get("so_tien_dung", "")
+    ty_trong_dung = du_lieu.get("ty_trong_dung", "")
+    so_kh_sai     = du_lieu.get("so_kh_sai", "")
+    so_tien_sai   = du_lieu.get("so_tien_sai", "")
+    ty_trong_sai  = du_lieu.get("ty_trong_sai", "")
+    bien_phap     = du_lieu.get("bien_phap", "")
+
+    doc.add_paragraph(
+        f"1. Tình hình thực hiện phương án vay vốn: {nhan_xet_chung}"
+    )
+    doc.add_paragraph(
+        f"2. Kiểm tra, đối chiếu thực tế được {so_kh_kt} KH, "
+        f"số tiền {fmt_bang_ty(float(tong_tien_kt or 0))} triệu đồng. Trong đó:"
+    )
+    doc.add_paragraph(
+        f"- Số KH đúng MĐ: {so_kh_dung} KH, "
+        f"số tiền: {so_tien_dung}, tỷ trọng: {ty_trong_dung}%."
+    )
+    doc.add_paragraph(
+        f"- Số KH sai MĐ: {so_kh_sai} KH, "
+        f"số tiền: {so_tien_sai}, tỷ trọng: {ty_trong_sai}%."
+    )
+    p_bp = doc.add_paragraph()
+    p_bp.add_run("Biện pháp xử lý: ").bold = True
+    p_bp.add_run(bien_phap)
+
+    # ── Ký tên ───────────────────────────────────────────────────────────────
     doc.add_paragraph()
     ky = doc.add_table(rows=1, cols=2)
     ky.style = "Table Grid"
-    for cell in ky.rows[0].cells:
-        tc = cell._tc
-        tcPr = tc.get_or_add_tcPr()
-        tcBorders = OxmlElement("w:tcBorders")
-        for bn in ["top","left","bottom","right"]:
-            b = OxmlElement(f"w:{bn}")
-            b.set(qn("w:val"), "none")
-            tcBorders.append(b)
-        tcPr.append(tcBorders)
-    ky.rows[0].cells[0].text = (
-        "CÁN BỘ CHỨNG KIẾN (nếu có)\n(Ký, ghi rõ họ tên)\n\n\n"
+    _xoa_border_row(ky)
+
+    p_ck = ky.rows[0].cells[0].paragraphs[0]
+    p_ck.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    p_ck.add_run(
+        ".............................................\n"
+        "CÁN BỘ CHỨNG KIẾN (nếu có)\n"
+        "(Ký, ghi rõ họ tên)\n\n\n"
     )
-    p_r2 = ky.rows[0].cells[1].paragraphs[0]
-    p_r2.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    p_r2.add_run(
+
+    p_cbkt = ky.rows[0].cells[1].paragraphs[0]
+    p_cbkt.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    p_cbkt.add_run(
         f"Ngày {ngay_kt.day} tháng {ngay_kt.month} năm {ngay_kt.year}\n"
-        "CÁN BỘ KIỂM TRA\n(Ký, ghi rõ họ tên)\n\n\n"
-        f"{du_lieu.get('can_bo_1','')}"
+        "CÁN BỘ KIỂM TRA\n"
+        "(Ký, ghi rõ họ tên)\n\n\n"
     )
 
     buf = io.BytesIO()
@@ -536,144 +631,244 @@ def _tao_word_mau06(du_lieu: dict, df_m06: pd.DataFrame,
 
 
 def _tao_word_mau16(du_lieu: dict, df_to: pd.DataFrame) -> bytes:
+    """Mẫu 16/TD — Biên bản kiểm tra hoạt động Tổ TK&VV (theo VB 727/HD-NHCS)."""
     doc = Document()
     _style_doc(doc)
     for section in doc.sections:
-        section.top_margin = Cm(2)
-        section.bottom_margin = Cm(2)
-        section.left_margin = Cm(3)
-        section.right_margin = Cm(2)
-        section.page_width = Cm(21)
-        section.page_height = Cm(29.7)
+        section.top_margin    = Cm(2.0)
+        section.bottom_margin = Cm(1.8)
+        section.left_margin   = Cm(3.0)
+        section.right_margin  = Cm(2.0)
+        section.page_width    = Cm(21)
+        section.page_height   = Cm(29.7)
 
-    ngay_kt = du_lieu.get("ngay_kt", date.today())
-    _add_header_quoc_hieu(
-        doc,
-        don_vi=du_lieu.get("don_vi_kt", ""),
-        so_vb="16/TD",
-        dia_danh=du_lieu.get("ten_xa", ""),
-        ngay_ky=ngay_kt,
-    )
+    # ── Header 2 cột (không border) ──────────────────────────────────────────
+    tbl_h = doc.add_table(rows=1, cols=2)
+    tbl_h.style = "Table Grid"
+    _xoa_border_table(tbl_h)
 
-    title = doc.add_paragraph()
-    title.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    run_t = title.add_run("BIÊN BẢN KIỂM TRA\nHoạt động tín dụng chính sách tại Tổ TK&VV")
-    run_t.bold = True
-    run_t.font.size = Pt(13)
+    cell_l = tbl_h.rows[0].cells[0]
+    p_l = cell_l.paragraphs[0]
+    p_l.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    rl = p_l.add_run("ĐƠN VỊ KIỂM TRA")
+    rl.bold = True; rl.font.size = Pt(13)
+    p_l2 = cell_l.add_paragraph(du_lieu.get("don_vi_kt", ""))
+    p_l2.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    if p_l2.runs:
+        p_l2.runs[0].bold = True; p_l2.runs[0].font.size = Pt(13)
 
-    ten_to = du_lieu.get("ten_to", "")
-    ten_xa = du_lieu.get("ten_xa", "")
-    doc.add_paragraph(
-        f"Hôm nay, ngày {ngay_kt.day} tháng {ngay_kt.month} năm {ngay_kt.year}\n"
-        f"Đoàn kiểm tra: {du_lieu.get('don_vi_kt', '')}\n"
-        f"Cán bộ kiểm tra: {du_lieu.get('can_bo_kt', '')} — Chức vụ: {du_lieu.get('chuc_vu', '')}\n"
-        f"Địa điểm kiểm tra: Tổ TK&VV {ten_to}, xã/phường {ten_xa}\n"
-        f"Đơn vị được kiểm tra: Tổ trưởng Tổ TK&VV {ten_to}"
-    )
-
-    doc.add_paragraph("I. NỘI DUNG KIỂM TRA").runs[0].bold = True
-    doc.add_paragraph("1. Kết quả hoạt động tín dụng").runs[0].bold = True
-
-    headers = [
-        "STT",
-        "Họ và tên KH",
-        "Mã khoản vay",
-        "Chương trình",
-        "Dư nợ (đồng)",
-        "Nợ quá hạn (đồng)",
-        "Lãi tồn (đồng)",
-        "Ghi chú",
-    ]
-    tbl = doc.add_table(rows=1, cols=len(headers))
-    tbl.style = "Table Grid"
-    for i, h in enumerate(headers):
-        cell = tbl.rows[0].cells[i]
-        cell.text = h
-        cell.vertical_alignment = WD_ALIGN_VERTICAL.CENTER
-        p = cell.paragraphs[0]
-        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        if p.runs:
-            p.runs[0].bold = True
-            p.runs[0].font.size = Pt(9)
-
-    tong_dn = tong_nqh = tong_lai_ton = 0.0
-    for stt, (_, row) in enumerate(df_to.iterrows(), 1):
-        r = tbl.add_row()
-        dn = float(row.get(COT_TONG_DU_NO, 0) or 0)
-        nqh = float(row.get(COT_DU_NO_QH, 0) or 0)
-        lai_ton = float(row.get(COT_LAI_TON, 0) or 0)
-        tong_dn += dn
-        tong_nqh += nqh
-        tong_lai_ton += lai_ton
-
-        vals = [
-            str(stt),
-            str(row.get(COT_TEN_KH, "")),
-            str(row.get(COT_SO_KU, "")),
-            str(row.get(COT_TEN_CT, "")),
-            f"{dn:,.0f}",
-            f"{nqh:,.0f}",
-            f"{lai_ton:,.0f}",
-            "",
-        ]
-        for i, v in enumerate(vals):
-            r.cells[i].text = v
-            r.cells[i].vertical_alignment = WD_ALIGN_VERTICAL.CENTER
-            p = r.cells[i].paragraphs[0]
-            if i in (0, 4, 5, 6):
-                p.alignment = WD_ALIGN_PARAGRAPH.RIGHT if i in (4, 5, 6) else WD_ALIGN_PARAGRAPH.CENTER
-            else:
-                p.alignment = WD_ALIGN_PARAGRAPH.LEFT
-            if p.runs:
-                p.runs[0].font.size = Pt(9)
-
-    r_tong = tbl.add_row()
-    r_tong.cells[0].merge(r_tong.cells[3])
-    r_tong.cells[0].text = "Tổng cộng"
-    p_t = r_tong.cells[0].paragraphs[0]
-    p_t.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    if p_t.runs:
-        p_t.runs[0].bold = True
-        p_t.runs[0].font.size = Pt(9)
-    r_tong.cells[4].text = f"{tong_dn:,.0f}"
-    r_tong.cells[5].text = f"{tong_nqh:,.0f}"
-    r_tong.cells[6].text = f"{tong_lai_ton:,.0f}"
-    for i in (4, 5, 6):
-        p = r_tong.cells[i].paragraphs[0]
-        p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-        if p.runs:
-            p.runs[0].bold = True
-            p.runs[0].font.size = Pt(9)
-
+    cell_r = tbl_h.rows[0].cells[1]
+    p_r = cell_r.paragraphs[0]
+    p_r.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    rr = p_r.add_run("CỘNG HOÀ XÃ HỘI CHỦ NGHĨA VIỆT NAM")
+    rr.bold = True; rr.font.size = Pt(13)
+    p_r2 = cell_r.add_paragraph("Độc lập - Tự do - Hạnh phúc")
+    p_r2.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    if p_r2.runs:
+        p_r2.runs[0].bold = True; p_r2.runs[0].font.size = Pt(13)
     doc.add_paragraph()
-    doc.add_paragraph("2. Nhận xét").runs[0].bold = True
-    doc.add_paragraph(du_lieu.get("nhan_xet", "................") or "................")
-    doc.add_paragraph("II. KẾT LUẬN VÀ KIẾN NGHỊ").runs[0].bold = True
-    doc.add_paragraph(du_lieu.get("ket_luan", "................") or "................")
 
+    # ── Tiêu đề ───────────────────────────────────────────────────────────────
+    t1 = doc.add_paragraph()
+    t1.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    r = t1.add_run("BIÊN BẢN KIỂM TRA")
+    r.bold = True; r.font.size = Pt(13.5)
+
+    t2 = doc.add_paragraph()
+    t2.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    r = t2.add_run("Hoạt động của Tổ Tiết kiệm và vay vốn")
+    r.bold = True; r.font.size = Pt(13.5)
+    doc.add_paragraph()
+
+    # ── Thông tin chung ───────────────────────────────────────────────────────
+    ngay_kt   = du_lieu.get("ngay_kt", date.today())
+    if isinstance(ngay_kt, str):
+        ngay_kt = _parse_date(ngay_kt)
+    ten_thon  = du_lieu.get("ten_thon", "")
+    ten_xa    = du_lieu.get("ten_xa", "")
+    don_vi_kt = du_lieu.get("don_vi_kt", "")
+    can_bo_1  = du_lieu.get("can_bo_1", "")
+    chuc_vu_1 = du_lieu.get("chuc_vu_1", "")
+    can_bo_2  = du_lieu.get("can_bo_2", "")
+    chuc_vu_2 = du_lieu.get("chuc_vu_2", "")
+    to_truong = du_lieu.get("to_truong", "")
+    to_pho    = du_lieu.get("to_pho", "")
+    hoi_dt    = du_lieu.get("hoi_doan_the", "")
+
+    def _pj(bold_prefix: str = "", rest: str = "", size: float = 13.5):
+        p = doc.add_paragraph()
+        p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+        if bold_prefix:
+            r = p.add_run(bold_prefix); r.bold = True; r.font.size = Pt(size)
+        if rest:
+            r2 = p.add_run(rest); r2.font.size = Pt(size)
+        return p
+
+    _pj(rest=f"Hôm nay, ngày {ngay_kt.day} tháng {ngay_kt.month} năm {ngay_kt.year}, "
+             f"tại Tổ Tiết kiệm và vay vốn (Tổ) thôn/tổ dân phố "
+             f"{ten_thon or '.....................................'}, "
+             f"xã/phường {ten_xa or '.......................'}")
+    _pj(bold_prefix="ĐOÀN KIỂM TRA: ", rest=don_vi_kt)
+    _pj(rest=f"- Ông (bà): {can_bo_1 or '........................................'}   "
+             f"Chức vụ: {chuc_vu_1 or '.............................'}")
+    if can_bo_2:
+        _pj(rest=f"- Ông (bà): {can_bo_2}   Chức vụ: {chuc_vu_2 or '.............................'}")
+    _pj(bold_prefix="ĐƠN VỊ ĐƯỢC KIỂM TRA: ",
+        rest=f"Tổ thuộc Hội {hoi_dt or '.....................................'}")
+    _pj(rest=f"- Ông (bà): {to_truong or '........................................'}   "
+             "Chức vụ: Tổ trưởng")
+    _pj(rest=f"- Ông (bà): {to_pho or '........................................'}   "
+             "Chức vụ: Tổ phó")
+    _pj(rest="Cùng tiến hành kiểm tra việc thực hiện Hợp đồng ủy nhiệm của Tổ đã ký "
+             "với NHCSXH, thống nhất kết quả kiểm tra như sau:")
+
+    # ── I. Tình hình chung của Tổ ────────────────────────────────────────────
+    p_i = doc.add_paragraph()
+    p_i.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+    ri = p_i.add_run("I. TÌNH HÌNH CHUNG CỦA TỔ")
+    ri.bold = True; ri.font.size = Pt(12)
+    ri2 = p_i.add_run(f" (đến thời điểm {ngay_kt.strftime('%d/%m/%Y')})")
+    ri2.font.size = Pt(13.5)
+
+    tong_dn  = df_to[COT_TONG_DU_NO].sum() if df_to is not None and COT_TONG_DU_NO in df_to.columns else 0
+    so_tv    = len(df_to) if df_to is not None else 0
+    nqh_val  = df_to[COT_DU_NO_QH].sum()   if df_to is not None and COT_DU_NO_QH  in df_to.columns else 0
+    lai_val  = df_to[COT_LAI_TON].sum()    if df_to is not None and COT_LAI_TON   in df_to.columns else 0
+    tg_val   = df_to[COT_SO_DU_TG].sum()   if df_to is not None and COT_SO_DU_TG  in df_to.columns else 0
+    ty_le    = du_lieu.get("ty_le_nqh", "")
+    xep_loai = du_lieu.get("xep_loai_to", "")
+
+    _pj(rest=f"1. Tổng dư nợ của Tổ: {fmt_bang_ty(tong_dn)} triệu đồng, "
+             f"{fmt_so(so_tv)} tổ viên. Trong đó, nợ quá hạn "
+             f"{fmt_bang_ty(nqh_val)} triệu đồng "
+             f"(tỷ lệ {ty_le or '......'}%)")
+    _pj(rest=f"2. Tổng lãi tồn của Tổ: {fmt_bang_ty(lai_val)} triệu đồng.")
+    _pj(rest=f"3. Số dư tiền gửi của Tổ: {fmt_bang_ty(tg_val)} triệu đồng.")
+    _pj(rest=f"4. Kết quả chấm điểm xếp loại Tổ "
+             f"(tháng {ngay_kt.month}/{ngay_kt.year}): "
+             f"{xep_loai or '............................................'}")
+
+    # ── II. Hoạt động của Tổ và Ban quản lý Tổ ───────────────────────────────
+    p_ii = doc.add_paragraph()
+    p_ii.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+    rii = p_ii.add_run("II. HOẠT ĐỘNG CỦA TỔ VÀ BAN QUẢN LÝ TỔ")
+    rii.bold = True; rii.font.size = Pt(12)
+
+    _pj(rest="Đoàn/cán bộ kiểm tra thực hiện kiểm tra theo nội dung kiểm tra, "
+             "giám sát tại khoản 3 Phụ lục I văn bản số 727/HD-NHCS ngày 11/02/2026. Cụ thể:")
+
+    # Checklist 1: Thành lập Tổ + Ban quản lý Tổ
+    CL1 = [
+        (True,  "1. Thành lập Tổ"),
+        (False, "- Tổ có được thành lập theo cụm dân cư liền kề?"),
+        (False, "- Số lượng đảm bảo quy định (từ 05 đến 60 tổ viên)"),
+        (True,  "2. Ban quản lý Tổ"),
+        (False, "- Ban quản lý Tổ gồm mấy người? Phân công nhiệm vụ Tổ trưởng, Tổ phó?"),
+        (False, "- Tổ trưởng, Tổ phó có mối quan hệ vợ, chồng, cha, mẹ, con hoặc anh, chị, em ruột?"),
+        (False, "- Ban quản lý Tổ có tham gia Ban Thường vụ tổ chức CT-XH cấp xã?"),
+        (False, "- Ban quản lý Tổ có kiêm Tổ trưởng Tổ vay vốn của ngân hàng khác?"),
+    ]
+    tbl1 = doc.add_table(rows=1 + len(CL1), cols=2)
+    tbl1.style = "Table Grid"
+    for ci, txt in enumerate(["Nội dung", "Kết quả kiểm tra"]):
+        c = tbl1.rows[0].cells[ci]
+        c.text = txt
+        if c.paragraphs[0].runs:
+            c.paragraphs[0].runs[0].bold = True
+            c.paragraphs[0].runs[0].font.size = Pt(12)
+        c.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+    for i, (is_hdr, txt) in enumerate(CL1, 1):
+        cell = tbl1.rows[i].cells[0]
+        cell.text = txt
+        if cell.paragraphs[0].runs:
+            cell.paragraphs[0].runs[0].bold = is_hdr
+            cell.paragraphs[0].runs[0].font.size = Pt(12)
+
+    # Checklist 2: Thực hiện nhiệm vụ BQL Tổ
+    CL2 = [
+        (True,  "3. Thực hiện nhiệm vụ của Ban quản lý Tổ"),
+        (False, "- Duy trì sinh hoạt Tổ định kỳ như thế nào (địa điểm, thời gian theo tháng/quý,….)?"),
+        (False, "- Tuyên truyền, phổ biến chính sách đến tổ viên? Vận động tổ viên thực hành tiết kiệm như thế nào?"),
+        (False, "- Tiếp nhận đề nghị vay vốn, tổ chức họp bình xét cho vay? Thành phần tham dự họp có đầy đủ?"),
+        (False, "- Tham gia giao dịch, chứng kiến giải ngân, thu nợ, họp giao ban tại điểm giao dịch?"),
+        (False, "- Có thu phí, thu nợ gốc, vay ké, chiếm dụng vốn, giữ sổ vay vốn của tổ viên?"),
+        (False, "- Trường hợp được ủy nhiệm thu lãi, có trả biên lai cho tổ viên sau khi thu tiền? "
+                "Nộp về ngân hàng đầy đủ số tiền đã thu và biên lai chưa thu (nếu có)?"),
+        (False, "- Chứng kiến việc kiểm tra sử dụng vốn vay, đối chiếu nợ vay và số dư tiền gửi tổ viên "
+                "của các tổ chức, cá nhân có thẩm quyền khi được yêu cầu?"),
+        (False, "- Giám sát, đôn đốc tổ viên sử dụng vốn vay đúng mục đích; trả nợ gốc, lãi đúng hạn? "
+                "Số tổ viên có lãi tồn (không bao gồm lãi tồn ân hạn), nợ quá hạn, sử dụng vốn vay sai mục đích?"),
+        (False, "- Thông báo, phối hợp xác minh và xử lý các trường hợp gia hạn nợ, điều chỉnh kỳ hạn nợ, "
+                "nợ quá hạn, nợ bị rủi ro, nợ bị chiếm dụng, sử dụng vốn sai mục đích, người vay đi khỏi nơi cư trú?"),
+        (False, "- Sắp xếp, lưu giữ hồ sơ hoạt động Tổ theo quy định?"),
+        (False, "- ……………………………………………………"),
+    ]
+    doc.add_paragraph()
+    tbl2 = doc.add_table(rows=1 + len(CL2), cols=2)
+    tbl2.style = "Table Grid"
+    for ci, txt in enumerate(["Nội dung", "Kết quả kiểm tra"]):
+        c = tbl2.rows[0].cells[ci]
+        c.text = txt
+        if c.paragraphs[0].runs:
+            c.paragraphs[0].runs[0].bold = True
+            c.paragraphs[0].runs[0].font.size = Pt(12)
+        c.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+    for i, (is_hdr, txt) in enumerate(CL2, 1):
+        cell = tbl2.rows[i].cells[0]
+        cell.text = txt
+        if cell.paragraphs[0].runs:
+            cell.paragraphs[0].runs[0].bold = is_hdr
+            cell.paragraphs[0].runs[0].font.size = Pt(12)
+
+    # ── III. Đánh giá, nhận xét ───────────────────────────────────────────────
+    doc.add_paragraph()
+    p_iii = doc.add_paragraph()
+    p_iii.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+    riii = p_iii.add_run("III. ĐÁNH GIÁ, NHẬN XÉT CỦA ĐOÀN KIỂM TRA")
+    riii.bold = True; riii.font.size = Pt(12)
+
+    so_kh_tt = du_lieu.get("so_kh_kt_thuc_te", "")
+    _pj(rest=f"Qua kiểm tra tại Tổ và thực tế tại "
+             f"{so_kh_tt or '…..'} khách hàng, Đoàn có nhận xét như sau:")
+
+    uu_diem   = du_lieu.get("uu_diem", "") or ".........................................."
+    ton_tai   = du_lieu.get("ton_tai", "") or ".........................................."
+    kien_nghi = du_lieu.get("kien_nghi", "") or ".........................................."
+
+    p_uu = doc.add_paragraph(); p_uu.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+    r = p_uu.add_run("1. Ưu điểm: "); r.bold = True; r.font.size = Pt(13.5)
+    r2 = p_uu.add_run(uu_diem); r2.font.size = Pt(13.5)
+
+    p_tt = doc.add_paragraph(); p_tt.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+    r = p_tt.add_run("2. Tồn tại: "); r.bold = True; r.font.size = Pt(13.5)
+    r2 = p_tt.add_run(ton_tai); r2.font.size = Pt(13.5)
+
+    p_kn = doc.add_paragraph(); p_kn.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+    r = p_kn.add_run("3. Kiến nghị (nếu có): "); r.bold = True; r.font.size = Pt(13.5)
+    r2 = p_kn.add_run(kien_nghi); r2.font.size = Pt(13.5)
+
+    so_phieu = du_lieu.get("so_phieu_kem_theo", "")
+    _pj(rest=f"Kèm theo Biên bản này là "
+             f"{so_phieu or '…'} Phiếu kiểm tra sử dụng vốn vay của khách hàng.")
+    _pj(rest="Biên bản được lập thành 02 bản (01 bản lưu Đoàn kiểm tra, 01 bản lưu Tổ).")
+
+    # ── Ký tên ────────────────────────────────────────────────────────────────
     doc.add_paragraph()
     ky = doc.add_table(rows=1, cols=2)
     ky.style = "Table Grid"
-    from docx.oxml.ns import qn
-    from docx.oxml import OxmlElement
-    for cell in ky.rows[0].cells:
-        tc = cell._tc
-        tcPr = tc.get_or_add_tcPr()
-        tcBorders = OxmlElement("w:tcBorders")
-        for border_name in ["top", "left", "bottom", "right"]:
-            border = OxmlElement(f"w:{border_name}")
-            border.set(qn("w:val"), "none")
-            tcBorders.append(border)
-        tcPr.append(tcBorders)
+    _xoa_border_table(ky)
 
-    p_l = ky.rows[0].cells[0].paragraphs[0]
-    p_l.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    p_l.add_run("TỔ TRƯỞNG TỔ TK&VV\n(Ký, ghi rõ họ tên)\n\n\n\n").bold = True
+    p_kl = ky.rows[0].cells[0].paragraphs[0]
+    p_kl.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    r = p_kl.add_run("TRƯỞNG ĐOÀN KIỂM TRA\n(Ký, ghi rõ họ tên)\n\n\n\n")
+    r.bold = True; r.font.size = Pt(12)
+    p_kl.add_run(can_bo_1).font.size = Pt(12)
 
-    p_r = ky.rows[0].cells[1].paragraphs[0]
-    p_r.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    p_r.add_run("CÁN BỘ KIỂM TRA\n(Ký, ghi rõ họ tên)\n\n\n\n").bold = True
-    p_r.add_run(str(du_lieu.get("can_bo_kt", "")))
+    p_kr = ky.rows[0].cells[1].paragraphs[0]
+    p_kr.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    r = p_kr.add_run("TỔ TRƯỞNG TỔ TK&VV\n(Ký, ghi rõ họ tên)\n\n\n\n")
+    r.bold = True; r.font.size = Pt(12)
+    p_kr.add_run(to_truong).font.size = Pt(12)
 
     buf = io.BytesIO()
     doc.save(buf)
@@ -1280,14 +1475,31 @@ def _render_mau06(df: pd.DataFrame, pgd_user: str) -> None:
             options=ds_to_m06,
             key="m06_chon_to"
         )
+        dia_ban = f1.text_input("Địa bàn kiểm tra",
+                                placeholder="Ấp..., xã...",
+                                key="m06_dia_ban")
+        ngay_kt = f1.date_input("Ngày kiểm tra",
+                                value=date.today(), key="m06_ngay_kt")
+
         can_bo_1  = f2.text_input("Cán bộ kiểm tra 1", key="m06_can_bo_1")
         chuc_vu_1 = f2.text_input("Chức vụ 1", key="m06_chuc_vu_1")
         can_bo_2  = f2.text_input("Cán bộ kiểm tra 2 (nếu có)", key="m06_can_bo_2")
-        dia_ban   = f2.text_input("Địa bàn kiểm tra",
-                                   placeholder="Ấp..., xã...",
-                                   key="m06_dia_ban")
-        ngay_kt   = f2.date_input("Ngày kiểm tra",
-                                   value=date.today(), key="m06_ngay_kt")
+        chuc_vu_2 = f2.text_input("Chức vụ 2 (nếu có)", key="m06_chuc_vu_2")
+
+        st.markdown("**Nội dung nhận xét:**")
+        nx1, nx2 = st.columns(2)
+        nhan_xet_chung = nx1.text_area(
+            "1. Tình hình thực hiện phương án vay vốn",
+            key="m06_nx_chung", height=80,
+        )
+        so_kh_dung    = nx2.text_input("Số KH đúng mục đích", key="m06_so_kh_dung")
+        so_tien_dung  = nx2.text_input("Số tiền đúng MĐ (triệu đ)", key="m06_tien_dung")
+        ty_trong_dung = nx2.text_input("Tỷ trọng đúng MĐ (%)", key="m06_ty_dung")
+        so_kh_sai     = nx2.text_input("Số KH sai mục đích", key="m06_so_kh_sai")
+        so_tien_sai   = nx2.text_input("Số tiền sai MĐ (triệu đ)", key="m06_tien_sai")
+        ty_trong_sai  = nx2.text_input("Tỷ trọng sai MĐ (%)", key="m06_ty_sai")
+        bien_phap     = st.text_area("Biện pháp xử lý", key="m06_bien_phap", height=60)
+
         submitted = st.form_submit_button("📄 Tạo Word")
 
     if submitted:
@@ -1302,14 +1514,23 @@ def _render_mau06(df: pd.DataFrame, pgd_user: str) -> None:
         loai_word = "06" if "06/TD" in loai_mau else "06A"
         with st.spinner("Đang tạo file..."):
             du_lieu_word = {
-                "don_vi_kt": don_vi_kt,
-                "ten_xa": ten_xa,
-                "ten_to": ten_to,
-                "can_bo_1": can_bo_1,
-                "chuc_vu_1": chuc_vu_1,
-                "can_bo_2": can_bo_2,
-                "dia_ban": dia_ban,
-                "ngay_kt": ngay_kt,
+                "don_vi_kt":      don_vi_kt,
+                "ten_xa":         ten_xa,
+                "ten_to":         ten_to,
+                "can_bo_1":       can_bo_1,
+                "chuc_vu_1":      chuc_vu_1,
+                "can_bo_2":       can_bo_2,
+                "chuc_vu_2":      chuc_vu_2,
+                "dia_ban":        dia_ban,
+                "ngay_kt":        ngay_kt,
+                "nhan_xet_chung": nhan_xet_chung,
+                "so_kh_dung":     so_kh_dung,
+                "so_tien_dung":   so_tien_dung,
+                "ty_trong_dung":  ty_trong_dung,
+                "so_kh_sai":      so_kh_sai,
+                "so_tien_sai":    so_tien_sai,
+                "ty_trong_sai":   ty_trong_sai,
+                "bien_phap":      bien_phap,
             }
             docx_bytes = _tao_word_mau06(du_lieu_word, df_xuat, loai=loai_word)
         ten_file = f"Mau06TD_{pgd_user}_{ngay_kt.strftime('%d%m%Y')}"
@@ -1488,55 +1709,110 @@ def _render_bien_ban(df: pd.DataFrame, pgd_user: str) -> None:
             don_vi_kt = c1.selectbox("Hội đoàn thể kiểm tra", DVUT_ORDER, key="bb_dvkt")
             ds_xa_bb = (
                 sorted(df[COT_TEN_XA].dropna().unique().tolist())
-                if COT_TEN_XA in df.columns
-                else []
+                if COT_TEN_XA in df.columns else []
             )
             ten_xa = c1.selectbox("Xã/Phường", [""] + ds_xa_bb, key="bb_xa")
-            ten_xa_filter = st.session_state.get("bb_xa", "")
+            ten_xa_cur = st.session_state.get("bb_xa", "")
             df_to_filter = (
-                df[df[COT_TEN_XA] == ten_xa_filter]
-                if ten_xa_filter and COT_TEN_XA in df.columns
-                else df
+                df[df[COT_TEN_XA] == ten_xa_cur]
+                if ten_xa_cur and COT_TEN_XA in df.columns else df
             )
             ds_to_bb = (
                 sorted(df_to_filter[COT_TEN_TO].dropna().unique().tolist())
-                if COT_TEN_TO in df_to_filter.columns
-                else []
+                if COT_TEN_TO in df_to_filter.columns else []
             )
-            ten_to = c1.selectbox("Tổ TK&VV", ["Tất cả"] + ds_to_bb, key="bb_to")
+            ten_to = c1.selectbox("Tổ TK&VV", [""] + ds_to_bb, key="bb_to")
+            ten_thon = c1.text_input(
+                "Thôn/tổ dân phố",
+                help="Địa chỉ thôn của Tổ TK&VV",
+                key="bb_thon",
+            )
 
-            can_bo_kt = c2.text_input("Cán bộ kiểm tra", key="bb_cb")
-            chuc_vu = c2.text_input("Chức vụ", key="bb_cv")
+            # Auto-detect tổ trưởng và hội đoàn thể từ df
+            _to_truong_auto = ""
+            _hoi_auto = ""
+            if ten_to and COT_TEN_TO in df.columns:
+                s_tt = df[df[COT_TEN_TO] == ten_to]
+                for cot_tt in ["Tên Tổ trưởng", "Tổ trưởng", "Họ tên Tổ trưởng"]:
+                    if cot_tt in df.columns:
+                        v = s_tt[cot_tt].dropna()
+                        if not v.empty:
+                            _to_truong_auto = str(v.iloc[0])
+                            break
+                if COT_DVUT in df.columns:
+                    v = s_tt[COT_DVUT].dropna()
+                    if not v.empty:
+                        _hoi_auto = str(v.iloc[0])
+
+            hoi_doan_the = c1.text_input(
+                "Tổ thuộc Hội", value=_hoi_auto, key="bb_hoi",
+                help="Hội quản lý tổ (tự điền từ dữ liệu, có thể sửa)",
+            )
+            to_truong = c2.text_input(
+                "Tổ trưởng Tổ TK&VV", value=_to_truong_auto, key="bb_totruong",
+            )
+            to_pho = c2.text_input("Tổ phó (nếu có)", key="bb_topho")
+            can_bo_1 = c2.text_input("Cán bộ kiểm tra 1", key="bb_cb1")
+            chuc_vu_1 = c2.text_input("Chức vụ 1", key="bb_cv1")
+            can_bo_2 = c2.text_input("Cán bộ kiểm tra 2 (nếu có)", key="bb_cb2")
+            chuc_vu_2 = c2.text_input("Chức vụ 2", key="bb_cv2")
             ngay_kt = c2.date_input("Ngày kiểm tra", value=date.today(), key="bb_ngay")
 
-            nhan_xet = st.text_area("Nhận xét", height=80, key="bb_nhanxet")
-            ket_luan = st.text_area("Kết luận & Kiến nghị", height=80, key="bb_ketluan")
+            st.markdown("**Phần I — Tình hình chung (để trống = lấy từ HSTD)**")
+            pi1, pi2 = st.columns(2)
+            ty_le_nqh = pi1.text_input(
+                "Tỷ lệ NQH (%)", placeholder="VD: 0,0 (để trống = tự tính)",
+                key="bb_tylnqh",
+            )
+            xep_loai_to = pi2.text_input(
+                "Kết quả xếp loại Tổ", placeholder="VD: Loại Tốt", key="bb_xeploai",
+            )
+
+            st.markdown("**Phần III — Đánh giá, nhận xét**")
+            so_kh_kt = st.text_input(
+                "Số KH kiểm tra thực tế", placeholder="VD: 05", key="bb_sokh",
+            )
+            t1, t2 = st.columns(2)
+            uu_diem  = t1.text_area("1. Ưu điểm", height=80, key="bb_uudiem")
+            ton_tai  = t2.text_area("2. Tồn tại", height=80, key="bb_tontai")
+            kien_nghi = st.text_area("3. Kiến nghị (nếu có)", height=70, key="bb_kiennghi")
+            so_phieu = st.text_input(
+                "Số phiếu kiểm tra kèm theo", placeholder="VD: 05", key="bb_sophieu",
+            )
             submitted_m16 = st.form_submit_button("📄 Tạo Word", type="primary")
 
         if submitted_m16:
             df_xuat = df.copy()
             if ten_xa and COT_TEN_XA in df_xuat.columns:
                 df_xuat = df_xuat[df_xuat[COT_TEN_XA] == ten_xa]
-            if ten_to != "Tất cả" and COT_TEN_TO in df_xuat.columns:
+            if ten_to and COT_TEN_TO in df_xuat.columns:
                 df_xuat = df_xuat[df_xuat[COT_TEN_TO] == ten_to]
 
             du_lieu = {
-                "don_vi_kt": don_vi_kt,
-                "ten_xa": ten_xa,
-                "ten_to": ten_to if ten_to != "Tất cả" else "",
-                "can_bo_kt": can_bo_kt,
-                "chuc_vu": chuc_vu,
-                "ngay_kt": ngay_kt,
-                "ngay": ngay_kt.day,
-                "thang": ngay_kt.month,
-                "nam": ngay_kt.year,
-                "nhan_xet": nhan_xet,
-                "ket_luan": ket_luan,
+                "don_vi_kt":        don_vi_kt,
+                "ten_xa":           ten_xa,
+                "ten_thon":         ten_thon,
+                "ten_to":           ten_to,
+                "hoi_doan_the":     hoi_doan_the,
+                "to_truong":        to_truong,
+                "to_pho":           to_pho,
+                "can_bo_1":         can_bo_1,
+                "chuc_vu_1":        chuc_vu_1,
+                "can_bo_2":         can_bo_2,
+                "chuc_vu_2":        chuc_vu_2,
+                "ngay_kt":          ngay_kt,
+                "ty_le_nqh":        ty_le_nqh,
+                "xep_loai_to":      xep_loai_to,
+                "so_kh_kt_thuc_te": so_kh_kt,
+                "uu_diem":          uu_diem,
+                "ton_tai":          ton_tai,
+                "kien_nghi":        kien_nghi,
+                "so_phieu_kem_theo": so_phieu,
             }
 
             with st.spinner("Đang tạo file..."):
                 docx_bytes = _tao_word_mau16(du_lieu, df_xuat)
-            ten_to_file = (ten_to if ten_to != "Tất cả" else "TatCa").replace(" ", "_")
+            ten_to_file = (ten_to or "TatCa").replace(" ", "_")
             ten_file = f"Mau16TD_{ten_to_file}_{ngay_kt.strftime('%d%m%Y')}"
 
             col1, col2 = st.columns(2)

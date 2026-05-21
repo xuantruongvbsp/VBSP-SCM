@@ -13,6 +13,10 @@ import pandas as pd
 import streamlit as st
 
 from auth import la_phan_he_pgd
+from logger import get_logger
+
+logger = get_logger(__name__)
+
 from config import (
     CACHE_HSTD, COT_TEN_PGD, COT_TEN_KH, COT_TEN_CT,
     COT_TONG_DU_NO, COT_NGAY_DEN_HAN, COT_MA_KH, COT_TEN_XA,
@@ -157,6 +161,7 @@ def render(tab=None, role: str = None, **kwargs) -> None:
                 )
                 st.plotly_chart(fig, use_container_width=True)
             except Exception as _e:
+                logger.error("Không thể vẽ đồ thị đến hạn: %s", _e, exc_info=True)
                 st.warning(f"Không thể vẽ đồ thị: {_e}")
 
     # ── Tổng hợp đến hạn theo PGD/Xã/Hội đoàn thể ───────────────────────────
@@ -218,6 +223,7 @@ def render(tab=None, role: str = None, **kwargs) -> None:
             )
             st.plotly_chart(_fig, use_container_width=True, key=f"bar_nhom_{nhom_key}")
         except Exception as _e:
+            logger.error("Không thể vẽ biểu đồ nhóm: %s", _e, exc_info=True)
             st.caption(f"Không thể vẽ biểu đồ: {_e}")
 
     cols_hien_thi = [
@@ -381,6 +387,7 @@ def render(tab=None, role: str = None, **kwargs) -> None:
                     )
                 st.session_state["_pdf_bytes_den_han_group"] = pdf_bytes
             except Exception as _e:
+                logger.error("Lỗi tạo PDF đến hạn: %s", _e, exc_info=True)
                 st.session_state["_pdf_bytes_den_han_group"] = None
                 st.error(f"❌ Lỗi tạo PDF: {_e}")
 

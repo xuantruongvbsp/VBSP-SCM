@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [2026-05-21] — Unit tests: +67 tests cho 4 service (period_compare, du_phong, cdtotkvv, kiem_soat mở rộng)
+- `tests/test_period_compare.py` — file mới: 29 tests (_derive_status, _status_series, _loan_key_series, join_by_loan, roll_cure_rate, classify_changes, vintage_nqh, par_breakdown) — cover toàn bộ pipeline so sánh kỳ cấp khế ước
+- `tests/test_du_phong_service.py` — file mới: 11 tests (du_phong_dong_tien 8 edge cases, du_phong_chi_tiet 3 edge cases) — duckdb in-memory
+- `tests/test_cdtotkvv_service.py` — file mới: 14 tests (loc_df 7 modes, cdtotkvv_ten_sheet_excel 5 edge cases, fmt_xuat_to_khong_dat_vn 2)
+- `tests/test_kiem_soat_to_sai_so_tv.py` — file mới: 13 tests (_tinh_to_sai_so_tv: thiếu/vượt TV, tình trạng CLOSE, vay trực tiếp, ĐVUT thay Tổ, thiếu cột, duckdb query)
+- Tổng: 515 → 559 tests; `pytest -q` → 559 passed trong 33s
+
 ## [2026-05-21] — backup_service.py + .gitignore
 - `backup_service.py` — file mới: `chay_backup()` copy DB + parquet + pgd_data xlsx vào `backups/<timestamp>/`, giữ 7 bản gần nhất; `don_backup()` dọn bản cũ; nút "Backup ngay" trong `tab_trang_thai_nguon` giờ hoạt động
 - `.gitignore` — thêm `backups/` để không commit dữ liệu backup

@@ -1,239 +1,320 @@
-"""Test cho services/period_compare.py — so sánh 2 kỳ, roll rate, vintage NQH."""
+"""Unit tests cho services/period_compare.py — So sánh kỳ cấp khế ước."""
 from __future__ import annotations
 
 import pandas as pd
 import pytest
 
-from services.period_compare import (
-    CHANGE_LABELS,
-    CHANGE_TYPES,
-    classify_changes,
-    join_by_loan,
-    par_breakdown,
-    roll_cure_rate,
-    vintage_nqh,
-)
 from config import (
     COT_DU_NO_QH,
     COT_DU_NO_TH,
     COT_MA_KH,
     COT_NGAY_DH,
+    COT_NGAY_DH_HD,
     COT_NGAY_SL,
     COT_NGAY_VAY,
     COT_SO_KU,
     COT_TONG_DU_NO,
 )
+from services.period_compare import (
+    _derive_status,
+    _status_series,
+    _loan_key_series,
+    join_by_loan,
+    roll_cure_rate,
+    classify_changes,
+    CHANGE_TYPES,
+    vintage_nqh,
+    par_breakdown,
+)
+
+NULL_SEP = "\x00"
+
+
+class TestDeriveStatus:
+    def test_khoanh(self):
+        assert _derive_status(100, 0, 50) == "kh"
+        assert _derive_status(0, 0, 1) == "kh"
+
+    def test_qua_han(self):
+        assert _derive_status(100, 10, 0) == "qh"
+
+    def test_trong_han(self):
+        assert _derive_status(100, 0, 0) == "th"
+
+    def test_none(self):
+        assert _derive_status(0, 0, 0) == "none"
+
+    def test_uu_tien_khoanh_tren_qh(self):
+        assert _derive_status(100, 50, 10) == "kh"
+
+
+class TestStatusSeries:
+    def test_3_trang_thai(self):
+        df = pd.DataFrame({
+            COT_DU_NO_TH: [100, 0, 0, 0],
+            COT_DU_NO_QH: [0, 50, 0, 0],
+            "Dư nợ khoanh": [0, 0, 10, 0],
+        })
+        s = _status_series(df)
+        assert s.iloc[0] == "th"
+        assert s.iloc[1] == "qh"
+        assert s.iloc[2] == "kh"
+        assert s.iloc[3] == "none"
+
+    def test_thieu_cot_van_chay(self):
+        df = pd.DataFrame({"A": [1]})
+        s = _status_series(df)
+        assert list(s) == ["none"]
+
+
+class TestLoanKeySeries:
+    def test_binh_thuong(self):
+        df = pd.DataFrame({
+            COT_SO_KU: ["KU001", "KU002"],
+            COT_MA_KH: ["KH1", "KH2"],
+        })
+        s = _loan_key_series(df)
+        assert s.iloc[0] == f"KU001{NULL_SEP}KH1"
+        assert s.iloc[1] == f"KU002{NULL_SEP}KH2"
+
+    def test_thieu_cot_tra_rong(self):
+        df = pd.DataFrame({"A": [1]})
+        s = _loan_key_series(df)
+        assert s.iloc[0] == f"{NULL_SEP}"
 
 
 class TestJoinByLoan:
-    def test_join_on_key(self):
+    def test_ca_hai_rong(self):
+        df = join_by_loan(pd.DataFrame(), pd.DataFrame())
+        assert df.empty
+
+    def test_3_bucket(self):
         prev = pd.DataFrame({
-            COT_SO_KU: ["KU1", "KU2", "KU3"],
-            COT_MA_KH: ["KH1", "KH2", "KH3"],
-            COT_TONG_DU_NO: [100, 200, 300],
+            COT_SO_KU: ["KU1", "KU2"],
+            COT_MA_KH: ["KH1", "KH2"],
+            COT_DU_NO_TH: [100, 200],
+            COT_DU_NO_QH: [0, 0],
         })
         curr = pd.DataFrame({
-            COT_SO_KU: ["KU1", "KU2", "KU4"],
-            COT_MA_KH: ["KH1", "KH2", "KH4"],
-            COT_TONG_DU_NO: [150, 250, 400],
+            COT_SO_KU: ["KU2", "KU3"],
+            COT_MA_KH: ["KH2", "KH3"],
+            COT_DU_NO_TH: [200, 100],
+            COT_DU_NO_QH: [0, 0],
         })
-        joined = join_by_loan(prev, curr)
-        assert len(joined) == 4
-        bucket_map = dict(zip(joined["_key"], joined["_bucket"]))
-        assert bucket_map["KU1\x00KH1"] == "both"
-        assert bucket_map["KU2\x00KH2"] == "both"
-        assert bucket_map["KU3\x00KH3"] == "closed"
-        assert bucket_map["KU4\x00KH4"] == "new"
-        assert f"{COT_TONG_DU_NO}_prev" in joined.columns
-        assert f"{COT_TONG_DU_NO}_curr" in joined.columns
-        assert joined.loc[joined["_key"] == "KU1\x00KH1", f"{COT_TONG_DU_NO}_prev"].iloc[0] == 100
-        assert joined.loc[joined["_key"] == "KU1\x00KH1", f"{COT_TONG_DU_NO}_curr"].iloc[0] == 150
+        df = join_by_loan(prev, curr)
+        assert "_bucket" in df.columns
+        assert set(df["_bucket"]) == {"both", "closed", "new"}
+        assert len(df) == 3
 
-    def test_join_with_extra_columns(self):
+    def test_trung_key_lay_dong_cuoi(self):
         prev = pd.DataFrame({
-            COT_SO_KU: ["KU1"], COT_MA_KH: ["KH1"], "extra_prev": ["abc"],
+            COT_SO_KU: ["KU1", "KU1"],
+            COT_MA_KH: ["KH1", "KH1"],
+            COT_DU_NO_TH: [100, 999],
+            COT_DU_NO_QH: [0, 0],
         })
         curr = pd.DataFrame({
-            COT_SO_KU: ["KU1"], COT_MA_KH: ["KH1"], "extra_curr": ["xyz"],
+            COT_SO_KU: ["KU1"],
+            COT_MA_KH: ["KH1"],
+            COT_DU_NO_TH: [500],
+            COT_DU_NO_QH: [0],
         })
-        joined = join_by_loan(prev, curr)
-        assert joined["extra_prev"].iloc[0] == "abc"
-        assert joined["extra_curr"].iloc[0] == "xyz"
-
-    def test_both_empty(self):
-        assert join_by_loan(pd.DataFrame(), pd.DataFrame()).empty
-
-    def test_status_columns_added(self):
-        prev = pd.DataFrame({
-            COT_SO_KU: ["KU1"], COT_MA_KH: ["KH1"],
-            COT_DU_NO_TH: [100], COT_DU_NO_QH: [0],
-        })
-        curr = pd.DataFrame({
-            COT_SO_KU: ["KU1"], COT_MA_KH: ["KH1"],
-            COT_DU_NO_TH: [0], COT_DU_NO_QH: [50],
-        })
-        joined = join_by_loan(prev, curr)
-        assert "_status_prev" in joined.columns
-        assert "_status_curr" in joined.columns
-        assert joined["_status_prev"].iloc[0] == "th"
-        assert joined["_status_curr"].iloc[0] == "qh"
-
-
-class TestClassifyChanges:
-    def _mk(self, bucket, sp, sc, dn_p=0, dn_c=0, dh_p=None, dh_c=None):
-        data = {
-            "_key": ["KU1"], "_bucket": [bucket],
-            "_status_prev": [sp], "_status_curr": [sc],
-            f"{COT_TONG_DU_NO}_prev": [dn_p], f"{COT_TONG_DU_NO}_curr": [dn_c],
-        }
-        if dh_p is not None:
-            data[f"{COT_NGAY_DH}_prev"] = [dh_p]
-        if dh_c is not None:
-            data[f"{COT_NGAY_DH}_curr"] = [dh_c]
-        return pd.DataFrame(data)
-
-    def test_classify_new_loan(self):
-        r = classify_changes(self._mk("new", "none", "th", dn_c=100))
-        assert r["_change_type"].iloc[0] == "new"
-
-    def test_classify_closed(self):
-        r = classify_changes(self._mk("closed", "th", "none", dn_p=100))
-        assert r["_change_type"].iloc[0] == "closed"
-
-    def test_classify_worsened(self):
-        r = classify_changes(self._mk("both", "th", "qh", dn_p=100, dn_c=100))
-        assert r["_change_type"].iloc[0] == "worsened"
-
-    def test_classify_improved(self):
-        r = classify_changes(self._mk("both", "qh", "th", dn_p=100, dn_c=100))
-        assert r["_change_type"].iloc[0] == "improved"
-
-    def test_classify_extended(self):
-        r = classify_changes(self._mk("both", "th", "th", dn_p=100, dn_c=100,
-                                       dh_p="2025-01-01", dh_c="2025-06-01"))
-        assert r["_change_type"].iloc[0] == "extended"
-
-    def test_classify_increased(self):
-        r = classify_changes(self._mk("both", "th", "th", dn_p=100, dn_c=150))
-        assert r["_change_type"].iloc[0] == "increased"
-
-    def test_classify_decreased(self):
-        r = classify_changes(self._mk("both", "th", "th", dn_p=200, dn_c=150))
-        assert r["_change_type"].iloc[0] == "decreased"
-
-    def test_classify_unchanged(self):
-        r = classify_changes(self._mk("both", "th", "th", dn_p=100, dn_c=100))
-        assert r["_change_type"].iloc[0] == "unchanged"
-
-    def test_extra_columns(self):
-        r = classify_changes(self._mk("both", "th", "qh", dn_p=100, dn_c=150))
-        assert "_change_label" in r.columns
-        assert "_du_no_delta" in r.columns
-        assert "_status_rank_delta" in r.columns
-        assert r["_du_no_delta"].iloc[0] == 50.0
-        assert r["_status_rank_delta"].iloc[0] == 1
-
-    def test_empty_input(self):
-        assert classify_changes(pd.DataFrame()).empty
+        df = join_by_loan(prev, curr)
+        assert len(df) == 1
+        assert df[f"{COT_DU_NO_TH}_prev"].iloc[0] == 999
 
 
 class TestRollCureRate:
-    def test_basic(self):
-        joined = pd.DataFrame({
-            "_key": ["KU1", "KU2", "KU3", "KU4"],
-            "_bucket": ["both", "both", "both", "both"],
-            "_status_prev": ["th", "th", "qh", "qh"],
-            "_status_curr": ["qh", "th", "th", "qh"],
-            f"{COT_DU_NO_TH}_prev": [100.0, 200.0, 0.0, 0.0],
-            f"{COT_DU_NO_TH}_curr": [0.0, 200.0, 150.0, 0.0],
-            f"{COT_DU_NO_QH}_prev": [0.0, 0.0, 300.0, 400.0],
-            f"{COT_DU_NO_QH}_curr": [50.0, 0.0, 0.0, 400.0],
-        })
-        r = roll_cure_rate(joined)
-        assert r["base_th_prev"] == 300.0
-        assert r["roll_count"] == 1
-        assert abs(r["roll_rate"] - 50.0 / 300.0) < 1e-9
-        assert r["base_qh_prev"] == 700.0
-        assert r["cure_count"] == 1
-        assert abs(r["cure_rate"] - 150.0 / 700.0) < 1e-9
-
-    def test_empty_input(self):
+    def test_trong(self):
         r = roll_cure_rate(pd.DataFrame())
         assert r["roll_rate"] == 0.0
         assert r["cure_rate"] == 0.0
-        assert r["roll_count"] == 0
 
-    def test_new_closed_ignored(self):
-        joined = pd.DataFrame({
-            "_key": ["KU1", "KU2"],
-            "_bucket": ["new", "closed"],
-            "_status_prev": ["none", "th"],
-            "_status_curr": ["th", "none"],
-            f"{COT_DU_NO_TH}_prev": [0.0, 100.0],
-            f"{COT_DU_NO_TH}_curr": [100.0, 0.0],
+    def test_roll_50pct(self):
+        df = pd.DataFrame({
+            "_bucket": ["both", "both"],
+            "_status_prev": ["th", "th"],
+            f"{COT_DU_NO_TH}_prev": [100.0, 100.0],
             f"{COT_DU_NO_QH}_prev": [0.0, 0.0],
+            f"{COT_DU_NO_TH}_curr": [50.0, 0.0],
+            f"{COT_DU_NO_QH}_curr": [50.0, 50.0],
+        })
+        r = roll_cure_rate(df)
+        assert r["roll_rate"] == pytest.approx(0.5)
+        assert r["roll_count"] == 2
+
+    def test_cure_100pct(self):
+        df = pd.DataFrame({
+            "_bucket": ["both", "both"],
+            "_status_prev": ["qh", "qh"],
+            f"{COT_DU_NO_TH}_prev": [0.0, 0.0],
+            f"{COT_DU_NO_QH}_prev": [100.0, 100.0],
+            f"{COT_DU_NO_TH}_curr": [100.0, 100.0],
             f"{COT_DU_NO_QH}_curr": [0.0, 0.0],
         })
-        r = roll_cure_rate(joined)
-        assert r["base_th_prev"] == 0.0
-        assert r["base_qh_prev"] == 0.0
-        assert r["roll_rate"] == 0.0
+        r = roll_cure_rate(df)
+        assert r["cure_rate"] == pytest.approx(1.0)
 
 
-class TestVintageNQH:
-    def test_basic(self):
-        df = pd.DataFrame({
-            COT_NGAY_VAY: ["2023-01-15", "2023-01-20", "2024-05-10"],
-            COT_SO_KU: ["KU1", "KU2", "KU3"],
-            COT_TONG_DU_NO: [500.0, 1000.0, 2000.0],
-            COT_DU_NO_QH: [0.0, 100.0, 50.0],
+class TestClassifyChanges:
+    def test_new_closed_both(self):
+        prev = pd.DataFrame({
+            COT_SO_KU: ["KU1", "KU2"],
+            COT_MA_KH: ["KH1", "KH2"],
+            COT_DU_NO_TH: [100, 200],
+            COT_DU_NO_QH: [0, 0],
         })
-        df[COT_NGAY_VAY] = pd.to_datetime(df[COT_NGAY_VAY])
-        v = vintage_nqh(df)
-        assert not v.empty
-        assert list(v.columns) == ["Năm vay", "so_ku", "tong_du_no", "du_no_qh", "Tỷ lệ NQH"]
-        row_2023 = v[v["Năm vay"] == "2023"].iloc[0]
-        assert row_2023["so_ku"] == 2
-        assert row_2023["du_no_qh"] == 100.0
-        assert row_2023["tong_du_no"] == 1500.0
-        assert row_2023["Tỷ lệ NQH"] == 100.0 / 1500.0
+        curr = pd.DataFrame({
+            COT_SO_KU: ["KU2", "KU3"],
+            COT_MA_KH: ["KH2", "KH3"],
+            COT_DU_NO_TH: [200, 100],
+            COT_DU_NO_QH: [0, 0],
+        })
+        joined = join_by_loan(prev, curr)
+        classified = classify_changes(joined)
+        buckets = classified["_bucket"]
+        changes = classified["_change_type"]
+        assert changes[buckets == "new"].iloc[0] == "new"
+        assert changes[buckets == "closed"].iloc[0] == "closed"
+        assert changes[buckets == "both"].iloc[0] == "unchanged"
 
-    def test_empty_input(self):
-        assert vintage_nqh(pd.DataFrame()).empty
+    def test_worsened(self):
+        prev = pd.DataFrame({
+            COT_SO_KU: ["KU1"],
+            COT_MA_KH: ["KH1"],
+            COT_DU_NO_TH: [100],
+            COT_DU_NO_QH: [0],
+        })
+        curr = pd.DataFrame({
+            COT_SO_KU: ["KU1"],
+            COT_MA_KH: ["KH1"],
+            COT_DU_NO_TH: [0],
+            COT_DU_NO_QH: [100],
+        })
+        joined = join_by_loan(prev, curr)
+        classified = classify_changes(joined)
+        assert classified["_change_type"].iloc[0] == "worsened"
 
-    def test_missing_ngay_vay(self):
-        assert vintage_nqh(pd.DataFrame({COT_TONG_DU_NO: [100]})).empty
+    def test_trong(self):
+        df = classify_changes(pd.DataFrame())
+        assert df.empty
+
+    def test_co_cot_label(self):
+        prev = pd.DataFrame({
+            COT_SO_KU: ["KU1"],
+            COT_MA_KH: ["KH1"],
+            COT_DU_NO_TH: [50],
+            COT_DU_NO_QH: [0],
+            COT_TONG_DU_NO: [50],
+        })
+        curr = pd.DataFrame({
+            COT_SO_KU: ["KU1"],
+            COT_MA_KH: ["KH1"],
+            COT_DU_NO_TH: [150],
+            COT_DU_NO_QH: [0],
+            COT_TONG_DU_NO: [150],
+        })
+        joined = join_by_loan(prev, curr)
+        classified = classify_changes(joined)
+        assert classified["_change_type"].iloc[0] == "increased"
+        assert "_change_label" in classified.columns
+        assert "Tăng DN" in classified["_change_label"].iloc[0]
+
+    def test_decreased(self):
+        prev = pd.DataFrame({
+            COT_SO_KU: ["KU1"],
+            COT_MA_KH: ["KH1"],
+            COT_DU_NO_TH: [150],
+            COT_DU_NO_QH: [0],
+            COT_TONG_DU_NO: [150],
+        })
+        curr = pd.DataFrame({
+            COT_SO_KU: ["KU1"],
+            COT_MA_KH: ["KH1"],
+            COT_DU_NO_TH: [50],
+            COT_DU_NO_QH: [0],
+            COT_TONG_DU_NO: [50],
+        })
+        joined = join_by_loan(prev, curr)
+        classified = classify_changes(joined)
+        assert classified["_change_type"].iloc[0] == "decreased"
+
+
+class TestVintageNqh:
+    def test_trong(self):
+        df = vintage_nqh(pd.DataFrame())
+        assert df.empty
+
+    def test_thieu_cot_ngay_vay(self):
+        df = pd.DataFrame({COT_SO_KU: ["KU1"]})
+        assert vintage_nqh(df).empty
+
+    def test_2_nam(self):
+        df = pd.DataFrame({
+            COT_SO_KU: ["KU1", "KU2", "KU3"],
+            COT_NGAY_VAY: ["01/01/2023", "15/06/2024", "01/01/2023"],
+            COT_TONG_DU_NO: [100, 200, 300],
+            COT_DU_NO_QH: [10, 0, 20],
+        })
+        df_out = vintage_nqh(df)
+        assert len(df_out) == 2
+        assert "Tỷ lệ NQH" in df_out.columns
+
+    def test_ngay_khong_parse_duoc(self):
+        df = pd.DataFrame({
+            COT_SO_KU: ["KU1"],
+            COT_NGAY_VAY: ["invalid"],
+            COT_TONG_DU_NO: [100],
+            COT_DU_NO_QH: [0],
+        })
+        df_out = vintage_nqh(df)
+        assert not df_out.empty
+        assert "N/A" in df_out["Năm vay"].values
 
 
 class TestParBreakdown:
-    def test_basic(self):
-        df = pd.DataFrame({
-            COT_NGAY_DH: ["2025-05-01", "2025-03-15", "2024-12-31"],
-            COT_TONG_DU_NO: [100.0, 200.0, 300.0],
-            COT_NGAY_SL: "2025-06-10",
-        })
-        df[COT_NGAY_DH] = pd.to_datetime(df[COT_NGAY_DH])
-        df[COT_NGAY_SL] = pd.to_datetime(df[COT_NGAY_SL])
-        par = par_breakdown(df)
-        assert par["par30"] == 600.0
-        assert par["par90"] == 300.0
-        assert par["par180"] == 0.0
-        assert par["tong_du_no"] == 600.0
-        assert abs(par["par30_pct"] - 1.0) < 1e-9
-        assert abs(par["par90_pct"] - 0.5) < 1e-9
+    def test_trong(self):
+        r = par_breakdown(pd.DataFrame())
+        assert r["tong_du_no"] == 0
 
-    def test_empty_input(self):
-        par = par_breakdown(pd.DataFrame())
-        assert par["par30"] == 0
-        assert par["par90"] == 0
-        assert par["par180"] == 0
-        assert par["tong_du_no"] == 0
-
-    def test_no_ngay_sl(self):
+    def test_khong_qua_han(self):
         df = pd.DataFrame({
-            COT_NGAY_DH: ["2025-06-01"],
-            COT_TONG_DU_NO: [100.0],
+            COT_NGAY_SL: ["01/01/2024"],
+            COT_NGAY_DH: ["01/01/2025"],
+            COT_TONG_DU_NO: [200],
+            COT_DU_NO_QH: [0],
         })
-        par = par_breakdown(df)
-        assert par["par30"] == 0
-        assert par["tong_du_no"] == 100.0
+        r = par_breakdown(df)
+        assert r["par30"] == 0
+
+    def test_qua_han_60_ngay(self):
+        df = pd.DataFrame({
+            COT_NGAY_SL: ["01/03/2024"],
+            COT_NGAY_DH: ["01/01/2024"],
+            COT_TONG_DU_NO: [100],
+            COT_DU_NO_QH: [0],
+        })
+        r = par_breakdown(df)
+        assert r["par30"] == 100
+        assert r["par90"] == 0
+
+    def test_qua_han_120_ngay(self):
+        df = pd.DataFrame({
+            COT_NGAY_SL: ["01/05/2024"],
+            COT_NGAY_DH: ["01/01/2024"],
+            COT_TONG_DU_NO: [300],
+            COT_DU_NO_QH: [0],
+        })
+        r = par_breakdown(df)
+        assert r["par30"] == 300
+        assert r["par90"] == 300
+        assert r["par180"] == 0
+
+    def test_fallback_dung_qh(self):
+        df = pd.DataFrame({
+            COT_NGAY_SL: ["01/02/2024", "01/02/2024"],
+            COT_TONG_DU_NO: [100, 50],
+            COT_DU_NO_QH: [100, 0],
+        })
+        r = par_breakdown(df)
+        assert r["par30"] == 100

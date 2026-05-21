@@ -217,6 +217,62 @@ NGUON_VON_KHTD = [
 # File JSON lưu kế hoạch tín dụng
 FILE_KHTD    = str(BASE_DIR / "khtd.json")
 
+# ── Biểu 01C (KHNV_01C.XLSX từ TTBC): mapping XD-code → ma_key nội bộ ────────
+BIEU_01C_XD_MA_KEY: dict[str, str] = {
+    "XD0009":  "1_TW",      # Hộ nghèo
+    "XD00010": "9_TW",      # Cận nghèo
+    "XD00011": "19_TW",     # Hộ mới thoát nghèo
+    "XD00012": "2_TW",      # HSSV có hoàn cảnh khó khăn
+    "XD00013": "3_TW_NSNN", # GQVL từ NSNN (Quỹ QG TW)
+    "XD00014": "3_TW_NHCSXH",# GQVL TW – NHCSXH huy động
+    "XD00015": "17_TW",     # Người lao động đi làm việc ở nước ngoài
+    "XD00016": "6_TW",      # NS&VSMT nông thôn
+    "XD00017": "10_TW",     # Hộ gia đình SXKD tại VKK
+    "XD00018": "15_TW",     # Thương nhân tại VKK
+    "XD00020": "21_TW",     # Người chấp hành xong án phạt tù
+    "XD00021": "25_TW",     # Nhà ở xã hội
+    "XD00022": "25_TW",     # Nhà ở XH – mua/thuê mua (sub, gộp vào 25_TW)
+    # ĐP block (mã XD00040+)
+    "XD00040": "1_DP",      # Hộ nghèo ĐP
+    "XD00041": "9_DP",      # Cận nghèo ĐP
+    "XD00042": "19_DP",     # Thoát nghèo ĐP
+    "XD00044": "3_DP_TINH", # GQVL ĐP – Cấp tỉnh
+    "XD00049": "21_DP",     # Người CHHXA phạm ĐP
+    "XD00050": "25_DP",     # Nhà ở XH ĐP
+}
+
+# Biểu 02C – phần C: Thuyết minh chỉ tiêu (XD00057–XD00074)
+BIEU_02C_THUYET_MINH_XD: dict[str, str] = {
+    "XD00057": "so_ho_dan_cu",
+    "XD00058": "so_ho_dtts",
+    "XD00060": "so_ho_ngheo",
+    "XD00062": "so_ho_can_ngheo",
+    "XD00064": "so_ho_thoat_ngheo",
+    "XD00068": "so_hssv",
+    "XD00069": "so_ld_gqvl_ns",
+    "XD00070": "so_ld_xkld",
+    "XD00071": "so_ct_ns_vsmt",
+    "XD00072": "so_can_nha_xh",
+    "XD00073": "tong_so_xa",
+    "XD00074": "so_xa_vkk",
+}
+
+# Nhãn tiếng Việt cho từng key thuyết minh (dùng trong form nhập liệu)
+THUYET_MINH_LABELS: dict[str, str] = {
+    "so_ho_dan_cu":      "Số hộ dân cư trú trên địa bàn",
+    "so_ho_dtts":        "Số hộ đồng bào dân tộc thiểu số",
+    "so_ho_ngheo":       "Số hộ nghèo theo chuẩn hiện hành",
+    "so_ho_can_ngheo":   "Số hộ cận nghèo theo chuẩn hiện hành",
+    "so_ho_thoat_ngheo": "Số hộ mới thoát nghèo",
+    "so_hssv":           "Tổng số HSSV có hoàn cảnh khó khăn",
+    "so_ld_gqvl_ns":     "Lao động có nhu cầu vay GQVL (từ NSNN)",
+    "so_ld_xkld":        "Lao động có nhu cầu vay đi làm việc nước ngoài",
+    "so_ct_ns_vsmt":     "Số công trình NS&VSMT nông thôn dự kiến XD",
+    "so_can_nha_xh":     "Số căn nhà ở xã hội dự kiến cho vay",
+    "tong_so_xa":        "Tổng số xã/phường/thị trấn trên địa bàn",
+    "so_xa_vkk":         "Số xã thuộc vùng khó khăn",
+}
+
 # ── File GQVL (Sao kê Giải quyết Việc làm) ──────────────────────────────────
 TEN_FILE_GQVL    = "SAO_KE_GQVL_du_lieu_tho.XLSX"
 FILE_PATH_GQVL   = os.path.join(THU_MUC_DATA, TEN_FILE_GQVL)

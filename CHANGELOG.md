@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## [2026-05-21] — backup_service.py + .gitignore
+- `backup_service.py` — file mới: `chay_backup()` copy DB + parquet + pgd_data xlsx vào `backups/<timestamp>/`, giữ 7 bản gần nhất; `don_backup()` dọn bản cũ; nút "Backup ngay" trong `tab_trang_thai_nguon` giờ hoạt động
+- `.gitignore` — thêm `backups/` để không commit dữ liệu backup
+
 ## [2026-05-21] — Unit tests: +63 tests cho 4 service (data_quality, report, kiem_soat, rui_ro)
 - `tests/test_data_quality.py` — file mới: 26 tests (_safe_series, chuan_hoa_ten_cot, kiem_tra_du_no_am, kiem_tra_so_tien_giai_ngan, kiem_tra_ma_don_vi_hop_le, chuan_hoa_ma_don_vi, kiem_tra_chat_luong, tong_hop_bao_cao_chat_luong)
 - `tests/test_report_service.py` — file mới: 9 tests (ten_file_bao_cao, xuat_bao_cao, xuat_sheet_don) — verify Excel bytes đầu ra

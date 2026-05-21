@@ -14,7 +14,7 @@ from config import (
     COT_TONG_DU_NO, COT_DU_NO_QH, COT_LAI_TON, COT_LAI_TON_QH,
     COT_SO_DU_TG, COT_NGAY_VAY, COT_TEN_TO, COT_DVUT,
     COT_TEN_XA, COT_TEN_THON, COT_MUC_VAY,
-    TEN_CHI_NHANH_HIEN_THI, DS_PGD,
+    TEN_CHI_NHANH_HIEN_THI, DS_PGD, PGD_XA_MAP,
 )
 from utils import fmt, fmt_bang_ty, fmt_ngay, fmt_so, xuat_excel
 from services.template_service import (
@@ -143,7 +143,7 @@ def _render_ke_hoach(df: pd.DataFrame, pgd_user: str, role: str) -> None:
         st.error("Không xác định được PGD.")
         return
 
-    key_prefix = f"uyt_kh_{pgd_slug(pgd_user) if pgd_user else 'cn'}_"
+    key_prefix_base = f"uyt_kh_{pgd_slug(pgd_user) if pgd_user else 'cn'}_"
 
     if pgd_user and not la_phan_he_cn(role):
         st.info(f"PGD: **{pgd_user}**")
@@ -156,9 +156,13 @@ def _render_ke_hoach(df: pd.DataFrame, pgd_user: str, role: str) -> None:
         pgd_opt = st.selectbox(
             "Chọn PGD",
             options=["(Tất cả)"] + ds_pgd,
-            key=f"{key_prefix}pgd",
+            key=f"{key_prefix_base}pgd",
         )
         pgd_chon = None if pgd_opt == "(Tất cả)" else pgd_opt
+
+    key_prefix = (
+        f"{key_prefix_base}{pgd_slug(pgd_chon) if pgd_chon else 'all'}_"
+    )
 
     df_src = df
     if pgd_chon and COT_TEN_PGD in df.columns:
@@ -187,11 +191,17 @@ def _render_ke_hoach(df: pd.DataFrame, pgd_user: str, role: str) -> None:
             placeholder="VD: 12/KH-HND",
             key=f"{key_prefix}so_vb",
         )
-        ds_xa_kh = (
+        ds_xa_df = (
             sorted(df_src[COT_TEN_XA].dropna().unique().tolist())
             if COT_TEN_XA in df_src.columns
             else []
         )
+        ds_xa_map = (
+            list(PGD_XA_MAP.get(pgd_chon, []))
+            if pgd_chon
+            else [xa for ds in PGD_XA_MAP.values() for xa in ds]
+        )
+        ds_xa_kh = sorted(set(ds_xa_df) | set(ds_xa_map))
         if ds_xa_kh:
             dia_danh = c1.selectbox(
                 "Địa danh (xã/phường)",
@@ -286,7 +296,7 @@ def _render_ke_hoach(df: pd.DataFrame, pgd_user: str, role: str) -> None:
                 file_name=ten_file + ".docx",
                 mime="application/vnd.openxmlformats-officedocument"
                      ".wordprocessingml.document",
-                key="kh_docx",
+                key=f"{key_prefix}kh_docx",
             )
         with col2:
             with st.spinner("Đang tạo PDF..."):
@@ -297,27 +307,52 @@ def _render_ke_hoach(df: pd.DataFrame, pgd_user: str, role: str) -> None:
                     data=pdf_bytes,
                     file_name=ten_file + ".pdf",
                     mime="application/pdf",
-                    key="kh_pdf",
+                    key=f"{key_prefix}kh_pdf",
                 )
             else:
                 st.caption("⚠️ PDF không khả dụng — cần MS Word trên server")
 
 
-def _render_mau06(df: pd.DataFrame, pgd_user: str) -> None:
+def _render_mau06(df: pd.DataFrame, pgd_user: str | None) -> None:
     st.markdown("#### 📋 Mẫu 06/TD & 06A/TD — Phiếu kiểm tra sử dụng vốn")
     st.caption("Quy định: kiểm tra 100% món vay trong 30 ngày sau giải ngân. "
                "Thời điểm kiểm tra cụ thể do CBTD nhập khi đi thực địa.")
+    key_prefix_base = f"uyt_m06_{pgd_slug(pgd_user) if pgd_user else 'cn'}_"
     if df is None or df.empty:
         st.warning("Chưa có dữ liệu HSTD."); return
     if COT_NGAY_VAY not in df.columns:
         st.warning(f"Không tìm thấy cột '{COT_NGAY_VAY}'."); return
 
+    if pgd_user:
+        st.info(f"PGD: **{pgd_user}**")
+        pgd_chon = pgd_user
+    else:
+        ds_pgd = (
+            sorted(df[COT_TEN_PGD].dropna().unique().tolist())
+            if COT_TEN_PGD in df.columns
+            else DS_PGD
+        )
+        pgd_opt = st.selectbox(
+            "Chọn PGD",
+            options=["(Tất cả)"] + ds_pgd,
+            key=f"{key_prefix_base}pgd",
+        )
+        pgd_chon = None if pgd_opt == "(Tất cả)" else pgd_opt
+
+    key_prefix = (
+        f"{key_prefix_base}{pgd_slug(pgd_chon) if pgd_chon else 'all'}_"
+    )
+
+    df_src = df
+    if pgd_chon and COT_TEN_PGD in df.columns:
+        df_src = df[df[COT_TEN_PGD] == pgd_chon].copy()
+
     c1, c2 = st.columns(2)
     loai_mau = c1.radio("Loại mẫu", ["06/TD (bảng nhiều KH)",
                                        "06A/TD (từng KH riêng)"],
-                         key="m06_loai")
+                        key=f"{key_prefix}loai")
     so_ngay  = c2.slider("Giải ngân trong N ngày qua", 7, 30, 30,
-                          key="m06_ngay")
+                         key=f"{key_prefix}ngay")
     st.caption("Ngày kiểm tra thực tế do Cán bộ hội đi kiểm tra ghi vào mẫu.")
 
     ngay_den = date.today()
@@ -325,7 +360,7 @@ def _render_mau06(df: pd.DataFrame, pgd_user: str) -> None:
     st.caption(f"📅 {ngay_tu.strftime('%d/%m/%Y')} → {ngay_den.strftime('%d/%m/%Y')}")
 
     try:
-        raw    = _loc_mau06(pickle.dumps(df), str(ngay_tu), str(ngay_den))
+        raw    = _loc_mau06(pickle.dumps(df_src), str(ngay_tu), str(ngay_den))
         df_m06 = pickle.loads(raw)
     except Exception as e:
         st.error(f"Lỗi: {e}"); return
@@ -342,23 +377,23 @@ def _render_mau06(df: pd.DataFrame, pgd_user: str) -> None:
                  hide_index=True, height=300)
 
     # Form thông tin người kiểm tra
-    with st.form("form_xuat_m06"):
+    with st.form(f"{key_prefix}form"):
         st.markdown("**Thông tin xuất mẫu:**")
         f1, f2 = st.columns(2)
         don_vi_kt = f1.selectbox(
             "Hội đoàn thể kiểm tra",
             options=DVUT_ORDER,
-            key="m06_don_vi_kt"
+            key=f"{key_prefix}don_vi_kt"
         )
         ds_xa_m06 = [""] + sorted(df_m06[COT_TEN_XA].dropna().unique().tolist()) \
                     if COT_TEN_XA in df_m06.columns else [""]
         ten_xa = f1.selectbox(
             "Xã/Phường",
             options=ds_xa_m06,
-            key="m06_ten_xa"
+            key=f"{key_prefix}ten_xa"
         )
         # Lọc Tổ theo Xã đã chọn (dùng session_state vì trong form)
-        ten_xa_filter = st.session_state.get("m06_ten_xa", "")
+        ten_xa_filter = st.session_state.get(f"{key_prefix}ten_xa", "")
         df_to_filter = df_m06[df_m06[COT_TEN_XA] == ten_xa_filter] \
                        if ten_xa_filter and COT_TEN_XA in df_m06.columns else df_m06
         ds_to_m06 = [""] + sorted(df_to_filter[COT_TEN_TO].dropna().unique().tolist()) \
@@ -366,32 +401,32 @@ def _render_mau06(df: pd.DataFrame, pgd_user: str) -> None:
         ten_to = f1.selectbox(
             "Tổ TK&VV",
             options=ds_to_m06,
-            key="m06_chon_to"
+            key=f"{key_prefix}chon_to"
         )
         dia_ban = f1.text_input("Địa bàn kiểm tra",
                                 placeholder="Ấp..., xã...",
-                                key="m06_dia_ban")
+                                key=f"{key_prefix}dia_ban")
         ngay_kt = f1.date_input("Ngày kiểm tra",
-                                value=date.today(), key="m06_ngay_kt")
+                                value=date.today(), key=f"{key_prefix}ngay_kt")
 
-        can_bo_1  = f2.text_input("Cán bộ kiểm tra 1", key="m06_can_bo_1")
-        chuc_vu_1 = f2.text_input("Chức vụ 1", key="m06_chuc_vu_1")
-        can_bo_2  = f2.text_input("Cán bộ kiểm tra 2 (nếu có)", key="m06_can_bo_2")
-        chuc_vu_2 = f2.text_input("Chức vụ 2 (nếu có)", key="m06_chuc_vu_2")
+        can_bo_1  = f2.text_input("Cán bộ kiểm tra 1", key=f"{key_prefix}can_bo_1")
+        chuc_vu_1 = f2.text_input("Chức vụ 1", key=f"{key_prefix}chuc_vu_1")
+        can_bo_2  = f2.text_input("Cán bộ kiểm tra 2 (nếu có)", key=f"{key_prefix}can_bo_2")
+        chuc_vu_2 = f2.text_input("Chức vụ 2 (nếu có)", key=f"{key_prefix}chuc_vu_2")
 
         st.markdown("**Nội dung nhận xét:**")
         nx1, nx2 = st.columns(2)
         nhan_xet_chung = nx1.text_area(
             "1. Tình hình thực hiện phương án vay vốn",
-            key="m06_nx_chung", height=80,
+            key=f"{key_prefix}nx_chung", height=80,
         )
-        so_kh_dung    = nx2.text_input("Số KH đúng mục đích", key="m06_so_kh_dung")
-        so_tien_dung  = nx2.text_input("Số tiền đúng MĐ (triệu đ)", key="m06_tien_dung")
-        ty_trong_dung = nx2.text_input("Tỷ trọng đúng MĐ (%)", key="m06_ty_dung")
-        so_kh_sai     = nx2.text_input("Số KH sai mục đích", key="m06_so_kh_sai")
-        so_tien_sai   = nx2.text_input("Số tiền sai MĐ (triệu đ)", key="m06_tien_sai")
-        ty_trong_sai  = nx2.text_input("Tỷ trọng sai MĐ (%)", key="m06_ty_sai")
-        bien_phap     = st.text_area("Biện pháp xử lý", key="m06_bien_phap", height=60)
+        so_kh_dung    = nx2.text_input("Số KH đúng mục đích", key=f"{key_prefix}so_kh_dung")
+        so_tien_dung  = nx2.text_input("Số tiền đúng MĐ (triệu đ)", key=f"{key_prefix}tien_dung")
+        ty_trong_dung = nx2.text_input("Tỷ trọng đúng MĐ (%)", key=f"{key_prefix}ty_dung")
+        so_kh_sai     = nx2.text_input("Số KH sai mục đích", key=f"{key_prefix}so_kh_sai")
+        so_tien_sai   = nx2.text_input("Số tiền sai MĐ (triệu đ)", key=f"{key_prefix}tien_sai")
+        ty_trong_sai  = nx2.text_input("Tỷ trọng sai MĐ (%)", key=f"{key_prefix}ty_sai")
+        bien_phap     = st.text_area("Biện pháp xử lý", key=f"{key_prefix}bien_phap", height=60)
 
         submitted = st.form_submit_button("📄 Tạo Word")
 
@@ -426,7 +461,8 @@ def _render_mau06(df: pd.DataFrame, pgd_user: str) -> None:
                 "bien_phap":      bien_phap,
             }
             docx_bytes = tao_word_uythac_mau06(du_lieu_word, df_xuat, loai=loai_word)
-        ten_file = f"Mau06TD_{pgd_user}_{ngay_kt.strftime('%d%m%Y')}"
+        pgd_scope = pgd_chon or pgd_user or "ToanCN"
+        ten_file = f"Mau06TD_{pgd_slug(pgd_scope)}_{ngay_kt.strftime('%d%m%Y')}"
         col1, col2 = st.columns(2)
         with col1:
             st.download_button(
@@ -435,7 +471,7 @@ def _render_mau06(df: pd.DataFrame, pgd_user: str) -> None:
                 file_name=ten_file + ".docx",
                 mime="application/vnd.openxmlformats-officedocument"
                      ".wordprocessingml.document",
-                key="m06_docx",
+                key=f"{key_prefix}docx",
             )
         with col2:
             with st.spinner("Đang tạo PDF..."):
@@ -446,34 +482,59 @@ def _render_mau06(df: pd.DataFrame, pgd_user: str) -> None:
                     data=pdf_bytes,
                     file_name=ten_file + ".pdf",
                     mime="application/pdf",
-                    key="m06_pdf",
+                    key=f"{key_prefix}pdf",
                 )
             else:
                 st.caption("⚠️ PDF không khả dụng — cần MS Word trên server")
 
 
-def _render_mau15(df: pd.DataFrame, pgd_user: str) -> None:
+def _render_mau15(df: pd.DataFrame, pgd_user: str | None) -> None:
     st.markdown("#### 📋 Mẫu 15/TD — Danh sách đối chiếu số dư")
     st.caption("Đối chiếu nợ gốc, nợ lãi, số dư tiền gửi TK từng tổ viên.")
+    key_prefix_base = f"uyt_m15_{pgd_slug(pgd_user) if pgd_user else 'cn'}_"
     if df is None or df.empty:
         st.warning("Chưa có dữ liệu HSTD."); return
 
+    if pgd_user:
+        st.info(f"PGD: **{pgd_user}**")
+        pgd_chon = pgd_user
+    else:
+        ds_pgd = (
+            sorted(df[COT_TEN_PGD].dropna().unique().tolist())
+            if COT_TEN_PGD in df.columns
+            else DS_PGD
+        )
+        pgd_opt = st.selectbox(
+            "Chọn PGD",
+            options=["(Tất cả)"] + ds_pgd,
+            key=f"{key_prefix_base}pgd",
+        )
+        pgd_chon = None if pgd_opt == "(Tất cả)" else pgd_opt
+
+    key_prefix = (
+        f"{key_prefix_base}{pgd_slug(pgd_chon) if pgd_chon else 'all'}_"
+    )
+
+    df_src = df
+    if pgd_chon and COT_TEN_PGD in df.columns:
+        df_src = df[df[COT_TEN_PGD] == pgd_chon].copy()
+
     # Chọn Tổ TK&VV
-    ds_to = sorted(df[COT_TEN_TO].dropna().unique().tolist()) \
-            if COT_TEN_TO in df.columns else []
+    ds_to = sorted(df_src[COT_TEN_TO].dropna().unique().tolist()) \
+            if COT_TEN_TO in df_src.columns else []
     if not ds_to:
         st.warning("Không có dữ liệu Tổ TK&VV."); return
 
     c1, c2 = st.columns(2)
     chon_dvut = c1.selectbox("Hội đoàn thể", ["Tất cả"] + DVUT_ORDER,
-                               key="m15_dvut")
+                              key=f"{key_prefix}dvut")
     # Lọc Tổ theo DVUT
-    df_filter = df.copy()
+    df_filter = df_src.copy()
     if chon_dvut != "Tất cả" and COT_DVUT in df_filter.columns:
         df_filter = df_filter[df_filter[COT_DVUT] == chon_dvut]
     ds_to_filter = sorted(df_filter[COT_TEN_TO].dropna().unique().tolist()) \
                    if COT_TEN_TO in df_filter.columns else []
-    chon_to = c2.selectbox("Tổ TK&VV", ds_to_filter, key="m15_to")
+    chon_to = c2.selectbox("Tổ TK&VV", ds_to_filter, key=f"{key_prefix}to")
 
     if not chon_to:
         st.info("Chọn Tổ TK&VV để xem dữ liệu."); return
@@ -501,43 +562,43 @@ def _render_mau15(df: pd.DataFrame, pgd_user: str) -> None:
     xa_cua_to = ""
     ten_to_truong = ""
     if chon_to:
-        if COT_TEN_XA in df.columns and COT_TEN_TO in df.columns:
-            s_xa = df[df[COT_TEN_TO] == chon_to][COT_TEN_XA].dropna()
+        if COT_TEN_XA in df_src.columns and COT_TEN_TO in df_src.columns:
+            s_xa = df_src[df_src[COT_TEN_TO] == chon_to][COT_TEN_XA].dropna()
             xa_cua_to = s_xa.iloc[0] if not s_xa.empty else ""
         for cot in ["Tên Tổ trưởng", "Tổ trưởng", "Họ tên Tổ trưởng"]:
-            if cot in df.columns:
-                s_tt = df[df[COT_TEN_TO] == chon_to][cot].dropna()
+            if cot in df_src.columns:
+                s_tt = df_src[df_src[COT_TEN_TO] == chon_to][cot].dropna()
                 ten_to_truong = str(s_tt.iloc[0]) if not s_tt.empty else ""
                 break
 
     # Form xuất Word
-    with st.form("form_xuat_m15"):
+    with st.form(f"{key_prefix}form"):
         st.markdown("**Thông tin xuất mẫu:**")
         f1, f2 = st.columns(2)
         pgd = f1.text_input(
             "PGD",
-            value=pgd_user,
+            value=pgd_chon or pgd_user or "",
             disabled=True,
-            key="m15_pgd"
+            key=f"{key_prefix}pgd"
         )
         ten_xa = f1.text_input(
             "Xã/Phường",
             value=xa_cua_to,
             disabled=True,
             help="Tự động lấy theo Tổ TK&VV đã chọn",
-            key="m15_ten_xa"
+            key=f"{key_prefix}ten_xa"
         )
         to_truong = f1.text_input(
             "Tổ trưởng",
             value=ten_to_truong,
             help="Tự động lấy từ HSTD, có thể sửa lại nếu cần",
-            key="m15_to_truong"
+            key=f"{key_prefix}to_truong"
         )
         ma_to     = f1.text_input("Mã Tổ")
         dia_chi   = f2.text_input("Địa chỉ Tổ")
         can_bo_kt = f2.text_input("Cán bộ đối chiếu")
         ngay_chot = f2.date_input("Ngày chốt số liệu", value=date.today(),
-                                   key="m15_ngay_chot")
+                                  key=f"{key_prefix}ngay_chot")
         submitted = st.form_submit_button("📄 Tạo Word")
 
     if submitted:
@@ -562,7 +623,7 @@ def _render_mau15(df: pd.DataFrame, pgd_user: str) -> None:
                 file_name=ten_file + ".docx",
                 mime="application/vnd.openxmlformats-officedocument"
                      ".wordprocessingml.document",
-                key="m15_docx",
+                key=f"{key_prefix}docx",
             )
         with col2:
             with st.spinner("Đang tạo PDF..."):
@@ -573,14 +634,15 @@ def _render_mau15(df: pd.DataFrame, pgd_user: str) -> None:
                     data=pdf_bytes,
                     file_name=ten_file + ".pdf",
                     mime="application/pdf",
-                    key="m15_pdf",
+                    key=f"{key_prefix}pdf",
                 )
             else:
                 st.caption("⚠️ PDF không khả dụng — cần MS Word trên server")
 
 
-def _render_bien_ban(df: pd.DataFrame, pgd_user: str) -> None:
+def _render_bien_ban(df: pd.DataFrame, pgd_user: str | None) -> None:
     st.markdown("#### 📋 Biên bản & Báo cáo tổng hợp")
+    key_prefix_base = f"uyt_bb_{pgd_slug(pgd_user) if pgd_user else 'cn'}_"
     loai = st.radio(
         "Loại biên bản",
         [
@@ -589,93 +651,116 @@ def _render_bien_ban(df: pd.DataFrame, pgd_user: str) -> None:
             "📊 Báo cáo tổng hợp ủy thác (Excel)",
         ],
         horizontal=True,
-        key="bb_loai",
+        key=f"{key_prefix_base}loai",
     )
 
-    if loai.startswith("📋"):
+    if pgd_user:
+        st.info(f"PGD: **{pgd_user}**")
+        pgd_chon = pgd_user
+    else:
+        if df is not None and (not df.empty) and COT_TEN_PGD in df.columns:
+            ds_pgd = sorted(df[COT_TEN_PGD].dropna().unique().tolist())
+        else:
+            ds_pgd = DS_PGD
+        pgd_opt = st.selectbox(
+            "Chọn PGD",
+            options=["(Tất cả)"] + ds_pgd,
+            key=f"{key_prefix_base}pgd",
+        )
+        pgd_chon = None if pgd_opt == "(Tất cả)" else pgd_opt
+
+    key_prefix = f"{key_prefix_base}{pgd_slug(pgd_chon) if pgd_chon else 'all'}_"
+
+    if loai.startswith("📄"):
+        df_src = pd.DataFrame()
+    else:
         if df is None or df.empty:
             st.warning("Chưa có dữ liệu HSTD.")
             return
+        df_src = df
+        if pgd_chon and COT_TEN_PGD in df.columns:
+            df_src = df[df[COT_TEN_PGD] == pgd_chon].copy()
 
-        with st.form("form_bb_m16"):
+    if loai.startswith("📋"):
+        with st.form(f"{key_prefix}form_m16"):
             c1, c2 = st.columns(2)
-            don_vi_kt = c1.selectbox("Hội đoàn thể kiểm tra", DVUT_ORDER, key="bb_dvkt")
+            don_vi_kt = c1.selectbox("Hội đoàn thể kiểm tra", DVUT_ORDER, key=f"{key_prefix}dvkt")
             ds_xa_bb = (
-                sorted(df[COT_TEN_XA].dropna().unique().tolist())
-                if COT_TEN_XA in df.columns else []
+                sorted(df_src[COT_TEN_XA].dropna().unique().tolist())
+                if COT_TEN_XA in df_src.columns else []
             )
-            ten_xa = c1.selectbox("Xã/Phường", [""] + ds_xa_bb, key="bb_xa")
-            ten_xa_cur = st.session_state.get("bb_xa", "")
+            ten_xa = c1.selectbox("Xã/Phường", [""] + ds_xa_bb, key=f"{key_prefix}xa")
+            ten_xa_cur = st.session_state.get(f"{key_prefix}xa", "")
             df_to_filter = (
-                df[df[COT_TEN_XA] == ten_xa_cur]
-                if ten_xa_cur and COT_TEN_XA in df.columns else df
+                df_src[df_src[COT_TEN_XA] == ten_xa_cur]
+                if ten_xa_cur and COT_TEN_XA in df_src.columns else df_src
             )
             ds_to_bb = (
                 sorted(df_to_filter[COT_TEN_TO].dropna().unique().tolist())
                 if COT_TEN_TO in df_to_filter.columns else []
             )
-            ten_to = c1.selectbox("Tổ TK&VV", [""] + ds_to_bb, key="bb_to")
+            ten_to = c1.selectbox("Tổ TK&VV", [""] + ds_to_bb, key=f"{key_prefix}to")
             ten_thon = c1.text_input(
                 "Thôn/tổ dân phố",
                 help="Địa chỉ thôn của Tổ TK&VV",
-                key="bb_thon",
+                key=f"{key_prefix}thon",
             )
 
             # Auto-detect tổ trưởng và hội đoàn thể từ df
             _to_truong_auto = ""
             _hoi_auto = ""
-            if ten_to and COT_TEN_TO in df.columns:
-                s_tt = df[df[COT_TEN_TO] == ten_to]
+            if ten_to and COT_TEN_TO in df_src.columns:
+                s_tt = df_src[df_src[COT_TEN_TO] == ten_to]
                 for cot_tt in ["Tên Tổ trưởng", "Tổ trưởng", "Họ tên Tổ trưởng"]:
-                    if cot_tt in df.columns:
+                    if cot_tt in df_src.columns:
                         v = s_tt[cot_tt].dropna()
                         if not v.empty:
                             _to_truong_auto = str(v.iloc[0])
                             break
-                if COT_DVUT in df.columns:
+                if COT_DVUT in df_src.columns:
                     v = s_tt[COT_DVUT].dropna()
                     if not v.empty:
                         _hoi_auto = str(v.iloc[0])
 
             hoi_doan_the = c1.text_input(
-                "Tổ thuộc Hội", value=_hoi_auto, key="bb_hoi",
+                "Tổ thuộc Hội", value=_hoi_auto, key=f"{key_prefix}hoi",
                 help="Hội quản lý tổ (tự điền từ dữ liệu, có thể sửa)",
             )
             to_truong = c2.text_input(
-                "Tổ trưởng Tổ TK&VV", value=_to_truong_auto, key="bb_totruong",
+                "Tổ trưởng Tổ TK&VV", value=_to_truong_auto, key=f"{key_prefix}totruong",
             )
-            to_pho = c2.text_input("Tổ phó (nếu có)", key="bb_topho")
-            can_bo_1 = c2.text_input("Cán bộ kiểm tra 1", key="bb_cb1")
-            chuc_vu_1 = c2.text_input("Chức vụ 1", key="bb_cv1")
-            can_bo_2 = c2.text_input("Cán bộ kiểm tra 2 (nếu có)", key="bb_cb2")
-            chuc_vu_2 = c2.text_input("Chức vụ 2", key="bb_cv2")
-            ngay_kt = c2.date_input("Ngày kiểm tra", value=date.today(), key="bb_ngay")
+            to_pho = c2.text_input("Tổ phó (nếu có)", key=f"{key_prefix}topho")
+            can_bo_1 = c2.text_input("Cán bộ kiểm tra 1", key=f"{key_prefix}cb1")
+            chuc_vu_1 = c2.text_input("Chức vụ 1", key=f"{key_prefix}cv1")
+            can_bo_2 = c2.text_input("Cán bộ kiểm tra 2 (nếu có)", key=f"{key_prefix}cb2")
+            chuc_vu_2 = c2.text_input("Chức vụ 2", key=f"{key_prefix}cv2")
+            ngay_kt = c2.date_input("Ngày kiểm tra", value=date.today(), key=f"{key_prefix}ngay")
 
             st.markdown("**Phần I — Tình hình chung (để trống = lấy từ HSTD)**")
             pi1, pi2 = st.columns(2)
             ty_le_nqh = pi1.text_input(
                 "Tỷ lệ NQH (%)", placeholder="VD: 0,0 (để trống = tự tính)",
-                key="bb_tylnqh",
+                key=f"{key_prefix}tylnqh",
             )
             xep_loai_to = pi2.text_input(
-                "Kết quả xếp loại Tổ", placeholder="VD: Loại Tốt", key="bb_xeploai",
+                "Kết quả xếp loại Tổ", placeholder="VD: Loại Tốt", key=f"{key_prefix}xeploai",
             )
 
             st.markdown("**Phần III — Đánh giá, nhận xét**")
             so_kh_kt = st.text_input(
-                "Số KH kiểm tra thực tế", placeholder="VD: 05", key="bb_sokh",
+                "Số KH kiểm tra thực tế", placeholder="VD: 05", key=f"{key_prefix}sokh",
             )
             t1, t2 = st.columns(2)
-            uu_diem  = t1.text_area("1. Ưu điểm", height=80, key="bb_uudiem")
-            ton_tai  = t2.text_area("2. Tồn tại", height=80, key="bb_tontai")
-            kien_nghi = st.text_area("3. Kiến nghị (nếu có)", height=70, key="bb_kiennghi")
+            uu_diem  = t1.text_area("1. Ưu điểm", height=80, key=f"{key_prefix}uudiem")
+            ton_tai  = t2.text_area("2. Tồn tại", height=80, key=f"{key_prefix}tontai")
+            kien_nghi = st.text_area("3. Kiến nghị (nếu có)", height=70, key=f"{key_prefix}kiennghi")
             so_phieu = st.text_input(
-                "Số phiếu kiểm tra kèm theo", placeholder="VD: 05", key="bb_sophieu",
+                "Số phiếu kiểm tra kèm theo", placeholder="VD: 05", key=f"{key_prefix}sophieu",
             )
             submitted_m16 = st.form_submit_button("📄 Tạo Word", type="primary")
 
         if submitted_m16:
-            df_xuat = df.copy()
+            df_xuat = df_src.copy()
             if ten_xa and COT_TEN_XA in df_xuat.columns:
                 df_xuat = df_xuat[df_xuat[COT_TEN_XA] == ten_xa]
             if ten_to and COT_TEN_TO in df_xuat.columns:
@@ -716,7 +801,7 @@ def _render_bien_ban(df: pd.DataFrame, pgd_user: str) -> None:
                     file_name=ten_file + ".docx",
                     mime="application/vnd.openxmlformats-officedocument"
                     ".wordprocessingml.document",
-                    key="bb_m16_docx",
+                    key=f"{key_prefix}m16_docx",
                 )
             with col2:
                 with st.spinner("Đang tạo PDF..."):
@@ -727,7 +812,7 @@ def _render_bien_ban(df: pd.DataFrame, pgd_user: str) -> None:
                         data=pdf_bytes,
                         file_name=ten_file + ".pdf",
                         mime="application/pdf",
-                        key="bb_m16_pdf",
+                        key=f"{key_prefix}m16_pdf",
                     )
                 else:
                     st.caption("⚠️ PDF không khả dụng — cần MS Word trên server")
@@ -735,20 +820,20 @@ def _render_bien_ban(df: pd.DataFrame, pgd_user: str) -> None:
         return
 
     if loai.startswith("📄"):
-        with st.form("form_bb_xm"):
+        with st.form(f"{key_prefix}form_xm"):
             c1, c2 = st.columns(2)
-            ten_kh = c1.text_input("Họ tên khách hàng", key="xm_kh")
-            so_ku = c1.text_input("Số khế ước", key="xm_sku")
+            ten_kh = c1.text_input("Họ tên khách hàng", key=f"{key_prefix}xm_kh")
+            so_ku = c1.text_input("Số khế ước", key=f"{key_prefix}xm_sku")
             so_tien = c1.number_input(
                 "Số tiền chiếm dụng (triệu đồng)",
                 min_value=0.0,
                 step=0.1,
-                key="xm_sotien",
+                key=f"{key_prefix}xm_sotien",
             )
-            can_bo_lap = c2.text_input("Cán bộ lập biên bản", key="xm_cb")
-            ngay_lap = c2.date_input("Ngày lập", value=date.today(), key="xm_ngay")
-            ly_do = st.text_area("Lý do / Hoàn cảnh", height=80, key="xm_lydo")
-            bien_phap = st.text_area("Biện pháp xử lý", height=80, key="xm_bien_phap")
+            can_bo_lap = c2.text_input("Cán bộ lập biên bản", key=f"{key_prefix}xm_cb")
+            ngay_lap = c2.date_input("Ngày lập", value=date.today(), key=f"{key_prefix}xm_ngay")
+            ly_do = st.text_area("Lý do / Hoàn cảnh", height=80, key=f"{key_prefix}xm_lydo")
+            bien_phap = st.text_area("Biện pháp xử lý", height=80, key=f"{key_prefix}xm_bien_phap")
             submitted_xm = st.form_submit_button("📄 Tạo Word", type="primary")
 
         if submitted_xm:
@@ -767,7 +852,8 @@ def _render_bien_ban(df: pd.DataFrame, pgd_user: str) -> None:
             }
             with st.spinner("Đang tạo file..."):
                 docx_bytes = tao_word_uythac_bb_xac_minh(du_lieu)
-            ten_file = f"BBXacMinh_{so_ku}_{ngay_lap.strftime('%d%m%Y')}"
+            pgd_scope = pgd_chon or pgd_user or "ToanCN"
+            ten_file = f"BBXacMinh_{so_ku}_{pgd_slug(pgd_scope)}_{ngay_lap.strftime('%d%m%Y')}"
 
             col1, col2 = st.columns(2)
             with col1:
@@ -777,7 +863,7 @@ def _render_bien_ban(df: pd.DataFrame, pgd_user: str) -> None:
                     file_name=ten_file + ".docx",
                     mime="application/vnd.openxmlformats-officedocument"
                     ".wordprocessingml.document",
-                    key="xm_docx",
+                    key=f"{key_prefix}xm_docx",
                 )
             with col2:
                 with st.spinner("Đang tạo PDF..."):
@@ -788,18 +874,14 @@ def _render_bien_ban(df: pd.DataFrame, pgd_user: str) -> None:
                         data=pdf_bytes,
                         file_name=ten_file + ".pdf",
                         mime="application/pdf",
-                        key="xm_pdf",
+                        key=f"{key_prefix}xm_pdf",
                     )
                 else:
                     st.caption("⚠️ PDF không khả dụng — cần MS Word trên server")
         return
 
-    if df is None or df.empty:
-        st.warning("Chưa có dữ liệu.")
-        return
-
     try:
-        df_th = pickle.loads(_tinh_theo_dvut(pickle.dumps(df)))
+        df_th = pickle.loads(_tinh_theo_dvut(pickle.dumps(df_src)))
     except Exception as e:
         st.error(f"Lỗi: {e}")
         df_th = pd.DataFrame()
@@ -824,18 +906,19 @@ def _render_bien_ban(df: pd.DataFrame, pgd_user: str) -> None:
     st.dataframe(hien, use_container_width=True, hide_index=True)
 
     buf = xuat_excel({"Tổng hợp ủy thác": hien})
-    ten_file = f"TongHopUyThac_{pgd_user}_{date.today().strftime('%d%m%Y')}.xlsx"
+    pgd_scope = pgd_chon or pgd_user or "ToanCN"
+    ten_file = f"TongHopUyThac_{pgd_slug(pgd_scope)}_{date.today().strftime('%d%m%Y')}.xlsx"
     if st.download_button(
         "📥 Tải Excel",
         data=buf,
         file_name=ten_file,
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        key="th_dl",
+        key=f"{key_prefix}th_dl",
     ):
         db.ghi_audit(
             st.session_state.get("username", "unknown"),
             "xuat_bieu_cn",
-            f"Tổng hợp ủy thác — {pgd_user}",
+            f"Tổng hợp ủy thác — {pgd_chon or pgd_user or '(Tất cả)'}",
         )
 
 
@@ -848,10 +931,11 @@ def _render_bb_ct_cx(df: pd.DataFrame, pgd_user: str | None,
         "Xuất Word/PDF trực tiếp từ dữ liệu đã lưu."
     )
 
+    key_prefix_base = f"uyt_bbctx_{pgd_slug(pgd_user) if pgd_user else 'cn'}_"
     loai_sel = st.radio(
         "Loại biên bản",
         ["02/BB-CT — Tổ chức CT-XH cấp tỉnh", "03/BB-CX — Tổ chức CT-XH cấp xã"],
-        horizontal=True, key="bbct_loai",
+        horizontal=True, key=f"{key_prefix_base}loai",
     )
     cap = "tinh" if "CT" in loai_sel else "xa"
     kv_prefix = "ut_bbct" if cap == "tinh" else "ut_bbcx"
@@ -859,7 +943,7 @@ def _render_bb_ct_cx(df: pd.DataFrame, pgd_user: str | None,
     c_nam, c_pgd = st.columns(2)
     nam = int(c_nam.number_input(
         "Năm", value=date.today().year,
-        min_value=2020, max_value=2035, step=1, key="bbct_nam",
+        min_value=2020, max_value=2035, step=1, key=f"{key_prefix_base}nam",
     ))
 
     if pgd_user:
@@ -868,9 +952,10 @@ def _render_bb_ct_cx(df: pd.DataFrame, pgd_user: str | None,
     else:
         scope = c_pgd.selectbox(
             "PGD / Đơn vị quản lý hồ sơ",
-            options=DS_PGD, key="bbct_pgd_sel",
+            options=DS_PGD, key=f"{key_prefix_base}pgd_sel",
         )
 
+    key_prefix = f"{key_prefix_base}{pgd_slug(scope) if scope else 'cn'}_"
     slug = pgd_slug(scope) if scope else "cn"
     kv_key = f"{kv_prefix}_{slug}_{nam}"
 
@@ -910,7 +995,7 @@ def _render_bb_ct_cx(df: pd.DataFrame, pgd_user: str | None,
                     f"_{ngay_str.replace('-', '')}"
                 )
                 ss_key = f"bbct_bytes_{rec_id}"
-                if st.button("📄 Tạo Word / PDF", key=f"bbct_gen_{rec_id}"):
+                if st.button("📄 Tạo Word / PDF", key=f"{key_prefix}gen_{rec_id}"):
                     st.session_state[ss_key] = tao_word_uythac_bb_ct_cx(
                         bb, cap=bb.get("loai_cap", cap)
                     )
@@ -924,7 +1009,7 @@ def _render_bb_ct_cx(df: pd.DataFrame, pgd_user: str | None,
                             file_name=ten_file + ".docx",
                             mime="application/vnd.openxmlformats-officedocument"
                                  ".wordprocessingml.document",
-                            key=f"bbct_dl_{rec_id}",
+                            key=f"{key_prefix}dl_{rec_id}",
                         )
                     with col_e2:
                         with st.spinner("Đang tạo PDF..."):
@@ -935,7 +1020,7 @@ def _render_bb_ct_cx(df: pd.DataFrame, pgd_user: str | None,
                                 data=pdf_b,
                                 file_name=ten_file + ".pdf",
                                 mime="application/pdf",
-                                key=f"bbct_pdf_{rec_id}",
+                                key=f"{key_prefix}pdf_{rec_id}",
                             )
                         else:
                             st.caption("⚠️ PDF không khả dụng — cần MS Word trên server")
@@ -945,18 +1030,18 @@ def _render_bb_ct_cx(df: pd.DataFrame, pgd_user: str | None,
     so_hieu_label = "02/BB-CT" if cap == "tinh" else "03/BB-CX"
     st.markdown(f"##### Nhập biên bản {so_hieu_label} mới")
 
-    with st.form(f"form_bb_{cap}_moi", clear_on_submit=True):
+    with st.form(f"{key_prefix}form_{cap}_moi", clear_on_submit=True):
         st.markdown("**Thông tin chung**")
         fc1, fc2 = st.columns(2)
-        dvut      = fc1.selectbox("Hội đoàn thể kiểm tra", DVUT_ORDER,  key=f"bbct_dvut_{cap}")
-        don_vi_kt = fc1.text_input("Tên đơn vị kiểm tra (đầy đủ)",      key=f"bbct_dvkt_{cap}")
-        ten_don_vi = fc1.text_input("Đơn vị được kiểm tra",              key=f"bbct_dvdc_{cap}",
+        dvut      = fc1.selectbox("Hội đoàn thể kiểm tra", DVUT_ORDER,  key=f"{key_prefix}dvut_{cap}")
+        don_vi_kt = fc1.text_input("Tên đơn vị kiểm tra (đầy đủ)",      key=f"{key_prefix}dvkt_{cap}")
+        ten_don_vi = fc1.text_input("Đơn vị được kiểm tra",              key=f"{key_prefix}dvdc_{cap}",
                                     placeholder="Hội ... xã/tỉnh ...")
-        ngay_kt    = fc2.date_input("Ngày kiểm tra", value=date.today(), key=f"bbct_ngay_{cap}")
-        truong_doan = fc2.text_input("Trưởng đoàn kiểm tra",             key=f"bbct_td_{cap}")
-        can_bo_2   = fc2.text_input("Cán bộ kiểm tra 2 (nếu có)",       key=f"bbct_cb2_{cap}")
-        dai_dien_dc = fc2.text_input("Đại diện đơn vị được kiểm tra",   key=f"bbct_dddc_{cap}")
-        chuc_vu_dc = fc2.text_input("Chức vụ đại diện",                  key=f"bbct_cvdc_{cap}")
+        ngay_kt    = fc2.date_input("Ngày kiểm tra", value=date.today(), key=f"{key_prefix}ngay_{cap}")
+        truong_doan = fc2.text_input("Trưởng đoàn kiểm tra",             key=f"{key_prefix}td_{cap}")
+        can_bo_2   = fc2.text_input("Cán bộ kiểm tra 2 (nếu có)",       key=f"{key_prefix}cb2_{cap}")
+        dai_dien_dc = fc2.text_input("Đại diện đơn vị được kiểm tra",   key=f"{key_prefix}dddc_{cap}")
+        chuc_vu_dc = fc2.text_input("Chức vụ đại diện",                  key=f"{key_prefix}cvdc_{cap}")
 
         st.markdown("**II. Kết quả thực hiện (theo Phụ lục I VB 727)**")
         muc_list = [
@@ -972,19 +1057,19 @@ def _render_bb_ct_cx(df: pd.DataFrame, pgd_user: str | None,
         for field_key, ten_muc in muc_list:
             st.markdown(f"*{ten_muc}*")
             mc1, mc2 = st.columns(2)
-            kq = mc1.text_area("a) Kết quả", height=60, key=f"bbct_{field_key}_kq_{cap}")
-            tt_nd = mc2.text_area("b) Tồn tại", height=60, key=f"bbct_{field_key}_tt_{cap}")
+            kq = mc1.text_area("a) Kết quả", height=60, key=f"{key_prefix}{field_key}_kq_{cap}")
+            tt_nd = mc2.text_area("b) Tồn tại", height=60, key=f"{key_prefix}{field_key}_tt_{cap}")
             nd_results[field_key] = {"ket_qua": kq, "ton_tai": tt_nd}
 
         st.markdown("**III. Đánh giá, Nhận xét & Kiến nghị**")
         ek1, ek2 = st.columns(2)
-        uu_diem     = ek1.text_area("Ưu điểm",        height=80, key=f"bbct_uu_{cap}")
-        ton_tai_ch  = ek2.text_area("Tồn tại chung",  height=80, key=f"bbct_tt_{cap}")
-        kien_nghi   = st.text_area("Kiến nghị",       height=80, key=f"bbct_kn_{cap}")
+        uu_diem     = ek1.text_area("Ưu điểm",        height=80, key=f"{key_prefix}uu_{cap}")
+        ton_tai_ch  = ek2.text_area("Tồn tại chung",  height=80, key=f"{key_prefix}tt_{cap}")
+        kien_nghi   = st.text_area("Kiến nghị",       height=80, key=f"{key_prefix}kn_{cap}")
 
         hk1, hk2 = st.columns(2)
         han_ht = hk1.date_input("Hạn hoàn thành kiến nghị",
-                                  value=date.today(), key=f"bbct_han_{cap}")
+                                  value=date.today(), key=f"{key_prefix}han_{cap}")
         tt_sel = hk2.selectbox(
             "Trạng thái tồn tại",
             options=["cho_xu_ly", "khong_ton_tai"],
@@ -992,10 +1077,10 @@ def _render_bb_ct_cx(df: pd.DataFrame, pgd_user: str | None,
                 "cho_xu_ly": "🔴 Có tồn tại — chờ xử lý",
                 "khong_ton_tai": "🟢 Không có tồn tại",
             }.get(x, x),
-            key=f"bbct_tt_select_{cap}",
+            key=f"{key_prefix}tt_select_{cap}",
         )
         y_kien = st.text_area("IV. Ý kiến đơn vị được kiểm tra", height=60,
-                               key=f"bbct_ykien_{cap}")
+                               key=f"{key_prefix}ykien_{cap}")
         submitted = st.form_submit_button("💾 Lưu biên bản", type="primary")
 
     if submitted:
@@ -1040,6 +1125,8 @@ def _render_theo_doi_bc_th(pgd_user: str | None,
                             username: str, role: str) -> None:
     """Sub-tab 7 — Theo dõi tiến độ xử lý kiến nghị + xuất Mẫu 04/BC-TH."""
     st.markdown("#### 📊 Theo dõi tiến độ & Báo cáo tổng hợp (Mẫu 04/BC-TH)")
+    slug = pgd_slug(pgd_user) if pgd_user else "cn"
+    key_prefix = f"uyt_td_{slug}_"
 
     # ── Section 1: Theo dõi ────────────────────────────────────────────────
     st.markdown("##### I. Theo dõi tiến độ xử lý kiến nghị")
@@ -1047,15 +1134,15 @@ def _render_theo_doi_bc_th(pgd_user: str | None,
     tc1, tc2, tc3 = st.columns(3)
     nam_td = int(tc1.number_input(
         "Năm", value=date.today().year,
-        min_value=2020, max_value=2035, step=1, key="td_nam",
+        min_value=2020, max_value=2035, step=1, key=f"{key_prefix}nam",
     ))
     loai_td = tc2.selectbox(
-        "Loại", ["Tất cả", "BB-CT (cấp tỉnh)", "BB-CX (cấp xã)"], key="td_loai"
+        "Loại", ["Tất cả", "BB-CT (cấp tỉnh)", "BB-CX (cấp xã)"], key=f"{key_prefix}loai"
     )
     tt_td = tc3.selectbox(
         "Trạng thái",
         ["Tất cả", "Chờ xử lý", "Đã xử lý", "Không tồn tại"],
-        key="td_tt",
+        key=f"{key_prefix}tt",
     )
 
     # Load records
@@ -1127,14 +1214,14 @@ def _render_theo_doi_bc_th(pgd_user: str | None,
                 chon_label = st.selectbox(
                     "Chọn biên bản cần cập nhật",
                     options=[""] + list(opt_map.keys()),
-                    key="td_chon_label",
+                    key=f"{key_prefix}chon_label",
                 )
                 if chon_label:
                     target = opt_map[chon_label]
                     ket_qua_xl = st.text_area(
-                        "Kết quả xử lý", height=60, key="td_kq_xl"
+                        "Kết quả xử lý", height=60, key=f"{key_prefix}kq_xl"
                     )
-                    if st.button("✅ Đánh dấu đã xử lý", key="td_btn_xl"):
+                    if st.button("✅ Đánh dấu đã xử lý", key=f"{key_prefix}btn_xl"):
                         kv_key_t = target.get("kv_key", "")
                         if kv_key_t:
                             ds_cur = db.doc_kv(kv_key_t) or []
@@ -1185,7 +1272,7 @@ def _render_theo_doi_bc_th(pgd_user: str | None,
     }
     chon_bc = st.multiselect(
         "Chọn biên bản đưa vào báo cáo tổng hợp",
-        options=list(opt_bc.keys()), key="bcth_chon",
+        options=list(opt_bc.keys()), key=f"{key_prefix}bcth_chon",
     )
     if not chon_bc:
         st.info("Chọn ít nhất 1 biên bản để tạo báo cáo.")
@@ -1193,27 +1280,27 @@ def _render_theo_doi_bc_th(pgd_user: str | None,
 
     ds_chon = [opt_bc[k] for k in chon_bc]
 
-    with st.form("form_bc_th"):
+    with st.form(f"{key_prefix}form_bc_th"):
         st.markdown("**Thông tin báo cáo:**")
         bc1, bc2 = st.columns(2)
-        don_vi_kt_bc  = bc1.text_input("Đơn vị kiểm tra", key="bcth_dvkt")
-        truong_doan_bc = bc1.text_input("Trưởng đoàn kiểm tra", key="bcth_td")
-        cap_uy        = bc1.text_input("Cấp ủy, chính quyền tham dự (nếu có)", key="bcth_capuy")
-        dia_danh_bc   = bc2.text_input("Địa danh ký", placeholder="Biên Hòa", key="bcth_dd")
-        ngay_bc       = bc2.date_input("Ngày báo cáo", value=date.today(), key="bcth_ngay")
+        don_vi_kt_bc  = bc1.text_input("Đơn vị kiểm tra", key=f"{key_prefix}bcth_dvkt")
+        truong_doan_bc = bc1.text_input("Trưởng đoàn kiểm tra", key=f"{key_prefix}bcth_td")
+        cap_uy        = bc1.text_input("Cấp ủy, chính quyền tham dự (nếu có)", key=f"{key_prefix}bcth_capuy")
+        dia_danh_bc   = bc2.text_input("Địa danh ký", placeholder="Biên Hòa", key=f"{key_prefix}bcth_dd")
+        ngay_bc       = bc2.date_input("Ngày báo cáo", value=date.today(), key=f"{key_prefix}bcth_ngay")
         noi_dung_kt   = st.text_area(
             "III. Nội dung kiểm tra",
             value="Theo Phụ lục I văn bản số 727/HD-NHCS ngày 11/02/2026.",
-            height=60, key="bcth_ndkt",
+            height=60, key=f"{key_prefix}bcth_ndkt",
         )
         st.markdown("**IV. Đánh giá & Kiến nghị:**")
         r1, r2 = st.columns(2)
-        nx_ctxh    = r1.text_area("Nhận xét đối với CT-XH",       height=60, key="bcth_nx_ctxh")
-        nx_to      = r2.text_area("Nhận xét đối với Tổ TK&VV",    height=60, key="bcth_nx_to")
-        nx_to_vien = r1.text_area("Nhận xét đối với tổ viên",     height=60, key="bcth_nx_tov")
-        kn_ctxh    = r2.text_area("Kiến nghị với CT-XH",          height=60, key="bcth_kn_ctxh")
-        kn_nhcs    = r1.text_area("Kiến nghị với NHCSXH",         height=60, key="bcth_kn_nhcs")
-        kn_cap_tren = r2.text_area("Kiến nghị với CT-XH cấp trên", height=60, key="bcth_kn_ct")
+        nx_ctxh    = r1.text_area("Nhận xét đối với CT-XH",       height=60, key=f"{key_prefix}bcth_nx_ctxh")
+        nx_to      = r2.text_area("Nhận xét đối với Tổ TK&VV",    height=60, key=f"{key_prefix}bcth_nx_to")
+        nx_to_vien = r1.text_area("Nhận xét đối với tổ viên",     height=60, key=f"{key_prefix}bcth_nx_tov")
+        kn_ctxh    = r2.text_area("Kiến nghị với CT-XH",          height=60, key=f"{key_prefix}bcth_kn_ctxh")
+        kn_nhcs    = r1.text_area("Kiến nghị với NHCSXH",         height=60, key=f"{key_prefix}bcth_kn_nhcs")
+        kn_cap_tren = r2.text_area("Kiến nghị với CT-XH cấp trên", height=60, key=f"{key_prefix}bcth_kn_ct")
         submitted_bc = st.form_submit_button("📄 Tạo Báo cáo tổng hợp Word", type="primary")
 
     if submitted_bc:
@@ -1235,7 +1322,7 @@ def _render_theo_doi_bc_th(pgd_user: str | None,
                 file_name=ten_file + ".docx",
                 mime="application/vnd.openxmlformats-officedocument"
                      ".wordprocessingml.document",
-                key="bcth_dl_docx",
+                key=f"{key_prefix}bcth_dl_docx",
             )
         with bc_c2:
             pdf_bc = docx_bytes_to_pdf(docx_bytes)
@@ -1245,7 +1332,7 @@ def _render_theo_doi_bc_th(pgd_user: str | None,
                     data=pdf_bc,
                     file_name=ten_file + ".pdf",
                     mime="application/pdf",
-                    key="bcth_dl_pdf",
+                    key=f"{key_prefix}bcth_dl_pdf",
                 )
             else:
                 st.caption("⚠️ PDF không khả dụng — cần MS Word trên server")

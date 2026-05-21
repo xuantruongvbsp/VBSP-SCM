@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## [2026-05-21] — Refactor: tách hàm tạo Word/PDF tab Ủy thác sang template_service
+- `services/template_service.py` — thêm các hàm `tao_word_uythac_*` để gom logic tạo Word (Kế hoạch, M06, M15, M16, BB-CT/CX, BC-TH, BB xác minh)
+- `tabs/tab_uy_thac.py` — bỏ khối WORD EXPORT FUNCTIONS khỏi tab, chuyển sang gọi `tao_word_uythac_*`, dọn import docx khỏi UI
+- `tests/test_uythac_template_service.py` — thêm smoke tests cho các hàm `tao_word_uythac_*` (assert docx bytes hợp lệ)
+
 ## [2026-05-21] — Xử lý toàn bộ vấn đề làm việc 2 máy
 - `db.py` — mở rộng export/import cover 10 bảng: users, kv_store, nhiem_vu, nhiem_vu_ketqua, tien_do_task, tien_do_ketqua, qlnk_*, mau_bieu_cv368 (format v2, tương thích ngược v1)
 - `db.py` — `luu_kv_sync_project/doc_kv_sync_project` trả về dict {bảng: count}

@@ -1,6 +1,6 @@
 """Tab Ủy thác — Theo dõi Hội đoàn thể và các mẫu biểu kiểm tra."""
 from __future__ import annotations
-import io, pickle, uuid
+import io, os, pickle, uuid
 from datetime import date, datetime, timedelta
 import pandas as pd
 import streamlit as st
@@ -8,13 +8,14 @@ from streamlit.delta_generator import DeltaGenerator
 
 import db
 from auth import la_phan_he_cn, normalize_role
+from data.core import ts_file
 from data.pgd import pgd_slug
 from config import (
     COT_TEN_PGD, COT_TEN_KH, COT_SO_KU, COT_TEN_CT,
     COT_TONG_DU_NO, COT_DU_NO_QH, COT_LAI_TON, COT_LAI_TON_QH,
     COT_SO_DU_TG, COT_NGAY_VAY, COT_TEN_TO, COT_DVUT,
     COT_TEN_XA, COT_TEN_THON, COT_MUC_VAY,
-    TEN_CHI_NHANH_HIEN_THI, DS_PGD, PGD_XA_MAP,
+    TEN_CHI_NHANH_HIEN_THI, DS_PGD, PGD_XA_MAP, CACHE_HSTD,
 )
 from utils import fmt, fmt_bang_ty, fmt_ngay, fmt_so, xuat_excel
 from services.template_service import (
@@ -96,6 +97,37 @@ def _loc_mau15(_df_bytes: bytes, ten_to: str) -> bytes:
         COT_TONG_DU_NO, "Nợ lãi", COT_SO_DU_TG,
     ] if c in df_to.columns or c == "Nợ lãi"]
     return pickle.dumps(df_to[cols].reset_index(drop=True))
+
+
+@st.cache_data(show_spinner=False, ttl=300)
+def _doc_hstd_cached(_ts: float = 0) -> pd.DataFrame:
+    try:
+        return pd.read_parquet(CACHE_HSTD)
+    except Exception:
+        return pd.DataFrame()
+
+
+def _co_du_lieu_to(df: pd.DataFrame) -> bool:
+    if df is None or df.empty:
+        return False
+    if COT_TEN_TO not in df.columns:
+        return False
+    s = df[COT_TEN_TO]
+    if s is None:
+        return False
+    try:
+        return s.dropna().astype(str).str.strip().replace("", pd.NA).dropna().size > 0
+    except Exception:
+        return False
+
+
+def _hstd_cache_hop_le(df: pd.DataFrame) -> bool:
+    if df is None or df.empty:
+        return False
+    if len(df.columns) < 15:
+        return False
+    bat_buoc = [COT_TEN_TO, COT_DVUT, COT_TEN_XA]
+    return all(c in df.columns for c in bat_buoc)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -320,8 +352,15 @@ def _render_mau06(df: pd.DataFrame, pgd_user: str | None) -> None:
     key_prefix_base = f"uyt_m06_{pgd_slug(pgd_user) if pgd_user else 'cn'}_"
     if df is None or df.empty:
         st.warning("Chưa có dữ liệu HSTD."); return
+    if len(df.columns) < 15:
+        st.error(
+            f"⚠️ Dữ liệu HSTD chưa đầy đủ (chỉ {len(df.columns)} cột) — không thể lập Mẫu 06/TD.\n\n"
+            "Cần upload/merge lại file HSTD đúng để tạo cache đầy đủ."
+        )
+        return
     if COT_NGAY_VAY not in df.columns:
-        st.warning(f"Không tìm thấy cột '{COT_NGAY_VAY}'."); return
+        st.warning(f"Thiếu cột '{COT_NGAY_VAY}' trong dữ liệu HSTD — không thể lọc giải ngân để lập Mẫu 06/TD.")
+        return
 
     if pgd_user:
         st.info(f"PGD: **{pgd_user}**")
@@ -494,6 +533,9 @@ def _render_mau15(df: pd.DataFrame, pgd_user: str | None) -> None:
     key_prefix_base = f"uyt_m15_{pgd_slug(pgd_user) if pgd_user else 'cn'}_"
     if df is None or df.empty:
         st.warning("Chưa có dữ liệu HSTD."); return
+    if COT_TEN_TO not in df.columns:
+        st.warning(f"Thiếu cột '{COT_TEN_TO}' trong dữ liệu HSTD — không thể lập Mẫu 15/TD.")
+        return
 
     if pgd_user:
         st.info(f"PGD: **{pgd_user}**")
@@ -520,8 +562,23 @@ def _render_mau15(df: pd.DataFrame, pgd_user: str | None) -> None:
         df_src = df[df[COT_TEN_PGD] == pgd_chon].copy()
 
     # Chọn Tổ TK&VV
-    ds_to = sorted(df_src[COT_TEN_TO].dropna().unique().tolist()) \
-            if COT_TEN_TO in df_src.columns else []
+    if not _co_du_lieu_to(df_src):
+        st.warning(f"Không có dữ liệu '{COT_TEN_TO}' trong phạm vi đã chọn.")
+        return
+    ds_to = (
+        sorted(
+            df_src[COT_TEN_TO]
+            .dropna()
+            .astype(str)
+            .str.strip()
+            .replace("", pd.NA)
+            .dropna()
+            .unique()
+            .tolist()
+        )
+        if COT_TEN_TO in df_src.columns
+        else []
+    )
     if not ds_to:
         st.warning("Không có dữ liệu Tổ TK&VV."); return
 
@@ -540,7 +597,7 @@ def _render_mau15(df: pd.DataFrame, pgd_user: str | None) -> None:
         st.info("Chọn Tổ TK&VV để xem dữ liệu."); return
 
     try:
-        df_to = pickle.loads(_loc_mau15(pickle.dumps(df), chon_to))
+        df_to = pickle.loads(_loc_mau15(pickle.dumps(df_src), chon_to))
     except Exception as e:
         st.error(f"Lỗi: {e}"); return
 
@@ -1349,7 +1406,14 @@ from tabs.base_tab import TabContext
 def render(tab: DeltaGenerator, **kwargs) -> None:
     """Entry point — dùng chung cho ws_operation và ws_management."""
     ctx = TabContext(tab, **kwargs)
-    df       = kwargs.get("df")
+    _df_full = kwargs.get("df_full")
+    df_full = _df_full if isinstance(_df_full, pd.DataFrame) else None
+    df = kwargs.get("df")
+    if (df is None or getattr(df, "empty", True)) and df_full is not None and not df_full.empty:
+        df = df_full
+    if (df is None or getattr(df, "empty", True)) and os.path.exists(CACHE_HSTD):
+        df_cache = _doc_hstd_cached(ts_file(CACHE_HSTD))
+        df = df_cache if _hstd_cache_hop_le(df_cache) else pd.DataFrame()
     pgd_user = ctx.pgd_user
     username = kwargs.get("username", "unknown")
     role     = normalize_role(str(kwargs.get("role", "user") or "user"))
@@ -1360,6 +1424,14 @@ def render(tab: DeltaGenerator, **kwargs) -> None:
             "Theo dõi hoạt động ủy thác và các mẫu biểu kiểm tra "
             "theo văn bản 727/HD-NHCS."
         )
+        if df is None or df.empty:
+            if os.path.exists(CACHE_HSTD):
+                df_cache2 = _doc_hstd_cached(ts_file(CACHE_HSTD))
+                if df_cache2 is not None and not df_cache2.empty and len(df_cache2.columns) < 15:
+                    st.error(
+                        f"⚠️ Dữ liệu HSTD cache chưa đầy đủ (chỉ {len(df_cache2.columns)} cột) — "
+                        "cần upload/merge HSTD lại để dùng các chức năng Ủy thác."
+                    )
         sub1, sub2, sub3, sub4, sub5, sub6, sub7 = st.tabs([
             "📊 Theo Hội đoàn thể",
             "📋 Kế hoạch (01/KH)",

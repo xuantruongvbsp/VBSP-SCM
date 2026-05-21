@@ -11,6 +11,7 @@ from typing import Any
 import pandas as pd
 
 import db
+from logger import get_logger
 from config import (
     CHUONG_TRINH_KHTD,
     DCGIAM_CRED_FILE,
@@ -26,6 +27,8 @@ from config import (
 )
 from data.pgd import pgd_slug as _pgd_slug
 from services.upload_service import KetQuaUpload
+
+logger = get_logger(__name__)
 
 LOAI_GIAO = "giao"
 LOAI_DIEU_CHINH = "dieu_chinh"

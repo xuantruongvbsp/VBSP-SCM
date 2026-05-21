@@ -20,6 +20,14 @@ from services import khnv_noi_bo_service
 from services.khnv_noi_bo_service import (
     _xuat_bc_phan_cong,
     _xuat_bc_tien_do,
+    _CHUC_VU_MAP,
+    _CHUC_VU_LABEL,
+    _CHUC_VU_SHORT,
+    _CHUC_VU_TASK_FILTER,
+    _MAU_GIAO_VIEC,
+    _MAU_GIAO_VIEC_TP,
+    _guess_chuc_vu,
+    _safe_date_lt,
 )
 from utils import get_tab_context, xuat_excel
 from components.export_pdf import xuat_pdf_co_chart, download_pdf_button
@@ -55,259 +63,6 @@ KHNV_PHAN_CONG = "khnv_phan_cong_list"
 KHNV_LICH      = "khnv_lich_list"
 KHNV_CAN_BO    = "khnv_can_bo_list"   # {id, ho_ten, chuc_vu: "vp1"|"vp2"|"cbtd"}
 
-# Chức vụ mapping
-_CHUC_VU_MAP = {
-    "vp1":  "Phó phòng (VT 1)",
-    "vp2":  "Phó phòng (VT 2)",
-    "cbtd": "Cán bộ TD",
-}
-_CHUC_VU_LABEL = {
-    "vp1":  "👔 Phó phòng Vị trí 1",
-    "vp2":  "👔 Phó phòng Vị trí 2",
-    "cbtd": "🧑‍💼 Cán bộ Tín dụng",
-}
-_CHUC_VU_SHORT = {
-    "vp1":  "Phó Phòng VT1",
-    "vp2":  "Phó Phòng VT2",
-    "cbtd": "Cán bộ Tín dụng",
-}
-# Tập nguoi_thuc_hien trong _MAU_GIAO_VIEC phù hợp với từng chức vụ
-_CHUC_VU_TASK_FILTER = {
-    "vp1":  {"Phó phòng (VT 1)", "Phó phòng (VT 1 & VT 2)",
-             "Phó phòng (VT 1) + Cán bộ TD", "Phó phòng (VT 1 & VT 2), Cán bộ TD",
-             "Tất cả cán bộ"},
-    "vp2":  {"Phó phòng (VT 2)", "Phó phòng (VT 1 & VT 2)",
-             "Phó phòng (VT 2) + Cán bộ TD", "Phó phòng (VT 1 & VT 2), Cán bộ TD",
-             "Tất cả cán bộ"},
-    "cbtd": {"Cán bộ TD", "Cán bộ TD (theo địa bàn)",
-             "Phó phòng (VT 1) + Cán bộ TD", "Phó phòng (VT 2) + Cán bộ TD",
-             "Phó phòng (VT 1 & VT 2), Cán bộ TD", "Tất cả cán bộ"},
-}
-
-# ──────────────────────────────────────────────
-# DỮ LIỆU MẪU — 38 đầu việc cấp dưới (nhóm I–VIII)
-# ──────────────────────────────────────────────
-
-_MAU_GIAO_VIEC = [
-    # I. QUẢN LÝ CHUNG & HÀNH CHÍNH (5 việc)
-    {"nhom": "I. Quản lý chung & Điều hành",
-     "tieu_de": "Tổng hợp kế hoạch công tác tháng của Phòng, báo cáo Trưởng phòng",
-     "nguoi_thuc_hien": "Phó phòng (VT 1)",
-     "mo_ta": "⏱ 25 hàng tháng · 📄 Dự thảo kế hoạch"},
-    {"nhom": "I. Quản lý chung & Điều hành",
-     "tieu_de": "Theo dõi, đôn đốc tiến độ công việc; tổng hợp phiếu giao việc",
-     "nguoi_thuc_hien": "Phó phòng (VT 1)",
-     "mo_ta": "⏱ Hàng tuần · 📄 Báo cáo chiều thứ Sáu"},
-    {"nhom": "I. Quản lý chung & Điều hành",
-     "tieu_de": "Phân công cán bộ đi giao dịch xã theo lịch cố định",
-     "nguoi_thuc_hien": "Phó phòng (VT 1)",
-     "mo_ta": "⏱ Trước 20 hàng tháng · 📄 Danh sách phân công"},
-    {"nhom": "I. Quản lý chung & Điều hành",
-     "tieu_de": "Kiểm soát, ký nháy các văn bản do Phòng soạn thảo",
-     "nguoi_thuc_hien": "Phó phòng (VT 1 & VT 2)",
-     "mo_ta": "⏱ Trong ngày · 📄 Văn bản trình Giám đốc"},
-    {"nhom": "I. Quản lý chung & Điều hành",
-     "tieu_de": "Theo dõi chấm công, nghỉ phép, nghỉ bù của cán bộ Phòng",
-     "nguoi_thuc_hien": "Phó phòng (VT 2)",
-     "mo_ta": "⏱ Hàng tháng · 📄 Bảng chấm công"},
-    # II. TÍN DỤNG & CHO VAY (6 việc)
-    {"nhom": "II. Tín dụng & Cho vay",
-     "tieu_de": "Thẩm định và phê duyệt các khoản vay theo phân quyền trên hệ thống Intellect",
-     "nguoi_thuc_hien": "Phó phòng (VT 1)",
-     "mo_ta": "⏱ Trong 2 ngày kể từ khi nhận hồ sơ · 📄 Kết quả thẩm định"},
-    {"nhom": "II. Tín dụng & Cho vay",
-     "tieu_de": "Tổng hợp nhu cầu vay vốn hộ nghèo, cận nghèo, đối tượng chính sách tại địa bàn TP",
-     "nguoi_thuc_hien": "Phó phòng (VT 1)",
-     "mo_ta": "⏱ Hàng quý · 📄 Báo cáo đề xuất bổ sung vốn"},
-    {"nhom": "II. Tín dụng & Cho vay",
-     "tieu_de": "Triển khai cho vay: HTTVL, hộ nghèo, cận nghèo, nhà ở xã hội, HS-SV, XKLĐ, NĐ75, QĐ755, 2085,...",
-     "nguoi_thuc_hien": "Cán bộ TD (theo địa bàn)",
-     "mo_ta": "⏱ Theo kế hoạch giải ngân · 📄 Hồ sơ giải ngân đúng quy trình"},
-    {"nhom": "II. Tín dụng & Cho vay",
-     "tieu_de": "Tập hợp, kiểm tra hồ sơ vay từ Tổ TK&VV, trình lãnh đạo phê duyệt",
-     "nguoi_thuc_hien": "Cán bộ TD",
-     "mo_ta": "⏱ Hàng tuần · 📄 Hồ sơ hợp lệ"},
-    {"nhom": "II. Tín dụng & Cho vay",
-     "tieu_de": "Xây dựng kế hoạch tín dụng năm của các xã, phường, trình Trưởng BĐD HĐQT TP phê duyệt",
-     "nguoi_thuc_hien": "Phó phòng (VT 1)",
-     "mo_ta": "⏱ Quý IV hàng năm · 📄 Kế hoạch được phê duyệt"},
-    {"nhom": "II. Tín dụng & Cho vay",
-     "tieu_de": "Xây dựng kế hoạch tín dụng toàn tỉnh, trình Trưởng BĐD HĐQT tỉnh",
-     "nguoi_thuc_hien": "Phó phòng (VT 2)",
-     "mo_ta": "⏱ Theo chỉ đạo · 📄 Kế hoạch trình Trung ương"},
-    # III. NGUỒN VỐN & QUỸ (3 việc)
-    {"nhom": "III. Nguồn vốn & Quỹ",
-     "tieu_de": "Theo dõi biến động quỹ an toàn chi trả, đề xuất bổ sung hoặc điều chuyển",
-     "nguoi_thuc_hien": "Phó phòng (VT 2)",
-     "mo_ta": "⏱ Hàng ngày · 📄 Điện chuyển vốn kịp thời"},
-    {"nhom": "III. Nguồn vốn & Quỹ",
-     "tieu_de": "Huy động tiền gửi tiết kiệm từ tổ chức, cá nhân trên địa bàn",
-     "nguoi_thuc_hien": "Phó phòng (VT 2) + Cán bộ TD",
-     "mo_ta": "⏱ Hàng tháng · 📄 Báo cáo kết quả huy động"},
-    {"nhom": "III. Nguồn vốn & Quỹ",
-     "tieu_de": "Quản lý nguồn vốn nhận ủy thác từ UBND tỉnh, các tổ chức; theo dõi Quỹ QGVL",
-     "nguoi_thuc_hien": "Phó phòng (VT 2)",
-     "mo_ta": "⏱ Thường xuyên · 📄 Sổ theo dõi, báo cáo đối chiếu"},
-    # IV. NỢ RỦI RO & QUẢN LÝ NỢ (5 việc)
-    {"nhom": "IV. Nợ rủi ro & Quản lý nợ",
-     "tieu_de": "Hướng dẫn, đôn đốc các đơn vị lập hồ sơ xử lý nợ rủi ro",
-     "nguoi_thuc_hien": "Phó phòng (VT 2)",
-     "mo_ta": "⏱ Theo phát sinh · 📄 Hồ sơ đầy đủ, đúng quy định"},
-    {"nhom": "IV. Nợ rủi ro & Quản lý nợ",
-     "tieu_de": "Kiểm tra, tổng hợp hồ sơ nợ rủi ro toàn tỉnh, trình cấp thẩm quyền",
-     "nguoi_thuc_hien": "Phó phòng (VT 2)",
-     "mo_ta": "⏱ Hàng quý · 📄 Tờ trình kèm hồ sơ"},
-    {"nhom": "IV. Nợ rủi ro & Quản lý nợ",
-     "tieu_de": "Thông báo công khai kết quả xử lý nợ rủi ro tại địa bàn thành phố",
-     "nguoi_thuc_hien": "Phó phòng (VT 2)",
-     "mo_ta": "⏱ Sau khi được phê duyệt · 📄 Biên bản, thông báo"},
-    {"nhom": "IV. Nợ rủi ro & Quản lý nợ",
-     "tieu_de": "Lưu giữ hồ sơ nợ rủi ro theo quy định",
-     "nguoi_thuc_hien": "Phó phòng (VT 2)",
-     "mo_ta": "⏱ Thường xuyên · 📄 Hồ sơ đầy đủ"},
-    {"nhom": "IV. Nợ rủi ro & Quản lý nợ",
-     "tieu_de": "Đôn đốc thu nợ đến hạn, quá hạn; lập danh sách nợ chây ỳ",
-     "nguoi_thuc_hien": "Cán bộ TD",
-     "mo_ta": "⏱ Hàng tháng · 📄 Báo cáo nợ chi tiết"},
-    # V. ỦY THÁC CT-XH & TỔ TK&VV (4 việc)
-    {"nhom": "V. Ủy thác CT-XH & Tổ TK&VV",
-     "tieu_de": "Tham mưu ký Văn bản liên tịch, Hợp đồng ủy thác với các tổ chức CT-XH",
-     "nguoi_thuc_hien": "Phó phòng (VT 1)",
-     "mo_ta": "⏱ Khi có thay đổi · 📄 Hợp đồng đã ký"},
-    {"nhom": "V. Ủy thác CT-XH & Tổ TK&VV",
-     "tieu_de": "Tổ chức họp giao ban với các tổ chức CT-XH cấp tỉnh, thành phố",
-     "nguoi_thuc_hien": "Phó phòng (VT 2)",
-     "mo_ta": "⏱ Định kỳ (2 tháng/lần) · 📄 Biên bản, thông báo kết luận"},
-    {"nhom": "V. Ủy thác CT-XH & Tổ TK&VV",
-     "tieu_de": "Đánh giá chất lượng hoạt động Tổ TK&VV; đề xuất củng cố tổ yếu kém",
-     "nguoi_thuc_hien": "Cán bộ TD (theo địa bàn)",
-     "mo_ta": "⏱ Hàng tháng · 📄 Bảng xếp loại Tổ"},
-    {"nhom": "V. Ủy thác CT-XH & Tổ TK&VV",
-     "tieu_de": "Tham gia sinh hoạt Tổ TK&VV theo lịch; kiểm tra sổ sách của Tổ",
-     "nguoi_thuc_hien": "Cán bộ TD",
-     "mo_ta": "⏱ Hàng tháng · 📄 Biên bản kiểm tra"},
-    # VI. GIAO DỊCH XÃ & KIỂM TRA CƠ SỞ (4 việc)
-    {"nhom": "VI. Giao dịch xã & Kiểm tra cơ sở",
-     "tieu_de": "Tham mưu tổ chức phiên giao dịch xã đúng lịch, an toàn",
-     "nguoi_thuc_hien": "Phó phòng (VT 1)",
-     "mo_ta": "⏱ Theo lịch cố định · 📄 Báo cáo sau phiên giao dịch"},
-    {"nhom": "VI. Giao dịch xã & Kiểm tra cơ sở",
-     "tieu_de": "Kiểm tra, giám sát hoạt động tại Điểm giao dịch xã; tỷ lệ giải ngân, thu nợ, thu lãi",
-     "nguoi_thuc_hien": "Phó phòng (VT 1) + Cán bộ TD",
-     "mo_ta": "⏱ Hàng quý · 📄 Báo cáo đánh giá"},
-    {"nhom": "VI. Giao dịch xã & Kiểm tra cơ sở",
-     "tieu_de": "Kiểm tra sử dụng vốn vay 100% món vay trong vòng 30 ngày sau giải ngân",
-     "nguoi_thuc_hien": "Cán bộ TD",
-     "mo_ta": "⏱ Hàng tháng · 📄 Mẫu 06/TD"},
-    {"nhom": "VI. Giao dịch xã & Kiểm tra cơ sở",
-     "tieu_de": "Mở hòm thư góp ý, tổng hợp ý kiến khách hàng tại Điểm giao dịch xã",
-     "nguoi_thuc_hien": "Cán bộ TD",
-     "mo_ta": "⏱ Hàng tháng · 📄 Báo cáo tham mưu giải quyết"},
-    # VII. BÁO CÁO THỐNG KÊ & TỔNG HỢP (6 việc)
-    {"nhom": "VII. Báo cáo & Thống kê",
-     "tieu_de": "Tổng hợp báo cáo thống kê tín dụng toàn tỉnh gửi NHCSXH TW, NHNN, các sở ngành",
-     "nguoi_thuc_hien": "Phó phòng (VT 2)",
-     "mo_ta": "⏱ Trước ngày 10 hàng tháng · 📄 Báo cáo đầy đủ biểu"},
-    {"nhom": "VII. Báo cáo & Thống kê",
-     "tieu_de": "Dự thảo Nghị quyết, báo cáo kết quả hoạt động của BĐD HĐQT tỉnh",
-     "nguoi_thuc_hien": "Phó phòng (VT 2)",
-     "mo_ta": "⏱ Theo kỳ họp · 📄 Nghị quyết trình ký"},
-    {"nhom": "VII. Báo cáo & Thống kê",
-     "tieu_de": "Xây dựng dự thảo báo cáo kết quả hoạt động chi nhánh tháng, quý, năm",
-     "nguoi_thuc_hien": "Phó phòng (VT 2)",
-     "mo_ta": "⏱ Theo định kỳ · 📄 Báo cáo trình Giám đốc"},
-    {"nhom": "VII. Báo cáo & Thống kê",
-     "tieu_de": "Lập dự toán, tờ trình văn phòng phẩm theo tháng; thanh toán các khoản của Phòng",
-     "nguoi_thuc_hien": "Phó phòng (VT 2)",
-     "mo_ta": "⏱ Hàng tháng · 📄 Dự toán, chứng từ"},
-    {"nhom": "VII. Báo cáo & Thống kê",
-     "tieu_de": "Kiểm soát, chỉnh sửa các cảnh báo trên chương trình TTBC-IMS",
-     "nguoi_thuc_hien": "Cán bộ TD",
-     "mo_ta": "⏱ Hàng tuần · 📄 Báo cáo kết quả chỉnh sửa"},
-    {"nhom": "VII. Báo cáo & Thống kê",
-     "tieu_de": "Chấm điểm 05 chuyên đề thi đua của chi nhánh",
-     "nguoi_thuc_hien": "Phó phòng (VT 1)",
-     "mo_ta": "⏱ Hàng quý · 📄 Bảng chấm điểm"},
-    # VIII. ĐÀO TẠO & CÔNG TÁC KHÁC (5 việc)
-    {"nhom": "VIII. Đào tạo & Công tác khác",
-     "tieu_de": "Dự thảo kế hoạch, tài liệu tập huấn nghiệp vụ cho cán bộ trong và ngoài ngành",
-     "nguoi_thuc_hien": "Phó phòng (VT 2)",
-     "mo_ta": "⏱ Quý II hàng năm · 📄 Kế hoạch, tài liệu"},
-    {"nhom": "VIII. Đào tạo & Công tác khác",
-     "tieu_de": "Tham gia tập huấn, bồi dưỡng nghiệp vụ khi được phân công",
-     "nguoi_thuc_hien": "Cán bộ TD",
-     "mo_ta": "⏱ Theo yêu cầu · 📄 Giấy chứng nhận (nếu có)"},
-    {"nhom": "VIII. Đào tạo & Công tác khác",
-     "tieu_de": "Thành viên Tổ giao dịch lưu động tại xã, phường",
-     "nguoi_thuc_hien": "Phó phòng (VT 1 & VT 2), Cán bộ TD",
-     "mo_ta": "⏱ Theo lịch phân công · 📄 Thực hiện giao dịch"},
-    {"nhom": "VIII. Đào tạo & Công tác khác",
-     "tieu_de": "Làm thư ký giúp việc cho thành viên BĐD HĐQT các cấp khi kiểm tra địa bàn",
-     "nguoi_thuc_hien": "Phó phòng (VT 1 & VT 2), Cán bộ TD",
-     "mo_ta": "⏱ Theo phân công · 📄 Biên bản kiểm tra"},
-    {"nhom": "VIII. Đào tạo & Công tác khác",
-     "tieu_de": "Thực hiện nhiệm vụ đột xuất do Trưởng phòng / Ban Giám đốc giao",
-     "nguoi_thuc_hien": "Tất cả cán bộ",
-     "mo_ta": "⏱ Theo yêu cầu · 📄 Báo cáo hoàn thành"},
-]
-
-# ──────────────────────────────────────────────
-# DỮ LIỆU TĨNH — 17 đầu việc Trưởng phòng (chỉ hiển thị tham chiếu, không lưu kv)
-# ──────────────────────────────────────────────
-
-_MAU_GIAO_VIEC_TP = [
-    {"ma": "TP01", "tieu_de": "Xây dựng chương trình, kế hoạch công tác của Phòng",
-     "mo_ta": "Lập kế hoạch tháng, quý, năm; tổng hợp, đánh giá kết quả thực hiện; báo cáo Ban Giám đốc",
-     "tan_suat": "Tháng/Quý/Năm"},
-    {"ma": "TP02", "tieu_de": "Quản lý, phân công, giám sát và đánh giá cán bộ",
-     "mo_ta": "Phân công nhiệm vụ cụ thể; theo dõi, đôn đốc, kiểm tra, nhận xét, đánh giá kết quả",
-     "tan_suat": "Hàng tuần/Tháng"},
-    {"ma": "TP03", "tieu_de": "Kiểm soát, ký nháy văn bản do Phòng soạn thảo",
-     "mo_ta": "Kiểm soát văn bản trước khi trình Giám đốc tỉnh phê duyệt hoặc ban hành",
-     "tan_suat": "Hàng ngày"},
-    {"ma": "TP04", "tieu_de": "Đầu mối triển khai tín dụng chính sách trên địa bàn",
-     "mo_ta": "Hướng dẫn, triển khai các chương trình tín dụng; phát hiện vướng mắc, đề xuất giải pháp",
-     "tan_suat": "Thường xuyên"},
-    {"ma": "TP05", "tieu_de": "Tham mưu Ban đại diện HĐQT tỉnh",
-     "mo_ta": "Tham mưu tổ chức họp, ban hành Nghị quyết; giao chỉ tiêu tín dụng; đề xuất bổ sung vốn",
-     "tan_suat": "Theo định kỳ/Đột xuất"},
-    {"ma": "TP06", "tieu_de": "Điều hành công tác nguồn vốn",
-     "mo_ta": "Giao hạn mức quỹ; điều hành quỹ hàng ngày; chỉ đạo huy động tiền gửi; quản lý vốn ủy thác",
-     "tan_suat": "Hàng ngày/Tháng"},
-    {"ma": "TP07", "tieu_de": "Chỉ đạo thực hiện và điều chỉnh kế hoạch tín dụng",
-     "mo_ta": "Chỉ đạo xây dựng kế hoạch; tổng hợp trình phê duyệt; điều chỉnh chỉ tiêu; đảm bảo tăng trưởng",
-     "tan_suat": "Quý/Năm"},
-    {"ma": "TP08", "tieu_de": "Chỉ đạo rà soát nhu cầu vay vốn",
-     "mo_ta": "Đảm bảo 100% hộ nghèo, cận nghèo, đối tượng chính sách có nhu cầu được tiếp cận vốn",
-     "tan_suat": "Năm/Đột xuất"},
-    {"ma": "TP09", "tieu_de": "Tham mưu ký kết và giám sát ủy thác qua tổ chức CT-XH",
-     "mo_ta": "Ký văn bản liên tịch, hợp đồng ủy thác; tổ chức triển khai; duy trì giao ban, sơ kết, tập huấn",
-     "tan_suat": "Theo định kỳ"},
-    {"ma": "TP10", "tieu_de": "Chỉ đạo xử lý nợ rủi ro",
-     "mo_ta": "Tham mưu chỉ đạo xử lý nợ rủi ro; thành lập đoàn kiểm tra; kiểm soát hồ sơ; tổng hợp trình cấp thẩm quyền",
-     "tan_suat": "Thường xuyên"},
-    {"ma": "TP11", "tieu_de": "Giám sát hoạt động giao dịch xã",
-     "mo_ta": "Chỉ đạo tổ chức giao dịch xã; kiểm tra mạng lưới điểm giao dịch; đánh giá chất lượng; đề xuất chấn chỉnh",
-     "tan_suat": "Tháng/Quý"},
-    {"ma": "TP12", "tieu_de": "Tổ chức đào tạo, tập huấn nghiệp vụ",
-     "mo_ta": "Dự thảo kế hoạch, chương trình, tài liệu; tham mưu tổ chức tập huấn cho thành viên BĐD HĐQT huyện",
-     "tan_suat": "Năm/Đột xuất"},
-    {"ma": "TP13", "tieu_de": "Kiểm soát và phê duyệt báo cáo thống kê",
-     "mo_ta": "Lập báo cáo định tính tập thể Phòng; kiểm soát, phê duyệt chỉ tiêu được phân quyền; tổng hợp theo quy định",
-     "tan_suat": "Tháng"},
-    {"ma": "TP14", "tieu_de": "Dự thảo báo cáo định kỳ và đột xuất",
-     "mo_ta": "Dự thảo báo cáo tín dụng, tham luận, giải trình, trả lời kiến nghị, góp ý dự thảo văn bản",
-     "tan_suat": "Theo yêu cầu"},
-    {"ma": "TP15", "tieu_de": "Làm thư ký cho thành viên BĐD HĐQT tỉnh",
-     "mo_ta": "Thư ký giúp việc khi thành viên BĐD HĐQT kiểm tra, giám sát địa bàn xã được phân công",
-     "tan_suat": "Theo phân công"},
-    {"ma": "TP16", "tieu_de": "Đầu mối giao dịch với Sở, ban, ngành, tổ chức CT-XH",
-     "mo_ta": "Phối hợp triển khai các hoạt động liên quan đến tín dụng chính sách",
-     "tan_suat": "Thường xuyên"},
-    {"ma": "TP17", "tieu_de": "Thực hiện nhiệm vụ khác do Ban Giám đốc giao",
-     "mo_ta": "Triển khai các nhiệm vụ phát sinh ngoài kế hoạch",
-     "tan_suat": "Đột xuất"},
-]
 
 
 # ──────────────────────────────────────────────
@@ -326,42 +81,6 @@ def _ghi_ds(key: str, ds: list, username: str, action: str, mo_ta: str):
     st.cache_data.clear()
 
 
-def _tinh_so_task(vp1: str, vp2: str, cbtd_list: list) -> int:
-    """Ước tính số task sau khi nhân bản theo danh sách cán bộ điền vào."""
-    n = len(cbtd_list) if cbtd_list else 1
-    total = 0
-    for t in _MAU_GIAO_VIEC:
-        ng = t["nguoi_thuc_hien"]
-        if ng in ("Phó phòng (VT 1)", "Phó phòng (VT 2)"):
-            total += 1
-        elif ng == "Phó phòng (VT 1 & VT 2)":
-            total += 2
-        elif ng in ("Cán bộ TD", "Cán bộ TD (theo địa bàn)"):
-            total += n
-        elif ng in ("Phó phòng (VT 1) + Cán bộ TD", "Phó phòng (VT 2) + Cán bộ TD"):
-            total += 1 + n
-        elif ng in ("Phó phòng (VT 1 & VT 2), Cán bộ TD",):
-            total += 2 + n
-        elif ng == "Tất cả cán bộ":
-            total += 2 + n
-        else:
-            total += 1
-    return total
-
-
-def _guess_chuc_vu(cv: dict) -> str:
-    """Đoán chức vụ từ task (field chuc_vu mới hoặc fallback từ nguoi_thuc_hien cũ)."""
-    cv_field = cv.get("chuc_vu")
-    if cv_field in _CHUC_VU_LABEL:
-        return cv_field
-    nguoi = cv.get("nguoi_thuc_hien", "")
-    if "VT 1" in nguoi and "VT 2" not in nguoi:
-        return "vp1"
-    if "VT 2" in nguoi:
-        return "vp2"
-    if "Phó phòng" in nguoi:
-        return "vp1"
-    return "cbtd"
 
 
 # ──────────────────────────────────────────────
@@ -867,13 +586,6 @@ def _render_phan_cong_v2(role_n: str, username: str) -> None:
             for cv in tasks:
                 _render_task_card(cv, ds, today, role_n, username, key_prefix="pc2_")
 
-
-def _safe_date_lt(date_str: str, ref: date) -> bool:
-    """True nếu date_str < ref, bắt lỗi parse."""
-    try:
-        return date.fromisoformat(date_str) < ref
-    except ValueError:
-        return False
 
 
 # ──────────────────────────────────────────────

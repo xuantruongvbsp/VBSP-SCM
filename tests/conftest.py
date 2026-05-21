@@ -76,7 +76,7 @@ mock_st.date_input = _mock_date_input
 mock_st.text_input = lambda label=None, **kw: ""
 mock_st.number_input = lambda label=None, **kw: 0
 mock_st.text_area = lambda label=None, **kw: ""
-mock_st.slider = lambda label=None, **kw: 0
+mock_st.slider = lambda *args, **kw: 0
 mock_st.radio = lambda label=None, options=None, **kw: (options[0] if options and len(options) > 0 else "")
 mock_st.checkbox = lambda label=None, **kw: False
 class _FakeFile:

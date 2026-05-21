@@ -38,9 +38,12 @@ from config import (
     COT_NGAY_DH_HD,
     COT_PL_NV,
 )
+from logger import get_logger
 from pdf_service import xuat_pdf
 from services.report_service import ten_file_bao_cao
 from utils import fmt_ngay, fmt_so, fmt_ty, xuat_excel, hien_thi_dataframe_phan_trang
+
+logger = get_logger(__name__)
 
 DUOI_TV = 5
 TREN_TV = 60
@@ -172,9 +175,13 @@ def _tinh_to_sai_so_tv(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
         agg_parts.append(f'SUM(TRY_CAST("{COT_DU_NO_QH}" AS DOUBLE)) AS "Dư_nợ_QH"')
     agg_sql = ", ".join(agg_parts)
 
-    df_to = duckdb.query(
-        f'SELECT {gb_sql}, {agg_sql} FROM df_active GROUP BY {gb_sql}'
-    ).df()
+    try:
+        df_to = duckdb.query(
+            f'SELECT {gb_sql}, {agg_sql} FROM df_active GROUP BY {gb_sql}'
+        ).df()
+    except Exception as exc:
+        logger.error("_tinh_to_sai_so_tv: DuckDB query lỗi — %s", exc, exc_info=True)
+        return pd.DataFrame(), pd.DataFrame()
     if "Dư_nợ_TH" not in df_to.columns:
         df_to["Dư_nợ_TH"] = 0.0
     if "Dư_nợ_QH" not in df_to.columns:

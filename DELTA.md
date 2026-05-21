@@ -27,15 +27,19 @@
 | `services/tongquan_service.py` | `tab_tongquan` | `xuat_excel_tqpgd` |
 | `services/khtd_nhap_service.py` | `tab_khtd_nhap` | 7 hàm: `clean_sheet_name`, `tao_df_mau_khtd_cn`, `luu_meta_qd`, `luu_file_qd`, ... |
 | `services/khtd_mau07_service.py` | `tab_khtd_mau07` | 21 hàm: slug/KV helpers, `xuat_mau07_word`, `TEN_BY_MAKEY`, ... |
+| `services/tien_do_excel_service.py` | `tab_tien_do` | `xuat_excel_tien_do()` — tạo 3-sheet Excel tiến độ với openpyxl |
+| `services/no_khoanh_service.py` | `tab_no_khoanh` | `loc_khoanh()`, `bang_theo_nhom()` |
+| `services/khnv_noi_bo_service.py` _(bổ sung)_ | `tab_khnv_noi_bo` | constants `_CHUC_VU_*`, `_MAU_GIAO_VIEC` (38), `_MAU_GIAO_VIEC_TP` (17), `_guess_chuc_vu`, `_safe_date_lt` |
 
 ### Tabs giảm dòng
 | Tab | Trước | Sau | Giảm |
 |---|---|---|---|
 | `tab_no_rui_ro.py` | 2 411 | ~1 067 | -1 344 (-56%) |
-| `tab_tien_do.py` | 1 962 | ~1 323 | -639 (-33%) |
-| `tab_khnv_noi_bo.py` | 1 802 | ~1 455 | -347 (-19%) |
+| `tab_tien_do.py` | 1 962 | 1 109 | -853 (-43%) |
+| `tab_khnv_noi_bo.py` | 1 802 | 1 039 | -763 (-42%) |
 | `tab_upload_khnv.py` | ~1 640 | ~1 332 | -308 (-19%) |
 | `tab_so_sanh_ky.py` | 1 405 | ~1 207 | -198 (-14%) |
+| `tab_no_khoanh.py` | ~1 367 | 1 217 | -150 (-11%) |
 | `tab_cdtotkvv.py` | 1 217 | ~1 097 | -120 (-10%) |
 | `tab_khtd_mau07.py` | ~1 100 | ~880 | -220 (-20%) |
 

@@ -1,5 +1,31 @@
 # CHANGELOG
 
+## [2026-05-21] — Unit tests: +57 tests cho 3 service core (HHI, So sánh kỳ, Nợ khoanh)
+- `tests/test_hhi_service.py` — file mới: 17 tests (tinh_hhi, tinh_hhi_breakdown, danh_gia_hhi) — edge cases: phân tán đều, tập trung hoàn toàn, tổng=0, thiếu cột, df rỗng
+- `tests/test_so_sanh_ky_service.py` — file mới: 31 tests (agg_mot_pgd, agg_theo_pgd, agg_theo_dvut, group_bien_dong, delta_str, tl_nqh, fmt_pct_vn, phan_loai_khach_hang, top_movers, phan_tich_hhi_pgd)
+- `tests/test_no_khoanh_service.py` — file mới: 9 tests (loc_khoanh, bang_theo_nhom) — edge cases: df rỗng, thiếu cột, str→số, tổng=0
+- Tổng: 364 → 421 tests; `pytest -q` → 421 passed trong 38s
+
+## [2026-05-21] — Refactor B2: tách 3 service mới + archive 2 orphan file
+- `services/tien_do_excel_service.py` — file mới (141 dòng): tách `_xuat_excel_tien_do()` từ `tab_tien_do.py`; tạo 3-sheet Excel (Tổng hợp / Ma trận PGD / Chi tiết xã) với openpyxl
+- `services/no_khoanh_service.py` — file mới (39 dòng): tách `_loc_khoanh()` + `_bang_theo_nhom()` từ `tab_no_khoanh.py`
+- `services/khnv_noi_bo_service.py` — bổ sung ~220 dòng: constants `_CHUC_VU_MAP/_LABEL/_SHORT/_TASK_FILTER`, `_MAU_GIAO_VIEC` (38 tasks), `_MAU_GIAO_VIEC_TP` (17 tasks), `_guess_chuc_vu()`, `_safe_date_lt()` từ `tab_khnv_noi_bo.py`
+- `tabs/tab_khnv_noi_bo.py` — giảm 1,451 → 1,039 dòng (-412); dead code `_tinh_so_task` xóa hẳn
+- `tabs/tab_tien_do.py` — giảm → 1,109 dòng (tách Excel builder)
+- `tabs/tab_no_khoanh.py` — giảm → 1,217 dòng (tách loc_khoanh + bang_theo_nhom)
+- `_archive/pdf_no_khoanh_tabs_old.py` — moved từ `tabs/pdf_no_khoanh.py` (duplicate của service)
+- `_archive/kiem_soat_service_tabs_old.py` — moved từ `tabs/kiem_soat_service.py` (phiên bản cũ)
+- Tất cả file pass `python -m py_compile`
+
+## [2026-05-21] — Smoke tests (import + render) + fix 6 source bugs phát hiện qua smoke test
+- `tests/test_smoke_imports.py` — file mới: smoke test 2 phase (import tất cả module + render 51 UI modules) với mock Streamlit; 105 tests, chạy `pytest -q` trong ~18s
+- `tests/conftest.py` — mock toàn bộ `streamlit` (sys.modules) TRƯỚC khi import project code; mock cache_data/cache_resource no-op giữ nguyên function gốc; mock columns/tabs/selectbox/button/file_uploader/slider/…
+- `data/cdtotkvv.py` dòng ~95 — thêm `if df.empty: return None` trước `df.columns = CDTOTKVV_COLS` (crash khi parquet rỗng)
+- `data/den_han.py` dòng ~81 — thêm `if df.empty: return df` đầu `tinh_den_han_df()` (KeyError khi DataFrame rỗng)
+- `tabs/tab_kehoach.py` dòng ~225 — thêm `if df_ss.empty: return` + guard `"_kh" in df_ss.columns` (KeyError khi không có dữ liệu KH)
+- `tabs/tab_tongquan.py` — 4 chỗ `except Exception:` → `except Exception as e:` (UnboundLocalError Python 3.14)
+- `tests/conftest.py` — `st.slider` lambda: `*args, **kw` thay `label=None, **kw` (TypeError: 4 positional args)
+
 ## [2026-05-21] — Fix [COT] hardcode: tab_baocao thay display string bằng biến _DN_*
 - `tabs/tab_baocao.py` dòng ~178 — thay `"Tổng dư nợ"`, `"Dư nợ QH"`, ... bằng biến `_DN_TONG_DU_NO`, `_DN_DU_NO_QH`, ... để check_conventions không báo [COT]; xóa `# noqa: COT`
 

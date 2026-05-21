@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## [2026-05-21] — Refactor: Ủy thác tách builder payload + gom download UI helper
+- `services/uy_thac_service.py` — thêm 6 builder payload functions thuần (build_payload_ke_hoach, build_payload_mau06, build_payload_mau15, build_payload_mau16, build_payload_bb_xac_minh, build_payload_bc_th) để tách khỏi tab
+- `tabs/tab_uy_thac.py` — thêm `_download_word_pdf_pair()` helper thay thế 6 lần lặp inline Word+PDF download buttons; tất cả _render_* giờ gọi builder từ service
+- `tests/test_uythac_template_service.py` — bổ sung smoke test cho build_payload_ke_hoach
+
 ## [2026-05-21] — Refactor: Ủy thác tách logic thuần + KV helpers ra uy_thac_service
 - `services/uy_thac_service.py` — thêm hàm thuần tính tổng hợp DVUT, lọc Mẫu 06/15, kiểm tra dữ liệu Tổ; chuẩn hóa helper KV key + đọc/lưu/cập nhật trạng thái biên bản (kèm audit)
 - `tabs/tab_uy_thac.py` — dùng service cho phần xử lý dữ liệu/KV; bổ sung logger.error(..., exc_info=True) thay cho UI nuốt lỗi; render(tab=None) theo chuẩn TabContext

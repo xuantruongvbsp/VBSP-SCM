@@ -9,10 +9,10 @@ from __future__ import annotations
 import os
 import re
 import json
-import logging
 from io import BytesIO
 from pathlib import Path
 from datetime import datetime
+from logger import get_logger
 from typing import TYPE_CHECKING, Any
 
 import streamlit as st
@@ -41,7 +41,7 @@ from data.core import ts_file
 if TYPE_CHECKING:
     from streamlit.delta_generator import DeltaGenerator
 
-_LOG = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # ── Hằng số ──────────────────────────────────────────────────────────────────
 KV_KEY_CN  = "khtd_cn"
@@ -117,6 +117,7 @@ def _luu_kv(key: str, data: dict[str, Any], username: str) -> bool:
         khtd_service.luu_khtd_dict(key, data, username)
         return True
     except Exception as e:
+        _LOG.error("Lỗi lưu dữ liệu (key=%s): %s", key, e, exc_info=True)
         st.error(f"Lỗi lưu dữ liệu (key={key}): {e}")
         return False
 

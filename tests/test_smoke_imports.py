@@ -14,6 +14,17 @@ from typing import Any
 import pandas as pd
 import pytest
 
+
+class _SessionState(dict):
+    """Dict hỗ trợ cả attribute access (st.session_state.foo = ...)."""
+    def __getattr__(self, name):
+        try:
+            return self[name]
+        except KeyError:
+            raise AttributeError(name)
+    def __setattr__(self, name, value):
+        self[name] = value
+
 # ---------------------------------------------------------------------------
 # Danh sách các module UI cần smoke test
 # ---------------------------------------------------------------------------
@@ -122,8 +133,7 @@ def _try_render(mod: object, module_name: str, monkeypatch: pytest.MonkeyPatch, 
     monkeypatch.setattr("db.ghi_audit", lambda username, action, desc: None)
 
     import streamlit as st
-    st.session_state = {"username": "tester", "role": "admin_cn"}
-    st.cache_data = type("Cache", (), {"clear": lambda: None})()
+    st.session_state = _SessionState({"username": "tester", "role": "admin_cn"})
 
     try:
         render_kwargs.setdefault("role", "admin_cn")
@@ -159,9 +169,13 @@ def _try_render(mod: object, module_name: str, monkeypatch: pytest.MonkeyPatch, 
                     elif second == "role":
                         args.append("admin_cn")
 
-            # Remaining kwargs
+            # Remaining kwargs — also pass through for **kwargs functions
+            has_var_kw = any(
+                p.kind == inspect.Parameter.VAR_KEYWORD
+                for p in sig.parameters.values()
+            )
             for key, val in render_kwargs.items():
-                if key in params:
+                if key in params or has_var_kw:
                     call_kwargs[key] = val
 
             mod.render(*args, **call_kwargs)
@@ -198,7 +212,30 @@ class TestSmokeRender:
 
     @pytest.mark.parametrize("module_name", RENDER_MODULES)
     def test_render(self, module_name: str, monkeypatch: pytest.MonkeyPatch) -> None:
+        from config import (
+            COT_DIA_CHI, COT_DU_NO_KHOANH, COT_DU_NO_QH, COT_DU_NO_TH,
+            COT_GOC_TRA, COT_LAI_SUAT, COT_MA_KH, COT_MUC_VAY,
+            COT_NGAY_DH, COT_NGAY_SL, COT_NGAY_VAY, COT_SO_KU,
+            COT_TEN_CHUONG_TRINH, COT_TEN_KH, COT_TEN_PGD, COT_TEN_TO,
+            COT_TEN_XA, COT_THOI_HAN, COT_TINH_TRANG, COT_TONG_DU_NO,
+            COT_PL_NV, COT_NGUON_VON, COT_SDT, COT_CMND,
+        )
+        SAMPLE_COLS = [
+            COT_MA_KH, COT_TEN_KH, COT_SO_KU, COT_NGAY_VAY, COT_NGAY_DH,
+            COT_THOI_HAN, COT_LAI_SUAT, COT_MUC_VAY, COT_DU_NO_TH,
+            COT_DU_NO_QH, COT_TONG_DU_NO, COT_DU_NO_KHOANH, COT_TEN_CHUONG_TRINH,
+            COT_TINH_TRANG, COT_DIA_CHI, COT_SDT, COT_TEN_TO, COT_TEN_XA,
+            COT_NGUON_VON, COT_PL_NV, COT_CMND, COT_GOC_TRA, COT_NGAY_SL,
+            COT_TEN_PGD,
+        ]
+        sample_df = pd.DataFrame({c: pd.Series(dtype="object") for c in SAMPLE_COLS})
+        render_kwargs = {
+            "df": sample_df,
+            "df_full": sample_df,
+            "df_gqvl": sample_df,
+            "df_nq11": sample_df,
+        }
         mod = _import(module_name)
-        err = _try_render(mod, module_name, monkeypatch, {})
+        err = _try_render(mod, module_name, monkeypatch, render_kwargs)
         if err:
             pytest.fail(f"{module_name}.render() thất bại: {err}")

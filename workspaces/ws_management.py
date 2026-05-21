@@ -175,6 +175,7 @@ def _render_canh_bao(df: pd.DataFrame, ds_pgd_all: list):
                 st.session_state["_file_kl"] = fname
                 st.success("✅ Đã tạo xong — nhấn nút bên dưới để tải về.")
             except Exception as e:
+                logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                 st.error(f"Lỗi tạo KL giao ban: {e}")
 
         if st.session_state.get("_bytes_kl"):
@@ -568,6 +569,7 @@ def _hien_thi_nqh_tab(df_kh: pd.DataFrame, username: str):
                     )
                 st.session_state["_pdf_bytes_nqh"] = _pdf_bytes_nqh
             except Exception as _e:
+                logger.error("Lỗi trong khối except: %s", _e, exc_info=True)
                 st.session_state["_pdf_bytes_nqh"] = None
                 st.error(f"\u274c L\u1ed7i t\u1ea1o PDF: {_e}")
 
@@ -827,6 +829,7 @@ Danh sách này ảnh hưởng trực tiếp đến báo cáo **phân tầng GQV
                     df_pv["Ghi chú"] = df_pv["Nhóm"].map(lambda m: ghi_chu_map.get(m, ""))
                     st.dataframe(df_pv, hide_index=True, use_container_width=True)
         except Exception as e:
+            logger.error("Lỗi trong khối except: %s", e, exc_info=True)
             st.warning(f"Không thể phân tích tác động GQVL: {e}")
 
     # ── Xuất Excel + Làm mới ─────────────────────────────────────────────────
@@ -937,6 +940,7 @@ def _render_quan_ly_template(df: pd.DataFrame):
                         st.rerun()
                         
                     except Exception as e:
+                        logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                         st.error(f"❌ Lỗi lưu file: {e}")
 
     # ══════════════════════════════════════════════════════════════════════════════
@@ -995,6 +999,7 @@ def _render_quan_ly_template(df: pd.DataFrame):
                         st.success(f"✅ Đã xóa: {file_to_delete.name}")
                         st.rerun()
                     except Exception as e:
+                        logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                         st.error(f"❌ Không thể xóa file: {e}")
 
     # ══════════════════════════════════════════════════════════════════════════════
@@ -1096,6 +1101,7 @@ def _render_quan_ly_template(df: pd.DataFrame):
                 st.success("✅ Test thành công! Nhấn nút trên để tải file Word.")
                 
             except Exception as e:
+                logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                 st.error(f"❌ Lỗi test template: {e}")
                 st.exception(e)  # Debug info
 
@@ -1367,6 +1373,7 @@ def render(**kwargs):
         try:
             active_item["fn"]()
         except Exception as e:
+            logger.error("Lỗi trong khối except: %s", e, exc_info=True)
             import traceback
             st.error(f"❌ Lỗi render **{active_label}**: {e}")
             st.code(traceback.format_exc())
@@ -1379,7 +1386,11 @@ def render(**kwargs):
                     try:
                         child["fn"]()
                     except Exception as e:
+                        logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                         import traceback
+from logger import get_logger
+logger = get_logger(__name__)
+
                         st.error(f"❌ Lỗi render **{active_label}**: {e}")
                         st.code(traceback.format_exc())
                     found_child = True

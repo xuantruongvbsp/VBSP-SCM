@@ -18,6 +18,7 @@ def _doc_hstd_cached(_ts: float = 0) -> pd.DataFrame:
     try:
         return pd.read_parquet(CACHE_HSTD)
     except Exception:
+        logger.error("Lỗi trong khối except: %s", e, exc_info=True)
         return pd.DataFrame()
 
 
@@ -26,6 +27,7 @@ def _doc_gqvl_cached(_ts: float = 0) -> pd.DataFrame:
     try:
         return pd.read_parquet(CACHE_GQVL)
     except Exception:
+        logger.error("Lỗi trong khối except: %s", e, exc_info=True)
         return pd.DataFrame()
 from pdf_service import xuat_pdf
 from utils import hien_thi_dataframe_phan_trang, xuat_excel, ten_file_xuat
@@ -460,6 +462,9 @@ def _tab_tien_do_kh_th() -> None:
     """Dashboard cảnh báo tiến độ KH vs TH thực hiện theo PGD."""
     from tabs.tab_khtd_nhap import _tinh_th_gqvl_phan_tang
 
+from logger import get_logger
+logger = get_logger(__name__)
+
     st.subheader("🎯 Tiến độ Kế hoạch vs Thực hiện")
     st.caption(
         "So sánh KH đã nhập với TH thực tế từ HSTD + GQVL. "
@@ -597,6 +602,7 @@ def _tab_tien_do_kh_th() -> None:
                 if not df_gqvl.empty and COT_TEN_PGD in df_gqvl.columns \
                 else pd.DataFrame()
         except Exception:
+            logger.error("Lỗi trong khối except: %s", e, exc_info=True)
             df_gqvl_pgd = pd.DataFrame()
         th_gqvl_pgd = _tinh_th_gqvl_phan_tang(df_gqvl_pgd)
         for sk, sv in th_gqvl_pgd.items():
@@ -642,6 +648,7 @@ def _tab_tien_do_kh_th() -> None:
                 })
                 st.session_state[_ss_ex] = buf
             except Exception as e:
+                logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                 st.error(f"❌ Lỗi: {e}")
         if st.session_state.get(_ss_ex):
             st.download_button(
@@ -666,6 +673,7 @@ def _tab_tien_do_kh_th() -> None:
                 st.session_state[_ss_pdf] = pdf_bytes
                 st.session_state["_pdf_file_tien_do"] = ten_file_xuat("TienDo_KH_TH", ext=".pdf")
             except Exception as e:
+                logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                 st.error(f"❌ Lỗi PDF: {e}")
         if st.session_state.get(_ss_pdf):
             st.download_button(
@@ -805,6 +813,7 @@ def render_xuat_baocao(role: str = "", username: str = "", df_full: "pd.DataFram
                 else:
                     st.info("Chưa có xã/phường nào được giao kế hoạch.")
         except Exception as e:
+            logger.error("Lỗi trong khối except: %s", e, exc_info=True)
             st.warning(f"Không thể xem trước: {e}")
 
     col1, col2 = st.columns([1, 3])
@@ -818,6 +827,7 @@ def render_xuat_baocao(role: str = "", username: str = "", df_full: "pd.DataFram
                     st.session_state["_file_khtd_xa"] = ten_file
                     st.success(f"✅ Đã tạo: {ten_file}")
                 except Exception as e:
+                    logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                     st.error(f"❌ Lỗi khi tạo file: {e}")
 
     if st.session_state.get("_bytes_khtd_xa"):

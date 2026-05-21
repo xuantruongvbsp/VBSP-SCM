@@ -41,6 +41,7 @@ def _ket_noi_gsheet():
     try:
         return gspread.service_account(filename=CREDENTIALS_FILE, scopes=scope)
     except Exception:
+        logger.error("Lỗi trong khối except: %s", e, exc_info=True)
         try:
             from oauth2client.service_account import ServiceAccountCredentials
         except ImportError:
@@ -61,6 +62,7 @@ def _doc_du_lieu() -> pd.DataFrame:
         df["thoi_gian"] = pd.to_datetime(df["thoi_gian"], dayfirst=True, errors="coerce")
         return df
     except Exception as e:
+        logger.error("Lỗi trong khối except: %s", e, exc_info=True)
         st.error(f"Lỗi kết nối GSheet: {e}")
         return pd.DataFrame(columns=COT)
 
@@ -89,6 +91,7 @@ def _phan_loai(ngay_nop, deadline_str: str | None) -> str:
         nop = ngay_nop.date() if hasattr(ngay_nop, "date") else pd.to_datetime(ngay_nop).date()
         return "dung_han" if nop <= dl else "tre"
     except Exception:
+        logger.error("Lỗi trong khối except: %s", e, exc_info=True)
         return "da_nop"
 
 
@@ -210,6 +213,7 @@ def _render_tong_quan(df: pd.DataFrame, deadline_cfg: dict, is_cn: bool, pgd_use
                     st.session_state["_dd_pdf_bytes"] = pdf_bytes
                     st.session_state["_dd_pdf_ten"] = f"{ten_file_goc}.pdf"
                 except Exception as e:
+                    logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                     st.error(f"❌ Lỗi PDF: {e}")
             if st.session_state.get("_dd_pdf_bytes"):
                 st.download_button(
@@ -236,6 +240,7 @@ def _render_tong_quan(df: pd.DataFrame, deadline_cfg: dict, is_cn: bool, pgd_use
                     st.session_state["_dd_pdf_hd_bytes"] = pdf_bytes
                     st.session_state["_dd_pdf_hd_ten"] = f"{ten_file_goc}_header.pdf"
                 except Exception as e:
+                    logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                     st.error(f"❌ Lỗi PDF Header: {e}")
             if st.session_state.get("_dd_pdf_hd_bytes"):
                 st.download_button(
@@ -315,6 +320,9 @@ def _render_danh_sach(df: pd.DataFrame, deadline_cfg: dict, is_cn: bool, pgd_use
         )
     with col_pdf:
         from pdf_service import nut_xuat_pdf
+from logger import get_logger
+logger = get_logger(__name__)
+
         nut_xuat_pdf(
             df_loc,
             "Tiến độ nộp báo cáo PGD",

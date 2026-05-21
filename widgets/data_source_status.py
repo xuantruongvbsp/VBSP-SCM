@@ -72,6 +72,7 @@ def _render_cache_status() -> None:
         else:
             st.sidebar.warning("⚠️ Chưa có CACHE KH-NV\n\nVui lòng upload tại tab KH-NV")
     except Exception:
+        logger.error("Lỗi trong khối except: %s", e, exc_info=True)
         st.sidebar.info("🔄 CACHE KH-NV")
 
 
@@ -111,6 +112,7 @@ def _render_pgd_status(pgd_user: str) -> None:
                     st.markdown(f"**{loai.upper()}**: 📤 Chưa upload")
 
     except Exception as e:
+        logger.error("Lỗi trong khối except: %s", e, exc_info=True)
         st.sidebar.error(f"Lỗi hiển thị: {str(e)[:50]}...")
 
 
@@ -139,6 +141,7 @@ def _render_admin_overview() -> None:
             st.sidebar.success("✅ Tỷ lệ upload tốt")
 
     except Exception:
+        logger.error("Lỗi trong khối except: %s", e, exc_info=True)
         st.sidebar.info("📊 Dữ liệu địa bàn")
 
 
@@ -172,11 +175,15 @@ def render_detailed_status(pgd_user: Optional[str] = None,
             )
         elif pgd_user:
             from services.data_priority_service import hien_thi_trang_thai_nguon_widget
+from logger import get_logger
+logger = get_logger(__name__)
+
             hien_thi_trang_thai_nguon_widget(pgd_user)
         else:
             st.info("Chọn PGD để xem chi tiết trạng thái dữ liệu địa bàn")
 
     except Exception as e:
+        logger.error("Lỗi trong khối except: %s", e, exc_info=True)
         st.error(f"Lỗi hiển thị chi tiết: {e}")
 
 

@@ -217,6 +217,7 @@ def _render_mau01_cv368(
                         f"Mau01_KH_KiemTra_{pgd_slug_val}_{rec.get('nam')}_Dot{rec.get('dot', 1)}.pdf"
                     )
                 except Exception as _e:
+                    logger.error("Lỗi trong khối except: %s", _e, exc_info=True)
                     st.error(f"❌ Lỗi tạo PDF: {_e}")
         if st.session_state.get(f"{key_prefix}m01_pdf_buf"):
             st.download_button(
@@ -308,6 +309,7 @@ def _render_mau01_cv368(
                     if not (0 <= _delta <= 120):
                         st.warning(f"⚠️ {_rv.get(COT_TEN_KH, '')}: Ngày KT cách HH khoanh {_delta} ngày (ngoài 0–120)")
             except Exception:
+                logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                 pass
 
     col_b1, col_b2, _ = st.columns([1, 1, 4])
@@ -354,6 +356,7 @@ def _render_mau01_cv368(
                         f"Mau01_KH_KiemTra_{pgd_slug_val}_{nam}_Dot{int(dot_kh)}.pdf"
                     )
                 except Exception as _e:
+                    logger.error("Lỗi trong khối except: %s", _e, exc_info=True)
                     st.error(f"❌ Lỗi tạo PDF: {_e}")
 
     if st.session_state.get(f"{key_prefix}m01_pdf_buf"):
@@ -407,6 +410,7 @@ def _render_mau02_cv368(
                     _slug_kh = "".join(c for c in nd.get("ten_kh", "KH") if c.isalnum() or c == "_")
                     st.session_state[f"{key_prefix}m02_pdf_fn"] = f"Mau02_CamKet_{_slug_kh}.pdf"
                 except Exception as _e:
+                    logger.error("Lỗi trong khối except: %s", _e, exc_info=True)
                     st.error(f"❌ Lỗi tạo PDF: {_e}")
         if st.session_state.get(f"{key_prefix}m02_pdf_buf"):
             st.download_button(
@@ -504,6 +508,7 @@ def _render_mau02_cv368(
                     ngay_str = datetime.now().strftime("%d%m%Y")
                     st.session_state[f"{key_prefix}m02_pdf_fn"] = f"Mau02_CamKet_{_slug_kh}_{ngay_str}.pdf"
                 except Exception as _e:
+                    logger.error("Lỗi trong khối except: %s", _e, exc_info=True)
                     st.error(f"❌ Lỗi tạo PDF: {_e}")
 
     if st.session_state.get(f"{key_prefix}m02_pdf_buf"):
@@ -550,6 +555,7 @@ def _render_mau03_cv368(
                         f"Mau03_BB_KiemTra_{pgd_slug_val}_{rec.get('nam')}_Dot{rec.get('dot', 1)}.pdf"
                     )
                 except Exception as _e:
+                    logger.error("Lỗi trong khối except: %s", _e, exc_info=True)
                     st.error(f"❌ Lỗi tạo PDF: {_e}")
         if st.session_state.get(f"{key_prefix}m03_pdf_buf"):
             st.download_button(
@@ -677,6 +683,7 @@ def _render_mau03_cv368(
                         f"Mau03_BB_KiemTra_{pgd_slug_val}_{nam}_Dot{int(dot_from_m01)}.pdf"
                     )
                 except Exception as _e:
+                    logger.error("Lỗi trong khối except: %s", _e, exc_info=True)
                     st.error(f"❌ Lỗi tạo PDF: {_e}")
 
     if st.session_state.get(f"{key_prefix}m03_pdf_buf"):
@@ -1134,6 +1141,9 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                     # Lọc ngày nếu có
                     if ngay_tu_06 or ngay_den_06:
                         from datetime import datetime as dt
+from logger import get_logger
+logger = get_logger(__name__)
+
                         try:
                             if ngay_tu_06:
                                 tu_dt = dt.strptime(ngay_tu_06.strip(), "%d/%m/%Y").date()
@@ -1198,6 +1208,7 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                                 )
                                 st.session_state[f"_{key_prefix}qlnk06_pdf"] = pdf_06
                             except Exception as e:
+                                logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                                 st.error(f"❌ Lỗi xuất PDF: {e}")
 
                     if st.session_state.get(f"_{key_prefix}qlnk06_buf"):
@@ -1259,6 +1270,7 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                                 )
                                 st.session_state[f"_{key_prefix}m10_pdf"] = pdf_m10
                             except Exception as e:
+                                logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                                 st.error(f"❌ Lỗi xuất PDF: {e}")
 
                     if st.session_state.get(f"_{key_prefix}m10_buf"):

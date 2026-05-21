@@ -88,6 +88,7 @@ def render(tab, **kwargs):
             try:
                 db_ht_rows = doc_dienbao(path_ht, ts_file(path_ht))
             except Exception as e:
+                logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                 st.error(f"Lỗi đọc file Điện báo: {e}")
 
         if db_ht_rows is None:
@@ -127,6 +128,9 @@ def render(tab, **kwargs):
                     else:
                         try:
                             from io import BytesIO
+from logger import get_logger
+logger = get_logger(__name__)
+
                             df_up = pd.read_excel(BytesIO(file_bytes), header=None)
                             new_kh = {}
                             for _, row in df_up.iterrows():
@@ -144,6 +148,7 @@ def render(tab, **kwargs):
                             kh_data = new_kh
                             st.success(f"✅ Đã tải {len(new_kh)} chỉ tiêu kế hoạch!")
                         except Exception as e:
+                            logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                             st.error(f"Lỗi đọc file: {e}")
 
         with col_nhap:

@@ -408,6 +408,7 @@ Bỏ chọn nếu chỉ áp dụng cho một số PGD cụ thể.
                 st.toast(f"✅ Đã tạo: {tieu_de}")
                 st.rerun()
             except Exception as e:
+                logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                 st.error(f"Lỗi: {e}")
 
 
@@ -434,6 +435,7 @@ def _render_quan_ly_task(tab, **kwargs):
                     dl = date.fromisoformat(t.get("ngay_deadline", ""))
                     stt = "⚠️ Đã hết hạn" if dl < date.today() else "🟢 Đang thực hiện"
                 except Exception:
+                    logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                     stt = "🟢 Đang thực hiện"
             else:
                 stt = "🔒 Đã đóng"
@@ -457,6 +459,7 @@ def _render_quan_ly_task(tab, **kwargs):
         try:
             deadline_default = date.fromisoformat(str(task.get("ngay_deadline") or date.today().isoformat()))
         except Exception:
+            logger.error("Lỗi trong khối except: %s", e, exc_info=True)
             deadline_default = date.today()
 
         loai_keys = list(LOAI_TASK.keys())
@@ -465,11 +468,13 @@ def _render_quan_ly_task(tab, **kwargs):
         try:
             loai_index = loai_keys.index(task.get("loai")) if task.get("loai") in loai_keys else 0
         except Exception:
+            logger.error("Lỗi trong khối except: %s", e, exc_info=True)
             loai_index = 0
 
         try:
             uu_tien_index = uu_tien_keys.index(task.get("uu_tien")) if task.get("uu_tien") in uu_tien_keys else 2
         except Exception:
+            logger.error("Lỗi trong khối except: %s", e, exc_info=True)
             uu_tien_index = 2
 
         with st.form("form_sua_task"):
@@ -528,6 +533,7 @@ def _render_quan_ly_task(tab, **kwargs):
                     str(task.get("ngay_bat_dau") or date.today().isoformat())
                 )
             except Exception:
+                logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                 pass
             ngay_bat_dau = st.date_input(
                 "Ngày bắt đầu",
@@ -621,6 +627,7 @@ def _render_quan_ly_task(tab, **kwargs):
                 st.toast("✅ Đã lưu thay đổi.")
                 st.rerun()
             except Exception as e:
+                logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                 st.error(f"Lỗi: {e}")
 
         c1, c2, c3 = st.columns([1.2, 1.2, 1.6])
@@ -637,6 +644,7 @@ def _render_quan_ly_task(tab, **kwargs):
                         st.toast("✅ Đã cập nhật trạng thái.")
                         st.rerun()
                     except Exception as e:
+                        logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                         st.error(f"Lỗi: {e}")
             else:
                 if st.button("🔓 Mở lại", key=f"td_mo_lai_{task_id}", use_container_width=True):
@@ -650,6 +658,7 @@ def _render_quan_ly_task(tab, **kwargs):
                         st.toast("✅ Đã cập nhật trạng thái.")
                         st.rerun()
                     except Exception as e:
+                        logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                         st.error(f"Lỗi: {e}")
 
         if la_admin_cn(role):
@@ -673,6 +682,7 @@ def _render_quan_ly_task(tab, **kwargs):
                             st.toast("🗑️ Đã xóa đầu việc.")
                             st.rerun()
                         except Exception as e:
+                            logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                             st.error(f"Lỗi: {e}")
 
 
@@ -698,6 +708,7 @@ def _render_cap_nhat(tab, **kwargs):
                     dl = date.fromisoformat(t["ngay_deadline"])
                     stt = "⚠️ Đã hết hạn" if dl < hom_nay else "🟢 Đang thực hiện"
                 except Exception:
+                    logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                     stt = "🟢 Đang thực hiện"
                 ngay_bd = t.get("ngay_bat_dau")
                 parts = [stt, t["tieu_de"]]
@@ -732,6 +743,7 @@ def _render_cap_nhat(tab, **kwargs):
                 else:
                     badge = "🟢 Đang thực hiện"
             except Exception:
+                logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                 badge = ""
 
             st.caption(
@@ -825,6 +837,7 @@ def _render_cap_nhat(tab, **kwargs):
                 try:
                     return pd.to_datetime(val).date()
                 except Exception:
+                    logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                     return None
 
             kq_hien_thi = kq_list
@@ -871,6 +884,7 @@ def _render_cap_nhat(tab, **kwargs):
                                     try:
                                         ngay_ht = pd.to_datetime(ngay_val).date().isoformat()
                                     except Exception:
+                                        logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                                         ngay_ht = None
                                 rows_bulk.append(
                                     {
@@ -1109,6 +1123,7 @@ def _render_xuat(tab, **kwargs):
                         dl = date.fromisoformat(t.get("ngay_deadline", ""))
                         stt = "⚠️ Đã hết hạn" if dl < date.today() else "🟢 Đang thực hiện"
                     except Exception:
+                        logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                         stt = "🟢 Đang thực hiện"
                 else:
                     stt = "🔒 Đã đóng"
@@ -1165,6 +1180,9 @@ def _render_xuat(tab, **kwargs):
 
 from tabs.base_tab import TabContext
 
+
+from logger import get_logger
+logger = get_logger(__name__)
 
 def render(tab, **kwargs):
     ctx = TabContext(tab, **kwargs)

@@ -33,6 +33,9 @@ from tabs.tab_khtd import (
 )
 from tabs.tab_khtd_xuat import _hien_thi_bang_cn_readonly
 from services.khtd_nhap_service import (
+from logger import get_logger
+logger = get_logger(__name__)
+
     clean_sheet_name as _clean_sheet_name,
     tinh_th_gqvl_phan_tang as _tinh_th_gqvl_phan_tang,
     format_kich_thuoc as _format_kich_thuoc,
@@ -55,6 +58,7 @@ def _luu_meta_qd(kv_key: str, danh_sach: list[dict], username: str) -> None:
     try:
         _svc_luu_meta_qd(kv_key, danh_sach, username)
     except Exception as e:
+        logger.error("Lỗi trong khối except: %s", e, exc_info=True)
         st.error(f"Lỗi lưu metadata file QĐ: {e}")
 
 
@@ -150,6 +154,7 @@ def _section_van_ban_qd_cn(role: str, username: str) -> None:
                         st.success(f"✅ Đã lưu: `{dp.name}`")
                         st.rerun()
                     except Exception as e:
+                        logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                         st.session_state.pop(_id, None)
                         st.error(f"Lỗi lưu file QĐ HĐQT tỉnh: {e}")
         with col_u2:
@@ -174,6 +179,7 @@ def _section_van_ban_qd_cn(role: str, username: str) -> None:
                         st.success(f"✅ Đã lưu: `{dp.name}`")
                         st.rerun()
                     except Exception as e:
+                        logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                         st.session_state.pop(_id, None)
                         st.error(f"Lỗi lưu file QĐ TW: {e}")
 
@@ -267,6 +273,7 @@ def _tab_khtd_chi_nhanh(
                                 )
                                 st.rerun()
                 except Exception as e:
+                    logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                     st.error(f"Lỗi xử lý file: {e}")
 
     # ── Phương thức 2: Nhập thủ công (bảng gọn) ──────────────────────────
@@ -1026,6 +1033,7 @@ def _tab_khtd_theo_xa(role: str, username: str, df_full: "pd.DataFrame | None") 
                         )
                     st.rerun()
             except Exception as e:
+                logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                 st.error(f"Lỗi đọc file Excel: {e}")
 
     df_loc = df_full
@@ -1273,6 +1281,7 @@ def _tab_khtd_theo_xa(role: str, username: str, df_full: "pd.DataFrame | None") 
                             )
                             st.success(f"✅ Đã lưu PDF: {dp}")
                         except Exception as _e:
+                            logger.error("Lỗi trong khối except: %s", _e, exc_info=True)
                             st.warning(f"⚠️ Không lưu được PDF vào thư mục: {_e}")
                     
                     st.session_state["_pdf_bytes_khtd_xa"] = pdf_bytes
@@ -1280,6 +1289,7 @@ def _tab_khtd_theo_xa(role: str, username: str, df_full: "pd.DataFrame | None") 
                     db.ghi_audit(username, "xuat_bieu_cn", f"KHTD xã — PGD: {pgd_chon} — Xã: {xa_chon}")
                     
                 except Exception as e:
+                    logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                     st.session_state["_pdf_bytes_khtd_xa"] = None
                     st.error(f"Lỗi xuất PDF: {e}")
             else:

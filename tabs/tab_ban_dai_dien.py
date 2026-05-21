@@ -60,6 +60,7 @@ def _doc_hstd(_ts: float = 0) -> pd.DataFrame | None:
     try:
         return pd.read_parquet(CACHE_HSTD)
     except Exception:
+        logger.error("Lỗi trong khối except: %s", e, exc_info=True)
         return None
 
 
@@ -79,6 +80,7 @@ def _ngay_so_lieu(df: pd.DataFrame) -> datetime | None:
     try:
         return datetime.strptime(str(sl.iloc[0]), "%d/%m/%Y")
     except Exception:
+        logger.error("Lỗi trong khối except: %s", e, exc_info=True)
         return None
 
 
@@ -229,6 +231,9 @@ def _render_tong_hop(df: pd.DataFrame, username: str) -> None:
         try:
             from pdf_service import xuat_pdf
 
+from logger import get_logger
+logger = get_logger(__name__)
+
             if st.button("📄 Xuất PDF", use_container_width=True, key="bdd_xuat_pdf", type="primary"):
                 pdf_bytes = xuat_pdf(
                     df_pgd,
@@ -246,6 +251,7 @@ def _render_tong_hop(df: pd.DataFrame, username: str) -> None:
                     key="bdd_dl_pdf",
                 )
         except Exception as e:
+            logger.error("Lỗi trong khối except: %s", e, exc_info=True)
             st.caption(f"PDF: {e}")
 
 
@@ -317,6 +323,7 @@ def _render_du_bao_von(df: pd.DataFrame) -> None:
             ma_ct = int(parts[0])
             nv = int(parts[1])
         except Exception:
+            logger.error("Lỗi trong khối except: %s", e, exc_info=True)
             continue
 
         if COT_MA_CHUONG_TRINH not in df.columns or COT_NGUON_VON not in df.columns:
@@ -529,6 +536,7 @@ def _render_van_ban(role: str, username: str) -> None:
                         use_container_width=True,
                     )
                 except Exception:
+                    logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                     st.caption("Không đọc được file đã lưu.")
             st.caption(f"Lưu bởi {v.get('nguoi_tao','—')} lúc {str(v.get('ngay_tao','—'))[:16]}")
             if co_quyen:

@@ -68,6 +68,7 @@ def _doc_lich_su(pgd_user: str) -> dict[str, pd.DataFrame]:
         try:
             df = doc_cdtotkvv_path(str(f), ts_file(str(f)))
         except Exception:
+            logger.error("Lỗi trong khối except: %s", e, exc_info=True)
             continue
         if df is None or df.empty:
             continue
@@ -177,6 +178,7 @@ def _sub_phan_tich(pgd_user: str, username: str) -> None:
                 if col_sum < 0 or "tru" in col_lower or "phat" in col_lower:
                     cot_tru_diem.append(col)
             except Exception:
+                logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                 continue
 
     if cot_tru_diem:
@@ -355,6 +357,7 @@ def _sub_phan_tich(pgd_user: str, username: str) -> None:
                         )
                         st.success("✅ Đã tạo file Excel!")
                     except Exception as e:
+                        logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                         st.error(f"Lỗi xuất Excel: {e}")
 
                 if st.session_state.get("_bytes_cdto_pgd"):
@@ -413,6 +416,7 @@ def _sub_xu_huong(pgd_user: str, _username: str) -> None:
                 }
             )
         except Exception as e:
+            logger.error("Lỗi trong khối except: %s", e, exc_info=True)
             st.warning(f"Lỗi xử lý tháng {thang}: {e}")
             continue
 
@@ -606,6 +610,9 @@ def render(tab: DeltaGenerator | None = None, **kwargs) -> None:
             from datetime import date, timedelta
             from config import COT_NGAY_DH, COT_TEN_TO, COT_TONG_DU_NO
 
+from logger import get_logger
+logger = get_logger(__name__)
+
             st.markdown("#### 📅 Nợ đến hạn trong 30 ngày tới")
 
             so_ngay = st.slider("Xem trong", 7, 60, 30,
@@ -630,6 +637,7 @@ def render(tab: DeltaGenerator | None = None, **kwargs) -> None:
                                  str(ngay_tu), str(ngay_den))
                     df_ndh = pickle.loads(raw)
                 except Exception as e:
+                    logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                     st.error(f"Lỗi: {e}")
                     df_ndh = pd.DataFrame()
 

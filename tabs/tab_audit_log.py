@@ -7,6 +7,9 @@ import db
 from auth import normalize_role, la_admin_cn
 from utils import format_df_vn
 
+from logger import get_logger
+logger = get_logger(__name__)
+
 ACTION_NHOM = {
     "Upload":    ["upload", "merge", "luu_pgd", "luu_file"],
     "KHTD":      ["luu_khtd", "luu_kh", "giao_khtd", "dieu_chinh"],
@@ -81,6 +84,7 @@ def _render_compact(username_filter: str | None = None) -> None:
             ).fetchall()
         ds_action = ["Tất cả"] + [r["action"] for r in rows]
     except Exception as e:
+        logger.error("Lỗi trong khối except: %s", e, exc_info=True)
         st.error(f"Không thể đọc danh sách action: {e}")
         ds_action = ["Tất cả"]
 
@@ -121,6 +125,7 @@ def _render_compact(username_filter: str | None = None) -> None:
         st.dataframe(df, use_container_width=True, hide_index=True)
 
     except Exception as e:
+        logger.error("Lỗi trong khối except: %s", e, exc_info=True)
         st.error(f"Lỗi đọc: {e}")
 
 

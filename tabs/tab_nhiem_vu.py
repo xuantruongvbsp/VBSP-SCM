@@ -319,6 +319,7 @@ def _render_nhap_moi(tab, **kwargs):
                     st.toast(f"✅ Đã tạo nhiệm vụ: {tieu_de}")
                     st.rerun()
                 except Exception as e:
+                    logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                     st.error(f"Lỗi khi lưu nhiệm vụ: {e}")
 
 
@@ -399,6 +400,7 @@ def _render_hau_kiem(tab, **kwargs):
                             st.toast(f"✅ Đã cập nhật: {_nhan_kq(ts_moi)}")
                             st.rerun()
                         except Exception as e:
+                            logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                             st.error(f"Lỗi cập nhật: {e}")
 
                     st.divider()
@@ -541,6 +543,7 @@ def _render_nhap_ket_qua(tab, **kwargs):
                             st.toast("✅ Đã lưu kết quả — đang chờ duyệt.")
                             st.rerun()
                         except Exception as e:
+                            logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                             st.error(f"Lỗi khi lưu kết quả: {e}")
 
 
@@ -590,6 +593,9 @@ def _xuat_pdf_nhiem_vu(ds_nv: list, chu_ky: str, ky: str) -> bytes:
     from reportlab.pdfbase.ttfonts import TTFont
     import os
 
+from logger import get_logger
+logger = get_logger(__name__)
+
     buf = io.BytesIO()
 
     # Đăng ký font Times New Roman hỗ trợ tiếng Việt
@@ -602,6 +608,7 @@ def _xuat_pdf_nhiem_vu(ds_nv: list, chu_ky: str, ky: str) -> bytes:
         base_font_bold = "TimesVN-Bold"
         base_font_ital = "TimesVN-Italic"
     except Exception:
+        logger.error("Lỗi trong khối except: %s", e, exc_info=True)
         # Fallback nếu không tìm thấy font
         base_font      = "Helvetica"
         base_font_bold = "Helvetica-Bold"

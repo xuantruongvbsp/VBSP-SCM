@@ -34,6 +34,9 @@ from config import (
 if TYPE_CHECKING:
     from streamlit.delta_generator import DeltaGenerator
 
+from logger import get_logger
+logger = get_logger(__name__)
+
 # ── Hằng số ──────────────────────────────────────────────────────────────────
 KV_KEY_XA   = "khtd_xa"
 DS_MA_CT    = [row[0] for row in CHUONG_TRINH_KHTD]
@@ -67,6 +70,7 @@ def _luu_meta_qd(kv_key: str, danh_sach: list[dict], username: str) -> None:
     try:
         _svc_luu_meta_qd(kv_key, danh_sach, username)
     except Exception as e:
+        logger.error("Lỗi trong khối except: %s", e, exc_info=True)
         st.error(f"Lỗi lưu metadata file QĐ: {e}")
 
 
@@ -161,6 +165,7 @@ def _section_van_ban_qd_pgd(pgd: str, role: str, username: str) -> None:
                         st.success(f"✅ Đã lưu: `{dp.name}`")
                         st.rerun()
                     except Exception as e:
+                        logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                         st.session_state.pop(_id, None)
                         st.error(f"Lỗi lưu file QĐ HĐQT tỉnh: {e}")
         with col_u2:
@@ -180,6 +185,7 @@ def _section_van_ban_qd_pgd(pgd: str, role: str, username: str) -> None:
                         st.success(f"✅ Đã lưu: `{dp.name}`")
                         st.rerun()
                     except Exception as e:
+                        logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                         st.session_state.pop(_id, None)
                         st.error(f"Lỗi lưu file QĐ HĐQT xã: {e}")
 
@@ -256,6 +262,7 @@ def _fmt_vn(x, d: int = 1) -> str:
         s = f"{v:,.{d}f}"
         return s.replace(",", "X").replace(".", ",").replace("X", ".")
     except Exception:
+        logger.error("Lỗi trong khối except: %s", e, exc_info=True)
         return "—"
 
 
@@ -265,6 +272,7 @@ def _fmt_vn_signed(x, d: int = 1) -> str:
         s = _fmt_vn(v, d)
         return f"+{s}" if v > 0 else s
     except Exception:
+        logger.error("Lỗi trong khối except: %s", e, exc_info=True)
         return "—"
 
 def _nv_int_tu_ma_key(ma_key: str) -> int | None:
@@ -276,6 +284,7 @@ def _nv_int_tu_ma_key(ma_key: str) -> int | None:
         try:
             return int(ma_key.split("|", 1)[1])
         except Exception:
+            logger.error("Lỗi trong khối except: %s", e, exc_info=True)
             return None
     nv = NGUON_VON_MA.get(ma_key)
     if nv == "TW":
@@ -290,11 +299,13 @@ def _ma_ct_tu_ma_key(ma_key: str) -> int | None:
         try:
             return int(ma_key.split("|", 1)[0])
         except Exception:
+            logger.error("Lỗi trong khối except: %s", e, exc_info=True)
             return None
     if ma_key.endswith("_TW") or ma_key.endswith("_DP"):
         try:
             return int(ma_key.rsplit("_", 1)[0])
         except Exception:
+            logger.error("Lỗi trong khối except: %s", e, exc_info=True)
             return None
     return MA_CT_BY_MAKEY.get(ma_key)
 

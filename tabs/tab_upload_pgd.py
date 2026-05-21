@@ -107,6 +107,7 @@ def _lay_ten_don_vi_trong_file(file_bytes: bytes, loai: str) -> str | None:
             return str(vals[0]).strip() if len(vals) > 0 else None
 
     except Exception:
+        logger.error("Lỗi trong khối except: %s", e, exc_info=True)
         return None
 
 
@@ -156,6 +157,7 @@ def _kiem_tra_loai_file(file_bytes: bytes, loai: str) -> tuple[bool, str]:
 
         return True, "OK"
     except Exception:
+        logger.error("Lỗi trong khối except: %s", e, exc_info=True)
         # Không đọc được → fail-open, không chặn upload
         return True, "Bỏ qua kiểm tra loại file."
 

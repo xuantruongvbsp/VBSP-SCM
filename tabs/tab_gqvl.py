@@ -207,6 +207,9 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
         try:
             if pgd_xem == "Tất cả":
                 from data import doc_gqvl_toan_cn
+from logger import get_logger
+logger = get_logger(__name__)
+
                 df = doc_gqvl_toan_cn()
                 if df is None:
                     st.warning("Chưa có file GQVL nào.")
@@ -218,6 +221,7 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                     st.info(f"Chưa có file GQVL cho **{pgd_xem}**.")
                     return
         except Exception as e:
+            logger.error("Lỗi trong khối except: %s", e, exc_info=True)
             st.error(f"Lỗi đọc file GQVL: {e}")
             return
 

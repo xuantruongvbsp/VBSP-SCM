@@ -117,6 +117,7 @@ def _luu_kv(key: str, data: dict[str, Any], username: str) -> bool:
         khtd_service.luu_khtd_dict(key, data, username)
         return True
     except Exception as e:
+        logger.error("Lỗi trong khối except: %s", e, exc_info=True)
         _LOG.error("Lỗi lưu dữ liệu (key=%s): %s", key, e, exc_info=True)
         st.error(f"Lỗi lưu dữ liệu (key={key}): {e}")
         return False
@@ -130,6 +131,7 @@ def _fmt_vn(x, d: int = 1) -> str:
         s = f"{v:,.{d}f}"
         return s.replace(",", "X").replace(".", ",").replace("X", ".")
     except Exception:
+        logger.error("Lỗi trong khối except: %s", e, exc_info=True)
         return "—"
 
 
@@ -160,6 +162,7 @@ def _fmt_vn_signed(x, d: int = 1) -> str:
         s = _fmt_vn(v, d)
         return f"+{s}" if v > 0 else s
     except Exception:
+        logger.error("Lỗi trong khối except: %s", e, exc_info=True)
         return "—"
 
 def _nv_int_tu_ma_key(ma_key: str) -> int | None:
@@ -171,6 +174,7 @@ def _nv_int_tu_ma_key(ma_key: str) -> int | None:
         try:
             return int(ma_key.split("|", 1)[1])
         except Exception:
+            logger.error("Lỗi trong khối except: %s", e, exc_info=True)
             return None
     nv = NGUON_VON_MA.get(ma_key)
     if nv == "TW":
@@ -185,11 +189,13 @@ def _ma_ct_tu_ma_key(ma_key: str) -> int | None:
         try:
             return int(ma_key.split("|", 1)[0])
         except Exception:
+            logger.error("Lỗi trong khối except: %s", e, exc_info=True)
             return None
     if ma_key.endswith("_TW") or ma_key.endswith("_DP"):
         try:
             return int(ma_key.rsplit("_", 1)[0])
         except Exception:
+            logger.error("Lỗi trong khối except: %s", e, exc_info=True)
             return None
     return MA_CT_BY_MAKEY.get(ma_key)
 
@@ -414,6 +420,7 @@ def _doc_gqvl_parquet(_ts: float = 0) -> "pd.DataFrame | None":
     try:
         return pd.read_parquet(CACHE_GQVL)
     except Exception:
+        logger.error("Lỗi trong khối except: %s", e, exc_info=True)
         return None
 
 

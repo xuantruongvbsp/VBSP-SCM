@@ -215,6 +215,7 @@ def _render_xuat_to_khong_dat_tieu_chi(
                     key="xuat_tc_pdf",
                 )
             except Exception as e_pdf:
+                logger.error("Lỗi trong khối except: %s", e_pdf, exc_info=True)
                 st.button(
                     "📄 Xuất PDF",
                     disabled=True,
@@ -231,7 +232,11 @@ def _render_xuat_to_khong_dat_tieu_chi(
         )
 
     except Exception as e:
+        logger.error("Lỗi trong khối except: %s", e, exc_info=True)
         import traceback
+
+from logger import get_logger
+logger = get_logger(__name__)
 
         st.error(f"❌ Lỗi khi xử lý xuất tổ không đạt tiêu chí: {e}")
         with st.expander("Chi tiết lỗi (debug)", expanded=False):
@@ -406,6 +411,7 @@ def _sub_phan_tich_chat_luong(username: str, cdto_mode: str, pgd_user: str) -> N
             return
             
     except Exception as e:
+        logger.error("Lỗi trong khối except: %s", e, exc_info=True)
         st.warning(f"Lỗi đọc dữ liệu: {e}")
         return
 
@@ -558,6 +564,7 @@ def _sub_phan_tich_chat_luong(username: str, cdto_mode: str, pgd_user: str) -> N
                     st.plotly_chart(fig, use_container_width=True)
                 
         except Exception as e:
+            logger.error("Lỗi trong khối except: %s", e, exc_info=True)
             st.warning(f"Lỗi đọc dữ liệu tháng so sánh: {e}")
 
     # Xuất tổ không đạt tiêu chí (sau phần so sánh 2 tháng)
@@ -587,6 +594,7 @@ def _sub_ban_do_chat_luong(username: str, cdto_mode: str, pgd_user: str) -> None
             return
             
     except Exception as e:
+        logger.error("Lỗi trong khối except: %s", e, exc_info=True)
         st.warning(f"Lỗi đọc dữ liệu: {e}")
         return
 
@@ -796,6 +804,7 @@ def _sub_ban_do_chat_luong(username: str, cdto_mode: str, pgd_user: str) -> None
                         st.cache_data.clear()
                         st.success("✅ Đã tạo file Excel!")
                     except Exception as e:
+                        logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                         st.error(f"Lỗi xuất Excel: {e}")
 
                 if st.session_state.get("_bytes_cdto4"):
@@ -855,6 +864,7 @@ def _sub_xu_huong(username: str, cdto_mode: str, pgd_user: str) -> None:
                 "diem_tb": diem_tb
             })
         except Exception as e:
+            logger.error("Lỗi trong khối except: %s", e, exc_info=True)
             st.warning(f"Lỗi xử lý tháng {thang}: {e}")
             continue
     

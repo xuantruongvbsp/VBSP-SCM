@@ -86,6 +86,7 @@ def _hostname() -> str:
     try:
         return socket.gethostname()
     except Exception:
+        logger.error("Lỗi trong khối except: %s", e, exc_info=True)
         return "unknown"
 
 
@@ -197,6 +198,9 @@ def _render_tim_kiem(dgd_map: dict, username: str = "unknown") -> None:
         with c_p:
             try:
                 from pdf_service import xuat_pdf
+from logger import get_logger
+logger = get_logger(__name__)
+
                 pdf_bytes = xuat_pdf(df_f[cols_show], "DANH SÁCH ĐIỂM GIAO DỊCH", username)
                 st.download_button(
                     "📄 Xuất PDF", data=pdf_bytes,
@@ -205,6 +209,7 @@ def _render_tim_kiem(dgd_map: dict, username: str = "unknown") -> None:
                     key="dgd_cn_search_dl_pdf",
                 )
             except Exception as e:
+                logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                 st.caption(f"Xuất PDF: {e}")
 
 
@@ -235,6 +240,7 @@ def _render_import(role: str, username: str, hn: str) -> None:
         try:
             parsed_xa = parse_excel_import(up.getvalue(), ten_pgd)
         except Exception as e:
+            logger.error("Lỗi trong khối except: %s", e, exc_info=True)
             st.error(f"❌ Không đọc được file: {e}")
             db.ghi_audit(username, "import_dgd_map_loi", f"[{hn}] {e}")
             parsed_xa = {}
@@ -278,6 +284,7 @@ def _render_import(role: str, username: str, hn: str) -> None:
                         st.success("✅ Đã merge vào dgd_map.")
                         st.rerun()
                     except Exception as e:
+                        logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                         db.ghi_audit(username, "import_dgd_map_loi", f"[{hn}] {e}")
                         st.error(f"❌ Lỗi: {e}")
             with c2:
@@ -298,6 +305,7 @@ def _render_import(role: str, username: str, hn: str) -> None:
                         )
                         st.rerun()
                     except Exception as e:
+                        logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                         db.ghi_audit(username, "import_dgd_map_loi", f"[{hn}] {e}")
                         st.error(f"❌ Lỗi: {e}")
         else:
@@ -382,6 +390,7 @@ def _render_import(role: str, username: str, hn: str) -> None:
                         st.cache_data.clear()
                         st.rerun()
                     except Exception as e:
+                        logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                         db.ghi_audit(username, "imp_loi_dgd", f"[{hn}] xóa ĐGD: {e}")
                         st.error(f"❌ Lỗi xóa: {e}")
 
@@ -438,6 +447,7 @@ def _render_import(role: str, username: str, hn: str) -> None:
                     )
                     st.rerun()
                 except Exception as e:
+                    logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                     db.ghi_audit(username, "imp_loi_dgd", f"[{hn}] thêm ĐGD: {e}")
                     st.error(f"❌ Lỗi lưu: {e}")
 
@@ -607,6 +617,7 @@ def _render_xem_sua(df_h: pd.DataFrame, username: str, hn: str) -> None:
                                 st.success("✅ Đã lưu.")
                                 st.rerun()
                             except Exception as e:
+                                logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                                 db.ghi_audit(
                                     username, "sua_dgd_map_loi", f"[{hn}] {e}"
                                 )
@@ -635,6 +646,7 @@ def _render_xem_sua(df_h: pd.DataFrame, username: str, hn: str) -> None:
                             st.success("✅ Đã xóa.")
                             st.rerun()
                         except Exception as e:
+                            logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                             db.ghi_audit(
                                 username, "xoa_dgd_map_loi", f"[{hn}] {e}"
                             )
@@ -689,5 +701,6 @@ def _render_xem_sua(df_h: pd.DataFrame, username: str, hn: str) -> None:
                     st.success("✅ Đã thêm ĐGD.")
                     st.rerun()
                 except Exception as e:
+                    logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                     db.ghi_audit(username, "them_dgd_map_loi", f"[{hn}] {e}")
                     st.error(f"❌ {e}")

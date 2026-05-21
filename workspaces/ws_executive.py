@@ -75,6 +75,7 @@ def _fmt(v) -> str:
             return s
         return "—"
     except Exception:
+        logger.error("Lỗi trong khối except: %s", e, exc_info=True)
         return "—"
 
 
@@ -940,6 +941,7 @@ def _migration_matrix_section(df_full: pd.DataFrame, username: str) -> None:
                         parts = val.split("/")
                         ky_moi = f"{parts[2][:4]}-{parts[1].zfill(2)}"
                 except Exception:
+                    logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                     pass
         if not ky_moi:
             ky_moi = datetime.now().strftime("%Y-%m")
@@ -1679,7 +1681,11 @@ def render(**kwargs) -> None:
             try:
                 fn()
             except Exception as e:
+                logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                 import traceback
+from logger import get_logger
+logger = get_logger(__name__)
+
                 st.error(f"❌ Lỗi render **{sel_label}**: {e}")
                 st.code(traceback.format_exc())
         else:

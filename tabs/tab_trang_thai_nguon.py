@@ -80,6 +80,7 @@ def _ts_fmt(fp: str | Path) -> str:
         ts = os.path.getmtime(str(fp))
         return datetime.fromtimestamp(ts).strftime("%d/%m/%Y %H:%M")
     except Exception:
+        logger.error("Lỗi trong khối except: %s", e, exc_info=True)
         return "—"
 
 
@@ -91,6 +92,7 @@ def _size_fmt(fp: str | Path) -> str:
             return f"{sz / 1_048_576:.1f} MB"
         return f"{sz / 1024:.0f} KB"
     except Exception:
+        logger.error("Lỗi trong khối except: %s", e, exc_info=True)
         return "—"
 
 
@@ -100,6 +102,7 @@ def _pgd_slug_local(ten_pgd: str) -> str:
         from data.pgd import pgd_slug
         return pgd_slug(ten_pgd)
     except Exception:
+        logger.error("Lỗi trong khối except: %s", e, exc_info=True)
         import re, unicodedata
         s = unicodedata.normalize("NFD", ten_pgd.lower())
         s = "".join(c for c in s if unicodedata.category(c) != "Mn")
@@ -200,6 +203,7 @@ def _render_tep_nguon(la_cn: bool, pgd_user: str | None) -> None:
                     df_dates = pd.DataFrame(rows, columns=["Đơn vị", "Ngày số liệu"])
                     st.dataframe(df_dates, use_container_width=True, hide_index=True, height=250)
         except Exception as e:
+            logger.error("Lỗi trong khối except: %s", e, exc_info=True)
             st.error(f"Lỗi kiểm tra ngày số liệu: {e}")
 
 
@@ -253,6 +257,7 @@ def _render_merge_cache(la_cn: bool) -> None:
         else:
             st.success(f"✅ DS_PGD đồng bộ — {len(DS_PGD)} đơn vị")
     except Exception as e:
+        logger.error("Lỗi trong khối except: %s", e, exc_info=True)
         st.error(f"Lỗi kiểm tra cấu hình: {e}")
 
     # ── Kiểm tra parquet integrity ───────────────────────────────────────
@@ -306,6 +311,7 @@ def _render_merge_cache(la_cn: bool) -> None:
                     con.close()
 
                 except Exception as e:
+                    logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                     st.error(f"Lỗi đọc parquet: {e}")
 
     except ImportError:
@@ -341,6 +347,7 @@ def _render_snapshot() -> None:
         st.dataframe(df_snap, use_container_width=True, hide_index=True)
 
     except Exception as e:
+        logger.error("Lỗi trong khối except: %s", e, exc_info=True)
         st.error(f"Lỗi đọc snapshot: {e}")
 
 
@@ -400,9 +407,11 @@ def _render_nguoi_dung() -> None:
             else:
                 st.success("✅ Tất cả tài khoản đã đổi mật khẩu ít nhất 1 lần")
         except Exception:
+            logger.error("Lỗi trong khối except: %s", e, exc_info=True)
             pass  # Bảng users có thể chưa có cột ngay_doi_mk — bỏ qua
 
     except Exception as e:
+        logger.error("Lỗi trong khối except: %s", e, exc_info=True)
         st.error(f"Lỗi đọc dữ liệu người dùng: {e}")
 
 
@@ -429,6 +438,7 @@ def _render_he_thong(la_cn: bool = False) -> None:
         else:
             st.success(f"✅ Ổ đĩa còn {free / 1e9:.1f} GB trống")  # noqa
     except Exception as e:
+        logger.error("Lỗi trong khối except: %s", e, exc_info=True)
         st.error(f"Lỗi đọc dung lượng: {e}")
 
     # ── Quyền ghi thư mục ────────────────────────────────────────────────
@@ -457,6 +467,7 @@ def _render_he_thong(la_cn: bool = False) -> None:
             hide_index=True,
         )
     except Exception as e:
+        logger.error("Lỗi trong khối except: %s", e, exc_info=True)
         st.error(f"Lỗi kiểm tra quyền thư mục: {e}")
 
     # ── Kích thước audit_log ──────────────────────────────────────────────
@@ -472,6 +483,7 @@ def _render_he_thong(la_cn: bool = False) -> None:
         else:
             st.success(f"✅ Audit log: **{total_audit:,}** dòng")
     except Exception as e:
+        logger.error("Lỗi trong khối except: %s", e, exc_info=True)
         st.error(f"Lỗi đọc audit log: {e}")
 
     # ── Kiểm tra credentials Google Sheets ───────────────────────────────
@@ -484,6 +496,7 @@ def _render_he_thong(la_cn: bool = False) -> None:
         else:
             st.info("ℹ️ Không tìm thấy `credentials.json` — tính năng Google Sheets bị tắt hoặc chưa cấu hình.")
     except Exception:
+        logger.error("Lỗi trong khối except: %s", e, exc_info=True)
         pass
 
     # ── Kiểm tra nhiệm vụ quá hạn ────────────────────────────────────────
@@ -524,6 +537,7 @@ def _render_he_thong(la_cn: bool = False) -> None:
                 df_td = pd.DataFrame(qh_td, columns=["ID", "Tên task", "Deadline", "Trạng thái"])
                 st.dataframe(df_td, use_container_width=True, hide_index=True, height=200)
     except Exception as e:
+        logger.error("Lỗi trong khối except: %s", e, exc_info=True)
         st.error(f"Lỗi kiểm tra nhiệm vụ quá hạn: {e}")
 
     # ── Backup thủ công ──────────────────────────────────────────────────────
@@ -555,6 +569,7 @@ def _render_he_thong(la_cn: bool = False) -> None:
                         else:
                             st.error("❌ Backup DB thất bại — xem backup.log")
                     except Exception as e:
+                        logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                         st.error(f"❌ Lỗi backup: {e}")
         with col_info:
             st.caption(
@@ -596,9 +611,13 @@ def _render_he_thong(la_cn: bool = False) -> None:
                     # Parse tên thư mục YYYYMMDD_HHMMSS
                     try:
                         from datetime import datetime
+from logger import get_logger
+logger = get_logger(__name__)
+
                         dt = datetime.strptime(d.name, "%Y%m%d_%H%M%S")
                         ngay = dt.strftime("%d/%m/%Y %H:%M")
                     except Exception:
+                        logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                         ngay = d.name
                     # Đếm số file
                     n_files = sum(1 for _ in d.rglob("*") if _.is_file())
@@ -619,6 +638,7 @@ def _render_he_thong(la_cn: bool = False) -> None:
                     hide_index=True,
                 )
     except Exception as e:
+        logger.error("Lỗi trong khối except: %s", e, exc_info=True)
         st.error(f"Lỗi đọc danh sách backup: {e}")
 
 
@@ -676,6 +696,7 @@ def _render_audit(la_cn: bool, username: str | None) -> None:
             st.info("Không có kết quả phù hợp.")
 
     except Exception as e:
+        logger.error("Lỗi trong khối except: %s", e, exc_info=True)
         st.error(f"Lỗi đọc audit log: {e}")
 
 

@@ -182,6 +182,7 @@ def _xu_ly_mot_file_khnv(
             audit = ("upload_pgd_khnv", f"{loai.upper()} — {ten_dv} ({mb:.1f} MB)")
             return loai, KetQuaUpload(True, msg, path), can_merge, audit
     except Exception as e:
+        logger.error("Lỗi trong khối except: %s", e, exc_info=True)
         return loai, KetQuaUpload(False, f"Lỗi lưu: {e}"), False, None
 
 
@@ -298,6 +299,7 @@ def _xu_ly_import_folder(danh_sach: list[dict], username: str) -> None:
         try:
             return r, Path(r["path"]).read_bytes(), None
         except Exception as e:
+            logger.error("Lỗi trong khối except: %s", e, exc_info=True)
             return r, None, str(e)
 
     progress = st.progress(0.0, text="⏳ Đang đọc file...")
@@ -349,6 +351,7 @@ def _xu_ly_import_folder(danh_sach: list[dict], username: str) -> None:
                 )
             return r, None, audit
         except Exception as e:
+            logger.error("Lỗi trong khối except: %s", e, exc_info=True)
             return r, str(e), None
 
     if tat_ca_bytes:
@@ -658,6 +661,7 @@ def _render_upload_hang_loat(role: str, username: str) -> None:
                     try:
                         os.unlink(p)
                     except Exception:
+                        logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                         pass
 
 
@@ -684,6 +688,7 @@ def _xoa_du_lieu_pgd(ten_pgd: str, loai: str, username: str) -> tuple[bool, str]
                      f"[{hostname}] {loai.upper()} — {ten_pgd}")
         return True, f"✅ Đã xóa {loai.upper()} — {ten_pgd}"
     except Exception as e:
+        logger.error("Lỗi trong khối except: %s", e, exc_info=True)
         db.ghi_audit(username, "loi_xoa_du_lieu_pgd",
                      f"[{hostname}] {loai.upper()} — {ten_pgd}: {e}")
         return False, f"❌ Lỗi xóa: {e}"
@@ -736,6 +741,7 @@ def _thuc_hien_xoa(
                     else:
                         st.warning(f"⚠️ Rebuild {loai.upper()}: {kq_merge.thong_bao}")
                 except Exception as e:
+                    logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                     st.error(f"❌ Lỗi rebuild {loai.upper()}: {e}")
 
     st.cache_data.clear()
@@ -927,6 +933,7 @@ def _render_upload_baseline(username: str) -> None:
                             try:
                                 _bm[f.name] = f.read_bytes()
                             except Exception:
+                                logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                                 pass
                         st.session_state["_bl_bytes"] = _bm
                         st.session_state["_bl_ids"] = [(k, len(v)) for k, v in _bm.items()]
@@ -1069,6 +1076,7 @@ def _render_upload_baseline(username: str) -> None:
                         )
                         thanh_cong += 1
                     except Exception as e:
+                        logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                         that_bai.append(f"{r['ten_pgd']} {r['loai']}: {e}")
 
                 st.cache_data.clear()
@@ -1152,6 +1160,9 @@ def _fragment_merge_toan_cn():
             try:
                 from services.upload_service import merge_du_lieu_toan_cn
 
+from logger import get_logger
+logger = get_logger(__name__)
+
                 for loai in ("hstd", "nq11", "gqvl"):
                     if st.session_state.get(f"can_merge_{loai}", False):
                         merge_du_lieu_toan_cn(loai)
@@ -1172,6 +1183,7 @@ def _fragment_merge_toan_cn():
                 st.rerun()
 
             except Exception as e:
+                logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                 st.error(f"❌ Lỗi khi merge: {e}")
 
 

@@ -87,6 +87,7 @@ def _hostname() -> str:
     try:
         return socket.gethostname()
     except Exception:
+        logger.error("Lỗi trong khối except: %s", e, exc_info=True)
         return "unknown"
 
 
@@ -143,6 +144,9 @@ def _render_tim_kiem_pgd(dgd_map: dict, pgd_user: str, username: str) -> None:
         with c_p:
             try:
                 from pdf_service import xuat_pdf
+from logger import get_logger
+logger = get_logger(__name__)
+
                 pdf_bytes = xuat_pdf(df_f[cols_show], "DANH SÁCH ĐIỂM GIAO DỊCH", username)
                 st.download_button(
                     "📄 Xuất PDF", data=pdf_bytes,
@@ -151,6 +155,7 @@ def _render_tim_kiem_pgd(dgd_map: dict, pgd_user: str, username: str) -> None:
                     key="dgd_pgd_search_dl_pdf",
                 )
             except Exception as e:
+                logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                 st.caption(f"Xuất PDF: {e}")
 
 
@@ -191,6 +196,7 @@ def _render_import_pgd(
         try:
             parsed_xa = parse_excel_import(up.getvalue(), pgd_user)
         except Exception as e:
+            logger.error("Lỗi trong khối except: %s", e, exc_info=True)
             st.error(f"❌ Không đọc được file: {e}")
             db.ghi_audit(username, "cbtd_import_dgd_loi", f"[{hn}] {e}")
             parsed_xa = {}
@@ -238,6 +244,7 @@ def _render_import_pgd(
                     st.success("✅ Đã merge cấu hình ĐGD cho PGD của bạn.")
                     st.rerun()
                 except Exception as e:
+                    logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                     db.ghi_audit(username, "cbtd_import_dgd_loi", f"[{hn}] {e}")
                     st.error(f"❌ Lỗi: {e}")
         else:
@@ -322,6 +329,7 @@ def _render_import_pgd(
                         st.cache_data.clear()
                         st.rerun()
                     except Exception as e:
+                        logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                         db.ghi_audit(username, "cbtd_imp_loi_dgd", f"[{hn}] xóa ĐGD: {e}")
                         st.error(f"❌ Lỗi xóa: {e}")
 
@@ -386,6 +394,7 @@ def _render_import_pgd(
                     )
                     st.rerun()
                 except Exception as e:
+                    logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                     db.ghi_audit(username, "cbtd_imp_loi_dgd", f"[{hn}] thêm ĐGD: {e}")
                     st.error(f"❌ Lỗi lưu: {e}")
 
@@ -519,6 +528,7 @@ def _render_xem_sua_pgd(
                                 st.success("✅ Đã lưu.")
                                 st.rerun()
                             except Exception as e:
+                                logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                                 db.ghi_audit(
                                     username,
                                     "cbtd_sua_dgd_map_loi",
@@ -552,6 +562,7 @@ def _render_xem_sua_pgd(
                             st.success("✅ Đã xóa.")
                             st.rerun()
                         except Exception as e:
+                            logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                             db.ghi_audit(
                                 username,
                                 "cbtd_xoa_dgd_map_loi",
@@ -612,6 +623,7 @@ def _render_xem_sua_pgd(
                     st.success("✅ Đã thêm ĐGD.")
                     st.rerun()
                 except Exception as e:
+                    logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                     db.ghi_audit(username, "cbtd_them_dgd_map_loi", f"[{hn}] {e}")
                     st.error(f"❌ {e}")
 

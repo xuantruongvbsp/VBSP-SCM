@@ -404,6 +404,7 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                 )
                 st.divider()
         except Exception:
+            logger.error("Lỗi trong khối except: %s", e, exc_info=True)
             pass
 
         st.markdown("**📂 Cơ cấu dư nợ theo chương trình tín dụng**")
@@ -660,6 +661,7 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                         )
                         df_pgd = df_pgd.merge(df_to_pgd, on=COT_TEN_PGD, how="left")
             except Exception:
+                logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                 pass
 
             for cot in ["Tổng Tổ", "Tốt", "Khá", "TB", "Yếu"]:
@@ -696,6 +698,7 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                     if _df_raw_pgd is not None and not _df_raw_pgd.empty:
                         _df_to_pgd_map = tong_hop_theo_pgd(_df_raw_pgd)
             except Exception:
+                logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                 _df_to_pgd_map = None
 
             tong = {COT_TEN_PGD: "Toàn Chi nhánh"}
@@ -802,6 +805,7 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                     try:
                         return fmt_so(val)
                     except Exception:
+                        logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                         return str(val)
                 return str(val)
 
@@ -897,6 +901,7 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                         st.session_state["_excel_bytes_tqpgd"] = buf
                         st.session_state["_excel_file_tqpgd"] = _ten_excel
                     except Exception as e:
+                        logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                         st.error(f"❌ Lỗi xuất Excel: {e}")
                 if st.session_state.get("_excel_bytes_tqpgd"):
                     st.download_button(
@@ -939,7 +944,11 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                         st.session_state[_ssf_tqpgd] = f"TQPGD_{datetime.now().strftime('%d%m%Y_%H%M')}.pdf"
                         db.ghi_audit(username or "unknown", "xuat_pdf", f"TQPGD")
                     except Exception as _e:
+                        logger.error("Lỗi trong khối except: %s", _e, exc_info=True)
                         import traceback
+
+from logger import get_logger
+logger = get_logger(__name__)
 
                         st.session_state[_ss_tqpgd] = None
                         st.error(f"❌ Lỗi: {_e}")
@@ -1223,6 +1232,7 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                 )
 
             except Exception as e:
+                logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                 st.error(f"Lỗi xử lý đến hạn: {e}")
 
             # ── Download PDF: chỉ giữ nút trong mỗi tab (không duplicate) ──

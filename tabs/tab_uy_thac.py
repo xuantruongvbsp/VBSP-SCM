@@ -88,6 +88,7 @@ def _doc_hstd_cached(_ts: float = 0) -> pd.DataFrame:
     try:
         return pd.read_parquet(CACHE_HSTD)
     except Exception:
+        logger.error("Lỗi trong khối except: %s", e, exc_info=True)
         return pd.DataFrame()
 
 

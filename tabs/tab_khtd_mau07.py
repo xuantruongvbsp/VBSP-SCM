@@ -227,6 +227,9 @@ def render(tab, **kwargs) -> None:
             )
             from data.hstd import doc_baseline_merged, doc_baseline
 
+from logger import get_logger
+logger = get_logger(__name__)
+
             ds_nam_bl = danh_sach_nam_baseline_pgd()
             if nam_baseline in ds_nam_bl:
                 fp = baseline_pgd_path(pgd_chon, nam_baseline)
@@ -240,6 +243,7 @@ def render(tab, **kwargs) -> None:
                 df_baseline = doc_baseline(nam_baseline, _ts=_ts2)
                 co_baseline = df_baseline is not None and not df_baseline.empty
         except Exception:
+            logger.error("Lỗi trong khối except: %s", e, exc_info=True)
             co_baseline = False
 
         if co_baseline:
@@ -484,6 +488,7 @@ def render(tab, **kwargs) -> None:
                     st.cache_data.clear()
                     st.rerun()
                 except Exception as e:
+                    logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                     st.error(f"❌ Lỗi khi lưu dữ liệu: {e}")
 
         # ── Xử lý Xuất Word ───────────────────────────────────────────────────
@@ -518,6 +523,7 @@ def render(tab, **kwargs) -> None:
                     )
                     st.success("✅ Đã tạo file Word — nhấn nút trên để tải về!")
                 except Exception as e:
+                    logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                     st.error(f"❌ Lỗi xuất Word: {e}")
                     st.exception(e)
 

@@ -92,6 +92,7 @@ def _kpi_pgd_list(df_pgd: pd.DataFrame, pgd_user: str) -> list[dict]:
             "delta_color": "inverse",
         })
     except Exception:
+        logger.error("Lỗi trong khối except: %s", e, exc_info=True)
         pass
 
     # ── KPI 2: Nợ quá hạn ─────────────────────────────────────────────────
@@ -109,6 +110,7 @@ def _kpi_pgd_list(df_pgd: pd.DataFrame, pgd_user: str) -> list[dict]:
             "delta_color": "inverse",
         })
     except Exception:
+        logger.error("Lỗi trong khối except: %s", e, exc_info=True)
         pass
 
     # ── KPI 3: 3 tháng KHĐ ────────────────────────────────────────────────
@@ -128,6 +130,7 @@ def _kpi_pgd_list(df_pgd: pd.DataFrame, pgd_user: str) -> list[dict]:
             "delta_color": "inverse",
         })
     except Exception:
+        logger.error("Lỗi trong khối except: %s", e, exc_info=True)
         pass
 
     # ── KPI 4: Tiến độ KHTD ───────────────────────────────────────────────
@@ -158,6 +161,7 @@ def _kpi_pgd_list(df_pgd: pd.DataFrame, pgd_user: str) -> list[dict]:
             "delta_color": "off",
         })
     except Exception:
+        logger.error("Lỗi trong khối except: %s", e, exc_info=True)
         pass
 
     return kpi
@@ -182,6 +186,7 @@ def _render_trang_chu(tab, df_pgd: pd.DataFrame, role: str, pgd_user: str, kwarg
                 if st.button("🔄 Làm mới", use_container_width=True, key="trang_chu_refresh"):
                     st.rerun()
         except Exception as e:
+            logger.error("Lỗi trong khối except: %s", e, exc_info=True)
             st.error(f"❌ Lỗi header: {e}")
 
         # ── Vùng B: 4 KPI cards ────────────────────────────────────────────
@@ -193,6 +198,7 @@ def _render_trang_chu(tab, df_pgd: pd.DataFrame, role: str, pgd_user: str, kwarg
                 if kpi_data:
                     kpi_row(kpi_data, num_columns=4)
         except Exception as e:
+            logger.error("Lỗi trong khối except: %s", e, exc_info=True)
             st.error(f"❌ Lỗi KPI: {e}")
 
         st.divider()
@@ -234,6 +240,7 @@ def _render_trang_chu(tab, df_pgd: pd.DataFrame, role: str, pgd_user: str, kwarg
                                 st.session_state["ws_op_jump_tab"] = tab_idx
                                 st.rerun()
             except Exception as e:
+                logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                 st.error(f"❌ Lỗi shortcut: {e}")
 
         # Cột phải: Cảnh báo + Nhiệm vụ
@@ -252,6 +259,7 @@ def _render_trang_chu(tab, df_pgd: pd.DataFrame, role: str, pgd_user: str, kwarg
                         if nqh_count > 0:
                             alerts.append(("🔴", f"NQH > 0: {fmt_so(nqh_count)} khoản", "danger", "bao_cao_giao_ban", 1))
                     except Exception:
+                        logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                         pass
 
                     # Cảnh báo 3m KHĐ
@@ -261,6 +269,7 @@ def _render_trang_chu(tab, df_pgd: pd.DataFrame, role: str, pgd_user: str, kwarg
                         if khd_count > 0:
                             alerts.append(("📅", f"3m KHĐ: {fmt_so(khd_count)} khoản", "danger", "kiem_soat_rr", 0))
                     except Exception:
+                        logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                         pass
 
                     if alerts:
@@ -272,6 +281,7 @@ def _render_trang_chu(tab, df_pgd: pd.DataFrame, role: str, pgd_user: str, kwarg
                     else:
                         st.success("✅ Không có cảnh báo nào")
             except Exception as e:
+                logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                 st.error(f"❌ Lỗi cảnh báo: {e}")
 
             # Phần nhiệm vụ
@@ -292,6 +302,7 @@ def _render_trang_chu(tab, df_pgd: pd.DataFrame, role: str, pgd_user: str, kwarg
                             st.caption(f"📌 {nv.get('tieu_de', '—')}")
                             st.caption(f"Hạn: {nv.get('ngay_deadline', '—')}")
             except Exception as e:
+                logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                 st.warning(f"⚠️ Không thể tải danh sách nhiệm vụ: {e}")
 
 
@@ -561,6 +572,7 @@ def _render_doc_hub(df: pd.DataFrame, df_nq11, role: str):
                     results.append((f"⬇ {ten_mau} — {len(df_chon)} hồ sơ (gộp)", data, fname, f"dl_batch_{ten_mau}"))
                 st.success(f"✅ Đã tạo: **{ten_mau}**")
             except Exception as e:
+                logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                 st.error(f"Lỗi tạo {ten_mau}: {e}")
         st.session_state[dh_ss_key] = results
 
@@ -782,6 +794,7 @@ def _render_thong_bao_ket_luan(tab, **kwargs):
                 st.success("✅ Đã tạo Thông báo Kết luận! Nhấn nút bên dưới để tải về.")
 
             except Exception as e:
+                logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                 st.error(f"❌ Lỗi tạo file: {e}")
 
         if st.session_state.get("tb_data"):
@@ -817,6 +830,7 @@ def _render_thong_bao_ket_luan(tab, **kwargs):
                 st.info("💡 Mở file Word rồi chọn **Save As → PDF** thủ công.")
                 st.session_state["_tb_pdf_bytes"] = None
             except Exception as _e_pdf:
+                logger.error("Lỗi trong khối except: %s", _e_pdf, exc_info=True)
                 st.error(f"❌ Lỗi chuyển PDF: {_e_pdf}")
                 st.session_state["_tb_pdf_bytes"] = None
 
@@ -910,6 +924,7 @@ def _render_bien_ban_giao_ban(tab, **kwargs):
                 st.session_state["_file_gb2"] = ten_file
                 st.success("✅ Đã tạo biên bản! Nhấn nút bên dưới để tải về.")
             except Exception as e:
+                logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                 st.error(f"❌ Lỗi xuất file: {e}")
                 st.exception(e)
 
@@ -1261,6 +1276,7 @@ def render(**kwargs):
             kpi_row(kpi_data, num_columns=4)
             st.divider()
     except Exception:
+        logger.error("Lỗi trong khối except: %s", e, exc_info=True)
         pass
 
     # ── Helpers render ──────────────────────────────────────────────────
@@ -1548,6 +1564,9 @@ def render(**kwargs):
     def _render_donut_co_cau(tab_parent, **kw) -> None:
         with get_tab_context(tab_parent):
             import plotly.graph_objects as go
+
+from logger import get_logger
+logger = get_logger(__name__)
 
             df_loc = kw.get("df")
             st.subheader("🍩 Donut — Cơ cấu Dư nợ theo Chương trình")

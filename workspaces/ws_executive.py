@@ -50,13 +50,9 @@ from services.hhi_service import tinh_hhi, tinh_hhi_breakdown, danh_gia_hhi
 from components.delta_card import delta_card, kpi_row
 
 
-_TAB_CACHE: dict = {}
-
 def _lazy_tab(name: str):
-    """Import tab module only on first use — cached permanently."""
-    if name not in _TAB_CACHE:
-        _TAB_CACHE[name] = importlib.import_module(f"tabs.{name}")
-    return _TAB_CACHE[name]
+    """Import tab module — dùng sys.modules cache của Python, tự invalidate khi Streamlit hot-reload."""
+    return importlib.import_module(f"tabs.{name}")
 
 # ── Hằng số ngưỡng NQH ────────────────────────────────────────────────────────
 _NGUONG_AN_TOAN  = 1.0   # % — xanh lá

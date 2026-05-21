@@ -177,25 +177,34 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                 if COT_DU_NO_KHOANH not in df_pdf_src.columns:
                     df_pdf_src[COT_DU_NO_KHOANH] = 0
 
+                _DN_SO_KH = "Số KH"
+                _DN_SO_MON = "Số món"
+                _DN_DU_NO_TH = "Dư nợ TH"
+                _DN_DU_NO_QH = "Dư nợ QH"
+                _DN_NO_KHOANH = "Nợ khoanh"
+                _DN_TONG_DU_NO = "Tổng dư nợ"
+                _DN_LAI_TON = "Lãi tồn"
+                _DN_TL_NO_XAU = "TL Nợ xấu %"
+
                 df_pdf = (
                     df_pdf_src.groupby([COT_TEN_PGD, COT_TEN_XA, COT_TEN_CT])
                     .agg(
                         **{
-                            "Số KH": (COT_MA_KH, "nunique"),
-                            "Số món": (COT_SO_KU, "nunique"),
-                            "Dư nợ TH": (COT_DU_NO_TH, "sum"),
-                            "Dư nợ QH": (COT_DU_NO_QH, "sum"),
-                            "Nợ khoanh": (COT_DU_NO_KHOANH, "sum"),
-                            "Tổng dư nợ": (COT_TONG_DU_NO, "sum"),
-                            "Lãi tồn": (COT_LAI_TON, "sum"),
+                            _DN_SO_KH: (COT_MA_KH, "nunique"),
+                            _DN_SO_MON: (COT_SO_KU, "nunique"),
+                            _DN_DU_NO_TH: (COT_DU_NO_TH, "sum"),
+                            _DN_DU_NO_QH: (COT_DU_NO_QH, "sum"),
+                            _DN_NO_KHOANH: (COT_DU_NO_KHOANH, "sum"),
+                            _DN_TONG_DU_NO: (COT_TONG_DU_NO, "sum"),
+                            _DN_LAI_TON: (COT_LAI_TON, "sum"),
                         }
                     )
                     .reset_index()
                 )
 
-                df_pdf["TL Nợ xấu %"] = (
-                    (df_pdf["Dư nợ QH"] + df_pdf["Nợ khoanh"])
-                    / df_pdf["Tổng dư nợ"].replace(0, float("nan"))  # noqa: COT — tên display sau agg rename
+                df_pdf[_DN_TL_NO_XAU] = (
+                    (df_pdf[_DN_DU_NO_QH] + df_pdf[_DN_NO_KHOANH])
+                    / df_pdf[_DN_TONG_DU_NO].replace(0, float("nan"))
                     * 100
                 ).round(2).fillna(0)
 
@@ -204,14 +213,14 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                     COT_TEN_PGD,
                     COT_TEN_XA,
                     COT_TEN_CT,
-                    "Số KH",
-                    "Số món",
-                    "Dư nợ TH",
-                    "Dư nợ QH",
-                    "Nợ khoanh",
-                    "Tổng dư nợ",
-                    "Lãi tồn",
-                    "TL Nợ xấu %",
+                    _DN_SO_KH,
+                    _DN_SO_MON,
+                    _DN_DU_NO_TH,
+                    _DN_DU_NO_QH,
+                    _DN_NO_KHOANH,
+                    _DN_TONG_DU_NO,
+                    _DN_LAI_TON,
+                    _DN_TL_NO_XAU,
                 ]
                 COLS_PDF = [c for c in COLS_PDF if c in df_pdf.columns]
                 df_pdf = df_pdf[COLS_PDF].sort_values([COT_TEN_PGD, COT_TEN_XA, COT_TEN_CT])

@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [2026-05-21] — Tính năng mới: Xây dựng KHTD tương lai (2026–2030)
+- `config.py` — thêm `BIEU_01C_XD_MA_KEY`, `BIEU_02C_THUYET_MINH_XD`, `THUYET_MINH_LABELS`
+- `services/khtd_import_service.py` — tạo mới: import Biểu 01C/02C, lưu thuyết minh, tổng hợp CN
+- `tabs/tab_xay_dung_khtd.py` — tạo mới: 4 sub-tab (Biểu 01C, Biểu 02C, Thuyết minh, Tổng hợp CN)
+- `workspaces/ws_management.py` dòng ~1159 — đăng ký tab "🔭 Xây dựng KHTD tương lai" vào group CN
+- `workspaces/ws_operation.py` dòng ~1692 — đăng ký tab "🔭 Xây dựng KHTD TL" vào ke_hoach_pgd
+
 ## [2026-05-21] — Sửa header bảng "Cơ cấu dư nợ theo chương trình tín dụng" thành 2 dòng
 - `tabs/tab_tongquan.py` dòng 449-458 — sửa logic `_col_cfg` để các cột có "(triệu đồng)" có header 2 dòng, riêng cột "Dư nợ (triệu đồng)" hiển thị "(Tỷ đồng)" vì giá trị được chia 1000
 - `tabs/tab_tongquan.py` dòng 833-836 — sửa `_disp_col()` để cột "Dư nợ" hiển thị "(Tỷ đồng)" thay vì "(Triệu đồng)" cho nhất quán với logic chia 1000

@@ -200,6 +200,17 @@ def _du_lieu_chung():
     }
 
 
+def _tong_hop_rong():
+    """Tổng hợp tối giản cho các mẫu Word cần tham số tong_hop."""
+    return {
+        "tong_ho": 0,
+        "tong_goc": 0.0,
+        "tong_lai": 0.0,
+        "tong_tien": 0.0,
+        "nhom_ct": {},
+    }
+
+
 class TestTaoWordSmokeAll:
     """Smoke test: mỗi hàm chỉ cần không crash và trả về bytes .docx hợp lệ."""
 
@@ -211,25 +222,43 @@ class TestTaoWordSmokeAll:
         assert self._is_valid_docx(byt)
 
     def test_mau_04xln(self):
-        byt = _tao_word_04xln(_du_lieu_chung())
+        # _tao_word_04xln(tong_hop, ten_pgd, nguon_label, dot, nam)
+        byt = _tao_word_04xln(_tong_hop_rong(), "PGD Long Thành", "Trung ương", 1, 2026)
         assert self._is_valid_docx(byt)
 
     def test_mau_05xln(self):
-        byt = _tao_word_05xln(_du_lieu_chung())
+        # _tao_word_05xln(tong_hop, ten_pgd, nguon_label, dot, nam)
+        byt = _tao_word_05xln(_tong_hop_rong(), "PGD Long Thành", "Trung ương", 1, 2026)
         assert self._is_valid_docx(byt)
 
     def test_mau_13xln(self):
-        byt = _tao_word_13xln(_du_lieu_chung())
+        # _tao_word_13xln(tong_hop, ten_pgd, nguon_label, so_qd, ngay_qd, ngay_bat_dau, ngay_ket_thuc)
+        byt = _tao_word_13xln(
+            _tong_hop_rong(), "PGD Long Thành", "Trung ương",
+            "01/QĐ", date(2026, 1, 1), date(2026, 1, 1), date(2026, 12, 31),
+        )
         assert self._is_valid_docx(byt)
 
     def test_mau_14xln(self):
-        byt = _tao_word_14xln(_du_lieu_chung())
+        # _tao_word_14xln(tong_hop, ten_pgd, nguon_label, so_qd, ngay_qd, ngay_bat_dau, ngay_ket_thuc)
+        byt = _tao_word_14xln(
+            _tong_hop_rong(), "PGD Long Thành", "Trung ương",
+            "01/QĐ", date(2026, 1, 1), date(2026, 1, 1), date(2026, 12, 31),
+        )
         assert self._is_valid_docx(byt)
 
     def test_to_trinh_pgd(self):
-        byt = _tao_word_to_trinh_pgd(_du_lieu_chung())
+        # _tao_word_to_trinh_pgd(tong_hop_khoanh, tong_hop_xoa, ds_khoanh, ten_pgd, nguon_label, dot, nam)
+        byt = _tao_word_to_trinh_pgd(
+            _tong_hop_rong(), _tong_hop_rong(), [],
+            "PGD Long Thành", "Trung ương", 1, 2026,
+        )
         assert self._is_valid_docx(byt)
 
     def test_to_trinh_cn(self):
-        byt = _tao_word_to_trinh_cn(_du_lieu_chung())
+        # _tao_word_to_trinh_cn(tong_hop_khoanh, tong_hop_xoa, ds_khoanh, ten_tinh, nguon_label, dot, nam)
+        byt = _tao_word_to_trinh_cn(
+            _tong_hop_rong(), _tong_hop_rong(), [],
+            "Chi nhánh Đồng Nai", "Trung ương", 1, 2026,
+        )
         assert self._is_valid_docx(byt)

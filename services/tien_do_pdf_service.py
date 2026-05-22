@@ -445,7 +445,7 @@ def _xuat_pdf_bao_cao_tien_do(ds_task, username):
         buf.seek(0)
         return buf
 
-    except Exception as e:
+    except Exception as e:  # conv: skip
         st.error(f"Lỗi tạo PDF báo cáo tiến độ: {e}")
         return None
 
@@ -636,6 +636,6 @@ def _xuat_pdf_tien_do(task, ds_kq, username):
         buf.seek(0)
         return buf
 
-    except Exception as e:
+    except Exception as e:  # conv: skip
         st.error(f"Lỗi tạo PDF: {e}")
         return None

@@ -226,7 +226,7 @@ fmt_so(so_luong)                   # → "1.234"
 
 | Loại | Dùng | Ví dụ |
 |---|---|---|
-| Tiền tệ (tỷ) | `fmt_ty(x)` | `1.234,560 tỷ` |
+| Tiền tệ (cột bảng) | `fmt_ty(x)` | `1.235` (triệu đồng, 0 số lẻ, header cột ghi "(triệu đồng)") |
 | Số lượng | `fmt_so(x)` | `1.234` |
 | Phần trăm | `f"{x:.2f}".replace(".", ",") + "%"` | `12,34%` |
 | **KHÔNG dùng** | `NumberColumn(format="%.3f")` | ~~`1,234.560`~~ (kiểu Mỹ) |
@@ -472,6 +472,7 @@ except Exception as e:
  Checklist trước khi sửa
 
 ```
+□ ĐỌC BUGMAP.md — kiểm tra section liên quan đến file/thao tác sắp sửa để tránh lặp lỗi cũ
 □ Đọc file cần sửa (view toàn bộ hoặc phần liên quan)
 □ Xác định hàm/dòng cụ thể sẽ thay đổi
 □ Kiểm tra hàm nào đang gọi hàm đó (grep ngược)
@@ -499,6 +500,14 @@ Thêm entry mới lên **ĐẦU FILE** `CHANGELOG.md` (ngay sau dòng `# CHANGEL
 ```
 
 **Quy tắc:** dùng ngày thực tế, mỗi file thay đổi = 1 dòng, KHÔNG xóa entry cũ, áp dụng cho MỌI thay đổi kể cả fix nhỏ.
+
+### 9.1 Sau mỗi lần fix bug — CẬP NHẬT BUGMAP.md
+
+Mỗi khi fix bug, thêm entry vào `BUGMAP.md` theo template có sẵn (cuối file):
+
+- Phân loại đúng section: A. Parquet, B. Streamlit UI, C. DataFrame, D. Database, E. Upload, F. PDF/Word, G. KHTD, H. GSheet, I. Role, J. Code Pattern
+- Nếu là dạng lỗi mới chưa có section → tạo section mới
+- Format: `### XX — [Tên lỗi]` với bảng `| | |` gồm: File, Dấu hiệu, Nguyên nhân, Fix, Ngày fix
 
 ---
 
@@ -529,6 +538,10 @@ Thêm entry mới lên **ĐẦU FILE** `CHANGELOG.md` (ngay sau dòng `# CHANGEL
 | `UI_GUIDELINES.md` | Bảng màu, typography |
 | `ROLES.md` | Cần phân quyền chi tiết theo role mới |
 | `TROUBLESHOOTING.md` | Gặp lỗi thường gặp về dữ liệu, cache, upload |
+| `BUGMAP.md` | ĐỌC TRƯỚC KHI CODE — tra lỗi đã mắc để tránh lặp; sau khi fix bug thì ghi thêm |
+| `SCHEMA.md` | **ĐỌC TRƯỚC KHI VIẾT SQL** — schema 16 bảng SQLite + parquet + query mẫu |
+| `TEST_COVERAGE.md` | Bản đồ 31 file test, lỗ hổng cần test — đọc khi viết test mới |
+| `DECISIONS.md` | Lý do chọn SQLite/Parquet/DuckDB/kv_store/render pattern — đọc khi muốn đổi công nghệ |
 | `CHANGELOG.md` | Lịch sử thay đổi |
 | `BACKLOG.md` | Yêu cầu người dùng — đã làm & sẽ làm |
 | `ROADMAP.md` | Sprint + backlog |

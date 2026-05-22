@@ -1,5 +1,15 @@
 # CHANGELOG
 
+## [2026-05-22] — Gắn "Tạo lại cache" vào nút "Phục hồi ngay"
+- `tabs/tab_trang_thai_nguon.py` dòng ~758 — thêm checkbox "🔄 Tạo lại cache Parquet sau khi phục hồi" (mặc định bật) ngay trước nút "Phục hồi ngay" trong sub-tab "💾 Hệ thống"
+- Sau khi `phuc_hoi_backup()` thành công, nếu checkbox được chọn: tự động xóa cache cũ → gọi `doc_file()` / `doc_file_nq11()` tạo lại cache từ Excel gốc trong `data/` → clear cache → ghi audit
+- Kết quả: 1-click duy nhất vừa phục hồi DB + file PGD vừa tạo lại cache parquet, không cần sang sub-tab "Merge & Cache"
+
+## [2026-05-22] — Nút "Tạo lại cache Parquet" trong Trạng thái Nguồn
+- `tabs/tab_trang_thai_nguon.py` dòng ~327 — thêm section "🔄 Tạo lại cache Parquet từ file Excel gốc" trong sub-tab "Merge & Cache" (chỉ hiện với role CN)
+- Nút "🔄 Tạo lại cache": xóa `cache/hstd.parquet` + `cache/nq11.parquet`, gọi `doc_file()` / `doc_file_nq11()` tạo lại từ Excel gốc trong `data/`, clear Streamlit cache, ghi audit
+- Hiển thị trạng thái file gốc (✅/❌) trước khi bấm; cảnh báo dữ liệu PGD upload sẽ mất
+
 ## [2026-05-22] — Bỏ _TAB_CACHE trong workspace: dùng sys.modules thay thế
 - `workspaces/ws_operation.py` — xóa `_TAB_CACHE`, `_lazy_tab()` gọi thẳng `importlib.import_module()`
 - `workspaces/ws_executive.py` — xóa `_TAB_CACHE`, tương tự

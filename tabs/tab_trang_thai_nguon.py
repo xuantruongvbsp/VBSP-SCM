@@ -85,7 +85,7 @@ def _ts_fmt(fp: str | Path) -> str:
     try:
         ts = os.path.getmtime(str(fp))
         return datetime.fromtimestamp(ts).strftime("%d/%m/%Y %H:%M")
-    except Exception as e:
+    except Exception as e:  # conv: skip
         logger.error("Lỗi _ts_fmt: %s", e, exc_info=True)
         return "—"
 
@@ -97,7 +97,7 @@ def _size_fmt(fp: str | Path) -> str:
         if sz >= 1_048_576:
             return f"{sz / 1_048_576:.1f} MB"
         return f"{sz / 1024:.0f} KB"
-    except Exception as e:
+    except Exception as e:  # conv: skip
         logger.error("Lỗi _size_fmt: %s", e, exc_info=True)
         return "—"
 
@@ -107,7 +107,7 @@ def _pgd_slug_local(ten_pgd: str) -> str:
     try:
         from data.pgd import pgd_slug
         return pgd_slug(ten_pgd)
-    except Exception as e:
+    except Exception as e:  # conv: skip
         logger.error("Lỗi _pgd_slug_local: %s", e, exc_info=True)
         import re, unicodedata
         s = unicodedata.normalize("NFD", ten_pgd.lower())
@@ -122,7 +122,7 @@ def _pgd_file_path(ten_pgd: str, loai: str) -> Path:
     try:
         from data.pgd import duong_dan_pgd
         return Path(duong_dan_pgd(ten_pgd, loai))
-    except Exception as e:
+    except Exception as e:  # conv: skip
         logger.error("Lỗi _pgd_file_path(%s, %s): %s", ten_pgd, loai, e)
         slug = _pgd_slug_local(ten_pgd)
         return PGD_DATA_DIR / slug / f"{loai}_latest.xlsx"
@@ -225,7 +225,7 @@ def _render_tep_nguon(la_cn: bool, pgd_user: str | None) -> None:
                         )
                         df_dates = pd.DataFrame(rows, columns=["Đơn vị", "Ngày số liệu"])
                         st.dataframe(df_dates, use_container_width=True, hide_index=True, height=250)
-        except Exception as e:
+        except Exception as e:  # conv: skip
             logger.error("Lỗi kiểm tra ngày số liệu: %s", e, exc_info=True)
             st.info(f"ℹ️ Không thể kiểm tra ngày số liệu: {e}")
 
@@ -315,7 +315,7 @@ def _render_merge_cache(la_cn: bool) -> None:
                     st.dataframe(df_dq, use_container_width=True, hide_index=True)
         if not co_dq_data:
             st.info("ℹ️ Chưa có dữ liệu kiểm tra chất lượng — chạy Merge lần đầu để có kết quả.")
-    except Exception as e:
+    except Exception as e:  # conv: skip
         logger.error("Lỗi đọc data_quality_meta: %s", e, exc_info=True)
         st.caption(f"Không đọc được metadata DQ: {e}")
 
@@ -340,7 +340,7 @@ def _render_merge_cache(la_cn: bool) -> None:
             st.warning("⚠️ DS_PGD không đồng bộ — " + " | ".join(msg))
         else:
             st.success(f"✅ DS_PGD đồng bộ — {len(DS_PGD)} đơn vị")
-    except Exception as e:
+    except Exception as e:  # conv: skip
         logger.error("Lỗi trong khối except: %s", e, exc_info=True)
         st.error(f"Lỗi kiểm tra cấu hình: {e}")
 
@@ -394,7 +394,7 @@ def _render_merge_cache(la_cn: bool) -> None:
                     st.info(f"📊 Tổng số dòng: **{total_rows:,}**")
                     con.close()
 
-                except Exception as e:
+                except Exception as e:  # conv: skip
                     logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                     st.error(f"Lỗi đọc parquet: {e}")
 
@@ -478,7 +478,7 @@ def _render_snapshot() -> None:
         df_snap = df_snap.drop(columns=["Tổng dư nợ (VND)"])
         st.dataframe(df_snap, use_container_width=True, hide_index=True)
 
-    except Exception as e:
+    except Exception as e:  # conv: skip
         logger.error("Lỗi trong khối except: %s", e, exc_info=True)
         st.error(f"Lỗi đọc snapshot: {e}")
 
@@ -538,11 +538,11 @@ def _render_nguoi_dung() -> None:
                 )
             else:
                 st.success("✅ Tất cả tài khoản đã đổi mật khẩu ít nhất 1 lần")
-        except Exception as e:
-            logger.error("Lỗi kiểm tra ngay_doi_mk: %s", e, exc_info=True)
-            pass  # Bảng users có thể chưa có cột ngay_doi_mk — bỏ qua
+        except Exception as e:  # conv: skip
+            logger.warning("Bỏ qua kiểm tra ngay_doi_mk (cột chưa tồn tại hoặc lỗi khác): %s", e)
+            pass
 
-    except Exception as e:
+    except Exception as e:  # conv: skip
         logger.error("Lỗi trong khối except: %s", e, exc_info=True)
         st.error(f"Lỗi đọc dữ liệu người dùng: {e}")
 
@@ -569,7 +569,7 @@ def _render_he_thong(la_cn: bool = False, username: str = "unknown") -> None:
             st.warning(f"⚠️ Ổ đĩa đã dùng {pct_used:.0f}% — nên theo dõi")
         else:
             st.success(f"✅ Ổ đĩa còn {free / 1e9:.1f} GB trống")  # noqa
-    except Exception as e:
+    except Exception as e:  # conv: skip
         logger.error("Lỗi trong khối except: %s", e, exc_info=True)
         st.error(f"Lỗi đọc dung lượng: {e}")
 
@@ -598,7 +598,7 @@ def _render_he_thong(la_cn: bool = False, username: str = "unknown") -> None:
             use_container_width=True,
             hide_index=True,
         )
-    except Exception as e:
+    except Exception as e:  # conv: skip
         logger.error("Lỗi trong khối except: %s", e, exc_info=True)
         st.error(f"Lỗi kiểm tra quyền thư mục: {e}")
 
@@ -614,7 +614,7 @@ def _render_he_thong(la_cn: bool = False, username: str = "unknown") -> None:
             )
         else:
             st.success(f"✅ Audit log: **{total_audit:,}** dòng")
-    except Exception as e:
+    except Exception as e:  # conv: skip
         logger.error("Lỗi trong khối except: %s", e, exc_info=True)
         st.error(f"Lỗi đọc audit log: {e}")
 
@@ -627,7 +627,7 @@ def _render_he_thong(la_cn: bool = False, username: str = "unknown") -> None:
             st.success(f"✅ `credentials.json` tồn tại ({_size_fmt(creds_path)})")
         else:
             st.info("ℹ️ Không tìm thấy `credentials.json` — tính năng Google Sheets bị tắt hoặc chưa cấu hình.")
-    except Exception as e:
+    except Exception as e:  # conv: skip
         logger.error("Lỗi kiểm tra credentials: %s", e, exc_info=True)
         pass
 
@@ -668,253 +668,254 @@ def _render_he_thong(la_cn: bool = False, username: str = "unknown") -> None:
                 st.warning(f"⚠️ **{len(qh_td)}** tiến độ task quá hạn")
                 df_td = pd.DataFrame(qh_td, columns=["ID", "Tên task", "Deadline", "Trạng thái"])
                 st.dataframe(df_td, use_container_width=True, hide_index=True, height=200)
-    except Exception as e:
+    except Exception as e:  # conv: skip
         logger.error("Lỗi trong khối except: %s", e, exc_info=True)
         st.error(f"Lỗi kiểm tra nhiệm vụ quá hạn: {e}")
 
-    # ── Sao lưu / Phục hồi qua GitHub (kv_store) ─────────────────────────
-    if la_cn:
-        st.markdown("#### 🔗 Sao lưu qua GitHub (kv_store)")
+    # ── Sao lưu & Đồng bộ ──────────────────────────────────────────────────
+    st.markdown("#### 🗄️ Sao lưu & Đồng bộ")
+
+    from backup_service import BACKUP_DIR
+
+    tab_backup, tab_sync = st.tabs(["💾 Sao lưu hệ thống", "🔗 Đồng bộ GitHub"])
+
+    # ── Tab: Sao lưu hệ thống ────────────────────────────────────────────
+    with tab_backup:
+        if la_cn:
+            col_btn, col_info = st.columns([1, 3])
+            with col_btn:
+                if st.button("🗄️ Backup ngay", key="btn_backup_now",
+                             type="primary"):
+                    with st.spinner("Đang backup..."):
+                        try:
+                            from backup_service import chay_backup
+                            ket_qua = chay_backup()
+                            db.ghi_audit(
+                                st.session_state.get("username", "unknown"),
+                                "manual_backup",
+                                f"ky={ket_qua['ky']} "
+                                f"db={'ok' if ket_qua['db_ok'] else 'loi'} "
+                                f"parquet={ket_qua['parquet']} "
+                                f"pgd={ket_qua['pgd_xlsx']}",
+                            )
+                            if ket_qua["db_ok"]:
+                                st.success(
+                                    f"✅ Backup thành công — kỳ **{ket_qua['ky']}**\n\n"
+                                    f"DB ✅ · Parquet: {ket_qua['parquet']} file"
+                                    f" · PGD: {ket_qua['pgd_xlsx']} file"
+                                )
+                            else:
+                                st.error("❌ Backup DB thất bại — xem backup.log")
+                        except Exception as e:  # conv: skip
+                            logger.error("Lỗi trong khối except: %s", e, exc_info=True)
+                            st.error(f"❌ Lỗi backup: {e}")
+            with col_info:
+                st.caption(
+                    "Backup gồm: SQLite DB · Parquet cache · File xlsx PGD\n\n"
+                    "Lưu vào: `backups/YYYYMMDD_HHMMSS/` · Giữ 7 bản gần nhất"
+                )
+        else:
+            st.info("ℹ️ Chỉ Admin/Manager Chi nhánh mới có thể thực hiện backup.")
+
+        # ── Danh sách backup đã có ───────────────────────────────────────
+        st.markdown("##### 📁 Các bản backup hiện có")
+        try:
+            bk_dir = Path(BACKUP_DIR)
+            if not bk_dir.exists():
+                st.info("Chưa có bản backup nào.")
+            else:
+                ds_bk = sorted(
+                    [d for d in bk_dir.iterdir()
+                     if d.is_dir() and len(d.name) == 15
+                     and d.name[8] == "_"],
+                    reverse=True,
+                )
+                if not ds_bk:
+                    st.info("Chưa có bản backup nào.")
+                else:
+                    rows = []
+                    for d in ds_bk:
+                        total = sum(
+                            f.stat().st_size
+                            for f in d.rglob("*") if f.is_file()
+                        )
+                        size_str = (
+                            f"{total/1e6:.1f} MB" if total >= 1e6
+                            else f"{total/1e3:.0f} KB"
+                        )
+                        try:
+                            dt = datetime.strptime(d.name, "%Y%m%d_%H%M%S")
+                            ngay = dt.strftime("%d/%m/%Y %H:%M")
+                        except Exception as e:  # conv: skip
+                            logger.error("Lỗi parse tên backup: %s", e, exc_info=True)
+                            ngay = d.name
+                        n_files = sum(1 for _ in d.rglob("*") if _.is_file())
+                        rows.append({
+                            "Kỳ backup": ngay,
+                            "Thư mục": d.name,
+                            "Số file": n_files,
+                            "Dung lượng": size_str,
+                            "DB": "✅" if (d / "vbsp_scm.db").exists() else "❌",
+                            "Parquet": "✅" if (d / "cache").exists() else "❌",
+                            "PGD xlsx": "✅" if (d / "pgd_data").exists() else "❌",
+                        })
+                    df_bk = pd.DataFrame(rows)
+                    st.caption(f"Tổng cộng **{len(ds_bk)}** bản backup")
+                    st.dataframe(
+                        df_bk,
+                        use_container_width=True,
+                        hide_index=True,
+                    )
+
+                    st.markdown("**⬇️ Tải bản backup về máy (để chuyển sang máy khác)**")
+                    for d in ds_bk:
+                        try:
+                            dt_lbl = datetime.strptime(d.name, "%Y%m%d_%H%M%S").strftime("%d/%m/%Y %H:%M:%S")
+                        except Exception:
+                            dt_lbl = d.name
+                        if st.button(f"⬇️ Tải  {dt_lbl}", key=f"btn_dl_{d.name}"):
+                            with st.spinner("Đang nén..."):
+                                try:
+                                    from backup_service import zip_ban_backup
+                                    zip_bytes = zip_ban_backup(d.name)
+                                    st.download_button(
+                                        label=f"💾 Lưu file  backup_{d.name}.zip",
+                                        data=zip_bytes,
+                                        file_name=f"backup_{d.name}.zip",
+                                        mime="application/zip",
+                                        key=f"dl_{d.name}",
+                                    )
+                                except Exception as e:  # conv: skip
+                                    st.error(f"❌ Lỗi nén: {e}")
+
+        except Exception as e:  # conv: skip
+            logger.error("Lỗi trong khối except: %s", e, exc_info=True)
+            st.error(f"Lỗi đọc danh sách backup: {e}")
+
+        # ── Phục hồi từ file zip ─────────────────────────────────────────
+        if la_cn:
+            st.markdown("---")
+            st.markdown("##### 📤 Phục hồi từ bản backup (máy khác chuyển sang)")
+            st.caption(
+                "Upload file `backup_YYYYMMDD_HHMMSS.zip` đã tải từ máy kia. "
+                "App sẽ ghi đè DB + cache + file PGD rồi tải lại dữ liệu tự động."
+            )
+            uploaded = st.file_uploader(
+                "Chọn file zip backup",
+                type=["zip"],
+                key="fu_restore_zip",
+            )
+            if uploaded is not None:
+                rebuild_cache = st.checkbox(
+                    "🔄 Tạo lại cache Parquet sau khi phục hồi",
+                    value=True,
+                    key="cb_rebuild_after_restore",
+                    help="Đọc lại file Excel gốc trong data/ để tạo cache mới. "
+                         "Dùng khi số liệu về 0 sau phục hồi (cache thiếu/lỗi).",
+                )
+                col_r1, col_r2 = st.columns([1, 3])
+                with col_r1:
+                    if st.button("🔄 Phục hồi ngay", key="btn_restore_now", type="primary"):
+                        with st.spinner("Đang phục hồi..."):
+                            try:
+                                from backup_service import phuc_hoi_backup
+                                kq = phuc_hoi_backup(uploaded.read())
+                                db.ghi_audit(
+                                    st.session_state.get("username", "unknown"),
+                                    "restore_backup",
+                                    f"db={'ok' if kq['db_ok'] else 'loi'} "
+                                    f"parquet={kq['parquet']} pgd={kq['pgd_xlsx']}",
+                                )
+                                if kq["db_ok"]:
+                                    _msg = (
+                                        f"✅ Phục hồi thành công!\n\n"
+                                        f"DB ✅ · Parquet: {kq['parquet']} file"
+                                        f" · PGD: {kq['pgd_xlsx']} file"
+                                    )
+                                    if kq["loi"]:
+                                        _msg += "\n\n⚠️ Một số lỗi nhỏ:\n" + "\n".join(kq["loi"])
+                                    st.success(_msg)
+
+                                    if rebuild_cache:
+                                        st.info("🔄 Đang tạo lại cache Parquet từ file Excel gốc...")
+                                        from backup_service import rebuild_cache_from_excel
+                                        r = rebuild_cache_from_excel(clear_st_cache=True)
+                                        for _err in r["loi"]:
+                                            st.warning(f"⚠️ {_err}")
+                                        if r["ok"] > 0:
+                                            db.ghi_audit(
+                                                st.session_state.get("username", "unknown"),
+                                                "rebuild_cache_after_restore",
+                                                f"ok={r['ok']} loi={len(r['loi'])}",
+                                            )
+                                            st.success(f"✅ Đã tạo lại {r['ok']}/{r['total']} cache Parquet từ file Excel gốc.")
+                                        elif not r["loi"]:
+                                            st.info("ℹ️ Không có file Excel gốc để tạo lại cache.")
+                                    st.info("💡 Nhấn **F5** hoặc reload trang để thấy dữ liệu mới.")
+                                else:
+                                    st.error("❌ Phục hồi DB thất bại:\n" + "\n".join(kq["loi"]))
+                            except Exception as e:  # conv: skip
+                                logger.error("Lỗi phuc hoi backup: %s", e, exc_info=True)
+                                st.error(f"❌ Lỗi: {e}")
+                with col_r2:
+                    st.caption(f"File: `{uploaded.name}` · {uploaded.size // 1024} KB")
+
+    # ── Tab: Đồng bộ GitHub (kv_store) ───────────────────────────────────
+    with tab_sync:
         st.caption(
-            "① **Máy này** → nhấn **Sao lưu** → commit GitHub Desktop\n\n"
-            "② **Máy kia** → pull GitHub → nhấn **Phục hồi**\n\n"
+            "Đồng bộ dữ liệu nghiệp vụ giữa các máy qua GitHub.\n\n"
+            "① **Máy này** → Xuất → commit GitHub Desktop\n"
+            "② **Máy kia** → pull GitHub → Nhập\n\n"
             "⚠️ Chỉ sync: `kv_store` · `users` · `nhiem_vu` · `tien_do_task`. "
             "**Không sync:** `pgd_data/` (re-upload sau pull) · `credentials.json` (copy thủ công)"
         )
-        _sync_path = Path(__file__).parent.parent / "backups" / "kv_sync.json"
-        col_sv, col_ph = st.columns(2)
-        with col_sv:
-            if st.button("💾 Sao lưu kv_store", key="btn_he_thong_save_kv",
-                         use_container_width=True,
-                         help="Xuất tất cả bảng → backups/kv_sync.json (commit được lên GitHub)"):
-                try:
-                    _counts = db.luu_kv_sync_project()
-                    _total = sum(_counts.values())
-                    db.ghi_audit(
-                        username, "export_kv_sync",
-                        f"Xuất {_total} bản ghi / {len(_counts)} bảng → kv_sync.json",
-                    )
-                    st.success(f"✅ Đã sao lưu **{_total}** bản ghi — nhớ commit GitHub Desktop")
-                    _labels = {
-                        "users": "👤", "kv_store": "🗂️",
-                        "nhiem_vu": "📋", "tien_do_task": "📊", "qlnk_ket_qua": "🔒",
-                    }
-                    for _t, _n in _counts.items():
-                        if _n > 0:
-                            st.caption(f"{_labels.get(_t, '•')} {_t}: {_n}")
-                except Exception as e:
-                    logger.error("Lỗi export kv_sync: %s", e, exc_info=True)
-                    st.error(f"❌ Lỗi sao lưu: {e}")
-        with col_ph:
-            if _sync_path.exists():
-                st.caption(f"File: `kv_sync.json` · {_sync_path.stat().st_size // 1024} KB")
-                if st.button("🔄 Phục hồi kv_store", key="btn_he_thong_load_kv",
-                             use_container_width=True, type="primary",
-                             help="Import tất cả bảng từ backups/kv_sync.json vừa pull về"):
+        if la_cn:
+            _sync_path = Path(__file__).parent.parent / "backups" / "kv_sync.json"
+            col_sv, col_ph = st.columns(2)
+            with col_sv:
+                if st.button("💾 Xuất ra kv_sync.json", key="btn_he_thong_save_kv",
+                             use_container_width=True,
+                             help="Xuất tất cả bảng → backups/kv_sync.json (commit được lên GitHub)"):
                     try:
-                        _counts = db.doc_kv_sync_project()
+                        _counts = db.luu_kv_sync_project()
                         _total = sum(_counts.values())
                         db.ghi_audit(
-                            username, "import_kv_sync",
-                            f"Import {_total} bản ghi / {len(_counts)} bảng từ kv_sync.json",
+                            username, "export_kv_sync",
+                            f"Xuất {_total} bản ghi / {len(_counts)} bảng → kv_sync.json",
                         )
-                        st.cache_data.clear()
-                        st.success(f"✅ Phục hồi **{_total}** bản ghi! Nhấn **F5** để tải lại.")
-                    except Exception as e:
-                        logger.error("Lỗi import kv_sync: %s", e, exc_info=True)
-                        st.error(f"❌ Lỗi phục hồi: {e}")
-            else:
-                st.caption("⚠️ Chưa có bản sao lưu — pull GitHub trước rồi thử lại")
-        st.markdown("---")
-
-    # ── Backup thủ công ──────────────────────────────────────────────────────
-    st.markdown("#### 🗄️ Backup dữ liệu")
-
-    if la_cn:
-        col_btn, col_info = st.columns([1, 3])
-        with col_btn:
-            if st.button("🗄️ Backup ngay", key="btn_backup_now",
-                         type="primary"):
-                with st.spinner("Đang backup..."):
-                    try:
-                        from backup_service import chay_backup
-                        ket_qua = chay_backup()
-                        db.ghi_audit(
-                            st.session_state.get("username", "unknown"),
-                            "manual_backup",
-                            f"ky={ket_qua['ky']} "
-                            f"db={'ok' if ket_qua['db_ok'] else 'loi'} "
-                            f"parquet={ket_qua['parquet']} "
-                            f"pgd={ket_qua['pgd_xlsx']}",
-                        )
-                        if ket_qua["db_ok"]:
-                            st.success(
-                                f"✅ Backup thành công — kỳ **{ket_qua['ky']}**\n\n"
-                                f"DB ✅ · Parquet: {ket_qua['parquet']} file"
-                                f" · PGD: {ket_qua['pgd_xlsx']} file"
-                            )
-                        else:
-                            st.error("❌ Backup DB thất bại — xem backup.log")
-                    except Exception as e:
-                        logger.error("Lỗi trong khối except: %s", e, exc_info=True)
-                        st.error(f"❌ Lỗi backup: {e}")
-        with col_info:
-            st.caption(
-                "Backup gồm: SQLite DB · Parquet cache · File xlsx PGD\n\n"
-                "Lưu vào: `backups/YYYYMMDD_HHMMSS/` · Giữ 7 bản gần nhất"
-            )
-    else:
-        st.info("ℹ️ Chỉ Admin/Manager Chi nhánh mới có thể thực hiện backup.")
-
-    # ── Danh sách backup đã có ───────────────────────────────────────────
-    st.markdown("##### 📁 Các bản backup hiện có")
-    try:
-        from backup_service import BACKUP_DIR
-        bk_dir = Path(BACKUP_DIR)
-        if not bk_dir.exists():
-            st.info("Chưa có bản backup nào.")
-        else:
-            ds_bk = sorted(
-                [d for d in bk_dir.iterdir()
-                 if d.is_dir() and len(d.name) == 15
-                 and d.name[8] == "_"],
-                reverse=True,
-            )
-            if not ds_bk:
-                st.info("Chưa có bản backup nào.")
-            else:
-                rows = []
-                for d in ds_bk:
-                    # Tính tổng dung lượng thư mục
-                    total = sum(
-                        f.stat().st_size
-                        for f in d.rglob("*") if f.is_file()
-                    )
-                    size_str = (
-                        f"{total/1e6:.1f} MB" if total >= 1e6
-                        else f"{total/1e3:.0f} KB"
-                    )
-                    # Parse tên thư mục YYYYMMDD_HHMMSS
-                    try:
-                        from datetime import datetime
-
-                        dt = datetime.strptime(d.name, "%Y%m%d_%H%M%S")
-                        ngay = dt.strftime("%d/%m/%Y %H:%M")
-                    except Exception as e:
-                        logger.error("Lỗi parse tên backup: %s", e, exc_info=True)
-                        ngay = d.name
-                    # Đếm số file
-                    n_files = sum(1 for _ in d.rglob("*") if _.is_file())
-                    rows.append({
-                        "Kỳ backup": ngay,
-                        "Thư mục": d.name,
-                        "Số file": n_files,
-                        "Dung lượng": size_str,
-                        "DB": "✅" if (d / "vbsp_scm.db").exists() else "❌",
-                        "Parquet": "✅" if (d / "cache").exists() else "❌",
-                        "PGD xlsx": "✅" if (d / "pgd_data").exists() else "❌",
-                    })
-                df_bk = pd.DataFrame(rows)
-                st.caption(f"Tổng cộng **{len(ds_bk)}** bản backup")
-                st.dataframe(
-                    df_bk,
-                    use_container_width=True,
-                    hide_index=True,
-                )
-
-                # Nút tải zip từng bản
-                st.markdown("**⬇️ Tải bản backup về máy (để chuyển sang máy khác)**")
-                for d in ds_bk:
-                    try:
-                        dt_lbl = datetime.strptime(d.name, "%Y%m%d_%H%M%S").strftime("%d/%m/%Y %H:%M:%S")
-                    except Exception:
-                        dt_lbl = d.name
-                    if st.button(f"⬇️ Tải  {dt_lbl}", key=f"btn_dl_{d.name}"):
-                        with st.spinner("Đang nén..."):
-                            try:
-                                from backup_service import zip_ban_backup
-                                zip_bytes = zip_ban_backup(d.name)
-                                st.download_button(
-                                    label=f"💾 Lưu file  backup_{d.name}.zip",
-                                    data=zip_bytes,
-                                    file_name=f"backup_{d.name}.zip",
-                                    mime="application/zip",
-                                    key=f"dl_{d.name}",
-                                )
-                            except Exception as e:
-                                st.error(f"❌ Lỗi nén: {e}")
-
-    except Exception as e:
-        logger.error("Lỗi trong khối except: %s", e, exc_info=True)
-        st.error(f"Lỗi đọc danh sách backup: {e}")
-
-    # ── Phục hồi từ file zip ─────────────────────────────────────────────────
-    if la_cn:
-        st.markdown("---")
-        st.markdown("#### 📤 Phục hồi từ bản backup (máy khác chuyển sang)")
-        st.caption(
-            "Upload file `backup_YYYYMMDD_HHMMSS.zip` đã tải từ máy kia. "
-            "App sẽ ghi đè DB + cache + file PGD rồi tải lại dữ liệu tự động."
-        )
-        uploaded = st.file_uploader(
-            "Chọn file zip backup",
-            type=["zip"],
-            key="fu_restore_zip",
-        )
-        if uploaded is not None:
-            rebuild_cache = st.checkbox(
-                "🔄 Tạo lại cache Parquet sau khi phục hồi",
-                value=True,
-                key="cb_rebuild_after_restore",
-                help="Đọc lại file Excel gốc trong data/ để tạo cache mới. "
-                     "Dùng khi số liệu về 0 sau phục hồi (cache thiếu/lỗi).",
-            )
-            col_r1, col_r2 = st.columns([1, 3])
-            with col_r1:
-                if st.button("🔄 Phục hồi ngay", key="btn_restore_now", type="primary"):
-                    with st.spinner("Đang phục hồi..."):
+                        st.success(f"✅ Đã xuất **{_total}** bản ghi — nhớ commit GitHub Desktop")
+                        _labels = {
+                            "users": "👤", "kv_store": "🗂️",
+                            "nhiem_vu": "📋", "tien_do_task": "📊", "qlnk_ket_qua": "🔒",
+                        }
+                        for _t, _n in _counts.items():
+                            if _n > 0:
+                                st.caption(f"{_labels.get(_t, '•')} {_t}: {_n}")
+                    except Exception as e:  # conv: skip
+                        logger.error("Lỗi export kv_sync: %s", e, exc_info=True)
+                        st.error(f"❌ Lỗi xuất: {e}")
+            with col_ph:
+                if _sync_path.exists():
+                    st.caption(f"File: `kv_sync.json` · {_sync_path.stat().st_size // 1024} KB")
+                    if st.button("🔄 Nhập từ kv_sync.json", key="btn_he_thong_load_kv",
+                                 use_container_width=True, type="primary",
+                                 help="Import tất cả bảng từ backups/kv_sync.json vừa pull về"):
                         try:
-                            from backup_service import phuc_hoi_backup
-                            kq = phuc_hoi_backup(uploaded.read())
+                            _counts = db.doc_kv_sync_project()
+                            _total = sum(_counts.values())
                             db.ghi_audit(
-                                st.session_state.get("username", "unknown"),
-                                "restore_backup",
-                                f"db={'ok' if kq['db_ok'] else 'loi'} "
-                                f"parquet={kq['parquet']} pgd={kq['pgd_xlsx']}",
+                                username, "import_kv_sync",
+                                f"Import {_total} bản ghi / {len(_counts)} bảng từ kv_sync.json",
                             )
-                            if kq["db_ok"]:
-                                _msg = (
-                                    f"✅ Phục hồi thành công!\n\n"
-                                    f"DB ✅ · Parquet: {kq['parquet']} file"
-                                    f" · PGD: {kq['pgd_xlsx']} file"
-                                )
-                                if kq["loi"]:
-                                    _msg += "\n\n⚠️ Một số lỗi nhỏ:\n" + "\n".join(kq["loi"])
-                                st.success(_msg)
-
-                                if rebuild_cache:
-                                    st.info("🔄 Đang tạo lại cache Parquet từ file Excel gốc...")
-                                    from backup_service import rebuild_cache_from_excel
-                                    r = rebuild_cache_from_excel(clear_st_cache=True)
-                                    for _err in r["loi"]:
-                                        st.warning(f"⚠️ {_err}")
-                                    if r["ok"] > 0:
-                                        db.ghi_audit(
-                                            st.session_state.get("username", "unknown"),
-                                            "rebuild_cache_after_restore",
-                                            f"ok={r['ok']} loi={len(r['loi'])}",
-                                        )
-                                        st.success(f"✅ Đã tạo lại {r['ok']}/{r['total']} cache Parquet từ file Excel gốc.")
-                                    elif not r["loi"]:
-                                        st.info("ℹ️ Không có file Excel gốc để tạo lại cache.")
-                                st.info("💡 Nhấn **F5** hoặc reload trang để thấy dữ liệu mới.")
-                            else:
-                                st.error("❌ Phục hồi DB thất bại:\n" + "\n".join(kq["loi"]))
-                        except Exception as e:
-                            logger.error("Lỗi phuc hoi backup: %s", e, exc_info=True)
-                            st.error(f"❌ Lỗi: {e}")
-            with col_r2:
-                st.caption(f"File: `{uploaded.name}` · {uploaded.size // 1024} KB")
+                            st.cache_data.clear()
+                            st.success(f"✅ Đã nhập **{_total}** bản ghi! Nhấn **F5** để tải lại.")
+                        except Exception as e:  # conv: skip
+                            logger.error("Lỗi import kv_sync: %s", e, exc_info=True)
+                            st.error(f"❌ Lỗi nhập: {e}")
+                else:
+                    st.caption("⚠️ Chưa có file kv_sync.json — pull GitHub trước rồi thử lại")
+        else:
+            st.info("ℹ️ Chỉ Admin/Manager Chi nhánh mới có thể đồng bộ dữ liệu.")
 
 
 # ── Sub-tab 6: Audit Log ──────────────────────────────────────────────────
@@ -970,7 +971,7 @@ def _render_audit(la_cn: bool, username: str | None) -> None:
         else:
             st.info("Không có kết quả phù hợp.")
 
-    except Exception as e:
+    except Exception as e:  # conv: skip
         logger.error("Lỗi trong khối except: %s", e, exc_info=True)
         st.error(f"Lỗi đọc audit log: {e}")
 

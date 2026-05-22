@@ -64,8 +64,8 @@ _RENDER_FIRST_PARAM = re.compile(
     r'def render\((?:role|mode|cap)\s*:'
 )
 
-# 8. except Exception mà không có exc_info=True trong file (tabs/*)
-# Warning nếu file có except Exception nhưng không dùng exc_info=True
+# 8. except Exception mà không có exc_info=True NGAY TRONG except block
+# Kiểm tra dòng except và 3 dòng tiếp theo có exc_info=True không
 _EXCEPT_EXC = re.compile(r'except\s+Exception\s+as\s+e\s*:')
 _EXC_INFO   = re.compile(r'exc_info\s*=\s*True')
 
@@ -140,11 +140,17 @@ def kiem_tra_file(path: Path) -> list[str]:
             )
 
         if _EXCEPT_EXC.search(line) and "# conv: skip" not in line:
-            loi.append(
-                f"  Dòng {i:4d}: [LOGGER] except Exception as e: — "
-                f"dùng logger.error(... , exc_info=True)\n"
-                f"           → {stripped[:100]}"
+            # Kiểm tra 3 dòng tiếp theo có exc_info=True không
+            co_exc_info = any(
+                _EXC_INFO.search(lines[j - 1]) if j <= len(lines) else False
+                for j in range(i + 1, min(i + 4, len(lines) + 1))
             )
+            if not co_exc_info:
+                loi.append(
+                    f"  Dòng {i:4d}: [LOGGER] except Exception as e: — "
+                    f"dùng logger.error(... , exc_info=True)\n"
+                    f"           → {stripped[:100]}"
+                )
 
     # Kiểm tra ghi_kv không có ghi_audit (warn nhẹ)
     if _GHI_KV.search(content) and not _GHI_AUDIT.search(content):

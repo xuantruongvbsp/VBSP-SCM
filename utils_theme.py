@@ -53,8 +53,9 @@ _TOKENS = {
 }
 
 
+@st.cache_resource
 def get_theme_css() -> str:
-    """Trả về CSS đầy đủ cho dark theme."""
+    """Trả về CSS đầy đủ cho dark theme — cached, chỉ build 1 lần."""
     c = _TOKENS
 
     return f"""<style>

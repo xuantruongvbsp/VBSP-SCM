@@ -323,6 +323,78 @@ def _render_merge_cache(la_cn: bool) -> None:
     except ImportError:
         st.warning("⚠️ Cần cài `duckdb` để kiểm tra parquet integrity.")
 
+    # ── Tạo lại cache Parquet từ Excel gốc ─────────────────────────────────
+    if la_cn:
+        st.markdown("---")
+        st.markdown("#### 🔄 Tạo lại cache Parquet từ file Excel gốc")
+        st.caption(
+            "Xóa cache hiện tại và tạo lại `hstd.parquet` + `nq11.parquet` "
+            "từ file Excel trong thư mục `data/`. Dùng khi qua máy mới "
+            "chưa có cache, hoặc cache bị lỗi/hỏng."
+        )
+
+        _nguon_co_san = []
+        for ten, fp in _SOURCE_MAP.items():
+            if os.path.exists(fp):
+                _nguon_co_san.append(f"✅ {ten}: `{os.path.basename(fp)}` ({_size_fmt(fp)})")
+            else:
+                _nguon_co_san.append(f"❌ {ten}: `{os.path.basename(fp)}` — chưa có file gốc")
+
+        for line in _nguon_co_san:
+            st.caption(line)
+
+        col_btn, col_info = st.columns([1, 3])
+        with col_btn:
+            if st.button("🔄 Tạo lại cache", key="btn_rebuild_cache", type="primary"):
+                with st.spinner("Đang tạo lại cache Parquet..."):
+                    _ok = 0
+                    _loi = []
+                    for ten in ["HSTD", "NQ11"]:
+                        fp_src = _SOURCE_MAP[ten]
+                        fp_cache = _CACHE_MAP[ten]
+                        if not os.path.exists(fp_src):
+                            _loi.append(f"{ten}: file gốc `{os.path.basename(fp_src)}` không tồn tại")
+                            continue
+                        try:
+                            if os.path.exists(fp_cache):
+                                os.remove(fp_cache)
+                            if ten == "HSTD":
+                                from data.hstd import doc_file
+                                doc_file.clear()
+                                doc_file(fp_src, ts_file(fp_src))
+                            else:
+                                from data.hstd import doc_file_nq11
+                                doc_file_nq11.clear()
+                                doc_file_nq11(fp_src, ts_file(fp_src))
+                            _ok += 1
+                            st.success(f"✅ {ten}: `{os.path.basename(fp_cache)}` — {_size_fmt(fp_cache)}")
+                        except Exception as exc:
+                            logger.error("rebuild_cache %s: %s", ten, exc, exc_info=True)
+                            _loi.append(f"{ten}: {exc}")
+
+                    if _loi:
+                        st.error("❌ Lỗi:\n" + "\n".join(_loi))
+                    if _ok > 0:
+                        st.cache_data.clear()
+                        db.ghi_audit(
+                            st.session_state.get("username", "unknown"),
+                            "rebuild_cache",
+                            f"ok={_ok} loi={len(_loi)}",
+                        )
+                        st.success(
+                            f"✅ Đã tạo lại {_ok}/2 cache Parquet. "
+                            f"Vào tab **📤 Upload HSTD** → Merge để đồng bộ dữ liệu PGD."
+                        )
+        with col_info:
+            st.caption(
+                "Thao tác này:\n"
+                "1. Xóa `cache/hstd.parquet` và `cache/nq11.parquet`\n"
+                "2. Đọc lại từ Excel gốc trong `data/`\n"
+                "3. Ghi cache mới\n\n"
+                "⚠️ Sau khi tạo lại cache, **dữ liệu upload từ PGD sẽ bị mất**. "
+                "Cần vào tab Upload → Merge để đồng bộ lại."
+            )
+
 
 # ── Sub-tab 3: Snapshot ───────────────────────────────────────────────────
 def _render_snapshot() -> None:
@@ -682,6 +754,13 @@ def _render_he_thong(la_cn: bool = False) -> None:
             key="fu_restore_zip",
         )
         if uploaded is not None:
+            rebuild_cache = st.checkbox(
+                "🔄 Tạo lại cache Parquet sau khi phục hồi",
+                value=True,
+                key="cb_rebuild_after_restore",
+                help="Đọc lại file Excel gốc trong data/ để tạo cache mới. "
+                     "Dùng khi số liệu về 0 sau phục hồi (cache thiếu/lỗi).",
+            )
             col_r1, col_r2 = st.columns([1, 3])
             with col_r1:
                 if st.button("🔄 Phục hồi ngay", key="btn_restore_now", type="primary"):
@@ -696,13 +775,55 @@ def _render_he_thong(la_cn: bool = False) -> None:
                                 f"parquet={kq['parquet']} pgd={kq['pgd_xlsx']}",
                             )
                             if kq["db_ok"]:
-                                st.success(
+                                _msg = (
                                     f"✅ Phục hồi thành công!\n\n"
                                     f"DB ✅ · Parquet: {kq['parquet']} file"
                                     f" · PGD: {kq['pgd_xlsx']} file"
                                 )
                                 if kq["loi"]:
-                                    st.warning("Một số lỗi nhỏ:\n" + "\n".join(kq["loi"]))
+                                    _msg += "\n\n⚠️ Một số lỗi nhỏ:\n" + "\n".join(kq["loi"])
+                                st.success(_msg)
+
+                                if rebuild_cache:
+                                    st.info("🔄 Đang tạo lại cache Parquet từ file Excel gốc...")
+                                    _ok, _loi = 0, []
+                                    for ten, fp_src, fp_cache in [
+                                        ("HSTD", FILE_PATH, CACHE_HSTD),
+                                        ("NQ11", FILE_PATH_NQ11, CACHE_NQ11),
+                                    ]:
+                                        if not os.path.exists(fp_src):
+                                            _loi.append(f"{ten}: file gốc `{os.path.basename(fp_src)}` chưa có")
+                                            continue
+                                        try:
+                                            if os.path.exists(fp_cache):
+                                                os.remove(fp_cache)
+                                            if ten == "HSTD":
+                                                from data.hstd import doc_file
+                                                from data.core import ts_file as _tsf
+                                                doc_file.clear()
+                                                doc_file(fp_src, _tsf(fp_src))
+                                            else:
+                                                from data.hstd import doc_file_nq11
+                                                from data.core import ts_file as _tsf
+                                                doc_file_nq11.clear()
+                                                doc_file_nq11(fp_src, _tsf(fp_src))
+                                            _ok += 1
+                                            st.success(f"✅ {ten}: `{os.path.basename(fp_cache)}` — {_size_fmt(fp_cache)}")
+                                        except Exception as exc:
+                                            logger.error("rebuild_%s: %s", ten, exc, exc_info=True)
+                                            _loi.append(f"{ten}: {exc}")
+                                    if _loi:
+                                        st.warning("⚠️ Một số cache không tạo được:\n" + "\n".join(_loi))
+                                    if _ok > 0:
+                                        st.cache_data.clear()
+                                        db.ghi_audit(
+                                            st.session_state.get("username", "unknown"),
+                                            "rebuild_cache_after_restore",
+                                            f"ok={_ok} loi={len(_loi)}",
+                                        )
+                                        st.success(f"✅ Đã tạo lại {_ok}/2 cache Parquet từ file Excel gốc.")
+                                    elif not _loi:
+                                        st.info("ℹ️ Không có file Excel gốc để tạo lại cache.")
                                 st.info("💡 Nhấn **F5** hoặc reload trang để thấy dữ liệu mới.")
                             else:
                                 st.error("❌ Phục hồi DB thất bại:\n" + "\n".join(kq["loi"]))

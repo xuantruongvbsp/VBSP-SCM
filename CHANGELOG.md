@@ -1,5 +1,66 @@
 # CHANGELOG
 
+## [2026-05-22] — Thêm COT_GIAI_NGAN_TRONG_NAM, thay 7 chỗ hardcode
+- `config.py` dòng ~311 — thêm `COT_GIAI_NGAN_TRONG_NAM = "Giải ngân trong năm"`; dùng trong `GQVL_COT_MAP` và `HSTD_DS_CHO_VAY_NAM_ALIASES`
+- `snapshot_service.py` — import + dùng trong `_GN_NAM_ALIASES` và `_COL_GN`
+- `tabs/tab_gqvl.py` — import + dùng thay `G_GN_NAM = "Giải ngân trong năm"`
+- `services/upload_service.py` — import + thay 3 chỗ trong `_cols_so`/`_cols_so_cn`/`_clean`
+- `tabs/tab_ban_dai_dien.py` — import + dùng trong `_GN_NAM_ALIASES`
+
+## [2026-05-22] — Sửa docs/TROUBLESHOOTING.md §1 — fmt_ty convention
+- `docs/TROUBLESHOOTING.md` §1 — xóa hướng dẫn sai `/1e12` → thay bằng bảng 2 lớp đúng: `fmt_ty()` /1e6 (triệu, bảng) và `/1e9` (tỷ, metric)
+
+## [2026-05-22] — Đồng bộ fmt_ty() toàn bộ docs (12 file, hoàn tất)
+- `.windsurfrules` §2.6 + §6 — `/1e12` → `/1e6` (triệu đồng)
+- `codebase_for_ai.md` §utils + §8.5 — "tỷ đồng" → "triệu đồng, cột bảng"; `/1e12` → `/1e6`
+- `docs/README.md` — `/1e12` → `/1e6, ra triệu đồng`
+- `docs/UI_GUIDELINES.md` §7 — `/1e12` → `/1e9` (metric card hiển thị "tỷ đồng" dùng /1e9, khác với fmt_ty dùng /1e6 cho bảng)
+
+## [2026-05-22] — Đồng bộ fmt_ty() toàn bộ docs (8 file)
+- `STABLE.md` §utils.py + §Tiền tệ + §Lỗi hay gặp — sửa 3 chỗ `/1e12`/`"tỷ đồng"` → `/1e6`/`"triệu đồng"`
+
+## [2026-05-22] — Đồng bộ fmt_ty() và dọn dẹp docs lỗi thời (7 file)
+- `docs/AGENTS.md` §3.5 + §6 checklist — sửa `/1e12` → `/1e6`, "tỷ" → "triệu đồng"; cập nhật ngày 13/05 → 22/05
+- `.clinerules` §2.6 + §6 — sửa `/1e12` → `/1e6`, "tỷ" → "triệu đồng"
+- `CONVENTIONS.md` §LỖI2 + §Format — sửa `/1e12`, ví dụ sai `13.199 tỷ` → `1.500 triệu`; sửa label bảng "Tiền (tỷ)" → "Tiền (cột bảng, triệu đồng)"
+- `codebase_for_ai.md` — xóa tham chiếu `tabs/pdf_service.py (cũ)` (file này ở root, không phải tabs/)
+- `PROMPT_TEMPLATE.md` — sửa `FILE_INDEX.md` (đã xóa) → `SCHEMA.md hoặc grep`
+- `docs/ARCHITECTURE.md` — cập nhật ngày 06/05 → 22/05
+
+## [2026-05-22] — Sửa 5 điểm sai sau rà soát Trae: SCHEMA/TEST_COVERAGE/rules/CLAUDE
+- `SCHEMA.md` — sửa `_load_parquet()` (không tồn tại) → `pd.read_parquet()` / `_duckdb_query()`; thêm `sk_gqvl.parquet`
+- `TEST_COVERAGE.md` — thêm D4 (5 components chưa test); thêm `data/core.py` aggregate functions vào D2
+- `.trae/rules/rules.md` §8.4 — sửa comment `fmt_ty()` sai (ghi "tỷ" thay vì "triệu", 3 số lẻ thay vì 0)
+- `CLAUDE.md` §5.4 — sửa bảng format số: label "Tiền tệ (tỷ)" → "Tiền tệ (cột bảng)", ví dụ sai "1.234,560 tỷ" → "1.235 (triệu đồng)"
+
+## [2026-05-22] — Tạo 3 file tài liệu mới: SCHEMA.md, TEST_COVERAGE.md, DECISIONS.md
+- `SCHEMA.md` — sơ đồ đầy đủ 16 bảng SQLite + file Parquet + query mẫu
+- `TEST_COVERAGE.md` — bản đồ 31 file test (~320 cases), danh sách lỗ hổng cần test (tabs, data modules)
+- `DECISIONS.md` — 12 quyết định kiến trúc có lý do (SQLite, Parquet, DuckDB, kv_store, render pattern, RBAC...)
+- `CLAUDE.md` — thêm SCHEMA/TEST_COVERAGE/DECISIONS vào bảng tài liệu tham chiếu Section 11
+
+## [2026-05-22] — Cập nhật BUGMAP.md: thêm 15 lỗi còn thiếu từ lịch sử fix
+- `BUGMAP.md` — thêm 15 entry mới: A4 (fillna ArrowDtype), A5 (DuckDB schema), A6 (GQVL rỗng), B7 (Series index lệch), B8 (.get fragile), C7 (category sum), C8 (DatetimeArray vs Categorical), C9 (UnicodeEncodeError emoji), C10 (DataFrame rỗng), C11 (Python 3.14 except), D4 (SQLite thread), D5 (schema mismatch), E5 (Nguồn vốn NaN), E6 (file_uploader reset), F5 (TA_LEFT), F6 (Timestamp PDF)
+
+## [2026-05-22] — Fix UnboundLocalError Path trong tab_trang_thai_nguon.py
+- `tabs/tab_trang_thai_nguon.py` dòng ~771 — xóa `from pathlib import Path` import cục bộ thừa trong `_render_he_thong()` gây shadow top-level import → `UnboundLocalError` khi dùng `Path` ở dòng 684 trước import cục bộ
+
+## [2026-05-22] — Fix 3 lỗi trong tab_canh_bao_nqh.py
+- `tabs/tab_canh_bao_nqh.py` dòng ~580 — **fix lỗi "truth value of a DataFrame is ambiguous"**: `kwargs.get("df_full") or kwargs.get("df")` → `kwargs.get("df_full", df)` (tránh dùng `or` trên DataFrame)
+- `tabs/tab_canh_bao_nqh.py` dòng ~97 — fix lệch index Series: bỏ `gh_thang_series = ngay_gh[da_gh]` (subset index), dùng `ngay_gh` trực tiếp với mask `da_gh`
+- `tabs/tab_canh_bao_nqh.py` dòng ~173 — fix `df_kh.get("is_3m_inactive", False)` fragile pattern → kiểm tra `"is_3m_inactive" in df_kh.columns` + `fillna(False).astype(bool)` tường minh
+
+## [2026-05-22] — Tab Cảnh báo Tín dụng: 8 sub-tab hoàn chỉnh
+- `tabs/tab_canh_bao_nqh.py` — ghi đè bản hoàn chỉnh 8 sub-tab: Tổng hợp, Đến hạn, 3 tháng KHĐ, BT sang Rủi ro, Nợ quá hạn phát sinh, Cảnh báo sớm, Khoanh sắp hết hạn, Gia hạn nợ
+- `tabs/tab_canh_bao_nqh.py` — sub-tab Gia hạn nợ: 5 KPI card (GH tháng, GH năm, SL GH BQ, Ngày GH gần nhất, Tổng dư nợ), lọc PGD + Hội đoàn thể, tổng hợp chi tiết
+- `tabs/tab_canh_bao_nqh.py` — sub-tab Khoanh sắp hết hạn: khẩn ≤30 ngày, cảnh báo ≤180 ngày, gọi `alert_center.canh_bao_no_khoanh_sap_het_han()`
+- `tabs/tab_canh_bao_nqh.py` — sub-tab Tổng hợp: dashboard 5 KPI + bảng breakdown theo PGD
+- `tabs/tab_canh_bao_nqh.py` — sub-tab 3 tháng KHĐ, BT sang Rủi ro, Nợ QH phát sinh: di chuyển từ `ws_management.py` với key_prefix riêng
+- `config.py` — thêm `COT_SO_LAN_GH` ("Số lần gia hạn"), `COT_NGAY_GH_GN` ("Ngày gia hạn gần nhất")
+- `workspaces/ws_management.py` — `_render_canh_bao_no()` và `_render_canh_bao_no_sub()` gọi `tab_canh_bao_nqh.render()`, đổi label "Cảnh báo NQH" → "Cảnh báo Tín dụng", gom children thành 1 entry duy nhất
+- `workspaces/ws_management.py` — xóa dead code: `_hien_thi_khd_tab`, `_hien_thi_migration_tab`, `_hien_thi_nqh_tab`, `_tim_cot` (~322 dòng)
+- `workspaces/ws_operation.py` — thêm `_render_canh_bao_nqh_pgd()` gọi tab mới, thêm "🚨 Cảnh báo Tín dụng" vào nhóm `kiem_soat_rr`
+
 ## [2026-05-22] — Fix lỗi "no such column: ten_task" trong Nhiệm vụ quá hạn
 - `tabs/tab_trang_thai_nguon.py` `_render_he_thong` — query `tien_do_task` dùng sai tên cột `ten_task` → sửa thành `tieu_de` (đúng theo schema db.py dòng 214)
 

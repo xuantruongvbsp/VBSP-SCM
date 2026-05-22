@@ -428,6 +428,30 @@
 
 ## J. Python / Code Pattern
 
+### J2 — Stale closure df=None: sidebar render trước data load → tab trắng
+
+| | |
+|---|---|
+| **File** | `workspaces/ws_management.py` + `app.py` |
+| **Dấu hiệu** | Tab "Thông tin chung" (và mọi tab trong Phòng KH-NV) chỉ hiện "⚠️ Chưa có dữ liệu HSTD" dù parquet có đủ dữ liệu |
+| **Nguyên nhân** | `app.py` sidebar render (dòng ~283) gọi `render_sidebar_menu(df=locals().get("df"))` TRƯỚC khi data load (dòng ~347). `df` chưa có → `None`. `_build_all_items(df=None)` tạo lambda closure với df=None. Hàm cũ lưu vào `st.session_state["_mgmt_all_items"]`. `render()` pop ra → dùng closures stale → tab nhận df=None |
+| **Fix** | Xóa `st.session_state["_mgmt_all_items"] = all_items` khỏi `render_sidebar_menu()`. `render()` luôn build ALL_ITEMS fresh từ kwargs đầy đủ |
+| **Ngày fix** | 2026-05-22 |
+
+**Pattern nguy hiểm — tránh lặp:**
+```python
+# ❌ SAI — sidebar render trước data load
+with st.sidebar:
+    render_sidebar_menu(df=locals().get("df"))  # df=None vì chưa load!
+    # → build closures với df=None → lưu vào session_state → render() dùng stale
+
+# ✅ ĐÚNG — render() luôn build fresh
+def render(**kwargs):
+    ALL_ITEMS = _build_all_items(..., df=kwargs.get("df"), ...)  # df đúng từ ctx
+```
+
+---
+
 ### J1 — UnboundLocalError: cannot access local variable 'X' where it is not associated with a value
 | | |
 |---|---|

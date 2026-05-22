@@ -38,11 +38,12 @@ from config import (
     COT_TONG_DU_NO,
     COT_DU_NO_TH,
     COT_DU_NO_QH,
+    COT_GIAI_NGAN_TRONG_NAM,
     DON_VI_CHI_NHANH,
 )
 
 _COT_DNK = "Dư nợ khoanh"
-_GN_NAM_ALIASES = ("Giải ngân trong năm", "Giải ngân Năm", "Giải ngân năm")
+_GN_NAM_ALIASES = (COT_GIAI_NGAN_TRONG_NAM, "Giải ngân Năm", "Giải ngân năm")
 
 
 def _ky_tu_df(df: pd.DataFrame) -> str:
@@ -367,7 +368,7 @@ def luu_gqvl_snapshot(df_gqvl: pd.DataFrame, username: str) -> KetQuaUpload:
     _COL_QH    = "Dư nợ quá hạn"
     _COL_KH    = "Dư nợ khoanh"
     _COL_MA_KH = "Mã KH"
-    _COL_GN    = "Giải ngân trong năm"
+    _COL_GN    = COT_GIAI_NGAN_TRONG_NAM
 
     ky = datetime.now().strftime("%Y-%m")
 

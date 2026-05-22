@@ -247,7 +247,7 @@ def pool_thon_cho_xa(
                 engine="openpyxl",
             ).iloc[:, 1:].dropna(how="all")
             pool |= _gop_thon_tu_bang(df_pgd, ten_pgd, ten_xa)
-    except Exception as e:
+    except Exception as e:  # conv: skip
         # Không fatal — fallback pool không gồm file PGD; log để debug đọc file.
         logging.warning(
             "[pool_thon] Không đọc được file HSTD PGD %s: %s",

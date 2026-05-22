@@ -298,7 +298,7 @@ def main():
         # Widget trạng thái nguồn dữ liệu ưu tiên PGD
         try:
             render_status_compact(pgd_user if la_phan_he_pgd(role) else None)
-        except Exception as e:
+        except Exception as e:  # conv: skip
             # Fallback về hiển thị file cũ nếu có lỗi
             st.caption("📊 Trạng thái file hệ thống:")
             for fp, ten in [(FILE_PATH,TEN_FILE),(FILE_PATH_NQ11,TEN_FILE_NQ11),

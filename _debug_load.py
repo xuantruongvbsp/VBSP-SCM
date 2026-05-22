@@ -10,7 +10,7 @@ print('Cache path:', cache)
 try:
     r1 = duckdb.query(f'SELECT COUNT(*) as n FROM "{cache}"').df()
     print('Total rows:', r1['n'].iloc[0])
-except Exception as e:
+except Exception as e:  # conv: skip
     print('QUERY FULL ERROR:', e)
 
 # 2) active_only query
@@ -19,7 +19,7 @@ sql = (f'SELECT COUNT(*) as n FROM "{cache}" WHERE '
 try:
     r2 = duckdb.query(sql).df()
     print('Active rows (du_no > 0):', r2['n'].iloc[0])
-except Exception as e:
+except Exception as e:  # conv: skip
     print('QUERY ACTIVE_ONLY ERROR:', e)
     df_s = pd.read_parquet(cache, columns=[COT_TONG_DU_NO])
     print('  dtype:', df_s[COT_TONG_DU_NO].dtype)

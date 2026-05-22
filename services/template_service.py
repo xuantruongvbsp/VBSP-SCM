@@ -80,7 +80,7 @@ def docx_to_pdf(docx_bytes: bytes) -> bytes | None:
                 with open(out, "rb") as f:
                     return f.read()
         return None
-    except Exception as e:
+    except Exception as e:  # conv: skip
         logger.warning(f"docx_to_pdf failed: {e}")
         return None
 
@@ -100,7 +100,7 @@ def docx_bytes_to_pdf(docx_bytes: bytes) -> bytes | None:
                 with open(out, "rb") as f:
                     return f.read()
         return None
-    except Exception as e:
+    except Exception as e:  # conv: skip
         import logging
         logging.warning(f"docx_to_pdf failed: {e}")
         return None

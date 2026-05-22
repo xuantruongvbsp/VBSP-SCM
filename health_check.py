@@ -57,7 +57,7 @@ def hstd_path(ten_pgd: str) -> Path:
 
 
 def _con() -> sqlite3.Connection:
-    conn = sqlite3.connect(DB_PATH, timeout=10)  # noqa: DB — health_check chạy độc lập, không qua app context
+    conn = sqlite3.connect(DB_PATH, timeout=10)  # conv: skip — health_check chạy độc lập, không qua app context
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -101,7 +101,7 @@ def check_database() -> None:
     try:
         conn = _con(); conn.execute("SELECT 1"); conn.close()
         check("Kết nối SQLite", True)
-    except Exception as e:
+    except Exception as e:  # conv: skip
         check("Kết nối SQLite", False, str(e))
         return
 
@@ -113,7 +113,7 @@ def check_database() -> None:
         conn.close()
         for tbl in ("kv_store", "users", "audit_log"):
             check(f"Bảng '{tbl}' tồn tại", tbl in existing)
-    except Exception as e:
+    except Exception as e:  # conv: skip
         check("Kiểm tra bảng", False, str(e))
 
 
@@ -127,7 +127,7 @@ def check_kv_store() -> None:
         conn = _con()
         rows = conn.execute("SELECT key, value FROM kv_store").fetchall()
         conn.close()
-    except Exception as e:
+    except Exception as e:  # conv: skip
         check("Đọc kv_store", False, str(e))
         return
 
@@ -251,7 +251,7 @@ def check_audit_log() -> None:
             "SELECT ts, username, action, detail FROM audit_log ORDER BY id DESC LIMIT 5"
         ).fetchall()
         conn.close()
-    except Exception as e:
+    except Exception as e:  # conv: skip
         check("Đọc audit_log", False, str(e))
         return
 

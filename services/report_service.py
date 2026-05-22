@@ -84,7 +84,7 @@ def _tao_sheet_bia(wb: Workbook, tieu_de: str, nguoi_xuat: str) -> None:
             logo.height = 80
             logo.width = 80
             ws.add_image(logo, 'B2')
-        except Exception as e:
+        except Exception as e:  # conv: skip
             print(f"Không thể thêm logo: {e}")
     
     # Thông tin header

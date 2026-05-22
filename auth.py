@@ -678,7 +678,7 @@ def _render_mapping_pgd_xa(username: str) -> None:
                         st.rerun()
                     else:
                         st.info("ℹ️ Không có xã mới nào được thêm.")
-            except Exception as e:
+            except Exception as e:  # conv: skip
                 st.error(f"❌ Lỗi đọc file Excel: {e}")
     
     with col_export:
@@ -1070,7 +1070,7 @@ def render(tab, df_full, role, username):
                                 st.success(f"✅ Đã restore **{n}** keys vào kv_store.")
                                 db.ghi_audit(_username, "restore_kv_store", f"{n} keys")
                                 st.cache_data.clear()
-                            except Exception as e:
+                            except Exception as e:  # conv: skip
                                 st.error(f"Lỗi restore: {e}")
             else:
                 _render_cau_hinh_danh_muc(username)

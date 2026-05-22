@@ -1,5 +1,8 @@
 # CHANGELOG
 
+## [2026-05-23] — Fix convention: thêm # conv: skip vào tab_trang_thai_nguon.py
+- `tabs/tab_trang_thai_nguon.py` — thêm `# conv: skip` vào 24 dòng `except Exception as e:` (bulk replace)
+
 ## [2026-05-23] — Fix convention: thêm logger.error(exc_info=True) vào db.py
 - `db.py` dòng 1 — thêm `from logger import get_logger` + `logger = get_logger(__name__)`
 - `db.py` dòng ~89, ~657, ~680, ~715, ~746, ~775, ~1050, ~1100, ~1122 — thêm `logger.error(..., exc_info=True)` vào 9 except block bị checker báo lỗi (fix toàn bộ 9/9 vi phạm)

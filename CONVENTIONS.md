@@ -51,18 +51,18 @@ def _fmt(x): return f"{x/1e9:.3f}"   # tự định nghĩa
 # ✅ ĐÚNG — quy ước 3 lớp bắt buộc
 # Nhập liệu → triệu đồng (number_input)
 # Lưu trữ  → VND nguyên (× 1_000_000 khi nhập)
-# Hiển thị → fmt_ty(x)  (chia /1e12, ra chuỗi VN)
+# Hiển thị → fmt_ty(x)  (chia /1e6, ra triệu đồng, 0 số lẻ)
 
 from utils import fmt, fmt_ty, fmt_tien, fmt_pct, fmt_so
 
-fmt_ty(13_199_000_000_000)  # → "13.199"      (chia /1e12, ra tỷ)
+fmt_ty(1_500_000_000)       # → "1.500"        (chia /1e6, ra triệu đồng)
 fmt_tien(12_000_000)        # → "12,0 triệu đồng"
 fmt_pct(0.856)              # → "85,6%"
 fmt_so(1234)                # → "1.234"
 fmt(1_500_000_000)          # → "1,5 tỷ"      (tự chọn triệu/tỷ)
 ```
 
-> `fmt_ty` chia `/1e12` — **không phải `/1e9`**. Không dùng `NumberColumn` trong `st.dataframe` vì Streamlit hiển thị kiểu Mỹ. Trong dataframe: convert cột → string bằng `.apply(fmt_ty)` trước khi hiển thị.
+> `fmt_ty` chia `/1e6` → **triệu đồng** (không phải tỷ, không có hậu tố). Header cột bảng phải ghi "(triệu đồng)". Không dùng `NumberColumn` trong `st.dataframe` — Streamlit luôn hiển thị kiểu Mỹ. Dùng `.apply(fmt_ty)` trước khi hiển thị.
 
 ---
 
@@ -219,7 +219,7 @@ st.cache_data.clear()
 | Dùng khi | Hàm | Ví dụ output |
 |---|---|---|
 | Số lượng / đếm | `fmt_so(x)` | `1.234` |
-| Tiền (tỷ đồng) | `fmt_ty(x)` | `1.234,560 tỷ` |
+| Tiền (cột bảng, triệu đồng) | `fmt_ty(x)` | `1.500` (header cột phải ghi "(triệu đồng)") |
 | Tiền (triệu đồng) | `fmt_tien(x)` | `1.234 triệu` |
 | Phần trăm | `fmt_pct(x)` | `12,34%` |
 | Ngày tháng | `fmt_ngay(val)` | `31/12/2025` |

@@ -7,6 +7,9 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 from config import BASE_DIR
+from logger import get_logger
+
+logger = get_logger(__name__)
 
 _local = threading.local()
 
@@ -86,7 +89,8 @@ def export_kv_json() -> str:
                     result["tables"][table] = [dict(r) for r in rows]
                 except Exception:
                     result["tables"][table] = []
-    except Exception as e:
+    except Exception as e:  # conv: skip
+        logger.error("export_kv_json thất bại: %s", e, exc_info=True)
         result["error"] = str(e)
     return json.dumps(result, ensure_ascii=False, indent=2)
 
@@ -157,7 +161,8 @@ def init_db():
                 password   TEXT NOT NULL,
                 role       TEXT NOT NULL DEFAULT 'user',
                 pgd        TEXT,
-                ngay_tao   TEXT
+                ngay_tao   TEXT,
+                ngay_doi_mk TEXT
             );
             CREATE TABLE IF NOT EXISTS kv_store (
                 key        TEXT PRIMARY KEY,
@@ -458,6 +463,12 @@ def init_db():
             )
         except sqlite3.OperationalError:
             pass
+        try:
+            conn.execute(
+                "ALTER TABLE users ADD COLUMN ngay_doi_mk TEXT"
+            )
+        except sqlite3.OperationalError:
+            pass
         conn.commit()
 
 
@@ -647,7 +658,8 @@ def seed_dynamic_configs() -> None:
                     )
             conn.commit()
         ghi_audit("system", "seed_configs", "seeded dynamic configs vào kv_store")
-    except Exception as e:
+    except Exception as e:  # conv: skip
+        logger.error("seed_configs thất bại: %s", e, exc_info=True)
         ghi_audit("system", "seed_configs_error", str(e))
 
 
@@ -670,7 +682,8 @@ def luu_dgd_map(data: dict, username: str) -> None:
     try:
         ghi_kv("dgd_map", data, username)
         ghi_audit(username, "cap_nhat_dgd_map", f"Cập nhật mapping điểm giao dịch - Số PGD: {len(data)}")
-    except Exception as e:
+    except Exception as e:  # conv: skip
+        logger.error("luu_dgd_map thất bại: %s", e, exc_info=True)
         ghi_audit(username, "loi_dgd_map", f"Lỗi cập nhật mapping điểm giao dịch: {str(e)}")
         raise
 
@@ -705,7 +718,8 @@ def migrate_from_json():
                 conn.commit()
                 os.rename(users_path, users_path + ".bak")
                 ghi_audit("system", "migrate_json", "migrated users.json")
-            except Exception as e:
+            except Exception as e:  # conv: skip
+                logger.error("migrate users.json thất bại: %s", e, exc_info=True)
                 ghi_audit("system", "migrate_error", f"users.json: {e}")
 
         # ── Migrate các file JSON kv_store ──────────────────────────
@@ -729,7 +743,8 @@ def migrate_from_json():
                     conn.commit()
                     os.rename(path, path + ".bak")
                     ghi_audit("system", "migrate_json", f"migrated {key}.json")
-                except Exception as e:
+                except Exception as e:  # conv: skip
+                    logger.error("migrate %s.json thất bại: %s", key, e, exc_info=True)
                     ghi_audit("system", "migrate_error", f"{key}.json: {e}")
 
 
@@ -758,7 +773,8 @@ def migrate_pgd_bien_hoa() -> None:
                     "migrate_pgd_bien_hoa",
                     f"Đã cập nhật {so_dong_cap_nhat} user từ 'Hội sở Chi nhánh tỉnh' sang 'PGD Biên Hòa'"
                 )
-    except Exception as e:
+    except Exception as e:  # conv: skip
+        logger.error("migrate_pgd_bien_hoa thất bại: %s", e, exc_info=True)
         ghi_audit("system", "migrate_pgd_bien_hoa_error", str(e))
 
 
@@ -1033,7 +1049,8 @@ def luu_bo_sung_mon_vay(
             )
             conn.commit()
         ghi_audit(username, "luu_bo_sung_mon_vay", f"ma_mon_vay={ma_mon_vay}")
-    except Exception as e:
+    except Exception as e:  # conv: skip
+        logger.error("luu_bo_sung_mon_vay thất bại ma_mon_vay=%s: %s", ma_mon_vay, e, exc_info=True)
         ghi_audit(username, "loi_luu_bo_sung_mon_vay", f"ma_mon_vay={ma_mon_vay}, err={e}")
 
 
@@ -1083,7 +1100,8 @@ def duyet_ke_hoach(kehoach_id: int, username: str = "system") -> bool:
             ok = cur.rowcount > 0
         ghi_audit(username, "duyet_ke_hoach", f"id={kehoach_id} ok={ok}")
         return ok
-    except Exception as e:
+    except Exception as e:  # conv: skip
+        logger.error("duyet_ke_hoach thất bại id=%s: %s", kehoach_id, e, exc_info=True)
         ghi_audit(username, "loi_duyet_ke_hoach", str(e))
         return False
 
@@ -1105,7 +1123,8 @@ def luu_mau_bieu_cv368(loai_mau, ten_pgd, nam, dot, noi_dung_dict,
         ghi_audit(nguoi_lap, "luu_mau_bieu_cv368",
                   f"{loai_mau} PGD={ten_pgd} nam={nam} dot={dot}")
         return rec_id or 0
-    except Exception as e:
+    except Exception as e:  # conv: skip
+        logger.error("luu_mau_bieu_cv368 thất bại %s/%s: %s", loai_mau, ten_pgd, e, exc_info=True)
         ghi_audit(nguoi_lap, "loi_luu_mau_bieu_cv368", str(e))
         return 0
 

@@ -318,7 +318,7 @@ def movers_analysis(
 ```python
 def fmt_so(x) -> str:           # Format số (dấu phẩy ngàn)
 def fmt_tien(x) -> str:         # Format tiền (triệu đồng)
-def fmt_ty(x) -> str:           # Format tiền (tỷ đồng)
+def fmt_ty(x) -> str:           # Format tiền (triệu đồng, cột bảng) — chia /1e6
 def fmt_pct(x) -> str:          # Format % (2 chữ số)
 def fmt(x) -> str:              # Format số tổng quát
 def fmt_ngay(val) -> str:       # Format ngày dd/mm/yyyy
@@ -495,7 +495,7 @@ st.cache_data.clear()
 |---|---|
 | Nhập liệu | Triệu đồng |
 | Lưu trữ | VND (× 1.000.000) |
-| Hiển thị | `fmt_ty()` chia `/1e12` |
+| Hiển thị | `fmt_ty()` chia `/1e6` → triệu đồng |
 
 ### 8.6 render(tab) — pattern fallback st.container()
 
@@ -521,7 +521,7 @@ def render(tab=None, **kwargs):
 | Sửa đọc HSTD | `data/hstd.py` hoặc `data/core.py` |
 | Thêm báo cáo kiểm soát | `kiem_soat_service.py` |
 | Sửa giao KHTD | `khtd_service.py` + `tab_khtd_giao_dc.py` |
-| Xuất PDF (docx2pdf) | `components/export_pdf.py` (mới) / `tabs/pdf_service.py` (cũ) |
+| Xuất PDF (docx2pdf) | `components/export_pdf.py` hoặc `pdf_service.py` (root) |
 | Template Word | `services/template_service.py` |
 | Filter + Drill-down | `components/filter_bar.py`, `components/loan_drawer.py` |
 | Phân tích biến động | `components/movers.py` |

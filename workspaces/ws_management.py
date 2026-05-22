@@ -829,6 +829,9 @@ def render_sidebar_menu(role: str, username: str, **kwargs):
     if not all_items:
         return
 
+    # Không lưu vào session_state — render() sẽ tự build ALL_ITEMS
+    # từ kwargs có đủ df/df_full (tránh truyền df=None khi sidebar render trước data load)
+
     if "ws_mgmt_menu" not in st.session_state:
         st.session_state["ws_mgmt_menu"] = all_items[0]["label"]
 

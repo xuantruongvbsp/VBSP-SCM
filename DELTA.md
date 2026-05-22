@@ -4,6 +4,25 @@
 
 ---
 
+## [2026-05-22] Fix tab Tổng quan: 3 section trống
+
+### Bug — guard + else-clause cho 3 section không có bảng/dữ liệu
+
+**Root cause** (chẩn đoán): cả 3 section đều bị guard `if col in df.columns:` nhưng **không có `else`** → khi cột bị thiếu (sai tên, dữ liệu chưa upload, file PGD riêng), heading vẫn render nhưng không có gì bên dưới — người dùng thấy phần trống.
+
+| Thay đổi | File | Dòng |
+|---|---|---|
+| Guard `if df is None/empty: return` | `tabs/tab_tongquan.py` | ~164 |
+| `if df_ct.empty: st.info(...)` | `tabs/tab_tongquan.py` | ~434 |
+| `else: st.warning(tên cột thiếu)` cho "Cơ cấu dư nợ" | `tabs/tab_tongquan.py` | ~533 |
+| `else: st.warning(...)` cho "Thông tin tổng quát PGD" | `tabs/tab_tongquan.py` | ~1008 |
+| `else: st.warning(...)` cho "Hồ sơ đến hạn" | `tabs/tab_tongquan.py` | ~1289 |
+| Expander debug "Chẩn đoán: Cột dữ liệu bị thiếu" | `tabs/tab_tongquan.py` | ~1296 |
+
+**Khi xảy ra**: app sẽ hiển thị `st.warning(...)` với tên cột bị thiếu thay vì trống không, và expander debug liệt kê tất cả cột còn thiếu + số cột/dòng hiện có + hướng dẫn sửa.
+
+---
+
 ## [2026-05-22] Thêm COT_GIAI_NGAN_TRONG_NAM
 
 ### Refactor — xoá hardcode "Giải ngân trong năm"

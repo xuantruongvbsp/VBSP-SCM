@@ -97,7 +97,7 @@ def ghi_ct_registry(pgd: str | None, data: dict, username: str) -> None:
                 ),
             )
             conn.commit()
-    except Exception as e:
+    except Exception as e:  # conv: skip
         raise RuntimeError(f"Không thể ghi ct_registry '{key}': {e}") from e
 
 
@@ -367,7 +367,7 @@ def quet_va_ghi_chuong_trinh(username: str) -> dict:
     try:
         if os.path.exists(FILE_PATH):
             df_hstd = _doc_hstd_raw(FILE_PATH)
-    except Exception as e:
+    except Exception as e:  # conv: skip
         ket_qua["loi"].append(f"Đọc HSTD lỗi: {e}")
 
     if df_hstd is None or df_hstd.empty:
@@ -387,7 +387,7 @@ def quet_va_ghi_chuong_trinh(username: str) -> dict:
             ket_qua["gqvl_phan_tang"] = phan_tang
         else:
             ket_qua["loi"].append("GQVL: file chưa có — bỏ qua phân tầng GQVL.")
-    except Exception as e:
+    except Exception as e:  # conv: skip
         ket_qua["loi"].append(f"Quét GQVL lỗi: {e}")
 
     # ── 4. Quét NQ11 (bổ sung — không ghi đè registry đã có) ────────────────
@@ -398,7 +398,7 @@ def quet_va_ghi_chuong_trinh(username: str) -> dict:
             registry_all.update(bo_sung)
         else:
             ket_qua["loi"].append("NQ11: file chưa có — bỏ qua bổ sung từ NQ11.")
-    except Exception as e:
+    except Exception as e:  # conv: skip
         ket_qua["loi"].append(f"Quét NQ11 lỗi: {e}")
 
     # ── 5. Gộp per-PGD registry (HSTD ← GQVL) ───────────────────────────────
@@ -413,13 +413,13 @@ def quet_va_ghi_chuong_trinh(username: str) -> dict:
         try:
             ghi_ct_registry(ten_pgd, reg, username)
             ket_qua["pgd_stats"][ten_pgd] = len(reg)
-        except Exception as e:
+        except Exception as e:  # conv: skip
             ket_qua["loi"].append(f"Ghi PGD '{ten_pgd}' lỗi: {e}")
 
     # ── 7. Ghi ct_registry_all (toàn hệ thống) ───────────────────────────────
     try:
         ghi_ct_registry(None, registry_all, username)
-    except Exception as e:
+    except Exception as e:  # conv: skip
         ket_qua["loi"].append(f"Ghi registry_all lỗi: {e}")
 
     ket_qua["tong_ct"] = len(registry_all)

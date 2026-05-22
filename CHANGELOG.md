@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## [2026-05-22] — Fix: thêm cột ngay_doi_mk vào schema users + migration
+- `db.py` dòng ~160 — thêm `ngay_doi_mk TEXT` vào CREATE TABLE users
+- `db.py` dòng ~463 — thêm ALTER TABLE migration cho DB cũ chưa có cột `ngay_doi_mk`
+- `tabs/tab_trang_thai_nguon.py` dòng ~541 — hạ log level từ ERROR → WARNING cho trường hợp cột chưa tồn tại (đã được catch an toàn)
+
 ## [2026-05-22] — Gộp section "Sao lưu qua GitHub" và "Backup dữ liệu" thành tab thống nhất
 - `tabs/tab_trang_thai_nguon.py` dòng ~676-920 — gộp 3 section cũ ("🔗 Sao lưu qua GitHub (kv_store)" + "🗄️ Backup dữ liệu" + "📤 Phục hồi từ bản backup") thành 1 section "🗄️ Sao lưu & Đồng bộ" với 2 tab:
   - Tab "💾 Sao lưu hệ thống": backup toàn bộ DB/Parquet/PGD xlsx + danh sách backup + download zip + phục hồi từ zip

@@ -248,3 +248,79 @@ def don_backup(max_keep: int = _MAX_KEEP) -> int:
         except Exception as exc:
             logger.warning("don_backup: khong xoa duoc %s -- %s", d.name, exc)
     return len(xoa)
+
+
+# -- rebuild_cache_from_excel -------------------------------------------------
+
+def rebuild_cache_from_excel(
+    specs: list[dict] | None = None,
+    clear_st_cache: bool = True,
+) -> dict:
+    """
+    Xoa cache parquet cu va tao lai tu file Excel goc.
+
+    ``specs``: list[dict], moi dict co cac key:
+        "name"       -- nhan hien thi (VD: "HSTD", "NQ11", "GQVL")
+        "source"     -- duong dan file Excel goc (FILE_PATH / FILE_PATH_NQ11)
+        "cache"      -- duong dan file parquet dich (CACHE_HSTD / CACHE_NQ11)
+        "doc_func"   -- ten ham doc: "doc_file" | "doc_file_nq11" | "doc_file_gqvl"
+
+    Neu ``specs`` la None, dung mac dinh (HSTD + NQ11).
+
+    Tra ve:
+      {"ok": int, "loi": list[str], "total": int}
+    """
+    import os as _os
+
+    if specs is None:
+        try:
+            from config import CACHE_HSTD, CACHE_NQ11, FILE_PATH, FILE_PATH_NQ11
+        except ImportError:
+            return {"ok": 0, "loi": ["Khong the import config"], "total": 0}
+        specs = [
+            {"name": "HSTD", "source": FILE_PATH, "cache": CACHE_HSTD, "doc_func": "doc_file"},
+            {"name": "NQ11", "source": FILE_PATH_NQ11, "cache": CACHE_NQ11, "doc_func": "doc_file_nq11"},
+        ]
+
+    from data.core import ts_file
+    from data.hstd import doc_file, doc_file_nq11, doc_file_gqvl
+
+    _DOC_MAP = {
+        "doc_file": doc_file,
+        "doc_file_nq11": doc_file_nq11,
+        "doc_file_gqvl": doc_file_gqvl,
+    }
+
+    _ok, _loi = 0, []
+
+    for spec in specs:
+        name = spec["name"]
+        fp_src = spec["source"]
+        fp_cache = spec["cache"]
+        doc_fn = _DOC_MAP.get(spec.get("doc_func", ""))
+
+        if not _os.path.exists(fp_src):
+            _loi.append(f"{name}: file goc `{_os.path.basename(fp_src)}` khong ton tai")
+            continue
+        if not doc_fn:
+            _loi.append(f"{name}: doc_func '{spec.get('doc_func')}' khong hop le")
+            continue
+
+        try:
+            if _os.path.exists(fp_cache):
+                _os.remove(fp_cache)
+            doc_fn.clear()
+            doc_fn(fp_src, ts_file(fp_src))
+            _ok += 1
+        except Exception as exc:
+            logger.error("rebuild_cache %s: %s", name, exc, exc_info=True)
+            _loi.append(f"{name}: {exc}")
+
+    if _ok > 0 and clear_st_cache:
+        try:
+            import streamlit as st
+            st.cache_data.clear()
+        except Exception:
+            pass
+
+    return {"ok": _ok, "loi": _loi, "total": len(specs)}

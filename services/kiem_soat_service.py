@@ -603,6 +603,7 @@ def _xuat_pdf_btn(
             st.session_state[ss_key]      = pdf_bytes
             st.session_state[ss_file_key] = f"{prefix_pdf}_{datetime.now().strftime('%d%m%Y_%H%M')}.pdf"
         except Exception as e:
+            logger.error("hien_thi_bieu_chi_tiet_pdf: %s — %s", ss_key, e, exc_info=True)
             st.session_state[ss_key] = None
             st.error(f"❌ Lỗi tạo PDF: {e}")
 

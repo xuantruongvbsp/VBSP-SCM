@@ -34,6 +34,7 @@ from config import (
     COT_NGAY_SL,
     COT_MA_CHUONG_TRINH,
     COT_NGUON_VON,
+    COT_GIAI_NGAN_TRONG_NAM,
     TEN_CHI_NHANH_HIEN_THI,
     NAM_HT,
     CACHE_HSTD,
@@ -56,7 +57,7 @@ _KV_HOP = "bdd_hop_list"
 _KV_VBAN = "bdd_van_ban_list"
 _MAX_FILE = 5 * 1024 * 1024
 
-_GN_NAM_ALIASES = ("Giải ngân trong năm", "Giải ngân Năm", "Giải ngân năm")
+_GN_NAM_ALIASES = (COT_GIAI_NGAN_TRONG_NAM, "Giải ngân Năm", "Giải ngân năm")
 _THU_NO_TH_NAM = ("Thu nợ TH Năm", "Thu nợ TH trong năm")
 _THU_NO_QH_NAM = ("Thu nợ QH Năm", "Thu nợ QH trong năm")
 

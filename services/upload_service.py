@@ -45,7 +45,7 @@ from config import (
     CDTOTKVV_DIR,
     TEN_FILE_GQVL, FILE_PATH_GQVL, CACHE_GQVL, CACHE_HSTD, CACHE_NQ11,
     DS_PGD, DON_VI_CHI_NHANH, GQVL_COT_MAP, COT_TEN_PGD,
-    COT_DU_NO_TH, COT_DU_NO_QH, COT_DU_NO_KHOANH, COT_THOI_HAN,
+    COT_DU_NO_TH, COT_DU_NO_QH, COT_DU_NO_KHOANH, COT_THOI_HAN, COT_GIAI_NGAN_TRONG_NAM,
     COT_MUC_VAY, COT_TONG_DU_NO, COT_LAI_TON, COT_LAI_TON_QH,
     COT_LAI_THANG, COT_GOC_TRA,
     UPLOAD_CANH_BAO_NGAY,
@@ -366,7 +366,7 @@ def merge_du_lieu_toan_cn(
                     d = d.rename(columns=GQVL_COT_MAP).reset_index(drop=True)
                     _cols_so = [
                         COT_DU_NO_TH, COT_DU_NO_QH, COT_DU_NO_KHOANH,
-                        "Tổng giải ngân", "Giải ngân trong năm", "Dư tài khoản",
+                        "Tổng giải ngân", COT_GIAI_NGAN_TRONG_NAM, "Dư tài khoản",
                         COT_THOI_HAN,
                         # "Nguồn vốn" là text "TW"/"ĐP" — không chuyển sang numeric
                     ]
@@ -465,7 +465,7 @@ def merge_du_lieu_toan_cn(
     # Ép kiểu thủ công để tránh DataType(null) từ PyArrow
     _cols_so_cn = [
         COT_DU_NO_TH, COT_DU_NO_QH, COT_DU_NO_KHOANH,
-        "Tổng giải ngân", "Giải ngân trong năm", "Dư tài khoản",
+        "Tổng giải ngân", COT_GIAI_NGAN_TRONG_NAM, "Dư tài khoản",
         COT_THOI_HAN,
         # "Nguồn vốn" là text "TW"/"ĐP" — KHÔNG ép numeric, sẽ thành NaN
         COT_MUC_VAY, COT_TONG_DU_NO, COT_LAI_TON, COT_LAI_TON_QH,
@@ -656,7 +656,7 @@ def merge_baseline_toan_cn(loai: str, nam: int) -> KetQuaUpload:
                     d = df.iloc[:, 1:].dropna(how="all").iloc[1:]
                     d = d.rename(columns=GQVL_COT_MAP).reset_index(drop=True)
                     for col in [COT_DU_NO_TH, COT_DU_NO_QH, COT_DU_NO_KHOANH,
-                                "Tổng giải ngân", "Giải ngân trong năm", COT_THOI_HAN]:
+                                "Tổng giải ngân", COT_GIAI_NGAN_TRONG_NAM, COT_THOI_HAN]:
                         if col in d.columns:
                             d[col] = pd.to_numeric(d[col], errors="coerce")
                     return d

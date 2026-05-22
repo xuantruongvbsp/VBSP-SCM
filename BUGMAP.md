@@ -23,7 +23,7 @@
 - [G. Kế hoạch tín dụng](#g-kế-hoạch-tín-dụng)
 - [H. GSheet / Google Sheets](#h-gsheet--google-sheets)
 - [I. Phân quyền / Role](#i-phân-quyền--role)
-- [Template: Ghi nhận bug mới](#template-ghi-nhận-bug-mới)
+- [J. Python / Code Pattern](#j-python--code-pattern)
 
 ---
 
@@ -50,6 +50,32 @@
 | **File** | Bất kỳ tab nào dùng `df_nq11` — thường thấy ở `tab_nq11.py` ~dòng 108 |
 | **Nguyên nhân** | Cột số trong NQ11 bị đọc thành ArrowDtype string, so sánh với int bị lỗi |
 | **Fix** | Sau khi load df_nq11: `df[col] = pd.to_numeric(df[col], errors='coerce')` cho các cột DNO, nợ TH, nợ QH, số tiền, dư nợ, GN |
+
+### A4 — `fillna("")` crash trên ArrowDtype(int64)
+| | |
+|---|---|
+| **File** | `services/upload_service.py` → `merge_du_lieu_toan_cn()` |
+| **Dấu hiệu** | `ArrowInvalid` hoặc `TypeError` khi gọi `.fillna("")` trên cột số ArrowDtype |
+| **Nguyên nhân** | ArrowDtype(int64) không chấp nhận fillna với string `""` |
+| **Fix** | Ép về object trước: `df[col] = df[col].astype(object).fillna("")` |
+| **Ngày fix** | 2026-05-19 |
+
+### A5 — DuckDB `Binder Error: Referenced column not found in FROM clause`
+| | |
+|---|---|
+| **File** | `tabs/tab_trang_thai_nguon.py`, bất kỳ tab nào dùng DuckDB query trên parquet |
+| **Dấu hiệu** | `duckdb.BinderException: Referenced column "X" not found in FROM clause` |
+| **Nguyên nhân** | Parquet cache thiếu cột (chưa merge đủ, hoặc schema khác giữa các PGD) |
+| **Fix** | Kiểm tra schema parquet TRƯỚC khi query: `df_check = con.execute("SELECT * FROM read_parquet(...) LIMIT 1").fetchdf()` → kiểm tra `if cot in df_check.columns` |
+| **Ngày fix** | 2026-05-22 |
+
+### A6 — GQVL parquet rỗng (0 cột)
+| | |
+|---|---|
+| **Dấu hiệu** | `Invalid Input Error: Failed to read Parquet file ... Need at least one non-root column` |
+| **Nguyên nhân** | Chưa upload/merge GQVL → file parquet rỗng hoặc không có cột |
+| **Fix** | Kiểm tra `if os.path.exists(path) and os.path.getsize(path) > 0` trước khi `read_parquet()`; nếu không → `st.info("Chưa có dữ liệu GQVL")` thay vì crash |
+| **Ngày fix** | 2026-05-22 |
 
 ---
 
@@ -87,9 +113,10 @@
 ### B5 — `ValueError: The truth value of a DataFrame is ambiguous`
 | | |
 |---|---|
-| **File** | Thường gặp ở `ws_operation.py`, `tab_no_khoanh.py` |
-| **Nguyên nhân** | Dùng `or` với DataFrame: `kwargs.get("df_full") or df` → Python cố evaluate bool của DataFrame |
-| **Fix** | `df if _df_full is None else _df_full` — kiểm tra `is None` thay vì dùng `or` |
+| **File** | `ws_operation.py`, `tab_no_khoanh.py`, `tabs/tab_canh_bao_nqh.py` ~dòng 580 |
+| **Nguyên nhân** | Dùng `or` với DataFrame: `kwargs.get("df_full") or kwargs.get("df")` → Python gọi `bool(DataFrame)` → exception |
+| **Fix** | `df = kwargs.get("df"); df_full = kwargs.get("df_full", df)` — dùng default của `.get()` thay vì `or`; hoặc `_df = kwargs.get("df_full"); df_full = _df if _df is not None else kwargs.get("df")` |
+| **Ngày fix** | 2026-05-22 |
 
 ### B6 — Tab crash khi `tab=None` (context manager error)
 | | |
@@ -97,6 +124,24 @@
 | **File** | Các renderer trong `ws_operation.py` dùng `with tab_parent:` |
 | **Nguyên nhân** | `tab=None` khi render ngoài context Streamlit tab |
 | **Fix** | Thay `with tab_parent:` → `with get_tab_context(tab_parent):` (từ `utils.py`) |
+
+### B7 — Index lệch khi subset pandas Series bằng boolean mask
+| | |
+|---|---|
+| **Dấu hiệu** | Kết quả tính toán sai lệch, hoặc `ValueError` về index alignment |
+| **File** | `tabs/tab_canh_bao_nqh.py` ~dòng 97 |
+| **Nguyên nhân** | Tạo Series con qua subset index: `s2 = s[da_mask]` → index bị skip, khi dùng lại với mask khác gây lệch |
+| **Fix** | Dùng Series gốc trực tiếp với mask: `s[da_mask]` ngay tại chỗ cần, KHÔNG lưu Series đã subset vào biến trung gian |
+| **Ngày fix** | 2026-05-22 |
+
+### B8 — `.get("col", False)` fragile pattern trên DataFrame
+| | |
+|---|---|
+| **Dấu hiệu** | Cột kiểm tra tồn tại nhưng `.get()` trả về `False` → nhầm với "cột không tồn tại" |
+| **File** | `tabs/tab_canh_bao_nqh.py` ~dòng 173 |
+| **Nguyên nhân** | `df_kh.get("is_3m_inactive", False)` — nếu cột có giá trị `0` hoặc `False`, `.get` trả về giá trị falsy đó thay vì nhận diện cột tồn tại |
+| **Fix** | Kiểm tra tường minh: `"is_3m_inactive" in df.columns` sau đó `.fillna(False).astype(bool)` |
+| **Ngày fix** | 2026-05-22 |
 
 ---
 
@@ -139,6 +184,51 @@
 | **Nguyên nhân** | Hardcode tên cột thay vì dùng constant từ `config.py` |
 | **Fix** | Dùng `COT_*` từ config. Alias hay nhầm: `COT_DIEN_THOAI` → `COT_SDT`; `COT_TEN_TKVV` → `COT_TEN_TO`; `"PL NV"` → `COT_PL_NV` |
 
+### C7 — `category type does not support sum operations`
+| | |
+|---|---|
+| **Dấu hiệu** | `ValueError: category type does not support sum operations` khi groupby/sum |
+| **File** | Bất kỳ tab nào merge dữ liệu từ parquet — đặc biệt `tab_tongquan.py`, `tab_no_khoanh.py` |
+| **Nguyên nhân** | Cột số bị lưu thành categorical dtype trong parquet do mixed type hoặc merge schema không đồng nhất |
+| **Fix** | Ép toàn bộ cột tiền tệ về numeric: `df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)`. Nếu vẫn lỗi: `.astype(object)` rồi mới `pd.to_numeric()` |
+| **Ngày fix** | 2026-05-20 |
+
+### C8 — `cannot subtract DatetimeArray from Categorical`
+| | |
+|---|---|
+| **Dấu hiệu** | `TypeError: cannot subtract DatetimeArray from Categorical` khi tính số ngày đến hạn |
+| **File** | Tab Sức khỏe tín dụng, bất kỳ tab nào tính `ngay_dh - ngay_hien_tai` |
+| **Nguyên nhân** | Cột ngày bị parquet lưu thành categorical thay vì datetime |
+| **Fix** | Ép về datetime trước khi tính: `pd.to_datetime(df[col], dayfirst=True, errors='coerce')` |
+| **Ngày fix** | 2026-05-20 |
+
+### C9 — `UnicodeEncodeError: surrogates not allowed` trong emoji
+| | |
+|---|---|
+| **Dấu hiệu** | `UnicodeEncodeError: 'utf-8' codec can't encode characters ... surrogates not allowed` |
+| **File** | Tab Cảnh báo NQH, bất kỳ tab nào dùng emoji trong markdown |
+| **Nguyên nhân** | Một số ký tự emoji chứa surrogate pair không hợp lệ với UTF-8 strict mode |
+| **Fix** | `.encode('utf-8', errors='replace').decode('utf-8')` hoặc thay emoji surrogate bằng emoji an toàn |
+| **Ngày fix** | 2026-05-17 |
+
+### C10 — DataFrame/Series rỗng gây crash
+| | |
+|---|---|
+| **Dấu hiệu** | `KeyError`, `IndexError`, hoặc `AttributeError` khi xử lý DataFrame rỗng |
+| **File** | `data/cdtotkvv.py` ~dòng 95, `data/den_han.py` ~dòng 81, `tabs/tab_kehoach.py` ~dòng 225 |
+| **Nguyên nhân** | Không guard `df.empty` trước khi gán cột hoặc truy cập column |
+| **Fix** | Thêm `if df.empty: return df` (hoặc `return None`) ở đầu hàm xử lý |
+| **Ngày fix** | 2026-05-21 |
+
+### C11 — `UnboundLocalError` do Python 3.14 `except Exception:` syntax
+| | |
+|---|---|
+| **Dấu hiệu** | `UnboundLocalError: cannot access local variable 'e' where it is not associated with a value` |
+| **File** | `tabs/tab_tongquan.py`, bất kỳ file nào có `except Exception: logger.error("...%s", e)` |
+| **Nguyên nhân** | Python 3.14: `except Exception:` (không `as e`) tự động unbind biến `e` khỏi scope ngoài. Dùng `e` trong block except gây UnboundLocalError |
+| **Fix** | Luôn dùng `except Exception as e:` — không bao giờ `except Exception:` |
+| **Ngày fix** | 2026-05-21 |
+
 ---
 
 ## D. Database / kv_store
@@ -160,6 +250,23 @@
 |---|---|
 | **Nguyên nhân** | Quên gọi `db.ghi_audit()` sau `db.ghi_kv()` |
 | **Fix** | Bắt buộc pattern: `db.ghi_kv(key, val, username)` → ngay tiếp theo `db.ghi_audit(username, action, detail)` |
+
+### D4 — SQLite thread-safety: ghi audit trong ThreadPoolExecutor crash
+| | |
+|---|---|
+| **Dấu hiệu** | `sqlite3.ProgrammingError: SQLite objects created in a thread can only be used in that same thread` |
+| **File** | `tabs/tab_upload_khnv.py` — import hàng loạt KH-NV |
+| **Nguyên nhân** | `db.ghi_audit()` được gọi từ worker thread trong `ThreadPoolExecutor` |
+| **Fix** | Gom audit records vào list ở worker thread, ghi tuần tự ở main thread sau khi executor hoàn tất |
+| **Ngày fix** | 2026-05-21 |
+
+### D5 — `no such column: X` — schema mismatch
+| | |
+|---|---|
+| **Dấu hiệu** | `sqlite3.OperationalError: no such column: ten_task` / `ngay_doi_mk` / `ngay_kiem_tra` |
+| **Nguyên nhân** | Một trong hai: (1) Query dùng sai tên cột không khớp schema thực tế trong `db.py`; (2) Migration chưa chạy để thêm cột mới |
+| **Fix** | Kiểm tra `db.py` để lấy tên cột chính xác từ `CREATE TABLE`. Nếu cần cột mới → thêm migration trong `db.py` |
+| **Ngày fix** | 2026-05-19/22 |
 
 ---
 
@@ -191,6 +298,24 @@
 | **Nguyên nhân** | String cleanup chạy trên tất cả cột thay vì chỉ cột object |
 | **Fix** | Chỉ cleanup cột `dtype == object`: `obj_cols = df.select_dtypes(include='object').columns` |
 
+### E5 — "Nguồn vốn" toàn NaN sau merge GQVL
+| | |
+|---|---|
+| **Dấu hiệu** | Cột `COT_NGUON_VON` = NaN trên toàn bộ dòng sau merge GQVL |
+| **File** | `services/upload_service.py` ~dòng 462 |
+| **Nguyên nhân** | Cột "Nguồn vốn" (text "TW"/"ĐP") bị đưa vào danh sách `_cols_so_cn` → bị ép `pd.to_numeric()` → NaN |
+| **Fix** | Loại "Nguồn vốn" khỏi `_cols_so_cn` — đây là cột text, không phải cột số |
+| **Ngày fix** | 2026-05-16 |
+
+### E6 — `file_uploader` không reset sau import hàng loạt
+| | |
+|---|---|
+| **Dấu hiệu** | Upload file lần 2 cùng tên → không kích hoạt import |
+| **File** | `tabs/tab_upload_khnv.py` ~dòng 707 |
+| **Nguyên nhân** | Streamlit `file_uploader` giữ state cũ, không detect file mới cùng tên |
+| **Fix** | Dùng version counter trong key: `key=f"upload_{_ver}"` → tăng `_ver` sau mỗi lần import thành công để widget reset |
+| **Ngày fix** | 2026-05-17 |
+
 ---
 
 ## F. PDF / Word
@@ -217,6 +342,24 @@
 | | |
 |---|---|
 | **Fix** | Kiểm tra `assets/logo.png` tồn tại. `pdf_service.py` tự fallback về text nếu thiếu |
+
+### F5 — `NameError: TA_LEFT` trong PDF
+| | |
+|---|---|
+| **Dấu hiệu** | `NameError: name 'TA_LEFT' is not defined` khi tạo PDF |
+| **File** | `pdf_service.py` ~dòng 31 |
+| **Nguyên nhân** | Thiếu `TA_LEFT` trong `from reportlab.lib.enums import TA_LEFT, TA_CENTER, TA_RIGHT` |
+| **Fix** | Import đầy đủ: `from reportlab.lib.enums import TA_LEFT` |
+| **Ngày fix** | 2026-05-22 |
+
+### F6 — Định dạng ngày Timestamp → dd/mm/yyyy trong PDF
+| | |
+|---|---|
+| **Dấu hiệu** | Ngày trong PDF hiển thị `2026-05-16 00:00:00` thay vì `16/05/2026` |
+| **File** | `tabs/tab_tien_do.py`, bất kỳ PDF nào có cột ngày |
+| **Nguyên nhân** | `pd.Timestamp` bị convert thẳng thành string giữ format ISO |
+| **Fix** | Dùng `.strftime("%d/%m/%Y")` hoặc `fmt_ngay()` từ `utils.py` trước khi đưa vào PDF |
+| **Ngày fix** | 2026-05-16 |
 
 ---
 
@@ -270,6 +413,19 @@
 | **File** | `auth.py`, `ws_operation.py` |
 | **Nguyên nhân** | Quên filter `st.session_state["user_info"]["pgd"]` |
 | **Fix** | `pgd_user = st.session_state.get("user_info", {}).get("pgd")` → filter DataFrame theo `COT_TEN_PGD` |
+
+---
+
+## J. Python / Code Pattern
+
+### J1 — UnboundLocalError: cannot access local variable 'X' where it is not associated with a value
+| | |
+|---|---|
+| **File** | Bất kỳ file nào có `from x import Y` ở cả top-level lẫn trong thân hàm |
+| **Dấu hiệu** | `UnboundLocalError: cannot access local variable 'Path' where it is not associated with a value` |
+| **Nguyên nhân** | Import cục bộ `from pathlib import Path` trong thân hàm khiến Python coi `Path` là local variable cho toàn bộ hàm. Dòng code dùng `Path` phía trên import cục bộ sẽ bị `UnboundLocalError`. |
+| **Fix** | Xóa import cục bộ thừa, dùng top-level import có sẵn. Chỉ import trong hàm khi thực sự cần lazy-load. |
+| **Ngày fix** | 2026-05-22 |
 
 ---
 

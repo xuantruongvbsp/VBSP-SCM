@@ -4,6 +4,26 @@
 
 ---
 
+## [2026-05-22] Hoàn thiện tab Trạng thái Nguồn dữ liệu
+
+### Bug fixes
+- `tab_trang_thai_nguon.py`: 6 chỗ `except Exception:` → `except Exception as e:` (NameError khi logger ghi `e`)
+- `tab_trang_thai_nguon.py`: `_pgd_gqvl_path()` dùng `GQVL_PGD_DIR` (legacy) → thay bằng `_pgd_file_path(ten_pgd, loai)` gọi `duong_dan_pgd()` từ `data/pgd.py` — GQVL không còn luôn hiển thị ❌
+
+### Thêm tính năng
+| Nơi | Tính năng |
+|---|---|
+| `_render_tep_nguon` | Cột CDTOTKVV + metric thứ 4 |
+| `_render_merge_cache` | Cột "Số dòng" + "PGD dùng SL cũ" trong bảng merge meta |
+| `_render_merge_cache` | Cảnh báo đỏ/vàng + expander danh sách khi có `pgd_cu` |
+| `_render_merge_cache` | Section "🔬 Chất lượng dữ liệu" từ `data_quality_meta_*` |
+| `_render_he_thong` | Section "🔗 Sao lưu qua GitHub (kv_store)" — gộp từ sidebar `app.py` vào |
+
+### Dọn dẹp
+- `app.py` sidebar: xóa block backup 40 dòng, thay bằng caption link đến tab
+
+---
+
 ## [2026-05-21] Logging + test coverage cho services quan trọng
 
 ### Logging thêm vào

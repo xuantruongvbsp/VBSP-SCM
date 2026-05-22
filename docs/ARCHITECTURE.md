@@ -1,6 +1,6 @@
 # Kiến trúc Module — VBSP-SCM
 > Tài liệu tham chiếu nhanh khi Cursor cần biết file nào làm gì.
-> Cập nhật lần cuối: 06/05/2026 — thêm phân hệ 2 cấp CN/PGD, role mới, tab Ủy thác, template_service
+> Cập nhật lần cuối: 22/05/2026 — thêm components/, SCHEMA/TEST_COVERAGE/DECISIONS; fix fmt_ty() docs
 
 ---
 

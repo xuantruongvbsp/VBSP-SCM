@@ -7,6 +7,9 @@
 ## [2026-05-23] — Fix dứt điểm: chữ trắng bóc bảng "Cơ cấu dư nợ theo chương trình tín dụng"
 - `tabs/tab_tongquan.py` dòng ~465 — bỏ HTML table thủ công (bị Streamlit dark mode CSS override không thể fix), thay bằng `hien_thi_dataframe_phan_trang` để Streamlit tự quản lý màu sắc light/dark
 
+## [2026-05-23] — Fix bug: bảng "Cơ cấu dư nợ" hiện empty table + chart dù không có dữ liệu
+- `tabs/tab_tongquan.py` dòng ~434 — `if df_ct.empty: st.info(...)` thiếu `else:` → code vẫn chạy xuống vẽ bảng + biểu đồ trống sau thông báo; thêm `else:` để bỏ qua hoàn toàn khi không có dữ liệu
+
 ## [2026-05-22] — Fix: thêm cột ngay_doi_mk vào schema users + migration
 - `db.py` dòng ~160 — thêm `ngay_doi_mk TEXT` vào CREATE TABLE users
 - `db.py` dòng ~463 — thêm ALTER TABLE migration cho DB cũ chưa có cột `ngay_doi_mk`

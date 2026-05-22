@@ -148,36 +148,6 @@ def doc_kv_sync_project() -> dict[str, int] | None:
     return import_kv_json(json_str)
 
 
-def backup_db_bytes() -> bytes:
-    """Checkpoint WAL về main file rồi đọc toàn bộ database thành bytes.
-    Dùng cho tính năng Backup/Restore trong sidebar — đảm bảo mọi dữ liệu
-    đang nằm trong WAL đều được flush vào file .db trước khi đọc."""
-    try:
-        with get_conn() as conn:
-            conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
-    except Exception:
-        pass
-    with open(get_db_path(), "rb") as f:
-        return f.read()
-
-
-def restore_db_bytes(data: bytes) -> None:
-    """Ghi database mới từ bytes, dọn WAL/SHM cũ, đóng connection thread hiện tại.
-    Sau khi gọi hàm này: gọi st.cache_data.clear() + st.rerun() để tải lại."""
-    db_path = get_db_path()
-    _close_thread_conn()
-    # Xóa WAL/SHM để tránh conflict với file db mới
-    for ext in ("-wal", "-shm"):
-        p = db_path + ext
-        try:
-            if os.path.exists(p):
-                os.remove(p)
-        except OSError:
-            pass
-    with open(db_path, "wb") as f:
-        f.write(data)
-
-
 def init_db():
     with get_conn() as conn:
         conn.executescript("""

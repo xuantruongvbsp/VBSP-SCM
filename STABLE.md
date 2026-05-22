@@ -123,7 +123,7 @@ def co_quyen_quan_ly_user_pgd(role) -> bool
 ```python
 def fmt_so(x) -> str           # Format số (dấu phẩy ngàn)
 def fmt_tien(x) -> str         # Format tiền (triệu đồng)
-def fmt_ty(x) -> str           # Format tiền (tỷ đồng) — chia /1e12
+def fmt_ty(x) -> str           # Format tiền (triệu đồng) — chia /1e6, 0 số lẻ, không hậu tố
 def fmt_pct(x) -> str          # Format % (2 chữ số)
 def fmt(x) -> str              # Format số tổng quát
 def fmt_ngay(val) -> str       # Format ngày dd/mm/yyyy
@@ -262,7 +262,7 @@ st.cache_data.clear()
 |---|---|
 | Nhập liệu | Triệu đồng |
 | Lưu trữ | VND (× 1.000.000) |
-| Hiển thị | `fmt_ty()` — KHÔNG dùng `/1e9` |
+| Hiển thị | `fmt_ty()` chia `/1e6` → triệu đồng — KHÔNG dùng `/1e9` hay `/1e12` |
 
 ### render(tab) — pattern chuẩn
 ```python
@@ -307,4 +307,4 @@ headless = true
 | 6 | `COT_DIEN_THOAI` | `COT_SDT` |
 | 7 | `COT_TEN_TKVV` | `COT_TEN_TO` |
 | 8 | `role == "admin"` | `normalize_role(role)` + helper functions |
-| 9 | `/1e9` cho tiền tệ | `/1e12` qua `fmt_ty()` |
+| 9 | `/1e9` hay `/1e12` cho tiền tệ | `/1e6` qua `fmt_ty()` (ra triệu đồng) |

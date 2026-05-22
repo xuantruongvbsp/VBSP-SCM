@@ -5,14 +5,24 @@
 
 ## 1. Dữ liệu hiển thị sai / Metric sai
 
-### Tổng KH/TH hiện sai (ví dụ: 0,013 thay vì 13,199 tỷ)
-**Nguyên nhân:** Chia `/1e9` thay vì `/1e12`
-```python
-# SAI
-tong_kh / 1e9
+### Tổng KH/TH hiện sai (số quá nhỏ hoặc quá lớn)
+**Nguyên nhân:** Dùng sai hệ số chia — dữ liệu lưu VND, phải chia đúng lớp:
 
-# ĐÚNG
-tong_kh / 1e12   # th_cn/kh_cn lưu VND → /1e12 = tỷ
+| Ngữ cảnh | Cách dùng | Kết quả |
+|---|---|---|
+| Cột bảng | `fmt_ty(tong_kh)` | triệu đồng (0 số lẻ) |
+| Metric / card inline | `vn(tong_kh / 1e9, 3) + " tỷ"` | tỷ đồng (3 số lẻ) |
+
+```python
+# SAI — /1e12 cho kết quả sai (số quá nhỏ)
+tong_kh / 1e12
+
+# ĐÚNG — cột bảng (header ghi "(triệu đồng)")
+from utils import fmt_ty
+fmt_ty(tong_kh)          # → "1.500" (triệu đồng)
+
+# ĐÚNG — metric card inline (hiển thị tỷ đồng)
+vn(tong_kh / 1e9, 3) + " tỷ"   # → "1,500 tỷ"
 ```
 
 ### TH = 0 toàn bộ

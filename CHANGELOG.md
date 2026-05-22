@@ -1,5 +1,19 @@
 # CHANGELOG
 
+## [2026-05-22] — Fix tab Tổng quan: 3 section trống không có bảng/dữ liệu
+- `tabs/tab_tongquan.py` dòng ~164 — thêm guard `if df is None or df.empty: st.warning(); return`
+- `tabs/tab_tongquan.py` dòng ~434 — thêm kiểm tra `if df_ct.empty: st.info(...)` cho "Cơ cấu dư nợ"
+- `tabs/tab_tongquan.py` dòng ~533 — thêm `else: st.warning(...)` cho "Cơ cấu dư nợ" khi thiếu cột
+- `tabs/tab_tongquan.py` dòng ~1008 — thêm `else: st.warning(...)` cho "Thông tin tổng quát PGD" khi thiếu cột
+- `tabs/tab_tongquan.py` dòng ~1289 — thêm `else: st.warning(...)` cho "Hồ sơ đến hạn" khi thiếu cột
+- `tabs/tab_tongquan.py` dòng ~1296 — thêm expander debug "Chẩn đoán: Cột dữ liệu bị thiếu" liệt kê cột còn thiếu + hướng dẫn fix
+
+## [2026-05-22] — Tab Thông tin đầu việc: thay màu xanh sang tông ấm, dễ đọc
+- `tabs/tab_khnv_noi_bo.py` dòng ~1048-1105 — thay màu xanh dương/tím (`#93c5fd`, `#a5b4fc`, `#c4b5fd`) ở cột Mã, Tần suất, Người thực hiện, Thời hạn sang tông ấm (`#fbbf24` vàng, `#fca5a5` hồng, `#d1d5db` xám); đổi header gradient từ xanh navy sang xám `#334155→#475569`
+
+## [2026-05-22] — Sửa CSS dark theme cho tab Thông tin đầu việc (Phòng KH-NV)
+- `tabs/tab_khnv_noi_bo.py` dòng ~1034-1120 — thay toàn bộ màu chữ/border/background trong `_render_thong_tin_dau_viec()` từ light-theme (`#111827`, `#1e3a5f`, `#374151`, `#059669`, `#f0f4f8`) sang dark-theme (`#f1f5f9`, `#cbd5e1`, `#93c5fd`, `#6ee7b7`, `#1e293b`)
+
 ## [2026-05-22] — Thêm COT_GIAI_NGAN_TRONG_NAM, thay 7 chỗ hardcode
 - `config.py` dòng ~311 — thêm `COT_GIAI_NGAN_TRONG_NAM = "Giải ngân trong năm"`; dùng trong `GQVL_COT_MAP` và `HSTD_DS_CHO_VAY_NAM_ALIASES`
 - `snapshot_service.py` — import + dùng trong `_GN_NAM_ALIASES` và `_COL_GN`

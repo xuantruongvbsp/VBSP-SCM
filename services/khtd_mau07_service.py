@@ -148,7 +148,7 @@ def tinh_du_no_ap_baseline(df_baseline: pd.DataFrame, ten_xa: str) -> dict:
             if ma_key:
                 result[f"{str(ten_thon).strip()}|{ma_key}"] = round(du_no / 1_000_000, 1)
         return result
-    except Exception as e:
+    except Exception as e:  # conv: skip
         return {"_err": str(e)}
 
 

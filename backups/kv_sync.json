@@ -1,5 +1,5 @@
 {
-  "exported_at": "2026-05-22T08:48:12.992521",
+  "exported_at": "2026-05-22T19:08:11.041014",
   "version": 2,
   "tables": {
     "users": [],
@@ -54,38 +54,38 @@
       },
       {
         "key": "merge_meta_hstd",
-        "value": "{\"thoi_gian\": \"2026-05-21T21:12:22.797316\", \"so_pgd\": 22, \"so_dong\": 349398, \"pgd_cu\": [\"Hội sở Chi nhánh tỉnh\", \"PGD Vĩnh Cửu\", \"PGD Tân Phú\", \"PGD Định Quán\", \"PGD Xuân Lộc\", \"PGD Trảng Bom\", \"PGD Long Khánh\", \"PGD Long Thành\", \"PGD Cẩm Mỹ\", \"PGD Nhơn Trạch\", \"PGD Lộc Ninh\", \"PGD Thống Nhất\", \"PGD Phước Long\", \"PGD Bù Đăng\", \"PGD Bình Long\", \"PGD Bình Phước\", \"PGD Chơn Thành\", \"PGD Đồng Phú\", \"PGD Bù Đốp\", \"PGD Phú Riềng\", \"PGD Bù Gia Mập\", \"PGD Hớn Quản\"]}",
-        "updated_at": "2026-05-21T21:12:22.805343",
+        "value": "{\"thoi_gian\": \"2026-05-22T17:43:30.757704\", \"so_pgd\": 22, \"so_dong\": 349398, \"pgd_cu\": []}",
+        "updated_at": "2026-05-22T17:43:30.759754",
         "updated_by": "admin"
       },
       {
         "key": "data_quality_meta_hstd",
-        "value": "{\"thoi_gian\": \"2026-05-21T21:12:22.806839\", \"bao_cao\": [], \"tong_so_loi\": 0, \"tong_dong\": 0}",
-        "updated_at": "2026-05-21T21:12:22.807146",
+        "value": "{\"thoi_gian\": \"2026-05-22T17:43:30.759859\", \"bao_cao\": [], \"tong_so_loi\": 0, \"tong_dong\": 0}",
+        "updated_at": "2026-05-22T17:43:30.760623",
         "updated_by": "admin"
       },
       {
         "key": "merge_meta_nq11",
-        "value": "{\"thoi_gian\": \"2026-05-21T21:12:31.726448\", \"so_pgd\": 12, \"so_dong\": 172037, \"pgd_cu\": [\"PGD Vĩnh Cửu\", \"PGD Tân Phú\", \"PGD Xuân Lộc\", \"PGD Long Thành\", \"PGD Định Quán\", \"PGD Trảng Bom\", \"PGD Thống Nhất\", \"Hội sở Chi nhánh tỉnh\", \"PGD Long Khánh\", \"PGD Cẩm Mỹ\", \"PGD Nhơn Trạch\", \"PGD Bình Long\"]}",
-        "updated_at": "2026-05-21T21:12:31.731589",
+        "value": "{\"thoi_gian\": \"2026-05-22T17:44:26.184922\", \"so_pgd\": 4, \"so_dong\": 53810, \"pgd_cu\": []}",
+        "updated_at": "2026-05-22T17:44:26.185655",
         "updated_by": "admin"
       },
       {
         "key": "data_quality_meta_nq11",
-        "value": "{\"thoi_gian\": \"2026-05-21T21:12:31.732148\", \"bao_cao\": [], \"tong_so_loi\": 0, \"tong_dong\": 0}",
-        "updated_at": "2026-05-21T21:12:31.737835",
+        "value": "{\"thoi_gian\": \"2026-05-22T17:44:26.185867\", \"bao_cao\": [], \"tong_so_loi\": 0, \"tong_dong\": 0}",
+        "updated_at": "2026-05-22T17:44:26.185915",
         "updated_by": "admin"
       },
       {
         "key": "merge_meta_gqvl",
-        "value": "{\"thoi_gian\": \"2026-05-21T21:12:36.671542\", \"so_pgd\": 22, \"so_dong\": 95791, \"pgd_cu\": []}",
-        "updated_at": "2026-05-21T21:12:36.671802",
+        "value": "{\"thoi_gian\": \"2026-05-22T17:44:30.526618\", \"so_pgd\": 22, \"so_dong\": 4557, \"pgd_cu\": []}",
+        "updated_at": "2026-05-22T17:44:30.526765",
         "updated_by": "admin"
       },
       {
         "key": "data_quality_meta_gqvl",
-        "value": "{\"thoi_gian\": \"2026-05-21T21:12:36.672065\", \"bao_cao\": [], \"tong_so_loi\": 0, \"tong_dong\": 0}",
-        "updated_at": "2026-05-21T21:12:36.672199",
+        "value": "{\"thoi_gian\": \"2026-05-22T17:44:30.526877\", \"bao_cao\": [], \"tong_so_loi\": 0, \"tong_dong\": 0}",
+        "updated_at": "2026-05-22T17:44:30.526949",
         "updated_by": "admin"
       }
     ],

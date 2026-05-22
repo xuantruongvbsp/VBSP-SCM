@@ -88,6 +88,6 @@ Chi tiết đầy đủ → xem `ARCHITECTURE.md`.
 - Lưu dữ liệu → `db.ghi_kv()` + `db.ghi_audit()`
 - Upload file → qua `upload_service.py`
 - Sau upload → `st.cache_data.clear()`
-- Tiền tệ: nhập **triệu** → lưu **VND** → hiển thị `fmt_ty()` (chia `/1e12`)
+- Tiền tệ: nhập **triệu** → lưu **VND** → hiển thị `fmt_ty()` (chia `/1e6`, ra triệu đồng)
 
 Chi tiết → xem `CONVENTIONS.md`.

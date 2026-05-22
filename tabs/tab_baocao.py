@@ -463,6 +463,7 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                             key="baocao_th_chuong_trinh",
                         )
                 except Exception as e:
+                    logger.error("tab_baocao: nhóm theo chương trình vay — %s", e, exc_info=True)
                     st.error(f"Lỗi khi nhóm theo chương trình vay: {e}")
                     dbc_raw = None
 

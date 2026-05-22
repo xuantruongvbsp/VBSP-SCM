@@ -18,6 +18,7 @@ import plotly.graph_objects as go
 from config import (
     FILE_PATH_GQVL, TEN_FILE_GQVL,
     COT_TEN_PGD, COT_MA_KH, COT_NGAY_SL,
+    COT_GIAI_NGAN_TRONG_NAM,
 )
 from data import (ts_file, doc_file_gqvl,
                   doc_gqvl_pgd, ds_pgd_co_gqvl, duong_dan_gqvl_pgd)
@@ -144,7 +145,7 @@ G_NGUON_VON  = "Nguồn vốn"
 G_MA_NHA_DAU_TU = "Mã nhà đầu tư"
 G_TEN_NGANH  = "Tên ngành SXKD"
 G_TONG_GN    = "Tổng giải ngân"
-G_GN_NAM     = "Giải ngân trong năm"
+G_GN_NAM     = COT_GIAI_NGAN_TRONG_NAM
 G_DU_TK      = "Dư tài khoản"
 G_NQ11       = "NQ11"
 

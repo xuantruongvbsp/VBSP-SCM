@@ -176,8 +176,8 @@ def _khtd_cn_hdr_cell(text, bg, color=None, bold=True) -> str:
 
 ```python
 k1, k2, k3, k4 = st.columns(4)
-k1.metric("Tổng kế hoạch", f"{_fvn(tong_kh / 1e12, 3)} tỷ đồng")
-k2.metric("Tổng thực hiện", f"{_fvn(tong_th / 1e12, 3)} tỷ đồng")
+k1.metric("Tổng kế hoạch", f"{_fvn(tong_kh / 1e9, 3)} tỷ đồng")
+k2.metric("Tổng thực hiện", f"{_fvn(tong_th / 1e9, 3)} tỷ đồng")
 k3.metric("Tỷ lệ đạt KH", f"{_fvn(pct, 1)}%" if pct else "—")
 k4.metric("Số CT có KH", f"{so_ct}/{tong_ct} chương trình")
 ```

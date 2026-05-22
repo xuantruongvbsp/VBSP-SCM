@@ -205,6 +205,12 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
             .ct-card .ct-bar{height:4px;border-radius:2px;margin-top:8px;background:var(--ct-color,#2E7D32);opacity:0.35}
             @media(max-width:1200px){.ct-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
             @media (max-width: 1200px){.tq-grid,.totkvv-grid{grid-template-columns:repeat(2,minmax(0,1fr));}}
+            table.ct-table, table.ct-table td, table.ct-table tr, table.ct-table tbody {
+                color:#1e293b !important;
+            }
+            table.ct-table th {
+                color:#fff !important;
+            }
             </style>
             """,
             unsafe_allow_html=True,
@@ -433,102 +439,83 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
 
             if df_ct.empty:
                 st.info("ℹ️ Chưa có dư nợ trong dữ liệu — bảng chương trình tín dụng trống.")
-            # Hiển thị bảng
-            # fmt_ty: VND → triệu đồng (chia /1_000_000). Tên cột phải ghi "(triệu đồng)"
-            df_hien = df_ct.rename(columns={"ten_ct": "Chương trình"}).copy()
-            df_hien["Số món vay"]              = df_hien["so_mon"].apply(fmt_so)
-            df_hien["Số KH"]                   = df_hien["so_kh"].apply(fmt_so)
-            df_hien["Dư nợ (triệu đồng)"]      = df_hien["du_no"].apply(fmt_ty)
-            df_hien["Nguồn TW (triệu đồng)"]   = df_hien["du_no_tw"].apply(fmt_ty)
-            df_hien["Nguồn ĐP (triệu đồng)"]   = df_hien["du_no_dp"].apply(fmt_ty)
-            df_hien["Dư nợ QH (triệu đồng)"]   = df_hien["du_no_qh"].apply(fmt_ty)
-            ty_le_qh = ((df_hien["du_no_qh"] / df_hien["du_no"] * 100).round(2)) if (df_hien["du_no"] > 0).any() else pd.Series(0.0, index=df_hien.index)
-            df_hien["Tỷ lệ QH %"]              = ty_le_qh.apply(lambda x: f"{x:.2f}".replace(".", ",") + "%")
-            df_hien["Dư nợ khoanh (triệu đồng)"] = df_hien["du_no_khoanh"].apply(fmt_ty)
-            df_hien["Giải ngân năm (triệu đồng)"] = df_hien["gn_nam"].apply(fmt_ty)
-            df_hien["Thu nợ năm (triệu đồng)"] = df_hien["tn_nam"].apply(fmt_ty)
-            df_hien["Tỷ trọng %"]              = df_hien["ty_trong"].apply(lambda x: f"{x:.1f}".replace(".", ",") + "%")
+            else:
+                df_hien = df_ct.rename(columns={"ten_ct": "Chương trình"}).copy()
+                df_hien["Số món vay"]              = df_hien["so_mon"].apply(fmt_so)
+                df_hien["Số KH"]                   = df_hien["so_kh"].apply(fmt_so)
+                df_hien["Dư nợ (triệu đồng)"]      = df_hien["du_no"].apply(fmt_ty)
+                df_hien["Nguồn TW (triệu đồng)"]   = df_hien["du_no_tw"].apply(fmt_ty)
+                df_hien["Nguồn ĐP (triệu đồng)"]   = df_hien["du_no_dp"].apply(fmt_ty)
+                df_hien["Dư nợ QH (triệu đồng)"]   = df_hien["du_no_qh"].apply(fmt_ty)
+                ty_le_qh = ((df_hien["du_no_qh"] / df_hien["du_no"] * 100).round(2)) if (df_hien["du_no"] > 0).any() else pd.Series(0.0, index=df_hien.index)
+                df_hien["Tỷ lệ QH %"]              = ty_le_qh.apply(lambda x: f"{x:.2f}".replace(".", ",") + "%")
+                df_hien["Dư nợ khoanh (triệu đồng)"] = df_hien["du_no_khoanh"].apply(fmt_ty)
+                df_hien["Giải ngân năm (triệu đồng)"] = df_hien["gn_nam"].apply(fmt_ty)
+                df_hien["Thu nợ năm (triệu đồng)"] = df_hien["tn_nam"].apply(fmt_ty)
+                df_hien["Tỷ trọng %"]              = df_hien["ty_trong"].apply(lambda x: f"{x:.1f}".replace(".", ",") + "%")
 
-            cols_hien = [
-                "Chương trình", "Số món vay", "Số KH",
-                "Dư nợ (triệu đồng)", "Nguồn TW (triệu đồng)", "Nguồn ĐP (triệu đồng)",
-                "Dư nợ QH (triệu đồng)", "Tỷ lệ QH %", "Dư nợ khoanh (triệu đồng)",
-                "Giải ngân năm (triệu đồng)", "Thu nợ năm (triệu đồng)", "Tỷ trọng %"
-            ]
+                cols_hien = [
+                    "Chương trình", "Số món vay", "Số KH",
+                    "Dư nợ (triệu đồng)", "Nguồn TW (triệu đồng)", "Nguồn ĐP (triệu đồng)",
+                    "Dư nợ QH (triệu đồng)", "Tỷ lệ QH %", "Dư nợ khoanh (triệu đồng)",
+                    "Giải ngân năm (triệu đồng)", "Thu nợ năm (triệu đồng)", "Tỷ trọng %"
+                ]
 
-            def _ct_header(col: str) -> str:
-                if col == "Chương trình":
-                    return col
-                if "(triệu đồng)" in col:
-                    base = col.replace(" (triệu đồng)", "")
-                    return f"{base}<br/><span style='font-weight:normal;font-size:11px'>(Triệu đồng)</span>"
-                return col
-
-            _ct_headers = "".join(
-                f'<th style="background:#2E7D32;color:#fff;text-align:center;'
-                f'padding:6px 5px;border:1px solid #1B5E20;font-size:12px;'
-                f'white-space:normal;min-width:{80 if col != "Chương trình" else 130}px;line-height:1.4">'
-                f'{_ct_header(col)}</th>'
-                for col in cols_hien
-            )
-            _ct_rows = ""
-            for i, (_, row) in enumerate(df_hien[cols_hien].iterrows()):
-                bg = "#F5F7FA" if i % 2 == 0 else "#FFFFFF"
-                cells = "".join(
-                    f'<td style="padding:5px 6px;border:1px solid #E0E0E0;'
-                    f'text-align:{"left" if c == cols_hien[0] else "right"};'
-                    f'font-size:0.88rem;white-space:nowrap">'
-                    f'{row[c]}</td>'
-                    for c in cols_hien
+                _rename_short = {
+                    "Dư nợ (triệu đồng)": "Dư nợ",
+                    "Nguồn TW (triệu đồng)": "Nguồn TW",
+                    "Nguồn ĐP (triệu đồng)": "Nguồn ĐP",
+                    "Dư nợ QH (triệu đồng)": "Dư nợ QH",
+                    "Dư nợ khoanh (triệu đồng)": "Khoanh",
+                    "Giải ngân năm (triệu đồng)": "GN năm",
+                    "Thu nợ năm (triệu đồng)": "TN năm",
+                }
+                st.caption("Đơn vị các cột tiền: triệu đồng")
+                hien_thi_dataframe_phan_trang(
+                    df_hien[cols_hien].rename(columns=_rename_short),
+                    key="ct_cocau",
                 )
-                _ct_rows += f'<tr style="background:{bg}">{cells}</tr>\n'
-            st.markdown(
-                f'<table style="width:100%;border-collapse:collapse;font-family:inherit;margin:8px 0">'
-                f'<thead><tr>{_ct_headers}</tr></thead>'
-                f'<tbody>{_ct_rows}</tbody></table>',
-                unsafe_allow_html=True,
-            )
 
-            df_top10 = df_ct.nlargest(10, "du_no").copy()
-            df_top10["label"] = df_top10["ten_ct"].str[:30]
-            df_top10["du_no_ty"] = df_top10["du_no"] / 1e6
-            df_top10["du_no_tw_ty"] = df_top10["du_no_tw"] / 1e6
-            df_top10["du_no_dp_ty"] = df_top10["du_no_dp"] / 1e6
-            df_top10["du_no_tw_ty"] = df_top10["du_no_tw_ty"].where(df_top10["du_no_tw_ty"] > 0, 0)
-            df_top10["du_no_dp_ty"] = df_top10["du_no_dp_ty"].where(df_top10["du_no_dp_ty"] > 0, 0)
-            fig_ct = go.Figure()
-            fig_ct.add_trace(go.Bar(
-                y=df_top10["label"],
-                x=df_top10["du_no_tw_ty"],
-                name="TW",
-                orientation="h",
-                marker_color="#2E7D32",
-                text=df_top10["du_no_tw_ty"].apply(lambda x: vn(x, 1) if x > 0 else ""),
-                textposition="inside",
-                insidetextanchor="middle",
-                textfont=dict(color="white", size=10),
-            ))
-            fig_ct.add_trace(go.Bar(
-                y=df_top10["label"],
-                x=df_top10["du_no_dp_ty"],
-                name="ĐP",
-                orientation="h",
-                marker_color="#E65100",
-                text=df_top10["du_no_dp_ty"].apply(lambda x: vn(x, 1) if x > 0 else ""),
-                textposition="inside",
-                insidetextanchor="middle",
-                textfont=dict(color="white", size=10),
-            ))
-            fig_ct.update_layout(
-                barmode="stack",
-                title="📊 Top 10 chương trình theo dư nợ",
-                xaxis_title="Dư nợ (triệu đồng)",
-                yaxis=dict(autorange="reversed"),
-                height=max(350, len(df_top10) * 35),
-                margin=dict(l=10, r=40, t=40, b=10),
-                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-            )
-            st.plotly_chart(fig_ct, use_container_width=True, key="ct_bar_top10")
+                df_top10 = df_ct.nlargest(10, "du_no").copy()
+                df_top10["label"] = df_top10["ten_ct"].str[:30]
+                df_top10["du_no_ty"] = df_top10["du_no"] / 1e6
+                df_top10["du_no_tw_ty"] = df_top10["du_no_tw"] / 1e6
+                df_top10["du_no_dp_ty"] = df_top10["du_no_dp"] / 1e6
+                df_top10["du_no_tw_ty"] = df_top10["du_no_tw_ty"].where(df_top10["du_no_tw_ty"] > 0, 0)
+                df_top10["du_no_dp_ty"] = df_top10["du_no_dp_ty"].where(df_top10["du_no_dp_ty"] > 0, 0)
+                fig_ct = go.Figure()
+                fig_ct.add_trace(go.Bar(
+                    y=df_top10["label"],
+                    x=df_top10["du_no_tw_ty"],
+                    name="TW",
+                    orientation="h",
+                    marker_color="#2E7D32",
+                    text=df_top10["du_no_tw_ty"].apply(lambda x: vn(x, 1) if x > 0 else ""),
+                    textposition="inside",
+                    insidetextanchor="middle",
+                    textfont=dict(color="white", size=10),
+                ))
+                fig_ct.add_trace(go.Bar(
+                    y=df_top10["label"],
+                    x=df_top10["du_no_dp_ty"],
+                    name="ĐP",
+                    orientation="h",
+                    marker_color="#E65100",
+                    text=df_top10["du_no_dp_ty"].apply(lambda x: vn(x, 1) if x > 0 else ""),
+                    textposition="inside",
+                    insidetextanchor="middle",
+                    textfont=dict(color="white", size=10),
+                ))
+                fig_ct.update_layout(
+                    barmode="stack",
+                    title="📊 Top 10 chương trình theo dư nợ",
+                    xaxis_title="Dư nợ (triệu đồng)",
+                    yaxis=dict(autorange="reversed"),
+                    height=max(350, len(df_top10) * 35),
+                    margin=dict(l=10, r=40, t=40, b=10),
+                    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+                )
+                st.plotly_chart(fig_ct, use_container_width=True, key="ct_bar_top10")
 
         else:
             _miss_ct = [c for c in [COT_TEN_CT, COT_TONG_DU_NO] if c not in df.columns]
@@ -704,7 +691,7 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                             .sum()
                         )
                         df_pgd = df_pgd.merge(df_to_pgd, on=COT_TEN_PGD, how="left")
-            except Exception as e:
+            except Exception as e:  # conv: skip
                 logger.error("Lỗi merge CDTOTKVV: %s", e, exc_info=True)
                 pass
 
@@ -741,7 +728,7 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                     _df_raw_pgd = tong_hop_tu_pgd_data()
                     if _df_raw_pgd is not None and not _df_raw_pgd.empty:
                         _df_to_pgd_map = tong_hop_theo_pgd(_df_raw_pgd)
-            except Exception as e:
+            except Exception as e:  # conv: skip
                 logger.error("Lỗi fallback CDTOTKVV từ pgd_data: %s", e, exc_info=True)
                 _df_to_pgd_map = None
 

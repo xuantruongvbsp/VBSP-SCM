@@ -1036,25 +1036,26 @@ def _render_thong_tin_dau_viec() -> None:
 
     # ── Phần 1: Đầu việc Trưởng phòng ──
     st.markdown(
-        "<h2 style='color:#1e3a5f;margin-bottom:4px'>📌 Bảng đầu việc của Trưởng phòng KH-NVTD</h2>"
+        "<h2 style='color:#e2e8f0;margin-bottom:4px'>📌 Bảng đầu việc của Trưởng phòng KH-NVTD</h2>",
+        unsafe_allow_html=True,
     )
     st.caption("17 đầu việc chính (TP01–TP17) — chỉ đọc, dùng để tra cứu và tham chiếu")
 
     rows_tp = ""
     for t in _MAU_GIAO_VIEC_TP:
         rows_tp += (
-            f"<tr style='border-bottom:1px solid #d1d5db'>"
-            f"<td style='padding:10px 12px;white-space:nowrap;font-weight:700;color:#1e3a5f;font-size:0.95rem'>{t['ma']}</td>"
-            f"<td style='padding:10px 12px;font-weight:600;color:#111827;font-size:0.95rem'>{t['tieu_de']}</td>"
-            f"<td style='padding:10px 12px;color:#374151;font-size:0.9rem;line-height:1.5'>{t['mo_ta']}</td>"
-            f"<td style='padding:10px 12px;white-space:nowrap;color:#6366f1;font-weight:600;font-size:0.9rem'>{t['tan_suat']}</td>"
+            f"<tr style='border-bottom:1px solid #334155'>"
+            f"<td style='padding:10px 12px;white-space:nowrap;font-weight:700;color:#fbbf24;font-size:0.95rem'>{t['ma']}</td>"
+            f"<td style='padding:10px 12px;font-weight:600;color:#f1f5f9;font-size:0.95rem'>{t['tieu_de']}</td>"
+            f"<td style='padding:10px 12px;color:#cbd5e1;font-size:0.9rem;line-height:1.5'>{t['mo_ta']}</td>"
+            f"<td style='padding:10px 12px;white-space:nowrap;color:#d1d5db;font-weight:600;font-size:0.9rem'>{t['tan_suat']}</td>"
             f"</tr>"
         )
     st.markdown(
         f"""<div style="overflow-x:auto;margin-bottom:28px">
         <table style="width:100%;border-collapse:collapse;font-size:0.92rem">
           <thead>
-            <tr style="background:linear-gradient(135deg,#1e3a5f,#2d5a87);color:white">
+            <tr style="background:linear-gradient(135deg,#334155,#475569);color:white">
               <th style="padding:12px 12px;text-align:left;white-space:nowrap;font-size:0.95rem">Mã</th>
               <th style="padding:12px 12px;text-align:left;font-size:0.95rem">Đầu việc</th>
               <th style="padding:12px 12px;text-align:left;font-size:0.95rem">Mô tả chi tiết</th>
@@ -1070,8 +1071,9 @@ def _render_thong_tin_dau_viec() -> None:
 
     # ── Phần 2: Bảng giao việc cấp dưới (38 việc) ──
     st.markdown(
-        "<h2 style='color:#1e3a5f;margin-bottom:4px'>📋 Bảng giao việc cấp dưới "
-        "<span style='font-size:0.9rem;font-weight:400;color:#6b7280'>(38 đầu việc nhóm I–VIII)</span></h2>"
+        "<h2 style='color:#e2e8f0;margin-bottom:4px'>📋 Bảng giao việc cấp dưới "
+        "<span style='font-size:0.9rem;font-weight:400;color:#94a3b8'>(38 đầu việc nhóm I–VIII)</span></h2>",
+        unsafe_allow_html=True,
     )
     st.caption("Phó phòng VT1, VT2 và Cán bộ TD tại Hội sở")
 
@@ -1083,8 +1085,8 @@ def _render_thong_tin_dau_viec() -> None:
     for nhom_name, items in dict(sorted(nhom_groups.items())).items():
         nhom_stt = nhom_name.split(".")[0] if "." in nhom_name else ""
         st.markdown(
-            f"<h3 style='color:#2d5a87;margin:20px 0 8px 0;font-size:1.05rem'>"
-            f"<span style='display:inline-block;background:#1e3a5f;color:white;"
+            f"<h3 style='color:#cbd5e1;margin:20px 0 8px 0;font-size:1.05rem'>"
+            f"<span style='display:inline-block;background:#2563eb;color:white;"
             f"border-radius:6px;padding:2px 12px;margin-right:8px;font-size:0.9rem'>"
             f"{nhom_stt}</span> {nhom_name.split('. ', 1)[1] if '. ' in nhom_name else nhom_name}</h3>",
             unsafe_allow_html=True,
@@ -1096,24 +1098,24 @@ def _render_thong_tin_dau_viec() -> None:
             thoi_han = parts[0].replace("⏱", "").strip() if len(parts) > 0 else ""
             san_pham = parts[1].replace("📄", "").strip() if len(parts) > 1 else ""
             rows += (
-                f"<tr style='border-bottom:1px solid #e5e7eb'>"
-                f"<td style='padding:8px 10px;text-align:center;color:#6b7280;width:44px;font-size:0.88rem'>{stt}</td>"
-                f"<td style='padding:8px 10px;font-weight:500;color:#111827;font-size:0.93rem;line-height:1.5'>{t['tieu_de']}</td>"
-                f"<td style='padding:8px 10px;white-space:nowrap;color:#2563eb;font-weight:600;font-size:0.88rem'>{t['nguoi_thuc_hien']}</td>"
-                f"<td style='padding:8px 10px;white-space:nowrap;color:#7c3aed;font-size:0.88rem'>{thoi_han}</td>"
-                f"<td style='padding:8px 10px;color:#059669;font-weight:500;font-size:0.88rem;line-height:1.4'>{san_pham}</td>"
+                f"<tr style='border-bottom:1px solid #334155'>"
+                f"<td style='padding:8px 10px;text-align:center;color:#94a3b8;width:44px;font-size:0.88rem'>{stt}</td>"
+                f"<td style='padding:8px 10px;font-weight:500;color:#f1f5f9;font-size:0.93rem;line-height:1.5'>{t['tieu_de']}</td>"
+                f"<td style='padding:8px 10px;white-space:nowrap;color:#fbbf24;font-weight:600;font-size:0.88rem'>{t['nguoi_thuc_hien']}</td>"
+                f"<td style='padding:8px 10px;white-space:nowrap;color:#fca5a5;font-size:0.88rem'>{thoi_han}</td>"
+                f"<td style='padding:8px 10px;color:#6ee7b7;font-weight:500;font-size:0.88rem;line-height:1.4'>{san_pham}</td>"
                 f"</tr>"
             )
         st.markdown(
-            f"""<div style="overflow-x:auto;margin-bottom:24px;border-radius:10px;border:1px solid #e5e7eb;padding:2px">
+            f"""<div style="overflow-x:auto;margin-bottom:24px;border-radius:10px;border:1px solid #334155;padding:2px">
             <table style="width:100%;border-collapse:collapse;font-size:0.92rem">
               <thead>
-                <tr style="background:#f0f4f8;border-bottom:2px solid #cbd5e1">
-                  <th style="padding:10px 10px;width:44px;text-align:center;font-size:0.9rem;color:#374151">STT</th>
-                  <th style="padding:10px 10px;text-align:left;font-size:0.9rem;color:#374151">Đầu việc</th>
-                  <th style="padding:10px 10px;text-align:left;font-size:0.9rem;color:#374151">Người thực hiện</th>
-                  <th style="padding:10px 10px;text-align:left;font-size:0.9rem;color:#374151">Thời hạn</th>
-                  <th style="padding:10px 10px;text-align:left;font-size:0.9rem;color:#374151">Sản phẩm</th>
+                <tr style="background:#1e293b;border-bottom:2px solid #475569">
+                  <th style="padding:10px 10px;width:44px;text-align:center;font-size:0.9rem;color:#e2e8f0">STT</th>
+                  <th style="padding:10px 10px;text-align:left;font-size:0.9rem;color:#e2e8f0">Đầu việc</th>
+                  <th style="padding:10px 10px;text-align:left;font-size:0.9rem;color:#e2e8f0">Người thực hiện</th>
+                  <th style="padding:10px 10px;text-align:left;font-size:0.9rem;color:#e2e8f0">Thời hạn</th>
+                  <th style="padding:10px 10px;text-align:left;font-size:0.9rem;color:#e2e8f0">Sản phẩm</th>
                 </tr>
               </thead>
               <tbody>{rows}</tbody>

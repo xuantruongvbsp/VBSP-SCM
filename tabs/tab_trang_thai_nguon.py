@@ -85,8 +85,8 @@ def _ts_fmt(fp: str | Path) -> str:
     try:
         ts = os.path.getmtime(str(fp))
         return datetime.fromtimestamp(ts).strftime("%d/%m/%Y %H:%M")
-    except Exception:
-        logger.error("Lỗi trong khối except: %s", e, exc_info=True)
+    except Exception as e:
+        logger.error("Lỗi _ts_fmt: %s", e, exc_info=True)
         return "—"
 
 
@@ -97,8 +97,8 @@ def _size_fmt(fp: str | Path) -> str:
         if sz >= 1_048_576:
             return f"{sz / 1_048_576:.1f} MB"
         return f"{sz / 1024:.0f} KB"
-    except Exception:
-        logger.error("Lỗi trong khối except: %s", e, exc_info=True)
+    except Exception as e:
+        logger.error("Lỗi _size_fmt: %s", e, exc_info=True)
         return "—"
 
 
@@ -107,26 +107,25 @@ def _pgd_slug_local(ten_pgd: str) -> str:
     try:
         from data.pgd import pgd_slug
         return pgd_slug(ten_pgd)
-    except Exception:
-        logger.error("Lỗi trong khối except: %s", e, exc_info=True)
+    except Exception as e:
+        logger.error("Lỗi _pgd_slug_local: %s", e, exc_info=True)
         import re, unicodedata
         s = unicodedata.normalize("NFD", ten_pgd.lower())
         s = "".join(c for c in s if unicodedata.category(c) != "Mn")
         return re.sub(r"[^a-z0-9]+", "_", s).strip("_")
 
 
-def _pgd_hstd_path(ten_pgd: str) -> Path:
-    return PGD_DATA_DIR / _pgd_slug_local(ten_pgd) / "hstd_latest.xlsx"
-
-
-def _pgd_nq11_path(ten_pgd: str) -> Path:
-    slug = _pgd_slug_local(ten_pgd)
-    return PGD_DATA_DIR / slug / "nq11_latest.xlsx"
-
-
-def _pgd_gqvl_path(ten_pgd: str) -> Path:
-    slug = _pgd_slug_local(ten_pgd)
-    return GQVL_PGD_DIR / f"gqvl_{slug}.xlsx"
+def _pgd_file_path(ten_pgd: str, loai: str) -> Path:
+    """Trả về đường dẫn file PGD theo loại (hstd/nq11/gqvl/cdtotkvv).
+    Dùng duong_dan_pgd() từ data.pgd để đảm bảo path nhất quán với upload_service.
+    """
+    try:
+        from data.pgd import duong_dan_pgd
+        return Path(duong_dan_pgd(ten_pgd, loai))
+    except Exception as e:
+        logger.error("Lỗi _pgd_file_path(%s, %s): %s", ten_pgd, loai, e)
+        slug = _pgd_slug_local(ten_pgd)
+        return PGD_DATA_DIR / slug / f"{loai}_latest.xlsx"
 
 
 # ── Sub-tab 1: Tệp nguồn ─────────────────────────────────────────────────
@@ -156,9 +155,10 @@ def _render_tep_nguon(la_cn: bool, pgd_user: str | None) -> None:
 
     rows_pgd = []
     for dv in ds_all:
-        p_hstd = _pgd_hstd_path(dv)
-        p_nq11 = _pgd_nq11_path(dv)
-        p_gqvl = _pgd_gqvl_path(dv)
+        p_hstd  = _pgd_file_path(dv, "hstd")
+        p_nq11  = _pgd_file_path(dv, "nq11")
+        p_gqvl  = _pgd_file_path(dv, "gqvl")
+        p_cdtk  = _pgd_file_path(dv, "cdtotkvv")
         rows_pgd.append({
             "Đơn vị": dv,
             "HSTD": "✅" if p_hstd.exists() else "❌",
@@ -167,6 +167,8 @@ def _render_tep_nguon(la_cn: bool, pgd_user: str | None) -> None:
             "NQ11 cập nhật": _ts_fmt(p_nq11) if p_nq11.exists() else "—",
             "GQVL": "✅" if p_gqvl.exists() else "❌",
             "GQVL cập nhật": _ts_fmt(p_gqvl) if p_gqvl.exists() else "—",
+            "CDTOTKVV": "✅" if p_cdtk.exists() else "❌",
+            "CDTOTKVV cập nhật": _ts_fmt(p_cdtk) if p_cdtk.exists() else "—",
         })
 
     df_pgd = pd.DataFrame(rows_pgd)
@@ -175,11 +177,13 @@ def _render_tep_nguon(la_cn: bool, pgd_user: str | None) -> None:
         co_hstd = (df_pgd["HSTD"] == "✅").sum()
         co_nq11 = (df_pgd["NQ11"] == "✅").sum()
         co_gqvl = (df_pgd["GQVL"] == "✅").sum()
+        co_cdtk = (df_pgd["CDTOTKVV"] == "✅").sum()
         total = len(ds_all)
-        c1, c2, c3 = st.columns(3)
+        c1, c2, c3, c4 = st.columns(4)
         c1.metric("HSTD có file", f"{co_hstd}/{total}")
         c2.metric("NQ11 có file", f"{co_nq11}/{total}")
         c3.metric("GQVL có file", f"{co_gqvl}/{total}")
+        c4.metric("CDTOTKVV có file", f"{co_cdtk}/{total}")
 
     st.dataframe(df_pgd, use_container_width=True, hide_index=True)
 
@@ -187,30 +191,43 @@ def _render_tep_nguon(la_cn: bool, pgd_user: str | None) -> None:
     if la_cn and os.path.exists(CACHE_HSTD):
         st.markdown("#### 📅 Kiểm tra Ngày số liệu")
         try:
-            import duckdb
-            con = duckdb.connect()
-            rows = con.execute(f"""
-                SELECT "{COT_TEN_PGD}", MAX("{COT_NGAY_SL}") as ngay_sl
-                FROM read_parquet('{CACHE_HSTD}')
-                GROUP BY "{COT_TEN_PGD}"
-                ORDER BY ngay_sl DESC
-            """).fetchall()
-            con.close()
-            if rows:
-                dates = [r[1] for r in rows if r[1]]
-                unique_dates = set(dates)
-                if len(unique_dates) <= 1:
-                    st.success(f"✅ Toàn bộ PGD đồng nhất ngày số liệu: **{dates[0] if dates else '—'}**")
-                else:
-                    st.warning(
-                        f"⚠️ Ngày số liệu không đồng nhất — "
-                        f"có **{len(unique_dates)}** mốc khác nhau"
-                    )
-                    df_dates = pd.DataFrame(rows, columns=["Đơn vị", "Ngày số liệu"])
-                    st.dataframe(df_dates, use_container_width=True, hide_index=True, height=250)
+            # Dùng PyArrow đọc metadata parquet — không cần DuckDB, không bị cache module
+            import pyarrow.parquet as pq
+            _pq_schema = pq.read_schema(CACHE_HSTD)
+            _pq_cols = _pq_schema.names  # list[str] — tên cột thực tế trong file
+
+            if COT_NGAY_SL not in _pq_cols or COT_TEN_PGD not in _pq_cols:
+                st.info(
+                    f"ℹ️ Cache HSTD hiện tại không có cột **'{COT_NGAY_SL}'** "
+                    f"(dạng tổng hợp, không phải hồ sơ chi tiết). "
+                    f"Cần **Merge** lại từ file PGD để kiểm tra ngày số liệu."
+                )
+            else:
+                import duckdb
+                _cache_path = CACHE_HSTD.replace("\\", "/")
+                con = duckdb.connect()
+                rows = con.execute(f"""
+                    SELECT "{COT_TEN_PGD}", MAX("{COT_NGAY_SL}") as ngay_sl
+                    FROM read_parquet('{_cache_path}')
+                    GROUP BY "{COT_TEN_PGD}"
+                    ORDER BY ngay_sl DESC
+                """).fetchall()
+                con.close()
+                if rows:
+                    dates = [r[1] for r in rows if r[1]]
+                    unique_dates = set(dates)
+                    if len(unique_dates) <= 1:
+                        st.success(f"✅ Toàn bộ PGD đồng nhất ngày số liệu: **{dates[0] if dates else '—'}**")
+                    else:
+                        st.warning(
+                            f"⚠️ Ngày số liệu không đồng nhất — "
+                            f"có **{len(unique_dates)}** mốc khác nhau"
+                        )
+                        df_dates = pd.DataFrame(rows, columns=["Đơn vị", "Ngày số liệu"])
+                        st.dataframe(df_dates, use_container_width=True, hide_index=True, height=250)
         except Exception as e:
-            logger.error("Lỗi trong khối except: %s", e, exc_info=True)
-            st.error(f"Lỗi kiểm tra ngày số liệu: {e}")
+            logger.error("Lỗi kiểm tra ngày số liệu: %s", e, exc_info=True)
+            st.info(f"ℹ️ Không thể kiểm tra ngày số liệu: {e}")
 
 
 # ── Sub-tab 2: Merge & Cache ──────────────────────────────────────────────
@@ -221,14 +238,20 @@ def _render_merge_cache(la_cn: bool) -> None:
     st.markdown("#### ⚙️ Trạng thái Merge")
     loai_merge = ["hstd", "nq11", "gqvl"]
     rows_merge = []
+    _meta_cache = {}
     for loai in loai_merge:
         meta = db.doc_kv(f"merge_meta_{loai}")
+        _meta_cache[loai] = meta
         if meta:
+            so_dong = meta.get("so_dong", 0) or 0
+            pgd_cu_list = meta.get("pgd_cu", []) or []
             rows_merge.append({
                 "Loại": loai.upper(),
                 "Trạng thái": "✅ Đã merge",
                 "Thời gian merge": meta.get("thoi_gian", "—"),
                 "Số PGD": meta.get("so_pgd", "—"),
+                "Số dòng": f"{so_dong:,}" if so_dong else "—",
+                "PGD dùng SL cũ": len(pgd_cu_list),
                 "Người thực hiện": meta.get("updated_by", meta.get("nguoi_dung", "—")),
             })
         else:
@@ -237,9 +260,64 @@ def _render_merge_cache(la_cn: bool) -> None:
                 "Trạng thái": "❌ Chưa merge",
                 "Thời gian merge": "—",
                 "Số PGD": "—",
+                "Số dòng": "—",
+                "PGD dùng SL cũ": "—",
                 "Người thực hiện": "—",
             })
     st.dataframe(pd.DataFrame(rows_merge), use_container_width=True, hide_index=True)
+
+    # ── Cảnh báo PGD dùng số liệu cũ ────────────────────────────────────
+    for loai in loai_merge:
+        meta = _meta_cache.get(loai)
+        if not meta:
+            continue
+        pgd_cu = meta.get("pgd_cu", []) or []
+        so_pgd_toan = meta.get("so_pgd") or 0
+        if not pgd_cu:
+            continue
+        if so_pgd_toan and len(pgd_cu) >= so_pgd_toan:
+            st.error(
+                f"❌ **{loai.upper()}**: Toàn bộ **{len(pgd_cu)}/{so_pgd_toan}** đơn vị "
+                f"đang dùng số liệu cũ (quá ngưỡng)!"
+            )
+        else:
+            st.warning(
+                f"⚠️ **{loai.upper()}**: **{len(pgd_cu)}/{so_pgd_toan}** đơn vị dùng số liệu cũ"
+            )
+        with st.expander(f"Xem danh sách {loai.upper()} — {len(pgd_cu)} đơn vị"):
+            st.write(pgd_cu)
+
+    # ── Chất lượng dữ liệu (data_quality_meta) ──────────────────────────
+    st.markdown("#### 🔬 Chất lượng dữ liệu (lần merge gần nhất)")
+    try:
+        from services.upload_service import lay_meta_chat_luong
+        co_dq_data = False
+        for loai in loai_merge:
+            dq = lay_meta_chat_luong(loai)
+            if not dq:
+                continue
+            co_dq_data = True
+            tong_loi = dq.get("tong_so_loi", 0) or 0
+            tong_dong = dq.get("tong_dong", 0) or 0
+            thoi_gian = dq.get("thoi_gian", "—")
+            bao_cao = dq.get("bao_cao") or []
+            with st.expander(
+                f"{'✅' if tong_loi == 0 else '⚠️'} {loai.upper()} — "
+                f"{tong_loi} lỗi / {tong_dong:,} dòng (kiểm tra: {thoi_gian[:16] if len(thoi_gian) > 10 else thoi_gian})",
+                expanded=(tong_loi > 0),
+            ):
+                if tong_loi == 0:
+                    st.success("✅ Không phát hiện lỗi chất lượng dữ liệu")
+                else:
+                    st.warning(f"⚠️ {tong_loi} lỗi trên {tong_dong:,} dòng")
+                if bao_cao:
+                    df_dq = pd.DataFrame(bao_cao)
+                    st.dataframe(df_dq, use_container_width=True, hide_index=True)
+        if not co_dq_data:
+            st.info("ℹ️ Chưa có dữ liệu kiểm tra chất lượng — chạy Merge lần đầu để có kết quả.")
+    except Exception as e:
+        logger.error("Lỗi đọc data_quality_meta: %s", e, exc_info=True)
+        st.caption(f"Không đọc được metadata DQ: {e}")
 
     if not la_cn:
         return
@@ -347,42 +425,18 @@ def _render_merge_cache(la_cn: bool) -> None:
         with col_btn:
             if st.button("🔄 Tạo lại cache", key="btn_rebuild_cache", type="primary"):
                 with st.spinner("Đang tạo lại cache Parquet..."):
-                    _ok = 0
-                    _loi = []
-                    for ten in ["HSTD", "NQ11"]:
-                        fp_src = _SOURCE_MAP[ten]
-                        fp_cache = _CACHE_MAP[ten]
-                        if not os.path.exists(fp_src):
-                            _loi.append(f"{ten}: file gốc `{os.path.basename(fp_src)}` không tồn tại")
-                            continue
-                        try:
-                            if os.path.exists(fp_cache):
-                                os.remove(fp_cache)
-                            if ten == "HSTD":
-                                from data.hstd import doc_file
-                                doc_file.clear()
-                                doc_file(fp_src, ts_file(fp_src))
-                            else:
-                                from data.hstd import doc_file_nq11
-                                doc_file_nq11.clear()
-                                doc_file_nq11(fp_src, ts_file(fp_src))
-                            _ok += 1
-                            st.success(f"✅ {ten}: `{os.path.basename(fp_cache)}` — {_size_fmt(fp_cache)}")
-                        except Exception as exc:
-                            logger.error("rebuild_cache %s: %s", ten, exc, exc_info=True)
-                            _loi.append(f"{ten}: {exc}")
-
-                    if _loi:
-                        st.error("❌ Lỗi:\n" + "\n".join(_loi))
-                    if _ok > 0:
-                        st.cache_data.clear()
+                    from backup_service import rebuild_cache_from_excel
+                    r = rebuild_cache_from_excel(clear_st_cache=True)
+                    for _err in r["loi"]:
+                        st.error(f"❌ {_err}")
+                    if r["ok"] > 0:
                         db.ghi_audit(
                             st.session_state.get("username", "unknown"),
                             "rebuild_cache",
-                            f"ok={_ok} loi={len(_loi)}",
+                            f"ok={r['ok']} loi={len(r['loi'])}",
                         )
                         st.success(
-                            f"✅ Đã tạo lại {_ok}/2 cache Parquet. "
+                            f"✅ Đã tạo lại {r['ok']}/{r['total']} cache Parquet. "
                             f"Vào tab **📤 Upload HSTD** → Merge để đồng bộ dữ liệu PGD."
                         )
         with col_info:
@@ -484,8 +538,8 @@ def _render_nguoi_dung() -> None:
                 )
             else:
                 st.success("✅ Tất cả tài khoản đã đổi mật khẩu ít nhất 1 lần")
-        except Exception:
-            logger.error("Lỗi trong khối except: %s", e, exc_info=True)
+        except Exception as e:
+            logger.error("Lỗi kiểm tra ngay_doi_mk: %s", e, exc_info=True)
             pass  # Bảng users có thể chưa có cột ngay_doi_mk — bỏ qua
 
     except Exception as e:
@@ -494,7 +548,7 @@ def _render_nguoi_dung() -> None:
 
 
 # ── Sub-tab 5: Hệ thống ──────────────────────────────────────────────────
-def _render_he_thong(la_cn: bool = False) -> None:
+def _render_he_thong(la_cn: bool = False, username: str = "unknown") -> None:
     st.subheader("💾 Tài nguyên Hệ thống")
 
     # ── Dung lượng ổ đĩa ─────────────────────────────────────────────────
@@ -573,8 +627,8 @@ def _render_he_thong(la_cn: bool = False) -> None:
             st.success(f"✅ `credentials.json` tồn tại ({_size_fmt(creds_path)})")
         else:
             st.info("ℹ️ Không tìm thấy `credentials.json` — tính năng Google Sheets bị tắt hoặc chưa cấu hình.")
-    except Exception:
-        logger.error("Lỗi trong khối except: %s", e, exc_info=True)
+    except Exception as e:
+        logger.error("Lỗi kiểm tra credentials: %s", e, exc_info=True)
         pass
 
     # ── Kiểm tra nhiệm vụ quá hạn ────────────────────────────────────────
@@ -595,7 +649,7 @@ def _render_he_thong(la_cn: bool = False) -> None:
         """, (hom_nay,)).fetchall()
 
         qh_td = conn.execute("""
-            SELECT id, ten_task, ngay_deadline, trang_thai
+            SELECT id, tieu_de, ngay_deadline, trang_thai
             FROM tien_do_task
             WHERE ngay_deadline < ?
               AND trang_thai NOT IN ('hoan_thanh', 'da_bao_cao')
@@ -617,6 +671,61 @@ def _render_he_thong(la_cn: bool = False) -> None:
     except Exception as e:
         logger.error("Lỗi trong khối except: %s", e, exc_info=True)
         st.error(f"Lỗi kiểm tra nhiệm vụ quá hạn: {e}")
+
+    # ── Sao lưu / Phục hồi qua GitHub (kv_store) ─────────────────────────
+    if la_cn:
+        st.markdown("#### 🔗 Sao lưu qua GitHub (kv_store)")
+        st.caption(
+            "① **Máy này** → nhấn **Sao lưu** → commit GitHub Desktop\n\n"
+            "② **Máy kia** → pull GitHub → nhấn **Phục hồi**\n\n"
+            "⚠️ Chỉ sync: `kv_store` · `users` · `nhiem_vu` · `tien_do_task`. "
+            "**Không sync:** `pgd_data/` (re-upload sau pull) · `credentials.json` (copy thủ công)"
+        )
+        _sync_path = Path(__file__).parent.parent / "backups" / "kv_sync.json"
+        col_sv, col_ph = st.columns(2)
+        with col_sv:
+            if st.button("💾 Sao lưu kv_store", key="btn_he_thong_save_kv",
+                         use_container_width=True,
+                         help="Xuất tất cả bảng → backups/kv_sync.json (commit được lên GitHub)"):
+                try:
+                    _counts = db.luu_kv_sync_project()
+                    _total = sum(_counts.values())
+                    db.ghi_audit(
+                        username, "export_kv_sync",
+                        f"Xuất {_total} bản ghi / {len(_counts)} bảng → kv_sync.json",
+                    )
+                    st.success(f"✅ Đã sao lưu **{_total}** bản ghi — nhớ commit GitHub Desktop")
+                    _labels = {
+                        "users": "👤", "kv_store": "🗂️",
+                        "nhiem_vu": "📋", "tien_do_task": "📊", "qlnk_ket_qua": "🔒",
+                    }
+                    for _t, _n in _counts.items():
+                        if _n > 0:
+                            st.caption(f"{_labels.get(_t, '•')} {_t}: {_n}")
+                except Exception as e:
+                    logger.error("Lỗi export kv_sync: %s", e, exc_info=True)
+                    st.error(f"❌ Lỗi sao lưu: {e}")
+        with col_ph:
+            if _sync_path.exists():
+                st.caption(f"File: `kv_sync.json` · {_sync_path.stat().st_size // 1024} KB")
+                if st.button("🔄 Phục hồi kv_store", key="btn_he_thong_load_kv",
+                             use_container_width=True, type="primary",
+                             help="Import tất cả bảng từ backups/kv_sync.json vừa pull về"):
+                    try:
+                        _counts = db.doc_kv_sync_project()
+                        _total = sum(_counts.values())
+                        db.ghi_audit(
+                            username, "import_kv_sync",
+                            f"Import {_total} bản ghi / {len(_counts)} bảng từ kv_sync.json",
+                        )
+                        st.cache_data.clear()
+                        st.success(f"✅ Phục hồi **{_total}** bản ghi! Nhấn **F5** để tải lại.")
+                    except Exception as e:
+                        logger.error("Lỗi import kv_sync: %s", e, exc_info=True)
+                        st.error(f"❌ Lỗi phục hồi: {e}")
+            else:
+                st.caption("⚠️ Chưa có bản sao lưu — pull GitHub trước rồi thử lại")
+        st.markdown("---")
 
     # ── Backup thủ công ──────────────────────────────────────────────────────
     st.markdown("#### 🗄️ Backup dữ liệu")
@@ -692,8 +801,8 @@ def _render_he_thong(la_cn: bool = False) -> None:
 
                         dt = datetime.strptime(d.name, "%Y%m%d_%H%M%S")
                         ngay = dt.strftime("%d/%m/%Y %H:%M")
-                    except Exception:
-                        logger.error("Lỗi trong khối except: %s", e, exc_info=True)
+                    except Exception as e:
+                        logger.error("Lỗi parse tên backup: %s", e, exc_info=True)
                         ngay = d.name
                     # Đếm số file
                     n_files = sum(1 for _ in d.rglob("*") if _.is_file())
@@ -786,43 +895,18 @@ def _render_he_thong(la_cn: bool = False) -> None:
 
                                 if rebuild_cache:
                                     st.info("🔄 Đang tạo lại cache Parquet từ file Excel gốc...")
-                                    _ok, _loi = 0, []
-                                    for ten, fp_src, fp_cache in [
-                                        ("HSTD", FILE_PATH, CACHE_HSTD),
-                                        ("NQ11", FILE_PATH_NQ11, CACHE_NQ11),
-                                    ]:
-                                        if not os.path.exists(fp_src):
-                                            _loi.append(f"{ten}: file gốc `{os.path.basename(fp_src)}` chưa có")
-                                            continue
-                                        try:
-                                            if os.path.exists(fp_cache):
-                                                os.remove(fp_cache)
-                                            if ten == "HSTD":
-                                                from data.hstd import doc_file
-                                                from data.core import ts_file as _tsf
-                                                doc_file.clear()
-                                                doc_file(fp_src, _tsf(fp_src))
-                                            else:
-                                                from data.hstd import doc_file_nq11
-                                                from data.core import ts_file as _tsf
-                                                doc_file_nq11.clear()
-                                                doc_file_nq11(fp_src, _tsf(fp_src))
-                                            _ok += 1
-                                            st.success(f"✅ {ten}: `{os.path.basename(fp_cache)}` — {_size_fmt(fp_cache)}")
-                                        except Exception as exc:
-                                            logger.error("rebuild_%s: %s", ten, exc, exc_info=True)
-                                            _loi.append(f"{ten}: {exc}")
-                                    if _loi:
-                                        st.warning("⚠️ Một số cache không tạo được:\n" + "\n".join(_loi))
-                                    if _ok > 0:
-                                        st.cache_data.clear()
+                                    from backup_service import rebuild_cache_from_excel
+                                    r = rebuild_cache_from_excel(clear_st_cache=True)
+                                    for _err in r["loi"]:
+                                        st.warning(f"⚠️ {_err}")
+                                    if r["ok"] > 0:
                                         db.ghi_audit(
                                             st.session_state.get("username", "unknown"),
                                             "rebuild_cache_after_restore",
-                                            f"ok={_ok} loi={len(_loi)}",
+                                            f"ok={r['ok']} loi={len(r['loi'])}",
                                         )
-                                        st.success(f"✅ Đã tạo lại {_ok}/2 cache Parquet từ file Excel gốc.")
-                                    elif not _loi:
+                                        st.success(f"✅ Đã tạo lại {r['ok']}/{r['total']} cache Parquet từ file Excel gốc.")
+                                    elif not r["loi"]:
                                         st.info("ℹ️ Không có file Excel gốc để tạo lại cache.")
                                 st.info("💡 Nhấn **F5** hoặc reload trang để thấy dữ liệu mới.")
                             else:
@@ -939,7 +1023,7 @@ def render(tab=None, **kwargs) -> None:
             with tabs[3]:
                 _render_nguoi_dung()
             with tabs[4]:
-                _render_he_thong(la_cn=la_cn)
+                _render_he_thong(la_cn=la_cn, username=username)
             with tabs[5]:
                 _render_audit(la_cn=True, username=username)
         else:

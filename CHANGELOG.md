@@ -1,5 +1,15 @@
 # CHANGELOG
 
+## [2026-05-22] — Root-fix df=None: ws_management render() luôn build ALL_ITEMS mới
+- `workspaces/ws_management.py` dòng ~832 — xóa `st.session_state["_mgmt_all_items"] = all_items` khỏi `render_sidebar_menu()` (comment trước đó chưa xóa dòng code thực tế)
+- `workspaces/ws_management.py` dòng ~971 — `render()` luôn build fresh ALL_ITEMS (bỏ pop + if-None pattern)
+- **Nguyên nhân gốc:** sidebar render (dòng ~283 app.py) xảy ra TRƯỚC data load (dòng ~347) → `locals().get("df") = None` → ALL_ITEMS closure chứa df=None → mọi tab nhận df=None → warning "Chưa có dữ liệu HSTD"
+
+## [2026-05-22] — Tối ưu: cache get_theme_css() + dọn code thừa sau revert
+- `utils_theme.py` dòng ~54 — thêm `@st.cache_resource` cho `get_theme_css()` (trước build lại 3000+ ký tự CSS mỗi rerun)
+- `workspaces/ws_management.py` dòng ~832 — thêm comment giải thích lý do không share ALL_ITEMS qua session_state (sidebar chạy trước data load → df có thể khác render)
+- `workspaces/ws_executive.py`, `ws_management.py` — **revert** ý tưởng share menu qua session_state: không an toàn vì sidebar và render() có thể nhận kwargs khác nhau
+
 ## [2026-05-22] — Fix tab Tổng quan: 3 section trống không có bảng/dữ liệu
 - `tabs/tab_tongquan.py` dòng ~164 — thêm guard `if df is None or df.empty: st.warning(); return`
 - `tabs/tab_tongquan.py` dòng ~434 — thêm kiểm tra `if df_ct.empty: st.info(...)` cho "Cơ cấu dư nợ"

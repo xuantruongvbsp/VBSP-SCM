@@ -52,6 +52,7 @@ pgd_data/                   ← file upload PGD (không commit)
 ## 3. Quy trình bắt buộc khi viết code
 
 ```
+Bước 0: ĐỌC BUGMAP.md — kiểm tra các lỗi đã từng mắc liên quan đến file/thao tác sắp sửa
 Bước 1: ĐỌC hàm gốc trước khi gọi — KHÔNG đoán tham số
 Bước 2: Dùng COT_* từ config.py — KHÔNG hardcode tên cột tiếng Việt
 Bước 3: Sau khi tạo hàm mới → grep xem có được gọi chưa
@@ -307,7 +308,8 @@ st.cache_data.clear()  # BẮT BUỘC sau upload thành công
 | Hiển thị | `fmt_ty()` | từ utils.py |
 
 ```python
-fmt_ty(x)   # → "1.234,560 tỷ"  ← chuẩn VN
+fmt_ty(x)   # → "1.500" (triệu đồng, 0 số lẻ, KHÔNG có hậu tố "tỷ")
+            # Cột bảng phải ghi header "(triệu đồng)"
 # KHÔNG dùng NumberColumn cho cột tiền tệ → .apply(fmt_ty) trước st.dataframe()
 # KHÔNG dùng /1e9 hay /1e12 trực tiếp
 ```
@@ -389,6 +391,12 @@ from config import DON_VI_CHI_NHANH, TEN_CHI_NHANH_HIEN_THI
 ```
 Thêm lên ĐẦU FILE, dùng ngày thực tế, KHÔNG xóa entry cũ.
 
+### 8.14 BUGMAP.md — cập nhật sau mỗi lần fix bug
+- **BẮT BUỘC**: Mỗi khi fix bug, thêm entry mới vào BUGMAP.md theo template có sẵn (cuối file)
+- Phân loại đúng section (A. Parquet, B. Streamlit UI, C. DataFrame, D. Database, E. Upload, F. PDF/Word, G. KHTD, H. GSheet, I. Role, J. Code Pattern)
+- Nếu là dạng lỗi mới chưa có section phù hợp → tạo section mới
+- Format: `### XX — [Tên lỗi]` với bảng `| | |` gồm: File, Dấu hiệu, Nguyên nhân, Fix, Ngày fix
+
 ---
 
 ## 9. Lỗi đã từng mắc — KHÔNG lặp lại
@@ -423,6 +431,7 @@ Thêm lên ĐẦU FILE, dùng ngày thực tế, KHÔNG xóa entry cũ.
 □ render(tab=None) với fallback st.container()
 □ KHÔNG tự git commit/push
 □ CHANGELOG.md đã cập nhật
+□ BUGMAP.md đã cập nhật (nếu fix bug)
 ```
 
 ### 10.1 Rà soát sau khi xong task (đảm bảo đã “ghi vào chức năng”)

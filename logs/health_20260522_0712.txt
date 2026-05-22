@@ -1,0 +1,960 @@
+VBSP-SCM Health Check + Test Run
+Thoi gian: 22/05/2026  7:12:59.84
+========================================
+
+VBSP-SCM Health Check  —  22/05/2026 07:13:00
+DB   : D:\VBSP-SCM\vbsp_scm.db
+Root : D:\VBSP-SCM
+
+1. Cơ sở dữ liệu SQLite
+  ─────────────────────────
+  ✅ File vbsp_scm.db tồn tại  →  D:\VBSP-SCM\vbsp_scm.db
+  ✅ Kết nối SQLite
+  ✅ Bảng 'kv_store' tồn tại
+  ✅ Bảng 'users' tồn tại
+  ✅ Bảng 'audit_log' tồn tại
+
+2. kv_store — toàn vẹn & dữ liệu nghiệp vụ
+  ────────────────────────────────────────────
+  ✅ Không có key kv_store bị corrupt  →  14 key, tất cả hợp lệ
+  ❌ khtd_cn tồn tại  →  Chưa nhập KHTD Chi nhánh
+  ✅ merge HSTD đã chạy  →  Lần cuối: 2026-05-20T19:53:09.734279 | 22 PGD
+  ℹ  Tổng số key trong kv_store: 14
+
+3. Parquet cache
+  ──────────────────
+  ✅ hstd.parquet tồn tại  →  0.0 MB | cập nhật 21/05 19:43 (11h trước)
+  ✅ nq11.parquet tồn tại  →  2.5 MB | cập nhật 21/05 19:43 (11h trước)
+  ✅ gqvl.parquet tồn tại  →  0.0 MB | cập nhật 21/05 20:42 (11h trước)
+
+4. Upload file PGD — hstd_latest.xlsx
+  ───────────────────────────────────────
+  ✅ Tất cả 22 đơn vị đã upload HSTD  →  22/22 đã có file
+    Tất cả 22 đơn vị OK
+
+5. Audit log 24h gần nhất
+  ───────────────────────────
+  ✅ Có hoạt động trong 24h  →  309 log trong 24h | tổng cộng 844
+
+  Thời gian              User             Action                   Detail
+  ────────────────────────────────────────────────────────────────────────────────────────
+  2026-05-21T20:56:14    admin            export_kv_sync           Xuất 14 bản ghi / 10 bảng → backups/kv_sync.
+  2026-05-21T20:56:09    admin            export_kv_sync           Xuất 14 bản ghi / 10 bảng → backups/kv_sync.
+  2026-05-21T20:41:58    user1            luu_cdtotkvv_snapshot    Kỳ 2026-05 — 23 dòng
+  2026-05-21T20:41:58    user1            luu_cdtotkvv_snapshot    Kỳ 2026-05 — 23 dòng
+  2026-05-21T20:41:58    test_user        luu_cdtotkvv_snapshot    Kỳ 2026-05 — 23 dòng
+
+════════════════════════════════════════════════════════
+TỔNG KẾT
+════════════════════════════════════════════════════════
+  Tổng checks : 13
+  Đạt        : 12
+  Lỗi        : 1
+
+    ✗ khtd_cn tồn tại
+════════════════════════════════════════════════════════
+============================= test session starts =============================
+platform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\Users\Administrator\AppData\Local\Programs\Python\Python314\python.exe
+cachedir: .pytest_cache
+rootdir: D:\VBSP-SCM
+configfile: pytest.ini
+plugins: anyio-4.13.0, cov-7.1.0
+collecting ... collected 559 items
+
+tests/test_auth.py::TestNormalizeRole::test_normalize_role_map[admin-admin_cn] PASSED [  0%]
+tests/test_auth.py::TestNormalizeRole::test_normalize_role_map[manager-manager_cn] PASSED [  0%]
+tests/test_auth.py::TestNormalizeRole::test_normalize_role_map[user-user_pgd] PASSED [  0%]
+tests/test_auth.py::TestNormalizeRole::test_normalize_role_map[admin_cn-admin_cn] PASSED [  0%]
+tests/test_auth.py::TestNormalizeRole::test_normalize_role_map[executive-executive] PASSED [  0%]
+tests/test_auth.py::TestNormalizeRole::test_normalize_role_map[user_pgd-user_pgd] PASSED [  1%]
+tests/test_auth.py::TestNormalizeRole::test_normalize_role_map[manager_cn-manager_cn] PASSED [  1%]
+tests/test_auth.py::TestNormalizeRole::test_normalize_role_map[chuyenvien_cn-chuyenvien_cn] PASSED [  1%]
+tests/test_auth.py::TestNormalizeRole::test_normalize_role_map[admin_pgd-admin_pgd] PASSED [  1%]
+tests/test_auth.py::TestNormalizeRole::test_normalize_role_map[manager_pgd-manager_pgd] PASSED [  1%]
+tests/test_auth.py::TestNormalizeRole::test_normalize_role_unknown PASSED [  1%]
+tests/test_auth.py::TestIsCnRole::test_is_cn_role[executive-True] PASSED [  2%]
+tests/test_auth.py::TestIsCnRole::test_is_cn_role[admin_cn-True] PASSED  [  2%]
+tests/test_auth.py::TestIsCnRole::test_is_cn_role[manager_cn-True] PASSED [  2%]
+tests/test_auth.py::TestIsCnRole::test_is_cn_role[chuyenvien_cn-True] PASSED [  2%]
+tests/test_auth.py::TestIsCnRole::test_is_cn_role[admin-True] PASSED     [  2%]
+tests/test_auth.py::TestIsCnRole::test_is_cn_role[manager-True] PASSED   [  3%]
+tests/test_auth.py::TestIsCnRole::test_is_cn_role[user_pgd-False] PASSED [  3%]
+tests/test_auth.py::TestIsCnRole::test_is_cn_role[admin_pgd-False] PASSED [  3%]
+tests/test_auth.py::TestIsCnRole::test_is_cn_role[manager_pgd-False] PASSED [  3%]
+tests/test_auth.py::TestIsCnRole::test_is_cn_role[user-False] PASSED     [  3%]
+tests/test_auth.py::TestIsCnRole::test_la_phan_he_cn_alias PASSED        [  3%]
+tests/test_auth.py::TestIsPgdRole::test_is_pgd_role[user_pgd-True] PASSED [  4%]
+tests/test_auth.py::TestIsPgdRole::test_is_pgd_role[admin_pgd-True] PASSED [  4%]
+tests/test_auth.py::TestIsPgdRole::test_is_pgd_role[manager_pgd-True] PASSED [  4%]
+tests/test_auth.py::TestIsPgdRole::test_is_pgd_role[user-True] PASSED    [  4%]
+tests/test_auth.py::TestIsPgdRole::test_is_pgd_role[executive-False] PASSED [  4%]
+tests/test_auth.py::TestIsPgdRole::test_is_pgd_role[admin_cn-False] PASSED [  5%]
+tests/test_auth.py::TestIsPgdRole::test_is_pgd_role[manager_cn-False] PASSED [  5%]
+tests/test_auth.py::TestIsPgdRole::test_is_pgd_role[admin-False] PASSED  [  5%]
+tests/test_auth.py::TestIsPgdRole::test_la_phan_he_pgd_alias PASSED      [  5%]
+tests/test_auth.py::TestCoQuyenUploadPgd::test_co_quyen_upload_pgd[admin_pgd-True] PASSED [  5%]
+tests/test_auth.py::TestCoQuyenUploadPgd::test_co_quyen_upload_pgd[manager_pgd-True] PASSED [  5%]
+tests/test_auth.py::TestCoQuyenUploadPgd::test_co_quyen_upload_pgd[user_pgd-False] PASSED [  6%]
+tests/test_auth.py::TestCoQuyenUploadPgd::test_co_quyen_upload_pgd[admin_cn-False] PASSED [  6%]
+tests/test_auth.py::TestCoQuyenUploadPgd::test_co_quyen_upload_pgd[executive-False] PASSED [  6%]
+tests/test_auth.py::TestCoQuyenUploadPgd::test_co_quyen_upload_pgd[admin-False] PASSED [  6%]
+tests/test_auth.py::TestCoQuyenUploadPgd::test_co_quyen_upload_pgd[user-False] PASSED [  6%]
+tests/test_auth.py::TestCoQuyenQuanLyUserPgd::test_co_quyen_quan_ly_user_pgd[admin_pgd-True] PASSED [  6%]
+tests/test_auth.py::TestCoQuyenQuanLyUserPgd::test_co_quyen_quan_ly_user_pgd[manager_pgd-False] PASSED [  7%]
+tests/test_auth.py::TestCoQuyenQuanLyUserPgd::test_co_quyen_quan_ly_user_pgd[user_pgd-False] PASSED [  7%]
+tests/test_auth.py::TestCoQuyenQuanLyUserPgd::test_co_quyen_quan_ly_user_pgd[admin_cn-False] PASSED [  7%]
+tests/test_auth.py::TestCoQuyenGiaoNhiemVu::test_co_quyen_giao_nhiem_vu[admin_pgd-True] PASSED [  7%]
+tests/test_auth.py::TestCoQuyenGiaoNhiemVu::test_co_quyen_giao_nhiem_vu[manager_pgd-True] PASSED [  7%]
+tests/test_auth.py::TestCoQuyenGiaoNhiemVu::test_co_quyen_giao_nhiem_vu[admin_cn-True] PASSED [  8%]
+tests/test_auth.py::TestCoQuyenGiaoNhiemVu::test_co_quyen_giao_nhiem_vu[manager_cn-True] PASSED [  8%]
+tests/test_auth.py::TestCoQuyenGiaoNhiemVu::test_co_quyen_giao_nhiem_vu[chuyenvien_cn-True] PASSED [  8%]
+tests/test_auth.py::TestCoQuyenGiaoNhiemVu::test_co_quyen_giao_nhiem_vu[user_pgd-False] PASSED [  8%]
+tests/test_auth.py::TestCoQuyenGiaoNhiemVu::test_co_quyen_giao_nhiem_vu[executive-False] PASSED [  8%]
+tests/test_auth.py::TestCoQuyenGiaoNhiemVu::test_co_quyen_giao_nhiem_vu[user-False] PASSED [  8%]
+tests/test_auth.py::TestLaChuyenVienCn::test_la_chuyen_vien_cn[chuyenvien_cn-True] PASSED [  9%]
+tests/test_auth.py::TestLaChuyenVienCn::test_la_chuyen_vien_cn[admin_cn-False] PASSED [  9%]
+tests/test_auth.py::TestLaChuyenVienCn::test_la_chuyen_vien_cn[manager_cn-False] PASSED [  9%]
+tests/test_auth.py::TestLaChuyenVienCn::test_la_chuyen_vien_cn[user_pgd-False] PASSED [  9%]
+tests/test_auth.py::TestGetPermissions::test_get_permissions[executive-expected0] PASSED [  9%]
+tests/test_auth.py::TestGetPermissions::test_get_permissions[admin_cn-expected1] PASSED [ 10%]
+tests/test_auth.py::TestGetPermissions::test_get_permissions[user_pgd-expected2] PASSED [ 10%]
+tests/test_auth.py::TestGetPermissions::test_get_permissions[admin_pgd-expected3] PASSED [ 10%]
+tests/test_auth.py::TestGetPermissions::test_get_permissions[manager_pgd-expected4] PASSED [ 10%]
+tests/test_auth.py::TestRoleMap::test_role_map_has_all_old_roles PASSED  [ 10%]
+tests/test_auth.py::TestRoleMap::test_role_map_preserves_new_roles PASSED [ 10%]
+tests/test_auth.py::TestRolesCnPgd::test_roles_cn_contains_expected PASSED [ 11%]
+tests/test_auth.py::TestRolesCnPgd::test_roles_pgd_contains_expected PASSED [ 11%]
+tests/test_cdtotkvv_service.py::TestLocDf::test_df_None PASSED           [ 11%]
+tests/test_cdtotkvv_service.py::TestLocDf::test_df_trong PASSED          [ 11%]
+tests/test_cdtotkvv_service.py::TestLocDf::test_mode_cn_tra_ve_toan_bo PASSED [ 11%]
+tests/test_cdtotkvv_service.py::TestLocDf::test_mode_pgd_loc_theo_ten PASSED [ 11%]
+tests/test_cdtotkvv_service.py::TestLocDf::test_mode_pgd_khong_khop PASSED [ 12%]
+tests/test_cdtotkvv_service.py::TestLocDf::test_mode_pgd_loc_theo_ma_khi_khong_co_ten PASSED [ 12%]
+tests/test_cdtotkvv_service.py::TestLocDf::test_mode_pgd_khong_pgd_user PASSED [ 12%]
+tests/test_cdtotkvv_service.py::TestCdtotkvvTenSheetExcel::test_ten_don_gian PASSED [ 12%]
+tests/test_cdtotkvv_service.py::TestCdtotkvvTenSheetExcel::test_ky_tu_cam PASSED [ 12%]
+tests/test_cdtotkvv_service.py::TestCdtotkvvTenSheetExcel::test_trung_thi_danh_so PASSED [ 13%]
+tests/test_cdtotkvv_service.py::TestCdtotkvvTenSheetExcel::test_ten_dai_cat_bot PASSED [ 13%]
+tests/test_cdtotkvv_service.py::TestCdtotkvvTenSheetExcel::test_ten_toan_ky_tu_cam PASSED [ 13%]
+tests/test_cdtotkvv_service.py::TestFmtXuatToKhongDatVn::test_co_du_no_va_diem PASSED [ 13%]
+tests/test_cdtotkvv_service.py::TestFmtXuatToKhongDatVn::test_cot_ko_co_van_chay PASSED [ 13%]
+tests/test_config.py::TestTimTenXaTrongHstd::test_tim_ten_xa_trong_hstd[X\xe3 La Ng\xe0-La Ng\xe0] PASSED [ 13%]
+tests/test_config.py::TestTimTenXaTrongHstd::test_tim_ten_xa_trong_hstd[X\xe3 Ph\xfa H\xf2a-Ph\xfa H\xf2a] PASSED [ 14%]
+tests/test_config.py::TestTimTenXaTrongHstd::test_tim_ten_xa_trong_hstd[X\xe3 B\xecnh Minh-B\xecnh Minh] PASSED [ 14%]
+tests/test_config.py::TestTimTenXaTrongHstd::test_tim_ten_xa_trong_hstd[Ph\u01b0\u1eddng Trung D\u0169ng-Trung D\u0169ng] PASSED [ 14%]
+tests/test_config.py::TestTimTenXaTrongHstd::test_tim_ten_xa_trong_hstd[Th\u1ecb tr\u1ea5n V\u0129nh An-V\u0129nh An] PASSED [ 14%]
+tests/test_config.py::TestTimTenXaTrongHstd::test_tim_ten_xa_trong_hstd[TT Gia Ray-Gia Ray] PASSED [ 14%]
+tests/test_config.py::TestTimTenXaTrongHstd::test_tim_ten_xa_trong_hstd[Kh\xf4ng c\xf3 prefix-Kh\xf4ng c\xf3 prefix] PASSED [ 15%]
+tests/test_config.py::TestDsPgd::test_ds_pgd_length PASSED               [ 15%]
+tests/test_config.py::TestDsPgd::test_ds_pgd_khong_chua_ho_so_cn PASSED  [ 15%]
+tests/test_config.py::TestMaPgdMap::test_ma_pgd_map_is_dict PASSED       [ 15%]
+tests/test_config.py::TestMaPgdMap::test_ma_pgd_map_values_are_strings PASSED [ 15%]
+tests/test_config.py::TestMaPgdMap::test_ma_pgd_map_has_ho_so_cn PASSED  [ 15%]
+tests/test_currency.py::TestFmtTy::test_1_ty PASSED                      [ 16%]
+tests/test_currency.py::TestFmtTy::test_100_ty PASSED                    [ 16%]
+tests/test_currency.py::TestFmtTy::test_zero PASSED                      [ 16%]
+tests/test_currency.py::TestFmtTy::test_none_or_nan PASSED               [ 16%]
+tests/test_currency.py::TestFmtTy::test_khong_dung_1e9 PASSED            [ 16%]
+tests/test_currency.py::TestFmtTien::test_1_trieu PASSED                 [ 16%]
+tests/test_currency.py::TestFmtTien::test_10_trieu PASSED                [ 17%]
+tests/test_currency.py::TestFmtTien::test_zero PASSED                    [ 17%]
+tests/test_currency.py::TestFmtSo::test_1000 PASSED                      [ 17%]
+tests/test_currency.py::TestFmtSo::test_so_lon PASSED                    [ 17%]
+tests/test_currency.py::TestFmtSo::test_zero PASSED                      [ 17%]
+tests/test_currency.py::TestFmtPct::test_0_5 PASSED                      [ 18%]
+tests/test_currency.py::TestFmtPct::test_zero PASSED                     [ 18%]
+tests/test_currency.py::TestFmtPct::test_none PASSED                     [ 18%]
+tests/test_data_quality.py::TestSafeSeries::test_co_cot PASSED           [ 18%]
+tests/test_data_quality.py::TestSafeSeries::test_thieu_cot PASSED        [ 18%]
+tests/test_data_quality.py::TestChuanHoaTenCot::test_khong_co_rename_map PASSED [ 18%]
+tests/test_data_quality.py::TestChuanHoaTenCot::test_hstd_rename PASSED  [ 19%]
+tests/test_data_quality.py::TestKiemTraDuNoAm::test_hstd_khong_am PASSED [ 19%]
+tests/test_data_quality.py::TestKiemTraDuNoAm::test_hstd_co_am PASSED    [ 19%]
+tests/test_data_quality.py::TestKiemTraDuNoAm::test_nq11_co_am PASSED    [ 19%]
+tests/test_data_quality.py::TestKiemTraDuNoAm::test_gqvl_co_am PASSED    [ 19%]
+tests/test_data_quality.py::TestKiemTraDuNoAm::test_thieu_cot_khong_crash PASSED [ 20%]
+tests/test_data_quality.py::TestKiemTraDuNoAm::test_loai_khong_xac_dinh PASSED [ 20%]
+tests/test_data_quality.py::TestKiemTraDuNoAm::test_du_no_str PASSED     [ 20%]
+tests/test_data_quality.py::TestKiemTraSoTienGiaiNgan::test_khong_phai_nq11 PASSED [ 20%]
+tests/test_data_quality.py::TestKiemTraSoTienGiaiNgan::test_nq11_khong_vuot PASSED [ 20%]
+tests/test_data_quality.py::TestKiemTraSoTienGiaiNgan::test_nq11_co_vuot PASSED [ 20%]
+tests/test_data_quality.py::TestKiemTraSoTienGiaiNgan::test_nq11_thieu_cot_khong_crash PASSED [ 21%]
+tests/test_data_quality.py::TestKiemTraMaDonViHopLe::test_pgd_hop_le PASSED [ 21%]
+tests/test_data_quality.py::TestKiemTraMaDonViHopLe::test_pgd_khong_hop_le PASSED [ 21%]
+tests/test_data_quality.py::TestKiemTraMaDonViHopLe::test_khong_co_cot_pgd_xa PASSED [ 21%]
+tests/test_data_quality.py::TestChuanHoaMaDonVi::test_giu_nguyen_pgd_hop_le PASSED [ 21%]
+tests/test_data_quality.py::TestChuanHoaMaDonVi::test_chuan_hoa_ma_ct PASSED [ 22%]
+tests/test_data_quality.py::TestChuanHoaMaDonVi::test_df_trong PASSED    [ 22%]
+tests/test_data_quality.py::TestKiemTraChatLuong::test_hstd_hop_le PASSED [ 22%]
+tests/test_data_quality.py::TestKiemTraChatLuong::test_nq11 PASSED       [ 22%]
+tests/test_data_quality.py::TestKiemTraChatLuong::test_thieu_cot_bat_buoc PASSED [ 22%]
+tests/test_data_quality.py::TestTongHopBaoCaoChatLuong::test_danh_sach_rong PASSED [ 22%]
+tests/test_data_quality.py::TestTongHopBaoCaoChatLuong::test_2_report PASSED [ 23%]
+tests/test_db.py::TestKvRoundtrip::test_ghi_doc_kv_dict PASSED           [ 23%]
+tests/test_db.py::TestKvRoundtrip::test_ghi_doc_kv_khong_doi_kieu_so PASSED [ 23%]
+tests/test_db.py::TestKvRoundtrip::test_doc_kv_key_khong_ton_tai PASSED  [ 23%]
+tests/test_db.py::TestKvRoundtrip::test_doc_kv_key_khong_ton_tai_default PASSED [ 23%]
+tests/test_db.py::TestKvOverwrite::test_ghi_kv_overwrite PASSED          [ 23%]
+tests/test_db.py::TestAudit::test_ghi_audit_khong_crash PASSED           [ 24%]
+tests/test_db.py::TestAudit::test_ghi_audit_co_record PASSED             [ 24%]
+tests/test_db.py::TestListKvPrefix::test_list_kv_prefix PASSED           [ 24%]
+tests/test_db.py::TestListKvPrefix::test_list_kv_prefix_no_match PASSED  [ 24%]
+tests/test_du_phong_service.py::TestDuPhongDongTien::test_df_trong PASSED [ 24%]
+tests/test_du_phong_service.py::TestDuPhongDongTien::test_thieu_cot_bat_buoc PASSED [ 25%]
+tests/test_du_phong_service.py::TestDuPhongDongTien::test_1_khe_uoc PASSED [ 25%]
+tests/test_du_phong_service.py::TestDuPhongDongTien::test_loc_theo_thang PASSED [ 25%]
+tests/test_du_phong_service.py::TestDuPhongDongTien::test_du_no_0_bi_loai PASSED [ 25%]
+tests/test_du_phong_service.py::TestDuPhongDongTien::test_kh�ng_co_ngay_vay PASSED [ 25%]
+tests/test_du_phong_service.py::TestDuPhongDongTien::test_default_tu_den_thang PASSED [ 25%]
+tests/test_du_phong_service.py::TestDuPhongChiTiet::test_df_trong PASSED [ 26%]
+tests/test_du_phong_service.py::TestDuPhongChiTiet::test_thieu_cot PASSED [ 26%]
+tests/test_du_phong_service.py::TestDuPhongChiTiet::test_thang_None PASSED [ 26%]
+tests/test_du_phong_service.py::TestDuPhongChiTiet::test_chi_tiet_1_thang PASSED [ 26%]
+tests/test_hhi_service.py::TestTinhHhi::test_df_trong_tra_ve_0 PASSED    [ 26%]
+tests/test_hhi_service.py::TestTinhHhi::test_dong_deu_hoan_toan PASSED   [ 27%]
+tests/test_hhi_service.py::TestTinhHhi::test_tap_trung_hoan_toan PASSED  [ 27%]
+tests/test_hhi_service.py::TestTinhHhi::test_3_nhom_khong_deu PASSED     [ 27%]
+tests/test_hhi_service.py::TestTinhHhi::test_tong_bang_0 PASSED          [ 27%]
+tests/test_hhi_service.py::TestTinhHhi::test_thieu_cot_tien_tu_dong_tim PASSED [ 27%]
+tests/test_hhi_service.py::TestTinhHhi::test_cot_tien_khong_ton_tai PASSED [ 27%]
+tests/test_hhi_service.py::TestTinhHhi::test_truyen_cot_tien_tuong_minh PASSED [ 28%]
+tests/test_hhi_service.py::TestTinhHhiBreakdown::test_df_trong PASSED    [ 28%]
+tests/test_hhi_service.py::TestTinhHhiBreakdown::test_breakdown_2_nhom PASSED [ 28%]
+tests/test_hhi_service.py::TestTinhHhiBreakdown::test_cot_khong_ton_tai PASSED [ 28%]
+tests/test_hhi_service.py::TestTinhHhiBreakdown::test_tong_0 PASSED      [ 28%]
+tests/test_hhi_service.py::TestDanhGiaHhi::test_da_dang_hoa_tot PASSED   [ 28%]
+tests/test_hhi_service.py::TestDanhGiaHhi::test_tap_trung_vua_phai_can_duoi PASSED [ 29%]
+tests/test_hhi_service.py::TestDanhGiaHhi::test_tap_trung_vua_phai_can_tren PASSED [ 29%]
+tests/test_hhi_service.py::TestDanhGiaHhi::test_tap_trung_cao PASSED     [ 29%]
+tests/test_hhi_service.py::TestDanhGiaHhi::test_tap_trung_cao_cuc_dai PASSED [ 29%]
+tests/test_khnv_noi_bo_service.py::test_doc_ds_default_empty PASSED      [ 29%]
+tests/test_khnv_noi_bo_service.py::test_ghi_ds_roundtrip_and_audit PASSED [ 30%]
+tests/test_khtd_mau07_service.py::test_slug_and_kv_key_helpers PASSED    [ 30%]
+tests/test_khtd_mau07_service.py::test_tinh_du_no_ap_baseline_basic PASSED [ 30%]
+tests/test_khtd_mau07_service.py::test_build_extract_and_total PASSED    [ 30%]
+tests/test_khtd_mau07_service.py::test_xuat_mau07_word_returns_docx_bytes PASSED [ 30%]
+tests/test_khtd_nhap_service.py::test_doc_excel_khtd_cn_upload_ok PASSED [ 30%]
+tests/test_khtd_nhap_service.py::test_doc_excel_khtd_cn_upload_missing_ma_ct PASSED [ 31%]
+tests/test_khtd_nhap_service.py::test_doc_excel_khtd_xa_upload_ok_and_validate_xa PASSED [ 31%]
+tests/test_khtd_nhap_service.py::test_luu_pdf_khtd_xa PASSED             [ 31%]
+tests/test_khtd_service.py::test_luu_khtd_dict_action_mapping PASSED     [ 31%]
+tests/test_khtd_service.py::test_luu_khtd_mau07_writes_three_keys PASSED [ 31%]
+tests/test_kiem_soat_service.py::TestTinhNgayGhDp::test_thieu_ngay_dh PASSED [ 32%]
+tests/test_kiem_soat_service.py::TestTinhNgayGhDp::test_ct_17_30_thang PASSED [ 32%]
+tests/test_kiem_soat_service.py::TestTinhNgayGhDp::test_thoi_han_ngan_toi_da_12_thang PASSED [ 32%]
+tests/test_kiem_soat_service.py::TestTinhNgayGhDp::test_thoi_han_dai_nua_thoi_han PASSED [ 32%]
+tests/test_kiem_soat_service.py::TestTinhNgayGhDp::test_thieu_thoi_han PASSED [ 32%]
+tests/test_kiem_soat_service.py::TestTinhNgayGhDp::test_ct_02_co_ra_truong_va_gn1 PASSED [ 32%]
+tests/test_kiem_soat_service.py::TestTinhNgayGhDp::test_ct_02_thieu_ra_truong PASSED [ 33%]
+tests/test_kiem_soat_service.py::TestTinhNgayGhDp::test_qd29_ho_ngheo PASSED [ 33%]
+tests/test_kiem_soat_service.py::TestTinhNgayGhDp::test_qd29_ho_moi_thoat_ngheo PASSED [ 33%]
+tests/test_kiem_soat_service.py::TestFmtSoCell::test_so_nguyen PASSED    [ 33%]
+tests/test_kiem_soat_service.py::TestFmtSoCell::test_nan PASSED          [ 33%]
+tests/test_kiem_soat_service.py::TestFmtSoCell::test_None PASSED         [ 33%]
+tests/test_kiem_soat_service.py::TestFmtSoCell::test_khong PASSED        [ 34%]
+tests/test_kiem_soat_service.py::TestKsHtmlMetricCard::test_basic PASSED [ 34%]
+tests/test_kiem_soat_service.py::TestTongHopVpTheoPgd::test_df_trong PASSED [ 34%]
+tests/test_kiem_soat_service.py::TestTongHopVpTheoPgd::test_thieu_cot_pgd PASSED [ 34%]
+tests/test_kiem_soat_service.py::TestTongHopVpTheoPgd::test_1_pgd_co_to PASSED [ 34%]
+tests/test_kiem_soat_service.py::TestTongHopGhvTheoPgd::test_df_trong PASSED [ 35%]
+tests/test_kiem_soat_service.py::TestTongHopGhvTheoPgd::test_thieu_cot PASSED [ 35%]
+tests/test_kiem_soat_service.py::TestTongHopGhvTheoPgd::test_1_pgd PASSED [ 35%]
+tests/test_kiem_soat_to_sai_so_tv.py::TestTinhToSaiSoTv::test_df_None PASSED [ 35%]
+tests/test_kiem_soat_to_sai_so_tv.py::TestTinhToSaiSoTv::test_df_trong PASSED [ 35%]
+tests/test_kiem_soat_to_sai_so_tv.py::TestTinhToSaiSoTv::test_thieu_cot_du_no PASSED [ 35%]
+tests/test_kiem_soat_to_sai_so_tv.py::TestTinhToSaiSoTv::test_1_to_thieu_tv PASSED [ 36%]
+tests/test_kiem_soat_to_sai_so_tv.py::TestTinhToSaiSoTv::test_1_to_vuot_tv PASSED [ 36%]
+tests/test_kiem_soat_to_sai_so_tv.py::TestTinhToSaiSoTv::test_khong_vi_pham PASSED [ 36%]
+tests/test_kiem_soat_to_sai_so_tv.py::TestTinhToSaiSoTv::test_loc_theo_tinh_trang_close PASSED [ 36%]
+tests/test_kiem_soat_to_sai_so_tv.py::TestTinhToSaiSoTv::test_loai_bo_vay_truc_tiep_khong_co_to PASSED [ 36%]
+tests/test_kiem_soat_to_sai_so_tv.py::TestTinhToSaiSoTv::test_co_dvut_thay_cho_to PASSED [ 37%]
+tests/test_kiem_soat_to_sai_so_tv.py::TestTinhToSaiSoTv::test_du_no_bang_0_bi_loai PASSED [ 37%]
+tests/test_kiem_soat_to_sai_so_tv.py::TestTinhToSaiSoTv::test_khong_co_ma_kh_ma_co_so_ku PASSED [ 37%]
+tests/test_kiem_soat_to_sai_so_tv.py::TestTinhToSaiSoTv::test_khong_co_ma_kh_khong_co_so_ku PASSED [ 37%]
+tests/test_kiem_soat_to_sai_so_tv.py::TestTinhToSaiSoTv::test_co_du_no_th_qh PASSED [ 37%]
+tests/test_merge_du_lieu_toan_cn.py::TestMergeLoaiKhongHoTro::test_cdtotkvv_bi_tu_choi PASSED [ 37%]
+tests/test_merge_du_lieu_toan_cn.py::TestMergeLoaiKhongHoTro::test_ten_loai_rac_bi_tu_choi PASSED [ 38%]
+tests/test_merge_du_lieu_toan_cn.py::TestMergeLoaiKhongHoTro::test_loai_trong_bi_tu_choi PASSED [ 38%]
+tests/test_merge_du_lieu_toan_cn.py::TestMergeKhongCoFile::test_khong_pgd_nao_co_file PASSED [ 38%]
+tests/test_merge_du_lieu_toan_cn.py::TestMergeKhongCoFile::test_ds_pgd_rong PASSED [ 38%]
+tests/test_merge_du_lieu_toan_cn.py::TestMergeMotPGD::test_thanh_cong_ghi_parquet PASSED [ 38%]
+tests/test_merge_du_lieu_toan_cn.py::TestMergeMotPGD::test_ket_qua_chua_ten_don_vi_va_so_dong PASSED [ 38%]
+tests/test_merge_du_lieu_toan_cn.py::TestMergeMotPGD::test_duong_dan_tra_ve_la_cache_path PASSED [ 39%]
+tests/test_merge_du_lieu_toan_cn.py::TestMergeNhieuPGD::test_concat_nhieu_pgd_dung_so_dong PASSED [ 39%]
+tests/test_merge_du_lieu_toan_cn.py::TestMergeNhieuPGD::test_cot_ten_pgd_duoc_gan_dung PASSED [ 39%]
+tests/test_merge_du_lieu_toan_cn.py::TestMergePGDLoi::test_1_loi_1_ok_van_thanh_cong PASSED [ 39%]
+tests/test_merge_du_lieu_toan_cn.py::TestMergePGDLoi::test_tat_ca_loi_tra_ve_that_bai PASSED [ 39%]
+tests/test_merge_du_lieu_toan_cn.py::TestMergePGDLoi::test_audit_log_ghi_pgd_loi PASSED [ 40%]
+tests/test_merge_du_lieu_toan_cn.py::TestMergePGDCu::test_pgd_cu_duoc_them_vao_meta PASSED [ 40%]
+tests/test_merge_du_lieu_toan_cn.py::TestMergeSchemaNormalize::test_pgd_thieu_cot_duoc_fill_na PASSED [ 40%]
+tests/test_merge_du_lieu_toan_cn.py::TestMergeSchemaNormalize::test_cot_so_duoc_ep_kieu_numeric PASSED [ 40%]
+tests/test_merge_du_lieu_toan_cn.py::TestMergeSchemaNormalize::test_nguon_von_khong_bi_ep_numeric PASSED [ 40%]
+tests/test_merge_du_lieu_toan_cn.py::TestMergeRollback::test_file_bak_duoc_khoi_phuc_khi_to_parquet_loi PASSED [ 40%]
+tests/test_merge_du_lieu_toan_cn.py::TestMergeMetaGhiVaoKV::test_meta_key_dung_loai PASSED [ 41%]
+tests/test_merge_du_lieu_toan_cn.py::TestMergeMetaGhiVaoKV::test_meta_chua_cac_truong_can_thiet PASSED [ 41%]
+tests/test_merge_du_lieu_toan_cn.py::TestMergeMetaGhiVaoKV::test_meta_so_pgd_dung_so_luong PASSED [ 41%]
+tests/test_merge_du_lieu_toan_cn.py::TestMergeAuditLog::test_audit_ghi_sau_thanh_cong PASSED [ 41%]
+tests/test_merge_du_lieu_toan_cn.py::TestMergeAuditLog::test_audit_detail_chua_loai_va_so_dong PASSED [ 41%]
+tests/test_merge_du_lieu_toan_cn.py::TestMergeGQVL::test_gqvl_thanh_cong PASSED [ 42%]
+tests/test_merge_du_lieu_toan_cn.py::TestMergeGQVL::test_gqvl_nguon_von_khong_bi_ep_numeric PASSED [ 42%]
+tests/test_merge_du_lieu_toan_cn.py::TestMergeConcurrency::test_merge_dong_thoi_2_luong_khong_corrupt_file PASSED [ 42%]
+tests/test_no_khoanh_service.py::TestLocKhoanh::test_df_trong PASSED     [ 42%]
+tests/test_no_khoanh_service.py::TestLocKhoanh::test_khong_co_cot_khoanh PASSED [ 42%]
+tests/test_no_khoanh_service.py::TestLocKhoanh::test_loc_dung_mon_khoanh PASSED [ 42%]
+tests/test_no_khoanh_service.py::TestLocKhoanh::test_du_no_khoanh_am_khong_loc PASSED [ 43%]
+tests/test_no_khoanh_service.py::TestLocKhoanh::test_du_no_khoanh_str_duoc_ep_so PASSED [ 43%]
+tests/test_no_khoanh_service.py::TestBangTheoNhom::test_df_trong PASSED  [ 43%]
+tests/test_no_khoanh_service.py::TestBangTheoNhom::test_thieu_cot_nhom PASSED [ 43%]
+tests/test_no_khoanh_service.py::TestBangTheoNhom::test_bang_theo_pgd PASSED [ 43%]
+tests/test_no_khoanh_service.py::TestBangTheoNhom::test_tong_0_khong_loi PASSED [ 44%]
+tests/test_no_rui_ro_service.py::test_tao_kv_key_thang_format PASSED     [ 44%]
+tests/test_no_rui_ro_service.py::test_tao_kv_key_now PASSED              [ 44%]
+tests/test_no_rui_ro_service.py::test_luu_va_xoa_ho_so PASSED            [ 44%]
+tests/test_pdf_service.py::TestXuatPdf::test_xuat_pdf_tra_ve_bytes PASSED [ 44%]
+tests/test_pdf_service.py::TestXuatPdf::test_xuat_pdf_co_cot_tien PASSED [ 44%]
+tests/test_pdf_service.py::TestXuatPdf::test_xuat_pdf_df_rong PASSED     [ 45%]
+tests/test_pdf_service.py::TestXuatPdf::test_xuat_pdf_bang_tra_ve_bytes PASSED [ 45%]
+tests/test_pdf_service.py::TestXuatPdf::test_reportlab_chua_cai PASSED   [ 45%]
+tests/test_period_compare.py::TestDeriveStatus::test_khoanh PASSED       [ 45%]
+tests/test_period_compare.py::TestDeriveStatus::test_qua_han PASSED      [ 45%]
+tests/test_period_compare.py::TestDeriveStatus::test_trong_han PASSED    [ 45%]
+tests/test_period_compare.py::TestDeriveStatus::test_none PASSED         [ 46%]
+tests/test_period_compare.py::TestDeriveStatus::test_uu_tien_khoanh_tren_qh PASSED [ 46%]
+tests/test_period_compare.py::TestStatusSeries::test_3_trang_thai PASSED [ 46%]
+tests/test_period_compare.py::TestStatusSeries::test_thieu_cot_van_chay PASSED [ 46%]
+tests/test_period_compare.py::TestLoanKeySeries::test_binh_thuong PASSED [ 46%]
+tests/test_period_compare.py::TestLoanKeySeries::test_thieu_cot_tra_rong PASSED [ 47%]
+tests/test_period_compare.py::TestJoinByLoan::test_ca_hai_rong PASSED    [ 47%]
+tests/test_period_compare.py::TestJoinByLoan::test_3_bucket PASSED       [ 47%]
+tests/test_period_compare.py::TestJoinByLoan::test_trung_key_lay_dong_cuoi PASSED [ 47%]
+tests/test_period_compare.py::TestRollCureRate::test_trong PASSED        [ 47%]
+tests/test_period_compare.py::TestRollCureRate::test_roll_50pct PASSED   [ 47%]
+tests/test_period_compare.py::TestRollCureRate::test_cure_100pct PASSED  [ 48%]
+tests/test_period_compare.py::TestClassifyChanges::test_new_closed_both PASSED [ 48%]
+tests/test_period_compare.py::TestClassifyChanges::test_worsened PASSED  [ 48%]
+tests/test_period_compare.py::TestClassifyChanges::test_trong PASSED     [ 48%]
+tests/test_period_compare.py::TestClassifyChanges::test_co_cot_label PASSED [ 48%]
+tests/test_period_compare.py::TestClassifyChanges::test_decreased PASSED [ 49%]
+tests/test_period_compare.py::TestVintageNqh::test_trong PASSED          [ 49%]
+tests/test_period_compare.py::TestVintageNqh::test_thieu_cot_ngay_vay PASSED [ 49%]
+tests/test_period_compare.py::TestVintageNqh::test_2_nam PASSED          [ 49%]
+tests/test_period_compare.py::TestVintageNqh::test_ngay_khong_parse_duoc PASSED [ 49%]
+tests/test_period_compare.py::TestParBreakdown::test_trong PASSED        [ 49%]
+tests/test_period_compare.py::TestParBreakdown::test_khong_qua_han PASSED [ 50%]
+tests/test_period_compare.py::TestParBreakdown::test_qua_han_60_ngay PASSED [ 50%]
+tests/test_period_compare.py::TestParBreakdown::test_qua_han_120_ngay PASSED [ 50%]
+tests/test_period_compare.py::TestParBreakdown::test_fallback_dung_qh PASSED [ 50%]
+tests/test_report_service.py::TestTenFileBaoCao::test_ten_file_xlsx PASSED [ 50%]
+tests/test_report_service.py::TestTenFileBaoCao::test_ten_file_pdf PASSED [ 50%]
+tests/test_report_service.py::TestTenFileBaoCao::test_ten_chua_ngay PASSED [ 51%]
+tests/test_report_service.py::TestXuatBaoCao::test_xuat_sheet_don PASSED [ 51%]
+tests/test_report_service.py::TestXuatBaoCao::test_xuat_bao_cao_nhieu_sheet PASSED [ 51%]
+tests/test_report_service.py::TestXuatBaoCao::test_xuat_bao_cao_sheet_trong PASSED [ 51%]
+tests/test_report_service.py::TestXuatBaoCao::test_xuat_bao_cao_df_trong PASSED [ 51%]
+tests/test_report_service.py::TestXuatBaoCao::test_xuat_sheet_don_unicode PASSED [ 52%]
+tests/test_report_service.py::TestXuatBaoCao::test_xuat_bao_cao_nhieu_dong PASSED [ 52%]
+tests/test_rui_ro_aggregation.py::TestLocTheoNguon::test_loc_tw PASSED   [ 52%]
+tests/test_rui_ro_aggregation.py::TestLocTheoNguon::test_loc_dp PASSED   [ 52%]
+tests/test_rui_ro_aggregation.py::TestLocTheoNguon::test_khong_co_nguon_von PASSED [ 52%]
+tests/test_rui_ro_aggregation.py::TestLocTheoNguon::test_danh_sach_rong PASSED [ 52%]
+tests/test_rui_ro_aggregation.py::TestTongHopNo::test_tong_hop_co_ban PASSED [ 53%]
+tests/test_rui_ro_aggregation.py::TestTongHopNo::test_thieu_ten_ct_lay_mac_dinh PASSED [ 53%]
+tests/test_rui_ro_aggregation.py::TestTongHopNo::test_ten_ct_None PASSED [ 53%]
+tests/test_rui_ro_aggregation.py::TestTongHopNo::test_goc_la_0 PASSED    [ 53%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_audit_log] PASSED [ 53%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_ban_dai_dien] PASSED [ 54%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_baocao] PASSED [ 54%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_candoi] PASSED [ 54%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_canh_bao_som] PASSED [ 54%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_cbtd] PASSED [ 54%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_cdtotkvv] PASSED [ 54%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_cdtotkvv_pgd] PASSED [ 55%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_checklist_bc] PASSED [ 55%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_danhsach] PASSED [ 55%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_den_han] PASSED [ 55%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_diem_gd_pgd] PASSED [ 55%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_gqvl] PASSED [ 55%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_hhi] PASSED [ 56%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_kehoach] PASSED [ 56%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_kh_gqvl] PASSED [ 56%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_khnv_noi_bo] PASSED [ 56%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_khtd] PASSED [ 56%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_khtd_giao_dc] PASSED [ 57%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_khtd_mau07] PASSED [ 57%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_khtd_nhap] PASSED [ 57%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_khtd_pgd] PASSED [ 57%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_khtd_xuat] PASSED [ 57%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_kiem_soat] PASSED [ 57%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_nhiem_vu] PASSED [ 58%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_no_khoanh] PASSED [ 58%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_no_rui_ro] PASSED [ 58%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_nq11] PASSED [ 58%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_phoi_hop_pgd] PASSED [ 58%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_qd62] PASSED [ 59%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_qlnk_dashboard] PASSED [ 59%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_quan_ly_bc] PASSED [ 59%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_quan_ly_cv] PASSED [ 59%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_quan_ly_dgd] PASSED [ 59%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_so_sanh_2_ky] PASSED [ 59%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_so_sanh_ky] PASSED [ 60%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_tien_do] PASSED [ 60%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_tien_do_nop] PASSED [ 60%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_tongquan] PASSED [ 60%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_tracuu] PASSED [ 60%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_trang_thai_nguon] PASSED [ 61%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_upload_khnv] PASSED [ 61%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_upload_pgd] PASSED [ 61%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_uy_thac] PASSED [ 61%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_xlrr_tong_hop] PASSED [ 61%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[widgets.data_source_status] PASSED [ 61%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[widgets.status_widget] PASSED [ 62%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[workspaces.ws_executive] PASSED [ 62%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[workspaces.ws_management] PASSED [ 62%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[workspaces.ws_operation] PASSED [ 62%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[services.upload_service] PASSED [ 62%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[services.uy_thac_service] PASSED [ 62%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[services.tien_do_service] PASSED [ 63%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[services.tongquan_service] PASSED [ 63%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[services.report_service] PASSED [ 63%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_audit_log] PASSED [ 63%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_ban_dai_dien] PASSED [ 63%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_baocao] PASSED [ 64%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_candoi] PASSED [ 64%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_canh_bao_som] PASSED [ 64%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_cbtd] PASSED [ 64%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_cdtotkvv] PASSED [ 64%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_cdtotkvv_pgd] PASSED [ 64%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_checklist_bc] PASSED [ 65%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_danhsach] PASSED [ 65%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_den_han] PASSED [ 65%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_diem_gd_pgd] PASSED [ 65%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_gqvl] PASSED [ 65%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_hhi] PASSED [ 66%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_kehoach] PASSED [ 66%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_kh_gqvl] PASSED [ 66%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_khnv_noi_bo] PASSED [ 66%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_khtd] PASSED [ 66%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_khtd_giao_dc] PASSED [ 66%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_khtd_mau07] PASSED [ 67%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_khtd_nhap] PASSED [ 67%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_khtd_pgd] PASSED [ 67%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_khtd_xuat] PASSED [ 67%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_kiem_soat] PASSED [ 67%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_nhiem_vu] PASSED [ 67%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_no_khoanh] PASSED [ 68%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_no_rui_ro] PASSED [ 68%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_nq11] PASSED [ 68%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_phoi_hop_pgd] PASSED [ 68%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_qd62] PASSED [ 68%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_qlnk_dashboard] PASSED [ 69%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_quan_ly_bc] PASSED [ 69%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_quan_ly_cv] PASSED [ 69%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_quan_ly_dgd] PASSED [ 69%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_so_sanh_2_ky] PASSED [ 69%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_so_sanh_ky] PASSED [ 69%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_tien_do] PASSED [ 70%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_tien_do_nop] PASSED [ 70%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_tongquan] PASSED [ 70%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_tracuu] PASSED [ 70%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_trang_thai_nguon] PASSED [ 70%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_upload_khnv] PASSED [ 71%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_upload_pgd] PASSED [ 71%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_uy_thac] PASSED [ 71%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_xlrr_tong_hop] PASSED [ 71%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[widgets.data_source_status] PASSED [ 71%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[widgets.status_widget] PASSED [ 71%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[workspaces.ws_executive] PASSED [ 72%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[workspaces.ws_management] PASSED [ 72%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[workspaces.ws_operation] PASSED [ 72%]
+tests/test_smoke_snapshot.py::test_smoke_imports PASSED                  [ 72%]
+tests/test_smoke_snapshot.py::test_snapshot_roundtrip PASSED             [ 72%]
+tests/test_snapshot_service.py::TestKyTuDf::test_ngay_dang_viet PASSED   [ 72%]
+tests/test_snapshot_service.py::TestKyTuDf::test_ngay_dang_iso PASSED    [ 73%]
+tests/test_snapshot_service.py::TestKyTuDf::test_khong_co_cot PASSED     [ 73%]
+tests/test_snapshot_service.py::TestKyTuDf::test_gia_tri_null PASSED     [ 73%]
+tests/test_snapshot_service.py::TestLuuSnapshot::test_luu_thanh_cong PASSED [ 73%]
+tests/test_snapshot_service.py::TestLuuSnapshot::test_luu_co_dong_tong_pgd PASSED [ 73%]
+tests/test_snapshot_service.py::TestLuuSnapshot::test_luu_co_dong_cn PASSED [ 74%]
+tests/test_snapshot_service.py::TestLuuSnapshot::test_upsert_cung_ky PASSED [ 74%]
+tests/test_snapshot_service.py::TestLuuSnapshot::test_df_rong_tra_false PASSED [ 74%]
+tests/test_snapshot_service.py::TestLuuSnapshot::test_df_none_tra_false PASSED [ 74%]
+tests/test_snapshot_service.py::TestDocSnapshot::test_doc_sau_luu PASSED [ 74%]
+tests/test_snapshot_service.py::TestDocSnapshot::test_ky_khong_ton_tai PASSED [ 74%]
+tests/test_snapshot_service.py::TestDocSnapshot::test_chi_lay_ma_ct_all PASSED [ 75%]
+tests/test_snapshot_service.py::TestDocSnapshotRange::test_range_mot_ky PASSED [ 75%]
+tests/test_snapshot_service.py::TestDocSnapshotRange::test_range_khong_co_du_lieu PASSED [ 75%]
+tests/test_snapshot_service.py::TestDanhSachKy::test_rong_khi_chua_co PASSED [ 75%]
+tests/test_snapshot_service.py::TestDanhSachKy::test_co_ky_sau_luu PASSED [ 75%]
+tests/test_snapshot_service.py::TestDanhSachKy::test_thu_tu_moi_truoc PASSED [ 76%]
+tests/test_snapshot_service.py::TestXoaSnapshot::test_xoa_thanh_cong PASSED [ 76%]
+tests/test_snapshot_service.py::TestXoaSnapshot::test_xoa_ky_khong_ton_tai PASSED [ 76%]
+tests/test_so_sanh_ky_service.py::TestAggMotPgd::test_df_None PASSED     [ 76%]
+tests/test_so_sanh_ky_service.py::TestAggMotPgd::test_df_trong PASSED    [ 76%]
+tests/test_so_sanh_ky_service.py::TestAggMotPgd::test_agg_du_no PASSED   [ 76%]
+tests/test_so_sanh_ky_service.py::TestAggMotPgd::test_agg_co_khoanh PASSED [ 77%]
+tests/test_so_sanh_ky_service.py::TestAggMotPgd::test_missing_cot_khong_crash PASSED [ 77%]
+tests/test_so_sanh_ky_service.py::TestAggTheoPgd::test_df_trong PASSED   [ 77%]
+tests/test_so_sanh_ky_service.py::TestAggTheoPgd::test_thieu_cot_pgd PASSED [ 77%]
+tests/test_so_sanh_ky_service.py::TestAggTheoPgd::test_2_pgd_co_tong PASSED [ 77%]
+tests/test_so_sanh_ky_service.py::TestAggTheoPgd::test_df_chua_khoanh PASSED [ 77%]
+tests/test_so_sanh_ky_service.py::TestAggTheoDvut::test_df_trong PASSED  [ 78%]
+tests/test_so_sanh_ky_service.py::TestAggTheoDvut::test_thieu_cot_dvut PASSED [ 78%]
+tests/test_so_sanh_ky_service.py::TestAggTheoDvut::test_theo_dvut_co_tong PASSED [ 78%]
+tests/test_so_sanh_ky_service.py::TestGroupBienDong::test_thieu_cot_dim PASSED [ 78%]
+tests/test_so_sanh_ky_service.py::TestGroupBienDong::test_group_theo_pgd PASSED [ 78%]
+tests/test_so_sanh_ky_service.py::TestDeltaStr::test_tang PASSED         [ 79%]
+tests/test_so_sanh_ky_service.py::TestDeltaStr::test_giam PASSED         [ 79%]
+tests/test_so_sanh_ky_service.py::TestDeltaStr::test_so PASSED           [ 79%]
+tests/test_so_sanh_ky_service.py::TestTlNqh::test_0 PASSED               [ 79%]
+tests/test_so_sanh_ky_service.py::TestTlNqh::test_10_pct PASSED          [ 79%]
+tests/test_so_sanh_ky_service.py::TestTlNqh::test_du_no_0 PASSED         [ 79%]
+tests/test_so_sanh_ky_service.py::TestFmtPctVn::test_5 PASSED            [ 80%]
+tests/test_so_sanh_ky_service.py::TestFmtPctVn::test_int PASSED          [ 80%]
+tests/test_so_sanh_ky_service.py::TestPhanLoaiKhachHang::test_df_trong PASSED [ 80%]
+tests/test_so_sanh_ky_service.py::TestPhanLoaiKhachHang::test_thieu_cot_ma_kh PASSED [ 80%]
+tests/test_so_sanh_ky_service.py::TestPhanLoaiKhachHang::test_3_loai PASSED [ 80%]
+tests/test_so_sanh_ky_service.py::TestTopMovers::test_df_trong PASSED    [ 81%]
+tests/test_so_sanh_ky_service.py::TestTopMovers::test_thieu_cot_nhom PASSED [ 81%]
+tests/test_so_sanh_ky_service.py::TestTopMovers::test_2_pgd_2_movers PASSED [ 81%]
+tests/test_so_sanh_ky_service.py::TestPhanTichHhiPgd::test_df_trong PASSED [ 81%]
+tests/test_so_sanh_ky_service.py::TestPhanTichHhiPgd::test_thieu_cot PASSED [ 81%]
+tests/test_so_sanh_ky_service.py::TestPhanTichHhiPgd::test_hoat_dong_binh_thuong PASSED [ 81%]
+tests/test_tien_do_service.py::test_tao_task_tao_ketqua_pgd PASSED       [ 82%]
+tests/test_tien_do_service.py::test_sync_bien_hoa_ketqua_on_off PASSED   [ 82%]
+tests/test_tien_do_service.py::test_cap_nhat_ketqua_bulk PASSED          [ 82%]
+tests/test_tongquan_service.py::test_tinh_kpi_tongquan_basic_and_no_mutation PASSED [ 82%]
+tests/test_tongquan_service.py::test_tinh_heatmap_pgd_basic PASSED       [ 82%]
+tests/test_tongquan_service.py::test_tinh_co_cau_ct_basic PASSED         [ 83%]
+tests/test_tongquan_service.py::test_tinh_tqpgd_extended_basic PASSED    [ 83%]
+tests/test_tongquan_service.py::test_den_han_filters_and_groupby PASSED  [ 83%]
+tests/test_upload_service.py::TestKetQuaUpload::test_thanh_cong_true PASSED [ 83%]
+tests/test_upload_service.py::TestKetQuaUpload::test_that_bai PASSED     [ 83%]
+tests/test_upload_service.py::TestKetQuaUpload::test_hien_thi_thanh_cong PASSED [ 83%]
+tests/test_upload_service.py::TestKetQuaUpload::test_hien_thi_that_bai PASSED [ 84%]
+tests/test_upload_service.py::TestKiemTraFile::test_file_hop_le PASSED   [ 84%]
+tests/test_upload_service.py::TestKiemTraFile::test_dinh_dang_sai PASSED [ 84%]
+tests/test_upload_service.py::TestKiemTraFile::test_file_qua_nho PASSED  [ 84%]
+tests/test_upload_service.py::TestKiemTraFile::test_extension_xls_hop_le PASSED [ 84%]
+tests/test_upload_service.py::TestKiemTraFile::test_ten_file_khong_co_extension PASSED [ 84%]
+tests/test_upload_service.py::TestKiemTraFile::test_custom_exts_chophep PASSED [ 85%]
+tests/test_upload_service.py::TestKiemTraFileHeThong::test_ten_file_hop_le PASSED [ 85%]
+tests/test_upload_service.py::TestKiemTraFileHeThong::test_ten_file_sai PASSED [ 85%]
+tests/test_upload_service.py::TestKiemTraFileHeThong::test_dinh_dang_sai_uu_tien_truoc PASSED [ 85%]
+tests/test_utils.py::TestFmtTy::test_fmt_ty_1_trieu PASSED               [ 85%]
+tests/test_utils.py::TestFmtTy::test_fmt_ty_1_ty PASSED                  [ 86%]
+tests/test_utils.py::TestFmtTy::test_fmt_ty_1_nghin_ty PASSED            [ 86%]
+tests/test_utils.py::TestFmtTy::test_fmt_ty_so_0 PASSED                  [ 86%]
+tests/test_utils.py::TestFmtTy::test_fmt_ty_so_am PASSED                 [ 86%]
+tests/test_utils.py::TestFmtTy::test_fmt_ty_none PASSED                  [ 86%]
+tests/test_utils.py::TestFmtTy::test_fmt_ty_nan PASSED                   [ 86%]
+tests/test_utils.py::TestFmtTy::test_fmt_ty_inf PASSED                   [ 87%]
+tests/test_utils.py::TestFmtTy::test_fmt_ty_chuoi_abc PASSED             [ 87%]
+tests/test_utils.py::TestFmt::test_fmt_1_trieu PASSED                    [ 87%]
+tests/test_utils.py::TestFmt::test_fmt_0 PASSED                          [ 87%]
+tests/test_utils.py::TestFmt::test_fmt_so_am PASSED                      [ 87%]
+tests/test_utils.py::TestFmtBangTy::test_fmt_bang_ty_1_ty PASSED         [ 88%]
+tests/test_utils.py::TestFmtBangTy::test_fmt_bang_ty_0 PASSED            [ 88%]
+tests/test_utils.py::TestFmtBangTy::test_fmt_bang_ty_so_le PASSED        [ 88%]
+tests/test_utils.py::TestFmtBangTy::test_fmt_bang_ty_abc PASSED          [ 88%]
+tests/test_utils.py::TestFmtTien::test_fmt_tien_1_trieu PASSED           [ 88%]
+tests/test_utils.py::TestFmtTien::test_fmt_tien_0 PASSED                 [ 88%]
+tests/test_utils.py::TestFmtTien::test_fmt_tien_abc PASSED               [ 89%]
+tests/test_utils.py::TestFmtSo::test_fmt_so_binh_thuong PASSED           [ 89%]
+tests/test_utils.py::TestFmtSo::test_fmt_so_0 PASSED                     [ 89%]
+tests/test_utils.py::TestFmtSo::test_fmt_so_abc PASSED                   [ 89%]
+tests/test_utils.py::TestFmtPct::test_fmt_pct_duong PASSED               [ 89%]
+tests/test_utils.py::TestFmtPct::test_fmt_pct_am PASSED                  [ 89%]
+tests/test_utils.py::TestFmtPct::test_fmt_pct_0 PASSED                   [ 90%]
+tests/test_utils.py::TestFmtPct::test_fmt_pct_abc PASSED                 [ 90%]
+tests/test_utils.py::TestVn::test_vn_co_thap_phan PASSED                 [ 90%]
+tests/test_utils.py::TestVn::test_vn_so_nguyen PASSED                    [ 90%]
+tests/test_utils.py::TestVn::test_vn_abc PASSED                          [ 90%]
+tests/test_utils.py::TestNormColHeader::test_norm_col_header_nbsp PASSED [ 91%]
+tests/test_utils.py::TestNormColHeader::test_norm_col_header_thin_space PASSED [ 91%]
+tests/test_utils.py::TestNormColHeader::test_norm_col_header_trim PASSED [ 91%]
+tests/test_utils.py::TestFmtCl::test_fmt_cl_duong PASSED                 [ 91%]
+tests/test_utils.py::TestFmtCl::test_fmt_cl_am PASSED                    [ 91%]
+tests/test_utils.py::TestFmtCl::test_fmt_cl_0 PASSED                     [ 91%]
+tests/test_utils.py::TestFmtCl::test_fmt_cl_abc PASSED                   [ 92%]
+tests/test_utils.py::TestFmtTl::test_fmt_tl_binh_thuong PASSED           [ 92%]
+tests/test_utils.py::TestFmtTl::test_fmt_tl_ca_hai_bang_0 PASSED         [ 92%]
+tests/test_utils.py::TestFmtTl::test_fmt_tl_mau_so_0 PASSED              [ 92%]
+tests/test_uythac_template_service.py::test_tao_word_uythac_ke_hoach_smoke PASSED [ 92%]
+tests/test_uythac_template_service.py::test_tao_word_uythac_mau06_smoke PASSED [ 93%]
+tests/test_uythac_template_service.py::test_tao_word_uythac_mau15_smoke PASSED [ 93%]
+tests/test_uythac_template_service.py::test_tao_word_uythac_mau16_smoke PASSED [ 93%]
+tests/test_uythac_template_service.py::test_tao_word_uythac_bb_xac_minh_smoke PASSED [ 93%]
+tests/test_uythac_template_service.py::test_tao_word_uythac_bb_ct_cx_smoke PASSED [ 93%]
+tests/test_uythac_template_service.py::test_tao_word_uythac_bc_th_smoke PASSED [ 93%]
+tests/test_uythac_template_service.py::test_tinh_theo_dvut_smoke PASSED  [ 94%]
+tests/test_uythac_template_service.py::test_loc_mau06_filters_and_sorts PASSED [ 94%]
+tests/test_uythac_template_service.py::test_loc_mau15_computes_no_lai PASSED [ 94%]
+tests/test_word_xln_service.py::TestPgdHelpers::test_pgd_plain_co_prefix PASSED [ 94%]
+tests/test_word_xln_service.py::TestPgdHelpers::test_pgd_plain_khong_prefix PASSED [ 94%]
+tests/test_word_xln_service.py::TestPgdHelpers::test_pgd_plain_pgd_hoa PASSED [ 94%]
+tests/test_word_xln_service.py::TestPgdHelpers::test_pgd_plain_none PASSED [ 95%]
+tests/test_word_xln_service.py::TestPgdHelpers::test_pgd_plain_empty PASSED [ 95%]
+tests/test_word_xln_service.py::TestPgdHelpers::test_pgd_plain_chi_co_pgd PASSED [ 95%]
+tests/test_word_xln_service.py::TestPgdHelpers::test_pgd_line_them_prefix PASSED [ 95%]
+tests/test_word_xln_service.py::TestPgdHelpers::test_pgd_line_da_co_prefix PASSED [ 95%]
+tests/test_word_xln_service.py::TestPgdHelpers::test_pgd_line_none_fallback PASSED [ 96%]
+tests/test_word_xln_service.py::TestPgdHelpers::test_pgd_line_empty_fallback PASSED [ 96%]
+tests/test_word_xln_service.py::TestNum::test_none_tra_0 PASSED          [ 96%]
+tests/test_word_xln_service.py::TestNum::test_empty_str_tra_0 PASSED     [ 96%]
+tests/test_word_xln_service.py::TestNum::test_whitespace_tra_0 PASSED    [ 96%]
+tests/test_word_xln_service.py::TestNum::test_int PASSED                 [ 96%]
+tests/test_word_xln_service.py::TestNum::test_float PASSED               [ 97%]
+tests/test_word_xln_service.py::TestNum::test_string_so_don_gian PASSED  [ 97%]
+tests/test_word_xln_service.py::TestNum::test_string_format_viet PASSED  [ 97%]
+tests/test_word_xln_service.py::TestNum::test_string_co_space PASSED     [ 97%]
+tests/test_word_xln_service.py::TestNum::test_string_khong_hop_le_tra_0 PASSED [ 97%]
+tests/test_word_xln_service.py::TestNum::test_string_dau_am PASSED       [ 98%]
+tests/test_word_xln_service.py::TestTaoWord01Xln::test_tra_ve_bytes PASSED [ 98%]
+tests/test_word_xln_service.py::TestTaoWord01Xln::test_bytes_khong_rong PASSED [ 98%]
+tests/test_word_xln_service.py::TestTaoWord01Xln::test_docx_magic_bytes PASSED [ 98%]
+tests/test_word_xln_service.py::TestTaoWord01Xln::test_du_lieu_trong_van_tao_duoc PASSED [ 98%]
+tests/test_word_xln_service.py::TestTaoWordSmokeAll::test_mau_02xln PASSED [ 98%]
+tests/test_word_xln_service.py::TestTaoWordSmokeAll::test_mau_04xln PASSED [ 99%]
+tests/test_word_xln_service.py::TestTaoWordSmokeAll::test_mau_05xln PASSED [ 99%]
+tests/test_word_xln_service.py::TestTaoWordSmokeAll::test_mau_13xln PASSED [ 99%]
+tests/test_word_xln_service.py::TestTaoWordSmokeAll::test_mau_14xln PASSED [ 99%]
+tests/test_word_xln_service.py::TestTaoWordSmokeAll::test_to_trinh_pgd PASSED [ 99%]
+tests/test_word_xln_service.py::TestTaoWordSmokeAll::test_to_trinh_cn PASSED [100%]
+
+============================== warnings summary ===============================
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_upload_khnv]
+  C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\site-packages\openpyxl\styles\stylesheet.py:237: UserWarning: Workbook contains no default style, apply openpyxl's default
+    warn("Workbook contains no default style, apply openpyxl's default")
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+======================= 559 passed, 1 warning in 39.30s =======================
+============================= test session starts =============================
+platform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0
+rootdir: D:\VBSP-SCM
+configfile: pytest.ini
+plugins: anyio-4.13.0, cov-7.1.0
+collected 559 items
+
+tests\test_auth.py ..................................................... [  9%]
+..........                                                               [ 11%]
+tests\test_cdtotkvv_service.py ..............                            [ 13%]
+tests\test_config.py ............                                        [ 15%]
+tests\test_currency.py ..............                                    [ 18%]
+tests\test_data_quality.py ..........................                    [ 23%]
+tests\test_db.py .........                                               [ 24%]
+tests\test_du_phong_service.py ...........                               [ 26%]
+tests\test_hhi_service.py .................                              [ 29%]
+tests\test_khnv_noi_bo_service.py ..                                     [ 30%]
+tests\test_khtd_mau07_service.py ....                                    [ 30%]
+tests\test_khtd_nhap_service.py ....                                     [ 31%]
+tests\test_khtd_service.py ..                                            [ 31%]
+tests\test_kiem_soat_service.py ....................                     [ 35%]
+tests\test_kiem_soat_to_sai_so_tv.py .............                       [ 37%]
+tests\test_merge_du_lieu_toan_cn.py ..........................           [ 42%]
+tests\test_no_khoanh_service.py .........                                [ 44%]
+tests\test_no_rui_ro_service.py ...                                      [ 44%]
+tests\test_pdf_service.py .....                                          [ 45%]
+tests\test_period_compare.py .............................               [ 50%]
+tests\test_report_service.py .........                                   [ 52%]
+tests\test_rui_ro_aggregation.py ........                                [ 53%]
+tests\test_smoke_imports.py ............................................ [ 61%]
+.............................................................            [ 72%]
+tests\test_smoke_snapshot.py ..                                          [ 72%]
+tests\test_snapshot_service.py ....................                      [ 76%]
+tests\test_so_sanh_ky_service.py ...............................         [ 81%]
+tests\test_tien_do_service.py ...                                        [ 82%]
+tests\test_tongquan_service.py .....                                     [ 83%]
+tests\test_upload_service.py .............                               [ 85%]
+tests\test_utils.py .......................................              [ 92%]
+tests\test_uythac_template_service.py ..........                         [ 94%]
+tests\test_word_xln_service.py ...............................           [100%]
+
+============================== warnings summary ===============================
+tests/test_merge_du_lieu_toan_cn.py::TestMergeGQVL::test_gqvl_thanh_cong
+  C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\xml\etree\ElementTree.py:1301: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x0000016F7771D8A0>
+    self._parser.feed(data)
+  Enable tracemalloc to get traceback where the object was allocated.
+  See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+
+tests/test_merge_du_lieu_toan_cn.py::TestMergeGQVL::test_gqvl_thanh_cong
+  C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\site-packages\openpyxl\styles\alignment.py:58: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x0000016F7771F3D0>
+    def __iter__(self):
+  Enable tracemalloc to get traceback where the object was allocated.
+  See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+
+tests/test_merge_du_lieu_toan_cn.py::TestMergeGQVL::test_gqvl_nguon_von_khong_bi_ep_numeric
+  C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\xml\etree\ElementTree.py:1301: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x0000016F77881030>
+    self._parser.feed(data)
+  Enable tracemalloc to get traceback where the object was allocated.
+  See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+
+tests/test_pdf_service.py::TestXuatPdf::test_xuat_pdf_tra_ve_bytes
+  C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\xml\etree\ElementTree.py:1301: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x0000016F77881F30>
+    self._parser.feed(data)
+  Enable tracemalloc to get traceback where the object was allocated.
+  See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+
+tests/test_period_compare.py::TestJoinByLoan::test_trung_key_lay_dong_cuoi
+  C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\xml\etree\ElementTree.py:1301: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x0000016F77882200>
+    self._parser.feed(data)
+  Enable tracemalloc to get traceback where the object was allocated.
+  See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_baocao]
+  C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\xml\etree\ElementTree.py:1301: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x0000016F788C36A0>
+    self._parser.feed(data)
+  Enable tracemalloc to get traceback where the object was allocated.
+  See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_baocao]
+  C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\xml\etree\ElementTree.py:1301: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x0000016F79E526B0>
+    self._parser.feed(data)
+  Enable tracemalloc to get traceback where the object was allocated.
+  See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_baocao]
+  <frozen abc>:106: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x0000016F79EEBD30>
+  Enable tracemalloc to get traceback where the object was allocated.
+  See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_baocao]
+  C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\xml\etree\ElementTree.py:1301: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x0000016F7A0B07C0>
+    self._parser.feed(data)
+  Enable tracemalloc to get traceback where the object was allocated.
+  See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_candoi]
+  C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\xml\etree\ElementTree.py:1301: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x0000016F7A0D2C50>
+    self._parser.feed(data)
+  Enable tracemalloc to get traceback where the object was allocated.
+  See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_cdtotkvv]
+  C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\xml\etree\ElementTree.py:1301: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x0000016F7A105D50>
+    self._parser.feed(data)
+  Enable tracemalloc to get traceback where the object was allocated.
+  See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_no_khoanh]
+  C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\xml\etree\ElementTree.py:1301: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x0000016F7A16B010>
+    self._parser.feed(data)
+  Enable tracemalloc to get traceback where the object was allocated.
+  See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_so_sanh_ky]
+  C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\site-packages\attr\_make.py:645: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x0000016F772B1E40>
+    class _ClassBuilder:
+  Enable tracemalloc to get traceback where the object was allocated.
+  See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_so_sanh_ky]
+  C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\site-packages\attr\_make.py:645: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x0000016F7A22CA90>
+    class _ClassBuilder:
+  Enable tracemalloc to get traceback where the object was allocated.
+  See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_so_sanh_ky]
+  C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\site-packages\attr\_make.py:645: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x0000016F7A22F790>
+    class _ClassBuilder:
+  Enable tracemalloc to get traceback where the object was allocated.
+  See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_so_sanh_ky]
+  C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\site-packages\attr\_make.py:645: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x0000016F7A1C4040>
+    class _ClassBuilder:
+  Enable tracemalloc to get traceback where the object was allocated.
+  See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_so_sanh_ky]
+  C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\site-packages\attr\_make.py:645: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x0000016F772B22F0>
+    class _ClassBuilder:
+  Enable tracemalloc to get traceback where the object was allocated.
+  See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_so_sanh_ky]
+  C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\site-packages\attr\_make.py:645: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x0000016F7A1C53F0>
+    class _ClassBuilder:
+  Enable tracemalloc to get traceback where the object was allocated.
+  See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_so_sanh_ky]
+  C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\site-packages\altair\vegalite\v6\schema\core.py:19784: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x0000016F7A16A4D0>
+    class ScaleInvalidDataShowAsValuexOffset(ScaleInvalidDataShowAsxOffset):
+  Enable tracemalloc to get traceback where the object was allocated.
+  See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_cdtotkvv]
+  C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\xml\etree\ElementTree.py:1301: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x0000016F7A20E5C0>
+    self._parser.feed(data)
+  Enable tracemalloc to get traceback where the object was allocated.
+  See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_upload_khnv]
+  C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\site-packages\openpyxl\styles\stylesheet.py:237: UserWarning: Workbook contains no default style, apply openpyxl's default
+    warn("Workbook contains no default style, apply openpyxl's default")
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=============================== tests coverage ================================
+_______________ coverage: platform win32, python 3.14.5-final-0 _______________
+
+Name                                    Stmts   Miss  Cover   Missing
+---------------------------------------------------------------------
+_check_render_sigs.py                      28     28     0%   2-33
+_patch_dkt.py                              37     37     0%   2-75
+_patch_full.py                             41     41     0%   2-63
+_test_exempt.py                             2      2     0%   1-2
+alert_center.py                           131    131     0%   7-227
+app.py                                    307    307     0%   5-594
+auth.py                                   462    396    14%   182, 191, 200, 219, 241-247, 260-276, 280, 284-287, 291-310, 317, 341-426, 435-581, 593-888, 893-1076
+backup_service.py                         144    125    13%   51-106, 116-128, 153-228, 235-250
+components\__init__.py                      0      0   100%
+components\delta_card.py                   32     26    19%   10-14, 45-72, 85, 102-105
+components\export_pdf.py                  159    115    28%   29-30, 50-51, 66-69, 74-124, 129-132, 162-310, 320
+components\filter_bar.py                   77     71     8%   34-132, 145-165
+components\loan_drawer.py                  49     39    20%   61-63, 68-83, 94, 148-181
+components\movers.py                      148    148     0%   8-326
+config.py                                 216     18    92%   52, 59, 63-66, 94, 98-101, 104-107, 125, 131-132
+data\__init__.py                            3      0   100%
+data\cdtotkvv.py                          164     35    79%   26, 59, 62, 70, 73, 76-78, 81, 87, 119-120, 126, 134-136, 139, 150, 154, 157, 182, 193-194, 208-242
+data\core.py                               55     42    24%   30-42, 58-66, 79-99, 109-128, 138-164
+data\den_han.py                            82     66    20%   26-30, 35-48, 53-76, 82-89, 93-99, 103-121, 125-156
+data\dgd_helpers.py                       174    129    26%   21, 27-37, 41-47, 52-81, 85-91, 96, 100, 116-121, 125-132, 136-143, 147-154, 169-208, 227, 229-232, 242-252, 266, 270-279
+data\giao_ban.py                          512    512     0%   5-974
+data\hstd.py                              228    163    29%   22-26, 32-40, 46-55, 65-80, 87-92, 102-106, 108-112, 123-134, 147-160, 168-175, 180-183, 238-247, 254-260, 266, 271, 276, 292-321, 336-420, 439-463
+data\khtd.py                              112     76    32%   25-26, 30-41, 47, 52, 63-64, 73, 88-99, 107-117, 131-142, 176-201, 206-211
+data\pgd.py                               244    105    57%   47, 49, 55, 68, 70, 72, 74-77, 81, 87-89, 121, 124-125, 164-165, 184-185, 188, 215-222, 237-261, 267-270, 275, 281, 314-317, 322-325, 331-336, 341, 352-364, 373, 382-383, 385, 396-412, 418-430
+db.py                                     452    291    36%   24-25, 41-42, 76-91, 98-129, 135-139, 145-148, 155-161, 167-178, 489-490, 515-516, 529-530, 542-543, 559-567, 579-590, 609-610, 619-632, 643-644, 672, 680-681, 700-705, 718-739, 749-763, 786-792, 801-808, 816, 846-943, 952-971, 980-999, 1012-1032, 1046-1067, 1075-1082, 1087-1098, 1103-1118, 1123-1140, 1144-1168, 1172-1186
+gen_dcgiam_sheet.py                        94     94     0%   3-162
+health_check.py                           177    177     0%   7-310
+logger.py                                  26      0   100%
+pdf_service.py                            414    255    38%   20-21, 49, 64-67, 95-96, 141-146, 170-175, 194, 198-201, 204-205, 222-223, 248, 250, 252, 254, 256, 258, 260, 262, 269, 364, 382-397, 409-428, 436, 469-647, 663-894
+seed_hstd_data.py                         118    118     0%   14-253
+services\__init__.py                        6      0   100%
+services\cdtotkvv_service.py               78     12    85%   30, 35-37, 57-58, 66, 89-93
+services\ct_discovery.py                  193    167    13%   45-49, 64-72, 83-101, 110-111, 116-117, 122-124, 142-179, 197-225, 240-295, 310-336, 358-457, 466-473
+services\data_priority.py                  14      7    50%   11-24
+services\data_priority_service.py         127    109    14%   31-48, 59-99, 104-114, 122, 127-146, 154-172, 179-196, 203-227, 234-258
+services\data_quality.py                  145     12    92%   97, 192, 219-220, 233, 277-281, 290, 301
+services\du_phong_service.py               83     21    75%   48-57, 118, 121-122, 153-162, 170, 173, 238, 244-249
+services\excel_service.py                 235    191    19%   13-14, 64-70, 74-79, 83-85, 93-142, 150-192, 200-279, 302-308, 312-313, 317-319, 323-325, 328-344, 374-387, 391-392
+services\file_detection_service.py        184    169     8%   34, 38-41, 48, 53-62, 76-128, 136-141, 157-227, 238-333
+services\hhi_service.py                    41      0   100%
+services\khnv_noi_bo_service.py           269    250     7%   22-172, 177-348, 601-611, 616-620
+services\khtd_import_service.py           189    189     0%   6-326
+services\khtd_mau07_service.py            415     87    79%   49-53, 73-74, 83-84, 88-97, 110, 131, 135, 146, 151-152, 160-161, 166-175, 189-192, 196-208, 212-215, 272-275, 409-411, 440-441, 448-450, 505-525, 577-580
+services\khtd_nhap_service.py             168     70    58%   18-19, 49-81, 86-88, 99-102, 108-115, 123-140, 167-168, 178-182, 184, 194, 200, 203-204, 223-224, 235, 240, 245, 248-249, 266, 268, 271
+services\khtd_service.py                  405    299    26%   61, 95, 138-140, 144-152, 168-171, 178, 201-209, 212-220, 232-252, 267-325, 333-389, 397-415, 427-452, 462-519, 523-528, 538-563, 573-574, 583-605, 630-649, 653, 657-675, 687-708, 722-783
+services\kiem_soat_service.py             484    352    27%   80-94, 117, 138-139, 145, 159, 182-184, 226, 246-328, 338-412, 480-507, 511-517, 521-531, 535-554, 565-568, 587-611, 627-668, 686-745, 763-976, 994-1137
+services\migration_service.py              98     82    16%   22-23, 30-47, 52-62, 67-70, 79-136, 142-151, 158-171
+services\no_khoanh_service.py              22      0   100%
+services\no_rui_ro_service.py              19      0   100%
+services\pdf_no_khoanh_service.py         686    619    10%   47-48, 58, 69-81, 91, 98-105, 109-120, 124-127, 131-134, 140, 144, 148, 153, 157, 161, 165, 169, 173, 177, 180, 184, 188, 192, 201-258, 263-286, 290-295, 304-395, 400-539, 546-687, 691-804, 816-973, 978-1063, 1069-1169, 1174-1262, 1273-1447
+services\period_compare.py                131      3    98%   200-201, 273
+services\report_service.py                151     15    90%   18-21, 87-88, 248-256
+services\rui_ro_aggregation.py             15      0   100%
+services\so_sanh_ky_service.py            110      9    92%   69, 73-74, 96, 100-101, 119, 145-146
+services\task_data_service.py              13      4    69%   19, 28, 32, 44
+services\template_service.py              873     88    90%   45, 53-63, 71-85, 90-106, 118-124, 132-161, 172-173, 179-180, 205-210, 504, 637-659, 778, 1115, 1189-1190, 1242, 1295-1296
+services\tien_do_excel_service.py          82     78     5%   19-156
+services\tien_do_pdf_service.py           295    285     3%   38-450, 454-641
+services\tien_do_service.py                95     19    80%   46-48, 116, 123-127, 133-135, 235-237, 241-244
+services\tongquan_service.py              233     86    63%   46-50, 100, 102, 111, 143, 147-153, 159-165, 172-178, 253, 269-274, 288, 308, 310, 316, 328, 339-342, 355, 357, 372-455
+services\upload_center.py                  80     80     0%   12-206
+services\upload_service.py                458    252    45%   105-127, 185-190, 200-211, 234-289, 354, 365-376, 421-423, 486, 489-493, 572-585, 589-590, 595-602, 609-610, 639-718, 737-839, 873-887, 894, 901-909
+services\uy_thac_service.py               167     99    41%   31, 33, 43, 45, 47, 53, 58, 60, 84, 89, 91, 96-99, 106-117, 132-150, 164-169, 180-210, 224-240, 253-273, 281-291, 303-324, 332-345, 355-363
+services\word_xln_service.py              847    151    82%   250-252, 269, 419, 494-525, 695, 703-714, 717-724, 743-778, 896-903, 906-940, 992-999, 1096-1110, 1116, 1263-1277, 1283
+snapshot_service.py                       312    134    57%   22-25, 61-63, 107, 169-172, 188-190, 206-208, 219-221, 230-246, 254-319, 324-336, 341-349, 362, 382, 384, 416-418, 423-435, 440-448, 462, 474, 477, 479, 481, 491, 500, 548-560, 565-573, 582-584
+tabs\__init__.py                            0      0   100%
+tabs\base_tab.py                           37      0   100%
+tabs\tab_audit_log.py                     106     46    57%   36-37, 39-40, 42-43, 48, 69-70, 77, 84-133, 168-169
+tabs\tab_ban_dai_dien.py                  341    292    14%   69-71, 75-78, 82-91, 97-116, 129-174, 178-260, 264-366, 370-371, 375-434, 438-568, 593-608
+tabs\tab_baocao.py                        350    261    25%   58-67, 106-107, 122, 138-140, 151, 153, 155, 176-226, 232-273, 276-300, 339-467, 473-479, 482-791
+tabs\tab_candoi.py                        288    150    48%   128-129, 148-150, 168, 181-185, 188-191, 194-195, 206-208, 213-215, 218-221, 240, 251, 256-270, 303, 322-341, 344-345, 354, 405-439, 443, 447-492, 508-528, 535, 546-566, 573, 577, 579-616, 619
+tabs\tab_canh_bao_som.py                  148    117    21%   37-39, 44, 63-93, 108-123, 128-152, 159-201, 213-338, 375-384
+tabs\tab_cbtd.py                          307    235    23%   61-63, 77, 81-84, 87-89, 93-98, 101-107, 123-166, 174-208, 215-272, 283, 308-331, 334-477, 488, 492-543
+tabs\tab_cdtotkvv.py                      542    447    18%   72-248, 284-287, 304-393, 401-402, 412-575, 584-585, 595-825, 834-835, 844-873, 879-1052, 1071-1072, 1076-1077, 1099
+tabs\tab_cdtotkvv_pgd.py                  332    244    27%   44-45, 52, 65, 68, 72-81, 96, 106-128, 139-380, 394-558, 563-577, 590-591, 594-595, 635-666
+tabs\tab_checklist_bc.py                  323     74    77%   38, 45-50, 55-58, 70-72, 85, 101, 140, 143, 148, 170, 173, 176, 179, 181-182, 224, 226, 230, 234-235, 241, 253-254, 306-308, 314-315, 368-381, 384-389, 409-429, 440, 458-459, 488-489
+tabs\tab_danhsach.py                      218     35    84%   42, 52, 153, 155, 157, 159, 161, 164-167, 230-231, 235-241, 243, 259-263, 266, 294, 300, 302, 311-313, 426-429
+tabs\tab_den_han.py                       185    153    17%   35-36, 38, 43-49, 61-63, 69-395
+tabs\tab_diem_gd_pgd.py                   374    335    10%   44-54, 59-79, 87-89, 93-97, 101-163, 173-403, 413-632, 636-663, 683-684, 690-719
+tabs\tab_gqvl.py                          187     69    63%   106, 184-185, 188-191, 198, 203-204, 209-210, 219-230, 274-302, 311-335, 344-393, 415, 417, 419, 448-452, 455
+tabs\tab_hhi.py                           136    108    21%   45-47, 58-62, 76-107, 115-154, 159-218, 227-281, 311-373
+tabs\tab_kehoach.py                       170    100    41%   41-43, 64-68, 71-77, 81, 85, 96-98, 101-110, 124, 130-154, 159, 167-173, 178-184, 187, 197-198, 204-210, 228-282
+tabs\tab_kh_gqvl.py                       101     39    61%   35-37, 100-116, 124-125, 128-129, 133-166
+tabs\tab_khnv_noi_bo.py                   607    439    28%   80-81, 94-148, 153-157, 167-227, 238-371, 390-444, 458-470, 488, 495-552, 560-587, 605-633, 664-665, 678-704, 725-726, 739-765, 784-806, 830-837, 839, 854-870, 881-1026, 1140-1142
+tabs\tab_khtd.py                          261    158    39%   100, 116-122, 126-133, 138, 158-163, 166-180, 184-194, 198, 205-209, 215-261, 273, 275, 306-357, 367-401, 413, 416-417
+tabs\tab_khtd_giao_dc.py                  319    157    51%   26-29, 38, 59-66, 111-117, 119-125, 141, 165-202, 216, 238-256, 266-292, 300-378, 450-454, 467-495, 532-559, 576-593, 604-614, 617-629, 633-655, 673-692, 771, 774-775
+tabs\tab_khtd_mau07.py                    256    125    51%   69, 84-116, 138-139, 165-174, 178-179, 182-186, 194, 239-242, 247-248, 254-275, 284, 297, 302-307, 312-317, 322-324, 326-327, 334-348, 403-405, 454-496, 500-532
+tabs\tab_khtd_nhap.py                     565    281    50%   62-66, 71, 83-119, 133-134, 146-163, 171-188, 192-206, 222-227, 254-281, 301-313, 523-532, 544, 578-579, 589-600, 632-643, 657-667, 708-788, 792-804, 837-879, 904-905, 909-990, 1021-1041, 1045-1047, 1196, 1237-1301, 1304-1310, 1313
+tabs\tab_khtd_pgd.py                      423    179    58%   66, 74-78, 82, 93-129, 149-150, 162-174, 182-194, 229-247, 264, 268-270, 274-280, 283-298, 303-307, 311-313, 338-341, 358-384, 390-418, 428, 452, 543-547, 568-569, 577-582, 590, 592, 612-622, 644-650, 658-663, 682
+tabs\tab_khtd_xuat.py                     469    399    15%   23-27, 34-36, 74, 85-303, 321-458, 483-683, 694-774, 794-821, 826-835, 838
+tabs\tab_kiem_soat.py                      53     44    17%   25-78, 82-121
+tabs\tab_nhiem_vu.py                      325    224    31%   42-46, 52, 56-58, 62, 66, 74, 90-95, 100-105, 116-130, 183-235, 296-328, 346-414, 423-470, 475-552, 578-583, 592-748
+tabs\tab_no_khoanh.py                     612    569     7%   58, 62, 66, 71-106, 111-152, 186-369, 388-521, 540-696, 713-803, 835-1345
+tabs\tab_no_rui_ro.py                     559    522     7%   70-76, 80-84, 88-89, 93-103, 111-158, 174-460, 465-759, 780-1071
+tabs\tab_nq11.py                           99     22    78%   96-97, 99-100, 103-104, 136-137, 143, 150, 152, 164-170, 198-209, 212
+tabs\tab_phoi_hop_pgd.py                  204    133    35%   43-46, 50, 54, 84, 90, 96-120, 130-218, 227-308, 336
+tabs\tab_qd62.py                          388    327    16%   53, 55, 60, 65-67, 72-75, 80-81, 86-91, 95, 103-273, 287-289, 292, 314-603, 626-627, 639-645
+tabs\tab_qlnk_dashboard.py                144    111    23%   31-32, 36-39, 44-46, 51-65, 69-83, 87-124, 148-274
+tabs\tab_quan_ly_bc.py                     13      0   100%
+tabs\tab_quan_ly_cv.py                     15      0   100%
+tabs\tab_quan_ly_dgd.py                   401    260    35%   43-53, 60-67, 87, 94-96, 104, 122-123, 134, 140, 155-217, 244-316, 333-336, 360, 372-399, 416-456, 468, 473-476, 490-491, 518, 527-528, 533, 538-657, 670-710
+tabs\tab_so_sanh_2_ky.py                  333    298    11%   33-37, 50-56, 62-66, 71, 75, 80-85, 93-132, 145-183, 208-260, 289-317, 328-378, 388-494, 518-618, 642-786, 821-900
+tabs\tab_so_sanh_ky.py                    522    473     9%   72-84, 93-152, 157-184, 198-261, 278-327, 341-388, 417-506, 519-661, 687, 712-1217
+tabs\tab_tien_do.py                       619    562     9%   86-87, 89-90, 96-240, 244-417, 421-691, 695-962, 966-1171, 1197-1198, 1201-1209, 1212-1213, 1230-1233
+tabs\tab_tien_do_nop.py                   270    186    31%   42, 45-46, 49-56, 67-73, 84-86, 91-101, 105-110, 120-252, 268-330, 353-387, 447-451, 456-457, 464, 471-472
+tabs\tab_tongquan.py                      523    247    53%   84-85, 105-106, 316, 323-333, 349-351, 358-414, 419-522, 555, 567, 572, 633, 653-692, 696, 720-721, 726-729, 748-776, 781, 816, 834-836, 859, 925-932, 934, 947-980, 983, 1029, 1058-1085, 1099-1243, 1259-1261
+tabs\tab_tracuu.py                        301    231    23%   35-36, 51-62, 77-82, 98-103, 127-130, 135-137, 175-213, 218-225, 247-353, 373-425, 474, 476-485, 521-522, 525-528, 534, 536, 538-543, 545, 547, 556-622
+tabs\tab_trang_thai_nguon.py              432    157    64%   88-90, 100-102, 110-115, 155, 198-210, 227, 245, 254-267, 277-278, 293, 304-310, 323-324, 345-346, 355-357, 371-376, 391-396, 409-414, 417, 441, 443, 446-448, 475-477, 485, 491-493, 503-506, 534-544, 557-579, 586, 595, 604, 623-625, 650-651, 653-669, 685-713, 746-747, 749-750, 752-753, 767-771, 798-799, 826-837
+tabs\tab_upload_khnv.py                   681    558    18%   85-92, 103-131, 147-192, 202-273, 278-286, 291-433, 469-671, 681-700, 709-756, 762, 788-841, 885, 887, 915-918, 929-947, 954-1098, 1120-1145, 1152-1191, 1205-1206, 1249-1299, 1302-1317, 1321-1331, 1345-1346
+tabs\tab_upload_pgd.py                    218    192    12%   65-115, 124-166, 174-209, 219-257, 268-361, 366-386, 410-457
+tabs\tab_uy_thac.py                       598    434    27%   70-72, 77-79, 84-86, 93-95, 103-125, 136-159, 171-304, 314-451, 460-603, 624-633, 638, 643-810, 844, 856-917, 977-1007, 1039, 1041, 1052-1113, 1127-1177, 1195, 1213
+tabs\tab_xay_dung_khtd.py                 309    309     0%   5-616
+tabs\tab_xlrr_tong_hop.py                 167     75    55%   27, 29, 31, 35, 53-56, 59, 69-84, 96-101, 151-187, 200-231, 242-257, 270-272
+tests\__init__.py                           0      0   100%
+tests\conftest.py                          96     22    77%   31, 59-62, 64, 85-88, 90-92, 94-100, 102, 130
+tests\fixtures.py                           9      9     0%   1-24
+tests\test_auth.py                         62      1    98%   267
+tests\test_cdtotkvv_service.py             69      0   100%
+tests\test_config.py                       21      1    95%   76
+tests\test_currency.py                     56      0   100%
+tests\test_data_quality.py                128      0   100%
+tests\test_db.py                           64      1    98%   124
+tests\test_du_phong_service.py             60      1    98%   148
+tests\test_hhi_service.py                  77      0   100%
+tests\test_khnv_noi_bo_service.py          23      0   100%
+tests\test_khtd_mau07_service.py           39      2    95%   84-85
+tests\test_khtd_nhap_service.py            37      0   100%
+tests\test_khtd_service.py                 36      1    97%   35
+tests\test_kiem_soat_service.py            91      0   100%
+tests\test_kiem_soat_to_sai_so_tv.py       63      0   100%
+tests\test_merge_du_lieu_toan_cn.py       331      7    98%   45-47, 257, 290, 811-812
+tests\test_no_khoanh_service.py            44      0   100%
+tests\test_no_rui_ro_service.py            34      0   100%
+tests\test_pdf_service.py                  39      0   100%
+tests\test_period_compare.py              145      0   100%
+tests\test_report_service.py               47      0   100%
+tests\test_rui_ro_aggregation.py           44      0   100%
+tests\test_smoke_imports.py                96     14    85%   23-24, 119-120, 167-172, 195-197, 254
+tests\test_smoke_snapshot.py               24      0   100%
+tests\test_snapshot_service.py            111      2    98%   232-233
+tests\test_so_sanh_ky_service.py          124      0   100%
+tests\test_tien_do_service.py              37      0   100%
+tests\test_tongquan_service.py             55      0   100%
+tests\test_upload_service.py               85      5    94%   23-24, 34, 128-129
+tests\test_utils.py                        95      1    99%   239
+tests\test_uythac_template_service.py      57      0   100%
+tests\test_word_xln_service.py             91      0   100%
+utils.py                                  367    206    44%   43-82, 105-106, 121, 152-153, 170-180, 191, 284, 288, 291-293, 312-313, 322-323, 353-362, 370-387, 406-437, 446-484, 489-493, 509-550, 568-616, 624-632, 649, 651
+utils_theme.py                              8      8     0%   5-369
+widgets\__init__.py                         2      0   100%
+widgets\data_source_status.py             109     91    17%   32-33, 46-68, 73-82, 87-122, 127-151, 159-191, 197
+widgets\status_widget.py                   45     37    18%   15-32, 37-45, 49-68
+workspaces\__init__.py                     10      5    50%   10-14
+workspaces\ws_executive.py                647    581    10%   55, 72-81, 86-90, 101-156, 165-166, 172-202, 213-253, 260-351, 375-393, 417-670, 685-718, 723-765, 773-823, 831-912, 923-1015, 1023-1055, 1069-1167, 1186-1248, 1255-1323, 1347-1352, 1357-1386, 1391-1398, 1403-1405, 1410-1413, 1418-1464, 1486, 1510-1573, 1599, 1609-1691
+workspaces\ws_management.py               670    593    11%   58-60, 68-188, 199-231, 244-264, 271-310, 315-357, 362-374, 380-583, 593-603, 608-865, 873-1112, 1198-1327, 1333, 1336, 1366-1367, 1381-1405
+workspaces\ws_operation.py                897    807    10%   73-169, 176-308, 316-437, 442, 448-457, 467-583, 595-618, 623-840, 850-934, 948-1218, 1237, 1254-1261, 1265, 1267, 1278-1282, 1286-1289, 1292-1414, 1417-1493, 1512-1564, 1567-1633, 1636-1638, 1770-1771
+---------------------------------------------------------------------
+TOTAL                                   32387  20258    37%
+====================== 559 passed, 21 warnings in 56.38s ======================

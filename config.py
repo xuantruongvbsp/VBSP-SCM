@@ -417,6 +417,8 @@ COT_PHAN_LOAI  = "Phân loại"
 # Ngày giao dịch gần nhất (KU_NGAYGDGN từ core banking — cột 130 HSTD)
 COT_NGAY_GDGN = "Ngày giao dịch gần nhất"
 COT_HINH_THUC_VAY = "Hình thức vay"      # hình thức vay (1=NHCSXH, 2=ủy thác,...)
+COT_SO_LAN_GH    = "Số lần gia hạn"    # số lượt đã gia hạn nợ (từ HSTD)
+COT_NGAY_GH_GN   = "Ngày gia hạn gần nhất"  # ngày quyết định gia hạn gần nhất (từ HSTD)
 
 # ── Cột dữ liệu NQ11 (khác tên so với HSTD) ──────────────────────────────────
 COT_DNO_NQ11        = "DNO NQ11"

@@ -1,5 +1,8 @@
 # CHANGELOG
 
+## [2026-05-23] — Fix: chữ bị ẩn trong bảng "Cơ cấu dư nợ theo chương trình tín dụng"
+- `tabs/tab_tongquan.py` dòng ~484 — thêm `color:#1e293b` inline vào `<td>` và `<tr>` của bảng CT để thắng dark mode override (trước đây chỉ dùng CSS class, bị Streamlit theme ghi đè)
+
 ## [2026-05-22] — Fix: thêm cột ngay_doi_mk vào schema users + migration
 - `db.py` dòng ~160 — thêm `ngay_doi_mk TEXT` vào CREATE TABLE users
 - `db.py` dòng ~463 — thêm ALTER TABLE migration cho DB cũ chưa có cột `ngay_doi_mk`

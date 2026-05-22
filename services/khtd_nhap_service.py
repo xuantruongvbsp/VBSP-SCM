@@ -164,7 +164,7 @@ def doc_excel_khtd_cn_upload(
     """
     try:
         df_up = pd.read_excel(BytesIO(file_bytes), header=0)
-    except Exception as e:
+    except Exception as e:  # conv: skip
         raise ValueError(f"Không đọc được file Excel: {e}") from e
 
     ten_cot = {str(c).strip(): c for c in df_up.columns}
@@ -220,7 +220,7 @@ def doc_excel_khtd_xa_upload(
     """
     try:
         df_up = pd.read_excel(BytesIO(file_bytes), header=0)
-    except Exception as e:
+    except Exception as e:  # conv: skip
         raise ValueError(f"Lỗi đọc file Excel: {e}") from e
 
     updates: dict[str, float] = {}

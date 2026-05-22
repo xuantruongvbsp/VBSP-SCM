@@ -591,6 +591,7 @@ def tai_tat_ca(
             else:
                 ket_qua[slug] = (kq.thong_bao or "")[:200] if kq.thong_bao else "lỗi"
         except Exception as e:
+            logger.error("tai_khtd_pgd: %s — %s", slug, e, exc_info=True)
             ket_qua[slug] = str(e)[:200]
             db.ghi_audit(username, "tai_khtd_pgd_error", f"{slug} · {e}")
 

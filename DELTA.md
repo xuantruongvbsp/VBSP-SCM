@@ -4,6 +4,21 @@
 
 ---
 
+## [2026-05-22] Root-fix df=None trong Phòng KH-NV
+
+### Bug — ALL_ITEMS closure stale (df=None) do sidebar render trước data load
+
+**Root cause:** `app.py` render sidebar (dòng ~283) → `render_sidebar_menu(df=locals().get("df"))` → `df` chưa định nghĩa → `None` → `_build_all_items(df=None)` → lambda đóng gói df=None → `st.session_state["_mgmt_all_items"] = all_items` (stale) → `render()` pop ra → mọi tab nhận df=None.
+
+| Thay đổi | File | Dòng |
+|---|---|---|
+| Xóa `st.session_state["_mgmt_all_items"] = all_items` | `workspaces/ws_management.py` | ~832 |
+| `render()` luôn build ALL_ITEMS fresh (bỏ pop + if-None) | `workspaces/ws_management.py` | ~971 |
+
+**Ghi chú:** trước đó CHANGELOG có entry "revert ý tưởng share menu qua session_state" nhưng chỉ thêm comment, không xóa dòng code → bug vẫn tồn tại.
+
+---
+
 ## [2026-05-22] Fix tab Tổng quan: 3 section trống
 
 ### Bug — guard + else-clause cho 3 section không có bảng/dữ liệu

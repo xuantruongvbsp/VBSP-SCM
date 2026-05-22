@@ -4,6 +4,66 @@
 
 ---
 
+## [2026-05-22] Thêm COT_GIAI_NGAN_TRONG_NAM
+
+### Refactor — xoá hardcode "Giải ngân trong năm"
+- `config.py` — thêm `COT_GIAI_NGAN_TRONG_NAM = "Giải ngân trong năm"` (trước `GQVL_COT_MAP`); `GQVL_COT_MAP` + `HSTD_DS_CHO_VAY_NAM_ALIASES` dùng constant thay dict-lookup
+- `snapshot_service.py` — `_GN_NAM_ALIASES[0]` + `_COL_GN` → constant
+- `tabs/tab_gqvl.py` — `G_GN_NAM` → constant
+- `services/upload_service.py` — 3 list `_cols_so` → constant
+- `tabs/tab_ban_dai_dien.py` — `_GN_NAM_ALIASES[0]` → constant
+
+Phân tích Thời hạn vay + Dư nợ trong hạn: đã có `COT_THOI_HAN`/`COT_DU_NO_TH`, toàn bộ code guard `if col in df.columns` → **an toàn dù GQVL file thiếu 2 cột này**.
+
+---
+
+## [2026-05-22] Đồng bộ fmt_ty() + sửa TROUBLESHOOTING
+
+### Sửa tài liệu — fmt_ty() bị doc sai /1e12 ở nhiều file
+Phát hiện `fmt_ty()` thực tế chia `/1e6` → triệu đồng (0 số lẻ, không hậu tố "tỷ"), nhưng bị document sai là `/1e12` trong 12+ file. Đã sửa toàn bộ.
+
+Quy ước đúng (đã đồng bộ vào STABLE.md, CLAUDE.md, CONVENTIONS.md, rules.md, AGENTS.md, .clinerules, .windsurfrules, codebase_for_ai.md, README.md, ARCHITECTURE.md):
+
+| Ngữ cảnh | Code | Kết quả |
+|---|---|---|
+| Cột bảng | `fmt_ty(x)` | triệu đồng (0 số lẻ) |
+| Metric card inline | `vn(x / 1e9, 3) + " tỷ"` | tỷ đồng (3 số lẻ) |
+
+- `docs/TROUBLESHOOTING.md` §1 — xóa ví dụ sai `/1e12 = tỷ` → bảng hướng dẫn 2 lớp đúng
+- `docs/UI_GUIDELINES.md` §7 metric card — `/1e12` → `/1e9` (metric card dùng /1e9, không phải /1e6)
+
+---
+
+## [2026-05-22] Tạo 3 file tài liệu: SCHEMA / TEST_COVERAGE / DECISIONS
+
+### Thêm mới
+- `SCHEMA.md` — 16 bảng SQLite đầy đủ (CREATE TABLE + migration columns + index), file parquet, query mẫu. **Tra ở đây thay vì đọc db.py khi cần schema.**
+- `TEST_COVERAGE.md` — bản đồ 31 test file (~320 cases), phân loại ✅/🟡/🔴, danh sách ưu tiên viết test (tab_canh_bao_nqh, data/hstd.py, alert_center, migration_service là cao nhất).
+- `DECISIONS.md` — 12 entry ADR (Architecture Decision Record): SQLite/Parquet/DuckDB/kv_store/render(tab=None)/pgd_mode/tiền VND/Streamlit/snapshot/git policy/RBAC/merge strategy.
+- `CLAUDE.md` Section 11 — bổ sung 3 dòng SCHEMA/TEST_COVERAGE/DECISIONS vào bảng tài liệu tham chiếu.
+
+---
+
+## [2026-05-22] Fix tab_canh_bao_nqh.py — 3 lỗi runtime
+
+### Bug fixes
+- **Root cause lỗi "truth value of a DataFrame is ambiguous"**: `render()` dòng ~580 dùng `kwargs.get("df_full") or kwargs.get("df")` → `or` trên DataFrame kích hoạt `bool(DataFrame)` → exception. Fix: `df_full = kwargs.get("df_full", kwargs.get("df"))`.
+- **Series index alignment**: `_render_tong_hop()` dòng ~97 tạo `gh_thang_series = ngay_gh[da_gh]` (subset index) rồi dùng `da_gh & gh_thang_series.dt.year == ...` → lệch index → NaN lan rộng. Fix: dùng `ngay_gh` trực tiếp.
+- **Fragile DataFrame.get pattern**: `_render_khd()` dòng ~173 `df_kh[df_kh.get("is_3m_inactive", False)]` → nếu cột missing trả `False`, `df[False]` là KeyError. Fix: kiểm tra explicit `"is_3m_inactive" in df_kh.columns`.
+
+---
+
+## [2026-05-22] Tạo tab_canh_bao_nqh.py
+
+### Tạo mới
+- `tabs/tab_canh_bao_nqh.py` — tab Cảnh báo Tín dụng: **render(tab=None, **kwargs)**
+  - 8 sub-tabs: Tổng hợp | Đến hạn | 3 tháng KHĐ | BT sang Rủi ro | Nợ QH phát sinh | Cảnh báo sớm | Khoanh sắp hết hạn | Gia hạn nợ
+  - Dùng chung `danh_dau_khong_hd_cached`, `canh_bao_migration_cached`, `tong_hop_khong_hd_cached`, `ds_chi_tiet_khong_hd` từ `data/`
+  - key_prefix phân biệt `cn_cbtd_` / `pgd_{slug}_cbtd_` tránh DuplicateElementKey
+  - Được gọi từ `ws_management._render_canh_bao_no()` (CN) và `ws_operation._render_canh_bao_nqh_pgd()` (PGD)
+
+---
+
 ## [2026-05-22] Hoàn thiện tab Trạng thái Nguồn dữ liệu
 
 ### Bug fixes

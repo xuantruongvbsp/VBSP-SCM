@@ -162,8 +162,8 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
     ts = kwargs.get("ts_hstd", 0.0)
 
     with ctx:
-        # ── Guard: chưa có dữ liệu ────────────────────────────────────────
-        if df is None or (hasattr(df, "empty") and df.empty):
+        # ── Guard: df là None → crash chắc chắn, dừng sớm ───────────────
+        if df is None:
             st.warning(
                 "⚠️ **Chưa có dữ liệu HSTD.** "
                 "Vui lòng upload file HSTD qua tab **📤 Upload HSTD** → Merge dữ liệu."
@@ -431,6 +431,8 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
             )
             col_khoanh = _col_khoanh_ct or None
 
+            if df_ct.empty:
+                st.info("ℹ️ Chưa có dư nợ trong dữ liệu — bảng chương trình tín dụng trống.")
             # Hiển thị bảng
             # fmt_ty: VND → triệu đồng (chia /1_000_000). Tên cột phải ghi "(triệu đồng)"
             df_hien = df_ct.rename(columns={"ten_ct": "Chương trình"}).copy()
@@ -1003,6 +1005,12 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                         key="btn_pdf_tqpgd_dl",
                         use_container_width=True,
                     )
+        else:
+            st.warning(
+                f"⚠️ Không hiển thị được bảng tổng quát PGD — "
+                f"thiếu cột **{COT_TEN_PGD}** trong dữ liệu HSTD. "
+                "Hãy kiểm tra file HSTD hoặc merge lại dữ liệu."
+            )
         st.divider()
         st.subheader("🔔 Hồ sơ đến hạn — Tổng hợp")
         if COT_NGAY_DH in df.columns:
@@ -1278,3 +1286,35 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
             # ── Download PDF: chỉ giữ nút trong mỗi tab (không duplicate) ──
             # Phần download ngoài tabs đã xóa để tránh trùng lặp với nút
             # "⬇ Tải file PDF" trong mỗi tab 1/3/6 tháng và Trong năm
+        else:
+            st.warning(
+                f"⚠️ Không hiển thị được hồ sơ đến hạn — "
+                f"thiếu cột **{COT_NGAY_DH}** trong dữ liệu HSTD. "
+                "Hãy kiểm tra file HSTD hoặc merge lại dữ liệu."
+            )
+
+        # ── Debug: hiển thị cột thiếu khi cần chẩn đoán ─────────────────
+        _cols_can_thiet = {
+            "Tên chương trình (COT_TEN_CT)":   COT_TEN_CT,
+            "Tổng dư nợ (COT_TONG_DU_NO)":     COT_TONG_DU_NO,
+            "Tên PGD (COT_TEN_PGD)":            COT_TEN_PGD,
+            "Ngày ĐH theo Gia hạn (COT_NGAY_DH)": COT_NGAY_DH,
+        }
+        _cols_thieu = {label: col for label, col in _cols_can_thiet.items() if col not in df.columns}
+        if _cols_thieu:
+            with st.expander("🔍 Chẩn đoán: Cột dữ liệu bị thiếu", expanded=True):
+                st.error(
+                    "**Các cột cần thiết KHÔNG có trong dữ liệu HSTD hiện tại:**\n\n"
+                    + "\n".join(f"- `{col}` → *{label}*" for label, col in _cols_thieu.items())
+                )
+                st.caption(
+                    f"📋 Dữ liệu hiện có **{len(df.columns)}** cột, **{len(df):,}** dòng. "
+                    f"Các cột đang có: `{', '.join(df.columns[:20].tolist())}"
+                    f"{'...' if len(df.columns) > 20 else ''}`"
+                )
+                st.info(
+                    "**Cách sửa:**\n"
+                    "1. Kiểm tra file Excel HSTD — cột phải có tên chính xác như trên\n"
+                    "2. Upload lại file HSTD qua **📤 Upload HSTD**\n"
+                    "3. Bấm **Merge dữ liệu** để tạo lại cache"
+                )

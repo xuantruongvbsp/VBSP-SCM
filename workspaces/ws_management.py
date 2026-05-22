@@ -195,42 +195,9 @@ def _render_canh_bao(df: pd.DataFrame, ds_pgd_all: list):
 
 
 def _render_canh_bao_no(df_full: pd.DataFrame, ds_pgd_all: list, role: str, username: str):
-    """Cảnh báo nợ — 5 sub-tab: Đến hạn, 3 tháng KHĐ, Migration, Nợ QH phát sinh, Cảnh báo sớm."""
-    from tabs.tab_den_han import render as render_den_han
-    from tabs import tab_canh_bao_som
-
-    sub1, sub2, sub3, sub4, sub5 = st.tabs([
-        "⏰ Đến hạn",
-        "🔴 3 tháng KHĐ",
-        "🚨 Nợ bình thường → Nợ rủi ro",
-        "📋 Nợ QH phát sinh",
-        "⚡ Cảnh báo sớm",
-    ])
-
-    with sub1:
-        render_den_han(role=role)
-
-    if df_full is None or df_full.empty:
-        for tab in [sub2, sub3, sub4, sub5]:
-            with tab:
-                st.warning("Chưa có dữ liệu HSTD.")
-        return
-
-    df_kh = danh_dau_khong_hd_cached(df_full)
-
-    with sub2:
-        _hien_thi_khd_tab(df_kh, ds_pgd_all)
-
-    with sub3:
-        _hien_thi_migration_tab(df_kh, ds_pgd_all)
-
-    with sub4:
-        _hien_thi_nqh_tab(df_kh, username)
-
-    with sub5:
-        tab_canh_bao_som._render_canh_bao(
-            df_kh, ds_pgd_all, key_prefix="cn_", la_cn=True
-        )
+    """Cảnh báo Tín dụng — gọi tab_canh_bao_nqh tập trung."""
+    from tabs.tab_canh_bao_nqh import render
+    render(role=role, username=username, df_full=df_full, ds_pgd_all=ds_pgd_all)
 
 
 def _render_canh_bao_no_sub(
@@ -240,30 +207,9 @@ def _render_canh_bao_no_sub(
     username: str,
     idx: int,
 ) -> None:
-    """Render 1 trong 5 nhánh con Cảnh báo NQH theo idx."""
-    from tabs.tab_den_han import render as render_den_han
-    from tabs import tab_canh_bao_som
-
-    if idx == 0:
-        render_den_han(role=role)
-        return
-
-    if df_full is None or df_full.empty:
-        st.warning("Chưa có dữ liệu HSTD.")
-        return
-
-    df_kh = danh_dau_khong_hd_cached(df_full)
-
-    if idx == 1:
-        _hien_thi_khd_tab(df_kh, ds_pgd_all)
-    elif idx == 2:
-        _hien_thi_migration_tab(df_kh, ds_pgd_all)
-    elif idx == 3:
-        _hien_thi_nqh_tab(df_kh, username)
-    elif idx == 4:
-        tab_canh_bao_som._render_canh_bao(
-            df_kh, ds_pgd_all, key_prefix="cn_", la_cn=True
-        )
+    """Render 1 trong 5 nhánh con Cảnh báo Tín dụng theo idx."""
+    from tabs.tab_canh_bao_nqh import render
+    render(role=role, username=username, df_full=df_full, ds_pgd_all=ds_pgd_all)
 
 
 def _hien_thi_khd_tab(df_kh: pd.DataFrame, ds_pgd_all: list):
@@ -1128,14 +1074,9 @@ def _build_all_items(role: str, username: str, **kwargs) -> list:
         {"group": "Phối hợp với PGD", "label": "🗂️ Nội bộ Phòng KH-NV", "icon": "users", "fn": lambda: _get_tab("tab_khnv_noi_bo").render(None, **kwargs)},
         {
             "group": "Giám sát",
-            "label": "Cảnh báo NQH",
+            "label": "Cảnh báo Tín dụng",
             "icon": "alert-triangle",
-            "children": [
-                {"label": "🔴 3 tháng KHĐ",     "fn": lambda df_full=df_full, ds_pgd_all=ds_pgd_all, role=role, username=kwargs.get("username", "unknown"), idx=1: _render_canh_bao_no_sub(df_full, ds_pgd_all, role, username, idx)},
-                {"label": "🚨 Nợ BT → Rủi ro",  "fn": lambda df_full=df_full, ds_pgd_all=ds_pgd_all, role=role, username=kwargs.get("username", "unknown"), idx=2: _render_canh_bao_no_sub(df_full, ds_pgd_all, role, username, idx)},
-                {"label": "📋 Nợ QH phát sinh", "fn": lambda df_full=df_full, ds_pgd_all=ds_pgd_all, role=role, username=kwargs.get("username", "unknown"), idx=3: _render_canh_bao_no_sub(df_full, ds_pgd_all, role, username, idx)},
-                {"label": "⚡ Cảnh báo sớm",    "fn": lambda df_full=df_full, ds_pgd_all=ds_pgd_all, role=role, username=kwargs.get("username", "unknown"), idx=4: _render_canh_bao_no_sub(df_full, ds_pgd_all, role, username, idx)},
-            ],
+            "fn": lambda: _render_canh_bao_no(df_full, ds_pgd_all, role, username),
         },
         {"group": "Giám sát",     "label": "📊 So sánh kỳ",            "icon": "chart-line", "fn": lambda: _get_tab("tab_so_sanh_ky").render(None, **kwargs)},
         {"group": "Kiểm soát",     "label": "Kiểm soát nội bộ",    "icon": "search",         "fn": lambda: _get_tab("tab_kiem_soat").render_tab(df_full, role, kwargs.get("username", "unknown"))},

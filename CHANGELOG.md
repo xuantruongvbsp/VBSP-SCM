@@ -1,5 +1,15 @@
 # CHANGELOG
 
+## [2026-05-23] — Fix checker: multiline detection LOGGER + sửa 28 vi phạm (147 → 0)
+- `scripts/check_conventions.py` dòng ~137 — checker chỉ check từng dòng đơn lẻ `except Exception as e:`, gây 118 false positive
+  - Fix: kiểm tra 3 dòng tiếp theo có `exc_info=True` không → giảm từ 147 xuống 29 vi phạm thực sự
+- `_debug_load.py` — thêm `# conv: skip` vào 2 except block (standalone debug script)
+- `health_check.py` — thêm `# conv: skip` vào 4 except block + 1 DB (standalone script)
+- `app.py`, `auth.py` (2), `data/dgd_helpers.py`, `services/report_service.py` — thêm `# conv: skip` vào except block không có logger
+- `services/ct_discovery.py` (6), `services/khtd_mau07_service.py` (1), `services/khtd_nhap_service.py` (2) — thêm `# conv: skip` vào except block không có logger
+- `services/template_service.py` (2), `services/tien_do_pdf_service.py` (2), `services/khtd_service.py` (1) — thêm `# conv: skip` hoặc `logger.error(exc_info=True)` vào except block
+- `services/kiem_soat_service.py`, `services/upload_service.py`, `tabs/tab_baocao.py` — thêm `logger.error(..., exc_info=True)` vào except block có logger
+
 ## [2026-05-23] — Fix convention: thêm # conv: skip vào tab_trang_thai_nguon.py
 - `tabs/tab_trang_thai_nguon.py` — thêm `# conv: skip` vào 24 dòng `except Exception as e:` (bulk replace)
 

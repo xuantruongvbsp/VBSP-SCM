@@ -770,7 +770,6 @@ def _render_he_thong(la_cn: bool = False, username: str = "unknown") -> None:
     st.markdown("##### 📁 Các bản backup hiện có")
     try:
         from backup_service import BACKUP_DIR
-        from pathlib import Path
         bk_dir = Path(BACKUP_DIR)
         if not bk_dir.exists():
             st.info("Chưa có bản backup nào.")

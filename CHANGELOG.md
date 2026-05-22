@@ -1,5 +1,21 @@
 # CHANGELOG
 
+## [2026-05-22] — Fix lỗi "no such column: ten_task" trong Nhiệm vụ quá hạn
+- `tabs/tab_trang_thai_nguon.py` `_render_he_thong` — query `tien_do_task` dùng sai tên cột `ten_task` → sửa thành `tieu_de` (đúng theo schema db.py dòng 214)
+
+## [2026-05-22] — Fix lỗi DuckDB query "Ngày số liệu not found" trong Tệp nguồn
+- `tabs/tab_trang_thai_nguon.py` dòng ~191 — kiểm tra schema parquet trước khi chạy DuckDB query; nếu cột `COT_NGAY_SL` / `COT_TEN_PGD` không tồn tại → hiển thị `st.info` thay vì lỗi
+
+## [2026-05-22] — Hoàn thiện tab Trạng thái Nguồn dữ liệu + gộp backup sidebar
+- `tabs/tab_trang_thai_nguon.py` dòng 88,100,110 — fix `except Exception:` → `except Exception as e:` trong `_ts_fmt`, `_size_fmt`, `_pgd_slug_local`
+- `tabs/tab_trang_thai_nguon.py` dòng 463,552,671 — fix tương tự trong `_render_nguoi_dung`, `_render_he_thong` (credentials + parse backup date)
+- `tabs/tab_trang_thai_nguon.py` dòng 118-128 — thay 3 hàm `_pgd_*_path()` bằng `_pgd_file_path(ten_pgd, loai)` dùng `duong_dan_pgd()` từ `data/pgd.py` — fix GQVL luôn hiển thị ❌
+- `tabs/tab_trang_thai_nguon.py` `_render_tep_nguon` — thêm cột CDTOTKVV + metric thứ 4 vào bảng upload 22 đơn vị
+- `tabs/tab_trang_thai_nguon.py` `_render_merge_cache` — thêm cột "Số dòng" và "PGD dùng SL cũ" vào bảng merge meta; thêm cảnh báo đỏ/vàng kèm expander khi có pgd_cu
+- `tabs/tab_trang_thai_nguon.py` `_render_merge_cache` — thêm section "🔬 Chất lượng dữ liệu" đọc từ `data_quality_meta_*` qua `lay_meta_chat_luong()`
+- `tabs/tab_trang_thai_nguon.py` `_render_he_thong` — thêm param `username`, thêm section "🔗 Sao lưu qua GitHub (kv_store)" gọi `db.luu_kv_sync_project()` / `db.doc_kv_sync_project()`
+- `app.py` dòng 335-381 — dọn block backup sidebar, thay bằng caption link hướng dẫn vào tab
+
 ## [2026-05-22] — Gắn "Tạo lại cache" vào nút "Phục hồi ngay"
 - `tabs/tab_trang_thai_nguon.py` dòng ~758 — thêm checkbox "🔄 Tạo lại cache Parquet sau khi phục hồi" (mặc định bật) ngay trước nút "Phục hồi ngay" trong sub-tab "💾 Hệ thống"
 - Sau khi `phuc_hoi_backup()` thành công, nếu checkbox được chọn: tự động xóa cache cũ → gọi `doc_file()` / `doc_file_nq11()` tạo lại cache từ Excel gốc trong `data/` → clear cache → ghi audit

@@ -142,7 +142,7 @@ Ràng buộc:
 ## Checklist trước khi gửi prompt
 
 ```
-□ Đã xác định đúng file và số dòng cần sửa (dùng FILE_INDEX.md)
+□ Đã xác định đúng file và số dòng cần sửa (dùng SCHEMA.md hoặc grep)
 □ Đã kiểm tra BUGMAP.md xem lỗi này đã có pattern fix chưa
 □ Đã paste đúng đoạn code liên quan (không paste cả file)
 □ Đã ghi rõ "không sửa gì" (prevent over-engineering)

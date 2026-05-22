@@ -442,6 +442,11 @@ def _render_canh_bao_som_pgd(tab, **kwargs) -> None:
     _lazy_tab("tab_canh_bao_som").render(tab, **kwargs)
 
 
+def _render_canh_bao_nqh_pgd(tab, **kwargs) -> None:
+    """Cảnh báo Tín dụng cho phân hệ PGD."""
+    _lazy_tab("tab_canh_bao_nqh").render(tab, **kwargs)
+
+
 def _banner_canh_bao_khd(df_pgd: pd.DataFrame, role: str) -> None:
     if df_pgd is None or df_pgd.empty:
         return
@@ -1689,6 +1694,7 @@ def render(**kwargs):
         "kiem_soat_rr": {
             "label": "🔍 Kiểm soát & Rủi ro",
             "tabs": [
+                ("🚨 Cảnh báo Tín dụng", lambda tab: _render_canh_bao_nqh_pgd(tab, **_pgd_df_kwargs, role=role, username=username, pgd_user=pgd_user)),
                 ("🔔 Đôn đốc KHĐ", lambda tab: _render_don_doc(df_pgd, pgd_user or pgd_filter or "", role)),
                 ("⚡ Cảnh báo sớm", lambda tab: _render_canh_bao_som_pgd(tab, **kwargs)),
                 ("💳 Nợ rủi ro QĐ62", lambda tab: _lazy_tab("tab_qd62").render(

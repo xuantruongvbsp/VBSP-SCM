@@ -54,7 +54,7 @@ slug = pgd_slug(ten_pgd) từ data/pgd.py
 ## 2.6 Tiền tệ — 3 lớp
   Nhập liệu : triệu đồng
   Lưu trữ   : VND (× 1.000.000)
-  Hiển thị  : fmt_ty() chia /1e12 ← KHÔNG phải /1e9
+  Hiển thị  : fmt_ty() chia /1e6 → triệu đồng (0 số lẻ, không có hậu tố "tỷ")
   from utils import fmt, fmt_ty, fmt_tien, fmt_pct, fmt_so
 
 ## 2.7 Phân quyền — dùng helper từ auth.py
@@ -115,7 +115,7 @@ slug = pgd_slug(ten_pgd) từ data/pgd.py
 - db.ghi_audit() sau mọi thao tác ghi
 - st.cache_data.clear() sau upload thành công
 - Upload qua upload_service.py
-- Tiền: nhập triệu → lưu VND → hiển thị fmt_ty() /1e12
+- Tiền: nhập triệu → lưu VND → hiển thị fmt_ty() /1e6 (triệu đồng, 0 số lẻ)
 - Phân quyền qua auth.py helpers
 - Không hardcode đường dẫn file
 - len(tab_names) == len(_tab_renderers) nếu sửa ws_*.py

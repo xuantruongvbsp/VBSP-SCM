@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## [2026-05-22] — Gộp section "Sao lưu qua GitHub" và "Backup dữ liệu" thành tab thống nhất
+- `tabs/tab_trang_thai_nguon.py` dòng ~676-920 — gộp 3 section cũ ("🔗 Sao lưu qua GitHub (kv_store)" + "🗄️ Backup dữ liệu" + "📤 Phục hồi từ bản backup") thành 1 section "🗄️ Sao lưu & Đồng bộ" với 2 tab:
+  - Tab "💾 Sao lưu hệ thống": backup toàn bộ DB/Parquet/PGD xlsx + danh sách backup + download zip + phục hồi từ zip
+  - Tab "🔗 Đồng bộ GitHub": xuất/nhập kv_sync.json để đồng bộ dữ liệu nghiệp vụ giữa các máy qua GitHub
+- Đổi label nút: "Sao lưu kv_store" → "Xuất ra kv_sync.json", "Phục hồi kv_store" → "Nhập từ kv_sync.json" để phân biệt rõ với backup hệ thống
+
 ## [2026-05-22] — Root-fix df=None: ws_management render() luôn build ALL_ITEMS mới
 - `workspaces/ws_management.py` dòng ~832 — xóa `st.session_state["_mgmt_all_items"] = all_items` khỏi `render_sidebar_menu()` (comment trước đó chưa xóa dòng code thực tế)
 - `workspaces/ws_management.py` dòng ~971 — `render()` luôn build fresh ALL_ITEMS (bỏ pop + if-None pattern)

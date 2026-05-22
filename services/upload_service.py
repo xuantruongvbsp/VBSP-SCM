@@ -667,7 +667,7 @@ def merge_baseline_toan_cn(loai: str, nam: int) -> KetQuaUpload:
             df[COT_TEN_PGD] = ten_pgd
             return ten_pgd, df, None
         except Exception as e:
-            logger.error("merge_baseline_toan_cn: lỗi đọc %s/%s/%d — %s", ten_pgd, loai, nam, e)
+            logger.error("merge_baseline_toan_cn: lỗi đọc %s/%s/%d — %s", ten_pgd, loai, nam, e, exc_info=True)
             return ten_pgd, None, str(e)
 
     frames: list[pd.DataFrame] = []

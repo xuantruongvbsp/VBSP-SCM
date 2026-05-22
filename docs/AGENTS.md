@@ -1,6 +1,6 @@
 # AGENTS.md — VBSP-SCM
 > File này là context chính cho Trae AI / Cline / Cursor. Đọc toàn bộ trước khi sinh code.
-> Cập nhật: 13/05/2026
+> Cập nhật: 22/05/2026
 
 ---
 
@@ -109,7 +109,7 @@ st.cache_data.clear()
 |---|---|
 | Nhập liệu | Triệu đồng |
 | Lưu trữ | VND (× 1.000.000) |
-| Hiển thị | `fmt_ty()` chia `/1e12` ← KHÔNG phải `/1e9` |
+| Hiển thị | `fmt_ty()` chia `/1e6` → **triệu đồng**, 0 số lẻ, không hậu tố |
 
 ```python
 from utils import fmt, fmt_tien, fmt_ty, fmt_pct, fmt_so
@@ -222,7 +222,7 @@ Snapshot (snapshot_service.py):
 - [ ] `st.cache_data.clear()` sau upload thành công
 - [ ] Upload qua `upload_service.py`
 - [ ] `luu_pgd_file(ten_pgd, loai, file_bytes)` — 3 tham số, không truyền username
-- [ ] Tiền: nhập triệu → lưu VND → hiển thị `fmt_ty()` chia `/1e12`
+- [ ] Tiền: nhập triệu → lưu VND → hiển thị `fmt_ty()` chia `/1e6` (triệu đồng, header cột ghi "(triệu đồng)")
 - [ ] `normalize_role(role)` trước khi check role
 - [ ] Dùng `la_phan_he_cn()` / `la_phan_he_pgd()` thay vì so sánh chuỗi role
 - [ ] Không hardcode đường dẫn file

@@ -2,7 +2,7 @@
 
 ## [2026-05-23] — Fix convention: thêm logger.error(exc_info=True) vào db.py
 - `db.py` dòng 1 — thêm `from logger import get_logger` + `logger = get_logger(__name__)`
-- `db.py` dòng ~89, ~657, ~680, ~715 — thêm `logger.error(..., exc_info=True)` vào 4 except block bị checker báo lỗi
+- `db.py` dòng ~89, ~657, ~680, ~715, ~746, ~775, ~1050, ~1100, ~1122 — thêm `logger.error(..., exc_info=True)` vào 9 except block bị checker báo lỗi (fix toàn bộ 9/9 vi phạm)
 
 ## [2026-05-23] — Fix dứt điểm: chữ trắng bóc bảng "Cơ cấu dư nợ theo chương trình tín dụng"
 - `tabs/tab_tongquan.py` dòng ~465 — bỏ HTML table thủ công (bị Streamlit dark mode CSS override không thể fix), thay bằng `hien_thi_dataframe_phan_trang` để Streamlit tự quản lý màu sắc light/dark

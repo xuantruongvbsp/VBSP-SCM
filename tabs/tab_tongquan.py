@@ -162,6 +162,13 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
     ts = kwargs.get("ts_hstd", 0.0)
 
     with ctx:
+        # ── Guard: chưa có dữ liệu ────────────────────────────────────────
+        if df is None or (hasattr(df, "empty") and df.empty):
+            st.warning(
+                "⚠️ **Chưa có dữ liệu HSTD.** "
+                "Vui lòng upload file HSTD qua tab **📤 Upload HSTD** → Merge dữ liệu."
+            )
+            return
         st.markdown(
             """
             <style>
@@ -521,6 +528,14 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
             )
             st.plotly_chart(fig_ct, use_container_width=True, key="ct_bar_top10")
 
+        else:
+            _miss_ct = [c for c in [COT_TEN_CT, COT_TONG_DU_NO] if c not in df.columns]
+            st.warning(
+                f"⚠️ Không hiển thị được cơ cấu dư nợ — "
+                f"thiếu cột: **{', '.join(_miss_ct)}**. "
+                "Hãy kiểm tra file HSTD hoặc merge lại dữ liệu."
+            )
+
         st.markdown("**🟢 Thông tin tổng quát theo PGD**")
         if COT_TEN_PGD in df.columns:
             col_khoanh = COT_DU_NO_KHOANH
@@ -687,8 +702,8 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                             .sum()
                         )
                         df_pgd = df_pgd.merge(df_to_pgd, on=COT_TEN_PGD, how="left")
-            except Exception:
-                logger.error("Lỗi trong khối except: %s", e, exc_info=True)
+            except Exception as e:
+                logger.error("Lỗi merge CDTOTKVV: %s", e, exc_info=True)
                 pass
 
             for cot in ["Tổng Tổ", "Tốt", "Khá", "TB", "Yếu"]:
@@ -724,8 +739,8 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                     _df_raw_pgd = tong_hop_tu_pgd_data()
                     if _df_raw_pgd is not None and not _df_raw_pgd.empty:
                         _df_to_pgd_map = tong_hop_theo_pgd(_df_raw_pgd)
-            except Exception:
-                logger.error("Lỗi trong khối except: %s", e, exc_info=True)
+            except Exception as e:
+                logger.error("Lỗi fallback CDTOTKVV từ pgd_data: %s", e, exc_info=True)
                 _df_to_pgd_map = None
 
             tong = {COT_TEN_PGD: "Toàn Chi nhánh"}

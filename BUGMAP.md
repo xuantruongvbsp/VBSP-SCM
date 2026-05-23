@@ -471,6 +471,18 @@ def render(**kwargs):
 
 ---
 
+### J3 — TypeError: tuple indices must be integers or slices, not tuple (openpyxl column width)
+
+| | |
+|---|---|
+| **File** | `services/tien_do_excel_service.py` dòng ~79, ~137 |
+| **Dấu hiệu** | `TypeError: tuple indices must be integers or slices, not tuple` khi gọi `xuat_excel_tien_do()` |
+| **Nguyên nhân** | `ws[row_start:row_end]` trả về tuple of row tuples (openpyxl); dùng thêm `[:, col_idx-1]` theo kiểu numpy 2D — không hợp lệ với plain tuple |
+| **Fix** | Thay `for cell in ws[ws.min_row:ws.max_row][:, col_idx-1]` → `for r in range(ws.min_row, ws.max_row+1): ws.cell(row=r, column=col_idx)` |
+| **Ngày fix** | 2026-05-23 |
+
+---
+
 ### J1 — UnboundLocalError: cannot access local variable 'X' where it is not associated with a value
 | | |
 |---|---|

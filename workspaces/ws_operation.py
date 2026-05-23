@@ -1696,7 +1696,7 @@ def render(**kwargs):
             "tabs": [
                 ("🚨 Cảnh báo Tín dụng", lambda tab: _render_canh_bao_nqh_pgd(tab, **_pgd_df_kwargs, role=role, username=username, pgd_user=pgd_user)),
                 ("🔔 Đôn đốc KHĐ", lambda tab: _render_don_doc(df_pgd, pgd_user or pgd_filter or "", role)),
-                ("⚡ Cảnh báo sớm", lambda tab: _render_canh_bao_som_pgd(tab, **kwargs)),
+                ("⚡ Nợ đến hạn có nguy cơ", lambda tab: _render_canh_bao_som_pgd(tab, **kwargs)),
                 ("💳 Nợ rủi ro QĐ62", lambda tab: _lazy_tab("tab_qd62").render(
                     mode="pgd", pgd_filter=pgd_user or pgd_filter
                 )),

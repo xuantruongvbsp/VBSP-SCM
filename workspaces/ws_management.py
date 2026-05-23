@@ -20,7 +20,7 @@ from config import (
     COT_TEN_PGD, COT_MA_KH, COT_SO_KU, COT_TEN_KH,
     COT_DU_NO_QH, COT_TONG_DU_NO, COT_DU_NO_TH, COT_TEN_CT,
     COT_NGAY_DH, COT_TINH_TRANG, COT_SDT,
-    COT_LAI_TON, COT_LAI_THANG, COT_DVUT, COT_MUC_VAY,
+    COT_LAI_TON, COT_LAI_TON_QH, COT_LAI_THANG, COT_DVUT, COT_MUC_VAY,
     COT_NGAY_VAY, COT_THOI_HAN, COT_LAI_SUAT,
     TEMPLATES_DIR, TAG_MAP,
 )
@@ -81,6 +81,12 @@ def _render_canh_bao(df: pd.DataFrame, ds_pgd_all: list):
     df_amber    = canh_bao_migration_cached(df_kh)
     amber_tong  = len(df_amber)
     tl_khd      = khd_tong / tong_mon * 100 if tong_mon > 0 else 0
+    tong_lai_khd = 0.0
+    if not df_kh.empty and "is_3m_inactive" in df_kh.columns:
+        df_khd = df_kh[df_kh["is_3m_inactive"]]
+        for col in (COT_LAI_TON, COT_LAI_TON_QH):
+            if col in df_kh.columns:
+                tong_lai_khd += pd.to_numeric(df_khd[col], errors="coerce").fillna(0).sum()
 
     kpi_row([
         {"label": "Tổng món vay", "value": tong_mon, "icon": "📊", "suffix": "", "precision": 0,
@@ -931,7 +937,7 @@ def render_sidebar_menu(role: str, username: str, **kwargs):
                 if st.button(
                     f"{arrow} {item['label']}",
                     key=f"menu_acc_{item['label']}",
-                    width="stretch",
+                    use_container_width=True,
                 ):
                     st.session_state[open_key] = not is_open
                     st.rerun()
@@ -955,7 +961,7 @@ def render_sidebar_menu(role: str, username: str, **kwargs):
                             if st.button(
                                 f"\u21b3 {child['label']}",
                                 key=f"menu_child_{child['label']}",
-                                width="stretch",
+                                use_container_width=True,
                             ):
                                 st.session_state["ws_mgmt_menu"] = child["label"]
                                 st.rerun()

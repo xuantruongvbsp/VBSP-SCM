@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## [2026-05-23] — Sắp xếp lại tab Upload: phân nhóm Hiện tại vs 31/12 bằng st.tabs()
+- `tabs/tab_upload_khnv.py` — dời bảng trạng thái 22 đơn vị lên đầu trang; bọc 4 expander cũ vào 3 tab: "📊 Dữ liệu Hiện tại" (Import + Tổng hợp), "📅 Mốc 31/12" (Baseline), "⚙️ Quản trị" (Xóa dữ liệu); bỏ expander khỏi `_render_xoa_du_lieu()` và `_render_upload_baseline()`
+- `tabs/tab_upload_pgd.py` — tách CDTOTKVV ra tab "🏆 Chấm điểm Tổ TK&VV" riêng; HSTD/NQ11/GQVL trong tab "📊 Sao kê"; thêm tham số `loai_filter` vào `_render_upload_form()`
+
 ## [2026-05-23] — Fix checker: multiline detection LOGGER + sửa 28 vi phạm (147 → 0)
 - `scripts/check_conventions.py` dòng ~137 — checker chỉ check từng dòng đơn lẻ `except Exception as e:`, gây 118 false positive
   - Fix: kiểm tra 3 dòng tiếp theo có `exc_info=True` không → giảm từ 147 xuống 29 vi phạm thực sự

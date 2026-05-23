@@ -9,7 +9,16 @@ from datetime import datetime, timedelta
 from pathlib import Path
 import streamlit as st
 import db
-from config import CACHE_GQVL
+from config import (
+    CACHE_GQVL,
+    COT_DU_NO_KHOANH,
+    COT_NGAY_HH_KHOANH,
+    COT_SO_KU,
+    COT_TEN_KH,
+    COT_TEN_PGD,
+    COT_TEN_TO_TRUONG,
+    COT_TEN_XA,
+)
 
 NGUONG_NGAY_UPLOAD_CU = 3   # cảnh báo nếu file chưa merge quá 3 ngày
 
@@ -86,12 +95,12 @@ def canh_bao_no_khoanh_sap_het_han(df_kh: pd.DataFrame) -> dict:
     import pandas as pd
     from datetime import date
 
-    if df_kh is None or df_kh.empty or 'Ngày hết hạn Khoanh' not in df_kh.columns:
+    if df_kh is None or df_kh.empty or COT_NGAY_HH_KHOANH not in df_kh.columns:
         return {'so_khan': 0, 'so_canh_bao': 0, 'chi_tiet_khan': [], 'chi_tiet_canh_bao': []}
 
     df = df_kh.copy()
     df['_ngay_het'] = pd.to_datetime(
-        df['Ngày hết hạn Khoanh'], errors='coerce', dayfirst=True,
+        df[COT_NGAY_HH_KHOANH], errors='coerce', dayfirst=True,
     )
     df = df.dropna(subset=['_ngay_het'])
 
@@ -101,7 +110,8 @@ def canh_bao_no_khoanh_sap_het_han(df_kh: pd.DataFrame) -> dict:
     khan = df[df['con_lai'] <= 30]
     canh_bao = df[(df['con_lai'] > 30) & (df['con_lai'] <= 180)]
 
-    cols = ['Số khế ước', 'Tên PGD', 'Tên xã', 'Tên KH', 'Ngày hết hạn Khoanh', 'con_lai']
+    cols = [COT_SO_KU, COT_TEN_PGD, COT_TEN_XA, COT_TEN_KH,
+            COT_DU_NO_KHOANH, COT_NGAY_HH_KHOANH, COT_TEN_TO_TRUONG, 'con_lai']
     cols = [c for c in cols if c in df.columns]
 
     return {
@@ -128,7 +138,7 @@ def render_badge_no_khoanh_sap_het_han(df_full) -> None:
 
     if data['so_khan'] > 0:
         if st.sidebar.button(
-            f"🔴 {data['so_khan']} món hết hạn khoanh",
+            f"🔴 {data['so_khan']} món phải kiểm tra nợ khoanh",
             key="alert_khoanh_khan_2",
         ):
             _jump_to_khoanh()

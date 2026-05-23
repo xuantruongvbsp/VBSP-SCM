@@ -18,6 +18,13 @@ from io import BytesIO
 import pandas as pd
 
 import db
+try:
+    from logger import get_logger
+    logger = get_logger(__name__)
+except Exception as e:
+    logger.error("Lỗi trong khối except: %s", e, exc_info=True)
+    import logging
+    logger = logging.getLogger(__name__)
 from config import (
     CHUONG_TRINH_KHTD,
     COT_MA_CHUONG_TRINH,
@@ -70,7 +77,8 @@ def _doc_kv_dict(key: str) -> dict:
         with db.get_conn() as conn:
             row = conn.execute("SELECT value FROM kv_store WHERE key=?", (key,)).fetchone()
         return json.loads(row["value"]) if row else {}
-    except Exception:
+    except Exception as e:
+        logger.error("_doc_kv_dict: lỗi đọc kv key=%s — %s", key, e, exc_info=True)
         return {}
 
 
@@ -80,7 +88,8 @@ def _doc_kv_list(key: str) -> list:
             row = conn.execute("SELECT value FROM kv_store WHERE key=?", (key,)).fetchone()
         val = json.loads(row["value"]) if row else []
         return val if isinstance(val, list) else []
-    except Exception:
+    except Exception as e:
+        logger.error("_doc_kv_list: lỗi đọc kv key=%s — %s", key, e, exc_info=True)
         return []
 
 
@@ -93,7 +102,8 @@ def _luu_kv(key: str, data, username: str) -> bool:
             )
             conn.commit()
         return True
-    except Exception:
+    except Exception as e:
+        logger.error("_luu_kv: lỗi ghi kv key=%s — %s", key, e, exc_info=True)
         return False
 
 

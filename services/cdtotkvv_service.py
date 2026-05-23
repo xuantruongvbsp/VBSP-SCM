@@ -17,6 +17,13 @@ from config import (
 )
 from data.pgd import duong_dan_pgd as _duong_dan_pgd
 from utils import fmt_so
+try:
+    from logger import get_logger
+    logger = get_logger(__name__)
+except Exception as e:
+    logger.error("Lỗi trong khối except: %s", e, exc_info=True)
+    import logging
+    logger = logging.getLogger(__name__)
 
 
 def tong_hop_tu_pgd_data() -> "pd.DataFrame | None":
@@ -35,7 +42,8 @@ def tong_hop_tu_pgd_data() -> "pd.DataFrame | None":
             df = df[pd.to_numeric(df["stt"], errors="coerce").notna()].reset_index(drop=True)
             if not df.empty:
                 frames.append(df)
-        except Exception:
+        except Exception as e:
+            logger.warning("tong_hop_tu_pgd_data: bỏ qua đơn vị lỗi — %s", e, exc_info=True)
             continue
     return pd.concat(frames, ignore_index=True) if frames else None
 

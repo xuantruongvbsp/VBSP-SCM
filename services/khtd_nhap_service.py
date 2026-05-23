@@ -11,6 +11,13 @@ import pandas as pd
 
 import db
 from config import CHUONG_TRINH_KHTD
+try:
+    from logger import get_logger
+    logger = get_logger(__name__)
+except Exception as e:
+    logger.error("Lỗi trong khối except: %s", e, exc_info=True)
+    import logging
+    logger = logging.getLogger(__name__)
 
 
 def clean_sheet_name(name: str) -> str:
@@ -98,8 +105,8 @@ def doc_meta_qd(kv_key: str) -> list[dict]:
             if row:
                 val = json.loads(row["value"])
                 return val if isinstance(val, list) else []
-    except Exception:
-        pass
+    except Exception as e:
+        logger.error("doc_cbtd_list: lỗi đọc kv key=%s — %s", kv_key, e, exc_info=True)
     return []
 
 

@@ -25,9 +25,11 @@ from config import (
 from services.hhi_service import danh_gia_hhi, tinh_hhi, tinh_hhi_breakdown
 from services.migration_service import migration_matrix
 from utils import fmt_so, fmt_ty
+import streamlit as st
 
 
-def agg_mot_pgd(df: pd.DataFrame) -> dict:
+@st.cache_data(ttl=300, show_spinner=False)
+def agg_mot_pgd(df: pd.DataFrame) -> dict[str, float | int]:
     """Tổng hợp các chỉ tiêu chính cho 1 DataFrame (1 PGD hoặc toàn CN)."""
     if df is None or df.empty:
         return {
@@ -50,12 +52,13 @@ def agg_mot_pgd(df: pd.DataFrame) -> dict:
     }
 
 
+@st.cache_data(ttl=300, show_spinner=False)
 def agg_theo_pgd(df: pd.DataFrame) -> pd.DataFrame:
     """Tổng hợp chỉ tiêu theo từng PGD, thêm hàng tổng."""
     if df is None or df.empty or COT_TEN_PGD not in df.columns:
         return pd.DataFrame()
-
-    agg_spec: dict = {
+    
+    agg_spec: dict[str, tuple[str, str]] = {
         "tong_du_no": (COT_TONG_DU_NO, "sum"),
         "du_no_th":   (COT_DU_NO_TH, "sum"),
         "du_no_qh":   (COT_DU_NO_QH, "sum"),
@@ -86,7 +89,7 @@ def agg_theo_dvut(df: pd.DataFrame) -> pd.DataFrame:
     if df is None or df.empty or COT_DVUT not in df.columns:
         return pd.DataFrame()
 
-    agg_spec: dict = {
+    agg_spec: dict[str, tuple[str, str]] = {
         "tong_du_no": (COT_TONG_DU_NO, "sum"),
         "du_no_qh":   (COT_DU_NO_QH, "sum"),
         "so_ho":      (COT_MA_KH, "nunique"),

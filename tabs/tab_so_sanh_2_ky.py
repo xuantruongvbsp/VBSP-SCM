@@ -14,7 +14,7 @@ import plotly.graph_objects as go
 from streamlit.delta_generator import DeltaGenerator
 
 from auth import normalize_role, la_phan_he_pgd
-from utils import get_tab_context, fmt_ty, fmt_so, xuat_excel
+from utils import get_tab_context, fmt_ty, fmt_so, xuat_excel, lazy_expander as _lazy_expander
 import db
 from snapshot_service import (
     danh_sach_ky, doc_snapshot,
@@ -377,24 +377,6 @@ def _render_export(agg1: dict, agg2: dict,
     ):
         db.ghi_audit(username, "xuat_bieu_cn",
                      f"Xuất Excel so sánh 2 kỳ: {ky1} vs {ky2}")
-
-
-# ──────────────────────────────────────────────
-# LAZY EXPANDER HELPER
-# ──────────────────────────────────────────────
-
-def _lazy_expander(label: str, key: str) -> bool:
-    """Chỉ render nội dung khi user nhấn mở lần đầu — tránh compute khi expander đóng."""
-    s_loaded = f"_ss2k_lazy_{key}"
-    if st.session_state.get(s_loaded, False):
-        with st.expander(label, expanded=True):
-            return True
-    with st.expander(label, expanded=False):
-        st.caption("👆 Nhấn để tải phân tích này")
-        if st.button("📊 Tải", key=f"_ss2k_lazy_btn_{key}", use_container_width=True):
-            st.session_state[s_loaded] = True
-            st.rerun()
-    return False
 
 
 # ──────────────────────────────────────────────

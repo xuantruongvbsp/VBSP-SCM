@@ -1,5 +1,28 @@
 # CHANGELOG
 
+## [2026-05-23] — Viết test data/core.py (21 cases, 100% pass)
+- `tests/test_core.py` — 7 cases cho `excel_to_parquet()`: roundtrip, cache hit, stale cache, post_fn, tự tạo thư mục cha, thiếu Excel raise, sai sheet raise
+- `tests/test_core.py` — 4 cases cho `tong_hop_du_no_pgd()`: output columns, group-by PGD+CT, lọc dư nợ=0, file not found
+- `tests/test_core.py` — 5 cases cho `dem_no_qua_han_pgd()`: output columns, filter NQH>0, sort DESC, all-zero, file not found
+- `tests/test_core.py` — 5 cases cho `tong_hop_theo_xa()`: output columns, filter by PGD, group-by xã+CT, wrong PGD, file not found
+
+## [2026-05-23] — Viết test data/hstd.py (29 cases, 100% pass)
+- `tests/test_hstd.py` — 17 cases cho `danh_dau_khong_hd()`: priority-1 path (ngày GDGN), priority-2 path (lãi tồn), exclusion mask (dư nợ=0, dư nợ khoanh, mã CT HSSV), multi-row, fallback thiếu cột
+- `tests/test_hstd.py` — 12 cases cho `canh_bao_migration()`: 2 mức cảnh báo (🔴/⚠️), điều kiện loại trừ (phân loại≠E, KHĐ rồi, lãi=0, < ngưỡng), auto-compute is_3m_inactive
+- `TEST_COVERAGE.md` — cập nhật data/hstd.py ✅
+
+## [2026-05-23] — Dọn dẹp code: logger + lazy_expander consolidation
+- `utils.py` — thêm `lazy_expander(label, key, expanded)`: expander lazy-load dùng chung, export public
+- `tabs/tab_so_sanh_ky.py` — xóa local `_lazy_expander`, import từ `utils.lazy_expander`
+- `tabs/tab_so_sanh_2_ky.py` — xóa local `_lazy_expander`, import từ `utils.lazy_expander`
+- `services/ct_discovery.py` — thêm logger; `except Exception as e` + `logger.error` cho 3 block
+- `services/du_phong_service.py` — thêm logger; `logger.error` cho 2 DuckDB query block
+- `services/cdtotkvv_service.py` — thêm logger; `logger.warning` cho loop continue
+- `services/khtd_mau07_service.py` — thêm logger; `logger.error` cho `_doc_kv_dict`, `_doc_kv_list`, `_luu_kv`
+- `services/khtd_nhap_service.py` — thêm logger; `logger.error` cho `doc_cbtd_list`
+- `services/file_detection_service.py` — `# conv: skip` cho 5 block detection/fallback trivial
+- `services/khnv_noi_bo_service.py` — `# conv: skip` cho 2 block font styling
+
 ## [2026-05-23] — ROADMAP.md mới — 4 giai đoạn phát triển
 - `ROADMAP.md` — viết lại roadmap mới với 4 giai đoạn: (1) Củng cố nền tảng (Test + Performance + Data Quality), (2) Báo cáo & Phân tích nâng cao, (3) DevOps & Vận hành, (4) Tích hợp & Mở rộng
 

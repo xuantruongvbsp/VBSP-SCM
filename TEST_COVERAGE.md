@@ -17,6 +17,8 @@
 
 ## A. Modules đã có test — services/
 
+| `data/core.py` | `test_core.py` | 21 | ✅ Cao | excel_to_parquet cache logic, 3 DuckDB queries |
+
 | Module | Test file | Cases | Mức độ | Ghi chú |
 |---|---|---|---|---|
 | `upload_service.py` | `test_upload_service.py` | 9 | 🟡 Trung bình | Validation file; chưa test merge path đầy đủ |
@@ -89,10 +91,10 @@
 
 | Module | Rủi ro | Ưu tiên |
 |---|---|---|
-| `data/hstd.py` — `danh_dau_khong_hd()` | Cao — logic 3 tháng KHĐ | 🔴 Cao |
-| `data/hstd.py` — `canh_bao_migration()` | Cao — migration BT→RR | 🔴 Cao |
-| `data/core.py` — `excel_to_parquet()` | Cao — đường vào toàn bộ dữ liệu | 🔴 Cao |
-| `data/core.py` — `tong_hop_du_no_pgd()`, `dem_no_qua_han_pgd()`, `tong_hop_theo_xa()` | Cao — DuckDB query trực tiếp trên parquet | 🔴 Cao |
+| `data/hstd.py` — `danh_dau_khong_hd()` | ✅ Có test (29 cases, test_hstd.py) | — |
+| `data/hstd.py` — `canh_bao_migration()` | ✅ Có test (29 cases, test_hstd.py) | — |
+| `data/core.py` — `excel_to_parquet()` | ✅ Có test (21 cases, test_core.py) | — |
+| `data/core.py` — `tong_hop_du_no_pgd()`, `dem_no_qua_han_pgd()`, `tong_hop_theo_xa()` | ✅ Có test (21 cases, test_core.py) | — |
 | `data/pgd.py` — `pgd_slug()`, `duong_dan_pgd()` | TB | 🟠 TB |
 | `data/khtd.py` — `doc_kehoach()`, `luu_kehoach()` | TB | 🟠 TB |
 | `data/giao_ban.py` — `tinh_so_lieu_van_xuoi()` | TB | 🟠 TB |

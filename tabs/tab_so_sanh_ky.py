@@ -57,7 +57,7 @@ from services.so_sanh_ky_service import (
     top_movers as _top_movers,
     phan_tich_hhi_pgd as _phan_tich_hhi_pgd,
 )
-from utils import fmt_so, fmt_ty
+from utils import fmt_so, fmt_ty, lazy_expander as _lazy_expander
 
 
 _DIM_OPTIONS = [
@@ -1334,23 +1334,6 @@ def _render_so_sanh_khtd(
         )
 
 
-def _lazy_expander(label: str, key: str, expanded: bool = False) -> bool:
-    """Expander chỉ render nội dung khi đã được mở ít nhất 1 lần."""
-    s_loaded = f"_lazy_loaded_{key}"
-    s_exp = f"_lazy_exp_{key}"
-    is_loaded = st.session_state.get(s_loaded, False)
-    if is_loaded:
-        is_open = st.session_state.get(s_exp, expanded)
-        with st.expander(label, expanded=is_open):
-            return True
-    else:
-        with st.expander(label, expanded=False):
-            st.caption("👆 Nhấn nút bên dưới để tải phân tích này")
-            if st.button("📊 Tải phân tích", key=f"_lazy_btn_{key}", use_container_width=True):
-                st.session_state[s_loaded] = True
-                st.session_state[s_exp] = True
-                st.rerun()
-            return False
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1417,9 +1400,10 @@ def render_moc_nam(tab: DeltaGenerator = None, **kwargs) -> None:
         )
 
         # ── Đọc baseline ──────────────────────────────────────────────────
-        fp_check = baseline_pgd_path(pgd_user if pgd_user else "hoi_so", chon_nam)
-        _ts = os.path.getmtime(fp_check) if os.path.exists(fp_check) else 0
-        df_bl_full = doc_baseline_merged(chon_nam, _ts=_ts)
+        with st.spinner("Đang tải dữ liệu mốc năm..."):
+            fp_check = baseline_pgd_path(pgd_user if pgd_user else "hoi_so", chon_nam)
+            _ts = os.path.getmtime(fp_check) if os.path.exists(fp_check) else 0
+            df_bl_full = doc_baseline_merged(chon_nam, _ts=_ts)
 
         if df_bl_full is None or df_bl_full.empty:
             st.warning(f"⚠️ Chưa có dữ liệu baseline 31/12/{chon_nam}.")
@@ -1439,7 +1423,12 @@ def render_moc_nam(tab: DeltaGenerator = None, **kwargs) -> None:
         agg_ht = _agg_mot_pgd(df_ht)
         agg_bl = _agg_mot_pgd(df_bl)
 
-        df_joined = join_by_loan(df_bl, df_ht)
+        # Lazy load expensive operations
+        df_joined = None
+        df_pgd_ht = None
+        df_pgd_bl = None
+        df_dvut_ht = None
+        df_dvut_bl = None
 
         ngay_sl = ""
         if COT_NGAY_SL in df_ht.columns:
@@ -1563,6 +1552,10 @@ def render_moc_nam(tab: DeltaGenerator = None, **kwargs) -> None:
         st.divider()
         if _lazy_expander("🔄 Vòng đời danh mục — Khế ước & Khách hàng", f"{key_prefix}vong_doi"):
 
+            # Lazy load joined data only when needed
+            if df_joined is None:
+                df_joined = join_by_loan(df_bl, df_ht)
+
             # Tính loan lifecycle
             prev_total_loans = agg_bl["so_ku"]
             curr_total_loans = agg_ht["so_ku"]
@@ -1651,8 +1644,11 @@ def render_moc_nam(tab: DeltaGenerator = None, **kwargs) -> None:
             st.divider()
             if _lazy_expander("🗺️ Chi tiết biến động theo PGD", f"{key_prefix}pgd_detail"):
 
-                df_pgd_ht = _agg_theo_pgd(df_full)
-                df_pgd_bl = _agg_theo_pgd(df_bl_full)
+                # Lazy load PGD aggregations only when needed
+                if df_pgd_ht is None:
+                    df_pgd_ht = _agg_theo_pgd(df_full)
+                if df_pgd_bl is None:
+                    df_pgd_bl = _agg_theo_pgd(df_bl_full)
 
                 if df_pgd_ht.empty or df_pgd_bl.empty:
                     st.info("Không đủ dữ liệu để so sánh theo PGD.")
@@ -1705,8 +1701,11 @@ def render_moc_nam(tab: DeltaGenerator = None, **kwargs) -> None:
         # ═══════════ KPI THEO HỘI ĐOÀN THỂ (ĐVUT) ══════════════════════════
         st.divider()
         if _lazy_expander("🏛️ So sánh theo Hội đoàn thể (ĐVUT)", f"{key_prefix}dvut"):
-            df_dvut_ht = _agg_theo_dvut(df_ht)
-            df_dvut_bl = _agg_theo_dvut(df_bl)
+            # Lazy load DVUT aggregations only when needed
+            if df_dvut_ht is None:
+                df_dvut_ht = _agg_theo_dvut(df_ht)
+            if df_dvut_bl is None:
+                df_dvut_bl = _agg_theo_dvut(df_bl)
 
             if df_dvut_ht.empty or df_dvut_bl.empty:
                 st.info("Không có cột Tên ĐVUT trong dữ liệu.")
@@ -1882,6 +1881,9 @@ def render_moc_nam(tab: DeltaGenerator = None, **kwargs) -> None:
         # ═══════════ ROLL RATE / CURE RATE (từ join trực tiếp) ══════════
         st.divider()
         with st.expander("📊 Roll rate / Cure rate", expanded=False):
+            # Lazy load joined data only when needed
+            if df_joined is None:
+                df_joined = join_by_loan(df_bl, df_ht)
             rc = roll_cure_rate(df_joined)
             st.markdown(
                 "**Roll rate** = tỷ lệ dư nợ Trong hạn ở kỳ trước chuyển sang Quá hạn kỳ này.  \n"

@@ -677,3 +677,25 @@ def lazy_tabs(labels: list[str], renderers: list, key: str = "lt",
                 renderer()
         except (ValueError, TypeError):
             renderer()
+
+
+def lazy_expander(label: str, key: str, expanded: bool = False) -> bool:
+    """
+    Expander chỉ render nội dung khi user nhấn mở lần đầu.
+
+    Trả về True nếu nên render nội dung, False nếu chưa cần.
+
+    Usage:
+        if lazy_expander("📋 Phân tích chi tiết", "my_key"):
+            _render_heavy_section()
+    """
+    s_loaded = f"_lazy_exp_loaded_{key}"
+    if st.session_state.get(s_loaded, False):
+        with st.expander(label, expanded=True):
+            return True
+    with st.expander(label, expanded=expanded):
+        st.caption("👆 Nhấn để tải phân tích này")
+        if st.button("📊 Tải", key=f"_lazy_exp_btn_{key}", use_container_width=True):
+            st.session_state[s_loaded] = True
+            st.rerun()
+    return False

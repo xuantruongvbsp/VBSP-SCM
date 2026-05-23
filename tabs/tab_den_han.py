@@ -114,11 +114,16 @@ def render(tab=None, role: str = None, **kwargs) -> None:
         return
 
     # ── Filters ──────────────────────────────────────────────────────
-    col_f1, col_f2, col_f3, col_f4, col_f5, col_f6 = st.columns(6)
-    with col_f1:
-        den_thang = st.slider(
-            "Xem trước (tháng)", min_value=1, max_value=12,
-            value=6, key=f"{key_prefix}den_han_slider")
+    _den_thang_map = {"1 tháng": 1, "3 tháng": 3, "6 tháng": 6, "12 tháng": 12}
+    den_thang = _den_thang_map[st.radio(
+        "Xem trước",
+        options=list(_den_thang_map.keys()),
+        index=2,
+        horizontal=True,
+        key=f"{key_prefix}den_han_radio",
+    )]
+
+    col_f2, col_f3, col_f4, col_f5, col_f6 = st.columns(5)
     with col_f2:
         if not la_phan_he_pgd(role) and COT_TEN_PGD in df_tinh.columns:
             ds_pgd_f = sorted(df_tinh[COT_TEN_PGD].dropna().unique().tolist())

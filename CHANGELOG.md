@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## [2026-05-23] — Highlight không gian làm việc đang chọn trong sidebar
+- `app.py` dòng ~272 — workspace đang active hiển thị div màu xanh dương gradient thay vì button, tạo phân biệt rõ với workspace chưa chọn (xanh lá)
+
+## [2026-05-23] — Khôi phục giao diện tab cha/tab con cho ws_operation và ws_management
+- `workspaces/ws_operation.py` dòng ~1752 — thay 2 `st.radio()` làm điều hướng nhóm/tab bằng `st.tabs()` lồng nhau (tab cha + tab con như trước)
+- `workspaces/ws_management.py` dòng ~844 — xóa vòng lặp đọc `ws_mgmt_grp_*` bị lỗi xung đột trạng thái nhiều nhóm radio
+- `workspaces/ws_management.py` dòng ~887 — thay `st.radio()` trong sidebar menu bằng `st.button()` + highlight HTML cho mục active (giống pattern accordion đã có)
+
 ## [2026-05-23] — Viết test 3 module mới + expand 2 module, fix bug tien_do_excel_service (80 cases)
 - `tests/test_file_detection_service.py` (mới) — 21 cases: md5_bytes/file, chuan_hoa_ten, ten_doc_ve_don_vi_chuan, kiem_tra_don_vi, nhan_dien_loai_tu_noi_dung
 - `tests/test_uy_thac_service.py` (mới) — 26 cases: tinh_theo_dvut, loc_mau06/15, co_du_lieu_to, kv_key_bb_ct_cx, 3 payload builders, doc/luu/cap_nhat bien_ban

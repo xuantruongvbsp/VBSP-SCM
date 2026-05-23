@@ -78,6 +78,17 @@ def excel_to_parquet(
             for col in list(df.columns):
                 if _should_force_str(col):
                     df[col] = _normalize_code_series(df[col])
+            # Sanitize object columns: bytes → str để tránh PyArrow
+            # "Expected bytes, got a 'float' object" khi gặp NaN trong cột binary
+            for col in list(df.columns):
+                if df[col].dtype == object:
+                    try:
+                        if df[col].dropna().apply(lambda x: isinstance(x, bytes)).any():
+                            df[col] = df[col].apply(
+                                lambda x: x.decode("utf-8", errors="replace") if isinstance(x, bytes) else x
+                            )
+                    except Exception:
+                        pass
             df.to_parquet(parquet_path, index=False, engine='pyarrow', compression='zstd', compression_level=3)
         except Exception as e:
             logger.error("excel_to_parquet: lỗi xử lý file %s → %s — %s", excel_path, parquet_path, e, exc_info=True)

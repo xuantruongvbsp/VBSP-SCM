@@ -268,6 +268,16 @@
 | **Fix** | `.encode('utf-8', errors='replace').decode('utf-8')` hoặc thay emoji surrogate bằng emoji an toàn |
 | **Ngày fix** | 2026-05-17 |
 
+### C12 — `canh_bao_tap_trung()` tính tỷ lệ % đến hạn sai (mẫu số bị thu nhỏ)
+| | |
+|---|---|
+| **File** | `data/den_han.py` → `canh_bao_tap_trung()`, `tabs/tab_den_han.py` ~dòng 159 |
+| **Dấu hiệu** | Cảnh báo ⚠️ hiện tỷ lệ ~48% (PGD Cẩm Mỹ, Trảng Bom...) thay vì ~10-15% thực tế |
+| **Nguyên nhân** | `tab_den_han.py` gọi `canh_bao_tap_trung(df_loc)` với `df_loc` đã bị lọc chỉ còn khoản đến hạn ≤N tháng. Bên trong hàm, `tong_pgd = df.groupby(PGD)[TONG_DU_NO].sum()` tính trên chính `df_loc` đó → mẫu số = tổng đến hạn ≤N tháng (không phải tổng dư nợ PGD). Kết quả: `ty_le = dư_nợ_1_tháng / dư_nợ_≤6_tháng` thay vì `/ tổng_dư_nợ_PGD` |
+| **Fix** | (1) Tạo `df_tinh_filtered` = `df_tinh` sau filter PGD/CT/ĐVUT nhưng **không** lọc tháng; (2) Truyền `df_tinh_filtered` vào `canh_bao_tap_trung()`; (3) Thêm `den_thang` param vào hàm để group theo toàn khoảng thay vì từng tháng riêng |
+| **Pattern tránh** | Không truyền DataFrame đã lọc thời gian vào hàm cần tính tỷ lệ trên tổng — luôn dùng dataset gốc (chỉ lọc dimension, không lọc metric) làm mẫu số |
+| **Ngày fix** | 2026-05-23 |
+
 ### C10 — DataFrame/Series rỗng gây crash
 | | |
 |---|---|
@@ -392,6 +402,15 @@
 | **Nguyên nhân** | Thiếu file font Times New Roman |
 | **Fix** | Đặt `assets/times.ttf` và `assets/timesbd.ttf`. Trên Windows tự tìm `C:/Windows/Fonts/` |
 
+### F5 — `UnboundLocalError: e` trong PDF fallback font handler
+| | |
+|---|---|
+| **File** | `tabs/tab_nhiem_vu.py` → `_xuat_pdf_nhiem_vu()` |
+| **Dấu hiệu** | Xuất PDF crash với `UnboundLocalError: cannot access local variable 'e'` khi font TTF không tìm thấy |
+| **Nguyên nhân** | `except Exception:` (không có biến) nhưng dòng tiếp theo gọi `logger.error(..., e, ...)` — `e` chưa được bind |
+| **Fix** | Đổi thành `except Exception as e:` để bind biến; log warning thay vì error vì fallback font là hành vi bình thường trên máy không có font |
+| **Ngày fix** | 2026-05-23 |
+
 ### F2 — `docx2pdf failed` / `Word not found`
 | | |
 |---|---|
@@ -472,6 +491,15 @@
 | **Nguyên nhân** | Check role bằng chuỗi thô: `if role == "admin"` thay vì dùng helper |
 | **Fix** | Dùng `from auth import la_phan_he_cn, la_phan_he_pgd, la_executive, la_admin_cn, normalize_role` |
 | **Bảng nhanh** | `la_phan_he_cn(role)` → executive/admin_cn/manager_cn/admin/manager. `la_phan_he_pgd(role)` → admin_pgd/manager_pgd/user_pgd/user |
+
+### I3 — `chuyenvien_cn` thấy giao diện CBTD thay vì giao diện Manager
+| | |
+|---|---|
+| **File** | `tabs/tab_nhiem_vu.py` dòng 568 (cũ) |
+| **Dấu hiệu** | User role `chuyenvien_cn` vào tab Nhiệm vụ thấy "Nhiệm vụ được giao" thay vì "Tổng quan / Danh sách / Tạo mới" |
+| **Nguyên nhân** | Check cứng `if role in ("admin_cn", "manager_cn"):` bỏ sót `chuyenvien_cn` |
+| **Fix** | Dùng `la_phan_he_cn(role) and not la_executive(role)` — bao gồm tất cả role CN trừ executive |
+| **Ngày fix** | 2026-05-23 |
 
 ### I2 — User thấy dữ liệu PGD khác
 | | |

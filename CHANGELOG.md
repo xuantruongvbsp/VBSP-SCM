@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## [2026-05-23] — Tăng tốc load mốc 31/12: tối ưu cache check và bytes scan
+- `data/hstd.py` — `doc_baseline_merged()`: check file size (< 1000 bytes = skip ngay) + mtime TRƯỚC rồi mới đọc full parquet; bytes scan O(n)→O(1)
+- `data/core.py` — `excel_to_parquet()`: bytes scan O(1)
+
+## [2026-05-23] — Tab Cảnh báo Tín dụng: thêm lọc Xã/Tổ trưởng phụ thuộc theo PGD
+- `tabs/tab_canh_bao_nqh.py` — Chuẩn hóa chuỗi lọc PGD → Xã → Tổ trưởng ở các sub-tab; danh sách Xã phụ thuộc PGD, danh sách Tổ trưởng phụ thuộc Xã; giữ nguyên các điều kiện lọc khác
+- `tabs/tab_den_han.py` — Mode "📊 Phân tích Đến hạn": thêm lọc Xã/Tổ trưởng theo PGD và áp dụng xuyên suốt chart/bảng theo cùng điều kiện
+
 ## [2026-05-23] — Tăng tốc load mốc 31/12: đọc 22 PGD song song thay vì tuần tự
 - `data/hstd.py` — `doc_baseline_merged()`: dùng `ThreadPoolExecutor(max_workers=8)` thay vòng lặp tuần tự; giảm thời gian rebuild từ ~40s xuống ~8s (Excel) hoặc ~1s→0.2s (parquet cache)
 - `tabs/tab_so_sanh_ky.py` — Bỏ `st.spinner("Đang tải dữ liệu mốc năm...")` trùng với spinner của `doc_baseline_merged`

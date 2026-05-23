@@ -78,6 +78,15 @@
 | **Fix** | Trước khi `to_parquet`, ép các cột định danh (`Mã *`, `Số khế ước`...) về string thống nhất (float nguyên → int → str; NaN → "") |
 | **Ngày fix** | 2026-05-23 |
 
+### A4d — Baseline 31/12 báo “chưa có dữ liệu” dù đã upload (cache baseline 0 cột)
+| | |
+|---|---|
+| **File** | `data/hstd.py` → `doc_baseline_merged()` và `data/core.py` → `excel_to_parquet()` |
+| **Dấu hiệu** | Tab So sánh kỳ báo `⚠️ Chưa có dữ liệu baseline 31/12/YYYY` trong khi `data/baseline_pgd/.../HSTD_3112_YYYY.XLSX` đã có; kiểm tra `cache/hstd_baseline_YYYY.parquet` thấy size rất nhỏ và đọc ra `(0, 0)` |
+| **Nguyên nhân** | Cache baseline đã bị ghi “rỗng/không hợp lệ” từ lần merge trước (do mixed dtype ở các cột định danh như `Số CMND`/`CCCD`/`Số điện thoại` khiến `to_parquet` fail hoặc dữ liệu bị clean sai). Logic cache chỉ so mtime nên không tự rebuild khi cache rỗng. |
+| **Fix** | (1) `doc_baseline_merged` coi cache rỗng hoặc `< 15 cột` là invalid → rebuild. (2) Chuẩn hóa thêm các cột định danh (`cmnd/cccd/sdt`) về string trước khi ghi parquet (cả ở `excel_to_parquet` và ngay trước `result.to_parquet` khi merge). |
+| **Ngày fix** | 2026-05-23 |
+
 ### A5 — DuckDB `Binder Error: Referenced column not found in FROM clause`
 | | |
 |---|---|

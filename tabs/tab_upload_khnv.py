@@ -71,10 +71,15 @@ def _hien_thi_bang_trang_thai() -> None:
         lay_trang_thai_upload_pgd(DS_DON_VI),
     ).copy()
 
-    # Thêm cột baseline 31/12 — hiển thị năm gần nhất có dữ liệu
-    ds_nam_bl = danh_sach_nam_baseline_pgd()
+    # Thêm cột baseline 31/12 — cache vào session_state để tránh rescan mỗi rerun
+    if "_blcache_nam_list" not in st.session_state:
+        st.session_state["_blcache_nam_list"] = danh_sach_nam_baseline_pgd()
+    ds_nam_bl = st.session_state["_blcache_nam_list"]
     nam_bl = ds_nam_bl[0] if ds_nam_bl else (_date.today().year - 1)
-    tt_bl = trang_thai_baseline_pgd(nam_bl)
+    _bl_tt_key = f"_blcache_tt_{nam_bl}"
+    if _bl_tt_key not in st.session_state:
+        st.session_state[_bl_tt_key] = trang_thai_baseline_pgd(nam_bl)
+    tt_bl = st.session_state[_bl_tt_key]
     col_bl = f"31/12/{nam_bl}"
     df_tt[col_bl] = df_tt["Đơn vị"].map(
         lambda dv: "✅ Có" if tt_bl.get(dv, False) else "❌ Chưa có"
@@ -757,88 +762,87 @@ def _thuc_hien_xoa(
 
 
 def _render_xoa_du_lieu(role: str, username: str) -> None:
-    """Expander xóa dữ liệu PGD — chỉ admin/manager."""
+    """Xóa dữ liệu PGD — chỉ admin/manager."""
     if not la_phan_he_cn(role) or normalize_role(role) == "executive":
         return
 
-    with st.expander("🗑️ Xóa dữ liệu PGD", expanded=False):
-        st.caption(
-            "Xóa file pgd_data/ của PGD — hệ thống tự động rebuild CACHE sau khi xóa."
-        )
+    st.caption(
+        "Xóa file pgd_data/ của PGD — hệ thống tự động rebuild CACHE sau khi xóa."
+    )
 
-        che_do = st.radio(
-            "Chế độ xóa",
-            ["Xóa từng PGD", "Xóa tất cả 22 đơn vị"],
-            horizontal=True,
-            key="xoa_pgd_che_do",
-        )
+    che_do = st.radio(
+        "Chế độ xóa",
+        ["Xóa từng PGD", "Xóa tất cả 22 đơn vị"],
+        horizontal=True,
+        key="xoa_pgd_che_do",
+    )
 
-        loai_xoa = st.multiselect(
-            "Loại dữ liệu cần xóa",
-            options=["hstd", "nq11", "gqvl", "cdtotkvv"],
-            default=["hstd", "nq11", "gqvl"],
-            format_func=lambda x: x.upper(),
-            key="xoa_pgd_loai",
-        )
+    loai_xoa = st.multiselect(
+        "Loại dữ liệu cần xóa",
+        options=["hstd", "nq11", "gqvl", "cdtotkvv"],
+        default=["hstd", "nq11", "gqvl"],
+        format_func=lambda x: x.upper(),
+        key="xoa_pgd_loai",
+    )
 
-        if not loai_xoa:
-            st.info("Chọn ít nhất 1 loại dữ liệu cần xóa.")
+    if not loai_xoa:
+        st.info("Chọn ít nhất 1 loại dữ liệu cần xóa.")
+        return
+
+    if che_do == "Xóa từng PGD":
+        # Chỉ hiện PGD đã có file
+        pgd_co_file = [
+            dv for dv in DS_DON_VI
+            if any(kiem_tra_file_ton_tai_pgd(dv, l) for l in loai_xoa)
+        ]
+        if not pgd_co_file:
+            st.info("ℹ️ Không có đơn vị nào có dữ liệu để xóa.")
             return
 
-        if che_do == "Xóa từng PGD":
-            # Chỉ hiện PGD đã có file
-            pgd_co_file = [
-                dv for dv in DS_DON_VI
-                if any(kiem_tra_file_ton_tai_pgd(dv, l) for l in loai_xoa)
-            ]
-            if not pgd_co_file:
-                st.info("ℹ️ Không có đơn vị nào có dữ liệu để xóa.")
-                return
+        ten_pgd_chon = st.selectbox(
+            "Chọn đơn vị cần xóa",
+            pgd_co_file,
+            key="xoa_pgd_chon_dv",
+        )
 
-            ten_pgd_chon = st.selectbox(
-                "Chọn đơn vị cần xóa",
-                pgd_co_file,
-                key="xoa_pgd_chon_dv",
+        # Preview file sẽ bị xóa
+        st.markdown("**File sẽ bị xóa:**")
+        cols_prev = st.columns(4)
+        for col, loai in zip(cols_prev, ["hstd", "nq11", "gqvl", "cdtotkvv"]):
+            co = kiem_tra_file_ton_tai_pgd(ten_pgd_chon, loai)
+            se_xoa = loai in loai_xoa and co
+            col.markdown(
+                f"**{loai.upper()}**  \n"
+                f"{'🗑️ Sẽ xóa' if se_xoa else ('⬜ Không có' if not co else '⏩ Bỏ qua')}"
             )
 
-            # Preview file sẽ bị xóa
-            st.markdown("**File sẽ bị xóa:**")
-            cols_prev = st.columns(4)
-            for col, loai in zip(cols_prev, ["hstd", "nq11", "gqvl", "cdtotkvv"]):
-                co = kiem_tra_file_ton_tai_pgd(ten_pgd_chon, loai)
-                se_xoa = loai in loai_xoa and co
-                col.markdown(
-                    f"**{loai.upper()}**  \n"
-                    f"{'🗑️ Sẽ xóa' if se_xoa else ('⬜ Không có' if not co else '⏩ Bỏ qua')}"
-                )
+        st.warning(
+            f"⚠️ Sẽ xóa **{', '.join(l.upper() for l in loai_xoa)}** "
+            f"của **{ten_pgd_chon}** và rebuild CACHE."
+        )
+        if st.button(
+            f"🗑️ Xác nhận xóa — {ten_pgd_chon}",
+            type="primary",
+            key="btn_xoa_1dv",
+        ):
+            _thuc_hien_xoa([ten_pgd_chon], loai_xoa, username)
 
-            st.warning(
-                f"⚠️ Sẽ xóa **{', '.join(l.upper() for l in loai_xoa)}** "
-                f"của **{ten_pgd_chon}** và rebuild CACHE."
-            )
+    else:  # Xóa tất cả
+        st.error(
+            f"⚠️ **CẢNH BÁO:** Sẽ xóa **{', '.join(l.upper() for l in loai_xoa)}** "
+            f"của **TẤT CẢ {len(DS_DON_VI)} đơn vị** và rebuild CACHE từ đầu."
+        )
+        xac_nhan = st.checkbox(
+            "Tôi hiểu hành động này không thể hoàn tác",
+            key="xoa_all_xac_nhan",
+        )
+        if xac_nhan:
             if st.button(
-                f"🗑️ Xác nhận xóa — {ten_pgd_chon}",
+                "🗑️ Xóa tất cả và rebuild CACHE",
                 type="primary",
-                key="btn_xoa_1dv",
+                key="btn_xoa_all",
             ):
-                _thuc_hien_xoa([ten_pgd_chon], loai_xoa, username)
-
-        else:  # Xóa tất cả
-            st.error(
-                f"⚠️ **CẢNH BÁO:** Sẽ xóa **{', '.join(l.upper() for l in loai_xoa)}** "
-                f"của **TẤT CẢ {len(DS_DON_VI)} đơn vị** và rebuild CACHE từ đầu."
-            )
-            xac_nhan = st.checkbox(
-                "Tôi hiểu hành động này không thể hoàn tác",
-                key="xoa_all_xac_nhan",
-            )
-            if xac_nhan:
-                if st.button(
-                    "🗑️ Xóa tất cả và rebuild CACHE",
-                    type="primary",
-                    key="btn_xoa_all",
-                ):
-                    _thuc_hien_xoa(DS_DON_VI, loai_xoa, username)
+                _thuc_hien_xoa(DS_DON_VI, loai_xoa, username)
 
 
 # ── Upload Baseline 31/12 ─────────────────────────────────────────────────────
@@ -852,297 +856,303 @@ _NHAN_BASELINE = {
 
 
 def _render_upload_baseline(username: str) -> None:
-    """Expander upload file mốc 31/12 (4 loại) per-PGD — bulk upload + tổng hợp thủ công."""
-    with st.expander("📅 Upload mốc số liệu 31/12 (Baseline)", expanded=False):
-        st.caption(
-            "Upload 4 loại file (HSTD, NQ11, GQVL, CDTOTKVV) cho ngày 31/12 — "
-            "định dạng y hệt file hàng ngày, nhưng ngày số liệu là 31/12."
-        )
+    """Upload file mốc 31/12 (4 loại) per-PGD — bulk upload + tổng hợp thủ công."""
+    st.caption(
+        "Upload 4 loại file (HSTD, NQ11, GQVL, CDTOTKVV) cho ngày 31/12 — "
+        "định dạng y hệt file hàng ngày, nhưng ngày số liệu là 31/12."
+    )
 
-        from datetime import date as _date
-        nam_mac_dinh = _date.today().year - 1
+    from datetime import date as _date
+    nam_mac_dinh = _date.today().year - 1
 
-        chon_nam = st.number_input(
-            "Năm cần upload (31/12/năm)",
-            min_value=2020,
-            max_value=_date.today().year,
-            value=nam_mac_dinh,
-            step=1,
-            key="upload_baseline_nam",
-        )
-        nam = int(chon_nam)
+    chon_nam = st.number_input(
+        "Năm cần upload (31/12/năm)",
+        min_value=2020,
+        max_value=_date.today().year,
+        value=nam_mac_dinh,
+        step=1,
+        key="upload_baseline_nam",
+    )
+    nam = int(chon_nam)
 
-        # ── Trạng thái 22 đơn vị × 4 loại ───────────────────────────
-        tt_loai = {loai: trang_thai_baseline_pgd_loai(nam, loai) for loai in LOAI_BASELINE}
-        da_co_hstd = sum(1 for v in tt_loai["hstd"].values() if v)
-        tong = len([DON_VI_CHI_NHANH] + DS_PGD)
+    # ── Trạng thái 22 đơn vị × 4 loại — cache vào session_state (92 os.path.exists/lần) ──
+    _tt_loai_key = f"_blcache_tt_loai_{nam}"
+    if _tt_loai_key not in st.session_state:
+        st.session_state[_tt_loai_key] = {
+            loai: trang_thai_baseline_pgd_loai(nam, loai) for loai in LOAI_BASELINE
+        }
+    tt_loai = st.session_state[_tt_loai_key]
+    da_co_hstd = sum(1 for v in tt_loai["hstd"].values() if v)
+    tong = len([DON_VI_CHI_NHANH] + DS_PGD)
 
-        cols_tt = st.columns(4)
-        for col, loai in zip(cols_tt, LOAI_BASELINE):
-            da_co = sum(1 for v in tt_loai[loai].values() if v)
-            nhan = _NHAN_BASELINE[loai]
-            if da_co == tong:
-                col.success(f"{nhan}\n\n✅ {da_co}/{tong}")
-            elif da_co > 0:
-                col.warning(f"{nhan}\n\n⏳ {da_co}/{tong}")
-            else:
-                col.info(f"{nhan}\n\n❌ 0/{tong}")
-
-        st.divider()
-
-        # ── Import hàng loạt: chọn file hoặc quét thư mục ──────────────
-        st.markdown("**📦 Import hàng loạt** — hệ thống tự nhận diện loại và PGD từ nội dung file")
-
-        tab_file, tab_folder = st.tabs(["📂 Chọn file", "📁 Quét thư mục"])
-
-        with tab_file:
-            st.info(
-                "**Cách chọn nhiều file:**  \n"
-                "• Windows: giữ **Ctrl** rồi click từng file, hoặc **Ctrl+A** "
-                "để chọn tất cả trong thư mục  \n"
-                "• Mac: giữ **⌘ Cmd** rồi click từng file  \n"
-                "• Hỗ trợ tối đa 88 file (22 PGD × 4 loại)"
-            )
-            _bl_ver = st.session_state.setdefault("bl_bulk_ver", 0)
-            uploaded = st.file_uploader(
-                "Chọn file baseline",
-                type=["xlsx", "xls"],
-                accept_multiple_files=True,
-                key=f"bl_bulk_{nam}_{_bl_ver}",
-                label_visibility="collapsed",
-            )
-            if uploaded:
-                _bl_ids_now = [(f.name, f.size) for f in uploaded]
-                if st.session_state.get("_bl_ids") != _bl_ids_now:
-                    st.session_state["_bl_ids"] = _bl_ids_now
-                    st.session_state["_bl_bytes"] = {f.name: f.read() for f in uploaded}
-
-        with tab_folder:
-            st.caption("Nhập đường dẫn thư mục chứa 4 loại file baseline 31/12 trên máy tính.")
-            thu_muc = st.text_input(
-                "Đường dẫn thư mục",
-                placeholder=r"Ví dụ: D:\Data\Baseline_3112_2025",
-                key="bl_folder_path",
-                label_visibility="collapsed",
-            )
-            if st.button("🔍 Quét thư mục", key="btn_bl_scan_folder"):
-                if not thu_muc or not os.path.isdir(thu_muc):
-                    st.error("❌ Thư mục không tồn tại.")
-                else:
-                    files = [f for f in Path(thu_muc).iterdir()
-                             if f.suffix.lower() in (".xlsx", ".xls")]
-                    if not files:
-                        st.warning("⚠️ Không có file Excel nào trong thư mục.")
-                    else:
-                        _bm: dict[str, bytes] = {}
-                        for f in files:
-                            try:
-                                _bm[f.name] = f.read_bytes()
-                            except Exception:
-                                logger.error("Lỗi trong khối except: %s", e, exc_info=True)
-                                pass
-                        st.session_state["_bl_bytes"] = _bm
-                        st.session_state["_bl_ids"] = [(k, len(v)) for k, v in _bm.items()]
-                        st.success(f"✅ Tìm thấy {len(_bm)} file.")
-                        st.rerun()
-
-        bytes_map: dict[str, bytes] = st.session_state.get("_bl_bytes", {})
-        if not bytes_map:
-            st.caption("Chưa có file nào.")
+    cols_tt = st.columns(4)
+    for col, loai in zip(cols_tt, LOAI_BASELINE):
+        da_co = sum(1 for v in tt_loai[loai].values() if v)
+        nhan = _NHAN_BASELINE[loai]
+        if da_co == tong:
+            col.success(f"{nhan}\n\n✅ {da_co}/{tong}")
+        elif da_co > 0:
+            col.warning(f"{nhan}\n\n⏳ {da_co}/{tong}")
         else:
-            # ── Tùy chọn ─────────────────────────────────────────────────
-            buoc_import = st.checkbox(
-                "🔁 Bắt buộc import lại (kể cả file giống hệt trên đĩa)",
-                value=False,
-                key="bl_force_import",
-            )
+            col.info(f"{nhan}\n\n❌ 0/{tong}")
 
-            # ── Nhận diện loại + PGD + so sánh MD5 ───────────────────────
-            rows: list[dict] = []
-            ds_don_vi_chuan = set([DON_VI_CHI_NHANH] + DS_PGD)
-            seen: dict[str, int] = {}  # key = "ten_pgd|loai"
+    st.divider()
 
-            with st.spinner("🔍 Đang nhận diện file..."):
-                for ten_file, data in bytes_map.items():
-                    loai = _nhan_dien_loai_tu_noi_dung(data)
-                    if loai is None:
-                        rows.append({
-                            "ten_file": ten_file, "loai": "❓",
-                            "ten_pgd": "—", "nhan_dien": False,
-                            "trang_thai": "❓ Không rõ loại",
-                            "so_sanh": "—", "co_the_import": False, "data": data,
-                        })
-                        continue
+    # ── Import hàng loạt: chọn file hoặc quét thư mục ──────────────
+    st.markdown("**📦 Import hàng loạt** — hệ thống tự nhận diện loại và PGD từ nội dung file")
 
-                    ten_pgd = _tim_ten_pgd_tu_noi_dung(data, loai)
-                    if ten_pgd:
-                        ten_pgd = _chuan_hoa_ten(ten_pgd)
+    tab_file, tab_folder = st.tabs(["📂 Chọn file", "📁 Quét thư mục"])
 
-                    if not ten_pgd or ten_pgd not in ds_don_vi_chuan:
-                        rows.append({
-                            "ten_file": ten_file, "loai": loai.upper(),
-                            "ten_pgd": ten_pgd or "❓", "nhan_dien": False,
-                            "trang_thai": "❓ Không rõ PGD",
-                            "so_sanh": "—", "co_the_import": False, "data": data,
-                        })
-                        continue
+    with tab_file:
+        st.info(
+            "**Cách chọn nhiều file:**  \n"
+            "• Windows: giữ **Ctrl** rồi click từng file, hoặc **Ctrl+A** "
+            "để chọn tất cả trong thư mục  \n"
+            "• Mac: giữ **⌘ Cmd** rồi click từng file  \n"
+            "• Hỗ trợ tối đa 88 file (22 PGD × 4 loại)"
+        )
+        _bl_ver = st.session_state.setdefault("bl_bulk_ver", 0)
+        uploaded = st.file_uploader(
+            "Chọn file baseline",
+            type=["xlsx", "xls"],
+            accept_multiple_files=True,
+            key=f"bl_bulk_{nam}_{_bl_ver}",
+            label_visibility="collapsed",
+        )
+        if uploaded:
+            _bl_ids_now = [(f.name, f.size) for f in uploaded]
+            if st.session_state.get("_bl_ids") != _bl_ids_now:
+                st.session_state["_bl_ids"] = _bl_ids_now
+                st.session_state["_bl_bytes"] = {f.name: f.read() for f in uploaded}
 
-                    dk = f"{ten_pgd}|{loai}"
-                    if dk in seen:
-                        rows[seen[dk]]["trang_thai"] = "⚠️ Trùng — bỏ qua (giữ file sau)"
-                        rows[seen[dk]]["co_the_import"] = False
-                        tt = "⚠️ Trùng — sẽ import (file này)"
-                    else:
-                        tt = "✅ Sẵn sàng"
+    with tab_folder:
+        st.caption("Nhập đường dẫn thư mục chứa 4 loại file baseline 31/12 trên máy tính.")
+        thu_muc = st.text_input(
+            "Đường dẫn thư mục",
+            placeholder=r"Ví dụ: D:\Data\Baseline_3112_2025",
+            key="bl_folder_path",
+            label_visibility="collapsed",
+        )
+        if st.button("🔍 Quét thư mục", key="btn_bl_scan_folder"):
+            if not thu_muc or not os.path.isdir(thu_muc):
+                st.error("❌ Thư mục không tồn tại.")
+            else:
+                files = [f for f in Path(thu_muc).iterdir()
+                         if f.suffix.lower() in (".xlsx", ".xls")]
+                if not files:
+                    st.warning("⚠️ Không có file Excel nào trong thư mục.")
+                else:
+                    _bm: dict[str, bytes] = {}
+                    for f in files:
+                        try:
+                            _bm[f.name] = f.read_bytes()
+                        except Exception:
+                            logger.error("Lỗi trong khối except: %s", e, exc_info=True)
+                            pass
+                    st.session_state["_bl_bytes"] = _bm
+                    st.session_state["_bl_ids"] = [(k, len(v)) for k, v in _bm.items()]
+                    st.success(f"✅ Tìm thấy {len(_bm)} file.")
+                    st.rerun()
 
-                    dest = baseline_pgd_path_loai(ten_pgd, nam, loai)
-                    if not os.path.exists(dest):
-                        so_sanh = "🆕 Chưa có"
-                        md5_ok = True
-                    else:
-                        giong = _md5_bytes(data) == _md5_file(dest)
-                        if giong:
-                            so_sanh = "🔁 Ghi đè" if buoc_import else "✅ Giống hệt"
-                            md5_ok = buoc_import
-                        else:
-                            so_sanh = "🔄 Có thay đổi"
-                            md5_ok = True
+    bytes_map: dict[str, bytes] = st.session_state.get("_bl_bytes", {})
+    if not bytes_map:
+        st.caption("Chưa có file nào.")
+    else:
+        # ── Tùy chọn ─────────────────────────────────────────────────
+        buoc_import = st.checkbox(
+            "🔁 Bắt buộc import lại (kể cả file giống hệt trên đĩa)",
+            value=False,
+            key="bl_force_import",
+        )
 
-                    co_the_import = tt in ("✅ Sẵn sàng", "⚠️ Trùng — sẽ import (file này)") and md5_ok
-                    seen[dk] = len(rows)
+        # ── Nhận diện loại + PGD + so sánh MD5 ───────────────────────
+        rows: list[dict] = []
+        ds_don_vi_chuan = set([DON_VI_CHI_NHANH] + DS_PGD)
+        seen: dict[str, int] = {}  # key = "ten_pgd|loai"
+
+        with st.spinner("🔍 Đang nhận diện file..."):
+            for ten_file, data in bytes_map.items():
+                loai = _nhan_dien_loai_tu_noi_dung(data)
+                if loai is None:
+                    rows.append({
+                        "ten_file": ten_file, "loai": "❓",
+                        "ten_pgd": "—", "nhan_dien": False,
+                        "trang_thai": "❓ Không rõ loại",
+                        "so_sanh": "—", "co_the_import": False, "data": data,
+                    })
+                    continue
+
+                ten_pgd = _tim_ten_pgd_tu_noi_dung(data, loai)
+                if ten_pgd:
+                    ten_pgd = _chuan_hoa_ten(ten_pgd)
+
+                if not ten_pgd or ten_pgd not in ds_don_vi_chuan:
                     rows.append({
                         "ten_file": ten_file, "loai": loai.upper(),
-                        "ten_pgd": ten_pgd, "nhan_dien": True,
-                        "trang_thai": tt, "so_sanh": so_sanh,
-                        "co_the_import": co_the_import, "data": data,
+                        "ten_pgd": ten_pgd or "❓", "nhan_dien": False,
+                        "trang_thai": "❓ Không rõ PGD",
+                        "so_sanh": "—", "co_the_import": False, "data": data,
                     })
+                    continue
 
-            # ── Preview table ─────────────────────────────────────────
-            so_trung = sum(1 for r in rows if "Trùng" in r.get("trang_thai", ""))
-            if so_trung:
-                st.warning(f"⚠️ Có **{so_trung}** file trùng — hệ thống giữ file cuối.")
+                dk = f"{ten_pgd}|{loai}"
+                if dk in seen:
+                    rows[seen[dk]]["trang_thai"] = "⚠️ Trùng — bỏ qua (giữ file sau)"
+                    rows[seen[dk]]["co_the_import"] = False
+                    tt = "⚠️ Trùng — sẽ import (file này)"
+                else:
+                    tt = "✅ Sẵn sàng"
 
-            def _style_tt(v: str) -> str:
-                if v.startswith("✅"): return "background-color:#d4edda;color:#155724;font-weight:bold"
-                if v.startswith("⚠️"): return "background-color:#fff3cd;color:#856404"
-                if v.startswith("❓"): return "background-color:#f8d7da;color:#721c24"
-                return ""
-
-            def _style_ss(v: str) -> str:
-                if v.startswith("🆕"): return "background-color:#d4edda;color:#155724;font-weight:bold"
-                if v.startswith("🔄"): return "background-color:#fff3cd;color:#856404;font-weight:bold"
-                if v.startswith("🔁"): return "background-color:#cce5ff;color:#004085;font-weight:bold"
-                if v.startswith("✅"): return "background-color:#e9ecef;color:#495057"
-                return ""
-
-            df_preview = pd.DataFrame([
-                {
-                    "Loại": r["loai"], "Tên file": r["ten_file"],
-                    "Đơn vị": r["ten_pgd"], "So sánh": r["so_sanh"],
-                    "Trạng thái": r["trang_thai"],
-                }
-                for r in rows
-            ])
-            st.dataframe(
-                df_preview.style
-                    .map(_style_tt, subset=["Trạng thái"])
-                    .map(_style_ss, subset=["So sánh"]),
-                use_container_width=True, hide_index=True,
-            )
-
-            co_the_import_list = [r for r in rows if r["co_the_import"]]
-            khong_nd  = [r for r in rows if not r["nhan_dien"]]
-            giong_het = [r for r in rows if r["nhan_dien"] and not r["co_the_import"]
-                         and r.get("so_sanh", "").startswith("✅")]
-            st.caption(
-                f"📊 Tổng **{len(rows)}** file · "
-                f"✅ Sẵn sàng **{len(co_the_import_list)}** · "
-                f"⏩ Giống hệt **{len(giong_het)}** · "
-                f"❓ Không nhận diện **{len(khong_nd)}**"
-            )
-
-            if not co_the_import_list:
-                st.warning("⚠️ Không có file nào hợp lệ để import.")
-            elif st.button(
-                f"📥 Import {len(co_the_import_list)} file baseline {nam}",
-                type="primary",
-                key="btn_luu_bulk_baseline",
-            ):
-                thanh_cong, that_bai = 0, []
-                for r in co_the_import_list:
-                    dest = baseline_pgd_path_loai(r["ten_pgd"], nam, r["loai"].lower())
-                    try:
-                        Path(dest).parent.mkdir(parents=True, exist_ok=True)
-                        with open(dest, "wb") as fh:
-                            fh.write(r["data"])
-                        mb = len(r["data"]) / 1024 / 1024
-                        db.ghi_audit(
-                            username, "upload_baseline",
-                            f"{r['loai']} 31/12/{nam} — {r['ten_pgd']} ({mb:.1f} MB)",
-                        )
-                        thanh_cong += 1
-                    except Exception as e:
-                        logger.error("Lỗi trong khối except: %s", e, exc_info=True)
-                        that_bai.append(f"{r['ten_pgd']} {r['loai']}: {e}")
-
-                st.cache_data.clear()
-                if thanh_cong:
-                    st.success(f"✅ Đã lưu **{thanh_cong}/{len(co_the_import_list)}** file baseline {nam}.")
-                if that_bai:
-                    st.error("❌ Lỗi:\n" + "\n".join(that_bai))
-
-                _bl_ver_new = st.session_state.get("bl_bulk_ver", 0) + 1
-                st.session_state["bl_bulk_ver"] = _bl_ver_new
-                st.session_state.pop("_bl_ids", None)
-                st.session_state.pop("_bl_bytes", None)
-                st.rerun()
-
-        # ── Tổng hợp thủ công Baseline ────────────────────────────────
-        st.divider()
-        st.markdown("**🔄 Tổng hợp thủ công** — gộp file baseline 22 đơn vị thành dữ liệu chung")
-        st.caption(
-            "Dùng sau khi upload đủ file baseline cho các đơn vị, hoặc khi cần rebuild cache 31/12."
-        )
-
-        loai_bl_chon = st.multiselect(
-            "Chọn loại cần tổng hợp",
-            options=list(LOAI_BASELINE),
-            default=["hstd", "nq11", "gqvl"],
-            format_func=lambda x: _NHAN_BASELINE.get(x, x.upper()),
-            key="bl_manual_merge_loai",
-        )
-        if st.button(
-            "🔄 Tổng hợp baseline ngay",
-            type="primary",
-            key="btn_bl_manual_merge",
-            disabled=not loai_bl_chon,
-        ):
-            if not loai_bl_chon:
-                st.warning("⚠️ Chọn ít nhất 1 loại.")
-            else:
-                tong_buoc = len(loai_bl_chon)
-                progress_bar = st.progress(0, text="⏳ Chuẩn bị tổng hợp baseline...")
-                for idx, loai in enumerate(loai_bl_chon):
-                    progress_bar.progress(
-                        idx / tong_buoc,
-                        text=f"🔄 Tổng hợp **{_NHAN_BASELINE.get(loai, loai.upper())}** "
-                             f"31/12/{nam} ({idx + 1}/{tong_buoc})...",
-                    )
-                    kq = merge_baseline_toan_cn(loai, nam)
-                    progress_bar.progress((idx + 1) / tong_buoc)
-                    if kq.thanh_cong:
-                        st.success(kq.thong_bao)
+                dest = baseline_pgd_path_loai(ten_pgd, nam, loai)
+                if not os.path.exists(dest):
+                    so_sanh = "🆕 Chưa có"
+                    md5_ok = True
+                else:
+                    giong = _md5_bytes(data) == _md5_file(dest)
+                    if giong:
+                        so_sanh = "🔁 Ghi đè" if buoc_import else "✅ Giống hệt"
+                        md5_ok = buoc_import
                     else:
-                        st.error(f"❌ {_NHAN_BASELINE.get(loai, loai.upper())}: {kq.thong_bao}")
+                        so_sanh = "🔄 Có thay đổi"
+                        md5_ok = True
 
-                progress_bar.progress(1.0, text="✅ Hoàn tất!")
-                st.cache_data.clear()
-                db.ghi_audit(
-                    username, "manual_merge_baseline",
-                    f"loai={loai_bl_chon} nam={nam}",
+                co_the_import = tt in ("✅ Sẵn sàng", "⚠️ Trùng — sẽ import (file này)") and md5_ok
+                seen[dk] = len(rows)
+                rows.append({
+                    "ten_file": ten_file, "loai": loai.upper(),
+                    "ten_pgd": ten_pgd, "nhan_dien": True,
+                    "trang_thai": tt, "so_sanh": so_sanh,
+                    "co_the_import": co_the_import, "data": data,
+                })
+
+        # ── Preview table ─────────────────────────────────────────
+        so_trung = sum(1 for r in rows if "Trùng" in r.get("trang_thai", ""))
+        if so_trung:
+            st.warning(f"⚠️ Có **{so_trung}** file trùng — hệ thống giữ file cuối.")
+
+        def _style_tt(v: str) -> str:
+            if v.startswith("✅"): return "background-color:#d4edda;color:#155724;font-weight:bold"
+            if v.startswith("⚠️"): return "background-color:#fff3cd;color:#856404"
+            if v.startswith("❓"): return "background-color:#f8d7da;color:#721c24"
+            return ""
+
+        def _style_ss(v: str) -> str:
+            if v.startswith("🆕"): return "background-color:#d4edda;color:#155724;font-weight:bold"
+            if v.startswith("🔄"): return "background-color:#fff3cd;color:#856404;font-weight:bold"
+            if v.startswith("🔁"): return "background-color:#cce5ff;color:#004085;font-weight:bold"
+            if v.startswith("✅"): return "background-color:#e9ecef;color:#495057"
+            return ""
+
+        df_preview = pd.DataFrame([
+            {
+                "Loại": r["loai"], "Tên file": r["ten_file"],
+                "Đơn vị": r["ten_pgd"], "So sánh": r["so_sanh"],
+                "Trạng thái": r["trang_thai"],
+            }
+            for r in rows
+        ])
+        st.dataframe(
+            df_preview.style
+                .map(_style_tt, subset=["Trạng thái"])
+                .map(_style_ss, subset=["So sánh"]),
+            use_container_width=True, hide_index=True,
+        )
+
+        co_the_import_list = [r for r in rows if r["co_the_import"]]
+        khong_nd  = [r for r in rows if not r["nhan_dien"]]
+        giong_het = [r for r in rows if r["nhan_dien"] and not r["co_the_import"]
+                     and r.get("so_sanh", "").startswith("✅")]
+        st.caption(
+            f"📊 Tổng **{len(rows)}** file · "
+            f"✅ Sẵn sàng **{len(co_the_import_list)}** · "
+            f"⏩ Giống hệt **{len(giong_het)}** · "
+            f"❓ Không nhận diện **{len(khong_nd)}**"
+        )
+
+        if not co_the_import_list:
+            st.warning("⚠️ Không có file nào hợp lệ để import.")
+        elif st.button(
+            f"📥 Import {len(co_the_import_list)} file baseline {nam}",
+            type="primary",
+            key="btn_luu_bulk_baseline",
+        ):
+            thanh_cong, that_bai = 0, []
+            for r in co_the_import_list:
+                dest = baseline_pgd_path_loai(r["ten_pgd"], nam, r["loai"].lower())
+                try:
+                    Path(dest).parent.mkdir(parents=True, exist_ok=True)
+                    with open(dest, "wb") as fh:
+                        fh.write(r["data"])
+                    mb = len(r["data"]) / 1024 / 1024
+                    db.ghi_audit(
+                        username, "upload_baseline",
+                        f"{r['loai']} 31/12/{nam} — {r['ten_pgd']} ({mb:.1f} MB)",
+                    )
+                    thanh_cong += 1
+                except Exception as e:
+                    logger.error("Lỗi trong khối except: %s", e, exc_info=True)
+                    that_bai.append(f"{r['ten_pgd']} {r['loai']}: {e}")
+
+            st.cache_data.clear()
+            if thanh_cong:
+                st.success(f"✅ Đã lưu **{thanh_cong}/{len(co_the_import_list)}** file baseline {nam}.")
+            if that_bai:
+                st.error("❌ Lỗi:\n" + "\n".join(that_bai))
+
+            _bl_ver_new = st.session_state.get("bl_bulk_ver", 0) + 1
+            st.session_state["bl_bulk_ver"] = _bl_ver_new
+            st.session_state.pop("_bl_ids", None)
+            st.session_state.pop("_bl_bytes", None)
+            for _k in [k for k in st.session_state if k.startswith("_blcache_")]:
+                st.session_state.pop(_k, None)
+            st.rerun()
+
+    # ── Tổng hợp thủ công Baseline ────────────────────────────────
+    st.divider()
+    st.markdown("**🔄 Tổng hợp thủ công** — gộp file baseline 22 đơn vị thành dữ liệu chung")
+    st.caption(
+        "Dùng sau khi upload đủ file baseline cho các đơn vị, hoặc khi cần rebuild cache 31/12."
+    )
+
+    loai_bl_chon = st.multiselect(
+        "Chọn loại cần tổng hợp",
+        options=list(LOAI_BASELINE),
+        default=["hstd", "nq11", "gqvl"],
+        format_func=lambda x: _NHAN_BASELINE.get(x, x.upper()),
+        key="bl_manual_merge_loai",
+    )
+    if st.button(
+        "🔄 Tổng hợp baseline ngay",
+        type="primary",
+        key="btn_bl_manual_merge",
+        disabled=not loai_bl_chon,
+    ):
+        if not loai_bl_chon:
+            st.warning("⚠️ Chọn ít nhất 1 loại.")
+        else:
+            tong_buoc = len(loai_bl_chon)
+            progress_bar = st.progress(0, text="⏳ Chuẩn bị tổng hợp baseline...")
+            for idx, loai in enumerate(loai_bl_chon):
+                progress_bar.progress(
+                    idx / tong_buoc,
+                    text=f"🔄 Tổng hợp **{_NHAN_BASELINE.get(loai, loai.upper())}** "
+                         f"31/12/{nam} ({idx + 1}/{tong_buoc})...",
                 )
-                st.toast("✅ Tổng hợp baseline hoàn tất!", icon="✅")
-                st.rerun()
+                kq = merge_baseline_toan_cn(loai, nam)
+                progress_bar.progress((idx + 1) / tong_buoc)
+                if kq.thanh_cong:
+                    st.success(kq.thong_bao)
+                else:
+                    st.error(f"❌ {_NHAN_BASELINE.get(loai, loai.upper())}: {kq.thong_bao}")
+
+            progress_bar.progress(1.0, text="✅ Hoàn tất!")
+            st.cache_data.clear()
+            db.ghi_audit(
+                username, "manual_merge_baseline",
+                f"loai={loai_bl_chon} nam={nam}",
+            )
+            st.toast("✅ Tổng hợp baseline hoàn tất!", icon="✅")
+            st.rerun()
 
 
 # ── Entry point ───────────────────────────────────────────────────────────────
@@ -1225,114 +1235,7 @@ def render(tab=None, **kwargs) -> None:
             "không phải tab Upload này."
         )
 
-        _render_upload_hang_loat(role, username)
-
-        _render_xoa_du_lieu(role, username)
-
-        _render_upload_baseline(username)
-
-        with st.expander("🔄 Tổng hợp toàn Chi nhánh thủ công",
-                         expanded=False):
-            st.caption(
-                "Dùng khi merge bị lỗi giữa chừng, hoặc sau khi "
-                "upload nhiều đơn vị liên tiếp cần gộp lại."
-            )
-            loai_chon = st.multiselect(
-                "Chọn loại cần tổng hợp",
-                options=["hstd", "nq11", "gqvl"],
-                default=["hstd", "nq11", "gqvl"],
-                format_func=lambda x: x.upper(),
-                key="khnv_manual_merge_loai",
-            )
-            if st.button("🔄 Tổng hợp ngay", type="primary",
-                         key="btn_manual_merge"):
-                if not loai_chon:
-                    st.warning("⚠️ Chọn ít nhất 1 loại.")
-                else:
-                    tong_buoc = len(loai_chon)
-                    progress_bar = st.progress(0, text="⏳ Chuẩn bị tổng hợp...")
-                    status_text = st.empty()
-
-                    for idx, loai in enumerate(loai_chon):
-                        pct_bat_dau = idx / tong_buoc
-                        pct_ket_thuc = (idx + 1) / tong_buoc
-
-                        progress_bar.progress(
-                            pct_bat_dau,
-                            text=f"🔄 Đang đọc và gộp **{loai.upper()}** "
-                                 f"({idx + 1}/{tong_buoc}) — "
-                                 f"đọc 22 đơn vị song song, vui lòng chờ..."
-                        )
-                        status_text.caption(
-                            f"⏳ {loai.upper()}: Đọc file từng PGD → gộp → ghi cache. "
-                            f"File lớn (~14MB) mất 10–30 giây lần đầu, "
-                            f"lần sau nhanh hơn nhờ cache."
-                        )
-
-                        kq = merge_du_lieu_toan_cn(loai)
-                        progress_bar.progress(pct_ket_thuc)
-
-                        if kq.thanh_cong:
-                            meta = lay_meta_merge(loai)
-                            so_pgd  = (meta or {}).get("so_pgd", "?")
-                            so_dong = (meta or {}).get("so_dong", 0)
-                            st.success(
-                                f"✅ **{loai.upper()}** — "
-                                f"**{so_pgd}** đơn vị · "
-                                f"**{fmt_so(so_dong)}** dòng"
-                            )
-                        else:
-                            st.error(f"❌ {loai.upper()}: {kq.thong_bao}")
-
-                    progress_bar.progress(1.0, text="✅ Hoàn tất!")
-                    status_text.empty()
-                    st.cache_data.clear()
-                    for _k in ["_ctx", "_ctx_cache_key", "_pgd_map_cache_ts", "_pgd_xa_map_cached", "_ds_pgd_all_cached", "df_full"]:
-                        st.session_state.pop(_k, None)
-
-                    db.ghi_audit(
-                        username,
-                        "manual_merge_toan_cn",
-                        f"loai={loai_chon}",
-                    )
-                    st.toast("✅ Tổng hợp hoàn tất!", icon="✅")
-                    st.rerun()
-
-        if "folder_import_ket_qua_merge" in st.session_state:
-            merge_rows = st.session_state.pop("folder_import_ket_qua_merge")
-            if merge_rows:
-                st.markdown("##### 🔄 Tổng hợp toàn Chi nhánh")
-                cols_merge = st.columns(len(merge_rows)) if merge_rows else []
-                for col_m, row in zip(cols_merge, merge_rows):
-                    loai_m = str(row.get("loai", "")).upper()
-                    sp = row.get("so_pgd")
-                    sd = row.get("so_dong")
-                    if row.get("thanh_cong"):
-                        col_m.success(
-                            f"**{loai_m}**\n\n"
-                            f"{'**' + str(sp) + '** đơn vị' if sp else ''}"
-                            f"{' · **' + fmt_so(sd) + '** dòng' if sd else ''}"
-                        )
-                    else:
-                        col_m.warning(f"**{loai_m}**\n\n{row.get('thong_bao', '')}")
-
-        # ── Hiển thị kết quả upload từ session_state ──────────────────────
-        if "khnv_ket_qua_upload" in st.session_state:
-            kq_map = st.session_state.pop("khnv_ket_qua_upload")
-            cols = st.columns(4)
-            for col, loai, nhan in zip(cols, ["hstd","nq11","gqvl","cdtotkvv"],
-                                       ["📊 HSTD","📑 NQ11","📋 GQVL","🏆 CDTOTKVV"]):
-                kq = kq_map.get(loai)
-                if kq is None: 
-                    col.info(f"**{nhan}**\n\nKhông có file")
-                elif kq["thanh_cong"]: 
-                    col.success(f"**{nhan}**\n\n{kq['thong_bao']}")
-                else: 
-                    col.warning(f"**{nhan}**\n\n{kq['thong_bao']}")
-
-        _fragment_merge_toan_cn()
-
-        st.markdown("---")
+        # ── Bảng trạng thái luôn hiển thị trên cùng ──────────────────
         col_tt, col_rf = st.columns([5, 1])
         with col_tt:
             st.markdown("#### 📋 Trạng thái Upload — 22 Đơn vị")
@@ -1343,6 +1246,125 @@ def render(tab=None, **kwargs) -> None:
                 use_container_width=True,
             ):
                 st.session_state.pop("trang_thai_upload_pgd", None)
+                for _k in [k for k in st.session_state if k.startswith("_blcache_")]:
+                    st.session_state.pop(_k, None)
                 st.rerun()
         with st.container(key="khnv_bang_trang_thai_upload"):
             _hien_thi_bang_trang_thai()
+
+        st.divider()
+
+        # ── 3 tab phân nhóm rõ ràng: Hiện tại | Mốc 31/12 | Quản trị ──
+        tab_ht, tab_bl, tab_qt = st.tabs([
+            "📊 Dữ liệu Hiện tại",
+            "📅 Mốc 31/12",
+            "⚙️ Quản trị",
+        ])
+
+        with tab_ht:
+            _render_upload_hang_loat(role, username)
+
+            with st.expander("🔄 Tổng hợp toàn Chi nhánh thủ công", expanded=False):
+                st.caption(
+                    "Dùng khi merge bị lỗi giữa chừng, hoặc sau khi "
+                    "upload nhiều đơn vị liên tiếp cần gộp lại."
+                )
+                loai_chon = st.multiselect(
+                    "Chọn loại cần tổng hợp",
+                    options=["hstd", "nq11", "gqvl"],
+                    default=["hstd", "nq11", "gqvl"],
+                    format_func=lambda x: x.upper(),
+                    key="khnv_manual_merge_loai",
+                )
+                if st.button("🔄 Tổng hợp ngay", type="primary",
+                             key="btn_manual_merge"):
+                    if not loai_chon:
+                        st.warning("⚠️ Chọn ít nhất 1 loại.")
+                    else:
+                        tong_buoc = len(loai_chon)
+                        progress_bar = st.progress(0, text="⏳ Chuẩn bị tổng hợp...")
+                        status_text = st.empty()
+
+                        for idx, loai in enumerate(loai_chon):
+                            pct_bat_dau = idx / tong_buoc
+                            pct_ket_thuc = (idx + 1) / tong_buoc
+
+                            progress_bar.progress(
+                                pct_bat_dau,
+                                text=f"🔄 Đang đọc và gộp **{loai.upper()}** "
+                                     f"({idx + 1}/{tong_buoc}) — "
+                                     f"đọc 22 đơn vị song song, vui lòng chờ..."
+                            )
+                            status_text.caption(
+                                f"⏳ {loai.upper()}: Đọc file từng PGD → gộp → ghi cache. "
+                                f"File lớn (~14MB) mất 10–30 giây lần đầu, "
+                                f"lần sau nhanh hơn nhờ cache."
+                            )
+
+                            kq = merge_du_lieu_toan_cn(loai)
+                            progress_bar.progress(pct_ket_thuc)
+
+                            if kq.thanh_cong:
+                                meta = lay_meta_merge(loai)
+                                so_pgd  = (meta or {}).get("so_pgd", "?")
+                                so_dong = (meta or {}).get("so_dong", 0)
+                                st.success(
+                                    f"✅ **{loai.upper()}** — "
+                                    f"**{so_pgd}** đơn vị · "
+                                    f"**{fmt_so(so_dong)}** dòng"
+                                )
+                            else:
+                                st.error(f"❌ {loai.upper()}: {kq.thong_bao}")
+
+                        progress_bar.progress(1.0, text="✅ Hoàn tất!")
+                        status_text.empty()
+                        st.cache_data.clear()
+                        for _k in ["_ctx", "_ctx_cache_key", "_pgd_map_cache_ts", "_pgd_xa_map_cached", "_ds_pgd_all_cached", "df_full"]:
+                            st.session_state.pop(_k, None)
+
+                        db.ghi_audit(
+                            username,
+                            "manual_merge_toan_cn",
+                            f"loai={loai_chon}",
+                        )
+                        st.toast("✅ Tổng hợp hoàn tất!", icon="✅")
+                        st.rerun()
+
+            if "folder_import_ket_qua_merge" in st.session_state:
+                merge_rows = st.session_state.pop("folder_import_ket_qua_merge")
+                if merge_rows:
+                    st.markdown("##### 🔄 Tổng hợp toàn Chi nhánh")
+                    cols_merge = st.columns(len(merge_rows)) if merge_rows else []
+                    for col_m, row in zip(cols_merge, merge_rows):
+                        loai_m = str(row.get("loai", "")).upper()
+                        sp = row.get("so_pgd")
+                        sd = row.get("so_dong")
+                        if row.get("thanh_cong"):
+                            col_m.success(
+                                f"**{loai_m}**\n\n"
+                                f"{'**' + str(sp) + '** đơn vị' if sp else ''}"
+                                f"{' · **' + fmt_so(sd) + '** dòng' if sd else ''}"
+                            )
+                        else:
+                            col_m.warning(f"**{loai_m}**\n\n{row.get('thong_bao', '')}")
+
+            if "khnv_ket_qua_upload" in st.session_state:
+                kq_map = st.session_state.pop("khnv_ket_qua_upload")
+                cols = st.columns(4)
+                for col, loai, nhan in zip(cols, ["hstd","nq11","gqvl","cdtotkvv"],
+                                           ["📊 HSTD","📑 NQ11","📋 GQVL","🏆 CDTOTKVV"]):
+                    kq = kq_map.get(loai)
+                    if kq is None:
+                        col.info(f"**{nhan}**\n\nKhông có file")
+                    elif kq["thanh_cong"]:
+                        col.success(f"**{nhan}**\n\n{kq['thong_bao']}")
+                    else:
+                        col.warning(f"**{nhan}**\n\n{kq['thong_bao']}")
+
+            _fragment_merge_toan_cn()
+
+        with tab_bl:
+            _render_upload_baseline(username)
+
+        with tab_qt:
+            _render_xoa_du_lieu(role, username)

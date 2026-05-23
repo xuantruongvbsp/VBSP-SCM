@@ -59,6 +59,7 @@ import db
 from widgets.status_widget import render_status_compact
 from alert_center import render_alert_sidebar
 from utils_theme import init_theme, get_theme_css
+from state_manager import SCMStateManager
 
 
 def _toi_uu_dtype(df: pd.DataFrame) -> pd.DataFrame:

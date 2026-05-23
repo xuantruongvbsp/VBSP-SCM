@@ -36,6 +36,9 @@ def excel_to_parquet(
             or " mã " in f" {s} "
             or s in {"mã thôn", "mã xã", "mã kh", "mã khách hàng", "mã chương trình"}
             or s in {"số khế ước", "số ku"}
+            or "cmnd" in s
+            or "cccd" in s
+            or s in {"số điện thoại", "điện thoại", "sdt", "sđt"}
         )
 
     def _normalize_code_series(ser: pd.Series) -> pd.Series:

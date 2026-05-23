@@ -89,29 +89,53 @@ def doc_baseline_merged(nam: int, _ts=0) -> pd.DataFrame | None:
         if not need_rebuild:
             return df_cache
 
-    # Rebuild: cache từng PGD bằng parquet → merge
+    # Rebuild: cache từng PGD bằng parquet → merge (song song để tăng tốc)
+    from concurrent.futures import ThreadPoolExecutor
+    from config import COT_TEN_PGD as _COT_TEN_PGD
+    from logger import get_logger as _get_logger
+    _rb_logger = _get_logger(__name__)
+
+    def _clean_fn(df_: pd.DataFrame) -> pd.DataFrame:
+        return df_.iloc[:, 1:].dropna(how="all")
+
+    def _load_one(dv_: str):
+        fp_ = baseline_pgd_path(dv_, nam)
+        if not os.path.exists(fp_):
+            return None
+        try:
+            path_pq_ = str(Path(fp_).with_suffix(".parquet"))
+            df_ = excel_to_parquet(fp_, path_pq_, "BCQUERY", 4, _clean_fn)
+            if df_ is not None and not df_.empty and len(df_.columns) >= _MIN_COLS:
+                if _COT_TEN_PGD not in df_.columns:
+                    df_ = df_.copy()
+                    df_[_COT_TEN_PGD] = dv_
+                return df_
+        except Exception as e_:
+            _rb_logger.error(
+                "doc_baseline_merged: lỗi đọc baseline %s (%d) — %s",
+                dv_, nam, e_, exc_info=True,
+            )
+        return None
+
     dfs = []
-    for dv in ds:
-        fp = baseline_pgd_path(dv, nam)
-        if os.path.exists(fp):
-            try:
-                path_pq = str(Path(fp).with_suffix(".parquet"))
-                def _clean(df): return df.iloc[:, 1:].dropna(how="all")
-                df = excel_to_parquet(fp, path_pq, "BCQUERY", 4, _clean)
-                if df is not None and (not df.empty) and len(df.columns) >= _MIN_COLS:
-                    from config import COT_TEN_PGD
-                    if COT_TEN_PGD not in df.columns:
-                        df = df.copy()
-                        df[COT_TEN_PGD] = dv
-                    dfs.append(df)
-            except Exception as e:
-                from logger import get_logger
-                _logger = get_logger(__name__)
-                _logger.error("doc_baseline_merged: lỗi đọc baseline %s (%d) — %s", dv, nam, e, exc_info=True)
-                continue
+    with ThreadPoolExecutor(max_workers=min(8, len(ds))) as _pool:
+        for _df in _pool.map(_load_one, ds):
+            if _df is not None:
+                dfs.append(_df)
 
     if dfs:
         result = pd.concat(dfs, ignore_index=True)
+        # Sanitize bytes → str: tránh PyArrow "Expected bytes, got float" khi có cột
+        # object chứa bytes từ cache cũ lẫn với NaN sau concat nhiều PGD
+        for _col in list(result.columns):
+            if result[_col].dtype == object:
+                try:
+                    if result[_col].dropna().apply(lambda x: isinstance(x, bytes)).any():
+                        result[_col] = result[_col].apply(
+                            lambda x: x.decode("utf-8", errors="replace") if isinstance(x, bytes) else x
+                        )
+                except Exception:
+                    pass
         try:
             import unicodedata as _ud
 

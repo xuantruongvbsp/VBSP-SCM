@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## [2026-05-23] — Fix upload crash: cache parquet cũ (int64 "Mã thôn") không được chuẩn hóa khi đọc lại
+- `data/core.py` dòng 87 — `excel_to_parquet()`: chuẩn hóa code columns sau khi đọc từ parquet cache (không chỉ khi ghi mới); xử lý cache cũ có dtype int64/float64 cho cột `Mã *`, `Số KU`... tránh lỗi `Expected bytes, got a 'int' object` khi merge toàn CN
+
+## [2026-05-23] — Tab So sánh kỳ: thêm xuất báo cáo Excel/PDF cho mốc 31/12
+- `tabs/tab_so_sanh_ky.py` — Thêm expander "📄 Xuất báo cáo" (tạo Excel multi-sheet: Tóm tắt/Chỉ tiêu/Tăng trưởng/Top biến động; PDF tóm tắt bảng chỉ tiêu); tiêu đề PDF kèm kỳ hiện tại và mốc 31/12
+
 ## [2026-05-23] — Thiết kế lại "📊 Phân tích Đến hạn" (tab_den_han.py)
 - `tabs/tab_den_han.py` — Thêm 3 filters mới (PGD/Chương trình/Hội đoàn thể); thêm metric Tỷ lệ dư nợ/tổng; cảnh báo tập trung dùng `canh_bao_tap_trung()`; tổ chức lại theo `st.tabs` 3 tab (Theo tháng / Theo nhóm / Danh sách); chart cột đổi màu urgency (đỏ ≤2, cam 3-4, vàng 5-6, xanh 7-12 tháng); gộp Excel+PDF vào action row trong Tab Danh sách; gọn phần Xuất PDF Group Header thành 3 cột ngang
 - `tabs/tab_den_han.py` — Import thêm `canh_bao_tap_trung` từ `data.den_han`, `hien_thi_dataframe_phan_trang` từ `utils`

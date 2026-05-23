@@ -1752,45 +1752,15 @@ def render(**kwargs):
     ds_key = list(nhom_kha_dung.keys())
     ds_label = [nhom_kha_dung[k]["label"] for k in ds_key]
 
-    nhom_chon = st.radio(
-        "Chọn nhóm công việc",
-        ds_label,
-        horizontal=True,
-        key="ws_op_nhom",
-    )
+    st.session_state.pop("ws_op_jump_tab", None)
 
-    idx_chon = ds_label.index(nhom_chon)
-    key_chon = ds_key[idx_chon]
-    tabs_info = nhom_kha_dung[key_chon]["tabs"]
-
-    ten_tabs = [t[0] for t in tabs_info]
-    renderers = [t[1] for t in tabs_info]
-
-    # ── Lazy tab — chỉ render tab đang chọn, không chạy tất cả ──────────
-    # (Streamlit st.tabs chạy ALL renderers mỗi rerun → dùng radio thay thế)
-    tab_key = f"ws_op_tab_{key_chon}"
-
-    # Nhảy tab từ shortcut: ghi index vào session_state trước khi radio render
-    jump_idx = st.session_state.pop("ws_op_jump_tab", None)
-    if jump_idx is not None and 0 <= jump_idx < len(ten_tabs):
-        st.session_state[tab_key] = jump_idx
-        st.toast(f"✨ Đã chuyển tới: {ten_tabs[jump_idx]}", icon="👆")
-
-    # Khởi tạo nếu chưa có
-    if tab_key not in st.session_state:
-        st.session_state[tab_key] = 0
-
-    # Radio làm tab selector — ẩn label, nằm ngang
-    sel_idx = st.radio(
-        "Tab",
-        options=range(len(ten_tabs)),
-        format_func=lambda i: ten_tabs[i],
-        horizontal=True,
-        key=tab_key,
-        label_visibility="collapsed",
-    )
-
-    st.divider()
-
-    # Chỉ gọi renderer của tab đang active
-    renderers[sel_idx](None)
+    outer_tabs = st.tabs(ds_label)
+    for outer_tab, outer_key in zip(outer_tabs, ds_key):
+        with outer_tab:
+            tabs_info = nhom_kha_dung[outer_key]["tabs"]
+            ten_tabs = [t[0] for t in tabs_info]
+            renderers_inner = [t[1] for t in tabs_info]
+            inner_tabs = st.tabs(ten_tabs)
+            for inner_tab, renderer in zip(inner_tabs, renderers_inner):
+                with inner_tab:
+                    renderer(None)

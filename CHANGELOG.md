@@ -1,5 +1,8 @@
 # CHANGELOG
 
+## [2026-05-23] — Tối ưu hiệu năng Tab So sánh 2 kỳ: cache snapshot queries
+- `snapshot_service.py` — thêm `@st.cache_data(ttl=300)` cho 9 hàm đọc: `doc_snapshot`, `doc_snapshot_range`, `danh_sach_ky`, `doc_nq11_snapshot`, `danh_sach_ky_nq11`, `doc_gqvl_snapshot`, `danh_sach_ky_gqvl`, `doc_cdtotkvv_snapshot`, `danh_sach_ky_cdtotkvv` — giảm từ 8+ SQL query/rerun xuống 0 (hit cache) sau lần đầu
+
 ## [2026-05-23] — Tối ưu hiệu năng Tab So sánh kỳ: lazy-load + giảm memory (3 bước)
 - `tabs/tab_so_sanh_ky.py` dòng ~1340-1355 — thêm `_lazy_expander()`: expander chỉ compute khi user click mở lần đầu, dùng `st.session_state`
 - `tabs/tab_so_sanh_ky.py` — wrap 15 section nặng bằng `_lazy_expander`: Vòng đời danh mục, Chi tiết PGD, ĐVUT, Ma trận chuyển nợ, PAR, HHI, Top biến động, Radar, Explorer KƯ, Vintage NQH, Nguồn vốn, Thời hạn vay, Lãi tồn, Aging, KHTD

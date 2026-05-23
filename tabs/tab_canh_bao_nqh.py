@@ -1,4 +1,4 @@
-"""Tab Cảnh báo Tín dụng — 8 sub-tab gom tất cả cảnh báo.
+"""Tab Cảnh báo Tín dụng — 7 sub-tab gom tất cả cảnh báo.
 Hoạt động ở cả phân hệ Chi nhánh (CN) lẫn PGD.
 """
 from __future__ import annotations
@@ -178,9 +178,9 @@ def _render_tong_hop(
 
 # ─── Sub-tab 2: Đến hạn ───────────────────────────────────────────────────────
 
-def _render_den_han_tab(role: str) -> None:
+def _render_den_han_tab(role: str, df_kh=None, ds_pgd_all=None, key_prefix="", la_cn=False) -> None:
     from tabs.tab_den_han import render as render_den_han
-    render_den_han(role=role)
+    render_den_han(role=role, df_kh=df_kh, ds_pgd_all=ds_pgd_all, key_prefix=key_prefix, la_cn=la_cn)
 
 
 # ─── Sub-tab 3: 3 tháng KHĐ ───────────────────────────────────────────────────
@@ -451,15 +451,7 @@ def _render_nqh(df_kh: pd.DataFrame, ds_pgd_all: list, la_cn: bool, key_prefix: 
                      prefix_file="NQH", key=f"{key_prefix}nqh_pdf")
     hien_thi_dataframe_phan_trang(df_ct, key=f"{key_prefix}nqh_chi", height=380)
 
-
-# ─── Sub-tab 6: Nợ đến hạn có nguy cơ ──────────────────────────────────────────
-
-def _render_canh_bao_som_tab(df_kh: pd.DataFrame, ds_pgd_all: list, key_prefix: str, la_cn: bool) -> None:
-    from tabs import tab_canh_bao_som
-    tab_canh_bao_som._render_canh_bao(df_kh, ds_pgd_all, key_prefix=key_prefix, la_cn=la_cn)
-
-
-# ─── Sub-tab 7: Khoanh sắp hết hạn ─────────────────────────────────────────────
+# ─── Sub-tab 6: Khoanh sắp hết hạn ─────────────────────────────────────────────
 
 def _render_khoanh_sap_hh(df_full: pd.DataFrame, key_prefix: str) -> None:
     if _COT_KHOANH not in df_full.columns:
@@ -518,7 +510,7 @@ def _render_khoanh_sap_hh(df_full: pd.DataFrame, key_prefix: str) -> None:
                      prefix_file="KhoanhSapHetHan", key=f"{key_prefix}kh_pdf")
 
 
-# ─── Sub-tab 8: Gia hạn nợ ─────────────────────────────────────────────────────
+# ─── Sub-tab 7: Gia hạn nợ ─────────────────────────────────────────────────────
 
 def _render_gia_han(
     df_full: pd.DataFrame, ds_pgd_all: list, ds_dvut_all: list, la_cn: bool, key_prefix: str
@@ -704,7 +696,6 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
             "3 tháng KHĐ",
             "BT sang Rủi ro",
             "Nợ quá hạn phát sinh",
-            "Nợ đến hạn có nguy cơ",
             "Khoanh sắp hết hạn",
             "Gia hạn nợ",
         ]
@@ -720,15 +711,13 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
         if tab_chon == "Tổng hợp":
             _render_tong_hop(df_full, df_kh, ds_pgd_all, la_cn, key_prefix)
         elif tab_chon == "Đến hạn":
-            _render_den_han_tab(role)
+            _render_den_han_tab(role, df_kh, ds_pgd_all, key_prefix, la_cn)
         elif tab_chon == "3 tháng KHĐ":
             _render_khd(df_kh, ds_pgd_all, la_cn, key_prefix)
         elif tab_chon == "BT sang Rủi ro":
             _render_migration(df_kh, ds_pgd_all, la_cn, key_prefix)
         elif tab_chon == "Nợ quá hạn phát sinh":
             _render_nqh(df_kh, ds_pgd_all, la_cn, key_prefix)
-        elif tab_chon == "Nợ đến hạn có nguy cơ":
-            _render_canh_bao_som_tab(df_kh, ds_pgd_all, key_prefix, la_cn)
         elif tab_chon == "Khoanh sắp hết hạn":
             _render_khoanh_sap_hh(df_full, key_prefix)
         elif tab_chon == "Gia hạn nợ":

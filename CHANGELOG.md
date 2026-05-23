@@ -1,7 +1,11 @@
 # CHANGELOG
 
-## [2026-05-23] — Tối ưu hiệu năng Tab So sánh 2 kỳ: cache snapshot queries
-- `snapshot_service.py` — thêm `@st.cache_data(ttl=300)` cho 9 hàm đọc: `doc_snapshot`, `doc_snapshot_range`, `danh_sach_ky`, `doc_nq11_snapshot`, `danh_sach_ky_nq11`, `doc_gqvl_snapshot`, `danh_sach_ky_gqvl`, `doc_cdtotkvv_snapshot`, `danh_sach_ky_cdtotkvv` — giảm từ 8+ SQL query/rerun xuống 0 (hit cache) sau lần đầu
+## [2026-05-23] — Tối ưu hiệu năng Tab So sánh 2 kỳ (4 fix)
+- `tabs/tab_so_sanh_ky.py` `render()` — thay `st.tabs()` bằng radio: chỉ render sub-tab đang active, tránh `render_moc_nam()` chạy ngầm khi user ở tab "So sánh 2 kỳ"
+- `tabs/tab_so_sanh_2_ky.py` — thêm `_lazy_expander()`, áp dụng cho 3 expander NQ11/GQVL/CDTOTKVV: chỉ compute khi user nhấn mở lần đầu
+- `tabs/tab_so_sanh_2_ky.py` `_render_export()` — `db.ghi_audit()` chỉ gọi khi user thực sự download, không gọi mỗi rerun
+- `tabs/tab_so_sanh_2_ky.py` `_render_bang_pgd()` — thay `apply(lambda, axis=1)` bằng pandas vectorized (`.replace(0, nan)`)
+- `snapshot_service.py` — thêm `@st.cache_data(ttl=300)` cho 9 hàm đọc: `doc_snapshot`, `doc_snapshot_range`, `danh_sach_ky`, `doc_nq11_snapshot`, `danh_sach_ky_nq11`, `doc_gqvl_snapshot`, `danh_sach_ky_gqvl`, `doc_cdtotkvv_snapshot`, `danh_sach_ky_cdtotkvv`
 
 ## [2026-05-23] — Tối ưu hiệu năng Tab So sánh kỳ: lazy-load + giảm memory (3 bước)
 - `tabs/tab_so_sanh_ky.py` dòng ~1340-1355 — thêm `_lazy_expander()`: expander chỉ compute khi user click mở lần đầu, dùng `st.session_state`

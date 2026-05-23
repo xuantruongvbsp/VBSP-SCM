@@ -841,13 +841,6 @@ def render_sidebar_menu(role: str, username: str, **kwargs):
 
     active_label = st.session_state.get("ws_mgmt_menu", "")
 
-    for key in list(st.session_state.keys()):
-        if key.startswith("ws_mgmt_grp_"):
-            val = st.session_state[key]
-            if val and val != active_label and val in valid_labels:
-                st.session_state["ws_mgmt_menu"] = val
-                active_label = val
-
     st.markdown(
         "<p style='font-size:14px;font-weight:700;"
         "color:#94A3B8;margin-bottom:6px'>MENU ĐIỀU HÀNH</p>",
@@ -885,21 +878,29 @@ def render_sidebar_menu(role: str, username: str, **kwargs):
         )
 
         if flat_items:
-            flat_labels = [it["label"] for it in flat_items]
-            radio_key = f"ws_mgmt_grp_{grp_name}"
-
-            try:
-                idx = flat_labels.index(active_label)
-            except ValueError:
-                idx = None
-
-            st.radio(
-                grp_name,
-                flat_labels,
-                index=idx,
-                key=radio_key,
-                label_visibility="collapsed",
-            )
+            for item in flat_items:
+                is_active = item["label"] == active_label
+                if is_active:
+                    st.markdown(
+                        f"<div style='"
+                        f"background:#E65100;"
+                        f"border-left:3px solid #BF360C;"
+                        f"color:#FFFFFF;"
+                        f"font-size:14px;font-weight:700;"
+                        f"padding:10px 12px 10px 14px;"
+                        f"border-radius:0 6px 6px 0;"
+                        f"margin-bottom:4px'>"
+                        f"{item['label']}</div>",
+                        unsafe_allow_html=True,
+                    )
+                else:
+                    if st.button(
+                        item["label"],
+                        key=f"menu_btn_{item['label']}",
+                        use_container_width=True,
+                    ):
+                        st.session_state["ws_mgmt_menu"] = item["label"]
+                        st.rerun()
 
         for item in acc_items:
             children = item.get("children", [])

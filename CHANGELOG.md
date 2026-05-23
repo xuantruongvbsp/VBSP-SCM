@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## [2026-05-23] — Viết test 3 module mới + expand 2 module, fix bug tien_do_excel_service (80 cases)
+- `tests/test_file_detection_service.py` (mới) — 21 cases: md5_bytes/file, chuan_hoa_ten, ten_doc_ve_don_vi_chuan, kiem_tra_don_vi, nhan_dien_loai_tu_noi_dung
+- `tests/test_uy_thac_service.py` (mới) — 26 cases: tinh_theo_dvut, loc_mau06/15, co_du_lieu_to, kv_key_bb_ct_cx, 3 payload builders, doc/luu/cap_nhat bien_ban
+- `tests/test_tien_do_excel_service.py` (mới) — 8 cases: 3 sheets, column names, empty df
+- `tests/test_khtd_service.py` (expand 3→21 cases) — kv_key_mau07, kv_key_dot, _so_trieu_tu_oa, _du_lieu_chuyen_trieu_sang_vnd, _parse_key_suffix, kiem_tra_can_bang, luu_dot
+- `tests/test_no_rui_ro_service.py` (expand 3→11 cases) — month padding, empty list, audit log, multiple PGD independence
+- `services/tien_do_excel_service.py` dòng ~79, ~137 — fix bug openpyxl numpy-style indexing `[:, col_idx-1]` → dùng `.cell(row=r, column=c)`
+
 ## [2026-05-23] — Tối ưu chuyển tab menu Điều hành: radio thay button (~50% widget)
 - `workspaces/ws_management.py` `render_sidebar_menu()` — thay ~25 `st.button()` riêng lẻ bằng `st.radio()` gom theo nhóm (8 radio group + ~4 accordion buttons)
 - `workspaces/ws_management.py` `render()` — cache `ALL_ITEMS` trong `session_state` theo `id(df_full)`, tránh build lại 25+ lambda khi dữ liệu không đổi

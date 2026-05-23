@@ -103,28 +103,28 @@
 | `data/hstd.py` — `canh_bao_migration()` | ✅ Có test (29 cases, test_hstd.py) | — |
 | `data/core.py` — `excel_to_parquet()` | ✅ Có test (21 cases, test_core.py) | — |
 | `data/core.py` — `tong_hop_du_no_pgd()`, `dem_no_qua_han_pgd()`, `tong_hop_theo_xa()` | ✅ Có test (21 cases, test_core.py) | — |
-| `data/pgd.py` — `pgd_slug()`, `duong_dan_pgd()` | TB | 🟠 TB |
-| `data/khtd.py` — `doc_kehoach()`, `luu_kehoach()` | TB | 🟠 TB |
-| `data/giao_ban.py` — `tinh_so_lieu_van_xuoi()` | TB | 🟠 TB |
+| `data/pgd.py` — `pgd_slug()`, `duong_dan_pgd()` | ✅ Có test (19 cases, test_pgd.py) | — |
+| `data/khtd.py` — `doc_kehoach()`, `luu_kehoach()` | TB — thin wrapper kv_store (test_db.py bao phủ) | 🟠 TB |
+| `data/giao_ban.py` — `tinh_so_lieu_van_xuoi()` | ✅ Có test (13 cases, test_giao_ban.py) | — |
 
 ### D3. Services chưa test
 
 | Module | Rủi ro | Ưu tiên |
 |---|---|---|
-| `services/migration_service.py` | Cao — logic chuyển nợ | 🔴 Cao |
-| `services/khtd_nhap_service.py` — XA path | TB | 🟠 TB |
-| `services/excel_service.py` | Thấp | 🟡 Thấp |
-| `alert_center.py` — `canh_bao_no_khoanh_sap_het_han()` | Cao — dùng bởi tab mới | 🔴 Cao |
+| `services/migration_service.py` | ✅ Có test (18 cases, test_migration_service.py) | — |
+| `services/khtd_nhap_service.py` — XA path | ✅ Có test (29 cases, test_khtd_nhap_service.py) | — |
+| `services/excel_service.py` | ✅ Có test (13 cases, test_excel_service.py) | — |
+| `alert_center.py` — `canh_bao_no_khoanh_sap_het_han()` | ✅ Có test (11 cases, test_alert_center.py) | — |
 
 ### D4. Components chưa test (`components/`)
 
 | Module | Rủi ro | Ưu tiên |
 |---|---|---|
 | `components/export_pdf.py` — `xuat_pdf_co_chart()` | Cao — logic PDF, đã có BUGMAP F6 (Timestamp format) | 🔴 Cao |
-| `components/movers.py` — `movers_analysis()` | Cao — phân tích nhiều nhánh, dùng cho dashboard CN | 🔴 Cao |
-| `components/delta_card.py` — `kpi_row()`, `delta_card()` | TB — UI pattern core, tham số `num_columns` hay nhầm (BUGMAP rules.md #1) | 🟠 TB |
-| `components/filter_bar.py` — `filter_bar()`, `apply_filters()` | TB — dùng nhiều tab | 🟠 TB |
-| `components/loan_drawer.py` — `loan_detail_drawer()` | TB — nhận `row: pd.Series`, hay nhầm với DataFrame | 🟠 TB |
+| `components/movers.py` — `_compute_movers()` | ✅ Có test (12 cases, test_movers.py) | — |
+| `components/delta_card.py` — `kpi_row()`, `delta_card()` | TB — UI pure, khó test ngoài Streamlit context | 🟡 Thấp |
+| `components/filter_bar.py` — `apply_filters()` | ✅ Có test (14 cases, test_filter_bar.py) | — |
+| `components/loan_drawer.py` — `loan_detail_drawer()` | TB — UI pure, khó test ngoài Streamlit context | 🟡 Thấp |
 
 ---
 

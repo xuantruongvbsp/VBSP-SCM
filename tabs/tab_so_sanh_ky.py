@@ -1360,9 +1360,18 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
     import importlib
     ctx = tab if tab is not None else st.container()
     with ctx:
-        s1, s2 = st.tabs(["📊 So sánh mốc năm", "🔄 So sánh 2 kỳ"])
-        render_moc_nam(s1, **kwargs)
-        importlib.import_module("tabs.tab_so_sanh_2_ky").render(s2, **kwargs)
+        sub = st.radio(
+            "Loại so sánh",
+            ["📊 So sánh mốc năm", "🔄 So sánh 2 kỳ"],
+            horizontal=True,
+            key="ss_ky_sub",
+            label_visibility="collapsed",
+        )
+        st.divider()
+        if sub == "📊 So sánh mốc năm":
+            render_moc_nam(None, **kwargs)
+        else:
+            importlib.import_module("tabs.tab_so_sanh_2_ky").render(None, **kwargs)
 
 
 def render_moc_nam(tab: DeltaGenerator = None, **kwargs) -> None:

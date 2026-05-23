@@ -274,6 +274,33 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                             key="cbtd_ct_ap",
                         )
 
+                # ── Cross-link: Tổ TK&VV thuộc địa bàn CBTD ─────────────────
+                st.markdown("**🏘️ Tổ TK&VV phụ trách**")
+                try:
+                    from services.cbtd_dia_ban_service import lay_to_theo_cbtd
+                    from services.cdtotkvv_service import tong_hop_tu_pgd_data
+                    df_cdto_xem = tong_hop_tu_pgd_data()
+                    to_map = lay_to_theo_cbtd({chon: info_xem}, dgd_map, df_cdto_xem)
+                    tos_cbtd = to_map.get(chon, [])
+                    if not tos_cbtd:
+                        st.caption("Chưa có dữ liệu Tổ TK&VV khớp với địa bàn CBTD này.")
+                    else:
+                        df_tos = pd.DataFrame(tos_cbtd)
+                        col_hien = [c for c in ["dgd", "ten_xa", "ma_to", "ten_to_truong",
+                                                "xep_loai", "tong_diem", "tinh_trang"]
+                                    if c in df_tos.columns]
+                        rename_tos = {
+                            "dgd": "ĐGD", "ten_xa": "Xã", "ma_to": "Mã Tổ",
+                            "ten_to_truong": "Tổ trưởng", "xep_loai": "Xếp loại",
+                            "tong_diem": "Điểm", "tinh_trang": "Tình trạng",
+                        }
+                        hien_thi_dataframe_phan_trang(
+                            df_tos[col_hien].rename(columns=rename_tos),
+                            key="cbtd_ct_to_tkvv",
+                        )
+                except Exception:
+                    st.caption("Chưa có dữ liệu Tổ TK&VV.")
+
         st.divider()
 
         # ════════════════════════════════════════════════════════════════════

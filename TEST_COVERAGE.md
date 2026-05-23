@@ -18,6 +18,14 @@
 ## A. Modules đã có test — services/
 
 | `data/core.py` | `test_core.py` | 21 | ✅ Cao | excel_to_parquet cache logic, 3 DuckDB queries |
+| `data/pgd.py` | `test_pgd.py` | 19 | ✅ Cao | pgd_slug, duong_dan_pgd đầy đủ |
+| `data/giao_ban.py` | `test_giao_ban.py` | 13 | ✅ Cao | tinh_so_lieu_van_xuoi: tags, tính toán, baseline |
+| `alert_center.py` | `test_alert_center.py` | 11 | ✅ Cao | canh_bao_no_khoanh_sap_het_han |
+| `services/migration_service.py` | `test_migration_service.py` | 18 | ✅ Cao | _nhan_nhom_no, matrix, monkeypatch SNAPSHOT_DIR |
+| `services/khtd_nhap_service.py` | `test_khtd_nhap_service.py` | 29 | ✅ Cao | clean_sheet, format, CN/XA upload, luu_pdf |
+| `services/excel_service.py` | `test_excel_service.py` | 13 | ✅ Cao | ten_file_xuat, ExcelReport build, chains |
+| `components/movers.py` | `test_movers.py` | 12 | ✅ Cao | _compute_movers: tong_du_no, ty_le_nqh, roll_rate |
+| `components/filter_bar.py` | `test_filter_bar.py` | 14 | ✅ Cao | apply_filters: scalar, list, range, multi |
 
 | Module | Test file | Cases | Mức độ | Ghi chú |
 |---|---|---|---|---|

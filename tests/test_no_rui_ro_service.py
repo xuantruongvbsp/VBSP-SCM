@@ -47,3 +47,68 @@ def test_luu_va_xoa_ho_so(test_db):
     val2 = no_rui_ro_service.doc_ho_so(kv_key)
     assert val2 == {}
 
+
+# ── additional edge cases ─────────────────────────────────────────────────────
+
+def test_tao_kv_key_thang_pads_month(test_db):
+    key = no_rui_ro_service.tao_kv_key_thang("PGD Long Thành", 2026, 1)
+    assert "_2026_01" in key
+
+
+def test_tao_kv_key_thang_double_digit_month(test_db):
+    key = no_rui_ro_service.tao_kv_key_thang("PGD Long Thành", 2026, 12)
+    assert "_2026_12" in key
+
+
+def test_doc_ho_so_returns_empty_dict_when_key_missing(test_db):
+    result = no_rui_ro_service.doc_ho_so("no_rui_ro_nonexistent_2026_99")
+    assert result == {}
+
+
+def test_luu_ho_so_empty_list(test_db):
+    ten_pgd = "PGD Trảng Bom"
+    key = no_rui_ro_service.tao_kv_key_thang(ten_pgd, 2026, 6)
+    no_rui_ro_service.luu_ho_so(key, [], username="tester", ten_pgd=ten_pgd)
+    val = no_rui_ro_service.doc_ho_so(key)
+    assert val["danh_sach"] == []
+
+
+def test_luu_ho_so_audit_logged(test_db):
+    ten_pgd = "PGD Long Khánh"
+    key = no_rui_ro_service.tao_kv_key_thang(ten_pgd, 2026, 7)
+    ds = [{"ten_kh": "B", "so_ku": "KU99"}]
+    no_rui_ro_service.luu_ho_so(key, ds, username="auditor", ten_pgd=ten_pgd)
+
+    with test_db.get_conn() as conn:
+        rows = conn.execute(
+            "SELECT action FROM audit_log WHERE username='auditor' ORDER BY id DESC LIMIT 1"
+        ).fetchall()
+    assert rows and rows[0][0] == "luu_no_rui_ro"
+
+
+def test_xoa_ho_so_audit_logged(test_db):
+    ten_pgd = "PGD Xuân Lộc"
+    key = no_rui_ro_service.tao_kv_key_thang(ten_pgd, 2026, 8)
+    no_rui_ro_service.xoa_ho_so(key, username="auditor2", ten_pgd=ten_pgd, so_ho_so=3)
+
+    with test_db.get_conn() as conn:
+        rows = conn.execute(
+            "SELECT action FROM audit_log WHERE username='auditor2' ORDER BY id DESC LIMIT 1"
+        ).fetchall()
+    assert rows and rows[0][0] == "xoa_no_rui_ro"
+
+
+def test_multiple_pgd_keys_independent(test_db):
+    pgd1, pgd2 = "PGD Long Thành", "PGD Trảng Bom"
+    key1 = no_rui_ro_service.tao_kv_key_thang(pgd1, 2026, 5)
+    key2 = no_rui_ro_service.tao_kv_key_thang(pgd2, 2026, 5)
+    assert key1 != key2
+
+    ds1 = [{"ten_kh": "KH1"}]
+    ds2 = [{"ten_kh": "KH2"}, {"ten_kh": "KH3"}]
+    no_rui_ro_service.luu_ho_so(key1, ds1, "tester", pgd1)
+    no_rui_ro_service.luu_ho_so(key2, ds2, "tester", pgd2)
+
+    assert len(no_rui_ro_service.doc_ho_so(key1)["danh_sach"]) == 1
+    assert len(no_rui_ro_service.doc_ho_so(key2)["danh_sach"]) == 2
+

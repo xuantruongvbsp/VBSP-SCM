@@ -218,19 +218,23 @@ def _render_canh_bao_no_sub(
     render(role=role, username=username, df_full=df_full, ds_pgd_all=ds_pgd_all)
 
 
-def _render_dgd_to_tkvv(tab_parent=None, **kw):
-    """Sub-tab Điểm GD & Tổ TK&VV — nested tabs."""
-    from tabs import tab_quan_ly_dgd
-    from tabs import tab_cdtotkvv
-
+def _render_cbtd_dia_ban(tab_parent=None, **kw):
+    """Nhóm CBTD & Địa bàn — 4 sub-tab: Dashboard · CBTD · ĐGD · Tổ TK&VV."""
     if tab_parent is not None:
         ctx = tab_parent
     else:
         ctx = st.container()
     with ctx:
-        _sub1, _sub2 = st.tabs(["📍 Điểm Giao Dịch", "🏘️ Tổ TK&VV"])
-        _get_tab("tab_quan_ly_dgd").render(_sub1, **kw)
-        _get_tab("tab_cdtotkvv").render(_sub2, **dict(kw, cdto_mode="cn"))
+        _s0, _s1, _s2, _s3 = st.tabs([
+            "📊 Dashboard",
+            "👔 Cán bộ tín dụng",
+            "📍 Điểm Giao Dịch",
+            "🏘️ Tổ TK&VV",
+        ])
+        _get_tab("tab_cbtd_dashboard").render(_s0, **kw)
+        _get_tab("tab_cbtd").render(_s1, **kw)
+        _get_tab("tab_quan_ly_dgd").render(_s2, **kw)
+        _get_tab("tab_cdtotkvv").render(_s3, **dict(kw, cdto_mode="cn"))
 
 
 def _render_ndt_dp(role: str, username: str) -> None:
@@ -792,16 +796,7 @@ def _build_all_items(role: str, username: str, **kwargs) -> list:
         },
         {"group": "Ủy Thác",       "label": "🏛️ Ban Đại Diện", "icon": "building",       "fn": lambda: _get_tab("tab_ban_dai_dien").render(None, cap="tinh", **kwargs)},
         {"group": "Ủy Thác",       "label": "🤝 Ủy thác", "icon": "handshake", "fn": lambda: _get_tab("tab_uy_thac").render(None, **kwargs)},
-        {
-            "group": "Ủy Thác",
-            "label": "Điểm GD & Tổ TK&VV",
-            "icon": "map-pin",
-            "children": [
-                {"label": "📍 Điểm Giao Dịch", "fn": lambda: _get_tab("tab_quan_ly_dgd").render(None, **kwargs)},
-                {"label": "🏘️ Tổ TK&VV",       "fn": lambda: _get_tab("tab_cdtotkvv").render(None, **dict(kwargs, cdto_mode="cn"))},
-            ],
-        },
-        {"group": "Ủy Thác",       "label": "👤 Cán bộ tín dụng",         "icon": "user",       "fn": lambda: _get_tab("tab_cbtd").render(None, **kwargs)},
+        {"group": "Ủy Thác",       "label": "👔 CBTD & Địa bàn",  "icon": "user",  "fn": lambda: _render_cbtd_dia_ban(None, **kwargs)},
     ]
 
     if can_upload:

@@ -286,25 +286,29 @@ def _render_trang_chu(tab, df_pgd: pd.DataFrame, role: str, pgd_user: str, kwarg
                 logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                 st.error(f"❌ Lỗi cảnh báo: {e}")
 
-            # Phần nhiệm vụ
+            # Phần nhiệm vụ — query trực tiếp từ bảng nhiem_vu
             st.markdown("**✅ Nhiệm vụ đang chờ**")
             try:
-                nhiem_vu_list = db.doc_kv("nhiem_vu_list", [])
-                if not nhiem_vu_list:
+                with db.get_conn() as conn:
+                    rows = conn.execute(
+                        """SELECT id, tieu_de, ngay_deadline, trang_thai
+                           FROM nhiem_vu
+                           WHERE (pgd = ? OR pgd IS NULL)
+                             AND trang_thai NOT IN ('da_hoan_thanh', 'tam_dung')
+                           ORDER BY ngay_deadline ASC
+                           LIMIT 5""",
+                        (pgd_user,),
+                    ).fetchall()
+                nv_pgd = [dict(r) for r in rows]
+                if not nv_pgd:
                     st.success("Không có nhiệm vụ nào đang chờ")
                 else:
-                    # Lọc nhiệm vụ của PGD hiện tại
-                    nv_pgd = [nv for nv in nhiem_vu_list
-                             if nv.get("pgd") == pgd_user and nv.get("trang_thai") != "hoan_thanh"]
-
-                    if not nv_pgd:
-                        st.success("Không có nhiệm vụ nào đang chờ")
-                    else:
-                        for nv in nv_pgd[:3]:
-                            st.caption(f"📌 {nv.get('tieu_de', '—')}")
-                            st.caption(f"Hạn: {nv.get('ngay_deadline', '—')}")
+                    for nv in nv_pgd:
+                        dl = nv.get("ngay_deadline", "")
+                        st.caption(f"📌 {nv.get('tieu_de', '—')}")
+                        st.caption(f"Hạn: {dl or '—'}")
             except Exception as e:  # conv: skip
-                logger.error("Lỗi trong khối except: %s", e, exc_info=True)
+                logger.error("Lỗi tải nhiệm vụ sidebar: %s", e, exc_info=True)
                 st.warning(f"⚠️ Không thể tải danh sách nhiệm vụ: {e}")
 
 
@@ -1245,6 +1249,7 @@ def render(**kwargs):
     df_nq11 = kwargs.get("df_nq11")
     role = kwargs.get("role")
     pgd_user = kwargs.get("pgd_user")
+    username = kwargs.get("username", "unknown")
 
     st.title("🗺️ Hỗ Trợ Địa Bàn PGD/Biên Hòa")
     st.caption("Tra cứu hồ sơ · Danh sách · Báo cáo giao ban · Văn bản tự động · Nhiệm vụ · Upload dữ liệu")
@@ -1282,16 +1287,96 @@ def render(**kwargs):
         if kpi_data:
             kpi_row(kpi_data, num_columns=4)
             st.divider()
-    except Exception:
+    except Exception as e:
         logger.error("Lỗi trong khối except: %s", e, exc_info=True)
         pass
 
     # ── Helpers render ──────────────────────────────────────────────────
     def _render_diem_gd_va_to_tkvv(tab_parent, **kw):
         with get_tab_context(tab_parent):
-            _sub1, _sub2 = st.tabs(["📍 Điểm Giao Dịch", "🏘️ Tổ TK&VV"])
+            _sub0, _sub1, _sub2 = st.tabs(["📊 Tổng quan", "📍 Điểm Giao Dịch", "🏘️ Tổ TK&VV"])
+            _render_dashboard_pgd_dgd(_sub0, **kw)
             _lazy_tab("tab_diem_gd_pgd").render(_sub1, **kw)
             _lazy_tab("tab_cdtotkvv_pgd").render(_sub2, **kw)
+
+    def _render_dashboard_pgd_dgd(tab_parent, **kw):
+        """Dashboard mini: KPI ĐGD & Tổ TK&VV trong phạm vi 1 PGD."""
+        with get_tab_context(tab_parent):
+            from components.delta_card import kpi_row as _kpi_row
+            from services.cbtd_dia_ban_service import tom_tat_kpi as _tom_kpi, canh_bao_cbtd_dia_ban as _canh_bao
+            from services.cdtotkvv_service import tong_hop_tu_pgd_data as _tong_hop_cdto, loc_df as _loc_df
+
+            _pgd_user = kw.get("pgd_user", "")
+            _df       = kw.get("df")
+            _role_kw  = kw.get("role", "user")
+            _username = kw.get("username", "unknown")
+
+            st.subheader("📊 Tổng quan ĐGD & Tổ TK&VV")
+            st.caption(f"Phạm vi: {_pgd_user or 'PGD của bạn'}")
+
+            _dgd_map   = db.doc_dgd_map() or {}
+            _cbtd_data = {}
+
+            try:
+                from data.khtd import doc_cbtd as _dc
+                _cbtd_all = _dc()
+                if _pgd_user:
+                    _cbtd_data = {
+                        k: v for k, v in _cbtd_all.items()
+                        if str(v.get("pgd", "")).strip().lower() == _pgd_user.strip().lower()
+                    }
+                else:
+                    _cbtd_data = _cbtd_all
+            except Exception:
+                pass
+
+            # Lọc dgd_map theo PGD
+            _dgd_pgd: dict = {}
+            if _pgd_user:
+                for pgd_k, xa_block in _dgd_map.items():
+                    if str(pgd_k).strip().lower() == _pgd_user.strip().lower():
+                        _dgd_pgd = {pgd_k: xa_block}
+                        break
+            else:
+                _dgd_pgd = _dgd_map
+
+            # Tổ TK&VV
+            _df_cdto_all = None
+            try:
+                _df_cdto_all = _tong_hop_cdto()
+                if _df_cdto_all is not None and not _df_cdto_all.empty:
+                    _df_cdto_all = _loc_df(_df_cdto_all, "pgd", _pgd_user)
+            except Exception:
+                pass
+
+            _kpi = _tom_kpi(_cbtd_data, _dgd_pgd, _df_cdto_all)
+
+            _kpi_row(
+                cols=[
+                    {"label": "CBTD của PGD", "value": fmt_so(_kpi["so_cbtd"]),        "icon": "👔"},
+                    {"label": "Tổng ĐGD",     "value": fmt_so(_kpi["so_dgd_tong"]),    "icon": "📍"},
+                    {"label": "Tổng Tổ",      "value": fmt_so(_kpi["so_to_tong"]),     "icon": "🏘️"},
+                    {"label": "Điểm TB",       "value": f"{_kpi['diem_tb']:.1f}" if _kpi["so_to_tong"] else "—", "icon": "⭐"},
+                    {"label": "% Tổ đạt",     "value": f"{_kpi['pct_to_dat']:.1f}%" if _kpi["so_to_tong"] else "—", "icon": "✅"},
+                    {"label": "Tổ TB/Yếu",    "value": fmt_so(_kpi["so_to_tb_yeu"]),  "icon": "🔴" if _kpi["so_to_tb_yeu"] else "🟢"},
+                ],
+                num_columns=6,
+            )
+
+            # Cảnh báo nhanh
+            try:
+                _cbs = _canh_bao(_cbtd_data, _dgd_pgd, _df, _df_cdto_all)
+                if _cbs:
+                    with st.expander(f"🔔 Cảnh báo ({len(_cbs)})", expanded=True):
+                        for _cb in _cbs:
+                            if _cb["muc_do"] == "🔴":
+                                st.error(_cb["noi_dung"])
+                            else:
+                                st.warning(_cb["noi_dung"])
+                else:
+                    st.success("✅ Không có cảnh báo nào cho PGD này.")
+            except Exception:
+                pass
 
     def _render_du_phong_dong_tien(tab_parent, **kw) -> None:
         with get_tab_context(tab_parent):
@@ -1663,7 +1748,7 @@ def render(**kwargs):
                 ("📊 Histogram Dư nợ", lambda tab: _render_histogram_du_no(tab, **_pgd_df_kwargs)),
                 ("🍩 Cơ cấu CT", lambda tab: _render_donut_co_cau(tab, **_pgd_df_kwargs)),
                 ("📊 So sánh kỳ", lambda tab: _lazy_tab("tab_so_sanh_ky").render(
-                    tab, df=df, df_full=df_full, role=role, username=username,
+                    tab, df=df_pgd, df_full=df_pgd, role=role, username=username,
                     pgd_user=pgd_user, pgd_mode=True,
                 )),
             ],

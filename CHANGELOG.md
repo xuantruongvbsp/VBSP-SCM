@@ -1,5 +1,19 @@
 # CHANGELOG
 
+## [2026-05-23] — Fix cột 31/12 bảng Trạng thái Upload: kiểm tra đủ 4 loại
+- `tabs/tab_upload_khnv.py` dòng ~72 — `_hien_thi_bang_trang_thai()`: cột 31/12 trước chỉ kiểm tra HSTD (`trang_thai_baseline_pgd`) → dễ hiểu lầm. Nay kiểm tra CẢ 4 loại qua `trang_thai_baseline_pgd_loai`: ✅ Đủ 4/4 | ⚠️ 2/4 (thiếu nq11,gqvl) | ❌ Chưa loại nào
+
+## [2026-05-23] — Fix load chậm So sánh kỳ mốc 31/12: thêm parquet cache cho baseline merged
+- `data/hstd.py` dòng ~60 — `doc_baseline_merged`: thêm parquet cache layer, lưu merged result vào `cache/{loai}_baseline_{nam}.parquet`, lần sau chỉ đọc parquet (tránh đọc 23 Excel files với engine openpyxl)
+- `data/hstd.py` dòng ~85 — dùng `excel_to_parquet` cho từng PGD (có per-file caching) thay vì `pd.read_excel` trực tiếp
+- `tabs/tab_so_sanh_ky.py` dòng ~1404 — `_ts` computed từ `max(getmtime)` của tất cả PGD files (không chỉ 1 file), đảm bảo cache invalidate đúng khi bất kỳ PGD nào upload lại
+- `tabs/tab_so_sanh_ky.py` dòng ~32 — thêm import `DON_VI_CHI_NHANH, DS_PGD`
+
+## [2026-05-23] — Fix ws_management: sidebar button sticky + thiếu biến tong_lai_khd
+- `ws_management.py` dòng ~934, ~958 — sửa `width="stretch"` → `use_container_width=True` (deprecated parameter gây button không phản hồi trong Streamlit 1.57)
+- `ws_management.py` dòng ~83 — thêm tính `tong_lai_khd` (tổng lãi tồn các món 3 tháng KHĐ) để tránh NameError
+- `ws_management.py` dòng ~23 — thêm import `COT_LAI_TON_QH`
+
 ## [2026-05-23] — Highlight không gian làm việc đang chọn trong sidebar
 - `app.py` dòng ~272 — workspace đang active hiển thị div màu xanh dương gradient thay vì button, tạo phân biệt rõ với workspace chưa chọn (xanh lá)
 

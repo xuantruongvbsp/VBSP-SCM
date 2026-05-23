@@ -1,5 +1,16 @@
 # CHANGELOG
 
+## [2026-05-23] — Viết test hàng loạt 8 module (135 cases, 100% pass)
+- `tests/test_pgd.py` — 19 cases: `pgd_slug()` (slug VN, đ/Đ, kỳ tự đặc biệt), `duong_dan_pgd()` (6 loại file)
+- `tests/test_alert_center.py` — 11 cases: `canh_bao_no_khoanh_sap_het_han()` — phân loại khan/cảnh báo/bình thường, edge case ngày không hợp lệ
+- `tests/test_giao_ban.py` — 13 cases: `tinh_so_lieu_van_xuoi()` — tags, tính toán NQH, so sánh baseline
+- `tests/test_migration_service.py` — 18 cases: `_nhan_nhom_no()` (E/D/C/B/A/blank), `migration_matrix()` monkeypatch `_SNAPSHOT_DIR`
+- `tests/test_movers.py` — 12 cases: `_compute_movers()` — tong_du_no, ty_le_nqh, roll_rate, guard conditions
+- `tests/test_filter_bar.py` — 14 cases: `apply_filters()` — scalar/list/range/multi-filter, case-insensitive
+- `tests/test_khtd_nhap_service.py` — 29 cases: `clean_sheet_name`, `format_kich_thuoc`, CN/XA upload, `luu_pdf_khtd_xa`
+- `tests/test_excel_service.py` — 13 cases: `ten_file_xuat`, `ExcelReport` builder, `xuat_excel_chuyen_nghiep`
+- Phát hiện: `fmt(x)` chia 1_000_000, `fmt(0)` = em dash — cập nhật test assertions cho đúng
+
 ## [2026-05-23] — Viết test data/core.py (21 cases, 100% pass)
 - `tests/test_core.py` — 7 cases cho `excel_to_parquet()`: roundtrip, cache hit, stale cache, post_fn, tự tạo thư mục cha, thiếu Excel raise, sai sheet raise
 - `tests/test_core.py` — 4 cases cho `tong_hop_du_no_pgd()`: output columns, group-by PGD+CT, lọc dư nợ=0, file not found

@@ -550,8 +550,8 @@ def _render_khoanh_sap_hh(
         return
 
     # ─── Apply time filter → table ───────────────────────────────────────────────
-    if loc_tg == "Phải kiểm tra nợ khoanh (≤ 120 ngày)":
-        mask_tg = con_lai.notna() & (con_lai <= 120)
+    if loc_tg == "Khẩn (≤ 30 ngày)":
+        mask_tg = con_lai.notna() & (con_lai <= 30)
     elif loc_tg == "Cảnh báo (≤ 180 ngày)":
         mask_tg = con_lai.notna() & (con_lai <= 180)
     else:
@@ -565,7 +565,7 @@ def _render_khoanh_sap_hh(
     df_loc["Còn lại (ngày)"] = df_loc["_con_lai"].astype("Int64")
     cols_ct = [c for c in [
         COT_TEN_PGD, COT_TEN_KH, COT_SO_KU, COT_TEN_CT,
-        _COT_KHOANH, COT_NGAY_HH_KHOANH, "Còn lại (ngày)",
+        COT_DU_NO_KHOANH, COT_NGAY_HH_KHOANH, "Còn lại (ngày)",
         COT_TEN_TO_TRUONG, COT_TEN_XA,
     ] if c and c in df_loc.columns]
     df_ct = df_loc[cols_ct].reset_index(drop=True)
@@ -581,13 +581,7 @@ def _render_khoanh_sap_hh(
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             key=f"{key_prefix}kh_dl",
         )
-    _tieu_de_khoanh = "Khoanh sắp hết hạn"
-    if loc_tg == "Phải kiểm tra nợ khoanh (≤ 120 ngày)":
-        _tieu_de_khoanh = "Khoanh sắp hết hạn — Phải kiểm tra nợ khoanh (≤ 120 ngày)"
-    elif loc_tg == "Cảnh báo (≤ 180 ngày)":
-        _tieu_de_khoanh = "Khoanh sắp hết hạn — Cảnh báo (≤ 180 ngày)"
-
-    nut_xuat_pdf(df_ct, _tieu_de_khoanh,
+    nut_xuat_pdf(df_ct, "Khoanh sắp hết hạn",
                  st.session_state.get("username", "unknown"),
                  prefix_file="KhoanhSapHetHan", key=f"{key_prefix}kh_pdf")
     hien_thi_dataframe_phan_trang(df_ct, key=f"{key_prefix}kh_tbl", height=380)

@@ -1466,14 +1466,13 @@ def render_moc_nam(tab: DeltaGenerator = None, **kwargs) -> None:
         )
 
         # ── Đọc baseline ──────────────────────────────────────────────────
-        with st.spinner("Đang tải dữ liệu mốc năm..."):
-            ds_dv = [DON_VI_CHI_NHANH] + DS_PGD
-            _ts = 0
-            for dv in ds_dv:
-                fp = baseline_pgd_path(dv, chon_nam)
-                if os.path.exists(fp):
-                    _ts = max(_ts, os.path.getmtime(fp))
-            df_bl_full = doc_baseline_merged(chon_nam, _ts=_ts)
+        ds_dv = [DON_VI_CHI_NHANH] + DS_PGD
+        _ts = 0
+        for dv in ds_dv:
+            fp = baseline_pgd_path(dv, chon_nam)
+            if os.path.exists(fp):
+                _ts = max(_ts, os.path.getmtime(fp))
+        df_bl_full = doc_baseline_merged(chon_nam, _ts=_ts)
 
         if df_bl_full is None or df_bl_full.empty:
             st.warning(f"⚠️ Chưa có dữ liệu baseline 31/12/{chon_nam}.")

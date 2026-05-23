@@ -4,6 +4,7 @@ from typing import Callable
 
 import duckdb
 import pandas as pd
+import unicodedata
 
 from logger import get_logger
 
@@ -27,6 +28,42 @@ def excel_to_parquet(
     Chỉ chuyển lại khi Excel mới hơn cache → đọc nhanh hơn ~200x.
     RAM giảm 50-70% nhờ PyArrow zero-copy; cache nhỏ hơn ~30% nhờ zstd.
     """
+    def _should_force_str(col: str) -> bool:
+        s = unicodedata.normalize("NFC", str(col or "")).strip().lower()
+        return (
+            s.startswith("mã ")
+            or s == "mã"
+            or " mã " in f" {s} "
+            or s in {"mã thôn", "mã xã", "mã kh", "mã khách hàng", "mã chương trình"}
+            or s in {"số khế ước", "số ku"}
+        )
+
+    def _normalize_code_series(ser: pd.Series) -> pd.Series:
+        bad_vals = {"nan", "none", "<na>", "nat"}
+        if isinstance(ser.dtype, pd.CategoricalDtype):
+            ser = ser.astype(object)
+        elif pd.api.types.is_integer_dtype(ser.dtype):
+            ser = ser.astype(object)
+        elif pd.api.types.is_float_dtype(ser.dtype):
+            whole = ser.notna() & (ser % 1 == 0)
+            ser = ser.astype(object)
+            if whole.any():
+                ser = ser.copy()
+                ser.loc[whole] = (
+                    pd.to_numeric(ser.loc[whole], errors="coerce")
+                    .astype("int64")
+                    .astype(str)
+                )
+        if ser.dtype == object:
+            num = pd.to_numeric(ser, errors="coerce")
+            whole2 = num.notna() & (num % 1 == 0) & ser.notna()
+            if whole2.any():
+                ser = ser.copy()
+                ser.loc[whole2] = num.loc[whole2].astype("int64").astype(str)
+        out = ser.fillna("").astype(str).str.strip()
+        low = out.str.lower()
+        return out.mask(low.isin(bad_vals), "")
+
     os.makedirs(os.path.dirname(parquet_path), exist_ok=True)
     if ts_file(parquet_path) < ts_file(excel_path):
         try:
@@ -35,9 +72,17 @@ def excel_to_parquet(
             )
             if post_fn:
                 df = post_fn(df)
+            for col in list(df.columns):
+                if _should_force_str(col):
+                    df[col] = _normalize_code_series(df[col])
             df.to_parquet(parquet_path, index=False, engine='pyarrow', compression='zstd', compression_level=3)
         except Exception as e:
             logger.error("excel_to_parquet: lỗi xử lý file %s → %s — %s", excel_path, parquet_path, e, exc_info=True)
+            try:
+                if os.path.exists(parquet_path):
+                    os.remove(parquet_path)
+            except Exception as e2:
+                logger.error("excel_to_parquet: không thể xóa cache parquet lỗi — %s", e2, exc_info=True)
             raise
     return pd.read_parquet(parquet_path, engine='pyarrow')
 

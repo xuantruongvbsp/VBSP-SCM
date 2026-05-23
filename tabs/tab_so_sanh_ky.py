@@ -59,7 +59,8 @@ from services.so_sanh_ky_service import (
     top_movers as _top_movers,
     phan_tich_hhi_pgd as _phan_tich_hhi_pgd,
 )
-from utils import fmt_so, fmt_ty, lazy_expander as _lazy_expander
+from pdf_service import nut_xuat_pdf
+from utils import fmt_so, fmt_ty, xuat_excel, ten_file_xuat, lazy_expander as _lazy_expander
 
 
 _DIM_OPTIONS = [
@@ -68,6 +69,54 @@ _DIM_OPTIONS = [
     (COT_TEN_XA,     "Xã"),
 ]
 
+_EXPORT_DIM_OPTIONS = [
+    (COT_TEN_PGD,    "PGD"),
+    (COT_TEN_XA,     "Xã"),
+    (COT_TEN_CT,     "Chương trình tín dụng"),
+    (COT_DVUT,       "Hội đoàn thể"),
+    (COT_NGUON_VON,  "Nguồn vốn"),
+]
+
+
+def _bang_tang_truong_export(
+    df_bl: pd.DataFrame,
+    df_ht: pd.DataFrame,
+    dim: str,
+    label_bl: str,
+    label_ht: str,
+) -> pd.DataFrame:
+    g_bl = _group_bien_dong(df_bl, dim).rename(columns={
+        "du_no": f"du_no_{label_bl}",
+        "du_no_qh": f"du_no_qh_{label_bl}",
+        "so_ku": f"so_ku_{label_bl}",
+        "nqh_pct": f"nqh_pct_{label_bl}",
+    })
+    g_ht = _group_bien_dong(df_ht, dim).rename(columns={
+        "du_no": f"du_no_{label_ht}",
+        "du_no_qh": f"du_no_qh_{label_ht}",
+        "so_ku": f"so_ku_{label_ht}",
+        "nqh_pct": f"nqh_pct_{label_ht}",
+    })
+
+    out = g_bl.merge(g_ht, on=dim, how="outer").fillna(0)
+    out["delta_dn"] = out[f"du_no_{label_ht}"] - out[f"du_no_{label_bl}"]
+    out["pct_change"] = (
+        out["delta_dn"]
+        / out[f"du_no_{label_bl}"].replace(0, float("nan"))
+        * 100
+    ).fillna(0)
+
+    out = out.sort_values("delta_dn", ascending=False)
+
+    df_show = pd.DataFrame()
+    df_show[dim] = out[dim].astype(str).replace({"nan": ""})
+    df_show[f"DN {label_bl}"] = out[f"du_no_{label_bl}"].apply(fmt_ty)
+    df_show[f"DN {label_ht}"] = out[f"du_no_{label_ht}"].apply(fmt_ty)
+    df_show["Δ DN"] = out["delta_dn"].apply(lambda x: ("+" if x >= 0 else "") + fmt_ty(x))
+    df_show["% thay đổi"] = out["pct_change"].apply(_fmt_pct_vn)
+    df_show[f"NQH {label_bl}"] = out[f"nqh_pct_{label_bl}"].apply(_fmt_pct_vn)
+    df_show[f"NQH {label_ht}"] = out[f"nqh_pct_{label_ht}"].apply(_fmt_pct_vn)
+    return df_show
 
 def _bang_par(df: pd.DataFrame, label: str) -> None:
     """Hiển thị PAR30/90/180 cho 1 DataFrame."""
@@ -1449,6 +1498,94 @@ def render_moc_nam(tab: DeltaGenerator = None, **kwargs) -> None:
             f"**Kỳ hiện tại:** {label_ht} &nbsp;|&nbsp; "
             f"**Mốc so sánh:** {label_bl}"
         )
+        _nx_bl = agg_bl["du_no_qh"] + agg_bl["du_no_khoanh"]
+        _nx_ht = agg_ht["du_no_qh"] + agg_ht["du_no_khoanh"]
+        rows = [
+            ("Tổng dư nợ",           agg_bl["tong_du_no"],    agg_ht["tong_du_no"],    "ty"),
+            ("  Dư nợ trong hạn",    agg_bl["du_no_th"],      agg_ht["du_no_th"],      "ty"),
+            ("  Dư nợ quá hạn",      agg_bl["du_no_qh"],      agg_ht["du_no_qh"],      "ty"),
+            ("  Dư nợ khoanh",       agg_bl["du_no_khoanh"],  agg_ht["du_no_khoanh"],  "ty"),
+            ("Nợ xấu (QH + Khoanh)", _nx_bl,                  _nx_ht,                  "ty"),
+            ("Tổng lãi tồn (TH+QH)", agg_bl["tong_lai_ton"],  agg_ht["tong_lai_ton"],  "ty"),
+            ("Giải ngân trong năm",  agg_bl["gn_nam"],        agg_ht["gn_nam"],        "ty"),
+            ("Số hộ vay",            agg_bl["so_ho"],         agg_ht["so_ho"],         "so"),
+            ("Số khế ước",           agg_bl["so_ku"],         agg_ht["so_ku"],         "so"),
+        ]
+        data_ct = []
+        for ten, bl_val, ht_val, unit in rows:
+            delta = ht_val - bl_val
+            pct = (delta / bl_val * 100) if bl_val != 0 else 0.0
+            sign = "+" if delta >= 0 else ""
+            data_ct.append({
+                "Chỉ tiêu": ten,
+                f"Mốc {label_bl}": fmt_ty(bl_val) if unit == "ty" else fmt_so(int(bl_val)),
+                f"Kỳ {label_ht}":  fmt_ty(ht_val) if unit == "ty" else fmt_so(int(ht_val)),
+                "Chênh lệch":      f"{sign}{fmt_ty(delta)}" if unit == "ty" else f"{sign}{fmt_so(int(delta))}",
+                "% thay đổi":      f"{sign}{pct:.2f}".replace(".", ",") + "%",
+            })
+        df_ct = pd.DataFrame(data_ct)
+
+        with st.expander("📄 Xuất báo cáo", expanded=False):
+            dim_labels = {col: lbl for col, lbl in _EXPORT_DIM_OPTIONS}
+            dim_default = COT_TEN_PGD if la_phan_he_cn(role) else COT_TEN_XA
+            dim_sel_xuat = st.radio(
+                "Phân tích theo",
+                options=[col for col, _ in _EXPORT_DIM_OPTIONS],
+                format_func=lambda x: dim_labels.get(x, x),
+                horizontal=True,
+                key=f"{key_prefix}ssk_xuat_dim",
+                index=[c for c, _ in _EXPORT_DIM_OPTIONS].index(dim_default)
+                if dim_default in [c for c, _ in _EXPORT_DIM_OPTIONS] else 0,
+            )
+
+            username = st.session_state.get("username", "unknown")
+            tieu_de_pdf = f"So sánh kỳ — {label_ht} vs {label_bl}"
+            if pgd_mode and pgd_user:
+                tieu_de_pdf = f"{tieu_de_pdf} — {pgd_user}"
+
+            col_xl, col_pdf = st.columns(2)
+            with col_xl:
+                if st.button("📥 Tạo Excel", key=f"{key_prefix}ssk_xuat_excel_btn", use_container_width=True):
+                    sheets: dict[str, pd.DataFrame] = {}
+                    sheets["Tóm tắt"] = pd.DataFrame([
+                        {"Mục": "Kỳ hiện tại", "Giá trị": label_ht},
+                        {"Mục": "Mốc so sánh", "Giá trị": label_bl},
+                        {"Mục": "Phạm vi", "Giá trị": (pgd_user if (pgd_mode and pgd_user) else "Toàn Chi nhánh")},
+                    ])
+                    sheets["Chỉ tiêu"] = df_ct
+                    if dim_sel_xuat in df_bl.columns or dim_sel_xuat in df_ht.columns:
+                        sheets["Tăng trưởng"] = _bang_tang_truong_export(
+                            df_bl, df_ht, dim_sel_xuat, label_bl, label_ht
+                        )
+                    if la_phan_he_cn(role):
+                        df_top = _top_movers(df_ht, df_bl, nhom_by=COT_TEN_PGD, n=10)
+                        if df_top is not None and not df_top.empty:
+                            sheets["Top biến động"] = df_top
+                    st.session_state[f"_{key_prefix}ssk_excel_bytes"] = xuat_excel(sheets)
+                    st.session_state[f"_{key_prefix}ssk_excel_name"] = ten_file_xuat(
+                        f"SoSanhKy_{label_ht.replace('/', '')}_vs_{label_bl.replace('/', '')}"
+                    )
+
+                if st.session_state.get(f"_{key_prefix}ssk_excel_bytes"):
+                    st.download_button(
+                        "⬇ Tải Excel",
+                        data=st.session_state[f"_{key_prefix}ssk_excel_bytes"],
+                        file_name=st.session_state.get(f"_{key_prefix}ssk_excel_name", "SoSanhKy.xlsx"),
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        key=f"{key_prefix}ssk_xuat_excel_dl",
+                        use_container_width=True,
+                    )
+
+            with col_pdf:
+                nut_xuat_pdf(
+                    df_ct,
+                    tieu_de_pdf,
+                    username,
+                    cols_tien=[],
+                    prefix_file="SoSanhKy",
+                    key=f"{key_prefix}ssk_pdf",
+                )
+
         st.divider()
 
         # ═══════════ 12 KPI CARDS (3 hàng × 4) ══════════════════════════
@@ -1514,30 +1651,6 @@ def render_moc_nam(tab: DeltaGenerator = None, **kwargs) -> None:
 
         # ── Chi tiết chỉ tiêu ─────────────────────────────────────────────
         with st.expander("📋 Chi tiết chỉ tiêu", expanded=True):
-            rows = [
-                ("Tổng dư nợ",           agg_bl["tong_du_no"],    agg_ht["tong_du_no"],    "ty"),
-                ("  Dư nợ trong hạn",    agg_bl["du_no_th"],      agg_ht["du_no_th"],      "ty"),
-                ("  Dư nợ quá hạn",      agg_bl["du_no_qh"],      agg_ht["du_no_qh"],      "ty"),
-                ("  Dư nợ khoanh",       agg_bl["du_no_khoanh"],  agg_ht["du_no_khoanh"],  "ty"),
-                ("Nợ xấu (QH + Khoanh)", no_xau_bl,               no_xau_ht,               "ty"),
-                ("Tổng lãi tồn (TH+QH)", agg_bl["tong_lai_ton"],  agg_ht["tong_lai_ton"],  "ty"),
-                ("Giải ngân trong năm",  agg_bl["gn_nam"],        agg_ht["gn_nam"],        "ty"),
-                ("Số hộ vay",            agg_bl["so_ho"],         agg_ht["so_ho"],         "so"),
-                ("Số khế ước",           agg_bl["so_ku"],         agg_ht["so_ku"],         "so"),
-            ]
-            data_ct = []
-            for ten, bl_val, ht_val, unit in rows:
-                delta = ht_val - bl_val
-                pct = (delta / bl_val * 100) if bl_val != 0 else 0.0
-                sign = "+" if delta >= 0 else ""
-                data_ct.append({
-                    "Chỉ tiêu": ten,
-                    f"Mốc {label_bl}": fmt_ty(bl_val) if unit == "ty" else fmt_so(int(bl_val)),
-                    "Hiện tại":        fmt_ty(ht_val) if unit == "ty" else fmt_so(int(ht_val)),
-                    "Chênh lệch":      f"{sign}{fmt_ty(delta)}" if unit == "ty" else f"{sign}{fmt_so(int(delta))}",
-                    "% thay đổi":      f"{sign}{pct:.2f}".replace(".", ",") + "%",
-                })
-            df_ct = pd.DataFrame(data_ct)
             st.dataframe(df_ct, hide_index=True, use_container_width=True)
 
         # ═══════════ TĂNG TRƯỞNG DƯ NỢ ══════════════════════════════════

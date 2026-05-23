@@ -1,5 +1,24 @@
 # CHANGELOG
 
+## [2026-05-23] — Thiết kế lại "📊 Phân tích Đến hạn" (tab_den_han.py)
+- `tabs/tab_den_han.py` — Thêm 3 filters mới (PGD/Chương trình/Hội đoàn thể); thêm metric Tỷ lệ dư nợ/tổng; cảnh báo tập trung dùng `canh_bao_tap_trung()`; tổ chức lại theo `st.tabs` 3 tab (Theo tháng / Theo nhóm / Danh sách); chart cột đổi màu urgency (đỏ ≤2, cam 3-4, vàng 5-6, xanh 7-12 tháng); gộp Excel+PDF vào action row trong Tab Danh sách; gọn phần Xuất PDF Group Header thành 3 cột ngang
+- `tabs/tab_den_han.py` — Import thêm `canh_bao_tap_trung` từ `data.den_han`, `hien_thi_dataframe_phan_trang` từ `utils`
+
+## [2026-05-23] — Fix upload crash: ép cột mã (vd Mã thôn) về string trước khi ghi parquet
+- `data/core.py` — `excel_to_parquet()`: chuẩn hóa các cột định danh (`Mã *`, `Số khế ước`...) về string đồng nhất (float nguyên → int → str; NaN → ""), tránh `ArrowInvalid: Could not convert ... tried to convert to int64` khi tạo cache parquet cho từng PGD
+
+## [2026-05-23] — Cập nhật PDF & ngưỡng cảnh báo nợ khoanh
+- `tabs/tab_canh_bao_nqh.py` — Tựa đề PDF tự động thêm phạm vi lọc (NQH phát sinh: trong tháng/trong năm; Gia hạn nợ: trong tháng/trong năm; Khoanh sắp hết hạn: theo lựa chọn thời gian)
+- `tabs/tab_canh_bao_nqh.py` — Đổi nhãn `"Khẩn (≤ 30 ngày)"` → `"Phải kiểm tra nợ khoanh (≤ 120 ngày)"` và đổi ngưỡng từ 30 → 120 ngày
+- `alert_center.py` — Đồng bộ ngưỡng 30 → 120 ngày và cập nhật label sidebar `"món hết hạn khoanh"` → `"món phải kiểm tra nợ khoanh"`
+
+## [2026-05-23] — Tab "Khoanh sắp hết hạn": thêm 4 filters, 4 metrics, cột mới
+- `tabs/tab_canh_bao_nqh.py` dòng ~25 — Thêm `COT_NGAY_HH_KHOANH` vào config imports
+- `tabs/tab_canh_bao_nqh.py` dòng ~456 — Viết lại `_render_khoanh_sap_hh(df_full, ds_pgd_all, la_cn, key_prefix)`: thêm 4 filters (Thời gian/PGD/ĐVUT/CT), 4 metrics (Khẩn/Cảnh báo/Tổng dư nợ khoanh/Tỷ lệ sắp hết hạn), bảng chi tiết có cột Tên tổ trưởng + Tên xã + Dư nợ khoanh
+- `tabs/tab_canh_bao_nqh.py` dòng ~722 — Cập nhật call site truyền thêm `ds_pgd_all, la_cn`
+- `alert_center.py` dòng 12 — Thêm import `COT_DU_NO_KHOANH, COT_NGAY_HH_KHOANH, COT_SO_KU, COT_TEN_KH, COT_TEN_PGD, COT_TEN_TO_TRUONG, COT_TEN_XA` từ config
+- `alert_center.py` dòng ~89 — `canh_bao_no_khoanh_sap_het_han()`: thay hardcode string bằng COT_* constants; bổ sung `COT_TEN_TO_TRUONG, COT_DU_NO_KHOANH` vào cols output
+
 ## [2026-05-23] — Gộp "Cảnh báo sớm" vào "Đến hạn" + đổi tên thành "Nợ đến hạn có nguy cơ"
 - `tabs/tab_den_han.py` — Thêm inner-tab `🚨 Nợ đến hạn có nguy cơ` vào render(); radio "Chế độ xem" cho phép chuyển giữa "📊 Phân tích Đến hạn" (giữ nguyên) và "🚨 Nợ đến hạn có nguy cơ" (delegate sang `tab_canh_bao_som._render_canh_bao()`); thêm import `danh_dau_khong_hd_cached`
 - `tabs/tab_canh_bao_nqh.py` — Xóa sub-tab "Nợ đến hạn có nguy cơ" khỏi `sub_labels` (8→7), xóa hàm `_render_canh_bao_som_tab()`, cập nhật `_render_den_han_tab()` truyền `df_kh, ds_pgd_all, key_prefix, la_cn`; đánh số lại sub-tab comment (6=cũ7, 7=cũ8)

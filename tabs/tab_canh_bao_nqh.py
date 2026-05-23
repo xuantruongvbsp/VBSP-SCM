@@ -23,6 +23,7 @@ from config import (
     COT_NGAY_DH,
     COT_NGAY_DH_HD,
     COT_NGAY_GH_GN,
+    COT_NGAY_HH_KHOANH,
     COT_NGAY_SL,
     COT_SO_KU,
     COT_SO_LAN_GH,
@@ -453,61 +454,143 @@ def _render_nqh(df_kh: pd.DataFrame, ds_pgd_all: list, la_cn: bool, key_prefix: 
 
 # ─── Sub-tab 6: Khoanh sắp hết hạn ─────────────────────────────────────────────
 
-def _render_khoanh_sap_hh(df_full: pd.DataFrame, key_prefix: str) -> None:
+def _render_khoanh_sap_hh(
+    df_full: pd.DataFrame, ds_pgd_all: list, la_cn: bool, key_prefix: str
+) -> None:
     if _COT_KHOANH not in df_full.columns:
         st.warning("Dữ liệu không có cột Dư nợ khoanh.")
         return
 
     du_kh = pd.to_numeric(df_full[_COT_KHOANH], errors="coerce").fillna(0)
-    df_khoanh = df_full[du_kh > 0]
-    data = canh_bao_no_khoanh_sap_het_han(df_khoanh)
+    df_base = df_full[du_kh > 0].copy()
 
-    k1, k2 = st.columns(2)
-    k1.metric("Khẩn (<= 30 ngày)", fmt_so(data["so_khan"]),
-              delta_color="inverse" if data["so_khan"] > 0 else "off")
-    k2.metric("Cảnh báo (<= 180 ngày)", fmt_so(data["so_canh_bao"]),
-              delta_color="inverse" if data["so_canh_bao"] > 0 else "off")
-
-    if data["so_khan"] == 0 and data["so_canh_bao"] == 0:
-        st.success("Không có món khoanh nào sắp hết hạn.")
+    if df_base.empty:
+        st.success("Không có món khoanh nào.")
         return
 
-    if data["so_khan"] > 0:
-        st.markdown("**Danh sách khẩn — hết hạn trong 30 ngày**")
-        df_khan = pd.DataFrame(data["chi_tiet_khan"])
-        if not df_khan.empty:
-            if "con_lai" in df_khan.columns:
-                df_khan = df_khan.rename(columns={"con_lai": "Còn lại (ngày)"})
-            hien_thi_dataframe_phan_trang(df_khan, key=f"{key_prefix}kh_khan", height=220)
+    today = pd.Timestamp.today().normalize()
+    if COT_NGAY_HH_KHOANH in df_base.columns:
+        df_base["_ngay_het"] = pd.to_datetime(
+            df_base[COT_NGAY_HH_KHOANH], errors="coerce", dayfirst=True
+        )
+        df_base["_con_lai"] = (df_base["_ngay_het"] - today).dt.days
+    else:
+        df_base["_con_lai"] = pd.NA
 
-    if data["so_canh_bao"] > 0:
-        st.markdown("**Danh sách cảnh báo — hết hạn trong 180 ngày**")
-        df_cb = pd.DataFrame(data["chi_tiet_canh_bao"])
-        if not df_cb.empty:
-            if "con_lai" in df_cb.columns:
-                df_cb = df_cb.rename(columns={"con_lai": "Còn lại (ngày)"})
-            hien_thi_dataframe_phan_trang(df_cb, key=f"{key_prefix}kh_cb", height=280)
+    # ─── 4 Filters ───────────────────────────────────────────────────────────────
+    col_tg, col_pgd = st.columns(2)
+    with col_tg:
+        loc_tg = st.selectbox(
+            "Thời gian",
+            ["Khẩn (≤ 30 ngày)", "Cảnh báo (≤ 180 ngày)", "Tất cả"],
+            key=f"{key_prefix}kh_tg",
+        )
+    with col_pgd:
+        if la_cn:
+            loc_pgd = st.selectbox(
+                "Lọc PGD", ["Tất cả"] + ds_pgd_all, key=f"{key_prefix}kh_pgd"
+            )
+        else:
+            loc_pgd = "Tất cả"
+            st.caption("Lọc PGD (CN)")
 
-    tong = data["so_khan"] + data["so_canh_bao"]
-    if tong > 0:
-        all_rows = data["chi_tiet_khan"] + data["chi_tiet_canh_bao"]
-        for r in all_rows:
-            if "con_lai" in r:
-                r["Còn lại (ngày)"] = r.pop("con_lai")
-        if st.button(f"Xuất Excel ({tong} món)", key=f"{key_prefix}kh_xuat_btn"):
-            st.session_state[f"_{key_prefix}kh_buf"] = xuat_excel(
-                {"KhoanhSapHetHan": pd.DataFrame(all_rows)}
+    col_dvut, col_ct = st.columns(2)
+    cot_dvut = _tim_cot(df_base, COT_DVUT)
+    with col_dvut:
+        if cot_dvut:
+            ds_dvut = sorted(df_base[cot_dvut].dropna().unique().tolist())
+            loc_dvut = st.selectbox(
+                "Lọc Hội đoàn thể", ["Tất cả"] + ds_dvut, key=f"{key_prefix}kh_dvut"
             )
-        if st.session_state.get(f"_{key_prefix}kh_buf"):
-            st.download_button(
-                "Tải về", data=st.session_state[f"_{key_prefix}kh_buf"],
-                file_name=f"KhoanhSapHetHan_{datetime.now().strftime('%Y%m%d')}.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                key=f"{key_prefix}kh_dl",
+        else:
+            loc_dvut = "Tất cả"
+            st.caption("Không có cột ĐVUT")
+
+    cot_ct = _tim_cot(df_base, COT_TEN_CT)
+    with col_ct:
+        if cot_ct:
+            ds_ct = sorted(df_base[cot_ct].dropna().unique().tolist())
+            loc_ct = st.selectbox(
+                "Lọc Chương trình", ["Tất cả"] + ds_ct, key=f"{key_prefix}kh_ct"
             )
-        nut_xuat_pdf(pd.DataFrame(all_rows), "Khoanh sắp hết hạn",
-                     st.session_state.get("username", "unknown"),
-                     prefix_file="KhoanhSapHetHan", key=f"{key_prefix}kh_pdf")
+        else:
+            loc_ct = "Tất cả"
+            st.caption("Không có cột Chương trình")
+
+    # ─── Apply PGD / ĐVUT / CT filters ──────────────────────────────────────────
+    df_filt = df_base.copy()
+    if loc_pgd != "Tất cả" and COT_TEN_PGD in df_filt.columns:
+        df_filt = df_filt[df_filt[COT_TEN_PGD] == loc_pgd]
+    if loc_dvut != "Tất cả" and cot_dvut:
+        df_filt = df_filt[df_filt[cot_dvut] == loc_dvut]
+    if loc_ct != "Tất cả" and cot_ct:
+        df_filt = df_filt[df_filt[cot_ct] == loc_ct]
+
+    # ─── 4 Metrics (tính trên df_filt, không qua time filter) ───────────────────
+    con_lai = df_filt["_con_lai"]
+    so_khan = int((con_lai.notna() & (con_lai <= 30)).sum())
+    so_cb = int((con_lai.notna() & (con_lai > 30) & (con_lai <= 180)).sum())
+    tong_dn_kh = pd.to_numeric(df_filt[_COT_KHOANH], errors="coerce").sum()
+    tong_sap_hh = pd.to_numeric(
+        df_filt[con_lai.notna() & (con_lai <= 180)][_COT_KHOANH], errors="coerce"
+    ).sum()
+    ty_le = tong_sap_hh / tong_dn_kh * 100 if tong_dn_kh else 0
+
+    k1, k2, k3, k4 = st.columns(4)
+    k1.metric("Khẩn (≤ 30 ngày)", fmt_so(so_khan),
+              delta_color="inverse" if so_khan > 0 else "off")
+    k2.metric("Cảnh báo (≤ 180 ngày)", fmt_so(so_cb),
+              delta_color="inverse" if so_cb > 0 else "off")
+    k3.metric("Dư nợ khoanh (triệu đ)", fmt_ty(tong_dn_kh))
+    k4.metric("Tỷ lệ sắp hết hạn",
+              f"{ty_le:.2f}".replace(".", ",") + "%")
+
+    if df_filt.empty:
+        st.info("Không có món khoanh nào trong phạm vi đã lọc.")
+        return
+
+    # ─── Apply time filter → table ───────────────────────────────────────────────
+    if loc_tg == "Phải kiểm tra nợ khoanh (≤ 120 ngày)":
+        mask_tg = con_lai.notna() & (con_lai <= 120)
+    elif loc_tg == "Cảnh báo (≤ 180 ngày)":
+        mask_tg = con_lai.notna() & (con_lai <= 180)
+    else:
+        mask_tg = pd.Series(True, index=df_filt.index)
+
+    df_loc = df_filt[mask_tg].copy()
+    if df_loc.empty:
+        st.info(f"Không có món khoanh nào trong phạm vi '{loc_tg}'.")
+        return
+
+    df_loc["Còn lại (ngày)"] = df_loc["_con_lai"].astype("Int64")
+    cols_ct = [c for c in [
+        COT_TEN_PGD, COT_TEN_KH, COT_SO_KU, COT_TEN_CT,
+        _COT_KHOANH, COT_NGAY_HH_KHOANH, "Còn lại (ngày)",
+        COT_TEN_TO_TRUONG, COT_TEN_XA,
+    ] if c and c in df_loc.columns]
+    df_ct = df_loc[cols_ct].reset_index(drop=True)
+
+    if st.button(f"Xuất Excel ({len(df_ct)} món)", key=f"{key_prefix}kh_xuat_btn"):
+        st.session_state[f"_{key_prefix}kh_buf"] = xuat_excel(
+            {"KhoanhSapHetHan": df_ct}
+        )
+    if st.session_state.get(f"_{key_prefix}kh_buf"):
+        st.download_button(
+            "Tải về", data=st.session_state[f"_{key_prefix}kh_buf"],
+            file_name=f"KhoanhSapHetHan_{datetime.now().strftime('%Y%m%d')}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            key=f"{key_prefix}kh_dl",
+        )
+    _tieu_de_khoanh = "Khoanh sắp hết hạn"
+    if loc_tg == "Phải kiểm tra nợ khoanh (≤ 120 ngày)":
+        _tieu_de_khoanh = "Khoanh sắp hết hạn — Phải kiểm tra nợ khoanh (≤ 120 ngày)"
+    elif loc_tg == "Cảnh báo (≤ 180 ngày)":
+        _tieu_de_khoanh = "Khoanh sắp hết hạn — Cảnh báo (≤ 180 ngày)"
+
+    nut_xuat_pdf(df_ct, _tieu_de_khoanh,
+                 st.session_state.get("username", "unknown"),
+                 prefix_file="KhoanhSapHetHan", key=f"{key_prefix}kh_pdf")
+    hien_thi_dataframe_phan_trang(df_ct, key=f"{key_prefix}kh_tbl", height=380)
 
 
 # ─── Sub-tab 7: Gia hạn nợ ─────────────────────────────────────────────────────
@@ -719,6 +802,6 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
         elif tab_chon == "Nợ quá hạn phát sinh":
             _render_nqh(df_kh, ds_pgd_all, la_cn, key_prefix)
         elif tab_chon == "Khoanh sắp hết hạn":
-            _render_khoanh_sap_hh(df_full, key_prefix)
+            _render_khoanh_sap_hh(df_full, ds_pgd_all, la_cn, key_prefix)
         elif tab_chon == "Gia hạn nợ":
             _render_gia_han(df_full, ds_pgd_all, ds_dvut_all, la_cn, key_prefix)

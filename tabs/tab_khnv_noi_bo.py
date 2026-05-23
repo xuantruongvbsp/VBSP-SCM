@@ -1060,10 +1060,13 @@ def _render_lich_cong_tac(tab, role_n: str, username: str):
     st.markdown("### 📅 Lịch công tác trong tháng")
 
     if view_mode == "📅 Lịch bàn":
+        # Luôn hiển thị lưới lịch bàn, dù có hay không có sự kiện
+        st.markdown(_html_lich_ban(ds_loc, thang_loc, nam_loc), unsafe_allow_html=True)
+        
+        # Thông báo hướng dẫn nếu chưa có sự kiện
         if not ds_loc:
-            st.info("ℹ️ Không có sự kiện nào trong tháng này.")
-        else:
-            st.markdown(_html_lich_ban(ds_loc, thang_loc, nam_loc), unsafe_allow_html=True)
+            st.info("ℹ️ Chưa có sự kiện nào trong tháng này. Click '➕ Thêm sự kiện' ở trên để tạo lịch mới.")
+        
         return  # bỏ qua for loop danh sách bên dưới
 
     # ── Chế độ Danh sách (giữ nguyên toàn bộ) ──

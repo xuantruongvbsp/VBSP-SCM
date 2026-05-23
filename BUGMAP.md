@@ -60,6 +60,15 @@
 | **Fix** | Thêm 2 nhánh `elif` trước `if ser.dtype == object`: (1) `is_integer_dtype` → `astype(object)`; (2) `is_float_dtype` → chuyển số nguyên dạng float → str rồi `astype(object)`. Dùng `pd.api.types.is_integer_dtype()` / `is_float_dtype()` thay vì so sánh `dtype ==`. |
 | **Ngày fix** | 2026-05-23 |
 
+### A4b — `Could not convert '46002612' ... Conversion failed for column Mã thôn with type object`
+| | |
+|---|---|
+| **File** | `data/core.py` → `excel_to_parquet()` ~dòng 18–55 |
+| **Dấu hiệu** | Upload/merge crash khi tạo cache parquet cho 1 PGD: `ArrowInvalid: Could not convert '46002612' with type str: tried to convert to int64` |
+| **Nguyên nhân** | `pd.read_excel()` trả cột code (vd `Mã thôn`) dạng `object` mixed (int + str). Khi `to_parquet(engine="pyarrow")`, Arrow infer `int64` rồi gặp chuỗi → fail |
+| **Fix** | Trước khi `to_parquet`, ép các cột định danh (`Mã *`, `Số khế ước`...) về string thống nhất (float nguyên → int → str; NaN → "") |
+| **Ngày fix** | 2026-05-23 |
+
 ### A5 — DuckDB `Binder Error: Referenced column not found in FROM clause`
 | | |
 |---|---|

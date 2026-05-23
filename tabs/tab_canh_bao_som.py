@@ -224,36 +224,21 @@ def _render_canh_bao(
 
     # ── Tính toán ────────────────────────────────────────────────
     df_soon = tinh_du_soon_dormant(df_kh, today, scope_code)
-    df_chuyen = tinh_chuyen_nqh_thang(df_kh, today)
-
     so_mon_soon = len(df_soon)
-    so_mon_chuyen = len(df_chuyen)
-
     tong_dn_soon = (
         pd.to_numeric(df_soon[COT_TONG_DU_NO], errors="coerce").sum()
         if not df_soon.empty and COT_TONG_DU_NO in df_soon.columns
         else 0
     )
-    tong_qh_chuyen = (
-        pd.to_numeric(df_chuyen[COT_DU_NO_QH], errors="coerce").sum()
-        if not df_chuyen.empty and COT_DU_NO_QH in df_chuyen.columns
-        else 0
-    )
 
     # ── KPI Cards ────────────────────────────────────────────────
-    k1, k2 = st.columns(2)
+    k1 = st.columns(1)[0]
     label_scope = scope_label.lower().replace(" ", " ")
     k1.metric(
         f"⚠️ Sắp đến hạn + KH không HĐ ({scope_label})",
         fmt_so(so_mon_soon),
         delta=fmt_ty(tong_dn_soon) if tong_dn_soon > 0 else None,
         delta_color="inverse" if so_mon_soon > 0 else "off",
-    )
-    k2.metric(
-        "🔴 Chuyển NQH trong tháng này",
-        fmt_so(so_mon_chuyen),
-        delta=fmt_ty(tong_qh_chuyen) if tong_qh_chuyen > 0 else None,
-        delta_color="inverse" if so_mon_chuyen > 0 else "off",
     )
 
     # ── Heatmap tháng ─────────────────────────────────────────────
@@ -268,80 +253,43 @@ def _render_canh_bao(
         )
         return
 
-    # ── Sub-tabs chi tiết ─────────────────────────────────────────
-    d1, d2 = st.tabs([
-        f"⚠️ Sắp đến hạn + KH không HĐ ({fmt_so(so_mon_soon)} món)",
-        f"🔴 Chuyển NQH trong tháng ({fmt_so(so_mon_chuyen)} món)",
-    ])
+    # ── Chi tiết ─────────────────────────────────────────
+    st.markdown(f"**⚠️ Sắp đến hạn + KH không HĐ ({fmt_so(so_mon_soon)} món)**")
 
-    with d1:
-        if df_soon.empty:
-            st.success(
-                f"✅ Không có khoản vay nào sắp đến hạn trong {scope_label.lower()} "
-                "mà khách hàng đang không hoạt động."
+    if df_soon.empty:
+        st.success(
+            f"✅ Không có khoản vay nào sắp đến hạn trong {scope_label.lower()} "
+            "mà khách hàng đang không hoạt động."
+        )
+    else:
+        df_filter_soon = df_soon.copy()
+        if la_cn and ds_pgd_all:
+            loc_pgd = st.selectbox(
+                "Lọc PGD", ["Tất cả"] + ds_pgd_all,
+                key=f"{key_prefix}som_pgd_soon",
             )
-        else:
-            df_filter_soon = df_soon.copy()
-            if la_cn and ds_pgd_all:
-                loc_pgd = st.selectbox(
-                    "Lọc PGD", ["Tất cả"] + ds_pgd_all,
-                    key=f"{key_prefix}som_pgd_soon",
-                )
-                if loc_pgd != "Tất cả" and COT_TEN_PGD in df_filter_soon.columns:
-                    df_filter_soon = df_filter_soon[df_filter_soon[COT_TEN_PGD] == loc_pgd]
+            if loc_pgd != "Tất cả" and COT_TEN_PGD in df_filter_soon.columns:
+                df_filter_soon = df_filter_soon[df_filter_soon[COT_TEN_PGD] == loc_pgd]
 
-            df_hien = _bang_hien_thi(df_filter_soon)
-            hien_thi_dataframe_phan_trang(df_hien, key=f"{key_prefix}som_tbl_soon", height=380)
+        df_hien = _bang_hien_thi(df_filter_soon)
+        hien_thi_dataframe_phan_trang(df_hien, key=f"{key_prefix}som_tbl_soon", height=380)
 
-            if st.button(
-                f"📥 Xuất Excel ({len(df_filter_soon)} món)",
-                key=f"{key_prefix}som_xuat_soon",
-            ):
-                st.session_state[f"_{key_prefix}som_buf_soon"] = xuat_excel(
-                    {"Sắp đến hạn KHĐ": df_hien}
-                )
-            if st.session_state.get(f"_{key_prefix}som_buf_soon"):
-                st.download_button(
-                    "⬇️ Tải về",
-                    data=st.session_state[f"_{key_prefix}som_buf_soon"],
-                    file_name=f"CanhBaoSom_{scope_label.replace(' ', '_')}_{today.strftime('%Y%m%d')}.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    key=f"{key_prefix}som_dl_soon",
-                )
+        if st.button(
+            f"📥 Xuất Excel ({len(df_filter_soon)} món)",
+            key=f"{key_prefix}som_xuat_soon",
+        ):
+            st.session_state[f"_{key_prefix}som_buf_soon"] = xuat_excel(
+                {"Sắp đến hạn KHĐ": df_hien}
+            )
+        if st.session_state.get(f"_{key_prefix}som_buf_soon"):
+            st.download_button(
+                "⬇️ Tải về",
+                data=st.session_state[f"_{key_prefix}som_buf_soon"],
+                file_name=f"CanhBaoSom_{scope_label.replace(' ', '_')}_{today.strftime('%Y%m%d')}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                key=f"{key_prefix}som_dl_soon",
+            )
 
-    with d2:
-        if df_chuyen.empty:
-            st.success("✅ Không có khoản vay nào chuyển NQH trong tháng này.")
-        else:
-            df_filter_chuyen = df_chuyen.copy()
-            if la_cn and ds_pgd_all:
-                loc_pgd2 = st.selectbox(
-                    "Lọc PGD", ["Tất cả"] + ds_pgd_all,
-                    key=f"{key_prefix}som_pgd_chuyen",
-                )
-                if loc_pgd2 != "Tất cả" and COT_TEN_PGD in df_filter_chuyen.columns:
-                    df_filter_chuyen = df_filter_chuyen[
-                        df_filter_chuyen[COT_TEN_PGD] == loc_pgd2
-                    ]
-
-            df_hien2 = _bang_hien_thi(df_filter_chuyen)
-            hien_thi_dataframe_phan_trang(df_hien2, key=f"{key_prefix}som_tbl_chuyen", height=380)
-
-            if st.button(
-                f"📥 Xuất Excel ({len(df_filter_chuyen)} món)",
-                key=f"{key_prefix}som_xuat_chuyen",
-            ):
-                st.session_state[f"_{key_prefix}som_buf_chuyen"] = xuat_excel(
-                    {"Chuyển NQH tháng này": df_hien2}
-                )
-            if st.session_state.get(f"_{key_prefix}som_buf_chuyen"):
-                st.download_button(
-                    "⬇️ Tải về",
-                    data=st.session_state[f"_{key_prefix}som_buf_chuyen"],
-                    file_name=f"ChuyenNQH_{today.strftime('%Y%m')}.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    key=f"{key_prefix}som_dl_chuyen",
-                )
 
 
 # ─── Public render ────────────────────────────────────────────────────────────

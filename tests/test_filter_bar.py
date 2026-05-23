@@ -52,8 +52,10 @@ class TestApplyFilters:
         assert all("Long Thành" in v for v in result["Tên PGD"])
 
     def test_scalar_case_insensitive(self):
-        result = apply_filters(_df(), {"Trạng thái": "ACTIVE"})
-        assert len(result) == 2
+        # "INACTIVE" chỉ khớp "inactive", không khớp "active" (không có "inactive" trong "active")
+        result = apply_filters(_df(), {"Trạng thái": "INACTIVE"})
+        assert len(result) == 1
+        assert result["Trạng thái"].iloc[0] == "inactive"
 
     def test_scalar_partial_match(self):
         result = apply_filters(_df(), {"Tên PGD": "Nhơn"})

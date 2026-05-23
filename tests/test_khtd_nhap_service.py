@@ -147,8 +147,9 @@ class TestDocExcelKhtdXaUpload:
     DS_XA = {"Xã An Bình", "Xã Phú Hữu"}
 
     def _xa_excel(self, rows: list[list]) -> bytes:
+        """doc_excel_khtd_xa_upload đọc với header=0 và dùng iloc[0/1/2] theo vị trí."""
         buf = BytesIO()
-        pd.DataFrame(rows).to_excel(buf, index=False, header=False)
+        pd.DataFrame(rows, columns=["Tên xã", "Mã CT", "Giá trị"]).to_excel(buf, index=False)
         return buf.getvalue()
 
     def test_hop_le_tra_ve_updates(self):

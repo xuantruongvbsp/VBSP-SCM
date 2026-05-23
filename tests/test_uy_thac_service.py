@@ -266,7 +266,7 @@ def test_luu_va_doc_bien_ban(test_db):
 def test_cap_nhat_trang_thai_found(test_db):
     key = "ut_bbct_test2_2026"
     record = {"id": "r1", "loai_cap": "tinh", "ten_don_vi": "PGD X", "ngay_kt": "2026-05-20"}
-    db_module.ghi_kv(key, [record], "tester")
+    db_module.ghi_kv(key, [record], "tester")  # list of dict → JSON-safe
 
     ok = svc.cap_nhat_trang_thai_bien_ban(
         key, "r1", "Đã xử lý xong", "tester", "PGD X"

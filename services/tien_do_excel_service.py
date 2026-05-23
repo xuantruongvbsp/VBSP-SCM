@@ -75,8 +75,8 @@ def xuat_excel_tien_do(df_tonghop: pd.DataFrame,
             for col_idx in range(1, len(col_names) + 1):
                 max_len = max(
                     (
-                        len(str(cell.value or ""))
-                        for cell in ws[ws.min_row : ws.max_row][:, col_idx - 1]
+                        len(str(ws.cell(row=r, column=col_idx).value or ""))
+                        for r in range(ws.min_row, ws.max_row + 1)
                     ),
                     default=15,
                 )
@@ -133,8 +133,8 @@ def xuat_excel_tien_do(df_tonghop: pd.DataFrame,
         for col_idx in range(1, len(col_names_mt) + 1):
             max_len = max(
                 (
-                    len(str(cell.value or ""))
-                    for cell in ws_mt[ws_mt.min_row : ws_mt.max_row][:, col_idx - 1]
+                    len(str(ws_mt.cell(row=r, column=col_idx).value or ""))
+                    for r in range(ws_mt.min_row, ws_mt.max_row + 1)
                 ),
                 default=12,
             )

@@ -68,18 +68,26 @@ def doc_baseline_merged(nam: int, _ts=0) -> pd.DataFrame | None:
     ds = [DON_VI_CHI_NHANH] + DS_PGD
 
     cache_path = baseline_cache_loai(nam, "hstd")
+    _MIN_COLS = 15
 
     # Check if cache is valid: all source files older than cache
     if os.path.exists(cache_path):
+        try:
+            df_cache = pd.read_parquet(cache_path)
+        except Exception:
+            df_cache = pd.DataFrame()
+
         cache_mtime = os.path.getmtime(cache_path)
-        need_rebuild = False
-        for dv in ds:
-            fp = baseline_pgd_path(dv, nam)
-            if os.path.exists(fp) and os.path.getmtime(fp) > cache_mtime:
-                need_rebuild = True
-                break
+        need_rebuild = df_cache.empty or len(df_cache.columns) < _MIN_COLS
         if not need_rebuild:
-            return pd.read_parquet(cache_path)
+            for dv in ds:
+                fp = baseline_pgd_path(dv, nam)
+                if os.path.exists(fp) and os.path.getmtime(fp) > cache_mtime:
+                    need_rebuild = True
+                    break
+
+        if not need_rebuild:
+            return df_cache
 
     # Rebuild: cache từng PGD bằng parquet → merge
     dfs = []
@@ -90,14 +98,64 @@ def doc_baseline_merged(nam: int, _ts=0) -> pd.DataFrame | None:
                 path_pq = str(Path(fp).with_suffix(".parquet"))
                 def _clean(df): return df.iloc[:, 1:].dropna(how="all")
                 df = excel_to_parquet(fp, path_pq, "BCQUERY", 4, _clean)
-                dfs.append(df)
-            except Exception:
-                pass
+                if df is not None and (not df.empty) and len(df.columns) >= _MIN_COLS:
+                    from config import COT_TEN_PGD
+                    if COT_TEN_PGD not in df.columns:
+                        df = df.copy()
+                        df[COT_TEN_PGD] = dv
+                    dfs.append(df)
+            except Exception as e:
+                from logger import get_logger
+                _logger = get_logger(__name__)
+                _logger.error("doc_baseline_merged: lỗi đọc baseline %s (%d) — %s", dv, nam, e, exc_info=True)
+                continue
 
     if dfs:
         result = pd.concat(dfs, ignore_index=True)
+        try:
+            import unicodedata as _ud
+
+            def _should_force_str(_col: str) -> bool:
+                s = _ud.normalize("NFC", str(_col or "")).strip().lower()
+                return (
+                    s.startswith("mã ")
+                    or s == "mã"
+                    or " mã " in f" {s} "
+                    or s in {"mã thôn", "mã xã", "mã kh", "mã khách hàng", "mã chương trình"}
+                    or s in {"số khế ước", "số ku"}
+                    or "cmnd" in s
+                    or "cccd" in s
+                    or s in {"số điện thoại", "điện thoại", "sdt", "sđt"}
+                )
+
+            def _norm_series(ser: pd.Series) -> pd.Series:
+                bad_vals = {"nan", "none", "<na>", "nat"}
+                if pd.api.types.is_integer_dtype(ser.dtype) or pd.api.types.is_float_dtype(ser.dtype):
+                    num = pd.to_numeric(ser, errors="coerce")
+                    whole = num.notna() & (num % 1 == 0)
+                    out = ser.astype(object)
+                    if whole.any():
+                        out = out.copy()
+                        out.loc[whole] = num.loc[whole].astype("int64").astype(str)
+                    out = out.fillna("").astype(str).str.strip()
+                else:
+                    num = pd.to_numeric(ser, errors="coerce")
+                    whole = num.notna() & (num % 1 == 0) & ser.notna()
+                    out = ser.astype(object)
+                    if whole.any():
+                        out = out.copy()
+                        out.loc[whole] = num.loc[whole].astype("int64").astype(str)
+                    out = out.fillna("").astype(str).str.strip()
+                low = out.str.lower()
+                return out.mask(low.isin(bad_vals), "")
+
+            for c in list(result.columns):
+                if _should_force_str(c):
+                    result[c] = _norm_series(result[c])
+        except Exception:
+            pass
         os.makedirs(os.path.dirname(cache_path), exist_ok=True)
-        result.to_parquet(cache_path, index=False, compression='zstd')
+        result.to_parquet(cache_path, index=False, engine="pyarrow", compression="zstd", compression_level=3)
         return result
 
     # fallback: file tổng cũ

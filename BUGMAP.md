@@ -78,6 +78,15 @@
 | **Fix** | Trước khi `to_parquet`, ép các cột định danh (`Mã *`, `Số khế ước`...) về string thống nhất (float nguyên → int → str; NaN → "") |
 | **Ngày fix** | 2026-05-23 |
 
+### A4e — `Expected bytes, got a 'float' object — Conversion failed for column Số ATM with type object`
+| | |
+|---|---|
+| **File** | `data/core.py` → `excel_to_parquet()` và `data/hstd.py` → `doc_baseline_merged()` |
+| **Dấu hiệu** | Tab “📊 So sánh kỳ” báo lỗi render; traceback chứa `(“Expected bytes, got a 'float' object”, 'Conversion failed for column Số ATM with type object')` |
+| **Nguyên nhân** | openpyxl đọc cột “Số ATM” (định dạng text trong Excel) trả về `bytes` cho các ô có giá trị và `float(NaN)` cho ô trống → pandas object column chứa bytes + NaN(float) hỗn hợp → PyArrow infer column là binary rồi crash khi gặp NaN float. `_should_force_str()` không cover “Số ATM” nên cột không được normalize. Lỗi xảy ra cả ở (1) lần ghi parquet đầu trong `excel_to_parquet`, (2) lần ghi cache merged trong `doc_baseline_merged` (nếu cache PGD cũ có bytes, sau concat với PGD khác không có cột → mixed bytes+NaN). |
+| **Fix** | Thêm bước sanitize **bytes→str** cho tất cả object columns trước mỗi lần `to_parquet`: (a) trong `excel_to_parquet()` trước dòng `df.to_parquet()`; (b) trong `doc_baseline_merged()` trước dòng `result.to_parquet()`. |
+| **Ngày fix** | 2026-05-23 |
+
 ### A4d — Baseline 31/12 báo “chưa có dữ liệu” dù đã upload (cache baseline 0 cột)
 | | |
 |---|---|

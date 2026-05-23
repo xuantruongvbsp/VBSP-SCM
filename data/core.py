@@ -84,7 +84,12 @@ def excel_to_parquet(
             except Exception as e2:
                 logger.error("excel_to_parquet: không thể xóa cache parquet lỗi — %s", e2, exc_info=True)
             raise
-    return pd.read_parquet(parquet_path, engine='pyarrow')
+    # Chuẩn hóa code columns sau khi đọc — xử lý cache cũ có dtype int64/float64
+    result = pd.read_parquet(parquet_path, engine='pyarrow')
+    for col in list(result.columns):
+        if _should_force_str(col):
+            result[col] = _normalize_code_series(result[col])
+    return result
 
 
 # ══════════════════════════════════════════════════════════════════════════════

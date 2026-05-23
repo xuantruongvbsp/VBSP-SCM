@@ -438,7 +438,7 @@ def _render_don_doc(df: pd.DataFrame, pgd_user: str, role: str):
 
 
 def _render_canh_bao_som_pgd(tab, **kwargs) -> None:
-    """Cảnh báo sớm NQH cho phân hệ PGD."""
+    """Nợ đến hạn có nguy cơ cho phân hệ PGD."""
     _lazy_tab("tab_canh_bao_som").render(tab, **kwargs)
 
 

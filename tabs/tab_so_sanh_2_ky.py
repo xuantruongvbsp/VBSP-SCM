@@ -215,8 +215,8 @@ def _render_bang_pgd(df1: pd.DataFrame, df2: pd.DataFrame,
     jn["delta_dn"]  = jn["dn2"]  - jn["dn1"]
     jn["delta_nqh"] = jn["nqh2"] - jn["nqh1"]
     jn["delta_ho"]  = jn["ho2"]  - jn["ho1"]
-    jn["tl_nqh1"]   = jn.apply(lambda r: r["nqh1"] / r["dn1"] * 100 if r["dn1"] else 0, axis=1)
-    jn["tl_nqh2"]   = jn.apply(lambda r: r["nqh2"] / r["dn2"] * 100 if r["dn2"] else 0, axis=1)
+    jn["tl_nqh1"] = (jn["nqh1"] / jn["dn1"].replace(0, float("nan")) * 100).fillna(0.0)
+    jn["tl_nqh2"] = (jn["nqh2"] / jn["dn2"].replace(0, float("nan")) * 100).fillna(0.0)
 
     # Hàng tổng
     tong = {
@@ -367,16 +367,34 @@ def _render_export(agg1: dict, agg2: dict,
         sheets["Theo PGD"] = df_pgd
 
     xl = xuat_excel(sheets)
-    st.download_button(
+    if st.download_button(
         "📥 Xuất Excel",
         data=xl,
         file_name=f"so_sanh_{ky1}_vs_{ky2}.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         key="ss2k_dl_excel",
         use_container_width=True,
-    )
-    db.ghi_audit(username, "xuat_bieu_cn",
-                 f"Xuất Excel so sánh 2 kỳ: {ky1} vs {ky2}")
+    ):
+        db.ghi_audit(username, "xuat_bieu_cn",
+                     f"Xuất Excel so sánh 2 kỳ: {ky1} vs {ky2}")
+
+
+# ──────────────────────────────────────────────
+# LAZY EXPANDER HELPER
+# ──────────────────────────────────────────────
+
+def _lazy_expander(label: str, key: str) -> bool:
+    """Chỉ render nội dung khi user nhấn mở lần đầu — tránh compute khi expander đóng."""
+    s_loaded = f"_ss2k_lazy_{key}"
+    if st.session_state.get(s_loaded, False):
+        with st.expander(label, expanded=True):
+            return True
+    with st.expander(label, expanded=False):
+        st.caption("👆 Nhấn để tải phân tích này")
+        if st.button("📊 Tải", key=f"_ss2k_lazy_btn_{key}", use_container_width=True):
+            st.session_state[s_loaded] = True
+            st.rerun()
+    return False
 
 
 # ──────────────────────────────────────────────
@@ -888,13 +906,13 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
 
         # ── NQ11 ──
         st.divider()
-        with st.expander("📋 So sánh NQ11 (Nghị quyết 11)", expanded=False):
+        if _lazy_expander("📋 So sánh NQ11 (Nghị quyết 11)", "nq11"):
             _render_nq11_section(ky1, ky2, pgd_mode, pgd_user)
 
         # ── GQVL ──
-        with st.expander("💼 So sánh GQVL (Giải quyết việc làm)", expanded=False):
+        if _lazy_expander("💼 So sánh GQVL (Giải quyết việc làm)", "gqvl"):
             _render_gqvl_section(ky1, ky2, pgd_mode, pgd_user)
 
         # ── Chất lượng tổ TK&VV ──
-        with st.expander("🏆 So sánh chất lượng Tổ TK&VV", expanded=False):
+        if _lazy_expander("🏆 So sánh chất lượng Tổ TK&VV", "cdtotkvv"):
             _render_cdtotkvv_section(ky1, ky2, pgd_mode, pgd_user)

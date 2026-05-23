@@ -981,11 +981,17 @@ def render(**kwargs):
 
     filtered_kw = {k: v for k, v in kwargs.items()
                    if k not in ("role", "username", "df", "df_full", "ds_pgd_all")}
-    ALL_ITEMS = _build_all_items(
-        role, username,
-        df=df, df_full=df_full, ds_pgd_all=ds_pgd_all,
-        can_upload=can_upload, **filtered_kw
-    )
+    _data_id = id(df_full)
+    if "_mgmt_all_items_cache" not in st.session_state or st.session_state.get("_mgmt_all_items_data_id") != _data_id:
+        ALL_ITEMS = _build_all_items(
+            role, username,
+            df=df, df_full=df_full, ds_pgd_all=ds_pgd_all,
+            can_upload=can_upload, **filtered_kw
+        )
+        st.session_state["_mgmt_all_items_cache"] = ALL_ITEMS
+        st.session_state["_mgmt_all_items_data_id"] = _data_id
+    else:
+        ALL_ITEMS = st.session_state["_mgmt_all_items_cache"]
 
     # ── Navigation: điều hướng hoàn toàn qua sidebar (render_sidebar_menu) ──
     valid_labels = [x["label"] for x in ALL_ITEMS] + [

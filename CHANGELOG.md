@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## [2026-05-23] — Tối ưu chuyển tab menu Điều hành: radio thay button (~50% widget)
+- `workspaces/ws_management.py` `render_sidebar_menu()` — thay ~25 `st.button()` riêng lẻ bằng `st.radio()` gom theo nhóm (8 radio group + ~4 accordion buttons)
+- `workspaces/ws_management.py` `render()` — cache `ALL_ITEMS` trong `session_state` theo `id(df_full)`, tránh build lại 25+ lambda khi dữ liệu không đổi
+- Kết quả: giảm từ ~25 widget xuống ~12 mỗi lần rerun, chuyển tab nhanh hơn đáng kể
+
 ## [2026-05-23] — Viết test hàng loạt 8 module (135 cases, 100% pass)
 - `tests/test_pgd.py` — 19 cases: `pgd_slug()` (slug VN, đ/Đ, kỳ tự đặc biệt), `duong_dan_pgd()` (6 loại file)
 - `tests/test_alert_center.py` — 11 cases: `canh_bao_no_khoanh_sap_het_han()` — phân loại khan/cảnh báo/bình thường, edge case ngày không hợp lệ

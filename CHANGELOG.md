@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## [2026-05-23] — Gộp "Cảnh báo sớm" vào "Đến hạn" + đổi tên thành "Nợ đến hạn có nguy cơ"
+- `tabs/tab_den_han.py` — Thêm inner-tab `🚨 Nợ đến hạn có nguy cơ` vào render(); radio "Chế độ xem" cho phép chuyển giữa "📊 Phân tích Đến hạn" (giữ nguyên) và "🚨 Nợ đến hạn có nguy cơ" (delegate sang `tab_canh_bao_som._render_canh_bao()`); thêm import `danh_dau_khong_hd_cached`
+- `tabs/tab_canh_bao_nqh.py` — Xóa sub-tab "Nợ đến hạn có nguy cơ" khỏi `sub_labels` (8→7), xóa hàm `_render_canh_bao_som_tab()`, cập nhật `_render_den_han_tab()` truyền `df_kh, ds_pgd_all, key_prefix, la_cn`; đánh số lại sub-tab comment (6=cũ7, 7=cũ8)
+- `tabs/tab_canh_bao_som.py` — Đổi tất cả label "Cảnh báo sớm NQH" → "Nợ đến hạn có nguy cơ" (docstring, subheader, warning message)
+- `workspaces/ws_operation.py` — Đổi label "Cảnh báo sớm" → "Nợ đến hạn có nguy cơ" trong docstring và menu item
+
 ## [2026-05-23] — Đồng bộ .windsurfrules với .trae/rules/rules.md
 - `.windsurfrules` — viết lại toàn bộ: sửa signature upload `luu_pgd_file` (3 params, không có username), thêm đủ COT_* constants, function signatures, kv_store keys, BUGMAP.md workflow, "Lỗi đã từng mắc", checklist rà soát; bản cũ (09/05) thiếu toàn bộ các phần này
 

@@ -65,6 +65,7 @@ _SYNC_TABLES = [
     "nhiem_vu_ketqua",
     "tien_do_task",
     "tien_do_ketqua",
+    "tien_do_template",
     "qlnk_ket_qua",
     "qlnk_bo_sung",
     "qlnk_ke_hoach",
@@ -247,6 +248,32 @@ def init_db():
             );
             CREATE INDEX IF NOT EXISTS idx_tiendo_kq_task ON tien_do_ketqua(task_id);
             CREATE INDEX IF NOT EXISTS idx_tiendo_kq_pgd ON tien_do_ketqua(task_id, pgd);
+
+            CREATE TABLE IF NOT EXISTS tien_do_template (
+                id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                ten             TEXT NOT NULL,
+                mo_ta           TEXT,
+                loai            TEXT,
+                uu_tien         TEXT DEFAULT 'binh_thuong',
+                cap_theo_doi    TEXT DEFAULT 'xa',
+                so_ngay_deadline INTEGER DEFAULT 30,
+                nguoi_tao       TEXT,
+                ngay_tao        TEXT
+            );
+            CREATE TABLE IF NOT EXISTS tien_do_lich_su (
+                id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                task_id         INTEGER NOT NULL,
+                ten_xa          TEXT NOT NULL,
+                pgd             TEXT,
+                trang_thai_cu   TEXT,
+                trang_thai_moi  TEXT,
+                pct_cu          INTEGER,
+                pct_moi         INTEGER,
+                ghi_chu         TEXT,
+                nguoi_nhap      TEXT,
+                ngay_nhap       TEXT
+            );
+            CREATE INDEX IF NOT EXISTS idx_tiendo_ls_task ON tien_do_lich_su(task_id);
 
             CREATE TABLE IF NOT EXISTS hstd_snapshot (
                 id           INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -466,6 +493,36 @@ def init_db():
         try:
             conn.execute(
                 "ALTER TABLE users ADD COLUMN ngay_doi_mk TEXT"
+            )
+        except sqlite3.OperationalError:
+            pass
+        try:
+            conn.execute(
+                "ALTER TABLE tien_do_ketqua ADD COLUMN pct_hoan_thanh INTEGER DEFAULT 0"
+            )
+        except sqlite3.OperationalError:
+            pass
+        try:
+            conn.execute(
+                "ALTER TABLE nhiem_vu ADD COLUMN uu_tien TEXT DEFAULT 'binh_thuong'"
+            )
+        except sqlite3.OperationalError:
+            pass
+        try:
+            conn.execute(
+                "ALTER TABLE nhiem_vu ADD COLUMN loai TEXT DEFAULT 'chung'"
+            )
+        except sqlite3.OperationalError:
+            pass
+        try:
+            conn.execute(
+                "ALTER TABLE nhiem_vu_ketqua ADD COLUMN file_path TEXT"
+            )
+        except sqlite3.OperationalError:
+            pass
+        try:
+            conn.execute(
+                "ALTER TABLE nhiem_vu_ketqua ADD COLUMN file_name TEXT"
             )
         except sqlite3.OperationalError:
             pass

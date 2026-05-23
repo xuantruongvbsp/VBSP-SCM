@@ -619,6 +619,26 @@ ROLES_CO_QUYEN_QUAN_LY_USER_CN  = ["admin_cn", "admin"]
 ROLES_CO_QUYEN_QUAN_LY_USER_PGD = ["admin_pgd"]
 ROLES_CO_QUYEN_GIAO_NHIEM_VU    = ["admin_pgd", "manager_pgd", "admin", "manager", "admin_cn", "manager_cn", "chuyenvien_cn"]
 
+# ── Loại công việc & Ưu tiên (dùng chung tab_tien_do + tab_nhiem_vu) ──────────
+LOAI_CONG_VIEC: dict[str, str] = {
+    "chung":            "📋 Công việc chung",
+    "chi_tieu_khtd":    "🎯 Chỉ tiêu KHTD",
+    "ho_so_rui_ro":     "🗂️ Hồ sơ rủi ro",
+    "khao_sat_nhu_cau": "📊 Khảo sát nhu cầu vay vốn",
+    "bao_cao":          "📄 Báo cáo",
+    "tap_huan":         "🎓 Tập huấn",
+    "giao_dich_xa":     "📅 Giao dịch xã",
+    "uy_thac":          "🤝 Hoạt động ủy thác",
+    "nguon_von":        "💰 Nguồn vốn",
+    "ban_dai_dien":     "📑 Ban đại diện HĐQT",
+    "khac":             "Khác",
+}
+UU_TIEN_CV: dict[str, str] = {
+    "khan_cap":    "🔴 Khẩn cấp",
+    "quan_trong":  "🟡 Quan trọng",
+    "binh_thuong": "🟢 Bình thường",
+}
+
 # ── Mapping cột dữ liệu ↔ tag trong file Word template ───────────────────────
 # Thêm/sửa tại đây để hỗ trợ mẫu biểu mới mà không cần sửa code khác
 TAG_MAP = {

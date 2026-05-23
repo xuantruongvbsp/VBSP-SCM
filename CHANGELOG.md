@@ -1,5 +1,26 @@
 # CHANGELOG
 
+## [2026-05-24] — UI xem lịch sử tiến độ (Block 4 trong Cập nhật tiến độ)
+- `services/tien_do_service.py` — Thêm `doc_lich_su_task(task_id, pgd, limit)`: query `tien_do_lich_su` theo task + PGD tùy chọn, trả list[dict] mới nhất trước
+- `tabs/tab_tien_do.py` — Thêm Block 4 "📜 Lịch sử cập nhật tiến độ" (expander) sau data editor trong `_render_cap_nhat()`: hiển thị bảng thay đổi trạng thái/% theo thời gian, ẩn cột PGD khi đang lọc 1 PGD
+
+## [2026-05-24] — Phase 3: Dashboard tổng hợp, template, lịch sử, attachment
+- `tabs/tab_tien_do.py` — Thêm template selector trước form Tạo đầu việc: chọn mẫu → "▶️ Áp dụng" → tự điền form qua session_state + rerun; fix 8 chỗ `except Exception:` thiếu `as e` và logger message vô nghĩa trong `_fmt_task`, `_render_quan_ly_task`, `_fmt_cap_nhat_opt`, `_fmt_task_pdf`, tao/sua/dong/xoa task
+- `services/tien_do_service.py` — `upsert_ketqua_xa()` đọc trạng thái cũ rồi ghi `tien_do_lich_su` khi trang_thai hoặc pct_hoan_thanh thay đổi; `cap_nhat_ketqua_bulk()` truyền pct vào upsert
+- `services/upload_service.py` — Thêm `luu_attachment_nhiem_vu(ten_pgd, nv_id, ten_file, file_bytes, username)`: validate ext/size (≤5MB), lưu vào `pgd_data/{slug}/nhiem_vu_attach/`, ghi audit
+- `tabs/tab_nhiem_vu.py` — Thêm `st.file_uploader()` ngoài form để đính kèm file kết quả (xlsx/pdf/docx); hiển thị tên file trong tab nhập kết quả + hậu kiểm; `_upsert_ket_qua()` hỗ trợ `file_path`/`file_name` với 2 nhánh SQL
+- `tabs/tab_tong_hop_cv.py` — `_hien_thi_ket_qua_search()` tìm full-text trên `tien_do_task` + `nhiem_vu`, kết quả 2 cột; alert deadline sắp đến có nút "✕ Ẩn" (session_state)
+- `workspaces/ws_operation.py` — Thay `db.doc_kv("nhiem_vu_list")` bằng query trực tiếp `nhiem_vu` table theo `pgd_user`, tránh stale data từ kv_store không còn được populate
+
+## [2026-05-23] — Phase 2: Tính năng nghiệp vụ nâng cao
+- `db.py` — Thêm migrations: cột `pct_hoan_thanh` (tien_do_ketqua), `uu_tien`/`loai` (nhiem_vu), `file_path`/`file_name` (nhiem_vu_ketqua); tạo bảng `tien_do_template` và `tien_do_lich_su`; thêm `tien_do_template` vào `_SYNC_TABLES`
+- `config.py` — Thêm hằng số dùng chung `LOAI_CONG_VIEC` và `UU_TIEN_CV` để tái sử dụng giữa tab_tien_do và tab_nhiem_vu
+- `services/tien_do_service.py` — Fix bug undefined `e` ở line 126; thêm tham số `pct_hoan_thanh` vào `upsert_ketqua_xa()`; cập nhật `cap_nhat_ketqua_bulk()` hỗ trợ % hoàn thành (pct=100 tự đặt da_hoan_thanh)
+- `tabs/tab_tien_do.py` — Fix 3 bug undefined `e`; thêm cột `% HT` (0–100, step=5) vào data_editor; cập nhật `_render_tong_quan()` tính % trung bình từ `pct_hoan_thanh` thay vì chỉ đếm done/total
+- `tabs/tab_nhiem_vu.py` — Thêm import `LOAI_CONG_VIEC`/`UU_TIEN_CV`; thêm filter ưu tiên + loại vào Danh sách nhiệm vụ; thêm trường `uu_tien` và `loai` vào form Nhập nhiệm vụ mới
+- `tabs/tab_tong_hop_cv.py` — Tạo mới: dashboard tổng hợp với cảnh báo deadline, KPI row 2 module, bảng đầu việc cần chú ý và nhiệm vụ chờ duyệt
+- `tabs/tab_quan_ly_cv.py` — Gắn tab "🏠 Tổng quan" (`tab_tong_hop_cv`) vào đầu danh sách tab
+
 ## [2026-05-23] — Hoàn thiện tab_nhiem_vu.py (Giai đoạn 1)
 - `tabs/tab_nhiem_vu.py` — Fix role: `chuyenvien_cn` giờ thấy giao diện manager (dùng `la_phan_he_cn() and not la_executive()` thay vì check chuỗi cứng)
 - `tabs/tab_nhiem_vu.py` — Thêm sub-tab "📊 Tổng quan" cho manager: 4 KPI metrics, ma trận PGD × Nhiệm vụ, biểu đồ Plotly phân bố trạng thái

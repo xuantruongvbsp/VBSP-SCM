@@ -548,6 +548,18 @@ def render(**kwargs):
 
 ---
 
+### J4 — `except Exception:` không bind `e` nhưng dùng `e` trong logger
+
+| | |
+|---|---|
+| **File** | `tabs/tab_tien_do.py`, `services/tien_do_service.py` |
+| **Dấu hiệu** | `NameError: name 'e' is not defined` trong except block |
+| **Nguyên nhân** | Viết `except Exception:` (không có `as e`) nhưng body vẫn dùng `logger.error(..., e, ...)` — `e` không được định nghĩa. Ngoài ra logger message `"Lỗi trong khối except"` không mang thông tin context. |
+| **Fix** | Đổi thành `except Exception as e:  # conv: skip`. Với lỗi parse/lookup nhỏ dùng `logger.warning()` thay `logger.error()`. Đặt message mô tả hành động: `"Lỗi tạo task '%s': %s"`, `"Không parse ngày deadline task_id=%s: %s"`, v.v. |
+| **Ngày fix** | 2026-05-23 (lần 1: tien_do_service.py); 2026-05-24 (lần 2: 8 chỗ còn lại trong _render_quan_ly_task, _fmt_task, _fmt_cap_nhat_opt, _fmt_task_pdf) |
+
+---
+
 ### J1 — UnboundLocalError: cannot access local variable 'X' where it is not associated with a value
 | | |
 |---|---|

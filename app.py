@@ -271,13 +271,23 @@ def main():
         st.markdown("**Không gian làm việc**")
         for ws_key in allowed:
             is_active = st.session_state.workspace == ws_key
-            if st.button(
-                f"{'▶ ' if is_active else '   '}{WS_LABELS.get(ws_key, ws_key)}",
-                key=f"ws_{ws_key}", use_container_width=True,
-                type="primary" if is_active else "secondary",
-            ):
-                st.session_state.workspace = ws_key
-                st.rerun()
+            label = WS_LABELS.get(ws_key, ws_key)
+            if is_active:
+                st.markdown(
+                    f"<div style='"
+                    f"background:linear-gradient(135deg,#1565C0,#1976D2);"
+                    f"border-left:4px solid #0D47A1;"
+                    f"color:#FFFFFF;font-size:15px;font-weight:700;"
+                    f"padding:12px 18px;border-radius:0 10px 10px 0;margin-bottom:6px;"
+                    f"box-shadow:0 3px 10px rgba(21,101,192,0.4);"
+                    f"letter-spacing:0.3px'>"
+                    f"▶ {label}</div>",
+                    unsafe_allow_html=True,
+                )
+            else:
+                if st.button(label, key=f"ws_{ws_key}", use_container_width=True):
+                    st.session_state.workspace = ws_key
+                    st.rerun()
 
         # ── Menu điều hành (chỉ hiện khi workspace = management) ──
         if st.session_state.get("workspace") == "management":

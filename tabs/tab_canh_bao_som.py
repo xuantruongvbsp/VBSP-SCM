@@ -1,4 +1,4 @@
-"""Cảnh báo sớm NQH — khoản vay sắp đến hạn + KH không hoạt động > 90 ngày.
+"""Nợ đến hạn có nguy cơ — khoản vay sắp đến hạn + KH không hoạt động > 90 ngày.
 
 Ported từ VSPPRO Npl.tsx (dueSoonDormant / chuyenNQHThang).
 Hoạt động ở cả phân hệ Chi nhánh (CN) lẫn PGD.
@@ -264,7 +264,7 @@ def _render_canh_bao(
     if COT_NGAY_DH not in df_kh.columns:
         st.warning(
             f"⚠️ Không tìm thấy cột '{COT_NGAY_DH}' trong dữ liệu. "
-            "Cảnh báo sớm cần cột ngày đến hạn để hoạt động."
+            "Nợ đến hạn có nguy cơ cần cột ngày đến hạn để hoạt động."
         )
         return
 
@@ -348,7 +348,7 @@ def _render_canh_bao(
 
 def render(tab: DeltaGenerator = None, **kwargs) -> None:
     """
-    Render tab Cảnh báo sớm NQH.
+    Render tab Nợ đến hạn có nguy cơ.
 
     Dùng được ở cả CN (truyền df_full) và PGD (truyền df đã lọc theo PGD).
     """
@@ -361,7 +361,7 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
 
     ctx = tab if tab is not None else st.container()
     with ctx:
-        st.subheader("🚨 Cảnh báo sớm NQH")
+        st.subheader("🚨 Nợ đến hạn có nguy cơ")
         st.caption(
             "Phát hiện khoản vay **sắp đến hạn** + khách hàng "
             "**không giao dịch > 90 ngày** — can thiệp trước khi phát sinh nợ quá hạn."

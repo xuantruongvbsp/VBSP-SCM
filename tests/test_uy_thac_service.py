@@ -253,7 +253,7 @@ def test_luu_va_doc_bien_ban(test_db):
         "loai": "CT",
         "loai_cap": "tinh",
         "ten_don_vi": "PGD Test",
-        "ngay_kt": date(2026, 5, 20),
+        "ngay_kt": "2026-05-20",  # string — date object không JSON-serializable
     }
     svc.luu_bien_ban(key, [], record, username="tester")
     result = svc.doc_ds_bien_ban(key)

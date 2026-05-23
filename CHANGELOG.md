@@ -1,5 +1,29 @@
 # CHANGELOG
 
+## [2026-05-23] — Hoàn thiện tab_nhiem_vu.py (Giai đoạn 1)
+- `tabs/tab_nhiem_vu.py` — Fix role: `chuyenvien_cn` giờ thấy giao diện manager (dùng `la_phan_he_cn() and not la_executive()` thay vì check chuỗi cứng)
+- `tabs/tab_nhiem_vu.py` — Thêm sub-tab "📊 Tổng quan" cho manager: 4 KPI metrics, ma trận PGD × Nhiệm vụ, biểu đồ Plotly phân bố trạng thái
+- `tabs/tab_nhiem_vu.py` — Thêm Lọc/Tìm kiếm trong Danh sách nhiệm vụ (text search + filter trạng thái)
+- `tabs/tab_nhiem_vu.py` — Thêm nút "📊 Xuất Excel" (2 sheet: nhiệm vụ + kết quả PGD) dùng `utils.xuat_excel()`
+- `tabs/tab_nhiem_vu.py` — Hỗ trợ đa năm: bộ lọc kỳ và form tạo nhiệm vụ có thêm selectbox Năm (±1 năm hiện tại)
+- `tabs/tab_nhiem_vu.py` — Thêm nút đổi trạng thái nhiệm vụ trực tiếp trong Danh sách (Chờ / Bắt đầu / Hoàn thành / Tạm dừng)
+- `tabs/tab_nhiem_vu.py` — Fix bug: `_ky_mac_dinh()` cho chu_ky="nam" giờ trả năm hiện tại (index=1) thay vì năm+1 (index=-1)
+- `tabs/tab_nhiem_vu.py` — Fix bug PDF: biến `e` trong except không được định nghĩa khi font load fail
+
+## [2026-05-23] — Fix canh_bao_tap_trung(): tỷ lệ % đến hạn tính sai mẫu số
+- `data/den_han.py` — `canh_bao_tap_trung()`: thêm tham số `den_thang: int = 6`; dùng `loc_den_han_trong(df, 0, den_thang)` thay vì hardcode 6; group theo PGD thay vì (PGD × tháng) để tính tổng đến hạn cả N tháng
+- `tabs/tab_den_han.py` dòng ~134 — thêm `df_tinh_filtered` (áp filter PGD/CT/ĐVUT nhưng không lọc tháng) làm input cho `canh_bao_tap_trung()`, thay vì truyền `df_loc` (đã lọc tháng → mẫu số bị thu nhỏ → % bị thổi phồng ~48% thay vì ~10-15%)
+- `tabs/tab_den_han.py` dòng ~199 — truyền `den_thang=den_thang` vào `canh_bao_tap_trung()`
+- **Kết quả:** Cảnh báo ⚠️ tập trung hiển thị đúng tỷ lệ dư nợ đến hạn trong N tháng / tổng dư nợ PGD
+
+## [2026-05-23] — Thay slider "Xem trước (tháng)" bằng radio button nằm ngang
+- `tabs/tab_den_han.py` dòng ~116 — thay `st.slider(min=1, max=12)` bằng `st.radio(horizontal=True)` với 4 options cố định: 1/3/6/12 tháng (mặc định 6 tháng); giảm từ 6 cột filter xuống 5 cột
+
+## [2026-05-23] — Phase 1: Fix bug + convention tab_so_sanh_2_ky
+- `tabs/tab_so_sanh_2_ky.py` — `_delta_fmt()`: thêm nhánh `delta==0` trả `"0,00%"` thay vì `"+0,00%"`
+- `tabs/tab_so_sanh_2_ky.py` — sửa nhãn `"(triệu đ)"` và `"(tr.đ)"` → `"(triệu đồng)"` (13 chỗ)
+- `tabs/tab_so_sanh_2_ky.py` — GQVL section: thay inline lambda `fv = fmt_ty if ... else ...` bằng `_fv()` helper đồng bộ với NQ11
+
 ## [2026-05-23] — Fix bytes check sai (O(1) bỏ sót bytes ở PGD thứ 2+)
 - `data/hstd.py` — `doc_baseline_merged()`: bytes scan kiểm tra 100 phần tử đầu thay vì chỉ `iloc[0]`; bytes có thể xuất hiện ở PGD thứ 2+ khi Hội sở đọc "Số ATM" thành str
 - `data/core.py` — `excel_to_parquet()`: tương tự

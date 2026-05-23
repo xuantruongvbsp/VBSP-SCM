@@ -13,6 +13,9 @@ from streamlit.delta_generator import DeltaGenerator
 from alert_center import canh_bao_no_khoanh_sap_het_han
 from auth import la_phan_he_cn, normalize_role
 from config import (
+    COT_CHUYEN_QH_TRONG_THANG,
+    COT_CQH_NAM,
+    COT_DU_NO_KHOANH,
     COT_DU_NO_QH,
     COT_DVUT,
     COT_LAI_THANG,
@@ -26,6 +29,7 @@ from config import (
     COT_TEN_CT,
     COT_TEN_KH,
     COT_TEN_PGD,
+    COT_TEN_TO_TRUONG,
     COT_TEN_XA,
     COT_TONG_DU_NO,
     DS_PGD,
@@ -118,16 +122,38 @@ def _render_tong_hop(
     st.divider()
     st.markdown("**Tổng hợp cảnh báo theo PGD**")
 
+    today_ts = pd.Timestamp.today()
+    end_date = today_ts + pd.DateOffset(months=3)
+
+    if COT_NGAY_DH in df_full.columns and not df_full.empty:
+        ngay_dh_all = pd.to_datetime(df_full[COT_NGAY_DH], errors="coerce", dayfirst=True)
+        is_den_han = (ngay_dh_all >= today_ts) & (ngay_dh_all <= end_date)
+        den_han_by_pgd = is_den_han.groupby(df_full[COT_TEN_PGD]).sum()
+    else:
+        den_han_by_pgd = pd.Series(dtype=int)
+
+    if COT_DU_NO_QH in df_full.columns:
+        has_nqh = pd.to_numeric(df_full[COT_DU_NO_QH], errors="coerce").fillna(0) > 0
+        nqh_by_pgd = has_nqh.groupby(df_full[COT_TEN_PGD]).sum()
+    else:
+        nqh_by_pgd = pd.Series(dtype=int)
+
+    if "is_3m_inactive" in df_kh.columns:
+        khd_by_pgd = df_kh.groupby(COT_TEN_PGD)["is_3m_inactive"].sum()
+    else:
+        khd_by_pgd = pd.Series(dtype=int)
+
+    gh_by_pgd = so_gh_thang.groupby(df_full[COT_TEN_PGD]).sum() if co_gia_han else pd.Series(dtype=int)
+
     rows_th = []
     for pgd in ds_pgd_all:
-        df_pgd = df_full[df_full[COT_TEN_PGD] == pgd]
-        df_kh_pgd = df_kh[df_kh[COT_TEN_PGD] == pgd]
-        khd = int(df_kh_pgd["is_3m_inactive"].sum()) if "is_3m_inactive" in df_kh_pgd.columns else 0
-        nqh = int((df_pgd[COT_DU_NO_QH].fillna(0) > 0).sum()) if COT_DU_NO_QH in df_pgd.columns else 0
-        gh = int(so_gh_thang[df_full[COT_TEN_PGD] == pgd].sum()) if co_gia_han else 0
-        rows_th.append({"PGD": pgd, "Đến hạn": _dem_den_han(df_pgd, 3),
+        dh = int(den_han_by_pgd.get(pgd, 0))
+        khd = int(khd_by_pgd.get(pgd, 0))
+        nqh = int(nqh_by_pgd.get(pgd, 0))
+        gh = int(gh_by_pgd.get(pgd, 0))
+        rows_th.append({"PGD": pgd, "Đến hạn": dh,
                         "3 tháng KHĐ": khd, "Nợ QH": nqh, "GH tháng": gh,
-                        "Tổng": _dem_den_han(df_pgd, 3) + khd + nqh + gh})
+                        "Tổng": dh + khd + nqh + gh})
 
     df_th = pd.DataFrame(rows_th)
     if not df_th.empty:
@@ -275,7 +301,7 @@ def _render_migration(
 
 def _render_nqh(df_kh: pd.DataFrame, ds_pgd_all: list, la_cn: bool, key_prefix: str) -> None:
     cot_nqh = _tim_cot(df_kh, COT_DU_NO_QH)
-    cot_ngay_sl = _tim_cot(df_kh, COT_NGAY_SL)
+    cot_tong_dn = _tim_cot(df_kh, COT_TONG_DU_NO)
 
     if cot_nqh and cot_nqh in df_kh.columns:
         mask_nqh = pd.to_numeric(df_kh[cot_nqh], errors="coerce").fillna(0) > 0
@@ -288,23 +314,70 @@ def _render_nqh(df_kh: pd.DataFrame, ds_pgd_all: list, la_cn: bool, key_prefix: 
         st.success("Không có nợ quá hạn phát sinh.")
         return
 
-    col_thang, col_dvut = st.columns(2)
-    if cot_ngay_sl and cot_ngay_sl in df_nqh_all.columns:
-        _ngay = pd.to_datetime(df_nqh_all[cot_ngay_sl], errors="coerce")
-        df_nqh_all["_thang_sl"] = _ngay.dt.to_period("M")
-        ds_th = sorted(df_nqh_all["_thang_sl"].dropna().unique(), reverse=True)
-        ds_th_lb = {p: f"Tháng {p.month:02d}/{p.year}" for p in ds_th}
-        options = ["Tất cả"] + [ds_th_lb[p] for p in ds_th]
-        with col_thang:
-            chon = st.selectbox("Lọc theo tháng số liệu", options=options,
-                                index=1 if len(options) > 1 else 0, key=f"{key_prefix}nqh_thang")
-        if chon != "Tất cả":
-            period = next((p for p, lb in ds_th_lb.items() if lb == chon), None)
-            if period:
-                df_nqh_all = df_nqh_all[df_nqh_all["_thang_sl"] == period]
-    else:
-        with col_thang:
-            st.caption("Không có cột Ngày số liệu.")
+    # Tính tổng dư nợ gốc (trước khi lọc) để tính tỷ lệ NQH chính xác
+    tong_du_no_goc = df_kh[cot_tong_dn].sum() if cot_tong_dn and cot_tong_dn in df_kh.columns else 0
+
+    # ─── Filter 1: Thời gian (Chuyển QH trong tháng / trong năm / Tất cả) ─────────
+    cot_chuyen_qh_thang = _tim_cot(df_nqh_all, COT_CHUYEN_QH_TRONG_THANG)
+    cot_cqh_nam = _tim_cot(df_nqh_all, COT_CQH_NAM)
+    cot_ngay_dh = _tim_cot(df_nqh_all, COT_NGAY_DH)
+
+    col_time, col_pgd = st.columns(2)
+
+    with col_time:
+        loc_thoi_gian = st.selectbox(
+            "Lọc theo thời gian",
+            options=["Chuyển nợ quá hạn trong tháng", "Chuyển nợ quá hạn trong năm", "Tất cả nợ quá hạn"],
+            index=2,
+            key=f"{key_prefix}nqh_thoigian"
+        )
+
+    if loc_thoi_gian == "Chuyển nợ quá hạn trong tháng":
+        if cot_chuyen_qh_thang and cot_chuyen_qh_thang in df_nqh_all.columns:
+            # Cách 1: Dùng cột Chuyển QH trong tháng
+            mask = pd.to_numeric(df_nqh_all[cot_chuyen_qh_thang], errors="coerce").fillna(0) > 0
+            df_nqh_all = df_nqh_all[mask]
+        elif cot_ngay_dh and cot_ngay_dh in df_nqh_all.columns:
+            # Cách 2 (fallback): Dùng Ngày ĐH theo Gia hạn
+            today = datetime.now()
+            ngay_dh = pd.to_datetime(df_nqh_all[cot_ngay_dh], errors="coerce")
+            mask = (
+                (ngay_dh.dt.year == today.year)
+                & (ngay_dh.dt.month == today.month)
+                & (ngay_dh.dt.day <= today.day)
+            )
+            df_nqh_all = df_nqh_all[mask]
+        else:
+            st.warning("Không có cột 'Chuyển QH trong tháng' hoặc 'Ngày ĐH' để lọc.")
+    elif loc_thoi_gian == "Chuyển nợ quá hạn trong năm":
+        if cot_cqh_nam and cot_cqh_nam in df_nqh_all.columns:
+            mask = pd.to_numeric(df_nqh_all[cot_cqh_nam], errors="coerce").fillna(0) > 0
+            df_nqh_all = df_nqh_all[mask]
+        elif cot_ngay_dh and cot_ngay_dh in df_nqh_all.columns:
+            # Fallback: Dùng Ngày ĐH trong năm hiện tại
+            today = datetime.now()
+            ngay_dh = pd.to_datetime(df_nqh_all[cot_ngay_dh], errors="coerce")
+            mask = (ngay_dh.dt.year == today.year) & (ngay_dh <= pd.Timestamp(today))
+            df_nqh_all = df_nqh_all[mask]
+        else:
+            st.warning("Không có cột 'CQH Năm' hoặc 'Ngày ĐH' để lọc.")
+    # else: "Tất cả nợ quá hạn" → giữ nguyên df_nqh_all
+
+    # ─── Filter 2: PGD ──────────────────────────────────────────────────────────
+    with col_pgd:
+        if la_cn:
+            loc_pgd = st.selectbox("Lọc PGD", ["Tất cả"] + ds_pgd_all, key=f"{key_prefix}nqh_pgd")
+        else:
+            loc_pgd = "Tất cả"
+            st.caption("Lọc PGD (CN)")
+
+    if loc_pgd != "Tất cả":
+        cot_pgd = _tim_cot(df_nqh_all, COT_TEN_PGD)
+        if cot_pgd and cot_pgd in df_nqh_all.columns:
+            df_nqh_all = df_nqh_all[df_nqh_all[cot_pgd] == loc_pgd]
+
+    # ─── Filter 3 & 4: Hội đoàn thể + Chương trình ─────────────────────────────
+    col_dvut, col_ct = st.columns(2)
 
     cot_dvut_nqh = _tim_cot(df_nqh_all, COT_DVUT)
     with col_dvut:
@@ -312,35 +385,52 @@ def _render_nqh(df_kh: pd.DataFrame, ds_pgd_all: list, la_cn: bool, key_prefix: 
             ds_dvut = sorted(df_nqh_all[cot_dvut_nqh].dropna().unique().tolist())
             loc_dvut = st.selectbox("Lọc theo Hội đoàn thể",
                                     options=["Tất cả"] + ds_dvut, key=f"{key_prefix}nqh_dvut")
-            if loc_dvut != "Tất cả":
-                df_nqh_all = df_nqh_all[df_nqh_all[cot_dvut_nqh] == loc_dvut]
+        else:
+            loc_dvut = "Tất cả"
+            st.caption("Không có cột ĐVUT")
 
-    if la_cn:
-        col_pgd, _ = st.columns([2, 1])
-        with col_pgd:
-            loc_pgd = st.selectbox("Lọc PGD", ["Tất cả"] + ds_pgd_all, key=f"{key_prefix}nqh_pgd")
-        if loc_pgd != "Tất cả":
-            cot_pgd = _tim_cot(df_nqh_all, COT_TEN_PGD)
-            if cot_pgd and cot_pgd in df_nqh_all.columns:
-                df_nqh_all = df_nqh_all[df_nqh_all[cot_pgd] == loc_pgd]
+    if loc_dvut != "Tất cả":
+        df_nqh_all = df_nqh_all[df_nqh_all[cot_dvut_nqh] == loc_dvut]
 
-    df_nqh = df_nqh_all.drop(columns=["_thang_sl"], errors="ignore").copy()
+    # Filter 4: Lọc theo Chương trình
+    cot_ct = _tim_cot(df_nqh_all, COT_TEN_CT)
+    with col_ct:
+        if cot_ct and cot_ct in df_nqh_all.columns:
+            ds_ct = sorted(df_nqh_all[cot_ct].dropna().unique().tolist())
+            loc_ct = st.selectbox("Lọc theo Chương trình",
+                                  options=["Tất cả"] + ds_ct, key=f"{key_prefix}nqh_ct")
+        else:
+            loc_ct = "Tất cả"
+            st.caption("Không có cột Chương trình")
+
+    if loc_ct != "Tất cả":
+        df_nqh_all = df_nqh_all[df_nqh_all[cot_ct] == loc_ct]
+
+    # ─── Lọc cứng: Chỉ lấy món có Dư nợ quá hạn > 0 và Dư nợ khoanh = 0 ───────
+    cot_khoanh = _tim_cot(df_nqh_all, COT_DU_NO_KHOANH)
+    if cot_khoanh and cot_khoanh in df_nqh_all.columns:
+        du_no_khoanh = pd.to_numeric(df_nqh_all[cot_khoanh], errors="coerce").fillna(0)
+        df_nqh_all = df_nqh_all[du_no_khoanh == 0]
+
+    df_nqh = df_nqh_all.copy()
     if df_nqh.empty:
         st.info("Không có hồ sơ nợ quá hạn trong phạm vi đã lọc.")
         return
 
+    # ─── Metrics ────────────────────────────────────────────────────────────────
     tong_qh = df_nqh[cot_nqh].sum() if cot_nqh and cot_nqh in df_nqh.columns else 0
-    cot_tong_dn = _tim_cot(df_nqh, COT_TONG_DU_NO)
-    tong_dn = df_nqh[cot_tong_dn].sum() if cot_tong_dn and cot_tong_dn in df_nqh.columns else 0
 
     k1, k2, k3 = st.columns(3)
     k1.metric("Số hồ sơ NQH", fmt_so(len(df_nqh)))
     k2.metric("Dư nợ QH", fmt_ty(tong_qh) if tong_qh else "0")
-    k3.metric("Tỷ lệ NQH", f"{tong_qh / tong_dn * 100:.2f}%" if tong_dn else "0%")
+    # Tỷ lệ NQH tính trên tổng dư nợ gốc (trước khi lọc)
+    ty_le_nqh = (tong_qh / tong_du_no_goc * 100) if tong_du_no_goc else 0
+    k3.metric("Tỷ lệ NQH", f"{ty_le_nqh:.2f}%")
 
+    # ─── Bảng chi tiết ──────────────────────────────────────────────────────────
     cols_ct = [c for c in [
         COT_TEN_PGD, COT_TEN_KH, COT_SO_KU, COT_TEN_CT, cot_nqh, cot_tong_dn,
-        COT_NGAY_DH_HD, COT_NGAY_DH, COT_NGAY_SL,
+        COT_NGAY_DH, COT_TEN_TO_TRUONG, COT_TEN_XA,
     ] if c and c in df_nqh.columns]
     df_ct = df_nqh[cols_ct].reset_index(drop=True)
 
@@ -362,7 +452,7 @@ def _render_nqh(df_kh: pd.DataFrame, ds_pgd_all: list, la_cn: bool, key_prefix: 
     hien_thi_dataframe_phan_trang(df_ct, key=f"{key_prefix}nqh_chi", height=380)
 
 
-# ─── Sub-tab 6: Cảnh báo sớm ───────────────────────────────────────────────────
+# ─── Sub-tab 6: Nợ đến hạn có nguy cơ ──────────────────────────────────────────
 
 def _render_canh_bao_som_tab(df_kh: pd.DataFrame, ds_pgd_all: list, key_prefix: str, la_cn: bool) -> None:
     from tabs import tab_canh_bao_som
@@ -614,33 +704,32 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
             "3 tháng KHĐ",
             "BT sang Rủi ro",
             "Nợ quá hạn phát sinh",
-            "Cảnh báo sớm",
+            "Nợ đến hạn có nguy cơ",
             "Khoanh sắp hết hạn",
             "Gia hạn nợ",
         ]
 
-        tabs = st.tabs(sub_labels)
+        tab_chon = st.radio(
+            "",
+            sub_labels,
+            horizontal=True,
+            label_visibility="collapsed",
+            key=f"{key_prefix}sub_tab",
+        )
 
-        with tabs[0]:
+        if tab_chon == "Tổng hợp":
             _render_tong_hop(df_full, df_kh, ds_pgd_all, la_cn, key_prefix)
-
-        with tabs[1]:
+        elif tab_chon == "Đến hạn":
             _render_den_han_tab(role)
-
-        with tabs[2]:
+        elif tab_chon == "3 tháng KHĐ":
             _render_khd(df_kh, ds_pgd_all, la_cn, key_prefix)
-
-        with tabs[3]:
+        elif tab_chon == "BT sang Rủi ro":
             _render_migration(df_kh, ds_pgd_all, la_cn, key_prefix)
-
-        with tabs[4]:
+        elif tab_chon == "Nợ quá hạn phát sinh":
             _render_nqh(df_kh, ds_pgd_all, la_cn, key_prefix)
-
-        with tabs[5]:
+        elif tab_chon == "Nợ đến hạn có nguy cơ":
             _render_canh_bao_som_tab(df_kh, ds_pgd_all, key_prefix, la_cn)
-
-        with tabs[6]:
+        elif tab_chon == "Khoanh sắp hết hạn":
             _render_khoanh_sap_hh(df_full, key_prefix)
-
-        with tabs[7]:
+        elif tab_chon == "Gia hạn nợ":
             _render_gia_han(df_full, ds_pgd_all, ds_dvut_all, la_cn, key_prefix)

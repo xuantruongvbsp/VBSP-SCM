@@ -8,10 +8,10 @@
 
 | | Số lượng |
 |---|---|
-| File test | 31 |
-| Test cases (ước tính) | ~320+ |
-| Modules có test | 22/~60 |
-| 🔴 Modules chưa có test | ~38 |
+| File test | 45 |
+| Test cases (ước tính) | ~820 |
+| Modules có test | 28/~60 |
+| 🔴 Modules chưa có test | ~32 |
 
 ---
 
@@ -52,6 +52,9 @@
 | `du_phong_service.py` | `test_du_phong_service.py` | 9 | 🟡 Trung bình | Monthly projection, breakdown |
 | `cdtotkvv_service.py` | `test_cdtotkvv_service.py` | 7 | 🟡 Trung bình | Scoring, sheet naming |
 | `period_compare.py` | `test_period_compare.py` | 16 | ✅ Cao | Status, loan join, cure rate |
+| `services/file_detection_service.py` | `test_file_detection_service.py` | 21 | ✅ Cao | md5, alias, unit name detection, file-type sniffing |
+| `services/uy_thac_service.py` | `test_uy_thac_service.py` | 26 | ✅ Cao | tinh_theo_dvut, loc_mau06/15, co_du_lieu_to, kv_key, payload builders, bien_ban CRUD |
+| `services/tien_do_excel_service.py` | `test_tien_do_excel_service.py` | 8 | ✅ Cao | 3 sheets, styling, empty df |
 
 ---
 
@@ -115,6 +118,9 @@
 | `services/khtd_nhap_service.py` — XA path | ✅ Có test (29 cases, test_khtd_nhap_service.py) | — |
 | `services/excel_service.py` | ✅ Có test (13 cases, test_excel_service.py) | — |
 | `alert_center.py` — `canh_bao_no_khoanh_sap_het_han()` | ✅ Có test (11 cases, test_alert_center.py) | — |
+| `services/file_detection_service.py` | ✅ Có test (21 cases, test_file_detection_service.py) | — |
+| `services/uy_thac_service.py` | ✅ Có test (26 cases, test_uy_thac_service.py) | — |
+| `services/tien_do_excel_service.py` | ✅ Có test (8 cases, test_tien_do_excel_service.py) | — |
 
 ### D4. Components chưa test (`components/`)
 

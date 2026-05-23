@@ -36,7 +36,7 @@ def _xuat_bc_phan_cong(ds: list, thang: int, nam: int, ten_truong_phong: str = "
             rPr = run._r.get_or_add_rPr()
             rFonts = rPr.get_or_add_rFonts()
             rFonts.set(qn("w:eastAsia"), "Times New Roman")
-        except Exception:
+        except Exception:  # conv: skip — cosmetic font, failure is benign
             pass
 
     def _remove_borders(table) -> None:
@@ -191,7 +191,7 @@ def _xuat_bc_tien_do(ds: list, thang: int, nam: int, ten_truong_phong: str = "")
             rPr = run._r.get_or_add_rPr()
             rFonts = rPr.get_or_add_rFonts()
             rFonts.set(qn("w:eastAsia"), "Times New Roman")
-        except Exception:
+        except Exception:  # conv: skip — cosmetic font, failure is benign
             pass
 
     def _remove_borders(table) -> None:

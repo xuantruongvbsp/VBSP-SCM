@@ -37,7 +37,7 @@ def md5_bytes(data: bytes) -> str:
 def md5_file(path: str) -> str:
     try:
         return hashlib.md5(open(path, "rb").read()).hexdigest()
-    except Exception:
+    except Exception:  # conv: skip — file not found is expected
         return ""
 
 
@@ -124,7 +124,7 @@ def lay_ten_don_vi_trong_file(file_bytes: bytes, loai: str) -> str | None:
             vals = df[cot_ten].dropna().astype(str).unique()
             return str(vals[0]).strip() if len(vals) > 0 else None
 
-    except Exception:
+    except Exception:  # conv: skip — unrecognized format fallback
         return None
 
 
@@ -206,7 +206,7 @@ def nhan_dien_loai_tu_noi_dung(data: bytes) -> str | None:
                     for c in cols_check
                 ):
                     return "gqvl"
-            except Exception:
+            except Exception:  # conv: skip — detection probe, failure is expected
                 pass
 
         # ── CDTOTKVV ─────────────────────────────────────────────────
@@ -306,7 +306,7 @@ def tim_ten_pgd_tu_noi_dung(file_bytes: bytes, loai: str) -> str | None:
             raw = s.iloc[0]
             try:
                 ma = str(int(float(raw))).zfill(6)
-            except Exception:
+            except Exception:  # conv: skip — string fallback for non-numeric cell
                 ma = str(raw).strip()
                 digits = "".join(ch for ch in ma if ch.isdigit())
                 if digits:
@@ -328,6 +328,6 @@ def tim_ten_pgd_tu_noi_dung(file_bytes: bytes, loai: str) -> str | None:
                         return hit
             return None
 
-    except Exception:
+    except Exception:  # conv: skip — detection probe, failure is expected
         return None
     return None

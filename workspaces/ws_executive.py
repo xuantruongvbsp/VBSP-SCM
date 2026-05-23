@@ -885,9 +885,14 @@ def _hhi_giam_sat(df_full: pd.DataFrame) -> None:
 
     # ── Breakdown chi tiết ─────────────────────────────────────────────
     with st.expander("📊 Xem chi tiết phân bổ", expanded=False):
-        tab_xa, tab_ct = st.tabs(["🏘️ Theo Xã", "📌 Theo Chương trình"])
-
-        with tab_xa:
+        dim_sel = st.radio(
+            "Phân tích theo",
+            ["🏘️ Theo Xã", "📌 Theo Chương trình"],
+            horizontal=True,
+            key="hhi_dim_sel",
+            label_visibility="collapsed",
+        )
+        if dim_sel == "🏘️ Theo Xã":
             if COT_TEN_XA in df_full.columns:
                 br = tinh_hhi_breakdown(df_full, COT_TEN_XA, cot_tien)
                 br.columns = ["Xã", "Dư nợ (đồng)", "Tỷ trọng %", "Đóng góp HHI"]
@@ -900,8 +905,7 @@ def _hhi_giam_sat(df_full: pd.DataFrame) -> None:
                     hide_index=True,
                     use_container_width=True,
                 )
-
-        with tab_ct:
+        else:
             if COT_TEN_CT in df_full.columns:
                 br = tinh_hhi_breakdown(df_full, COT_TEN_CT, cot_tien)
                 br.columns = ["Chương trình", "Dư nợ (đồng)", "Tỷ trọng %", "Đóng góp HHI"]

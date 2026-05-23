@@ -12,6 +12,13 @@ from config import (
     COT_TEN_CT, COT_TONG_DU_NO, COT_DU_NO_TH, COT_DU_NO_QH,
     COT_NGAY_VAY, COT_NGAY_DH, COT_MUC_VAY, COT_NGUON_VON,
 )
+try:
+    from logger import get_logger
+    logger = get_logger(__name__)
+except Exception as e:
+    logger.error("Lỗi trong khối except: %s", e, exc_info=True)
+    import logging
+    logger = logging.getLogger(__name__)
 
 
 def du_phong_dong_tien(
@@ -118,7 +125,8 @@ def du_phong_dong_tien(
             tong_hop = duckdb.execute(sql, [tu_thang, den_thang]).df()
         else:
             tong_hop = con.execute(sql, [tu_thang, den_thang]).df()
-    except Exception:
+    except Exception as e:
+        logger.error("du_phong_dong_tien: lỗi query — %s", e, exc_info=True)
         return pd.DataFrame()
 
     if tong_hop.empty:
@@ -238,7 +246,8 @@ def du_phong_chi_tiet(
             df_ct = duckdb.execute(sql, [thang_dau]).df()
         else:
             df_ct = con.execute(sql, [thang_dau]).df()
-    except Exception:
+    except Exception as e:
+        logger.error("du_phong_chi_tiet: lỗi query — %s", e, exc_info=True)
         return pd.DataFrame()
 
     if df_ct.empty:

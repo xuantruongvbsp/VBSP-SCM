@@ -15,6 +15,13 @@ from typing import Any
 import pandas as pd
 
 import db
+try:
+    from logger import get_logger
+    logger = get_logger(__name__)
+except Exception as e:
+    logger.error("Lỗi trong khối except: %s", e, exc_info=True)
+    import logging
+    logger = logging.getLogger(__name__)
 from config import (
     FILE_PATH, FILE_PATH_NQ11, FILE_PATH_GQVL,
     COT_TEN_PGD, COT_MA_CHUONG_TRINH, COT_TEN_CT, COT_NGUON_VON,
@@ -68,7 +75,8 @@ def doc_ct_registry(pgd: str | None = None) -> dict:
                 "SELECT value FROM kv_store WHERE key=?", (key,)
             ).fetchone()
         return json.loads(row["value"]) if row else {}
-    except Exception:
+    except Exception as e:
+        logger.error("doc_ct_registry: lỗi đọc kv key=%s — %s", key, e, exc_info=True)
         return {}
 
 
@@ -439,8 +447,8 @@ def quet_va_ghi_chuong_trinh(username: str) -> dict:
                 ),
             )
             conn.commit()
-    except Exception:
-        pass
+    except Exception as e:
+        logger.error("quet_va_ghi_chuong_trinh: lỗi ghi lịch sử discovery — %s", e, exc_info=True)
 
     # ── 9. Audit ──────────────────────────────────────────────────────────────
     db.ghi_audit(
@@ -469,5 +477,6 @@ def doc_ket_qua_quet_cuoi() -> dict:
                 "SELECT value FROM kv_store WHERE key='ct_discovery_last_result'"
             ).fetchone()
         return json.loads(row["value"]) if row else {}
-    except Exception:
+    except Exception as e:
+        logger.error("doc_lich_su_discovery: lỗi đọc kv — %s", e, exc_info=True)
         return {}

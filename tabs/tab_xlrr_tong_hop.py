@@ -278,17 +278,19 @@ def render(tab=None, **kwargs) -> None:
         df_qd62 = _doc_tat_ca_qd62()
         df_no_rr = _doc_tat_ca_no_rr()
 
-        t1, t2, t3, t4 = st.tabs([
-            "📊 Tổng quan",
-            "📋 Hồ sơ QĐ62",
-            "💳 Nợ RR HSTD",
-            "📤 Xuất báo cáo",
-        ])
-        with t1:
+        tab_sel = st.radio(
+            "Xem",
+            ["📊 Tổng quan", "📋 Hồ sơ QĐ62", "💳 Nợ RR HSTD", "📤 Xuất báo cáo"],
+            horizontal=True,
+            key="xlrr_tab_sel",
+            label_visibility="collapsed",
+        )
+        st.divider()
+        if tab_sel == "📊 Tổng quan":
             _render_tong_quan(df_qd62, df_no_rr)
-        with t2:
+        elif tab_sel == "📋 Hồ sơ QĐ62":
             _render_qd62(df_qd62)
-        with t3:
+        elif tab_sel == "💳 Nợ RR HSTD":
             _render_no_rr(df_no_rr)
-        with t4:
+        else:
             _render_xuat_bao_cao(df_qd62, df_no_rr)

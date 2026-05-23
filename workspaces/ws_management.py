@@ -812,7 +812,8 @@ def _build_all_items(role: str, username: str, **kwargs) -> list:
 
 
 def render_sidebar_menu(role: str, username: str, **kwargs):
-    """Render menu ĐIỀU HÀNH — gọi từ app.py bên trong with st.sidebar."""
+    """Render menu ĐIỀU HÀNH — gọi từ app.py bên trong with st.sidebar.
+    Tối ưu: dùng st.radio() theo nhóm thay cho ~25 st.button() riêng lẻ."""
 
     GROUP_COLORS = {
         "Giám sát":                    {"bg": "#0D2137", "border": "#64B5F6", "text": "#90CAF9"},
@@ -829,17 +830,23 @@ def render_sidebar_menu(role: str, username: str, **kwargs):
     if not all_items:
         return
 
-    # Không lưu vào session_state — render() sẽ tự build ALL_ITEMS
-    # từ kwargs có đủ df/df_full (tránh truyền df=None khi sidebar render trước data load)
-
-    if "ws_mgmt_menu" not in st.session_state:
-        st.session_state["ws_mgmt_menu"] = all_items[0]["label"]
-
     valid_labels = [x["label"] for x in all_items] + [
         c["label"] for x in all_items for c in x.get("children", [])
     ]
+
+    if "ws_mgmt_menu" not in st.session_state:
+        st.session_state["ws_mgmt_menu"] = all_items[0]["label"]
     if st.session_state["ws_mgmt_menu"] not in valid_labels:
         st.session_state["ws_mgmt_menu"] = all_items[0]["label"]
+
+    active_label = st.session_state.get("ws_mgmt_menu", "")
+
+    for key in list(st.session_state.keys()):
+        if key.startswith("ws_mgmt_grp_"):
+            val = st.session_state[key]
+            if val and val != active_label and val in valid_labels:
+                st.session_state["ws_mgmt_menu"] = val
+                active_label = val
 
     st.markdown(
         "<p style='font-size:14px;font-weight:700;"
@@ -847,25 +854,55 @@ def render_sidebar_menu(role: str, username: str, **kwargs):
         unsafe_allow_html=True
     )
 
-    current_group = None
+    groups = []
+    current_grp = None
+    cur_flat = []
+    cur_acc = []
     for item in all_items:
-        grp = item["group"]
-        clr = GROUP_COLORS.get(grp, {"bg": "#F1EFE8", "border": "#888", "text": "#444"})
+        g = item["group"]
+        if g != current_grp:
+            if cur_flat or cur_acc:
+                groups.append((current_grp, cur_flat, cur_acc))
+            current_grp = g
+            cur_flat = []
+            cur_acc = []
+        if item.get("children"):
+            cur_acc.append(item)
+        else:
+            cur_flat.append(item)
+    if cur_flat or cur_acc:
+        groups.append((current_grp, cur_flat, cur_acc))
 
-        if grp != current_group:
-            current_group = grp
-            st.markdown(
-                f"<p style='font-size:11px;font-weight:700;"
-                f"color:{clr['text']};text-transform:uppercase;"
-                f"letter-spacing:0.06em;padding:12px 4px 4px;margin:0'>"
-                f"{grp}</p>",
-                unsafe_allow_html=True,
+    for grp_name, flat_items, acc_items in groups:
+        clr = GROUP_COLORS.get(grp_name, {"bg": "#F1EFE8", "border": "#888", "text": "#444"})
+
+        st.markdown(
+            f"<p style='font-size:11px;font-weight:700;"
+            f"color:{clr['text']};text-transform:uppercase;"
+            f"letter-spacing:0.06em;padding:12px 4px 4px;margin:0'>"
+            f"{grp_name}</p>",
+            unsafe_allow_html=True,
+        )
+
+        if flat_items:
+            flat_labels = [it["label"] for it in flat_items]
+            radio_key = f"ws_mgmt_grp_{grp_name}"
+
+            try:
+                idx = flat_labels.index(active_label)
+            except ValueError:
+                idx = None
+
+            st.radio(
+                grp_name,
+                flat_labels,
+                index=idx,
+                key=radio_key,
+                label_visibility="collapsed",
             )
 
-        children = item.get("children", [])
-        active_label = st.session_state.get("ws_mgmt_menu", "")
-
-        if children:
+        for item in acc_items:
+            children = item.get("children", [])
             child_labels = [c["label"] for c in children]
             is_child_active = active_label in child_labels
             open_key = f"ws_mgmt_acc_{item['label']}"
@@ -876,7 +913,6 @@ def render_sidebar_menu(role: str, username: str, **kwargs):
             is_open = st.session_state.get(open_key, False)
 
             if is_child_active:
-                # Parent highlight cam khi child đang active — không toggle
                 st.markdown(
                     f"<div style='"
                     f"background:#E65100;"
@@ -886,11 +922,11 @@ def render_sidebar_menu(role: str, username: str, **kwargs):
                     f"padding:10px 12px 10px 14px;"
                     f"border-radius:0 6px 6px 0;"
                     f"margin-bottom:4px'>"
-                    f"▾ {item['label']}</div>",
+                    f"\u25be {item['label']}</div>",
                     unsafe_allow_html=True,
                 )
             else:
-                arrow = "▾" if is_open else "▸"
+                arrow = "\u25be" if is_open else "\u25b8"
                 if st.button(
                     f"{arrow} {item['label']}",
                     key=f"menu_acc_{item['label']}",
@@ -909,45 +945,19 @@ def render_sidebar_menu(role: str, username: str, **kwargs):
                             f"color:#FFFFFF;font-size:13px;font-weight:700;"
                             f"padding:8px 10px 8px 22px;"
                             f"border-radius:0 6px 6px 0;margin-bottom:3px'>"
-                            f"● {child['label']}</div>",
+                            f"\u25cf {child['label']}</div>",
                             unsafe_allow_html=True,
                         )
                     else:
                         _, col = st.columns([0.06, 0.94])
                         with col:
                             if st.button(
-                                f"↳ {child['label']}",
+                                f"\u21b3 {child['label']}",
                                 key=f"menu_child_{child['label']}",
                                 width="stretch",
                             ):
                                 st.session_state["ws_mgmt_menu"] = child["label"]
                                 st.rerun()
-
-        else:
-            is_active = active_label == item["label"]
-
-            if is_active:
-                st.markdown(
-                    f"<div style='"
-                    f"background:#E65100;"
-                    f"border-left:3px solid #BF360C;"
-                    f"color:#FFFFFF;"
-                    f"font-size:14px;font-weight:700;"
-                    f"padding:10px 12px 10px 14px;"
-                    f"border-radius:0 6px 6px 0;"
-                    f"margin-bottom:4px'>"
-                    f"{item['label']}</div>",
-                    unsafe_allow_html=True,
-                )
-            else:
-                if st.button(
-                    item["label"],
-                    key=f"menu_{item['label']}",
-                    use_container_width=True,
-                ):
-                    st.session_state["ws_mgmt_menu"] = item["label"]
-                    st.rerun()
-
 
 def render(**kwargs):
     _wl = st.session_state.pop("_data_load_warning", None)

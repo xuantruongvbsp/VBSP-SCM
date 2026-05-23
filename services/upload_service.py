@@ -484,7 +484,21 @@ def merge_du_lieu_toan_cn(
             ser = df_toan_cn[col]
             if isinstance(ser.dtype, pd.CategoricalDtype):
                 ser = ser.astype(object)
-            # Xử lý float nguyên (ví dụ mã KH 12345.0 → "12345") vectorized
+            # Ép int64/uint64 về object — tránh ValueError fillna("") trên int64
+            # Trường hợp: Mã thôn (46007818), Mã xã đọc từ Excel thành int64
+            elif pd.api.types.is_integer_dtype(ser.dtype):
+                ser = ser.astype(object)
+            # Ép float64 về object — chuyển 46007818.0 → "46007818", NaN → None
+            elif pd.api.types.is_float_dtype(ser.dtype):
+                _whole_f = ser.notna() & (ser % 1 == 0)
+                ser = ser.astype(object)
+                if _whole_f.any():
+                    ser = ser.copy()
+                    ser.loc[_whole_f] = (
+                        pd.to_numeric(ser.loc[_whole_f], errors="coerce")
+                        .astype("int64").astype(str)
+                    )
+            # Xử lý float nguyên trong object dtype (ví dụ mã KH 12345.0 → "12345") vectorized
             if ser.dtype == object:
                 _num = pd.to_numeric(ser, errors="coerce")
                 _whole = _num.notna() & (_num % 1 == 0) & ser.notna()

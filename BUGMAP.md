@@ -51,14 +51,14 @@
 | **Nguyên nhân** | Cột số trong NQ11 bị đọc thành ArrowDtype string, so sánh với int bị lỗi |
 | **Fix** | Sau khi load df_nq11: `df[col] = pd.to_numeric(df[col], errors='coerce')` cho các cột DNO, nợ TH, nợ QH, số tiền, dư nợ, GN |
 
-### A4 — `fillna("")` crash trên ArrowDtype(int64)
+### A4 — `fillna("")` crash trên ArrowDtype(int64) / pandas int64
 | | |
 |---|---|
-| **File** | `services/upload_service.py` → `merge_du_lieu_toan_cn()` |
-| **Dấu hiệu** | `ArrowInvalid` hoặc `TypeError` khi gọi `.fillna("")` trên cột số ArrowDtype |
-| **Nguyên nhân** | ArrowDtype(int64) không chấp nhận fillna với string `""` |
-| **Fix** | Ép về object trước: `df[col] = df[col].astype(object).fillna("")` |
-| **Ngày fix** | 2026-05-19 |
+| **File** | `services/upload_service.py` → `merge_du_lieu_toan_cn()` dòng ~483–496 |
+| **Dấu hiệu** | `ValueError: Cannot convert '46007818' to int64` hoặc `TypeError/ArrowInvalid` khi gọi `.fillna("")` trên cột số |
+| **Nguyên nhân** | Cột định danh như `Mã thôn` (46007818), `Mã xã` từ Excel đọc thành `int64` hoặc `float64` (không phải `object`). Code chỉ xử lý `CategoricalDtype` và `object` → bỏ qua int64/float64 → `fillna("")` crash vì int64 không nhận chuỗi rỗng. Float64 không crash nhưng ra "46007818.0" thay vì "46007818". |
+| **Fix** | Thêm 2 nhánh `elif` trước `if ser.dtype == object`: (1) `is_integer_dtype` → `astype(object)`; (2) `is_float_dtype` → chuyển số nguyên dạng float → str rồi `astype(object)`. Dùng `pd.api.types.is_integer_dtype()` / `is_float_dtype()` thay vì so sánh `dtype ==`. |
+| **Ngày fix** | 2026-05-23 |
 
 ### A5 — DuckDB `Binder Error: Referenced column not found in FROM clause`
 | | |

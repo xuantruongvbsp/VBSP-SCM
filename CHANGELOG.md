@@ -1,5 +1,35 @@
 # CHANGELOG
 
+## [2026-05-23] — Tối ưu hiệu năng Tab So sánh kỳ: lazy-load + giảm memory (3 bước)
+- `tabs/tab_so_sanh_ky.py` dòng ~1340-1355 — thêm `_lazy_expander()`: expander chỉ compute khi user click mở lần đầu, dùng `st.session_state`
+- `tabs/tab_so_sanh_ky.py` — wrap 15 section nặng bằng `_lazy_expander`: Vòng đời danh mục, Chi tiết PGD, ĐVUT, Ma trận chuyển nợ, PAR, HHI, Top biến động, Radar, Explorer KƯ, Vintage NQH, Nguồn vốn, Thời hạn vay, Lãi tồn, Aging, KHTD
+- `tabs/tab_so_sanh_ky.py` — `_render_thoi_han_vay._group()`: chỉ copy 5-6 cột cần thay vì toàn bộ DataFrame
+- `tabs/tab_so_sanh_ky.py` — `_render_lai_ton_chi_tiet()`: chỉ copy 3-4 cột cần (PGD + DN + Lãi) thay vì toàn bộ
+- `tabs/tab_so_sanh_ky.py` — `_render_aging_analysis._tinh_aging()`: chỉ copy 2-3 cột (Số KƯ + Ngày ĐH + DN QH) thay vì toàn bộ + bỏ `pd.to_datetime` trên toàn bộ 30+ columns
+- Dự kiến: load lần đầu từ 8-15s → 1-2s, RAM từ 1.5-2GB → 200-300MB
+
+## [2026-05-23] — Thêm chế độ xem Lịch bàn vào Tab Lịch công tác KH-NV
+- `tabs/tab_khnv_noi_bo.py` dòng ~10 — thêm `import calendar` (stdlib)
+- `tabs/tab_khnv_noi_bo.py` dòng ~819–918 — thêm constants `_LICH_BAN_CHIP`, `_LOAI_ICON`, `_DAYS_VN` và hàm `_html_lich_ban(ds_loc, thang, nam)`: render lưới tháng 7 cột (T2→CN) bằng HTML thuần inline CSS, chip sự kiện màu theo loại, highlight ngày hôm nay, tối đa 3 chip/ô + overflow label, sự kiện hủy có gạch ngang
+- `tabs/tab_khnv_noi_bo.py` dòng ~1052–1067 — thêm `st.radio("Chế độ xem", ["📅 Lịch bàn","📋 Danh sách"])` trong `_render_lich_cong_tac()`; nhánh Lịch bàn gọi `_html_lich_ban()` rồi `return` sớm, nhánh Danh sách giữ nguyên for loop hiện tại
+
+## [2026-05-23] — Fix crash merge: Mã thôn int64/float64 không qua fillna("")
+- `services/upload_service.py` dòng ~483–507 — thêm 2 nhánh `elif` xử lý `int64` và `float64` trong vòng lặp chuẩn hóa `_str_cols`: int64 → `astype(object)`; float64 → chuyển số nguyên dạng `.0` thành string rồi `astype(object)`; tránh `ValueError: Cannot convert '46007818' to int64` và format sai "46007818.0"
+- Xóa `src/main.py` — file AI khác tạo sai cấu trúc dự án (đọc CSV, hardcode path)
+- `BUGMAP.md` — cập nhật entry A4 mô tả đầy đủ cả 2 trường hợp int64/float64
+
+## [2026-05-23] — Thêm 2 báo cáo Đợt 2 vào Tab So sánh kỳ
+- `tabs/tab_so_sanh_ky.py` dòng ~1082-1227 — thêm `_render_aging_analysis()`: Phân tích tuổi nợ quá hạn (Aging) theo 6 nhóm 1-30/31-60/61-90/91-180/181-365/>365 ngày, chart + bảng so sánh 2 kỳ + cơ cấu tỷ trọng
+- `tabs/tab_so_sanh_ky.py` dòng ~1229-1325 — thêm `_render_so_sanh_khtd()`: So sánh dư nợ thực tế vs Kế hoạch Tín dụng, progress bar % đạt KH, KPI cards, bảng top 30 chỉ tiêu
+- `tabs/tab_so_sanh_ky.py` dòng ~1893-1900 — gắn 2 expander mới vào cuối `render_moc_nam()`
+
+## [2026-05-23] — Thêm 3 báo cáo mới vào Tab So sánh kỳ (Đợt 1)
+- `tabs/tab_so_sanh_ky.py` dòng ~666-1065 — thêm 3 helper function mới:
+  - `_render_co_cau_nguon_von()`: Cơ cấu dư nợ theo Nguồn vốn (TW/ĐP), chart + bảng chi tiết NQH, Nợ xấu, số hộ
+  - `_render_thoi_han_vay()`: Phân tích theo Thời hạn vay (≤12/13-36/37-60/>60 tháng), chart + bảng so sánh
+  - `_render_lai_ton_chi_tiet()`: Lãi tồn breakdown TH/QH, KPI cards, biểu đồ, bảng chi tiết, Top PGD lãi tồn
+- `tabs/tab_so_sanh_ky.py` dòng ~1637-1648 — gắn 3 expander mới vào cuối `render_moc_nam()`
+
 ## [2026-05-23] — Fix hiệu năng tab Upload: cache baseline status vào session_state
 - `tabs/tab_upload_khnv.py` dòng ~75, ~879, ~1106, ~1249 — cache kết quả `danh_sach_nam_baseline_pgd()` và `trang_thai_baseline_pgd*()` vào `st.session_state["_blcache_*"]`; xóa cache khi nhấn "Làm mới" hoặc sau import thành công; loại bỏ ~120+ lệnh file I/O mỗi lần rerun
 

@@ -7,6 +7,7 @@
 6. 📖 Thông tin đầu việc   — bảng tham chiếu tĩnh TP01–TP17 + 38 việc cấp dưới
 """
 
+import calendar
 from uuid import uuid4
 from datetime import date, datetime, timedelta
 from collections import defaultdict
@@ -815,6 +816,124 @@ def _render_bao_cao(role_n: str, username: str, **kwargs) -> None:
 # TAB 5: 📅 Lịch công tác
 # ──────────────────────────────────────────────
 
+_LICH_BAN_CHIP = {  # (bg, fg, border-left) theo loại × trạng thái
+    "sap_dien_ra": {
+        "hop":      ("#dbeafe", "#1e40af", "#3b82f6"),
+        "kiem_tra": ("#fef9c3", "#854d0e", "#eab308"),
+        "cong_tac": ("#dcfce7", "#14532d", "#22c55e"),
+        "tap_huan": ("#ede9fe", "#4c1d95", "#8b5cf6"),
+        "khac":     ("#f1f5f9", "#334155", "#94a3b8"),
+    },
+    "da_hoan_thanh": ("#f0fdf4", "#6b7280", "#86efac"),
+    "huy_bo":        ("#fef2f2", "#9ca3af", "#fca5a5"),
+}
+_LOAI_ICON = {
+    "hop": "🗓️", "kiem_tra": "🔍", "cong_tac": "✈️", "tap_huan": "🎓", "khac": "📌",
+}
+_DAYS_VN = ["Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7", "CN"]
+
+
+def _html_lich_ban(ds_loc: list, thang: int, nam: int) -> str:
+    """Tạo HTML lưới lịch bàn 7 cột (T2→CN) cho tháng/năm chỉ định.
+
+    Mỗi ô ngày hiển thị chip sự kiện màu theo loại. Hôm nay highlight vàng.
+    Dùng inline CSS hoàn toàn (không inject style block).
+    """
+    # Index sự kiện theo ngày trong tháng
+    ev_by_day: dict[int, list] = defaultdict(list)
+    for ev in ds_loc:
+        try:
+            ev_by_day[date.fromisoformat(ev["ngay"]).day].append(ev)
+        except (ValueError, KeyError):
+            pass
+
+    today = date.today()
+    today_day = today.day if (today.month == thang and today.year == nam) else -1
+
+    # Header hàng thứ
+    header = "".join(
+        f'<th style="background:#1e293b;color:#e2e8f0;padding:8px 4px;'
+        f'text-align:center;font-size:0.82rem;font-weight:600;'
+        f'border:1px solid #334155">{d}</th>'
+        for d in _DAYS_VN
+    )
+
+    rows_html = ""
+    for week in calendar.monthcalendar(nam, thang):
+        cells = ""
+        for day_num in week:
+            if day_num == 0:
+                # Ô trống — ngày thuộc tháng trước/sau
+                cells += (
+                    '<td style="background:#f8fafc;border:1px solid #e2e8f0;'
+                    'min-width:110px;min-height:80px;width:14.28%"></td>'
+                )
+                continue
+
+            is_today = (day_num == today_day)
+            bg_cell = "#fef3c7" if is_today else "#ffffff"
+            bd_top  = "3px solid #f59e0b" if is_today else "1px solid #e2e8f0"
+            day_lbl = (
+                f'<div style="font-size:0.82rem;'
+                f'font-weight:{"700" if is_today else "500"};'
+                f'color:{"#b45309" if is_today else "#374151"};'
+                f'text-align:right;padding:2px 4px 4px 0">{day_num}</div>'
+            )
+
+            evs = ev_by_day.get(day_num, [])
+            MAX_CHIPS = 3
+            chips = ""
+            for ev in evs[:MAX_CHIPS]:
+                loai = ev.get("loai", "khac")
+                tt   = ev.get("trang_thai", "sap_dien_ra")
+                tieu_de_raw = ev.get("tieu_de", "") or ""
+                short = tieu_de_raw[:18] + ("…" if len(tieu_de_raw) > 18 else "")
+                icon  = _LOAI_ICON.get(loai, "📌")
+
+                if tt in ("da_hoan_thanh", "huy_bo"):
+                    bg_c, fg_c, bd_c = _LICH_BAN_CHIP[tt]
+                else:
+                    palette = _LICH_BAN_CHIP["sap_dien_ra"]
+                    bg_c, fg_c, bd_c = palette.get(loai, palette["khac"])
+
+                opacity  = "opacity:0.75;" if tt != "sap_dien_ra" else ""
+                strike   = "text-decoration:line-through;" if tt == "huy_bo" else ""
+                full_esc = tieu_de_raw.replace('"', "&quot;")
+                chips += (
+                    f'<div title="{full_esc}" style="background:{bg_c};color:{fg_c};'
+                    f'border-left:3px solid {bd_c};border-radius:3px;'
+                    f'padding:1px 4px;margin:1px 0;font-size:0.72rem;'
+                    f'line-height:1.4;overflow:hidden;white-space:nowrap;'
+                    f'text-overflow:ellipsis;{opacity}{strike}">'
+                    f'{icon} {short}</div>'
+                )
+
+            overflow = len(evs) - MAX_CHIPS
+            if overflow > 0:
+                chips += (
+                    f'<div style="font-size:0.68rem;color:#6b7280;'
+                    f'padding:1px 4px;font-style:italic">+{overflow} sự kiện</div>'
+                )
+
+            cells += (
+                f'<td style="background:{bg_cell};border-top:{bd_top};'
+                f'border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0;'
+                f'border-bottom:1px solid #e2e8f0;'
+                f'vertical-align:top;padding:4px;'
+                f'min-width:110px;min-height:80px;width:14.28%">'
+                f'{day_lbl}{chips}</td>'
+            )
+        rows_html += f"<tr>{cells}</tr>\n"
+
+    return (
+        '<div style="overflow-x:auto;margin:8px 0 16px 0">'
+        '<table style="border-collapse:collapse;width:100%;'
+        "font-family:'Inter','Segoe UI',sans-serif;table-layout:fixed\">"
+        f"<thead><tr>{header}</tr></thead>"
+        f"<tbody>{rows_html}</tbody>"
+        "</table></div>"
+    )
+
 
 def _render_lich_cong_tac(tab, role_n: str, username: str):
     """Quản lý lịch họp / kiểm tra / công tác / tập huấn."""
@@ -930,7 +1049,24 @@ def _render_lich_cong_tac(tab, role_n: str, username: str):
             st.button("📥 Xuất PDF", disabled=True, key="pdf_lich_dis",
                       use_container_width=True)
 
+    # ── Chế độ xem ──
+    view_mode = st.radio(
+        "Chế độ xem",
+        ["📅 Lịch bàn", "📋 Danh sách"],
+        horizontal=True,
+        key="lich_view_mode",
+    )
+
     st.markdown("### 📅 Lịch công tác trong tháng")
+
+    if view_mode == "📅 Lịch bàn":
+        if not ds_loc:
+            st.info("ℹ️ Không có sự kiện nào trong tháng này.")
+        else:
+            st.markdown(_html_lich_ban(ds_loc, thang_loc, nam_loc), unsafe_allow_html=True)
+        return  # bỏ qua for loop danh sách bên dưới
+
+    # ── Chế độ Danh sách (giữ nguyên toàn bộ) ──
     for ev in ds_loc:
         try:
             ev_date = date.fromisoformat(ev["ngay"])

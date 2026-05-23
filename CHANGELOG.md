@@ -1,5 +1,15 @@
 # CHANGELOG
 
+## [2026-05-24] — Nâng cấp & gộp nhóm CBTD – ĐGD – Tổ TK&VV
+- `services/cbtd_dia_ban_service.py` — Tạo mới: `lay_to_theo_cbtd()`, `canh_bao_cbtd_dia_ban()`, `tom_tat_kpi()` — helper thuần Python cho cross-join CBTD→ĐGD→Tổ và cảnh báo thông minh
+- `tabs/tab_cbtd_dashboard.py` — Tạo mới: Dashboard KPI tổng hợp (6 KPI cards, 3 loại cảnh báo, bảng pivot, xuất Excel cross-mảng nhiều sheet)
+- `tabs/tab_cbtd.py` dòng ~277 — Sub-tab Chi tiết thêm section "🏘️ Tổ TK&VV phụ trách": cross-link CBTD→ĐGD→Tổ→xếp loại
+- `workspaces/ws_management.py` — Gộp "Cán bộ tín dụng" + "Điểm GD & Tổ TK&VV" thành 1 entry "👔 CBTD & Địa bàn" (4 sub-tab: Dashboard · CBTD · ĐGD · Tổ TK&VV)
+- `workspaces/ws_operation.py` — Thêm sub-tab "📊 Tổng quan" (dashboard mini PGD) vào nhóm ĐGD & Tổ TK&VV; fix `NameError: df_full` → `df_pgd`; fix `username` chưa được unpack; fix duplicate keyword `role` trong lambda `_render_canh_bao_nqh_pgd`
+- `tabs/tab_kehoach.py` dòng ~113 — Guard `db_ht_rows or []` tránh `TypeError` khi `st.stop()` không dừng được trong test environment
+- `tabs/tab_khtd_mau07.py` dòng ~18 — Thêm `import os` bị thiếu
+- **Kết quả:** 105/105 smoke tests pass
+
 ## [2026-05-24] — UI xem lịch sử tiến độ (Block 4 trong Cập nhật tiến độ)
 - `services/tien_do_service.py` — Thêm `doc_lich_su_task(task_id, pgd, limit)`: query `tien_do_lich_su` theo task + PGD tùy chọn, trả list[dict] mới nhất trước
 - `tabs/tab_tien_do.py` — Thêm Block 4 "📜 Lịch sử cập nhật tiến độ" (expander) sau data editor trong `_render_cap_nhat()`: hiển thị bảng thay đổi trạng thái/% theo thời gian, ẩn cột PGD khi đang lọc 1 PGD

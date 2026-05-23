@@ -400,6 +400,7 @@ COT_TEN_XA        = "Tên xã"
 COT_TEN_THON      = "Tên thôn"
 COT_NGUON_VON     = "Nguồn vốn"         # 1=TW, 2=ĐP
 COT_MA_NHA_DAU_TU = "Mã nhà đầu tư"    # chỉ có khi ĐP
+COT_TEN_NHA_DAU_TU = "Tên nhà đầu tư"
 COT_MA_CHUONG_TRINH = "Mã chương trình"
 COT_TEN_HSSV      = "Họ tên HSSV"       # tên học sinh sinh viên
 COT_TEN_VC        = "Họ tên vợ/chồng"   # tên vợ / chồng
@@ -433,6 +434,7 @@ COT_TEN_DT                  = "Tên DT"
 COT_NGAY_CAP_CMND           = "Ngày cấp CMND"
 COT_NOI_CAP_CMND            = "Nơi cấp CMND"
 COT_MA_TO                   = "Mã tổ"
+COT_TEN_TO_TRUONG            = "Tên tổ trưởng"
 COT_LOAI_TO                 = "Loại tổ"
 COT_MA_CIF_TT               = "Mã CIF TT"
 COT_MA_DVUT                 = "Mã ĐVUT"

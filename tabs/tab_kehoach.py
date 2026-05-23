@@ -110,7 +110,7 @@ def render(tab, **kwargs):
             st.stop()
 
         # Lấy danh sách chỉ tiêu (bỏ dòng NQH con)
-        ds_chi_tieu = [r["ten"] for r in db_ht_rows if not r["la_nqh_con"]]
+        ds_chi_tieu = [r["ten"] for r in (db_ht_rows or []) if not r["la_nqh_con"]]
 
         # ── Đọc kế hoạch đã lưu ──────────────────────────────────────────
         kh_data = doc_kehoach(ten_pgd=pgd_user if pgd_mode else None)

@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## [2026-05-23] — Tăng tốc load mốc 31/12: đọc 22 PGD song song thay vì tuần tự
+- `data/hstd.py` — `doc_baseline_merged()`: dùng `ThreadPoolExecutor(max_workers=8)` thay vòng lặp tuần tự; giảm thời gian rebuild từ ~40s xuống ~8s (Excel) hoặc ~1s→0.2s (parquet cache)
+- `tabs/tab_so_sanh_ky.py` — Bỏ `st.spinner("Đang tải dữ liệu mốc năm...")` trùng với spinner của `doc_baseline_merged`
+
+## [2026-05-23] — Fix lỗi render tab So sánh kỳ: "Expected bytes, got float" trên cột Số ATM
+- `data/core.py` — `excel_to_parquet()`: thêm bước sanitize bytes→str cho object columns trước `to_parquet()`, tránh PyArrow crash khi cột có bytes lẫn float(NaN)
+- `data/hstd.py` — `doc_baseline_merged()`: thêm bước sanitize tương tự trước `result.to_parquet()` sau concat nhiều PGD
+
 ## [2026-05-23] — Fix upload crash: cache parquet cũ (int64 "Mã thôn") không được chuẩn hóa khi đọc lại
 - `data/core.py` dòng 87 — `excel_to_parquet()`: chuẩn hóa code columns sau khi đọc từ parquet cache (không chỉ khi ghi mới); xử lý cache cũ có dtype int64/float64 cho cột `Mã *`, `Số KU`... tránh lỗi `Expected bytes, got a 'int' object` khi merge toàn CN
 

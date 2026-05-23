@@ -14,6 +14,7 @@ from __future__ import annotations
 from datetime import datetime
 
 import pandas as pd
+import streamlit as st
 
 import db
 try:
@@ -173,6 +174,7 @@ def luu_snapshot(df_full: pd.DataFrame, username: str) -> KetQuaUpload:
         return KetQuaUpload(False, f"❌ Lỗi lưu snapshot: {e}")
 
 
+@st.cache_data(ttl=300, show_spinner=False)
 def doc_snapshot(ky: str) -> pd.DataFrame:
     """Tổng theo PGD của 1 kỳ (ma_ct='ALL', nguon_von='ALL')."""
     try:
@@ -191,6 +193,7 @@ def doc_snapshot(ky: str) -> pd.DataFrame:
         return pd.DataFrame()
 
 
+@st.cache_data(ttl=300, show_spinner=False)
 def doc_snapshot_range(tu_ky: str, den_ky: str) -> pd.DataFrame:
     """Tổng toàn CN qua nhiều kỳ — dùng cho line chart."""
     try:
@@ -209,6 +212,7 @@ def doc_snapshot_range(tu_ky: str, den_ky: str) -> pd.DataFrame:
         return pd.DataFrame()
 
 
+@st.cache_data(ttl=300, show_spinner=False)
 def danh_sach_ky() -> list[str]:
     """Danh sách kỳ đã có snapshot, mới → cũ."""
     try:
@@ -320,6 +324,7 @@ def luu_nq11_snapshot(df_nq11: pd.DataFrame, username: str) -> KetQuaUpload:
         return KetQuaUpload(False, f"❌ Lỗi lưu NQ11 snapshot: {e}")
 
 
+@st.cache_data(ttl=300, show_spinner=False)
 def doc_nq11_snapshot(ky: str) -> pd.DataFrame:
     """Tổng theo PGD của 1 kỳ NQ11."""
     try:
@@ -337,6 +342,7 @@ def doc_nq11_snapshot(ky: str) -> pd.DataFrame:
         return pd.DataFrame()
 
 
+@st.cache_data(ttl=300, show_spinner=False)
 def danh_sach_ky_nq11() -> list[str]:
     """Danh sách kỳ đã có NQ11 snapshot, mới → cũ."""
     try:
@@ -419,6 +425,7 @@ def luu_gqvl_snapshot(df_gqvl: pd.DataFrame, username: str) -> KetQuaUpload:
         return KetQuaUpload(False, f"❌ Lỗi lưu GQVL snapshot: {e}")
 
 
+@st.cache_data(ttl=300, show_spinner=False)
 def doc_gqvl_snapshot(ky: str) -> pd.DataFrame:
     """Tổng theo PGD của 1 kỳ GQVL."""
     try:
@@ -436,6 +443,7 @@ def doc_gqvl_snapshot(ky: str) -> pd.DataFrame:
         return pd.DataFrame()
 
 
+@st.cache_data(ttl=300, show_spinner=False)
 def danh_sach_ky_gqvl() -> list[str]:
     """Danh sách kỳ đã có GQVL snapshot, mới → cũ."""
     try:
@@ -544,6 +552,7 @@ def luu_cdtotkvv_snapshot(df_cdtotkvv: pd.DataFrame, ky: str, username: str) -> 
         return KetQuaUpload(False, f"❌ Lỗi lưu CDTOTKVV snapshot: {e}")
 
 
+@st.cache_data(ttl=300, show_spinner=False)
 def doc_cdtotkvv_snapshot(ky: str) -> pd.DataFrame:
     """Tổng theo PGD của 1 kỳ CDTOTKVV."""
     try:
@@ -561,6 +570,7 @@ def doc_cdtotkvv_snapshot(ky: str) -> pd.DataFrame:
         return pd.DataFrame()
 
 
+@st.cache_data(ttl=300, show_spinner=False)
 def danh_sach_ky_cdtotkvv() -> list[str]:
     """Danh sách kỳ đã có CDTOTKVV snapshot, mới → cũ."""
     try:

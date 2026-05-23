@@ -82,22 +82,42 @@ def upsert_ketqua_xa(
     ngay_ht: str | None,
     ghi_chu: str | None,
     username: str,
+    pct_hoan_thanh: int = 0,
 ) -> None:
     now = datetime.now().isoformat()
+    pct = max(0, min(100, int(pct_hoan_thanh or 0)))
     with db.get_conn() as conn:
+        # Đọc trạng thái cũ để ghi lịch sử
+        row_cu = conn.execute(
+            "SELECT trang_thai, pct_hoan_thanh FROM tien_do_ketqua WHERE task_id=? AND ten_xa=?",
+            (task_id, ten_xa),
+        ).fetchone()
+        ts_cu  = row_cu["trang_thai"] if row_cu else None
+        pct_cu = int(row_cu["pct_hoan_thanh"] or 0) if row_cu else 0
+
         conn.execute(
             """INSERT INTO tien_do_ketqua
                (task_id, pgd, ten_xa, trang_thai, ngay_hoan_thanh,
-                ghi_chu, nguoi_nhap, ngay_nhap)
-               VALUES (?,?,?,?,?,?,?,?)
+                ghi_chu, nguoi_nhap, ngay_nhap, pct_hoan_thanh)
+               VALUES (?,?,?,?,?,?,?,?,?)
                ON CONFLICT(task_id, ten_xa) DO UPDATE SET
                  trang_thai      = excluded.trang_thai,
                  ngay_hoan_thanh = excluded.ngay_hoan_thanh,
                  ghi_chu         = excluded.ghi_chu,
                  nguoi_nhap      = excluded.nguoi_nhap,
-                 ngay_nhap       = excluded.ngay_nhap""",
-            (task_id, pgd, ten_xa, trang_thai, ngay_ht, ghi_chu, username, now),
+                 ngay_nhap       = excluded.ngay_nhap,
+                 pct_hoan_thanh  = excluded.pct_hoan_thanh""",
+            (task_id, pgd, ten_xa, trang_thai, ngay_ht, ghi_chu, username, now, pct),
         )
+        # Ghi lịch sử khi có thay đổi thực sự
+        if ts_cu != trang_thai or pct_cu != pct:
+            conn.execute(
+                """INSERT INTO tien_do_lich_su
+                   (task_id, ten_xa, pgd, trang_thai_cu, trang_thai_moi,
+                    pct_cu, pct_moi, ghi_chu, nguoi_nhap, ngay_nhap)
+                   VALUES (?,?,?,?,?,?,?,?,?,?)""",
+                (task_id, ten_xa, pgd, ts_cu, trang_thai, pct_cu, pct, ghi_chu, username, now),
+            )
         conn.commit()
 
 
@@ -115,23 +135,28 @@ def cap_nhat_ketqua_bulk(
         if not ten_xa_dv:
             continue
         hoan_thanh = bool(r.get("hoan_thanh"))
-        trang_thai = "da_hoan_thanh" if hoan_thanh else "chua_thuc_hien"
+        pct = max(0, min(100, int(r.get("pct_hoan_thanh") or 0)))
+        # pct=100 luôn đánh dấu hoàn thành; checkbox vẫn hoạt động khi pct<100
+        if pct == 100:
+            trang_thai = "da_hoan_thanh"
+        else:
+            trang_thai = "da_hoan_thanh" if hoan_thanh else "chua_thuc_hien"
         ngay_ht = r.get("ngay_hoan_thanh")
         if isinstance(ngay_ht, date):
             ngay_ht = ngay_ht.isoformat()
         elif ngay_ht:
             try:
                 ngay_ht = date.fromisoformat(str(ngay_ht)).isoformat()
-            except Exception:
-                logger.error("Lỗi trong khối except: %s", e, exc_info=True)
+            except ValueError as e:
+                logger.warning("ngay_ht không hợp lệ '%s': %s", ngay_ht, e)
                 ngay_ht = None
         ghi_chu = str(r.get("ghi_chu") or "").strip() or None
         pgd_val = ten_xa_dv if cap_theo_doi == "pgd" else pgd_sel
         try:
-            upsert_ketqua_xa(task_id, ten_xa_dv, pgd_val, trang_thai, ngay_ht, ghi_chu, username)
+            upsert_ketqua_xa(task_id, ten_xa_dv, pgd_val, trang_thai, ngay_ht, ghi_chu, username, pct)
             count += 1
         except Exception as e:
-            logger.error("Lỗi trong khối except: %s", e, exc_info=True)
+            logger.error("upsert_ketqua_xa thất bại xa=%s: %s", ten_xa_dv, e, exc_info=True)
             errors.append((ten_xa_dv, str(e)))
     return count, errors
 
@@ -242,3 +267,35 @@ def xoa_task(task_id: int) -> None:
         conn.execute("DELETE FROM tien_do_ketqua WHERE task_id=?", (task_id,))
         conn.execute("DELETE FROM tien_do_task WHERE id=?", (task_id,))
         conn.commit()
+
+
+def doc_lich_su_task(
+    task_id: int,
+    pgd: str | None = None,
+    limit: int = 50,
+) -> list[dict]:
+    """Đọc lịch sử thay đổi tiến độ cho một đầu việc.
+
+    Tham số:
+        task_id – ID đầu việc.
+        pgd     – Lọc theo PGD (None = tất cả PGD).
+        limit   – Số dòng tối đa trả về (mặc định 50).
+    """
+    with db.get_conn() as conn:
+        if pgd:
+            rows = conn.execute(
+                """SELECT * FROM tien_do_lich_su
+                   WHERE task_id = ? AND pgd = ?
+                   ORDER BY ngay_nhap DESC
+                   LIMIT ?""",
+                (task_id, pgd, limit),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                """SELECT * FROM tien_do_lich_su
+                   WHERE task_id = ?
+                   ORDER BY ngay_nhap DESC
+                   LIMIT ?""",
+                (task_id, limit),
+            ).fetchall()
+        return [dict(r) for r in rows]

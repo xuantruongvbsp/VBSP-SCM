@@ -83,7 +83,10 @@ def excel_to_parquet(
             for col in list(df.columns):
                 if df[col].dtype == object:
                     try:
-                        if df[col].dropna().apply(lambda x: isinstance(x, bytes)).any():
+                        _non_null = df[col].dropna()
+                        if len(_non_null) > 0 and any(
+                            isinstance(v, bytes) for v in _non_null.iloc[:100]
+                        ):
                             df[col] = df[col].apply(
                                 lambda x: x.decode("utf-8", errors="replace") if isinstance(x, bytes) else x
                             )

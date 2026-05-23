@@ -78,26 +78,136 @@ def _dem_den_han(df: pd.DataFrame, n_thang: int) -> int:
     return int(((ngay_dh >= today) & (ngay_dh <= end_date)).sum())
 
 
+def _selectbox_safe(label: str, options: list, key: str):
+    if not options:
+        options = ["Tất cả"]
+    prev = st.session_state.get(key)
+    index = 0 if prev not in options else int(options.index(prev))
+    return st.selectbox(label, options=options, index=index, key=key)
+
+
+def _ap_dung_loc_xa_to_truong(df: pd.DataFrame, key_prefix: str) -> tuple[pd.DataFrame, str, str]:
+    df_loc = df
+
+    col_xa, col_to = st.columns(2)
+
+    with col_xa:
+        if COT_TEN_XA in df_loc.columns:
+            ds_xa = sorted(df_loc[COT_TEN_XA].dropna().astype(str).unique().tolist())
+            loc_xa = _selectbox_safe("Lọc Xã", ["Tất cả"] + ds_xa, key=f"{key_prefix}loc_xa")
+        else:
+            loc_xa = "Tất cả"
+            st.caption("Không có cột Xã")
+
+    if loc_xa != "Tất cả" and COT_TEN_XA in df_loc.columns:
+        df_loc = df_loc[df_loc[COT_TEN_XA] == loc_xa]
+
+    with col_to:
+        if COT_TEN_TO_TRUONG in df_loc.columns:
+            ds_to = sorted(df_loc[COT_TEN_TO_TRUONG].dropna().astype(str).unique().tolist())
+            loc_to = _selectbox_safe(
+                "Lọc Tổ trưởng", ["Tất cả"] + ds_to, key=f"{key_prefix}loc_to_truong"
+            )
+        else:
+            loc_to = "Tất cả"
+            st.caption("Không có cột Tổ trưởng")
+
+    if loc_to != "Tất cả" and COT_TEN_TO_TRUONG in df_loc.columns:
+        df_loc = df_loc[df_loc[COT_TEN_TO_TRUONG] == loc_to]
+
+    return df_loc, loc_xa, loc_to
+
+
+def _ap_dung_loc_pgd_xa_to_truong(
+    df: pd.DataFrame,
+    ds_pgd_all: list,
+    la_cn: bool,
+    key_prefix: str,
+    pgd_user: str | None = None,
+) -> tuple[pd.DataFrame, str, str, str]:
+    df_loc = df
+    loc_pgd = "Tất cả"
+
+    col_pgd, col_xa, col_to = st.columns(3)
+
+    with col_pgd:
+        if la_cn and COT_TEN_PGD in df_loc.columns:
+            ds_pgd = list(ds_pgd_all or [])
+            loc_pgd = _selectbox_safe("Lọc PGD", ["Tất cả"] + ds_pgd, key=f"{key_prefix}loc_pgd")
+        else:
+            pgd_fixed = pgd_user
+            if not pgd_fixed and COT_TEN_PGD in df_loc.columns:
+                _vals = sorted(df_loc[COT_TEN_PGD].dropna().unique().tolist())
+                if len(_vals) == 1:
+                    pgd_fixed = _vals[0]
+            if pgd_fixed:
+                loc_pgd = pgd_fixed
+                st.caption(f"PGD: {pgd_fixed}")
+            else:
+                loc_pgd = "Tất cả"
+                st.caption("Lọc PGD (CN)")
+
+    if loc_pgd != "Tất cả" and COT_TEN_PGD in df_loc.columns:
+        df_loc = df_loc[df_loc[COT_TEN_PGD] == loc_pgd]
+
+    with col_xa:
+        if COT_TEN_XA in df_loc.columns:
+            ds_xa = sorted(df_loc[COT_TEN_XA].dropna().astype(str).unique().tolist())
+            loc_xa = _selectbox_safe("Lọc Xã", ["Tất cả"] + ds_xa, key=f"{key_prefix}loc_xa")
+        else:
+            loc_xa = "Tất cả"
+            st.caption("Không có cột Xã")
+
+    if loc_xa != "Tất cả" and COT_TEN_XA in df_loc.columns:
+        df_loc = df_loc[df_loc[COT_TEN_XA] == loc_xa]
+
+    with col_to:
+        if COT_TEN_TO_TRUONG in df_loc.columns:
+            ds_to = sorted(df_loc[COT_TEN_TO_TRUONG].dropna().astype(str).unique().tolist())
+            loc_to = _selectbox_safe(
+                "Lọc Tổ trưởng", ["Tất cả"] + ds_to, key=f"{key_prefix}loc_to_truong"
+            )
+        else:
+            loc_to = "Tất cả"
+            st.caption("Không có cột Tổ trưởng")
+
+    if loc_to != "Tất cả" and COT_TEN_TO_TRUONG in df_loc.columns:
+        df_loc = df_loc[df_loc[COT_TEN_TO_TRUONG] == loc_to]
+
+    return df_loc, loc_pgd, loc_xa, loc_to
+
+
 # ─── Sub-tab 1: Tổng hợp ──────────────────────────────────────────────────────
 
 def _render_tong_hop(
     df_full: pd.DataFrame, df_kh: pd.DataFrame, ds_pgd_all: list, la_cn: bool, key_prefix: str
 ) -> None:
+    df_full_loc, loc_pgd, loc_xa, loc_to = _ap_dung_loc_pgd_xa_to_truong(
+        df_full, ds_pgd_all, la_cn, key_prefix
+    )
+    df_kh_loc = df_kh.copy()
+    if loc_pgd != "Tất cả" and COT_TEN_PGD in df_kh_loc.columns:
+        df_kh_loc = df_kh_loc[df_kh_loc[COT_TEN_PGD] == loc_pgd]
+    if loc_xa != "Tất cả" and COT_TEN_XA in df_kh_loc.columns:
+        df_kh_loc = df_kh_loc[df_kh_loc[COT_TEN_XA] == loc_xa]
+    if loc_to != "Tất cả" and COT_TEN_TO_TRUONG in df_kh_loc.columns:
+        df_kh_loc = df_kh_loc[df_kh_loc[COT_TEN_TO_TRUONG] == loc_to]
+
     today = datetime.now()
 
     khoanh_data = canh_bao_no_khoanh_sap_het_han(
-        df_full[df_full.get(_COT_KHOANH, pd.Series(0)).fillna(0) > 0]
-        if _COT_KHOANH in df_full.columns
+        df_full_loc[df_full_loc.get(_COT_KHOANH, pd.Series(0)).fillna(0) > 0]
+        if _COT_KHOANH in df_full_loc.columns
         else pd.DataFrame()
     )
 
-    khd_tong = int(df_kh["is_3m_inactive"].sum()) if "is_3m_inactive" in df_kh.columns else 0
-    co_nqh = COT_DU_NO_QH in df_full.columns and (df_full[COT_DU_NO_QH].fillna(0) > 0).any()
+    khd_tong = int(df_kh_loc["is_3m_inactive"].sum()) if "is_3m_inactive" in df_kh_loc.columns else 0
+    co_nqh = COT_DU_NO_QH in df_full_loc.columns and (df_full_loc[COT_DU_NO_QH].fillna(0) > 0).any()
 
-    co_gia_han = COT_NGAY_DH_HD in df_full.columns and COT_NGAY_DH in df_full.columns
+    co_gia_han = COT_NGAY_DH_HD in df_full_loc.columns and COT_NGAY_DH in df_full_loc.columns
     if co_gia_han:
-        ngay_hd = pd.to_datetime(df_full[COT_NGAY_DH_HD], errors="coerce", dayfirst=True)
-        ngay_gh = pd.to_datetime(df_full[COT_NGAY_DH], errors="coerce", dayfirst=True)
+        ngay_hd = pd.to_datetime(df_full_loc[COT_NGAY_DH_HD], errors="coerce", dayfirst=True)
+        ngay_gh = pd.to_datetime(df_full_loc[COT_NGAY_DH], errors="coerce", dayfirst=True)
         da_gh = ngay_gh > ngay_hd
         # dùng ngay_gh trực tiếp để tránh lệch index khi subset
         so_gh_thang = da_gh & (ngay_gh.dt.year == today.year) & (ngay_gh.dt.month == today.month)
@@ -105,7 +215,7 @@ def _render_tong_hop(
 
     cols_kpi = st.columns(5)
     with cols_kpi[0]:
-        st.metric("Đến hạn (3 tháng)", _dem_den_han(df_full, 3))
+        st.metric("Đến hạn (3 tháng)", _dem_den_han(df_full_loc, 3))
     with cols_kpi[1]:
         st.metric("3 tháng không HĐ", fmt_so(khd_tong),
                   delta_color="inverse" if khd_tong > 0 else "off")
@@ -126,25 +236,25 @@ def _render_tong_hop(
     today_ts = pd.Timestamp.today()
     end_date = today_ts + pd.DateOffset(months=3)
 
-    if COT_NGAY_DH in df_full.columns and not df_full.empty:
-        ngay_dh_all = pd.to_datetime(df_full[COT_NGAY_DH], errors="coerce", dayfirst=True)
+    if COT_NGAY_DH in df_full_loc.columns and not df_full_loc.empty:
+        ngay_dh_all = pd.to_datetime(df_full_loc[COT_NGAY_DH], errors="coerce", dayfirst=True)
         is_den_han = (ngay_dh_all >= today_ts) & (ngay_dh_all <= end_date)
-        den_han_by_pgd = is_den_han.groupby(df_full[COT_TEN_PGD]).sum()
+        den_han_by_pgd = is_den_han.groupby(df_full_loc[COT_TEN_PGD]).sum()
     else:
         den_han_by_pgd = pd.Series(dtype=int)
 
-    if COT_DU_NO_QH in df_full.columns:
-        has_nqh = pd.to_numeric(df_full[COT_DU_NO_QH], errors="coerce").fillna(0) > 0
-        nqh_by_pgd = has_nqh.groupby(df_full[COT_TEN_PGD]).sum()
+    if COT_DU_NO_QH in df_full_loc.columns:
+        has_nqh = pd.to_numeric(df_full_loc[COT_DU_NO_QH], errors="coerce").fillna(0) > 0
+        nqh_by_pgd = has_nqh.groupby(df_full_loc[COT_TEN_PGD]).sum()
     else:
         nqh_by_pgd = pd.Series(dtype=int)
 
-    if "is_3m_inactive" in df_kh.columns:
-        khd_by_pgd = df_kh.groupby(COT_TEN_PGD)["is_3m_inactive"].sum()
+    if "is_3m_inactive" in df_kh_loc.columns:
+        khd_by_pgd = df_kh_loc.groupby(COT_TEN_PGD)["is_3m_inactive"].sum()
     else:
         khd_by_pgd = pd.Series(dtype=int)
 
-    gh_by_pgd = so_gh_thang.groupby(df_full[COT_TEN_PGD]).sum() if co_gia_han else pd.Series(dtype=int)
+    gh_by_pgd = so_gh_thang.groupby(df_full_loc[COT_TEN_PGD]).sum() if co_gia_han else pd.Series(dtype=int)
 
     rows_th = []
     for pgd in ds_pgd_all:
@@ -189,56 +299,49 @@ def _render_den_han_tab(role: str, df_kh=None, ds_pgd_all=None, key_prefix="", l
 def _render_khd(
     df_kh: pd.DataFrame, ds_pgd_all: list, la_cn: bool, key_prefix: str
 ) -> None:
-    khd_tong = int(df_kh["is_3m_inactive"].sum()) if "is_3m_inactive" in df_kh.columns else 0
-    tong_mon = len(df_kh)
+    df_kh_loc, _, _, _ = _ap_dung_loc_pgd_xa_to_truong(df_kh, ds_pgd_all, la_cn, key_prefix)
+    khd_tong = int(df_kh_loc["is_3m_inactive"].sum()) if "is_3m_inactive" in df_kh_loc.columns else 0
+    tong_mon = len(df_kh_loc)
     tl_khd = khd_tong / tong_mon * 100 if tong_mon > 0 else 0
 
     k1, k2, k3 = st.columns(3)
     k1.metric("Tổng món vay", fmt_so(tong_mon))
     k2.metric("3 tháng không HĐ", fmt_so(khd_tong),
               delta=f"{tl_khd:.1f}%", delta_color="inverse" if tl_khd > 2 else "off")
-    if COT_LAI_TON in df_kh.columns and "is_3m_inactive" in df_kh.columns:
-        _mask_khd = df_kh["is_3m_inactive"].fillna(False).astype(bool)
-        tong_lai = pd.to_numeric(df_kh.loc[_mask_khd, COT_LAI_TON], errors="coerce").sum()
+    if COT_LAI_TON in df_kh_loc.columns and "is_3m_inactive" in df_kh_loc.columns:
+        _mask_khd = df_kh_loc["is_3m_inactive"].fillna(False).astype(bool)
+        tong_lai = pd.to_numeric(df_kh_loc.loc[_mask_khd, COT_LAI_TON], errors="coerce").sum()
     else:
         tong_lai = 0
     k3.metric("Lãi tồn (đồng)", fmt(tong_lai))
 
     st.markdown("**Tổng hợp theo PGD**")
-    nhom_pgd = tong_hop_khong_hd_cached(df_kh, nhom_theo=COT_TEN_PGD)
+    nhom_pgd = tong_hop_khong_hd_cached(df_kh_loc, nhom_theo=COT_TEN_PGD)
     if not nhom_pgd.empty:
         hien_thi_dataframe_phan_trang(nhom_pgd, key=f"{key_prefix}khd_pgd", height=280)
 
     st.markdown("**Tổng hợp theo Hội đoàn thể**")
-    nhom_dvut = tong_hop_khong_hd_cached(df_kh, nhom_theo=COT_DVUT)
+    nhom_dvut = tong_hop_khong_hd_cached(df_kh_loc, nhom_theo=COT_DVUT)
     if not nhom_dvut.empty:
         hien_thi_dataframe_phan_trang(nhom_dvut, key=f"{key_prefix}khd_dvut", height=220)
 
-    ds_chi = ds_chi_tiet_khong_hd(df_kh)
+    ds_chi = ds_chi_tiet_khong_hd(df_kh_loc)
     if not ds_chi.empty:
-        if la_cn:
-            col_loc, col_xuat = st.columns([2, 1])
-            with col_loc:
-                loc_pgd = st.selectbox("Lọc PGD", ["Tất cả"] + ds_pgd_all, key=f"{key_prefix}khd_loc_pgd")
-            df_chi_loc = ds_chi if loc_pgd == "Tất cả" else ds_chi[ds_chi[COT_TEN_PGD] == loc_pgd]
-        else:
-            col_xuat = st.container()
-            df_chi_loc = ds_chi
-        with col_xuat:
-            st.markdown("<br>", unsafe_allow_html=True)
-            if st.button(f"Tạo Excel ({len(df_chi_loc)} món)", key=f"{key_prefix}khd_xuat_btn"):
-                st.session_state[f"_{key_prefix}khd_buf"] = xuat_excel({"3mKHD": df_chi_loc})
-            if st.session_state.get(f"_{key_prefix}khd_buf"):
-                st.download_button(
-                    "Tải về Excel", data=st.session_state[f"_{key_prefix}khd_buf"],
-                    file_name=f"3mKHD_{datetime.now().strftime('%Y%m%d')}.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    key=f"{key_prefix}khd_xuat",
-                )
-            nut_xuat_pdf(df_chi_loc, "3 tháng không hoạt động",
-                         st.session_state.get("username", "unknown"),
-                         cols_tien=[COT_TONG_DU_NO, COT_LAI_TON] if COT_TONG_DU_NO in df_chi_loc.columns else None,
-                         prefix_file="3mKHD", key=f"{key_prefix}khd_pdf")
+        df_chi_loc = ds_chi
+        st.markdown("<br>", unsafe_allow_html=True)
+        if st.button(f"Tạo Excel ({len(df_chi_loc)} món)", key=f"{key_prefix}khd_xuat_btn"):
+            st.session_state[f"_{key_prefix}khd_buf"] = xuat_excel({"3mKHD": df_chi_loc})
+        if st.session_state.get(f"_{key_prefix}khd_buf"):
+            st.download_button(
+                "Tải về Excel", data=st.session_state[f"_{key_prefix}khd_buf"],
+                file_name=f"3mKHD_{datetime.now().strftime('%Y%m%d')}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                key=f"{key_prefix}khd_xuat",
+            )
+        nut_xuat_pdf(df_chi_loc, "3 tháng không hoạt động",
+                     st.session_state.get("username", "unknown"),
+                     cols_tien=[COT_TONG_DU_NO, COT_LAI_TON] if COT_TONG_DU_NO in df_chi_loc.columns else None,
+                     prefix_file="3mKHD", key=f"{key_prefix}khd_pdf")
         hien_thi_dataframe_phan_trang(df_chi_loc, key=f"{key_prefix}khd_chi", height=320)
 
 
@@ -268,29 +371,22 @@ def _render_migration(
     k2.metric("Tổng lãi tồn (triệu đồng)", vn(tong_lai / 1e6, 0))
     k3.metric("Tổng dư nợ (1-<3 tháng rủi ro)", fmt_ty(_tong_dn_13))
 
-    if la_cn:
-        col_loc, col_xuat = st.columns([2, 1])
-        with col_loc:
-            loc_pgd = st.selectbox("Lọc PGD", ["Tất cả"] + ds_pgd_all, key=f"{key_prefix}mg_loc_pgd")
-        df_loc = df_amber if loc_pgd == "Tất cả" else df_amber[df_amber[COT_TEN_PGD] == loc_pgd]
-    else:
-        col_xuat = st.container()
-        df_loc = df_amber
-    with col_xuat:
-        st.markdown("<br>", unsafe_allow_html=True)
-        if st.button(f"Tạo Excel ({len(df_loc)} món)", key=f"{key_prefix}mg_xuat_btn"):
-            st.session_state[f"_{key_prefix}mg_buf"] = xuat_excel({"Migration": df_loc})
-        if st.session_state.get(f"_{key_prefix}mg_buf"):
-            st.download_button(
-                "Tải về Excel", data=st.session_state[f"_{key_prefix}mg_buf"],
-                file_name=f"Migration_{datetime.now().strftime('%Y%m%d')}.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                key=f"{key_prefix}mg_xuat",
-            )
-        nut_xuat_pdf(df_loc, "BT sang Rủi ro",
-                     st.session_state.get("username", "unknown"),
-                     cols_tien=[COT_TONG_DU_NO, COT_LAI_TON] if COT_TONG_DU_NO in df_loc.columns else None,
-                     prefix_file="Migration", key=f"{key_prefix}mg_pdf")
+    df_loc, _, _, _ = _ap_dung_loc_pgd_xa_to_truong(df_amber, ds_pgd_all, la_cn, key_prefix)
+
+    st.markdown("<br>", unsafe_allow_html=True)
+    if st.button(f"Tạo Excel ({len(df_loc)} món)", key=f"{key_prefix}mg_xuat_btn"):
+        st.session_state[f"_{key_prefix}mg_buf"] = xuat_excel({"Migration": df_loc})
+    if st.session_state.get(f"_{key_prefix}mg_buf"):
+        st.download_button(
+            "Tải về Excel", data=st.session_state[f"_{key_prefix}mg_buf"],
+            file_name=f"Migration_{datetime.now().strftime('%Y%m%d')}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            key=f"{key_prefix}mg_xuat",
+        )
+    nut_xuat_pdf(df_loc, "BT sang Rủi ro",
+                 st.session_state.get("username", "unknown"),
+                 cols_tien=[COT_TONG_DU_NO, COT_LAI_TON] if COT_TONG_DU_NO in df_loc.columns else None,
+                 prefix_file="Migration", key=f"{key_prefix}mg_pdf")
     cols_hien = [c for c in [
         COT_TEN_PGD, "Tên xã", COT_DVUT, COT_TEN_KH, COT_SO_KU,
         COT_TEN_CT, COT_LAI_TON, COT_LAI_THANG, "so_thang_ton_uoc", "muc_canh_bao",
@@ -376,6 +472,8 @@ def _render_nqh(df_kh: pd.DataFrame, ds_pgd_all: list, la_cn: bool, key_prefix: 
         cot_pgd = _tim_cot(df_nqh_all, COT_TEN_PGD)
         if cot_pgd and cot_pgd in df_nqh_all.columns:
             df_nqh_all = df_nqh_all[df_nqh_all[cot_pgd] == loc_pgd]
+
+    df_nqh_all, loc_xa, loc_to = _ap_dung_loc_xa_to_truong(df_nqh_all, key_prefix=f"{key_prefix}nqh_")
 
     # ─── Filter 3 & 4: Hội đoàn thể + Chương trình ─────────────────────────────
     col_dvut, col_ct = st.columns(2)
@@ -494,6 +592,12 @@ def _render_khoanh_sap_hh(
             loc_pgd = "Tất cả"
             st.caption("Lọc PGD (CN)")
 
+    df_filt = df_base.copy()
+    if loc_pgd != "Tất cả" and COT_TEN_PGD in df_filt.columns:
+        df_filt = df_filt[df_filt[COT_TEN_PGD] == loc_pgd]
+
+    df_filt, loc_xa, loc_to = _ap_dung_loc_xa_to_truong(df_filt, key_prefix=f"{key_prefix}kh_")
+
     col_dvut, col_ct = st.columns(2)
     cot_dvut = _tim_cot(df_base, COT_DVUT)
     with col_dvut:
@@ -517,13 +621,9 @@ def _render_khoanh_sap_hh(
             loc_ct = "Tất cả"
             st.caption("Không có cột Chương trình")
 
-    # ─── Apply PGD / ĐVUT / CT filters ──────────────────────────────────────────
-    df_filt = df_base.copy()
-    if loc_pgd != "Tất cả" and COT_TEN_PGD in df_filt.columns:
-        df_filt = df_filt[df_filt[COT_TEN_PGD] == loc_pgd]
-    if loc_dvut != "Tất cả" and cot_dvut:
+    if loc_dvut != "Tất cả" and cot_dvut and cot_dvut in df_filt.columns:
         df_filt = df_filt[df_filt[cot_dvut] == loc_dvut]
-    if loc_ct != "Tất cả" and cot_ct:
+    if loc_ct != "Tất cả" and cot_ct and cot_ct in df_filt.columns:
         df_filt = df_filt[df_filt[cot_ct] == loc_ct]
 
     # ─── 4 Metrics (tính trên df_filt, không qua time filter) ───────────────────
@@ -664,6 +764,9 @@ def _render_gia_han(
 
     if loc_pgd != "Tất cả" and COT_TEN_PGD in df_loc.columns:
         df_loc = df_loc[df_loc[COT_TEN_PGD] == loc_pgd]
+
+    df_loc, loc_xa, loc_to = _ap_dung_loc_xa_to_truong(df_loc, key_prefix=f"{key_prefix}gh_")
+
     if loc_dvut != "Tất cả" and COT_DVUT in df_loc.columns:
         df_loc = df_loc[df_loc[COT_DVUT] == loc_dvut]
 

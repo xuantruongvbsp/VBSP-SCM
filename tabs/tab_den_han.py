@@ -18,7 +18,7 @@ logger = get_logger(__name__)
 from config import (
     CACHE_HSTD, COT_TEN_PGD, COT_TEN_KH, COT_TEN_CT,
     COT_TONG_DU_NO, COT_NGAY_DEN_HAN, COT_MA_KH, COT_TEN_XA,
-    COT_SO_KU, COT_DVUT,
+    COT_SO_KU, COT_DVUT, COT_TEN_TO_TRUONG,
 )
 from data.den_han import tinh_den_han_df, canh_bao_tap_trung
 from data.hstd import danh_dau_khong_hd_cached
@@ -48,6 +48,14 @@ def _loc_thang(df_tinh: pd.DataFrame, tu_thang: int, den_thang: int) -> pd.DataF
     return df_tinh[mask].copy()
 
 
+def _selectbox_safe(label: str, options: list, key: str):
+    if not options:
+        options = ["Tất cả"]
+    prev = st.session_state.get(key)
+    index = 0 if prev not in options else int(options.index(prev))
+    return st.selectbox(label, options=options, index=index, key=key)
+
+
 def render(tab=None, role: str = None, **kwargs) -> None:
     st.subheader("⏰ Cảnh báo Khoản vay Đến hạn & Nợ đến hạn có nguy cơ")
     st.caption(
@@ -59,11 +67,13 @@ def render(tab=None, role: str = None, **kwargs) -> None:
     _pgd_filter = pgd_user if la_phan_he_pgd(role) else None
 
     # ── Chế độ xem ──────────────────────────────────────────────────
+    key_prefix = kwargs.get("key_prefix", "dh_")
+
     mode = st.radio(
         "Chế độ xem",
         ["📊 Phân tích Đến hạn", "🚨 Nợ đến hạn có nguy cơ"],
         horizontal=True,
-        key="den_han_mode",
+        key=f"{key_prefix}den_han_mode",
     )
 
     # ── Mode 2: Nợ đến hạn có nguy cơ ───────────────────────────────
@@ -103,41 +113,69 @@ def render(tab=None, role: str = None, **kwargs) -> None:
         st.error(f"❌ File HSTD thiếu cột '{COT_NGAY_DEN_HAN}'. Kiểm tra lại file upload.")
         return
 
-    # ── Filters (4 cột) ──────────────────────────────────────────────
-    col_f1, col_f2, col_f3, col_f4 = st.columns(4)
+    # ── Filters ──────────────────────────────────────────────────────
+    col_f1, col_f2, col_f3, col_f4, col_f5, col_f6 = st.columns(6)
     with col_f1:
         den_thang = st.slider(
             "Xem trước (tháng)", min_value=1, max_value=12,
-            value=6, key="den_han_slider")
+            value=6, key=f"{key_prefix}den_han_slider")
     with col_f2:
         if not la_phan_he_pgd(role) and COT_TEN_PGD in df_tinh.columns:
             ds_pgd_f = sorted(df_tinh[COT_TEN_PGD].dropna().unique().tolist())
-            loc_pgd = st.selectbox("Lọc PGD", ["Tất cả"] + ds_pgd_f, key="den_han_loc_pgd")
+            loc_pgd = _selectbox_safe("Lọc PGD", ["Tất cả"] + ds_pgd_f, key=f"{key_prefix}den_han_loc_pgd")
         else:
             loc_pgd = "Tất cả"
             st.caption("Lọc PGD (CN)")
-    with col_f3:
-        if COT_TEN_CT in df_tinh.columns:
-            ds_ct_f = sorted(df_tinh[COT_TEN_CT].dropna().unique().tolist())
-            loc_ct = st.selectbox("Lọc Chương trình", ["Tất cả"] + ds_ct_f, key="den_han_loc_ct")
-        else:
-            loc_ct = "Tất cả"
-    with col_f4:
-        if COT_DVUT in df_tinh.columns:
-            ds_dvut_f = sorted(df_tinh[COT_DVUT].dropna().unique().tolist())
-            loc_dvut = st.selectbox(
-                "Lọc Hội đoàn thể", ["Tất cả"] + ds_dvut_f, key="den_han_loc_dvut"
-            )
-        else:
-            loc_dvut = "Tất cả"
 
     df_tinh_filtered = df_tinh.copy()
     if loc_pgd != "Tất cả" and COT_TEN_PGD in df_tinh_filtered.columns:
         df_tinh_filtered = df_tinh_filtered[df_tinh_filtered[COT_TEN_PGD] == loc_pgd]
-    if loc_ct != "Tất cả" and COT_TEN_CT in df_tinh_filtered.columns:
+
+    with col_f3:
+        if COT_TEN_XA in df_tinh_filtered.columns:
+            ds_xa = sorted(df_tinh_filtered[COT_TEN_XA].dropna().astype(str).unique().tolist())
+            loc_xa = _selectbox_safe("Lọc Xã", ["Tất cả"] + ds_xa, key=f"{key_prefix}den_han_loc_xa")
+        else:
+            loc_xa = "Tất cả"
+            st.caption("Không có cột Xã")
+
+    if loc_xa != "Tất cả" and COT_TEN_XA in df_tinh_filtered.columns:
+        df_tinh_filtered = df_tinh_filtered[df_tinh_filtered[COT_TEN_XA] == loc_xa]
+
+    with col_f4:
+        if COT_TEN_TO_TRUONG in df_tinh_filtered.columns:
+            ds_to = sorted(df_tinh_filtered[COT_TEN_TO_TRUONG].dropna().astype(str).unique().tolist())
+            loc_to = _selectbox_safe(
+                "Lọc Tổ trưởng", ["Tất cả"] + ds_to, key=f"{key_prefix}den_han_loc_to_truong"
+            )
+        else:
+            loc_to = "Tất cả"
+            st.caption("Không có cột Tổ trưởng")
+
+    if loc_to != "Tất cả" and COT_TEN_TO_TRUONG in df_tinh_filtered.columns:
+        df_tinh_filtered = df_tinh_filtered[df_tinh_filtered[COT_TEN_TO_TRUONG] == loc_to]
+
+    with col_f5:
+        if COT_TEN_CT in df_tinh_filtered.columns:
+            ds_ct_f = sorted(df_tinh_filtered[COT_TEN_CT].dropna().unique().tolist())
+            loc_ct = _selectbox_safe(
+                "Lọc Chương trình", ["Tất cả"] + ds_ct_f, key=f"{key_prefix}den_han_loc_ct"
+            )
+        else:
+            loc_ct = "Tất cả"
+    with col_f6:
+        if COT_DVUT in df_tinh_filtered.columns:
+            ds_dvut_f = sorted(df_tinh_filtered[COT_DVUT].dropna().unique().tolist())
+            loc_dvut = _selectbox_safe(
+                "Lọc Hội đoàn thể", ["Tất cả"] + ds_dvut_f, key=f"{key_prefix}den_han_loc_dvut"
+            )
+        else:
+            loc_dvut = "Tất cả"
+    with col_f4:
         df_tinh_filtered = df_tinh_filtered[df_tinh_filtered[COT_TEN_CT] == loc_ct]
     if loc_dvut != "Tất cả" and COT_DVUT in df_tinh_filtered.columns:
         df_tinh_filtered = df_tinh_filtered[df_tinh_filtered[COT_DVUT] == loc_dvut]
+
 
     df_loc = _loc_thang(df_tinh_filtered, 0, den_thang)
     df_loc = df_loc[pd.to_numeric(df_loc[COT_TONG_DU_NO], errors="coerce").fillna(0) > 0]
@@ -158,7 +196,7 @@ def render(tab=None, role: str = None, **kwargs) -> None:
     # ── Cảnh báo tập trung ───────────────────────────────────────────
     if not df_loc.empty:
         try:
-            for cb in canh_bao_tap_trung(df_tinh_filtered)[:5]:
+            for cb in canh_bao_tap_trung(df_tinh_filtered, den_thang=den_thang)[:5]:
                 ty_le_cb = f"{cb['ty_le'] * 100:.1f}".replace(".", ",") + "%"
                 st.warning(
                     f"⚠️ **{cb['pgd']}**: {ty_le_cb} dư nợ đến hạn trong {cb['thang']} "
@@ -176,6 +214,10 @@ def render(tab=None, role: str = None, **kwargs) -> None:
             df_nam = df_nam[pd.to_numeric(df_nam[COT_TONG_DU_NO], errors="coerce").fillna(0) > 0]
             if loc_pgd != "Tất cả" and COT_TEN_PGD in df_nam.columns:
                 df_nam = df_nam[df_nam[COT_TEN_PGD] == loc_pgd]
+            if loc_xa != "Tất cả" and COT_TEN_XA in df_nam.columns:
+                df_nam = df_nam[df_nam[COT_TEN_XA] == loc_xa]
+            if loc_to != "Tất cả" and COT_TEN_TO_TRUONG in df_nam.columns:
+                df_nam = df_nam[df_nam[COT_TEN_TO_TRUONG] == loc_to]
             if loc_ct != "Tất cả" and COT_TEN_CT in df_nam.columns:
                 df_nam = df_nam[df_nam[COT_TEN_CT] == loc_ct]
             if loc_dvut != "Tất cả" and COT_DVUT in df_nam.columns:

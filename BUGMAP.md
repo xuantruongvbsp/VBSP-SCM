@@ -83,8 +83,9 @@
 |---|---|
 | **File** | `data/core.py` → `excel_to_parquet()` và `data/hstd.py` → `doc_baseline_merged()` |
 | **Dấu hiệu** | Tab “📊 So sánh kỳ” báo lỗi render; traceback chứa `(“Expected bytes, got a 'float' object”, 'Conversion failed for column Số ATM with type object')` |
-| **Nguyên nhân** | openpyxl đọc cột “Số ATM” (định dạng text trong Excel) trả về `bytes` cho các ô có giá trị và `float(NaN)` cho ô trống → pandas object column chứa bytes + NaN(float) hỗn hợp → PyArrow infer column là binary rồi crash khi gặp NaN float. `_should_force_str()` không cover “Số ATM” nên cột không được normalize. Lỗi xảy ra cả ở (1) lần ghi parquet đầu trong `excel_to_parquet`, (2) lần ghi cache merged trong `doc_baseline_merged` (nếu cache PGD cũ có bytes, sau concat với PGD khác không có cột → mixed bytes+NaN). |
-| **Fix** | Thêm bước sanitize **bytes→str** cho tất cả object columns trước mỗi lần `to_parquet`: (a) trong `excel_to_parquet()` trước dòng `df.to_parquet()`; (b) trong `doc_baseline_merged()` trước dòng `result.to_parquet()`. |
+| **Nguyên nhân** | openpyxl đọc cột “Số ATM” trả về `bytes` cho ô có giá trị, `float(NaN)` cho ô trống → object column hỗn hợp → PyArrow infer binary → crash khi gặp float. Phức tạp thêm: Hội sở đọc “Số ATM” thành string (không bytes) trong khi các PGD Bình Phước đọc thành bytes → sau concat, `iloc[0]` là string nên check “chỉ đầu” bỏ sót bytes từ PGD thứ 2+. |
+| **Fix** | (1) Bytes→str sanitization trước `to_parquet` trong cả `excel_to_parquet` và `doc_baseline_merged`. (2) **Check 100 phần tử** (`any(isinstance(v, bytes) for v in _non_null.iloc[:100])`), không phải chỉ `iloc[0]`, để phát hiện bytes dù chúng xuất hiện ở PGD giữa. |
+| **Pattern tránh** | `isinstance(_s.iloc[0], bytes)` — sai khi đơn vị đầu tiên trong concat có dtype khác (string). Dùng `any(... for v in sample[:100])` thay thế. |
 | **Ngày fix** | 2026-05-23 |
 
 ### A4d — Baseline 31/12 báo “chưa có dữ liệu” dù đã upload (cache baseline 0 cột)

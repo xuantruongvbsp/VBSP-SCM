@@ -70,24 +70,21 @@ def doc_baseline_merged(nam: int, _ts=0) -> pd.DataFrame | None:
     cache_path = baseline_cache_loai(nam, "hstd")
     _MIN_COLS = 15
 
-    # Check if cache is valid: all source files older than cache
-    if os.path.exists(cache_path):
-        try:
-            df_cache = pd.read_parquet(cache_path)
-        except Exception:
-            df_cache = pd.DataFrame()
-
+    # Check cache hợp lệ: mtime trước, rồi mới đọc full parquet (tránh đọc file lớn khi không cần)
+    if os.path.exists(cache_path) and os.path.getsize(cache_path) >= 1000:
         cache_mtime = os.path.getmtime(cache_path)
-        need_rebuild = df_cache.empty or len(df_cache.columns) < _MIN_COLS
-        if not need_rebuild:
-            for dv in ds:
-                fp = baseline_pgd_path(dv, nam)
-                if os.path.exists(fp) and os.path.getmtime(fp) > cache_mtime:
-                    need_rebuild = True
-                    break
-
-        if not need_rebuild:
-            return df_cache
+        _stale = any(
+            os.path.exists(baseline_pgd_path(dv, nam))
+            and os.path.getmtime(baseline_pgd_path(dv, nam)) > cache_mtime
+            for dv in ds
+        )
+        if not _stale:
+            try:
+                df_cache = pd.read_parquet(cache_path)
+                if not df_cache.empty and len(df_cache.columns) >= _MIN_COLS:
+                    return df_cache
+            except Exception:
+                pass
 
     # Rebuild: cache từng PGD bằng parquet → merge (song song để tăng tốc)
     from concurrent.futures import ThreadPoolExecutor
@@ -130,7 +127,12 @@ def doc_baseline_merged(nam: int, _ts=0) -> pd.DataFrame | None:
         for _col in list(result.columns):
             if result[_col].dtype == object:
                 try:
-                    if result[_col].dropna().apply(lambda x: isinstance(x, bytes)).any():
+                    _non_null = result[_col].dropna()
+                    # Kiểm tra 100 phần tử đầu — không chỉ iloc[0] vì bytes có thể xuất hiện
+                    # ở PGD thứ 2+ trong khi PGD đầu (Hội sở) có thể là string
+                    if len(_non_null) > 0 and any(
+                        isinstance(v, bytes) for v in _non_null.iloc[:100]
+                    ):
                         result[_col] = result[_col].apply(
                             lambda x: x.decode("utf-8", errors="replace") if isinstance(x, bytes) else x
                         )

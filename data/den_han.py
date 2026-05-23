@@ -104,7 +104,7 @@ def tong_hop_den_han(df, nhom_theo="pgd") -> pd.DataFrame:
     if cot_nhom not in df.columns:
         return pd.DataFrame()
 
-    df_loc = loc_den_han_trong(df, tu_thang=0, den_thang=6)
+    df_loc = loc_den_han_trong(df, tu_thang=0, den_thang=den_thang)
     if df_loc.empty:
         return pd.DataFrame()
 
@@ -121,8 +121,8 @@ def tong_hop_den_han(df, nhom_theo="pgd") -> pd.DataFrame:
     return ket_qua
 
 
-def canh_bao_tap_trung(df, nguong_ty_le=0.30) -> list[dict]:
-    df_loc = loc_den_han_trong(df, tu_thang=0, den_thang=6)
+def canh_bao_tap_trung(df, nguong_ty_le=0.30, den_thang: int = 6) -> list[dict]:
+    df_loc = loc_den_han_trong(df, tu_thang=0, den_thang=den_thang)
     if df_loc.empty or COT_TEN_PGD not in df.columns:
         return []
 
@@ -130,21 +130,21 @@ def canh_bao_tap_trung(df, nguong_ty_le=0.30) -> list[dict]:
         .groupby(COT_TEN_PGD)[COT_TONG_DU_NO].sum()
 
     canh_bao_list = []
-    grouped = df_loc.groupby([COT_TEN_PGD, "Tháng đến hạn còn lại"])
+    grouped = df_loc.groupby(COT_TEN_PGD)
 
     today = date.today()
-    for (ten_pgd, thang_con_lai), grp in grouped:
+    thang_str = f"trong {den_thang} tháng tới"
+    for ten_pgd, grp in grouped:
         tong_den_han = grp[COT_TONG_DU_NO].sum()
         tong_pgd_val = tong_pgd.get(ten_pgd, 0)
         if tong_pgd_val <= 0:
             continue
         ty_le = tong_den_han / tong_pgd_val
         if ty_le >= nguong_ty_le:
-            thang_str = (today + relativedelta(months=int(thang_con_lai))).strftime("Tháng %m/%Y")
             canh_bao_list.append({
                 "pgd": ten_pgd,
                 "thang": thang_str,
-                "thang_con_lai": int(thang_con_lai),
+                "thang_con_lai": den_thang,
                 "so_khoan": int(len(grp)),
                 "tong_den_han": int(tong_den_han),
                 "tong_pgd": int(tong_pgd_val),

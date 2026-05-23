@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## [2026-05-23] — Fix bytes check sai (O(1) bỏ sót bytes ở PGD thứ 2+)
+- `data/hstd.py` — `doc_baseline_merged()`: bytes scan kiểm tra 100 phần tử đầu thay vì chỉ `iloc[0]`; bytes có thể xuất hiện ở PGD thứ 2+ khi Hội sở đọc "Số ATM" thành str
+- `data/core.py` — `excel_to_parquet()`: tương tự
+
 ## [2026-05-23] — Tăng tốc load mốc 31/12: tối ưu cache check và bytes scan
 - `data/hstd.py` — `doc_baseline_merged()`: check file size (< 1000 bytes = skip ngay) + mtime TRƯỚC rồi mới đọc full parquet; bytes scan O(n)→O(1)
 - `data/core.py` — `excel_to_parquet()`: bytes scan O(1)

@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [2026-05-23] — Đồng bộ .windsurfrules với .trae/rules/rules.md
+- `.windsurfrules` — viết lại toàn bộ: sửa signature upload `luu_pgd_file` (3 params, không có username), thêm đủ COT_* constants, function signatures, kv_store keys, BUGMAP.md workflow, "Lỗi đã từng mắc", checklist rà soát; bản cũ (09/05) thiếu toàn bộ các phần này
+
+## [2026-05-23] — Fix load chậm tab Cảnh báo Tín dụng: lazy tabs + vectorize for-loop
+- `tabs/tab_canh_bao_nqh.py` dòng ~620 — `render()`: thay `st.tabs()` (render cả 8 sub-tab cùng lúc) bằng `st.radio()` lazy — chỉ render sub-tab được chọn, giảm 8x computation mỗi lần mở tab
+- `tabs/tab_canh_bao_nqh.py` dòng ~121 — `_render_tong_hop()`: vectorize for-loop 22 PGD: gọi `pd.to_datetime` 1 lần + `groupby().sum()` thay vì 44 lần `_dem_den_han()` tuần tự trong vòng lặp
+
 ## [2026-05-23] — Fix cột 31/12 bảng Trạng thái Upload: kiểm tra đủ 4 loại
 - `tabs/tab_upload_khnv.py` dòng ~72 — `_hien_thi_bang_trang_thai()`: cột 31/12 trước chỉ kiểm tra HSTD (`trang_thai_baseline_pgd`) → dễ hiểu lầm. Nay kiểm tra CẢ 4 loại qua `trang_thai_baseline_pgd_loai`: ✅ Đủ 4/4 | ⚠️ 2/4 (thiếu nq11,gqvl) | ❌ Chưa loại nào
 

@@ -1,6 +1,6 @@
 """
-Tab Cảnh báo Khoản vay Đến hạn.
-Phân tích dư nợ đến hạn trong N tháng tới dựa trên HSTD hiện tại.
+Tab Cảnh báo Khoản vay Đến hạn & Nợ đến hạn có nguy cơ.
+Phân tích dư nợ đến hạn trong N tháng tới + phát hiện khoản có nguy cơ chuyển NQH.
 """
 from __future__ import annotations
 
@@ -23,6 +23,7 @@ from config import (
     COT_SO_KU, COT_DVUT,
 )
 from data.den_han import tinh_den_han_df
+from data.hstd import danh_dau_khong_hd_cached
 from pdf_service import xuat_pdf_group_header, nut_xuat_pdf
 from utils import fmt_ty, fmt_so, xuat_excel, ten_file_xuat
 
@@ -50,12 +51,46 @@ def _loc_thang(df_tinh: pd.DataFrame, tu_thang: int, den_thang: int) -> pd.DataF
 
 
 def render(tab=None, role: str = None, **kwargs) -> None:
-    st.subheader("⏰ Cảnh báo Khoản vay Đến hạn")
-    st.caption("Phân tích dư nợ đến hạn trong N tháng tới dựa trên HSTD hiện tại.")
+    st.subheader("⏰ Cảnh báo Khoản vay Đến hạn & Nợ đến hạn có nguy cơ")
+    st.caption(
+        "Phân tích dư nợ đến hạn trong N tháng tới + "
+        "phát hiện khoản vay sắp đến hạn có khách hàng không giao dịch > 90 ngày."
+    )
 
     pgd_user = kwargs.get("pgd_user")
     _pgd_filter = pgd_user if la_phan_he_pgd(role) else None
 
+    # ── Chế độ xem ──────────────────────────────────────────────────
+    mode = st.radio(
+        "Chế độ xem",
+        ["📊 Phân tích Đến hạn", "🚨 Nợ đến hạn có nguy cơ"],
+        horizontal=True,
+        key="den_han_mode",
+    )
+
+    # ── Mode 2: Nợ đến hạn có nguy cơ ───────────────────────────────
+    if mode == "🚨 Nợ đến hạn có nguy cơ":
+        df_kh = kwargs.get("df_kh")
+        ds_pgd_all = list(kwargs.get("ds_pgd_all", []) or [])
+        la_cn = kwargs.get("la_cn", False)
+        key_prefix = kwargs.get("key_prefix", "dh_")
+
+        if df_kh is None:
+            try:
+                _mtime = os.path.getmtime(CACHE_HSTD)
+                df_full = pd.read_parquet(CACHE_HSTD)
+                if _pgd_filter and COT_TEN_PGD in df_full.columns:
+                    df_full = df_full[df_full[COT_TEN_PGD] == _pgd_filter]
+                df_kh = danh_dau_khong_hd_cached(df_full)
+            except Exception:
+                st.warning("⚠️ Chưa có dữ liệu HSTD.")
+                return
+
+        from tabs.tab_canh_bao_som import _render_canh_bao
+        _render_canh_bao(df_kh, ds_pgd_all, key_prefix, la_cn)
+        return
+
+    # ── Mode 1: Phân tích Đến hạn ──────────────────────────────────
     try:
         _mtime = os.path.getmtime(CACHE_HSTD)
     except FileNotFoundError:
@@ -103,7 +138,6 @@ def render(tab=None, role: str = None, **kwargs) -> None:
         st.info("Không có khoản vay đến hạn trong 12 tháng tới.")
     else:
         df_nam = df_nam.copy()
-        # Dùng "Ngày đến hạn" (đã parse đúng dayfirst=True) thay vì re-parse cột gốc
         df_nam["_ngay_dh"] = pd.to_datetime(df_nam["Ngày đến hạn"], errors="coerce")
         df_nam["_thang_label"] = df_nam["_ngay_dh"].dt.strftime("%m/%Y")
         df_nam["_sort_key"] = df_nam["_ngay_dh"].dt.to_period("M")
@@ -126,7 +160,6 @@ def render(tab=None, role: str = None, **kwargs) -> None:
                 if tong_du_no_nam > 0 else 0
             ).round(1)
 
-            # Bảng thống kê
             df_bang = df_th_stats[["_thang_label", "so_khoan", "du_no", "pct"]].copy()
             df_bang.columns = ["Tháng", "Số khoản", "Dư nợ (triệu đồng)", "Tỷ trọng %"]
             df_bang["Số khoản"] = df_bang["Số khoản"].apply(fmt_so)
@@ -134,11 +167,10 @@ def render(tab=None, role: str = None, **kwargs) -> None:
                 df_th_stats["du_no"] / 1e6
             ).round(0).apply(lambda x: f"{x:,.0f}".replace(",", "."))
             df_bang["Tỷ trọng %"] = df_th_stats["pct"].apply(
-                lambda x: f"{x:.1f}".replace(".", ",") + "%"
+                lambda x: f"{x:.1f}".replace(",", ",") + "%"
             )
             st.dataframe(df_bang, use_container_width=True, hide_index=True)
 
-            # Đồ thị cột
             try:
                 import plotly.graph_objects as go
                 du_no_trieu = (df_th_stats["du_no"] / 1e6).round(0)
@@ -196,7 +228,6 @@ def render(tab=None, role: str = None, **kwargs) -> None:
             use_container_width=True, hide_index=True,
         )
 
-        # Biểu đồ bar ngang có màu gradient
         try:
             import plotly.express as _px
             _top = _th_agg.nlargest(min(20, len(_th_agg)), "_du_no").sort_values("_du_no")
@@ -237,7 +268,6 @@ def render(tab=None, role: str = None, **kwargs) -> None:
         if df_loc.empty:
             st.info("Không có dữ liệu.")
         else:
-            # Convert ngày sang dd/mm/yyyy để hiển thị
             df_hien = df_loc[cols_hien_thi].sort_values("Ngày đến hạn").copy()
             if "Ngày đến hạn" in df_hien.columns:
                 df_hien["Ngày đến hạn"] = pd.to_datetime(
@@ -251,13 +281,11 @@ def render(tab=None, role: str = None, **kwargs) -> None:
             ]
             cols_ok = [c for c in COLS_CHI_TIET if c in df_loc.columns]
             df_chi_tiet = df_loc[cols_ok].sort_values("Ngày đến hạn").reset_index(drop=True)
-            # Convert ngày trong file xuất
             if "Ngày đến hạn" in df_chi_tiet.columns:
                 df_chi_tiet["Ngày đến hạn"] = pd.to_datetime(
                     df_chi_tiet["Ngày đến hạn"], errors="coerce"
                 ).dt.strftime("%d/%m/%Y").fillna("")
 
-            # Sheet tổng hợp theo nhom_theo (pgd hoặc xa)
             nhom_col_dt = COT_TEN_PGD if nhom_theo == "PGD" else "Tên xã"
             if nhom_col_dt in df_loc.columns:
                 df_tong_hop = df_loc.groupby(nhom_col_dt).agg(
@@ -325,7 +353,6 @@ def render(tab=None, role: str = None, **kwargs) -> None:
                 key="den_han_loc_ct_pdf",
             )
 
-    # Áp dụng bộ lọc PDF
     df_pdf = df_loc.copy()
     if "Ngày đến hạn" in df_pdf.columns:
         df_pdf["Ngày đến hạn"] = pd.to_datetime(
@@ -338,7 +365,6 @@ def render(tab=None, role: str = None, **kwargs) -> None:
     if loc_xa_pdf and COT_TEN_XA in df_pdf.columns:
         df_pdf = df_pdf[df_pdf[COT_TEN_XA] == loc_xa_pdf]
 
-    # Xác định cột nhóm và cột detail cho PDF
     _nhom_col_map = {
         "Chương trình": COT_TEN_CT,
         "PGD":          COT_TEN_PGD,

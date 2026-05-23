@@ -213,8 +213,13 @@ def _kiem_tra_don_vi(file_bytes: bytes, loai: str, ten_dv_chon: str) -> tuple[bo
 
 # ── Form upload ───────────────────────────────────────────────────────────────
 
-def _render_upload_form(ten_dv: str, prefix: str, username: str) -> None:
-    """Form upload 4 file cho đơn vị. Không merge toàn CN (việc của KH-NV)."""
+def _render_upload_form(
+    ten_dv: str,
+    prefix: str,
+    username: str,
+    loai_filter: list[str] | None = None,
+) -> None:
+    """Form upload file cho đơn vị. loai_filter giới hạn loại hiển thị; None = tất cả 4 loại."""
     # Hiển thị kết quả upload từ lần trước (lưu qua session_state vì rerun xóa UI)
     prev_kq = st.session_state.pop(f"{prefix}_ket_qua", None)
     if prev_kq:
@@ -229,25 +234,30 @@ def _render_upload_form(ten_dv: str, prefix: str, username: str) -> None:
     st.markdown(f"##### 📤 Upload file cho: **{ten_dv}**")
 
     _ver = st.session_state.setdefault(f"{prefix}_upload_ver", 0)
-    c1, c2, c3, c4 = st.columns(4)
-    with c1:
-        st.caption("📊 HSTD Chi tiết")
-        f_hstd = st.file_uploader("HSTD", type=["xlsx", "xls"],
-                                   key=f"{prefix}_hstd_{_ver}", label_visibility="collapsed")
-    with c2:
-        st.caption("📑 Sao kê NQ11")
-        f_nq11 = st.file_uploader("NQ11", type=["xlsx", "xls"],
-                                   key=f"{prefix}_nq11_{_ver}", label_visibility="collapsed")
-    with c3:
-        st.caption("📋 Sao kê GQVL")
-        f_gqvl = st.file_uploader("GQVL", type=["xlsx", "xls"],
-                                   key=f"{prefix}_gqvl_{_ver}", label_visibility="collapsed")
-    with c4:
-        st.caption("🏆 Chấm điểm Tổ TK&VV")
-        f_cdtotkvv = st.file_uploader("CDTOTKVV", type=["xlsx", "xls"],
-                                       key=f"{prefix}_cdtotkvv_{_ver}", label_visibility="collapsed")
 
-    co_file = any(f is not None for f in [f_hstd, f_nq11, f_gqvl, f_cdtotkvv])
+    LOAI_ALL = [
+        ("hstd",     "📊 HSTD Chi tiết"),
+        ("nq11",     "📑 Sao kê NQ11"),
+        ("gqvl",     "📋 Sao kê GQVL"),
+        ("cdtotkvv", "🏆 Chấm điểm Tổ TK&VV"),
+    ]
+    loai_hien_thi = [x for x in LOAI_ALL if loai_filter is None or x[0] in loai_filter]
+    cols = st.columns(len(loai_hien_thi))
+    file_map: dict = {}
+    for col, (loai, caption) in zip(cols, loai_hien_thi):
+        with col:
+            st.caption(caption)
+            file_map[loai] = st.file_uploader(
+                loai.upper(), type=["xlsx", "xls"],
+                key=f"{prefix}_{loai}_{_ver}", label_visibility="collapsed",
+            )
+
+    f_hstd     = file_map.get("hstd")
+    f_nq11     = file_map.get("nq11")
+    f_gqvl     = file_map.get("gqvl")
+    f_cdtotkvv = file_map.get("cdtotkvv")
+
+    co_file = any(f is not None for f in file_map.values())
     if not co_file:
         st.info("Chọn ít nhất 1 file để bắt đầu upload.")
         return
@@ -436,23 +446,41 @@ def render(tab=None, **kwargs) -> None:
             _bang_trang_thai_don_vi(ten_xem)
 
         st.divider()
-        # Form upload riêng cho phân hệ Hỗ trợ địa bàn
-        # Không dùng form của KH-NV — 2 luồng độc lập
-        # Phân hệ PGD (admin_pgd, manager_pgd, user_pgd) chỉ upload cho PGD của mình
+
+        # ── Xác định đơn vị upload và prefix ────────────────────────
         if la_phan_he_pgd(role):
-            ten_dv = pgd_user or ""
-            if ten_dv:
+            ten_dv_upload = pgd_user or ""
+            if not ten_dv_upload:
+                st.warning("⚠️ Không xác định được PGD. Liên hệ Admin.")
+                ten_dv_upload = None
+            else:
                 if normalize_role(role) != "user_pgd":
                     st.info(f"📍 Đơn vị upload: **{pgd_user}**")
-                _render_upload_form(ten_dv, "pgd_op", username)
-            else:
-                st.warning("⚠️ Không xác định được PGD. Liên hệ Admin.")
+            prefix_base = "pgd_op"
         else:
-            # admin_cn, admin được chọn tự do
-            ten_dv = st.selectbox(
+            ten_dv_upload = st.selectbox(
                 "🏢 Chọn PGD cần upload",
                 DS_DON_VI,
                 key="pgd_upload_op_chon_dv",
             )
-            _render_upload_form(ten_dv, f"pgd_op_{ten_dv[:8]}", username)
+            prefix_base = f"pgd_op_{ten_dv_upload[:8]}"
+
+        if ten_dv_upload:
+            # ── 2 tab tách sao kê (hàng ngày) vs chấm điểm (hàng tháng) ──
+            tab_sk, tab_cd = st.tabs([
+                "📊 Sao kê (HSTD / NQ11 / GQVL)",
+                "🏆 Chấm điểm Tổ TK&VV",
+            ])
+            with tab_sk:
+                st.caption("Cập nhật: hàng ngày — xuất từ CoreBanking")
+                _render_upload_form(
+                    ten_dv_upload, f"{prefix_base}_sk", username,
+                    loai_filter=["hstd", "nq11", "gqvl"],
+                )
+            with tab_cd:
+                st.caption("Cập nhật: hàng tháng — hệ thống lưu lịch sử theo tháng")
+                _render_upload_form(
+                    ten_dv_upload, f"{prefix_base}_cd", username,
+                    loai_filter=["cdtotkvv"],
+                )
 

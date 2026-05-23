@@ -60,6 +60,15 @@
 | **Fix** | Thêm 2 nhánh `elif` trước `if ser.dtype == object`: (1) `is_integer_dtype` → `astype(object)`; (2) `is_float_dtype` → chuyển số nguyên dạng float → str rồi `astype(object)`. Dùng `pd.api.types.is_integer_dtype()` / `is_float_dtype()` thay vì so sánh `dtype ==`. |
 | **Ngày fix** | 2026-05-23 |
 
+### A4c — `Expected bytes, got a 'int' object — Conversion failed for column Mã thôn with type object`
+| | |
+|---|---|
+| **File** | `data/core.py` → `excel_to_parquet()` dòng 87 |
+| **Dấu hiệu** | `("Expected bytes, got a 'int' object", 'Conversion failed for column Mã thôn with type object')` khi merge toàn CN sau upload |
+| **Nguyên nhân** | Cache parquet cũ (trước khi fix A4/A4b) chứa cột `Mã thôn` dạng int64. Khi `excel_to_parquet()` thấy cache còn mới hơn Excel, nó đọc thẳng parquet mà **không** chuẩn hóa. Các frame từ PGD khác có string, frame từ PGD cũ có int64 → sau `pd.concat` cột thành object mixed (int + str) → `to_parquet` crash với `Expected bytes, got a 'int' object`. |
+| **Fix** | Chuẩn hóa code columns NGAY SAU khi đọc từ cache parquet (bất kể mới hay cũ): thêm vòng lặp `for col in result.columns: if _should_force_str(col): result[col] = _normalize_code_series(result[col])` trước `return result` trong `excel_to_parquet()`. Thao tác idempotent: cột string không thay đổi. |
+| **Ngày fix** | 2026-05-23 |
+
 ### A4b — `Could not convert '46002612' ... Conversion failed for column Mã thôn with type object`
 | | |
 |---|---|

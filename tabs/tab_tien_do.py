@@ -99,6 +99,15 @@ def _render_tong_quan(tab, **kwargs):
             sum(1 for r in v if r["trang_thai"] == "da_hoan_thanh")
             for v in all_kq.values()
         )
+        # Tính % trung bình từ pct_hoan_thanh (nếu có dữ liệu)
+        all_pct = [
+            int(r.get("pct_hoan_thanh") or 0)
+            for v in all_kq.values()
+            for r in v
+        ]
+        pct_avg = round(sum(all_pct) / len(all_pct)) if all_pct else 0
+        # Dùng pct_avg nếu có dữ liệu %, ngược lại fallback về count-based %
+        pct_hien_thi = pct_avg if pct_avg > 0 else (round(tong_xong / tong_xa * 100) if tong_xa else 0)
         tong_tre = 0
         for t in ds_task:
             kq = all_kq.get(t["id"], [])
@@ -110,7 +119,7 @@ def _render_tong_quan(tab, **kwargs):
         c1.metric("Đầu việc", len(ds_task))
         c2.metric("✅ Hoàn thành",
                   f"{tong_xong}/{tong_xa}",
-                  f"{round(tong_xong/tong_xa*100) if tong_xa else 0}%")
+                  f"{pct_hien_thi}%")
         c3.metric("🔴 Trễ hạn", tong_tre, delta_color="inverse")
         c4.metric("⬜ Chưa báo cáo", tong_xa - tong_xong - tong_tre)
 
@@ -284,6 +293,36 @@ Bỏ chọn nếu chỉ áp dụng cho một số PGD cụ thể.
 **8. Người phụ trách** — Ghi tên cán bộ chịu trách nhiệm theo dõi đầu việc này.
             """)
 
+        # ── Tạo từ mẫu ──────────────────────────────────────────────────────
+        try:
+            with db.get_conn() as conn:
+                _templates = [dict(r) for r in conn.execute(
+                    "SELECT * FROM tien_do_template ORDER BY ten"
+                ).fetchall()]
+        except Exception:
+            _templates = []
+
+        if _templates:
+            _tmpl_options = ["— Tạo mới (không dùng mẫu) —"] + [t["ten"] for t in _templates]
+            c_tmpl, c_apply = st.columns([3, 1])
+            with c_tmpl:
+                _tmpl_sel = st.selectbox(
+                    "📋 Tạo từ mẫu",
+                    _tmpl_options,
+                    key="td_chon_mau",
+                    label_visibility="collapsed",
+                )
+            with c_apply:
+                if _tmpl_sel != _tmpl_options[0]:
+                    if st.button("▶️ Áp dụng mẫu", use_container_width=True, key="td_apply_mau"):
+                        _t = next((t for t in _templates if t["ten"] == _tmpl_sel), None)
+                        if _t:
+                            st.session_state["tao_task_tieu_de"] = _t["ten"]
+                            st.session_state["tao_task_loai"] = _t.get("loai") or "chung"
+                            st.session_state["tao_task_uu_tien"] = _t.get("uu_tien") or "binh_thuong"
+                            st.session_state["tao_task_loai_theo_doi"] = _t.get("cap_theo_doi") or "xa"
+                            st.rerun()
+
         with st.form("form_tao_task", clear_on_submit=False):
             tieu_de = st.text_area("Tên đầu việc *",
                                    placeholder="VD: Nộp hồ sơ rủi ro tháng 5/2026",
@@ -413,7 +452,7 @@ Bỏ chọn nếu chỉ áp dụng cho một số PGD cụ thể.
                 st.toast(f"✅ Đã tạo: {tieu_de}")
                 st.rerun()
             except Exception as e:
-                logger.error("Lỗi trong khối except: %s", e, exc_info=True)
+                logger.error("Lỗi tạo đầu việc '%s': %s", tieu_de, e, exc_info=True)
                 st.error(f"Lỗi: {e}")
 
 
@@ -439,8 +478,8 @@ def _render_quan_ly_task(tab, **kwargs):
                 try:
                     dl = date.fromisoformat(t.get("ngay_deadline", ""))
                     stt = "⚠️ Đã hết hạn" if dl < date.today() else "🟢 Đang thực hiện"
-                except Exception:
-                    logger.error("Lỗi trong khối except: %s", e, exc_info=True)
+                except Exception as e:  # conv: skip
+                    logger.warning("Không parse ngày deadline (fmt_task) task_id=%s: %s", task_id, e)
                     stt = "🟢 Đang thực hiện"
             else:
                 stt = "🔒 Đã đóng"
@@ -463,8 +502,8 @@ def _render_quan_ly_task(tab, **kwargs):
 
         try:
             deadline_default = date.fromisoformat(str(task.get("ngay_deadline") or date.today().isoformat()))
-        except Exception:
-            logger.error("Lỗi trong khối except: %s", e, exc_info=True)
+        except Exception as e:  # conv: skip
+            logger.warning("Không parse được ngày deadline task_id=%s: %s", task_id, e)
             deadline_default = date.today()
 
         loai_keys = list(LOAI_TASK.keys())
@@ -472,14 +511,14 @@ def _render_quan_ly_task(tab, **kwargs):
 
         try:
             loai_index = loai_keys.index(task.get("loai")) if task.get("loai") in loai_keys else 0
-        except Exception:
-            logger.error("Lỗi trong khối except: %s", e, exc_info=True)
+        except Exception as e:  # conv: skip
+            logger.warning("Không tìm được loai_index task_id=%s: %s", task_id, e)
             loai_index = 0
 
         try:
             uu_tien_index = uu_tien_keys.index(task.get("uu_tien")) if task.get("uu_tien") in uu_tien_keys else 2
-        except Exception:
-            logger.error("Lỗi trong khối except: %s", e, exc_info=True)
+        except Exception as e:  # conv: skip
+            logger.warning("Không tìm được uu_tien_index task_id=%s: %s", task_id, e)
             uu_tien_index = 2
 
         with st.form("form_sua_task"):
@@ -537,9 +576,8 @@ def _render_quan_ly_task(tab, **kwargs):
                 ngay_bat_dau_val = date.fromisoformat(
                     str(task.get("ngay_bat_dau") or date.today().isoformat())
                 )
-            except Exception:
-                logger.error("Lỗi trong khối except: %s", e, exc_info=True)
-                pass
+            except Exception as e:  # conv: skip
+                logger.warning("Không parse được ngày_bắt_đầu task_id=%s: %s", task_id, e)
             ngay_bat_dau = st.date_input(
                 "Ngày bắt đầu",
                 value=ngay_bat_dau_val,
@@ -632,7 +670,7 @@ def _render_quan_ly_task(tab, **kwargs):
                 st.toast("✅ Đã lưu thay đổi.")
                 st.rerun()
             except Exception as e:
-                logger.error("Lỗi trong khối except: %s", e, exc_info=True)
+                logger.error("Lỗi lưu chỉnh sửa task_id=%s: %s", task_id, e, exc_info=True)
                 st.error(f"Lỗi: {e}")
 
         c1, c2, c3 = st.columns([1.2, 1.2, 1.6])
@@ -649,7 +687,7 @@ def _render_quan_ly_task(tab, **kwargs):
                         st.toast("✅ Đã cập nhật trạng thái.")
                         st.rerun()
                     except Exception as e:
-                        logger.error("Lỗi trong khối except: %s", e, exc_info=True)
+                        logger.error("Lỗi đóng task_id=%s: %s", task_id, e, exc_info=True)
                         st.error(f"Lỗi: {e}")
             else:
                 if st.button("🔓 Mở lại", key=f"td_mo_lai_{task_id}", use_container_width=True):
@@ -663,7 +701,7 @@ def _render_quan_ly_task(tab, **kwargs):
                         st.toast("✅ Đã cập nhật trạng thái.")
                         st.rerun()
                     except Exception as e:
-                        logger.error("Lỗi trong khối except: %s", e, exc_info=True)
+                        logger.error("Lỗi mở lại task_id=%s: %s", task_id, e, exc_info=True)
                         st.error(f"Lỗi: {e}")
 
         if la_admin_cn(role):
@@ -687,7 +725,7 @@ def _render_quan_ly_task(tab, **kwargs):
                             st.toast("🗑️ Đã xóa đầu việc.")
                             st.rerun()
                         except Exception as e:
-                            logger.error("Lỗi trong khối except: %s", e, exc_info=True)
+                            logger.error("Lỗi xóa task_id=%s: %s", task_id, e, exc_info=True)
                             st.error(f"Lỗi: {e}")
 
 
@@ -712,8 +750,8 @@ def _render_cap_nhat(tab, **kwargs):
                 try:
                     dl = date.fromisoformat(t["ngay_deadline"])
                     stt = "⚠️ Đã hết hạn" if dl < hom_nay else "🟢 Đang thực hiện"
-                except Exception:
-                    logger.error("Lỗi trong khối except: %s", e, exc_info=True)
+                except Exception as e:  # conv: skip
+                    logger.warning("Không parse ngày deadline (fmt_cap_nhat_opt): %s", e)
                     stt = "🟢 Đang thực hiện"
                 ngay_bd = t.get("ngay_bat_dau")
                 parts = [stt, t["tieu_de"]]
@@ -747,8 +785,8 @@ def _render_cap_nhat(tab, **kwargs):
                     badge = "🟠 Sắp hết hạn (≤ 3 ngày)"
                 else:
                     badge = "🟢 Đang thực hiện"
-            except Exception:
-                logger.error("Lỗi trong khối except: %s", e, exc_info=True)
+            except Exception as e:  # conv: skip
+                logger.warning("Không parse ngày deadline để hiển thị badge: %s", e)
                 badge = ""
 
             st.caption(
@@ -841,8 +879,8 @@ def _render_cap_nhat(tab, **kwargs):
                     return None
                 try:
                     return pd.to_datetime(val).date()
-                except Exception:
-                    logger.error("Lỗi trong khối except: %s", e, exc_info=True)
+                except Exception as e:  # conv: skip
+                    logger.warning("_parse_date không hợp lệ '%s': %s", val, e)
                     return None
 
             kq_hien_thi = kq_list
@@ -854,6 +892,7 @@ def _render_cap_nhat(tab, **kwargs):
                     ten_cot: r["ten_xa"],
                     "Trạng thái": TS_KQ_LABEL.get(r["trang_thai"], r["trang_thai"]),
                     "Hoàn thành": r["trang_thai"] == "da_hoan_thanh",
+                    "% HT": int(r.get("pct_hoan_thanh") or 0),
                     "Ngày hoàn thành": _parse_date(r.get("ngay_hoan_thanh")),
                     "Ghi chú": r.get("ghi_chu") or "",
                 }
@@ -888,13 +927,14 @@ def _render_cap_nhat(tab, **kwargs):
                                 if pd.notna(ngay_val) and ngay_val:
                                     try:
                                         ngay_ht = pd.to_datetime(ngay_val).date().isoformat()
-                                    except Exception:
-                                        logger.error("Lỗi trong khối except: %s", e, exc_info=True)
+                                    except Exception as e:  # conv: skip
+                                        logger.warning("ngay_ht không hợp lệ: %s", e)
                                         ngay_ht = None
                                 rows_bulk.append(
                                     {
                                         "ten_xa": ten_xa_dv,
                                         "hoan_thanh": bool(edited.iloc[i]["Hoàn thành"]),
+                                        "pct_hoan_thanh": int(edited.iloc[i].get("% HT") or 0),
                                         "ngay_hoan_thanh": ngay_ht,
                                         "ghi_chu": str(edited.iloc[i]["Ghi chú"]).strip() or None,
                                     }
@@ -950,6 +990,10 @@ def _render_cap_nhat(tab, **kwargs):
                         "Trạng thái", disabled=True, width="small",
                     ),
                     "Hoàn thành": st.column_config.CheckboxColumn("✅ Hoàn thành"),
+                    "% HT": st.column_config.NumberColumn(
+                        "% HT", min_value=0, max_value=100, step=5, width="small",
+                        help="Nhập % hoàn thành (0–100). Khi = 100 tự đánh dấu hoàn thành.",
+                    ),
                     "Ngày hoàn thành": st.column_config.DateColumn(
                         "Ngày hoàn thành", format="DD/MM/YYYY", default=None,
                     ),
@@ -960,6 +1004,53 @@ def _render_cap_nhat(tab, **kwargs):
                 key=editor_key,
             )
             st.session_state[f"{editor_key}_data"] = edited
+
+        # ── Khối 4: LỊCH SỬ CẬP NHẬT ────────────────────────────────────────
+        with st.expander("📜 Lịch sử cập nhật tiến độ", expanded=False):
+            _pgd_filter = pgd_sel if pgd_sel != "__ALL__" else None
+            try:
+                ls_rows = tien_do_service.doc_lich_su_task(
+                    task_id,
+                    pgd=_pgd_filter,
+                    limit=100,
+                )
+            except Exception as e:  # conv: skip
+                logger.warning("Lỗi đọc lịch sử task_id=%s: %s", task_id, e)
+                ls_rows = []
+
+            if not ls_rows:
+                st.caption("Chưa có lịch sử thay đổi nào được ghi nhận.")
+            else:
+                _TS_LABEL = {
+                    "chua_thuc_hien": "⬜ Chưa",
+                    "da_hoan_thanh":  "✅ Xong",
+                    "khong_ap_dung":  "➖ N/A",
+                }
+                df_ls = pd.DataFrame([
+                    {
+                        "Thời gian":  (r.get("ngay_nhap") or "")[:16].replace("T", " "),
+                        "Đơn vị":     r.get("ten_xa") or "",
+                        "PGD":        r.get("pgd") or "",
+                        "Trước":      _TS_LABEL.get(r.get("trang_thai_cu") or "", r.get("trang_thai_cu") or "—"),
+                        "Sau":        _TS_LABEL.get(r.get("trang_thai_moi") or "", r.get("trang_thai_moi") or "—"),
+                        "% trước":    int(r.get("pct_cu") or 0),
+                        "% sau":      int(r.get("pct_moi") or 0),
+                        "Ghi chú":    r.get("ghi_chu") or "",
+                        "Người nhập": r.get("nguoi_nhap") or "",
+                    }
+                    for r in ls_rows
+                ])
+                # Ẩn cột PGD nếu đang lọc theo 1 PGD cụ thể
+                cols_show = list(df_ls.columns)
+                if _pgd_filter:
+                    cols_show = [c for c in cols_show if c != "PGD"]
+                st.dataframe(
+                    df_ls[cols_show],
+                    use_container_width=True,
+                    hide_index=True,
+                    height=min(400, 40 + len(df_ls) * 35),
+                )
+                st.caption(f"Hiển thị {len(df_ls)} bản ghi gần nhất.")
 
 
 def _render_xuat(tab, **kwargs):
@@ -1127,8 +1218,8 @@ def _render_xuat(tab, **kwargs):
                     try:
                         dl = date.fromisoformat(t.get("ngay_deadline", ""))
                         stt = "⚠️ Đã hết hạn" if dl < date.today() else "🟢 Đang thực hiện"
-                    except Exception:
-                        logger.error("Lỗi trong khối except: %s", e, exc_info=True)
+                    except Exception as e:  # conv: skip
+                        logger.warning("Không parse ngày deadline (fmt_task_pdf) task_id=%s: %s", task_id, e)
                         stt = "🟢 Đang thực hiện"
                 else:
                     stt = "🔒 Đã đóng"

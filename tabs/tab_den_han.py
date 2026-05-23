@@ -131,14 +131,16 @@ def render(tab=None, role: str = None, **kwargs) -> None:
         else:
             loc_dvut = "Tất cả"
 
-    df_loc = _loc_thang(df_tinh, 0, den_thang)
+    df_tinh_filtered = df_tinh.copy()
+    if loc_pgd != "Tất cả" and COT_TEN_PGD in df_tinh_filtered.columns:
+        df_tinh_filtered = df_tinh_filtered[df_tinh_filtered[COT_TEN_PGD] == loc_pgd]
+    if loc_ct != "Tất cả" and COT_TEN_CT in df_tinh_filtered.columns:
+        df_tinh_filtered = df_tinh_filtered[df_tinh_filtered[COT_TEN_CT] == loc_ct]
+    if loc_dvut != "Tất cả" and COT_DVUT in df_tinh_filtered.columns:
+        df_tinh_filtered = df_tinh_filtered[df_tinh_filtered[COT_DVUT] == loc_dvut]
+
+    df_loc = _loc_thang(df_tinh_filtered, 0, den_thang)
     df_loc = df_loc[pd.to_numeric(df_loc[COT_TONG_DU_NO], errors="coerce").fillna(0) > 0]
-    if loc_pgd != "Tất cả" and COT_TEN_PGD in df_loc.columns:
-        df_loc = df_loc[df_loc[COT_TEN_PGD] == loc_pgd]
-    if loc_ct != "Tất cả" and COT_TEN_CT in df_loc.columns:
-        df_loc = df_loc[df_loc[COT_TEN_CT] == loc_ct]
-    if loc_dvut != "Tất cả" and COT_DVUT in df_loc.columns:
-        df_loc = df_loc[df_loc[COT_DVUT] == loc_dvut]
 
     # ── 4 Metrics ────────────────────────────────────────────────────
     tong_khoan = len(df_loc)
@@ -156,7 +158,7 @@ def render(tab=None, role: str = None, **kwargs) -> None:
     # ── Cảnh báo tập trung ───────────────────────────────────────────
     if not df_loc.empty:
         try:
-            for cb in canh_bao_tap_trung(df_loc)[:5]:
+            for cb in canh_bao_tap_trung(df_tinh_filtered)[:5]:
                 ty_le_cb = f"{cb['ty_le'] * 100:.1f}".replace(".", ",") + "%"
                 st.warning(
                     f"⚠️ **{cb['pgd']}**: {ty_le_cb} dư nợ đến hạn trong {cb['thang']} "

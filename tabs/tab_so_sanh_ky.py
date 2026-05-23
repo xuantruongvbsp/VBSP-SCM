@@ -1427,7 +1427,22 @@ def render_moc_nam(tab: DeltaGenerator = None, **kwargs) -> None:
         st.subheader("📈 So sánh kỳ — Hiện tại vs Mốc 31/12")
 
         # ── Chọn năm baseline ─────────────────────────────────────────────
-        ds_nam = danh_sach_nam_baseline_pgd() or danh_sach_nam_baseline()
+        ds_nam: list[int] = []
+        try:
+            from config import BASELINE_PGD_DIR
+            if BASELINE_PGD_DIR.exists():
+                years = set()
+                for f in BASELINE_PGD_DIR.rglob("HSTD_3112_*.XLSX"):
+                    try:
+                        years.add(int(f.stem.split("_")[-1]))
+                    except ValueError:
+                        continue
+                ds_nam = sorted(years, reverse=True)
+        except Exception:
+            ds_nam = []
+
+        if not ds_nam:
+            ds_nam = danh_sach_nam_baseline_pgd() or danh_sach_nam_baseline()
         if not ds_nam:
             st.warning("⚠️ Chưa có dữ liệu năm trước để so sánh.")
             st.markdown(

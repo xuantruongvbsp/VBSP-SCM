@@ -47,14 +47,16 @@ def _agg(df: pd.DataFrame) -> dict:
 
 def _delta_fmt(delta: float, unit: str = "tien") -> str:
     """Format ±delta kiểu VN."""
-    sign = "+" if delta >= 0 else ""
+    if delta == 0:
+        if unit == "pct":
+            return "0,00%"
+        return "0"
+    sign = "+" if delta > 0 else ""
     if unit == "tien":
         return f"{sign}{fmt_ty(delta)}"
     if unit == "so":
         return f"{sign}{fmt_so(int(round(delta)))}"
-    # unit == "pct"
-    return f"{sign}{abs(delta):.2f}".replace(".", ",") + "%" if delta >= 0 \
-        else f"-{abs(delta):.2f}".replace(".", ",") + "%"
+    return f"{sign}{abs(delta):.2f}".replace(".", ",") + "%"
 
 
 def _pct_change(v1: float, v2: float) -> str:
@@ -85,6 +87,81 @@ def _mau_delta(delta: float, inverse: bool = False) -> str:
     return "#16a34a" if good else "#dc2626"
 
 
+def _ky_selector(
+    ds: list, ky1: str, ky2: str, prefix: str,
+    label: str = "",
+) -> tuple[str, str] | None:
+    """Chọn 2 kỳ snapshot, trả (sel_k1, sel_k2) hoặc None nếu trùng/hết."""
+    lbl = f"{label} " if label else ""
+    available_ky1 = ky1 if ky1 in ds else (ds[min(1, len(ds) - 1)] if len(ds) > 1 else ds[0])
+    available_ky2 = ky2 if ky2 in ds else ds[0]
+    if available_ky1 == available_ky2:
+        available_ky1 = ds[min(1, len(ds) - 1)]
+        available_ky2 = ds[0]
+    col_k1, col_k2 = st.columns(2)
+    sel_k1 = col_k1.selectbox(
+        f"📅 {lbl}— Kỳ 1", ds,
+        index=ds.index(available_ky1) if available_ky1 in ds else min(1, len(ds) - 1),
+        key=f"ss2k_{prefix}_ky1",
+        help="Kỳ dùng làm mốc so sánh (thường là kỳ cũ hơn)",
+    )
+    sel_k2 = col_k2.selectbox(
+        f"📅 {lbl}— Kỳ 2", ds,
+        index=ds.index(available_ky2) if available_ky2 in ds else 0,
+        key=f"ss2k_{prefix}_ky2",
+        help="Kỳ muốn đánh giá biến động (thường là kỳ mới hơn)",
+    )
+    if sel_k1 == sel_k2:
+        st.warning("⚠️ Vui lòng chọn 2 kỳ khác nhau.")
+        return None
+    return sel_k1, sel_k2
+
+
+def _fv(v: float, unit: str) -> str:
+    """Format giá trị theo đơn vị."""
+    if unit == "tien":
+        return fmt_ty(v)
+    if unit == "so":
+        return fmt_so(int(round(v)))
+    return f"{v:.2f}".replace(".", ",") + "%"
+
+
+def _render_table(rows: list[tuple], ky1: str, ky2: str,
+                  title: str = "Chỉ tiêu") -> None:
+    """HTML table so sánh 2 kỳ (label, v1, v2, inverse, unit)."""
+    rows_html = ""
+    for label, v1, v2, inv, unit in rows:
+        delta = v2 - v1
+        mau = _mau_delta(delta, inverse=inv)
+        d_str = _delta_fmt(delta, unit)
+        p_str = _pct_change(v1, v2) if unit != "pct" else _delta_fmt(delta, "pct")
+        rows_html += (
+            f"<tr style='border-bottom:1px solid #e5e7eb'>"
+            f"<td style='padding:8px 12px;font-weight:500'>{label}</td>"
+            f"<td style='padding:8px 12px;text-align:right'>{_fv(v1, unit)}</td>"
+            f"<td style='padding:8px 12px;text-align:right;font-weight:600'>{_fv(v2, unit)}</td>"
+            f"<td style='padding:8px 12px;text-align:right;color:{mau};font-weight:600'>{d_str}</td>"
+            f"<td style='padding:8px 12px;text-align:right;color:{mau}'>{p_str}</td>"
+            f"</tr>"
+        )
+    st.markdown(
+        f"""<div style="overflow-x:auto;border-radius:8px;border:1px solid #e5e7eb">
+        <table style="width:100%;border-collapse:collapse;font-size:0.93rem">
+          <thead>
+            <tr style="background:#1e3a5f;color:white">
+              <th style="padding:10px 12px;text-align:left">{title}</th>
+              <th style="padding:10px 12px;text-align:right">Kỳ {ky1}</th>
+              <th style="padding:10px 12px;text-align:right">Kỳ {ky2}</th>
+              <th style="padding:10px 12px;text-align:right">Chênh lệch</th>
+              <th style="padding:10px 12px;text-align:right">% thay đổi</th>
+            </tr>
+          </thead>
+          <tbody>{rows_html}</tbody>
+        </table></div>""",
+        unsafe_allow_html=True,
+    )
+
+
 # ──────────────────────────────────────────────
 # RENDER KPI CARDS
 # ──────────────────────────────────────────────
@@ -97,13 +174,13 @@ def _render_kpi(agg1: dict, agg2: dict, ky1: str, ky2: str) -> None:
     r2c1, r2c2, r2c3 = st.columns(3)
 
     r1c1.metric(
-        "Tổng dư nợ (triệu đ)",
+        "Tổng dư nợ (triệu đồng)",
         fmt_ty(agg2["tong_du_no"]),
         delta=_delta_fmt(agg2["tong_du_no"] - agg1["tong_du_no"], "tien"),
         help=f"Kỳ {ky1}: {fmt_ty(agg1['tong_du_no'])} triệu đồng",
     )
     r1c2.metric(
-        "Dư nợ quá hạn (triệu đ)",
+        "Dư nợ quá hạn (triệu đồng)",
         fmt_ty(agg2["du_no_qh"]),
         delta=_delta_fmt(agg2["du_no_qh"] - agg1["du_no_qh"], "tien"),
         delta_color="inverse",
@@ -117,7 +194,7 @@ def _render_kpi(agg1: dict, agg2: dict, ky1: str, ky2: str) -> None:
         help=f"Kỳ {ky1}: {_fmt_pct(tl1)}",
     )
     r2c1.metric(
-        "Dư nợ khoanh (triệu đ)",
+        "Dư nợ khoanh (triệu đồng)",
         fmt_ty(agg2["du_no_khoanh"]),
         delta=_delta_fmt(agg2["du_no_khoanh"] - agg1["du_no_khoanh"], "tien"),
         delta_color="inverse",
@@ -146,56 +223,16 @@ def _render_bang_chi_tiet(agg1: dict, agg2: dict, ky1: str, ky2: str) -> None:
     tl2 = _tl_nqh(agg2)
 
     rows = [
-        # (nhãn, v1, v2, inverse)
-        ("Tổng dư nợ (triệu đồng)",     agg1["tong_du_no"],   agg2["tong_du_no"],   False, "tien"),
+        ("Tổng dư nợ (triệu đồng)",      agg1["tong_du_no"],   agg2["tong_du_no"],   False, "tien"),
         ("Dư nợ trong hạn (triệu đồng)", agg1["du_no_th"],     agg2["du_no_th"],     False, "tien"),
         ("Dư nợ quá hạn (triệu đồng)",   agg1["du_no_qh"],     agg2["du_no_qh"],     True,  "tien"),
         ("Dư nợ khoanh (triệu đồng)",    agg1["du_no_khoanh"], agg2["du_no_khoanh"], True,  "tien"),
         ("Tỷ lệ NQH (%)",                tl1,                  tl2,                  True,  "pct"),
         ("Số hộ vay",                    agg1["so_ho"],        agg2["so_ho"],        False, "so"),
         ("Số khế ước",                   agg1["so_ku"],        agg2["so_ku"],        False, "so"),
-        ("Giải ngân trong năm (tr.đ)",   agg1["gn_nam"],       agg2["gn_nam"],       False, "tien"),
+        ("Giải ngân trong năm (triệu đồng)", agg1["gn_nam"],       agg2["gn_nam"],       False, "tien"),
     ]
-
-    def _fmt_val(v: float, unit: str) -> str:
-        if unit == "tien":
-            return fmt_ty(v)
-        if unit == "so":
-            return fmt_so(int(round(v)))
-        return _fmt_pct(v)
-
-    rows_html = ""
-    for label, v1, v2, inv, unit in rows:
-        delta = v2 - v1
-        mau = _mau_delta(delta, inverse=inv)
-        d_str = _delta_fmt(delta, unit)
-        p_str = _pct_change(v1, v2) if unit != "pct" else _delta_fmt(delta, "pct")
-        rows_html += (
-            f"<tr style='border-bottom:1px solid #e5e7eb'>"
-            f"<td style='padding:8px 12px;font-weight:500'>{label}</td>"
-            f"<td style='padding:8px 12px;text-align:right'>{_fmt_val(v1, unit)}</td>"
-            f"<td style='padding:8px 12px;text-align:right;font-weight:600'>{_fmt_val(v2, unit)}</td>"
-            f"<td style='padding:8px 12px;text-align:right;color:{mau};font-weight:600'>{d_str}</td>"
-            f"<td style='padding:8px 12px;text-align:right;color:{mau}'>{p_str}</td>"
-            f"</tr>"
-        )
-
-    st.markdown(
-        f"""<div style="overflow-x:auto;border-radius:8px;border:1px solid #e5e7eb">
-        <table style="width:100%;border-collapse:collapse;font-size:0.93rem">
-          <thead>
-            <tr style="background:#1e3a5f;color:white">
-              <th style="padding:10px 12px;text-align:left">Chỉ tiêu</th>
-              <th style="padding:10px 12px;text-align:right">Kỳ {ky1}</th>
-              <th style="padding:10px 12px;text-align:right">Kỳ {ky2}</th>
-              <th style="padding:10px 12px;text-align:right">Chênh lệch</th>
-              <th style="padding:10px 12px;text-align:right">% thay đổi</th>
-            </tr>
-          </thead>
-          <tbody>{rows_html}</tbody>
-        </table></div>""",
-        unsafe_allow_html=True,
-    )
+    _render_table(rows, ky1, ky2, "Chỉ tiêu")
 
 
 # ──────────────────────────────────────────────
@@ -349,7 +386,7 @@ def _render_export(agg1: dict, agg2: dict,
         ("Số khế ước",                   fmt_so(int(agg1["so_ku"])),   fmt_so(int(agg2["so_ku"])),
          _delta_fmt(agg2["so_ku"] - agg1["so_ku"], "so"),
          _pct_change(agg1["so_ku"], agg2["so_ku"])),
-        ("Giải ngân trong năm (tr.đ)",   fmt_ty(agg1["gn_nam"]),       fmt_ty(agg2["gn_nam"]),
+        ("Giải ngân trong năm (triệu đồng)", fmt_ty(agg1["gn_nam"]), fmt_ty(agg2["gn_nam"]),
          _delta_fmt(agg2["gn_nam"] - agg1["gn_nam"], "tien"),
          _pct_change(agg1["gn_nam"], agg2["gn_nam"])),
     ]
@@ -393,28 +430,10 @@ def _render_nq11_section(ky1: str, ky2: str, pgd_mode: bool, pgd_user: str | Non
         )
         return
 
-    # Dùng chung kỳ đã chọn ở phần HSTD nếu có, không thì cho chọn riêng
-    available_ky1 = ky1 if ky1 in ds else (ds[min(1, len(ds)-1)] if len(ds) > 1 else ds[0])
-    available_ky2 = ky2 if ky2 in ds else ds[0]
-
-    if available_ky1 == available_ky2:
-        # Tự điều chỉnh tránh trùng
-        idx2 = 0
-        idx1 = 1 if len(ds) > 1 else 0
-        available_ky1 = ds[idx1]
-        available_ky2 = ds[idx2]
-
-    col_k1, col_k2 = st.columns(2)
-    sel_k1 = col_k1.selectbox("📅 NQ11 — Kỳ 1", ds,
-                               index=ds.index(available_ky1) if available_ky1 in ds else min(1, len(ds)-1),
-                               key="ss2k_nq11_ky1")
-    sel_k2 = col_k2.selectbox("📅 NQ11 — Kỳ 2", ds,
-                               index=ds.index(available_ky2) if available_ky2 in ds else 0,
-                               key="ss2k_nq11_ky2")
-
-    if sel_k1 == sel_k2:
-        st.warning("⚠️ Vui lòng chọn 2 kỳ NQ11 khác nhau.")
+    ky_sel = _ky_selector(ds, ky1, ky2, "nq11", label="NQ11")
+    if ky_sel is None:
         return
+    sel_k1, sel_k2 = ky_sel
 
     df1 = doc_nq11_snapshot(sel_k1)
     df2 = doc_nq11_snapshot(sel_k2)
@@ -423,7 +442,6 @@ def _render_nq11_section(ky1: str, ky2: str, pgd_mode: bool, pgd_user: str | Non
         st.warning("⚠️ Một trong hai kỳ NQ11 chưa có dữ liệu snapshot.")
         return
 
-    # Lọc PGD nếu cần
     if pgd_mode and pgd_user:
         df1 = df1[df1["ten_pgd"] == pgd_user].reset_index(drop=True)
         df2 = df2[df2["ten_pgd"] == pgd_user].reset_index(drop=True)
@@ -431,7 +449,6 @@ def _render_nq11_section(ky1: str, ky2: str, pgd_mode: bool, pgd_user: str | Non
             st.warning(f"⚠️ Không có NQ11 snapshot cho **{pgd_user}**.")
             return
     else:
-        # Lấy hàng tổng CN
         df1 = df1[df1["ten_pgd"] == "__CN__"].reset_index(drop=True)
         df2 = df2[df2["ten_pgd"] == "__CN__"].reset_index(drop=True)
 
@@ -442,16 +459,15 @@ def _render_nq11_section(ky1: str, ky2: str, pgd_mode: bool, pgd_user: str | Non
     a1 = df1.iloc[0].to_dict()
     a2 = df2.iloc[0].to_dict()
 
-    # KPI row
     c1, c2, c3 = st.columns(3)
     c1.metric(
-        "Tổng dư nợ NQ11 (triệu đ)",
+        "Tổng dư nợ NQ11 (triệu đồng)",
         fmt_ty(float(a2.get("tong_du_no", 0))),
         delta=_delta_fmt(float(a2.get("tong_du_no", 0)) - float(a1.get("tong_du_no", 0)), "tien"),
         help=f"Kỳ {sel_k1}: {fmt_ty(float(a1.get('tong_du_no', 0)))} triệu đồng",
     )
     c2.metric(
-        "Nợ quá hạn NQ11 (triệu đ)",
+        "Nợ quá hạn NQ11 (triệu đồng)",
         fmt_ty(float(a2.get("no_qh", 0))),
         delta=_delta_fmt(float(a2.get("no_qh", 0)) - float(a1.get("no_qh", 0)), "tien"),
         delta_color="inverse",
@@ -464,49 +480,14 @@ def _render_nq11_section(ky1: str, ky2: str, pgd_mode: bool, pgd_user: str | Non
         help=f"Kỳ {sel_k1}: {fmt_so(int(a1.get('so_kh', 0)))} KH",
     )
 
-    # Bảng chi tiết
     rows_nq11 = [
         ("Tổng dư nợ NQ11 (triệu đồng)", float(a1.get("tong_du_no", 0)), float(a2.get("tong_du_no", 0)), False, "tien"),
         ("Nợ trong hạn NQ11 (triệu đồng)", float(a1.get("no_th", 0)), float(a2.get("no_th", 0)), False, "tien"),
         ("Nợ quá hạn NQ11 (triệu đồng)", float(a1.get("no_qh", 0)), float(a2.get("no_qh", 0)), True, "tien"),
-        ("Giải ngân NQ11 trong năm (tr.đ)", float(a1.get("gn_nam", 0)), float(a2.get("gn_nam", 0)), False, "tien"),
+        ("Giải ngân NQ11 trong năm (triệu đồng)", float(a1.get("gn_nam", 0)), float(a2.get("gn_nam", 0)), False, "tien"),
         ("Số khách hàng NQ11", float(a1.get("so_kh", 0)), float(a2.get("so_kh", 0)), False, "so"),
     ]
-
-    def _fv(v: float, unit: str) -> str:
-        if unit == "tien":
-            return fmt_ty(v)
-        return fmt_so(int(round(v)))
-
-    rows_html = ""
-    for label, v1, v2, inv, unit in rows_nq11:
-        delta = v2 - v1
-        mau = _mau_delta(delta, inverse=inv)
-        rows_html += (
-            f"<tr style='border-bottom:1px solid #e5e7eb'>"
-            f"<td style='padding:8px 12px;font-weight:500'>{label}</td>"
-            f"<td style='padding:8px 12px;text-align:right'>{_fv(v1, unit)}</td>"
-            f"<td style='padding:8px 12px;text-align:right;font-weight:600'>{_fv(v2, unit)}</td>"
-            f"<td style='padding:8px 12px;text-align:right;color:{mau};font-weight:600'>{_delta_fmt(delta, unit)}</td>"
-            f"<td style='padding:8px 12px;text-align:right;color:{mau}'>{_pct_change(v1, v2) if unit != 'pct' else _delta_fmt(delta, 'pct')}</td>"
-            f"</tr>"
-        )
-    st.markdown(
-        f"""<div style="overflow-x:auto;border-radius:8px;border:1px solid #e5e7eb">
-        <table style="width:100%;border-collapse:collapse;font-size:0.93rem">
-          <thead>
-            <tr style="background:#1e3a5f;color:white">
-              <th style="padding:10px 12px;text-align:left">Chỉ tiêu NQ11</th>
-              <th style="padding:10px 12px;text-align:right">Kỳ {sel_k1}</th>
-              <th style="padding:10px 12px;text-align:right">Kỳ {sel_k2}</th>
-              <th style="padding:10px 12px;text-align:right">Chênh lệch</th>
-              <th style="padding:10px 12px;text-align:right">% thay đổi</th>
-            </tr>
-          </thead>
-          <tbody>{rows_html}</tbody>
-        </table></div>""",
-        unsafe_allow_html=True,
-    )
+    _render_table(rows_nq11, sel_k1, sel_k2, "Chỉ tiêu NQ11")
 
 
 # ──────────────────────────────────────────────
@@ -523,23 +504,10 @@ def _render_gqvl_section(ky1: str, ky2: str, pgd_mode: bool, pgd_user: str | Non
         )
         return
 
-    available_ky1 = ky1 if ky1 in ds else (ds[min(1, len(ds)-1)] if len(ds) > 1 else ds[0])
-    available_ky2 = ky2 if ky2 in ds else ds[0]
-    if available_ky1 == available_ky2:
-        available_ky1 = ds[min(1, len(ds)-1)]
-        available_ky2 = ds[0]
-
-    col_k1, col_k2 = st.columns(2)
-    sel_k1 = col_k1.selectbox("📅 GQVL — Kỳ 1", ds,
-                               index=ds.index(available_ky1) if available_ky1 in ds else min(1, len(ds)-1),
-                               key="ss2k_gqvl_ky1")
-    sel_k2 = col_k2.selectbox("📅 GQVL — Kỳ 2", ds,
-                               index=ds.index(available_ky2) if available_ky2 in ds else 0,
-                               key="ss2k_gqvl_ky2")
-
-    if sel_k1 == sel_k2:
-        st.warning("⚠️ Vui lòng chọn 2 kỳ GQVL khác nhau.")
+    ky_sel = _ky_selector(ds, ky1, ky2, "gqvl", label="GQVL")
+    if ky_sel is None:
         return
+    sel_k1, sel_k2 = ky_sel
 
     df1 = doc_gqvl_snapshot(sel_k1)
     df2 = doc_gqvl_snapshot(sel_k2)
@@ -567,27 +535,27 @@ def _render_gqvl_section(ky1: str, ky2: str, pgd_mode: bool, pgd_user: str | Non
 
     c1, c2, c3, c4 = st.columns(4)
     c1.metric(
-        "DN trong hạn GQVL (triệu đ)",
+        "DN trong hạn GQVL (triệu đồng)",
         fmt_ty(float(a2.get("dn_th", 0))),
         delta=_delta_fmt(float(a2.get("dn_th", 0)) - float(a1.get("dn_th", 0)), "tien"),
         help=f"Kỳ {sel_k1}: {fmt_ty(float(a1.get('dn_th', 0)))}",
     )
     c2.metric(
-        "DN quá hạn GQVL (triệu đ)",
+        "DN quá hạn GQVL (triệu đồng)",
         fmt_ty(float(a2.get("dn_qh", 0))),
         delta=_delta_fmt(float(a2.get("dn_qh", 0)) - float(a1.get("dn_qh", 0)), "tien"),
         delta_color="inverse",
         help=f"Kỳ {sel_k1}: {fmt_ty(float(a1.get('dn_qh', 0)))}",
     )
     c3.metric(
-        "DN khoanh GQVL (triệu đ)",
+        "DN khoanh GQVL (triệu đồng)",
         fmt_ty(float(a2.get("dn_khoanh", 0))),
         delta=_delta_fmt(float(a2.get("dn_khoanh", 0)) - float(a1.get("dn_khoanh", 0)), "tien"),
         delta_color="inverse",
         help=f"Kỳ {sel_k1}: {fmt_ty(float(a1.get('dn_khoanh', 0)))}",
     )
     c4.metric(
-        "Giải ngân GQVL (triệu đ)",
+        "Giải ngân GQVL (triệu đồng)",
         fmt_ty(float(a2.get("gn_nam", 0))),
         delta=_delta_fmt(float(a2.get("gn_nam", 0)) - float(a1.get("gn_nam", 0)), "tien"),
         help=f"Kỳ {sel_k1}: {fmt_ty(float(a1.get('gn_nam', 0)))}",
@@ -597,40 +565,10 @@ def _render_gqvl_section(ky1: str, ky2: str, pgd_mode: bool, pgd_user: str | Non
         ("Dư nợ trong hạn (triệu đồng)", float(a1.get("dn_th", 0)), float(a2.get("dn_th", 0)), False, "tien"),
         ("Dư nợ quá hạn (triệu đồng)", float(a1.get("dn_qh", 0)), float(a2.get("dn_qh", 0)), True, "tien"),
         ("Dư nợ khoanh (triệu đồng)", float(a1.get("dn_khoanh", 0)), float(a2.get("dn_khoanh", 0)), True, "tien"),
-        ("Giải ngân trong năm (tr.đ)", float(a1.get("gn_nam", 0)), float(a2.get("gn_nam", 0)), False, "tien"),
+        ("Giải ngân trong năm (triệu đồng)", float(a1.get("gn_nam", 0)), float(a2.get("gn_nam", 0)), False, "tien"),
         ("Số khách hàng GQVL", float(a1.get("so_kh", 0)), float(a2.get("so_kh", 0)), False, "so"),
     ]
-
-    rows_html = ""
-    for label, v1, v2, inv, unit in rows_gqvl:
-        delta = v2 - v1
-        mau = _mau_delta(delta, inverse=inv)
-        fv = fmt_ty if unit == "tien" else (lambda x: fmt_so(int(round(x))))
-        rows_html += (
-            f"<tr style='border-bottom:1px solid #e5e7eb'>"
-            f"<td style='padding:8px 12px;font-weight:500'>{label}</td>"
-            f"<td style='padding:8px 12px;text-align:right'>{fv(v1)}</td>"
-            f"<td style='padding:8px 12px;text-align:right;font-weight:600'>{fv(v2)}</td>"
-            f"<td style='padding:8px 12px;text-align:right;color:{mau};font-weight:600'>{_delta_fmt(delta, unit)}</td>"
-            f"<td style='padding:8px 12px;text-align:right;color:{mau}'>{_pct_change(v1, v2)}</td>"
-            f"</tr>"
-        )
-    st.markdown(
-        f"""<div style="overflow-x:auto;border-radius:8px;border:1px solid #e5e7eb">
-        <table style="width:100%;border-collapse:collapse;font-size:0.93rem">
-          <thead>
-            <tr style="background:#1e3a5f;color:white">
-              <th style="padding:10px 12px;text-align:left">Chỉ tiêu GQVL</th>
-              <th style="padding:10px 12px;text-align:right">Kỳ {sel_k1}</th>
-              <th style="padding:10px 12px;text-align:right">Kỳ {sel_k2}</th>
-              <th style="padding:10px 12px;text-align:right">Chênh lệch</th>
-              <th style="padding:10px 12px;text-align:right">% thay đổi</th>
-            </tr>
-          </thead>
-          <tbody>{rows_html}</tbody>
-        </table></div>""",
-        unsafe_allow_html=True,
-    )
+    _render_table(rows_gqvl, sel_k1, sel_k2, "Chỉ tiêu GQVL")
 
 
 # ──────────────────────────────────────────────
@@ -647,23 +585,10 @@ def _render_cdtotkvv_section(ky1: str, ky2: str, pgd_mode: bool, pgd_user: str |
         )
         return
 
-    available_ky1 = ky1 if ky1 in ds else (ds[min(1, len(ds)-1)] if len(ds) > 1 else ds[0])
-    available_ky2 = ky2 if ky2 in ds else ds[0]
-    if available_ky1 == available_ky2:
-        available_ky1 = ds[min(1, len(ds)-1)]
-        available_ky2 = ds[0]
-
-    col_k1, col_k2 = st.columns(2)
-    sel_k1 = col_k1.selectbox("📅 CDTOTKVV — Kỳ 1", ds,
-                               index=ds.index(available_ky1) if available_ky1 in ds else min(1, len(ds)-1),
-                               key="ss2k_cdt_ky1")
-    sel_k2 = col_k2.selectbox("📅 CDTOTKVV — Kỳ 2", ds,
-                               index=ds.index(available_ky2) if available_ky2 in ds else 0,
-                               key="ss2k_cdt_ky2")
-
-    if sel_k1 == sel_k2:
-        st.warning("⚠️ Vui lòng chọn 2 kỳ chấm điểm khác nhau.")
+    ky_sel = _ky_selector(ds, ky1, ky2, "cdt", label="CDTOTKVV")
+    if ky_sel is None:
         return
+    sel_k1, sel_k2 = ky_sel
 
     df1 = doc_cdtotkvv_snapshot(sel_k1)
     df2 = doc_cdtotkvv_snapshot(sel_k2)
@@ -675,7 +600,6 @@ def _render_cdtotkvv_section(ky1: str, ky2: str, pgd_mode: bool, pgd_user: str |
     if pgd_mode and pgd_user:
         df1_f = df1[df1["ten_pgd"] == pgd_user].reset_index(drop=True)
         df2_f = df2[df2["ten_pgd"] == pgd_user].reset_index(drop=True)
-        # Fallback sang tổng CN nếu không có PGD cụ thể
         if df1_f.empty or df2_f.empty:
             df1_f = df1[df1["ten_pgd"] == "__CN__"].reset_index(drop=True)
             df2_f = df2[df2["ten_pgd"] == "__CN__"].reset_index(drop=True)
@@ -691,7 +615,6 @@ def _render_cdtotkvv_section(ky1: str, ky2: str, pgd_mode: bool, pgd_user: str |
     a1 = df1.iloc[0].to_dict()
     a2 = df2.iloc[0].to_dict()
 
-    # KPI cards
     c1, c2, c3, c4, c5 = st.columns(5)
     c1.metric("Tổng số tổ",     fmt_so(int(a2.get("so_to", 0))),
               delta=_delta_fmt(float(a2.get("so_to", 0)) - float(a1.get("so_to", 0)), "so"))
@@ -713,7 +636,6 @@ def _render_cdtotkvv_section(ky1: str, ky2: str, pgd_mode: bool, pgd_user: str |
               delta=_delta_fmt(float(a2.get("diem_tb", 0)) - float(a1.get("diem_tb", 0)), "pct"),
               help=f"Kỳ {sel_k1}: {float(a1.get('diem_tb', 0)):.2f} điểm")
 
-    # Bảng so sánh cơ cấu xếp loại
     cat_rows = [
         ("Tổng số tổ",      float(a1.get("so_to",  0)), float(a2.get("so_to",  0)), False),
         ("Tổ xếp loại Tốt", float(a1.get("so_tot", 0)), float(a2.get("so_tot", 0)), False),
@@ -757,7 +679,6 @@ def _render_cdtotkvv_section(ky1: str, ky2: str, pgd_mode: bool, pgd_user: str |
         unsafe_allow_html=True,
     )
 
-    # Biểu đồ cơ cấu xếp loại (pie comparison) — CN only
     if not pgd_mode:
         try:
             col_pie1, col_pie2 = st.columns(2)
@@ -783,7 +704,7 @@ def _render_cdtotkvv_section(ky1: str, ky2: str, pgd_mode: bool, pgd_user: str |
                 col_pie.plotly_chart(fig, use_container_width=True,
                                      key=f"ss2k_pie_cdt_{title.replace('-','_')}")
         except Exception:
-            pass  # Biểu đồ pie là optional
+            pass
 
 
 # ──────────────────────────────────────────────
@@ -808,7 +729,6 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
     with ctx:
         st.subheader("🔄 So sánh 2 kỳ")
 
-        # ── Kiểm tra snapshot ──
         ds_ky = danh_sach_ky()
         if len(ds_ky) < 2:
             st.warning(
@@ -817,28 +737,11 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
             )
             return
 
-        # ── Chọn 2 kỳ ──
-        col_k1, col_k2 = st.columns(2)
-        ky1 = col_k1.selectbox(
-            "📅 Kỳ 1 — mốc gốc",
-            ds_ky,
-            index=min(1, len(ds_ky) - 1),
-            key="ss2k_ky1",
-            help="Kỳ dùng làm mốc so sánh (thường là kỳ cũ hơn)",
-        )
-        ky2 = col_k2.selectbox(
-            "📅 Kỳ 2 — kỳ so sánh",
-            ds_ky,
-            index=0,
-            key="ss2k_ky2",
-            help="Kỳ muốn đánh giá biến động (thường là kỳ mới hơn)",
-        )
-
-        if ky1 == ky2:
-            st.warning("⚠️ Vui lòng chọn **2 kỳ khác nhau**.")
+        ky_sel = _ky_selector(ds_ky, ds_ky[min(1, len(ds_ky)-1)], ds_ky[0], "", label="")
+        if ky_sel is None:
             return
+        ky1, ky2 = ky_sel
 
-        # ── Tải dữ liệu ──
         df1 = doc_snapshot(ky1)
         df2 = doc_snapshot(ky2)
 
@@ -846,11 +749,25 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
             st.warning("⚠️ Một hoặc cả hai kỳ chưa có dữ liệu snapshot.")
             return
 
-        # ── Lọc PGD (nếu cần) ──
+        # ── Phase 3a: Lọc PGD cho phân hệ CN ──
+        pgd_data_list = sorted(set(
+            p for p in list(df1["ten_pgd"].unique()) + list(df2["ten_pgd"].unique())
+            if not str(p).startswith("__")
+        ))
+        _loc_pgd = None
+        if not pgd_mode and pgd_data_list:
+            _loc_pgd = st.selectbox(
+                "📍 Lọc PGD",
+                ["🏢 Tất cả Chi nhánh"] + pgd_data_list,
+                key="ss2k_pgd_filter",
+            )
+            if _loc_pgd and _loc_pgd != "🏢 Tất cả Chi nhánh":
+                df1 = df1[df1["ten_pgd"] == _loc_pgd].reset_index(drop=True)
+                df2 = df2[df2["ten_pgd"] == _loc_pgd].reset_index(drop=True)
+
         if pgd_mode and pgd_user:
             df1 = df1[df1["ten_pgd"] == pgd_user].reset_index(drop=True)
             df2 = df2[df2["ten_pgd"] == pgd_user].reset_index(drop=True)
-
             if df1.empty or df2.empty:
                 st.warning(f"⚠️ Chưa có dữ liệu snapshot cho **{pgd_user}** trong kỳ đã chọn.")
                 return
@@ -858,43 +775,35 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
         agg1 = _agg(df1)
         agg2 = _agg(df2)
 
-        st.caption(
-            f"So sánh **{ky1}** → **{ky2}** "
-            + (f"· {pgd_user}" if pgd_mode and pgd_user else "· Toàn Chi nhánh")
+        _ten_hien_thi = _loc_pgd if _loc_pgd and _loc_pgd != "🏢 Tất cả Chi nhánh" else (
+            pgd_user if pgd_mode and pgd_user else "Toàn Chi nhánh"
         )
+        st.caption(f"So sánh **{ky1}** → **{ky2}** · {_ten_hien_thi}")
         st.divider()
 
-        # ── KPI cards ──
         _render_kpi(agg1, agg2, ky1, ky2)
-
         st.divider()
 
-        # ── Bảng chi tiết ──
         st.markdown("**📊 Bảng so sánh chi tiết**")
         _render_bang_chi_tiet(agg1, agg2, ky1, ky2)
 
-        # ── Bảng & biểu đồ theo PGD (CN only) ──
-        if not pgd_mode:
+        # Bảng & biểu đồ theo PGD (chỉ khi không lọc 1 PGD cụ thể)
+        if not pgd_mode and (not _loc_pgd or _loc_pgd == "🏢 Tất cả Chi nhánh"):
             st.divider()
             st.markdown("**🏢 Biến động theo đơn vị**")
             _render_bang_pgd(df1, df2, ky1, ky2)
-
             st.divider()
             _render_bieu_do(df1, df2, ky1, ky2)
 
-        # ── Xuất Excel ──
         st.divider()
         _render_export(agg1, agg2, df1, df2, ky1, ky2, pgd_mode, username)
 
-        # ── NQ11 ──
         st.divider()
         if _lazy_expander("📋 So sánh NQ11 (Nghị quyết 11)", "nq11"):
             _render_nq11_section(ky1, ky2, pgd_mode, pgd_user)
 
-        # ── GQVL ──
         if _lazy_expander("💼 So sánh GQVL (Giải quyết việc làm)", "gqvl"):
             _render_gqvl_section(ky1, ky2, pgd_mode, pgd_user)
 
-        # ── Chất lượng tổ TK&VV ──
         if _lazy_expander("🏆 So sánh chất lượng Tổ TK&VV", "cdtotkvv"):
             _render_cdtotkvv_section(ky1, ky2, pgd_mode, pgd_user)

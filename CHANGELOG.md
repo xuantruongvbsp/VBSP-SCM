@@ -1,5 +1,8 @@
 # CHANGELOG
 
+## [2026-05-23] — Fix hiệu năng tab Upload: cache baseline status vào session_state
+- `tabs/tab_upload_khnv.py` dòng ~75, ~879, ~1106, ~1249 — cache kết quả `danh_sach_nam_baseline_pgd()` và `trang_thai_baseline_pgd*()` vào `st.session_state["_blcache_*"]`; xóa cache khi nhấn "Làm mới" hoặc sau import thành công; loại bỏ ~120+ lệnh file I/O mỗi lần rerun
+
 ## [2026-05-23] — Sắp xếp lại tab Upload: phân nhóm Hiện tại vs 31/12 bằng st.tabs()
 - `tabs/tab_upload_khnv.py` — dời bảng trạng thái 22 đơn vị lên đầu trang; bọc 4 expander cũ vào 3 tab: "📊 Dữ liệu Hiện tại" (Import + Tổng hợp), "📅 Mốc 31/12" (Baseline), "⚙️ Quản trị" (Xóa dữ liệu); bỏ expander khỏi `_render_xoa_du_lieu()` và `_render_upload_baseline()`
 - `tabs/tab_upload_pgd.py` — tách CDTOTKVV ra tab "🏆 Chấm điểm Tổ TK&VV" riêng; HSTD/NQ11/GQVL trong tab "📊 Sao kê"; thêm tham số `loai_filter` vào `_render_upload_form()`

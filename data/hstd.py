@@ -59,23 +59,47 @@ def doc_baseline_pgd(ten_pgd: str, nam: int, _ts=0) -> pd.DataFrame | None:
 def doc_baseline_merged(nam: int, _ts=0) -> pd.DataFrame | None:
     """
     Đọc và merge HSTD mốc 31/12 từ tất cả đơn vị đã upload.
+    Sử dụng parquet cache sau lần merge đầu tiên để load nhanh ở lần sau.
     Ưu tiên baseline_pgd_path; fallback về baseline_path cũ nếu không có đơn vị nào.
     Trả None nếu không có dữ liệu.
     """
-    from config import BASELINE_PGD_DIR, baseline_pgd_path, baseline_path
+    from config import BASELINE_PGD_DIR, baseline_pgd_path, baseline_path, baseline_cache_loai
     from config import DS_PGD, DON_VI_CHI_NHANH
     ds = [DON_VI_CHI_NHANH] + DS_PGD
+
+    cache_path = baseline_cache_loai(nam, "hstd")
+
+    # Check if cache is valid: all source files older than cache
+    if os.path.exists(cache_path):
+        cache_mtime = os.path.getmtime(cache_path)
+        need_rebuild = False
+        for dv in ds:
+            fp = baseline_pgd_path(dv, nam)
+            if os.path.exists(fp) and os.path.getmtime(fp) > cache_mtime:
+                need_rebuild = True
+                break
+        if not need_rebuild:
+            return pd.read_parquet(cache_path)
+
+    # Rebuild: cache từng PGD bằng parquet → merge
     dfs = []
     for dv in ds:
         fp = baseline_pgd_path(dv, nam)
         if os.path.exists(fp):
             try:
-                df = pd.read_excel(fp, sheet_name="BCQUERY", header=4, engine="openpyxl").iloc[:, 1:].dropna(how="all")
+                path_pq = str(Path(fp).with_suffix(".parquet"))
+                def _clean(df): return df.iloc[:, 1:].dropna(how="all")
+                df = excel_to_parquet(fp, path_pq, "BCQUERY", 4, _clean)
                 dfs.append(df)
             except Exception:
                 pass
+
     if dfs:
-        return pd.concat(dfs, ignore_index=True)
+        result = pd.concat(dfs, ignore_index=True)
+        os.makedirs(os.path.dirname(cache_path), exist_ok=True)
+        result.to_parquet(cache_path, index=False, compression='zstd')
+        return result
+
     # fallback: file tổng cũ
     return doc_baseline(nam, _ts)
 

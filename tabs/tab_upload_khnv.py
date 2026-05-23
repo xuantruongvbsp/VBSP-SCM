@@ -71,19 +71,30 @@ def _hien_thi_bang_trang_thai() -> None:
         lay_trang_thai_upload_pgd(DS_DON_VI),
     ).copy()
 
-    # Thêm cột baseline 31/12 — cache vào session_state để tránh rescan mỗi rerun
+    # Cột 31/12: kiểm tra CẢ 4 loại (HSTD/NQ11/GQVL/CDTOTKVV), không chỉ HSTD
     if "_blcache_nam_list" not in st.session_state:
         st.session_state["_blcache_nam_list"] = danh_sach_nam_baseline_pgd()
     ds_nam_bl = st.session_state["_blcache_nam_list"]
     nam_bl = ds_nam_bl[0] if ds_nam_bl else (_date.today().year - 1)
-    _bl_tt_key = f"_blcache_tt_{nam_bl}"
-    if _bl_tt_key not in st.session_state:
-        st.session_state[_bl_tt_key] = trang_thai_baseline_pgd(nam_bl)
-    tt_bl = st.session_state[_bl_tt_key]
+
+    _bl_loai_key = f"_blcache_tt_loai_col_{nam_bl}"
+    if _bl_loai_key not in st.session_state:
+        st.session_state[_bl_loai_key] = {
+            loai: trang_thai_baseline_pgd_loai(nam_bl, loai) for loai in LOAI_BASELINE
+        }
+    tt_bl_loai = st.session_state[_bl_loai_key]
+
     col_bl = f"31/12/{nam_bl}"
-    df_tt[col_bl] = df_tt["Đơn vị"].map(
-        lambda dv: "✅ Có" if tt_bl.get(dv, False) else "❌ Chưa có"
-    )
+    def _nhan_bl(dv):
+        dem = sum(1 for loai in LOAI_BASELINE if tt_bl_loai[loai].get(dv, False))
+        tong = len(LOAI_BASELINE)
+        if dem == 0:
+            return "❌ Chưa loại nào"
+        if dem == tong:
+            return f"✅ Đủ {tong}/{tong}"
+        loai_thieu = [loai for loai in LOAI_BASELINE if not tt_bl_loai[loai].get(dv, False)]
+        return f"⚠️ {dem}/{tong} (thiếu {','.join(loai_thieu)})"
+    df_tt[col_bl] = df_tt["Đơn vị"].apply(_nhan_bl)
 
     # Tô màu badge theo tiền tố: ✅ xanh | ⚠️ vàng | ❌ đỏ
     def style_trang_thai(val: str) -> str:

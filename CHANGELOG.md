@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [2026-05-23] — ROADMAP.md mới — 4 giai đoạn phát triển
+- `ROADMAP.md` — viết lại roadmap mới với 4 giai đoạn: (1) Củng cố nền tảng (Test + Performance + Data Quality), (2) Báo cáo & Phân tích nâng cao, (3) DevOps & Vận hành, (4) Tích hợp & Mở rộng
+
+## [2026-05-23] — Dọn dẹp: thay st.tabs() bằng radio ở 2 nơi
+- `tabs/tab_xlrr_tong_hop.py` `render()` — 4 tab → radio: chỉ render sub-tab active (tổng quan / QĐ62 / nợ RR / xuất báo cáo)
+- `workspaces/ws_executive.py` `_hhi_giam_sat()` — 2 tab HHI → radio: chỉ tính `tinh_hhi_breakdown()` cho dim đang chọn
+
 ## [2026-05-23] — Tối ưu hiệu năng Tab So sánh 2 kỳ (4 fix)
 - `tabs/tab_so_sanh_ky.py` `render()` — thay `st.tabs()` bằng radio: chỉ render sub-tab đang active, tránh `render_moc_nam()` chạy ngầm khi user ở tab "So sánh 2 kỳ"
 - `tabs/tab_so_sanh_2_ky.py` — thêm `_lazy_expander()`, áp dụng cho 3 expander NQ11/GQVL/CDTOTKVV: chỉ compute khi user nhấn mở lần đầu

@@ -925,3 +925,56 @@ def luu_cdtotkvv(thang_nam: str, file_bytes: bytes) -> KetQuaUpload:
         f"Đã lưu chấm điểm tháng **{thang_nam}** ({mb:.1f} MB)",
         duong_dan,
     )
+
+
+# ── Lưu file đính kèm kết quả nhiệm vụ ───────────────────────────────────────
+
+_EXTS_ATTACHMENT = {
+    ".xlsx", ".xls", ".XLSX", ".XLS",
+    ".pdf", ".PDF",
+    ".docx", ".DOCX", ".doc", ".DOC",
+}
+_MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024   # 5 MB
+
+
+def luu_attachment_nhiem_vu(
+    ten_pgd: str,
+    nv_id: int,
+    ten_file: str,
+    file_bytes: bytes,
+    username: str,
+) -> KetQuaUpload:
+    """
+    Lưu file đính kèm kết quả nhiệm vụ vào pgd_data/{slug}/nhiem_vu_attach/.
+    Cho phép: Excel, PDF, Word (≤ 5 MB).
+    Trả về KetQuaUpload; .duong_dan chứa đường dẫn file đã lưu.
+    """
+    ext = Path(ten_file).suffix
+    if ext not in _EXTS_ATTACHMENT:
+        return KetQuaUpload(
+            False,
+            f"⚠️ Định dạng không hỗ trợ: {ext}. Chấp nhận: Excel, PDF, Word",
+        )
+    if len(file_bytes) > _MAX_ATTACHMENT_BYTES:
+        mb = len(file_bytes) / 1024 / 1024
+        return KetQuaUpload(False, f"⚠️ File quá lớn ({mb:.1f} MB). Tối đa 5 MB.")
+    if len(file_bytes) < 10:
+        return KetQuaUpload(False, "⚠️ File trống hoặc không hợp lệ.")
+
+    try:
+        from data.pgd import pgd_slug
+        slug = pgd_slug(ten_pgd)
+        attach_dir = Path("pgd_data") / slug / "nhiem_vu_attach"
+        attach_dir.mkdir(parents=True, exist_ok=True)
+        safe_name = f"nv{nv_id}_{ten_file}"
+        save_path = attach_dir / safe_name
+        save_path.write_bytes(file_bytes)
+        mb = len(file_bytes) / 1024 / 1024
+        db.ghi_audit(
+            username, "upload_nhiem_vu_attach",
+            f"nv_id={nv_id} · file={ten_file} ({mb:.1f} MB) · pgd={ten_pgd}",
+        )
+        return KetQuaUpload(True, f"✅ Đã lưu file: **{ten_file}** ({mb:.1f} MB)", str(save_path))
+    except Exception as e:  # conv: skip
+        logger.error("luu_attachment_nhiem_vu thất bại nv_id=%s: %s", nv_id, e, exc_info=True)
+        return KetQuaUpload(False, f"❌ Lỗi lưu file: {e}")

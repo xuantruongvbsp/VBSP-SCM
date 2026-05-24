@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## [2026-05-24] — Refactor DGD/CBTD: Fix helpers + Thêm tab Gán CBTD
+- `tabs/tab_cbtd.py` — Fix `_ds_dgd_cua_pgd()` dùng `lay_dgd_cho_pgd()` thay vì `dgd_map`; fix `_ap_cua_dgd()` đọc schema mới (`entry.get("thon", [])`) + backward-compat với list cũ
+- `tabs/tab_quan_ly_dgd.py` — Thêm sub-tab "👤 Gán CBTD" (`_render_gan_cbtd`): chọn PGD → Xã → list ĐGD, selectbox chọn CBTD cho từng ĐGD, lưu ngược vào `cbtd_data[ma_cb]["ds_dgd"]`
+- `tabs/tab_diem_gd_pgd.py` — Thêm sub-tab "👤 Gán CBTD" (`_render_gan_cbtd_pgd`): tương tự CN nhưng PGD cố định theo user, chỉ hiển thị ĐGD/CBTD thuộc PGD của user
+
 ## [2026-05-24] — Refactor DGD module: hardcode DGD_DANH_SACH, bỏ import Excel
 - `config.py` — Thêm `DGD_DANH_SACH` (270 điểm GD, đầy đủ pgd/xa/ten/ngay_gd/gio_gd/dia_diem) + helper `lay_dgd_cho_pgd()` / `lay_dgd_theo_xa()`
 - `data/dgd_helpers.py` — Xóa `parse_excel_import` (và import `BytesIO`); thêm `xa_short()` / `khop_xa_dgd()` để chuẩn hóa tên xã khi khớp với DGD_DANH_SACH

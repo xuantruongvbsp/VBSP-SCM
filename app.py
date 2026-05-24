@@ -72,7 +72,7 @@ def _toi_uu_dtype(df: pd.DataFrame) -> pd.DataFrame:
     """
     NGUONG_CATEGORY = 200
 
-    for col in df.select_dtypes(include="object").columns:
+    for col in df.select_dtypes(include=["object", "string"]).columns:
         try:
             if df[col].nunique(dropna=False) <= NGUONG_CATEGORY:
                 if col.lower().startswith("ngày"):

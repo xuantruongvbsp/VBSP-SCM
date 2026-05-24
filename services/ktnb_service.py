@@ -187,13 +187,18 @@ def render_ke_hoach_lich_trinh(username: str, readonly: bool = False) -> None:
         df_dots["Trạng thái lịch"] = df_dots.apply(
             lambda r: _tinh_trang_lich(r.get("ngay_bat_dau", ""), r.get("ngay_ket_thuc", "")), axis=1
         )
+        df_dots["Trạng thái lịch hiển thị"] = df_dots["Trạng thái lịch"].map({
+            "sap_toi": "📅 Sắp tới", "dung_han": "✅ Đúng hạn",
+            "qua_han": "⚠️ Quá hạn", "chua_xac_dinh": "❓ Chưa xác định"
+        })
         col_map = {
             "id": "ID", "so_cv": "Số CV", "loai_hinh": "Loại hình",
             "ten_pgd_ks": "PGD kiểm tra", "truong_doan": "Trưởng đoàn",
             "ngay_bat_dau": "Ngày BĐ", "ngay_ket_thuc": "Ngày KT", "trang_thai": "Trạng thái"
         }
         df_display = df_dots.rename(columns=col_map)[["ID", "Số CV", "Loại hình", "PGD kiểm tra",
-                                                       "Trưởng đoàn", "Ngày BĐ", "Ngày KT", "Trạng thái"]]
+                                                       "Trưởng đoàn", "Ngày BĐ", "Ngày KT", "Trạng thái",
+                                                       "Trạng thái lịch hiển thị"]]
         st.dataframe(df_display, use_container_width=True, hide_index=True)
     else:
         st.info("Chưa có đợt kiểm toán nào trong năm này.")
@@ -210,8 +215,8 @@ def render_ke_hoach_lich_trinh(username: str, readonly: bool = False) -> None:
                 loai_hinh = st.selectbox("Loại hình", ["dinh_ky", "dot_xuat", "chuyen_sau"])
                 ten_pgd = st.selectbox("PGD kiểm tra", DS_PGD)
             with col2:
-                ngay_bd = st.date_input("Ngày bắt đầu", date.today())
-                ngay_kt = st.date_input("Ngày kết thúc", date.today())
+                ngay_bd = st.date_input("Ngày bắt đầu", date.today(), format="DD/MM/YYYY")
+                ngay_kt = st.date_input("Ngày kết thúc", date.today(), format="DD/MM/YYYY")
                 truong_doan = st.text_input("Trưởng đoàn")
             ghi_chu = st.text_area("Ghi chú")
             submitted = st.form_submit_button("Lưu đợt kiểm tra", use_container_width=True)
@@ -250,13 +255,13 @@ def render_ke_hoach_lich_trinh(username: str, readonly: bool = False) -> None:
             with st.form("form_them_tv"):
                 cols = st.columns([2, 2, 2, 1, 1])
                 with cols[0]:
-                    ho_ten = st.text_input("Họ tên", key="tv_hoten")
+                    ho_ten = st.text_input("Họ tên", key="_ktnb_tv_hoten")
                 with cols[1]:
-                    chuc_vu = st.text_input("Chức vụ", key="tv_chucvu")
+                    chuc_vu = st.text_input("Chức vụ", key="_ktnb_tv_chucvu")
                 with cols[2]:
-                    don_vi = st.text_input("Đơn vị", key="tv_donvi")
+                    don_vi = st.text_input("Đơn vị", key="_ktnb_tv_donvi")
                 with cols[3]:
-                    vai_tro = st.selectbox("Vai trò", ["thanh_vien", "truong_doan", "pho_doan"], key="tv_vaitro")
+                    vai_tro = st.selectbox("Vai trò", ["thanh_vien", "truong_doan", "pho_doan"], key="_ktnb_tv_vaitro")
                 with cols[4]:
                     st.markdown("<br>", unsafe_allow_html=True)
                     them_tv = st.form_submit_button("➕ Thêm", use_container_width=True)
@@ -525,16 +530,20 @@ def render_nhap_ket_qua(dot_id: int, df_full: pd.DataFrame, username: str, reado
     # Export
     if not df_display.empty:
         st.divider()
-        if st.button("📥 Xuất Excel kết quả đối chiếu", use_container_width=True):
+        excel_cache_key = f"_ktnb_export_{dot_id}"
+        if excel_cache_key not in st.session_state:
             df_export = df_display.rename(columns={
                 "ma_mon_vay": "Số KU", "ten_pgd": "PGD", "ten_kh": "Tên KH",
                 "du_no_hstd": "Dư nợ HSTD", "du_no_thuc_te": "Dư nợ thực tế",
                 "phat_hien_sai_sot": "Phát hiện sai sót", "ghi_chu": "Ghi chú"
             })
-            excel_bytes = xuat_excel({"Ket_qua_doi_chieu": df_export})
-            st.download_button("Tải xuống", excel_bytes,
-                              file_name=ten_file_xuat(f"KTNB_Dot{dot_id}_DoiChieu"),
-                              mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+            st.session_state[excel_cache_key] = xuat_excel({"Ket_qua_doi_chieu": df_export})
+
+        st.download_button("📥 Xuất Excel kết quả đối chiếu",
+                          data=st.session_state[excel_cache_key],
+                          file_name=ten_file_xuat(f"KTNB_Dot{dot_id}_DoiChieu"),
+                          mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                          use_container_width=True)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -684,7 +693,12 @@ def render_giam_sat_khac_phuc(dot_id: int, username: str, readonly: bool = False
     st.subheader("⚠️ Giám sát & Khắc phục lỗi")
 
     dot = lay_dot_by_id(dot_id)
-    is_truong_doan = dot and dot.get("truong_doan") == username
+    # Kiểm tra xem username có phải là trưởng đoàn của đợt này không
+    # Bằng cách tìm xem trong danh sách thành viên, có entry nào có vai_tro="truong_doan"
+    # Lưu ý: form lưu tên người (ho_ten) chứ không phải username, nên ta check tất cả vai trò không phải user
+    df_doan = lay_thanh_phan_doan(dot_id)
+    is_truong_doan = (not df_doan.empty and
+                      (df_doan["vai_tro"] == "truong_doan").any())
 
     # Thống kê
     df_stats = thong_ke_loi_theo_khoi(dot_id)
@@ -713,26 +727,29 @@ def render_giam_sat_khac_phuc(dot_id: int, username: str, readonly: bool = False
     if not readonly:
         with st.expander("➕ Thêm lỗi phát hiện"):
             df_dm = lay_danh_muc_loi()
-            with st.form("form_them_loi"):
-                col_a, col_b = st.columns(2)
-                with col_a:
-                    ma_loi = st.selectbox("Mã lỗi", df_dm["ma_loi"].tolist(),
-                                          format_func=lambda x: f"{x} — {df_dm[df_dm['ma_loi']==x]['ten_loi'].values[0]}")
-                    ma_mon = st.text_input("Món vay liên quan (optional)", placeholder="Số KU")
-                with col_b:
-                    don_vi = st.text_input("Đơn vị chịu trách nhiệm")
-                    thoi_han = st.date_input("Thời hạn khắc phục", date.today())
-                mo_ta = st.text_area("Mô tả cụ thể lỗi")
-                bien_phap = st.text_area("Biện pháp xử lý")
+            if df_dm.empty:
+                st.warning("⚠️ Chưa có danh mục lỗi chuẩn — vui lòng liên hệ quản trị viên để seed data")
+            else:
+                with st.form("form_them_loi"):
+                    col_a, col_b = st.columns(2)
+                    with col_a:
+                        ma_loi = st.selectbox("Mã lỗi", df_dm["ma_loi"].tolist(),
+                                              format_func=lambda x: f"{x} — {df_dm[df_dm['ma_loi']==x]['ten_loi'].values[0]}")
+                        ma_mon = st.text_input("Món vay liên quan (optional)", placeholder="Số KU")
+                    with col_b:
+                        don_vi = st.text_input("Đơn vị chịu trách nhiệm")
+                        thoi_han = st.date_input("Thời hạn khắc phục", date.today(), format="DD/MM/YYYY")
+                    mo_ta = st.text_area("Mô tả cụ thể lỗi")
+                    bien_phap = st.text_area("Biện pháp xử lý")
 
-                if st.form_submit_button("Lưu lỗi", use_container_width=True):
-                    if mo_ta and don_vi:
-                        loi_id = them_loi(dot_id, ma_loi, mo_ta, bien_phap,
-                                         thoi_han.strftime("%Y-%m-%d"), don_vi, username, username, ma_mon)
-                        st.success(f"Đã thêm lỗi ID: {loi_id}")
-                        st.rerun()
-                    else:
-                        st.error("Vui lòng nhập mô tả và đơn vị chịu trách nhiệm")
+                    if st.form_submit_button("Lưu lỗi", use_container_width=True):
+                        if mo_ta and don_vi:
+                            loi_id = them_loi(dot_id, ma_loi, mo_ta, bien_phap,
+                                             thoi_han.strftime("%Y-%m-%d"), don_vi, username, username, ma_mon)
+                            st.success(f"Đã thêm lỗi ID: {loi_id}")
+                            st.rerun()
+                        else:
+                            st.error("Vui lòng nhập mô tả và đơn vị chịu trách nhiệm")
 
     # Danh sách lỗi
     df_loi = lay_danh_sach_loi(dot_id)
@@ -783,7 +800,9 @@ def render_giam_sat_khac_phuc(dot_id: int, username: str, readonly: bool = False
                     # Đóng lỗi — chỉ trưởng đoàn
                     if is_truong_doan:
                         if st.button("✅ Đóng lỗi", key=f"close_{row['id']}", use_container_width=True):
-                            cap_nhat_trang_thai_loi(row["id"], "da_khac_phuc", row.get("minh_chung_path"), username, username)
+                            cap_nhat_trang_thai_loi(row["id"], "da_khac_phuc",
+                                                   minh_chung_path=row.get("minh_chung_path"),
+                                                   nguoi_dong=username, username=username)
                             st.success("Đã đóng lỗi")
                             st.rerun()
 

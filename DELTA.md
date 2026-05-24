@@ -4,6 +4,127 @@
 
 ---
 
+## [2026-05-25] Card nền màu cho Tổng hợp Cảnh báo Tín dụng
+
+### CSS classes mới: `.cb-card` + `.cb-{blue|green|red|purple}`
+```
+.cb-grid  — 5-column responsive grid
+.cb-card  — card nền màu, dùng flex column
+.cb-blue  — #dbeafe (Đến hạn)
+.cb-green — #dcfce7 (KHĐ=0, QH=Không, Khoanh=0)
+.cb-red   — #fee2e2 (KHĐ>0, QH=Có, Khoanh>0)
+.cb-purple— #ede9fe (Đã gia hạn)
+```
+
+### 5 chỉ tiêu mới (tên rõ ràng)
+| Cũ | Mới |
+|---|---|
+| Đến hạn (3 tháng) | 🔔 Đến hạn ≤ 3 tháng |
+| 3 tháng không HĐ | ⚠️ ≥ 3 tháng không HĐ |
+| Có nợ quá hạn | 🚨 Có nợ quá hạn |
+| Khoanh khẩn | 📌 Khoanh cần kiểm tra (tổng ≤180d) |
+| Đã gia hạn | 📅 Đã gia hạn (T/N) |
+
+### File changed
+| File | Change |
+|---|---|
+| `tabs/tab_canh_bao_nqh.py` | `_render_tong_hop()`: thay 5 `st.metric()` bằng HTML card |
+
+---
+
+## [2026-05-24] Thiết kế lại bộ lọc Hồ sơ đến hạn — Tổng hợp (Tầng 1 + Tầng 2)
+
+### Kiến trúc filter mới
+```
+Tầng 1 — Bộ lọc chung (trước lazy_tabs)
+  Expander "🔍 Bộ lọc chung" (mặc định đóng)
+    PGD [multiselect]      → filter_chung[PGD]
+    Chương trình [multiselect] → filter_chung[CT]
+  → dt_chung = apply_filters(dt, filter_chung) → dùng cho TẤT CẢ các tab
+
+Tầng 2 — Bộ lọc trong tab (trong mỗi lazy_tab)
+  Expander "🔍 Lọc trong tab" (mặc định đóng)
+    Xã [multiselect]       → tab_filters["xa"]
+    Nguồn vốn [TW/ĐP/Tất cả] → tab_filters["nv"]
+    Dư nợ range [slider]   → tab_filters["no_range"]
+  → df_tab = ap_dung_loc_den_han_tab(df_loc, ...)
+  Key widget: tq_tab_{key_prefix}_{xa|nv|no} → độc lập giữa các tab
+
+Tab mới: 📅 Tùy chỉnh
+  → date_input Từ ngày / Đến ngày → loc_den_han với khoảng tùy chọn
+```
+
+### Files changed
+| File | Change |
+|---|---|
+| `tabs/tab_tongquan.py` | Refactor ~290 dòng section đến hạn. `filter_values` → `filter_chung` + `tab_filters`. Tầng 2 filter trong mỗi tab |
+| `services/tongquan_service.py` | Thêm `ap_dung_loc_den_han_tab()` |
+
+### Performance impact
+| Thay đổi | Trước | Sau |
+|---|---|---|
+| Filter Xã gây rerun | Cả 4 tab | Chỉ tab hiện tại |
+| Số tab | 4 (1T/3T/6T/TN) | 5 (+Tùy chỉnh) |
+| Chiều lọc | 3 (PGD/CT/Xã) | 5 (PGD/CT/Xã/NV/Dư nợ range) |
+
+### API mới: ap_dung_loc_den_han_tab()
+```python
+def ap_dung_loc_den_han_tab(
+    df, *, cot_xa, cot_nv, loc_xa, loc_nv, cot_tdn, range_no_trieu
+) -> pd.DataFrame:
+    # Lọc Xã theo multiselect
+    # Lọc Nguồn vốn (1=TW, 2=ĐP)
+    # Lọc Dư nợ theo range (triệu đồng → nhân 1e6)
+```
+
+### API thay đổi: _bang_den_han()
+```python
+def _bang_den_han(df_loc, label, key_prefix, tab_filters=None):
+    # tab_filters: dict từ Tầng 2 filter
+    # Dùng filter_chung + tab_filters để quyết định co_loc (Excel export)
+    # PDF: truyền filter_chung.get(PGD), filter_chung.get(CT), tab_filters.get("xa")
+```
+
+---
+
+## [2026-05-24] Tối ưu cold start tầng 1: lazy import + skip NQ11/GQVL
+
+### Profiled bottlenecks
+| Module | Import time |
+|---|---|
+| alert_center | 18.0s |
+| widgets.status_widget | 25.8s |
+| **TOTAL top-level imports** | **43.8s** |
+
+### Changes
+| File | Change | Impact |
+|---|---|---|
+| `app.py` dòng 59-60 | Removed top-level imports of `render_alert_sidebar` + `render_status_compact` | -44s cold start |
+| `app.py` dòng ~300, ~314 | Lazy import inside `with st.sidebar:` block at point of use | Only pay import cost when sidebar renders |
+| `app.py` dòng ~456, ~486 | Skip NQ11/GQVL load when `ws_hien_tai == "executive"` | -2-3s for executive users |
+
+**Pattern**: top-level imports of heavy modules (alert_center, status_widget) run on every Streamlit rerun even when not used. Move to lazy import at point of use.
+
+## [2026-05-24] Optimize cold start: bỏ object→category + DuckDB full scan
+
+### Profiling measured bottlenecks
+| Metric | Value |
+|---|---|
+| Parquet file | 29.7 MB |
+| Data | 349,398 rows × 174 cols (163 object) |
+| pd.read_parquet | 4.7s |
+| DuckDB SELECT * → Arrow → pandas | 8.3s |
+| _toi_uu_dtype(): nunique() × 163 cols | ~4s |
+| _toi_uu_dtype(): astype("category") | ~2s |
+| RAM after load | 738 MB (25× parquet size) |
+
+### Changes
+| File | Change | Impact |
+|---|---|---|
+| `app.py:_toi_uu_dtype()` | Removed object→category conversion loop (~25 lines) | -6s cold start, eliminates "category type does not support sum operations" bugs |
+| `app.py:_load_hstd()` | Full scan (no WHERE) uses `pd.read_parquet()` instead of DuckDB; DuckDB kept for filtered queries | -3.5s for full scan |
+| Total | | **~10s faster cold start** |
+
 ## [2026-05-24] Fix 13 lỗi Tab Kiểm toán Nội bộ — Phase 2 (Sonnet Review)
 
 | Fix | File | Mức độ | Chi tiết |

@@ -1,5 +1,99 @@
 # CHANGELOG
 
+## [2026-05-25] — Fix ngưỡng khoanh sắp hết hạn: 30d → 120d (đồng bộ CHANGELOG 23/05)
+- `alert_center.py` dòng 226-227 — Sửa ngưỡng `khan`: `con_lai <= 30` → `con_lai <= 120`; `canh_bao`: `(>30, <=180)` → `(>120, <=180)` — thay đổi này đã ghi trong CHANGELOG 23/05 nhưng chưa apply vào code
+- `tabs/tab_canh_bao_nqh.py` — Cập nhật subtitle card: "X khẩn (≤30d)" → "X phải KT (≤120d) · Y theo dõi (121-180d)"
+
+## [2026-05-25] — Fix card Khoanh cần kiểm tra trong Cảnh báo NQH
+- `tabs/tab_canh_bao_nqh.py` dòng ~255-280 — Đổi metric chính từ `so_khan` (≤30d) sang `so_khan + so_cb` (tổng cần KT ≤180d); đổi title "Khoanh hết hạn ≤ 30d" → "Khoanh cần kiểm tra"; đổi subtitle "X cảnh báo (≤ 120d)" → "X khẩn (≤30d) · Y theo dõi (≤180d)"; fix màu card đỏ khi tổng > 0 thay vì chỉ khi so_khan > 0; fix nhãn "≤ 120d" → "≤180d" cho đúng logic alert_center.py
+
+## [2026-05-25] — Fix DuplicateElementKey trong render_export_ui (So sánh kỳ)
+- `tabs/tab_so_sanh_ky/_export.py` dòng ~230 — Thêm tham số `key_prefix: str = "ssk"` vào `render_export_ui`; thay 6 hardcoded key `ssk_*` bằng `f"{key_prefix}_*"`; phân biệt session state cache theo prefix
+- `tabs/tab_so_sanh_ky/render_moc_nam.py` — Thêm `key_prefix` vào `_render_export_section`; 4 section HSTD/NQ11/GQVL/CDT dùng key riêng (`{key_prefix}hstd`, `{key_prefix}nq11`, `{key_prefix}gqvl`, `{key_prefix}cdt`)
+- `tabs/tab_so_sanh_ky/render_2_ky.py` — Truyền `key_prefix="2ky"` vào `render_export_ui`
+
+## [2026-05-25] — Tăng cỡ chữ và độ tương phản card KPI Cảnh báo NQH
+- `tabs/tab_canh_bao_nqh.py` dòng ~237-250 — Tăng font value 1.8→2.4rem, label 0.75→0.9rem, sub 0.73→0.82rem; bỏ uppercase/letter-spacing; tăng padding/min-height; màu chữ đậm hơn cho 4 màu card
+
+## [2026-05-25] — Card nền màu cho Tổng hợp Cảnh báo Tín dụng + đổi tên chỉ tiêu rõ ràng
+- `tabs/tab_canh_bao_nqh.py` dòng ~236-252 — Thay 5 `st.metric()` bằng HTML card nền màu (`.cb-card` + `.cb-blue/green/red/purple`) cho sub-tab "Tổng hợp"
+- Đổi tên chỉ tiêu rõ ràng: "Khoanh khẩn" → "Khoanh hết hạn ≤ 30d", "Đến hạn (3 tháng)" → "Đến hạn ≤ 3 tháng", "3 tháng không HĐ" → "≥ 3 tháng không HĐ", "Đã gia hạn" → "Đã gia hạn (T/N)"
+- 5 card: 🔵 Đến hạn, 🔴/🟢 3 tháng KHĐ (đỏ nếu có), 🔴/🟢 Có nợ QH, 🔴/🟢 Khoanh hết hạn, 🟣 Đã gia hạn
+- Responsive: 5 col → 3 col → 2 col theo màn hình
+
+## [2026-05-25] — Fix lỗi Categorical "values should be unique" tab So sánh kỳ
+- `services/so_sanh_ky_service.py` `group_bien_dong()` — convert cột dim Categorical → object trước và sau groupby để tránh lỗi merge CategoricalIndex duplicate categories từ HSTD parquet
+- `services/so_sanh_ky_service.py` `agg_theo_pgd()` — convert COT_TEN_PGD Categorical → object trước groupby; đảm bảo object sau groupby trước khi concat hàng tổng
+
+## [2026-05-25] — Tầng 2 tab Đến hạn: gom 3 widget thành 1 filter_bar
+- `tabs/tab_tongquan.py` dòng ~1101 — hàm `_bang_den_han` thay `st.expander` + 3 widget rời (multiselect Xã, selectbox Nguồn vốn, slider Dư nợ) bằng 1 `filter_bar` duy nhất với type multiselect/multiselect/range
+- `services/tongquan_service.py` dòng ~328 — mở rộng `loc_nv: int | None` → `int | list[int] | None`, thêm nhánh `isinstance(list)` để hỗ trợ multiselect Nguồn vốn chọn nhiều
+
+## [2026-05-25] — Lịch công tác KHNV: luôn hiện lịch bàn + dark mode + badge hôm nay
+- `tabs/tab_khnv_noi_bo.py` dòng ~990 — bỏ early return khi ds rỗng, lịch bàn luôn hiện ngay cả khi chưa có sự kiện
+- `tabs/tab_khnv_noi_bo.py` `_html_lich_ban()` — thay màu hardcode `#ffffff`/`#f8fafc` bằng `transparent`/`rgba()` tương thích dark mode; số hôm nay hiển thị dạng badge tròn vàng như app lịch điện thoại
+- `tabs/tab_khnv_noi_bo.py` list view — `#e8f4fd` → `rgba(59,130,246,0.08)` cho tuần hiện tại
+- `tabs/tab_khnv_noi_bo.py` edit form — thêm `format="DD/MM/YYYY"` cho st.date_input
+
+## [2026-05-25] — Fix 2 lỗi tab Thông tin chung sau review
+- `tabs/tab_tongquan.py` dòng 12 — thêm `timedelta` vào import (`NameError` khi mở tab "Tùy chỉnh")
+- `tabs/tab_tongquan.py` dòng 1139 — slider dư nợ ở default range không bị tính là "có lọc" (co_loc_tab luôn True)
+
+## [2026-05-24] — Fix root cause So sánh kỳ: cột dư nợ string → agg/groupby trả string 516818 ký tự
+- `services/so_sanh_ky_service.py` `agg_mot_pgd()` — thêm helper `_num_sum()` dùng `pd.to_numeric()` trước sum, tránh string concatenation khi cột là object
+- `services/so_sanh_ky_service.py` `agg_theo_pgd()` — convert numeric trước groupby
+- `services/so_sanh_ky_service.py` `agg_theo_dvut()` — convert numeric trước groupby (cùng pattern với agg_theo_pgd)
+- `services/so_sanh_ky_service.py` `group_bien_dong()` — convert numeric trước groupby cho COT_TONG_DU_NO và COT_DU_NO_QH
+
+## [2026-05-24] — Thiết kế lại bộ lọc Hồ sơ đến hạn — Tổng hợp: Tầng 1 + Tầng 2 + tab Tùy chỉnh
+- `tabs/tab_tongquan.py` dòng ~1017-1306 — Refactor toàn bộ section "🔔 Hồ sơ đến hạn — Tổng hợp":
+  - Tầng 1 (Bộ lọc chung): expander với PGD + Chương trình (multiselect) — hiệu lực cho tất cả tab
+  - Tầng 2 (Lọc trong tab): expander trong mỗi tab — Xã (multiselect), Nguồn vốn (TW/ĐP), Dư nợ range slider — key suffix theo tab để độc lập
+  - Tab mới "📅 Tùy chỉnh": chọn khoảng ngày linh hoạt bằng date_input
+  - `_bang_den_han()` nhận thêm tham số `tab_filters` — merge filter chung + filter riêng trước khi xuất Excel/PDF
+  - `filter_values` cũ → thay bằng `filter_chung` + `tab_filters`
+- `services/tongquan_service.py` dòng ~326-350 — Thêm `ap_dung_loc_den_han_tab()`: filter theo Xã, Nguồn vốn, khoảng dư nợ
+- Giảm rerun: thay đổi filter Tầng 2 chỉ rerun tab hiện tại, không ảnh hưởng các tab khác
+
+## [2026-05-24] — Fix lỗi So sánh kỳ: dtype string sau merge.fillna() không convert numeric → subtract crash
+- `tabs/tab_so_sanh_ky/render_2_ky.py` dòng 150-153 — Hàm `_render_bang_pgd()`: thêm loop `pd.to_numeric()` trước subtract
+- `tabs/tab_so_sanh_ky/render_moc_nam.py` dòng 303-306 — Tab "🏢 Theo PGD" (merge agg_theo_pgd): thêm loop `pd.to_numeric()` trước subtract
+- `tabs/tab_so_sanh_ky/render_moc_nam.py` dòng 352-355 — Tab "📋 Theo CT": thêm loop `pd.to_numeric()` trước subtract
+- `tabs/tab_so_sanh_ky/render_moc_nam.py` dòng 376-379 — Tab "📍 Theo Xã": thêm loop `pd.to_numeric()` trước subtract
+- `tabs/tab_so_sanh_ky/render_moc_nam.py` dòng 494-497 — Sheet export PGD: thêm loop `pd.to_numeric()` trước subtract
+- Nguyên nhân: `fillna(0)` không chuyển dtype object/string → numeric, chỉ thay NaN → 0. Cần explicit conversion trước phép tính
+
+## [2026-05-24] — Tối ưu cold start tầng 1: lazy import alert_center + status_widget, skip NQ11/GQVL cho executive
+- `app.py` dòng 59-60 — Xóa top-level import `render_alert_sidebar` (18s) và `render_status_compact` (26s); chuyển thành lazy import bên trong `with st.sidebar:` block
+- `app.py` dòng ~300-314 — Thêm `from alert_center import render_alert_sidebar` và `from widgets.status_widget import render_status_compact` + `from auth import la_phan_he_pgd` vào đúng nơi dùng trong sidebar
+- `app.py` dòng ~456, ~486 — Skip NQ11/GQVL load khi `ws_hien_tai == "executive"` (BGĐ không cần NQ11/GQVL)
+- Profiled: alert_center import = 18s, status_widget import = 26s → **cắt ~44s cold start**, vài s mỗi rerun
+
+## [2026-05-24] — Hoàn thiện báo cáo Quản lý Công việc & Nhiệm vụ
+- `services/bc_tongquan_service.py` — File mới: logic lọc, tính KPI, tạo ma trận, xuất Excel/PDF báo cáo
+- `tabs/bc_tong_hop.py` — File mới: render UI báo cáo với filter nâng cao, 4 KPI metrics, lazy tabs (tổng hợp/phân tích/so sánh), xuất 3 định dạng
+- `tabs/tab_quan_ly_bc.py` dòng 8, 11–18 — Thêm sub-tab "📊 Báo cáo tổng hợp" vào wrapper, mount `bc_tong_hop.render()`
+
+## [2026-05-24] — Optimize cold start: bỏ object→category + DuckDB full scan → pd.read_parquet
+- `app.py` dòng 65–88 — `_toi_uu_dtype()`: bỏ vòng lặp object→category (nunique() 163 cột × 349K dòng = ~6s, từng gây bug "category type does not support sum operations"); giữ float32/int downcast
+- `app.py` dòng 90–132 — `_load_hstd()`: full scan (không WHERE) dùng `pd.read_parquet(engine='pyarrow')` (4.7s) thay vì DuckDB SELECT * (8.3s); vẫn giữ DuckDB khi có filter ten_pgd/active_only
+- Profiling: 29.7MB parquet → 738MB RAM pandas (25×), 163/174 cột là object, nunique() trên 163 cột mất ~4s
+
+## [2026-05-24] — Fix circular import KeyError services
+- `data/hstd.py` dòng 9 — Chuyển `from services.data_quality import kiem_tra_chat_luong` từ top-level thành lazy import bên trong `doc_file_nq11()` và `doc_file_gqvl()` để phá vòng circular: `services/__init__` → `upload_service` → `data.hstd` → `services.data_quality` → KeyError
+
+## [2026-05-24] — Fix sidebar alert gây lag mọi tab
+- `alert_center.py` dòng 121 — Tăng `_KHD_CACHE_TTL` từ 300s → 1800s (30 phút)
+- `alert_center.py` dòng 179 — Thay `tong_hop_khong_hd()` → `tong_hop_khong_hd_cached()` dùng `@st.cache_data(ttl=7200)` shared across sessions + lọc PGD sau cache thay vì trước
+
+## [2026-05-24] — Fix tab Thông tin chung load chậm
+- `tabs/tab_tongquan.py` dòng 96, 122 — Tăng TTL cache `_cache_co_cau_ct` và `_cache_tqpgd_extended` từ 120s → 3600s (tránh recompute mỗi 2 phút trên 292k rows)
+- `services/tongquan_service.py` dòng 257–283 — `tinh_tqpgd_extended()`: bỏ `.copy()` 292k rows, skip `pd.to_datetime()` nếu đã là datetime64, thay `.apply(lambda stack)` bằng vectorized `.sum(axis=1)` + groupby
+
+## [2026-05-24] — Fix tab Tiến Độ Nộp load chậm do GSheet connection
+- `tabs/tab_tien_do_nop.py` dòng 36 — Thêm `@st.cache_resource` cho `_ket_noi_gsheet()`: chỉ tạo OAuth connection 1 lần thay vì mỗi 5 phút (tiết kiệm 4-5s mỗi lần refresh)
+- `tabs/tab_tien_do_nop.py` dòng 50, 100 — Fix `e` undefined trong 2 `except` block
+
 ## [2026-05-24] — Fix pandas warning + optimize watchdog
 - `app.py` dòng 75 — Sửa `select_dtypes(include="object")` → `include=["object", "string"]` (pandas 2.x deprecated)
 - `.streamlit/config.toml` — Thêm `logs` vào `folderWatchBlacklist` tránh rerun khi log file thay đổi

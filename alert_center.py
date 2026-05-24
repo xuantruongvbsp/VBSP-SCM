@@ -118,7 +118,7 @@ def _xoa_da_doc_cu(active_ids: set[str]) -> None:
 NGUONG_NGAY_UPLOAD_CU = 3   # cảnh báo nếu file chưa merge quá 3 ngày
 _NGUONG_UPLOAD_KHAN   = 7   # 🔴 nếu trễ ≥ 7 ngày
 
-_KHD_CACHE_TTL = 300  # 5 phút
+_KHD_CACHE_TTL = 1800  # 30 phút
 
 
 def _kiem_tra_upload_tre() -> list[AlertItem]:
@@ -176,12 +176,14 @@ def _kiem_tra_khong_hoat_dong(df_full, pgd_filter: str | None = None) -> list[Al
         return cached["data"]
 
     try:
-        from data.hstd import tong_hop_khong_hd
-        from config import COT_TEN_PGD as _COT_TEN_PGD
-        df_loc = df_full
-        if pgd_filter and _COT_TEN_PGD in df_full.columns:
-            df_loc = df_full[df_full[_COT_TEN_PGD] == pgd_filter]
-        tong_hop = tong_hop_khong_hd(df_loc, nhom_theo=_COT_TEN_PGD)
+        import os
+        from data.hstd import tong_hop_khong_hd_cached
+        from config import COT_TEN_PGD as _COT_TEN_PGD, CACHE_HSTD
+        _ts = os.path.getmtime(CACHE_HSTD) if os.path.exists(CACHE_HSTD) else 0.0
+        # Cache toàn CN, filter sau — tránh tạo nhiều bản cache theo PGD
+        tong_hop = tong_hop_khong_hd_cached(df_full, nhom_theo=_COT_TEN_PGD, ts=_ts)
+        if pgd_filter and _COT_TEN_PGD in tong_hop.columns:
+            tong_hop = tong_hop[tong_hop[_COT_TEN_PGD] == pgd_filter]
         if tong_hop.empty:
             result: list[AlertItem] = []
         else:
@@ -221,8 +223,8 @@ def canh_bao_no_khoanh_sap_het_han(df_kh) -> dict:
     today = pd.Timestamp(date.today())
     df['con_lai'] = (df['_ngay_het'] - today).dt.days
 
-    khan = df[df['con_lai'] <= 30]
-    canh_bao = df[(df['con_lai'] > 30) & (df['con_lai'] <= 180)]
+    khan = df[df['con_lai'] <= 120]
+    canh_bao = df[(df['con_lai'] > 120) & (df['con_lai'] <= 180)]
 
     cols = [COT_SO_KU, COT_TEN_PGD, COT_TEN_XA, COT_TEN_KH,
             COT_DU_NO_KHOANH, COT_NGAY_HH_KHOANH, COT_TEN_TO_TRUONG, 'con_lai']

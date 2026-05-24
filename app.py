@@ -56,42 +56,22 @@ import auth
 from auth import LOGO_NHCSXH_B64 as LOGO_B64, normalize_role
 import workspaces
 import db
-from widgets.status_widget import render_status_compact
-from alert_center import render_alert_sidebar
 from utils_theme import init_theme, get_theme_css
 from state_manager import SCMStateManager
 
 
 def _toi_uu_dtype(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Giảm working memory của DataFrame sau khi load:
-      - string cột ≤ 200 giá trị duy nhất → category  (10–20× nhỏ hơn)
-      - float64 → float32 cho cột số thực              (~50% nhỏ hơn)
-      - int64   → int32/int16 nếu giá trị vừa           (~50% nhỏ hơn)
-    Không đụng cột tiền tệ lớn (>1e9) để tránh overflow float32.
+    Reduce DataFrame memory after load:
+      - float64 -> float32 for numeric columns              (~50% smaller)
+      - int64   -> int32/int16 if values fit                (~50% smaller)
+    Keep float64 for large monetary columns (>1e9) to avoid overflow.
+    No category conversion for object columns: nunique() on 163 cols x 349K rows
+    costs ~6s and causes "category type does not support sum operations" bugs.
     """
-    NGUONG_CATEGORY = 200
-
-    for col in df.select_dtypes(include=["object", "string"]).columns:
-        try:
-            if df[col].nunique(dropna=False) <= NGUONG_CATEGORY:
-                if col.lower().startswith("ngày"):
-                    continue
-                vals = df[col].dropna()
-                if len(vals) > 0:
-                    numeric_vals = pd.to_numeric(vals, errors="coerce")
-                    ty_le_so = numeric_vals.notna().sum() / len(vals)
-                    if ty_le_so > 0.8:
-                        df[col] = pd.to_numeric(df[col], errors="coerce")
-                        continue
-                df[col] = df[col].astype("category")
-        except Exception:
-            pass
-
     for col in df.select_dtypes(include="float64").columns:
         try:
             col_max = df[col].abs().max(skipna=True)
-            # Giữ float64 cho cột tiền tệ lớn (VND) để không mất độ chính xác
             if pd.isna(col_max) or col_max < 1e9:
                 df[col] = df[col].astype("float32")
         except Exception:
@@ -125,7 +105,6 @@ def _load_hstd(
     - ten_pgd=<str>, active_only=False → PGD role: lọc theo PGD
     - ten_pgd=<str>, active_only=True  → PGD role + active filter
     """
-    import duckdb
 
     sql = f'SELECT * FROM "{cache_path}"'
     where_clauses = []
@@ -140,9 +119,12 @@ def _load_hstd(
         sql += ' WHERE ' + ' AND '.join(where_clauses)
 
     try:
-        # self_destruct=True: Arrow giải phóng từng cột khi pandas nhận → peak thấp hơn
-        arrow_tbl = duckdb.query(sql).to_arrow_table()
-        df = arrow_tbl.to_pandas(self_destruct=True)
+        if where_clauses:
+            import duckdb
+            arrow_tbl = duckdb.query(sql).to_arrow_table()
+            df = arrow_tbl.to_pandas(self_destruct=True)
+        else:
+            df = pd.read_parquet(cache_path, engine='pyarrow')
         return _toi_uu_dtype(df)
     except Exception:
         return pd.DataFrame()
@@ -315,6 +297,8 @@ def main():
         st.divider()
         # Widget trạng thái nguồn dữ liệu ưu tiên PGD
         try:
+            from widgets.status_widget import render_status_compact
+            from auth import la_phan_he_pgd
             render_status_compact(pgd_user if la_phan_he_pgd(role) else None)
         except Exception as e:  # conv: skip
             # Fallback về hiển thị file cũ nếu có lỗi
@@ -329,6 +313,7 @@ def main():
                     icon = "✅" if ngay.date() >= date.today() else "⚠️"
                     st.caption(f"{icon} `{ten}` {mb:.1f}MB")
 
+        from alert_center import render_alert_sidebar
         render_alert_sidebar(
             df_full=st.session_state.get("df_full"),
             role=role,
@@ -471,7 +456,7 @@ def main():
                 else:
                     df_nq11 = doc_nq11_toan_cn_pgd()
 
-            if df_nq11 is None and os.path.exists(FILE_PATH_NQ11):
+            if df_nq11 is None and os.path.exists(FILE_PATH_NQ11) and ws_hien_tai != "executive":
                 if not os.path.exists(CACHE_NQ11):
                     doc_file_nq11(FILE_PATH_NQ11, ts_file(FILE_PATH_NQ11))
                 if la_phan_he_pgd(role) and pgd_user:
@@ -501,7 +486,7 @@ def main():
                     df_nq11 = _load_nq11(CACHE_NQ11, _nq11_ts)
 
             df_sk_gqvl = None
-            if os.path.exists(FILE_PATH_SK_GQVL):
+            if os.path.exists(FILE_PATH_SK_GQVL) and ws_hien_tai != "executive":
                 df_sk_gqvl = doc_file_sk_gqvl(FILE_PATH_SK_GQVL, _gqvl_ts)
 
             _map_cache_ts = _hstd_ts

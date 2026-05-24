@@ -9,7 +9,7 @@ logger = get_logger(__name__)
 import logging
 import os
 from io import BytesIO
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from typing import TYPE_CHECKING
 
 import streamlit as st
@@ -93,7 +93,7 @@ def _cache_heatmap_pgd(
     )
 
 
-@st.cache_data(ttl=120, show_spinner=False)
+@st.cache_data(ttl=3600, show_spinner=False)
 def _cache_co_cau_ct(
     _df: pd.DataFrame,
     ts: float,
@@ -119,7 +119,7 @@ def _cache_co_cau_ct(
     )
 
 
-@st.cache_data(ttl=120, show_spinner=False)
+@st.cache_data(ttl=3600, show_spinner=False)
 def _cache_tqpgd_extended(
     _df: pd.DataFrame,
     ts: float,
@@ -1015,7 +1015,30 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                 cuoi_nam = pd.Timestamp(hn.year, 12, 31)
 
 
-                # ── Bộ lọc dữ liệu (sử dụng filter_bar component) ──
+                # ── Tầng 1: Bộ lọc chung (PGD + Chương trình) ──
+                filter_chung = {}
+                with st.expander("🔍 Bộ lọc chung", expanded=False):
+                    filters_chung_cfg = []
+                    if COT_TEN_PGD in dt.columns:
+                        filters_chung_cfg.append({
+                            "field": COT_TEN_PGD,
+                            "label": "PGD",
+                            "type": "multiselect",
+                        })
+                    if COT_TEN_CT in dt.columns:
+                        filters_chung_cfg.append({
+                            "field": COT_TEN_CT,
+                            "label": "Chương trình",
+                            "type": "multiselect",
+                        })
+                    filter_chung = filter_bar(dt, filters_chung_cfg, key_prefix="tq_dh_chung")
+
+                cot_xa = next((c for c in [COT_TEN_XA, "Tên xã"] if c in dt.columns), None)
+
+                dt_chung = apply_filters(dt, filter_chung)
+                dt_chung = _tqsvc.loc_du_no_duong(dt_chung, COT_TONG_DU_NO)
+
+                # ── Nhóm tổng hợp ──
                 _c0, _c1 = st.columns([2, 10])
                 with _c0:
                     nhom_chon = st.selectbox(
@@ -1031,45 +1054,15 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                 }
                 nhom_col = NHOM_COT[nhom_chon]
 
-                # Xác định cột Xã (có thể là alias)
-                cot_xa = next((c for c in [COT_TEN_XA, "Tên xã"] if c in dt.columns), None)
-
-                # Filter bar cho PGD, CT, Xã
-                filters_cfg = []
-                if COT_TEN_PGD in dt.columns:
-                    filters_cfg.append({
-                        "field": COT_TEN_PGD,
-                        "label": "Lọc PGD",
-                        "type": "multiselect",
-                    })
-                if COT_TEN_CT in dt.columns:
-                    filters_cfg.append({
-                        "field": COT_TEN_CT,
-                        "label": "Lọc CT",
-                        "type": "multiselect",
-                    })
-                if cot_xa:
-                    filters_cfg.append({
-                        "field": cot_xa,
-                        "label": "Lọc Xã",
-                        "type": "multiselect",
-                    })
-
-                filter_values = filter_bar(dt, filters_cfg, key_prefix="tq_dh")
-
-                # Áp dụng bộ lọc vào dt trước khi lọc theo mốc thời gian
-                dt_loc = apply_filters(dt, filter_values)
-                dt_loc = _tqsvc.loc_du_no_duong(dt_loc, COT_TONG_DU_NO)
-
                 MOC = {
                     "1 tháng":   hn + pd.Timedelta(days=30),
                     "3 tháng":   hn + pd.Timedelta(days=90),
                     "6 tháng":   hn + pd.Timedelta(days=180),
                     "Trong năm": cuoi_nam,
+                    "Tùy chỉnh": None,
                 }
 
                 def _build_pdf_den_han(df_loc, label, loc_pgd, loc_ct, loc_xa, username, key_prefix):
-                    """Build PDF bytes: luôn groupby [PGD, Xã, Chương trình], bộ lọc chỉ thu hẹp input."""
                     COLS_GROUP = [COT_TEN_PGD, COT_TEN_XA, COT_TEN_CT]
                     cols_ok = [c for c in COLS_GROUP if c in df_loc.columns]
 
@@ -1105,7 +1098,65 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                         prefix_file=f"HoSoDenHan_{key_prefix}",
                     )
 
-                def _bang_den_han(df_loc, label, key_prefix):
+                def _bang_den_han(df_loc, label, key_prefix, tab_filters=None):
+                    if tab_filters is None:
+                        tab_filters = {}
+
+                    # Tạo cột tạm để filter_bar hiển thị đẹp
+                    _df_bar = df_loc.copy()
+                    _nguon_von_map = {1: "TW", 2: "ĐP", 1.0: "TW", 2.0: "ĐP"}
+                    if COT_NGUON_VON in _df_bar.columns:
+                        _df_bar["_nv_label"] = (
+                            pd.to_numeric(_df_bar[COT_NGUON_VON], errors="coerce")
+                            .map(_nguon_von_map)
+                            .fillna("Khác")
+                        )
+                    if COT_TONG_DU_NO in _df_bar.columns:
+                        _df_bar["_no_trieu"] = (
+                            pd.to_numeric(_df_bar[COT_TONG_DU_NO], errors="coerce") / 1_000_000
+                        ).round(1)
+
+                    # 1 filter_bar gộp 3 điều kiện: Xã + Nguồn vốn + Dư nợ
+                    _filters_cfg = []
+                    if cot_xa and cot_xa in _df_bar.columns:
+                        _filters_cfg.append({"field": cot_xa, "label": "Xã", "type": "multiselect"})
+                    if "_nv_label" in _df_bar.columns:
+                        _filters_cfg.append({"field": "_nv_label", "label": "Nguồn vốn", "type": "multiselect"})
+                    if "_no_trieu" in _df_bar.columns and not _df_bar.empty:
+                        _filters_cfg.append({"field": "_no_trieu", "label": "Dư nợ (triệu đồng)", "type": "range"})
+
+                    filter_result = filter_bar(_df_bar, _filters_cfg, key_prefix=f"tq_tab_{key_prefix}") if _filters_cfg else {}
+
+                    # Trích xuất và chuẩn hoá kết quả
+                    xa_filter = filter_result.get(cot_xa) if cot_xa else None
+                    nv_labels = filter_result.get("_nv_label")
+                    no_trieu_range = filter_result.get("_no_trieu")
+
+                    nv_filter = None
+                    if nv_labels:
+                        _nv_vals = []
+                        if "TW" in nv_labels:
+                            _nv_vals.append(1)
+                        if "ĐP" in nv_labels:
+                            _nv_vals.append(2)
+                        if _nv_vals:
+                            nv_filter = _nv_vals if len(_nv_vals) > 1 else _nv_vals[0]
+
+                    # Lưu vào tab_filters để co_loc_tab kiểm tra
+                    tab_filters["xa"] = xa_filter
+                    tab_filters["nv"] = nv_filter
+                    tab_filters["no_range"] = no_trieu_range
+
+                    df_loc = _tqsvc.ap_dung_loc_den_han_tab(
+                        df_loc,
+                        cot_xa=cot_xa,
+                        cot_nv=COT_NGUON_VON,
+                        loc_xa=xa_filter,
+                        loc_nv=nv_filter,
+                        cot_tdn=COT_TONG_DU_NO,
+                        range_no_trieu=no_trieu_range,
+                    )
+
                     tg = None
                     if df_loc.empty:
                         st.success(f"✅ Không có món vay đến hạn {label}")
@@ -1126,7 +1177,6 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                     c2.metric("Số khách hàng", fmt_so(tong_kh))
                     c3.metric("Tổng dư nợ", fmt(tong_no))
 
-                    # Biểu đồ phân bổ theo tháng
                     df_thang = _tqsvc.tong_hop_den_han_theo_thang(
                         df_loc,
                         cot_ngay_dh=COT_NGAY_DH,
@@ -1226,12 +1276,13 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                             st.divider()
                             col_ex, col_pdf = st.columns(2)
 
-                            # PDF: luôn groupby [PGD, Xã, Chương trình] — bộ lọc chỉ thu hẹp input
                             pdf_key = f"den_han_{key_prefix}_pdf"
 
+                            co_loc_chung = any(v for v in filter_chung.values() if v)
+                            co_loc_tab = bool(tab_filters.get("xa") or tab_filters.get("nv") or tab_filters.get("no_range"))
+                            co_loc = co_loc_chung or co_loc_tab
+
                             with col_ex:
-                                # Excel: giữ logic hiện tại
-                                co_loc = any(filter_values.values())
                                 if co_loc:
                                     df_excel = tg[[nhom_col, "_mon", "_kh", "_no"]].rename(columns={
                                         nhom_col: nhom_chon,
@@ -1266,9 +1317,9 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                                     with st.spinner("⏳ Đang tạo PDF..."):
                                         pdf_bytes = _build_pdf_den_han(
                                             df_loc, label,
-                                            filter_values.get(COT_TEN_PGD),
-                                            filter_values.get(COT_TEN_CT),
-                                            filter_values.get(cot_xa),
+                                            filter_chung.get(COT_TEN_PGD),
+                                            filter_chung.get(COT_TEN_CT),
+                                            tab_filters.get("xa"),
                                             username, key_prefix
                                         )
                                     state.downloads.set(
@@ -1277,7 +1328,6 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                                         f"HoSoDenHan_{key_prefix}_{datetime.now().strftime('%d%m%Y_%H%M')}.pdf",
                                     )
 
-                            # Download button đặt NGOÀI block columns để tránh duplicate widget
                             state = SCMStateManager()
                             if state.downloads.has(pdf_key):
                                 if st.download_button(
@@ -1292,19 +1342,47 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                     else:
                         st.caption(f"⚠️ Không có cột '{nhom_chon}' trong dữ liệu")
 
+                def _render_tab_tuy_chinh(key_prefix):
+                    col_tu, col_den = st.columns(2)
+                    with col_tu:
+                        tu_ngay = st.date_input(
+                            "Từ ngày", value=date.today(),
+                            format="DD/MM/YYYY",
+                            key=f"tq_tab_{key_prefix}_tu",
+                        )
+                    with col_den:
+                        den_ngay = st.date_input(
+                            "Đến ngày", value=date.today() + timedelta(days=90),
+                            format="DD/MM/YYYY",
+                            key=f"tq_tab_{key_prefix}_den",
+                        )
+                    df_tab = _tqsvc.loc_den_han(
+                        dt_chung,
+                        cot_ngay_dh=COT_NGAY_DH,
+                        tu_ngay=pd.Timestamp(tu_ngay),
+                        den_ngay=pd.Timestamp(den_ngay),
+                    )
+                    _bang_den_han(df_tab, "Tùy chỉnh", key_prefix)
+
                 _moc_labels = list(MOC.keys())
                 _moc_values = list(MOC.values())
-                lazy_tabs(
-                    [f"📅 {lbl}" for lbl in _moc_labels],
-                    [
-                        lambda _den=den, _lbl=lbl, _key=lbl.replace(" ", "_"): _bang_den_han(
-                            _tqsvc.loc_den_han(dt_loc, cot_ngay_dh=COT_NGAY_DH, tu_ngay=hn, den_ngay=_den),
+
+                def _make_renderer(lbl, den):
+                    key = lbl.replace(" ", "_")
+                    if lbl == "Tùy chỉnh":
+                        return lambda _key=key: _render_tab_tuy_chinh(_key)
+                    else:
+                        return lambda _den=den, _lbl=lbl, _key=key: _bang_den_han(
+                            _tqsvc.loc_den_han(dt_chung, cot_ngay_dh=COT_NGAY_DH, tu_ngay=hn, den_ngay=_den),
                             _lbl, _key,
                         )
-                        for den, lbl in zip(_moc_values, _moc_labels)
-                    ],
+
+                lazy_tabs(
+                    [f"📅 {lbl}" for lbl in _moc_labels],
+                    [_make_renderer(lbl, den) for lbl, den in zip(_moc_labels, _moc_values)],
                     key="tq_den_han",
                 )
+
 
             except Exception as e:  # conv: skip
                 logger.error("Lỗi trong khối except: %s", e, exc_info=True)

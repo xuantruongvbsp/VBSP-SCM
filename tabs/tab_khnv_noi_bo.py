@@ -851,9 +851,9 @@ def _html_lich_ban(ds_loc: list, thang: int, nam: int) -> str:
 
     # Header hàng thứ
     header = "".join(
-        f'<th style="background:#1e293b;color:#e2e8f0;padding:8px 4px;'
-        f'text-align:center;font-size:0.82rem;font-weight:600;'
-        f'border:1px solid #334155">{d}</th>'
+        f'<th style="background:rgba(30,58,95,0.85);color:#e2e8f0;padding:10px 4px;'
+        f'text-align:center;font-size:0.8rem;font-weight:600;'
+        f'border:1px solid rgba(255,255,255,0.08)">{d}</th>'
         for d in _DAYS_VN
     )
 
@@ -862,22 +862,29 @@ def _html_lich_ban(ds_loc: list, thang: int, nam: int) -> str:
         cells = ""
         for day_num in week:
             if day_num == 0:
-                # Ô trống — ngày thuộc tháng trước/sau
                 cells += (
-                    '<td style="background:#f8fafc;border:1px solid #e2e8f0;'
-                    'min-width:110px;min-height:80px;width:14.28%"></td>'
+                    '<td style="background:rgba(0,0,0,0.03);'
+                    'border:1px solid rgba(128,128,128,0.12);'
+                    'min-width:100px;min-height:90px;width:14.28%"></td>'
                 )
                 continue
 
             is_today = (day_num == today_day)
-            bg_cell = "#fef3c7" if is_today else "#ffffff"
-            bd_top  = "3px solid #f59e0b" if is_today else "1px solid #e2e8f0"
-            day_lbl = (
-                f'<div style="font-size:0.82rem;'
-                f'font-weight:{"700" if is_today else "500"};'
-                f'color:{"#b45309" if is_today else "#374151"};'
-                f'text-align:right;padding:2px 4px 4px 0">{day_num}</div>'
-            )
+            bg_cell = "rgba(251,191,36,0.12)" if is_today else "transparent"
+            bd_top  = "3px solid #f59e0b" if is_today else "1px solid rgba(128,128,128,0.15)"
+            if is_today:
+                day_lbl = (
+                    f'<div style="text-align:right;padding:3px 6px 4px 0">'
+                    f'<span style="display:inline-flex;align-items:center;'
+                    f'justify-content:center;width:26px;height:26px;border-radius:50%;'
+                    f'background:#f59e0b;color:#fff;font-size:0.82rem;font-weight:700">'
+                    f'{day_num}</span></div>'
+                )
+            else:
+                day_lbl = (
+                    f'<div style="font-size:0.82rem;font-weight:500;'
+                    f'text-align:right;padding:3px 6px 4px 0;opacity:0.7">{day_num}</div>'
+                )
 
             evs = ev_by_day.get(day_num, [])
             MAX_CHIPS = 3
@@ -916,10 +923,11 @@ def _html_lich_ban(ds_loc: list, thang: int, nam: int) -> str:
 
             cells += (
                 f'<td style="background:{bg_cell};border-top:{bd_top};'
-                f'border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0;'
-                f'border-bottom:1px solid #e2e8f0;'
+                f'border-left:1px solid rgba(128,128,128,0.12);'
+                f'border-right:1px solid rgba(128,128,128,0.12);'
+                f'border-bottom:1px solid rgba(128,128,128,0.12);'
                 f'vertical-align:top;padding:4px;'
-                f'min-width:110px;min-height:80px;width:14.28%">'
+                f'min-width:100px;min-height:90px;width:14.28%">'
                 f'{day_lbl}{chips}</td>'
             )
         rows_html += f"<tr>{cells}</tr>\n"
@@ -986,14 +994,6 @@ def _render_lich_cong_tac(tab, role_n: str, username: str):
                                 f"{LOAI_LICH.get(loai,loai)}: {tieu_de.strip()} ngày {ngay.isoformat()}")
                         st.success("✅ Đã thêm sự kiện!")
                         st.rerun()
-
-    if not ds:
-        col_pdf, _ = st.columns([1, 5])
-        with col_pdf:
-            st.button("📥 Xuất PDF", disabled=True, key="pdf_lich_dis_empty",
-                      use_container_width=True)
-        st.info("ℹ️ Chưa có lịch công tác nào.")
-        return
 
     # ── Bộ lọc ──
     col_f1, col_f2 = st.columns(2)
@@ -1068,7 +1068,14 @@ def _render_lich_cong_tac(tab, role_n: str, username: str):
         
         return  # bỏ qua for loop danh sách bên dưới
 
-    # ── Chế độ Danh sách (giữ nguyên toàn bộ) ──
+    # ── Chế độ Danh sách ──
+    if not ds_loc:
+        if not ds:
+            st.info("ℹ️ Chưa có lịch công tác nào. Dùng '➕ Thêm sự kiện' ở trên để tạo lịch mới.")
+        else:
+            st.info("ℹ️ Không có sự kiện trong tháng này.")
+        return
+
     for ev in ds_loc:
         try:
             ev_date = date.fromisoformat(ev["ngay"])
@@ -1081,7 +1088,7 @@ def _render_lich_cong_tac(tab, role_n: str, username: str):
             end_week = start_week + timedelta(days=6)
             is_current_week = start_week <= ev_date <= end_week
 
-        bg = "#e8f4fd;" if is_current_week else ""
+        bg = "rgba(59,130,246,0.08);" if is_current_week else ""
         st.markdown(
             f"<div style='background-color:{bg} padding:8px; border-radius:4px; margin-bottom:4px;'>",
             unsafe_allow_html=True,
@@ -1121,6 +1128,7 @@ def _render_lich_cong_tac(tab, role_n: str, username: str):
                     "Ngày",
                     value=date.fromisoformat(ev["ngay"]) if ev.get("ngay") else today,
                     key=f"ln_{ev['id']}",
+                    format="DD/MM/YYYY",
                 )
                 new_dia_diem   = st.text_input("Địa điểm", value=ev.get("dia_diem", ""), key=f"ld_{ev['id']}")
                 new_thanh_vien = st.text_area("Thành viên", value=ev.get("thanh_vien", ""), key=f"ltv_{ev['id']}")

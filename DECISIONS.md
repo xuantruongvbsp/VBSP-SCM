@@ -209,3 +209,33 @@
   - Merge có schema normalization → bắt lỗi cột sai tên/type ngay lúc upload
   - `merge_meta_hstd` trong kv_store ghi lại trạng thái → biết PGD nào dùng số liệu cũ
 - **Hệ quả**: Dữ liệu CN lag sau khi PGD upload (phải chờ merge); rollback được nếu merge lỗi
+
+---
+
+## D013 — Không dùng Streamlit Multipage, giữ monolithic app.py
+
+- **Ngày**: 2026-05-24
+- **Quyết định**: KHÔNG tách workspace thành `pages/` (multipage), giữ nguyên `app.py` điều phối 3 workspace dựa trên role
+- **Các lựa chọn**: Multipage (pages/) / Giữ monolithic app.py / Tách mỗi workspace thành app riêng
+- **Lý do**:
+  - Kiến trúc workspace-by-role (`ws_executive` / `ws_management` / `ws_operation`) không phải tính năng độc lập — `app.py` điều phối dựa trên `role` từ session sau login
+  - Multipage yêu cầu: duplicate auth + session check mỗi page, không có `st.session_state` cross-page đáng tin, phải refactor toàn bộ routing
+  - 3 workspace × 1800+ dòng mỗi cái → rủi ro refactor cao, lợi ích không tương xứng cho 20 users
+  - Tầng 1 (lazy import 44s + skip NQ11/GQVL) đã đạt KPI ROADMAP ≤3s load
+- **Hệ quả**: Mỗi lần thêm tab làm workspace phình to hơn → phải tiếp tục lazy import; không tách được deployment từng workspace
+- **Điều kiện thay đổi**: Khi workspace > 5000 dòng, hoặc cần deploy PGD workspace riêng biệt
+
+---
+
+## D014 — FastAPI backend hoãn đến 2027 (Giai đoạn 4)
+
+- **Ngày**: 2026-05-24
+- **Quyết định**: Hoãn triển khai FastAPI/data server đến 2027; tiếp tục dùng DuckDB trực tiếp trong Streamlit process
+- **Các lựa chọn**: FastAPI ngay / Hoãn 2027 / Không bao giờ
+- **Lý do**:
+  - ROADMAP.md Giai đoạn 4 (2027) đã ghi: "Khi số đơn vị > 50, users > 100, hoặc cần multi-server deployment"
+  - Hiện tại 22 đơn vị (~20 users), Windows Server nội bộ đơn → chưa đến ngưỡng
+  - Thêm FastAPI tạo dependency hạ tầng mới: đảm bảo server luôn chạy, startup order, port conflict
+  - Tầng 1 lazy import đã đạt target performance cho quy mô hiện tại
+- **Hệ quả**: Streamlit vẫn load toàn bộ parquet trong process (~700MB RAM); khi data gấp đôi phải xem xét lại
+- **Điều kiện thay đổi**: >100 users đồng thời, data >1GB, hoặc cần mobile app

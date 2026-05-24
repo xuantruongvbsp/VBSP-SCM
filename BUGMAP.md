@@ -278,6 +278,17 @@
 | **Fix** | Ép về datetime trước khi tính: `pd.to_datetime(df[col], dayfirst=True, errors='coerce')` |
 | **Ngày fix** | 2026-05-20 |
 
+### C9 — `ufunc 'subtract' did not contain a loop with signature matching types (dtype('<U516818'), dtype('int64'))`
+| | |
+|---|---|
+| **Dấu hiệu** | Tab So sánh kỳ → Kỳ hiện tại → 5 chỗ crash khi subtract: "🏢 Theo PGD", "📋 Theo CT", "📍 Theo Xã", export sheet, _render_top_bien_dong; `TypeError: ufunc 'subtract' did not contain a loop with signature...` |
+| **File** | `tabs/tab_so_sanh_ky/render_moc_nam.py` & `render_2_ky.py` |
+| **Nguyên nhân** | `pd.merge(..., suffixes=...).fillna(0)` sau merge 2 DataFrame **không** convert về numeric. Khi trừ, numpy nhận thấy column là string (dtype `<U516818>`) và int64 → crash |
+| **Pattern** | `fillna(0)` giữ nguyên dtype object/string của column. Chỉ replace NaN → 0 text. Nếu merge tạo ra mixed-type column thì `fillna` không rescue. |
+| **Fix** | Sau `fillna(0)`, loop và **explicit `pd.to_numeric()`** trước khi tính toán: `for col in [...]: if col in merged.columns: merged[col] = pd.to_numeric(merged[col], errors='coerce').fillna(0)` |
+| **Đã fix** | (1) `render_2_ky.py` dòng 150-153: `_render_bang_pgd()` (2) `render_moc_nam.py` dòng 303-306: Tab "🏢 Theo PGD" (3) dòng 352-355: Tab "📋 Theo CT" (4) dòng 376-379: Tab "📍 Theo Xã" (5) dòng 494-497: Export PGD sheet (6) dòng 99-101: `_render_top_bien_dong()` |
+| **Ngày fix** | 2026-05-24 |
+
 ### C9 — `UnicodeEncodeError: surrogates not allowed` trong emoji
 | | |
 |---|---|
@@ -636,6 +647,16 @@ def _duong_dan_pgd(ten_pgd: str, loai: str) -> str:
 | **Fix** | (1) Đổi `@st.cache_data` → `@st.cache_resource` cho `doc_baseline_merged()` — trả cùng object, không pickle. Thêm `.copy()` tại nơi gọi để tránh mutate. (2) Đổi `st.expander` → `_lazy_expander` cho section Roll rate. (3) Thêm `@st.cache_data` cho `agg_theo_dvut()`. (4) Cache groupby trong `_chart_tang_truong()` bằng `_cached_group()` module-level |
 | **Pattern tránh** | `@st.cache_data` cho hàm trả DataFrame lớn (>10MB). Dùng `@st.cache_resource` + `.copy()` tại nơi gọi. `st.expander(expanded=False)` vẫn execute code bên trong — dùng `lazy_expander` từ `utils.py` |
 | **Ngày fix** | 2026-05-24 |
+
+### K3 — Categorical "values should be unique if codes is not None" — tab So sánh kỳ
+| | |
+|---|---|
+| **File** | `services/so_sanh_ky_service.py` → `group_bien_dong()`, `agg_theo_pgd()` |
+| **Dấu hiệu** | Tab "📊 So sánh kỳ" crash với message "values should be unique if codes is not None" khi render section HSTD |
+| **Nguyên nhân** | HSTD parquet đọc về có cột string (VD: `Tên chương trình`, `Tên PGD`) dạng `CategoricalDtype`. Khi `groupby(dim, dropna=False)` trả `CategoricalIndex`, sau đó `merge(g_ht, g_bl, on=dim)` pandas cố union 2 category list → tạo ra duplicate categories → raise lỗi Categorical |
+| **Fix** | Trong `group_bien_dong`: convert `df[dim]` từ Categorical → object trước `groupby`, và `g[dim]` → object sau `reset_index()`. Trong `agg_theo_pgd`: convert `COT_TEN_PGD` → object trước `groupby` và kết quả sau `reset_index()` |
+| **Pattern tránh** | `groupby()` + `merge()` trên Categorical column từ parquet mà không normalize. Luôn dùng `if isinstance(df[col].dtype, pd.CategoricalDtype): df[col] = df[col].astype(object)` trước groupby/merge |
+| **Ngày fix** | 2026-05-25 |
 
 ---
 

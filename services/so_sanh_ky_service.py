@@ -37,18 +37,22 @@ def agg_mot_pgd(df: pd.DataFrame) -> dict[str, float | int]:
             "du_no_khoanh": 0, "so_ho": 0, "so_ku": 0, "gn_nam": 0,
             "tong_lai_ton": 0,
         }
+
+    def _num_sum(col: str) -> float:
+        if col not in df.columns:
+            return 0.0
+        return float(pd.to_numeric(df[col], errors="coerce").sum())
+
     col_gn = next((c for c in HSTD_DS_CHO_VAY_NAM_ALIASES if c in df.columns), None)
-    lai_th = df[COT_LAI_TON].sum()    if COT_LAI_TON    in df.columns else 0
-    lai_qh = df[COT_LAI_TON_QH].sum() if COT_LAI_TON_QH in df.columns else 0
     return {
-        "tong_du_no":    df[COT_TONG_DU_NO].sum()    if COT_TONG_DU_NO   in df.columns else 0,
-        "du_no_th":      df[COT_DU_NO_TH].sum()      if COT_DU_NO_TH     in df.columns else 0,
-        "du_no_qh":      df[COT_DU_NO_QH].sum()      if COT_DU_NO_QH     in df.columns else 0,
-        "du_no_khoanh":  df[COT_DU_NO_KHOANH].sum()  if COT_DU_NO_KHOANH in df.columns else 0,
-        "so_ho":         int(df[COT_MA_KH].nunique()) if COT_MA_KH        in df.columns else 0,
-        "so_ku":         int(df[COT_SO_KU].nunique()) if COT_SO_KU        in df.columns else 0,
-        "gn_nam":        df[col_gn].sum()             if col_gn                         else 0,
-        "tong_lai_ton":  lai_th + lai_qh,
+        "tong_du_no":    _num_sum(COT_TONG_DU_NO),
+        "du_no_th":      _num_sum(COT_DU_NO_TH),
+        "du_no_qh":      _num_sum(COT_DU_NO_QH),
+        "du_no_khoanh":  _num_sum(COT_DU_NO_KHOANH),
+        "so_ho":         int(df[COT_MA_KH].nunique()) if COT_MA_KH in df.columns else 0,
+        "so_ku":         int(df[COT_SO_KU].nunique()) if COT_SO_KU in df.columns else 0,
+        "gn_nam":        _num_sum(col_gn) if col_gn else 0.0,
+        "tong_lai_ton":  _num_sum(COT_LAI_TON) + _num_sum(COT_LAI_TON_QH),
     }
 
 
@@ -71,10 +75,23 @@ def agg_theo_pgd(df: pd.DataFrame) -> pd.DataFrame:
     if col_gn:
         agg_spec["gn_nam"] = (col_gn, "sum")
 
+    df = df.copy()
+    # Normalize Categorical → object để tránh lỗi groupby/concat trên Categorical parquet
+    if isinstance(df[COT_TEN_PGD].dtype, pd.CategoricalDtype):
+        df[COT_TEN_PGD] = df[COT_TEN_PGD].astype(object)
+    _num_cols = [c for c in [COT_TONG_DU_NO, COT_DU_NO_TH, COT_DU_NO_QH, COT_DU_NO_KHOANH, col_gn]
+                 if c and c in df.columns]
+    for _c in _num_cols:
+        df[_c] = pd.to_numeric(df[_c], errors="coerce").fillna(0)
+
     try:
         result = df.groupby(COT_TEN_PGD).agg(**agg_spec).reset_index()
     except Exception:
         return pd.DataFrame()
+
+    # Đảm bảo cột PGD là object sau groupby
+    if isinstance(result[COT_TEN_PGD].dtype, pd.CategoricalDtype):
+        result[COT_TEN_PGD] = result[COT_TEN_PGD].astype(object)
 
     tong = {COT_TEN_PGD: "⬛ Tổng Chi nhánh"}
     for col in result.columns:
@@ -99,6 +116,13 @@ def agg_theo_dvut(df: pd.DataFrame) -> pd.DataFrame:
     if COT_DU_NO_KHOANH in df.columns:
         agg_spec["du_no_khoanh"] = (COT_DU_NO_KHOANH, "sum")
 
+    _num_cols = [c for c in [COT_TONG_DU_NO, COT_DU_NO_QH, COT_DU_NO_KHOANH]
+                 if c and c in df.columns]
+    if _num_cols:
+        df = df.copy()
+        for _c in _num_cols:
+            df[_c] = pd.to_numeric(df[_c], errors="coerce").fillna(0)
+
     try:
         result = df.groupby(COT_DVUT).agg(**agg_spec).reset_index()
     except Exception:
@@ -115,12 +139,26 @@ def group_bien_dong(df: pd.DataFrame, dim: str) -> pd.DataFrame:
     """Tổng hợp df theo dim: du_no, du_no_qh, so_ku, nqh_pct."""
     if dim not in df.columns:
         return pd.DataFrame(columns=[dim, "du_no", "du_no_qh", "so_ku", "nqh_pct"])
+    df = df.copy()
+    # Normalize Categorical → object để tránh lỗi "values should be unique if codes is not None"
+    # khi merge 2 kết quả groupby có CategoricalIndex với category list khác nhau
+    if isinstance(df[dim].dtype, pd.CategoricalDtype):
+        df[dim] = df[dim].astype(object)
+    _src_num = [c for c in [COT_TONG_DU_NO, COT_DU_NO_QH] if c in df.columns]
+    for _c in _src_num:
+        df[_c] = pd.to_numeric(df[_c], errors="coerce").fillna(0)
     cols: dict = {"du_no_qh": (COT_DU_NO_QH, "sum"), "so_ku": (COT_SO_KU, "nunique")}
     if COT_TONG_DU_NO in df.columns:
         cols["du_no"] = (COT_TONG_DU_NO, "sum")
     g = df.groupby(dim, dropna=False).agg(**cols).reset_index()
+    # Đảm bảo cột dim là object sau groupby (groupby trên Categorical trả CategoricalIndex)
+    if isinstance(g[dim].dtype, pd.CategoricalDtype):
+        g[dim] = g[dim].astype(object)
     if "du_no" not in g.columns:
         g["du_no"] = 0
+    for _c in ("du_no", "du_no_qh", "so_ku"):
+        if _c in g.columns:
+            g[_c] = pd.to_numeric(g[_c], errors="coerce").fillna(0)
     g["nqh_pct"] = (g["du_no_qh"] / g["du_no"].replace(0, float("nan")) * 100).fillna(0)
     return g
 

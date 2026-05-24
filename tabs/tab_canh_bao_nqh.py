@@ -233,22 +233,60 @@ def _render_tong_hop(
         so_gh_thang = da_gh & (ngay_gh.dt.year == today.year) & (ngay_gh.dt.month == today.month)
         so_gh_nam   = da_gh & (ngay_gh.dt.year == today.year) & (ngay_gh.dt.month > today.month)
 
-    cols_kpi = st.columns(5)
-    with cols_kpi[0]:
-        st.metric("Đến hạn (3 tháng)", _dem_den_han(df_full_loc, 3))
-    with cols_kpi[1]:
-        st.metric("3 tháng không HĐ", fmt_so(khd_tong),
-                  delta_color="inverse" if khd_tong > 0 else "off")
-    with cols_kpi[2]:
-        st.metric("Có nợ quá hạn", "Có" if co_nqh else "Không")
-    with cols_kpi[3]:
-        st.metric("Khoanh khẩn", fmt_so(khoanh_data.get("so_khan", 0)),
-                  delta=f"{khoanh_data.get('so_canh_bao', 0)} cảnh báo",
-                  delta_color="inverse")
-    with cols_kpi[4]:
-        st.metric("Đã gia hạn",
-                  f"{so_gh_thang.sum()}/{so_gh_nam.sum()}" if co_gia_han else "—",
-                  help="Tháng/Năm")
+    st.markdown("""
+    <style>
+    .cb-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:14px;margin-bottom:14px}
+    .cb-card{border-radius:12px;padding:20px 14px 18px;border:2px solid #d1d5db;text-align:center;min-height:120px;display:flex;flex-direction:column;justify-content:center;gap:4px}
+    .cb-card .cb-value{font-size:2.4rem;font-weight:800;line-height:1.1;margin:0}
+    .cb-card .cb-label{font-size:0.9rem;font-weight:700;margin:0}
+    .cb-card .cb-sub{font-size:0.82rem;font-weight:500;margin:0;line-height:1.4;opacity:0.85}
+    .cb-blue{background:#dbeafe;border-color:#60a5fa}.cb-blue .cb-value{color:#1e3a8a}.cb-blue .cb-label{color:#1d4ed8}.cb-blue .cb-sub{color:#1d4ed8}
+    .cb-green{background:#dcfce7;border-color:#4ade80}.cb-green .cb-value{color:#14532d}.cb-green .cb-label{color:#15803d}.cb-green .cb-sub{color:#15803d}
+    .cb-red{background:#fee2e2;border-color:#f87171}.cb-red .cb-value{color:#7f1d1d}.cb-red .cb-label{color:#b91c1c}.cb-red .cb-sub{color:#b91c1c}
+    .cb-purple{background:#ede9fe;border-color:#a78bfa}.cb-purple .cb-value{color:#4c1d95}.cb-purple .cb-label{color:#6d28d9}.cb-purple .cb-sub{color:#6d28d9}
+    @media(max-width:1000px){.cb-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+    @media(max-width:600px){.cb-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+    </style>
+    """, unsafe_allow_html=True)
+
+    den_han_3t = _dem_den_han(df_full_loc, 3)
+    khd_class = "cb-red" if khd_tong > 0 else "cb-green"
+    nqh_class = "cb-red" if co_nqh else "cb-green"
+    so_khan = khoanh_data.get("so_khan", 0)
+    so_cb   = khoanh_data.get("so_canh_bao", 0)
+    so_khoanh_can_kt = so_khan + so_cb
+    khoanh_class = "cb-red" if so_khoanh_can_kt > 0 else "cb-green"
+    gh_str = f"{so_gh_thang.sum()}/{so_gh_nam.sum()}" if co_gia_han else "—"
+
+    st.markdown(f"""
+    <div class="cb-grid">
+        <div class="cb-card cb-blue">
+            <div class="cb-label">🔔 Đến hạn ≤ 3 tháng</div>
+            <div class="cb-value">{fmt_so(den_han_3t)}</div>
+            <div class="cb-sub">Món vay sắp đến hạn</div>
+        </div>
+        <div class="cb-card {khd_class}">
+            <div class="cb-label">⚠️ ≥ 3 tháng không HĐ</div>
+            <div class="cb-value">{fmt_so(khd_tong)}</div>
+            <div class="cb-sub">Khách hàng ngưng giao dịch</div>
+        </div>
+        <div class="cb-card {nqh_class}">
+            <div class="cb-label">🚨 Có nợ quá hạn</div>
+            <div class="cb-value">{"Có" if co_nqh else "Không"}</div>
+            <div class="cb-sub">Phát sinh nợ quá hạn</div>
+        </div>
+        <div class="cb-card {khoanh_class}">
+            <div class="cb-label">📌 Khoanh cần kiểm tra</div>
+            <div class="cb-value">{fmt_so(so_khoanh_can_kt)}</div>
+            <div class="cb-sub">{so_khan} phải KT (≤120d) · {so_cb} theo dõi (121-180d)</div>
+        </div>
+        <div class="cb-card cb-purple">
+            <div class="cb-label">📅 Đã gia hạn (T/N)</div>
+            <div class="cb-value">{gh_str}</div>
+            <div class="cb-sub">Tháng này / Còn trong năm</div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
     st.divider()
     st.markdown("**Tổng hợp cảnh báo theo PGD**")

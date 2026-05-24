@@ -147,6 +147,9 @@ def _render_bang_pgd(df1: pd.DataFrame, df2: pd.DataFrame,
         "tong_du_no": "dn2", "du_no_qh": "nqh2", "so_ho": "ho2",
     })
     jn = pd.merge(m1, m2, on="ten_pgd", how="outer").fillna(0)
+    for col in ["dn1", "dn2", "nqh1", "nqh2", "ho1", "ho2"]:
+        if col in jn.columns:
+            jn[col] = pd.to_numeric(jn[col], errors="coerce").fillna(0)
     jn["delta_dn"]  = jn["dn2"]  - jn["dn1"]
     jn["delta_nqh"] = jn["nqh2"] - jn["nqh1"]
     jn["delta_ho"]  = jn["ho2"]  - jn["ho1"]
@@ -555,7 +558,7 @@ def _render_cached(role: str, username: str, pgd_user: str | None, pgd_mode: boo
     if not pgd_mode and not df1.empty and not df2.empty:
         sheets_extra = build_excel_sheets_pgd(df1, df2, ky1, ky2)
     render_export_ui(rows_data, ky1, ky2, username, sheets_extra,
-                     action="xuat_bieu_cn")
+                     action="xuat_bieu_cn", key_prefix="2ky")
 
     # ── Lazy sections ──
     st.divider()

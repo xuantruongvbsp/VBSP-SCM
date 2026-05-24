@@ -237,8 +237,12 @@ def render_export_ui(
     figs: list[tuple[go.Figure, str]] | None = None,
     pgd_mode: bool = False,
     action: str = "xuat_bieu_cn",
+    key_prefix: str = "ssk",
 ) -> None:
     """Section xuất báo cáo: radio chọn dạng + nút download trực tiếp.
+
+    key_prefix phải unique mỗi lần gọi để tránh DuplicateElementKey khi
+    render_export_ui xuất hiện nhiều lần trong cùng một Streamlit page.
 
     Dùng st.session_state để cache bytes, tránh antipattern
     st.button → st.download_button lồng nhau (bytes biến mất sau rerun).
@@ -252,7 +256,7 @@ def render_export_ui(
     with col_ex_opt:
         ex_type = st.radio(
             "Dạng Excel", ["Tổng quan", "Đa chiều"],
-            horizontal=True, key="ssk_ex_type", label_visibility="collapsed",
+            horizontal=True, key=f"{key_prefix}_ex_type", label_visibility="collapsed",
         )
 
     col_pdf_label, col_pdf_opt = st.columns([0.2, 0.8])
@@ -261,11 +265,11 @@ def render_export_ui(
     with col_pdf_opt:
         pdf_type = st.radio(
             "Dạng PDF", ["Tổng quan", "Đầy đủ"],
-            horizontal=True, key="ssk_pdf_type", label_visibility="collapsed",
+            horizontal=True, key=f"{key_prefix}_pdf_type", label_visibility="collapsed",
         )
 
-    # ── Cache Excel bytes trong session_state theo (ky1, ky2, dạng) ──
-    xl_key = f"_ssk_xl_{ky1}_{ky2}_{ex_type}"
+    # ── Cache Excel bytes trong session_state theo (prefix, ky1, ky2, dạng) ──
+    xl_key = f"_{key_prefix}_xl_{ky1}_{ky2}_{ex_type}"
     if xl_key not in st.session_state:
         if ex_type == "Tổng quan":
             st.session_state[xl_key] = xuat_excel_tong_quan(rows_data, ky1, ky2)
@@ -273,7 +277,7 @@ def render_export_ui(
             st.session_state[xl_key] = xuat_excel_da_chieu(rows_data, ky1, ky2, sheets_extra)
 
     # ── Cache PDF bytes trong session_state ──
-    pdf_key = f"_ssk_pdf_{ky1}_{ky2}_{pdf_type}"
+    pdf_key = f"_{key_prefix}_pdf_{ky1}_{ky2}_{pdf_type}"
     if pdf_key not in st.session_state:
         if not _PDF_READY:
             st.session_state[pdf_key] = b""
@@ -292,7 +296,7 @@ def render_export_ui(
             data=st.session_state[xl_key],
             file_name=f"so_sanh_ky_{ky1}_vs_{ky2}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            key="ssk_dl_excel",
+            key=f"{key_prefix}_dl_excel",
             use_container_width=True,
         ):
             db.ghi_audit(username, action,
@@ -312,7 +316,7 @@ def render_export_ui(
                 data=pdf_bytes,
                 file_name=f"so_sanh_ky_{ky1}_vs_{ky2}.pdf",
                 mime="application/pdf",
-                key="ssk_dl_pdf",
+                key=f"{key_prefix}_dl_pdf",
                 use_container_width=True,
             ):
                 db.ghi_audit(username, action,

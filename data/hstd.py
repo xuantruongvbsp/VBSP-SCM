@@ -6,7 +6,6 @@ import pandas as pd
 import streamlit as st
 
 from data.core import ts_file, excel_to_parquet, _should_force_str, _normalize_code_series
-from services.data_quality import kiem_tra_chat_luong
 from config import (
     CACHE_HSTD, CACHE_NQ11,
     GQVL_COT_MAP, CACHE_GQVL, CACHE_SK_GQVL,
@@ -168,6 +167,7 @@ def doc_baseline_merged(nam: int) -> pd.DataFrame | None:
 def doc_file_nq11(fp: str, _ts) -> pd.DataFrame:
     """Đọc file sao kê NQ11 (BCQUERY sheet, header dòng 4)."""
     def clean(df): return df.iloc[:, 1:].dropna(how="all")
+    from services.data_quality import kiem_tra_chat_luong
     try:
         df = excel_to_parquet(fp, CACHE_NQ11, "BCQUERY", 4, clean)
     except Exception:
@@ -179,6 +179,7 @@ def doc_file_nq11(fp: str, _ts) -> pd.DataFrame:
 @st.cache_data(ttl=7200, show_spinner=False)
 def doc_file_gqvl(fp: str, _ts) -> pd.DataFrame:
     """Đọc file sao kê GQVL, chuẩn hoá tên cột."""
+    from services.data_quality import kiem_tra_chat_luong
     try:
         os.makedirs(os.path.dirname(CACHE_GQVL), exist_ok=True)
         if ts_file(CACHE_GQVL) < ts_file(fp):

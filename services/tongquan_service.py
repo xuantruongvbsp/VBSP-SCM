@@ -255,28 +255,29 @@ def tinh_tqpgd_extended(
 
     # Nợ ĐH năm — tính riêng nếu có ngày đh
     if cot_ngay_dh in df_loc.columns:
-        df_dh = df_loc[[cot_pgd, cot_ngay_dh, cot_tdn]].copy()
-        df_dh[cot_ngay_dh] = pd.to_datetime(df_dh[cot_ngay_dh], dayfirst=True, errors="coerce")
-        mask = df_dh[cot_ngay_dh].dt.year == int(nam_ht)
+        ngay_dh = df_loc[cot_ngay_dh]
+        if not pd.api.types.is_datetime64_any_dtype(ngay_dh):
+            ngay_dh = pd.to_datetime(ngay_dh, dayfirst=True, errors="coerce")
+        tdn_num = pd.to_numeric(df_loc[cot_tdn], errors="coerce").fillna(0)
+        mask = ngay_dh.dt.year == int(nam_ht)
         dh = (
-            df_dh[mask]
-            .groupby(cot_pgd)[cot_tdn]
-            .apply(lambda x: pd.to_numeric(x, errors="coerce").fillna(0).sum())
-            .reset_index(name="no_dh_nam")
+            pd.DataFrame({cot_pgd: df_loc.loc[mask, cot_pgd].values, "no_dh_nam": tdn_num[mask].values})
+            .groupby(cot_pgd, as_index=False)["no_dh_nam"]
+            .sum()
         )
         df_pgd = df_pgd.merge(dh, on=cot_pgd, how="left")
         df_pgd["no_dh_nam"] = df_pgd["no_dh_nam"].fillna(0)
     else:
         df_pgd["no_dh_nam"] = 0.0
 
-    # DS Thu nợ — tính riêng vì cần multiple columns
+    # DS Thu nợ — vectorized thay vì apply(lambda stack)
     cols_thu = [c for c in cols_thu_key.split(",") if c and c in df_loc.columns]
     if cols_thu:
-        thu = (
-            df_loc.groupby(cot_pgd)[cols_thu]
-            .apply(lambda x: pd.to_numeric(x.stack(), errors="coerce").fillna(0).sum())
-            .reset_index(name="ds_thu_no")
-        )
+        thu_num = df_loc[[cot_pgd] + cols_thu].copy()
+        for c in cols_thu:
+            thu_num[c] = pd.to_numeric(thu_num[c], errors="coerce").fillna(0)
+        thu_num["ds_thu_no"] = thu_num[cols_thu].sum(axis=1)
+        thu = thu_num.groupby(cot_pgd, as_index=False)["ds_thu_no"].sum()
         df_pgd = df_pgd.merge(thu, on=cot_pgd, how="left")
         df_pgd["ds_thu_no"] = df_pgd["ds_thu_no"].fillna(0)
     else:
@@ -315,6 +316,32 @@ def ap_dung_loc_ket_hop(
         df_loc = df_loc[df_loc[cot_ct].isin(loc_ct)]
     if loc_xa and cot_xa and cot_xa in df_loc.columns:
         df_loc = df_loc[df_loc[cot_xa].isin(loc_xa)]
+    return df_loc
+
+
+def ap_dung_loc_den_han_tab(
+    df: pd.DataFrame,
+    *,
+    cot_xa: str | None,
+    cot_nv: str | None,
+    loc_xa: list | None,
+    loc_nv: int | list[int] | None,
+    cot_tdn: str,
+    range_no_trieu: tuple | None,
+) -> pd.DataFrame:
+    df_loc = df
+    if loc_xa and cot_xa and cot_xa in df_loc.columns:
+        df_loc = df_loc[df_loc[cot_xa].isin(loc_xa)]
+    if loc_nv is not None and cot_nv and cot_nv in df_loc.columns:
+        nv_num = pd.to_numeric(df_loc[cot_nv], errors="coerce").fillna(0).astype(int)
+        if isinstance(loc_nv, list):
+            df_loc = df_loc[nv_num.isin(loc_nv)]
+        else:
+            df_loc = df_loc[nv_num == loc_nv]
+    if range_no_trieu and cot_tdn in df_loc.columns:
+        lo = range_no_trieu[0] * 1_000_000
+        hi = range_no_trieu[1] * 1_000_000
+        df_loc = df_loc[(df_loc[cot_tdn] >= lo) & (df_loc[cot_tdn] <= hi)]
     return df_loc
 
 

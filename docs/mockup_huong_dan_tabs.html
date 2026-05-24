@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hướng dẫn Tab – VBSP-SCM</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--red:#C0392B;--navy:#1a3a5c;--teal:#1D9E75;--gold:#EF9F27;--bg:#f0f4fa;--card:#fff;--border:#e2e8f0;--muted:#6b7280}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:#1f2937;line-height:1.6}
+.banner{background:linear-gradient(135deg,#922B21,#C0392B);color:#fff;padding:22px 36px;display:flex;align-items:center;gap:16px}
+.banner h1{font-size:1.4rem;font-weight:700}.banner p{font-size:.88rem;opacity:.85;margin-top:3px}
+.layout{display:flex;min-height:100vh}
+.sidebar{width:260px;background:#1a2332;flex-shrink:0;padding:16px 0;position:sticky;top:0;height:100vh;overflow-y:auto}
+.sidebar::-webkit-scrollbar{width:4px}.sidebar::-webkit-scrollbar-thumb{background:#374151}
+.nav-g{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;padding:14px 18px 5px}
+.nav-a{display:flex;align-items:center;gap:9px;padding:8px 18px;font-size:13px;color:#cbd5e1;cursor:pointer;border-left:3px solid transparent;text-decoration:none;transition:.15s}
+.nav-a:hover{background:rgba(255,255,255,.06);color:#fff}
+.nav-a.active{background:rgba(192,57,43,.22);color:#fff;border-left-color:#C0392B;font-weight:600}
+.content{flex:1;padding:30px 36px}
+.sec{display:none}.sec.active{display:block}
+.ph{margin-bottom:22px}.ph h2{font-size:1.35rem;font-weight:700;color:var(--navy);display:flex;align-items:center;gap:8px}
+.ph p{color:var(--muted);font-size:.9rem;margin-top:5px}
+.card{background:var(--card);border-radius:10px;box-shadow:0 2px 10px rgba(0,0,0,.07);padding:22px 26px;margin-bottom:20px;border:1px solid var(--border)}
+.ct{font-size:1rem;font-weight:700;color:var(--navy);margin-bottom:14px;padding-bottom:8px;border-bottom:2px solid var(--red)}
+.fg{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px}
+.fc{background:#f8fafc;border:1px solid var(--border);border-radius:8px;padding:14px 16px}
+.fc h4{font-size:.91rem;font-weight:600;color:var(--navy);margin-bottom:8px}
+.fc ul{padding-left:17px;font-size:.85rem;color:var(--muted)}.fc ul li{margin-bottom:3px}
+.fc.red{border-left:4px solid var(--red);background:#fff5f5}
+.fc.teal{border-left:4px solid var(--teal);background:#f0fdf9}
+.fc.navy{border-left:4px solid var(--navy);background:#f0f4ff}
+.fc.gold{border-left:4px solid var(--gold);background:#fffbeb}
+.ib{padding:12px 16px;border-radius:7px;font-size:.88rem;margin-bottom:14px}
+.ib.blue{background:#eff6ff;border-left:4px solid #3b82f6;color:#1e40af}
+.ib.green{background:#f0fdf4;border-left:4px solid #22c55e;color:#14532d}
+.ib.amber{background:#fffbeb;border-left:4px solid #f59e0b;color:#78350f}
+.tabs{display:flex;flex-wrap:wrap;gap:4px;background:#f8fafc;border:1px solid var(--border);border-radius:7px;padding:7px 9px;margin-bottom:14px}
+.tc{padding:4px 11px;border-radius:5px;font-size:11.5px;font-weight:500;background:#fff;border:1px solid var(--border);color:#374151}
+.tc.on{background:var(--red);color:#fff;border-color:var(--red)}
+.rp{display:inline-block;padding:2px 9px;border-radius:11px;font-size:11px;font-weight:600;margin:2px}
+.rp.a{background:#fee2e2;color:#991b1b}.rp.m{background:#fef3c7;color:#92400e}
+.rp.e{background:#dbeafe;color:#1e40af}.rp.p{background:#d1fae5;color:#065f46}
+.rp.u{background:#ede9fe;color:#5b21b6}
+.tbl{width:100%;border-collapse:collapse;font-size:12.5px}
+.tbl th{background:var(--navy);color:#fff;padding:8px 10px;text-align:left;font-size:12px}
+.tbl td{padding:7px 10px;border-bottom:1px solid var(--border)}
+.tbl tr:nth-child(even) td{background:#f5f8fc}
+.badge-ok{background:#dcfce7;color:#14532d;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600}
+.badge-no{background:#fee2e2;color:#991b1b;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600}
+.badge-w{background:#fef9c3;color:#713f12;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600}
+.steps{display:flex;flex-direction:column;gap:0}
+.step{display:flex;gap:14px;position:relative}
+.step:not(:last-child)::before{content:'';position:absolute;left:15px;top:38px;width:2px;height:calc(100% - 6px);background:var(--border)}
+.sn{width:31px;height:31px;flex-shrink:0;border-radius:50%;background:var(--navy);color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;margin-top:2px}
+.sb{flex:1;padding-bottom:20px}.sb h4{font-size:.91rem;font-weight:700}.sb p{font-size:.86rem;color:var(--muted);margin-top:3px}
+.tip{margin-top:7px;padding:7px 11px;background:#f0fdf4;border-left:3px solid #10b981;border-radius:4px;font-size:.84rem;color:#065f46}
+.warn{margin-top:7px;padding:7px 11px;background:#fff8e1;border-left:3px solid #f59e0b;border-radius:4px;font-size:.84rem;color:#78350f}
+.kpir{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
+.kpib{background:#f8fafc;border:1px solid var(--border);border-radius:8px;padding:12px;text-align:center}
+.kpib .v{font-size:1.35rem;font-weight:700;color:var(--navy)}.kpib .l{font-size:.74rem;color:var(--muted);margin-top:3px}
+.kpib .d{font-size:.78rem;font-weight:600;margin-top:2px;color:#16a34a}
+@media(max-width:860px){.sidebar{display:none}.content{padding:18px 14px}.kpir{grid-template-columns:repeat(2,1fr)}}
+</style>
+</head>
+<body>
+
+<div class="banner">
+  <div style="font-size:2rem">🏦</div>
+  <div>
+    <h1>VBSP-SCM — Hướng dẫn sử dụng các Tab</h1>
+    <p>NHCSXH Chi nhánh Đồng Nai &nbsp;·&nbsp; 22 đơn vị · ~20 users · 9 role &nbsp;·&nbsp; Cập nhật 05/2026</p>
+  </div>
+</div>
+
+<div class="layout">
+<nav class="sidebar">
+  <div class="nav-g">Tổng quan</div>
+  <a class="nav-a active" onclick="show('ov')">🏠 Giới thiệu &amp; Luồng DL</a>
+  <a class="nav-a" onclick="show('roles')">👤 Phân quyền Role</a>
+  <div class="nav-g">Phân hệ KH-NV (CN)</div>
+  <a class="nav-a" onclick="show('cn1')">📊 Thông tin chung</a>
+  <a class="nav-a" onclick="show('cn2')">🔍 Giám sát tín dụng</a>
+  <a class="nav-a" onclick="show('cn3')">🔒 Kiểm soát &amp; Rủi ro</a>
+  <a class="nav-a" onclick="show('cn4')">📋 Kế hoạch tín dụng</a>
+  <a class="nav-a" onclick="show('cn5')">📈 Báo cáo</a>
+  <a class="nav-a" onclick="show('cn6')">🤝 Ủy thác &amp; CBTD</a>
+  <a class="nav-a" onclick="show('cn7')">⚙️ Upload &amp; Hệ thống</a>
+  <div class="nav-g">Phân hệ Địa bàn (PGD)</div>
+  <a class="nav-a" onclick="show('pgd1')">🏠 Trang chủ PGD</a>
+  <a class="nav-a" onclick="show('pgd2')">📋 Nghiệp vụ hàng ngày</a>
+  <a class="nav-a" onclick="show('pgd3')">📈 Báo cáo &amp; Giao ban</a>
+  <a class="nav-a" onclick="show('pgd4')">🎯 Kế hoạch PGD</a>
+  <a class="nav-a" onclick="show('pgd5')">🚨 Kiểm soát &amp; Rủi ro</a>
+  <a class="nav-a" onclick="show('pgd6')">⚙️ Quản trị PGD</a>
+  <div class="nav-g">Phân hệ BGĐ</div>
+  <a class="nav-a" onclick="show('bgd')">👔 Dashboard BGĐ</a>
+  <div class="nav-g">Tra cứu</div>
+  <a class="nav-a" onclick="show('faq')">❓ FAQ &amp; Lỗi thường gặp</a>
+</nav>
+
+<main class="content">
+
+<!-- ══ TỔNG QUAN ══ -->
+<section id="ov" class="sec active">
+  <div class="ph"><h2>🏠 Giới thiệu hệ thống</h2><p>3 phân hệ: BGĐ (chỉ xem) · KH-NV (toàn CN) · Địa bàn PGD</p></div>
+  <div class="card">
+    <div class="ct">🏗️ 3 Phân hệ</div>
+    <div class="fg">
+      <div class="fc red"><h4>👔 BGĐ (Executive)</h4><ul><li>Dashboard vĩ mô toàn CN</li><li>Gauge NQH, so sánh 22 PGD</li><li>Chỉ xem — không nhập liệu</li></ul></div>
+      <div class="fc navy"><h4>📋 Phòng KH-NV (Management)</h4><ul><li>Giám sát toàn 22 đơn vị</li><li>Giao &amp; ĐC KHTD, upload merge</li><li>Kiểm soát, báo cáo tổng hợp</li></ul></div>
+      <div class="fc teal"><h4>🏘️ Địa bàn PGD (Operation)</h4><ul><li>Tác nghiệp riêng từng PGD</li><li>Upload HSTD, NQ11, GQVL</li><li>Tra cứu, giao ban, nhiệm vụ</li></ul></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="ct">🔄 Luồng dữ liệu</div>
+    <div class="steps">
+      <div class="step"><div class="sn">1</div><div class="sb"><h4>PGD upload HSTD riêng</h4><p>Tab Upload PGD → <code>pgd_data/{slug}/hstd_latest.xlsx</code></p><div class="tip">Dữ liệu PGD hoàn toàn độc lập với luồng CN</div></div></div>
+      <div class="step"><div class="sn">2</div><div class="sb"><h4>CN merge 22 PGD</h4><p>Tab Upload KH-NV → merge → <code>cache/hstd.parquet</code></p><div class="warn">Chỉ <code>admin_cn</code> / <code>manager_cn</code> có quyền này</div></div></div>
+      <div class="step"><div class="sn">3</div><div class="sb"><h4>CN/BGĐ xem dữ liệu tổng hợp</h4><p>Mọi tab ws_management &amp; ws_executive đọc từ cache parquet</p></div></div>
+      <div class="step"><div class="sn">4</div><div class="sb"><h4>CN giao KHTD → PGD thực hiện</h4><p>PGD thấy chỉ tiêu riêng → Nhập KH theo xã → Báo cáo tiến độ</p></div></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="ct">💻 Truy cập hệ thống</div>
+    <div class="ib blue">Chạy: <code>Chay_VBSP_SCM.bat</code> hoặc <code>streamlit run app.py</code> → <strong>http://localhost:8501</strong></div>
+    <div class="fg">
+      <div class="fc navy"><h4>Đăng nhập CN</h4><ul><li>User: <code>admin_cn</code> / <code>manager_cn</code></li><li>Pass: <code>123456</code></li></ul></div>
+      <div class="fc teal"><h4>Đăng nhập PGD</h4><ul><li>User: <code>admin_{slug_pgd}</code></li><li>Pass: <code>123456</code></li></ul></div>
+      <div class="fc gold"><h4>Đăng nhập BGĐ</h4><ul><li>User: <code>bgd</code></li><li>Pass: <code>123456</code></li></ul></div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ PHÂN QUYỀN ══ -->
+<section id="roles" class="sec">
+  <div class="ph"><h2>👤 Phân quyền &amp; Role</h2><p>9 role — kiểm soát quyền truy cập từng tab, upload, giao KHTD</p></div>
+  <div class="card">
+    <div class="ct">🔑 Bảng phân quyền</div>
+    <p style="font-size:.85rem;margin-bottom:10px;font-weight:600;color:var(--navy)">Phân hệ Chi nhánh</p>
+    <table class="tbl" style="margin-bottom:16px">
+      <thead><tr><th>Role</th><th>Tên</th><th>Upload CN</th><th>Giao KH</th><th>Quản lý user</th><th>Xem toàn CN</th></tr></thead>
+      <tbody>
+        <tr><td><span class="rp a">admin_cn</span></td><td>Quản trị CN</td><td><span class="badge-ok">✓</span></td><td><span class="badge-ok">✓</span></td><td><span class="badge-ok">✓</span></td><td><span class="badge-ok">✓</span></td></tr>
+        <tr><td><span class="rp m">manager_cn</span></td><td>Lãnh đạo CN</td><td><span class="badge-ok">✓</span></td><td><span class="badge-ok">✓</span></td><td><span class="badge-w">Hạn chế</span></td><td><span class="badge-ok">✓</span></td></tr>
+        <tr><td><span class="rp e">executive</span></td><td>Ban Giám đốc</td><td><span class="badge-no">✗</span></td><td><span class="badge-no">✗</span></td><td><span class="badge-no">✗</span></td><td><span class="badge-ok">✓</span></td></tr>
+      </tbody>
+    </table>
+    <p style="font-size:.85rem;margin-bottom:10px;font-weight:600;color:var(--navy)">Phân hệ PGD</p>
+    <table class="tbl">
+      <thead><tr><th>Role</th><th>Tên</th><th>Upload PGD</th><th>Nhập KH</th><th>Quản lý user</th><th>Phạm vi</th></tr></thead>
+      <tbody>
+        <tr><td><span class="rp p">admin_pgd</span></td><td>Quản trị PGD</td><td><span class="badge-ok">✓</span></td><td><span class="badge-ok">✓</span></td><td><span class="badge-ok">✓</span></td><td>1 PGD</td></tr>
+        <tr><td><span class="rp p">manager_pgd</span></td><td>Lãnh đạo PGD</td><td><span class="badge-ok">✓</span></td><td><span class="badge-ok">✓</span></td><td><span class="badge-no">✗</span></td><td>1 PGD</td></tr>
+        <tr><td><span class="rp u">user_pgd</span></td><td>CBTD địa bàn</td><td><span class="badge-no">✗</span></td><td><span class="badge-ok">✓</span></td><td><span class="badge-no">✗</span></td><td>1 PGD</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ══ CN1 THÔNG TIN CHUNG ══ -->
+<section id="cn1" class="sec">
+  <div class="ph"><h2>📊 Thông tin chung — KH-NV</h2><p>KPI toàn CN, biểu đồ 22 PGD, bảng phân loại NQH</p></div>
+  <div class="ib blue">Role: <span class="rp a">admin_cn</span><span class="rp m">manager_cn</span><span class="rp e">executive</span></div>
+  <div class="card">
+    <div class="ct">📊 KPI tổng hợp (minh hoạ)</div>
+    <div class="kpir">
+      <div class="kpib"><div class="v">1,245 tỷ</div><div class="l">Tổng dư nợ</div><div class="d">▲ +2.3%</div></div>
+      <div class="kpib"><div class="v">1.00%</div><div class="l">Tỷ lệ NQH</div><div class="d">✓ An toàn</div></div>
+      <div class="kpib"><div class="v">48,250</div><div class="l">Hộ vay</div><div class="d">▲ +350</div></div>
+      <div class="kpib"><div class="v">22/22</div><div class="l">PGD đã nộp DL</div><div class="d">✓ Đủ</div></div>
+    </div>
+    <div class="fg">
+      <div class="fc navy"><h4>📊 Delta Card KPI</h4><ul><li>Tổng dư nợ, NQH, số hộ</li><li>Biến động ▲/▼ so kỳ trước</li><li>Màu xanh/đỏ theo ngưỡng</li></ul></div>
+      <div class="fc teal"><h4>📈 Biểu đồ PGD</h4><ul><li>Bar chart so sánh 22 PGD</li><li>Lọc theo chương trình</li><li>Tooltip chi tiết khi hover</li></ul></div>
+      <div class="fc gold"><h4>📋 Bảng NQH theo PGD</h4><ul><li>Màu nền theo mức rủi ro</li><li>Xuất Excel toàn CN</li></ul></div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ CN2 GIÁM SÁT ══ -->
+<section id="cn2" class="sec">
+  <div class="ph"><h2>🔍 Giám sát tín dụng — KH-NV</h2><p>Cảnh báo NQH, so sánh kỳ, đến hạn</p></div>
+  <div class="ib blue">Role: <span class="rp a">admin_cn</span><span class="rp m">manager_cn</span></div>
+  <div class="card">
+    <div class="ct">🚨 Cảnh báo Tín dụng</div>
+    <div class="tabs">
+      <div class="tc on">🚨 NQH Đột biến</div><div class="tc">📉 3T không HĐ</div><div class="tc">🔀 Migration</div><div class="tc">⏰ Đến hạn</div>
+    </div>
+    <div class="fg">
+      <div class="fc red"><h4>🔥 NQH Đột biến</h4><ul><li>PGD/Xã tăng NQH bất thường</li><li>&gt;2% Cảnh báo · &gt;3% Nguy hiểm</li><li>So sánh delta kỳ trước</li></ul></div>
+      <div class="fc navy"><h4>📉 3T không hoạt động</h4><ul><li>≥3 tháng không trả nợ</li><li>Lọc theo PGD, chương trình</li><li>Xuất danh sách chấn chỉnh</li></ul></div>
+      <div class="fc teal"><h4>🔀 Migration nợ</h4><ul><li>TH→QH, QH→Khoanh</li><li>Cảnh báo sớm nguy cơ</li></ul></div>
+      <div class="fc gold"><h4>⏰ Đến hạn</h4><ul><li>30/60/90 ngày tới</li><li>Xuất danh sách đôn đốc</li></ul></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="ct">📊 So sánh kỳ</div>
+    <div class="fg">
+      <div class="fc navy"><h4>📈 So sánh 2 kỳ</h4><ul><li>Chọn kỳ từ snapshot</li><li>Biến động dư nợ TH/QH/Khoanh</li><li>Biểu đồ waterfall</li></ul></div>
+      <div class="fc teal"><h4>📊 So sánh kỳ nâng cao</h4><ul><li>Tách TW/ĐP</li><li>Bảng delta màu +/–</li><li>Xuất Excel kỳ báo cáo</li></ul></div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ CN3 KIỂM SOÁT ══ -->
+<section id="cn3" class="sec">
+  <div class="ph"><h2>🔒 Kiểm soát &amp; Rủi ro — KH-NV</h2><p>Kiểm soát nội bộ, nợ rủi ro, HHI, nợ khoanh</p></div>
+  <div class="ib blue">Role: <span class="rp a">admin_cn</span><span class="rp m">manager_cn</span></div>
+  <div class="card">
+    <div class="ct">📋 Các module kiểm soát</div>
+    <div class="fg">
+      <div class="fc red"><h4>🔍 Kiểm soát nội bộ</h4><ul><li>Chọn PGD, kỳ kiểm tra</li><li>Checklist chỉ tiêu đạt/không đạt</li><li>Xuất biên bản Word/PDF chuẩn NĐ30</li></ul></div>
+      <div class="fc navy"><h4>💳 Xử lý nợ rủi ro</h4><ul><li>Tổng hợp nợ rủi ro QĐ62</li><li>Phân tích theo CT, PGD</li><li>Lộ trình xử lý</li></ul></div>
+      <div class="fc teal"><h4>📊 HHI – Tập trung rủi ro</h4><ul><li>Chỉ số Herfindahl-Hirschman</li><li>Đánh giá mức độ tập trung</li><li>Cảnh báo rủi ro cao</li></ul></div>
+      <div class="fc gold"><h4>🔒 Nợ Khoanh</h4><ul><li>Tab 1: Tổng quan nợ khoanh</li><li>Tab 2: Quản lý theo CV 368</li><li>Xu hướng, xuất báo cáo</li></ul></div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ CN4 KHTD ══ -->
+<section id="cn4" class="sec">
+  <div class="ph"><h2>📋 Kế hoạch Tín dụng — KH-NV</h2><p>Giao KHTD, điều chỉnh, tiến độ thực hiện</p></div>
+  <div class="ib blue">Role: <span class="rp a">admin_cn</span><span class="rp m">manager_cn</span></div>
+  <div class="card">
+    <div class="ct">📋 Quy trình giao KHTD</div>
+    <div class="steps">
+      <div class="step"><div class="sn">1</div><div class="sb"><h4>Nhập KHTD từ TW giao xuống</h4><p>Nhập theo từng chương trình TW &amp; ĐP</p></div></div>
+      <div class="step"><div class="sn">2</div><div class="sb"><h4>Phân bổ cho 22 PGD</h4><p>Giao theo đợt — PGD nhận thấy ngay trên hệ thống</p><div class="tip">PGD xem chỉ tiêu được giao tại tab KHTD của mình</div></div></div>
+      <div class="step"><div class="sn">3</div><div class="sb"><h4>Điều chỉnh KHTD khi cần</h4><p>Tăng/giảm chỉ tiêu, ghi lý do, lưu lịch sử</p></div></div>
+      <div class="step"><div class="sn">4</div><div class="sb"><h4>Theo dõi tiến độ</h4><p>KH giao vs TH thực hiện, tỷ lệ % đạt</p></div></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="ct">📋 Danh sách tab KHTD</div>
+    <div class="tabs">
+      <div class="tc on">📋 Kế hoạch TD</div><div class="tc">📋 Giao &amp; ĐC KHTD</div><div class="tc">📡 Cân đối - Điện báo</div>
+      <div class="tc">📡 Điện báo</div><div class="tc">📤 Xuất BC KHTD</div><div class="tc">🔭 Xây dựng KHTD TL</div>
+    </div>
+    <div class="fg">
+      <div class="fc navy"><h4>📋 Kế hoạch tín dụng</h4><ul><li>Bảng KHTD theo chương trình</li><li>TW giao vs ĐP phân bổ</li><li>Màu xanh/vàng/đỏ theo %</li></ul></div>
+      <div class="fc teal"><h4>📡 Cân đối - Điện báo</h4><ul><li>Cân đối nguồn vốn</li><li>Dữ liệu điện báo kỳ gần nhất</li><li>Xuất file điện báo theo mẫu</li></ul></div>
+      <div class="fc gold"><h4>📤 Xuất báo cáo KHTD</h4><ul><li>Word/Excel theo mẫu</li><li>Chọn kỳ, đơn vị</li></ul></div>
+      <div class="fc red"><h4>🔭 Xây dựng KHTD TL</h4><ul><li>Mô phỏng kịch bản</li><li>Dự báo dựa trên xu hướng</li></ul></div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ CN5 BÁO CÁO ══ -->
+<section id="cn5" class="sec">
+  <div class="ph"><h2>📈 Báo cáo — KH-NV</h2><p>Báo cáo tín dụng tổng hợp, tiến độ, nợ đến hạn</p></div>
+  <div class="ib blue">Role: <span class="rp a">admin_cn</span><span class="rp m">manager_cn</span><span class="rp e">executive</span></div>
+  <div class="card">
+    <div class="ct">📊 Báo cáo tín dụng</div>
+    <div class="tabs"><div class="tc on">📊 Báo cáo tín dụng</div><div class="tc">⏰ Nợ Đến Hạn</div></div>
+    <div class="fg">
+      <div class="fc navy"><h4>📊 Báo cáo tín dụng</h4><ul><li>Bảng tổng hợp CT theo TW/ĐP</li><li>Header 2 dòng chuẩn màu</li><li>Xuất Excel chuyên nghiệp</li></ul></div>
+      <div class="fc gold"><h4>⏰ Nợ Đến Hạn</h4><ul><li>Lọc 30/60/90 ngày tới</li><li>Phân nhóm PGD, CT</li><li>Xuất danh sách đôn đốc</li></ul></div>
+      <div class="fc teal"><h4>📈 Tiến độ công việc</h4><ul><li>% hoàn thành theo PGD</li><li>Gantt chart theo thời gian</li><li>Highlight trễ hạn</li></ul></div>
+      <div class="fc red"><h4>📋 Tiến độ nộp BC</h4><ul><li>Trạng thái 22 PGD</li><li>Nhắc PGD chưa nộp</li><li>Lịch sử nộp</li></ul></div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ CN6 ỦY THÁC ══ -->
+<section id="cn6" class="sec">
+  <div class="ph"><h2>🤝 Ủy Thác &amp; CBTD — KH-NV</h2><p>BĐD cấp tỉnh, hợp đồng ủy thác, CBTD địa bàn</p></div>
+  <div class="ib blue">Role: <span class="rp a">admin_cn</span><span class="rp m">manager_cn</span></div>
+  <div class="card">
+    <div class="ct">📋 Các tab Ủy thác</div>
+    <div class="fg">
+      <div class="fc navy"><h4>🏛️ Ban Đại Diện cấp Tỉnh</h4><ul><li>Danh sách thành viên BĐD</li><li>Thêm/Sửa/Xóa</li><li>Phân nhóm cấp tỉnh &amp; xã</li></ul></div>
+      <div class="fc teal"><h4>🤝 Ủy thác</h4><ul><li>Quản lý hợp đồng ủy thác</li><li>Mẫu 06, 15, 16 tự điền</li><li>Theo dõi trạng thái</li></ul></div>
+      <div class="fc gold"><h4>👔 CBTD &amp; Địa bàn</h4><ul><li>Danh sách CBTD theo PGD</li><li>Địa bàn quản lý theo xã</li><li>Phân công &amp; theo dõi</li></ul></div>
+      <div class="fc red"><h4>📍 Điểm Giao Dịch CN</h4><ul><li>Danh sách DGD toàn CN</li><li>Số liệu theo điểm GD</li><li>CBTD phụ trách</li></ul></div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ CN7 HỆ THỐNG ══ -->
+<section id="cn7" class="sec">
+  <div class="ph"><h2>⚙️ Upload &amp; Hệ thống — KH-NV</h2><p>Merge 22 PGD, template văn bản, audit log</p></div>
+  <div class="ib amber">⚠️ Ảnh hưởng toàn hệ thống — chỉ <span class="rp a">admin_cn</span><span class="rp m">manager_cn</span></div>
+  <div class="card">
+    <div class="ct">📤 Upload &amp; merge 22 PGD</div>
+    <div class="steps">
+      <div class="step"><div class="sn">1</div><div class="sb"><h4>Chuẩn bị 22 file HSTD</h4><p>Mỗi PGD gửi 1 file Excel chuẩn mẫu</p><div class="warn">Tên file phải đúng định dạng slug PGD</div></div></div>
+      <div class="step"><div class="sn">2</div><div class="sb"><h4>Upload tại tab "Upload dữ liệu"</h4><p>Kéo thả nhiều file → hệ thống tự nhận dạng PGD từ tên file</p></div></div>
+      <div class="step"><div class="sn">3</div><div class="sb"><h4>Kiểm tra kết quả merge</h4><p>✅ thành công / ❌ lỗi từng file — xem chi tiết nếu cần</p></div></div>
+      <div class="step"><div class="sn">4</div><div class="sb"><h4>Dữ liệu cập nhật toàn hệ thống</h4><p>Tất cả tab CN/BGĐ phản ánh dữ liệu mới ngay sau khi merge</p><div class="tip">Snapshot tự động lưu → xem lại dữ liệu kỳ trước được</div></div></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="ct">📋 Template &amp; Nhật ký</div>
+    <div class="tabs"><div class="tc on">📤 Upload template</div><div class="tc">📋 Danh sách</div><div class="tc">🧪 Test template</div></div>
+    <div class="fg">
+      <div class="fc teal"><h4>📋 Quản lý Template</h4><ul><li>Upload .docx mẫu</li><li>Tự điền tag: KH, CT, PGD...</li><li>Test template với hồ sơ thật</li></ul></div>
+      <div class="fc red"><h4>📋 Audit log</h4><ul><li>Ai làm gì, lúc nào</li><li>Lọc theo user, thao tác</li><li>Chỉ <code>admin_cn</code> xem</li></ul></div>
+      <div class="fc navy"><h4>🔍 Trạng thái hệ thống</h4><ul><li>Tình trạng file mỗi PGD</li><li>Ngày cập nhật lần cuối</li><li>Cảnh báo dữ liệu cũ &gt;7 ngày</li></ul></div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ PGD1 TRANG CHỦ ══ -->
+<section id="pgd1" class="sec">
+  <div class="ph"><h2>🏠 Trang chủ PGD</h2><p>KPI nhanh riêng PGD, cảnh báo ưu tiên</p></div>
+  <div class="ib green">Role: <span class="rp p">admin_pgd</span><span class="rp p">manager_pgd</span><span class="rp u">user_pgd</span> — chỉ thấy dữ liệu PGD mình</div>
+  <div class="card">
+    <div class="ct">📊 KPI trang chủ (minh hoạ — PGD Long Thành)</div>
+    <div class="kpir">
+      <div class="kpib"><div class="v">98,250</div><div class="l">Tổng dư nợ (tr.đ)</div><div class="d">▲ +1.2%</div></div>
+      <div class="kpib"><div class="v">0.46%</div><div class="l">Tỷ lệ NQH</div><div class="d">✓ An toàn</div></div>
+      <div class="kpib"><div class="v">3,250</div><div class="l">Hộ vay</div><div class="d">▲ +42</div></div>
+      <div class="kpib"><div class="v">82%</div><div class="l">TL đạt KHTD</div><div class="d">▲ Tốt</div></div>
+    </div>
+    <div class="ib amber">🟡 5 hồ sơ đến hạn trong 30 ngày — Cần đôn đốc</div>
+  </div>
+</section>
+
+<!-- ══ PGD2 NGHIỆP VỤ ══ -->
+<section id="pgd2" class="sec">
+  <div class="ph"><h2>📋 Nghiệp vụ hàng ngày — PGD</h2><p>Tra cứu, danh sách KH, tiến độ, phân tích nâng cao</p></div>
+  <div class="ib green">Role: <span class="rp p">admin_pgd</span><span class="rp p">manager_pgd</span><span class="rp u">user_pgd</span></div>
+  <div class="card">
+    <div class="ct">📋 Danh sách tab</div>
+    <div class="tabs">
+      <div class="tc on">📊 Thông tin chung</div><div class="tc">📈 Tiến độ</div><div class="tc">🔍 Tra cứu</div>
+      <div class="tc">📋 Danh sách &amp; Lọc</div><div class="tc">⏰ Đến hạn</div><div class="tc">📈 Dự phóng dòng tiền</div>
+      <div class="tc">🔥 Heatmap đáo hạn</div><div class="tc">📊 Histogram dư nợ</div><div class="tc">🍩 Cơ cấu CT</div><div class="tc">📊 So sánh kỳ</div>
+    </div>
+    <div class="fg">
+      <div class="fc teal"><h4>🔍 Tra cứu hồ sơ</h4><ul><li>Tìm theo Tên KH, Mã KH, Số KƯ</li><li>Chi tiết hồ sơ, lãi tồn</li><li>Lịch sử trả nợ</li></ul></div>
+      <div class="fc navy"><h4>📋 Danh sách &amp; Lọc</h4><ul><li>Lọc đa chiều: PGD, CT, Xã, TT</li><li>Sắp xếp, phân trang</li><li>Xuất Excel danh sách</li></ul></div>
+      <div class="fc gold"><h4>🔥 Heatmap &amp; Phân tích</h4><ul><li>Heatmap đáo hạn tháng/CT</li><li>Histogram phân bố dư nợ</li><li>Donut cơ cấu chương trình</li></ul></div>
+      <div class="fc red"><h4>📈 Dự phóng dòng tiền</h4><ul><li>Dự báo thu nợ kỳ tới</li><li>Tính toán lịch trả nợ</li></ul></div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ PGD3 BÁO CÁO GIAO BAN ══ -->
+<section id="pgd3" class="sec">
+  <div class="ph"><h2>📈 Báo cáo &amp; Giao ban — PGD</h2><p>Báo cáo tín dụng PGD, điện báo, biên bản, thông báo kết luận</p></div>
+  <div class="ib green">Role: <span class="rp p">admin_pgd</span><span class="rp p">manager_pgd</span><span class="rp u">user_pgd</span></div>
+  <div class="card">
+    <div class="ct">📋 Danh sách tab</div>
+    <div class="tabs">
+      <div class="tc on">📊 Báo cáo TD</div><div class="tc">📡 Điện báo</div><div class="tc">📝 BC Giao ban</div>
+      <div class="tc">📄 Trung tâm mẫu biểu</div><div class="tc">📋 Biên bản giao ban</div><div class="tc">📢 Thông báo kết luận</div>
+    </div>
+    <div class="fg">
+      <div class="fc teal"><h4>📝 Báo cáo Giao ban</h4><ul><li>Tự tính số liệu giao ban</li><li>Xuất Word/PDF chuẩn mẫu</li><li>Giao ban Tổ TK&VV, theo xã</li></ul></div>
+      <div class="fc navy"><h4>📄 Trung tâm mẫu biểu</h4><ul><li>Kho mẫu văn bản chuẩn</li><li>Tự điền từ hệ thống</li><li>Mẫu 06, 07, 08, 15, 16...</li></ul></div>
+      <div class="fc red"><h4>📢 Thông báo kết luận Giao ban</h4><ul><li>Nhập nội dung kết luận họp xã</li><li>Tự điền thông tin PGD, ngày</li><li>Xuất Word chuẩn NĐ30</li><li>Lưu lịch sử các kỳ</li></ul></div>
+      <div class="fc gold"><h4>📋 Biên bản giao ban</h4><ul><li>Lập biên bản họp giao ban</li><li>Xuất PDF, lưu theo kỳ</li></ul></div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ PGD4 KẾ HOẠCH ══ -->
+<section id="pgd4" class="sec">
+  <div class="ph"><h2>🎯 Kế hoạch PGD</h2><p>Xem KHTD được giao, nhập TH theo xã, NQ11, xây dựng KH tương lai</p></div>
+  <div class="ib green">Role: <span class="rp p">admin_pgd</span><span class="rp p">manager_pgd</span></div>
+  <div class="card">
+    <div class="ct">📋 Danh sách tab</div>
+    <div class="tabs">
+      <div class="tc on">🎯 KHTD</div><div class="tc">📋 Giao &amp; ĐC KHTD</div><div class="tc">📋 Mẫu 07</div><div class="tc">🔭 Xây dựng KHTD TL</div><div class="tc">📋 NQ11</div>
+    </div>
+    <div class="fg">
+      <div class="fc navy"><h4>🎯 KHTD PGD</h4><ul><li>Xem chỉ tiêu CN giao</li><li>Tiến độ thực hiện</li><li>Phân nhóm TW/ĐP</li></ul></div>
+      <div class="fc teal"><h4>📋 Mẫu 07 Giao KH</h4><ul><li>Giao chỉ tiêu xuống UBND xã</li><li>Tự tính phân bổ</li><li>Xuất QĐ giao KH Mẫu 07</li></ul></div>
+      <div class="fc gold"><h4>📋 NQ11</h4><ul><li>Theo dõi thực hiện NQ11</li><li>Bảng tổng hợp theo xã</li><li>Xuất báo cáo NQ11</li></ul></div>
+      <div class="fc red"><h4>🔭 Xây dựng KHTD TL</h4><ul><li>Mô phỏng kịch bản</li><li>Dự báo KH năm tới</li></ul></div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ PGD5 KIỂM SOÁT ══ -->
+<section id="pgd5" class="sec">
+  <div class="ph"><h2>🚨 Kiểm soát &amp; Rủi ro — PGD</h2><p>Cảnh báo NQH, đôn đốc, nợ rủi ro, ủy thác, BĐD xã</p></div>
+  <div class="ib green">Role: <span class="rp p">admin_pgd</span><span class="rp p">manager_pgd</span><span class="rp u">user_pgd</span></div>
+  <div class="card">
+    <div class="ct">📋 Danh sách tab</div>
+    <div class="tabs">
+      <div class="tc on">🚨 Cảnh báo TD</div><div class="tc">🔔 Đôn đốc KHĐ</div><div class="tc">⚡ Nợ nguy cơ</div>
+      <div class="tc">💳 Nợ rủi ro QĐ62</div><div class="tc">📍 Điểm GD</div><div class="tc">🏘️ Tổ TK&amp;VV</div>
+      <div class="tc">🏛️ Ban Đại Diện</div><div class="tc">🤝 Ủy thác</div><div class="tc">📊 Nợ Khoanh</div><div class="tc">🔒 Nợ Khoanh CV368</div>
+    </div>
+    <div class="fg">
+      <div class="fc red"><h4>🚨 Cảnh báo NQH PGD</h4><ul><li>NQH theo xã, tổ TK&VV</li><li>3 tháng không hoạt động</li><li>So sánh kỳ trước</li></ul></div>
+      <div class="fc navy"><h4>🔔 Đôn đốc KH Đến hạn</h4><ul><li>Danh sách KH cần đôn đốc</li><li>Xuất thông báo Word</li><li>SMS template đôn đốc</li></ul></div>
+      <div class="fc teal"><h4>📍 Điểm GD &amp; Tổ TK&VV</h4><ul><li>Số liệu theo điểm GD</li><li>Thống kê theo tổ TK&VV</li><li>CBTD phụ trách</li></ul></div>
+      <div class="fc gold"><h4>🏛️ Ban ĐD &amp; Ủy thác cấp xã</h4><ul><li>Thành viên BĐD cấp xã</li><li>Hợp đồng ủy thác</li><li>Mẫu 15, 16 tự điền</li></ul></div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ PGD6 QUẢN TRỊ ══ -->
+<section id="pgd6" class="sec">
+  <div class="ph"><h2>⚙️ Quản trị PGD</h2><p>Upload HSTD, nhiệm vụ, trạng thái hệ thống</p></div>
+  <div class="ib amber">Upload HSTD: chỉ <span class="rp p">admin_pgd</span>. Tab khác: <span class="rp p">admin_pgd</span><span class="rp p">manager_pgd</span><span class="rp u">user_pgd</span></div>
+  <div class="card">
+    <div class="ct">📤 Upload Dữ liệu PGD</div>
+    <div class="steps">
+      <div class="step"><div class="sn">1</div><div class="sb"><h4>Chuẩn bị file HSTD</h4><p>File Excel theo mẫu chuẩn</p></div></div>
+      <div class="step"><div class="sn">2</div><div class="sb"><h4>Upload tại tab "Upload Dữ liệu"</h4><p>Chọn loại: HSTD / NQ11 / GQVL → kéo thả file</p><div class="tip">Lưu tại <code>pgd_data/{slug}/hstd_latest.xlsx</code> — không ảnh hưởng CN</div></div></div>
+      <div class="step"><div class="sn">3</div><div class="sb"><h4>Xác nhận upload thành công</h4><p>Tóm tắt: số dòng, ngày cập nhật, trạng thái kiểm tra</p></div></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="ct">✅ Nhiệm vụ &amp; Trạng thái</div>
+    <div class="fg">
+      <div class="fc teal"><h4>✅ Nhiệm vụ</h4><ul><li>Nhận nhiệm vụ từ Phòng KH-NV</li><li>Cập nhật trạng thái: Đang làm / Xong</li><li>Ghi chú, đính kèm file</li></ul></div>
+      <div class="fc navy"><h4>🔍 Trạng thái hệ thống</h4><ul><li>Tình trạng file HSTD PGD</li><li>Ngày upload lần cuối</li><li>Cảnh báo file cũ &gt;7 ngày</li></ul></div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ BGĐ ══ -->
+<section id="bgd" class="sec">
+  <div class="ph"><h2>👔 Dashboard Ban Giám đốc</h2><p>Tầm nhìn vĩ mô — Sức khỏe tín dụng toàn CN, chỉ đọc</p></div>
+  <div class="ib blue">Role: <span class="rp e">executive</span> — Chỉ xem, không nhập liệu, không upload</div>
+  <div class="card">
+    <div class="ct">📊 KPI vĩ mô (minh hoạ)</div>
+    <div class="kpir">
+      <div class="kpib"><div class="v">1,245 tỷ</div><div class="l">Tổng dư nợ</div><div class="d">▲ 2.3%</div></div>
+      <div class="kpib"><div class="v">1.00%</div><div class="l">Tỷ lệ NQH</div><div class="d">✓ An toàn</div></div>
+      <div class="kpib"><div class="v">92%</div><div class="l">TL đạt KHTD</div><div class="d">▲ +5%</div></div>
+      <div class="kpib"><div class="v">22/22</div><div class="l">PGD cập nhật DL</div><div class="d">✓ Đủ</div></div>
+    </div>
+    <div style="background:#f0f4ff;border:1px solid #bfdbfe;border-radius:8px;padding:14px;font-size:12.5px;color:#1e40af;text-align:center">
+      🎯 Đồng hồ đo NQH (Gauge Plotly) — Xanh ≤1% · Vàng 1–2% · Đỏ &gt;2%<br>
+      📊 Bar chart so sánh sức khỏe 22 PGD · 🚨 Top 5 PGD cần chú ý
+    </div>
+  </div>
+  <div class="card">
+    <div class="ct">✨ Nội dung Dashboard BGĐ</div>
+    <div class="fg">
+      <div class="fc red"><h4>🎯 Gauge NQH</h4><ul><li>Plotly gauge toàn CN</li><li>3 vùng màu trực quan</li><li>Cập nhật theo dữ liệu mới nhất</li></ul></div>
+      <div class="fc navy"><h4>📊 So sánh 22 PGD</h4><ul><li>Bar chart dư nợ / NQH</li><li>Highlight đơn vị cần chú ý</li></ul></div>
+      <div class="fc teal"><h4>📈 Tiến độ KHTD</h4><ul><li>% đạt KH toàn CN</li><li>Trend tháng/quý/năm</li></ul></div>
+      <div class="fc gold"><h4>🚨 Cảnh báo BGĐ</h4><ul><li>Top PGD tăng NQH nhiều nhất</li><li>Xã có NQH bất thường</li><li>Migration nợ cảnh báo sớm</li></ul></div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ FAQ ══ -->
+<section id="faq" class="sec">
+  <div class="ph"><h2>❓ FAQ &amp; Lỗi thường gặp</h2><p>Giải đáp nhanh các vấn đề phổ biến</p></div>
+  <div class="card">
+    <div class="ct">🔐 Đăng nhập &amp; Phân quyền</div>
+    <div class="fg">
+      <div class="fc red"><h4>Không đăng nhập được</h4><ul><li>Kiểm tra tài khoản tồn tại chưa</li><li>Kiểm tra role hợp lệ chưa</li><li>Reset mật khẩu qua admin cấp trên</li></ul></div>
+      <div class="fc navy"><h4>Không thấy dữ liệu PGD</h4><ul><li><code>user_pgd</code> chỉ thấy PGD được phân công</li><li>Kiểm tra <code>user_info["pgd"]</code></li><li>Liên hệ <code>admin_pgd</code> hoặc <code>admin_cn</code></li></ul></div>
+      <div class="fc teal"><h4>Không upload được</h4><ul><li><code>admin_pgd</code>/<code>manager_pgd</code>: Có quyền upload PGD</li><li><code>user_pgd</code>: Không có quyền upload</li><li><code>admin_cn</code>/<code>manager_cn</code>: Upload merge toàn CN</li></ul></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="ct">📊 Dữ liệu &amp; Upload</div>
+    <div class="fg">
+      <div class="fc gold"><h4>Dữ liệu không cập nhật</h4><ul><li>Kiểm tra file đã merge chưa (CN)</li><li>Reload trang (Ctrl+Shift+R)</li><li>Xem tab Trạng thái hệ thống</li></ul></div>
+      <div class="fc red"><h4>Lỗi upload file</h4><ul><li>Kiểm tra đúng mẫu file</li><li>Tên file đúng slug PGD</li><li>File không bị khoá/mở bởi Excel</li></ul></div>
+      <div class="fc navy"><h4>Dữ liệu PGD vs CN lệch</h4><ul><li>Phân hệ CN đọc cache parquet đã merge</li><li>Phân hệ PGD đọc file upload riêng</li><li>Hai luồng độc lập — bình thường</li></ul></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="ct">📞 Liên hệ hỗ trợ</div>
+    <div class="ib blue">Phòng KH-NV Chi nhánh Đồng Nai &nbsp;·&nbsp; Quản trị hệ thống: <code>admin_cn</code></div>
+    <div class="ib green">Sự cố PGD: liên hệ <code>admin_pgd</code> của đơn vị, hoặc chuyển lên <code>admin_cn</code></div>
+  </div>
+</section>
+
+</main>
+</div>
+
+<script>
+function show(id){
+  document.querySelectorAll('.sec').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.nav-a').forEach(a=>a.classList.remove('active'));
+  var sec=document.getElementById(id);
+  if(sec) sec.classList.add('active');
+  var links=document.querySelectorAll('.nav-a');
+  links.forEach(function(a){
+    if(a.getAttribute('onclick')&&a.getAttribute('onclick').includes("'"+id+"'")){a.classList.add('active');}
+  });
+  window.scrollTo(0,0);
+}
+</script>
+</body>
+</html>

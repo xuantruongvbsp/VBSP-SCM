@@ -1,7 +1,7 @@
 # VBSP-SCM — Cursor Rules
 # Hệ thống Quản trị Tín dụng Nội bộ — NHCSXH Chi nhánh Đồng Nai
 # Đọc toàn bộ file này trước khi đọc bất kỳ file code nào.
-# Cập nhật: 21/05/2026
+# Cập nhật: 24/05/2026
 
 ---
 
@@ -157,6 +157,8 @@ db.ghi_kv("key_name", value, username)
 | `dgd_map` | Điểm giao dịch toàn CN |
 | `kh_gqvl_cn_{nam}` | KH GQVL Chi nhánh |
 | `kh_gqvl_pgd_{slug}_{nam}` | KH GQVL theo PGD (dự phòng) |
+| `khnv_phan_cong_list` | Phân công cán bộ nội bộ Phòng KH-NV |
+| `khnv_lich_list` | Lịch công tác Phòng KH-NV |
 
 `slug` = `pgd_slug(ten_pgd)` từ `data/pgd.py`.
 
@@ -256,7 +258,7 @@ from auth import co_quyen_upload_pgd, co_quyen_quan_ly_user_pgd
 
 role = normalize_role(role)   # luôn normalize trước
 
-if la_phan_he_cn(role):       # executive, admin_cn, manager_cn, admin, manager
+if la_phan_he_cn(role):       # executive, admin_cn, manager_cn, admin, manager, chuyenvien_cn
 if la_phan_he_pgd(role):      # admin_pgd, manager_pgd, user_pgd, user
 if co_quyen_upload_pgd(role): # admin_pgd, manager_pgd
 ```
@@ -268,6 +270,7 @@ if co_quyen_upload_pgd(role): # admin_pgd, manager_pgd
 | `executive` | CN | Chỉ đọc dashboard |
 | `admin_cn` / `admin` | CN | Toàn quyền |
 | `manager_cn` / `manager` | CN | Upload, giao chỉ tiêu |
+| `chuyenvien_cn` | CN | Tác nghiệp CN (không có quyền upload) |
 | `admin_pgd` | PGD | Upload + quản lý user PGD |
 | `manager_pgd` | PGD | Upload + nhập kế hoạch |
 | `user_pgd` / `user` | PGD | Tác nghiệp, chỉ thấy PGD mình |
@@ -323,6 +326,8 @@ else:
 - Inject CSS **một lần** trong `app.py` — không inject trong tab
 - Bảng ≥ 8 cột → HTML thuần + `st.markdown(unsafe_allow_html=True)`
 - Màu sắc → xem `UI_GUIDELINES.md`
+- HTML: **KHÔNG** hardcode `color:black` / `background:white` — dùng CSS variable tương thích dark mode
+- `st.date_input` bắt buộc có `format="DD/MM/YYYY"`
 
 ---
 
@@ -344,14 +349,37 @@ Trước khi dùng thư viện mới, kiểm tra đã có:
 
 ---
 
-### 5.12 Error handling — KHÔNG dùng except: pass
+### 5.12 Error logging — KHÔNG nuốt lỗi
 
 ```python
+from logger import get_logger
+logger = get_logger(__name__)
+
 try:
     xu_ly_gi_do()
 except Exception as e:
+    logger.error("ten_ham: mo_ta — %s", e, exc_info=True)
     db.ghi_audit(username, "loi_he_thong", f"{e}")
     st.error(f"❌ Lỗi: {e}")
+# KHÔNG: except Exception: pass
+```
+
+---
+
+### 5.13 DuckDB — LUÔN kiểm tra schema trước khi query
+
+```python
+import duckdb, pyarrow.parquet as pq
+
+# PHẢI kiểm tra schema trước
+schema = pq.read_schema(CACHE_HSTD)
+cols = [f.name for f in schema]
+if "Ten_ct" not in cols:
+    st.warning("⚠️ Parquet thiếu cột Ten_ct")
+    return
+
+# Sau đó mới query
+df = duckdb.query(f"SELECT ... FROM '{CACHE_HSTD}'").df()
 ```
 
 ---

@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## [2026-05-24] — Fix pandas warning + optimize watchdog
+- `app.py` dòng 75 — Sửa `select_dtypes(include="object")` → `include=["object", "string"]` (pandas 2.x deprecated)
+- `.streamlit/config.toml` — Thêm `logs` vào `folderWatchBlacklist` tránh rerun khi log file thay đổi
+
 ## [2026-05-24] — Fix 13 lỗi Tab Kiểm toán Nội bộ (KTNB) — Phase 2
 - `services/ktnb_service.py` dòng ~724 — Thêm guard `if df_dm.empty` trước khi render form thêm lỗi; trước đó crash `IndexError` khi bảng danh mục lỗi trống
 - `services/ktnb_service.py` dòng ~786 — Sửa call `cap_nhat_trang_thai_loi()` để dùng keyword args thay positional (dòng này bỏ sót ở phase 1)

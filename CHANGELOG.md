@@ -1,5 +1,8 @@
 # CHANGELOG
 
+## [2026-05-24] — Fix lỗi "category does not support sum" trong So sánh kỳ
+- `app.py` dòng ~77-92, `_toi_uu_dtype()` — thêm kiểm tra: cột object có ≥80% giá trị chuyển được sang số thì ép về `pd.to_numeric()` thay vì `astype("category")` (gốc lỗi: cột "Giải ngân trong năm" bị convert thành category, `.sum()` crash)
+
 ## [2026-05-24] — Tối ưu cache: fix DataFrame hashing trong các cached wrappers
 - `data/hstd.py` dòng 346–359 — Đổi signature 3 cached wrappers (`danh_dau_khong_hd_cached`, `tong_hop_khong_hd_cached`, `canh_bao_migration_cached`) sang `(_df, ts=0.0)` — bỏ hash DataFrame, dùng `ts` làm cache key
 - `tabs/tab_kiem_soat.py` dòng 20, 32–35 — Import cached, thay direct call → `danh_dau_khong_hd_cached(df, ts=ts_file(CACHE_HSTD))`

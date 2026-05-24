@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [2026-05-24] — Fix 7 lỗi Tab Kiểm toán Nội bộ (KTNB)
+- `services/ktnb_service.py` dòng ~671 — Thêm try-except trong `_luu_minh_chung()` để handle OSError + unhandled exceptions; trước đó ghi file thất bại vẫn trả về path=None im lặng
+- `services/ktnb_service.py` dòng ~756 — Kiểm tra `path is not None` sau upload file minh chứng; thêm limit 10MB; thay positional args → keyword args cho `cap_nhat_trang_thai_loi()`
+- `services/ktnb_service.py` dòng ~217 — Thêm validation: Số CV ≤50 ký tự, Trưởng đoàn không trống, Ngày bắt đầu ≤ Ngày kết thúc
+- `services/ktnb_service.py` dòng ~183-383 — Dùng consistent session key prefix `_ktnb_*` (thay vì mixed `ktnb_*`); keys: `_ktnb_nam`, `_ktnb_dot_team`, `_ktnb_sample_ratio`, `_ktnb_prioritize_risk`, `_ktnb_filter_status`, `_ktnb_dot_selector`
+- `services/ktnb_service.py` dòng ~817 — Xóa `st.json(dot)` trong tab A; đã hiển thị info đầu form, không cần raw JSON; xóa duplicate call `render_ke_hoach_lich_trinh()` sau json
+
 ## [2026-05-24] — Fix 6 lỗi tab So sánh 2 kỳ (package tabs/tab_so_sanh_ky/)
 - `tabs/tab_so_sanh_ky/_common.py` dòng ~105 — Thêm `.delta-pos`, `.delta-neg`, `.delta-zero` vào `Q_BAR_CSS`; trước đó các class tồn tại trong HTML nhưng không có style định nghĩa → màu delta hoàn toàn mất
 - `tabs/tab_so_sanh_ky/_export.py` hàm `render_export_ui()` — Thay antipattern `st.button → st.download_button` lồng nhau (bytes biến mất sau rerun) bằng `session_state` cache + `st.download_button` trực tiếp; thêm `st.warning` khi `reportlab` chưa cài (trước đó trả `b""` im lặng)

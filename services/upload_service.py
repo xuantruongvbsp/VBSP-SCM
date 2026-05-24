@@ -756,6 +756,50 @@ def luu_pgd_file(ten_pgd: str, loai: str, file_bytes: bytes) -> KetQuaUpload:
     ok, msg = kiem_tra_file(f"{loai}_{ten_pgd}.xlsx", file_bytes)
     if not ok:
         return KetQuaUpload(False, msg)
+    
+    # Validate dữ liệu trước khi lưu (chỉ cho HSTD, GQVL, NQ11)
+    if loai in ["hstd", "gqvl", "nq11"]:
+        try:
+            from services.validation_service import validate_dataframe
+            from io import BytesIO
+            import pandas as pd
+            
+            # Đọc file để validate
+            df = pd.read_excel(BytesIO(file_bytes))
+            
+            # Validate theo loại bảng
+            validation_result = validate_dataframe(df, loai)
+            
+            # Nếu có lỗi critical, block upload
+            if not validation_result.is_valid:
+                error_msgs = []
+                for error in validation_result.errors:
+                    if error.level.value == "critical":
+                        error_msgs.append(f"• {error.column}: {error.message}")
+                
+                if error_msgs:
+                    return KetQuaUpload(
+                        False, 
+                        f"🚫 Dữ liệu không hợp lệ, không thể lưu:\n" + "\n".join(error_msgs[:5])
+                    )
+            
+            # Log warnings cho admin
+            if validation_result.warning_count > 0:
+                warning_msgs = []
+                for error in validation_result.errors:
+                    if error.level.value == "warning":
+                        warning_msgs.append(f"• {error.column}: {error.message}")
+                
+                if warning_msgs:
+                    logger.warning(
+                        "Validation warnings for %s/%s: %s", 
+                        ten_pgd, loai, "\n".join(warning_msgs[:3])
+                    )
+        
+        except Exception as e:
+            logger.error("Lỗi validation %s/%s: %s", ten_pgd, loai, e, exc_info=True)
+            # Không block upload nếu có lỗi trong validation logic
+            logger.debug("Tiếp tục lưu file %s/%s dù validation lỗi", ten_pgd, loai)
 
     from data.pgd import luu_file_pgd as _luu_pgd, thu_muc_pgd
     path = _luu_pgd(ten_pgd, loai, file_bytes)

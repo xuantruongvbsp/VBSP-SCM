@@ -4,6 +4,18 @@
 
 ---
 
+## [2026-05-24] Fix 7 lỗi Tab Kiểm toán Nội bộ (KTNB)
+
+| Fix | File | Mức độ | Chi tiết |
+|---|---|---|---|
+| Try-except file operations | `ktnb_service.py` ~671 | 🔴 CRITICAL | `_luu_minh_chung()` bây giờ handle OSError + unhandled exceptions, trả None nếu lỗi |
+| Validate path after upload | `ktnb_service.py` ~756 | 🔴 CRITICAL | Check `path is not None`, thêm 10MB limit, dùng keyword args |
+| Form validation | `ktnb_service.py` ~217 | 🟡 MEDIUM | Validate: Số CV ≤50 ký tự, Trưởng đoàn, Ngày bắt đầu ≤ Kết thúc |
+| Session key consistency | `ktnb_service.py` ~183-383 | 🟡 MEDIUM | Dùng `_ktnb_*` prefix cho tất cả session keys (thay mix cũ) |
+| Remove st.json() + duplicate | `ktnb_service.py` ~817 | 🔴 CRITICAL | Xóa raw JSON display + duplicate `render_ke_hoach_lich_trinh()` call |
+
+---
+
 ## [2026-05-24] Fix 6 lỗi tab So sánh 2 kỳ
 
 ### Package `tabs/tab_so_sanh_ky/`

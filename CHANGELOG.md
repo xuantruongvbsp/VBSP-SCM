@@ -1,5 +1,21 @@
 # CHANGELOG
 
+## [2026-05-24] — Refactor Navigation state: ws_management/ws_operation dùng SCMStateManager
+- `workspaces/ws_management.py` — Thay `st.session_state["ws_mgmt_menu"]`/`ws_mgmt_jump` bằng `SCMStateManager.nav_ws_mgmt_menu`/`nav_ws_mgmt_jump` (persist menu + one-shot jump)
+- `workspaces/ws_operation.py` — Thay `ws_op_nhom`/`ws_op_jump_tab` bằng `SCMStateManager.nav_ws_op_nhom`/`nav_ws_op_jump_tab`; outer navigation dùng `st.radio`, inner dùng `lazy_tabs()` để render 1 tab và hỗ trợ jump theo shortcut/cảnh báo
+- `state_manager.py` — Getter/setter `nav_*`/`filter_*` dùng `setdefault(...)` để không KeyError nếu workspace được import độc lập trước khi `ensure_initialized()`
+- `alert_center.py` — Cập nhật `_jump_to_khoanh()` dùng `SCMStateManager` cho nhảy workspace (management/operation)
+- `BUGMAP.md` — Thêm B10: shortcut set `ws_op_*` nhưng không nhảy tab
+
+## [2026-05-24] — Fix circular import deadlock: data → services → data.pgd
+- `services/upload_service.py` dòng ~39 — Chuyển `from data.pgd import duong_dan_pgd` (module-level) thành lazy-load wrapper `_duong_dan_pgd()` để phá vòng: `data.__init__ → data.hstd → services.__init__ → upload_service → data.pgd` gây `_ModuleLock DeadlockError`
+- **Kết quả:** App khởi động bình thường, không còn `_frozen_importlib._DeadlockError`
+
+## [2026-05-24] — state_manager.py: quản lý State tập trung
+- `state_manager.py` — Tạo mới: `SCMStateManager` với typed properties (filters, navigation) + generic namespace (downloads, temp, cache); `ensure_initialized()` khởi tạo 1 lần ở app.py; `debug_dump()` cho tra cứu state
+- `app.py` dòng ~62 — Thêm `from state_manager import SCMStateManager`
+- `app.py` dòng ~174 — Thêm `SCMStateManager.ensure_initialized()` ở đầu `main()`
+
 ## [2026-05-24] — Nâng cấp & gộp nhóm CBTD – ĐGD – Tổ TK&VV
 - `services/cbtd_dia_ban_service.py` — Tạo mới: `lay_to_theo_cbtd()`, `canh_bao_cbtd_dia_ban()`, `tom_tat_kpi()` — helper thuần Python cho cross-join CBTD→ĐGD→Tổ và cảnh báo thông minh
 - `tabs/tab_cbtd_dashboard.py` — Tạo mới: Dashboard KPI tổng hợp (6 KPI cards, 3 loại cảnh báo, bảng pivot, xuất Excel cross-mảng nhiều sheet)

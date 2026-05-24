@@ -12,6 +12,7 @@ from typing import Any, Callable
 import duckdb
 import pandas as pd
 import streamlit as st
+from state_manager import SCMStateManager
 
 from config import (
     COT_TEN_PGD,
@@ -586,9 +587,8 @@ def _xuat_pdf_btn(
     """Render Xuất PDF (xuat_pdf) — ẩn khi readonly."""
     if readonly or df is None or df.empty:
         return
-
-    ss_key      = f"_pdf_bytes_{key}"
-    ss_file_key = f"_pdf_file_{key}"
+    state = SCMStateManager()
+    downloads_key = f"pdf_{key}"
 
     if st.button("📄 Xuất PDF", key=key, type="primary"):
         try:
@@ -600,22 +600,25 @@ def _xuat_pdf_btn(
                     cols_tien,
                     prefix_file=prefix_pdf,
                 )
-            st.session_state[ss_key]      = pdf_bytes
-            st.session_state[ss_file_key] = f"{prefix_pdf}_{datetime.now().strftime('%d%m%Y_%H%M')}.pdf"
+            state.downloads.set(
+                downloads_key,
+                pdf_bytes,
+                f"{prefix_pdf}_{datetime.now().strftime('%d%m%Y_%H%M')}.pdf",
+            )
         except Exception as e:
-            logger.error("hien_thi_bieu_chi_tiet_pdf: %s — %s", ss_key, e, exc_info=True)
-            st.session_state[ss_key] = None
+            logger.error("hien_thi_bieu_chi_tiet_pdf: %s — %s", downloads_key, e, exc_info=True)
+            state.downloads.clear(downloads_key)
             st.error(f"❌ Lỗi tạo PDF: {e}")
 
-    pdf_data = st.session_state.get(ss_key)
-    if pdf_data is not None:
-        st.download_button(
+    if state.downloads.has(downloads_key):
+        if st.download_button(
             label="⬇ Tải file PDF",
-            data=pdf_data,
-            file_name=st.session_state.get(ss_file_key, f"{prefix_pdf}.pdf"),
+            data=state.downloads.get_bytes(downloads_key),
+            file_name=state.downloads.get_filename(downloads_key) or f"{prefix_pdf}.pdf",
             mime="application/pdf",
             key=f"{key}_dl",
-        )
+        ):
+            state.downloads.clear(downloads_key)
 
 
 def render_3m_khd(

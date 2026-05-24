@@ -92,7 +92,14 @@ def lay_ap_tu_dgd_list(pgd: str, ds_dgd: list, dgd_map: dict) -> list[tuple[str,
             continue
         for dgd_name, ap_list in dgd_block.items():
             if dgd_name in ds_dgd:
-                for ap in (ap_list or []):
+                # Schema moi: ap_list co the la dict {"thon": [...]} hoac list cu
+                if isinstance(ap_list, dict):
+                    thon_items = ap_list.get("thon", [])
+                elif isinstance(ap_list, list):
+                    thon_items = ap_list
+                else:
+                    thon_items = []
+                for ap in thon_items:
                     ap_s = str(ap).strip()
                     if ap_s:
                         result.append((ten_xa, ap_s))

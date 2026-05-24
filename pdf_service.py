@@ -3,6 +3,7 @@ from datetime import datetime
 from pathlib import Path
 import pandas as pd
 import streamlit as st
+from state_manager import SCMStateManager
 
 try:
     from reportlab.lib import colors
@@ -379,28 +380,31 @@ def nut_xuat_pdf(
     prefix_file: str = "BC",
     key: str = "btn_pdf",
 ) -> None:
-    ss_key      = f"_pdf_bytes_{key}"
-    ss_file_key = f"_pdf_file_{key}"
+    state = SCMStateManager()
+    downloads_key = f"pdf_{key}"
 
     if st.button("📄 Xuất PDF", key=key, type="primary"):
         try:
             with st.spinner("Đang tạo PDF..."):
                 pdf_bytes = xuat_pdf(df, tieu_de, username, cols_tien, prefix_file=prefix_file)
-            st.session_state[ss_key]      = pdf_bytes
-            st.session_state[ss_file_key] = f"{prefix_file}_{datetime.now().strftime('%d%m%Y_%H%M')}.pdf"
+            state.downloads.set(
+                downloads_key,
+                pdf_bytes,
+                f"{prefix_file}_{datetime.now().strftime('%d%m%Y_%H%M')}.pdf",
+            )
         except Exception as e:  # conv: skip
-            st.session_state[ss_key] = None
+            state.downloads.clear(downloads_key)
             st.error(f"❌ Lỗi tạo PDF: {e}")
 
-    pdf_data = st.session_state.get(ss_key)
-    if pdf_data is not None:
-        st.download_button(
+    if state.downloads.has(downloads_key):
+        if st.download_button(
             label="⬇ Tải file PDF",
-            data=pdf_data,
-            file_name=st.session_state.get(ss_file_key, f"{prefix_file}.pdf"),
+            data=state.downloads.get_bytes(downloads_key),
+            file_name=state.downloads.get_filename(downloads_key) or f"{prefix_file}.pdf",
             mime="application/pdf",
             key=f"dl_{key}",
-        )
+        ):
+            state.downloads.clear(downloads_key)
 
 
 # ── Extra functions chỉ có ở root pdf_service.py ──────────────────────────

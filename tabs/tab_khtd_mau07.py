@@ -149,6 +149,23 @@ def render(tab, **kwargs) -> None:
                 )
 
         ds_xa_pgd = PGD_XA_MAP.get(pgd_chon, [])
+        
+        # Validation warnings cho PGD và xã
+        try:
+            from services.validation_service import validation_service
+            
+            # Kiểm tra PGD có trong hệ thống không
+            if pgd_chon not in validation_service.pgd_names and pgd_chon != DON_VI_CHI_NHANH:
+                st.error(f"⚠️ PGD '{pgd_chon}' không tồn tại trong hệ thống.")
+            
+            # Kiểm tra xã thuộc PGD
+            if len(ds_xa_pgd) == 0 and pgd_chon != DON_VI_CHI_NHANH:
+                st.warning(f"⚠️ Không có xã/phường nào được cấu hình cho PGD '{pgd_chon}'.")
+            elif len(ds_xa_pgd) > 0:
+                st.info(f"ℹ️ PGD '{pgd_chon}' có {len(ds_xa_pgd)} xã/phường.")
+                
+        except Exception as e:
+            logger.error("Lỗi validation warnings tab_khtd_mau07: %s", e, exc_info=True)
 
         # ═══ MAPPING VÀ FUZZY MATCHING TÊNN XÃ ═══
         df_full = kwargs.get("df_full")

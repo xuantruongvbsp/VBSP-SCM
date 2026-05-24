@@ -1,11 +1,32 @@
 # CHANGELOG
 
+## [2026-05-24] — Refactor Filter state: dùng SCMStateManager.filter_* (PGD/Xã/Chương trình)
+- `workspaces/ws_operation.py` — Dropdown “Xem theo PGD” đồng bộ vào `state.filter_pgd` để giữ filter xuyên suốt workspace/tabs
+- `tabs/tab_baocao.py` — Bộ lọc PGD/Xã/Chương trình đồng bộ với `state.filter_pgd/filter_xa/filter_chuong_trinh`; đổi PGD tự reset Xã
+- `tabs/tab_so_sanh_2_ky.py` — Lọc PGD (CN) đồng bộ với `state.filter_pgd` để giữ lựa chọn khi chuyển qua lại các tab báo cáo
+
+## [2026-05-24] — QA helpers: debug_dump + clear state khi logout
+- `app.py` — thêm expander “🧪 Debug state” (admin) hiển thị `SCMStateManager.debug_dump()` + nút “Clear downloads”
+- `app.py` — khi “Đăng xuất”, xoá toàn bộ key `_scm_*` để tránh state rò rỉ giữa phiên đăng nhập khác role
+
+## [2026-05-24] — Refactor Download bytes: dùng SCMStateManager.downloads (giảm RAM)
+- `state_manager.py` — `downloads` namespace được dùng làm nơi lưu bytes+filename thay cho nhiều key `_bytes_*` / `_pdf_bytes_*` rải rác
+- `pdf_service.py` — `nut_xuat_pdf()` chuyển từ `st.session_state[_pdf_bytes_*]` sang `SCMStateManager.downloads` + clear one-shot khi bấm tải
+- `services/kiem_soat_service.py` — `_xuat_pdf_btn()` chuyển sang `SCMStateManager.downloads` (loại bỏ `_pdf_bytes_*` / `_pdf_file_*`)
+- `services/template_service.py` — `nut_tai_word_va_pdf()`/`hien_thi_nut_tai()` chuyển sang `SCMStateManager.downloads` (docx/pdf), clear khi bấm tải
+- `tabs/tab_baocao.py`, `tab_kehoach.py`, `tab_cbtd.py`, `tab_den_han.py`, `tab_gqvl.py`, `tab_qd62.py`, `tab_nq11.py`, `tab_khtd_xuat.py`, `tab_khtd_nhap.py`, `tab_danhsach.py`, `tab_tongquan.py`, `tab_candoi.py`, `tab_cdtotkvv.py`, `tab_cdtotkvv_pgd.py`, `workspaces/ws_management.py`, `workspaces/ws_operation.py` — thay session_state bytes/file → `state.downloads`
+
 ## [2026-05-24] — Refactor Navigation state: ws_management/ws_operation dùng SCMStateManager
 - `workspaces/ws_management.py` — Thay `st.session_state["ws_mgmt_menu"]`/`ws_mgmt_jump` bằng `SCMStateManager.nav_ws_mgmt_menu`/`nav_ws_mgmt_jump` (persist menu + one-shot jump)
 - `workspaces/ws_operation.py` — Thay `ws_op_nhom`/`ws_op_jump_tab` bằng `SCMStateManager.nav_ws_op_nhom`/`nav_ws_op_jump_tab`; outer navigation dùng `st.radio`, inner dùng `lazy_tabs()` để render 1 tab và hỗ trợ jump theo shortcut/cảnh báo
 - `state_manager.py` — Getter/setter `nav_*`/`filter_*` dùng `setdefault(...)` để không KeyError nếu workspace được import độc lập trước khi `ensure_initialized()`
 - `alert_center.py` — Cập nhật `_jump_to_khoanh()` dùng `SCMStateManager` cho nhảy workspace (management/operation)
 - `BUGMAP.md` — Thêm B10: shortcut set `ws_op_*` nhưng không nhảy tab
+
+## [2026-05-24] — Dashboard "🌅 Hôm nay" cho workspace BGĐ
+- `workspaces/ws_executive.py` — Thêm `_render_hom_nay()`: KPI row 5 chỉ số (tổng dư nợ, NQH, tỷ lệ NQH, số KH, đến hạn tuần), bảng 22 PGD (dư nợ + NQH% + badge trạng thái), alert biến động ≥5% so kỳ snapshot trước, trạng thái cập nhật HSTD/NQ11/GQVL
+- `workspaces/ws_executive.py` — Thêm menu item "🌅 Hôm nay" đầu nhóm "Tổng quan" trong `_build_exec_items()`
+- **Kết quả:** BGĐ mở app thấy ngay tình hình ngày hôm nay mà không cần click thêm
 
 ## [2026-05-24] — Fix circular import deadlock: data → services → data.pgd
 - `services/upload_service.py` dòng ~39 — Chuyển `from data.pgd import duong_dan_pgd` (module-level) thành lazy-load wrapper `_duong_dan_pgd()` để phá vòng: `data.__init__ → data.hstd → services.__init__ → upload_service → data.pgd` gây `_ModuleLock DeadlockError`

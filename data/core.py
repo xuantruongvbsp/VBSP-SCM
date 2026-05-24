@@ -16,6 +16,48 @@ def ts_file(fp: str) -> float:
     return os.path.getmtime(fp) if os.path.exists(fp) else 0
 
 
+def _should_force_str(col: str) -> bool:
+    s = unicodedata.normalize("NFC", str(col or "")).strip().lower()
+    return (
+        s.startswith("mã ")
+        or s == "mã"
+        or " mã " in f" {s} "
+        or s in {"mã thôn", "mã xã", "mã kh", "mã khách hàng", "mã chương trình"}
+        or s in {"số khế ước", "số ku", "số atm"}
+        or "cmnd" in s
+        or "cccd" in s
+        or s in {"số điện thoại", "điện thoại", "sdt", "sđt"}
+        or s.startswith("số ") and ("kh" in s or "account" in s)
+    )
+
+
+def _normalize_code_series(ser: pd.Series) -> pd.Series:
+    bad_vals = {"nan", "none", "<na>", "nat"}
+    if isinstance(ser.dtype, pd.CategoricalDtype):
+        ser = ser.astype(object)
+    elif pd.api.types.is_integer_dtype(ser.dtype):
+        ser = ser.astype(object)
+    elif pd.api.types.is_float_dtype(ser.dtype):
+        whole = ser.notna() & (ser % 1 == 0)
+        ser = ser.astype(object)
+        if whole.any():
+            ser = ser.copy()
+            ser.loc[whole] = (
+                pd.to_numeric(ser.loc[whole], errors="coerce")
+                .astype("int64")
+                .astype(str)
+            )
+    if ser.dtype == object:
+        num = pd.to_numeric(ser, errors="coerce")
+        whole2 = num.notna() & (num % 1 == 0) & ser.notna()
+        if whole2.any():
+            ser = ser.copy()
+            ser.loc[whole2] = num.loc[whole2].astype("int64").astype(str)
+    out = ser.fillna("").astype(str).str.strip()
+    low = out.str.lower()
+    return out.mask(low.isin(bad_vals), "")
+
+
 def excel_to_parquet(
     excel_path: str,
     parquet_path: str,
@@ -28,46 +70,6 @@ def excel_to_parquet(
     Chỉ chuyển lại khi Excel mới hơn cache → đọc nhanh hơn ~200x.
     RAM giảm 50-70% nhờ PyArrow zero-copy; cache nhỏ hơn ~30% nhờ zstd.
     """
-    def _should_force_str(col: str) -> bool:
-        s = unicodedata.normalize("NFC", str(col or "")).strip().lower()
-        return (
-            s.startswith("mã ")
-            or s == "mã"
-            or " mã " in f" {s} "
-            or s in {"mã thôn", "mã xã", "mã kh", "mã khách hàng", "mã chương trình"}
-            or s in {"số khế ước", "số ku", "số atm"}
-            or "cmnd" in s
-            or "cccd" in s
-            or s in {"số điện thoại", "điện thoại", "sdt", "sđt"}
-            or s.startswith("số ") and ("kh" in s or "account" in s)
-        )
-
-    def _normalize_code_series(ser: pd.Series) -> pd.Series:
-        bad_vals = {"nan", "none", "<na>", "nat"}
-        if isinstance(ser.dtype, pd.CategoricalDtype):
-            ser = ser.astype(object)
-        elif pd.api.types.is_integer_dtype(ser.dtype):
-            ser = ser.astype(object)
-        elif pd.api.types.is_float_dtype(ser.dtype):
-            whole = ser.notna() & (ser % 1 == 0)
-            ser = ser.astype(object)
-            if whole.any():
-                ser = ser.copy()
-                ser.loc[whole] = (
-                    pd.to_numeric(ser.loc[whole], errors="coerce")
-                    .astype("int64")
-                    .astype(str)
-                )
-        if ser.dtype == object:
-            num = pd.to_numeric(ser, errors="coerce")
-            whole2 = num.notna() & (num % 1 == 0) & ser.notna()
-            if whole2.any():
-                ser = ser.copy()
-                ser.loc[whole2] = num.loc[whole2].astype("int64").astype(str)
-        out = ser.fillna("").astype(str).str.strip()
-        low = out.str.lower()
-        return out.mask(low.isin(bad_vals), "")
-
     os.makedirs(os.path.dirname(parquet_path), exist_ok=True)
     if ts_file(parquet_path) < ts_file(excel_path):
         try:

@@ -1,5 +1,5 @@
 {
-  "exported_at": "2026-05-22T20:55:35.558869",
+  "exported_at": "2026-05-24T15:33:20.159950",
   "version": 2,
   "tables": {
     "users": [],
@@ -87,12 +87,19 @@
         "value": "{\"thoi_gian\": \"2026-05-22T17:44:30.526877\", \"bao_cao\": [], \"tong_so_loi\": 0, \"tong_dong\": 0}",
         "updated_at": "2026-05-22T17:44:30.526949",
         "updated_by": "admin"
+      },
+      {
+        "key": "alert_read_ids",
+        "value": "{\"ids\": []}",
+        "updated_at": "2026-05-24T15:33:18.648435",
+        "updated_by": "admin"
       }
     ],
     "nhiem_vu": [],
     "nhiem_vu_ketqua": [],
     "tien_do_task": [],
     "tien_do_ketqua": [],
+    "tien_do_template": [],
     "qlnk_ket_qua": [],
     "qlnk_bo_sung": [],
     "qlnk_ke_hoach": [],

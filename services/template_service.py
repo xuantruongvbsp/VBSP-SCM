@@ -116,12 +116,16 @@ def nut_tai_word_va_pdf(
     Gọi bên trong if st.button().
     """
     import streamlit as st
+    from state_manager import SCMStateManager
 
-    st.session_state[f"_w_bytes_{key_prefix}"] = docx_bytes
-    st.session_state[f"_f_name_{key_prefix}"] = ten_file_goc
+    state = SCMStateManager()
+    ten_docx = ten_file_goc if ten_file_goc.lower().endswith(".docx") else f"{ten_file_goc}.docx"
+    ten_pdf = ten_file_goc if ten_file_goc.lower().endswith(".pdf") else f"{ten_file_goc}.pdf"
+
+    state.downloads.set(f"{key_prefix}_docx", docx_bytes, ten_docx)
     pdf_bytes = docx_to_pdf(docx_bytes)
     if pdf_bytes:
-        st.session_state[f"_p_bytes_{key_prefix}"] = pdf_bytes
+        state.downloads.set(f"{key_prefix}_pdf", pdf_bytes, ten_pdf)
 
 
 def hien_thi_nut_tai(key_prefix: str) -> None:
@@ -130,33 +134,37 @@ def hien_thi_nut_tai(key_prefix: str) -> None:
     Gọi NGOÀI if st.button() — luôn render.
     """
     import streamlit as st
+    from state_manager import SCMStateManager
 
-    docx_bytes = st.session_state.get(f"_w_bytes_{key_prefix}")
-    if not docx_bytes:
+    state = SCMStateManager()
+    docx_key = f"{key_prefix}_docx"
+    pdf_key = f"{key_prefix}_pdf"
+    if not state.downloads.has(docx_key):
         return
 
     col1, col2 = st.columns(2)
     with col1:
-        st.download_button(
+        if st.download_button(
             "⬇️ Tải Word (.docx)",
-            data=docx_bytes,
-            file_name=f"{st.session_state.get(f'_f_name_{key_prefix}', 'file')}.docx",
+            data=state.downloads.get_bytes(docx_key),
+            file_name=state.downloads.get_filename(docx_key) or "file.docx",
             mime="application/vnd.openxmlformats-officedocument"
                  ".wordprocessingml.document",
             key=f"{key_prefix}_dl_docx",
             use_container_width=True,
-        )
+        ):
+            state.downloads.clear(docx_key)
     with col2:
-        pdf_bytes = st.session_state.get(f"_p_bytes_{key_prefix}")
-        if pdf_bytes:
-            st.download_button(
+        if state.downloads.has(pdf_key):
+            if st.download_button(
                 "⬇️ Tải PDF",
-                data=pdf_bytes,
-                file_name=f"{st.session_state.get(f'_f_name_{key_prefix}', 'file')}.pdf",
+                data=state.downloads.get_bytes(pdf_key),
+                file_name=state.downloads.get_filename(pdf_key) or "file.pdf",
                 mime="application/pdf",
                 key=f"{key_prefix}_dl_pdf",
                 use_container_width=True,
-            )
+            ):
+                state.downloads.clear(pdf_key)
         else:
             st.caption("⚠️ PDF: cần MS Word trên server")
 

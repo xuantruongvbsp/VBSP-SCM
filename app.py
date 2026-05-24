@@ -77,6 +77,13 @@ def _toi_uu_dtype(df: pd.DataFrame) -> pd.DataFrame:
             if df[col].nunique(dropna=False) <= NGUONG_CATEGORY:
                 if col.lower().startswith("ngày"):
                     continue
+                vals = df[col].dropna()
+                if len(vals) > 0:
+                    numeric_vals = pd.to_numeric(vals, errors="coerce")
+                    ty_le_so = numeric_vals.notna().sum() / len(vals)
+                    if ty_le_so > 0.8:
+                        df[col] = pd.to_numeric(df[col], errors="coerce")
+                        continue
                 df[col] = df[col].astype("category")
         except Exception:
             pass

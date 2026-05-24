@@ -98,6 +98,8 @@ COT_NGUON_VON         = "Nguồn vốn"       # 1=TW, 2=ĐP
 COT_MA_CHUONG_TRINH   = "Mã chương trình"
 COT_PL_NV             = "Phân loại NV"    # KHÔNG hardcode "PL NV"
 COT_MA_NHA_DAU_TU     = "Mã nhà đầu tư"
+COT_TEN_NHA_DAU_TU     = "Tên nhà đầu tư"
+COT_TEN_TO_TRUONG      = "Tên tổ trưởng"
 
 # Personal
 COT_NGAY_SINH       = "Ngày sinh"

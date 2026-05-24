@@ -218,26 +218,42 @@ def tinh_tqpgd_extended(
         nqh=(cot_dqh, "sum"),
     )
 
+    # Gộp khoanh + lãi tồn + nợ ĐH + DS cho vay thành 1 lần tính toán
+    agg_extra = {}
+
     if col_khoanh and col_khoanh in df_loc.columns:
-        kh = df_loc.groupby(cot_pgd, as_index=False).agg(**{col_khoanh: (col_khoanh, "sum")})
+        agg_extra[col_khoanh] = (col_khoanh, "sum")
     else:
-        kh = df_loc.groupby(cot_pgd, as_index=False).agg(**{"khoanh_tmp": (cot_ma_kh, "size")})
+        agg_extra["khoanh_tmp"] = (cot_ma_kh, "size")
         col_khoanh = "khoanh_tmp"
-    df_pgd = df_pgd.merge(kh, on=cot_pgd, how="left")
-    df_pgd = df_pgd.rename(columns={col_khoanh: "du_no_khoanh"})
-    df_pgd["du_no_khoanh"] = pd.to_numeric(df_pgd["du_no_khoanh"], errors="coerce").fillna(0)
 
     if cot_lai_ton in df_loc.columns:
-        lt = (
-            df_loc.groupby(cot_pgd)[cot_lai_ton]
-            .apply(lambda x: pd.to_numeric(x, errors="coerce").fillna(0).sum())
-            .reset_index(name="lai_ton")
-        )
-        df_pgd = df_pgd.merge(lt, on=cot_pgd, how="left")
+        agg_extra[cot_lai_ton] = (cot_lai_ton, "sum")
+
+    if col_cv and col_cv in df_loc.columns:
+        agg_extra[col_cv] = (col_cv, "sum")
+
+    # Tính 1 lần cho các cột trên
+    if agg_extra:
+        extra_data = df_loc.groupby(cot_pgd, as_index=False).agg(**agg_extra)
+        df_pgd = df_pgd.merge(extra_data, on=cot_pgd, how="left")
+
+    df_pgd = df_pgd.rename(columns={col_khoanh: "du_no_khoanh"})
+    df_pgd["du_no_khoanh"] = pd.to_numeric(df_pgd.get("du_no_khoanh", 0), errors="coerce").fillna(0)
+
+    if cot_lai_ton in df_loc.columns:
+        df_pgd["lai_ton"] = pd.to_numeric(df_pgd.get(cot_lai_ton, 0), errors="coerce").fillna(0)
+        df_pgd = df_pgd.drop(columns=[cot_lai_ton])
     else:
         df_pgd["lai_ton"] = 0.0
-    df_pgd["lai_ton"] = pd.to_numeric(df_pgd["lai_ton"], errors="coerce").fillna(0)
 
+    if col_cv and col_cv in df_loc.columns:
+        df_pgd["ds_cho_vay"] = pd.to_numeric(df_pgd.get(col_cv, 0), errors="coerce").fillna(0)
+        df_pgd = df_pgd.drop(columns=[col_cv])
+    else:
+        df_pgd["ds_cho_vay"] = 0.0
+
+    # Nợ ĐH năm — tính riêng nếu có ngày đh
     if cot_ngay_dh in df_loc.columns:
         df_dh = df_loc[[cot_pgd, cot_ngay_dh, cot_tdn]].copy()
         df_dh[cot_ngay_dh] = pd.to_datetime(df_dh[cot_ngay_dh], dayfirst=True, errors="coerce")
@@ -249,21 +265,11 @@ def tinh_tqpgd_extended(
             .reset_index(name="no_dh_nam")
         )
         df_pgd = df_pgd.merge(dh, on=cot_pgd, how="left")
+        df_pgd["no_dh_nam"] = df_pgd["no_dh_nam"].fillna(0)
     else:
         df_pgd["no_dh_nam"] = 0.0
-    df_pgd["no_dh_nam"] = pd.to_numeric(df_pgd["no_dh_nam"], errors="coerce").fillna(0)
 
-    if col_cv and col_cv in df_loc.columns:
-        cv = (
-            df_loc.groupby(cot_pgd)[col_cv]
-            .apply(lambda x: pd.to_numeric(x, errors="coerce").fillna(0).sum())
-            .reset_index(name="ds_cho_vay")
-        )
-        df_pgd = df_pgd.merge(cv, on=cot_pgd, how="left")
-    else:
-        df_pgd["ds_cho_vay"] = 0.0
-    df_pgd["ds_cho_vay"] = pd.to_numeric(df_pgd["ds_cho_vay"], errors="coerce").fillna(0)
-
+    # DS Thu nợ — tính riêng vì cần multiple columns
     cols_thu = [c for c in cols_thu_key.split(",") if c and c in df_loc.columns]
     if cols_thu:
         thu = (
@@ -272,9 +278,10 @@ def tinh_tqpgd_extended(
             .reset_index(name="ds_thu_no")
         )
         df_pgd = df_pgd.merge(thu, on=cot_pgd, how="left")
+        df_pgd["ds_thu_no"] = df_pgd["ds_thu_no"].fillna(0)
     else:
         df_pgd["ds_thu_no"] = 0.0
-    df_pgd["ds_thu_no"] = pd.to_numeric(df_pgd["ds_thu_no"], errors="coerce").fillna(0)
+
     return df_pgd
 
 
@@ -365,6 +372,32 @@ def tong_hop_den_han(
         .reset_index()
     )
     return tg
+
+
+def tong_hop_den_han_theo_thang(
+    df: pd.DataFrame,
+    *,
+    cot_ngay_dh: str,
+    cot_so_ku: str,
+    cot_ma_kh: str,
+    cot_tdn: str,
+) -> pd.DataFrame:
+    """Tổng hợp dư nợ đến hạn theo từng tháng — dùng cho biểu đồ timeline."""
+    _empty = pd.DataFrame(columns=["nam_thang_label", "_mon", "_kh", "_no"])
+    if cot_ngay_dh not in df.columns:
+        return _empty
+    df2 = df.copy()
+    df2["_ym"] = pd.to_datetime(df2[cot_ngay_dh], errors="coerce").dt.to_period("M")
+    df2 = df2.dropna(subset=["_ym"])
+    if df2.empty or cot_so_ku not in df2.columns or cot_tdn not in df2.columns:
+        return _empty
+    tg = (
+        df2.groupby("_ym")
+        .agg(_mon=(cot_so_ku, "nunique"), _kh=(cot_ma_kh, "nunique"), _no=(cot_tdn, "sum"))
+        .reset_index()
+    )
+    tg["nam_thang_label"] = tg["_ym"].apply(lambda p: f"{p.month:02d}/{p.year}")
+    return tg.sort_values("_ym").drop(columns=["_ym"]).reset_index(drop=True)
 
 
 def xuat_excel_tqpgd(df: pd.DataFrame, ten_file: str) -> bytes:

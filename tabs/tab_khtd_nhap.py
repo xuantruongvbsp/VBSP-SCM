@@ -16,6 +16,7 @@ import streamlit as st
 import db
 from auth import get_permissions, normalize_role
 from pdf_service import xuat_pdf_bang
+from state_manager import SCMStateManager
 from config import CHUONG_TRINH_KHTD, COT_TEN_PGD, DS_PGD, PGD_XA_MAP
 from utils import fmt, xuat_excel, ten_file_xuat, vn
 
@@ -1288,17 +1289,21 @@ def _tab_khtd_theo_xa(role: str, username: str, df_full: "pd.DataFrame | None") 
                             logger.error("Lỗi trong khối except: %s", _e, exc_info=True)
                             st.warning(f"⚠️ Không lưu được PDF vào thư mục: {_e}")
                     
-                    st.session_state["_pdf_bytes_khtd_xa"] = pdf_bytes
-                    st.session_state["_pdf_file_khtd_xa"] = f"KHTD_{xa_chon}_{datetime.now().strftime('%Y%m%d')}.pdf"
+                    state = SCMStateManager()
+                    state.downloads.set(
+                        "khtd_xa_pdf",
+                        pdf_bytes,
+                        f"KHTD_{xa_chon}_{datetime.now().strftime('%Y%m%d')}.pdf",
+                    )
                     db.ghi_audit(username, "xuat_bieu_cn", f"KHTD xã — PGD: {pgd_chon} — Xã: {xa_chon}")
                     
                 except Exception as e:
                     logger.error("Lỗi trong khối except: %s", e, exc_info=True)
-                    st.session_state["_pdf_bytes_khtd_xa"] = None
+                    SCMStateManager().downloads.clear("khtd_xa_pdf")
                     st.error(f"Lỗi xuất PDF: {e}")
             else:
                 st.warning("Không có dữ liệu kế hoạch để xuất PDF")
-                st.session_state["_pdf_bytes_khtd_xa"] = None
+                SCMStateManager().downloads.clear("khtd_xa_pdf")
 
         if st.form_submit_button("💾 Lưu kế hoạch xã này", type="primary"):
             for khoa, gia_tri_trieu in gia_tri_moi.items():
@@ -1309,14 +1314,16 @@ def _tab_khtd_theo_xa(role: str, username: str, df_full: "pd.DataFrame | None") 
                 st.success(f"✅ Đã lưu kế hoạch cho xã **{xa_chon}**")
                 st.rerun()
 
-    if st.session_state.get("_pdf_bytes_khtd_xa"):
-        st.download_button(
+    state = SCMStateManager()
+    if state.downloads.has("khtd_xa_pdf"):
+        if st.download_button(
             label="⬇️ Tải PDF về máy",
-            data=st.session_state["_pdf_bytes_khtd_xa"],
-            file_name=st.session_state.get("_pdf_file_khtd_xa", "KHTD.pdf"),
+            data=state.downloads.get_bytes("khtd_xa_pdf"),
+            file_name=state.downloads.get_filename("khtd_xa_pdf") or "KHTD.pdf",
             mime="application/pdf",
             key="download_pdf_khtd_xa"
-        )
+        ):
+            state.downloads.clear("khtd_xa_pdf")
 
 
 def render_nhap_cn(role: str, username: str, df_full: "pd.DataFrame | None", df_gqvl: "pd.DataFrame | None" = None) -> None:

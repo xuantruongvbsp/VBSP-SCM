@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## [2026-05-24] — Refactor DGD module: hardcode DGD_DANH_SACH, bỏ import Excel
+- `config.py` — Thêm `DGD_DANH_SACH` (270 điểm GD, đầy đủ pgd/xa/ten/ngay_gd/gio_gd/dia_diem) + helper `lay_dgd_cho_pgd()` / `lay_dgd_theo_xa()`
+- `data/dgd_helpers.py` — Xóa `parse_excel_import` (và import `BytesIO`); thêm `xa_short()` / `khop_xa_dgd()` để chuẩn hóa tên xã khi khớp với DGD_DANH_SACH
+- `tabs/tab_quan_ly_dgd.py` — Xóa tab "Import từ file" + `_render_import`; đổi tên tab "Xem & Sửa" → "Gán Thôn/Ấp" (`_render_gan_thon`), chỉ cho phép sửa thôn/ấp; thêm tab chỉ-đọc "Thông tin điểm GD" (`_render_thong_tin_dgd`) hiển thị `DGD_DANH_SACH`; thứ tự tab mới: Thông tin điểm GD → Gán Thôn/Ấp → Tìm kiếm → Tổng quan
+- `tabs/tab_diem_gd_pgd.py` — Tương tự cho CBTD PGD: xóa `_render_import_pgd` + `_render_xem_sua_pgd`; thêm `_render_thong_tin_dgd_pgd` + `_render_gan_thon_pgd`; tab không còn yêu cầu HSTD để mở; thứ tự tab mới: Thông tin điểm GD → Gán Thôn/Ấp → Tìm kiếm → Tổng quan
+
 ## [2026-05-24] — Refactor Filter state Cảnh báo & Nợ khoanh: dùng SCMStateManager.filter_*
 - `tabs/tab_canh_bao_nqh.py` — Tất cả bộ lọc PGD (sub-tab NQH, Khoanh sắp hết hạn, Gia hạn) đồng bộ với `state.filter_pgd`/`state.filter_chuong_trinh`; đổi PGD tự reset Xã; thêm import SCMStateManager
 - `tabs/tab_canh_bao_som.py` — Bộ lọc PGD trong "Sắp đến hạn + KH không HĐ" đồng bộ với `state.filter_pgd`; download cũng chuyển sang `state.downloads`

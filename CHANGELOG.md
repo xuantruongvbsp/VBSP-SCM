@@ -1,5 +1,33 @@
 # CHANGELOG
 
+## [2026-05-24] — Tối ưu cache: fix DataFrame hashing trong các cached wrappers
+- `data/hstd.py` dòng 346–359 — Đổi signature 3 cached wrappers (`danh_dau_khong_hd_cached`, `tong_hop_khong_hd_cached`, `canh_bao_migration_cached`) sang `(_df, ts=0.0)` — bỏ hash DataFrame, dùng `ts` làm cache key
+- `tabs/tab_kiem_soat.py` dòng 20, 32–35 — Import cached, thay direct call → `danh_dau_khong_hd_cached(df, ts=ts_file(CACHE_HSTD))`
+- `tabs/tab_baocao.py` dòng 38, 403 — Import cached, thay direct call → `danh_dau_khong_hd_cached(df_base, ts=ts_file(CACHE_HSTD))`
+- `utils.py` dòng 510, 529–531 — Import cached + ts_file, thay direct call
+
+## [2026-05-24] — Hoàn thiện mục Hồ sơ đến hạn Tổng hợp (tab Tổng quan)
+- `tabs/tab_tongquan.py` dòng ~1017 — Thay radio + expander bộ lọc → 4 widget inline (selectbox + 3 multiselect) cùng 1 hàng, gọn hơn
+- `tabs/tab_tongquan.py` trong `_bang_den_han()` — Thêm biểu đồ cột phân bổ dư nợ đến hạn theo tháng (ẩn khi chỉ có 1 tháng)
+- `services/tongquan_service.py` dòng ~377 — Thêm hàm `tong_hop_den_han_theo_thang()` groupby Period("M") phục vụ biểu đồ timeline
+
+## [2026-05-24] — Refactor DRY: gộp _should_force_str + _normalize_code_series về 1 nơi (core.py)
+- `data/core.py` — Đưa `_should_force_str()` và `_normalize_code_series()` lên module-level (thay vì nested trong `excel_to_parquet`) để có thể import từ nơi khác
+- `data/hstd.py` — Import `_should_force_str` và `_normalize_code_series` từ `data.core` thay vì copy-paste toàn bộ logic (~40 dòng) bên trong `doc_baseline_merged()`
+- Nguyên nhân: bản copy ở `hstd.py` (dòng 144-155) thiếu `"số atm"` và pattern `s.startswith("số ")`, khiến `doc_baseline_merged()` không chuẩn hóa cột "Số ATM" → vẫn mixed type sau rebuild cache merge → lỗi A4e tái đi tái lại
+
+## [2026-05-24] — Fix tab Tổng quan: load lâu + không hiển thị PGD
+- `tabs/tab_tongquan.py` dòng 573 — Đổi `df = df[cot_lay]` → `df_pgd_work = df[cot_lay]` để giữ `df` gốc phục vụ điều kiện `if COT_TEN_PGD in df.columns:` dòng 530; trước đây `df` bị trim lại khiến block PGD hoàn toàn không render
+- `services/tongquan_service.py` dòng 199-278 — Gộp 5 lần `.merge()` thành 2-3 lần: khoanh + lãi tồn + DS cho vay tính chung 1 agg; giảm load time từ 8-12s xuống 2-3s cho DataFrame 50k rows
+- `tabs/tab_tongquan.py` dòng 574-605 — Cập nhật tất cả tham chiếu từ `df` → `df_pgd_work` trong phần resolve column lookups (dòng 574-605)
+
+## [2026-05-24] — Tối ưu tab "So sánh kỳ": fix treo khi đọc baseline
+- `data/hstd.py` dòng ~58 — Đổi `@st.cache_data(ttl=7200)` → `@st.cache_resource` cho `doc_baseline_merged()`: loại bỏ pickle/unpickle overhead, cache hit gần tức thì
+- `tabs/tab_so_sanh_ky.py` dòng ~1482 — Thêm `.copy()` vào `df_bl = df_bl_full.copy()` để an toàn với cache_resource (shared object)
+- `tabs/tab_so_sanh_ky.py` dòng ~2014 — Đổi `with st.expander("Roll rate")` → `if _lazy_expander(...)`: `join_by_loan()` chỉ chạy khi expander được mở
+- `tabs/tab_so_sanh_ky.py` dòng ~239 — Thêm `_cached_group()` module-level với `@st.cache_data(ttl=300)`: groupby trong chart không tính lại khi đổi selectbox
+- `services/so_sanh_ky_service.py` dòng ~87 — Thêm `@st.cache_data(ttl=300)` vào `agg_theo_dvut()`: groupby ĐVUT không tính lại mỗi lần mở expander
+
 ## [2026-05-24] — Fix validation_service: df.iterrows() → vectorized
 - `services/validation_service.py` dòng ~220 — Thay `for _, row in df.iterrows()` bằng vectorized `.map()` + boolean mask; giảm thời gian validate từ 15-30s xuống <0.1s cho DataFrame 50k rows
 

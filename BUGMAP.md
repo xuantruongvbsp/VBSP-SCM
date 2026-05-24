@@ -84,7 +84,7 @@
 | **File** | `data/core.py` → `excel_to_parquet()` dòng 31–42 và `data/hstd.py` → `doc_baseline_merged()` |
 | **Dấu hiệu** | Tab “📊 So sánh kỳ” báo lỗi render; traceback chứa `(“Expected bytes, got a 'float' object”, 'Conversion failed for column Số ATM with type object')` |
 | **Nguyên nhân** | (1) openpyxl đọc cột “Số ATM” trả về `bytes` cho ô có giá trị, `float(NaN)` cho ô trống → object column hỗn hợp. (2) Hội sở đọc “Số ATM” thành string (không bytes) trong khi các PGD Bình Phước đọc thành bytes → sau concat, `iloc[0]` là string nên check “chỉ đầu” bỏ sót bytes từ PGD thứ 2+. (3) “Số ATM” không trong danh sách `_should_force_str()` → không được chuẩn hóa thành string → column vẫn mixed type. |
-| **Fix** | (1) Thêm “số atm” vào `_should_force_str()` (~dòng 38) để chuẩn hóa từ đầu. (2) Bytes→str sanitization trước `to_parquet` trong cả `excel_to_parquet` (dòng 81–94) và `doc_baseline_merged` (dòng 125–138). (3) **Check 100 phần tử** (`any(isinstance(v, bytes) for v in _non_null.iloc[:100])`), không phải chỉ `iloc[0]`, để phát hiện bytes dù chúng xuất hiện ở PGD giữa. |
+| **Fix** | (1) Thêm “số atm” vào `_should_force_str()` (~dòng 38) để chuẩn hóa từ đầu. (2) Bytes→str sanitization trước `to_parquet` trong cả `excel_to_parquet` (dòng 81–94) và `doc_baseline_merged` (dòng 125–138). (3) **Check 100 phần tử** (`any(isinstance(v, bytes) for v in _non_null.iloc[:100])`), không phải chỉ `iloc[0]`, để phát hiện bytes dù chúng xuất hiện ở PGD giữa. (4) **Refactor DRY**: dua `_should_force_str` + `_normalize_code_series` len module-level trong `core.py`, `hstd.py` import lai -- triet tieu goc loi copy-paste lech nhau. |
 | **Pattern tránh** | `isinstance(_s.iloc[0], bytes)` — sai khi đơn vị đầu tiên trong concat có dtype khác (string). Dùng `any(... for v in sample[:100])` thay thế. |
 | **Ngày fix** | 2026-05-24 |
 
@@ -207,6 +207,16 @@
 | **Dấu hiệu** | Click “Truy cập nhanh”/cảnh báo → app `st.rerun()` nhưng vẫn ở nhóm/tab cũ; `ws_op_jump_tab` bị pop mà không được dùng |
 | **Nguyên nhân** | Điều hướng dùng `st.tabs()` (không control được tab active) và code chỉ `pop("ws_op_jump_tab")` rồi render toàn bộ tabs |
 | **Fix** | Chuyển outer navigation sang `st.radio` + inner dùng `lazy_tabs()` (render 1 tab); jump-tab đọc one-shot từ `SCMStateManager.nav_ws_op_jump_tab` và set `st.session_state[f\"_{inner_key}_idx\"]` |
+| **Ngày fix** | 2026-05-24 |
+
+### B11 — Tab Tổng quan load lâu + không hiển thị "Thông tin tổng quát theo PGD"
+| | |
+|---|---|
+| **File** | `tabs/tab_tongquan.py` (dòng ~530, ~573) + `services/tongquan_service.py` |
+| **Dấu hiệu** | Sau phần "Cơ cấu dư nợ theo chương trình", phần "🟢 Thông tin tổng quát theo PGD" không hiển thị; app treo 8-12 giây |
+| **Nguyên nhân** | (1) Dataframe gốc `df` bị trim lại dòng 573 nhưng điều kiện `if COT_TEN_PGD in df.columns:` dòng 530 cần `df` nguyên bản; (2) Hàm `tinh_tqpgd_extended()` thực hiện 5 `.merge()` liên tiếp, gây lag nặng trên DataFrame 50k rows |
+| **Fix** | (1) Dòng 573: `df = df[cot_lay]` → `df_pgd_work = df[cot_lay]`; cập nhật tham chiếu dòng 574-605; (2) Gộp merge từ 5 lần → 2-3 lần trong `tinh_tqpgd_extended()`: khoanh + lãi tồn + DS cho vay tính chung 1 `.agg()` |
+| **Load time** | Giảm từ 8-12s → 2-3s |
 | **Ngày fix** | 2026-05-24 |
 
 ---
@@ -615,6 +625,16 @@ def _duong_dan_pgd(ten_pgd: str, loai: str) -> str:
 | **Nguyên nhân** | `for _, row in df.iterrows():` duyệt từng dòng trong Python → O(n) với overhead Python interpreter. DataFrame 50k rows → 15-30 giây. `iterrows()` chậm hơn vectorized ~100x |
 | **Fix** | Thay bằng vectorized: lấy distinct pairs `(xa, pgd)` → `.map(xa_to_pgd)` → so sánh → tìm mismatch. Không cần vòng lặp Python. `iterrows()` chỉ dùng cho ≤3 hàng mẫu hiển thị lỗi |
 | **Pattern tránh** | `for _, row in df.iterrows():` khi validate/transform toàn DataFrame. Thay bằng `.map()`, `.isin()`, `.merge()`, boolean mask |
+| **Ngày fix** | 2026-05-24 |
+
+### K2 — `@st.cache_data` pickle overhead — tab "So sánh kỳ" treo khi đọc baseline
+| | |
+|---|---|
+| **File** | `data/hstd.py` → `doc_baseline_merged()` |
+| **Dấu hiệu** | Tab "So sánh kỳ" treo 3-8 giây ngay cả khi baseline đã cache; lần đầu (cache miss) treo 30-120 giây |
+| **Nguyên nhân** | `@st.cache_data` pickle/unpickle toàn bộ DataFrame mỗi lần trả kết quả — ngay cả cache hit. DataFrame 22 PGD × 50k+ dòng → serialize/deserialize tốn nhiều giây. Roll rate `st.expander` (không lazy) khiến `join_by_loan()` luôn chạy. `agg_theo_dvut()` không có cache |
+| **Fix** | (1) Đổi `@st.cache_data` → `@st.cache_resource` cho `doc_baseline_merged()` — trả cùng object, không pickle. Thêm `.copy()` tại nơi gọi để tránh mutate. (2) Đổi `st.expander` → `_lazy_expander` cho section Roll rate. (3) Thêm `@st.cache_data` cho `agg_theo_dvut()`. (4) Cache groupby trong `_chart_tang_truong()` bằng `_cached_group()` module-level |
+| **Pattern tránh** | `@st.cache_data` cho hàm trả DataFrame lớn (>10MB). Dùng `@st.cache_resource` + `.copy()` tại nơi gọi. `st.expander(expanded=False)` vẫn execute code bên trong — dùng `lazy_expander` từ `utils.py` |
 | **Ngày fix** | 2026-05-24 |
 
 ---

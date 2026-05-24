@@ -507,9 +507,10 @@ def _tinh_so_lieu_klgb(df: "pd.DataFrame") -> dict:
         "Hội cựu chiến binh", "Đoàn thanh niên"
     """
     from datetime import date
-    from data import danh_dau_khong_hd, tong_hop_khong_hd, canh_bao_migration
+    from data import danh_dau_khong_hd_cached, tong_hop_khong_hd_cached, canh_bao_migration
+    from data.core import ts_file
     from config import (COT_TONG_DU_NO, COT_DU_NO_TH, COT_DU_NO_QH,
-                        DVUT_TAG_KEY)
+                        DVUT_TAG_KEY, CACHE_HSTD)
 
     today = date.today()
     so_lieu = {
@@ -526,8 +527,9 @@ def _tinh_so_lieu_klgb(df: "pd.DataFrame") -> dict:
     so_lieu["ty_le_nqh"] = f"{dqh/tdn*100:.3f}%" if tdn > 0 else "0.000%"
 
     # 3 tháng không hoạt động — tổng hợp theo ĐVUT
-    df_kh = danh_dau_khong_hd(df)
-    khd   = tong_hop_khong_hd(df_kh, nhom_theo=COT_DVUT)
+    _ts = ts_file(CACHE_HSTD)
+    df_kh = danh_dau_khong_hd_cached(df, ts=_ts)
+    khd   = tong_hop_khong_hd_cached(df_kh, nhom_theo=COT_DVUT, ts=_ts)
 
     # Điền từng ĐVUT theo đúng tên thực tế trong file HSTD
     tong_3m = 0

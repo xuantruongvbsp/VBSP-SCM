@@ -35,7 +35,9 @@ from config import (
 from utils import fmt_so, fmt_ty, vn, ten_file_xuat, hien_thi_dataframe_phan_trang, xuat_excel
 from services import xuat_bao_cao, ten_file_bao_cao
 from pdf_service import nut_xuat_pdf
-from data import (danh_dau_khong_hd, tong_hop_khong_hd, ds_chi_tiet_khong_hd)
+from data import (danh_dau_khong_hd_cached, tong_hop_khong_hd_cached, ds_chi_tiet_khong_hd)
+from data.core import ts_file
+from config import CACHE_HSTD
 from auth import la_phan_he_pgd, la_phan_he_cn, la_executive
 from state_manager import SCMStateManager
 from logger import get_logger
@@ -400,7 +402,7 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
             elif loai_th == "🤝 Theo hội đoàn thể (ĐVUT)":
                 if COT_DVUT in df_base.columns:
                     # Đánh dấu 3 tháng không hoạt động
-                    df_kh = danh_dau_khong_hd(df_base)
+                    df_kh = danh_dau_khong_hd_cached(df_base, ts=ts_file(CACHE_HSTD))
 
                     dbc_raw = df_kh.groupby(COT_DVUT).agg(
                         Số_KH          =(COT_MA_KH,    "nunique"),

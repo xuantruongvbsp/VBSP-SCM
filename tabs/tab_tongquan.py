@@ -570,22 +570,22 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                     )
                 ):
                     cot_lay.append(c)
-            df = df[cot_lay]
+            df_pgd_work = df[cot_lay]
             # Resolve column lookups để làm cache key
-            _col_cv_pgd = next((c for c in HSTD_DS_CHO_VAY_NAM_ALIASES if c in df.columns), None)
+            _col_cv_pgd = next((c for c in HSTD_DS_CHO_VAY_NAM_ALIASES if c in df_pgd_work.columns), None)
             if _col_cv_pgd is None:
                 _col_cv_pgd = next(
-                    (c for c in df.columns
+                    (c for c in df_pgd_work.columns
                      if "giải ngân" in str(c).replace("\n", " ").lower()
                      and "tháng" not in str(c).lower()
                      and ("trong năm" in str(c).replace("\n", " ").lower()
                           or str(c).strip().lower().endswith("năm"))),
                     None,
                 )
-            _thu_cols_pgd = [c for c in HSTD_THU_NO_NAM_ALIASES if c in df.columns]
+            _thu_cols_pgd = [c for c in HSTD_THU_NO_NAM_ALIASES if c in df_pgd_work.columns]
             if not _thu_cols_pgd:
                 _thu_cols_pgd = [
-                    c for c in df.columns
+                    c for c in df_pgd_work.columns
                     if "thu nợ" in str(c).replace("\n", " ").lower()
                     and "tháng" not in str(c).lower()
                     and (
@@ -597,7 +597,7 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                 ]
 
             df_pgd_raw = _cache_tqpgd_extended(
-                df, ts, str(pgd_filter),
+                df_pgd_work, ts, str(pgd_filter),
                 col_khoanh if col_khoanh and col_khoanh in df.columns else "",
                 _col_cv_pgd or "",
                 ",".join(_thu_cols_pgd),
@@ -1014,42 +1014,32 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                 cuoi_nam = pd.Timestamp(hn.year, 12, 31)
 
 
-                # Lựa chọn nhóm tổng hợp
-                nhom_chon = st.radio(
-                    "Tổng hợp theo",
-                    ["Chương trình", "PGD", "Xã"],
-                    horizontal=True,
-                    key="tq_denh_nhom",
-                )
+                # Nhóm tổng hợp + bộ lọc — gom vào 1 hàng
+                _c0, _c1, _c2, _c3 = st.columns([2, 3, 3, 3])
+                with _c0:
+                    nhom_chon = st.selectbox(
+                        "Nhóm TH",
+                        ["Chương trình", "PGD", "Xã"],
+                        key="tq_denh_nhom",
+                    )
+                with _c1:
+                    ds_pgd = sorted(dt[COT_TEN_PGD].dropna().unique()) if COT_TEN_PGD in dt.columns else []
+                    loc_pgd = st.multiselect("Lọc PGD", options=ds_pgd, default=[], key="tq_loc_pgd")
+                with _c2:
+                    ds_ct = sorted(dt[COT_TEN_CT].dropna().unique()) if COT_TEN_CT in dt.columns else []
+                    loc_ct = st.multiselect("Lọc CT", options=ds_ct, default=[], key="tq_loc_ct")
+                with _c3:
+                    dt_theo_pgd = dt[dt[COT_TEN_PGD].isin(loc_pgd)] if (loc_pgd and COT_TEN_PGD in dt.columns) else dt
+                    cot_xa = next((c for c in [COT_TEN_XA, "Tên xã"] if c in dt_theo_pgd.columns), None)
+                    ds_xa = sorted(dt_theo_pgd[cot_xa].dropna().unique()) if cot_xa else []
+                    loc_xa = st.multiselect("Lọc Xã", options=ds_xa, default=[], key="tq_loc_xa")
+
                 NHOM_COT = {
                     "Chương trình": COT_TEN_CT,
                     "PGD":          COT_TEN_PGD,
                     "Xã":           COT_TEN_XA,
                 }
                 nhom_col = NHOM_COT[nhom_chon]
-
-                # Bộ lọc kết hợp nhiều điều kiện
-                with st.expander("🔍 Bộ lọc nâng cao", expanded=False):
-                    col1, col2, col3 = st.columns(3)
-
-                    with col1:
-                        ds_pgd = sorted(dt[COT_TEN_PGD].dropna().unique()) if COT_TEN_PGD in dt.columns else []
-                        loc_pgd = st.multiselect("Lọc PGD", options=ds_pgd, default=[], key="tq_loc_pgd")
-
-                    with col2:
-                        ds_ct = sorted(dt[COT_TEN_CT].dropna().unique()) if COT_TEN_CT in dt.columns else []
-                        loc_ct = st.multiselect("Lọc Chương trình", options=ds_ct, default=[], key="tq_loc_ct")
-
-                    with col3:
-                        # Chỉ lấy xã thuộc PGD đã chọn, nếu chưa chọn PGD thì hiện tất cả
-                        if loc_pgd:
-                            dt_theo_pgd = dt[dt[COT_TEN_PGD].isin(loc_pgd)]
-                        else:
-                            dt_theo_pgd = dt
-
-                        cot_xa = next((c for c in [COT_TEN_XA, "Tên xã"] if c in dt_theo_pgd.columns), None)
-                        ds_xa = sorted(dt_theo_pgd[cot_xa].dropna().unique()) if cot_xa else []
-                        loc_xa = st.multiselect("Lọc Xã", options=ds_xa, default=[], key="tq_loc_xa")
 
                 # Áp dụng bộ lọc vào dt trước khi lọc theo mốc thời gian
                 dt_loc = _tqsvc.ap_dung_loc_ket_hop(
@@ -1127,6 +1117,34 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                     c1.metric("Số món vay", fmt_so(tong_mon))
                     c2.metric("Số khách hàng", fmt_so(tong_kh))
                     c3.metric("Tổng dư nợ", fmt(tong_no))
+
+                    # Biểu đồ phân bổ theo tháng
+                    df_thang = _tqsvc.tong_hop_den_han_theo_thang(
+                        df_loc,
+                        cot_ngay_dh=COT_NGAY_DH,
+                        cot_so_ku=COT_SO_KU,
+                        cot_ma_kh=COT_MA_KH,
+                        cot_tdn=COT_TONG_DU_NO,
+                    )
+                    if not df_thang.empty and len(df_thang) > 1:
+                        fig_bar = px.bar(
+                            df_thang,
+                            x="nam_thang_label",
+                            y="_no",
+                            text=df_thang["_no"].apply(fmt_bang_ty),
+                            labels={"nam_thang_label": "Tháng", "_no": "Dư nợ (triệu đồng)"},
+                            title=f"Phân bổ dư nợ đến hạn — {label}",
+                            color_discrete_sequence=["#0066CC"],
+                        )
+                        fig_bar.update_traces(textposition="outside", textfont_size=11)
+                        fig_bar.update_layout(
+                            height=300,
+                            paper_bgcolor="rgba(0,0,0,0)",
+                            margin=dict(l=0, r=0, t=40, b=0),
+                            xaxis_title="",
+                            yaxis_title="Triệu đồng",
+                        )
+                        st.plotly_chart(fig_bar, use_container_width=True, key=f"bar_den_han_{key_prefix}")
 
                     st.divider()
 

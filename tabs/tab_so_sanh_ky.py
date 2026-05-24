@@ -236,6 +236,17 @@ def _bang_vintage_nqh(df_ht: pd.DataFrame, df_bl: pd.DataFrame, chon_nam: str) -
 
 # ─── New visual helpers (port from PeriodOverview.tsx) ───────────────────────
 
+@st.cache_data(ttl=300, show_spinner=False)
+def _cached_group(df_id: int, df: pd.DataFrame, dim: str) -> pd.DataFrame:
+    """Groupby COT_TONG_DU_NO theo dim; cache bằng id(df) — ổn định nhờ cache_resource."""
+    if dim not in df.columns:
+        return pd.DataFrame(columns=[dim, "dn"])
+    g = df.groupby(dim, dropna=False)[COT_TONG_DU_NO].sum().reset_index()
+    g.columns = [dim, "dn"]
+    g[dim] = g[dim].fillna("—").astype(str)
+    return g
+
+
 def _chart_tang_truong(
     df_bl: pd.DataFrame,
     df_ht: pd.DataFrame,
@@ -253,16 +264,8 @@ def _chart_tang_truong(
         st.info(f"Cột '{dim}' không có trong dữ liệu.")
         return
 
-    def _group(df: pd.DataFrame) -> pd.DataFrame:
-        if dim not in df.columns:
-            return pd.DataFrame(columns=[dim, "dn"])
-        g = df.groupby(dim, dropna=False)[COT_TONG_DU_NO].sum().reset_index()
-        g.columns = [dim, "dn"]
-        g[dim] = g[dim].fillna("—").astype(str)
-        return g
-
-    g_bl = _group(df_bl)
-    g_ht = _group(df_ht)
+    g_bl = _cached_group(id(df_bl), df_bl, dim)
+    g_ht = _cached_group(id(df_ht), df_ht, dim)
 
     all_vals = sorted(
         set(g_bl[dim].tolist()) | set(g_ht[dim].tolist()),
@@ -1479,7 +1482,7 @@ def render_moc_nam(tab: DeltaGenerator = None, **kwargs) -> None:
         if pgd_mode and pgd_user and COT_TEN_PGD in df_bl_full.columns:
             df_bl = df_bl_full[df_bl_full[COT_TEN_PGD] == pgd_user].copy()
         else:
-            df_bl = df_bl_full
+            df_bl = df_bl_full.copy()
 
         df_ht = df if pgd_mode else df_full
         if df_ht is None or df_ht.empty:
@@ -2011,7 +2014,7 @@ def render_moc_nam(tab: DeltaGenerator = None, **kwargs) -> None:
 
         # ═══════════ ROLL RATE / CURE RATE (từ join trực tiếp) ══════════
         st.divider()
-        with st.expander("📊 Roll rate / Cure rate", expanded=False):
+        if _lazy_expander("📊 Roll rate / Cure rate", f"{key_prefix}rollcure"):
             # Lazy load joined data only when needed
             if df_joined is None:
                 df_joined = join_by_loan(df_bl, df_ht)

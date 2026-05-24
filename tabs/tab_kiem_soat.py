@@ -17,7 +17,9 @@ from config import (
     COT_NGAY_DH,
     COT_TEN_PGD,
 )
-from data import danh_dau_khong_hd, tong_hop_khong_hd, ds_chi_tiet_khong_hd
+from data import danh_dau_khong_hd_cached, tong_hop_khong_hd_cached, ds_chi_tiet_khong_hd
+from data.core import ts_file
+from config import CACHE_HSTD
 from services.kiem_soat_service import BAO_CAO_REGISTRY, NHOM_BAO_CAO, chon_pgd_filter
 
 
@@ -28,9 +30,10 @@ def _get_ks_cache(df: pd.DataFrame) -> dict:
         return ks
 
     with st.spinner("Đang phân tích dữ liệu..."):
-        df_kh = danh_dau_khong_hd(df)
+        _ts = ts_file(CACHE_HSTD)
+        df_kh = danh_dau_khong_hd_cached(df, ts=_ts)
 
-        df_khd_pgd = tong_hop_khong_hd(df_kh, nhom_theo=COT_TEN_PGD)
+        df_khd_pgd = tong_hop_khong_hd_cached(df_kh, nhom_theo=COT_TEN_PGD, ts=_ts)
         df_khd_chi = ds_chi_tiet_khong_hd(df_kh)
 
         if COT_DU_NO_QH in df_kh.columns and COT_TEN_PGD in df_kh.columns:

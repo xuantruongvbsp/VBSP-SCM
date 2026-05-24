@@ -14,10 +14,13 @@ from typing import TYPE_CHECKING, Any
 
 import streamlit as st
 import pandas as pd
-import plotly.express as px
-import plotly.graph_objects as go
 
-from config import *
+from config import (
+    DB_HT_CACHE,
+    DB_PREV_CACHE,
+    FILE_PATH_DB,
+    FILE_PATH_DB_PREV,
+)
 from utils import (
     fmt_ty,
     fmt_cl,
@@ -31,7 +34,6 @@ import db
 from data import ts_file, doc_dienbao, db_lookup
 from data.pgd import duong_dan_pgd, pgd_slug
 from services import luu_dienbao
-from tabs import tab_kehoach
 
 
 if TYPE_CHECKING:
@@ -136,6 +138,11 @@ from tabs.base_tab import TabContext
 
 
 def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
+    import plotly.express as px
+    import plotly.graph_objects as go
+    import importlib
+    tab_kehoach = importlib.import_module("tabs.tab_kehoach")
+
     ctx = TabContext(tab, **kwargs)
     df        = kwargs.get("df")
     df_full   = ctx.df_full if ctx.df_full is not None and not ctx.df_full.empty else df

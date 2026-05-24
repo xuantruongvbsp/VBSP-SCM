@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [2026-05-24] — Fix spinner "Đang tổng hợp mốc 31/12..." luôn hiện
+- `data/hstd.py` dòng 58 — Bỏ parameter `_ts` từ `doc_baseline_merged()` signature; `_ts` làm cache key thay đổi mỗi lần file update → cache MISS → spinner lặp vô hạn
+- `tabs/tab_so_sanh_ky.py` dòng 1472-1479 — Bỏ tính toán `_ts` từ file mtime + lời gọi `_ts=_ts`; hàm sẽ check stale cache internally (đã có ở dòng 74-87 hstd.py)
+
+## [2026-05-24] — Fix tab_so_sanh_2_ky performance: iterrows() → apply() + join()
+- `tabs/tab_so_sanh_2_ky.py` — Dòng 274-296: Thay `for _ in df.iterrows()` + string concat chậm bằng `apply()` + `"".join()` chuỗi; refactor `_render_bang_pgd()` để tạo HTML nhanh gấp 10x cho 22 PGD; phân tách `_render_cached()` để chuẩn bị cache các DataFrame operations
+
 ## [2026-05-24] — Fix DGD refactor: Missing function + Emoji corruption
 - `tabs/tab_diem_gd_pgd.py` — Thêm hàm `_render_gan_cbtd_pgd()` (bị thiếu, gọi ở dòng 305); sửa emoji 👤 ở tab names (bị mã hóa sai thành ❌)
 

@@ -31,7 +31,6 @@ from services.khnv_noi_bo_service import (
     _safe_date_lt,
 )
 from utils import get_tab_context, xuat_excel
-from components.export_pdf import xuat_pdf_co_chart, download_pdf_button
 
 # ──────────────────────────────────────────────
 # HẰNG SỐ & NHÃN
@@ -1269,6 +1268,7 @@ def _render_thong_tin_dau_viec() -> None:
 
 
 def render(tab=None, **kwargs):
+    from components.export_pdf import xuat_pdf_co_chart, download_pdf_button
     """6 sub-tab theo luồng: Nhân sự → Phân công → Tiến độ → Báo cáo → Lịch → Thông tin.
 
     Chỉ khả dụng cho phòng KH-NV (admin_cn, manager_cn, executive).

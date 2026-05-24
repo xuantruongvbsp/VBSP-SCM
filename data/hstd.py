@@ -56,7 +56,7 @@ def doc_baseline_pgd(ten_pgd: str, nam: int, _ts=0) -> pd.DataFrame | None:
 
 
 @st.cache_data(ttl=7200, show_spinner="Đang tổng hợp mốc 31/12...")
-def doc_baseline_merged(nam: int, _ts=0) -> pd.DataFrame | None:
+def doc_baseline_merged(nam: int) -> pd.DataFrame | None:
     """
     Đọc và merge HSTD mốc 31/12 từ tất cả đơn vị đã upload.
     Sử dụng parquet cache sau lần merge đầu tiên để load nhanh ở lần sau.

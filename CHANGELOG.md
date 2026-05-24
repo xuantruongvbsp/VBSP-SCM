@@ -1,5 +1,8 @@
 # CHANGELOG
 
+## [2026-05-24] — Fix DGD refactor: Missing function + Emoji corruption
+- `tabs/tab_diem_gd_pgd.py` — Thêm hàm `_render_gan_cbtd_pgd()` (bị thiếu, gọi ở dòng 305); sửa emoji 👤 ở tab names (bị mã hóa sai thành ❌)
+
 ## [2026-05-24] — Refactor DGD/CBTD: Fix helpers + Thêm tab Gán CBTD
 - `tabs/tab_cbtd.py` — Fix `_ds_dgd_cua_pgd()` dùng `lay_dgd_cho_pgd()` thay vì `dgd_map`; fix `_ap_cua_dgd()` đọc schema mới (`entry.get("thon", [])`) + backward-compat với list cũ
 - `tabs/tab_quan_ly_dgd.py` — Thêm sub-tab "👤 Gán CBTD" (`_render_gan_cbtd`): chọn PGD → Xã → list ĐGD, selectbox chọn CBTD cho từng ĐGD, lưu ngược vào `cbtd_data[ma_cb]["ds_dgd"]`

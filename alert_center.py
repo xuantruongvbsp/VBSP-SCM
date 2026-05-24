@@ -155,15 +155,18 @@ def render_badge_no_khoanh_sap_het_han(df_full) -> None:
 
 def _jump_to_khoanh():
     """Set session state để nhảy đến tab Nợ khoanh phù hợp workspace hiện tại."""
+    from state_manager import SCMStateManager
+
     st.session_state._qlnk_filter = "sap_het_han"
     ws = st.session_state.get("workspace", "operation")
+    state = SCMStateManager()
     if ws == "management":
-        st.session_state.ws_mgmt_jump = "🔒 Quản lý Nợ Khoanh theo CV 368"
+        state.nav_ws_mgmt_jump = "🔒 Quản lý Nợ Khoanh theo CV 368"
     elif ws == "executive":
         st.session_state.ws_exec_jump = "📊 Tổng hợp nợ khoanh"
     else:
-        st.session_state.ws_op_nhom = "kiem_soat_rr"
-        st.session_state.ws_op_jump_tab = 7
+        state.nav_ws_op_nhom = "kiem_soat_rr"
+        state.nav_ws_op_jump_tab = 7
 
 
 _KHOANH_ALERT_CACHE_TTL = 600

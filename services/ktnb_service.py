@@ -180,7 +180,7 @@ def render_ke_hoach_lich_trinh(username: str, readonly: bool = False) -> None:
 
     current_year = date.today().year
     nam = st.selectbox("Năm kiểm toán", list(range(current_year - 2, current_year + 3)),
-                       index=2, key="ktnb_nam_ke_hoach")
+                       index=2, key="_ktnb_nam")
 
     df_dots = lay_danh_sach_dot(nam)
     if not df_dots.empty:
@@ -218,6 +218,12 @@ def render_ke_hoach_lich_trinh(username: str, readonly: bool = False) -> None:
             if submitted:
                 if not so_cv or not truong_doan:
                     st.error("Vui lòng nhập Số CV và Trưởng đoàn")
+                elif len(so_cv.strip()) > 50:
+                    st.error("❌ Số CV quá dài (tối đa 50 ký tự)")
+                elif not truong_doan.strip():
+                    st.error("❌ Tên trưởng đoàn không hợp lệ")
+                elif ngay_bd > ngay_kt:
+                    st.error("❌ Ngày bắt đầu không được sau ngày kết thúc")
                 else:
                     dot_id = them_dot_kiem_tra(
                         nam=nam, so_cv=so_cv, loai_hinh=loai_hinh, ten_pgd_ks=ten_pgd,
@@ -232,7 +238,7 @@ def render_ke_hoach_lich_trinh(username: str, readonly: bool = False) -> None:
         with st.expander("👥 Cập nhật thành phần đoàn"):
             dot_options = {f"{r['id']}: {r['ten_pgd_ks']} ({r['so_cv']})": r['id']
                           for _, r in df_dots.iterrows()}
-            dot_sel = st.selectbox("Chọn đợt", list(dot_options.keys()), key="ktnb_dot_tp")
+            dot_sel = st.selectbox("Chọn đợt", list(dot_options.keys()), key="_ktnb_dot_team")
             dot_id = dot_options[dot_sel]
 
             df_tv = lay_thanh_phan_doan(dot_id)
@@ -369,9 +375,9 @@ def render_chon_mau(dot_id: int, df_full: pd.DataFrame, username: str, readonly:
 
     col1, col2, col3 = st.columns([1, 1, 2])
     with col1:
-        ty_le = st.slider("Tỷ lệ mẫu (non-risk)", 1, 50, 10, key="ktnb_ty_le")
+        ty_le = st.slider("Tỷ lệ mẫu (non-risk)", 1, 50, 10, key="_ktnb_sample_ratio")
     with col2:
-        uu_tien = st.checkbox("Ưu tiên rủi ro 100%", value=True, key="ktnb_uu_tien")
+        uu_tien = st.checkbox("Ưu tiên rủi ro 100%", value=True, key="_ktnb_prioritize_risk")
     with col3:
         st.markdown("<br>", unsafe_allow_html=True)
         if not readonly:
@@ -468,7 +474,7 @@ def render_nhap_ket_qua(dot_id: int, df_full: pd.DataFrame, username: str, reado
     with col_f1:
         loc_trang_thai = st.selectbox("Lọc trạng thái",
                                        ["Tất cả", "Chưa đối chiếu", "Đã đối chiếu"],
-                                       key="ktnb_loc_tt")
+                                       key="_ktnb_filter_status")
     with col_f2:
         st.write(f"**Tổng: {len(df_display)} KH** | Đã đối chiếu: {(df_display['trang_thai_doi_chieu']=='da_doi_chieu').sum()}")
 
@@ -653,17 +659,24 @@ def _luu_minh_chung(uploaded_file: st.runtime.uploaded_file_manager.UploadedFile
     """Lưu file minh chứng và trả về đường dẫn tương đối."""
     if uploaded_file is None:
         return None
-    dot_dir = KTNB_DIR / f"dot_{dot_id}"
-    dot_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        dot_dir = KTNB_DIR / f"dot_{dot_id}"
+        dot_dir.mkdir(parents=True, exist_ok=True)
 
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    file_name = f"{timestamp}_{uploaded_file.name}"
-    file_path = dot_dir / file_name
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        file_name = f"{timestamp}_{uploaded_file.name}"
+        file_path = dot_dir / file_name
 
-    with open(file_path, "wb") as f:
-        f.write(uploaded_file.getvalue())
+        with open(file_path, "wb") as f:
+            f.write(uploaded_file.getvalue())
 
-    return str(file_path.relative_to(PGD_DATA_DIR))
+        return str(file_path.relative_to(PGD_DATA_DIR))
+    except OSError as e:
+        logger.error("Lỗi lưu minh chứng: %s", e)
+        return None
+    except Exception as e:
+        logger.error("Lỗi không xác định khi lưu minh chứng: %s", e, exc_info=True)
+        return None
 
 
 def render_giam_sat_khac_phuc(dot_id: int, username: str, readonly: bool = False) -> None:
@@ -754,10 +767,18 @@ def render_giam_sat_khac_phuc(dot_id: int, username: str, readonly: bool = False
                     up_file = st.file_uploader("Minh chứng", key=f"up_{row['id']}",
                                               accept_multiple_files=False)
                     if up_file:
-                        path = _luu_minh_chung(up_file, dot_id)
-                        cap_nhat_trang_thai_loi(row["id"], "dang_khac_phuc", path, username, username)
-                        st.success("Đã lưu minh chứng")
-                        st.rerun()
+                        if up_file.size > 10_000_000:
+                            st.error("❌ File quá lớn (tối đa 10MB)")
+                        else:
+                            path = _luu_minh_chung(up_file, dot_id)
+                            if not path:
+                                st.error("❌ Lỗi lưu file minh chứng — vui lòng kiểm tra dung lượng hoặc định dạng file")
+                            else:
+                                cap_nhat_trang_thai_loi(row["id"], "dang_khac_phuc",
+                                                       minh_chung_path=path,
+                                                       nguoi_dong=username, username=username)
+                                st.success("Đã lưu minh chứng")
+                                st.rerun()
 
                     # Đóng lỗi — chỉ trưởng đoàn
                     if is_truong_doan:
@@ -795,7 +816,7 @@ def render_ktnb(df_full: pd.DataFrame, role: str, username: str) -> None:
 
     dot_options = {f"{r['id']}: {r['ten_pgd_ks']} ({r['so_cv']}, {r['nam']})": r['id']
                    for _, r in df_dots.iterrows()}
-    dot_sel = st.selectbox("📋 Chọn đợt kiểm toán", list(dot_options.keys()), key="ktnb_dot_main")
+    dot_sel = st.selectbox("📋 Chọn đợt kiểm toán", list(dot_options.keys()), key="_ktnb_dot_selector")
     dot_id = dot_options[dot_sel]
 
     st.divider()
@@ -809,9 +830,6 @@ def render_ktnb(df_full: pd.DataFrame, role: str, username: str) -> None:
     ])
 
     with tab_a:
-        # Hiển thị chỉ đợt đang chọn trong tab A
-        dot = lay_dot_by_id(dot_id)
-        st.json(dot) if dot else st.error("Không tìm thấy đợt")
         render_ke_hoach_lich_trinh(username, readonly)
 
     with tab_b:

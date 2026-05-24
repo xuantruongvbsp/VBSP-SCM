@@ -8,12 +8,34 @@ import streamlit as st
 import pandas as pd
 
 import db
-from config import *
+from config import (
+    COT_DIA_CHI,
+    COT_DU_NO_KHOANH,
+    COT_DU_NO_QH,
+    COT_DU_NO_TH,
+    COT_DVUT,
+    COT_LAI_SUAT,
+    COT_LAI_TON,
+    COT_MA_KH,
+    COT_NGAY_DH,
+    COT_NGAY_VAY,
+    COT_NGUON_VON,
+    COT_SDT,
+    COT_SO_KU,
+    COT_TEN_CT,
+    COT_TEN_KH,
+    COT_TEN_PGD,
+    COT_TEN_THON,
+    COT_TEN_TO,
+    COT_TEN_XA,
+    COT_THOI_HAN,
+    COT_TINH_TRANG,
+    COT_TONG_DU_NO,
+)
 from utils import fmt_so, fmt_ty, vn, ten_file_xuat, hien_thi_dataframe_phan_trang, xuat_excel
 from services import xuat_bao_cao, ten_file_bao_cao
 from pdf_service import nut_xuat_pdf
 from data import (danh_dau_khong_hd, tong_hop_khong_hd, ds_chi_tiet_khong_hd)
-from tabs import tab_nq11
 from auth import la_phan_he_pgd, la_phan_he_cn, la_executive
 from state_manager import SCMStateManager
 from logger import get_logger
@@ -550,7 +572,7 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
             st.divider()
 
             if _tab_bc_ct == "📑 NQ11":
-                tab_nq11.render(st.container(), **kwargs)
+                import importlib; tab_nq11 = importlib.import_module("tabs.tab_nq11"); tab_nq11.render(st.container(), **kwargs)
             else:
                 loai_ct = st.radio("Loại chi tiết",
                     ["📋 Danh sách theo tiêu chí lọc",

@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import os
 
-import altair as alt
 import pandas as pd
 import streamlit as st
 from streamlit.delta_generator import DeltaGenerator
@@ -246,6 +245,7 @@ def _chart_tang_truong(
     key_prefix: str,
 ) -> None:
     """Grouped bar chart tăng trưởng dư nợ theo dimension, prev vs curr."""
+    import altair as alt
     if COT_TONG_DU_NO not in df_bl.columns or COT_TONG_DU_NO not in df_ht.columns:
         st.info("Không đủ dữ liệu để vẽ biểu đồ.")
         return
@@ -721,6 +721,7 @@ def _render_co_cau_nguon_von(
     label_ht: str,
     key_prefix: str,
 ) -> None:
+    import altair as alt
     st.markdown(
         "So sánh cơ cấu dư nợ và chất lượng tín dụng giữa **Vốn TW** (1) "
         "và **Vốn Địa phương** (2)."
@@ -848,6 +849,7 @@ def _render_thoi_han_vay(
     label_ht: str,
     key_prefix: str,
 ) -> None:
+    import altair as alt
     st.markdown(
         "Phân nhóm dư nợ theo kỳ hạn: ngắn hạn (≤12 tháng), "
         "trung hạn (13-36 tháng), dài hạn (37-60 tháng), rất dài hạn (>60 tháng)."
@@ -981,6 +983,7 @@ def _render_lai_ton_chi_tiet(
     key_prefix: str,
     pgd_mode: bool,
 ) -> None:
+    import altair as alt
     st.markdown(
         "Phân tích **lãi tồn** (lãi dự thu chưa thu được) — chia theo trong hạn và quá hạn, "
         "kèm tỷ lệ lãi tồn / dư nợ."
@@ -1149,6 +1152,7 @@ def _render_aging_analysis(
     label_ht: str,
     key_prefix: str,
 ) -> None:
+    import altair as alt
     st.markdown(
         "Phân tích **tuổi nợ quá hạn** (Aging) — phân nhóm dư nợ quá hạn theo "
         "số ngày quá hạn, so sánh giữa hai kỳ."

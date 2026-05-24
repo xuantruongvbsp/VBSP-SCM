@@ -21,7 +21,10 @@ import streamlit as st
 import pandas as pd
 
 import db
-from config import COT_HINH_THUC_VAY, COT_MA_KH, COT_SO_KU, COT_TEN_THON, COT_TEN_XA, COT_TONG_DU_NO, COT_DU_NO_QH, DS_PGD, DON_VI_CHI_NHANH
+from config import (
+    COT_HINH_THUC_VAY, COT_MA_KH, COT_SO_KU, COT_TEN_THON, COT_TEN_XA,
+    COT_TONG_DU_NO, COT_DU_NO_QH, DS_PGD, DON_VI_CHI_NHANH, lay_dgd_cho_pgd,
+)
 from auth import la_phan_he_cn, la_executive, normalize_role
 from state_manager import SCMStateManager
 from utils import xuat_excel, hien_thi_dataframe_phan_trang, fmt_so
@@ -66,23 +69,25 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
 
         # ── Helpers ──────────────────────────────────────────────────────────
         def _ds_dgd_cua_pgd(pgd: str) -> list[tuple[str, str]]:
-            """[(xa, dgd_name)] — toàn bộ ĐGD trong PGD (từ dgd_map)."""
-            xa_block = dgd_map.get(pgd, {})
-            return [
-                (xa, dgd_name)
-                for xa, dgd_block in xa_block.items()
-                if isinstance(dgd_block, dict)
-                for dgd_name in dgd_block.keys()
-            ]
+            """[(xa, dgd_name)] — toàn bộ ĐGD trong PGD (từ DGD_DANH_SACH)."""
+            dgd_list = lay_dgd_cho_pgd(pgd)
+            return [(d["xa"], d["ten"]) for d in dgd_list]
 
         def _label_dgd(xa: str, dgd_name: str) -> str:
             return f"{xa} — {dgd_name}"
 
         def _ap_cua_dgd(pgd: str, dgd_name: str) -> list[str]:
-            """List ấp của một ĐGD từ dgd_map."""
+            """List ấp của một ĐGD từ dgd_map (schema mới: dict với key 'thon')."""
             for xa, dgd_block in dgd_map.get(pgd, {}).items():
                 if isinstance(dgd_block, dict) and dgd_name in dgd_block:
-                    return [str(a).strip() for a in (dgd_block[dgd_name] or []) if str(a).strip()]
+                    entry = dgd_block[dgd_name]
+                    if isinstance(entry, dict):
+                        thon_list = entry.get("thon", [])
+                    elif isinstance(entry, list):
+                        thon_list = entry
+                    else:
+                        thon_list = []
+                    return [str(a).strip() for a in thon_list if str(a).strip()]
             return []
 
         def _so_ap_cbtd(info: dict) -> int:

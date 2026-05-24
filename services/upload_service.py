@@ -34,7 +34,12 @@ from logger import get_logger
 logger = get_logger(__name__)
 from utils import fmt_so, vn
 from data.core import ts_file, excel_to_parquet
-from data.pgd import duong_dan_pgd
+
+
+def _duong_dan_pgd(ten_pgd: str, loai: str) -> str:
+    """Lazy-load data.pgd để tránh circular import khi services.__init__ được load."""
+    from data.pgd import duong_dan_pgd as _fn
+    return _fn(ten_pgd, loai)
 
 from services.data_quality import kiem_tra_chat_luong
 from config import (
@@ -234,14 +239,14 @@ def luu_dienbao(
     if loai == "ht":
         ten_hien = "Điện báo hiện tại"
         duong_dan = (
-            duong_dan_pgd(ten_pgd, "dienbao_ht")
+            _duong_dan_pgd(ten_pgd, "dienbao_ht")
             if ten_pgd
             else DB_HT_CACHE
         )
     elif loai == "prev":
         ten_hien = "Điện báo 31/12 năm trước"
         duong_dan = (
-            duong_dan_pgd(ten_pgd, "dienbao_prev")
+            _duong_dan_pgd(ten_pgd, "dienbao_prev")
             if ten_pgd
             else DB_PREV_CACHE
         )
@@ -324,7 +329,7 @@ def merge_du_lieu_toan_cn(
 
     meta_map: dict[str, tuple[bool, bool]] = {}
     for ten_pgd in tat_ca_dv:
-        path_excel = duong_dan_pgd(ten_pgd, loai)
+        path_excel = _duong_dan_pgd(ten_pgd, loai)
         if not Path(path_excel).exists():
             meta_map[ten_pgd] = (False, False)
             continue
@@ -344,7 +349,7 @@ def merge_du_lieu_toan_cn(
         ten_pgd: str, loai: str
     ) -> tuple[str, pd.DataFrame | None, str | None]:
         """Trả về (ten_pgd, df | None, canh_bao_str | None)."""
-        path_excel = duong_dan_pgd(ten_pgd, loai)
+        path_excel = _duong_dan_pgd(ten_pgd, loai)
         if not Path(path_excel).exists():
             return ten_pgd, None, None
         try:

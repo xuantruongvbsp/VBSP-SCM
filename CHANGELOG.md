@@ -1,6 +1,15 @@
 # CHANGELOG
 
-## [2026-05-24] — Fix 7 lỗi Tab Kiểm toán Nội bộ (KTNB)
+## [2026-05-24] — Fix 13 lỗi Tab Kiểm toán Nội bộ (KTNB) — Phase 2
+- `services/ktnb_service.py` dòng ~724 — Thêm guard `if df_dm.empty` trước khi render form thêm lỗi; trước đó crash `IndexError` khi bảng danh mục lỗi trống
+- `services/ktnb_service.py` dòng ~786 — Sửa call `cap_nhat_trang_thai_loi()` để dùng keyword args thay positional (dòng này bỏ sót ở phase 1)
+- `services/ktnb_service.py` dòng ~690 — Đơn giản logic `is_truong_doan`: check xem có vai_trò="truong_doan" trong đoàn (trước đó so sánh text_name == username → LUÔN FALSE)
+- `services/ktnb_service.py` dòng ~195–196 — Thêm cột "Trạng thái lịch hiển thị" (map nội bộ → tiếng Việt) vào bảng danh sách đợt
+- `services/ktnb_service.py` dòng ~213–214, ~735 — Thêm `format="DD/MM/YYYY"` vào 3 `st.date_input` (CLAUDE.md §5.9)
+- `services/ktnb_service.py` dòng ~253–259 — Thêm prefix `_ktnb_` vào widget keys trong form_them_tv (`_ktnb_tv_hoten`, `_ktnb_tv_chucvu`, `_ktnb_tv_donvi`, `_ktnb_tv_vaitro`)
+- `services/ktnb_service.py` dòng ~528–537 — Sửa Excel export từ antipattern `st.button→st.download_button` → session_state cache (tương tự fix ở tab so sánh kỳ)
+
+## [2026-05-24] — Fix 7 lỗi Tab Kiểm toán Nội bộ (KTNB) — Phase 1
 - `services/ktnb_service.py` dòng ~671 — Thêm try-except trong `_luu_minh_chung()` để handle OSError + unhandled exceptions; trước đó ghi file thất bại vẫn trả về path=None im lặng
 - `services/ktnb_service.py` dòng ~756 — Kiểm tra `path is not None` sau upload file minh chứng; thêm limit 10MB; thay positional args → keyword args cho `cap_nhat_trang_thai_loi()`
 - `services/ktnb_service.py` dòng ~217 — Thêm validation: Số CV ≤50 ký tự, Trưởng đoàn không trống, Ngày bắt đầu ≤ Ngày kết thúc

@@ -469,6 +469,9 @@ df = duckdb.query(f"SELECT ... FROM '{CACHE_HSTD}'").df()
 □ Widget key có suffix unique
 □ render(tab=None) với fallback st.container()
 □ KHÔNG tự git commit/push
+□ st.date_input có format="DD/MM/YYYY"
+□ DuckDB: check schema parquet trước khi query (8.17)
+□ HTML: KHÔNG hardcode color:black/background:white (dark mode)
 □ CHANGELOG.md đã cập nhật
 □ BUGMAP.md đã cập nhật (nếu fix bug)
 ```
@@ -505,6 +508,7 @@ df = duckdb.query(f"SELECT ... FROM '{CACHE_HSTD}'").df()
 
 | File | Đọc khi |
 |---|---|
+| `DELTA.md` | **ĐỌC ĐẦU MỖI PHIÊN** — thay đổi gần đây, component mới, signature đã cập nhật |
 | `CLAUDE.md` | Convention đầy đủ, luồng dữ liệu, pattern chuẩn |
 | `BUGMAP.md` | Gặp lỗi — tra trước khi debug |
 | ~~`FILE_INDEX.md`~~ | *(đã xóa)* |

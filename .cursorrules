@@ -485,6 +485,7 @@ except Exception as e:
 ## 8. Checklist trước khi sửa
 
 ```
+□ ĐỌC BUGMAP.md — kiểm tra section liên quan để tránh lặp lỗi cũ
 □ Đọc file cần sửa (view toàn bộ hoặc phần liên quan)
 □ Xác định hàm/dòng cụ thể sẽ thay đổi
 □ Kiểm tra hàm nào đang gọi hàm đó (grep ngược)
@@ -495,8 +496,15 @@ except Exception as e:
 □ Role check: dùng la_phan_he_cn() hay check chuỗi thô?
 □ normalize_role(role) trước khi check role
 □ render(tab=None, **kwargs) với fallback st.container()
+□ Convention check (nếu task có sửa code logic/UI):
+  python scripts/check_conventions.py path/to/file.py
 □ len(tab_names) == len(_tab_renderers) nếu sửa ws_*.py
 □ prefix widget unique khi pgd_mode=True
+□ st.date_input có format="DD/MM/YYYY"
+□ DuckDB: check schema parquet trước khi query (5.13)
+□ HTML: KHÔNG hardcode color:black/background:white (dark mode)
+□ CHANGELOG.md đã cập nhật
+□ BUGMAP.md đã cập nhật (nếu fix bug)
 ```
 
 ---
@@ -537,6 +545,7 @@ Thêm entry mới lên **ĐẦU FILE** `CHANGELOG.md` (ngay sau dòng `# CHANGEL
 
 | Tag | Khi nào dùng |
 |---|---|
+| `@DELTA.md` | **ĐỌC ĐẦU MỖI PHIÊN** — thay đổi gần đây, component mới |
 | `@HUONG_DAN_NGUON_DU_LIEU.md` | Mọi tính năng đọc/ghi dữ liệu |
 | `@CONVENTIONS.md` | Mọi tính năng mới |
 | `@ARCHITECTURE.md` | Thêm tab mới, workspace, sửa app.py |

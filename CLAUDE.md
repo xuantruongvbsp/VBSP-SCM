@@ -652,6 +652,9 @@ def movers_analysis(
   python scripts/check_conventions.py path/to/file.py
 □ len(tab_names) == len(_tab_renderers) nếu sửa ws_*.py
 □ prefix widget unique khi pgd_mode=True
+□ st.date_input có format="DD/MM/YYYY"
+□ DuckDB: check schema parquet trước khi query (5.16)
+□ HTML: KHÔNG hardcode color:black/background:white (dark mode)
 ```
 
 ---
@@ -704,6 +707,7 @@ Mỗi khi fix bug, thêm entry vào `BUGMAP.md` theo template có sẵn (cuối 
 
 | File | Đọc khi nào |
 |---|---|
+| `DELTA.md` | **ĐỌC ĐẦU MỖI PHIÊN** — thay đổi gần đây, component mới, signature đã cập nhật |
 | `ARCHITECTURE.md` | Cần hiểu quan hệ import giữa các module |
 | `CONVENTIONS.md` | Cần biết quy ước chi tiết về kv_store, upload, CSS |
 | `UI_GUIDELINES.md` | Bảng màu, typography |

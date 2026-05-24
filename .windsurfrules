@@ -466,6 +466,9 @@ df = duckdb.query(f"SELECT ... FROM '{CACHE_HSTD}'").df()
 □ Convention check (nếu task có sửa code logic/UI):
   python scripts/check_conventions.py path/to/file.py
 □ KHÔNG tự git commit/push
+□ st.date_input có format="DD/MM/YYYY"
+□ DuckDB: check schema parquet trước khi query (6.17)
+□ HTML: KHÔNG hardcode color:black/background:white (dark mode)
 □ CHANGELOG.md đã cập nhật
 □ BUGMAP.md đã cập nhật (nếu fix bug)
 ```
@@ -498,6 +501,7 @@ df = duckdb.query(f"SELECT ... FROM '{CACHE_HSTD}'").df()
 
 | File | Đọc khi |
 |---|---|
+| `DELTA.md` | **ĐỌC ĐẦU MỖI PHIÊN** — thay đổi gần đây, component mới, signature đã cập nhật |
 | `CLAUDE.md` | Convention đầy đủ, luồng dữ liệu, pattern chuẩn |
 | `BUGMAP.md` | Gặp lỗi — tra trước khi debug |
 | `ARCHITECTURE.md` | Quan hệ import giữa các module |

@@ -428,6 +428,92 @@ def init_db():
             );
             CREATE INDEX IF NOT EXISTS idx_mbcv368_pgd_loai_nam
                 ON mau_bieu_cv368(ten_pgd, loai_mau, nam);
+
+            CREATE TABLE IF NOT EXISTS ktnb_dot_kiem_tra (
+                id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                nam             INTEGER NOT NULL,
+                so_cv           TEXT,
+                loai_hinh       TEXT NOT NULL DEFAULT 'dinh_ky',
+                ten_pgd_ks      TEXT NOT NULL,
+                ngay_bat_dau    TEXT,
+                ngay_ket_thuc   TEXT,
+                truong_doan     TEXT,
+                trang_thai      TEXT NOT NULL DEFAULT 'ke_hoach',
+                ghi_chu         TEXT,
+                nguoi_tao       TEXT NOT NULL,
+                created_at      TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+                updated_at      TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+            );
+            CREATE INDEX IF NOT EXISTS idx_ktnb_dot_nam ON ktnb_dot_kiem_tra(nam);
+            CREATE INDEX IF NOT EXISTS idx_ktnb_dot_pgd ON ktnb_dot_kiem_tra(ten_pgd_ks);
+
+            CREATE TABLE IF NOT EXISTS ktnb_doan_kiem_tra (
+                id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                dot_id          INTEGER NOT NULL REFERENCES ktnb_dot_kiem_tra(id) ON DELETE CASCADE,
+                ho_ten          TEXT NOT NULL,
+                chuc_vu         TEXT,
+                don_vi          TEXT,
+                vai_tro         TEXT NOT NULL DEFAULT 'thanh_vien',
+                ghi_chu         TEXT,
+                UNIQUE(dot_id, ho_ten)
+            );
+            CREATE INDEX IF NOT EXISTS idx_ktnb_doan_dot ON ktnb_doan_kiem_tra(dot_id);
+
+            CREATE TABLE IF NOT EXISTS ktnb_danh_muc_loi_chuan (
+                ma_loi          TEXT PRIMARY KEY,
+                khoi_nghiep_vu  TEXT NOT NULL,
+                ten_loi         TEXT NOT NULL,
+                mo_ta           TEXT,
+                muc_do          TEXT NOT NULL DEFAULT 'trung_binh',
+                so_cv           TEXT,
+                con_hieu_luc    INTEGER NOT NULL DEFAULT 1
+            );
+
+            CREATE TABLE IF NOT EXISTS ktnb_mau_doi_chieu_kh (
+                id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                dot_id          INTEGER NOT NULL REFERENCES ktnb_dot_kiem_tra(id) ON DELETE CASCADE,
+                ma_mon_vay      TEXT NOT NULL,
+                ten_pgd         TEXT,
+                ten_kh          TEXT,
+                so_tien_vay     REAL,
+                du_no_hstd      REAL,
+                tinh_trang      TEXT,
+                uu_tien_rui_ro  INTEGER NOT NULL DEFAULT 0,
+                trang_thai_doi_chieu TEXT NOT NULL DEFAULT 'chua_doi_chieu',
+                ngay_doi_chieu  TEXT,
+                du_no_thuc_te   REAL,
+                ghi_nhan_loi    TEXT,
+                phat_hien_sai_sot INTEGER NOT NULL DEFAULT 0,
+                ghi_chu         TEXT,
+                nguoi_nhap      TEXT,
+                created_at      TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+                updated_at      TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+                UNIQUE(dot_id, ma_mon_vay)
+            );
+            CREATE INDEX IF NOT EXISTS idx_ktnb_mau_dot ON ktnb_mau_doi_chieu_kh(dot_id);
+            CREATE INDEX IF NOT EXISTS idx_ktnb_mau_ma ON ktnb_mau_doi_chieu_kh(ma_mon_vay);
+
+            CREATE TABLE IF NOT EXISTS ktnb_ket_qua_loi (
+                id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                dot_id          INTEGER NOT NULL REFERENCES ktnb_dot_kiem_tra(id) ON DELETE CASCADE,
+                ma_loi          TEXT NOT NULL REFERENCES ktnb_danh_muc_loi_chuan(ma_loi),
+                ma_mon_vay      TEXT,
+                mo_ta_cu_the    TEXT,
+                bien_phap_xu_ly TEXT,
+                thoi_han_kp     TEXT,
+                don_vi_chiu_trach TEXT,
+                trang_thai      TEXT NOT NULL DEFAULT 'chua_khac_phuc',
+                minh_chung_path TEXT,
+                nguoi_ghi_nhan  TEXT NOT NULL,
+                nguoi_dong_loi  TEXT,
+                ngay_dong_loi   TEXT,
+                ghi_chu         TEXT,
+                created_at      TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+                updated_at      TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+            );
+            CREATE INDEX IF NOT EXISTS idx_ktnb_loi_dot     ON ktnb_ket_qua_loi(dot_id);
+            CREATE INDEX IF NOT EXISTS idx_ktnb_loi_ma      ON ktnb_ket_qua_loi(ma_loi);
+            CREATE INDEX IF NOT EXISTS idx_ktnb_loi_trang_thai ON ktnb_ket_qua_loi(trang_thai);
         """)
         try:
             conn.execute(
@@ -527,6 +613,52 @@ def init_db():
         except sqlite3.OperationalError:
             pass
         conn.commit()
+
+
+_KTNB_LOI_CHUAN = [
+    ("TD_01", "tin_dung", "Hồ sơ vay thiếu giấy tờ bắt buộc", "Thiếu CMND/CCCD, giấy đề nghị vay vốn, biên bản họp tổ", "trung_binh", "CV 9919/NHCS-KTNB"),
+    ("TD_02", "tin_dung", "Sai lãi suất cho vay", "Lãi suất áp dụng không đúng quyết định hiện hành", "cao", "CV 9919/NHCS-KTNB"),
+    ("TD_03", "tin_dung", "Mức vay vượt quy định chương trình", "Số tiền cho vay vượt mức tối đa chương trình tín dụng", "cao", "CV 9919/NHCS-KTNB"),
+    ("TD_04", "tin_dung", "Sai đối tượng thụ hưởng", "Người vay không thuộc đối tượng chương trình tín dụng", "cao", "CV 9919/NHCS-KTNB"),
+    ("TD_05", "tin_dung", "Gia hạn nợ không đúng quy trình", "Thiếu biên bản xét duyệt gia hạn hoặc gia hạn sai thẩm quyền", "trung_binh", "CV 9919/NHCS-KTNB"),
+    ("TD_06", "tin_dung", "Dư nợ thực tế không khớp sổ sách", "Chênh lệch giữa dư nợ đối chiếu thực tế và dư nợ trên hệ thống", "cao", "CV 10499/NHCS-KTNB"),
+    ("TD_07", "tin_dung", "Không lập/lưu biên bản kiểm tra sau vay", "Thiếu biên bản kiểm tra sử dụng vốn định kỳ theo quy định", "thap", "CV 9919/NHCS-KTNB"),
+    ("TD_08", "tin_dung", "Tổ TK&VV hoạt động không đúng quy định", "Danh sách tổ viên, biên bản họp tổ không đầy đủ/lưu trữ không đúng", "thap", "CV 9919/NHCS-KTNB"),
+    ("KT_01", "ke_toan", "Hạch toán sai tài khoản", "Bút toán không đúng hệ thống tài khoản NHCSXH", "cao", "CV 9919/NHCS-KTNB"),
+    ("KT_02", "ke_toan", "Chứng từ kế toán không hợp lệ", "Chứng từ thiếu chữ ký, dấu, hoặc số tiền bằng chữ/số không khớp", "trung_binh", "CV 9919/NHCS-KTNB"),
+    ("KT_03", "ke_toan", "Tồn quỹ tiền mặt vượt định mức", "Số dư tiền mặt cuối ngày vượt định mức cho phép", "trung_binh", "CV 9919/NHCS-KTNB"),
+    ("KT_04", "ke_toan", "Bảo quản kho quỹ không đúng quy định", "Phòng kho quỹ không đạt tiêu chuẩn an toàn theo quy định", "trung_binh", "CV 9919/NHCS-KTNB"),
+    ("KT_05", "ke_toan", "Báo cáo tài chính nộp trễ hạn", "Báo cáo định kỳ nộp sau ngày quy định", "thap", "CV 9919/NHCS-KTNB"),
+    ("TC_01", "tccb", "Hồ sơ nhân sự không đầy đủ", "Thiếu quyết định bổ nhiệm, hợp đồng lao động, bằng cấp chứng chỉ", "thap", "CV 9919/NHCS-KTNB"),
+    ("TC_02", "tccb", "Vi phạm quy chế chi tiêu nội bộ", "Chi tiêu vượt định mức hoặc không có chứng từ hợp lệ", "trung_binh", "CV 9919/NHCS-KTNB"),
+    ("TC_03", "tccb", "Ban đại diện HĐQT chưa giám sát theo quy định", "Thiếu biên bản giám sát định kỳ hoặc giám sát không đúng nội dung", "thap", "CV 9919/NHCS-KTNB"),
+    ("TC_04", "tccb", "Công tác lưu trữ văn bản không đúng quy định", "Văn bản không được phân loại, đóng dấu mật hoặc lưu trữ đúng niên hạn", "thap", "CV 9919/NHCS-KTNB"),
+]
+
+
+def seed_ktnb_danh_muc_loi() -> int:
+    """Seed danh mục lỗi chuẩn theo CV 9919/NHCS-KTNB. Chạy an toàn nhiều lần.
+    Trả về số bản ghi đã insert (0 nếu đã có hết)."""
+    count = 0
+    try:
+        with get_conn() as conn:
+            for row in _KTNB_LOI_CHUAN:
+                ma_loi, khoi, ten, mo_ta, muc_do, so_cv = row
+                exists = conn.execute(
+                    "SELECT 1 FROM ktnb_danh_muc_loi_chuan WHERE ma_loi = ?", (ma_loi,)
+                ).fetchone()
+                if not exists:
+                    conn.execute(
+                        """INSERT INTO ktnb_danh_muc_loi_chuan
+                           (ma_loi, khoi_nghiep_vu, ten_loi, mo_ta, muc_do, so_cv)
+                           VALUES (?,?,?,?,?,?)""",
+                        (ma_loi, khoi, ten, mo_ta, muc_do, so_cv),
+                    )
+                    count += 1
+            conn.commit()
+    except Exception as e:
+        logger.error("seed_ktnb_danh_muc_loi thất bại: %s", e, exc_info=True)
+    return count
 
 
 def ghi_kv(key: str, value: dict, username: str = "system", note: str = None) -> None:

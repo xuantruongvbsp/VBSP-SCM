@@ -314,7 +314,21 @@ Phân loại đúng section (A. Parquet, B. Streamlit UI, C. DataFrame, D. Datab
 
 ---
 
-# 20. CHECKLIST CUỐI TRƯỚC KHI APPLY
+# 20. TÀI LIỆU THAM CHIẾU
+
+| File | Đọc khi |
+|---|---|
+| `DELTA.md` | **ĐỌC ĐẦU MỖI PHIÊN** — thay đổi gần đây, component mới, signature đã cập nhật |
+| `CLAUDE.md` | Convention đầy đủ, luồng dữ liệu, pattern chuẩn |
+| `BUGMAP.md` | Gặp lỗi — tra trước khi debug |
+| `ARCHITECTURE.md` | Quan hệ import giữa các module |
+| `TROUBLESHOOTING.md` | Lỗi vận hành thường gặp |
+| `CHANGELOG.md` | Lịch sử thay đổi |
+| `SCHEMA.md` | **ĐỌC TRƯỚC KHI VIẾT SQL** — schema 16 bảng SQLite + parquet + query mẫu |
+
+---
+
+# 21. CHECKLIST CUỐI TRƯỚC KHI APPLY
 
 ```
 □ Đọc BUGMAP.md section liên quan — tránh lặp lỗi cũ

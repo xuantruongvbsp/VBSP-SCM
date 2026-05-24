@@ -15,6 +15,7 @@ import streamlit as st
 from streamlit.delta_generator import DeltaGenerator
 
 from auth import la_phan_he_cn, normalize_role, get_permissions, co_quyen_upload_pgd
+from state_manager import SCMStateManager
 from config import (
     COT_CMND,
     COT_DIA_CHI,
@@ -818,6 +819,7 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
     role     = normalize_role(role_raw)
     pgd_user = kwargs.get("pgd_user")
     username = kwargs.get("username", "unknown")
+    state = SCMStateManager()
 
     ctx = get_tab_context(tab)
     with ctx:
@@ -862,23 +864,29 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
         if la_phan_he_cn(role):
             col_f, _ = st.columns([2, 4])
             with col_f:
+                _opts_pgd = ["Tất cả"] + DS_PGD
+                _desired_pgd = state.filter_pgd or "Tất cả"
+                if "khoanh_pgd_loc" not in st.session_state:
+                    st.session_state["khoanh_pgd_loc"] = _desired_pgd if _desired_pgd in _opts_pgd else "Tất cả"
+                elif st.session_state.get("khoanh_pgd_loc") not in _opts_pgd:
+                    st.session_state["khoanh_pgd_loc"] = "Tất cả"
                 pgd_chon = st.selectbox(
                     "🔍 Lọc PGD",
-                    ["Tất cả"] + DS_PGD,
+                    _opts_pgd,
                     key="khoanh_pgd_loc",
                 )
+            state.filter_pgd = None if pgd_chon == "Tất cả" else pgd_chon
             if pgd_chon != "Tất cả" and COT_TEN_PGD in df_kh.columns:
                 df_kh = df_kh[df_kh[COT_TEN_PGD] == pgd_chon]
         else:
             from data.pgd import pgd_slug
             key_prefix = f"pgd_{pgd_slug(pgd_user)}_" if pgd_user else "pgd_"
+            if pgd_user:
+                state.filter_pgd = pgd_user
 
         # ── KPI tổng quan — tính từ df_kh (đã qua filter PGD) ─────────────
         # tong_du_no: toàn bộ dư nợ cùng scope — lọc use_df theo PGD đã chọn
-        _pgd_filter_kpi = (
-            st.session_state.get("khoanh_pgd_loc")
-            if la_phan_he_cn(role) else pgd_user
-        )
+        _pgd_filter_kpi = state.filter_pgd if la_phan_he_cn(role) else pgd_user
         if _pgd_filter_kpi and _pgd_filter_kpi != "Tất cả" and COT_TEN_PGD in use_df.columns:
             use_df_scope = use_df[use_df[COT_TEN_PGD] == _pgd_filter_kpi]
         else:
@@ -918,7 +926,7 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
         st.divider()
 
         # ── Lọc món sắp hết hạn khoanh (từ sidebar badge) ────────────────
-        _qlnk_filter = st.session_state.pop('_qlnk_filter', None)
+        _qlnk_filter = state.temp.pop("_qlnk_filter")
         if _qlnk_filter == 'sap_het_han':
             from alert_center import canh_bao_no_khoanh_sap_het_han
             data_hh = canh_bao_no_khoanh_sap_het_han(df_kh)
@@ -1018,17 +1026,18 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                     f"📥 Xuất Excel ({len(df_kh)} món)",
                     key=f"{key_prefix}khoanh_xuat",
                 ):
-                    st.session_state[f"_{key_prefix}khoanh_buf"] = xuat_excel(
+                    state.downloads.set("khoanh", xuat_excel(
                         {"Nợ khoanh": df_hien}
-                    )
-                if st.session_state.get(f"_{key_prefix}khoanh_buf"):
-                    st.download_button(
+                    ), "NoKhoanh.xlsx")
+                if state.downloads.has("khoanh"):
+                    if st.download_button(
                         "⬇️ Tải về Excel",
-                        data=st.session_state[f"_{key_prefix}khoanh_buf"],
-                        file_name="NoKhoanh.xlsx",
+                        data=state.downloads.get_bytes("khoanh"),
+                        file_name=state.downloads.get_filename("khoanh"),
                         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                         key=f"{key_prefix}khoanh_dl",
-                    )
+                    ):
+                        state.downloads.clear("khoanh")
 
         if nhom == "tongquan":
             return
@@ -1072,17 +1081,18 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                         height=320,
                     )
                     if st.button("📥 Xuất M08 Excel", key=f"{key_prefix}bc_m08_xuat"):
-                        st.session_state[f"_{key_prefix}m08_buf"] = xuat_excel(
+                        state.downloads.set("m08", xuat_excel(
                             {"M08_ChuaKiemTra": df_chua_kt[cols_m08]}
-                        )
-                    if st.session_state.get(f"_{key_prefix}m08_buf"):
-                        st.download_button(
+                        ), "M08_ChuaKiemTra.xlsx")
+                    if state.downloads.has("m08"):
+                        if st.download_button(
                             "⬇️ Tải M08",
-                            data=st.session_state[f"_{key_prefix}m08_buf"],
-                            file_name="M08_ChuaKiemTra.xlsx",
+                            data=state.downloads.get_bytes("m08"),
+                            file_name=state.downloads.get_filename("m08"),
                             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                             key=f"{key_prefix}bc_m08_dl",
-                        )
+                        ):
+                            state.downloads.clear("m08")
 
             with st.expander("📋 M09 — Danh sách món vay có khả năng trả nợ"):
                 rows_m09 = [
@@ -1103,17 +1113,18 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                         height=300,
                     )
                     if st.button("📥 Xuất M09 Excel", key=f"{key_prefix}bc_m09_xuat"):
-                        st.session_state[f"_{key_prefix}m09_buf"] = xuat_excel(
+                        state.downloads.set("m09", xuat_excel(
                             {"M09_CoKNTraNo": df_m09[cols_m09]}
-                        )
-                    if st.session_state.get(f"_{key_prefix}m09_buf"):
-                        st.download_button(
+                        ), "M09_CoKNTraNo.xlsx")
+                    if state.downloads.has("m09"):
+                        if st.download_button(
                             "⬇️ Tải M09",
-                            data=st.session_state[f"_{key_prefix}m09_buf"],
-                            file_name="M09_CoKNTraNo.xlsx",
+                            data=state.downloads.get_bytes("m09"),
+                            file_name=state.downloads.get_filename("m09"),
                             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                             key=f"{key_prefix}bc_m09_dl",
-                        )
+                        ):
+                            state.downloads.clear("m09")
 
             with st.expander("📊 QLNK_06 — Báo cáo kết quả kiểm tra nợ khoanh", expanded=False):
                 st.markdown("**Bộ lọc**")
@@ -1197,9 +1208,9 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                     col_06_1, col_06_2 = st.columns(2)
                     with col_06_1:
                         if st.button("📥 Xuất QLNK_06 Excel", key=f"{key_prefix}bc_06_xuat"):
-                            st.session_state[f"_{key_prefix}qlnk06_buf"] = xuat_excel(
+                            state.downloads.set("qlnk06_excel", xuat_excel(
                                 {"QLNK_06": df_06[cols_06]}
-                            )
+                            ), "QLNK_06.xlsx")
                     with col_06_2:
                         if st.button("📄 Xuất QLNK_06 PDF", key=f"{key_prefix}bc_06_pdf"):
                             try:
@@ -1210,27 +1221,29 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                                     ngay_tu=ngay_tu_06,
                                     ngay_den=ngay_den_06
                                 )
-                                st.session_state[f"_{key_prefix}qlnk06_pdf"] = pdf_06
+                                state.downloads.set("qlnk06_pdf", pdf_06, "QLNK_06.pdf")
                             except Exception as e:
-                                logger.error("Lỗi trong khối except: %s", e, exc_info=True)
+                                logger.error("Lỗi xuất PDF QLNK_06: %s", e, exc_info=True)
                                 st.error(f"❌ Lỗi xuất PDF: {e}")
 
-                    if st.session_state.get(f"_{key_prefix}qlnk06_buf"):
-                        st.download_button(
+                    if state.downloads.has("qlnk06_excel"):
+                        if st.download_button(
                             "⬇️ Tải QLNK_06 Excel",
-                            data=st.session_state[f"_{key_prefix}qlnk06_buf"],
-                            file_name="QLNK_06.xlsx",
+                            data=state.downloads.get_bytes("qlnk06_excel"),
+                            file_name=state.downloads.get_filename("qlnk06_excel"),
                             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                             key=f"{key_prefix}bc_06_dl",
-                        )
-                    if st.session_state.get(f"_{key_prefix}qlnk06_pdf"):
-                        st.download_button(
+                        ):
+                            state.downloads.clear("qlnk06_excel")
+                    if state.downloads.has("qlnk06_pdf"):
+                        if st.download_button(
                             "⬇️ Tải QLNK_06 PDF",
-                            data=st.session_state[f"_{key_prefix}qlnk06_pdf"],
-                            file_name="QLNK_06.pdf",
+                            data=state.downloads.get_bytes("qlnk06_pdf"),
+                            file_name=state.downloads.get_filename("qlnk06_pdf"),
                             mime="application/pdf",
                             key=f"{key_prefix}bc_06_pdf_dl",
-                        )
+                        ):
+                            state.downloads.clear("qlnk06_pdf")
 
             with st.expander("📋 M10_QLNK — Danh sách món vay chưa nhập kết quả kiểm tra"):
                 rows_m10 = [
@@ -1262,9 +1275,9 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                     col_ex1, col_ex2 = st.columns(2)
                     with col_ex1:
                         if st.button("📥 Xuất M10 Excel", key=f"{key_prefix}bc_m10_xuat"):
-                            st.session_state[f"_{key_prefix}m10_buf"] = xuat_excel(
+                            state.downloads.set("m10_excel", xuat_excel(
                                 {"M10_LuuTam": df_m10[cols_m10]}
-                            )
+                            ), "M10_LuuTam.xlsx")
                     with col_ex2:
                         if st.button("📄 Xuất M10 PDF", key=f"{key_prefix}bc_m10_pdf"):
                             pgd_pdf = pgd_filter_bc or ""
@@ -1272,27 +1285,29 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                                 pdf_m10 = _xuat_pdf_m10(
                                     df_m10.to_dict("records"), ten_pgd=pgd_pdf
                                 )
-                                st.session_state[f"_{key_prefix}m10_pdf"] = pdf_m10
+                                state.downloads.set("m10_pdf", pdf_m10, "M10_LuuTam.pdf")
                             except Exception as e:
-                                logger.error("Lỗi trong khối except: %s", e, exc_info=True)
+                                logger.error("Lỗi xuất PDF M10: %s", e, exc_info=True)
                                 st.error(f"❌ Lỗi xuất PDF: {e}")
 
-                    if st.session_state.get(f"_{key_prefix}m10_buf"):
-                        st.download_button(
+                    if state.downloads.has("m10_excel"):
+                        if st.download_button(
                             "⬇️ Tải M10 Excel",
-                            data=st.session_state[f"_{key_prefix}m10_buf"],
-                            file_name="M10_LuuTam.xlsx",
+                            data=state.downloads.get_bytes("m10_excel"),
+                            file_name=state.downloads.get_filename("m10_excel"),
                             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                             key=f"{key_prefix}bc_m10_dl",
-                        )
-                    if st.session_state.get(f"_{key_prefix}m10_pdf"):
-                        st.download_button(
+                        ):
+                            state.downloads.clear("m10_excel")
+                    if state.downloads.has("m10_pdf"):
+                        if st.download_button(
                             "⬇️ Tải M10 PDF",
-                            data=st.session_state[f"_{key_prefix}m10_pdf"],
-                            file_name="M10_LuuTam.pdf",
+                            data=state.downloads.get_bytes("m10_pdf"),
+                            file_name=state.downloads.get_filename("m10_pdf"),
                             mime="application/pdf",
                             key=f"{key_prefix}bc_m10_pdf_dl",
-                        )
+                        ):
+                            state.downloads.clear("m10_pdf")
 
             with st.expander("📊 Tiến độ kiểm tra theo PGD"):
                 if not rows_all_kt:
@@ -1338,14 +1353,15 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                         "📥 Xuất tiến độ Excel",
                         key=f"{key_prefix}bc_td_xuat",
                     ):
-                        st.session_state[f"_{key_prefix}td_buf"] = xuat_excel(
+                        state.downloads.set("tiendo", xuat_excel(
                             {"TienDoKiemTra": df_td_pgd}
-                        )
-                    if st.session_state.get(f"_{key_prefix}td_buf"):
-                        st.download_button(
+                        ), "TienDoKiemTraNK.xlsx")
+                    if state.downloads.has("tiendo"):
+                        if st.download_button(
                             "⬇️ Tải tiến độ",
-                            data=st.session_state[f"_{key_prefix}td_buf"],
-                            file_name="TienDoKiemTraNK.xlsx",
+                            data=state.downloads.get_bytes("tiendo"),
+                            file_name=state.downloads.get_filename("tiendo"),
                             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                             key=f"{key_prefix}bc_td_dl",
-                        )
+                        ):
+                            state.downloads.clear("tiendo")

@@ -35,10 +35,11 @@ def excel_to_parquet(
             or s == "mã"
             or " mã " in f" {s} "
             or s in {"mã thôn", "mã xã", "mã kh", "mã khách hàng", "mã chương trình"}
-            or s in {"số khế ước", "số ku"}
+            or s in {"số khế ước", "số ku", "số atm"}
             or "cmnd" in s
             or "cccd" in s
             or s in {"số điện thoại", "điện thoại", "sdt", "sđt"}
+            or s.startswith("số ") and ("kh" in s or "account" in s)
         )
 
     def _normalize_code_series(ser: pd.Series) -> pd.Series:

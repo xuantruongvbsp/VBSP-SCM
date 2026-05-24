@@ -605,6 +605,20 @@ def _duong_dan_pgd(ten_pgd: str, loai: str) -> str:
 
 ---
 
+## K. Performance / Tốc độ
+
+### K1 — `df.iterrows()` trong validation — upload PGD chậm 15-30 giây
+| | |
+|---|---|
+| **File** | `services/validation_service.py` → `_validate_pgd_xa_relationship()` |
+| **Dấu hiệu** | Upload file HSTD/GQVL/NQ11 treo lâu, UI không phản hồi; tab loading chậm sau khi upload (vì UI thread bị block) |
+| **Nguyên nhân** | `for _, row in df.iterrows():` duyệt từng dòng trong Python → O(n) với overhead Python interpreter. DataFrame 50k rows → 15-30 giây. `iterrows()` chậm hơn vectorized ~100x |
+| **Fix** | Thay bằng vectorized: lấy distinct pairs `(xa, pgd)` → `.map(xa_to_pgd)` → so sánh → tìm mismatch. Không cần vòng lặp Python. `iterrows()` chỉ dùng cho ≤3 hàng mẫu hiển thị lỗi |
+| **Pattern tránh** | `for _, row in df.iterrows():` khi validate/transform toàn DataFrame. Thay bằng `.map()`, `.isin()`, `.merge()`, boolean mask |
+| **Ngày fix** | 2026-05-24 |
+
+---
+
 ## Lệnh debug nhanh
 
 ```bash

@@ -142,38 +142,79 @@ COT_DVUT       = "Tên ĐVUT"
 ```python
 # ⚠️ THAM SỐ: num_columns (KHÔNG phải cols)
 def kpi_row(cols: list[dict], num_columns: int = 4): ...
-def delta_card(label, value, delta=None, delta_label="so với kỳ trước",
-               delta_color="normal", help=None, icon="", suffix="",
-               precision=0, key=None, use_container_width=True): ...
+
+def delta_card(
+    label: str,
+    value: str | float | int,
+    delta: float | None = None,
+    delta_label: str = "so với kỳ trước",
+    delta_color: str = "normal",   # "normal"|"inverse"|"off"
+    help: str | None = None,
+    icon: str = "",
+    suffix: str = "",
+    precision: int = 0,
+    key: str | None = None,
+    use_container_width: bool = True,
+): ...
 ```
 
 ### export_pdf.py
 ```python
 # ⚠️ download_pdf_button nhận PDF BYTES — không phải df, tieu_de
-def download_pdf_button(pdf_bytes: bytes, filename: str = "bao_cao.pdf",
-                        label: str = "📥 Tải PDF", key: str | None = None): ...
-def xuat_pdf_co_chart(df, tieu_de, nguoi_xuat, figs=None, cols_tien=None,
-                      don_vi_tien="đồng", prefix_file="",
-                      them_dong_tong=True, them_ngay_xuat=True) -> bytes: ...
+def download_pdf_button(
+    pdf_bytes: bytes,
+    filename: str = "bao_cao.pdf",
+    label: str = "📥 Tải PDF",
+    key: str | None = None,
+): ...
+
+def xuat_pdf_co_chart(
+    df: pd.DataFrame,
+    tieu_de: str,
+    nguoi_xuat: str,
+    figs: list[tuple[go.Figure, str]] | None = None,
+    cols_tien: list[str] | None = None,
+    don_vi_tien: str = "đồng",
+    prefix_file: str = "",
+    them_dong_tong: bool = True,
+    them_ngay_xuat: bool = True,
+) -> bytes: ...
 ```
 
 ### filter_bar.py
 ```python
-def filter_bar(df, filters: list[dict], key_prefix="fb", on_change=None) -> dict: ...
+def filter_bar(
+    df: pd.DataFrame,
+    filters: list[dict],    # [{"field": "Tên xã", "label": "Xã", "type": "select"}]
+    key_prefix: str = "fb", # type: "select"|"multiselect"|"text"|"range"
+    on_change=None,
+) -> dict: ...              # {field: value} — None = "Tất cả"
+
 def apply_filters(df: pd.DataFrame, filter_values: dict) -> pd.DataFrame: ...
 ```
 
 ### loan_drawer.py
 ```python
 # ⚠️ Nhận ROW (pd.Series | dict) — KHÔNG phải DataFrame
-def loan_detail_drawer(row, title=None, extra_fields=None, field_configs=None): ...
+def loan_detail_drawer(
+    row: pd.Series | dict,
+    title: str | None = None,
+    extra_fields: list[tuple] | None = None,
+    field_configs: list[dict] | None = None,
+): ...
 ```
 
 ### movers.py
 ```python
-def movers_analysis(df_curr, df_prev=None, top_n=10, key_prefix="mover",
-                    on_select_dimension=None, on_select_metric=None,
-                    show_title=True): ...
+def movers_analysis(
+    df_curr: pd.DataFrame,
+    df_prev: pd.DataFrame | None = None,
+    top_n: int = 10,
+    key_prefix: str = "mover",
+    on_select_dimension=None,
+    on_select_metric=None,
+    show_title: bool = True,
+): ...
 ```
 
 ### Utils (utils.py)
@@ -187,6 +228,9 @@ def vn(s: str) -> str          # normalize tiếng Việt
 def get_tab_context(tab)       # fallback st.container() khi tab=None
 def hien_thi_dataframe_phan_trang(df, key, page_size=50): ...
 def xuat_excel(sheets: dict, ten_file: str) -> bytes: ...
+def auto_fill_document(template_path, tag_map, output_path): ...
+def auto_audit(action: str = "", clear_cache: bool = True): ...
+def auto_fill_batch(df_rows, template_path, tag_map, ...): ...
 def lazy_tabs(labels: list[str], renderers: list, key: str = "lt"): ...
 
 # ⚠️ pgd_slug() ở data/pgd.py (KHÔNG phải utils)
@@ -347,6 +391,8 @@ Thêm lên ĐẦU FILE, dùng ngày thực tế, KHÔNG xóa entry cũ.
 
 ### 6.14 BUGMAP.md — cập nhật sau mỗi lần fix bug
 - **BẮT BUỘC**: Mỗi khi fix bug, thêm entry mới vào BUGMAP.md
+- Phân loại đúng section (A. Parquet, B. Streamlit UI, C. DataFrame, D. Database, E. Upload, F. PDF/Word, G. KHTD, H. GSheet, I. Role, J. Code Pattern)
+- Nếu là dạng lỗi mới chưa có section phù hợp → tạo section mới
 - Format: `### XX — [Tên lỗi]` với bảng `| | |` gồm: File, Dấu hiệu, Nguyên nhân, Fix, Ngày fix
 
 ---
@@ -381,6 +427,8 @@ Thêm lên ĐẦU FILE, dùng ngày thực tế, KHÔNG xóa entry cũ.
 □ st.cache_data.clear() sau upload/lưu file
 □ Widget key có suffix unique
 □ render(tab=None) với fallback st.container()
+□ Convention check (nếu task có sửa code logic/UI):
+  python scripts/check_conventions.py path/to/file.py
 □ KHÔNG tự git commit/push
 □ CHANGELOG.md đã cập nhật
 □ BUGMAP.md đã cập nhật (nếu fix bug)

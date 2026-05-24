@@ -211,31 +211,29 @@ class ValidationService:
         """Validate quan hệ PGD-Xã"""
         pgd_col = self._get_column(df, [COT_TEN_PGD, "Tên PGD", "PGD"])
         xa_col = self._get_column(df, [COT_TEN_XA, "Tên xã", "Xã"])
-        
+
         if not pgd_col or not xa_col:
             return
-        
-        # Kiểm tra xã có thuộc PGD không
-        invalid_relationships = []
-        for _, row in df.iterrows():
-            pgd = row[pgd_col]
-            xa = row[xa_col]
-            
-            if pd.isna(pgd) or pd.isna(xa):
-                continue
-            
-            # Kiểm tra qua XA_TO_PGD
-            expected_pgd = self.xa_to_pgd.get(xa)
-            if expected_pgd and expected_pgd != pgd:
-                invalid_relationships.append(f"{xa} (thuộc {expected_pgd}) nhưng trong dữ liệu là {pgd}")
-        
-        if len(invalid_relationships) > 0:
+
+        # Vectorized: lấy distinct cặp (xa, pgd) rồi so với xa_to_pgd map
+        pairs = df[[xa_col, pgd_col]].dropna().drop_duplicates()
+        pairs = pairs.astype(str)
+        pairs["expected_pgd"] = pairs[xa_col].map(self.xa_to_pgd)
+        invalid = pairs[
+            pairs["expected_pgd"].notna() & (pairs["expected_pgd"] != pairs[pgd_col])
+        ]
+
+        if not invalid.empty:
+            samples = [
+                f"{r[xa_col]} (thuộc {r['expected_pgd']}) nhưng trong dữ liệu là {r[pgd_col]}"
+                for _, r in invalid.head(3).iterrows()
+            ]
             result.add_error(ValidationError(
                 ValidationLevel.CRITICAL,
                 f"{pgd_col}-{xa_col}",
-                f"Xã không thuộc PGD: {', '.join(invalid_relationships[:3])}",
-                row_count=len(invalid_relationships),
-                sample_values=invalid_relationships[:3]
+                f"Xã không thuộc PGD: {', '.join(samples)}",
+                row_count=len(invalid),
+                sample_values=samples,
             ))
     
     def _validate_hstd_specific(self, df: pd.DataFrame, result: ValidationResult):

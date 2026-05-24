@@ -1,5 +1,5 @@
 {
-  "exported_at": "2026-05-25T06:16:35.874108",
+  "exported_at": "2026-05-25T06:31:18.872781",
   "version": 2,
   "tables": {
     "users": [],
@@ -91,7 +91,7 @@
       {
         "key": "alert_read_ids",
         "value": "{\"ids\": []}",
-        "updated_at": "2026-05-25T06:16:34.466342",
+        "updated_at": "2026-05-25T06:31:18.006026",
         "updated_by": "admin"
       }
     ],

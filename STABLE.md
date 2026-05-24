@@ -156,6 +156,8 @@ def ghi_audit(username: str, action: str, detail: str)
 ### data/core.py
 ```python
 def ts_file(fp: str) -> float
+def _should_force_str(col: str) -> bool        # Nhận diện cột mã định danh cần ép string ("Số ATM", "Mã KH"...)
+def _normalize_code_series(ser: pd.Series) -> pd.Series  # Chuẩn hóa code columns: NaN→"", int→str, bỏ bad vals
 def excel_to_parquet(excel_path, parquet_path, sheet, header, post_fn=None) -> pd.DataFrame
 def tong_hop_du_no_pgd(parquet_path) -> pd.DataFrame
 def dem_no_qua_han_pgd(parquet_path) -> pd.DataFrame

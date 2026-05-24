@@ -347,11 +347,28 @@ def main():
             st.divider()
             st.caption("💾 Sao lưu & phục hồi → tab **🔍 Trạng thái** › Hệ thống")
 
+        if normalize_role(role) in ("admin_cn", "admin"):
+            st.divider()
+            with st.expander("🧪 Debug state", expanded=False):
+                try:
+                    dump = SCMStateManager.debug_dump()
+                    downloads = dump.get("_scm_downloads", {}) if isinstance(dump, dict) else {}
+                    st.caption(f"downloads keys: {len(downloads) if isinstance(downloads, dict) else 0}")
+                    if st.button("🧹 Clear downloads", use_container_width=True, key="dbg_clear_downloads"):
+                        SCMStateManager().downloads.clear_all()
+                        st.rerun()
+                    st.json(dump)
+                except Exception as e:  # conv: skip
+                    st.error(f"Debug dump lỗi: {e}")
+
         st.divider()
         if st.button("🚪 Đăng xuất", use_container_width=True):
             for k in ["logged_in","user_info","username","workspace"]:
                 st.session_state[k] = False if k=="logged_in" else None
             st.session_state.username = ""
+            for k in list(st.session_state.keys()):
+                if str(k).startswith("_scm_"):
+                    st.session_state.pop(k, None)
             db.ghi_audit(username, "logout", "")
             st.rerun()
 

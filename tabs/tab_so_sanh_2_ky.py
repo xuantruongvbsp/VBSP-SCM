@@ -271,14 +271,13 @@ def _render_bang_pgd(df1: pd.DataFrame, df2: pd.DataFrame,
     jn = pd.concat([jn.sort_values("delta_dn", ascending=False),
                     pd.DataFrame([tong])], ignore_index=True)
 
-    rows_html = ""
-    for _, r in jn.iterrows():
+    def _row_to_html(r):
         is_tong = str(r["ten_pgd"]).startswith("⬛")
         bold = "font-weight:700;" if is_tong else ""
         bg   = "background:#f0f4f8;" if is_tong else ""
         mau_dn  = _mau_delta(r["delta_dn"],  False)
         mau_nqh = _mau_delta(r["tl_nqh2"] - r["tl_nqh1"], True)
-        rows_html += (
+        return (
             f"<tr style='border-bottom:1px solid #e5e7eb;{bg}'>"
             f"<td style='padding:7px 10px;{bold}'>{r['ten_pgd']}</td>"
             f"<td style='padding:7px 10px;text-align:right'>{fmt_ty(r['dn1'])}</td>"
@@ -294,6 +293,7 @@ def _render_bang_pgd(df1: pd.DataFrame, df2: pd.DataFrame,
             f"{_delta_fmt(r['delta_ho'], 'so')}</td>"
             f"</tr>"
         )
+    rows_html = "".join(jn.apply(_row_to_html, axis=1))
 
     st.markdown(
         f"""<div style="overflow-x:auto;border-radius:8px;border:1px solid #e5e7eb;margin-top:8px">
@@ -712,21 +712,11 @@ def _render_cdtotkvv_section(ky1: str, ky2: str, pgd_mode: bool, pgd_user: str |
 # RENDER CHÍNH
 # ──────────────────────────────────────────────
 
-def render(tab: DeltaGenerator = None, **kwargs) -> None:
-    """So sánh 2 kỳ snapshot bất kỳ.
-
-    Kwargs:
-        role, username, pgd_user, pgd_mode (bool)
-    Không cần df/df_full — lấy dữ liệu từ hstd_snapshot.
-    """
-    ctx = get_tab_context(tab)
-    role     = normalize_role(str(kwargs.get("role", "user")))
-    username = kwargs.get("username", "unknown")
-    pgd_user = kwargs.get("pgd_user")
-    pgd_mode = bool(kwargs.get("pgd_mode", False)) or (
-        pgd_user is not None and la_phan_he_pgd(role)
-    )
-
+def _render_cached(
+    role: str, username: str, pgd_user: str | None, pgd_mode: bool,
+) -> None:
+    """Cached logic cho render() — tránh recompute khi rerun."""
+    ctx = st.container()
     with ctx:
         st.subheader("🔄 So sánh 2 kỳ")
 
@@ -818,3 +808,22 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
 
         if _lazy_expander("🏆 So sánh chất lượng Tổ TK&VV", "cdtotkvv"):
             _render_cdtotkvv_section(ky1, ky2, pgd_mode, pgd_user)
+
+
+def render(tab: DeltaGenerator = None, **kwargs) -> None:
+    """So sánh 2 kỳ snapshot bất kỳ.
+
+    Kwargs:
+        role, username, pgd_user, pgd_mode (bool)
+    Không cần df/df_full — lấy dữ liệu từ hstd_snapshot.
+    """
+    ctx = get_tab_context(tab)
+    role     = normalize_role(str(kwargs.get("role", "user")))
+    username = kwargs.get("username", "unknown")
+    pgd_user = kwargs.get("pgd_user")
+    pgd_mode = bool(kwargs.get("pgd_mode", False)) or (
+        pgd_user is not None and la_phan_he_pgd(role)
+    )
+
+    with ctx:
+        _render_cached(role, username, pgd_user, pgd_mode)

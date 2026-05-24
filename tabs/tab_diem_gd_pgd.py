@@ -403,6 +403,31 @@ def render(tab: "DeltaGenerator", **kwargs: dict) -> None:
         if not pgd_user:
             st.error("Không xác định được PGD của người dùng.")
             return
+        
+        # Validation warnings cho dữ liệu Điểm GD
+        try:
+            from services.validation_service import validation_service
+            
+            # Kiểm tra xem PGD có trong hệ thống không
+            if pgd_user not in validation_service.pgd_names:
+                st.error(f"⚠️ PGD '{pgd_user}' không tồn tại trong hệ thống. Vui lòng kiểm tra lại.")
+                return
+            
+            # Kiểm tra số lượng Điểm GD cho PGD
+            dgd_count = len([d for d in DGD_DANH_SACH if d["pgd"] == pgd_user])
+            if dgd_count == 0:
+                st.warning(f"⚠️ Không có Điểm Giao Dịch nào được cấu hình cho PGD '{pgd_user}'.")
+            else:
+                st.info(f"ℹ️ PGD '{pgd_user}' có {dgd_count} Điểm Giao Dịch.")
+            
+            # Kiểm tra xã thuộc PGD
+            xa_list = PGD_XA_MAP.get(pgd_user, [])
+            if len(xa_list) == 0:
+                st.warning(f"⚠️ Không có xã/phường nào được cấu hình cho PGD '{pgd_user}'.")
+            
+        except Exception as e:
+            logger.error("Lỗi validation warnings tab_diem_gd_pgd: %s", e, exc_info=True)
+            # Không block tab nếu có lỗi validation
 
         df_pgd: pd.DataFrame = pd.DataFrame()
         if df is not None and not df.empty:

@@ -200,6 +200,15 @@
 | **Bài học** | Bảng HTML qua `st.markdown(unsafe_allow_html=True)` không an toàn với dark mode. Bảng đơn giản → dùng `hien_thi_dataframe_phan_trang`. Bảng cần màu điều kiện → set cả `background-color` per-cell (không chỉ per-row) |
 | **Ngày fix** | 2026-05-23 |
 
+### B10 — Shortcut/alert set `ws_op_nhom`/`ws_op_jump_tab` nhưng không nhảy tab
+| | |
+|---|---|
+| **File** | `workspaces/ws_operation.py` + `alert_center.py` |
+| **Dấu hiệu** | Click “Truy cập nhanh”/cảnh báo → app `st.rerun()` nhưng vẫn ở nhóm/tab cũ; `ws_op_jump_tab` bị pop mà không được dùng |
+| **Nguyên nhân** | Điều hướng dùng `st.tabs()` (không control được tab active) và code chỉ `pop("ws_op_jump_tab")` rồi render toàn bộ tabs |
+| **Fix** | Chuyển outer navigation sang `st.radio` + inner dùng `lazy_tabs()` (render 1 tab); jump-tab đọc one-shot từ `SCMStateManager.nav_ws_op_jump_tab` và set `st.session_state[f\"_{inner_key}_idx\"]` |
+| **Ngày fix** | 2026-05-24 |
+
 ---
 
 ## C. Dữ liệu / DataFrame
@@ -557,6 +566,31 @@ def render(**kwargs):
 | **Nguyên nhân** | Viết `except Exception:` (không có `as e`) nhưng body vẫn dùng `logger.error(..., e, ...)` — `e` không được định nghĩa. Ngoài ra logger message `"Lỗi trong khối except"` không mang thông tin context. |
 | **Fix** | Đổi thành `except Exception as e:  # conv: skip`. Với lỗi parse/lookup nhỏ dùng `logger.warning()` thay `logger.error()`. Đặt message mô tả hành động: `"Lỗi tạo task '%s': %s"`, `"Không parse ngày deadline task_id=%s: %s"`, v.v. |
 | **Ngày fix** | 2026-05-23 (lần 1: tien_do_service.py); 2026-05-24 (lần 2: 8 chỗ còn lại trong _render_quan_ly_task, _fmt_task, _fmt_cap_nhat_opt, _fmt_task_pdf) |
+
+---
+
+### J5 — `_frozen_importlib._DeadlockError`: circular import giữa `data` và `services`
+
+| | |
+|---|---|
+| **File** | `services/upload_service.py` dòng ~37 |
+| **Dấu hiệu** | `_DeadlockError: deadlock detected by _ModuleLock('data.pgd')` khi Streamlit khởi động; traceback: `app.py → data.__init__ → data.hstd → services.__init__ → upload_service → data.pgd` |
+| **Nguyên nhân** | `upload_service.py` import `from data.pgd import duong_dan_pgd` ở module-level. Khi `data.hstd` (đang load trong `data.__init__`) import `from services.data_quality import ...`, Python phải chạy `services/__init__.py` → kéo `upload_service` → lại cần lock `data.pgd` (đang bị `data.__init__` giữ) → deadlock. |
+| **Fix** | Chuyển import `from data.pgd import duong_dan_pgd` thành lazy wrapper: `def _duong_dan_pgd(ten_pgd, loai): from data.pgd import duong_dan_pgd as _fn; return _fn(ten_pgd, loai)` — thay mọi chỗ dùng `duong_dan_pgd(...)` bằng `_duong_dan_pgd(...)` |
+| **Pattern** | Bất cứ khi nào `services/` import `data.*` ở module-level và `data/` import `services` → phải lazy-load. |
+| **Ngày fix** | 2026-05-24 |
+
+**Rule phòng ngừa:**
+```python
+# ❌ SAI — module-level import trong services/ kéo ngược data/
+# services/upload_service.py
+from data.pgd import duong_dan_pgd   # deadlock nếu data đang load services
+
+# ✅ ĐÚNG — lazy import trong hàm wrapper
+def _duong_dan_pgd(ten_pgd: str, loai: str) -> str:
+    from data.pgd import duong_dan_pgd as _fn  # chỉ chạy khi hàm được gọi
+    return _fn(ten_pgd, loai)
+```
 
 ---
 

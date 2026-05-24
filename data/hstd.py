@@ -180,6 +180,20 @@ def doc_baseline_merged(nam: int, _ts=0) -> pd.DataFrame | None:
                     result[c] = _norm_series(result[c])
         except Exception:
             pass
+        # Sanitize object columns: bytes→str, mixed float/str → str
+        # Phòng ArrowTypeError khi cột object chứa hỗn hợp bytes+float (e.g. "Số ATM")
+        import math as _math
+        for _sc in list(result.columns):
+            if result[_sc].dtype == object:
+                def _to_safe(v):
+                    if v is None:
+                        return None
+                    if isinstance(v, bytes):
+                        return v.decode("utf-8", errors="replace")
+                    if isinstance(v, float) and _math.isnan(v):
+                        return None
+                    return v
+                result[_sc] = result[_sc].map(_to_safe)
         os.makedirs(os.path.dirname(cache_path), exist_ok=True)
         result.to_parquet(cache_path, index=False, engine="pyarrow", compression="zstd", compression_level=3)
         return result

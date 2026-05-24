@@ -18,6 +18,7 @@ import db
 import plotly.express as px
 import plotly.graph_objects as go
 
+from state_manager import SCMStateManager
 from config import *
 from config import DS_PGD, CACHE_HSTD, DON_VI_CHI_NHANH, TEN_CHI_NHANH_HIEN_THI
 
@@ -927,28 +928,29 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
             with col_ex:
                 if st.button("📥 Xuất Excel", key="btn_excel_tqpgd", use_container_width=True):
                     try:
+                        state = SCMStateManager()
                         _ten_excel = ten_file_xuat("TQPGD")
                         buf = _xuat_excel_tqpgd(df_show, _ten_excel)
-                        st.session_state["_excel_bytes_tqpgd"] = buf
-                        st.session_state["_excel_file_tqpgd"] = _ten_excel
+                        state.downloads.set("tqpgd_excel", buf, _ten_excel)
                     except Exception as e:  # conv: skip
                         logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                         st.error(f"❌ Lỗi xuất Excel: {e}")
-                if st.session_state.get("_excel_bytes_tqpgd"):
-                    st.download_button(
+                state = SCMStateManager()
+                if state.downloads.has("tqpgd_excel"):
+                    if st.download_button(
                         "⬇ Tải Excel",
-                        data=st.session_state["_excel_bytes_tqpgd"],
-                        file_name=st.session_state.get("_excel_file_tqpgd", "TQPGD.xlsx"),
+                        data=state.downloads.get_bytes("tqpgd_excel"),
+                        file_name=state.downloads.get_filename("tqpgd_excel") or "TQPGD.xlsx",
                         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                         key="btn_excel_tqpgd_dl",
                         use_container_width=True,
-                    )
+                    ):
+                        state.downloads.clear("tqpgd_excel")
 
             with col_pdf:
-                _ss_tqpgd = "_pdf_bytes_tqpgd"
-                _ssf_tqpgd = "_pdf_file_tqpgd"
                 if st.button("📄 Xuất PDF", key="btn_pdf_tqpgd", type="primary", use_container_width=True):
                     try:
+                        state = SCMStateManager()
                         # Đổi tên cột → 2 dòng cho header PDF (Reportlab Paragraph hỗ trợ <br/>)
                         def _pdf_col(col: str) -> str:
                             if col.endswith("(triệu đồng)"):
@@ -971,27 +973,32 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                                 cols_right=_cols_right_pdf,
                                 prefix_file="TQPGD",
                             )
-                        st.session_state[_ss_tqpgd] = _bytes
-                        st.session_state[_ssf_tqpgd] = f"TQPGD_{datetime.now().strftime('%d%m%Y_%H%M')}.pdf"
+                        state.downloads.set(
+                            "tqpgd_pdf",
+                            _bytes,
+                            f"TQPGD_{datetime.now().strftime('%d%m%Y_%H%M')}.pdf",
+                        )
                         db.ghi_audit(username or "unknown", "xuat_pdf", f"TQPGD")
                     except Exception as _e:
                         logger.error("Lỗi trong khối except: %s", _e, exc_info=True)
                         import traceback
 
 
-                        st.session_state[_ss_tqpgd] = None
+                        SCMStateManager().downloads.clear("tqpgd_pdf")
                         st.error(f"❌ Lỗi: {_e}")
                         st.code(traceback.format_exc())
 
-                if st.session_state.get(_ss_tqpgd):
-                    st.download_button(
+                state = SCMStateManager()
+                if state.downloads.has("tqpgd_pdf"):
+                    if st.download_button(
                         label="⬇ Tải file PDF TQPGD",
-                        data=st.session_state[_ss_tqpgd],
-                        file_name=st.session_state.get(_ssf_tqpgd, "TQPGD.pdf"),
+                        data=state.downloads.get_bytes("tqpgd_pdf"),
+                        file_name=state.downloads.get_filename("tqpgd_pdf") or "TQPGD.pdf",
                         mime="application/pdf",
                         key="btn_pdf_tqpgd_dl",
                         use_container_width=True,
-                    )
+                    ):
+                        state.downloads.clear("tqpgd_pdf")
         else:
             st.warning(
                 f"⚠️ Không hiển thị được bảng tổng quát PGD — "
@@ -1194,8 +1201,7 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                             col_ex, col_pdf = st.columns(2)
 
                             # PDF: luôn groupby [PGD, Xã, Chương trình] — bộ lọc chỉ thu hẹp input
-                            ss_key      = f"_pdf_bytes_denh_{key_prefix}"
-                            ss_file_key = f"_pdf_file_denh_{key_prefix}"
+                            pdf_key = f"den_han_{key_prefix}_pdf"
 
                             with col_ex:
                                 # Excel: giữ logic hiện tại
@@ -1230,25 +1236,29 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                             with col_pdf:
                                 if st.button("📄 Xuất PDF", key=f"pdf_den_han_{key_prefix}",
                                              type="primary", use_container_width=True):
+                                    state = SCMStateManager()
                                     with st.spinner("⏳ Đang tạo PDF..."):
                                         pdf_bytes = _build_pdf_den_han(
                                             df_loc, label, loc_pgd, loc_ct, loc_xa, username, key_prefix
                                         )
-                                    st.session_state[ss_key]      = pdf_bytes
-                                    st.session_state[ss_file_key] = (
-                                        f"HoSoDenHan_{key_prefix}_{datetime.now().strftime('%d%m%Y_%H%M')}.pdf"
+                                    state.downloads.set(
+                                        pdf_key,
+                                        pdf_bytes,
+                                        f"HoSoDenHan_{key_prefix}_{datetime.now().strftime('%d%m%Y_%H%M')}.pdf",
                                     )
 
                             # Download button đặt NGOÀI block columns để tránh duplicate widget
-                            if st.session_state.get(ss_key):
-                                st.download_button(
+                            state = SCMStateManager()
+                            if state.downloads.has(pdf_key):
+                                if st.download_button(
                                     label="⬇ Tải file PDF",
-                                    data=st.session_state[ss_key],
-                                    file_name=st.session_state.get(ss_file_key, f"HoSoDenHan_{key_prefix}.pdf"),
+                                    data=state.downloads.get_bytes(pdf_key),
+                                    file_name=state.downloads.get_filename(pdf_key) or f"HoSoDenHan_{key_prefix}.pdf",
                                     mime="application/pdf",
                                     key=f"dl_den_han_{key_prefix}",
                                     use_container_width=True,
-                                )
+                                ):
+                                    state.downloads.clear(pdf_key)
                     else:
                         st.caption(f"⚠️ Không có cột '{nhom_chon}' trong dữ liệu")
 

@@ -16,6 +16,7 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
+from state_manager import SCMStateManager
 from config import (
     COT_TEN_PGD, COT_MA_KH, COT_SO_KU, COT_TEN_KH,
     COT_DU_NO_QH, COT_TONG_DU_NO, COT_DU_NO_TH, COT_TEN_CT,
@@ -183,21 +184,24 @@ def _render_canh_bao(df: pd.DataFrame, ds_pgd_all: list):
                 ten_pgd_str = "" if pgd_kl == "Toàn CN" else pgd_kl
                 data = auto_fill_klgb(df_kl, str(path_mau), ten_pgd_str)
                 fname = f"KL_GiaoBan_{pgd_kl}_{datetime.now().strftime('%d%m%Y')}.docx"
-                st.session_state["_bytes_kl"] = data
-                st.session_state["_file_kl"] = fname
+                state = SCMStateManager()
+                state.downloads.set("kl_giao_ban_docx", data, fname)
                 st.success("✅ Đã tạo xong — nhấn nút bên dưới để tải về.")
             except Exception as e:  # conv: skip
                 logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                 st.error(f"Lỗi tạo KL giao ban: {e}")
 
-        if st.session_state.get("_bytes_kl"):
-            st.download_button(
-                f"⬇️ Tải KL giao ban — {st.session_state['_file_kl']}",
-                data=st.session_state["_bytes_kl"],
-                file_name=st.session_state["_file_kl"],
+        state = SCMStateManager()
+        if state.downloads.has("kl_giao_ban_docx"):
+            fname = state.downloads.get_filename("kl_giao_ban_docx") or "KL_GiaoBan.docx"
+            if st.download_button(
+                f"⬇️ Tải KL giao ban — {fname}",
+                data=state.downloads.get_bytes("kl_giao_ban_docx"),
+                file_name=fname,
                 mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                 key="kl_dl",
-            )
+            ):
+                state.downloads.clear("kl_giao_ban_docx")
 
 
 def _render_canh_bao_no(df_full: pd.DataFrame, ds_pgd_all: list, role: str, username: str):
@@ -816,6 +820,7 @@ def render_sidebar_menu(role: str, username: str, **kwargs):
     """Render menu ĐIỀU HÀNH — gọi từ app.py bên trong with st.sidebar.
     Tối ưu: dùng st.radio() theo nhóm thay cho ~25 st.button() riêng lẻ."""
 
+    state = SCMStateManager()
     GROUP_COLORS = {
         "Giám sát":                    {"bg": "#0D2137", "border": "#64B5F6", "text": "#90CAF9"},
         "Kiểm soát":                   {"bg": "#2D0D14", "border": "#EF9A9A", "text": "#F48FB1"},
@@ -835,12 +840,11 @@ def render_sidebar_menu(role: str, username: str, **kwargs):
         c["label"] for x in all_items for c in x.get("children", [])
     ]
 
-    if "ws_mgmt_menu" not in st.session_state:
-        st.session_state["ws_mgmt_menu"] = all_items[0]["label"]
-    if st.session_state["ws_mgmt_menu"] not in valid_labels:
-        st.session_state["ws_mgmt_menu"] = all_items[0]["label"]
-
-    active_label = st.session_state.get("ws_mgmt_menu", "")
+    default_label = all_items[0]["label"]
+    active_label = state.nav_ws_mgmt_menu
+    if active_label not in valid_labels:
+        state.nav_ws_mgmt_menu = default_label
+        active_label = default_label
 
     st.markdown(
         "<p style='font-size:14px;font-weight:700;"
@@ -900,7 +904,7 @@ def render_sidebar_menu(role: str, username: str, **kwargs):
                         key=f"menu_btn_{item['label']}",
                         use_container_width=True,
                     ):
-                        st.session_state["ws_mgmt_menu"] = item["label"]
+                        state.nav_ws_mgmt_menu = item["label"]
                         st.rerun()
 
         for item in acc_items:
@@ -958,7 +962,7 @@ def render_sidebar_menu(role: str, username: str, **kwargs):
                                 key=f"menu_child_{child['label']}",
                                 use_container_width=True,
                             ):
-                                st.session_state["ws_mgmt_menu"] = child["label"]
+                                state.nav_ws_mgmt_menu = child["label"]
                                 st.rerun()
 
 def render(**kwargs):
@@ -1001,17 +1005,17 @@ def render(**kwargs):
     ]
 
     # Handle jump từ shortcut / nút điều hướng ngoài ws_management
-    jump_label = st.session_state.pop("ws_mgmt_jump", None)
+    state = SCMStateManager()
+    jump_label = state.nav_ws_mgmt_jump
     if jump_label and jump_label in valid_labels:
-        st.session_state["ws_mgmt_menu"] = jump_label
+        state.nav_ws_mgmt_menu = jump_label
         st.toast(f"✨ Đã chuyển tới: {jump_label}", icon="👆")
 
     # Khởi tạo / validate ws_mgmt_menu
-    if "ws_mgmt_menu" not in st.session_state or \
-            st.session_state["ws_mgmt_menu"] not in valid_labels:
-        st.session_state["ws_mgmt_menu"] = ALL_ITEMS[0]["label"]
-
-    active_label = st.session_state["ws_mgmt_menu"]
+    active_label = state.nav_ws_mgmt_menu
+    if active_label not in valid_labels:
+        active_label = ALL_ITEMS[0]["label"]
+        state.nav_ws_mgmt_menu = active_label
 
     # ── Render DUY NHẤT mục đang chọn ────────────────────────────────────
     active_item = next((x for x in ALL_ITEMS if x["label"] == active_label), None)

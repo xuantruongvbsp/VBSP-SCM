@@ -1343,6 +1343,156 @@ def _ranking_pgd(df_full: pd.DataFrame) -> None:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# DASHBOARD HÔM NAY — widget tổng hợp "ngày hôm nay"
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def _render_hom_nay(df_full: "pd.DataFrame | None", **kwargs) -> None:
+    """
+    Dashboard 'Ngày hôm nay':
+      - Row KPI: Tổng dư nợ, NQH, số KH, đến hạn tuần này
+      - Bảng 22 PGD: dư nợ, NQH%, trạng thái upload, badge bất thường
+      - Alert: PGD biến động dư nợ bất thường (> ±5% so kỳ snapshot gần nhất)
+    """
+    st.subheader(f"🌅 Tình hình hôm nay — {datetime.now().strftime('%d/%m/%Y')}")
+
+    if df_full is None or df_full.empty:
+        st.info("⏳ Chưa có dữ liệu HSTD. Vui lòng upload file tại tab Quản trị.")
+        return
+
+    from config import DS_PGD, DON_VI_CHI_NHANH, COT_NGAY_DH, COT_DU_NO_TH
+    from services.upload_service import lay_meta_merge
+
+    # ── KPI tổng ─────────────────────────────────────────────────────────────
+    tdn  = pd.to_numeric(df_full[COT_TONG_DU_NO], errors="coerce").sum() if COT_TONG_DU_NO in df_full.columns else 0
+    dqh  = pd.to_numeric(df_full[COT_DU_NO_QH],   errors="coerce").sum() if COT_DU_NO_QH   in df_full.columns else 0
+    so_kh = df_full[COT_MA_KH].nunique() if COT_MA_KH in df_full.columns else 0
+    tlqh = (dqh / tdn * 100) if tdn > 0 else 0.0
+
+    # Đến hạn tuần này (7 ngày tới)
+    so_den_han_tuan = 0
+    if COT_NGAY_DH in df_full.columns:
+        try:
+            _ngay_dh = pd.to_datetime(df_full[COT_NGAY_DH], errors="coerce")
+            _hom_nay = pd.Timestamp.now().normalize()
+            so_den_han_tuan = int((_ngay_dh.between(_hom_nay, _hom_nay + pd.Timedelta(days=7))).sum())
+        except Exception:
+            pass
+
+    # Ngày số liệu
+    ngay_sl_str = ""
+    if COT_NGAY_SL in df_full.columns:
+        _sl = pd.to_datetime(df_full[COT_NGAY_SL], errors="coerce").dropna()
+        if not _sl.empty:
+            ngay_sl_str = _sl.max().strftime("%d/%m/%Y")
+
+    st.caption(f"Số liệu: {ngay_sl_str or '—'}")
+
+    _, mau_kpi, _ = _mau_nqh(tlqh)
+    kpi_row(
+        cols=[
+            {"label": "Tổng dư nợ (tr.đ)",  "value": fmt_so(round(tdn / 1e6, 1)),  "icon": "💰"},
+            {"label": "Dư nợ QH (tr.đ)",    "value": fmt_so(round(dqh / 1e6, 1)),  "icon": "⚠️" if dqh > 0 else "✅"},
+            {"label": "Tỷ lệ NQH",          "value": f"{tlqh:.3f}%",               "icon": "🔴" if tlqh >= _NGUONG_CANH_BAO else ("🟡" if tlqh >= _NGUONG_AN_TOAN else "🟢")},
+            {"label": "Số khách hàng",      "value": fmt_so(so_kh),                "icon": "👥"},
+            {"label": "Đến hạn tuần này",   "value": fmt_so(so_den_han_tuan),      "icon": "📅"},
+        ],
+        num_columns=5,
+    )
+
+    # ── Metadata merge ────────────────────────────────────────────────────────
+    meta = lay_meta_merge("hstd")
+    if meta:
+        _t = meta.get("thoi_gian") or meta.get("ngay") or ""
+        _so_dong = meta.get("tong_dong") or meta.get("so_dong") or ""
+        st.caption(f"🔄 Cập nhật lần cuối: {_t} · {_so_dong} dòng")
+
+    st.divider()
+
+    # ── Bảng 22 PGD ──────────────────────────────────────────────────────────
+    st.markdown("**📊 Tình hình từng PGD**")
+
+    ds_dv = [DON_VI_CHI_NHANH] + DS_PGD if isinstance(DS_PGD, list) else [DON_VI_CHI_NHANH]
+
+    # Tính KPI theo PGD từ df_full
+    rows_pgd = []
+    if COT_TEN_PGD in df_full.columns:
+        grp = df_full.groupby(COT_TEN_PGD, observed=True)
+        for pgd_name, grp_df in grp:
+            _tdn  = pd.to_numeric(grp_df[COT_TONG_DU_NO], errors="coerce").sum() if COT_TONG_DU_NO in grp_df.columns else 0
+            _dqh  = pd.to_numeric(grp_df[COT_DU_NO_QH],   errors="coerce").sum() if COT_DU_NO_QH   in grp_df.columns else 0
+            _kh   = grp_df[COT_MA_KH].nunique() if COT_MA_KH in grp_df.columns else 0
+            _tlqh = (_dqh / _tdn * 100) if _tdn > 0 else 0.0
+            _mau, _, _icon = _mau_nqh(_tlqh)
+            rows_pgd.append({
+                "PGD":            pgd_name,
+                "Dư nợ (tr.đ)":  round(_tdn / 1e6, 1),
+                "Dư nợ QH":       round(_dqh / 1e6, 1),
+                "NQH %":          round(_tlqh, 3),
+                "Số KH":          _kh,
+                "TT":             _icon,
+            })
+
+    if rows_pgd:
+        df_pgd_kpi = pd.DataFrame(rows_pgd).sort_values("Dư nợ (tr.đ)", ascending=False)
+
+        # Snapshot so sánh — phát hiện biến động
+        _bao_cao_bt: list[str] = []
+        try:
+            _ds_ky = danh_sach_ky()
+            if len(_ds_ky) >= 2:
+                _snap_prev = doc_snapshot(_ds_ky[-2])
+                if _snap_prev is not None and COT_TEN_PGD in _snap_prev.columns:
+                    _snap_grp = _snap_prev.groupby(COT_TEN_PGD, observed=True)[COT_TONG_DU_NO].sum()
+                    for _, row in df_pgd_kpi.iterrows():
+                        pgd_n = row["PGD"]
+                        _tdn_ht  = row["Dư nợ (tr.đ)"] * 1e6
+                        _tdn_prev = float(_snap_grp.get(pgd_n, 0) or 0)
+                        if _tdn_prev > 0:
+                            _bien_dong = (_tdn_ht - _tdn_prev) / _tdn_prev * 100
+                            if abs(_bien_dong) >= 5:
+                                _dau = "📈" if _bien_dong > 0 else "📉"
+                                _bao_cao_bt.append(
+                                    f"**{pgd_n}**: {_dau} {_bien_dong:+.1f}% so kỳ trước"
+                                )
+        except Exception:
+            pass
+
+        if _bao_cao_bt:
+            with st.expander(f"⚡ {len(_bao_cao_bt)} PGD biến động dư nợ ≥ 5% so kỳ trước", expanded=True):
+                for _msg in _bao_cao_bt:
+                    st.markdown(f"- {_msg}")
+
+        hien_thi_dataframe_phan_trang(
+            df_pgd_kpi,
+            key="exec_hom_nay_pgd",
+            column_config={
+                "NQH %": st.column_config.NumberColumn("NQH %", format="%.3f%%"),
+                "Dư nợ (tr.đ)": st.column_config.NumberColumn("Dư nợ (tr.đ)", format="%.1f"),
+                "Dư nợ QH": st.column_config.NumberColumn("Dư nợ QH (tr.đ)", format="%.1f"),
+                "TT": st.column_config.TextColumn("Trạng thái", width="small"),
+            },
+        )
+    else:
+        st.info("Không có dữ liệu theo PGD.")
+
+    # ── Upload status nhanh ───────────────────────────────────────────────────
+    st.divider()
+    st.markdown("**📁 Trạng thái cập nhật dữ liệu**")
+    try:
+        from services.upload_service import lay_meta_merge as _lmm
+        for _loai, _ten in [("hstd", "HSTD"), ("nq11", "NQ11"), ("gqvl", "GQVL")]:
+            _m = _lmm(_loai)
+            if _m:
+                _t = _m.get("thoi_gian") or _m.get("ngay") or "?"
+                _dv = _m.get("pgd_moi_upload") or _m.get("ten_pgd") or ""
+                st.caption(f"✅ **{_ten}**: {_t}" + (f" · {_dv}" if _dv else ""))
+            else:
+                st.caption(f"⚠️ **{_ten}**: Chưa có dữ liệu")
+    except Exception:
+        pass
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # SECTION WRAPPERS — gom logic thành từng mục menu độc lập
 # ═══════════════════════════════════════════════════════════════════════════════
 
@@ -1488,6 +1638,7 @@ def _render_pdf_section(df_full: pd.DataFrame, username: str) -> None:
 def _build_exec_items(df_full, role: str, username: str, **kwargs) -> list:
     """Xây danh sách ALL_ITEMS cho workspace Lãnh đạo."""
     return [
+        {"group": "Tổng quan",       "label": "🌅 Hôm nay",                  "fn": lambda: _render_hom_nay(df_full, **kwargs)},
         {"group": "Tổng quan",       "label": "Sức khỏe tín dụng",          "fn": lambda: _render_suc_khoe_tong_quan(df_full)},
         {"group": "Tổng quan",       "label": "Tiến độ & Kế hoạch",         "fn": lambda: _render_tien_do_va_kh(df_full, **kwargs)},
         {"group": "Tổng quan",       "label": "So sánh PGD",                 "fn": lambda: _render_so_sanh_xep_hang_pgd(df_full)},

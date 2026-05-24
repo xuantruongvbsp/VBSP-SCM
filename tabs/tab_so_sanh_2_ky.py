@@ -15,6 +15,7 @@ from streamlit.delta_generator import DeltaGenerator
 
 from auth import normalize_role, la_phan_he_pgd
 from utils import get_tab_context, fmt_ty, fmt_so, xuat_excel, lazy_expander as _lazy_expander
+from state_manager import SCMStateManager
 import db
 from snapshot_service import (
     danh_sach_ky, doc_snapshot,
@@ -756,14 +757,24 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
         ))
         _loc_pgd = None
         if not pgd_mode and pgd_data_list:
+            state = SCMStateManager()
+            _opts = ["🏢 Tất cả Chi nhánh"] + pgd_data_list
+            _desired = state.filter_pgd or "🏢 Tất cả Chi nhánh"
+            if "ss2k_pgd_filter" not in st.session_state:
+                st.session_state["ss2k_pgd_filter"] = _desired if _desired in _opts else "🏢 Tất cả Chi nhánh"
+            elif st.session_state.get("ss2k_pgd_filter") not in _opts:
+                st.session_state["ss2k_pgd_filter"] = "🏢 Tất cả Chi nhánh"
             _loc_pgd = st.selectbox(
                 "📍 Lọc PGD",
-                ["🏢 Tất cả Chi nhánh"] + pgd_data_list,
+                _opts,
                 key="ss2k_pgd_filter",
             )
             if _loc_pgd and _loc_pgd != "🏢 Tất cả Chi nhánh":
+                state.filter_pgd = _loc_pgd
                 df1 = df1[df1["ten_pgd"] == _loc_pgd].reset_index(drop=True)
                 df2 = df2[df2["ten_pgd"] == _loc_pgd].reset_index(drop=True)
+            else:
+                state.filter_pgd = None
 
         if pgd_mode and pgd_user:
             df1 = df1[df1["ten_pgd"] == pgd_user].reset_index(drop=True)

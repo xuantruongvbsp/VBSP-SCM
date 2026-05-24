@@ -15,6 +15,7 @@ from pdf_service import nut_xuat_pdf
 from data import (danh_dau_khong_hd, tong_hop_khong_hd, ds_chi_tiet_khong_hd)
 from tabs import tab_nq11
 from auth import la_phan_he_pgd, la_phan_he_cn, la_executive
+from state_manager import SCMStateManager
 from logger import get_logger
 
 logger = get_logger(__name__)
@@ -78,6 +79,7 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
     pgd_user = ctx.pgd_user
     username = ctx.username
     df_nq11 = kwargs.get("df_nq11")
+    state = SCMStateManager()
 
     with ctx:
         st.subheader("📈 Báo cáo")
@@ -105,17 +107,29 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                 if la_phan_he_pgd(role) and pgd_user:
                     loc_pgd = pgd_user
                     st.markdown(f"📍 PGD: **{loc_pgd}**")
+                    state.filter_pgd = pgd_user
                 else:
                     ds_pgd = (
                         sorted(df[COT_TEN_PGD].dropna().unique())
                         if COT_TEN_PGD in df.columns
                         else []
                     )
+                    _opts_pgd = ["Tất cả"] + ds_pgd
+                    _desired_pgd = state.filter_pgd or "Tất cả"
+                    if "bc_pc_pgd" not in st.session_state:
+                        st.session_state["bc_pc_pgd"] = _desired_pgd if _desired_pgd in _opts_pgd else "Tất cả"
+                    elif st.session_state.get("bc_pc_pgd") not in _opts_pgd:
+                        st.session_state["bc_pc_pgd"] = "Tất cả"
                     loc_pgd = st.selectbox(
                         "📍 PGD",
-                        ["Tất cả"] + ds_pgd,
+                        _opts_pgd,
                         key="bc_pc_pgd",
                     )
+                    _new_pgd = None if loc_pgd == "Tất cả" else loc_pgd
+                    if _new_pgd != state.filter_pgd:
+                        state.filter_pgd = _new_pgd
+                        if "bc_pc_xa" in st.session_state:
+                            st.session_state["bc_pc_xa"] = "Tất cả"
 
             with col_f2:
                 if loc_pgd != "Tất cả":
@@ -130,7 +144,14 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                         if COT_TEN_XA in df.columns
                         else []
                     )
-                loc_xa = st.selectbox("🏘️ Xã", ["Tất cả"] + ds_xa, key="bc_pc_xa")
+                _opts_xa = ["Tất cả"] + ds_xa
+                _desired_xa = state.filter_xa or "Tất cả"
+                if "bc_pc_xa" not in st.session_state:
+                    st.session_state["bc_pc_xa"] = _desired_xa if _desired_xa in _opts_xa else "Tất cả"
+                elif st.session_state.get("bc_pc_xa") not in _opts_xa:
+                    st.session_state["bc_pc_xa"] = "Tất cả"
+                loc_xa = st.selectbox("🏘️ Xã", _opts_xa, key="bc_pc_xa")
+                state.filter_xa = None if loc_xa == "Tất cả" else loc_xa
 
             with col_f3:
                 ds_ct = []
@@ -144,7 +165,14 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                         if COT_TEN_CT in df.columns
                         else []
                     )
-                loc_ct = st.selectbox("📌 Chương trình", ["Tất cả"] + ds_ct, key="bc_pc_ct")
+                _opts_ct = ["Tất cả"] + ds_ct
+                _desired_ct = state.filter_chuong_trinh or "Tất cả"
+                if "bc_pc_ct" not in st.session_state:
+                    st.session_state["bc_pc_ct"] = _desired_ct if _desired_ct in _opts_ct else "Tất cả"
+                elif st.session_state.get("bc_pc_ct") not in _opts_ct:
+                    st.session_state["bc_pc_ct"] = "Tất cả"
+                loc_ct = st.selectbox("📌 Chương trình", _opts_ct, key="bc_pc_ct")
+                state.filter_chuong_trinh = None if loc_ct == "Tất cả" else loc_ct
 
             df_filtered = df.copy()
             if loc_pgd != "Tất cả" and COT_TEN_PGD in df_filtered.columns:
@@ -225,9 +253,6 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                 COLS_PDF = [c for c in COLS_PDF if c in df_pdf.columns]
                 df_pdf = df_pdf[COLS_PDF].sort_values([COT_TEN_PGD, COT_TEN_XA, COT_TEN_CT])
 
-            _ss_pdf = "_pdf_bytes_baocao_phancap"
-            _ssf_pdf = "_pdf_file_baocao_phancap"
-
             if st.button("📄 Xuất PDF phân cấp", key="btn_pdf_bc_phancap", type="primary"):
                 if _missing_cols:
                     st.warning(f"⚠️ Thiếu cột dữ liệu để xuất PDF: {', '.join(_missing_cols)}")
@@ -261,8 +286,11 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                                 ],
                                 tieu_de_phu=tieu_de_phu,
                             )
-                        st.session_state[_ss_pdf] = pdf_bytes
-                        st.session_state[_ssf_pdf] = ten_file_xuat("BC_PhanCap_PGD_Xa_CT")
+                        state.downloads.set(
+                            "bc_phancap_pdf",
+                            pdf_bytes,
+                            ten_file_xuat("BC_PhanCap_PGD_Xa_CT").replace(".xlsx", ".pdf"),
+                        )
                         db.ghi_audit(
                             username or "unknown",
                             "xuat_pdf_bao_cao",
@@ -272,24 +300,35 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                         logger.error("Lỗi tạo PDF phân cấp: %s", _e, exc_info=True)
                         st.error(f"❌ Lỗi tạo PDF: {_e}")
 
-            if st.session_state.get(_ss_pdf):
-                st.download_button(
+            if state.downloads.has("bc_phancap_pdf"):
+                if st.download_button(
                     "⬇ Tải PDF phân cấp",
-                    data=st.session_state[_ss_pdf],
-                    file_name=st.session_state.get(_ssf_pdf, "BC_PhanCap.pdf"),
+                    data=state.downloads.get_bytes("bc_phancap_pdf"),
+                    file_name=state.downloads.get_filename("bc_phancap_pdf") or "BC_PhanCap.pdf",
                     mime="application/pdf",
                     key="btn_pdf_bc_phancap_dl",
-                )
+                ):
+                    state.downloads.clear("bc_phancap_pdf")
         else:
             if (la_phan_he_cn(role) and not la_executive(role)) and COT_TEN_PGD in df.columns:
+                _ds_pgd_bc = sorted(df[COT_TEN_PGD].dropna().unique().tolist())
+                _opts_pgd_bc = ["Tất cả"] + _ds_pgd_bc
+                _desired_pgd_bc = state.filter_pgd or "Tất cả"
+                if "bc_pgd_chung" not in st.session_state:
+                    st.session_state["bc_pgd_chung"] = _desired_pgd_bc if _desired_pgd_bc in _opts_pgd_bc else "Tất cả"
+                elif st.session_state.get("bc_pgd_chung") not in _opts_pgd_bc:
+                    st.session_state["bc_pgd_chung"] = "Tất cả"
                 loc_pgd_bc = st.selectbox(
                     "📍 PGD",
-                    ["Tất cả"] + sorted(df[COT_TEN_PGD].dropna().unique().tolist()),
+                    _opts_pgd_bc,
                     key="bc_pgd_chung",
                 )
+                state.filter_pgd = None if loc_pgd_bc == "Tất cả" else loc_pgd_bc
             else:
                 loc_pgd_bc = pgd_user or "Tất cả"
                 st.markdown(f"📍 PGD: **{loc_pgd_bc}**")
+                if pgd_user:
+                    state.filter_pgd = pgd_user
 
             df_base = df.copy()
             if (la_phan_he_cn(role) and not la_executive(role)) and loc_pgd_bc != "Tất cả":
@@ -421,9 +460,18 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                         ["Tất cả","1 - Trung ương (TW)","2 - Địa phương (ĐP)"],
                         key="bc_th_nv")
                 with col_f2:
-                    loc_ct_th = st.selectbox("Chương trình",
-                        ["Tất cả"]+sorted(df_base[COT_TEN_CT].dropna().unique().tolist()),
-                        key="bc_th_ct") if COT_TEN_CT in df_base.columns else "Tất cả"
+                    if COT_TEN_CT in df_base.columns:
+                        _ds_ct_th = sorted(df_base[COT_TEN_CT].dropna().unique().tolist())
+                        _opts_ct_th = ["Tất cả"] + _ds_ct_th
+                        _desired_ct_th = state.filter_chuong_trinh or "Tất cả"
+                        if "bc_th_ct" not in st.session_state:
+                            st.session_state["bc_th_ct"] = _desired_ct_th if _desired_ct_th in _opts_ct_th else "Tất cả"
+                        elif st.session_state.get("bc_th_ct") not in _opts_ct_th:
+                            st.session_state["bc_th_ct"] = "Tất cả"
+                        loc_ct_th = st.selectbox("Chương trình", _opts_ct_th, key="bc_th_ct")
+                        state.filter_chuong_trinh = None if loc_ct_th == "Tất cả" else loc_ct_th
+                    else:
+                        loc_ct_th = "Tất cả"
 
                 df_ct_th = df_base.copy()
                 if loc_nv == "1 - Trung ương (TW)" and COT_NGUON_VON in df_ct_th.columns:
@@ -476,15 +524,17 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                         tieu_de="Báo cáo tổng hợp",
                         nguoi_xuat=username or "Người dùng",
                     )
-                    st.session_state["_bytes_bc_th"] = data_excel
-                    st.session_state["_file_bc_th"] = ten_file_bao_cao("BC_TH")
+                    state.downloads.set("bc_th_excel", data_excel, ten_file_bao_cao("BC_TH"))
 
-                if st.session_state.get("_bytes_bc_th"):
-                    st.download_button("⬇ Tải Excel",
-                        data=st.session_state["_bytes_bc_th"],
-                        file_name=st.session_state["_file_bc_th"],
+                if state.downloads.has("bc_th_excel"):
+                    if st.download_button(
+                        "⬇ Tải Excel",
+                        data=state.downloads.get_bytes("bc_th_excel"),
+                        file_name=state.downloads.get_filename("bc_th_excel") or "BC_TH.xlsx",
                         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                        key="dl_bc_th")
+                        key="dl_bc_th",
+                    ):
+                        state.downloads.clear("bc_th_excel")
 
         # ══════════════════════════════
         # MẢNG 2: CHI TIẾT
@@ -515,10 +565,19 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                 with st.expander("🔧 Bộ lọc nâng cao", expanded=True):
                     d1, d2, d3 = st.columns(3)
                     with d1:
-                        loc_xa_ct = st.selectbox("Xã",
-                            ["Tất cả"]+sorted(df_base[COT_TEN_XA].dropna().unique().tolist())
-                            if COT_TEN_XA in df_base.columns else ["Tất cả"],
-                            key="bc_ct_xa")
+                        _ds_xa_ct = (
+                            sorted(df_base[COT_TEN_XA].dropna().unique().tolist())
+                            if COT_TEN_XA in df_base.columns
+                            else []
+                        )
+                        _opts_xa_ct = ["Tất cả"] + _ds_xa_ct
+                        _desired_xa_ct = state.filter_xa or "Tất cả"
+                        if "bc_ct_xa" not in st.session_state:
+                            st.session_state["bc_ct_xa"] = _desired_xa_ct if _desired_xa_ct in _opts_xa_ct else "Tất cả"
+                        elif st.session_state.get("bc_ct_xa") not in _opts_xa_ct:
+                            st.session_state["bc_ct_xa"] = "Tất cả"
+                        loc_xa_ct = st.selectbox("Xã", _opts_xa_ct, key="bc_ct_xa")
+                        state.filter_xa = None if loc_xa_ct == "Tất cả" else loc_xa_ct
                     with d2:
                         loc_dvut_ct = st.selectbox("Hội đoàn thể",
                             ["Tất cả"]+sorted(df_base[COT_DVUT].dropna().unique().tolist())
@@ -579,7 +638,14 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                 elif loai_ct == "📌 Theo chương trình vay cụ thể":
                     if COT_TEN_CT in df_ct.columns:
                         ds_ct2 = sorted(df_ct[COT_TEN_CT].dropna().unique().tolist())
+                        if ds_ct2:
+                            _desired_ct2 = state.filter_chuong_trinh
+                            if "bc_ct2_sel" not in st.session_state:
+                                st.session_state["bc_ct2_sel"] = _desired_ct2 if _desired_ct2 in ds_ct2 else ds_ct2[0]
+                            elif st.session_state.get("bc_ct2_sel") not in ds_ct2:
+                                st.session_state["bc_ct2_sel"] = ds_ct2[0]
                         chon_ct2 = st.selectbox("Chọn chương trình", ds_ct2, key="bc_ct2_sel")
+                        state.filter_chuong_trinh = chon_ct2
                         df_ct2 = df_ct[df_ct[COT_TEN_CT] == chon_ct2]
 
                         c1,c2,c3,c4 = st.columns(4)
@@ -776,18 +842,18 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                                 f"BC_CT_{loai_ct[2:12].strip().replace(' ','_')}"
                             )
                             file_bytes = xuat_bao_cao(sheets, tieu_de_xuat, username or "unknown")
-                            st.session_state["_bytes_bc_ct"] = file_bytes
-                            st.session_state["_file_bc_ct"] = ten_file
+                            state.downloads.set("bc_ct_excel", file_bytes, ten_file)
                             db.ghi_audit(username or "unknown", "xuat_excel", f"BC_chi_tiet_{loai_ct[2:12].strip()}")
 
-                        if st.session_state.get("_bytes_bc_ct"):
-                            st.download_button(
+                        if state.downloads.has("bc_ct_excel"):
+                            if st.download_button(
                                 "⬇ Tải Excel",
-                                data=st.session_state["_bytes_bc_ct"],
-                                file_name=st.session_state["_file_bc_ct"],
+                                data=state.downloads.get_bytes("bc_ct_excel"),
+                                file_name=state.downloads.get_filename("bc_ct_excel") or "BC_CT.xlsx",
                                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                                 key="dl_bc_ct",
-                            )
+                            ):
+                                state.downloads.clear("bc_ct_excel")
                     with col_pdf:
                         nut_xuat_pdf(
                             df=export_df,

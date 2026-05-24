@@ -12,6 +12,7 @@ import streamlit as st
 from streamlit.delta_generator import DeltaGenerator
 
 from auth import la_phan_he_cn, normalize_role
+from state_manager import SCMStateManager
 from config import (
     COT_DU_NO_QH,
     COT_DU_NO_TH,
@@ -264,12 +265,20 @@ def _render_canh_bao(
     else:
         df_filter_soon = df_soon.copy()
         if la_cn and ds_pgd_all:
+            state = SCMStateManager()
+            _key_pgd = f"{key_prefix}som_pgd_soon"
+            _desired_pgd = state.filter_pgd or "Tất cả"
+            if _key_pgd not in st.session_state:
+                st.session_state[_key_pgd] = _desired_pgd if _desired_pgd in (["Tất cả"] + ds_pgd_all) else "Tất cả"
             loc_pgd = st.selectbox(
                 "Lọc PGD", ["Tất cả"] + ds_pgd_all,
-                key=f"{key_prefix}som_pgd_soon",
+                key=_key_pgd,
             )
             if loc_pgd != "Tất cả" and COT_TEN_PGD in df_filter_soon.columns:
                 df_filter_soon = df_filter_soon[df_filter_soon[COT_TEN_PGD] == loc_pgd]
+                state.filter_pgd = loc_pgd
+            else:
+                state.filter_pgd = None
 
         df_hien = _bang_hien_thi(df_filter_soon)
         hien_thi_dataframe_phan_trang(df_hien, key=f"{key_prefix}som_tbl_soon", height=380)
@@ -278,17 +287,24 @@ def _render_canh_bao(
             f"📥 Xuất Excel ({len(df_filter_soon)} món)",
             key=f"{key_prefix}som_xuat_soon",
         ):
-            st.session_state[f"_{key_prefix}som_buf_soon"] = xuat_excel(
-                {"Sắp đến hạn KHĐ": df_hien}
+            state = SCMStateManager()
+            _dl_key = f"{key_prefix}som_excel_soon"
+            state.downloads.set(
+                _dl_key,
+                xuat_excel({"Sắp đến hạn KHĐ": df_hien}),
+                f"CanhBaoSom_{scope_label.replace(' ', '_')}_{today.strftime('%Y%m%d')}.xlsx",
             )
-        if st.session_state.get(f"_{key_prefix}som_buf_soon"):
-            st.download_button(
+        state = SCMStateManager()
+        _dl_key = f"{key_prefix}som_excel_soon"
+        if state.downloads.has(_dl_key):
+            if st.download_button(
                 "⬇️ Tải về",
-                data=st.session_state[f"_{key_prefix}som_buf_soon"],
-                file_name=f"CanhBaoSom_{scope_label.replace(' ', '_')}_{today.strftime('%Y%m%d')}.xlsx",
+                data=state.downloads.get_bytes(_dl_key) or b"",
+                file_name=state.downloads.get_filename(_dl_key) or f"CanhBaoSom_{scope_label.replace(' ', '_')}_{today.strftime('%Y%m%d')}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 key=f"{key_prefix}som_dl_soon",
-            )
+            ):
+                state.downloads.clear(_dl_key)
 
 
 

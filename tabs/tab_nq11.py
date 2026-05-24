@@ -13,6 +13,7 @@ import plotly.graph_objects as go
 from config import *
 from utils import fmt_ty, xuat_excel, ten_file_xuat, hien_thi_dataframe_phan_trang
 from data import ts_file
+from state_manager import SCMStateManager
 
 if TYPE_CHECKING:
     from streamlit.delta_generator import DeltaGenerator
@@ -86,6 +87,7 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
 
     _tab_ctx = tab if tab is not None else __import__('streamlit').container()
     with _tab_ctx:
+            state = SCMStateManager()
             st.subheader("📑 Dữ liệu Nghị Quyết 11 (NQ11)")
 
             def fmt_vn_tien(x: float) -> str:
@@ -205,17 +207,21 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                         if loai_loc != "Chỉ món không có NQ11":
                             df_loc_nq[df_loc_nq[COT_DNO_NQ11]>0][cot_hien_nq].to_excel(
                                 w, index=False, sheet_name="Chỉ món NQ11")
-                    st.session_state["_bytes_nq11"] = buf.getvalue()
-                    st.session_state["_file_nq11"] = f"NQ11_{datetime.today().strftime('%d%m%Y')}.xlsx"
+                    state.downloads.set(
+                        "nq11_excel",
+                        buf.getvalue(),
+                        f"NQ11_{datetime.today().strftime('%d%m%Y')}.xlsx",
+                    )
 
-                if st.session_state.get("_bytes_nq11"):
-                    st.download_button(
+                if state.downloads.has("nq11_excel"):
+                    if st.download_button(
                         "⬇ Tải file Excel",
-                        data=st.session_state["_bytes_nq11"],
-                        file_name=st.session_state["_file_nq11"],
+                        data=state.downloads.get_bytes("nq11_excel"),
+                        file_name=state.downloads.get_filename("nq11_excel") or f"NQ11_{datetime.today().strftime('%d%m%Y')}.xlsx",
                         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                         key="dl_nq11",
-                    )
+                    ):
+                        state.downloads.clear("nq11_excel")
 
         # =============================================
         # TAB CÂN ĐỐI NGUỒN VỐN  (dữ liệu Điện báo — toàn chi nhánh)

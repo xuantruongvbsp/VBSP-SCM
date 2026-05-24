@@ -24,6 +24,7 @@ from data.den_han import tinh_den_han_df, canh_bao_tap_trung
 from data.hstd import danh_dau_khong_hd_cached
 from pdf_service import xuat_pdf_group_header, nut_xuat_pdf
 from utils import fmt_ty, fmt_so, xuat_excel, ten_file_xuat, hien_thi_dataframe_phan_trang
+from state_manager import SCMStateManager
 
 
 @st.cache_data(show_spinner=False)
@@ -57,6 +58,7 @@ def _selectbox_safe(label: str, options: list, key: str):
 
 
 def render(tab=None, role: str = None, **kwargs) -> None:
+    state = SCMStateManager()
     st.subheader("⏰ Cảnh báo Khoản vay Đến hạn & Nợ đến hạn có nguy cơ")
     st.caption(
         "Phân tích dư nợ đến hạn trong N tháng tới + "
@@ -500,17 +502,22 @@ def render(tab=None, role: str = None, **kwargs) -> None:
                         loc_ct=loc_ct_pdf,
                         loc_xa="",
                     )
-                st.session_state["_pdf_bytes_den_han_group"] = pdf_bytes
+                state.downloads.set(
+                    "den_han_group_pdf",
+                    pdf_bytes,
+                    f"DenHan_{den_thang}thang_{datetime.now().strftime('%d%m%Y_%H%M')}.pdf",
+                )
             except Exception as _e:
                 logger.error("Lỗi tạo PDF đến hạn: %s", _e, exc_info=True)
-                st.session_state["_pdf_bytes_den_han_group"] = None
+                state.downloads.clear("den_han_group_pdf")
                 st.error(f"❌ Lỗi tạo PDF: {_e}")
 
-    if st.session_state.get("_pdf_bytes_den_han_group"):
-        st.download_button(
+    if state.downloads.has("den_han_group_pdf"):
+        if st.download_button(
             label="⬇ Tải file PDF",
-            data=st.session_state["_pdf_bytes_den_han_group"],
-            file_name=f"DenHan_{den_thang}thang_{datetime.now().strftime('%d%m%Y_%H%M')}.pdf",
+            data=state.downloads.get_bytes("den_han_group_pdf"),
+            file_name=state.downloads.get_filename("den_han_group_pdf") or f"DenHan_{den_thang}thang_{datetime.now().strftime('%d%m%Y_%H%M')}.pdf",
             mime="application/pdf",
             key="btn_pdf_den_han_group_dl",
-        )
+        ):
+            state.downloads.clear("den_han_group_pdf")

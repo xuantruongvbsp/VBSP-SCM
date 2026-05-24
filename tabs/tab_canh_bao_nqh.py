@@ -42,6 +42,7 @@ from data.hstd import (
     tong_hop_khong_hd_cached,
 )
 from pdf_service import nut_xuat_pdf
+from state_manager import SCMStateManager
 from utils import (
     fmt,
     fmt_so,
@@ -88,12 +89,17 @@ def _selectbox_safe(label: str, options: list, key: str):
 
 def _ap_dung_loc_xa_to_truong(df: pd.DataFrame, key_prefix: str) -> tuple[pd.DataFrame, str, str]:
     df_loc = df
+    state = SCMStateManager()
 
     col_xa, col_to = st.columns(2)
 
     with col_xa:
         if COT_TEN_XA in df_loc.columns:
             ds_xa = sorted(df_loc[COT_TEN_XA].dropna().astype(str).unique().tolist())
+            _key_xa = f"{key_prefix}loc_xa"
+            _desired_xa = state.filter_xa or "Tất cả"
+            if _key_xa not in st.session_state:
+                st.session_state[_key_xa] = _desired_xa if _desired_xa in (["Tất cả"] + ds_xa) else "Tất cả"
             loc_xa = _selectbox_safe("Lọc Xã", ["Tất cả"] + ds_xa, key=f"{key_prefix}loc_xa")
         else:
             loc_xa = "Tất cả"
@@ -101,6 +107,7 @@ def _ap_dung_loc_xa_to_truong(df: pd.DataFrame, key_prefix: str) -> tuple[pd.Dat
 
     if loc_xa != "Tất cả" and COT_TEN_XA in df_loc.columns:
         df_loc = df_loc[df_loc[COT_TEN_XA] == loc_xa]
+    state.filter_xa = None if loc_xa == "Tất cả" else loc_xa
 
     with col_to:
         if COT_TEN_TO_TRUONG in df_loc.columns:
@@ -127,12 +134,17 @@ def _ap_dung_loc_pgd_xa_to_truong(
 ) -> tuple[pd.DataFrame, str, str, str]:
     df_loc = df
     loc_pgd = "Tất cả"
+    state = SCMStateManager()
 
     col_pgd, col_xa, col_to = st.columns(3)
 
     with col_pgd:
         if la_cn and COT_TEN_PGD in df_loc.columns:
             ds_pgd = list(ds_pgd_all or [])
+            _key_pgd = f"{key_prefix}loc_pgd"
+            _desired_pgd = state.filter_pgd or "Tất cả"
+            if _key_pgd not in st.session_state:
+                st.session_state[_key_pgd] = _desired_pgd if _desired_pgd in (["Tất cả"] + ds_pgd) else "Tất cả"
             loc_pgd = _selectbox_safe("Lọc PGD", ["Tất cả"] + ds_pgd, key=f"{key_prefix}loc_pgd")
         else:
             pgd_fixed = pgd_user
@@ -149,10 +161,17 @@ def _ap_dung_loc_pgd_xa_to_truong(
 
     if loc_pgd != "Tất cả" and COT_TEN_PGD in df_loc.columns:
         df_loc = df_loc[df_loc[COT_TEN_PGD] == loc_pgd]
+    _new_pgd = None if loc_pgd == "Tất cả" else loc_pgd
+    if _new_pgd != state.filter_pgd:
+        state.filter_pgd = _new_pgd
 
     with col_xa:
         if COT_TEN_XA in df_loc.columns:
             ds_xa = sorted(df_loc[COT_TEN_XA].dropna().astype(str).unique().tolist())
+            _key_xa = f"{key_prefix}loc_xa"
+            _desired_xa = state.filter_xa or "Tất cả"
+            if _key_xa not in st.session_state:
+                st.session_state[_key_xa] = _desired_xa if _desired_xa in (["Tất cả"] + ds_xa) else "Tất cả"
             loc_xa = _selectbox_safe("Lọc Xã", ["Tất cả"] + ds_xa, key=f"{key_prefix}loc_xa")
         else:
             loc_xa = "Tất cả"
@@ -160,6 +179,7 @@ def _ap_dung_loc_pgd_xa_to_truong(
 
     if loc_xa != "Tất cả" and COT_TEN_XA in df_loc.columns:
         df_loc = df_loc[df_loc[COT_TEN_XA] == loc_xa]
+    state.filter_xa = None if loc_xa == "Tất cả" else loc_xa
 
     with col_to:
         if COT_TEN_TO_TRUONG in df_loc.columns:
@@ -461,17 +481,25 @@ def _render_nqh(df_kh: pd.DataFrame, ds_pgd_all: list, la_cn: bool, key_prefix: 
     # else: "Tất cả nợ quá hạn" → giữ nguyên df_nqh_all
 
     # ─── Filter 2: PGD ──────────────────────────────────────────────────────────
+    state = SCMStateManager()
     with col_pgd:
         if la_cn:
-            loc_pgd = st.selectbox("Lọc PGD", ["Tất cả"] + ds_pgd_all, key=f"{key_prefix}nqh_pgd")
+            _key_pgd = f"{key_prefix}nqh_pgd"
+            _desired_pgd = state.filter_pgd or "Tất cả"
+            if _key_pgd not in st.session_state:
+                st.session_state[_key_pgd] = _desired_pgd if _desired_pgd in (["Tất cả"] + ds_pgd_all) else "Tất cả"
+            loc_pgd = st.selectbox("Lọc PGD", ["Tất cả"] + ds_pgd_all, key=_key_pgd)
         else:
             loc_pgd = "Tất cả"
             st.caption("Lọc PGD (CN)")
 
     if loc_pgd != "Tất cả":
+        state.filter_pgd = loc_pgd
         cot_pgd = _tim_cot(df_nqh_all, COT_TEN_PGD)
         if cot_pgd and cot_pgd in df_nqh_all.columns:
             df_nqh_all = df_nqh_all[df_nqh_all[cot_pgd] == loc_pgd]
+    else:
+        state.filter_pgd = None
 
     df_nqh_all, loc_xa, loc_to = _ap_dung_loc_xa_to_truong(df_nqh_all, key_prefix=f"{key_prefix}nqh_")
 
@@ -496,11 +524,16 @@ def _render_nqh(df_kh: pd.DataFrame, ds_pgd_all: list, la_cn: bool, key_prefix: 
     with col_ct:
         if cot_ct and cot_ct in df_nqh_all.columns:
             ds_ct = sorted(df_nqh_all[cot_ct].dropna().unique().tolist())
+            _key_ct = f"{key_prefix}nqh_ct"
+            _desired_ct = state.filter_chuong_trinh or "Tất cả"
+            if _key_ct not in st.session_state:
+                st.session_state[_key_ct] = _desired_ct if _desired_ct in (["Tất cả"] + ds_ct) else "Tất cả"
             loc_ct = st.selectbox("Lọc theo Chương trình",
-                                  options=["Tất cả"] + ds_ct, key=f"{key_prefix}nqh_ct")
+                                  options=["Tất cả"] + ds_ct, key=_key_ct)
         else:
             loc_ct = "Tất cả"
             st.caption("Không có cột Chương trình")
+    state.filter_chuong_trinh = None if loc_ct == "Tất cả" else loc_ct
 
     if loc_ct != "Tất cả":
         df_nqh_all = df_nqh_all[df_nqh_all[cot_ct] == loc_ct]
@@ -533,15 +566,22 @@ def _render_nqh(df_kh: pd.DataFrame, ds_pgd_all: list, la_cn: bool, key_prefix: 
     ] if c and c in df_nqh.columns]
     df_ct = df_nqh[cols_ct].reset_index(drop=True)
 
+    _dl_key = f"{key_prefix}nqh_excel"
     if st.button(f"Xuất Excel ({len(df_ct)} món)", key=f"{key_prefix}nqh_xuat_btn"):
-        st.session_state[f"_{key_prefix}nqh_buf"] = xuat_excel({"NQH": df_ct})
-    if st.session_state.get(f"_{key_prefix}nqh_buf"):
-        st.download_button(
-            "Tải về", data=st.session_state[f"_{key_prefix}nqh_buf"],
-            file_name=f"NQH_{datetime.now().strftime('%Y%m%d')}.xlsx",
+        state.downloads.set(
+            _dl_key,
+            xuat_excel({"NQH": df_ct}),
+            f"NQH_{datetime.now().strftime('%Y%m%d')}.xlsx",
+        )
+    if state.downloads.has(_dl_key):
+        if st.download_button(
+            "Tải về",
+            data=state.downloads.get_bytes(_dl_key) or b"",
+            file_name=state.downloads.get_filename(_dl_key) or f"NQH_{datetime.now().strftime('%Y%m%d')}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             key=f"{key_prefix}nqh_xuat",
-        )
+        ):
+            state.downloads.clear(_dl_key)
     cpn, _ = st.columns([1, 1])
     with cpn:
         nut_xuat_pdf(df_ct, "Nợ quá hạn phát sinh",
@@ -583,10 +623,15 @@ def _render_khoanh_sap_hh(
             ["Khẩn (≤ 30 ngày)", "Cảnh báo (≤ 180 ngày)", "Tất cả"],
             key=f"{key_prefix}kh_tg",
         )
+    state = SCMStateManager()
     with col_pgd:
         if la_cn:
+            _key_pgd = f"{key_prefix}kh_pgd"
+            _desired_pgd = state.filter_pgd or "Tất cả"
+            if _key_pgd not in st.session_state:
+                st.session_state[_key_pgd] = _desired_pgd if _desired_pgd in (["Tất cả"] + ds_pgd_all) else "Tất cả"
             loc_pgd = st.selectbox(
-                "Lọc PGD", ["Tất cả"] + ds_pgd_all, key=f"{key_prefix}kh_pgd"
+                "Lọc PGD", ["Tất cả"] + ds_pgd_all, key=_key_pgd
             )
         else:
             loc_pgd = "Tất cả"
@@ -595,6 +640,9 @@ def _render_khoanh_sap_hh(
     df_filt = df_base.copy()
     if loc_pgd != "Tất cả" and COT_TEN_PGD in df_filt.columns:
         df_filt = df_filt[df_filt[COT_TEN_PGD] == loc_pgd]
+        state.filter_pgd = loc_pgd
+    else:
+        state.filter_pgd = None
 
     df_filt, loc_xa, loc_to = _ap_dung_loc_xa_to_truong(df_filt, key_prefix=f"{key_prefix}kh_")
 
@@ -614,12 +662,17 @@ def _render_khoanh_sap_hh(
     with col_ct:
         if cot_ct:
             ds_ct = sorted(df_base[cot_ct].dropna().unique().tolist())
+            _key_ct = f"{key_prefix}kh_ct"
+            _desired_ct = state.filter_chuong_trinh or "Tất cả"
+            if _key_ct not in st.session_state:
+                st.session_state[_key_ct] = _desired_ct if _desired_ct in (["Tất cả"] + ds_ct) else "Tất cả"
             loc_ct = st.selectbox(
-                "Lọc Chương trình", ["Tất cả"] + ds_ct, key=f"{key_prefix}kh_ct"
+                "Lọc Chương trình", ["Tất cả"] + ds_ct, key=_key_ct
             )
         else:
             loc_ct = "Tất cả"
             st.caption("Không có cột Chương trình")
+    state.filter_chuong_trinh = None if loc_ct == "Tất cả" else loc_ct
 
     if loc_dvut != "Tất cả" and cot_dvut and cot_dvut in df_filt.columns:
         df_filt = df_filt[df_filt[cot_dvut] == loc_dvut]
@@ -749,9 +802,14 @@ def _render_gia_han(
         return
 
     if la_cn:
+        state = SCMStateManager()
         col_f1, col_f2 = st.columns(2)
         with col_f1:
-            loc_pgd = st.selectbox("Lọc PGD", ["Tất cả"] + ds_pgd_all, key=f"{key_prefix}gh_pgd")
+            _key_pgd = f"{key_prefix}gh_pgd"
+            _desired_pgd = state.filter_pgd or "Tất cả"
+            if _key_pgd not in st.session_state:
+                st.session_state[_key_pgd] = _desired_pgd if _desired_pgd in (["Tất cả"] + ds_pgd_all) else "Tất cả"
+            loc_pgd = st.selectbox("Lọc PGD", ["Tất cả"] + ds_pgd_all, key=_key_pgd)
         with col_f2:
             loc_dvut = st.selectbox("Lọc Hội đoàn thể", ["Tất cả"] + ds_dvut_all,
                                     key=f"{key_prefix}gh_dvut")
@@ -764,6 +822,10 @@ def _render_gia_han(
 
     if loc_pgd != "Tất cả" and COT_TEN_PGD in df_loc.columns:
         df_loc = df_loc[df_loc[COT_TEN_PGD] == loc_pgd]
+        state.filter_pgd = loc_pgd
+    else:
+        if la_cn:
+            state.filter_pgd = None
 
     df_loc, loc_xa, loc_to = _ap_dung_loc_xa_to_truong(df_loc, key_prefix=f"{key_prefix}gh_")
 

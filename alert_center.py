@@ -3,12 +3,23 @@ alert_center.py
 Tổng hợp và hiển thị cảnh báo tự động trong sidebar.
 Mỗi lần gọi render_alert_sidebar() sẽ đọc dữ liệu thực
 từ kv_store + parquet, không cache để luôn mới nhất.
+
+Phân mức cảnh báo:
+  🔴 KHAN      — cần xử lý ngay (nợ khoanh sắp hết hạn ≤30 ngày, data trễ nặng)
+  🟠 CANH_BAO  — cần theo dõi (sắp hết hạn ≤180 ngày, 3 tháng KHĐ, upload trễ)
+  🟡 LUU_Y     — thông tin cần lưu ý (nhắc nhở, thống kê)
 """
 from __future__ import annotations
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from pathlib import Path
+from typing import Literal
+import hashlib
 import streamlit as st
 import db
+from logger import get_logger
+
+logger = get_logger(__name__)
 from config import (
     CACHE_GQVL,
     COT_DU_NO_KHOANH,
@@ -20,44 +31,140 @@ from config import (
     COT_TEN_XA,
 )
 
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# AlertItem — đơn vị cảnh báo có phân mức
+# ═══════════════════════════════════════════════════════════════════════════════
+
+MUC_KHAN     = "khan"       # 🔴
+MUC_CANH_BAO = "canh_bao"  # 🟠
+MUC_LUU_Y    = "luu_y"     # 🟡
+
+_MUC_ICON  = {MUC_KHAN: "🔴", MUC_CANH_BAO: "🟠", MUC_LUU_Y: "🟡"}
+_MUC_LABEL = {MUC_KHAN: "KHẨN", MUC_CANH_BAO: "CẢNH BÁO", MUC_LUU_Y: "LƯU Ý"}
+_MUC_ORDER = {MUC_KHAN: 0, MUC_CANH_BAO: 1, MUC_LUU_Y: 2}
+
+
+@dataclass
+class AlertItem:
+    muc: Literal["khan", "canh_bao", "luu_y"]
+    tieu_de: str
+    mo_ta: str = ""
+    jump_fn: object = field(default=None, repr=False)  # callable hoặc None
+
+    @property
+    def alert_id(self) -> str:
+        """Hash ổn định từ (muc, tieu_de) — dùng làm key đã-đọc."""
+        raw = f"{self.muc}|{self.tieu_de}"
+        return hashlib.md5(raw.encode()).hexdigest()[:12]
+
+    @property
+    def icon(self) -> str:
+        return _MUC_ICON.get(self.muc, "⚪")
+
+    @property
+    def label_muc(self) -> str:
+        return _MUC_LABEL.get(self.muc, self.muc.upper())
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Đã đọc — lưu vào kv_store
+# ═══════════════════════════════════════════════════════════════════════════════
+
+_KV_READ_KEY = "alert_read_ids"
+
+
+def _lay_da_doc() -> set[str]:
+    """Đọc tập hợp alert_id đã đọc từ kv_store."""
+    try:
+        data = db.doc_kv(_KV_READ_KEY, {})
+        return set(data.get("ids", []))
+    except Exception as e:
+        logger.error(f"Lỗi đọc danh sách đã đọc: {e}", exc_info=True)
+        return set()
+
+
+def _luu_da_doc(ids: set[str]) -> None:
+    """Lưu tập hợp alert_id đã đọc vào kv_store."""
+    try:
+        username = st.session_state.get("username", "system")
+        db.ghi_kv(_KV_READ_KEY, {"ids": list(ids)}, username=username)
+        db.ghi_audit(username, "alert_danh_dau_da_doc", f"Đã đọc {len(ids)} cảnh báo")
+    except Exception as e:
+        logger.error(f"Lỗi lưu danh sách đã đọc: {e}", exc_info=True)
+
+
+def _danh_dau_da_doc(alert_ids: list[str]) -> None:
+    """Thêm các alert_id vào danh sách đã đọc."""
+    da_doc = _lay_da_doc()
+    da_doc.update(alert_ids)
+    _luu_da_doc(da_doc)
+
+
+def _xoa_da_doc_cu(active_ids: set[str]) -> None:
+    """Xóa các alert_id không còn active để tránh bloat kv_store."""
+    try:
+        da_doc = _lay_da_doc()
+        da_doc &= active_ids
+        _luu_da_doc(da_doc)
+    except Exception as e:
+        logger.error(f"Lỗi xóa đã đọc cũ: {e}", exc_info=True)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Nguồn cảnh báo
+# ═══════════════════════════════════════════════════════════════════════════════
+
 NGUONG_NGAY_UPLOAD_CU = 3   # cảnh báo nếu file chưa merge quá 3 ngày
+_NGUONG_UPLOAD_KHAN   = 7   # 🔴 nếu trễ ≥ 7 ngày
+
+_KHD_CACHE_TTL = 300  # 5 phút
 
 
-def _kiem_tra_upload_tre() -> list[str]:
-    """Trả về danh sách loại file chưa được merge trong NGUONG_NGAY_UPLOAD_CU ngày.
+def _kiem_tra_upload_tre() -> list[AlertItem]:
+    """Trả về list AlertItem cho file chưa được merge đúng hạn.
     Cache vào st.session_state["merge_meta_cache"], invalidate sau 60 giây."""
     now = datetime.now()
     cache = st.session_state.get("merge_meta_cache")
     if cache and (now - cache["timestamp"]).total_seconds() < 60:
         return cache["data"]
 
-    canh_bao = []
+    items: list[AlertItem] = []
     for loai in ["hstd", "nq11", "gqvl"]:
         meta = db.doc_kv(f"merge_meta_{loai}")
         if not meta:
-            canh_bao.append(f"Chưa có dữ liệu **{loai.upper()}**")
+            items.append(AlertItem(
+                muc=MUC_KHAN,
+                tieu_de=f"Chưa có dữ liệu {loai.upper()}",
+                mo_ta="Chưa từng merge — cần upload ngay",
+            ))
             continue
         try:
             thoi_gian = datetime.fromisoformat(meta["thoi_gian"])
             delta = (now - thoi_gian).days
-            if delta >= NGUONG_NGAY_UPLOAD_CU:
-                canh_bao.append(
-                    f"**{loai.upper()}** chưa cập nhật ({delta} ngày trước)"
-                )
-        except Exception:
-            pass
+            if delta >= _NGUONG_UPLOAD_KHAN:
+                items.append(AlertItem(
+                    muc=MUC_KHAN,
+                    tieu_de=f"{loai.upper()} chưa cập nhật {delta} ngày",
+                    mo_ta=f"Lần cuối: {thoi_gian.strftime('%d/%m/%Y %H:%M')}",
+                ))
+            elif delta >= NGUONG_NGAY_UPLOAD_CU:
+                items.append(AlertItem(
+                    muc=MUC_CANH_BAO,
+                    tieu_de=f"{loai.upper()} cần cập nhật ({delta} ngày)",
+                    mo_ta=f"Lần cuối: {thoi_gian.strftime('%d/%m/%Y %H:%M')}",
+                ))
+        except Exception as e:
+            logger.error(f"Lỗi kiểm tra upload trễ {loai}: {e}", exc_info=True)
 
-    st.session_state["merge_meta_cache"] = {"data": canh_bao, "timestamp": now}
-    return canh_bao
+    st.session_state["merge_meta_cache"] = {"data": items, "timestamp": now}
+    return items
 
 
-_KHD_CACHE_TTL = 300  # 5 phút
-
-
-def _kiem_tra_khong_hoat_dong(df_full, pgd_filter: str | None = None) -> list[str]:
+def _kiem_tra_khong_hoat_dong(df_full, pgd_filter: str | None = None) -> list[AlertItem]:
     """
-    Trả về danh sách cảnh báo hộ 3 tháng không hoạt động.
-    Kết quả cache 5 phút trong session_state — tránh tính lại toàn bộ HSTD mỗi rerun.
+    Trả về list AlertItem cho hộ 3 tháng không hoạt động.
+    Kết quả cache 5 phút trong session_state.
     """
     if df_full is None or df_full.empty:
         return []
@@ -69,25 +176,32 @@ def _kiem_tra_khong_hoat_dong(df_full, pgd_filter: str | None = None) -> list[st
         return cached["data"]
 
     try:
-        from hstd import tong_hop_khong_hd
-        from config import COT_TEN_PGD
+        from data.hstd import tong_hop_khong_hd
+        from config import COT_TEN_PGD as _COT_TEN_PGD
         df_loc = df_full
-        if pgd_filter and COT_TEN_PGD in df_full.columns:
-            df_loc = df_full[df_full[COT_TEN_PGD] == pgd_filter]
-        tong_hop = tong_hop_khong_hd(df_loc, nhom_theo=COT_TEN_PGD)
+        if pgd_filter and _COT_TEN_PGD in df_full.columns:
+            df_loc = df_full[df_full[_COT_TEN_PGD] == pgd_filter]
+        tong_hop = tong_hop_khong_hd(df_loc, nhom_theo=_COT_TEN_PGD)
         if tong_hop.empty:
-            result: list[str] = []
+            result: list[AlertItem] = []
         else:
             tong_mon = int(tong_hop["Món_3m_KHĐ"].sum())
-            result = [f"**{tong_mon} món vay** ≥ 3 tháng không hoạt động"] if tong_mon > 0 else []
-    except Exception:
+            result = [
+                AlertItem(
+                    muc=MUC_CANH_BAO,
+                    tieu_de=f"{tong_mon} món vay ≥ 3 tháng không hoạt động",
+                    mo_ta="Kiểm tra tab Cảnh báo tín dụng → 3 tháng KHĐ",
+                )
+            ] if tong_mon > 0 else []
+    except Exception as e:
+        logger.error(f"Lỗi kiểm tra không hoạt động: {e}", exc_info=True)
         result = []
 
     st.session_state[cache_key] = {"data": result, "ts": now}
     return result
 
 
-def canh_bao_no_khoanh_sap_het_han(df_kh: pd.DataFrame) -> dict:
+def canh_bao_no_khoanh_sap_het_han(df_kh) -> dict:
     """Tính số món sắp hết hạn khoanh.
 
     df_kh: DataFrame đã lọc những món có Dư nợ khoanh > 0.
@@ -188,53 +302,131 @@ def _get_khoanh_alert_data(df_full):
     return data
 
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# Build danh sách alert tổng hợp
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def _build_alert_items(
+    df_full,
+    role: str,
+    pgd_user: str | None,
+) -> list[AlertItem]:
+    """Thu thập toàn bộ cảnh báo thành list[AlertItem], sắp xếp theo mức."""
+    from auth import la_phan_he_cn, la_phan_he_pgd
+
+    items: list[AlertItem] = []
+
+    # Upload trễ — chỉ CN thấy
+    if la_phan_he_cn(role):
+        items += _kiem_tra_upload_tre()
+
+    # 3 tháng không hoạt động
+    pgd_filter = pgd_user if la_phan_he_pgd(role) else None
+    items += _kiem_tra_khong_hoat_dong(df_full, pgd_filter)
+
+    # Nợ khoanh sắp hết hạn
+    khoanh_data = _get_khoanh_alert_data(df_full)
+    if khoanh_data["so_khan"] > 0:
+        items.append(AlertItem(
+            muc=MUC_KHAN,
+            tieu_de=f"{khoanh_data['so_khan']} món nợ khoanh hết hạn (≤30 ngày)",
+            mo_ta="Cần kiểm tra ngay — tab Nợ Khoanh",
+            jump_fn=_jump_to_khoanh,
+        ))
+    if khoanh_data["so_canh_bao"] > 0:
+        items.append(AlertItem(
+            muc=MUC_CANH_BAO,
+            tieu_de=f"{khoanh_data['so_canh_bao']} món sắp hết hạn khoanh (≤180 ngày)",
+            mo_ta="Xem chi tiết — tab Nợ Khoanh",
+            jump_fn=_jump_to_khoanh,
+        ))
+
+    # Sắp xếp: 🔴 → 🟠 → 🟡
+    items.sort(key=lambda a: _MUC_ORDER.get(a.muc, 99))
+    return items
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Render sidebar
+# ═══════════════════════════════════════════════════════════════════════════════
+
 def render_alert_sidebar(
     df_full=None,
     role: str = "user",
     pgd_user: str | None = None,
 ) -> None:
     """
-    Hiển thị cảnh báo trong sidebar.
+    Hiển thị cảnh báo phân mức trong sidebar.
     Gọi sau render_status_compact() trong app.py.
 
-    Chỉ hiển thị nếu có ít nhất 1 cảnh báo.
+    - Badge tổng số cảnh báo chưa đọc
+    - Phân nhóm 🔴/🟠/🟡
+    - Button "Đánh dấu đã đọc tất cả"
+    - Trạng thái đã đọc lưu vào kv_store
     """
-    canh_bao: list[str] = []
-
-    # Cảnh báo upload trễ — chỉ admin/manager mới thấy
-    from auth import la_phan_he_cn, la_phan_he_pgd
-    if la_phan_he_cn(role):
-        canh_bao += _kiem_tra_upload_tre()
-
-    # Cảnh báo 3 tháng không hoạt động
-    pgd_filter = pgd_user if la_phan_he_pgd(role) else None
-    canh_bao += _kiem_tra_khong_hoat_dong(df_full, pgd_filter)
-
-    # Cảnh báo nợ khoanh sắp hết hạn
-    khoanh_data = _get_khoanh_alert_data(df_full)
-    co_khoanh = khoanh_data['so_khan'] > 0 or khoanh_data['so_canh_bao'] > 0
-
-    if not canh_bao and not co_khoanh:
+    all_items = _build_alert_items(df_full, role, pgd_user)
+    if not all_items:
         return
 
+    # Lấy set đã đọc + dọn id cũ
+    active_ids = {a.alert_id for a in all_items}
+    _xoa_da_doc_cu(active_ids)
+    da_doc = _lay_da_doc()
+    chua_doc = [a for a in all_items if a.alert_id not in da_doc]
+
     st.divider()
-    st.markdown("🔔 **Cảnh báo**")
-    for msg in canh_bao:
-        st.warning(msg, icon="⚠️")
 
-    if co_khoanh:
-        if khoanh_data['so_khan'] > 0:
-            if st.button(
-                f"🔴 {khoanh_data['so_khan']} món hết hạn khoanh",
-                key="alert_khoanh_khan",
-            ):
-                _jump_to_khoanh()
-                st.rerun()
+    # Badge header
+    n_chua_doc = len(chua_doc)
+    n_khan = sum(1 for a in chua_doc if a.muc == MUC_KHAN)
+    if n_khan > 0:
+        badge_txt = f"🔴 **{n_chua_doc} cảnh báo chưa đọc**"
+    elif n_chua_doc > 0:
+        badge_txt = f"🟠 **{n_chua_doc} cảnh báo chưa đọc**"
+    else:
+        badge_txt = "🟢 Đã xem hết"
+    st.markdown(f"🔔 {badge_txt}")
 
-        if khoanh_data['so_canh_bao'] > 0:
-            if st.button(
-                f"🟠 {khoanh_data['so_canh_bao']} món sắp hết hạn khoanh",
-                key="alert_khoanh_canh_bao",
-            ):
-                _jump_to_khoanh()
-                st.rerun()
+    # Hiển thị từng alert theo mức
+    for muc in [MUC_KHAN, MUC_CANH_BAO, MUC_LUU_Y]:
+        nhom = [a for a in all_items if a.muc == muc]
+        if not nhom:
+            continue
+        icon = _MUC_ICON[muc]
+        for alert in nhom:
+            is_read = alert.alert_id in da_doc
+            if alert.jump_fn is not None:
+                btn_label = f"{'~~' if is_read else ''}{icon} {alert.tieu_de}{'~~ ✓' if is_read else ''}"
+                btn_key = f"alert_jump_{alert.alert_id}"
+                if st.button(btn_label, key=btn_key, use_container_width=True):
+                    _danh_dau_da_doc([alert.alert_id])
+                    alert.jump_fn()
+                    st.rerun()
+            else:
+                if is_read:
+                    st.caption(f"{icon} ~~{alert.tieu_de}~~ ✓")
+                elif muc == MUC_KHAN:
+                    st.error(
+                        f"{icon} **{alert.tieu_de}**"
+                        + (f"\n\n{alert.mo_ta}" if alert.mo_ta else "")
+                    )
+                elif muc == MUC_CANH_BAO:
+                    st.warning(
+                        f"{icon} **{alert.tieu_de}**"
+                        + (f"\n\n{alert.mo_ta}" if alert.mo_ta else "")
+                    )
+                else:
+                    st.info(
+                        f"{icon} {alert.tieu_de}"
+                        + (f"\n\n{alert.mo_ta}" if alert.mo_ta else "")
+                    )
+
+    # Button đánh dấu tất cả đã đọc
+    if chua_doc:
+        if st.button(
+            "✅ Đánh dấu đã đọc tất cả",
+            key="alert_mark_all_read",
+            use_container_width=True,
+        ):
+            _danh_dau_da_doc([a.alert_id for a in chua_doc])
+            st.rerun()

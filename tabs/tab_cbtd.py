@@ -23,6 +23,7 @@ import pandas as pd
 import db
 from config import COT_HINH_THUC_VAY, COT_MA_KH, COT_SO_KU, COT_TEN_THON, COT_TEN_XA, COT_TONG_DU_NO, COT_DU_NO_QH, DS_PGD, DON_VI_CHI_NHANH
 from auth import la_phan_he_cn, la_executive, normalize_role
+from state_manager import SCMStateManager
 from utils import xuat_excel, hien_thi_dataframe_phan_trang, fmt_so
 from data.khtd import doc_cbtd, luu_cbtd, lay_ap_tu_dgd_list, gan_cbtd_vao_df
 
@@ -38,6 +39,7 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
     role_raw = str(kwargs.get("role", "user") or "user")
     role     = normalize_role(role_raw)
     username = kwargs.get("username", "unknown")
+    state = SCMStateManager()
 
     import streamlit as _st
     ctx = tab if tab is not None else _st.container()
@@ -563,14 +565,18 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                     if not df_cb2.empty:
                         df_cb2.drop(columns=["CBTD","Tên CBTD"], errors="ignore", inplace=True)
                         df_cb2.to_excel(w, index=False, sheet_name=f"CB_{ma}"[:31])
-            st.session_state["_bytes_cbtd"] = buf.getvalue()
-            st.session_state["_file_cbtd"]  = f"BC_CBTD_{datetime.today().strftime('%d%m%Y')}.xlsx"
+            state.downloads.set(
+                "cbtd_excel",
+                buf.getvalue(),
+                f"BC_CBTD_{datetime.today().strftime('%d%m%Y')}.xlsx",
+            )
 
-        if st.session_state.get("_bytes_cbtd"):
-            st.download_button(
+        if state.downloads.has("cbtd_excel"):
+            if st.download_button(
                 "⬇ Tải Excel",
-                data=st.session_state["_bytes_cbtd"],
-                file_name=st.session_state["_file_cbtd"],
+                data=state.downloads.get_bytes("cbtd_excel"),
+                file_name=state.downloads.get_filename("cbtd_excel") or f"BC_CBTD_{datetime.today().strftime('%d%m%Y')}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 key="dl_cbtd",
-            )
+            ):
+                state.downloads.clear("cbtd_excel")

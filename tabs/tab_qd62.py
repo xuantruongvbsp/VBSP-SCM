@@ -12,6 +12,7 @@ import streamlit as st
 
 import db
 from auth import normalize_role
+from state_manager import SCMStateManager
 from config import DS_PGD, PGD_XA_MAP, PGD_DATA_DIR
 from data.pgd import pgd_slug, thu_muc_pgd
 from utils import fmt_ty
@@ -497,19 +498,21 @@ def _render_cn(username: str, role: str) -> None:
                 tong_pgd.to_excel(writer, sheet_name="Tong_hop_theo_PGD", index=False)
             output.seek(0)
             ten_file = f"QD62_DS_Tong_CN_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
-            st.session_state["_bytes_qd62_tong"] = output.getvalue()
-            st.session_state["_file_qd62_tong"] = ten_file
+            state = SCMStateManager()
+            state.downloads.set("qd62_tong_excel", output.getvalue(), ten_file)
             db.ghi_audit(username, "qd62_cn_xuat_ds_tong",
                          f"Xuất DS tổng {len(df_tong)} món")
 
-        if st.session_state.get("_bytes_qd62_tong"):
-            st.download_button(
+        state = SCMStateManager()
+        if state.downloads.has("qd62_tong_excel"):
+            if st.download_button(
                 "⬇️ Tải Excel DS tổng",
-                data=st.session_state["_bytes_qd62_tong"],
-                file_name=st.session_state.get("_file_qd62_tong", "QD62_DS_Tong.xlsx"),
+                data=state.downloads.get_bytes("qd62_tong_excel"),
+                file_name=state.downloads.get_filename("qd62_tong_excel") or "QD62_DS_Tong.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 key="qd62_cn_dl_tong",
-            )
+            ):
+                state.downloads.clear("qd62_tong_excel")
 
     # ── C. Panel kiểm soát ───────────────────────────────────────────────
     st.markdown("---")
@@ -596,17 +599,19 @@ def _render_cn(username: str, role: str) -> None:
             output.seek(0)
 
             ten_file = f"QD62_tong_hop_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
-            st.session_state["_bytes_qd62"] = output.getvalue()
-            st.session_state["_file_qd62"] = ten_file
+            state = SCMStateManager()
+            state.downloads.set("qd62_cn_excel", output.getvalue(), ten_file)
 
-    if st.session_state.get("_bytes_qd62"):
-        st.download_button(
+    state = SCMStateManager()
+    if state.downloads.has("qd62_cn_excel"):
+        if st.download_button(
             "⬇️ Tải file Excel",
-            data=st.session_state["_bytes_qd62"],
-            file_name=st.session_state["_file_qd62"],
+            data=state.downloads.get_bytes("qd62_cn_excel"),
+            file_name=state.downloads.get_filename("qd62_cn_excel") or "QD62_tong_hop.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             key="qd62_cn_dl_excel",
-        )
+        ):
+            state.downloads.clear("qd62_cn_excel")
 
 
 # ══════════════════════════════════════════════════════════════════════════════

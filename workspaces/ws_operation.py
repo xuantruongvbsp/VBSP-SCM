@@ -18,6 +18,7 @@ from io import BytesIO
 from datetime import date, datetime
 
 import db
+from state_manager import SCMStateManager
 from config import (
     COT_TEN_KH, COT_MA_KH, COT_SO_KU, COT_TEN_CT,
     COT_DU_NO_QH, COT_TONG_DU_NO, COT_NGAY_DH,
@@ -43,6 +44,7 @@ from utils import (
     xuat_excel,
     hien_thi_dataframe_phan_trang,
     get_tab_context,
+    lazy_tabs,
 )
 from services.excel_service import xuat_excel_chuyen_nghiep, ten_file_xuat as excel_ten_file
 from pdf_service import xuat_pdf, kiem_tra_pdf_dependency, render_huong_dan
@@ -175,6 +177,7 @@ def _render_trang_chu(tab, df_pgd: pd.DataFrame, role: str, pgd_user: str, kwarg
     """
     ctx = tab if tab is not None else st.container()
     with ctx:
+        state = SCMStateManager()
         st.subheader("🏠 Trang Chủ")
 
         # ── Vùng A: Header ──────────────────────────────────────────────────
@@ -229,8 +232,8 @@ def _render_trang_chu(tab, df_pgd: pd.DataFrame, role: str, pgd_user: str, kwarg
                         with s1:
                             if st.button(f"{icon} {title}\n_{desc}_", use_container_width=True,
                                        key=f"sc_1_{i}"):
-                                st.session_state["ws_op_nhom"] = nhom
-                                st.session_state["ws_op_jump_tab"] = tab_idx
+                                state.nav_ws_op_nhom = nhom
+                                state.nav_ws_op_jump_tab = tab_idx
                                 st.rerun()
 
                     if i + 1 < len(shortcuts):
@@ -238,8 +241,8 @@ def _render_trang_chu(tab, df_pgd: pd.DataFrame, role: str, pgd_user: str, kwarg
                         with s2:
                             if st.button(f"{icon} {title}\n_{desc}_", use_container_width=True,
                                        key=f"sc_1_{i+1}"):
-                                st.session_state["ws_op_nhom"] = nhom
-                                st.session_state["ws_op_jump_tab"] = tab_idx
+                                state.nav_ws_op_nhom = nhom
+                                state.nav_ws_op_jump_tab = tab_idx
                                 st.rerun()
             except Exception as e:  # conv: skip
                 logger.error("Lỗi trong khối except: %s", e, exc_info=True)
@@ -277,8 +280,8 @@ def _render_trang_chu(tab, df_pgd: pd.DataFrame, role: str, pgd_user: str, kwarg
                     if alerts:
                         for icon, text, color, nhom, tab_idx in alerts:
                             if st.button(f"{icon} {text}", use_container_width=True, key=f"alert_{text}"):
-                                st.session_state["ws_op_nhom"] = nhom
-                                st.session_state["ws_op_jump_tab"] = tab_idx
+                                state.nav_ws_op_nhom = nhom
+                                state.nav_ws_op_jump_tab = tab_idx
                                 st.rerun()
                     else:
                         st.success("✅ Không có cảnh báo nào")
@@ -922,6 +925,7 @@ def _render_bien_ban_giao_ban(tab, **kwargs):
             df_xa = df[df[COT_TEN_XA] == chon_xa].copy()
             gn_input = {"__tong__": gn_tong * 1_000_000} if gn_tong > 0 else None
             try:
+                state = SCMStateManager()
                 data = xuat_bien_ban_giao_ban(
                     df_xa=df_xa,
                     df_baseline=df_bl,
@@ -931,23 +935,24 @@ def _render_bien_ban_giao_ban(tab, **kwargs):
                 )
                 thang = date.today().strftime("%m%Y")
                 ten_file = f"BB_GiaoBan_{chon_xa.replace(' ','_')}_{thang}.docx"
-                st.session_state["_bytes_gb2"] = data
-                st.session_state["_file_gb2"] = ten_file
+                state.downloads.set("gb2_word", data, ten_file)
                 st.success("✅ Đã tạo biên bản! Nhấn nút bên dưới để tải về.")
             except Exception as e:  # conv: skip
                 logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                 st.error(f"❌ Lỗi xuất file: {e}")
                 st.exception(e)
 
-        if st.session_state.get("_bytes_gb2"):
-            st.download_button(
+        state = SCMStateManager()
+        if state.downloads.has("gb2_word"):
+            if st.download_button(
                 "⬇️ Tải về Word",
-                data=st.session_state["_bytes_gb2"],
-                file_name=st.session_state["_file_gb2"],
+                data=state.downloads.get_bytes("gb2_word"),
+                file_name=state.downloads.get_filename("gb2_word"),
                 mime="application/vnd.openxmlformats-officedocument"
                      ".wordprocessingml.document",
                 key="gb2_dl_word",
-            )
+            ):
+                state.downloads.clear("gb2_word")
 
 
 def _render_bao_cao_giao_ban(tab, **kwargs):
@@ -1250,6 +1255,7 @@ def render(**kwargs):
     role = kwargs.get("role")
     pgd_user = kwargs.get("pgd_user")
     username = kwargs.get("username", "unknown")
+    state = SCMStateManager()
 
     st.title("🗺️ Hỗ Trợ Địa Bàn PGD/Biên Hòa")
     st.caption("Tra cứu hồ sơ · Danh sách · Báo cáo giao ban · Văn bản tự động · Nhiệm vụ · Upload dữ liệu")
@@ -1262,16 +1268,26 @@ def render(**kwargs):
     pgd_filter: str | None = None
     if is_cn_role(role) and pgd_user is None and df is not None and COT_TEN_PGD in df.columns:
         ds_pgd_all: list = kwargs.get("ds_pgd_all", [])
+        _opts = ["Toàn Chi nhánh"] + ds_pgd_all
+        _desired = state.filter_pgd or "Toàn Chi nhánh"
+        if "ws_op_pgd_filter" not in st.session_state:
+            st.session_state["ws_op_pgd_filter"] = _desired if _desired in _opts else "Toàn Chi nhánh"
+        elif st.session_state.get("ws_op_pgd_filter") not in _opts:
+            st.session_state["ws_op_pgd_filter"] = "Toàn Chi nhánh"
         _pgd_filter_val = st.selectbox(
             "🔎 Xem theo PGD",
-            ["Toàn Chi nhánh"] + ds_pgd_all,
+            _opts,
             key="ws_op_pgd_filter",
         )
         if _pgd_filter_val != "Toàn Chi nhánh":
             pgd_filter = _pgd_filter_val
+            state.filter_pgd = _pgd_filter_val
+        else:
+            state.filter_pgd = None
 
     # Lọc df theo PGD
     if is_pgd_role(role) and pgd_user and df is not None and COT_TEN_PGD in df.columns:
+        state.filter_pgd = pgd_user
         df_pgd = df[df[COT_TEN_PGD] == pgd_user].copy()
     elif is_cn_role(role) and pgd_filter is not None and df is not None and COT_TEN_PGD in df.columns:
         df_pgd = df[df[COT_TEN_PGD] == pgd_filter].copy()
@@ -1837,15 +1853,37 @@ def render(**kwargs):
     ds_key = list(nhom_kha_dung.keys())
     ds_label = [nhom_kha_dung[k]["label"] for k in ds_key]
 
-    st.session_state.pop("ws_op_jump_tab", None)
+    state = SCMStateManager()
+    if not ds_key:
+        return
 
-    outer_tabs = st.tabs(ds_label)
-    for outer_tab, outer_key in zip(outer_tabs, ds_key):
-        with outer_tab:
-            tabs_info = nhom_kha_dung[outer_key]["tabs"]
-            ten_tabs = [t[0] for t in tabs_info]
-            renderers_inner = [t[1] for t in tabs_info]
-            inner_tabs = st.tabs(ten_tabs)
-            for inner_tab, renderer in zip(inner_tabs, renderers_inner):
-                with inner_tab:
-                    renderer(None)
+    desired_group = state.nav_ws_op_nhom or ds_key[0]
+    if desired_group not in ds_key:
+        desired_group = ds_key[0]
+        state.nav_ws_op_nhom = desired_group
+
+    outer_key = "ws_op_group"
+    if outer_key not in st.session_state or st.session_state.get(outer_key) not in ds_key:
+        st.session_state[outer_key] = desired_group
+
+    selected_group = st.radio(
+        "Nhóm",
+        options=ds_key,
+        format_func=lambda k: nhom_kha_dung[k]["label"],
+        horizontal=True,
+        key=outer_key,
+        label_visibility="collapsed",
+    )
+    if selected_group != state.nav_ws_op_nhom:
+        state.nav_ws_op_nhom = selected_group
+
+    jump_tab_idx = state.nav_ws_op_jump_tab
+    tabs_info = nhom_kha_dung[selected_group]["tabs"]
+    ten_tabs = [t[0] for t in tabs_info]
+    renderers_inner = [t[1] for t in tabs_info]
+    inner_key = f"ws_op_{selected_group}"
+    if jump_tab_idx is not None and 0 <= int(jump_tab_idx) < len(ten_tabs):
+        st.session_state[f"_{inner_key}_idx"] = int(jump_tab_idx)
+        st.toast(f"✨ Đã chuyển tới: {nhom_kha_dung[selected_group]['label']} · {ten_tabs[int(jump_tab_idx)]}", icon="👆")
+
+    lazy_tabs(ten_tabs, renderers_inner, key=inner_key, horizontal=True)

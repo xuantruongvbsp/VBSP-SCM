@@ -27,6 +27,7 @@ import plotly.graph_objects as go
 import db
 from auth import la_phan_he_cn, la_phan_he_pgd
 from utils import fmt_so, xuat_excel, ten_file_xuat, hien_thi_dataframe_phan_trang
+from state_manager import SCMStateManager
 from services import luu_cdtotkvv, KetQuaUpload
 from services.cdtotkvv_service import (
     tong_hop_tu_pgd_data,
@@ -802,8 +803,12 @@ def _sub_ban_do_chat_luong(username: str, cdto_mode: str, pgd_user: str) -> None
             with col_xuat:
                 if st.button("⬇️ Xuất Excel Top Tổ Yếu", key="cdto4_xuat_yeu"):
                     try:
-                        st.session_state["_bytes_cdto4"] = xuat_excel({"To_Yeu": df_yeu})
-                        st.session_state["_file_cdto4"] = ten_file_xuat(f"ToYeu_{thang_chon}")
+                        state = SCMStateManager()
+                        state.downloads.set(
+                            "cdtotkvv_to_yeu_excel",
+                            xuat_excel({"To_Yeu": df_yeu}),
+                            ten_file_xuat(f"ToYeu_{thang_chon}"),
+                        )
                         db.ghi_audit(username, "xuat_excel_to_yeu", f"thang={thang_chon}")
                         st.cache_data.clear()
                         st.success("✅ Đã tạo file Excel!")
@@ -811,14 +816,16 @@ def _sub_ban_do_chat_luong(username: str, cdto_mode: str, pgd_user: str) -> None
                         logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                         st.error(f"Lỗi xuất Excel: {e}")
 
-                if st.session_state.get("_bytes_cdto4"):
-                    st.download_button(
+                state = SCMStateManager()
+                if state.downloads.has("cdtotkvv_to_yeu_excel"):
+                    if st.download_button(
                         label="📥 Tải file Excel",
-                        data=st.session_state["_bytes_cdto4"],
-                        file_name=st.session_state["_file_cdto4"],
+                        data=state.downloads.get_bytes("cdtotkvv_to_yeu_excel"),
+                        file_name=state.downloads.get_filename("cdtotkvv_to_yeu_excel") or ten_file_xuat(f"ToYeu_{thang_chon}"),
                         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                         key="cdto4_download_yeu"
-                    )
+                    ):
+                        state.downloads.clear("cdtotkvv_to_yeu_excel")
         else:
             st.success("✅ Không có Tổ nào xếp loại Yếu!")
     else:

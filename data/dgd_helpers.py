@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import logging
 import re
-from io import BytesIO
 from pathlib import Path
 from typing import Any
 
@@ -47,39 +46,19 @@ def _split_ap_cell(val: Any) -> list[str]:
     return [p.strip() for p in parts if p.strip()]
 
 
-def parse_excel_import(uploaded: bytes, ten_pgd: str) -> dict[str, dict[str, list[str]]]:
-    """Trả về {ten_xa: {ten_dgd: [ap,...]}} cho một PGD."""
-    _ = ten_pgd  # PGD do selectbox — cấu trúc dict theo xã
-    raw = pd.read_excel(BytesIO(uploaded), header=None)
-    if raw.shape[1] < 4:
-        raise ValueError("File phải có ít nhất 4 cột (A–D).")
-    start = 0
-    if raw.shape[0] > 0:
-        c0 = str(raw.iloc[0, 0]).strip().lower()
-        c1 = str(raw.iloc[0, 1]).strip().lower() if raw.shape[1] > 1 else ""
-        if c0 in ("stt", "số tt", "so tt") or "xã" in c1 or "phường" in c1:
-            start = 1
-    body = raw.iloc[start:, :4].copy()
-    body.columns = ["stt", "xa", "dgd", "ap"]
 
-    out: dict[str, dict[str, list[str]]] = {}
-    for _, row in body.iterrows():
-        ten_xa = str(row["xa"]).strip() if pd.notna(row["xa"]) else ""
-        ten_dgd = str(row["dgd"]).strip() if pd.notna(row["dgd"]) else ""
-        if not ten_xa or not ten_dgd:
-            continue
-        ds_ap = _split_ap_cell(row["ap"])
-        if ten_xa not in out:
-            out[ten_xa] = {}
-        if ten_dgd not in out[ten_xa]:
-            out[ten_xa][ten_dgd] = []
-        seen = set(out[ten_xa][ten_dgd])
-        for ap in ds_ap:
-            if ap not in seen:
-                out[ten_xa][ten_dgd].append(ap)
-                seen.add(ap)
-    return out
+def xa_short(ten_xa_full: str) -> str:
+    """Bỏ prefix 'Xã '/'Phường '/'Thị trấn '/'Thị xã ' → trả tên ngắn."""
+    s = str(ten_xa_full).strip()
+    for prefix in ("Thị trấn ", "Thị xã ", "Phường ", "Xã "):
+        if s.startswith(prefix):
+            return s[len(prefix):]
+    return s
 
+
+def khop_xa_dgd(ten_xa_full: str, dgd_xa: str) -> bool:
+    """So sánh tên xã đầy đủ (từ PGD_XA_MAP) với tên xã ngắn trong DGD_DANH_SACH."""
+    return xa_short(ten_xa_full).strip().lower() == str(dgd_xa).strip().lower()
 
 def dem_thong_ke(parsed: dict[str, dict[str, list[str]]]) -> tuple[int, int, int, int]:
     so_xa = len(parsed)

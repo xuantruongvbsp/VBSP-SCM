@@ -17,6 +17,7 @@ from data.khtd import doc_kehoach, luu_kehoach
 from data.pgd import duong_dan_pgd, pgd_slug
 from services import kiem_tra_file
 from auth import la_phan_he_cn, la_executive, normalize_role
+from state_manager import SCMStateManager
 from utils import (
     fmt,
     fmt_tien,
@@ -49,6 +50,7 @@ def render(tab, **kwargs):
     )
 
     with ctx:
+        state = SCMStateManager()
         st.subheader("🎯 Kế hoạch Chi nhánh vs Thực hiện")
         st.caption("📌 So sánh kế hoạch nhập tay với số liệu Điện báo hiện tại")
 
@@ -180,15 +182,17 @@ def render(tab, **kwargs):
                         for ten in ds_chi_tieu]
             with pd.ExcelWriter(buf, engine="openpyxl") as w:
                 pd.DataFrame(rows_mau).to_excel(w, index=False, sheet_name="Ke hoach")
-            st.session_state[f"_bytes_{prefix}_mau_kh"] = buf.getvalue()
-            st.session_state[f"_file_{prefix}_mau_kh"] = "mau_ke_hoach.xlsx"
+            state.downloads.set(f"{prefix}_mau_kh", buf.getvalue(), "mau_ke_hoach.xlsx")
 
-        if st.session_state.get(f"_bytes_{prefix}_mau_kh"):
-            st.download_button("⬇ Tải ngay",
-                data=st.session_state[f"_bytes_{prefix}_mau_kh"],
-                file_name=st.session_state[f"_file_{prefix}_mau_kh"],
+        if state.downloads.has(f"{prefix}_mau_kh"):
+            if st.download_button(
+                "⬇ Tải ngay",
+                data=state.downloads.get_bytes(f"{prefix}_mau_kh"),
+                file_name=state.downloads.get_filename(f"{prefix}_mau_kh") or "mau_ke_hoach.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                key=f"{prefix}_dl_mau_kh")
+                key=f"{prefix}_dl_mau_kh",
+            ):
+                state.downloads.clear(f"{prefix}_mau_kh")
 
         st.divider()
 
@@ -275,12 +279,18 @@ def render(tab, **kwargs):
                        for i, r in df_ss.iterrows()]
             with pd.ExcelWriter(buf, engine="openpyxl") as w:
                 pd.DataFrame(rows_ex).to_excel(w, index=False, sheet_name="KH vs TH")
-            st.session_state[f"_bytes_{prefix}_khvsth"] = buf.getvalue()
-            st.session_state[f"_file_{prefix}_khvsth"] = f"KHvsTH_{datetime.today().strftime('%d%m%Y')}.xlsx"
+            state.downloads.set(
+                f"{prefix}_khvsth",
+                buf.getvalue(),
+                f"KHvsTH_{datetime.today().strftime('%d%m%Y')}.xlsx",
+            )
 
-        if st.session_state.get(f"_bytes_{prefix}_khvsth"):
-            st.download_button("⬇ Tải báo cáo",
-                data=st.session_state[f"_bytes_{prefix}_khvsth"],
-                file_name=st.session_state[f"_file_{prefix}_khvsth"],
+        if state.downloads.has(f"{prefix}_khvsth"):
+            if st.download_button(
+                "⬇ Tải báo cáo",
+                data=state.downloads.get_bytes(f"{prefix}_khvsth"),
+                file_name=state.downloads.get_filename(f"{prefix}_khvsth") or f"KHvsTH_{datetime.today().strftime('%d%m%Y')}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                key=f"{prefix}_dl_khvsth")
+                key=f"{prefix}_dl_khvsth",
+            ):
+                state.downloads.clear(f"{prefix}_khvsth")

@@ -1,0 +1,11 @@
+import importlib.util
+spec = importlib.util.spec_from_file_location('dgd_helpers', 'data/dgd_helpers.py')
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+print('xa_short("Xã Trấn Biên") =', mod.xa_short('Xã Trấn Biên'))
+print('xa_short("Phường Biên Hòa") =', mod.xa_short('Phường Biên Hòa'))
+print('khop_xa_dgd("Phường Biên Hòa","Biên Hòa") =', mod.khop_xa_dgd('Phường Biên Hòa', 'Biên Hòa'))
+print('khop_xa_dgd("Xã La Ngà","La Ngà") =', mod.khop_xa_dgd('Xã La Ngà', 'La Ngà'))
+print('has parse_excel_import:', hasattr(mod, 'parse_excel_import'))
+print('has xa_short:', hasattr(mod, 'xa_short'))
+print('has khop_xa_dgd:', hasattr(mod, 'khop_xa_dgd'))

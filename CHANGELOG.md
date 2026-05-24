@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [2026-05-24] — Refactor Filter state Cảnh báo & Nợ khoanh: dùng SCMStateManager.filter_*
+- `tabs/tab_canh_bao_nqh.py` — Tất cả bộ lọc PGD (sub-tab NQH, Khoanh sắp hết hạn, Gia hạn) đồng bộ với `state.filter_pgd`/`state.filter_chuong_trinh`; đổi PGD tự reset Xã; thêm import SCMStateManager
+- `tabs/tab_canh_bao_som.py` — Bộ lọc PGD trong "Sắp đến hạn + KH không HĐ" đồng bộ với `state.filter_pgd`; download cũng chuyển sang `state.downloads`
+- `tabs/tab_no_khoanh.py` — Bộ lọc PGD đồng bộ với `state.filter_pgd`; toàn bộ download (khoanh, M08, M09, QLNK_06 Excel+PDF, M10 Excel+PDF, tiến độ) chuyển sang `state.downloads` (clear one-shot); `_qlnk_filter` chuyển sang `state.temp`
+- `alert_center.py` — `_jump_to_khoanh()` dùng `state.temp.set("_qlnk_filter", ...)` thay vì `st.session_state._qlnk_filter`
+- `services/cbtd_dia_ban_service.py` dòng ~202, ~241 — sửa `except Exception as e: logger.warning(...)` thành `logger.error(... , exc_info=True)` cho đúng convention
+
 ## [2026-05-24] — Refactor Filter state: dùng SCMStateManager.filter_* (PGD/Xã/Chương trình)
 - `workspaces/ws_operation.py` — Dropdown “Xem theo PGD” đồng bộ vào `state.filter_pgd` để giữ filter xuyên suốt workspace/tabs
 - `tabs/tab_baocao.py` — Bộ lọc PGD/Xã/Chương trình đồng bộ với `state.filter_pgd/filter_xa/filter_chuong_trinh`; đổi PGD tự reset Xã
@@ -22,6 +29,14 @@
 - `state_manager.py` — Getter/setter `nav_*`/`filter_*` dùng `setdefault(...)` để không KeyError nếu workspace được import độc lập trước khi `ensure_initialized()`
 - `alert_center.py` — Cập nhật `_jump_to_khoanh()` dùng `SCMStateManager` cho nhảy workspace (management/operation)
 - `BUGMAP.md` — Thêm B10: shortcut set `ws_op_*` nhưng không nhảy tab
+
+## [2026-05-24] — Alert Center phân mức 🔴/🟠/🟡 + trạng thái đã đọc
+- `alert_center.py` — Thêm `AlertItem` dataclass: trường `muc` (khan/canh_bao/luu_y), `tieu_de`, `mo_ta`, `jump_fn`; `alert_id` hash MD5 ổn định từ (muc, tieu_de)
+- `alert_center.py` — Hàm đã đọc: `_lay_da_doc()` / `_luu_da_doc()` / `_danh_dau_da_doc()` / `_xoa_da_doc_cu()` — persist vào kv_store key `alert_read_ids`
+- `alert_center.py` — Refactor `_kiem_tra_upload_tre()` và `_kiem_tra_khong_hoat_dong()` → trả `list[AlertItem]` phân mức (upload trễ ≥7 ngày = 🔴, 3-6 ngày = 🟠; KHĐ = 🟠)
+- `alert_center.py` — `_build_alert_items()` gom tất cả nguồn, sort 🔴→🟠→🟡
+- `alert_center.py` — `render_alert_sidebar()`: badge header (🔴/🟠 N cảnh báo chưa đọc), hiển thị theo mức với `st.error/warning/info`, alert có `jump_fn` → clickable button, button "✅ Đánh dấu đã đọc tất cả"
+- **Kết quả:** 11/11 test_alert_center.py pass
 
 ## [2026-05-24] — Dashboard "🌅 Hôm nay" cho workspace BGĐ
 - `workspaces/ws_executive.py` — Thêm `_render_hom_nay()`: KPI row 5 chỉ số (tổng dư nợ, NQH, tỷ lệ NQH, số KH, đến hạn tuần), bảng 22 PGD (dư nợ + NQH% + badge trạng thái), alert biến động ≥5% so kỳ snapshot trước, trạng thái cập nhật HSTD/NQ11/GQVL

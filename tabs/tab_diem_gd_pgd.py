@@ -9,7 +9,6 @@ logger = get_logger(__name__)
 import copy
 import re
 import socket
-from io import BytesIO
 from typing import TYPE_CHECKING, Any
 
 import pandas as pd
@@ -18,6 +17,7 @@ import streamlit as st
 from config import (
     COT_TEN_PGD,
     COT_TEN_XA,
+    DGD_DANH_SACH,
     DON_VI_CHI_NHANH,
     PGD_XA_MAP,
 )
@@ -25,13 +25,10 @@ from config import (
 import db
 from auth import normalize_role
 from data.dgd_helpers import (
-    dem_thong_ke,
-    dgd_dang_dung_trong_hstd,
-    parse_excel_import,
+    khop_xa_dgd,
     pool_thon_cho_xa,
     trang_thai_pgd_vs_map,
 )
-from data.pgd import pgd_slug
 from utils import fmt_so, hien_thi_dataframe_phan_trang, pick_hstd_column, xuat_excel
 
 
@@ -40,18 +37,12 @@ if TYPE_CHECKING:
 
 
 def _normalize_entry(val: Any) -> dict:
-    """Backward compat: list → dict với đủ 5 trường."""
+    """Backward compat: list/dict → dict chỉ giữ trường 'thon'."""
     if isinstance(val, list):
-        return {"thon": val, "dia_chi": "", "nguoi_phu_trach": "", "sdt": "", "lich_gd": ""}
+        return {"thon": val}
     if isinstance(val, dict):
-        return {
-            "thon": val.get("thon", []),
-            "dia_chi": val.get("dia_chi", ""),
-            "nguoi_phu_trach": val.get("nguoi_phu_trach", ""),
-            "sdt": val.get("sdt", ""),
-            "lich_gd": val.get("lich_gd", ""),
-        }
-    return {"thon": [], "dia_chi": "", "nguoi_phu_trach": "", "sdt": "", "lich_gd": ""}
+        return {"thon": val.get("thon", [])}
+    return {"thon": []}
 
 
 def _dgd_to_rows_pgd(dgd_map: dict, pgd_user: str) -> list[dict]:
@@ -69,10 +60,6 @@ def _dgd_to_rows_pgd(dgd_map: dict, pgd_user: str) -> list[dict]:
             rows.append({
                 "Xã": xa,
                 "Tên ĐGD": ten,
-                "Địa chỉ": e["dia_chi"],
-                "Người phụ trách": e["nguoi_phu_trach"],
-                "SĐT": e["sdt"],
-                "Lịch GD": e["lich_gd"],
                 "Số thôn/ấp": len(e["thon"]),
                 "Thôn/Ấp": ", ".join(e["thon"]),
             })
@@ -97,11 +84,30 @@ def _hostname() -> str:
         return "unknown"
 
 
+def _render_thong_tin_dgd_pgd(pgd_filter: str) -> None:
+    """Tab chỉ-đọc: hiển thị ĐGD của PGD này từ DGD_DANH_SACH."""
+    st.markdown("### 📋 Thông tin Điểm Giao Dịch")
+    data = [d for d in DGD_DANH_SACH if d["pgd"] == pgd_filter]
+    df_show = pd.DataFrame([
+        {
+            "STT": d["stt"],
+            "Tên ĐGD": d["ten"],
+            "Xã/Phường": d["xa"],
+            "Ngày GD": d["ngay_gd"],
+            "Giờ GD": d["gio_gd"],
+            "Địa điểm": d["dia_diem"],
+        }
+        for d in data
+    ])
+    st.caption(f"**{len(df_show)}** điểm giao dịch của **{pgd_filter}**")
+    st.dataframe(df_show, use_container_width=True, hide_index=True)
+
+
 def _render_tim_kiem_pgd(dgd_map: dict, pgd_user: str, username: str) -> None:
-    st.markdown("### 🔍 Tìm kiếm Điểm giao dịch")
+    st.markdown("### 🔍 Tìm kiếm Thôn/Ấp đã gán")
     rows = _dgd_to_rows_pgd(dgd_map, pgd_user)
     if not rows:
-        st.info("Chưa có dữ liệu điểm giao dịch nào cho PGD của bạn.")
+        st.info("Chưa có thôn/ấp nào được gán cho PGD của bạn.")
         return
 
     df_all = pd.DataFrame(rows)
@@ -110,7 +116,7 @@ def _render_tim_kiem_pgd(dgd_map: dict, pgd_user: str, username: str) -> None:
     with c1:
         q = st.text_input(
             "🔍 Tìm nhanh", key="dgd_pgd_search_q",
-            placeholder="Tên ĐGD, xã, người phụ trách, SĐT...",
+            placeholder="Tên ĐGD, xã, thôn/ấp...",
         )
     with c2:
         xa_opts = ["(Tất cả)"] + sorted(df_all["Xã"].unique().tolist())
@@ -124,13 +130,12 @@ def _render_tim_kiem_pgd(dgd_map: dict, pgd_user: str, username: str) -> None:
         mask = (
             df_f["Tên ĐGD"].str.lower().str.contains(kw, na=False)
             | df_f["Xã"].str.lower().str.contains(kw, na=False)
-            | df_f["Người phụ trách"].str.lower().str.contains(kw, na=False)
-            | df_f["SĐT"].str.lower().str.contains(kw, na=False)
+            | df_f["Thôn/Ấp"].str.lower().str.contains(kw, na=False)
         )
         df_f = df_f[mask]
 
+    cols_show = ["Xã", "Tên ĐGD", "Số thôn/ấp", "Thôn/Ấp"]
     st.caption(f"Tìm thấy **{len(df_f)}** điểm giao dịch")
-    cols_show = ["Xã", "Tên ĐGD", "Địa chỉ", "Người phụ trách", "SĐT", "Lịch GD", "Số thôn/ấp"]
     hien_thi_dataframe_phan_trang(
         df_f[cols_show] if not df_f.empty else pd.DataFrame(columns=cols_show),
         key="dgd_pgd_search_tbl",
@@ -138,301 +143,38 @@ def _render_tim_kiem_pgd(dgd_map: dict, pgd_user: str, username: str) -> None:
     )
 
     if not df_f.empty:
-        c_e, c_p = st.columns(2)
-        with c_e:
-            buf = xuat_excel({"Điểm GD": df_f})
-            st.download_button(
-                "📥 Xuất Excel", data=buf,
-                file_name=f"danh_sach_dgd_{pgd_slug(pgd_user)}.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                key="dgd_pgd_search_dl_excel",
-            )
-        with c_p:
-            try:
-                from pdf_service import xuat_pdf
-
-                pdf_bytes = xuat_pdf(df_f[cols_show], "DANH SÁCH ĐIỂM GIAO DỊCH", username)
-                st.download_button(
-                    "📄 Xuất PDF", data=pdf_bytes,
-                    file_name=f"danh_sach_dgd_{pgd_slug(pgd_user)}.pdf",
-                    mime="application/pdf",
-                    key="dgd_pgd_search_dl_pdf",
-                )
-            except Exception as e:
-                logger.error("Lỗi trong khối except: %s", e, exc_info=True)
-                st.caption(f"Xuất PDF: {e}")
-
-
-def _render_import_pgd(
-    pgd_user: str,
-    username: str,
-    hn: str,
-    df_hstd_pgd: pd.DataFrame,
-) -> None:
-    """Giống tab KH-NV Import, chỉ cho một PGD; merge chỉ ghi đè nhánh dgd_map[pgd_user]."""
-    st.markdown(f"**PGD:** {pgd_user}")
-    ds_xa_cfg = list(PGD_XA_MAP.get(pgd_user, []) or [])
-    xa_vi_du = str(ds_xa_cfg[0]).strip() if ds_xa_cfg else ""
-    df_mau = pd.DataFrame(
-        [
-            {"STT": 1, "Xã": xa_vi_du, "ĐGD": "Điểm GD 1", "Ấp/KP": ""},
-            {"STT": 2, "Xã": xa_vi_du, "ĐGD": "Điểm GD 1", "Ấp/KP": ""},
-            {"STT": 3, "Xã": xa_vi_du, "ĐGD": "Điểm GD 1", "Ấp/KP": ""},
-        ]
-    )
-    buf = BytesIO()
-    with pd.ExcelWriter(buf, engine="openpyxl") as w:
-        df_mau.to_excel(w, index=False, sheet_name="Mau")
-    st.download_button(
-        "📤 Tải file mẫu Excel",
-        data=buf.getvalue(),
-        file_name=f"mau_dgd_{pgd_slug(pgd_user)}.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        key="dgd_pgd_op_imp_dl_mau",
-        use_container_width=True,
-    )
-    up = st.file_uploader(
-        "File Excel (cột A–D: STT | Xã | ĐGD | Ấp/KP)",
-        type=["xlsx", "xls"],
-        key="dgd_pgd_op_imp_up",
-    )
-    if up:
-        try:
-            parsed_xa = parse_excel_import(up.getvalue(), pgd_user)
-        except Exception as e:
-            logger.error("Lỗi trong khối except: %s", e, exc_info=True)
-            st.error(f"❌ Không đọc được file: {e}")
-            db.ghi_audit(username, "cbtd_import_dgd_loi", f"[{hn}] {e}")
-            parsed_xa = {}
-
-        if parsed_xa:
-            _n_pgd, n_xa, n_dgd, n_ap = dem_thong_ke(parsed_xa)
-            st.markdown(
-                f"**Preview:** **{pgd_user}** — {fmt_so(n_xa)} xã, "
-                f"{fmt_so(n_dgd)} ĐGD, {fmt_so(n_ap)} ấp/khu phố."
-            )
-            rows = []
-            for xa, dct in sorted(parsed_xa.items()):
-                for dgd, ds_ap in sorted(dct.items()):
-                    rows.append(
-                        {
-                            "Xã": xa,
-                            "Điểm GD": dgd,
-                            "Ấp/KP": ", ".join(ds_ap),
-                            "Số ấp": len(ds_ap),
-                        }
-                    )
-            if rows:
-                hien_thi_dataframe_phan_trang(
-                    pd.DataFrame(rows), key="dgd_pgd_op_imp_preview", height=280
-                )
-            else:
-                st.warning("Không có dòng dữ liệu hợp lệ sau khi parse.")
-
-            if st.button(
-                "Merge vào dgd_map hiện tại (chỉ PGD của tôi)",
-                type="primary",
-                key="dgd_pgd_op_merge",
-            ):
-                try:
-                    m = copy.deepcopy(db.doc_dgd_map())
-                    m[_resolve_pgd_key(pgd_user)] = parsed_xa
-                    db.luu_dgd_map(m, username)
-                    db.ghi_audit(
-                        username,
-                        "cbtd_import_dgd_merge",
-                        f"[{hn}] PGD={pgd_user} — "
-                        f"{n_xa} xã, {n_dgd} ĐGD, {n_ap} ấp",
-                    )
-                    st.cache_data.clear()
-                    st.success("✅ Đã merge cấu hình ĐGD cho PGD của bạn.")
-                    st.rerun()
-                except Exception as e:
-                    logger.error("Lỗi trong khối except: %s", e, exc_info=True)
-                    db.ghi_audit(username, "cbtd_import_dgd_loi", f"[{hn}] {e}")
-                    st.error(f"❌ Lỗi: {e}")
-        else:
-            st.info("Không có dữ liệu hợp lệ để preview/lưu.")
-    else:
-        st.info("Chọn file Excel để xem preview và lưu.")
-
-    st.divider()
-    st.markdown("### ➕ Thêm mới Điểm giao dịch")
-
-    dgd_map_imp: dict[str, Any] = copy.deepcopy(db.doc_kv("dgd_map") or {})
-
-    ds_xa_imp = [str(x).strip() for x in ds_xa_cfg]
-    if not ds_xa_imp:
-        st.warning(
-            "PGD chưa có xã/phường trong PGD_XA_MAP — không thể thêm ĐGD thủ công."
+        from data.pgd import pgd_slug
+        buf = xuat_excel({"Điểm GD": df_f})
+        st.download_button(
+            "📥 Xuất Excel", data=buf,
+            file_name=f"danh_sach_dgd_{pgd_slug(pgd_user)}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            key="dgd_pgd_search_dl_excel",
         )
-        return
-
-    chon_xa_imp = st.selectbox(
-        "Chọn Xã/Phường",
-        options=ds_xa_imp,
-        key="dgd_pgd_op_imp_chon_xa",
-    )
-
-    st.text_input(
-        "Tên Điểm giao dịch",
-        key="dgd_pgd_op_imp_ten_dgd",
-        placeholder="Ví dụ: Điểm GD 1",
-    )
-    ten_dgd_typed = str(
-        st.session_state.get("dgd_pgd_op_imp_ten_dgd", "")
-    ).strip()
-
-    pool_imp = pool_thon_cho_xa(
-        pd.DataFrame(),
-        pgd_user,
-        chon_xa_imp,
-        dgd_map_imp,
-    )
-
-    xa_hien_co = dgd_map_imp.get(_resolve_pgd_key(pgd_user), {}).get(chon_xa_imp, {})
-    if not isinstance(xa_hien_co, dict):
-        xa_hien_co = {}
-
-    thon_da_gan: set[str] = {
-        str(t).strip()
-        for dgd, raw_entry in xa_hien_co.items()
-        if dgd != ten_dgd_typed
-        for t in _normalize_entry(raw_entry)["thon"]
-        if str(t).strip() and str(t).strip().lower() != "nan"
-    }
-    pool_kha_dung = [t for t in pool_imp if t not in thon_da_gan]
-
-    if xa_hien_co:
-        st.markdown(f"**ĐGD hiện có tại {chon_xa_imp}:**")
-        for dgd_name, raw_entry in list(xa_hien_co.items()):
-            e = _normalize_entry(raw_entry)
-            ap_txt = ", ".join(str(x).strip() for x in e["thon"] if str(x).strip()) or "(chưa gán thôn)"
-            slug_x = re.sub(r"\W+", "_", str(dgd_name))[:80]
-            col_dgd, col_xoa = st.columns([5, 1])
-            with col_dgd:
-                st.write(f"📍 **{dgd_name}** — {ap_txt}")
-            with col_xoa:
-                if st.button(
-                    "🗑️",
-                    key=f"dgd_pgd_op_imp_xoa_{slug_x}",
-                    help="Xóa ĐGD",
-                ):
-                    try:
-                        del dgd_map_imp[_resolve_pgd_key(pgd_user)][chon_xa_imp][dgd_name]
-                        if not dgd_map_imp[_resolve_pgd_key(pgd_user)][chon_xa_imp]:
-                            del dgd_map_imp[_resolve_pgd_key(pgd_user)][chon_xa_imp]
-                        if not dgd_map_imp[_resolve_pgd_key(pgd_user)]:
-                            del dgd_map_imp[_resolve_pgd_key(pgd_user)]
-                        db.luu_dgd_map(dgd_map_imp, username)
-                        db.ghi_audit(
-                            username,
-                            "cbtd_imp_xoa_dgd",
-                            f"[{hn}] PGD={pgd_user} xã={chon_xa_imp} ĐGD={dgd_name}",
-                        )
-                        st.cache_data.clear()
-                        st.rerun()
-                    except Exception as e:
-                        logger.error("Lỗi trong khối except: %s", e, exc_info=True)
-                        db.ghi_audit(username, "cbtd_imp_loi_dgd", f"[{hn}] xóa ĐGD: {e}")
-                        st.error(f"❌ Lỗi xóa: {e}")
-
-    chon_thon_imp = st.multiselect(
-        "Chọn thôn/ấp phụ trách",
-        options=pool_kha_dung,
-        help="Chỉ hiển thị thôn chưa gán cho ĐGD khác trong cùng xã.",
-        key="dgd_pgd_op_imp_chon_thon",
-    )
-    if not pool_imp:
-        st.caption("⚠️ Chưa có danh sách thôn — kiểm tra lại file HSTD của PGD này.")
-
-    dia_chi_imp = st.text_input(
-        "Địa chỉ chi tiết", key="dgd_pgd_op_imp_dia_chi", placeholder="123 đường ABC, KP 5"
-    )
-    nguoi_pt_imp = st.text_input(
-        "Người phụ trách", key="dgd_pgd_op_imp_nguoi_pt", placeholder="Nguyễn Văn A"
-    )
-    sdt_imp = st.text_input(
-        "Số điện thoại", key="dgd_pgd_op_imp_sdt", placeholder="0901234567"
-    )
-    lich_gd_imp = st.text_input(
-        "Lịch giao dịch", key="dgd_pgd_op_imp_lich_gd", placeholder="T2, T4, T6 / 08:00–11:00"
-    )
-
-    if st.button("➕ Thêm Điểm giao dịch", key="dgd_pgd_op_imp_btn_them", type="primary"):
-        if not ten_dgd_typed:
-            st.error("❌ Vui lòng nhập tên Điểm giao dịch.")
-        elif ten_dgd_typed in xa_hien_co:
-            st.error(f"❌ ĐGD '{ten_dgd_typed}' đã tồn tại tại {chon_xa_imp}.")
-        else:
-            dup_b: list[str] = []
-            for other, raw_e in xa_hien_co.items():
-                thon_other = _normalize_entry(raw_e)["thon"]
-                for t in chon_thon_imp:
-                    if t in thon_other:
-                        dup_b.append(f"{t} → {other}")
-            if dup_b:
-                st.error("❌ Trùng thôn/ấp với ĐGD khác: " + ", ".join(dup_b))
-            else:
-                try:
-                    m = copy.deepcopy(db.doc_dgd_map())
-                    cur = m.setdefault(_resolve_pgd_key(pgd_user), {}).setdefault(chon_xa_imp, {})
-                    cur[ten_dgd_typed] = {
-                        "thon": [str(t).strip() for t in chon_thon_imp],
-                        "dia_chi": dia_chi_imp.strip(),
-                        "nguoi_phu_trach": nguoi_pt_imp.strip(),
-                        "sdt": sdt_imp.strip(),
-                        "lich_gd": lich_gd_imp.strip(),
-                    }
-                    db.luu_dgd_map(m, username)
-                    db.ghi_audit(
-                        username,
-                        "cbtd_imp_them_dgd",
-                        f"[{hn}] PGD={pgd_user} xa={chon_xa_imp} "
-                        f"{ten_dgd_typed}: {chon_thon_imp}",
-                    )
-                    st.cache_data.clear()
-                    st.success(
-                        f"✅ Đã thêm ĐGD '{ten_dgd_typed}' "
-                        f"với {len(chon_thon_imp)} thôn."
-                    )
-                    st.rerun()
-                except Exception as e:
-                    logger.error("Lỗi trong khối except: %s", e, exc_info=True)
-                    db.ghi_audit(username, "cbtd_imp_loi_dgd", f"[{hn}] thêm ĐGD: {e}")
-                    st.error(f"❌ Lỗi lưu: {e}")
 
 
-def _render_xem_sua_pgd(
+
+
+def _render_gan_thon_pgd(
     pgd_user: str,
     username: str,
     hn: str,
     df_h: pd.DataFrame,
 ) -> None:
-    """Giống _render_xem_sua KH-NV, PGD cố định."""
+    """Gán thôn/ấp cho ĐGD — PGD cố định, tên & lịch GD bất biến."""
     dgd_map = copy.deepcopy(db.doc_dgd_map())
-    ten_pgd = pgd_user
+    ten_pgd = _resolve_pgd_key(pgd_user)
 
-    xa_from_map = (
-        sorted(dgd_map.get(_resolve_pgd_key(ten_pgd), {}).keys())
-        if isinstance(dgd_map.get(_resolve_pgd_key(ten_pgd)), dict)
-        else []
-    )
-    ds_xa_cfg = list(PGD_XA_MAP.get(ten_pgd, []))
-
-    if xa_from_map:
-        chon_xa = st.selectbox(
-            "Chọn Xã/Phường", xa_from_map, key="dgd_pgd_op_edit_xa"
-        )
-    elif ds_xa_cfg:
-        st.info(
-            f"**{ten_pgd}** chưa có dữ liệu trong dgd_map — chọn xã để thêm ĐGD."
-        )
-        chon_xa = st.selectbox(
-            "Chọn Xã/Phường", ds_xa_cfg, key="dgd_pgd_op_edit_xa_boot"
-        )
-    else:
+    ds_xa_cfg = list(PGD_XA_MAP.get(pgd_user, []))
+    if not ds_xa_cfg:
         st.warning("PGD không có trong PGD_XA_MAP.")
+        return
+
+    chon_xa = st.selectbox("Chọn Xã/Phường", ds_xa_cfg, key="dgd_pgd_op_edit_xa")
+
+    ds_dgd_xa = [d for d in DGD_DANH_SACH if d["pgd"] == ten_pgd and khop_xa_dgd(chon_xa, d["xa"])]
+    if not ds_dgd_xa:
+        st.info(f"Không có ĐGD nào trong DGD_DANH_SACH cho PGD **{pgd_user}** / xã **{chon_xa}**.")
         return
 
     pool = pool_thon_cho_xa(df_h, ten_pgd, chon_xa, dgd_map)
@@ -440,196 +182,49 @@ def _render_xem_sua_pgd(
     if not isinstance(xa_dgd, dict):
         xa_dgd = {}
 
-    st.markdown(f"**ĐGD tại {chon_xa}**")
+    st.caption(f"**{len(ds_dgd_xa)}** điểm GD tại {chon_xa} — chỉ được gán thôn/ấp.")
 
-    for ten_dgd in list(xa_dgd.keys()):
-        e = _normalize_entry(xa_dgd.get(ten_dgd))
+    for dgd_info in ds_dgd_xa:
+        ten_dgd = dgd_info["ten"]
+        e = _normalize_entry(xa_dgd.get(ten_dgd, {}))
         ds_thon = e["thon"]
         sid = re.sub(r"\W+", "_", ten_dgd)[:40]
-        with st.expander(f"📍 {ten_dgd}", expanded=False):
-            ten_moi = st.text_input(
-                "Tên ĐGD",
-                value=ten_dgd,
-                key=f"dgd_pgd_op_nm_{sid}_{ten_pgd}_{chon_xa}",
-            )
+        with st.expander(f"📍 {ten_dgd}  •  Ngày {dgd_info['ngay_gd']}  •  {dgd_info['gio_gd']}", expanded=False):
+            st.caption(f"📌 {dgd_info['dia_diem']}")
             thon_sel = st.multiselect(
-                "Thôn/ấp",
+                "Thôn/ấp phụ trách",
                 options=pool,
                 default=[t for t in ds_thon if t in pool],
                 key=f"dgd_pgd_op_th_{sid}_{ten_pgd}_{chon_xa}",
             )
-            dia_chi_val = st.text_input(
-                "Địa chỉ chi tiết", value=e["dia_chi"],
-                key=f"dgd_pgd_op_dc_{sid}_{ten_pgd}_{chon_xa}",
-            )
-            nguoi_pt_val = st.text_input(
-                "Người phụ trách", value=e["nguoi_phu_trach"],
-                key=f"dgd_pgd_op_pt_{sid}_{ten_pgd}_{chon_xa}",
-            )
-            sdt_val = st.text_input(
-                "Số điện thoại", value=e["sdt"],
-                key=f"dgd_pgd_op_sdt_{sid}_{ten_pgd}_{chon_xa}",
-            )
-            lich_gd_val = st.text_input(
-                "Lịch giao dịch", value=e["lich_gd"],
-                key=f"dgd_pgd_op_lich_{sid}_{ten_pgd}_{chon_xa}",
-                placeholder="T2, T4, T6 / 08:00–11:00",
-            )
-            c_s, c_d = st.columns(2)
-            with c_s:
-                if st.button(
-                    "💾 Lưu thay đổi",
-                    key=f"dgd_pgd_op_sv_{sid}_{ten_pgd}_{chon_xa}",
-                ):
-                    tm = ten_moi.strip()
-                    if not tm:
-                        st.error("Tên ĐGD không được để trống.")
-                    elif dgd_dang_dung_trong_hstd(
-                        df_h, ten_pgd, chon_xa, ten_dgd
-                    ) and (tm != ten_dgd.strip()):
-                        st.error(
-                            "ĐGD đang có hồ sơ trong HSTD — không đổi tên được. "
-                            "Cập nhật HSTD trước."
+            if st.button("💾 Lưu thôn/ấp", key=f"dgd_pgd_op_sv_{sid}_{ten_pgd}_{chon_xa}"):
+                dup_m: list[str] = []
+                for other, raw_e in xa_dgd.items():
+                    if other == ten_dgd:
+                        continue
+                    thon_other = _normalize_entry(raw_e)["thon"]
+                    for t in thon_sel:
+                        if t in thon_other:
+                            dup_m.append(f"{t} → {other}")
+                if dup_m:
+                    st.error("Trùng thôn/ấp với ĐGD khác: " + ", ".join(dup_m))
+                else:
+                    try:
+                        m = copy.deepcopy(db.doc_dgd_map())
+                        cur = m.setdefault(ten_pgd, {}).setdefault(chon_xa, {})
+                        cur[ten_dgd] = {"thon": list(thon_sel)}
+                        db.luu_dgd_map(m, username)
+                        db.ghi_audit(
+                            username, "cbtd_gan_thon_dgd",
+                            f"[{hn}] PGD={pgd_user} xa={chon_xa} ĐGD={ten_dgd!r}: {thon_sel}",
                         )
-                    elif tm != ten_dgd and tm in xa_dgd:
-                        st.error("Tên ĐGD mới đã tồn tại.")
-                    else:
-                        dup_m: list[str] = []
-                        for other, raw_e in xa_dgd.items():
-                            if other == ten_dgd:
-                                continue
-                            thon_other = _normalize_entry(raw_e)["thon"]
-                            for t in thon_sel:
-                                if t in thon_other:
-                                    dup_m.append(f"{t} → {other}")
-                        if dup_m:
-                            st.error(
-                                "Trùng thôn/ấp với ĐGD khác: " + ", ".join(dup_m)
-                            )
-                        else:
-                            try:
-                                m = copy.deepcopy(db.doc_dgd_map())
-                                cur = m.setdefault(ten_pgd, {}).setdefault(
-                                    chon_xa, {}
-                                )
-                                if tm != ten_dgd:
-                                    del cur[ten_dgd]
-                                cur[tm] = {
-                                    "thon": list(thon_sel),
-                                    "dia_chi": dia_chi_val.strip(),
-                                    "nguoi_phu_trach": nguoi_pt_val.strip(),
-                                    "sdt": sdt_val.strip(),
-                                    "lich_gd": lich_gd_val.strip(),
-                                }
-                                db.luu_dgd_map(m, username)
-                                db.ghi_audit(
-                                    username,
-                                    "cbtd_sua_dgd_map",
-                                    f"[{hn}] PGD={ten_pgd} xa={chon_xa} "
-                                    f"ĐGD={ten_dgd!r} → {tm!r}",
-                                )
-                                st.cache_data.clear()
-                                st.success("✅ Đã lưu.")
-                                st.rerun()
-                            except Exception as e:
-                                logger.error("Lỗi trong khối except: %s", e, exc_info=True)
-                                db.ghi_audit(
-                                    username,
-                                    "cbtd_sua_dgd_map_loi",
-                                    f"[{hn}] {e}",
-                                )
-                                st.error(f"❌ {e}")
-            with c_d:
-                if st.button(
-                    "🗑️ Xóa ĐGD",
-                    key=f"dgd_pgd_op_del_{sid}_{ten_pgd}_{chon_xa}",
-                ):
-                    if dgd_dang_dung_trong_hstd(df_h, ten_pgd, chon_xa, ten_dgd):
-                        st.error(
-                            "ĐGD đang có hồ sơ trong HSTD, không thể xóa."
-                        )
-                    else:
-                        try:
-                            m = copy.deepcopy(db.doc_dgd_map())
-                            del m[ten_pgd][chon_xa][ten_dgd]
-                            if not m[ten_pgd][chon_xa]:
-                                del m[ten_pgd][chon_xa]
-                            if not m[ten_pgd]:
-                                del m[ten_pgd]
-                            db.luu_dgd_map(m, username)
-                            db.ghi_audit(
-                                username,
-                                "cbtd_xoa_dgd_map",
-                                f"[{hn}] PGD={ten_pgd} xa={chon_xa} ĐGD={ten_dgd!r}",
-                            )
-                            st.cache_data.clear()
-                            st.success("✅ Đã xóa.")
-                            st.rerun()
-                        except Exception as e:
-                            logger.error("Lỗi trong khối except: %s", e, exc_info=True)
-                            db.ghi_audit(
-                                username,
-                                "cbtd_xoa_dgd_map_loi",
-                                f"[{hn}] {e}",
-                            )
-                            st.error(f"❌ {e}")
-
-    st.divider()
-    st.markdown("**➕ Thêm ĐGD mới**")
-    st_ten = st.text_input(
-        "Tên điểm GD",
-        key="dgd_pgd_op_add_ten",
-        placeholder="Ví dụ: Điểm GD 1",
-    )
-    st_thon = st.multiselect("Chọn thôn/ấp", pool, key="dgd_pgd_op_add_thon")
-    st_dia_chi = st.text_input("Địa chỉ chi tiết", key="dgd_pgd_op_add_dia_chi")
-    st_nguoi_pt = st.text_input("Người phụ trách", key="dgd_pgd_op_add_nguoi_pt")
-    st_sdt = st.text_input("Số điện thoại", key="dgd_pgd_op_add_sdt")
-    st_lich_gd = st.text_input(
-        "Lịch giao dịch", key="dgd_pgd_op_add_lich_gd", placeholder="T2, T4, T6 / 08:00–11:00"
-    )
-    if st.button("💾 Lưu ĐGD mới", type="primary", key="dgd_pgd_op_add_btn"):
-        if not st_ten.strip():
-            st.error("Vui lòng nhập tên điểm giao dịch.")
-        elif not st_thon:
-            st.error("Vui lòng chọn ít nhất 1 thôn/ấp.")
-        elif st_ten.strip() in xa_dgd:
-            st.error("Tên điểm giao dịch đã tồn tại.")
-        else:
-            dup_a: list[str] = []
-            for _dgd, raw_e in xa_dgd.items():
-                thon_other = _normalize_entry(raw_e)["thon"]
-                for t in st_thon:
-                    if t in thon_other:
-                        dup_a.append(f"{t} ({_dgd})")
-            if dup_a:
-                st.error(
-                    "❌ Thôn/ấp đã gán cho ĐGD khác: " + ", ".join(dup_a)
-                )
-            else:
-                try:
-                    m = copy.deepcopy(db.doc_dgd_map())
-                    cur = m.setdefault(ten_pgd, {}).setdefault(chon_xa, {})
-                    cur[st_ten.strip()] = {
-                        "thon": list(st_thon),
-                        "dia_chi": st_dia_chi.strip(),
-                        "nguoi_phu_trach": st_nguoi_pt.strip(),
-                        "sdt": st_sdt.strip(),
-                        "lich_gd": st_lich_gd.strip(),
-                    }
-                    db.luu_dgd_map(m, username)
-                    db.ghi_audit(
-                        username,
-                        "cbtd_them_dgd_map",
-                        f"[{hn}] PGD={ten_pgd} xa={chon_xa} ĐGD={st_ten.strip()!r}",
-                    )
-                    st.cache_data.clear()
-                    st.success("✅ Đã thêm ĐGD.")
-                    st.rerun()
-                except Exception as e:
-                    logger.error("Lỗi trong khối except: %s", e, exc_info=True)
-                    db.ghi_audit(username, "cbtd_them_dgd_map_loi", f"[{hn}] {e}")
-                    st.error(f"❌ {e}")
+                        st.cache_data.clear()
+                        st.success("✅ Đã lưu.")
+                        st.rerun()
+                    except Exception as e:
+                        logger.error("Lỗi trong khối except: %s", e, exc_info=True)
+                        db.ghi_audit(username, "cbtd_gan_thon_dgd_loi", f"[{hn}] {e}")
+                        st.error(f"❌ {e}")
 
 
 def _render_tong_quan_pgd(pgd_user: str) -> None:
@@ -673,7 +268,7 @@ def render(tab: "DeltaGenerator", **kwargs: dict) -> None:
     with _tab_ctx:
         st.subheader("📍 Điểm GD của tôi")
         st.caption(
-            "Cấu hình điểm giao dịch — Import Excel, xem & sửa theo xã (chỉ PGD của bạn)."
+            "Cấu hình điểm giao dịch — gán thôn/ấp cho từng điểm GD trong PGD của bạn."
         )
 
         if normalize_role(str(role or "user")) != "user_pgd":
@@ -683,37 +278,29 @@ def render(tab: "DeltaGenerator", **kwargs: dict) -> None:
             st.error("Không xác định được PGD của người dùng.")
             return
 
-        if df is None or df.empty:
-            st.warning("Chưa có dữ liệu HSTD của PGD. Vui lòng upload trước.")
-            return
-
-        col_xa = pick_hstd_column(df, COT_TEN_XA, "Tên xã", "Tên Xã")
-        if col_xa is None:
-            st.warning("Không tìm thấy cột 'Tên xã' trong dữ liệu.")
-            return
-
-        df_pgd = df
-        col_pgd = pick_hstd_column(df_pgd, COT_TEN_PGD, "Tên PGD")
-        if col_pgd:
-            s_pgd = df_pgd[col_pgd].astype(str).str.strip()
-            df_pgd = df_pgd[s_pgd == str(pgd_user).strip()].copy()
-            if df_pgd.empty:
-                st.warning(f"Không có dữ liệu HSTD thuộc PGD **{pgd_user}**.")
-                return
+        df_pgd: pd.DataFrame = pd.DataFrame()
+        if df is not None and not df.empty:
+            col_xa = pick_hstd_column(df, COT_TEN_XA, "Tên xã", "Tên Xã")
+            col_pgd = pick_hstd_column(df, COT_TEN_PGD, "Tên PGD")
+            if col_pgd:
+                s_pgd = df[col_pgd].astype(str).str.strip()
+                df_pgd = df[s_pgd == str(pgd_user).strip()].copy()
+            elif col_xa:
+                df_pgd = df.copy()
 
         hn = _hostname()
-        t_search, t_imp, t_edit, t_sum = st.tabs(
-            ["🔍 Tìm kiếm", "📥 Import từ file", "🗺️ Xem & Sửa", "📋 Tổng quan"]
+        t_info, t_edit, t_search, t_sum = st.tabs(
+            ["📋 Thông tin điểm GD", "✏️ Gán Thôn/Ấp", "🔍 Tìm kiếm", "📋 Tổng quan"]
         )
+
+        with t_info:
+            _render_thong_tin_dgd_pgd(pgd_user)
+
+        with t_edit:
+            _render_gan_thon_pgd(pgd_user, username, hn, df_pgd)
 
         with t_search:
             _render_tim_kiem_pgd(db.doc_dgd_map(), pgd_user, username)
-
-        with t_imp:
-            _render_import_pgd(pgd_user, username, hn, df_pgd)
-
-        with t_edit:
-            _render_xem_sua_pgd(pgd_user, username, hn, df_pgd)
 
         with t_sum:
             _render_tong_quan_pgd(pgd_user)

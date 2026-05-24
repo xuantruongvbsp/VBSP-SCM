@@ -25,6 +25,7 @@ from data import (ts_file, doc_file_gqvl,
 from services import luu_pgd_file
 from utils import fmt, fmt_bang_ty, fmt_ty, fmt_so, vn, xuat_excel, hien_thi_dataframe_phan_trang
 from auth import la_phan_he_cn, la_executive, normalize_role
+from state_manager import SCMStateManager
 
 
 if TYPE_CHECKING:
@@ -164,6 +165,7 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
 
     _tab_ctx = tab if tab is not None else __import__('streamlit').container()
     with _tab_ctx:
+        state = SCMStateManager()
         st.subheader("💼 Theo dõi chỉ tiêu Giải quyết Việc làm (GQVL)")
 
         # ── Upload file ───────────────────────────────────────────────────
@@ -387,15 +389,21 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                         buf = BytesIO()
                         with pd.ExcelWriter(buf, engine="openpyxl") as w:
                             df_qh[cols_qh].to_excel(w, index=False, sheet_name="NQH_GQVL")
-                        st.session_state["_bytes_gqvl_qh"] = buf.getvalue()
-                        st.session_state["_file_gqvl_qh"] = f"NQH_GQVL_{datetime.today().strftime('%d%m%Y')}.xlsx"
+                        state.downloads.set(
+                            "gqvl_qh_excel",
+                            buf.getvalue(),
+                            f"NQH_GQVL_{datetime.today().strftime('%d%m%Y')}.xlsx",
+                        )
 
-                    if st.session_state.get("_bytes_gqvl_qh"):
-                        st.download_button("⬇ Tải Excel NQH GQVL",
-                            data=st.session_state["_bytes_gqvl_qh"],
-                            file_name=st.session_state["_file_gqvl_qh"],
+                    if state.downloads.has("gqvl_qh_excel"):
+                        if st.download_button(
+                            "⬇ Tải Excel NQH GQVL",
+                            data=state.downloads.get_bytes("gqvl_qh_excel"),
+                            file_name=state.downloads.get_filename("gqvl_qh_excel") or f"NQH_GQVL_{datetime.today().strftime('%d%m%Y')}.xlsx",
                             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                            key="dl_gqvl_qh")
+                            key="dl_gqvl_qh",
+                        ):
+                            state.downloads.clear("gqvl_qh_excel")
 
         # ── Tab 4: Danh sách chi tiết ─────────────────────────────────────
         with tb4:
@@ -449,12 +457,18 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                 buf = BytesIO()
                 with pd.ExcelWriter(buf, engine="openpyxl") as w:
                     df_loc[cols_hien].to_excel(w, index=False, sheet_name="GQVL")
-                st.session_state["_bytes_gqvl_ds"] = buf.getvalue()
-                st.session_state["_file_gqvl_ds"] = f"GQVL_{datetime.today().strftime('%d%m%Y')}.xlsx"
+                state.downloads.set(
+                    "gqvl_ds_excel",
+                    buf.getvalue(),
+                    f"GQVL_{datetime.today().strftime('%d%m%Y')}.xlsx",
+                )
 
-            if st.session_state.get("_bytes_gqvl_ds"):
-                st.download_button("⬇ Tải Excel",
-                    data=st.session_state["_bytes_gqvl_ds"],
-                    file_name=st.session_state["_file_gqvl_ds"],
+            if state.downloads.has("gqvl_ds_excel"):
+                if st.download_button(
+                    "⬇ Tải Excel",
+                    data=state.downloads.get_bytes("gqvl_ds_excel"),
+                    file_name=state.downloads.get_filename("gqvl_ds_excel") or f"GQVL_{datetime.today().strftime('%d%m%Y')}.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    key="dl_gqvl_ds")
+                    key="dl_gqvl_ds",
+                ):
+                    state.downloads.clear("gqvl_ds_excel")

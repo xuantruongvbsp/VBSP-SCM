@@ -21,6 +21,7 @@ import streamlit as st
 
 import db
 from config import CDTOTKVV_COLS
+from state_manager import SCMStateManager
 from data.cdtotkvv import (
     doc_cdtotkvv_pgd,
     doc_cdtotkvv_path,
@@ -353,8 +354,12 @@ def _sub_phan_tich(pgd_user: str, username: str) -> None:
             with col_xuat:
                 if st.button("⬇️ Xuất Excel Top Tổ Yếu", key="cdtotkvv_pgd_xuat_yeu"):
                     try:
-                        st.session_state["_bytes_cdto_pgd"] = xuat_excel({"To_Yeu": df_yeu})
-                        st.session_state["_file_cdto_pgd"] = ten_file_xuat(f"ToYeu_{pgd_user}")
+                        state = SCMStateManager()
+                        state.downloads.set(
+                            "cdtotkvv_pgd_to_yeu_excel",
+                            xuat_excel({"To_Yeu": df_yeu}),
+                            ten_file_xuat(f"ToYeu_{pgd_user}"),
+                        )
                         hostname = socket.gethostname()
                         db.ghi_audit(
                             username,
@@ -366,14 +371,16 @@ def _sub_phan_tich(pgd_user: str, username: str) -> None:
                         logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                         st.error(f"Lỗi xuất Excel: {e}")
 
-                if st.session_state.get("_bytes_cdto_pgd"):
-                    st.download_button(
+                state = SCMStateManager()
+                if state.downloads.has("cdtotkvv_pgd_to_yeu_excel"):
+                    if st.download_button(
                         label="📥 Tải file Excel",
-                        data=st.session_state["_bytes_cdto_pgd"],
-                        file_name=st.session_state["_file_cdto_pgd"],
+                        data=state.downloads.get_bytes("cdtotkvv_pgd_to_yeu_excel"),
+                        file_name=state.downloads.get_filename("cdtotkvv_pgd_to_yeu_excel") or ten_file_xuat(f"ToYeu_{pgd_user}"),
                         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                         key="cdtotkvv_pgd_download_yeu",
-                    )
+                    ):
+                        state.downloads.clear("cdtotkvv_pgd_to_yeu_excel")
         else:
             st.success("✅ Không có Tổ nào xếp loại Yếu!")
     else:

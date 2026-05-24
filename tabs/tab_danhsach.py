@@ -19,6 +19,7 @@ from utils import (
     hien_thi_dataframe_phan_trang,
 )
 from auth import la_phan_he_pgd
+from state_manager import SCMStateManager
 if TYPE_CHECKING:
     from streamlit.delta_generator import DeltaGenerator
 
@@ -122,6 +123,7 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
     df_full  = kwargs.get("df_full", df)
     role     = kwargs.get("role")
     pgd_user = kwargs.get("pgd_user")
+    state = SCMStateManager()
     username = kwargs.get("username")
     df_nq11  = kwargs.get("df_nq11")
 
@@ -259,14 +261,21 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
             buf = BytesIO()
             with pd.ExcelWriter(buf, engine="openpyxl") as w:
                 dl[ch].to_excel(w, index=False, sheet_name="Danh sách")
-            st.session_state["_bytes_ds"] = buf.getvalue()
-            st.session_state["_file_ds"] = f"danh_sach_{datetime.today().strftime('%d%m%Y')}.xlsx"
+            state.downloads.set(
+                "danhsach_excel",
+                buf.getvalue(),
+                f"danh_sach_{datetime.today().strftime('%d%m%Y')}.xlsx",
+            )
 
-        if st.session_state.get("_bytes_ds"):
-            st.download_button("⬇ Tải file Excel", data=st.session_state["_bytes_ds"],
-                file_name=st.session_state["_file_ds"],
+        if state.downloads.has("danhsach_excel"):
+            if st.download_button(
+                "⬇ Tải file Excel",
+                data=state.downloads.get_bytes("danhsach_excel"),
+                file_name=state.downloads.get_filename("danhsach_excel") or f"danh_sach_{datetime.today().strftime('%d%m%Y')}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                key="dl_ds")
+                key="dl_ds",
+            ):
+                state.downloads.clear("danhsach_excel")
 
         # ══════════════════════════════════════════════════════════════════════
         # SECTION: NỢ ĐẾN HẠN

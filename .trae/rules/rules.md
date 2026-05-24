@@ -50,6 +50,59 @@ pgd_data/                   ← file upload PGD (không commit)
 
 ---
 
+## 2.1 Bản đồ file — đọc cái gì trước khi sửa cái gì
+
+| Muốn sửa | Đọc trước | Sửa ở đây |
+|---|---|---|
+| Logic giao diện tab | `tabs/tab_*.py` liên quan | Tab đó |
+| Merge 22 PGD | `upload_service.py` dòng 288–480 | `merge_du_lieu_toan_cn()` |
+| Đọc Excel → Parquet | `data/core.py` | `excel_to_parquet()` |
+| Phân quyền / role | `auth.py`, `ROLES.md` | `auth.py` |
+| Hằng số cột / chương trình | `config.py` | `config.py` |
+| Xuất Word / PDF | `services/template_service.py` | Template + service |
+| Workspace CN | `workspaces/ws_management.py` | File đó |
+| Workspace PGD | `workspaces/ws_operation.py` | File đó |
+| Upload file | `services/upload_service.py` | `luu_pgd_file()` / `luu_file_he_thong()` |
+| Dữ liệu kv_store | `db.py` | `doc_kv()` / `ghi_kv()` |
+| Thêm tab PGD | `tabs/tab_*.py` + `ws_operation.py` | File đó |
+| Thêm tab toàn CN | `tabs/tab_*.py` + `ws_management.py` | File đó |
+| Snapshot HSTD | `snapshot_service.py` | upsert-safe, tự trigger sau merge |
+| Giao ban | `data/giao_ban.py` | `tinh_so_lieu_van_xuoi()` |
+
+---
+
+## 2.2 Luồng dữ liệu — PHẢI hiểu trước khi sửa
+
+```
+PHÂN HỆ KH-NV: ws_management + ws_executive
+  Phòng KH-NV upload 22 file:
+    tab_upload_khnv
+      → upload_service.luu_file_he_thong()
+      → merge_du_lieu_toan_cn()  # gộp 22 PGD → 1 parquet
+      → cache/hstd.parquet  # CACHE_HSTD
+      → dùng bởi: ws_management, ws_executive...
+  KHÔNG BAO GIỜ bị ảnh hưởng bởi PGD upload
+
+PHÂN HỆ ĐỊA BÀN: ws_operation
+  PGD tự upload file của mình:
+    tab_upload_pgd
+      → upload_service.luu_pgd_file()
+      → pgd_data/{slug}/hstd_latest.xlsx
+      → dùng bởi: ws_operation (lọc theo pgd_user)
+  luu_pgd_file() KHÔNG được gọi merge_du_lieu_toan_cn()
+
+Context truyền vào render():
+  ctx = dict(
+      df=df,              # toàn CN (CN role) hoặc chỉ PGD (PGD role)
+      df_full=df_full,    # luôn là toàn CN — dùng cho báo cáo
+      role=role,
+      pgd_user=pgd_user,  # None nếu CN role
+      username=username,
+  )
+```
+
+---
+
 ## 3. Quy trình bắt buộc khi viết code
 
 ```

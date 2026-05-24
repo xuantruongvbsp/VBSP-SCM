@@ -41,6 +41,7 @@ from pdf_service import nut_xuat_pdf, xuat_pdf
 from services.upload_service import format_caption_merge
 from services import tongquan_service as _tqsvc
 from services.tongquan_service import xuat_excel_tqpgd as _xuat_excel_tqpgd
+from components.filter_bar import filter_bar, apply_filters
 
 if TYPE_CHECKING:
     from streamlit.delta_generator import DeltaGenerator
@@ -1014,25 +1015,14 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                 cuoi_nam = pd.Timestamp(hn.year, 12, 31)
 
 
-                # Nhóm tổng hợp + bộ lọc — gom vào 1 hàng
-                _c0, _c1, _c2, _c3 = st.columns([2, 3, 3, 3])
+                # ── Bộ lọc dữ liệu (sử dụng filter_bar component) ──
+                _c0, _c1 = st.columns([2, 10])
                 with _c0:
                     nhom_chon = st.selectbox(
                         "Nhóm TH",
                         ["Chương trình", "PGD", "Xã"],
                         key="tq_denh_nhom",
                     )
-                with _c1:
-                    ds_pgd = sorted(dt[COT_TEN_PGD].dropna().unique()) if COT_TEN_PGD in dt.columns else []
-                    loc_pgd = st.multiselect("Lọc PGD", options=ds_pgd, default=[], key="tq_loc_pgd")
-                with _c2:
-                    ds_ct = sorted(dt[COT_TEN_CT].dropna().unique()) if COT_TEN_CT in dt.columns else []
-                    loc_ct = st.multiselect("Lọc CT", options=ds_ct, default=[], key="tq_loc_ct")
-                with _c3:
-                    dt_theo_pgd = dt[dt[COT_TEN_PGD].isin(loc_pgd)] if (loc_pgd and COT_TEN_PGD in dt.columns) else dt
-                    cot_xa = next((c for c in [COT_TEN_XA, "Tên xã"] if c in dt_theo_pgd.columns), None)
-                    ds_xa = sorted(dt_theo_pgd[cot_xa].dropna().unique()) if cot_xa else []
-                    loc_xa = st.multiselect("Lọc Xã", options=ds_xa, default=[], key="tq_loc_xa")
 
                 NHOM_COT = {
                     "Chương trình": COT_TEN_CT,
@@ -1041,16 +1031,34 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                 }
                 nhom_col = NHOM_COT[nhom_chon]
 
+                # Xác định cột Xã (có thể là alias)
+                cot_xa = next((c for c in [COT_TEN_XA, "Tên xã"] if c in dt.columns), None)
+
+                # Filter bar cho PGD, CT, Xã
+                filters_cfg = []
+                if COT_TEN_PGD in dt.columns:
+                    filters_cfg.append({
+                        "field": COT_TEN_PGD,
+                        "label": "Lọc PGD",
+                        "type": "multiselect",
+                    })
+                if COT_TEN_CT in dt.columns:
+                    filters_cfg.append({
+                        "field": COT_TEN_CT,
+                        "label": "Lọc CT",
+                        "type": "multiselect",
+                    })
+                if cot_xa:
+                    filters_cfg.append({
+                        "field": cot_xa,
+                        "label": "Lọc Xã",
+                        "type": "multiselect",
+                    })
+
+                filter_values = filter_bar(dt, filters_cfg, key_prefix="tq_dh")
+
                 # Áp dụng bộ lọc vào dt trước khi lọc theo mốc thời gian
-                dt_loc = _tqsvc.ap_dung_loc_ket_hop(
-                    dt,
-                    cot_pgd=COT_TEN_PGD,
-                    cot_ct=COT_TEN_CT,
-                    cot_xa=cot_xa,
-                    loc_pgd=loc_pgd,
-                    loc_ct=loc_ct,
-                    loc_xa=loc_xa,
-                )
+                dt_loc = apply_filters(dt, filter_values)
                 dt_loc = _tqsvc.loc_du_no_duong(dt_loc, COT_TONG_DU_NO)
 
                 MOC = {
@@ -1223,7 +1231,7 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
 
                             with col_ex:
                                 # Excel: giữ logic hiện tại
-                                co_loc = bool(loc_pgd or loc_ct or loc_xa)
+                                co_loc = any(filter_values.values())
                                 if co_loc:
                                     df_excel = tg[[nhom_col, "_mon", "_kh", "_no"]].rename(columns={
                                         nhom_col: nhom_chon,
@@ -1257,7 +1265,11 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                                     state = SCMStateManager()
                                     with st.spinner("⏳ Đang tạo PDF..."):
                                         pdf_bytes = _build_pdf_den_han(
-                                            df_loc, label, loc_pgd, loc_ct, loc_xa, username, key_prefix
+                                            df_loc, label,
+                                            filter_values.get(COT_TEN_PGD),
+                                            filter_values.get(COT_TEN_CT),
+                                            filter_values.get(cot_xa),
+                                            username, key_prefix
                                         )
                                     state.downloads.set(
                                         pdf_key,

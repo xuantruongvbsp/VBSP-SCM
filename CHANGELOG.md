@@ -1,5 +1,8 @@
 # CHANGELOG
 
+## [2026-05-25] — Thiết kế lại bảng Tổng hợp cảnh báo theo PGD (sub-tab Tổng hợp)
+- `tabs/tab_canh_bao_nqh.py` dòng ~325-420 — Thay `hien_thi_dataframe_phan_trang()` bằng HTML table: sắp xếp theo tổng cảnh báo giảm dần; phân loại 🔴/🟡/🟢 theo ngưỡng 10/5; KPI cards tóm tắt; progress bar cột Đến hạn; badge mức độ rủi ro; footer tổng kết; row nền đỏ/vàng theo mức độ
+
 ## [2026-05-25] — Fix ngưỡng khoanh sắp hết hạn: 30d → 120d (đồng bộ CHANGELOG 23/05)
 - `alert_center.py` dòng 226-227 — Sửa ngưỡng `khan`: `con_lai <= 30` → `con_lai <= 120`; `canh_bao`: `(>30, <=180)` → `(>120, <=180)` — thay đổi này đã ghi trong CHANGELOG 23/05 nhưng chưa apply vào code
 - `tabs/tab_canh_bao_nqh.py` — Cập nhật subtitle card: "X khẩn (≤30d)" → "X phải KT (≤120d) · Y theo dõi (121-180d)"

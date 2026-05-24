@@ -9,6 +9,7 @@ logger = get_logger(__name__)
 import copy
 import re
 import socket
+from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
 import pandas as pd
@@ -29,6 +30,7 @@ from data.dgd_helpers import (
     pool_thon_cho_xa,
     trang_thai_pgd_vs_map,
 )
+from data.khtd import doc_cbtd, luu_cbtd
 from utils import fmt_so, hien_thi_dataframe_phan_trang, pick_hstd_column, xuat_excel
 
 
@@ -289,8 +291,8 @@ def render(tab: "DeltaGenerator", **kwargs: dict) -> None:
                 df_pgd = df.copy()
 
         hn = _hostname()
-        t_info, t_edit, t_search, t_sum = st.tabs(
-            ["📋 Thông tin điểm GD", "✏️ Gán Thôn/Ấp", "🔍 Tìm kiếm", "📋 Tổng quan"]
+        t_info, t_edit, t_cbtd, t_search, t_sum = st.tabs(
+            ["📋 Thông tin điểm GD", "✏️ Gán Thôn/Ấp", "� Gán CBTD", "�🔍 Tìm kiếm", "📋 Tổng quan"]
         )
 
         with t_info:
@@ -299,8 +301,141 @@ def render(tab: "DeltaGenerator", **kwargs: dict) -> None:
         with t_edit:
             _render_gan_thon_pgd(pgd_user, username, hn, df_pgd)
 
+        with t_cbtd:
+            _render_gan_cbtd_pgd(pgd_user, username, hn)
+
         with t_search:
             _render_tim_kiem_pgd(db.doc_dgd_map(), pgd_user, username)
 
         with t_sum:
             _render_tong_quan_pgd(pgd_user)
+
+
+def _render_gan_cbtd_pgd(pgd_user: str, username: str, hn: str) -> None:
+    """Tab gán CBTD cho ĐGD — PGD cố định."""
+    st.markdown("### 👤 Gán CBTD cho Điểm Giao Dịch")
+    st.caption(f"PGD: **{pgd_user}** — Chọn Xã → ĐGD, sau đó chọn CBTD phụ trách.")
+
+    cbtd_data: dict = doc_cbtd()
+    dgd_map: dict = db.doc_dgd_map() or {}
+
+    ten_pgd = _resolve_pgd_key(pgd_user)
+
+    # Build reverse mapping: (pgd, dgd) -> ma_cb
+    dgd_to_cbtd: dict[tuple[str, str], str] = {}
+    for ma_cb, info in cbtd_data.items():
+        pgd_cb = info.get("pgd", "")
+        for dgd in info.get("ds_dgd", []):
+            dgd_to_cbtd[(pgd_cb, dgd)] = ma_cb
+
+    # Get DGD list for this PGD
+    from config import lay_dgd_cho_pgd
+    ds_dgd_pgd = lay_dgd_cho_pgd(ten_pgd)
+    if not ds_dgd_pgd:
+        st.info(f"Không có ĐGD nào trong DGD_DANH_SACH cho PGD **{pgd_user}**.")
+        return
+
+    # Group by xa
+    xa_to_dgd: dict[str, list[dict]] = {}
+    for d in ds_dgd_pgd:
+        xa = d["xa"]
+        if xa not in xa_to_dgd:
+            xa_to_dgd[xa] = []
+        xa_to_dgd[xa].append(d)
+
+    # Get xã list from PGD_XA_MAP for this user
+    ds_xa_cfg = list(PGD_XA_MAP.get(pgd_user, []))
+    if not ds_xa_cfg:
+        st.warning("PGD không có trong PGD_XA_MAP.")
+        return
+
+    chon_xa = st.selectbox("Chọn Xã/Phường", ds_xa_cfg, key="cbtd_gan_pgd_xa")
+    ds_dgd_xa = xa_to_dgd.get(chon_xa, [])
+
+    if not ds_dgd_xa:
+        st.info(f"Không có ĐGD nào cho xã **{chon_xa}**.")
+        return
+
+    # Get CBTD list for this PGD
+    ds_cbtd_pgd = [(ma, info) for ma, info in cbtd_data.items() if info.get("pgd") == ten_pgd]
+
+    st.caption(f"**{len(ds_dgd_xa)}** ĐGD tại {chon_xa} — **{len(ds_cbtd_pgd)}** CBTD")
+
+    # Build options for selectbox
+    cbtd_opts = ["— Chưa gán"] + [f"{ma} — {info['ho_ten']}" for ma, info in ds_cbtd_pgd]
+    cbtd_map = {f"{ma} — {info['ho_ten']}": ma for ma, info in ds_cbtd_pgd}
+
+    # Track changes
+    changed = False
+    new_assignments: dict[str, str | None] = {}  # dgd_name -> ma_cb or None
+
+    for dgd_info in ds_dgd_xa:
+        ten_dgd = dgd_info["ten"]
+        current_ma = dgd_to_cbtd.get((ten_pgd, ten_dgd))
+        current_label = f"{current_ma} — {cbtd_data[current_ma]['ho_ten']}" if current_ma else "— Chưa gán"
+
+        # Find ap list for this DGD
+        ap_list: list[str] = []
+        xa_dgd = dgd_map.get(ten_pgd, {}).get(chon_xa, {})
+        if isinstance(xa_dgd, dict) and ten_dgd in xa_dgd:
+            entry = xa_dgd[ten_dgd]
+            if isinstance(entry, dict):
+                ap_list = entry.get("thon", [])
+            elif isinstance(entry, list):
+                ap_list = entry
+
+        col1, col2 = st.columns([3, 2])
+        with col1:
+            st.markdown(f"**📍 {ten_dgd}**")
+            st.caption(f"📌 {dgd_info['dia_diem']} — Ngày {dgd_info['ngay_gd']} {dgd_info['gio_gd']}")
+        with col2:
+            selected = st.selectbox(
+                "CBTD phụ trách",
+                cbtd_opts,
+                index=cbtd_opts.index(current_label) if current_label in cbtd_opts else 0,
+                key=f"cbtd_pgd_sel_{ten_pgd}_{chon_xa}_{ten_dgd}",
+            )
+            selected_ma = cbtd_map.get(selected)
+            if selected_ma != current_ma:
+                new_assignments[ten_dgd] = selected_ma
+                changed = True
+
+        if ap_list:
+            st.caption(f"   └─ {len(ap_list)} thôn/ấp: {', '.join(ap_list[:5])}{'...' if len(ap_list) > 5 else ''}")
+        else:
+            st.caption("   └─ ⚠️ Chưa gán thôn/ấp")
+        st.divider()
+
+    # Summary table
+    if new_assignments:
+        st.markdown("**📝 Thay đổi sắp lưu:**")
+        for dgd, ma_cb in new_assignments.items():
+            if ma_cb:
+                st.caption(f"• **{dgd}** → {ma_cb} — {cbtd_data[ma_cb]['ho_ten']}")
+            else:
+                old_ma = dgd_to_cbtd.get((ten_pgd, dgd))
+                if old_ma:
+                    st.caption(f"• **{dgd}** → ❌ Bỏ gán (đang thuộc {old_ma})")
+
+    if st.button("💾 Lưu phân công", type="primary", key="btn_luu_gan_cbtd_pgd", disabled=not changed):
+        # Update cbtd_data
+        for dgd, new_ma in new_assignments.items():
+            old_ma = dgd_to_cbtd.get((ten_pgd, dgd))
+            if old_ma and old_ma != new_ma:
+                # Remove from old CBTD
+                if dgd in cbtd_data[old_ma].get("ds_dgd", []):
+                    cbtd_data[old_ma]["ds_dgd"].remove(dgd)
+                    cbtd_data[old_ma]["ngay_cap"] = datetime.today().strftime("%d/%m/%Y %H:%M")
+            if new_ma:
+                # Add to new CBTD
+                if dgd not in cbtd_data[new_ma].get("ds_dgd", []):
+                    cbtd_data[new_ma].setdefault("ds_dgd", []).append(dgd)
+                    cbtd_data[new_ma]["ngay_cap"] = datetime.today().strftime("%d/%m/%Y %H:%M")
+
+        luu_cbtd(cbtd_data)
+        db.ghi_audit(
+            username, "gan_cbtd_dgd_pgd",
+            f"[{hn}] PGD={pgd_user} xa={chon_xa} assignments={new_assignments}",
+        )
+        st.success("✅ Đã lưu phân công CBTD.")
+        st.rerun()

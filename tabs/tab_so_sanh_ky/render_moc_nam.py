@@ -9,40 +9,32 @@ from streamlit.delta_generator import DeltaGenerator
 from auth import la_phan_he_cn, normalize_role
 from config import (
     COT_DU_NO_KHOANH, COT_DU_NO_QH, COT_DU_NO_TH,
-    COT_DVUT, COT_MA_KH, COT_NGAY_SL, COT_NGUON_VON,
-    COT_SO_KU, COT_TEN_CT, COT_TEN_KH, COT_TEN_PGD,
-    COT_TEN_XA, COT_TONG_DU_NO, COT_LAI_TON, COT_LAI_TON_QH,
-    HSTD_DS_CHO_VAY_NAM_ALIASES,
-    DON_VI_CHI_NHANH,
-    baseline_pgd_path, danh_sach_nam_baseline,
-    danh_sach_nam_baseline_pgd,
+    COT_DVUT, COT_MA_KH, COT_NGAY_SL,
+    COT_SO_KU, COT_TEN_CT, COT_TEN_PGD,
+    COT_TEN_XA, COT_TONG_DU_NO,
+    danh_sach_nam_baseline, danh_sach_nam_baseline_pgd,
 )
 from data.hstd import doc_baseline_merged
 from data.pgd import pgd_slug
 from services.so_sanh_ky_service import (
     agg_mot_pgd as _agg_mot_pgd,
     agg_theo_pgd as _agg_theo_pgd,
-    agg_theo_dvut as _agg_theo_dvut,
-    top_movers as _top_movers,
     group_bien_dong as _group_bien_dong,
-    phan_loai_khach_hang as _phan_loai_khach_hang,
     tl_nqh as _tl_nqh,
     fmt_pct_vn as _fmt_pct_vn,
 )
 from services.period_compare import (
-    join_by_loan, par_breakdown, classify_changes,
-    CHANGE_LABELS,
+    join_by_loan,
 )
 from tabs.tab_so_sanh_ky._common import (
-    delta_str, pct_change_str, fmt_pct_vn, tl_nqh, mau_delta,
-    render_kpi_row, render_quality_bars_2_ky,
-    render_comparison_table, render_hbar_chart, render_flow_diagram,
+    delta_str, pct_change_str,
+    render_quality_bars_2_ky,
+    render_hbar_chart, render_flow_diagram,
 )
 from tabs.tab_so_sanh_ky._export import (
     render_export_ui,
 )
-from utils import fmt_ty, fmt_so, xuat_excel, ten_file_xuat, lazy_expander as _lazy_expander
-from pdf_service import nut_xuat_pdf
+from utils import fmt_ty, fmt_so
 import db
 
 

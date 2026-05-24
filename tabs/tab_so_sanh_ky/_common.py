@@ -5,13 +5,9 @@ Tất cả hàm đều standalone (không st.*) hoặc nhận ctx để render.
 """
 from __future__ import annotations
 
-from typing import Any
-
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
-from streamlit.delta_generator import DeltaGenerator
-
 from utils import fmt_ty, fmt_so
 
 
@@ -106,6 +102,10 @@ Q_BAR_CSS = """
 .qb-legend .cl-th { color:#059669; font-weight:700; }
 .qb-legend .cl-qh { color:#e11d48; font-weight:700; }
 .qb-legend .cl-kh { color:#d97706; font-weight:700; }
+/* Delta table colors — dùng bởi render_comparison_table và _render_bang_pgd */
+.delta-pos { color: var(--green, #16a34a) !important; font-weight: 600; }
+.delta-neg { color: var(--red,   #dc2626) !important; font-weight: 600; }
+.delta-zero { color: var(--text-muted, #6b7280); }
 </style>
 """
 

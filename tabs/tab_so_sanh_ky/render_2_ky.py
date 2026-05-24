@@ -6,9 +6,8 @@ import pandas as pd
 from streamlit.delta_generator import DeltaGenerator
 
 from auth import normalize_role, la_phan_he_pgd
-from utils import get_tab_context, fmt_ty, fmt_so, xuat_excel, lazy_expander as _lazy_expander
+from utils import get_tab_context, fmt_ty, fmt_so, lazy_expander as _lazy_expander
 from state_manager import SCMStateManager
-import db
 from snapshot_service import (
     danh_sach_ky, doc_snapshot,
     danh_sach_ky_nq11, doc_nq11_snapshot,
@@ -16,7 +15,7 @@ from snapshot_service import (
     danh_sach_ky_cdtotkvv, doc_cdtotkvv_snapshot,
 )
 from tabs.tab_so_sanh_ky._common import (
-    delta_str, pct_change_str, fmt_pct_vn, tl_nqh, mau_delta,
+    delta_str, pct_change_str, fmt_pct_vn, tl_nqh,
     render_kpi_row, render_quality_bars_2_ky,
     render_comparison_table, render_hbar_chart,
 )
@@ -112,9 +111,9 @@ def _render_kpi(agg1: dict, agg2: dict, ky1: str, ky2: str) -> None:
 
     # Quality bars
     render_quality_bars_2_ky(
-        f"Kỳ {ky1} — {ky1}", agg1["tong_du_no"], agg1["du_no_th"],
+        f"Kỳ {ky1}", agg1["tong_du_no"], agg1["du_no_th"],
         agg1["du_no_qh"], agg1["du_no_khoanh"],
-        f"Kỳ {ky2} — {ky2}", agg2["tong_du_no"], agg2["du_no_th"],
+        f"Kỳ {ky2}", agg2["tong_du_no"], agg2["du_no_th"],
         agg2["du_no_qh"], agg2["du_no_khoanh"],
     )
 
@@ -379,18 +378,33 @@ def _render_cdtotkvv_section(ky1: str, ky2: str, pgd_mode: bool, pgd_user: str |
     a1 = df1.iloc[0].to_dict()
     a2 = df2.iloc[0].to_dict()
 
+    # Row 1: 5 metrics — đầy đủ Tốt / Khá / TB / Yếu
     render_kpi_row([
         {"label": "Tổng số tổ", "value": fmt_so(int(a2.get("so_to", 0))),
          "delta": float(a2.get("so_to", 0)) - float(a1.get("so_to", 0)), "unit": "so"},
         {"label": "Tổ Tốt", "value": fmt_so(int(a2.get("so_tot", 0))),
          "delta": float(a2.get("so_tot", 0)) - float(a1.get("so_tot", 0)), "unit": "so",
          "help": f"Kỳ {sel_k1}: {fmt_so(int(a1.get('so_tot', 0)))}"},
+        {"label": "Tổ Khá", "value": fmt_so(int(a2.get("so_kha", 0))),
+         "delta": float(a2.get("so_kha", 0)) - float(a1.get("so_kha", 0)), "unit": "so",
+         "help": f"Kỳ {sel_k1}: {fmt_so(int(a1.get('so_kha', 0)))}"},
+        {"label": "Tổ Trung bình", "value": fmt_so(int(a2.get("so_tb", 0))),
+         "delta": float(a2.get("so_tb", 0)) - float(a1.get("so_tb", 0)), "unit": "so", "inverse": True,
+         "help": f"Kỳ {sel_k1}: {fmt_so(int(a1.get('so_tb', 0)))}"},
         {"label": "Tổ Yếu", "value": fmt_so(int(a2.get("so_yeu", 0))),
          "delta": float(a2.get("so_yeu", 0)) - float(a1.get("so_yeu", 0)), "unit": "so", "inverse": True,
          "help": f"Kỳ {sel_k1}: {fmt_so(int(a1.get('so_yeu', 0)))}"},
-        {"label": "Điểm TB", "value": f"{float(a2.get('diem_tb', 0)):.2f}",
-         "delta": float(a2.get("diem_tb", 0)) - float(a1.get("diem_tb", 0)), "unit": "pct"},
     ])
+    # Row 2: Điểm TB — căn giữa
+    st.markdown("")  # spacer
+    _metric_col = st.columns([1, 2, 1])[1]  # center column
+    with _metric_col:
+        st.metric(
+            "📊 Điểm TB toàn CN / PGD",
+            f"{float(a2.get('diem_tb', 0)):.2f}",
+            delta=delta_str(float(a2.get("diem_tb", 0)) - float(a1.get("diem_tb", 0)), "pct"),
+            help=f"Kỳ {sel_k1}: {float(a1.get('diem_tb', 0)):.2f} điểm",
+        )
 
     cat_rows = [
         ("Tổng số tổ",      float(a1.get("so_to",  0)), float(a2.get("so_to",  0)), False, "so"),
@@ -401,6 +415,37 @@ def _render_cdtotkvv_section(ky1: str, ky2: str, pgd_mode: bool, pgd_user: str |
         ("Điểm TB",         float(a1.get("diem_tb",0)), float(a2.get("diem_tb",0)), False, "pct"),
     ]
     render_comparison_table(cat_rows, sel_k1, sel_k2, title="Chỉ tiêu chất lượng tổ")
+
+    st.divider()
+
+    # Pie charts cơ cấu xếp loại — chỉ hiện khi xem toàn Chi nhánh (không PGD)
+    if not pgd_mode:
+        st.markdown("**📊 Cơ cấu xếp loại theo từng kỳ**")
+        try:
+            col_pie1, col_pie2 = st.columns(2)
+            labels_pie  = ["Tốt", "Khá", "Trung bình", "Yếu"]
+            colors_pie  = ["#16a34a", "#2563eb", "#f59e0b", "#dc2626"]
+            vals1 = [float(a1.get("so_tot", 0)), float(a1.get("so_kha", 0)),
+                     float(a1.get("so_tb",  0)), float(a1.get("so_yeu", 0))]
+            vals2 = [float(a2.get("so_tot", 0)), float(a2.get("so_kha", 0)),
+                     float(a2.get("so_tb",  0)), float(a2.get("so_yeu", 0))]
+            for col_pie, vals, lbl in [(col_pie1, vals1, sel_k1), (col_pie2, vals2, sel_k2)]:
+                fig_pie = go.Figure(go.Pie(
+                    labels=labels_pie, values=vals,
+                    marker_colors=colors_pie,
+                    hole=0.35,
+                    textinfo="label+percent",
+                ))
+                fig_pie.update_layout(
+                    title=dict(text=f"Cơ cấu xếp loại kỳ {lbl}", font_size=13),
+                    height=300,
+                    margin=dict(t=40, b=10, l=10, r=10),
+                    showlegend=False,
+                )
+                col_pie.plotly_chart(fig_pie, use_container_width=True,
+                                     key=f"ss2k_pie_cdt_{lbl.replace('-', '_')}")
+        except Exception:
+            pass
 
 
 # ─── RENDER CHÍNH ──────────────────────────────────────────────────────

@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mockup — Tab So sánh kỳ</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: -apple-system, 'Segoe UI', system-ui, sans-serif;
+    background: #f0f2f5; padding: 24px; color: #111827;
+  }
+  .container { max-width: 1200px; margin: 0 auto; }
+
+  /* HEADER */
+  .header {
+    background: linear-gradient(135deg, #1e3a5f 0%, #2563eb 100%);
+    color: #fff; padding: 24px 32px; border-radius: 16px; margin-bottom: 24px;
+  }
+  .header h1 { font-size: 28px; font-weight: 700; }
+  .header p { font-size: 14px; opacity:0.85; margin-top:4px; }
+
+  /* APP FRAME */
+  .mockup {
+    background: #fff; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,.06);
+    overflow: hidden; margin-bottom: 32px;
+  }
+  .mockup-header {
+    background: #f8fafc; padding: 12px 24px; border-bottom: 1px solid #e2e8f0;
+    display: flex; gap: 8px; align-items: center;
+  }
+  .dot { width: 12px; height: 12px; border-radius: 50%; }
+  .dot.r { background: #ef4444; }
+  .dot.y { background: #eab308; }
+  .dot.g { background: #22c55e; }
+  .mockup-title { font-size: 13px; color: #64748b; margin-left: 12px; font-weight: 500; }
+
+  .mockup-body { padding: 24px 32px; }
+
+  /* RADIO */
+  .radio-bar {
+    display: flex; gap: 0; background: #f1f5f9; border-radius: 40px; padding: 4px;
+    width: fit-content; margin-bottom: 8px;
+  }
+  .radio-bar .opt {
+    padding: 10px 28px; border-radius: 40px; font-size: 15px; font-weight: 600;
+    cursor: default; transition: all .2s; color: #64748b;
+  }
+  .radio-bar .opt.active {
+    background: #fff; color: #1e3a5f; box-shadow: 0 2px 8px rgba(0,0,0,.08);
+  }
+
+  .divider { height: 1px; background: #e2e8f0; margin: 16px 0 24px; }
+
+  /* SECTION */
+  .section { margin-bottom: 32px; }
+  .section-title {
+    font-size: 18px; font-weight: 700; color: #1e3a5f;
+    padding-bottom: 12px; border-bottom: 2px solid #e2e8f0; margin-bottom: 20px;
+    display: flex; align-items: center; gap: 8px;
+  }
+
+  /* KPI GRID */
+  .kpi-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 14px; margin-bottom: 24px; }
+  .kpi-card {
+    background: #f8fafc; border-radius: 12px; padding: 16px 18px;
+    border: 1px solid #e2e8f0; transition: box-shadow .2s;
+  }
+  .kpi-card .icon { font-size: 22px; margin-bottom: 6px; }
+  .kpi-card .label { font-size: 13px; color: #64748b; font-weight: 500; }
+  .kpi-card .value { font-size: 24px; font-weight: 700; margin: 4px 0 2px; }
+  .kpi-card .delta { font-size: 13px; font-weight: 600; }
+  .kpi-card .delta.up { color: #16a34a; }
+  .kpi-card .delta.down { color: #dc2626; }
+
+  /* QUALITY BARS */
+  .qb-flex { display: flex; gap: 24px; margin-bottom: 24px; }
+  .qb-box { flex: 1; background: #f8fafc; border-radius: 12px; padding: 16px 20px; border:1px solid #e2e8f0; }
+  .qb-box .qb-title { font-size: 13px; font-weight: 600; color:#475569; margin-bottom: 8px; }
+  .qbar {
+    height: 32px; border-radius: 6px; overflow: hidden; display: flex;
+    margin-bottom: 4px; font-size: 11px; font-weight: 600; color: #fff;
+  }
+  .qbar .seg { display: flex; align-items: center; justify-content: center; transition: width .4s; }
+  .qbar .seg.th { background: #34d399; }
+  .qbar .seg.qh { background: #f43f5e; }
+  .qbar .seg.kh { background: #fbbf24; color:#1e293b; }
+  .qb-legend { display: flex; gap: 16px; font-size: 11px; color:#64748b; }
+  .qb-legend span::before { content:""; display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:4px; vertical-align:middle; }
+
+  /* SUB-TABS */
+  .sub-tabs {
+    display: flex; gap: 0; background: #f1f5f9; border-radius: 10px; padding: 3px;
+    width: fit-content; margin-bottom: 20px;
+  }
+  .sub-tabs .st {
+    padding: 8px 20px; border-radius: 8px; font-size: 13px; font-weight: 500;
+    cursor: default; color: #64748b;
+  }
+  .sub-tabs .st.active { background:#fff; color:#1e3a5f; box-shadow:0 1px 4px rgba(0,0,0,.06); }
+
+  /* TABLE */
+  .tbl-wrap { overflow-x: auto; margin: 12px 0 20px; border-radius: 10px; border:1px solid #e2e8f0; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th {
+    background: #1e3a5f; color: #fff; padding: 10px 14px; text-align: left;
+    font-weight: 600; white-space: nowrap;
+  }
+  td { padding: 9px 14px; border-bottom: 1px solid #e2e8f0; }
+  tr:nth-child(even) td { background: #f8fafc; }
+  .tr-total td { background: #eef2ff !important; font-weight: 700; border-top: 2px solid #6366f1; }
+  .num { text-align: right; font-variant-numeric: tabular-nums; }
+  .up { color: #16a34a; }
+  .down { color: #dc2626; }
+
+  /* H-BAR EXAMPLE */
+  .hchart { background: #f8fafc; border-radius: 12px; padding: 16px 20px; border:1px solid #e2e8f0; margin:16px 0; }
+  .hchart .hc-title { font-size:14px; font-weight:600; margin-bottom:12px; }
+  .hbar { display:flex; align-items:center; margin:6px 0; gap:8px; }
+  .hbar .lbl { width:120px; font-size:12px; text-align:right; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .hbar .bar { height:22px; border-radius:4px; min-width:4px; transition:width .3s; }
+  .hbar .bar.green { background:#34d399; }
+  .hbar .bar.red { background:#f87171; }
+  .hbar .val { font-size:12px; font-weight:600; min-width:60px; }
+
+  /* FLOW DIAGRAM */
+  .flow { display:flex; align-items:center; justify-content:center; gap:16px; margin:20px 0; }
+  .flow-box {
+    background:#f8fafc; border:2px solid #e2e8f0; border-radius:12px;
+    padding:16px 24px; text-align:center; min-width:160px;
+  }
+  .flow-box .fb-label { font-size:13px; color:#64748b; }
+  .flow-box .fb-val { font-size:22px; font-weight:700; margin:6px 0; }
+  .flow-arrow { font-size:28px; color:#94a3b8; }
+  .flow-split { display:flex; gap:8px; }
+  .flow-split .sub { font-size:12px; padding:8px 16px; border-radius:8px; background:#f1f5f9; text-align:center; min-width:100px; }
+  .flow-split .sub .s-val { font-weight:700; font-size:16px; }
+
+  /* EXPORT */
+  .export-box {
+    background: #f0fdf4; border: 2px dashed #86efac; border-radius: 12px;
+    padding: 24px; text-align: center; margin-top: 16px;
+  }
+  .export-box h3 { font-size:16px; color:#166534; margin-bottom:12px; }
+  .export-grid { display:flex; gap:16px; justify-content:center; flex-wrap:wrap; }
+  .export-btn {
+    padding:12px 28px; border-radius:10px; font-weight:600; font-size:14px; cursor:default;
+    display:flex; align-items:center; gap:8px;
+  }
+  .export-btn.excel { background:#dcfce7; color:#166534; border:1px solid #86efac; }
+  .export-btn.pdf { background:#fce7f3; color:#9d174d; border:1px solid #f9a8d4; }
+
+  /* SELECT */
+  .sel-pair { display:flex; gap:20px; margin-bottom:16px; }
+  .sel-group { flex:1; }
+  .sel-group label { display:block; font-size:13px; font-weight:500; color:#374151; margin-bottom:4px; }
+  .sel-box {
+    width:100%; padding:10px 14px; border:1px solid #d1d5db; border-radius:8px;
+    background:#fff; font-size:14px; color:#111827;
+  }
+
+  /* EXPANDER */
+  .expander {
+    border:1px solid #e2e8f0; border-radius:10px; margin:12px 0; overflow:hidden;
+  }
+  .expander-hd {
+    padding:12px 16px; background:#f8fafc; font-weight:600; font-size:14px;
+    cursor:default; display:flex; align-items:center; gap:8px; color:#475569;
+  }
+  .expander-bd { padding:16px 20px; border-top:1px solid #e2e8f0; }
+  .expander-bd .placeholder {
+    background:#f1f5f9; border-radius:8px; padding:20px; text-align:center; color:#94a3b8; font-size:13px;
+  }
+
+  /* LEGEND */
+  .legend-row { display:flex; gap:24px; font-size:12px; color:#64748b; flex-wrap:wrap; margin-bottom:8px; }
+
+  .note {
+    margin-top: 32px; padding: 16px 20px; background: #fefce8; border: 1px solid #fde68a;
+    border-radius: 10px; font-size: 13px; color: #92400e;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+<!-- HEADER -->
+<div class="header">
+  <h1>📊 So sánh số liệu</h1>
+  <p>Phân tích biến động giữa 2 kỳ — Chi nhánh NHCSXH Đồng Nai</p>
+</div>
+
+<!-- MOCKUP FRAME 1: TỔNG THỂ -->
+<div class="mockup">
+  <div class="mockup-header">
+    <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+    <span class="mockup-title">tab_so_sanh_ky · render()</span>
+  </div>
+  <div class="mockup-body">
+
+    <!-- ═══════ RADIO ═══════ -->
+    <div class="radio-bar">
+      <span class="opt active">📊 So sánh mốc năm</span>
+      <span class="opt">🔄 So sánh 2 kỳ snapshot</span>
+    </div>
+    <div class="divider"></div>
+
+    <!-- ═══════ MỐC NĂM ═══════ -->
+    <!-- Section 1: TỔNG QUAN -->
+    <div class="section">
+      <div class="section-title">📈 TỔNG QUAN</div>
+
+      <!-- Row chọn năm -->
+      <div style="margin-bottom:16px;">
+        <div class="sel-group" style="max-width:300px;">
+          <label>So sánh với mốc 31/12 năm</label>
+          <div class="sel-box">2025 &nbsp;▾</div>
+        </div>
+      </div>
+
+      <!-- KPI Row 1 — 4 cards -->
+      <div class="kpi-grid">
+        <div class="kpi-card">
+          <div class="icon">💰</div>
+          <div class="label">Tổng dư nợ</div>
+          <div class="value">1.250.360</div>
+          <div class="delta up">▲ +85.420 (7,3%)</div>
+        </div>
+        <div class="kpi-card">
+          <div class="icon">📋</div>
+          <div class="label">Số khế ước</div>
+          <div class="value">24.568</div>
+          <div class="delta up">▲ +1.234 (5,3%)</div>
+        </div>
+        <div class="kpi-card">
+          <div class="icon">👥</div>
+          <div class="label">Số hộ vay</div>
+          <div class="value">18.207</div>
+          <div class="delta up">▲ +890 (5,1%)</div>
+        </div>
+        <div class="kpi-card">
+          <div class="icon">📐</div>
+          <div class="label">Mức vay BQ/KH</div>
+          <div class="value">68,7</div>
+          <div class="delta up">▲ +2,1 (3,2%)</div>
+        </div>
+      </div>
+
+      <!-- KPI Row 2 — tỷ lệ NQH, dư nợ QH, khoanh, tỷ lệ khoanh -->
+      <div class="kpi-grid">
+        <div class="kpi-card">
+          <div class="icon">⚠️</div>
+          <div class="label">Tỷ lệ NQH</div>
+          <div class="value">2,34%</div>
+          <div class="delta down">▼ -0,12 pp</div>
+        </div>
+        <div class="kpi-card">
+          <div class="icon">🔴</div>
+          <div class="label">Dư nợ quá hạn</div>
+          <div class="value">29.258</div>
+          <div class="delta down">▼ -1.240 (4,1%)</div>
+        </div>
+        <div class="kpi-card">
+          <div class="icon">🟡</div>
+          <div class="label">Dư nợ khoanh</div>
+          <div class="value">8.456</div>
+          <div class="delta up">▲ +320 (3,9%)</div>
+        </div>
+        <div class="kpi-card">
+          <div class="icon">📊</div>
+          <div class="label">Tỷ lệ DN khoanh</div>
+          <div class="value">0,68%</div>
+          <div class="delta up">▲ +0,02 pp</div>
+        </div>
+      </div>
+
+      <!-- KPI Row 3 — nợ xấu, tỷ lệ nợ xấu, lãi tồn, giải ngân -->
+      <div class="kpi-grid">
+        <div class="kpi-card">
+          <div class="icon">🚨</div>
+          <div class="label">Nợ xấu (QH+Khoanh)</div>
+          <div class="value">37.714</div>
+          <div class="delta down">▼ -920 (2,4%)</div>
+        </div>
+        <div class="kpi-card">
+          <div class="icon">📉</div>
+          <div class="label">Tỷ lệ nợ xấu</div>
+          <div class="value">3,02%</div>
+          <div class="delta down">▼ -0,10 pp</div>
+        </div>
+        <div class="kpi-card">
+          <div class="icon">💸</div>
+          <div class="label">Tổng lãi tồn</div>
+          <div class="value">12.456</div>
+          <div class="delta up">▲ +890 (7,7%)</div>
+        </div>
+        <div class="kpi-card">
+          <div class="icon">💵</div>
+          <div class="label">Giải ngân trong năm</div>
+          <div class="value">285.600</div>
+          <div class="delta up">▲ +42.100 (17,3%)</div>
+        </div>
+      </div>
+
+      <!-- QUALITY BARS -->
+      <div class="legend-row">
+        <span><span style="display:inline-block;width:12px;height:12px;background:#34d399;border-radius:3px;vertical-align:middle;margin-right:4px;"></span> Trong hạn</span>
+        <span><span style="display:inline-block;width:12px;height:12px;background:#f43f5e;border-radius:3px;vertical-align:middle;margin-right:4px;"></span> Quá hạn</span>
+        <span><span style="display:inline-block;width:12px;height:12px;background:#fbbf24;border-radius:3px;vertical-align:middle;margin-right:4px;"></span> Khoanh</span>
+      </div>
+      <div class="qb-flex">
+        <div class="qb-box">
+          <div class="qb-title">📅 Baseline 31/12/2025</div>
+          <div class="qbar">
+            <div class="seg th" style="width:92%">92%</div>
+            <div class="seg qh" style="width:5%">5%</div>
+            <div class="seg kh" style="width:3%">3%</div>
+          </div>
+        </div>
+        <div class="qb-box">
+          <div class="qb-title">📅 Hiện tại (24/05/2026)</div>
+          <div class="qbar">
+            <div class="seg th" style="width:93%">93%</div>
+            <div class="seg qh" style="width:4%">4%</div>
+            <div class="seg kh" style="width:3%">3%</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 2: PHÂN TÍCH ĐA CHIỀU -->
+    <div class="section">
+      <div class="section-title">📋 PHÂN TÍCH ĐA CHIỀU</div>
+
+      <div class="sub-tabs">
+        <span class="st active">🏢 Theo PGD</span>
+        <span class="st">📋 Theo chương trình</span>
+        <span class="st">📍 Theo xã</span>
+        <span class="st">📊 Top biến động</span>
+        <span class="st">🔄 Vòng đời</span>
+      </div>
+
+      <!-- Bảng PGD -->
+      <div class="tbl-wrap">
+        <table>
+          <tr>
+            <th>PGD</th>
+            <th class="num">Dư nợ BL</th>
+            <th class="num">Dư nợ HT</th>
+            <th class="num">Δ tuyệt đối</th>
+            <th class="num">Δ %</th>
+            <th class="num">NQH BL</th>
+            <th class="num">NQH HT</th>
+            <th class="num">Δ NQH</th>
+            <th class="num">Số KƯ</th>
+          </tr>
+          <tr>
+            <td>PGD Biên Hòa</td>
+            <td class="num">156.200</td>
+            <td class="num">168.400</td>
+            <td class="num up">+12.200</td>
+            <td class="num up">+7,8%</td>
+            <td class="num">2,1%</td>
+            <td class="num">1,8%</td>
+            <td class="num down">-0,3 pp</td>
+            <td class="num">3.456</td>
+          </tr>
+          <tr>
+            <td>PGD Long Thành</td>
+            <td class="num">124.500</td>
+            <td class="num">130.200</td>
+            <td class="num up">+5.700</td>
+            <td class="num up">+4,6%</td>
+            <td class="num">3,4%</td>
+            <td class="num">3,1%</td>
+            <td class="num down">-0,3 pp</td>
+            <td class="num">2.890</td>
+          </tr>
+          <tr>
+            <td>PGD Nhơn Trạch</td>
+            <td class="num">98.600</td>
+            <td class="num">92.300</td>
+            <td class="num down">-6.300</td>
+            <td class="num down">-6,4%</td>
+            <td class="num">2,8%</td>
+            <td class="num">3,5%</td>
+            <td class="num up">+0,7 pp</td>
+            <td class="num">1.890</td>
+          </tr>
+          <tr class="tr-total">
+            <td><strong>Tổng toàn Chi nhánh</strong></td>
+            <td class="num"><strong>1.164.940</strong></td>
+            <td class="num"><strong>1.250.360</strong></td>
+            <td class="num up"><strong>+85.420</strong></td>
+            <td class="num up"><strong>+7,3%</strong></td>
+            <td class="num"><strong>2,46%</strong></td>
+            <td class="num"><strong>2,34%</strong></td>
+            <td class="num down"><strong>-0,12 pp</strong></td>
+            <td class="num"><strong>24.568</strong></td>
+          </tr>
+        </table>
+      </div>
+
+      <!-- Top biến động (expanded sub-tab) -->
+      <div style="display:grid; grid-template-columns:2fr 2fr 1fr; gap:14px; margin:16px 0;">
+        <div>
+          <label style="font-size:13px;font-weight:500;color:#374151;">Phân tích theo chiều</label>
+          <div class="sel-box" style="margin-top:4px;">🏢 PGD &nbsp;▾</div>
+        </div>
+        <div>
+          <label style="font-size:13px;font-weight:500;color:#374151;">Chỉ tiêu so sánh</label>
+          <div class="sel-box" style="margin-top:4px;">💰 Tổng dư nợ &nbsp;▾</div>
+        </div>
+        <div>
+          <label style="font-size:13px;font-weight:500;color:#374151;">Top N</label>
+          <div class="sel-box" style="margin-top:4px;">5 &nbsp;▾</div>
+        </div>
+      </div>
+
+      <div style="display:flex; gap:20px;">
+        <div style="flex:1; background:#f8fafc; border-radius:12px; padding:16px; border:1px solid #e2e8f0;">
+          <div style="font-size:14px;font-weight:600;color:#16a34a;margin-bottom:12px;">📈 Top 5 tăng mạnh</div>
+          <div class="hbar"><span class="lbl">Biên Hòa</span><div class="bar green" style="width:100%"></div><span class="val up">+12.200</span></div>
+          <div class="hbar"><span class="lbl">Long Thành</span><div class="bar green" style="width:75%"></div><span class="val up">+5.700</span></div>
+          <div class="hbar"><span class="lbl">Vĩnh Cửu</span><div class="bar green" style="width:60%"></div><span class="val up">+4.200</span></div>
+          <div class="hbar"><span class="lbl">Xuân Lộc</span><div class="bar green" style="width:40%"></div><span class="val up">+2.800</span></div>
+          <div class="hbar"><span class="lbl">Trảng Bom</span><div class="bar green" style="width:25%"></div><span class="val up">+1.560</span></div>
+        </div>
+        <div style="flex:1; background:#f8fafc; border-radius:12px; padding:16px; border:1px solid #e2e8f0;">
+          <div style="font-size:14px;font-weight:600;color:#dc2626;margin-bottom:12px;">📉 Top 5 giảm mạnh</div>
+          <div class="hbar"><span class="lbl">Nhơn Trạch</span><div class="bar red" style="width:100%"></div><span class="val down">-6.300</span></div>
+          <div class="hbar"><span class="lbl">Tân Phú</span><div class="bar red" style="width:55%"></div><span class="val down">-3.500</span></div>
+          <div class="hbar"><span class="lbl">Định Quán</span><div class="bar red" style="width:35%"></div><span class="val down">-2.100</span></div>
+          <div class="hbar"><span class="lbl">Cẩm Mỹ</span><div class="bar red" style="width:20%"></div><span class="val down">-1.200</span></div>
+          <div class="hbar"><span class="lbl">Thống Nhất</span><div class="bar red" style="width:10%"></div><span class="val down">-680</span></div>
+        </div>
+      </div>
+
+      <!-- Flow diagram (Vòng đời) -->
+      <div style="margin-top:24px; padding:16px; background:#f8fafc; border-radius:12px; border:1px solid #e2e8f0;">
+        <div style="font-size:14px;font-weight:600; margin-bottom:16px;">🔄 Vòng đời khế ước</div>
+        <div class="flow">
+          <div class="flow-box">
+            <div class="fb-label">Baseline 31/12/2025</div>
+            <div class="fb-val">24.568</div>
+            <div style="font-size:12px;color:#64748b;">khế ước</div>
+          </div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-split">
+            <div class="sub" style="background:#dcfce7;">
+              <div style="font-size:12px;color:#166534;">Đã tất toán</div>
+              <div class="s-val" style="color:#16a34a;">3.456</div>
+            </div>
+            <div class="sub" style="background:#e0f2fe;">
+              <div style="font-size:12px;color:#1e40af;">Duy trì</div>
+              <div class="s-val" style="color:#2563eb;">20.112</div>
+            </div>
+            <div class="sub" style="background:#fef3c7;">
+              <div style="font-size:12px;color:#92400e;">Mới phát sinh</div>
+              <div class="s-val" style="color:#d97706;">4.398</div>
+            </div>
+          </div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-box">
+            <div class="fb-label">Hiện tại 24/05/2026</div>
+            <div class="fb-val">24.510</div>
+            <div style="font-size:12px;color:#64748b;">khế ước</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 3: XUẤT BÁO CÁO -->
+    <div class="section">
+      <div class="section-title">📤 XUẤT BÁO CÁO</div>
+      <div class="export-box">
+        <h3>🎯 Chọn định dạng xuất</h3>
+        <div style="display:flex; gap:16px; justify-content:center; margin-bottom:16px;">
+          <div class="radio-bar" style="background:#f1f5f9;">
+            <span class="opt active">📄 Dạng 1 — Tổng quan (1 sheet)</span>
+            <span class="opt">📑 Dạng 2 — Đa chiều (nhiều sheet)</span>
+          </div>
+        </div>
+        <div class="export-grid">
+          <div class="export-btn excel">📥 Excel — Tổng quan</div>
+          <div class="export-btn pdf">📥 PDF — Tổng quan</div>
+          <div class="export-btn excel" style="background:#e0f2fe; color:#1e3a5f; border-color:#93c5fd;">📥 Excel — Đa chiều</div>
+          <div class="export-btn pdf" style="background:#f3e8ff; color:#6b21a8; border-color:#d8b4fe;">📥 PDF — Đa chiều</div>
+        </div>
+        <div style="margin-top:12px; font-size:12px; color:#64748b;">
+          ⚡ Tự động audit · Ngày xuất: 24/05/2026 · Người xuất: admin_cn
+        </div>
+      </div>
+    </div>
+
+    <!-- NQ11 / GQVL / CDTOTKVV — LAZY EXPANDER (in 2-ky mode) -->
+    <div style="margin-top:8px; display:flex; gap:12px; font-size:13px; color:#94a3b8; padding:8px 12px; background:#f8fafc; border-radius:8px;">
+      <span>📋 So sánh NQ11</span>
+      <span>💼 So sánh GQVL</span>
+      <span>🏆 So sánh chất lượng Tổ TK&VV</span>
+      <span style="margin-left:auto; font-size:11px;">⚡ lazy expander (chỉ load khi mở)</span>
+    </div>
+
+  </div><!-- mockup-body -->
+</div><!-- mockup -->
+
+
+<!-- MOCKUP FRAME 2: So sánh 2 kỳ (thu gọn) -->
+<div class="mockup" style="margin-top:24px;">
+  <div class="mockup-header">
+    <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+    <span class="mockup-title">tab_so_sanh_ky · render() — chế độ 🔄 So sánh 2 kỳ</span>
+  </div>
+  <div class="mockup-body">
+
+    <div class="radio-bar">
+      <span class="opt">📊 So sánh mốc năm</span>
+      <span class="opt active">🔄 So sánh 2 kỳ</span>
+    </div>
+    <div class="divider"></div>
+
+    <!-- Section 1: TỔNG QUAN -->
+    <div class="section">
+      <div class="section-title">📈 TỔNG QUAN</div>
+
+      <div class="sel-pair">
+        <div class="sel-group">
+          <label>📅 Kỳ 1 (mốc so sánh)</label>
+          <div class="sel-box">2026-03-31 &nbsp;▾</div>
+        </div>
+        <div class="sel-group">
+          <label>📅 Kỳ 2 (kỳ đánh giá)</label>
+          <div class="sel-box">2026-04-30 &nbsp;▾</div>
+        </div>
+      </div>
+
+      <!-- KPI 2 rows × 4 -->
+      <div class="kpi-grid">
+        <div class="kpi-card">
+          <div class="icon">💰</div>
+          <div class="label">Tổng dư nợ</div>
+          <div class="value">1.250.360</div>
+          <div class="delta up">▲ +42.100 (3,5%)</div>
+        </div>
+        <div class="kpi-card">
+          <div class="icon">⚠️</div>
+          <div class="label">Tỷ lệ NQH</div>
+          <div class="value">2,34%</div>
+          <div class="delta down">▼ -0,08 pp</div>
+        </div>
+        <div class="kpi-card">
+          <div class="icon">👥</div>
+          <div class="label">Số hộ vay</div>
+          <div class="value">18.207</div>
+          <div class="delta up">▲ +156 (0,9%)</div>
+        </div>
+        <div class="kpi-card">
+          <div class="icon">📋</div>
+          <div class="label">Số khế ước</div>
+          <div class="value">24.568</div>
+          <div class="delta up">▲ +312 (1,3%)</div>
+        </div>
+      </div>
+
+      <div class="kpi-grid">
+        <div class="kpi-card">
+          <div class="icon">🔴</div>
+          <div class="label">Dư nợ quá hạn</div>
+          <div class="value">29.258</div>
+          <div class="delta down">▼ -890 (2,9%)</div>
+        </div>
+        <div class="kpi-card">
+          <div class="icon">🟡</div>
+          <div class="label">Dư nợ khoanh</div>
+          <div class="value">8.456</div>
+          <div class="delta up">▲ +120 (1,4%)</div>
+        </div>
+        <div class="kpi-card">
+          <div class="icon">💵</div>
+          <div class="label">Giải ngân trong năm</div>
+          <div class="value">285.600</div>
+          <div class="delta up">▲ +18.200 (6,8%)</div>
+        </div>
+        <div class="kpi-card">
+          <div class="icon">📐</div>
+          <div class="label">Mức vay BQ/KH</div>
+          <div class="value">68,7</div>
+          <div class="delta up">▲ +0,9 (1,3%)</div>
+        </div>
+      </div>
+
+      <!-- Quality bars -->
+      <div class="qb-flex">
+        <div class="qb-box">
+          <div class="qb-title">📅 Kỳ 1: 31/03/2026</div>
+          <div class="qbar">
+            <div class="seg th" style="width:91%">91%</div>
+            <div class="seg qh" style="width:6%">6%</div>
+            <div class="seg kh" style="width:3%">3%</div>
+          </div>
+        </div>
+        <div class="qb-box">
+          <div class="qb-title">📅 Kỳ 2: 30/04/2026</div>
+          <div class="qbar">
+            <div class="seg th" style="width:93%">93%</div>
+            <div class="seg qh" style="width:4%">4%</div>
+            <div class="seg kh" style="width:3%">3%</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Bảng chi tiết -->
+      <div class="tbl-wrap">
+        <table>
+          <tr>
+            <th>Chỉ tiêu</th>
+            <th class="num">Kỳ 1</th>
+            <th class="num">Kỳ 2</th>
+            <th class="num">Chênh lệch</th>
+            <th class="num">% thay đổi</th>
+          </tr>
+          <tr>
+            <td>Tổng dư nợ</td>
+            <td class="num">1.208.260</td>
+            <td class="num">1.250.360</td>
+            <td class="num up">+42.100</td>
+            <td class="num up">+3,48%</td>
+          </tr>
+          <tr>
+            <td>Dư nợ trong hạn</td>
+            <td class="num">1.099.516</td>
+            <td class="num">1.162.835</td>
+            <td class="num up">+63.319</td>
+            <td class="num up">+5,76%</td>
+          </tr>
+          <tr>
+            <td>Dư nợ quá hạn</td>
+            <td class="num">30.148</td>
+            <td class="num">29.258</td>
+            <td class="num down">-890</td>
+            <td class="num down">-2,95%</td>
+          </tr>
+          <tr>
+            <td>Dư nợ khoanh</td>
+            <td class="num">8.336</td>
+            <td class="num">8.456</td>
+            <td class="num up">+120</td>
+            <td class="num up">+1,44%</td>
+          </tr>
+          <tr>
+            <td>Tỷ lệ NQH</td>
+            <td class="num">2,50%</td>
+            <td class="num">2,34%</td>
+            <td class="num down">-0,16 pp</td>
+            <td class="num">—</td>
+          </tr>
+        </table>
+      </div>
+    </div>
+
+    <!-- Section 3: XUẤT BÁO CÁO (same pattern) -->
+    <div class="section">
+      <div class="section-title">📤 XUẤT BÁO CÁO</div>
+      <div class="export-box">
+        <h3>🎯 Chọn định dạng xuất</h3>
+        <div class="export-grid">
+          <div class="export-btn excel">📥 Excel — Tổng quan</div>
+          <div class="export-btn pdf">📥 PDF — Tổng quan</div>
+          <div class="export-btn excel" style="background:#e0f2fe; color:#1e3a5f; border-color:#93c5fd;">📥 Excel — Đa chiều</div>
+          <div class="export-btn pdf" style="background:#f3e8ff; color:#6b21a8; border-color:#d8b4fe;">📥 PDF — Đa chiều</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- NOTE -->
+<div class="note">
+  <strong>📌 Mô tả kiến trúc:</strong><br>
+  • <code>__init__.py</code> — Radio router → <code>render_moc_nam()</code> hoặc <code>render_2_ky()</code><br>
+  • <code>_common.py</code> — 6 component dùng chung: KPI row, Quality bar, HTML table, Bar chart, Flow diagram, Formatting helpers<br>
+  • <code>_export.py</code> — Excel 2 dạng (Tổng quan / Đa chiều) + PDF 2 dạng (1 trang / nhiều trang + chart)<br>
+  • <code>render_moc_nam.py</code> — 3 section: 📈 TỔNG QUAN (12 KPI) → 📋 ĐA CHIỀU (5 sub-tabs) → 📤 XUẤT BÁO CÁO<br>
+  • <code>render_2_ky.py</code> — 3 section + lazy expander cho NQ11/GQVL/CDTOTKVV
+</div>
+
+</div><!-- container -->
+</body>
+</html>

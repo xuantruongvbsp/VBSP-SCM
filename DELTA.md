@@ -4,6 +4,24 @@
 
 ---
 
+## [2026-05-24] Fix 6 lỗi tab So sánh 2 kỳ
+
+### Package `tabs/tab_so_sanh_ky/`
+
+| Fix | File | Chi tiết |
+|---|---|---|
+| CSS classes mất màu delta | `_common.py` dòng ~105 | Thêm `.delta-pos`, `.delta-neg`, `.delta-zero` vào `Q_BAR_CSS`; trước đó class HTML gán nhưng không có style → bảng so sánh mất màu xanh/đỏ |
+| Export UI antipattern | `_export.py` `render_export_ui()` | `st.button→st.download_button` lồng nhau → bytes biến mất sau rerun; thay bằng `session_state` cache + `st.download_button` trực tiếp |
+| Cảnh báo PDF | `_export.py` `render_export_ui()` | Nếu `reportlab` chưa cài, hiện `st.warning` thay vì trả `b""` im lặng |
+| Label quality bar lặp | `render_2_ky.py` dòng ~114 | `f"Kỳ {ky1} — {ky1}"` → `f"Kỳ {ky1}"` |
+| CDTOTKVV thiếu metric | `render_2_ky.py` `_render_cdtotkvv_section()` | Bổ sung Tổ Khá + Tổ Trung bình vào KPI row (bản cũ chỉ có 4/6 metric) |
+| CDTOTKVV mất pie charts | `render_2_ky.py` `_render_cdtotkvv_section()` | Thêm lại 2 pie charts song song 2 kỳ (mất khi refactor từ tab_so_sanh_2_ky.py) |
+
+### `tabs/tab_so_sanh_2_ky.py`
+Thêm `⚠️ DEPRECATED` — file không còn được gọi từ workspace nào.
+
+---
+
 ## [2026-05-24] Refactor DRY: gộp _should_force_str + _normalize_code_series về 1 nơi + root-fix lỗi A4e tái đi tái lại
 
 ### Refactor — triệt tiêu duplicate code giữa core.py và hstd.py

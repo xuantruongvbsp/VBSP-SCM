@@ -1,5 +1,24 @@
 # CHANGELOG
 
+## [2026-05-24] — Fix 6 lỗi tab So sánh 2 kỳ (package tabs/tab_so_sanh_ky/)
+- `tabs/tab_so_sanh_ky/_common.py` dòng ~105 — Thêm `.delta-pos`, `.delta-neg`, `.delta-zero` vào `Q_BAR_CSS`; trước đó các class tồn tại trong HTML nhưng không có style định nghĩa → màu delta hoàn toàn mất
+- `tabs/tab_so_sanh_ky/_export.py` hàm `render_export_ui()` — Thay antipattern `st.button → st.download_button` lồng nhau (bytes biến mất sau rerun) bằng `session_state` cache + `st.download_button` trực tiếp; thêm `st.warning` khi `reportlab` chưa cài (trước đó trả `b""` im lặng)
+- `tabs/tab_so_sanh_ky/render_2_ky.py` dòng ~114 — Sửa label quality bar bị lặp `f"Kỳ {ky1} — {ky1}"` → `f"Kỳ {ky1}"`
+- `tabs/tab_so_sanh_ky/render_2_ky.py` hàm `_render_cdtotkvv_section()` — Bổ sung 2 metric bị thiếu: Tổ Khá (`so_kha`) và Tổ Trung bình (`so_tb`) vào KPI row; thêm lại 2 pie charts cơ cấu xếp loại song song 2 kỳ (đã có trong tab_so_sanh_2_ky.py cũ nhưng mất khi refactor)
+- `tabs/tab_so_sanh_2_ky.py` — Thêm `⚠️ DEPRECATED` vào docstring; file không còn được gọi từ workspace nào (đã chuyển sang package)
+
+## [2026-05-24] — Triển khai Tab Kiểm toán Nội bộ (KTNB)
+- `services/ktnb_service.py` — 4 phân hệ hoàn chỉnh:
+  - **A. Kế hoạch & Lịch trình**: `them_dot_kiem_tra()`, `cap_nhat_dot_kiem_tra()`, `lay_danh_sach_dot()`, `cap_nhat_thanh_phan_doan()`, `render_ke_hoach_lich_trinh()` — UI form tạo đợt, bảng lịch trình với cảnh báo màu (sắp tới/đúng hạn/quá hạn), quản lý thành viên đoàn
+  - **B. Chọn mẫu đối chiếu**: `chon_mau_doi_chieu()` — ưu tiên 100% món có NQH/Khoanh + random sample theo tỷ lệ %, `luu_mau_doi_chieu()`, `render_chon_mau()` — UI bộ lọc + KPI mẫu đã chọn
+  - **C. Nhập kết quả đối chiếu**: `lay_ho_so_doi_chieu()`, `luu_ket_qua_doi_chieu()`, `render_nhap_ket_qua()` — UI layout 2 cột (readonly trái/editable phải), theo dõi trạng thái đối chiếu, xuất Excel
+  - **D. Giám sát & Khắc phục lỗi**: `lay_danh_muc_loi()`, `them_loi()`, `cap_nhat_trang_thai_loi()` — chỉ trưởng đoàn được đóng lỗi, `thong_ke_loi_theo_khoi()`, `render_giam_sat_khac_phuc()` — Pie chart + bảng lỗi + upload minh chứng
+- `services/ktnb_service.py` — `render_ktnb(df_full, role, username)` — main entry point với 4 sub-tabs A/B/C/D và selectbox chọn đợt kiểm tra chung
+- `tabs/tab_kiem_soat.py` — Refactor: `_render_tab_kiem_soat()` giữ nguyên code Kiểm soát CN, `render_tab()` mới tạo 2 tab cấp cao: "🔍 Kiểm soát Chi nhánh" và "📋 Kiểm toán Nội bộ", lazy import `render_ktnb` từ services
+- `tests/test_ktnb_service.py` — Tests cho Phân hệ A/B/D, helper `_tinh_trang_lich()`, seed danh mục lỗi
+- `tests/test_ktnb_db.py` — CRUD tests cho 5 bảng KTNB: `ktnb_dot_kiem_tra`, `ktnb_doan_kiem_tra`, `ktnb_danh_muc_loi_chuan`, `ktnb_mau_doi_chieu_kh`, `ktnb_ket_qua_loi` (in-memory SQLite)
+- Ràng buộc: Session key prefix `ktnb_*`, upload minh chứng → `pgd_data/ktnb/`, `readonly=True` khi `role == "executive"`, không dùng thư viện mới (chỉ sqlite3, pandas, streamlit)
+
 ## [2026-05-24] — Tái cấu trúc Tab So sánh kỳ: package hóa + mockup + 2 dạng export
 - `tabs/tab_so_sanh_ky/` — package mới: `__init__.py` (router), `_common.py` (KPI, quality bars, tables, charts, flow diagram), `_export.py` (Excel + PDF 2 dạng), `render_2_ky.py` (tinh gọn từ tab_so_sanh_2_ky.py), `render_moc_nam.py` (tinh gọn từ tab_so_sanh_ky.py)
 - `tabs/tab_so_sanh_ky.py` — thu gọn thành thin router (delegate to package)

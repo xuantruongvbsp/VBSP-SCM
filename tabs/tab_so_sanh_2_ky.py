@@ -1,5 +1,9 @@
 """So sánh số liệu giữa 2 kỳ snapshot bất kỳ (từ bảng hstd_snapshot).
 
+⚠️  DEPRECATED — File này không còn được gọi từ workspace nào.
+    Logic đã chuyển sang: tabs/tab_so_sanh_ky/render_2_ky.py
+    Giữ lại chỉ để tham khảo; KHÔNG sửa file này.
+
 Khác tab_so_sanh_ky.py (so sánh df hiện tại vs baseline 31/12):
 - Không phụ thuộc df upload, không cần file baseline Excel
 - Người dùng chọn Kỳ 1 và Kỳ 2 tự do từ lịch sử snapshot

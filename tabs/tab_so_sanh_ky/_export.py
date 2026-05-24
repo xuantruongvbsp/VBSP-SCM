@@ -13,8 +13,7 @@ import streamlit as st
 import plotly.graph_objects as go
 
 import db
-from utils import xuat_excel, fmt_ty, fmt_so
-from tabs.tab_so_sanh_ky._common import delta_str, pct_change_str, fmt_pct_vn
+from utils import xuat_excel
 
 
 # ─── EXCEL ────────────────────────────────────────────────────────────────
@@ -239,59 +238,84 @@ def render_export_ui(
     pgd_mode: bool = False,
     action: str = "xuat_bieu_cn",
 ) -> None:
-    """Section 3 UI: radio chọn dạng + nút tải Excel/PDF."""
+    """Section xuất báo cáo: radio chọn dạng + nút download trực tiếp.
+
+    Dùng st.session_state để cache bytes, tránh antipattern
+    st.button → st.download_button lồng nhau (bytes biến mất sau rerun).
+    """
     st.markdown("**📤 Xuất báo cáo**")
 
-    ex_type = st.radio(
-        "Dạng Excel",
-        ["Tổng quan", "Đa chiều"],
-        horizontal=True,
-        key="ssk_ex_type",
-        label_visibility="collapsed",
-    )
-    pdf_type = st.radio(
-        "Dạng PDF",
-        ["Tổng quan", "Đầy đủ"],
-        horizontal=True,
-        key="ssk_pdf_type",
-        label_visibility="collapsed",
-    )
+    # Chọn dạng Excel và PDF
+    col_ex_label, col_ex_opt = st.columns([0.2, 0.8])
+    with col_ex_label:
+        st.write("📊 Excel:")
+    with col_ex_opt:
+        ex_type = st.radio(
+            "Dạng Excel", ["Tổng quan", "Đa chiều"],
+            horizontal=True, key="ssk_ex_type", label_visibility="collapsed",
+        )
+
+    col_pdf_label, col_pdf_opt = st.columns([0.2, 0.8])
+    with col_pdf_label:
+        st.write("📄 PDF:")
+    with col_pdf_opt:
+        pdf_type = st.radio(
+            "Dạng PDF", ["Tổng quan", "Đầy đủ"],
+            horizontal=True, key="ssk_pdf_type", label_visibility="collapsed",
+        )
+
+    # ── Cache Excel bytes trong session_state theo (ky1, ky2, dạng) ──
+    xl_key = f"_ssk_xl_{ky1}_{ky2}_{ex_type}"
+    if xl_key not in st.session_state:
+        if ex_type == "Tổng quan":
+            st.session_state[xl_key] = xuat_excel_tong_quan(rows_data, ky1, ky2)
+        else:
+            st.session_state[xl_key] = xuat_excel_da_chieu(rows_data, ky1, ky2, sheets_extra)
+
+    # ── Cache PDF bytes trong session_state ──
+    pdf_key = f"_ssk_pdf_{ky1}_{ky2}_{pdf_type}"
+    if pdf_key not in st.session_state:
+        if not _PDF_READY:
+            st.session_state[pdf_key] = b""
+        elif pdf_type == "Tổng quan":
+            st.session_state[pdf_key] = xuat_pdf_tong_quan(rows_data, ky1, ky2, username)
+        else:
+            st.session_state[pdf_key] = xuat_pdf_da_chieu(
+                rows_data, ky1, ky2, username, extra_tables, figs,
+            )
 
     col_ex, col_pdf = st.columns(2)
 
     with col_ex:
-        if st.button("📥 Xuất Excel", key="ssk_btn_excel", use_container_width=True):
-            with st.spinner("Đang tạo Excel..."):
-                if ex_type == "Tổng quan":
-                    xl = xuat_excel_tong_quan(rows_data, ky1, ky2)
-                else:
-                    xl = xuat_excel_da_chieu(rows_data, ky1, ky2, sheets_extra)
-            st.download_button(
-                "⬇ Tải file Excel",
-                data=xl,
-                file_name=f"so_sanh_ky_{ky1}_vs_{ky2}.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                key="ssk_dl_excel",
-            )
+        if st.download_button(
+            "📥 Xuất Excel",
+            data=st.session_state[xl_key],
+            file_name=f"so_sanh_ky_{ky1}_vs_{ky2}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            key="ssk_dl_excel",
+            use_container_width=True,
+        ):
             db.ghi_audit(username, action,
                          f"Xuất Excel so sánh kỳ: {ky1} vs {ky2} ({ex_type})")
 
     with col_pdf:
-        if st.button("📄 Xuất PDF", key="ssk_btn_pdf", use_container_width=True):
-            with st.spinner("Đang tạo PDF..."):
-                if pdf_type == "Tổng quan":
-                    pdf = xuat_pdf_tong_quan(rows_data, ky1, ky2, username)
-                else:
-                    pdf = xuat_pdf_da_chieu(rows_data, ky1, ky2, username,
-                                            extra_tables, figs)
-            st.download_button(
-                "⬇ Tải file PDF",
-                data=pdf,
+        pdf_bytes = st.session_state[pdf_key]
+        if not pdf_bytes:
+            st.error(
+                "🚨 **Không thể xuất PDF**\n\n"
+                "Thư viện **reportlab** chưa được cài đặt. Chạy lệnh:\n\n"
+                "`pip install reportlab`"
+            )
+        else:
+            if st.download_button(
+                "📄 Xuất PDF",
+                data=pdf_bytes,
                 file_name=f"so_sanh_ky_{ky1}_vs_{ky2}.pdf",
                 mime="application/pdf",
                 key="ssk_dl_pdf",
-            )
-            db.ghi_audit(username, action,
-                         f"Xuất PDF so sánh kỳ: {ky1} vs {ky2} ({pdf_type})")
+                use_container_width=True,
+            ):
+                db.ghi_audit(username, action,
+                             f"Xuất PDF so sánh kỳ: {ky1} vs {ky2} ({pdf_type})")
 
     st.caption(f"File: so_sanh_ky_{ky1}_vs_{ky2}.xlsx / .pdf")

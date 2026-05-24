@@ -81,7 +81,8 @@ def _get_ks_cache(df: pd.DataFrame) -> dict:
     return result
 
 
-def render_tab(df, role: str, username: str, **kwargs) -> None:
+def _render_tab_kiem_soat(df: pd.DataFrame, role: str, username: str) -> None:
+    """Render phần Kiểm soát Chi nhánh (tab cũ)."""
     if df is None or df.empty:
         st.warning("Chưa có dữ liệu HSTD toàn CN.")
         return
@@ -122,3 +123,15 @@ def render_tab(df, role: str, username: str, **kwargs) -> None:
     meta = BAO_CAO_REGISTRY[st.session_state["ks_bao_cao"]]
     st.caption(meta.mo_ta)
     meta.render_fn(cache, pgd_chon, username, readonly)
+
+
+def render_tab(df, role: str, username: str, **kwargs) -> None:
+    """Main render với 2 tab cấp cao: Kiểm soát CN + Kiểm toán Nội bộ."""
+    tab_ks, tab_ktnb = st.tabs(["🔍 Kiểm soát Chi nhánh", "📋 Kiểm toán Nội bộ"])
+
+    with tab_ks:
+        _render_tab_kiem_soat(df, role, username)
+
+    with tab_ktnb:
+        from services.ktnb_service import render_ktnb
+        render_ktnb(df, role, username)

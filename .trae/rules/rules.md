@@ -380,9 +380,20 @@ st.column_config.NumberColumn(format=".2%")    # ✅ phần trăm
 ### 8.5 Phân quyền — KHÔNG check chuỗi thô
 ```python
 role = normalize_role(role)
-if la_phan_he_cn(role): ...   # ✅
+if la_phan_he_cn(role): ...   # ✅  (executive/admin_cn/manager_cn/chuyenvien_cn/admin/manager)
+if la_phan_he_pgd(role): ...  # ✅  (admin_pgd/manager_pgd/user_pgd/user)
 if role == "admin": ...        # ❌
 ```
+
+| Role | Phân hệ | Quyền chính |
+|---|---|---|
+| `executive` | CN | Chỉ đọc dashboard |
+| `admin_cn` / `admin` | CN | Toàn quyền |
+| `manager_cn` / `manager` | CN | Upload, giao chỉ tiêu |
+| `chuyenvien_cn` | CN | Tác nghiệp CN (không upload) |
+| `admin_pgd` | PGD | Upload + quản lý user PGD |
+| `manager_pgd` | PGD | Upload + nhập kế hoạch |
+| `user_pgd` / `user` | PGD | Tác nghiệp, chỉ thấy PGD mình |
 
 ### 8.6 Tên cột — dùng COT_* từ config
 ```python

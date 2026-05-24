@@ -1,5 +1,19 @@
 # CHANGELOG
 
+## [2026-05-24] — Tái cấu trúc Tab So sánh kỳ: package hóa + mockup + 2 dạng export
+- `tabs/tab_so_sanh_ky/` — package mới: `__init__.py` (router), `_common.py` (KPI, quality bars, tables, charts, flow diagram), `_export.py` (Excel + PDF 2 dạng), `render_2_ky.py` (tinh gọn từ tab_so_sanh_2_ky.py), `render_moc_nam.py` (tinh gọn từ tab_so_sanh_ky.py)
+- `tabs/tab_so_sanh_ky.py` — thu gọn thành thin router (delegate to package)
+- `tabs/tab_so_sanh_ky/_common.py` — shared helpers: `render_kpi_row()`, `render_quality_bars_2_ky()`, `render_comparison_table()`, `render_hbar_chart()`, `render_flow_diagram()` — dark mode compatible
+- `tabs/tab_so_sanh_ky/_export.py` — `xuat_excel_tong_quan()`, `xuat_excel_da_chieu()`, `xuat_pdf_tong_quan()`, `xuat_pdf_da_chieu()`, `render_export_ui()` — mỗi loại 2 dạng (Tổng quan / Đa chiều)
+- `mockup_so_sanh_ky.html` — mockup trực quan 3 Section (Tổng quan → Phân tích đa chiều → Xuất báo cáo)
+
+## [2026-05-24] — Đồng bộ và fix tất cả rules files (CLAUDE.md, Trae, Windsurf, Cursor, Cline)
+- `CLAUDE.md` — cập nhật ngày 24/05; thêm chuyenvien_cn, khnv keys, auth functions (5.14), error logging (5.15), DuckDB (5.16), dark mode + date_input vào 5.9, DELTA.md vào refs
+- `.trae/rules/rules.md` — thêm ngày; fix fmt_ty() inconsistency; thêm Bản đồ file (2.1), Luồng dữ liệu (2.2), pgd_mode (8.15), CSS/UI (8.16), DuckDB (8.17); bảng role + chuyenvien_cn; DELTA.md vào refs
+- `.windsurfrules` — đồng bộ với Trae: thêm 2.1, 2.2, 6.15, 6.16, 6.17, bảng role, DELTA.md
+- `.cursorrules` — thêm chuyenvien_cn, khnv keys, BUGMAP vào checklist, upgrade error logging, DuckDB (5.13), dark mode + date_input, DELTA.md
+- `.clinerules` — thêm khnv keys, logger pattern (15), DELTA.md (21), fix section numbers
+
 ## [2026-05-24] — Fix lỗi "category does not support sum" trong So sánh kỳ
 - `app.py` dòng ~77-92, `_toi_uu_dtype()` — thêm kiểm tra: cột object có ≥80% giá trị chuyển được sang số thì ép về `pd.to_numeric()` thay vì `astype("category")` (gốc lỗi: cột "Giải ngân trong năm" bị convert thành category, `.sum()` crash)
 

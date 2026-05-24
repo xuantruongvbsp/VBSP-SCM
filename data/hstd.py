@@ -5,7 +5,7 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
-from data.core import ts_file, excel_to_parquet
+from data.core import ts_file, excel_to_parquet, _should_force_str, _normalize_code_series
 from services.data_quality import kiem_tra_chat_luong
 from config import (
     CACHE_HSTD, CACHE_NQ11,
@@ -55,7 +55,7 @@ def doc_baseline_pgd(ten_pgd: str, nam: int, _ts=0) -> pd.DataFrame | None:
         return pd.read_excel(fp, sheet_name="BCQUERY", header=4).iloc[:, 1:].dropna(how="all")
 
 
-@st.cache_data(ttl=7200, show_spinner="Đang tổng hợp mốc 31/12...")
+@st.cache_resource(show_spinner="Đang tổng hợp mốc 31/12...")
 def doc_baseline_merged(nam: int) -> pd.DataFrame | None:
     """
     Đọc và merge HSTD mốc 31/12 từ tất cả đơn vị đã upload.
@@ -138,48 +138,9 @@ def doc_baseline_merged(nam: int) -> pd.DataFrame | None:
                         )
                 except Exception:
                     pass
-        try:
-            import unicodedata as _ud
-
-            def _should_force_str(_col: str) -> bool:
-                s = _ud.normalize("NFC", str(_col or "")).strip().lower()
-                return (
-                    s.startswith("mã ")
-                    or s == "mã"
-                    or " mã " in f" {s} "
-                    or s in {"mã thôn", "mã xã", "mã kh", "mã khách hàng", "mã chương trình"}
-                    or s in {"số khế ước", "số ku"}
-                    or "cmnd" in s
-                    or "cccd" in s
-                    or s in {"số điện thoại", "điện thoại", "sdt", "sđt"}
-                )
-
-            def _norm_series(ser: pd.Series) -> pd.Series:
-                bad_vals = {"nan", "none", "<na>", "nat"}
-                if pd.api.types.is_integer_dtype(ser.dtype) or pd.api.types.is_float_dtype(ser.dtype):
-                    num = pd.to_numeric(ser, errors="coerce")
-                    whole = num.notna() & (num % 1 == 0)
-                    out = ser.astype(object)
-                    if whole.any():
-                        out = out.copy()
-                        out.loc[whole] = num.loc[whole].astype("int64").astype(str)
-                    out = out.fillna("").astype(str).str.strip()
-                else:
-                    num = pd.to_numeric(ser, errors="coerce")
-                    whole = num.notna() & (num % 1 == 0) & ser.notna()
-                    out = ser.astype(object)
-                    if whole.any():
-                        out = out.copy()
-                        out.loc[whole] = num.loc[whole].astype("int64").astype(str)
-                    out = out.fillna("").astype(str).str.strip()
-                low = out.str.lower()
-                return out.mask(low.isin(bad_vals), "")
-
-            for c in list(result.columns):
-                if _should_force_str(c):
-                    result[c] = _norm_series(result[c])
-        except Exception:
-            pass
+        for c in list(result.columns):
+            if _should_force_str(c):
+                result[c] = _normalize_code_series(result[c])
         # Sanitize object columns: bytes→str, mixed float/str → str
         # Phòng ArrowTypeError khi cột object chứa hỗn hợp bytes+float (e.g. "Số ATM")
         import math as _math
@@ -383,19 +344,22 @@ def danh_dau_khong_hd(df: "pd.DataFrame") -> "pd.DataFrame":
 
 
 @st.cache_data(show_spinner=False, ttl=7200)
-def danh_dau_khong_hd_cached(df: "pd.DataFrame") -> "pd.DataFrame":
-    """Cache wrapper cho danh_dau_khong_hd — dùng thay thế khi gọi nhiều lần trong cùng rerun."""
-    return danh_dau_khong_hd(df)
+def danh_dau_khong_hd_cached(_df: "pd.DataFrame", ts: float = 0.0) -> "pd.DataFrame":
+    """Cache by ts — không hash DataFrame để tránh chậm trên tập dữ liệu lớn."""
+    _ = ts
+    return danh_dau_khong_hd(_df)
 
 
 @st.cache_data(show_spinner=False, ttl=7200)
-def tong_hop_khong_hd_cached(df: "pd.DataFrame", nhom_theo: str = "Tên ĐVUT") -> "pd.DataFrame":
-    return tong_hop_khong_hd(df, nhom_theo=nhom_theo)
+def tong_hop_khong_hd_cached(_df: "pd.DataFrame", nhom_theo: str = "Tên ĐVUT", ts: float = 0.0) -> "pd.DataFrame":
+    _ = ts
+    return tong_hop_khong_hd(_df, nhom_theo=nhom_theo)
 
 
 @st.cache_data(show_spinner=False, ttl=7200)
-def canh_bao_migration_cached(df: "pd.DataFrame") -> "pd.DataFrame":
-    return canh_bao_migration(df)
+def canh_bao_migration_cached(_df: "pd.DataFrame", ts: float = 0.0) -> "pd.DataFrame":
+    _ = ts
+    return canh_bao_migration(_df)
 
 
 def tong_hop_khong_hd(df: "pd.DataFrame",

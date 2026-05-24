@@ -326,7 +326,113 @@ def _render_tong_hop(
 
     df_th = pd.DataFrame(rows_th)
     if not df_th.empty:
-        hien_thi_dataframe_phan_trang(df_th, key=f"{key_prefix}th_pgd", height=340)
+        df_th = df_th.sort_values("Tổng", ascending=False).reset_index(drop=True)
+        NGUONG_NH = 10
+        NGUONG_TD = 5
+        df_th["Mức độ"] = df_th["Tổng"].apply(
+            lambda x: "🔴 Nguy hiểm" if x >= NGUONG_NH
+            else ("🟡 Theo dõi" if x >= NGUONG_TD else "🟢 Ổn định"))
+        df_th["_css"] = df_th["Tổng"].apply(
+            lambda x: "rnh" if x >= NGUONG_NH
+            else ("rtd" if x >= NGUONG_TD else "rok"))
+        so_nh = int((df_th["Tổng"] >= NGUONG_NH).sum())
+        so_td = int(((df_th["Tổng"] >= NGUONG_TD) & (df_th["Tổng"] < NGUONG_NH)).sum())
+        so_od = int((df_th["Tổng"] < NGUONG_TD).sum())
+        max_dh = int(df_th["Đến hạn"].max()) or 1
+        tong_dh = int(df_th["Đến hạn"].sum())
+
+        st.markdown("""
+        <style>
+        .thb{border-collapse:collapse;font-size:13px;width:100%}
+        .thb th{text-align:center;padding:10px 8px;font-weight:600;font-size:11px;opacity:.7;border-bottom:2px solid #e2e8f0;white-space:nowrap}
+        .thb th:first-child{text-align:left;padding-left:14px}
+        .thb td{text-align:center;padding:8px 6px;border-bottom:1px solid #f1f5f9}
+        .thb td:first-child{text-align:left;padding-left:14px;font-weight:600}
+        .thb tr.rnh td{background:#fef2f2}.thb tr.rtd td{background:#fffbeb}
+        .thb tr:hover td{filter:brightness(.97)}
+        .tbadge{display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:700;white-space:nowrap}
+        .tbadge-nh{background:#fee2e2;color:#b91c1c}.tbadge-td{background:#fef3c7;color:#b45309}.tbadge-od{background:#dcfce7;color:#15803d}
+        .tv-hot{color:#b91c1c;font-weight:700}.tv-warm{color:#b45309;font-weight:700}.tv-ok{color:#94a3b8}
+        .tbar{display:flex;align-items:center;gap:4px;justify-content:center}
+        .tbar-tr{width:36px;height:4px;background:#e2e8f0;border-radius:2px;overflow:hidden;flex-shrink:0}
+        .tbar-f{height:100%;border-radius:2px}.tbar-n{font-weight:600;min-width:22px;text-align:right;font-size:12px}
+        .tleg{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:10px;font-size:12px}
+        .tleg-i{display:flex;align-items:center;gap:5px}.tleg-d{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+        .tfoot{display:flex;gap:16px;padding:10px 14px;font-size:11px;flex-wrap:wrap}
+        .twrp{border-radius:12px;border:1px solid #e2e8f0;overflow:hidden;margin-bottom:8px}
+        @media(max-width:800px){.tkpi{grid-template-columns:repeat(2,1fr)}}
+        </style>
+        """, unsafe_allow_html=True)
+
+        # KPI cards
+        st.markdown(f"""
+        <div class="tleg">
+            <div class="tleg-i"><span class="tleg-d" style="background:#ef4444"></span> Nguy hiểm ≥{NGUONG_NH}</div>
+            <div class="tleg-i"><span class="tleg-d" style="background:#f59e0b"></span> Theo dõi {NGUONG_TD}–{NGUONG_NH - 1}</div>
+            <div class="tleg-i"><span class="tleg-d" style="background:#22c55e"></span> Ổn định &lt;{NGUONG_TD}</div>
+        </div>
+        <div class="tkpi" style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px">
+            <div style="border-radius:12px;padding:12px 14px;text-align:center;background:#fef2f2;border:1px solid #fecaca">
+                <div style="font-size:26px;font-weight:800;color:#b91c1c">🔴 {so_nh}</div>
+                <div style="font-size:11px;opacity:.7;margin-top:2px">PGD nguy hiểm</div>
+            </div>
+            <div style="border-radius:12px;padding:12px 14px;text-align:center;background:#fffbeb;border:1px solid #fde68a">
+                <div style="font-size:26px;font-weight:800;color:#b45309">🟡 {so_td}</div>
+                <div style="font-size:11px;opacity:.7;margin-top:2px">PGD cần theo dõi</div>
+            </div>
+            <div style="border-radius:12px;padding:12px 14px;text-align:center;background:#f0fdf4;border:1px solid #bbf7d0">
+                <div style="font-size:26px;font-weight:800;color:#15803d">🟢 {so_od}</div>
+                <div style="font-size:11px;opacity:.7;margin-top:2px">PGD ổn định</div>
+            </div>
+            <div style="border-radius:12px;padding:12px 14px;text-align:center;background:#eff6ff;border:1px solid #bfdbfe">
+                <div style="font-size:26px;font-weight:800;color:#1d4ed8">🔔 {fmt_so(tong_dh)}</div>
+                <div style="font-size:11px;opacity:.7;margin-top:2px">Tổng món đến hạn ≤ 3 tháng</div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        # Bảng HTML
+        rows_h = []
+        for _, r in df_th.iterrows():
+            pct_dh = min(100, int(r["Đến hạn"] / max_dh * 100)) if max_dh else 0
+            cls = r["_css"]
+            v_cls = lambda v, _cls=cls: "tv-hot" if v >= NGUONG_NH else ("tv-warm" if v >= NGUONG_TD else "tv-ok")
+            b_cls = "tbadge-nh" if cls == "rnh" else ("tbadge-td" if cls == "rtd" else "tbadge-od")
+            b_txt = "🔴 Nguy hiểm" if cls == "rnh" else ("🟡 Theo dõi" if cls == "rtd" else "🟢 Ổn định")
+            rows_h.append(
+                f"""<tr class="{cls}">
+                <td>{r['PGD']}</td>
+                <td><div class="tbar"><div class="tbar-tr"><div class="tbar-f" style="width:{pct_dh}%;background:#3b82f6"></div></div><span class="tbar-n {v_cls(r['Đến hạn'])}">{r['Đến hạn']}</span></div></td>
+                <td><span class="{v_cls(r['3 tháng KHĐ'])}">{r['3 tháng KHĐ']}</span></td>
+                <td><span class="{v_cls(r['Nợ QH'])}">{r['Nợ QH']}</span></td>
+                <td><span class="{v_cls(r['GH tháng'])}">{r['GH tháng']}</span></td>
+                <td><strong>{r['Tổng']}</strong></td>
+                <td><span class="tbadge {b_cls}">{b_txt}</span></td>
+            </tr>""")
+        st.markdown(f"""
+        <div class="twrp">
+        <table class="thb">
+        <thead><tr>
+            <th style="width:150px">PGD</th>
+            <th>🔔 Đến hạn<br><small>≤ 3 tháng</small></th>
+            <th>⚠️ 3 tháng<br><small>không HĐ</small></th>
+            <th>🚨 Nợ<br><small>quá hạn</small></th>
+            <th>📅 GH<br><small>tháng</small></th>
+            <th>Tổng<br><small>cảnh báo</small></th>
+            <th>Mức độ<br><small>rủi ro</small></th>
+        </tr></thead>
+        <tbody>
+        {''.join(rows_h)}
+        </tbody>
+        </table>
+        <div class="tfoot" style="background:#f8fafc;border-radius:0 0 12px 12px">
+            <span>🔴 <strong>{so_nh}</strong> nguy hiểm</span>
+            <span>🟡 <strong>{so_td}</strong> theo dõi</span>
+            <span>🟢 <strong>{so_od}</strong> ổn định</span>
+            <span style="margin-left:auto">📅 {today.strftime('%d/%m/%Y')}</span>
+        </div>
+        </div>
+        """, unsafe_allow_html=True)
 
     cxl, cpdf = st.columns(2)
     with cxl:

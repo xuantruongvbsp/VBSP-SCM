@@ -4,7 +4,19 @@
 
 ---
 
-## [2026-05-24] Fix 7 lỗi Tab Kiểm toán Nội bộ (KTNB)
+## [2026-05-24] Fix 13 lỗi Tab Kiểm toán Nội bộ — Phase 2 (Sonnet Review)
+
+| Fix | File | Mức độ | Chi tiết |
+|---|---|---|---|
+| Guard empty danh mục lỗi | `ktnb_service.py` ~724 | 🔴 CRITICAL | Thêm `if df_dm.empty` check trước form — tránh `IndexError` khi bảng trống |
+| Fix keyword args dòng 786 | `ktnb_service.py` ~786 | 🔴 CRITICAL | Sửa call `cap_nhat_trang_thai_loi()` sang keyword args (Phase 1 bỏ sót dòng này) |
+| Fix `is_truong_doan` logic | `ktnb_service.py` ~690 | 🔴 CRITICAL | Check có vai_tro="truong_doan" trong đoàn, chứ không so sánh text == username (sai) |
+| Cột trạng thái lịch | `ktnb_service.py` ~195 | 🟡 MEDIUM | Thêm cột "Trạng thái lịch hiển thị" vào bảng (map: sap_toi→📅, dung_han→✅, qua_han→⚠️) |
+| Date format YYYY-MM-DD | `ktnb_service.py` ~213,214,735 | 🟡 MEDIUM | Thêm `format="DD/MM/YYYY"` vào 3 `st.date_input` (CLAUDE.md §5.9) |
+| Widget key prefix | `ktnb_service.py` ~253 | 🟡 MEDIUM | Thêm `_ktnb_` prefix cho form_them_tv keys (`tv_*` → `_ktnb_tv_*`) |
+| Excel export antipattern | `ktnb_service.py` ~528 | 🟡 MEDIUM | Sửa `st.button→st.download_button` thành session_state cache (tránh bytes mất) |
+
+## [2026-05-24] Fix 7 lỗi Tab Kiểm toán Nội bộ — Phase 1 (Haiku)
 
 | Fix | File | Mức độ | Chi tiết |
 |---|---|---|---|

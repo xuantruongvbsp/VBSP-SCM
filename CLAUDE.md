@@ -1,7 +1,7 @@
 # CLAUDE.md — VBSP-SCM
 > Hướng dẫn dự án dành riêng cho **Claude Code** / Trae / Cline / Cursor.  
 > Đọc toàn bộ file này trước khi đọc bất kỳ file code nào.  
-> Cập nhật: 14/05/2026
+> Cập nhật: 24/05/2026
 
 ---
 
@@ -149,6 +149,8 @@ db.ghi_kv("key_name", value, username)
 | `dgd_map` | Điểm giao dịch toàn CN |
 | `kh_gqvl_cn_{nam}` | KH GQVL Chi nhánh |
 | `kh_gqvl_pgd_{slug}_{nam}` | KH GQVL theo PGD (dự phòng) |
+| `khnv_phan_cong_list` | Phân công cán bộ nội bộ Phòng KH-NV |
+| `khnv_lich_list` | Lịch công tác Phòng KH-NV |
 
 `slug` = `pgd_slug(ten_pgd)` từ `data/pgd.py`.
 
@@ -248,7 +250,7 @@ from auth import co_quyen_upload_pgd, co_quyen_quan_ly_user_pgd
 
 role = normalize_role(role)   # luôn normalize trước
 
-if la_phan_he_cn(role):       # executive, admin_cn, manager_cn, admin, manager
+if la_phan_he_cn(role):       # executive, admin_cn, manager_cn, admin, manager, chuyenvien_cn
 if la_phan_he_pgd(role):      # admin_pgd, manager_pgd, user_pgd, user
 if co_quyen_upload_pgd(role): # admin_pgd, manager_pgd
 ```
@@ -260,6 +262,7 @@ if co_quyen_upload_pgd(role): # admin_pgd, manager_pgd
 | `executive` | CN | Chỉ đọc dashboard |
 | `admin_cn` / `admin` | CN | Toàn quyền |
 | `manager_cn` / `manager` | CN | Upload, giao chỉ tiêu |
+| `chuyenvien_cn` | CN | Tác nghiệp CN (không có quyền upload) |
 | `admin_pgd` | PGD | Upload + quản lý user PGD |
 | `manager_pgd` | PGD | Upload + nhập kế hoạch |
 | `user_pgd` / `user` | PGD | Tác nghiệp, chỉ thấy PGD mình |
@@ -315,6 +318,8 @@ else:
 - Inject CSS **một lần** trong `app.py` — không inject trong tab
 - Bảng ≥ 8 cột → HTML thuần + `st.markdown(unsafe_allow_html=True)`
 - Màu sắc → xem `UI_GUIDELINES.md`
+- HTML: **KHÔNG** hardcode `color:black` / `background:white` — dùng CSS variable tương thích dark mode
+- `st.date_input` bắt buộc có `format="DD/MM/YYYY"`
 
 ---
 
@@ -360,6 +365,83 @@ Trước khi dùng thư viện mới, kiểm tra đã có trong codebase:
 - `python-docx`, `docx2pdf` — có
 - `streamlit`, `duckdb` — có
 - `concurrent.futures`, `threading` — có (stdlib)
+
+---
+
+### 5.13 Tên cột — dùng COT_* từ config.py
+
+```python
+# ✅ ĐÚNG — dùng hằng số từ config.py
+df[COT_TONG_DU_NO]    # ✅
+df["Tổng dư nợ"]      # ❌
+
+# Các COT_* phổ biến:
+COT_TEN_PGD      = "Tên PGD"         COT_MA_KH         = "Mã KH"
+COT_TEN_KH       = "Tên KH"          COT_SO_KU         = "Số khế ước"
+COT_NGAY_VAY     = "Ngày vay"        COT_NGAY_DH       = "Ngày ĐH theo Gia hạn"
+COT_DU_NO_TH     = "Dư nợ trong hạn" COT_DU_NO_QH      = "Dư nợ quá hạn"
+COT_TONG_DU_NO   = "Tổng dư nợ"      COT_DU_NO_KHOANH  = "Dư nợ khoanh"
+COT_TEN_CT       = "Tên chương trình" COT_TEN_XA       = "Tên xã"
+COT_TEN_TO       = "Tên tổ"          COT_NGAY_SL       = "Ngày số liệu"
+COT_SDT          = "Số điện thoại"   COT_CMND          = "Số CMND"
+COT_TEN_NHA_DAU_TU = "Tên nhà đầu tư" COT_TEN_TO_TRUONG = "Tên tổ trưởng"
+
+# Xem đầy đủ tại config.py — KHÔNG hardcode tên cột tiếng Việt
+```
+
+---
+
+### 5.14 Auth functions — Tham chiếu nhanh
+
+```python
+from auth import (
+    normalize_role,                  # "admin"→"admin_cn", "user"→"user_pgd"
+    la_phan_he_cn,                   # executive/admin_cn/manager_cn/admin/manager/chuyenvien_cn
+    la_phan_he_pgd,                  # admin_pgd/manager_pgd/user_pgd/user
+    la_executive,
+    la_admin_cn,
+    la_chuyen_vien_cn,
+    co_quyen_upload_pgd,             # admin_pgd, manager_pgd
+    co_quyen_quan_ly_user_pgd,       # admin_pgd
+    co_quyen_giao_nhiem_vu,
+    get_permissions,                 # → dict
+)
+```
+
+---
+
+### 5.15 Error logging — KHÔNG nuốt lỗi
+
+```python
+from logger import get_logger
+logger = get_logger(__name__)
+
+try:
+    xu_ly_gi_do()
+except Exception as e:
+    logger.error("ten_ham: mo_ta — %s", e, exc_info=True)
+    st.error(f"❌ Lỗi: {e}")
+# KHÔNG: except Exception: pass
+# KHÔNG: except Exception as e: print(e)
+```
+
+---
+
+### 5.16 DuckDB — LUÔN kiểm tra schema trước khi query
+
+```python
+import duckdb, pyarrow.parquet as pq
+
+# PHẢI kiểm tra schema trước khi query
+schema = pq.read_schema(CACHE_HSTD)
+cols = [f.name for f in schema]
+if "Ten_ct" not in cols:
+    st.warning("⚠️ Parquet thiếu cột Ten_ct")
+    return
+
+# Sau đó mới query
+df = duckdb.query(f"SELECT ... FROM '{CACHE_HSTD}'").df()
+```
 
 ---
 
@@ -469,6 +551,89 @@ except Exception as e:
 
 ---
 
+## 8. Function Signatures — Components
+
+### delta_card.py
+```python
+# ⚠️ THAM SỐ: num_columns (KHÔNG phải cols)
+def kpi_row(cols: list[dict], num_columns: int = 4): ...
+
+def delta_card(
+    label: str,
+    value: str | float | int,
+    delta: float | None = None,
+    delta_label: str = "so với kỳ trước",
+    delta_color: str = "normal",   # "normal"|"inverse"|"off"
+    help: str | None = None,
+    icon: str = "",
+    suffix: str = "",
+    precision: int = 0,
+    key: str | None = None,
+    use_container_width: bool = True,
+): ...
+```
+
+### export_pdf.py
+```python
+# ⚠️ download_pdf_button nhận PDF BYTES — không phải df, tieu_de
+def download_pdf_button(
+    pdf_bytes: bytes,
+    filename: str = "bao_cao.pdf",
+    label: str = "📥 Tải PDF",
+    key: str | None = None,
+): ...
+
+def xuat_pdf_co_chart(
+    df: pd.DataFrame,
+    tieu_de: str,
+    nguoi_xuat: str,
+    figs: list[tuple[go.Figure, str]] | None = None,
+    cols_tien: list[str] | None = None,
+    don_vi_tien: str = "đồng",
+    prefix_file: str = "",
+    them_dong_tong: bool = True,
+    them_ngay_xuat: bool = True,
+) -> bytes: ...
+```
+
+### filter_bar.py
+```python
+def filter_bar(
+    df: pd.DataFrame,
+    filters: list[dict],    # [{"field": "Tên xã", "label": "Xã", "type": "select"}]
+    key_prefix: str = "fb", # type: "select"|"multiselect"|"text"|"range"
+    on_change=None,
+) -> dict: ...              # {field: value} — None = "Tất cả"
+
+def apply_filters(df: pd.DataFrame, filter_values: dict) -> pd.DataFrame: ...
+```
+
+### loan_drawer.py
+```python
+# ⚠️ Nhận ROW (pd.Series | dict) — KHÔNG phải DataFrame
+def loan_detail_drawer(
+    row: pd.Series | dict,
+    title: str | None = None,
+    extra_fields: list[tuple] | None = None,
+    field_configs: list[dict] | None = None,
+): ...
+```
+
+### movers.py
+```python
+def movers_analysis(
+    df_curr: pd.DataFrame,
+    df_prev: pd.DataFrame | None = None,
+    top_n: int = 10,
+    key_prefix: str = "mover",
+    on_select_dimension=None,
+    on_select_metric=None,
+    show_title: bool = True,
+): ...
+```
+
+---
+
  Checklist trước khi sửa
 
 ```
@@ -483,6 +648,8 @@ except Exception as e:
 □ Role check: dùng la_phan_he_cn() hay check chuỗi thô?
 □ normalize_role(role) trước khi check role
 □ render(tab=None, **kwargs) với fallback st.container()
+□ Convention check (nếu task có sửa code logic/UI):
+  python scripts/check_conventions.py path/to/file.py
 □ len(tab_names) == len(_tab_renderers) nếu sửa ws_*.py
 □ prefix widget unique khi pgd_mode=True
 ```
@@ -520,6 +687,10 @@ Mỗi khi fix bug, thêm entry vào `BUGMAP.md` theo template có sẵn (cuối 
 | Format tiền tệ | `fmt()`, `fmt_ty()`, `fmt_so()` — `utils.py` |
 | Hiển thị bảng phân trang | `hien_thi_dataframe_phan_trang(df, key=...)` — `utils.py` |
 | Xuất Excel nhiều sheet | `xuat_excel({"Sheet1": df1, "Sheet2": df2})` — `utils.py` |
+| Fill hợp đồng Word | `auto_fill_document(data_row, template_path, tag_map, output_path)` — `utils.py` |
+| Fill hàng loạt | `auto_fill_batch(df_rows, template_path, tag_map, ...)` — `utils.py` |
+| Ghi audit log tự động | `auto_audit(action, clear_cache=True)` — `utils.py` |
+| Lazy loading tabs | `lazy_tabs(labels, renderers, key="lt")` — `utils.py` |
 | Nút tải Word + PDF | `nut_tai_word_va_pdf(docx_bytes, ten_file, key)` — `template_service.py` |
 | Đọc kv_store nhiều key | `db.doc_kv_prefix("prefix_")` — `db.py` |
 | Gộp 22 PGD | `merge_du_lieu_toan_cn(loai)` — `upload_service.py` |

@@ -2,7 +2,7 @@
 # Hệ thống Quản trị Tín dụng Nội bộ — NHCSXH Chi nhánh Đồng Nai
 # Đọc file này trước khi sinh bất kỳ code nào.
 # Không chứa dữ liệu nhạy cảm — chỉ function names, column names, patterns.
-# Cập nhật: 23/05/2026 — đồng bộ với .trae/rules/rules.md
+# Cập nhật: 24/05/2026 — đồng bộ với .trae/rules/rules.md
 
 ---
 
@@ -221,7 +221,7 @@ def movers_analysis(
 ```python
 def fmt_so(x) -> str           # "1.234"
 def fmt_tien(x) -> str         # triệu đồng
-def fmt_ty(x) -> str           # "1.234,560 tỷ"
+def fmt_ty(x) -> str           # "1.500" (triệu đồng, 0 số lẻ — KHÔNG có hậu tố "tỷ")
 def fmt_pct(x) -> str          # "12,34%"
 def fmt(x) -> str              # "1.234.567.890"
 def vn(s: str) -> str          # normalize tiếng Việt
@@ -239,7 +239,7 @@ def lazy_tabs(labels: list[str], renderers: list, key: str = "lt"): ...
 ### Auth (auth.py)
 ```python
 def normalize_role(role: str) -> str      # "admin"→"admin_cn", "user"→"user_pgd"
-def la_phan_he_cn(role: str) -> bool      # executive/admin_cn/manager_cn/admin/manager
+def la_phan_he_cn(role: str) -> bool      # executive/admin_cn/manager_cn/admin/manager/chuyenvien_cn
 def la_phan_he_pgd(role: str) -> bool     # admin_pgd/manager_pgd/user_pgd/user
 def la_executive(role: str) -> bool
 def la_admin_cn(role: str) -> bool
@@ -394,6 +394,42 @@ Thêm lên ĐẦU FILE, dùng ngày thực tế, KHÔNG xóa entry cũ.
 - Phân loại đúng section (A. Parquet, B. Streamlit UI, C. DataFrame, D. Database, E. Upload, F. PDF/Word, G. KHTD, H. GSheet, I. Role, J. Code Pattern)
 - Nếu là dạng lỗi mới chưa có section phù hợp → tạo section mới
 - Format: `### XX — [Tên lỗi]` với bảng `| | |` gồm: File, Dấu hiệu, Nguyên nhân, Fix, Ngày fix
+
+### 6.15 pgd_mode — pattern song song 2 phân hệ
+```python
+pgd_mode = kwargs.get("pgd_mode", False)
+pgd_user = kwargs.get("pgd_user")
+
+if pgd_mode:
+    path = duong_dan_pgd(pgd_user, "dienbao_ht")
+    key  = f"kehoach_pgd_{pgd_slug(pgd_user)}"
+    # prefix widget = f"pgd_{pgd_slug(pgd_user)}_"  ← tránh DuplicateElementKey
+else:
+    path = DB_HT_CACHE   # toàn CN, như cũ
+    key  = "kehoach"
+```
+
+### 6.16 CSS & UI
+- Inject CSS **một lần** trong `app.py` — không inject trong tab
+- Bảng ≥ 8 cột → HTML thuần + `st.markdown(unsafe_allow_html=True)`
+- HTML: **KHÔNG** hardcode `color:black` / `background:white` — dùng CSS variable tương thích dark mode
+- `st.date_input` bắt buộc có `format="DD/MM/YYYY"`
+- Màu sắc → xem `UI_GUIDELINES.md`
+
+### 6.17 DuckDB — LUÔN kiểm tra schema trước khi query
+```python
+import duckdb, pyarrow.parquet as pq
+
+# PHẢI kiểm tra schema trước
+schema = pq.read_schema(CACHE_HSTD)
+cols = [f.name for f in schema]
+if "Ten_ct" not in cols:
+    st.warning("⚠️ Parquet thiếu cột Ten_ct")
+    return
+
+# Sau đó mới query
+df = duckdb.query(f"SELECT ... FROM '{CACHE_HSTD}'").df()
+```
 
 ---
 

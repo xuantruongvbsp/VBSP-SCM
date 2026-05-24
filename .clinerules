@@ -1,5 +1,5 @@
 # VBSP-SCM — Cline Rules
-# Cập nhật: 23/05/2026
+# Cập nhật: 24/05/2026
 # Đồng bộ với CLAUDE.md — đọc CLAUDE.md để biết toàn bộ quy tắc chi tiết.
 
 ---
@@ -64,6 +64,10 @@ Key chuẩn:
 | `kehoach_pgd_{slug}` | KH Điện báo PGD |
 | `no_rui_ro_{slug}_{yyyy}_{mm}` | Hồ sơ rủi ro |
 | `kh_gqvl_cn_{nam}` | KH GQVL Chi nhánh |
+| `kh_gqvl_pgd_{slug}_{nam}` | KH GQVL theo PGD (dự phòng) |
+| `dgd_map` | Điểm giao dịch toàn CN |
+| `khnv_phan_cong_list` | Phân công cán bộ nội bộ Phòng KH-NV |
+| `khnv_lich_list` | Lịch công tác Phòng KH-NV |
 
 `slug` = `pgd_slug(ten_pgd)` từ `data/pgd.py`
 

@@ -416,65 +416,292 @@
 
 
 <!-- ════════════════════════════════════════ -->
-<!--  KHUYẾN NGHỊ 4 LOẠI TASK                -->
+<!--  KẾ HOẠCH A — CHI PHÍ TỐI ƯU            -->
 <!-- ════════════════════════════════════════ -->
-<div class="section-title">🎯 Khuyến nghị cho VBSP-SCM</div>
+<div class="section-title">💰 KẾ HOẠCH A — CHI PHÍ TỐI ƯU</div>
 
-<div class="grid2">
-  <div class="card">
-    <div class="ct">💼 Task thường (40%)</div>
-    <ul>
-      <li><span class="pu">⭐</span> <strong>V4 Pro</strong> tự viết & tự review</li>
-      <li>Không cần Sonnet hay Haiku</li>
-      <li>Chất lượng 8,5/10 là đủ</li>
-      <li><strong>Chi phí: ~40%</strong></li>
+<div style="display:flex; gap:16px; align-items:stretch; margin-bottom:16px;">
+  <div style="flex:1; background:linear-gradient(135deg,rgba(52,211,153,.08),rgba(52,211,153,.02)); border:2px solid rgba(52,211,153,.3); border-radius:14px; padding:20px;">
+    <div style="font-size:22px; font-weight:700; color:#6ee7b7; margin-bottom:4px;">💵 ~48% Sonnet</div>
+    <div style="font-size:12px; color:#64748b;">Tiết kiệm 52% chi phí · Chất lượng ~8,5/10</div>
+  </div>
+</div>
+
+<div class="flow" style="justify-content:flex-start; padding:12px 0;">
+  <div class="agent r-write" style="min-width:160px;">
+    <div class="icon">✍️</div>
+    <div class="name">DeepSeek V4</div>
+    <div class="cost">💵 12%</div>
+    <span class="tag t-write">Code thô</span>
+  </div>
+  <div class="arrow">→</div>
+  <div class="agent r-review" style="min-width:160px;">
+    <div class="icon">🔍</div>
+    <div class="name">Claude Haiku</div>
+    <div class="cost">💵💵 18%</div>
+    <span class="tag t-review">Bắt lỗi syntax</span>
+  </div>
+  <div class="arrow">→</div>
+  <div class="diamond" style="width:50px;height:50px;border-color:#34d399;"><div class="in" style="font-size:8px;">OK?</div></div>
+  <div class="arrow">→</div>
+  <div style="text-align:center;">
+    <span class="bi" style="font-size:18px;">✅</span>
+    <div style="font-size:11px;color:#4ade80;">Merge (80%)</div>
+  </div>
+  <div style="font-size:13px;color:#64748b;padding:0 8px;">hoặc</div>
+  <div style="text-align:center;min-width:140px;">
+    <div class="diamond" style="width:50px;height:50px;border-color:#fbbf24;"><div class="in" style="font-size:7px;">?</div></div>
+    <div style="font-size:11px;color:#fbbf24;">Nếu cần audit (20%)</div>
+  </div>
+  <div class="arrow">→</div>
+  <div class="agent r-audit" style="min-width:150px;">
+    <div class="icon">🏛️</div>
+    <div class="name">Sonnet</div>
+    <div class="cost">💵💵💵 +35%</div>
+    <span class="tag t-audit">Audit</span>
+  </div>
+</div>
+
+<table>
+  <tr>
+    <th style="width:20%;">Loại task</th>
+    <th style="width:15%;">% workload</th>
+    <th style="width:30%;">Agent</th>
+    <th style="width:15%;">Đơn giá</th>
+    <th style="width:20%;">Đóng góp vào tổng</th>
+  </tr>
+  <tr>
+    <td>💼 Task thường</td>
+    <td>50%</td>
+    <td>V4 (12%) + Haiku (18%)</td>
+    <td><span class="badge green">30%</span></td>
+    <td>15,0%</td>
+  </tr>
+  <tr>
+    <td>🧠 Task phức tạp</td>
+    <td>20%</td>
+    <td>V4 (12%) + Haiku (18%) + Sonnet audit (35%)</td>
+    <td><span class="badge yellow">65%</span></td>
+    <td>13,0%</td>
+  </tr>
+  <tr>
+    <td>🔧 Fix bug</td>
+    <td>10%</td>
+    <td>Haiku check (18%) + Sonnet fix (50%)</td>
+    <td><span class="badge yellow">68%</span></td>
+    <td>6,8%</td>
+  </tr>
+  <tr>
+    <td>🏆 Critical</td>
+    <td>20%</td>
+    <td>Sonnet trọn gói</td>
+    <td><span class="badge red">100%</span></td>
+    <td>20,0%</td>
+  </tr>
+  <tr style="background:rgba(52,211,153,.06);">
+    <td colspan="3"><strong>TỔNG CỘNG</strong></td>
+    <td colspan="2"><strong style="color:#6ee7b7;font-size:16px;">~48%</strong></td>
+  </tr>
+</table>
+
+<div class="tagline green" style="margin-top:12px;">
+  ✅ V4 giá rẻ nhất + Haiku bắt lỗi nhanh + Sonnet chỉ audit 20% task phức tạp = Tiết kiệm nhất
+</div>
+
+<div style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:16px;">
+  <div style="background:#1e293b; border:1px solid #334155; border-radius:10px; padding:14px;">
+    <div style="font-size:14px;font-weight:700;color:#6ee7b7;margin-bottom:6px;">👍 Ưu điểm</div>
+    <ul style="list-style:none;padding:0;font-size:12px;color:#94a3b8;">
+      <li style="padding:2px 0;">▹ Chi phí thấp nhất (~48%)</li>
+      <li style="padding:2px 0;">▹ V4 siêu nhanh, Haiku siêu nhanh</li>
+      <li style="padding:2px 0;">▹ Chất lượng vẫn ổn (8,5/10)</li>
     </ul>
   </div>
-  <div class="card">
-    <div class="ct">🧠 Task phức tạp (20%)</div>
-    <ul>
-      <li><span class="pu">🧠</span> <strong>R1</strong> phân tích thiết kế</li>
-      <li><span class="pu">⭐</span> <strong>V4 Pro</strong> viết code chính</li>
-      <li><span class="pu">🏛️</span> <strong>Sonnet</strong> audit final</li>
-      <li><strong>Chi phí: ~55%</strong></li>
-    </ul>
-  </div>
-  <div class="card">
-    <div class="ct">🔧 Fix bug & review (10%)</div>
-    <ul>
-      <li><span class="pu">🔍</span> <strong>Haiku</strong> phát hiện lỗi</li>
-      <li><span class="pu">🏛️</span> <strong>Sonnet</strong> sửa logic</li>
-      <li>Không cần V4 hay R1</li>
-      <li><strong>Chi phí: ~20%</strong></li>
-    </ul>
-  </div>
-  <div class="card">
-    <div class="ct">🏆 Production-critical (30%)</div>
-    <ul>
-      <li><span class="pu">😊</span> <strong>Chỉ Sonnet</strong> trọn gói</li>
-      <li>Không phối hợp, không tiết kiệm</li>
-      <li>0 lần sửa, chất lượng cao nhất</li>
-      <li><strong>Chi phí: 100% (xứng đáng)</strong></li>
+  <div style="background:#1e293b; border:1px solid #334155; border-radius:10px; padding:14px;">
+    <div style="font-size:14px;font-weight:700;color:#fca5a5;margin-bottom:6px;">⚠️ Đánh đổi</div>
+    <ul style="list-style:none;padding:0;font-size:12px;color:#94a3b8;">
+      <li style="padding:2px 0;">▹ Phải có bước Haiku review</li>
+      <li style="padding:2px 0;">▹ V4 code thô → 80% mới đạt</li>
+      <li style="padding:2px 0;">▹ Mất công chuyển context 2-3 agent</li>
+      <li style="padding:2px 0;">▹ Audit mới đạt chất lượng cao</li>
     </ul>
   </div>
 </div>
 
-<div class="recom">
-  <h3>💡 Kết luận</h3>
+
+<!-- ════════════════════════════════════════ -->
+<!--  KẾ HOẠCH B — HIỆU SUẤT TỐI ƯU        -->
+<!-- ════════════════════════════════════════ -->
+<div class="section-title" style="margin-top:40px;">🚀 KẾ HOẠCH B — HIỆU SUẤT TỐI ƯU</div>
+
+<div style="display:flex; gap:16px; align-items:stretch; margin-bottom:16px;">
+  <div style="flex:1; background:linear-gradient(135deg,rgba(192,132,252,.08),rgba(96,165,250,.04)); border:2px solid rgba(192,132,252,.3); border-radius:14px; padding:20px;">
+    <div style="font-size:22px; font-weight:700; color:#c4b5fd; margin-bottom:4px;">⭐ ~67% Sonnet</div>
+    <div style="font-size:12px; color:#64748b;">Tiết kiệm 33% · Chất lượng ~9/10 · Nhanh hơn</div>
+  </div>
+</div>
+
+<div class="flow" style="justify-content:flex-start; padding:12px 0;">
+  <div class="agent sweet" style="min-width:170px;">
+    <div class="icon">⭐</div>
+    <div class="name" style="background:linear-gradient(135deg,#c084fc,#60a5fa);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">DeepSeek V4 Pro</div>
+    <div class="cost">💵💵 40%</div>
+    <span class="tag t-sweet">Code sạch</span>
+  </div>
+  <div class="arrow">→</div>
+  <div class="diamond" style="width:56px;height:56px;"><div class="in" style="font-size:9px;">ĐẠT?</div></div>
+  <div class="arrow">→</div>
+  <div style="text-align:center;">
+    <span class="bi" style="font-size:18px;">✅</span>
+    <div style="font-size:11px;color:#4ade80;">Merge (70%)</div>
+  </div>
+  <div style="font-size:13px;color:#64748b;padding:0 8px;">hoặc</div>
+  <div style="text-align:center;min-width:140px;">
+    <div style="font-size:11px;color:#fbbf24;">Cần audit (30%)</div>
+    <div class="arrow" style="font-size:16px;color:#fbbf24;">↳</div>
+  </div>
+  <div class="agent r-audit" style="min-width:150px;">
+    <div class="icon">🏛️</div>
+    <div class="name">Sonnet</div>
+    <div class="cost">💵💵💵 +35%</div>
+    <span class="tag t-audit">Audit</span>
+  </div>
+</div>
+
+<table>
+  <tr>
+    <th style="width:20%;">Loại task</th>
+    <th style="width:15%;">% workload</th>
+    <th style="width:30%;">Agent</th>
+    <th style="width:15%;">Đơn giá</th>
+    <th style="width:20%;">Đóng góp vào tổng</th>
+  </tr>
+  <tr>
+    <td>💼 Task thường</td>
+    <td>40%</td>
+    <td>V4 Pro tự xử</td>
+    <td><span class="badge green">40%</span></td>
+    <td>16,0%</td>
+  </tr>
+  <tr>
+    <td>🧠 Task phức tạp</td>
+    <td>20%</td>
+    <td>R1 (8%) + V4 Pro (40%) + Sonnet audit (35%)</td>
+    <td><span class="badge yellow">83%</span></td>
+    <td>16,6%</td>
+  </tr>
+  <tr>
+    <td>🔧 Fix bug</td>
+    <td>10%</td>
+    <td>Haiku check (18%) + Sonnet fix (50%)</td>
+    <td><span class="badge yellow">68%</span></td>
+    <td>6,8%</td>
+  </tr>
+  <tr>
+    <td>🏆 Critical</td>
+    <td>30%</td>
+    <td>Sonnet trọn gói</td>
+    <td><span class="badge red">100%</span></td>
+    <td>30,0%</td>
+  </tr>
+  <tr style="background:rgba(192,132,252,.06);">
+    <td colspan="3"><strong>TỔNG CỘNG</strong></td>
+    <td colspan="2"><strong style="color:#c4b5fd;font-size:16px;">~67%</strong></td>
+  </tr>
+</table>
+
+<div class="tagline gold" style="margin-top:12px;">
+  ⭐ V4 Pro code sạch → bỏ qua Haiku → 70% merge luôn → nhanh hơn, ít bước hơn
+</div>
+
+<div style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:16px;">
+  <div style="background:#1e293b; border:1px solid #334155; border-radius:10px; padding:14px;">
+    <div style="font-size:14px;font-weight:700;color:#6ee7b7;margin-bottom:6px;">👍 Ưu điểm</div>
+    <ul style="list-style:none;padding:0;font-size:12px;color:#94a3b8;">
+      <li style="padding:2px 0;">▹ V4 Pro code sạch ~8,5/10, tỷ lệ đạt cao</li>
+      <li style="padding:2px 0;">▹ Ít bước hơn: không cần Haiku</li>
+      <li style="padding:2px 0;">▹ 70% task merge thẳng, không audit</li>
+      <li style="padding:2px 0;">▹ Chất lượng tổng thể ~9/10</li>
+    </ul>
+  </div>
+  <div style="background:#1e293b; border:1px solid #334155; border-radius:10px; padding:14px;">
+    <div style="font-size:14px;font-weight:700;color:#fca5a5;margin-bottom:6px;">⚠️ Đánh đổi</div>
+    <ul style="list-style:none;padding:0;font-size:12px;color:#94a3b8;">
+      <li style="padding:2px 0;">▹ V4 Pro đắt hơn V4 thường (40% vs 12%)</li>
+      <li style="padding:2px 0;">▹ R1 phân tích tốn thêm 8%</li>
+      <li style="padding:2px 0;">▹ Critical task vẫn cần Sonnet 100%</li>
+    </ul>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════ -->
+<!--  SO SÁNH NHANH 2 KẾ HOẠCH              -->
+<!-- ════════════════════════════════════════ -->
+<div class="section-title" style="margin-top:40px;">⚖️ SO SÁNH NHANH</div>
+
+<table>
+  <tr>
+    <th style="width:22%;">Tiêu chí</th>
+    <th style="width:28%;background:rgba(52,211,153,.08);color:#6ee7b7;text-align:center;">💵 KẾ HOẠCH A<br><span style="font-size:11px;font-weight:400;">Chi phí tối ưu</span></th>
+    <th style="width:28%;background:rgba(192,132,252,.08);color:#c4b5fd;text-align:center;">⭐ KẾ HOẠCH B<br><span style="font-size:11px;font-weight:400;">Hiệu suất tối ưu</span></th>
+    <th style="width:22%;text-align:center;">Sonnet 100%</th>
+  </tr>
+  <tr>
+    <td><strong>Chi phí bình quân</strong></td>
+    <td style="text-align:center;"><span style="color:#6ee7b7;font-size:20px;font-weight:700;">~48%</span></td>
+    <td style="text-align:center;"><span style="color:#c4b5fd;font-size:20px;font-weight:700;">~67%</span></td>
+    <td style="text-align:center;"><span style="font-size:20px;font-weight:700;color:#94a3b8;">100%</span></td>
+  </tr>
+  <tr>
+    <td><strong>Chất lượng code</strong></td>
+    <td style="text-align:center;"><span class="badge green">8,5/10</span></td>
+    <td style="text-align:center;"><span class="badge green">9/10</span></td>
+    <td style="text-align:center;"><span class="badge green">9,5/10</span></td>
+  </tr>
+  <tr>
+    <td><strong>Số agent dùng</strong></td>
+    <td style="text-align:center;">V4 + Haiku + Sonnet</td>
+    <td style="text-align:center;">R1 + V4 Pro + Sonnet</td>
+    <td style="text-align:center;">Chỉ Sonnet</td>
+  </tr>
+  <tr>
+    <td><strong>Số bước trung bình/task</strong></td>
+    <td style="text-align:center;">2-3 bước</td>
+    <td style="text-align:center;">1-2 bước</td>
+    <td style="text-align:center;">1 bước</td>
+  </tr>
+  <tr>
+    <td><strong>% task cần audit</strong></td>
+    <td style="text-align:center;">~30-40%</td>
+    <td style="text-align:center;">~30%</td>
+    <td style="text-align:center;">0%</td>
+  </tr>
+  <tr>
+    <td><strong>Phù hợp nhất khi</strong></td>
+    <td style="text-align:center;font-size:12px;color:#94a3b8;">Ngân sách eo hẹp<br>Nhiều task đơn giản</td>
+    <td style="text-align:center;font-size:12px;color:#94a3b8;">Cần chất lượng cao<br>Ít thời gian review</td>
+    <td style="text-align:center;font-size:12px;color:#94a3b8;">Không giới hạn<br>ngân sách</td>
+  </tr>
+</table>
+
+<div class="recom" style="margin-top:24px;">
+  <h3>🎯 Khuyến nghị cuối cùng</h3>
   <p>
-    <strong>⭐ V4 Pro là "sweet spot" kinh tế nhất cho VBSP-SCM.</strong> Viết code sạch hơn V4 thường (8,5 vs 7), tự tuân convention, có ngữ cảnh 1M tokens — đủ để không cần Haiku review trung gian. Chất lượng chỉ kém Sonnet 0,5 điểm nhưng giá bằng 40-50%.
+    <strong>Với VBSP-SCM — chọn KẾ HOẠCH B (Hiệu suất tối ưu).</strong><br>
+    Lý do: Dự án có convention chặt (rules.md + BUGMAP.md), code phức tạp vừa phải, bạn cần chất lượng ổn định hơn là tiết kiệm tối đa. V4 Pro tự viết đã sạch, 70% task merge thẳng không cần audit, tổng chi phí ~67% — tiết kiệm 1/3 so với Sonnet trọn gói.
   </p>
-  <p style="margin-top:8px;">
-    ⚖️ <strong>Tỷ lệ vàng khuyến nghị:</strong><br>
-    • <span class="pu">😊</span> <strong>Sonnet 50%</strong> — task production-critical, tôi làm chính<br>
-    • <span class="pu">⭐</span> <strong>V4 Pro 40%</strong> — task thường, tự xử không cần review<br>
-    • <span class="pu">🔍</span> <strong>Haiku 10%</strong> — fix nhanh, review syntax<br>
-    • 🧠 R1 — chỉ dùng phân tích thiết kế, không viết code
+  <p style="margin-top:8px; font-size:13px; color:#c4b5fd;">
+    ⚖️ <strong>Tỷ lệ áp dụng Kế hoạch B:</strong><br>
+    • <span class="pu">⭐</span> <strong>V4 Pro 40%</strong> — task thường, tự code tự merge<br>
+    • <span class="pu">😊</span> <strong>Sonnet 30%</strong> — production-critical<br>
+    • <span class="pu">🧠+⭐+🏛️</span> <strong>Phối hợp 3 agent 20%</strong> — task phức tạp<br>
+    • <span class="pu">🔍+🏛️</span> <strong>Haiku+Sonnet 10%</strong> — fix bug
   </p>
 </div>
 
 <div class="fn">
-  <strong>📌 Chú thích:</strong> Chi phí so sánh với Sonnet trọn gói = 100%. "Phối hợp" giả định chuyển context qua lại giữa các công cụ. Thực tế có thể chênh lệch tuỳ task và số lần retry.
+  <strong>📌 Chú thích:</strong> Chi phí so sánh với Sonnet trọn gói = 100%. Đơn giá từng agent: V4 ~12%, V4 Pro ~40%, Haiku ~18%, Sonnet audit ~35%, Sonnet trọn gói 100%. Số liệu ước tính dựa trên giá API công khai (5/2026).
 </div>
 
 </div>

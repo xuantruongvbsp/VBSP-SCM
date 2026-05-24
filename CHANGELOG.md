@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## [2026-05-24] — Fix render "So sánh kỳ": Số ATM mixed type → PyArrow crash
+- `data/core.py` dòng 38 — Thêm "số atm" vào `_should_force_str()` để chuẩn hóa cột định danh từ đầu; thêm pattern `s.startswith("số ") and ("kh" in s or "account" in s)` để bắt các cột tương tự
+- Nguyên nhân: "Số ATM" không được chuẩn hóa thành string → vẫn có mixed type (float NaN + bytes từ các PGD) → PyArrow crash "Expected bytes, got a 'float' object"
+
 ## [2026-05-24] — Fix spinner "Đang tổng hợp mốc 31/12..." luôn hiện
 - `data/hstd.py` dòng 58 — Bỏ parameter `_ts` từ `doc_baseline_merged()` signature; `_ts` làm cache key thay đổi mỗi lần file update → cache MISS → spinner lặp vô hạn
 - `tabs/tab_so_sanh_ky.py` dòng 1472-1479 — Bỏ tính toán `_ts` từ file mtime + lời gọi `_ts=_ts`; hàm sẽ check stale cache internally (đã có ở dòng 74-87 hstd.py)

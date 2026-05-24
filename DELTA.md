@@ -4,6 +4,24 @@
 
 ---
 
+## [2026-05-24] Refactor DRY: gộp _should_force_str + _normalize_code_series về 1 nơi + root-fix lỗi A4e tái đi tái lại
+
+### Refactor — triệt tiêu duplicate code giữa core.py và hstd.py
+`_should_force_str()` và `_normalize_code_series()` bị copy-paste giữa `data/core.py` (bản gốc, đã fix "số atm") và `data/hstd.py` (bản thiếu "số atm" + pattern `s.startswith("số ")`). Khi `doc_baseline_merged()` rebuild cache merge dùng bản `hstd.py` → cột "Số ATM" không được chuẩn hóa → vẫn mixed type → crash.
+
+| Thay đổi | File | Dòng |
+|---|---|---|
+| Đưa `_should_force_str` + `_normalize_code_series` lên **module-level** | `data/core.py` | ~19–55 |
+| Import từ `data.core` thay vì copy-paste | `data/hstd.py` | ~8 |
+| Xóa block `try: import unicodedata...` + `_should_force_str` + `_norm_series` (~40 dòng) | `data/hstd.py` | ~141–182 |
+| Gọi `_should_force_str` + `_normalize_code_series` từ import thay vì local | `data/hstd.py` | ~142–143 |
+
+**Kết quả**: 1 nơi duy nhất định nghĩa 2 hàm → sau này sửa 1 lần là đủ.
+
+### Lỗi A4e — Số ATM mixed type → PyArrow crash (đã fix trước đó, giờ thêm root cause)
+- `data/core.py` dòng ~38 — Đã thêm `"số atm"` + pattern `s.startswith("số ") and ("kh" in s or "account" in s)` vào `_should_force_str()`
+- `data/core.py` dòng ~88–89 — Check `any(isinstance(v, bytes) for v in _non_null.iloc[:100])` (100 phần tử, không chỉ `iloc[0]`)
+
 ## [2026-05-22] Root-fix df=None trong Phòng KH-NV
 
 ### Bug — ALL_ITEMS closure stale (df=None) do sidebar render trước data load

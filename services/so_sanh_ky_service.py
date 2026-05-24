@@ -84,6 +84,7 @@ def agg_theo_pgd(df: pd.DataFrame) -> pd.DataFrame:
     return result
 
 
+@st.cache_data(ttl=300, show_spinner=False)
 def agg_theo_dvut(df: pd.DataFrame) -> pd.DataFrame:
     """Tổng hợp chỉ tiêu theo Hội đoàn thể (ĐVUT), thêm hàng tổng."""
     if df is None or df.empty or COT_DVUT not in df.columns:

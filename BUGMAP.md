@@ -81,12 +81,12 @@
 ### A4e — `Expected bytes, got a 'float' object — Conversion failed for column Số ATM with type object`
 | | |
 |---|---|
-| **File** | `data/core.py` → `excel_to_parquet()` và `data/hstd.py` → `doc_baseline_merged()` |
+| **File** | `data/core.py` → `excel_to_parquet()` dòng 31–42 và `data/hstd.py` → `doc_baseline_merged()` |
 | **Dấu hiệu** | Tab “📊 So sánh kỳ” báo lỗi render; traceback chứa `(“Expected bytes, got a 'float' object”, 'Conversion failed for column Số ATM with type object')` |
-| **Nguyên nhân** | openpyxl đọc cột “Số ATM” trả về `bytes` cho ô có giá trị, `float(NaN)` cho ô trống → object column hỗn hợp → PyArrow infer binary → crash khi gặp float. Phức tạp thêm: Hội sở đọc “Số ATM” thành string (không bytes) trong khi các PGD Bình Phước đọc thành bytes → sau concat, `iloc[0]` là string nên check “chỉ đầu” bỏ sót bytes từ PGD thứ 2+. |
-| **Fix** | (1) Bytes→str sanitization trước `to_parquet` trong cả `excel_to_parquet` và `doc_baseline_merged`. (2) **Check 100 phần tử** (`any(isinstance(v, bytes) for v in _non_null.iloc[:100])`), không phải chỉ `iloc[0]`, để phát hiện bytes dù chúng xuất hiện ở PGD giữa. |
+| **Nguyên nhân** | (1) openpyxl đọc cột “Số ATM” trả về `bytes` cho ô có giá trị, `float(NaN)` cho ô trống → object column hỗn hợp. (2) Hội sở đọc “Số ATM” thành string (không bytes) trong khi các PGD Bình Phước đọc thành bytes → sau concat, `iloc[0]` là string nên check “chỉ đầu” bỏ sót bytes từ PGD thứ 2+. (3) “Số ATM” không trong danh sách `_should_force_str()` → không được chuẩn hóa thành string → column vẫn mixed type. |
+| **Fix** | (1) Thêm “số atm” vào `_should_force_str()` (~dòng 38) để chuẩn hóa từ đầu. (2) Bytes→str sanitization trước `to_parquet` trong cả `excel_to_parquet` (dòng 81–94) và `doc_baseline_merged` (dòng 125–138). (3) **Check 100 phần tử** (`any(isinstance(v, bytes) for v in _non_null.iloc[:100])`), không phải chỉ `iloc[0]`, để phát hiện bytes dù chúng xuất hiện ở PGD giữa. |
 | **Pattern tránh** | `isinstance(_s.iloc[0], bytes)` — sai khi đơn vị đầu tiên trong concat có dtype khác (string). Dùng `any(... for v in sample[:100])` thay thế. |
-| **Ngày fix** | 2026-05-23 |
+| **Ngày fix** | 2026-05-24 |
 
 ### A4d — Baseline 31/12 báo “chưa có dữ liệu” dù đã upload (cache baseline 0 cột)
 | | |

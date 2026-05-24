@@ -260,65 +260,13 @@ def _render_tong_quan_pgd(pgd_user: str) -> None:
     hien_thi_dataframe_phan_trang(df_o, key="dgd_pgd_op_tongquan_tbl", height=160)
 
 
-def render(tab: "DeltaGenerator", **kwargs: dict) -> None:
-    df: pd.DataFrame | None = kwargs.get("df")
-    role: str = kwargs.get("role", "user")
-    pgd_user: str | None = kwargs.get("pgd_user")
-    username: str = kwargs.get("username") or st.session_state.get("username", "unknown")
-
-    _tab_ctx = tab if tab is not None else __import__('streamlit').container()
-    with _tab_ctx:
-        st.subheader("📍 Điểm GD của tôi")
-        st.caption(
-            "Cấu hình điểm giao dịch — gán thôn/ấp cho từng điểm GD trong PGD của bạn."
-        )
-
-        if normalize_role(str(role or "user")) != "user_pgd":
-            st.info("Tab này dành cho CBTD (role=user).")
-
-        if not pgd_user:
-            st.error("Không xác định được PGD của người dùng.")
-            return
-
-        df_pgd: pd.DataFrame = pd.DataFrame()
-        if df is not None and not df.empty:
-            col_xa = pick_hstd_column(df, COT_TEN_XA, "Tên xã", "Tên Xã")
-            col_pgd = pick_hstd_column(df, COT_TEN_PGD, "Tên PGD")
-            if col_pgd:
-                s_pgd = df[col_pgd].astype(str).str.strip()
-                df_pgd = df[s_pgd == str(pgd_user).strip()].copy()
-            elif col_xa:
-                df_pgd = df.copy()
-
-        hn = _hostname()
-        t_info, t_edit, t_cbtd, t_search, t_sum = st.tabs(
-            ["📋 Thông tin điểm GD", "✏️ Gán Thôn/Ấp", "� Gán CBTD", "�🔍 Tìm kiếm", "📋 Tổng quan"]
-        )
-
-        with t_info:
-            _render_thong_tin_dgd_pgd(pgd_user)
-
-        with t_edit:
-            _render_gan_thon_pgd(pgd_user, username, hn, df_pgd)
-
-        with t_cbtd:
-            _render_gan_cbtd_pgd(pgd_user, username, hn)
-
-        with t_search:
-            _render_tim_kiem_pgd(db.doc_dgd_map(), pgd_user, username)
-
-        with t_sum:
-            _render_tong_quan_pgd(pgd_user)
-
-
 def _render_gan_cbtd_pgd(pgd_user: str, username: str, hn: str) -> None:
-    """Tab gán CBTD cho ĐGD — PGD cố định."""
+    """Tab gán CBTD cho ĐGD — PGD cố định, chỉ chọn Xã → ĐGD → CBTD."""
     st.markdown("### 👤 Gán CBTD cho Điểm Giao Dịch")
-    st.caption(f"PGD: **{pgd_user}** — Chọn Xã → ĐGD, sau đó chọn CBTD phụ trách.")
+    st.caption("Chọn Xã → ĐGD, sau đó chọn CBTD phụ trách. Mỗi ĐGD chỉ được 1 CBTD.")
 
     cbtd_data: dict = doc_cbtd()
     dgd_map: dict = db.doc_dgd_map() or {}
-
     ten_pgd = _resolve_pgd_key(pgd_user)
 
     # Build reverse mapping: (pgd, dgd) -> ma_cb
@@ -343,14 +291,9 @@ def _render_gan_cbtd_pgd(pgd_user: str, username: str, hn: str) -> None:
             xa_to_dgd[xa] = []
         xa_to_dgd[xa].append(d)
 
-    # Get xã list from PGD_XA_MAP for this user
     ds_xa_cfg = list(PGD_XA_MAP.get(pgd_user, []))
-    if not ds_xa_cfg:
-        st.warning("PGD không có trong PGD_XA_MAP.")
-        return
-
-    chon_xa = st.selectbox("Chọn Xã/Phường", ds_xa_cfg, key="cbtd_gan_pgd_xa")
-    ds_dgd_xa = xa_to_dgd.get(chon_xa, [])
+    chon_xa = st.selectbox("Chọn Xã/Phường", ds_xa_cfg, key="dgd_pgd_cbtd_xa")
+    ds_dgd_xa = [d for d in ds_dgd_pgd if khop_xa_dgd(chon_xa, d["xa"])]
 
     if not ds_dgd_xa:
         st.info(f"Không có ĐGD nào cho xã **{chon_xa}**.")
@@ -359,7 +302,7 @@ def _render_gan_cbtd_pgd(pgd_user: str, username: str, hn: str) -> None:
     # Get CBTD list for this PGD
     ds_cbtd_pgd = [(ma, info) for ma, info in cbtd_data.items() if info.get("pgd") == ten_pgd]
 
-    st.caption(f"**{len(ds_dgd_xa)}** ĐGD tại {chon_xa} — **{len(ds_cbtd_pgd)}** CBTD")
+    st.caption(f"**{len(ds_dgd_xa)}** ĐGD tại {chon_xa} — **{len(ds_cbtd_pgd)}** CBTD trong {pgd_user}")
 
     # Build options for selectbox
     cbtd_opts = ["— Chưa gán"] + [f"{ma} — {info['ho_ten']}" for ma, info in ds_cbtd_pgd]
@@ -387,13 +330,13 @@ def _render_gan_cbtd_pgd(pgd_user: str, username: str, hn: str) -> None:
         col1, col2 = st.columns([3, 2])
         with col1:
             st.markdown(f"**📍 {ten_dgd}**")
-            st.caption(f"📌 {dgd_info['dia_diem']} — Ngày {dgd_info['ngay_gd']} {dgd_info['gio_gd']}")
+            st.caption(f"📌 {dgd_info['dia_diem']} — Ngày {dgd_info['ngay_gd']} {dgd_info['thoi_gian']}")
         with col2:
             selected = st.selectbox(
                 "CBTD phụ trách",
                 cbtd_opts,
                 index=cbtd_opts.index(current_label) if current_label in cbtd_opts else 0,
-                key=f"cbtd_pgd_sel_{ten_pgd}_{chon_xa}_{ten_dgd}",
+                key=f"dgd_pgd_cbtd_sel_{chon_xa}_{ten_dgd}",
             )
             selected_ma = cbtd_map.get(selected)
             if selected_ma != current_ma:
@@ -434,8 +377,59 @@ def _render_gan_cbtd_pgd(pgd_user: str, username: str, hn: str) -> None:
 
         luu_cbtd(cbtd_data)
         db.ghi_audit(
-            username, "gan_cbtd_dgd_pgd",
+            username, "gan_cbtd_dgd",
             f"[{hn}] PGD={pgd_user} xa={chon_xa} assignments={new_assignments}",
         )
         st.success("✅ Đã lưu phân công CBTD.")
         st.rerun()
+
+
+def render(tab: "DeltaGenerator", **kwargs: dict) -> None:
+    df: pd.DataFrame | None = kwargs.get("df")
+    role: str = kwargs.get("role", "user")
+    pgd_user: str | None = kwargs.get("pgd_user")
+    username: str = kwargs.get("username") or st.session_state.get("username", "unknown")
+
+    _tab_ctx = tab if tab is not None else __import__('streamlit').container()
+    with _tab_ctx:
+        st.subheader("📍 Điểm GD của tôi")
+        st.caption(
+            "Cấu hình điểm giao dịch — gán thôn/ấp cho từng điểm GD trong PGD của bạn."
+        )
+
+        if normalize_role(str(role or "user")) != "user_pgd":
+            st.info("Tab này dành cho CBTD (role=user).")
+
+        if not pgd_user:
+            st.error("Không xác định được PGD của người dùng.")
+            return
+
+        df_pgd: pd.DataFrame = pd.DataFrame()
+        if df is not None and not df.empty:
+            col_xa = pick_hstd_column(df, COT_TEN_XA, "Tên xã", "Tên Xã")
+            col_pgd = pick_hstd_column(df, COT_TEN_PGD, "Tên PGD")
+            if col_pgd:
+                s_pgd = df[col_pgd].astype(str).str.strip()
+                df_pgd = df[s_pgd == str(pgd_user).strip()].copy()
+            elif col_xa:
+                df_pgd = df.copy()
+
+        hn = _hostname()
+        t_info, t_edit, t_cbtd, t_search, t_sum = st.tabs(
+            ["📋 Thông tin điểm GD", "✏️ Gán Thôn/Ấp", "👤 Gán CBTD", "🔍 Tìm kiếm", "📋 Tổng quan"]
+        )
+
+        with t_info:
+            _render_thong_tin_dgd_pgd(pgd_user)
+
+        with t_edit:
+            _render_gan_thon_pgd(pgd_user, username, hn, df_pgd)
+
+        with t_cbtd:
+            _render_gan_cbtd_pgd(pgd_user, username, hn)
+
+        with t_search:
+            _render_tim_kiem_pgd(db.doc_dgd_map(), pgd_user, username)
+
+        with t_sum:
+            _render_tong_quan_pgd(pgd_user)

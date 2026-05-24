@@ -14,6 +14,7 @@ import pandas as pd
 import streamlit as st
 from openpyxl.styles import Font, PatternFill
 
+from state_manager import SCMStateManager
 from config import TEN_CHINH_THUC_CT, CHUONG_TRINH_KHTD, DS_PGD, COT_TEN_PGD, CACHE_HSTD, CACHE_GQVL, XA_TO_PGD, PGD_XA_MAP, DON_VI_CHI_NHANH
 from data.core import ts_file
 
@@ -448,20 +449,26 @@ def _tab_canh_bao_chenh_lech() -> None:
     # ── Xuất Excel ────────────────────────────────────────────────────────
     st.divider()
     if st.button("📥 Xuất báo cáo chênh lệch", key="btn_xuat_chenh_lech"):
+        state = SCMStateManager()
         buf = BytesIO()
         with pd.ExcelWriter(buf, engine="openpyxl") as writer:
             df.to_excel(writer, index=False, sheet_name="Chênh lệch KHTD")
-        st.session_state["_bytes_khtd_cl"] = buf.getvalue()
-        st.session_state["_file_khtd_cl"] = f"CanhBao_KHTD_{datetime.today().strftime('%d%m%Y')}.xlsx"
+        state.downloads.set(
+            "khtd_chenh_lech_excel",
+            buf.getvalue(),
+            f"CanhBao_KHTD_{datetime.today().strftime('%d%m%Y')}.xlsx",
+        )
 
-    if st.session_state.get("_bytes_khtd_cl"):
-        st.download_button(
+    state = SCMStateManager()
+    if state.downloads.has("khtd_chenh_lech_excel"):
+        if st.download_button(
             label="⬇ Tải file Excel",
-            data=st.session_state["_bytes_khtd_cl"],
-            file_name=st.session_state["_file_khtd_cl"],
+            data=state.downloads.get_bytes("khtd_chenh_lech_excel"),
+            file_name=state.downloads.get_filename("khtd_chenh_lech_excel") or f"CanhBao_KHTD_{datetime.today().strftime('%d%m%Y')}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             key="dl_chenh_lech_excel",
-        )
+        ):
+            state.downloads.clear("khtd_chenh_lech_excel")
 
 
 def _tab_tien_do_kh_th() -> None:
@@ -643,28 +650,28 @@ def _tab_tien_do_kh_th() -> None:
     col_ex, col_pdf = st.columns(2)
 
     with col_ex:
-        _ss_ex = "_excel_tien_do_kh_th"
         if st.button("📥 Xuất Excel", key="btn_xuat_tien_do_excel"):
             try:
                 buf = xuat_excel({
                     "KH vs TH": df_ct[cols_show],
                     "PGD chậm": pd.DataFrame(rows_pgd) if rows_pgd else pd.DataFrame(),
                 })
-                st.session_state[_ss_ex] = buf
+                SCMStateManager().downloads.set("tien_do_kh_th_excel", buf, ten_file_xuat("TienDo_KH_TH"))
             except Exception as e:
                 logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                 st.error(f"❌ Lỗi: {e}")
-        if st.session_state.get(_ss_ex):
-            st.download_button(
+        state = SCMStateManager()
+        if state.downloads.has("tien_do_kh_th_excel"):
+            if st.download_button(
                 "⬇ Tải Excel",
-                data=st.session_state[_ss_ex],
-                file_name=ten_file_xuat("TienDo_KH_TH"),
+                data=state.downloads.get_bytes("tien_do_kh_th_excel"),
+                file_name=state.downloads.get_filename("tien_do_kh_th_excel") or ten_file_xuat("TienDo_KH_TH"),
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 key="dl_tien_do_excel",
-            )
+            ):
+                state.downloads.clear("tien_do_kh_th_excel")
 
     with col_pdf:
-        _ss_pdf = "_pdf_tien_do_kh_th"
         if st.button("📄 Xuất PDF", key="btn_xuat_tien_do_pdf", type="primary"):
             try:
                 with st.spinner("⏳ Đang tạo PDF..."):
@@ -674,19 +681,24 @@ def _tab_tien_do_kh_th() -> None:
                         username="VBSP-SCM",
                         cols_tien=["KH (triệu đồng)", "TH (triệu đồng)"],
                     )
-                st.session_state[_ss_pdf] = pdf_bytes
-                st.session_state["_pdf_file_tien_do"] = ten_file_xuat("TienDo_KH_TH", ext=".pdf")
+                SCMStateManager().downloads.set(
+                    "tien_do_kh_th_pdf",
+                    pdf_bytes,
+                    ten_file_xuat("TienDo_KH_TH", ext=".pdf"),
+                )
             except Exception as e:
                 logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                 st.error(f"❌ Lỗi PDF: {e}")
-        if st.session_state.get(_ss_pdf):
-            st.download_button(
+        state = SCMStateManager()
+        if state.downloads.has("tien_do_kh_th_pdf"):
+            if st.download_button(
                 "⬇ Tải PDF",
-                data=st.session_state[_ss_pdf],
-                file_name=st.session_state.get("_pdf_file_tien_do", "TienDo_KH_TH.pdf"),
+                data=state.downloads.get_bytes("tien_do_kh_th_pdf"),
+                file_name=state.downloads.get_filename("tien_do_kh_th_pdf") or "TienDo_KH_TH.pdf",
                 mime="application/pdf",
                 key="dl_tien_do_pdf",
-            )
+            ):
+                state.downloads.clear("tien_do_kh_th_pdf")
 
 
 def xuat_khtd_theo_xa(role: str, username: str, df_full: "pd.DataFrame | None" = None) -> bytes:
@@ -827,19 +839,21 @@ def render_xuat_baocao(role: str = "", username: str = "", df_full: "pd.DataFram
                 try:
                     excel_bytes = xuat_khtd_theo_xa(role, username, df_full)
                     ten_file = ten_file_xuat("KHTD_theo_Xa")
-                    st.session_state["_bytes_khtd_xa"] = excel_bytes
-                    st.session_state["_file_khtd_xa"] = ten_file
+                    state = SCMStateManager()
+                    state.downloads.set("khtd_xa_excel", excel_bytes, ten_file)
                     st.success(f"✅ Đã tạo: {ten_file}")
                 except Exception as e:
                     logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                     st.error(f"❌ Lỗi khi tạo file: {e}")
 
-    if st.session_state.get("_bytes_khtd_xa"):
-        st.download_button(
+    state = SCMStateManager()
+    if state.downloads.has("khtd_xa_excel"):
+        if st.download_button(
             label="⬇️ Tải file Excel",
-            data=st.session_state["_bytes_khtd_xa"],
-            file_name=st.session_state.get("_file_khtd_xa", "KHTD_theo_Xa.xlsx"),
+            data=state.downloads.get_bytes("khtd_xa_excel"),
+            file_name=state.downloads.get_filename("khtd_xa_excel") or "KHTD_theo_Xa.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             key="dl_khtd_xa",
-        )
+        ):
+            state.downloads.clear("khtd_xa_excel")
 

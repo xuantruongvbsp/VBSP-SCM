@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## [2026-05-25] — Bộ lọc Hồ sơ đến hạn: 5 cột PGD→Xã→Hội đoàn thể→CT→Nguồn vốn
+- `tabs/tab_tongquan.py` dòng ~1100 — thêm filter Hội đoàn thể (COT_DVUT), thêm lại Chương trình; layout 6 cột [2,2,2,2,2,1]; áp filter _sel_dvut vào dt_chung và filter_chung; cập nhật _co_loc
+
+## [2026-05-25] — Xóa filter Chương trình và thanh kéo Dư nợ (section Hồ sơ đến hạn)
+- `tabs/tab_tongquan.py` dòng ~1107 — bỏ multiselect "Chương trình" (`_sel_ct`), bỏ slider "Dư nợ (triệu đồng)" (`_no_range`); thu layout thành 4 cột [3,3,2,1]; dọn session_state key và `_co_loc` expression
+
 ## [2026-05-25] — Thiết kế lại section "Hồ sơ đến hạn — Tổng hợp"
 - `tabs/tab_tongquan.py` — Header row [6:2] với Nhóm TH selectbox phải; gộp 2 tầng filter thành 1 khu vực thống nhất (PGD + CT + Xã + Nguồn vốn + Dư nợ slider); xóa hoàn toàn tầng 2 filter trong tab; KPI cards thay `st.metric()` bằng `kpi_row()` có icon+tooltip; charts bar+donut song song [6:4] thay vì xếp dọc; export buttons layout [3:3:4]
 

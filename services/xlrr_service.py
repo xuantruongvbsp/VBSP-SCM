@@ -131,7 +131,7 @@ class HoSoRuiRo:
     def from_dict(cls, data: dict) -> "HoSoRuiRo":
         """Create from dict (e.g., from kv_store)."""
         # Convert string dates back to date objects
-        for key in ["ngay_vay", "ngay_dh", "ngay_rr"]:
+        for key in ["ngay_vay", "ngay_dh", "ngay_rr", "ngay_ky_01", "ngay_lap_02"]:
             if key in data and isinstance(data[key], str):
                 try:
                     data[key] = date.fromisoformat(data[key])

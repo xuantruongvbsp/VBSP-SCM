@@ -4,6 +4,28 @@
 
 ---
 
+## [2026-05-25] Fix 4 bugs XLRR — Claude Sonnet review
+
+### Bug 1 (🔴 crash): `HoSoRuiRo.from_dict()` không convert ngay_ky_01/ngay_lap_02
+- **File:** `services/xlrr_service.py` dòng ~134
+- **Triệu chứng:** `AttributeError: 'str' object has no attribute 'strftime'` khi bấm xuất 01/XLN hoặc 02/XLN sau lần load từ kv_store
+- **Fix:** Thêm `"ngay_ky_01", "ngay_lap_02"` vào list convert date trong `from_dict()`
+- **Pattern:** Mỗi khi thêm `Optional[date]` field mới → bắt buộc thêm vào CẢ `to_dict()` VÀ `from_dict()`
+
+### Bug 2 (🟡 logic): DON_VI_CHI_NHANH trong dropdown CN lập hồ sơ PGD
+- **File:** `tabs/tab_xu_ly_rui_ro.py` dòng ~87
+- **Fix:** Bỏ Hội sở khỏi dropdown → chỉ dùng `DS_PGD` (21 PGD)
+
+### Bug 3 (🟡 UX): du_no_goc_display luôn trống
+- **File:** `tabs/tab_xu_ly_rui_ro.py` dòng ~148
+- **Fix:** Tính `tong_du_no_goc_val` từ `ds_chon` + `df_pgd` TRƯỚC khi vào form
+
+### Bug 4 (🟡 data): pgd_slug="" khi import Excel từ PGD
+- **File:** `services/xlrr_export_service.py` dòng ~206
+- **Fix:** `pgd_slug=_pgd_slug(ten_pgd)` thay vì để rỗng
+
+---
+
 ## [2026-05-25] Fix tab Xử lý Rủi ro — Sub-tab 5 Báo cáo
 
 ### Lỗi đã fix

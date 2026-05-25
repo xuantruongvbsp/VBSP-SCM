@@ -703,6 +703,52 @@ Mỗi khi fix bug, thêm entry vào `BUGMAP.md` theo template có sẵn (cuối 
 
 ---
 
+## 12. Tự động chọn model cho subagent
+
+**Workflow thực tế:** AI khác (Cascade/Trae/Windsurf) viết code → **Sonnet chỉ review + fix**.  
+Khi nhận task review, tự đánh giá và spawn model phù hợp — không dùng Sonnet cho mọi bước.
+
+### 12.1 Bảng chọn model theo bước review
+
+| Bước | Model | Làm gì |
+|---|---|---|
+| **Đọc + hiểu** code mới viết | `haiku` | Đọc file, grep pattern, hiểu cấu trúc, tóm tắt thay đổi |
+| **Review + fix** bug thường | `sonnet` | Phân tích logic, tìm bug, sửa code `tabs/`, `services/` |
+| **Review** code chạm `auth.py` / `db.py` / migration | `opus` | Gợi ý user restart — KHÔNG tự spawn Opus |
+
+### 12.2 Quy tắc bắt buộc
+
+**Trước khi review, đánh giá:**
+
+```
+Chưa đọc file nào  →  spawn Haiku đọc + tóm tắt trước, Sonnet review + fix sau
+Đã có summary      →  Sonnet review + fix trực tiếp
+Code chạm auth/db  →  Cảnh báo user: "nên dùng Opus"
+```
+
+**Ví dụ thực tế:**
+
+```python
+# Bước 1: Haiku đọc code mới để hiểu cấu trúc
+Agent(subagent_type="Explore", model="haiku",
+      prompt="Đọc tab_xu_ly_rui_ro.py và xlrr_service.py, tóm tắt các hàm chính, luồng dữ liệu")
+
+# Bước 2: Sonnet nhận tóm tắt → review logic → fix bug
+# (làm trực tiếp, không spawn thêm)
+
+# Nếu code chạm auth.py/db.py → KHÔNG spawn Opus, thay vào đó nói:
+# "⚠️ Code này sửa db.py — sai thì mất dữ liệu. Nên dùng Opus.
+#  Bạn restart với `claude --model claude-opus-4-7` không?"
+```
+
+### 12.3 Khi nào KHÔNG spawn subagent
+
+- User đã gửi kèm summary/tóm tắt thay đổi → Sonnet review trực tiếp, bỏ bước Haiku
+- Chỉ sửa ≤ 2 file nhỏ → làm trực tiếp không cần spawn
+- User đang hỏi/giải thích → trả lời trực tiếp
+
+---
+
 ## 11. Tài liệu liên quan
 
 | File | Đọc khi nào |

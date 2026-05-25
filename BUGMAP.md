@@ -599,6 +599,19 @@ def render(**kwargs):
 
 ---
 
+### J6 — `from_dict()` bỏ sót field date mới → `.strftime()` crash khi xuất biểu mẫu
+
+| | |
+|---|---|
+| **File** | `services/xlrr_service.py` dòng ~134 |
+| **Dấu hiệu** | `AttributeError: 'str' object has no attribute 'strftime'` khi bấm nút xuất 01/XLN hoặc 02/XLN sau lần load hồ sơ từ kv_store |
+| **Nguyên nhân** | `HoSoRuiRo.from_dict()` chỉ convert `["ngay_vay", "ngay_dh", "ngay_rr"]` từ string→date, nhưng `ngay_ky_01` và `ngay_lap_02` (2 field mới) bị bỏ sót → sau khi đọc từ kv_store, 2 field này vẫn là ISO string → `.strftime()` crash ở tab xuất biểu mẫu |
+| **Fix** | Thêm `"ngay_ky_01", "ngay_lap_02"` vào list convert trong `from_dict()` |
+| **Ngày fix** | 2026-05-25 |
+| **Pattern nguy hiểm** | Mỗi khi thêm field `Optional[date]` mới vào dataclass, **bắt buộc** thêm tên field đó vào cả `to_dict()` và `from_dict()`. Chỉ thêm một chiều sẽ gây crash âm thầm khi load. |
+
+---
+
 ### J5 — `_frozen_importlib._DeadlockError`: circular import giữa `data` và `services`
 
 | | |
@@ -730,6 +743,15 @@ DEBUG=1 streamlit run app.py
 | **Nguyên nhân** | SQLite mặc định `foreign_keys=OFF`; cả production và test fixture đều không bật |
 | **Fix** | Thêm `PRAGMA foreign_keys=ON` vào `db.py` connection setup và fixture `in_memory_db` |
 | **Test** | `test_ktnb_db.py::TestKtnbDotKiemTra::test_delete_dot_cascade` |
+| **Ngày fix** | 2026-05-25 |
+
+### J05 — UnboundLocalError `fmt` trong `_subtab_lap_hs_pgd()` do import cục bộ
+| | |
+|---|---|
+| **File** | `tabs/tab_xu_ly_rui_ro.py` → `_subtab_lap_hs_pgd()` ~dòng 158 |
+| **Dấu hiệu** | `UnboundLocalError: cannot access free variable 'fmt' where it is not associated with a value in enclosing scope` khi mở tab Xử lý Rủi ro |
+| **Nguyên nhân** | `from utils import fmt` trong thân hàm khiến Python coi `fmt` là local variable cho toàn bộ hàm. Lambda `lambda x: fmt(x) if pd.notna(x) else ""` ở dòng trên import cục bộ bị lỗi vì `fmt` chưa được gán trong local scope tại thời điểm lambda chạy. |
+| **Fix** | Xóa `from utils import fmt` dư thừa — `fmt` đã được import ở module level (dòng 55) |
 | **Ngày fix** | 2026-05-25 |
 
 ---

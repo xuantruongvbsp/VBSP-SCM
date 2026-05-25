@@ -14,6 +14,7 @@ from typing import Optional
 import pandas as pd
 
 from services.xlrr_service import HoSoRuiRo
+from data.pgd import pgd_slug as _pgd_slug
 
 
 # ── Constants ───────────────────────────────────────────────────────────────
@@ -203,7 +204,7 @@ def nhap_danh_sach_rui_ro_excel(file_bytes: bytes) -> list[HoSoRuiRo]:
             so_ku=str(get_val("so_ku", "")),
             xa=str(get_val("xa", "")),
             ten_pgd=str(get_val("ten_pgd", "")),
-            pgd_slug="",  # Sẽ được tính lại
+            pgd_slug=_pgd_slug(str(get_val("ten_pgd", ""))),  # Tính từ ten_pgd
             ten_ct=str(get_val("ten_ct", "")),
             du_no_goc=get_float("du_no_goc"),
             du_no_lai=get_float("du_no_lai"),

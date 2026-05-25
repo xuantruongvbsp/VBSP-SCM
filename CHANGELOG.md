@@ -1,5 +1,22 @@
 # CHANGELOG
 
+## [2026-05-25] — Fix 3 bugs mẫu 04/05 XLN
+- `tabs/tab_xu_ly_rui_ro.py` — Thêm import `TEN_CHI_NHANH_HIEN_THI`; thay 2 chỗ hardcode `"Chi nhánh NHCSXH tỉnh Đồng Nai"` bằng constant (vi phạm rule 5.6).
+- `services/word_xln_service.py` dòng ~1830 — `_add_bang_tong_hop_04_05()`: bỏ param `loai` không dùng; cập nhật 2 caller.
+- `services/word_xln_service.py` dòng ~1863 — `_add_phan_ky_tong_hop()`: thêm dòng địa danh + ngày tháng trước bảng ký — param `ngay_lap`/`dia_danh` nhận vào nhưng chưa render → mẫu thiếu dòng bắt buộc.
+
+## [2026-05-25] — Fix UnboundLocalError `fmt` trong tab XLRR
+- `tabs/tab_xu_ly_rui_ro.py` dòng ~158 — Xóa `from utils import fmt` dư thừa trong `_subtab_lap_hs_pgd()`. Import này khiến Python coi `fmt` là local variable → lambda dùng `fmt` ở dòng trên bị `UnboundLocalError: cannot access free variable 'fmt'`.
+
+## [2026-05-25] — Thêm rule 12 vào CLAUDE.md: tự chọn model subagent
+- `CLAUDE.md` — Thêm section 12 "Tự động chọn model cho subagent": bảng Haiku/Sonnet/Opus theo loại task, quy tắc spawn Agent, khi nào không spawn.
+
+## [2026-05-25] — Fix 4 bugs trong tab XLRR (Xử lý Rủi ro)
+- `services/xlrr_service.py` dòng ~134 — `HoSoRuiRo.from_dict()`: thêm `ngay_ky_01`, `ngay_lap_02` vào danh sách convert string→date. Trước đây thiếu → `.strftime()` crash khi xuất mẫu 01/02/XLN sau lần load từ kv_store.
+- `tabs/tab_xu_ly_rui_ro.py` dòng ~87 — `_subtab_lap_hs_pgd()`: bỏ `DON_VI_CHI_NHANH` khỏi dropdown CN lập thay PGD (Hội sở không có HSTD → luôn cảnh báo vô nghĩa).
+- `tabs/tab_xu_ly_rui_ro.py` dòng ~148 — Tính `tong_du_no_goc_val` từ `ds_chon` trước khi vào form, điền vào `du_no_goc_display` thay vì để trống.
+- `services/xlrr_export_service.py` dòng ~206 — `nhap_danh_sach_rui_ro_excel()`: tính `pgd_slug` từ `ten_pgd` thay vì để rỗng — tránh thiếu dữ liệu khi tổng hợp theo PGD.
+
 ## [2026-05-25] — Fix NameError _COT_TEN_PGD trong cache-check block
 - `data/hstd.py` dòng ~65 — `doc_baseline_merged()`: chuyển `from config import COT_TEN_PGD as _COT_TEN_PGD` lên đầu hàm (trước cache-check block). Trước đây import đặt sai vị trí trong rebuild block → `NameError` bị `except Exception: pass` nuốt im → **mỗi lần gọi đều tốn công rebuild cache** thay vì dùng cache parquet có sẵn.
 

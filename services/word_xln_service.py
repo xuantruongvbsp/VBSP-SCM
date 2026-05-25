@@ -1729,7 +1729,7 @@ def _tao_word_04xln_v2(
     p.add_run("Căn cứ các biên bản kiểm tra, chúng tôi nhất trí đề nghị khoanh nợ cho các hộ vay sau:").italic = True
     
     # Bảng tổng hợp
-    _add_bang_tong_hop_04_05(doc, ds_hs, "khoanh")
+    _add_bang_tong_hop_04_05(doc, ds_hs)
     
     # Tổng kết
     tong_goc = sum(hs.du_no_goc for hs in ds_hs)
@@ -1788,7 +1788,7 @@ def _tao_word_05xln_v2(
     p.add_run("Căn cứ các biên bản kiểm tra và đề nghị của PGD, chúng tôi nhất trí đề nghị xóa nợ cho các hộ vay sau:").italic = True
     
     # Bảng tổng hợp
-    _add_bang_tong_hop_04_05(doc, ds_hs, "xoa")
+    _add_bang_tong_hop_04_05(doc, ds_hs)
     
     # Tổng kết
     tong_goc = sum(hs.du_no_goc for hs in ds_hs)
@@ -1827,9 +1827,8 @@ def _add_thanh_phan_tong_hop(doc: Document, thong_tin: dict) -> None:
 def _add_bang_tong_hop_04_05(
     doc: Document,
     ds_hs: list,
-    loai: str,  # "khoanh" hoặc "xoa"
 ) -> None:
-    """Thêm bảng tổng hợp danh sách hộ vay."""
+    """Thêm bảng tổng hợp danh sách hộ vay (dùng chung cho mẫu 04 và 05)."""
     # Tạo bảng
     table = doc.add_table(rows=1, cols=8)
     table.style = 'Table Grid'
@@ -1862,7 +1861,14 @@ def _add_phan_ky_tong_hop(
 ) -> None:
     """Thêm phần ký cho mẫu tổng hợp."""
     doc.add_paragraph()
-    
+
+    # Dòng địa danh + ngày tháng (bắt buộc với văn bản hành chính VN)
+    p_ngay = doc.add_paragraph()
+    p_ngay.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    p_ngay.add_run(
+        f"{dia_danh}, ngày {ngay_lap.day:02d} tháng {ngay_lap.month:02d} năm {ngay_lap.year}"
+    ).italic = True
+
     # Tạo bảng 3 cột cho phần ký
     tbl = doc.add_table(rows=1, cols=3)
     tbl.alignment = WD_TABLE_ALIGNMENT.CENTER

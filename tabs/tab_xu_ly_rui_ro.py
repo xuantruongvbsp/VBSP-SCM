@@ -33,6 +33,7 @@ from config import (
     DON_VI_CHI_NHANH,  # Để có đủ 22 đơn vị trong dropdown
     DS_PGD,
     NGUYEN_NHAN_RR,
+    TEN_CHI_NHANH_HIEN_THI,
 )
 from data.pgd import pgd_slug
 from services.xlrr_service import (
@@ -84,9 +85,8 @@ def _subtab_lap_hs_pgd(df: pd.DataFrame, ctx: TabContext) -> None:
     if la_phan_he_pgd(role):
         ten_pgd = ctx.pgd_user or DS_PGD[0]
     else:
-        # CN chọn đơn vị để lập thay (22 đơn vị đầy đủ)
-        ds_don_vi = [DON_VI_CHI_NHANH] + DS_PGD
-        ten_pgd = st.selectbox("📍 Chọn đơn vị để lập hồ sơ", ds_don_vi, key="xlrr_pgd_chon_pgd")
+        # CN chọn PGD để lập thay (chỉ 21 PGD — Hội sở không có HSTD)
+        ten_pgd = st.selectbox("📍 Chọn PGD để lập hồ sơ", DS_PGD, key="xlrr_pgd_chon_pgd")
     
     pgd_slug_val = pgd_slug(ten_pgd)
     df_pgd = df[df[COT_TEN_PGD] == ten_pgd].copy() if COT_TEN_PGD in df.columns else pd.DataFrame()
@@ -147,7 +147,17 @@ def _subtab_lap_hs_pgd(df: pd.DataFrame, ctx: TabContext) -> None:
         return
     
     st.success(f"✅ Đã chọn **{len(ds_chon)}** hộ vay.")
-    
+
+    # Tính tổng dư nợ gốc từ HSTD trước khi vào form
+    tong_du_no_goc_val = ""
+    if COT_TONG_DU_NO in ds_chon.columns:
+        # ds_chon còn chứa cột được format (string), cần lấy từ df_pgd gốc
+        ds_so_ku_chon = set(ds_chon[COT_SO_KU].astype(str).tolist()) if COT_SO_KU in ds_chon.columns else set()
+        if ds_so_ku_chon and COT_SO_KU in df_pgd.columns:
+            df_goc = df_pgd[df_pgd[COT_SO_KU].astype(str).isin(ds_so_ku_chon)]
+            tong_goc = df_goc[COT_TONG_DU_NO].sum() if COT_TONG_DU_NO in df_goc.columns else 0
+            tong_du_no_goc_val = fmt(tong_goc)
+
     # Bước 3: Nhập thông tin rủi ro
     st.markdown("#### 📝 Bước 3: Thông tin rủi ro")
     with st.form("xlrr_pgd_form_nhap"):
@@ -168,7 +178,7 @@ def _subtab_lap_hs_pgd(df: pd.DataFrame, ctx: TabContext) -> None:
                 format_func=lambda x: x[0],
                 key="xlrr_pgd_nguon",
             )[1]
-        
+
         # Mức độ và số tháng (chỉ cho khoanh nợ)
         muc_do = ""
         so_thang = 0
@@ -190,19 +200,19 @@ def _subtab_lap_hs_pgd(df: pd.DataFrame, ctx: TabContext) -> None:
                     min_value=0, max_value=120, value=goi_y, step=6,
                     key="xlrr_pgd_so_thang",
                 )
-        
+
         ghi_chu = st.text_area(
             "Ghi chú / Tóm tắt nguyên nhân *",
             placeholder="Nhập tối thiểu 20 ký tự...",
             height=100,
             key="xlrr_pgd_ghi_chu",
         )
-        
-        # Thông tin dư nợ: gốc từ HSTD, lãi nhập tay
+
+        # Thông tin dư nợ: gốc từ HSTD (tính từ ds_chon), lãi nhập tay
         st.markdown("**💰 Thông tin dư nợ**")
         du_no_goc_display = st.text_input(
-            "Dư nợ gốc (từ HSTD)",
-            value="",
+            "Dư nợ gốc (từ HSTD, đồng)",
+            value=tong_du_no_goc_val,
             disabled=True,
             key="xlrr_pgd_du_no_goc_display",
         )
@@ -581,7 +591,7 @@ def _subtab_tong_hop_cn(ctx: TabContext) -> None:
                         from services.word_xln_service import _tao_word_04xln_v2
                         
                         thong_tin_04 = {
-                            "ten_nhcsxh": "Chi nhánh NHCSXH tỉnh Đồng Nai",
+                            "ten_nhcsxh": TEN_CHI_NHANH_HIEN_THI,
                             "dia_danh": "TP. Biên Hòa",
                             "ngay_lap": ngay_lap_04,
                             "ten_pgd": ten_pgd_04,
@@ -624,7 +634,7 @@ def _subtab_tong_hop_cn(ctx: TabContext) -> None:
                         from services.word_xln_service import _tao_word_05xln_v2
                         
                         thong_tin_05 = {
-                            "ten_nhcsxh": "Chi nhánh NHCSXH tỉnh Đồng Nai",
+                            "ten_nhcsxh": TEN_CHI_NHANH_HIEN_THI,
                             "dia_danh": "TP. Biên Hòa",
                             "ngay_lap": ngay_lap_05,
                             "ten_pgd": ten_pgd_05,

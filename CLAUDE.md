@@ -143,7 +143,11 @@ db.ghi_kv("key_name", value, username)
 | `khtd_pgd_{slug}` | KHTD từng PGD |
 | `ct_registry_{slug}` | Danh mục chương trình theo PGD |
 | `merge_meta_{loai}` | Metadata sau merge (hstd/nq11/gqvl) |
-| `no_rui_ro_{slug}_{yyyy}_{mm}` | Hồ sơ rủi ro theo PGD/kỳ |
+| `no_rui_ro_{slug}_{yyyy}_{mm}` | Hồ sơ rủi ro theo PGD/kỳ (cũ — deprecated) |
+| `xlrr_pgd_{slug}_{yyyy}_{mm}` | Hồ sơ XLRR PGD lập theo kỳ |
+| `xlrr_cn_{yyyy}_{mm}` | Hồ sơ XLRR CN tổng hợp theo kỳ |
+| `qd62_cn_{yyyy}_{mm}` | Hồ sơ QĐ62 CN theo kỳ |
+| `xlrr_ket_qua_{yyyy}_{mm}` | Kết quả XLRR từ NHCSXH TW theo kỳ |
 | `kehoach` | KH Điện báo toàn CN |
 | `kehoach_pgd_{slug}` | KH Điện báo từng PGD |
 | `dgd_map` | Điểm giao dịch toàn CN |

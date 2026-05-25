@@ -680,6 +680,15 @@ def _duong_dan_pgd(ten_pgd: str, loai: str) -> str:
 | **Pattern tránh** | `groupby()` + `merge()` trên Categorical column từ parquet mà không normalize. Luôn dùng `if isinstance(df[col].dtype, pd.CategoricalDtype): df[col] = df[col].astype(object)` trước groupby/merge |
 | **Ngày fix** | 2026-05-25 |
 
+### K4 — Categorical "values should be unique" — tab Cảnh báo Tín dụng (Tổng hợp)
+| | |
+|---|---|
+| **File** | `tabs/tab_canh_bao_nqh.py` → `_render_tong_hop()` |
+| **Dấu hiệu** | Sub-tab "Tổng hợp" crash với "values should be unique if codes is not None" khi render bảng Tổng hợp cảnh báo theo PGD |
+| **Nguyên nhân** | `df_full_loc[COT_TEN_PGD]` và `df_kh_loc[COT_TEN_PGD]` từ parquet có dtype Categorical. Khi `groupby(COT_TEN_PGD)` tạo CategoricalIndex → pandas safe_sort crash |
+| **Fix** | Thêm đoạn convert Categorical → object cho cả `df_full_loc` và `df_kh_loc` trước khi dùng groupby: `if isinstance(_df[COT_TEN_PGD].dtype, pd.CategoricalDtype): _df[COT_TEN_PGD] = _df[COT_TEN_PGD].astype(object)` |
+| **Ngày fix** | 2026-05-25 |
+
 ---
 
 ## Lệnh debug nhanh

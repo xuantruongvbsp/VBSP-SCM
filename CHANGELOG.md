@@ -1,5 +1,33 @@
 # CHANGELOG
 
+## [2026-05-25] — Thêm Sửa/Xóa hồ sơ trong Lập HS PGD (XLRR)
+- `tabs/tab_xu_ly_rui_ro.py` — thêm `_cap_nhat_hs()`, `_xoa_hs()` module-level helpers; thêm section "📂 Hồ sơ đã lập" với nút ✏️ Sửa (toggle) + 🗑️ Xóa (popover confirm); form sửa pre-filled dùng `dataclasses.replace`; chỉ hiện form lập mới khi không ở edit mode
+
+## [2026-05-25] — Ô Tên KH: kết hợp text_input lọc + selectbox chọn
+- `tabs/tab_xu_ly_rui_ro.py` dòng ~126-152 — Tên KH dùng text_input (gõ tự do lọc substring) + selectbox phía dưới hiện danh sách đã thu hẹp; label selectbox hiện số lượng KH khớp; filter logic: chọn từ dropdown → exact match, chỉ gõ → substring search
+
+## [2026-05-25] — Cải thiện bộ lọc Bước 1 trong Lập hồ sơ XLRR
+- `tabs/tab_xu_ly_rui_ro.py` dòng ~105-140 — cascade 3 tầng Xã→Tổ→KH; thêm `help="Gõ để tìm nhanh"` cho Xã/Tổ; đổi `""` → `"Tất cả"`
+
+## [2026-05-25] — Fix dropdown Lập hồ sơ XLRR thiếu Hội sở CN tỉnh
+- `tabs/tab_xu_ly_rui_ro.py` dòng ~88-96 — đổi options từ `DS_PGD` (21) sang `[DON_VI_CHI_NHANH] + DS_PGD` (22 đơn vị); PGD role fallback từ `DS_PGD[0]` → `DON_VI_CHI_NHANH`
+
+## [2026-05-25] — Fix 2 bug biểu đồ Top 10 chương trình
+- `tabs/tab_tongquan.py` dòng ~551-559 — sửa đơn vị card từ `/1e6` → `/1e9` (tỷ đồng); thêm `reset_index(drop=True)` để STT hiển thị đúng 1..N thay vì index gốc DataFrame
+
+## [2026-05-25] — Fix convention: logger.error vào 11 except blocks
+- `tabs/tab_xu_ly_rui_ro.py` dòng ~55-58, ~502-1279 — thêm `from logger import get_logger`, `logger.error(..., exc_info=True)` vào 11 except Exception blocks
+
+## [2026-05-25] — Hoàn thiện Tab Xử lý Rủi ro (XLRR) — CN 5 tabs, PGD 3 tabs
+- `services/xlrr_service.py` — Thêm constants `KET_QUA_*`, `KET_QUA_LABEL`; thêm 4 methods vào `LuuTruXLRR`: `_key_ket_qua`, `luu_ket_qua`, `doc_ket_qua`, `doc_ket_qua_pgd`
+- `services/word_xln_service.py` — **MỚI** 2 hàm: `_tao_word_thong_bao_ket_qua_cn()`, `_tao_word_thong_bao_ket_qua_pgd()`
+- `tabs/tab_xu_ly_rui_ro.py` — Tái cấu trúc: CN 5 tabs (thêm Dashboard GĐ + Thông báo kết quả), PGD 3 tabs (thêm Gửi CN với Tờ trình PGD + Kết quả XLRR); đổi `_subtab_bao_cao` → `_subtab_gui_cn_pgd`; thêm section Tờ trình CN vào `_subtab_tong_hop_cn`
+- `CLAUDE.md` — Cập nhật bảng key kv_store: thêm `xlrr_pgd_*`, `xlrr_cn_*`, `qd62_cn_*`, `xlrr_ket_qua_*`
+
+## [2026-05-25] — Redesign dashboard TỔNG QUAN tab So sánh mốc năm
+- `tabs/tab_so_sanh_ky/_kpi_cards.py` — **MỚI** — 5 components: `render_big_metric_card`, `render_mini_card`, `render_mini_cards_row`, `render_debt_structure_donut`, `render_compact_comparison_table`, `render_dashboard_header`
+- `tabs/tab_so_sanh_ky/render_moc_nam.py` dòng ~302–437 — Thay thế 12 `st.metric()` cũ bằng dashboard mới: 2 big cards, 4 mini cards, donut chart Plotly, bảng so sánh compact
+
 ## [2026-05-25] — Fix 3 bugs mẫu 04/05 XLN
 - `tabs/tab_xu_ly_rui_ro.py` — Thêm import `TEN_CHI_NHANH_HIEN_THI`; thay 2 chỗ hardcode `"Chi nhánh NHCSXH tỉnh Đồng Nai"` bằng constant (vi phạm rule 5.6).
 - `services/word_xln_service.py` dòng ~1830 — `_add_bang_tong_hop_04_05()`: bỏ param `loai` không dùng; cập nhật 2 caller.
@@ -81,6 +109,9 @@
 ## [2026-05-25] — Thiết kế lại section "Hồ sơ đến hạn — Tổng hợp"
 - `tabs/tab_tongquan.py` — Header row [6:2] với Nhóm TH selectbox phải; gộp 2 tầng filter thành 1 khu vực thống nhất (PGD + CT + Xã + Nguồn vốn + Dư nợ slider); xóa hoàn toàn tầng 2 filter trong tab; KPI cards thay `st.metric()` bằng `kpi_row()` có icon+tooltip; charts bar+donut song song [6:4] thay vì xếp dọc; export buttons layout [3:3:4]
 
+## [2026-05-25] — Fix Categorical groupby crash trong Tổng hợp cảnh báo theo PGD
+- `tabs/tab_canh_bao_nqh.py` dòng ~217 — Thêm convert `COT_TEN_PGD` từ Categorical → object cho `df_full_loc` và `df_kh_loc` trước groupby (pattern K3/K4 BUGMAP.md)
+
 ## [2026-05-25] — Thiết kế lại bảng Tổng hợp cảnh báo theo PGD (sub-tab Tổng hợp)
 - `tabs/tab_canh_bao_nqh.py` dòng ~325-420 — Thay `hien_thi_dataframe_phan_trang()` bằng HTML table: sắp xếp theo tổng cảnh báo giảm dần; phân loại 🔴/🟡/🟢 theo ngưỡng 10/5; KPI cards tóm tắt; progress bar cột Đến hạn; badge mức độ rủi ro; footer tổng kết; row nền đỏ/vàng theo mức độ
 
@@ -95,6 +126,12 @@
 - `tabs/tab_so_sanh_ky/_export.py` dòng ~230 — Thêm tham số `key_prefix: str = "ssk"` vào `render_export_ui`; thay 6 hardcoded key `ssk_*` bằng `f"{key_prefix}_*"`; phân biệt session state cache theo prefix
 - `tabs/tab_so_sanh_ky/render_moc_nam.py` — Thêm `key_prefix` vào `_render_export_section`; 4 section HSTD/NQ11/GQVL/CDT dùng key riêng (`{key_prefix}hstd`, `{key_prefix}nq11`, `{key_prefix}gqvl`, `{key_prefix}cdt`)
 - `tabs/tab_so_sanh_ky/render_2_ky.py` — Truyền `key_prefix="2ky"` vào `render_export_ui`
+
+## [2026-05-25] — Bỏ hard-block snapshot tháng 12, thêm manual trigger NQ11
+- `tabs/tab_so_sanh_ky/render_moc_nam.py` dòng ~662-700 — `_render_nq11_section`: bỏ `return` cứng khi thiếu snapshot 12, fall back dùng tất cả kỳ + thêm caption; thêm `df_nq11` param
+- `tabs/tab_so_sanh_ky/render_moc_nam.py` dòng ~118-144 — Thêm `_render_nq11_manual_snap()`: widget tạo snapshot NQ11 thủ công cho admin (text_input YYYY-MM + nút tạo + validation regex)
+- `tabs/tab_so_sanh_ky/render_moc_nam.py` dòng ~802-820, 913-930 — GQVL và CDTOTKVV: bỏ hard-block tương tự, fall back toàn bộ kỳ
+- `tabs/tab_so_sanh_ky/render_moc_nam.py` dòng ~1048, 1076 — `render_moc_nam`: extract `df_nq11` từ kwargs, truyền vào `_render_nq11_section`
 
 ## [2026-05-25] — Tăng cỡ chữ và độ tương phản card KPI Cảnh báo NQH
 - `tabs/tab_canh_bao_nqh.py` dòng ~237-250 — Tăng font value 1.8→2.4rem, label 0.75→0.9rem, sub 0.73→0.82rem; bỏ uppercase/letter-spacing; tăng padding/min-height; màu chữ đậm hơn cho 4 màu card

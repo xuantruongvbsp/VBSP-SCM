@@ -1097,49 +1097,57 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                         pd.to_numeric(dt[COT_TONG_DU_NO], errors="coerce") / 1_000_000
                     ).round(1)
 
-                # ── BỘ LỌC THỐNG NHẤT (5 tiêu chí, 2 hàng) ──
-                _f_pgd = sorted(dt[COT_TEN_PGD].dropna().unique().tolist()) if COT_TEN_PGD in dt.columns else []
-                _f_ct  = sorted(dt[COT_TEN_CT].dropna().unique().tolist())  if COT_TEN_CT  in dt.columns else []
-                _f_xa  = sorted(dt[cot_xa].dropna().unique().tolist())       if cot_xa and cot_xa in dt.columns else []
-                _f_nv  = sorted(dt["_nv_label"].dropna().unique().tolist())  if "_nv_label" in dt.columns else []
+                # ── BỘ LỌC: PGD → Xã → Hội đoàn thể → Chương trình → Nguồn vốn ──
+                _f_pgd  = sorted(dt[COT_TEN_PGD].dropna().unique().tolist()) if COT_TEN_PGD in dt.columns else []
+                _f_ct   = sorted(dt[COT_TEN_CT].dropna().unique().tolist())  if COT_TEN_CT  in dt.columns else []
+                _f_xa   = sorted(dt[cot_xa].dropna().unique().tolist())       if cot_xa and cot_xa in dt.columns else []
+                _f_nv   = sorted(dt["_nv_label"].dropna().unique().tolist())  if "_nv_label" in dt.columns else []
+                _f_dvut = sorted(dt[COT_DVUT].dropna().unique().tolist())     if COT_DVUT in dt.columns else []
 
-                # Hàng 1: 3 multiselect + nút xóa
-                _c1, _c3, _c4, _c5 = st.columns([3, 3, 2, 1])
+                _c1, _c2, _c3, _c4, _c5, _c6 = st.columns([2, 2, 2, 2, 2, 1])
                 with _c1:
-                    _sel_pgd = st.multiselect("PGD", _f_pgd, key="tq_dh_pgd",
-                                               placeholder="Tất cả PGD...") if _f_pgd else []
+                    _sel_pgd  = st.multiselect("PGD", _f_pgd, key="tq_dh_pgd",
+                                                placeholder="Tất cả PGD...") if _f_pgd else []
+                with _c2:
+                    _sel_xa   = st.multiselect("Xã", _f_xa, key="tq_dh_xa",
+                                                placeholder="Tất cả xã...") if _f_xa else []
                 with _c3:
-                    _sel_xa  = st.multiselect("Xã", _f_xa, key="tq_dh_xa",
-                                               placeholder="Tất cả xã...") if _f_xa else []
+                    _sel_dvut = st.multiselect("Hội đoàn thể", _f_dvut, key="tq_dh_dvut",
+                                                placeholder="Tất cả hội...") if _f_dvut else []
                 with _c4:
-                    _sel_nv  = st.multiselect("Nguồn vốn", _f_nv, key="tq_dh_nv",
-                                               placeholder="TW / ĐP...") if _f_nv else []
+                    _sel_ct   = st.multiselect("Chương trình", _f_ct, key="tq_dh_ct",
+                                                placeholder="Tất cả CT...") if _f_ct else []
                 with _c5:
+                    _sel_nv   = st.multiselect("Nguồn vốn", _f_nv, key="tq_dh_nv",
+                                                placeholder="TW / ĐP...") if _f_nv else []
+                with _c6:
                     st.write("")
                     if st.button("🔄", key="tq_dh_clear", help="Xóa tất cả bộ lọc",
                                  use_container_width=True):
-                        for _k in ["tq_dh_pgd", "tq_dh_xa", "tq_dh_nv"]:
+                        for _k in ["tq_dh_pgd", "tq_dh_xa", "tq_dh_dvut", "tq_dh_ct", "tq_dh_nv"]:
                             st.session_state.pop(_k, None)
                         st.rerun()
-                _sel_ct = []
 
                 # Áp dụng tất cả filter lên dt → dt_chung
                 dt_chung = dt.copy()
                 if _sel_pgd and COT_TEN_PGD in dt_chung.columns:
                     dt_chung = dt_chung[dt_chung[COT_TEN_PGD].isin(_sel_pgd)]
-                if _sel_ct and COT_TEN_CT in dt_chung.columns:
-                    dt_chung = dt_chung[dt_chung[COT_TEN_CT].isin(_sel_ct)]
                 if _sel_xa and cot_xa and cot_xa in dt_chung.columns:
                     dt_chung = dt_chung[dt_chung[cot_xa].isin(_sel_xa)]
+                if _sel_dvut and COT_DVUT in dt_chung.columns:
+                    dt_chung = dt_chung[dt_chung[COT_DVUT].isin(_sel_dvut)]
+                if _sel_ct and COT_TEN_CT in dt_chung.columns:
+                    dt_chung = dt_chung[dt_chung[COT_TEN_CT].isin(_sel_ct)]
                 if _sel_nv and "_nv_label" in dt_chung.columns:
                     dt_chung = dt_chung[dt_chung["_nv_label"].isin(_sel_nv)]
                 dt_chung = _tqsvc.loc_du_no_duong(dt_chung, COT_TONG_DU_NO)
 
                 # filter_chung cho _xuat_pdf_den_han (PGD, CT, Xã)
                 filter_chung: dict = {}
-                if _sel_pgd: filter_chung[COT_TEN_PGD] = _sel_pgd
-                if _sel_ct:  filter_chung[COT_TEN_CT]  = _sel_ct
+                if _sel_pgd:  filter_chung[COT_TEN_PGD] = _sel_pgd
+                if _sel_ct:   filter_chung[COT_TEN_CT]  = _sel_ct
                 if _sel_xa and cot_xa: filter_chung[cot_xa] = _sel_xa
+                if _sel_dvut: filter_chung[COT_DVUT]    = _sel_dvut
 
                 NHOM_COT = {
                     "Chương trình": COT_TEN_CT,
@@ -1299,7 +1307,7 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                     if tg is not None:
                         st.divider()
                         pdf_key = f"den_han_{key_prefix}_pdf"
-                        _co_loc = bool(_sel_pgd or _sel_ct or _sel_xa or _sel_nv or _no_range)
+                        _co_loc = bool(_sel_pgd or _sel_xa or _sel_dvut or _sel_ct or _sel_nv)
 
                         _ex_col, _pdf_col_btn, _ = st.columns([3, 3, 4])
 

@@ -1556,17 +1556,19 @@ def _add_thanh_phan_tham_du_02xln(doc: Document, du_lieu: dict) -> None:
     doc.add_paragraph()
     
     thanh_phan = [
-        (f"1. {du_lieu.get('ten_pgd', '')}", "Phó Giám đốc", f"NHCSXH {du_lieu.get('ten_nhcsxh', '')}"),
-        (f"2. {du_lieu.get('ten_ubnd', '')}", "Phó Chủ tịch", "UBND xã"),
-        (f"3. {du_lieu.get('ten_hoi_nd', '')}", "Chủ tịch", "Hội Nông dân xã"),
+        (f"1. {du_lieu.get('ten_pgd', '')}", du_lieu.get('chuc_vu_pgd', 'Phó Giám đốc'), f"NHCSXH {du_lieu.get('ten_nhcsxh', '')}"),
+        (f"2. {du_lieu.get('ten_ubnd', '')}", du_lieu.get('chuc_vu_ubnd', 'Phó Chủ tịch'), "UBND xã"),
+        (f"3. {du_lieu.get('ten_hoi_nd', '')}", du_lieu.get('chuc_vu_hoi_nd', 'Chủ tịch Hội Nông dân xã'), ""),
         (f"4. {du_lieu.get('ten_cbtd', '')}", "CBTD", f"NHCSXH {du_lieu.get('ten_nhcsxh', '')}"),
         (f"5. {du_lieu.get('ten_to_truong', '')}", "Tổ trưởng", "Tổ TKVV"),
         (f"6. {du_lieu.get('ten_kh', '')}", "", "là khách hàng vay vốn."),
     ]
-    
+
     for ten, chuc_vu, dai_dien in thanh_phan:
-        if chuc_vu:
+        if chuc_vu and dai_dien:
             doc.add_paragraph(f"{ten}, Chức vụ: {chuc_vu}, Đại diện: {dai_dien}")
+        elif chuc_vu:
+            doc.add_paragraph(f"{ten}, {chuc_vu}")
         else:
             doc.add_paragraph(f"{ten} {dai_dien}")
     
@@ -1889,3 +1891,370 @@ def _add_phan_ky_tong_hop(
     _set_cell(row3[0], thong_tin.get('ten_pgd', ''), bold=True, font_size=11)
     _set_cell(row3[1], thong_tin.get('ten_ubnd', ''), bold=True, font_size=11)
     _set_cell(row3[2], thong_tin.get('ten_hoi_nd', ''), bold=True, font_size=11)
+
+
+# ── Thông báo kết quả XLRR ──────────────────────────────────────────────────
+
+def _tao_word_thong_bao_ket_qua_cn(
+    ds_ket_qua: list[dict],
+    so_quyet_dinh: str,
+    ngay_quyet_dinh: date,
+    dot: int,
+    nam: int,
+) -> bytes:
+    """Thông báo kết quả xử lý nợ rủi ro toàn CN gửi các PGD.
+
+    Bảng tổng hợp theo PGD: PGD | Số HS | Khoanh | Xóa | Không duyệt | Tổng tiền duyệt.
+    """
+    from collections import defaultdict
+
+    doc = Document()
+    _style_doc_xln(doc)
+    sec = doc.sections[0]
+    sec.page_height = Cm(29.7)
+    sec.page_width = Cm(21.0)
+    _set_margins(doc, left_cm=3.0, right_cm=2.0, top_cm=2.5, bottom_cm=2.5)
+
+    ngay_hom_nay = date.today()
+
+    # Header 2 cột
+    hdr = doc.add_table(rows=1, cols=2)
+    hdr.style = "Table Grid"
+    for cell in hdr.rows[0].cells:
+        _bo_border_cell(cell)
+
+    cell_l = hdr.rows[0].cells[0]
+    cell_r = hdr.rows[0].cells[1]
+
+    p_l = cell_l.paragraphs[0]
+    p_l.alignment = WD_ALIGN_PARAGRAPH.LEFT
+    r = p_l.add_run("CHI NHÁNH NHCSXH TỈNH ĐỒNG NAI")
+    r.bold = True
+    r.font.name = "Times New Roman"
+    r.font.size = Pt(12)
+    p_l2 = cell_l.add_paragraph()
+    r2 = p_l2.add_run(f"Số: .../TB-NHCS")
+    r2.font.name = "Times New Roman"
+    r2.font.size = Pt(12)
+
+    p_r = cell_r.paragraphs[0]
+    p_r.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    rr = p_r.add_run("CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM")
+    rr.bold = True
+    rr.font.name = "Times New Roman"
+    rr.font.size = Pt(12)
+    p_r2 = cell_r.add_paragraph()
+    p_r2.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    rr2 = p_r2.add_run("Độc lập - Tự do - Hạnh phúc")
+    rr2.bold = True
+    rr2.font.name = "Times New Roman"
+    rr2.font.size = Pt(12)
+    p_r3 = cell_r.add_paragraph()
+    p_r3.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    rr3 = p_r3.add_run(
+        f"Đồng Nai, ngày {ngay_hom_nay.day:02d} tháng {ngay_hom_nay.month:02d} năm {ngay_hom_nay.year}"
+    )
+    rr3.font.name = "Times New Roman"
+    rr3.font.size = Pt(12)
+
+    doc.add_paragraph()
+    t = doc.add_paragraph()
+    t.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    tr = t.add_run("THÔNG BÁO")
+    tr.bold = True
+    tr.font.name = "Times New Roman"
+    tr.font.size = Pt(14)
+
+    sub = doc.add_paragraph(
+        f"Kết quả xử lý nợ bị rủi ro đợt {dot} năm {nam}"
+    )
+    sub.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    sub.runs[0].font.name = "Times New Roman"
+    sub.runs[0].font.size = Pt(12)
+
+    doc.add_paragraph()
+    kq = doc.add_paragraph(
+        f"Căn cứ Quyết định số {so_quyet_dinh} ngày "
+        f"{ngay_quyet_dinh.day:02d}/{ngay_quyet_dinh.month:02d}/{ngay_quyet_dinh.year} "
+        "của NHCSXH về việc xử lý nợ bị rủi ro, Chi nhánh thông báo kết quả như sau:"
+    )
+    kq.runs[0].font.name = "Times New Roman"
+    kq.runs[0].font.size = Pt(12)
+
+    # Tổng hợp theo PGD
+    agg: dict[str, dict] = defaultdict(lambda: {
+        "so_hs": 0, "khoanh": 0, "xoa": 0, "khong_duyet": 0, "tong_tien": 0.0
+    })
+    for r_item in ds_ket_qua:
+        pgd = r_item.get("ten_pgd", "Không rõ")
+        agg[pgd]["so_hs"] += 1
+        ket_qua = r_item.get("ket_qua", "")
+        if ket_qua == "da_khoanh":
+            agg[pgd]["khoanh"] += 1
+        elif ket_qua == "da_xoa":
+            agg[pgd]["xoa"] += 1
+        elif ket_qua == "khong_duyet":
+            agg[pgd]["khong_duyet"] += 1
+        agg[pgd]["tong_tien"] += float(r_item.get("so_tien_duoc_duyet", 0) or 0)
+
+    headers = ["STT", "Đơn vị", "Số HS", "Khoanh", "Xóa", "Không duyệt", "Tổng tiền (đồng)"]
+    table = doc.add_table(rows=1, cols=len(headers))
+    table.style = "Table Grid"
+    hdr_cells = table.rows[0].cells
+    for i, h in enumerate(headers):
+        _set_cell(hdr_cells[i], h, bold=True, font_size=10)
+
+    tong_hs = tong_kh = tong_xoa = tong_kd = 0
+    tong_tien_all = 0.0
+    for idx, (pgd_name, v) in enumerate(sorted(agg.items()), 1):
+        row_cells = table.add_row().cells
+        _set_cell(row_cells[0], str(idx), font_size=10)
+        _set_cell(row_cells[1], pgd_name, font_size=10, align=WD_ALIGN_PARAGRAPH.LEFT)
+        _set_cell(row_cells[2], str(v["so_hs"]), font_size=10)
+        _set_cell(row_cells[3], str(v["khoanh"]), font_size=10)
+        _set_cell(row_cells[4], str(v["xoa"]), font_size=10)
+        _set_cell(row_cells[5], str(v["khong_duyet"]), font_size=10)
+        _set_cell(row_cells[6], fmt(v["tong_tien"]), font_size=10, align=WD_ALIGN_PARAGRAPH.RIGHT)
+        tong_hs += v["so_hs"]
+        tong_kh += v["khoanh"]
+        tong_xoa += v["xoa"]
+        tong_kd += v["khong_duyet"]
+        tong_tien_all += v["tong_tien"]
+
+    # Dòng tổng
+    tong_row = table.add_row().cells
+    _set_cell(tong_row[0], "", font_size=10)
+    _set_cell(tong_row[1], "Tổng cộng", bold=True, font_size=10, align=WD_ALIGN_PARAGRAPH.LEFT)
+    _set_cell(tong_row[2], str(tong_hs), bold=True, font_size=10)
+    _set_cell(tong_row[3], str(tong_kh), bold=True, font_size=10)
+    _set_cell(tong_row[4], str(tong_xoa), bold=True, font_size=10)
+    _set_cell(tong_row[5], str(tong_kd), bold=True, font_size=10)
+    _set_cell(tong_row[6], fmt(tong_tien_all), bold=True, font_size=10, align=WD_ALIGN_PARAGRAPH.RIGHT)
+
+    doc.add_paragraph()
+    p_note = doc.add_paragraph(
+        "Đề nghị các Phòng giao dịch triển khai thực hiện theo quy định."
+    )
+    p_note.runs[0].font.name = "Times New Roman"
+    p_note.runs[0].font.size = Pt(12)
+
+    # Phần ký Giám đốc CN
+    doc.add_paragraph()
+    p_ngay = doc.add_paragraph()
+    p_ngay.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    r_ngay = p_ngay.add_run(
+        f"Đồng Nai, ngày {ngay_hom_nay.day:02d} tháng {ngay_hom_nay.month:02d} năm {ngay_hom_nay.year}"
+    )
+    r_ngay.italic = True
+    r_ngay.font.name = "Times New Roman"
+    r_ngay.font.size = Pt(12)
+
+    ky_tbl = doc.add_table(rows=1, cols=2)
+    ky_tbl.alignment = WD_TABLE_ALIGNMENT.CENTER
+    for cell in ky_tbl.rows[0].cells:
+        _bo_border_cell(cell)
+
+    _set_cell(ky_tbl.rows[0].cells[0], "NƠI NHẬN\n- Các PGD trực thuộc;\n- Lưu NHCS.", font_size=10, align=WD_ALIGN_PARAGRAPH.LEFT)
+    p_gd = ky_tbl.rows[0].cells[1].paragraphs[0]
+    p_gd.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    r_gd = p_gd.add_run("GIÁM ĐỐC")
+    r_gd.bold = True
+    r_gd.font.name = "Times New Roman"
+    r_gd.font.size = Pt(12)
+    p_gd2 = ky_tbl.rows[0].cells[1].add_paragraph()
+    p_gd2.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    r_gd2 = p_gd2.add_run("\n\n\n\n(Ký, đóng dấu)")
+    r_gd2.italic = True
+    r_gd2.font.name = "Times New Roman"
+    r_gd2.font.size = Pt(12)
+
+    buf = io.BytesIO()
+    doc.save(buf)
+    return buf.getvalue()
+
+
+def _tao_word_thong_bao_ket_qua_pgd(
+    ds_ket_qua_pgd: list[dict],
+    ten_pgd: str,
+    so_quyet_dinh: str,
+    ngay_quyet_dinh: date,
+    dot: int,
+    nam: int,
+) -> bytes:
+    """Thông báo kết quả xử lý nợ rủi ro chi tiết cho 1 PGD.
+
+    Bảng chi tiết từng KH: KH | Số KU | Biện pháp | Kết quả | Tiền duyệt | Ghi chú.
+    """
+    ten_pgd_plain = _pgd_plain(ten_pgd)
+    ten_pgd_line = _pgd_line(ten_pgd)
+
+    doc = Document()
+    _style_doc_xln(doc)
+    sec = doc.sections[0]
+    sec.page_height = Cm(29.7)
+    sec.page_width = Cm(21.0)
+    _set_margins(doc, left_cm=3.0, right_cm=2.0, top_cm=2.5, bottom_cm=2.5)
+
+    ngay_hom_nay = date.today()
+
+    # Header
+    hdr = doc.add_table(rows=1, cols=2)
+    hdr.style = "Table Grid"
+    for cell in hdr.rows[0].cells:
+        _bo_border_cell(cell)
+
+    cell_l = hdr.rows[0].cells[0]
+    cell_r = hdr.rows[0].cells[1]
+
+    p_l = cell_l.paragraphs[0]
+    p_l.alignment = WD_ALIGN_PARAGRAPH.LEFT
+    rl = p_l.add_run("CHI NHÁNH NHCSXH TỈNH ĐỒNG NAI")
+    rl.bold = True
+    rl.font.name = "Times New Roman"
+    rl.font.size = Pt(12)
+    p_l2 = cell_l.add_paragraph()
+    rl2 = p_l2.add_run(ten_pgd_line)
+    rl2.bold = True
+    rl2.font.name = "Times New Roman"
+    rl2.font.size = Pt(12)
+    p_l3 = cell_l.add_paragraph()
+    rl3 = p_l3.add_run("Số: .../TB-NHCS")
+    rl3.font.name = "Times New Roman"
+    rl3.font.size = Pt(12)
+
+    p_r = cell_r.paragraphs[0]
+    p_r.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    rr = p_r.add_run("CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM")
+    rr.bold = True
+    rr.font.name = "Times New Roman"
+    rr.font.size = Pt(12)
+    p_r2 = cell_r.add_paragraph()
+    p_r2.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    rr2 = p_r2.add_run("Độc lập - Tự do - Hạnh phúc")
+    rr2.bold = True
+    rr2.font.name = "Times New Roman"
+    rr2.font.size = Pt(12)
+    p_r3 = cell_r.add_paragraph()
+    p_r3.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    rr3 = p_r3.add_run(
+        f"{ten_pgd_plain}, ngày {ngay_hom_nay.day:02d} tháng {ngay_hom_nay.month:02d} năm {ngay_hom_nay.year}"
+    )
+    rr3.font.name = "Times New Roman"
+    rr3.font.size = Pt(12)
+
+    doc.add_paragraph()
+    t = doc.add_paragraph()
+    t.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    tr = t.add_run("THÔNG BÁO")
+    tr.bold = True
+    tr.font.name = "Times New Roman"
+    tr.font.size = Pt(14)
+
+    sub = doc.add_paragraph(
+        f"Kết quả xử lý nợ bị rủi ro đợt {dot} năm {nam} — {ten_pgd_line}"
+    )
+    sub.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    sub.runs[0].font.name = "Times New Roman"
+    sub.runs[0].font.size = Pt(12)
+
+    doc.add_paragraph()
+    kq = doc.add_paragraph(
+        f"Căn cứ Quyết định số {so_quyet_dinh} ngày "
+        f"{ngay_quyet_dinh.day:02d}/{ngay_quyet_dinh.month:02d}/{ngay_quyet_dinh.year} "
+        "của NHCSXH, Chi nhánh thông báo kết quả xử lý nợ bị rủi ro cho "
+        f"{ten_pgd_line} như sau:"
+    )
+    kq.runs[0].font.name = "Times New Roman"
+    kq.runs[0].font.size = Pt(12)
+
+    # Bảng chi tiết từng KH
+    ket_qua_label = {
+        "da_khoanh": "Đã khoanh",
+        "da_xoa": "Đã xóa",
+        "khong_duyet": "Không duyệt",
+        "cho_xu_ly": "Chờ xử lý",
+    }
+    headers = ["STT", "Tên KH", "Số KU", "Biện pháp", "Kết quả", "Tiền duyệt (đồng)", "Ghi chú"]
+    table = doc.add_table(rows=1, cols=len(headers))
+    table.style = "Table Grid"
+    hdr_cells = table.rows[0].cells
+    for i, h in enumerate(headers):
+        _set_cell(hdr_cells[i], h, bold=True, font_size=10)
+
+    tong_tien = 0.0
+    for idx, r_item in enumerate(ds_ket_qua_pgd, 1):
+        row_cells = table.add_row().cells
+        _set_cell(row_cells[0], str(idx), font_size=10)
+        _set_cell(row_cells[1], r_item.get("ten_kh", ""), font_size=10, align=WD_ALIGN_PARAGRAPH.LEFT)
+        _set_cell(row_cells[2], r_item.get("so_ku", ""), font_size=10)
+        bp = "Khoanh" if r_item.get("bien_phap") == "khoanh" else "Xóa"
+        _set_cell(row_cells[3], bp, font_size=10)
+        kq_text = ket_qua_label.get(r_item.get("ket_qua", ""), r_item.get("ket_qua", ""))
+        _set_cell(row_cells[4], kq_text, font_size=10)
+        tien = float(r_item.get("so_tien_duoc_duyet", 0) or 0)
+        _set_cell(row_cells[5], fmt(tien), font_size=10, align=WD_ALIGN_PARAGRAPH.RIGHT)
+        _set_cell(row_cells[6], r_item.get("ghi_chu", ""), font_size=9, align=WD_ALIGN_PARAGRAPH.LEFT)
+        tong_tien += tien
+
+    # Dòng tổng
+    tong_row = table.add_row().cells
+    _set_cell(tong_row[0], "", font_size=10)
+    _set_cell(tong_row[1], "Tổng cộng", bold=True, font_size=10, align=WD_ALIGN_PARAGRAPH.LEFT)
+    for i in range(2, 5):
+        _set_cell(tong_row[i], "", font_size=10)
+    _set_cell(tong_row[5], fmt(tong_tien), bold=True, font_size=10, align=WD_ALIGN_PARAGRAPH.RIGHT)
+    _set_cell(tong_row[6], "", font_size=10)
+
+    doc.add_paragraph()
+    p_note = doc.add_paragraph(
+        f"Đề nghị {ten_pgd_line} thực hiện theo quy định và thông báo kết quả đến "
+        "khách hàng trong thời hạn quy định."
+    )
+    p_note.runs[0].font.name = "Times New Roman"
+    p_note.runs[0].font.size = Pt(12)
+
+    # Phần ký 2 cột: PGD nhận + Giám đốc CN
+    doc.add_paragraph()
+    p_ngay = doc.add_paragraph()
+    p_ngay.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    r_ngay = p_ngay.add_run(
+        f"Đồng Nai, ngày {ngay_hom_nay.day:02d} tháng {ngay_hom_nay.month:02d} năm {ngay_hom_nay.year}"
+    )
+    r_ngay.italic = True
+    r_ngay.font.name = "Times New Roman"
+    r_ngay.font.size = Pt(12)
+
+    ky_tbl = doc.add_table(rows=1, cols=2)
+    ky_tbl.alignment = WD_TABLE_ALIGNMENT.CENTER
+    for cell in ky_tbl.rows[0].cells:
+        _bo_border_cell(cell)
+
+    p_pgd = ky_tbl.rows[0].cells[0].paragraphs[0]
+    p_pgd.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    r_pgd = p_pgd.add_run(f"TRƯỞNG {ten_pgd_line.upper()}")
+    r_pgd.bold = True
+    r_pgd.font.name = "Times New Roman"
+    r_pgd.font.size = Pt(12)
+    p_pgd2 = ky_tbl.rows[0].cells[0].add_paragraph()
+    p_pgd2.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    r_pgd2 = p_pgd2.add_run("\n\n\n\n(Ký, đóng dấu)")
+    r_pgd2.italic = True
+    r_pgd2.font.name = "Times New Roman"
+    r_pgd2.font.size = Pt(12)
+
+    p_gd = ky_tbl.rows[0].cells[1].paragraphs[0]
+    p_gd.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    r_gd = p_gd.add_run("GIÁM ĐỐC CHI NHÁNH")
+    r_gd.bold = True
+    r_gd.font.name = "Times New Roman"
+    r_gd.font.size = Pt(12)
+    p_gd2 = ky_tbl.rows[0].cells[1].add_paragraph()
+    p_gd2.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    r_gd2 = p_gd2.add_run("\n\n\n\n(Ký, đóng dấu)")
+    r_gd2.italic = True
+    r_gd2.font.name = "Times New Roman"
+    r_gd2.font.size = Pt(12)
+
+    buf = io.BytesIO()
+    doc.save(buf)
+    return buf.getvalue()

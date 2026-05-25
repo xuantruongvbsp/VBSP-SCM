@@ -62,7 +62,7 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
         # Render báo cáo được chọn
         st.divider()
         
-        if selected_report == "hstd":
+        if selected_report == "HSTD)":
             render_tong_hop_hstd(
                 tab=None,
                 df=df,
@@ -70,7 +70,7 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                 pgd_user=pgd_user,
                 username=username,
             )
-        elif selected_report == "noruiro":
+        elif selected_report == "rủi":
             render_no_rui_ro(
                 tab=None,
                 df=df,
@@ -78,7 +78,7 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                 pgd_user=pgd_user,
                 username=username,
             )
-        elif selected_report == "nq11":
+        elif selected_report == "NQ11":
             render_nq11(
                 tab=None,
                 df_nq11=df_nq11,
@@ -86,7 +86,7 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                 pgd_user=pgd_user,
                 username=username,
             )
-        elif selected_report == "gqvl":
+        elif selected_report == "GQVL":
             render_gqvl(
                 tab=None,
                 df_gqvl=df_gqvl,
@@ -94,7 +94,7 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                 pgd_user=pgd_user,
                 username=username,
             )
-        elif selected_report == "cdtotkvv":
+        elif selected_report == "TK&VV":
             render_cdtotkvv(
                 tab=None,
                 df_cdtotkvv=df_cdtotkvv,

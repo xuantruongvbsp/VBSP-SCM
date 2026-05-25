@@ -536,46 +536,130 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                     key="ct_cocau",
                 )
 
+                # ═══════════════════════════════════════════════════════════════════════════
+                # 📊 TOP 10 CHƯƠNG TRÌNH - CẢI TIẾN
+                # ═══════════════════════════════════════════════════════════════════════════
                 df_top10 = df_ct.nlargest(10, "du_no").copy()
-                df_top10["label"] = df_top10["ten_ct"].str[:30]
+                df_top10["label"] = df_top10["ten_ct"].str[:35]
                 df_top10["du_no_ty"] = df_top10["du_no"] / 1e6
                 df_top10["du_no_tw_ty"] = df_top10["du_no_tw"] / 1e6
                 df_top10["du_no_dp_ty"] = df_top10["du_no_dp"] / 1e6
                 df_top10["du_no_tw_ty"] = df_top10["du_no_tw_ty"].where(df_top10["du_no_tw_ty"] > 0, 0)
                 df_top10["du_no_dp_ty"] = df_top10["du_no_dp_ty"].where(df_top10["du_no_dp_ty"] > 0, 0)
+                
+                # Tính tổng để hiển thị (VND → tỷ đồng)
+                tong_top10 = df_top10["du_no"].sum() / 1e9
+                tong_tw = df_top10["du_no_tw"].sum() / 1e9
+                tong_dp = df_top10["du_no_dp"].sum() / 1e9
+
+                # Thêm cột STT và tỷ lệ — reset index để STT đúng 1..N
+                df_top10 = df_top10.reset_index(drop=True)
+                df_top10["ty_le"] = (df_top10["du_no"] / df_top10["du_no"].sum() * 100).round(1)
+                df_top10["label_display"] = df_top10.apply(
+                    lambda x: f"#{int(x.name)+1} {x['label']} ({x['ty_le']}%)", axis=1
+                )
+                
+                # Card tổng quan
+                st.markdown(f"""
+                <div style="display: flex; gap: 16px; margin-bottom: 20px;">
+                    <div style="flex: 1; background: linear-gradient(135deg, #1e3a5f 0%, #3b5998 100%); 
+                                color: white; padding: 16px; border-radius: 12px; text-align: center;">
+                        <div style="font-size: 0.85rem; opacity: 0.9;">Tổng Top 10 CT</div>
+                        <div style="font-size: 1.6rem; font-weight: 700;">{vn(tong_top10, 1)} tỷ</div>
+                    </div>
+                    <div style="flex: 1; background: linear-gradient(135deg, #059669 0%, #10b981 100%); 
+                                color: white; padding: 16px; border-radius: 12px; text-align: center;">
+                        <div style="font-size: 0.85rem; opacity: 0.9;">Nguồn TW</div>
+                        <div style="font-size: 1.6rem; font-weight: 700;">{vn(tong_tw, 1)} tỷ</div>
+                    </div>
+                    <div style="flex: 1; background: linear-gradient(135deg, #ea580c 0%, #f97316 100%); 
+                                color: white; padding: 16px; border-radius: 12px; text-align: center;">
+                        <div style="font-size: 0.85rem; opacity: 0.9;">Nguồn ĐP</div>
+                        <div style="font-size: 1.6rem; font-weight: 700;">{vn(tong_dp, 1)} tỷ</div>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Biểu đồ cải tiến
                 fig_ct = go.Figure()
+                
+                # TW bar với gradient effect
                 fig_ct.add_trace(go.Bar(
-                    y=df_top10["label"],
+                    y=df_top10["label_display"],
                     x=df_top10["du_no_tw_ty"],
-                    name="TW",
+                    name="🏛️ Nguồn TW",
                     orientation="h",
-                    marker_color="#2E7D32",
-                    text=df_top10["du_no_tw_ty"].apply(lambda x: vn(x, 1) if x > 0 else ""),
+                    marker=dict(
+                        color=["rgba(5, 150, 105, 0.85)" for _ in range(len(df_top10))],
+                        line=dict(color="rgba(5, 150, 105, 1)", width=1.5),
+                    ),
+                    text=[vn(x, 0) if x > 0 else "" for x in df_top10["du_no_tw_ty"]],
                     textposition="inside",
                     insidetextanchor="middle",
-                    textfont=dict(color="white", size=10),
+                    textfont=dict(color="white", size=11, family="Arial Black"),
+                    hovertemplate="<b>%{y}</b><br>" +
+                                  "Nguồn TW: %{x:,.0f} triệu đồng<br>" +
+                                  "<extra></extra>",
                 ))
+                
+                # ĐP bar với gradient effect
                 fig_ct.add_trace(go.Bar(
-                    y=df_top10["label"],
+                    y=df_top10["label_display"],
                     x=df_top10["du_no_dp_ty"],
-                    name="ĐP",
+                    name="🏘️ Nguồn ĐP",
                     orientation="h",
-                    marker_color="#E65100",
-                    text=df_top10["du_no_dp_ty"].apply(lambda x: vn(x, 1) if x > 0 else ""),
+                    marker=dict(
+                        color=["rgba(234, 88, 12, 0.85)" for _ in range(len(df_top10))],
+                        line=dict(color="rgba(234, 88, 12, 1)", width=1.5),
+                    ),
+                    text=[vn(x, 0) if x > 0 else "" for x in df_top10["du_no_dp_ty"]],
                     textposition="inside",
                     insidetextanchor="middle",
-                    textfont=dict(color="white", size=10),
+                    textfont=dict(color="white", size=11, family="Arial Black"),
+                    hovertemplate="<b>%{y}</b><br>" +
+                                  "Nguồn ĐP: %{x:,.0f} triệu đồng<br>" +
+                                  "<extra></extra>",
                 ))
+                
+                # Layout cải tiến
                 fig_ct.update_layout(
                     barmode="stack",
-                    title="📊 Top 10 chương trình theo dư nợ",
-                    xaxis_title="Dư nợ (triệu đồng)",
-                    yaxis=dict(autorange="reversed"),
-                    height=max(350, len(df_top10) * 35),
-                    margin=dict(l=10, r=40, t=40, b=10),
-                    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+                    title=dict(
+                        text="📊 Top 10 Chương trình theo Dư nợ (triệu đồng)",
+                        font=dict(size=18, color="#1e3a5f", family="Arial Black"),
+                        x=0.5,
+                        xanchor="center",
+                    ),
+                    xaxis=dict(
+                        title=dict(text="Dư nợ (triệu đồng)", font=dict(size=12, color="#64748b")),
+                        showgrid=True,
+                        gridcolor="rgba(100, 116, 139, 0.2)",
+                        zeroline=False,
+                    ),
+                    yaxis=dict(
+                        autorange="reversed",
+                        showgrid=False,
+                        tickfont=dict(size=12, color="#334155"),
+                    ),
+                    height=max(450, len(df_top10) * 45),  # Tăng chiều cao
+                    margin=dict(l=280, r=40, t=80, b=40),  # Tăng lề trái cho label dài
+                    legend=dict(
+                        orientation="h",
+                        yanchor="bottom",
+                        y=1.02,
+                        xanchor="center",
+                        x=0.5,
+                        bgcolor="rgba(255,255,255,0.9)",
+                        bordercolor="#e2e8f0",
+                        borderwidth=1,
+                        font=dict(size=13),
+                    ),
+                    plot_bgcolor="white",
+                    paper_bgcolor="white",
+                    bargap=0.25,  # Tăng khoảng cách giữa các bar
                 )
-                st.plotly_chart(fig_ct, use_container_width=True, key="ct_bar_top10")
+                
+                st.plotly_chart(fig_ct, use_container_width=True, key="ct_bar_top10_v2")
 
         else:
             _miss_ct = [c for c in [COT_TEN_CT, COT_TONG_DU_NO] if c not in df.columns]

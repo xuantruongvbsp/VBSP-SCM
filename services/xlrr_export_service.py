@@ -15,6 +15,9 @@ import pandas as pd
 
 from services.xlrr_service import HoSoRuiRo
 from data.pgd import pgd_slug as _pgd_slug
+from logger import get_logger
+
+logger = get_logger(__name__)
 
 
 # ── Constants ───────────────────────────────────────────────────────────────
@@ -48,8 +51,11 @@ EXCEL_COLUMNS = [
     "ngay_lap_02",
     "dia_diem_02",
     "ten_pgd_02",
+    "chuc_vu_pgd_02",
     "ten_ubnd_02",
+    "chuc_vu_ubnd_02",
     "ten_hoi_nd_02",
+    "chuc_vu_hoi_nd_02",
     "ten_cbtd_02",
     "ten_to_truong_02",
     "chi_tiet_thiet_hai_02",
@@ -285,8 +291,9 @@ def merge_du_lieu_pgd_vao_cn(
         LuuTruXLRR.luu_cn(ds_merged, nam, thang, nguoi_nhap)
         
     except Exception as e:
+        logger.error("merge_du_lieu_pgd_vao_cn: %s", e, exc_info=True)
         errors.append(str(e))
-    
+
     return count, errors
 
 

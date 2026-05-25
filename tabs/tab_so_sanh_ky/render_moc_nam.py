@@ -27,7 +27,7 @@ from config import (
 from data.hstd import doc_baseline_merged
 from data.pgd import pgd_slug
 from snapshot_service import (
-    doc_nq11_snapshot, danh_sach_ky_nq11,
+    doc_nq11_snapshot, danh_sach_ky_nq11, luu_nq11_snapshot,
     doc_gqvl_snapshot, danh_sach_ky_gqvl,
     doc_cdtotkvv_snapshot, danh_sach_ky_cdtotkvv,
 )
@@ -43,6 +43,13 @@ from tabs.tab_so_sanh_ky._common import (
     delta_str, pct_change_str, fmt_pct_vn, tl_nqh,
     render_kpi_row, render_quality_bars_2_ky,
     render_comparison_table, render_hbar_chart, render_flow_diagram,
+)
+from tabs.tab_so_sanh_ky._kpi_cards import (
+    render_big_metric_card,
+    render_mini_cards_row,
+    render_debt_structure_donut,
+    render_compact_comparison_table,
+    render_dashboard_header,
 )
 from tabs.tab_so_sanh_ky._export import render_export_ui, render_export_hstd_ui
 from utils import fmt_ty, fmt_so
@@ -106,6 +113,35 @@ def _snap(agg: dict) -> dict:
 def _ds(v: float, b: float) -> str:
     """Delta string helper."""
     return delta_str(v - b, "tien")
+
+
+def _render_nq11_manual_snap(df_nq11: "pd.DataFrame", key_prefix: str) -> None:
+    """Widget tạo snapshot NQ11 thủ công cho admin — dùng khi thiếu snapshot tháng 12."""
+    with st.expander("🔧 Tạo snapshot NQ11 tháng 12 (Admin)", expanded=True):
+        st.caption("Tạo snapshot từ dữ liệu NQ11 hiện đang tải, với kỳ do bạn chỉ định.")
+        username = st.session_state.get("username", "unknown")
+        c1, c2 = st.columns([2, 1])
+        with c1:
+            ky_input = st.text_input(
+                "Kỳ snapshot (YYYY-MM)",
+                value="2024-12",
+                placeholder="Ví dụ: 2024-12",
+                key=f"{key_prefix}nq11_manual_ky",
+            )
+        with c2:
+            st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
+            btn = st.button("✅ Tạo snapshot", key=f"{key_prefix}nq11_manual_btn", type="primary")
+
+        if btn:
+            import re
+            if not re.fullmatch(r"\d{4}-\d{2}", ky_input.strip()):
+                st.error("❌ Kỳ không đúng định dạng YYYY-MM (vd: 2024-12).")
+            else:
+                result = luu_nq11_snapshot(df_nq11, username, ky=ky_input.strip())
+                result.hien_thi()
+                if result.thanh_cong:
+                    st.cache_data.clear()
+                    st.rerun()
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -263,12 +299,12 @@ def _render_hstd_section(
     label_bl = f"31/12/{chon_nam}"
     label_ht = ngay_sl or "Hiện tại"
 
-    st.caption(f"**Kỳ hiện tại:** {label_ht} &nbsp;|&nbsp; **Mốc so sánh:** {label_bl}")
-    st.divider()
+    # ═══════════════════════════════════════════════════════════════════════
+    # 📊 DASHBOARD TỔNG QUAN MỚI
+    # ═══════════════════════════════════════════════════════════════════════
+    render_dashboard_header(label_ht, label_bl, key_prefix)
 
-    # ── SECTION 1: KPI ────────────────────────────────────────────────────
-    st.markdown("**📈 TỔNG QUAN**")
-
+    # ── Tính toán các chỉ tiêu ──
     tl_nqh_ht = _tl_nqh(agg_ht["du_no_qh"], agg_ht["tong_du_no"])
     tl_nqh_bl = _tl_nqh(agg_bl["du_no_qh"], agg_bl["tong_du_no"])
     tl_kh_ht  = _tl_nqh(agg_ht["du_no_khoanh"], agg_ht["tong_du_no"])
@@ -280,62 +316,124 @@ def _render_hstd_section(
     muc_vay_ht = agg_ht["tong_du_no"] / agg_ht["so_ho"] if agg_ht["so_ho"] > 0 else 0
     muc_vay_bl = agg_bl["tong_du_no"] / agg_bl["so_ho"] if agg_bl["so_ho"] > 0 else 0
 
-    # Hàng 1 — Tăng trưởng
-    render_kpi_row([
-        {"label": "💰 Tổng dư nợ", "value": fmt_ty(agg_ht["tong_du_no"]),
-         "delta": agg_ht["tong_du_no"] - agg_bl["tong_du_no"], "unit": "tien",
-         "help": f"Mốc: {fmt_ty(agg_bl['tong_du_no'])}"},
-        {"label": "📋 Số khế ước", "value": fmt_so(agg_ht["so_ku"]),
-         "delta": agg_ht["so_ku"] - agg_bl["so_ku"], "unit": "so",
-         "help": f"Mốc: {fmt_so(agg_bl['so_ku'])}"},
-        {"label": "👥 Số hộ vay", "value": fmt_so(agg_ht["so_ho"]),
-         "delta": agg_ht["so_ho"] - agg_bl["so_ho"], "unit": "so",
-         "help": f"Mốc: {fmt_so(agg_bl['so_ho'])}"},
-        {"label": "💵 Mức vay BQ/KH", "value": fmt_ty(muc_vay_ht),
-         "delta": muc_vay_ht - muc_vay_bl, "unit": "tien",
-         "help": f"Mốc: {fmt_ty(muc_vay_bl)}"},
-    ])
-
-    # Hàng 2 — NQH & khoanh
-    render_kpi_row([
-        {"label": "⚠️ Tỷ lệ NQH", "value": fmt_pct_vn(tl_nqh_ht),
-         "delta": tl_nqh_ht - tl_nqh_bl, "unit": "pct", "inverse": True,
-         "help": f"Mốc: {fmt_pct_vn(tl_nqh_bl)}"},
-        {"label": "🔴 Dư nợ quá hạn", "value": fmt_ty(agg_ht["du_no_qh"]),
-         "delta": agg_ht["du_no_qh"] - agg_bl["du_no_qh"], "unit": "tien", "inverse": True,
-         "help": f"Mốc: {fmt_ty(agg_bl['du_no_qh'])}"},
-        {"label": "🟡 Dư nợ khoanh", "value": fmt_ty(agg_ht["du_no_khoanh"]),
-         "delta": agg_ht["du_no_khoanh"] - agg_bl["du_no_khoanh"], "unit": "tien", "inverse": True,
-         "help": f"Mốc: {fmt_ty(agg_bl['du_no_khoanh'])}"},
-        {"label": "📊 Tỷ lệ DN khoanh", "value": fmt_pct_vn(tl_kh_ht),
-         "delta": tl_kh_ht - tl_kh_bl, "unit": "pct", "inverse": True,
-         "help": f"Mốc: {fmt_pct_vn(tl_kh_bl)}"},
-    ])
-
-    # Hàng 3 — Nợ xấu & lãi tồn
-    render_kpi_row([
-        {"label": "🚫 Nợ xấu (QH+Khoanh)", "value": fmt_ty(no_xau_ht),
-         "delta": no_xau_ht - no_xau_bl, "unit": "tien", "inverse": True,
-         "help": f"Mốc: {fmt_ty(no_xau_bl)}"},
-        {"label": "📉 Tỷ lệ nợ xấu", "value": fmt_pct_vn(tl_nx_ht),
-         "delta": tl_nx_ht - tl_nx_bl, "unit": "pct", "inverse": True,
-         "help": f"Mốc: {fmt_pct_vn(tl_nx_bl)}"},
-        {"label": "💹 Tổng lãi tồn", "value": fmt_ty(agg_ht["tong_lai_ton"]),
-         "delta": agg_ht["tong_lai_ton"] - agg_bl["tong_lai_ton"], "unit": "tien", "inverse": True,
-         "help": f"Mốc: {fmt_ty(agg_bl['tong_lai_ton'])}"},
-        {"label": "📈 Giải ngân trong năm", "value": fmt_ty(agg_ht["gn_nam"]),
-         "delta": agg_ht["gn_nam"] - agg_bl["gn_nam"], "unit": "tien",
-         "help": f"Mốc: {fmt_ty(agg_bl['gn_nam'])}"},
-    ])
-
-    # Quality bars
-    render_quality_bars_2_ky(
-        f"Kỳ trước · {label_bl}", agg_bl["tong_du_no"], agg_bl["du_no_th"],
-        agg_bl["du_no_qh"], agg_bl["du_no_khoanh"],
-        f"Kỳ sau · {label_ht}", agg_ht["tong_du_no"], agg_ht["du_no_th"],
-        agg_ht["du_no_qh"], agg_ht["du_no_khoanh"],
-    )
-
+    # ── ROW 1: Big Cards (Tổng dư nợ + Nợ xấu) ──
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        # Card Tổng dư nợ - luôn xanh (tăng là tốt)
+        delta_dn_pct = ((agg_ht["tong_du_no"] - agg_bl["tong_du_no"]) / agg_bl["tong_du_no"] * 100) if agg_bl["tong_du_no"] else 0
+        progress_dn = (agg_ht["tong_du_no"] / agg_bl["tong_du_no"] * 100) if agg_bl["tong_du_no"] else 100
+        
+        render_big_metric_card(
+            icon="💰",
+            label="Tổng dư nợ (triệu đồng)",
+            value=fmt_ty(agg_ht["tong_du_no"]),
+            delta_pct=delta_dn_pct,
+            delta_value=agg_ht["tong_du_no"] - agg_bl["tong_du_no"],
+            baseline_value=agg_bl["tong_du_no"],
+            progress_pct=progress_dn,
+            is_inverse=False,
+            color_scheme="blue" if delta_dn_pct >= 0 else "red",
+            key=f"{key_prefix}big_dn",
+        )
+    
+    with col2:
+        # Card Nợ xấu - đỏ nếu tăng, xanh nếu giảm
+        delta_nx_pct = ((no_xau_ht - no_xau_bl) / no_xau_bl * 100) if no_xau_bl else 0
+        progress_nx = (no_xau_ht / no_xau_bl * 100) if no_xau_bl else 100
+        
+        render_big_metric_card(
+            icon="⚠️",
+            label="Nợ xấu QH + Khoanh (triệu đồng)",
+            value=fmt_ty(no_xau_ht),
+            delta_pct=delta_nx_pct,
+            delta_value=no_xau_ht - no_xau_bl,
+            baseline_value=no_xau_bl,
+            progress_pct=progress_nx,
+            is_inverse=True,  # Tăng là xấu
+            color_scheme="green" if delta_nx_pct <= 0 else "red",
+            key=f"{key_prefix}big_nx",
+        )
+    
+    # Badge tỷ lệ nợ xấu
+    col_badge1, col_badge2, _ = st.columns([1, 1, 2])
+    with col_badge1:
+        st.markdown(f"<div style='text-align:center; padding:8px; background:#f0fdf4; border-radius:8px; color:#166534; font-weight:600;'>📉 Tỷ lệ nợ xấu: <b>{fmt_pct_vn(tl_nx_ht)}</b> (mốc: {fmt_pct_vn(tl_nx_bl)})</div>", unsafe_allow_html=True)
+    with col_badge2:
+        st.markdown(f"<div style='text-align:center; padding:8px; background:#fefce8; border-radius:8px; color:#854d0e; font-weight:600;'>📊 Tỷ lệ NQH: <b>{fmt_pct_vn(tl_nqh_ht)}</b> (mốc: {fmt_pct_vn(tl_nqh_bl)})</div>", unsafe_allow_html=True)
+    
+    st.markdown("")  # Spacing
+    
+    # ── ROW 2: Mini Cards ──
+    mini_cards = [
+        {
+            "icon": "👥",
+            "label": "Số hộ vay",
+            "value": fmt_so(agg_ht["so_ho"]),
+            "delta": agg_ht["so_ho"] - agg_bl["so_ho"],
+            "unit": "so",
+            "color": "#3b82f6",  # blue
+        },
+        {
+            "icon": "📋",
+            "label": "Số khế ước",
+            "value": fmt_so(agg_ht["so_ku"]),
+            "delta": agg_ht["so_ku"] - agg_bl["so_ku"],
+            "unit": "so",
+            "color": "#8b5cf6",  # purple
+        },
+        {
+            "icon": "💹",
+            "label": "Tổng lãi tồn",
+            "value": fmt_ty(agg_ht["tong_lai_ton"]),
+            "delta": agg_ht["tong_lai_ton"] - agg_bl["tong_lai_ton"],
+            "unit": "tien",
+            "color": "#eab308",  # yellow
+        },
+        {
+            "icon": "📈",
+            "label": "Giải ngân năm",
+            "value": fmt_ty(agg_ht["gn_nam"]),
+            "delta": agg_ht["gn_nam"] - agg_bl["gn_nam"],
+            "unit": "tien",
+            "color": "#22c55e",  # green
+        },
+    ]
+    render_mini_cards_row(mini_cards, key_prefix=f"{key_prefix}mini")
+    
+    st.markdown("")  # Spacing
+    st.divider()
+    
+    # ── ROW 3: Donut Chart + Comparison Table ──
+    st.markdown("**📊 Cấu trúc dư nợ & So sánh chi tiết**")
+    
+    col_chart, col_table = st.columns([1, 1])
+    
+    with col_chart:
+        render_debt_structure_donut(
+            trong_han=agg_ht["du_no_th"],
+            qua_han=agg_ht["du_no_qh"],
+            khoanh=agg_ht["du_no_khoanh"],
+            title=f"Cấu trúc dư nợ - {label_ht}",
+            key=f"{key_prefix}donut",
+        )
+    
+    with col_table:
+        # Prepare comparison rows
+        comp_rows = [
+            {"label": "Dư nợ trong hạn", "value_bl": agg_bl["du_no_th"], "value_ht": agg_ht["du_no_th"], "is_risk": False, "unit": "tien"},
+            {"label": "Dư nợ quá hạn", "value_bl": agg_bl["du_no_qh"], "value_ht": agg_ht["du_no_qh"], "is_risk": True, "unit": "tien"},
+            {"label": "Dư nợ khoanh", "value_bl": agg_bl["du_no_khoanh"], "value_ht": agg_ht["du_no_khoanh"], "is_risk": True, "unit": "tien"},
+            {"label": "Tỷ lệ NQH (%)", "value_bl": tl_nqh_bl, "value_ht": tl_nqh_ht, "is_risk": True, "unit": "pct"},
+            {"label": "Mức vay BQ/KH", "value_bl": muc_vay_bl, "value_ht": muc_vay_ht, "is_risk": False, "unit": "tien"},
+        ]
+        render_compact_comparison_table(
+            rows=comp_rows,
+            label_bl=label_bl,
+            label_ht=label_ht,
+            key=f"{key_prefix}comptable",
+        )
+    
     st.divider()
 
     # ── SECTION 2: Multi-dimension tabs ───────────────────────────────────
@@ -566,26 +664,38 @@ def _render_nq11_section(
     pgd_user: str | None,
     pgd_mode: bool,
     key_prefix: str,
+    df_nq11: "pd.DataFrame | None" = None,
 ) -> None:
     """Render section cho NQ11 snapshot comparison."""
     ds_ky = danh_sach_ky_nq11()
     if not ds_ky:
         st.warning("⚠️ Chưa có dữ liệu NQ11 snapshot.")
+        if la_phan_he_cn(role) and df_nq11 is not None and not df_nq11.empty:
+            _render_nq11_manual_snap(df_nq11, key_prefix)
         return
 
-    # Tìm các kỳ 12 (mốc năm)
-    ds_nam = sorted([k for k in ds_ky if k.endswith("-12")], reverse=True)
-    if not ds_nam:
-        st.info("ℹ️ Chưa có snapshot NQ11 tháng 12 (mốc năm).")
+    # Ưu tiên kỳ tháng 12 làm mốc — nếu không có thì dùng tất cả kỳ
+    ds_nam_12 = sorted([k for k in ds_ky if k.endswith("-12")], reverse=True)
+    co_thang_12 = bool(ds_nam_12)
+    if not co_thang_12:
+        st.caption("ℹ️ Chưa có snapshot tháng 12 — hiển thị tất cả kỳ có sẵn.")
+        ds_nam = ds_ky
+        if la_phan_he_cn(role) and df_nq11 is not None and not df_nq11.empty:
+            _render_nq11_manual_snap(df_nq11, key_prefix)
+    else:
+        ds_nam = ds_nam_12
+
+    if len(ds_ky) < 2:
+        st.info("ℹ️ Cần ít nhất 2 kỳ snapshot để so sánh.")
         return
 
     col1, col2 = st.columns(2)
     with col1:
-        ky_bl = st.selectbox("Mốc năm", ds_nam, key=f"{key_prefix}nq11_bl")
+        lbl_bl = "Mốc năm (31/12)" if co_thang_12 else "Mốc so sánh"
+        ky_bl = st.selectbox(lbl_bl, ds_nam, key=f"{key_prefix}nq11_bl")
     with col2:
-        # Kỳ hiện tại: các kỳ không phải tháng 12, hoặc tháng 12 gần nhất
         ds_ht = [k for k in ds_ky if k != ky_bl]
-        ky_ht = st.selectbox("Kỳ hiện tại", ds_ht[:5] if ds_ht else ds_ky[:5],
+        ky_ht = st.selectbox("Kỳ hiện tại", ds_ht[:8] if ds_ht else ds_ky[:8],
                              key=f"{key_prefix}nq11_ht")
 
     if ky_bl == ky_ht:
@@ -689,17 +799,32 @@ def _render_gqvl_section(
         st.warning("⚠️ Chưa có dữ liệu GQVL snapshot.")
         return
 
-    ds_nam = sorted([k for k in ds_ky if k.endswith("-12")], reverse=True)
-    if not ds_nam:
-        st.info("ℹ️ Chưa có snapshot GQVL tháng 12 (mốc năm).")
+    ds_nam_12 = sorted([k for k in ds_ky if k.endswith("-12")], reverse=True)
+    co_thang_12 = bool(ds_nam_12)
+    
+    if not co_thang_12:
+        st.info("""
+        ℹ️ **Chưa có snapshot tháng 12 (mốc năm)**
+        
+        Hệ thống đang hiển thị tất cả các kỳ có sẵn để bạn có thể chọn kỳ so sánh thay thế.
+        
+        💡 **Gợi ý:** Upload báo cáo tháng 12 trong tab **Hệ thống** để có mốc năm chuẩn.
+        """)
+        ds_nam = ds_ky
+    else:
+        ds_nam = ds_nam_12
+
+    if len(ds_ky) < 2:
+        st.info("ℹ️ Cần ít nhất 2 kỳ snapshot để so sánh.")
         return
 
     col1, col2 = st.columns(2)
     with col1:
-        ky_bl = st.selectbox("Mốc năm", ds_nam, key=f"{key_prefix}gqvl_bl")
+        lbl_bl = "Mốc năm (31/12)" if co_thang_12 else "Mốc so sánh"
+        ky_bl = st.selectbox(lbl_bl, ds_nam, key=f"{key_prefix}gqvl_bl")
     with col2:
         ds_ht = [k for k in ds_ky if k != ky_bl]
-        ky_ht = st.selectbox("Kỳ hiện tại", ds_ht[:5] if ds_ht else ds_ky[:5],
+        ky_ht = st.selectbox("Kỳ hiện tại", ds_ht[:8] if ds_ht else ds_ky[:8],
                              key=f"{key_prefix}gqvl_ht")
 
     if ky_bl == ky_ht:
@@ -792,17 +917,32 @@ def _render_cdtotkvv_section(
         st.warning("⚠️ Chưa có dữ liệu CDTOTKVV snapshot.")
         return
 
-    ds_nam = sorted([k for k in ds_ky if k.endswith("-12")], reverse=True)
-    if not ds_nam:
-        st.info("ℹ️ Chưa có snapshot CDTOTKVV tháng 12 (mốc năm).")
+    ds_nam_12 = sorted([k for k in ds_ky if k.endswith("-12")], reverse=True)
+    co_thang_12 = bool(ds_nam_12)
+    
+    if not co_thang_12:
+        st.info("""
+        ℹ️ **Chưa có snapshot tháng 12 (mốc năm)**
+        
+        Hệ thống đang hiển thị tất cả các kỳ có sẵn để bạn có thể chọn kỳ so sánh thay thế.
+        
+        💡 **Gợi ý:** Upload báo cáo tháng 12 trong tab **Hệ thống** để có mốc năm chuẩn.
+        """)
+        ds_nam = ds_ky
+    else:
+        ds_nam = ds_nam_12
+
+    if len(ds_ky) < 2:
+        st.info("ℹ️ Cần ít nhất 2 kỳ snapshot để so sánh.")
         return
 
     col1, col2 = st.columns(2)
     with col1:
-        ky_bl = st.selectbox("Mốc năm", ds_nam, key=f"{key_prefix}cdt_bl")
+        lbl_bl = "Mốc năm (31/12)" if co_thang_12 else "Mốc so sánh"
+        ky_bl = st.selectbox(lbl_bl, ds_nam, key=f"{key_prefix}cdt_bl")
     with col2:
         ds_ht = [k for k in ds_ky if k != ky_bl]
-        ky_ht = st.selectbox("Kỳ hiện tại", ds_ht[:5] if ds_ht else ds_ky[:5],
+        ky_ht = st.selectbox("Kỳ hiện tại", ds_ht[:8] if ds_ht else ds_ky[:8],
                              key=f"{key_prefix}cdt_ht")
 
     if ky_bl == ky_ht:
@@ -919,6 +1059,7 @@ def render_moc_nam(tab: DeltaGenerator = None, **kwargs) -> None:
     role     = normalize_role(role_raw)
     pgd_user = kwargs.get("pgd_user")
     pgd_mode = kwargs.get("pgd_mode", False)
+    df_nq11  = kwargs.get("df_nq11")
 
     key_prefix = f"pgd_{pgd_slug(pgd_user)}_" if pgd_mode and pgd_user else "cn_"
 
@@ -946,7 +1087,7 @@ def render_moc_nam(tab: DeltaGenerator = None, **kwargs) -> None:
         if selected_key == "hstd":
             _render_hstd_section(df_full, df, role, pgd_user, pgd_mode, key_prefix)
         elif selected_key == "nq11":
-            _render_nq11_section(role, pgd_user, pgd_mode, key_prefix)
+            _render_nq11_section(role, pgd_user, pgd_mode, key_prefix, df_nq11=df_nq11)
         elif selected_key == "gqvl":
             _render_gqvl_section(role, pgd_user, pgd_mode, key_prefix)
         elif selected_key == "cdtotkvv":

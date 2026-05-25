@@ -823,101 +823,7 @@ def _canh_bao_xa_nqh(df_full: pd.DataFrame) -> None:
     st.plotly_chart(fig, use_container_width=True)
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# SECTION 4b — Giám sát Tập trung Rủi ro (HHI)
-# ═══════════════════════════════════════════════════════════════════════════════
-def _hhi_giam_sat(df_full: pd.DataFrame) -> None:
-    """Giám sát mức độ tập trung danh mục cho vay — HHI theo Xã và Chương trình."""
-    st.markdown("#### 🎯 Giám sát Tập trung Rủi ro — HHI")
 
-    if df_full is None or df_full.empty:
-        st.info("Chưa có dữ liệu để phân tích.")
-        return
-
-    cot_tien = COT_TONG_DU_NO if COT_TONG_DU_NO in df_full.columns else ""
-
-    if not cot_tien:
-        st.warning("Không tìm thấy cột Tổng dư nợ trong dữ liệu.")
-        return
-
-    # ── HHI theo Xã ────────────────────────────────────────────────────
-    hhi_xa = tinh_hhi(df_full, COT_TEN_XA, cot_tien) if COT_TEN_XA in df_full.columns else 0
-    # ── HHI theo Chương trình ──────────────────────────────────────────
-    hhi_ct = tinh_hhi(df_full, COT_TEN_CT, cot_tien) if COT_TEN_CT in df_full.columns else 0
-
-    muc_xa, icon_xa, mau_xa = danh_gia_hhi(hhi_xa)
-    muc_ct, icon_ct, mau_ct = danh_gia_hhi(hhi_ct)
-
-    c_xa, c_ct = st.columns(2)
-
-    with c_xa:
-        st.markdown(
-            f"**🏘️ Tập trung theo Xã**",
-            help="HHI càng cao → dư nợ tập trung vào ít xã → rủi ro địa lý",
-        )
-        st.markdown(
-            f"<span style='font-size:2.2rem;font-weight:800;color:{mau_xa}'>"
-            f"{hhi_xa * 10000:.0f}</span>",
-            unsafe_allow_html=True,
-        )
-        st.caption(f"{icon_xa} {muc_xa}")
-        st.progress(min(hhi_xa * 10000 / 5000, 1.0))
-
-    with c_ct:
-        st.markdown(
-            f"**📌 Tập trung theo Chương trình**",
-            help="HHI càng cao → dư nợ tập trung vào ít chương trình → rủi ro sản phẩm",
-        )
-        st.markdown(
-            f"<span style='font-size:2.2rem;font-weight:800;color:{mau_ct}'>"
-            f"{hhi_ct * 10000:.0f}</span>",
-            unsafe_allow_html=True,
-        )
-        st.caption(f"{icon_ct} {muc_ct}")
-        st.progress(min(hhi_ct * 10000 / 5000, 1.0))
-
-    # ── Thang tham chiếu ──────────────────────────────────────────────
-    st.caption(
-        "Thang HHI: **<1000** ✅ Đa dạng hóa tốt · "
-        "**1000–2500** ⚠️ Tập trung vừa · "
-        "**>2500** 🚨 Tập trung cao"
-    )
-
-    # ── Breakdown chi tiết ─────────────────────────────────────────────
-    with st.expander("📊 Xem chi tiết phân bổ", expanded=False):
-        dim_sel = st.radio(
-            "Phân tích theo",
-            ["🏘️ Theo Xã", "📌 Theo Chương trình"],
-            horizontal=True,
-            key="hhi_dim_sel",
-            label_visibility="collapsed",
-        )
-        if dim_sel == "🏘️ Theo Xã":
-            if COT_TEN_XA in df_full.columns:
-                br = tinh_hhi_breakdown(df_full, COT_TEN_XA, cot_tien)
-                br.columns = ["Xã", "Dư nợ (đồng)", "Tỷ trọng %", "Đóng góp HHI"]
-                br["Dư nợ (triệu đồng)"] = (br["Dư nợ (đồng)"] / 1e6).round(0)
-                br["Dư nợ (triệu đồng)"] = br["Dư nợ (triệu đồng)"].apply(
-                    lambda x: f"{x:,.0f}".replace(",", ".")
-                )
-                st.dataframe(
-                    br[["Xã", "Dư nợ (triệu đồng)", "Tỷ trọng %", "Đóng góp HHI"]],
-                    hide_index=True,
-                    use_container_width=True,
-                )
-        else:
-            if COT_TEN_CT in df_full.columns:
-                br = tinh_hhi_breakdown(df_full, COT_TEN_CT, cot_tien)
-                br.columns = ["Chương trình", "Dư nợ (đồng)", "Tỷ trọng %", "Đóng góp HHI"]
-                br["Dư nợ (triệu đồng)"] = (br["Dư nợ (đồng)"] / 1e6).round(0)
-                br["Dư nợ (triệu đồng)"] = br["Dư nợ (triệu đồng)"].apply(
-                    lambda x: f"{x:,.0f}".replace(",", ".")
-                )
-                st.dataframe(
-                    br[["Chương trình", "Dư nợ (triệu đồng)", "Tỷ trọng %", "Đóng góp HHI"]],
-                    hide_index=True,
-                    use_container_width=True,
-                )
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -1642,7 +1548,6 @@ def _build_exec_items(df_full, role: str, username: str, **kwargs) -> list:
         {"group": "Tổng quan",       "label": "Sức khỏe tín dụng",          "fn": lambda: _render_suc_khoe_tong_quan(df_full)},
         {"group": "Tổng quan",       "label": "Tiến độ & Kế hoạch",         "fn": lambda: _render_tien_do_va_kh(df_full, **kwargs)},
         {"group": "Tổng quan",       "label": "So sánh PGD",                 "fn": lambda: _render_so_sanh_xep_hang_pgd(df_full)},
-        {"group": "Cảnh báo rủi ro", "label": "HHI — Tập trung rủi ro",     "fn": lambda: _hhi_giam_sat(df_full)},
         {"group": "Cảnh báo rủi ro", "label": "NQH theo Xã",                "fn": lambda: _render_nqh_xa_canh_bao(df_full)},
         {"group": "Cảnh báo rủi ro", "label": "Migration & Chuyển dịch nợ", "fn": lambda: _render_migration_section(df_full, username)},
         {"group": "Cảnh báo rủi ro", "label": "📊 Tổng hợp nợ khoanh",     "fn": lambda: _lazy_tab("tab_qlnk_dashboard").render(None, **kwargs)},

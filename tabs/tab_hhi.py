@@ -1,379 +1,264 @@
 """
-Tab Tập trung rủi ro & Chỉ số HHI — Phân hệ Chi nhánh.
+Tab Nguồn vốn địa phương — Phân hệ Chi nhánh.
 
-Đo mức độ tập trung danh mục cho vay bằng Herfindahl-Hirschman Index (HHI)
-theo 3 chiều: Chương trình, Xã, PGD.
+Báo cáo Tỷ trọng Vốn ủy thác địa phương trên Tổng nguồn vốn:
+  Tỷ lệ % = Nguồn vốn ngân sách địa phương (Tỉnh/Huyện) ủy thác / Tổng nguồn vốn tại địa phương
 
-HHI = Σ(Si²) × 10.000   (Si = tỷ trọng dư nợ nhóm i / tổng dư nợ)
-  < 1.000  → Đa dạng hóa tốt
-  1.000–2.500 → Tập trung vừa
-  > 2.500  → Tập trung cao — cần kiểm soát
-Ngưỡng đồng bộ với services/hhi_service.py::danh_gia_hhi().
+Phân tích theo 3 chiều: PGD, Xã, Chương trình tín dụng.
+Dữ liệu từ cột "Nguồn vốn" (1=TW, 2=ĐP) trong HSTD.
 """
 from __future__ import annotations
 
 from datetime import date
 
 import pandas as pd
-import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
 from streamlit.delta_generator import DeltaGenerator
 
-from auth import normalize_role, la_executive
 from config import (
-    COT_DU_NO_QH,
-    COT_MA_KH,
+    COT_NGUON_VON,
     COT_TEN_CT,
     COT_TEN_PGD,
     COT_TEN_XA,
     COT_TONG_DU_NO,
 )
-from data import canh_bao_migration_cached, danh_dau_khong_hd_cached
-from services.hhi_service import tinh_hhi as _hhi_raw, tinh_hhi_breakdown
-from utils import fmt_so, fmt_ty, hien_thi_dataframe_phan_trang, xuat_excel, lazy_tabs
+from utils import fmt_ty, hien_thi_dataframe_phan_trang, xuat_excel, lazy_tabs
 
 
-# ── Helpers ────────────────────────────────────────────────────────────────────
+def _phan_nguon_von(df: pd.DataFrame) -> pd.DataFrame:
+    """Thêm cột _nv_label: 'Trung ương' | 'Địa phương' | 'Khác'."""
+    df = df.copy()
+    if COT_NGUON_VON not in df.columns:
+        df["_nv_label"] = "Không rõ"
+        return df
+    nv_map = {1: "Trung ương", 2: "Địa phương", 1.0: "Trung ương", 2.0: "Địa phương"}
+    df["_nv_label"] = (
+        pd.to_numeric(df[COT_NGUON_VON], errors="coerce")
+        .map(nv_map)
+        .fillna("Khác")
+    )
+    return df
 
-def _tinh_hhi(
+
+def _bang_theo_nv(
     df: pd.DataFrame,
     nhom_col: str,
-    du_no_col: str = COT_TONG_DU_NO,
-) -> float:
-    """Wrapper trả về HHI trên thang ×10.000 — dùng hhi_service bên dưới."""
-    if nhom_col not in df.columns:
-        return 0.0
-    return round(_hhi_raw(df, nhom_col, du_no_col) * 10_000, 1)
-
-
-def _nhan_xet_hhi(hhi: float) -> tuple[str, str]:
-    """Trả về (nhãn ngưỡng, delta_color cho st.metric).
-
-    Ngưỡng đồng bộ với services/hhi_service.py::danh_gia_hhi():
-      < 1.000  → Đa dạng hóa tốt
-      1.000–2.500 → Tập trung vừa
-      > 2.500  → Tập trung cao
-    """
-    if hhi < 1_000:
-        return "✅ Đa dạng hóa tốt", "normal"
-    if hhi < 2_500:
-        return "⚠️ Tập trung vừa", "off"
-    return "🚨 Tập trung cao", "inverse"
-
-
-def _bang_tap_trung(
-    df: pd.DataFrame,
-    nhom_col: str,
-    du_no_col: str = COT_TONG_DU_NO,
-    nqh_col: str = COT_DU_NO_QH,
     extra_cols: list[str] | None = None,
 ) -> pd.DataFrame:
-    """Bảng tổng hợp: nhóm | Dư nợ | Tỷ trọng% | Dư nợ NQH | NQH%.
-
-    Trả về DataFrame đã format (chuỗi) — dùng cho cả hiển thị lẫn xuất Excel.
-    """
-    if nhom_col not in df.columns or du_no_col not in df.columns:
+    """Bảng tổng hợp theo nhóm: TW dư nợ | ĐP dư nợ | Tỷ trọng ĐP%."""
+    if nhom_col not in df.columns or COT_TONG_DU_NO not in df.columns:
         return pd.DataFrame()
 
-    has_nqh = nqh_col in df.columns
-    agg: dict[str, tuple] = {"_du_no": (du_no_col, "sum")}
-    if has_nqh:
-        agg["_nqh"] = (nqh_col, "sum")
+    df = _phan_nguon_von(df)
+
+    pivot = df.pivot_table(
+        index=[nhom_col] + (extra_cols if extra_cols else []),
+        columns="_nv_label",
+        values=COT_TONG_DU_NO,
+        aggfunc="sum",
+        fill_value=0,
+    ).reset_index()
+
+    for nv_col in ["Trung ương", "Địa phương"]:
+        if nv_col not in pivot.columns:
+            pivot[nv_col] = 0.0
+
+    pivot["Tổng dư nợ"] = pivot["Trung ương"] + pivot["Địa phương"]
+    if "Khác" in pivot.columns:
+        pivot["Tổng dư nợ"] += pivot["Khác"]
+    pivot["Tỷ trọng ĐP (%)"] = pivot.apply(
+        lambda r: r["Địa phương"] / r["Tổng dư nợ"] * 100
+        if r["Tổng dư nợ"] > 0 else 0.0,
+        axis=1,
+    )
+
+    result = pivot.sort_values("Tổng dư nợ", ascending=False).reset_index(drop=True)
+
+    result["TW (triệu đồng)"] = result["Trung ương"].apply(fmt_ty)
+    result["ĐP (triệu đồng)"] = result["Địa phương"].apply(fmt_ty)
+    result["Tổng (triệu đồng)"] = result["Tổng dư nợ"].apply(fmt_ty)
+    result["Tỷ trọng ĐP (%)"] = result["Tỷ trọng ĐP (%)"].apply(
+        lambda x: f"{x:.1f}".replace(".", ",") + "%"
+    )
+
+    display_cols = [nhom_col]
     if extra_cols:
-        for c in extra_cols:
-            if c in df.columns:
-                agg[c] = (c, "first")
-
-    result = df.groupby(nhom_col, dropna=False).agg(**agg).reset_index()
-    total = result["_du_no"].sum()
-
-    result["Dư nợ"] = result["_du_no"].apply(fmt_ty)
-    result["Tỷ trọng%"] = result["_du_no"].apply(
-        lambda x: f"{x / total * 100:.1f}".replace(".", ",") + "%" if total > 0 else "0,0%"
-    )
-    if has_nqh:
-        result["Dư nợ NQH"] = result["_nqh"].apply(fmt_ty)
-        result["NQH%"] = result.apply(
-            lambda r: f"{r['_nqh'] / r['_du_no'] * 100:.2f}".replace(".", ",") + "%"
-            if r["_du_no"] > 0 else "0,00%",
-            axis=1,
-        )
-
-    # Sắp xếp giảm dần theo dư nợ rồi bỏ cột tạm
-    result = result.sort_values("_du_no", ascending=False).reset_index(drop=True)
-    drop_cols = ["_du_no"] + (["_nqh"] if has_nqh else [])
-    result = result.drop(columns=drop_cols)
-    return result
+        display_cols += [c for c in extra_cols if c in result.columns]
+    display_cols += ["TW (triệu đồng)", "ĐP (triệu đồng)", "Tổng (triệu đồng)", "Tỷ trọng ĐP (%)"]
+    return result[[c for c in display_cols if c in result.columns]]
 
 
-# ── Sub-tab renderers (module-level để tránh nested function) ──────────────────
+def _ve_bieu_do_ngang(df_table: pd.DataFrame, label_col: str, tieu_de: str, key: str) -> None:
+    """Vẽ biểu đồ cột ngang tỷ trọng ĐP."""
+    df_chart = df_table.copy()
+    pct_col = "Tỷ trọng ĐP (%)"
+    df_chart["_pct"] = df_chart[pct_col].str.replace(",", ".").str.rstrip("%").astype(float)
+    df_chart = df_chart.sort_values("_pct", ascending=True)
 
-def _render_sub_ct(df_full: pd.DataFrame) -> None:
-    """Sub-tab: biểu đồ cột ngang top 15 + bảng theo Chương trình."""
-    # Dùng tinh_hhi_breakdown() từ hhi_service thay vì tính lại
-    br = tinh_hhi_breakdown(df_full, COT_TEN_CT, COT_TONG_DU_NO)
-    if br.empty:
-        st.info("Không có dữ liệu chương trình.")
-        return
+    colors = ["#E53935" if v > 50 else ("#FFA000" if v > 30 else "#43A047") for v in df_chart["_pct"]]
 
-    br = br.rename(columns={
-        COT_TEN_CT: "_nhom",
-        "ty_trong_pct": "ty_trong",
-    })
-    top15 = br.head(15).copy()
-
-    top15["color"] = top15["ty_trong"].apply(
-        lambda x: "#E53935" if x >= 25 else ("#FFA000" if x >= 10 else "#43A047")
-    )
-
-    fig = go.Figure(
-        go.Bar(
-            y=top15["_nhom"].astype(str),
-            x=top15["ty_trong"],
-            orientation="h",
-            marker_color=top15["color"],
-            text=top15["ty_trong"].apply(
-                lambda x: f"{x:.1f}%".replace(".", ",")
-            ),
-            textposition="outside",
-        )
-    )
+    fig = go.Figure(go.Bar(
+        y=df_chart[label_col],
+        x=df_chart["_pct"],
+        orientation="h",
+        marker_color=colors,
+        text=df_chart[pct_col],
+        textposition="outside",
+    ))
     fig.update_layout(
-        title="Top 15 Chương trình theo tỷ trọng dư nợ",
-        xaxis_title="Tỷ trọng (%)",
+        title=tieu_de,
+        xaxis_title="Tỷ trọng ĐP (%)",
         yaxis=dict(autorange="reversed"),
-        height=max(400, len(top15) * 34 + 100),
-        margin=dict(l=20, r=90, t=50, b=30),
+        height=max(400, len(df_chart) * 30 + 100),
+        margin=dict(l=20, r=80, t=50, b=30),
     )
-    st.plotly_chart(fig, use_container_width=True, key="hhi_ct_chart")
-
-    st.markdown("**Bảng tổng hợp Chương trình**")
-    df_ct = _bang_tap_trung(df_full, COT_TEN_CT)
-    if not df_ct.empty:
-        hien_thi_dataframe_phan_trang(df_ct, key="hhi_ct_table", height=350)
-
-
-def _render_sub_xa(df_full: pd.DataFrame) -> None:
-    """Sub-tab: treemap theo Xã × PGD + bảng chi tiết."""
-    agg_xa = (
-        df_full.groupby([COT_TEN_PGD, COT_TEN_XA], dropna=False)[COT_TONG_DU_NO]
-        .sum()
-        .reset_index(name="tong_du_no")
-    )
-
-    if COT_DU_NO_QH in df_full.columns:
-        nqh_xa = (
-            df_full.groupby([COT_TEN_PGD, COT_TEN_XA], dropna=False)[COT_DU_NO_QH]
-            .sum()
-            .reset_index(name="tong_nqh")
-        )
-        agg_xa = agg_xa.merge(nqh_xa, on=[COT_TEN_PGD, COT_TEN_XA], how="left")
-        agg_xa["tl_nqh_pct"] = agg_xa.apply(
-            lambda r: r["tong_nqh"] / r["tong_du_no"] * 100
-            if r["tong_du_no"] > 0 else 0.0,
-            axis=1,
-        )
-    else:
-        agg_xa["tl_nqh_pct"] = 0.0
-
-    # Bỏ dòng dư nợ = 0 (treemap không hỗ trợ value=0)
-    agg_xa = agg_xa[agg_xa["tong_du_no"] > 0].copy()
-    agg_xa["tong_du_no_trieu"] = agg_xa["tong_du_no"] / 1_000_000
-
-    if not agg_xa.empty:
-        midpoint = float(agg_xa["tl_nqh_pct"].median())
-        fig_xa = px.treemap(
-            agg_xa,
-            path=[px.Constant("Chi nhánh"), COT_TEN_PGD, COT_TEN_XA],
-            values="tong_du_no_trieu",
-            color="tl_nqh_pct",
-            color_continuous_scale=["#43A047", "#FFA000", "#E53935"],
-            color_continuous_midpoint=midpoint,
-            title="Dư nợ theo Xã — màu nền = tỷ lệ NQH%",
-            labels={
-                "tong_du_no_trieu": "Dư nợ (triệu đồng)",
-                "tl_nqh_pct": "NQH%",
-            },
-        )
-        fig_xa.update_traces(
-            hovertemplate=(
-                "<b>%{label}</b><br>"
-                "Dư nợ: %{value:.3f} tỷ<br>"
-                "NQH: %{color:.2f}%"
-                "<extra></extra>"
-            )
-        )
-        fig_xa.update_layout(height=520)
-        st.plotly_chart(fig_xa, use_container_width=True, key="hhi_xa_treemap")
-
-    st.markdown("**Bảng tổng hợp Xã**")
-    df_xa = _bang_tap_trung(df_full, COT_TEN_XA, extra_cols=[COT_TEN_PGD])
-    if not df_xa.empty:
-        # Đưa COT_TEN_PGD lên ngay sau COT_TEN_XA
-        col_first = [COT_TEN_XA] + (
-            [COT_TEN_PGD] if COT_TEN_PGD in df_xa.columns else []
-        )
-        col_rest = [c for c in df_xa.columns if c not in col_first]
-        hien_thi_dataframe_phan_trang(
-            df_xa[col_first + col_rest],
-            key="hhi_xa_table",
-            height=350,
-        )
+    st.plotly_chart(fig, use_container_width=True, key=key)
 
 
 def _render_sub_pgd(df_full: pd.DataFrame) -> None:
-    """Sub-tab: bảng PGD tổng hợp với 3m KHĐ và Migration."""
-    df_pgd = _bang_tap_trung(df_full, COT_TEN_PGD)
+    df_pgd = _bang_theo_nv(df_full, COT_TEN_PGD)
     if df_pgd.empty:
         st.warning("Không có dữ liệu PGD.")
         return
-
-    # Số món vay
-    if COT_MA_KH in df_full.columns:
-        so_mon = (
-            df_full.groupby(COT_TEN_PGD)[COT_MA_KH]
-            .count()
-            .reset_index(name="Số món")
-        )
-    else:
-        so_mon = (
-            df_full.groupby(COT_TEN_PGD)
-            .size()
-            .reset_index(name="Số món")
-        )
-    df_pgd = df_pgd.merge(so_mon, on=COT_TEN_PGD, how="left")
-    df_pgd["Số món"] = df_pgd["Số món"].fillna(0).apply(lambda x: fmt_so(int(x)))
-
-    # 3m KHĐ + Migration
-    try:
-        df_kh = danh_dau_khong_hd_cached(df_full)
-
-        if "is_3m_inactive" in df_kh.columns:
-            khd_pgd = (
-                df_kh[df_kh["is_3m_inactive"]]
-                .groupby(COT_TEN_PGD)
-                .size()
-                .reset_index(name="3m KHĐ")
-            )
-            df_pgd = df_pgd.merge(khd_pgd, on=COT_TEN_PGD, how="left")
-            df_pgd["3m KHĐ"] = df_pgd["3m KHĐ"].fillna(0).astype(int)
-
-        df_amber = canh_bao_migration_cached(df_kh)
-        if not df_amber.empty and COT_TEN_PGD in df_amber.columns:
-            mig_pgd = (
-                df_amber.groupby(COT_TEN_PGD)
-                .size()
-                .reset_index(name="Migration ⚠️")
-            )
-            df_pgd = df_pgd.merge(mig_pgd, on=COT_TEN_PGD, how="left")
-            df_pgd["Migration ⚠️"] = df_pgd["Migration ⚠️"].fillna(0).astype(int)
-    except Exception:
-        pass
-
-    cols_order = [COT_TEN_PGD, "Số món", "Dư nợ", "Tỷ trọng%", "Dư nợ NQH", "NQH%"]
-    if "3m KHĐ" in df_pgd.columns:
-        cols_order.append("3m KHĐ")
-    if "Migration ⚠️" in df_pgd.columns:
-        cols_order.append("Migration ⚠️")
-
-    st.markdown("**Bảng tổng hợp PGD**")
-    hien_thi_dataframe_phan_trang(
-        df_pgd[[c for c in cols_order if c in df_pgd.columns]],
-        key="hhi_pgd_table",
-        height=480,
-    )
+    _ve_bieu_do_ngang(df_pgd, COT_TEN_PGD, "Tỷ trọng vốn Địa phương theo PGD", "nvdp_pgd_chart")
+    st.markdown("**Bảng chi tiết theo PGD**")
+    hien_thi_dataframe_phan_trang(df_pgd, key="nvdp_pgd_table", height=480)
 
 
-# ── Entry point ────────────────────────────────────────────────────────────────
+def _render_sub_xa(df_full: pd.DataFrame) -> None:
+    df_xa = _bang_theo_nv(df_full, COT_TEN_XA, extra_cols=[COT_TEN_PGD])
+    if df_xa.empty:
+        st.warning("Không có dữ liệu Xã.")
+        return
+    df_top = df_xa.copy()
+    df_top["_pct"] = df_top["Tỷ trọng ĐP (%)"].str.replace(",", ".").str.rstrip("%").astype(float)
+    df_top = df_top.sort_values("_pct", ascending=False).head(20)
+    _ve_bieu_do_ngang(df_top, COT_TEN_XA, "Top 20 Xã — Tỷ trọng vốn Địa phương cao nhất", "nvdp_xa_chart")
+    st.markdown("**Bảng chi tiết theo Xã**")
+    hien_thi_dataframe_phan_trang(df_xa, key="nvdp_xa_table", height=480)
+
+
+def _render_sub_ct(df_full: pd.DataFrame) -> None:
+    df_ct = _bang_theo_nv(df_full, COT_TEN_CT)
+    if df_ct.empty:
+        st.warning("Không có dữ liệu Chương trình.")
+        return
+    _ve_bieu_do_ngang(df_ct, COT_TEN_CT, "Tỷ trọng vốn Địa phương theo Chương trình tín dụng", "nvdp_ct_chart")
+    st.markdown("**Bảng chi tiết theo Chương trình**")
+    hien_thi_dataframe_phan_trang(df_ct, key="nvdp_ct_table", height=480)
+
+
+# ── Entry point ───────────────────────────────────────────────────────────────
 
 def render(tab: DeltaGenerator = None, **kwargs) -> None:
-    """Render tab Tập trung rủi ro & HHI.
-
-    Nhận df_full (toàn CN) từ kwargs — không dùng df (PGD-filtered).
-    """
     df_full = kwargs.get("df_full")
-    normalize_role(str(kwargs.get("role", "user") or "user"))  # validate only
 
     ctx = tab if tab is not None else st.container()
     with ctx:
-        st.subheader("📊 Tập trung rủi ro & Chỉ số HHI")
+        st.subheader("🏦 Nguồn vốn địa phương")
         st.caption(
-            "Đo mức độ tập trung danh mục cho vay theo Chương trình, Xã và PGD "
-            "bằng chỉ số Herfindahl-Hirschman Index (HHI)."
+            "Báo cáo Tỷ trọng Vốn ủy thác địa phương trên Tổng nguồn vốn "
+            "— phân tích theo PGD, Xã và Chương trình tín dụng."
         )
 
         if df_full is None or df_full.empty:
             st.warning("⚠️ Chưa có dữ liệu toàn Chi nhánh. Vui lòng upload và merge HSTD.")
             return
 
-        # ── SECTION 1: 3 KPI cards ─────────────────────────────────────────
-        hhi_ct  = _tinh_hhi(df_full, COT_TEN_CT)
-        hhi_xa  = _tinh_hhi(df_full, COT_TEN_XA)
-        hhi_pgd = _tinh_hhi(df_full, COT_TEN_PGD)
-
-        c1, c2, c3 = st.columns(3)
-        for col, hhi, label in [
-            (c1, hhi_ct,  "HHI theo Chương trình"),
-            (c2, hhi_xa,  "HHI theo Xã"),
-            (c3, hhi_pgd, "HHI theo PGD"),
-        ]:
-            nhan, delta_color = _nhan_xet_hhi(hhi)
-            col.metric(
-                label=label,
-                value=f"{int(hhi):,}".replace(",", ".") + " điểm",
-                delta=nhan,
-                delta_color=delta_color,
+        if COT_NGUON_VON not in df_full.columns:
+            st.warning(
+                "⚠️ Dữ liệu HSTD không có cột 'Nguồn vốn'. "
+                "Vui lòng kiểm tra lại file HSTD gốc."
             )
+            return
 
-        # ── SECTION 2: Thang giải thích ───────────────────────────────────
-        st.info(
-            "**Thang HHI:**   "
-            "✅ **< 1.000** — Đa dạng hóa tốt   |   "
-            "⚠️ **1.000 – 2.500** — Tập trung vừa   |   "
-            "🚨 **> 2.500** — Tập trung cao, cần kiểm soát"
+        df = _phan_nguon_von(df_full)
+
+        tong_du_no = pd.to_numeric(df[COT_TONG_DU_NO], errors="coerce").sum()
+        dn_tw = pd.to_numeric(df[df["_nv_label"] == "Trung ương"][COT_TONG_DU_NO], errors="coerce").sum()
+        dn_dp = pd.to_numeric(df[df["_nv_label"] == "Địa phương"][COT_TONG_DU_NO], errors="coerce").sum()
+        tl_dp = dn_dp / tong_du_no * 100 if tong_du_no > 0 else 0.0
+
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("Tổng dư nợ", fmt_ty(tong_du_no) + " tr.đ")
+        c2.metric("Dư nợ Trung ương", fmt_ty(dn_tw) + " tr.đ")
+        c3.metric("Dư nợ Địa phương", fmt_ty(dn_dp) + " tr.đ")
+        delta_color = "inverse" if tl_dp > 50 else "normal"
+        c4.metric(
+            "Tỷ trọng vốn ĐP",
+            f"{tl_dp:.1f}".replace(".", ",") + "%",
+            delta="Vốn ĐP chiếm ưu thế" if tl_dp > 50 else "Vốn TW chiếm ưu thế",
+            delta_color=delta_color,
         )
+
+        col_pie, col_info = st.columns([1, 2])
+        with col_pie:
+            fig_pie = go.Figure(go.Pie(
+                labels=["Trung ương", "Địa phương"],
+                values=[dn_tw, dn_dp],
+                marker_colors=["#42A5F5", "#EF5350"],
+                hole=0.4,
+                textinfo="label+percent",
+            ))
+            fig_pie.update_layout(
+                title="Cơ cấu nguồn vốn",
+                height=320,
+                margin=dict(l=10, r=10, t=40, b=10),
+            )
+            st.plotly_chart(fig_pie, use_container_width=True, key="nvdp_pie")
+
+        with col_info:
+            st.markdown("##### 📐 Cách đo lường")
+            st.latex(
+                r"\text{Tỷ lệ \%} = "
+                r"\frac{\text{Nguồn vốn ngân sách địa phương (Tỉnh/Huyện) ủy thác}}"
+                r"{\text{Tổng nguồn vốn tại địa phương}}"
+            )
+            st.info(
+                "Nguồn vốn được xác định từ cột **Nguồn vốn** trong HSTD: "
+                "**1 = Trung ương**, **2 = Địa phương**."
+            )
 
         st.divider()
 
         lazy_tabs(
-            ["📊 Theo Chương trình", "🗺️ Theo Xã", "🏢 Theo PGD"],
+            ["🏢 Theo PGD", "🗺️ Theo Xã", "📌 Theo Chương trình"],
             [
-                lambda: (
-                    st.warning("Không tìm thấy cột Tên chương trình trong dữ liệu.")
-                    if COT_TEN_CT not in df_full.columns
-                    else _render_sub_ct(df_full)
-                ),
-                lambda: (
-                    st.warning(f"Thiếu cột: {', '.join([c for c in [COT_TEN_XA, COT_TEN_PGD] if c not in df_full.columns])}")
-                    if any(c not in df_full.columns for c in [COT_TEN_XA, COT_TEN_PGD])
-                    else _render_sub_xa(df_full)
-                ),
                 lambda: (
                     st.warning("Không tìm thấy cột Tên PGD trong dữ liệu.")
                     if COT_TEN_PGD not in df_full.columns
                     else _render_sub_pgd(df_full)
                 ),
+                lambda: (
+                    st.warning("Không tìm thấy cột Tên Xã trong dữ liệu.")
+                    if COT_TEN_XA not in df_full.columns
+                    else _render_sub_xa(df_full)
+                ),
+                lambda: (
+                    st.warning("Không tìm thấy cột Tên chương trình trong dữ liệu.")
+                    if COT_TEN_CT not in df_full.columns
+                    else _render_sub_ct(df_full)
+                ),
             ],
-            key="hhi",
+            key="nvdp",
         )
 
         st.divider()
 
-        # ── SECTION 4: Xuất Excel ──────────────────────────────────────────
-        st.markdown("**📥 Xuất Excel — 3 chiều phân tích**")
+        st.markdown("**📥 Xuất Excel — Báo cáo Nguồn vốn địa phương**")
         today_str = date.today().strftime("%d/%m/%Y")
         today_file = date.today().strftime("%Y%m%d")
 
         buf = xuat_excel({
-            "Chương trình": _bang_tap_trung(df_full, COT_TEN_CT),
-            "Xã": _bang_tap_trung(df_full, COT_TEN_XA, extra_cols=[COT_TEN_PGD]),
-            "PGD": _bang_tap_trung(df_full, COT_TEN_PGD),
+            "Theo PGD": _bang_theo_nv(df_full, COT_TEN_PGD),
+            "Theo Xã": _bang_theo_nv(df_full, COT_TEN_XA, extra_cols=[COT_TEN_PGD]),
+            "Theo Chương trình": _bang_theo_nv(df_full, COT_TEN_CT),
         })
         st.download_button(
-            label=f"⬇️ Tải Excel HHI ({today_str})",
+            label=f"⬇️ Tải Excel Nguồn vốn ĐP ({today_str})",
             data=buf,
-            file_name=f"HHI_TapTrungRuiRo_{today_file}.xlsx",
+            file_name=f"NguonVonDiaPhuong_{today_file}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            key="hhi_xuat_excel",
+            key="nvdp_xuat_excel",
         )

@@ -6,6 +6,7 @@ from dataclasses import dataclass, field, asdict
 from datetime import date, datetime
 from typing import Optional, Literal
 from pathlib import Path
+import uuid
 
 import pandas as pd
 
@@ -26,6 +27,19 @@ LOAI_HO_SO_QD62 = "qd62"
 TRANG_THAI_CHO_DUYET = "cho_duyet"
 TRANG_THAI_DA_DUYET = "da_duyet"
 TRANG_THAI_TU_CHOI = "tu_choi"
+
+# Kết quả xử lý từ NHCSXH TW
+KET_QUA_DA_KHOANH   = "da_khoanh"
+KET_QUA_DA_XOA      = "da_xoa"
+KET_QUA_KHONG_DUYET = "khong_duyet"
+KET_QUA_CHO_XU_LY  = "cho_xu_ly"
+
+KET_QUA_LABEL: dict[str, str] = {
+    KET_QUA_DA_KHOANH:   "✅ Đã khoanh",
+    KET_QUA_DA_XOA:      "✅ Đã xóa",
+    KET_QUA_KHONG_DUYET: "❌ Không duyệt",
+    KET_QUA_CHO_XU_LY:  "⏳ Chờ xử lý",
+}
 
 # ── Data Model ───────────────────────────────────────────────────────────────
 
@@ -76,6 +90,10 @@ class HoSoRuiRo:
     ngay_duyet: Optional[datetime] = None
     nguoi_duyet: str = ""
     
+    # Đợt XLRR (theo quy định TW)
+    dot_id: str = ""          # ID đợt, VD: "cn_2026_1" hoặc "pgd_tanphong_2026_1"
+    da_gui_cn: bool = False   # PGD đã bấm gửi đợt lên CN chưa
+    
     # Flags
     lap_thay_pgd: bool = False  # CN lập thay PGD
     
@@ -91,9 +109,12 @@ class HoSoRuiRo:
     # Thông tin mẫu 02/XLN — Biên bản
     ngay_lap_02: Optional[date] = None
     dia_diem_02: str = ""
-    ten_pgd_02: str = ""  # Phó GĐ NHCSXH
+    ten_pgd_02: str = ""        # GĐ hoặc Phó GĐ NHCSXH
+    chuc_vu_pgd_02: str = "Phó Giám đốc"
     ten_ubnd_02: str = ""
+    chuc_vu_ubnd_02: str = "Phó Chủ tịch"
     ten_hoi_nd_02: str = ""
+    chuc_vu_hoi_nd_02: str = "Chủ tịch Hội Nông dân xã"
     ten_cbtd_02: str = ""
     ten_to_truong_02: str = ""
     chi_tiet_thiet_hai_02: str = ""
@@ -157,6 +178,121 @@ class HoSoRuiRo:
     @property
     def is_xoa(self) -> bool:
         return self.bien_phap == "xoa"
+
+
+@dataclass
+class DotXLRR:
+    """Đợt xử lý rủi ro — theo quy định TW, 1-3 đợt/năm."""
+    id: str
+    ten_dot: str
+    nam: int
+    ngay_bat_dau: date
+    ngay_ket_thuc: date
+    nguoi_tao: str
+    loai: Literal["cn", "pgd"]
+    pgd_slug: str = ""
+    ngay_tao: datetime = field(default_factory=datetime.now)
+    da_gui_tw: bool = False
+    
+    def to_dict(self) -> dict:
+        d = asdict(self)
+        for key in ["ngay_bat_dau", "ngay_ket_thuc", "ngay_tao"]:
+            val = d.get(key)
+            if isinstance(val, (datetime, date)):
+                d[key] = val.isoformat()
+        return d
+    
+    @classmethod
+    def from_dict(cls, data: dict) -> "DotXLRR":
+        for key in ["ngay_bat_dau", "ngay_ket_thuc"]:
+            if key in data and isinstance(data[key], str):
+                try:
+                    data[key] = date.fromisoformat(data[key])
+                except ValueError:
+                    data[key] = date.today()
+        if "ngay_tao" in data and isinstance(data["ngay_tao"], str):
+            try:
+                data["ngay_tao"] = datetime.fromisoformat(data["ngay_tao"])
+            except ValueError:
+                data["ngay_tao"] = datetime.now()
+        return cls(**data)
+    
+    @property
+    def con_lai(self) -> int:
+        delta = (self.ngay_ket_thuc - date.today()).days
+        return max(delta, 0)
+    
+    @property
+    def qua_han(self) -> bool:
+        return date.today() > self.ngay_ket_thuc
+    
+    @property
+    def trang_thai_label(self) -> str:
+        if self.qua_han:
+            return "🔴 Quá hạn"
+        if self.con_lai <= 7:
+            return f"🟡 Sắp hết hạn ({self.con_lai} ngày)"
+        return f"🟢 Đang mở ({self.con_lai} ngày)"
+
+
+class LuuTruDotXLRR:
+    """Quản lý lưu trữ đợt XLRR trong kv_store."""
+    
+    @staticmethod
+    def _key_cn(nam: int) -> str:
+        return f"xlrr_dot_cn_{nam}"
+    
+    @staticmethod
+    def _key_pgd(slug: str, nam: int) -> str:
+        return f"xlrr_dot_pgd_{slug}_{nam}"
+    
+    @classmethod
+    def tao_dot(cls, ten_dot: str, nam: int, ngay_bat_dau: date, ngay_ket_thuc: date,
+                nguoi_tao: str, loai: Literal["cn", "pgd"], pgd_slug_val: str = "") -> DotXLRR:
+        ds = cls.doc_ds(nam, loai, pgd_slug_val)
+        dot_id = f"{loai}_{'' if loai == 'cn' else pgd_slug_val + '_'}{nam}_{len(ds) + 1}"
+        dot = DotXLRR(id=dot_id, ten_dot=ten_dot, nam=nam,
+                      ngay_bat_dau=ngay_bat_dau, ngay_ket_thuc=ngay_ket_thuc,
+                      nguoi_tao=nguoi_tao, loai=loai, pgd_slug=pgd_slug_val)
+        ds.append(dot)
+        key = cls._key_cn(nam) if loai == "cn" else cls._key_pgd(pgd_slug_val, nam)
+        db.ghi_kv(key, [d.to_dict() for d in ds], nguoi_tao)
+        db.ghi_audit(nguoi_tao, "xlrr_tao_dot", f"{ten_dot} ({loai})")
+        return dot
+    
+    @classmethod
+    def doc_ds(cls, nam: int, loai: Literal["cn", "pgd"], pgd_slug_val: str = "") -> list[DotXLRR]:
+        key = cls._key_cn(nam) if loai == "cn" else cls._key_pgd(pgd_slug_val, nam)
+        data = db.doc_kv(key)
+        if not data:
+            return []
+        return [DotXLRR.from_dict(d) for d in data] if isinstance(data, list) else []
+    
+    @classmethod
+    def xoa_dot(cls, dot_id: str, nam: int, loai: Literal["cn", "pgd"], pgd_slug_val: str, username: str) -> bool:
+        ds = cls.doc_ds(nam, loai, pgd_slug_val)
+        ds_moi = [d for d in ds if d.id != dot_id]
+        if len(ds_moi) == len(ds):
+            return False
+        key = cls._key_cn(nam) if loai == "cn" else cls._key_pgd(pgd_slug_val, nam)
+        db.ghi_kv(key, [d.to_dict() for d in ds_moi], username)
+        db.ghi_audit(username, "xlrr_xoa_dot", f"{dot_id}")
+        return True
+    
+    @classmethod
+    def cap_nhat_dot(cls, dot_id: str, nam: int, loai: Literal["cn", "pgd"],
+                     pgd_slug_val: str, username: str, **updates) -> DotXLRR | None:
+        ds = cls.doc_ds(nam, loai, pgd_slug_val)
+        for dot in ds:
+            if dot.id == dot_id:
+                for k, v in updates.items():
+                    if hasattr(dot, k):
+                        setattr(dot, k, v)
+                key = cls._key_cn(nam) if loai == "cn" else cls._key_pgd(pgd_slug_val, nam)
+                db.ghi_kv(key, [d.to_dict() for d in ds], username)
+                db.ghi_audit(username, "xlrr_sua_dot", f"{dot_id}")
+                return dot
+        return None
 
 
 # ── Storage Layer ──────────────────────────────────────────────────────────
@@ -301,6 +437,36 @@ class LuuTruXLRR:
             return False
         return False
 
+    @staticmethod
+    def _key_ket_qua(nam: int, thang: int) -> str:
+        return f"xlrr_ket_qua_{nam}_{thang:02d}"
+
+    @classmethod
+    def luu_ket_qua(cls, data: dict, nam: int, thang: int, username: str) -> None:
+        """Lưu kết quả xử lý từ NHCSXH TW theo kỳ."""
+        key = cls._key_ket_qua(nam, thang)
+        db.ghi_kv(key, data, username)
+        so_hs = len(data.get("ds_ket_qua", []))
+        so_qd = data.get("so_quyet_dinh", "")
+        db.ghi_audit(username, "xlrr_luu_ket_qua", f"QĐ {so_qd} — {so_hs} hồ sơ T{thang}/{nam}")
+
+    @classmethod
+    def doc_ket_qua(cls, nam: int, thang: int) -> dict | None:
+        """Đọc kết quả xử lý từ NHCSXH TW theo kỳ."""
+        key = cls._key_ket_qua(nam, thang)
+        return db.doc_kv(key)
+
+    @classmethod
+    def doc_ket_qua_pgd(cls, pgd_slug_val: str, nam: int, thang: int) -> list[dict]:
+        """Lọc kết quả của 1 PGD cụ thể."""
+        data = cls.doc_ket_qua(nam, thang)
+        if not data:
+            return []
+        return [
+            r for r in data.get("ds_ket_qua", [])
+            if pgd_slug(r.get("ten_pgd", "")) == pgd_slug_val
+        ]
+
 
 # ── Aggregation Layer ───────────────────────────────────────────────────────
 
@@ -428,7 +594,9 @@ class TongHopXLRR:
 
 __all__ = [
     "HoSoRuiRo",
+    "DotXLRR",
     "LuuTruXLRR",
+    "LuuTruDotXLRR",
     "TongHopXLRR",
     "NGUON_TW",
     "NGUON_DP",

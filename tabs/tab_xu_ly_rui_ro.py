@@ -3,6 +3,7 @@ Tích hợp: tab_no_rui_ro.py + tab_qd62.py + tab_xlrr_tong_hop.py
 """
 from __future__ import annotations
 
+import dataclasses
 import uuid
 from datetime import date, datetime
 from typing import Optional
@@ -40,6 +41,8 @@ from services.xlrr_service import (
     HoSoRuiRo,
     LuuTruXLRR,
     TongHopXLRR,
+    DotXLRR,
+    LuuTruDotXLRR,
     LOAI_HO_SO_HSTD,
     LOAI_HO_SO_QD62,
     NGUON_TW,
@@ -51,9 +54,14 @@ from services.xlrr_service import (
 from services.word_xln_service import (
     _tao_word_01xln_v2,
     _tao_word_02xln_v2,
+    _tao_word_to_trinh_pgd,
 )
+from services.xlrr_export_service import tong_hop_theo_bien_phap
 from tabs.base_tab import TabContext
 from utils import fmt, fmt_ty, hien_thi_dataframe_phan_trang
+from logger import get_logger
+
+logger = get_logger(__name__)
 
 # ── Constants ───────────────────────────────────────────────────────────────
 LABEL_TW = "Trung ương"
@@ -70,6 +78,78 @@ TRANG_THAI_BADGE = {
 }
 
 
+# ── Helpers cập nhật / xóa hồ sơ ─────────────────────────────────────────────
+
+def _cap_nhat_hs(hs_moi: HoSoRuiRo, pgd_slug_val: str, nam: int, thang: int, username: str, la_cn: bool) -> None:
+    if la_cn:
+        ds = LuuTruXLRR.doc_cn(nam, thang)
+        LuuTruXLRR.luu_cn([hs_moi if hs.id == hs_moi.id else hs for hs in ds], nam, thang, username)
+        db.ghi_audit(username, "xlrr_cap_nhat_cn", f"ID={hs_moi.id[:8]} KH={hs_moi.ten_kh}")
+    else:
+        ds = LuuTruXLRR.doc_pgd(pgd_slug_val, nam, thang)
+        LuuTruXLRR.luu_pgd([hs_moi if hs.id == hs_moi.id else hs for hs in ds], pgd_slug_val, nam, thang, username)
+        db.ghi_audit(username, "xlrr_cap_nhat_pgd", f"ID={hs_moi.id[:8]} KH={hs_moi.ten_kh}")
+    st.cache_data.clear()
+
+
+def _xoa_hs(ho_so_id: str, pgd_slug_val: str, nam: int, thang: int, username: str, la_cn: bool) -> bool:
+    if la_cn:
+        ds = LuuTruXLRR.doc_cn(nam, thang)
+        ds_moi = [hs for hs in ds if hs.id != ho_so_id]
+        if len(ds_moi) == len(ds):
+            return False
+        LuuTruXLRR.luu_cn(ds_moi, nam, thang, username)
+        db.ghi_audit(username, "xlrr_xoa_cn", f"ID={ho_so_id[:8]}")
+    else:
+        ds = LuuTruXLRR.doc_pgd(pgd_slug_val, nam, thang)
+        ds_moi = [hs for hs in ds if hs.id != ho_so_id]
+        if len(ds_moi) == len(ds):
+            return False
+        LuuTruXLRR.luu_pgd(ds_moi, pgd_slug_val, nam, thang, username)
+        db.ghi_audit(username, "xlrr_xoa_pgd", f"ID={ho_so_id[:8]}")
+    st.cache_data.clear()
+    return True
+
+
+def _hs_to_du_lieu_02(hs: HoSoRuiRo) -> dict:
+    """Chuyển HoSoRuiRo → dict chuẩn cho _tao_word_02xln_v2."""
+    return {
+        "ten_nhcsxh": hs.ten_pgd,
+        "dia_danh": "TP. Biên Hòa",
+        "ngay_lap": hs.ngay_lap_02 or date.today(),
+        "dia_diem": hs.dia_diem_02,
+        "ten_pgd": hs.ten_pgd_02,
+        "chuc_vu_pgd": hs.chuc_vu_pgd_02,
+        "ten_ubnd": hs.ten_ubnd_02,
+        "chuc_vu_ubnd": hs.chuc_vu_ubnd_02,
+        "ten_hoi_nd": hs.ten_hoi_nd_02,
+        "chuc_vu_hoi_nd": hs.chuc_vu_hoi_nd_02,
+        "ten_cbtd": hs.ten_cbtd_02,
+        "ten_to_truong": hs.ten_to_truong_02,
+        "ten_kh": hs.ten_kh,
+        "dia_chi": getattr(hs, "dia_chi", ""),
+        "so_ku": hs.so_ku,
+        "ngay_vay": hs.ngay_vay or date.today(),
+        "ten_ct": hs.ten_ct,
+        "ma_mon_vay": getattr(hs, "ma_mon_vay", ""),
+        "muc_vay": f"{getattr(hs, 'muc_vay', 0):,.0f}".replace(",", "."),
+        "tong_du_no": f"{hs.tong_du_no:,.0f}".replace(",", ".") if hs.tong_du_no else "0",
+        "du_no_goc": f"{hs.du_no_goc:,.0f}".replace(",", "."),
+        "lai_ton": f"{hs.lai_ton:,.0f}".replace(",", "."),
+        "nguyen_nhan": hs.nguyen_nhan,
+        "so_tien_thiet_hai": f"{hs.du_no_goc:,.0f}".replace(",", "."),
+        "chi_tiet_thiet_hai": hs.chi_tiet_thiet_hai_02,
+        "danh_gia_thiet_hai": hs.danh_gia_thiet_hai_02,
+        "danh_gia_du_an": hs.danh_gia_du_an_02,
+        "tai_san_hien_tai": hs.tai_san_hien_tai_02,
+        "kha_nang_tra_no": hs.kha_nang_tra_no_02,
+        "bien_phap_thu_hoi": "",
+        "bien_phap": "Khoanh Nợ" if hs.bien_phap == "khoanh" else "Xóa Nợ",
+        "so_thang": hs.so_thang,
+        "so_tien_de_nghi": f"{hs.tong_du_no:,.0f}".replace(",", ".") if hs.tong_du_no else "0",
+    }
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # SUB-TAB 1: LẬP HỒ SƠ PGD
 # ══════════════════════════════════════════════════════════════════════════════
@@ -83,39 +163,307 @@ def _subtab_lap_hs_pgd(df: pd.DataFrame, ctx: TabContext) -> None:
     username = ctx.username
     
     if la_phan_he_pgd(role):
-        ten_pgd = ctx.pgd_user or DS_PGD[0]
+        ten_pgd = ctx.pgd_user or DON_VI_CHI_NHANH
     else:
-        # CN chọn PGD để lập thay (chỉ 21 PGD — Hội sở không có HSTD)
-        ten_pgd = st.selectbox("📍 Chọn PGD để lập hồ sơ", DS_PGD, key="xlrr_pgd_chon_pgd")
+        # CN chọn PGD để lập thay — 22 đơn vị (Hội sở CN tỉnh + 21 PGD)
+        ten_pgd = st.selectbox(
+            "📍 Chọn PGD để lập hồ sơ",
+            [DON_VI_CHI_NHANH] + DS_PGD,
+            key="xlrr_pgd_chon_pgd",
+        )
     
     pgd_slug_val = pgd_slug(ten_pgd)
     df_pgd = df[df[COT_TEN_PGD] == ten_pgd].copy() if COT_TEN_PGD in df.columns else pd.DataFrame()
-    
+
+    # ── Chọn đợt XLRR ────────────────────────────────────────────────────────
+    _nam_xl = datetime.now().year
+    ds_dot = LuuTruDotXLRR.doc_ds(_nam_xl, "cn") if _la_cn else LuuTruDotXLRR.doc_ds(_nam_xl, "pgd", pgd_slug_val)
+    dot_key = f"xlrr_dot_{pgd_slug_val}"
+    dot_options = {f"{d.ten_dot} ({d.ngay_bat_dau:%d/%m}–{d.ngay_ket_thuc:%d/%m})": d.id for d in ds_dot}
+    dot_id = st.session_state.get(dot_key, "")
+    if dot_options:
+        dot_label = st.selectbox("📅 Chọn đợt XLRR", list(dot_options.keys()), key=dot_key)
+        dot_id = dot_options[dot_label]
+    else:
+        st.warning("⚠️ Chưa có đợt XLRR nào. Vào tab '📅 Quản lý đợt' để tạo đợt trước.")
+        dot_id = ""
+
+    # ── Hồ sơ đã lập trong tháng ──────────────────────────────────────────────
+    _now = datetime.now()
+    _nam, _thang = _now.year, _now.month
+    _la_cn = la_phan_he_cn(role)
+    _edit_key = f"xlrr_edit_{pgd_slug_val}"
+    _edit_id = st.session_state.get(_edit_key)
+
+    if _la_cn:
+        ds_hs = [hs for hs in LuuTruXLRR.doc_cn(_nam, _thang) if hs.ten_pgd == ten_pgd]
+    else:
+        ds_hs = LuuTruXLRR.doc_pgd(pgd_slug_val, _nam, _thang)
+
+    _hs_sua = next((hs for hs in ds_hs if hs.id == _edit_id), None) if _edit_id else None
+
+    _bp_label = {BIEN_PHAP_KHOANH: "Khoanh nợ", BIEN_PHAP_XOA: "Xóa nợ", BIEN_PHAP_KHAC: "Khác"}
+    _exp_title = (
+        f"📂 Hồ sơ đã lập tháng {_thang}/{_nam} — {len(ds_hs)} hồ sơ"
+        if ds_hs else f"📂 Chưa có hồ sơ tháng {_thang}/{_nam}"
+    )
+    with st.expander(_exp_title, expanded=bool(_edit_id)):
+        if not ds_hs:
+            st.info("Chưa có hồ sơ nào được lập trong tháng này.")
+        for hs in ds_hs:
+            _active = hs.id == _edit_id
+            c_info, c_bp, c_tt, c_dn, c_sua, c_xoa = st.columns([3, 1.5, 1.5, 1.5, 0.6, 0.6])
+            c_info.markdown(f"**{hs.ten_kh}**  \n`{hs.so_ku}`")
+            c_bp.caption(_bp_label.get(hs.bien_phap, hs.bien_phap))
+            c_tt.caption(TRANG_THAI_BADGE.get(hs.trang_thai, hs.trang_thai))
+            c_dn.caption(f"{fmt_ty(hs.tong_du_no)} tr")
+            with c_sua:
+                if st.button(
+                    "✅" if _active else "✏️",
+                    key=f"btn_sua_{hs.id[:8]}",
+                    help="Đang sửa — bấm để hủy" if _active else "Sửa hồ sơ này",
+                ):
+                    if _active:
+                        st.session_state.pop(_edit_key, None)
+                    else:
+                        st.session_state[_edit_key] = hs.id
+                    st.rerun()
+            with c_xoa:
+                with st.popover("🗑️"):
+                    st.warning(f"Xóa hồ sơ **{hs.ten_kh}** (`{hs.so_ku}`)? Không thể hoàn tác.")
+                    if st.button("⚠️ Xác nhận xóa", key=f"btn_xoa_ok_{hs.id[:8]}", type="primary"):
+                        if _xoa_hs(hs.id, pgd_slug_val, _nam, _thang, username, _la_cn):
+                            st.session_state.pop(_edit_key, None)
+                            st.toast(f"Đã xóa hồ sơ {hs.ten_kh}", icon="🗑️")
+                            st.rerun()
+
+    st.divider()
+
+    # ── EDIT MODE: form sửa pre-filled ────────────────────────────────────────
+    if _hs_sua:
+        st.markdown(f"#### ✏️ Sửa hồ sơ: **{_hs_sua.ten_kh}** — `{_hs_sua.so_ku}`")
+        _kp = f"sua_{_hs_sua.id[:8]}_"
+        _bp_opts = [("Khoanh nợ (QĐ62)", BIEN_PHAP_KHOANH), ("Xóa nợ (QĐ62)", BIEN_PHAP_XOA)]
+        _bp_idx = next((i for i, (_, v) in enumerate(_bp_opts) if v == _hs_sua.bien_phap), 0)
+        _nv_opts = [(LABEL_TW, NGUON_TW), (LABEL_DP, NGUON_DP)]
+        _nv_idx = next((i for i, (_, v) in enumerate(_nv_opts) if v == _hs_sua.nguon_von), 0)
+        _nn_idx = NGUYEN_NHAN_RR.index(_hs_sua.nguyen_nhan) if _hs_sua.nguyen_nhan in NGUYEN_NHAN_RR else 0
+        _md_opts = [("Từ 40% đến <80%", "40-80"), ("Từ 80% đến 100%", "80-100"), ("Không áp dụng", "")]
+        _md_idx = next((i for i, (_, v) in enumerate(_md_opts) if v == (_hs_sua.muc_do or "")), 2)
+
+        with st.form(f"xlrr_form_sua_{_hs_sua.id[:8]}"):
+            col1, col2 = st.columns(2)
+            with col1:
+                bien_phap_s = st.selectbox(
+                    "Biện pháp xử lý *", _bp_opts, index=_bp_idx,
+                    format_func=lambda x: x[0], key=f"{_kp}bp",
+                )[1]
+                nguyen_nhan_s = st.selectbox(
+                    "Nguyên nhân rủi ro *", NGUYEN_NHAN_RR,
+                    index=_nn_idx, key=f"{_kp}nn",
+                )
+            with col2:
+                ngay_rr_s = st.date_input(
+                    "Ngày xảy ra rủi ro *",
+                    value=_hs_sua.ngay_rr if isinstance(_hs_sua.ngay_rr, date) else date.today(),
+                    format="DD/MM/YYYY", key=f"{_kp}ngay_rr",
+                )
+                nguon_von_s = st.selectbox(
+                    "Nguồn vốn *", _nv_opts, index=_nv_idx,
+                    format_func=lambda x: x[0], key=f"{_kp}nv",
+                )[1]
+
+            muc_do_s, so_thang_s = "", int(_hs_sua.so_thang or 0)
+            if bien_phap_s == BIEN_PHAP_KHOANH:
+                st.markdown("**Mức độ thiệt hại (khoanh nợ)**")
+                mc1, mc2 = st.columns(2)
+                with mc1:
+                    muc_do_s = st.radio(
+                        "Mức độ", _md_opts, index=_md_idx,
+                        format_func=lambda x: x[0], key=f"{_kp}muc_do",
+                    )[1]
+                with mc2:
+                    so_thang_s = st.number_input(
+                        "Số tháng đề nghị khoanh *",
+                        min_value=0, max_value=120, value=so_thang_s, step=6,
+                        key=f"{_kp}so_thang",
+                    )
+
+            ghi_chu_s = st.text_area(
+                "Ghi chú / Tóm tắt nguyên nhân *",
+                value=_hs_sua.ghi_chu or "", height=100, key=f"{_kp}gc",
+            )
+            st.markdown("**💰 Thông tin dư nợ**")
+            st.text_input(
+                "Dư nợ gốc (từ HSTD, đồng)", value=fmt(_hs_sua.du_no_goc),
+                disabled=True, key=f"{_kp}dng",
+            )
+            du_no_lai_s = st.number_input(
+                "Dư nợ lãi (triệu đồng) *",
+                min_value=0.0, step=0.1, format="%.1f",
+                value=round((_hs_sua.du_no_lai or 0) / 1_000_000, 1),
+                key=f"{_kp}dnl",
+            )
+
+            with st.expander("📝 Thông tin mẫu 01/XLN (tùy chọn)"):
+                ngay_ky_01_s = st.date_input("Ngày ký đơn:", format="DD/MM/YYYY",
+                    value=_hs_sua.ngay_ky_01 if isinstance(_hs_sua.ngay_ky_01, date) else date.today(),
+                    key=f"{_kp}01_ngay")
+                ma_to_s = st.text_input("Mã Tổ TK&VV:", value=_hs_sua.ma_to or "", key=f"{_kp}01_ma_to")
+                ten_to_truong_s = st.text_input("Tổ trưởng:", value=_hs_sua.ten_to_truong or "", key=f"{_kp}01_ttr")
+                nguyen_nhan_01_s = st.text_area("Nguyên nhân rủi ro:", value=_hs_sua.nguyen_nhan_01 or "", key=f"{_kp}01_nn")
+                so_tien_th_s = st.text_input("Số tiền thiệt hại:", value=_hs_sua.so_tien_thiet_hai_01 or "0", key=f"{_kp}01_stth")
+                muc_do_th_s = st.text_input("Mức độ thiệt hại (%):", value=_hs_sua.muc_do_thiet_hai_01 or "0", key=f"{_kp}01_mdth")
+                kha_nang_01_s = st.text_area("Khả năng trả nợ:", value=_hs_sua.kha_nang_tra_no_01 or "", key=f"{_kp}01_kn")
+                ke_hoach_01_s = st.text_input("Kế hoạch trả nợ:", value=_hs_sua.ke_hoach_tra_no_01 or "", key=f"{_kp}01_kh")
+
+            with st.expander("📋 Thông tin mẫu 02/XLN (tùy chọn)"):
+                ngay_lap_02_s = st.date_input("Ngày lập biên bản:", format="DD/MM/YYYY",
+                    value=_hs_sua.ngay_lap_02 if isinstance(_hs_sua.ngay_lap_02, date) else date.today(),
+                    key=f"{_kp}02_ngay")
+                dia_diem_02_s = st.text_input("Địa điểm:", value=_hs_sua.dia_diem_02 or "", key=f"{_kp}02_dd")
+                st.markdown("**Thành phần tham dự:**")
+                _scv1, _sten1 = st.columns([1, 2])
+                with _scv1:
+                    chuc_vu_pgd_02_s = st.selectbox("Chức vụ NHCSXH:", ["Phó Giám đốc", "Giám đốc"],
+                        index=0 if (_hs_sua.chuc_vu_pgd_02 or "Phó Giám đốc") == "Phó Giám đốc" else 1,
+                        key=f"{_kp}02_cv_pgd")
+                with _sten1:
+                    ten_pgd_02_s = st.text_input("Họ tên đại diện NHCSXH:", value=_hs_sua.ten_pgd_02 or "", key=f"{_kp}02_pgd")
+                _scv2, _sten2 = st.columns([1, 2])
+                with _scv2:
+                    chuc_vu_ubnd_02_s = st.selectbox("Chức vụ UBND xã:", ["Phó Chủ tịch", "Chủ tịch"],
+                        index=0 if (_hs_sua.chuc_vu_ubnd_02 or "Phó Chủ tịch") == "Phó Chủ tịch" else 1,
+                        key=f"{_kp}02_cv_ubnd")
+                with _sten2:
+                    ten_ubnd_02_s = st.text_input("Họ tên đại diện UBND:", value=_hs_sua.ten_ubnd_02 or "", key=f"{_kp}02_ubnd")
+                _scv3, _sten3 = st.columns([1, 2])
+                with _scv3:
+                    chuc_vu_hoi_nd_02_s = st.text_input("Chức danh đoàn thể/CA:",
+                        value=_hs_sua.chuc_vu_hoi_nd_02 or "Chủ tịch Hội Nông dân xã",
+                        key=f"{_kp}02_cv_hnd",
+                        help="VD: Chủ tịch Hội ND xã, Trưởng CA xã, Phó CT Hội PN")
+                with _sten3:
+                    ten_hoi_nd_02_s = st.text_input("Họ tên đại diện đoàn thể/CA:", value=_hs_sua.ten_hoi_nd_02 or "", key=f"{_kp}02_hnd")
+                ten_cbtd_02_s = st.text_input("CBTD NHCSXH:", value=_hs_sua.ten_cbtd_02 or "", key=f"{_kp}02_cbtd")
+                ten_to_truong_02_s = st.text_input("Tổ trưởng TK&VV:", value=_hs_sua.ten_to_truong_02 or "", key=f"{_kp}02_ttr")
+                st.markdown("**Nội dung biên bản:**")
+                chi_tiet_02_s = st.text_input("Chi tiết thiệt hại:", value=_hs_sua.chi_tiet_thiet_hai_02 or "", key=f"{_kp}02_ct")
+                danh_gia_02_s = st.text_input("Đánh giá thiệt hại:", value=_hs_sua.danh_gia_thiet_hai_02 or "", key=f"{_kp}02_dg")
+                du_an_02_s = st.text_area("Đánh giá dự án:", value=_hs_sua.danh_gia_du_an_02 or "", key=f"{_kp}02_da")
+                tai_san_02_s = st.text_input("Tài sản hiện tại:", value=_hs_sua.tai_san_hien_tai_02 or "", key=f"{_kp}02_ts")
+                kha_nang_02_s = st.text_area("Khả năng trả nợ:", value=_hs_sua.kha_nang_tra_no_02 or "", key=f"{_kp}02_kn")
+
+            c_save, c_cancel = st.columns(2)
+            with c_save:
+                submitted_sua = st.form_submit_button("💾 Cập nhật hồ sơ", type="primary", use_container_width=True)
+            with c_cancel:
+                huy_sua = st.form_submit_button("↩️ Hủy", type="secondary", use_container_width=True)
+
+        if huy_sua:
+            st.session_state.pop(_edit_key, None)
+            st.rerun()
+
+        if submitted_sua:
+            if len(ghi_chu_s.strip()) < 20:
+                st.error("⚠️ Ghi chú phải có ít nhất 20 ký tự.")
+            else:
+                hs_moi = dataclasses.replace(
+                    _hs_sua,
+                    bien_phap=bien_phap_s,
+                    nguyen_nhan=nguyen_nhan_s,
+                    ngay_rr=ngay_rr_s,
+                    nguon_von=nguon_von_s,
+                    muc_do=muc_do_s,
+                    so_thang=int(so_thang_s),
+                    ghi_chu=ghi_chu_s.strip(),
+                    du_no_lai=float(du_no_lai_s * 1_000_000),
+                    lai_ton=float(du_no_lai_s * 1_000_000),
+                    ngay_ky_01=ngay_ky_01_s,
+                    ma_to=ma_to_s,
+                    ten_to_truong=ten_to_truong_s,
+                    nguyen_nhan_01=nguyen_nhan_01_s,
+                    so_tien_thiet_hai_01=so_tien_th_s,
+                    muc_do_thiet_hai_01=muc_do_th_s,
+                    kha_nang_tra_no_01=kha_nang_01_s,
+                    ke_hoach_tra_no_01=ke_hoach_01_s,
+                    ngay_lap_02=ngay_lap_02_s,
+                    dia_diem_02=dia_diem_02_s,
+                    ten_pgd_02=ten_pgd_02_s,
+                    chuc_vu_pgd_02=chuc_vu_pgd_02_s,
+                    ten_ubnd_02=ten_ubnd_02_s,
+                    chuc_vu_ubnd_02=chuc_vu_ubnd_02_s,
+                    ten_hoi_nd_02=ten_hoi_nd_02_s,
+                    chuc_vu_hoi_nd_02=chuc_vu_hoi_nd_02_s,
+                    ten_cbtd_02=ten_cbtd_02_s,
+                    ten_to_truong_02=ten_to_truong_02_s,
+                    chi_tiet_thiet_hai_02=chi_tiet_02_s,
+                    danh_gia_thiet_hai_02=danh_gia_02_s,
+                    danh_gia_du_an_02=du_an_02_s,
+                    tai_san_hien_tai_02=tai_san_02_s,
+                    kha_nang_tra_no_02=kha_nang_02_s,
+                )
+                _cap_nhat_hs(hs_moi, pgd_slug_val, _nam, _thang, username, _la_cn)
+                st.session_state.pop(_edit_key, None)
+                st.success(f"✅ Đã cập nhật hồ sơ KH **{hs_moi.ten_kh}**")
+                st.rerun()
+        return
+
+    # ── NEW MODE: lập hồ sơ mới ───────────────────────────────────────────────
+    st.markdown("#### ➕ Lập hồ sơ mới")
     if df_pgd.empty:
         st.warning(f"⚠️ Không có dữ liệu HSTD cho {ten_pgd}")
         return
-    
-    # Bước 1: Lọc hộ vay
+
+    # Bước 1: Lọc hộ vay (cascade: Xã → Tổ → KH)
     with st.expander("🔎 Bước 1: Lọc hộ vay", expanded=True):
         c1, c2, c3 = st.columns(3)
         with c1:
             ds_xa = sorted(df_pgd[COT_TEN_XA].dropna().unique().tolist()) if COT_TEN_XA in df_pgd.columns else []
-            chon_xa = st.selectbox("Xã/Phường", [""] + ds_xa, key="xlrr_pgd_xa")
+            chon_xa = st.selectbox(
+                "Xã/Phường",
+                ["Tất cả"] + ds_xa,
+                key="xlrr_pgd_xa",
+                help="Gõ để tìm nhanh trong danh sách",
+            )
         with c2:
-            df_loc = df_pgd[df_pgd[COT_TEN_XA] == chon_xa] if chon_xa and COT_TEN_XA in df_pgd.columns else df_pgd
-            ds_to = sorted(df_loc[COT_TEN_TO].dropna().unique().tolist()) if COT_TEN_TO in df_loc.columns else []
-            chon_to = st.selectbox("Tổ TK&VV", [""] + ds_to, key="xlrr_pgd_to")
+            # Tổ chỉ hiện theo Xã đã chọn
+            _df_xa = df_pgd[df_pgd[COT_TEN_XA] == chon_xa] if (chon_xa != "Tất cả" and COT_TEN_XA in df_pgd.columns) else df_pgd
+            ds_to = sorted(_df_xa[COT_TEN_TO].dropna().unique().tolist()) if COT_TEN_TO in _df_xa.columns else []
+            chon_to = st.selectbox(
+                "Tổ TK&VV",
+                ["Tất cả"] + ds_to,
+                key="xlrr_pgd_to",
+                help="Gõ để tìm nhanh trong danh sách",
+            )
         with c3:
-            tim_kh = st.text_input("Tìm tên KH", placeholder="Nhập tên...", key="xlrr_pgd_tim")
-    
+            # Tên KH: text_input lọc trước → selectbox hiện kết quả đã thu hẹp
+            _df_to = _df_xa[_df_xa[COT_TEN_TO] == chon_to] if (chon_to != "Tất cả" and COT_TEN_TO in _df_xa.columns) else _df_xa
+            ds_kh_all = sorted(_df_to[COT_TEN_KH].dropna().unique().tolist()) if COT_TEN_KH in _df_to.columns else []
+            tim_kh = st.text_input(
+                "Tên KH",
+                placeholder="Gõ tên để lọc...",
+                key="xlrr_pgd_tim_kh",
+            )
+            ds_kh_filter = [k for k in ds_kh_all if tim_kh.strip().lower() in k.lower()] if tim_kh.strip() else ds_kh_all
+            chon_kh = st.selectbox(
+                f"Chọn ({len(ds_kh_filter)} KH)",
+                ["Tất cả"] + ds_kh_filter,
+                key="xlrr_pgd_kh",
+                label_visibility="collapsed" if not ds_kh_filter else "visible",
+            )
+
     # Lọc dữ liệu
     df_hien = df_pgd.copy()
-    if chon_xa and COT_TEN_XA in df_hien.columns:
+    if chon_xa != "Tất cả" and COT_TEN_XA in df_hien.columns:
         df_hien = df_hien[df_hien[COT_TEN_XA] == chon_xa]
-    if chon_to and COT_TEN_TO in df_hien.columns:
+    if chon_to != "Tất cả" and COT_TEN_TO in df_hien.columns:
         df_hien = df_hien[df_hien[COT_TEN_TO] == chon_to]
-    if tim_kh and COT_TEN_KH in df_hien.columns:
-        df_hien = df_hien[df_hien[COT_TEN_KH].str.contains(tim_kh, case=False, na=False)]
+    # Nếu đã chọn tên cụ thể từ dropdown → exact match; ngược lại dùng substring từ text_input
+    if chon_kh != "Tất cả" and COT_TEN_KH in df_hien.columns:
+        df_hien = df_hien[df_hien[COT_TEN_KH] == chon_kh]
+    elif tim_kh.strip() and COT_TEN_KH in df_hien.columns:
+        df_hien = df_hien[df_hien[COT_TEN_KH].str.contains(tim_kh.strip(), case=False, na=False)]
     
     if df_hien.empty:
         st.info("ℹ️ Không tìm thấy hộ vay nào phù hợp.")
@@ -143,10 +491,9 @@ def _subtab_lap_hs_pgd(df: pd.DataFrame, ctx: TabContext) -> None:
     
     ds_chon = edited[edited["Chọn"] == True]
     if ds_chon.empty:
-        st.info("👆 Tích chọn ít nhất 1 hộ vay để tiếp tục.")
-        return
-    
-    st.success(f"✅ Đã chọn **{len(ds_chon)}** hộ vay.")
+        st.info("👆 Tích chọn hộ vay ở bảng trên để điền thông tin và lưu hồ sơ bên dưới.")
+    else:
+        st.success(f"✅ Đã chọn **{len(ds_chon)}** hộ vay.")
 
     # Tính tổng dư nợ gốc từ HSTD trước khi vào form
     tong_du_no_goc_val = ""
@@ -250,9 +597,25 @@ def _subtab_lap_hs_pgd(df: pd.DataFrame, ctx: TabContext) -> None:
             )
             dia_diem_02 = st.text_input("Địa điểm:", key="xlrr_pgd_02_dia_diem")
             st.markdown("**Thành phần tham dự:**")
-            ten_pgd_02 = st.text_input("Phó GĐ NHCSXH:", key="xlrr_pgd_02_pgd")
-            ten_ubnd_02 = st.text_input("Phó Chủ tịch UBND:", key="xlrr_pgd_02_ubnd")
-            ten_hoi_nd_02 = st.text_input("Chủ tịch Hội ND:", key="xlrr_pgd_02_hoi_nd")
+            _cv1, _ten1 = st.columns([1, 2])
+            with _cv1:
+                chuc_vu_pgd_02 = st.selectbox("Chức vụ NHCSXH:", ["Phó Giám đốc", "Giám đốc"], key="xlrr_pgd_02_cv_pgd")
+            with _ten1:
+                ten_pgd_02 = st.text_input("Họ tên đại diện NHCSXH:", key="xlrr_pgd_02_pgd")
+            _cv2, _ten2 = st.columns([1, 2])
+            with _cv2:
+                chuc_vu_ubnd_02 = st.selectbox("Chức vụ UBND xã:", ["Phó Chủ tịch", "Chủ tịch"], key="xlrr_pgd_02_cv_ubnd")
+            with _ten2:
+                ten_ubnd_02 = st.text_input("Họ tên đại diện UBND:", key="xlrr_pgd_02_ubnd")
+            _cv3, _ten3 = st.columns([1, 2])
+            with _cv3:
+                chuc_vu_hoi_nd_02 = st.text_input(
+                    "Chức danh đoàn thể/CA:", value="Chủ tịch Hội Nông dân xã",
+                    key="xlrr_pgd_02_cv_hnd",
+                    help="VD: Chủ tịch Hội ND xã, Trưởng CA xã, Phó CT Hội PN",
+                )
+            with _ten3:
+                ten_hoi_nd_02 = st.text_input("Họ tên đại diện đoàn thể/CA:", key="xlrr_pgd_02_hoi_nd")
             ten_cbtd_02 = st.text_input("CBTD NHCSXH:", key="xlrr_pgd_02_cbtd")
             ten_to_truong_02 = st.text_input("Tổ trưởng TK&VV:", key="xlrr_pgd_02_to_truong")
             st.markdown("**Nội dung biên bản:**")
@@ -261,8 +624,28 @@ def _subtab_lap_hs_pgd(df: pd.DataFrame, ctx: TabContext) -> None:
             danh_gia_du_an_02 = st.text_area("Đánh giá dự án:", key="xlrr_pgd_02_du_an")
             tai_san_hien_tai_02 = st.text_input("Tài sản hiện tại:", key="xlrr_pgd_02_tai_san")
             kha_nang_tra_no_02 = st.text_area("Khả năng trả nợ:", key="xlrr_pgd_02_kha_nang")
-        
-        submitted = st.form_submit_button("💾 Lưu hồ sơ", type="primary")
+
+        # Expander: Tờ trình PGD gửi CN
+        with st.expander("📄 Thông tin Tờ trình gửi CN (tùy chọn — xuất ngay sau khi lưu)"):
+            _col_tt1, _col_tt2 = st.columns(2)
+            with _col_tt1:
+                dot_tt_form = st.number_input(
+                    "Đợt xử lý:", min_value=1, max_value=4, value=1,
+                    key="xlrr_pgd_tt_dot",
+                )
+            with _col_tt2:
+                nguon_tt_form = st.selectbox(
+                    "Nguồn vốn Tờ trình:",
+                    ["Trung ương (TW)", "Địa phương (ĐP)"],
+                    key="xlrr_pgd_tt_nguon",
+                )
+
+        submitted = st.form_submit_button(
+            "💾 Lưu hồ sơ",
+            type="primary",
+            disabled=ds_chon.empty,
+            help="Tích chọn ít nhất 1 hộ vay ở Bước 2 trước khi lưu.",
+        )
     
     if submitted:
         # Validate
@@ -319,6 +702,7 @@ def _subtab_lap_hs_pgd(df: pd.DataFrame, ctx: TabContext) -> None:
                 trang_thai=TRANG_THAI_CHO_DUYET,
                 nguoi_tao=username,
                 lap_thay_pgd=la_phan_he_cn(role),
+                dot_id=dot_id,
                 # Thông tin mẫu 01/XLN
                 ngay_ky_01=ngay_ky_01,
                 ma_to=ma_to,
@@ -331,8 +715,11 @@ def _subtab_lap_hs_pgd(df: pd.DataFrame, ctx: TabContext) -> None:
                 ngay_lap_02=ngay_lap_02,
                 dia_diem_02=dia_diem_02,
                 ten_pgd_02=ten_pgd_02,
+                chuc_vu_pgd_02=chuc_vu_pgd_02,
                 ten_ubnd_02=ten_ubnd_02,
+                chuc_vu_ubnd_02=chuc_vu_ubnd_02,
                 ten_hoi_nd_02=ten_hoi_nd_02,
+                chuc_vu_hoi_nd_02=chuc_vu_hoi_nd_02,
                 ten_cbtd_02=ten_cbtd_02,
                 ten_to_truong_02=ten_to_truong_02,
                 chi_tiet_thiet_hai_02=chi_tiet_thiet_hai_02,
@@ -350,10 +737,111 @@ def _subtab_lap_hs_pgd(df: pd.DataFrame, ctx: TabContext) -> None:
         else:
             # PGD lập → lưu vào PGD registry
             LuuTruXLRR.luu_pgd(ds_luu, pgd_slug_val, now.year, now.month, username)
-        
+
         st.cache_data.clear()
         st.success(f"✅ Đã lưu **{len(ds_luu)}** hồ sơ xử lý rủi ro.")
         st.balloons()
+        # Lưu vào session_state để hiện nút tải ngay sau form
+        st.session_state[f"xlrr_saved_{pgd_slug_val}"] = {
+            "ds_luu": ds_luu,
+            "dot": int(dot_tt_form),
+            "nguon": nguon_tt_form,
+            "nam": now.year,
+            "thang": now.month,
+            "ten_pgd": ten_pgd,
+        }
+
+    # ── Download section (hiện sau khi lưu thành công) ───────────────
+    _saved = st.session_state.get(f"xlrr_saved_{pgd_slug_val}")
+    if _saved:
+        _ds = _saved["ds_luu"]
+        _dot = _saved["dot"]
+        _nguon = _saved["nguon"]
+        _nam = _saved["nam"]
+        _ten_pgd = _saved["ten_pgd"]
+        _slug_dl = pgd_slug(_ten_pgd)
+
+        st.markdown("---")
+        st.markdown("#### 📥 Tải biểu mẫu vừa lưu")
+
+        # Nút tải từng hồ sơ
+        for _i, _hs in enumerate(_ds):
+            with st.expander(f"📄 {_hs.ten_kh} — {_hs.so_ku}", expanded=False):
+                _c1, _c2 = st.columns(2)
+                with _c1:
+                    if _hs.ten_to_truong:
+                        try:
+                            _du_lieu_01 = _hs.to_dict()
+                            _bytes_01 = _tao_word_01xln_v2(_du_lieu_01)
+                            st.download_button(
+                                label="⬇️ Mẫu 01/XLN — Đơn đề nghị",
+                                data=_bytes_01,
+                                file_name=f"01XLN_{_slug_dl}_{_hs.so_ku[:8]}.docx",
+                                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                                use_container_width=True,
+                                key=f"dl_01xln_{pgd_slug_val}_{_i}",
+                            )
+                        except Exception as e:
+                            logger.error("dl_01xln_%s: %s", _hs.id, e, exc_info=True)
+                            st.error(f"❌ Lỗi 01/XLN: {e}")
+                    else:
+                        st.caption("⚠️ Chưa điền Tổ trưởng → không xuất 01/XLN")
+                with _c2:
+                    if _hs.ten_pgd_02:
+                        try:
+                            _bytes_02 = _tao_word_02xln_v2(_hs_to_du_lieu_02(_hs))
+                            st.download_button(
+                                label="⬇️ Mẫu 02/XLN — Biên bản",
+                                data=_bytes_02,
+                                file_name=f"02XLN_{_slug_dl}_{_hs.so_ku[:8]}.docx",
+                                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                                use_container_width=True,
+                                key=f"dl_02xln_{pgd_slug_val}_{_i}",
+                            )
+                        except Exception as e:
+                            logger.error("dl_02xln_%s: %s", _hs.id, e, exc_info=True)
+                            st.error(f"❌ Lỗi 02/XLN: {e}")
+                    else:
+                        st.caption("⚠️ Chưa điền Phó GĐ NHCSXH → không xuất 02/XLN")
+
+        # Tờ trình PGD tổng hợp
+        st.markdown("**📝 Tờ trình PGD gửi Chi nhánh**")
+        _ds_kh = tong_hop_theo_bien_phap(_ds, "khoanh")
+        _ds_xoa = tong_hop_theo_bien_phap(_ds, "xoa")
+        _ds_kh_dict = [hs.to_dict() for hs in _ds_kh]
+        _ds_xoa_dict = [hs.to_dict() for hs in _ds_xoa]
+
+        def _agg_pgd_inline(ds_list: list) -> dict:
+            tong = sum(float(r.get("tong_du_no", 0) or 0) for r in ds_list)
+            tw = sum(float(r.get("tong_du_no", 0) or 0) for r in ds_list if r.get("nguon_von") == 1)
+            return {"tong": tong, "tw": tw, "dp": tong - tw, "so_ho": len(ds_list)}
+
+        _th_kh = _agg_pgd_inline(_ds_kh_dict)
+        _th_xoa = _agg_pgd_inline(_ds_xoa_dict)
+        _col_tt, _col_close = st.columns([3, 1])
+        with _col_tt:
+            try:
+                _bytes_tt = _tao_word_to_trinh_pgd(
+                    _th_kh, _th_xoa, _ds_kh_dict,
+                    _ten_pgd, _nguon, _dot, _nam,
+                )
+                st.download_button(
+                    label="⬇️ Tờ trình PGD gửi CN (.docx)",
+                    data=_bytes_tt,
+                    file_name=f"ToTrinh_PGD_{_slug_dl}_Dot{_dot}_{_nam}.docx",
+                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    use_container_width=True,
+                    key=f"dl_tt_pgd_{pgd_slug_val}",
+                )
+                db.ghi_audit(username, "xuat_to_trinh_pgd",
+                             f"{_ten_pgd} — Đợt {_dot} T{_saved['thang']}/{_nam}")
+            except Exception as e:
+                logger.error("dl_to_trinh_pgd: %s", e, exc_info=True)
+                st.error(f"❌ Lỗi Tờ trình PGD: {e}")
+        with _col_close:
+            if st.button("✕ Đóng", key=f"xlrr_saved_close_{pgd_slug_val}", use_container_width=True):
+                del st.session_state[f"xlrr_saved_{pgd_slug_val}"]
+                st.rerun()
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -500,6 +988,7 @@ def _subtab_tong_hop_cn(ctx: TabContext) -> None:
                 ds_hs = nhap_danh_sach_rui_ro_excel(file.read())
                 ds_all.extend(ds_hs)
             except Exception as e:
+                logger.error("import_xlrr_excel: %s — %s", file.name, e, exc_info=True)
                 errors.append(f"{file.name}: {str(e)}")
         
         if errors:
@@ -613,6 +1102,7 @@ def _subtab_tong_hop_cn(ctx: TabContext) -> None:
                             db.ghi_audit(ctx.username, "xuat_04xln", f"{len(ds_khoanh)} hồ sơ khoanh nợ")
                             st.success(f"✅ Đã xuất mẫu 04/XLN ({len(ds_khoanh)} hồ sơ)")
                         except Exception as e:
+                            logger.error("xuat_04xln: %s", e, exc_info=True)
                             st.error(f"❌ Lỗi xuất 04/XLN: {e}")
             else:
                 st.info("ℹ️ Không có hồ sơ khoanh nợ")
@@ -656,29 +1146,86 @@ def _subtab_tong_hop_cn(ctx: TabContext) -> None:
                             db.ghi_audit(ctx.username, "xuat_05xln", f"{len(ds_xoa)} hồ sơ xóa nợ")
                             st.success(f"✅ Đã xuất mẫu 05/XLN ({len(ds_xoa)} hồ sơ)")
                         except Exception as e:
+                            logger.error("xuat_05xln: %s", e, exc_info=True)
                             st.error(f"❌ Lỗi xuất 05/XLN: {e}")
             else:
                 st.info("ℹ️ Không có hồ sơ xóa nợ")
     else:
         st.info("ℹ️ Chưa có dữ liệu CN để tổng hợp mẫu 04/05.")
 
+    # ── Tờ trình CN gửi NHCSXH TW ─────────────────────────────────────────
+    st.markdown("---")
+    st.markdown("#### 📝 Tờ trình CN gửi NHCSXH TW")
+
+    with st.expander("Nhập thông tin để xuất Tờ trình CN"):
+        col_tt1, col_tt2 = st.columns(2)
+        with col_tt1:
+            dot_tt_cn = st.number_input("Đợt xử lý:", min_value=1, max_value=4, value=1, key="xlrr_tt_cn_dot")
+            nam_tt_cn = st.number_input("Năm:", min_value=2020, max_value=2030, value=int(nam), key="xlrr_tt_cn_nam")
+        with col_tt2:
+            nguon_tt_cn = st.selectbox("Nguồn vốn:", ["Trung ương (TW)", "Địa phương (ĐP)"], key="xlrr_tt_cn_nguon")
+
+        if st.button("📝 Xuất Tờ trình CN", type="primary", use_container_width=True, key="btn_tt_cn"):
+            from services.word_xln_service import _tao_word_to_trinh_cn
+            from services.xlrr_export_service import tong_hop_theo_bien_phap
+
+            ds_cn_tt = LuuTruXLRR.doc_cn(int(nam_tt_cn), thang)
+            if not ds_cn_tt:
+                st.warning("⚠️ Chưa có hồ sơ CN kỳ này.")
+            else:
+                ds_kh_tt = tong_hop_theo_bien_phap(ds_cn_tt, "khoanh")
+                ds_xoa_tt = tong_hop_theo_bien_phap(ds_cn_tt, "xoa")
+                # Hàm nhận list[dict] — convert HoSoRuiRo → dict
+                ds_kh_dict = [hs.to_dict() for hs in ds_kh_tt]
+                ds_xoa_dict = [hs.to_dict() for hs in ds_xoa_tt]
+                # Tổng hợp metrics dạng dict cho hàm to_trinh
+                def _agg(ds_list: list) -> dict:
+                    tong = sum(float(r.get("tong_du_no", 0) or 0) for r in ds_list)
+                    tw = sum(float(r.get("tong_du_no", 0) or 0) for r in ds_list if r.get("nguon_von") == 1)
+                    dp = tong - tw
+                    return {"tong": tong, "tw": tw, "dp": dp, "so_ho": len(ds_list)}
+                tong_hop_kh = _agg(ds_kh_dict)
+                tong_hop_xoa = _agg(ds_xoa_dict)
+                nguon_label = nguon_tt_cn
+                try:
+                    file_bytes = _tao_word_to_trinh_cn(
+                        tong_hop_kh, tong_hop_xoa, ds_kh_dict,
+                        TEN_CHI_NHANH_HIEN_THI, nguon_label,
+                        int(dot_tt_cn), int(nam_tt_cn),
+                    )
+                    st.download_button(
+                        label="⬇️ Tải Tờ trình CN (.docx)",
+                        data=file_bytes,
+                        file_name=f"ToTrinh_CN_Dot{int(dot_tt_cn)}_{int(nam_tt_cn)}.docx",
+                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                        use_container_width=True,
+                        key="dl_tt_cn",
+                    )
+                    db.ghi_audit(ctx.username, "xuat_to_trinh_cn",
+                                 f"Đợt {int(dot_tt_cn)} T{thang}/{int(nam_tt_cn)}")
+                    st.success("✅ Xuất Tờ trình CN thành công!")
+                except Exception as e:
+                    logger.error("xuat_to_trinh_cn: %s", e, exc_info=True)
+                    st.error(f"❌ Lỗi xuất Tờ trình CN: {e}")
+
 
 # ══════════════════════════════════════════════════════════════════════════════
-# SUB-TAB 4: XUẤT BIỂU MẪU (cũ là SUB-TAB 5)
+# SUB-TAB 4 (PGD) / SUB-TAB 4 (CN): GỬI CN / XUẤT BIỂU MẪU
 # ══════════════════════════════════════════════════════════════════════════════
 
-def _subtab_bao_cao(df: pd.DataFrame, ctx: TabContext) -> None:
-    """Sub-tab 4: Xuất biểu mẫu 01/XLN, 02/XLN, 04/XLN, 05/XLN và tờ trình."""
-    st.caption("📄 Xuất biểu mẫu và dữ liệu rủi ro")
-    
-    # Import service export
-    from services.xlrr_export_service import xuat_danh_sach_rui_ro_excel
+def _subtab_gui_cn_pgd(df: pd.DataFrame, ctx: TabContext) -> None:
+    """Xuất biểu mẫu 01/XLN, 02/XLN; Tờ trình PGD; Gửi Excel lên CN."""
+    st.caption("📤 Xuất biểu mẫu và gửi dữ liệu lên CN")
 
-    # Lấy dữ liệu hồ sơ
+    from services.xlrr_export_service import (
+        xuat_danh_sach_rui_ro_excel,
+        tong_hop_theo_bien_phap,
+    )
+
     role = ctx.role_norm
     pgd_user = ctx.pgd_user
 
-    # ── Chọn kỳ xuất biểu ─────────────────────────────────────────────
+    # ── Chọn kỳ ──────────────────────────────────────────────────────
     now = datetime.now()
     col_ky1, col_ky2 = st.columns(2)
     with col_ky1:
@@ -686,7 +1233,7 @@ def _subtab_bao_cao(df: pd.DataFrame, ctx: TabContext) -> None:
             "Tháng",
             list(range(1, 13)),
             index=now.month - 1,
-            key="xlrr_bc_thang",
+            key="xlrr_pgd_gui_thang",
         )
     with col_ky2:
         nam_xuat = st.number_input(
@@ -695,10 +1242,10 @@ def _subtab_bao_cao(df: pd.DataFrame, ctx: TabContext) -> None:
             max_value=2030,
             value=now.year,
             step=1,
-            key="xlrr_bc_nam",
+            key="xlrr_pgd_gui_nam",
         )
 
-    # ── Load hồ sơ từ kv_store theo kỳ đã chọn ────────────────────────
+    # ── Load hồ sơ ──────────────────────────────────────────────────
     if la_phan_he_cn(role):
         ds_hs = LuuTruXLRR.doc_cn(int(nam_xuat), thang_xuat)
         ds_hs += LuuTruXLRR.doc_qd62(int(nam_xuat), thang_xuat)
@@ -710,18 +1257,16 @@ def _subtab_bao_cao(df: pd.DataFrame, ctx: TabContext) -> None:
         )
 
     if not ds_hs:
-        st.info(
-            f"ℹ️ Chưa có hồ sơ nào trong kỳ T{thang_xuat}/{int(nam_xuat)}."
-        )
+        st.info(f"ℹ️ Chưa có hồ sơ nào trong kỳ T{thang_xuat}/{int(nam_xuat)}.")
         return
 
-    # ── Nút xuất Excel cho PGD ─────────────────────────────────────────
+    # ── Xuất Excel gửi CN (chỉ PGD) ──────────────────────────────────
     if la_phan_he_pgd(role):
         st.markdown("---")
-        st.markdown("#### 📥 Xuất dữ liệu gửi CN")
+        st.markdown("#### 📥 Bước 1: Xuất Excel gửi CN")
         col_excel = st.columns([1, 2])
         with col_excel[0]:
-            if st.button("📥 Xuất Excel", use_container_width=True, type="primary"):
+            if st.button("📥 Xuất Excel", use_container_width=True, type="primary", key="xlrr_pgd_gui_btn_excel"):
                 try:
                     excel_bytes = xuat_danh_sach_rui_ro_excel(
                         ds_hs, pgd_user or "PGD", int(nam_xuat), thang_xuat
@@ -732,12 +1277,62 @@ def _subtab_bao_cao(df: pd.DataFrame, ctx: TabContext) -> None:
                         file_name=f"XLRR_{pgd_slug(pgd_user or 'pgd')}_{thang_xuat:02d}_{int(nam_xuat)}.xlsx",
                         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                         use_container_width=True,
+                        key="xlrr_pgd_gui_dl_excel",
                     )
                 except Exception as e:
+                    logger.error("xuat_excel_xlrr_pgd: %s", e, exc_info=True)
                     st.error(f"❌ Lỗi xuất Excel: {e}")
         with col_excel[1]:
             st.caption("File Excel này chứa dữ liệu rủi ro để gửi CN tổng hợp mẫu 04/05.")
+
+        # ── Tờ trình PGD ─────────────────────────────────────────────
         st.markdown("---")
+        st.markdown("#### 📝 Bước 2: Xuất Tờ trình PGD gửi CN")
+        with st.expander("Nhập thông tin để xuất Tờ trình PGD"):
+            col_tt1, col_tt2 = st.columns(2)
+            with col_tt1:
+                dot_tt = st.number_input("Đợt xử lý:", min_value=1, max_value=4, value=1, key="xlrr_tt_pgd_dot")
+                nam_tt = st.number_input("Năm:", min_value=2020, max_value=2030, value=int(nam_xuat), key="xlrr_tt_pgd_nam")
+            with col_tt2:
+                nguon_tt = st.selectbox("Nguồn vốn:", ["Trung ương (TW)", "Địa phương (ĐP)"], key="xlrr_tt_pgd_nguon")
+
+            if st.button("📝 Xuất Tờ trình PGD", type="primary", use_container_width=True, key="xlrr_tt_pgd_btn"):
+                from services.word_xln_service import _tao_word_to_trinh_pgd
+
+                ds_kh_pgd = tong_hop_theo_bien_phap(ds_hs, "khoanh")
+                ds_xoa_pgd = tong_hop_theo_bien_phap(ds_hs, "xoa")
+                ds_kh_dict = [hs.to_dict() for hs in ds_kh_pgd]
+                ds_xoa_dict = [hs.to_dict() for hs in ds_xoa_pgd]
+
+                def _agg_pgd(ds_list: list) -> dict:
+                    tong = sum(float(r.get("tong_du_no", 0) or 0) for r in ds_list)
+                    tw = sum(float(r.get("tong_du_no", 0) or 0) for r in ds_list if r.get("nguon_von") == 1)
+                    return {"tong": tong, "tw": tw, "dp": tong - tw, "so_ho": len(ds_list)}
+
+                tong_hop_kh = _agg_pgd(ds_kh_dict)
+                tong_hop_xoa = _agg_pgd(ds_xoa_dict)
+                try:
+                    file_bytes = _tao_word_to_trinh_pgd(
+                        tong_hop_kh, tong_hop_xoa, ds_kh_dict,
+                        pgd_user or "", nguon_tt, int(dot_tt), int(nam_tt),
+                    )
+                    st.download_button(
+                        label="⬇️ Tải Tờ trình PGD (.docx)",
+                        data=file_bytes,
+                        file_name=f"ToTrinh_PGD_{pgd_slug(pgd_user or 'pgd')}_Dot{int(dot_tt)}_{int(nam_tt)}.docx",
+                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                        use_container_width=True,
+                        key="xlrr_tt_pgd_dl",
+                    )
+                    db.ghi_audit(ctx.username, "xuat_to_trinh_pgd",
+                                 f"{pgd_user} — Đợt {int(dot_tt)} T{thang_xuat}/{int(nam_tt)}")
+                    st.success("✅ Xuất Tờ trình PGD thành công!")
+                except Exception as e:
+                    logger.error("xuat_to_trinh_pgd: %s", e, exc_info=True)
+                    st.error(f"❌ Lỗi xuất Tờ trình PGD: {e}")
+
+        st.markdown("---")
+        st.markdown("#### 📄 Bước 3: Xuất biểu mẫu từng hồ sơ")
 
     # ── Chọn hồ sơ ───────────────────────────────────────────────────
     st.markdown("#### 📋 Chọn hồ sơ xuất biểu mẫu")
@@ -750,7 +1345,7 @@ def _subtab_bao_cao(df: pd.DataFrame, ctx: TabContext) -> None:
         "Chọn hồ sơ:",
         options=list(hs_map.keys()),
         format_func=lambda x: hs_labels.get(x, x),
-        key="xlrr_bc_select_hs",
+        key="xlrr_pgd_gui_select_hs",
     )
 
     if not selected_id:
@@ -773,7 +1368,7 @@ def _subtab_bao_cao(df: pd.DataFrame, ctx: TabContext) -> None:
     with col1:
         st.markdown("**📝 Mẫu 01/XLN — Đơn đề nghị**")
         
-        if st.button("📄 Xuất 01/XLN", use_container_width=True, key="btn_01xln"):
+        if st.button("📄 Xuất 01/XLN", use_container_width=True, key="xlrr_pgd_gui_btn_01xln"):
             # Chuẩn bị dữ liệu từ hs đã lưu
             du_lieu_01 = {
                 "ten_nhcsxh": hs.ten_pgd,
@@ -810,51 +1405,20 @@ def _subtab_bao_cao(df: pd.DataFrame, ctx: TabContext) -> None:
                     file_name=f"01XLN_{hs.ma_kh}_{(hs.ngay_ky_01 or date.today()).strftime('%Y%m%d')}.docx",
                     mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                     use_container_width=True,
-                    key="dl_01xln"
+                    key="xlrr_pgd_gui_dl_01xln"
                 )
                 db.ghi_audit(ctx.username, "xuat_01xln", f"Mã KH: {hs.ma_kh}, Số KU: {hs.so_ku}")
                 st.success("✅ Đã xuất 01/XLN thành công!")
             except Exception as e:
+                logger.error("xuat_01xln: %s", e, exc_info=True)
                 st.error(f"❌ Lỗi xuất 01/XLN: {e}")
     
     # ── Xuất 02/XLN ────────────────────────────────────────────────────
     with col2:
         st.markdown("**📋 Mẫu 02/XLN — Biên bản**")
         
-        if st.button("📄 Xuất 02/XLN", use_container_width=True, key="btn_02xln"):
-            # Chuẩn bị dữ liệu từ hs đã lưu
-            du_lieu_02 = {
-                "ten_nhcsxh": hs.ten_pgd,
-                "dia_danh": "TP. Biên Hòa",
-                "ngay_lap": hs.ngay_lap_02 or date.today(),
-                "dia_diem": hs.dia_diem_02,
-                "ten_pgd": hs.ten_pgd_02,
-                "ten_ubnd": hs.ten_ubnd_02,
-                "ten_hoi_nd": hs.ten_hoi_nd_02,
-                "ten_cbtd": hs.ten_cbtd_02,
-                "ten_to_truong": hs.ten_to_truong_02,
-                "ten_kh": hs.ten_kh,
-                "dia_chi": getattr(hs, 'dia_chi', ''),
-                "so_ku": hs.so_ku,
-                "ngay_vay": hs.ngay_vay or date.today(),
-                "ten_ct": hs.ten_ct,
-                "ma_mon_vay": getattr(hs, 'ma_mon_vay', ''),
-                "muc_vay": f"{getattr(hs, 'muc_vay', 0):,.0f}".replace(",", "."),
-                "tong_du_no": f"{hs.tong_du_no:,.0f}".replace(",", ".") if hs.tong_du_no else "0",
-                "du_no_goc": f"{hs.du_no_goc:,.0f}".replace(",", "."),
-                "lai_ton": f"{hs.lai_ton:,.0f}".replace(",", "."),
-                "nguyen_nhan": hs.nguyen_nhan,
-                "so_tien_thiet_hai": f"{hs.du_no_goc:,.0f}".replace(",", "."),
-                "chi_tiet_thiet_hai": hs.chi_tiet_thiet_hai_02,
-                "danh_gia_thiet_hai": hs.danh_gia_thiet_hai_02,
-                "danh_gia_du_an": hs.danh_gia_du_an_02,
-                "tai_san_hien_tai": hs.tai_san_hien_tai_02,
-                "kha_nang_tra_no": hs.kha_nang_tra_no_02,
-                "bien_phap_thu_hoi": "",
-                "bien_phap": "Khoanh Nợ" if hs.bien_phap == "khoanh" else "Xóa Nợ",
-                "so_thang": hs.so_thang,
-                "so_tien_de_nghi": f"{hs.tong_du_no:,.0f}".replace(",", ".") if hs.tong_du_no else "0",
-            }
+        if st.button("📄 Xuất 02/XLN", use_container_width=True, key="xlrr_pgd_gui_btn_02xln"):
+            du_lieu_02 = _hs_to_du_lieu_02(hs)
             
             try:
                 file_bytes = _tao_word_02xln_v2(du_lieu_02)
@@ -864,12 +1428,318 @@ def _subtab_bao_cao(df: pd.DataFrame, ctx: TabContext) -> None:
                     file_name=f"02XLN_{hs.ma_kh}_{(hs.ngay_lap_02 or date.today()).strftime('%Y%m%d')}.docx",
                     mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                     use_container_width=True,
-                    key="dl_02xln"
+                    key="xlrr_pgd_gui_dl_02xln"
                 )
                 db.ghi_audit(ctx.username, "xuat_02xln", f"Mã KH: {hs.ma_kh}, Số KU: {hs.so_ku}")
                 st.success("✅ Đã xuất 02/XLN thành công!")
             except Exception as e:
+                logger.error("xuat_02xln: %s", e, exc_info=True)
                 st.error(f"❌ Lỗi xuất 02/XLN: {e}")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SUB-TAB 5 (CN): DASHBOARD GIÁM ĐỐC
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _subtab_dashboard_gd(ctx: TabContext) -> None:
+    """Dashboard tổng hợp XLRR cho Giám đốc / Ban lãnh đạo."""
+    from auth import la_executive, la_admin_cn
+
+    role = ctx.role_norm
+    if not (la_executive(role) or la_admin_cn(role) or role in ("manager_cn", "manager")):
+        st.warning("⚠️ Chỉ Giám đốc và Ban lãnh đạo Chi nhánh mới có quyền xem mục này.")
+        return
+
+    st.caption("📊 Tổng quan tình hình xử lý rủi ro toàn Chi nhánh")
+
+    now = datetime.now()
+    col_f1, col_f2 = st.columns(2)
+    with col_f1:
+        thang_dg = st.selectbox("Tháng", list(range(1, 13)), index=now.month - 1, key="xlrr_dg_thang")
+    with col_f2:
+        nam_dg = st.number_input("Năm", min_value=2020, max_value=2030, value=now.year, key="xlrr_dg_nam")
+
+    metrics = TongHopXLRR.tong_hop_toan_cn(int(nam_dg), thang_dg)
+
+    st.markdown(f"#### 📊 Tổng quan T{thang_dg}/{int(nam_dg)}")
+    c1, c2, c3, c4, c5, c6 = st.columns(6)
+    c1.metric("Tổng hồ sơ", metrics.get("tong_ho_so", 0))
+    c2.metric("PGD có hồ sơ", metrics.get("so_pgd_co_hs", 0))
+    c3.metric("Khoanh nợ", metrics.get("so_khoanh", 0))
+    c4.metric("Xóa nợ", metrics.get("so_xoa", 0))
+    c5.metric("TW (triệu đ)", fmt_ty(metrics.get("tw_tien", 0)))
+    c6.metric("ĐP (triệu đ)", fmt_ty(metrics.get("dp_tien", 0)))
+
+    st.markdown("#### 🏢 Chi tiết theo PGD")
+    df_pgd = TongHopXLRR.tong_hop_theo_pgd(int(nam_dg), thang_dg)
+    if df_pgd.empty:
+        st.info("ℹ️ Chưa có dữ liệu.")
+    else:
+        st.dataframe(df_pgd, use_container_width=True, hide_index=True)
+
+    st.markdown("#### 📋 Theo chương trình tín dụng")
+    df_ct = TongHopXLRR.tong_hop_theo_chuong_trinh(int(nam_dg), thang_dg)
+    if df_ct.empty:
+        st.info("ℹ️ Chưa có dữ liệu.")
+    else:
+        st.dataframe(df_ct, use_container_width=True, hide_index=True)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SUB-TAB 6 (CN): NHẬP KẾT QUẢ TỪ NHCSXH TW
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _subtab_nhap_ket_qua_cn(ctx: TabContext) -> None:
+    """CN nhập kết quả xử lý từ NHCSXH TW và xuất thông báo."""
+    from services.xlrr_service import (
+        KET_QUA_DA_KHOANH, KET_QUA_DA_XOA,
+        KET_QUA_KHONG_DUYET, KET_QUA_CHO_XU_LY, KET_QUA_LABEL,
+    )
+    from services.word_xln_service import (
+        _tao_word_thong_bao_ket_qua_cn,
+        _tao_word_thong_bao_ket_qua_pgd,
+    )
+
+    st.caption("📬 Nhập kết quả xử lý nợ rủi ro từ NHCSXH TW và xuất thông báo")
+
+    now = datetime.now()
+    col_f1, col_f2 = st.columns(2)
+    with col_f1:
+        thang_kq = st.selectbox("Tháng hồ sơ:", list(range(1, 13)), index=now.month - 1, key="xlrr_kq_cn_thang")
+    with col_f2:
+        nam_kq = st.number_input("Năm:", min_value=2020, max_value=2030, value=now.year, key="xlrr_kq_cn_nam")
+
+    ds_cn = LuuTruXLRR.doc_cn(int(nam_kq), thang_kq)
+    if not ds_cn:
+        st.info(f"ℹ️ Chưa có hồ sơ CN kỳ T{thang_kq}/{int(nam_kq)}.")
+        return
+
+    st.markdown(f"**{len(ds_cn)} hồ sơ cần cập nhật kết quả**")
+
+    # Thông tin QĐ từ TW
+    st.markdown("#### 📋 Thông tin Quyết định")
+    col_qd1, col_qd2, col_qd3 = st.columns(3)
+    with col_qd1:
+        so_qd = st.text_input("Số Quyết định:", placeholder="62/QĐ-HĐQT", key="xlrr_kq_cn_so_qd")
+    with col_qd2:
+        ngay_qd = st.date_input("Ngày QĐ:", value=date.today(), format="DD/MM/YYYY", key="xlrr_kq_cn_ngay_qd")
+    with col_qd3:
+        dot_kq = st.number_input("Đợt:", min_value=1, max_value=4, value=1, key="xlrr_kq_cn_dot")
+
+    # Bảng nhập kết quả từng hồ sơ
+    st.markdown("#### 📝 Cập nhật kết quả từng hồ sơ")
+    ket_qua_options = list(KET_QUA_LABEL.values())
+    ket_qua_keys = list(KET_QUA_LABEL.keys())
+
+    # Load kết quả đã lưu (nếu có)
+    data_cu = LuuTruXLRR.doc_ket_qua(int(nam_kq), thang_kq) or {}
+    ds_cu_map = {r["ho_so_id"]: r for r in data_cu.get("ds_ket_qua", [])}
+
+    ds_ket_qua_moi = []
+    for hs in ds_cn:
+        cu = ds_cu_map.get(hs.id, {})
+        kq_idx = ket_qua_keys.index(cu.get("ket_qua", KET_QUA_CHO_XU_LY)) if cu.get("ket_qua") in ket_qua_keys else 3
+
+        with st.expander(f"🔹 {hs.ten_kh} — {hs.ten_pgd} — {hs.so_ku}"):
+            col_a, col_b, col_c = st.columns(3)
+            with col_a:
+                kq_sel = st.selectbox(
+                    "Kết quả:",
+                    ket_qua_options,
+                    index=kq_idx,
+                    key=f"xlrr_kq_cn_kq_{hs.id}",
+                )
+                kq_val = ket_qua_keys[ket_qua_options.index(kq_sel)]
+            with col_b:
+                tien_duyet = st.number_input(
+                    "Số tiền duyệt (triệu đ):",
+                    min_value=0.0,
+                    value=float(cu.get("so_tien_duoc_duyet", hs.tong_du_no or 0)) / 1_000_000,
+                    step=0.1,
+                    key=f"xlrr_kq_cn_tien_{hs.id}",
+                )
+            with col_c:
+                ghi_chu = st.text_input(
+                    "Ghi chú:",
+                    value=cu.get("ghi_chu", ""),
+                    key=f"xlrr_kq_cn_gc_{hs.id}",
+                )
+
+            ds_ket_qua_moi.append({
+                "ho_so_id": hs.id,
+                "ten_kh": hs.ten_kh,
+                "ten_pgd": hs.ten_pgd,
+                "so_ku": hs.so_ku,
+                "bien_phap": hs.bien_phap,
+                "ket_qua": kq_val,
+                "so_tien_duoc_duyet": int(tien_duyet * 1_000_000),
+                "so_tien_de_nghi": int(hs.tong_du_no or 0),
+                "ghi_chu": ghi_chu,
+            })
+
+    st.markdown("---")
+    col_luu, col_tb_cn, col_tb_pgd = st.columns(3)
+
+    with col_luu:
+        if st.button("💾 Lưu kết quả", type="primary", use_container_width=True, key="xlrr_kq_cn_btn_luu"):
+            if not so_qd.strip():
+                st.error("❌ Vui lòng nhập số Quyết định.")
+            else:
+                data_luu = {
+                    "so_quyet_dinh": so_qd.strip(),
+                    "ngay_quyet_dinh": ngay_qd.isoformat(),
+                    "dot": int(dot_kq),
+                    "nam": int(nam_kq),
+                    "thang": thang_kq,
+                    "ngay_nhap": datetime.now().isoformat(),
+                    "nguoi_nhap": ctx.username,
+                    "ds_ket_qua": ds_ket_qua_moi,
+                    "ghi_chu_chung": "",
+                }
+                LuuTruXLRR.luu_ket_qua(data_luu, int(nam_kq), thang_kq, ctx.username)
+                st.success(f"✅ Đã lưu kết quả {len(ds_ket_qua_moi)} hồ sơ!")
+                st.rerun()
+
+    with col_tb_cn:
+        if st.button("📄 Xuất thông báo CN", use_container_width=True, key="xlrr_kq_cn_btn_tb_cn"):
+            data_xuat = LuuTruXLRR.doc_ket_qua(int(nam_kq), thang_kq)
+            if not data_xuat or not data_xuat.get("ds_ket_qua"):
+                st.warning("⚠️ Chưa lưu kết quả. Lưu trước rồi xuất thông báo.")
+            else:
+                try:
+                    file_bytes = _tao_word_thong_bao_ket_qua_cn(
+                        data_xuat["ds_ket_qua"],
+                        data_xuat.get("so_quyet_dinh", ""),
+                        date.fromisoformat(data_xuat.get("ngay_quyet_dinh", date.today().isoformat())),
+                        data_xuat.get("dot", 1),
+                        int(nam_kq),
+                    )
+                    st.download_button(
+                        label="⬇️ Tải thông báo CN (.docx)",
+                        data=file_bytes,
+                        file_name=f"ThongBaoKetQua_CN_T{thang_kq:02d}_{int(nam_kq)}.docx",
+                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                        use_container_width=True,
+                        key="xlrr_kq_cn_dl_tb_cn",
+                    )
+                    db.ghi_audit(ctx.username, "xuat_thong_bao_ket_qua_cn",
+                                 f"T{thang_kq}/{int(nam_kq)}")
+                    st.success("✅ Xuất thông báo CN thành công!")
+                except Exception as e:
+                    logger.error("xuat_thong_bao_cn: %s", e, exc_info=True)
+                    st.error(f"❌ Lỗi xuất thông báo CN: {e}")
+
+    with col_tb_pgd:
+        pgd_list = sorted({r.get("ten_pgd", "") for r in ds_ket_qua_moi if r.get("ten_pgd")})
+        if pgd_list:
+            ten_pgd_chon = st.selectbox("Chọn PGD xuất thông báo:", pgd_list, key="xlrr_kq_cn_pgd_chon")
+            if st.button("📄 Xuất thông báo PGD", use_container_width=True, key="xlrr_kq_cn_btn_tb_pgd"):
+                data_xuat = LuuTruXLRR.doc_ket_qua(int(nam_kq), thang_kq)
+                if not data_xuat:
+                    st.warning("⚠️ Chưa lưu kết quả.")
+                else:
+                    ds_pgd = [r for r in data_xuat.get("ds_ket_qua", [])
+                              if r.get("ten_pgd") == ten_pgd_chon]
+                    try:
+                        file_bytes = _tao_word_thong_bao_ket_qua_pgd(
+                            ds_pgd,
+                            ten_pgd_chon,
+                            data_xuat.get("so_quyet_dinh", ""),
+                            date.fromisoformat(data_xuat.get("ngay_quyet_dinh", date.today().isoformat())),
+                            data_xuat.get("dot", 1),
+                            int(nam_kq),
+                        )
+                        st.download_button(
+                            label=f"⬇️ Tải thông báo {ten_pgd_chon} (.docx)",
+                            data=file_bytes,
+                            file_name=f"ThongBaoKetQua_{pgd_slug(ten_pgd_chon)}_T{thang_kq:02d}_{int(nam_kq)}.docx",
+                            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                            use_container_width=True,
+                            key="xlrr_kq_cn_dl_tb_pgd",
+                        )
+                        db.ghi_audit(ctx.username, "xuat_thong_bao_ket_qua_pgd",
+                                     f"{ten_pgd_chon} T{thang_kq}/{int(nam_kq)}")
+                        st.success(f"✅ Xuất thông báo {ten_pgd_chon} thành công!")
+                    except Exception as e:
+                        logger.error("xuat_thong_bao_pgd: %s", e, exc_info=True)
+                        st.error(f"❌ Lỗi xuất thông báo PGD: {e}")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SUB-TAB 3 (PGD): KẾT QUẢ XLRR
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _subtab_ket_qua_pgd(ctx: TabContext) -> None:
+    """PGD xem kết quả xử lý nợ rủi ro của PGD mình sau khi CN nhập."""
+    from services.xlrr_service import KET_QUA_LABEL
+    from services.word_xln_service import _tao_word_thong_bao_ket_qua_pgd
+
+    pgd_user = ctx.pgd_user
+    if not pgd_user:
+        st.warning("⚠️ Không xác định được PGD của tài khoản.")
+        return
+
+    st.caption(f"📬 Kết quả xử lý nợ rủi ro — {pgd_user}")
+
+    now = datetime.now()
+    col_f1, col_f2 = st.columns(2)
+    with col_f1:
+        thang_kq = st.selectbox("Tháng:", list(range(1, 13)), index=now.month - 1, key=f"xlrr_kq_pgd_{pgd_slug(pgd_user)}_thang")
+    with col_f2:
+        nam_kq = st.number_input("Năm:", min_value=2020, max_value=2030, value=now.year, key=f"xlrr_kq_pgd_{pgd_slug(pgd_user)}_nam")
+
+    ds_kq = LuuTruXLRR.doc_ket_qua_pgd(pgd_slug(pgd_user), int(nam_kq), thang_kq)
+
+    if not ds_kq:
+        st.info(f"ℹ️ Chưa có kết quả xử lý nào cho {pgd_user} kỳ T{thang_kq}/{int(nam_kq)}.")
+        st.caption("CN sẽ cập nhật kết quả sau khi nhận Quyết định từ NHCSXH TW.")
+        return
+
+    # Lấy meta QĐ
+    data_full = LuuTruXLRR.doc_ket_qua(int(nam_kq), thang_kq) or {}
+    so_qd = data_full.get("so_quyet_dinh", "")
+    ngay_qd_str = data_full.get("ngay_quyet_dinh", "")
+    dot = data_full.get("dot", 1)
+
+    if so_qd:
+        st.success(f"✅ Kết quả theo QĐ số **{so_qd}** — Đợt {dot} năm {int(nam_kq)}")
+
+    # Bảng hiển thị kết quả
+    rows = []
+    for r in ds_kq:
+        kq_label = KET_QUA_LABEL.get(r.get("ket_qua", ""), r.get("ket_qua", ""))
+        rows.append({
+            "Tên KH": r.get("ten_kh", ""),
+            "Số KU": r.get("so_ku", ""),
+            "Biện pháp": "Khoanh" if r.get("bien_phap") == "khoanh" else "Xóa",
+            "Kết quả": kq_label,
+            "Tiền duyệt (triệu đ)": fmt_ty(float(r.get("so_tien_duoc_duyet", 0) or 0)),
+            "Ghi chú": r.get("ghi_chu", ""),
+        })
+
+    st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+
+    # Nút tải thông báo
+    if so_qd and ngay_qd_str:
+        st.markdown("---")
+        if st.button("📄 Tải Thông báo kết quả (.docx)", use_container_width=True,
+                     key=f"xlrr_kq_pgd_{pgd_slug(pgd_user)}_btn_tb"):
+            try:
+                ngay_qd = date.fromisoformat(ngay_qd_str)
+                file_bytes = _tao_word_thong_bao_ket_qua_pgd(
+                    ds_kq, pgd_user, so_qd, ngay_qd, dot, int(nam_kq),
+                )
+                st.download_button(
+                    label="⬇️ Tải thông báo (.docx)",
+                    data=file_bytes,
+                    file_name=f"ThongBaoKetQua_{pgd_slug(pgd_user)}_T{thang_kq:02d}_{int(nam_kq)}.docx",
+                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    use_container_width=True,
+                    key=f"xlrr_kq_pgd_{pgd_slug(pgd_user)}_dl_tb",
+                )
+            except Exception as e:
+                logger.error("tai_thong_bao_ket_qua: %s", e, exc_info=True)
+                st.error(f"❌ Lỗi tải thông báo: {e}")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -877,41 +1747,38 @@ def _subtab_bao_cao(df: pd.DataFrame, ctx: TabContext) -> None:
 # ══════════════════════════════════════════════════════════════════════════════
 
 def render(tab=None, **kwargs) -> None:
-    """Render tab Xử lý Rủi ro với 4 sub-tabs."""
+    """Render tab Xử lý Rủi ro — CN: 5 tabs, PGD: 3 tabs."""
     ctx = TabContext(tab, **kwargs)
     role = ctx.role_norm
-    
-    # Xác định quyền truy cập
+
     la_cn = la_phan_he_cn(role)
     la_pgd = la_phan_he_pgd(role)
-    
+
     with ctx:
         st.title("🔴 Xử lý Rủi ro (XLRR)")
         st.caption("Quản lý hồ sơ xử lý nợ rủi ro theo QĐ62/2015/QĐ-TTg")
-        
-        # Xác định sub-tabs hiển thị dựa trên quyền (4 tabs cho CN, 2 tabs cho PGD)
+
         if la_cn:
             tab_labels = [
-                "🏢 Lập hồ sơ PGD",      # Tab 1
-                "� Theo dõi QĐ62",      # Tab 2
-                "� Tổng hợp CN",        # Tab 3
-                "📄 Xuất biểu mẫu",      # Tab 4
+                "🏢 Lập hồ sơ PGD",
+                "🔍 Theo dõi QĐ62",
+                "🔄 Tổng hợp CN",
+                "📊 Dashboard",
+                "📬 Thông báo kết quả",
             ]
         elif la_pgd:
             tab_labels = [
-                "🏢 Lập hồ sơ PGD",
-                "📄 Xuất biểu mẫu",
+                "🏢 Lập hồ sơ",
+                "📤 Gửi lên CN",
+                "📬 Kết quả XLRR",
             ]
         else:
             st.error("❌ Bạn không có quyền truy cập chức năng này.")
             return
-        
-        # Render tabs
+
         tabs = st.tabs(tab_labels)
-        
-        # Lấy DataFrame từ context
         df = kwargs.get("df", pd.DataFrame())
-        
+
         if la_cn:
             with tabs[0]:
                 _subtab_lap_hs_pgd(df, ctx)
@@ -920,12 +1787,16 @@ def render(tab=None, **kwargs) -> None:
             with tabs[2]:
                 _subtab_tong_hop_cn(ctx)
             with tabs[3]:
-                _subtab_bao_cao(df, ctx)
+                _subtab_dashboard_gd(ctx)
+            with tabs[4]:
+                _subtab_nhap_ket_qua_cn(ctx)
         elif la_pgd:
             with tabs[0]:
                 _subtab_lap_hs_pgd(df, ctx)
             with tabs[1]:
-                _subtab_bao_cao(df, ctx)
+                _subtab_gui_cn_pgd(df, ctx)
+            with tabs[2]:
+                _subtab_ket_qua_pgd(ctx)
 
 
 # ══════════════════════════════════════════════════════════════════════════════

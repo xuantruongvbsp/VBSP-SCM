@@ -264,17 +264,19 @@ def tong_hop_bieu_02c_cn(nam: int, loai: str = "1n") -> pd.DataFrame:
 
 
 def trang_thai_xd_pgd(nam: int, loai: str = "1n") -> dict[str, dict[str, bool]]:
-    """Trả về {pgd_ten: {co_01c, co_02c, co_tm}} cho 1 năm / 1 loại KH."""
+    """Trả về {pgd_ten: {co_01c, co_02c, co_tm}} — 3 batch queries thay vì N×3."""
+    suffix = f"_{nam}"
+    all_01c = set(db.doc_kv_prefix(f"khtd_xd_{loai}_01c_").keys())
+    all_02c = set(db.doc_kv_prefix(f"khtd_xd_{loai}_02c_").keys())
+    all_tm  = set(db.doc_kv_prefix(f"khtd_xd_{loai}_tm_").keys())
+
     ket_qua: dict[str, dict[str, bool]] = {}
     for pgd_ten in DS_PGD:
         slug = _slug(pgd_ten)
         prefix_01c = f"khtd_xd_{loai}_01c_{slug}_"
-        has_01c = any(
-            k.endswith(f"_{nam}")
-            for k in db.doc_kv_prefix(prefix_01c)
-        )
-        has_02c = bool(db.doc_kv(f"khtd_xd_{loai}_02c_{slug}_{nam}"))
-        has_tm = bool(db.doc_kv(f"khtd_xd_{loai}_tm_{slug}_{nam}"))
+        has_01c = any(k.startswith(prefix_01c) and k.endswith(suffix) for k in all_01c)
+        has_02c = f"khtd_xd_{loai}_02c_{slug}{suffix}" in all_02c
+        has_tm  = f"khtd_xd_{loai}_tm_{slug}{suffix}" in all_tm
         ket_qua[pgd_ten] = {"co_01c": has_01c, "co_02c": has_02c, "co_tm": has_tm}
     return ket_qua
 
@@ -300,6 +302,137 @@ def luu_thuyet_minh(
 def doc_thuyet_minh(pgd_ten: str, nam: int, loai: str = "1n") -> dict[str, float]:
     key = f"khtd_xd_{loai}_tm_{_slug(pgd_ten)}_{nam}"
     return db.doc_kv(key) or {}
+
+
+# ── Tổng hợp Biểu 01C toàn CN ────────────────────────────────────────────────
+
+def tong_hop_bieu_01c_cn(nam: int, loai: str = "1n") -> pd.DataFrame:
+    """Tổng hợp nhu cầu vay Biểu 01C từ tất cả PGD cho 1 năm / 1 loại KH.
+
+    Columns: PGD | xa | ma_key | ten_ct | nhu_cau_trieu
+    """
+    prefix = f"khtd_xd_{loai}_01c_"
+    all_kv = db.doc_kv_prefix(prefix)
+    suffix = f"_{nam}"
+    ma_key_info = {mk: ten for mk, _, ten, _, _ in CHUONG_TRINH_KHTD}
+
+    rows = []
+    for key, flat_data in all_kv.items():
+        if not key.endswith(suffix):
+            continue
+        rest = key[len(prefix):]  # {pgd_slug}_{xa_slug}_{nam}
+        for pgd_ten in DS_PGD:
+            pgd_s = _slug(pgd_ten)
+            if rest.startswith(pgd_s + "_"):
+                xa_slug = rest[len(pgd_s) + 1 : -len(suffix)]
+                for flat_key, val in flat_data.items():
+                    mk = flat_key.split("|", 1)[1] if "|" in flat_key else flat_key
+                    ten_ct = ma_key_info.get(mk, mk)
+                    rows.append({
+                        "PGD": pgd_ten,
+                        "xa": xa_slug,
+                        "ma_key": mk,
+                        "ten_ct": ten_ct,
+                        "nhu_cau_trieu": float(val),
+                    })
+                break
+
+    if not rows:
+        return pd.DataFrame(columns=["PGD", "xa", "ma_key", "ten_ct", "nhu_cau_trieu"])
+    return pd.DataFrame(rows)
+
+
+# ── Approval workflow ─────────────────────────────────────────────────────────
+
+_DEFAULT_APPROVAL: dict = {
+    "trang_thai": "nhap_lieu",
+    "ngay_nop": None,
+    "nguoi_nop": "",
+    "ngay_duyet": None,
+    "nguoi_duyet": "",
+    "y_kien": "",
+    "lan_nop": 0,
+}
+
+
+def doc_trang_thai_approval(pgd_ten: str, ds_nam: list[int], loai: str) -> dict:
+    """Đọc trạng thái approval cho 1 PGD / giai đoạn."""
+    key = f"khtd_xd_{loai}_status_{_slug(pgd_ten)}_{ds_nam[0]}"
+    return db.doc_kv(key) or dict(_DEFAULT_APPROVAL)
+
+
+def nop_ke_hoach(pgd_ten: str, ds_nam: list[int], loai: str, username: str) -> bool:
+    """PGD nộp kế hoạch. Điều kiện: tất cả năm đều có đủ 3 biểu."""
+    slug = _slug(pgd_ten)
+    # Check conditions
+    all_01c = set(db.doc_kv_prefix(f"khtd_xd_{loai}_01c_{slug}_").keys())
+    for nam in ds_nam:
+        suf = f"_{nam}"
+        has_01c = any(k.endswith(suf) for k in all_01c)
+        has_02c = bool(db.doc_kv(f"khtd_xd_{loai}_02c_{slug}_{nam}"))
+        has_tm  = bool(db.doc_kv(f"khtd_xd_{loai}_tm_{slug}_{nam}"))
+        if not (has_01c and has_02c and has_tm):
+            return False
+
+    key = f"khtd_xd_{loai}_status_{slug}_{ds_nam[0]}"
+    cu = doc_trang_thai_approval(pgd_ten, ds_nam, loai)
+    cu["trang_thai"] = "da_nop"
+    cu["ngay_nop"] = datetime.now().isoformat()
+    cu["nguoi_nop"] = username
+    cu["lan_nop"] = cu.get("lan_nop", 0) + 1
+    db.ghi_kv(key, cu, username)
+    db.ghi_audit(
+        username, "nop_ke_hoach_xd",
+        f"PGD: {pgd_ten} — {loai} {ds_nam[0]}–{ds_nam[-1]} — Lần {cu['lan_nop']}",
+    )
+    return True
+
+
+def duyet_ke_hoach_xd(
+    pgd_ten: str,
+    ds_nam: list[int],
+    loai: str,
+    trang_thai_moi: str,
+    y_kien: str,
+    username: str,
+) -> bool:
+    """CN duyệt (da_duyet) hoặc trả lại (tu_choi) kế hoạch PGD."""
+    key = f"khtd_xd_{loai}_status_{_slug(pgd_ten)}_{ds_nam[0]}"
+    cu = doc_trang_thai_approval(pgd_ten, ds_nam, loai)
+    cu["trang_thai"] = trang_thai_moi
+    cu["ngay_duyet"] = datetime.now().isoformat()
+    cu["nguoi_duyet"] = username
+    cu["y_kien"] = y_kien
+    db.ghi_kv(key, cu, username)
+    db.ghi_audit(
+        username, f"khtd_xd_{trang_thai_moi}",
+        f"PGD: {pgd_ten} — {loai} — {y_kien[:80] if y_kien else 'Không có ý kiến'}",
+    )
+    return True
+
+
+def mo_lai_ke_hoach(pgd_ten: str, ds_nam: list[int], loai: str, username: str) -> bool:
+    """admin_cn mở lại kế hoạch đã duyệt → nhap_lieu."""
+    key = f"khtd_xd_{loai}_status_{_slug(pgd_ten)}_{ds_nam[0]}"
+    cu = doc_trang_thai_approval(pgd_ten, ds_nam, loai)
+    cu["trang_thai"] = "nhap_lieu"
+    cu["ngay_duyet"] = None
+    cu["nguoi_duyet"] = ""
+    db.ghi_kv(key, cu, username)
+    db.ghi_audit(username, "mo_lai_ke_hoach_xd", f"PGD: {pgd_ten} — {loai}")
+    return True
+
+
+def trang_thai_approval_cn(ds_nam: list[int], loai: str) -> dict[str, dict]:
+    """Trả về {pgd_ten: approval_dict} cho tất cả PGD."""
+    nam_dau = ds_nam[0]
+    prefix = f"khtd_xd_{loai}_status_"
+    all_kv = db.doc_kv_prefix(prefix)
+    result: dict[str, dict] = {}
+    for pgd_ten in DS_PGD:
+        key = f"{prefix}{_slug(pgd_ten)}_{nam_dau}"
+        result[pgd_ten] = all_kv.get(key, dict(_DEFAULT_APPROVAL))
+    return result
 
 
 # ── Đọc Thuyết minh từ Biểu 02C (import) ─────────────────────────────────────

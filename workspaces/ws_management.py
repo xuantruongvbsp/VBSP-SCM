@@ -764,6 +764,9 @@ def _build_all_items(role: str, username: str, **kwargs) -> list:
         {"group": "Thông tin chung", "label": "📊 Thông tin chung", "icon": "info-circle", "fn": lambda: _get_tab("tab_tongquan").render(None, **kwargs)},
         {"group": "Phối hợp với PGD", "label": "📊 Quản lý Công việc & Nhiệm vụ", "icon": "layout", "fn": lambda: _get_tab("tab_quan_ly_cv").render(None, **kwargs)},
         {"group": "Phối hợp với PGD", "label": "🗂️ Nội bộ Phòng KH-NV", "icon": "users", "fn": lambda: _get_tab("tab_khnv_noi_bo").render(None, **kwargs)},
+        {"group": "Phối hợp với PGD", "label": "📋 Giao & ĐC KHTD", "icon": "upload", "fn": lambda: _get_tab("tab_khtd_giao_dc").render(None, **kwargs)},
+        {"group": "Phối hợp với PGD", "label": "🔭 Xây dựng KHTD 1-3-5 năm", "icon": "calendar-plus", "fn": lambda: _get_tab("tab_xay_dung_khtd").render(None, **kwargs)},
+        {"group": "Phối hợp với PGD", "label": "🏦 Nguồn vốn địa phương", "icon": "bank", "fn": lambda: _get_tab("tab_hhi").render(None, **kwargs)},
         {
             "group": "Giám sát",
             "label": "Cảnh báo Tín dụng",
@@ -773,7 +776,6 @@ def _build_all_items(role: str, username: str, **kwargs) -> list:
         {"group": "Giám sát",     "label": "📊 So sánh kỳ",            "icon": "chart-line", "fn": lambda: _get_tab("tab_so_sanh_ky").render(None, **kwargs)},
         {"group": "Kiểm soát",     "label": "Kiểm soát nội bộ",    "icon": "search",         "fn": lambda: _get_tab("tab_kiem_soat").render_tab(df_full, role, kwargs.get("username", "unknown"))},
         {"group": "Kiểm soát",     "label": "Xử lý Rủi ro",   "icon": "alert-circle",   "fn": lambda: _get_tab("tab_xu_ly_rui_ro").render(None, **kwargs)},
-        {"group": "Kiểm soát",     "label": "Tập trung rủi ro & HHI",  "icon": "chart-pie",  "fn": lambda: _get_tab("tab_hhi").render(None, **kwargs)},
         {
             "group": "Kiểm soát",
             "label": "🔒 Chuyên Đề Nợ Khoanh",
@@ -784,11 +786,9 @@ def _build_all_items(role: str, username: str, **kwargs) -> list:
             ],
         },
         {"group": "Kế hoạch và Thực hiện KHTD", "label": "Kế hoạch tín dụng", "icon": "file-text",  "fn": lambda: _get_tab("tab_khtd").render(None, **dict(kwargs, khtd_mode="cn"))},
-        {"group": "Kế hoạch và Thực hiện KHTD", "label": "📋 Giao & ĐC KHTD", "icon": "upload", "fn": lambda: _get_tab("tab_khtd_giao_dc").render(None, **kwargs)},
         {"group": "Kế hoạch và Thực hiện KHTD", "label": "Cân đối - Điện báo", "icon": "chart-line", "fn": lambda: _get_tab("tab_kehoach").render(None, **kwargs)},
         {"group": "Kế hoạch và Thực hiện KHTD", "label": "📡 Điện báo",            "icon": "antenna",    "fn": lambda: _get_tab("tab_candoi").render(None, **kwargs)},
         {"group": "Kế hoạch và Thực hiện KHTD", "label": "Xuất báo cáo KHTD",  "icon": "file-export", "fn": lambda: _get_tab("tab_khtd_xuat").render_xuat_baocao(role=kwargs.get("role", ""), username=kwargs.get("username", ""), df_full=kwargs.get("df"))},
-        {"group": "Kế hoạch và Thực hiện KHTD", "label": "🔭 Xây dựng KHTD tương lai", "icon": "calendar-plus", "fn": lambda: _get_tab("tab_xay_dung_khtd").render(None, **kwargs)},
         {
             "group": "Báo cáo",
             "label": "Báo cáo tín dụng",

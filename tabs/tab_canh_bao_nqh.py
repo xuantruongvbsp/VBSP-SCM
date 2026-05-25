@@ -213,6 +213,10 @@ def _render_tong_hop(
     if loc_to != "Tất cả" and COT_TEN_TO_TRUONG in df_kh_loc.columns:
         df_kh_loc = df_kh_loc[df_kh_loc[COT_TEN_TO_TRUONG] == loc_to]
 
+    for _df in (df_full_loc, df_kh_loc):
+        if COT_TEN_PGD in _df.columns and isinstance(_df[COT_TEN_PGD].dtype, pd.CategoricalDtype):
+            _df[COT_TEN_PGD] = _df[COT_TEN_PGD].astype(object)
+
     today = datetime.now()
 
     khoanh_data = canh_bao_no_khoanh_sap_het_han(

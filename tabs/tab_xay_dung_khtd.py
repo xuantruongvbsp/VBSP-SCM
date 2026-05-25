@@ -12,7 +12,8 @@ from logger import get_logger
 
 logger = get_logger(__name__)
 
-from auth import la_phan_he_cn, normalize_role
+import db
+from auth import la_admin_cn, la_phan_he_cn, normalize_role
 from config import (
     CHUONG_TRINH_KHTD,
     DS_PGD,
@@ -26,11 +27,23 @@ from services.khtd_import_service import (
     doc_bieu_02c,
     doc_thuyet_minh,
     doc_thuyet_minh_tu_bieu_02c,
+    doc_trang_thai_approval,
+    duyet_ke_hoach_xd,
     luu_bieu_01c,
     luu_bieu_02c,
     luu_thuyet_minh,
+    mo_lai_ke_hoach,
+    nop_ke_hoach,
+    tong_hop_bieu_01c_cn,
     tong_hop_bieu_02c_cn,
+    trang_thai_approval_cn,
     trang_thai_xd_pgd,
+)
+from services.khtd_xuat_service import (
+    xuat_excel_1pgd,
+    xuat_excel_tong_hop_cn,
+    xuat_word_bao_cao_pgd,
+    xuat_word_tong_hop_cn,
 )
 from utils import fmt_ty
 
@@ -111,12 +124,13 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
             _render_bieu_01c(s1, pgd_chon, ds_nam, loai, username)
             _render_bieu_02c(s2, pgd_chon, ds_nam, loai, username, role)
             _render_thuyet_minh(s3, pgd_chon, ds_nam, loai, username, role)
-            _render_tong_hop_cn(s4, ds_nam, loai)
+            _render_tong_hop_cn(s4, ds_nam, loai, username, role)
         else:
             s1, s2, s3 = st.tabs(["📥 Biểu 01C", "📊 Biểu 02C", "📝 Thuyết minh"])
             _render_bieu_01c(s1, pgd_chon, ds_nam, loai, username)
             _render_bieu_02c(s2, pgd_chon, ds_nam, loai, username, role)
             _render_thuyet_minh(s3, pgd_chon, ds_nam, loai, username, role)
+            _render_approval_pgd(pgd_chon, ds_nam, loai, username, role)
 
 
 # ── Sub-tab 1: Biểu 01C ───────────────────────────────────────────────────────
@@ -236,6 +250,11 @@ def _render_bieu_02c(
     with tab:
         st.markdown(f"#### Biểu 02C — Kế hoạch tín dụng ({pgd_chon})")
 
+        approval = doc_trang_thai_approval(pgd_chon, ds_nam, loai)
+        locked = approval.get("trang_thai") == "da_duyet"
+        if locked:
+            st.info("🔒 Kế hoạch đã được Chi nhánh duyệt — chỉ xem.")
+
         with st.expander("📥 Import thuyết minh từ file KHNV_02C.XLSX", expanded=False):
             if len(ds_nam) > 1:
                 nam_tm = st.selectbox(
@@ -275,12 +294,12 @@ def _render_bieu_02c(
         st.markdown("##### Dư nợ dự kiến theo chương trình (triệu đồng)")
 
         if len(ds_nam) == 1:
-            _form_02c_nam(pgd_chon, ds_nam[0], loai, username, role)
+            _form_02c_nam(pgd_chon, ds_nam[0], loai, username, role, locked=locked)
         else:
             y_tabs = st.tabs([f"Năm {n}" for n in ds_nam])
             for y_tab, nam in zip(y_tabs, ds_nam):
                 with y_tab:
-                    _form_02c_nam(pgd_chon, nam, loai, username, role)
+                    _form_02c_nam(pgd_chon, nam, loai, username, role, locked=locked)
 
 
 def _form_02c_nam(
@@ -289,12 +308,13 @@ def _form_02c_nam(
     loai: str,
     username: str,
     role: str,
+    locked: bool = False,
 ) -> None:
     """Form nhập dư nợ 02C cho một năm cụ thể."""
     du_lieu_cu = doc_bieu_02c(pgd_chon, nam, loai)
     du_no_cu = du_lieu_cu.get("du_no", {})
     nguon_von_cu = du_lieu_cu.get("nguon_von", {})
-    co_quyen = role not in ("executive",)
+    co_quyen = normalize_role(role) not in ("executive",) and not locked
     slug = pgd_slug(pgd_chon)
 
     with st.form(f"xd_{loai}_02c_form_{slug}_{nam}"):
@@ -316,7 +336,7 @@ def _form_02c_nam(
                     step=100.0,
                     format="%.0f",
                     value=val_trieu,
-                    key=f"xd_{loai}_02c_{slug}_{mk}_{nam}",
+                    key=f"xd_{loai}_02c_{slug}_{mk}_tw_{nam}",
                     label_visibility="collapsed",
                     disabled=not co_quyen,
                 )
@@ -337,7 +357,7 @@ def _form_02c_nam(
                     step=100.0,
                     format="%.0f",
                     value=val_trieu,
-                    key=f"xd_{loai}_02c_{slug}_{mk}_{nam}",
+                    key=f"xd_{loai}_02c_{slug}_{mk}_dp_{nam}",
                     label_visibility="collapsed",
                     disabled=not co_quyen,
                 )
@@ -404,13 +424,18 @@ def _render_thuyet_minh(
     with tab:
         st.markdown(f"#### Thuyết minh chỉ tiêu ({pgd_chon})")
 
+        approval = doc_trang_thai_approval(pgd_chon, ds_nam, loai)
+        locked = approval.get("trang_thai") == "da_duyet"
+        if locked:
+            st.info("🔒 Kế hoạch đã được Chi nhánh duyệt — chỉ xem.")
+
         if len(ds_nam) == 1:
-            _form_thuyet_minh_nam(pgd_chon, ds_nam[0], loai, username, role)
+            _form_thuyet_minh_nam(pgd_chon, ds_nam[0], loai, username, role, locked=locked)
         else:
             y_tabs = st.tabs([f"Năm {n}" for n in ds_nam])
             for y_tab, nam in zip(y_tabs, ds_nam):
                 with y_tab:
-                    _form_thuyet_minh_nam(pgd_chon, nam, loai, username, role)
+                    _form_thuyet_minh_nam(pgd_chon, nam, loai, username, role, locked=locked)
 
 
 def _form_thuyet_minh_nam(
@@ -419,10 +444,11 @@ def _form_thuyet_minh_nam(
     loai: str,
     username: str,
     role: str,
+    locked: bool = False,
 ) -> None:
     """Form nhập thuyết minh cho một năm cụ thể."""
     du_lieu_cu = doc_thuyet_minh(pgd_chon, nam, loai)
-    co_quyen = role not in ("executive",)
+    co_quyen = normalize_role(role) not in ("executive",) and not locked
     slug = pgd_slug(pgd_chon)
 
     with st.form(f"xd_{loai}_tm_form_{slug}_{nam}"):
@@ -610,7 +636,6 @@ def _bang_du_no_da_nam(ds_nam: list[int], loai: str) -> None:
 def _to_trieu(vnd_or_zero) -> float:
     """Chuyển giá trị VND đã lưu → triệu đồng để hiển thị trong number_input."""
     try:
-        v = float(vnd_or_zero)
-        return v / 1_000_000 if v >= 1_000_000 else v
+        return float(vnd_or_zero) / 1_000_000
     except (TypeError, ValueError):
         return 0.0

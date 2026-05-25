@@ -4,6 +4,35 @@
 
 ---
 
+## [2026-05-25] Thiết kế lại Hồ sơ đến hạn — Tổng hợp (`tab_tongquan.py`)
+
+### Thay đổi layout
+| Thành phần | Trước | Sau |
+|---|---|---|
+| Header + Nhóm TH | `st.subheader` + `st.selectbox([2,10])` tách riêng | Cùng hàng `st.columns([6,2])` |
+| Filter tầng 1 | `st.expander` bao quanh `filter_bar()` (double toggle) | `st.multiselect` inline luôn hiển thị |
+| Filter tầng 2 | `filter_bar()` có toggle ẩn/hiện bên trong mỗi tab | **Xóa** — gộp vào unified filter |
+| 5 filter fields | PGD + CT (ngoài); Xã + NV + Dư nợ (trong tab) | PGD + CT + Xã + NV + Dư nợ slider (1 hàng duy nhất) |
+| KPI | 3 × `st.metric()` | `kpi_row()` icon + help tooltip |
+| Charts | Bar dọc → divider → Pie dọc | Bar (60%) \| Donut (40%) song song |
+| Bảng | Trong `if nhom_col in df_loc.columns:` | Bên dưới 2 charts |
+| Export | `st.columns(2)` nhỏ | `st.columns([3,3,4])` rõ ràng |
+
+### Xóa code
+- Toàn bộ block tầng 2 trong `_bang_den_han` (~60 dòng): `_df_bar`, `_filters_cfg`, `filter_bar()`, `ap_dung_loc_den_han_tab()`
+- `tab_filters` dict (param của `_bang_den_han`)
+- `st.divider()` giữa bar chart và bảng
+
+### Function signature mới
+```python
+# CŨ:
+def _bang_den_han(df_loc, label, key_prefix, tab_filters=None)
+# MỚI (closure lấy _sel_pgd, _sel_ct, _sel_xa, _sel_nv, _no_range từ outer scope):
+def _bang_den_han(df_loc, label, key_prefix)
+```
+
+---
+
 ## [2026-05-25] Card nền màu cho Tổng hợp Cảnh báo Tín dụng
 
 ### CSS classes mới: `.cb-card` + `.cb-{blue|green|red|purple}`

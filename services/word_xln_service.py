@@ -1680,3 +1680,206 @@ def _tao_word_02xln_v2(du_lieu: dict) -> bytes:
     buf = io.BytesIO()
     doc.save(buf)
     return buf.getvalue()
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# MẪU 04/05 - TỔNG HỢP
+# ═════════════════════════════════════════════════════════════════════════════
+
+def _tao_word_04xln_v2(
+    ds_hs: list,
+    thong_tin: dict,
+) -> bytes:
+    """Mẫu 04/XLN — Biên bản tổng hợp đề nghị KHOANH NỢ.
+    
+    Args:
+        ds_hs: Danh sách HoSoRuiRo (đã lọc biện pháp khoanh)
+        thong_tin: Dict chứa ten_nhcsxh, dia_danh, ngay_lap, 
+                   ten_pgd, ten_ubnd, ten_hoi_nd, ten_cbtd
+    
+    Returns:
+        File Word dạng bytes
+    """
+    from services.xlrr_service import HoSoRuiRo
+    
+    doc = Document()
+    _style_doc_xln(doc)
+    _set_margins(doc, left_cm=2.5, right_cm=2.0, top_cm=2.0, bottom_cm=2.0)
+    
+    ngay_lap = thong_tin.get('ngay_lap', date.today())
+    ten_nhcsxh = thong_tin.get('ten_nhcsxh', 'Chi nhánh NHCSXH')
+    dia_danh = thong_tin.get('dia_danh', 'TP. Biên Hòa')
+    
+    # Header
+    _add_header_xln_v2(doc, ten_nhcsxh, dia_danh, ngay_lap, "04/XLN")
+    
+    # Tiêu đề
+    _add_tieu_de_xln(
+        doc, 
+        "BIÊN BẢN TỔNG HỢP", 
+        "Đề nghị khoanh nợ bị rủi ro",
+        f"(Tổng hợp {len(ds_hs)} hộ vay)"
+    )
+    
+    # Thành phần tham dự
+    _add_thanh_phan_tong_hop(doc, thong_tin)
+    
+    # Nội dung - Danh sách các hộ
+    p = doc.add_paragraph()
+    p.add_run("Căn cứ các biên bản kiểm tra, chúng tôi nhất trí đề nghị khoanh nợ cho các hộ vay sau:").italic = True
+    
+    # Bảng tổng hợp
+    _add_bang_tong_hop_04_05(doc, ds_hs, "khoanh")
+    
+    # Tổng kết
+    tong_goc = sum(hs.du_no_goc for hs in ds_hs)
+    tong_lai = sum(hs.lai_ton for hs in ds_hs)
+    
+    p_tong = doc.add_paragraph()
+    p_tong.add_run(f"\nTổng cộng: {len(ds_hs)} hộ vay, tổng dư nợ gốc {fmt(tong_goc)} đồng, lãi {fmt(tong_lai)} đồng.")
+    p_tong.runs[0].bold = True
+    
+    # Phần ký
+    _add_phan_ky_tong_hop(doc, ngay_lap, dia_danh, thong_tin)
+    
+    buf = io.BytesIO()
+    doc.save(buf)
+    return buf.getvalue()
+
+
+def _tao_word_05xln_v2(
+    ds_hs: list,
+    thong_tin: dict,
+) -> bytes:
+    """Mẫu 05/XLN — Biên bản tổng hợp đề nghị XÓA NỢ.
+    
+    Args:
+        ds_hs: Danh sách HoSoRuiRo (đã lọc biện pháp xoa)
+        thong_tin: Dict chứa ten_nhcsxh, dia_danh, ngay_lap,
+                   ten_pgd, ten_ubnd, ten_hoi_nd, ten_cbtd
+    
+    Returns:
+        File Word dạng bytes
+    """
+    doc = Document()
+    _style_doc_xln(doc)
+    _set_margins(doc, left_cm=2.5, right_cm=2.0, top_cm=2.0, bottom_cm=2.0)
+    
+    ngay_lap = thong_tin.get('ngay_lap', date.today())
+    ten_nhcsxh = thong_tin.get('ten_nhcsxh', 'Chi nhánh NHCSXH')
+    dia_danh = thong_tin.get('dia_danh', 'TP. Biên Hòa')
+    
+    # Header
+    _add_header_xln_v2(doc, ten_nhcsxh, dia_danh, ngay_lap, "05/XLN")
+    
+    # Tiêu đề
+    _add_tieu_de_xln(
+        doc,
+        "BIÊN BẢN TỔNG HỢP",
+        "Đề nghị xóa nợ bị rủi ro",
+        f"(Tổng hợp {len(ds_hs)} hộ vay)"
+    )
+    
+    # Thành phần tham dự
+    _add_thanh_phan_tong_hop(doc, thong_tin)
+    
+    # Nội dung
+    p = doc.add_paragraph()
+    p.add_run("Căn cứ các biên bản kiểm tra và đề nghị của PGD, chúng tôi nhất trí đề nghị xóa nợ cho các hộ vay sau:").italic = True
+    
+    # Bảng tổng hợp
+    _add_bang_tong_hop_04_05(doc, ds_hs, "xoa")
+    
+    # Tổng kết
+    tong_goc = sum(hs.du_no_goc for hs in ds_hs)
+    tong_lai = sum(hs.lai_ton for hs in ds_hs)
+    
+    p_tong = doc.add_paragraph()
+    p_tong.add_run(f"\nTổng cộng: {len(ds_hs)} hộ vay, tổng dư nợ gốc {fmt(tong_goc)} đồng, lãi {fmt(tong_lai)} đồng.")
+    p_tong.runs[0].bold = True
+    
+    # Phần ký
+    _add_phan_ky_tong_hop(doc, ngay_lap, dia_danh, thong_tin)
+    
+    buf = io.BytesIO()
+    doc.save(buf)
+    return buf.getvalue()
+
+
+def _add_thanh_phan_tong_hop(doc: Document, thong_tin: dict) -> None:
+    """Thêm phần thành phần tham dự cho mẫu tổng hợp."""
+    p = doc.add_paragraph()
+    p.add_run("I. THÀNH PHẦN THAM DỰ:").bold = True
+    
+    thanh_phan = [
+        ("1", "Phó Giám đốc NHCSXH", thong_tin.get('ten_pgd', '...')),
+        ("2", "Phó Chủ tịch UBND", thong_tin.get('ten_ubnd', '...')),
+        ("3", "Chủ tịch Hội Nông dân", thong_tin.get('ten_hoi_nd', '...')),
+        ("4", "CBTD NHCSXH", thong_tin.get('ten_cbtd', '...')),
+    ]
+    
+    for stt, chuc_danh, ten in thanh_phan:
+        p = doc.add_paragraph()
+        p.paragraph_format.left_indent = Cm(1)
+        p.add_run(f"{stt}. {chuc_danh}: {ten}")
+
+
+def _add_bang_tong_hop_04_05(
+    doc: Document,
+    ds_hs: list,
+    loai: str,  # "khoanh" hoặc "xoa"
+) -> None:
+    """Thêm bảng tổng hợp danh sách hộ vay."""
+    # Tạo bảng
+    table = doc.add_table(rows=1, cols=8)
+    table.style = 'Table Grid'
+    table.alignment = WD_TABLE_ALIGNMENT.CENTER
+    
+    # Header row
+    hdr_cells = table.rows[0].cells
+    headers = ["STT", "Tên khách hàng", "Số KU", "Xã", "Dư nợ gốc", "Dư nợ lãi", "Tổng", "Nguyên nhân rủi ro"]
+    for i, text in enumerate(headers):
+        _set_cell(hdr_cells[i], text, bold=True, font_size=10)
+    
+    # Data rows
+    for idx, hs in enumerate(ds_hs, 1):
+        row = table.add_row().cells
+        _set_cell(row[0], str(idx), font_size=10)
+        _set_cell(row[1], hs.ten_kh, font_size=10, align=WD_ALIGN_PARAGRAPH.LEFT)
+        _set_cell(row[2], hs.so_ku, font_size=10)
+        _set_cell(row[3], hs.xa, font_size=10)
+        _set_cell(row[4], fmt(hs.du_no_goc), font_size=10, align=WD_ALIGN_PARAGRAPH.RIGHT)
+        _set_cell(row[5], fmt(hs.lai_ton), font_size=10, align=WD_ALIGN_PARAGRAPH.RIGHT)
+        _set_cell(row[6], fmt(hs.tong_du_no), font_size=10, align=WD_ALIGN_PARAGRAPH.RIGHT)
+        _set_cell(row[7], hs.nguyen_nhan, font_size=9, align=WD_ALIGN_PARAGRAPH.LEFT)
+
+
+def _add_phan_ky_tong_hop(
+    doc: Document,
+    ngay_lap: date,
+    dia_danh: str,
+    thong_tin: dict,
+) -> None:
+    """Thêm phần ký cho mẫu tổng hợp."""
+    doc.add_paragraph()
+    
+    # Tạo bảng 3 cột cho phần ký
+    tbl = doc.add_table(rows=1, cols=3)
+    tbl.alignment = WD_TABLE_ALIGNMENT.CENTER
+    
+    # Row 1: Chức danh
+    row1 = tbl.rows[0].cells
+    _set_cell(row1[0], "PHÓ GIÁM ĐỐC\nNHCSXH", bold=True, font_size=11)
+    _set_cell(row1[1], "PHÓ CHỦ TỊCH\nUBND", bold=True, font_size=11)
+    _set_cell(row1[2], "CHỦ TỊCH\nHỘI NÔNG DÂN", bold=True, font_size=11)
+    
+    # Row 2: Khoảng trống ký
+    row2 = tbl.add_row().cells
+    for cell in row2:
+        _set_cell(cell, "\n\n\n", font_size=11)
+    
+    # Row 3: Tên người ký
+    row3 = tbl.add_row().cells
+    _set_cell(row3[0], thong_tin.get('ten_pgd', ''), bold=True, font_size=11)
+    _set_cell(row3[1], thong_tin.get('ten_ubnd', ''), bold=True, font_size=11)
+    _set_cell(row3[2], thong_tin.get('ten_hoi_nd', ''), bold=True, font_size=11)

@@ -559,19 +559,96 @@ def _subtab_tong_hop_cn(ctx: TabContext) -> None:
     ds_cn = LuuTruXLRR.doc_cn(int(nam), thang)
     
     if ds_cn:
+        ds_khoanh = tong_hop_theo_bien_phap(ds_cn, "khoanh")
+        ds_xoa = tong_hop_theo_bien_phap(ds_cn, "xoa")
+        
         col_export = st.columns(2)
+        
+        # ── Mẫu 04/XLN ───────────────────────────────────────────────────
         with col_export[0]:
             st.markdown("**Mẫu 04/XLN — Tổng hợp Khoanh nợ**")
-            ds_khoanh = tong_hop_theo_bien_phap(ds_cn, "khoanh")
             st.caption(f"Có {len(ds_khoanh)} hồ sơ khoanh nợ")
-            if ds_khoanh and st.button("📄 Xuất 04/XLN", use_container_width=True, key="btn_04xln"):
-                st.info("📝 Mẫu 04/XLN đang được phát triển...")
+            
+            if ds_khoanh:
+                with st.expander("📝 Nhập thông tin để xuất 04/XLN"):
+                    ten_pgd_04 = st.text_input("Phó GĐ NHCSXH:", key="xlrr_04_pgd")
+                    ten_ubnd_04 = st.text_input("Phó Chủ tịch UBND:", key="xlrr_04_ubnd")
+                    ten_hoi_nd_04 = st.text_input("Chủ tịch Hội ND:", key="xlrr_04_hoi_nd")
+                    ten_cbtd_04 = st.text_input("CBTD NHCSXH:", key="xlrr_04_cbtd")
+                    ngay_lap_04 = st.date_input("Ngày lập:", value=date.today(), format="DD/MM/YYYY", key="xlrr_04_ngay")
+                    
+                    if st.button("📄 Xuất 04/XLN", type="primary", use_container_width=True, key="btn_04xln"):
+                        from services.word_xln_service import _tao_word_04xln_v2
+                        
+                        thong_tin_04 = {
+                            "ten_nhcsxh": "Chi nhánh NHCSXH tỉnh Đồng Nai",
+                            "dia_danh": "TP. Biên Hòa",
+                            "ngay_lap": ngay_lap_04,
+                            "ten_pgd": ten_pgd_04,
+                            "ten_ubnd": ten_ubnd_04,
+                            "ten_hoi_nd": ten_hoi_nd_04,
+                            "ten_cbtd": ten_cbtd_04,
+                        }
+                        
+                        try:
+                            file_bytes = _tao_word_04xln_v2(ds_khoanh, thong_tin_04)
+                            st.download_button(
+                                label="⬇️ Tải 04/XLN (.docx)",
+                                data=file_bytes,
+                                file_name=f"04XLN_TongHop_Khoanh_{thang:02d}_{int(nam)}.docx",
+                                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                                use_container_width=True,
+                                key="dl_04xln"
+                            )
+                            db.ghi_audit(ctx.username, "xuat_04xln", f"{len(ds_khoanh)} hồ sơ khoanh nợ")
+                            st.success(f"✅ Đã xuất mẫu 04/XLN ({len(ds_khoanh)} hồ sơ)")
+                        except Exception as e:
+                            st.error(f"❌ Lỗi xuất 04/XLN: {e}")
+            else:
+                st.info("ℹ️ Không có hồ sơ khoanh nợ")
+        
+        # ── Mẫu 05/XLN ───────────────────────────────────────────────────
         with col_export[1]:
             st.markdown("**Mẫu 05/XLN — Tổng hợp Xóa nợ**")
-            ds_xoa = tong_hop_theo_bien_phap(ds_cn, "xoa")
             st.caption(f"Có {len(ds_xoa)} hồ sơ xóa nợ")
-            if ds_xoa and st.button("📄 Xuất 05/XLN", use_container_width=True, key="btn_05xln"):
-                st.info("📝 Mẫu 05/XLN đang được phát triển...")
+            
+            if ds_xoa:
+                with st.expander("📝 Nhập thông tin để xuất 05/XLN"):
+                    ten_pgd_05 = st.text_input("Phó GĐ NHCSXH:", key="xlrr_05_pgd")
+                    ten_ubnd_05 = st.text_input("Phó Chủ tịch UBND:", key="xlrr_05_ubnd")
+                    ten_hoi_nd_05 = st.text_input("Chủ tịch Hội ND:", key="xlrr_05_hoi_nd")
+                    ten_cbtd_05 = st.text_input("CBTD NHCSXH:", key="xlrr_05_cbtd")
+                    ngay_lap_05 = st.date_input("Ngày lập:", value=date.today(), format="DD/MM/YYYY", key="xlrr_05_ngay")
+                    
+                    if st.button("📄 Xuất 05/XLN", type="primary", use_container_width=True, key="btn_05xln"):
+                        from services.word_xln_service import _tao_word_05xln_v2
+                        
+                        thong_tin_05 = {
+                            "ten_nhcsxh": "Chi nhánh NHCSXH tỉnh Đồng Nai",
+                            "dia_danh": "TP. Biên Hòa",
+                            "ngay_lap": ngay_lap_05,
+                            "ten_pgd": ten_pgd_05,
+                            "ten_ubnd": ten_ubnd_05,
+                            "ten_hoi_nd": ten_hoi_nd_05,
+                            "ten_cbtd": ten_cbtd_05,
+                        }
+                        
+                        try:
+                            file_bytes = _tao_word_05xln_v2(ds_xoa, thong_tin_05)
+                            st.download_button(
+                                label="⬇️ Tải 05/XLN (.docx)",
+                                data=file_bytes,
+                                file_name=f"05XLN_TongHop_Xoa_{thang:02d}_{int(nam)}.docx",
+                                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                                use_container_width=True,
+                                key="dl_05xln"
+                            )
+                            db.ghi_audit(ctx.username, "xuat_05xln", f"{len(ds_xoa)} hồ sơ xóa nợ")
+                            st.success(f"✅ Đã xuất mẫu 05/XLN ({len(ds_xoa)} hồ sơ)")
+                        except Exception as e:
+                            st.error(f"❌ Lỗi xuất 05/XLN: {e}")
+            else:
+                st.info("ℹ️ Không có hồ sơ xóa nợ")
     else:
         st.info("ℹ️ Chưa có dữ liệu CN để tổng hợp mẫu 04/05.")
 

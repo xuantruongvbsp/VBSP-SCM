@@ -1,5 +1,5 @@
 {
-  "exported_at": "2026-05-25T06:31:18.872781",
+  "exported_at": "2026-05-25T19:13:06.252380",
   "version": 2,
   "tables": {
     "users": [],
@@ -89,9 +89,15 @@
         "updated_by": "admin"
       },
       {
+        "key": "xlrr_cn_2026_05",
+        "value": "{\"danh_sach\": [{\"id\": \"4cb415b1-d39b-47ec-91cb-3c966d155711\", \"ma_kh\": \"4600012084\", \"ten_kh\": \"Nguyễn Thị Ren\", \"so_ku\": \"6600000730906632.0\", \"xa\": \"Long Phước\", \"ten_pgd\": \"PGD Long Thành\", \"pgd_slug\": \"pgd_long_thanh\", \"ten_ct\": \"Cho vay nước sạch và vệ sinh môi trường nông thôn\", \"du_no_goc\": 50000000.0, \"du_no_lai\": 0.0, \"lai_ton\": 0.0, \"ngay_vay\": \"18/04/2025\", \"ngay_dh\": \"18/04/2030\", \"bien_phap\": \"khoanh\", \"nguyen_nhan\": \"Thiên tai, dịch bệnh (QĐ62)\", \"muc_do\": \"80-100\", \"so_thang\": 60, \"ngay_rr\": \"2026-05-25\", \"ghi_chu\": \"khách hàng khó khăn không thể trả được nợ\", \"nguon_von\": 1, \"loai_ho_so\": \"hstd\", \"trang_thai\": \"cho_duyet\", \"so_cccd\": \"\", \"ly_do\": \"\", \"file_dinh_kem\": \"\", \"ngay_tao\": \"2026-05-25T15:55:21.695459\", \"nguoi_tao\": \"admin\", \"ngay_duyet\": null, \"nguoi_duyet\": \"\", \"lap_thay_pgd\": true}, {\"id\": \"f93cc685-18d4-4b33-9403-a3094a47d865\", \"ma_kh\": \"4600012084\", \"ten_kh\": \"Nguyễn Thị Ren\", \"so_ku\": \"6600000731887466.0\", \"xa\": \"Long Phước\", \"ten_pgd\": \"PGD Long Thành\", \"pgd_slug\": \"pgd_long_thanh\", \"ten_ct\": \"Cho vay giải quyết việc làm\", \"du_no_goc\": 30000000.0, \"du_no_lai\": 0.0, \"lai_ton\": 0.0, \"ngay_vay\": \"18/09/2025\", \"ngay_dh\": \"18/09/2030\", \"bien_phap\": \"khoanh\", \"nguyen_nhan\": \"Thiên tai, dịch bệnh (QĐ62)\", \"muc_do\": \"80-100\", \"so_thang\": 60, \"ngay_rr\": \"2026-05-25\", \"ghi_chu\": \"khách hàng khó khăn không thể trả được nợ\", \"nguon_von\": 1, \"loai_ho_so\": \"hstd\", \"trang_thai\": \"cho_duyet\", \"so_cccd\": \"\", \"ly_do\": \"\", \"file_dinh_kem\": \"\", \"ngay_tao\": \"2026-05-25T15:55:21.700658\", \"nguoi_tao\": \"admin\", \"ngay_duyet\": null, \"nguoi_duyet\": \"\", \"lap_thay_pgd\": true}, {\"id\": \"9cce564f-bb69-4bac-84c7-076414882111\", \"ma_kh\": \"4600012269\", \"ten_kh\": \"Võ Thị Châu\", \"so_ku\": \"6600000722566048.0\", \"xa\": \"Long Phước\", \"ten_pgd\": \"PGD Long Thành\", \"pgd_slug\": \"pgd_long_thanh\", \"ten_ct\": \"Cho vay giải quyết việc làm\", \"du_no_goc\": 27000000.0, \"du_no_lai\": 0.0, \"lai_ton\": 0.0, \"ngay_vay\": \"04/04/2022\", \"ngay_dh\": \"04/04/2027\", \"bien_phap\": \"khoanh\", \"nguyen_nhan\": \"Thiên tai, dịch bệnh (QĐ62)\", \"muc_do\": \"80-100\", \"so_thang\": 60, \"ngay_rr\": \"2026-05-25\", \"ghi_chu\": \"khách hàng khó khăn không thể trả được nợ\", \"nguon_von\": 1, \"loai_ho_so\": \"hstd\", \"trang_thai\": \"cho_duyet\", \"so_cccd\": \"\", \"ly_do\": \"\", \"file_dinh_kem\": \"\", \"ngay_tao\": \"2026-05-25T15:55:21.704349\", \"nguoi_tao\": \"admin\", \"ngay_duyet\": null, \"nguoi_duyet\": \"\", \"lap_thay_pgd\": true}, {\"id\": \"930a390f-9f15-4596-8e29-06287720e75b\", \"ma_kh\": \"4600012426\", \"ten_kh\": \"Nguyễn Thị Hải\", \"so_ku\": \"6600000733231078.0\", \"xa\": \"Long Phước\", \"ten_pgd\": \"PGD Long Thành\", \"pgd_slug\": \"pgd_long_thanh\", \"ten_ct\": \"Cho vay nước sạch và vệ sinh môi trường nông thôn\", \"du_no_goc\": 50000000.0, \"du_no_lai\": 0.0, \"lai_ton\": 0.0, \"ngay_vay\": \"18/03/2026\", \"ngay_dh\": \"18/03/2031\", \"bien_phap\": \"khoanh\", \"nguyen_nhan\": \"Thiên tai, dịch bệnh (QĐ62)\", \"muc_do\": \"80-100\", \"so_thang\": 60, \"ngay_rr\": \"2026-05-25\", \"ghi_chu\": \"khách hàng khó khăn không thể trả được nợ\", \"nguon_von\": 1, \"loai_ho_so\": \"hstd\", \"trang_thai\": \"cho_duyet\", \"so_cccd\": \"\", \"ly_do\": \"\", \"file_dinh_kem\": \"\", \"ngay_tao\": \"2026-05-25T15:55:21.707987\", \"nguoi_tao\": \"admin\", \"ngay_duyet\": null, \"nguoi_duyet\": \"\", \"lap_thay_pgd\": true}], \"ngay_cap_nhat\": \"2026-05-25T15:55:21.710748\", \"nguoi_cap_nhat\": \"admin\"}",
+        "updated_at": "2026-05-25T15:55:21.711118",
+        "updated_by": "admin"
+      },
+      {
         "key": "alert_read_ids",
         "value": "{\"ids\": []}",
-        "updated_at": "2026-05-25T06:31:18.006026",
+        "updated_at": "2026-05-25T19:13:05.721839",
         "updated_by": "admin"
       }
     ],

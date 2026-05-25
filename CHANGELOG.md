@@ -1,5 +1,48 @@
 # CHANGELOG
 
+## [2026-05-26] — Fix bug tính Tổng dư nợ bỏ sót hàng "Khác" trong tab nguồn vốn ĐP
+- `tabs/tab_hhi.py` dòng ~67 — `_bang_theo_nv()`: cộng thêm cột "Khác" vào Tổng dư nợ nếu tồn tại, tránh tỷ trọng ĐP% bị thổi phồng khi có giá trị Nguồn vốn không phải 1/2
+
+## [2026-05-26] — UX nâng cao tab_baocao: 9 components + 2 báo cáo v2
+- `tabs/tab_baocao/components/skeleton_loader.py` — **MỚI** — Skeleton loading với shimmer effect
+- `tabs/tab_baocao/components/sticky_table.py` — **MỚI** — Sticky header table, sortable
+- `tabs/tab_baocao/components/inline_filter.py` — **MỚI** — Inline filter + quick search
+- `tabs/tab_baocao/components/quick_export.py` — **MỚI** — Quick export buttons trên mỗi bảng
+- `tabs/tab_baocao/components/tooltip.py` — **MỚI** — Tooltip giải thích công thức tính
+- `tabs/tab_baocao/components/alert_suggestion.py` — **MỚI** — Auto alerts + action suggestions
+- `tabs/tab_baocao/tree_navigation.py` — **MỚI** — Tree navigation 5 nhóm, 21 báo cáo
+- `tabs/tab_baocao/reports/tong_hop_hstd_v2.py` — **MỚI** — Tổng hợp HSTD với UX nâng cao
+- `tabs/tab_baocao/reports/no_rui_ro_v2.py` — **MỚI** — Nợ rủi ro với UX nâng cao
+
+## [2026-05-26] — Fix 5 bug tab_baocao sau review
+- `tabs/tab_baocao/__init__.py` — Thêm `render()` vào package (CRITICAL: Python dùng package thay file → `render()` cần có trong `__init__.py`)
+- `tabs/tab_baocao/reports/gqvl.py` — Đổi `COT_GQVL_MA_NHA_DAU_TU` (không tồn tại) → `COT_TEN_NHA_DAU_TU` (CRITICAL: ImportError)
+- `tabs/tab_baocao/components/export_panel.py` — Bỏ `.getvalue()` thừa trên bytes object (CRITICAL: AttributeError khi xuất Excel)
+- `tabs/tab_baocao/components/metric_cards.py` — Sửa đơn vị: `_fmt_trieu` chia 1e6 nhưng hiển thị "tỷ" → đổi thành `_fmt_ty` chia 1e9; `fmt_ty→fmt_so` cho số lượng
+- `tabs/tab_baocao/reports/` (5 file) — Đổi `fmt_ty(len(...))` → `fmt_so(len(...))` (fmt_ty chia cho 1e6 → count nhỏ ra "0")
+
+## [2026-05-25] — Refactor tab_baocao: chỉ 4 nguồn dữ liệu (HSTD, NQ11, GQVL, CDTOTKVV)
+- `tabs/tab_baocao.py` — Tái cấu trúc hoàn toàn: Entry point mới gọi dashboard + 5 module báo cáo; loại bỏ toàn bộ code cũ (~976 dòng)
+- `tabs/tab_baocao/` — **MỚI** — Package module: `dashboard.py`, `components/`, `reports/`
+- `tabs/tab_baocao/dashboard.py` — Dashboard tổng quan hiển thị trạng thái 4 nguồn dữ liệu + metric cards
+- `tabs/tab_baocao/components/metric_cards.py` — Component hiển thị KPI: Tổng dư nợ, Nợ QH, Số món, DNO NQ11
+- `tabs/tab_baocao/components/data_source_indicator.py` — Component hiển thị trạng thái 4 file: HSTD, NQ11, GQVL, CDTOTKVV
+- `tabs/tab_baocao/components/export_panel.py` — Component xuất Excel/PDF với state management
+- `tabs/tab_baocao/reports/tong_hop_hstd.py` — Báo cáo tổng hợp từ HSTD (theo PGD/Xã/Thôn/CT/ĐVUT/CBTD)
+- `tabs/tab_baocao/reports/no_rui_ro.py` — Báo cáo nợ rủi ro: QH, khoanh, đến hạn 30/60 ngày, tỷ lệ nợ xấu
+- `tabs/tab_baocao/reports/nq11.py` — Báo cáo NQ11: tổng hợp theo CT, chi tiết có/không NQ11
+- `tabs/tab_baocao/reports/gqvl.py` — Báo cáo GQVL: phân tầng TW/ĐP, theo NĐT, giải ngân
+- `tabs/tab_baocao/reports/cdtotkvv.py` — Báo cáo CDTOTKVV: xếp hạng, phân tích điểm, theo địa bàn
+
+## [2026-05-25] — Mẫu 02/XLN: chức danh thành phần tham dự linh hoạt
+- `services/xlrr_service.py` — thêm 3 field mới vào `HoSoRuiRo`: `chuc_vu_pgd_02` (default "Phó Giám đốc"), `chuc_vu_ubnd_02` (default "Phó Chủ tịch"), `chuc_vu_hoi_nd_02` (default "Chủ tịch Hội Nông dân xã", free-form để nhập CA xã...)
+- `services/word_xln_service.py` — `_add_thanh_phan_tham_du_02xln` dùng chức danh động từ `du_lieu`; xử lý `dai_dien` rỗng (dạng "Chủ tịch Hội ND xã")
+- `tabs/tab_xu_ly_rui_ro.py` — form mới + form sửa: selectbox GĐ/PGĐ cho NHCSXH, selectbox CT/PCT cho UBND, text_input free-form cho đoàn thể/CA; thêm `_hs_to_du_lieu_02()` helper dùng chung; fix bug download section dùng `to_dict()` thiếu key mapping
+- `services/xlrr_export_service.py` — thêm 3 field vào `_EXPORT_COLS`; fix pre-existing convention: thêm `logger.error` vào except
+
+## [2026-05-25] — Thêm download section sau lưu hồ sơ XLRR (01/XLN, 02/XLN, Tờ trình PGD)
+- `tabs/tab_xu_ly_rui_ro.py` — sau khi lưu thành công: lưu ds_luu + dot/nguon vào session_state; hiện section 📥 với nút tải 01/XLN (nếu có Tổ trưởng), 02/XLN (nếu có Phó GĐ), Tờ trình PGD tổng hợp; nút ✕ Đóng xóa session_state; thêm import `_tao_word_to_trinh_pgd` + `tong_hop_theo_bien_phap`
+
 ## [2026-05-25] — Thêm Sửa/Xóa hồ sơ trong Lập HS PGD (XLRR)
 - `tabs/tab_xu_ly_rui_ro.py` — thêm `_cap_nhat_hs()`, `_xoa_hs()` module-level helpers; thêm section "📂 Hồ sơ đã lập" với nút ✏️ Sửa (toggle) + 🗑️ Xóa (popover confirm); form sửa pre-filled dùng `dataclasses.replace`; chỉ hiện form lập mới khi không ở edit mode
 

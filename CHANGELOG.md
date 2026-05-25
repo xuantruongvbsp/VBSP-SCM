@@ -1,5 +1,8 @@
 # CHANGELOG
 
+## [2026-05-25] — Thiết kế lại section "Hồ sơ đến hạn — Tổng hợp"
+- `tabs/tab_tongquan.py` — Header row [6:2] với Nhóm TH selectbox phải; gộp 2 tầng filter thành 1 khu vực thống nhất (PGD + CT + Xã + Nguồn vốn + Dư nợ slider); xóa hoàn toàn tầng 2 filter trong tab; KPI cards thay `st.metric()` bằng `kpi_row()` có icon+tooltip; charts bar+donut song song [6:4] thay vì xếp dọc; export buttons layout [3:3:4]
+
 ## [2026-05-25] — Thiết kế lại bảng Tổng hợp cảnh báo theo PGD (sub-tab Tổng hợp)
 - `tabs/tab_canh_bao_nqh.py` dòng ~325-420 — Thay `hien_thi_dataframe_phan_trang()` bằng HTML table: sắp xếp theo tổng cảnh báo giảm dần; phân loại 🔴/🟡/🟢 theo ngưỡng 10/5; KPI cards tóm tắt; progress bar cột Đến hạn; badge mức độ rủi ro; footer tổng kết; row nền đỏ/vàng theo mức độ
 

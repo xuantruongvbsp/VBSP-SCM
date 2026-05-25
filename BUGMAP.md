@@ -97,6 +97,15 @@
 | **Fix** | (1) `doc_baseline_merged` coi cache rỗng hoặc `< 15 cột` là invalid → rebuild. (2) Chuẩn hóa thêm các cột định danh (`cmnd/cccd/sdt`) về string trước khi ghi parquet (cả ở `excel_to_parquet` và ngay trước `result.to_parquet` khi merge). |
 | **Ngày fix** | 2026-05-23 |
 
+### A4e — Cache baseline thiếu PGD sau lần đọc lỗi (silent skip → cache không tự chữa)
+| | |
+|---|---|
+| **File** | `data/hstd.py` → `doc_baseline_merged()` |
+| **Dấu hiệu** | Tab So sánh mốc năm → Theo PGD: một số PGD hiển thị `0` cho cột "DN mốc" dù file `data/baseline_pgd/{slug}/HSTD_3112_YYYY.XLSX` đã tồn tại trên đĩa. Các PGD khác vẫn hiển thị bình thường. |
+| **Nguyên nhân** | `doc_baseline_merged()` build cache baseline bằng cách duyệt 23 đơn vị, đọc từng file Excel. Nếu đọc file của PGD X lỗi (sai sheet, sai header, < 15 cột sau clean…), PGD X bị **bỏ qua âm thầm** — chỉ ghi log, không hiển thị cảnh báo cho user. Cache ghi ra thiếu PGD X. Logic stale-check **chỉ so mtime** (`file_mtime > cache_mtime`). File PGD X tồn tại trước khi cache được ghi nên `file_mtime < cache_mtime` → cache được coi là "hợp lệ" → PGD X vĩnh viễn không có trong baseline cho đến khi file được upload lại hoặc cache bị xóa thủ công. |
+| **Fix** | Sau khi đọc cache parquet, kiểm tra tính đầy đủ: nếu có PGD nào trên đĩa (`os.path.exists`) mà thiếu trong cột `COT_TEN_PGD` của cache → coi cache không hợp lệ → tự rebuild. |
+| **Ngày fix** | 2026-05-25 |
+
 ### A5 — DuckDB `Binder Error: Referenced column not found in FROM clause`
 | | |
 |---|---|
@@ -678,6 +687,50 @@ sqlite3 data.db "SELECT * FROM audit_log WHERE action LIKE '%merge%loi%' ORDER B
 # Chạy debug mode
 DEBUG=1 streamlit run app.py
 ```
+
+---
+
+## J. Code Pattern
+
+### J01 — alert_center.py ngưỡng khẩn/cảnh báo sai
+| | |
+|---|---|
+| **File** | `alert_center.py` → `canh_bao_no_khoanh_sap_het_han()` ~dòng 226 |
+| **Dấu hiệu** | Test fail: 60 ngày bị tính là `so_khan` thay vì `so_canh_bao` |
+| **Nguyên nhân** | Threshold "khẩn" hardcode 120 ngày thay vì 30 ngày; "cảnh báo" khoảng 120–180 thay vì 30–180 |
+| **Fix** | `khan = df[df['con_lai'] <= 30]`; `canh_bao = df[(df['con_lai'] > 30) & (df['con_lai'] <= 180)]` |
+| **Test** | `test_alert_center.py::TestCanhBaoNoKhoanh` |
+| **Ngày fix** | 2026-05-25 |
+
+### J02 — NameError `_ts` trong doc_baseline_merged fallback
+| | |
+|---|---|
+| **File** | `data/hstd.py` → `doc_baseline_merged()` ~dòng 162 |
+| **Dấu hiệu** | `NameError: name '_ts' is not defined` khi render `tab_so_sanh_ky` |
+| **Nguyên nhân** | Hàm `doc_baseline_merged(nam)` không có tham số `_ts` nhưng fallback gọi `doc_baseline(nam, _ts)` |
+| **Fix** | Đổi thành `return doc_baseline(nam)` (dùng default `_ts=0`) |
+| **Test** | `test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_so_sanh_ky]` |
+| **Ngày fix** | 2026-05-25 |
+
+### J03 — patch.object svc.duong_dan_pgd AttributeError (21 test merge fail)
+| | |
+|---|---|
+| **File** | `services/upload_service.py` → `_duong_dan_pgd()` ~dòng 39 |
+| **Dấu hiệu** | `AttributeError: module 'services.upload_service' does not have attribute 'duong_dan_pgd'` |
+| **Nguyên nhân** | Hàm wrapper đặt tên `_duong_dan_pgd` (private); test cần `patch.object(svc, "duong_dan_pgd", ...)` nhưng tên không khớp |
+| **Fix** | Đổi tên `_duong_dan_pgd` → `duong_dan_pgd` (public) và cập nhật toàn bộ chỗ gọi trong file |
+| **Test** | `test_merge_du_lieu_toan_cn.py` — 21 tests |
+| **Ngày fix** | 2026-05-25 |
+
+### J04 — SQLite CASCADE DELETE không hoạt động (PRAGMA foreign_keys OFF)
+| | |
+|---|---|
+| **File** | `db.py` ~dòng 31 + `tests/test_ktnb_db.py` fixture |
+| **Dấu hiệu** | `test_delete_dot_cascade` fail: row con vẫn còn sau DELETE cha |
+| **Nguyên nhân** | SQLite mặc định `foreign_keys=OFF`; cả production và test fixture đều không bật |
+| **Fix** | Thêm `PRAGMA foreign_keys=ON` vào `db.py` connection setup và fixture `in_memory_db` |
+| **Test** | `test_ktnb_db.py::TestKtnbDotKiemTra::test_delete_dot_cascade` |
+| **Ngày fix** | 2026-05-25 |
 
 ---
 

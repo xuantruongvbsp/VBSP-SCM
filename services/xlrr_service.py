@@ -79,11 +79,34 @@ class HoSoRuiRo:
     # Flags
     lap_thay_pgd: bool = False  # CN lập thay PGD
     
+    # Thông tin mẫu 01/XLN — Đơn đề nghị
+    ngay_ky_01: Optional[date] = None
+    ma_to: str = ""
+    ten_to_truong: str = ""
+    so_tien_thiet_hai_01: str = ""
+    muc_do_thiet_hai_01: str = ""
+    kha_nang_tra_no_01: str = ""
+    ke_hoach_tra_no_01: str = ""
+    
+    # Thông tin mẫu 02/XLN — Biên bản
+    ngay_lap_02: Optional[date] = None
+    dia_diem_02: str = ""
+    ten_pgd_02: str = ""  # Phó GĐ NHCSXH
+    ten_ubnd_02: str = ""
+    ten_hoi_nd_02: str = ""
+    ten_cbtd_02: str = ""
+    ten_to_truong_02: str = ""
+    chi_tiet_thiet_hai_02: str = ""
+    danh_gia_thiet_hai_02: str = ""
+    danh_gia_du_an_02: str = ""
+    tai_san_hien_tai_02: str = ""
+    kha_nang_tra_no_02: str = ""
+    
     def to_dict(self) -> dict:
         """Convert to dict for JSON serialization."""
         d = asdict(self)
         # Convert datetime/date to string; NaT/NaN/None → None (an toàn cho json.dumps)
-        for key in ["ngay_vay", "ngay_dh", "ngay_rr", "ngay_tao", "ngay_duyet"]:
+        for key in ["ngay_vay", "ngay_dh", "ngay_rr", "ngay_tao", "ngay_duyet", "ngay_ky_01", "ngay_lap_02"]:
             val = d.get(key)
             if val is None:
                 continue

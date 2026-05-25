@@ -64,10 +64,14 @@ def doc_baseline_merged(nam: int) -> pd.DataFrame | None:
     """
     from config import BASELINE_PGD_DIR, baseline_pgd_path, baseline_path, baseline_cache_loai
     from config import DS_PGD, DON_VI_CHI_NHANH
+    from config import COT_TEN_PGD as _COT_TEN_PGD   # cần trước cache-check block
     ds = [DON_VI_CHI_NHANH] + DS_PGD
 
     cache_path = baseline_cache_loai(nam, "hstd")
     _MIN_COLS = 15
+
+    from logger import get_logger as _get_logger
+    _rb_logger = _get_logger(__name__)
 
     # Check cache hợp lệ: mtime trước, rồi mới đọc full parquet (tránh đọc file lớn khi không cần)
     if os.path.exists(cache_path) and os.path.getsize(cache_path) >= 1000:
@@ -81,15 +85,25 @@ def doc_baseline_merged(nam: int) -> pd.DataFrame | None:
             try:
                 df_cache = pd.read_parquet(cache_path)
                 if not df_cache.empty and len(df_cache.columns) >= _MIN_COLS:
-                    return df_cache
+                    _ds_co_file = [dv for dv in ds if os.path.exists(baseline_pgd_path(dv, nam))]
+                    if _COT_TEN_PGD in df_cache.columns:
+                        _pgd_cache = set(df_cache[_COT_TEN_PGD].dropna().unique())
+                        _pgd_disk = set(_ds_co_file)
+                        _thieu = _pgd_disk - _pgd_cache
+                        if _thieu:
+                            _rb_logger.warning(
+                                "doc_baseline_merged: cache thiếu %d PGD (%d/%d đơn vị có file) → rebuild",
+                                len(_thieu), len(_ds_co_file), len(ds),
+                            )
+                        else:
+                            return df_cache
+                    else:
+                        return df_cache
             except Exception:
                 pass
 
     # Rebuild: cache từng PGD bằng parquet → merge (song song để tăng tốc)
     from concurrent.futures import ThreadPoolExecutor
-    from config import COT_TEN_PGD as _COT_TEN_PGD
-    from logger import get_logger as _get_logger
-    _rb_logger = _get_logger(__name__)
 
     def _clean_fn(df_: pd.DataFrame) -> pd.DataFrame:
         return df_.iloc[:, 1:].dropna(how="all")
@@ -159,7 +173,7 @@ def doc_baseline_merged(nam: int) -> pd.DataFrame | None:
         return result
 
     # fallback: file tổng cũ
-    return doc_baseline(nam, _ts)
+    return doc_baseline(nam)
 
 
 # ── NQ11 ─────────────────────────────────────────────────────────────────────

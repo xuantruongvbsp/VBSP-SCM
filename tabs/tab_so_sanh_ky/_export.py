@@ -532,6 +532,8 @@ def _render_export_chi_tiet(
             sheets = {"Chi tiết": df_xl}
             tong_hop_sheets = _build_tong_hop_sheets(df_xuat)
             sheets.update(tong_hop_sheets)
+            if sheets_extra:
+                sheets.update(sheets_extra)
             st.session_state[xl_key] = xuat_excel(sheets)
 
         st.download_button(

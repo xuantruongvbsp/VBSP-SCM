@@ -17,6 +17,7 @@ def in_memory_db():
     """Tạo database in-memory với schema KTNB."""
     conn = sqlite3.connect(":memory:")
     conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA foreign_keys = ON")
 
     # Tạo bảng KTNB
     conn.executescript("""

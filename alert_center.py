@@ -223,8 +223,8 @@ def canh_bao_no_khoanh_sap_het_han(df_kh) -> dict:
     today = pd.Timestamp(date.today())
     df['con_lai'] = (df['_ngay_het'] - today).dt.days
 
-    khan = df[df['con_lai'] <= 120]
-    canh_bao = df[(df['con_lai'] > 120) & (df['con_lai'] <= 180)]
+    khan = df[df['con_lai'] <= 30]
+    canh_bao = df[(df['con_lai'] > 30) & (df['con_lai'] <= 180)]
 
     cols = [COT_SO_KU, COT_TEN_PGD, COT_TEN_XA, COT_TEN_KH,
             COT_DU_NO_KHOANH, COT_NGAY_HH_KHOANH, COT_TEN_TO_TRUONG, 'con_lai']

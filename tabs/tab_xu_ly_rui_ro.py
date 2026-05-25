@@ -30,6 +30,7 @@ from config import (
     COT_TEN_TO,
     COT_TEN_XA,
     COT_TONG_DU_NO,
+    DON_VI_CHI_NHANH,  # Để có đủ 22 đơn vị trong dropdown
     DS_PGD,
     NGUYEN_NHAN_RR,
 )
@@ -83,8 +84,9 @@ def _subtab_lap_hs_pgd(df: pd.DataFrame, ctx: TabContext) -> None:
     if la_phan_he_pgd(role):
         ten_pgd = ctx.pgd_user or DS_PGD[0]
     else:
-        # CN chọn PGD để lập thay
-        ten_pgd = st.selectbox("📍 Chọn PGD để lập hồ sơ", DS_PGD, key="xlrr_pgd_chon_pgd")
+        # CN chọn đơn vị để lập thay (22 đơn vị đầy đủ)
+        ds_don_vi = [DON_VI_CHI_NHANH] + DS_PGD
+        ten_pgd = st.selectbox("📍 Chọn đơn vị để lập hồ sơ", ds_don_vi, key="xlrr_pgd_chon_pgd")
     
     pgd_slug_val = pgd_slug(ten_pgd)
     df_pgd = df[df[COT_TEN_PGD] == ten_pgd].copy() if COT_TEN_PGD in df.columns else pd.DataFrame()
@@ -196,6 +198,60 @@ def _subtab_lap_hs_pgd(df: pd.DataFrame, ctx: TabContext) -> None:
             key="xlrr_pgd_ghi_chu",
         )
         
+        # Thông tin dư nợ: gốc từ HSTD, lãi nhập tay
+        st.markdown("**💰 Thông tin dư nợ**")
+        du_no_goc_display = st.text_input(
+            "Dư nợ gốc (từ HSTD)",
+            value="",
+            disabled=True,
+            key="xlrr_pgd_du_no_goc_display",
+        )
+        du_no_lai_input = st.number_input(
+            "Dư nợ lãi (nhập tay để khớp số liệu kế toán) *",
+            min_value=0.0,
+            step=0.1,
+            format="%.1f",
+            key="xlrr_pgd_du_no_lai",
+        )
+        
+        # Expander: Thông tin mẫu 01/XLN — Đơn đề nghị
+        with st.expander("📝 Thông tin mẫu 01/XLN — Đơn đề nghị (tùy chọn)"):
+            ngay_ky_01 = st.date_input(
+                "Ngày ký đơn:",
+                value=date.today(),
+                format="DD/MM/YYYY",
+                key="xlrr_pgd_01_ngay",
+            )
+            ma_to = st.text_input("Mã Tổ TK&VV:", key="xlrr_pgd_01_ma_to")
+            ten_to_truong = st.text_input("Tổ trưởng:", key="xlrr_pgd_01_to_truong")
+            nguyen_nhan_01 = st.text_area("Nguyên nhân rủi ro:", key="xlrr_pgd_01_nguyen_nhan")
+            so_tien_thiet_hai_01 = st.text_input("Số tiền thiệt hại:", value="0", key="xlrr_pgd_01_thiet_hai")
+            muc_do_thiet_hai_01 = st.text_input("Mức độ thiệt hại (%):", value="0", key="xlrr_pgd_01_muc_do")
+            kha_nang_tra_no_01 = st.text_area("Khả năng trả nợ:", key="xlrr_pgd_01_kha_nang")
+            ke_hoach_tra_no_01 = st.text_input("Kế hoạch trả nợ:", key="xlrr_pgd_01_ke_hoach")
+        
+        # Expander: Thông tin mẫu 02/XLN — Biên bản
+        with st.expander("📋 Thông tin mẫu 02/XLN — Biên bản (tùy chọn)"):
+            ngay_lap_02 = st.date_input(
+                "Ngày lập biên bản:",
+                value=date.today(),
+                format="DD/MM/YYYY",
+                key="xlrr_pgd_02_ngay",
+            )
+            dia_diem_02 = st.text_input("Địa điểm:", key="xlrr_pgd_02_dia_diem")
+            st.markdown("**Thành phần tham dự:**")
+            ten_pgd_02 = st.text_input("Phó GĐ NHCSXH:", key="xlrr_pgd_02_pgd")
+            ten_ubnd_02 = st.text_input("Phó Chủ tịch UBND:", key="xlrr_pgd_02_ubnd")
+            ten_hoi_nd_02 = st.text_input("Chủ tịch Hội ND:", key="xlrr_pgd_02_hoi_nd")
+            ten_cbtd_02 = st.text_input("CBTD NHCSXH:", key="xlrr_pgd_02_cbtd")
+            ten_to_truong_02 = st.text_input("Tổ trưởng TK&VV:", key="xlrr_pgd_02_to_truong")
+            st.markdown("**Nội dung biên bản:**")
+            chi_tiet_thiet_hai_02 = st.text_input("Chi tiết thiệt hại:", key="xlrr_pgd_02_chi_tiet")
+            danh_gia_thiet_hai_02 = st.text_input("Đánh giá thiệt hại:", key="xlrr_pgd_02_danh_gia")
+            danh_gia_du_an_02 = st.text_area("Đánh giá dự án:", key="xlrr_pgd_02_du_an")
+            tai_san_hien_tai_02 = st.text_input("Tài sản hiện tại:", key="xlrr_pgd_02_tai_san")
+            kha_nang_tra_no_02 = st.text_area("Khả năng trả nợ:", key="xlrr_pgd_02_kha_nang")
+        
         submitted = st.form_submit_button("💾 Lưu hồ sơ", type="primary")
     
     if submitted:
@@ -238,8 +294,8 @@ def _subtab_lap_hs_pgd(df: pd.DataFrame, ctx: TabContext) -> None:
                 pgd_slug=pgd_slug_val,
                 ten_ct=str(row_full.get(COT_TEN_CT, "")),
                 du_no_goc=float(row_full.get(COT_TONG_DU_NO, 0) or 0),
-                du_no_lai=float(row_full.get(COT_LAI_TON, 0) or 0),
-                lai_ton=float(row_full.get(COT_LAI_TON, 0) or 0),
+                du_no_lai=float(du_no_lai_input * 1_000_000),
+                lai_ton=float(du_no_lai_input * 1_000_000),  # Lãi tồn nhập tay
                 ngay_vay=row_full.get(COT_NGAY_VAY),
                 ngay_dh=row_full.get(COT_NGAY_DH),
                 bien_phap=bien_phap,
@@ -253,6 +309,27 @@ def _subtab_lap_hs_pgd(df: pd.DataFrame, ctx: TabContext) -> None:
                 trang_thai=TRANG_THAI_CHO_DUYET,
                 nguoi_tao=username,
                 lap_thay_pgd=la_phan_he_cn(role),
+                # Thông tin mẫu 01/XLN
+                ngay_ky_01=ngay_ky_01,
+                ma_to=ma_to,
+                ten_to_truong=ten_to_truong,
+                so_tien_thiet_hai_01=so_tien_thiet_hai_01,
+                muc_do_thiet_hai_01=muc_do_thiet_hai_01,
+                kha_nang_tra_no_01=kha_nang_tra_no_01,
+                ke_hoach_tra_no_01=ke_hoach_tra_no_01,
+                # Thông tin mẫu 02/XLN
+                ngay_lap_02=ngay_lap_02,
+                dia_diem_02=dia_diem_02,
+                ten_pgd_02=ten_pgd_02,
+                ten_ubnd_02=ten_ubnd_02,
+                ten_hoi_nd_02=ten_hoi_nd_02,
+                ten_cbtd_02=ten_cbtd_02,
+                ten_to_truong_02=ten_to_truong_02,
+                chi_tiet_thiet_hai_02=chi_tiet_thiet_hai_02,
+                danh_gia_thiet_hai_02=danh_gia_thiet_hai_02,
+                danh_gia_du_an_02=danh_gia_du_an_02,
+                tai_san_hien_tai_02=tai_san_hien_tai_02,
+                kha_nang_tra_no_02=kha_nang_tra_no_02,
             )
             ds_luu.append(hs)
         
@@ -270,121 +347,11 @@ def _subtab_lap_hs_pgd(df: pd.DataFrame, ctx: TabContext) -> None:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# SUB-TAB 2: LẬP HỒ SƠ CN (QĐ62)
-# ══════════════════════════════════════════════════════════════════════════════
-
-def _subtab_lap_hs_cn(df: pd.DataFrame, ctx: TabContext) -> None:
-    """Sub-tab 2: Lập hồ sơ CN (QĐ62 trực tiếp hoặc lập thay PGD)."""
-    st.caption("Lập hồ sơ QĐ62 trực tiếp hoặc lập thay cho PGD")
-    
-    role = ctx.role_norm
-    username = ctx.username
-    
-    # Chọn mode
-    mode = st.radio(
-        "Chế độ lập hồ sơ",
-        ["🏢 Lập QĐ62 trực tiếp (Hội sở/CN)", "🔄 Lập thay cho PGD"],
-        horizontal=True,
-        key="xlrr_cn_mode",
-    )
-    
-    if mode == "🔄 Lập thay cho PGD":
-        # Chuyển sang sub-tab 1 với context CN
-        st.info("Chuyển sang tab 'Lập hồ sơ PGD' và chọn PGD từ dropdown.")
-        return
-    
-    # Mode QĐ62 trực tiếp
-    st.markdown("#### ➕ Thêm hồ sơ QĐ62 mới")
-    
-    with st.form("xlrr_cn_form_qd62"):
-        col_a, col_b = st.columns(2)
-        with col_a:
-            ho_ten = st.text_input("Họ tên khách hàng *", placeholder="Nguyễn Văn A", key="xlrr_cn_ho_ten")
-            so_cccd = st.text_input("Số CCCD/CMND *", placeholder="0790xxxxxx", key="xlrr_cn_cccd")
-            ten_pgd = st.selectbox("Phòng giao dịch *", DS_PGD, key="xlrr_cn_pgd")
-        with col_b:
-            xa = st.text_input("Xã/Phường *", key="xlrr_cn_xa")
-            ten_ct = st.text_input("Chương trình tín dụng", key="xlrr_cn_ct")
-            du_no_goc = st.number_input("Dư nợ gốc (triệu đồng) *", min_value=0.0, step=0.1, format="%.1f", key="xlrr_cn_goc")
-            du_no_lai = st.number_input("Dư nợ lãi (triệu đồng)", min_value=0.0, step=0.1, format="%.1f", key="xlrr_cn_lai")
-        
-        ly_do = st.selectbox("Lý do rủi ro *", NGUYEN_NHAN_RR, key="xlrr_cn_ly_do")
-        ghi_chu = st.text_area("Ghi chú", height=80, key="xlrr_cn_ghi_chu")
-        
-        submitted = st.form_submit_button("💾 Lưu hồ sơ QĐ62", type="primary")
-    
-    if submitted:
-        # Validate
-        errs = []
-        if not ho_ten.strip():
-            errs.append("Họ tên")
-        if not so_cccd.strip():
-            errs.append("Số CCCD")
-        if not xa.strip():
-            errs.append("Xã/Phường")
-        if du_no_goc <= 0:
-            errs.append("Dư nợ gốc phải > 0")
-        
-        if errs:
-            st.error(f"⚠️ Vui lòng nhập: {', '.join(errs)}")
-            return
-        
-        # Tạo hồ sơ
-        now = datetime.now()
-        hs = HoSoRuiRo(
-            id=str(uuid.uuid4()),
-            ma_kh=so_cccd,
-            ten_kh=ho_ten.strip(),
-            so_ku="",
-            xa=xa.strip(),
-            ten_pgd=ten_pgd,
-            pgd_slug=pgd_slug(ten_pgd),
-            ten_ct=ten_ct or "QĐ62",
-            du_no_goc=int(du_no_goc * 1_000_000),
-            du_no_lai=int(du_no_lai * 1_000_000),
-            nguyen_nhan=ly_do,
-            ghi_chu=ghi_chu.strip(),
-            loai_ho_so=LOAI_HO_SO_QD62,
-            trang_thai=TRANG_THAI_CHO_DUYET,
-            so_cccd=so_cccd.strip(),
-            ly_do=ly_do,
-            nguoi_tao=username,
-            ngay_tao=now,
-        )
-        
-        # Lưu
-        LuuTruXLRR.luu_qd62([hs], now.year, now.month, username)
-        
-        st.cache_data.clear()
-        st.success(f"✅ Đã thêm hồ sơ QĐ62: {ho_ten.strip()}")
-        st.rerun()
-    
-    # Hiển thị danh sách QĐ62 đã lập
-    st.markdown("#### 📋 Hồ sơ QĐ62 đã lập trong kỳ")
-    now = datetime.now()
-    ds_qd62 = LuuTruXLRR.doc_qd62(now.year, now.month)
-    
-    if not ds_qd62:
-        st.info("ℹ️ Chưa có hồ sơ QĐ62 nào trong kỳ này.")
-    else:
-        df_qd62 = pd.DataFrame([{
-            "Họ tên": hs.ten_kh,
-            "Xã": hs.xa,
-            "PGD": hs.ten_pgd,
-            "Dư nợ gốc": fmt_ty(hs.du_no_goc),
-            "Lý do": hs.ly_do,
-            "Trạng thái": TRANG_THAI_BADGE.get(hs.trang_thai, hs.trang_thai),
-        } for hs in ds_qd62])
-        
-        st.dataframe(df_qd62, use_container_width=True, hide_index=True)
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# SUB-TAB 3: THEO DÕI QĐ62
+# SUB-TAB 2: THEO DÕI QĐ62 (cũ là SUB-TAB 3)
 # ══════════════════════════════════════════════════════════════════════════════
 
 def _subtab_theo_doi_qd62(ctx: TabContext) -> None:
-    """Sub-tab 3: Theo dõi và quản lý trạng thái hồ sơ QĐ62."""
+    """Sub-tab 2: Theo dõi và quản lý trạng thái hồ sơ QĐ62."""
     st.caption("Theo dõi trạng thái hồ sơ QĐ62 toàn Chi nhánh")
     
     role = ctx.role_norm
@@ -481,12 +448,19 @@ def _subtab_theo_doi_qd62(ctx: TabContext) -> None:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# SUB-TAB 4: TỔNG HỢP TOÀN CN
+# SUB-TAB 3: TỔNG HỢP TOÀN CN (cũ là SUB-TAB 4)
 # ══════════════════════════════════════════════════════════════════════════════
 
 def _subtab_tong_hop_cn(ctx: TabContext) -> None:
-    """Sub-tab 4: Tổng hợp toàn Chi nhánh."""
+    """Sub-tab 3: Tổng hợp toàn Chi nhánh."""
     st.caption("Tổng hợp hồ sơ xử lý rủi ro toàn Chi nhánh Đồng Nai")
+    
+    # Import services
+    from services.xlrr_export_service import (
+        nhap_danh_sach_rui_ro_excel,
+        merge_du_lieu_pgd_vao_cn,
+        tong_hop_theo_bien_phap,
+    )
     
     # Filters
     col_f1, col_f2 = st.columns(2)
@@ -495,6 +469,59 @@ def _subtab_tong_hop_cn(ctx: TabContext) -> None:
         thang = st.selectbox("Tháng", list(range(1, 13)), index=now.month - 1, key="xlrr_th_thang")
     with col_f2:
         nam = st.number_input("Năm", min_value=2020, max_value=2030, value=now.year, key="xlrr_th_nam")
+    
+    # ── Nhập dữ liệu từ PGD ────────────────────────────────────────────
+    st.markdown("---")
+    st.markdown("#### 📥 Nhập dữ liệu từ PGD")
+    
+    uploaded_files = st.file_uploader(
+        "Chọn file Excel từ các PGD (có thể chọn nhiều file)",
+        type=['xlsx'],
+        accept_multiple_files=True,
+        key="xlrr_th_upload",
+    )
+    
+    if uploaded_files:
+        ds_all = []
+        errors = []
+        
+        for file in uploaded_files:
+            try:
+                ds_hs = nhap_danh_sach_rui_ro_excel(file.read())
+                ds_all.extend(ds_hs)
+            except Exception as e:
+                errors.append(f"{file.name}: {str(e)}")
+        
+        if errors:
+            st.error("❌ Lỗi khi đọc file:")
+            for err in errors:
+                st.write(f"- {err}")
+        
+        if ds_all:
+            # Preview dữ liệu
+            st.markdown("**📋 Preview dữ liệu:**")
+            preview_df = pd.DataFrame([{
+                "Tên KH": hs.ten_kh,
+                "PGD": hs.ten_pgd,
+                "Số KU": hs.so_ku,
+                "Biện pháp": "Khoanh" if hs.bien_phap == "khoanh" else "Xóa",
+                "Dư nợ gốc": fmt_ty(hs.du_no_goc),
+            } for hs in ds_all])
+            st.dataframe(preview_df, use_container_width=True, hide_index=True)
+            
+            col_merge = st.columns([1, 3])
+            with col_merge[0]:
+                if st.button("💾 Merge vào CN", type="primary", use_container_width=True):
+                    count, errs = merge_du_lieu_pgd_vao_cn(ds_all, int(nam), thang, ctx.username)
+                    if errs:
+                        st.error(f"❌ Lỗi: {', '.join(errs)}")
+                    else:
+                        st.success(f"✅ Đã nhập {count} hồ sơ vào CN!")
+                        st.rerun()
+            with col_merge[1]:
+                st.caption("Dữ liệu sẽ được merge vào database CN và ghi đè nếu trùng ID.")
+    
+    st.markdown("---")
     
     # Metrics
     metrics = TongHopXLRR.tong_hop_toan_cn(int(nam), thang)
@@ -523,15 +550,42 @@ def _subtab_tong_hop_cn(ctx: TabContext) -> None:
         st.info("ℹ️ Chưa có dữ liệu.")
     else:
         st.dataframe(df_ct, use_container_width=True, hide_index=True)
+    
+    # ── Xuất mẫu 04/05 (tổng hợp theo biện pháp) ───────────────────────
+    st.markdown("---")
+    st.markdown("#### 📄 Xuất mẫu tổng hợp 04/XLN và 05/XLN")
+    
+    # Load dữ liệu CN để tổng hợp
+    ds_cn = LuuTruXLRR.doc_cn(int(nam), thang)
+    
+    if ds_cn:
+        col_export = st.columns(2)
+        with col_export[0]:
+            st.markdown("**Mẫu 04/XLN — Tổng hợp Khoanh nợ**")
+            ds_khoanh = tong_hop_theo_bien_phap(ds_cn, "khoanh")
+            st.caption(f"Có {len(ds_khoanh)} hồ sơ khoanh nợ")
+            if ds_khoanh and st.button("📄 Xuất 04/XLN", use_container_width=True, key="btn_04xln"):
+                st.info("📝 Mẫu 04/XLN đang được phát triển...")
+        with col_export[1]:
+            st.markdown("**Mẫu 05/XLN — Tổng hợp Xóa nợ**")
+            ds_xoa = tong_hop_theo_bien_phap(ds_cn, "xoa")
+            st.caption(f"Có {len(ds_xoa)} hồ sơ xóa nợ")
+            if ds_xoa and st.button("📄 Xuất 05/XLN", use_container_width=True, key="btn_05xln"):
+                st.info("📝 Mẫu 05/XLN đang được phát triển...")
+    else:
+        st.info("ℹ️ Chưa có dữ liệu CN để tổng hợp mẫu 04/05.")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# SUB-TAB 5: BÁO CÁO & IN ẤN
+# SUB-TAB 4: XUẤT BIỂU MẪU (cũ là SUB-TAB 5)
 # ══════════════════════════════════════════════════════════════════════════════
 
 def _subtab_bao_cao(df: pd.DataFrame, ctx: TabContext) -> None:
-    """Sub-tab 5: Xuất biểu mẫu 01/XLN và 02/XLN."""
-    st.caption("📄 Xuất biểu mẫu Đơn đề nghị (01/XLN) và Biên bản (02/XLN)")
+    """Sub-tab 4: Xuất biểu mẫu 01/XLN, 02/XLN, 04/XLN, 05/XLN và tờ trình."""
+    st.caption("📄 Xuất biểu mẫu và dữ liệu rủi ro")
+    
+    # Import service export
+    from services.xlrr_export_service import xuat_danh_sach_rui_ro_excel
 
     # Lấy dữ liệu hồ sơ
     role = ctx.role_norm
@@ -570,12 +624,36 @@ def _subtab_bao_cao(df: pd.DataFrame, ctx: TabContext) -> None:
 
     if not ds_hs:
         st.info(
-            f"ℹ️ Chưa có hồ sơ nào trong kỳ T{thang_xuat}/{int(nam_xuat)} để xuất biểu mẫu."
+            f"ℹ️ Chưa có hồ sơ nào trong kỳ T{thang_xuat}/{int(nam_xuat)}."
         )
         return
 
-    # ── Chọn hồ sơ (dùng id làm key để tránh trùng label) ────────────
-    st.markdown("**📋 Chọn hồ sơ xuất biểu mẫu**")
+    # ── Nút xuất Excel cho PGD ─────────────────────────────────────────
+    if la_phan_he_pgd(role):
+        st.markdown("---")
+        st.markdown("#### 📥 Xuất dữ liệu gửi CN")
+        col_excel = st.columns([1, 2])
+        with col_excel[0]:
+            if st.button("📥 Xuất Excel", use_container_width=True, type="primary"):
+                try:
+                    excel_bytes = xuat_danh_sach_rui_ro_excel(
+                        ds_hs, pgd_user or "PGD", int(nam_xuat), thang_xuat
+                    )
+                    st.download_button(
+                        label="⬇️ Tải file Excel",
+                        data=excel_bytes,
+                        file_name=f"XLRR_{pgd_slug(pgd_user or 'pgd')}_{thang_xuat:02d}_{int(nam_xuat)}.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        use_container_width=True,
+                    )
+                except Exception as e:
+                    st.error(f"❌ Lỗi xuất Excel: {e}")
+        with col_excel[1]:
+            st.caption("File Excel này chứa dữ liệu rủi ro để gửi CN tổng hợp mẫu 04/05.")
+        st.markdown("---")
+
+    # ── Chọn hồ sơ ───────────────────────────────────────────────────
+    st.markdown("#### 📋 Chọn hồ sơ xuất biểu mẫu")
     hs_map = {hs.id: hs for hs in ds_hs}
     hs_labels = {
         hs.id: f"{hs.ten_kh} — {hs.ten_pgd} — KU: {hs.so_ku or 'N/A'}"
@@ -593,53 +671,48 @@ def _subtab_bao_cao(df: pd.DataFrame, ctx: TabContext) -> None:
 
     hs = hs_map[selected_id]
     
+    # Kiểm tra trạng thái nhập liệu
+    da_nhap_01 = bool(hs.ngay_ky_01 and hs.ten_to_truong)
+    da_nhap_02 = bool(hs.ngay_lap_02 and hs.ten_pgd_02)
+    
+    if not da_nhap_01 or not da_nhap_02:
+        st.warning("⚠️ Hồ sơ chưa nhập đầy đủ thông tin mẫu 01/XLN hoặc 02/XLN. Vui lòng quay lại tab 'Lập hồ sơ PGD' để bổ sung.")
+    else:
+        st.success("✅ Hồ sơ đã nhập đầy đủ thông tin.")
+    
     col1, col2 = st.columns(2)
     
+    # ── Xuất 01/XLN ────────────────────────────────────────────────────
     with col1:
         st.markdown("**📝 Mẫu 01/XLN — Đơn đề nghị**")
         
-        # Form nhập thông tin bổ sung cho 01
-        with st.form("form_01xln"):
-            ngay_ky = st.date_input("Ngày ký đơn:", value=date.today(), format="DD/MM/YYYY", key="xlrr_01_ngay")
-            ma_to = st.text_input("Mã Tổ TK&VV:", value=getattr(hs, 'ma_to', ''), key="xlrr_01_ma_to")
-            ten_to_truong = st.text_input("Tổ trưởng:", value=getattr(hs, 'ten_to_truong', ''), key="xlrr_01_to_truong")
-            nguyen_nhan = st.text_area("Nguyên nhân rủi ro:", value=getattr(hs, 'nguyen_nhan', ''), key="xlrr_01_nguyen_nhan")
-            so_tien_thiet_hai = st.text_input("Số tiền thiệt hại:", value="0", key="xlrr_01_thiet_hai")
-            muc_do_thiet_hai = st.text_input("Mức độ thiệt hại (%):", value="0", key="xlrr_01_muc_do")
-            kha_nang_tra_no = st.text_area("Khả năng trả nợ:", value=getattr(hs, 'kha_nang_tra_no', ''), key="xlrr_01_kha_nang")
-            bien_phap = st.selectbox("Biện pháp:", ["khoanh nợ", "xóa nợ"], key="xlrr_01_bien_phap")
-            so_thang = st.number_input("Số tháng đề nghị:", min_value=0, value=getattr(hs, 'so_thang', 36), key="xlrr_01_thang")
-            ke_hoach_tra_no = st.text_input("Kế hoạch trả nợ:", value="", key="xlrr_01_ke_hoach")
-            
-            submit_01 = st.form_submit_button("📄 Xuất 01/XLN", use_container_width=True)
-        
-        if submit_01:
-            # Chuẩn bị dữ liệu
+        if st.button("📄 Xuất 01/XLN", use_container_width=True, key="btn_01xln"):
+            # Chuẩn bị dữ liệu từ hs đã lưu
             du_lieu_01 = {
-                "ten_nhcsxh": getattr(hs, 'ten_pgd', ''),
+                "ten_nhcsxh": hs.ten_pgd,
                 "dia_danh": "TP. Biên Hòa",
-                "ngay_ky": ngay_ky,
+                "ngay_ky": hs.ngay_ky_01 or date.today(),
                 "ten_kh": hs.ten_kh,
                 "dia_chi": getattr(hs, 'dia_chi', ''),
-                "ma_to": ma_to,
-                "ten_to_truong": ten_to_truong,
+                "ma_to": hs.ma_to,
+                "ten_to_truong": hs.ten_to_truong,
                 "so_ku": hs.so_ku,
-                "ngay_vay": getattr(hs, 'ngay_vay', date.today()),
-                "ten_ct": getattr(hs, 'ten_ct', ''),
+                "ngay_vay": hs.ngay_vay or date.today(),
+                "ten_ct": hs.ten_ct,
                 "muc_vay": f"{getattr(hs, 'muc_vay', 0):,.0f}".replace(",", "."),
                 "ngay_dh": getattr(hs, 'ngay_dh', ''),
                 "muc_dich_vay": getattr(hs, 'muc_dich_vay', ''),
                 "tong_du_no": f"{hs.tong_du_no:,.0f}".replace(",", ".") if hs.tong_du_no else "0",
-                "du_no_goc": f"{getattr(hs, 'du_no_goc', 0):,.0f}".replace(",", "."),
-                "lai_ton": f"{getattr(hs, 'lai_ton', 0):,.0f}".replace(",", "."),
-                "nguyen_nhan": nguyen_nhan,
-                "so_tien_thiet_hai": so_tien_thiet_hai,
-                "muc_do_thiet_hai": muc_do_thiet_hai,
-                "kha_nang_tra_no": kha_nang_tra_no,
-                "bien_phap": bien_phap,
+                "du_no_goc": f"{hs.du_no_goc:,.0f}".replace(",", "."),
+                "lai_ton": f"{hs.lai_ton:,.0f}".replace(",", "."),
+                "nguyen_nhan": hs.nguyen_nhan,
+                "so_tien_thiet_hai": hs.so_tien_thiet_hai_01,
+                "muc_do_thiet_hai": hs.muc_do_thiet_hai_01,
+                "kha_nang_tra_no": hs.kha_nang_tra_no_01,
+                "bien_phap": "Khoanh Nợ" if hs.bien_phap == "khoanh" else "Xóa Nợ",
                 "so_tien_de_nghi": f"{hs.tong_du_no:,.0f}".replace(",", ".") if hs.tong_du_no else "0",
-                "so_thang": int(so_thang),
-                "ke_hoach_tra_no": ke_hoach_tra_no,
+                "so_thang": hs.so_thang,
+                "ke_hoach_tra_no": hs.ke_hoach_tra_no_01,
             }
             
             try:
@@ -647,74 +720,52 @@ def _subtab_bao_cao(df: pd.DataFrame, ctx: TabContext) -> None:
                 st.download_button(
                     label="⬇️ Tải 01/XLN (.docx)",
                     data=file_bytes,
-                    file_name=f"01XLN_{hs.ma_kh}_{ngay_ky.strftime('%Y%m%d')}.docx",
+                    file_name=f"01XLN_{hs.ma_kh}_{(hs.ngay_ky_01 or date.today()).strftime('%Y%m%d')}.docx",
                     mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                    use_container_width=True
+                    use_container_width=True,
+                    key="dl_01xln"
                 )
                 db.ghi_audit(ctx.username, "xuat_01xln", f"Mã KH: {hs.ma_kh}, Số KU: {hs.so_ku}")
                 st.success("✅ Đã xuất 01/XLN thành công!")
             except Exception as e:
                 st.error(f"❌ Lỗi xuất 01/XLN: {e}")
     
+    # ── Xuất 02/XLN ────────────────────────────────────────────────────
     with col2:
         st.markdown("**📋 Mẫu 02/XLN — Biên bản**")
         
-        # Form nhập thông tin bổ sung cho 02
-        with st.form("form_02xln"):
-            ngay_lap = st.date_input("Ngày lập biên bản:", value=date.today(), format="DD/MM/YYYY", key="xlrr_02_ngay")
-            dia_diem = st.text_input("Địa điểm:", value="", key="xlrr_02_dia_diem")
-            
-            st.markdown("**Thành phần tham dự:**")
-            ten_pgd = st.text_input("Phó GĐ NHCSXH:", key="xlrr_02_pgd")
-            ten_ubnd = st.text_input("Phó Chủ tịch UBND:", key="xlrr_02_ubnd")
-            ten_hoi_nd = st.text_input("Chủ tịch Hội ND:", key="xlrr_02_hoi_nd")
-            ten_cbtd = st.text_input("CBTD NHCSXH:", key="xlrr_02_cbtd")
-            ten_to_truong_02 = st.text_input("Tổ trưởng TK&VV:", value=getattr(hs, 'ten_to_truong', ''), key="xlrr_02_to_truong")
-            
-            st.markdown("**Nội dung biên bản:**")
-            nguyen_nhan_02 = st.text_area("Nguyên nhân rủi ro:", value=getattr(hs, 'nguyen_nhan', ''), key="xlrr_02_nguyen_nhan")
-            chi_tiet_thiet_hai = st.text_input("Chi tiết thiệt hại:", value="", key="xlrr_02_chi_tiet_th")
-            danh_gia_thiet_hai = st.text_input("Đánh giá thiệt hại:", value="", key="xlrr_02_dg_th")
-            danh_gia_du_an = st.text_area("Đánh giá dự án:", value="", key="xlrr_02_dg_du_an")
-            tai_san_hien_tai = st.text_input("Tài sản hiện tại:", value="", key="xlrr_02_ts")
-            kha_nang_tra_no_02 = st.text_area("Khả năng trả nợ:", value=getattr(hs, 'kha_nang_tra_no', ''), key="xlrr_02_kha_nang")
-            bien_phap_02 = st.selectbox("Biện pháp đề nghị:", ["khoanh nợ", "xóa nợ"], key="xlrr_02_bien_phap")
-            so_thang_02 = st.number_input("Số tháng:", min_value=0, value=getattr(hs, 'so_thang', 36), key="xlrr_02_thang")
-            
-            submit_02 = st.form_submit_button("📄 Xuất 02/XLN", use_container_width=True)
-        
-        if submit_02:
-            # Chuẩn bị dữ liệu
+        if st.button("📄 Xuất 02/XLN", use_container_width=True, key="btn_02xln"):
+            # Chuẩn bị dữ liệu từ hs đã lưu
             du_lieu_02 = {
-                "ten_nhcsxh": getattr(hs, 'ten_pgd', ''),
+                "ten_nhcsxh": hs.ten_pgd,
                 "dia_danh": "TP. Biên Hòa",
-                "ngay_lap": ngay_lap,
-                "dia_diem": dia_diem,
-                "ten_pgd": ten_pgd,
-                "ten_ubnd": ten_ubnd,
-                "ten_hoi_nd": ten_hoi_nd,
-                "ten_cbtd": ten_cbtd,
-                "ten_to_truong": ten_to_truong_02,
+                "ngay_lap": hs.ngay_lap_02 or date.today(),
+                "dia_diem": hs.dia_diem_02,
+                "ten_pgd": hs.ten_pgd_02,
+                "ten_ubnd": hs.ten_ubnd_02,
+                "ten_hoi_nd": hs.ten_hoi_nd_02,
+                "ten_cbtd": hs.ten_cbtd_02,
+                "ten_to_truong": hs.ten_to_truong_02,
                 "ten_kh": hs.ten_kh,
                 "dia_chi": getattr(hs, 'dia_chi', ''),
                 "so_ku": hs.so_ku,
-                "ngay_vay": getattr(hs, 'ngay_vay', date.today()),
-                "ten_ct": getattr(hs, 'ten_ct', ''),
+                "ngay_vay": hs.ngay_vay or date.today(),
+                "ten_ct": hs.ten_ct,
                 "ma_mon_vay": getattr(hs, 'ma_mon_vay', ''),
                 "muc_vay": f"{getattr(hs, 'muc_vay', 0):,.0f}".replace(",", "."),
                 "tong_du_no": f"{hs.tong_du_no:,.0f}".replace(",", ".") if hs.tong_du_no else "0",
-                "du_no_goc": f"{getattr(hs, 'du_no_goc', 0):,.0f}".replace(",", "."),
-                "lai_ton": f"{getattr(hs, 'lai_ton', 0):,.0f}".replace(",", "."),
-                "nguyen_nhan": nguyen_nhan_02,
-                "so_tien_thiet_hai": f"{getattr(hs, 'so_tien_thiet_hai', 0):,.0f}".replace(",", "."),
-                "chi_tiet_thiet_hai": chi_tiet_thiet_hai,
-                "danh_gia_thiet_hai": danh_gia_thiet_hai,
-                "danh_gia_du_an": danh_gia_du_an,
-                "tai_san_hien_tai": tai_san_hien_tai,
-                "kha_nang_tra_no": kha_nang_tra_no_02,
+                "du_no_goc": f"{hs.du_no_goc:,.0f}".replace(",", "."),
+                "lai_ton": f"{hs.lai_ton:,.0f}".replace(",", "."),
+                "nguyen_nhan": hs.nguyen_nhan,
+                "so_tien_thiet_hai": f"{hs.du_no_goc:,.0f}".replace(",", "."),
+                "chi_tiet_thiet_hai": hs.chi_tiet_thiet_hai_02,
+                "danh_gia_thiet_hai": hs.danh_gia_thiet_hai_02,
+                "danh_gia_du_an": hs.danh_gia_du_an_02,
+                "tai_san_hien_tai": hs.tai_san_hien_tai_02,
+                "kha_nang_tra_no": hs.kha_nang_tra_no_02,
                 "bien_phap_thu_hoi": "",
-                "bien_phap": bien_phap_02,
-                "so_thang": int(so_thang_02),
+                "bien_phap": "Khoanh Nợ" if hs.bien_phap == "khoanh" else "Xóa Nợ",
+                "so_thang": hs.so_thang,
                 "so_tien_de_nghi": f"{hs.tong_du_no:,.0f}".replace(",", ".") if hs.tong_du_no else "0",
             }
             
@@ -723,9 +774,10 @@ def _subtab_bao_cao(df: pd.DataFrame, ctx: TabContext) -> None:
                 st.download_button(
                     label="⬇️ Tải 02/XLN (.docx)",
                     data=file_bytes,
-                    file_name=f"02XLN_{hs.ma_kh}_{ngay_lap.strftime('%Y%m%d')}.docx",
+                    file_name=f"02XLN_{hs.ma_kh}_{(hs.ngay_lap_02 or date.today()).strftime('%Y%m%d')}.docx",
                     mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                    use_container_width=True
+                    use_container_width=True,
+                    key="dl_02xln"
                 )
                 db.ghi_audit(ctx.username, "xuat_02xln", f"Mã KH: {hs.ma_kh}, Số KU: {hs.so_ku}")
                 st.success("✅ Đã xuất 02/XLN thành công!")
@@ -738,7 +790,7 @@ def _subtab_bao_cao(df: pd.DataFrame, ctx: TabContext) -> None:
 # ══════════════════════════════════════════════════════════════════════════════
 
 def render(tab=None, **kwargs) -> None:
-    """Render tab Xử lý Rủi ro với 5 sub-tabs."""
+    """Render tab Xử lý Rủi ro với 4 sub-tabs."""
     ctx = TabContext(tab, **kwargs)
     role = ctx.role_norm
     
@@ -750,19 +802,18 @@ def render(tab=None, **kwargs) -> None:
         st.title("🔴 Xử lý Rủi ro (XLRR)")
         st.caption("Quản lý hồ sơ xử lý nợ rủi ro theo QĐ62/2015/QĐ-TTg")
         
-        # Xác định sub-tabs hiển thị dựa trên quyền
+        # Xác định sub-tabs hiển thị dựa trên quyền (4 tabs cho CN, 2 tabs cho PGD)
         if la_cn:
             tab_labels = [
-                "📝 Lập hồ sơ PGD",
-                "🏢 Lập hồ sơ CN",
-                "📋 Theo dõi QĐ62",
-                "📊 Tổng hợp CN",
-                "📄 Báo cáo",
+                "🏢 Lập hồ sơ PGD",      # Tab 1
+                "� Theo dõi QĐ62",      # Tab 2
+                "� Tổng hợp CN",        # Tab 3
+                "📄 Xuất biểu mẫu",      # Tab 4
             ]
         elif la_pgd:
             tab_labels = [
-                "📝 Lập hồ sơ PGD",
-                "📄 Báo cáo",
+                "🏢 Lập hồ sơ PGD",
+                "📄 Xuất biểu mẫu",
             ]
         else:
             st.error("❌ Bạn không có quyền truy cập chức năng này.")
@@ -778,12 +829,10 @@ def render(tab=None, **kwargs) -> None:
             with tabs[0]:
                 _subtab_lap_hs_pgd(df, ctx)
             with tabs[1]:
-                _subtab_lap_hs_cn(df, ctx)
-            with tabs[2]:
                 _subtab_theo_doi_qd62(ctx)
-            with tabs[3]:
+            with tabs[2]:
                 _subtab_tong_hop_cn(ctx)
-            with tabs[4]:
+            with tabs[3]:
                 _subtab_bao_cao(df, ctx)
         elif la_pgd:
             with tabs[0]:

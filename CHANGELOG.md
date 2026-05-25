@@ -1,5 +1,18 @@
 # CHANGELOG
 
+## [2026-05-25] — Fix NameError _COT_TEN_PGD trong cache-check block
+- `data/hstd.py` dòng ~65 — `doc_baseline_merged()`: chuyển `from config import COT_TEN_PGD as _COT_TEN_PGD` lên đầu hàm (trước cache-check block). Trước đây import đặt sai vị trí trong rebuild block → `NameError` bị `except Exception: pass` nuốt im → **mỗi lần gọi đều tốn công rebuild cache** thay vì dùng cache parquet có sẵn.
+
+## [2026-05-25] — Fix cache baseline thiếu PGD sau lần đọc lỗi (silent skip)
+- `data/hstd.py` dòng ~70–95 — `doc_baseline_merged()`: thêm kiểm tra tính đầy đủ của cache baseline — nếu PGD nào có file trên đĩa nhưng thiếu trong cache (`COT_TEN_PGD`) thì coi cache không hợp lệ → tự rebuild. Trước đây chỉ kiểm tra mtime, không phát hiện được trường hợp PGD có file nhưng lần đọc trước lỗi → cache thiếu PGD vĩnh viễn.
+
+## [2026-05-25] — Fix 4 nhóm lỗi từ health check (27 test failures → 0)
+- `alert_center.py` dòng ~226 — Sửa ngưỡng "khẩn": 120 ngày → 30 ngày; "cảnh báo": >30 & ≤180 ngày (test expect ≤30 là khan)
+- `data/hstd.py` dòng ~162 — Sửa NameError `_ts`: `doc_baseline_merged` fallback gọi `doc_baseline(nam, _ts)` thay bằng `doc_baseline(nam)` (`_ts` không có trong scope)
+- `services/upload_service.py` dòng ~39 — Đổi tên `_duong_dan_pgd` → `duong_dan_pgd` (public) để test có thể `patch.object(svc, "duong_dan_pgd", ...)` (21 test merge bị lỗi AttributeError)
+- `db.py` dòng ~31 — Thêm `PRAGMA foreign_keys=ON` vào production connection (CASCADE DELETE bảng KTNB không hoạt động)
+- `tests/test_ktnb_db.py` dòng ~19 — Thêm `PRAGMA foreign_keys = ON` cho in-memory fixture
+
 ## [2026-05-25] — Fix snapshot_service: import KetQuaUpload sai path gây ERROR log
 - `snapshot_service.py` dòng 27–31 — Xóa try/except `from upload_service import KetQuaUpload` (module path sai → ERROR log mỗi lần khởi động); sửa thành `from services.upload_service import KetQuaUpload`; sửa logger except block (gọi `logger.error()` trước khi `logger` được định nghĩa)
 
@@ -30,6 +43,17 @@
 - `tabs/tab_baocao.py` dòng ~377 — thêm `group_col` để theo dõi cột nhóm hiện tại (Xã/Thôn/ĐVUT/CT)
 - `tabs/tab_baocao.py` dòng ~547 — Mảng Tổng hợp: layout 3 cột Excel + PDF Pivot + PDF theo Nhóm; audit log sau mỗi lần xuất
 - `tabs/tab_baocao.py` dòng ~941 — Mảng Chi tiết: thay `nut_xuat_pdf` bằng 2 nút PDF Chi tiết + PDF theo Nhóm (group by PGD); audit log sau mỗi lần xuất
+
+## [2026-05-25] — So sánh mốc năm: tích hợp 3 loại PDF vào HSTD export
+- `tabs/tab_so_sanh_ky/_export.py` ~347 — thêm `_build_col_chung()`: trích COL_CHUNG từ df (chuẩn tab_baocao)
+- `tabs/tab_so_sanh_ky/_export.py` ~360 — thêm `render_export_hstd_ui(df_ht, df_bl, ...)`: radio Tổng hợp/Chi tiết + chọn kỳ xuất; route sang `_render_export_tong_hop()` / `_render_export_chi_tiet()`
+- `tabs/tab_so_sanh_ky/_export.py` ~420 — thêm `_render_export_tong_hop()`: 3 cột Excel + PDF Pivot (Loại 1 - agg theo PGD) + PDF theo Nhóm (Loại 3 - từng PGD + bảng COL_CHUNG)
+- `tabs/tab_so_sanh_ky/_export.py` ~490 — thêm `_render_export_chi_tiet()`: 3 cột Excel + PDF Chi tiết (Loại 2 - danh sách đầy đủ COL_CHUNG) + PDF theo Nhóm (Loại 3); Excel gộp sheets_extra từ bên ngoài
+- `tabs/tab_so_sanh_ky/_export.py` ~570 — thêm `_build_tong_hop_sheets()`: sheet bổ sung Tổng hợp PGD/Xã/CT cho Excel
+- `tabs/tab_so_sanh_ky/_export.py` ~610 — thêm `_download_pdf_btn()`: helper download + audit log
+- `tabs/tab_so_sanh_ky/render_moc_nam.py` ~47 — import thêm `render_export_hstd_ui`
+- `tabs/tab_so_sanh_ky/render_moc_nam.py` ~202 — `_render_export_section()` thêm tham số `df_ht`, `df_bl`; khi có → gọi `render_export_hstd_ui()`, khi None → giao diện cũ (NQ11/GQVL/CDTOTKVV không bị ảnh hưởng)
+- `tabs/tab_so_sanh_ky/render_moc_nam.py` ~555 — `_render_hstd_section()` truyền `df_ht`, `df_bl` vào export → kích hoạt giao diện 3 loại PDF
 
 ## [2026-05-25] — Bộ lọc Hồ sơ đến hạn: 5 cột PGD→Xã→Hội đoàn thể→CT→Nguồn vốn
 - `tabs/tab_tongquan.py` dòng ~1100 — thêm filter Hội đoàn thể (COT_DVUT), thêm lại Chương trình; layout 6 cột [2,2,2,2,2,1]; áp filter _sel_dvut vào dt_chung và filter_chung; cập nhật _co_loc

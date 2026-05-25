@@ -1,0 +1,1732 @@
+VBSP-SCM Health Check + Test Run
+Thoi gian: 25/05/2026 15:02:38.60
+========================================
+
+VBSP-SCM Health Check  —  25/05/2026 15:02:38
+DB   : D:\VBSP-SCM\vbsp_scm.db
+Root : D:\VBSP-SCM
+
+1. Cơ sở dữ liệu SQLite
+  ─────────────────────────
+  ✅ File vbsp_scm.db tồn tại  →  D:\VBSP-SCM\vbsp_scm.db
+  ✅ Kết nối SQLite
+  ✅ Bảng 'kv_store' tồn tại
+  ✅ Bảng 'users' tồn tại
+  ✅ Bảng 'audit_log' tồn tại
+
+2. kv_store — toàn vẹn & dữ liệu nghiệp vụ
+  ────────────────────────────────────────────
+  ✅ Không có key kv_store bị corrupt  →  15 key, tất cả hợp lệ
+  ❌ khtd_cn tồn tại  →  Chưa nhập KHTD Chi nhánh
+  ✅ merge HSTD đã chạy  →  Lần cuối: 2026-05-22T17:43:30.757704 | 22 PGD
+  ℹ  Tổng số key trong kv_store: 15
+
+3. Parquet cache
+  ──────────────────
+  ✅ hstd.parquet tồn tại  →  29.2 MB | cập nhật 22/05 17:43 (69h trước)
+  ✅ nq11.parquet tồn tại  →  2.5 MB | cập nhật 22/05 17:44 (69h trước)
+  ✅ gqvl.parquet tồn tại  →  0.1 MB | cập nhật 22/05 17:44 (69h trước)
+
+4. Upload file PGD — hstd_latest.xlsx
+  ───────────────────────────────────────
+  ✅ Tất cả 22 đơn vị đã upload HSTD  →  22/22 đã có file
+    Tất cả 22 đơn vị OK
+
+5. Audit log 24h gần nhất
+  ───────────────────────────
+  ✅ Có hoạt động trong 24h  →  116 log trong 24h | tổng cộng 1220
+
+  Thời gian              User             Action                   Detail
+  ────────────────────────────────────────────────────────────────────────────────────────
+  2026-05-25T14:43:30    system           seed_configs             seeded dynamic configs vào kv_store
+  2026-05-25T14:43:17    system           seed_configs             seeded dynamic configs vào kv_store
+  2026-05-25T14:16:45    system           seed_configs             seeded dynamic configs vào kv_store
+  2026-05-25T14:16:33    system           seed_configs             seeded dynamic configs vào kv_store
+  2026-05-25T14:16:12    system           seed_configs             seeded dynamic configs vào kv_store
+
+════════════════════════════════════════════════════════
+TỔNG KẾT
+════════════════════════════════════════════════════════
+  Tổng checks : 13
+  Đạt        : 12
+  Lỗi        : 1
+
+    ✗ khtd_cn tồn tại
+════════════════════════════════════════════════════════
+============================= test session starts =============================
+platform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\Users\Administrator\AppData\Local\Programs\Python\Python314\python.exe
+cachedir: .pytest_cache
+rootdir: D:\VBSP-SCM
+configfile: pytest.ini
+plugins: anyio-4.13.0, cov-7.1.0
+collecting ... collected 841 items
+
+tests/test_alert_center.py::TestCanhBaoNoKhoanh::test_empty_df_tra_ve_zeros PASSED [  0%]
+tests/test_alert_center.py::TestCanhBaoNoKhoanh::test_thieu_cot_ngay_tra_ve_zeros PASSED [  0%]
+tests/test_alert_center.py::TestCanhBaoNoKhoanh::test_le_30_ngay_la_khan PASSED [  0%]
+tests/test_alert_center.py::TestCanhBaoNoKhoanh::test_dung_30_ngay_la_khan PASSED [  0%]
+tests/test_alert_center.py::TestCanhBaoNoKhoanh::test_31_den_180_la_canh_bao FAILED [  0%]
+tests/test_alert_center.py::TestCanhBaoNoKhoanh::test_dung_180_la_canh_bao PASSED [  0%]
+tests/test_alert_center.py::TestCanhBaoNoKhoanh::test_qua_180_bi_bo_qua PASSED [  0%]
+tests/test_alert_center.py::TestCanhBaoNoKhoanh::test_hon_hop_3_truong_hop FAILED [  0%]
+tests/test_alert_center.py::TestCanhBaoNoKhoanh::test_chi_tiet_khan_la_list_dict PASSED [  1%]
+tests/test_alert_center.py::TestCanhBaoNoKhoanh::test_chi_tiet_canh_bao_la_list_dict FAILED [  1%]
+tests/test_alert_center.py::TestCanhBaoNoKhoanh::test_ngay_khong_phan_tich_duoc_bi_bo_qua PASSED [  1%]
+tests/test_auth.py::TestNormalizeRole::test_normalize_role_map[admin-admin_cn] PASSED [  1%]
+tests/test_auth.py::TestNormalizeRole::test_normalize_role_map[manager-manager_cn] PASSED [  1%]
+tests/test_auth.py::TestNormalizeRole::test_normalize_role_map[user-user_pgd] PASSED [  1%]
+tests/test_auth.py::TestNormalizeRole::test_normalize_role_map[admin_cn-admin_cn] PASSED [  1%]
+tests/test_auth.py::TestNormalizeRole::test_normalize_role_map[executive-executive] PASSED [  1%]
+tests/test_auth.py::TestNormalizeRole::test_normalize_role_map[user_pgd-user_pgd] PASSED [  2%]
+tests/test_auth.py::TestNormalizeRole::test_normalize_role_map[manager_cn-manager_cn] PASSED [  2%]
+tests/test_auth.py::TestNormalizeRole::test_normalize_role_map[chuyenvien_cn-chuyenvien_cn] PASSED [  2%]
+tests/test_auth.py::TestNormalizeRole::test_normalize_role_map[admin_pgd-admin_pgd] PASSED [  2%]
+tests/test_auth.py::TestNormalizeRole::test_normalize_role_map[manager_pgd-manager_pgd] PASSED [  2%]
+tests/test_auth.py::TestNormalizeRole::test_normalize_role_unknown PASSED [  2%]
+tests/test_auth.py::TestIsCnRole::test_is_cn_role[executive-True] PASSED [  2%]
+tests/test_auth.py::TestIsCnRole::test_is_cn_role[admin_cn-True] PASSED  [  2%]
+tests/test_auth.py::TestIsCnRole::test_is_cn_role[manager_cn-True] PASSED [  2%]
+tests/test_auth.py::TestIsCnRole::test_is_cn_role[chuyenvien_cn-True] PASSED [  3%]
+tests/test_auth.py::TestIsCnRole::test_is_cn_role[admin-True] PASSED     [  3%]
+tests/test_auth.py::TestIsCnRole::test_is_cn_role[manager-True] PASSED   [  3%]
+tests/test_auth.py::TestIsCnRole::test_is_cn_role[user_pgd-False] PASSED [  3%]
+tests/test_auth.py::TestIsCnRole::test_is_cn_role[admin_pgd-False] PASSED [  3%]
+tests/test_auth.py::TestIsCnRole::test_is_cn_role[manager_pgd-False] PASSED [  3%]
+tests/test_auth.py::TestIsCnRole::test_is_cn_role[user-False] PASSED     [  3%]
+tests/test_auth.py::TestIsCnRole::test_la_phan_he_cn_alias PASSED        [  3%]
+tests/test_auth.py::TestIsPgdRole::test_is_pgd_role[user_pgd-True] PASSED [  4%]
+tests/test_auth.py::TestIsPgdRole::test_is_pgd_role[admin_pgd-True] PASSED [  4%]
+tests/test_auth.py::TestIsPgdRole::test_is_pgd_role[manager_pgd-True] PASSED [  4%]
+tests/test_auth.py::TestIsPgdRole::test_is_pgd_role[user-True] PASSED    [  4%]
+tests/test_auth.py::TestIsPgdRole::test_is_pgd_role[executive-False] PASSED [  4%]
+tests/test_auth.py::TestIsPgdRole::test_is_pgd_role[admin_cn-False] PASSED [  4%]
+tests/test_auth.py::TestIsPgdRole::test_is_pgd_role[manager_cn-False] PASSED [  4%]
+tests/test_auth.py::TestIsPgdRole::test_is_pgd_role[admin-False] PASSED  [  4%]
+tests/test_auth.py::TestIsPgdRole::test_la_phan_he_pgd_alias PASSED      [  4%]
+tests/test_auth.py::TestCoQuyenUploadPgd::test_co_quyen_upload_pgd[admin_pgd-True] PASSED [  5%]
+tests/test_auth.py::TestCoQuyenUploadPgd::test_co_quyen_upload_pgd[manager_pgd-True] PASSED [  5%]
+tests/test_auth.py::TestCoQuyenUploadPgd::test_co_quyen_upload_pgd[user_pgd-False] PASSED [  5%]
+tests/test_auth.py::TestCoQuyenUploadPgd::test_co_quyen_upload_pgd[admin_cn-False] PASSED [  5%]
+tests/test_auth.py::TestCoQuyenUploadPgd::test_co_quyen_upload_pgd[executive-False] PASSED [  5%]
+tests/test_auth.py::TestCoQuyenUploadPgd::test_co_quyen_upload_pgd[admin-False] PASSED [  5%]
+tests/test_auth.py::TestCoQuyenUploadPgd::test_co_quyen_upload_pgd[user-False] PASSED [  5%]
+tests/test_auth.py::TestCoQuyenQuanLyUserPgd::test_co_quyen_quan_ly_user_pgd[admin_pgd-True] PASSED [  5%]
+tests/test_auth.py::TestCoQuyenQuanLyUserPgd::test_co_quyen_quan_ly_user_pgd[manager_pgd-False] PASSED [  6%]
+tests/test_auth.py::TestCoQuyenQuanLyUserPgd::test_co_quyen_quan_ly_user_pgd[user_pgd-False] PASSED [  6%]
+tests/test_auth.py::TestCoQuyenQuanLyUserPgd::test_co_quyen_quan_ly_user_pgd[admin_cn-False] PASSED [  6%]
+tests/test_auth.py::TestCoQuyenGiaoNhiemVu::test_co_quyen_giao_nhiem_vu[admin_pgd-True] PASSED [  6%]
+tests/test_auth.py::TestCoQuyenGiaoNhiemVu::test_co_quyen_giao_nhiem_vu[manager_pgd-True] PASSED [  6%]
+tests/test_auth.py::TestCoQuyenGiaoNhiemVu::test_co_quyen_giao_nhiem_vu[admin_cn-True] PASSED [  6%]
+tests/test_auth.py::TestCoQuyenGiaoNhiemVu::test_co_quyen_giao_nhiem_vu[manager_cn-True] PASSED [  6%]
+tests/test_auth.py::TestCoQuyenGiaoNhiemVu::test_co_quyen_giao_nhiem_vu[chuyenvien_cn-True] PASSED [  6%]
+tests/test_auth.py::TestCoQuyenGiaoNhiemVu::test_co_quyen_giao_nhiem_vu[user_pgd-False] PASSED [  7%]
+tests/test_auth.py::TestCoQuyenGiaoNhiemVu::test_co_quyen_giao_nhiem_vu[executive-False] PASSED [  7%]
+tests/test_auth.py::TestCoQuyenGiaoNhiemVu::test_co_quyen_giao_nhiem_vu[user-False] PASSED [  7%]
+tests/test_auth.py::TestLaChuyenVienCn::test_la_chuyen_vien_cn[chuyenvien_cn-True] PASSED [  7%]
+tests/test_auth.py::TestLaChuyenVienCn::test_la_chuyen_vien_cn[admin_cn-False] PASSED [  7%]
+tests/test_auth.py::TestLaChuyenVienCn::test_la_chuyen_vien_cn[manager_cn-False] PASSED [  7%]
+tests/test_auth.py::TestLaChuyenVienCn::test_la_chuyen_vien_cn[user_pgd-False] PASSED [  7%]
+tests/test_auth.py::TestGetPermissions::test_get_permissions[executive-expected0] PASSED [  7%]
+tests/test_auth.py::TestGetPermissions::test_get_permissions[admin_cn-expected1] PASSED [  7%]
+tests/test_auth.py::TestGetPermissions::test_get_permissions[user_pgd-expected2] PASSED [  8%]
+tests/test_auth.py::TestGetPermissions::test_get_permissions[admin_pgd-expected3] PASSED [  8%]
+tests/test_auth.py::TestGetPermissions::test_get_permissions[manager_pgd-expected4] PASSED [  8%]
+tests/test_auth.py::TestRoleMap::test_role_map_has_all_old_roles PASSED  [  8%]
+tests/test_auth.py::TestRoleMap::test_role_map_preserves_new_roles PASSED [  8%]
+tests/test_auth.py::TestRolesCnPgd::test_roles_cn_contains_expected PASSED [  8%]
+tests/test_auth.py::TestRolesCnPgd::test_roles_pgd_contains_expected PASSED [  8%]
+tests/test_cdtotkvv_service.py::TestLocDf::test_df_None PASSED           [  8%]
+tests/test_cdtotkvv_service.py::TestLocDf::test_df_trong PASSED          [  9%]
+tests/test_cdtotkvv_service.py::TestLocDf::test_mode_cn_tra_ve_toan_bo PASSED [  9%]
+tests/test_cdtotkvv_service.py::TestLocDf::test_mode_pgd_loc_theo_ten PASSED [  9%]
+tests/test_cdtotkvv_service.py::TestLocDf::test_mode_pgd_khong_khop PASSED [  9%]
+tests/test_cdtotkvv_service.py::TestLocDf::test_mode_pgd_loc_theo_ma_khi_khong_co_ten PASSED [  9%]
+tests/test_cdtotkvv_service.py::TestLocDf::test_mode_pgd_khong_pgd_user PASSED [  9%]
+tests/test_cdtotkvv_service.py::TestCdtotkvvTenSheetExcel::test_ten_don_gian PASSED [  9%]
+tests/test_cdtotkvv_service.py::TestCdtotkvvTenSheetExcel::test_ky_tu_cam PASSED [  9%]
+tests/test_cdtotkvv_service.py::TestCdtotkvvTenSheetExcel::test_trung_thi_danh_so PASSED [  9%]
+tests/test_cdtotkvv_service.py::TestCdtotkvvTenSheetExcel::test_ten_dai_cat_bot PASSED [ 10%]
+tests/test_cdtotkvv_service.py::TestCdtotkvvTenSheetExcel::test_ten_toan_ky_tu_cam PASSED [ 10%]
+tests/test_cdtotkvv_service.py::TestFmtXuatToKhongDatVn::test_co_du_no_va_diem PASSED [ 10%]
+tests/test_cdtotkvv_service.py::TestFmtXuatToKhongDatVn::test_cot_ko_co_van_chay PASSED [ 10%]
+tests/test_config.py::TestTimTenXaTrongHstd::test_tim_ten_xa_trong_hstd[X\xe3 La Ng\xe0-La Ng\xe0] PASSED [ 10%]
+tests/test_config.py::TestTimTenXaTrongHstd::test_tim_ten_xa_trong_hstd[X\xe3 Ph\xfa H\xf2a-Ph\xfa H\xf2a] PASSED [ 10%]
+tests/test_config.py::TestTimTenXaTrongHstd::test_tim_ten_xa_trong_hstd[X\xe3 B\xecnh Minh-B\xecnh Minh] PASSED [ 10%]
+tests/test_config.py::TestTimTenXaTrongHstd::test_tim_ten_xa_trong_hstd[Ph\u01b0\u1eddng Trung D\u0169ng-Trung D\u0169ng] PASSED [ 10%]
+tests/test_config.py::TestTimTenXaTrongHstd::test_tim_ten_xa_trong_hstd[Th\u1ecb tr\u1ea5n V\u0129nh An-V\u0129nh An] PASSED [ 11%]
+tests/test_config.py::TestTimTenXaTrongHstd::test_tim_ten_xa_trong_hstd[TT Gia Ray-Gia Ray] PASSED [ 11%]
+tests/test_config.py::TestTimTenXaTrongHstd::test_tim_ten_xa_trong_hstd[Kh\xf4ng c\xf3 prefix-Kh\xf4ng c\xf3 prefix] PASSED [ 11%]
+tests/test_config.py::TestDsPgd::test_ds_pgd_length PASSED               [ 11%]
+tests/test_config.py::TestDsPgd::test_ds_pgd_khong_chua_ho_so_cn PASSED  [ 11%]
+tests/test_config.py::TestMaPgdMap::test_ma_pgd_map_is_dict PASSED       [ 11%]
+tests/test_config.py::TestMaPgdMap::test_ma_pgd_map_values_are_strings PASSED [ 11%]
+tests/test_config.py::TestMaPgdMap::test_ma_pgd_map_has_ho_so_cn PASSED  [ 11%]
+tests/test_core.py::TestExcelToParquet::test_basic_roundtrip PASSED      [ 12%]
+tests/test_core.py::TestExcelToParquet::test_post_fn_applied PASSED      [ 12%]
+tests/test_core.py::TestExcelToParquet::test_cache_hit_skips_excel_reread PASSED [ 12%]
+tests/test_core.py::TestExcelToParquet::test_stale_cache_regenerated PASSED [ 12%]
+tests/test_core.py::TestExcelToParquet::test_parent_dir_created_automatically PASSED [ 12%]
+tests/test_core.py::TestExcelToParquet::test_missing_excel_raises PASSED [ 12%]
+tests/test_core.py::TestExcelToParquet::test_invalid_sheet_raises PASSED [ 12%]
+tests/test_core.py::TestTongHopDuNoPgd::test_output_columns PASSED       [ 12%]
+tests/test_core.py::TestTongHopDuNoPgd::test_aggregates_by_pgd_and_ct PASSED [ 12%]
+tests/test_core.py::TestTongHopDuNoPgd::test_filters_zero_du_no PASSED   [ 13%]
+tests/test_core.py::TestTongHopDuNoPgd::test_file_not_found_returns_empty PASSED [ 13%]
+tests/test_core.py::TestDemNoQuaHanPgd::test_output_columns PASSED       [ 13%]
+tests/test_core.py::TestDemNoQuaHanPgd::test_counts_only_qua_han PASSED  [ 13%]
+tests/test_core.py::TestDemNoQuaHanPgd::test_ordered_desc_by_tong_no_qh PASSED [ 13%]
+tests/test_core.py::TestDemNoQuaHanPgd::test_all_zero_nqh_returns_empty PASSED [ 13%]
+tests/test_core.py::TestDemNoQuaHanPgd::test_file_not_found_returns_empty PASSED [ 13%]
+tests/test_core.py::TestTongHopTheoXa::test_output_columns PASSED        [ 13%]
+tests/test_core.py::TestTongHopTheoXa::test_filters_by_pgd PASSED        [ 14%]
+tests/test_core.py::TestTongHopTheoXa::test_aggregates_by_xa_and_ct PASSED [ 14%]
+tests/test_core.py::TestTongHopTheoXa::test_wrong_pgd_returns_empty PASSED [ 14%]
+tests/test_core.py::TestTongHopTheoXa::test_file_not_found_returns_empty PASSED [ 14%]
+tests/test_currency.py::TestFmtTy::test_1_ty PASSED                      [ 14%]
+tests/test_currency.py::TestFmtTy::test_100_ty PASSED                    [ 14%]
+tests/test_currency.py::TestFmtTy::test_zero PASSED                      [ 14%]
+tests/test_currency.py::TestFmtTy::test_none_or_nan PASSED               [ 14%]
+tests/test_currency.py::TestFmtTy::test_khong_dung_1e9 PASSED            [ 14%]
+tests/test_currency.py::TestFmtTien::test_1_trieu PASSED                 [ 15%]
+tests/test_currency.py::TestFmtTien::test_10_trieu PASSED                [ 15%]
+tests/test_currency.py::TestFmtTien::test_zero PASSED                    [ 15%]
+tests/test_currency.py::TestFmtSo::test_1000 PASSED                      [ 15%]
+tests/test_currency.py::TestFmtSo::test_so_lon PASSED                    [ 15%]
+tests/test_currency.py::TestFmtSo::test_zero PASSED                      [ 15%]
+tests/test_currency.py::TestFmtPct::test_0_5 PASSED                      [ 15%]
+tests/test_currency.py::TestFmtPct::test_zero PASSED                     [ 15%]
+tests/test_currency.py::TestFmtPct::test_none PASSED                     [ 16%]
+tests/test_data_quality.py::TestSafeSeries::test_co_cot PASSED           [ 16%]
+tests/test_data_quality.py::TestSafeSeries::test_thieu_cot PASSED        [ 16%]
+tests/test_data_quality.py::TestChuanHoaTenCot::test_khong_co_rename_map PASSED [ 16%]
+tests/test_data_quality.py::TestChuanHoaTenCot::test_hstd_rename PASSED  [ 16%]
+tests/test_data_quality.py::TestKiemTraDuNoAm::test_hstd_khong_am PASSED [ 16%]
+tests/test_data_quality.py::TestKiemTraDuNoAm::test_hstd_co_am PASSED    [ 16%]
+tests/test_data_quality.py::TestKiemTraDuNoAm::test_nq11_co_am PASSED    [ 16%]
+tests/test_data_quality.py::TestKiemTraDuNoAm::test_gqvl_co_am PASSED    [ 17%]
+tests/test_data_quality.py::TestKiemTraDuNoAm::test_thieu_cot_khong_crash PASSED [ 17%]
+tests/test_data_quality.py::TestKiemTraDuNoAm::test_loai_khong_xac_dinh PASSED [ 17%]
+tests/test_data_quality.py::TestKiemTraDuNoAm::test_du_no_str PASSED     [ 17%]
+tests/test_data_quality.py::TestKiemTraSoTienGiaiNgan::test_khong_phai_nq11 PASSED [ 17%]
+tests/test_data_quality.py::TestKiemTraSoTienGiaiNgan::test_nq11_khong_vuot PASSED [ 17%]
+tests/test_data_quality.py::TestKiemTraSoTienGiaiNgan::test_nq11_co_vuot PASSED [ 17%]
+tests/test_data_quality.py::TestKiemTraSoTienGiaiNgan::test_nq11_thieu_cot_khong_crash PASSED [ 17%]
+tests/test_data_quality.py::TestKiemTraMaDonViHopLe::test_pgd_hop_le PASSED [ 17%]
+tests/test_data_quality.py::TestKiemTraMaDonViHopLe::test_pgd_khong_hop_le PASSED [ 18%]
+tests/test_data_quality.py::TestKiemTraMaDonViHopLe::test_khong_co_cot_pgd_xa PASSED [ 18%]
+tests/test_data_quality.py::TestChuanHoaMaDonVi::test_giu_nguyen_pgd_hop_le PASSED [ 18%]
+tests/test_data_quality.py::TestChuanHoaMaDonVi::test_chuan_hoa_ma_ct PASSED [ 18%]
+tests/test_data_quality.py::TestChuanHoaMaDonVi::test_df_trong PASSED    [ 18%]
+tests/test_data_quality.py::TestKiemTraChatLuong::test_hstd_hop_le PASSED [ 18%]
+tests/test_data_quality.py::TestKiemTraChatLuong::test_nq11 PASSED       [ 18%]
+tests/test_data_quality.py::TestKiemTraChatLuong::test_thieu_cot_bat_buoc PASSED [ 18%]
+tests/test_data_quality.py::TestTongHopBaoCaoChatLuong::test_danh_sach_rong PASSED [ 19%]
+tests/test_data_quality.py::TestTongHopBaoCaoChatLuong::test_2_report PASSED [ 19%]
+tests/test_db.py::TestKvRoundtrip::test_ghi_doc_kv_dict PASSED           [ 19%]
+tests/test_db.py::TestKvRoundtrip::test_ghi_doc_kv_khong_doi_kieu_so PASSED [ 19%]
+tests/test_db.py::TestKvRoundtrip::test_doc_kv_key_khong_ton_tai PASSED  [ 19%]
+tests/test_db.py::TestKvRoundtrip::test_doc_kv_key_khong_ton_tai_default PASSED [ 19%]
+tests/test_db.py::TestKvOverwrite::test_ghi_kv_overwrite PASSED          [ 19%]
+tests/test_db.py::TestAudit::test_ghi_audit_khong_crash PASSED           [ 19%]
+tests/test_db.py::TestAudit::test_ghi_audit_co_record PASSED             [ 19%]
+tests/test_db.py::TestListKvPrefix::test_list_kv_prefix PASSED           [ 20%]
+tests/test_db.py::TestListKvPrefix::test_list_kv_prefix_no_match PASSED  [ 20%]
+tests/test_du_phong_service.py::TestDuPhongDongTien::test_df_trong PASSED [ 20%]
+tests/test_du_phong_service.py::TestDuPhongDongTien::test_thieu_cot_bat_buoc PASSED [ 20%]
+tests/test_du_phong_service.py::TestDuPhongDongTien::test_1_khe_uoc PASSED [ 20%]
+tests/test_du_phong_service.py::TestDuPhongDongTien::test_loc_theo_thang PASSED [ 20%]
+tests/test_du_phong_service.py::TestDuPhongDongTien::test_du_no_0_bi_loai PASSED [ 20%]
+tests/test_du_phong_service.py::TestDuPhongDongTien::test_kh�ng_co_ngay_vay PASSED [ 20%]
+tests/test_du_phong_service.py::TestDuPhongDongTien::test_default_tu_den_thang PASSED [ 21%]
+tests/test_du_phong_service.py::TestDuPhongChiTiet::test_df_trong PASSED [ 21%]
+tests/test_du_phong_service.py::TestDuPhongChiTiet::test_thieu_cot PASSED [ 21%]
+tests/test_du_phong_service.py::TestDuPhongChiTiet::test_thang_None PASSED [ 21%]
+tests/test_du_phong_service.py::TestDuPhongChiTiet::test_chi_tiet_1_thang PASSED [ 21%]
+tests/test_excel_service.py::TestTenFileXuat::test_bat_dau_bang_prefix PASSED [ 21%]
+tests/test_excel_service.py::TestTenFileXuat::test_mac_dinh_extension_xlsx PASSED [ 21%]
+tests/test_excel_service.py::TestTenFileXuat::test_extension_pdf PASSED  [ 21%]
+tests/test_excel_service.py::TestTenFileXuat::test_co_timestamp_8_chu_so_ngay PASSED [ 21%]
+tests/test_excel_service.py::TestTenFileXuat::test_hai_lan_goi_khac_nhau PASSED [ 22%]
+tests/test_excel_service.py::TestExcelReport::test_build_tra_ve_bytes PASSED [ 22%]
+tests/test_excel_service.py::TestExcelReport::test_build_co_kpi PASSED   [ 22%]
+tests/test_excel_service.py::TestExcelReport::test_build_co_detail PASSED [ 22%]
+tests/test_excel_service.py::TestExcelReport::test_build_nhieu_sheet PASSED [ 22%]
+tests/test_excel_service.py::TestExcelReport::test_add_detail_empty_df_bi_bo_qua PASSED [ 22%]
+tests/test_excel_service.py::TestExcelReport::test_chaining PASSED       [ 22%]
+tests/test_excel_service.py::TestXuatExcelChuyenNghiep::test_tra_ve_bytes PASSED [ 22%]
+tests/test_excel_service.py::TestXuatExcelChuyenNghiep::test_voi_kpi_items PASSED [ 23%]
+tests/test_file_detection_service.py::test_md5_bytes_returns_hex PASSED  [ 23%]
+tests/test_file_detection_service.py::test_md5_bytes_different_inputs_differ PASSED [ 23%]
+tests/test_file_detection_service.py::test_md5_file_not_found_returns_empty PASSED [ 23%]
+tests/test_file_detection_service.py::test_md5_file_existing_matches_bytes PASSED [ 23%]
+tests/test_file_detection_service.py::test_chuan_hoa_ten_alias_pgd_bien_hoa PASSED [ 23%]
+tests/test_file_detection_service.py::test_chuan_hoa_ten_alias_hoi_so_cn PASSED [ 23%]
+tests/test_file_detection_service.py::test_chuan_hoa_ten_no_alias_passthrough PASSED [ 23%]
+tests/test_file_detection_service.py::test_chuan_hoa_ten_strips_whitespace PASSED [ 24%]
+tests/test_file_detection_service.py::test_ten_doc_ve_don_vi_chuan_none PASSED [ 24%]
+tests/test_file_detection_service.py::test_ten_doc_ve_don_vi_chuan_empty PASSED [ 24%]
+tests/test_file_detection_service.py::test_ten_doc_ve_don_vi_chuan_nan_string PASSED [ 24%]
+tests/test_file_detection_service.py::test_ten_doc_ve_don_vi_chuan_valid_pgd PASSED [ 24%]
+tests/test_file_detection_service.py::test_ten_doc_ve_don_vi_chuan_alias_maps_to_chi_nhanh PASSED [ 24%]
+tests/test_file_detection_service.py::test_ten_doc_ve_don_vi_chuan_partial_match PASSED [ 24%]
+tests/test_file_detection_service.py::test_kiem_tra_don_vi_match PASSED  [ 24%]
+tests/test_file_detection_service.py::test_kiem_tra_don_vi_mismatch PASSED [ 24%]
+tests/test_file_detection_service.py::test_kiem_tra_don_vi_cannot_read PASSED [ 25%]
+tests/test_file_detection_service.py::test_nhan_dien_invalid_bytes_returns_none PASSED [ 25%]
+tests/test_file_detection_service.py::test_nhan_dien_hstd PASSED         [ 25%]
+tests/test_file_detection_service.py::test_nhan_dien_nq11 PASSED         [ 25%]
+tests/test_filter_bar.py::TestApplyFilters::test_filter_rong_tra_ve_nguyen_vien PASSED [ 25%]
+tests/test_filter_bar.py::TestApplyFilters::test_empty_df_tra_ve_empty PASSED [ 25%]
+tests/test_filter_bar.py::TestApplyFilters::test_none_value_bi_bo_qua PASSED [ 25%]
+tests/test_filter_bar.py::TestApplyFilters::test_col_khong_ton_tai_bi_bo_qua PASSED [ 25%]
+tests/test_filter_bar.py::TestApplyFilters::test_scalar_loc_theo_chuoi_con PASSED [ 26%]
+tests/test_filter_bar.py::TestApplyFilters::test_scalar_case_insensitive PASSED [ 26%]
+tests/test_filter_bar.py::TestApplyFilters::test_scalar_partial_match PASSED [ 26%]
+tests/test_filter_bar.py::TestApplyFilters::test_list_isin PASSED        [ 26%]
+tests/test_filter_bar.py::TestApplyFilters::test_list_nhieu_gia_tri PASSED [ 26%]
+tests/test_filter_bar.py::TestApplyFilters::test_list_rong_khong_loc PASSED [ 26%]
+tests/test_filter_bar.py::TestApplyFilters::test_range_loc_dung PASSED   [ 26%]
+tests/test_filter_bar.py::TestApplyFilters::test_range_bao_gom_bien PASSED [ 26%]
+tests/test_filter_bar.py::TestApplyFilters::test_range_loai_tat_ca PASSED [ 26%]
+tests/test_filter_bar.py::TestApplyFilters::test_nhieu_filter_and PASSED [ 27%]
+tests/test_giao_ban.py::TestTinhSoLieuVanXuoi::test_tra_ve_dict PASSED   [ 27%]
+tests/test_giao_ban.py::TestTinhSoLieuVanXuoi::test_co_cac_tag_bat_buoc PASSED [ 27%]
+tests/test_giao_ban.py::TestTinhSoLieuVanXuoi::test_tong_du_no_dung PASSED [ 27%]
+tests/test_giao_ban.py::TestTinhSoLieuVanXuoi::test_ty_le_nqh_dung PASSED [ 27%]
+tests/test_giao_ban.py::TestTinhSoLieuVanXuoi::test_so_kh_dem_distinct_ma_kh PASSED [ 27%]
+tests/test_giao_ban.py::TestTinhSoLieuVanXuoi::test_so_to_dem_distinct PASSED [ 27%]
+tests/test_giao_ban.py::TestTinhSoLieuVanXuoi::test_nam_moc_duoc_giu PASSED [ 27%]
+tests/test_giao_ban.py::TestTinhSoLieuVanXuoi::test_baseline_none_khong_crash PASSED [ 28%]
+tests/test_giao_ban.py::TestTinhSoLieuVanXuoi::test_baseline_none_tang_giam_default_tang PASSED [ 28%]
+tests/test_giao_ban.py::TestTinhSoLieuVanXuoi::test_voi_baseline_tang PASSED [ 28%]
+tests/test_giao_ban.py::TestTinhSoLieuVanXuoi::test_voi_baseline_giam PASSED [ 28%]
+tests/test_giao_ban.py::TestTinhSoLieuVanXuoi::test_du_no_0_khong_crash PASSED [ 28%]
+tests/test_giao_ban.py::TestTinhSoLieuVanXuoi::test_kh_trung_khong_dem_2_lan PASSED [ 28%]
+tests/test_hhi_service.py::TestTinhHhi::test_df_trong_tra_ve_0 PASSED    [ 28%]
+tests/test_hhi_service.py::TestTinhHhi::test_dong_deu_hoan_toan PASSED   [ 28%]
+tests/test_hhi_service.py::TestTinhHhi::test_tap_trung_hoan_toan PASSED  [ 29%]
+tests/test_hhi_service.py::TestTinhHhi::test_3_nhom_khong_deu PASSED     [ 29%]
+tests/test_hhi_service.py::TestTinhHhi::test_tong_bang_0 PASSED          [ 29%]
+tests/test_hhi_service.py::TestTinhHhi::test_thieu_cot_tien_tu_dong_tim PASSED [ 29%]
+tests/test_hhi_service.py::TestTinhHhi::test_cot_tien_khong_ton_tai PASSED [ 29%]
+tests/test_hhi_service.py::TestTinhHhi::test_truyen_cot_tien_tuong_minh PASSED [ 29%]
+tests/test_hhi_service.py::TestTinhHhiBreakdown::test_df_trong PASSED    [ 29%]
+tests/test_hhi_service.py::TestTinhHhiBreakdown::test_breakdown_2_nhom PASSED [ 29%]
+tests/test_hhi_service.py::TestTinhHhiBreakdown::test_cot_khong_ton_tai PASSED [ 29%]
+tests/test_hhi_service.py::TestTinhHhiBreakdown::test_tong_0 PASSED      [ 30%]
+tests/test_hhi_service.py::TestDanhGiaHhi::test_da_dang_hoa_tot PASSED   [ 30%]
+tests/test_hhi_service.py::TestDanhGiaHhi::test_tap_trung_vua_phai_can_duoi PASSED [ 30%]
+tests/test_hhi_service.py::TestDanhGiaHhi::test_tap_trung_vua_phai_can_tren PASSED [ 30%]
+tests/test_hhi_service.py::TestDanhGiaHhi::test_tap_trung_cao PASSED     [ 30%]
+tests/test_hhi_service.py::TestDanhGiaHhi::test_tap_trung_cao_cuc_dai PASSED [ 30%]
+tests/test_hstd.py::TestDanhDauKhongHD::test_output_columns_luon_duoc_them PASSED [ 30%]
+tests/test_hstd.py::TestDanhDauKhongHD::test_fallback_khong_co_cot_van_them_column PASSED [ 30%]
+tests/test_hstd.py::TestDanhDauKhongHD::test_p1_ro_rang_qua_3_thang PASSED [ 31%]
+tests/test_hstd.py::TestDanhDauKhongHD::test_p1_sat_nguong_tren_bi_danh_dau PASSED [ 31%]
+tests/test_hstd.py::TestDanhDauKhongHD::test_p1_sat_nguong_duoi_khong_danh_dau PASSED [ 31%]
+tests/test_hstd.py::TestDanhDauKhongHD::test_p1_duoi_3_thang_khong_danh_dau PASSED [ 31%]
+tests/test_hstd.py::TestDanhDauKhongHD::test_p1_so_thang_dung_gia_tri PASSED [ 31%]
+tests/test_hstd.py::TestDanhDauKhongHD::test_loai_tru_du_no_bang_0 PASSED [ 31%]
+tests/test_hstd.py::TestDanhDauKhongHD::test_loai_tru_du_no_khoanh PASSED [ 31%]
+tests/test_hstd.py::TestDanhDauKhongHD::test_loai_tru_ma_ct_hssv_string PASSED [ 31%]
+tests/test_hstd.py::TestDanhDauKhongHD::test_loai_tru_ma_ct_hssv_integer PASSED [ 31%]
+tests/test_hstd.py::TestDanhDauKhongHD::test_ma_ct_khac_2_khong_bi_loai PASSED [ 32%]
+tests/test_hstd.py::TestDanhDauKhongHD::test_p2_lai_ton_lon_hon_3_lan_lai_thang PASSED [ 32%]
+tests/test_hstd.py::TestDanhDauKhongHD::test_p2_lai_ton_duoi_3_lan PASSED [ 32%]
+tests/test_hstd.py::TestDanhDauKhongHD::test_p2_lai_thang_bang_0_khong_danh_dau PASSED [ 32%]
+tests/test_hstd.py::TestDanhDauKhongHD::test_p2_loai_tru_khoanh_van_ap_dung PASSED [ 32%]
+tests/test_hstd.py::TestDanhDauKhongHD::test_nhieu_dong_chi_danh_dau_dung_dieu_kien PASSED [ 32%]
+tests/test_hstd.py::TestCanhBaoMigration::test_output_co_cac_cot_can_thiet PASSED [ 32%]
+tests/test_hstd.py::TestCanhBaoMigration::test_empty_df_khong_crash PASSED [ 32%]
+tests/test_hstd.py::TestCanhBaoMigration::test_nguy_co_cao_so_thang_qua_2_5 PASSED [ 33%]
+tests/test_hstd.py::TestCanhBaoMigration::test_sap_chuyen_so_thang_2_den_2_4 PASSED [ 33%]
+tests/test_hstd.py::TestCanhBaoMigration::test_so_thang_ton_uoc_chinh_xac PASSED [ 33%]
+tests/test_hstd.py::TestCanhBaoMigration::test_duoi_nguong_2_thang_khong_canh_bao PASSED [ 33%]
+tests/test_hstd.py::TestCanhBaoMigration::test_phan_loai_khac_E_bi_loai PASSED [ 33%]
+tests/test_hstd.py::TestCanhBaoMigration::test_da_la_khd_bi_loai PASSED  [ 33%]
+tests/test_hstd.py::TestCanhBaoMigration::test_lai_ton_bang_0_khong_canh_bao PASSED [ 33%]
+tests/test_hstd.py::TestCanhBaoMigration::test_phan_loai_viet_thuong_va_khoang_trang PASSED [ 33%]
+tests/test_hstd.py::TestCanhBaoMigration::test_nhieu_dong_mixed_cap_do PASSED [ 34%]
+tests/test_hstd.py::TestCanhBaoMigration::test_is_3m_inactive_auto_computed_khi_thieu PASSED [ 34%]
+tests/test_khnv_noi_bo_service.py::test_doc_ds_default_empty PASSED      [ 34%]
+tests/test_khnv_noi_bo_service.py::test_ghi_ds_roundtrip_and_audit PASSED [ 34%]
+tests/test_khtd_mau07_service.py::test_slug_and_kv_key_helpers PASSED    [ 34%]
+tests/test_khtd_mau07_service.py::test_tinh_du_no_ap_baseline_basic PASSED [ 34%]
+tests/test_khtd_mau07_service.py::test_build_extract_and_total PASSED    [ 34%]
+tests/test_khtd_mau07_service.py::test_xuat_mau07_word_returns_docx_bytes PASSED [ 34%]
+tests/test_khtd_nhap_service.py::TestCleanSheetName::test_gioi_han_31_ky_tu PASSED [ 34%]
+tests/test_khtd_nhap_service.py::TestCleanSheetName::test_giua_nguyen_ten_ngan PASSED [ 35%]
+tests/test_khtd_nhap_service.py::TestCleanSheetName::test_strip_khoang_trang PASSED [ 35%]
+tests/test_khtd_nhap_service.py::TestCleanSheetName::test_xoa_backslash PASSED [ 35%]
+tests/test_khtd_nhap_service.py::TestCleanSheetName::test_xoa_slash PASSED [ 35%]
+tests/test_khtd_nhap_service.py::TestCleanSheetName::test_xoa_dau_hoi PASSED [ 35%]
+tests/test_khtd_nhap_service.py::TestCleanSheetName::test_xoa_dau_ngoac_vuong PASSED [ 35%]
+tests/test_khtd_nhap_service.py::TestCleanSheetName::test_xoa_dau_hai_cham PASSED [ 35%]
+tests/test_khtd_nhap_service.py::TestFormatKichThuoc::test_duoi_1mb_hien_thi_kb PASSED [ 35%]
+tests/test_khtd_nhap_service.py::TestFormatKichThuoc::test_tren_1mb_hien_thi_mb PASSED [ 36%]
+tests/test_khtd_nhap_service.py::TestFormatKichThuoc::test_dung_ranh_gioi_1mb PASSED [ 36%]
+tests/test_khtd_nhap_service.py::TestFormatKichThuoc::test_co_so_thap_phan PASSED [ 36%]
+tests/test_khtd_nhap_service.py::TestDocExcelKhtdCnUpload::test_hop_le_tra_ve_dict_vnd PASSED [ 36%]
+tests/test_khtd_nhap_service.py::TestDocExcelKhtdCnUpload::test_chuyen_trieu_sang_vnd PASSED [ 36%]
+tests/test_khtd_nhap_service.py::TestDocExcelKhtdCnUpload::test_nhieu_dong_hop_le PASSED [ 36%]
+tests/test_khtd_nhap_service.py::TestDocExcelKhtdCnUpload::test_thieu_cot_ma_ct_raise_valueerror PASSED [ 36%]
+tests/test_khtd_nhap_service.py::TestDocExcelKhtdCnUpload::test_thieu_cot_kh_raise_valueerror PASSED [ 36%]
+tests/test_khtd_nhap_service.py::TestDocExcelKhtdCnUpload::test_ma_key_khong_hop_le_vao_bo_qua PASSED [ 36%]
+tests/test_khtd_nhap_service.py::TestDocExcelKhtdCnUpload::test_gia_tri_0_bi_bo_qua PASSED [ 37%]
+tests/test_khtd_nhap_service.py::TestDocExcelKhtdCnUpload::test_gia_tri_na_bi_bo_qua PASSED [ 37%]
+tests/test_khtd_nhap_service.py::TestDocExcelKhtdXaUpload::test_hop_le_tra_ve_updates PASSED [ 37%]
+tests/test_khtd_nhap_service.py::TestDocExcelKhtdXaUpload::test_chuyen_trieu_sang_vnd PASSED [ 37%]
+tests/test_khtd_nhap_service.py::TestDocExcelKhtdXaUpload::test_xa_khong_thuoc_pgd_tao_canh_bao PASSED [ 37%]
+tests/test_khtd_nhap_service.py::TestDocExcelKhtdXaUpload::test_ma_ct_khong_hop_le_tao_canh_bao PASSED [ 37%]
+tests/test_khtd_nhap_service.py::TestDocExcelKhtdXaUpload::test_gia_tri_le_0_bi_bo_qua PASSED [ 37%]
+tests/test_khtd_nhap_service.py::TestDocExcelKhtdXaUpload::test_ds_xa_rong_cho_phep_tat_ca PASSED [ 37%]
+tests/test_khtd_nhap_service.py::TestLuuPdfKhtdXa::test_pdf_rong_raise PASSED [ 38%]
+tests/test_khtd_nhap_service.py::TestLuuPdfKhtdXa::test_thu_muc_rong_raise PASSED [ 38%]
+tests/test_khtd_nhap_service.py::TestLuuPdfKhtdXa::test_thu_muc_khong_ton_tai_raise PASSED [ 38%]
+tests/test_khtd_nhap_service.py::TestLuuPdfKhtdXa::test_luu_thanh_cong_tra_ve_path PASSED [ 38%]
+tests/test_khtd_nhap_service.py::TestLuuPdfKhtdXa::test_ten_file_bat_dau_khtd PASSED [ 38%]
+tests/test_khtd_nhap_service.py::TestLuuPdfKhtdXa::test_ten_file_co_timestamp PASSED [ 38%]
+tests/test_khtd_nhap_service.py::TestLuuPdfKhtdXa::test_ky_tu_dac_biet_trong_ten_bi_thay_the PASSED [ 38%]
+tests/test_khtd_service.py::test_luu_khtd_dict_action_mapping PASSED     [ 38%]
+tests/test_khtd_service.py::test_luu_khtd_mau07_writes_three_keys PASSED [ 39%]
+tests/test_khtd_service.py::test_kv_key_mau07_returns_tuple_of_two PASSED [ 39%]
+tests/test_khtd_service.py::test_kv_key_mau07_consistent_slugging PASSED [ 39%]
+tests/test_khtd_service.py::test_kv_key_mau07_different_xa_different_key PASSED [ 39%]
+tests/test_khtd_service.py::test_kv_key_dot_format PASSED                [ 39%]
+tests/test_khtd_service.py::test_kv_key_dot_pads_month PASSED            [ 39%]
+tests/test_khtd_service.py::test_so_trieu_tu_oa_numeric_string PASSED    [ 39%]
+tests/test_khtd_service.py::test_so_trieu_tu_oa_comma_separated PASSED   [ 39%]
+tests/test_khtd_service.py::test_so_trieu_tu_oa_empty_string PASSED      [ 39%]
+tests/test_khtd_service.py::test_so_trieu_tu_oa_none PASSED              [ 40%]
+tests/test_khtd_service.py::test_so_trieu_tu_oa_nan_string PASSED        [ 40%]
+tests/test_khtd_service.py::test_so_trieu_tu_oa_float_value PASSED       [ 40%]
+tests/test_khtd_service.py::test_du_lieu_chuyen_trieu_sang_vnd_basic PASSED [ 40%]
+tests/test_khtd_service.py::test_du_lieu_chuyen_trieu_sang_vnd_zero_dc PASSED [ 40%]
+tests/test_khtd_service.py::test_du_lieu_chuyen_trieu_sang_vnd_empty_list PASSED [ 40%]
+tests/test_khtd_service.py::test_parse_key_suffix_valid PASSED           [ 40%]
+tests/test_khtd_service.py::test_parse_key_suffix_invalid PASSED         [ 40%]
+tests/test_khtd_service.py::test_kiem_tra_can_bang_empty_returns_empty PASSED [ 41%]
+tests/test_khtd_service.py::test_luu_dot_stores_payload PASSED           [ 41%]
+tests/test_kiem_soat_service.py::TestTinhNgayGhDp::test_thieu_ngay_dh PASSED [ 41%]
+tests/test_kiem_soat_service.py::TestTinhNgayGhDp::test_ct_17_30_thang PASSED [ 41%]
+tests/test_kiem_soat_service.py::TestTinhNgayGhDp::test_thoi_han_ngan_toi_da_12_thang PASSED [ 41%]
+tests/test_kiem_soat_service.py::TestTinhNgayGhDp::test_thoi_han_dai_nua_thoi_han PASSED [ 41%]
+tests/test_kiem_soat_service.py::TestTinhNgayGhDp::test_thieu_thoi_han PASSED [ 41%]
+tests/test_kiem_soat_service.py::TestTinhNgayGhDp::test_ct_02_co_ra_truong_va_gn1 PASSED [ 41%]
+tests/test_kiem_soat_service.py::TestTinhNgayGhDp::test_ct_02_thieu_ra_truong PASSED [ 41%]
+tests/test_kiem_soat_service.py::TestTinhNgayGhDp::test_qd29_ho_ngheo PASSED [ 42%]
+tests/test_kiem_soat_service.py::TestTinhNgayGhDp::test_qd29_ho_moi_thoat_ngheo PASSED [ 42%]
+tests/test_kiem_soat_service.py::TestFmtSoCell::test_so_nguyen PASSED    [ 42%]
+tests/test_kiem_soat_service.py::TestFmtSoCell::test_nan PASSED          [ 42%]
+tests/test_kiem_soat_service.py::TestFmtSoCell::test_None PASSED         [ 42%]
+tests/test_kiem_soat_service.py::TestFmtSoCell::test_khong PASSED        [ 42%]
+tests/test_kiem_soat_service.py::TestKsHtmlMetricCard::test_basic PASSED [ 42%]
+tests/test_kiem_soat_service.py::TestTongHopVpTheoPgd::test_df_trong PASSED [ 42%]
+tests/test_kiem_soat_service.py::TestTongHopVpTheoPgd::test_thieu_cot_pgd PASSED [ 43%]
+tests/test_kiem_soat_service.py::TestTongHopVpTheoPgd::test_1_pgd_co_to PASSED [ 43%]
+tests/test_kiem_soat_service.py::TestTongHopGhvTheoPgd::test_df_trong PASSED [ 43%]
+tests/test_kiem_soat_service.py::TestTongHopGhvTheoPgd::test_thieu_cot PASSED [ 43%]
+tests/test_kiem_soat_service.py::TestTongHopGhvTheoPgd::test_1_pgd PASSED [ 43%]
+tests/test_kiem_soat_to_sai_so_tv.py::TestTinhToSaiSoTv::test_df_None PASSED [ 43%]
+tests/test_kiem_soat_to_sai_so_tv.py::TestTinhToSaiSoTv::test_df_trong PASSED [ 43%]
+tests/test_kiem_soat_to_sai_so_tv.py::TestTinhToSaiSoTv::test_thieu_cot_du_no PASSED [ 43%]
+tests/test_kiem_soat_to_sai_so_tv.py::TestTinhToSaiSoTv::test_1_to_thieu_tv PASSED [ 43%]
+tests/test_kiem_soat_to_sai_so_tv.py::TestTinhToSaiSoTv::test_1_to_vuot_tv PASSED [ 44%]
+tests/test_kiem_soat_to_sai_so_tv.py::TestTinhToSaiSoTv::test_khong_vi_pham PASSED [ 44%]
+tests/test_kiem_soat_to_sai_so_tv.py::TestTinhToSaiSoTv::test_loc_theo_tinh_trang_close PASSED [ 44%]
+tests/test_kiem_soat_to_sai_so_tv.py::TestTinhToSaiSoTv::test_loai_bo_vay_truc_tiep_khong_co_to PASSED [ 44%]
+tests/test_kiem_soat_to_sai_so_tv.py::TestTinhToSaiSoTv::test_co_dvut_thay_cho_to PASSED [ 44%]
+tests/test_kiem_soat_to_sai_so_tv.py::TestTinhToSaiSoTv::test_du_no_bang_0_bi_loai PASSED [ 44%]
+tests/test_kiem_soat_to_sai_so_tv.py::TestTinhToSaiSoTv::test_khong_co_ma_kh_ma_co_so_ku PASSED [ 44%]
+tests/test_kiem_soat_to_sai_so_tv.py::TestTinhToSaiSoTv::test_khong_co_ma_kh_khong_co_so_ku PASSED [ 44%]
+tests/test_kiem_soat_to_sai_so_tv.py::TestTinhToSaiSoTv::test_co_du_no_th_qh PASSED [ 45%]
+tests/test_ktnb_db.py::TestKtnbDotKiemTra::test_insert_dot PASSED        [ 45%]
+tests/test_ktnb_db.py::TestKtnbDotKiemTra::test_select_dot PASSED        [ 45%]
+tests/test_ktnb_db.py::TestKtnbDotKiemTra::test_update_dot PASSED        [ 45%]
+tests/test_ktnb_db.py::TestKtnbDotKiemTra::test_delete_dot_cascade FAILED [ 45%]
+tests/test_ktnb_db.py::TestKtnbDanhMucLoi::test_seed_loi_chuan PASSED    [ 45%]
+tests/test_ktnb_db.py::TestKtnbDanhMucLoi::test_primary_key_ma_loi PASSED [ 45%]
+tests/test_ktnb_db.py::TestKtnbMauDoiChieu::test_insert_mau PASSED       [ 45%]
+tests/test_ktnb_db.py::TestKtnbMauDoiChieu::test_unique_dot_ku PASSED    [ 46%]
+tests/test_ktnb_db.py::TestKtnbKetQuaLoi::test_insert_loi PASSED         [ 46%]
+tests/test_ktnb_db.py::TestKtnbKetQuaLoi::test_cap_nhat_trang_thai PASSED [ 46%]
+tests/test_ktnb_service.py::TestPhanHeA::test_lay_danh_sach_dot_empty PASSED [ 46%]
+tests/test_ktnb_service.py::TestPhanHeA::test_them_va_lay_dot PASSED     [ 46%]
+tests/test_ktnb_service.py::TestPhanHeA::test_cap_nhat_dot PASSED        [ 46%]
+tests/test_ktnb_service.py::TestPhanHeA::test_thanh_phan_doan PASSED     [ 46%]
+tests/test_ktnb_service.py::TestPhanHeB::test_chon_mau_uu_tien_rui_ro PASSED [ 46%]
+tests/test_ktnb_service.py::TestPhanHeB::test_chon_mau_ty_le PASSED      [ 46%]
+tests/test_ktnb_service.py::TestPhanHeD::test_lay_danh_muc_loi PASSED    [ 47%]
+tests/test_ktnb_service.py::TestPhanHeD::test_thong_ke_loi PASSED        [ 47%]
+tests/test_ktnb_service.py::TestTinhTrangLich::test_tinh_trang_sap_toi PASSED [ 47%]
+tests/test_ktnb_service.py::TestTinhTrangLich::test_tinh_trang_qua_han PASSED [ 47%]
+tests/test_ktnb_service.py::TestTinhTrangLich::test_tinh_trang_dung_han PASSED [ 47%]
+tests/test_merge_du_lieu_toan_cn.py::TestMergeLoaiKhongHoTro::test_cdtotkvv_bi_tu_choi PASSED [ 47%]
+tests/test_merge_du_lieu_toan_cn.py::TestMergeLoaiKhongHoTro::test_ten_loai_rac_bi_tu_choi PASSED [ 47%]
+tests/test_merge_du_lieu_toan_cn.py::TestMergeLoaiKhongHoTro::test_loai_trong_bi_tu_choi PASSED [ 47%]
+tests/test_merge_du_lieu_toan_cn.py::TestMergeKhongCoFile::test_khong_pgd_nao_co_file FAILED [ 48%]
+tests/test_merge_du_lieu_toan_cn.py::TestMergeKhongCoFile::test_ds_pgd_rong PASSED [ 48%]
+tests/test_merge_du_lieu_toan_cn.py::TestMergeMotPGD::test_thanh_cong_ghi_parquet FAILED [ 48%]
+tests/test_merge_du_lieu_toan_cn.py::TestMergeMotPGD::test_ket_qua_chua_ten_don_vi_va_so_dong FAILED [ 48%]
+tests/test_merge_du_lieu_toan_cn.py::TestMergeMotPGD::test_duong_dan_tra_ve_la_cache_path FAILED [ 48%]
+tests/test_merge_du_lieu_toan_cn.py::TestMergeNhieuPGD::test_concat_nhieu_pgd_dung_so_dong FAILED [ 48%]
+tests/test_merge_du_lieu_toan_cn.py::TestMergeNhieuPGD::test_cot_ten_pgd_duoc_gan_dung FAILED [ 48%]
+tests/test_merge_du_lieu_toan_cn.py::TestMergePGDLoi::test_1_loi_1_ok_van_thanh_cong FAILED [ 48%]
+tests/test_merge_du_lieu_toan_cn.py::TestMergePGDLoi::test_tat_ca_loi_tra_ve_that_bai FAILED [ 48%]
+tests/test_merge_du_lieu_toan_cn.py::TestMergePGDLoi::test_audit_log_ghi_pgd_loi FAILED [ 49%]
+tests/test_merge_du_lieu_toan_cn.py::TestMergePGDCu::test_pgd_cu_duoc_them_vao_meta FAILED [ 49%]
+tests/test_merge_du_lieu_toan_cn.py::TestMergeSchemaNormalize::test_pgd_thieu_cot_duoc_fill_na FAILED [ 49%]
+tests/test_merge_du_lieu_toan_cn.py::TestMergeSchemaNormalize::test_cot_so_duoc_ep_kieu_numeric FAILED [ 49%]
+tests/test_merge_du_lieu_toan_cn.py::TestMergeSchemaNormalize::test_nguon_von_khong_bi_ep_numeric FAILED [ 49%]
+tests/test_merge_du_lieu_toan_cn.py::TestMergeRollback::test_file_bak_duoc_khoi_phuc_khi_to_parquet_loi FAILED [ 49%]
+tests/test_merge_du_lieu_toan_cn.py::TestMergeMetaGhiVaoKV::test_meta_key_dung_loai FAILED [ 49%]
+tests/test_merge_du_lieu_toan_cn.py::TestMergeMetaGhiVaoKV::test_meta_chua_cac_truong_can_thiet FAILED [ 49%]
+tests/test_merge_du_lieu_toan_cn.py::TestMergeMetaGhiVaoKV::test_meta_so_pgd_dung_so_luong FAILED [ 50%]
+tests/test_merge_du_lieu_toan_cn.py::TestMergeAuditLog::test_audit_ghi_sau_thanh_cong FAILED [ 50%]
+tests/test_merge_du_lieu_toan_cn.py::TestMergeAuditLog::test_audit_detail_chua_loai_va_so_dong FAILED [ 50%]
+tests/test_merge_du_lieu_toan_cn.py::TestMergeGQVL::test_gqvl_thanh_cong FAILED [ 50%]
+tests/test_merge_du_lieu_toan_cn.py::TestMergeGQVL::test_gqvl_nguon_von_khong_bi_ep_numeric FAILED [ 50%]
+tests/test_merge_du_lieu_toan_cn.py::TestMergeConcurrency::test_merge_dong_thoi_2_luong_khong_corrupt_file FAILED [ 50%]
+tests/test_migration_service.py::TestNhanNhomNo::test_e_la_trong_han PASSED [ 50%]
+tests/test_migration_service.py::TestNhanNhomNo::test_d_la_qua_han PASSED [ 50%]
+tests/test_migration_service.py::TestNhanNhomNo::test_c_la_khoanh PASSED [ 51%]
+tests/test_migration_service.py::TestNhanNhomNo::test_b_la_khoanh PASSED [ 51%]
+tests/test_migration_service.py::TestNhanNhomNo::test_a_la_khoanh PASSED [ 51%]
+tests/test_migration_service.py::TestNhanNhomNo::test_rong_la_tat_toan PASSED [ 51%]
+tests/test_migration_service.py::TestNhanNhomNo::test_nan_string_la_tat_toan PASSED [ 51%]
+tests/test_migration_service.py::TestNhanNhomNo::test_viet_thuong_duoc_chuan_hoa PASSED [ 51%]
+tests/test_migration_service.py::TestNhanNhomNo::test_khoang_trang_duoc_strip PASSED [ 51%]
+tests/test_migration_service.py::TestNhanNhomNo::test_output_co_2_cot PASSED [ 51%]
+tests/test_migration_service.py::TestDanhSachKy::test_thu_muc_rong_tra_ve_list_rong PASSED [ 51%]
+tests/test_migration_service.py::TestDanhSachKy::test_liet_ke_ky_dung_dinh_dang PASSED [ 52%]
+tests/test_migration_service.py::TestDanhSachKy::test_sap_xep_moi_truoc PASSED [ 52%]
+tests/test_migration_service.py::TestDanhSachKy::test_bo_qua_file_sai_dinh_dang PASSED [ 52%]
+tests/test_migration_service.py::TestDocSnapshot::test_ky_khong_ton_tai_tra_ve_empty PASSED [ 52%]
+tests/test_migration_service.py::TestDocSnapshot::test_doc_dung_parquet PASSED [ 52%]
+tests/test_migration_service.py::TestMigrationMatrix::test_ky_khong_ton_tai_tra_ve_empty PASSED [ 52%]
+tests/test_migration_service.py::TestMigrationMatrix::test_matrix_co_4x4_rows PASSED [ 52%]
+tests/test_migration_service.py::TestMigrationMatrix::test_chi_tiet_co_cot_nhom_no PASSED [ 52%]
+tests/test_migration_service.py::TestMigrationMatrix::test_mon_vay_chuyen_nhom_duoc_ghi_nhan PASSED [ 53%]
+tests/test_movers.py::TestComputeMovers::test_tra_ve_list PASSED         [ 53%]
+tests/test_movers.py::TestComputeMovers::test_so_phan_tu_khop_so_pgd PASSED [ 53%]
+tests/test_movers.py::TestComputeMovers::test_moi_phan_tu_co_cac_key_bat_buoc PASSED [ 53%]
+tests/test_movers.py::TestComputeMovers::test_empty_curr_tra_ve_list_rong PASSED [ 53%]
+tests/test_movers.py::TestComputeMovers::test_col_khong_ton_tai_tra_ve_list_rong PASSED [ 53%]
+tests/test_movers.py::TestComputeMovers::test_tong_du_no_curr_dung PASSED [ 53%]
+tests/test_movers.py::TestComputeMovers::test_prev_none_cho_prev_value_la_0 PASSED [ 53%]
+tests/test_movers.py::TestComputeMovers::test_delta_voi_prev PASSED      [ 53%]
+tests/test_movers.py::TestComputeMovers::test_pct_delta_dung PASSED      [ 54%]
+tests/test_movers.py::TestComputeMovers::test_ty_le_nqh_no_prev PASSED   [ 54%]
+tests/test_movers.py::TestComputeMovers::test_ty_le_nqh_dn_0_khong_crash PASSED [ 54%]
+tests/test_movers.py::TestComputeMovers::test_roll_rate_voi_prev PASSED  [ 54%]
+tests/test_no_khoanh_service.py::TestLocKhoanh::test_df_trong PASSED     [ 54%]
+tests/test_no_khoanh_service.py::TestLocKhoanh::test_khong_co_cot_khoanh PASSED [ 54%]
+tests/test_no_khoanh_service.py::TestLocKhoanh::test_loc_dung_mon_khoanh PASSED [ 54%]
+tests/test_no_khoanh_service.py::TestLocKhoanh::test_du_no_khoanh_am_khong_loc PASSED [ 54%]
+tests/test_no_khoanh_service.py::TestLocKhoanh::test_du_no_khoanh_str_duoc_ep_so PASSED [ 55%]
+tests/test_no_khoanh_service.py::TestBangTheoNhom::test_df_trong PASSED  [ 55%]
+tests/test_no_khoanh_service.py::TestBangTheoNhom::test_thieu_cot_nhom PASSED [ 55%]
+tests/test_no_khoanh_service.py::TestBangTheoNhom::test_bang_theo_pgd PASSED [ 55%]
+tests/test_no_khoanh_service.py::TestBangTheoNhom::test_tong_0_khong_loi PASSED [ 55%]
+tests/test_no_rui_ro_service.py::test_tao_kv_key_thang_format PASSED     [ 55%]
+tests/test_no_rui_ro_service.py::test_tao_kv_key_now PASSED              [ 55%]
+tests/test_no_rui_ro_service.py::test_luu_va_xoa_ho_so PASSED            [ 55%]
+tests/test_no_rui_ro_service.py::test_tao_kv_key_thang_pads_month PASSED [ 56%]
+tests/test_no_rui_ro_service.py::test_tao_kv_key_thang_double_digit_month PASSED [ 56%]
+tests/test_no_rui_ro_service.py::test_doc_ho_so_returns_empty_dict_when_key_missing PASSED [ 56%]
+tests/test_no_rui_ro_service.py::test_luu_ho_so_empty_list PASSED        [ 56%]
+tests/test_no_rui_ro_service.py::test_luu_ho_so_audit_logged PASSED      [ 56%]
+tests/test_no_rui_ro_service.py::test_xoa_ho_so_audit_logged PASSED      [ 56%]
+tests/test_no_rui_ro_service.py::test_multiple_pgd_keys_independent PASSED [ 56%]
+tests/test_pdf_service.py::TestXuatPdf::test_xuat_pdf_tra_ve_bytes PASSED [ 56%]
+tests/test_pdf_service.py::TestXuatPdf::test_xuat_pdf_co_cot_tien PASSED [ 56%]
+tests/test_pdf_service.py::TestXuatPdf::test_xuat_pdf_df_rong PASSED     [ 57%]
+tests/test_pdf_service.py::TestXuatPdf::test_xuat_pdf_bang_tra_ve_bytes PASSED [ 57%]
+tests/test_pdf_service.py::TestXuatPdf::test_reportlab_chua_cai PASSED   [ 57%]
+tests/test_period_compare.py::TestDeriveStatus::test_khoanh PASSED       [ 57%]
+tests/test_period_compare.py::TestDeriveStatus::test_qua_han PASSED      [ 57%]
+tests/test_period_compare.py::TestDeriveStatus::test_trong_han PASSED    [ 57%]
+tests/test_period_compare.py::TestDeriveStatus::test_none PASSED         [ 57%]
+tests/test_period_compare.py::TestDeriveStatus::test_uu_tien_khoanh_tren_qh PASSED [ 57%]
+tests/test_period_compare.py::TestStatusSeries::test_3_trang_thai PASSED [ 58%]
+tests/test_period_compare.py::TestStatusSeries::test_thieu_cot_van_chay PASSED [ 58%]
+tests/test_period_compare.py::TestLoanKeySeries::test_binh_thuong PASSED [ 58%]
+tests/test_period_compare.py::TestLoanKeySeries::test_thieu_cot_tra_rong PASSED [ 58%]
+tests/test_period_compare.py::TestJoinByLoan::test_ca_hai_rong PASSED    [ 58%]
+tests/test_period_compare.py::TestJoinByLoan::test_3_bucket PASSED       [ 58%]
+tests/test_period_compare.py::TestJoinByLoan::test_trung_key_lay_dong_cuoi PASSED [ 58%]
+tests/test_period_compare.py::TestRollCureRate::test_trong PASSED        [ 58%]
+tests/test_period_compare.py::TestRollCureRate::test_roll_50pct PASSED   [ 58%]
+tests/test_period_compare.py::TestRollCureRate::test_cure_100pct PASSED  [ 59%]
+tests/test_period_compare.py::TestClassifyChanges::test_new_closed_both PASSED [ 59%]
+tests/test_period_compare.py::TestClassifyChanges::test_worsened PASSED  [ 59%]
+tests/test_period_compare.py::TestClassifyChanges::test_trong PASSED     [ 59%]
+tests/test_period_compare.py::TestClassifyChanges::test_co_cot_label PASSED [ 59%]
+tests/test_period_compare.py::TestClassifyChanges::test_decreased PASSED [ 59%]
+tests/test_period_compare.py::TestVintageNqh::test_trong PASSED          [ 59%]
+tests/test_period_compare.py::TestVintageNqh::test_thieu_cot_ngay_vay PASSED [ 59%]
+tests/test_period_compare.py::TestVintageNqh::test_2_nam PASSED          [ 60%]
+tests/test_period_compare.py::TestVintageNqh::test_ngay_khong_parse_duoc PASSED [ 60%]
+tests/test_period_compare.py::TestParBreakdown::test_trong PASSED        [ 60%]
+tests/test_period_compare.py::TestParBreakdown::test_khong_qua_han PASSED [ 60%]
+tests/test_period_compare.py::TestParBreakdown::test_qua_han_60_ngay PASSED [ 60%]
+tests/test_period_compare.py::TestParBreakdown::test_qua_han_120_ngay PASSED [ 60%]
+tests/test_period_compare.py::TestParBreakdown::test_fallback_dung_qh PASSED [ 60%]
+tests/test_pgd.py::TestPgdSlug::test_ten_tieng_viet_co_ban PASSED        [ 60%]
+tests/test_pgd.py::TestPgdSlug::test_chu_d_viet_duoc_xu_ly PASSED        [ 60%]
+tests/test_pgd.py::TestPgdSlug::test_chu_d_hoa_duoc_xu_ly PASSED         [ 61%]
+tests/test_pgd.py::TestPgdSlug::test_khoang_trang_dau_cuoi_bi_strip PASSED [ 61%]
+tests/test_pgd.py::TestPgdSlug::test_so_trong_ten_duoc_giu PASSED        [ 61%]
+tests/test_pgd.py::TestPgdSlug::test_dau_gach_ngang_thanh_underscore PASSED [ 61%]
+tests/test_pgd.py::TestPgdSlug::test_ket_qua_luon_lowercase PASSED       [ 61%]
+tests/test_pgd.py::TestPgdSlug::test_hai_ten_pgd_khac_nhau_cho_slug_khac PASSED [ 61%]
+tests/test_pgd.py::TestPgdSlug::test_hoi_so_khong_crash PASSED           [ 61%]
+tests/test_pgd.py::TestPgdSlug::test_khong_co_ky_tu_dac_biet PASSED      [ 61%]
+tests/test_pgd.py::TestDuongDanPgd::test_hstd_ket_thuc_dung_ten_file PASSED [ 62%]
+tests/test_pgd.py::TestDuongDanPgd::test_nq11 PASSED                     [ 62%]
+tests/test_pgd.py::TestDuongDanPgd::test_gqvl PASSED                     [ 62%]
+tests/test_pgd.py::TestDuongDanPgd::test_cdtotkvv PASSED                 [ 62%]
+tests/test_pgd.py::TestDuongDanPgd::test_dienbao_ht PASSED               [ 62%]
+tests/test_pgd.py::TestDuongDanPgd::test_dienbao_prev PASSED             [ 62%]
+tests/test_pgd.py::TestDuongDanPgd::test_slug_co_trong_path PASSED       [ 62%]
+tests/test_pgd.py::TestDuongDanPgd::test_hai_pgd_co_path_khac_nhau PASSED [ 62%]
+tests/test_pgd.py::TestDuongDanPgd::test_path_la_chuoi PASSED            [ 63%]
+tests/test_report_service.py::TestTenFileBaoCao::test_ten_file_xlsx PASSED [ 63%]
+tests/test_report_service.py::TestTenFileBaoCao::test_ten_file_pdf PASSED [ 63%]
+tests/test_report_service.py::TestTenFileBaoCao::test_ten_chua_ngay PASSED [ 63%]
+tests/test_report_service.py::TestXuatBaoCao::test_xuat_sheet_don PASSED [ 63%]
+tests/test_report_service.py::TestXuatBaoCao::test_xuat_bao_cao_nhieu_sheet PASSED [ 63%]
+tests/test_report_service.py::TestXuatBaoCao::test_xuat_bao_cao_sheet_trong PASSED [ 63%]
+tests/test_report_service.py::TestXuatBaoCao::test_xuat_bao_cao_df_trong PASSED [ 63%]
+tests/test_report_service.py::TestXuatBaoCao::test_xuat_sheet_don_unicode PASSED [ 63%]
+tests/test_report_service.py::TestXuatBaoCao::test_xuat_bao_cao_nhieu_dong PASSED [ 64%]
+tests/test_rui_ro_aggregation.py::TestLocTheoNguon::test_loc_tw PASSED   [ 64%]
+tests/test_rui_ro_aggregation.py::TestLocTheoNguon::test_loc_dp PASSED   [ 64%]
+tests/test_rui_ro_aggregation.py::TestLocTheoNguon::test_khong_co_nguon_von PASSED [ 64%]
+tests/test_rui_ro_aggregation.py::TestLocTheoNguon::test_danh_sach_rong PASSED [ 64%]
+tests/test_rui_ro_aggregation.py::TestTongHopNo::test_tong_hop_co_ban PASSED [ 64%]
+tests/test_rui_ro_aggregation.py::TestTongHopNo::test_thieu_ten_ct_lay_mac_dinh PASSED [ 64%]
+tests/test_rui_ro_aggregation.py::TestTongHopNo::test_ten_ct_None PASSED [ 64%]
+tests/test_rui_ro_aggregation.py::TestTongHopNo::test_goc_la_0 PASSED    [ 65%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_audit_log] PASSED [ 65%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_ban_dai_dien] PASSED [ 65%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_baocao] PASSED [ 65%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_candoi] PASSED [ 65%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_canh_bao_som] PASSED [ 65%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_cbtd] PASSED [ 65%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_cdtotkvv] PASSED [ 65%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_cdtotkvv_pgd] PASSED [ 65%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_checklist_bc] PASSED [ 66%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_danhsach] PASSED [ 66%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_den_han] PASSED [ 66%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_diem_gd_pgd] PASSED [ 66%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_gqvl] PASSED [ 66%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_hhi] PASSED [ 66%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_kehoach] PASSED [ 66%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_kh_gqvl] PASSED [ 66%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_khnv_noi_bo] PASSED [ 67%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_khtd] PASSED [ 67%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_khtd_giao_dc] PASSED [ 67%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_khtd_mau07] PASSED [ 67%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_khtd_nhap] PASSED [ 67%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_khtd_pgd] PASSED [ 67%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_khtd_xuat] PASSED [ 67%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_kiem_soat] PASSED [ 67%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_nhiem_vu] PASSED [ 68%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_no_khoanh] PASSED [ 68%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_no_rui_ro] PASSED [ 68%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_nq11] PASSED [ 68%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_phoi_hop_pgd] PASSED [ 68%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_qd62] PASSED [ 68%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_qlnk_dashboard] PASSED [ 68%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_quan_ly_bc] PASSED [ 68%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_quan_ly_cv] PASSED [ 68%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_quan_ly_dgd] PASSED [ 69%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_so_sanh_2_ky] PASSED [ 69%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_so_sanh_ky] PASSED [ 69%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_tien_do] PASSED [ 69%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_tien_do_nop] PASSED [ 69%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_tongquan] PASSED [ 69%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_tracuu] PASSED [ 69%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_trang_thai_nguon] PASSED [ 69%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_upload_khnv] PASSED [ 70%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_upload_pgd] PASSED [ 70%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_uy_thac] PASSED [ 70%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_xlrr_tong_hop] PASSED [ 70%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[widgets.data_source_status] PASSED [ 70%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[widgets.status_widget] PASSED [ 70%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[workspaces.ws_executive] PASSED [ 70%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[workspaces.ws_management] PASSED [ 70%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[workspaces.ws_operation] PASSED [ 70%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[services.upload_service] PASSED [ 71%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[services.uy_thac_service] PASSED [ 71%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[services.tien_do_service] PASSED [ 71%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[services.tongquan_service] PASSED [ 71%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[services.report_service] PASSED [ 71%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_audit_log] PASSED [ 71%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_ban_dai_dien] PASSED [ 71%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_baocao] PASSED [ 71%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_candoi] PASSED [ 72%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_canh_bao_som] PASSED [ 72%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_cbtd] PASSED [ 72%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_cdtotkvv] PASSED [ 72%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_cdtotkvv_pgd] PASSED [ 72%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_checklist_bc] PASSED [ 72%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_danhsach] PASSED [ 72%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_den_han] PASSED [ 72%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_diem_gd_pgd] PASSED [ 73%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_gqvl] PASSED [ 73%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_hhi] PASSED [ 73%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_kehoach] PASSED [ 73%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_kh_gqvl] PASSED [ 73%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_khnv_noi_bo] PASSED [ 73%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_khtd] PASSED [ 73%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_khtd_giao_dc] PASSED [ 73%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_khtd_mau07] PASSED [ 73%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_khtd_nhap] PASSED [ 74%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_khtd_pgd] PASSED [ 74%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_khtd_xuat] PASSED [ 74%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_kiem_soat] PASSED [ 74%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_nhiem_vu] PASSED [ 74%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_no_khoanh] PASSED [ 74%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_no_rui_ro] PASSED [ 74%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_nq11] PASSED [ 74%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_phoi_hop_pgd] PASSED [ 75%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_qd62] PASSED [ 75%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_qlnk_dashboard] PASSED [ 75%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_quan_ly_bc] PASSED [ 75%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_quan_ly_cv] PASSED [ 75%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_quan_ly_dgd] PASSED [ 75%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_so_sanh_2_ky] PASSED [ 75%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_so_sanh_ky] FAILED [ 75%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_tien_do] PASSED [ 75%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_tien_do_nop] PASSED [ 76%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_tongquan] PASSED [ 76%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_tracuu] PASSED [ 76%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_trang_thai_nguon] PASSED [ 76%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_upload_khnv] PASSED [ 76%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_upload_pgd] PASSED [ 76%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_uy_thac] PASSED [ 76%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_xlrr_tong_hop] PASSED [ 76%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[widgets.data_source_status] PASSED [ 77%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[widgets.status_widget] PASSED [ 77%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[workspaces.ws_executive] PASSED [ 77%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[workspaces.ws_management] PASSED [ 77%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[workspaces.ws_operation] PASSED [ 77%]
+tests/test_smoke_snapshot.py::test_smoke_imports PASSED                  [ 77%]
+tests/test_smoke_snapshot.py::test_snapshot_roundtrip PASSED             [ 77%]
+tests/test_snapshot_service.py::TestKyTuDf::test_ngay_dang_viet PASSED   [ 77%]
+tests/test_snapshot_service.py::TestKyTuDf::test_ngay_dang_iso PASSED    [ 78%]
+tests/test_snapshot_service.py::TestKyTuDf::test_khong_co_cot PASSED     [ 78%]
+tests/test_snapshot_service.py::TestKyTuDf::test_gia_tri_null PASSED     [ 78%]
+tests/test_snapshot_service.py::TestLuuSnapshot::test_luu_thanh_cong PASSED [ 78%]
+tests/test_snapshot_service.py::TestLuuSnapshot::test_luu_co_dong_tong_pgd PASSED [ 78%]
+tests/test_snapshot_service.py::TestLuuSnapshot::test_luu_co_dong_cn PASSED [ 78%]
+tests/test_snapshot_service.py::TestLuuSnapshot::test_upsert_cung_ky PASSED [ 78%]
+tests/test_snapshot_service.py::TestLuuSnapshot::test_df_rong_tra_false PASSED [ 78%]
+tests/test_snapshot_service.py::TestLuuSnapshot::test_df_none_tra_false PASSED [ 78%]
+tests/test_snapshot_service.py::TestDocSnapshot::test_doc_sau_luu PASSED [ 79%]
+tests/test_snapshot_service.py::TestDocSnapshot::test_ky_khong_ton_tai PASSED [ 79%]
+tests/test_snapshot_service.py::TestDocSnapshot::test_chi_lay_ma_ct_all PASSED [ 79%]
+tests/test_snapshot_service.py::TestDocSnapshotRange::test_range_mot_ky PASSED [ 79%]
+tests/test_snapshot_service.py::TestDocSnapshotRange::test_range_khong_co_du_lieu PASSED [ 79%]
+tests/test_snapshot_service.py::TestDanhSachKy::test_rong_khi_chua_co PASSED [ 79%]
+tests/test_snapshot_service.py::TestDanhSachKy::test_co_ky_sau_luu PASSED [ 79%]
+tests/test_snapshot_service.py::TestDanhSachKy::test_thu_tu_moi_truoc PASSED [ 79%]
+tests/test_snapshot_service.py::TestXoaSnapshot::test_xoa_thanh_cong PASSED [ 80%]
+tests/test_snapshot_service.py::TestXoaSnapshot::test_xoa_ky_khong_ton_tai PASSED [ 80%]
+tests/test_so_sanh_ky_service.py::TestAggMotPgd::test_df_None PASSED     [ 80%]
+tests/test_so_sanh_ky_service.py::TestAggMotPgd::test_df_trong PASSED    [ 80%]
+tests/test_so_sanh_ky_service.py::TestAggMotPgd::test_agg_du_no PASSED   [ 80%]
+tests/test_so_sanh_ky_service.py::TestAggMotPgd::test_agg_co_khoanh PASSED [ 80%]
+tests/test_so_sanh_ky_service.py::TestAggMotPgd::test_missing_cot_khong_crash PASSED [ 80%]
+tests/test_so_sanh_ky_service.py::TestAggTheoPgd::test_df_trong PASSED   [ 80%]
+tests/test_so_sanh_ky_service.py::TestAggTheoPgd::test_thieu_cot_pgd PASSED [ 80%]
+tests/test_so_sanh_ky_service.py::TestAggTheoPgd::test_2_pgd_co_tong PASSED [ 81%]
+tests/test_so_sanh_ky_service.py::TestAggTheoPgd::test_df_chua_khoanh PASSED [ 81%]
+tests/test_so_sanh_ky_service.py::TestAggTheoDvut::test_df_trong PASSED  [ 81%]
+tests/test_so_sanh_ky_service.py::TestAggTheoDvut::test_thieu_cot_dvut PASSED [ 81%]
+tests/test_so_sanh_ky_service.py::TestAggTheoDvut::test_theo_dvut_co_tong PASSED [ 81%]
+tests/test_so_sanh_ky_service.py::TestGroupBienDong::test_thieu_cot_dim PASSED [ 81%]
+tests/test_so_sanh_ky_service.py::TestGroupBienDong::test_group_theo_pgd PASSED [ 81%]
+tests/test_so_sanh_ky_service.py::TestDeltaStr::test_tang PASSED         [ 81%]
+tests/test_so_sanh_ky_service.py::TestDeltaStr::test_giam PASSED         [ 82%]
+tests/test_so_sanh_ky_service.py::TestDeltaStr::test_so PASSED           [ 82%]
+tests/test_so_sanh_ky_service.py::TestTlNqh::test_0 PASSED               [ 82%]
+tests/test_so_sanh_ky_service.py::TestTlNqh::test_10_pct PASSED          [ 82%]
+tests/test_so_sanh_ky_service.py::TestTlNqh::test_du_no_0 PASSED         [ 82%]
+tests/test_so_sanh_ky_service.py::TestFmtPctVn::test_5 PASSED            [ 82%]
+tests/test_so_sanh_ky_service.py::TestFmtPctVn::test_int PASSED          [ 82%]
+tests/test_so_sanh_ky_service.py::TestPhanLoaiKhachHang::test_df_trong PASSED [ 82%]
+tests/test_so_sanh_ky_service.py::TestPhanLoaiKhachHang::test_thieu_cot_ma_kh PASSED [ 82%]
+tests/test_so_sanh_ky_service.py::TestPhanLoaiKhachHang::test_3_loai PASSED [ 83%]
+tests/test_so_sanh_ky_service.py::TestTopMovers::test_df_trong PASSED    [ 83%]
+tests/test_so_sanh_ky_service.py::TestTopMovers::test_thieu_cot_nhom PASSED [ 83%]
+tests/test_so_sanh_ky_service.py::TestTopMovers::test_2_pgd_2_movers PASSED [ 83%]
+tests/test_so_sanh_ky_service.py::TestPhanTichHhiPgd::test_df_trong PASSED [ 83%]
+tests/test_so_sanh_ky_service.py::TestPhanTichHhiPgd::test_thieu_cot PASSED [ 83%]
+tests/test_so_sanh_ky_service.py::TestPhanTichHhiPgd::test_hoat_dong_binh_thuong PASSED [ 83%]
+tests/test_tien_do_excel_service.py::test_xuat_returns_bytes PASSED      [ 83%]
+tests/test_tien_do_excel_service.py::test_xuat_produces_valid_xlsx PASSED [ 84%]
+tests/test_tien_do_excel_service.py::test_xuat_three_sheets PASSED       [ 84%]
+tests/test_tien_do_excel_service.py::test_xuat_correct_sheet_names PASSED [ 84%]
+tests/test_tien_do_excel_service.py::test_xuat_tonghop_has_data PASSED   [ 84%]
+tests/test_tien_do_excel_service.py::test_xuat_matran_has_correct_data PASSED [ 84%]
+tests/test_tien_do_excel_service.py::test_xuat_ct_has_correct_columns PASSED [ 84%]
+tests/test_tien_do_excel_service.py::test_xuat_empty_dataframes_no_crash PASSED [ 84%]
+tests/test_tien_do_service.py::test_tao_task_tao_ketqua_pgd PASSED       [ 84%]
+tests/test_tien_do_service.py::test_sync_bien_hoa_ketqua_on_off PASSED   [ 85%]
+tests/test_tien_do_service.py::test_cap_nhat_ketqua_bulk PASSED          [ 85%]
+tests/test_tongquan_service.py::test_tinh_kpi_tongquan_basic_and_no_mutation PASSED [ 85%]
+tests/test_tongquan_service.py::test_tinh_heatmap_pgd_basic PASSED       [ 85%]
+tests/test_tongquan_service.py::test_tinh_co_cau_ct_basic PASSED         [ 85%]
+tests/test_tongquan_service.py::test_tinh_tqpgd_extended_basic PASSED    [ 85%]
+tests/test_tongquan_service.py::test_den_han_filters_and_groupby PASSED  [ 85%]
+tests/test_upload_service.py::TestKetQuaUpload::test_thanh_cong_true PASSED [ 85%]
+tests/test_upload_service.py::TestKetQuaUpload::test_that_bai PASSED     [ 85%]
+tests/test_upload_service.py::TestKetQuaUpload::test_hien_thi_thanh_cong PASSED [ 86%]
+tests/test_upload_service.py::TestKetQuaUpload::test_hien_thi_that_bai PASSED [ 86%]
+tests/test_upload_service.py::TestKiemTraFile::test_file_hop_le PASSED   [ 86%]
+tests/test_upload_service.py::TestKiemTraFile::test_dinh_dang_sai PASSED [ 86%]
+tests/test_upload_service.py::TestKiemTraFile::test_file_qua_nho PASSED  [ 86%]
+tests/test_upload_service.py::TestKiemTraFile::test_extension_xls_hop_le PASSED [ 86%]
+tests/test_upload_service.py::TestKiemTraFile::test_ten_file_khong_co_extension PASSED [ 86%]
+tests/test_upload_service.py::TestKiemTraFile::test_custom_exts_chophep PASSED [ 86%]
+tests/test_upload_service.py::TestKiemTraFileHeThong::test_ten_file_hop_le PASSED [ 87%]
+tests/test_upload_service.py::TestKiemTraFileHeThong::test_ten_file_sai PASSED [ 87%]
+tests/test_upload_service.py::TestKiemTraFileHeThong::test_dinh_dang_sai_uu_tien_truoc PASSED [ 87%]
+tests/test_utils.py::TestFmtTy::test_fmt_ty_1_trieu PASSED               [ 87%]
+tests/test_utils.py::TestFmtTy::test_fmt_ty_1_ty PASSED                  [ 87%]
+tests/test_utils.py::TestFmtTy::test_fmt_ty_1_nghin_ty PASSED            [ 87%]
+tests/test_utils.py::TestFmtTy::test_fmt_ty_so_0 PASSED                  [ 87%]
+tests/test_utils.py::TestFmtTy::test_fmt_ty_so_am PASSED                 [ 87%]
+tests/test_utils.py::TestFmtTy::test_fmt_ty_none PASSED                  [ 87%]
+tests/test_utils.py::TestFmtTy::test_fmt_ty_nan PASSED                   [ 88%]
+tests/test_utils.py::TestFmtTy::test_fmt_ty_inf PASSED                   [ 88%]
+tests/test_utils.py::TestFmtTy::test_fmt_ty_chuoi_abc PASSED             [ 88%]
+tests/test_utils.py::TestFmt::test_fmt_1_trieu PASSED                    [ 88%]
+tests/test_utils.py::TestFmt::test_fmt_0 PASSED                          [ 88%]
+tests/test_utils.py::TestFmt::test_fmt_so_am PASSED                      [ 88%]
+tests/test_utils.py::TestFmtBangTy::test_fmt_bang_ty_1_ty PASSED         [ 88%]
+tests/test_utils.py::TestFmtBangTy::test_fmt_bang_ty_0 PASSED            [ 88%]
+tests/test_utils.py::TestFmtBangTy::test_fmt_bang_ty_so_le PASSED        [ 89%]
+tests/test_utils.py::TestFmtBangTy::test_fmt_bang_ty_abc PASSED          [ 89%]
+tests/test_utils.py::TestFmtTien::test_fmt_tien_1_trieu PASSED           [ 89%]
+tests/test_utils.py::TestFmtTien::test_fmt_tien_0 PASSED                 [ 89%]
+tests/test_utils.py::TestFmtTien::test_fmt_tien_abc PASSED               [ 89%]
+tests/test_utils.py::TestFmtSo::test_fmt_so_binh_thuong PASSED           [ 89%]
+tests/test_utils.py::TestFmtSo::test_fmt_so_0 PASSED                     [ 89%]
+tests/test_utils.py::TestFmtSo::test_fmt_so_abc PASSED                   [ 89%]
+tests/test_utils.py::TestFmtPct::test_fmt_pct_duong PASSED               [ 90%]
+tests/test_utils.py::TestFmtPct::test_fmt_pct_am PASSED                  [ 90%]
+tests/test_utils.py::TestFmtPct::test_fmt_pct_0 PASSED                   [ 90%]
+tests/test_utils.py::TestFmtPct::test_fmt_pct_abc PASSED                 [ 90%]
+tests/test_utils.py::TestVn::test_vn_co_thap_phan PASSED                 [ 90%]
+tests/test_utils.py::TestVn::test_vn_so_nguyen PASSED                    [ 90%]
+tests/test_utils.py::TestVn::test_vn_abc PASSED                          [ 90%]
+tests/test_utils.py::TestNormColHeader::test_norm_col_header_nbsp PASSED [ 90%]
+tests/test_utils.py::TestNormColHeader::test_norm_col_header_thin_space PASSED [ 90%]
+tests/test_utils.py::TestNormColHeader::test_norm_col_header_trim PASSED [ 91%]
+tests/test_utils.py::TestFmtCl::test_fmt_cl_duong PASSED                 [ 91%]
+tests/test_utils.py::TestFmtCl::test_fmt_cl_am PASSED                    [ 91%]
+tests/test_utils.py::TestFmtCl::test_fmt_cl_0 PASSED                     [ 91%]
+tests/test_utils.py::TestFmtCl::test_fmt_cl_abc PASSED                   [ 91%]
+tests/test_utils.py::TestFmtTl::test_fmt_tl_binh_thuong PASSED           [ 91%]
+tests/test_utils.py::TestFmtTl::test_fmt_tl_ca_hai_bang_0 PASSED         [ 91%]
+tests/test_utils.py::TestFmtTl::test_fmt_tl_mau_so_0 PASSED              [ 91%]
+tests/test_uy_thac_service.py::test_tinh_theo_dvut_empty_df PASSED       [ 92%]
+tests/test_uy_thac_service.py::test_tinh_theo_dvut_missing_col PASSED    [ 92%]
+tests/test_uy_thac_service.py::test_tinh_theo_dvut_aggregates_correctly PASSED [ 92%]
+tests/test_uy_thac_service.py::test_tinh_theo_dvut_respects_order PASSED [ 92%]
+tests/test_uy_thac_service.py::test_loc_mau06_basic_date_filter PASSED   [ 92%]
+tests/test_uy_thac_service.py::test_loc_mau06_excludes_outside_range PASSED [ 92%]
+tests/test_uy_thac_service.py::test_loc_mau06_empty_df_returns_empty PASSED [ 92%]
+tests/test_uy_thac_service.py::test_loc_mau06_missing_col_returns_empty PASSED [ 92%]
+tests/test_uy_thac_service.py::test_loc_mau15_filters_by_to PASSED       [ 92%]
+tests/test_uy_thac_service.py::test_loc_mau15_adds_no_lai_column PASSED  [ 93%]
+tests/test_uy_thac_service.py::test_loc_mau15_combines_lai_ton_and_qh PASSED [ 93%]
+tests/test_uy_thac_service.py::test_loc_mau15_empty_df_returns_empty PASSED [ 93%]
+tests/test_uy_thac_service.py::test_co_du_lieu_to_true PASSED            [ 93%]
+tests/test_uy_thac_service.py::test_co_du_lieu_to_empty_df PASSED        [ 93%]
+tests/test_uy_thac_service.py::test_co_du_lieu_to_missing_col PASSED     [ 93%]
+tests/test_uy_thac_service.py::test_co_du_lieu_to_all_null PASSED        [ 93%]
+tests/test_uy_thac_service.py::test_kv_key_bb_ct_cx_tinh PASSED          [ 93%]
+tests/test_uy_thac_service.py::test_kv_key_bb_ct_cx_xa PASSED            [ 94%]
+tests/test_uy_thac_service.py::test_kv_key_bb_ct_cx_no_scope PASSED      [ 94%]
+tests/test_uy_thac_service.py::test_build_payload_mau15_returns_dict_and_filename PASSED [ 94%]
+tests/test_uy_thac_service.py::test_build_payload_bb_xac_minh_formats_so_tien PASSED [ 94%]
+tests/test_uy_thac_service.py::test_build_payload_bc_th_returns_dict_and_filename PASSED [ 94%]
+tests/test_uy_thac_service.py::test_doc_ds_bien_ban_empty_key PASSED     [ 94%]
+tests/test_uy_thac_service.py::test_luu_va_doc_bien_ban PASSED           [ 94%]
+tests/test_uy_thac_service.py::test_cap_nhat_trang_thai_found PASSED     [ 94%]
+tests/test_uy_thac_service.py::test_cap_nhat_trang_thai_not_found PASSED [ 95%]
+tests/test_uy_thac_service.py::test_cap_nhat_trang_thai_empty_list PASSED [ 95%]
+tests/test_uythac_template_service.py::test_tao_word_uythac_ke_hoach_smoke PASSED [ 95%]
+tests/test_uythac_template_service.py::test_tao_word_uythac_mau06_smoke PASSED [ 95%]
+tests/test_uythac_template_service.py::test_tao_word_uythac_mau15_smoke PASSED [ 95%]
+tests/test_uythac_template_service.py::test_tao_word_uythac_mau16_smoke PASSED [ 95%]
+tests/test_uythac_template_service.py::test_tao_word_uythac_bb_xac_minh_smoke PASSED [ 95%]
+tests/test_uythac_template_service.py::test_tao_word_uythac_bb_ct_cx_smoke PASSED [ 95%]
+tests/test_uythac_template_service.py::test_tao_word_uythac_bc_th_smoke PASSED [ 95%]
+tests/test_uythac_template_service.py::test_tinh_theo_dvut_smoke PASSED  [ 96%]
+tests/test_uythac_template_service.py::test_loc_mau06_filters_and_sorts PASSED [ 96%]
+tests/test_uythac_template_service.py::test_loc_mau15_computes_no_lai PASSED [ 96%]
+tests/test_word_xln_service.py::TestPgdHelpers::test_pgd_plain_co_prefix PASSED [ 96%]
+tests/test_word_xln_service.py::TestPgdHelpers::test_pgd_plain_khong_prefix PASSED [ 96%]
+tests/test_word_xln_service.py::TestPgdHelpers::test_pgd_plain_pgd_hoa PASSED [ 96%]
+tests/test_word_xln_service.py::TestPgdHelpers::test_pgd_plain_none PASSED [ 96%]
+tests/test_word_xln_service.py::TestPgdHelpers::test_pgd_plain_empty PASSED [ 96%]
+tests/test_word_xln_service.py::TestPgdHelpers::test_pgd_plain_chi_co_pgd PASSED [ 97%]
+tests/test_word_xln_service.py::TestPgdHelpers::test_pgd_line_them_prefix PASSED [ 97%]
+tests/test_word_xln_service.py::TestPgdHelpers::test_pgd_line_da_co_prefix PASSED [ 97%]
+tests/test_word_xln_service.py::TestPgdHelpers::test_pgd_line_none_fallback PASSED [ 97%]
+tests/test_word_xln_service.py::TestPgdHelpers::test_pgd_line_empty_fallback PASSED [ 97%]
+tests/test_word_xln_service.py::TestNum::test_none_tra_0 PASSED          [ 97%]
+tests/test_word_xln_service.py::TestNum::test_empty_str_tra_0 PASSED     [ 97%]
+tests/test_word_xln_service.py::TestNum::test_whitespace_tra_0 PASSED    [ 97%]
+tests/test_word_xln_service.py::TestNum::test_int PASSED                 [ 97%]
+tests/test_word_xln_service.py::TestNum::test_float PASSED               [ 98%]
+tests/test_word_xln_service.py::TestNum::test_string_so_don_gian PASSED  [ 98%]
+tests/test_word_xln_service.py::TestNum::test_string_format_viet PASSED  [ 98%]
+tests/test_word_xln_service.py::TestNum::test_string_co_space PASSED     [ 98%]
+tests/test_word_xln_service.py::TestNum::test_string_khong_hop_le_tra_0 PASSED [ 98%]
+tests/test_word_xln_service.py::TestNum::test_string_dau_am PASSED       [ 98%]
+tests/test_word_xln_service.py::TestTaoWord01Xln::test_tra_ve_bytes PASSED [ 98%]
+tests/test_word_xln_service.py::TestTaoWord01Xln::test_bytes_khong_rong PASSED [ 98%]
+tests/test_word_xln_service.py::TestTaoWord01Xln::test_docx_magic_bytes PASSED [ 99%]
+tests/test_word_xln_service.py::TestTaoWord01Xln::test_du_lieu_trong_van_tao_duoc PASSED [ 99%]
+tests/test_word_xln_service.py::TestTaoWordSmokeAll::test_mau_02xln PASSED [ 99%]
+tests/test_word_xln_service.py::TestTaoWordSmokeAll::test_mau_04xln PASSED [ 99%]
+tests/test_word_xln_service.py::TestTaoWordSmokeAll::test_mau_05xln PASSED [ 99%]
+tests/test_word_xln_service.py::TestTaoWordSmokeAll::test_mau_13xln PASSED [ 99%]
+tests/test_word_xln_service.py::TestTaoWordSmokeAll::test_mau_14xln PASSED [ 99%]
+tests/test_word_xln_service.py::TestTaoWordSmokeAll::test_to_trinh_pgd PASSED [ 99%]
+tests/test_word_xln_service.py::TestTaoWordSmokeAll::test_to_trinh_cn PASSED [100%]
+
+================================== FAILURES ===================================
+_______________ TestCanhBaoNoKhoanh.test_31_den_180_la_canh_bao _______________
+tests\test_alert_center.py:66: in test_31_den_180_la_canh_bao
+    assert result["so_khan"] == 0
+E   assert 1 == 0
+________________ TestCanhBaoNoKhoanh.test_hon_hop_3_truong_hop ________________
+tests\test_alert_center.py:83: in test_hon_hop_3_truong_hop
+    assert result["so_khan"] == 1
+E   assert 2 == 1
+___________ TestCanhBaoNoKhoanh.test_chi_tiet_canh_bao_la_list_dict ___________
+tests\test_alert_center.py:97: in test_chi_tiet_canh_bao_la_list_dict
+    assert len(result["chi_tiet_canh_bao"]) == 1
+E   assert 0 == 1
+E    +  where 0 = len([])
+_________________ TestKtnbDotKiemTra.test_delete_dot_cascade __________________
+tests\test_ktnb_db.py:173: in test_delete_dot_cascade
+    assert row is None
+E   assert <sqlite3.Row object at 0x0000023E04CB7130> is None
+_______________ TestMergeKhongCoFile.test_khong_pgd_nao_co_file _______________
+tests\test_merge_du_lieu_toan_cn.py:143: in test_khong_pgd_nao_co_file
+    with patch.object(svc, "duong_dan_pgd", side_effect=_duong_dan_miss), \
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:1510: in __enter__
+    original, local = self.get_original()
+                      ^^^^^^^^^^^^^^^^^^^
+C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:1480: in get_original
+    raise AttributeError(
+E   AttributeError: <module 'services.upload_service' from 'D:\\VBSP-SCM\\services\\upload_service.py'> does not have the attribute 'duong_dan_pgd'
+_________________ TestMergeMotPGD.test_thanh_cong_ghi_parquet _________________
+tests\test_merge_du_lieu_toan_cn.py:175: in test_thanh_cong_ghi_parquet
+    with patch.object(svc, "duong_dan_pgd", side_effect=fake_duong_dan), \
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:1510: in __enter__
+    original, local = self.get_original()
+                      ^^^^^^^^^^^^^^^^^^^
+C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:1480: in get_original
+    raise AttributeError(
+E   AttributeError: <module 'services.upload_service' from 'D:\\VBSP-SCM\\services\\upload_service.py'> does not have the attribute 'duong_dan_pgd'
+___________ TestMergeMotPGD.test_ket_qua_chua_ten_don_vi_va_so_dong ___________
+tests\test_merge_du_lieu_toan_cn.py:198: in test_ket_qua_chua_ten_don_vi_va_so_dong
+    with patch.object(svc, "duong_dan_pgd", side_effect=fake_duong_dan), \
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:1510: in __enter__
+    original, local = self.get_original()
+                      ^^^^^^^^^^^^^^^^^^^
+C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:1480: in get_original
+    raise AttributeError(
+E   AttributeError: <module 'services.upload_service' from 'D:\\VBSP-SCM\\services\\upload_service.py'> does not have the attribute 'duong_dan_pgd'
+_____________ TestMergeMotPGD.test_duong_dan_tra_ve_la_cache_path _____________
+tests\test_merge_du_lieu_toan_cn.py:221: in test_duong_dan_tra_ve_la_cache_path
+    with patch.object(svc, "duong_dan_pgd", side_effect=fake_duong_dan), \
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:1510: in __enter__
+    original, local = self.get_original()
+                      ^^^^^^^^^^^^^^^^^^^
+C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:1480: in get_original
+    raise AttributeError(
+E   AttributeError: <module 'services.upload_service' from 'D:\\VBSP-SCM\\services\\upload_service.py'> does not have the attribute 'duong_dan_pgd'
+____________ TestMergeNhieuPGD.test_concat_nhieu_pgd_dung_so_dong _____________
+tests\test_merge_du_lieu_toan_cn.py:259: in test_concat_nhieu_pgd_dung_so_dong
+    with patch.object(svc, "duong_dan_pgd", side_effect=fake_duong_dan), \
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:1510: in __enter__
+    original, local = self.get_original()
+                      ^^^^^^^^^^^^^^^^^^^
+C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:1480: in get_original
+    raise AttributeError(
+E   AttributeError: <module 'services.upload_service' from 'D:\\VBSP-SCM\\services\\upload_service.py'> does not have the attribute 'duong_dan_pgd'
+______________ TestMergeNhieuPGD.test_cot_ten_pgd_duoc_gan_dung _______________
+tests\test_merge_du_lieu_toan_cn.py:292: in test_cot_ten_pgd_duoc_gan_dung
+    with patch.object(svc, "duong_dan_pgd", side_effect=fake_duong_dan), \
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:1510: in __enter__
+    original, local = self.get_original()
+                      ^^^^^^^^^^^^^^^^^^^
+C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:1480: in get_original
+    raise AttributeError(
+E   AttributeError: <module 'services.upload_service' from 'D:\\VBSP-SCM\\services\\upload_service.py'> does not have the attribute 'duong_dan_pgd'
+_______________ TestMergePGDLoi.test_1_loi_1_ok_van_thanh_cong ________________
+tests\test_merge_du_lieu_toan_cn.py:332: in test_1_loi_1_ok_van_thanh_cong
+    with patch.object(svc, "duong_dan_pgd", side_effect=fake_duong_dan), \
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:1510: in __enter__
+    original, local = self.get_original()
+                      ^^^^^^^^^^^^^^^^^^^
+C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:1480: in get_original
+    raise AttributeError(
+E   AttributeError: <module 'services.upload_service' from 'D:\\VBSP-SCM\\services\\upload_service.py'> does not have the attribute 'duong_dan_pgd'
+_______________ TestMergePGDLoi.test_tat_ca_loi_tra_ve_that_bai _______________
+tests\test_merge_du_lieu_toan_cn.py:353: in test_tat_ca_loi_tra_ve_that_bai
+    with patch.object(svc, "duong_dan_pgd", side_effect=fake_duong_dan), \
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:1510: in __enter__
+    original, local = self.get_original()
+                      ^^^^^^^^^^^^^^^^^^^
+C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:1480: in get_original
+    raise AttributeError(
+E   AttributeError: <module 'services.upload_service' from 'D:\\VBSP-SCM\\services\\upload_service.py'> does not have the attribute 'duong_dan_pgd'
+_________________ TestMergePGDLoi.test_audit_log_ghi_pgd_loi __________________
+tests\test_merge_du_lieu_toan_cn.py:382: in test_audit_log_ghi_pgd_loi
+    with patch.object(svc, "duong_dan_pgd", side_effect=fake_duong_dan), \
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:1510: in __enter__
+    original, local = self.get_original()
+                      ^^^^^^^^^^^^^^^^^^^
+C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:1480: in get_original
+    raise AttributeError(
+E   AttributeError: <module 'services.upload_service' from 'D:\\VBSP-SCM\\services\\upload_service.py'> does not have the attribute 'duong_dan_pgd'
+________________ TestMergePGDCu.test_pgd_cu_duoc_them_vao_meta ________________
+tests\test_merge_du_lieu_toan_cn.py:423: in test_pgd_cu_duoc_them_vao_meta
+    with patch.object(svc, "duong_dan_pgd", side_effect=fake_duong_dan), \
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:1510: in __enter__
+    original, local = self.get_original()
+                      ^^^^^^^^^^^^^^^^^^^
+C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:1480: in get_original
+    raise AttributeError(
+E   AttributeError: <module 'services.upload_service' from 'D:\\VBSP-SCM\\services\\upload_service.py'> does not have the attribute 'duong_dan_pgd'
+__________ TestMergeSchemaNormalize.test_pgd_thieu_cot_duoc_fill_na ___________
+tests\test_merge_du_lieu_toan_cn.py:472: in test_pgd_thieu_cot_duoc_fill_na
+    with patch.object(svc, "duong_dan_pgd", side_effect=fake_duong_dan), \
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:1510: in __enter__
+    original, local = self.get_original()
+                      ^^^^^^^^^^^^^^^^^^^
+C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:1480: in get_original
+    raise AttributeError(
+E   AttributeError: <module 'services.upload_service' from 'D:\\VBSP-SCM\\services\\upload_service.py'> does not have the attribute 'duong_dan_pgd'
+__________ TestMergeSchemaNormalize.test_cot_so_duoc_ep_kieu_numeric __________
+tests\test_merge_du_lieu_toan_cn.py:500: in test_cot_so_duoc_ep_kieu_numeric
+    with patch.object(svc, "duong_dan_pgd", side_effect=fake_duong_dan), \
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:1510: in __enter__
+    original, local = self.get_original()
+                      ^^^^^^^^^^^^^^^^^^^
+C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:1480: in get_original
+    raise AttributeError(
+E   AttributeError: <module 'services.upload_service' from 'D:\\VBSP-SCM\\services\\upload_service.py'> does not have the attribute 'duong_dan_pgd'
+_________ TestMergeSchemaNormalize.test_nguon_von_khong_bi_ep_numeric _________
+tests\test_merge_du_lieu_toan_cn.py:529: in test_nguon_von_khong_bi_ep_numeric
+    with patch.object(svc, "duong_dan_pgd", side_effect=fake_duong_dan), \
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:1510: in __enter__
+    original, local = self.get_original()
+                      ^^^^^^^^^^^^^^^^^^^
+C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:1480: in get_original
+    raise AttributeError(
+E   AttributeError: <module 'services.upload_service' from 'D:\\VBSP-SCM\\services\\upload_service.py'> does not have the attribute 'duong_dan_pgd'
+______ TestMergeRollback.test_file_bak_duoc_khoi_phuc_khi_to_parquet_loi ______
+tests\test_merge_du_lieu_toan_cn.py:574: in test_file_bak_duoc_khoi_phuc_khi_to_parquet_loi
+    with patch.object(svc, "duong_dan_pgd", side_effect=fake_duong_dan), \
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:1510: in __enter__
+    original, local = self.get_original()
+                      ^^^^^^^^^^^^^^^^^^^
+C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:1480: in get_original
+    raise AttributeError(
+E   AttributeError: <module 'services.upload_service' from 'D:\\VBSP-SCM\\services\\upload_service.py'> does not have the attribute 'duong_dan_pgd'
+________________ TestMergeMetaGhiVaoKV.test_meta_key_dung_loai ________________
+tests\test_merge_du_lieu_toan_cn.py:624: in test_meta_key_dung_loai
+    self._run_merge(tmp_path, mock_db, duong_dan_pgd_factory, "hstd")
+tests\test_merge_du_lieu_toan_cn.py:608: in _run_merge
+    patch.object(svc, "duong_dan_pgd", side_effect=fake_duong_dan), \
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:1510: in __enter__
+    original, local = self.get_original()
+                      ^^^^^^^^^^^^^^^^^^^
+C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:1480: in get_original
+    raise AttributeError(
+E   AttributeError: <module 'services.upload_service' from 'D:\\VBSP-SCM\\services\\upload_service.py'> does not have the attribute 'duong_dan_pgd'
+__________ TestMergeMetaGhiVaoKV.test_meta_chua_cac_truong_can_thiet __________
+tests\test_merge_du_lieu_toan_cn.py:634: in test_meta_chua_cac_truong_can_thiet
+    self._run_merge(tmp_path, mock_db, duong_dan_pgd_factory, "hstd")
+tests\test_merge_du_lieu_toan_cn.py:608: in _run_merge
+    patch.object(svc, "duong_dan_pgd", side_effect=fake_duong_dan), \
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:1510: in __enter__
+    original, local = self.get_original()
+                      ^^^^^^^^^^^^^^^^^^^
+C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:1480: in get_original
+    raise AttributeError(
+E   AttributeError: <module 'services.upload_service' from 'D:\\VBSP-SCM\\services\\upload_service.py'> does not have the attribute 'duong_dan_pgd'
+____________ TestMergeMetaGhiVaoKV.test_meta_so_pgd_dung_so_luong _____________
+tests\test_merge_du_lieu_toan_cn.py:650: in test_meta_so_pgd_dung_so_luong
+    self._run_merge(tmp_path, mock_db, duong_dan_pgd_factory, "hstd")
+tests\test_merge_du_lieu_toan_cn.py:608: in _run_merge
+    patch.object(svc, "duong_dan_pgd", side_effect=fake_duong_dan), \
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:1510: in __enter__
+    original, local = self.get_original()
+                      ^^^^^^^^^^^^^^^^^^^
+C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:1480: in get_original
+    raise AttributeError(
+E   AttributeError: <module 'services.upload_service' from 'D:\\VBSP-SCM\\services\\upload_service.py'> does not have the attribute 'duong_dan_pgd'
+_______________ TestMergeAuditLog.test_audit_ghi_sau_thanh_cong _______________
+tests\test_merge_du_lieu_toan_cn.py:675: in test_audit_ghi_sau_thanh_cong
+    with patch.object(svc, "duong_dan_pgd", side_effect=fake_duong_dan), \
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:1510: in __enter__
+    original, local = self.get_original()
+                      ^^^^^^^^^^^^^^^^^^^
+C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:1480: in get_original
+    raise AttributeError(
+E   AttributeError: <module 'services.upload_service' from 'D:\\VBSP-SCM\\services\\upload_service.py'> does not have the attribute 'duong_dan_pgd'
+__________ TestMergeAuditLog.test_audit_detail_chua_loai_va_so_dong ___________
+tests\test_merge_du_lieu_toan_cn.py:699: in test_audit_detail_chua_loai_va_so_dong
+    with patch.object(svc, "duong_dan_pgd", side_effect=fake_duong_dan), \
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:1510: in __enter__
+    original, local = self.get_original()
+                      ^^^^^^^^^^^^^^^^^^^
+C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:1480: in get_original
+    raise AttributeError(
+E   AttributeError: <module 'services.upload_service' from 'D:\\VBSP-SCM\\services\\upload_service.py'> does not have the attribute 'duong_dan_pgd'
+_____________________ TestMergeGQVL.test_gqvl_thanh_cong ______________________
+tests\test_merge_du_lieu_toan_cn.py:734: in test_gqvl_thanh_cong
+    with patch.object(svc, "duong_dan_pgd", side_effect=fake_duong_dan), \
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:1510: in __enter__
+    original, local = self.get_original()
+                      ^^^^^^^^^^^^^^^^^^^
+C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:1480: in get_original
+    raise AttributeError(
+E   AttributeError: <module 'services.upload_service' from 'D:\\VBSP-SCM\\services\\upload_service.py'> does not have the attribute 'duong_dan_pgd'
+____________ TestMergeGQVL.test_gqvl_nguon_von_khong_bi_ep_numeric ____________
+tests\test_merge_du_lieu_toan_cn.py:760: in test_gqvl_nguon_von_khong_bi_ep_numeric
+    with patch.object(svc, "duong_dan_pgd", side_effect=fake_duong_dan), \
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:1510: in __enter__
+    original, local = self.get_original()
+                      ^^^^^^^^^^^^^^^^^^^
+C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:1480: in get_original
+    raise AttributeError(
+E   AttributeError: <module 'services.upload_service' from 'D:\\VBSP-SCM\\services\\upload_service.py'> does not have the attribute 'duong_dan_pgd'
+____ TestMergeConcurrency.test_merge_dong_thoi_2_luong_khong_corrupt_file _____
+tests\test_merge_du_lieu_toan_cn.py:819: in test_merge_dong_thoi_2_luong_khong_corrupt_file
+    assert not errors, f"L\u1ed7i khi ch\u1ea1y \u0111\u1ed3ng th\u1eddi: {errors}"
+E   AssertionError: L\u1ed7i khi ch\u1ea1y \u0111\u1ed3ng th\u1eddi: [AttributeError("<module 'services.upload_service' from 'D:\\\\\\\\VBSP-SCM\\\\\\\\services\\\\\\\\upload_service.py'> does not have the attribute 'duong_dan_pgd'"), AttributeError("<module 'services.upload_service' from 'D:\\\\\\\\VBSP-SCM\\\\\\\\services\\\\\\\\upload_service.py'> does not have the attribute 'duong_dan_pgd'")]
+E   assert not [AttributeError("<module 'services.upload_service' from 'D:\\\\VBSP-SCM\\\\services\\\\upload_service.py'> does not have the attribute 'duong_dan_pgd'"), AttributeError("<module 'services.upload_service' from 'D:\\\\VBSP-SCM\\\\services\\\\upload_service.py'> does not have the attribute 'duong_dan_pgd'")]
+______________ TestSmokeRender.test_render[tabs.tab_so_sanh_ky] _______________
+tests\test_smoke_imports.py:254: in test_render
+    pytest.fail(f"{module_name}.render() th\u1ea5t b\u1ea1i: {err}")
+E   Failed: tabs.tab_so_sanh_ky.render() th\u1ea5t b\u1ea1i: NameError: name '_ts' is not defined
+---------------------------- Captured stdout call -----------------------------
+DEBUG:tests.test_smoke_imports:L\u1ed7i render tabs.tab_so_sanh_ky: name '_ts' is not defined\nTraceback (most recent call last):\n  File "D:\\VBSP-SCM\\tests\\test_smoke_imports.py", line 183, in _try_render\n    mod.render(*args, **call_kwargs)\n    ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^\n  File "D:\\VBSP-SCM\\tabs\\tab_so_sanh_ky\\__init__.py", line 30, in render\n    render_moc_nam(None, **kwargs)\n    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^\n  File "D:\\VBSP-SCM\\tabs\\tab_so_sanh_ky\\render_moc_nam.py", line 947, in render_moc_nam\n    _render_hstd_section(df_full, df, role, pgd_user, pgd_mode, key_prefix)\n    ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File "D:\\VBSP-SCM\\tabs\\tab_so_sanh_ky\\render_moc_nam.py", line 240, in _render_hstd_section\n    df_bl_full = doc_baseline_merged(chon_nam)\n  File "D:\\VBSP-SCM\\data\\hstd.py", line 162, in doc_baseline_merged\n    return doc_baseline(nam, _ts)\n                             ^^^\nNameError: name '_ts' is not defined
+------------------------------ Captured log call ------------------------------
+DEBUG    tests.test_smoke_imports:test_smoke_imports.py:196 L\u1ed7i render tabs.tab_so_sanh_ky: name '_ts' is not defined\nTraceback (most recent call last):\n  File "D:\\VBSP-SCM\\tests\\test_smoke_imports.py", line 183, in _try_render\n    mod.render(*args, **call_kwargs)\n    ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^\n  File "D:\\VBSP-SCM\\tabs\\tab_so_sanh_ky\\__init__.py", line 30, in render\n    render_moc_nam(None, **kwargs)\n    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^\n  File "D:\\VBSP-SCM\\tabs\\tab_so_sanh_ky\\render_moc_nam.py", line 947, in render_moc_nam\n    _render_hstd_section(df_full, df, role, pgd_user, pgd_mode, key_prefix)\n    ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File "D:\\VBSP-SCM\\tabs\\tab_so_sanh_ky\\render_moc_nam.py", line 240, in _render_hstd_section\n    df_bl_full = doc_baseline_merged(chon_nam)\n  File "D:\\VBSP-SCM\\data\\hstd.py", line 162, in doc_baseline_merged\n    return doc_baseline(nam, _ts)\n                             ^^^\nNameError: name '_ts' is not defined
+============================== warnings summary ===============================
+tests/test_alert_center.py::TestCanhBaoNoKhoanh::test_ngay_khong_phan_tich_duoc_bi_bo_qua
+  D:\VBSP-SCM\alert_center.py:218: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
+    df['_ngay_het'] = pd.to_datetime(
+
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_upload_khnv]
+  C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\site-packages\openpyxl\styles\stylesheet.py:237: UserWarning: Workbook contains no default style, apply openpyxl's default
+    warn("Workbook contains no default style, apply openpyxl's default")
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+FAILED tests/test_alert_center.py::TestCanhBaoNoKhoanh::test_31_den_180_la_canh_bao - assert 1 == 0
+FAILED tests/test_alert_center.py::TestCanhBaoNoKhoanh::test_hon_hop_3_truong_hop - assert 2 == 1
+FAILED tests/test_alert_center.py::TestCanhBaoNoKhoanh::test_chi_tiet_canh_bao_la_list_dict - assert 0 == 1
+ +  where 0 = len([])
+FAILED tests/test_ktnb_db.py::TestKtnbDotKiemTra::test_delete_dot_cascade - assert <sqlite3.Row object at 0x0000023E04CB7130> is None
+FAILED tests/test_merge_du_lieu_toan_cn.py::TestMergeKhongCoFile::test_khong_pgd_nao_co_file - AttributeError: <module 'services.upload_service' from 'D:\\VBSP-SCM\\services\\upload_service.py'> does not have the attribute 'duong_dan_pgd'
+FAILED tests/test_merge_du_lieu_toan_cn.py::TestMergeMotPGD::test_thanh_cong_ghi_parquet - AttributeError: <module 'services.upload_service' from 'D:\\VBSP-SCM\\services\\upload_service.py'> does not have the attribute 'duong_dan_pgd'
+FAILED tests/test_merge_du_lieu_toan_cn.py::TestMergeMotPGD::test_ket_qua_chua_ten_don_vi_va_so_dong - AttributeError: <module 'services.upload_service' from 'D:\\VBSP-SCM\\services\\upload_service.py'> does not have the attribute 'duong_dan_pgd'
+FAILED tests/test_merge_du_lieu_toan_cn.py::TestMergeMotPGD::test_duong_dan_tra_ve_la_cache_path - AttributeError: <module 'services.upload_service' from 'D:\\VBSP-SCM\\services\\upload_service.py'> does not have the attribute 'duong_dan_pgd'
+FAILED tests/test_merge_du_lieu_toan_cn.py::TestMergeNhieuPGD::test_concat_nhieu_pgd_dung_so_dong - AttributeError: <module 'services.upload_service' from 'D:\\VBSP-SCM\\services\\upload_service.py'> does not have the attribute 'duong_dan_pgd'
+FAILED tests/test_merge_du_lieu_toan_cn.py::TestMergeNhieuPGD::test_cot_ten_pgd_duoc_gan_dung - AttributeError: <module 'services.upload_service' from 'D:\\VBSP-SCM\\services\\upload_service.py'> does not have the attribute 'duong_dan_pgd'
+FAILED tests/test_merge_du_lieu_toan_cn.py::TestMergePGDLoi::test_1_loi_1_ok_van_thanh_cong - AttributeError: <module 'services.upload_service' from 'D:\\VBSP-SCM\\services\\upload_service.py'> does not have the attribute 'duong_dan_pgd'
+FAILED tests/test_merge_du_lieu_toan_cn.py::TestMergePGDLoi::test_tat_ca_loi_tra_ve_that_bai - AttributeError: <module 'services.upload_service' from 'D:\\VBSP-SCM\\services\\upload_service.py'> does not have the attribute 'duong_dan_pgd'
+FAILED tests/test_merge_du_lieu_toan_cn.py::TestMergePGDLoi::test_audit_log_ghi_pgd_loi - AttributeError: <module 'services.upload_service' from 'D:\\VBSP-SCM\\services\\upload_service.py'> does not have the attribute 'duong_dan_pgd'
+FAILED tests/test_merge_du_lieu_toan_cn.py::TestMergePGDCu::test_pgd_cu_duoc_them_vao_meta - AttributeError: <module 'services.upload_service' from 'D:\\VBSP-SCM\\services\\upload_service.py'> does not have the attribute 'duong_dan_pgd'
+FAILED tests/test_merge_du_lieu_toan_cn.py::TestMergeSchemaNormalize::test_pgd_thieu_cot_duoc_fill_na - AttributeError: <module 'services.upload_service' from 'D:\\VBSP-SCM\\services\\upload_service.py'> does not have the attribute 'duong_dan_pgd'
+FAILED tests/test_merge_du_lieu_toan_cn.py::TestMergeSchemaNormalize::test_cot_so_duoc_ep_kieu_numeric - AttributeError: <module 'services.upload_service' from 'D:\\VBSP-SCM\\services\\upload_service.py'> does not have the attribute 'duong_dan_pgd'
+FAILED tests/test_merge_du_lieu_toan_cn.py::TestMergeSchemaNormalize::test_nguon_von_khong_bi_ep_numeric - AttributeError: <module 'services.upload_service' from 'D:\\VBSP-SCM\\services\\upload_service.py'> does not have the attribute 'duong_dan_pgd'
+FAILED tests/test_merge_du_lieu_toan_cn.py::TestMergeRollback::test_file_bak_duoc_khoi_phuc_khi_to_parquet_loi - AttributeError: <module 'services.upload_service' from 'D:\\VBSP-SCM\\services\\upload_service.py'> does not have the attribute 'duong_dan_pgd'
+FAILED tests/test_merge_du_lieu_toan_cn.py::TestMergeMetaGhiVaoKV::test_meta_key_dung_loai - AttributeError: <module 'services.upload_service' from 'D:\\VBSP-SCM\\services\\upload_service.py'> does not have the attribute 'duong_dan_pgd'
+FAILED tests/test_merge_du_lieu_toan_cn.py::TestMergeMetaGhiVaoKV::test_meta_chua_cac_truong_can_thiet - AttributeError: <module 'services.upload_service' from 'D:\\VBSP-SCM\\services\\upload_service.py'> does not have the attribute 'duong_dan_pgd'
+FAILED tests/test_merge_du_lieu_toan_cn.py::TestMergeMetaGhiVaoKV::test_meta_so_pgd_dung_so_luong - AttributeError: <module 'services.upload_service' from 'D:\\VBSP-SCM\\services\\upload_service.py'> does not have the attribute 'duong_dan_pgd'
+FAILED tests/test_merge_du_lieu_toan_cn.py::TestMergeAuditLog::test_audit_ghi_sau_thanh_cong - AttributeError: <module 'services.upload_service' from 'D:\\VBSP-SCM\\services\\upload_service.py'> does not have the attribute 'duong_dan_pgd'
+FAILED tests/test_merge_du_lieu_toan_cn.py::TestMergeAuditLog::test_audit_detail_chua_loai_va_so_dong - AttributeError: <module 'services.upload_service' from 'D:\\VBSP-SCM\\services\\upload_service.py'> does not have the attribute 'duong_dan_pgd'
+FAILED tests/test_merge_du_lieu_toan_cn.py::TestMergeGQVL::test_gqvl_thanh_cong - AttributeError: <module 'services.upload_service' from 'D:\\VBSP-SCM\\services\\upload_service.py'> does not have the attribute 'duong_dan_pgd'
+FAILED tests/test_merge_du_lieu_toan_cn.py::TestMergeGQVL::test_gqvl_nguon_von_khong_bi_ep_numeric - AttributeError: <module 'services.upload_service' from 'D:\\VBSP-SCM\\services\\upload_service.py'> does not have the attribute 'duong_dan_pgd'
+FAILED tests/test_merge_du_lieu_toan_cn.py::TestMergeConcurrency::test_merge_dong_thoi_2_luong_khong_corrupt_file - AssertionError: L\u1ed7i khi ch\u1ea1y \u0111\u1ed3ng th\u1eddi: [AttributeError("<module 'services.upload_service' from 'D:\\\\\\\\VBSP-SCM\\\\\\\\services\\\\\\\\upload_service.py'> does not have the attribute 'duong_dan_pgd'"), AttributeError("<module 'services.upload_service' from 'D:\\\\\\\\VBSP-SCM\\\\\\\\services\\\\\\\\upload_service.py'> does not have the attribute 'duong_dan_pgd'")]\nassert not [AttributeError("<module 'services.upload_service' from 'D:\\\\\\\\VBSP-SCM\\\\\\\\services\\\\\\\\upload_service.py'> does not have the attribute 'duong_dan_pgd'"), AttributeError("<module 'services.upload_service' from 'D:\\\\\\\\VBSP-SCM\\\\\\\\services\\\\\\\\upload_service.py'> does not have the attribute 'duong_dan_pgd'")]
+FAILED tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_so_sanh_ky] - Failed: tabs.tab_so_sanh_ky.render() th\u1ea5t b\u1ea1i: NameError: name '_ts' is not defined
+================= 27 failed, 814 passed, 2 warnings in 25.53s =================
+============================= test session starts =============================
+platform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0
+rootdir: D:\VBSP-SCM
+configfile: pytest.ini
+plugins: anyio-4.13.0, cov-7.1.0
+collected 841 items
+
+tests\test_alert_center.py ....F..F.F.                                   [  1%]
+tests\test_auth.py ..................................................... [  7%]
+..........                                                               [  8%]
+tests\test_cdtotkvv_service.py ..............                            [ 10%]
+tests\test_config.py ............                                        [ 11%]
+tests\test_core.py .....................                                 [ 14%]
+tests\test_currency.py ..............                                    [ 16%]
+tests\test_data_quality.py ..........................                    [ 19%]
+tests\test_db.py .........                                               [ 20%]
+tests\test_du_phong_service.py ...........                               [ 21%]
+tests\test_excel_service.py .............                                [ 23%]
+tests\test_file_detection_service.py ....................                [ 25%]
+tests\test_filter_bar.py ..............                                  [ 27%]
+tests\test_giao_ban.py .............                                     [ 28%]
+tests\test_hhi_service.py .................                              [ 30%]
+tests\test_hstd.py .............................                         [ 34%]
+tests\test_khnv_noi_bo_service.py ..                                     [ 34%]
+tests\test_khtd_mau07_service.py ....                                    [ 34%]
+tests\test_khtd_nhap_service.py .................................        [ 38%]
+tests\test_khtd_service.py ....................                          [ 41%]
+tests\test_kiem_soat_service.py ....................                     [ 43%]
+tests\test_kiem_soat_to_sai_so_tv.py .............                       [ 45%]
+tests\test_ktnb_db.py ...F......                                         [ 46%]
+tests\test_ktnb_service.py ...........                                   [ 47%]
+tests\test_merge_du_lieu_toan_cn.py ...F.FFFFFFFFFFFFFFFFFFFFF           [ 50%]
+tests\test_migration_service.py ....................                     [ 53%]
+tests\test_movers.py ............                                        [ 54%]
+tests\test_no_khoanh_service.py .........                                [ 55%]
+tests\test_no_rui_ro_service.py ..........                               [ 56%]
+tests\test_pdf_service.py .....                                          [ 57%]
+tests\test_period_compare.py .............................               [ 60%]
+tests\test_pgd.py ...................                                    [ 63%]
+tests\test_report_service.py .........                                   [ 64%]
+tests\test_rui_ro_aggregation.py ........                                [ 65%]
+tests\test_smoke_imports.py ............................................ [ 70%]
+..............................................F..............            [ 77%]
+tests\test_smoke_snapshot.py ..                                          [ 77%]
+tests\test_snapshot_service.py ....................                      [ 80%]
+tests\test_so_sanh_ky_service.py ...............................         [ 83%]
+tests\test_tien_do_excel_service.py ........                             [ 84%]
+tests\test_tien_do_service.py ...                                        [ 85%]
+tests\test_tongquan_service.py .....                                     [ 85%]
+tests\test_upload_service.py .............                               [ 87%]
+tests\test_utils.py .......................................              [ 91%]
+tests\test_uy_thac_service.py ...........................                [ 95%]
+tests\test_uythac_template_service.py ..........                         [ 96%]
+tests\test_word_xln_service.py ...............................           [100%]
+
+================================== FAILURES ===================================
+_______________ TestCanhBaoNoKhoanh.test_31_den_180_la_canh_bao _______________
+tests\test_alert_center.py:66: in test_31_den_180_la_canh_bao
+    assert result["so_khan"] == 0
+E   assert 1 == 0
+________________ TestCanhBaoNoKhoanh.test_hon_hop_3_truong_hop ________________
+tests\test_alert_center.py:83: in test_hon_hop_3_truong_hop
+    assert result["so_khan"] == 1
+E   assert 2 == 1
+___________ TestCanhBaoNoKhoanh.test_chi_tiet_canh_bao_la_list_dict ___________
+tests\test_alert_center.py:97: in test_chi_tiet_canh_bao_la_list_dict
+    assert len(result["chi_tiet_canh_bao"]) == 1
+E   assert 0 == 1
+E    +  where 0 = len([])
+_________________ TestKtnbDotKiemTra.test_delete_dot_cascade __________________
+tests\test_ktnb_db.py:173: in test_delete_dot_cascade
+    assert row is None
+E   assert <sqlite3.Row object at 0x000001CF731F1E40> is None
+_______________ TestMergeKhongCoFile.test_khong_pgd_nao_co_file _______________
+tests\test_merge_du_lieu_toan_cn.py:143: in test_khong_pgd_nao_co_file
+    with patch.object(svc, "duong_dan_pgd", side_effect=_duong_dan_miss), \
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:1510: in __enter__
+    original, local = self.get_original()
+                      ^^^^^^^^^^^^^^^^^^^
+C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:1480: in get_original
+    raise AttributeError(
+E   AttributeError: <module 'services.upload_service' from 'D:\\VBSP-SCM\\services\\upload_service.py'> does not have the attribute 'duong_dan_pgd'
+_________________ TestMergeMotPGD.test_thanh_cong_ghi_parquet _________________
+tests\test_merge_du_lieu_toan_cn.py:175: in test_thanh_cong_ghi_parquet
+    with patch.object(svc, "duong_dan_pgd", side_effect=fake_duong_dan), \
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:1510: in __enter__
+    original, local = self.get_original()
+                      ^^^^^^^^^^^^^^^^^^^
+C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:1480: in get_original
+    raise AttributeError(
+E   AttributeError: <module 'services.upload_service' from 'D:\\VBSP-SCM\\services\\upload_service.py'> does not have the attribute 'duong_dan_pgd'
+___________ TestMergeMotPGD.test_ket_qua_chua_ten_don_vi_va_so_dong ___________
+tests\test_merge_du_lieu_toan_cn.py:198: in test_ket_qua_chua_ten_don_vi_va_so_dong
+    with patch.object(svc, "duong_dan_pgd", side_effect=fake_duong_dan), \
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:1510: in __enter__
+    original, local = self.get_original()
+                      ^^^^^^^^^^^^^^^^^^^
+C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:1480: in get_original
+    raise AttributeError(
+E   AttributeError: <module 'services.upload_service' from 'D:\\VBSP-SCM\\services\\upload_service.py'> does not have the attribute 'duong_dan_pgd'
+_____________ TestMergeMotPGD.test_duong_dan_tra_ve_la_cache_path _____________
+tests\test_merge_du_lieu_toan_cn.py:221: in test_duong_dan_tra_ve_la_cache_path
+    with patch.object(svc, "duong_dan_pgd", side_effect=fake_duong_dan), \
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:1510: in __enter__
+    original, local = self.get_original()
+                      ^^^^^^^^^^^^^^^^^^^
+C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:1480: in get_original
+    raise AttributeError(
+E   AttributeError: <module 'services.upload_service' from 'D:\\VBSP-SCM\\services\\upload_service.py'> does not have the attribute 'duong_dan_pgd'
+____________ TestMergeNhieuPGD.test_concat_nhieu_pgd_dung_so_dong _____________
+tests\test_merge_du_lieu_toan_cn.py:259: in test_concat_nhieu_pgd_dung_so_dong
+    with patch.object(svc, "duong_dan_pgd", side_effect=fake_duong_dan), \
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:1510: in __enter__
+    original, local = self.get_original()
+                      ^^^^^^^^^^^^^^^^^^^
+C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:1480: in get_original
+    raise AttributeError(
+E   AttributeError: <module 'services.upload_service' from 'D:\\VBSP-SCM\\services\\upload_service.py'> does not have the attribute 'duong_dan_pgd'
+______________ TestMergeNhieuPGD.test_cot_ten_pgd_duoc_gan_dung _______________
+tests\test_merge_du_lieu_toan_cn.py:292: in test_cot_ten_pgd_duoc_gan_dung
+    with patch.object(svc, "duong_dan_pgd", side_effect=fake_duong_dan), \
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:1510: in __enter__
+    original, local = self.get_original()
+                      ^^^^^^^^^^^^^^^^^^^
+C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:1480: in get_original
+    raise AttributeError(
+E   AttributeError: <module 'services.upload_service' from 'D:\\VBSP-SCM\\services\\upload_service.py'> does not have the attribute 'duong_dan_pgd'
+_______________ TestMergePGDLoi.test_1_loi_1_ok_van_thanh_cong ________________
+tests\test_merge_du_lieu_toan_cn.py:332: in test_1_loi_1_ok_van_thanh_cong
+    with patch.object(svc, "duong_dan_pgd", side_effect=fake_duong_dan), \
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:1510: in __enter__
+    original, local = self.get_original()
+                      ^^^^^^^^^^^^^^^^^^^
+C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:1480: in get_original
+    raise AttributeError(
+E   AttributeError: <module 'services.upload_service' from 'D:\\VBSP-SCM\\services\\upload_service.py'> does not have the attribute 'duong_dan_pgd'
+_______________ TestMergePGDLoi.test_tat_ca_loi_tra_ve_that_bai _______________
+tests\test_merge_du_lieu_toan_cn.py:353: in test_tat_ca_loi_tra_ve_that_bai
+    with patch.object(svc, "duong_dan_pgd", side_effect=fake_duong_dan), \
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:1510: in __enter__
+    original, local = self.get_original()
+                      ^^^^^^^^^^^^^^^^^^^
+C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:1480: in get_original
+    raise AttributeError(
+E   AttributeError: <module 'services.upload_service' from 'D:\\VBSP-SCM\\services\\upload_service.py'> does not have the attribute 'duong_dan_pgd'
+_________________ TestMergePGDLoi.test_audit_log_ghi_pgd_loi __________________
+tests\test_merge_du_lieu_toan_cn.py:382: in test_audit_log_ghi_pgd_loi
+    with patch.object(svc, "duong_dan_pgd", side_effect=fake_duong_dan), \
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:1510: in __enter__
+    original, local = self.get_original()
+                      ^^^^^^^^^^^^^^^^^^^
+C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:1480: in get_original
+    raise AttributeError(
+E   AttributeError: <module 'services.upload_service' from 'D:\\VBSP-SCM\\services\\upload_service.py'> does not have the attribute 'duong_dan_pgd'
+________________ TestMergePGDCu.test_pgd_cu_duoc_them_vao_meta ________________
+tests\test_merge_du_lieu_toan_cn.py:423: in test_pgd_cu_duoc_them_vao_meta
+    with patch.object(svc, "duong_dan_pgd", side_effect=fake_duong_dan), \
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:1510: in __enter__
+    original, local = self.get_original()
+                      ^^^^^^^^^^^^^^^^^^^
+C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:1480: in get_original
+    raise AttributeError(
+E   AttributeError: <module 'services.upload_service' from 'D:\\VBSP-SCM\\services\\upload_service.py'> does not have the attribute 'duong_dan_pgd'
+__________ TestMergeSchemaNormalize.test_pgd_thieu_cot_duoc_fill_na ___________
+tests\test_merge_du_lieu_toan_cn.py:472: in test_pgd_thieu_cot_duoc_fill_na
+    with patch.object(svc, "duong_dan_pgd", side_effect=fake_duong_dan), \
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:1510: in __enter__
+    original, local = self.get_original()
+                      ^^^^^^^^^^^^^^^^^^^
+C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:1480: in get_original
+    raise AttributeError(
+E   AttributeError: <module 'services.upload_service' from 'D:\\VBSP-SCM\\services\\upload_service.py'> does not have the attribute 'duong_dan_pgd'
+__________ TestMergeSchemaNormalize.test_cot_so_duoc_ep_kieu_numeric __________
+tests\test_merge_du_lieu_toan_cn.py:500: in test_cot_so_duoc_ep_kieu_numeric
+    with patch.object(svc, "duong_dan_pgd", side_effect=fake_duong_dan), \
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:1510: in __enter__
+    original, local = self.get_original()
+                      ^^^^^^^^^^^^^^^^^^^
+C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:1480: in get_original
+    raise AttributeError(
+E   AttributeError: <module 'services.upload_service' from 'D:\\VBSP-SCM\\services\\upload_service.py'> does not have the attribute 'duong_dan_pgd'
+_________ TestMergeSchemaNormalize.test_nguon_von_khong_bi_ep_numeric _________
+tests\test_merge_du_lieu_toan_cn.py:529: in test_nguon_von_khong_bi_ep_numeric
+    with patch.object(svc, "duong_dan_pgd", side_effect=fake_duong_dan), \
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:1510: in __enter__
+    original, local = self.get_original()
+                      ^^^^^^^^^^^^^^^^^^^
+C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:1480: in get_original
+    raise AttributeError(
+E   AttributeError: <module 'services.upload_service' from 'D:\\VBSP-SCM\\services\\upload_service.py'> does not have the attribute 'duong_dan_pgd'
+______ TestMergeRollback.test_file_bak_duoc_khoi_phuc_khi_to_parquet_loi ______
+tests\test_merge_du_lieu_toan_cn.py:574: in test_file_bak_duoc_khoi_phuc_khi_to_parquet_loi
+    with patch.object(svc, "duong_dan_pgd", side_effect=fake_duong_dan), \
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:1510: in __enter__
+    original, local = self.get_original()
+                      ^^^^^^^^^^^^^^^^^^^
+C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:1480: in get_original
+    raise AttributeError(
+E   AttributeError: <module 'services.upload_service' from 'D:\\VBSP-SCM\\services\\upload_service.py'> does not have the attribute 'duong_dan_pgd'
+________________ TestMergeMetaGhiVaoKV.test_meta_key_dung_loai ________________
+tests\test_merge_du_lieu_toan_cn.py:624: in test_meta_key_dung_loai
+    self._run_merge(tmp_path, mock_db, duong_dan_pgd_factory, "hstd")
+tests\test_merge_du_lieu_toan_cn.py:608: in _run_merge
+    patch.object(svc, "duong_dan_pgd", side_effect=fake_duong_dan), \
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:1510: in __enter__
+    original, local = self.get_original()
+                      ^^^^^^^^^^^^^^^^^^^
+C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:1480: in get_original
+    raise AttributeError(
+E   AttributeError: <module 'services.upload_service' from 'D:\\VBSP-SCM\\services\\upload_service.py'> does not have the attribute 'duong_dan_pgd'
+__________ TestMergeMetaGhiVaoKV.test_meta_chua_cac_truong_can_thiet __________
+tests\test_merge_du_lieu_toan_cn.py:634: in test_meta_chua_cac_truong_can_thiet
+    self._run_merge(tmp_path, mock_db, duong_dan_pgd_factory, "hstd")
+tests\test_merge_du_lieu_toan_cn.py:608: in _run_merge
+    patch.object(svc, "duong_dan_pgd", side_effect=fake_duong_dan), \
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:1510: in __enter__
+    original, local = self.get_original()
+                      ^^^^^^^^^^^^^^^^^^^
+C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:1480: in get_original
+    raise AttributeError(
+E   AttributeError: <module 'services.upload_service' from 'D:\\VBSP-SCM\\services\\upload_service.py'> does not have the attribute 'duong_dan_pgd'
+____________ TestMergeMetaGhiVaoKV.test_meta_so_pgd_dung_so_luong _____________
+tests\test_merge_du_lieu_toan_cn.py:650: in test_meta_so_pgd_dung_so_luong
+    self._run_merge(tmp_path, mock_db, duong_dan_pgd_factory, "hstd")
+tests\test_merge_du_lieu_toan_cn.py:608: in _run_merge
+    patch.object(svc, "duong_dan_pgd", side_effect=fake_duong_dan), \
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:1510: in __enter__
+    original, local = self.get_original()
+                      ^^^^^^^^^^^^^^^^^^^
+C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:1480: in get_original
+    raise AttributeError(
+E   AttributeError: <module 'services.upload_service' from 'D:\\VBSP-SCM\\services\\upload_service.py'> does not have the attribute 'duong_dan_pgd'
+_______________ TestMergeAuditLog.test_audit_ghi_sau_thanh_cong _______________
+tests\test_merge_du_lieu_toan_cn.py:675: in test_audit_ghi_sau_thanh_cong
+    with patch.object(svc, "duong_dan_pgd", side_effect=fake_duong_dan), \
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:1510: in __enter__
+    original, local = self.get_original()
+                      ^^^^^^^^^^^^^^^^^^^
+C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:1480: in get_original
+    raise AttributeError(
+E   AttributeError: <module 'services.upload_service' from 'D:\\VBSP-SCM\\services\\upload_service.py'> does not have the attribute 'duong_dan_pgd'
+__________ TestMergeAuditLog.test_audit_detail_chua_loai_va_so_dong ___________
+tests\test_merge_du_lieu_toan_cn.py:699: in test_audit_detail_chua_loai_va_so_dong
+    with patch.object(svc, "duong_dan_pgd", side_effect=fake_duong_dan), \
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:1510: in __enter__
+    original, local = self.get_original()
+                      ^^^^^^^^^^^^^^^^^^^
+C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:1480: in get_original
+    raise AttributeError(
+E   AttributeError: <module 'services.upload_service' from 'D:\\VBSP-SCM\\services\\upload_service.py'> does not have the attribute 'duong_dan_pgd'
+_____________________ TestMergeGQVL.test_gqvl_thanh_cong ______________________
+tests\test_merge_du_lieu_toan_cn.py:734: in test_gqvl_thanh_cong
+    with patch.object(svc, "duong_dan_pgd", side_effect=fake_duong_dan), \
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:1510: in __enter__
+    original, local = self.get_original()
+                      ^^^^^^^^^^^^^^^^^^^
+C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:1480: in get_original
+    raise AttributeError(
+E   AttributeError: <module 'services.upload_service' from 'D:\\VBSP-SCM\\services\\upload_service.py'> does not have the attribute 'duong_dan_pgd'
+____________ TestMergeGQVL.test_gqvl_nguon_von_khong_bi_ep_numeric ____________
+tests\test_merge_du_lieu_toan_cn.py:760: in test_gqvl_nguon_von_khong_bi_ep_numeric
+    with patch.object(svc, "duong_dan_pgd", side_effect=fake_duong_dan), \
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:1510: in __enter__
+    original, local = self.get_original()
+                      ^^^^^^^^^^^^^^^^^^^
+C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:1480: in get_original
+    raise AttributeError(
+E   AttributeError: <module 'services.upload_service' from 'D:\\VBSP-SCM\\services\\upload_service.py'> does not have the attribute 'duong_dan_pgd'
+____ TestMergeConcurrency.test_merge_dong_thoi_2_luong_khong_corrupt_file _____
+tests\test_merge_du_lieu_toan_cn.py:819: in test_merge_dong_thoi_2_luong_khong_corrupt_file
+    assert not errors, f"L\u1ed7i khi ch\u1ea1y \u0111\u1ed3ng th\u1eddi: {errors}"
+E   AssertionError: L\u1ed7i khi ch\u1ea1y \u0111\u1ed3ng th\u1eddi: [AttributeError("<module 'services.upload_service' from 'D:\\\\\\\\VBSP-SCM\\\\\\\\services\\\\\\\\upload_service.py'> does not have the attribute 'duong_dan_pgd'"), AttributeError("<module 'services.upload_service' from 'D:\\\\\\\\VBSP-SCM\\\\\\\\services\\\\\\\\upload_service.py'> does not have the attribute 'duong_dan_pgd'")]
+E   assert not [AttributeError("<module 'services.upload_service' from 'D:\\\\VBSP-SCM\\\\services\\\\upload_service.py'> does not ha....upload_service' from 'D:\\\\VBSP-SCM\\\\services\\\\upload_service.py'> does not have the attribute 'duong_dan_pgd'")]
+______________ TestSmokeRender.test_render[tabs.tab_so_sanh_ky] _______________
+tests\test_smoke_imports.py:254: in test_render
+    pytest.fail(f"{module_name}.render() th\u1ea5t b\u1ea1i: {err}")
+E   Failed: tabs.tab_so_sanh_ky.render() th\u1ea5t b\u1ea1i: NameError: name '_ts' is not defined
+---------------------------- Captured stdout call -----------------------------
+DEBUG:tests.test_smoke_imports:L\u1ed7i render tabs.tab_so_sanh_ky: name '_ts' is not defined\nTraceback (most recent call last):\n  File "D:\\VBSP-SCM\\tests\\test_smoke_imports.py", line 183, in _try_render\n    mod.render(*args, **call_kwargs)\n    ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^\n  File "D:\\VBSP-SCM\\tabs\\tab_so_sanh_ky\\__init__.py", line 30, in render\n    render_moc_nam(None, **kwargs)\n    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^\n  File "D:\\VBSP-SCM\\tabs\\tab_so_sanh_ky\\render_moc_nam.py", line 947, in render_moc_nam\n    _render_hstd_section(df_full, df, role, pgd_user, pgd_mode, key_prefix)\n    ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File "D:\\VBSP-SCM\\tabs\\tab_so_sanh_ky\\render_moc_nam.py", line 240, in _render_hstd_section\n    df_bl_full = doc_baseline_merged(chon_nam)\n  File "D:\\VBSP-SCM\\data\\hstd.py", line 162, in doc_baseline_merged\n    return doc_baseline(nam, _ts)\n                             ^^^\nNameError: name '_ts' is not defined
+------------------------------ Captured log call ------------------------------
+DEBUG    tests.test_smoke_imports:test_smoke_imports.py:196 L\u1ed7i render tabs.tab_so_sanh_ky: name '_ts' is not defined\nTraceback (most recent call last):\n  File "D:\\VBSP-SCM\\tests\\test_smoke_imports.py", line 183, in _try_render\n    mod.render(*args, **call_kwargs)\n    ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^\n  File "D:\\VBSP-SCM\\tabs\\tab_so_sanh_ky\\__init__.py", line 30, in render\n    render_moc_nam(None, **kwargs)\n    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^\n  File "D:\\VBSP-SCM\\tabs\\tab_so_sanh_ky\\render_moc_nam.py", line 947, in render_moc_nam\n    _render_hstd_section(df_full, df, role, pgd_user, pgd_mode, key_prefix)\n    ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File "D:\\VBSP-SCM\\tabs\\tab_so_sanh_ky\\render_moc_nam.py", line 240, in _render_hstd_section\n    df_bl_full = doc_baseline_merged(chon_nam)\n  File "D:\\VBSP-SCM\\data\\hstd.py", line 162, in doc_baseline_merged\n    return doc_baseline(nam, _ts)\n                             ^^^\nNameError: name '_ts' is not defined
+============================== warnings summary ===============================
+tests/test_alert_center.py::TestCanhBaoNoKhoanh::test_ngay_khong_phan_tich_duoc_bi_bo_qua
+  D:\VBSP-SCM\alert_center.py:218: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
+    df['_ngay_het'] = pd.to_datetime(
+
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_upload_khnv]
+  C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\site-packages\openpyxl\styles\stylesheet.py:237: UserWarning: Workbook contains no default style, apply openpyxl's default
+    warn("Workbook contains no default style, apply openpyxl's default")
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=============================== tests coverage ================================
+_______________ coverage: platform win32, python 3.14.5-final-0 _______________
+
+Name                                    Stmts   Miss  Cover   Missing
+---------------------------------------------------------------------
+_check_render_sigs.py                      28     28     0%   2-33
+_debug_load.py                             19     19     0%   1-26
+_edit_dgd_helpers.py                       54     54     0%   2-93
+_parse_dgd.py                              60     60     0%   1-93
+_patch_dkt.py                              37     37     0%   2-75
+_patch_full.py                             41     41     0%   2-63
+_patch_khtd.py                             10     10     0%   1-35
+_test_exempt.py                             2      2     0%   1-2
+_verify_helpers.py                         11     11     0%   1-11
+alert_center.py                           223    163    27%   58-59, 63, 67, 79-84, 89-94, 99-101, 106-111, 127-161, 169-203, 243-269, 274-285, 292-304, 317-348, 369-434
+app.py                                    296    296     0%   5-570
+auth.py                                   462    396    14%   182, 191, 200, 219, 241-247, 260-276, 280, 284-287, 291-310, 317, 341-426, 435-581, 593-888, 893-1076
+backup_service.py                         183    163    11%   51-106, 116-128, 153-228, 235-250, 273-326
+check_hon_quan_hstd.py                     90     90     0%   6-137
+components\__init__.py                      0      0   100%
+components\delta_card.py                   32     26    19%   10-14, 45-72, 85, 102-105
+components\export_pdf.py                  159    115    28%   29-30, 50-51, 66-69, 74-124, 129-132, 162-310, 320
+components\filter_bar.py                   77     55    29%   34-132
+components\loan_drawer.py                  49     39    20%   61-63, 68-83, 94, 148-181
+components\movers.py                      148    100    32%   43-46, 125-129, 139-154, 173-174, 203-326
+config.py                                 370     22    94%   57-67, 94, 100-101, 106-107, 113-114, 131-132, 1708-1709
+data\__init__.py                            3      0   100%
+data\cdtotkvv.py                          164     48    71%   26, 59, 62, 70, 73, 76-78, 81, 87, 96-111, 119-120, 126, 134-136, 139, 150, 154, 162-164, 167, 182, 193-194, 208-242
+data\core.py                              100     38    62%   35-58, 83, 88-97, 103-105, 111, 133, 168-169, 197-198, 233-234
+data\den_han.py                            82     66    20%   26-30, 35-48, 53-76, 82-89, 93-99, 103-121, 125-156
+data\dgd_helpers.py                       151    101    33%   20, 26-36, 40-46, 56, 64-70, 75, 79, 95-100, 104-111, 115-122, 126-133, 148-187, 206, 208-211, 221-231, 245, 249-258
+data\giao_ban.py                          512    456    11%   39, 103-201, 206-276, 285-367, 380-455, 480-928, 942-974
+data\hstd.py                              287    156    46%   21-25, 36-39, 45-54, 84-86, 95, 105-110, 120, 123-159, 169-175, 186-190, 192-196, 207-218, 231-244, 252-259, 264-267, 350-351, 356-357, 362-363, 379-408, 423-507
+data\khtd.py                              117     81    31%   25-26, 30-41, 47, 52, 63-64, 73, 88-106, 114-124, 138-149, 183-208, 213-218
+data\pgd.py                               244    103    58%   55, 68, 70, 72, 74-77, 81, 87-89, 121, 124-125, 164-165, 184-185, 188, 215-222, 237-261, 267-270, 275, 281, 314-317, 322-325, 331-336, 341, 352-364, 373, 382-383, 385, 396-412, 418-430
+db.py                                     483    286    41%   27-28, 44-45, 80-96, 103-134, 140-144, 150-153, 577-578, 651-657, 659-660, 685-686, 699-700, 712-713, 729-737, 749-760, 779-780, 789-802, 813-814, 842, 850-852, 871-877, 890-912, 922-937, 960-967, 976-983, 991, 1021-1118, 1127-1146, 1155-1174, 1187-1207, 1221-1243, 1251-1258, 1263-1274, 1279-1295, 1300-1318, 1322-1346, 1350-1364
+gen_dcgiam_sheet.py                        94     94     0%   3-162
+health_check.py                           177    177     0%   7-310
+logger.py                                  26      0   100%
+pdf_service.py                            564    400    29%   30-31, 59, 74-77, 105-106, 151-156, 180-185, 204, 208-211, 214-215, 232-233, 258, 260, 262, 264, 266, 268, 270, 272, 279, 369-413, 430-455, 473-719, 734, 752-776, 782-801, 809, 842-1020, 1036-1267
+seed_hstd_data.py                         118    118     0%   14-253
+services\__init__.py                        6      0   100%
+services\bc_tongquan_service.py           183    163    11%   51-85, 102-127, 140-169, 190-217, 234-268, 273-286, 291-310, 315-324, 329-338, 355-361, 378-461
+services\cbtd_dia_ban_service.py          129    129     0%   9-295
+services\cdtotkvv_service.py               86     16    81%   23-26, 37, 42-44, 65-66, 74, 97-101
+services\ct_discovery.py                  202    173    14%   21-24, 52-56, 71-80, 91-109, 118-119, 124-125, 130-132, 150-187, 205-233, 248-303, 318-344, 366-465, 474-482
+services\data_priority.py                  14      7    50%   11-24
+services\data_priority_service.py         127    109    14%   31-48, 59-99, 104-114, 122, 127-146, 154-172, 179-196, 203-227, 234-258
+services\data_quality.py                  145     12    92%   97, 192, 219-220, 233, 277-281, 290, 301
+services\du_phong_service.py               92     26    72%   18-21, 55-64, 125, 128-130, 161-170, 178, 181, 246, 253-258
+services\excel_service.py                 235     33    86%   13-14, 64-70, 75, 78-79, 116-119, 128, 156-158, 212, 224-225, 250-251, 253-258, 384-385
+services\file_detection_service.py        184    134    27%   62, 76-128, 175-223, 238-333
+services\hhi_service.py                    41      0   100%
+services\khnv_noi_bo_service.py           269    250     7%   22-172, 177-348, 601-611, 616-620
+services\khtd_import_service.py           189    189     0%   6-326
+services\khtd_mau07_service.py            425     94    78%   24-27, 56-60, 80-82, 91-93, 97-107, 120, 141, 145, 156, 161-162, 170-171, 176-185, 199-202, 206-218, 222-225, 282-285, 419-421, 450-451, 458-460, 515-535, 587-590
+services\khtd_nhap_service.py             175     61    65%   17-20, 56-88, 106-109, 115-122, 130-147, 174-175, 188-189, 201, 210-211, 230-231, 242, 247, 252, 255-256
+services\khtd_service.py                  406    260    36%   61, 95, 138-140, 151-152, 178, 201-209, 212-220, 232-252, 267-325, 333-389, 448-452, 462-519, 523-528, 538-563, 573-574, 583-606, 631-650, 654, 661-676, 688-709, 723-784
+services\kiem_soat_service.py             485    352    27%   81-95, 118, 139-140, 146, 160, 183-185, 227, 247-329, 339-413, 481-508, 512-518, 522-532, 536-555, 566-569, 588-621, 631-672, 690-749, 767-980, 998-1141
+services\ktnb_service.py                  449    338    25%   90, 128, 163, 173-174, 179-275, 295, 300-301, 325-370, 375-411, 421-427, 437-454, 459-542, 576-590, 601-633, 654-664, 669-688, 693-807, 826-861
+services\migration_service.py              98     30    69%   30-47, 60-61, 90, 158-171
+services\no_khoanh_service.py              22      0   100%
+services\no_rui_ro_service.py              19      0   100%
+services\pdf_no_khoanh_service.py         686    619    10%   47-48, 58, 69-81, 91, 98-105, 109-120, 124-127, 131-134, 140, 144, 148, 153, 157, 161, 165, 169, 173, 177, 180, 184, 188, 192, 201-258, 263-286, 290-295, 304-395, 400-539, 546-687, 691-804, 816-973, 978-1063, 1069-1169, 1174-1262, 1273-1447
+services\period_compare.py                131      3    98%   200-201, 273
+services\report_service.py                151     15    90%   18-21, 87-88, 248-256
+services\rui_ro_aggregation.py             15      0   100%
+services\so_sanh_ky_service.py            140     13    91%   76, 81, 89-90, 94, 117, 128-129, 146, 156, 158, 187-188
+services\task_data_service.py              13      4    69%   19, 28, 32, 44
+services\template_service.py              880     95    89%   45, 53-63, 71-85, 90-106, 118-128, 136-169, 180-181, 187-188, 213-218, 512, 645-667, 786, 1123, 1197-1198, 1250, 1303-1304
+services\tien_do_excel_service.py          82      0   100%
+services\tien_do_pdf_service.py           295    285     3%   38-450, 454-641
+services\tien_do_service.py               110     25    77%   46-48, 136, 141, 148-152, 158-160, 260-262, 266-269, 284-301
+services\tongquan_service.py              270    115    57%   46-50, 100, 102, 111, 143, 147-153, 159-165, 172-178, 271, 276-282, 296, 316, 318, 332-345, 350, 362, 373-376, 389, 391, 413-427, 432-515
+services\upload_center.py                  80     80     0%   12-206
+services\upload_service.py                539    445    17%   41-42, 110-132, 190-195, 205-216, 239-294, 332-346, 352-394, 405-420, 425-432, 435, 446-633, 658-763, 782-928, 962-976, 990-998, 1027-1055
+services\uy_thac_service.py               167     42    75%   47, 84, 91, 99, 112, 115-117, 133, 142, 145-147, 164-169, 182, 209, 224-240, 253-273, 303-324
+services\validation_service.py            132     88    33%   47-48, 54-58, 62-69, 73-84, 109-144, 148-154, 164-170, 180-187, 196-202, 212-231, 242, 247, 252, 256-259, 263, 287, 301-302
+services\word_xln_service.py             1098    393    64%   250-252, 269, 419, 494-525, 695, 703-714, 717-724, 743-778, 896-903, 906-940, 992-999, 1096-1110, 1116, 1263-1277, 1283, 1332-1362, 1367-1388, 1393-1465, 1470-1503, 1508-1547, 1552-1577, 1583-1647, 1652-1663, 1668-1682
+services\xlrr_service.py                  222    222     0%   2-406
+snapshot_service.py                       333    224    33%   23-25, 58-60, 93, 104, 106, 108, 166-169, 186-188, 205-207, 219-221, 230-246, 258-324, 330-342, 348-356, 365-377, 389-447, 453-465, 471-479, 492-574, 580-592, 598-606, 615-617
+state_manager.py                          139     49    65%   24-26, 41-43, 51-52, 55-56, 59-60, 63, 76, 79-81, 84, 87, 99, 102-104, 107-108, 111, 166-184, 206-209, 244, 261, 268, 272, 278, 282, 289-296, 301
+tabs\__init__.py                            0      0   100%
+tabs\base_tab.py                           37      0   100%
+tabs\bc_tong_hop.py                       320    190    41%   59-60, 63-66, 69-72, 77-80, 93-119, 137-138, 140-143, 146-149, 180-182, 191-233, 256, 259-261, 316-319, 348-351, 360-382, 386-403, 407-426, 431-443, 448-462, 475, 484-515, 525-526, 530-532, 537-596, 601-640
+tabs\tab_audit_log.py                     106     46    57%   36-37, 39-40, 42-43, 48, 69-70, 77, 84-133, 168-169
+tabs\tab_ban_dai_dien.py                  341    292    14%   70-72, 76-79, 83-92, 98-117, 130-175, 179-261, 265-367, 371-372, 376-435, 439-569, 594-609
+tabs\tab_baocao.py                        475    357    25%   83-92, 132-134, 145-146, 154-156, 160, 175-176, 183-185, 196-197, 203, 205, 207, 228-278, 281-325, 328-363, 404-544, 552-557, 560-567, 571-585, 587-594, 598-612, 614-998
+tabs\tab_candoi.py                        292    151    48%   131-132, 156-158, 176, 189-193, 196-199, 202-203, 214-216, 221-223, 226-229, 248, 259, 264-278, 311, 330-349, 352-353, 362, 413-447, 451, 455-500, 516-536, 543, 554-574, 581, 585, 587-624, 632-639
+tabs\tab_canh_bao_nqh.py                  593    593     0%   4-1110
+tabs\tab_canh_bao_som.py                  142    110    23%   38-40, 45, 64-94, 109-124, 129-153, 160-202, 214-307, 339-348
+tabs\tab_cbtd.py                          330    252    24%   66-68, 81-91, 94-96, 100-105, 108-114, 130-173, 181-215, 222-309, 317, 339-340, 352-363, 368-511, 522, 526-587
+tabs\tab_cbtd_dashboard.py                122    122     0%   10-275
+tabs\tab_cdtotkvv.py                      545    449    18%   73-249, 285-288, 305-394, 402-403, 413-576, 585-586, 596-832, 841-842, 851-880, 886-1059, 1078-1079, 1083-1084, 1106
+tabs\tab_cdtotkvv_pgd.py                  335    246    27%   45-46, 53, 66, 69, 73-82, 97, 107-129, 140-387, 401-565, 570-584, 597-598, 601-602, 642-673
+tabs\tab_checklist_bc.py                  323     74    77%   38, 45-50, 55-58, 70-72, 85, 101, 140, 143, 148, 170, 173, 176, 179, 181-182, 224, 226, 230, 234-235, 241, 253-254, 306-308, 314-315, 368-381, 384-389, 409-429, 440, 458-459, 488-489
+tabs\tab_danhsach.py                      220     35    84%   43, 53, 155, 157, 159, 161, 163, 166-169, 232-233, 237-243, 245, 261-264, 271-278, 303, 309, 311, 320-322, 435-438
+tabs\tab_den_han.py                       270    233    14%   35-36, 38, 43-49, 53-57, 83-101, 106-108, 114-523
+tabs\tab_diem_gd_pgd.py                   277    235    15%   43-47, 52-68, 76-78, 82-86, 91-105, 109-150, 167-229, 233-260, 265-384, 404-405, 417-460
+tabs\tab_gqvl.py                          189     69    63%   108, 187-188, 191-194, 201, 206-207, 212-213, 222-233, 277-305, 314-338, 347-406, 424, 426, 428, 457-460, 467-474
+tabs\tab_hhi.py                           136    108    21%   45-47, 58-62, 76-107, 115-154, 159-218, 227-281, 311-373
+tabs\tab_kehoach.py                       172    100    42%   42-44, 66-70, 73-79, 83, 87, 98-100, 103-112, 126, 132-156, 161, 169-175, 180-185, 188-195, 201-202, 208-214, 232-296
+tabs\tab_kh_gqvl.py                       101     39    61%   35-37, 100-116, 124-125, 128-129, 133-166
+tabs\tab_khnv_noi_bo.py                   663    449    32%   80-81, 94-148, 153-157, 167-227, 238-371, 390-444, 458-470, 488, 495-552, 560-587, 605-633, 664-665, 678-704, 725-726, 739-765, 784-806, 844-847, 876, 893-908, 919, 956-963, 965, 980-996, 1010-1018, 1026-1045, 1072-1172, 1289-1291
+tabs\tab_khtd.py                          261    158    39%   100, 116-122, 126-133, 138, 158-163, 166-180, 184-194, 198, 205-209, 215-261, 273, 275, 306-357, 367-401, 413, 416-417
+tabs\tab_khtd_giao_dc.py                  319    157    51%   26-29, 38, 59-66, 111-117, 119-125, 141, 165-202, 216, 238-256, 266-292, 300-378, 450-454, 467-495, 532-559, 576-593, 604-614, 617-629, 633-655, 673-692, 771, 774-775
+tabs\tab_khtd_mau07.py                    267    130    51%   70, 85-117, 139-140, 159, 163, 167-168, 183-192, 196-197, 200-204, 212, 257-260, 267-269, 272-293, 302, 315, 320-325, 330-335, 340-342, 344-345, 352-366, 421-423, 472-514, 518-550
+tabs\tab_khtd_nhap.py                     568    282    50%   63-67, 72, 84-120, 134-135, 147-164, 172-189, 193-207, 223-228, 255-282, 302-314, 524-533, 545, 579-580, 590-601, 633-644, 658-668, 709-789, 793-805, 838-880, 905-906, 910-991, 1022-1042, 1046-1048, 1197, 1238-1306, 1309-1315, 1319-1326
+tabs\tab_khtd_pgd.py                      423    179    58%   66, 74-78, 82, 93-129, 149-150, 162-174, 182-194, 229-247, 264, 268-270, 274-280, 283-298, 303-307, 311-313, 338-341, 358-384, 390-418, 428, 452, 543-547, 568-569, 577-582, 590, 592, 612-622, 644-650, 658-663, 682
+tabs\tab_khtd_xuat.py                     475    403    15%   24-28, 35-37, 75, 86-304, 322-471, 490-701, 706-786, 806-833, 838-847, 851-858
+tabs\tab_kiem_soat.py                      63     51    19%   27-81, 86-125, 130-137
+tabs\tab_nhiem_vu.py                      485    347    28%   49, 52-56, 62, 67-75, 79, 83, 91, 107-112, 117-122, 135-166, 171-177, 186-219, 286-349, 368-520, 607-642, 660-730, 739-788, 793-896, 927-932, 941-1067
+tabs\tab_no_khoanh.py                     631    586     7%   59, 63, 67, 72-107, 112-153, 187-370, 389-522, 541-697, 714-804, 837-1367
+tabs\tab_no_rui_ro.py                     559    522     7%   70-76, 80-84, 88-89, 93-103, 111-158, 174-460, 465-759, 780-1071
+tabs\tab_nq11.py                          101     22    78%   98-99, 101-102, 105-106, 138-139, 145, 152, 154, 166-172, 200-210, 217-224
+tabs\tab_phoi_hop_pgd.py                  204    133    35%   43-46, 50, 54, 84, 90, 96-120, 130-218, 227-308, 336
+tabs\tab_qd62.py                          393    331    16%   54, 56, 61, 66-68, 73-76, 81-82, 87-92, 96, 104-274, 288-290, 293, 315-614, 631-632, 644-650
+tabs\tab_qlnk_dashboard.py                144    111    23%   31-32, 36-39, 44-46, 51-65, 69-83, 87-124, 148-274
+tabs\tab_quan_ly_bc.py                     15      0   100%
+tabs\tab_quan_ly_cv.py                     17      0   100%
+tabs\tab_quan_ly_dgd.py                   283    117    59%   44, 47, 54-61, 77, 84-86, 94, 112-113, 124, 130, 150, 174-214, 233, 238-241, 255-256, 278-279, 286-287, 292, 310-336, 350-352, 361-362, 376-377, 401-405, 420-421, 424, 431-438, 442-461
+tabs\tab_so_sanh_2_ky.py                  335    292    13%   38-42, 55-64, 69-73, 78, 82, 87-92, 100-122, 127-131, 137-152, 175-214, 227-240, 250-302, 331-359, 370-420, 430-495, 504-576, 585-712, 735-814
+tabs\tab_so_sanh_ky.py                      5      5     0%   6-15
+tabs\tab_so_sanh_ky\__init__.py            17      1    94%   32
+tabs\tab_so_sanh_ky\_common.py            103     83    19%   18-25, 30-34, 38, 42, 47-52, 57-62, 72-80, 114, 120-123, 149-152, 168-189, 208-212, 226-244, 259-316
+tabs\tab_so_sanh_ky\_export.py            248    212    15%   30-31, 42-45, 55-61, 78-79, 83, 97, 113-118, 129-158, 170-223, 234-240, 265-340, 346, 379-418, 437-509, 525-596, 600-633, 646-657
+tabs\tab_so_sanh_ky\render_2_ky.py        252    230     9%   31-35, 52-74, 80-113, 124-136, 143-194, 220-228, 239-288, 294-345, 351-451, 457-570, 574-583
+tabs\tab_so_sanh_ky\render_moc_nam.py     419    360    14%   87-88, 91, 97-103, 108, 123-193, 208-216, 235-236, 241-555, 571-672, 687-775, 790-906, 948-953
+tabs\tab_tien_do.py                       657    600     9%   86-87, 89-90, 96-249, 253-456, 460-729, 733-1053, 1057-1262, 1288-1289, 1292-1300, 1303-1304, 1321-1324
+tabs\tab_tien_do_nop.py                   306    189    38%   43, 46-47, 50-57, 65-70, 85-87, 92-102, 106-111, 121-253, 269-331, 354-388, 480-483, 501-505, 510-511, 518, 528-529
+tabs\tab_tong_hop_cv.py                   160     72    55%   29-30, 43-44, 58-64, 68-69, 94-95, 106-114, 122-123, 146-147, 152-218, 233-247, 280-281, 292-293, 304-305
+tabs\tab_tongquan.py                      594    279    53%   87-88, 108-109, 165-203, 227-231, 389, 396-406, 422-424, 431-487, 492-578, 619, 631, 636, 697, 717-756, 760, 784-785, 790-793, 812-840, 845, 880, 898-900, 923, 989-996, 999-1007, 1011-1048, 1052-1062, 1119-1121, 1126, 1128, 1130, 1132, 1134, 1164-1361, 1364-1383, 1405-1413
+tabs\tab_tracuu.py                        301    231    23%   35-36, 51-62, 77-82, 98-103, 127-130, 135-137, 175-213, 218-225, 247-353, 373-425, 474, 476-485, 521-522, 525-528, 534, 536, 538-543, 545, 547, 556-622
+tabs\tab_trang_thai_nguon.py              554    235    58%   88-90, 100-102, 107-115, 125-128, 154, 200, 220, 228-230, 246-248, 274-288, 299-315, 318-320, 323, 332-345, 355-356, 369, 388, 397-402, 427-438, 471-472, 481-483, 497-502, 517-522, 536, 541-547, 567, 569, 572-574, 601-603, 611, 617-619, 629-632, 663-673, 689-711, 718, 725, 734, 749-751, 774-775, 777-793, 809-861, 879-896, 903-918, 951-952, 954-955, 957-958, 972-976, 1003-1004, 1031-1042
+tabs\tab_upload_khnv.py                   704    563    20%   94, 101-108, 119-147, 163-208, 218-289, 294-302, 307-449, 485-687, 697-716, 725-772, 778, 803-856, 904, 906, 934-937, 948-966, 973-1119, 1141-1166, 1173-1212, 1226-1227, 1259-1262, 1292-1342, 1345-1360, 1363-1373
+tabs\tab_upload_pgd.py                    226    200    12%   65-115, 124-166, 174-209, 224-267, 278-371, 376-396, 420-482
+tabs\tab_uy_thac.py                       598    434    27%   70-72, 77-79, 84-86, 93-95, 103-125, 136-159, 171-304, 314-451, 460-603, 624-633, 638, 643-810, 844, 856-917, 977-1007, 1039, 1041, 1052-1113, 1127-1177, 1195, 1213
+tabs\tab_xay_dung_khtd.py                 309    309     0%   5-616
+tabs\tab_xlrr_tong_hop.py                 167     90    46%   27, 29, 31, 35, 53-56, 59, 69-84, 96-101, 146-187, 195-231, 239-257, 270-272, 291-296
+tabs\tab_xu_ly_rui_ro.py                  362    362     0%   4-799
+tests\__init__.py                           0      0   100%
+tests\conftest.py                          96     22    77%   31, 59-62, 64, 85-88, 90-92, 94-100, 102, 130
+tests\fixtures.py                           9      9     0%   1-24
+tests\test_alert_center.py                 56      2    96%   67, 84
+tests\test_auth.py                         62      1    98%   267
+tests\test_cdtotkvv_service.py             69      0   100%
+tests\test_config.py                       21      1    95%   76
+tests\test_core.py                        133      0   100%
+tests\test_currency.py                     56      0   100%
+tests\test_data_quality.py                128      0   100%
+tests\test_db.py                           64      1    98%   124
+tests\test_du_phong_service.py             60      1    98%   148
+tests\test_excel_service.py                68      0   100%
+tests\test_file_detection_service.py       84      0   100%
+tests\test_filter_bar.py                   55      0   100%
+tests\test_giao_ban.py                     56      0   100%
+tests\test_hhi_service.py                  77      0   100%
+tests\test_hstd.py                        140      0   100%
+tests\test_khnv_noi_bo_service.py          23      0   100%
+tests\test_khtd_mau07_service.py           39      2    95%   84-85
+tests\test_khtd_nhap_service.py           132      0   100%
+tests\test_khtd_service.py                111      1    99%   38
+tests\test_kiem_soat_service.py            91      0   100%
+tests\test_kiem_soat_to_sai_so_tv.py       63      0   100%
+tests\test_ktnb_db.py                      86      1    99%   279
+tests\test_ktnb_service.py                 74      1    99%   166
+tests\test_merge_du_lieu_toan_cn.py       331    102    69%   45-47, 141, 147-150, 184-187, 207-210, 230-232, 253-257, 268-272, 286-290, 301-304, 328-330, 341-344, 359-361, 378-380, 391-398, 432-441, 468-470, 481-484, 509-512, 538-543, 571-572, 584-589, 617, 626-627, 636-643, 652-657, 684-687, 708-717, 743-746, 769-773, 810, 820-823
+tests\test_migration_service.py           115      0   100%
+tests\test_movers.py                       61      0   100%
+tests\test_no_khoanh_service.py            44      0   100%
+tests\test_no_rui_ro_service.py            75      0   100%
+tests\test_pdf_service.py                  39      0   100%
+tests\test_period_compare.py              145      0   100%
+tests\test_pgd.py                          57      0   100%
+tests\test_report_service.py               47      0   100%
+tests\test_rui_ro_aggregation.py           44      0   100%
+tests\test_smoke_imports.py                96     10    90%   23-24, 119-120, 167-172
+tests\test_smoke_snapshot.py               24      0   100%
+tests\test_snapshot_service.py            111      2    98%   232-233
+tests\test_so_sanh_ky_service.py          124      0   100%
+tests\test_tien_do_excel_service.py        57      0   100%
+tests\test_tien_do_service.py              37      0   100%
+tests\test_tongquan_service.py             55      0   100%
+tests\test_upload_service.py               85      5    94%   23-24, 34, 128-129
+tests\test_utils.py                        95      1    99%   239
+tests\test_uy_thac_service.py             142      0   100%
+tests\test_uythac_template_service.py      57      0   100%
+tests\test_word_xln_service.py             91      0   100%
+utils.py                                  380    218    43%   43-82, 105-106, 121, 152-153, 170-180, 191, 284, 288, 291-293, 312-313, 322-323, 353-362, 370-387, 406-437, 446-484, 489-493, 509-552, 570-618, 626-634, 651, 653, 694-703
+utils_theme.py                              9      9     0%   5-370
+widgets\__init__.py                         2      0   100%
+widgets\data_source_status.py             109     91    17%   32-33, 46-68, 73-82, 87-122, 127-151, 159-191, 197
+widgets\status_widget.py                   45     37    18%   15-32, 37-45, 49-68
+workspaces\__init__.py                     10      5    50%   10-14
+workspaces\ws_executive.py                730    663     9%   55, 72-81, 86-90, 101-156, 165-166, 172-202, 213-253, 260-351, 375-393, 417-670, 685-718, 723-765, 773-823, 831-916, 927-1019, 1027-1059, 1073-1171, 1190-1252, 1259-1327, 1356-1492, 1501-1506, 1511-1540, 1545-1552, 1557-1559, 1564-1567, 1572-1618, 1640, 1665-1728, 1754, 1764-1846
+workspaces\ws_management.py               490    410    16%   59-61, 69-204, 209-210, 221-222, 227-241, 246-503, 511-750, 823-966, 971, 974, 1000, 1011-1012, 1025-1049
+workspaces\ws_operation.py                969    871    10%   75-171, 178-315, 323-444, 449, 454, 460-469, 479-595, 607-630, 635-852, 862-955, 962-1232, 1251, 1270-1286, 1290-1291, 1293, 1304-1308, 1312-1316, 1320-1395, 1398-1520, 1523-1599, 1618-1670, 1673-1739, 1742-1744, 1858, 1862-1863, 1886-1887
+---------------------------------------------------------------------
+TOTAL                                   38980  23836    39%
+=========================== short test summary info ===========================
+FAILED tests/test_alert_center.py::TestCanhBaoNoKhoanh::test_31_den_180_la_canh_bao
+FAILED tests/test_alert_center.py::TestCanhBaoNoKhoanh::test_hon_hop_3_truong_hop
+FAILED tests/test_alert_center.py::TestCanhBaoNoKhoanh::test_chi_tiet_canh_bao_la_list_dict
+FAILED tests/test_ktnb_db.py::TestKtnbDotKiemTra::test_delete_dot_cascade - a...
+FAILED tests/test_merge_du_lieu_toan_cn.py::TestMergeKhongCoFile::test_khong_pgd_nao_co_file
+FAILED tests/test_merge_du_lieu_toan_cn.py::TestMergeMotPGD::test_thanh_cong_ghi_parquet
+FAILED tests/test_merge_du_lieu_toan_cn.py::TestMergeMotPGD::test_ket_qua_chua_ten_don_vi_va_so_dong
+FAILED tests/test_merge_du_lieu_toan_cn.py::TestMergeMotPGD::test_duong_dan_tra_ve_la_cache_path
+FAILED tests/test_merge_du_lieu_toan_cn.py::TestMergeNhieuPGD::test_concat_nhieu_pgd_dung_so_dong
+FAILED tests/test_merge_du_lieu_toan_cn.py::TestMergeNhieuPGD::test_cot_ten_pgd_duoc_gan_dung
+FAILED tests/test_merge_du_lieu_toan_cn.py::TestMergePGDLoi::test_1_loi_1_ok_van_thanh_cong
+FAILED tests/test_merge_du_lieu_toan_cn.py::TestMergePGDLoi::test_tat_ca_loi_tra_ve_that_bai
+FAILED tests/test_merge_du_lieu_toan_cn.py::TestMergePGDLoi::test_audit_log_ghi_pgd_loi
+FAILED tests/test_merge_du_lieu_toan_cn.py::TestMergePGDCu::test_pgd_cu_duoc_them_vao_meta
+FAILED tests/test_merge_du_lieu_toan_cn.py::TestMergeSchemaNormalize::test_pgd_thieu_cot_duoc_fill_na
+FAILED tests/test_merge_du_lieu_toan_cn.py::TestMergeSchemaNormalize::test_cot_so_duoc_ep_kieu_numeric
+FAILED tests/test_merge_du_lieu_toan_cn.py::TestMergeSchemaNormalize::test_nguon_von_khong_bi_ep_numeric
+FAILED tests/test_merge_du_lieu_toan_cn.py::TestMergeRollback::test_file_bak_duoc_khoi_phuc_khi_to_parquet_loi
+FAILED tests/test_merge_du_lieu_toan_cn.py::TestMergeMetaGhiVaoKV::test_meta_key_dung_loai
+FAILED tests/test_merge_du_lieu_toan_cn.py::TestMergeMetaGhiVaoKV::test_meta_chua_cac_truong_can_thiet
+FAILED tests/test_merge_du_lieu_toan_cn.py::TestMergeMetaGhiVaoKV::test_meta_so_pgd_dung_so_luong
+FAILED tests/test_merge_du_lieu_toan_cn.py::TestMergeAuditLog::test_audit_ghi_sau_thanh_cong
+FAILED tests/test_merge_du_lieu_toan_cn.py::TestMergeAuditLog::test_audit_detail_chua_loai_va_so_dong
+FAILED tests/test_merge_du_lieu_toan_cn.py::TestMergeGQVL::test_gqvl_thanh_cong
+FAILED tests/test_merge_du_lieu_toan_cn.py::TestMergeGQVL::test_gqvl_nguon_von_khong_bi_ep_numeric
+FAILED tests/test_merge_du_lieu_toan_cn.py::TestMergeConcurrency::test_merge_dong_thoi_2_luong_khong_corrupt_file
+FAILED tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_so_sanh_ky]
+================= 27 failed, 814 passed, 2 warnings in 43.55s =================

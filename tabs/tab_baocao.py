@@ -34,8 +34,8 @@ from config import (
 )
 from utils import fmt_so, fmt_ty, vn, ten_file_xuat, hien_thi_dataframe_phan_trang, xuat_excel
 from services import xuat_bao_cao, ten_file_bao_cao
-from pdf_service import nut_xuat_pdf
-from data import (danh_dau_khong_hd_cached, tong_hop_khong_hd_cached, ds_chi_tiet_khong_hd)
+from pdf_service import xuat_pdf_pivot, xuat_pdf_chi_tiet, xuat_pdf_theo_nhom
+from data import (danh_dau_khong_hd_cached, tong_hop_khong_hd_cached, tong_hop_khong_hd, ds_chi_tiet_khong_hd)
 from data.core import ts_file
 from config import CACHE_HSTD
 from auth import la_phan_he_pgd, la_phan_he_cn, la_executive
@@ -374,11 +374,13 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                 horizontal=True, key="bc_loai_th")
 
             dbc_raw = None
+            group_col = None
 
             # ── Xã / thôn ──
             if loai_th == "🏘️ Theo xã/thôn":
                 cap_xa = st.radio("Cấp", ["Theo xã","Theo thôn/ấp"], horizontal=True, key="bc_cap_xa")
                 nhom = COT_TEN_XA if cap_xa == "Theo xã" else COT_TEN_THON
+                group_col = nhom
                 if nhom in df_base.columns:
                     dbc_raw = df_base.groupby(nhom).agg(
                         Số_KH          =(COT_MA_KH,"nunique"),
@@ -401,6 +403,7 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
             # ── ĐVUT ──
             elif loai_th == "🤝 Theo hội đoàn thể (ĐVUT)":
                 if COT_DVUT in df_base.columns:
+                    group_col = COT_DVUT
                     # Đánh dấu 3 tháng không hoạt động
                     df_kh = danh_dau_khong_hd_cached(df_base, ts=ts_file(CACHE_HSTD))
 
@@ -477,6 +480,7 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
 
             # ── Chương trình ──
             elif loai_th == "📌 Theo chương trình vay":
+                group_col = COT_TEN_CT
                 # Lọc thêm nguồn vốn
                 col_f1, col_f2 = st.columns(2)
                 with col_f1:
@@ -542,23 +546,79 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
             # Xuất tổng hợp
             if dbc_raw is not None:
                 st.divider()
-                if st.button("📥 Xuất tổng hợp Excel", key="btn_xuat_th", type="primary"):
-                    data_excel = xuat_bao_cao(
-                        sheets={"Tổng hợp": dbc_raw},
-                        tieu_de="Báo cáo tổng hợp",
-                        nguoi_xuat=username or "Người dùng",
-                    )
-                    state.downloads.set("bc_th_excel", data_excel, ten_file_bao_cao("BC_TH"))
+                col_xl, col_pdf1, col_pdf2 = st.columns(3)
+                with col_xl:
+                    if st.button("📥 Xuất tổng hợp Excel", key="btn_xuat_th", type="primary"):
+                        data_excel = xuat_bao_cao(
+                            sheets={"Tổng hợp": dbc_raw},
+                            tieu_de="Báo cáo tổng hợp",
+                            nguoi_xuat=username or "Người dùng",
+                        )
+                        state.downloads.set("bc_th_excel", data_excel, ten_file_bao_cao("BC_TH"))
 
-                if state.downloads.has("bc_th_excel"):
-                    if st.download_button(
-                        "⬇ Tải Excel",
-                        data=state.downloads.get_bytes("bc_th_excel"),
-                        file_name=state.downloads.get_filename("bc_th_excel") or "BC_TH.xlsx",
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                        key="dl_bc_th",
-                    ):
-                        state.downloads.clear("bc_th_excel")
+                    if state.downloads.has("bc_th_excel"):
+                        if st.download_button(
+                            "⬇ Tải Excel",
+                            data=state.downloads.get_bytes("bc_th_excel"),
+                            file_name=state.downloads.get_filename("bc_th_excel") or "BC_TH.xlsx",
+                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                            key="dl_bc_th",
+                        ):
+                            state.downloads.clear("bc_th_excel")
+                with col_pdf1:
+                    if group_col and group_col in df_base.columns:
+                        if st.button("📄 Xuất PDF Pivot", key="btn_pdf_pivot", type="primary"):
+                            try:
+                                with st.spinner("Đang tạo PDF Pivot..."):
+                                    pdf_bytes = xuat_pdf_pivot(
+                                        df_base, group_col,
+                                        "Báo cáo tổng hợp",
+                                        username or "unknown",
+                                        prefix_file="BC_TH",
+                                    )
+                                state.downloads.set("bc_th_pdf_pivot", pdf_bytes,
+                                    f"BC_TH_{datetime.now().strftime('%d%m%Y_%H%M')}.pdf")
+                                db.ghi_audit(username or "unknown", "xuat_pdf_pivot",
+                                    f"Tổng hợp theo {group_col}")
+                            except Exception as e:
+                                state.downloads.clear("bc_th_pdf_pivot")
+                                st.error(f"❌ Lỗi tạo PDF: {e}")
+                        if state.downloads.has("bc_th_pdf_pivot"):
+                            if st.download_button(
+                                "⬇ Tải PDF Pivot",
+                                data=state.downloads.get_bytes("bc_th_pdf_pivot"),
+                                file_name=state.downloads.get_filename("bc_th_pdf_pivot") or "BC_TH.pdf",
+                                mime="application/pdf",
+                                key="dl_bc_th_pivot",
+                            ):
+                                state.downloads.clear("bc_th_pdf_pivot")
+                with col_pdf2:
+                    if group_col and group_col in df_base.columns:
+                        if st.button("📄 Xuất PDF theo Nhóm", key="btn_pdf_nhom_th", type="primary"):
+                            try:
+                                with st.spinner("Đang tạo PDF theo Nhóm..."):
+                                    pdf_bytes = xuat_pdf_theo_nhom(
+                                        df_base, group_col, COL_CHUNG,
+                                        "Báo cáo chi tiết theo nhóm",
+                                        username or "unknown",
+                                        prefix_file="BC_TH_NHOM",
+                                    )
+                                state.downloads.set("bc_th_pdf_nhom", pdf_bytes,
+                                    f"BC_TH_NHOM_{datetime.now().strftime('%d%m%Y_%H%M')}.pdf")
+                                db.ghi_audit(username or "unknown", "xuat_pdf_nhom",
+                                    f"Theo nhóm {group_col}")
+                            except Exception as e:
+                                state.downloads.clear("bc_th_pdf_nhom")
+                                st.error(f"❌ Lỗi tạo PDF: {e}")
+                        if state.downloads.has("bc_th_pdf_nhom"):
+                            if st.download_button(
+                                "⬇ Tải PDF Nhóm",
+                                data=state.downloads.get_bytes("bc_th_pdf_nhom"),
+                                file_name=state.downloads.get_filename("bc_th_pdf_nhom") or "BC_TH_NHOM.pdf",
+                                mime="application/pdf",
+                                key="dl_bc_th_nhom",
+                            ):
+                                state.downloads.clear("bc_th_pdf_nhom")
 
         # ══════════════════════════════
         # MẢNG 2: CHI TIẾT
@@ -879,12 +939,60 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                             ):
                                 state.downloads.clear("bc_ct_excel")
                     with col_pdf:
-                        nut_xuat_pdf(
-                            df=export_df,
-                            tieu_de=f"Báo cáo — {loai_ct[2:].strip()}",
-                            username=username or "unknown",
-                            cols_tien=[c for c in [COT_DU_NO_TH, COT_DU_NO_QH, COT_TONG_DU_NO]
-                                       if c in export_df.columns],
-                            prefix_file="BC_CT",
-                            key="pdf_bc_ct",
-                        )
+                        col_pdf_ct, col_pdf_nhom = st.columns(2)
+                        with col_pdf_ct:
+                            if st.button("📄 PDF Chi tiết", key="btn_pdf_ct", type="primary"):
+                                try:
+                                    with st.spinner("Đang tạo PDF chi tiết..."):
+                                        pdf_bytes = xuat_pdf_chi_tiet(
+                                            export_df, COL_CHUNG,
+                                            f"Báo cáo — {loai_ct[2:].strip()}",
+                                            username or "unknown",
+                                            prefix_file="BC_CT",
+                                        )
+                                    state.downloads.set("bc_ct_pdf", pdf_bytes,
+                                        f"BC_CT_{datetime.now().strftime('%d%m%Y_%H%M')}.pdf")
+                                    db.ghi_audit(username or "unknown", "xuat_pdf_chi_tiet",
+                                        f"Chi tiết {loai_ct[2:12].strip()}")
+                                except Exception as e:
+                                    state.downloads.clear("bc_ct_pdf")
+                                    st.error(f"❌ Lỗi tạo PDF: {e}")
+                            if state.downloads.has("bc_ct_pdf"):
+                                if st.download_button(
+                                    "⬇ Tải PDF",
+                                    data=state.downloads.get_bytes("bc_ct_pdf"),
+                                    file_name=state.downloads.get_filename("bc_ct_pdf") or "BC_CT.pdf",
+                                    mime="application/pdf",
+                                    key="dl_bc_ct_pdf",
+                                ):
+                                    state.downloads.clear("bc_ct_pdf")
+                        with col_pdf_nhom:
+                            nhom_col = COT_TEN_PGD if COT_TEN_PGD in df_ct.columns else (
+                                COT_TEN_XA if COT_TEN_XA in df_ct.columns else None
+                            )
+                            if nhom_col and nhom_col in df_ct.columns:
+                                if st.button("📄 PDF theo Nhóm", key="btn_pdf_nhom_ct", type="primary"):
+                                    try:
+                                        with st.spinner("Đang tạo PDF theo Nhóm..."):
+                                            pdf_bytes = xuat_pdf_theo_nhom(
+                                                df_ct, nhom_col, COL_CHUNG,
+                                                f"Báo cáo chi tiết — {loai_ct[2:].strip()}",
+                                                username or "unknown",
+                                                prefix_file="BC_CT_NHOM",
+                                            )
+                                        state.downloads.set("bc_ct_pdf_nhom", pdf_bytes,
+                                            f"BC_CT_NHOM_{datetime.now().strftime('%d%m%Y_%H%M')}.pdf")
+                                        db.ghi_audit(username or "unknown", "xuat_pdf_nhom",
+                                            f"Chi tiết theo nhóm {nhom_col}")
+                                    except Exception as e:
+                                        state.downloads.clear("bc_ct_pdf_nhom")
+                                        st.error(f"❌ Lỗi tạo PDF: {e}")
+                                if state.downloads.has("bc_ct_pdf_nhom"):
+                                    if st.download_button(
+                                        "⬇ Tải PDF Nhóm",
+                                        data=state.downloads.get_bytes("bc_ct_pdf_nhom"),
+                                        file_name=state.downloads.get_filename("bc_ct_pdf_nhom") or "BC_CT_NHOM.pdf",
+                                        mime="application/pdf",
+                                        key="dl_bc_ct_nhom",
+                                    ):
+                                        state.downloads.clear("bc_ct_pdf_nhom")

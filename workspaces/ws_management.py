@@ -772,7 +772,7 @@ def _build_all_items(role: str, username: str, **kwargs) -> list:
         },
         {"group": "Giám sát",     "label": "📊 So sánh kỳ",            "icon": "chart-line", "fn": lambda: _get_tab("tab_so_sanh_ky").render(None, **kwargs)},
         {"group": "Kiểm soát",     "label": "Kiểm soát nội bộ",    "icon": "search",         "fn": lambda: _get_tab("tab_kiem_soat").render_tab(df_full, role, kwargs.get("username", "unknown"))},
-        {"group": "Kiểm soát",     "label": "Xử lý nợ rủi ro",   "icon": "alert-circle",   "fn": lambda: _get_tab("tab_xlrr_tong_hop").render(None, **kwargs)},
+        {"group": "Kiểm soát",     "label": "Xử lý Rủi ro",   "icon": "alert-circle",   "fn": lambda: _get_tab("tab_xu_ly_rui_ro").render(None, **kwargs)},
         {"group": "Kiểm soát",     "label": "Tập trung rủi ro & HHI",  "icon": "chart-pie",  "fn": lambda: _get_tab("tab_hhi").render(None, **kwargs)},
         {
             "group": "Kiểm soát",

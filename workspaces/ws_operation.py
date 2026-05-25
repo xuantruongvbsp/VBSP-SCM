@@ -1798,8 +1798,8 @@ def render(**kwargs):
                 ("🚨 Cảnh báo Tín dụng", lambda tab: _render_canh_bao_nqh_pgd(tab, **_pgd_df_kwargs)),
                 ("🔔 Đôn đốc KHĐ", lambda tab: _render_don_doc(df_pgd, pgd_user or pgd_filter or "", role)),
                 ("⚡ Nợ đến hạn có nguy cơ", lambda tab: _render_canh_bao_som_pgd(tab, **kwargs)),
-                ("💳 Nợ rủi ro QĐ62", lambda tab: _lazy_tab("tab_qd62").render(
-                    mode="pgd", pgd_filter=pgd_user or pgd_filter
+                ("💳 Xử lý Rủi ro", lambda tab: _lazy_tab("tab_xu_ly_rui_ro").render(
+                    tab, df=df_pgd, role=role, username=username, pgd_user=pgd_user or pgd_filter
                 )),
                 ("📍 Điểm Giao Dịch", lambda tab: _lazy_tab("tab_diem_gd_pgd").render(tab, **kwargs)),
                 ("🏘️ Tổ TK&VV",       lambda tab: _lazy_tab("tab_cdtotkvv_pgd").render(tab, **kwargs)),

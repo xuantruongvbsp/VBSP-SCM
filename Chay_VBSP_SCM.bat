@@ -2,7 +2,6 @@
 setlocal
 
 cd /d %~dp0
-echo Dang khoi dong VBSP-SCM...
 set "PORT=8501"
 set "URL=http://127.0.0.1:%PORT%"
 
@@ -13,16 +12,19 @@ if not exist ".\.venv\Scripts\streamlit.exe" (
   exit /b 1
 )
 
-start /b "" ".\.venv\Scripts\streamlit.exe" run app.py ^
+echo.
+echo ============================================
+echo   VBSP-SCM — He thong Tin dung Noi bo
+echo ============================================
+echo.
+echo   URL: %URL%
+echo   Auto-reload: Co (watchdog .py)
+echo   Dung: Nhan Ctrl+C
+echo.
+echo Dang khoi dong server...
+
+".\.venv\Scripts\streamlit.exe" run app.py ^
   --server.address 127.0.0.1 ^
   --server.port %PORT% ^
-  --server.headless true ^
+  --server.headless false ^
   --browser.gatherUsageStats false
-
-echo Server dang khoi dong, cho 3 giay...
-timeout /t 3 /nobreak >nul
-
-start "" "%URL%"
-echo Server dang chay tai %URL%
-echo Auto-reload khi save file .py (watchdog). Giu cua so nay de server tiep tuc chay.
-echo Nhan Ctrl+C de dung server.

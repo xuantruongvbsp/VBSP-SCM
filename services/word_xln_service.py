@@ -1321,3 +1321,362 @@ def _tao_word_to_trinh_cn(
     buf = io.BytesIO()
     doc.save(buf)
     return buf.getvalue()
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# MẪU 01/XLN và 02/XLN PHIÊN BẢN MỚI (v2) — Theo mẫu thực tế QĐ62
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def _add_header_xln_v2(doc: Document, ten_nhcsxh: str, dia_danh: str, ngay: date, mau_so: str) -> None:
+    """Header chuẩn: Bảng 2 cột không border."""
+    table = doc.add_table(rows=1, cols=2)
+    table.style = "Table Grid"
+    
+    for cell in table.rows[0].cells:
+        tc = cell._tc
+        tcPr = tc.get_or_add_tcPr()
+        tcBorders = OxmlElement("w:tcBorders")
+        for bn in ["top", "left", "bottom", "right"]:
+            b = OxmlElement(f"w:{bn}")
+            b.set(qn("w:val"), "none")
+            tcBorders.append(b)
+        tcPr.append(tcBorders)
+    
+    cell_left = table.rows[0].cells[0]
+    cell_left.paragraphs[0].add_run(f"Mẫu số {mau_so}")
+    
+    cell_right = table.rows[0].cells[1]
+    p1 = cell_right.paragraphs[0]
+    p1.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    r1 = p1.add_run("CỘNG HOÀ XÃ HỘI CHỦ NGHĨA VIỆT NAM")
+    r1.bold = True
+    
+    p2 = cell_right.add_paragraph("Độc lập - Tự do - Hạnh phúc")
+    p2.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    r2 = p2.runs[0]
+    r2.bold = True
+    
+    p3 = cell_right.add_paragraph(f"{dia_danh}, ngày {ngay.day} tháng {ngay.month} năm {ngay.year}")
+    p3.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    
+    doc.add_paragraph()
+
+
+def _add_tieu_de_xln(doc: Document, line1: str, line2: str = None, line3: str = None) -> None:
+    """Tiêu đề căn giữa, in đậm."""
+    p1 = doc.add_paragraph()
+    p1.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    r1 = p1.add_run(line1)
+    r1.bold = True
+    r1.font.size = Pt(14)
+    r1.font.name = "Times New Roman"
+    
+    if line2:
+        p2 = doc.add_paragraph()
+        p2.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        r2 = p2.add_run(line2)
+        r2.font.size = Pt(13)
+        r2.font.name = "Times New Roman"
+    
+    if line3:
+        p3 = doc.add_paragraph()
+        p3.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        r3 = p3.add_run(line3)
+        r3.font.size = Pt(12)
+        r3.font.name = "Times New Roman"
+    
+    doc.add_paragraph()
+
+
+def _add_noi_dung_01xln(doc: Document, du_lieu: dict) -> None:
+    """Thêm nội dung 4 điểm cho 01/XLN — text tự do."""
+    doc.add_paragraph(f"Kính gửi: Ngân hàng Chính sách xã hội {du_lieu.get('ten_nhcsxh', '')}")
+    doc.add_paragraph()
+    
+    doc.add_paragraph(f"Tên tôi là: {du_lieu.get('ten_kh', '')}")
+    doc.add_paragraph(f"Hiện cư trú tại: {du_lieu.get('dia_chi', '')}")
+    doc.add_paragraph(f"Là thành viên của Tổ TK&VV {du_lieu.get('ma_to', '')} do ông (bà): {du_lieu.get('ten_to_truong', '')} làm Tổ trưởng")
+    doc.add_paragraph()
+    
+    p2 = doc.add_paragraph()
+    p2.add_run(f"Theo HĐTD (sổ Vay vốn) số {du_lieu.get('so_ku', '')}, ngày {du_lieu.get('ngay_vay', '')}, tôi có đứng tên vay vốn chương trình {du_lieu.get('ten_ct', '')} tại NHCSXH {du_lieu.get('ten_nhcsxh', '')}.")
+    
+    p2_1 = doc.add_paragraph()
+    p2_1.paragraph_format.left_indent = Cm(1)
+    p2_1.add_run(f"Số tiền vay {du_lieu.get('muc_vay', '')} đồng; Thời điểm nhận tiền vay {du_lieu.get('ngay_vay', '')};\tHạn trả nợ: {du_lieu.get('ngay_dh', '')} ; Mục đích vay vốn {du_lieu.get('muc_dich_vay', '')}")
+    
+    p2_2 = doc.add_paragraph()
+    p2_2.paragraph_format.left_indent = Cm(1)
+    p2_2.add_run(f"Hiện nay, tôi còn nợ Ngân hàng số tiền: {du_lieu.get('tong_du_no', '')} đồng\n(Trong đó: Nợ gốc: {du_lieu.get('du_no_goc', '')} đồng; Nợ lãi: {du_lieu.get('lai_ton', '')} đồng)")
+    doc.add_paragraph()
+    
+    p3 = doc.add_paragraph()
+    p3.add_run(f"Trong thời gian vừa qua do: {du_lieu.get('nguyen_nhan', '')}")
+    doc.add_paragraph("........................................................................................")
+    doc.add_paragraph("3. Số vốn, tài sản của dự án, phương án vay vốn bị thiệt hại như sau:")
+    
+    p3_2 = doc.add_paragraph()
+    p3_2.paragraph_format.left_indent = Cm(1)
+    p3_2.add_run(f"- Số vốn và tài sản bị thiệt hại {du_lieu.get('so_tien_thiet_hai', '')} đồng.")
+    
+    p3_3 = doc.add_paragraph()
+    p3_3.paragraph_format.left_indent = Cm(1)
+    p3_3.add_run("(Ghi rõ tên, số lượng hiện vật bị thiệt hại): ..................................)")
+    
+    p3_4 = doc.add_paragraph()
+    p3_4.paragraph_format.left_indent = Cm(1)
+    p3_4.add_run(f"- Tổng số vốn thực hiện dự án (phương án vay vốn) {du_lieu.get('muc_vay', '')} đồng.")
+    
+    p3_5 = doc.add_paragraph()
+    p3_5.paragraph_format.left_indent = Cm(1)
+    p3_5.add_run(f"- Mức độ thiệt hại về vốn và tài sản {du_lieu.get('muc_do_thiet_hai', '')}%.")
+    doc.add_paragraph()
+    
+    p4 = doc.add_paragraph()
+    p4.add_run("4. Tình hình kinh tế, khả năng trả nợ Ngân hàng hiện nay của cá nhân và các thành viên cùng tham gia ký kết hợp đồng vay vốn sau khi gặp rủi ro:")
+    
+    p4_1 = doc.add_paragraph()
+    p4_1.paragraph_format.left_indent = Cm(1)
+    p4_1.add_run(du_lieu.get('kha_nang_tra_no', ''))
+    doc.add_paragraph("........................................................................................")
+    doc.add_paragraph()
+    
+    p_de_nghi = doc.add_paragraph()
+    p_de_nghi.add_run(f"Vậy tôi làm đơn này đề nghị NHCSXH {du_lieu.get('ten_nhcsxh', '')} và các cơ quan chức năng xem xét {du_lieu.get('bien_phap', '')} số nợ bị rủi ro do nguyên nhân khách quan của tôi, cụ thể:")
+    
+    p_de_nghi_1 = doc.add_paragraph()
+    p_de_nghi_1.paragraph_format.left_indent = Cm(1)
+    p_de_nghi_1.add_run(f"- Số tiền đề nghị là {du_lieu.get('so_tien_de_nghi', '')} đồng")
+    
+    p_de_nghi_2 = doc.add_paragraph()
+    p_de_nghi_2.paragraph_format.left_indent = Cm(1)
+    p_de_nghi_2.add_run(f"(Trong đó: Nợ gốc: {du_lieu.get('du_no_goc', '')} đồng; Nợ lãi: {du_lieu.get('lai_ton', '')} đồng)")
+    
+    p_de_nghi_3 = doc.add_paragraph()
+    p_de_nghi_3.paragraph_format.left_indent = Cm(1)
+    p_de_nghi_3.add_run(f"- Thời gian đề nghị {du_lieu.get('so_thang', '')} tháng")
+    
+    p_de_nghi_4 = doc.add_paragraph()
+    p_de_nghi_4.paragraph_format.left_indent = Cm(1)
+    p_de_nghi_4.add_run(f"- Kế hoạch trả nợ: {du_lieu.get('ke_hoach_tra_no', '')}")
+    doc.add_paragraph()
+    
+    doc.add_paragraph("Tôi xin cam đoan và chịu trách nhiệm trước pháp luật về nội dung kê khai trên đơn và các hồ sơ giấy tờ chứng minh là đúng.")
+    doc.add_paragraph()
+
+
+def _add_phan_ky_1cot(doc: Document, ngay: date, ten_kh: str, dia_danh: str) -> None:
+    """Phần ký 1 cột — căn phải (cho 01/XLN)."""
+    table = doc.add_table(rows=1, cols=1)
+    table.style = "Table Grid"
+    
+    for cell in table.rows[0].cells:
+        tc = cell._tc
+        tcPr = tc.get_or_add_tcPr()
+        tcBorders = OxmlElement("w:tcBorders")
+        for bn in ["top", "left", "bottom", "right"]:
+            b = OxmlElement(f"w:{bn}")
+            b.set(qn("w:val"), "none")
+            tcBorders.append(b)
+        tcPr.append(tcBorders)
+    
+    cell = table.rows[0].cells[0]
+    
+    p1 = cell.paragraphs[0]
+    p1.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    p1.add_run(f"{dia_danh}, ngày {ngay.day} tháng {ngay.month} năm {ngay.year}")
+    
+    p2 = cell.add_paragraph()
+    p2.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    p2.add_run("Người làm đơn")
+    
+    p3 = cell.add_paragraph()
+    p3.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    p3.add_run("(Ký ghi rõ họ tên, hoặc điểm chỉ)")
+    p3.runs[0].italic = True
+    
+    cell.add_paragraph()
+    cell.add_paragraph()
+    
+    p4 = cell.add_paragraph()
+    p4.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    p4.add_run(ten_kh)
+
+
+def _add_phan_ky_3cot_v2(doc: Document, ngay: date, dia_danh: str) -> None:
+    """Phần ký bảng 3 cột có border (cho 02/XLN)."""
+    doc.add_paragraph()
+    
+    table = doc.add_table(rows=1, cols=3)
+    table.style = "Table Grid"
+    
+    cell1 = table.rows[0].cells[0]
+    p1_1 = cell1.paragraphs[0]
+    p1_1.add_run("Đại diện khách hàng vay vốn\n")
+    p1_1.add_run("(Ký ghi rõ họ tên hoặc điểm chỉ,\nđóng dấu nếu là đại diện pháp nhân)")
+    p1_1.runs[1].italic = True
+    cell1.add_paragraph("\n\nx\n\n\n")
+    p1_2 = cell1.add_paragraph()
+    p1_2.add_run("Đại diện UBND cấp xã\n")
+    p1_2.add_run("(Xác nhận, ký tên, đóng dấu)")
+    p1_2.runs[1].italic = True
+    cell1.add_paragraph("\n\nx")
+    
+    cell2 = table.rows[0].cells[1]
+    p2_1 = cell2.paragraphs[0]
+    p2_1.add_run("Tổ trưởng Tổ TK&VV\n")
+    p2_1.add_run("(Ký, ghi rõ họ tên)")
+    p2_1.runs[1].italic = True
+    cell2.add_paragraph("\n\nx\n\n\n")
+    p2_2 = cell2.add_paragraph()
+    p2_2.add_run("Đại diện tổ chức\nHội đoàn thể nhận\nủy thác\n")
+    p2_2.add_run("(Ký tên, đóng dấu)")
+    p2_2.runs[1].italic = True
+    cell2.add_paragraph("\n\nx")
+    
+    cell3 = table.rows[0].cells[2]
+    p3_1 = cell3.paragraphs[0]
+    p3_1.add_run("Cán bộ tín dụng\n")
+    p3_1.add_run("(Ký tên, ghi rõ họ tên)")
+    p3_1.runs[1].italic = True
+    cell3.add_paragraph("\n\nx\n\n\n")
+    p3_2 = cell3.add_paragraph()
+    p3_2.add_run("Đại diện NHCSXH\n")
+    p3_2.add_run("(Ký tên, đóng dấu)")
+    p3_2.runs[1].italic = True
+    cell3.add_paragraph("\n\nx")
+
+
+def _add_thanh_phan_tham_du_02xln(doc: Document, du_lieu: dict) -> None:
+    """Thêm thành phần tham dự (6 người) cho 02/XLN."""
+    ngay = du_lieu.get('ngay_lap', date.today())
+    
+    p = doc.add_paragraph()
+    p.add_run(f"Hôm nay, ngày {ngay.day} tháng {ngay.month} năm {ngay.year}, tại {du_lieu.get('dia_diem', '')} chúng tôi gồm có:")
+    doc.add_paragraph()
+    
+    thanh_phan = [
+        (f"1. {du_lieu.get('ten_pgd', '')}", "Phó Giám đốc", f"NHCSXH {du_lieu.get('ten_nhcsxh', '')}"),
+        (f"2. {du_lieu.get('ten_ubnd', '')}", "Phó Chủ tịch", "UBND xã"),
+        (f"3. {du_lieu.get('ten_hoi_nd', '')}", "Chủ tịch", "Hội Nông dân xã"),
+        (f"4. {du_lieu.get('ten_cbtd', '')}", "CBTD", f"NHCSXH {du_lieu.get('ten_nhcsxh', '')}"),
+        (f"5. {du_lieu.get('ten_to_truong', '')}", "Tổ trưởng", "Tổ TKVV"),
+        (f"6. {du_lieu.get('ten_kh', '')}", "", "là khách hàng vay vốn."),
+    ]
+    
+    for ten, chuc_vu, dai_dien in thanh_phan:
+        if chuc_vu:
+            doc.add_paragraph(f"{ten}, Chức vụ: {chuc_vu}, Đại diện: {dai_dien}")
+        else:
+            doc.add_paragraph(f"{ten} {dai_dien}")
+    
+    doc.add_paragraph()
+    
+    p_mo_dau = doc.add_paragraph()
+    p_mo_dau.add_run(f"Đã tiến hành thẩm tra và lập biên bản đề nghị xử lý nợ bị rủi ro của ông (bà): {du_lieu.get('ten_kh', '')}, địa chỉ: {du_lieu.get('dia_chi', '')} là đại diện hộ gia đình vay vốn Ngân hàng Chính sách xã hội (NHCSXH) theo HĐTD (Sổ Vay vốn) số {du_lieu.get('so_ku', '')}, ngày {du_lieu.get('ngay_vay', '')}, có mã món vay {du_lieu.get('ma_mon_vay', '')}. Cụ thể như sau:")
+    doc.add_paragraph()
+
+
+def _add_noi_dung_02xln(doc: Document, du_lieu: dict) -> None:
+    """Thêm nội dung 5 mục La Mã cho 02/XLN."""
+    
+    p_i = doc.add_paragraph()
+    run_i = p_i.add_run("I. Nguyên nhân khách hàng bị rủi ro:")
+    run_i.bold = True
+    doc.add_paragraph(du_lieu.get('nguyen_nhan', ''))
+    doc.add_paragraph()
+    
+    p_ii = doc.add_paragraph()
+    run_ii = p_ii.add_run("II. Xác định mức độ thiệt hại về vốn và tài sản:")
+    run_ii.bold = True
+    
+    for i, text in enumerate([
+        f"1. Số vốn và tài sản bị thiệt hại: {du_lieu.get('so_tien_thiet_hai', '')} đồng.",
+        f"(Ghi rõ tên, số lượng hiện vật bị thiệt hại): {du_lieu.get('chi_tiet_thiet_hai', '')}",
+        f"2. Tổng số vốn thực hiện dự án (phương án vay vốn): {du_lieu.get('muc_vay', '')} đồng.",
+        f"3. Đánh giá mức độ thiệt hại về vốn và tài sản: {du_lieu.get('danh_gia_thiet_hai', '')}"
+    ], 1):
+        p = doc.add_paragraph()
+        p.paragraph_format.left_indent = Cm(0.5)
+        p.add_run(text)
+    doc.add_paragraph()
+    
+    p_iii = doc.add_paragraph()
+    run_iii = p_iii.add_run("III. Dư nợ tại NHCSXH đến ngày lập biên bản:")
+    run_iii.bold = True
+    doc.add_paragraph(f"Tổng số nợ còn phải trả ngân hàng đến ngày lập biên bản: {du_lieu.get('tong_du_no', '')} đồng.")
+    
+    for text in [f"Trong đó:  + Nợ gốc: {du_lieu.get('du_no_goc', '')} đồng.", f"+ Nợ lãi: {du_lieu.get('lai_ton', '')} đồng."]:
+        p = doc.add_paragraph()
+        p.paragraph_format.left_indent = Cm(0.5)
+        p.add_run(text)
+    doc.add_paragraph()
+    
+    p_iv = doc.add_paragraph()
+    run_iv = p_iv.add_run("IV. Đánh giá thực trạng dự án, phương án vay vốn, tài sản và khả năng trả nợ của khách hàng sau khi bị thiệt hại:")
+    run_iv.bold = True
+    
+    for title, content in [
+        ("1. Đánh giá thực trạng dự án, phương án vay vốn; phương án khôi phục dự án vay vốn:", du_lieu.get('danh_gia_du_an', '')),
+        ("2. Tài sản hiện tại của khách hàng:", du_lieu.get('tai_san_hien_tai', '')),
+        ("3. Đánh giá tình trạng khả năng trả nợ của khách hàng và tất cả các thành viên:", du_lieu.get('kha_nang_tra_no', '')),
+        ("4. Về việc áp dụng mọi biện pháp thu hồi nợ:", du_lieu.get('bien_phap_thu_hoi', '...................................................................................................................................'))
+    ]:
+        p = doc.add_paragraph()
+        p.paragraph_format.left_indent = Cm(0.5)
+        p.add_run(title)
+        
+        p_nd = doc.add_paragraph()
+        p_nd.paragraph_format.left_indent = Cm(1)
+        p_nd.add_run(content)
+    doc.add_paragraph()
+    
+    p_v = doc.add_paragraph()
+    run_v = p_v.add_run("V. Đề xuất biện pháp xử lý:")
+    run_v.bold = True
+    
+    p_v_1 = doc.add_paragraph()
+    p_v_1.add_run(f"Căn cứ vào quy chế xử lý nợ bị rủi ro do nguyên nhân khách quan tại NHCSXH, thẩm tra tình hình thực tế của khách hàng, chúng tôi nhất trí xác nhận các nội dung trên là đúng và thống nhất đề nghị NHCSXH, các cơ quan có thẩm quyền xem xét {du_lieu.get('bien_phap', '')} cho {du_lieu.get('ten_kh', '')} với thời gian {du_lieu.get('so_thang', '')} tháng, số tiền {du_lieu.get('so_tien_de_nghi', '')} đồng.")
+    
+    for text in [f"Trong đó:  + Nợ gốc: {du_lieu.get('du_no_goc', '')} đồng.", f"+ Nợ lãi: {du_lieu.get('lai_ton', '')} đồng."]:
+        p = doc.add_paragraph()
+        p.paragraph_format.left_indent = Cm(0.5)
+        p.add_run(text)
+    doc.add_paragraph()
+    
+    doc.add_paragraph("Biên bản này lập thành 02 bản có giá trị pháp lý như nhau và được các thành viên thống nhất thông qua ký tên dưới đây.")
+
+
+def _tao_word_01xln_v2(du_lieu: dict) -> bytes:
+    """Mẫu 01/XLN — Đơn đề nghị xử lý nợ (theo mẫu thực tế QĐ62)."""
+    doc = Document()
+    _style_doc_xln(doc)
+    _set_margins(doc, left_cm=3.0, right_cm=2.0, top_cm=2.5, bottom_cm=2.5)
+    
+    _add_header_xln_v2(doc, du_lieu.get('ten_nhcsxh', ''), du_lieu.get('dia_danh', ''), du_lieu.get('ngay_ky', date.today()), "01/XLN")
+    _add_tieu_de_xln(doc, "ĐƠN ĐỀ NGHỊ XỬ LÝ NỢ")
+    _add_noi_dung_01xln(doc, du_lieu)
+    _add_phan_ky_1cot(doc, du_lieu.get('ngay_ky', date.today()), du_lieu.get('ten_kh', ''), du_lieu.get('dia_danh', ''))
+    
+    buf = io.BytesIO()
+    doc.save(buf)
+    return buf.getvalue()
+
+
+def _tao_word_02xln_v2(du_lieu: dict) -> bytes:
+    """Mẫu 02/XLN — Biên bản đề nghị xử lý nợ (theo mẫu thực tế QĐ62)."""
+    doc = Document()
+    _style_doc_xln(doc)
+    _set_margins(doc, left_cm=3.0, right_cm=2.0, top_cm=2.5, bottom_cm=2.5)
+    
+    ngay_lap = du_lieu.get('ngay_lap', date.today())
+    
+    _add_header_xln_v2(doc, du_lieu.get('ten_nhcsxh', ''), du_lieu.get('dia_danh', ''), ngay_lap, "02/XLN")
+    _add_tieu_de_xln(doc, "BIÊN BẢN", "Đề nghị xử lý nợ bị rủi ro", f"(Chương trình {du_lieu.get('ten_ct', '')})")
+    _add_thanh_phan_tham_du_02xln(doc, du_lieu)
+    _add_noi_dung_02xln(doc, du_lieu)
+    _add_phan_ky_3cot_v2(doc, ngay_lap, du_lieu.get('dia_danh', ''))
+    
+    buf = io.BytesIO()
+    doc.save(buf)
+    return buf.getvalue()

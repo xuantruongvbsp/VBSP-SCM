@@ -1,5 +1,36 @@
 # CHANGELOG
 
+## [2026-05-25] — Fix snapshot_service: import KetQuaUpload sai path gây ERROR log
+- `snapshot_service.py` dòng 27–31 — Xóa try/except `from upload_service import KetQuaUpload` (module path sai → ERROR log mỗi lần khởi động); sửa thành `from services.upload_service import KetQuaUpload`; sửa logger except block (gọi `logger.error()` trước khi `logger` được định nghĩa)
+
+## [2026-05-25] — Fix XLRR sub-tab 5 Báo cáo: lỗi method không tồn tại
+- `tabs/tab_xu_ly_rui_ro.py` ~532 — `_subtab_bao_cao()`: thay `doc_ds_cn()` / `doc_ds_pgd()` (không tồn tại) bằng `doc_cn(nam,thang)` + `doc_qd62(nam,thang)` / `doc_pgd(slug,nam,thang)` đúng signature; thêm month/year selector để chọn kỳ; fix selectbox dùng `id` thay text-key tránh collision khi có hồ sơ trùng tên
+
+## [2026-05-25] — Fix XLRR: NaT serialization + date_input format
+- `services/xlrr_service.py` ~82 — `HoSoRuiRo.to_dict()`: thêm check `pd.isnull()` cho NaT dates từ DataFrame trước khi `json.dumps` (bug crash khi KH có ngày vay/đến hạn trống)
+- `tabs/tab_xu_ly_rui_ro.py` ~158 — `st.date_input` thêm `format="DD/MM/YYYY"` theo convention 5.9
+
+## [2026-05-25] — Fix snapshot NQ11/GQVL: tl_nqh + tl_tot_kha tính on-the-fly
+- `tabs/tab_so_sanh_ky/render_moc_nam.py` ~604 — NQ11: tính `tl_nqh = no_qh/tong_du_no*100` thay vì lấy từ DB (cột không tồn tại → trước đây luôn 0%)
+- `tabs/tab_so_sanh_ky/render_moc_nam.py` ~814 — CDTOTKVV: tính `tl_tot_kha = (so_tot+so_kha)/so_to*100` thay vì lấy từ DB (cột không tồn tại → trước đây luôn 0%)
+
+## [2026-05-25] — Fix snapshot NQ11/GQVL: auto-create sau merge_baseline
+- `snapshot_service.py` ~254, ~385 — thêm tham số `ky: str | None = None` vào `luu_nq11_snapshot()` và `luu_gqvl_snapshot()`; thêm `_ky_tu_gqvl()` trích xuất kỳ từ cột "Ngày vay"
+- `services/upload_service.py` ~737 — `merge_baseline_toan_cn()`: sau khi merge, tự gọi snapshot với `ky=f"{nam}-12"` cho NQ11, GQVL, HSTD
+
+## [2026-05-25] — Fix import tong_hop_khong_hd trong tab_baocao
+- `tabs/tab_baocao.py` dòng 38 — thêm `tong_hop_khong_hd` vào import (bug cũ: dùng mà chưa import, gây NameError ở mảng ĐVUT)
+
+## [2026-05-25] — Thêm 3 loại xuất PDF: Pivot, Chi tiết, Theo Nhóm
+- `pdf_service.py` dòng ~8 — thêm import COT_* từ config; thêm `PageBreak` vào reportlab import
+- `pdf_service.py` dòng ~364 — thêm `xuat_pdf_pivot(df, group_col, ...)`: groupby nội bộ → gọi `xuat_pdf()` với bảng pivot (Số KH / Số món / Dư nợ TH / QH / Tổng / Tỷ lệ QH% / Lãi tồn nếu có)
+- `pdf_service.py` dòng ~427 — thêm `xuat_pdf_chi_tiet(df, cols_hien_thi, ...)`: thin wrapper, chọn cột + tự phát hiện cột tiền → gọi `xuat_pdf()`
+- `pdf_service.py` dòng ~480 — thêm `xuat_pdf_theo_nhom(df, group_col, cols_chi_tiet, ...)`: PDF landscape nhiều section, mỗi nhóm = PageBreak + header + bảng chi tiết + dòng Cộng, chữ ký cuối
+- `tabs/tab_baocao.py` dòng ~37 — import 3 hàm mới từ pdf_service
+- `tabs/tab_baocao.py` dòng ~377 — thêm `group_col` để theo dõi cột nhóm hiện tại (Xã/Thôn/ĐVUT/CT)
+- `tabs/tab_baocao.py` dòng ~547 — Mảng Tổng hợp: layout 3 cột Excel + PDF Pivot + PDF theo Nhóm; audit log sau mỗi lần xuất
+- `tabs/tab_baocao.py` dòng ~941 — Mảng Chi tiết: thay `nut_xuat_pdf` bằng 2 nút PDF Chi tiết + PDF theo Nhóm (group by PGD); audit log sau mỗi lần xuất
+
 ## [2026-05-25] — Bộ lọc Hồ sơ đến hạn: 5 cột PGD→Xã→Hội đoàn thể→CT→Nguồn vốn
 - `tabs/tab_tongquan.py` dòng ~1100 — thêm filter Hội đoàn thể (COT_DVUT), thêm lại Chương trình; layout 6 cột [2,2,2,2,2,1]; áp filter _sel_dvut vào dt_chung và filter_chung; cập nhật _co_loc
 

@@ -734,6 +734,32 @@ def merge_baseline_toan_cn(loai: str, nam: int) -> KetQuaUpload:
         + (f" | {len(loi)} lỗi" if loi else ""),
     )
 
+    ky_baseline = f"{nam}-12"
+    try:
+        if loai == "nq11":
+            from snapshot_service import luu_nq11_snapshot as _luu_nq11
+            kq_snap = _luu_nq11(df_all, username, ky=ky_baseline)
+            if kq_snap.thanh_cong:
+                logger.info("merge_baseline_toan_cn: NQ11 snapshot %s OK", ky_baseline)
+            else:
+                logger.warning("merge_baseline_toan_cn: NQ11 snapshot lỗi — %s", kq_snap.thong_bao)
+        elif loai == "gqvl":
+            from snapshot_service import luu_gqvl_snapshot as _luu_gqvl
+            kq_snap = _luu_gqvl(df_all, username, ky=ky_baseline)
+            if kq_snap.thanh_cong:
+                logger.info("merge_baseline_toan_cn: GQVL snapshot %s OK", ky_baseline)
+            else:
+                logger.warning("merge_baseline_toan_cn: GQVL snapshot lỗi — %s", kq_snap.thong_bao)
+        elif loai == "hstd":
+            from snapshot_service import luu_snapshot as _luu_snap
+            kq_snap = _luu_snap(df_all, username)
+            if kq_snap.thanh_cong:
+                logger.info("merge_baseline_toan_cn: HSTD snapshot %s OK", ky_baseline)
+            else:
+                logger.warning("merge_baseline_toan_cn: HSTD snapshot lỗi — %s", kq_snap.thong_bao)
+    except Exception as e:
+        logger.error("merge_baseline_toan_cn: lỗi tạo snapshot %s — %s", loai, e, exc_info=True)
+
     return KetQuaUpload(
         True,
         f"✅ Tổng hợp baseline **{loai.upper()}** 31/12/{nam}: "

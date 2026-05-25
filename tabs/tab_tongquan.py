@@ -1065,17 +1065,9 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                 "Hãy kiểm tra file HSTD hoặc merge lại dữ liệu."
             )
         st.divider()
-        # ── Header: tiêu đề trái | Nhóm TH phải ──
-        _hdr_l, _hdr_r = st.columns([6, 2])
-        with _hdr_l:
-            st.subheader("🔔 Hồ sơ đến hạn — Tổng hợp")
-        with _hdr_r:
-            nhom_chon = st.selectbox(
-                "Nhóm tổng hợp",
-                ["Chương trình", "PGD", "Xã"],
-                key="tq_denh_nhom",
-                label_visibility="collapsed",
-            )
+        # ── Header ──
+        st.subheader("🔔 Hồ sơ đến hạn — Tổng hợp")
+        nhom_chon = "Chương trình"  # nhóm tổng hợp mặc định
 
         if COT_NGAY_DH in df.columns:
             try:

@@ -20,15 +20,10 @@ import db
 try:
     from logger import get_logger
     logger = get_logger(__name__)
-except Exception as e:
-    logger.error("Lỗi trong khối except: %s", e, exc_info=True)
+except Exception:
     import logging
     logger = logging.getLogger(__name__)
-try:
-    from upload_service import KetQuaUpload
-except Exception as e:
-    logger.error("Lỗi trong khối except: %s", e, exc_info=True)
-    from services.upload_service import KetQuaUpload
+from services.upload_service import KetQuaUpload
 from config import (
     COT_MA_CHUONG_TRINH,
     COT_MA_KH,
@@ -251,10 +246,14 @@ def _ky_tu_nq11(df: pd.DataFrame) -> str:
     return datetime.now().strftime("%Y-%m")
 
 
-def luu_nq11_snapshot(df_nq11: pd.DataFrame, username: str) -> KetQuaUpload:
+def luu_nq11_snapshot(df_nq11: pd.DataFrame, username: str, ky: str | None = None) -> KetQuaUpload:
     """Tổng hợp df_nq11 (NQ11 toàn CN) → lưu vào nq11_snapshot.
     INSERT OR REPLACE — chạy lại cùng kỳ sẽ ghi đè.
     Lưu 2 loại: tổng theo PGD + tổng CN ('__CN__').
+
+    ky: nếu cung cấp (vd "2025-12"), dùng trực tiếp.
+        Nếu None, trích xuất từ cột "Ngày báo cáo NQ11".
+        Fallback: tháng hiện tại.
     """
     if df_nq11 is None or df_nq11.empty:
         return KetQuaUpload(False, "Không có dữ liệu NQ11 để tạo snapshot.")
@@ -265,7 +264,8 @@ def luu_nq11_snapshot(df_nq11: pd.DataFrame, username: str) -> KetQuaUpload:
         DON_VI_CHI_NHANH,
     )
 
-    ky = _ky_tu_nq11(df_nq11)
+    if ky is None:
+        ky = _ky_tu_nq11(df_nq11)
 
     # Lấy ngày báo cáo
     ngay_bc = None
@@ -360,10 +360,31 @@ def danh_sach_ky_nq11() -> list[str]:
 # GQVL SNAPSHOT
 # ─────────────────────────────────────────────────────────────────────────────
 
-def luu_gqvl_snapshot(df_gqvl: pd.DataFrame, username: str) -> KetQuaUpload:
+def _ky_tu_gqvl(df: pd.DataFrame) -> str:
+    """Suy ra kỳ 'YYYY-MM' từ dữ liệu GQVL. Thử cột 'Ngày vay', fallback: tháng hiện tại."""
+    _COT_NGAY_VAY = "Ngày vay"
+    if _COT_NGAY_VAY in df.columns:
+        sl = df[_COT_NGAY_VAY].dropna()
+        if len(sl):
+            try:
+                ngay_vay = pd.to_datetime(sl, errors="coerce", dayfirst=True)
+                ngay_max = ngay_vay.dropna().max()
+                if pd.notna(ngay_max):
+                    return ngay_max.strftime("%Y-%m")
+            except Exception as e:
+                logger.error("_ky_tu_gqvl: lỗi parse Ngày vay — %s", e, exc_info=True)
+                pass
+    return datetime.now().strftime("%Y-%m")
+
+
+def luu_gqvl_snapshot(df_gqvl: pd.DataFrame, username: str, ky: str | None = None) -> KetQuaUpload:
     """Tổng hợp df_gqvl (GQVL toàn CN, sau khi đã rename cột) → lưu vào gqvl_snapshot.
     INSERT OR REPLACE — chạy lại cùng kỳ sẽ ghi đè.
     Lưu 2 loại: tổng theo PGD + tổng CN ('__CN__').
+
+    ky: nếu cung cấp (vd "2025-12"), dùng trực tiếp.
+        Nếu None, thử trích xuất từ cột "Ngày vay" trong dữ liệu.
+        Fallback: tháng hiện tại.
     """
     if df_gqvl is None or df_gqvl.empty:
         return KetQuaUpload(False, "Không có dữ liệu GQVL để tạo snapshot.")
@@ -376,7 +397,8 @@ def luu_gqvl_snapshot(df_gqvl: pd.DataFrame, username: str) -> KetQuaUpload:
     _COL_MA_KH = "Mã KH"
     _COL_GN    = COT_GIAI_NGAN_TRONG_NAM
 
-    ky = datetime.now().strftime("%Y-%m")
+    if ky is None:
+        ky = _ky_tu_gqvl(df_gqvl)
 
     df = df_gqvl.copy()
 

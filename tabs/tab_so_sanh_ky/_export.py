@@ -1,7 +1,8 @@
-"""Xuất báo cáo So sánh kỳ — Excel + PDF, mỗi loại 2 dạng.
+"""Xuất báo cáo So sánh kỳ — Excel + PDF, 3 loại PDF.
 
-Dạng 1 — Tổng quan:  1 sheet / 1 trang A4 (KPI + bảng chỉ tiêu chính)
-Dạng 2 — Đa chiều:   Nhiều sheet / Nhiều trang (từng chiều + chart ảnh)
+Loại 1 — PDF Pivot (Tổng hợp): agg theo PGD (Số KH, Số món, DN, TH, QH, %)
+Loại 2 — PDF Chi tiết (Danh sách đầy đủ): loan-level, COL_CHUNG
+Loại 3 — PDF theo Nhóm (PGD): từng PGD 1 bảng chi tiết + dòng tổng
 """
 from __future__ import annotations
 
@@ -13,7 +14,21 @@ import streamlit as st
 import plotly.graph_objects as go
 
 import db
-from utils import xuat_excel
+from utils import xuat_excel, fmt_so
+from config import (
+    COT_TEN_PGD, COT_TEN_XA, COT_TEN_THON, COT_DVUT, COT_TEN_TO,
+    COT_MA_KH, COT_TEN_KH, COT_SDT, COT_DIA_CHI,
+    COT_SO_KU, COT_NGAY_VAY, COT_NGAY_DH, COT_THOI_HAN,
+    COT_LAI_SUAT, COT_DU_NO_TH, COT_DU_NO_QH, COT_DU_NO_KHOANH,
+    COT_TONG_DU_NO, COT_TEN_CT, COT_NGUON_VON,
+    COT_TINH_TRANG, COT_LAI_TON,
+)
+
+try:
+    from pdf_service import xuat_pdf_pivot, xuat_pdf_chi_tiet, xuat_pdf_theo_nhom
+    _PDF_SERVICE_READY = True
+except ImportError:
+    _PDF_SERVICE_READY = False
 
 
 # ─── EXCEL ────────────────────────────────────────────────────────────────
@@ -323,3 +338,318 @@ def render_export_ui(
                              f"Xuất PDF so sánh kỳ: {ky1} vs {ky2} ({pdf_type})")
 
     st.caption(f"File: so_sanh_ky_{ky1}_vs_{ky2}.xlsx / .pdf")
+
+
+# ─── HSTD EXPORT UI (3 loại PDF) ───────────────────────────────────────
+
+def _build_col_chung(df: pd.DataFrame) -> list[str]:
+    return [c for c in [
+        COT_TEN_PGD, COT_TEN_XA, COT_TEN_THON, COT_DVUT, COT_TEN_TO,
+        COT_MA_KH, COT_TEN_KH, COT_SDT, COT_DIA_CHI,
+        COT_SO_KU, COT_NGAY_VAY, COT_NGAY_DH, COT_THOI_HAN,
+        COT_LAI_SUAT, COT_DU_NO_TH, COT_DU_NO_QH,
+        COT_TONG_DU_NO, COT_TEN_CT, COT_NGUON_VON,
+        COT_TINH_TRANG,
+    ] if c in df.columns]
+
+
+def render_export_hstd_ui(
+    df_ht: pd.DataFrame,
+    df_bl: pd.DataFrame,
+    label_ht: str,
+    label_bl: str,
+    rows_data: list[tuple],
+    username: str,
+    sheets_extra: dict[str, pd.DataFrame] | None = None,
+    action: str = "xuat_bieu_cn",
+    key_prefix: str = "ssk",
+) -> None:
+    """Section xuất báo cáo HSTD: 2 mảng (Tổng hợp / Chi tiết) x 3 loại PDF.
+
+    Mảng "📊 Tổng hợp":
+      - Excel (tổng quan, có sẵn)
+      - PDF Pivot (Loại 1): agg theo PGD
+      - PDF theo Nhóm (Loại 3): từng PGD + bảng chi tiết COL_CHUNG
+
+    Mảng "Chi tiết":
+      - Excel (tổng quan, có sẵn)
+      - PDF Chi tiết (Loại 2): danh sách đầy đủ COL_CHUNG
+      - PDF theo Nhóm (Loại 3): từng PGD + bảng chi tiết COL_CHUNG
+    """
+    st.markdown("**📤 Xuất báo cáo HSTD**")
+
+    # ── Chọn kỳ dữ liệu xuất ──
+    mang = st.radio(
+        "Loại xuất",
+        ["📊 Tổng hợp", "Chi tiết"],
+        horizontal=True,
+        key=f"{key_prefix}_hstd_mang",
+    )
+
+    col_k, col_x = st.columns([0.45, 0.55])
+    with col_k:
+        ky_xuat = st.selectbox(
+            "Kỳ dữ liệu xuất",
+            [label_ht, label_bl],
+            key=f"{key_prefix}_hstd_ky_xuat",
+        )
+    df_xuat = df_ht if ky_xuat == label_ht else df_bl
+
+    if df_xuat is None or df_xuat.empty:
+        st.warning("⚠️ Không có dữ liệu HSTD cho kỳ đã chọn.")
+        return
+
+    col_chung = _build_col_chung(df_xuat)
+    if not col_chung:
+        st.warning("⚠️ Không có cột dữ liệu phù hợp để xuất.")
+        return
+
+    if COT_TONG_DU_NO in df_xuat.columns:
+        df_xuat = df_xuat[df_xuat[COT_TONG_DU_NO] > 0].copy()
+
+    tien_de_pdf = f"So sánh mốc năm — {ky_xuat}"
+
+    if mang == "📊 Tổng hợp":
+        _render_export_tong_hop(
+            df_xuat, col_chung, rows_data, label_ht, label_bl,
+            ky_xuat, tien_de_pdf, username, sheets_extra, action, key_prefix,
+        )
+    else:
+        _render_export_chi_tiet(
+            df_xuat, col_chung, rows_data, label_ht, label_bl,
+            ky_xuat, tien_de_pdf, username, sheets_extra, action, key_prefix,
+        )
+
+
+def _render_export_tong_hop(
+    df_xuat: pd.DataFrame,
+    col_chung: list[str],
+    rows_data: list[tuple],
+    label_ht: str,
+    label_bl: str,
+    ky_xuat: str,
+    tieu_de_pdf: str,
+    username: str,
+    sheets_extra: dict[str, pd.DataFrame] | None,
+    action: str,
+    key_prefix: str,
+) -> None:
+    col_xl, col_pdf1, col_pdf2 = st.columns(3)
+
+    # ── Excel ──
+    with col_xl:
+        xl_key = f"_{key_prefix}_hstd_xl_{ky_xuat}"
+        if xl_key not in st.session_state:
+            if sheets_extra:
+                st.session_state[xl_key] = xuat_excel_da_chieu(
+                    rows_data, label_ht, label_bl, sheets_extra,
+                )
+            else:
+                st.session_state[xl_key] = xuat_excel_tong_quan(
+                    rows_data, label_ht, label_bl,
+                )
+
+        st.download_button(
+            "📥 Xuất Excel",
+            data=st.session_state[xl_key],
+            file_name=f"so_sanh_moc_nam_{ky_xuat.replace('/', '_')}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            key=f"{key_prefix}_hstd_dl_excel",
+            use_container_width=True,
+        )
+
+    # ── PDF Pivot (Loại 1) ──
+    with col_pdf1:
+        pdf1_key = f"_{key_prefix}_hstd_pdf1_{ky_xuat}"
+        if pdf1_key not in st.session_state:
+            if _PDF_SERVICE_READY:
+                try:
+                    st.session_state[pdf1_key] = xuat_pdf_pivot(
+                        df_xuat, COT_TEN_PGD,
+                        tieu_de_pdf, username,
+                        prefix_file="SSK_PIVOT",
+                    )
+                except Exception:
+                    st.session_state[pdf1_key] = b""
+            else:
+                st.session_state[pdf1_key] = b""
+
+        _download_pdf_btn(
+            pdf1_key, st.session_state[pdf1_key],
+            f"SSK_Pivot_{ky_xuat.replace('/', '_')}.pdf",
+            "📄 PDF Pivot (Loại 1)",
+            f"{key_prefix}_hstd_dl_pdf1",
+            username, action, f"PDF Pivot: {ky_xuat}",
+        )
+
+    # ── PDF theo Nhóm (Loại 3) ──
+    with col_pdf2:
+        pdf3_key = f"_{key_prefix}_hstd_pdf3_{ky_xuat}"
+        if pdf3_key not in st.session_state:
+            if _PDF_SERVICE_READY and COT_TEN_PGD in df_xuat.columns:
+                try:
+                    st.session_state[pdf3_key] = xuat_pdf_theo_nhom(
+                        df_xuat, COT_TEN_PGD, col_chung,
+                        tieu_de_pdf, username,
+                        prefix_file="SSK_NHOM",
+                    )
+                except Exception:
+                    st.session_state[pdf3_key] = b""
+            else:
+                st.session_state[pdf3_key] = b""
+
+        _download_pdf_btn(
+            pdf3_key, st.session_state[pdf3_key],
+            f"SSK_Nhom_{ky_xuat.replace('/', '_')}.pdf",
+            "📄 PDF theo Nhóm (Loại 3)",
+            f"{key_prefix}_hstd_dl_pdf3",
+            username, action, f"PDF Nhóm: {ky_xuat}",
+        )
+
+    st.caption(f"File: SSK_Pivot_{ky_xuat.replace('/', '_')}.pdf · SSK_Nhom_{ky_xuat.replace('/', '_')}.pdf")
+
+
+def _render_export_chi_tiet(
+    df_xuat: pd.DataFrame,
+    col_chung: list[str],
+    rows_data: list[tuple],
+    label_ht: str,
+    label_bl: str,
+    ky_xuat: str,
+    tieu_de_pdf: str,
+    username: str,
+    sheets_extra: dict[str, pd.DataFrame] | None,
+    action: str,
+    key_prefix: str,
+) -> None:
+    col_xl, col_pdf2, col_pdf3 = st.columns(3)
+
+    # ── Excel ──
+    with col_xl:
+        xl_key = f"_{key_prefix}_hstd_xl_ct_{ky_xuat}"
+        if xl_key not in st.session_state:
+            df_xl = df_xuat[col_chung].copy()
+            sheets = {"Chi tiết": df_xl}
+            tong_hop_sheets = _build_tong_hop_sheets(df_xuat)
+            sheets.update(tong_hop_sheets)
+            st.session_state[xl_key] = xuat_excel(sheets)
+
+        st.download_button(
+            "📥 Xuất Excel",
+            data=st.session_state[xl_key],
+            file_name=f"so_sanh_ct_moc_nam_{ky_xuat.replace('/', '_')}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            key=f"{key_prefix}_hstd_dl_excel_ct",
+            use_container_width=True,
+        )
+
+    # ── PDF Chi tiết (Loại 2) ──
+    with col_pdf2:
+        pdf2_key = f"_{key_prefix}_hstd_pdf2_{ky_xuat}"
+        if pdf2_key not in st.session_state:
+            if _PDF_SERVICE_READY:
+                try:
+                    st.session_state[pdf2_key] = xuat_pdf_chi_tiet(
+                        df_xuat, col_chung,
+                        tieu_de_pdf, username,
+                        prefix_file="SSK_CT",
+                    )
+                except Exception:
+                    st.session_state[pdf2_key] = b""
+            else:
+                st.session_state[pdf2_key] = b""
+
+        _download_pdf_btn(
+            pdf2_key, st.session_state[pdf2_key],
+            f"SSK_ChiTiet_{ky_xuat.replace('/', '_')}.pdf",
+            "📄 PDF Chi tiết (Loại 2)",
+            f"{key_prefix}_hstd_dl_pdf2",
+            username, action, f"PDF Chi tiết: {ky_xuat}",
+        )
+
+    # ── PDF theo Nhóm (Loại 3) ──
+    with col_pdf3:
+        pdf3_key = f"_{key_prefix}_hstd_pdf3_ct_{ky_xuat}"
+        if pdf3_key not in st.session_state:
+            if _PDF_SERVICE_READY and COT_TEN_PGD in df_xuat.columns:
+                try:
+                    st.session_state[pdf3_key] = xuat_pdf_theo_nhom(
+                        df_xuat, COT_TEN_PGD, col_chung,
+                        tieu_de_pdf, username,
+                        prefix_file="SSK_CT_NHOM",
+                    )
+                except Exception:
+                    st.session_state[pdf3_key] = b""
+            else:
+                st.session_state[pdf3_key] = b""
+
+        _download_pdf_btn(
+            pdf3_key, st.session_state[pdf3_key],
+            f"SSK_CT_Nhom_{ky_xuat.replace('/', '_')}.pdf",
+            "📄 PDF theo Nhóm (Loại 3)",
+            f"{key_prefix}_hstd_dl_pdf3_ct",
+            username, action, f"PDF Nhóm (CT): {ky_xuat}",
+        )
+
+    st.caption(f"File: SSK_ChiTiet_{ky_xuat.replace('/', '_')}.pdf · SSK_CT_Nhom_{ky_xuat.replace('/', '_')}.pdf")
+
+
+def _build_tong_hop_sheets(df: pd.DataFrame) -> dict[str, pd.DataFrame]:
+    sheets = {}
+    if COT_TEN_PGD in df.columns:
+        agg_pgd = df.groupby(COT_TEN_PGD).agg(
+            **{
+                "Số KH": (COT_MA_KH, "nunique") if COT_MA_KH in df.columns else (COT_SO_KU, "nunique"),
+                "Số món": (COT_SO_KU, "nunique"),
+                "Tổng dư nợ": (COT_TONG_DU_NO, "sum"),
+                "Dư nợ TH": (COT_DU_NO_TH, "sum") if COT_DU_NO_TH in df.columns else (COT_TONG_DU_NO, "sum"),
+                "Dư nợ QH": (COT_DU_NO_QH, "sum") if COT_DU_NO_QH in df.columns else (COT_TONG_DU_NO, "sum"),
+            }
+        ).reset_index()
+        sheets["Tổng hợp PGD"] = agg_pgd
+
+    if COT_TEN_XA in df.columns:
+        agg_xa = df.groupby(COT_TEN_XA).agg(
+            **{
+                "Số KH": (COT_MA_KH, "nunique") if COT_MA_KH in df.columns else (COT_SO_KU, "nunique"),
+                "Số món": (COT_SO_KU, "nunique"),
+                "Tổng dư nợ": (COT_TONG_DU_NO, "sum"),
+            }
+        ).reset_index()
+        sheets["Tổng hợp Xã"] = agg_xa
+
+    if COT_TEN_CT in df.columns:
+        agg_ct = df.groupby(COT_TEN_CT).agg(
+            **{
+                "Số KH": (COT_MA_KH, "nunique") if COT_MA_KH in df.columns else (COT_SO_KU, "nunique"),
+                "Số món": (COT_SO_KU, "nunique"),
+                "Tổng dư nợ": (COT_TONG_DU_NO, "sum"),
+            }
+        ).reset_index()
+        sheets["Tổng hợp CT"] = agg_ct
+
+    return sheets
+
+
+def _download_pdf_btn(
+    cache_key: str,
+    pdf_bytes: bytes,
+    filename: str,
+    label: str,
+    widget_key: str,
+    username: str,
+    action: str,
+    audit_detail: str,
+) -> None:
+    if not pdf_bytes:
+        st.warning("⚠️ Không thể tạo PDF. Kiểm tra cài đặt reportlab.")
+    else:
+        if st.download_button(
+            label,
+            data=pdf_bytes,
+            file_name=filename,
+            mime="application/pdf",
+            key=widget_key,
+            use_container_width=True,
+        ):
+            db.ghi_audit(username, action, audit_detail)

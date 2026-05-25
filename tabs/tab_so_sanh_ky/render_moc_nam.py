@@ -44,7 +44,7 @@ from tabs.tab_so_sanh_ky._common import (
     render_kpi_row, render_quality_bars_2_ky,
     render_comparison_table, render_hbar_chart, render_flow_diagram,
 )
-from tabs.tab_so_sanh_ky._export import render_export_ui
+from tabs.tab_so_sanh_ky._export import render_export_ui, render_export_hstd_ui
 from utils import fmt_ty, fmt_so
 import db
 
@@ -201,11 +201,20 @@ def _render_export_section(
     username: str,
     sheets_extra: dict[str, pd.DataFrame] | None = None,
     key_prefix: str = "moc",
+    df_ht: pd.DataFrame | None = None,
+    df_bl: pd.DataFrame | None = None,
 ) -> None:
-    """Section xuất báo cáo."""
-    st.markdown("**📤 XUẤT BÁO CÁO**")
-    render_export_ui(rows_data, label_bl, label_ht, username, sheets_extra,
-                     action="xuat_bieu_cn", key_prefix=key_prefix)
+    """Section xuất báo cáo. Nếu có df_ht/df_bl → dùng giao diện HSTD 3 loại PDF."""
+    if df_ht is not None and df_bl is not None:
+        render_export_hstd_ui(
+            df_ht, df_bl, label_ht, label_bl,
+            rows_data, username, sheets_extra,
+            action="xuat_bieu_cn", key_prefix=key_prefix,
+        )
+    else:
+        st.markdown("**📤 XUẤT BÁO CÁO**")
+        render_export_ui(rows_data, label_bl, label_ht, username, sheets_extra,
+                         action="xuat_bieu_cn", key_prefix=key_prefix)
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -544,7 +553,8 @@ def _render_hstd_section(
             sheets_extra = {"Theo PGD": merged_pgd}
 
     _render_export_section(rows_data, label_bl, label_ht, username, sheets_extra,
-                           key_prefix=f"{key_prefix}hstd")
+                           key_prefix=f"{key_prefix}hstd",
+                           df_ht=df_ht, df_bl=df_bl)
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -604,6 +614,15 @@ def _render_nq11_section(
     a_bl = df_bl.iloc[0].to_dict() if not df_bl.empty else {}
     a_ht = df_ht.iloc[0].to_dict() if not df_ht.empty else {}
 
+    # Tính tl_nqh từ dữ liệu (cột này không lưu trong DB)
+    def _nq11_tl_nqh(a: dict) -> float:
+        qh = float(a.get("no_qh", 0))
+        dn = float(a.get("tong_du_no", 0))
+        return qh / dn * 100 if dn > 0 else 0.0
+
+    tl_nqh_ht = _nq11_tl_nqh(a_ht)
+    tl_nqh_bl = _nq11_tl_nqh(a_bl)
+
     label_bl = f"NQ11 {ky_bl}"
     label_ht = f"NQ11 {ky_ht}"
 
@@ -621,9 +640,9 @@ def _render_nq11_section(
         {"label": "👥 Số KH NQ11", "value": fmt_so(int(a_ht.get("so_kh", 0))),
          "delta": float(a_ht.get("so_kh", 0)) - float(a_bl.get("so_kh", 0)), "unit": "so",
          "help": f"Mốc: {fmt_so(int(a_bl.get('so_kh', 0)))}"},
-        {"label": "📊 Tỷ lệ NQH", "value": fmt_pct_vn(float(a_ht.get("tl_nqh", 0))),
-         "delta": float(a_ht.get("tl_nqh", 0)) - float(a_bl.get("tl_nqh", 0)), "unit": "pct", "inverse": True,
-         "help": f"Mốc: {fmt_pct_vn(float(a_bl.get('tl_nqh', 0)))}"},
+        {"label": "📊 Tỷ lệ NQH", "value": fmt_pct_vn(tl_nqh_ht),
+         "delta": tl_nqh_ht - tl_nqh_bl, "unit": "pct", "inverse": True,
+         "help": f"Mốc: {fmt_pct_vn(tl_nqh_bl)}"},
     ])
 
     # Table
@@ -633,7 +652,7 @@ def _render_nq11_section(
         ("Nợ quá hạn NQ11 (triệu đồng)", float(a_bl.get("no_qh", 0)), float(a_ht.get("no_qh", 0)), True, "tien"),
         ("Giải ngân NQ11 trong năm (triệu đồng)", float(a_bl.get("gn_nam", 0)), float(a_ht.get("gn_nam", 0)), False, "tien"),
         ("Số khách hàng NQ11", float(a_bl.get("so_kh", 0)), float(a_ht.get("so_kh", 0)), False, "so"),
-        ("Tỷ lệ NQH (%)", float(a_bl.get("tl_nqh", 0)), float(a_ht.get("tl_nqh", 0)), True, "pct"),
+        ("Tỷ lệ NQH (%)", tl_nqh_bl, tl_nqh_ht, True, "pct"),
     ]
     render_comparison_table(rows_nq11, label_bl, label_ht, title="Chỉ tiêu NQ11")
 
@@ -814,6 +833,16 @@ def _render_cdtotkvv_section(
     a_bl = df_bl.iloc[0].to_dict() if not df_bl.empty else {}
     a_ht = df_ht.iloc[0].to_dict() if not df_ht.empty else {}
 
+    # Tính tl_tot_kha từ dữ liệu (cột này không lưu trong DB)
+    def _cdt_tl_tot_kha(a: dict) -> float:
+        tot = int(a.get("so_tot", 0))
+        kha = int(a.get("so_kha", 0))
+        so_to = int(a.get("so_to", 0))
+        return (tot + kha) / so_to * 100 if so_to > 0 else 0.0
+
+    tl_tot_kha_ht = _cdt_tl_tot_kha(a_ht)
+    tl_tot_kha_bl = _cdt_tl_tot_kha(a_bl)
+
     label_bl = f"CDT {ky_bl}"
     label_ht = f"CDT {ky_ht}"
 
@@ -840,9 +869,9 @@ def _render_cdtotkvv_section(
         {"label": "🔴 Tổ Yếu", "value": fmt_so(int(a_ht.get("so_yeu", 0))),
          "delta": float(a_ht.get("so_yeu", 0)) - float(a_bl.get("so_yeu", 0)), "unit": "so", "inverse": True,
          "help": f"Mốc: {fmt_so(int(a_bl.get('so_yeu', 0)))}"},
-        {"label": "📊 Tỷ lệ tổ Tốt/Khá", "value": fmt_pct_vn(float(a_ht.get("tl_tot_kha", 0))),
-         "delta": float(a_ht.get("tl_tot_kha", 0)) - float(a_bl.get("tl_tot_kha", 0)), "unit": "pct",
-         "help": f"Mốc: {fmt_pct_vn(float(a_bl.get('tl_tot_kha', 0)))}"},
+        {"label": "📊 Tỷ lệ tổ Tốt/Khá", "value": fmt_pct_vn(tl_tot_kha_ht),
+         "delta": tl_tot_kha_ht - tl_tot_kha_bl, "unit": "pct",
+         "help": f"Mốc: {fmt_pct_vn(tl_tot_kha_bl)}"},
         {"label": "", "value": "", "delta": None},
         {"label": "", "value": "", "delta": None},
     ])
@@ -854,7 +883,7 @@ def _render_cdtotkvv_section(
         ("Tổ Khá", float(a_bl.get("so_kha", 0)), float(a_ht.get("so_kha", 0)), False, "so"),
         ("Tổ Trung bình", float(a_bl.get("so_tb", 0)), float(a_ht.get("so_tb", 0)), True, "so"),
         ("Tổ Yếu", float(a_bl.get("so_yeu", 0)), float(a_ht.get("so_yeu", 0)), True, "so"),
-        ("Tỷ lệ tổ Tốt/Khá (%)", float(a_bl.get("tl_tot_kha", 0)), float(a_ht.get("tl_tot_kha", 0)), False, "pct"),
+        ("Tỷ lệ tổ Tốt/Khá (%)", tl_tot_kha_bl, tl_tot_kha_ht, False, "pct"),
     ]
     render_comparison_table(rows_cdt, label_bl, label_ht, title="Chỉ tiêu Chấm điểm tổ")
 

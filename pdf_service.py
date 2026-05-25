@@ -4,6 +4,15 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 from state_manager import SCMStateManager
+from config import (
+    COT_DU_NO_KHOANH,
+    COT_DU_NO_QH,
+    COT_DU_NO_TH,
+    COT_LAI_TON,
+    COT_MA_KH,
+    COT_SO_KU,
+    COT_TONG_DU_NO,
+)
 
 try:
     from reportlab.lib import colors
@@ -12,7 +21,7 @@ try:
     from reportlab.lib.styles import ParagraphStyle
     from reportlab.platypus import (
         SimpleDocTemplate, Table, TableStyle, Paragraph,
-        Spacer, HRFlowable, Image as RLImage
+        Spacer, HRFlowable, PageBreak, Image as RLImage
     )
     from reportlab.pdfbase import pdfmetrics
     from reportlab.pdfbase.ttfonts import TTFont
@@ -341,6 +350,366 @@ def xuat_pdf(
         canvas.drawRightString(
             page_size[0] - margin,
             0.8 * cm,
+            f"Trang {_doc.page}  |  VBSP-SCM  |  {ngay_str}"
+        )
+        canvas.restoreState()
+
+    doc.build(story, onFirstPage=_on_page, onLaterPages=_on_page)
+    buf.seek(0)
+    return buf.getvalue()
+
+
+def xuat_pdf_pivot(
+    df: pd.DataFrame,
+    group_col: str,
+    tieu_de: str,
+    nguoi_xuat: str,
+    prefix_file: str = "BC_PIVOT",
+) -> bytes:
+    if not _REPORTLAB_READY:
+        raise ImportError("Chưa cài thư viện reportlab. Chạy: pip install reportlab")
+    if df is None or df.empty:
+        raise ValueError("Không có dữ liệu để xuất PDF")
+    if group_col not in df.columns:
+        raise ValueError(f"Cột nhóm '{group_col}' không tồn tại trong dữ liệu")
+
+    _dang_ky_font()
+
+    _DN_SO_KH = "Số KH"
+    _DN_SO_MON = "Số món"
+    _DN_TONG_DU_NO = "Tổng dư nợ"
+    _DN_DU_NO_TH = "Dư nợ TH"
+    _DN_DU_NO_QH = "Dư nợ QH"
+    _DN_TL_QH = "Tỷ lệ QH%"
+
+    agg_dict = {
+        _DN_SO_KH: (COT_MA_KH, "nunique"),
+        _DN_SO_MON: (COT_SO_KU, "nunique"),
+        _DN_TONG_DU_NO: (COT_TONG_DU_NO, "sum"),
+        _DN_DU_NO_TH: (COT_DU_NO_TH, "sum"),
+        _DN_DU_NO_QH: (COT_DU_NO_QH, "sum"),
+    }
+    if COT_LAI_TON in df.columns:
+        _DN_LAI_TON = "Lãi tồn"
+        agg_dict[_DN_LAI_TON] = (COT_LAI_TON, "sum")
+
+    df_pivot = (
+        df.groupby(group_col)
+        .agg(**agg_dict)
+        .sort_values(_DN_TONG_DU_NO, ascending=False)
+        .reset_index()
+    )
+
+    df_pivot[_DN_TL_QH] = (
+        df_pivot[_DN_DU_NO_QH]
+        / df_pivot[_DN_TONG_DU_NO].replace(0, float("nan"))
+        * 100
+    ).round(2).fillna(0)
+
+    cols_tien = [_DN_TONG_DU_NO, _DN_DU_NO_TH, _DN_DU_NO_QH]
+    if COT_LAI_TON in df.columns:
+        cols_tien.append(_DN_LAI_TON)
+
+    return xuat_pdf(
+        df_pivot,
+        tieu_de,
+        nguoi_xuat,
+        cols_tien=cols_tien,
+        prefix_file=prefix_file,
+        them_dong_tong=True,
+    )
+
+
+def xuat_pdf_chi_tiet(
+    df: pd.DataFrame,
+    cols_hien_thi: list[str],
+    tieu_de: str,
+    nguoi_xuat: str,
+    prefix_file: str = "BC_CT",
+) -> bytes:
+    if not _REPORTLAB_READY:
+        raise ImportError("Chưa cài thư viện reportlab. Chạy: pip install reportlab")
+    if df is None or df.empty:
+        raise ValueError("Không có dữ liệu để xuất PDF")
+
+    _dang_ky_font()
+
+    cols_co = [c for c in cols_hien_thi if c in df.columns]
+    if not cols_co:
+        cols_co = list(df.columns)
+
+    df_xuat = df[cols_co].copy()
+
+    _MONEY_PATTERNS = {
+        COT_DU_NO_TH, COT_DU_NO_QH, COT_TONG_DU_NO,
+        COT_LAI_TON, COT_DU_NO_KHOANH,
+        "Tổng dư nợ", "Dư nợ TH", "Dư nợ QH", "Dư nợ trong hạn",
+        "Dư nợ quá hạn", "Lãi tồn", "Dư nợ khoanh", "Nợ khoanh",
+        "Tổng_dư_nợ", "Dư_nợ_trong_hạn", "Dư_nợ_quá_hạn",
+        "Lãi_tồn_KHĐ", "Nợ_khoanh",
+        "Số_KH", "Số_món_vay", "Số món",
+        "Dư_nợ_TH", "Dư_nợ_QH",
+    }
+    cols_tien = [c for c in cols_co if c in _MONEY_PATTERNS]
+
+    return xuat_pdf(
+        df_xuat,
+        tieu_de,
+        nguoi_xuat,
+        cols_tien=cols_tien,
+        prefix_file=prefix_file,
+        them_dong_tong=True,
+    )
+
+
+def xuat_pdf_theo_nhom(
+    df: pd.DataFrame,
+    group_col: str,
+    cols_chi_tiet: list[str],
+    tieu_de: str,
+    nguoi_xuat: str,
+    prefix_file: str = "BC_NHOM",
+) -> bytes:
+    if not _REPORTLAB_READY:
+        raise ImportError("Chưa cài thư viện reportlab. Chạy: pip install reportlab")
+    if df is None or df.empty:
+        raise ValueError("Không có dữ liệu để xuất PDF")
+    if group_col not in df.columns:
+        raise ValueError(f"Cột nhóm '{group_col}' không tồn tại trong dữ liệu")
+
+    _dang_ky_font()
+    from utils import fmt_so
+
+    cols_co = [c for c in cols_chi_tiet if c in df.columns]
+    if not cols_co:
+        cols_co = list(df.columns)
+
+    _MONEY_PATTERNS = {
+        COT_DU_NO_TH, COT_DU_NO_QH, COT_TONG_DU_NO,
+        COT_LAI_TON, COT_DU_NO_KHOANH,
+        "Tổng dư nợ", "Dư nợ TH", "Dư nợ QH", "Dư nợ trong hạn",
+        "Dư nợ quá hạn", "Lãi tồn", "Dư nợ khoanh", "Nợ khoanh",
+        "Tổng_dư_nợ", "Dư_nợ_trong_hạn", "Dư_nợ_quá_hạn",
+        "Lãi_tồn_KHĐ", "Nợ_khoanh",
+        "Số_KH", "Số_món_vay", "Số món",
+        "Dư_nợ_TH", "Dư_nợ_QH",
+    }
+    cols_tien = [c for c in cols_co if c in _MONEY_PATTERNS]
+
+    fn = FONT_NORMAL if _FONT_REGISTERED else FONT_FALLBACK
+    fb = FONT_BOLD if _FONT_REGISTERED else FONT_FALLBACK
+
+    buf = BytesIO()
+    page_size = landscape(A4)
+    margin = 1.0 * cm
+
+    doc = SimpleDocTemplate(
+        buf,
+        pagesize=page_size,
+        leftMargin=margin, rightMargin=margin,
+        topMargin=margin, bottomMargin=2 * cm,
+        title=tieu_de,
+        author="VBSP-SCM",
+    )
+
+    story = []
+    usable_w = page_size[0] - 2 * margin
+    ngay_str = datetime.now().strftime("%d/%m/%Y %H:%M")
+
+    logo_path = Path("assets/logo.png")
+    if logo_path.exists():
+        logo = RLImage(str(logo_path), width=2.0 * cm, height=2.0 * cm)
+        from reportlab.platypus import Table as RLTable
+        header_tbl = RLTable(
+            [[logo, Paragraph(
+                "NGÂN HÀNG CHÍNH SÁCH XÃ HỘI VIỆT NAM<br/>"
+                "<font size='9'>Chi nhánh tỉnh Đồng Nai</font>",
+                ParagraphStyle("hdr_nhom", fontName=fb, fontSize=11,
+                               alignment=TA_CENTER, leading=15)
+            )]],
+            colWidths=[2.3 * cm, usable_w - 2.3 * cm]
+        )
+        header_tbl.setStyle(TableStyle([
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 0),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+        ]))
+        story.append(header_tbl)
+    else:
+        story.append(Paragraph(
+            "NGÂN HÀNG CHÍNH SÁCH XÃ HỘI VIỆT NAM",
+            ParagraphStyle("bank_nhom", fontName=fb, fontSize=11,
+                           alignment=TA_CENTER, spaceAfter=2)
+        ))
+        story.append(Paragraph(
+            "CHI NHÁNH TỈNH ĐỒNG NAI",
+            ParagraphStyle("branch_nhom", fontName=fn, fontSize=10,
+                           alignment=TA_CENTER, spaceAfter=6)
+        ))
+
+    story.append(HRFlowable(width="100%", thickness=1.5,
+                            color=VBSP_GREEN, spaceAfter=6))
+    story.append(Paragraph(
+        tieu_de.upper(),
+        ParagraphStyle("title_nhom", fontName=fb, fontSize=12, alignment=TA_CENTER,
+                       textColor=VBSP_GREEN, spaceAfter=4)
+    ))
+    story.append(Paragraph(
+        f"Ngày xuất: {ngay_str}  |  Người xuất: {nguoi_xuat}",
+        ParagraphStyle("meta_nhom", fontName=fn, fontSize=8, alignment=TA_CENTER,
+                       textColor=colors.grey, spaceAfter=10)
+    ))
+
+    groups = list(df.groupby(group_col, sort=False))
+    n_cols = len(cols_co)
+
+    if n_cols <= 6:
+        font_size = 10
+    elif n_cols <= 10:
+        font_size = 9
+    elif n_cols <= 14:
+        font_size = 8
+    else:
+        font_size = 7
+
+    hdr_font_size = font_size + 1
+
+    for gi, (nhom_val, nhom_df) in enumerate(groups):
+        nhom_label = str(nhom_val) if pd.notna(nhom_val) else "(Không xác định)"
+        n_ho_so = len(nhom_df)
+        tong_du_no = nhom_df[COT_TONG_DU_NO].sum() if COT_TONG_DU_NO in nhom_df.columns else 0
+        tong_str = f"{fmt_so(tong_du_no)}"
+
+        if gi > 0:
+            story.append(PageBreak())
+
+        story.append(Spacer(1, 0.3 * cm))
+        story.append(HRFlowable(width="100%", thickness=0.5,
+                                color=VBSP_GREEN, spaceAfter=4))
+        story.append(Paragraph(
+            f"<b>{nhom_label}</b> — {n_ho_so} hồ sơ — Tổng dư nợ: {tong_str}",
+            ParagraphStyle("section_nhom", fontName=fb, fontSize=10,
+                           textColor=VBSP_GREEN, spaceAfter=6)
+        ))
+
+        nhom_display = nhom_df[cols_co].copy()
+
+        header_cells = [
+            Paragraph(str(c).replace("_", " "), ParagraphStyle("th_nhom", fontName=fb,
+                      fontSize=hdr_font_size, alignment=TA_CENTER, textColor=colors.white))
+            for c in cols_co
+        ]
+        table_data = [header_cells]
+
+        for _, row in nhom_display.iterrows():
+            cells = []
+            for col in cols_co:
+                val = row[col]
+                if col in cols_tien and pd.notna(val):
+                    try:
+                        if isinstance(val, bool):
+                            raise ValueError
+                        if isinstance(val, (int, float)):
+                            txt = fmt_so(float(val))
+                        else:
+                            num = float(
+                                str(val).strip().replace(".", "").replace(",", ".")
+                            )
+                            txt = fmt_so(num)
+                        p = Paragraph(txt, ParagraphStyle("td_r_nhom", fontName=fn,
+                                          fontSize=font_size, alignment=TA_RIGHT))
+                    except (ValueError, TypeError):
+                        p = Paragraph(
+                            str(val) if pd.notna(val) else "",
+                            ParagraphStyle("td_r_nhom2", fontName=fn,
+                                           fontSize=font_size, alignment=TA_RIGHT),
+                        )
+                else:
+                    p = Paragraph(str(val) if pd.notna(val) else "",
+                                  ParagraphStyle("td_nhom", fontName=fn, fontSize=font_size,
+                                                 wordWrap="CJK"))
+                cells.append(p)
+            table_data.append(cells)
+
+        cong_cells = []
+        for ci, col in enumerate(cols_co):
+            if col in cols_tien:
+                try:
+                    tong = pd.to_numeric(nhom_display[col], errors="coerce").sum()
+                    cong_cells.append(Paragraph(
+                        f"<b>{fmt_so(tong)}</b>",
+                        ParagraphStyle("cong_r_nhom", fontName=fb, fontSize=font_size,
+                                       alignment=TA_RIGHT),
+                    ))
+                except Exception:
+                    cong_cells.append(Paragraph("", ParagraphStyle("cong_nhom", fontName=fb, fontSize=font_size)))
+            elif ci == 0:
+                cong_cells.append(Paragraph(
+                    "<b>Cộng</b>",
+                    ParagraphStyle("cong_lbl_nhom", fontName=fb, fontSize=font_size,
+                                   alignment=TA_LEFT),
+                ))
+            else:
+                cong_cells.append(Paragraph("", ParagraphStyle("cong_nhom", fontName=fb, fontSize=font_size)))
+        table_data.append(cong_cells)
+
+        col_widths = [usable_w / n_cols] * n_cols if n_cols else [usable_w]
+        tbl = Table(table_data, colWidths=col_widths, repeatRows=1)
+        last_r = len(table_data) - 1
+        style_cmds = [
+            ("BACKGROUND", (0, 0),       (-1, 0),       VBSP_GREEN),
+            ("TEXTCOLOR",  (0, 0),       (-1, 0),       colors.white),
+            ("FONTNAME",   (0, 0),       (-1, 0),       fb),
+            ("FONTSIZE",   (0, 0),       (-1, 0),       hdr_font_size),
+            ("ALIGN",      (0, 0),       (-1, 0),       "CENTER"),
+            ("VALIGN",     (0, 0),       (-1, -1),      "MIDDLE"),
+            ("GRID",       (0, 0),       (-1, -1),      0.5, BORDER_COLOR),
+            ("BACKGROUND", (0, last_r),  (-1, last_r),  VBSP_GREEN_LIGHT),
+            ("FONTNAME",   (0, last_r),  (-1, last_r),  fb),
+            ("LINEABOVE",  (0, last_r),  (-1, last_r),  1.5, VBSP_GREEN),
+        ]
+        for r in range(1, last_r):
+            if r % 2 == 0:
+                style_cmds.append(("BACKGROUND", (0, r), (-1, r), ROW_ALT))
+        tbl.setStyle(TableStyle(style_cmds))
+        story.append(tbl)
+
+    story.append(Spacer(1, 1.5 * cm))
+    story.append(Paragraph(
+        f"Đồng Nai, ngày {datetime.now().strftime('%d')} "
+        f"tháng {datetime.now().strftime('%m')} "
+        f"năm {datetime.now().strftime('%Y')}",
+        ParagraphStyle("date_sign_nhom", fontName=fn, fontSize=10,
+                       alignment=TA_RIGHT, spaceAfter=6)
+    ))
+
+    ky_data = [[
+        Paragraph("NGƯỜI LẬP BIỂU", ParagraphStyle("ky_nhom_a", fontName=fb, fontSize=10, alignment=TA_CENTER)),
+        Paragraph("KIỂM SOÁT",       ParagraphStyle("ky_nhom_b", fontName=fb, fontSize=10, alignment=TA_CENTER)),
+        Paragraph("GIÁM ĐỐC",        ParagraphStyle("ky_nhom_c", fontName=fb, fontSize=10, alignment=TA_CENTER)),
+    ], [
+        Paragraph("<i>(Ký, ghi rõ họ tên)</i>", ParagraphStyle("ky_nhom_d", fontName=fn, fontSize=9, alignment=TA_CENTER, textColor=colors.grey)),
+        Paragraph("<i>(Ký, ghi rõ họ tên)</i>", ParagraphStyle("ky_nhom_e", fontName=fn, fontSize=9, alignment=TA_CENTER, textColor=colors.grey)),
+        Paragraph("<i>(Ký, ghi rõ họ tên)</i>", ParagraphStyle("ky_nhom_f", fontName=fn, fontSize=9, alignment=TA_CENTER, textColor=colors.grey)),
+    ], [
+        Paragraph(" \n\n\n", ParagraphStyle("gap_nhom_a", fontSize=10)),
+        Paragraph(" \n\n\n", ParagraphStyle("gap_nhom_b", fontSize=10)),
+        Paragraph(" \n\n\n", ParagraphStyle("gap_nhom_c", fontSize=10)),
+    ]]
+    ky_tbl = Table(ky_data, colWidths=[usable_w / 3] * 3)
+    ky_tbl.setStyle(TableStyle([
+        ("ALIGN",      (0, 0), (-1, -1), "CENTER"),
+        ("VALIGN",     (0, 0), (-1, -1), "TOP"),
+        ("TOPPADDING", (0, 0), (-1, -1), 6),
+    ]))
+    story.append(ky_tbl)
+
+    def _on_page(canvas, _doc):
+        canvas.saveState()
+        canvas.setFont(fn if _FONT_REGISTERED else FONT_FALLBACK, 7)
+        canvas.setFillColor(colors.grey)
+        canvas.drawRightString(
+            page_size[0] - margin, 0.8 * cm,
             f"Trang {_doc.page}  |  VBSP-SCM  |  {ngay_str}"
         )
         canvas.restoreState()

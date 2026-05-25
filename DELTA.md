@@ -4,6 +4,32 @@
 
 ---
 
+## [2026-05-25] Fix tab Xử lý Rủi ro — Sub-tab 5 Báo cáo
+
+### Lỗi đã fix
+`_subtab_bao_cao()` gọi 2 method không tồn tại trong `LuuTruXLRR`:
+- `LuuTruXLRR.doc_ds_cn()` → **AttributeError** khi mở tab
+- `LuuTruXLRR.doc_ds_pgd(pgd_user)` → **AttributeError** khi mở tab
+
+### Fix
+```python
+# TRƯỚC (crash):
+ds_hs = LuuTruXLRR.doc_ds_cn()
+ds_hs = LuuTruXLRR.doc_ds_pgd(pgd_user)
+
+# SAU (đúng):
+ds_hs = LuuTruXLRR.doc_cn(int(nam_xuat), thang_xuat)
+ds_hs += LuuTruXLRR.doc_qd62(int(nam_xuat), thang_xuat)
+# PGD:
+ds_hs = LuuTruXLRR.doc_pgd(pgd_slug(pgd_user), int(nam_xuat), thang_xuat)
+```
+
+### Cải thiện thêm
+- Thêm **month/year selector** (T1–T12, 2020–2030) để chọn kỳ xuất biểu
+- Selectbox hồ sơ dùng `id` làm key thay text-label → tránh collision khi trùng tên KH
+
+---
+
 ## [2026-05-25] Thiết kế lại Hồ sơ đến hạn — Tổng hợp (`tab_tongquan.py`)
 
 ### Thay đổi layout

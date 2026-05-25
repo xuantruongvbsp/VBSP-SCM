@@ -946,27 +946,25 @@ def _subtab_theo_doi_qd62(ctx: TabContext) -> None:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# SUB-TAB 3: TỔNG HỢP TOÀN CN (cũ là SUB-TAB 4)
+# SUB-TAB 3 (CN): TỔNG HỢP CN → TW
 # ══════════════════════════════════════════════════════════════════════════════
 
 def _subtab_tong_hop_cn(ctx: TabContext) -> None:
-    """Sub-tab 3: Tổng hợp toàn Chi nhánh."""
-    st.caption("Tổng hợp hồ sơ xử lý rủi ro toàn Chi nhánh Đồng Nai")
-    
-    # Import services
+    """Tổng hợp toàn Chi nhánh — gửi TW."""
+    st.caption("Tổng hợp hồ sơ XLRR toàn Chi nhánh — chọn hồ sơ từ các PGD để gửi TW")
+
     from services.xlrr_export_service import (
         nhap_danh_sach_rui_ro_excel,
-        merge_du_lieu_pgd_vao_cn,
         tong_hop_theo_bien_phap,
     )
-    
-    # Filters
-    col_f1, col_f2 = st.columns(2)
-    with col_f1:
-        now = datetime.now()
-        thang = st.selectbox("Tháng", list(range(1, 13)), index=now.month - 1, key="xlrr_th_thang")
-    with col_f2:
+    from collections import defaultdict
+
+    now = datetime.now()
+    col_d1, col_d2 = st.columns(2)
+    with col_d1:
         nam = st.number_input("Năm", min_value=2020, max_value=2030, value=now.year, key="xlrr_th_nam")
+    with col_d2:
+        thang = st.selectbox("Tháng", list(range(1, 13)), index=now.month - 1, key="xlrr_th_thang")
     
     # ── Nhập dữ liệu từ PGD ────────────────────────────────────────────
     st.markdown("---")

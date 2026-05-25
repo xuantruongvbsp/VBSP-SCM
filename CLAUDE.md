@@ -703,6 +703,29 @@ Mỗi khi fix bug, thêm entry vào `BUGMAP.md` theo template có sẵn (cuối 
 
 ---
 
+## 11. Tài liệu liên quan
+
+| File | Đọc khi nào |
+|---|---|
+| `DELTA.md` | **ĐỌC ĐẦU MỖI PHIÊN** — thay đổi gần đây, component mới, signature đã cập nhật |
+| `ARCHITECTURE.md` | Cần hiểu quan hệ import giữa các module |
+| `CONVENTIONS.md` | Cần biết quy ước chi tiết về kv_store, upload, CSS |
+| `UI_GUIDELINES.md` | Bảng màu, typography |
+| `ROLES.md` | Cần phân quyền chi tiết theo role mới |
+| `TROUBLESHOOTING.md` | Gặp lỗi thường gặp về dữ liệu, cache, upload |
+| `BUGMAP.md` | ĐỌC TRƯỚC KHI CODE — tra lỗi đã mắc để tránh lặp; sau khi fix bug thì ghi thêm |
+| `SCHEMA.md` | **ĐỌC TRƯỚC KHI VIẾT SQL** — schema 16 bảng SQLite + parquet + query mẫu |
+| `TEST_COVERAGE.md` | Bản đồ 31 file test, lỗ hổng cần test — đọc khi viết test mới |
+| `DECISIONS.md` | Lý do chọn SQLite/Parquet/DuckDB/kv_store/render pattern — đọc khi muốn đổi công nghệ |
+| `CHANGELOG.md` | Lịch sử thay đổi |
+| `BACKLOG.md` | Yêu cầu người dùng — đã làm & sẽ làm |
+| `ROADMAP.md` | Sprint + backlog |
+| `TEMPLATES.md` | Hướng dẫn quản lý template Word |
+| `HUONG_DAN_PHAN_HE.md` | Hướng dẫn sử dụng theo phân hệ |
+| `HUONG_DAN_NGUON_DU_LIEU.md` | Luồng upload, cache, 2 luồng dữ liệu |
+
+---
+
 ## 12. Tự động chọn model cho subagent
 
 **Workflow thực tế:** AI khác (Cascade/Trae/Windsurf) viết code → **Sonnet chỉ review + fix**.  
@@ -747,25 +770,25 @@ Agent(subagent_type="Explore", model="haiku",
 - Chỉ sửa ≤ 2 file nhỏ → làm trực tiếp không cần spawn
 - User đang hỏi/giải thích → trả lời trực tiếp
 
----
+### 12.4 BẮT BUỘC — Hiện model ở đầu mỗi task
 
-## 11. Tài liệu liên quan
+**Mỗi khi bắt đầu làm task (không phải hỏi/trả lời thường), PHẢI hiện dòng:**
 
-| File | Đọc khi nào |
-|---|---|
-| `DELTA.md` | **ĐỌC ĐẦU MỖI PHIÊN** — thay đổi gần đây, component mới, signature đã cập nhật |
-| `ARCHITECTURE.md` | Cần hiểu quan hệ import giữa các module |
-| `CONVENTIONS.md` | Cần biết quy ước chi tiết về kv_store, upload, CSS |
-| `UI_GUIDELINES.md` | Bảng màu, typography |
-| `ROLES.md` | Cần phân quyền chi tiết theo role mới |
-| `TROUBLESHOOTING.md` | Gặp lỗi thường gặp về dữ liệu, cache, upload |
-| `BUGMAP.md` | ĐỌC TRƯỚC KHI CODE — tra lỗi đã mắc để tránh lặp; sau khi fix bug thì ghi thêm |
-| `SCHEMA.md` | **ĐỌC TRƯỚC KHI VIẾT SQL** — schema 16 bảng SQLite + parquet + query mẫu |
-| `TEST_COVERAGE.md` | Bản đồ 31 file test, lỗ hổng cần test — đọc khi viết test mới |
-| `DECISIONS.md` | Lý do chọn SQLite/Parquet/DuckDB/kv_store/render pattern — đọc khi muốn đổi công nghệ |
-| `CHANGELOG.md` | Lịch sử thay đổi |
-| `BACKLOG.md` | Yêu cầu người dùng — đã làm & sẽ làm |
-| `ROADMAP.md` | Sprint + backlog |
-| `TEMPLATES.md` | Hướng dẫn quản lý template Word |
-| `HUONG_DAN_PHAN_HE.md` | Hướng dẫn sử dụng theo phân hệ |
-| `HUONG_DAN_NGUON_DU_LIEU.md` | Luồng upload, cache, 2 luồng dữ liệu |
+```
+🤖 Model: Sonnet 4.6  |  Lý do: [1 câu ngắn]
+```
+
+Hoặc khi spawn subagent:
+
+```
+🤖 Bước 1 — Haiku đọc file  |  Bước 2 — Sonnet review + fix
+```
+
+Hoặc khi cần Opus:
+
+```
+⚠️ Model đề xuất: Opus 4.7  |  Lý do: task chạm db.py — sai thì mất dữ liệu
+   → Restart: claude --model claude-opus-4-7
+```
+
+**Mục đích:** User luôn biết model nào đang xử lý task, tự kiểm soát chi phí và độ tin cậy.

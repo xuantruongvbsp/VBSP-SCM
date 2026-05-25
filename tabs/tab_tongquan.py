@@ -42,6 +42,7 @@ from services.upload_service import format_caption_merge
 from services import tongquan_service as _tqsvc
 from services.tongquan_service import xuat_excel_tqpgd as _xuat_excel_tqpgd
 from components.filter_bar import filter_bar, apply_filters
+from components.delta_card import kpi_row
 
 if TYPE_CHECKING:
     from streamlit.delta_generator import DeltaGenerator
@@ -150,6 +151,63 @@ def _cache_tqpgd_extended(
 
 from tabs.base_tab import TabContext
 
+
+
+def _xuat_pdf_den_han(
+    df_loc: pd.DataFrame,
+    label: str,
+    loc_pgd: list | None = None,
+    loc_ct: list | None = None,
+    loc_xa: list | None = None,
+    username: str = "",
+    key_prefix: str = "",
+) -> bytes:
+    COLS_GROUP = [COT_TEN_PGD, COT_TEN_XA, COT_TEN_CT]
+    cols_ok = [c for c in COLS_GROUP if c in df_loc.columns]
+    RENAME_MAP = {COT_TEN_PGD: "PGD", COT_TEN_XA: "Xã", COT_TEN_CT: "Chương trình"}
+    rename_ok = {k: v for k, v in RENAME_MAP.items() if k in df_loc.columns}
+
+    pdf_tg = _tqsvc.tong_hop_den_han(
+        df_loc,
+        group_cols=cols_ok,
+        cot_so_ku=COT_SO_KU,
+        cot_ma_kh=COT_MA_KH,
+        cot_tdn=COT_TONG_DU_NO,
+    ).rename(columns=rename_ok)
+
+    pdf_tg = pdf_tg.sort_values(
+        by=[c for c in ["PGD", "Xã", "Chương trình"] if c in pdf_tg.columns],
+        ascending=True,
+    )
+
+    pdf_tg["Dư nợ (triệu đồng)"] = (pdf_tg["_no"] / 1_000_000).round(0)
+    pdf_tg["Số món vay"] = pdf_tg["_mon"]
+    pdf_tg["Số KH"] = pdf_tg["_kh"]
+
+    cols_hien_thi = [v for v in ["PGD", "Xã", "Chương trình"] if v in pdf_tg.columns]
+    df_pdf = pdf_tg[[*cols_hien_thi, "Số món vay", "Số KH", "Dư nợ (triệu đồng)"]]
+
+    phu_parts = [f"Kỳ: {label}"]
+    if loc_pgd:
+        phu_parts.append(f"PGD: {', '.join(sorted(loc_pgd))}")
+    if loc_ct:
+        phu_parts.append(f"CT: {', '.join(sorted(loc_ct))}")
+    if loc_xa:
+        phu_parts.append(f"Xã: {', '.join(sorted(loc_xa))}")
+
+    tong_no = df_loc[COT_TONG_DU_NO].sum()
+    n_mon = df_loc[COT_SO_KU].nunique()
+    n_kh = df_loc[COT_MA_KH].nunique()
+    phu_parts.append(f"Tổng: {fmt_so(n_mon)} món | {fmt_so(n_kh)} KH | {fmt(tong_no)} trđ")
+
+    return xuat_pdf(
+        df_pdf,
+        f"HỒ SƠ ĐẾN HẠN — {label}",
+        username,
+        cols_tien=["Dư nợ (triệu đồng)"],
+        prefix_file=f"HoSoDenHan_{key_prefix}",
+        them_dong_tong=True,
+    )
 
 
 def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
@@ -1007,45 +1065,81 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                 "Hãy kiểm tra file HSTD hoặc merge lại dữ liệu."
             )
         st.divider()
-        st.subheader("🔔 Hồ sơ đến hạn — Tổng hợp")
+        # ── Header: tiêu đề trái | Nhóm TH phải ──
+        _hdr_l, _hdr_r = st.columns([6, 2])
+        with _hdr_l:
+            st.subheader("🔔 Hồ sơ đến hạn — Tổng hợp")
+        with _hdr_r:
+            nhom_chon = st.selectbox(
+                "Nhóm tổng hợp",
+                ["Chương trình", "PGD", "Xã"],
+                key="tq_denh_nhom",
+                label_visibility="collapsed",
+            )
+
         if COT_NGAY_DH in df.columns:
             try:
                 dt = _tqsvc.chuan_hoa_ngay(df, COT_NGAY_DH, dayfirst=True)
                 hn       = pd.Timestamp.today().normalize()
                 cuoi_nam = pd.Timestamp(hn.year, 12, 31)
 
-
-                # ── Tầng 1: Bộ lọc chung (PGD + Chương trình) ──
-                filter_chung = {}
-                with st.expander("🔍 Bộ lọc chung", expanded=False):
-                    filters_chung_cfg = []
-                    if COT_TEN_PGD in dt.columns:
-                        filters_chung_cfg.append({
-                            "field": COT_TEN_PGD,
-                            "label": "PGD",
-                            "type": "multiselect",
-                        })
-                    if COT_TEN_CT in dt.columns:
-                        filters_chung_cfg.append({
-                            "field": COT_TEN_CT,
-                            "label": "Chương trình",
-                            "type": "multiselect",
-                        })
-                    filter_chung = filter_bar(dt, filters_chung_cfg, key_prefix="tq_dh_chung")
-
                 cot_xa = next((c for c in [COT_TEN_XA, "Tên xã"] if c in dt.columns), None)
 
-                dt_chung = apply_filters(dt, filter_chung)
+                # Thêm cột phụ để filter Nguồn vốn và Dư nợ (triệu)
+                _nguon_von_map = {1: "TW", 2: "ĐP", 1.0: "TW", 2.0: "ĐP"}
+                if COT_NGUON_VON in dt.columns:
+                    dt["_nv_label"] = (
+                        pd.to_numeric(dt[COT_NGUON_VON], errors="coerce")
+                        .map(_nguon_von_map).fillna("Khác")
+                    )
+                if COT_TONG_DU_NO in dt.columns:
+                    dt["_no_trieu"] = (
+                        pd.to_numeric(dt[COT_TONG_DU_NO], errors="coerce") / 1_000_000
+                    ).round(1)
+
+                # ── BỘ LỌC THỐNG NHẤT (5 tiêu chí, 2 hàng) ──
+                _f_pgd = sorted(dt[COT_TEN_PGD].dropna().unique().tolist()) if COT_TEN_PGD in dt.columns else []
+                _f_ct  = sorted(dt[COT_TEN_CT].dropna().unique().tolist())  if COT_TEN_CT  in dt.columns else []
+                _f_xa  = sorted(dt[cot_xa].dropna().unique().tolist())       if cot_xa and cot_xa in dt.columns else []
+                _f_nv  = sorted(dt["_nv_label"].dropna().unique().tolist())  if "_nv_label" in dt.columns else []
+
+                # Hàng 1: 3 multiselect + nút xóa
+                _c1, _c3, _c4, _c5 = st.columns([3, 3, 2, 1])
+                with _c1:
+                    _sel_pgd = st.multiselect("PGD", _f_pgd, key="tq_dh_pgd",
+                                               placeholder="Tất cả PGD...") if _f_pgd else []
+                with _c3:
+                    _sel_xa  = st.multiselect("Xã", _f_xa, key="tq_dh_xa",
+                                               placeholder="Tất cả xã...") if _f_xa else []
+                with _c4:
+                    _sel_nv  = st.multiselect("Nguồn vốn", _f_nv, key="tq_dh_nv",
+                                               placeholder="TW / ĐP...") if _f_nv else []
+                with _c5:
+                    st.write("")
+                    if st.button("🔄", key="tq_dh_clear", help="Xóa tất cả bộ lọc",
+                                 use_container_width=True):
+                        for _k in ["tq_dh_pgd", "tq_dh_xa", "tq_dh_nv"]:
+                            st.session_state.pop(_k, None)
+                        st.rerun()
+                _sel_ct = []
+
+                # Áp dụng tất cả filter lên dt → dt_chung
+                dt_chung = dt.copy()
+                if _sel_pgd and COT_TEN_PGD in dt_chung.columns:
+                    dt_chung = dt_chung[dt_chung[COT_TEN_PGD].isin(_sel_pgd)]
+                if _sel_ct and COT_TEN_CT in dt_chung.columns:
+                    dt_chung = dt_chung[dt_chung[COT_TEN_CT].isin(_sel_ct)]
+                if _sel_xa and cot_xa and cot_xa in dt_chung.columns:
+                    dt_chung = dt_chung[dt_chung[cot_xa].isin(_sel_xa)]
+                if _sel_nv and "_nv_label" in dt_chung.columns:
+                    dt_chung = dt_chung[dt_chung["_nv_label"].isin(_sel_nv)]
                 dt_chung = _tqsvc.loc_du_no_duong(dt_chung, COT_TONG_DU_NO)
 
-                # ── Nhóm tổng hợp ──
-                _c0, _c1 = st.columns([2, 10])
-                with _c0:
-                    nhom_chon = st.selectbox(
-                        "Nhóm TH",
-                        ["Chương trình", "PGD", "Xã"],
-                        key="tq_denh_nhom",
-                    )
+                # filter_chung cho _xuat_pdf_den_han (PGD, CT, Xã)
+                filter_chung: dict = {}
+                if _sel_pgd: filter_chung[COT_TEN_PGD] = _sel_pgd
+                if _sel_ct:  filter_chung[COT_TEN_CT]  = _sel_ct
+                if _sel_xa and cot_xa: filter_chung[cot_xa] = _sel_xa
 
                 NHOM_COT = {
                     "Chương trình": COT_TEN_CT,
@@ -1062,102 +1156,7 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                     "Tùy chỉnh": None,
                 }
 
-                def _build_pdf_den_han(df_loc, label, loc_pgd, loc_ct, loc_xa, username, key_prefix):
-                    COLS_GROUP = [COT_TEN_PGD, COT_TEN_XA, COT_TEN_CT]
-                    cols_ok = [c for c in COLS_GROUP if c in df_loc.columns]
-
-                    RENAME_MAP = {COT_TEN_PGD: "PGD", COT_TEN_XA: "Xã", COT_TEN_CT: "Chương trình"}
-                    rename_ok = {k: v for k, v in RENAME_MAP.items() if k in df_loc.columns}
-
-                    pdf_tg = _tqsvc.tong_hop_den_han(
-                        df_loc,
-                        group_cols=cols_ok,
-                        cot_so_ku=COT_SO_KU,
-                        cot_ma_kh=COT_MA_KH,
-                        cot_tdn=COT_TONG_DU_NO,
-                    )
-
-                    pdf_tg["Số món vay"] = pdf_tg["_mon"].apply(fmt_so)
-                    pdf_tg["Số KH"]      = pdf_tg["_kh"].apply(fmt_so)
-                    pdf_tg["Dư nợ (triệu đồng)"] = pdf_tg["_no"].apply(fmt_bang_ty)
-
-                    pdf_tg = pdf_tg.rename(columns=rename_ok)
-                    pdf_tg = pdf_tg.sort_values(
-                        by=[c for c in ["PGD", "Xã", "Chương trình"] if c in pdf_tg.columns],
-                        ascending=True,
-                    )
-
-                    cols_hien_thi = [v for v in ["PGD", "Xã", "Chương trình"] if v in pdf_tg.columns]
-                    df_pdf = pdf_tg[[*cols_hien_thi, "Số món vay", "Số KH", "Dư nợ (triệu đồng)"]]
-
-                    return xuat_pdf(
-                        df_pdf,
-                        f"Hồ sơ đến hạn {label} — Tổng hợp theo PGD / Xã / Chương trình",
-                        username,
-                        cols_tien=[],
-                        prefix_file=f"HoSoDenHan_{key_prefix}",
-                    )
-
-                def _bang_den_han(df_loc, label, key_prefix, tab_filters=None):
-                    if tab_filters is None:
-                        tab_filters = {}
-
-                    # Tạo cột tạm để filter_bar hiển thị đẹp
-                    _df_bar = df_loc.copy()
-                    _nguon_von_map = {1: "TW", 2: "ĐP", 1.0: "TW", 2.0: "ĐP"}
-                    if COT_NGUON_VON in _df_bar.columns:
-                        _df_bar["_nv_label"] = (
-                            pd.to_numeric(_df_bar[COT_NGUON_VON], errors="coerce")
-                            .map(_nguon_von_map)
-                            .fillna("Khác")
-                        )
-                    if COT_TONG_DU_NO in _df_bar.columns:
-                        _df_bar["_no_trieu"] = (
-                            pd.to_numeric(_df_bar[COT_TONG_DU_NO], errors="coerce") / 1_000_000
-                        ).round(1)
-
-                    # 1 filter_bar gộp 3 điều kiện: Xã + Nguồn vốn + Dư nợ
-                    _filters_cfg = []
-                    if cot_xa and cot_xa in _df_bar.columns:
-                        _filters_cfg.append({"field": cot_xa, "label": "Xã", "type": "multiselect"})
-                    if "_nv_label" in _df_bar.columns:
-                        _filters_cfg.append({"field": "_nv_label", "label": "Nguồn vốn", "type": "multiselect"})
-                    if "_no_trieu" in _df_bar.columns and not _df_bar.empty:
-                        _filters_cfg.append({"field": "_no_trieu", "label": "Dư nợ (triệu đồng)", "type": "range"})
-
-                    filter_result = filter_bar(_df_bar, _filters_cfg, key_prefix=f"tq_tab_{key_prefix}") if _filters_cfg else {}
-
-                    # Trích xuất và chuẩn hoá kết quả
-                    xa_filter = filter_result.get(cot_xa) if cot_xa else None
-                    nv_labels = filter_result.get("_nv_label")
-                    no_trieu_range = filter_result.get("_no_trieu")
-
-                    nv_filter = None
-                    if nv_labels:
-                        _nv_vals = []
-                        if "TW" in nv_labels:
-                            _nv_vals.append(1)
-                        if "ĐP" in nv_labels:
-                            _nv_vals.append(2)
-                        if _nv_vals:
-                            nv_filter = _nv_vals if len(_nv_vals) > 1 else _nv_vals[0]
-
-                    # Lưu vào tab_filters để co_loc_tab kiểm tra
-                    tab_filters["xa"] = xa_filter
-                    tab_filters["nv"] = nv_filter
-                    tab_filters["no_range"] = no_trieu_range
-
-                    df_loc = _tqsvc.ap_dung_loc_den_han_tab(
-                        df_loc,
-                        cot_xa=cot_xa,
-                        cot_nv=COT_NGUON_VON,
-                        loc_xa=xa_filter,
-                        loc_nv=nv_filter,
-                        cot_tdn=COT_TONG_DU_NO,
-                        range_no_trieu=no_trieu_range,
-                    )
-
-                    tg = None
+                def _bang_den_han(df_loc, label, key_prefix):
                     if df_loc.empty:
                         st.success(f"✅ Không có món vay đến hạn {label}")
                         return
@@ -1172,10 +1171,17 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                     tong_mon = _tong["tong_mon"]
                     tong_kh = _tong["tong_kh"]
 
-                    c1, c2, c3 = st.columns(3)
-                    c1.metric("Số món vay", fmt_so(tong_mon))
-                    c2.metric("Số khách hàng", fmt_so(tong_kh))
-                    c3.metric("Tổng dư nợ", fmt(tong_no))
+                    kpi_row(
+                        cols=[
+                            {"label": "Số món vay",    "value": fmt_so(tong_mon), "icon": "📋",
+                             "help": "Tổng số khế ước đến hạn trong kỳ"},
+                            {"label": "Số khách hàng", "value": fmt_so(tong_kh),  "icon": "👥",
+                             "help": "Số KH có món vay đến hạn"},
+                            {"label": "Tổng dư nợ",    "value": fmt(tong_no),     "icon": "💰",
+                             "help": "Đơn vị: triệu đồng"},
+                        ],
+                        num_columns=3,
+                    )
 
                     df_thang = _tqsvc.tong_hop_den_han_theo_thang(
                         df_loc,
@@ -1184,28 +1190,11 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                         cot_ma_kh=COT_MA_KH,
                         cot_tdn=COT_TONG_DU_NO,
                     )
-                    if not df_thang.empty and len(df_thang) > 1:
-                        fig_bar = px.bar(
-                            df_thang,
-                            x="nam_thang_label",
-                            y="_no",
-                            text=df_thang["_no"].apply(fmt_bang_ty),
-                            labels={"nam_thang_label": "Tháng", "_no": "Dư nợ (triệu đồng)"},
-                            title=f"Phân bổ dư nợ đến hạn — {label}",
-                            color_discrete_sequence=["#0066CC"],
-                        )
-                        fig_bar.update_traces(textposition="outside", textfont_size=11)
-                        fig_bar.update_layout(
-                            height=300,
-                            paper_bgcolor="rgba(0,0,0,0)",
-                            margin=dict(l=0, r=0, t=40, b=0),
-                            xaxis_title="",
-                            yaxis_title="Triệu đồng",
-                        )
-                        st.plotly_chart(fig_bar, use_container_width=True, key=f"bar_den_han_{key_prefix}")
 
-                    st.divider()
-
+                    # ── Tính tg trước để dùng cho cả pie lẫn bảng ──
+                    tg = None
+                    cols_hien_thi: list = []
+                    rename_map: dict = {}
                     if nhom_col in df_loc.columns:
                         if nhom_chon == "Xã" and COT_TEN_PGD in df_loc.columns:
                             tg = _tqsvc.tong_hop_den_han(
@@ -1215,9 +1204,6 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                                 cot_ma_kh=COT_MA_KH,
                                 cot_tdn=COT_TONG_DU_NO,
                             ).sort_values("_no", ascending=False)
-                            tg["Số món vay"] = tg["_mon"].apply(fmt_so)
-                            tg["Số KH"]      = tg["_kh"].apply(fmt_so)
-                            tg["Dư nợ (triệu đồng)"] = tg["_no"].apply(fmt_bang_ty)
                             cols_hien_thi = [COT_TEN_PGD, nhom_col, "Số món vay", "Số KH", "Dư nợ (triệu đồng)"]
                             rename_map = {COT_TEN_PGD: "PGD", nhom_col: "Xã"}
                         else:
@@ -1228,119 +1214,151 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                                 cot_ma_kh=COT_MA_KH,
                                 cot_tdn=COT_TONG_DU_NO,
                             ).sort_values("_no", ascending=False)
+                            cols_hien_thi = [nhom_col, "Số món vay", "Số KH", "Dư nợ (triệu đồng)"]
+                            rename_map = {nhom_col: nhom_chon}
+                        if tg is not None:
                             tg["Số món vay"] = tg["_mon"].apply(fmt_so)
                             tg["Số KH"]      = tg["_kh"].apply(fmt_so)
                             tg["Dư nợ (triệu đồng)"] = tg["_no"].apply(fmt_bang_ty)
-                            cols_hien_thi = [nhom_col, "Số món vay", "Số KH", "Dư nợ (triệu đồng)"]
-                            rename_map = {nhom_col: nhom_chon}
 
-                        hien_thi_dataframe_phan_trang(
-                            tg[cols_hien_thi].rename(columns=rename_map),
-                            key=f"tongquan_den_han_{key_prefix}",
-                        )
+                    # ── Layout 2 cột: Bar 60% | Donut 40% ──
+                    _col_bar, _col_pie = st.columns([6, 4])
 
-                        if nhom_col in df_loc.columns and len(tg) > 0:
+                    with _col_bar:
+                        if not df_thang.empty and len(df_thang) > 1:
+                            fig_bar = px.bar(
+                                df_thang,
+                                x="nam_thang_label",
+                                y="_no",
+                                text=df_thang["_no"].apply(fmt_bang_ty),
+                                labels={"nam_thang_label": "Tháng", "_no": "Dư nợ (triệu đồng)"},
+                                title=f"Phân bổ dư nợ — {label}",
+                                color_discrete_sequence=["#0066CC"],
+                            )
+                            fig_bar.update_traces(textposition="outside", textfont_size=11)
+                            fig_bar.update_layout(
+                                height=360,
+                                paper_bgcolor="rgba(0,0,0,0)",
+                                margin=dict(l=0, r=0, t=40, b=0),
+                                xaxis_title="",
+                                yaxis_title="Triệu đồng",
+                            )
+                            st.plotly_chart(fig_bar, use_container_width=True,
+                                            key=f"bar_den_han_{key_prefix}")
+                        else:
+                            st.caption("Không đủ dữ liệu để vẽ biểu đồ phân bổ.")
+
+                    with _col_pie:
+                        if tg is not None and nhom_col in df_loc.columns and len(tg) > 0:
                             top10 = tg.nlargest(10, "_no")
-
                             fig = go.Figure(go.Pie(
                                 labels=top10[nhom_col],
                                 values=top10["_no"],
                                 hole=0.5,
                                 textinfo="label+percent",
                                 textposition="outside",
-                                hovertemplate="<b>%{label}</b><br>Dư nợ: %{customdata}<br>Tỷ lệ: %{percent}<extra></extra>",
+                                hovertemplate=(
+                                    "<b>%{label}</b><br>Dư nợ: %{customdata}"
+                                    "<br>Tỷ lệ: %{percent}<extra></extra>"
+                                ),
                                 customdata=top10["Dư nợ (triệu đồng)"],
                                 marker=dict(
                                     colors=px.colors.sequential.Greens_r[: len(top10)],
                                     line=dict(color="white", width=2),
                                 ),
                             ))
-
                             fig.update_layout(
-                                title=f"Top 10 {nhom_chon} có dư nợ đến hạn cao nhất",
-                                height=450,
+                                title=f"Top 10 {nhom_chon}",
+                                height=360,
                                 annotations=[dict(
-                                    text=f"<b>{fmt(tong_no)}</b><br>Tổng dư nợ",
+                                    text=f"<b>{fmt(tong_no)}</b><br>tr.đ",
                                     x=0.5, y=0.5,
-                                    font=dict(size=13),
+                                    font=dict(size=12),
                                     showarrow=False,
                                 )],
-                                legend=dict(orientation="v", x=1.05, y=0.5),
-                                margin=dict(l=0, r=150, t=50, b=0),
+                                legend=dict(orientation="v", x=1.02, y=0.5),
+                                margin=dict(l=0, r=120, t=50, b=0),
                                 paper_bgcolor="rgba(0,0,0,0)",
                             )
+                            st.plotly_chart(fig, use_container_width=True,
+                                            key=f"pie_den_han_{key_prefix}")
+                        else:
+                            st.caption("Không có dữ liệu biểu đồ cơ cấu.")
 
-                            st.plotly_chart(fig, use_container_width=True, key=f"pie_den_han_{key_prefix}")
-
-                        if tg is not None:
-                            st.divider()
-                            col_ex, col_pdf = st.columns(2)
-
-                            pdf_key = f"den_han_{key_prefix}_pdf"
-
-                            co_loc_chung = any(v for v in filter_chung.values() if v)
-                            co_loc_tab = bool(tab_filters.get("xa") or tab_filters.get("nv") or tab_filters.get("no_range"))
-                            co_loc = co_loc_chung or co_loc_tab
-
-                            with col_ex:
-                                if co_loc:
-                                    df_excel = tg[[nhom_col, "_mon", "_kh", "_no"]].rename(columns={
-                                        nhom_col: nhom_chon,
-                                        "_mon": "Số món vay",
-                                        "_kh":  "Số KH",
-                                        "_no":  "Dư nợ",
-                                    })
-                                    ten_sheet = f"TH_{nhom_chon[:10]}_{key_prefix}"
-                                else:
-                                    COLS_CHI_TIET = [
-                                        COT_TEN_PGD, COT_MA_KH, COT_TEN_KH, COT_SO_KU,
-                                        COT_TEN_CT, COT_TONG_DU_NO, COT_NGAY_DH,
-                                    ]
-                                    cols_ok = [c for c in COLS_CHI_TIET if c in df_loc.columns]
-                                    df_excel = df_loc[cols_ok].sort_values(COT_TEN_PGD).reset_index(drop=True)
-                                    ten_sheet = f"ChiTiet_{key_prefix}"
-
-                                excel_bytes = xuat_excel({ten_sheet: df_excel})
-                                st.download_button(
-                                    label="📥 Xuất Excel",
-                                    data=excel_bytes,
-                                    file_name=ten_file_xuat(f"HoSoDenHan_{key_prefix}"),
-                                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                                    use_container_width=True,
-                                    key=f"excel_den_han_{key_prefix}",
-                                )
-
-                            with col_pdf:
-                                if st.button("📄 Xuất PDF", key=f"pdf_den_han_{key_prefix}",
-                                             type="primary", use_container_width=True):
-                                    state = SCMStateManager()
-                                    with st.spinner("⏳ Đang tạo PDF..."):
-                                        pdf_bytes = _build_pdf_den_han(
-                                            df_loc, label,
-                                            filter_chung.get(COT_TEN_PGD),
-                                            filter_chung.get(COT_TEN_CT),
-                                            tab_filters.get("xa"),
-                                            username, key_prefix
-                                        )
-                                    state.downloads.set(
-                                        pdf_key,
-                                        pdf_bytes,
-                                        f"HoSoDenHan_{key_prefix}_{datetime.now().strftime('%d%m%Y_%H%M')}.pdf",
-                                    )
-
-                            state = SCMStateManager()
-                            if state.downloads.has(pdf_key):
-                                if st.download_button(
-                                    label="⬇ Tải file PDF",
-                                    data=state.downloads.get_bytes(pdf_key),
-                                    file_name=state.downloads.get_filename(pdf_key) or f"HoSoDenHan_{key_prefix}.pdf",
-                                    mime="application/pdf",
-                                    key=f"dl_den_han_{key_prefix}",
-                                    use_container_width=True,
-                                ):
-                                    state.downloads.clear(pdf_key)
+                    # ── Bảng tổng hợp bên dưới ──
+                    if tg is not None:
+                        st.markdown(f"**Tổng hợp theo {nhom_chon}**")
+                        hien_thi_dataframe_phan_trang(
+                            tg[cols_hien_thi].rename(columns=rename_map),
+                            key=f"tongquan_den_han_{key_prefix}",
+                        )
                     else:
                         st.caption(f"⚠️ Không có cột '{nhom_chon}' trong dữ liệu")
+
+                    # ── Export ──
+                    if tg is not None:
+                        st.divider()
+                        pdf_key = f"den_han_{key_prefix}_pdf"
+                        _co_loc = bool(_sel_pgd or _sel_ct or _sel_xa or _sel_nv or _no_range)
+
+                        _ex_col, _pdf_col_btn, _ = st.columns([3, 3, 4])
+
+                        with _ex_col:
+                            if _co_loc:
+                                df_excel = tg[[nhom_col, "_mon", "_kh", "_no"]].rename(columns={
+                                    nhom_col: nhom_chon,
+                                    "_mon": "Số món vay",
+                                    "_kh":  "Số KH",
+                                    "_no":  "Dư nợ",
+                                })
+                                ten_sheet = f"TH_{nhom_chon[:10]}_{key_prefix}"
+                            else:
+                                COLS_CHI_TIET = [
+                                    COT_TEN_PGD, COT_MA_KH, COT_TEN_KH, COT_SO_KU,
+                                    COT_TEN_CT, COT_TONG_DU_NO, COT_NGAY_DH,
+                                ]
+                                cols_ok = [c for c in COLS_CHI_TIET if c in df_loc.columns]
+                                df_excel = df_loc[cols_ok].sort_values(COT_TEN_PGD).reset_index(drop=True)
+                                ten_sheet = f"ChiTiet_{key_prefix}"
+                            excel_bytes = xuat_excel({ten_sheet: df_excel})
+                            st.download_button(
+                                label="📥 Xuất Excel",
+                                data=excel_bytes,
+                                file_name=ten_file_xuat(f"HoSoDenHan_{key_prefix}"),
+                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                use_container_width=True,
+                                key=f"excel_den_han_{key_prefix}",
+                            )
+
+                        with _pdf_col_btn:
+                            if st.button("📄 Xuất PDF", key=f"pdf_den_han_{key_prefix}",
+                                         type="primary", use_container_width=True):
+                                state = SCMStateManager()
+                                with st.spinner("⏳ Đang tạo PDF..."):
+                                    pdf_bytes_out = _xuat_pdf_den_han(
+                                        df_loc=df_loc, label=label,
+                                        loc_pgd=filter_chung.get(COT_TEN_PGD),
+                                        loc_ct=filter_chung.get(COT_TEN_CT),
+                                        loc_xa=filter_chung.get(cot_xa) if cot_xa else None,
+                                        username=username, key_prefix=key_prefix,
+                                    )
+                                state.downloads.set(
+                                    pdf_key,
+                                    pdf_bytes_out,
+                                    f"HoSoDenHan_{key_prefix}_{datetime.now().strftime('%d%m%Y_%H%M')}.pdf",
+                                )
+
+                        state = SCMStateManager()
+                        if state.downloads.has(pdf_key):
+                            if st.download_button(
+                                label="⬇ Tải file PDF",
+                                data=state.downloads.get_bytes(pdf_key),
+                                file_name=state.downloads.get_filename(pdf_key) or f"HoSoDenHan_{key_prefix}.pdf",
+                                mime="application/pdf",
+                                key=f"dl_den_han_{key_prefix}",
+                                use_container_width=True,
+                            ):
+                                state.downloads.clear(pdf_key)
 
                 def _render_tab_tuy_chinh(key_prefix):
                     col_tu, col_den = st.columns(2)

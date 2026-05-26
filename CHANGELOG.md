@@ -1,5 +1,8 @@
 # CHANGELOG
 
+## [2026-05-26] — Kích hoạt v2 reports trong tab_baocao
+- `tabs/tab_baocao/__init__.py` — routing `"hstd"` và `"noruiro"` chuyển sang gọi `render_tong_hop_hstd_v2` / `render_no_rui_ro_v2`; xóa import component thừa không dùng trong module
+
 ## [2026-05-26] — Fix bug tính Tổng dư nợ bỏ sót hàng "Khác" trong tab nguồn vốn ĐP
 - `tabs/tab_hhi.py` dòng ~67 — `_bang_theo_nv()`: cộng thêm cột "Khác" vào Tổng dư nợ nếu tồn tại, tránh tỷ trọng ĐP% bị thổi phồng khi có giá trị Nguồn vốn không phải 1/2
 

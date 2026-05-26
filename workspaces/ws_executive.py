@@ -1281,8 +1281,8 @@ def _render_hom_nay(df_full: "pd.DataFrame | None", **kwargs) -> None:
             _ngay_dh = pd.to_datetime(df_full[COT_NGAY_DH], errors="coerce")
             _hom_nay = pd.Timestamp.now().normalize()
             so_den_han_tuan = int((_ngay_dh.between(_hom_nay, _hom_nay + pd.Timedelta(days=7))).sum())
-        except Exception:
-            pass
+        except Exception as e:
+            logger.error("_render_hom_nay: tính đến hạn tuần — %s", e, exc_info=True)
 
     # Ngày số liệu
     ngay_sl_str = ""
@@ -1360,21 +1360,25 @@ def _render_hom_nay(df_full: "pd.DataFrame | None", **kwargs) -> None:
                                 _bao_cao_bt.append(
                                     f"**{pgd_n}**: {_dau} {_bien_dong:+.1f}% so kỳ trước"
                                 )
-        except Exception:
-            pass
+        except Exception as e:
+            logger.error("_render_hom_nay: so sánh snapshot — %s", e, exc_info=True)
 
         if _bao_cao_bt:
             with st.expander(f"⚡ {len(_bao_cao_bt)} PGD biến động dư nợ ≥ 5% so kỳ trước", expanded=True):
                 for _msg in _bao_cao_bt:
                     st.markdown(f"- {_msg}")
 
+        # Chuyển float → string VN-style trước khi hiển thị (rule 5.4 — không dùng NumberColumn cho cột tiền)
+        df_pgd_display = df_pgd_kpi.copy()
+        df_pgd_display["Dư nợ (tr.đ)"]   = df_pgd_display["Dư nợ (tr.đ)"].apply(lambda x: fmt_so(round(x, 0)))
+        df_pgd_display["Dư nợ QH (tr.đ)"] = df_pgd_display["Dư nợ QH"].apply(lambda x: fmt_so(round(x, 0)))
+        df_pgd_display["NQH %"]           = df_pgd_display["NQH %"].apply(lambda x: f"{x:.3f}".replace(".", ",") + "%")
+        df_pgd_display["Số KH"]           = df_pgd_display["Số KH"].apply(fmt_so)
+        df_pgd_display = df_pgd_display.drop(columns=["Dư nợ QH"])
         hien_thi_dataframe_phan_trang(
-            df_pgd_kpi,
+            df_pgd_display[["PGD", "Dư nợ (tr.đ)", "Dư nợ QH (tr.đ)", "NQH %", "Số KH", "TT"]],
             key="exec_hom_nay_pgd",
             column_config={
-                "NQH %": st.column_config.NumberColumn("NQH %", format="%.3f%%"),
-                "Dư nợ (tr.đ)": st.column_config.NumberColumn("Dư nợ (tr.đ)", format="%.1f"),
-                "Dư nợ QH": st.column_config.NumberColumn("Dư nợ QH (tr.đ)", format="%.1f"),
                 "TT": st.column_config.TextColumn("Trạng thái", width="small"),
             },
         )
@@ -1394,8 +1398,9 @@ def _render_hom_nay(df_full: "pd.DataFrame | None", **kwargs) -> None:
                 st.caption(f"✅ **{_ten}**: {_t}" + (f" · {_dv}" if _dv else ""))
             else:
                 st.caption(f"⚠️ **{_ten}**: Chưa có dữ liệu")
-    except Exception:
-        pass
+    except Exception as e:
+        logger.error("_render_hom_nay: hiển thị trạng thái upload — %s", e, exc_info=True)
+        st.caption("⚠️ Không thể tải trạng thái cập nhật dữ liệu.")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

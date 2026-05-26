@@ -4,6 +4,26 @@
 
 ---
 
+## [2026-05-26] XLRR: Archive tab cũ + Fix GOM tháng + Bổ sung 13/14 XLN
+
+### Tab đã xóa (deprecated)
+- `tabs/tab_no_rui_ro.py` — đã xóa, bản sao lưu tại `_archive/tab_no_rui_ro_DEPRECATED.py`
+- `tabs/tab_xlrr_tong_hop.py` — đã xóa, bản sao lưu tại `_archive/`
+
+### Fix bug: GOM tháng sai trong `_subtab_tong_hop_cn`
+- **Vấn đề:** 3 chỗ dùng `thang_hien_tai = now.month` (hardcode tháng hiện tại) thay vì tháng user chọn; vòng lặp gom tất cả 12 tháng thay vì chỉ tháng đang xem
+- **Fix:** Thêm `thang_cn = st.selectbox(...)` → thay `now.month` ở Bước 1 (GOM), Bước 2 (Import Excel), Bước 3 (Rà soát)
+- **File:** `tabs/tab_xu_ly_rui_ro.py` dòng ~961-1075
+
+### Tính năng mới: 13/XLN · 14/XLN trong _subtab_tong_hop_cn
+- **Vị trí:** dòng ~1255, cuối section Tổng hợp CN→TW
+- **Chức năng:** Xuất báo cáo sau hạch toán khi có QĐ HĐQT
+- **UI:** Expander nhập thông tin QĐ (số, ngày ký, từ–đến ngày) + 4 nút grid 2×2
+- **Functions:** `_tao_word_13xln()`, `_tao_word_14xln()` từ `services/word_xln_service.py`; `_tong_hop_no()` từ `services/rui_ro_aggregation.py`
+- **Guard:** Kiểm tra `so_qd_13.strip()` trước khi xuất; hiển thị warning nếu không có hồ sơ
+
+---
+
 ## [2026-05-25] Fix 4 bugs XLRR — Claude Sonnet review
 
 ### Bug 1 (🔴 crash): `HoSoRuiRo.from_dict()` không convert ngay_ky_01/ngay_lap_02

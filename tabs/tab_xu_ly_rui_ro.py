@@ -1380,12 +1380,9 @@ def _subtab_gui_cn_pgd(df: pd.DataFrame, ctx: TabContext) -> None:
                     logger.error("xuat_to_trinh_pgd: %s", e, exc_info=True)
                     st.error(f"❌ Lỗi xuất Tờ trình PGD: {e}")
 
+        # ── Bước 3: Đánh dấu đã gửi CN ──────────────────────────────
         st.markdown("---")
-        st.markdown("#### 📄 Bước 3: Xuất biểu mẫu từng hồ sơ")
-
-        # ── Bước 4: Đánh dấu đã gửi CN ──────────────────────────────
-        st.markdown("---")
-        st.markdown("#### 📤 Bước 4: Đánh dấu đã gửi CN")
+        st.markdown("#### 📤 Bước 3: Đánh dấu đã gửi CN")
         da_gui = all(hs.da_gui_cn for hs in ds_hs)
         if da_gui:
             st.success("✅ Tất cả hồ sơ kỳ này đã được đánh dấu gửi CN.")
@@ -1401,7 +1398,9 @@ def _subtab_gui_cn_pgd(df: pd.DataFrame, ctx: TabContext) -> None:
                 st.cache_data.clear()
                 st.rerun()
 
-    # ── Chọn hồ sơ ───────────────────────────────────────────────────
+    # ── Bước 4 (PGD) / Bước 1 (CN): Xuất biểu mẫu từng hồ sơ ───────
+    st.markdown("---")
+    st.markdown("#### 📄 Xuất biểu mẫu từng hồ sơ (01/XLN, 02/XLN)")
     st.markdown("#### 📋 Chọn hồ sơ xuất biểu mẫu")
     hs_map = {hs.id: hs for hs in ds_hs}
     hs_labels = {

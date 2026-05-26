@@ -280,7 +280,6 @@ def _kiem_tra_nqh_cao(df_full, pgd_filter: str | None = None) -> list[AlertItem]
         return cached["data"]
 
     try:
-        df = df_full if pgd_filter is None else df_full[df_full.get(COT_TEN_PGD, pd.Series()) == pgd_filter]
         if COT_TEN_PGD in df_full.columns and pgd_filter:
             df = df_full[df_full[COT_TEN_PGD] == pgd_filter]
         else:

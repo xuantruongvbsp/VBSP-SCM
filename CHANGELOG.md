@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## [2026-05-26] — Review + fix §2.4 Quản lý Công văn (3 bug)
+- `services/cong_van_service.py` dòng ~168 — **BUG FIX HIGH**: `ds_cv_sap_den_han()` lọc `ngay_ban_hanh` thay vì `ngay_nhan` → công văn quá hạn hiển thị sai; đổi sang raw query filter `ngay_nhan <= ?`
+- `tabs/tab_quan_ly_cong_van.py` dòng ~139,154 — **BUG FIX MEDIUM**: `.index()` crash `ValueError` nếu DB có loai/trang_thai ngoài enum → thêm guard fallback
+- `tabs/tab_quan_ly_cong_van.py` dòng ~238-241 — **CLEANUP**: xóa dead code `'keyword' in dir()` (vars luôn defined trong Streamlit rerun)
+
 ## [2026-05-26] — Review + fix tab_pgd_cards redesign (BQ/hộ)
 - `services/tongquan_service.py` dòng ~587 — **BUG FIX**: `.replace(0, pd.NA)` trên `int64` Series → đổi sang `.where(so_kh > 0)` tránh dtype object gây crash
 - `tabs/tab_pgd_cards.py` dòng ~326 — **BUG FIX LOGIC**: `bq_cn = mean()` of per-PGD BQ (sai khi PGD khác quy mô) → đổi sang weighted mean `sum(du_no)/sum(so_kh)`

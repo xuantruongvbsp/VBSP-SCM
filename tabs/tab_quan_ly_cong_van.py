@@ -136,7 +136,8 @@ def _form_sua_cv(username: str) -> None:
             except Exception:
                 ngay_bh_def = date.today()
             ngay_bh = st.date_input("Ngày ban hành *", value=ngay_bh_def, format="DD/MM/YYYY", key=f"cv_s_ngay_bh_{edit_id}")
-            loai_idx = list(LOAI_CONG_VAN.keys()).index(cv.get("loai", "cong_van"))
+            _loai_val = cv.get("loai", "cong_van") if cv.get("loai", "cong_van") in LOAI_CONG_VAN else "cong_van"
+            loai_idx = list(LOAI_CONG_VAN.keys()).index(_loai_val)
             loai = st.selectbox("Loại *", options=list(LOAI_CONG_VAN.keys()), format_func=lambda x: LOAI_CONG_VAN[x], index=loai_idx, key=f"cv_s_loai_{edit_id}")
             tag_cur = [t.strip() for t in cv.get("tag", "").split(",") if t.strip()]
             tag = st.multiselect("Tag", options=TAG_GOP_Y, default=tag_cur, key=f"cv_s_tag_{edit_id}")
@@ -151,7 +152,8 @@ def _form_sua_cv(username: str) -> None:
             co_quan = st.text_input("Cơ quan ban hành", value=cv.get("co_quan_ban_hanh", ""), key=f"cv_s_cq_{edit_id}")
             nguoi_ky = st.text_input("Người ký", value=cv.get("nguoi_ky", ""), key=f"cv_s_nk_{edit_id}")
         noi_dung = st.text_area("Nội dung tóm tắt", value=cv.get("noi_dung_tom_tat", ""), height=60, key=f"cv_s_nd_{edit_id}")
-        tt_idx = list(TRANG_THAI_CV.keys()).index(cv.get("trang_thai", "chua_xu_ly"))
+        _tt_val = cv.get("trang_thai", "chua_xu_ly") if cv.get("trang_thai", "chua_xu_ly") in TRANG_THAI_CV else "chua_xu_ly"
+        tt_idx = list(TRANG_THAI_CV.keys()).index(_tt_val)
         trang_thai = st.selectbox("Trạng thái", options=list(TRANG_THAI_CV.keys()), format_func=lambda x: TRANG_THAI_CV[x], index=tt_idx, key=f"cv_s_tt_{edit_id}")
 
         col_save, col_cancel = st.columns(2)
@@ -234,11 +236,12 @@ def render(tab: DeltaGenerator | None = None, **kwargs) -> None:
             st.caption("Xuất Excel với bộ lọc hiện tại")
             if st.button("📥 Xuất Excel", type="primary", use_container_width=True, key="cv_xuat_excel"):
                 try:
+                    # keyword/loai_filter/tag_filter/tt_filter luôn được định nghĩa ở t1 (Streamlit chạy cả 3 tab mỗi rerun)
                     data = xuat_danh_sach_cv(
-                        keyword=keyword if 'keyword' in dir() else "",
-                        loai=None if loai_filter == "Tất cả" else loai_filter if 'loai_filter' in dir() else None,
-                        tag=None if tag_filter == "Tất cả" else tag_filter if 'tag_filter' in dir() else None,
-                        trang_thai=None if tt_filter == "Tất cả" else tt_filter if 'tt_filter' in dir() else None,
+                        keyword=keyword,
+                        loai=None if loai_filter == "Tất cả" else loai_filter,
+                        tag=None if tag_filter == "Tất cả" else tag_filter,
+                        trang_thai=None if tt_filter == "Tất cả" else tt_filter,
                     )
                     st.download_button(
                         "⬇️ Tải Excel",

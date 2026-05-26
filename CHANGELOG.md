@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## [2026-05-26] — XLRR tổng hợp CN: fix bug scope biến hs_gui
+- `tabs/tab_xu_ly_rui_ro.py` dòng ~988 — `hs_gui` trong `_subtab_tong_hop_cn` bị scope sai (giá trị của `thang=12` cuối cùng, không phải tổng năm); đổi sang `hs_gui_pgd` tích lũy qua toàn bộ vòng tháng trước khi dùng
+
+## [2026-05-26] — Dashboard "Ngày hôm nay" BGĐ: fix convention + format số
+- `workspaces/ws_executive.py` dòng ~1284 — fix `except Exception: pass` → `logger.error(..., exc_info=True)` (3 chỗ: đến hạn tuần, so sánh snapshot, trạng thái upload)
+- `workspaces/ws_executive.py` dòng ~1371 — bỏ `NumberColumn` kiểu Mỹ cho cột tiền; pre-convert → string VN-style bằng `fmt_so()` + `replace(".", ",")` trước `hien_thi_dataframe_phan_trang`
+- `workspaces/ws_executive.py` dòng ~1397 — thêm `st.caption` fallback khi exception trạng thái upload
+
 ## [2026-05-26] — XLRR: Tái cấu trúc theo đợt — 2 luồng riêng CN/PGD + Tổng hợp bán tự động
 - `services/xlrr_service.py` dòng ~9 — thêm `import uuid`
 - `services/xlrr_service.py` dòng ~94-95 — thêm `dot_id: str` và `da_gui_cn: bool` vào `HoSoRuiRo`

@@ -1,5 +1,22 @@
 # CHANGELOG
 
+## [2026-05-26] — Review + fix tab_pgd_cards redesign (BQ/hộ)
+- `services/tongquan_service.py` dòng ~587 — **BUG FIX**: `.replace(0, pd.NA)` trên `int64` Series → đổi sang `.where(so_kh > 0)` tránh dtype object gây crash
+- `tabs/tab_pgd_cards.py` dòng ~326 — **BUG FIX LOGIC**: `bq_cn = mean()` of per-PGD BQ (sai khi PGD khác quy mô) → đổi sang weighted mean `sum(du_no)/sum(so_kh)`
+
+## [2026-05-26] — §2.4 Quản lý Công văn: DB + CRUD + tìm kiếm full-text + tag + xuất Excel
+- `db.py` dòng ~618 — **MỚI** bảng `cong_van` (15 cột: so_hieu, trich_yeu, ngay_ban_hanh, ngay_nhan, loai, co_quan, nguoi_ky, tag, noi_dung, file_path, trang_thai...) + 3 index
+- `services/cong_van_service.py` — **MỚI** — CRUD (them/cap_nhat/xoa/doc_cv), `tim_kiem_cv()` full-text LIKE (so_hieu + trich_yeu + noi_dung + tag + co_quan), `thong_ke_cv_theo_loai/trang_thai()`, `xuat_danh_sach_cv()` 3 sheet, `ds_cv_sap_den_han()` cảnh báo quá hạn
+- `tabs/tab_quan_ly_cong_van.py` — **MỚI** — 3 sub-tab: 🔍 Tìm kiếm & Danh sách (KPI cards + filter + bảng + edit/delete), ➕ Thêm mới (form), 📤 Xuất Excel. Tag multi-select gợi ý (TW, HĐQT, Tín dụng, Kế toán...)
+- `workspaces/ws_management.py` — mount tab vào group "Phối hợp với PGD"
+
+## [2026-05-26] — Fix bugs ktnb_service + den_han_notice_service
+- `services/ktnb_service.py` dòng 821-892 — **BUG FIX CRITICAL**: `ten_dot` → `ten_pgd_ks` (cột không tồn tại trong schema, gây OperationalError khi gọi `tong_hop_ktnb_theo_nam()` / `xuat_bao_cao_ktnb_excel()`)
+- `services/ktnb_service.py` dòng 22-38 — Xoá unused imports `COT_THOI_HAN`, `COT_LAI_SUAT`, `COT_DIA_CHI`
+- `services/den_han_notice_service.py` dòng 6/115 — `__import__("datetime").timedelta` → import `timedelta` proper
+- `services/den_han_notice_service.py` dòng 17 — Xoá unused import `COT_TEN_TO`
+- `services/den_han_notice_service.py` dòng 177 — `except Exception: pass` → log error (rule 5.15)
+
 ## [2026-05-26] — §2.3 Thông báo đến hạn Word + §2.5 Báo cáo KTNB tổng hợp
 - `services/den_han_notice_service.py` — **MỚI** — `tao_thu_nhac_no()`: tạo thư nhắc nợ Word cho 1 KH; `lay_ds_den_han()`: DuckDB lấy DS khoản vay đến hạn trong N ngày; `tao_thu_hang_loat()`: batch tạo thư cho nhiều KH
 - `services/ktnb_service.py` dòng ~812 — **MỚI** 3 hàm: `tong_hop_ktnb_theo_nam()` (KPI + ds đợt), `tong_hop_ktnb_theo_khoi()` (theo khối NV), `xuat_bao_cao_ktnb_excel()` (xuất Excel 3 sheet)

@@ -583,8 +583,9 @@ def tinh_card_pgd(
         df_pgd[c] = df_pgd[c].astype(int)
 
     # Dư nợ bình quân hộ (đơn vị: đồng)
+    # Dùng .where() thay .replace(0, pd.NA) vì so_kh đã là int64 (không chứa NA)
     df_pgd["dn_binh_quan_ho"] = (
-        df_pgd["du_no"] / df_pgd["so_kh"].replace(0, pd.NA)
+        df_pgd["du_no"] / df_pgd["so_kh"].where(df_pgd["so_kh"] > 0)
     ).fillna(0).round(0)
 
     return df_pgd.reset_index(drop=True)

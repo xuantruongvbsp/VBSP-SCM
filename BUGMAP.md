@@ -648,6 +648,20 @@ def _duong_dan_pgd(ten_pgd: str, loai: str) -> str:
 
 ---
 
+### D2 — `OperationalError: no such column` do tên cột không khớp schema mới
+
+| | |
+|---|---|
+| **File** | `services/ktnb_service.py` dòng ~821 |
+| **Dấu hiệu** | `OperationalError: no such column: ten_dot` khi gọi `tong_hop_ktnb_theo_nam()` hoặc `xuat_bao_cao_ktnb_excel()` |
+| **Nguyên nhân** | Hàm query `SELECT id, ten_dot, ...` nhưng bảng `ktnb_dot_kiem_tra` không có cột `ten_dot` — chỉ có `ten_pgd_ks` (xem schema `db.py:433`). Code mới tạo dùng nhầm tên cột. |
+| **Fix** | Thay `ten_dot` → `ten_pgd_ks` trong SQL query + `dot["ten_dot"]` → `dot["ten_pgd_ks"]` (3 chỗ: dòng 821, 844, 892) |
+| **Ngày fix** | 2026-05-26 |
+
+**Pattern phòng ngừa:** Mỗi khi viết SQL query mới, đối chiếu tên cột với schema trong `db.py` hoặc `SCHEMA.md` trước.
+
+---
+
 ## K. Performance / Tốc độ
 
 ### K1 — `df.iterrows()` trong validation — upload PGD chậm 15-30 giây

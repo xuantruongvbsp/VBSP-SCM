@@ -321,7 +321,10 @@ def _render_chart_bq(df_cards: pd.DataFrame) -> None:
 
     ten_pgd_labels = df_ch["ten_pgd"].str.replace("PGD ", "", regex=False)
     bq_ho_tr  = (df_ch["dn_binh_quan_ho"] / 1_000_000).round(1)
-    bq_cn     = float(df_cards["dn_binh_quan_ho"].mean()) / 1_000_000
+    # BQ thực = tổng dư nợ / tổng số KH (weighted mean), không dùng mean() của per-PGD BQ
+    _tong_dn  = df_cards["du_no"].sum()
+    _tong_kh  = df_cards["so_kh"].sum()
+    bq_cn     = (_tong_dn / _tong_kh / 1_000_000) if _tong_kh > 0 else 0
 
     bar_colors = [
         "#4DD0E1" if v >= bq_cn else "#78909C"

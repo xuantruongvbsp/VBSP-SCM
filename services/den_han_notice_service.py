@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import os
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from io import BytesIO
 
 import pandas as pd
@@ -14,7 +14,7 @@ from data.core import _duckdb_query
 from config import (
     CACHE_HSTD, TEN_CHI_NHANH_HIEN_THI,
     COT_TEN_PGD, COT_TEN_KH, COT_SO_KU, COT_TEN_CT,
-    COT_TONG_DU_NO, COT_NGAY_DH, COT_DIA_CHI, COT_TEN_XA, COT_TEN_TO,
+    COT_TONG_DU_NO, COT_NGAY_DH, COT_DIA_CHI, COT_TEN_XA,
 )
 
 
@@ -112,7 +112,7 @@ def lay_ds_den_han(
     if not os.path.exists(parquet_path):
         return pd.DataFrame()
 
-    cutoff = (date.today() + __import__("datetime").timedelta(days=days_ahead)).isoformat()
+    cutoff = (date.today() + timedelta(days=days_ahead)).isoformat()
 
     schema_cols = pd.read_parquet(parquet_path, engine='pyarrow').columns.tolist()
     select_cols = [
@@ -145,6 +145,9 @@ def tao_thu_hang_loat(
     ten_pgd_filter: str | None = None,
 ) -> list[dict]:
     """Từ DataFrame đến hạn, tạo danh sách thư nhắc nợ."""
+    from logger import get_logger
+    logger = get_logger(__name__)
+
     results = []
     df_loc = df.copy()
     if ten_pgd_filter and COT_TEN_PGD in df_loc.columns:
@@ -174,7 +177,7 @@ def tao_thu_hang_loat(
                 "bytes": doc_bytes,
                 "filename": filename,
             })
-        except Exception:
-            pass
+        except Exception as e:
+            logger.error("tao_thu_hang_loat: lỗi KH=%s, KU=%s — %s", ten_kh, so_ku, e)
 
     return results

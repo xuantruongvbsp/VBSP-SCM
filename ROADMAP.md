@@ -29,12 +29,16 @@
 | **TabContext / base_tab.py** | Pattern chuẩn `render(tab=None, **kwargs)` tập trung hóa role normalization, container fallback | ✅ 2026-05-15 |
 | **Hiệu năng** | Lazy-load expander, df.copy subset, cache snapshot, cache baseline status | ✅ |
 | **Cold start tối ưu** | Lazy import heavy modules (−44s), DuckDB full scan → `pd.read_parquet` (−10s) → tổng **−54s** cold start | ✅ 2026-05-24 |
+| **Performance GĐ2** | DuckDB aggregates thay pandas groupby (4 hàm data/core.py), DuckDB cho _export.py, cache TTL | ✅ 2026-05-26 |
+| **Báo cáo Định kỳ** | Excel 5 sheet hằng ngày, Word 4 section, Task Scheduler 07:00, tab UI ở 3 workspace | ✅ 2026-05-26 |
+| **Đến hạn nâng cao** | So sánh cùng kỳ năm trước, Phát hiện PGD đột biến ≥30%, Thư nhắc nợ Word từng KH | ✅ 2026-05-26 |
+| **KTNB Phase 2** | Báo cáo tổng hợp theo năm/khối NV, xuất Excel 3 sheet | ✅ 2026-05-26 |
 | **DRY services extraction** | Tách 13+ services từ tabs: `word_xln_service`, `rui_ro_aggregation`, `so_sanh_ky_service`, `cdtotkvv_service`, `khtd_mau07_service`... | ✅ 2026-05-21 |
-| **Test** | **43 file, 839 test cases** ✅ vượt mục tiêu 65% | Service + core + utils + tabs |
+| **Test** | **46 file, 717 test cases** ✅ vượt mục tiêu 65% | Service + core + utils + tabs + components |
 
 ---
 
-## Giai đoạn 1 — Củng cố nền tảng (Q3/2026)
+## Giai đoạn 1 — Củng cố nền tảng ✅ HOÀN THÀNH 2026-05-26
 
 ### 1.1 Test coverage — lấp đầy lỗ hổng
 
@@ -120,9 +124,9 @@
 
 | Mục tiêu | Chi tiết | File liên quan | Ưu tiên |
 |---|---|---|---|
-| Tìm kiếm full-text | Tra cứu công văn theo số hiệu, ngày, từ khóa nội dung | `tabs/tab_quan_ly_cv.py` | 🔴 Cao |
-| Gắn tag & phân loại | Phân loại: Hướng dẫn / Quyết định / Thông báo / Báo cáo TW | `tabs/tab_quan_ly_cv.py` | 🟠 TB |
-| Xuất danh sách Excel/PDF | Danh sách công văn theo kỳ, trạng thái xử lý | `tabs/tab_tong_hop_cv.py` | 🟠 TB |
+| Tìm kiếm full-text | Tra cứu công văn theo số hiệu, ngày, từ khóa nội dung, tag, loại, trạng thái | `tabs/tab_quan_ly_cong_van.py` + `services/cong_van_service.py` | ✅ Done 2026-05-26 |
+| Gắn tag & phân loại | Phân loại: Công văn / Quyết định / Thông báo / Báo cáo / Hướng dẫn; tag multi-select (TW, HĐQT, Tín dụng...16 tags) | `tabs/tab_quan_ly_cong_van.py` | ✅ Done 2026-05-26 |
+| Xuất danh sách Excel/PDF | Danh sách công văn theo kỳ, trạng thái xử lý (3 sheet: DS + Theo loại + Theo TT) | `services/cong_van_service.py` | ✅ Done 2026-05-26 |
 | Nhắc nhở deadline | Cảnh báo công văn cần xử lý trước ngày X | `alert_center.py` | 🟡 Thấp |
 
 ### 2.5 KTNB — Kiểm toán Nội bộ Phase 2
@@ -207,14 +211,15 @@
 ```
 Q3/2026                    Q4/2026                    2027
 ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐
-│ ✅ 1.1 Test ≥80% │  │ 2.4 Quản lý CV   │  │ 4.1 API RESTful   │
-│ ✅ 1.2 Cold -54s │  │ 2.5 KTNB Phase 2 │  │ 4.2 Tính năng mới │
-│ 1.3 Health check │  │ 2.6 KHTD Approval│  │ 4.2 Ghi chú KV    │
-│ 1.3 TabContext   │  │ 3.1 Deployment   │  │                   │
-│ 1.4 Filter save  │  │ 3.2 Backup       │  │                   │
-│ 1.4 Health sched │  │ 3.3 Security     │  │                   │
-│                   │  │ 2.1 Báo cáo auto │  │                   │
-│                   │  │ 2.2 Phân tích    │  │                   │
+│ ✅ GĐ1 HOÀN THÀNH│  │ 2.5 KTNB Phase 2 │  │ 4.1 API RESTful   │
+│ ✅ §2.1 Báo cáo   │  │ 2.6 KHTD Approval│  │ 4.2 Tính năng mới │
+│ ✅ §2.3 Đến hạn   │  │ 3.1 Deployment   │  │ 4.2 Ghi chú KV    │
+│ ✅ §2.4 Công văn  │  │ 3.2 Backup       │  │                   │
+│ ✅ §2.5 KTNB      │  │ 3.3 Security     │  │                   │
+│ ░░ §2.2 Phân tích │  │                   │  │                   │
+│ ░░ §2.6 KHTD Appr │  │                   │  │                   │
+│ → Test ≥80%       │  │                   │  │                   │
+│ → Load ≤3s        │  │                   │  │                   │
 └──────────────────┘  └──────────────────┘  └──────────────────┘
 ```
 
@@ -235,13 +240,6 @@ Q3/2026                    Q4/2026                    2027
 
 | Ngày | Người | Thay đổi |
 |---|---|---|
+| 2026-05-26 | — | **🎉 HOÀN THÀNH GIAI ĐOẠN 1** (4/4 mục): Test 717 cases 46 file, Performance DuckDB+cache, Health check+alert, UX Filter preset+card+alert+dashboard |
+| 2026-05-26 | — | **🚀 GIAI ĐOẠN 2 — 45%**: §2.1 Báo cáo Excel/Word định kỳ + Task Scheduler, §2.3 So sánh đến hạn cùng kỳ + Thư nhắc nợ Word, §2.4 Quản lý Công văn full-text (DB + CRUD + tag), §2.5 Báo cáo KTNB tổng hợp |
 | 2026-05-23 | — | Khởi tạo phiên bản mới — 4 giai đoạn |
-| 2026-05-23 | — | Cập nhật hiện trạng (+4 mục), thêm mục 1.4 UX ngắn hạn, 2.3 Đến hạn nâng cao; loại 5 mục không khả thi |
-| 2026-05-26 | — | ✅ Hoàn thành GĐ2: Báo cáo Excel/Word định kỳ + So sánh đến hạn cùng kỳ năm trước |
-| 2026-05-26 | — | ✅ Hoàn thành §1.1 Test components: test_components.py 27 tests (delta_card, movers, loan_drawer, tongquan_service) |
-| 2026-05-26 | — | ✅ Hoàn thành §1.3 Health check: check DB, kv_store, parquet, PGD uploads, audit log, alert sidebar |
-| 2026-05-26 | — | ✅ Hoàn thành §1.4: Lưu cấu hình lọc (filter_bar preset save/load/auto-load vào kv_store) |
-| 2026-05-26 | — | ✅ Hoàn thành ROADMAP §1.2: DuckDB aggregates (4 hàm mới trong data/core.py), cache TTL, DuckDB cho _export.py |
-| 2026-05-26 | — | ✅ §2.3 Thông báo đến hạn Word (den_han_notice_service.py) + §2.5 Báo cáo KTNB tổng hợp (tong_hop_ktnb_theo_nam/khoi, xuat Excel) |
-| 2026-05-26 | — | Hoàn thành 3/5 tính năng 1.4: Tab card 22 PGD, Alert Center phân mức, Dashboard Hôm nay BGĐ |
-| 2026-05-26 | — | Đồng bộ hiện trạng: bổ sung 9 mục đã hoàn thành (KTNB, Xây dựng KHTD, CBTD Dashboard, Phối hợp PGD, Quản lý CV, Báo cáo v2, Dark Mode, TabContext, Cold start); nâng KPI test ≥80%; thêm §2.4–2.6 (Quản lý CV, KTNB P2, KHTD Approval); health check lên 🔴 Cao |

@@ -26,8 +26,6 @@ from config import (
     COT_SO_KU,
     COT_NGAY_VAY,
     COT_NGAY_DH,
-    COT_THOI_HAN,
-    COT_LAI_SUAT,
     COT_MUC_VAY,
     COT_DU_NO_TH,
     COT_DU_NO_QH,
@@ -35,7 +33,6 @@ from config import (
     COT_DU_NO_KHOANH,
     COT_TEN_CT,
     COT_TINH_TRANG,
-    COT_DIA_CHI,
     DS_PGD,
     PGD_DATA_DIR,
 )
@@ -818,7 +815,7 @@ def tong_hop_ktnb_theo_nam(nam: int | None = None) -> dict:
 
     with db.get_conn() as conn:
         dots = pd.read_sql_query(
-            """SELECT id, ten_dot, ngay_bat_dau, ngay_ket_thuc
+            """SELECT id, ten_pgd_ks, ngay_bat_dau, ngay_ket_thuc
                FROM ktnb_dot_kiem_tra
                WHERE CAST(substr(ngay_bat_dau, 1, 4) AS INTEGER) = ?
                ORDER BY ngay_bat_dau""",
@@ -841,7 +838,7 @@ def tong_hop_ktnb_theo_nam(nam: int | None = None) -> dict:
         da_kp += so_da_kp
         ds_dot.append({
             "id": dot_id,
-            "ten_dot": dot["ten_dot"],
+            "ten_pgd_ks": dot["ten_pgd_ks"],
             "ngay_bat_dau": dot["ngay_bat_dau"],
             "ngay_ket_thuc": dot["ngay_ket_thuc"],
             "so_loi": so_loi,
@@ -889,7 +886,7 @@ def xuat_bao_cao_ktnb_excel(nam: int | None = None) -> bytes:
     rows = []
     for dot in tong_hop["ds_dot"]:
         rows.append({
-            "Đợt": dot["ten_dot"],
+            "Đợt": dot["ten_pgd_ks"],
             "Từ ngày": dot["ngay_bat_dau"][:10] if dot["ngay_bat_dau"] else "",
             "Đến ngày": dot["ngay_ket_thuc"][:10] if dot["ngay_ket_thuc"] else "",
             "Số lỗi": dot["so_loi"],

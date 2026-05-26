@@ -763,6 +763,15 @@ DEBUG=1 streamlit run app.py
 | **Fix** | Xóa `from utils import fmt` dư thừa — `fmt` đã được import ở module level (dòng 55) |
 | **Ngày fix** | 2026-05-25 |
 
+### J06 — GOM vào CN luôn dùng tháng hiện tại, bỏ qua tháng user chọn
+| | |
+|---|---|
+| **File** | `tabs/tab_xu_ly_rui_ro.py` → `_subtab_tong_hop_cn()` ~dòng 993-1075 |
+| **Dấu hiệu** | Bấm "GOM vào CN" hoặc "Merge file Excel" luôn lưu vào tháng hiện tại (`now.month`), kể cả khi user đang xem kỳ khác; bảng Rà soát (Bước 3) cũng đọc nhầm tháng |
+| **Nguyên nhân** | Ba chỗ dùng `thang_hien_tai = now.month` thay vì biến `thang_cn` từ selectbox; thêm vào đó vòng lặp `for thang in range(1, 13)` gom cả 12 tháng thay vì chỉ tháng đang chọn |
+| **Fix** | Thêm `thang_cn = st.selectbox("Tháng lưu CN", ...)` (layout 2 cột cạnh `nam`); xóa vòng lặp 12 tháng → dùng `LuuTruXLRR.doc_pgd(slug, nam, thang_cn)`; thay 3 chỗ `thang_hien_tai = now.month` → `thang_cn` |
+| **Ngày fix** | 2026-05-26 |
+
 ---
 
 ## Template: Ghi nhận bug mới

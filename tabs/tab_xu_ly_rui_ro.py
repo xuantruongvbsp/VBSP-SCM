@@ -1839,8 +1839,7 @@ def _subtab_quan_ly_dot_cn(ctx: TabContext) -> None:
     for dot in ds_dot:
         c1, c2, c3, c4, c5 = st.columns([3, 2, 2, 1, 1])
         with c1:
-            st.markdown(f"**{dot.ten_dot}**  
-`{dot.id}`")
+            st.markdown(f"**{dot.ten_dot}**\n`{dot.id}`")
         with c2:
             st.caption(f"📅 {dot.ngay_bat_dau:%d/%m/%Y} – {dot.ngay_ket_thuc:%d/%m/%Y}")
         with c3:
@@ -1966,8 +1965,7 @@ def _subtab_dot_xlrr_pgd(ctx: TabContext) -> None:
     for dot in ds_dot_pgd:
         c1, c2, c3, c4 = st.columns([3, 2, 2, 1])
         with c1:
-            st.markdown(f"**{dot.ten_dot}**  
-`{dot.id}`")
+            st.markdown(f"**{dot.ten_dot}**\n`{dot.id}`")
         with c2:
             st.caption(f"📅 {dot.ngay_bat_dau:%d/%m/%Y} – {dot.ngay_ket_thuc:%d/%m/%Y}")
         with c3:

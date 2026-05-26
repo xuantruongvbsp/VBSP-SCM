@@ -569,7 +569,10 @@ def tinh_card_pgd(
     else:
         df_pgd["no_den_han_thang"] = 0.0
 
-    df_pgd["no_den_han_thang"] = pd.to_numeric(df_pgd.get("no_den_han_thang", 0), errors="coerce").fillna(0)
+    df_pgd["no_den_han_thang"] = pd.to_numeric(
+        df_pgd["no_den_han_thang"] if "no_den_han_thang" in df_pgd.columns else 0,
+        errors="coerce",
+    ).fillna(0)
     df_pgd["ty_le_nqh"] = (df_pgd["nqh"] / df_pgd["du_no"] * 100).where(df_pgd["du_no"] > 0, 0).round(2)
 
     # Đảm bảo tất cả đơn vị trong ds_don_vi đều có row (điền 0 nếu không có dữ liệu)

@@ -1,5 +1,21 @@
 # CHANGELOG
 
+## [2026-05-26] — XLRR: Tái cấu trúc theo đợt — 2 luồng riêng CN/PGD + Tổng hợp bán tự động
+- `services/xlrr_service.py` dòng ~9 — thêm `import uuid`
+- `services/xlrr_service.py` dòng ~94-95 — thêm `dot_id: str` và `da_gui_cn: bool` vào `HoSoRuiRo`
+- `services/xlrr_service.py` dòng ~184-295 — thêm `DotXLRR` dataclass + `LuuTruDotXLRR` class (CRUD đợt)
+- `tabs/tab_xu_ly_rui_ro.py` dòng ~1798 — **MỚI** `_subtab_quan_ly_dot_cn()`: CN tạo/sửa/xóa đợt XLRR
+- `tabs/tab_xu_ly_rui_ro.py` dòng ~1898 — **MỚI** `_subtab_dot_xlrr_pgd()`: PGD tự tạo đợt hoặc copy từ CN
+- `tabs/tab_xu_ly_rui_ro.py` dòng ~953 — **VIẾT LẠI** `_subtab_tong_hop_cn()`: flow 4 bước (auto-gom PGD → import Excel fallback → rà soát checkbox → gửi TW) + xuất 04/XLN, 05/XLN, Tờ trình CN
+- `tabs/tab_xu_ly_rui_ro.py` dòng ~2008 — cập nhật `render()`: tab labels mới (CN: 6 tabs, PGD: 4 tabs) + routing
+- `tabs/tab_xu_ly_rui_ro.py` dòng ~183 — fix bug `_la_cn` dùng trước khi khai báo trong `_subtab_lap_hs_pgd`
+
+## [2026-05-26] — Tab card 22 PGD: fix 4 bug sau review
+- `tabs/tab_pgd_cards.py` dòng ~202 — thay `os.path.getmtime(pgd_data/)` bằng `ts_file(CACHE_HSTD)` (dir mtime không cập nhật khi overwrite file trên Windows)
+- `tabs/tab_pgd_cards.py` dòng ~313 — pre-compute `_uinfo` dict trước lambda, tránh gọi `_upload_info()` 2 lần/PGD (44→22 filesystem calls)
+- `tabs/tab_pgd_cards.py` dòng ~132 — đổi `:,.0f` (US-style) sang `fmt_so(...) + " tr"` (VN-style) trong card
+- `services/tongquan_service.py` dòng ~572 — thay `df_pgd.get(...)` bằng explicit column check tường minh
+
 ## [2026-05-26] — Alert Center: fix bug + thêm 2 nguồn cảnh báo
 - `alert_center.py` — fix bug `~~text~~` trong `st.button()` (Streamlit không render markdown trong button label); dùng `st.caption()` cho alert đã đọc có jump_fn
 - `alert_center.py` — xóa dead code `render_badge_no_khoanh_sap_het_han()` (không còn được gọi từ đâu)

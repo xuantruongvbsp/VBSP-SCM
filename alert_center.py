@@ -23,12 +23,15 @@ logger = get_logger(__name__)
 from config import (
     CACHE_GQVL,
     COT_DU_NO_KHOANH,
+    COT_DU_NO_QH,
+    COT_NGAY_DH,
     COT_NGAY_HH_KHOANH,
     COT_SO_KU,
     COT_TEN_KH,
     COT_TEN_PGD,
     COT_TEN_TO_TRUONG,
     COT_TEN_XA,
+    COT_TONG_DU_NO,
 )
 
 
@@ -117,6 +120,12 @@ def _xoa_da_doc_cu(active_ids: set[str]) -> None:
 
 NGUONG_NGAY_UPLOAD_CU = 3   # cảnh báo nếu file chưa merge quá 3 ngày
 _NGUONG_UPLOAD_KHAN   = 7   # 🔴 nếu trễ ≥ 7 ngày
+
+_NGUONG_NQH_KHAN    = 3.0   # NQH% > 3% → 🔴
+_NGUONG_NQH_CANH_BAO = 1.0  # NQH% > 1% → 🟠
+
+_NGUONG_DH_30_KHAN    = 50   # ≥ 50 món đến hạn trong 30 ngày → 🔴
+_NGUONG_DH_30_TY_KHAN = 5.0  # hoặc tổng ≥ 5 tỷ → 🔴
 
 _KHD_CACHE_TTL = 1800  # 30 phút
 
@@ -238,36 +247,6 @@ def canh_bao_no_khoanh_sap_het_han(df_kh) -> dict:
     }
 
 
-def render_badge_no_khoanh_sap_het_han(df_full) -> None:
-    """Hiển thị badge cảnh báo nợ khoanh sắp hết hạn trên sidebar."""
-    import pandas as pd
-
-    if df_full is None or df_full.empty:
-        return
-    if 'Dư nợ khoanh' not in df_full.columns:
-        return
-
-    du_kh = pd.to_numeric(df_full['Dư nợ khoanh'], errors='coerce').fillna(0)
-    df_kh = df_full[du_kh > 0]
-
-    data = canh_bao_no_khoanh_sap_het_han(df_kh)
-
-    if data['so_khan'] > 0:
-        if st.sidebar.button(
-            f"🔴 {data['so_khan']} món phải kiểm tra nợ khoanh",
-            key="alert_khoanh_khan_2",
-        ):
-            _jump_to_khoanh()
-            st.rerun()
-
-    if data['so_canh_bao'] > 0:
-        if st.sidebar.button(
-            f"🟠 {data['so_canh_bao']} món sắp hết hạn khoanh",
-            key="alert_khoanh_canh_bao_2",
-        ):
-            _jump_to_khoanh()
-            st.rerun()
-
 
 def _jump_to_khoanh():
     """Set session state để nhảy đến tab Nợ khoanh phù hợp workspace hiện tại."""
@@ -283,6 +262,103 @@ def _jump_to_khoanh():
     else:
         state.nav_ws_op_nhom = "kiem_soat_rr"
         state.nav_ws_op_jump_tab = 7
+
+
+def _kiem_tra_nqh_cao(df_full, pgd_filter: str | None = None) -> list[AlertItem]:
+    """Cảnh báo nếu tỷ lệ NQH vượt ngưỡng. Cache 30 phút."""
+    import pandas as pd
+
+    if df_full is None or df_full.empty:
+        return []
+    if COT_DU_NO_QH not in df_full.columns or COT_TONG_DU_NO not in df_full.columns:
+        return []
+
+    cache_key = f"_alert_nqh_{pgd_filter or 'all'}"
+    now = datetime.now()
+    cached = st.session_state.get(cache_key)
+    if cached and (now - cached["ts"]).total_seconds() < _KHD_CACHE_TTL:
+        return cached["data"]
+
+    try:
+        df = df_full if pgd_filter is None else df_full[df_full.get(COT_TEN_PGD, pd.Series()) == pgd_filter]
+        if COT_TEN_PGD in df_full.columns and pgd_filter:
+            df = df_full[df_full[COT_TEN_PGD] == pgd_filter]
+        else:
+            df = df_full
+
+        tong_dn = pd.to_numeric(df[COT_TONG_DU_NO], errors="coerce").fillna(0).sum()
+        if tong_dn <= 0:
+            result: list[AlertItem] = []
+        else:
+            tong_nqh = pd.to_numeric(df[COT_DU_NO_QH], errors="coerce").fillna(0).sum()
+            ty_le = tong_nqh / tong_dn * 100
+            scope = pgd_filter or "toàn Chi nhánh"
+            ty_le_str = f"{ty_le:.2f}".replace(".", ",") + "%"
+            if ty_le >= _NGUONG_NQH_KHAN:
+                result = [AlertItem(
+                    muc=MUC_KHAN,
+                    tieu_de=f"NQH {scope} cao: {ty_le_str}",
+                    mo_ta="Vượt ngưỡng 3% — cần xử lý ngay, tab Cảnh báo NQH",
+                )]
+            elif ty_le >= _NGUONG_NQH_CANH_BAO:
+                result = [AlertItem(
+                    muc=MUC_CANH_BAO,
+                    tieu_de=f"NQH {scope}: {ty_le_str}",
+                    mo_ta="Theo dõi chặt — tab Cảnh báo NQH",
+                )]
+            else:
+                result = []
+    except Exception as e:
+        logger.error("_kiem_tra_nqh_cao: %s", e, exc_info=True)
+        result = []
+
+    st.session_state[cache_key] = {"data": result, "ts": now}
+    return result
+
+
+def _kiem_tra_no_den_han(df_full, pgd_filter: str | None = None) -> list[AlertItem]:
+    """Cảnh báo nếu có nhiều món đến hạn trong 30 ngày tới. Cache 30 phút."""
+    import pandas as pd
+
+    if df_full is None or df_full.empty or COT_NGAY_DH not in df_full.columns:
+        return []
+
+    cache_key = f"_alert_den_han_{pgd_filter or 'all'}"
+    now = datetime.now()
+    cached = st.session_state.get(cache_key)
+    if cached and (now - cached["ts"]).total_seconds() < _KHD_CACHE_TTL:
+        return cached["data"]
+
+    try:
+        df = df_full.copy()
+        if pgd_filter and COT_TEN_PGD in df.columns:
+            df = df[df[COT_TEN_PGD] == pgd_filter]
+
+        df["_ngay_dh"] = pd.to_datetime(df[COT_NGAY_DH], errors="coerce", dayfirst=True)
+        today = pd.Timestamp("today").normalize()
+        den_han = df[(df["_ngay_dh"] >= today) & (df["_ngay_dh"] <= today + pd.Timedelta(days=30))]
+
+        if den_han.empty:
+            result = []
+        else:
+            so_mon = len(den_han)
+            tong_ty = pd.to_numeric(den_han[COT_TONG_DU_NO], errors="coerce").fillna(0).sum() / 1e9
+            tong_str = f"{tong_ty:.1f}".replace(".", ",") + " tỷ"
+            if so_mon >= _NGUONG_DH_30_KHAN or tong_ty >= _NGUONG_DH_30_TY_KHAN:
+                muc = MUC_KHAN
+            else:
+                muc = MUC_CANH_BAO
+            result = [AlertItem(
+                muc=muc,
+                tieu_de=f"{so_mon} món đến hạn trong 30 ngày",
+                mo_ta=f"Tổng: {tong_str} — xem tab Phân tích Đến hạn",
+            )]
+    except Exception as e:
+        logger.error("_kiem_tra_no_den_han: %s", e, exc_info=True)
+        result = []
+
+    st.session_state[cache_key] = {"data": result, "ts": now}
+    return result
 
 
 _KHOANH_ALERT_CACHE_TTL = 600
@@ -325,6 +401,12 @@ def _build_alert_items(
     # 3 tháng không hoạt động
     pgd_filter = pgd_user if la_phan_he_pgd(role) else None
     items += _kiem_tra_khong_hoat_dong(df_full, pgd_filter)
+
+    # NQH cao
+    items += _kiem_tra_nqh_cao(df_full, pgd_filter)
+
+    # Nợ đến hạn trong 30 ngày
+    items += _kiem_tra_no_den_han(df_full, pgd_filter)
 
     # Nợ khoanh sắp hết hạn
     khoanh_data = _get_khoanh_alert_data(df_full)
@@ -398,9 +480,10 @@ def render_alert_sidebar(
         for alert in nhom:
             is_read = alert.alert_id in da_doc
             if alert.jump_fn is not None:
-                btn_label = f"{'~~' if is_read else ''}{icon} {alert.tieu_de}{'~~ ✓' if is_read else ''}"
                 btn_key = f"alert_jump_{alert.alert_id}"
-                if st.button(btn_label, key=btn_key, use_container_width=True):
+                if is_read:
+                    st.caption(f"{icon} {alert.tieu_de} ✓")
+                elif st.button(f"{icon} {alert.tieu_de}", key=btn_key, use_container_width=True):
                     _danh_dau_da_doc([alert.alert_id])
                     alert.jump_fn()
                     st.rerun()

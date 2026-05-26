@@ -1,5 +1,75 @@
 # CHANGELOG
 
+## [2026-05-26] — Tab card 22 PGD: redesign + fix applymap pandas 3.0
+- `tabs/tab_pgd_cards.py` dòng ~416 — **BUG FIX**: thay `Styler.applymap()` → `.map()` (pandas 3.0 đã xóa applymap — crash AttributeError khi render bảng xếp hạng)
+- `tabs/tab_pgd_cards.py` — **REDESIGN**: card gradient dark, 5 KPI metrics (thêm BQ/hộ), Plotly combo chart dư nợ+NQH%+BQ/hộ, bar chart xếp hạng BQ/hộ, bảng color-coded Styler, sort option "BQ/hộ (giảm)", rank badge #N trên card
+- `services/tongquan_service.py` dòng ~586 — **MỚI**: cột `dn_binh_quan_ho` (dư nợ bình quân hộ = du_no/so_kh, đơn vị đồng) trong output `tinh_card_pgd()`
+
+## [2026-05-26] — §2.1 Word report + §2.3 So sánh đến hạn cùng kỳ
+- `scripts/daily_word_report.py` — **MỚI** — tạo báo cáo Word định kỳ (4 section: Tổng quan, PGD chi tiết, Top NQH, KHTD) với openpyxl formatting
+- `scripts/daily_report.py` — **MỚI** — tạo báo cáo Excel định kỳ hằng ngày (4 sheet: Bìa, Tổng quan PGD, Top NQH, Đến hạn 30d, KHTD) + `list_reports()` + cleanup 30d
+- `scripts/setup_daily_report_task.bat` — **MỚI** — cài Task Scheduler chạy daily_report.py lúc 07:00
+- `tabs/tab_bao_cao_dinh_ky.py` — **MỚI** — 2 cột Excel/Word: tạo ngay + download; đăng ký ở 3 workspace (management, executive, operation)
+- `services/den_han_compare_service.py` — **MỚI** — `so_sanh_den_han_cung_ky()`: so sánh số món + dư nợ đến hạn N tháng giữa năm nay và baseline năm trước; `phan_tich_den_han_dot_bien()`: phát hiện PGD tăng ≥30%
+
+## [2026-05-26] — §2.1 Báo cáo định kỳ sáng: service + tab + health_check integration
+- `services/daily_report_service.py` — **MỚI** — tạo Excel tóm tắt sáng, lưu `cache/reports/`
+  - `REPORTS_DIR` = `BASE_DIR/cache/reports` (tuyệt đối, không phụ thuộc CWD)
+  - `tao_bao_cao_sang(nguoi_tao)` → tạo 4 sheets: Tổng quan, Dư nợ PGD, NQH PGD, Đến hạn tháng
+  - `lay_bao_cao_sang_hom_nay()` → Path nếu đã có, None nếu chưa
+  - `lay_ds_bao_cao(n=7)` → list báo cáo N ngày gần nhất
+  - `ten_file_ngay(d)` → `bao_cao_sang_DDMMYYYY.xlsx`
+- `tabs/tab_bao_cao_dinh_ky.py` — **MỚI** — UI: trạng thái hôm nay, nút Tạo ngay, download button, lịch sử 7 ngày
+- `workspaces/ws_management.py` dòng ~803 — mount tab `📅 Báo cáo định kỳ` vào group `Báo cáo`
+- `health_check.py` dòng ~343 — tự động tạo báo cáo sáng sau health check nếu chưa có hôm nay
+
+## [2026-05-26] — Test components: 27 test cases mới cho delta_card + movers + loan_drawer + tongquan_service
+- `tests/test_components.py` — **MỚI** 27 test cases cho 6 class:
+  - `TestFmtVnNum` (5): format số VN (`_fmt_vn_num`)
+  - `TestPickDimCol` (5): lookup cột từ dimension key (`_pick_dim_col`)
+  - `TestFormatValue` (3): format tiền/tỷ lệ/số (`_format_value`)
+  - `TestRenderField` (8): HTML field drawer (`_render_field`) — null, nan, tiền, pct, error
+  - `TestLocDuNoDuong` (3): lọc dư nợ dương (`loc_du_no_duong`)
+  - `TestChuanHoaNgay` (3): chuẩn hóa ngày datetime/string/missing (`chuan_hoa_ngay`)
+- Tổng tests: 717 (↑27) — 46 file
+
+## [2026-05-26] — Health check tự động: ghi kv_store + sidebar alert + Task Scheduler
+- `health_check.py` dòng ~298 — thêm `_ghi_ket_qua_kv()`: sau mỗi lần chạy ghi JSON vào `kv_store` key `health_check_result` (ts, total, passed, failed, failed_labels, exit_code)
+- `health_check.py` dòng ~320 — `__main__` gọi `_ghi_ket_qua_kv(exit_code)` trước `sys.exit()`
+- `alert_center.py` dòng ~382 — thêm `_kiem_tra_health_check()`: đọc `health_check_result` từ kv_store, sinh AlertItem 🔴/🟠 nếu failed≥1, 🟡 nếu chưa chạy hoặc stale >25h
+- `alert_center.py` dòng ~411 — `_build_alert_items()` gọi `_kiem_tra_health_check()` cho CN role
+- `scripts/setup_health_check_task.bat` — **MỚI** — cài Windows Task Scheduler chạy health_check.py lúc 06:30 hằng ngày, log ra `logs/health_check.log`
+
+## [2026-05-26] — Lưu cấu hình lọc: ROADMAP §1.4 UX
+- `components/filter_bar.py` dòng 1–8 — **MỚI** import `db`, `logger`; thêm docstring "Lưu cấu hình bộ lọc"
+- `components/filter_bar.py` dòng 12–52 — **MỚI** 4 hàm quản lý preset: `load_filter_presets()`, `save_filter_presets()`, `get_last_filter_preset_name()`, `set_last_filter_preset_name()` — dùng kv_store key `filter_preset_{username}`
+- `components/filter_bar.py` dòng 65 — `filter_bar()` thêm param `username=""` (optional) + docstring
+- `components/filter_bar.py` dòng 92–99 — **MỚI** auto-load: khi filter_bar mở lần đầu, tự động tải preset lần cuối dùng
+- `components/filter_bar.py` dòng 186–188 — **MỚI** hiện UI Save/Load/Delete nếu `username` được truyền
+- `components/filter_bar.py` dòng 198–213 — **MỚI** `_apply_preset_to_session()`: áp dụng giá trị preset vào session_state
+- `components/filter_bar.py` dòng 216–274 — **MỚI** `_show_filter_presets_ui()`: 3 cột Save / Load / Delete với text input + selectbox + button
+
+## [2026-05-26] — Fix UserWarning pd.to_datetime thiếu format
+- `alert_center.py` dòng ~227 — thêm `format='mixed'` vào `pd.to_datetime()` trong `_canh_bao_no_khoanh_sap_het_han()` — loại bỏ UserWarning "Could not infer format"
+
+## [2026-05-26] — ROADMAP.md: đồng bộ hiện trạng + bổ sung giai đoạn 2.4–2.6
+- `ROADMAP.md` — bổ sung 9 mục vào "Hiện trạng": KTNB, Xây dựng KHTD, CBTD Dashboard, Phối hợp PGD, Quản lý Công văn, Báo cáo v2, Dark Mode, TabContext, Cold start −54s
+- `ROADMAP.md` — §1.1 Test: cập nhật KPI ≥80%, ghi nhận 43 file/839 cases
+- `ROADMAP.md` — §1.2 Performance: ghi nhận cold start đã đạt; 2 mục Done
+- `ROADMAP.md` — §1.3: thêm TabContext adoption; nâng health check → 🔴 Cao
+- `ROADMAP.md` — §1.4: nâng health check scheduled → 🔴 Cao
+- `ROADMAP.md` — thêm §2.4 Quản lý Công văn (4 mục)
+- `ROADMAP.md` — thêm §2.5 KTNB Phase 2 (4 mục)
+- `ROADMAP.md` — thêm §2.6 Xây dựng KHTD Workflow (3 mục)
+- `ROADMAP.md` — §4.2: đánh dấu Quản lý văn bản → chuyển lên §2.4; cập nhật timeline
+
+## [2026-05-26] — Performance: DuckDB aggregates + cache optimization ROADMAP §1.2
+- `data/core.py` dòng ~235–455 — **MỚI** 4 hàm DuckDB aggregate: `tong_hop_tq_pgd()`, `tong_hop_tq_pgd_full()`, `tong_hop_tq_co_cau_ct()`, `tong_hop_tq_kpi()` — 1 SQL query thay thế 4-6 pandas groupby cho dashboard Tổng quan (tinh_tqpgd_extended, tinh_co_cau_ct, tinh_kpi_tongquan)
+- `data/core.py` dòng ~240 — schema check `pd.read_parquet(parquet_path).columns.tolist()` trước mỗi DuckDB query (§8.17)
+- `tabs/tab_so_sanh_ky/_export.py` dòng 599 — `_build_tong_hop_sheets()` thêm `parquet_path` parameter: dùng DuckDB query trực tiếp trên parquet nếu file tồn tại, fallback về pandas groupby
+- `tabs/tab_so_sanh_ky/_export.py` dòng 533 — gọi `_build_tong_hop_sheets(df_xuat, CACHE_HSTD)` (pass parquet path)
+- `tabs/tab_so_sanh_ky/_export.py` dòng 7 — thêm `import os` + `CACHE_HSTD` vào config import
+
 ## [2026-05-26] — XLRR: archive 2 file cũ + fix GOM tháng + bổ sung 13/14 XLN
 - `tabs/tab_no_rui_ro.py` — XÓA (đã archive tại `_archive/`; deprecated, không còn được import)
 - `tabs/tab_xlrr_tong_hop.py` — XÓA (đã archive tại `_archive/`; deprecated, không còn được import)

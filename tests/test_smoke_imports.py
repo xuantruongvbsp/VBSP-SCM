@@ -33,6 +33,7 @@ TAB_MODULES: list[str] = [
     "tabs.tab_audit_log",
     "tabs.tab_ban_dai_dien",
     "tabs.tab_baocao",
+    "tabs.tab_bao_cao_dinh_ky",
     "tabs.tab_candoi",
     "tabs.tab_canh_bao_som",
     "tabs.tab_cbtd",

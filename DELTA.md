@@ -4,6 +4,169 @@
 
 ---
 
+## [2026-05-26] tab_pgd_cards redesign + fix applymap pandas 3.0
+
+### `tabs/tab_pgd_cards.py` — REDESIGN TOÀN DIỆN
+- **BUG FIX**: `Styler.applymap()` → `.map()` — pandas 3.0 đã xóa `applymap`; crash `AttributeError` nếu không fix
+- CSS: gradient card `#0D1B2A→#112240`, hover glow xanh, badge NQH dạng pill có viền màu, rank badge #N góc phải
+- KPI row: 5 metrics (thêm **BQ/hộ toàn CN**)
+- Card HTML: 5 KPI block (thêm **BQ/hộ**, màu cyan), hiển thị số món vay
+- Biểu đồ: Plotly combo chart bar dư nợ + scatter NQH% + scatter BQ/hộ; tab 2 = bar chart xếp hạng BQ/hộ với đường tham chiếu BQ CN
+- Sort: thêm option **"BQ/hộ (giảm)"**
+- Bảng xếp hạng: pandas Styler `.map()` color-coded NQH% + BQ/hộ cyan
+
+### `services/tongquan_service.py` — `tinh_card_pgd()`
+- Thêm cột output: `dn_binh_quan_ho` = `du_no / so_kh` (đơn vị đồng, fillna=0)
+- Signature không đổi
+
+**Pandas compatibility note:** pandas 3.0 xóa `Styler.applymap()` — dùng `.map()` thay thế (API giống nhau).
+
+---
+
+## [2026-05-26] test_components.py — 27 test cases components (ROADMAP §1.1)
+
+### `tests/test_components.py` — **MỚI** (27 test cases)
+
+| Class | Tests | Hàm được test |
+|---|---|---|
+| `TestFmtVnNum` | 5 | `delta_card._fmt_vn_num()` — số nguyên, thực, chuỗi, âm |
+| `TestPickDimCol` | 5 | `movers._pick_dim_col()` — 5 dimension keys (pgd/xa/chuongtrinh/to/dvut) |
+| `TestFormatValue` | 3 | `movers._format_value()` — tiền, tỷ lệ, số khác |
+| `TestRenderField` | 8 | `loan_drawer._render_field()` — null, nan, tiền, pct, error path |
+| `TestLocDuNoDuong` | 3 | `tongquan_service.loc_du_no_duong()` |
+| `TestChuanHoaNgay` | 3 | `tongquan_service.chuan_hoa_ngay()` — datetime, string, missing column |
+
+**Kết quả:** `27 passed in 0.79s ✅`
+
+---
+
+## [2026-05-26] daily_report_service — Báo cáo định kỳ sáng (ROADMAP §2.1)
+
+### `services/daily_report_service.py` — **MỚI**
+
+**Public API:**
+```python
+tao_bao_cao_sang(nguoi_tao="system") -> Path    # tạo Excel + lưu + audit
+lay_bao_cao_sang_hom_nay() -> Path | None        # có báo cáo hôm nay chưa
+lay_ds_bao_cao(n_ngay=7) -> list[dict]           # {ngay, path, ten_file, size_kb, hom_nay}
+ten_file_ngay(d=None) -> str                     # "bao_cao_sang_DDMMYYYY.xlsx"
+REPORTS_DIR: Path                                # BASE_DIR/cache/reports (tuyệt đối)
+```
+
+**4 sheets Excel:**
+| Sheet | Nguồn dữ liệu |
+|---|---|
+| Tổng quan | `tong_hop_tq_kpi(CACHE_HSTD)` — 1 dòng KPI |
+| Dư nợ theo PGD | `tong_hop_tq_pgd_full(CACHE_HSTD, year)` — 22 PGD |
+| NQH theo PGD | `dem_no_qua_han_pgd(CACHE_HSTD)` |
+| Đến hạn tháng này | pandas read_parquet → group by PGD |
+
+**Integration:**
+- `tabs/tab_bao_cao_dinh_ky.py` — UI tab (mount trong ws_management.py group "Báo cáo")
+- `health_check.py` `__main__` — auto-generate nếu chưa có hôm nay
+
+---
+
+## [2026-05-26] filter_bar — Lưu cấu hình bộ lọc (ROADMAP §1.4)
+
+### `components/filter_bar.py` — 4 hàm preset + UI Save/Load/Delete
+
+**4 hàm public mới:**
+```python
+load_filter_presets(username)         # → {name: {field: value}}
+save_filter_presets(username, presets) # ghi kv + audit + cache.clear()
+get_last_filter_preset_name(username)  # → str | None
+set_last_filter_preset_name(username, name)
+```
+
+**Key kv_store:** `filter_preset_{username}` → `{"presets": {...}, "last_used": "tên"}`
+
+**Thay đổi `filter_bar()`:**
+- Thêm param `username: str = ""` (optional — backward compatible)
+- Auto-load preset lần cuối khi render lần đầu (flag `{key_prefix}_auto_loaded`)
+- Hiện UI Save/Load/Delete 3 cột nếu `username` được truyền
+
+**Cách dùng:**
+```python
+filter_values = filter_bar(df, filters, key_prefix="fb",
+                            username=st.session_state.get("username", ""))
+```
+
+---
+
+## [2026-05-26] Health check tự động ROADMAP §1.3/1.4 — kv_store + sidebar + Task Scheduler
+
+### `health_check.py` — ghi kết quả vào kv_store
+
+**Thêm `_ghi_ket_qua_kv(exit_code)`** (~dòng 298):
+- Sau khi chạy xong 5 checks, ghi JSON vào `kv_store` key `health_check_result`
+- Payload: `{ts, total, passed, failed, failed_labels, exit_code}`
+- Ghi trực tiếp SQLite (không qua `db.py`) vì health_check chạy độc lập
+
+### `alert_center.py` — đọc kết quả và hiện cảnh báo sidebar
+
+**Thêm `_kiem_tra_health_check()`** (~dòng 382):
+
+| Trường hợp | Alert |
+|---|---|
+| Chưa chạy lần nào (`health_check_result` = None) | 🟡 LƯU Ý — hướng dẫn chạy thủ công |
+| Kết quả stale > 25h | 🟡 LƯU Ý — kiểm tra Task Scheduler |
+| `failed` ≥ 3 | 🔴 KHẨN — liệt kê labels tối đa 3+N |
+| `failed` 1–2 | 🟠 CẢNH BÁO — liệt kê labels |
+| `failed` = 0 | Không hiện gì |
+
+**`_build_alert_items()`** gọi `_kiem_tra_health_check()` cho CN role.
+
+### `scripts/setup_health_check_task.bat` — **MỚI**
+- `schtasks /create /sc daily /st 06:30` — chạy mỗi ngày 6:30 sáng
+- Log ra `logs/health_check.log`
+- Chạy với quyền Administrator (Run as administrator)
+
+---
+
+## [2026-05-26] Performance §1.2 — 4 DuckDB aggregates + cache optimization
+
+### 4 hàm DuckDB mới trong `data/core.py` (~dòng 235–455)
+
+| Hàm | Thay thế | Mô tả |
+|---|---|---|
+| `tong_hop_tq_pgd(parquet_path, nam_ht)` | `tinh_tqpgd_extended()` (~4 pandas groupby) | Tổng hợp dư nợ/NQH/khoanh/đến hạn 22 PGD, 1 SQL |
+| `tong_hop_tq_pgd_full(parquet_path, nam_ht, pgd_filter)` | `tinh_tqpgd_extended()` + merge | Tổng hợp có filter PGD |
+| `tong_hop_tq_co_cau_ct(parquet_path, pgd_filter)` | `tinh_co_cau_ct()` (~6 pandas groupby) | Cơ cấu dư nợ theo chương trình TD |
+| `tong_hop_tq_kpi(parquet_path, pgd_filter)` | `tinh_kpi_tongquan()` | KPI tổng quan: tổng dư nợ, NQH%, khoanh, cảnh báo |
+
+**Pattern mỗi hàm:**
+- Schema check `pd.read_parquet(parquet_path).columns.tolist()` trước query (§5.16)
+- Fallback `return pd.DataFrame()` nếu lỗi, không raise
+- Đọc trực tiếp từ Parquet — không nạp toàn bộ DataFrame vào RAM
+
+### DuckDB cho `_build_tong_hop_sheets` trong `tabs/tab_so_sanh_ky/_export.py` (~dòng 599)
+
+- Thêm param `parquet_path`
+- Nếu `CACHE_HSTD` tồn tại → 3 DuckDB queries (PGD / Xã / CT) thay pandas groupby
+- Fallback về pandas nếu không có parquet hoặc query lỗi
+
+### Cache coverage — đã xác nhận
+
+| File | Hàm | Cache |
+|---|---|---|
+| `app.py` | `_load_hstd()` | `@st.cache_resource(ttl=3600)` ✅ |
+| `data/hstd.py` | `doc_file()` | `@st.cache_data(ttl=7200)` ✅ |
+| `tabs/tab_tongquan.py` | 4 cache functions | `@st.cache_data(ttl=3600)` ✅ |
+| `tabs/tab_so_sanh_ky/_export.py` | export state | `st.session_state` ✅ |
+
+### Kết quả kiểm tra
+
+```
+✅ py_compile: data/core.py → OK
+✅ py_compile: _export.py → OK
+✅ import: 4 hàm DuckDB → OK
+✅ convention check: data/core.py → OK
+✅ convention check: _export.py → OK
+```
+
+---
+
 ## [2026-05-26] XLRR: Archive tab cũ + Fix GOM tháng + Bổ sung 13/14 XLN
 
 ### Tab đã xóa (deprecated)

@@ -1,4 +1,4 @@
-"""FilterBar - Thanh lọc dữ liệu nâng cao."""
+"""FilterBar - Thanh lọc dữ liệu nâng cao + Lưu cấu hình bộ lọc."""
 
 from __future__ import annotations
 
@@ -7,14 +7,66 @@ from typing import Any, Callable
 import pandas as pd
 import streamlit as st
 
+import db
+from logger import get_logger
+
+logger = get_logger(__name__)
+
+
+def _get_filter_preset_key(username: str) -> str:
+    return f"filter_preset_{username}"
+
+
+def load_filter_presets(username: str) -> dict[str, dict[str, Any]]:
+    """Đọc tất cả bộ lọc đã lưu của user. Trả về {preset_name: {field: value}}."""
+    if not username:
+        return {}
+    data = db.doc_kv(_get_filter_preset_key(username))
+    if isinstance(data, dict) and "presets" in data:
+        return data["presets"]
+    return {}
+
+
+def save_filter_presets(username: str, presets: dict[str, dict[str, Any]]) -> None:
+    """Lưu toàn bộ bộ lọc của user vào kv_store.
+    Giữ nguyên trường 'last_used' hiện có (không ghi đè).
+    """
+    if not username:
+        return
+    existing = db.doc_kv(_get_filter_preset_key(username)) or {}
+    payload = {"presets": presets}
+    if "last_used" in existing:
+        payload["last_used"] = existing["last_used"]
+    db.ghi_kv(_get_filter_preset_key(username), payload, username)
+    db.ghi_audit(username, "luu_filter_preset", f"{len(presets)} presets")
+    st.cache_data.clear()
+
+
+def get_last_filter_preset_name(username: str) -> str | None:
+    """Lấy tên preset đã dùng lần cuối."""
+    data = db.doc_kv(_get_filter_preset_key(username))
+    if isinstance(data, dict):
+        return data.get("last_used")
+    return None
+
+
+def set_last_filter_preset_name(username: str, name: str) -> None:
+    """Ghi nhận preset vừa được chọn."""
+    if not username:
+        return
+    data = db.doc_kv(_get_filter_preset_key(username)) or {}
+    data["last_used"] = name
+    db.ghi_kv(_get_filter_preset_key(username), data, username)
+
 
 def filter_bar(
     df: pd.DataFrame,
     filters: list[dict],
     key_prefix: str = "fb",
     on_change: Callable | None = None,
+    username: str = "",
 ) -> dict[str, Any]:
-    """Thanh lọc dữ liệu động.
+    """Thanh lọc dữ liệu động + lưu/tải cấu hình bộ lọc.
 
     Args:
         df: DataFrame gốc
@@ -27,6 +79,7 @@ def filter_bar(
             - placeholder: text placeholder (optional)
         key_prefix: prefix cho session state keys
         on_change: callback khi filter thay đổi
+        username: nếu có → hiện nút Lưu/Tải bộ lọc từ kv_store
 
     Returns:
         dict[field -> value] chứa giá trị filter hiện tại
@@ -37,6 +90,16 @@ def filter_bar(
         return result
 
     expanded = st.session_state.get(f"{key_prefix}_expanded", False)
+
+    # ── Auto-load last used preset ──────────────────────────────────
+    _auto_key = f"{key_prefix}_auto_loaded"
+    if username and not st.session_state.get(_auto_key):
+        last_name = get_last_filter_preset_name(username)
+        if last_name:
+            presets = load_filter_presets(username)
+            if last_name in presets:
+                _apply_preset_to_session(presets[last_name], filters, key_prefix)
+        st.session_state[_auto_key] = True
 
     col_toggle, col_clear = st.columns([6, 1])
     with col_toggle:
@@ -124,12 +187,97 @@ def filter_bar(
                 )
                 result[field] = range_val
 
+    # ── Save / Load presets ─────────────────────────────────────────
+    if username and result:
+        _show_filter_presets_ui(result, key_prefix, username)
+
     st.divider()
 
     if on_change:
         on_change()
 
     return result
+
+
+def _apply_preset_to_session(
+    preset_values: dict[str, Any],
+    filters: list[dict],
+    key_prefix: str,
+) -> None:
+    """Áp dụng giá trị preset vào session_state keys."""
+    if filters:
+        for f in filters:
+            field = f["field"]
+            session_key = f"{key_prefix}_{field}"
+            if field in preset_values:
+                st.session_state[session_key] = preset_values[field]
+    else:
+        for field, val in preset_values.items():
+            session_key = f"{key_prefix}_{field}"
+            st.session_state[session_key] = val
+
+
+def _show_filter_presets_ui(
+    current_values: dict[str, Any],
+    key_prefix: str,
+    username: str,
+) -> None:
+    """Hiển thị row Lưu/Tải/Xóa bộ lọc."""
+    presets = load_filter_presets(username)
+    preset_names = sorted(presets.keys())
+
+    st.caption("💾 **Lưu / Tải cấu hình bộ lọc**")
+    col_save, col_load, col_del = st.columns([2, 2, 1])
+
+    with col_save:
+        save_name = st.text_input(
+            "Tên bộ lọc",
+            placeholder="VD: Phòng KH-NV, TW...",
+            key=f"{key_prefix}_preset_name",
+            label_visibility="collapsed",
+        )
+        if st.button("💾 Lưu", width="stretch", key=f"{key_prefix}_save_preset"):
+            name = save_name.strip()
+            if not name:
+                st.toast("⚠️ Nhập tên bộ lọc trước khi lưu", icon="⚠️")
+            else:
+                presets[name] = dict(current_values)
+                save_filter_presets(username, presets)
+                set_last_filter_preset_name(username, name)
+                st.toast(f"✅ Đã lưu bộ lọc '{name}'", icon="💾")
+                st.rerun()
+
+    with col_load:
+        if preset_names:
+            selected = st.selectbox(
+                "Tải bộ lọc",
+                options=[""] + preset_names,
+                format_func=lambda x: "Chọn bộ lọc đã lưu..." if x == "" else x,
+                key=f"{key_prefix}_load_preset",
+                label_visibility="collapsed",
+            )
+            if selected and st.button("📂 Tải", width="stretch", key=f"{key_prefix}_load_btn"):
+                _apply_preset_to_session(presets[selected], [], key_prefix)
+                set_last_filter_preset_name(username, selected)
+                st.toast(f"✅ Đã tải bộ lọc '{selected}'", icon="📂")
+                st.rerun()
+        else:
+            st.caption("Chưa có bộ lọc nào được lưu")
+
+    with col_del:
+        if preset_names:
+            del_name = st.selectbox(
+                "Xóa",
+                options=[""] + preset_names,
+                format_func=lambda x: "🗑️" if x == "" else x,
+                key=f"{key_prefix}_del_preset",
+                label_visibility="collapsed",
+            )
+            if del_name and st.button("🗑️", width="stretch", key=f"{key_prefix}_del_btn"):
+                presets.pop(del_name, None)
+                save_filter_presets(username, presets)
+                st.toast(f"🗑️ Đã xóa bộ lọc '{del_name}'", icon="🗑️")
+                st.rerun()
 
 
 def apply_filters(df: pd.DataFrame, filter_values: dict) -> pd.DataFrame:

@@ -6,6 +6,7 @@ Loại 3 — PDF theo Nhóm (PGD): từng PGD 1 bảng chi tiết + dòng tổng
 """
 from __future__ import annotations
 
+import os
 from io import BytesIO
 from datetime import datetime
 
@@ -16,6 +17,7 @@ import plotly.graph_objects as go
 import db
 from utils import xuat_excel, fmt_so
 from config import (
+    CACHE_HSTD,
     COT_TEN_PGD, COT_TEN_XA, COT_TEN_THON, COT_DVUT, COT_TEN_TO,
     COT_MA_KH, COT_TEN_KH, COT_SDT, COT_DIA_CHI,
     COT_SO_KU, COT_NGAY_VAY, COT_NGAY_DH, COT_THOI_HAN,
@@ -530,7 +532,7 @@ def _render_export_chi_tiet(
         if xl_key not in st.session_state:
             df_xl = df_xuat[col_chung].copy()
             sheets = {"Chi tiết": df_xl}
-            tong_hop_sheets = _build_tong_hop_sheets(df_xuat)
+            tong_hop_sheets = _build_tong_hop_sheets(df_xuat, CACHE_HSTD)
             sheets.update(tong_hop_sheets)
             if sheets_extra:
                 sheets.update(sheets_extra)
@@ -596,8 +598,59 @@ def _render_export_chi_tiet(
     st.caption(f"File: SSK_ChiTiet_{ky_xuat.replace('/', '_')}.pdf · SSK_CT_Nhom_{ky_xuat.replace('/', '_')}.pdf")
 
 
-def _build_tong_hop_sheets(df: pd.DataFrame) -> dict[str, pd.DataFrame]:
+def _build_tong_hop_sheets(df: pd.DataFrame, parquet_path: str = "") -> dict[str, pd.DataFrame]:
+    """Tổng hợp Excel sheets theo PGD/Xã/CT. Dùng DuckDB nếu có parquet_path."""
     sheets = {}
+
+    if parquet_path and os.path.exists(parquet_path):
+        try:
+            from data.core import _duckdb_query
+            cols = pd.read_parquet(parquet_path, engine='pyarrow').columns.tolist()
+
+            if COT_TEN_PGD in cols:
+                sql = f"""
+                    SELECT "{COT_TEN_PGD}" AS pgd,
+                        COUNT(DISTINCT "{COT_MA_KH}") AS "Số KH",
+                        COUNT(DISTINCT "{COT_SO_KU}") AS "Số món",
+                        SUM("{COT_TONG_DU_NO}") AS "Tổng dư nợ",
+                        SUM("{COT_DU_NO_TH}") AS "Dư nợ TH",
+                        SUM("{COT_DU_NO_QH}") AS "Dư nợ QH"
+                    FROM read_parquet(?)
+                    WHERE "{COT_TONG_DU_NO}" IS NOT NULL
+                    GROUP BY "{COT_TEN_PGD}"
+                    ORDER BY "{COT_TEN_PGD}"
+                """
+                sheets["Tổng hợp PGD"] = _duckdb_query(sql, [parquet_path])
+
+            if COT_TEN_XA in cols:
+                sql = f"""
+                    SELECT "{COT_TEN_XA}" AS xa,
+                        COUNT(DISTINCT "{COT_MA_KH}") AS "Số KH",
+                        COUNT(DISTINCT "{COT_SO_KU}") AS "Số món",
+                        SUM("{COT_TONG_DU_NO}") AS "Tổng dư nợ"
+                    FROM read_parquet(?)
+                    WHERE "{COT_TONG_DU_NO}" IS NOT NULL
+                    GROUP BY "{COT_TEN_XA}"
+                    ORDER BY "Tổng dư nợ" DESC
+                """
+                sheets["Tổng hợp Xã"] = _duckdb_query(sql, [parquet_path])
+
+            if COT_TEN_CT in cols:
+                sql = f"""
+                    SELECT "{COT_TEN_CT}" AS ct,
+                        COUNT(DISTINCT "{COT_MA_KH}") AS "Số KH",
+                        COUNT(DISTINCT "{COT_SO_KU}") AS "Số món",
+                        SUM("{COT_TONG_DU_NO}") AS "Tổng dư nợ"
+                    FROM read_parquet(?)
+                    WHERE "{COT_TONG_DU_NO}" IS NOT NULL
+                    GROUP BY "{COT_TEN_CT}"
+                    ORDER BY "Tổng dư nợ" DESC
+                """
+                sheets["Tổng hợp CT"] = _duckdb_query(sql, [parquet_path])
+            return sheets
+        except Exception:
+            pass
+
     if COT_TEN_PGD in df.columns:
         agg_pgd = df.groupby(COT_TEN_PGD).agg(
             **{

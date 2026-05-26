@@ -232,3 +232,226 @@ def tong_hop_theo_xa(parquet_path: str, ten_pgd: str) -> pd.DataFrame:
         return _duckdb_query(sql, [parquet_path, ten_pgd])
     except Exception:
         return pd.DataFrame()
+
+
+def tong_hop_tq_pgd(parquet_path: str, nam_ht: int) -> pd.DataFrame:
+    """
+    Tổng hợp toàn PGD cho dashboard Tổng quan — 1 query thay 4 pandas groupby.
+
+    Trả về DataFrame: [ten_pgd, du_no, so_kh, so_mon, nqh, du_no_khoanh,
+                         lai_ton, ds_cho_vay, no_dh_nam, ds_thu_no]
+    Tất cả giá trị là VND thô (chưa chia triệu).
+    """
+    from config import (
+        COT_TEN_PGD, COT_MA_KH, COT_SO_KU,
+        COT_TONG_DU_NO, COT_DU_NO_QH, COT_DU_NO_KHOANH,
+        COT_LAI_TON, COT_NGAY_DH,
+    )
+
+    if not os.path.exists(parquet_path):
+        return pd.DataFrame()
+
+    schema = pd.read_parquet(parquet_path, engine='pyarrow').columns.tolist()
+
+    has_khoanh = COT_DU_NO_KHOANH in schema
+    has_lai_ton = COT_LAI_TON in schema
+    has_ngay_dh = COT_NGAY_DH in schema
+
+    select_cols = f"""
+        "{COT_TEN_PGD}"          AS ten_pgd,
+        SUM("{COT_TONG_DU_NO}")  AS du_no,
+        COUNT(DISTINCT "{COT_MA_KH}") AS so_kh,
+        COUNT("{COT_SO_KU}")     AS so_mon,
+        SUM("{COT_DU_NO_QH}")    AS nqh
+    """
+    extra_cols = ""
+    if has_khoanh:
+        extra_cols += f""",
+        SUM("{COT_DU_NO_KHOANH}") AS du_no_khoanh"""
+    else:
+        extra_cols += """,
+        0 AS du_no_khoanh"""
+    if has_lai_ton:
+        extra_cols += f""",
+        SUM("{COT_LAI_TON}") AS lai_ton"""
+    else:
+        extra_cols += """,
+        0 AS lai_ton"""
+    extra_cols += """,
+        0 AS ds_cho_vay"""
+
+    no_dh = ""
+    if has_ngay_dh:
+        no_dh = f""",
+        SUM(CASE WHEN "{COT_NGAY_DH}" IS NOT NULL
+            AND EXTRACT(YEAR FROM "{COT_NGAY_DH}") = {int(nam_ht)}
+            THEN "{COT_TONG_DU_NO}" ELSE 0 END) AS no_dh_nam"""
+    else:
+        no_dh = """,
+        0 AS no_dh_nam"""
+
+    sql = f"""
+        SELECT {select_cols}{extra_cols}{no_dh},
+            0 AS ds_thu_no
+        FROM read_parquet(?)
+        WHERE "{COT_TONG_DU_NO}" IS NOT NULL
+        GROUP BY "{COT_TEN_PGD}"
+        ORDER BY "{COT_TEN_PGD}"
+    """
+    try:
+        return _duckdb_query(sql, [parquet_path])
+    except Exception:
+        return pd.DataFrame()
+
+
+def tong_hop_tq_co_cau_ct(parquet_path: str, pgd_filter: str = "") -> pd.DataFrame:
+    """
+    Tổng hợp cơ cấu dư nợ theo chương trình tín dụng + nguồn vốn.
+    1 query thay thế 6+ pandas groupby trong tinh_co_cau_ct.
+
+    Trả về DataFrame: [ten_ct, nguon_von, tong_du_no, so_kh, so_mon, nqh, khoanh, ...]
+    """
+    from config import (
+        COT_TEN_CT, COT_MA_KH, COT_SO_KU,
+        COT_TONG_DU_NO, COT_DU_NO_QH, COT_DU_NO_KHOANH,
+        COT_NGUON_VON, COT_TEN_PGD,
+    )
+
+    if not os.path.exists(parquet_path):
+        return pd.DataFrame()
+
+    schema = pd.read_parquet(parquet_path, engine='pyarrow').columns.tolist()
+    has_khoanh = COT_DU_NO_KHOANH in schema
+    has_nv = COT_NGUON_VON in schema
+
+    khoanh_col = f'SUM("{COT_DU_NO_KHOANH}")' if has_khoanh else '0'
+    nv_group = f', "{COT_NGUON_VON}"' if has_nv else ''
+
+    where_clause = f'WHERE "{COT_TONG_DU_NO}" IS NOT NULL'
+    if pgd_filter and pgd_filter != "Tất cả":
+        where_clause += f' AND "{COT_TEN_PGD}" = \'{pgd_filter}\''
+
+    sql = f"""
+        SELECT
+            "{COT_TEN_CT}"          AS ten_ct,
+            SUM("{COT_TONG_DU_NO}") AS tong_du_no,
+            COUNT(DISTINCT "{COT_MA_KH}") AS so_kh,
+            COUNT("{COT_SO_KU}")    AS so_mon,
+            SUM("{COT_DU_NO_QH}")   AS nqh,
+            {khoanh_col}            AS khoanh
+            {nv_group}
+        FROM read_parquet(?)
+        {where_clause}
+        GROUP BY "{COT_TEN_CT}"{nv_group}
+        ORDER BY tong_du_no DESC
+    """
+    try:
+        return _duckdb_query(sql, [parquet_path])
+    except Exception:
+        return pd.DataFrame()
+
+
+def tong_hop_tq_kpi(parquet_path: str, pgd_filter: str = "") -> pd.DataFrame:
+    """
+    KPI tổng quan: tổng dư nợ, NQH, khoanh, số KH, số món.
+    1 query thay thế pandas groupby trong tinh_kpi_tongquan.
+
+    Trả về 1 dòng DataFrame: [tong_du_no, so_kh, so_mon, nqh, khoanh, lai_ton]
+    """
+    from config import (
+        COT_TEN_PGD, COT_MA_KH, COT_SO_KU,
+        COT_TONG_DU_NO, COT_DU_NO_QH, COT_DU_NO_KHOANH,
+        COT_LAI_TON,
+    )
+
+    if not os.path.exists(parquet_path):
+        return pd.DataFrame()
+
+    schema = pd.read_parquet(parquet_path, engine='pyarrow').columns.tolist()
+    has_khoanh = COT_DU_NO_KHOANH in schema
+    has_lai_ton = COT_LAI_TON in schema
+    khoanh_col = f'SUM("{COT_DU_NO_KHOANH}")' if has_khoanh else '0'
+    lai_col = f'SUM("{COT_LAI_TON}")' if has_lai_ton else '0'
+
+    where_clause = f'WHERE "{COT_TONG_DU_NO}" IS NOT NULL'
+    if pgd_filter and pgd_filter != "Tất cả":
+        where_clause += f' AND "{COT_TEN_PGD}" = \'{pgd_filter}\''
+
+    sql = f"""
+        SELECT
+            SUM("{COT_TONG_DU_NO}")          AS tong_du_no,
+            COUNT(DISTINCT "{COT_MA_KH}")     AS so_kh,
+            COUNT("{COT_SO_KU}")              AS so_mon,
+            SUM("{COT_DU_NO_QH}")             AS nqh,
+            {khoanh_col}                      AS khoanh,
+            {lai_col}                         AS lai_ton
+        FROM read_parquet(?)
+        {where_clause}
+    """
+    try:
+        return _duckdb_query(sql, [parquet_path])
+    except Exception:
+        return pd.DataFrame()
+
+
+def tong_hop_tq_pgd_full(parquet_path: str, nam_ht: int, pgd_filter: str = "") -> pd.DataFrame:
+    """
+    Tổng hợp PGD đầy đủ — thay thế tinh_tqpgd_extended + merge.
+    1 query DuckDB trả tất cả chỉ số cho dashboard PGD.
+
+    Columns: ten_pgd, du_no, so_kh, so_mon, nqh, du_no_khoanh,
+             lai_ton, ds_cho_vay, no_dh_nam, ds_thu_no
+    """
+    from config import (
+        COT_TEN_PGD, COT_MA_KH, COT_SO_KU,
+        COT_TONG_DU_NO, COT_DU_NO_QH, COT_DU_NO_KHOANH,
+        COT_LAI_TON, COT_NGAY_DH,
+    )
+
+    if not os.path.exists(parquet_path):
+        return pd.DataFrame()
+
+    schema = pd.read_parquet(parquet_path, engine='pyarrow').columns.tolist()
+
+    has_khoanh = COT_DU_NO_KHOANH in schema
+    has_lai_ton = COT_LAI_TON in schema
+    has_ngay_dh = COT_NGAY_DH in schema
+
+    khoanh_col = f'SUM("{COT_DU_NO_KHOANH}")' if has_khoanh else '0'
+    lai_col = f'SUM("{COT_LAI_TON}")' if has_lai_ton else '0'
+
+    no_dh = ""
+    if has_ngay_dh:
+        no_dh = f""",
+        SUM(CASE WHEN "{COT_NGAY_DH}" IS NOT NULL
+            AND EXTRACT(YEAR FROM "{COT_NGAY_DH}") = {int(nam_ht)}
+            THEN "{COT_TONG_DU_NO}" ELSE 0 END)"""
+    else:
+        no_dh = """,
+        0"""
+
+    where_clause = f'WHERE "{COT_TONG_DU_NO}" IS NOT NULL'
+    if pgd_filter and pgd_filter != "Tất cả":
+        where_clause += f' AND "{COT_TEN_PGD}" = \'{pgd_filter}\''
+
+    sql = f"""
+        SELECT
+            "{COT_TEN_PGD}"          AS ten_pgd,
+            SUM("{COT_TONG_DU_NO}")  AS du_no,
+            COUNT(DISTINCT "{COT_MA_KH}") AS so_kh,
+            COUNT("{COT_SO_KU}")     AS so_mon,
+            SUM("{COT_DU_NO_QH}")    AS nqh,
+            {khoanh_col}             AS du_no_khoanh,
+            {lai_col}                AS lai_ton,
+            0                        AS ds_cho_vay
+            {no_dh}                  AS no_dh_nam,
+            0                        AS ds_thu_no
+        FROM read_parquet(?)
+        {where_clause}
+        GROUP BY "{COT_TEN_PGD}"
+        ORDER BY "{COT_TEN_PGD}"
+    """
+    try:
+        return _duckdb_query(sql, [parquet_path])
+    except Exception:
+        return pd.DataFrame()

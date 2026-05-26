@@ -1773,6 +1773,7 @@ def render(**kwargs):
             "label": "📈 Báo cáo & Giao ban",
             "tabs": [
                 ("📊 Báo cáo tín dụng", lambda tab: _lazy_tab("tab_baocao").render(tab, **_pgd_df_kwargs)),
+                ("📅 Báo cáo định kỳ", lambda tab: _lazy_tab("tab_bao_cao_dinh_ky").render(tab, **kwargs)),
                 ("📡 Điện báo", lambda tab: _lazy_tab("tab_candoi").render(
                     tab, **{**kwargs, "pgd_mode": True, "df": df, "df_full": df}
                 )),

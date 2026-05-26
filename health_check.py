@@ -296,6 +296,38 @@ def summary() -> int:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# GHI KẾT QUẢ VÀO KV_STORE (để app đọc và hiện cảnh báo sidebar)
+# ══════════════════════════════════════════════════════════════════════════════
+def _ghi_ket_qua_kv(exit_code: int) -> None:
+    """Lưu kết quả health check vào kv_store với key 'health_check_result'."""
+    passed = sum(1 for ok, _ in _results if ok)
+    failed = len(_results) - passed
+    failed_labels = [lbl for ok, lbl in _results if not ok]
+
+    payload = json.dumps({
+        "ts":           datetime.now().isoformat(),
+        "total":        len(_results),
+        "passed":       passed,
+        "failed":       failed,
+        "failed_labels": failed_labels,
+        "exit_code":    exit_code,
+    }, ensure_ascii=False)
+
+    try:
+        conn = _con()
+        conn.execute(
+            """INSERT OR REPLACE INTO kv_store (key, value, updated_at, updated_by)
+               VALUES (?, ?, ?, ?)""",
+            ("health_check_result", payload, datetime.now().isoformat(), "health_check"),
+        )
+        conn.commit()
+        conn.close()
+        print(f"\n  ℹ  Đã ghi kết quả vào kv_store → key: health_check_result")
+    except Exception as e:  # conv: skip — health_check chạy độc lập
+        print(f"\n  ⚠  Không ghi được vào kv_store: {e}", file=sys.stderr)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 if __name__ == "__main__":
     print(_b(f"\nVBSP-SCM Health Check  —  {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}"))
     print(f"DB   : {DB_PATH}")
@@ -307,4 +339,18 @@ if __name__ == "__main__":
     check_pgd_uploads()
     check_audit_log()
 
-    sys.exit(summary())
+    exit_code = summary()
+    _ghi_ket_qua_kv(exit_code)
+
+    # Tự động tạo báo cáo sáng nếu chưa có hôm nay
+    try:
+        from services.daily_report_service import lay_bao_cao_sang_hom_nay, tao_bao_cao_sang
+        if lay_bao_cao_sang_hom_nay() is None:
+            path = tao_bao_cao_sang("health_check")
+            print(f"\n  ✅  Báo cáo sáng: đã tạo {path.name} ({path.stat().st_size // 1024} KB)")
+        else:
+            print(f"\n  ℹ   Báo cáo sáng: đã có hôm nay — bỏ qua")
+    except Exception as _bc_err:
+        print(f"\n  ⚠   Báo cáo sáng: không tạo được — {_bc_err}", file=sys.stderr)
+
+    sys.exit(exit_code)

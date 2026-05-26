@@ -1560,6 +1560,7 @@ def _build_exec_items(df_full, role: str, username: str, **kwargs) -> list:
         {"group": "Kiểm soát",       "label": "Xử lý Rủi ro",             "fn": lambda: _lazy_tab("tab_xu_ly_rui_ro").render(None, df=df_full, role=role, username=username)},
         {"group": "Kiểm soát",       "label": "Giao & Điều chỉnh KHTD",     "fn": lambda: _lazy_tab("tab_khtd_giao_dc").render(None, **kwargs)},
         {"group": "Báo cáo",         "label": "So sánh kỳ",                 "fn": lambda: _lazy_tab("tab_so_sanh_ky").render(None, df=df_full, df_full=df_full, role=role, username=username)},
+        {"group": "Báo cáo",         "label": "📅 Báo cáo định kỳ",       "fn": lambda: _lazy_tab("tab_bao_cao_dinh_ky").render(None, role=role, username=username)},
         {"group": "Báo cáo",         "label": "Xuất PDF báo cáo",           "fn": lambda: _render_pdf_section(df_full, username)},
         {"group": "Hệ thống",        "label": "Hướng dẫn",                  "fn": lambda: render_huong_dan()},
     ]

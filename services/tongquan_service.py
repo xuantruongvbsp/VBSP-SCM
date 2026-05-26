@@ -529,7 +529,7 @@ def tinh_card_pgd(
     """Tính chỉ số tóm tắt cho từng PGD (dùng cho tab card 22 PGD).
 
     Trả về DataFrame gồm:
-      ten_pgd, du_no, nqh, ty_le_nqh, so_kh, so_mon, no_den_han_thang
+      ten_pgd, du_no, nqh, ty_le_nqh, so_kh, so_mon, no_den_han_thang, dn_binh_quan_ho
     Các PGD không có dữ liệu vẫn xuất hiện với giá trị 0.
     """
     import datetime as _dt
@@ -581,5 +581,10 @@ def tinh_card_pgd(
     df_pgd = df_base.merge(df_pgd, on="ten_pgd", how="left").fillna(0)
     for c in ["so_kh", "so_mon"]:
         df_pgd[c] = df_pgd[c].astype(int)
+
+    # Dư nợ bình quân hộ (đơn vị: đồng)
+    df_pgd["dn_binh_quan_ho"] = (
+        df_pgd["du_no"] / df_pgd["so_kh"].replace(0, pd.NA)
+    ).fillna(0).round(0)
 
     return df_pgd.reset_index(drop=True)

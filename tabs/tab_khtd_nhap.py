@@ -37,7 +37,8 @@ from tabs.tab_khtd import (
     _ten_ct_base,
     _tinh_thuc_hien_theo_ct,
 )
-from tabs.tab_khtd_xuat import _hien_thi_bang_cn_readonly
+# NOTE: _hien_thi_bang_cn_readonly import lazy (tránh circular import)
+# tab_khtd_xuat → tab_khtd → tab_khtd_nhap → tab_khtd_xuat (vòng tròn)
 from services.khtd_nhap_service import (
 
 
@@ -222,6 +223,7 @@ def _tab_khtd_chi_nhanh(
     if not co_quyen:
         st.warning("⚠️ Chỉ Admin / Manager mới được nhập kế hoạch cấp Chi nhánh.")
         df_loc = df_full
+        from tabs.tab_khtd_xuat import _hien_thi_bang_cn_readonly  # lazy – tránh circular import
         _hien_thi_bang_cn_readonly(kh_cn, th_cn, df_loc=df_loc, username=username)
         st.divider()
         _section_van_ban_qd_cn(role, username)
@@ -817,6 +819,7 @@ def _tab_khtd_chi_nhanh(
 
     # ── Tóm tắt hiện trạng (luôn hiển thị) ───────────────────────────────
     st.markdown("##### 📊 Tóm tắt hiện trạng")
+    from tabs.tab_khtd_xuat import _hien_thi_bang_cn_readonly  # lazy – tránh circular import
     _hien_thi_bang_cn_readonly(
         kh_cn,
         th_cn,

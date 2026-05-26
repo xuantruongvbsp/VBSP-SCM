@@ -799,6 +799,7 @@ def _build_all_items(role: str, username: str, **kwargs) -> list:
                 {"label": "⏰ Nợ Đến Hạn",        "fn": lambda df_full=df_full, ds_pgd_all=ds_pgd_all, role=role, username=kwargs.get("username", "unknown"), idx=0: _render_canh_bao_no_sub(df_full, ds_pgd_all, role, username, idx)},
             ],
         },
+        {"group": "Báo cáo", "label": "📅 Báo cáo định kỳ", "icon": "calendar", "fn": lambda: _get_tab("tab_bao_cao_dinh_ky").render(None, **kwargs)},
         {"group": "Ủy Thác",       "label": "🏛️ Ban Đại Diện", "icon": "building",       "fn": lambda: _get_tab("tab_ban_dai_dien").render(None, cap="tinh", **kwargs)},
         {"group": "Ủy Thác",       "label": "🤝 Ủy thác", "icon": "handshake", "fn": lambda: _get_tab("tab_uy_thac").render(None, **kwargs)},
         {"group": "Ủy Thác",       "label": "👔 CBTD & Địa bàn",  "icon": "user",  "fn": lambda: _render_cbtd_dia_ban(None, **kwargs)},

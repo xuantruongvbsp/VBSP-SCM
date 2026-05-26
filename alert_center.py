@@ -225,7 +225,7 @@ def canh_bao_no_khoanh_sap_het_han(df_kh) -> dict:
 
     df = df_kh.copy()
     df['_ngay_het'] = pd.to_datetime(
-        df[COT_NGAY_HH_KHOANH], errors='coerce', dayfirst=True,
+        df[COT_NGAY_HH_KHOANH], errors='coerce', dayfirst=True, format='mixed',
     )
     df = df.dropna(subset=['_ngay_het'])
 
@@ -380,6 +380,66 @@ def _get_khoanh_alert_data(df_full):
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# Health check tự động
+# ═══════════════════════════════════════════════════════════════════════════════
+
+_HC_STALE_HOURS = 25  # Cảnh báo nếu health check chưa chạy trong 25h
+
+def _kiem_tra_health_check() -> list[AlertItem]:
+    """Đọc kết quả health check tự động từ kv_store, trả về alerts nếu có lỗi."""
+    items: list[AlertItem] = []
+    try:
+        result = db.doc_kv("health_check_result")
+        if result is None:
+            items.append(AlertItem(
+                muc=MUC_LUU_Y,
+                tieu_de="Health check chưa chạy lần nào",
+                mo_ta="Chạy: python health_check.py — hoặc đặt lịch tự động 6:30 sáng",
+            ))
+            return items
+
+        ts_str  = result.get("ts", "")
+        failed  = result.get("failed", 0)
+        labels  = result.get("failed_labels", [])
+        total   = result.get("total", 0)
+
+        # Cảnh báo nếu lần chạy cuối đã quá _HC_STALE_HOURS
+        if ts_str:
+            try:
+                ts = datetime.fromisoformat(ts_str)
+                age_h = (datetime.now() - ts).total_seconds() / 3600
+                if age_h > _HC_STALE_HOURS:
+                    items.append(AlertItem(
+                        muc=MUC_LUU_Y,
+                        tieu_de=f"Health check chưa chạy {int(age_h)}h",
+                        mo_ta="Kiểm tra Task Scheduler hoặc chạy thủ công: python health_check.py",
+                    ))
+            except ValueError:
+                pass
+
+        if failed == 0:
+            return items  # Tất cả OK — không hiện gì
+
+        # Có lỗi — hiện cảnh báo
+        ts_disp = ts_str[:16].replace("T", " ") if ts_str else "?"
+        mo_ta   = f"Lần kiểm tra: {ts_disp} | {failed}/{total} checks lỗi"
+        if labels:
+            mo_ta += " — " + "; ".join(labels[:3])
+            if len(labels) > 3:
+                mo_ta += f" (+{len(labels) - 3} mục khác)"
+
+        muc = MUC_KHAN if failed >= 3 else MUC_CANH_BAO
+        items.append(AlertItem(
+            muc=muc,
+            tieu_de=f"⚙ Hệ thống: {failed} vấn đề cần kiểm tra",
+            mo_ta=mo_ta,
+        ))
+    except Exception as e:
+        logger.error("_kiem_tra_health_check: %s", e, exc_info=True)
+    return items
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # Build danh sách alert tổng hợp
 # ═══════════════════════════════════════════════════════════════════════════════
 
@@ -406,6 +466,10 @@ def _build_alert_items(
 
     # Nợ đến hạn trong 30 ngày
     items += _kiem_tra_no_den_han(df_full, pgd_filter)
+
+    # Health check tự động (kết quả lần chạy gần nhất)
+    if la_phan_he_cn(role):
+        items += _kiem_tra_health_check()
 
     # Nợ khoanh sắp hết hạn
     khoanh_data = _get_khoanh_alert_data(df_full)

@@ -513,3 +513,70 @@ def xuat_excel_tqpgd(df: pd.DataFrame, ten_file: str) -> bytes:
         ws.freeze_panes = "B2"
 
     return buf.getvalue()
+
+
+def tinh_card_pgd(
+    df: pd.DataFrame,
+    *,
+    cot_pgd: str,
+    cot_tdn: str,
+    cot_dqh: str,
+    cot_ma_kh: str,
+    cot_so_ku: str,
+    cot_ngay_dh: str,
+    ds_don_vi: list[str],
+) -> pd.DataFrame:
+    """Tính chỉ số tóm tắt cho từng PGD (dùng cho tab card 22 PGD).
+
+    Trả về DataFrame gồm:
+      ten_pgd, du_no, nqh, ty_le_nqh, so_kh, so_mon, no_den_han_thang
+    Các PGD không có dữ liệu vẫn xuất hiện với giá trị 0.
+    """
+    import datetime as _dt
+
+    for c in [cot_tdn, cot_dqh]:
+        if c in df.columns:
+            df = df.copy()
+            break
+    for c in [cot_tdn, cot_dqh]:
+        if c in df.columns:
+            df[c] = pd.to_numeric(df[c], errors="coerce").fillna(0)
+
+    df_pgd = (
+        df.groupby(cot_pgd, as_index=False)
+        .agg(
+            du_no=(cot_tdn, "sum"),
+            nqh=(cot_dqh, "sum"),
+            so_kh=(cot_ma_kh, "nunique"),
+            so_mon=(cot_so_ku, "nunique"),
+        )
+    )
+
+    # Đến hạn trong tháng này
+    today = _dt.date.today()
+    first_of_month = today.replace(day=1)
+    last_of_month = (today.replace(day=28) + _dt.timedelta(days=4)).replace(day=1) - _dt.timedelta(days=1)
+
+    if cot_ngay_dh in df.columns:
+        ngay_dh = pd.to_datetime(df[cot_ngay_dh], dayfirst=True, errors="coerce")
+        mask_thang = (ngay_dh.dt.date >= first_of_month) & (ngay_dh.dt.date <= last_of_month)
+        df_dh = (
+            df.loc[mask_thang].groupby(cot_pgd, as_index=False)[cot_tdn]
+            .sum()
+            .rename(columns={cot_tdn: "no_den_han_thang"})
+        )
+        df_pgd = df_pgd.merge(df_dh, on=cot_pgd, how="left")
+    else:
+        df_pgd["no_den_han_thang"] = 0.0
+
+    df_pgd["no_den_han_thang"] = pd.to_numeric(df_pgd.get("no_den_han_thang", 0), errors="coerce").fillna(0)
+    df_pgd["ty_le_nqh"] = (df_pgd["nqh"] / df_pgd["du_no"] * 100).where(df_pgd["du_no"] > 0, 0).round(2)
+
+    # Đảm bảo tất cả đơn vị trong ds_don_vi đều có row (điền 0 nếu không có dữ liệu)
+    df_base = pd.DataFrame({"ten_pgd": ds_don_vi})
+    df_pgd = df_pgd.rename(columns={cot_pgd: "ten_pgd"})
+    df_pgd = df_base.merge(df_pgd, on="ten_pgd", how="left").fillna(0)
+    for c in ["so_kh", "so_mon"]:
+        df_pgd[c] = df_pgd[c].astype(int)
+
+    return df_pgd.reset_index(drop=True)

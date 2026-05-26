@@ -1,5 +1,16 @@
 # CHANGELOG
 
+## [2026-05-26] — XLRR: archive 2 file cũ + fix GOM tháng + bổ sung 13/14 XLN
+- `tabs/tab_no_rui_ro.py` — XÓA (đã archive tại `_archive/`; deprecated, không còn được import)
+- `tabs/tab_xlrr_tong_hop.py` — XÓA (đã archive tại `_archive/`; deprecated, không còn được import)
+- `tabs/tab_xu_ly_rui_ro.py` dòng 1-2 — sửa docstring: "5 sub-tabs" → "CN: 6 sub-tabs, PGD: 4 sub-tabs (đã archive)"
+- `tabs/tab_xu_ly_rui_ro.py` dòng ~961 — thêm `thang_cn` selectbox (bố cục 2 cột với `nam`)
+- `tabs/tab_xu_ly_rui_ro.py` dòng ~993 — fix bug: xóa vòng lặp 12 tháng khi gom PGD → dùng `thang_cn` trực tiếp
+- `tabs/tab_xu_ly_rui_ro.py` dòng ~1015,1060,1075 — thay 3 chỗ `thang_hien_tai = now.month` → `thang_cn` (GOM, Import Excel, Rà soát)
+- `tabs/tab_xu_ly_rui_ro.py` dòng ~1255 — **MỚI** section 13/XLN · 14/XLN (báo cáo sau hạch toán QĐ HĐQT): 4 nút grid 2×2, expander nhập QĐ HĐQT, xuất Word via `word_xln_service`
+- `tabs_tab_list.txt` — cập nhật `tab_xlrr_tong_hop.py` → `tab_xu_ly_rui_ro.py`
+- `tests/test_smoke_imports.py` — xóa `tab_no_rui_ro`, `tab_xlrr_tong_hop`; thêm `tab_xu_ly_rui_ro`
+
 ## [2026-05-26] — XLRR _subtab_gui_cn_pgd: fix UX thứ tự bước
 - `tabs/tab_xu_ly_rui_ro.py` dòng ~1384 — xóa heading "Bước 3" rỗng (không có nội dung giữa heading và bước tiếp theo); đổi số bước: Bước 4→Bước 3 (đánh dấu gửi CN), thêm heading "Xuất biểu mẫu từng hồ sơ" đúng chỗ trước form chọn hồ sơ
 

@@ -1,5 +1,8 @@
 # CHANGELOG
 
+## [2026-05-27] — Cải tiến Chay_VBSP_SCM.bat tự động setup trên máy mới
+- `Chay_VBSP_SCM.bat` — Nâng cấp script tự động: (1) tự tìm Python ở nhiều vị trí (LocalAppData, Program Files), (2) tự tạo venv nếu chưa có, (3) tự cài requirements.txt nếu thiếu, (4) hiển thị tiến trình 4 bước rõ ràng
+
 ## [2026-05-26] — Review + fix §2.4 Quản lý Công văn (3 bug)
 - `services/cong_van_service.py` dòng ~168 — **BUG FIX HIGH**: `ds_cv_sap_den_han()` lọc `ngay_ban_hanh` thay vì `ngay_nhan` → công văn quá hạn hiển thị sai; đổi sang raw query filter `ngay_nhan <= ?`
 - `tabs/tab_quan_ly_cong_van.py` dòng ~139,154 — **BUG FIX MEDIUM**: `.index()` crash `ValueError` nếu DB có loai/trang_thai ngoài enum → thêm guard fallback

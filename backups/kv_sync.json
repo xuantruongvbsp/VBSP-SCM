@@ -1,5 +1,5 @@
 {
-  "exported_at": "2026-05-26T12:19:55.536738",
+  "exported_at": "2026-05-26T18:10:08.568678",
   "version": 2,
   "tables": {
     "users": [],
@@ -95,9 +95,15 @@
         "updated_by": "admin"
       },
       {
+        "key": "health_check_result",
+        "value": "{\"ts\": \"2026-05-26T16:32:16.405877\", \"total\": 13, \"passed\": 12, \"failed\": 1, \"failed_labels\": [\"khtd_cn tồn tại\"], \"exit_code\": 1}",
+        "updated_at": "2026-05-26T16:32:16.406166",
+        "updated_by": "health_check"
+      },
+      {
         "key": "alert_read_ids",
         "value": "{\"ids\": []}",
-        "updated_at": "2026-05-26T12:19:54.113044",
+        "updated_at": "2026-05-26T18:10:08.236584",
         "updated_by": "admin"
       }
     ],

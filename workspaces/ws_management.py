@@ -762,6 +762,7 @@ def _build_all_items(role: str, username: str, **kwargs) -> list:
 
     ALL_ITEMS = [
         {"group": "Thông tin chung", "label": "📊 Thông tin chung", "icon": "info-circle", "fn": lambda: _get_tab("tab_tongquan").render(None, **kwargs)},
+        {"group": "Thông tin chung", "label": "🏢 Toàn cảnh 22 PGD", "icon": "grid", "fn": lambda: _get_tab("tab_pgd_cards").render(None, **kwargs)},
         {"group": "Phối hợp với PGD", "label": "📊 Quản lý Công việc & Nhiệm vụ", "icon": "layout", "fn": lambda: _get_tab("tab_quan_ly_cv").render(None, **kwargs)},
         {"group": "Phối hợp với PGD", "label": "🗂️ Nội bộ Phòng KH-NV", "icon": "users", "fn": lambda: _get_tab("tab_khnv_noi_bo").render(None, **kwargs)},
         {"group": "Phối hợp với PGD", "label": "📋 Giao & ĐC KHTD", "icon": "upload", "fn": lambda: _get_tab("tab_khtd_giao_dc").render(None, **kwargs)},

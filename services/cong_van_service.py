@@ -165,11 +165,19 @@ def ds_cv_theo_tag(tag: str, limit: int = 50) -> list[dict]:
 
 
 def ds_cv_sap_den_han(ngay_canh_bao: str | None = None) -> list[dict]:
-    """Công văn chưa xử lý đã nhận quá N ngày."""
+    """Công văn chưa xử lý đã NHẬN quá N ngày (lọc theo ngay_nhan, không phải ngay_ban_hanh)."""
     if ngay_canh_bao is None:
         from datetime import date, timedelta
         ngay_canh_bao = (date.today() - timedelta(days=7)).isoformat()
-    return tim_kiem_cv(trang_thai="chua_xu_ly", den_ngay=ngay_canh_bao, limit=50)
+    with db.get_conn() as conn:
+        rows = conn.execute(
+            """SELECT * FROM cong_van
+               WHERE trang_thai = 'chua_xu_ly' AND ngay_nhan <= ?
+               ORDER BY ngay_nhan ASC
+               LIMIT 50""",
+            (ngay_canh_bao,),
+        ).fetchall()
+    return [dict(r) for r in rows]
 
 
 def thong_ke_cv_theo_loai() -> pd.DataFrame:

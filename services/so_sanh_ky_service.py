@@ -7,6 +7,8 @@ from __future__ import annotations
 
 import pandas as pd
 
+import duckdb
+
 from config import (
     COT_DU_NO_KHOANH,
     COT_DU_NO_QH,
@@ -58,10 +60,50 @@ def agg_mot_pgd(df: pd.DataFrame) -> dict[str, float | int]:
 
 @st.cache_data(ttl=300, show_spinner=False)
 def agg_theo_pgd(df: pd.DataFrame) -> pd.DataFrame:
-    """Tổng hợp chỉ tiêu theo từng PGD, thêm hàng tổng."""
+    """Tổng hợp chỉ tiêu theo từng PGD, thêm hàng tổng — dùng DuckDB SQL."""
     if df is None or df.empty or COT_TEN_PGD not in df.columns:
         return pd.DataFrame()
-    
+
+    col_gn = next((c for c in HSTD_DS_CHO_VAY_NAM_ALIASES if c in df.columns), None)
+
+    # Xây dựng câu SQL động dựa trên các cột có sẵn
+    cols_sql = [f'"{COT_TEN_PGD}"']
+    aggs = [
+        f'COALESCE(SUM(CAST("{COT_TONG_DU_NO}" AS DOUBLE)), 0) AS tong_du_no',
+        f'COALESCE(SUM(CAST("{COT_DU_NO_TH}" AS DOUBLE)), 0) AS du_no_th',
+        f'COALESCE(SUM(CAST("{COT_DU_NO_QH}" AS DOUBLE)), 0) AS du_no_qh',
+        f'COUNT(DISTINCT "{COT_MA_KH}") AS so_ho',
+        f'COUNT(DISTINCT "{COT_SO_KU}") AS so_ku',
+    ]
+    if COT_DU_NO_KHOANH in df.columns:
+        aggs.append(f'COALESCE(SUM(CAST("{COT_DU_NO_KHOANH}" AS DOUBLE)), 0) AS du_no_khoanh')
+    if col_gn:
+        aggs.append(f'COALESCE(SUM(CAST("{col_gn}" AS DOUBLE)), 0) AS gn_nam')
+
+    sql = f'''
+        SELECT {", ".join(cols_sql + aggs)}
+        FROM df
+        GROUP BY "{COT_TEN_PGD}"
+        ORDER BY tong_du_no DESC
+    '''
+
+    try:
+        result = duckdb.sql(sql).to_df()
+    except Exception:
+        # Fallback về pandas nếu DuckDB lỗi
+        return _agg_theo_pgd_pandas(df, col_gn)
+
+    # Thêm hàng tổng
+    tong = {COT_TEN_PGD: "⬛ Tổng Chi nhánh"}
+    for col in result.columns:
+        if col != COT_TEN_PGD:
+            tong[col] = result[col].sum()
+    result = pd.concat([result, pd.DataFrame([tong])], ignore_index=True)
+    return result
+
+
+def _agg_theo_pgd_pandas(df: pd.DataFrame, col_gn: str | None) -> pd.DataFrame:
+    """Fallback pandas groupby khi DuckDB lỗi."""
     agg_spec: dict[str, tuple[str, str]] = {
         "tong_du_no": (COT_TONG_DU_NO, "sum"),
         "du_no_th":   (COT_DU_NO_TH, "sum"),
@@ -71,12 +113,10 @@ def agg_theo_pgd(df: pd.DataFrame) -> pd.DataFrame:
     }
     if COT_DU_NO_KHOANH in df.columns:
         agg_spec["du_no_khoanh"] = (COT_DU_NO_KHOANH, "sum")
-    col_gn = next((c for c in HSTD_DS_CHO_VAY_NAM_ALIASES if c in df.columns), None)
     if col_gn:
         agg_spec["gn_nam"] = (col_gn, "sum")
 
     df = df.copy()
-    # Normalize Categorical → object để tránh lỗi groupby/concat trên Categorical parquet
     if isinstance(df[COT_TEN_PGD].dtype, pd.CategoricalDtype):
         df[COT_TEN_PGD] = df[COT_TEN_PGD].astype(object)
     _num_cols = [c for c in [COT_TONG_DU_NO, COT_DU_NO_TH, COT_DU_NO_QH, COT_DU_NO_KHOANH, col_gn]
@@ -89,7 +129,6 @@ def agg_theo_pgd(df: pd.DataFrame) -> pd.DataFrame:
     except Exception:
         return pd.DataFrame()
 
-    # Đảm bảo cột PGD là object sau groupby
     if isinstance(result[COT_TEN_PGD].dtype, pd.CategoricalDtype):
         result[COT_TEN_PGD] = result[COT_TEN_PGD].astype(object)
 
@@ -103,10 +142,40 @@ def agg_theo_pgd(df: pd.DataFrame) -> pd.DataFrame:
 
 @st.cache_data(ttl=300, show_spinner=False)
 def agg_theo_dvut(df: pd.DataFrame) -> pd.DataFrame:
-    """Tổng hợp chỉ tiêu theo Hội đoàn thể (ĐVUT), thêm hàng tổng."""
+    """Tổng hợp chỉ tiêu theo Hội đoàn thể (ĐVUT), thêm hàng tổng — dùng DuckDB SQL."""
     if df is None or df.empty or COT_DVUT not in df.columns:
         return pd.DataFrame()
 
+    aggs = [
+        f'COALESCE(SUM(CAST("{COT_TONG_DU_NO}" AS DOUBLE)), 0) AS tong_du_no',
+        f'COALESCE(SUM(CAST("{COT_DU_NO_QH}" AS DOUBLE)), 0) AS du_no_qh',
+        f'COUNT(DISTINCT "{COT_MA_KH}") AS so_ho',
+        f'COUNT(DISTINCT "{COT_SO_KU}") AS so_ku',
+    ]
+    if COT_DU_NO_KHOANH in df.columns:
+        aggs.append(f'COALESCE(SUM(CAST("{COT_DU_NO_KHOANH}" AS DOUBLE)), 0) AS du_no_khoanh')
+
+    sql = f'''
+        SELECT "{COT_DVUT}", {", ".join(aggs)}
+        FROM df
+        GROUP BY "{COT_DVUT}"
+        ORDER BY tong_du_no DESC
+    '''
+
+    try:
+        result = duckdb.sql(sql).to_df()
+    except Exception:
+        return _agg_theo_dvut_pandas(df)
+
+    tong = {COT_DVUT: "⬛ Tổng"}
+    for col in result.columns:
+        if col != COT_DVUT:
+            tong[col] = result[col].sum()
+    return pd.concat([result, pd.DataFrame([tong])], ignore_index=True)
+
+
+def _agg_theo_dvut_pandas(df: pd.DataFrame) -> pd.DataFrame:
+    """Fallback pandas groupby khi DuckDB lỗi."""
     agg_spec: dict[str, tuple[str, str]] = {
         "tong_du_no": (COT_TONG_DU_NO, "sum"),
         "du_no_qh":   (COT_DU_NO_QH, "sum"),
@@ -136,12 +205,46 @@ def agg_theo_dvut(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def group_bien_dong(df: pd.DataFrame, dim: str) -> pd.DataFrame:
-    """Tổng hợp df theo dim: du_no, du_no_qh, so_ku, nqh_pct."""
+    """Tổng hợp df theo dim: du_no, du_no_qh, so_ku, nqh_pct — dùng DuckDB SQL."""
+    if dim not in df.columns:
+        return pd.DataFrame(columns=[dim, "du_no", "du_no_qh", "so_ku", "nqh_pct"])
+
+    # Xây dựng SQL động
+    has_tdn = COT_TONG_DU_NO in df.columns
+    aggs = [
+        f'COALESCE(SUM(CAST("{COT_DU_NO_QH}" AS DOUBLE)), 0) AS du_no_qh',
+        f'COUNT(DISTINCT "{COT_SO_KU}") AS so_ku',
+    ]
+    if has_tdn:
+        aggs.insert(0, f'COALESCE(SUM(CAST("{COT_TONG_DU_NO}" AS DOUBLE)), 0) AS du_no')
+
+    sql = f'''
+        SELECT "{dim}", {", ".join(aggs)}
+        FROM df
+        GROUP BY "{dim}"
+        ORDER BY du_no_qh DESC
+    '''
+
+    try:
+        g = duckdb.sql(sql).to_df()
+    except Exception:
+        return _group_bien_dong_pandas(df, dim)
+
+    if not has_tdn:
+        g["du_no"] = 0
+
+    for _c in ("du_no", "du_no_qh", "so_ku"):
+        if _c in g.columns:
+            g[_c] = pd.to_numeric(g[_c], errors="coerce").fillna(0)
+    g["nqh_pct"] = (g["du_no_qh"] / g["du_no"].replace(0, float("nan")) * 100).fillna(0)
+    return g
+
+
+def _group_bien_dong_pandas(df: pd.DataFrame, dim: str) -> pd.DataFrame:
+    """Fallback pandas groupby khi DuckDB lỗi."""
     if dim not in df.columns:
         return pd.DataFrame(columns=[dim, "du_no", "du_no_qh", "so_ku", "nqh_pct"])
     df = df.copy()
-    # Normalize Categorical → object để tránh lỗi "values should be unique if codes is not None"
-    # khi merge 2 kết quả groupby có CategoricalIndex với category list khác nhau
     if isinstance(df[dim].dtype, pd.CategoricalDtype):
         df[dim] = df[dim].astype(object)
     _src_num = [c for c in [COT_TONG_DU_NO, COT_DU_NO_QH] if c in df.columns]
@@ -151,7 +254,6 @@ def group_bien_dong(df: pd.DataFrame, dim: str) -> pd.DataFrame:
     if COT_TONG_DU_NO in df.columns:
         cols["du_no"] = (COT_TONG_DU_NO, "sum")
     g = df.groupby(dim, dropna=False).agg(**cols).reset_index()
-    # Đảm bảo cột dim là object sau groupby (groupby trên Categorical trả CategoricalIndex)
     if isinstance(g[dim].dtype, pd.CategoricalDtype):
         g[dim] = g[dim].astype(object)
     if "du_no" not in g.columns:

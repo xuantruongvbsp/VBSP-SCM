@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [2026-05-26] — Alert Center: fix bug + thêm 2 nguồn cảnh báo
+- `alert_center.py` — fix bug `~~text~~` trong `st.button()` (Streamlit không render markdown trong button label); dùng `st.caption()` cho alert đã đọc có jump_fn
+- `alert_center.py` — xóa dead code `render_badge_no_khoanh_sap_het_han()` (không còn được gọi từ đâu)
+- `alert_center.py` — thêm `_kiem_tra_nqh_cao()`: cảnh báo 🔴 khi NQH% > 3%, 🟠 khi > 1%
+- `alert_center.py` — thêm `_kiem_tra_no_den_han()`: cảnh báo số món/tổng tiền đến hạn trong 30 ngày
+- `ROADMAP.md` — đánh dấu Alert Center phân mức là Done
+
 ## [2026-05-26] — Kích hoạt v2 reports trong tab_baocao
 - `tabs/tab_baocao/__init__.py` — routing `"hstd"` và `"noruiro"` chuyển sang gọi `render_tong_hop_hstd_v2` / `render_no_rui_ro_v2`; xóa import component thừa không dùng trong module
 

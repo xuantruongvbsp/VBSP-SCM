@@ -989,18 +989,19 @@ def _subtab_tong_hop_cn(ctx: TabContext) -> None:
     pgd_summary = []
     for ten_pgd in DS_PGD:
         slug = pgd_slug(ten_pgd)
-        # Quét tất cả các tháng trong năm
+        # Gom tất cả các tháng trong năm cho PGD này
+        hs_gui_pgd: list = []
         for thang in range(1, 13):
             ds = LuuTruXLRR.doc_pgd(slug, nam, thang)
-            hs_gui = [hs for hs in ds if hs.da_gui_cn]
-            all_pgd_hs.extend(hs_gui)
-        if hs_gui:
+            hs_gui_pgd.extend(hs for hs in ds if hs.da_gui_cn)
+        all_pgd_hs.extend(hs_gui_pgd)
+        if hs_gui_pgd:
             pgd_summary.append({
                 "PGD": ten_pgd,
-                "Số HS đã gửi": len(hs_gui),
-                "Khoanh": sum(1 for hs in hs_gui if hs.is_khoanh),
-                "Xóa": sum(1 for hs in hs_gui if hs.is_xoa),
-                "Dư nợ (tr)": fmt_ty(sum(hs.tong_du_no for hs in hs_gui)),
+                "Số HS đã gửi": len(hs_gui_pgd),
+                "Khoanh": sum(1 for hs in hs_gui_pgd if hs.is_khoanh),
+                "Xóa": sum(1 for hs in hs_gui_pgd if hs.is_xoa),
+                "Dư nợ (tr)": fmt_ty(sum(hs.tong_du_no for hs in hs_gui_pgd)),
             })
 
     if pgd_summary:

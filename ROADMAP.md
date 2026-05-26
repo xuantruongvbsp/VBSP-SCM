@@ -1,6 +1,6 @@
 # ROADMAP — Lộ trình phát triển VBSP-SCM
 
-> Cập nhật: 2026-05-23
+> Cập nhật: 2026-05-26
 > Dự án: Hệ thống Quản trị Tín dụng Nội bộ — NHCSXH Chi nhánh Đồng Nai
 
 ---
@@ -61,9 +61,9 @@
 
 | Mục tiêu | Chi tiết | File liên quan | Ưu tiên |
 |---|---|---|---|
-| Dashboard "Ngày hôm nay" | Widget tổng hợp: dư nợ, NQH mới, khoản đến hạn tuần này; auto-highlight PGD biến động bất thường | `workspaces/ws_executive.py` | 🔴 Cao |
+| Dashboard "Ngày hôm nay" | Widget tổng hợp: dư nợ, NQH mới, khoản đến hạn tuần này; auto-highlight PGD biến động bất thường | `workspaces/ws_executive.py` | ✅ Done 2026-05-26 |
 | Alert Center phân mức | Nhóm cảnh báo 🔴/🟠/🟡, badge số lượng sidebar, trạng thái "đã đọc" vào kv_store | `alert_center.py` | ✅ Done 2026-05-26 |
-| Tab card 22 PGD | Mỗi PGD = 1 card: dư nợ, NQH%, đến hạn tháng này, trạng thái upload; click → drill-down | `tabs/tab_tongquan.py` hoặc tab mới | 🔴 Cao |
+| Tab card 22 PGD | Mỗi PGD = 1 card: dư nợ, NQH%, đến hạn tháng này, trạng thái upload; click → drill-down | `tabs/tab_pgd_cards.py` (tab mới) | ✅ Done 2026-05-26 |
 | Lưu cấu hình lọc | Lưu bộ lọc hay dùng (PGD + CT + ĐVUT) vào kv_store, load lại khi mở app | `components/filter_bar.py` + `db.py` | 🟠 TB |
 | Health check tự động | Schedule chạy 6:30 sáng, kiểm tra parquet/kv_store/số dòng, cảnh báo sidebar nếu lỗi | `health_check.py` | 🟠 TB |
 
@@ -188,3 +188,4 @@ Q3/2026                    Q4/2026                    2027
 |---|---|---|
 | 2026-05-23 | — | Khởi tạo phiên bản mới — 4 giai đoạn |
 | 2026-05-23 | — | Cập nhật hiện trạng (+4 mục), thêm mục 1.4 UX ngắn hạn, 2.3 Đến hạn nâng cao; loại 5 mục không khả thi |
+| 2026-05-26 | — | Hoàn thành 3/5 tính năng 1.4: Tab card 22 PGD, Alert Center phân mức, Dashboard Hôm nay BGĐ |

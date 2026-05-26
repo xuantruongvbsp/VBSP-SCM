@@ -808,6 +808,119 @@ def render_giam_sat_khac_phuc(dot_id: int, username: str, readonly: bool = False
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# BÁO CÁO TỔNG HỢP KTNB (ROADMAP §2.5)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def tong_hop_ktnb_theo_nam(nam: int | None = None) -> dict:
+    """Tổng hợp kết quả kiểm toán theo năm."""
+    if nam is None:
+        nam = datetime.now().year
+
+    with db.get_conn() as conn:
+        dots = pd.read_sql_query(
+            """SELECT id, ten_dot, ngay_bat_dau, ngay_ket_thuc
+               FROM ktnb_dot_kiem_tra
+               WHERE CAST(substr(ngay_bat_dau, 1, 4) AS INTEGER) = ?
+               ORDER BY ngay_bat_dau""",
+            conn, params=(nam,),
+        )
+
+    if dots.empty:
+        return {"nam": nam, "so_dot": 0, "tong_loi": 0, "da_kp": 0, "ds_dot": []}
+
+    tong_loi = 0
+    da_kp = 0
+    ds_dot = []
+
+    for _, dot in dots.iterrows():
+        dot_id = int(dot["id"])
+        df_loi = lay_danh_sach_loi(dot_id)
+        so_loi = len(df_loi)
+        so_da_kp = len(df_loi[df_loi["trang_thai"] == "da_khac_phuc"]) if not df_loi.empty else 0
+        tong_loi += so_loi
+        da_kp += so_da_kp
+        ds_dot.append({
+            "id": dot_id,
+            "ten_dot": dot["ten_dot"],
+            "ngay_bat_dau": dot["ngay_bat_dau"],
+            "ngay_ket_thuc": dot["ngay_ket_thuc"],
+            "so_loi": so_loi,
+            "da_khac_phuc": so_da_kp,
+        })
+
+    return {
+        "nam": nam,
+        "so_dot": len(dots),
+        "tong_loi": tong_loi,
+        "da_kp": da_kp,
+        "ty_le_kp": round(da_kp / tong_loi * 100, 1) if tong_loi > 0 else 0,
+        "ds_dot": ds_dot,
+    }
+
+
+def tong_hop_ktnb_theo_khoi(nam: int | None = None) -> pd.DataFrame:
+    """Tổng hợp lỗi KTNB theo khối nghiệp vụ trong năm."""
+    if nam is None:
+        nam = datetime.now().year
+
+    with db.get_conn() as conn:
+        df = pd.read_sql_query(
+            """
+            SELECT c.khoi_nghiep_vu, c.muc_do, COUNT(*) as so_loi,
+                   SUM(CASE WHEN l.trang_thai = 'da_khac_phuc' THEN 1 ELSE 0 END) as da_kp
+            FROM ktnb_ket_qua_loi l
+            JOIN ktnb_danh_muc_loi_chuan c ON l.ma_loi = c.ma_loi
+            JOIN ktnb_dot_kiem_tra d ON l.dot_id = d.id
+            WHERE CAST(substr(d.ngay_bat_dau, 1, 4) AS INTEGER) = ?
+            GROUP BY c.khoi_nghiep_vu, c.muc_do
+            ORDER BY so_loi DESC
+            """, conn, params=(nam,),
+        )
+    return df
+
+
+def xuat_bao_cao_ktnb_excel(nam: int | None = None) -> bytes:
+    """Xuất báo cáo KTNB tổng hợp ra Excel."""
+    from utils import xuat_excel
+
+    nam = nam or datetime.now().year
+    tong_hop = tong_hop_ktnb_theo_nam(nam)
+
+    rows = []
+    for dot in tong_hop["ds_dot"]:
+        rows.append({
+            "Đợt": dot["ten_dot"],
+            "Từ ngày": dot["ngay_bat_dau"][:10] if dot["ngay_bat_dau"] else "",
+            "Đến ngày": dot["ngay_ket_thuc"][:10] if dot["ngay_ket_thuc"] else "",
+            "Số lỗi": dot["so_loi"],
+            "Đã khắc phục": dot["da_khac_phuc"],
+            "Tỷ lệ KP": round(dot["da_khac_phuc"] / dot["so_loi"] * 100, 1) if dot["so_loi"] > 0 else 0,
+        })
+
+    df_dot = pd.DataFrame(rows)
+    df_khoi = tong_hop_ktnb_theo_khoi(nam)
+
+    summary_rows = [{
+        "Chỉ tiêu": "Tổng số đợt", "Giá trị": tong_hop["so_dot"],
+    }, {
+        "Chỉ tiêu": "Tổng số lỗi", "Giá trị": tong_hop["tong_loi"],
+    }, {
+        "Chỉ tiêu": "Đã khắc phục", "Giá trị": tong_hop["da_kp"],
+    }, {
+        "Chỉ tiêu": "Tỷ lệ khắc phục", "Giá trị": f"{tong_hop['ty_le_kp']}%",
+    }]
+
+    df_summary = pd.DataFrame(summary_rows)
+
+    sheets = {
+        "Tổng quan": df_summary,
+        "Chi tiết theo đợt": df_dot,
+        "Theo khối NV": df_khoi,
+    }
+    return xuat_excel(sheets)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # MAIN RENDER FUNCTION
 # ═══════════════════════════════════════════════════════════════════════════════
 

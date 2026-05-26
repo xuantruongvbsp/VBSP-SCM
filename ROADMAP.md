@@ -111,7 +111,7 @@
 | Mục tiêu | Chi tiết | File liên quan | Ưu tiên |
 |---|---|---|---|
 | So sánh đến hạn cùng kỳ năm trước | Tháng N/2025 vs N/2026 — phát hiện PGD tăng đột biến | `services/den_han_compare_service.py` | ✅ Done 2026-05-26 |
-| Thông báo đến hạn Word/PDF | Từ danh sách khoản đến hạn → thư thông báo cho từng KH | `services/` + `templates/` | 🟠 TB |
+| Thông báo đến hạn Word/PDF | Từ danh sách khoản đến hạn → thư thông báo cho từng KH | `services/den_han_notice_service.py` | ✅ Done 2026-05-26 |
 | Phân tích Tổ TK&VV | Tổ có nhiều khoản đến hạn nhất, tổ có NQH > 0 | `tabs/tab_den_han.py` | 🟡 Thấp |
 
 ### 2.4 Quản lý Công văn — hoàn thiện
@@ -131,7 +131,7 @@
 
 | Mục tiêu | Chi tiết | File liên quan | Ưu tiên |
 |---|---|---|---|
-| Báo cáo KTNB tổng hợp | Tổng hợp kết quả kiểm toán theo đoàn, theo năm; tỷ lệ lỗi theo loại | `services/ktnb_service.py` | 🔴 Cao |
+| Báo cáo KTNB tổng hợp | Tổng hợp kết quả kiểm toán theo đoàn, theo năm; tỷ lệ lỗi theo loại | `services/ktnb_service.py` | ✅ Done 2026-05-26 |
 | Xuất biên bản PDF | Biên bản kiểm toán đúng mẫu Ngân hàng Chính sách, ký số | `services/ktnb_service.py` + `templates/` | 🟠 TB |
 | Theo dõi khắc phục lỗi | Dashboard tiến độ sửa lỗi sau kiểm toán theo PGD | `services/ktnb_service.py` | 🟠 TB |
 | Lịch sử kiểm toán | Timeline cuộc kiểm toán nhiều năm; xu hướng cải thiện | `db.py` + `tabs/` | 🟡 Thấp |
@@ -242,5 +242,6 @@ Q3/2026                    Q4/2026                    2027
 | 2026-05-26 | — | ✅ Hoàn thành §1.3 Health check: check DB, kv_store, parquet, PGD uploads, audit log, alert sidebar |
 | 2026-05-26 | — | ✅ Hoàn thành §1.4: Lưu cấu hình lọc (filter_bar preset save/load/auto-load vào kv_store) |
 | 2026-05-26 | — | ✅ Hoàn thành ROADMAP §1.2: DuckDB aggregates (4 hàm mới trong data/core.py), cache TTL, DuckDB cho _export.py |
+| 2026-05-26 | — | ✅ §2.3 Thông báo đến hạn Word (den_han_notice_service.py) + §2.5 Báo cáo KTNB tổng hợp (tong_hop_ktnb_theo_nam/khoi, xuat Excel) |
 | 2026-05-26 | — | Hoàn thành 3/5 tính năng 1.4: Tab card 22 PGD, Alert Center phân mức, Dashboard Hôm nay BGĐ |
 | 2026-05-26 | — | Đồng bộ hiện trạng: bổ sung 9 mục đã hoàn thành (KTNB, Xây dựng KHTD, CBTD Dashboard, Phối hợp PGD, Quản lý CV, Báo cáo v2, Dark Mode, TabContext, Cold start); nâng KPI test ≥80%; thêm §2.4–2.6 (Quản lý CV, KTNB P2, KHTD Approval); health check lên 🔴 Cao |

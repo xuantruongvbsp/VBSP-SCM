@@ -8,8 +8,12 @@ from datetime import datetime, date
 import os
 
 import pandas as pd
+import pyarrow.parquet as pq
 
 from data.core import _duckdb_query
+from logger import get_logger
+
+logger = get_logger(__name__)
 from config import (
     CACHE_HSTD,
     COT_TEN_PGD, COT_SO_KU, COT_MA_KH, COT_TONG_DU_NO,
@@ -51,8 +55,13 @@ def so_sanh_den_han_cung_ky(
         else:
             cutoff_ht = date(cutoff_ht.year, cutoff_ht.month + 1, 1)
 
-    schema = pd.read_parquet(parquet_path, engine='pyarrow').columns.tolist()
-    if COT_NGAY_DH not in schema:
+    # Đọc schema nhẹ (không load data) — pq.read_schema() chỉ đọc metadata
+    try:
+        schema_fields = [f.name for f in pq.read_schema(parquet_path)]
+    except Exception as e:
+        logger.error("so_sanh_den_han_cung_ky: đọc schema parquet lỗi — %s", e, exc_info=True)
+        return None
+    if COT_NGAY_DH not in schema_fields:
         return None
 
     sql_ht = f"""
@@ -63,11 +72,15 @@ def so_sanh_den_han_cung_ky(
         FROM read_parquet(?)
         WHERE "{COT_NGAY_DH}" IS NOT NULL
           AND "{COT_TONG_DU_NO}" > 0
-          AND "{COT_NGAY_DH}" >= CURRENT_DATE
-          AND "{COT_NGAY_DH}" < '{cutoff_ht.isoformat()}'
+          AND TRY_CAST("{COT_NGAY_DH}" AS DATE) >= CURRENT_DATE
+          AND TRY_CAST("{COT_NGAY_DH}" AS DATE) < '{cutoff_ht.isoformat()}'
         GROUP BY "{COT_TEN_PGD}"
     """
-    df_ht = _duckdb_query(sql_ht, [str(parquet_path)])
+    try:
+        df_ht = _duckdb_query(sql_ht, [str(parquet_path)])
+    except Exception as e:
+        logger.error("so_sanh_den_han_cung_ky: DuckDB query lỗi — %s", e, exc_info=True)
+        return None
 
     df_bl = doc_baseline_merged(nam_truoc)
     if df_bl is None or df_bl.empty:

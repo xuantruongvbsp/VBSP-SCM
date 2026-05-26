@@ -911,7 +911,7 @@ def _migration_matrix_section(df_full: pd.DataFrame, username: str) -> None:
         return f"background-color:rgb({r},{g},200);color:{'#fff' if ti_le > 0.5 else '#333'}"
 
     st.dataframe(
-        matrix.style.applymap(_mau_nen).format("{:.0f}"),
+        matrix.style.map(_mau_nen).format("{:.0f}"),
         use_container_width=True,
     )
     st.caption(

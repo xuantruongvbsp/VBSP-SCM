@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## [2026-05-26] — §2.3 Thông báo đến hạn Word + §2.5 Báo cáo KTNB tổng hợp
+- `services/den_han_notice_service.py` — **MỚI** — `tao_thu_nhac_no()`: tạo thư nhắc nợ Word cho 1 KH; `lay_ds_den_han()`: DuckDB lấy DS khoản vay đến hạn trong N ngày; `tao_thu_hang_loat()`: batch tạo thư cho nhiều KH
+- `services/ktnb_service.py` dòng ~812 — **MỚI** 3 hàm: `tong_hop_ktnb_theo_nam()` (KPI + ds đợt), `tong_hop_ktnb_theo_khoi()` (theo khối NV), `xuat_bao_cao_ktnb_excel()` (xuất Excel 3 sheet)
+
 ## [2026-05-26] — Tab card 22 PGD: redesign + fix applymap pandas 3.0
 - `tabs/tab_pgd_cards.py` dòng ~416 — **BUG FIX**: thay `Styler.applymap()` → `.map()` (pandas 3.0 đã xóa applymap — crash AttributeError khi render bảng xếp hạng)
 - `tabs/tab_pgd_cards.py` — **REDESIGN**: card gradient dark, 5 KPI metrics (thêm BQ/hộ), Plotly combo chart dư nợ+NQH%+BQ/hộ, bar chart xếp hạng BQ/hộ, bảng color-coded Styler, sort option "BQ/hộ (giảm)", rank badge #N trên card

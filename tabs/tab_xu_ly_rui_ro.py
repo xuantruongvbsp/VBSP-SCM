@@ -1,5 +1,5 @@
-"""Tab Xử lý Rủi ro (XLRR) — 5 sub-tabs: Lập hồ sơ PGD, Lập hồ sơ CN, Theo dõi QĐ62, Tổng hợp CN, Báo cáo.
-Tích hợp: tab_no_rui_ro.py + tab_qd62.py + tab_xlrr_tong_hop.py
+"""Tab Xử lý Rủi ro (XLRR) — CN: 6 sub-tabs, PGD: 4 sub-tabs.
+Tích hợp: tab_no_rui_ro.py + tab_qd62.py + tab_xlrr_tong_hop.py (đã archive)
 """
 from __future__ import annotations
 
@@ -961,7 +961,11 @@ def _subtab_tong_hop_cn(ctx: TabContext) -> None:
     from collections import defaultdict
 
     now = datetime.now()
-    nam = st.number_input("Năm", min_value=2020, max_value=2030, value=now.year, key="xlrr_th_nam")
+    col_nam, col_thang = st.columns(2)
+    with col_nam:
+        nam = st.number_input("Năm", min_value=2020, max_value=2030, value=now.year, key="xlrr_th_nam")
+    with col_thang:
+        thang_cn = st.selectbox("Tháng lưu CN", list(range(1, 13)), index=now.month - 1, key="xlrr_th_thang")
 
     # ── Chọn đợt XLRR ────────────────────────────────────────────────────
     ds_dot = LuuTruDotXLRR.doc_ds(nam, "cn")
@@ -989,11 +993,9 @@ def _subtab_tong_hop_cn(ctx: TabContext) -> None:
     pgd_summary = []
     for ten_pgd in DS_PGD:
         slug = pgd_slug(ten_pgd)
-        # Gom tất cả các tháng trong năm cho PGD này
         hs_gui_pgd: list = []
-        for thang in range(1, 13):
-            ds = LuuTruXLRR.doc_pgd(slug, nam, thang)
-            hs_gui_pgd.extend(hs for hs in ds if hs.da_gui_cn)
+        ds = LuuTruXLRR.doc_pgd(slug, nam, thang_cn)
+        hs_gui_pgd.extend(hs for hs in ds if hs.da_gui_cn)
         all_pgd_hs.extend(hs_gui_pgd)
         if hs_gui_pgd:
             pgd_summary.append({
@@ -1010,9 +1012,7 @@ def _subtab_tong_hop_cn(ctx: TabContext) -> None:
         col_gom, _ = st.columns([1, 3])
         with col_gom:
             if st.button("🔄 GOM vào CN", type="primary", use_container_width=True, key="xlrr_th_gom"):
-                # Merge all PGD HS into CN storage for the current month
-                thang_hien_tai = now.month
-                LuuTruXLRR.luu_cn(all_pgd_hs, nam, thang_hien_tai, ctx.username)
+                LuuTruXLRR.luu_cn(all_pgd_hs, nam, thang_cn, ctx.username)
                 st.success(f"✅ Đã gom {len(all_pgd_hs)} hồ sơ từ {len(pgd_summary)} PGD vào CN!")
                 db.ghi_audit(ctx.username, "xlrr_gom_cn", f"Đợt {dot.id}: {len(all_pgd_hs)} HS từ {len(pgd_summary)} PGD")
                 st.cache_data.clear()
@@ -1058,12 +1058,11 @@ def _subtab_tong_hop_cn(ctx: TabContext) -> None:
             st.dataframe(preview_df, use_container_width=True, hide_index=True)
 
             if st.button("💾 Merge file Excel vào CN", type="primary", use_container_width=True, key="xlrr_th_merge_import"):
-                thang_hien_tai = now.month
-                ds_cn = LuuTruXLRR.doc_cn(nam, thang_hien_tai)
+                ds_cn = LuuTruXLRR.doc_cn(nam, thang_cn)
                 cn_dict = {hs.id: hs for hs in ds_cn}
                 for hs in ds_import:
                     cn_dict[hs.id] = hs
-                LuuTruXLRR.luu_cn(list(cn_dict.values()), nam, thang_hien_tai, ctx.username)
+                LuuTruXLRR.luu_cn(list(cn_dict.values()), nam, thang_cn, ctx.username)
                 st.success(f"✅ Đã merge {len(ds_import)} hồ sơ từ Excel vào CN!")
                 db.ghi_audit(ctx.username, "xlrr_import_cn", f"{len(ds_import)} HS từ Excel")
                 st.cache_data.clear()
@@ -1073,8 +1072,7 @@ def _subtab_tong_hop_cn(ctx: TabContext) -> None:
     st.markdown("---")
     st.markdown("#### ✅ Bước 3: Rà soát danh sách gửi TW")
 
-    thang_hien_tai = now.month
-    ds_cn_all = LuuTruXLRR.doc_cn(nam, thang_hien_tai)
+    ds_cn_all = LuuTruXLRR.doc_cn(nam, thang_cn)
 
     if not ds_cn_all:
         st.info("Chưa có hồ sơ nào trong CN. Thực hiện Bước 1 hoặc Bước 2 trước.")
@@ -1256,6 +1254,143 @@ def _subtab_tong_hop_cn(ctx: TabContext) -> None:
                 except Exception as e:
                     logger.error("xuat_to_trinh_cn: %s", e, exc_info=True)
                     st.error(f"❌ Lỗi xuất Tờ trình CN: {e}")
+
+        # ── 13/XLN · 14/XLN — Báo cáo sau hạch toán ────────────────────
+        st.markdown("---")
+        st.markdown("#### 📊 Báo cáo sau hạch toán (13/XLN · 14/XLN)")
+        st.caption("Xuất sau khi có Quyết định của Hội đồng quản trị NHCSXH.")
+
+        ds_kh_tw_13 = [hs for hs in ds_chon if hs.bien_phap == BIEN_PHAP_KHOANH and hs.nguon_von == NGUON_TW]
+        ds_kh_dp_13 = [hs for hs in ds_chon if hs.bien_phap == BIEN_PHAP_KHOANH and hs.nguon_von == NGUON_DP]
+        ds_xo_tw_13 = [hs for hs in ds_chon if hs.bien_phap == BIEN_PHAP_XOA and hs.nguon_von == NGUON_TW]
+        ds_xo_dp_13 = [hs for hs in ds_chon if hs.bien_phap == BIEN_PHAP_XOA and hs.nguon_von == NGUON_DP]
+
+        with st.expander("⚙️ Thông tin Quyết định HĐQT", expanded=False):
+            col_qd1, col_qd2, col_qd3, col_qd4 = st.columns(4)
+            with col_qd1:
+                so_qd_13 = st.text_input("Số QĐ HĐQT", placeholder="123/QĐ-HĐQT", key="xlrr_13_so_qd")
+            with col_qd2:
+                ngay_qd_13 = st.date_input("Ngày ký QĐ", value=date.today(), format="DD/MM/YYYY", key="xlrr_13_ngay_qd")
+            with col_qd3:
+                ngay_bd_13 = st.date_input("Từ ngày", value=date.today(), format="DD/MM/YYYY", key="xlrr_13_ngay_bd")
+            with col_qd4:
+                ngay_kt_13 = st.date_input("Đến ngày", value=date.today(), format="DD/MM/YYYY", key="xlrr_13_ngay_kt")
+
+        from services.rui_ro_aggregation import _tong_hop_no
+        from services.word_xln_service import _tao_word_13xln, _tao_word_14xln
+
+        col13_tw, col13_dp, col14_tw, col14_dp = st.columns(4)
+
+        def _to_dict_list(hs_list: list) -> list:
+            return [hs.to_dict() for hs in hs_list]
+
+        with col13_tw:
+            if st.button("📥 13/XLN\nTW", use_container_width=True, key="xlrr_13_tw_btn"):
+                if not ds_kh_tw_13:
+                    st.warning("⚠️ Không có hồ sơ khoanh nợ TW.")
+                elif not so_qd_13.strip():
+                    st.error("⚠️ Vui lòng nhập Số QĐ HĐQT.")
+                else:
+                    try:
+                        tong_hop = _tong_hop_no(_to_dict_list(ds_kh_tw_13))
+                        file_bytes = _tao_word_13xln(
+                            tong_hop, TEN_CHI_NHANH_HIEN_THI, LABEL_TW,
+                            so_qd_13.strip(), ngay_qd_13, ngay_bd_13, ngay_kt_13,
+                        )
+                        st.download_button(
+                            label="⬇️ Tải 13/XLN TW (.docx)",
+                            data=file_bytes,
+                            file_name=f"13XLN_TW_CN_Dot{dot.id}.docx",
+                            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                            use_container_width=True,
+                            key="dl_13xln_tw",
+                        )
+                        db.ghi_audit(ctx.username, "xuat_13xln_tw", f"{len(ds_kh_tw_13)} HS - Đợt {dot.id}")
+                        st.success(f"✅ Đã xuất 13/XLN TW ({len(ds_kh_tw_13)} hồ sơ)")
+                    except Exception as e:
+                        logger.error("xuat_13xln_tw: %s", e, exc_info=True)
+                        st.error(f"❌ Lỗi xuất 13/XLN TW: {e}")
+
+        with col13_dp:
+            if st.button("📥 13/XLN\nĐP", use_container_width=True, key="xlrr_13_dp_btn"):
+                if not ds_kh_dp_13:
+                    st.warning("⚠️ Không có hồ sơ khoanh nợ ĐP.")
+                elif not so_qd_13.strip():
+                    st.error("⚠️ Vui lòng nhập Số QĐ HĐQT.")
+                else:
+                    try:
+                        tong_hop = _tong_hop_no(_to_dict_list(ds_kh_dp_13))
+                        file_bytes = _tao_word_13xln(
+                            tong_hop, TEN_CHI_NHANH_HIEN_THI, LABEL_DP,
+                            so_qd_13.strip(), ngay_qd_13, ngay_bd_13, ngay_kt_13,
+                        )
+                        st.download_button(
+                            label="⬇️ Tải 13/XLN ĐP (.docx)",
+                            data=file_bytes,
+                            file_name=f"13XLN_DP_CN_Dot{dot.id}.docx",
+                            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                            use_container_width=True,
+                            key="dl_13xln_dp",
+                        )
+                        db.ghi_audit(ctx.username, "xuat_13xln_dp", f"{len(ds_kh_dp_13)} HS - Đợt {dot.id}")
+                        st.success(f"✅ Đã xuất 13/XLN ĐP ({len(ds_kh_dp_13)} hồ sơ)")
+                    except Exception as e:
+                        logger.error("xuat_13xln_dp: %s", e, exc_info=True)
+                        st.error(f"❌ Lỗi xuất 13/XLN ĐP: {e}")
+
+        with col14_tw:
+            if st.button("📥 14/XLN\nTW", use_container_width=True, key="xlrr_14_tw_btn"):
+                if not ds_xo_tw_13:
+                    st.warning("⚠️ Không có hồ sơ xóa nợ TW.")
+                elif not so_qd_13.strip():
+                    st.error("⚠️ Vui lòng nhập Số QĐ HĐQT.")
+                else:
+                    try:
+                        tong_hop = _tong_hop_no(_to_dict_list(ds_xo_tw_13))
+                        file_bytes = _tao_word_14xln(
+                            tong_hop, TEN_CHI_NHANH_HIEN_THI, LABEL_TW,
+                            so_qd_13.strip(), ngay_qd_13, ngay_bd_13, ngay_kt_13,
+                        )
+                        st.download_button(
+                            label="⬇️ Tải 14/XLN TW (.docx)",
+                            data=file_bytes,
+                            file_name=f"14XLN_TW_CN_Dot{dot.id}.docx",
+                            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                            use_container_width=True,
+                            key="dl_14xln_tw",
+                        )
+                        db.ghi_audit(ctx.username, "xuat_14xln_tw", f"{len(ds_xo_tw_13)} HS - Đợt {dot.id}")
+                        st.success(f"✅ Đã xuất 14/XLN TW ({len(ds_xo_tw_13)} hồ sơ)")
+                    except Exception as e:
+                        logger.error("xuat_14xln_tw: %s", e, exc_info=True)
+                        st.error(f"❌ Lỗi xuất 14/XLN TW: {e}")
+
+        with col14_dp:
+            if st.button("📥 14/XLN\nĐP", use_container_width=True, key="xlrr_14_dp_btn"):
+                if not ds_xo_dp_13:
+                    st.warning("⚠️ Không có hồ sơ xóa nợ ĐP.")
+                elif not so_qd_13.strip():
+                    st.error("⚠️ Vui lòng nhập Số QĐ HĐQT.")
+                else:
+                    try:
+                        tong_hop = _tong_hop_no(_to_dict_list(ds_xo_dp_13))
+                        file_bytes = _tao_word_14xln(
+                            tong_hop, TEN_CHI_NHANH_HIEN_THI, LABEL_DP,
+                            so_qd_13.strip(), ngay_qd_13, ngay_bd_13, ngay_kt_13,
+                        )
+                        st.download_button(
+                            label="⬇️ Tải 14/XLN ĐP (.docx)",
+                            data=file_bytes,
+                            file_name=f"14XLN_DP_CN_Dot{dot.id}.docx",
+                            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                            use_container_width=True,
+                            key="dl_14xln_dp",
+                        )
+                        db.ghi_audit(ctx.username, "xuat_14xln_dp", f"{len(ds_xo_dp_13)} HS - Đợt {dot.id}")
+                        st.success(f"✅ Đã xuất 14/XLN ĐP ({len(ds_xo_dp_13)} hồ sơ)")
+                    except Exception as e:
+                        logger.error("xuat_14xln_dp: %s", e, exc_info=True)
+                        st.error(f"❌ Lỗi xuất 14/XLN ĐP: {e}")
 
 
 # ══════════════════════════════════════════════════════════════════════════════

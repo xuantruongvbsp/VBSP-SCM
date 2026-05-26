@@ -56,7 +56,6 @@ TAB_MODULES: list[str] = [
     "tabs.tab_kiem_soat",
     "tabs.tab_nhiem_vu",
     "tabs.tab_no_khoanh",
-    "tabs.tab_no_rui_ro",
     "tabs.tab_nq11",
     "tabs.tab_phoi_hop_pgd",
     "tabs.tab_qd62",
@@ -74,7 +73,7 @@ TAB_MODULES: list[str] = [
     "tabs.tab_upload_khnv",
     "tabs.tab_upload_pgd",
     "tabs.tab_uy_thac",
-    "tabs.tab_xlrr_tong_hop",
+    "tabs.tab_xu_ly_rui_ro",
 ]
 
 WIDGET_MODULES: list[str] = [

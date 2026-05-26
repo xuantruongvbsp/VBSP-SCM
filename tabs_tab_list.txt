@@ -34,7 +34,7 @@ I. WORKSPACE ĐIỀU HÀNH (ws_management.py)
     (droplist: 📊 Tiến độ hoạt động)    (chưa có báo cáo)
     (droplist: 🎯 Kế hoạch — Thực hiện) (chưa có báo cáo)
     (droplist: 📁 Khác)                 (chưa có báo cáo)
-  tab_xlrr_tong_hop.py    Xử lý nợ rủi ro
+  tab_xu_ly_rui_ro.py     Xử lý nợ rủi ro (tích hợp: Lập HS + QĐ62 + Tổng hợp)
   tab_cbtd.py             Cán bộ tín dụng
   tab_hhi.py              Tập trung rủi ro & HHI
   tab_no_khoanh.py        📊 Tổng quan Nợ Khoanh          (accordion "Chuyên Đề Nợ Khoanh")

@@ -1,5 +1,8 @@
 # CHANGELOG
 
+## [2026-05-26] — XLRR _subtab_gui_cn_pgd: fix UX thứ tự bước
+- `tabs/tab_xu_ly_rui_ro.py` dòng ~1384 — xóa heading "Bước 3" rỗng (không có nội dung giữa heading và bước tiếp theo); đổi số bước: Bước 4→Bước 3 (đánh dấu gửi CN), thêm heading "Xuất biểu mẫu từng hồ sơ" đúng chỗ trước form chọn hồ sơ
+
 ## [2026-05-26] — XLRR tổng hợp CN: fix bug scope biến hs_gui
 - `tabs/tab_xu_ly_rui_ro.py` dòng ~988 — `hs_gui` trong `_subtab_tong_hop_cn` bị scope sai (giá trị của `thang=12` cuối cùng, không phải tổng năm); đổi sang `hs_gui_pgd` tích lũy qua toàn bộ vòng tháng trước khi dùng
 

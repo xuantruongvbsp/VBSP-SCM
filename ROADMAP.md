@@ -62,7 +62,7 @@
 | Mục tiêu | Chi tiết | File liên quan | Ưu tiên |
 |---|---|---|---|
 | Dashboard "Ngày hôm nay" | Widget tổng hợp: dư nợ, NQH mới, khoản đến hạn tuần này; auto-highlight PGD biến động bất thường | `workspaces/ws_executive.py` | 🔴 Cao |
-| Alert Center phân mức | Nhóm cảnh báo 🔴/🟠/🟡, badge số lượng sidebar, trạng thái "đã đọc" vào kv_store | `alert_center.py` | 🔴 Cao |
+| Alert Center phân mức | Nhóm cảnh báo 🔴/🟠/🟡, badge số lượng sidebar, trạng thái "đã đọc" vào kv_store | `alert_center.py` | ✅ Done 2026-05-26 |
 | Tab card 22 PGD | Mỗi PGD = 1 card: dư nợ, NQH%, đến hạn tháng này, trạng thái upload; click → drill-down | `tabs/tab_tongquan.py` hoặc tab mới | 🔴 Cao |
 | Lưu cấu hình lọc | Lưu bộ lọc hay dùng (PGD + CT + ĐVUT) vào kv_store, load lại khi mở app | `components/filter_bar.py` + `db.py` | 🟠 TB |
 | Health check tự động | Schedule chạy 6:30 sáng, kiểm tra parquet/kv_store/số dòng, cảnh báo sidebar nếu lỗi | `health_check.py` | 🟠 TB |

@@ -10,11 +10,6 @@ from .tree_navigation import render_tree_navigation, render_compact_navigation, 
 from .components.metric_cards import render_metric_cards
 from .components.data_source_indicator import render_data_source_status
 from .components.export_panel import render_export_panel
-from .components.skeleton_loader import render_skeleton_metrics, render_skeleton_table
-from .components.sticky_table import render_sticky_table
-from .components.inline_filter import render_combined_filter_search
-from .components.quick_export import render_quick_export_buttons
-from .components.alert_suggestion import render_combined_alerts_suggestions
 from .reports import (
     render_tong_hop_hstd,
     render_no_rui_ro,
@@ -73,9 +68,9 @@ def render(tab: "DeltaGenerator | None" = None, **kwargs) -> None:
         st.divider()
 
         if selected_report == "hstd":
-            render_tong_hop_hstd(tab=None, df=df, role=role, pgd_user=pgd_user, username=username)
+            render_tong_hop_hstd_v2(tab=None, df=df, role=role, pgd_user=pgd_user, username=username)
         elif selected_report == "noruiro":
-            render_no_rui_ro(tab=None, df=df, role=role, pgd_user=pgd_user, username=username)
+            render_no_rui_ro_v2(tab=None, df=df, role=role, pgd_user=pgd_user, username=username)
         elif selected_report == "nq11":
             render_nq11(tab=None, df_nq11=df_nq11, role=role, pgd_user=pgd_user, username=username)
         elif selected_report == "gqvl":

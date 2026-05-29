@@ -37,12 +37,16 @@ tabs/*.docx
 # File tạm
 tmp_*.txt
 *.bak
+*.log
 
 # IDE
 .vscode/
 .idea/
 .DS_Store
 Thumbs.db
+
+# Nested repo clone (do Trae tạo) — xóa thủ công khi đóng Trae
+VBSP-SCM/
 
 # Trae AI — chỉ ignore settings/cache, KHÔNG ignore rules
 .trae/settings/

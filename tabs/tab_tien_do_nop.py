@@ -142,16 +142,23 @@ def _render_tong_quan(df: pd.DataFrame, deadline_cfg: dict, is_cn: bool, pgd_use
 
     df = _gan_trang_thai(df, deadline_cfg)
 
-    dung_han = (df["tt"] == "dung_han").sum()
-    tre = (df["tt"] == "tre").sum()
-    da_nop = len(df)
+    # Deduplicate: mỗi cặp (PGD × Loại) chỉ tính 1 lần — lần nộp MỚI NHẤT
+    df_dedup = (
+        df.sort_values("thoi_gian")
+          .dropna(subset=["thoi_gian"])
+          .drop_duplicates(subset=["ten_pgd", "loai_bao_cao"], keep="last")
+    )
+
+    dung_han = (df_dedup["tt"] == "dung_han").sum()
+    tre      = (df_dedup["tt"] == "tre").sum()
+    da_nop   = len(df_dedup)
 
     c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Tổng lượt nộp", da_nop)
+    c1.metric("Đã nộp (đơn vị × loại)", da_nop)
     c2.metric("🟢 Đúng hạn", dung_han)
     c3.metric("🟡 Trễ hạn", tre)
-    tong_can = len(ds_pgd_scope) * len(ds_loai)
-    chua_nop = max(0, tong_can - da_nop)
+    tong_can  = len(ds_pgd_scope) * len(ds_loai)
+    chua_nop  = max(0, tong_can - da_nop)
     c4.metric("🔴 Chưa nộp", chua_nop)
 
     st.divider()
@@ -346,37 +353,64 @@ def _render_cai_dat(df: pd.DataFrame, deadline_cfg: dict, username: str) -> None
     st.markdown("**Cấu hình deadline cho từng loại báo cáo**")
     st.caption("Sau khi lưu, cột Trạng thái sẽ tự tính 🟢 Đúng hạn / 🟡 Trễ / 🔴 Chưa nộp.")
 
-    ds_loai = sorted(df["loai_bao_cao"].dropna().unique().tolist()) if not df.empty else []
+    # Gộp loại từ GSheet + loại đã có trong deadline_cfg
+    ds_loai_gsheet = sorted(df["loai_bao_cao"].dropna().unique().tolist()) if not df.empty else []
+    ds_loai_cfg    = sorted(deadline_cfg.keys())
+    ds_loai = sorted(set(ds_loai_gsheet) | set(ds_loai_cfg))
 
     if not ds_loai:
-        st.info("Chưa có dữ liệu từ Google Sheets để cấu hình deadline.")
+        st.info("Chưa có dữ liệu từ Google Sheets và chưa có deadline nào được cài đặt.")
         return
 
-    loai_chon = st.selectbox("Loại báo cáo", ds_loai, key="cd_loai")
+    # Hiển thị label kèm trạng thái đã có deadline chưa
+    def _label(loai: str) -> str:
+        return f"{loai}  ✅" if loai in deadline_cfg else loai
 
-    dl_hien = deadline_cfg.get(loai_chon)
+    loai_options = ds_loai
+    loai_labels  = [_label(l) for l in loai_options]
+    idx = st.selectbox(
+        "Chọn loại báo cáo",
+        range(len(loai_options)),
+        format_func=lambda i: loai_labels[i],
+        key="cd_loai",
+    )
+    loai_chon = loai_options[idx]
+
+    dl_hien   = deadline_cfg.get(loai_chon)
     dl_default = pd.to_datetime(dl_hien).date() if dl_hien else date.today()
 
-    dl_moi = st.date_input(
-        f"Deadline cho **{loai_chon}**",
-        value=dl_default, format="DD/MM/YYYY",
-        key="cd_dl_input",
-    )
-
-    if st.button("💾 Lưu deadline", key="cd_btn_luu", type="primary"):
-        cfg_moi = dict(deadline_cfg)
-        cfg_moi[loai_chon] = dl_moi.strftime("%Y-%m-%d")
-        _luu_deadline_config(cfg_moi, username)
-        st.success(f"✅ Đã lưu: **{loai_chon}** → deadline {dl_moi.strftime('%d/%m/%Y')}")
-        st.rerun()
+    col_input, col_btn, col_del = st.columns([3, 1, 1])
+    with col_input:
+        dl_moi = st.date_input(
+            f"Deadline — **{loai_chon}**",
+            value=dl_default, format="DD/MM/YYYY",
+            key="cd_dl_input",
+        )
+    with col_btn:
+        st.write("")  # spacing
+        if st.button("💾 Lưu", key="cd_btn_luu", type="primary", use_container_width=True):
+            cfg_moi = dict(deadline_cfg)
+            cfg_moi[loai_chon] = dl_moi.strftime("%Y-%m-%d")
+            _luu_deadline_config(cfg_moi, username)
+            st.success(f"✅ Đã lưu: **{loai_chon}** → {dl_moi.strftime('%d/%m/%Y')}")
+            st.rerun()
+    with col_del:
+        st.write("")  # spacing
+        if dl_hien:
+            if st.button("🗑 Xóa", key="cd_btn_xoa", use_container_width=True):
+                cfg_moi = dict(deadline_cfg)
+                cfg_moi.pop(loai_chon, None)
+                _luu_deadline_config(cfg_moi, username)
+                st.success(f"✅ Đã xóa deadline: **{loai_chon}**")
+                st.rerun()
 
     st.divider()
     st.markdown("**Danh sách deadline đã cài đặt**")
     rows = [{"Loại báo cáo": loai, "Deadline": dl}
-            for loai, dl in deadline_cfg.items()]
+            for loai, dl in sorted(deadline_cfg.items())]
     if rows:
         st.dataframe(
-            pd.DataFrame(rows).sort_values("Loại báo cáo"),
+            pd.DataFrame(rows),
             hide_index=True, use_container_width=True,
         )
     else:

@@ -1,7 +1,7 @@
 # CLAUDE.md — VBSP-SCM
 > Hướng dẫn dự án dành riêng cho **Claude Code** / Trae / Cline / Cursor.  
 > Đọc toàn bộ file này trước khi đọc bất kỳ file code nào.  
-> Cập nhật: 29/05/2026
+> Cập nhật: 30/05/2026
 
 ---
 
@@ -164,6 +164,7 @@ db.ghi_kv("key_name", value, username)
 | `kh_gqvl_pgd_{slug}_{nam}` | KH GQVL theo PGD (dự phòng) |
 | `khnv_phan_cong_list` | Phân công cán bộ nội bộ Phòng KH-NV |
 | `khnv_lich_list` | Lịch công tác Phòng KH-NV |
+| `bao_cao_deadline_config` | Deadline từng loại BC `{loai: "YYYY-MM-DD"}` — dùng trong `tab_tien_do_nop.py` |
 
 `slug` = `pgd_slug(ten_pgd)` từ `data/pgd.py`.
 
@@ -329,7 +330,7 @@ else:
 ### 5.9 CSS & UI
 
 - Inject CSS **một lần** trong `app.py` — không inject trong tab
-- Bảng ≥ 8 cột → HTML thuần + `st.markdown(unsafe_allow_html=True)`
+- Bảng ≥ 8 cột → HTML thuần + `st.html(html_str)` (Streamlit ≥1.36) hoặc `st.markdown(html_str, unsafe_allow_html=True)` (cũ hơn)
 - Màu sắc → xem `UI_GUIDELINES.md`
 - HTML: **KHÔNG** hardcode `color:black` / `background:white` — dùng CSS variable tương thích dark mode
 - `st.date_input` bắt buộc có `format="DD/MM/YYYY"`

@@ -520,6 +520,32 @@
 | **Nguyên nhân** | Chưa có `gqvl.parquet` (chưa upload/merge GQVL) hoặc thiếu cột nguồn vốn/PL NV/Mã NĐT |
 | **Fix** | Upload lại GQVL → merge → kiểm tra parquet có cột theo `config.GQVL_COT_MAP` |
 
+### H3 — `invalid_grant: Invalid JWT Signature` khi kết nối GSheet
+| | |
+|---|---|
+| **File** | `tabs/tab_tien_do_nop.py` → `_ket_noi_gsheet()` ~dòng 38 |
+| **Dấu hiệu** | UI báo: `Lỗi kết nối GSheet: ('invalid_grant: Invalid JWT Signature.', ...)` |
+| **Nguyên nhân** | (1) Service Account key bị Google tự động **Disable** vì phát hiện exposed trên public GitHub repo; (2) Windows Time Service (`w32time`) không chạy → đồng hồ sai lệch |
+| **Fix** | Xóa key cũ trên GCP Console → tạo key mới (JSON) → copy đè `credentials.json`. Đồng thời: `net start w32time && w32tm /resync /force`. Đã thêm bước đồng bộ thời gian vào `setup_env.bat` |
+| **Ngày fix** | 2026-05-29 |
+
+### H4 — Số cột Sheet không khớp COT (Google Form thêm cột mới)
+| | |
+|---|---|
+| **File** | `tabs/tab_tien_do_nop.py` → `_doc_du_lieu()` ~dòng 67 |
+| **Dấu hiệu** | `8 columns passed, passed data had 9 columns` |
+| **Nguyên nhân** | Google Form thêm cột phụ (ví dụ "Cột 8" trống) → `data[1:]` có 9 cột nhưng `COT` chỉ có 8 |
+| **Fix** | `df = pd.DataFrame([r[:len(COT)] for r in data[1:]], columns=COT)` — chỉ lấy N cột đầu, bỏ qua cột thừa |
+| **Ngày fix** | 2026-05-29 |
+
+### H5 — Loại bỏ "Kỳ báo cáo" khỏi Form/Sheet toàn bộ
+| | |
+|---|---|
+| **File** | `tabs/tab_tien_do_nop.py` — toàn file |
+| **Lý do** | Các loại báo cáo là sự kiện 1 lần (không lặp tháng/quý), không cần khái niệm "kỳ". PGD cũng muốn bỏ trường này khỏi Form. |
+| **Thay đổi** | COT 8→7 cột (bỏ `ky_bao_cao`); deadline `{loai: {ky: dl}}` → `{loai: dl}`; bỏ dropdown kỳ ở 3 tab; ma trận PGD × Loại × Kỳ → PGD × Loại |
+| **Ngày fix** | 2026-05-29 |
+
 ---
 
 ## I. Phân quyền / Role

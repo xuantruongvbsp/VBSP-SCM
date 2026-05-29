@@ -23,7 +23,7 @@ SHEET_ID = "15Ev2rTv6khLFaMpAiMwqJCVC_33ocJ-6cp016RGNkYk"
 SHEET_TAB = "TIENDO_BAOCAO"
 CREDENTIALS_FILE = "credentials.json"
 COT = ["thoi_gian", "email", "ten_pgd", "loai_bao_cao",
-       "noi_dung", "file_dinh_kem", "ho_ten"]
+       "ky_bao_cao", "noi_dung", "file_dinh_kem", "ho_ten"]
 
 DS_PGD_ALL = [DON_VI_CHI_NHANH] + DS_PGD
 
@@ -57,6 +57,16 @@ def _ket_noi_gsheet():
         return gspread.authorize(creds)
 
 
+def _chuan_hoa_ten_pgd(raw: str) -> str:
+    if not isinstance(raw, str) or not raw.strip():
+        return raw
+    s = raw.strip()
+    for prefix in ("Phòng giao dịch ", "Phong giao dich ", "PGD ", "pgd "):
+        if s.lower().startswith(prefix.lower()):
+            return "PGD " + s[len(prefix):].strip()
+    return s
+
+
 @st.cache_data(ttl=300)
 def _doc_du_lieu() -> pd.DataFrame:
     try:
@@ -66,6 +76,7 @@ def _doc_du_lieu() -> pd.DataFrame:
         if len(data) <= 1:
             return pd.DataFrame(columns=COT)
         df = pd.DataFrame([r[:len(COT)] for r in data[1:]], columns=COT)
+        df["ten_pgd"] = df["ten_pgd"].apply(_chuan_hoa_ten_pgd)
         df["thoi_gian"] = pd.to_datetime(df["thoi_gian"], dayfirst=True, errors="coerce")
         return df
     except Exception as e:
@@ -77,8 +88,17 @@ def _doc_du_lieu() -> pd.DataFrame:
 # ── Deadline config ───────────────────────────────────────────────────────────
 
 def _doc_deadline_config() -> dict:
-    """Đọc cấu hình deadline: {loai_bao_cao: 'YYYY-MM-DD'}"""
-    return db.doc_kv("bao_cao_deadline_config") or {}
+    """Đọc cấu hình deadline: {loai_bao_cao: 'YYYY-MM-DD'} — tự normalize từ định dạng cũ."""
+    raw = db.doc_kv("bao_cao_deadline_config") or {}
+    normalized = {}
+    for key, val in raw.items():
+        if isinstance(val, dict):
+            vals = [v for v in val.values() if isinstance(v, str)]
+            if vals:
+                normalized[key] = vals[0]
+        elif isinstance(val, str):
+            normalized[key] = val
+    return normalized
 
 
 def _luu_deadline_config(cfg: dict, username: str) -> None:
@@ -175,7 +195,7 @@ def _render_tong_quan(df: pd.DataFrame, deadline_cfg: dict, is_cn: bool, pgd_use
         st.dataframe(df_xuat, hide_index=True, use_container_width=True)
 
         ten_file_goc = "don_doc_bao_cao"
-        username_xuat = st.session_state.get("txt_username", "unknown")
+        username_xuat = st.session_state.get("username", "unknown")
 
         col_excel, col_pdf, col_pdf_hd, _ = st.columns([1, 1, 1.4, 3])
 
@@ -313,7 +333,7 @@ def _render_danh_sach(df: pd.DataFrame, deadline_cfg: dict, is_cn: bool, pgd_use
         nut_xuat_pdf(
             df_loc,
             "Tiến độ nộp báo cáo PGD",
-            st.session_state.get("txt_username", "unknown"),
+            st.session_state.get("username", "unknown"),
             cols_tien=[],
             prefix_file="TienDoNop",
             key="pdf_tdn",
@@ -398,24 +418,29 @@ def _render_huong_dan_mockup() -> None:
     
     # Flow diagram bằng HTML
     flow_html = """
-    <div style="display: flex; align-items: center; justify-content: center; gap: 15px; 
-                flex-wrap: wrap; padding: 20px; background: #f8f9fa; border-radius: 12px;">
-        <div style="text-align: center; padding: 15px; background: #e3f2fd; border-radius: 10px; min-width: 120px;">
+    <div style="display: flex; align-items: center; justify-content: center; gap: 15px;
+                flex-wrap: wrap; padding: 20px; background: var(--background-color, transparent);
+                border: 1px solid var(--border-color, #ddd); border-radius: 12px;">
+        <div style="text-align: center; padding: 15px; border: 1px solid var(--border-color, #ccc);
+                    border-radius: 10px; min-width: 120px;">
             <div style="font-size: 32px;">📝</div>
             <div style="font-weight: 600; font-size: 13px; margin-top: 5px;">PGD nộp Form</div>
         </div>
-        <div style="color: #666; font-size: 24px;">→</div>
-        <div style="text-align: center; padding: 15px; background: #e8f5e9; border-radius: 10px; min-width: 120px;">
+        <div style="font-size: 24px;">→</div>
+        <div style="text-align: center; padding: 15px; border: 1px solid var(--border-color, #ccc);
+                    border-radius: 10px; min-width: 120px;">
             <div style="font-size: 32px;">📊</div>
             <div style="font-weight: 600; font-size: 13px; margin-top: 5px;">Lưu Sheets</div>
         </div>
-        <div style="color: #666; font-size: 24px;">→</div>
-        <div style="text-align: center; padding: 15px; background: #fff3e0; border-radius: 10px; min-width: 120px;">
+        <div style="font-size: 24px;">→</div>
+        <div style="text-align: center; padding: 15px; border: 1px solid var(--border-color, #ccc);
+                    border-radius: 10px; min-width: 120px;">
             <div style="font-size: 32px;">⚙️</div>
             <div style="font-weight: 600; font-size: 13px; margin-top: 5px;">VBSP đọc (5 phút)</div>
         </div>
-        <div style="color: #666; font-size: 24px;">→</div>
-        <div style="text-align: center; padding: 15px; background: #fce4ec; border-radius: 10px; min-width: 120px;">
+        <div style="font-size: 24px;">→</div>
+        <div style="text-align: center; padding: 15px; border: 1px solid var(--border-color, #ccc);
+                    border-radius: 10px; min-width: 120px;">
             <div style="font-size: 32px;">📈</div>
             <div style="font-weight: 600; font-size: 13px; margin-top: 5px;">KH-NV theo dõi</div>
         </div>
@@ -460,17 +485,23 @@ def _render_huong_dan_mockup() -> None:
 
 # ── Entry point ───────────────────────────────────────────────────────────────
 
+_CACHE_VER = "v2"
+
 def render(tab: DeltaGenerator = None, **kwargs) -> None:
     role_raw = str(kwargs.get("role", "user") or "user")
     role_n = normalize_role(role_raw)
     is_cn = la_phan_he_cn(role_n)
     pgd_user = kwargs.get("pgd_user")
-    username = kwargs.get("username", st.session_state.get("txt_username", "unknown"))
+    username = kwargs.get("username", st.session_state.get("username", "unknown"))
 
     ctx = tab if tab is not None else st.container()
     with ctx:
         st.subheader("📋 Tiến độ Báo cáo của PGD")
         st.caption("Dữ liệu từ Google Form · Tự động cập nhật mỗi 5 phút")
+
+        if st.session_state.get(f"_tdn_cache_ver") != _CACHE_VER:
+            _doc_du_lieu.clear()
+            st.session_state[f"_tdn_cache_ver"] = _CACHE_VER
 
         if not Path(CREDENTIALS_FILE).exists():
             st.warning(

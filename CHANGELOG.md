@@ -1,5 +1,23 @@
 # CHANGELOG
 
+## [2026-05-30] — Fix đếm KPI trùng lặp tab Tổng quan tiến độ nộp BC
+- `tabs/tab_tien_do_nop.py` — `_render_tong_quan()`: deduplicate theo `(ten_pgd, loai_bao_cao)` trước khi tính KPI, giữ lần nộp muộn nhất; label "Tổng lượt nộp" → "Đã nộp (đơn vị × loại)"
+
+## [2026-05-30] — Làm phẳng tab Quản lý Công việc: 6→2 nhóm
+- `tabs/tab_quan_ly_cv.py` — **UX REFACTOR**: 6 tab ngang rối → 2 nhóm logic (📋 Công việc & Tiến độ / 📊 Báo cáo), mỗi nhóm 3 sub-tab
+- `tabs/tab_quan_ly_bc.py` — KHÔNG CÒN DÙNG, có thể xóa (đã flat từ trước)
+
+## [2026-05-30] — Cập nhật rules.md + BUGMAP.md
+- `.trae/rules/rules.md` — cập nhật ngày, thêm `tab_tien_do_nop.py` vào cấu trúc + bản đồ file, thêm key `bao_cao_deadline_config`, cập nhật ghi chú `st.html()`
+- `BUGMAP.md` — thêm H6 (deadline nested dict) và H7 (tên PGD Form ≠ DS_PGD)
+
+## [2026-05-30] — Fix cài đặt deadline: thêm sửa + xóa + gộp nguồn
+- `tabs/tab_tien_do_nop.py` — `_render_cai_dat()`: selectbox nay gộp cả loại từ GSheet lẫn loại đã có trong kv_store; thêm nút 🗑 Xóa deadline; label hiện ✅ khi loại đã có deadline
+
+## [2026-05-30] — Flatten tab Quản lý Công việc: xóa wrapper tab_quan_ly_bc
+- `tabs/tab_quan_ly_cv.py` — mở rộng từ 4 → 6 tab phẳng, nhúng trực tiếp bc_tong_hop / tab_tien_do_nop / tab_checklist_bc (trước ở tầng 3, nay tầng 2)
+- `tabs/tab_quan_ly_bc.py` — không còn dùng (có thể xóa sau khi xác nhận ổn định)
+
 ## [2026-05-30] — Fix lệch cột COT + cache tab_tien_do_nop.py
 - `tabs/tab_tien_do_nop.py` dòng 25 — thêm lại `ky_bao_cao` vào COT (Trae bỏ nhưng Google Form vẫn có cột Kỳ Báo Cáo → toàn bộ cột bị lệch, Họ tên bị mất)
 - `tabs/tab_tien_do_nop.py` dòng 60–71 — chuyển `@st.cache_data(ttl=300)` từ `_chuan_hoa_ten_pgd` (sai) sang `_doc_du_lieu` (đúng)

@@ -1,7 +1,7 @@
 # CLAUDE.md — VBSP-SCM
 > Hướng dẫn dự án dành riêng cho **Claude Code** / Trae / Cline / Cursor.  
 > Đọc toàn bộ file này trước khi đọc bất kỳ file code nào.  
-> Cập nhật: 24/05/2026
+> Cập nhật: 29/05/2026
 
 ---
 
@@ -67,6 +67,8 @@ Hệ thống Quản trị Tín dụng Nội bộ — **Ngân hàng Chính sách 
 | Xuất biểu mẫu XLN | `tab_no_rui_ro.py` | Hàm `_tao_word_*xln()` |
 | Workspace CN | `workspaces/ws_management.py` | File đó |
 | Workspace PGD | `workspaces/ws_operation.py` | File đó |
+| Xử lý Rủi ro | `tab_xu_ly_rui_ro.py` + `services/xlrr_service.py` | File đó |
+| Tiến độ Báo cáo PGD (GSheet) | `tabs/tab_tien_do_nop.py` + Google Form | Tab đó; credentials ở `credentials.json` |
 | Upload file | `services/upload_service.py` | `luu_pgd_file()` / `luu_file_he_thong()` |
 | Dữ liệu kv_store | `db.py` | `doc_kv()` / `ghi_kv()` |
 | Thêm tab PGD | `tabs/tab_*.py` + `ws_operation.py` | File đó |
@@ -116,6 +118,13 @@ Context truyền vào render():
       pgd_xa_map=...,
       ds_pgd_all=...,
   )
+
+Google Sheets → tab_tien_do_nop:
+  PGD nộp Google Form
+    → Google Sheets TIENDO_BAOCAO (Sheet ID: 15Ev2r...)
+    → tab_tien_do_nop.py doc qua gspread (cache 5 phút)
+    → Tab: Hướng dẫn | Cài đặt deadline | Tổng quan | Danh sách
+    → credentials.json (Service Account, KHÔNG commit)
 ```
 
 ---

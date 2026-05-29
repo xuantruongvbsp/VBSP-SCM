@@ -4,6 +4,50 @@
 
 ---
 
+## [2026-05-29] GSheet Tiến độ Báo cáo: refactor toàn diện + JWT fix + health check
+
+### `tabs/tab_tien_do_nop.py` — REFACTOR LỚN (loại bỏ "Kỳ báo cáo")
+
+**Lý do:** Các loại báo cáo (Kiểm toán NHNN, Đột xuất, KHTD...) là sự kiện 1 lần, không lặp tháng/quý. Kỳ báo cáo là thừa.
+
+| Thành phần | Trước | Sau |
+|---|---|---|
+| **COT** | 8 cột (có `ky_bao_cao`) | 7 cột (bỏ `ky_bao_cao`) |
+| **Deadline config** | `{loai: {ky: dl}}` | `{loai: dl}` |
+| **Tab Tổng quan** | Dropdown chọn kỳ → ma trận PGD×Loại×Kỳ | Ma trận PGD×Loại luôn hiện |
+| **Tab Danh sách** | 3 dropdown (Kỳ, Loại, Đơn vị) | 2 dropdown (Loại, Đơn vị) |
+| **Tab Cài đặt** | Chọn Loại + Kỳ → cài deadline | Chọn Loại → cài deadline |
+| **Tab Hướng dẫn** | Không có | Mới: flow diagram HTML + mockup Form |
+
+### BUG FIX: Google Form thêm cột "Cột 8" → 9 cột nhưng COT chỉ 8
+- **Dòng ~67:** `df = pd.DataFrame([r[:len(COT)] for r in data[1:]], columns=COT)`
+- Chỉ lấy N cột đầu, chống lỗi khi Google Form thêm cột phụ
+
+### BUG FIX: `invalid_grant: Invalid JWT Signature`
+- **Nguyên nhân:** Google tự động Disable service account key vì phát hiện exposed trên public GitHub repo
+- **Fix:** Xóa key cũ (`bf4faee...`, status=Disabled/Exposed) → tạo key mới trên GCP Console → copy đè `credentials.json`
+- **Phòng ngừa:** `setup_env.bat` thêm Bước 1: đồng bộ thời gian `w32tm /resync` (tránh lỗi JWT do clock skew)
+
+### `setup_env.bat` — thêm bước đồng bộ thời gian
+- Nâng từ 5→6 bước: Bước 1 mới = `net start w32time && w32tm /resync /force`
+- Cấu hình `w32time` thành `Automatic` (tự chạy khi khởi động)
+
+### Health check toàn diện (29/05/2026)
+| Chỉ số | Giá trị | Đánh giá |
+|---|---|---|
+| Tabs | 52/52 compile OK | 🟢 |
+| .py files (active) | 230 files, 89,761 dòng | 🟢 |
+| DB | 0.3MB, 25 tables, audit_log 75 dòng | 🟢 |
+| Disk | 209.7GB, dùng 3% | 🟢 |
+| `st.cache` deprecated | 0 | 🟢 |
+| `st.beta_`/`st.experimental_` | 0 | 🟢 |
+| `width='stretch'` còn sót | 7 chỗ (filter_bar, movers, tab_phoi_hop_pgd) | 🟡 |
+| `_archive/` dead code | 21 .py files | 🟡 |
+| `VBSP-SCM/` duplicate subfolder | 393 files | 🟡 |
+| `html()` vs `markdown(unsafe_allow_html)` | Đã dùng `st.html()` | 🟢 |
+
+---
+
 ## [2026-05-26] tab_pgd_cards redesign + fix applymap pandas 3.0
 
 ### `tabs/tab_pgd_cards.py` — REDESIGN TOÀN DIỆN

@@ -1,5 +1,16 @@
 # CHANGELOG
 
+## [2026-05-29] — Seed admin user + dọn nested repo
+- `auth.py` — gọi `doc_users()` để seed user admin mặc định vào bảng `users` (trước đó bảng trống)
+- `.gitignore` — thêm `VBSP-SCM/` để ẩn nested repo clone do Trae tạo (cần xóa thủ công sau khi đóng Trae)
+
+## [2026-05-29] — GSheet hoàn chỉnh: JWT fix + bỏ kỳ báo cáo + health check
+- `tabs/tab_tien_do_nop.py` — **REFACTOR LỚN**: bỏ `ky_bao_cao` khỏi COT (8→7 cột), deadline config đổi từ `{loai: {ky: dl}}` → `{loai: dl}`, đơn giản 3 tab Tổng quan / Danh sách / Cài đặt, thêm tab Hướng dẫn
+- `tabs/tab_tien_do_nop.py` dòng ~67 — **BUG FIX**: Google Form thêm cột "Cột 8" → dùng `r[:len(COT)]` chỉ lấy N cột đầu
+- `setup_env.bat` — Thêm Bước 1: đồng bộ thời gian Windows (`w32tm /resync`) trước cài đặt (ngừa lỗi JWT)
+- `BUGMAP.md` — H3: `invalid_grant` (key bị Google Disable vì exposed public repo → tạo key mới) + H4: số cột Sheet ≠ COT + H5: loại bỏ kỳ báo cáo
+- Health check toàn diện: 52/52 tabs compile OK, 230 .py files (89,761 dòng), DB 0.3MB, audit_log 75 dòng, không còn `st.cache`/`st.beta_` deprecated
+
 ## [2026-05-27] — Cải tiến Chay_VBSP_SCM.bat tự động setup trên máy mới
 - `Chay_VBSP_SCM.bat` — Nâng cấp script tự động: (1) tự tìm Python ở nhiều vị trí (LocalAppData, Program Files), (2) tự tạo venv nếu chưa có, (3) tự cài requirements.txt nếu thiếu, (4) hiển thị tiến trình 4 bước rõ ràng
 

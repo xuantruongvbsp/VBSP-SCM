@@ -1,106 +1,70 @@
 @echo off
 setlocal enabledelayedexpansion
+chcp 65001 >nul
 
-cd /d %~dp0
+cd /d "%~dp0"
 set "PORT=8501"
-set "URL=http://127.0.0.1:%PORT%"
-set "PYTHON_CMD="
+set "URL=http://localhost:%PORT%"
+set "VENV=venv"
+set "PY_EXE=%VENV%\Scripts\python.exe"
 
-:: ─── Bước 1: Tìm Python ─────────────────────────────────────────
+:: ─── Bước 1: Kiểm tra venv ──────────────────────────────────────
 echo.
 echo ============================================
 echo   VBSP-SCM — He thong Tin dung Noi bo
 echo ============================================
 echo.
-echo [1/4] Dang tim Python...
+echo [1/3] Kiem tra moi truong ao (venv)...
 
-:: Thử python trực tiếp
-python --version >nul 2>&1
-if %errorlevel% equ 0 (
-    where python >nul 2>&1
-    if %errorlevel% equ 0 (
-        for /f "delims=" %%i in ('where python') do set "PYTHON_CMD=%%i"
-        goto :found_python
-    )
-)
-
-:: Thử python trong LocalAppData (cài từ python.org)
-for /d %%p in ("%LOCALAPPDATA%\Programs\Python\Python*") do (
-    if exist "%%p\python.exe" (
-        set "PYTHON_CMD=%%p\python.exe"
-        goto :found_python
-    )
-)
-
-:: Thử python trong Program Files
-for /d %%p in ("C:\Program Files\Python*") do (
-    if exist "%%p\python.exe" (
-        set "PYTHON_CMD=%%p\python.exe"
-        goto :found_python
-    )
-)
-
-echo Khong tim thay Python. Hay tai va cai dat tu: https://www.python.org/downloads/
-echo Nho tick chon "Add Python to PATH" khi cai dat.
-pause
-exit /b 1
-
-:found_python
-echo   Tim thay: !PYTHON_CMD!
-!PYTHON_CMD! --version
-
-:: ─── Bước 2: Tạo venv nếu chưa có ────────────────────────────────
-echo.
-echo [2/4] Kiem tra moi truong ao (venv)...
-
-if not exist ".venv\Scripts\python.exe" (
-    echo   Dang tao venv...
-    !PYTHON_CMD! -m venv .venv
+if not exist "%PY_EXE%" (
+    echo   Chua cai dat! Dang chay setup_env.bat...
+    echo.
+    call "%~dp0setup_env.bat"
     if !errorlevel! neq 0 (
-        echo   LOI: Khong the tao venv.
+        echo   LOI: Cai dat that bai.
         pause
         exit /b 1
     )
-    echo   Da tao venx thanh cong.
+    echo.
+    echo   Quay lai binh thuong...
+    echo.
 ) else (
-    echo   Venv da ton tai.
+    echo   Venv da san sang.
 )
 
-:: ─── Bước 3: Cài thư viện nếu chưa đủ ────────────────────────────
+:: ─── Bước 2: Kiểm tra thư viện ──────────────────────────────────
 echo.
-echo [3/4] Kiem tra thu vien...
-
-if not exist ".venv\Scripts\streamlit.exe" (
-    echo   Dang cai dat thu vien (lan dau, co the mat 2-5 phut)...
-    ".venv\Scripts\python.exe" -m pip install -r requirements.txt
-    ".venv\Scripts\python.exe" -m pip install reportlab kaleido
+echo [2/3] Kiem tra thu vien...
+"%PY_EXE%" -c "import streamlit" 2>nul
+if %errorlevel% neq 0 (
+    echo   Chua cai dat! Dang chay setup_env.bat...
+    echo.
+    call "%~dp0setup_env.bat"
     if !errorlevel! neq 0 (
-        echo   LOI: Khong the cai thu vien. Vui long thu lai.
+        echo   LOI: Cai dat that bai.
         pause
         exit /b 1
     )
-    echo   Da cai dat thu vien thanh cong.
 ) else (
-    echo   Thu vien da san sang.
+    echo   Thu vien OK.
 )
 
-:: ─── Bước 4: Chạy ứng dụng ───────────────────────────────────────
+:: ─── Bước 3: Khởi động ──────────────────────────────────────────
 echo.
-echo [4/4] Khoi dong ung dung...
+echo [3/3] Khoi dong ung dung...
 echo.
 echo   URL: %URL%
-echo   Auto-reload: Co (theo doi file .py)
 echo   Tat: Nhan Ctrl+C
 echo.
 
-".venv\Scripts\streamlit.exe" run app.py ^
-  --server.address 127.0.0.1 ^
+start "" %URL%
+
+"%PY_EXE%" -m streamlit run app.py ^
   --server.port %PORT% ^
-  --server.headless false ^
   --browser.gatherUsageStats false
 
 if %errorlevel% neq 0 (
     echo.
-    echo Ung dung da dung voi ma loi: %errorlevel%
+    echo   Ung dung da dung. Nhan phim bat ky de thoat.
     pause
 )

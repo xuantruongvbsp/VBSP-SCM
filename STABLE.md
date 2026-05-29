@@ -224,6 +224,16 @@ def merge_du_lieu_toan_cn()    # auto-trigger sau upload HSTD/NQ11/GQVL
 # KetQuaUpload.hien_thi()     # hiển thị kết quả upload
 ```
 
+### tabs/tab_tien_do_nop.py (GSheet — Tiến độ Báo cáo PGD)
+```python
+# Đọc dữ liệu từ Google Sheet TIENDO_BAOCAO, cache 5 phút
+def render(tab, **kwargs)      # Tab: Hướng dẫn | Cài đặt deadline | Tổng quan | Danh sách
+# Deadline config:
+#   kv_store key "bao_cao_deadline_config" → {loai_bao_cao: "YYYY-MM-DD"}
+# COT (7 cột): thoi_gian, email, ten_pgd, loai_bao_cao, noi_dung, file_dinh_kem, ho_ten
+# Không có cột ky_bao_cao (đã bỏ vì BC là sự kiện 1 lần)
+```
+
 ---
 
 ## 5. QUY TẮC CODE

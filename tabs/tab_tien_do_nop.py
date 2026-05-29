@@ -23,7 +23,7 @@ SHEET_ID = "15Ev2rTv6khLFaMpAiMwqJCVC_33ocJ-6cp016RGNkYk"
 SHEET_TAB = "TIENDO_BAOCAO"
 CREDENTIALS_FILE = "credentials.json"
 COT = ["thoi_gian", "email", "ten_pgd", "loai_bao_cao",
-       "ky_bao_cao", "noi_dung", "file_dinh_kem", "ho_ten"]
+       "noi_dung", "file_dinh_kem", "ho_ten"]
 
 DS_PGD_ALL = [DON_VI_CHI_NHANH] + DS_PGD
 
@@ -65,7 +65,7 @@ def _doc_du_lieu() -> pd.DataFrame:
         data = sheet.get_all_values()
         if len(data) <= 1:
             return pd.DataFrame(columns=COT)
-        df = pd.DataFrame(data[1:], columns=COT)
+        df = pd.DataFrame([r[:len(COT)] for r in data[1:]], columns=COT)
         df["thoi_gian"] = pd.to_datetime(df["thoi_gian"], dayfirst=True, errors="coerce")
         return df
     except Exception as e:
@@ -77,14 +77,13 @@ def _doc_du_lieu() -> pd.DataFrame:
 # ── Deadline config ───────────────────────────────────────────────────────────
 
 def _doc_deadline_config() -> dict:
-    """Đọc cấu hình deadline: {loai_bao_cao: {ky_bao_cao: 'YYYY-MM-DD'}}"""
+    """Đọc cấu hình deadline: {loai_bao_cao: 'YYYY-MM-DD'}"""
     return db.doc_kv("bao_cao_deadline_config") or {}
 
 
 def _luu_deadline_config(cfg: dict, username: str) -> None:
     db.ghi_kv("bao_cao_deadline_config", cfg, username)
-    tong = sum(len(v) for v in cfg.values())
-    db.ghi_audit(username, "luu_deadline_bao_cao", f"{tong} deadline đã lưu")
+    db.ghi_audit(username, "luu_deadline_bao_cao", f"{len(cfg)} deadline đã lưu")
 
 
 def _phan_loai(ngay_nop, deadline_str: str | None) -> str:
@@ -105,7 +104,7 @@ def _phan_loai(ngay_nop, deadline_str: str | None) -> str:
 def _gan_trang_thai(df: pd.DataFrame, deadline_cfg: dict) -> pd.DataFrame:
     df = df.copy()
     df["tt"] = df.apply(
-        lambda r: _phan_loai(r["thoi_gian"], deadline_cfg.get(r["loai_bao_cao"], {}).get(r["ky_bao_cao"])),
+        lambda r: _phan_loai(r["thoi_gian"], deadline_cfg.get(r["loai_bao_cao"])),
         axis=1,
     )
     return df
@@ -118,31 +117,22 @@ def _render_tong_quan(df: pd.DataFrame, deadline_cfg: dict, is_cn: bool, pgd_use
         st.info("Chưa có dữ liệu từ Google Sheets.")
         return
 
-    ds_ky = sorted(df["ky_bao_cao"].dropna().unique().tolist(), reverse=True)
-    ky_chon = st.selectbox("Chọn kỳ báo cáo", ["Tất cả"] + ds_ky, key="tquan_ky")
-
-    df_ky = df[df["ky_bao_cao"] == ky_chon].copy() if ky_chon != "Tất cả" else df.copy()
-    df_ky = _gan_trang_thai(df_ky, deadline_cfg)
-
-    dung_han = (df_ky["tt"] == "dung_han").sum()
-    tre = (df_ky["tt"] == "tre").sum()
-    da_nop = len(df_ky)
-
-    ds_pgd_scope = [pgd_user] if (not is_cn and pgd_user) else DS_PGD_ALL
     ds_loai = sorted(df["loai_bao_cao"].dropna().unique().tolist())
+    ds_pgd_scope = [pgd_user] if (not is_cn and pgd_user) else DS_PGD_ALL
+
+    df = _gan_trang_thai(df, deadline_cfg)
+
+    dung_han = (df["tt"] == "dung_han").sum()
+    tre = (df["tt"] == "tre").sum()
+    da_nop = len(df)
 
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("Tổng lượt nộp", da_nop)
     c2.metric("🟢 Đúng hạn", dung_han)
     c3.metric("🟡 Trễ hạn", tre)
-    if ky_chon != "Tất cả":
-        tong_can = len(ds_pgd_scope) * len(ds_loai)
-        chua_nop = max(0, tong_can - da_nop)
-        c4.metric("🔴 Chưa nộp", chua_nop)
-
-    if ky_chon == "Tất cả" or not ds_loai:
-        st.info("Chọn một kỳ cụ thể để xem ma trận trạng thái PGD.")
-        return
+    tong_can = len(ds_pgd_scope) * len(ds_loai)
+    chua_nop = max(0, tong_can - da_nop)
+    c4.metric("🔴 Chưa nộp", chua_nop)
 
     st.divider()
     st.markdown("**Ma trận trạng thái — PGD × Loại báo cáo**")
@@ -151,49 +141,46 @@ def _render_tong_quan(df: pd.DataFrame, deadline_cfg: dict, is_cn: bool, pgd_use
     for pgd in ds_pgd_scope:
         row: dict = {"Đơn vị": pgd}
         for loai in ds_loai:
-            match = df_ky[(df_ky["ten_pgd"] == pgd) & (df_ky["loai_bao_cao"] == loai)]
+            match = df[(df["ten_pgd"] == pgd) & (df["loai_bao_cao"] == loai)]
             if match.empty:
-                has_dl = bool(deadline_cfg.get(loai, {}).get(ky_chon))
+                has_dl = loai in deadline_cfg
                 row[loai] = "🔴 Chưa nộp" if has_dl else "⚪ Chưa nộp"
             else:
                 tt = match.sort_values("thoi_gian").iloc[-1]["tt"]
                 row[loai] = f"{_EMOJI[tt]} {_LABEL[tt]}"
         rows.append(row)
 
-    st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
+    st.dataframe(pd.DataFrame(rows), hide_index=True, use_container_width=True)
 
-    # Danh sách đôn đốc: từng dòng = 1 PGD × 1 loại báo cáo còn thiếu
     ds_don_doc = []
     for r in rows:
         for loai in ds_loai:
             if "🔴" in str(r.get(loai, "")):
-                dl = deadline_cfg.get(loai, {}).get(ky_chon, "")
+                dl = deadline_cfg.get(loai, "")
                 ds_don_doc.append({
                     "Đơn vị": r["Đơn vị"],
                     "Loại báo cáo": loai,
-                    "Kỳ": ky_chon,
                     "Deadline": dl or "Chưa cài",
                 })
 
     if ds_don_doc:
         df_don_doc = pd.DataFrame(ds_don_doc)
         st.divider()
-        st.warning(f"⚠️ **{len(df_don_doc)} báo cáo chưa nộp** — kỳ {ky_chon}")
+        st.warning(f"⚠️ **{len(df_don_doc)} báo cáo chưa nộp**")
 
-        # Chọn PGD để lọc trước khi xuất
         ds_pgd_thieu = ["Tất cả"] + sorted(df_don_doc["Đơn vị"].unique().tolist())
         pgd_xuat = st.selectbox("Lọc đơn vị trước khi xuất", ds_pgd_thieu, key="dd_pgd_xuat")
         df_xuat = df_don_doc if pgd_xuat == "Tất cả" else df_don_doc[df_don_doc["Đơn vị"] == pgd_xuat]
 
-        st.dataframe(df_xuat, hide_index=True, width="stretch")
+        st.dataframe(df_xuat, hide_index=True, use_container_width=True)
 
-        ten_file_goc = f"don_doc_{ky_chon.replace('/', '-')}"
+        ten_file_goc = "don_doc_bao_cao"
         username_xuat = st.session_state.get("txt_username", "unknown")
 
         col_excel, col_pdf, col_pdf_hd, _ = st.columns([1, 1, 1.4, 3])
 
         with col_excel:
-            if st.button("📥 Excel", key="btn_dd_excel", width="stretch", type="primary"):
+            if st.button("📥 Excel", key="btn_dd_excel", use_container_width=True, type="primary"):
                 st.session_state["_don_doc_bytes"] = xuat_excel({"Đôn đốc nộp báo cáo": df_xuat})
                 st.session_state["_don_doc_ten"] = f"{ten_file_goc}.xlsx"
             if st.session_state.get("_don_doc_bytes"):
@@ -206,13 +193,13 @@ def _render_tong_quan(df: pd.DataFrame, deadline_cfg: dict, is_cn: bool, pgd_use
                 )
 
         with col_pdf:
-            if st.button("📄 PDF", key="btn_dd_pdf", width="stretch", type="primary"):
+            if st.button("📄 PDF", key="btn_dd_pdf", use_container_width=True, type="primary"):
                 try:
                     from pdf_service import xuat_pdf
                     with st.spinner("Đang tạo PDF..."):
                         pdf_bytes = xuat_pdf(
                             df_xuat,
-                            f"Danh sách tiến độ nộp báo cáo — kỳ {ky_chon}",
+                            "Danh sách tiến độ nộp báo cáo",
                             username_xuat,
                             cols_tien=[],
                             them_dong_tong=False,
@@ -232,7 +219,7 @@ def _render_tong_quan(df: pd.DataFrame, deadline_cfg: dict, is_cn: bool, pgd_use
                 )
 
         with col_pdf_hd:
-            if st.button("📄 PDF có Header", key="btn_dd_pdf_hd", width="stretch", type="primary"):
+            if st.button("📄 PDF có Header", key="btn_dd_pdf_hd", use_container_width=True, type="primary"):
                 try:
                     from pdf_service import xuat_pdf_group_header
                     with st.spinner("Đang tạo PDF..."):
@@ -241,7 +228,7 @@ def _render_tong_quan(df: pd.DataFrame, deadline_cfg: dict, is_cn: bool, pgd_use
                             tieu_de="DANH SÁCH TIẾN ĐỘ NỘP BÁO CÁO",
                             nhom_theo="Đơn vị",
                             nguoi_xuat=username_xuat,
-                            tieu_de_phu=f"Kỳ: {ky_chon}",
+                            tieu_de_phu="",
                             loai_van_ban="DANH SÁCH",
                         )
                     st.session_state["_dd_pdf_hd_bytes"] = pdf_bytes
@@ -266,14 +253,11 @@ def _render_danh_sach(df: pd.DataFrame, deadline_cfg: dict, is_cn: bool, pgd_use
         st.info("Chưa có dữ liệu.")
         return
 
-    col1, col2, col3 = st.columns(3)
+    col1, col2 = st.columns(2)
     with col1:
-        ds_ky = ["Tất cả"] + sorted(df["ky_bao_cao"].dropna().unique().tolist(), reverse=True)
-        ky_chon = st.selectbox("Kỳ báo cáo", ds_ky, key="ds_ky")
-    with col2:
         ds_loai = ["Tất cả"] + sorted(df["loai_bao_cao"].dropna().unique().tolist())
         loai_chon = st.selectbox("Loại báo cáo", ds_loai, key="ds_loai")
-    with col3:
+    with col2:
         if is_cn:
             ds_don_vi = ["Tất cả"] + sorted(df["ten_pgd"].dropna().unique().tolist())
             pgd_chon = st.selectbox("Đơn vị", ds_don_vi, key="ds_pgd")
@@ -282,8 +266,6 @@ def _render_danh_sach(df: pd.DataFrame, deadline_cfg: dict, is_cn: bool, pgd_use
             st.caption(f"Đơn vị: **{pgd_chon}**")
 
     df_loc = df.copy()
-    if ky_chon != "Tất cả":
-        df_loc = df_loc[df_loc["ky_bao_cao"] == ky_chon]
     if loai_chon != "Tất cả":
         df_loc = df_loc[df_loc["loai_bao_cao"] == loai_chon]
     if pgd_chon and pgd_chon != "Tất cả":
@@ -295,15 +277,15 @@ def _render_danh_sach(df: pd.DataFrame, deadline_cfg: dict, is_cn: bool, pgd_use
     st.caption(f"Hiển thị {len(df_loc)} / {len(df)} lượt nộp")
 
     df_hien = df_loc[["thoi_gian", "ho_ten", "ten_pgd", "loai_bao_cao",
-                       "ky_bao_cao", "tt_hien", "noi_dung", "file_dinh_kem"]].copy()
+                       "tt_hien", "noi_dung", "file_dinh_kem"]].copy()
     df_hien["thoi_gian"] = df_hien["thoi_gian"].dt.strftime("%d/%m/%Y %H:%M")
     df_hien = df_hien.rename(columns={
         "thoi_gian": "Thời gian", "ho_ten": "Họ tên", "ten_pgd": "Đơn vị",
-        "loai_bao_cao": "Loại", "ky_bao_cao": "Kỳ",
-        "tt_hien": "Trạng thái", "noi_dung": "Nội dung", "file_dinh_kem": "File",
+        "loai_bao_cao": "Loại", "tt_hien": "Trạng thái",
+        "noi_dung": "Nội dung", "file_dinh_kem": "File",
     })
     st.dataframe(
-        df_hien, width="stretch", hide_index=True,
+        df_hien, use_container_width=True, hide_index=True,
         column_config={
             "File": st.column_config.LinkColumn("File", display_text="📎 Xem"),
             "Nội dung": st.column_config.TextColumn(width="large"),
@@ -313,7 +295,7 @@ def _render_danh_sach(df: pd.DataFrame, deadline_cfg: dict, is_cn: bool, pgd_use
     st.divider()
     col_excel, col_pdf, _ = st.columns([1, 1, 5])
     with col_excel:
-        if st.button("📥 Xuất Excel", key="btn_xuat_tdn", width="stretch", type="primary"):
+        if st.button("📥 Xuất Excel", key="btn_xuat_tdn", use_container_width=True, type="primary"):
             df_export = df_loc.drop(columns=["tt", "tt_hien"], errors="ignore")
             st.session_state["_excel_tdn_bytes"] = xuat_excel({"Tiến độ nộp báo cáo": df_export})
             st.session_state["_excel_tdn_ten"] = f"tien_do_nop_{len(df_loc)}_dong.xlsx"
@@ -341,48 +323,41 @@ def _render_danh_sach(df: pd.DataFrame, deadline_cfg: dict, is_cn: bool, pgd_use
 # ── Tab 3: Cài đặt deadline ───────────────────────────────────────────────────
 
 def _render_cai_dat(df: pd.DataFrame, deadline_cfg: dict, username: str) -> None:
-    st.markdown("**Cấu hình deadline cho từng loại báo cáo × kỳ**")
+    st.markdown("**Cấu hình deadline cho từng loại báo cáo**")
     st.caption("Sau khi lưu, cột Trạng thái sẽ tự tính 🟢 Đúng hạn / 🟡 Trễ / 🔴 Chưa nộp.")
 
     ds_loai = sorted(df["loai_bao_cao"].dropna().unique().tolist()) if not df.empty else []
-    ds_ky = sorted(df["ky_bao_cao"].dropna().unique().tolist(), reverse=True) if not df.empty else []
 
     if not ds_loai:
         st.info("Chưa có dữ liệu từ Google Sheets để cấu hình deadline.")
         return
 
-    col1, col2 = st.columns(2)
-    with col1:
-        loai_chon = st.selectbox("Loại báo cáo", ds_loai, key="cd_loai")
-    with col2:
-        ky_chon = st.selectbox("Kỳ báo cáo", ds_ky, key="cd_ky")
+    loai_chon = st.selectbox("Loại báo cáo", ds_loai, key="cd_loai")
 
-    dl_hien = deadline_cfg.get(loai_chon, {}).get(ky_chon)
+    dl_hien = deadline_cfg.get(loai_chon)
     dl_default = pd.to_datetime(dl_hien).date() if dl_hien else date.today()
 
     dl_moi = st.date_input(
-        f"Deadline — **{loai_chon}** / kỳ **{ky_chon}**",
+        f"Deadline cho **{loai_chon}**",
         value=dl_default, format="DD/MM/YYYY",
         key="cd_dl_input",
     )
 
     if st.button("💾 Lưu deadline", key="cd_btn_luu", type="primary"):
-        cfg_moi = {k: dict(v) for k, v in deadline_cfg.items()}
-        if loai_chon not in cfg_moi:
-            cfg_moi[loai_chon] = {}
-        cfg_moi[loai_chon][ky_chon] = dl_moi.strftime("%Y-%m-%d")
+        cfg_moi = dict(deadline_cfg)
+        cfg_moi[loai_chon] = dl_moi.strftime("%Y-%m-%d")
         _luu_deadline_config(cfg_moi, username)
-        st.success(f"✅ Đã lưu: **{loai_chon}** — kỳ **{ky_chon}** → deadline {dl_moi.strftime('%d/%m/%Y')}")
+        st.success(f"✅ Đã lưu: **{loai_chon}** → deadline {dl_moi.strftime('%d/%m/%Y')}")
         st.rerun()
 
     st.divider()
     st.markdown("**Danh sách deadline đã cài đặt**")
-    rows = [{"Loại báo cáo": loai, "Kỳ": ky, "Deadline": dl}
-            for loai, kys in deadline_cfg.items() for ky, dl in kys.items()]
+    rows = [{"Loại báo cáo": loai, "Deadline": dl}
+            for loai, dl in deadline_cfg.items()]
     if rows:
         st.dataframe(
-            pd.DataFrame(rows).sort_values(["Loại báo cáo", "Kỳ"]),
-            hide_index=True, width="stretch",
+            pd.DataFrame(rows).sort_values("Loại báo cáo"),
+            hide_index=True, use_container_width=True,
         )
     else:
         st.info("Chưa có deadline nào. Dùng form trên để thêm.")

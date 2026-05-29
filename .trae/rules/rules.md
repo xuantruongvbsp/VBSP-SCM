@@ -1,7 +1,7 @@
 # VBSP-SCM — Trae / Claude Code Rules
 > Đọc file này trước khi sinh bất kỳ code nào.
 > Không chứa dữ liệu nhạy cảm — chỉ function names, column names, patterns.
-> Cập nhật: 24/05/2026
+> Cập nhật: 30/05/2026
 
 ---
 
@@ -40,6 +40,7 @@ services/
   kiem_soat_service.py      ← kiểm soát Chi nhánh
 tabs/tab_*.py               ← mỗi file = 1 tab UI
 tabs/tab_khnv_noi_bo.py     ← Quản lý nội bộ Phòng KH-NV
+tabs/tab_tien_do_nop.py     ← Tiến độ nộp BC từ PGD (đọc Google Sheets)
 workspaces/
   ws_executive.py           ← BGĐ — chỉ đọc
   ws_management.py          ← Phòng KH-NV — toàn CN
@@ -68,6 +69,7 @@ pgd_data/                   ← file upload PGD (không commit)
 | Thêm tab toàn CN | `tabs/tab_*.py` + `ws_management.py` | File đó |
 | Snapshot HSTD | `snapshot_service.py` | upsert-safe, tự trigger sau merge |
 | Giao ban | `data/giao_ban.py` | `tinh_so_lieu_van_xuoi()` |
+| Tiến độ nộp BC / GSheet | `tabs/tab_tien_do_nop.py` | `_doc_du_lieu()`, `_render_cai_dat()` |
 
 ---
 
@@ -335,6 +337,7 @@ db.ghi_kv("key", value, username)   # ghi
 | `kh_gqvl_pgd_{slug}_{nam}` | KH GQVL theo PGD |
 | `khnv_phan_cong_list` | Phân công cán bộ nội bộ Phòng KH-NV |
 | `khnv_lich_list` | Lịch công tác Phòng KH-NV |
+| `bao_cao_deadline_config` | Deadline từng loại báo cáo `{loai: "YYYY-MM-DD"}` |
 
 `slug` = `pgd_slug(ten_pgd)` từ `data/pgd.py`
 
@@ -480,7 +483,7 @@ else:
 
 ### 8.16 CSS & UI
 - Inject CSS **một lần** trong `app.py` — không inject trong tab
-- Bảng ≥ 8 cột → HTML thuần + `st.markdown(unsafe_allow_html=True)`
+- Bảng ≥ 8 cột → HTML thuần + `st.html(html_str)` (Streamlit ≥1.36) hoặc `st.markdown(html_str, unsafe_allow_html=True)` (cũ hơn)
 - HTML: **KHÔNG** hardcode `color:black` / `background:white` — dùng CSS variable tương thích dark mode
 - `st.date_input` bắt buộc có `format="DD/MM/YYYY"`
 - Màu sắc → xem `UI_GUIDELINES.md`

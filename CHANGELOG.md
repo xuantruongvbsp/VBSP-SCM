@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## [2026-05-30] — Fix lệch cột COT + cache tab_tien_do_nop.py
+- `tabs/tab_tien_do_nop.py` dòng 25 — thêm lại `ky_bao_cao` vào COT (Trae bỏ nhưng Google Form vẫn có cột Kỳ Báo Cáo → toàn bộ cột bị lệch, Họ tên bị mất)
+- `tabs/tab_tien_do_nop.py` dòng 60–71 — chuyển `@st.cache_data(ttl=300)` từ `_chuan_hoa_ten_pgd` (sai) sang `_doc_du_lieu` (đúng)
+
+## [2026-05-29] — Fix 2 bug tab_tien_do_nop.py (review fix Trae)
+- `tabs/tab_tien_do_nop.py` dòng 187, 325 — sửa `st.session_state.get("txt_username")` → `"username"` (bug audit log ghi "unknown")
+- `tabs/tab_tien_do_nop.py` dòng 411–431 — bỏ hardcode màu nền trong flow HTML, dùng CSS variable tương thích dark mode
+
 ## [2026-05-29] — Seed admin user + dọn nested repo
 - `auth.py` — gọi `doc_users()` để seed user admin mặc định vào bảng `users` (trước đó bảng trống)
 - `.gitignore` — thêm `VBSP-SCM/` để ẩn nested repo clone do Trae tạo (cần xóa thủ công sau khi đóng Trae)

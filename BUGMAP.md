@@ -538,6 +538,24 @@
 | **Fix** | `df = pd.DataFrame([r[:len(COT)] for r in data[1:]], columns=COT)` — chỉ lấy N cột đầu, bỏ qua cột thừa |
 | **Ngày fix** | 2026-05-29 |
 
+### H6 — Deadline config kv_store định dạng cũ (nested dict)
+| | |
+|---|---|
+| **File** | `tabs/tab_tien_do_nop.py` → `_doc_deadline_config()` |
+| **Dấu hiệu** | `pd.to_datetime({"05/2026": "2026-06-01"})` → crash; hoặc trạng thái luôn "Chưa nộp" dù đã cài deadline |
+| **Nguyên nhân** | Dữ liệu cũ trong kv_store có dạng `{loai: {ky: "YYYY-MM-DD"}}` (nested dict) sau khi bỏ concept "kỳ" → `deadline_cfg.get(loai)` trả về dict thay vì str |
+| **Fix** | Normalize trong `_doc_deadline_config()`: nếu value là dict → lấy `list(val.values())[0]`; nếu là str → giữ nguyên. Không cần xóa dữ liệu cũ trong kv_store |
+| **Ngày fix** | 2026-05-30 |
+
+### H7 — Tên PGD từ Google Form không khớp DS_PGD
+| | |
+|---|---|
+| **File** | `tabs/tab_tien_do_nop.py` → `_doc_du_lieu()` |
+| **Dấu hiệu** | Tab Tổng quan hiển thị toàn 🔴 Chưa nộp dù PGD đã nộp; ma trận không khớp |
+| **Nguyên nhân** | Google Form lưu tên PGD dạng `"Phòng giao dịch Long Thành"` nhưng `DS_PGD` dùng `"PGD Long Thành"` → `df[df["ten_pgd"] == pgd]` không match |
+| **Fix** | Thêm hàm `_chuan_hoa_ten_pgd(raw)` normalize prefix: `"Phòng giao dịch "` / `"Phong giao dich "` / `"pgd "` → `"PGD "`. Gọi trong `_doc_du_lieu()` sau khi đọc sheet |
+| **Ngày fix** | 2026-05-30 |
+
 ### H5 — Loại bỏ "Kỳ báo cáo" khỏi Form/Sheet toàn bộ
 | | |
 |---|---|

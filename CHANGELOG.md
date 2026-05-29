@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [2026-05-30] — Config Sheet theo dõi nhập liệu HSSV Lần 2
+- `kv_store[gsheet_theo_doi_nhap_config]` — auto-config Sheet ID ĐIỀU CHỈNH HSSV LẦN 2, tab, header_row=10, col HSSV=4, Nước sạch=8, Việc làm=13
+
+## [2026-05-30] — Tính năng mới: Tab Theo dõi nhập liệu PGD (GSheet phân cấp)
+- `tabs/tab_theo_doi_nhap.py` — tạo mới: đọc GSheet phân cấp PGD→Xã/Phường, tính % điền theo từng chương trình (HSSV/Nước sạch/Việc làm), ma trận PGD × CT, xuất Excel, tab cài đặt admin
+- `tabs/tab_quan_ly_cv.py` — thêm sub-tab "📋 Theo dõi nhập liệu" vào nhóm Báo cáo
+
 ## [2026-05-30] — Fix đếm KPI trùng lặp tab Tổng quan tiến độ nộp BC
 - `tabs/tab_tien_do_nop.py` — `_render_tong_quan()`: deduplicate theo `(ten_pgd, loai_bao_cao)` trước khi tính KPI, giữ lần nộp muộn nhất; label "Tổng lượt nộp" → "Đã nộp (đơn vị × loại)"
 

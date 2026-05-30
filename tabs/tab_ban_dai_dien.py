@@ -67,7 +67,7 @@ def _doc_hstd(_ts: float = 0) -> pd.DataFrame | None:
     """Đọc HSTD từ cache parquet. _ts dùng để bust cache khi file thay đổi."""
     try:
         return pd.read_parquet(CACHE_HSTD)
-    except Exception:
+    except Exception as e:
         logger.error("Lỗi trong khối except: %s", e, exc_info=True)
         return None
 
@@ -87,7 +87,7 @@ def _ngay_so_lieu(df: pd.DataFrame) -> datetime | None:
         return None
     try:
         return datetime.strptime(str(sl.iloc[0]), "%d/%m/%Y")
-    except Exception:
+    except Exception as e:
         logger.error("Lỗi trong khối except: %s", e, exc_info=True)
         return None
 
@@ -328,7 +328,7 @@ def _render_du_bao_von(df: pd.DataFrame) -> None:
             parts = str(ma_key).split("_")
             ma_ct = int(parts[0])
             nv = int(parts[1])
-        except Exception:
+        except Exception as e:
             logger.error("Lỗi trong khối except: %s", e, exc_info=True)
             continue
 
@@ -541,7 +541,7 @@ def _render_van_ban(role: str, username: str) -> None:
                         key=f"vb_dl_{v.get('id', i)}",
                         use_container_width=True,
                     )
-                except Exception:
+                except Exception as e:
                     logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                     st.caption("Không đọc được file đã lưu.")
             st.caption(f"Lưu bởi {v.get('nguoi_tao','—')} lúc {str(v.get('ngay_tao','—'))[:16]}")

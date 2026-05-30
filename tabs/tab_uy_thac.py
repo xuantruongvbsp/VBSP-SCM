@@ -90,7 +90,7 @@ def _loc_mau15(_df_bytes: bytes, ten_to: str) -> bytes:
 def _doc_hstd_cached(_ts: float = 0) -> pd.DataFrame:
     try:
         return pd.read_parquet(CACHE_HSTD)
-    except Exception:
+    except Exception as e:
         logger.error("Lỗi trong khối except: %s", e, exc_info=True)
         return pd.DataFrame()
 

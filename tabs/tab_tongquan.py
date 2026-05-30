@@ -39,6 +39,10 @@ from data.pgd import ds_pgd_co_file
 from data.cdtotkvv import doc_cdtotkvv, ds_thang_nam, tong_hop_theo_pgd
 from pdf_service import nut_xuat_pdf, xuat_pdf
 from services.upload_service import format_caption_merge
+from services.tongquan_cdto_service import (
+    load_cdto_toan_cn,
+    render_totkvv_html,
+)
 from services import tongquan_service as _tqsvc
 from services.tongquan_service import xuat_excel_tqpgd as _xuat_excel_tqpgd
 from components.filter_bar import filter_bar, apply_filters
@@ -411,74 +415,34 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
         st.divider()
 
         try:
-            df_to_raw = None
-            thang_hien = None
-            ds_thang = ds_thang_nam()
-            if ds_thang:
-                for _thang in ds_thang:
-                    _df = doc_cdtotkvv(_thang)
-                    if _df is not None and not _df.empty:
-                        df_to_raw = _df
-                        thang_hien = _thang
-                        break
-            if df_to_raw is None or df_to_raw.empty:
-                from data.cdtotkvv import tong_hop_tu_pgd_data
-                df_to_raw = tong_hop_tu_pgd_data()
-                thang_hien = None
-            if df_to_raw is not None and not df_to_raw.empty:
-                th = tong_hop_theo_pgd(df_to_raw)
-                tong_to = int(th["tong_to"].sum())
-                to_tot = int(th["to_tot"].sum())
-                to_kha = int(th["to_kha"].sum())
-                to_tb = int(th["to_tb"].sum())
-                to_yeu = int(th["to_yeu"].sum())
+            cdto = load_cdto_toan_cn()
 
-                tl_tot = (to_tot / tong_to * 100) if tong_to else 0
-                tl_kha = (to_kha / tong_to * 100) if tong_to else 0
-                tl_tb = (to_tb / tong_to * 100) if tong_to else 0
-                tl_yeu = (to_yeu / tong_to * 100) if tong_to else 0
-                _tong_to = fmt_so(tong_to)
-                _to_tot = fmt_so(to_tot)
-                _to_kha = fmt_so(to_kha)
-                _to_tb = fmt_so(to_tb)
-                _to_yeu = fmt_so(to_yeu)
-                _tl_tot = vn(tl_tot, 1)
-                _tl_kha = vn(tl_kha, 1)
-                _tl_tb = vn(tl_tb, 1)
-                _tl_yeu = vn(tl_yeu, 1)
-                st.markdown(
-                        f"""
-                        <div class="totkvv-wrap">
-                            <div class="totkvv-head">
-                                <div class="totkvv-title">Xếp loại Tổ TK&amp;VV toàn Chi nhánh</div>
-                                <div class="totkvv-chip">{f"Tháng {thang_hien}" if thang_hien else "Dữ liệu tổng hợp"}</div>
-                            </div>
-                            <div class="totkvv-grid">
-                                <div class="totkvv-item tot-a">
-                                    <div class="v">{_tong_to}</div>
-                                    <div class="l">Tổng Tổ</div>
-                                </div>
-                                <div class="totkvv-item tot-b">
-                                    <div class="v">{_to_tot}</div>
-                                    <div class="l">Tốt · <span class="s">{_tl_tot}%</span></div>
-                                </div>
-                                <div class="totkvv-item tot-c">
-                                    <div class="v">{_to_kha}</div>
-                                    <div class="l">Khá · <span class="s">{_tl_kha}%</span></div>
-                                </div>
-                                <div class="totkvv-item tot-d">
-                                    <div class="v">{_to_tb}</div>
-                                    <div class="l">Trung bình · <span class="s">{_tl_tb}%</span></div>
-                                </div>
-                                <div class="totkvv-item tot-e">
-                                    <div class="v">{_to_yeu}</div>
-                                    <div class="l">Yếu · <span class="s">{_tl_yeu}%</span></div>
-                                </div>
-                            </div>
-                        </div>
-                        """,
-                        unsafe_allow_html=True,
-                )
+            if cdto["co_du_lieu"]:
+                if cdto["so_pgd_thieu"] == 0:
+                    st.success(
+                        f"✅ CDTOTKVV (chấm điểm Tổ): đủ **{cdto['so_pgd_co']}/{len(DS_PGD)} PGD**"
+                        + (f" · Tháng {cdto['thang_hien']}" if cdto["thang_hien"] else "")
+                    )
+                else:
+                    st.warning(
+                        f"⚠️ CDTOTKVV: **{cdto['so_pgd_co']}/{len(DS_PGD)} PGD**"
+                        + (f" · Tháng {cdto['thang_hien']}" if cdto["thang_hien"] else "")
+                        + f" — còn thiếu {cdto['so_pgd_thieu']} đơn vị"
+                    )
+            else:
+                st.info("ℹ️ CDTOTKVV (chấm điểm Tổ): chưa có dữ liệu.")
+
+            if cdto["co_du_lieu"] and cdto["kpi"] is not None:
+                html_card = render_totkvv_html(cdto["kpi"], cdto["thang_hien"])
+                st.markdown(html_card, unsafe_allow_html=True)
+
+                if cdto["so_pgd_thieu"] > 0:
+                    ten_thieu = ", ".join(cdto["ds_pgd_thieu"][:5])
+                    duoi = f" và {cdto['so_pgd_thieu'] - 5} đơn vị khác" if cdto["so_pgd_thieu"] > 5 else ""
+                    st.warning(
+                        f"⚠️ Dữ liệu CDTOTKVV từ **{cdto['so_pgd_co']}/{len(DS_PGD)} PGD**. "
+                        f"Thiếu: **{ten_thieu}{duoi}** — card được tính từ dữ liệu hiện có."
+                    )
                 st.divider()
             else:
                 st.info(
@@ -843,8 +807,8 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                         )
                         df_pgd = df_pgd.merge(df_to_pgd, on=COT_TEN_PGD, how="left")
             except Exception as e:  # conv: skip
-                logger.error("Lỗi merge CDTOTKVV: %s", e, exc_info=True)
-                pass
+                logger.error("Lỗi merge CDTOTKVV vào bảng PGD: %s", e, exc_info=True)
+                st.caption("⚠️ Không gộp được dữ liệu CDTOTKVV vào bảng — bảng sẽ thiếu cột Tổ TK&VV.")
 
             for cot in ["Tổng Tổ", "Tốt", "Khá", "TB", "Yếu"]:
                 if cot in df_pgd.columns:

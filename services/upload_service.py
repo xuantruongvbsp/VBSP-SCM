@@ -643,9 +643,8 @@ def merge_du_lieu_toan_cn(
                                 _dt_tmp = _pd.to_datetime(_val, errors="coerce")
                                 if _pd.notna(_dt_tmp):
                                     _ky_str = _dt_tmp.strftime("%Y-%m")
-                        except Exception:
-                            logger.error("Lỗi trong khối except: %s", e, exc_info=True)
-                            pass
+                        except Exception as e:
+                            logger.debug("luu_pgd_file: không parse được kỳ từ CDTOTKVV — %s", e)
                 _df_cdtot = _doc_cdtot()
                 if _df_cdtot is not None and not _df_cdtot.empty:
                     _luu_cdtot(_df_cdtot, _ky_str, _snap_user)
@@ -1010,8 +1009,8 @@ def format_caption_merge(loai: str) -> str | None:
     try:
         thoi_gian = datetime.fromisoformat(meta["thoi_gian"])
         thoi_gian_str = thoi_gian.strftime("%H:%M %d/%m")
-    except Exception:
-        logger.error("Lỗi trong khối except: %s", e, exc_info=True)
+    except Exception as e:
+        logger.debug("lay_thong_tin_merge: không parse được thời gian ISO — %s", e)
         thoi_gian_str = str(meta.get("thoi_gian", ""))
 
     so_pgd  = meta.get("so_pgd", 0)

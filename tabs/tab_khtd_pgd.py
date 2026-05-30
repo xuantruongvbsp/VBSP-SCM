@@ -265,7 +265,7 @@ def _fmt_vn(x, d: int = 1) -> str:
         v = float(x)
         s = f"{v:,.{d}f}"
         return s.replace(",", "X").replace(".", ",").replace("X", ".")
-    except Exception:
+    except Exception as e:
         logger.error("Lỗi trong khối except: %s", e, exc_info=True)
         return "—"
 
@@ -275,7 +275,7 @@ def _fmt_vn_signed(x, d: int = 1) -> str:
         v = float(x)
         s = _fmt_vn(v, d)
         return f"+{s}" if v > 0 else s
-    except Exception:
+    except Exception as e:
         logger.error("Lỗi trong khối except: %s", e, exc_info=True)
         return "—"
 
@@ -287,7 +287,7 @@ def _nv_int_tu_ma_key(ma_key: str) -> int | None:
     if "|" in ma_key:
         try:
             return int(ma_key.split("|", 1)[1])
-        except Exception:
+        except Exception as e:
             logger.error("Lỗi trong khối except: %s", e, exc_info=True)
             return None
     nv = NGUON_VON_MA.get(ma_key)
@@ -302,13 +302,13 @@ def _ma_ct_tu_ma_key(ma_key: str) -> int | None:
     if "|" in ma_key:
         try:
             return int(ma_key.split("|", 1)[0])
-        except Exception:
+        except Exception as e:
             logger.error("Lỗi trong khối except: %s", e, exc_info=True)
             return None
     if ma_key.endswith("_TW") or ma_key.endswith("_DP"):
         try:
             return int(ma_key.rsplit("_", 1)[0])
-        except Exception:
+        except Exception as e:
             logger.error("Lỗi trong khối except: %s", e, exc_info=True)
             return None
     return MA_CT_BY_MAKEY.get(ma_key)

@@ -837,7 +837,7 @@ def _render_upload_hang_loat(role: str, username: str) -> None:
                 for p in tmp_files:
                     try:
                         os.unlink(p)
-                    except Exception:
+                    except Exception as e:
                         logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                         pass
 
@@ -1112,7 +1112,7 @@ def _render_upload_baseline(username: str) -> None:
                     for f in files:
                         try:
                             _bm[f.name] = f.read_bytes()
-                        except Exception:
+                        except Exception as e:
                             logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                             pass
                     st.session_state["_bl_bytes"] = _bm

@@ -74,7 +74,7 @@ def _doc_lich_su(pgd_user: str) -> dict[str, pd.DataFrame]:
         label = f"{int(mm):02d}/{yyyy}"
         try:
             df = doc_cdtotkvv_path(str(f), ts_file(str(f)))
-        except Exception:
+        except Exception as e:
             logger.error("Lỗi trong khối except: %s", e, exc_info=True)
             continue
         if df is None or df.empty:
@@ -184,7 +184,7 @@ def _sub_phan_tich(pgd_user: str, username: str) -> None:
                 col_lower = str(col).lower()
                 if col_sum < 0 or "tru" in col_lower or "phat" in col_lower:
                     cot_tru_diem.append(col)
-            except Exception:
+            except Exception as e:
                 logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                 continue
 

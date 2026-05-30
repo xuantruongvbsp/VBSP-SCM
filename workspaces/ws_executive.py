@@ -76,7 +76,7 @@ def _fmt(v) -> str:
             s = f"{trieu:,.0f}".replace(",","X").replace(".",",").replace("X",".")
             return s
         return "—"
-    except Exception:
+    except Exception as e:
         logger.error("Lỗi trong khối except: %s", e, exc_info=True)
         return "—"
 
@@ -852,7 +852,7 @@ def _migration_matrix_section(df_full: pd.DataFrame, username: str) -> None:
                     if "/" in val:
                         parts = val.split("/")
                         ky_moi = f"{parts[2][:4]}-{parts[1].zfill(2)}"
-                except Exception:
+                except Exception as e:
                     logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                     pass
         if not ky_moi:

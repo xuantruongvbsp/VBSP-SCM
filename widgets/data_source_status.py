@@ -77,7 +77,7 @@ def _render_cache_status() -> None:
             st.sidebar.success(f"✅ CACHE KH-NV\n\n📅 {mtime.strftime('%d/%m %H:%M')}")
         else:
             st.sidebar.warning("⚠️ Chưa có CACHE KH-NV\n\nVui lòng upload tại tab KH-NV")
-    except Exception:
+    except Exception as e:
         logger.error("Lỗi trong khối except: %s", e, exc_info=True)
         st.sidebar.info("🔄 CACHE KH-NV")
 
@@ -146,7 +146,7 @@ def _render_admin_overview() -> None:
         else:
             st.sidebar.success("✅ Tỷ lệ upload tốt")
 
-    except Exception:
+    except Exception as e:
         logger.error("Lỗi trong khối except: %s", e, exc_info=True)
         st.sidebar.info("📊 Dữ liệu địa bàn")
 

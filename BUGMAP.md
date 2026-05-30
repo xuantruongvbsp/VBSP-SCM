@@ -832,6 +832,57 @@ DEBUG=1 streamlit run app.py
 
 ---
 
+### J7 — `except Exception: pass` nuốt lỗi im trong hàm visualization/helper
+
+| | |
+|---|---|
+| **File** | `workspaces/ws_operation.py` → `_heatmap_rui_ro_xa()` ~dòng 778 |
+| **Dấu hiệu** | Cột "Tăng trưởng" trong heatmap Xã luôn hiện "—" dù có dữ liệu snapshot; không có log lỗi nào → không biết tại sao |
+| **Nguyên nhân** | Khối try/except bọc toàn bộ snapshot lookup dùng `except Exception: pass` — nếu `snapshot_service.doc_snapshot()` raise lỗi (file missing, schema mismatch...) thì bị bỏ qua hoàn toàn |
+| **Fix** | `except Exception as e: logger.error("_heatmap_rui_ro_xa snapshot: %s", e, exc_info=True)` |
+| **Ngày fix** | 2026-05-30 |
+
+**Pattern nguy hiểm — tránh lặp:**
+```python
+# ❌ SAI — không biết gì khi lỗi
+try:
+    snapshot_data = doc_snapshot(ky)
+    ...
+except Exception:
+    pass
+
+# ✅ ĐÚNG — fallback im lặng nhưng ghi log để debug
+try:
+    snapshot_data = doc_snapshot(ky)
+    ...
+except Exception as e:
+    logger.error("ten_ham snapshot: %s", e, exc_info=True)
+    # tt giữ nguyên None → hiển thị "—" là đúng hành vi fallback
+```
+
+---
+
+### J8 — `DataFrame.get(key, default_series)` deprecated trong pandas 2.x
+
+| | |
+|---|---|
+| **File** | `workspaces/ws_operation.py` → `_render_dashboard_nang_cao_pgd()` ~dòng 865 |
+| **Dấu hiệu** | `FutureWarning: DataFrame.get with a non-scalar key is deprecated` trong log; hành vi có thể thay đổi giữa các phiên bản pandas |
+| **Nguyên nhân** | `df_pgd.get(COT_DU_NO_TH, pd.Series([0]*len(df_pgd))).sum()` — kết hợp guard `if col in df.columns` bên ngoài với `.get(col, default)` bên trong là thừa; pandas 2.x deprecated `df.get(key)` cho dict-style access với non-scalar |
+| **Fix** | `pd.to_numeric(df_pgd[COT_DU_NO_TH], errors="coerce").sum() if COT_DU_NO_TH in df_pgd.columns else 0` |
+| **Ngày fix** | 2026-05-30 |
+
+**Pattern chuẩn — dùng nhất quán:**
+```python
+# ❌ SAI — thừa + deprecated
+val = df.get(COT_X, pd.Series([0]*len(df))).sum() if COT_X in df.columns else 0
+
+# ✅ ĐÚNG — rõ ràng, không deprecated
+val = pd.to_numeric(df[COT_X], errors="coerce").sum() if COT_X in df.columns else 0
+```
+
+---
+
 ## Template: Ghi nhận bug mới
 
 Mỗi khi fix bug, copy template dưới đây và điền vào đúng mục:

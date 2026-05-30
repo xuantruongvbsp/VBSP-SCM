@@ -81,7 +81,7 @@ def _resolve_pgd_key(pgd_user: str) -> str:
 def _hostname() -> str:
     try:
         return socket.gethostname()
-    except Exception:
+    except Exception as e:
         logger.error("Lỗi trong khối except: %s", e, exc_info=True)
         return "unknown"
 

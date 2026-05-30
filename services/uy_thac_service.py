@@ -142,7 +142,7 @@ def luu_bien_ban(kv_key: str, ds_hien_tai: list, record: dict, username: str) ->
             ngay_kt_hien_thi = ngay_kt_raw.strftime("%d/%m/%Y")
         elif isinstance(ngay_kt_raw, str) and ngay_kt_raw:
             ngay_kt_hien_thi = datetime.fromisoformat(ngay_kt_raw).strftime("%d/%m/%Y")
-    except Exception:
+    except Exception as e:
         logger.error("Lỗi trong khối except: %s", e, exc_info=True)
         ngay_kt_hien_thi = str(ngay_kt_raw or "")
     loai_str = "bb_ct" if cap == "tinh" else "bb_cx"

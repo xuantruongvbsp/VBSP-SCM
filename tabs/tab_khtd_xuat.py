@@ -23,7 +23,7 @@ from data.core import ts_file
 def _doc_hstd_cached(_ts: float = 0) -> pd.DataFrame:
     try:
         return pd.read_parquet(CACHE_HSTD)
-    except Exception:
+    except Exception as e:
         logger.error("Lỗi trong khối except: %s", e, exc_info=True)
         return pd.DataFrame()
 
@@ -32,7 +32,7 @@ def _doc_hstd_cached(_ts: float = 0) -> pd.DataFrame:
 def _doc_gqvl_cached(_ts: float = 0) -> pd.DataFrame:
     try:
         return pd.read_parquet(CACHE_GQVL)
-    except Exception:
+    except Exception as e:
         logger.error("Lỗi trong khối except: %s", e, exc_info=True)
         return pd.DataFrame()
 from pdf_service import xuat_pdf
@@ -612,7 +612,7 @@ def _tab_tien_do_kh_th() -> None:
             df_gqvl_pgd = df_gqvl[df_gqvl[COT_TEN_PGD] == ten_pgd] \
                 if not df_gqvl.empty and COT_TEN_PGD in df_gqvl.columns \
                 else pd.DataFrame()
-        except Exception:
+        except Exception as e:
             logger.error("Lỗi trong khối except: %s", e, exc_info=True)
             df_gqvl_pgd = pd.DataFrame()
         th_gqvl_pgd = _tinh_th_gqvl_phan_tang(df_gqvl_pgd)

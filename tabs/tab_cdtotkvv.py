@@ -36,6 +36,10 @@ from services.cdtotkvv_service import (
     cdtotkvv_ten_sheet_excel as _cdtotkvv_ten_sheet_excel,
     fmt_xuat_to_khong_dat_vn as _fmt_xuat_to_khong_dat_vn,
 )
+from services.tongquan_cdto_service import (
+    load_cdto_toan_cn,
+    compute_totkvv_kpi,
+)
 from data.cdtotkvv import (
 
     doc_cdtotkvv, ds_thang_nam, tong_hop_theo_pgd,
@@ -295,21 +299,36 @@ def _sub_upload(role: str, username: str) -> None:
 
 def _sub_tong_hop(username: str) -> None:
     st.markdown("##### Tổng hợp dữ liệu từ hệ thống tập trung")
-    
-    # Đọc dữ liệu từ pgd_data/
-    df = tong_hop_tu_pgd_data()
+
+    cdto = load_cdto_toan_cn()
+    df = cdto["df_raw"]
+    kpi = cdto["kpi"]
+    thang_hien = cdto["thang_hien"]
+
     if df is None or df.empty:
         st.info("Chưa có dữ liệu CDTOTKVV nào từ hệ thống tập trung. Hãy kiểm tra tab Upload để xem trạng thái.")
         return
 
-    th = tong_hop_theo_pgd(df)
+    if cdto["so_pgd_thieu"] > 0:
+        ten_thieu = ", ".join(cdto["ds_pgd_thieu"][:5])
+        duoi = f" và {cdto['so_pgd_thieu'] - 5} đơn vị khác" if cdto["so_pgd_thieu"] > 5 else ""
+        st.info(
+            f"📊 Dữ liệu từ **{cdto['so_pgd_co']}/{len(DS_PGD)} PGD** · "
+            f"Thiếu: **{ten_thieu}{duoi}**"
+        )
+    if thang_hien:
+        st.caption(f"📅 Kỳ: Tháng {thang_hien}")
 
-    tong_to   = int(th["tong_to"].sum())
-    tong_tot  = int(th["to_tot"].sum())
-    tong_kha  = int(th["to_kha"].sum()) if "to_kha" in th.columns else 0
-    tong_tb   = int(th["to_tb"].sum()) if "to_tb" in th.columns else 0
-    tong_yeu  = int(th["to_yeu"].sum())
-    diem_tb   = round(float(df["tong_diem"].mean()), 2) if "tong_diem" in df.columns else 0.0
+    if kpi is None:
+        st.info("Không tính được KPI từ dữ liệu hiện có.")
+        return
+
+    tong_to = kpi["tong_to"]
+    tong_tot = kpi["to_tot"]
+    tong_kha = kpi["to_kha"]
+    tong_tb = kpi["to_tb"]
+    tong_yeu = kpi["to_yeu"]
+    diem_tb = kpi["diem_tb"]
     ty_le_dat = ((tong_tot + tong_kha) / tong_to * 100) if tong_to else 0.0
     ty_le_yeu_kem = (tong_yeu / tong_to * 100) if tong_to else 0.0
 

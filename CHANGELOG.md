@@ -1,5 +1,47 @@
 # CHANGELOG
 
+## [2026-05-30] — Refactor CDTOTKVV: tách service thống nhất + badge + health-check + unit tests
+- `services/tongquan_cdto_service.py` **(mới)** — service thống nhất load CDTOTKVV toàn CN: `load_cdto_toan_cn()` (chuỗi ưu tiên: ds_thang_nam → fallback pgd_data), `compute_totkvv_kpi()`, `render_totkvv_html()`, `health_check_cdto()`
+- `tabs/tab_tongquan.py` — thay ~60 dòng load + tính KPI thủ công bằng 2 dòng gọi service; thêm badge ✅/⚠️/ℹ️ CDTOTKVV (giống HSTD); sửa `except pass` → `st.caption()` cảnh báo merge CDTOTKVV lỗi
+- `tabs/tab_cdtotkvv.py` `_sub_tong_hop()` — dùng `load_cdto_toan_cn()` thay vì `tong_hop_tu_pgd_data()` trực tiếp; thêm hiển thị tháng + cảnh báo thiếu PGD
+- `services/upload_service.py` — fix `NameError` biến `suffix` chưa khởi tạo trong except của `luu_pgd_file()`
+- `tests/test_tongquan_cdto_service.py` **(mới)** — 10 test smoke: `compute_totkvv_kpi` (4), `render_totkvv_html` (3), `health_check_cdto` (1)
+
+## [2026-05-30] — Fix 27 NameError ẩn: `except Exception:` thiếu `as e` toàn project
+- `services/uy_thac_service.py` dòng ~145 — 1 chỗ
+- `tabs/tab_ban_dai_dien.py` dòng ~70, 90, 331, 544 — 4 chỗ
+- `tabs/tab_cdtotkvv_pgd.py` dòng ~77, 187 — 2 chỗ
+- `tabs/tab_diem_gd_pgd.py` dòng ~84 — 1 chỗ
+- `tabs/tab_khtd_pgd.py` dòng ~268, 278, 290, 305, 311 — 5 chỗ
+- `tabs/tab_khtd_xuat.py` dòng ~26, 35, 615 — 3 chỗ
+- `tabs/tab_no_khoanh.py` dòng ~318 — 1 chỗ
+- `tabs/tab_quan_ly_dgd.py` dòng ~84 — 1 chỗ
+- `tabs/tab_upload_khnv.py` dòng ~840, 1115 — 2 chỗ
+- `tabs/tab_upload_pgd.py` dòng ~113, 163 — 2 chỗ
+- `tabs/tab_uy_thac.py` dòng ~93 — 1 chỗ
+- `widgets/data_source_status.py` dòng ~80, 149 — 2 chỗ
+- `workspaces/ws_executive.py` dòng ~79, 855 — 2 chỗ
+
+## [2026-05-30] — Fix 3 lỗi sau rà P0 features trong ws_operation.py
+- `workspaces/ws_operation.py` dòng ~778 — sửa `except Exception: pass` → `except Exception as e: logger.error(...)` trong `_heatmap_rui_ro_xa` (vi phạm rule 5.15)
+- `workspaces/ws_operation.py` dòng ~865 — thay `df_pgd.get(COT_DU_NO_TH, pd.Series(...))` bằng `pd.to_numeric(df_pgd[COT_DU_NO_TH], errors="coerce").sum()` (pattern deprecated pandas 2.x)
+- `workspaces/ws_operation.py` dòng ~250 — xóa dead code `_render_gauge_nqh_pgd` (định nghĩa nhưng không gọi ở đâu; dashboard tab dùng `_gauge_nqh_pgd` trực tiếp)
+
+## [2026-05-30] — Fix 2 bug NameError trong upload_service.py
+- `services/upload_service.py` dòng ~646 — `except Exception:` thiếu `as e` → NameError khi log; đổi thành `except Exception as e:` + sửa message logger
+- `services/upload_service.py` dòng ~1013 — `except Exception:` thiếu `as e` trong `lay_thong_tin_merge()` → NameError; đổi thành `except Exception as e:` + sửa message logger
+
+## [2026-05-30] — Triển khai P0 features cho ws_operation.py (PGD workspace)
+- `workspaces/ws_operation.py` dòng ~177–261 — thêm `_mau_nqh_pgd()`, `_gauge_nqh_pgd()`, `_render_gauge_nqh_pgd()`: Gauge đồng hồ NQH cho PGD (xanh/cam/đỏ theo ngưỡng 1%/2%)
+- `workspaces/ws_operation.py` dòng ~544–696 — thêm `_render_canh_bao_som_pgd_full()`: Cảnh báo sớm đầy đủ (4 KPI, tổng hợp theo Xã, Amber migration list, xuất KL giao ban)
+- `workspaces/ws_operation.py` dòng ~728–846 — thêm `_heatmap_rui_ro_xa()`: Heatmap rủi ro 8 cột theo Xã (NQH%, 3T KHĐ, Migration, Điểm RR)
+- `workspaces/ws_operation.py` dòng ~849–912 — thêm `_render_dashboard_nang_cao_pgd()`: Dashboard sức khỏe tín dụng (Gauge + 4 KPI cards + progress bar + heatmap Xã)
+- `workspaces/ws_operation.py` dòng ~2189, 2240 — thêm tab "📊 Dashboard Sức khỏe" (nhóm Trang Chủ) và "🚨 Cảnh báo sớm (Full)" (nhóm Kiểm soát & Rủi ro)
+
+## [2026-05-30] — Fix 2 bug ws_operation.py: thiếu import + except thiếu `as e`
+- `workspaces/ws_operation.py` dòng ~24 — thêm `COT_DU_NO_TH`, `COT_NGAY_VAY` vào import config (thiếu → NameError khi chạy Dashboard sức khỏe & Heatmap đáo hạn)
+- `workspaces/ws_operation.py` dòng ~101–172, 360–372 — sửa 6 khối `except Exception:` thành `except Exception as e:` để log đúng lỗi gốc (trước đây gây NameError trong exception handler)
+
 ## [2026-05-30] — Multi-tab selection khi thêm Google Sheet (tab Theo dõi nhập liệu)
 - `tabs/tab_theo_doi_nhap.py` dòng ~787 — thay single-tab selectbox bằng checkbox list: chọn nhiều tab cùng lúc, tab đã có tự disabled, nút "➕ Thêm N tab đã chọn", template áp dụng cho tất cả tab được chọn
 

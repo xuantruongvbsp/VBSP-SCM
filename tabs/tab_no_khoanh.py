@@ -315,7 +315,7 @@ def _render_mau01_cv368(
                     _delta = (_dhh - _dkt).days
                     if not (0 <= _delta <= 120):
                         st.warning(f"⚠️ {_rv.get(COT_TEN_KH, '')}: Ngày KT cách HH khoanh {_delta} ngày (ngoài 0–120)")
-            except Exception:
+            except Exception as e:
                 logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                 pass
 

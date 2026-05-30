@@ -5,6 +5,8 @@ PGD chỉ có quyền xem, không chỉnh sửa.
 """
 from __future__ import annotations
 
+from io import BytesIO
+
 import pandas as pd
 import streamlit as st
 from streamlit.delta_generator import DeltaGenerator
@@ -100,6 +102,3 @@ Danh sách này ảnh hưởng trực tiếp đến báo cáo **phân tầng GQV
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 key="ndt_dp_export",
             )
-
-
-from io import BytesIO

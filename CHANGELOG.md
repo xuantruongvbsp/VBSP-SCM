@@ -1,5 +1,8 @@
 # CHANGELOG
 
+## [2026-05-31b] — Fix import BytesIO misplaced trong tab_ndt_dp.py
+- `tabs/tab_ndt_dp.py` dòng 3 — chuyển `from io import BytesIO` lên đầu file (đúng convention), xóa import thừa ở cuối file
+
 ## [2026-05-31] — Triển khai P3 features cho PGD workspace (làm hết plan)
 - `tabs/tab_ndt_dp.py` **(mới)** — tab Mã NĐT Địa phương phiên bản PGD (chỉ xem, không CRUD)
 - `tabs/tab_hhi.py` dòng ~156, ~177-181, ~240-278 — thêm `pgd_user` parameter:

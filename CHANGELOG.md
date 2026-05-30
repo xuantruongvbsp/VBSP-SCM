@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## [2026-05-30] — Upload CDTOTKVV toàn CN: 1 file tổng hợp → tự tách 22 PGD
+- `data/cdtotkvv.py` dòng ~170 — thêm `tach_file_cdto_toan_cn(file_bytes)`: đọc file toàn CN, group theo mã đơn vị, trả `{ten_pgd: excel_bytes}`
+- `services/upload_service.py` dòng ~301 — thêm `xu_ly_cdto_toan_cn(file_bytes)`: tách + lưu từng PGD qua `luu_file_pgd_voi_lich_su`
+- `tabs/tab_upload_khnv.py` — thêm `_render_cdto_toan_cn(username)` + gọi trong tab "Dữ liệu Hiện tại": preview đơn vị, cảnh báo thiếu PGD, nút upload
+
 ## [2026-05-30] — Nâng cấp xuất PDF tab tiến độ: refactor helper, đổi tên, strip emoji Excel
 - `tabs/tab_tien_do_nop.py` — extract `_pdf_button()` helper dùng chung cho 2 loại PDF, loại bỏ ~25 dòng lặp
 - `tabs/tab_tien_do_nop.py` — import `xuat_pdf`, `xuat_pdf_group_header` ra ngoài handler

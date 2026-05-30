@@ -482,6 +482,113 @@ def _form_thuyet_minh_nam(
             st.success(f"✅ Đã lưu thuyết minh ({loai}) năm **{nam}** cho {pgd_chon}.")
 
 
+# ── Approval: PGD view ───────────────────────────────────────────────────────
+
+def _render_approval_pgd(
+    pgd_chon: str,
+    ds_nam: list[int],
+    loai: str,
+    username: str,
+    role: str,
+) -> None:
+    """Section phê duyệt kế hoạch — hiển thị dưới các sub-tab nhập liệu (PGD view)."""
+    st.divider()
+    st.markdown("#### 📋 Nộp & Theo dõi Phê duyệt")
+
+    approval = doc_trang_thai_approval(pgd_chon, ds_nam, loai)
+    tt = approval.get("trang_thai", "nhap_lieu")
+    slug = pgd_slug(pgd_chon)
+    giai_doan = str(ds_nam[0]) if len(ds_nam) == 1 else f"{ds_nam[0]}–{ds_nam[-1]}"
+
+    # ── Badge trạng thái ──────────────────────────────────────────────────────
+    _TT_LABEL = {
+        "nhap_lieu": ("🖊️", "Đang nhập liệu", "info"),
+        "da_nop":    ("⏳", "Đã nộp — Chờ Chi nhánh duyệt", "warning"),
+        "da_duyet":  ("✅", "ĐÃ DUYỆT", "success"),
+        "tu_choi":   ("❌", "Bị trả lại — Cần chỉnh sửa và nộp lại", "error"),
+    }
+    icon, label, badge_type = _TT_LABEL.get(tt, ("❓", tt, "info"))
+    getattr(st, badge_type)(f"{icon} **{label}**")
+
+    if tt == "da_duyet":
+        ngay = (approval.get("ngay_duyet") or "")[:10]
+        nguoi = approval.get("nguoi_duyet") or ""
+        y_kien = approval.get("y_kien") or ""
+        st.caption(f"Duyệt bởi: **{nguoi}** — Ngày: **{ngay}**")
+        if y_kien:
+            st.caption(f"Ý kiến: {y_kien}")
+        # Export buttons (locked — read only)
+        _render_export_buttons_pgd(pgd_chon, ds_nam, loai, slug)
+        return
+
+    if tt == "tu_choi":
+        y_kien = approval.get("y_kien") or ""
+        if y_kien:
+            st.markdown(f"**Ý kiến Chi nhánh:** {y_kien}")
+        nguoi_duyet = approval.get("nguoi_duyet") or ""
+        if nguoi_duyet:
+            st.caption(f"Trả lại bởi: {nguoi_duyet}")
+
+    if tt == "da_nop":
+        lan = approval.get("lan_nop", 1)
+        ngay_nop = (approval.get("ngay_nop") or "")[:10]
+        st.caption(f"Đã nộp lần {lan} — Ngày {ngay_nop}")
+        _render_export_buttons_pgd(pgd_chon, ds_nam, loai, slug)
+        return
+
+    # ── Nút nộp (chỉ khi nhap_lieu hoặc tu_choi) ─────────────────────────────
+    st.markdown("**Điều kiện nộp:** Phải có đầy đủ Biểu 01C, Biểu 02C và Thuyết minh cho tất cả các năm.")
+
+    lan_nop = approval.get("lan_nop", 0)
+    label_btn = f"📤 Nộp Kế hoạch ({giai_doan})" if lan_nop == 0 else f"🔄 Nộp lại Kế hoạch (lần {lan_nop + 1})"
+
+    if st.button(label_btn, key=f"xd_nop_{slug}_{loai}_{ds_nam[0]}", type="primary"):
+        ok = nop_ke_hoach(pgd_chon, ds_nam, loai, username)
+        if ok:
+            st.success("✅ Đã nộp kế hoạch thành công! Chi nhánh sẽ xem xét và phê duyệt.")
+            st.rerun()
+        else:
+            st.error("❌ Chưa đủ dữ liệu để nộp. Hãy đảm bảo đã nhập đủ Biểu 01C, 02C và Thuyết minh.")
+
+    _render_export_buttons_pgd(pgd_chon, ds_nam, loai, slug)
+
+
+def _render_export_buttons_pgd(
+    pgd_chon: str, ds_nam: list[int], loai: str, slug: str
+) -> None:
+    """Nút tải Excel + Word cho 1 PGD."""
+    with st.expander("📥 Tải xuống", expanded=False):
+        c1, c2 = st.columns(2)
+        with c1:
+            try:
+                excel_bytes = xuat_excel_1pgd(pgd_chon, ds_nam, loai)
+                st.download_button(
+                    "📊 Tải Excel",
+                    data=excel_bytes,
+                    file_name=f"KHTD_{loai}_{slug}_{ds_nam[0]}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    key=f"xd_dl_excel_{slug}_{loai}_{ds_nam[0]}",
+                    use_container_width=True,
+                )
+            except Exception as e:
+                logger.error("_render_export_buttons_pgd excel: %s", e, exc_info=True)
+                st.caption(f"⚠️ Không xuất được Excel: {e}")
+        with c2:
+            try:
+                word_bytes = xuat_word_bao_cao_pgd(pgd_chon, ds_nam, loai)
+                st.download_button(
+                    "📝 Tải Tờ trình Word",
+                    data=word_bytes,
+                    file_name=f"TT_KHTD_{loai}_{slug}_{ds_nam[0]}.docx",
+                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    key=f"xd_dl_word_{slug}_{loai}_{ds_nam[0]}",
+                    use_container_width=True,
+                )
+            except Exception as e:
+                logger.error("_render_export_buttons_pgd word: %s", e, exc_info=True)
+                st.caption(f"⚠️ Không xuất được Word: {e}")
+
+
 # ── Sub-tab 4: Tổng hợp CN ────────────────────────────────────────────────────
 
 def _render_tong_hop_cn(tab, ds_nam: list[int], loai: str) -> None:
@@ -503,6 +610,11 @@ def _render_tong_hop_cn(tab, ds_nam: list[int], loai: str) -> None:
 
         st.markdown("---")
 
+        # ── Phê duyệt kế hoạch PGD ───────────────────────────────────────
+        _render_approval_cn(ds_nam, loai)
+
+        st.markdown("---")
+
         # ── Tổng hợp dư nợ ───────────────────────────────────────────────
         st.markdown("##### Tổng hợp dư nợ dự kiến toàn CN")
 
@@ -510,6 +622,122 @@ def _render_tong_hop_cn(tab, ds_nam: list[int], loai: str) -> None:
             _bang_du_no_1nam(ds_nam[0], loai)
         else:
             _bang_du_no_da_nam(ds_nam, loai)
+
+        st.markdown("---")
+
+        # ── Xuất tổng hợp ────────────────────────────────────────────────
+        with st.expander("📥 Xuất báo cáo tổng hợp CN", expanded=False):
+            c1, c2 = st.columns(2)
+            giai_doan_str = str(ds_nam[0]) if len(ds_nam) == 1 else f"{ds_nam[0]}-{ds_nam[-1]}"
+            with c1:
+                try:
+                    excel_bytes = xuat_excel_tong_hop_cn(ds_nam, loai)
+                    st.download_button(
+                        "📊 Tải Excel tổng hợp",
+                        data=excel_bytes,
+                        file_name=f"KHTD_TH_CN_{loai}_{giai_doan_str}.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        key=f"xd_cn_dl_excel_{loai}_{ds_nam[0]}",
+                        use_container_width=True,
+                    )
+                except Exception as e:
+                    logger.error("_render_tong_hop_cn excel: %s", e, exc_info=True)
+                    st.caption(f"⚠️ {e}")
+            with c2:
+                try:
+                    word_bytes = xuat_word_tong_hop_cn(ds_nam, loai)
+                    st.download_button(
+                        "📝 Tải Word tổng hợp",
+                        data=word_bytes,
+                        file_name=f"KHTD_TH_CN_{loai}_{giai_doan_str}.docx",
+                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                        key=f"xd_cn_dl_word_{loai}_{ds_nam[0]}",
+                        use_container_width=True,
+                    )
+                except Exception as e:
+                    logger.error("_render_tong_hop_cn word: %s", e, exc_info=True)
+                    st.caption(f"⚠️ {e}")
+
+
+def _render_approval_cn(ds_nam: list[int], loai: str) -> None:
+    """Panel phê duyệt tập trung — dành cho admin_cn / manager_cn trong Tổng hợp CN."""
+    st.markdown("##### ✅ Phê duyệt Kế hoạch PGD")
+
+    approval_map = trang_thai_approval_cn(ds_nam, loai)
+    da_nop = [(pgd, ap) for pgd, ap in approval_map.items() if ap.get("trang_thai") == "da_nop"]
+    da_duyet = sum(1 for ap in approval_map.values() if ap.get("trang_thai") == "da_duyet")
+    tu_choi  = sum(1 for ap in approval_map.values() if ap.get("trang_thai") == "tu_choi")
+
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Chờ duyệt", len(da_nop))
+    c2.metric("Đã duyệt", da_duyet)
+    c3.metric("Bị trả lại", tu_choi)
+
+    if not da_nop:
+        st.info("📭 Không có PGD nào đang chờ duyệt.")
+    else:
+        st.markdown(f"**{len(da_nop)} PGD đang chờ duyệt:**")
+
+        username_duyetvien = st.session_state.get("username", "unknown")
+
+        for pgd_ten, ap in da_nop:
+            slug = pgd_slug(pgd_ten)
+            lan_nop = ap.get("lan_nop", 1)
+            ngay_nop = (ap.get("ngay_nop") or "")[:10]
+            nguoi_nop = ap.get("nguoi_nop") or ""
+
+            with st.expander(f"📋 {pgd_ten} — Nộp lần {lan_nop} ({ngay_nop})", expanded=False):
+                st.caption(f"Người nộp: {nguoi_nop}")
+
+                y_kien = st.text_area(
+                    "Ý kiến (tùy chọn)",
+                    key=f"xd_yk_{slug}_{loai}_{ds_nam[0]}",
+                    placeholder="Nhập ý kiến hoặc yêu cầu chỉnh sửa...",
+                    height=80,
+                )
+                col_duyet, col_tuchoi = st.columns(2)
+                with col_duyet:
+                    if st.button(
+                        "✅ Duyệt",
+                        key=f"xd_duyet_{slug}_{loai}_{ds_nam[0]}",
+                        type="primary",
+                        use_container_width=True,
+                    ):
+                        duyet_ke_hoach_xd(pgd_ten, ds_nam, loai, "da_duyet", y_kien, username_duyetvien)
+                        st.success(f"✅ Đã duyệt kế hoạch của {pgd_ten}")
+                        st.rerun()
+                with col_tuchoi:
+                    if st.button(
+                        "↩️ Trả lại",
+                        key=f"xd_tuchoi_{slug}_{loai}_{ds_nam[0]}",
+                        use_container_width=True,
+                    ):
+                        if not y_kien.strip():
+                            st.warning("⚠️ Vui lòng nhập ý kiến khi trả lại kế hoạch.")
+                        else:
+                            duyet_ke_hoach_xd(pgd_ten, ds_nam, loai, "tu_choi", y_kien, username_duyetvien)
+                            st.warning(f"↩️ Đã trả lại kế hoạch của {pgd_ten}")
+                            st.rerun()
+
+    # Danh sách đã duyệt — cho phép admin_cn mở lại
+    da_duyet_list = [(pgd, ap) for pgd, ap in approval_map.items() if ap.get("trang_thai") == "da_duyet"]
+    if da_duyet_list:
+        with st.expander(f"🔓 Mở lại kế hoạch đã duyệt ({len(da_duyet_list)} PGD)", expanded=False):
+            username_duyetvien = st.session_state.get("username", "unknown")
+            for pgd_ten, ap in da_duyet_list:
+                slug = pgd_slug(pgd_ten)
+                ngay = (ap.get("ngay_duyet") or "")[:10]
+                col_info, col_btn = st.columns([3, 1])
+                col_info.markdown(f"**{pgd_ten}** — Duyệt: {ngay}")
+                with col_btn:
+                    if st.button(
+                        "🔓 Mở lại",
+                        key=f"xd_molai_{slug}_{loai}_{ds_nam[0]}",
+                        use_container_width=True,
+                    ):
+                        mo_lai_ke_hoach(pgd_ten, ds_nam, loai, username_duyetvien)
+                        st.info(f"🔓 Đã mở lại kế hoạch của {pgd_ten} để chỉnh sửa.")
+                        st.rerun()
 
 
 def _bang_trang_thai_1nam(nam: int, loai: str) -> None:

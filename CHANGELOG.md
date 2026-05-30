@@ -1,5 +1,49 @@
 # CHANGELOG
 
+## [2026-05-31g] — Bugfix: TypeError _set_cell color kwarg trong Word HSTD export
+- `services/hstd_word_service.py` dòng ~387 — xoá kwarg `color=` không hợp lệ khỏi `_set_cell()` trong `_ve_chu_ky()`, tránh `TypeError` khi xuất Word
+
+## [2026-05-31f] — Fix path credentials.json: module constant → inline (tránh Streamlit cache)
+
+- `tabs/tab_tien_do_nop.py` — xoá module-level `CREDENTIALS_FILE`, thay bằng `_p = str(BASE_DIR / "credentials.json")` trong `_ket_noi_gsheet()` và `render()` (tránh Streamlit cache module cũ)
+- `tabs/tab_theo_doi_nhap.py` — xoá module-level `CREDENTIALS_FILE`, thay bằng `_p = str(BASE_DIR / "credentials.json")` trong `_ket_noi_gsheet()` và `render()` tương tự
+
+## [2026-05-31] — Sprint 3-5: KHTD Approval Workflow hoàn chỉnh
+- `services/khtd_xuat_service.py` **(mới)** — 4 hàm xuất: `xuat_excel_1pgd()`, `xuat_excel_tong_hop_cn()`, `xuat_word_bao_cao_pgd()`, `xuat_word_tong_hop_cn()` (fix ImportError khi tab load)
+- `tabs/tab_xay_dung_khtd.py` dòng ~487 — thêm `_render_approval_pgd()`: UI nộp/theo dõi phê duyệt cho PGD (fix NameError); trạng thái nhap_lieu/da_nop/da_duyet/tu_choi + nút nộp/nộp lại + tải Excel/Word
+- `tabs/tab_xay_dung_khtd.py` dòng ~592 — thêm `_render_approval_cn()`: panel phê duyệt tập trung cho CN (KPI cards + danh sách chờ duyệt + Duyệt/Trả lại + Mở lại)
+- `tabs/tab_xay_dung_khtd.py` dòng ~619 — thêm nút tải Excel/Word tổng hợp CN vào `_render_tong_hop_cn`
+
+## [2026-05-31e] — Sprint 1-2: Bảo mật & Audit NHCSXH (Tuân thủ TT 09/2019/TT-NHNN)
+- `security.py` **(MỚI)** — Module bảo mật chính cho compliance NHCSXH:
+  - **Session Timeout 30 phút**: Tự động logout sau inactive (cấu hình `SESSION_TIMEOUT_MINUTES = 30`)
+  - **IP Whitelist**: Quản lý IP nội bộ NHCSXH — hỗ trợ CIDR range (10.0.0.0/8, 192.168.0.0/16...), kiểm tra trước login
+  - **2FA/TOTP**: Xác thực 2 yếu tố cho admin (Google Authenticator compatible) với time window ±1 (30s)
+- `tabs/tab_security.py` **(MỚI)** — Tab quản lý bảo mật (chỉ Admin CN):
+  - Quản lý IP Whitelist: Thêm/xóa range, validation CIDR
+  - Thiết lập 2FA: QR code generation, verification
+  - Audit settings: Thống kê log, cleanup dữ liệu cũ
+- `db.py` — Mở rộng audit_log cho NHCSXH compliance:
+  - Thêm 6 cột: `table_name`, `record_id`, `old_value`, `new_value`, `ip_address`, `user_agent`
+  - Migration tự động cho DB hiện có (ALTER TABLE ADD COLUMN)
+  - Hàm `ghi_audit_full()` — ghi audit trail đầy đủ với IP, UA, old/new values
+  - Index mới: `idx_audit_table_record`, `idx_audit_ip`
+- `app.py` — Tích hợp kiểm tra bảo mật:
+  - `init_session_security()` — khởi tạo session tracking
+  - `check_and_handle_timeout()` — kiểm tra timeout mỗi request
+  - IP whitelist check (bypass cho localhost 127.0.0.1)
+  - `update_last_activity()` — cập nhật timestamp sau mỗi tương tác
+- `tabs/tab_audit_log.py` — Hiển thị audit trail đầy đủ:
+  - Checkbox "Hiển thị đầy đủ" để xem IP, User Agent, Bảng, Record ID
+  - Column config động theo chế độ hiển thị
+- `workspaces/ws_management.py` — Thêm menu "🔐 Quản lý bảo mật" cho admin_cn
+- `tests/test_security.py` **(MỚI)** — 16 unit tests cho security module:
+  - IP Whitelist: 6 tests (ip_to_int, CIDR range, add/remove validation)
+  - TOTP 2FA: 5 tests (secret gen, HOTP, verify, window tolerance)
+  - Session Timeout: 3 tests (config, valid, expired)
+  - Audit Trail: 1 test (ghi_audit_full call)
+  - Integration: 1 test (full security flow)
+
 ## [2026-05-31d] — Báo cáo Tổng hợp HSTD Word (.docx)
 - `services/hstd_word_service.py` **(MỚI)** — service xuất báo cáo Word tổng hợp HSTD:
   - Trang bìa: Header NHCSXH + tiêu đề + tháng/năm + người xuất

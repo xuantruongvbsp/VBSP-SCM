@@ -15,13 +15,12 @@ from streamlit.delta_generator import DeltaGenerator
 
 import db
 from auth import la_phan_he_cn, normalize_role
-from config import DS_PGD, DON_VI_CHI_NHANH
+from config import BASE_DIR, DS_PGD, DON_VI_CHI_NHANH
 from utils import xuat_excel
 
 
 SHEET_ID = "15Ev2rTv6khLFaMpAiMwqJCVC_33ocJ-6cp016RGNkYk"
 SHEET_TAB = "TIENDO_BAOCAO"
-CREDENTIALS_FILE = "credentials.json"
 COT = ["thoi_gian", "email", "ten_pgd", "loai_bao_cao",
        "ky_bao_cao", "noi_dung", "file_dinh_kem", "ho_ten"]
 
@@ -53,25 +52,26 @@ def _clear_export_cache():
 
 @st.cache_resource(show_spinner=False)
 def _ket_noi_gsheet():
+    _p = Path(__file__).resolve().parent.parent / "credentials.json"
     scope = [
         "https://spreadsheets.google.com/feeds",
         "https://www.googleapis.com/auth/drive",
     ]
-    if not Path(CREDENTIALS_FILE).exists():
-        raise FileNotFoundError(f"Không tìm thấy file credentials: {CREDENTIALS_FILE}")
+    if not _p.exists():
+        raise FileNotFoundError(f"Không tìm thấy file credentials: {_p}")
     try:
         import gspread
     except ImportError:
         raise RuntimeError("Thiếu thư viện gspread. Cài đặt: pip install gspread google-auth")
     try:
-        return gspread.service_account(filename=CREDENTIALS_FILE, scopes=scope)
+        return gspread.service_account(filename=_p, scopes=scope)
     except Exception as e:
         logger.error("_ket_noi_gsheet: fallback oauth2client — %s", e, exc_info=True)
         try:
             from oauth2client.service_account import ServiceAccountCredentials
         except ImportError:
             raise RuntimeError("Không thể kết nối GSheet: cần cài google-auth hoặc oauth2client.")
-        creds = ServiceAccountCredentials.from_json_keyfile_name(CREDENTIALS_FILE, scope)
+        creds = ServiceAccountCredentials.from_json_keyfile_name(_p, scope)
         return gspread.authorize(creds)
 
 
@@ -760,7 +760,8 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
             _doc_du_lieu.clear()
             st.session_state[f"_tdn_cache_ver"] = _CACHE_VER
 
-        if not Path(CREDENTIALS_FILE).exists():
+        _credentials_path = str(BASE_DIR / "credentials.json")
+        if not Path(_credentials_path).exists():
             st.warning(
                 "⚠️ Chưa cấu hình Google Sheets. "
                 "Đặt file `credentials.json` (Service Account) vào thư mục gốc."

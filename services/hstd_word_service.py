@@ -384,7 +384,7 @@ def _ve_chu_ky(doc: Document, username: str):
     for i, label in enumerate(ky_labels):
         _set_cell(tbl.rows[0].cells[i], label, bold=True, size=10)
     for i, sub in enumerate(ky_subs):
-        _set_cell(tbl.rows[1].cells[i], sub, size=8, color=(120, 120, 120))
+        _set_cell(tbl.rows[1].cells[i], sub, size=8)
         tbl.rows[1].cells[i].paragraphs[0].runs[0].font.color.rgb = RGBColor(120, 120, 120)
 
     _p(doc, "", size=8, space_after=4)

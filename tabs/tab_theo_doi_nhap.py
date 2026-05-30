@@ -18,11 +18,11 @@ import db
 from auth import la_phan_he_cn, normalize_role
 from components.delta_card import kpi_row
 from logger import get_logger
+from config import BASE_DIR
 from utils import get_tab_context, xuat_excel
 
 logger = get_logger(__name__)
 
-CREDENTIALS_FILE  = "credentials.json"
 KV_LIST_KEY       = "gsheet_theo_doi_nhap_list"   # list nhiều sheet
 KV_LEGACY_KEY     = "gsheet_theo_doi_nhap_config"  # key cũ — tự migrate
 
@@ -39,21 +39,22 @@ _EMOJI_PCT = {"full": "🟢", "partial": "🟡", "empty": "🔴"}
 
 @st.cache_resource(show_spinner=False)
 def _ket_noi_gsheet():
+    _p = str(BASE_DIR / "credentials.json")
     scope = [
         "https://spreadsheets.google.com/feeds",
         "https://www.googleapis.com/auth/drive",
     ]
-    if not Path(CREDENTIALS_FILE).exists():
-        raise FileNotFoundError(f"Không tìm thấy {CREDENTIALS_FILE}")
+    if not Path(_p).exists():
+        raise FileNotFoundError(f"Không tìm thấy {_p}")
     try:
         import gspread
-        return gspread.service_account(filename=CREDENTIALS_FILE, scopes=scope)
+        return gspread.service_account(filename=_p, scopes=scope)
     except Exception as e:
         logger.error("_ket_noi_gsheet: %s", e, exc_info=True)
         try:
             from oauth2client.service_account import ServiceAccountCredentials
             import gspread
-            creds = ServiceAccountCredentials.from_json_keyfile_name(CREDENTIALS_FILE, scope)
+            creds = ServiceAccountCredentials.from_json_keyfile_name(_p, scope)
             return gspread.authorize(creds)
         except ImportError:
             raise RuntimeError("Không thể kết nối GSheet.")
@@ -693,6 +694,7 @@ def _render_cai_dat(ds_sheet: list[dict], username: str) -> None:
                             n = sum(1 for r in rows if any(str(c).strip() for c in r))
                             st.success(f"✅ OK — {n} hàng dữ liệu")
                         except Exception as e:
+                            logger.error("_sub_cau_hinh doc_sheet: %s", e, exc_info=True)
                             st.error(f"❌ {e}")
                 with col_s:
                     if st.button("💾 Lưu", key=f"cd_{i}_save", type="primary",
@@ -868,6 +870,7 @@ def _render_cai_dat(ds_sheet: list[dict], username: str) -> None:
                     else:
                         st.caption("💡 Tạo template trong mục 📁 Quản lý Template để tự động điền cấu hình.")
                 except Exception as e:
+                    logger.error("_sub_tong_hop doc_sheet: %s", e, exc_info=True)
                     st.error(f"❌ Không đọc được sheet: {e}")
 
 
@@ -994,7 +997,8 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
     with ctx:
         st.subheader("📋 Theo dõi tiến trình nhập liệu PGD")
 
-        if not Path(CREDENTIALS_FILE).exists():
+        _credentials_path = str(BASE_DIR / "credentials.json")
+        if not Path(_credentials_path).exists():
             st.warning("⚠️ Chưa có `credentials.json`.")
             return
 

@@ -298,6 +298,44 @@ def luu_dienbao(
     )
 
 
+# ── Upload CDTOTKVV toàn Chi nhánh (1 file tổng hợp → tách 22 PGD) ──────────
+
+def xu_ly_cdto_toan_cn(file_bytes: bytes) -> dict[str, "KetQuaUpload"]:
+    """
+    Tách file CDTOTKVV toàn CN và lưu cho từng PGD.
+    Trả về {ten_pgd: KetQuaUpload}.
+    Caller phải ghi audit sau khi nhận kết quả.
+    """
+    from data.cdtotkvv import tach_file_cdto_toan_cn, doc_thang_nam_tu_file
+    from data.pgd import luu_file_pgd_voi_lich_su, luu_file_pgd
+
+    try:
+        pgd_map = tach_file_cdto_toan_cn(file_bytes)
+    except Exception as e:
+        return {"_loi_doc": KetQuaUpload(False, f"Lỗi đọc/tách file: {e}")}
+
+    if not pgd_map:
+        return {"_loi_doc": KetQuaUpload(False, "Không tìm thấy dữ liệu đơn vị nào trong file")}
+
+    thang = doc_thang_nam_tu_file(file_bytes)
+    ket_qua: dict[str, KetQuaUpload] = {}
+
+    for ten_pgd, pgd_bytes in pgd_map.items():
+        mb = len(pgd_bytes) / 1024 / 1024
+        try:
+            if thang:
+                luu_file_pgd_voi_lich_su(ten_pgd, "cdtotkvv", pgd_bytes, thang)
+                msg = f"✅ Lưu OK · tháng {thang} · {mb:.1f} MB"
+            else:
+                luu_file_pgd(ten_pgd, "cdtotkvv", pgd_bytes)
+                msg = f"✅ Lưu OK · {mb:.1f} MB"
+            ket_qua[ten_pgd] = KetQuaUpload(True, msg)
+        except Exception as e:
+            ket_qua[ten_pgd] = KetQuaUpload(False, f"❌ Lỗi: {e}")
+
+    return ket_qua
+
+
 # ── Gộp dữ liệu toàn Chi nhánh từ 22 đơn vị ─────────────────────────────────
 
 def merge_du_lieu_toan_cn(

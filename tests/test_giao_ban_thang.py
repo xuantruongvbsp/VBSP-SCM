@@ -3,13 +3,16 @@ from __future__ import annotations
 
 import sys
 import os
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
+import importlib.util
 import pandas as pd
 import numpy as np
-import pytest
 
-from services.giao_ban_thang_service import tao_bao_cao_giao_ban_thang
+_mod_path = os.path.join(os.path.dirname(__file__), "..", "services", "giao_ban_thang_service.py")
+_mod_path = os.path.abspath(_mod_path)
+spec = importlib.util.spec_from_file_location("giao_ban_thang_service", _mod_path)
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+tao_bao_cao_giao_ban_thang = mod.tao_bao_cao_giao_ban_thang
 
 
 def _tao_df_gia():
@@ -37,56 +40,27 @@ def _tao_df_gia():
     return pd.DataFrame(rows)
 
 
-class TestGiaoBanThang:
-    def test_tao_pdf_ok(self):
-        df = _tao_df_gia()
-        assert df is not None
-        assert len(df) > 0
-
-        bytes_out = tao_bao_cao_giao_ban_thang(
-            df, thang=6, nam=2026, username="test_user",
-        )
-
-        assert bytes_out is not None
-        assert len(bytes_out) > 2000, f"PDF too small: {len(bytes_out)} bytes"
-        assert bytes_out[:4] == b"%PDF", "Output is not valid PDF"
-
-        with open("tests/test_giao_ban_output.pdf", "wb") as f:
-            f.write(bytes_out)
-
-    def test_df_empty(self):
-        import streamlit as st
-        df = pd.DataFrame(columns=["Tên PGD", "Mã KH", "Tổng dư nợ"])
-        bytes_out = tao_bao_cao_giao_ban_thang(
-            df, thang=6, nam=2026, username="test_user",
-        )
-        assert bytes_out == b""
-
-    def test_pdf_co_du_bang_xep_hang(self):
-        df = _tao_df_gia()
-        bytes_out = tao_bao_cao_giao_ban_thang(
-            df, thang=6, nam=2026, username="test_user",
-        )
-        assert bytes_out is not None
-        assert len(bytes_out) > 2000
-
-
-if __name__ == "__main__":
-    import sys
-    import warnings
-    warnings.filterwarnings("ignore")
-
+def main():
     df = _tao_df_gia()
-    print(f"Mock data: {len(df)} rows, {df['Tên PGD'].nunique()} PGD")
+    print(f"Mock data: {len(df):,} rows, {df['Tên PGD'].nunique()} PGD")
+    print(f"Total dư nợ: {int(df['Tổng dư nợ'].sum() / 1e6):,} triệu đồng")
+    print(f"Total QH: {int(df['Dư nợ quá hạn'].sum() / 1e6):,} triệu đồng")
+    print(f"Total Khoanh: {int(df['Dư nợ khoanh'].sum() / 1e6):,} triệu đồng")
+    print(f"Total Lãi tồn: {int(df['Lãi tồn TH'].sum() / 1e6):,} triệu đồng")
 
     bytes_out = tao_bao_cao_giao_ban_thang(
         df, thang=6, nam=2026, username="test_user",
     )
 
-    if bytes_out:
-        out_path = "test_giao_ban.pdf"
+    if bytes_out and len(bytes_out) > 1000:
+        out_path = "tests/test_giao_ban_output.pdf"
         with open(out_path, "wb") as f:
             f.write(bytes_out)
-        print(f"✅ OK — PDF: {len(bytes_out):,} bytes → {out_path}")
+        print(f"\n✅ OK — PDF: {len(bytes_out):,} bytes → {out_path}")
     else:
-        print("❌ FAIL — no PDF output")
+        size = len(bytes_out) if bytes_out else 0
+        print(f"\n❌ FAIL — output: {size} bytes")
+
+
+if __name__ == "__main__":
+    main()

@@ -251,14 +251,20 @@ def _render_tong_quan(df: pd.DataFrame, deadline_cfg: dict, is_cn: bool, pgd_use
         for loai in ds_loai:
             cell = str(r.get(loai, ""))
             dl = deadline_cfg.get(loai, "")
+            dl_hien = dl
+            if dl:
+                try:
+                    dl_hien = pd.to_datetime(dl).strftime("%d/%m/%Y")
+                except Exception:
+                    dl_hien = dl
             entry = {
                 "Đơn vị": r["Đơn vị"],
                 "Loại báo cáo": loai,
                 "Trạng thái": cell,
-                "Thời hạn": dl or "Chưa cài",
+                "Thời hạn": dl_hien or "Chưa cài",
             }
             ds_tat_ca.append(entry)
-            if "🔴" in cell:
+            if "🔴" in cell or "⚠️" in cell:
                 ds_chua.append(entry)
             elif "🟢" in cell or "🟡" in cell:
                 ds_da.append(entry)
@@ -296,15 +302,17 @@ def _render_tong_quan(df: pd.DataFrame, deadline_cfg: dict, is_cn: bool, pgd_use
 
         st.dataframe(df_xuat, hide_index=True, use_container_width=True)
 
-        ten_file_goc = f"tien_do_{loai_xuat.replace(' ', '_').lower()}"
+        _slug_map = {"Tất cả": "tat_ca", "Đã hoàn thành": "da_hoan_thanh", "Chưa hoàn thành": "chua_hoan_thanh"}
+        ten_file_goc = f"tien_do_{_slug_map.get(loai_xuat, 'xuat')}"
         username_xuat = st.session_state.get("username", "unknown")
 
         col_excel, col_pdf, col_pdf_hd, _ = st.columns([1, 1, 1.4, 3])
 
         with col_excel:
             if st.button("📥 Excel", key="btn_dd_excel", use_container_width=True, type="primary"):
-                st.session_state["_don_doc_bytes"] = xuat_excel({f"Tiến độ — {loai_xuat}": df_xuat})
-                st.session_state["_don_doc_ten"] = f"{ten_file_goc}.xlsx"
+                with st.spinner("Đang tạo Excel..."):
+                    st.session_state["_don_doc_bytes"] = xuat_excel({f"Tiến độ — {loai_xuat}": df_xuat})
+                    st.session_state["_don_doc_ten"] = f"{ten_file_goc}.xlsx"
             if st.session_state.get("_don_doc_bytes"):
                 st.download_button(
                     "⬇ Tải Excel",
@@ -615,7 +623,7 @@ def _render_cai_dat(df: pd.DataFrame, deadline_cfg: dict, username: str) -> None
 
     st.divider()
     st.markdown("**Danh sách thời hạn hoàn thành đã cài đặt**")
-    rows = [{"Loại báo cáo": loai, "Thời hạn": dl}
+    rows = [{"Loại báo cáo": loai, "Thời hạn": pd.to_datetime(dl).strftime("%d/%m/%Y") if dl else dl}
             for loai, dl in sorted(deadline_cfg.items())]
     if rows:
         st.dataframe(

@@ -71,6 +71,10 @@ def _doc_sheet(sheet_id: str, sheet_tab: str, header_row: int) -> list[list]:
 
 
 # ── Logic phân nhóm + tính tiến độ ──────────────────────────────────────────
+# loai_cau_truc:
+#   "phan_cap_stt"  — STT chữ La Mã = PGD header, STT số = xã/phường con (mặc định)
+#   "phang"         — mỗi hàng = 1 đơn vị, không có con
+#   "cot_pgd"       — có cột riêng ghi tên PGD cho mỗi hàng; name_col = tên xã/phường
 
 def _la_pgd_header(stt) -> bool:
     if stt is None:
@@ -89,8 +93,39 @@ def _da_nhap(val) -> bool:
     return val is not None and str(val).strip() != ""
 
 
-def _phan_nhom_pgd(rows: list[list], stt_idx: int, name_idx: int) -> dict[str, list[list]]:
-    groups: dict[str, list[list]] = {}
+def _phan_nhom_pgd(
+    rows: list[list],
+    stt_idx: int,
+    name_idx: int,
+    loai: str = "phan_cap_stt",
+    pgd_col_idx: int = 0,   # dùng cho loai="cot_pgd"
+) -> dict[str, list[list]]:
+    """Phân nhóm rows theo PGD dựa theo loại cấu trúc."""
+
+    if loai == "phang":
+        # Mỗi hàng = 1 đơn vị, không có con — đơn vị = name_idx
+        groups: dict[str, list[list]] = {}
+        for row in rows:
+            if not any(str(c).strip() for c in row):
+                continue
+            name = str(row[name_idx]).strip() if len(row) > name_idx else ""
+            if name:
+                groups[name] = [row]   # mỗi đơn vị = 1 hàng
+        return groups
+
+    if loai == "cot_pgd":
+        # Có cột riêng ghi tên PGD; name_col = tên xã/phường
+        groups = {}
+        for row in rows:
+            if not any(str(c).strip() for c in row):
+                continue
+            pgd  = str(row[pgd_col_idx]).strip() if len(row) > pgd_col_idx else ""
+            if pgd:
+                groups.setdefault(pgd, []).append(row)
+        return groups
+
+    # Mặc định: phan_cap_stt — STT chữ = PGD, STT số = con
+    groups = {}
     current: str | None = None
     for row in rows:
         if not any(str(c).strip() for c in row):
@@ -348,20 +383,47 @@ def _render_form_sheet(cfg: dict, prefix: str) -> dict:
                         key=f"{prefix}_tab",
                         help="Tên đúng của tab trong Google Sheet (phân biệt HOA/thường, dấu)")
 
+    st.markdown("**Kiểu cấu trúc sheet**")
+    LOAI_OPTIONS = {
+        "phan_cap_stt": "📊 Phân cấp STT — STT chữ La Mã = PGD, STT số = xã/phường con",
+        "phang":        "📋 Phẳng — mỗi hàng = 1 đơn vị, không có hàng con",
+        "cot_pgd":      "🗂 Cột PGD riêng — có cột ghi tên PGD cho mỗi hàng",
+    }
+    loai_val = cfg.get("loai_cau_truc", "phan_cap_stt")
+    loai_idx = list(LOAI_OPTIONS.keys()).index(loai_val) if loai_val in LOAI_OPTIONS else 0
+    loai_chon = st.selectbox(
+        "Kiểu cấu trúc",
+        options=list(LOAI_OPTIONS.keys()),
+        format_func=lambda k: LOAI_OPTIONS[k],
+        index=loai_idx,
+        key=f"{prefix}_loai",
+    )
+
     st.markdown("**Cấu hình hàng & cột**")
-    c1, c2, c3 = st.columns(3)
-    with c1:
+    hr_col, nc_col = st.columns(2)
+    with hr_col:
         hr = st.number_input("Header row (hàng tên cột)", min_value=1, max_value=50,
                              value=cfg.get("header_row", 10), key=f"{prefix}_hr",
-                             help="Hàng chứa STT, Tên PGD, tên cột... Dữ liệu bắt đầu từ hàng tiếp theo")
-    with c2:
-        sc = st.number_input("Cột STT (phân biệt PGD/xã)", min_value=1, max_value=30,
-                             value=cfg.get("stt_col", 1), key=f"{prefix}_sc",
-                             help="Cột chứa số thứ tự. PGD = chữ La Mã (I,II...), Xã = số (1,2...)")
-    with c3:
+                             help="Hàng chứa tên các cột. Dữ liệu bắt đầu từ hàng tiếp theo")
+    with nc_col:
         nc = st.number_input("Cột Tên đơn vị", min_value=1, max_value=30,
                              value=cfg.get("name_col", 2), key=f"{prefix}_nc",
                              help="Cột chứa tên PGD / tên xã phường")
+
+    # Cột bổ sung tùy theo kiểu
+    if loai_chon == "phan_cap_stt":
+        sc = st.number_input("Cột STT (phân biệt PGD/xã)", min_value=1, max_value=30,
+                             value=cfg.get("stt_col", 1), key=f"{prefix}_sc",
+                             help="Cột STT: hàng PGD = chữ La Mã (I,II...), hàng xã = số (1,2...)")
+        pgd_col = cfg.get("pgd_col", 1)
+    elif loai_chon == "cot_pgd":
+        pgd_col = st.number_input("Cột tên PGD", min_value=1, max_value=30,
+                                   value=cfg.get("pgd_col", 1), key=f"{prefix}_pgd_col",
+                                   help="Cột ghi tên PGD (lặp lại ở mỗi hàng)")
+        sc = cfg.get("stt_col", 1)
+    else:  # phang
+        sc      = cfg.get("stt_col", 1)
+        pgd_col = cfg.get("pgd_col", 1)
 
     st.markdown("**Cột cần theo dõi** (có thể thêm nhiều chương trình)")
     st.caption("Mỗi dòng = 1 chỉ tiêu cần theo dõi. Cột tính từ 1 (cột A=1, B=2, C=3...)")
@@ -409,6 +471,8 @@ def _render_form_sheet(cfg: dict, prefix: str) -> dict:
         "header_row":       int(hr),
         "stt_col":          int(sc),
         "name_col":         int(nc),
+        "pgd_col":          int(pgd_col),
+        "loai_cau_truc":    loai_chon,
         "ds_chuong_trinh":  ds_ct_new,
     }
 
@@ -568,12 +632,20 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                         raw = _doc_sheet(sheet_id,
                                          cfg_sel.get("sheet_tab", ""),
                                          cfg_sel.get("header_row", 10))
-                    groups = _phan_nhom_pgd(raw,
-                                            cfg_sel.get("stt_col", 1) - 1,
-                                            cfg_sel.get("name_col", 2) - 1)
-                    df_td  = _tinh_tien_do(groups, ds_ct)
+                    groups = _phan_nhom_pgd(
+                        raw,
+                        stt_idx     = cfg_sel.get("stt_col",  1) - 1,
+                        name_idx    = cfg_sel.get("name_col", 2) - 1,
+                        loai        = cfg_sel.get("loai_cau_truc", "phan_cap_stt"),
+                        pgd_col_idx = cfg_sel.get("pgd_col", 1) - 1,
+                    )
+                    df_td = _tinh_tien_do(groups, ds_ct)
+                    n_con = sum(len(v) for v in groups.values())
+                    loai_label = {"phan_cap_stt": "phân cấp STT",
+                                  "phang": "phẳng", "cot_pgd": "cột PGD"
+                                  }.get(cfg_sel.get("loai_cau_truc", ""), "")
                     st.caption(f"📅 Cache 5 phút · {len(groups)} đơn vị · "
-                               f"{sum(len(v) for v in groups.values())} xã/phường")
+                               f"{n_con} hàng · {loai_label}")
                 except Exception as e:
                     logger.error("tab_theo_doi_nhap: %s", e, exc_info=True)
                     st.error(f"❌ Lỗi đọc sheet: {e}")

@@ -286,7 +286,7 @@ def fmt_ngay(val) -> str:
         import pandas as _pd
         if isinstance(val, _pd.Timestamp):
             return val.strftime("%d/%m/%Y") if not _pd.isna(val) else ""
-        ts = _pd.to_datetime(val, dayfirst=False, errors="coerce")
+        ts = _pd.to_datetime(val, dayfirst=True, errors="coerce")
         if _pd.notna(ts):
             return ts.strftime("%d/%m/%Y")
     except Exception:

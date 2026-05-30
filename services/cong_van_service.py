@@ -45,16 +45,18 @@ def them_cv(
     tag: str = "",
     noi_dung: str = "",
     file_path: str = "",
+    onedrive_url: str = "",
     trang_thai: str = "chua_xu_ly",
     username: str = "",
 ) -> int:
     with db.get_conn() as conn:
         cur = conn.execute(
             """INSERT INTO cong_van (so_hieu, trich_yeu, ngay_ban_hanh, ngay_nhan, loai,
-               co_quan_ban_hanh, nguoi_ky, tag, noi_dung_tom_tat, file_path, trang_thai, nguoi_tao)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
+               co_quan_ban_hanh, nguoi_ky, tag, noi_dung_tom_tat, file_path, onedrive_url,
+               trang_thai, nguoi_tao)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (so_hieu, trich_yeu, ngay_ban_hanh, ngay_nhan, loai,
-             co_quan, nguoi_ky, tag, noi_dung, file_path, trang_thai, username),
+             co_quan, nguoi_ky, tag, noi_dung, file_path, onedrive_url, trang_thai, username),
         )
         conn.commit()
         cv_id = cur.lastrowid
@@ -74,6 +76,7 @@ def cap_nhat_cv(
     tag: str | None = None,
     noi_dung: str | None = None,
     file_path: str | None = None,
+    onedrive_url: str | None = None,
     trang_thai: str | None = None,
     username: str = "",
 ) -> bool:
@@ -85,7 +88,7 @@ def cap_nhat_cv(
         ("loai", loai), ("co_quan_ban_hanh", co_quan),
         ("nguoi_ky", nguoi_ky), ("tag", tag),
         ("noi_dung_tom_tat", noi_dung), ("file_path", file_path),
-        ("trang_thai", trang_thai),
+        ("onedrive_url", onedrive_url), ("trang_thai", trang_thai),
     ]:
         if val is not None:
             sets.append(f"{col} = ?")
@@ -225,6 +228,7 @@ def xuat_danh_sach_cv(
             "Tag": r.get("tag", ""),
             "Trạng thái": TRANG_THAI_CV.get(r.get("trang_thai", ""), r.get("trang_thai", "")),
             "Nội dung": r.get("noi_dung_tom_tat", ""),
+            "OneDrive URL": r.get("onedrive_url", ""),
         })
 
     df = pd.DataFrame(rows)

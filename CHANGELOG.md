@@ -1,7 +1,18 @@
 # CHANGELOG
 
+## [2026-05-30] — Tích hợp OneDrive tự động cho module Quản lý Công văn
+- `services/onedrive_service.py` — tạo mới: upload file lên OneDrive qua Microsoft Graph API (Client Credentials), cache token trong kv_store, chunked upload cho file >4MB, fallback graceful
+- `db.py` dòng ~644 — migration: ALTER TABLE cong_van ADD COLUMN onedrive_url TEXT
+- `services/cong_van_service.py` — thêm param `onedrive_url` vào `them_cv()`, `cap_nhat_cv()`; thêm cột "OneDrive URL" vào `xuat_danh_sach_cv()`
+- `tabs/tab_quan_ly_cong_van.py` — gọi `upload_cong_van()` sau khi lưu file local; hiển thị link "📎 Xem file" trong danh sách; thêm tab "🟢/🔴 OneDrive" với hướng dẫn 5 bước + kiểm tra kết nối + FAQ
+- `.streamlit/secrets.toml` — tạo mới: template cấu hình Azure credentials (không commit)
+
+## [2026-05-30] — Fix card Xếp loại Tổ TK&VV không hiện sau upload CDTOTKVV toàn CN
+- `tabs/tab_tongquan.py` dòng ~412 — thay `except Exception: pass` bằng `st.warning()` hiển thị lỗi cho người dùng; thêm `st.info()` khi không có dữ liệu CDTOTKVV thay vì im lặng bỏ qua
+- `services/upload_service.py` dòng ~928 — fix `NameError` với biến `suffix` trong khối `except` của `luu_pgd_file()`: tách `suffix` ra ngoài try, thêm fallback `thang_nam.replace("/", "_")`, bọc riêng phần ghi file versioned
+
 ## [2026-05-30] — Upload CDTOTKVV toàn CN: 1 file tổng hợp → tự tách 22 PGD
-- `data/cdtotkvv.py` dòng ~170 — thêm `tach_file_cdto_toan_cn(file_bytes)`: đọc file toàn CN, group theo mã đơn vị, trả `{ten_pgd: excel_bytes}`
+- `data/cdtotkvv.py` dòng ~170 — thêm `tach_file_cdto_toan_cn(file_bytes)`: đọc file toàn CN, tự phát hiện dòng data, map 18 cột → 20 cột CDTOTKVV_COLS (fix hoán vị LOAITO/DVUT, fix TONGDIEM→tong_diem, XEPLOAI→xep_loai)
 - `services/upload_service.py` dòng ~301 — thêm `xu_ly_cdto_toan_cn(file_bytes)`: tách + lưu từng PGD qua `luu_file_pgd_voi_lich_su`
 - `tabs/tab_upload_khnv.py` — thêm `_render_cdto_toan_cn(username)` + gọi trong tab "Dữ liệu Hiện tại": preview đơn vị, cảnh báo thiếu PGD, nút upload
 

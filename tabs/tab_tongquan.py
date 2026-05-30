@@ -411,7 +411,6 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
         st.divider()
 
         try:
-            # Thử load theo từng tháng trong ds_thang_nam(), lấy cái đầu tiên có data
             df_to_raw = None
             thang_hien = None
             ds_thang = ds_thang_nam()
@@ -422,7 +421,6 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                         df_to_raw = _df
                         thang_hien = _thang
                         break
-            # Fallback: gộp trực tiếp từ pgd_data nếu ds_thang không có gì
             if df_to_raw is None or df_to_raw.empty:
                 from data.cdtotkvv import tong_hop_tu_pgd_data
                 df_to_raw = tong_hop_tu_pgd_data()
@@ -482,9 +480,18 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                         unsafe_allow_html=True,
                 )
                 st.divider()
-        except Exception as e:  # conv: skip
-            logger.error("Lỗi trong khối except: %s", e, exc_info=True)
-            pass
+            else:
+                st.info(
+                    "ℹ️ Chưa có dữ liệu Chấm điểm Tổ TK&VV toàn Chi nhánh. "
+                    "Vui lòng upload file CDTOTKVV tại tab **Upload Dữ liệu → "
+                    "🏆 Upload CDTOTKVV Toàn Chi nhánh** (Phòng KH-NV)."
+                )
+        except Exception as e:
+            logger.error("CDTOTKVV tongquan: %s", e, exc_info=True)
+            st.warning(
+                "⚠️ Không thể hiển thị card Xếp loại Tổ TK&VV. "
+                "Vui lòng kiểm tra lại dữ liệu CDTOTKVV đã upload."
+            )
 
         st.markdown("**📂 Cơ cấu dư nợ theo chương trình tín dụng**")
         if COT_TEN_CT in df.columns and COT_TONG_DU_NO in df.columns:

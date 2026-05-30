@@ -485,10 +485,10 @@ def _render_cdto_toan_cn(username: str) -> None:
         if _SS_PREVIEW not in st.session_state:
             with st.spinner("🔍 Đang phân tích file..."):
                 try:
-                    from data.cdtotkvv import tach_file_cdto_toan_cn, doc_thang_nam_tu_file
+                    from data.cdtotkvv import tach_file_cdto_toan_cn, doc_thang_tu_cdto_toan_cn
 
                     pgd_map = tach_file_cdto_toan_cn(file_bytes)
-                    thang   = doc_thang_nam_tu_file(file_bytes)
+                    thang   = doc_thang_tu_cdto_toan_cn(file_bytes)
 
                     ds_tat_ca = [DON_VI_CHI_NHANH] + DS_PGD
                     thieu     = [dv for dv in ds_tat_ca if dv not in pgd_map]
@@ -585,8 +585,7 @@ def _render_cdto_toan_cn(username: str) -> None:
                         f"CDTOTKVV toàn CN — {ten_pgd} · tháng {thang or 'unknown'}",
                     )
 
-            so_ok  = sum(1 for v in ket_qua.values() if v.thanh_cong)
-            so_loi = sum(1 for v in ket_qua.values() if not v.thanh_cong)
+            so_ok = sum(1 for v in ket_qua.values() if v.thanh_cong)
             if so_ok:
                 st.success(f"✅ Đã lưu **{so_ok}** đơn vị thành công")
             for ten_pgd, kq in ket_qua.items():

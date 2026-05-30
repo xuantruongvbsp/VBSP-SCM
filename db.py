@@ -642,6 +642,10 @@ def init_db():
         conn.execute(
             """CREATE INDEX IF NOT EXISTS idx_cong_van_loai ON cong_van(loai)"""
         )
+        try:
+            conn.execute("ALTER TABLE cong_van ADD COLUMN onedrive_url TEXT")
+        except sqlite3.OperationalError:
+            pass
 
         conn.commit()
 

@@ -12,6 +12,7 @@ from streamlit.delta_generator import DeltaGenerator
 
 from logger import get_logger
 from tabs.base_tab import TabContext
+from services.onedrive_service import upload_cong_van, kiem_tra_ket_noi, _kiem_tra_config
 from services.cong_van_service import (
     LOAI_CONG_VAN, TRANG_THAI_CV, TAG_GOP_Y,
     them_cv, cap_nhat_cv, xoa_cv, doc_cv, tim_kiem_cv,
@@ -45,14 +46,27 @@ def _form_them_cv(username: str) -> None:
             if not so_hieu.strip() or not trich_yeu.strip():
                 st.error("⚠️ Số hiệu và Trích yếu là bắt buộc.")
                 return
+            import os
             file_path = ""
+            onedrive_url = ""
             if file_upload:
-                import os
                 upload_dir = os.path.join("cache", "cong_van")
                 os.makedirs(upload_dir, exist_ok=True)
                 file_path = os.path.join(upload_dir, f"{so_hieu.replace('/', '_')}_{file_upload.name}")
                 with open(file_path, "wb") as f:
                     f.write(file_upload.getvalue())
+
+                # Push lên OneDrive (fallback graceful nếu chưa cấu hình hoặc lỗi)
+                ket_qua_od = upload_cong_van(
+                    file_bytes=file_upload.getvalue(),
+                    file_name=file_upload.name,
+                    so_hieu=so_hieu.strip(),
+                    ngay_ban_hanh=ngay_bh,
+                )
+                if ket_qua_od.thanh_cong:
+                    onedrive_url = ket_qua_od.url
+                else:
+                    st.warning(f"⚠️ Không thể upload OneDrive: {ket_qua_od.loi}. File đã lưu local.")
 
             them_cv(
                 so_hieu=so_hieu.strip(),
@@ -65,6 +79,7 @@ def _form_them_cv(username: str) -> None:
                 tag=", ".join(tag),
                 noi_dung=noi_dung.strip(),
                 file_path=file_path,
+                onedrive_url=onedrive_url,
                 trang_thai=trang_thai,
                 username=username,
             )
@@ -91,9 +106,17 @@ def _hien_thi_bang_cv(ds: list[dict], username: str) -> None:
                         for t in tags[:5]
                     )
                     tag_html = f'<div style="margin-top:2px">{tag_spans}</div>'
+                link_html = ""
+                if cv.get("onedrive_url"):
+                    link_html = (
+                        f' <a href="{cv["onedrive_url"]}" target="_blank"'
+                        f' style="color:#42A5F5;text-decoration:none;font-size:12px">'
+                        f'📎 Xem file</a>'
+                    )
                 st.markdown(
                     f"**{loai_icon} {cv.get('so_hieu', '')}**"
                     f" — {cv.get('trich_yeu', '')[:80]}"
+                    f"{link_html}"
                     f"{tag_html}",
                     unsafe_allow_html=True,
                 )
@@ -175,6 +198,185 @@ def _form_sua_cv(username: str) -> None:
                 st.rerun()
 
 
+def _huong_dan_onedrive() -> None:
+    """Tab hướng dẫn cấu hình và kiểm tra kết nối OneDrive."""
+
+    # ── Trạng thái kết nối ─────────────────────────────────────────────────────
+    da_cau_hinh = _kiem_tra_config()
+    if da_cau_hinh:
+        st.success("✅ **Đã cấu hình credentials** — OneDrive sẵn sàng hoạt động")
+    else:
+        st.warning("⚠️ **Chưa cấu hình** — File công văn sẽ chỉ lưu local. Làm theo hướng dẫn dưới đây để bật OneDrive.")
+
+    # ── Nút kiểm tra kết nối ──────────────────────────────────────────────────
+    if da_cau_hinh:
+        if st.button("🔌 Kiểm tra kết nối OneDrive", key="cv_od_test", type="primary"):
+            with st.spinner("Đang kết nối..."):
+                ket_qua = kiem_tra_ket_noi()
+            if ket_qua["ok"]:
+                st.success(f"✅ Kết nối thành công!")
+                col_a, col_b, col_c = st.columns(3)
+                col_a.metric("Drive", ket_qua.get("drive_name", "—"))
+                col_b.metric("Chủ sở hữu", ket_qua.get("owner", "—"))
+                col_c.metric("Đã dùng", f"{ket_qua.get('quota_used_gb', 0):.1f} / {ket_qua.get('quota_total_gb', 0):.0f} GB")
+                if ket_qua.get("drive_url"):
+                    st.markdown(f"[🔗 Mở OneDrive]({ket_qua['drive_url']})", unsafe_allow_html=False)
+            else:
+                st.error(f"❌ Kết nối thất bại: `{ket_qua.get('loi', '')}`")
+                st.info("Kiểm tra lại tenant_id, client_id, client_secret trong secrets.toml và đảm bảo đã Grant admin consent.")
+
+    st.divider()
+
+    # ── Hướng dẫn thiết lập ───────────────────────────────────────────────────
+    st.markdown("## 📖 Hướng dẫn cấu hình OneDrive")
+    st.caption("Thực hiện 1 lần bởi quản trị viên hệ thống. Sau khi cấu hình, file công văn sẽ tự đồng bộ lên OneDrive.")
+
+    # Bước 1
+    with st.expander("**Bước 1 — Tạo App Registration trên Azure Portal**", expanded=not da_cau_hinh):
+        st.markdown("""
+1. Đăng nhập **[https://portal.azure.com](https://portal.azure.com)** bằng tài khoản Microsoft 365 của đơn vị (cần quyền Global Admin hoặc Application Admin)
+
+2. Tìm kiếm **"Microsoft Entra ID"** → chọn mục đó
+
+3. Menu bên trái → **App registrations** → **+ New registration**
+
+4. Điền thông tin:
+   - **Name:** `VBSP-SCM OneDrive`
+   - **Supported account types:** *Accounts in this organizational directory only*
+   - Không cần Redirect URI
+   → Nhấn **Register**
+
+5. Sau khi tạo xong, trang **Overview** hiển thị:
+   - **Application (client) ID** → copy → điền vào `client_id`
+   - **Directory (tenant) ID** → copy → điền vào `tenant_id`
+""")
+        st.info("💡 Ghi lại 2 giá trị này ngay — sẽ cần ở Bước 5")
+
+    # Bước 2
+    with st.expander("**Bước 2 — Tạo Client Secret**", expanded=not da_cau_hinh):
+        st.markdown("""
+1. Trong app vừa tạo → menu trái → **Certificates & secrets**
+
+2. Tab **Client secrets** → **+ New client secret**
+
+3. Điền:
+   - **Description:** `VBSP-SCM`
+   - **Expires:** chọn 24 months (hoặc theo chính sách đơn vị)
+   → Nhấn **Add**
+
+4. Cột **Value** xuất hiện → **Copy ngay giá trị này** → điền vào `client_secret`
+
+> ⚠️ **Quan trọng:** Giá trị Secret chỉ hiển thị 1 lần duy nhất. Nếu tắt trang rồi mới copy thì phải tạo lại secret mới.
+""")
+
+    # Bước 3
+    with st.expander("**Bước 3 — Cấp quyền truy cập OneDrive**", expanded=not da_cau_hinh):
+        st.markdown("""
+1. Menu trái → **API permissions** → **+ Add a permission**
+
+2. Chọn **Microsoft Graph** → **Application permissions**
+
+3. Tìm kiếm `Files` → mở rộng → tích chọn **`Files.ReadWrite.All`**
+   → Nhấn **Add permissions**
+
+4. Nhấn **✅ Grant admin consent for [tên tổ chức]** → Confirm
+
+5. Cột Status chuyển sang ✅ *Granted for [tên tổ chức]* là thành công
+""")
+        st.warning("🔑 Bước Grant admin consent bắt buộc phải do Global Admin thực hiện. Nếu không có quyền, liên hệ IT của đơn vị.")
+
+    # Bước 4
+    with st.expander("**Bước 4 — Lấy Drive ID**", expanded=not da_cau_hinh):
+        st.markdown("""
+Có 2 cách để xác định drive lưu file:
+
+---
+
+#### Cách A — Dùng `user_id` (đơn giản hơn)
+
+Dùng địa chỉ email của người dùng OneDrive làm `user_id`.
+
+**Ví dụ:** `nhanvien@nhcsxh.vn`
+
+> File sẽ được lưu vào OneDrive của người dùng đó, thư mục `VBSP-SCM/CongVan/`
+
+---
+
+#### Cách B — Dùng `drive_id` (chính xác hơn, khuyến nghị)
+
+1. Truy cập **[Graph Explorer](https://developer.microsoft.com/en-us/graph/graph-explorer)** — đăng nhập tài khoản admin
+
+2. Gọi API:
+   ```
+   GET https://graph.microsoft.com/v1.0/users/{email}/drive
+   ```
+   Thay `{email}` bằng email người dùng OneDrive
+
+3. Trong kết quả JSON, tìm trường `"id"` ở cấp cao nhất → đây là `drive_id`
+
+**Ví dụ response:**
+```json
+{
+  "id": "b!AbCdEfGh1234...",
+  "name": "OneDrive",
+  "driveType": "business",
+  ...
+}
+```
+
+→ Copy giá trị `id` → điền vào `drive_id`
+""")
+
+    # Bước 5
+    with st.expander("**Bước 5 — Cấu hình trong hệ thống**", expanded=not da_cau_hinh):
+        st.markdown("""
+Mở file **`.streamlit/secrets.toml`** trong thư mục cài đặt hệ thống và điền các giá trị đã thu thập:
+""")
+        st.code("""[onedrive]
+tenant_id     = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"   # Bước 1
+client_id     = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"   # Bước 1
+client_secret = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"   # Bước 2
+drive_id      = "b!AbCdEfGh1234..."                      # Bước 4 cách B (ưu tiên)
+user_id       = ""                                       # Bước 4 cách A (nếu không có drive_id)
+""", language="toml")
+        st.info("📁 File này nằm tại: `D:\\VBSP-SCM\\.streamlit\\secrets.toml`  \nFile đã được thêm vào `.gitignore` — an toàn, không bị commit lên GitHub.")
+
+        st.markdown("""
+Sau khi lưu file:
+1. **Khởi động lại Streamlit** (Ctrl+C → `streamlit run app.py`)
+2. Quay lại tab này → nhấn **"Kiểm tra kết nối OneDrive"**
+""")
+
+    st.divider()
+
+    # ── Câu hỏi thường gặp ────────────────────────────────────────────────────
+    st.markdown("#### ❓ Câu hỏi thường gặp")
+    with st.expander("Nếu OneDrive lỗi thì file công văn có bị mất không?"):
+        st.markdown("""
+**Không.** File luôn được lưu local trước (`cache/cong_van/`) — OneDrive chỉ là bản sao thêm.
+Nếu upload OneDrive thất bại, hệ thống sẽ hiện cảnh báo màu vàng nhưng vẫn lưu công văn thành công vào cơ sở dữ liệu.
+""")
+    with st.expander("Công văn đã thêm trước khi cấu hình có được đồng bộ lên OneDrive không?"):
+        st.markdown("""
+**Không tự động.** Các công văn cũ chỉ có file local, không có link OneDrive.
+Chỉ công văn **thêm mới sau khi cấu hình** mới được tự động upload OneDrive.
+Nếu cần đồng bộ hàng loạt, liên hệ quản trị viên hệ thống để chạy script riêng.
+""")
+    with st.expander("Link 'Xem file' trong danh sách có bảo mật không?"):
+        st.markdown("""
+Link được tạo với kiểu **view + scope organization** — chỉ những người có tài khoản Microsoft 365 trong cùng tổ chức mới mở được.
+Người ngoài tổ chức (không có tài khoản đăng nhập) **không thể truy cập**.
+""")
+    with st.expander("Có thể dùng SharePoint thay vì OneDrive cá nhân không?"):
+        st.markdown("""
+Có. Cần lấy `drive_id` của thư viện tài liệu SharePoint:
+```
+GET https://graph.microsoft.com/v1.0/sites/{site_id}/drives
+```
+Tìm drive có `driveType = "documentLibrary"` → lấy `id` → điền vào `drive_id`.
+""")
+
+
 def render(tab: DeltaGenerator | None = None, **kwargs) -> None:
     ctx = TabContext(tab, **kwargs)
     username = ctx.username
@@ -197,7 +399,13 @@ def render(tab: DeltaGenerator | None = None, **kwargs) -> None:
         c3.metric("⚠️ Quá hạn 7 ngày", len(ds_tre))
 
         # ── Sub-tabs ──
-        t1, t2, t3 = st.tabs(["🔍 Tìm kiếm & Danh sách", "➕ Thêm mới", "📤 Xuất Excel"])
+        _od_badge = "🟢" if _kiem_tra_config() else "🔴"
+        t1, t2, t3, t4 = st.tabs([
+            "🔍 Tìm kiếm & Danh sách",
+            "➕ Thêm mới",
+            "📤 Xuất Excel",
+            f"{_od_badge} OneDrive",
+        ])
 
         with t1:
             st.markdown("#### 🔍 Tìm kiếm công văn")
@@ -254,6 +462,9 @@ def render(tab: DeltaGenerator | None = None, **kwargs) -> None:
                 except Exception as e:
                     logger.error("xuat_excel_cv: %s", e, exc_info=True)
                     st.error(f"❌ Lỗi xuất Excel: {e}")
+
+        with t4:
+            _huong_dan_onedrive()
 
 
 __all__ = ["render"]

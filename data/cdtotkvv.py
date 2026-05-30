@@ -195,10 +195,73 @@ def ds_thang_nam() -> list[str]:
     return sorted(thang_set, key=lambda s: (s[3:], s[:2]), reverse=True)
 
 
+def doc_thang_tu_cdto_toan_cn(file_bytes: bytes) -> str | None:
+    """
+    Đọc tháng báo cáo từ cột NGAYBC (cột S, index 18) của file CDTOTKVV toàn CN.
+    Đáng tin hơn doc_thang_nam_tu_file() vì đọc từ dữ liệu thực (không bị
+    ảnh hưởng bởi ngày tạo/export file trong header).
+    Trả về "MM/YYYY" hoặc None nếu không đọc được.
+    """
+    from io import BytesIO
+    from datetime import datetime, date as _date
+
+    import openpyxl
+
+    from config import MA_PGD_MAP
+
+    COL_MAPGD  = 2   # cột C
+    COL_NGAYBC = 18  # cột S
+
+    def _norm_ma(val) -> str | None:
+        try:
+            return str(int(float(str(val).strip()))).zfill(6)
+        except (ValueError, TypeError):
+            return None
+
+    try:
+        wb = openpyxl.load_workbook(BytesIO(file_bytes), read_only=True, data_only=True)
+        ws = wb.active
+        for row in ws.iter_rows(values_only=True):
+            row = list(row)
+            if len(row) <= COL_MAPGD:
+                continue
+            ma_dv = _norm_ma(row[COL_MAPGD])
+            if not ma_dv or ma_dv not in MA_PGD_MAP:
+                continue
+            # Dòng data hợp lệ — đọc NGAYBC
+            if len(row) <= COL_NGAYBC:
+                break
+            val = row[COL_NGAYBC]
+            if isinstance(val, (datetime, _date)):
+                return val.strftime("%m/%Y")
+            if val:
+                m = re.search(r"(\d{1,2})[/\-](\d{1,2})[/\-](\d{4})", str(val).strip())
+                if m:
+                    return f"{m.group(2).zfill(2)}/{m.group(3)}"
+            break
+        wb.close()
+    except Exception:
+        pass
+    return None
+
+
 def tach_file_cdto_toan_cn(file_bytes: bytes) -> dict[str, bytes]:
     """
     Đọc file CDTOTKVV toàn CN, tách thành dict {ten_pgd: excel_bytes}.
-    Mỗi file con giữ nguyên CDTOTKVV_DATA_ROW_START dòng header gốc.
+    Mỗi file con được chuẩn hóa theo đúng CDTOTKVV_COLS (20 cột per-PGD)
+    để doc_cdtotkvv_path() đọc được chính xác.
+
+    Format toàn CN (18 cột):
+      0:STT 1:MAPGD 2:TEN_PGD 3:MAXA 4:TENXA 5:MATO 6:TENTO
+      7:LOAITO 8:DVUT 9:DUNO 10:Tham gia GDX 11:TL thu nợ gốc
+      12:TL thu lãi 13:TG Tổ TKVV 14:TL nợ quá hạn
+      15:TONGDIEM 16:XEPLOAI 17:NGAYBC
+
+    Format per-PGD / CDTOTKVV_COLS (20 cột):
+      0:stt 1:ma_dv 2:ten_dv 3:ma_xa 4:ten_xa 5:ma_to
+      6:ten_to_truong 7:dvut 8:loai_to 9:du_no 10:so_du_tk
+      11-16:diem_* 17:tong_diem 18:xep_loai 19:tinh_trang
+
     Raises ValueError nếu không đọc được hoặc không tìm thấy đơn vị hợp lệ.
     """
     from io import BytesIO
@@ -208,7 +271,11 @@ def tach_file_cdto_toan_cn(file_bytes: bytes) -> dict[str, bytes]:
 
     from config import MA_PGD_MAP, CDTOTKVV_DATA_ROW_START
 
-    COL_MA_DV = 1  # 0-based index trong CDTOTKVV_COLS = ["stt", "ma_dv", ...]
+    # Số cột đầu ra cố định theo CDTOTKVV_COLS
+    N_COLS_OUT = 20
+    # Vị trí cột MAPGD trong file toàn CN — cột A trống, data bắt đầu từ cột B
+    # nên: B=STT(1), C=MAPGD(2), D=TEN_PGD(3), ...
+    COL_MA_DV_IN = 2
 
     def _norm_ma(val) -> str | None:
         if val is None:
@@ -218,30 +285,83 @@ def tach_file_cdto_toan_cn(file_bytes: bytes) -> dict[str, bytes]:
         except (ValueError, TypeError):
             return None
 
+    def _get(row: list, idx: int):
+        return row[idx] if idx < len(row) else None
+
+    def _map_row(src: list) -> list:
+        """Chuyển 1 data row từ format toàn CN → CDTOTKVV_COLS (20 cột).
+        Cột A trống nên index lệch +1 so với tên cột:
+          B(1)=STT  C(2)=MAPGD  D(3)=TEN_PGD  E(4)=MAXA  F(5)=TENXA
+          G(6)=MATO  H(7)=TENTO  I(8)=LOAITO  J(9)=DVUT  K(10)=DUNO
+          L(11)=Tham gia GDX  ...  Q(16)=TONGDIEM  R(17)=XEPLOAI  S(18)=NGAYBC
+        """
+        return [
+            _get(src,  1),  # stt          ← B: STT
+            _get(src,  2),  # ma_dv        ← C: MAPGD
+            _get(src,  3),  # ten_dv       ← D: TEN_PGD
+            _get(src,  4),  # ma_xa        ← E: MAXA
+            _get(src,  5),  # ten_xa       ← F: TENXA
+            _get(src,  6),  # ma_to        ← G: MATO
+            _get(src,  7),  # ten_to_truong← H: TENTO
+            _get(src,  9),  # dvut         ← J: DVUT  (đổi chỗ với LOAITO)
+            _get(src,  8),  # loai_to      ← I: LOAITO (đổi chỗ với DVUT)
+            _get(src, 10),  # du_no        ← K: DUNO
+            None,           # so_du_tk     (không có trong toàn CN)
+            None,           # diem_gdtx    (không có)
+            None,           # diem_nqh     (không có)
+            None,           # diem_thu_no  (không có)
+            None,           # diem_thu_lai (không có)
+            None,           # diem_tv_tiengui (không có)
+            None,           # diem_ds_tg   (không có)
+            _get(src, 16),  # tong_diem    ← Q: TONGDIEM
+            _get(src, 17),  # xep_loai     ← R: XEPLOAI
+            None,           # tinh_trang   (không có trong toàn CN)
+        ]
+
+    # Tự phát hiện dòng bắt đầu dữ liệu: dòng đầu tiên có MAPGD hợp lệ
+    # (đáng tin hơn STT vì MAPGD là cột ta cần, header sẽ không có mã 6 số)
     wb = openpyxl.load_workbook(BytesIO(file_bytes), read_only=True, data_only=True)
     ws = wb.active
     all_rows = [list(r) for r in ws.iter_rows(values_only=True)]
     wb.close()
 
-    if len(all_rows) <= CDTOTKVV_DATA_ROW_START:
-        raise ValueError("File không có dữ liệu sau dòng header")
+    data_start = None
+    for i, row in enumerate(all_rows):
+        if not row or len(row) <= COL_MA_DV_IN:
+            continue
+        ma_dv = _norm_ma(row[COL_MA_DV_IN])
+        if ma_dv and ma_dv in MA_PGD_MAP:
+            data_start = i
+            break
 
-    header_rows = all_rows[:CDTOTKVV_DATA_ROW_START]
-    data_rows   = all_rows[CDTOTKVV_DATA_ROW_START:]
-    n_cols      = len(header_rows[0]) if header_rows else 20
+    if data_start is None:
+        raise ValueError(
+            "Không tìm thấy dòng dữ liệu hợp lệ trong file "
+            "(cột B 'Mã PGD' phải chứa mã 6 số như 004601, 004602…)"
+        )
+
+    raw_headers = all_rows[:data_start]
+    data_rows   = all_rows[data_start:]
+
+    # Đảm bảo đúng CDTOTKVV_DATA_ROW_START dòng header để
+    # doc_cdtotkvv_path(skiprows=CDTOTKVV_DATA_ROW_START) đọc không lệch.
+    empty_row = [None] * N_COLS_OUT
+    header_rows = raw_headers[:CDTOTKVV_DATA_ROW_START]
+    while len(header_rows) < CDTOTKVV_DATA_ROW_START:
+        header_rows.append(empty_row)
 
     groups: dict[str, list] = defaultdict(list)
     for row in data_rows:
-        if not row or len(row) <= COL_MA_DV:
+        if not row or len(row) <= COL_MA_DV_IN:
             continue
-        ma_dv = _norm_ma(row[COL_MA_DV])
+        ma_dv = _norm_ma(row[COL_MA_DV_IN])
         if ma_dv and ma_dv in MA_PGD_MAP:
             groups[ma_dv].append(row)
 
     if not groups:
         raise ValueError(
             "Không tìm thấy mã đơn vị hợp lệ trong file "
-            "(kiểm tra cột 'Mã đơn vị' tại cột B)"
+            "(kiểm tra cột B 'Mã PGD' có giá trị 6 chữ số như 004601)"
         )
 
     result: dict[str, bytes] = {}
@@ -250,12 +370,13 @@ def tach_file_cdto_toan_cn(file_bytes: bytes) -> dict[str, bytes]:
         wb_out  = openpyxl.Workbook(write_only=True)
         ws_out  = wb_out.create_sheet()
 
+        # Ghi header gốc (metadata, bị skip khi đọc)
         for hrow in header_rows:
-            pad = hrow + [None] * max(0, n_cols - len(hrow))
-            ws_out.append(pad)
+            ws_out.append(hrow + [None] * max(0, N_COLS_OUT - len(hrow)))
+
+        # Ghi data rows đã chuẩn hóa theo CDTOTKVV_COLS
         for drow in rows:
-            pad = drow + [None] * max(0, n_cols - len(drow))
-            ws_out.append(pad)
+            ws_out.append(_map_row(drow))
 
         buf = BytesIO()
         wb_out.save(buf)

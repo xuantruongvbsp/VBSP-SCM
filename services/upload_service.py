@@ -306,7 +306,7 @@ def xu_ly_cdto_toan_cn(file_bytes: bytes) -> dict[str, "KetQuaUpload"]:
     Trả về {ten_pgd: KetQuaUpload}.
     Caller phải ghi audit sau khi nhận kết quả.
     """
-    from data.cdtotkvv import tach_file_cdto_toan_cn, doc_thang_nam_tu_file
+    from data.cdtotkvv import tach_file_cdto_toan_cn, doc_thang_tu_cdto_toan_cn
     from data.pgd import luu_file_pgd_voi_lich_su, luu_file_pgd
 
     try:
@@ -317,7 +317,7 @@ def xu_ly_cdto_toan_cn(file_bytes: bytes) -> dict[str, "KetQuaUpload"]:
     if not pgd_map:
         return {"_loi_doc": KetQuaUpload(False, "Không tìm thấy dữ liệu đơn vị nào trong file")}
 
-    thang = doc_thang_nam_tu_file(file_bytes)
+    thang = doc_thang_tu_cdto_toan_cn(file_bytes)
     ket_qua: dict[str, KetQuaUpload] = {}
 
     for ten_pgd, pgd_bytes in pgd_map.items():
@@ -927,12 +927,16 @@ def luu_pgd_file(ten_pgd: str, loai: str, file_bytes: bytes) -> KetQuaUpload:
     # Chỉ lưu lịch sử cho CDTOTKVV (dữ liệu theo tháng)
     # HSTD/NQ11/GQVL là sao kê theo ngày -> chỉ giữ latest
     if thang_nam and loai == "cdtotkvv":
-        try:
-            from datetime import datetime as _dt
-            from pathlib import Path as _Path
+        from datetime import datetime as _dt
+        from pathlib import Path as _Path
 
+        suffix = thang_nam.replace("/", "_")
+        try:
             dt = _dt.strptime(thang_nam, "%m/%Y")
             suffix = dt.strftime("%Y_%m")
+        except ValueError:
+            pass
+        try:
             path_version = _Path(str(thu_muc_pgd(ten_pgd))) / f"{loai}_{suffix}.xlsx"
             if not path_version.exists():
                 path_version.write_bytes(file_bytes)

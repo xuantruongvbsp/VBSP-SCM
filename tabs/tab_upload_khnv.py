@@ -449,6 +449,158 @@ def _xu_ly_import_folder(danh_sach: list[dict], username: str) -> None:
     st.rerun()
 
 
+def _render_cdto_toan_cn(username: str) -> None:
+    """Upload 1 file CDTOTKVV tổng hợp toàn CN → tự tách và lưu 22 PGD."""
+    with st.expander("🏆 Upload CDTOTKVV Toàn Chi nhánh", expanded=False):
+        st.info(
+            "Upload 1 file CDTOTKVV tổng hợp của toàn CN — hệ thống tự tách và "
+            "lưu cho từng PGD (không cần upload 22 lần riêng lẻ)."
+        )
+
+        _ver = st.session_state.setdefault("cdto_cn_ver", 0)
+        uploaded = st.file_uploader(
+            "Chọn file CDTOTKVV toàn CN",
+            type=["xlsx", "xls"],
+            key=f"cdto_cn_uploader_{_ver}",
+            label_visibility="collapsed",
+        )
+
+        _SS_BYTES   = "cdto_cn_bytes"
+        _SS_PREVIEW = "cdto_cn_preview"
+        _SS_FILE_ID = "cdto_cn_file_id"
+
+        if uploaded is not None:
+            file_id = (uploaded.name, uploaded.size)
+            if st.session_state.get(_SS_FILE_ID) != file_id:
+                st.session_state[_SS_FILE_ID] = file_id
+                st.session_state[_SS_BYTES]   = uploaded.read()
+                st.session_state.pop(_SS_PREVIEW, None)
+
+        if _SS_BYTES not in st.session_state:
+            return
+
+        file_bytes: bytes = st.session_state[_SS_BYTES]
+
+        # Phân tích file — cache kết quả vào session_state
+        if _SS_PREVIEW not in st.session_state:
+            with st.spinner("🔍 Đang phân tích file..."):
+                try:
+                    from data.cdtotkvv import tach_file_cdto_toan_cn, doc_thang_nam_tu_file
+
+                    pgd_map = tach_file_cdto_toan_cn(file_bytes)
+                    thang   = doc_thang_nam_tu_file(file_bytes)
+
+                    ds_tat_ca = [DON_VI_CHI_NHANH] + DS_PGD
+                    thieu     = [dv for dv in ds_tat_ca if dv not in pgd_map]
+
+                    preview_rows = []
+                    for ten_pgd, pgd_bytes in sorted(pgd_map.items()):
+                        so_to: int | str = "?"
+                        try:
+                            from io import BytesIO as _BIO
+                            df_tmp = pd.read_excel(
+                                _BIO(pgd_bytes), engine="openpyxl",
+                                header=None, skiprows=10,
+                            )
+                            so_to = int(pd.to_numeric(
+                                df_tmp.iloc[:, 0], errors="coerce"
+                            ).notna().sum())
+                        except Exception:
+                            pass
+
+                        da_co = kiem_tra_file_ton_tai_pgd(ten_pgd, "cdtotkvv")
+                        preview_rows.append({
+                            "Đơn vị":     ten_pgd,
+                            "Số tổ":      so_to,
+                            "Hiện tại":   "🔄 Cập nhật" if da_co else "🆕 Mới",
+                            "Trạng thái": "✅ Sẵn sàng",
+                        })
+
+                    st.session_state[_SS_PREVIEW] = {
+                        "rows":  preview_rows,
+                        "thang": thang,
+                        "thieu": thieu,
+                        "so_dv": len(pgd_map),
+                    }
+                except ValueError as e:
+                    st.error(f"❌ {e}")
+                    return
+                except Exception as e:
+                    logger.error("_render_cdto_toan_cn: lỗi phân tích — %s", e, exc_info=True)
+                    st.error(f"❌ Lỗi phân tích file: {e}")
+                    return
+
+        preview = st.session_state.get(_SS_PREVIEW)
+        if not preview:
+            return
+
+        # Thông tin nhận diện
+        thang = preview["thang"]
+        c1, c2 = st.columns(2)
+        c1.metric("Tháng báo cáo", thang or "⚠️ Không đọc được")
+        c2.metric("Số đơn vị nhận diện", preview["so_dv"])
+
+        if preview["thieu"]:
+            st.warning(
+                f"⚠️ Thiếu **{len(preview['thieu'])}** đơn vị so với danh sách 22 PGD: "
+                + ", ".join(preview["thieu"])
+            )
+
+        def _style_ht(v: str) -> str:
+            if v.startswith("🆕"):
+                return "background-color:#d4edda;color:#155724;font-weight:bold"
+            if v.startswith("🔄"):
+                return "background-color:#fff3cd;color:#856404"
+            return ""
+
+        df_prev = pd.DataFrame(preview["rows"])
+        st.dataframe(
+            df_prev.style.map(_style_ht, subset=["Hiện tại"]),
+            use_container_width=True,
+            hide_index=True,
+            height=min(600, 60 + len(preview["rows"]) * 35),
+        )
+
+        if preview["so_dv"] < 2:
+            st.error("❌ File phải có ít nhất 2 đơn vị — đây có thể là file 1 PGD thông thường.")
+            return
+
+        if st.button(
+            f"📤 Upload {preview['so_dv']} đơn vị",
+            type="primary",
+            key="btn_cdto_cn_upload",
+        ):
+            with st.spinner("⏳ Đang tách và lưu từng PGD..."):
+                from services.upload_service import xu_ly_cdto_toan_cn
+                ket_qua = xu_ly_cdto_toan_cn(file_bytes)
+
+            if "_loi_doc" in ket_qua:
+                st.error(ket_qua["_loi_doc"].thong_bao)
+                return
+
+            for ten_pgd, kq in ket_qua.items():
+                if kq.thanh_cong:
+                    db.ghi_audit(
+                        username, "upload_cdto_toan_cn",
+                        f"CDTOTKVV toàn CN — {ten_pgd} · tháng {thang or 'unknown'}",
+                    )
+
+            so_ok  = sum(1 for v in ket_qua.values() if v.thanh_cong)
+            so_loi = sum(1 for v in ket_qua.values() if not v.thanh_cong)
+            if so_ok:
+                st.success(f"✅ Đã lưu **{so_ok}** đơn vị thành công")
+            for ten_pgd, kq in ket_qua.items():
+                if not kq.thanh_cong:
+                    st.warning(f"⚠️ {ten_pgd}: {kq.thong_bao}")
+
+            st.cache_data.clear()
+            for _k in (_SS_PREVIEW, _SS_BYTES, _SS_FILE_ID):
+                st.session_state.pop(_k, None)
+            st.session_state.pop("trang_thai_upload_pgd", None)
+            st.session_state["cdto_cn_ver"] = _ver + 1
+            st.rerun()
+
+
 def _render_upload_hang_loat(role: str, username: str) -> None:
     """Upload hàng loạt qua trình duyệt — thay thế quét thư mục server."""
     _ = role
@@ -1274,6 +1426,7 @@ def render(tab=None, **kwargs) -> None:
 
         with tab_ht:
             _render_upload_hang_loat(role, username)
+            _render_cdto_toan_cn(username)
 
             with st.expander("🔄 Tổng hợp toàn Chi nhánh thủ công", expanded=False):
                 st.caption(

@@ -195,6 +195,75 @@ def ds_thang_nam() -> list[str]:
     return sorted(thang_set, key=lambda s: (s[3:], s[:2]), reverse=True)
 
 
+def tach_file_cdto_toan_cn(file_bytes: bytes) -> dict[str, bytes]:
+    """
+    Đọc file CDTOTKVV toàn CN, tách thành dict {ten_pgd: excel_bytes}.
+    Mỗi file con giữ nguyên CDTOTKVV_DATA_ROW_START dòng header gốc.
+    Raises ValueError nếu không đọc được hoặc không tìm thấy đơn vị hợp lệ.
+    """
+    from io import BytesIO
+    from collections import defaultdict
+
+    import openpyxl
+
+    from config import MA_PGD_MAP, CDTOTKVV_DATA_ROW_START
+
+    COL_MA_DV = 1  # 0-based index trong CDTOTKVV_COLS = ["stt", "ma_dv", ...]
+
+    def _norm_ma(val) -> str | None:
+        if val is None:
+            return None
+        try:
+            return str(int(float(str(val).strip()))).zfill(6)
+        except (ValueError, TypeError):
+            return None
+
+    wb = openpyxl.load_workbook(BytesIO(file_bytes), read_only=True, data_only=True)
+    ws = wb.active
+    all_rows = [list(r) for r in ws.iter_rows(values_only=True)]
+    wb.close()
+
+    if len(all_rows) <= CDTOTKVV_DATA_ROW_START:
+        raise ValueError("File không có dữ liệu sau dòng header")
+
+    header_rows = all_rows[:CDTOTKVV_DATA_ROW_START]
+    data_rows   = all_rows[CDTOTKVV_DATA_ROW_START:]
+    n_cols      = len(header_rows[0]) if header_rows else 20
+
+    groups: dict[str, list] = defaultdict(list)
+    for row in data_rows:
+        if not row or len(row) <= COL_MA_DV:
+            continue
+        ma_dv = _norm_ma(row[COL_MA_DV])
+        if ma_dv and ma_dv in MA_PGD_MAP:
+            groups[ma_dv].append(row)
+
+    if not groups:
+        raise ValueError(
+            "Không tìm thấy mã đơn vị hợp lệ trong file "
+            "(kiểm tra cột 'Mã đơn vị' tại cột B)"
+        )
+
+    result: dict[str, bytes] = {}
+    for ma_dv, rows in groups.items():
+        ten_pgd = MA_PGD_MAP[ma_dv]
+        wb_out  = openpyxl.Workbook(write_only=True)
+        ws_out  = wb_out.create_sheet()
+
+        for hrow in header_rows:
+            pad = hrow + [None] * max(0, n_cols - len(hrow))
+            ws_out.append(pad)
+        for drow in rows:
+            pad = drow + [None] * max(0, n_cols - len(drow))
+            ws_out.append(pad)
+
+        buf = BytesIO()
+        wb_out.save(buf)
+        result[ten_pgd] = buf.getvalue()
+
+    return result
+
+
 @st.cache_data(show_spinner=False)
 def tong_hop_theo_pgd(df: pd.DataFrame) -> pd.DataFrame:
     """

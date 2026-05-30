@@ -878,7 +878,7 @@ def _render_cap_nhat(tab, **kwargs):
                 if not val:
                     return None
                 try:
-                    return pd.to_datetime(val).date()
+                    return pd.to_datetime(val, dayfirst=True).date()
                 except Exception as e:  # conv: skip
                     logger.warning("_parse_date không hợp lệ '%s': %s", val, e)
                     return None
@@ -926,7 +926,7 @@ def _render_cap_nhat(tab, **kwargs):
                                 ngay_ht = None
                                 if pd.notna(ngay_val) and ngay_val:
                                     try:
-                                        ngay_ht = pd.to_datetime(ngay_val).date().isoformat()
+                                        ngay_ht = pd.to_datetime(ngay_val, dayfirst=True).date().isoformat()
                                     except Exception as e:  # conv: skip
                                         logger.warning("ngay_ht không hợp lệ: %s", e)
                                         ngay_ht = None

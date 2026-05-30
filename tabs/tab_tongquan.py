@@ -38,6 +38,7 @@ from utils import (
 from data.pgd import ds_pgd_co_file
 from data.cdtotkvv import doc_cdtotkvv, ds_thang_nam, tong_hop_theo_pgd
 from pdf_service import nut_xuat_pdf, xuat_pdf
+from services.giao_ban_thang_service import tao_bao_cao_giao_ban_thang
 from services.upload_service import format_caption_merge
 from services.tongquan_cdto_service import (
     load_cdto_toan_cn,
@@ -1037,7 +1038,7 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                         lambda v, c=col: _fmt_cell(v, c)
                     )
 
-            col_ex, col_pdf = st.columns(2)
+            col_ex, col_pdf, col_gb = st.columns(3)
 
             with col_ex:
                 if st.button("📥 Xuất Excel", key="btn_excel_tqpgd", use_container_width=True):
@@ -1097,7 +1098,6 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                         logger.error("Lỗi trong khối except: %s", _e, exc_info=True)
                         import traceback
 
-
                         SCMStateManager().downloads.clear("tqpgd_pdf")
                         st.error(f"❌ Lỗi: {_e}")
                         st.code(traceback.format_exc())
@@ -1113,6 +1113,50 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                         use_container_width=True,
                     ):
                         state.downloads.clear("tqpgd_pdf")
+
+            with col_gb:
+                if st.button("📋 Giao ban tháng", key="btn_giaoban_tqpgd", use_container_width=True):
+                    try:
+                        from datetime import datetime as _dt
+                        state = SCMStateManager()
+                        now = _dt.now()
+                        thang = now.month
+                        nam = now.year
+                        if df_full is not None and not df_full.empty:
+                            df_xuat = df_full
+                        else:
+                            df_xuat = df
+                        with st.spinner("⏳ Đang tạo báo cáo giao ban..."):
+                            _gb_bytes = tao_bao_cao_giao_ban_thang(
+                                df=df_xuat,
+                                thang=thang,
+                                nam=nam,
+                                username=username,
+                            )
+                        state.downloads.set(
+                            "tqpgd_giaoban",
+                            _gb_bytes,
+                            f"GiaoBan_Thang{thang}_{nam}_{_dt.now().strftime('%d%m%Y_%H%M')}.pdf",
+                        )
+                        db.ghi_audit(username or "unknown", "xuat_giao_ban_thang", f"Tháng {thang}/{nam}")
+                    except Exception as _e:
+                        logger.error("Lỗi xuất giao ban: %s", _e, exc_info=True)
+                        import traceback
+                        SCMStateManager().downloads.clear("tqpgd_giaoban")
+                        st.error(f"❌ Lỗi: {_e}")
+                        st.code(traceback.format_exc())
+
+                state = SCMStateManager()
+                if state.downloads.has("tqpgd_giaoban"):
+                    if st.download_button(
+                        label="⬇ Tải PDF Giao ban",
+                        data=state.downloads.get_bytes("tqpgd_giaoban"),
+                        file_name=state.downloads.get_filename("tqpgd_giaoban") or "GiaoBan.pdf",
+                        mime="application/pdf",
+                        key="btn_giaoban_tqpgd_dl",
+                        use_container_width=True,
+                    ):
+                        state.downloads.clear("tqpgd_giaoban")
         else:
             st.warning(
                 f"⚠️ Không hiển thị được bảng tổng quát PGD — "

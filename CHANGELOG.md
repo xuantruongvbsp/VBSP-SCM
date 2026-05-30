@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [2026-05-30] — Tab Theo dõi nhập liệu: hỗ trợ 3 kiểu cấu trúc sheet
+- `tabs/tab_theo_doi_nhap.py` — thêm `loai_cau_truc`: phẳng / phân cấp STT / cột PGD riêng; form chỉnh sửa hiện đúng trường tùy kiểu; caption hiển thị loại đang dùng
+
+## [2026-05-30] — Fix tab Tiến độ nộp BC: tổng quan chỉ theo dõi loại có deadline + xác nhận xóa
+- `tabs/tab_tien_do_nop.py` — `_render_tong_quan()`: ds_loai lấy từ `deadline_cfg` thay vì GSheet, lọc df_dedup theo ds_loai; thêm early return nếu chưa có deadline. Xóa deadline → loại đó biến mất khỏi tổng quan
+- `tabs/tab_tien_do_nop.py` — `_render_cai_dat()`: nút "🗑 Xóa" → `st.popover` có xác nhận "⚠️ Xác nhận xóa"
+
 ## [2026-05-30] — Tab Theo dõi nhập liệu: mockup hướng dẫn + thêm/xóa chỉ tiêu động
 - `tabs/tab_theo_doi_nhap.py` — thêm mockup HTML giải thích cấu trúc sheet; form thêm mới có nút ➕/✕ để quản lý số chỉ tiêu động; help text cho từng trường
 

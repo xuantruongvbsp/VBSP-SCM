@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [2026-05-30] — Fix PDF xuất tiến độ: strip emoji + stale download bytes
+- `tabs/tab_tien_do_nop.py` — `_clean_trang_thai()`: bỏ emoji khỏi cột Trạng thái trước khi truyền vào PDF (font TNR không hỗ trợ emoji)
+- `tabs/tab_tien_do_nop.py` — `_clear_export_cache()` + `on_change` trên radio/selectbox: xóa bytes cũ khi đổi filter, tránh tải nhầm file
+
+## [2026-05-30] — Tab Tổng quan: xuất PDF chọn Đã hoàn thành / Chưa hoàn thành / Tất cả
+- `tabs/tab_tien_do_nop.py` — `_render_tong_quan()`: tách ds thành 3 list `ds_tat_ca`/`ds_da`/`ds_chua`; thêm `st.radio` chọn loại xuất; tiêu đề file/PDF/PDF Header thay đổi theo loại; section luôn hiện thay vì chỉ khi có 🔴
+
 ## [2026-05-30] — Tab Tổng quan: ghi chú, ghi đè/chỉ ghi chú, badge ⚠️ thiếu file
 - `tabs/tab_tien_do_nop.py` — `_doc_manual_log()`: đổi return type thành `{(pgd,loai): entry_dict}` (backwards-compatible)
 - `tabs/tab_tien_do_nop.py` — matrix build: badge `*` ghi đè, `📝` chỉ ghi chú, `⚠️` auto-detect `file_dinh_kem` trống; caption chú giải 3 badge

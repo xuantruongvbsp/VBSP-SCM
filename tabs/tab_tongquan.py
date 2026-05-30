@@ -39,6 +39,7 @@ from data.pgd import ds_pgd_co_file
 from data.cdtotkvv import doc_cdtotkvv, ds_thang_nam, tong_hop_theo_pgd
 from pdf_service import nut_xuat_pdf, xuat_pdf
 from services.giao_ban_thang_service import tao_bao_cao_giao_ban_thang
+from services.hstd_word_service import xuat_word_hstd_tong_hop
 from services.upload_service import format_caption_merge
 from services.tongquan_cdto_service import (
     load_cdto_toan_cn,
@@ -1038,7 +1039,7 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                         lambda v, c=col: _fmt_cell(v, c)
                     )
 
-            col_ex, col_pdf, col_gb = st.columns(3)
+            col_ex, col_pdf, col_gb, col_word = st.columns(4)
 
             with col_ex:
                 if st.button("📥 Xuất Excel", key="btn_excel_tqpgd", use_container_width=True):
@@ -1157,6 +1158,44 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                         use_container_width=True,
                     ):
                         state.downloads.clear("tqpgd_giaoban")
+
+            with col_word:
+                if st.button("📄 Word HSTD", key="btn_word_tqpgd", use_container_width=True):
+                    try:
+                        state = SCMStateManager()
+                        if df_full is not None and not df_full.empty:
+                            df_xuat = df_full
+                        else:
+                            df_xuat = df
+                        with st.spinner("⏳ Đang tạo báo cáo Word..."):
+                            _wd_bytes = xuat_word_hstd_tong_hop(
+                                df=df_xuat,
+                                username=username,
+                            )
+                        state.downloads.set(
+                            "tqpgd_word",
+                            _wd_bytes,
+                            f"HSTD_TongHop_{datetime.now().strftime('%d%m%Y_%H%M')}.docx",
+                        )
+                        db.ghi_audit(username or "unknown", "xuat_word_hstd", "Tổng hợp HSTD Word")
+                    except Exception as _e:
+                        logger.error("Lỗi xuất Word HSTD: %s", _e, exc_info=True)
+                        import traceback
+                        SCMStateManager().downloads.clear("tqpgd_word")
+                        st.error(f"❌ Lỗi: {_e}")
+                        st.code(traceback.format_exc())
+
+                state = SCMStateManager()
+                if state.downloads.has("tqpgd_word"):
+                    if st.download_button(
+                        label="⬇ Tải Word HSTD",
+                        data=state.downloads.get_bytes("tqpgd_word"),
+                        file_name=state.downloads.get_filename("tqpgd_word") or "HSTD_TongHop.docx",
+                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                        key="btn_word_tqpgd_dl",
+                        use_container_width=True,
+                    ):
+                        state.downloads.clear("tqpgd_word")
         else:
             st.warning(
                 f"⚠️ Không hiển thị được bảng tổng quát PGD — "

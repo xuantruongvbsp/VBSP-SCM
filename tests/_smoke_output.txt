@@ -1,0 +1,212 @@
+﻿============================= test session starts =============================
+platform win32 -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- C:\Users\Administrator\AppData\Local\Programs\Python\Python314\python.exe
+cachedir: .pytest_cache
+rootdir: D:\VBSP-SCM
+configfile: pytest.ini
+collecting ... collected 105 items
+
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_audit_log] PASSED [  0%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_ban_dai_dien] PASSED [  1%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_baocao] PASSED [  2%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_bao_cao_dinh_ky] PASSED [  3%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_quan_ly_cong_van] FAILED [  4%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_candoi] PASSED [  5%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_canh_bao_som] PASSED [  6%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_cbtd] PASSED [  7%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_cdtotkvv] PASSED [  8%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_cdtotkvv_pgd] PASSED [  9%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_checklist_bc] PASSED [ 10%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_danhsach] PASSED [ 11%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_den_han] PASSED [ 12%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_diem_gd_pgd] PASSED [ 13%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_gqvl] PASSED [ 14%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_hhi] PASSED [ 15%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_kehoach] PASSED [ 16%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_kh_gqvl] PASSED [ 17%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_khnv_noi_bo] PASSED [ 18%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_khtd] PASSED [ 19%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_khtd_giao_dc] PASSED [ 20%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_khtd_mau07] PASSED [ 20%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_khtd_nhap] PASSED [ 21%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_khtd_pgd] PASSED [ 22%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_khtd_xuat] PASSED [ 23%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_kiem_soat] PASSED [ 24%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_nhiem_vu] PASSED [ 25%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_no_khoanh] PASSED [ 26%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_nq11] PASSED [ 27%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_phoi_hop_pgd] PASSED [ 28%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_qlnk_dashboard] PASSED [ 29%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_quan_ly_bc] PASSED [ 30%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_quan_ly_cv] PASSED [ 31%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_quan_ly_dgd] PASSED [ 32%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_so_sanh_2_ky] PASSED [ 33%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_so_sanh_ky] PASSED [ 34%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_tien_do] PASSED [ 35%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_tien_do_nop] PASSED [ 36%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_tongquan] PASSED [ 37%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_tracuu] PASSED [ 38%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_trang_thai_nguon] PASSED [ 39%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_upload_khnv] PASSED [ 40%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_upload_pgd] PASSED [ 40%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_uy_thac] FAILED [ 41%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_xu_ly_rui_ro] PASSED [ 42%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[widgets.data_source_status] PASSED [ 43%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[widgets.status_widget] PASSED [ 44%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[workspaces.ws_executive] PASSED [ 45%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[workspaces.ws_management] PASSED [ 46%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[workspaces.ws_operation] PASSED [ 47%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[services.upload_service] PASSED [ 48%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[services.uy_thac_service] PASSED [ 49%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[services.tien_do_service] PASSED [ 50%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[services.tongquan_service] PASSED [ 51%]
+tests/test_smoke_imports.py::TestSmokeImports::test_import[services.report_service] PASSED [ 52%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_audit_log] PASSED [ 53%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_ban_dai_dien] PASSED [ 54%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_baocao] PASSED [ 55%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_bao_cao_dinh_ky] PASSED [ 56%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_quan_ly_cong_van] FAILED [ 57%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_candoi] PASSED [ 58%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_canh_bao_som] PASSED [ 59%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_cbtd] PASSED [ 60%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_cdtotkvv] PASSED [ 60%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_cdtotkvv_pgd] PASSED [ 61%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_checklist_bc] PASSED [ 62%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_danhsach] PASSED [ 63%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_den_han] PASSED [ 64%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_diem_gd_pgd] PASSED [ 65%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_gqvl] PASSED [ 66%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_hhi] PASSED [ 67%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_kehoach] PASSED [ 68%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_kh_gqvl] PASSED [ 69%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_khnv_noi_bo] PASSED [ 70%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_khtd] PASSED [ 71%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_khtd_giao_dc] PASSED [ 72%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_khtd_mau07] PASSED [ 73%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_khtd_nhap] PASSED [ 74%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_khtd_pgd] FAILED [ 75%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_khtd_xuat] PASSED [ 76%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_kiem_soat] PASSED [ 77%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_nhiem_vu] PASSED [ 78%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_no_khoanh] PASSED [ 79%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_nq11] PASSED [ 80%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_phoi_hop_pgd] PASSED [ 80%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_qlnk_dashboard] PASSED [ 81%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_quan_ly_bc] PASSED [ 82%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_quan_ly_cv] PASSED [ 83%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_quan_ly_dgd] PASSED [ 84%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_so_sanh_2_ky] PASSED [ 85%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_so_sanh_ky] PASSED [ 86%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_tien_do] PASSED [ 87%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_tien_do_nop] PASSED [ 88%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_tongquan] PASSED [ 89%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_tracuu] PASSED [ 90%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_trang_thai_nguon] PASSED [ 91%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_upload_khnv] FAILED [ 92%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_upload_pgd] PASSED [ 93%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_uy_thac] FAILED [ 94%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_xu_ly_rui_ro] PASSED [ 95%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[widgets.data_source_status] PASSED [ 96%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[widgets.status_widget] PASSED [ 97%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[workspaces.ws_executive] PASSED [ 98%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[workspaces.ws_management] PASSED [ 99%]
+tests/test_smoke_imports.py::TestSmokeRender::test_render[workspaces.ws_operation] PASSED [100%]
+
+================================== FAILURES ===================================
+E   ModuleNotFoundError: No module named 'requests'
+
+During handling of the above exception, another exception occurred:
+E   ImportError: Không import được tabs.tab_quan_ly_cong_van: No module named 'requests'
+D:\VBSP-SCM\tests\test_smoke_imports.py:120: ImportError: Không import được tabs.tab_quan_ly_cong_van: No module named 'requests'
+E   ModuleNotFoundError: No module named 'docxtpl'
+
+During handling of the above exception, another exception occurred:
+E   ImportError: Không import được tabs.tab_uy_thac: No module named 'docxtpl'
+D:\VBSP-SCM\tests\test_smoke_imports.py:120: ImportError: Không import được tabs.tab_uy_thac: No module named 'docxtpl'
+E   ModuleNotFoundError: No module named 'requests'
+
+During handling of the above exception, another exception occurred:
+E   ImportError: Không import được tabs.tab_quan_ly_cong_van: No module named 'requests'
+D:\VBSP-SCM\tests\test_smoke_imports.py:120: ImportError: Không import được tabs.tab_quan_ly_cong_van: No module named 'requests'
+E   Failed: tabs.tab_khtd_pgd.render() thất bại: AttributeError: The '.style' accessor requires jinja2
+---------------------------- Captured stdout call -----------------------------
+DEBUG:tests.test_smoke_imports:Lỗi render tabs.tab_khtd_pgd: The '.style' accessor requires jinja2
+Traceback (most recent call last):
+  File "D:\VBSP-SCM\tests\test_smoke_imports.py", line 183, in _try_render
+    mod.render(*args, **call_kwargs)
+    ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\VBSP-SCM\tabs\tab_khtd_pgd.py", line 666, in render
+    df_pgd.drop(columns=["_nhom"]).style.apply(_to_mau_ma_tran, axis=1),
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\site-packages\pandas\core\generic.py", line 6206, in __getattr__
+    return object.__getattribute__(self, name)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+  File "C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\site-packages\pandas\core\frame.py", line 1430, in style
+    raise AttributeError("The '.style' accessor requires jinja2")
+AttributeError: The '.style' accessor requires jinja2. Did you mean: 'astype'?
+------------------------------ Captured log call ------------------------------
+DEBUG    tests.test_smoke_imports:test_smoke_imports.py:196 Lỗi render tabs.tab_khtd_pgd: The '.style' accessor requires jinja2
+Traceback (most recent call last):
+  File "D:\VBSP-SCM\tests\test_smoke_imports.py", line 183, in _try_render
+    mod.render(*args, **call_kwargs)
+    ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\VBSP-SCM\tabs\tab_khtd_pgd.py", line 666, in render
+    df_pgd.drop(columns=["_nhom"]).style.apply(_to_mau_ma_tran, axis=1),
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\site-packages\pandas\core\generic.py", line 6206, in __getattr__
+    return object.__getattribute__(self, name)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+  File "C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\site-packages\pandas\core\frame.py", line 1430, in style
+    raise AttributeError("The '.style' accessor requires jinja2")
+AttributeError: The '.style' accessor requires jinja2. Did you mean: 'astype'?
+D:\VBSP-SCM\tests\test_smoke_imports.py:254: Failed: tabs.tab_khtd_pgd.render() thất bại: AttributeError: The '.style' accessor requires jinja2
+E   Failed: tabs.tab_upload_khnv.render() thất bại: AttributeError: The '.style' accessor requires jinja2
+---------------------------- Captured stdout call -----------------------------
+DEBUG:tests.test_smoke_imports:Lỗi render tabs.tab_upload_khnv: The '.style' accessor requires jinja2
+Traceback (most recent call last):
+  File "D:\VBSP-SCM\tests\test_smoke_imports.py", line 183, in _try_render
+    mod.render(*args, **call_kwargs)
+    ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\VBSP-SCM\tabs\tab_upload_khnv.py", line 1419, in render
+    _hien_thi_bang_trang_thai()
+    ~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "D:\VBSP-SCM\tabs\tab_upload_khnv.py", line 111, in _hien_thi_bang_trang_thai
+    styled = df_tt.style.map(style_trang_thai, subset=cols_loai)
+             ^^^^^^^^^^^
+  File "C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\site-packages\pandas\core\generic.py", line 6206, in __getattr__
+    return object.__getattribute__(self, name)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+  File "C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\site-packages\pandas\core\frame.py", line 1430, in style
+    raise AttributeError("The '.style' accessor requires jinja2")
+AttributeError: The '.style' accessor requires jinja2. Did you mean: 'astype'?
+------------------------------ Captured log call ------------------------------
+DEBUG    tests.test_smoke_imports:test_smoke_imports.py:196 Lỗi render tabs.tab_upload_khnv: The '.style' accessor requires jinja2
+Traceback (most recent call last):
+  File "D:\VBSP-SCM\tests\test_smoke_imports.py", line 183, in _try_render
+    mod.render(*args, **call_kwargs)
+    ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\VBSP-SCM\tabs\tab_upload_khnv.py", line 1419, in render
+    _hien_thi_bang_trang_thai()
+    ~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "D:\VBSP-SCM\tabs\tab_upload_khnv.py", line 111, in _hien_thi_bang_trang_thai
+    styled = df_tt.style.map(style_trang_thai, subset=cols_loai)
+             ^^^^^^^^^^^
+  File "C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\site-packages\pandas\core\generic.py", line 6206, in __getattr__
+    return object.__getattribute__(self, name)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+  File "C:\Users\Administrator\AppData\Local\Programs\Python\Python314\Lib\site-packages\pandas\core\frame.py", line 1430, in style
+    raise AttributeError("The '.style' accessor requires jinja2")
+AttributeError: The '.style' accessor requires jinja2. Did you mean: 'astype'?
+D:\VBSP-SCM\tests\test_smoke_imports.py:254: Failed: tabs.tab_upload_khnv.render() thất bại: AttributeError: The '.style' accessor requires jinja2
+E   ModuleNotFoundError: No module named 'docxtpl'
+
+During handling of the above exception, another exception occurred:
+E   ImportError: Không import được tabs.tab_uy_thac: No module named 'docxtpl'
+D:\VBSP-SCM\tests\test_smoke_imports.py:120: ImportError: Không import được tabs.tab_uy_thac: No module named 'docxtpl'
+=========================== short test summary info ===========================
+FAILED tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_quan_ly_cong_van]
+FAILED tests/test_smoke_imports.py::TestSmokeImports::test_import[tabs.tab_uy_thac]
+FAILED tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_quan_ly_cong_van]
+FAILED tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_khtd_pgd]
+FAILED tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_upload_khnv]
+FAILED tests/test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_uy_thac]
+======================== 6 failed, 99 passed in 21.41s ========================

@@ -593,4 +593,11 @@ def _hex(c) -> str:
     try:
         return c.hexval()
     except AttributeError:
-        return str(c)
+        pass
+    try:
+        r = int(c.red * 255) if hasattr(c, 'red') else 0
+        g = int(c.green * 255) if hasattr(c, 'green') else 0
+        b = int(c.blue * 255) if hasattr(c, 'blue') else 0
+        return f"#{r:02x}{g:02x}{b:02x}"
+    except Exception:
+        return "#000000"

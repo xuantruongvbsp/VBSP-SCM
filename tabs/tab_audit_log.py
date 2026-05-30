@@ -25,12 +25,24 @@ ACTION_NHOM = {
 
 def _doc_audit(ngay_tu: str, ngay_den: str,
                username_loc: str, action_loc: str,
-               username_filter: str | None = None) -> pd.DataFrame:
-    sql = """
-        SELECT id, ts, username, action, detail
-        FROM audit_log
-        WHERE ts >= ? AND ts <= ?
+               username_filter: str | None = None,
+               show_full: bool = False) -> pd.DataFrame:
     """
+    Đọc audit log. Nếu show_full=True, lấy thêm ip_address, user_agent, table_name.
+    """
+    if show_full:
+        sql = """
+            SELECT id, ts, username, action, detail,
+                   table_name, record_id, ip_address, user_agent
+            FROM audit_log
+            WHERE ts >= ? AND ts <= ?
+        """
+    else:
+        sql = """
+            SELECT id, ts, username, action, detail
+            FROM audit_log
+            WHERE ts >= ? AND ts <= ?
+        """
     params = [ngay_tu + "T00:00:00", ngay_den + "T23:59:59"]
     if username_loc and username_loc != "Tất cả":
         sql += " AND username = ?"
@@ -45,7 +57,13 @@ def _doc_audit(ngay_tu: str, ngay_den: str,
     with db.get_conn() as conn:
         rows = conn.execute(sql, params).fetchall()
     if not rows:
+        if show_full:
+            return pd.DataFrame(columns=["id","ts","username","action","detail",
+                                         "table_name","record_id","ip_address","user_agent"])
         return pd.DataFrame(columns=["id","ts","username","action","detail"])
+    if show_full:
+        return pd.DataFrame(rows, columns=["ID","Thời gian","User","Hành động","Chi tiết",
+                                             "Bảng","Record ID","IP Address","User Agent"])
     return pd.DataFrame(rows, columns=["ID","Thời gian","User","Hành động","Chi tiết"])
 
 
@@ -216,7 +234,8 @@ def _render_pgd_mode(pgd_user: str) -> None:
 
 def _render_full(role: str, username_filter: str | None = None) -> None:
     """Chế độ full — đầy đủ bộ lọc, metrics, export (dành cho Admin)."""
-    c1, c2, c3, c4 = st.columns([1.2, 1.2, 1.5, 1.5])
+    # Bộ lọc + tùy chọn hiển thị
+    c1, c2, c3, c4, c5 = st.columns([1.2, 1.2, 1.5, 1.5, 1])
     with c1:
         ngay_tu = st.date_input(
             "Từ ngày",
@@ -240,8 +259,10 @@ def _render_full(role: str, username_filter: str | None = None) -> None:
             placeholder="vd: upload, khtd, export",
             key="audit_action",
         )
+    with c5:
+        show_full = st.checkbox("Hiển thị đầy đủ", key="audit_full", help="Hiển thị IP, User Agent, Bảng")
 
-    df = _doc_audit(ngay_tu, ngay_den, user_chon, action_chon, username_filter)
+    df = _doc_audit(ngay_tu, ngay_den, user_chon, action_chon, username_filter, show_full)
 
     st.caption(f"Tìm thấy **{len(df)}** bản ghi (tối đa 500)")
 
@@ -256,16 +277,27 @@ def _render_full(role: str, username_filter: str | None = None) -> None:
               df["Hành động"].value_counts().index[0] if not df.empty else "—")
 
     st.divider()
+
+    # Xây dựng column_config động dựa trên các cột có trong df
+    column_config = {
+        "Thời gian": st.column_config.TextColumn(width="medium"),
+        "User":      st.column_config.TextColumn(width="small"),
+        "Hành động": st.column_config.TextColumn(width="medium"),
+        "Chi tiết":  st.column_config.TextColumn(width="large"),
+    }
+    if show_full:
+        column_config.update({
+            "Bảng":        st.column_config.TextColumn(width="small"),
+            "Record ID":   st.column_config.TextColumn(width="small"),
+            "IP Address":  st.column_config.TextColumn(width="small"),
+            "User Agent":  st.column_config.TextColumn(width="medium"),
+        })
+
     st.dataframe(
         df.drop(columns=["ID"]),
         use_container_width=True,
         hide_index=True,
-        column_config={
-            "Thời gian": st.column_config.TextColumn(width="medium"),
-            "User":      st.column_config.TextColumn(width="small"),
-            "Hành động": st.column_config.TextColumn(width="medium"),
-            "Chi tiết":  st.column_config.TextColumn(width="large"),
-        },
+        column_config=column_config,
     )
 
     csv = df.to_csv(index=False).encode("utf-8-sig")

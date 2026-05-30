@@ -1,5 +1,24 @@
 # CHANGELOG
 
+## [2026-05-31d] — Báo cáo Tổng hợp HSTD Word (.docx)
+- `services/hstd_word_service.py` **(MỚI)** — service xuất báo cáo Word tổng hợp HSTD:
+  - Trang bìa: Header NHCSXH + tiêu đề + tháng/năm + người xuất
+  - Bảng 1: Tổng hợp theo chương trình tín dụng (Số món, Số KH, Dư nợ, QH, QH%, Khoanh, Lãi tồn) — có dòng tổng, tô màu QH% cao (>5% đỏ, >3% cam)
+  - Bảng 2: Chi tiết 22 PGD (cùng cột như bảng 1) — xếp hạng theo dư nợ giảm dần
+  - Phần biểu đồ: nhận list (png_bytes, caption) để chèn ảnh vào Word
+  - Khối chữ ký cuối (Người lập / Kiểm soát / Giám đốc)
+  - Dùng python-docx, font Times New Roman, theme VBSP green
+- `tabs/tab_tongquan.py` dòng ~1040, ~1160-1200 — thêm nút "📄 Word HSTD" (cột thứ 4), đổi layout 3 cột → 4 cột (Excel / PDF / Giao ban / Word), dùng `SCMStateManager.downloads` + audit log
+
+## [2026-05-31c] — Báo cáo giao ban tháng tổng hợp (PDF A4 landscape)
+- `services/giao_ban_thang_service.py` **(MỚI)** — service xuất báo cáo giao ban tháng 2 trang PDF:
+  - Trang 1: Header NHCSXH + 10 KPI tổng quan toàn CN (Dư nợ, QH, QH%, Khoanh, Lãi tồn, Số món, Số KH...) + so sánh tăng/giảm với kỳ trước
+  - Trang 2: Bảng xếp hạng 22 PGD theo dư nợ (có QH%, ±DN) + highlight Top 3/Bottom 3 + PGD có QH% cao nhất + Nhận xét tự động (theo ngưỡng QH) + Khối chữ ký
+  - Sử dụng reportlab, font Times New Roman, logo NHCSXH, CSS class VBSP green
+- `tabs/tab_tongquan.py` dòng ~1040-1115 — thêm nút "📋 Giao ban tháng" (cột thứ 3, cùng hàng Excel/PDF), dùng `SCMStateManager.downloads` + audit log
+- `tests/test_giao_ban_thang.py` **(MỚI)** — test smoke tạo PDF từ dữ liệu giả 22 PGD
+- Fix `_hex()`: xử lý cả `Color` object (không có `.hexval()`) bằng cách đọc `.red/.green/.blue`, fallback `#000000`
+
 ## [2026-05-31b] — Fix import BytesIO misplaced trong tab_ndt_dp.py
 - `tabs/tab_ndt_dp.py` dòng 3 — chuyển `from io import BytesIO` lên đầu file (đúng convention), xóa import thừa ở cuối file
 

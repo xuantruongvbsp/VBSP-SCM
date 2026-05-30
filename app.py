@@ -58,6 +58,14 @@ import workspaces
 import db
 from utils_theme import init_theme, get_theme_css
 from state_manager import SCMStateManager
+from security import (
+    init_session_security,
+    check_and_handle_timeout,
+    update_last_activity,
+    check_ip_and_handle,
+    is_ip_allowed,
+    _get_client_ip,
+)
 
 
 def _toi_uu_dtype(df: pd.DataFrame) -> pd.DataFrame:
@@ -190,6 +198,25 @@ def main():
         # Chế độ test hoặc chưa đăng nhập
         st.warning("⚠️ Chưa đăng nhập hoặc session hết hạn.")
         st.stop()
+
+    # ── Bảo mật & Tuân thủ NHCSXH ─────────────────────────────────────────────
+    # Khởi tạo session security
+    init_session_security()
+
+    # Kiểm tra session timeout
+    check_and_handle_timeout()
+
+    # Kiểm tra IP whitelist (chỉ khi không phải localhost/dev)
+    client_ip = _get_client_ip()
+    if client_ip != "127.0.0.1" and not is_ip_allowed(client_ip):
+        st.error(f"⛔ IP {client_ip} không được phép truy cập hệ thống.")
+        db.ghi_audit(st.session_state.get("username", "unknown"), "ip_blocked", f"IP: {client_ip}")
+        st.info("Vui lòng liên hệ quản trị viên để được hỗ trợ.")
+        st.stop()
+
+    # Cập nhật last activity
+    update_last_activity()
+    # ─────────────────────────────────────────────────────────────────────────
 
     ho_ten    = user_info["ho_ten"]
     role      = user_info["role"]

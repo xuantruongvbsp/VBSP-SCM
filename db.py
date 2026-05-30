@@ -178,7 +178,13 @@ def init_db():
                 ts         TEXT NOT NULL,
                 username   TEXT NOT NULL DEFAULT 'system',
                 action     TEXT NOT NULL,
-                detail     TEXT
+                detail     TEXT,
+                table_name TEXT,
+                record_id  TEXT,
+                old_value  TEXT,
+                new_value  TEXT,
+                ip_address TEXT,
+                user_agent TEXT
             );
             CREATE TABLE IF NOT EXISTS nhiem_vu (
                 id            INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -516,6 +522,16 @@ def init_db():
             CREATE INDEX IF NOT EXISTS idx_ktnb_loi_ma      ON ktnb_ket_qua_loi(ma_loi);
             CREATE INDEX IF NOT EXISTS idx_ktnb_loi_trang_thai ON ktnb_ket_qua_loi(trang_thai);
         """)
+        # ── Tạo index cho audit_log (sau executescript để tránh lỗi) ──────────
+        try:
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_audit_table_record ON audit_log(table_name, record_id)")
+        except sqlite3.OperationalError:
+            pass
+        try:
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_audit_ip ON audit_log(ip_address)")
+        except sqlite3.OperationalError:
+            pass
+        # ─────────────────────────────────────────────────────────────────────
         try:
             conn.execute(
                 "ALTER TABLE tien_do_task ADD COLUMN cap_theo_doi TEXT NOT NULL DEFAULT 'xa'"
@@ -646,6 +662,22 @@ def init_db():
             conn.execute("ALTER TABLE cong_van ADD COLUMN onedrive_url TEXT")
         except sqlite3.OperationalError:
             pass
+
+        # ── Migration: Mở rộng audit_log cho NHCSXH compliance ─────────────────
+        # (index đã được tạo ở trên, chỉ cần migration columns)
+        for col, typ in [
+            ("table_name", "TEXT"),
+            ("record_id", "TEXT"),
+            ("old_value", "TEXT"),
+            ("new_value", "TEXT"),
+            ("ip_address", "TEXT"),
+            ("user_agent", "TEXT"),
+        ]:
+            try:
+                conn.execute(f"ALTER TABLE audit_log ADD COLUMN {col} {typ}")
+            except sqlite3.OperationalError:
+                pass
+        # (indexes đã được tạo sau executescript ở trên)
 
         conn.commit()
 
@@ -838,11 +870,63 @@ def khoi_phuc_kv(key: str, history_id: int, username: str) -> bool:
 
 
 def ghi_audit(username: str, action: str, detail: str = "") -> None:
+    """Ghi audit log cơ bản (backward compatible)."""
     try:
         with get_conn() as conn:
             conn.execute(
                 "INSERT INTO audit_log (ts, username, action, detail) VALUES (?,?,?,?)",
                 (datetime.now().isoformat(), username, action, detail)
+            )
+            conn.commit()
+    except Exception:
+        pass
+
+
+def ghi_audit_full(
+    username: str,
+    action: str,
+    detail: str = "",
+    table_name: str = None,
+    record_id: str = None,
+    old_value: dict = None,
+    new_value: dict = None,
+    ip_address: str = None,
+    user_agent: str = None,
+) -> None:
+    """
+    Ghi audit log đầy đủ cho compliance NHCSXH.
+    
+    Args:
+        username: Tên user thực hiện
+        action: Loại hành động (insert, update, delete, login, logout...)
+        detail: Mô tả chi tiết
+        table_name: Tên bảng bị tác động
+        record_id: ID của record bị tác động
+        old_value: Giá trị cũ (dict)
+        new_value: Giá trị mới (dict)
+        ip_address: IP address của client
+        user_agent: User agent string
+    """
+    try:
+        import json
+        with get_conn() as conn:
+            conn.execute(
+                """INSERT INTO audit_log
+                   (ts, username, action, detail, table_name, record_id,
+                    old_value, new_value, ip_address, user_agent)
+                   VALUES (?,?,?,?,?,?,?,?,?,?)""",
+                (
+                    datetime.now().isoformat(),
+                    username,
+                    action,
+                    detail,
+                    table_name,
+                    str(record_id) if record_id is not None else None,
+                    json.dumps(old_value, ensure_ascii=False) if old_value else None,
+                    json.dumps(new_value, ensure_ascii=False) if new_value else None,
+                    ip_address,
+                    user_agent,
+                ),
             )
             conn.commit()
     except Exception:

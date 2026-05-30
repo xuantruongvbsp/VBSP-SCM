@@ -812,6 +812,7 @@ def _build_all_items(role: str, username: str, **kwargs) -> list:
         ALL_ITEMS.append({"group": "Hệ thống", "label": "Mã NĐT địa phương", "icon": "building-bank", "fn": lambda: _render_ndt_dp(role_n, kwargs.get("username", "unknown"))})
     if role_n == "admin_cn":
         ALL_ITEMS.append({"group": "Hệ thống", "label": "Nhật ký hệ thống", "icon": "list", "fn": lambda: _get_tab("tab_audit_log").render(None, **kwargs)})
+        ALL_ITEMS.append({"group": "Hệ thống", "label": "🔐 Quản lý bảo mật", "icon": "shield", "fn": lambda: _get_tab("tab_security").render(None, **kwargs)})
     ALL_ITEMS.append({"group": "Hệ thống", "label": "🔍 Trạng thái hệ thống", "icon": "pulse", "fn": lambda: _get_tab("tab_trang_thai_nguon").render(None, **kwargs)})
     ALL_ITEMS.append({"group": "Hệ thống", "label": "Upload dữ liệu", "icon": "upload", "fn": lambda: _get_tab("tab_upload_khnv").render(None, **kwargs)})
     ALL_ITEMS.append({"group": "Hệ thống", "label": "📖 Hướng dẫn", "icon": "book", "fn": lambda: render_huong_dan()})

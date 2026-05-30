@@ -222,7 +222,7 @@ def render(tab=None, **kwargs) -> None:
     from streamlit.delta_generator import DeltaGenerator
     _ctx = tab if tab is not None else st.container()
     with _ctx:
-        st.subheader("🏠 Tổng quan Quản lý Công việc")
+        st.subheader("� Dashboard Tổng quan Công việc")
 
         # ── Cảnh báo deadline ────────────────────────────────────────────
         alert_key = "_tong_hop_alert_dismissed"

@@ -1290,7 +1290,7 @@ def render(tab, **kwargs):
 
         if ctx.is_pgd:
             lazy_tabs(
-                ["📊 Tổng quan", "📋 Cập nhật tiến độ"],
+                ["📊 Danh sách đầu việc", "📋 Cập nhật tiến độ"],
                 [
                     lambda: _render_tong_quan(st.container(), **kwargs),
                     lambda: _render_cap_nhat(st.container(), **kwargs),
@@ -1304,7 +1304,7 @@ def render(tab, **kwargs):
             return
 
         lazy_tabs(
-            ["📊 Tổng quan", "➕ Tạo đầu việc mới", "✏️ Chỉnh sửa & Xóa đầu việc",
+            ["📊 Danh sách đầu việc", "➕ Tạo đầu việc mới", "✏️ Chỉnh sửa & Xóa đầu việc",
              "📋 Cập nhật tiến độ", "📤 Xuất báo cáo"],
             [
                 lambda: _render_tong_quan(st.container(), **kwargs),

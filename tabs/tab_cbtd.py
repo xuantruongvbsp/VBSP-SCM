@@ -42,6 +42,7 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
     role_raw = str(kwargs.get("role", "user") or "user")
     role     = normalize_role(role_raw)
     username = kwargs.get("username", "unknown")
+    pgd_user = kwargs.get("pgd_user", "")  # PGD mode filter
     state = SCMStateManager()
 
     import streamlit as _st
@@ -49,11 +50,24 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
 
     with ctx:
         st.subheader("👔 Quản lý Cán bộ Tín dụng (CBTD)")
-        st.caption("1 CBTD phụ trách 2–4 Điểm giao dịch (ĐGD) trong cùng PGD. "
-                   "Thôn/ấp được suy ra tự động từ cấu hình ĐGD.")
+        if pgd_user:
+            st.caption(f"1 CBTD phụ trách 2–4 Điểm giao dịch (ĐGD) trong PGD **{pgd_user}**. "
+                       "Thôn/ấp được suy ra tự động từ cấu hình ĐGD.")
+        else:
+            st.caption("1 CBTD phụ trách 2–4 Điểm giao dịch (ĐGD) trong cùng PGD. "
+                       "Thôn/ấp được suy ra tự động từ cấu hình ĐGD.")
 
-        cbtd_data: dict = doc_cbtd()
-        dgd_map: dict   = db.doc_dgd_map() or {}
+        cbtd_data_raw: dict = doc_cbtd()
+        # Filter theo PGD nếu có pgd_user
+        if pgd_user:
+            cbtd_data = {
+                k: v for k, v in cbtd_data_raw.items()
+                if str(v.get("pgd", "")).strip().lower() == pgd_user.strip().lower()
+            }
+        else:
+            cbtd_data = cbtd_data_raw
+
+        dgd_map: dict = db.doc_dgd_map() or {}
 
         if not dgd_map:
             st.warning("⚠️ Chưa cấu hình Điểm giao dịch. "

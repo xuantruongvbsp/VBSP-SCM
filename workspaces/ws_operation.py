@@ -712,7 +712,7 @@ def _banner_canh_bao_khd(df_pgd: pd.DataFrame, role: str) -> None:
 # KIỂM SOÁT NỘI BỘ PGD — Checklist 7 điểm tự kiểm tra trước khi báo cáo CN
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def _render_kiem_soat_noi_bo_pgd(df_pgd: pd.DataFrame, pgd_user: str, role: str, state) -> None:
+def _render_kiem_soat_noi_bo_pgd(df_pgd: pd.DataFrame, pgd_user: str, role: str) -> None:
     """
     Checklist 7 điểm kiểm soát nội bộ cho CBTD địa bàn PGD.
     Mỗi điểm: Pass/Fail + số liệu thực tế + nút nhảy tới tab xử lý.
@@ -867,8 +867,9 @@ def _render_kiem_soat_noi_bo_pgd(df_pgd: pd.DataFrame, pgd_user: str, role: str,
             if not ok:
                 st.markdown("<br>", unsafe_allow_html=True)
                 if st.button("→ Xử lý", key=f"ksnb_{item_id}_btn", use_container_width=True):
-                    state.nav_ws_op_nhom = nhom_nav
-                    state.nav_ws_op_jump_tab = tab_idx
+                    _st = SCMStateManager()
+                    _st.nav_ws_op_nhom = nhom_nav
+                    _st.nav_ws_op_jump_tab = tab_idx
                     st.rerun()
 
     st.divider()
@@ -891,7 +892,7 @@ def _render_kiem_soat_noi_bo_pgd(df_pgd: pd.DataFrame, pgd_user: str, role: str,
             data=buf,
             file_name=f"KiemSoat_{pgd_user or 'PGD'}_{date.today().strftime('%Y%m%d')}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            key="ksnb_xuat_excel",
+            key=f"ksnb_{pgd_user or 'cn'}_xuat_excel",
         )
 
 
@@ -2514,6 +2515,10 @@ def render(**kwargs):
             "label": "🎯 Kế hoạch PGD",
             "tabs": [
                 ("🎯 KHTD", lambda tab: _lazy_tab("tab_khtd_pgd").render(tab, **kwargs)),
+                ("⚖️ Kế hoạch/Cân đối", lambda tab: _lazy_tab("tab_kehoach").render(
+                    tab, df=df_pgd, role=role, username=username,
+                    pgd_mode=True, pgd_user=pgd_user or pgd_filter or ""
+                )),
                 ("📋 Giao & ĐC KHTD", lambda tab: _lazy_tab("tab_khtd_giao_dc").render(tab, **kwargs)),
                 ("📋 Mẫu 07 Giao KH", lambda tab: _lazy_tab("tab_khtd_mau07").render(tab, **kwargs)),
                 ("🔭 Xây dựng KHTD TL", lambda tab: _lazy_tab("tab_xay_dung_khtd").render(tab, **kwargs)),
@@ -2528,6 +2533,10 @@ def render(**kwargs):
                 ("⚡ Nợ đến hạn có nguy cơ", lambda tab: _render_canh_bao_som_pgd(tab, **kwargs)),
                 ("🚨 Cảnh báo sớm (Full)", lambda tab: _render_canh_bao_som_pgd_full(df_pgd, pgd_user or pgd_filter or "", role, username)),
                 ("🔍 Kiểm soát Nội bộ", lambda tab: _render_kiem_soat_pgd(tab, df_pgd, pgd_user or pgd_filter or "", role, username)),
+                ("✅ Checklist Trước Báo Cáo", lambda tab: _render_kiem_soat_noi_bo_pgd(df_pgd, pgd_user or pgd_filter or "", role)),
+                ("👔 CBTD & Địa bàn", lambda tab: _lazy_tab("tab_cbtd").render(
+                    tab, df=df_pgd, role=role, username=username, pgd_user=pgd_user or pgd_filter or ""
+                )),
                 ("💳 Xử lý Rủi ro", lambda tab: _lazy_tab("tab_xu_ly_rui_ro").render(
                     tab, df=df_pgd, role=role, username=username, pgd_user=pgd_user or pgd_filter
                 )),
@@ -2561,6 +2570,17 @@ def render(**kwargs):
                 ("✅ Nhiệm vụ", lambda tab: _lazy_tab("tab_nhiem_vu").render(tab, **kwargs)),
                 ("📤 Upload Dữ liệu", lambda tab: _lazy_tab("tab_upload_pgd").render(tab, **kwargs)),
                 ("📤 Upload HSTD", lambda tab: _lazy_tab("tab_upload_pgd").render(tab, **kwargs)),
+                ("🏦 Nguồn vốn ĐP", lambda tab: _lazy_tab("tab_hhi").render(
+                    tab, df_full=df_pgd, pgd_user=pgd_user or pgd_filter or ""
+                )),
+                ("🏦 Mã NĐT địa phương", lambda tab: _lazy_tab("tab_ndt_dp").render(
+                    tab, df=df_pgd, role=role, username=username,
+                    pgd_user=pgd_user or pgd_filter or ""
+                )),
+                ("📋 Nhật ký hoạt động", lambda tab: _lazy_tab("tab_audit_log").render(
+                    tab, role=role, username=username,
+                    pgd_user=pgd_user or pgd_filter or ""
+                )),
                 ("🔍 Trạng thái hệ thống", lambda tab: _lazy_tab("tab_trang_thai_nguon").render(tab, **kwargs)),
                 ("📖 Hướng dẫn", lambda tab: render_huong_dan()),
             ],

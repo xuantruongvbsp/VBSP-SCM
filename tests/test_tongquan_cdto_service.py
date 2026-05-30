@@ -18,6 +18,8 @@ class TestComputeTotkvvKpi:
             "ten_dv": ["PGD A"] * 5 + ["PGD B"] * 5,
             "xep_loai": ["Tốt", "Tốt", "Tốt", "Khá", "Khá",
                          "Trung bình", "Trung bình", "Yếu", "Yếu", "Yếu"],
+            "tinh_trang": ["A", "A", "A", "A", "B",
+                           "B", "B", "C", "C", "C"],
             "tong_diem": [95, 93, 91, 85, 82, 75, 73, 65, 60, 55],
         })
         kpi = compute_totkvv_kpi(df)
@@ -30,10 +32,12 @@ class TestComputeTotkvvKpi:
         assert abs(kpi["tl_kha"] - 20.0) < 0.01
         assert abs(kpi["tl_tb"] - 20.0) < 0.01
         assert abs(kpi["tl_yeu"] - 30.0) < 0.01
-        assert abs(kpi["diem_tb"] - 76.7) < 0.5
+        assert abs(kpi["diem_tb"] - 77.4) < 0.5
 
     def test_empty_dataframe(self):
-        df = pd.DataFrame(columns=["stt", "ma_dv", "ten_dv", "xep_loai", "tong_diem"])
+        df = pd.DataFrame(columns=[
+            "stt", "ma_dv", "ten_dv", "xep_loai", "tinh_trang", "tong_diem",
+        ])
         kpi = compute_totkvv_kpi(df)
         assert kpi["tong_to"] == 0
         assert kpi["to_tot"] == 0
@@ -45,20 +49,24 @@ class TestComputeTotkvvKpi:
             "ma_dv": ["004601", "004601"],
             "ten_dv": ["PGD A", "PGD A"],
             "xep_loai": ["Tốt", "Tốt"],
+            "tinh_trang": ["A", "A"],
             "tong_diem": [90, 92],
         })
         kpi = compute_totkvv_kpi(df)
         assert kpi["to_kha"] == 0
 
-    def test_no_tong_diem_co_lumn(self):
+    def test_tl_kha_zero(self):
         df = pd.DataFrame({
-            "stt": [1],
-            "ma_dv": ["004601"],
-            "ten_dv": ["PGD A"],
-            "xep_loai": ["Tốt"],
+            "stt": [1, 2],
+            "ma_dv": ["004601", "004601"],
+            "ten_dv": ["PGD A", "PGD A"],
+            "xep_loai": ["Tốt", "Tốt"],
+            "tinh_trang": ["A", "A"],
+            "tong_diem": [90, 92],
         })
         kpi = compute_totkvv_kpi(df)
-        assert kpi["diem_tb"] == 0.0
+        assert kpi["tl_kha"] == 0.0
+        assert kpi["diem_tb"] == 91.0
 
 
 class TestRenderTotkvvHtml:

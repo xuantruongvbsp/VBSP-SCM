@@ -25,21 +25,17 @@ import plotly.express as px
 import plotly.graph_objects as go
 
 import db
-from auth import la_phan_he_cn, la_phan_he_pgd
-from utils import fmt_so, xuat_excel, ten_file_xuat, hien_thi_dataframe_phan_trang
+from auth import la_phan_he_cn, la_phan_he_pgd, normalize_role
+from config import DS_PGD
+from utils import fmt_so, vn, xuat_excel, ten_file_xuat, hien_thi_dataframe_phan_trang
 from state_manager import SCMStateManager
-from services import luu_cdtotkvv, KetQuaUpload
 from services.cdtotkvv_service import (
-    tong_hop_tu_pgd_data,
     bang_trang_thai_cdtotkvv as _bang_trang_thai_cdtotkvv,
     loc_df as _loc_df,
     cdtotkvv_ten_sheet_excel as _cdtotkvv_ten_sheet_excel,
     fmt_xuat_to_khong_dat_vn as _fmt_xuat_to_khong_dat_vn,
 )
-from services.tongquan_cdto_service import (
-    load_cdto_toan_cn,
-    compute_totkvv_kpi,
-)
+from services.tongquan_cdto_service import load_cdto_toan_cn
 from data.cdtotkvv import (
 
     doc_cdtotkvv, ds_thang_nam, tong_hop_theo_pgd,
@@ -308,6 +304,8 @@ def _sub_tong_hop(username: str) -> None:
     if df is None or df.empty:
         st.info("Chưa có dữ liệu CDTOTKVV nào từ hệ thống tập trung. Hãy kiểm tra tab Upload để xem trạng thái.")
         return
+
+    th = tong_hop_theo_pgd(df)
 
     if cdto["so_pgd_thieu"] > 0:
         ten_thieu = ", ".join(cdto["ds_pgd_thieu"][:5])
@@ -786,8 +784,8 @@ def _sub_ban_do_chat_luong(username: str, cdto_mode: str, pgd_user: str) -> None
                             ma_to = str(df_yeu.loc[idx, "ma_to"])
                             if ma_to in ma_to_yeu_truoc:
                                 df_yeu.loc[idx, "Liên tiếp Yếu"] = "🔴 2+ tháng"
-            except:
-                pass  # Không thể kiểm tra tháng trước
+            except Exception as e:
+                logger.error("kiem_tra_lien_tiep_yeu: %s", e, exc_info=True)
             
             # Hiển thị bảng
             cols_hien = []
@@ -981,9 +979,10 @@ def _sub_xu_huong(username: str, cdto_mode: str, pgd_user: str) -> None:
                         "pgd": row["ten_dv"],
                         "diem_tb": row["tong_diem_tb"]
                     })
-            except:
+            except Exception as e:
+                logger.error("xu_huong_pgd_thang: %s", e, exc_info=True)
                 continue
-        
+
         if pgd_records:
             df_pgd_trend = pd.DataFrame(pgd_records)
             
@@ -1050,9 +1049,10 @@ def _sub_xu_huong(username: str, cdto_mode: str, pgd_user: str) -> None:
                                 pgd_data = df_t[df_t["ten_dv"] == pgd]
                                 yeu_count = len(pgd_data[pgd_data["xep_loai"] == _XEP_LOAI_YEU])
                                 pgd_yeu_counts.append(yeu_count)
-                        except:
+                        except Exception as e:
+                            logger.error("canh_bao_to_yeu: %s", e, exc_info=True)
                             continue
-                    
+
                     if len(pgd_yeu_counts) >= 2:
                         if pgd_yeu_counts[-1] > pgd_yeu_counts[-2]:
                             if len(pgd_yeu_counts) >= 3 and pgd_yeu_counts[-2] > pgd_yeu_counts[-3]:
@@ -1085,7 +1085,7 @@ def render(tab: DeltaGenerator | None = None, **kwargs) -> None:
         tab: Streamlit DeltaGenerator cho tab này
         **kwargs: Chứa role, username, cdto_mode, pgd_user
     """
-    role: str = str(kwargs.get("role", ""))
+    role: str = normalize_role(str(kwargs.get("role", "")))
     username: str = str(kwargs.get("username", "unknown"))
     cdto_mode: str = str(kwargs.get("cdto_mode", "cn"))  # "cn" hoặc "pgd"
     pgd_user: str = str(kwargs.get("pgd_user", ""))
@@ -1106,7 +1106,7 @@ def render(tab: DeltaGenerator | None = None, **kwargs) -> None:
             st.caption("Quản lý và xem tổng hợp chấm điểm Tổ Tiết kiệm & Vay vốn toàn chi nhánh")
 
         # Tạo 5 sub-tabs
-        if cdto_mode == "cn" and role in ("admin", "manager", "admin_cn", "manager_cn"):
+        if cdto_mode == "cn" and la_phan_he_cn(role):
             # Admin/Manager workspace: đầy đủ chức năng
             sub1, sub2, sub3, sub4, sub5 = st.tabs([
                 "📤 Upload", 

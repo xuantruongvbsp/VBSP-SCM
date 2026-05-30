@@ -61,19 +61,30 @@ def render(tab=None, **kwargs) -> None:
     mode = kwargs.pop("mode", "full")
     force_allow = kwargs.pop("force_allow", False)
     username_filter = kwargs.pop("username_filter", None)
+    pgd_user = kwargs.get("pgd_user", "")  # PGD mode filter
 
     role_raw = str(kwargs.get("role", "user") or "user")
     role = normalize_role(role_raw)
 
-    if not force_allow and not la_admin_cn(role):
-        st.warning("⛔ Chỉ Admin mới có quyền xem Lịch sử giao dịch.")
+    # PGD role: chỉ xem log của chính mình (theo username)
+    is_pgd_role = pgd_user and not la_admin_cn(role)
+
+    if not force_allow and not la_admin_cn(role) and not is_pgd_role:
+        st.warning("⛔ Chỉ Admin hoặc PGD mới có quyền xem Lịch sử giao dịch.")
         return
 
     _tab_ctx = tab if tab is not None else st.container()
     with _tab_ctx:
-        st.subheader("📋 Lịch sử giao dịch")
+        if pgd_user:
+            st.subheader(f"📋 Nhật ký hoạt động — {pgd_user}")
+            st.caption("Chỉ hiển thị các hành động của PGD bạn.")
+        else:
+            st.subheader("📋 Lịch sử giao dịch")
 
-        if mode == "compact":
+        if is_pgd_role:
+            # PGD mode: filter theo username từ pgd_user
+            _render_pgd_mode(pgd_user)
+        elif mode == "compact":
             _render_compact(username_filter)
         else:
             _render_full(role, username_filter)
@@ -131,6 +142,76 @@ def _render_compact(username_filter: str | None = None) -> None:
     except Exception as e:
         logger.error("Lỗi trong khối except: %s", e, exc_info=True)
         st.error(f"Lỗi đọc: {e}")
+
+
+def _render_pgd_mode(pgd_user: str) -> None:
+    """Chế độ PGD — chỉ xem log của chính PGD, đơn giản hóa giao diện."""
+    from datetime import datetime, timedelta
+
+    # PGD filter: tìm username theo pgd_user
+    pgd_username = pgd_user.replace(" ", "_").lower()
+
+    c1, c2 = st.columns(2)
+    with c1:
+        ngay_tu = st.date_input(
+            "Từ ngày",
+            value=datetime.today() - timedelta(days=30),
+            format="DD/MM/YYYY",
+            key="audit_pgd_tu",
+        ).strftime("%Y-%m-%d")
+    with c2:
+        ngay_den = st.date_input(
+            "Đến ngày",
+            value=datetime.today(),
+            format="DD/MM/YYYY",
+            key="audit_pgd_den",
+        ).strftime("%Y-%m-%d")
+
+    try:
+        sql = """
+            SELECT ts, username, action, detail
+            FROM audit_log
+            WHERE ts >= ? AND ts <= ?
+            AND (username LIKE ? OR detail LIKE ?)
+            ORDER BY ts DESC LIMIT 200
+        """
+        params = [
+            ngay_tu + "T00:00:00",
+            ngay_den + "T23:59:59",
+            f"%{pgd_username}%",
+            f"%{pgd_user}%",
+        ]
+
+        with db.get_conn() as conn:
+            rows = conn.execute(sql, params).fetchall()
+
+        if not rows:
+            st.info("Không có bản ghi nào trong khoảng thời gian này.")
+            return
+
+        df = pd.DataFrame(
+            rows,
+            columns=["Thời gian", "User", "Hành động", "Chi tiết"],
+        )
+        df = format_df_vn(df)
+
+        st.caption(f"Tìm thấy **{len(df)}** bản ghi (tối đa 200)")
+
+        st.dataframe(
+            df,
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                "Thời gian": st.column_config.TextColumn(width="medium"),
+                "User":      st.column_config.TextColumn(width="small"),
+                "Hành động": st.column_config.TextColumn(width="medium"),
+                "Chi tiết":  st.column_config.TextColumn(width="large"),
+            },
+        )
+
+    except Exception as e:
+        logger.error("Lỗi trong khối except: %s", e, exc_info=True)
+        st.error(f"Lỗi đọc dữ liệu: {e}")
 
 
 def _render_full(role: str, username_filter: str | None = None) -> None:

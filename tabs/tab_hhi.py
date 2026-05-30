@@ -153,18 +153,32 @@ def _render_sub_ct(df_full: pd.DataFrame) -> None:
 
 def render(tab: DeltaGenerator = None, **kwargs) -> None:
     df_full = kwargs.get("df_full")
+    pgd_user = kwargs.get("pgd_user", "")  # PGD mode filter
 
     ctx = tab if tab is not None else st.container()
     with ctx:
         st.subheader("🏦 Nguồn vốn địa phương")
-        st.caption(
-            "Báo cáo Tỷ trọng Vốn ủy thác địa phương trên Tổng nguồn vốn "
-            "— phân tích theo PGD, Xã và Chương trình tín dụng."
-        )
+        if pgd_user:
+            st.caption(
+                f"Báo cáo Tỷ trọng Vốn ủy thác địa phương tại **{pgd_user}** — "
+                "phân tích theo Xã và Chương trình tín dụng."
+            )
+        else:
+            st.caption(
+                "Báo cáo Tỷ trọng Vốn ủy thác địa phương trên Tổng nguồn vốn "
+                "— phân tích theo PGD, Xã và Chương trình tín dụng."
+            )
 
         if df_full is None or df_full.empty:
-            st.warning("⚠️ Chưa có dữ liệu toàn Chi nhánh. Vui lòng upload và merge HSTD.")
+            st.warning("⚠️ Chưa có dữ liệu. Vui lòng upload và merge HSTD.")
             return
+
+        # Filter theo PGD nếu có pgd_user
+        if pgd_user and COT_TEN_PGD in df_full.columns:
+            df_full = df_full[df_full[COT_TEN_PGD] == pgd_user].copy()
+            if df_full.empty:
+                st.warning(f"⚠️ Không có dữ liệu cho PGD **{pgd_user}**.")
+                return
 
         if COT_NGUON_VON not in df_full.columns:
             st.warning(
@@ -222,27 +236,46 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
 
         st.divider()
 
-        lazy_tabs(
-            ["🏢 Theo PGD", "🗺️ Theo Xã", "📌 Theo Chương trình"],
-            [
-                lambda: (
-                    st.warning("Không tìm thấy cột Tên PGD trong dữ liệu.")
-                    if COT_TEN_PGD not in df_full.columns
-                    else _render_sub_pgd(df_full)
-                ),
-                lambda: (
-                    st.warning("Không tìm thấy cột Tên Xã trong dữ liệu.")
-                    if COT_TEN_XA not in df_full.columns
-                    else _render_sub_xa(df_full)
-                ),
-                lambda: (
-                    st.warning("Không tìm thấy cột Tên chương trình trong dữ liệu.")
-                    if COT_TEN_CT not in df_full.columns
-                    else _render_sub_ct(df_full)
-                ),
-            ],
-            key="nvdp",
-        )
+        # Tabs: ẩn "Theo PGD" nếu ở PGD mode
+        if pgd_user:
+            lazy_tabs(
+                ["🗺️ Theo Xã", "📌 Theo Chương trình"],
+                [
+                    lambda: (
+                        st.warning("Không tìm thấy cột Tên Xã trong dữ liệu.")
+                        if COT_TEN_XA not in df_full.columns
+                        else _render_sub_xa(df_full)
+                    ),
+                    lambda: (
+                        st.warning("Không tìm thấy cột Tên chương trình trong dữ liệu.")
+                        if COT_TEN_CT not in df_full.columns
+                        else _render_sub_ct(df_full)
+                    ),
+                ],
+                key="nvdp_pgd" if pgd_user else "nvdp",
+            )
+        else:
+            lazy_tabs(
+                ["🏢 Theo PGD", "🗺️ Theo Xã", "📌 Theo Chương trình"],
+                [
+                    lambda: (
+                        st.warning("Không tìm thấy cột Tên PGD trong dữ liệu.")
+                        if COT_TEN_PGD not in df_full.columns
+                        else _render_sub_pgd(df_full)
+                    ),
+                    lambda: (
+                        st.warning("Không tìm thấy cột Tên Xã trong dữ liệu.")
+                        if COT_TEN_XA not in df_full.columns
+                        else _render_sub_xa(df_full)
+                    ),
+                    lambda: (
+                        st.warning("Không tìm thấy cột Tên chương trình trong dữ liệu.")
+                        if COT_TEN_CT not in df_full.columns
+                        else _render_sub_ct(df_full)
+                    ),
+                ],
+                key="nvdp",
+            )
 
         st.divider()
 

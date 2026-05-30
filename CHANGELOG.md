@@ -1,5 +1,39 @@
 # CHANGELOG
 
+## [2026-05-31] — Triển khai P3 features cho PGD workspace (làm hết plan)
+- `tabs/tab_ndt_dp.py` **(mới)** — tab Mã NĐT Địa phương phiên bản PGD (chỉ xem, không CRUD)
+- `tabs/tab_hhi.py` dòng ~156, ~177-181, ~240-278 — thêm `pgd_user` parameter:
+  - Filter dữ liệu theo PGD
+  - Ẩn tab "Theo PGD" khi ở PGD mode
+  - Caption khác nhau cho CN mode vs PGD mode
+- `tabs/tab_audit_log.py` dòng ~64, ~69-86, ~147-214 — thêm `pgd_user` parameter:
+  - Cho phép PGD xem nhật ký hoạt động của chính mình
+  - Hàm `_render_pgd_mode()` mới với giao diện đơn giản hóa
+- `workspaces/ws_operation.py` dòng ~2573-2583 — thêm 3 tab P3 vào nhóm Quản trị PGD:
+  - "🏦 Nguồn vốn ĐP" (tab_hhi)
+  - "🏦 Mã NĐT địa phương" (tab_ndt_dp)
+  - "📋 Nhật ký hoạt động" (tab_audit_log)
+
+## [2026-05-31] — Triển khai P2 features cho PGD workspace
+- `workspaces/ws_operation.py` dòng ~2518, ~2537 — thêm 2 tab P2:
+  - "⚖️ Kế hoạch/Cân đối" trong nhóm Kế hoạch PGD (dùng `tab_kehoach` với `pgd_mode=True`)
+  - "👔 CBTD & Địa bàn" trong nhóm Kiểm soát & Rủi ro (dùng `tab_cbtd` với `pgd_user` filter)
+- `tabs/tab_cbtd.py` dòng ~45, ~60-68 — thêm hỗ trợ `pgd_user` parameter để filter CBTD theo PGD, hiển thị caption khác khi ở PGD mode
+
+## [2026-05-30] — Housekeeping: dọn sạch _archive/ 21 file dead code + fix smoke test
+- `_archive/` — xóa 21 file deprecated (tab_NO_rui_ro, tab_qd62, tab_xlrr_tong_hop, test cũ, seed data...): không còn file nào trong _archive/ cả
+- `tests/test_smoke_imports.py` dòng ~63 — xóa `"tabs.tab_qd62"` khỏi danh sách (module đã archive); compile OK
+- `health check thực tế`: `width='stretch'` đã hết sạch (0 match trong code active); thư mục trùng `VBSP-SCM/` không tồn tại
+
+## [2026-05-30] — Fix 3 bug crash trong tab_cdtotkvv.py sau refactor
+- `tabs/tab_cdtotkvv.py` dòng ~30 — thêm `from config import DS_PGD` + `vn` vào utils import (NameError)
+- `tabs/tab_cdtotkvv.py` `_sub_tong_hop()` — thêm `th = tong_hop_theo_pgd(df)` (NameError: `th` undefined)
+- `tabs/tab_cdtotkvv.py` — xóa import `compute_totkvv_kpi` không dùng sau refactor
+
+## [2026-05-30] — Thêm tab "✅ Checklist Trước Báo Cáo" cho PGD workspace
+- `workspaces/ws_operation.py` dòng ~715 — thêm `_render_kiem_soat_noi_bo_pgd()`: checklist 7 điểm (NQH, 3m KHĐ, Amber, lãi tồn, thiếu SĐT, đến hạn tháng tới, KHTD) với pass/fail + nút nhảy tab xử lý + xuất Phiếu KS Excel
+- `workspaces/ws_operation.py` dòng ~2531 — thêm tab "✅ Checklist Trước Báo Cáo" vào nhóm Kiểm soát & Rủi ro
+
 ## [2026-05-30] — Refactor CDTOTKVV: tách service thống nhất + badge + health-check + unit tests
 - `services/tongquan_cdto_service.py` **(mới)** — service thống nhất load CDTOTKVV toàn CN: `load_cdto_toan_cn()` (chuỗi ưu tiên: ds_thang_nam → fallback pgd_data), `compute_totkvv_kpi()`, `render_totkvv_html()`, `health_check_cdto()`
 - `tabs/tab_tongquan.py` — thay ~60 dòng load + tính KPI thủ công bằng 2 dòng gọi service; thêm badge ✅/⚠️/ℹ️ CDTOTKVV (giống HSTD); sửa `except pass` → `st.caption()` cảnh báo merge CDTOTKVV lỗi

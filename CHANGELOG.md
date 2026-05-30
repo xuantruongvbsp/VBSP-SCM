@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## [2026-05-30] — Fix xuất báo cáo tiến độ: phân loại ⚠️, slug filename, spinner Excel
+- `tabs/tab_tien_do_nop.py` dòng ~267 — ⚠️ (thiếu file) vào ds_chua thay vì ds_da, nhất quán với rule thiếu file = Trễ hạn
+- `tabs/tab_tien_do_nop.py` dòng ~305 — tên file dùng ASCII slug thay vì tiếng Việt (tránh lỗi download)
+- `tabs/tab_tien_do_nop.py` dòng ~311 — thêm `st.spinner` cho nút Excel
+
 ## [2026-05-30] — Fix PDF xuất tiến độ: strip emoji + stale download bytes
 - `tabs/tab_tien_do_nop.py` — `_clean_trang_thai()`: bỏ emoji khỏi cột Trạng thái trước khi truyền vào PDF (font TNR không hỗ trợ emoji)
 - `tabs/tab_tien_do_nop.py` — `_clear_export_cache()` + `on_change` trên radio/selectbox: xóa bytes cũ khi đổi filter, tránh tải nhầm file

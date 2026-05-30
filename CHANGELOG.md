@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## [2026-05-30] — Nâng cấp xuất PDF tab tiến độ: refactor helper, đổi tên, strip emoji Excel
+- `tabs/tab_tien_do_nop.py` — extract `_pdf_button()` helper dùng chung cho 2 loại PDF, loại bỏ ~25 dòng lặp
+- `tabs/tab_tien_do_nop.py` — import `xuat_pdf`, `xuat_pdf_group_header` ra ngoài handler
+- `tabs/tab_tien_do_nop.py` — đổi "PDF có Header" → "📊 PDF theo đơn vị" cho rõ nghĩa
+- `tabs/tab_tien_do_nop.py` — Excel cũng strip emoji cột Trạng thái (nhất quán với PDF)
+
 ## [2026-05-30] — Fix xuất báo cáo tiến độ: phân loại ⚠️, slug filename, spinner Excel
 - `tabs/tab_tien_do_nop.py` dòng ~267 — ⚠️ (thiếu file) vào ds_chua thay vì ds_da, nhất quán với rule thiếu file = Trễ hạn
 - `tabs/tab_tien_do_nop.py` dòng ~305 — tên file dùng ASCII slug thay vì tiếng Việt (tránh lỗi download)

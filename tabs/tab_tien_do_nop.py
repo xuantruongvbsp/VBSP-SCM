@@ -137,7 +137,12 @@ def _render_tong_quan(df: pd.DataFrame, deadline_cfg: dict, is_cn: bool, pgd_use
         st.info("Chưa có dữ liệu từ Google Sheets.")
         return
 
-    ds_loai = sorted(df["loai_bao_cao"].dropna().unique().tolist())
+    if not deadline_cfg:
+        st.info("ℹ️ Chưa có deadline nào được cài đặt. Vào tab **⚙️ Cài đặt deadline** để thêm.")
+        return
+
+    # Chỉ hiển thị loại báo cáo có deadline — xóa deadline là không còn theo dõi
+    ds_loai = sorted(deadline_cfg.keys())
     ds_pgd_scope = [pgd_user] if (not is_cn and pgd_user) else DS_PGD_ALL
 
     df = _gan_trang_thai(df, deadline_cfg)
@@ -148,6 +153,8 @@ def _render_tong_quan(df: pd.DataFrame, deadline_cfg: dict, is_cn: bool, pgd_use
           .dropna(subset=["thoi_gian"])
           .drop_duplicates(subset=["ten_pgd", "loai_bao_cao"], keep="last")
     )
+    # Chỉ tính các loại có deadline
+    df_dedup = df_dedup[df_dedup["loai_bao_cao"].isin(ds_loai)]
 
     dung_han = (df_dedup["tt"] == "dung_han").sum()
     tre      = (df_dedup["tt"] == "tre").sum()
@@ -397,12 +404,15 @@ def _render_cai_dat(df: pd.DataFrame, deadline_cfg: dict, username: str) -> None
     with col_del:
         st.write("")  # spacing
         if dl_hien:
-            if st.button("🗑 Xóa", key="cd_btn_xoa", use_container_width=True):
-                cfg_moi = dict(deadline_cfg)
-                cfg_moi.pop(loai_chon, None)
-                _luu_deadline_config(cfg_moi, username)
-                st.success(f"✅ Đã xóa deadline: **{loai_chon}**")
-                st.rerun()
+            with st.popover("🗑 Xóa", use_container_width=True):
+                st.warning(f"Xóa deadline của **{loai_chon}**?")
+                st.caption("Loại báo cáo này sẽ không còn được theo dõi ở tab Tổng quan.")
+                if st.button("⚠️ Xác nhận xóa", key="cd_btn_xoa_cf", type="primary", use_container_width=True):
+                    cfg_moi = dict(deadline_cfg)
+                    cfg_moi.pop(loai_chon, None)
+                    _luu_deadline_config(cfg_moi, username)
+                    st.success(f"✅ Đã xóa deadline: **{loai_chon}**")
+                    st.rerun()
 
     st.divider()
     st.markdown("**Danh sách deadline đã cài đặt**")

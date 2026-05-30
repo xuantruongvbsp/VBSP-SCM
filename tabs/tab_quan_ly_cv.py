@@ -1,4 +1,4 @@
-"""Wrapper: Quản lý Công việc & Nhiệm vụ — 2 nhóm chính, logic gọn."""
+"""Wrapper: Dashboard Công việc — Quản lý Tiến độ & Nhiệm vụ."""
 from __future__ import annotations
 
 import streamlit as st
@@ -13,12 +13,12 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
     ctx = get_tab_context(tab)
     with ctx:
         t_cv, t_bc = st.tabs([
-            "📋 Công việc & Tiến độ",
-            "📊 Báo cáo",
+            "� Dashboard Công việc",
+            "� Báo cáo",
         ])
         with t_cv:
             s1, s2, s3 = st.tabs([
-                "🏠 Tổng quan",
+                "� Tổng quan toàn bộ",
                 "📅 Tiến độ Công việc",
                 "📌 Nhiệm vụ định kỳ",
             ])

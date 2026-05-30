@@ -1,5 +1,8 @@
 # CHANGELOG
 
+## [2026-05-30] — Nâng cấp tab Theo dõi nhập liệu: hỗ trợ nhiều Google Sheet
+- `tabs/tab_theo_doi_nhap.py` — đổi từ 1 config → list nhiều sheet (`gsheet_theo_doi_nhap_list`); thêm selectbox chọn sheet; UI thêm/sửa/xóa từng sheet; tự migrate config cũ
+
 ## [2026-05-30] — Config Sheet theo dõi nhập liệu HSSV Lần 2
 - `kv_store[gsheet_theo_doi_nhap_config]` — auto-config Sheet ID ĐIỀU CHỈNH HSSV LẦN 2, tab, header_row=10, col HSSV=4, Nước sạch=8, Việc làm=13
 

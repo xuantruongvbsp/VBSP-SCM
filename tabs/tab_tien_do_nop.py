@@ -30,6 +30,24 @@ DS_PGD_ALL = [DON_VI_CHI_NHANH] + DS_PGD
 _EMOJI = {"dung_han": "🟢", "tre": "🟡", "chua_nop": "🔴", "da_nop": "⚪"}
 _LABEL = {"dung_han": "Đúng hạn", "tre": "Trễ hạn", "chua_nop": "Chưa nộp", "da_nop": "Đã nộp"}
 
+_EMOJI_STRIP = ("🟢", "🟡", "🔴", "⚪", "⚠️", "📝")
+
+def _clean_trang_thai(val: str) -> str:
+    """Bỏ emoji + badge cho PDF — thiếu file → Trễ hạn."""
+    if "⚠️" in str(val):
+        return "Trễ hạn"
+    text = str(val)
+    for ch in _EMOJI_STRIP:
+        text = text.replace(ch, "")
+    return text.replace("*", "").strip()
+
+def _clear_export_cache():
+    """Xóa bytes export cũ khi user đổi filter — tránh tải nhầm file."""
+    for k in ["_don_doc_bytes", "_don_doc_ten",
+              "_dd_pdf_bytes", "_dd_pdf_ten",
+              "_dd_pdf_hd_bytes", "_dd_pdf_hd_ten"]:
+        st.session_state.pop(k, None)
+
 
 # ── Kết nối & đọc Google Sheets ──────────────────────────────────────────────
 
@@ -226,36 +244,66 @@ def _render_tong_quan(df: pd.DataFrame, deadline_cfg: dict, is_cn: bool, pgd_use
     st.dataframe(pd.DataFrame(rows), hide_index=True, use_container_width=True)
     st.caption("* Ghi đè thủ công  ·  ⚠️ Thiếu file đính kèm  ·  📝 Có ghi chú")
 
-    ds_don_doc = []
+    ds_tat_ca = []
+    ds_chua = []
+    ds_da = []
     for r in rows:
         for loai in ds_loai:
-            if "🔴" in str(r.get(loai, "")):
-                dl = deadline_cfg.get(loai, "")
-                ds_don_doc.append({
-                    "Đơn vị": r["Đơn vị"],
-                    "Loại báo cáo": loai,
-                    "Thời hạn": dl or "Chưa cài",
-                })
+            cell = str(r.get(loai, ""))
+            dl = deadline_cfg.get(loai, "")
+            entry = {
+                "Đơn vị": r["Đơn vị"],
+                "Loại báo cáo": loai,
+                "Trạng thái": cell,
+                "Thời hạn": dl or "Chưa cài",
+            }
+            ds_tat_ca.append(entry)
+            if "🔴" in cell:
+                ds_chua.append(entry)
+            elif "🟢" in cell or "🟡" in cell:
+                ds_da.append(entry)
 
-    if ds_don_doc:
-        df_don_doc = pd.DataFrame(ds_don_doc)
-        st.divider()
-        st.warning(f"⚠️ **{len(df_don_doc)} báo cáo chưa nộp**")
+    st.divider()
+    st.markdown("### 📥 Xuất báo cáo")
 
-        ds_pgd_thieu = ["Tất cả"] + sorted(df_don_doc["Đơn vị"].unique().tolist())
-        pgd_xuat = st.selectbox("Lọc đơn vị trước khi xuất", ds_pgd_thieu, key="dd_pgd_xuat")
-        df_xuat = df_don_doc if pgd_xuat == "Tất cả" else df_don_doc[df_don_doc["Đơn vị"] == pgd_xuat]
+    loai_xuat = st.radio(
+        "Chọn loại danh sách để xuất",
+        ["Tất cả", "Đã hoàn thành", "Chưa hoàn thành"],
+        horizontal=True,
+        key="tq_loai_xuat",
+        on_change=_clear_export_cache,
+    )
+
+    if loai_xuat == "Tất cả":
+        ds_xuat = ds_tat_ca
+    elif loai_xuat == "Đã hoàn thành":
+        ds_xuat = ds_da
+    else:
+        ds_xuat = ds_chua
+
+    if not ds_xuat:
+        st.info(f"Không có báo cáo **{loai_xuat.lower()}**.")
+    else:
+        if loai_xuat == "Chưa hoàn thành":
+            st.warning(f"⚠️ **{len(ds_xuat)} báo cáo chưa hoàn thành**")
+        else:
+            st.caption(f"📋 {len(ds_xuat)} báo cáo — **{loai_xuat}**")
+
+        df_xuat_full = pd.DataFrame(ds_xuat)
+        ds_pgd_thieu = ["Tất cả"] + sorted(df_xuat_full["Đơn vị"].unique().tolist())
+        pgd_xuat = st.selectbox("Lọc đơn vị trước khi xuất", ds_pgd_thieu, key="dd_pgd_xuat", on_change=_clear_export_cache)
+        df_xuat = df_xuat_full if pgd_xuat == "Tất cả" else df_xuat_full[df_xuat_full["Đơn vị"] == pgd_xuat]
 
         st.dataframe(df_xuat, hide_index=True, use_container_width=True)
 
-        ten_file_goc = "don_doc_bao_cao"
+        ten_file_goc = f"tien_do_{loai_xuat.replace(' ', '_').lower()}"
         username_xuat = st.session_state.get("username", "unknown")
 
         col_excel, col_pdf, col_pdf_hd, _ = st.columns([1, 1, 1.4, 3])
 
         with col_excel:
             if st.button("📥 Excel", key="btn_dd_excel", use_container_width=True, type="primary"):
-                st.session_state["_don_doc_bytes"] = xuat_excel({"Đôn đốc nộp báo cáo": df_xuat})
+                st.session_state["_don_doc_bytes"] = xuat_excel({f"Tiến độ — {loai_xuat}": df_xuat})
                 st.session_state["_don_doc_ten"] = f"{ten_file_goc}.xlsx"
             if st.session_state.get("_don_doc_bytes"):
                 st.download_button(
@@ -271,9 +319,12 @@ def _render_tong_quan(df: pd.DataFrame, deadline_cfg: dict, is_cn: bool, pgd_use
                 try:
                     from pdf_service import xuat_pdf
                     with st.spinner("Đang tạo PDF..."):
+                        df_pdf = df_xuat.copy()
+                        if "Trạng thái" in df_pdf.columns:
+                            df_pdf["Trạng thái"] = df_pdf["Trạng thái"].apply(_clean_trang_thai)
                         pdf_bytes = xuat_pdf(
-                            df_xuat,
-                            "Danh sách tiến độ nộp báo cáo",
+                            df_pdf,
+                            f"Tiến độ nộp báo cáo — {loai_xuat}",
                             username_xuat,
                             cols_tien=[],
                             them_dong_tong=False,
@@ -297,9 +348,12 @@ def _render_tong_quan(df: pd.DataFrame, deadline_cfg: dict, is_cn: bool, pgd_use
                 try:
                     from pdf_service import xuat_pdf_group_header
                     with st.spinner("Đang tạo PDF..."):
+                        df_pdf_hd = df_xuat.copy()
+                        if "Trạng thái" in df_pdf_hd.columns:
+                            df_pdf_hd["Trạng thái"] = df_pdf_hd["Trạng thái"].apply(_clean_trang_thai)
                         pdf_bytes = xuat_pdf_group_header(
-                            df_xuat,
-                            tieu_de="DANH SÁCH TIẾN ĐỘ NỘP BÁO CÁO",
+                            df_pdf_hd,
+                            tieu_de=f"DANH SÁCH TIẾN ĐỘ NỘP BÁO CÁO — {loai_xuat.upper()}",
                             nhom_theo="Đơn vị",
                             nguoi_xuat=username_xuat,
                             tieu_de_phu="",
@@ -453,31 +507,50 @@ def _render_danh_sach(df: pd.DataFrame, deadline_cfg: dict, is_cn: bool, pgd_use
     )
 
     st.divider()
-    col_excel, col_pdf, _ = st.columns([1, 1, 5])
-    with col_excel:
-        if st.button("📥 Xuất Excel", key="btn_xuat_tdn", use_container_width=True, type="primary"):
-            df_export = df_loc.drop(columns=["tt", "tt_hien"], errors="ignore")
-            st.session_state["_excel_tdn_bytes"] = xuat_excel({"Tiến độ nộp báo cáo": df_export})
-            st.session_state["_excel_tdn_ten"] = f"tien_do_nop_{len(df_loc)}_dong.xlsx"
-    if st.session_state.get("_excel_tdn_bytes"):
-        st.download_button(
-            "⬇ Tải Excel",
-            data=st.session_state["_excel_tdn_bytes"],
-            file_name=st.session_state["_excel_tdn_ten"],
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            key="dl_excel_tdn",
-        )
-    with col_pdf:
-        from pdf_service import nut_xuat_pdf
+    st.markdown("### 📥 Xuất báo cáo")
+    loai_xuat_ds = st.radio(
+        "Chọn trạng thái để xuất",
+        ["Tất cả", "Đã hoàn thành", "Chưa hoàn thành"],
+        horizontal=True,
+        key="ds_loai_xuat",
+    )
+    if loai_xuat_ds == "Đã hoàn thành":
+        df_xuat_ds = df_loc[df_loc["tt"].isin(["dung_han", "tre", "da_nop"])]
+    elif loai_xuat_ds == "Chưa hoàn thành":
+        df_xuat_ds = df_loc[df_loc["tt"] == "chua_nop"]
+    else:
+        df_xuat_ds = df_loc
 
-        nut_xuat_pdf(
-            df_loc,
-            "Tiến độ nộp báo cáo PGD",
-            st.session_state.get("username", "unknown"),
-            cols_tien=[],
-            prefix_file="TienDoNop",
-            key="pdf_tdn",
-        )
+    if df_xuat_ds.empty:
+        st.info(f"Không có báo cáo **{loai_xuat_ds.lower()}**.")
+    else:
+        st.caption(f"📋 {len(df_xuat_ds)} lượt nộp — **{loai_xuat_ds}**")
+        ten_file_ds = f"tien_do_nop_{loai_xuat_ds.replace(' ', '_').lower()}"
+        col_excel, col_pdf, _ = st.columns([1, 1, 5])
+        with col_excel:
+            if st.button("📥 Xuất Excel", key="btn_xuat_tdn", use_container_width=True, type="primary"):
+                df_export = df_xuat_ds.drop(columns=["tt", "tt_hien"], errors="ignore")
+                st.session_state["_excel_tdn_bytes"] = xuat_excel({f"Tiến độ nộp — {loai_xuat_ds}": df_export})
+                st.session_state["_excel_tdn_ten"] = f"{ten_file_ds}.xlsx"
+        if st.session_state.get("_excel_tdn_bytes"):
+            st.download_button(
+                "⬇ Tải Excel",
+                data=st.session_state["_excel_tdn_bytes"],
+                file_name=st.session_state["_excel_tdn_ten"],
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                key="dl_excel_tdn",
+            )
+        with col_pdf:
+            from pdf_service import nut_xuat_pdf
+
+            nut_xuat_pdf(
+                df_xuat_ds,
+                f"Tiến độ nộp báo cáo — {loai_xuat_ds}",
+                st.session_state.get("username", "unknown"),
+                cols_tien=[],
+                prefix_file=ten_file_ds,
+                key="pdf_tdn",
+            )
 
 
 # ── Tab 3: Cài đặt thời hạn hoàn thành ────────────────────────────────────────

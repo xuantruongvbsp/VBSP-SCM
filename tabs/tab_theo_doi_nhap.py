@@ -266,6 +266,76 @@ def _render_chi_tiet(df_td: pd.DataFrame, ds_ct: list[dict], username: str) -> N
                            key="ttdn_dl_excel")
 
 
+_MOCKUP_HTML = """
+<div style="font-size:12px; border:1px solid var(--border-color,#ccc); border-radius:8px; overflow:auto; padding:12px;">
+  <div style="margin-bottom:8px; font-weight:600;">📌 Cấu trúc Google Sheet được hỗ trợ</div>
+  <table style="border-collapse:collapse; width:100%; font-size:11px;">
+    <tr style="background:var(--secondary-background-color,#f0f2f6);">
+      <td style="border:1px solid #ccc;padding:4px 8px;font-weight:600;">Hàng</td>
+      <td style="border:1px solid #ccc;padding:4px 8px;font-weight:600;">Cột 1 (STT)</td>
+      <td style="border:1px solid #ccc;padding:4px 8px;font-weight:600;">Cột 2 (Tên đơn vị)</td>
+      <td style="border:1px solid #ccc;padding:4px 8px;font-weight:600;">Cột 3</td>
+      <td style="border:1px solid #ccc;padding:4px 8px;font-weight:600; color:#e67e22;">Cột 4 ← theo dõi</td>
+      <td style="border:1px solid #ccc;padding:4px 8px;font-weight:600;">Cột 5</td>
+    </tr>
+    <tr>
+      <td style="border:1px solid #ccc;padding:4px 8px; color:#888;">1–7</td>
+      <td colspan="5" style="border:1px solid #ccc;padding:4px 8px; color:#888; font-style:italic;">Tiêu đề, chú thích... (bỏ qua)</td>
+    </tr>
+    <tr style="background:#fff3cd;">
+      <td style="border:1px solid #ccc;padding:4px 8px; font-weight:600;">8 ← Header row</td>
+      <td style="border:1px solid #ccc;padding:4px 8px;">STT</td>
+      <td style="border:1px solid #ccc;padding:4px 8px;">Tên PGD / xã</td>
+      <td style="border:1px solid #ccc;padding:4px 8px;">KH đã giao</td>
+      <td style="border:1px solid #ccc;padding:4px 8px; color:#e67e22; font-weight:600;">Điều chỉnh tăng trưởng</td>
+      <td style="border:1px solid #ccc;padding:4px 8px;">Nợ đến hạn</td>
+    </tr>
+    <tr style="background:#d4edda;">
+      <td style="border:1px solid #ccc;padding:4px 8px;">9</td>
+      <td style="border:1px solid #ccc;padding:4px 8px; font-weight:600; color:#155724;">I ← chữ = PGD</td>
+      <td style="border:1px solid #ccc;padding:4px 8px; font-weight:600; color:#155724;">Hội sở chi nhánh tỉnh</td>
+      <td style="border:1px solid #ccc;padding:4px 8px;">92.539</td>
+      <td style="border:1px solid #ccc;padding:4px 8px; color:#e67e22;">0</td>
+      <td style="border:1px solid #ccc;padding:4px 8px;"></td>
+    </tr>
+    <tr>
+      <td style="border:1px solid #ccc;padding:4px 8px;">10</td>
+      <td style="border:1px solid #ccc;padding:4px 8px; color:#0c5460;">1 ← số = xã</td>
+      <td style="border:1px solid #ccc;padding:4px 8px; color:#0c5460;">Phường Phước Tân</td>
+      <td style="border:1px solid #ccc;padding:4px 8px;">4.336</td>
+      <td style="border:1px solid #ccc;padding:4px 8px; color:#e67e22;"></td>
+      <td style="border:1px solid #ccc;padding:4px 8px;"></td>
+    </tr>
+    <tr>
+      <td style="border:1px solid #ccc;padding:4px 8px;">11</td>
+      <td style="border:1px solid #ccc;padding:4px 8px; color:#0c5460;">2</td>
+      <td style="border:1px solid #ccc;padding:4px 8px; color:#0c5460;">Phường Biên Hòa</td>
+      <td style="border:1px solid #ccc;padding:4px 8px;">14.662</td>
+      <td style="border:1px solid #ccc;padding:4px 8px; color:#e67e22;"></td>
+      <td style="border:1px solid #ccc;padding:4px 8px;"></td>
+    </tr>
+    <tr style="background:#d4edda;">
+      <td style="border:1px solid #ccc;padding:4px 8px;">...</td>
+      <td style="border:1px solid #ccc;padding:4px 8px; font-weight:600; color:#155724;">II ← chữ = PGD tiếp</td>
+      <td style="border:1px solid #ccc;padding:4px 8px; font-weight:600; color:#155724;">PGD Long Thành</td>
+      <td style="border:1px solid #ccc;padding:4px 8px;">...</td>
+      <td style="border:1px solid #ccc;padding:4px 8px;">...</td>
+      <td style="border:1px solid #ccc;padding:4px 8px;">...</td>
+    </tr>
+  </table>
+  <div style="margin-top:10px; display:flex; gap:16px; flex-wrap:wrap; font-size:11px;">
+    <span>🟡 <b>Header row</b> = hàng chứa tên cột (STT, Tên PGD...)</span>
+    <span>🟢 <b>Hàng PGD</b> = Cột STT là chữ La Mã (I, II, III...)</span>
+    <span>🔵 <b>Hàng xã/phường</b> = Cột STT là số (1, 2, 3...)</span>
+    <span>🟠 <b>Cột theo dõi</b> = Cột cần kiểm tra đã điền chưa</span>
+  </div>
+  <div style="margin-top:8px; font-size:11px; color:#888;">
+    💡 Mở sheet → đếm số cột từ trái sang phải để biết số cột (A=1, B=2, C=3...)
+  </div>
+</div>
+"""
+
+
 def _render_form_sheet(cfg: dict, prefix: str) -> dict:
     """Form nhập 1 sheet config, trả về dict đã cập nhật."""
     ten = st.text_input("Tên hiển thị", value=cfg.get("ten_hien_thi", ""),
@@ -273,32 +343,64 @@ def _render_form_sheet(cfg: dict, prefix: str) -> dict:
                         help="VD: HSSV Lần 2 - 2026")
     sid = st.text_input("Google Sheet ID", value=cfg.get("sheet_id", ""),
                         key=f"{prefix}_sid",
-                        help="Lấy từ URL: .../spreadsheets/d/**[ID]**/edit")
+                        help="Lấy từ URL: docs.google.com/spreadsheets/d/**[ID]**/edit")
     tab = st.text_input("Tên worksheet (tab)", value=cfg.get("sheet_tab", ""),
-                        key=f"{prefix}_tab")
+                        key=f"{prefix}_tab",
+                        help="Tên đúng của tab trong Google Sheet (phân biệt HOA/thường, dấu)")
 
+    st.markdown("**Cấu hình hàng & cột**")
     c1, c2, c3 = st.columns(3)
     with c1:
-        hr = st.number_input("Header row", min_value=1, max_value=50,
-                             value=cfg.get("header_row", 10), key=f"{prefix}_hr")
+        hr = st.number_input("Header row (hàng tên cột)", min_value=1, max_value=50,
+                             value=cfg.get("header_row", 10), key=f"{prefix}_hr",
+                             help="Hàng chứa STT, Tên PGD, tên cột... Dữ liệu bắt đầu từ hàng tiếp theo")
     with c2:
-        sc = st.number_input("Cột STT", min_value=1, max_value=30,
-                             value=cfg.get("stt_col", 1), key=f"{prefix}_sc")
+        sc = st.number_input("Cột STT (phân biệt PGD/xã)", min_value=1, max_value=30,
+                             value=cfg.get("stt_col", 1), key=f"{prefix}_sc",
+                             help="Cột chứa số thứ tự. PGD = chữ La Mã (I,II...), Xã = số (1,2...)")
     with c3:
         nc = st.number_input("Cột Tên đơn vị", min_value=1, max_value=30,
-                             value=cfg.get("name_col", 2), key=f"{prefix}_nc")
+                             value=cfg.get("name_col", 2), key=f"{prefix}_nc",
+                             help="Cột chứa tên PGD / tên xã phường")
 
-    st.markdown("**Cột 'Điều chỉnh tăng trưởng' (1-indexed):**")
-    ds_ct_old = cfg.get("ds_chuong_trinh", list(DEFAULT_CT))
+    st.markdown("**Cột cần theo dõi** (có thể thêm nhiều chương trình)")
+    st.caption("Mỗi dòng = 1 chỉ tiêu cần theo dõi. Cột tính từ 1 (cột A=1, B=2, C=3...)")
+
+    ds_ct_old = list(cfg.get("ds_chuong_trinh", list(DEFAULT_CT)))
+
+    # Session state để quản lý số lượng CT rows
+    key_count = f"{prefix}_ct_count"
+    if key_count not in st.session_state:
+        st.session_state[key_count] = len(ds_ct_old)
+    count = st.session_state[key_count]
+
+    # Đảm bảo ds_ct_old đủ dài
+    while len(ds_ct_old) < count:
+        ds_ct_old.append({"ten": f"Chỉ tiêu {len(ds_ct_old)+1}", "col": 1})
+
     ds_ct_new = []
-    for i, ct in enumerate(ds_ct_old):
-        ca, cb = st.columns([3, 1])
+    for i in range(count):
+        ct = ds_ct_old[i] if i < len(ds_ct_old) else {"ten": "", "col": 1}
+        ca, cb, cc = st.columns([3, 1, 0.5])
         with ca:
-            tn = st.text_input("Tên CT", value=ct["ten"], key=f"{prefix}_ct{i}_ten")
+            tn = st.text_input("Tên chỉ tiêu", value=ct.get("ten", ""),
+                               key=f"{prefix}_ct{i}_ten",
+                               placeholder="VD: HSSV, Nước sạch, Việc làm...")
         with cb:
-            cl = st.number_input("Cột", min_value=1, max_value=50,
-                                 value=ct["col"], key=f"{prefix}_ct{i}_col")
-        ds_ct_new.append({"ten": tn, "col": int(cl)})
+            cl = st.number_input("Cột số", min_value=1, max_value=100,
+                                 value=ct.get("col", 1), key=f"{prefix}_ct{i}_col",
+                                 help="A=1, B=2, C=3...")
+        with cc:
+            st.write("")
+            if count > 1 and st.button("✕", key=f"{prefix}_ct{i}_del",
+                                        help="Xóa dòng này"):
+                st.session_state[key_count] = max(1, count - 1)
+                st.rerun()
+        ds_ct_new.append({"ten": tn.strip(), "col": int(cl)})
+
+    if st.button("➕ Thêm chỉ tiêu", key=f"{prefix}_ct_add"):
+        st.session_state[key_count] = count + 1
+        st.rerun()
 
     return {
         "ten_hien_thi":     ten.strip(),
@@ -350,32 +452,66 @@ def _render_cai_dat(ds_sheet: list[dict], username: str) -> None:
                         st.rerun()
 
     st.divider()
-    st.markdown("**➕ Thêm sheet mới**")
-    with st.expander("Mở form thêm mới", expanded=len(ds_sheet) == 0):
-        new_cfg = _render_form_sheet(_sheet_moi(), prefix="cd_new")
-        col_t2, col_s2 = st.columns(2)
-        with col_t2:
-            if st.button("🔌 Test kết nối", key="cd_new_test", use_container_width=True):
+    st.markdown("**➕ Thêm Google Sheet mới**")
+
+    url_input = st.text_input(
+        "Paste link Google Sheet",
+        key="cd_url_input",
+        placeholder="https://docs.google.com/spreadsheets/d/...",
+        label_visibility="collapsed",
+    )
+
+    if url_input.strip():
+        # Trích Sheet ID từ URL
+        import re
+        m = re.search(r"/spreadsheets/d/([a-zA-Z0-9_-]+)", url_input)
+        if not m:
+            st.error("❌ Link không hợp lệ. Cần dạng: .../spreadsheets/d/[ID]/...")
+        else:
+            sid = m.group(1)
+            # Kiểm tra đã có chưa
+            existing_ids = [s.get("sheet_id") for s in ds_sheet]
+            if sid in existing_ids:
+                st.warning("⚠️ Sheet này đã có trong danh sách.")
+            else:
                 try:
-                    with st.spinner("Kết nối..."):
-                        rows = _doc_sheet(new_cfg["sheet_id"],
-                                          new_cfg["sheet_tab"],
-                                          new_cfg["header_row"])
-                    n = sum(1 for r in rows if any(str(c).strip() for c in r))
-                    st.success(f"✅ OK — {n} hàng dữ liệu")
+                    with st.spinner("Đang đọc danh sách tab..."):
+                        client   = _ket_noi_gsheet()
+                        ss       = client.open_by_key(sid)
+                        tab_list = [w.title for w in ss.worksheets()]
+
+                    col_a, col_b, col_c = st.columns([2, 2, 1])
+                    with col_a:
+                        tab_chon = st.selectbox("Chọn tab", tab_list, key="cd_tab_chon")
+                    with col_b:
+                        ten_hien_thi = st.text_input(
+                            "Đặt tên", key="cd_ten_moi",
+                            placeholder="VD: HSSV Lần 3 - 2026",
+                            value=tab_chon[:40] if tab_chon else "",
+                        )
+                    with col_c:
+                        st.write("")
+                        if st.button("➕ Thêm", key="cd_add_quick",
+                                     type="primary", use_container_width=True):
+                            # Copy cấu hình cột từ sheet đầu tiên (cùng cấu trúc)
+                            base_cfg = ds_sheet[0] if ds_sheet else _sheet_moi()
+                            new_cfg  = {
+                                **base_cfg,
+                                "ten_hien_thi": ten_hien_thi.strip() or tab_chon,
+                                "sheet_id":     sid,
+                                "sheet_tab":    tab_chon,
+                            }
+                            ds_sheet.append(new_cfg)
+                            _doc_sheet.clear()
+                            _luu_ds_sheet(ds_sheet, username)
+                            st.success(f"✅ Đã thêm: {new_cfg['ten_hien_thi']}")
+                            st.rerun()
+
+                    if ds_sheet:
+                        st.caption(f"💡 Cấu hình cột sẽ copy từ **{ds_sheet[0].get('ten_hien_thi', 'sheet đầu tiên')}**. "
+                                   "Nếu cột khác → mở expander sheet vừa thêm để chỉnh.")
                 except Exception as e:
-                    st.error(f"❌ {e}")
-        with col_s2:
-            if st.button("➕ Thêm vào danh sách", key="cd_new_add",
-                         type="primary", use_container_width=True):
-                if not new_cfg["sheet_id"] or not new_cfg["ten_hien_thi"]:
-                    st.error("❌ Cần nhập Tên hiển thị và Sheet ID")
-                else:
-                    ds_sheet.append(new_cfg)
-                    _doc_sheet.clear()
-                    _luu_ds_sheet(ds_sheet, username)
-                    st.success(f"✅ Đã thêm: {new_cfg['ten_hien_thi']}")
-                    st.rerun()
+                    st.error(f"❌ Không đọc được sheet: {e}")
 
 
 # ── Entry point ───────────────────────────────────────────────────────────────

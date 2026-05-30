@@ -7,6 +7,7 @@ Admin cấu hình nhiều sheet, mỗi sheet có tên hiển thị riêng.
 """
 from __future__ import annotations
 
+from datetime import date as _date
 from pathlib import Path
 
 import pandas as pd
@@ -477,7 +478,200 @@ def _render_form_sheet(cfg: dict, prefix: str) -> dict:
     }
 
 
+def _render_template_section(username: str) -> None:
+    """UI quản lý template cấu hình Google Sheet."""
+    from services.template_manager import (
+        doc_ds_template, luu_template, xoa_template,
+        ten_da_ton_tai, clone_template as _clone_tpl,
+    )
+    from services.template_detection_service import phat_hien_cau_truc
+
+    # ── Danh sách templates hiện có ───────────────────────────────────────────
+    templates = doc_ds_template()
+    if templates:
+        st.markdown(f"**{len(templates)} template đã lưu:**")
+        for t in templates:
+            tid   = t["id"]
+            mo_ta = t.get("mo_ta") or ""
+            label = f"📁 {t['ten']}" + (f" — {mo_ta}" if mo_ta else "")
+            with st.expander(label, expanded=False):
+                new_ten   = st.text_input("Tên template", value=t["ten"],
+                                          key=f"tpl_e_{tid}_ten")
+                new_mo_ta = st.text_input("Mô tả", value=mo_ta,
+                                          key=f"tpl_e_{tid}_mo_ta")
+                cl1, cl2, cl3 = st.columns(3)
+                with cl1:
+                    if st.button("💾 Lưu tên/mô tả", key=f"tpl_e_{tid}_save",
+                                 use_container_width=True):
+                        if not new_ten.strip():
+                            st.error("❌ Cần nhập tên.")
+                        elif ten_da_ton_tai(new_ten.strip(), exclude_id=tid):
+                            st.error(f"❌ Tên '{new_ten.strip()}' đã tồn tại.")
+                        else:
+                            luu_template({**t, "ten": new_ten.strip(),
+                                          "mo_ta": new_mo_ta.strip()}, username)
+                            st.success("✅ Đã lưu")
+                            st.rerun()
+                with cl2:
+                    if st.button("📋 Clone", key=f"tpl_clone_{tid}",
+                                 use_container_width=True, help="Tạo bản copy"):
+                        st.session_state[f"tpl_clone_{tid}_show"] = True
+                with cl3:
+                    if st.button("🗑 Xóa", key=f"tpl_del_{tid}",
+                                 use_container_width=True):
+                        xoa_template(tid, username)
+                        st.success(f"Đã xóa: {t['ten']}")
+                        st.rerun()
+                if st.session_state.get(f"tpl_clone_{tid}_show"):
+                    clone_ten = st.text_input(
+                        "Tên bản clone",
+                        value=f"{t['ten']} (copy)",
+                        key=f"tpl_clone_{tid}_ten",
+                    )
+                    cc1, cc2 = st.columns(2)
+                    with cc1:
+                        if st.button("✅ Tạo clone", key=f"tpl_clone_{tid}_ok",
+                                     type="primary", use_container_width=True):
+                            if not clone_ten.strip():
+                                st.error("❌ Cần nhập tên.")
+                            elif ten_da_ton_tai(clone_ten.strip()):
+                                st.error(f"❌ '{clone_ten.strip()}' đã tồn tại.")
+                            else:
+                                _clone_tpl(tid, clone_ten.strip(), username)
+                                st.session_state.pop(f"tpl_clone_{tid}_show", None)
+                                st.success(f"✅ Đã tạo: {clone_ten.strip()}")
+                                st.rerun()
+                    with cc2:
+                        if st.button("✕ Huỷ", key=f"tpl_clone_{tid}_cancel",
+                                     use_container_width=True):
+                            st.session_state.pop(f"tpl_clone_{tid}_show", None)
+                            st.rerun()
+        st.divider()
+
+    # ── Tạo template mới từ file mẫu ─────────────────────────────────────────
+    st.markdown("**Tạo template từ file mẫu**")
+    uploaded = st.file_uploader(
+        "Upload file Excel/CSV mẫu",
+        type=["xlsx", "xls", "csv"],
+        key="tpl_upload",
+        help="Upload 1 file mẫu để hệ thống tự detect cấu trúc header, cột",
+    )
+
+    if uploaded:
+        if st.button("🔍 Phân tích cấu trúc", key="tpl_analyze"):
+            try:
+                with st.spinner("Đang phân tích..."):
+                    result = phat_hien_cau_truc(uploaded.read(), uploaded.name)
+                st.session_state["tpl_detect_result"] = result
+                st.session_state.pop("tpl_ct_count", None)
+            except Exception as e:
+                logger.error("_render_template_section: phân tích file — %s", e, exc_info=True)
+                st.error(f"❌ {e}")
+
+    detect = st.session_state.get("tpl_detect_result")
+    if not detect:
+        if not templates:
+            st.caption("💡 Upload file Excel từ Phòng KH-NV rồi nhấn **Phân tích cấu trúc** để tạo template.")
+        return
+
+    # ── Hiển thị headers detect được ─────────────────────────────────────────
+    all_headers = detect.get("all_headers", [])
+    if all_headers:
+        st.caption("Headers phát hiện: " +
+                   " · ".join(f"[{i+1}] {h}" for i, h in enumerate(all_headers) if h.strip()))
+
+    st.markdown("**Xem lại & điều chỉnh cấu hình:**")
+    col_a, col_b = st.columns(2)
+    with col_a:
+        hr = st.number_input("Header row", min_value=1, max_value=50,
+                             value=detect["header_row"], key="tpl_hr",
+                             help="Hàng chứa tên cột (đếm từ 1)")
+        sc = st.number_input("Cột STT", min_value=1, max_value=30,
+                             value=detect["stt_col"], key="tpl_sc")
+    with col_b:
+        nc = st.number_input("Cột Tên đơn vị", min_value=1, max_value=30,
+                             value=detect["name_col"], key="tpl_nc")
+        _LOAI_OPTS = {
+            "phan_cap_stt": "📊 Phân cấp STT",
+            "phang":        "📋 Phẳng",
+            "cot_pgd":      "🗂 Cột PGD riêng",
+        }
+        loai_val = detect.get("loai_cau_truc", "phan_cap_stt")
+        loai_idx = list(_LOAI_OPTS.keys()).index(loai_val) if loai_val in _LOAI_OPTS else 0
+        loai = st.selectbox("Kiểu cấu trúc", list(_LOAI_OPTS.keys()),
+                            format_func=lambda k: _LOAI_OPTS[k],
+                            index=loai_idx, key="tpl_loai")
+
+    st.markdown("**Cột cần theo dõi** (nhấn ✕ để bỏ bớt):")
+    ds_ct_init = list(detect.get("ds_chuong_trinh", []))
+
+    key_count = "tpl_ct_count"
+    if key_count not in st.session_state:
+        st.session_state[key_count] = len(ds_ct_init)
+    count = st.session_state[key_count]
+    while len(ds_ct_init) < count:
+        ds_ct_init.append({"ten": f"Cột {len(ds_ct_init)+1}", "col": 1})
+
+    ds_ct_new = []
+    for i in range(count):
+        ct = ds_ct_init[i] if i < len(ds_ct_init) else {"ten": "", "col": 1}
+        ca, cb, cc = st.columns([3, 1, 0.5])
+        with ca:
+            tn = st.text_input("Tên", value=ct.get("ten", ""),
+                               key=f"tpl_ct{i}_ten", label_visibility="collapsed")
+        with cb:
+            cl = st.number_input("Cột", min_value=1, max_value=100,
+                                 value=ct.get("col", 1), key=f"tpl_ct{i}_col",
+                                 label_visibility="collapsed")
+        with cc:
+            st.write("")
+            if count > 1 and st.button("✕", key=f"tpl_ct{i}_del"):
+                st.session_state[key_count] = max(1, count - 1)
+                st.rerun()
+        if tn.strip():
+            ds_ct_new.append({"ten": tn.strip(), "col": int(cl)})
+
+    if st.button("➕ Thêm cột", key="tpl_ct_add"):
+        st.session_state[key_count] = count + 1
+        st.rerun()
+
+    st.divider()
+    tpl_ten   = st.text_input("Tên template *", key="tpl_ten",
+                               placeholder="VD: NQH - Phân tích nguyên nhân")
+    tpl_mo_ta = st.text_input("Mô tả (tùy chọn)", key="tpl_mo_ta",
+                               placeholder="VD: Dùng cho sheet NQH từ 2024+")
+
+    if st.button("💾 Lưu Template", key="tpl_save", type="primary"):
+        if not tpl_ten.strip():
+            st.error("❌ Cần nhập tên template.")
+        elif ten_da_ton_tai(tpl_ten.strip()):
+            st.error(f"❌ Template '{tpl_ten.strip()}' đã tồn tại. Dùng tên khác.")
+        elif not ds_ct_new:
+            st.error("❌ Cần có ít nhất 1 cột theo dõi.")
+        else:
+            template = {
+                "ten":             tpl_ten.strip(),
+                "mo_ta":           tpl_mo_ta.strip(),
+                "nguoi_tao":       username,
+                "ngay_tao":        _date.today().isoformat(),
+                "header_row":      int(hr),
+                "stt_col":         int(sc),
+                "name_col":        int(nc),
+                "loai_cau_truc":   loai,
+                "ds_chuong_trinh": ds_ct_new,
+            }
+            luu_template(template, username)
+            st.session_state.pop("tpl_detect_result", None)
+            st.session_state.pop("tpl_ct_count", None)
+            st.success(f"✅ Đã lưu template: {tpl_ten.strip()}")
+            st.rerun()
+
+
 def _render_cai_dat(ds_sheet: list[dict], username: str) -> None:
+    with st.expander("📁 Quản lý Template", expanded=False):
+        _render_template_section(username)
+
+    st.divider()
     st.markdown("**Danh sách Google Sheet đang theo dõi**")
 
     if not ds_sheet:
@@ -515,6 +709,52 @@ def _render_cai_dat(ds_sheet: list[dict], username: str) -> None:
                         st.success("✅ Đã xóa")
                         st.rerun()
 
+                # ── Migration: lưu config này thành template ─────────────────
+                if st.button("📁 Lưu thành Template", key=f"cd_{i}_to_tpl",
+                             use_container_width=True):
+                    st.session_state[f"cd_mig_{i}"] = True
+
+                if st.session_state.get(f"cd_mig_{i}"):
+                    from services.template_manager import (
+                        luu_template as _luu_tpl_m,
+                        ten_da_ton_tai as _dup_m,
+                    )
+                    mig_ten = st.text_input(
+                        "Tên template mới",
+                        value=new_cfg.get("ten_hien_thi", ""),
+                        key=f"cd_mig_{i}_ten",
+                        placeholder="VD: NQH - Phân tích nguyên nhân",
+                    )
+                    cm1, cm2 = st.columns(2)
+                    with cm1:
+                        if st.button("✅ Lưu Template", key=f"cd_mig_{i}_ok",
+                                     type="primary", use_container_width=True):
+                            if not mig_ten.strip():
+                                st.error("❌ Cần nhập tên.")
+                            elif _dup_m(mig_ten.strip()):
+                                st.error(f"❌ '{mig_ten.strip()}' đã tồn tại.")
+                            else:
+                                _luu_tpl_m({
+                                    "ten":             mig_ten.strip(),
+                                    "mo_ta":           f"Tạo từ: {new_cfg.get('ten_hien_thi','')}",
+                                    "nguoi_tao":       username,
+                                    "ngay_tao":        _date.today().isoformat(),
+                                    "header_row":      new_cfg.get("header_row",   10),
+                                    "stt_col":         new_cfg.get("stt_col",       1),
+                                    "name_col":        new_cfg.get("name_col",      2),
+                                    "pgd_col":         new_cfg.get("pgd_col",       1),
+                                    "loai_cau_truc":   new_cfg.get("loai_cau_truc", "phan_cap_stt"),
+                                    "ds_chuong_trinh": list(new_cfg.get("ds_chuong_trinh", [])),
+                                }, username)
+                                st.session_state.pop(f"cd_mig_{i}", None)
+                                st.success(f"✅ Template '{mig_ten.strip()}' đã được lưu.")
+                                st.rerun()
+                    with cm2:
+                        if st.button("✕ Huỷ", key=f"cd_mig_{i}_cancel",
+                                     use_container_width=True):
+                            st.session_state.pop(f"cd_mig_{i}", None)
+                            st.rerun()
+
     st.divider()
     st.markdown("**➕ Thêm Google Sheet mới**")
 
@@ -544,36 +784,89 @@ def _render_cai_dat(ds_sheet: list[dict], username: str) -> None:
                         ss       = client.open_by_key(sid)
                         tab_list = [w.title for w in ss.worksheets()]
 
-                    col_a, col_b, col_c = st.columns([2, 2, 1])
-                    with col_a:
-                        tab_chon = st.selectbox("Chọn tab", tab_list, key="cd_tab_chon")
-                    with col_b:
-                        ten_hien_thi = st.text_input(
-                            "Đặt tên", key="cd_ten_moi",
-                            placeholder="VD: HSSV Lần 3 - 2026",
-                            value=tab_chon[:40] if tab_chon else "",
-                        )
-                    with col_c:
-                        st.write("")
-                        if st.button("➕ Thêm", key="cd_add_quick",
-                                     type="primary", use_container_width=True):
-                            # Copy cấu hình cột từ sheet đầu tiên (cùng cấu trúc)
-                            base_cfg = ds_sheet[0] if ds_sheet else _sheet_moi()
-                            new_cfg  = {
-                                **base_cfg,
-                                "ten_hien_thi": ten_hien_thi.strip() or tab_chon,
-                                "sheet_id":     sid,
-                                "sheet_tab":    tab_chon,
-                            }
-                            ds_sheet.append(new_cfg)
-                            _doc_sheet.clear()
-                            _luu_ds_sheet(ds_sheet, username)
-                            st.success(f"✅ Đã thêm: {new_cfg['ten_hien_thi']}")
-                            st.rerun()
+                    # ── Chọn template (áp dụng cho tất cả tab được chọn) ──────
+                    from services.template_manager import (
+                        doc_ds_template as _tmpl_list,
+                        ap_dung_template,
+                        goi_y_template as _goi_y,
+                    )
+                    _templates    = _tmpl_list()
+                    _existing_tabs = {s.get("sheet_tab") for s in ds_sheet
+                                      if s.get("sheet_id") == sid}
 
-                    if ds_sheet:
-                        st.caption(f"💡 Cấu hình cột sẽ copy từ **{ds_sheet[0].get('ten_hien_thi', 'sheet đầu tiên')}**. "
-                                   "Nếu cột khác → mở expander sheet vừa thêm để chỉnh.")
+                    if _templates:
+                        _tpl_opts    = {"": "📋 Copy từ sheet đầu tiên"}
+                        _tpl_opts.update({t["id"]: f"📁 {t['ten']}" for t in _templates})
+                        _tpl_keys    = list(_tpl_opts.keys())
+                        _suggest_id  = _goi_y(tab_list[0] if tab_list else "", _templates)
+                        _suggest_idx = (_tpl_keys.index(_suggest_id)
+                                        if _suggest_id and _suggest_id in _tpl_keys else 0)
+                        tpl_sel_id = st.selectbox(
+                            "Áp dụng template",
+                            _tpl_keys,
+                            format_func=lambda k: _tpl_opts[k],
+                            index=_suggest_idx,
+                            key="cd_tpl_sel",
+                        )
+                        if _suggest_id and _suggest_id == tpl_sel_id:
+                            st.caption("✨ Tự động gợi ý dựa trên tên tab đầu tiên.")
+                    else:
+                        tpl_sel_id = ""
+
+                    # ── Checkbox list chọn tab ────────────────────────────────
+                    st.markdown("**Chọn tab cần theo dõi:**")
+                    tab_chon_list = []
+                    for tab_name in tab_list:
+                        da_co = tab_name in _existing_tabs
+                        label = tab_name + (" *(đã có)*" if da_co else "")
+                        checked = st.checkbox(
+                            label,
+                            value=(not da_co),
+                            key=f"cd_chk_{sid[:8]}_{tab_name[:30]}",
+                            disabled=da_co,
+                        )
+                        if checked and not da_co:
+                            tab_chon_list.append(tab_name)
+
+                    n_chon = len(tab_chon_list)
+                    if n_chon == 0:
+                        st.info("Chưa chọn tab nào.")
+                    else:
+                        if st.button(f"➕ Thêm {n_chon} tab đã chọn",
+                                     key="cd_add_multi", type="primary"):
+                            added = []
+                            for tab_name in tab_chon_list:
+                                ten = tab_name[:40]
+                                if tpl_sel_id:
+                                    new_cfg = ap_dung_template(tpl_sel_id, sid, tab_name, ten)
+                                    if new_cfg is None:
+                                        st.warning(f"⚠️ Template lỗi, bỏ qua tab: {tab_name}")
+                                        continue
+                                else:
+                                    base_cfg = ds_sheet[0] if ds_sheet else _sheet_moi()
+                                    new_cfg  = {
+                                        **base_cfg,
+                                        "ten_hien_thi": ten,
+                                        "sheet_id":     sid,
+                                        "sheet_tab":    tab_name,
+                                    }
+                                ds_sheet.append(new_cfg)
+                                added.append(ten)
+                            if added:
+                                _doc_sheet.clear()
+                                _luu_ds_sheet(ds_sheet, username)
+                                st.success(f"✅ Đã thêm {len(added)} tab: "
+                                           + " · ".join(added))
+                                st.rerun()
+
+                    if tpl_sel_id and _templates:
+                        st.caption(f"💡 Cấu hình từ template "
+                                   f"**{_tpl_opts.get(tpl_sel_id, '')}** — áp dụng cho tất cả tab chọn.")
+                    elif ds_sheet:
+                        st.caption(f"💡 Không chọn template → copy cấu hình từ "
+                                   f"**{ds_sheet[0].get('ten_hien_thi', 'sheet đầu tiên')}**.")
+                    else:
+                        st.caption("💡 Tạo template trong mục 📁 Quản lý Template để tự động điền cấu hình.")
                 except Exception as e:
                     st.error(f"❌ Không đọc được sheet: {e}")
 

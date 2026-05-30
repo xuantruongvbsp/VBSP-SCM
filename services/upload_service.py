@@ -306,7 +306,11 @@ def xu_ly_cdto_toan_cn(file_bytes: bytes) -> dict[str, "KetQuaUpload"]:
     Trả về {ten_pgd: KetQuaUpload}.
     Caller phải ghi audit sau khi nhận kết quả.
     """
-    from data.cdtotkvv import tach_file_cdto_toan_cn, doc_thang_tu_cdto_toan_cn
+    from data.cdtotkvv import (
+        tach_file_cdto_toan_cn,
+        doc_thang_tu_cdto_toan_cn,
+        doc_thang_nam_tu_file,
+    )
     from data.pgd import luu_file_pgd_voi_lich_su, luu_file_pgd
 
     try:
@@ -317,7 +321,9 @@ def xu_ly_cdto_toan_cn(file_bytes: bytes) -> dict[str, "KetQuaUpload"]:
     if not pgd_map:
         return {"_loi_doc": KetQuaUpload(False, "Không tìm thấy dữ liệu đơn vị nào trong file")}
 
-    thang = doc_thang_tu_cdto_toan_cn(file_bytes)
+    # Ưu tiên đọc kỳ từ tiêu đề file (ghi "Tháng X năm YYYY") vì chính xác hơn.
+    # NGAYBC (cột S) chứa ngày xuất/finalize, có thể khác kỳ báo cáo.
+    thang = doc_thang_nam_tu_file(file_bytes) or doc_thang_tu_cdto_toan_cn(file_bytes)
     ket_qua: dict[str, KetQuaUpload] = {}
 
     for ten_pgd, pgd_bytes in pgd_map.items():

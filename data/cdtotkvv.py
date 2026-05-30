@@ -94,6 +94,9 @@ def doc_cdtotkvv_path(duong_dan: str, _ts) -> pd.DataFrame | None:
     if df.empty:
         return None
     df = df.iloc[:, : len(CDTOTKVV_COLS)].copy()
+    # File tách từ toàn CN: openpyxl bỏ trailing None → có thể thiếu cột cuối (tinh_trang)
+    for col in CDTOTKVV_COLS[len(df.columns):]:
+        df[col] = pd.NA
     df.columns = CDTOTKVV_COLS
     df = df[pd.to_numeric(df["stt"], errors="coerce").notna()].reset_index(drop=True)
     for col in _COLS_FLOAT:

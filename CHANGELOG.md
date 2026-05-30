@@ -1,5 +1,27 @@
 # CHANGELOG
 
+## [2026-05-30] — Multi-tab selection khi thêm Google Sheet (tab Theo dõi nhập liệu)
+- `tabs/tab_theo_doi_nhap.py` dòng ~787 — thay single-tab selectbox bằng checkbox list: chọn nhiều tab cùng lúc, tab đã có tự disabled, nút "➕ Thêm N tab đã chọn", template áp dụng cho tất cả tab được chọn
+
+## [2026-05-30] — Fix card Xếp loại Tổ TK&VV không hiện + Fix ngày kỳ BC sai
+- `data/cdtotkvv.py` dòng ~96 — `doc_cdtotkvv_path()`: pad cột thiếu thành NA trước khi gán CDTOTKVV_COLS; openpyxl write-only bỏ trailing None nên file tách từ toàn CN chỉ có 19 cột thay vì 20 → ValueError
+- `services/upload_service.py` dòng ~309 — `xu_ly_cdto_toan_cn()`: ưu tiên `doc_thang_nam_tu_file` (tiêu đề) thay NGAYBC (ngày xuất file) để xác định kỳ
+- `tabs/tab_upload_khnv.py` dòng ~488 — preview CDTOTKVV: cùng logic
+- `services/upload_service.py` dòng ~309 — `xu_ly_cdto_toan_cn()`: ưu tiên đọc kỳ từ tiêu đề file (`doc_thang_nam_tu_file`) thay vì cột NGAYBC (`doc_thang_tu_cdto_toan_cn`) vì NGAYBC chứa ngày xuất file, không phải kỳ BC
+- `tabs/tab_upload_khnv.py` dòng ~488 — preview CDTOTKVV: cùng logic, dùng `doc_thang_nam_tu_file` trước
+
+## [2026-05-30] — Template-Based Google Sheet Configuration (tab Theo dõi nhập liệu) — Phase 3
+- `services/template_manager.py` — thêm `ten_da_ton_tai()`, `clone_template()`, `goi_y_template()`: kiểm tra trùng tên, clone template, gợi ý template theo tên tab GSheet
+- `tabs/tab_theo_doi_nhap.py` dòng ~488 — template list: đổi sang expander với Edit tên/mô tả + Clone + Xóa inline
+- `tabs/tab_theo_doi_nhap.py` dòng ~598 — lưu template: thêm validate duplicate name
+- `tabs/tab_theo_doi_nhap.py` dòng ~746 — thêm sheet: auto-suggest template dựa trên `goi_y_template(tab_chon)`
+- `tabs/tab_theo_doi_nhap.py` dòng ~711 — mỗi sheet expander: nút "📁 Lưu thành Template" để migration config → template
+
+## [2026-05-30] — Template-Based Google Sheet Configuration (tab Theo dõi nhập liệu) — Phase 1+2
+- `services/template_detection_service.py` (viết lại) — `phat_hien_cau_truc(file_bytes, filename)`: auto-detect header row, cột STT/Tên, loại cấu trúc và cột dữ liệu từ Excel/CSV
+- `services/template_manager.py` (viết lại) — `doc_ds_template()`, `luu_template()`, `xoa_template()`, `ap_dung_template()`: CRUD template vào kv_store với prefix `gsheet_template_`
+- `tabs/tab_theo_doi_nhap.py` dòng ~481 — thêm `_render_template_section()`: UI tạo/xóa template; thêm expander "📁 Quản lý Template" vào `_render_cai_dat()`; mục "Thêm sheet mới" nay có selectbox chọn template
+
 ## [2026-05-30] — Tích hợp OneDrive tự động cho module Quản lý Công văn
 - `services/onedrive_service.py` — tạo mới: upload file lên OneDrive qua Microsoft Graph API (Client Credentials), cache token trong kv_store, chunked upload cho file >4MB, fallback graceful
 - `db.py` dòng ~644 — migration: ALTER TABLE cong_van ADD COLUMN onedrive_url TEXT

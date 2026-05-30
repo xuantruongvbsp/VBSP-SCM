@@ -1,5 +1,19 @@
 # CHANGELOG
 
+## [2026-05-30] — Tab Tổng quan: ghi chú, ghi đè/chỉ ghi chú, badge ⚠️ thiếu file
+- `tabs/tab_tien_do_nop.py` — `_doc_manual_log()`: đổi return type thành `{(pgd,loai): entry_dict}` (backwards-compatible)
+- `tabs/tab_tien_do_nop.py` — matrix build: badge `*` ghi đè, `📝` chỉ ghi chú, `⚠️` auto-detect `file_dinh_kem` trống; caption chú giải 3 badge
+- `tabs/tab_tien_do_nop.py` — form thủ công: thêm `ghi_chu` text_input + `ghi_de` checkbox; list entries hiện 4 cột kèm ghi chú
+
+## [2026-05-30] — Fix metrics tab Tổng quan nhất quán với ma trận
+- `tabs/tab_tien_do_nop.py` dòng ~191 — build `rows` trước, tính metrics từ `rows` thay vì `df_dedup`; metrics nay khớp chính xác với ma trận kể cả đánh dấu thủ công; bỏ `df_dedup` không cần thiết
+
+## [2026-05-30] — Tab Tổng quan tiến độ nộp BC: đánh dấu thủ công PGD nộp ngoài Form
+- `tabs/tab_tien_do_nop.py` — thêm `_doc_manual_log()`, `_doc_manual_log_raw()`, `_luu_manual_log()`; kv_store key `manual_nop_tdn` lưu `list[dict]`
+- `tabs/tab_tien_do_nop.py` — `_render_tong_quan()`: parallel lookup `manual_map` TRƯỚC GSheet khi build ma trận; ô override có dấu `*`; caption giải thích dưới ma trận
+- `tabs/tab_tien_do_nop.py` — `_render_tong_quan()`: form 3 field (PGD/Loại/Ngày) + nút "✅ Đánh dấu"; danh sách đánh dấu kèm nút "↩️ Bỏ" từng entry
+- `tabs/tab_tien_do_nop.py` — signature `_render_tong_quan` thêm `username`, `can_config`; form chỉ hiện cho admin CN; có audit log `tdn_manual_submit`
+
 ## [2026-05-30] — Tab Theo dõi nhập liệu: hỗ trợ 3 kiểu cấu trúc sheet
 - `tabs/tab_theo_doi_nhap.py` — thêm `loai_cau_truc`: phẳng / phân cấp STT / cột PGD riêng; form chỉnh sửa hiện đúng trường tùy kiểu; caption hiển thị loại đang dùng
 

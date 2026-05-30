@@ -1,5 +1,8 @@
 # CHANGELOG
 
+## [2026-05-30] — Tab Theo dõi nhập liệu: mockup hướng dẫn + thêm/xóa chỉ tiêu động
+- `tabs/tab_theo_doi_nhap.py` — thêm mockup HTML giải thích cấu trúc sheet; form thêm mới có nút ➕/✕ để quản lý số chỉ tiêu động; help text cho từng trường
+
 ## [2026-05-30] — Nâng cấp tab Theo dõi nhập liệu: hỗ trợ nhiều Google Sheet
 - `tabs/tab_theo_doi_nhap.py` — đổi từ 1 config → list nhiều sheet (`gsheet_theo_doi_nhap_list`); thêm selectbox chọn sheet; UI thêm/sửa/xóa từng sheet; tự migrate config cũ
 

@@ -44,8 +44,8 @@ def _clean_trang_thai(val: str) -> str:
 def _clear_export_cache():
     """Xóa bytes export cũ khi user đổi filter — tránh tải nhầm file."""
     for k in ["_don_doc_bytes", "_don_doc_ten",
-              "_dd_pdf_bytes", "_dd_pdf_ten",
-              "_dd_pdf_hd_bytes", "_dd_pdf_hd_ten"]:
+              "_dd_pdf_bytes", "_dd_pdf_bytes__ten",
+              "_dd_pdf_dv_bytes", "_dd_pdf_dv_bytes__ten"]:
         st.session_state.pop(k, None)
 
 
@@ -306,12 +306,47 @@ def _render_tong_quan(df: pd.DataFrame, deadline_cfg: dict, is_cn: bool, pgd_use
         ten_file_goc = f"tien_do_{_slug_map.get(loai_xuat, 'xuat')}"
         username_xuat = st.session_state.get("username", "unknown")
 
-        col_excel, col_pdf, col_pdf_hd, _ = st.columns([1, 1, 1.4, 3])
+        # Import 1 lần — tránh lặp trong từng handler
+        from pdf_service import xuat_pdf, xuat_pdf_group_header
+
+        # df đã clean emoji — dùng chung cho cả 2 loại PDF
+        df_pdf_base = df_xuat.copy()
+        if "Trạng thái" in df_pdf_base.columns:
+            df_pdf_base["Trạng thái"] = df_pdf_base["Trạng thái"].apply(_clean_trang_thai)
+
+        # df Excel — clean emoji cho nhất quán với file công vụ
+        df_excel = df_xuat.copy()
+        if "Trạng thái" in df_excel.columns:
+            df_excel["Trạng thái"] = df_excel["Trạng thái"].apply(_clean_trang_thai)
+
+        def _pdf_button(col, btn_label, btn_key, dl_key, file_name, generator_fn):
+            """Helper dùng chung: nút generate → lưu session_state → nút download."""
+            _ten_key = f"{dl_key}__ten"
+            with col:
+                if st.button(btn_label, key=btn_key, use_container_width=True, type="primary"):
+                    try:
+                        with st.spinner("Đang tạo PDF..."):
+                            pdf_bytes = generator_fn()
+                        st.session_state[dl_key] = pdf_bytes
+                        st.session_state[_ten_key] = file_name
+                    except Exception as e:
+                        logger.error("%s: %s", btn_key, e, exc_info=True)
+                        st.error(f"❌ Lỗi PDF: {e}")
+                if st.session_state.get(dl_key):
+                    st.download_button(
+                        "⬇ Tải PDF",
+                        data=st.session_state[dl_key],
+                        file_name=st.session_state.get(_ten_key, file_name),
+                        mime="application/pdf",
+                        key=f"dl_{dl_key}",
+                    )
+
+        col_excel, col_pdf, col_pdf_dv, _ = st.columns([1, 1, 1.2, 3])
 
         with col_excel:
             if st.button("📥 Excel", key="btn_dd_excel", use_container_width=True, type="primary"):
                 with st.spinner("Đang tạo Excel..."):
-                    st.session_state["_don_doc_bytes"] = xuat_excel({f"Tiến độ — {loai_xuat}": df_xuat})
+                    st.session_state["_don_doc_bytes"] = xuat_excel({f"Tiến độ — {loai_xuat}": df_excel})
                     st.session_state["_don_doc_ten"] = f"{ten_file_goc}.xlsx"
             if st.session_state.get("_don_doc_bytes"):
                 st.download_button(
@@ -322,64 +357,35 @@ def _render_tong_quan(df: pd.DataFrame, deadline_cfg: dict, is_cn: bool, pgd_use
                     key="dl_don_doc",
                 )
 
-        with col_pdf:
-            if st.button("📄 PDF", key="btn_dd_pdf", use_container_width=True, type="primary"):
-                try:
-                    from pdf_service import xuat_pdf
-                    with st.spinner("Đang tạo PDF..."):
-                        df_pdf = df_xuat.copy()
-                        if "Trạng thái" in df_pdf.columns:
-                            df_pdf["Trạng thái"] = df_pdf["Trạng thái"].apply(_clean_trang_thai)
-                        pdf_bytes = xuat_pdf(
-                            df_pdf,
-                            f"Tiến độ nộp báo cáo — {loai_xuat}",
-                            username_xuat,
-                            cols_tien=[],
-                            them_dong_tong=False,
-                        )
-                    st.session_state["_dd_pdf_bytes"] = pdf_bytes
-                    st.session_state["_dd_pdf_ten"] = f"{ten_file_goc}.pdf"
-                except Exception as e:
-                    logger.error("Lỗi trong khối except: %s", e, exc_info=True)
-                    st.error(f"❌ Lỗi PDF: {e}")
-            if st.session_state.get("_dd_pdf_bytes"):
-                st.download_button(
-                    "⬇ Tải PDF",
-                    data=st.session_state["_dd_pdf_bytes"],
-                    file_name=st.session_state["_dd_pdf_ten"],
-                    mime="application/pdf",
-                    key="dl_dd_pdf",
-                )
+        _pdf_button(
+            col=col_pdf,
+            btn_label="📄 PDF",
+            btn_key="btn_dd_pdf",
+            dl_key="_dd_pdf_bytes",
+            file_name=f"{ten_file_goc}.pdf",
+            generator_fn=lambda: xuat_pdf(
+                df_pdf_base,
+                f"Tiến độ nộp báo cáo — {loai_xuat}",
+                username_xuat,
+                cols_tien=[],
+                them_dong_tong=False,
+            ),
+        )
 
-        with col_pdf_hd:
-            if st.button("📄 PDF có Header", key="btn_dd_pdf_hd", use_container_width=True, type="primary"):
-                try:
-                    from pdf_service import xuat_pdf_group_header
-                    with st.spinner("Đang tạo PDF..."):
-                        df_pdf_hd = df_xuat.copy()
-                        if "Trạng thái" in df_pdf_hd.columns:
-                            df_pdf_hd["Trạng thái"] = df_pdf_hd["Trạng thái"].apply(_clean_trang_thai)
-                        pdf_bytes = xuat_pdf_group_header(
-                            df_pdf_hd,
-                            tieu_de=f"DANH SÁCH TIẾN ĐỘ NỘP BÁO CÁO — {loai_xuat.upper()}",
-                            nhom_theo="Đơn vị",
-                            nguoi_xuat=username_xuat,
-                            tieu_de_phu="",
-                            loai_van_ban="DANH SÁCH",
-                        )
-                    st.session_state["_dd_pdf_hd_bytes"] = pdf_bytes
-                    st.session_state["_dd_pdf_hd_ten"] = f"{ten_file_goc}_header.pdf"
-                except Exception as e:
-                    logger.error("Lỗi trong khối except: %s", e, exc_info=True)
-                    st.error(f"❌ Lỗi PDF Header: {e}")
-            if st.session_state.get("_dd_pdf_hd_bytes"):
-                st.download_button(
-                    "⬇ Tải PDF Header",
-                    data=st.session_state["_dd_pdf_hd_bytes"],
-                    file_name=st.session_state["_dd_pdf_hd_ten"],
-                    mime="application/pdf",
-                    key="dl_dd_pdf_hd",
-                )
+        _pdf_button(
+            col=col_pdf_dv,
+            btn_label="📊 PDF theo đơn vị",
+            btn_key="btn_dd_pdf_dv",
+            dl_key="_dd_pdf_dv_bytes",
+            file_name=f"{ten_file_goc}_theo_don_vi.pdf",
+            generator_fn=lambda: xuat_pdf_group_header(
+                df_pdf_base,
+                tieu_de=f"DANH SÁCH TIẾN ĐỘ NỘP BÁO CÁO — {loai_xuat.upper()}",
+                nhom_theo="Đơn vị",
+                nguoi_xuat=username_xuat,
+                loai_van_ban="DANH SÁCH",
+            ),
+        )
 
     # ── Đánh dấu thủ công (chỉ admin CN) ────────────────────────────────────
     if can_config:

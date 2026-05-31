@@ -333,7 +333,7 @@ def _render_trang_chu(tab, df_pgd: pd.DataFrame, role: str, pgd_user: str, kwarg
                     ("⏰", "Đến hạn", "Khoản đến hạn", "nghiep_vu_pgd", 4),
                     ("📝", "Giao ban xã", "Biên bản giao ban", "bao_cao_giao_ban", 2),
                     ("🎯", "KHTD PGD", "Kế hoạch tín dụng", "ke_hoach_pgd", 0),
-                    ("🔔", "Đôn đốc KHĐ", "Khoản 3m KHĐ", "kiem_soat_rr", 0),
+                    ("🔔", "Đôn đốc KHĐ", "Khoản 3m KHĐ", "kiem_soat_rr", 1),
                 ]
 
                 for i in range(0, len(shortcuts), 2):
@@ -383,7 +383,7 @@ def _render_trang_chu(tab, df_pgd: pd.DataFrame, role: str, pgd_user: str, kwarg
                         df_kh = danh_dau_khong_hd_cached(df_pgd)
                         khd_count = int(df_kh["is_3m_inactive"].sum()) if "is_3m_inactive" in df_kh.columns else 0
                         if khd_count > 0:
-                            alerts.append(("📅", f"3m KHĐ: {fmt_so(khd_count)} khoản", "danger", "kiem_soat_rr", 0))
+                            alerts.append(("📅", f"3m KHĐ: {fmt_so(khd_count)} khoản", "danger", "kiem_soat_rr", 1))
                     except Exception as e:
                         logger.error("_render_trang_chu canh_bao_khd: %s", e, exc_info=True)
 
@@ -425,297 +425,9 @@ def _render_trang_chu(tab, df_pgd: pd.DataFrame, role: str, pgd_user: str, kwarg
                 st.warning(f"⚠️ Không thể tải danh sách nhiệm vụ: {e}")
 
 
-def _render_don_doc(df: pd.DataFrame, pgd_user: str, role: str):
-    """
-    Widget 3 tháng không hoạt động — dành cho CBTD địa bàn.
-    Hiển thị bảng theo ĐVUT + xuất danh sách đôn đốc.
-    """
-    st.subheader("🔴 Món vay 3 tháng không hoạt động")
-    st.caption("Lãi tồn > 3 tháng lãi dự thu — cần đôn đốc thu hồi trước khi phát sinh NQH")
-
-    if df is None or df.empty:
-        st.warning("Chưa có dữ liệu."); return
-
-    # Đánh dấu 3 tháng không hoạt động
-    df_kh = danh_dau_khong_hd_cached(df)
-    n_khd = int(df_kh["is_3m_inactive"].sum()) if "is_3m_inactive" in df_kh.columns else 0
-    n_tong = len(df_kh)
-
-    # KPI
-    k1, k2, k3 = st.columns(3)
-    k1.metric("Tổng món vay", fmt_so(n_tong))
-    k2.metric("Cần đôn đốc 🔴", fmt_so(n_khd),
-              delta=f"{n_khd/n_tong*100:.1f}% tổng món" if n_tong > 0 else "0%",
-              delta_color="inverse" if n_khd > 0 else "off")
-    tong_lai = df_kh[df_kh.get("is_3m_inactive", False)][COT_LAI_TON].sum() \
-               if COT_LAI_TON in df_kh.columns else 0
-    k3.metric("Lãi tồn cần thu (đồng)", fmt(tong_lai))
-
-    if n_khd == 0:
-        st.success("✅ Không có món vay nào quá 3 tháng không hoạt động!")
-        return
-
-    st.divider()
-
-    # ── Bảng tổng hợp theo ĐVUT ───────────────────────────────────────────
-    st.markdown("**Tổng hợp theo Hội đoàn thể (ĐVUT)**")
-    nhom_dvut = tong_hop_khong_hd_cached(df_kh, nhom_theo=COT_DVUT)
-    if not nhom_dvut.empty:
-        hien_thi_dataframe_phan_trang(
-            nhom_dvut,
-            key="op_khd_nhom_dvut",
-            height=220,
-        )
-
-    # Bảng theo Xã
-    st.markdown("**Tổng hợp theo Xã/Phường**")
-    nhom_xa = tong_hop_khong_hd_cached(df_kh, nhom_theo=COT_TEN_XA)
-    if not nhom_xa.empty:
-        hien_thi_dataframe_phan_trang(
-            nhom_xa,
-            key="op_khd_nhom_xa",
-            height=220,
-        )
-
-    st.divider()
-
-    # ── Danh sách chi tiết + xuất Excel ──────────────────────────────────
-    st.markdown("**📋 Danh sách hộ cần đôn đốc**")
-    col_loc, col_xuat = st.columns([2, 1])
-
-    with col_loc:
-        ds_dvut = ["Tất cả"]
-        if COT_DVUT in df_kh.columns:
-            ds_dvut += sorted(df_kh[COT_DVUT].dropna().unique().tolist())
-        chon_dvut = st.selectbox("Lọc Hội đoàn thể", ds_dvut, key="op_khd_dvut")
-
-    gia_tri = None if chon_dvut == "Tất cả" else chon_dvut
-    df_dondoc = ds_chi_tiet_khong_hd(df_kh, nhom_theo=COT_DVUT,
-                                      gia_tri_nhom=gia_tri)
-
-    with col_xuat:
-        st.markdown("<br>", unsafe_allow_html=True)
-        if not df_dondoc.empty:
-            from services.excel_service import xuat_excel_chuyen_nghiep, ten_file_xuat as excel_ten_file
-            kpi_don_doc = [
-                ("Số hộ KHĐ", fmt_so(len(df_dondoc)), f"Lọc: {chon_dvut}"),
-            ]
-            if COT_LAI_TON in df_dondoc.columns:
-                kpi_don_doc.append(("Lãi tồn", fmt_ty(df_dondoc[COT_LAI_TON].sum()), "triệu đồng"))
-            st.download_button(
-                label=f"⬇️ Xuất Excel chuyên nghiệp ({len(df_dondoc)} hộ)",
-                type="primary",
-                data=xuat_excel_chuyen_nghiep(
-                    df=df_dondoc,
-                    title="Danh sách Đôn đốc 3 tháng KHĐ",
-                    subtitle=f"PGD: {pgd_user} - {chon_dvut}",
-                    nguoi_xuat=st.session_state.get("txt_username", ""),
-                    kpi_items=kpi_don_doc,
-                ),
-                file_name=excel_ten_file("DonDoc_3m_KHD"),
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                key="op_xuat_khd_pro",
-            )
-
-    if not df_dondoc.empty:
-        hien_thi_dataframe_phan_trang(
-            df_dondoc,
-            key="op_khd_dondoc",
-            height=360,
-        )
-        tong_lai_ds = df_dondoc[COT_LAI_TON].sum() \
-                      if COT_LAI_TON in df_dondoc.columns else 0
-        st.caption(
-            f"**{fmt_so(len(df_dondoc))}** món · "
-            f"Lãi tồn: **{fmt(tong_lai_ds)}** triệu đồng"
-        )
-
-        # ── LoanDetailDrawer ───────────────────────────────────────────
-        st.divider()
-        st.markdown("**🔍 Tra cứu chi tiết khoản vay**")
-        cols_chon = [c for c in [COT_SO_KU, COT_TEN_KH, COT_MA_KH] if c in df_dondoc.columns]
-        if cols_chon:
-            df_chon = df_dondoc.copy()
-            df_chon["_hien_thi"] = df_chon[cols_chon[0]].astype(str)
-            if len(cols_chon) > 1:
-                for c in cols_chon[1:]:
-                    df_chon["_hien_thi"] += " | " + df_chon[c].astype(str)
-            options = dict(zip(df_chon["_hien_thi"], df_dondoc.index))
-            selected_label = st.selectbox(
-                "Chọn khoản vay để xem chi tiết",
-                options=list(options.keys()),
-                key="op_khd_chon_drawer",
-            )
-            if selected_label:
-                row_idx = options[selected_label]
-                row_data = df_dondoc.loc[row_idx]
-                loan_detail_drawer(row_data)
-    else:
-        st.info("Không có hộ nào thỏa điều kiện.")
-
-
 def _render_canh_bao_som_pgd(tab, **kwargs) -> None:
     """Nợ đến hạn có nguy cơ cho phân hệ PGD."""
     _lazy_tab("tab_canh_bao_som").render(tab, **kwargs)
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# CẢNH BÁO SỚM ĐẦY ĐỦ — Giống ws_management._render_canh_bao() nhưng cho PGD
-# ═══════════════════════════════════════════════════════════════════════════════
-
-def _render_canh_bao_som_pgd_full(df: pd.DataFrame, pgd_user: str, role: str, username: str):
-    """
-    Tab Cảnh báo sớm đầy đủ cho PGD — Migration & 3 tháng không hoạt động.
-    Giống y chang _render_canh_bao() trong ws_management nhưng:
-    - Top Xã thay vì Top PGD
-    - Phạm vi chỉ 1 PGD
-    """
-    st.subheader("🚨 Cảnh báo sớm — Phân loại nợ & 3 tháng không HĐ")
-
-    if df is None or df.empty:
-        st.warning("Chưa có dữ liệu HSTD.")
-        return
-
-    # Đánh dấu 3 tháng không hoạt động
-    df_kh = danh_dau_khong_hd_cached(df)
-
-    # ── KPI nhanh ──────────────────────────────────────────────────────────
-    tong_mon = len(df_kh)
-    khd_tong = int(df_kh["is_3m_inactive"].sum()) if "is_3m_inactive" in df_kh.columns else 0
-    df_amber = canh_bao_migration_cached(df_kh)
-    amber_tong = len(df_amber)
-    tl_khd = khd_tong / tong_mon * 100 if tong_mon > 0 else 0
-    tong_lai_khd = 0.0
-    if not df_kh.empty and "is_3m_inactive" in df_kh.columns:
-        df_khd_only = df_kh[df_kh["is_3m_inactive"]]
-        for col in (COT_LAI_TON, COT_LAI_TON_QH):
-            if col in df_kh.columns:
-                tong_lai_khd += pd.to_numeric(df_khd_only[col], errors="coerce").fillna(0).sum()
-
-    kpi_row([
-        {"label": "Tổng món vay", "value": tong_mon, "icon": "📊", "suffix": "", "precision": 0,
-         "help": f"Tổng số món vay {pgd_user or 'PGD'}"},
-        {"label": "3 tháng KHĐ", "value": khd_tong, "icon": "🔴", "suffix": "", "precision": 0,
-         "delta": tl_khd, "delta_label": "% tổng món", "delta_color": "inverse" if tl_khd > 2 else "off",
-         "help": "Số món 3 tháng không hoạt động"},
-        {"label": "Sắp chuyển KHĐ", "value": amber_tong, "icon": "⚠️", "suffix": "", "precision": 0,
-         "delta_color": "off", "help": "Lãi tồn 2-3 tháng, cần đôn đốc ngay"},
-        {"label": "Lãi tồn KHĐ", "value": tong_lai_khd, "icon": "💰", "suffix": "đồng", "precision": 0,
-         "help": "Tổng lãi tồn các món 3 tháng KHĐ"},
-    ], num_columns=4)
-
-    st.divider()
-
-    # ── Bảng Top đơn vị cần chấn chỉnh — theo XÃ thay vì PGD ─────────────────
-    if COT_TEN_XA in df_kh.columns:
-        st.markdown("**📋 Tổng hợp theo Xã/Phường**")
-        nhom_xa = tong_hop_khong_hd_cached(df_kh, nhom_theo=COT_TEN_XA)
-        if not nhom_xa.empty:
-            hien_thi_dataframe_phan_trang(
-                nhom_xa,
-                key="pgd_khd_nhom_xa",
-                height=300,
-            )
-
-    st.markdown("**📋 Tổng hợp theo Hội đoàn thể (ĐVUT)**")
-    nhom_dvut = tong_hop_khong_hd_cached(df_kh, nhom_theo=COT_DVUT)
-    if not nhom_dvut.empty:
-        hien_thi_dataframe_phan_trang(
-            nhom_dvut,
-            key="pgd_khd_nhom_dvut",
-            height=220,
-        )
-
-    st.divider()
-
-    # ── Vùng Amber — cảnh báo sớm migration ──────────────────────────────
-    st.markdown("**⚠️ Danh sách sắp chuyển 03 tháng không hoạt động — Đang tồn lãi 2–3 tháng (cần đôn đốc ngay)**")
-    if not df_amber.empty:
-        col_amber_loc, col_amber_xuat = st.columns([2, 1])
-        with col_amber_loc:
-            if COT_TEN_XA in df_amber.columns:
-                ds_xa = ["Tất cả"] + sorted(df_amber[COT_TEN_XA].dropna().unique().tolist())
-                loc_xa_a = st.selectbox("Lọc Xã", ds_xa, key="pgd_amber_xa")
-            else:
-                loc_xa_a = "Tất cả"
-        with col_amber_xuat:
-            st.markdown("<br>", unsafe_allow_html=True)
-            if COT_TEN_XA in df_amber.columns and loc_xa_a != "Tất cả":
-                df_amber_loc = df_amber[df_amber[COT_TEN_XA] == loc_xa_a]
-            else:
-                df_amber_loc = df_amber
-            buf_a = xuat_excel({"SapChuyen3mKHD": df_amber_loc})
-            st.download_button(
-                f"⬇️ Xuất Excel Amber ({len(df_amber_loc)} món)",
-                data=buf_a,
-                file_name=f"SapChuyen3mKHD_{pgd_user or 'PGD'}_{datetime.now().strftime('%Y%m%d')}.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                key="pgd_cb_xuat_amber",
-            )
-        cols_hien = [c for c in [
-            COT_TEN_XA, COT_DVUT, COT_TEN_KH,
-            COT_SO_KU, COT_TEN_CT, COT_LAI_TON, COT_LAI_THANG,
-            "so_thang_ton_uoc", "muc_canh_bao",
-        ] if c in df_amber_loc.columns]
-        hien_thi_dataframe_phan_trang(
-            df_amber_loc[cols_hien] if cols_hien else df_amber_loc,
-            key="pgd_amber_ds",
-            height=320,
-        )
-    else:
-        st.success("✅ Không có món vay nào sắp chuyển 03 tháng không hoạt động.")
-
-    st.divider()
-
-    # ── Xuất KL giao ban tự động ──────────────────────────────────────────
-    st.markdown("**📄 Xuất Thông báo KL Giao ban (Bảng II tự động điền)**")
-    templates = quet_templates(TEMPLATES_DIR)
-    mau_klgb = [(t, p) for t, p in templates
-                if "giao" in t.lower() or "kl" in t.lower() or "thong bao" in t.lower()]
-
-    if not mau_klgb:
-        st.info("⚠️ Chưa có mẫu KL giao ban trong thư mục `templates/`. "
-                "Đặt file `.docx` vào thư mục đó và reload.")
-    else:
-        col_xa_kl, col_mau_kl = st.columns(2)
-        with col_xa_kl:
-            if COT_TEN_XA in df_kh.columns:
-                ds_xa_kl = sorted(df_kh[COT_TEN_XA].dropna().unique().tolist())
-                xa_kl = st.selectbox("Chọn Xã", ["Toàn PGD"] + ds_xa_kl, key="pgd_kl_xa")
-            else:
-                xa_kl = "Toàn PGD"
-        with col_mau_kl:
-            ten_mau_kl = st.selectbox(
-                "Mẫu biểu", [t[0] for t in mau_klgb], key="pgd_kl_mau")
-
-        if st.button("🖨️ Tạo KL giao ban", type="primary", key="pgd_kl_btn"):
-            try:
-                if COT_TEN_XA in df_kh.columns and xa_kl != "Toàn PGD":
-                    df_kl = df_kh[df_kh[COT_TEN_XA] == xa_kl]
-                else:
-                    df_kl = df_kh
-                idx_mau = [t[0] for t in mau_klgb].index(ten_mau_kl)
-                path_mau = mau_klgb[idx_mau][1]
-                data = auto_fill_klgb(df_kl, str(path_mau), pgd_user or "")
-                fname = f"KL_GiaoBan_{pgd_user or 'PGD'}_{xa_kl.replace(' ', '_')}_{datetime.now().strftime('%d%m%Y')}.docx"
-                state = SCMStateManager()
-                state.downloads.set("pgd_kl_giao_ban_docx", data, fname)
-                st.success("✅ Đã tạo xong — nhấn nút bên dưới để tải về.")
-            except Exception as e:
-                logger.error("Lỗi tạo KL giao ban PGD: %s", e, exc_info=True)
-                st.error(f"Lỗi tạo KL giao ban: {e}")
-
-        state = SCMStateManager()
-        if state.downloads.has("pgd_kl_giao_ban_docx"):
-            fname = state.downloads.get_filename("pgd_kl_giao_ban_docx") or "KL_GiaoBan.docx"
-            if st.download_button(
-                f"⬇️ Tải KL giao ban — {fname}",
-                data=state.downloads.get_bytes("pgd_kl_giao_ban_docx"),
-                file_name=fname,
-                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                key="pgd_kl_dl",
-            ):
-                state.downloads.clear("pgd_kl_giao_ban_docx")
 
 
 def _render_canh_bao_nqh_pgd(tab, **kwargs) -> None:
@@ -744,392 +456,18 @@ def _banner_canh_bao_khd(df_pgd: pd.DataFrame, role: str) -> None:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# KIỂM SOÁT NỘI BỘ PGD — Checklist 7 điểm tự kiểm tra trước khi báo cáo CN
-# ═══════════════════════════════════════════════════════════════════════════════
-
-def _render_kiem_soat_noi_bo_pgd(df_pgd: pd.DataFrame, pgd_user: str, role: str) -> None:
-    """
-    Checklist 7 điểm kiểm soát nội bộ cho CBTD địa bàn PGD.
-    Mỗi điểm: Pass/Fail + số liệu thực tế + nút nhảy tới tab xử lý.
-    """
-    st.subheader("✅ Kiểm soát Nội bộ PGD")
-    st.caption(
-        f"CBTD tự kiểm tra trước khi báo cáo — "
-        f"**{pgd_user or 'PGD'}** · {date.today().strftime('%d/%m/%Y')}"
-    )
-
-    if df_pgd is None or df_pgd.empty:
-        st.warning("⚠️ Chưa có dữ liệu HSTD.")
-        return
-
-    # ── Tính các chỉ số ──────────────────────────────────────────────────────
-    tdn = pd.to_numeric(df_pgd[COT_TONG_DU_NO], errors="coerce").sum() \
-          if COT_TONG_DU_NO in df_pgd.columns else 0.0
-    dqh = pd.to_numeric(df_pgd[COT_DU_NO_QH], errors="coerce").sum() \
-          if COT_DU_NO_QH in df_pgd.columns else 0.0
-    tlqh = dqh / tdn * 100 if tdn > 0 else 0.0
-
-    df_kh = danh_dau_khong_hd_cached(df_pgd)
-    n_khd = int(df_kh["is_3m_inactive"].sum()) if "is_3m_inactive" in df_kh.columns else 0
-    n_tong = len(df_pgd)
-    tl_khd = n_khd / n_tong * 100 if n_tong > 0 else 0.0
-
-    df_amber = canh_bao_migration_cached(df_pgd)
-    n_amber = len(df_amber)
-
-    n_co_lai_ton = 0
-    if COT_LAI_TON in df_pgd.columns:
-        n_co_lai_ton = int(
-            (pd.to_numeric(df_pgd[COT_LAI_TON], errors="coerce").fillna(0) > 0).sum()
-        )
-
-    n_thieu_sdt = 0
-    if COT_SDT in df_pgd.columns:
-        n_thieu_sdt = int(
-            df_pgd[COT_SDT].isna().sum()
-            + (df_pgd[COT_SDT].astype(str).str.strip() == "").sum()
-        )
-
-    from dateutil.relativedelta import relativedelta
-    thang_toi = date.today() + relativedelta(months=1)
-    n_dh_thang_toi = 0
-    if COT_NGAY_DH in df_pgd.columns:
-        _ngay_dh = pd.to_datetime(df_pgd[COT_NGAY_DH], errors="coerce")
-        n_dh_thang_toi = int(
-            ((_ngay_dh.dt.month == thang_toi.month) & (_ngay_dh.dt.year == thang_toi.year)).sum()
-        )
-
-    kh_xa = db.doc_kv("khtd_xa") or {}
-    ds_xa_pgd = set(PGD_XA_MAP.get(pgd_user or "", []))
-    tong_kh_pgd = sum(
-        float(v) for k, v in kh_xa.items()
-        if "|" in k and k.split("|", 1)[0] in ds_xa_pgd
-    ) if (kh_xa and ds_xa_pgd) else 0.0
-    pct_khtd = tdn / tong_kh_pgd * 100 if tong_kh_pgd > 0 else None
-
-    # ── Danh sách điểm kiểm soát ─────────────────────────────────────────────
-    # (id, tiêu_đề, pass_bool, mô_tả, nhóm_nav, tab_idx)
-    items = [
-        (
-            "nqh",
-            "Tỷ lệ NQH < 1%",
-            tlqh < _NGUONG_AN_TOAN_PGD,
-            f"NQH hiện tại: **{tlqh:.3f}%**",
-            "kiem_soat_rr", 0,
-        ),
-        (
-            "khd",
-            "3 tháng KHĐ < 5% tổng hồ sơ",
-            tl_khd < 5.0,
-            f"3m KHĐ: **{n_khd} món** ({tl_khd:.1f}%)",
-            "kiem_soat_rr", 1,
-        ),
-        (
-            "amber",
-            "Không có khoản sắp chuyển 3m KHĐ",
-            n_amber == 0,
-            f"Sắp chuyển: **{n_amber} món** (lãi tồn 2–3 tháng)",
-            "kiem_soat_rr", 3,
-        ),
-        (
-            "lai",
-            "Không có lãi tồn",
-            n_co_lai_ton == 0,
-            f"Lãi tồn > 0: **{n_co_lai_ton} hồ sơ**",
-            "kiem_soat_rr", 0,
-        ),
-        (
-            "sdt",
-            "Hồ sơ đủ số điện thoại",
-            n_thieu_sdt == 0,
-            f"Thiếu SĐT: **{n_thieu_sdt} hồ sơ**",
-            "nghiep_vu_pgd", 2,
-        ),
-        (
-            "daohantoi",
-            f"Đã nắm hồ sơ đến hạn tháng {thang_toi.month}/{thang_toi.year}",
-            n_dh_thang_toi > 0,
-            f"Đến hạn tháng tới: **{n_dh_thang_toi} món**",
-            "nghiep_vu_pgd", 4,
-        ),
-        (
-            "khtd",
-            "Tiến độ KHTD ≥ 95%",
-            (pct_khtd or 0) >= 95,
-            f"KHTD: **{pct_khtd:.1f}%**" if pct_khtd is not None else "KHTD: **Chưa có kế hoạch**",
-            "ke_hoach_pgd", 0,
-        ),
-    ]
-
-    n_pass = sum(1 for _, _, ok, _, _, _ in items if ok)
-    n_fail = len(items) - n_pass
-
-    # ── Header tổng kết ───────────────────────────────────────────────────────
-    c_ok, c_fail, c_pct = st.columns(3)
-    c_ok.metric("✅ Đạt", n_pass, help="Số tiêu chí đạt yêu cầu")
-    c_fail.metric("🔴 Cần xử lý", n_fail, help="Số tiêu chí cần hành động")
-    c_pct.metric(
-        "Điểm kiểm soát",
-        f"{n_pass}/{len(items)}",
-        delta=f"{n_pass/len(items)*100:.0f}%",
-        delta_color="normal" if n_fail == 0 else "inverse",
-    )
-
-    if n_fail == 0:
-        st.success("🎉 Tất cả tiêu chí đạt — sẵn sàng báo cáo lên Chi nhánh!")
-    else:
-        st.warning(f"⚠️ Còn **{n_fail} tiêu chí** cần xử lý trước khi báo cáo.")
-
-    st.divider()
-
-    # ── Bảng checklist ────────────────────────────────────────────────────────
-    for idx, (item_id, tieu_de, ok, mo_ta, nhom_nav, tab_idx) in enumerate(items):
-        icon = "✅" if ok else "🔴"
-        bg = "rgba(46,125,50,0.08)" if ok else "rgba(198,40,40,0.08)"
-        border = "#2e7d32" if ok else "#c62828"
-        col_info, col_btn = st.columns([5, 1])
-        with col_info:
-            st.markdown(
-                f"""<div style="padding:8px 12px;margin:4px 0;border-left:3px solid {border};
-                    background:{bg};border-radius:4px">
-                    <span style="font-size:1.1em">{icon}</span>&nbsp;
-                    <b>{tieu_de}</b><br>
-                    <span style="font-size:0.85em;color:#94A3B8">{mo_ta}</span>
-                </div>""",
-                unsafe_allow_html=True,
-            )
-        with col_btn:
-            if not ok:
-                st.markdown("<br>", unsafe_allow_html=True)
-                if st.button("→ Xử lý", key=f"ksnb_{item_id}_btn", use_container_width=True):
-                    _st = SCMStateManager()
-                    _st.nav_ws_op_nhom = nhom_nav
-                    _st.nav_ws_op_jump_tab = tab_idx
-                    st.rerun()
-
-    st.divider()
-
-    # ── Xuất báo cáo kiểm soát ────────────────────────────────────────────────
-    with st.expander("📄 Xuất Phiếu Kiểm soát Nội bộ (Excel)"):
-        rows = []
-        for _, tieu_de, ok, mo_ta, _, _ in items:
-            rows.append({
-                "Tiêu chí": tieu_de,
-                "Kết quả": "✅ Đạt" if ok else "🔴 Cần xử lý",
-                "Chi tiết": mo_ta.replace("**", ""),
-                "Ngày kiểm tra": date.today().strftime("%d/%m/%Y"),
-                "PGD": pgd_user or "",
-            })
-        df_ks = pd.DataFrame(rows)
-        buf = xuat_excel({"KiemSoatNoiBo": df_ks})
-        st.download_button(
-            f"⬇️ Tải Phiếu Kiểm soát ({date.today().strftime('%d/%m/%Y')})",
-            data=buf,
-            file_name=f"KiemSoat_{pgd_user or 'PGD'}_{date.today().strftime('%Y%m%d')}.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            key=f"ksnb_{pgd_user or 'cn'}_xuat_excel",
-        )
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# HEATMAP RỦI RO THEO XÃ — Cho PGD (y chang ws_executive nhưng thay PGD bằng Xã)
-# ═══════════════════════════════════════════════════════════════════════════════
-
-def _heatmap_rui_ro_xa(df_pgd: pd.DataFrame, pgd_user: str) -> None:
-    """
-    Bảng HTML 7 cột: Xã | Dư nợ | NQH% | 3T KHĐ | Migration | Tăng trưởng | Điểm RR.
-    Giống _heatmap_rui_ro_pgd() trong ws_executive nhưng so sánh các Xã thay vì PGD.
-    """
-    if df_pgd is None or df_pgd.empty:
-        return
-    if COT_TEN_XA not in df_pgd.columns:
-        st.info("Không có cột Tên xã để hiển thị heatmap rủi ro.")
-        return
-
-    g = df_pgd.groupby(COT_TEN_XA)
-    t = g.agg(
-        du_no=(COT_TONG_DU_NO, "sum"),
-        dqh=(COT_DU_NO_QH, "sum"),
-        nkh=(COT_MA_KH, "nunique"),
-    ).reset_index()
-    t["tl_nqh"] = (t["dqh"] / t["du_no"].replace(0, float("nan")) * 100).round(3).fillna(0)
-
-    df_k = danh_dau_khong_hd_cached(df_pgd)
-    khd = df_k[df_k["is_3m_inactive"]].groupby(COT_TEN_XA).size().reset_index(name="khd")
-    t = t.merge(khd, on=COT_TEN_XA, how="left")
-    t["khd"] = t["khd"].fillna(0).astype(int)
-
-    df_mg = canh_bao_migration_cached(df_pgd)
-    mg = (
-        df_mg.groupby(COT_TEN_XA).size().reset_index(name="mg")
-        if not df_mg.empty
-        else pd.DataFrame(columns=[COT_TEN_XA, "mg"])
-    )
-    t = t.merge(mg, on=COT_TEN_XA, how="left")
-    t["mg"] = t["mg"].fillna(0).astype(int)
-
-    # Tăng trưởng: so sánh với snapshot (nếu có)
-    t["tt"] = None
-    try:
-        from snapshot_service import doc_snapshot, danh_sach_ky
-        ds_ky = danh_sach_ky()
-        if len(ds_ky) >= 2:
-            _df_prev = doc_snapshot(ds_ky[1])
-            if _df_prev is not None and not _df_prev.empty:
-                # Lọc snapshot theo PGD hiện tại
-                if pgd_user and COT_TEN_PGD in _df_prev.columns:
-                    _df_prev = _df_prev[_df_prev[COT_TEN_PGD] == pgd_user]
-                prev_map = _df_prev.set_index("ten_xa")["tong_du_no"].to_dict() if "ten_xa" in _df_prev.columns else {}
-                if prev_map:
-                    t["tt"] = t.apply(
-                        lambda r: (r["du_no"] - prev_map.get(r[COT_TEN_XA], r["du_no"])) / 1e6,
-                        axis=1,
-                    )
-    except Exception as e:
-        logger.error("_heatmap_rui_ro_xa snapshot: %s", e, exc_info=True)
-
-    t["rr"] = (
-        t["tl_nqh"] * 3
-        + t["khd"] / t["nkh"].replace(0, 1) * 100
-        + t["mg"] / t["nkh"].replace(0, 1) * 100
-    ).round(1)
-    t = t.sort_values("rr", ascending=False).reset_index(drop=True)
-
-    BD = "#2A2D3E"; H = "#1B5E20"; W = "#1E2130"; A = "#161922"; TX = "#E0E6ED"
-    R = "#EF9A9A"; AM = "#FFCC80"; G = "#A5D6A7"; GR = "#94A3B8"
-
-    def td(v, al="right", c="", bg="", fw=""):
-        s = f"text-align:{al};padding:5px 8px;border:1px solid {BD};font-size:0.8rem;white-space:nowrap;color:{TX}"
-        if c:
-            s += f";color:{c}"
-        if bg:
-            s += f";background:{bg}"
-        if fw:
-            s += f";font-weight:{fw}"
-        return f"<td style='{s}'>{v}</td>"
-
-    def nc(tl): return R if tl >= 2 else (AM if tl >= 0.5 else G)
-
-    hdrs = ["#", "Xã/Phường", "Dư nợ (triệu đồng)", "NQH%", "3T KHĐ", "Migration", "Tăng trưởng", "Điểm RR"]
-    thead = "".join(
-        f'<th style="background:{H};color:#fff;text-align:{"center" if i==0 else "left" if i==1 else "right"};padding:6px 8px;border:1px solid {BD};font-size:0.8rem">{h}</th>'
-        for i, h in enumerate(hdrs)
-    )
-    rows_h = []
-    for i, row in t.iterrows():
-        bg = W if i % 2 == 0 else A
-        tl = row["tl_nqh"]
-        tt_s = "—"
-        if row["tt"] is not None:
-            col = G if row["tt"] >= 0 else R
-            tt_vn = f"{abs(row['tt']):,.0f}".replace(",","X").replace(".",",").replace("X",".")
-            tt_s = f'<span style="color:{col}">{"+" if row["tt"] >= 0 else "-"}{tt_vn}</span>'
-        rows_h.append(
-            "<tr>" + "".join(
-                [
-                    td(str(i + 1), "center", "", bg),
-                    td(row[COT_TEN_XA], "left", "", bg),
-                    td(fmt_ty(row["du_no"]), bg=bg),
-                    td(f"{tl:.3f}%", c=nc(tl), bg=bg, fw="bold" if tl >= 0.5 else ""),
-                    td(str(row["khd"]), c=R if row["khd"] > 0 else GR, bg=bg),
-                    td(str(row["mg"]), c=AM if row["mg"] > 0 else GR, bg=bg),
-                    td(tt_s, bg=bg),
-                    td(f"{row['rr']:.1f}", c=R if row["rr"] >= 5 else (AM if row["rr"] >= 2 else G), bg=bg, fw="bold"),
-                ]
-            ) + "</tr>"
-        )
-
-    st.markdown(
-        f"""
-<div style="overflow-x:auto;margin:8px 0">
-<table style="border-collapse:collapse;width:100%;font-family:'Inter','Segoe UI',sans-serif">
-  <thead><tr>{thead}</tr></thead>
-  <tbody>{"" .join(rows_h)}</tbody>
-</table>
-<p style="font-size:0.75rem;color:#94A3B8;margin:4px 0 0">
-NQH%: <span style="color:{G}">■</span>&lt;0.5% &nbsp;
-<span style="color:{AM}">■</span>0.5–2% &nbsp;
-<span style="color:{R}">■</span>≥2% &nbsp;·&nbsp;
-Điểm RR = NQH%×3 + KHĐ/KH% + Mg/KH%
-</p></div>""",
-        unsafe_allow_html=True,
-    )
-
-
-def _render_dashboard_nang_cao_pgd(tab_parent, df_pgd: pd.DataFrame, pgd_user: str, role: str):
-    """
-    Dashboard nâng cao cho PGD — Giống ws_executive._the_suc_khoe() nhưng cho 1 PGD:
-    - Gauge NQH
-    - Heatmap rủi ro theo Xã
-    """
-    with tab_parent:
-        st.subheader("📊 Dashboard Sức Khỏe Tín Dụng")
-        st.caption(f"Phạm vi: **{pgd_user or 'PGD'}** — Đánh giá rủi ro theo các xã/phường")
-
-        if df_pgd is None or df_pgd.empty:
-            st.warning("⚠️ Chưa có dữ liệu HSTD để hiển thị dashboard.")
-            return
-
-        # Tính chỉ số
-        tdn = df_pgd[COT_TONG_DU_NO].sum() if COT_TONG_DU_NO in df_pgd.columns else 0
-        dth = pd.to_numeric(df_pgd[COT_DU_NO_TH], errors="coerce").sum() if COT_DU_NO_TH in df_pgd.columns else 0
-        dqh = df_pgd[COT_DU_NO_QH].sum() if COT_DU_NO_QH in df_pgd.columns else 0
-        tlqh = dqh / tdn * 100 if tdn > 0 else 0.0
-        n_hs = len(df_pgd)
-        n_kh = df_pgd[COT_MA_KH].nunique() if COT_MA_KH in df_pgd.columns else 0
-
-        mau, tinh_trang, icon = _mau_nqh_pgd(tlqh)
-
-        col_gauge, col_kpi = st.columns([2, 3], gap="large")
-
-        with col_gauge:
-            st.plotly_chart(_gauge_nqh_pgd(tlqh, pgd_user or "PGD"), use_container_width=True)
-
-        with col_kpi:
-            st.markdown(f"### {icon} Chỉ số Tín dụng {pgd_user or 'PGD'}")
-            kpi_row([
-                {"label": "Tổng dư nợ", "value": fmt_ty(tdn), "icon": "💰", "suffix": "triệu đ", "precision": 0,
-                 "help": f"Tổng dư nợ {pgd_user or 'PGD'}"},
-                {"label": "Dư nợ trong hạn", "value": fmt_ty(dth), "icon": "✅", "suffix": "triệu đ", "precision": 0,
-                 "help": "Dư nợ chưa đến hạn thanh toán"},
-                {"label": "Nợ quá hạn", "value": fmt_ty(dqh), "icon": "⚠️", "suffix": "triệu đ", "precision": 0,
-                 "delta": tlqh, "delta_label": "% NQH", "delta_color": "inverse" if tlqh >= 1 else "normal",
-                 "help": f"{tinh_trang}" if dqh > 0 else "✅ Không có NQH"},
-                {"label": "Số khách hàng", "value": fmt_so(n_kh), "icon": "👥", "suffix": "", "precision": 0,
-                 "help": f"Tổng {fmt_so(n_hs)} hồ sơ"},
-            ], num_columns=4)
-
-            st.markdown("---")
-            pct_th = dth / tdn * 100 if tdn > 0 else 100
-            st.markdown(
-                f"**Tỷ lệ Dư nợ trong hạn:** "
-                f"<span style='color:#90CAF9;font-weight:bold'>{pct_th:.1f}%</span> "
-                f"&nbsp;|&nbsp; **NQH:** "
-                f"<span style='color:{mau};font-weight:bold'>{tlqh:.3f}%</span>",
-                unsafe_allow_html=True,
-            )
-            st.progress(
-                min(pct_th / 100, 1.0),
-                text=f"Sức khỏe: {pct_th:.1f}% dư nợ đang trong hạn",
-            )
-
-        st.divider()
-
-        # Heatmap rủi ro theo Xã
-        st.markdown("### 🔥 Heatmap Rủi ro theo Xã/Phường")
-        st.caption("Điểm RR (Risk Rating) = NQH%×3 + KHĐ/KH% + Mg/KH% · Cao = Rủi ro lớn")
-        _heatmap_rui_ro_xa(df_pgd, pgd_user)
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
 # KIỂM SOÁT NỘI BỘ — Phiên bản rút gọn cho PGD (chỉ xem, không chỉnh sửa)
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def _render_kiem_soat_pgd(tab_parent, df_pgd: pd.DataFrame, pgd_user: str, role: str, username: str):
-    """
-    Kiểm soát nội bộ cho PGD — Phiên bản rút gọn chỉ xem dữ liệu 1 PGD.
-    Giống tab_kiem_soat.render_tab() nhưng không có filter PGD và chỉ đọc.
-    """
+    """Checklist 7 điểm + Kiểm soát dữ liệu — gộp trong 1 tab."""
+    with get_tab_context(tab_parent):
+        _sub0, _sub1 = st.tabs(["✅ Checklist Nội bộ", "🔍 Kiểm soát Dữ liệu"])
+        _lazy_tab("tab_kiem_soat_noi_bo_pgd").render(_sub0, df=df_pgd, pgd_user=pgd_user or "", role=role)
+        _render_kiem_soat_data(_sub1, df_pgd, pgd_user, role, username)
+
+
+def _render_kiem_soat_data(tab_parent, df_pgd: pd.DataFrame, pgd_user: str, role: str, username: str):
     with tab_parent:
         st.subheader("🔍 Kiểm soát Nội bộ PGD")
         st.caption(f"Phạm vi: **{pgd_user or 'PGD'}** — Chế độ chỉ xem")
@@ -2077,6 +1415,12 @@ def render(**kwargs):
             _lazy_tab("tab_diem_gd_pgd").render(_sub1, **kw)
             _lazy_tab("tab_cdtotkvv_pgd").render(_sub2, **kw)
 
+    def _render_ban_dai_dien_uy_thac(tab_parent, **kw):
+        with get_tab_context(tab_parent):
+            _sub0, _sub1 = st.tabs(["🏛️ Ban Đại Diện", "🤝 Ủy thác"])
+            _lazy_tab("tab_ban_dai_dien").render(_sub0, cap="xa", **kw)
+            _lazy_tab("tab_uy_thac").render(_sub1, **kw)
+
     def _render_dashboard_pgd_dgd(tab_parent, **kw):
         """Dashboard mini: KPI ĐGD & Tổ TK&VV trong phạm vi 1 PGD."""
         with get_tab_context(tab_parent):
@@ -2566,37 +1910,23 @@ def render(**kwargs):
             "tabs": [
                 ("🚨 Cảnh báo Tín dụng", lambda tab: _render_canh_bao_nqh_pgd(tab, **_pgd_df_kwargs)),
                 ("🔔 Đôn đốc KHĐ", lambda tab: _lazy_tab("tab_don_doc_khd").render(tab, df=df_pgd, pgd_user=pgd_user or pgd_filter or "", role=role)),
-                ("⚡ Nợ đến hạn có nguy cơ", lambda tab: _render_canh_bao_som_pgd(tab, **kwargs)),
-                ("🚨 Cảnh báo sớm (Full)", lambda tab: _lazy_tab("tab_canh_bao_som_pgd").render(tab, df=df_pgd, pgd_user=pgd_user or pgd_filter or "", role=role, username=username)),
-                ("✅ Checklist Nội bộ PGD", lambda tab: _lazy_tab("tab_kiem_soat_noi_bo_pgd").render(tab, df=df_pgd, pgd_user=pgd_user or pgd_filter or "", role=role)),
-                ("🔍 Kiểm soát Dữ liệu", lambda tab: _render_kiem_soat_pgd(tab, df_pgd, pgd_user or pgd_filter or "", role, username)),
+                ("⚠️ Cảnh báo sớm", lambda tab: _lazy_tab("tab_canh_bao_som_pgd").render(tab, df=df_pgd, pgd_user=pgd_user or pgd_filter or "", role=role, username=username)),
+                ("✅ Checklist & Kiểm soát", lambda tab: _render_kiem_soat_pgd(tab, df_pgd, pgd_user or pgd_filter or "", role, username)),
                 ("👔 CBTD & Địa bàn", lambda tab: _lazy_tab("tab_cbtd").render(
                     tab, df=df_pgd, role=role, username=username, pgd_user=pgd_user or pgd_filter or ""
                 )),
                 ("💳 Xử lý Rủi ro", lambda tab: _lazy_tab("tab_xu_ly_rui_ro").render(
                     tab, df=df_pgd, role=role, username=username, pgd_user=pgd_user or pgd_filter
                 )),
-                ("📍 Điểm Giao Dịch", lambda tab: _lazy_tab("tab_diem_gd_pgd").render(tab, **kwargs)),
-                ("🏘️ Tổ TK&VV",       lambda tab: _lazy_tab("tab_cdtotkvv_pgd").render(tab, **kwargs)),
-                ("🏛️ Ban Đại Diện", lambda tab: _lazy_tab("tab_ban_dai_dien").render(tab, cap="xa", **kwargs)),
-                ("🤝 Ủy thác", lambda tab: _lazy_tab("tab_uy_thac").render(tab, **kwargs)),
+                ("📍 Điểm GD & Tổ TK&VV", lambda tab: _render_diem_gd_va_to_tkvv(tab, **kwargs)),
+                ("🏛️ Ban Đại Diện & Ủy thác", lambda tab: _render_ban_dai_dien_uy_thac(tab, **kwargs)),
                 ("📊 Tổng quan Nợ Khoanh", lambda tab: _lazy_tab("tab_no_khoanh").render(
-                    tab,
-                    df=df_pgd,
-                    df_full=None,
-                    role=role,
-                    username=username,
-                    pgd_user=pgd_user,
-                    nhom="tongquan",
+                    tab, df=df_pgd, df_full=None, role=role, username=username,
+                    pgd_user=pgd_user, nhom="tongquan",
                 )),
                 ("🔒 Quản lý Nợ Khoanh CV 368", lambda tab: _lazy_tab("tab_no_khoanh").render(
-                    tab,
-                    df=df_pgd,
-                    df_full=None,
-                    role=role,
-                    username=username,
-                    pgd_user=pgd_user,
-                    nhom="cv368",
+                    tab, df=df_pgd, df_full=None, role=role, username=username,
+                    pgd_user=pgd_user, nhom="cv368",
                 )),
             ],
         },

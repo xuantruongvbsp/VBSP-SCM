@@ -477,7 +477,7 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
             f"SELECT column_name FROM (DESCRIBE SELECT * FROM read_parquet('{hstd_path}'))"
         ).df()["column_name"].tolist()
         _cols_exist = [c for c in COLS_CAN if c in _schema]
-        _cols_sql = ", ".join(f'"{c}"' for c in _cols_exist)
+        _cols_sql = ", ".join(f'"{c}"' for c in _cols_exist) if _cols_exist else "*"
         df_work = duckdb.query(
             f"SELECT {_cols_sql} FROM read_parquet('{hstd_path}')"
         ).df()

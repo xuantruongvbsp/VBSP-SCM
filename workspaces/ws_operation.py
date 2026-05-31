@@ -2511,7 +2511,7 @@ def render(**kwargs):
             "label": "🏠 Trang Chủ",
             "tabs": [
                 ("🏠 Trang Chủ", lambda tab: _render_trang_chu(tab, df_pgd, role, pgd_user, kwargs)),
-                ("📊 Dashboard Sức khỏe", lambda tab: _render_dashboard_nang_cao_pgd(tab, df_pgd, pgd_user or pgd_filter or "", role)),
+                ("📊 Dashboard Sức khỏe", lambda tab: _lazy_tab("tab_dashboard_suc_khoe_pgd").render(tab, df=df_pgd, pgd_user=pgd_user or pgd_filter or "", role=role)),
             ],
         },
         "nghiep_vu_pgd": {
@@ -2545,6 +2545,9 @@ def render(**kwargs):
                 ("📄 Trung tâm mẫu biểu",       lambda tab: _render_doc_hub_tab(tab)),
                 ("📋 Biên bản giao ban",         lambda tab: _render_bien_ban_giao_ban(tab, **kwargs)),
                 ("📢 Thông báo kết luận",        lambda tab: _render_thong_bao_ket_luan(tab, **kwargs)),
+                ("📋 Theo dõi nhập liệu",         lambda tab: _lazy_tab("tab_theo_doi_nhap").render(tab, **kwargs)),
+                ("📥 Tiến độ nộp BC",             lambda tab: _lazy_tab("tab_tien_do_nop").render(tab, **kwargs)),
+                ("✅ Checklist BC",               lambda tab: _lazy_tab("tab_checklist_bc").render(tab, **kwargs)),
             ],
         },
         "ke_hoach_pgd": {
@@ -2565,11 +2568,11 @@ def render(**kwargs):
             "label": "🔍 Kiểm soát & Rủi ro",
             "tabs": [
                 ("🚨 Cảnh báo Tín dụng", lambda tab: _render_canh_bao_nqh_pgd(tab, **_pgd_df_kwargs)),
-                ("🔔 Đôn đốc KHĐ", lambda tab: _render_don_doc(df_pgd, pgd_user or pgd_filter or "", role)),
+                ("🔔 Đôn đốc KHĐ", lambda tab: _lazy_tab("tab_don_doc_khd").render(tab, df=df_pgd, pgd_user=pgd_user or pgd_filter or "", role=role)),
                 ("⚡ Nợ đến hạn có nguy cơ", lambda tab: _render_canh_bao_som_pgd(tab, **kwargs)),
-                ("🚨 Cảnh báo sớm (Full)", lambda tab: _render_canh_bao_som_pgd_full(df_pgd, pgd_user or pgd_filter or "", role, username)),
-                ("🔍 Kiểm soát Nội bộ", lambda tab: _render_kiem_soat_pgd(tab, df_pgd, pgd_user or pgd_filter or "", role, username)),
-                ("✅ Checklist Trước Báo Cáo", lambda tab: _render_kiem_soat_noi_bo_pgd(df_pgd, pgd_user or pgd_filter or "", role)),
+                ("🚨 Cảnh báo sớm (Full)", lambda tab: _lazy_tab("tab_canh_bao_som_pgd").render(tab, df=df_pgd, pgd_user=pgd_user or pgd_filter or "", role=role, username=username)),
+                ("✅ Checklist Nội bộ PGD", lambda tab: _lazy_tab("tab_kiem_soat_noi_bo_pgd").render(tab, df=df_pgd, pgd_user=pgd_user or pgd_filter or "", role=role)),
+                ("🔍 Kiểm soát Dữ liệu", lambda tab: _render_kiem_soat_pgd(tab, df_pgd, pgd_user or pgd_filter or "", role, username)),
                 ("👔 CBTD & Địa bàn", lambda tab: _lazy_tab("tab_cbtd").render(
                     tab, df=df_pgd, role=role, username=username, pgd_user=pgd_user or pgd_filter or ""
                 )),

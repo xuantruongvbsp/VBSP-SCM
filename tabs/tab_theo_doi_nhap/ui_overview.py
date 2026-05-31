@@ -172,7 +172,6 @@ def _render_so_sanh_ky(
     cols = st.columns(4)
     with cols[0]:
         arrow = "📈" if delta_pct >= 0 else "📉"
-        color = "green" if delta_pct >= 0 else "red"
         st.metric(
             f"{arrow} % Trung bình",
             f"{curr_pct:.1f}%",

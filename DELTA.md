@@ -41,7 +41,7 @@
 | Disk | 209.7GB, dùng 3% | 🟢 |
 | `st.cache` deprecated | 0 | 🟢 |
 | `st.beta_`/`st.experimental_` | 0 | 🟢 |
-| `width='stretch'` còn sót | 7 chỗ (filter_bar, movers, tab_phoi_hop_pgd) | 🟡 |
+| `width='stretch'` còn sót | 0 — đã fix toàn bộ 31/05 | 🟢 |
 | `_archive/` dead code | 21 .py files | 🟡 |
 | `VBSP-SCM/` duplicate subfolder | 393 files | 🟡 |
 | `html()` vs `markdown(unsafe_allow_html)` | Đã dùng `st.html()` | 🟢 |

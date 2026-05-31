@@ -1,5 +1,29 @@
 # CHANGELOG
 
+## [2026-06-01] — Xóa dead code ws_operation.py
+- `workspaces/ws_operation.py` — xóa 666 dòng dead code: `_render_don_doc`, `_render_canh_bao_som_pgd_full`, `_render_kiem_soat_noi_bo_pgd`, `_heatmap_rui_ro_xa`, `_render_dashboard_nang_cao_pgd` (đã migrate sang tab files riêng)
+
+## [2026-05-31] — Fix 4 lỗi tab_bao_cao_giao_ban_pgd + ẩn Upload tab với CN role
+- `tabs/tab_bao_cao_giao_ban_pgd.py` dòng ~64 — `dir()` → `locals()` để check biến local đúng cách; thêm `with ctx:` wrapper; format số dùng `fmt_ty`/`vn()`/`fmt_so()` thay vì `round(1)` và `{x:,.0f}`
+- `workspaces/ws_operation.py` dòng ~2638 — ẩn tất cả tab có "Upload" khi không có quyền, không chỉ "Upload HSTD"
+
+## [2026-05-31] — Thêm pgd_list per chỉ tiêu trong Tab Theo dõi Nhập liệu
+- `tabs/tab_theo_doi_nhap/data.py` — `tinh_tien_do()`: thêm logic `pgd_list`, gán `None` cho PGD không áp dụng, chỉ average chỉ tiêu áp dụng; `emoji_pct()`: handle `None` → "—"
+- `tabs/tab_theo_doi_nhap/ui_settings.py` — thêm multiselect "PGD áp dụng" cho từng chỉ tiêu; import `DS_PGD`, `DON_VI_CHI_NHANH`
+- `tabs/tab_theo_doi_nhap/ui_overview.py` — `_render_heatmap()`: guard None, hiển thị "—" cho ô không áp dụng
+- `tabs/tab_theo_doi_nhap/ui_detail.py` — `_render_bang_chi_tiet_html()`: guard None, hiển thị "—" và xuất Excel "—"
+
+## [2026-05-31] — Hoàn thiện phân hệ PGD Phase 3+6: Extract analytics + Restructure Kiểm soát
+- `tabs/tab_phan_tich_pgd.py` — extract 4 tab inline (Dự phóng Dòng tiền + Heatmap Đáo hạn + Histogram Dư nợ + Donut Cơ cấu CT) → 1 tab với 4 sub-tab
+- `tabs/tab_bao_cao_giao_ban_pgd.py` — extract `_render_bao_cao_giao_ban` (~210 dòng) ra tab riêng
+- `workspaces/ws_operation.py` — restructure nhóm Kiểm soát & Rủi ro: 14 tab → 10 tab
+  - Gộp "Nợ đến hạn" + "Cảnh báo sớm" → tab "⚠️ Cảnh báo sớm"
+  - Gộp "Checklist Nội bộ" + "Kiểm soát Dữ liệu" → tab "✅ Checklist & Kiểm soát" (2 sub-tab)
+  - Gộp "Điểm GD" + "Tổ TK&VV" → tab "📍 Điểm GD & Tổ TK&VV" (3 sub-tab)
+  - Gộp "Ban Đại Diện" + "Ủy thác" → tab "🏛️ Ban Đại Diện & Ủy thác" (2 sub-tab)
+- `workspaces/ws_operation.py` — fix shortcut index bugs: "Đôn đốc KHĐ" (0→1), "3m KHĐ" alert (0→1)
+- `tabs/tab_kiem_soat_noi_bo_pgd.py` — fix amber index: 3→2 (sau restructure)
+
 ## [2026-05-31] — Hoàn thiện phân hệ Hỗ trợ PGD (P1+P2): Tách inline + Thêm 7 tab
 - `workspaces/ws_operation.py` — thay 4 hàm render inline bằng `_lazy_tab` gọi file riêng
 - `tabs/tab_don_doc_khd.py` — extract `_render_don_doc` (~170 dòng) ra tab riêng

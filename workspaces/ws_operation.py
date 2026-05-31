@@ -2522,10 +2522,7 @@ def render(**kwargs):
                 ("🔍 Tra cứu hồ sơ", lambda tab: _lazy_tab("tab_tracuu").render(tab, **kwargs)),
                 ("📋 Danh sách & Lọc", lambda tab: _lazy_tab("tab_danhsach").render(tab, **kwargs)),
                 ("⏰ Đến hạn", lambda tab: _lazy_tab("tab_den_han").render(tab, role=role, pgd_user=pgd_user)),
-                ("📈 Dự phóng Dòng tiền", lambda tab: _render_du_phong_dong_tien(tab, **_pgd_df_kwargs)),
-                ("🔥 Heatmap Đáo hạn", lambda tab: _render_heatmap_dao_han(tab, **_pgd_df_kwargs)),
-                ("📊 Histogram Dư nợ", lambda tab: _render_histogram_du_no(tab, **_pgd_df_kwargs)),
-                ("🍩 Cơ cấu CT", lambda tab: _render_donut_co_cau(tab, **_pgd_df_kwargs)),
+                ("📈 Dự phóng Dòng tiền", lambda tab: _lazy_tab("tab_phan_tich_pgd").render(tab, **_pgd_df_kwargs)),
                 ("📊 So sánh kỳ", lambda tab: _lazy_tab("tab_so_sanh_ky").render(
                     tab, df=df_pgd, df_full=df_pgd, role=role, username=username,
                     pgd_user=pgd_user, pgd_mode=True,
@@ -2541,7 +2538,7 @@ def render(**kwargs):
                 ("📡 Điện báo", lambda tab: _lazy_tab("tab_candoi").render(
                     tab, **{**kwargs, "pgd_mode": True, "df": df, "df_full": df}
                 )),
-                ("📝 Báo cáo Giao ban", lambda tab: _render_bao_cao_giao_ban(tab, **kwargs)),
+                ("📝 Báo cáo Giao ban", lambda tab: _lazy_tab("tab_bao_cao_giao_ban_pgd").render(tab, **kwargs)),
                 ("📄 Trung tâm mẫu biểu",       lambda tab: _render_doc_hub_tab(tab)),
                 ("📋 Biên bản giao ban",         lambda tab: _render_bien_ban_giao_ban(tab, **kwargs)),
                 ("📢 Thông báo kết luận",        lambda tab: _render_thong_bao_ket_luan(tab, **kwargs)),
@@ -2632,10 +2629,10 @@ def render(**kwargs):
     nhom_kha_dung = {}
     for key, info in CAC_NHOM.items():
         if key in nhom_duoc_phep:
-            # Ẩn Upload HSTD nếu không phải admin_pgd
+            # Ẩn Upload tabs nếu không có quyền upload
             if key == "quan_tri_pgd" and not tab_perm["co_quyen_upload_hstd"]:
                 info_copy = dict(info)
-                info_copy["tabs"] = [t for t in info["tabs"] if "Upload HSTD" not in t[0]]
+                info_copy["tabs"] = [t for t in info["tabs"] if "Upload" not in t[0]]
                 nhom_kha_dung[key] = info_copy
             else:
                 nhom_kha_dung[key] = info

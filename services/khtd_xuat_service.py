@@ -294,6 +294,15 @@ def xuat_word_bao_cao_pgd(pgd_ten: str, ds_nam: list[int], loai: str) -> bytes:
         for ci, h in enumerate(hdrs[:3]):
             cell = tbl.rows[0].cells[ci]
             cell.text = h
+            # Background xanh VBSP + chữ trắng
+            from docx.oxml.ns import qn
+            from docx.oxml import OxmlElement
+            tc_pr = cell._tc.get_or_add_tcPr()
+            shd = OxmlElement("w:shd")
+            shd.set(qn("w:val"), "clear")
+            shd.set(qn("w:color"), "auto")
+            shd.set(qn("w:fill"), "1F4E79")
+            tc_pr.append(shd)
             for run in cell.paragraphs[0].runs:
                 run.bold = True
                 run.font.color.rgb = RGBColor(0xFF, 0xFF, 0xFF)

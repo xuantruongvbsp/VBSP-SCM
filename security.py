@@ -235,9 +235,6 @@ def get_totp_uri(secret: str, username: str, issuer: str = "VBSP-SCM") -> str:
 def verify_totp(secret: str, code: str) -> bool:
     """Xác thực mã TOTP."""
     try:
-        import time
-        
-        # Tính TOTP
         counter = int(time.time()) // 30
         
         # Thử 3 window: hiện tại, trước 1, sau 1

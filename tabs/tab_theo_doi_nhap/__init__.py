@@ -40,7 +40,7 @@ def _kiem_tra_ket_noi() -> tuple[bool, str]:
         import gspread  # noqa: F401
     except ImportError:
         return False, "Thiếu thư viện gspread"
-    return True, f"OK — {cred_path}"
+    return True, f"credentials.json tìm thấy ({cred_path.name})"
 
 
 def render(tab: DeltaGenerator = None, **kwargs) -> None:
@@ -170,6 +170,7 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
             render_chi_tiet(
                 df_td, ds_ct, username,
                 pgd_groups=groups,
+                name_idx=name_col_idx,
             )
 
         if t2 is not None:
@@ -179,8 +180,10 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
         with t3:
             render_huong_dan()
 
-        # ── Cleanup định kỳ snapshot cũ ───────────────────────────────────
-        try:
-            cleanup_snapshots_cu(90)
-        except Exception:
-            pass
+        # ── Cleanup định kỳ snapshot cũ (1 lần/session) ─────────────────────
+        if not st.session_state.get("_ttdn_cleanup_done"):
+            try:
+                cleanup_snapshots_cu(90)
+            except Exception:
+                pass
+            st.session_state["_ttdn_cleanup_done"] = True

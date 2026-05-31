@@ -60,9 +60,15 @@ def _render_heatmap(df_td: pd.DataFrame, ds_ct: list[dict], ten_sheet: str) -> N
         row_html += f"<td style='padding:6px 8px;text-align:center;'>{so_xa}</td>"
 
         for ct_name in ct_names:
-            pct = r.get(f"{ct_name}_pct", 0)
-            fil = int(r.get(f"{ct_name}_filled", 0))
-            tot = int(r.get(f"{ct_name}_total", 0))
+            pct = r.get(f"{ct_name}_pct")
+            if pct is None:
+                row_html += (
+                    "<td style='padding:4px 6px;text-align:center;"
+                    "color:var(--text-color-secondary,#aaa);font-size:12px;'>—</td>"
+                )
+                continue
+            fil = int(r.get(f"{ct_name}_filled") or 0)
+            tot = int(r.get(f"{ct_name}_total") or 0)
             bg = _heatmap_color(pct)
             tc = _heatmap_text_color(pct)
             display = f"{fil}/{tot}<br><small>({pct:.0f}%)</small>"

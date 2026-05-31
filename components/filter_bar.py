@@ -105,14 +105,14 @@ def filter_bar(
     with col_toggle:
         if st.button(
             "🔍 Bộ lọc" if not expanded else "🔍 Ẩn bộ lọc",
-            width="stretch",
+            use_container_width=True,
             key=f"{key_prefix}_toggle",
         ):
             st.session_state[f"{key_prefix}_expanded"] = not expanded
             st.rerun()
 
     with col_clear:
-        if st.button("🔄 Xóa", width="stretch", key=f"{key_prefix}_clear"):
+        if st.button("🔄 Xóa", use_container_width=True, key=f"{key_prefix}_clear"):
             for f in filters:
                 key = f"{key_prefix}_{f['field']}"
                 st.session_state.pop(key, None)
@@ -236,7 +236,7 @@ def _show_filter_presets_ui(
             key=f"{key_prefix}_preset_name",
             label_visibility="collapsed",
         )
-        if st.button("💾 Lưu", width="stretch", key=f"{key_prefix}_save_preset"):
+        if st.button("💾 Lưu", use_container_width=True, key=f"{key_prefix}_save_preset"):
             name = save_name.strip()
             if not name:
                 st.toast("⚠️ Nhập tên bộ lọc trước khi lưu", icon="⚠️")
@@ -256,7 +256,7 @@ def _show_filter_presets_ui(
                 key=f"{key_prefix}_load_preset",
                 label_visibility="collapsed",
             )
-            if selected and st.button("📂 Tải", width="stretch", key=f"{key_prefix}_load_btn"):
+            if selected and st.button("📂 Tải", use_container_width=True, key=f"{key_prefix}_load_btn"):
                 _apply_preset_to_session(presets[selected], [], key_prefix)
                 set_last_filter_preset_name(username, selected)
                 st.toast(f"✅ Đã tải bộ lọc '{selected}'", icon="📂")
@@ -273,7 +273,7 @@ def _show_filter_presets_ui(
                 key=f"{key_prefix}_del_preset",
                 label_visibility="collapsed",
             )
-            if del_name and st.button("🗑️", width="stretch", key=f"{key_prefix}_del_btn"):
+            if del_name and st.button("🗑️", use_container_width=True, key=f"{key_prefix}_del_btn"):
                 presets.pop(del_name, None)
                 save_filter_presets(username, presets)
                 st.toast(f"🗑️ Đã xóa bộ lọc '{del_name}'", icon="🗑️")

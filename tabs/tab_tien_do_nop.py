@@ -15,7 +15,7 @@ from streamlit.delta_generator import DeltaGenerator
 
 import db
 from auth import la_phan_he_cn, normalize_role
-from config import BASE_DIR, DS_PGD, DON_VI_CHI_NHANH
+from config import DS_PGD, DON_VI_CHI_NHANH
 from utils import xuat_excel
 
 
@@ -50,28 +50,41 @@ def _clear_export_cache():
 
 # ── Kết nối & đọc Google Sheets ──────────────────────────────────────────────
 
-@st.cache_resource(show_spinner=False)
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+
+def _tim_credentials() -> Path:
+    candidates = [
+        PROJECT_ROOT / "credentials.json",
+        PROJECT_ROOT.parent / "credentials.json",
+        Path.cwd() / "credentials.json",
+        Path("credentials.json"),
+    ]
+    from config import BASE_DIR as _bd
+    candidates.append(_bd / "credentials.json")
+    for cand in candidates:
+        if cand.exists():
+            return cand.resolve()
+    raise FileNotFoundError(f"Không tìm thấy credentials.json. Đã thử: {[str(c) for c in candidates]}")
+
 def _ket_noi_gsheet():
-    _p = Path(__file__).resolve().parent.parent / "credentials.json"
+    _p = _tim_credentials()
     scope = [
         "https://spreadsheets.google.com/feeds",
         "https://www.googleapis.com/auth/drive",
     ]
-    if not _p.exists():
-        raise FileNotFoundError(f"Không tìm thấy file credentials: {_p}")
     try:
         import gspread
     except ImportError:
         raise RuntimeError("Thiếu thư viện gspread. Cài đặt: pip install gspread google-auth")
     try:
-        return gspread.service_account(filename=_p, scopes=scope)
+        return gspread.service_account(filename=str(_p), scopes=scope)
     except Exception as e:
         logger.error("_ket_noi_gsheet: fallback oauth2client — %s", e, exc_info=True)
         try:
             from oauth2client.service_account import ServiceAccountCredentials
         except ImportError:
             raise RuntimeError("Không thể kết nối GSheet: cần cài google-auth hoặc oauth2client.")
-        creds = ServiceAccountCredentials.from_json_keyfile_name(_p, scope)
+        creds = ServiceAccountCredentials.from_json_keyfile_name(str(_p), scope)
         return gspread.authorize(creds)
 
 
@@ -85,7 +98,6 @@ def _chuan_hoa_ten_pgd(raw: str) -> str:
     return s
 
 
-@st.cache_data(ttl=300)
 def _doc_du_lieu() -> pd.DataFrame:
     try:
         client = _ket_noi_gsheet()
@@ -557,8 +569,23 @@ def _render_danh_sach(df: pd.DataFrame, deadline_cfg: dict, is_cn: bool, pgd_use
         with col_pdf:
             from pdf_service import nut_xuat_pdf
 
+            # Chuẩn bị DataFrame sạch cho PDF: bỏ cột nội bộ/URL dài, format datetime
+            df_for_pdf = df_xuat_ds.drop(columns=["tt", "tt_hien", "file_dinh_kem", "email"], errors="ignore").copy()
+            if "thoi_gian" in df_for_pdf.columns:
+                df_for_pdf["thoi_gian"] = df_for_pdf["thoi_gian"].dt.strftime("%d/%m/%Y")
+            if "noi_dung" in df_for_pdf.columns:
+                df_for_pdf["noi_dung"] = df_for_pdf["noi_dung"].astype(str).str[:80]
+            df_for_pdf = df_for_pdf.rename(columns={
+                "thoi_gian":    "Thời gian",
+                "ho_ten":       "Họ tên",
+                "ten_pgd":      "Đơn vị",
+                "loai_bao_cao": "Loại BC",
+                "ky_bao_cao":   "Kỳ",
+                "noi_dung":     "Nội dung",
+            })
+
             nut_xuat_pdf(
-                df_xuat_ds,
+                df_for_pdf,
                 f"Tiến độ nộp báo cáo — {loai_xuat_ds}",
                 st.session_state.get("username", "unknown"),
                 cols_tien=[],
@@ -744,6 +771,28 @@ def _render_huong_dan_mockup() -> None:
 
 _CACHE_VER = "v2"
 
+def _kiem_tra_ket_noi():
+    """Kiểm tra toàn bộ chuỗi kết nối GSheet — trả về (ok, msg)."""
+    from pathlib import Path
+    root = Path(__file__).resolve().parent.parent
+    cred_path = root / "credentials.json"
+    if not cred_path.exists():
+        return False, f"KHÔNG tìm thấy {cred_path}"
+    try:
+        import gspread
+    except ImportError:
+        return False, "Thiếu thư viện gspread"
+    try:
+        scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+        client = gspread.service_account(filename=str(cred_path), scopes=scope)
+        sheet = client.open_by_key(SHEET_ID)
+        ws = sheet.worksheet(SHEET_TAB)
+        data = ws.get_all_values()
+        return True, f"OK — {sheet.title}/{ws.title}: {len(data)} dòng"
+    except Exception as e:
+        logger.error("_kiem_tra_ket_noi: %s", e, exc_info=True)
+        return False, f"LỖI: {type(e).__name__}: {e}"
+
 def render(tab: DeltaGenerator = None, **kwargs) -> None:
     role_raw = str(kwargs.get("role", "user") or "user")
     role_n = normalize_role(role_raw)
@@ -753,20 +802,14 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
 
     ctx = tab if tab is not None else st.container()
     with ctx:
+        ok, msg = _kiem_tra_ket_noi()
+        if not ok:
+            st.error(f"🔴 **GSheet lỗi:** {msg}")
+        else:
+            st.success(f"🟢 **GSheet OK** — {msg}")
+
         st.subheader("📋 Tiến độ Báo cáo của PGD")
         st.caption("Dữ liệu từ Google Form · Tự động cập nhật mỗi 5 phút")
-
-        if st.session_state.get(f"_tdn_cache_ver") != _CACHE_VER:
-            _doc_du_lieu.clear()
-            st.session_state[f"_tdn_cache_ver"] = _CACHE_VER
-
-        _credentials_path = str(BASE_DIR / "credentials.json")
-        if not Path(_credentials_path).exists():
-            st.warning(
-                "⚠️ Chưa cấu hình Google Sheets. "
-                "Đặt file `credentials.json` (Service Account) vào thư mục gốc."
-            )
-            return
 
         col_r, _ = st.columns([1, 7])
         with col_r:

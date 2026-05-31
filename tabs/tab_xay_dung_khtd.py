@@ -13,7 +13,7 @@ from logger import get_logger
 logger = get_logger(__name__)
 
 import db
-from auth import la_admin_cn, la_phan_he_cn, normalize_role
+from auth import la_admin_cn, la_manager_cn, la_phan_he_cn, normalize_role
 from config import (
     CHUONG_TRINH_KHTD,
     DS_PGD,
@@ -591,7 +591,7 @@ def _render_export_buttons_pgd(
 
 # ── Sub-tab 4: Tổng hợp CN ────────────────────────────────────────────────────
 
-def _render_tong_hop_cn(tab, ds_nam: list[int], loai: str) -> None:
+def _render_tong_hop_cn(tab, ds_nam: list[int], loai: str, username: str = "", role: str = "") -> None:
     with tab:
         giai_doan = (
             str(ds_nam[0]) if len(ds_nam) == 1
@@ -611,7 +611,7 @@ def _render_tong_hop_cn(tab, ds_nam: list[int], loai: str) -> None:
         st.markdown("---")
 
         # ── Phê duyệt kế hoạch PGD ───────────────────────────────────────
-        _render_approval_cn(ds_nam, loai)
+        _render_approval_cn(ds_nam, loai, role)
 
         st.markdown("---")
 
@@ -659,9 +659,11 @@ def _render_tong_hop_cn(tab, ds_nam: list[int], loai: str) -> None:
                     st.caption(f"⚠️ {e}")
 
 
-def _render_approval_cn(ds_nam: list[int], loai: str) -> None:
+def _render_approval_cn(ds_nam: list[int], loai: str, role: str = "") -> None:
     """Panel phê duyệt tập trung — dành cho admin_cn / manager_cn trong Tổng hợp CN."""
     st.markdown("##### ✅ Phê duyệt Kế hoạch PGD")
+
+    co_quyen_duyet = la_admin_cn(role) or la_manager_cn(role)
 
     approval_map = trang_thai_approval_cn(ds_nam, loai)
     da_nop = [(pgd, ap) for pgd, ap in approval_map.items() if ap.get("trang_thai") == "da_nop"]
@@ -677,6 +679,8 @@ def _render_approval_cn(ds_nam: list[int], loai: str) -> None:
         st.info("📭 Không có PGD nào đang chờ duyệt.")
     else:
         st.markdown(f"**{len(da_nop)} PGD đang chờ duyệt:**")
+        if not co_quyen_duyet:
+            st.info("ℹ️ Chỉ Trưởng/Phó phòng KH-NV mới có quyền phê duyệt kế hoạch.")
 
         username_duyetvien = st.session_state.get("username", "unknown")
 
@@ -702,6 +706,7 @@ def _render_approval_cn(ds_nam: list[int], loai: str) -> None:
                         key=f"xd_duyet_{slug}_{loai}_{ds_nam[0]}",
                         type="primary",
                         use_container_width=True,
+                        disabled=not co_quyen_duyet,
                     ):
                         duyet_ke_hoach_xd(pgd_ten, ds_nam, loai, "da_duyet", y_kien, username_duyetvien)
                         st.success(f"✅ Đã duyệt kế hoạch của {pgd_ten}")
@@ -711,6 +716,7 @@ def _render_approval_cn(ds_nam: list[int], loai: str) -> None:
                         "↩️ Trả lại",
                         key=f"xd_tuchoi_{slug}_{loai}_{ds_nam[0]}",
                         use_container_width=True,
+                        disabled=not co_quyen_duyet,
                     ):
                         if not y_kien.strip():
                             st.warning("⚠️ Vui lòng nhập ý kiến khi trả lại kế hoạch.")
@@ -734,6 +740,7 @@ def _render_approval_cn(ds_nam: list[int], loai: str) -> None:
                         "🔓 Mở lại",
                         key=f"xd_molai_{slug}_{loai}_{ds_nam[0]}",
                         use_container_width=True,
+                        disabled=not la_admin_cn(role),
                     ):
                         mo_lai_ke_hoach(pgd_ten, ds_nam, loai, username_duyetvien)
                         st.info(f"🔓 Đã mở lại kế hoạch của {pgd_ten} để chỉnh sửa.")

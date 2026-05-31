@@ -36,6 +36,32 @@ from services.upload_service import (
 from auth import co_quyen_upload_pgd, la_phan_he_pgd, normalize_role
 
 
+def _preview_excel(file_bytes: bytes, loai: str, max_rows: int = 10) -> pd.DataFrame | None:
+    """
+    Đọc preview n rows từ file Excel để hiển thị trước khi lưu.
+    
+    Returns:
+        DataFrame với dữ liệu preview hoặc None nếu lỗi
+    """
+    try:
+        buf = BytesIO(file_bytes)
+        if loai in ("hstd", "nq11"):
+            df = pd.read_excel(buf, sheet_name="BCQUERY", header=4, nrows=max_rows)
+            df = df.iloc[:, 1:]  # Bỏ cột đầu tiên
+        elif loai == "gqvl":
+            df = pd.read_excel(buf, sheet_name="Sheet1", header=7, nrows=max_rows)
+            df = df.iloc[:, 1:]
+        elif loai == "cdtotkvv":
+            df = pd.read_excel(buf, header=7, nrows=max_rows)
+        else:
+            df = pd.read_excel(buf, nrows=max_rows)
+        
+        return df.dropna(how="all")
+    except Exception as e:
+        logger.warning("Preview %s lỗi: %s", loai, e)
+        return None
+
+
 # data_priority_service và _render_upload_hang_loat đã được tách ra
 # theo kiến trúc 2 luồng độc lập (xem HUONG_DAN_NGUON_DU_LIEU.md)
 
@@ -262,10 +288,56 @@ def _render_upload_form(
         st.info("Chọn ít nhất 1 file để bắt đầu upload.")
         return
 
-    if st.button("📤 Upload", type="primary", key=f"{prefix}_btn_upload"):
-        with st.spinner("⏳ Đang xử lý file..."):
-            _xu_ly_upload(ten_dv, username,
-                          f_hstd, f_nq11, f_gqvl, f_cdtotkvv, prefix)
+    # ── Preview data trước khi upload ─────────────────────────────────
+    danh_sach_file = [
+        ("hstd",     f_hstd,     "📊 HSTD"),
+        ("nq11",     f_nq11,     "📑 NQ11"),
+        ("gqvl",     f_gqvl,     "📋 GQVL"),
+        ("cdtotkvv", f_cdtotkvv, "🏆 CDTOTKVV"),
+    ]
+    
+    # Chỉ preview file đầu tiên được chọn
+    file_preview = None
+    for loai, f_obj, nhan in danh_sach_file:
+        if f_obj is not None:
+            file_preview = (loai, f_obj, nhan)
+            break
+    
+    if file_preview:
+        loai, f_obj, nhan = file_preview
+        file_bytes = f_obj.read()
+        f_obj.seek(0)  # Reset để đọc lại sau
+        
+        with st.expander(f"🔍 Xem trước dữ liệu {nhan} (10 dòng đầu)", expanded=True):
+            df_preview = _preview_excel(file_bytes, loai, max_rows=10)
+            if df_preview is not None and not df_preview.empty:
+                st.dataframe(df_preview, use_container_width=True, hide_index=True)
+                st.caption(f"📊 File có {len(df_preview.columns)} cột, hiển thị 10 dòng đầu tiên")
+                
+                # Kiểm tra schema cơ bản
+                cols = list(df_preview.columns)
+                required_cols = {
+                    "hstd": ["Tên PGD", "Mã KH"],
+                    "nq11": ["Mã PGD", "Số khế ước"],
+                    "gqvl": ["Tên PGD", "Mã KH"],
+                    "cdtotkvv": ["Mã đơn vị", "Tên đơn vị"],
+                }
+                
+                missing = [c for c in required_cols.get(loai, []) if not any(c.lower() in col.lower() for col in cols)]
+                if missing:
+                    st.warning(f"⚠️ Thiếu cột quan trọng: {', '.join(missing)}")
+                else:
+                    st.success(f"✅ Đã phát hiện các cột cần thiết")
+            else:
+                st.warning("⚠️ Không thể đọc preview. File có thể không đúng định dạng.")
+    
+    # Nút upload với xác nhận
+    col_upload, col_cancel = st.columns([1, 3])
+    with col_upload:
+        if st.button("📤 Xác nhận Upload", type="primary", key=f"{prefix}_btn_upload"):
+            with st.spinner("⏳ Đang xử lý file..."):
+                _xu_ly_upload(ten_dv, username,
+                              f_hstd, f_nq11, f_gqvl, f_cdtotkvv, prefix)
 
 
 def _xu_ly_upload(

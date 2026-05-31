@@ -10,6 +10,7 @@ logger = get_logger(__name__)
 
 import importlib
 import socket
+import hashlib
 
 import streamlit as st
 import pandas as pd
@@ -17,6 +18,18 @@ import os
 from io import BytesIO
 from datetime import date, datetime
 import plotly.graph_objects as go
+
+
+def _df_hash(df: pd.DataFrame) -> str:
+    """Tạo hash ngắn cho DataFrame để dùng làm cache key."""
+    if df is None or df.empty:
+        return "empty"
+    try:
+        # Hash dựa trên shape và sample dữ liệu
+        sample = str(df.shape) + str(df.head(2).to_json()) + str(df.tail(2).to_json())
+        return hashlib.md5(sample.encode()).hexdigest()[:12]
+    except Exception:
+        return "unknown"
 
 import db
 from state_manager import SCMStateManager
@@ -64,12 +77,16 @@ def _lazy_tab(name: str):
 
 # ── Helper: tính 4 KPI DeltaCard cho trang chủ PGD ──────────────────────────
 
-def _kpi_pgd_list(df_pgd: pd.DataFrame, pgd_user: str) -> list[dict]:
-    """Tính 4 KPI DeltaCard cho trang chủ / sidebar PGD.
+@st.cache_data(ttl=300, show_spinner="Đang tính KPI...")
+def _kpi_pgd_list_cached(df_hash: str, pgd_user: str, _df_json: str) -> list[dict]:
+    """Cached version của _kpi_pgd_list — dùng hash thay vì df trực tiếp."""
+    # Parse lại df từ json (chỉ dùng cho cache, không dùng cho tính toán thực)
+    df_pgd = pd.read_json(_df_json) if _df_json else pd.DataFrame()
+    return _kpi_pgd_list_impl(df_pgd, pgd_user)
 
-    Returns:
-        List dict (kwargs cho delta_card), tối đa 4 phần tử.
-    """
+
+def _kpi_pgd_list_impl(df_pgd: pd.DataFrame, pgd_user: str) -> list[dict]:
+    """Implementation thực sự của tính KPI."""
     kpi: list[dict] = []
     if df_pgd is None or df_pgd.empty:
         return kpi
@@ -148,26 +165,44 @@ def _kpi_pgd_list(df_pgd: pd.DataFrame, pgd_user: str) -> list[dict]:
             if "|" in k and k.split("|", 1)[0] in ds_xa
         ) if (kh_xa and ds_xa) else 0.0
 
-        if tong_kh > 0:
-            pct_khtd  = tong_dn / tong_kh * 100   # TH = tổng dư nợ PGD
-            khtd_val  = f"{pct_khtd:.0f}%"
-        else:
-            khtd_val  = "—"
-
+        # Tính tiến độ thực hiện so với kế hoạch
+        tien_do = min((tong_dn / tong_kh * 100), 999.9) if tong_kh > 0 else 0.0
         kpi.append({
-            "label":       "KHTD",
-            "value":       khtd_val,
-            "delta":       None,              # không so sánh
-            "icon":        "📊",
+            "label":       "Tiến độ KHTD",
+            "value":       f"{tien_do:.1f}%",
+            "delta":       fmt_ty(tong_kh),
+            "delta_label": "KH năm",
+            "icon":        "🎯",
             "suffix":      "",
-            "precision":   0,
-            "help":        "Tiến độ thực hiện KHTD",
-            "delta_color": "off",
+            "precision":   1,
+            "help":        "Tỷ lệ thực hiện kế hoạch tín dụng",
+            "delta_color": "normal",
         })
     except Exception as e:
         logger.error("_kpi_pgd_list KPI4: %s", e, exc_info=True)
 
     return kpi
+
+
+def _kpi_pgd_list(df_pgd: pd.DataFrame, pgd_user: str) -> list[dict]:
+    """
+    Tính 4 KPI DeltaCard cho trang chủ / sidebar PGD.
+    Wrapper có cache — tự động hash dataframe.
+
+    Returns:
+        List dict (kwargs cho delta_card), tối đa 4 phần tử.
+    """
+    if df_pgd is None or df_pgd.empty:
+        return []
+    
+    df_hash = _df_hash(df_pgd)
+    # Convert df thành json string để serialize cho cache
+    try:
+        _df_json = df_pgd.head(1000).to_json() if len(df_pgd) > 1000 else df_pgd.to_json()
+    except Exception:
+        _df_json = ""
+    
+    return _kpi_pgd_list_cached(df_hash, pgd_user, _df_json)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -2495,6 +2530,7 @@ def render(**kwargs):
                     tab, df=df_pgd, df_full=df_pgd, role=role, username=username,
                     pgd_user=pgd_user, pgd_mode=True,
                 )),
+                ("📄 Quản lý Template", lambda tab: _lazy_tab("tab_template_pgd").render(tab, **kwargs)),
             ],
         },
         "bao_cao_giao_ban": {
@@ -2581,6 +2617,8 @@ def render(**kwargs):
                     tab, role=role, username=username,
                     pgd_user=pgd_user or pgd_filter or ""
                 )),
+                ("📊 Dashboard GQVL", lambda tab: _lazy_tab("tab_gqvl_pgd").render(tab, **kwargs)),
+                ("📈 Phân tích xu hướng", lambda tab: _lazy_tab("tab_xu_huong_pgd").render(tab, **kwargs)),
                 ("🔍 Trạng thái hệ thống", lambda tab: _lazy_tab("tab_trang_thai_nguon").render(tab, **kwargs)),
                 ("📖 Hướng dẫn", lambda tab: render_huong_dan()),
             ],

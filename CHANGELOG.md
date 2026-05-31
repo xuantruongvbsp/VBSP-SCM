@@ -1,5 +1,14 @@
 # CHANGELOG
 
+## [2026-05-31] — Hoàn thiện phân hệ Hỗ trợ PGD (P1+P2): Tách inline + Thêm 7 tab
+- `workspaces/ws_operation.py` — thay 4 hàm render inline bằng `_lazy_tab` gọi file riêng
+- `tabs/tab_don_doc_khd.py` — extract `_render_don_doc` (~170 dòng) ra tab riêng
+- `tabs/tab_canh_bao_som_pgd.py` — extract `_render_canh_bao_som_pgd_full` (~170 dòng) ra tab riêng
+- `tabs/tab_dashboard_suc_khoe_pgd.py` — extract `_render_dashboard_nang_cao_pgd` (~140 dòng) ra tab riêng
+- `tabs/tab_kiem_soat_noi_bo_pgd.py` — extract `_render_kiem_soat_noi_bo_pgd` (~150 dòng) ra tab riêng
+- `workspaces/ws_operation.py` nhóm `bao_cao_giao_ban` — thêm 3 tab: Theo dõi nhập liệu, Tiến độ nộp BC, Checklist BC
+- `workspaces/ws_operation.py` nhóm `kiem_soat_rr` — cập nhật tên tab "Checklist Trước Báo Cáo" → "Checklist Nội bộ PGD"
+
 ## [2026-05-31] — Fix 6 bugs module tab_theo_doi_nhap (review sau refactor)
 - `ui_detail.py:281` — Guard `if not pgd_list` trước `st.selectbox` → tránh crash khi filter trả về rỗng
 - `ui_detail.py:107` — `_render_drilldown_xa` nhận `name_idx: int = 1` thay vì hardcode `row[1]`; `render_chi_tiet` truyền `name_idx` từ config

@@ -107,6 +107,7 @@ def _render_drilldown_xa(
     pgd_groups: dict[str, list[list]],
     ds_ct: list[dict],
     ten_pgd: str,
+    name_idx: int = 1,
 ) -> None:
     """Hiển thị chi tiết từng xã/phường của một PGD."""
     sub_rows = pgd_groups.get(ten_pgd, [])
@@ -147,7 +148,7 @@ def _render_drilldown_xa(
 
     rows_html = ""
     for row in sub_rows:
-        name = str(row[1]).strip() if len(row) > 1 else "?"
+        name = str(row[name_idx]).strip() if len(row) > name_idx else "?"
         row_html = f"<tr><td style='padding:6px 8px;'>{name}</td>"
 
         row_filled = 0
@@ -196,36 +197,24 @@ def render_chi_tiet(
     ds_ct: list[dict],
     username: str,
     pgd_groups: dict[str, list[list]] | None = None,
+    name_idx: int = 1,
 ) -> None:
     if df_td.empty:
         st.info("Chưa có dữ liệu.")
         return
 
     # ── Quick filter chips ─────────────────────────────────────────────────
-    st.markdown("**Lọc nhanh:**")
-    cf1, cf2, cf3, cf4 = st.columns(4)
-    with cf1:
-        show_all = st.checkbox("Tất cả", value=True, key="ttdn_chip_all")
-    with cf2:
-        show_full = st.checkbox("🟢 Hoàn thành", value=False, key="ttdn_chip_full")
-    with cf3:
-        show_partial = st.checkbox("🟡 Đang điền", value=False, key="ttdn_chip_partial")
-    with cf4:
-        show_empty = st.checkbox("🔴 Chưa điền", value=False, key="ttdn_chip_empty")
-
-    # Chỉ 1 chip được chọn
-    if show_full:
-        show_all = False
-        show_partial = False
-        show_empty = False
-    if show_partial:
-        show_all = False
-        show_full = False
-        show_empty = False
-    if show_empty:
-        show_all = False
-        show_full = False
-        show_partial = False
+    filter_choice = st.radio(
+        "Lọc nhanh",
+        ["Tất cả", "🟢 Hoàn thành", "🟡 Đang điền", "🔴 Chưa điền"],
+        horizontal=True,
+        key="ttdn_chip_filter",
+        label_visibility="collapsed",
+    )
+    show_all = filter_choice == "Tất cả"
+    show_full = filter_choice == "🟢 Hoàn thành"
+    show_partial = filter_choice == "🟡 Đang điền"
+    show_empty = filter_choice == "🔴 Chưa điền"
 
     # ── Advanced filters ───────────────────────────────────────────────────
     st.divider()
@@ -278,14 +267,17 @@ def render_chi_tiet(
         st.divider()
         st.markdown("**🔍 Xem chi tiết xã/phường của một PGD:**")
         pgd_list = sorted(df_show["Đơn vị"].tolist())
-        pgd_chon = st.selectbox(
-            "Chọn PGD",
-            pgd_list,
-            key="ttdn_drill_pgd",
-            label_visibility="collapsed",
-        )
-        if pgd_chon:
-            _render_drilldown_xa(pgd_groups, ds_ct, pgd_chon)
+        if not pgd_list:
+            st.info("Không có đơn vị nào phù hợp để xem chi tiết.")
+        else:
+            pgd_chon = st.selectbox(
+                "Chọn PGD",
+                pgd_list,
+                key="ttdn_drill_pgd",
+                label_visibility="collapsed",
+            )
+            if pgd_chon:
+                _render_drilldown_xa(pgd_groups, ds_ct, pgd_chon, name_idx=name_idx)
 
     # ── Export ──────────────────────────────────────────────────────────────
     st.divider()

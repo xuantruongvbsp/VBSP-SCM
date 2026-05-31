@@ -1,5 +1,100 @@
 # CHANGELOG
 
+## [2026-05-31] — Tái cấu trúc + Nâng cấp tab Theo dõi Nhập liệu (Phase 1-4)
+- `tabs/tab_theo_doi_nhap.py` → module `tabs/tab_theo_doi_nhap/` với 7 file (__init__, constants, data, ui_overview, ui_detail, ui_settings, ui_guide)
+- `tabs/tab_theo_doi_nhap/constants.py` — tập trung tất cả hằng số, KV keys, MOCKUP_HTML
+- `tabs/tab_theo_doi_nhap/data.py` — tách logic đọc GSheet, phân nhóm PGD, tính tiến độ, config persistence, snapshot history
+- `tabs/tab_theo_doi_nhap/ui_overview.py` — Dashboard KPI 6 cards, Heatmap gradient, Progress bars ngang, So sánh kỳ trước qua snapshot
+- `tabs/tab_theo_doi_nhap/ui_detail.py` — Quick filter chips, Inline progress bars, Drill-down xã/phường, Sort, Export Excel cải tiến
+- `tabs/tab_theo_doi_nhap/ui_settings.py` — Quản lý cấu hình sheet + Template (thêm deadline field)
+- `tabs/tab_theo_doi_nhap/ui_guide.py` — Hướng dẫn sử dụng (cập nhật tính năng mới)
+- `tabs/tab_quan_ly_cv.py` — giữ nguyên import `from tabs import ... tab_theo_doi_nhap` (Python tự tìm package)
+
+## [2026-05-31] — Fix 2 bugs tab_xu_huong_pgd: agg key conflict + DataFrame mutation
+- `tabs/tab_xu_huong_pgd.py` dòng ~59 — `count_col` fallback gây overwrite key "sum" bằng "count" khi `COT_MA_KH` vắng → dùng named agg `(col, func)` và thêm guard thiếu cột
+- `tabs/tab_xu_huong_pgd.py` dòng ~222 — `_render_phan_tich_tang_truong` mutate df caller → thêm `df = df.copy()`
+
+## [2026-05-31] — Fix 7 bugs critical Phase 2 PGD (tab_template_pgd, tab_gqvl_pgd, tab_xu_huong_pgd)
+- `tabs/tab_template_pgd.py` dòng ~33 — `quet_templates()` thiếu arg → `quet_templates(TEMPLATES_DIR)`
+- `tabs/tab_template_pgd.py` dòng ~87-113 — treat `list[tuple]` như `list[dict]` → fix toàn bộ truy cập `t[0]`/`t[1]`
+- `tabs/tab_template_pgd.py` dòng ~144,150 — `auto_fill_document` sai thứ tự arg + `.getvalue()` trên bytes → `auto_fill_document(sample_data, path, TAG_MAP)` trả về `bytes` dùng trực tiếp
+- `tabs/tab_gqvl_pgd.py` dòng ~187 — `doc_gqvl_pgd(pgd_user)` thiếu `_ts` → thêm `ts_file(duong_dan_pgd(...))`
+- `tabs/tab_gqvl_pgd.py` dòng ~50-52,77-83,113,145 — tên cột gạch dưới không tồn tại + broken agg tuple → dùng COT_* constants + rebuild agg_dict an toàn
+- `tabs/tab_xu_huong_pgd.py` dòng ~63 — `.agg()` fallback nhận tuple → dùng `count_col` variable
+- `tabs/tab_xu_huong_pgd.py` + `tab_gqvl_pgd.py` — xóa `from state_manager import SCMStateManager` unused
+
+## [2026-05-31] — Fix sai lệch Sheet vs Config: lọc dòng "Tổng cộng" trong tab Theo dõi nhập liệu
+- `tabs/tab_theo_doi_nhap.py` dòng ~112 — thêm `_la_dong_tong_cong(name)`: bỏ qua dòng "Tổng cộng", "Cộng", "Ghi chú" khi đếm xã/phường (áp dụng cả 3 kiểu cấu trúc: phân cấp STT / phẳng / cột PGD riêng)
+- `tabs/tab_theo_doi_nhap.py` dòng ~233 — `_render_tong_quan()` thêm tham số `pgd_groups`, `name_idx`: cảnh báo sai lệch hiển thị danh sách tên xã từ sheet thay vì chỉ đếm số
+- `tabs/tab_theo_doi_nhap.py` dòng ~1095 — khởi tạo `groups` + truyền vào `_render_tong_quan()`
+
+## [2026-05-31] — Fix 7 chỗ width='stretch' deprecated còn sót
+- `components/filter_bar.py` dòng ~108,115,239,259,276 — 5 chỗ `width="stretch"` → `use_container_width=True` trong `st.button`
+- `components/movers.py` dòng ~324 — `width="stretch"` → `use_container_width=True` trong `st.dataframe`
+- `components/export_pdf.py` dòng ~326 — `width="stretch"` → `use_container_width=True` trong `st.download_button`
+- `tabs/tab_phoi_hop_pgd.py` dòng ~208 — `width="stretch"` → `use_container_width=True` trong `st.button`
+
+## [2026-05-31] — Hoàn thiện tab Theo dõi nhập liệu (6 cải tiến)
+- `tabs/tab_theo_doi_nhap.py` dòng ~1018 — `_kiem_tra_ket_noi()` dùng `_tim_credentials()` (5 path fallback) thay vì hardcode 1 path `root / "credentials.json"`; bỏ gọi `gspread.service_account()` test auth không cần thiết (lỗi sẽ tự hiện khi đọc sheet thật)
+- `tabs/tab_theo_doi_nhap.py` dòng ~18 — xóa import `la_phan_he_cn` + biến `is_cn` không dùng trong `render()`
+- `tabs/tab_theo_doi_nhap.py` dòng ~258 — thay `except Exception: pass` bằng `logger.warning(...)` trong PGD_XA_MAP check
+- `tabs/tab_theo_doi_nhap.py` dòng ~22 — gộp 3 import `template_manager` + `template_detection_service` lên module-level; xóa 3 lần import lặp trong `_render_template_section()`, `_render_cai_dat()` (migration/add-sheet)
+- `tabs/tab_theo_doi_nhap.py` dòng ~1040 — cleanup session_state keys `cd_mig_*` / `cd_*_ct_count` cho sheet index đã bị xóa
+
+## [2026-05-31] — Fix lỗi PDF "too large on page" trong tab Tiến độ nộp báo cáo
+- `tabs/tab_tien_do_nop.py` dòng ~569 — tạo `df_for_pdf` sạch trước khi gọi `nut_xuat_pdf`: bỏ cột `tt/tt_hien/file_dinh_kem/email` (URL dài + cột nội bộ), format `thoi_gian` → string, truncate `noi_dung` 80 ký tự; trước đó gửi thẳng 10 cột thô khiến row 864pt vượt frame 498pt
+
+## [2026-05-31] — Fix lỗi '_doc_sheet has no attribute clear' trong tab theo dõi nhập liệu
+- `tabs/tab_theo_doi_nhap.py` dòng ~75 — thêm `@st.cache_data(ttl=300)` vào `_doc_sheet()` để có `.clear()` method; trước đó là hàm thường nên gọi `.clear()` bị lỗi `'function' object has no attribute 'clear'`
+
+## [2026-05-31o] — tab_theo_doi_nhap: hiển thị cột "Số xã" và cảnh báo sai lệch vs PGD_XA_MAP
+- `tabs/tab_theo_doi_nhap.py` dòng ~243 — thêm cột "Số xã" vào bảng ma trận; so sánh `_total` từng PGD vs `PGD_XA_MAP` trong config, hiện warning nếu lệch (giúp phát hiện dòng thừa/thiếu trong Google Sheet)
+
+## [2026-05-31n] — Fix credentials.json: hàm _tim_credentials() thử 5 đường dẫn fallback
+
+## [2026-05-31o] — Debug GSheet: thêm _kiem_tra_ket_noi() ở đầu render() cả 2 tab
+
+- `tabs/tab_tien_do_nop.py` — thêm `_kiem_tra_ket_noi()`: kiểm tra credentials.json + gspread.auth + open_by_key(SHEET_ID) ngay đầu render(); hiển thị st.success() hoặc st.error() rõ ràng
+- `tabs/tab_theo_doi_nhap.py` — thêm `_kiem_tra_ket_noi()`: kiểm tra credentials + gspread.auth ngay đầu render()
+- Đã xác minh từ CLI: credentials.json tồn tại, gspread 6.2.1 auth OK, cả 2 SHEET_ID đều truy cập được (DCGIAM_KHTD_2026_V2 + ĐIỀU CHỈNH CHƯƠNG TRÌNH HSSV LẦN 2)
+- Yêu cầu: restart Streamlit server (Ctrl+C → streamlit run app.py) để load code mới
+
+- `tabs/tab_tien_do_nop.py` — thêm `_tim_credentials()`: thử `PROJECT_ROOT/`, `PROJECT_ROOT.parent/`, `Path.cwd()/`, `Path(".")`, `config.BASE_DIR/` → trả về path đầu tiên tồn tại; `_ket_noi_gsheet()` gọi `_tim_credentials()` thay vì hardcode một path
+- `tabs/tab_theo_doi_nhap.py` — tương tự: thêm `_tim_credentials()` + tích hợp vào `_ket_noi_gsheet()`
+- Nếu vẫn không tìm thấy: `FileNotFoundError` kèm **danh sách đầy đủ 5 path đã thử** (không còn thông báo chung chung)
+
+## [2026-05-31m] — Fix credentials.json: xoá @st.cache_data khỏi _doc_du_lieu/_doc_sheet
+
+- `tabs/tab_tien_do_nop.py` — xoá `@st.cache_data(ttl=300)` khỏi `_doc_du_lieu()` + xoá `_CACHE_VER` check trong `render()` (cache Streamlit lưu lên đĩa, giữ nguyên kết quả LỖI ngay cả sau restart)
+- `tabs/tab_theo_doi_nhap.py` — xoá `@st.cache_data(ttl=300)` khỏi `_doc_sheet()` tương tự
+- Toàn bộ 2 file: 0 `@st.cache` — không còn cơ chế cache nào giữ kết quả lỗi cũ
+
+## [2026-05-31l] — Cleanup 3 vấn đề nhỏ sau review
+- `app.py` — xóa import thừa `check_ip_and_handle` (không dùng)
+- `security.py` — xóa `import time` trùng trong `verify_totp()` (đã import module-level)
+- `tabs/tab_xay_dung_khtd.py` — thêm role-gate nút Duyệt/Trả lại (`disabled` cho non admin_cn/manager_cn) và nút Mở lại (chỉ admin_cn); thêm `la_manager_cn` vào import
+
+## [2026-05-31k] — Fix credentials.json: xoá nốt check sót trong tab_theo_doi_nhap.py
+
+- `tabs/tab_theo_doi_nhap.py` dòng 998-1017 — xoá block check `_cred_path` (tên biến khác nên các lần fix trước không khớp) — đây là tab "Theo dõi tiến trình nhập liệu PGD" (tab báo cáo PGD)
+- Toàn bộ project: grep xác nhận **không còn** bất kỳ `credentials.json.exists()` check blocking nào trong code Python
+
+## [2026-05-31j] — Fix credentials.json: xoá @st.cache_resource + xoá check sớm trong render()
+
+- `tabs/tab_tien_do_nop.py` — xoá `@st.cache_resource` khỏi `_ket_noi_gsheet()` (tránh Streamlit resource cache giữ path cũ vĩnh viễn); xoá luôn check sớm trong `render()` — để lỗi từ `_ket_noi_gsheet()` tự hiển thị với full path
+- `tabs/tab_theo_doi_nhap.py` — tương tự: xoá `@st.cache_resource` + xoá check sớm
+- Xóa `__pycache__` sau mỗi lần sửa
+
+## [2026-05-31i] — Fix 2 bug Sprint 3-5: TypeError + Word header invisible
+- `tabs/tab_xay_dung_khtd.py` dòng 594 — thêm `username=""` và `role=""` vào signature `_render_tong_hop_cn()` để khớp với call ở dòng 127 (tránh TypeError khi CN user mở tab)
+- `services/khtd_xuat_service.py` dòng 294-300 — thêm `w:shd fill=1F4E79` cho header cells bảng dư nợ Word (tránh chữ trắng trên nền trắng — header vô hình)
+
+## [2026-05-31h] — Fix credentials.json: dùng Path(__file__) trực tiếp (triệt để)
+
+- `tabs/tab_tien_do_nop.py` — bỏ import `BASE_DIR`; `_ket_noi_gsheet()` + `render()` dùng `Path(__file__).resolve().parent.parent / "credentials.json"` (không phụ thuộc config, luôn đúng dù CWD hay cache thế nào)
+- `tabs/tab_theo_doi_nhap.py` — bỏ import `BASE_DIR`; `_ket_noi_gsheet()` + `render()` dùng `Path(__file__).resolve().parent.parent / "credentials.json"` tương tự
+- Xóa toàn bộ `__pycache__` prefix `tabs/` và root — tránh `.pyc` cache cũ
+
 ## [2026-05-31g] — Bugfix: TypeError _set_cell color kwarg trong Word HSTD export
 - `services/hstd_word_service.py` dòng ~387 — xoá kwarg `color=` không hợp lệ khỏi `_set_cell()` trong `_ve_chu_ky()`, tránh `TypeError` khi xuất Word
 

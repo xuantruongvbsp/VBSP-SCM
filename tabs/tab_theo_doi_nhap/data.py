@@ -146,22 +146,33 @@ def tinh_tien_do(pgd_groups: dict, ds_ct: list[dict]) -> pd.DataFrame:
         total = len(sub_rows)
         row: dict = {"Đơn vị": pgd, "_total": total}
         sum_pct = 0.0
+        ap_dung_count = 0
         for ct in ds_ct:
-            ci = ct["col"] - 1
             ten = ct["ten"]
+            pgd_list = ct.get("pgd_list") or []
+            ap_dung = (not pgd_list) or (pgd in pgd_list)
+            if not ap_dung:
+                row[f"{ten}_filled"] = None
+                row[f"{ten}_total"] = None
+                row[f"{ten}_pct"] = None
+                continue
+            ci = ct["col"] - 1
             filled = sum(1 for r in sub_rows if len(r) > ci and da_nhap(r[ci]))
             pct = (filled / total * 100) if total > 0 else 0.0
             row[f"{ten}_filled"] = filled
             row[f"{ten}_total"] = total
             row[f"{ten}_pct"] = round(pct, 1)
             sum_pct += pct
-        row["Tổng_pct"] = round(sum_pct / len(ds_ct), 1) if ds_ct else 0.0
+            ap_dung_count += 1
+        row["Tổng_pct"] = round(sum_pct / ap_dung_count, 1) if ap_dung_count else 0.0
         rows_out.append(row)
     return pd.DataFrame(rows_out) if rows_out else pd.DataFrame()
 
 
-def emoji_pct(pct: float) -> str:
+def emoji_pct(pct: float | None) -> str:
     from .constants import EMOJI_PCT
+    if pct is None:
+        return "—"
     if pct >= 100:
         return EMOJI_PCT["full"]
     if pct > 0:

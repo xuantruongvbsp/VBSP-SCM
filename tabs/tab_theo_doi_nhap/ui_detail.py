@@ -61,9 +61,16 @@ def _render_bang_chi_tiet_html(
         for ct_name in ct_names:
             if ct_chon not in ("Tất cả", ct_name):
                 continue
-            pct = r.get(f"{ct_name}_pct", 0)
-            fil = int(r.get(f"{ct_name}_filled", 0))
-            tot = int(r.get(f"{ct_name}_total", 0))
+            pct = r.get(f"{ct_name}_pct")
+            if pct is None:
+                row_html += (
+                    "<td style='padding:4px 8px;min-width:140px;"
+                    "color:var(--text-color-secondary,#aaa);'>—</td>"
+                )
+                xuat_row[ct_name] = "—"
+                continue
+            fil = int(r.get(f"{ct_name}_filled") or 0)
+            tot = int(r.get(f"{ct_name}_total") or 0)
             row_html += (
                 f"<td style='padding:4px 8px;min-width:140px;'>"
                 f"{_render_inline_progress(pct)}"

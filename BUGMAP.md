@@ -127,6 +127,24 @@
 
 ## B. Streamlit UI
 
+### B2 — `StreamlitAPIException: Selectbox has no options`
+| | |
+|---|---|
+| **File** | `tabs/tab_theo_doi_nhap/ui_detail.py` dòng ~281 |
+| **Dấu hiệu** | Crash khi user filter → 0 kết quả, drill-down selectbox nhận list rỗng |
+| **Nguyên nhân** | `st.selectbox` không cho phép options=[] — ném APIException ngay |
+| **Fix** | Guard `if not pgd_list: st.info(...); return` trước khi gọi selectbox |
+| **Ngày fix** | 2026-05-31 |
+
+### B3 — Checkbox mutual-exclusivity logic sai (UI vs Python state)
+| | |
+|---|---|
+| **File** | `tabs/tab_theo_doi_nhap/ui_detail.py` |
+| **Dấu hiệu** | Filter hoạt động đúng nhưng checkbox "Tất cả" vẫn hiển thị tích dù đã chọn filter con |
+| **Nguyên nhân** | Gán lại biến Python sau `st.checkbox()` không cập nhật widget state trên browser |
+| **Fix** | Dùng `st.radio` với `horizontal=True` thay vì nhiều checkbox mutual-exclusive |
+| **Ngày fix** | 2026-05-31 |
+
 ### B1 — `DuplicateElementKey`
 | | |
 |---|---|

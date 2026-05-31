@@ -205,7 +205,7 @@ def _render_danh_sach(username: str, role_n: str, pgd_user: str = "") -> None:
                         key=f"ph_tt_{item['id']}",
                         label_visibility="collapsed",
                     )
-                    if st.button("Lưu", key=f"ph_save_{item['id']}", width="stretch"):
+                    if st.button("Lưu", key=f"ph_save_{item['id']}", use_container_width=True):
                         full_ds = _doc_ds()
                         for x in full_ds:
                             if x["id"] == item["id"]:

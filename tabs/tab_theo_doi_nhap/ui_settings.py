@@ -18,6 +18,7 @@ from services.template_manager import (
 )
 from services.template_detection_service import phat_hien_cau_truc
 
+from config import DS_PGD, DON_VI_CHI_NHANH
 from .constants import DEFAULT_CT, LOAI_OPTIONS
 from .data import (
     doc_ds_sheet,
@@ -26,6 +27,8 @@ from .data import (
     doc_sheet,
     ket_noi_gsheet,
 )
+
+_DS_PGD_ALL = [DON_VI_CHI_NHANH] + DS_PGD
 
 logger = get_logger(__name__)
 
@@ -130,7 +133,15 @@ def _render_form_sheet(cfg: dict, prefix: str) -> dict:
                                         help="Xóa dòng này"):
                 st.session_state[key_count] = max(1, count - 1)
                 st.rerun()
-        ds_ct_new.append({"ten": tn.strip(), "col": int(cl)})
+        pgd_list_old = [p for p in (ct.get("pgd_list") or []) if p in _DS_PGD_ALL]
+        pgd_sel = st.multiselect(
+            "PGD áp dụng (để trống = tất cả)",
+            options=_DS_PGD_ALL,
+            default=pgd_list_old,
+            key=f"{prefix}_ct{i}_pgd",
+            placeholder="Để trống = tất cả PGD",
+        )
+        ds_ct_new.append({"ten": tn.strip(), "col": int(cl), "pgd_list": pgd_sel})
 
     if st.button("➕ Thêm chỉ tiêu", key=f"{prefix}_ct_add"):
         st.session_state[key_count] = count + 1

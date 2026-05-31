@@ -87,7 +87,7 @@ def render(tab=None, **kwargs) -> None:
         ("khd", "3 tháng KHĐ < 5% tổng hồ sơ", tl_khd < 5.0,
          f"3m KHĐ: **{n_khd} món** ({tl_khd:.1f}%)", "kiem_soat_rr", 1),
         ("amber", "Không có khoản sắp chuyển 3m KHĐ", n_amber == 0,
-         f"Sắp chuyển: **{n_amber} món** (lãi tồn 2–3 tháng)", "kiem_soat_rr", 3),
+         f"Sắp chuyển: **{n_amber} món** (lãi tồn 2–3 tháng)", "kiem_soat_rr", 2),
         ("lai", "Không có lãi tồn", n_co_lai_ton == 0,
          f"Lãi tồn > 0: **{n_co_lai_ton} hồ sơ**", "kiem_soat_rr", 0),
         ("sdt", "Hồ sơ đủ số điện thoại", n_thieu_sdt == 0,

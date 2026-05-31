@@ -1,5 +1,14 @@
 # CHANGELOG
 
+## [2026-05-31] — Fix 6 bugs module tab_theo_doi_nhap (review sau refactor)
+- `ui_detail.py:281` — Guard `if not pgd_list` trước `st.selectbox` → tránh crash khi filter trả về rỗng
+- `ui_detail.py:107` — `_render_drilldown_xa` nhận `name_idx: int = 1` thay vì hardcode `row[1]`; `render_chi_tiet` truyền `name_idx` từ config
+- `__init__.py` — `render_chi_tiet(... name_idx=name_col_idx)` để drill-down dùng đúng cột tên
+- `ui_overview.py:175` — Xóa dead variable `color = "green" if ...` không bao giờ được dùng
+- `ui_detail.py` — Thay 4 checkbox mutual-exclusive (logic Python) bằng `st.radio` horizontal (UI nhất quán)
+- `__init__.py:34` — Sửa message `_kiem_tra_ket_noi` từ "GSheet OK" → "credentials.json tìm thấy" (không mislead)
+- `__init__.py:183` — `cleanup_snapshots_cu` throttle bằng session_state (chạy 1 lần/session thay vì mỗi rerun)
+
 ## [2026-05-31] — Tái cấu trúc + Nâng cấp tab Theo dõi Nhập liệu (Phase 1-4)
 - `tabs/tab_theo_doi_nhap.py` → module `tabs/tab_theo_doi_nhap/` với 7 file (__init__, constants, data, ui_overview, ui_detail, ui_settings, ui_guide)
 - `tabs/tab_theo_doi_nhap/constants.py` — tập trung tất cả hằng số, KV keys, MOCKUP_HTML

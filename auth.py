@@ -124,7 +124,7 @@ la_phan_he_pgd = is_pgd_role
 def co_quyen_upload_pgd(role: str) -> bool:
     """Kiểm tra quyền upload dữ liệu PGD."""
     normalized = normalize_role(role)
-    return normalized in ["admin_pgd", "manager_pgd"]
+    return normalized in ["admin_pgd", "manager_pgd", "admin_cn", "manager_cn"]
 
 
 def co_quyen_quan_ly_user_pgd(role: str) -> bool:
@@ -213,7 +213,7 @@ def get_tab_permissions(role: str) -> dict:
             "co_quyen_khtd": True,
             "co_quyen_kiem_soat": True,
             "co_quyen_quan_tri": True,
-            "co_quyen_upload_hstd": False,
+            "co_quyen_upload_hstd": normalized in ("admin_cn", "manager_cn"),
         }
     # Fallback: CBTD mặc định
     return {

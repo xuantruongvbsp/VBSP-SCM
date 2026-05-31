@@ -62,7 +62,6 @@ from security import (
     init_session_security,
     check_and_handle_timeout,
     update_last_activity,
-    check_ip_and_handle,
     is_ip_allowed,
     _get_client_ip,
 )

@@ -76,7 +76,7 @@ from config import (
 
     COT_TEN_PGD, COT_SDT, COT_DIA_CHI,
 
-    COT_LAI_TON, COT_LAI_THANG, COT_DVUT, COT_TEN_XA,
+    COT_LAI_TON, COT_LAI_THANG, COT_DVUT, COT_TEN_XA, COT_TEN_TO,
 
     COT_LAI_TON_QH,
 
@@ -156,17 +156,17 @@ def _lazy_tab(name: str):
 
 
 
-@st.cache_data(ttl=300, show_spinner="Đang tính KPI...")
+@st.cache_data(ttl=300, show_spinner=False)
 
-def _kpi_pgd_list_cached(df_hash: str, pgd_user: str, _df_json: str) -> list[dict]:
+def _kpi_pgd_list_cached(df_hash: str, pgd_user: str, _df: pd.DataFrame) -> list[dict]:
 
-    """Cached version của _kpi_pgd_list — dùng hash thay vì df trực tiếp."""
+    """Cached version của _kpi_pgd_list — dùng df_hash làm key, _df không bị hash."""
 
-    # Parse lại df từ json (chỉ dùng cho cache, không dùng cho tính toán thực)
+    if _df is None or _df.empty:
 
-    df_pgd = pd.read_json(_df_json) if _df_json else pd.DataFrame()
+        return []
 
-    return _kpi_pgd_list_impl(df_pgd, pgd_user)
+    return _kpi_pgd_list_impl(_df, pgd_user)
 
 
 
@@ -337,30 +337,154 @@ def _kpi_pgd_list_impl(df_pgd: pd.DataFrame, pgd_user: str) -> list[dict]:
         tien_do = min((tong_dn / tong_kh * 100), 999.9) if tong_kh > 0 else 0.0
 
         kpi.append({
-
             "label":       "Tiến độ KHTD",
-
             "value":       f"{tien_do:.1f}%",
-
-            "delta":       fmt_ty(tong_kh),
-
-            "delta_label": "KH năm",
-
+            "delta":       None,
+            "delta_label": "",
             "icon":        "🎯",
-
             "suffix":      "",
-
             "precision":   1,
-
-            "help":        "Tỷ lệ thực hiện kế hoạch tín dụng",
-
+            "help":        f"Tỷ lệ thực hiện kế hoạch tín dụng. KH năm: {fmt_ty(tong_kh)} triệu đồng",
             "delta_color": "normal",
-
         })
 
     except Exception as e:
 
         logger.error("_kpi_pgd_list KPI4: %s", e, exc_info=True)
+
+
+
+    # ── KPI 5-8: Dư nợ Bình Quân ───────────────────────────────────────────
+
+    try:
+
+        # Đếm số lượng các nhóm
+
+        so_xa = df_pgd[COT_TEN_XA].nunique() if COT_TEN_XA in df_pgd.columns else 0
+
+        so_hoi = df_pgd[COT_DVUT].nunique() if COT_DVUT in df_pgd.columns else 0
+
+        so_to = df_pgd[COT_TEN_TO].nunique() if COT_TEN_TO in df_pgd.columns else 0
+
+        tong_so_khoan = len(df_pgd)
+
+
+
+        # KPI 5: Dư nợ BQ xã/phường
+
+        dn_bq_xa = tong_dn / so_xa if so_xa > 0 else 0.0
+
+        kpi.append({
+
+            "label":       "Dư nợ BQ xã",
+
+            "value":       fmt_ty(dn_bq_xa),
+
+            "delta":       None,
+
+            "delta_label": f"{fmt_so(so_xa)} xã",
+
+            "icon":        "🏘️",
+
+            "suffix":      "",
+
+            "precision":   1,
+
+            "help":        "Dư nợ bình quân trên mỗi xã/phường",
+
+            "delta_color": "normal",
+
+        })
+
+
+
+        # KPI 6: Dư nợ BQ hộ vay
+
+        dn_bq_ho = tong_dn / tong_so_khoan if tong_so_khoan > 0 else 0.0
+
+        kpi.append({
+
+            "label":       "Dư nợ BQ hộ",
+
+            "value":       fmt_ty(dn_bq_ho),
+
+            "delta":       None,
+
+            "delta_label": f"{fmt_so(tong_so_khoan)} khoản",
+
+            "icon":        "👥",
+
+            "suffix":      "",
+
+            "precision":   1,
+
+            "help":        "Dư nợ bình quân trên mỗi khoản vay",
+
+            "delta_color": "normal",
+
+        })
+
+
+
+        # KPI 7: Dư nợ BQ Hội (ĐVUT)
+
+        dn_bq_hoi = tong_dn / so_hoi if so_hoi > 0 else 0.0
+
+        kpi.append({
+
+            "label":       "Dư nợ BQ Hội",
+
+            "value":       fmt_ty(dn_bq_hoi),
+
+            "delta":       None,
+
+            "delta_label": f"{fmt_so(so_hoi)} Hội",
+
+            "icon":        "🏛️",
+
+            "suffix":      "",
+
+            "precision":   1,
+
+            "help":        "Dư nợ bình quân trên mỗi ĐVUT (Hội)",
+
+            "delta_color": "normal",
+
+        })
+
+
+
+        # KPI 8: Dư nợ BQ tổ
+
+        dn_bq_to = tong_dn / so_to if so_to > 0 else 0.0
+
+        kpi.append({
+
+            "label":       "Dư nợ BQ tổ",
+
+            "value":       fmt_ty(dn_bq_to),
+
+            "delta":       None,
+
+            "delta_label": f"{fmt_so(so_to)} tổ",
+
+            "icon":        "📊",
+
+            "suffix":      "",
+
+            "precision":   1,
+
+            "help":        "Dư nợ bình quân trên mỗi tổ",
+
+            "delta_color": "normal",
+
+        })
+
+
+
+    except Exception as e:
+
+        logger.error("_kpi_pgd_list KPI5-8 DNBQ: %s", e, exc_info=True)
 
 
 
@@ -374,7 +498,7 @@ def _kpi_pgd_list(df_pgd: pd.DataFrame, pgd_user: str) -> list[dict]:
 
     """
 
-    Tính 4 KPI DeltaCard cho trang chủ / sidebar PGD.
+    Tính 8 KPI DeltaCard cho trang chủ / sidebar PGD.
 
     Wrapper có cache — tự động hash dataframe.
 
@@ -382,7 +506,7 @@ def _kpi_pgd_list(df_pgd: pd.DataFrame, pgd_user: str) -> list[dict]:
 
     Returns:
 
-        List dict (kwargs cho delta_card), tối đa 4 phần tử.
+        List dict (kwargs cho delta_card), tối đa 8 phần tử.
 
     """
 
@@ -394,19 +518,7 @@ def _kpi_pgd_list(df_pgd: pd.DataFrame, pgd_user: str) -> list[dict]:
 
     df_hash = _df_hash(df_pgd)
 
-    # Convert df thành json string để serialize cho cache
-
-    try:
-
-        _df_json = df_pgd.head(1000).to_json() if len(df_pgd) > 1000 else df_pgd.to_json()
-
-    except Exception:
-
-        _df_json = ""
-
-    
-
-    return _kpi_pgd_list_cached(df_hash, pgd_user, _df_json)
+    return _kpi_pgd_list_cached(df_hash, pgd_user, df_pgd)
 
 
 
@@ -614,7 +726,7 @@ def _render_trang_chu(tab, df_pgd: pd.DataFrame, role: str, pgd_user: str, kwarg
 
 
 
-        # ── Vùng B: 4 KPI cards ────────────────────────────────────────────
+        # ── Vùng B: 8 KPI cards ────────────────────────────────────────────
 
         try:
 

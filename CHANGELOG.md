@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## [2026-06-03] — Fix bottleneck load chậm tab HỖ TRỢ ĐỊA BÀN
+- `workspaces/ws_operation.py` dòng ~159-409 — `_kpi_pgd_list`: loại bỏ `df.to_json()` chạy trên mọi rerun; thay bằng truyền DataFrame trực tiếp vào cached func qua `_df` (prefix `_` → không hash), cache key vẫn là `df_hash`
+
+## [2026-06-02] — Fix KPI Tiến độ KHTD crash do truyền string vào delta
+- `workspaces/ws_operation.py` dòng ~338 — KPI 4: `delta` từ `fmt_ty(tong_kh)` (str) → `None`; thông tin KH năm chuyển vào `help`
+
 ## [2026-06-02] — Fix ánh xạ nhóm Dashboard GQVL trong Hỗ trợ địa bàn
 - `workspaces/ws_operation.py` dòng ~5291 — thêm `📊 Dashboard GQVL` vào `ke_hoach_pgd` tabs
 - `workspaces/ws_operation.py` dòng ~5407 — xóa `📊 Dashboard GQVL` khỏi `quan_tri_pgd` tabs

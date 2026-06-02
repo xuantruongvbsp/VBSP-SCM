@@ -127,6 +127,15 @@
 
 ## B. Streamlit UI
 
+### B4 — Tab HỖ TRỢ ĐỊA BÀN load chậm (mọi rerun)
+| | |
+|---|---|
+| **File** | `workspaces/ws_operation.py` dòng ~159-409 |
+| **Dấu hiệu** | Tab Trang Chủ PGD phản hồi chậm 0.5-3s sau mọi thao tác click/tương tác |
+| **Nguyên nhân** | `_kpi_pgd_list()` gọi `df.to_json()` lên đến 1000 hàng TRƯỚC khi gọi hàm cache — to_json chạy dù cache đã có kết quả; trên cache miss còn thêm `pd.read_json()` để parse lại |
+| **Fix** | Thay `_df_json: str` bằng `_df: pd.DataFrame` (prefix `_` → Streamlit không hash); loại bỏ `to_json()` hoàn toàn; dùng `df_hash` làm cache key |
+| **Ngày fix** | 2026-06-03 |
+
 ### B2 — `StreamlitAPIException: Selectbox has no options`
 | | |
 |---|---|

@@ -503,6 +503,28 @@ if "Ten_ct" not in cols:
 df = duckdb.query(f"SELECT ... FROM '{CACHE_HSTD}'").df()
 ```
 
+### 8.18 Tóm tắt sau mỗi task — gửi Sonnet kiểm tra
+**BẮT BUỘC**: Sau khi hoàn thành MỌI task, kết thúc bằng một đoạn tóm tắt ngắn gọn để người dùng copy gửi qua Sonnet kiểm tra. Format:
+
+```
+## Tóm tắt gửi Sonnet kiểm tra
+
+### Task: [mô tả 1 dòng]
+
+**Nguyên nhân:** [gốc rễ vấn đề, 1-2 dòng]
+
+**Sửa:**
+| File | Thay đổi |
+|---|---|
+| `path/file.py` | Mô tả ngắn |
+
+**Verify:** compile OK × N, convention OK × N
+```
+
+- Chỉ liệt kê file thực sự đã sửa, không kể file chỉ đọc
+- Mô tả thay đổi ≤ 1 dòng/file
+- Nếu nhiều task trong 1 phiên → gộp chung 1 tóm tắt
+
 ---
 
 ## 9. Lỗi đã từng mắc — KHÔNG lặp lại

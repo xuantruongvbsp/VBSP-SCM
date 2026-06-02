@@ -10,7 +10,6 @@ from config import (
     COT_TEN_PGD, COT_TEN_XA, COT_TEN_CT,
     COT_MA_KH, COT_TONG_DU_NO, COT_DU_NO_QH, COT_DVUT,
 )
-from auth import is_pgd_role, is_cn_role
 from data import danh_dau_khong_hd_cached
 from utils import fmt, fmt_so, fmt_ty, vn, hien_thi_dataframe_phan_trang
 from logger import get_logger
@@ -35,17 +34,7 @@ def render(tab=None, **kwargs) -> None:
         st.markdown("**① Bộ lọc dữ liệu**")
 
         df_filtered = df.copy()
-        chon_pgd = None
-        if is_pgd_role(role) and pgd_user:
-            if COT_TEN_PGD in df.columns:
-                df_filtered = df[df[COT_TEN_PGD] == pgd_user].copy()
-            st.info(f"Dữ liệu đã lọc theo PGD: **{pgd_user}**")
-        elif is_cn_role(role):
-            if COT_TEN_PGD in df.columns:
-                ds_pgd = sorted(df[COT_TEN_PGD].dropna().unique().tolist())
-                if ds_pgd:
-                    chon_pgd = st.selectbox("Chọn Phòng Giao dịch", ds_pgd, key="op_gb_pgd")
-                    df_filtered = df[df[COT_TEN_PGD] == chon_pgd].copy()
+        current_pgd = pgd_user or kwargs.get("pgd_filter", "")
 
         if COT_TEN_XA in df_filtered.columns:
             ds_xa = sorted(df_filtered[COT_TEN_XA].dropna().unique().tolist())
@@ -63,7 +52,6 @@ def render(tab=None, **kwargs) -> None:
             return
 
         dgd_map = db.doc_dgd_map()
-        current_pgd = pgd_user if is_pgd_role(role) else chon_pgd
 
         ds_dgd = []
         chon_dgd = None

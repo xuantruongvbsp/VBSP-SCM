@@ -40,6 +40,7 @@ def duong_dan_pgd(ten_pgd: str, loai: str) -> str:
     """
     Đường dẫn file PGD theo cấu trúc mới.
     loai: "hstd" | "nq11" | "gqvl" | "cdtotkvv" → pgd_data/{slug}/{loai}_latest.xlsx
+          "hstd_khnv"  → pgd_data/{slug}/hstd_khnv.xlsx  (riêng Phòng KH-NV, tránh ghi đè bởi PGD support)
           "dienbao_ht" | "dienbao_prev" → pgd_data/{slug}/dienbao_ht.xlsx | dienbao_prev.xlsx
     """
     slug_dir = Path(PGD_DATA_DIR) / pgd_slug(ten_pgd)
@@ -47,6 +48,8 @@ def duong_dan_pgd(ten_pgd: str, loai: str) -> str:
         return str(slug_dir / "dienbao_ht.xlsx")
     if loai == "dienbao_prev":
         return str(slug_dir / "dienbao_prev.xlsx")
+    if loai == "hstd_khnv":
+        return str(thu_muc_pgd(ten_pgd) / "hstd_khnv.xlsx")
     return str(thu_muc_pgd(ten_pgd) / f"{loai}_latest.xlsx")
 
 

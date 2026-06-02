@@ -128,9 +128,9 @@ def compute_totkvv_kpi(df_raw: pd.DataFrame) -> dict:
     }
 
 
-def render_totkvv_html(kpi: dict, thang_hien: str | None = None) -> str:
+def render_totkvv_html(kpi: dict, thang_hien: str | None = None, ten_don_vi: str = "toàn Chi nhánh") -> str:
     """
-    Trả về HTML string cho card Xếp loại Tổ TK&VV toàn Chi nhánh.
+    Trả về HTML string cho card Xếp loại Tổ TK&VV.
     Gọi từ st.markdown(..., unsafe_allow_html=True).
     """
     tong_to = kpi["tong_to"]
@@ -149,7 +149,7 @@ def render_totkvv_html(kpi: dict, thang_hien: str | None = None) -> str:
     return f"""
 <div class="totkvv-wrap">
     <div class="totkvv-head">
-        <div class="totkvv-title">Xếp loại Tổ TK&amp;VV toàn Chi nhánh</div>
+        <div class="totkvv-title">Xếp loại Tổ TK&amp;VV {ten_don_vi}</div>
         <div class="totkvv-chip">{chip_text}</div>
     </div>
     <div class="totkvv-grid">

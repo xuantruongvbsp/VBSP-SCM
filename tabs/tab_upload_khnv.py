@@ -198,7 +198,9 @@ def _xu_ly_mot_file_khnv(
             )
             return loai, KetQuaUpload(True, msg, path), False, audit
         else:
-            path = _luu_pgd(ten_dv, loai, file_bytes)
+            # HSTD → lưu vào hstd_khnv.xlsx (riêng Phòng KH-NV, không bị PGD support ghi đè)
+            loai_luu = "hstd_khnv" if loai == "hstd" else loai
+            path = _luu_pgd(ten_dv, loai_luu, file_bytes)
             can_merge = loai in ("hstd", "nq11", "gqvl")
             msg = f"✅ {ten_hien} ({mb:.1f} MB) · DQ {dq_pct}%"
             audit = ("upload_pgd_khnv", f"{loai.upper()} — {ten_dv} ({mb:.1f} MB)")
@@ -366,7 +368,9 @@ def _xu_ly_import_folder(danh_sach: list[dict], username: str) -> None:
                     # Ghi chú vào row để hiển thị cảnh báo sau
                     r["canh_bao"] = "⚠️ Không đọc được tháng — chỉ lưu latest"
             else:
-                _ghi_file_pgd(r["ten_pgd"], r["loai"], data)
+                # HSTD → lưu vào hstd_khnv.xlsx (riêng Phòng KH-NV)
+                loai_luu = "hstd_khnv" if r["loai"] == "hstd" else r["loai"]
+                _ghi_file_pgd(r["ten_pgd"], loai_luu, data)
                 audit = (
                     "folder_import_file",
                     f"{r['loai'].upper()} — {r['ten_pgd']} ({r['ten_file']})",
@@ -712,7 +716,9 @@ def _render_upload_hang_loat(role: str, username: str) -> None:
                     "⚠️ Trùng — sẽ import (file này)",
                 )
 
-                path_ht = duong_dan_pgd(ten_pgd, loai.lower())
+                # HSTD → so sánh với hstd_khnv.xlsx (file riêng của Phòng KH-NV)
+                loai_so_sanh = "hstd_khnv" if loai.lower() == "hstd" else loai.lower()
+                path_ht = duong_dan_pgd(ten_pgd, loai_so_sanh)
                 if not os.path.exists(path_ht):
                     so_sanh = "🆕 Chưa có"
                     md5_co_the_import = True
@@ -851,16 +857,22 @@ def _xoa_du_lieu_pgd(ten_pgd: str, loai: str, username: str) -> tuple[bool, str]
     """
     import socket
     hostname = socket.gethostname()
-    path_excel   = Path(duong_dan_pgd(ten_pgd, loai))
-    path_parquet = path_excel.with_suffix(".parquet")
+    # Với HSTD: xóa cả hstd_latest.xlsx (PGD support) lẫn hstd_khnv.xlsx (Phòng KH-NV)
+    paths_can_xoa = [Path(duong_dan_pgd(ten_pgd, loai))]
+    if loai == "hstd":
+        paths_can_xoa.append(Path(duong_dan_pgd(ten_pgd, "hstd_khnv")))
 
-    if not path_excel.exists():
+    path_excel = paths_can_xoa[0]
+    if not any(p.exists() for p in paths_can_xoa):
         return False, f"Không tìm thấy file {loai.upper()} của {ten_pgd}"
 
     try:
-        path_excel.unlink()
-        if path_parquet.exists():
-            path_parquet.unlink()
+        for p in paths_can_xoa:
+            if p.exists():
+                p.unlink()
+            pq = p.with_suffix(".parquet")
+            if pq.exists():
+                pq.unlink()
         db.ghi_audit(username, "xoa_du_lieu_pgd",
                      f"[{hostname}] {loai.upper()} — {ten_pgd}")
         return True, f"✅ Đã xóa {loai.upper()} — {ten_pgd}"

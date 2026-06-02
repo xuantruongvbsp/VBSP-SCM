@@ -54,14 +54,18 @@ def render_export_panel(
     
     with col1:
         if st.button("📊 Xuất Excel", type="primary", key=f"btn_xl_{key_suffix}"):
-            buf = xuat_excel({sheet_name: df_export})
-            state.downloads.set(
-                f"bc_excel_{key_suffix}",
-                buf,
-                ten_file_bao_cao(prefix_file),
-            )
-            ghi_audit(username, "xuat_excel", f"{tieu_de} - Excel")
-            st.success("✅ Đã tạo file Excel!")
+            try:
+                buf = xuat_excel({sheet_name: df_export})
+                state.downloads.set(
+                    f"bc_excel_{key_suffix}",
+                    buf,
+                    ten_file_bao_cao(prefix_file),
+                )
+                ghi_audit(username, "xuat_excel", f"{tieu_de} - Excel")
+                st.success("✅ Đã tạo file Excel!")
+            except Exception as e:
+                logger.error("export_panel: lỗi tạo Excel — %s", e, exc_info=True)
+                st.error(f"❌ Lỗi tạo Excel: {e}")
         
         if state.downloads.has(f"bc_excel_{key_suffix}"):
             st.download_button(

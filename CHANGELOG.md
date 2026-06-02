@@ -1,5 +1,108 @@
 # CHANGELOG
 
+## [2026-06-02] — Fix ánh xạ nhóm Dashboard GQVL trong Hỗ trợ địa bàn
+- `workspaces/ws_operation.py` dòng ~5291 — thêm `📊 Dashboard GQVL` vào `ke_hoach_pgd` tabs
+- `workspaces/ws_operation.py` dòng ~5407 — xóa `📊 Dashboard GQVL` khỏi `quan_tri_pgd` tabs
+
+## [2026-06-02] — Port sidebar accordion KH-NV sang Hỗ trợ địa bàn
+- `workspaces/ws_operation.py` dòng ~4008 — `_WS_OP_MENU_ITEMS`: cấu trúc lại sang dict format với `group` + `children`, hỗ trợ flat item và accordion
+- `workspaces/ws_operation.py` dòng ~4087 — thêm `_GROUP_COLORS` 6 nhóm màu
+- `workspaces/ws_operation.py` dòng ~4096 — `_GROUP_KEY_MAP`: ánh xạ group name → CAC_NHOM key
+- `workspaces/ws_operation.py` dòng ~4106 — `render_sidebar_menu`: viết lại giống hệt ws_management (flat button + accordion ▸/▾ + ↳ children + ● active + orange bar)
+- `workspaces/ws_operation.py` dòng ~5421 — `render()`: `_tab_label_fns` luôn include trang_chu items, xóa `_SIDEBAR_LABEL_MAP` hack
+
+## [2026-06-02] — Fix "22 PGD chưa có dữ liệu" trong tab Tổng quan CT phân hệ Hỗ trợ địa bàn
+- `tabs/tab_tongquan.py` dòng ~662 — khi `pgd_user` set, lọc `df` chỉ giữ dòng của PGD đó trước khi tính bảng tổng quát
+- `tabs/tab_tongquan.py` dòng ~759 — `pgd_thieu_bang`: khi `pgd_user` set, chỉ kiểm tra chính PGD đó thay vì toàn bộ DS_PGD (22 đơn vị)
+- `tabs/tab_tongquan.py` dòng ~772 — khi `pgd_user` set và thiếu dữ liệu, dùng `st.caption` nhẹ thay vì `st.warning` dài
+
+## [2026-06-02] — Fix lỗi xử lý đến hạn: lambda params sai + thiếu pd.to_numeric
+- `tabs/tab_tongquan.py` dòng ~1547 — `_make_renderer`: bỏ default params `_den=den, _lbl=lbl, _key=key` và `_key=key` khỏi lambdas → `lazy_tabs` thấy `n_params=0` và gọi `renderer()` đúng; trước đó `n_params=3` khiến `renderer(st.container())` truyền DeltaGenerator làm `den_ngay`, gây lỗi khi so sánh
+- `services/tongquan_service.py` dòng ~97, ~351 — `tinh_co_cau_ct` và `loc_du_no_duong`: bọc `pd.to_numeric(..., errors="coerce")` trước `fillna(0) > 0` để bảo vệ khi cột có dtype=object (cùng pattern CHANGELOG 30/06/2026)
+
+## [2026-06-02] — Fix card Xếp loại Tổ TK&VV hiện toàn CN thay vì PGD tại phân hệ Hỗ trợ địa bàn
+- `tabs/tab_tongquan.py` dòng ~420 — khi `pgd_user` set, lọc `cdto["df_raw"]` theo PGD trước khi tính KPI và render HTML card; title cũng đổi sang tên PGD thay vì "toàn Chi nhánh"
+- `services/tongquan_cdto_service.py` dòng ~131 — thêm param `ten_don_vi` vào `render_totkvv_html()` để title linh hoạt theo đơn vị
+
+## [2026-06-02] — Fix IndentationError trong tab_tracuu.py (backslash + blank line)
+- `tabs/tab_tracuu.py` dòng 771, 1076, 1080, 1116, 1170 — thay `\` line continuation có blank line bằng parentheses để tránh IndentationError
+
+## [2026-06-02] — Fix sidebar navigation "đang được phát triển" do label mismatch
+- `workspaces/ws_operation.py` dòng ~5372 — thêm `_SIDEBAR_LABEL_MAP` để dịch label tắt từ sidebar ("📤 Upload", "🔍 Tra cứu", "📝 Giao ban", "🚨 Cảnh báo TD") sang đúng label trong CAC_NHOM trước khi lookup `_tab_label_fns`
+
+## [2026-06-02] — Fix NameError: state not defined trong ws_operation.py
+- `workspaces/ws_operation.py` dòng ~5546 — 19 dòng bị tuột indentation xuống module level (0 space thay vì 4 space), khiến `state`, `CAC_NHOM`, `nhom_duoc_phep` ra ngoài scope của `render()`; sửa bằng cách thêm 4 spaces cho toàn bộ block
+
+## [2026-06-02] — Fix import errors tab Tra cứu v2 + components mới
+- `config.py` dòng ~389 — thêm `COT_LAI_DA_TRA = "Lãi đã trả"` (thiếu trong codebase)
+- `tabs/tab_tracuu_v2.py` — sửa 5 import lỗi: bỏ `COT_GOC_TRA_GOC_DA_TRA`/`CACHE_NQ11_SHEET` (không tồn tại); sửa `doc_nq11_sheet`→`doc_nq11_toan_cn_pgd`, `doc_sao_ke_gqvl`→`doc_gqvl_toan_cn`; sửa `from loan_drawer`→`from components.loan_drawer`; bỏ import `nut_xuat_pdf` không dùng
+- `components/filter_panel.py` — chuyển import COT_* từ cuối file lên đầu; gộp `COT_DU_NO_KHOANH` vào block import chính
+
+## [2026-06-02] — Fix sidebar luôn nhận df=None (alert NQH/KHĐ không hiển thị)
+- `app.py` dòng ~309–341 — cả ws_management lẫn ws_operation sidebar đều dùng `locals().get("df")` trước khi data load → luôn None; sửa thành `st.session_state.get("_ctx", {}).get("df")` để nhận df từ cache session state sau lần chạy đầu tiên
+- `workspaces/ws_operation.py` — xóa dead import `lazy_tabs` (không còn dùng sau refactor sidebar)
+
+## [2026-06-02] — Refactor giao diện Hỗ trợ địa bàn sang st.sidebar (giống KH-NV)
+- `workspaces/ws_operation.py` — thêm `_WS_OP_MENU_GROUPS`, `_WS_OP_GROUP_COLORS`, `render_sidebar_menu()` (module-level); xóa toàn bộ `col_sidebar` fake sidebar (cảnh báo nhanh, quick actions, nhiệm vụ) khỏi `render()`; thay `st.radio` + `lazy_tabs` bằng điều hướng qua `state.nav_ws_op_menu` → render trực tiếp tab đang chọn
+- `state_manager.py` — thêm `nav_ws_op_menu` property
+- `app.py` — thêm `workspaces.ws_operation.render_sidebar_menu()` khi workspace = operation (song song với ws_management)
+
+## [2026-06-02] — Fix TypeError: Invalid comparison between dtype=str and int
+- `tabs/tab_danhsach.py` dòng 39 — bọc `pd.to_numeric(..., errors="coerce")` trước `fillna(0) > 0` cho `COT_TONG_DU_NO`
+- `tabs/tab_tracuu.py` dòng 539, 545, 556, 559 — 4 chỗ so sánh `fillna(0) > 0` trên `COT_TONG_DU_NO` / `COT_DU_NO_QH` không có `pd.to_numeric` bảo vệ
+- `workspaces/ws_operation.py` dòng 484, 495 — 2 chỗ so sánh `COT_DU_NO_QH > 0` trực tiếp trong `_render_trang_chu`
+
+## [2026-06-02] — Fix lazy_tabs nuốt TypeError của renderer khiến lỗi bị mask
+- `utils.py` dòng ~674 — `lazy_tabs()`: tách `inspect.signature()` ra khỏi renderer call; `except (ValueError, TypeError)` chỉ bắt lỗi từ inspect, không bắt lỗi bên trong lambda → `TypeError: lambda() missing 1 required positional argument: 'tab'` không còn xảy ra do fallback `renderer()` sai
+
+## [2026-06-02] — Fix lỗi nút in báo cáo không phản hồi trong phân hệ Hỗ trợ địa bàn
+- `workspaces/ws_operation.py` dòng ~1293 — `_render_bao_cao_giao_ban`: chuyển `st.download_button(data=xuat_excel_chuyen_nghiep(...))` và `download_pdf_button(pdf_bytes=xuat_pdf_co_chart(...))` từ unconditional (gọi mỗi lần render) sang lazy generation (chỉ gọi khi bấm nút "Tạo"); thêm `try/except` + `st.error()` khi có lỗi; dùng `st.session_state` lưu bytes để tránh regenerate
+- `workspaces/ws_operation.py` dòng ~1759 — `_render_heatmap_dao_han`: tương tự, chuyển `st.download_button(data=xuat_excel_chuyen_nghiep(...))` sang lazy generation
+- `app.py` dòng ~515 — đổi tên biến `df_sk_gqvl` → `df_gqvl` trong ctx dict (khớp với key `tab_baocao` và `tab_tracuu` mong đợi)
+- `tabs/tab_tracuu.py` — cập nhật `_xay_gqvl_nq11_set(df_sk_gqvl)` → `df_gqvl` đồng bộ với app.py
+- `tabs/tab_baocao/components/export_panel.py` — thêm `try/except` cho nút "Xuất Excel" (trước chỉ có cho PDF)
+
+## [2026-06-02] — Phân hệ Hỗ trợ địa bàn: Xóa selectbox Chọn PGD, tự nhận diện từ file upload
+- `workspaces/ws_operation.py` dòng ~1350-1365 — xóa `ws_op_pgd_filter` session state + selectbox "Chọn PGD" khỏi sidebar; `pgd_filter` chỉ còn là `pgd_user` (None cho CN role); `_ten_hien_thi` đổi từ `"—"` → `"Toàn địa bàn"` cho CN role; bỏ lọc df theo `pgd_filter` cho CN role → df_pgd = toàn bộ dữ liệu PGD
+- `tabs/tab_upload_pgd.py` dòng ~246 — `_render_upload_form()`: hỗ trợ `ten_dv=None` → tự động đọc PGD từ file bằng `_lay_ten_don_vi_trong_file()` + `_TEN_DV_ALIAS`; hiển thị "PGD tự động nhận diện từ file" sau khi detect; dùng `ten_dv_resolved` thay cho `ten_dv` trong `_xu_ly_upload()`
+- `tabs/tab_upload_pgd.py` dòng ~540 — CN role: bỏ selectbox `"🏢 Chọn PGD cần upload"`; thay bằng `ten_dv_upload=None` + info "tự động nhận diện PGD từ nội dung file upload"; `prefix_base` cố định `"pgd_op_cn"`; bỏ guard `if ten_dv_upload:` để tabs luôn hiển thị
+
+## [2026-06-01] — Tối ưu tốc độ merge 22 PGD (tab Upload KH-NV)
+- `data/core.py` dòng ~107 — `excel_to_parquet()`: chỉ `_normalize_code_series()` khi dtype sai (int64/float64); bỏ qua nếu đã là object → không lặp lại 22×N_code_cols normalize khi cache hit
+- `services/upload_service.py` dòng ~500 — schema normalization: thay for-loop lồng O(22×N_cols) bằng `df.reindex(columns=all_cols)` vectorized
+- `services/upload_service.py` dòng ~538 — string column loop: precompute `_BAD_VALS_LIST` 1 lần ngoài vòng lặp; thêm probe 200 dòng trước `pd.to_numeric()` toàn cột → bỏ qua cột text thuần (Tên KH, Địa chỉ...)
+- `services/upload_service.py` dòng ~458 — tăng `ThreadPoolExecutor(max_workers=8)` → `min(len(tat_ca_dv), 12)` cho IO-bound
+
+## [2026-06-01] — Fix lỗi KPI crash do dtype mất khi serialize DataFrame
+- `workspaces/ws_operation.py` — bỏ `_df_hash` + JSON roundtrip trong `_kpi_pgd_list_cached`; truyền `df_pgd` thẳng vào `@st.cache_data` (Streamlit tự hash); xóa import thừa `hashlib`, `StringIO`
+
+## [2026-06-01] — Fix 2 bug sau tái cấu trúc ws_operation
+- `auth.py` — thêm `"trang_chu"` vào đầu tất cả 6 danh sách `nhom_duoc_phep` trong `get_tab_permissions()` → nhóm Trang Chủ bị ẩn hoàn toàn trước khi fix
+- `tabs/tab_den_han.py` dòng ~184 — thêm guard `if loc_ct != "Tất cả"` cho filter Chương trình; bỏ `with col_f4:` thừa bao ngoài → khi chọn "Tất cả" không bị filter trống kết quả
+
+## [2026-06-01] — Tách lưu trữ HSTD giữa 2 phân hệ, chống ghi đè nhau
+- `data/pgd.py` — thêm loai `"hstd_khnv"` vào `duong_dan_pgd()` → `pgd_data/{slug}/hstd_khnv.xlsx`
+- `tabs/tab_upload_khnv.py` — 4 điểm: upload đơn lẻ, folder import, so sánh MD5, xóa file đều dùng `"hstd_khnv"` thay vì `"hstd"` cho Phòng KH-NV
+- `services/upload_service.py` — thêm `_path_merge()` bên trong `merge_du_lieu_toan_cn`: ưu tiên `hstd_khnv.xlsx` trước, fallback `hstd_latest.xlsx` — merge không bị ảnh hưởng khi PGD support ghi đè
+
+## [2026-06-01] — Rà soát & Tái cấu trúc Phân hệ Hỗ trợ Địa bàn PGD
+- `tabs/tab_bao_cao_giao_ban_pgd.py` — bỏ bộ lọc PGD thừa (selectbox "Chọn Phòng Giao dịch" cho CN role) vì workspace đã lọc PGD từ trên; bỏ `st.info` PGD role không cần thiết; gộp `current_pgd` từ `pgd_user or pgd_filter`
+- `tabs/tab_den_han.py` — bỏ bộ lọc PGD thừa trong tab khi `pgd_user` hoặc `pgd_filter` đã được xác định; thêm nhận `pgd_filter` từ kwargs; áp dụng cho cả phần filter chính và PDF export
+- `tabs/tab_danhsach.py` — bỏ filter `COT_TEN_PGD` dư thừa (df đã được lọc trước khi truyền vào)
+- `tabs/tab_don_doc_khd.py` — bổ sung bộ lọc Xã + Tổ trưởng (ngoài Hội đoàn thể hiện có); layout 4 cột: Xã | HĐT | Tổ trưởng | Xuất Excel; cập nhật label xuất Excel theo tất cả bộ lọc
+- `tabs/tab_canh_bao_som_pgd.py` — bổ sung bộ lọc Hội đoàn thể + Tổ trưởng cho danh sách Amber (ngoài Xã hiện có); layout 4 cột đồng nhất
+- `workspaces/ws_operation.py` — Tái cấu trúc nhóm tab: 6→9 nhóm, phân tách rõ ràng hơn: `tac_nghiep` (5 tab), `phan_tich` (4 tab mới: Dự phóng/So sánh/Xu hướng/GQVL), `bao_cao_giao_ban` (6 tab), `mau_bieu` (5 tab mới: Mẫu biểu/Template/Theo dõi nhập/Tiến độ/Checklist), `ke_hoach_pgd` (6 tab), `kiem_soat_rr` (6 tab, gộp 2 tab Nợ Khoanh → 1), `dia_ban` (3 tab mới: CBTD/Điểm GD/Ban ĐD), `quan_tri` (7 tab, gộp 2 tab Upload → 1); cập nhật shortcut & alerts trong Trang Chủ
+- `auth.py` — cập nhật `nhom_duoc_phep` cho tất cả role: thêm `tac_nghiep`, `phan_tich`, `mau_bieu`, `dia_ban`, `quan_tri`; bỏ `nghiep_vu_pgd`, `quan_tri_pgd`
+
+## [2026-06-01] — Fix UX ws_operation: bỏ "Toàn Chi nhánh", bắt buộc chọn PGD
+- `workspaces/ws_operation.py` dòng ~1368 — đổi selectbox từ `["Toàn Chi nhánh"] + ds_pgd_all` → `ds_pgd_all`; đổi nhãn từ "🔎 Xem theo PGD" → "📍 Chọn PGD cần hỗ trợ:"; title tự động hiện tên PGD đang chọn thay vì hardcode "PGD/Biên Hòa"
+
+## [2026-06-01] — Fix ws_operation không load pgd_data cho CN role mới
+- `app.py` dòng ~461 — đổi `elif role in ("admin", "manager")` → `elif la_phan_he_cn(role)`; sửa bug CN role mới (admin_cn/manager_cn/chuyenvien_cn) không được load dữ liệu từ `pgd_data/*/hstd_latest.xlsx` khi vào phân hệ hỗ trợ địa bàn
+
+## [2026-06-01] — Fix lỗi validation "Upload nhầm đơn vị" cho Hội sở
+- `tabs/tab_upload_pgd.py` dòng ~195 — thêm bảng alias `_TEN_DV_ALIAS`; hàm `_kiem_tra_don_vi()` áp alias trước khi so sánh tên đơn vị; xóa regex `chuan_hoa_ten` bị lỗi (xóa từ "hội/sở/chi/nhánh/tỉnh" khiến tên Hội sở so sánh thành chuỗi rỗng)
+
 ## [2026-06-01] — Xóa dead code ws_operation.py
 - `workspaces/ws_operation.py` — xóa 666 dòng dead code: `_render_don_doc`, `_render_canh_bao_som_pgd_full`, `_render_kiem_soat_noi_bo_pgd`, `_heatmap_rui_ro_xa`, `_render_dashboard_nang_cao_pgd` (đã migrate sang tab files riêng)
 

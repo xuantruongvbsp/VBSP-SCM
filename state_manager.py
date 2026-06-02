@@ -260,6 +260,14 @@ class SCMStateManager:
     def nav_ws_op_jump_tab(self, value: Optional[int]) -> None:
         self._nav_ns()["ws_op_jump_tab"] = value
 
+    @property
+    def nav_ws_op_menu(self) -> str:
+        return self._nav_ns().get("ws_op_menu", "")
+
+    @nav_ws_op_menu.setter
+    def nav_ws_op_menu(self, value: str) -> None:
+        self._nav_ns()["ws_op_menu"] = value
+
     # ── Domain: Workspace ────────────────────────────────────────
     # Giữ nguyên attribute style của Streamlit để backward-compatible
 

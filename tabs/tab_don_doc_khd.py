@@ -4,7 +4,7 @@ from __future__ import annotations
 import streamlit as st
 import pandas as pd
 
-from config import COT_TEN_XA, COT_DVUT, COT_TEN_KH, COT_SO_KU, COT_TEN_CT, COT_LAI_TON
+from config import COT_TEN_XA, COT_DVUT, COT_TEN_KH, COT_SO_KU, COT_TEN_CT, COT_LAI_TON, COT_TEN_TO_TRUONG
 from data import danh_dau_khong_hd_cached, tong_hop_khong_hd_cached, ds_chi_tiet_khong_hd
 from utils import fmt, fmt_so, fmt_ty, hien_thi_dataframe_phan_trang
 from components.loan_drawer import loan_detail_drawer
@@ -61,23 +61,45 @@ def render(tab=None, **kwargs) -> None:
     st.divider()
 
     st.markdown("**📋 Danh sách hộ cần đôn đốc**")
-    col_loc, col_xuat = st.columns([2, 1])
+    col_xa, col_dvut, col_to, col_xuat = st.columns([1, 1, 1, 1])
 
-    with col_loc:
+    with col_xa:
+        ds_xa = ["Tất cả"]
+        if COT_TEN_XA in df_kh.columns:
+            ds_xa += sorted(df_kh[COT_TEN_XA].dropna().unique().tolist())
+        chon_xa = st.selectbox("Lọc Xã", ds_xa, key="op_khd_xa")
+
+    with col_dvut:
         ds_dvut = ["Tất cả"]
         if COT_DVUT in df_kh.columns:
             ds_dvut += sorted(df_kh[COT_DVUT].dropna().unique().tolist())
         chon_dvut = st.selectbox("Lọc Hội đoàn thể", ds_dvut, key="op_khd_dvut")
 
-    gia_tri = None if chon_dvut == "Tất cả" else chon_dvut
-    df_dondoc = ds_chi_tiet_khong_hd(df_kh, nhom_theo=COT_DVUT, gia_tri_nhom=gia_tri)
+    with col_to:
+        ds_to = ["Tất cả"]
+        if COT_TEN_TO_TRUONG in df_kh.columns:
+            ds_to += sorted(df_kh[COT_TEN_TO_TRUONG].dropna().unique().tolist())
+        chon_to = st.selectbox("Lọc Tổ trưởng", ds_to, key="op_khd_to")
+
+    df_dondoc = ds_chi_tiet_khong_hd(df_kh)
+    bo_loc = []
+    if chon_xa != "Tất cả" and COT_TEN_XA in df_dondoc.columns:
+        df_dondoc = df_dondoc[df_dondoc[COT_TEN_XA] == chon_xa]
+        bo_loc.append(str(chon_xa))
+    if chon_dvut != "Tất cả" and COT_DVUT in df_dondoc.columns:
+        df_dondoc = df_dondoc[df_dondoc[COT_DVUT] == chon_dvut]
+        bo_loc.append(str(chon_dvut))
+    if chon_to != "Tất cả" and COT_TEN_TO_TRUONG in df_dondoc.columns:
+        df_dondoc = df_dondoc[df_dondoc[COT_TEN_TO_TRUONG] == chon_to]
+        bo_loc.append(str(chon_to))
+    loc_label = " - ".join(bo_loc) if bo_loc else "Tất cả"
 
     with col_xuat:
         st.markdown("<br>", unsafe_allow_html=True)
         if not df_dondoc.empty:
             from services.excel_service import xuat_excel_chuyen_nghiep, ten_file_xuat as excel_ten_file
             kpi_don_doc = [
-                ("Số hộ KHĐ", fmt_so(len(df_dondoc)), f"Lọc: {chon_dvut}"),
+                ("Số hộ KHĐ", fmt_so(len(df_dondoc)), f"Lọc: {loc_label}"),
             ]
             if COT_LAI_TON in df_dondoc.columns:
                 kpi_don_doc.append(("Lãi tồn", fmt_ty(df_dondoc[COT_LAI_TON].sum()), "triệu đồng"))
@@ -87,7 +109,7 @@ def render(tab=None, **kwargs) -> None:
                 data=xuat_excel_chuyen_nghiep(
                     df=df_dondoc,
                     title="Danh sách Đôn đốc 3 tháng KHĐ",
-                    subtitle=f"PGD: {pgd_user} - {chon_dvut}",
+                    subtitle=f"PGD: {pgd_user} - {loc_label}",
                     nguoi_xuat=st.session_state.get("txt_username", ""),
                     kpi_items=kpi_don_doc,
                 ),

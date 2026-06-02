@@ -66,7 +66,8 @@ def render(tab=None, role: str = None, **kwargs) -> None:
     )
 
     pgd_user = kwargs.get("pgd_user")
-    _pgd_filter = pgd_user if la_phan_he_pgd(role) else None
+    pgd_filter = kwargs.get("pgd_filter")
+    _pgd_filter = pgd_user or pgd_filter
 
     # ── Chế độ xem ──────────────────────────────────────────────────
     key_prefix = kwargs.get("key_prefix", "dh_")
@@ -127,7 +128,9 @@ def render(tab=None, role: str = None, **kwargs) -> None:
 
     col_f2, col_f3, col_f4, col_f5, col_f6 = st.columns(5)
     with col_f2:
-        if not la_phan_he_pgd(role) and COT_TEN_PGD in df_tinh.columns:
+        if _pgd_filter:
+            loc_pgd = "Tất cả"
+        elif not la_phan_he_pgd(role) and COT_TEN_PGD in df_tinh.columns:
             ds_pgd_f = sorted(df_tinh[COT_TEN_PGD].dropna().unique().tolist())
             loc_pgd = _selectbox_safe("Lọc PGD", ["Tất cả"] + ds_pgd_f, key=f"{key_prefix}den_han_loc_pgd")
         else:
@@ -178,7 +181,7 @@ def render(tab=None, role: str = None, **kwargs) -> None:
             )
         else:
             loc_dvut = "Tất cả"
-    with col_f4:
+    if loc_ct != "Tất cả" and COT_TEN_CT in df_tinh_filtered.columns:
         df_tinh_filtered = df_tinh_filtered[df_tinh_filtered[COT_TEN_CT] == loc_ct]
     if loc_dvut != "Tất cả" and COT_DVUT in df_tinh_filtered.columns:
         df_tinh_filtered = df_tinh_filtered[df_tinh_filtered[COT_DVUT] == loc_dvut]
@@ -435,7 +438,7 @@ def render(tab=None, role: str = None, **kwargs) -> None:
         )
     with col_g2:
         loc_pgd_pdf = ""
-        if not la_phan_he_pgd(role) and COT_TEN_PGD in df_loc.columns:
+        if not _pgd_filter and not la_phan_he_pgd(role) and COT_TEN_PGD in df_loc.columns:
             ds_pgd_pdf = sorted(df_loc[COT_TEN_PGD].dropna().unique().tolist())
             loc_pgd_pdf = st.selectbox(
                 "Lọc PGD", [""] + ds_pgd_pdf,

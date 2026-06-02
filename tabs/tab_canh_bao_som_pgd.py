@@ -7,7 +7,7 @@ from datetime import datetime
 
 from config import (
     COT_TEN_XA, COT_DVUT, COT_TEN_KH, COT_SO_KU, COT_TEN_CT,
-    COT_LAI_TON, COT_LAI_THANG, COT_LAI_TON_QH,
+    COT_LAI_TON, COT_LAI_THANG, COT_LAI_TON_QH, COT_TEN_TO_TRUONG,
     TEMPLATES_DIR,
 )
 from data import danh_dau_khong_hd_cached, tong_hop_khong_hd_cached, canh_bao_migration_cached
@@ -74,19 +74,33 @@ def render(tab=None, **kwargs) -> None:
 
     st.markdown("**⚠️ Danh sách sắp chuyển 03 tháng không hoạt động — Đang tồn lãi 2–3 tháng (cần đôn đốc ngay)**")
     if not df_amber.empty:
-        col_amber_loc, col_amber_xuat = st.columns([2, 1])
-        with col_amber_loc:
+        col_a_xa, col_a_dvut, col_a_to, col_a_xuat = st.columns([1, 1, 1, 1])
+        with col_a_xa:
             if COT_TEN_XA in df_amber.columns:
                 ds_xa = ["Tất cả"] + sorted(df_amber[COT_TEN_XA].dropna().unique().tolist())
                 loc_xa_a = st.selectbox("Lọc Xã", ds_xa, key="pgd_amber_xa")
             else:
                 loc_xa_a = "Tất cả"
-        with col_amber_xuat:
-            st.markdown("<br>", unsafe_allow_html=True)
-            if COT_TEN_XA in df_amber.columns and loc_xa_a != "Tất cả":
-                df_amber_loc = df_amber[df_amber[COT_TEN_XA] == loc_xa_a]
+        with col_a_dvut:
+            if COT_DVUT in df_amber.columns:
+                ds_dvut = ["Tất cả"] + sorted(df_amber[COT_DVUT].dropna().unique().tolist())
+                loc_dvut_a = st.selectbox("Lọc Hội đoàn thể", ds_dvut, key="pgd_amber_dvut")
             else:
-                df_amber_loc = df_amber
+                loc_dvut_a = "Tất cả"
+        with col_a_to:
+            if COT_TEN_TO_TRUONG in df_amber.columns:
+                ds_to = ["Tất cả"] + sorted(df_amber[COT_TEN_TO_TRUONG].dropna().unique().tolist())
+                loc_to_a = st.selectbox("Lọc Tổ trưởng", ds_to, key="pgd_amber_to")
+            else:
+                loc_to_a = "Tất cả"
+        with col_a_xuat:
+            df_amber_loc = df_amber
+            if loc_xa_a != "Tất cả" and COT_TEN_XA in df_amber.columns:
+                df_amber_loc = df_amber_loc[df_amber_loc[COT_TEN_XA] == loc_xa_a]
+            if loc_dvut_a != "Tất cả" and COT_DVUT in df_amber.columns:
+                df_amber_loc = df_amber_loc[df_amber_loc[COT_DVUT] == loc_dvut_a]
+            if loc_to_a != "Tất cả" and COT_TEN_TO_TRUONG in df_amber.columns:
+                df_amber_loc = df_amber_loc[df_amber_loc[COT_TEN_TO_TRUONG] == loc_to_a]
             buf_a = xuat_excel({"SapChuyen3mKHD": df_amber_loc})
             st.download_button(
                 f"⬇️ Xuất Excel Amber ({len(df_amber_loc)} món)",

@@ -246,6 +246,36 @@
 | **Load time** | Giảm từ 8-12s → 2-3s |
 | **Ngày fix** | 2026-05-24 |
 
+### B14 — Lambda params với default values khiến `lazy_tabs` truyền sai tham số
+| | |
+|---|---|
+| **File** | `tabs/tab_tongquan.py` → `_make_renderer()` dòng ~1547 |
+| **Dấu hiệu** | `TypeError: '>' not supported between instances of 'function' and 'int'` khi render phần "Hồ sơ đến hạn — Tổng hợp" |
+| **Nguyên nhân** | Lambda dạng `lambda _den=den, _lbl=lbl, _key=key: ...` có `n_params=3` → `lazy_tabs` gọi `renderer(st.container())` → DeltaGenerator gán vào `_den` thay vì Timestamp; lỗi bị ẩn bởi `lazy_tabs` cũ nhưng expose sau B13 được fix |
+| **Fix** | Bỏ default params khỏi lambdas: `lambda: _bang_den_han(...)` — `_make_renderer` là function riêng nên closure bắt đúng `den`/`lbl`/`key` mà không cần default params |
+| **Nguyên tắc** | Default params trong lambda chỉ cần thiết khi lambda định nghĩa trong vòng lặp (tránh late binding). Khi đã bọc trong function riêng, dùng closure bình thường. |
+| **Ngày fix** | 2026-06-02 |
+
+### B13 — `lazy_tabs` nuốt TypeError của renderer → lỗi bị mask thành "missing argument: 'tab'"
+| | |
+|---|---|
+| **File** | `utils.py` → `lazy_tabs()` dòng ~674 |
+| **Dấu hiệu** | `TypeError: render.<locals>.<lambda>() missing 1 required positional argument: 'tab'` — lỗi thật bên trong lambda bị ẩn |
+| **Nguyên nhân** | `try: inspect.signature(); renderer(st.container()); except (ValueError, TypeError): renderer()` — `except` bắt cả TypeError từ BÊN TRONG lambda; fallback gọi `renderer()` không có `tab` → sinh lỗi "missing argument" che khuất lỗi gốc |
+| **Fix** | Tách `inspect.signature` ra ngoài try/except riêng: `try: n_params = len(inspect.signature(r).parameters); except ...: n_params = 0` → sau đó gọi `renderer(st.container())` hoặc `renderer()` bên ngoài try/except |
+| **Pattern nguy hiểm** | `except TypeError: fn()` trong generic dispatch bắt lỗi từ bên trong `fn`, không chỉ từ bước setup — mọi TypeError bên trong fn đều bị nuốt và gọi lại fn theo cách sai |
+| **Ngày fix** | 2026-06-02 |
+
+### B12 — Nút in báo cáo không phản hồi / app treo (unconditional generation)
+| | |
+|---|---|
+| **File** | `workspaces/ws_operation.py` — `_render_bao_cao_giao_ban` (~dòng 1293), `_render_heatmap_dao_han` (~dòng 1759); `tabs/tab_baocao/components/export_panel.py` |
+| **Dấu hiệu** | Bấm nút "Xuất Excel" / "Xuất PDF" không có phản hồi; app treo vài giây hoặc crash âm thầm khi dependency lỗi |
+| **Nguyên nhân** | `st.download_button(data=xuat_excel_chuyen_nghiep(...))` / `download_pdf_button(pdf_bytes=xuat_pdf_co_chart(...))` gọi hàm tạo file **mỗi lần Streamlit rerun** — kể cả khi user chưa bấm nút. Nếu hàm export throw exception → crash thầm lặng (không có try/except). |
+| **Fix** | Tách 2 bước: (1) Button "Tạo file" → gọi hàm → lưu bytes vào `st.session_state`; (2) `st.download_button(data=st.session_state[...])` chỉ render khi bytes đã có. Thêm `try/except` + `logger.error()` + `st.error()` quanh bước tạo file. |
+| **Pattern chuẩn** | `if st.button("Tạo"): st.session_state["_key"] = gen_bytes()` → `if st.session_state.get("_key"): st.download_button(data=st.session_state["_key"])` |
+| **Ngày fix** | 2026-06-02 |
+
 ---
 
 ## C. Dữ liệu / DataFrame
@@ -449,6 +479,15 @@
 | **Fix** | Dùng version counter trong key: `key=f"upload_{_ver}"` → tăng `_ver` sau mỗi lần import thành công để widget reset |
 | **Ngày fix** | 2026-05-17 |
 
+### E7 — "Upload nhầm đơn vị" sai khi upload HSTD Hội sở CN
+| | |
+|---|---|
+| **Dấu hiệu** | Upload HSTD cho "Hội sở Chi nhánh tỉnh" bị báo lỗi: "File chứa: Hội sở CN Đồng Nai \| Đang chọn: Hội sở Chi nhánh tỉnh" |
+| **File** | `tabs/tab_upload_pgd.py` hàm `_kiem_tra_don_vi()` |
+| **Nguyên nhân** | Hàm `chuan_hoa_ten()` dùng regex xóa luôn các từ "hội/sở/chi/nhánh/tỉnh" → tên Hội sở bị biến thành chuỗi rỗng, không bao giờ khớp. Ngoài ra thiếu bảng alias "Hội sở CN Đồng Nai" → `DON_VI_CHI_NHANH` |
+| **Fix** | Thêm `_TEN_DV_ALIAS` (giống `TEN_DV_ALIAS` trong `file_detection_service.py`); áp alias trước khi so sánh; xóa regex sai |
+| **Ngày fix** | 2026-06-01 |
+
 ---
 
 ## F. PDF / Word
@@ -586,6 +625,16 @@
 
 ## I. Phân quyền / Role
 
+### I3 — Card Xếp loại Tổ TK&VV tại Phân hệ Hỗ trợ địa bàn hiện toàn Chi nhánh
+
+| | |
+|---|---|
+| **File** | `tabs/tab_tongquan.py` dòng ~420, `services/tongquan_cdto_service.py` |
+| **Dấu hiệu** | Tại Phân hệ Hỗ trợ địa bàn (ws_operation), card Xếp loại Tổ TK&VV trong tab "Thông tin chung" hiện số liệu 4.552 tổ (toàn CN) thay vì chỉ tổ của PGD/Hội sở đang đăng nhập |
+| **Nguyên nhân** | `tab_tongquan.py` gọi `load_cdto_toan_cn()` + `render_totkvv_html()` mà không lọc theo `pgd_user`; `render_totkvv_html()` hardcode title "toàn Chi nhánh" |
+| **Fix** | Khi `pgd_user` có giá trị: filter `cdto["df_raw"]` qua `loc_df(df, "pgd", pgd_user)`, recompute KPI, truyền `ten_don_vi=pgd_user` vào `render_totkvv_html()`; thêm param `ten_don_vi` vào hàm này |
+| **Ngày fix** | 2026-06-02 |
+
 ### I1 — Logic role sai / bỏ sót role mới
 | | |
 |---|---|
@@ -721,6 +770,19 @@ def _duong_dan_pgd(ten_pgd: str, loai: str) -> str:
 | **Ngày fix** | 2026-05-26 |
 
 **Pattern phòng ngừa:** Mỗi khi viết SQL query mới, đối chiếu tên cột với schema trong `db.py` hoặc `SCHEMA.md` trước.
+
+---
+
+### J7 — Key mismatch `df_sk_gqvl` / `df_gqvl` → dữ liệu GQVL luôn `None` trong tab
+
+| | |
+|---|---|
+| **File** | `app.py` dòng ~561 (ctx dict), `tabs/tab_tracuu.py` dòng ~447, `tabs/tab_baocao/components/export_panel.py` |
+| **Dấu hiệu** | Tab Tra cứu / Báo cáo: filter GQVL không hoạt động, số liệu GQVL = 0 hoặc None dù đã merge |
+| **Nguyên nhân** | `app.py` truyền key `df_sk_gqvl` vào ctx dict, nhưng `tab_baocao` và `tab_tracuu` đọc bằng `kwargs.get("df_gqvl")` → luôn nhận `None` |
+| **Fix** | Đổi tên biến trong `app.py`: `df_sk_gqvl` → `df_gqvl` (cả khai báo lẫn truyền vào ctx); đồng bộ `tab_tracuu.py`: `_xay_gqvl_nq11_set(df_sk_gqvl)` → `df_gqvl` |
+| **Pattern phòng ngừa** | Mỗi khi thêm key vào ctx dict ở `app.py`, kiểm tra ngay tên key tại nơi đọc (`kwargs.get("...")`) trong tab. Không đổi tên biến 1 chiều. |
+| **Ngày fix** | 2026-06-02 |
 
 ---
 

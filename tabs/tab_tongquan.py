@@ -44,6 +44,7 @@ from services.upload_service import format_caption_merge
 from services.tongquan_cdto_service import (
     load_cdto_toan_cn,
     render_totkvv_html,
+    compute_totkvv_kpi,
 )
 from services import tongquan_service as _tqsvc
 from services.tongquan_service import xuat_excel_tqpgd as _xuat_excel_tqpgd
@@ -419,26 +420,38 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
         try:
             cdto = load_cdto_toan_cn()
 
-            if cdto["co_du_lieu"]:
-                if cdto["so_pgd_thieu"] == 0:
-                    st.success(
-                        f"✅ CDTOTKVV (chấm điểm Tổ): đủ **{cdto['so_pgd_co']}/{len(DS_PGD)} PGD**"
-                        + (f" · Tháng {cdto['thang_hien']}" if cdto["thang_hien"] else "")
-                    )
+            # PGD mode: lọc dữ liệu CDTOTKVV chỉ cho đơn vị hiện tại
+            _ten_don_vi = "toàn Chi nhánh"
+            if pgd_user and cdto["co_du_lieu"] and cdto["df_raw"] is not None:
+                from services.cdtotkvv_service import loc_df as _loc_cdto
+                _df_pgd_cdto = _loc_cdto(cdto["df_raw"], "pgd", pgd_user)
+                if not _df_pgd_cdto.empty:
+                    cdto = {**cdto, "df_raw": _df_pgd_cdto, "kpi": compute_totkvv_kpi(_df_pgd_cdto)}
+                    _ten_don_vi = pgd_user
                 else:
-                    st.warning(
-                        f"⚠️ CDTOTKVV: **{cdto['so_pgd_co']}/{len(DS_PGD)} PGD**"
-                        + (f" · Tháng {cdto['thang_hien']}" if cdto["thang_hien"] else "")
-                        + f" — còn thiếu {cdto['so_pgd_thieu']} đơn vị"
-                    )
+                    cdto = {**cdto, "co_du_lieu": False}
+
+            if cdto["co_du_lieu"]:
+                if not pgd_user:
+                    if cdto["so_pgd_thieu"] == 0:
+                        st.success(
+                            f"✅ CDTOTKVV (chấm điểm Tổ): đủ **{cdto['so_pgd_co']}/{len(DS_PGD)} PGD**"
+                            + (f" · Tháng {cdto['thang_hien']}" if cdto["thang_hien"] else "")
+                        )
+                    else:
+                        st.warning(
+                            f"⚠️ CDTOTKVV: **{cdto['so_pgd_co']}/{len(DS_PGD)} PGD**"
+                            + (f" · Tháng {cdto['thang_hien']}" if cdto["thang_hien"] else "")
+                            + f" — còn thiếu {cdto['so_pgd_thieu']} đơn vị"
+                        )
             else:
                 st.info("ℹ️ CDTOTKVV (chấm điểm Tổ): chưa có dữ liệu.")
 
             if cdto["co_du_lieu"] and cdto["kpi"] is not None:
-                html_card = render_totkvv_html(cdto["kpi"], cdto["thang_hien"])
+                html_card = render_totkvv_html(cdto["kpi"], cdto["thang_hien"], ten_don_vi=_ten_don_vi)
                 st.markdown(html_card, unsafe_allow_html=True)
 
-                if cdto["so_pgd_thieu"] > 0:
+                if not pgd_user and cdto["so_pgd_thieu"] > 0:
                     ten_thieu = ", ".join(cdto["ds_pgd_thieu"][:5])
                     duoi = f" và {cdto['so_pgd_thieu'] - 5} đơn vị khác" if cdto["so_pgd_thieu"] > 5 else ""
                     st.warning(
@@ -645,6 +658,8 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
         st.markdown("**🟢 Thông tin tổng quát theo PGD**")
         if COT_TEN_PGD in df.columns:
             col_khoanh = COT_DU_NO_KHOANH
+            # Nếu đang xem 1 PGD cụ thể, chỉ lấy dữ liệu PGD đó
+            df = df if not pgd_user else df[df[COT_TEN_PGD] == pgd_user].copy()
             # Chỉ lấy các cột cần dùng trong tab Tổng quan (từ đoạn PGD trở đi), không copy toàn bộ
             COT_CAN = [
                 COT_TEN_PGD,
@@ -741,7 +756,10 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
 
             # Bổ sung PGD trong DS_PGD nhưng không có dòng trong df → hiển thị với giá trị 0
             pgd_co_trong_bang = set(df_pgd[COT_TEN_PGD].tolist())
-            pgd_thieu_bang = [p for p in [DON_VI_CHI_NHANH] + DS_PGD if p not in pgd_co_trong_bang]
+            if pgd_user:
+                pgd_thieu_bang = [pgd_user] if pgd_user not in pgd_co_trong_bang else []
+            else:
+                pgd_thieu_bang = [p for p in [DON_VI_CHI_NHANH] + DS_PGD if p not in pgd_co_trong_bang]
             if pgd_thieu_bang:
                 rows_thieu = [{COT_TEN_PGD: p} for p in pgd_thieu_bang]
                 df_thieu = pd.DataFrame(rows_thieu)
@@ -750,7 +768,10 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                         df_thieu[cot] = 0.0
                 df_pgd = pd.concat([df_pgd, df_thieu], ignore_index=True)
                 df_pgd = df_pgd.sort_values(COT_TEN_PGD).reset_index(drop=True)
-                if pgd_thieu_bang == ["PGD Biên Hòa"]:
+                # Khi đang xem 1 PGD cụ thể, chỉ cảnh báo PGD đó thiếu
+                if pgd_user:
+                    st.caption(f"⚠️ {pgd_user} chưa upload dữ liệu HSTD.")
+                elif pgd_thieu_bang == ["PGD Biên Hòa"]:
                     st.caption("⚠️ PGD Biên Hòa chưa upload dữ liệu.")
                 else:
                     st.warning(
@@ -1526,11 +1547,11 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                 def _make_renderer(lbl, den):
                     key = lbl.replace(" ", "_")
                     if lbl == "Tùy chỉnh":
-                        return lambda _key=key: _render_tab_tuy_chinh(_key)
+                        return lambda: _render_tab_tuy_chinh(key)
                     else:
-                        return lambda _den=den, _lbl=lbl, _key=key: _bang_den_han(
-                            _tqsvc.loc_den_han(dt_chung, cot_ngay_dh=COT_NGAY_DH, tu_ngay=hn, den_ngay=_den),
-                            _lbl, _key,
+                        return lambda: _bang_den_han(
+                            _tqsvc.loc_den_han(dt_chung, cot_ngay_dh=COT_NGAY_DH, tu_ngay=hn, den_ngay=den),
+                            lbl, key,
                         )
 
                 lazy_tabs(

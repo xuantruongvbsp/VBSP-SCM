@@ -94,7 +94,7 @@ def tinh_co_cau_ct(
     cot_nv: str,
     cot_ma_kh: str,
 ) -> pd.DataFrame:
-    df_loc = df[df[cot_tdn].fillna(0) > 0].copy()
+    df_loc = df[pd.to_numeric(df[cot_tdn], errors="coerce").fillna(0) > 0].copy()
     cols_to_sum = [cot_tdn, cot_dqh, cot_dnk, cot_nv]
     if col_khoanh:
         cols_to_sum.append(col_khoanh)
@@ -348,7 +348,7 @@ def ap_dung_loc_den_han_tab(
 def loc_du_no_duong(df: pd.DataFrame, cot_tdn: str) -> pd.DataFrame:
     if cot_tdn not in df.columns:
         return df
-    return df[df[cot_tdn].fillna(0) > 0]
+    return df[pd.to_numeric(df[cot_tdn], errors="coerce").fillna(0) > 0]
 
 
 def loc_den_han(

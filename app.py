@@ -308,16 +308,36 @@ def main():
         # ── Menu điều hành (chỉ hiện khi workspace = management) ──
         if st.session_state.get("workspace") == "management":
             from workspaces.ws_management import render_sidebar_menu
-            can_upload = locals().get("can_upload")
-            if can_upload is None:
-                can_upload = role in ("admin", "admin_cn", "manager", "manager_cn", "chuyenvien_cn")
+            can_upload = role in ("admin", "admin_cn", "manager", "manager_cn", "chuyenvien_cn")
+            _ctx_sb = st.session_state.get("_ctx") or {}
             render_sidebar_menu(
                 role=role,
                 username=username,
-                df=locals().get("df"),
-                df_full=locals().get("df_full"),
-                ds_pgd_all=locals().get("ds_pgd_all", []),
+                df=_ctx_sb.get("df"),
+                df_full=_ctx_sb.get("df_full"),
+                ds_pgd_all=_ctx_sb.get("ds_pgd_all", []),
                 can_upload=can_upload,
+            )
+
+        # ── Menu Hỗ trợ địa bàn (chỉ hiện khi workspace = operation) ──
+        if st.session_state.get("workspace") == "operation":
+            from workspaces.ws_operation import render_sidebar_menu
+            from auth import get_tab_permissions, is_pgd_role
+            _tab_perm = get_tab_permissions(role)
+            _ctx_sb = st.session_state.get("_ctx") or {}
+            _df_op = _ctx_sb.get("df")
+            _pgd_user_op = pgd_user
+            _df_pgd_op = None
+            if _df_op is not None and not _df_op.empty and is_pgd_role(role) and _pgd_user_op and COT_TEN_PGD in _df_op.columns:
+                _df_pgd_op = _df_op[_df_op[COT_TEN_PGD] == _pgd_user_op].copy()
+            elif _df_op is not None and not _df_op.empty:
+                _df_pgd_op = _df_op
+            render_sidebar_menu(
+                role=role,
+                username=username,
+                df_pgd=_df_pgd_op,
+                pgd_user=_pgd_user_op,
+                tab_perm=_tab_perm,
             )
 
         st.divider()
@@ -458,7 +478,7 @@ def main():
                     else:
                         st.info(f"ℹ️ `{pgd_user}` chưa upload HSTD — "
                                 f"tạm dùng dữ liệu từ Phòng KH-NV.")
-                elif role in ("admin", "manager"):
+                elif la_phan_he_cn(role):
                     from pathlib import Path
                     from config import PGD_DATA_DIR
                     _pgd_hstd_mtime = max(
@@ -511,9 +531,9 @@ def main():
                 else:
                     df_nq11 = _load_nq11(CACHE_NQ11, _nq11_ts)
 
-            df_sk_gqvl = None
+            df_gqvl = None
             if os.path.exists(FILE_PATH_SK_GQVL) and ws_hien_tai != "executive":
-                df_sk_gqvl = doc_file_sk_gqvl(FILE_PATH_SK_GQVL, _gqvl_ts)
+                df_gqvl = doc_file_sk_gqvl(FILE_PATH_SK_GQVL, _gqvl_ts)
 
             _map_cache_ts = _hstd_ts
             if st.session_state.get("_pgd_map_cache_ts") != _map_cache_ts:
@@ -558,7 +578,7 @@ def main():
                 pgd_user=pgd_user,
                 username=username,
                 df_nq11=df_nq11,
-                df_sk_gqvl=df_sk_gqvl,
+                df_gqvl=df_gqvl,
                 pgd_xa_map=_pgd_xa_map,
                 ds_pgd_all=_ds_pgd_all,
                 ts_hstd=ts_file(CACHE_HSTD) if os.path.exists(CACHE_HSTD) else 0.0,

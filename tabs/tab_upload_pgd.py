@@ -192,6 +192,14 @@ def _kiem_tra_loai_file(file_bytes: bytes, loai: str) -> tuple[bool, str]:
         return True, "Bỏ qua kiểm tra loại file."
 
 
+_TEN_DV_ALIAS: dict[str, str] = {
+    "Hội sở CN Đồng Nai": DON_VI_CHI_NHANH,
+    "Hội sở CN tỉnh":     DON_VI_CHI_NHANH,
+    "CN Đồng Nai":        DON_VI_CHI_NHANH,
+    "PGD Biên Hòa":       DON_VI_CHI_NHANH,
+}
+
+
 def _kiem_tra_don_vi(file_bytes: bytes, loai: str, ten_dv_chon: str) -> tuple[bool, str]:
     """
     Kiểm tra tên đơn vị trong file có khớp với đơn vị đang chọn.
@@ -204,34 +212,14 @@ def _kiem_tra_don_vi(file_bytes: bytes, loai: str, ten_dv_chon: str) -> tuple[bo
             f" — hệ thống tin tưởng bạn đang upload đúng file của "
             f"**{ten_dv_chon}**."
         )
-    
-    # Chuẩn hóa tên để so sánh (loại bỏ khoảng trắng, chuyển thường, loại bỏ ký tự đặc biệt)
-    def chuan_hoa_ten(ten: str) -> str:
-        import re
-        ten = ten.strip().lower()
-        # Loại bỏ các từ không quan trọng
-        ten = re.sub(r'\b(pgd|phòng|giao|dịch|hội|sở|chi|nhánh|tỉnh)\b', '', ten)
-        # Loại bỏ ký tự đặc biệt và khoảng trắng thừa
-        ten = re.sub(r'[^\w\s]', ' ', ten)
-        ten = re.sub(r'\s+', ' ', ten).strip()
-        return ten
-    
-    ten_file_chuan = chuan_hoa_ten(ten_trong_file)
-    ten_chon_chuan = chuan_hoa_ten(ten_dv_chon)
-    
-    # Kiểm tra khớp chính xác
-    if ten_trong_file.strip() == ten_dv_chon.strip():
+
+    # Áp dụng alias trước khi so sánh (vd: "Hội sở CN Đồng Nai" → DON_VI_CHI_NHANH)
+    ten_file_mapped = _TEN_DV_ALIAS.get(ten_trong_file.strip(), ten_trong_file.strip())
+    ten_chon_mapped = _TEN_DV_ALIAS.get(ten_dv_chon.strip(), ten_dv_chon.strip())
+
+    if ten_file_mapped == ten_chon_mapped:
         return True, f"✅ Đơn vị khớp: **{ten_trong_file}**"
-    
-    # Kiểm tra khớp sau chuẩn hóa
-    if ten_file_chuan == ten_chon_chuan:
-        return True, f"✅ Đơn vị khớp (chuẩn hóa): **{ten_trong_file}**"
-    
-    # Kiểm tra chứa từ khóa chính
-    if ten_file_chuan and ten_chon_chuan and len(ten_file_chuan) > 2:
-        if ten_file_chuan in ten_chon_chuan or ten_chon_chuan in ten_file_chuan:
-            return True, f"✅ Đơn vị tương tự: **{ten_trong_file}**"
-    
+
     return False, (
         f"⚠️ Upload nhầm đơn vị! File chứa: **{ten_trong_file}** | Đang chọn: **{ten_dv_chon}**"
     )
@@ -256,8 +244,6 @@ def _render_upload_form(
                 st.error(msg)
             else:
                 st.warning(msg)
-
-    st.markdown(f"##### 📤 Upload file cho: **{ten_dv}**")
 
     _ver = st.session_state.setdefault(f"{prefix}_upload_ver", 0)
 
@@ -287,6 +273,28 @@ def _render_upload_form(
     if not co_file:
         st.info("Chọn ít nhất 1 file để bắt đầu upload.")
         return
+
+    # ── Tự động nhận diện PGD từ file (khi ten_dv=None) ────────────
+    ten_dv_resolved = ten_dv
+    if ten_dv is None:
+        for loai, f_obj in file_map.items():
+            if f_obj is None:
+                continue
+            fb = f_obj.read()
+            f_obj.seek(0)
+            detected = _lay_ten_don_vi_trong_file(fb, loai)
+            if detected:
+                mapped = _TEN_DV_ALIAS.get(detected.strip(), detected.strip())
+                ten_dv_resolved = mapped
+                break
+
+    if ten_dv_resolved is None:
+        st.warning("⚠️ Không thể nhận diện PGD từ file. Vui lòng kiểm tra file.")
+        return
+
+    st.markdown(f"##### 📤 Upload file cho: **{ten_dv_resolved}**")
+    if ten_dv is None and ten_dv_resolved:
+        st.info(f"🏢 PGD tự động nhận diện từ file: **{ten_dv_resolved}**")
 
     # ── Preview data trước khi upload ─────────────────────────────────
     danh_sach_file = [
@@ -336,7 +344,7 @@ def _render_upload_form(
     with col_upload:
         if st.button("📤 Xác nhận Upload", type="primary", key=f"{prefix}_btn_upload"):
             with st.spinner("⏳ Đang xử lý file..."):
-                _xu_ly_upload(ten_dv, username,
+                _xu_ly_upload(ten_dv_resolved, username,
                               f_hstd, f_nq11, f_gqvl, f_cdtotkvv, prefix)
 
 
@@ -530,29 +538,25 @@ def render(tab=None, **kwargs) -> None:
                     st.info(f"📍 Đơn vị upload: **{pgd_user}**")
             prefix_base = "pgd_op"
         else:
-            ten_dv_upload = st.selectbox(
-                "🏢 Chọn PGD cần upload",
-                DS_DON_VI,
-                key="pgd_upload_op_chon_dv",
-            )
-            prefix_base = f"pgd_op_{ten_dv_upload[:8]}"
+            ten_dv_upload = None
+            st.info("📌 Hệ thống sẽ **tự động nhận diện PGD** từ nội dung file upload.")
+            prefix_base = "pgd_op_cn"
 
-        if ten_dv_upload:
-            # ── 2 tab tách sao kê (hàng ngày) vs chấm điểm (hàng tháng) ──
-            tab_sk, tab_cd = st.tabs([
-                "📊 Sao kê (HSTD / NQ11 / GQVL)",
-                "🏆 Chấm điểm Tổ TK&VV",
-            ])
-            with tab_sk:
-                st.caption("Cập nhật: hàng ngày — xuất từ CoreBanking")
-                _render_upload_form(
-                    ten_dv_upload, f"{prefix_base}_sk", username,
-                    loai_filter=["hstd", "nq11", "gqvl"],
-                )
-            with tab_cd:
-                st.caption("Cập nhật: hàng tháng — hệ thống lưu lịch sử theo tháng")
-                _render_upload_form(
-                    ten_dv_upload, f"{prefix_base}_cd", username,
-                    loai_filter=["cdtotkvv"],
-                )
+        # ── 2 tab tách sao kê (hàng ngày) vs chấm điểm (hàng tháng) ──
+        tab_sk, tab_cd = st.tabs([
+            "📊 Sao kê (HSTD / NQ11 / GQVL)",
+            "🏆 Chấm điểm Tổ TK&VV",
+        ])
+        with tab_sk:
+            st.caption("Cập nhật: hàng ngày — xuất từ CoreBanking")
+            _render_upload_form(
+                ten_dv_upload, f"{prefix_base}_sk", username,
+                loai_filter=["hstd", "nq11", "gqvl"],
+            )
+        with tab_cd:
+            st.caption("Cập nhật: hàng tháng — hệ thống lưu lịch sử theo tháng")
+            _render_upload_form(
+                ten_dv_upload, f"{prefix_base}_cd", username,
+                loai_filter=["cdtotkvv"],
+            )
 

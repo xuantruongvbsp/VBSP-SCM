@@ -104,11 +104,15 @@ def excel_to_parquet(
             except Exception as e2:
                 logger.error("excel_to_parquet: không thể xóa cache parquet lỗi — %s", e2, exc_info=True)
             raise
-    # Chuẩn hóa code columns sau khi đọc — xử lý cache cũ có dtype int64/float64
+    # Chuẩn hóa code columns — CHỈ khi dtype sai (int64/float64 = cache cũ chưa normalize).
+    # Parquet vừa ghi đã được normalize khi ghi → bỏ qua nếu dtype đã là object/string.
+    # Tránh chạy lại 22×N_code_cols normalization khi cache hit.
     result = pd.read_parquet(parquet_path, engine='pyarrow')
     for col in list(result.columns):
         if _should_force_str(col):
-            result[col] = _normalize_code_series(result[col])
+            _s = result[col]
+            if pd.api.types.is_integer_dtype(_s) or pd.api.types.is_float_dtype(_s):
+                result[col] = _normalize_code_series(_s)
     return result
 
 

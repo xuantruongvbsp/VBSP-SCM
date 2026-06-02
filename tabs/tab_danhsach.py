@@ -18,7 +18,6 @@ from utils import (
     ten_file_xuat,
     hien_thi_dataframe_phan_trang,
 )
-from auth import la_phan_he_pgd
 from state_manager import SCMStateManager
 if TYPE_CHECKING:
     from streamlit.delta_generator import DeltaGenerator
@@ -37,7 +36,7 @@ def _cache_kpi_danhsach(
     _ = (ts, pgd_user, filter_sig)  # cache key; filter_sig = trạng thái bộ lọc (không hash _dl)
     n_kh = _dl[cot_ma_kh].nunique() if cot_ma_kh in _dl.columns else len(_dl)
     if cot_ma_kh in _dl.columns and cot_tdn in _dl.columns:
-        _mask = _dl[cot_tdn].fillna(0) > 0
+        _mask = pd.to_numeric(_dl[cot_tdn], errors="coerce").fillna(0) > 0
         n_kh_dn = _dl.loc[_mask, cot_ma_kh].nunique()
     else:
         n_kh_dn = n_kh
@@ -151,8 +150,6 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
 
         # Filter sau expander — dùng boolean mask, không copy toàn bộ df
         _masks = []
-        if la_phan_he_pgd(role) and pgd_user:
-            _masks.append(df[COT_TEN_PGD] == pgd_user)
         if cxa   != "Tất cả" and COT_TEN_XA  in df.columns:
             _masks.append(df[COT_TEN_XA]  == cxa)
         if cdvut != "Tất cả" and COT_DVUT in df.columns:

@@ -371,9 +371,21 @@ def merge_du_lieu_toan_cn(
 
     _u = st.session_state.get("username", "unknown")
 
+    def _path_merge(ten_pgd: str, loai: str) -> str:
+        """
+        Trả về đường dẫn file nguồn cho merge.
+        HSTD: ưu tiên hstd_khnv.xlsx (Phòng KH-NV) → fallback hstd_latest.xlsx (PGD support).
+        Các loại khác: dùng đường dẫn chuẩn.
+        """
+        if loai == "hstd":
+            path_khnv = duong_dan_pgd(ten_pgd, "hstd_khnv")
+            if Path(path_khnv).exists():
+                return path_khnv
+        return duong_dan_pgd(ten_pgd, loai)
+
     meta_map: dict[str, tuple[bool, bool]] = {}
     for ten_pgd in tat_ca_dv:
-        path_excel = duong_dan_pgd(ten_pgd, loai)
+        path_excel = _path_merge(ten_pgd, loai)
         if not Path(path_excel).exists():
             meta_map[ten_pgd] = (False, False)
             continue
@@ -393,7 +405,7 @@ def merge_du_lieu_toan_cn(
         ten_pgd: str, loai: str
     ) -> tuple[str, pd.DataFrame | None, str | None]:
         """Trả về (ten_pgd, df | None, canh_bao_str | None)."""
-        path_excel = duong_dan_pgd(ten_pgd, loai)
+        path_excel = _path_merge(ten_pgd, loai)
         if not Path(path_excel).exists():
             return ten_pgd, None, None
         try:
@@ -443,7 +455,7 @@ def merge_du_lieu_toan_cn(
     tong = len(tat_ca_dv)
     prog = st.progress(0, text=f"⏳ Đang đọc 0/{tong} PGD...")
     da_xong = 0
-    with ThreadPoolExecutor(max_workers=8) as ex:
+    with ThreadPoolExecutor(max_workers=min(len(tat_ca_dv), 12)) as ex:
         futures = {ex.submit(_doc_mot_pgd, dv, loai): dv for dv in tat_ca_dv}
         for future in as_completed(futures):
             da_xong += 1
@@ -487,16 +499,11 @@ def merge_du_lieu_toan_cn(
 
     # ── Chuẩn hóa schema: tránh DataType(null) khi các PGD
     #    có cột toàn null hoặc thiếu cột ──────────────────────
+    # reindex() nhanh hơn for-loop lồng O(22×N_cols) — pandas tối ưu hoá nội bộ
     all_cols = list(dict.fromkeys(
         col for df in frames for col in df.columns
     ))
-    normalized: list[pd.DataFrame] = []
-    for df in frames:
-        for col in all_cols:
-            if col not in df.columns:
-                df[col] = pd.NA
-        normalized.append(df[all_cols])
-    frames = normalized
+    frames = [df.reindex(columns=all_cols) for df in frames]
 
     df_toan_cn = pd.concat(frames, ignore_index=True)
 
@@ -527,6 +534,7 @@ def merge_du_lieu_toan_cn(
     # Xử lý mixed type (int + str rỗng) → tránh ArrowInvalid khi ghi parquet
     # category columns → astype(object) trước, nếu không apply() giữ nguyên
     # category dtype và pd.to_datetime() downstream sẽ lỗi
+    _BAD_VALS_LIST = list(_BAD_VALS)  # precompute 1 lần — tránh tạo list mới mỗi vòng lặp
     _str_cols = [c for c in df_toan_cn.columns if c not in _cols_so_cn]
     if _str_cols:
         for col in _str_cols:
@@ -547,15 +555,19 @@ def merge_du_lieu_toan_cn(
                         pd.to_numeric(ser.loc[_whole_f], errors="coerce")
                         .astype("int64").astype(str)
                     )
-            # Xử lý float nguyên trong object dtype (ví dụ mã KH 12345.0 → "12345") vectorized
+            # Xử lý float nguyên trong object dtype (mã KH 12345.0 → "12345")
+            # Probe 200 dòng đầu trước — bỏ qua hoàn toàn cột text thuần
+            # (Tên KH, Địa chỉ...) không chứa float → tiết kiệm pd.to_numeric() trên 100K dòng
             if ser.dtype == object:
-                _num = pd.to_numeric(ser, errors="coerce")
-                _whole = _num.notna() & (_num % 1 == 0) & ser.notna()
-                if _whole.any():
-                    ser = ser.copy()
-                    ser.loc[_whole] = _num.loc[_whole].astype("int64").astype(str)
+                _probe = pd.to_numeric(ser.iloc[:200], errors="coerce")
+                if _probe.notna().any():
+                    _num = pd.to_numeric(ser, errors="coerce")
+                    _whole = _num.notna() & (_num % 1 == 0) & ser.notna()
+                    if _whole.any():
+                        ser = ser.copy()
+                        ser.loc[_whole] = _num.loc[_whole].astype("int64").astype(str)
             df_toan_cn[col] = (
-                ser.fillna("").astype(str).str.strip().replace(list(_BAD_VALS), "")
+                ser.fillna("").astype(str).str.strip().replace(_BAD_VALS_LIST, "")
             )
 
     with _MERGE_LOCK[loai]:

@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## [2026-06-03] — Thêm 4 KPI dư nợ bình quân vào Trang Chủ PGD
+- `workspaces/ws_operation.py` dòng ~357-488 — thêm 4 KPI mới: Dư nợ BQ xã, BQ hộ, BQ Hội, BQ tổ vào `_kpi_pgd_list_impl`; cập nhật docstring từ "4 KPI" → "8 KPI"
+- `workspaces/ws_operation.py` dòng ~79 — thêm `COT_TEN_TO` vào import từ `config.py`
+
 ## [2026-06-03] — Fix bottleneck load chậm tab HỖ TRỢ ĐỊA BÀN
 - `workspaces/ws_operation.py` dòng ~159-409 — `_kpi_pgd_list`: loại bỏ `df.to_json()` chạy trên mọi rerun; thay bằng truyền DataFrame trực tiếp vào cached func qua `_df` (prefix `_` → không hash), cache key vẫn là `df_hash`
 

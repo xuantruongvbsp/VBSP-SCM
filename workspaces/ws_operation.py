@@ -70,7 +70,7 @@ from state_manager import SCMStateManager
 
 from config import (
 
-    COT_TEN_KH, COT_MA_KH, COT_SO_KU, COT_TEN_CT,
+    COT_TEN_KH, COT_MA_KH, COT_SO_KU, COT_TEN_CT, COT_MUC_VAY,
 
     COT_DU_NO_QH, COT_DU_NO_TH, COT_TONG_DU_NO, COT_NGAY_DH, COT_NGAY_VAY,
 
@@ -382,15 +382,15 @@ def _kpi_pgd_list_impl(df_pgd: pd.DataFrame, pgd_user: str) -> list[dict]:
 
             "delta":       None,
 
-            "delta_label": f"{fmt_so(so_xa)} xã",
+            "delta_label": "",
 
             "icon":        "🏘️",
 
-            "suffix":      "",
+            "suffix":      "tr.đ",
 
-            "precision":   1,
+            "precision":   0,
 
-            "help":        "Dư nợ bình quân trên mỗi xã/phường",
+            "help":        f"Dư nợ bình quân trên mỗi xã/phường. Số xã: {fmt_so(so_xa)}",
 
             "delta_color": "normal",
 
@@ -410,15 +410,15 @@ def _kpi_pgd_list_impl(df_pgd: pd.DataFrame, pgd_user: str) -> list[dict]:
 
             "delta":       None,
 
-            "delta_label": f"{fmt_so(tong_so_khoan)} khoản",
+            "delta_label": "",
 
             "icon":        "👥",
 
-            "suffix":      "",
+            "suffix":      "tr.đ",
 
-            "precision":   1,
+            "precision":   0,
 
-            "help":        "Dư nợ bình quân trên mỗi khoản vay",
+            "help":        f"Dư nợ bình quân trên mỗi khoản vay. Số khoản: {fmt_so(tong_so_khoan)}",
 
             "delta_color": "normal",
 
@@ -438,15 +438,15 @@ def _kpi_pgd_list_impl(df_pgd: pd.DataFrame, pgd_user: str) -> list[dict]:
 
             "delta":       None,
 
-            "delta_label": f"{fmt_so(so_hoi)} Hội",
+            "delta_label": "",
 
             "icon":        "🏛️",
 
-            "suffix":      "",
+            "suffix":      "tr.đ",
 
-            "precision":   1,
+            "precision":   0,
 
-            "help":        "Dư nợ bình quân trên mỗi ĐVUT (Hội)",
+            "help":        f"Dư nợ bình quân trên mỗi ĐVUT (Hội). Số Hội: {fmt_so(so_hoi)}",
 
             "delta_color": "normal",
 
@@ -466,15 +466,15 @@ def _kpi_pgd_list_impl(df_pgd: pd.DataFrame, pgd_user: str) -> list[dict]:
 
             "delta":       None,
 
-            "delta_label": f"{fmt_so(so_to)} tổ",
+            "delta_label": "",
 
             "icon":        "📊",
 
-            "suffix":      "",
+            "suffix":      "tr.đ",
 
-            "precision":   1,
+            "precision":   0,
 
-            "help":        "Dư nợ bình quân trên mỗi tổ",
+            "help":        f"Dư nợ bình quân trên mỗi tổ. Số tổ: {fmt_so(so_to)}",
 
             "delta_color": "normal",
 
@@ -4117,10 +4117,122 @@ Doanh số cho vay trong tháng: {ds_cv:,.0f} triệu đồng; doanh số thu n�
 
 
 
+def _render_phan_tich_nqh_pgd(tab, df: pd.DataFrame, pgd_user: str) -> None:
+    with get_tab_context(tab):
+        st.subheader("📈 Phân tích Nợ Quá Hạn")
+        st.caption(f"📍 Địa bàn: **{pgd_user}**")
+
+        if df is None or df.empty:
+            st.warning("⚠️ Chưa có dữ liệu HSTD.")
+            return
+
+        cot_nqh = COT_DU_NO_QH if COT_DU_NO_QH in df.columns else None
+        cot_tdn = COT_TONG_DU_NO if COT_TONG_DU_NO in df.columns else None
+        cot_xa  = COT_TEN_XA if COT_TEN_XA in df.columns else None
+        cot_ct  = COT_TEN_CT if COT_TEN_CT in df.columns else None
+
+        if cot_nqh is None:
+            st.warning("⚠️ Không tìm thấy cột Dư nợ quá hạn.")
+            return
+
+        df_w = df.copy()
+        df_w[cot_nqh] = pd.to_numeric(df_w[cot_nqh], errors="coerce").fillna(0)
+
+        df_nqh = df_w[df_w[cot_nqh] > 0].copy()
+        tong_nqh = df_w[cot_nqh].sum()
+
+        if cot_tdn:
+            df_w[cot_tdn] = pd.to_numeric(df_w[cot_tdn], errors="coerce").fillna(0)
+            tong_dn = df_w[cot_tdn].sum()
+            ty_le_nqh = (tong_nqh / tong_dn * 100) if tong_dn > 0 else 0.0
+        else:
+            tong_dn = 0.0
+            ty_le_nqh = 0.0
+
+        so_mon_nqh = len(df_nqh)
+        tong_mon = len(df_w)
+
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("🔴 Tổng NQH", fmt_ty(tong_nqh))
+        c2.metric("📊 Tỷ lệ NQH", f"{ty_le_nqh:.2f}%")
+        c3.metric("📋 Số món NQH", fmt_so(so_mon_nqh))
+        c4.metric("📁 Tổng món", fmt_so(tong_mon))
+
+        st.divider()
+
+        col_left, col_right = st.columns(2)
+
+        with col_left:
+            if cot_xa and not df_nqh.empty:
+                st.markdown("**🏘️ NQH theo Xã/Phường**")
+                nhom_xa = df_nqh.groupby(cot_xa)[cot_nqh].sum().sort_values(ascending=False)
+
+                fig_xa = go.Figure(data=[go.Bar(
+                    x=nhom_xa.values / 1e6,
+                    y=nhom_xa.index.tolist(),
+                    orientation="h",
+                    marker_color="#C62828",
+                    text=[f"{fmt_ty(v)} tr.đ" for v in nhom_xa.values],
+                    textposition="outside",
+                )])
+                fig_xa.update_layout(
+                    height=max(200, 40 * len(nhom_xa)),
+                    margin=dict(l=0, r=60, t=10, b=0),
+                    xaxis_title="Triệu đồng",
+                )
+                st.plotly_chart(fig_xa, use_container_width=True)
+
+        with col_right:
+            if cot_ct and not df_nqh.empty:
+                st.markdown("**📌 NQH theo Chương trình**")
+                nhom_ct = df_nqh.groupby(cot_ct)[cot_nqh].sum().sort_values(ascending=False)
+                colors_ct = ["#C62828", "#E65100", "#F9A825", "#6A1B9A", "#1565C0",
+                             "#00838F", "#2E7D32", "#4E342E", "#37474F", "#827717"]
+
+                fig_ct = go.Figure(data=[go.Pie(
+                    labels=nhom_ct.index.tolist(),
+                    values=nhom_ct.values / 1e6,
+                    hole=0.4,
+                    marker=dict(colors=colors_ct[:len(nhom_ct)]),
+                    textinfo="label+percent",
+                    hovertemplate="<b>%{label}</b><br>%{value:,.0f} tr.đ<br>%{percent:.1f}%<extra></extra>",
+                )])
+                fig_ct.update_layout(
+                    height=350,
+                    margin=dict(l=0, r=0, t=10, b=0),
+                    legend=dict(orientation="h", y=-0.1),
+                )
+                st.plotly_chart(fig_ct, use_container_width=True)
+
+        st.divider()
+
+        if not df_nqh.empty:
+            st.markdown(f"**📋 Top {min(20, len(df_nqh))} món NQH lớn nhất**")
+
+            cols_hien = [c for c in [
+                COT_TEN_KH, COT_SO_KU, COT_TEN_CT, COT_TEN_XA, COT_TEN_TO,
+                COT_NGAY_VAY, COT_NGAY_DH, COT_MUC_VAY, cot_nqh, COT_LAI_TON_QH,
+            ] if c in df_nqh.columns]
+
+            df_top = df_nqh.sort_values(cot_nqh, ascending=False).head(20)
+            df_show = df_top[cols_hien].copy()
+
+            for c in [cot_nqh, COT_MUC_VAY]:
+                if c in df_show.columns:
+                    df_show[c] = pd.to_numeric(df_show[c], errors="coerce").fillna(0).apply(fmt_ty)
+            if COT_LAI_TON_QH in df_show.columns:
+                df_show[COT_LAI_TON_QH] = pd.to_numeric(df_show[COT_LAI_TON_QH], errors="coerce").fillna(0).apply(fmt_ty)
+
+            hien_thi_dataframe_phan_trang(df_show, key="op_nqh_top", page_size=20)
+        else:
+            st.success("✅ PGD này không có Nợ quá hạn.")
+
+
 _WS_OP_MENU_ITEMS = [
     # ── Tổng quan ──
     {"group": "Tổng quan", "label": "🏠 Trang Chủ"},
     {"group": "Tổng quan", "label": "📊 Dashboard Sức khỏe"},
+    {"group": "Tổng quan", "label": "📊 Tổng quan ĐGD & Tổ TK&VV"},
     # ── Tác nghiệp ──
     {"group": "Tác nghiệp", "label": "📊 Thông tin chung"},
     {"group": "Tác nghiệp", "label": "📈 Tiến độ công việc"},
@@ -4142,6 +4254,12 @@ _WS_OP_MENU_ITEMS = [
             {"label": "📅 Báo cáo định kỳ"},
             {"label": "📡 Điện báo"},
             {"label": "📝 Báo cáo Giao ban"},
+            {"label": "📄 Trung tâm mẫu biểu"},
+            {"label": "📋 Biên bản giao ban"},
+            {"label": "📢 Thông báo kết luận"},
+            {"label": "📋 Theo dõi nhập liệu"},
+            {"label": "📥 Tiến độ nộp BC"},
+            {"label": "✅ Checklist BC"},
         ],
     },
     # ── Kế hoạch ──
@@ -4156,6 +4274,7 @@ _WS_OP_MENU_ITEMS = [
             {"label": "🔭 Xây dựng KHTD TL"},
             {"label": "📋 NQ11"},
             {"label": "📊 Dashboard GQVL"},
+            {"label": "📊 Xuất báo cáo KHTD"},
         ],
     },
     # ── Kiểm soát ──
@@ -4171,6 +4290,7 @@ _WS_OP_MENU_ITEMS = [
             {"label": "🔍 Kiểm soát Dữ liệu"},
             {"label": "👔 CBTD & Địa bàn"},
             {"label": "💳 Xử lý Rủi ro"},
+            {"label": "📈 Phân tích NQH"},
             {"label": "📍 Điểm Giao Dịch"},
             {"label": "🏛️ Ban Đại Diện"},
             {"label": "🤝 Ủy thác"},
@@ -5297,11 +5417,9 @@ def render(**kwargs):
             "tabs": [
 
                 ("🏠 Trang Chủ", lambda tab: _render_trang_chu(tab, df_pgd, role, pgd_user, kwargs)),
-
                 ("📊 Dashboard Sức khỏe", lambda tab: _lazy_tab("tab_dashboard_suc_khoe_pgd").render(tab, df=df_pgd, pgd_user=pgd_user or pgd_filter or "", role=role)),
-
+                ("📊 Tổng quan ĐGD & Tổ TK&VV", lambda tab: _render_dashboard_pgd_dgd(tab, df=df_pgd, pgd_user=pgd_user or pgd_filter or "", role=role, username=username)),
             ],
-
         },
 
         "nghiep_vu_pgd": {
@@ -5401,11 +5519,9 @@ def render(**kwargs):
                 ("📋 NQ11", lambda tab: _lazy_tab("tab_nq11").render(tab, **_pgd_df_kwargs)),
 
                 ("📊 Dashboard GQVL", lambda tab: _lazy_tab("tab_gqvl_pgd").render(tab, **kwargs)),
-
+                ("📊 Xuất báo cáo KHTD", lambda tab: _lazy_tab("tab_khtd_xuat").render_xuat_baocao(role=role, username=username, df_full=df_pgd)),
             ],
-
         },
-
         "kiem_soat_rr": {
 
             "label": "🔍 Kiểm soát & Rủi ro",
@@ -5431,11 +5547,9 @@ def render(**kwargs):
                 )),
 
                 ("💳 Xử lý Rủi ro", lambda tab: _lazy_tab("tab_xu_ly_rui_ro").render(
-
                     tab, df=df_pgd, role=role, username=username, pgd_user=pgd_user or pgd_filter
-
                 )),
-
+                ("📈 Phân tích NQH", lambda tab: _render_phan_tich_nqh_pgd(tab, df_pgd, pgd_user or pgd_filter or "")),
                 ("📍 Điểm Giao Dịch", lambda tab: _lazy_tab("tab_diem_gd_pgd").render(tab, **kwargs)),
 
                 ("🏘️ Tổ TK&VV",       lambda tab: _lazy_tab("tab_cdtotkvv_pgd").render(tab, **kwargs)),

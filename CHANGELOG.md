@@ -1,5 +1,18 @@
 # CHANGELOG
 
+## [2026-06-03] — Fix _render_phan_tich_nqh_pgd: NameError COT_MUC_VAY + format số
+- `workspaces/ws_operation.py` dòng ~73 — thêm `COT_MUC_VAY` vào import từ config (thiếu → NameError crash khi mở tab Phân tích NQH)
+- `workspaces/ws_operation.py` dòng ~4175 — chart bar text: `f"{v/1e6:,.0f}"` (kiểu Mỹ) → `fmt_ty(v)` (kiểu VN)
+
+## [2026-06-03] — Nâng cấp phân hệ Hỗ trợ địa bàn: +3 tab mới + 6 tab sidebar
+- `workspaces/ws_operation.py` dòng ~4120 — thêm hàm `_render_phan_tich_nqh_pgd()`: 4 KPI card + bar NQH/xã + donut NQH/CT + Top 20 món NQH
+- `workspaces/ws_operation.py` `_WS_OP_MENU_ITEMS` — thêm 3 tab mới: Tổng quan ĐGD & Tổ TK&VV, Phân tích NQH, Xuất báo cáo KHTD
+- `workspaces/ws_operation.py` `_WS_OP_MENU_ITEMS` — bổ sung 6 tab Báo cáo bị thiếu: Trung tâm mẫu biểu, Biên bản GB, KL GB, Theo dõi nhập liệu, Tiến độ nộp BC, Checklist BC
+- `workspaces/ws_operation.py` `CAC_NHOM` — gắn 3 tab mới vào nhóm: trang_chu, kiem_soat_rr, ke_hoach_pgd
+
+## [2026-06-03] — Fix KPI 5-8 DNBQ: chuyển số lượng nhóm vào help thay vì delta_label
+- `workspaces/ws_operation.py` dòng ~377-481 — KPI 5-8: `delta_label` → `""`, thêm số xã/khoản/Hội/tổ vào `help` (hover); thêm `suffix="tr.đ"`; sửa `precision=0`
+
 ## [2026-06-03] — Thêm 4 KPI dư nợ bình quân vào Trang Chủ PGD
 - `workspaces/ws_operation.py` dòng ~357-488 — thêm 4 KPI mới: Dư nợ BQ xã, BQ hộ, BQ Hội, BQ tổ vào `_kpi_pgd_list_impl`; cập nhật docstring từ "4 KPI" → "8 KPI"
 - `workspaces/ws_operation.py` dòng ~79 — thêm `COT_TEN_TO` vào import từ `config.py`

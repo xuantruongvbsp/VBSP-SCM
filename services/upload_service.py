@@ -279,6 +279,34 @@ def luu_dienbao(
                 f"Kiểm tra lại định dạng file mẫu.",
             )
 
+        # ── Phát hiện format ma trận (nhiều cột PGD) ──
+        is_matrix = False
+        if len(df_check.columns) >= 5 and len(df_check) >= 5:
+            v_header = str(df_check.iloc[4, 2]).strip().lower() if pd.notna(df_check.iloc[4, 2]) else ""
+            if "cộng" in v_header or "tong" in v_header:
+                is_matrix = True
+
+        # Kiểm tra số sheet nếu là file có sheet
+        try:
+            xls = pd.ExcelFile(BytesIO(file_bytes))
+            n_sheets = len(xls.sheet_names)
+        except Exception:
+            n_sheets = 1
+
+        # Đếm số chỉ tiêu và đơn vị
+        n_chi_tieu = 0
+        n_don_vi = 0
+        skip_kw = ("", "nan", "chỉ tiêu", "điện báo ngày", "stt", "b.", "a.")
+        for i in range(5, len(df_check)):
+            ten = str(df_check.iloc[i, 1]).strip() if pd.notna(df_check.iloc[i, 1]) else ""
+            if ten and ten.lower() not in skip_kw and ten.lower() not in ("i", "ii", "iii"):
+                n_chi_tieu += 1
+
+        if is_matrix:
+            for j in range(3, len(df_check.columns)):
+                if pd.notna(df_check.iloc[4, j]) and str(df_check.iloc[4, j]).strip().lower() != "nan":
+                    n_don_vi += 1
+
     except Exception as e:
         logger.error("Lỗi trong khối except: %s", e, exc_info=True)
         return KetQuaUpload(False, f"❌ Không đọc được file {ten_hien}: {e}")
@@ -287,13 +315,20 @@ def luu_dienbao(
     username = st.session_state.get("username", "unknown")
     hostname = socket.gethostname()
     ten = ten_file_goc or "(không tên)"
-    chi_tiet = f"[{hostname}] loai={loai} file={ten}"
+    chi_tiet = (
+        f"[{hostname}] loai={loai} file={ten} "
+        f"sheets={n_sheets} chi_tieu={n_chi_tieu}"
+    )
+    if is_matrix:
+        chi_tiet += f" dv={n_don_vi} format=matrix"
     if ten_pgd:
         chi_tiet += f" pgd={ten_pgd}"
     db.ghi_audit(username, "upload_dienbao", chi_tiet)
     return KetQuaUpload(
         True,
-        f"✅ Đã lưu file {ten_hien}",
+        f"✅ Đã lưu file {ten_hien} ({n_sheets} sheet, {n_chi_tieu} chỉ tiêu"
+        + (f", {n_don_vi} đơn vị" if is_matrix else "")
+        + ")",
         duong_dan,
     )
 

@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Luồng Xử Lý Dữ Liệu Điện Báo – VBSP-SCM</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --red:#C0392B;--navy:#1a3a5c;--teal:#1D9E75;--gold:#EF9F27;
+  --bg:#f0f4fa;--card:#fff;--border:#e2e8f0;--muted:#6b7280;
+  --blue:#2563eb;--light-blue:#dbeafe;--green:#16a34a;--light-green:#dcfce7;
+  --orange:#ea580c;--light-orange:#fff7ed;--purple:#7c3aed;--light-purple:#ede9fe;
+}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:#1f2937;line-height:1.6}
+.banner{
+  background:linear-gradient(135deg,#1a3a5c,#2d6aa0);
+  color:#fff;padding:22px 36px;display:flex;align-items:center;gap:16px
+}
+.banner h1{font-size:1.35rem;font-weight:700}.banner p{font-size:.85rem;opacity:.85;margin-top:3px}
+.container{max-width:1300px;margin:0 auto;padding:28px 36px}
+
+/* Flow */
+.flow-wrapper{position:relative;padding:20px 0}
+.flow-row{
+  display:flex;align-items:stretch;gap:20px;margin-bottom:16px;position:relative
+}
+.flow-row.arrows::after{
+  content:"↓";
+  position:absolute;left:50%;transform:translateX(-50%);bottom:-28px;
+  font-size:20px;color:var(--muted);font-weight:bold
+}
+.flow-step{
+  flex:1;background:var(--card);border:1px solid var(--border);
+  border-radius:10px;padding:18px 20px;box-shadow:0 2px 8px rgba(0,0,0,.05);
+  position:relative;min-width:0
+}
+.flow-step .step-num{
+  position:absolute;top:-12px;left:14px;
+  background:var(--navy);color:#fff;width:26px;height:26px;
+  border-radius:50%;display:flex;align-items:center;justify-content:center;
+  font-size:12px;font-weight:700
+}
+.flow-step .step-icon{font-size:22px;margin-bottom:8px}
+.flow-step h3{font-size:13px;font-weight:700;color:var(--navy);margin-bottom:6px}
+.flow-step p{font-size:11.5px;color:var(--muted);line-height:1.5}
+.flow-step .tag{
+  display:inline-block;padding:2px 8px;border-radius:10px;
+  font-size:10px;font-weight:600;margin-top:6px
+}
+.tag-blue{background:var(--light-blue);color:var(--blue)}
+.tag-green{background:var(--light-green);color:var(--green)}
+.tag-orange{background:var(--light-orange);color:var(--orange)}
+.tag-purple{background:var(--light-purple);color:var(--purple)}
+.tag-red{background:#fee2e2;color:#991b1b}
+
+/* Section title */
+.sec-title{
+  font-size:1.15rem;font-weight:700;color:var(--navy);
+  padding:10px 0;border-bottom:2px solid var(--red);
+  margin:28px 0 18px;display:flex;align-items:center;gap:8px
+}
+
+/* Data sheet cards */
+.sheet-grid{
+  display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px
+}
+.sheet-card{
+  background:var(--card);border:1px solid var(--border);
+  border-radius:8px;padding:14px 16px;box-shadow:0 1px 4px rgba(0,0,0,.04)
+}
+.sheet-card h4{font-size:13px;font-weight:700;color:var(--red);margin-bottom:6px}
+.sheet-card .meta{font-size:11px;color:var(--muted);margin-bottom:4px}
+.sheet-card .meta span{font-weight:600;color:#374151}
+.sheet-card .desc{font-size:11px;color:#374151;line-height:1.4}
+
+/* Code box */
+.code-box{
+  background:#1e293b;color:#e2e8f0;border-radius:8px;padding:14px 18px;
+  font-family:'Consolas','Courier New',monospace;font-size:12px;
+  line-height:1.7;overflow-x:auto;margin:10px 0
+}
+.code-box .kw{color:#93c5fd}.code-box .str{color:#86efac}
+.code-box .fn{color:#fde68a}.code-box .cmt{color:#64748b}
+.code-box .val{color:#fda4af}
+
+/* 2 col layout */
+.col2{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.col3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px}
+
+/* Table */
+.tbl{width:100%;border-collapse:collapse;font-size:12px;margin:10px 0}
+.tbl th{background:var(--navy);color:#fff;padding:7px 10px;text-align:left;font-size:11px}
+.tbl td{padding:6px 10px;border-bottom:1px solid var(--border);font-size:11px}
+.tbl tr:nth-child(even) td{background:#f5f8fc}
+
+/* Timeline */
+.timeline{position:relative;padding-left:30px}
+.timeline::before{
+  content:'';position:absolute;left:8px;top:0;bottom:0;
+  width:2px;background:var(--border)
+}
+.tl-node{
+  position:relative;margin-bottom:18px;padding-left:10px
+}
+.tl-node::before{
+  content:'';position:absolute;left:-25px;top:4px;
+  width:12px;height:12px;border-radius:50%;background:var(--red);
+  border:2px solid #fff;box-shadow:0 0 0 2px var(--red)
+}
+.tl-node h4{font-size:13px;font-weight:700;color:var(--navy)}
+.tl-node p{font-size:11px;color:var(--muted)}
+
+/* Architecture diagram */
+.arch-box{
+  display:flex;flex-direction:column;gap:10px;margin:16px 0
+}
+.arch-layer{
+  background:var(--card);border:1px solid var(--border);
+  border-radius:8px;padding:12px 16px;display:flex;align-items:center;gap:12px
+}
+.arch-layer .layer-label{
+  font-size:11px;font-weight:700;padding:4px 10px;border-radius:6px;
+  white-space:nowrap;min-width:90px;text-align:center
+}
+.l-front{background:var(--light-green);color:var(--green)}
+.l-service{background:var(--light-blue);color:var(--blue)}
+.l-data{background:var(--light-purple);color:var(--purple)}
+.l-store{background:var(--light-orange);color:var(--orange)}
+.arch-layer .layer-content{font-size:11px;color:#374151}
+.arch-layer .layer-content code{
+  background:#f1f5f9;padding:1px 5px;border-radius:3px;font-size:10.5px
+}
+
+/* Comparison */
+.cmp-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.cmp-box{
+  border-radius:8px;padding:14px 16px;border:1px solid var(--border)
+}
+.cmp-box.old{background:#fff5f5;border-left:4px solid #ef4444}
+.cmp-box.new{background:#f0fdf4;border-left:4px solid #22c55e}
+.cmp-box h4{font-size:13px;font-weight:700;margin-bottom:8px}
+.cmp-box ul{padding-left:18px;font-size:11px;color:#374151}
+.cmp-box ul li{margin-bottom:4px}
+</style>
+</head>
+<body>
+
+<div class="banner">
+  <div>
+    <h1>📡 Luồng Xử Lý Dữ Liệu Điện Báo</h1>
+    <p>VBSP-SCM — Phân hệ Phòng KH-NV · Cập nhật 06/2026</p>
+  </div>
+</div>
+
+<div class="container">
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- TỔNG QUAN LUỒNG -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+
+<div class="sec-title">🔄 TỔNG QUAN LUỒNG XỬ LÝ</div>
+
+<div class="flow-wrapper">
+  <div class="flow-row arrows">
+    <div class="flow-step">
+      <div class="step-num">1</div>
+      <div class="step-icon">📥</div>
+      <h3>Tải mẫu từ Core Banking</h3>
+      <p>Báo cáo nhanh → Báo cáo theo công thức → Điện báo ngày → Tick tất cả</p>
+      <span class="tag tag-blue">Người dùng</span>
+    </div>
+    <div class="flow-step">
+      <div class="step-num">2</div>
+      <div class="step-icon">📤</div>
+      <h3>Upload lên VBSP-SCM</h3>
+      <p>Tab 📡 Điện báo → Upload file Điện báo hiện tại + 31/12 năm trước</p>
+      <span class="tag tag-blue">Người dùng</span>
+    </div>
+    <div class="flow-step">
+      <div class="step-num">3</div>
+      <div class="step-icon">🔍</div>
+      <h3>Validate & Phân tích</h3>
+      <p>Tự nhận diện format (dọc/matrix), đếm sheet/đơn vị/chỉ tiêu, kiểm tra số liệu</p>
+      <span class="tag tag-green">upload_service.py</span>
+    </div>
+    <div class="flow-step">
+      <div class="step-num">4</div>
+      <div class="step-icon">💾</div>
+      <h3>Lưu cache & Audit</h3>
+      <p>Lưu vào cache/dienbao_ht.xlsx, ghi audit log (ai, khi nào, bao nhiêu dòng)</p>
+      <span class="tag tag-purple">data/hstd.py</span>
+    </div>
+  </div>
+
+  <div class="flow-row arrows">
+    <div class="flow-step">
+      <div class="step-num">5</div>
+      <div class="step-icon">📊</div>
+      <h3>Đọc & Chuẩn hóa</h3>
+      <p><code>doc_dienbao()</code> / <code>doc_dienbao_matrix()</code><br>Tự động chọn sheet, parse chỉ tiêu, map NQH con</p>
+      <span class="tag tag-purple">data/hstd.py</span>
+    </div>
+    <div class="flow-step">
+      <div class="step-num">6</div>
+      <div class="step-icon">⚖️</div>
+      <h3>Cân đối NV & SDV</h3>
+      <p>So sánh hiện tại vs 31/12, tính chênh lệch, tỷ lệ %, biểu đồ</p>
+      <span class="tag tag-green">tab_candoi.py</span>
+    </div>
+    <div class="flow-step">
+      <div class="step-icon">🎯</div>
+      <h3>KH vs Thực hiện</h3>
+      <p>Đối chiếu chỉ tiêu kế hoạch (nhập tay/upload) với Điện báo hiện tại</p>
+      <span class="tag tag-green">tab_kehoach.py</span>
+    </div>
+    <div class="flow-step">
+      <div class="step-icon">📄</div>
+      <h3>Báo cáo KHNV</h3>
+      <p>Tổng hợp + Đối chiếu HSTD vs Điện báo → Xuất Excel/Word</p>
+      <span class="tag tag-orange">tab_khnv_bao_cao.py</span>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- KIẾN TRÚC HỆ THỐNG -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+
+<div class="sec-title">🏗️ KIẾN TRÚC 4 TẦNG</div>
+
+<div class="arch-box">
+  <div class="arch-layer">
+    <span class="layer-label l-front">UI / Tab</span>
+    <div class="layer-content">
+      <code>tab_candoi.py</code> (Cân đối NV&SDV) &nbsp;|&nbsp;
+      <code>tab_kehoach.py</code> (KH vs TH) &nbsp;|&nbsp;
+      <code>tab_khnv_bao_cao.py</code> (Báo cáo KHNV)
+    </div>
+  </div>
+  <div class="arch-layer">
+    <span class="layer-label l-service">Service</span>
+    <div class="layer-content">
+      <code>upload_service.py → luu_dienbao()</code> (validate + lưu file) &nbsp;|&nbsp;
+      <code>khnv_bao_cao_service.py</code> (tổng hợp + xuất Excel/Word)
+    </div>
+  </div>
+  <div class="arch-layer">
+    <span class="layer-label l-data">Data</span>
+    <div class="layer-content">
+      <code>data/hstd.py → doc_dienbao()</code> (format dọc 3 cột) &nbsp;|&nbsp;
+      <code>doc_dienbao_matrix()</code> (ma trận 22 PGD) &nbsp;|&nbsp;
+      <code>liet_ke_sheet_dienbao()</code> (quét sheet) &nbsp;|&nbsp;
+      <code>db_lookup()</code> (tìm chỉ tiêu)
+    </div>
+  </div>
+  <div class="arch-layer">
+    <span class="layer-label l-store">Storage</span>
+    <div class="layer-content">
+      <code>cache/dienbao_ht.xlsx</code> (hiện tại) &nbsp;|&nbsp;
+      <code>cache/dienbao_prev.xlsx</code> (31/12) &nbsp;|&nbsp;
+      <code>data/Dienbao_ht.xlsx</code> (file mặc định) &nbsp;|&nbsp;
+      Audit log trong SQLite
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- CẤU TRÚC FILE -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+
+<div class="sec-title">🗂️ CẤU TRÚC FILE DIEN BAO NGAY CN.xlsx</div>
+
+<div class="sheet-grid">
+  <div class="sheet-card">
+    <h4>📊 M</h4>
+    <div class="meta">63 dòng × <span>33 cột</span> | Ngày <span>31/5/2026</span></div>
+    <div class="desc">SỬ DỤNG VỐN — chi tiết từng chương trình, 22 đơn vị</div>
+    <span class="tag tag-green" style="margin-top:6px">Ma trận</span>
+  </div>
+  <div class="sheet-card">
+    <h4>📅 Y</h4>
+    <div class="meta">60 dòng × <span>33 cột</span> | Ngày <span>05/01/2026</span></div>
+    <div class="desc">SỬ DỤNG VỐN — số liệu đầu năm (mốc so sánh)</div>
+    <span class="tag tag-green" style="margin-top:6px">Ma trận</span>
+  </div>
+  <div class="sheet-card">
+    <h4>🏦 DB</h4>
+    <div class="meta">342 dòng × <span>28 cột</span> | Ngày <span>03/6/2026</span></div>
+    <div class="desc">KẾ HOẠCH NGUỒN VỐN — đầy đủ nhất (TW + ĐP + điều chỉnh)</div>
+    <span class="tag tag-green" style="margin-top:6px">Ma trận</span>
+  </div>
+  <div class="sheet-card">
+    <h4>📋 KH_GIAO_DAU_NAM</h4>
+    <div class="meta">59 dòng × <span>59 cột</span> | Ngày <span>15/01/2026</span></div>
+    <div class="desc">Kế hoạch giao đầu năm — mốc baseline</div>
+    <span class="tag tag-green" style="margin-top:6px">Ma trận</span>
+  </div>
+  <div class="sheet-card">
+    <h4>✏️ DIEU_CHINH_KHTD</h4>
+    <div class="meta">62 dòng × <span>234 cột</span> | Đợt <span>T1/2026</span></div>
+    <div class="desc">Điều chỉnh chỉ tiêu từng đợt trong năm</div>
+    <span class="tag tag-orange" style="margin-top:6px">Đặc biệt</span>
+  </div>
+  <div class="sheet-card">
+    <h4>📡 DB1</h4>
+    <div class="meta">47 dòng × <span>24 cột</span></div>
+    <div class="desc">Điện báo ngày cấp CN — format dọc 22 PGD</div>
+    <span class="tag tag-blue" style="margin-top:6px">Dọc</span>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- FORMAT -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+
+<div class="sec-title">📐 SO SÁNH 2 FORMAT</div>
+
+<div class="cmp-grid">
+  <div class="cmp-box old">
+    <h4>❌ Format Cũ (3 cột)</h4>
+    <p style="font-size:11px;color:var(--muted);margin-bottom:6px">Chỉ đọc được cột B/C → bỏ qua 21 PGD</p>
+    <div class="code-box">
+<span class="cmt"># Cột B = tên chỉ tiêu, Cột C = giá trị</span>
+<span class="kw">for</span> row <span class="kw">in</span> rows:
+    ten = row[<span class="val">1</span>]  <span class="cmt">← cột B</span>
+    val = row[<span class="val">2</span>]  <span class="cmt">← cột C (chỉ có Cộng)</span>
+    rows.append({<span class="str">"ten"</span>: ten, <span class="str">"val"</span>: val})
+    </div>
+    <ul>
+      <li>Không biết số liệu từng PGD</li>
+      <li>Tên chỉ tiêu hardcode ~30 dòng</li>
+      <li>Không đọc được sheet khác</li>
+    </ul>
+  </div>
+  <div class="cmp-box new">
+    <h4>✅ Format Mới (Ma Trận)</h4>
+    <p style="font-size:11px;color:var(--muted);margin-bottom:6px">Đọc toàn bộ 22 cột PGD × tất cả sheet</p>
+    <div class="code-box">
+<span class="cmt"># Cột B = tên, Cột C = Cộng, D→... = từng PGD</span>
+data = doc_dienbao_matrix(fp, sheet=<span class="str">"M"</span>)
+<span class="cmt"># Trả về:</span>
+data[<span class="str">"rows"</span>]   <span class="cmt">← list chỉ tiêu + giá trị Cộng</span>
+data[<span class="str">"units"</span>]  <span class="cmt">← [HST, L.Thành, T.Bom, ...]</span>
+data[<span class="str">"matrix"</span>] <span class="cmt">← {"Hộ nghèo": {"HST":0.1, "T.Bom":2.6,...}}</span>
+    </div>
+    <ul>
+      <li>Đầy đủ 22 đơn vị</li>
+      <li>Tự động phát hiện chỉ tiêu</li>
+      <li>Đọc được tất cả 7 sheet</li>
+      <li>Ma trận chỉ tiêu × đơn vị</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- TIMELINE -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+
+<div class="sec-title">⏱️ QUY TRÌNH XỬ LÝ THEO THỜI GIAN</div>
+
+<div class="timeline">
+  <div class="tl-node">
+    <h4>Đầu tháng — Nhận file từ Core Banking</h4>
+    <p>Tải mẫu Điện báo ngày từ hệ thống Intellect → lưu file <code>DIEN BAO NGAY CN.xlsx</code></p>
+  </div>
+  <div class="tl-node">
+    <h4>Upload lên VBSP-SCM (≤ 5 giây)</h4>
+    <p>Vào tab 📡 Điện báo → Upload file hiện tại. Hệ thống tự validate:</p>
+    <p>✓ Kiểm tra định dạng (≥ 3 cột)  ·  ✓ Phát hiện format ma trận  ·  ✓ Đếm sheet/chỉ tiêu/đơn vị  </p>
+    <p>✓ Lưu → <code>cache/dienbao_ht.xlsx</code>  ·  ✓ Ghi audit</p>
+  </div>
+  <div class="tl-node">
+    <h4>Xem & Phân tích (real-time)</h4>
+    <p>Tab 📡 Điện báo → 6 sub-tab: Tổng quan · KH vs TH · Toàn bộ chỉ tiêu · Theo chương trình · Biểu đồ · <strong>Dữ liệu thô</strong></p>
+  </div>
+  <div class="tl-node">
+    <h4>Xuất báo cáo KHNV (tích hợp)</h4>
+    <p>Tab 📄 Báo cáo KHNV → chọn nguồn "Điện báo" → chọn sheet → xem KPI → tải Excel/Word</p>
+  </div>
+  <div class="tl-node">
+    <h4>Đối chiếu HSTD vs Điện báo</h4>
+    <p>Tab 📄 Báo cáo KHNV → chọn "So sánh" → tự động đối chiếu → cảnh báo chênh lệch > 1%</p>
+  </div>
+  <div class="tl-node">
+    <h4>Lưu trữ & Audit</h4>
+    <p>File Điện báo được lưu trong cache/, audit log ghi: ai upload, thời gian, tên file, số sheet/chỉ tiêu</p>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- DATA FLOW DETAIL -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+
+<div class="sec-title">🔀 CHI TIẾT LUỒNG DỮ LIỆU QUA CÁC HÀM</div>
+
+<table class="tbl">
+  <tr><th width="30">#</th><th width="200">Hàm</th><th width="120">Input</th><th width="120">Output</th><th>Mô tả</th></tr>
+  <tr>
+    <td>①</td><td><code>luu_dienbao()</code></td>
+    <td>File .xlsx (bytes)</td>
+    <td>KetQuaUpload</td>
+    <td>Validate cấu trúc → phát hiện format → lưu file → ghi audit</td>
+  </tr>
+  <tr>
+    <td>②</td><td><code>liet_ke_sheet_dienbao()</code></td>
+    <td>Path file</td>
+    <td>list[dict]</td>
+    <td>Quét tất cả sheet: tên, dòng, cột, format, số đơn vị, ngày</td>
+  </tr>
+  <tr>
+    <td>③</td><td><code>doc_dienbao()</code></td>
+    <td>Path + sheet</td>
+    <td>list[{ten,val,cha}]</td>
+    <td>Tự nhận diện format → parse chỉ tiêu + giá trị Cộng + NQH con</td>
+  </tr>
+  <tr>
+    <td>④</td><td><code>doc_dienbao_matrix()</code></td>
+    <td>Path + sheet</td>
+    <td>{rows, units, matrix}</td>
+    <td>Đọc ma trận đầy đủ: chỉ tiêu × đơn vị, danh sách PGD, mã đơn vị</td>
+  </tr>
+  <tr>
+    <td>⑤</td><td><code>db_lookup()</code></td>
+    <td>rows + tên CT</td>
+    <td>float</td>
+    <td>Tìm giá trị theo tên chỉ tiêu (chính xác → gần đúng)</td>
+  </tr>
+  <tr>
+    <td>⑥</td><td><code>tong_hop_tu_dienbao()</code></td>
+    <td>sheet_name</td>
+    <td>dict metrics + matrix</td>
+    <td>Tổng hợp 12 chỉ số chính (dư nợ, NQH, vốn TW, huy động...) từ Điện báo</td>
+  </tr>
+  <tr>
+    <td>⑦</td><td><code>so_sanh_hstd_vs_dienbao()</code></td>
+    <td>2 dict</td>
+    <td>list[dict]</td>
+    <td>Đối chiếu chỉ số HSTD vs Điện báo → cảnh báo chênh lệch > 1%</td>
+  </tr>
+  <tr>
+    <td>⑧</td><td><code>xuat_excel_bao_cao_khnv()</code><br><code>xuat_word_bao_cao_khnv()</code></td>
+    <td>so_lieu + bảng</td>
+    <td>bytes (.xlsx / .docx)</td>
+    <td>Xuất báo cáo Excel 5 sheet hoặc Word với bảng + số liệu tự động</td>
+  </tr>
+</table>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- CAP NHAT -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+
+<div class="sec-title">📋 TÓM TẮT CÁC NÂNG CẤP (06/2026)</div>
+
+<table class="tbl">
+  <tr><th width="40">#</th><th>Nâng cấp</th><th>File</th><th>Trước</th><th>Sau</th></tr>
+  <tr>
+    <td>1</td><td>Đọc ma trận 22 PGD</td>
+    <td><code>data/hstd.py</code></td>
+    <td>Chỉ đọc cột B/C</td>
+    <td>Đọc 22 cột PGD, 7 sheet</td>
+  </tr>
+  <tr>
+    <td>2</td><td>Tự nhận diện format</td>
+    <td><code>data/hstd.py</code></td>
+    <td>Hardcode 3 cột</td>
+    <td>Tự detect matrix/dọc</td>
+  </tr>
+  <tr>
+    <td>3</td><td>Tab Dữ liệu thô</td>
+    <td><code>tab_candoi.py</code></td>
+    <td>Không có</td>
+    <td>Chọn sheet, chọn PGD, tải Excel</td>
+  </tr>
+  <tr>
+    <td>4</td><td>Validate thông minh</td>
+    <td><code>upload_service.py</code></td>
+    <td>Chỉ check 3 cột</td>
+    <td>Phát hiện format, đếm sheet/CT/ĐV</td>
+  </tr>
+  <tr>
+    <td>5</td><td>Báo cáo KHNV</td>
+    <td><code>tab_khnv_bao_cao.py</code></td>
+    <td>Không có</td>
+    <td>3 chế độ: HSTD/Điện báo/So sánh</td>
+  </tr>
+  <tr>
+    <td>6</td><td>Đối chiếu tự động</td>
+    <td><code>khnv_bao_cao_service.py</code></td>
+    <td>Không có</td>
+    <td>HSTD vs Điện báo, cảnh báo >1%</td>
+  </tr>
+  <tr>
+    <td>7</td><td>Lookup keys chuẩn</td>
+    <td><code>tab_candoi.py</code></td>
+    <td>Hardcode lệch</td>
+    <td>Khớp tên thực tế trong DB1</td>
+  </tr>
+</table>
+
+</div>
+</body>
+</html>

@@ -94,14 +94,14 @@ _CHUONG_TRINH_CANDOI: list[tuple[str, str | None]] = [
     ("Hộ nghèo KHA",               "Dư nợ hộ nghèo KHA"),
     ("Hộ cận nghèo KHA",           "Dư nợ hộ cận nghèo KHA"),
     ("Hộ mới thoát nghèo KHA",     "Dư nợ hộ mới thoát nghèo KHA"),
-    ("HSSV có HCKK",               "Dư nợ HSSV có HCKK"),
+    ("HSSV có HCKK",               "Dư nợ HSSV"),           # DB1 dùng "Dư nợ HSSV"
     ("Giải quyết việc làm KHA",    "Dư nợ GQVL KHA"),
-    ("NSVSMT nông thôn (KHA+KHB)", "Dư nợ NSVSMT NT"),
+    ("NSVSMT nông thôn",           "Dư nợ NSVSMT NT"),
     ("SXKD vùng KK",               "Dư nợ SXKD VKK"),
     ("TN vùng KK",                 "Dư nợ TN VKK"),
     ("Nhà ở hộ nghèo",             "Dư nợ hộ nghèo về nhà ở"),
-    ("Nhà ở gđ2 KHA",              "Dư nợ nhà ở gđ2 KHA"),
-    ("XKLĐ",                       "Dư nợ XKLĐ"),
+    ("Nhà ở giai đoạn 2 KHA",      "Dư nợ nhà ở gđ 2 KHA"),
+    ("Cho vay XKLĐ",               "Dư nợ XKLĐ"),
     ("KFW",                        "Dư nợ KFW"),
     ("DTTS ĐBKK KHA",              "Dư nợ DTTS ĐBKK KHA"),
     ("DTTS 2085 KHA",              "Dư nợ DTTS 2085 KHA"),
@@ -113,12 +113,11 @@ _CHUONG_TRINH_CANDOI: list[tuple[str, str | None]] = [
     ("Hộ nghèo KHB",               "Dư nợ hộ nghèo KHB"),
     ("Hộ cận nghèo KHB",           "Dư nợ hộ cận nghèo KHB"),
     ("Hộ mới thoát nghèo KHB",     "Dư nợ hộ mới thoát nghèo KHB"),
-    ("Giải quyết việc làm KHB",    "Dư nợ GQVK KHB"),
+    ("Giải quyết việc làm KHB",    "Dư nợ GQVL KHB"),       # sửa GQVK→GQVL
     ("NSVSMT NT KHB",              "Dư nợ NSVSMT NT KHB"),
     ("DTTS ĐBKK KHB",              "Dư nợ DTTS ĐBKK KHB"),
     ("DTTS 2085 KHB",              "Dư nợ DTTS 2085 KHB"),
     ("NOXH 100% KHB",              "Dư nợ NOXH100 KHB"),
-    ("Nhà ở CHSAPT KHB",           "DƯ nợ NCHSAPT KHB"),
     ("Khác KHB",                   "Dư nợ Khác KHB"),
     ("Nợ quá hạn KHB",             "Dư nợ Quá hạn KHB"),
     ("Nợ khoanh KHB",              "Dư nợ Khoanh KHB"),
@@ -235,12 +234,13 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                 "_ht": val_ht, "_pv": val_pv or 0, "_cl": cl or 0,
             }
 
-        cd_tab1, cd_tab2, cd_tab3, cd_tab4, cd_tab5 = st.tabs([
+        cd_tab1, cd_tab2, cd_tab3, cd_tab4, cd_tab5, cd_tab6 = st.tabs([
             "📊 Tổng quan",
             "🎯 KH vs Thực hiện",
             "📋 Toàn bộ chỉ tiêu",
             "📌 Theo chương trình",
             "📊 Biểu đồ so sánh",
+            "🔍 Dữ liệu thô",
         ])
 
         with cd_tab1:
@@ -315,13 +315,16 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                     horizontal=True, key=f"cd_nhom{key_sfx}")
 
                 NHOM_KEYS_LOC = {
-                    "Nguồn vốn":       ["Nguồn vốn","Tổng huy động","Tiền gửi","UTĐT"],
+                    "Nguồn vốn":       ["Nguồn vốn","Tổng huy động","Tiền gửi","UTĐT","Vốn Trung ương","Vốn TW","HĐV"],
                     "Dư nợ KHA":       ["KHA","Kế hoạch A","GQVL KHA","NSVSMT NT","HSSV",
                                         "hộ nghèo KHA","cận nghèo KHA","thoát nghèo KHA",
-                                        "SXKD VKK","XKLĐ","KFW","nhà ở","DTTS","NOXH"],
-                    "Dư nợ KHB":       ["KHB","Kế hoạch B","GQVK KHB","NSVSMT NT KHB",
+                                        "SXKD VKK","XKLĐ","KFW","nhà ở","DTTS","NOXH",
+                                        "TN VKK","nhà ở gđ","Quá hạn KHA","Khoanh KHA"],
+                    "Dư nợ KHB":       ["KHB","Kế hoạch B","GQVL KHB","NSVSMT NT KHB",
                                         "hộ nghèo KHB","cận nghèo KHB","thoát nghèo KHB",
-                                        "DTTS ĐBKK KHB","NOXH100 KHB","NCHSAPT"],
+                                        "DTTS ĐBKK KHB","NOXH100 KHB",
+                                        "Quá hạn KHB","Khoanh KHB","Khác KHB",
+                                        "DTTS 2085"],
                     "Vốn an toàn & quỹ":["Vốn An toàn","Tồn quỹ","Tiền gửi tại NHNN"],
                 }
 
@@ -498,6 +501,103 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                     plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
                 )
                 st.plotly_chart(fig_bd, use_container_width=True)
+
+        with cd_tab6:
+            from data.hstd import doc_dienbao_matrix, liet_ke_sheet_dienbao
+
+            file_path = path_ht if path_ht and os.path.exists(path_ht) else (
+                store_ht if os.path.exists(store_ht) else None
+            )
+            if not file_path:
+                st.info("Chưa có file Điện báo — vui lòng upload ở cuối trang.")
+            else:
+                st.caption(f"📂 File: `{os.path.basename(file_path)}`")
+
+                # Liệt kê các sheet
+                try:
+                    ds_sheet = liet_ke_sheet_dienbao(file_path)
+                except Exception:
+                    ds_sheet = []
+
+                if ds_sheet:
+                    st.markdown("### 📑 Danh sách Sheet")
+                    df_sheets = pd.DataFrame(ds_sheet)
+                    st.dataframe(df_sheets, use_container_width=True, hide_index=True)
+
+                    # Chọn sheet để xem chi tiết
+                    sheet_options = [s["sheet"] for s in ds_sheet if s["format"] == "matrix"]
+                    if not sheet_options:
+                        sheet_options = [s["sheet"] for s in ds_sheet]
+
+                    chon_sheet = st.selectbox("Chọn sheet để xem dữ liệu", sheet_options, key=f"cd_raw_sheet{key_sfx}")
+
+                    if chon_sheet:
+                        try:
+                            data_matrix = doc_dienbao_matrix(file_path, 0, sheet_name=chon_sheet)
+                            units = data_matrix.get("units", [])
+                            rows = data_matrix.get("rows", [])
+                            matrix = data_matrix.get("matrix", {})
+
+                            st.markdown(f"**📅 Ngày báo cáo:** {data_matrix.get('ngay_bao_cao', 'Không rõ')}")
+                            st.markdown(f"**🏢 Số đơn vị:** {len(units)} — {', '.join(units[:5])}{'...' if len(units) > 5 else ''}")
+
+                            # Hiển thị dữ liệu dạng bảng: chỉ tiêu × đơn vị
+                            if matrix and units:
+                                st.markdown("### 📊 Bảng dữ liệu (Chỉ tiêu × Đơn vị)")
+
+                                # Chọn đơn vị để xem
+                                dv_chon = st.multiselect(
+                                    "Chọn đơn vị hiển thị",
+                                    units,
+                                    default=units[:5] if len(units) >= 5 else units,
+                                    key=f"cd_raw_dv{key_sfx}",
+                                )
+
+                                if dv_chon:
+                                    # Build DataFrame
+                                    data_rows = []
+                                    for r in rows:
+                                        if r["la_nqh_con"]:
+                                            continue
+                                        ten_ct = r["ten"]
+                                        row_data = {"Chỉ tiêu": ten_ct, "Cộng": r["val"]}
+                                        if ten_ct in matrix:
+                                            for dv in dv_chon:
+                                                row_data[dv] = matrix[ten_ct].get(dv, 0)
+                                        data_rows.append(row_data)
+
+                                    df_view = pd.DataFrame(data_rows)
+                                    cols_hien = ["Chỉ tiêu", "Cộng"] + dv_chon
+                                    df_view = df_view[[c for c in cols_hien if c in df_view.columns]]
+
+                                    column_config = {"Chỉ tiêu": st.column_config.TextColumn("Chỉ tiêu", width="large")}
+                                    for c in df_view.columns:
+                                        if c != "Chỉ tiêu":
+                                            column_config[c] = st.column_config.NumberColumn(c, format="%.0f")
+
+                                    hien_thi_dataframe_phan_trang(
+                                        df_view,
+                                        key=f"cd_raw_table{key_sfx}",
+                                        column_config=column_config,
+                                        height=500,
+                                    )
+
+                                    # Download button
+                                    buf_raw = BytesIO()
+                                    with pd.ExcelWriter(buf_raw, engine="openpyxl") as w:
+                                        df_view.to_excel(w, index=False, sheet_name=chon_sheet)
+                                    st.download_button(
+                                        "⬇️ Tải Excel dữ liệu thô",
+                                        data=buf_raw.getvalue(),
+                                        file_name=f"DienBao_{chon_sheet}_{datetime.today().strftime('%d%m%Y')}.xlsx",
+                                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                        key=f"cd_raw_dl{key_sfx}",
+                                    )
+                        except Exception as e:
+                            logger.error("Lỗi đọc dữ liệu thô: %s", e, exc_info=True)
+                            st.error(f"❌ Lỗi: {e}")
+                else:
+                    st.info("Không thể phân tích cấu trúc file.")
 
         st.divider()
 

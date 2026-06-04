@@ -16,7 +16,8 @@ from data.core import ts_file, excel_to_parquet
 # hstd
 from data.hstd import (
     doc_file, doc_file_nq11, doc_file_gqvl, doc_file_sk_gqvl,
-    doc_dienbao, db_lookup, db_nqh_con,
+    doc_dienbao, doc_dienbao_matrix, liet_ke_sheet_dienbao,
+    db_lookup, db_nqh_con,
     danh_dau_khong_hd, danh_dau_khong_hd_cached,
     tong_hop_khong_hd, tong_hop_khong_hd_cached,
     ds_chi_tiet_khong_hd, canh_bao_migration, canh_bao_migration_cached,

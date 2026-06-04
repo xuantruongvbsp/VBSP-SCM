@@ -234,29 +234,204 @@ def doc_file_sk_gqvl(fp: str, _ts) -> pd.DataFrame:
 
 # ── ĐIỆN BÁO ─────────────────────────────────────────────────────────────────
 @st.cache_data(ttl=7200, show_spinner=False)
-def doc_dienbao(fp: str, _ts) -> list:
+def doc_dienbao(fp: str, _ts, sheet_name: str | None = None) -> list:
     """
-    Đọc file Điện báo 2 cột (Chỉ tiêu / Giá trị).
+    Đọc file Điện báo — tự động nhận diện format:
+
+    Format 1 (cũ - dọc): Cột B = tên chỉ tiêu, Cột C = giá trị tổng.
+    Format 2 (mới - ma trận): Cột B = tên chỉ tiêu, Cột C = Cộng (tổng),
+                              từ Cột D trở đi = giá trị từng PGD.
+
     Trả về list[dict]: {ten, val, la_nqh_con, cha}
+    val luôn là giá trị cột C (Cộng/Tổng).
+
+    Nếu sheet_name được chỉ định, chỉ đọc sheet đó.
     """
-    df_raw = pd.read_excel(fp, header=None)
+    if sheet_name:
+        df_raw = pd.read_excel(fp, sheet_name=sheet_name, header=None)
+    else:
+        df_raw = pd.read_excel(fp, header=None)
+
+    # Tự động nhận diện format: nếu có >=5 cột và row4 có "Cộng" → matrix
+    is_matrix = False
+    if len(df_raw.columns) >= 5 and len(df_raw) >= 5:
+        v_header = str(df_raw.iloc[4, 2]).strip().lower() if pd.notna(df_raw.iloc[4, 2]) else ""
+        if "cộng" in v_header or "tong" in v_header:
+            is_matrix = True
+
     rows, ten_cha = [], None
+    skip_keywords = ("", "nan", "chỉ tiêu", "điện báo ngày", "stt", "b.", "a.", "i", "ii", "iii")
+    nqh_prefixes = ("trđ:", "nqh:", "trd:")
+
     for _, row in df_raw.iterrows():
         ten = str(row.iloc[1]).strip() if pd.notna(row.iloc[1]) else ""
-        if ten in ("", "nan", "Chỉ tiêu", "Điện báo ngày"):
+
+        # Bỏ qua dòng tiêu đề / trống
+        if ten.lower() in skip_keywords or ten == "":
             continue
+        # Bỏ qua dòng header của bảng (dòng có "sử dụng vốn", "kế hoạch", "nguồn vốn" nhưng là section header)
+        if any(kw in ten.lower() for kw in ("điện báo", "ngân hàng", "chi nhánh", "cân đối")):
+            continue
+
+        # Đọc giá trị từ cột C (Cộng) — index 2
         try:
             val = float(row.iloc[2]) if pd.notna(row.iloc[2]) else 0.0
-        except:
+        except (ValueError, TypeError):
             val = 0.0
-        if ten.startswith("Trđ:"):
+
+        # Phát hiện dòng NQH con (prefix Trđ: hoặc indent)
+        is_nqh_con = False
+        if ten.startswith("-") or ten.startswith("+"):
+            # Dòng con (có dấu - hoặc + ở đầu)
+            is_nqh_con = True
+            ten_clean = ten.lstrip("-+ ").strip()
+            rows.append({"ten": f"  NQH: {ten_clean}", "val": val,
+                         "la_nqh_con": True, "cha": ten_cha})
+            continue
+        elif any(ten.lower().startswith(p) for p in nqh_prefixes):
             rows.append({"ten": f"  NQH: {ten_cha}", "val": val,
                          "la_nqh_con": True, "cha": ten_cha})
+            continue
+
+        rows.append({"ten": ten, "val": val,
+                     "la_nqh_con": False, "cha": None})
+        ten_cha = ten
+
+    return rows
+
+
+def doc_dienbao_matrix(
+    fp: str,
+    _ts,
+    sheet_name: str | None = None,
+    cot_tong: int = 2,
+) -> dict[str, list]:
+    """
+    Đọc file Điện báo format MA TRẬN (nhiều cột PGD).
+
+    Trả về dict:
+    {
+        "rows": list[dict],       # như doc_dienbao() — cột Cộng
+        "units": list[str],       # tên các đơn vị (HST, L.Thành, T.Bom, ...)
+        "unit_codes": list[str],  # mã đơn vị (004601, 004602, ...)
+        "matrix": {ten_ct: {ten_dv: float}},  # ma trận đầy đủ
+        "ngay_bao_cao": str,      # ngày trên file
+        "sheet_name": str,
+    }
+    """
+    if sheet_name:
+        df_raw = pd.read_excel(fp, sheet_name=sheet_name, header=None)
+    else:
+        df_raw = pd.read_excel(fp, header=None)
+
+    # ── Trích xuất danh sách đơn vị (từ row 4, từ cột 3 trở đi) ──
+    units = []
+    unit_codes = []
+    for j in range(3, len(df_raw.columns)):
+        ten_dv = str(df_raw.iloc[4, j]).strip() if pd.notna(df_raw.iloc[4, j]) else ""
+        ma_dv = str(int(df_raw.iloc[3, j])) if pd.notna(df_raw.iloc[3, j]) else ""
+        if ten_dv and ten_dv.lower() != "nan":
+            units.append(ten_dv)
+            unit_codes.append(ma_dv)
+
+    # ── Trích xuất ngày báo cáo ──
+    ngay_bc = ""
+    for i in range(min([5], len(df_raw))):
+        for j in range(len(df_raw.columns)):
+            v = str(df_raw.iloc[i, j]) if pd.notna(df_raw.iloc[i, j]) else ""
+            if "ngày" in v.lower():
+                ngay_bc = v.replace("Ngày ", "").replace("ngày ", "").strip()
+                break
+
+    # ── Đọc chỉ tiêu + giá trị ──
+    rows = []
+    matrix = {}
+    ten_cha = None
+    skip_keywords = ("", "nan", "chỉ tiêu", "điện báo ngày", "stt",
+                     "sử dụng vốn", "kế hoạch nguồn vốn", "trung ương",
+                     "địa phương")
+
+    for i in range(5, len(df_raw)):
+        ten = str(df_raw.iloc[i, 1]).strip() if pd.notna(df_raw.iloc[i, 1]) else ""
+        if not ten or ten.lower() in skip_keywords:
+            continue
+        if ten.lower() in ("i", "ii", "iii"):
+            continue
+
+        try:
+            val_tong = float(df_raw.iloc[i, cot_tong]) if pd.notna(df_raw.iloc[i, cot_tong]) else 0.0
+        except (ValueError, TypeError):
+            val_tong = 0.0
+
+        # Đọc giá trị từng đơn vị
+        dv_vals = {}
+        for j, dv_name in enumerate(units):
+            col_idx = 3 + j
+            try:
+                dv_vals[dv_name] = float(df_raw.iloc[i, col_idx]) if pd.notna(df_raw.iloc[i, col_idx]) else 0.0
+            except (ValueError, TypeError):
+                dv_vals[dv_name] = 0.0
+
+        matrix[ten] = dv_vals
+
+        # Dòng con (bắt đầu bằng - hoặc +)
+        if ten.startswith("-") or ten.startswith("+"):
+            ten_clean = ten.lstrip("-+ ").strip()
+            rows.append({"ten": f"  NQH: {ten_clean}", "val": val_tong,
+                         "la_nqh_con": True, "cha": ten_cha})
         else:
-            rows.append({"ten": ten, "val": val,
+            rows.append({"ten": ten, "val": val_tong,
                          "la_nqh_con": False, "cha": None})
             ten_cha = ten
-    return rows
+
+    return {
+        "rows": rows,
+        "units": units,
+        "unit_codes": unit_codes,
+        "matrix": matrix,
+        "ngay_bao_cao": ngay_bc,
+        "sheet_name": sheet_name or "",
+    }
+
+
+def liet_ke_sheet_dienbao(fp: str) -> list[dict]:
+    """Liệt kê các sheet trong file Điện báo, kèm metadata."""
+    import pandas as pd
+    xls = pd.ExcelFile(fp)
+    result = []
+    for s in xls.sheet_names:
+        df = pd.read_excel(fp, sheet_name=s, header=None)
+        n_rows = len(df)
+        n_cols = len(df.columns)
+        # Xác định format
+        is_matrix = False
+        if n_cols >= 5 and n_rows >= 5:
+            v = str(df.iloc[4, 2]).strip().lower() if pd.notna(df.iloc[4, 2]) else ""
+            if "cộng" in v or "tong" in v:
+                is_matrix = True
+        # Đếm đơn vị nếu là matrix
+        n_dv = 0
+        if is_matrix:
+            for j in range(3, n_cols):
+                if pd.notna(df.iloc[4, j]) and str(df.iloc[4, j]).strip().lower() != "nan":
+                    n_dv += 1
+        # Tìm ngày
+        ngay = ""
+        for i in range(min(5, n_rows)):
+            for j in range(min(20, n_cols)):
+                v = str(df.iloc[i, j]) if pd.notna(df.iloc[i, j]) else ""
+                if "ngày" in v.lower():
+                    ngay = v.strip()[:60]
+                    break
+        result.append({
+            "sheet": s,
+            "rows": n_rows,
+            "cols": n_cols,
+            "format": "matrix" if is_matrix else "doc",
+            "n_don_vi": n_dv,
+            "ngay": ngay,
+        })
+    return result
 
 
 def db_lookup(rows: list, ten_search: str) -> float:

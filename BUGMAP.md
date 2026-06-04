@@ -127,6 +127,25 @@
 
 ## B. Streamlit UI
 
+### B6 — `cannot import name 'render_nhap_cn' from partially initialized module 'tabs.tab_khtd_nhap'`
+| | |
+|---|---|
+| **File** | `tabs/tab_khtd.py` dòng 404 |
+| **Dấu hiệu** | Crash khi mở tab Xuất báo cáo KHTD: `cannot import name 'render_nhap_cn' from partially initialized module 'tabs.tab_khtd_nhap' (most likely due to a circular import)` |
+| **Nguyên nhân** | `tab_khtd.py` import `render_nhap_cn, render_nhap_pgd` từ `tab_khtd_nhap` ở **module-level**; trong khi `tab_khtd_nhap` cũng import các hằng/hàm từ `tab_khtd` ở module-level → vòng tròn: A chưa xong đã bị B hỏi, B chưa xong đã bị A hỏi |
+| **Fix** | Xóa module-level import dòng 404; chuyển thành **lazy import** bên trong `with tab_cn:` / `with tab_xa:` block — đúng pattern đã dùng cho `render_xuat_baocao` (line 449) |
+| **Pattern chuẩn** | Bất kỳ hai tab nào import lẫn nhau → bên **gọi hàm** phải dùng lazy import bên trong hàm/block, không để ở module-level |
+| **Ngày fix** | 2026-06-04 |
+
+### B5 — KPI Điện báo hiển thị sai 1000x (scan đơn vị chỉ quét 15 cột)
+| | |
+|---|---|
+| **File** | `tabs/tab_candoi.py` dòng ~199–209 |
+| **Dấu hiệu** | KPI "Tổng dư nợ" hiển thị `13,430,710 tỷ đồng` thay vì `13,430.7 tỷ đồng`; biểu đồ thanh thấp bất thường (giá trị chia /1,000,000 thay vì /1000) |
+| **Nguyên nhân** | Vòng lặp detect "triệu đồng" chỉ quét 15 cột đầu → sheet M có text đơn vị ở cột xa → `_don_vi_trieu = False` → `_to_ty(x)` trả về `x` nguyên vẹn thay vì `/1000`; `_dv_div = 1_000_000` thay vì `1000` |
+| **Fix** | Mặc định `_don_vi_trieu = True` (tất cả file Điện báo VBSP đều dùng triệu đồng). `_to_ty(x) = round(x/1000, 2)` unconditional. `_dv_div = 1000` unconditional |
+| **Ngày fix** | 2026-06-04 |
+
 ### B4 — Tab HỖ TRỢ ĐỊA BÀN load chậm (mọi rerun)
 | | |
 |---|---|
@@ -754,6 +773,18 @@ def _duong_dan_pgd(ten_pgd: str, loai: str) -> str:
     from data.pgd import duong_dan_pgd as _fn  # chỉ chạy khi hàm được gọi
     return _fn(ten_pgd, loai)
 ```
+
+---
+
+### J7 — TypeError: `'<' not supported between instances of 'int' and 'list'` từ min([N], int)
+
+| | |
+|---|---|
+| **File** | `data/hstd.py` dòng 376 trong `doc_dienbao_matrix()` |
+| **Dấu hiệu** | Tab Cân đối → sub-tab "Dữ liệu thô" → `❌ Lỗi: '<' not supported between instances of 'int' and 'list'` |
+| **Nguyên nhân** | Trae viết `min([5], len(df_raw))` thay vì `min(5, len(df_raw))`. Python's `min(a,b)` thực hiện `b < a` để so sánh → `int < list` → TypeError. |
+| **Fix** | `min([5], len(df_raw))` → `min(5, len(df_raw))` |
+| **Ngày fix** | 2026-06-04 |
 
 ---
 

@@ -265,13 +265,17 @@ def doc_dienbao(fp: str, _ts, sheet_name: str | None = None) -> list:
             sum_all_cols = True
 
     # ── Phát hiện đơn vị (triệu đồng hay đồng) ──
-    don_vi_trieu = False
-    for i in range(min(5, len(df_raw))):
-        for j in range(min(15, n_cols)):
+    # Mặc định coi là triệu đồng (VBSP dùng đơn vị này)
+    don_vi_trieu = True
+    # Kiểm tra text "đồng" mà không có "triệu" → đơn vị là đồng
+    for i in range(min(8, len(df_raw))):
+        for j in range(min(30, n_cols)):
             v = str(df_raw.iloc[i, j]).lower() if pd.notna(df_raw.iloc[i, j]) else ""
             if "triệu đồng" in v:
                 don_vi_trieu = True
                 break
+            if "nghìn đồng" in v or ("đồng" in v and "triệu" not in v and "tỷ" not in v):
+                don_vi_trieu = False
 
     rows, ten_cha = [], None
     skip_keywords = ("", "nan", "chỉ tiêu", "điện báo ngày", "stt", "b.", "a.", "i", "ii", "iii")
@@ -373,7 +377,7 @@ def doc_dienbao_matrix(
 
     # ── Trích xuất ngày báo cáo ──
     ngay_bc = ""
-    for i in range(min([5], len(df_raw))):
+    for i in range(min(5, len(df_raw))):
         for j in range(len(df_raw.columns)):
             v = str(df_raw.iloc[i, j]) if pd.notna(df_raw.iloc[i, j]) else ""
             if "ngày" in v.lower():

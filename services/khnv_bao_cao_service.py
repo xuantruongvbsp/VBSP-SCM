@@ -171,28 +171,20 @@ def _tim_file_dienbao_prev() -> str | None:
     return None
 
 
-def tong_hop_tu_dienbao(sheet_name: str = "DB1") -> dict:
+def tong_hop_tu_dienbao(sheet_name: str = "DB1", file_path_override: str | None = None) -> dict:
     """Đọc file Điện báo → tổng hợp các chỉ số chính + bảng theo đơn vị.
 
     Args:
-        sheet_name: Sheet để đọc (mặc định DB1 - format dọc tiện cho lookup)
+        sheet_name:         Sheet để đọc (mặc định DB1)
+        file_path_override: Đường dẫn file khác (dùng cho file kỳ trước).
+                            None → tự tìm file hiện tại.
 
     Returns:
-        dict: {
-            "tong_du_no", "du_no_kha", "du_no_khb",
-            "du_no_qua_han_kha", "du_no_qua_han_khb",
-            "nguon_tw_kha", "huy_dong_von", "utdt_dp",
-            "nguon": "Điện báo",
-            "ngay_bao_cao": str,
-            "file_path": str,
-            "matrix": {ten_ct: {ten_dv: float}},  # ma trận đầy đủ
-            "units": list[str],
-            "bang_theo_dv": pd.DataFrame,
-        }
+        dict: {tong_du_no, du_no_kha, du_no_khb, nguon_tw_kha, ...}
     """
     from data.hstd import doc_dienbao_matrix, db_lookup
 
-    fp = _tim_file_dienbao()
+    fp = file_path_override if file_path_override else _tim_file_dienbao()
     if not fp:
         return {"nguon": "Điện báo", "error": "Chưa có file Điện báo"}
 
@@ -537,3 +529,136 @@ def _add_df_to_docx_table(doc, df: pd.DataFrame, font_size: int = 8):
             for p in cells[i].paragraphs:
                 for run in p.runs:
                     run.font.size = Pt(font_size)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PHẦN 7: RENDER MẪU BÁO CÁO (Preview trong UI)
+# ══════════════════════════════════════════════════════════════════════════════
+
+_RE_TEMPLATE_VAR = __import__("re").compile(r"\{\{(\w+)\}\}")
+
+
+def _fmt_triệu(x) -> str:
+    """Format số → chuỗi triệu đồng (kiểu Việt Nam: 1.234.567)."""
+    try:
+        n = float(x)
+        trieu = n / 1_000_000
+        s = f"{trieu:,.0f}"
+        return s.replace(",", ".")
+    except (ValueError, TypeError):
+        return str(x)
+
+
+def build_template_vars(
+    so_lieu: dict,
+    bang_pgd: pd.DataFrame | None = None,
+    chenh_lech: list | None = None,
+) -> dict[str, str]:
+    """Xây dựng dict biến cho template {{tên_biến}}.
+
+    Hỗ trợ các biến:
+      {{thang}} {{nam}} {{nguon}} {{ngay_bao_cao}}
+      {{tong_du_no}} {{du_no_trong_han}} {{du_no_qua_han}} {{du_no_khoanh}}
+      {{ty_le_no_qua_han}} {{so_khach_hang}} {{so_mon_vay}}
+      {{nguon_von_tw}} {{nguon_von_dp}} {{giai_ngan_trong_thang}}
+      {{du_no_kha}} {{du_no_khb}}
+      {{du_no_qua_han_kha}} {{du_no_qua_han_khb}}
+      {{du_no_khoanh_kha}} {{du_no_khoanh_khb}}
+      {{nguon_tw_kha}} {{huy_dong_von}} {{utdt_dp}} {{von_an_toan}}
+      {{bang_pgd_text}} {{chenh_lech_text}}
+
+    Giá trị số được format kiểu Việt Nam (triệu đồng).
+    """
+    vars_map: dict[str, str] = {}
+
+    # ── Trường text ──
+    for k in ("thang", "nam", "nguon", "ngay_bao_cao"):
+        v = so_lieu.get(k, "")
+        vars_map[k] = str(v) if v else ""
+
+    # ── Số tiền (HSTD) ──
+    _money_keys = (
+        "tong_du_no", "du_no_trong_han", "du_no_qua_han", "du_no_khoanh",
+        "nguon_von_tw", "nguon_von_dp", "giai_ngan_trong_thang",
+    )
+    for k in _money_keys:
+        v = so_lieu.get(k, 0)
+        vars_map[k] = _fmt_triệu(v) if v else "—"
+
+    # ── Số đếm / tỷ lệ ──
+    vars_map["ty_le_no_qua_han"] = f"{so_lieu.get('ty_le_no_qua_han', 0)}%"
+    vars_map["so_khach_hang"] = f"{so_lieu.get('so_khach_hang', 0):,}".replace(",", ".")
+    vars_map["so_mon_vay"] = f"{so_lieu.get('so_mon_vay', 0):,}".replace(",", ".")
+
+    # ── Số tiền (Điện báo) ──
+    _db_keys = (
+        "du_no_kha", "du_no_khb",
+        "du_no_qua_han_kha", "du_no_qua_han_khb",
+        "du_no_khoanh_kha", "du_no_khoanh_khb",
+        "nguon_tw_kha", "huy_dong_von", "utdt_dp", "von_an_toan",
+    )
+    for k in _db_keys:
+        v = so_lieu.get(k, 0)
+        vars_map[k] = _fmt_triệu(v) if v else "—"
+
+    # ── Bảng PGD (text thuần) ──
+    if bang_pgd is not None and not bang_pgd.empty:
+        lines = []
+        for _, r in bang_pgd.iterrows():
+            pgd_name = r.iloc[0]
+            vals = []
+            for c in r.index[1:]:
+                v = r[c]
+                vals.append(_fmt_triệu(v) if isinstance(v, (int, float)) else str(v))
+            lines.append(f"- {pgd_name}: {' | '.join(vals)}")
+        vars_map["bang_pgd_text"] = "\n".join(lines)
+    else:
+        vars_map["bang_pgd_text"] = "*(Không có dữ liệu)*"
+
+    # ── Đối chiếu ──
+    if chenh_lech:
+        lines = []
+        for item in chenh_lech:
+            lines.append(
+                f"- {item.get('Chỉ tiêu', '')}: "
+                f"HSTD={_fmt_triệu(item.get('HSTD', 0))} | "
+                f"Điện báo={_fmt_triệu(item.get('Điện báo', 0))} | "
+                f"CL={_fmt_triệu(item.get('Chênh lệch', 0))} ({item.get('Tỷ lệ %', 0)}%) "
+                f"{item.get('Cảnh báo', '')}"
+            )
+        vars_map["chenh_lech_text"] = "\n".join(lines)
+    else:
+        vars_map["chenh_lech_text"] = "*(Không có dữ liệu đối chiếu)*"
+
+    return vars_map
+
+
+def render_mau_preview(ten_file: str, vars_map: dict[str, str]) -> str:
+    """Đọc mẫu .md → thay {{biến}} → trả về Markdown đã render.
+
+    Args:
+        ten_file: Tên file .md trong MAU_BAO_CAO_DIR
+        vars_map: Dict biến → giá trị (từ build_template_vars())
+
+    Returns:
+        Chuỗi Markdown đã thay thế biến, sẵn sàng hiển thị.
+    """
+    path = MAU_BAO_CAO_DIR / ten_file
+    if not path.exists():
+        return f"*(Không tìm thấy file mẫu: {ten_file})*"
+
+    raw = path.read_text(encoding="utf-8")
+
+    # Loại bỏ YAML frontmatter (--- ... ---)
+    if raw.startswith("---"):
+        idx = raw.find("---", 3)
+        if idx != -1:
+            raw = raw[idx + 3:].strip()
+
+    # Thay thế {{biến}}
+    def _replacer(m):
+        key = m.group(1)
+        return vars_map.get(key, m.group(0))
+
+    rendered = _RE_TEMPLATE_VAR.sub(_replacer, raw)
+    return rendered

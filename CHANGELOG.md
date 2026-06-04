@@ -1,5 +1,29 @@
 # CHANGELOG
 
+## [2026-06-04] — tab_candoi: redesign toàn bộ tab Điện báo
+- `tabs/tab_candoi.py` — Redesign toàn bộ (740 dòng → cấu trúc mới sạch hơn):
+  - Upload lên đầu (state-based): chưa có file → form nổi bật + return; đã có → compact status bar + expander
+  - Sheet selector 2 cột: Sheet HIỆN TẠI (default M) + Sheet SO SÁNH (auto-map M→Y, DB→KH_GIAO_DAU_NAM)
+  - `doc_dienbao()` giờ nhận `sheet_name` đúng sheet được chọn → KPI/bảng đọc đúng dữ liệu
+  - Rút gọn từ 6 → 4 sub-tabs: xóa "KH vs TH"; gộp "Toàn bộ chỉ tiêu" vào Tổng quan (expander)
+  - Label cột dùng ngày thực tế từ metadata sheet (không hardcode "31/12/2025")
+  - Extract `_render_upload_section()` ra module-level function (reuse cho cả state A và expander)
+
+## [2026-06-04] — tab_khtd: fix circular import render_nhap_cn/render_nhap_pgd
+- `tabs/tab_khtd.py` dòng 404 — `from tabs.tab_khtd_nhap import render_nhap_cn, render_nhap_pgd` ở module-level gây circular import (tab_khtd_nhap import ngược lại tab_khtd); chuyển thành lazy import bên trong `with tab_cn:` / `with tab_xa:` block — đúng pattern đã dùng cho render_xuat_baocao
+
+## [2026-06-04] — tab_candoi: fix _to_ty() và _dv_div hiển thị sai 1000x
+- `tabs/tab_candoi.py` dòng ~199-209 — `_don_vi_trieu` scan chỉ quét 15 cột đầu, sheet M có text "triệu đồng" ở cột xa → không detect → `_to_ty(x)` trả về `x` thay vì `x/1000` → KPI hiển thị "13,430,710 tỷ đồng" thay vì "13,430.7 tỷ đồng"; tương tự `_dv_div=1_000_000` thay vì `1000` → biểu đồ sai
+- Fix: mặc định `_don_vi_trieu = True` (chuẩn VBSP), `_dv_div = 1000` unconditional, `_to_ty(x) = round(x/1000, 2)` unconditional
+
+## [2026-06-04] — tab_khnv_bao_cao: redesign theo mẫu Điện báo + fix BytesIO
+- `tabs/tab_khnv_bao_cao.py` — viết lại toàn bộ: 3 mode (Điện báo / HSTD / Đối chiếu), bảng so sánh 2 kỳ, tự map M↔Y
+- `tabs/tab_khnv_bao_cao.py` dòng 309 — fix `pd.io.excel._make_bytes_io()` không tồn tại → `BytesIO()`
+- `services/khnv_bao_cao_service.py` — service mới: tong_hop_so_lieu_thang, tong_hop_tu_dienbao, so_sanh_hstd_vs_dienbao, xuat_excel/word
+
+## [2026-06-04] — hstd.py: fix typo min([5],...) → min(5,...) trong doc_dienbao_matrix
+- `data/hstd.py` dòng 376 — `min([5], len(df_raw))` so sánh list với int → TypeError; sửa thành `min(5, len(df_raw))`
+
 ## [2026-06-04] — tab_candoi: fix delta_card nhận % thay đổi thay vì tỷ đồng
 - `tabs/tab_candoi.py` dòng ~241 — kpi_row delta đổi từ _to_ty(ht-pv) → _pct(ht,pv) = (ht-pv)/pv×100; delta_card luôn format "±X%" nên phải pass % change không phải giá trị tuyệt đối
 

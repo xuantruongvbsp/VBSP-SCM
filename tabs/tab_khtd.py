@@ -401,8 +401,7 @@ def _tinh_th_gqvl_phan_tang(df_gqvl: "pd.DataFrame | None") -> dict[str, float]:
     return result
 
 
-from tabs.tab_khtd_nhap import render_nhap_cn, render_nhap_pgd
-# render_xuat_baocao: lazy import inside render() để tránh circular import
+# render_nhap_cn / render_nhap_pgd / render_xuat_baocao: lazy import inside render() để tránh circular import
 
 
 # ── Helper đọc GQVL parquet toàn CN ─────────────────────────────────────────
@@ -442,8 +441,10 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
             "⚠️ Cảnh báo chênh lệch",
         ])
         with tab_cn:
+            from tabs.tab_khtd_nhap import render_nhap_cn  # lazy — tránh circular import
             render_nhap_cn(role, username, df_full, df_gqvl)
         with tab_xa:
+            from tabs.tab_khtd_nhap import render_nhap_pgd  # lazy — tránh circular import
             render_nhap_pgd(role, username, df_full)
         with tab_cb:
             from tabs.tab_khtd_xuat import render_xuat_baocao  # lazy — tránh circular import

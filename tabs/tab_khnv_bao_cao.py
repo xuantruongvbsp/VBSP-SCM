@@ -1,18 +1,26 @@
-"""Tab Báo cáo KHNV — Số liệu & Xuất báo cáo cho phòng KH-NV.
+"""Tab Báo cáo KHNV — Upload Điện báo & So sánh kỳ.
 
-Tích hợp 3 chế độ:
-- 📊 HSTD:     Tổng hợp từ dữ liệu chi tiết
-- 📡 Điện báo: Số liệu từ file Điện báo CN
-- 🔄 So sánh:  Đối chiếu HSTD vs Điện báo
-- 📥 Xuất:     Excel / Word
+THIẾT KẾ THEO MẪU DIEN BAO NGAY CN:
+- Upload file HIỆN TẠI (vd: sheet M) + file KỲ TRƯỚC (vd: sheet Y)
+- Bảng so sánh: Chỉ tiêu | Hiện tại | Kỳ trước | Chênh lệch | Tỷ lệ %
+- Tự động phát hiện đơn vị, định dạng số
+- Xuất Excel/Word
+
+3 chế độ:
+- 📡 Điện báo:     Upload 2 file → bảng so sánh
+- 📊 HSTD:         Từ dữ liệu chi tiết
+- 🔄 Đối chiếu:    HSTD vs Điện báo
 """
 from __future__ import annotations
 
 from datetime import date, datetime
 from typing import TYPE_CHECKING
 
+from io import BytesIO
+
 import streamlit as st
 import pandas as pd
+import os
 
 from logger import get_logger
 from services.khnv_bao_cao_service import (
@@ -20,13 +28,14 @@ from services.khnv_bao_cao_service import (
     tong_hop_tu_dienbao,
     so_sanh_hstd_vs_dienbao,
     lay_danh_sach_mau,
-    doc_noi_dung_mau,
     xuat_excel_bao_cao_khnv,
     xuat_word_bao_cao_khnv,
+    build_template_vars,
+    render_mau_preview,
 )
 from components.delta_card import kpi_row
-from config import DB_HT_CACHE, FILE_PATH_DB
-import os
+from config import DB_HT_CACHE, DB_PREV_CACHE, FILE_PATH_DB, FILE_PATH_DB_PREV
+from services.upload_service import luu_dienbao
 
 if TYPE_CHECKING:
     from streamlit.delta_generator import DeltaGenerator
@@ -34,20 +43,142 @@ if TYPE_CHECKING:
 logger = get_logger(__name__)
 
 
+def _find_db_file(loai: str) -> str | None:
+    if loai == "ht":
+        return DB_HT_CACHE if os.path.exists(DB_HT_CACHE) else (FILE_PATH_DB if os.path.exists(FILE_PATH_DB) else None)
+    elif loai == "prev":
+        return DB_PREV_CACHE if os.path.exists(DB_PREV_CACHE) else (FILE_PATH_DB_PREV if os.path.exists(FILE_PATH_DB_PREV) else None)
+    return None
+
+
+def _file_info(fp: str) -> str:
+    try:
+        kb = os.path.getsize(fp) // 1024
+        mt = datetime.fromtimestamp(os.path.getmtime(fp)).strftime("%d/%m/%Y %H:%M")
+        return f"📂 {os.path.basename(fp)} · {kb} KB · {mt}"
+    except Exception:
+        return f"📂 {os.path.basename(fp)}"
+
+
+def _fmt_vnd(x, don_vi_trieu: bool = False) -> str:
+    """Format số: nếu triệu đồng → tỷ đồng, nếu đồng → triệu đồng."""
+    try:
+        x = float(x)
+        if don_vi_trieu:
+            return f"{x/1000:,.1f}"
+        return f"{x/1_000_000:,.0f}"
+    except Exception:
+        return "—"
+
+
+def _build_ss_table(
+    fp_ht: str, sheet_ht: str, fp_prev: str | None, sheet_prev: str | None,
+) -> tuple[pd.DataFrame, bool, dict, dict]:
+    """Xây bảng so sánh từ 2 file/sheet.
+
+    Returns: (df_so_sanh, has_prev, db_ht, db_prev)
+    """
+    from data.hstd import doc_dienbao_matrix, doc_dienbao, liet_ke_sheet_dienbao
+
+    # ── Đọc data hiện tại ──
+    try:
+        data_ht = doc_dienbao_matrix(fp_ht, 0, sheet_name=sheet_ht)
+    except Exception:
+        try:
+            rows_ht = doc_dienbao(fp_ht, 0, sheet_name=sheet_ht)
+            data_ht = {"rows": rows_ht, "units": [], "matrix": {}, "ngay_bao_cao": ""}
+        except Exception as e:
+            return pd.DataFrame({"Lỗi": [str(e)]}), False, {}, {}
+
+    rows_ht = data_ht.get("rows", [])
+    ngay_ht = data_ht.get("ngay_bao_cao", "Hiện tại")
+    units = data_ht.get("units", [])
+    matrix_ht = data_ht.get("matrix", {})
+    _is_trieu = any(r.get("don_vi_trieu") for r in rows_ht)
+
+    db_ht_info = {"ngay_bao_cao": ngay_ht, "units": units, "matrix": matrix_ht,
+                  "rows": rows_ht, "is_trieu": _is_trieu}
+
+    # ── Đọc data kỳ trước ──
+    has_prev = bool(fp_prev and os.path.exists(fp_prev))
+    rows_pv = []
+    matrix_pv = {}
+    ngay_pv = "Kỳ trước"
+    if has_prev:
+        try:
+            data_pv = doc_dienbao_matrix(fp_prev, 0, sheet_name=sheet_prev)
+            rows_pv = data_pv.get("rows", [])
+            matrix_pv = data_pv.get("matrix", {})
+            ngay_pv = data_pv.get("ngay_bao_cao", "Kỳ trước")
+        except Exception:
+            try:
+                rows_pv = doc_dienbao(fp_prev, 0, sheet_name=sheet_prev)
+            except Exception:
+                rows_pv = []
+
+    db_pv_info = {"ngay_bao_cao": ngay_pv, "matrix": matrix_pv, "rows": rows_pv}
+
+    # ── Build dict tra cứu nhanh cho kỳ trước ──
+    pv_lookup = {}
+    for r in rows_pv:
+        if not r.get("la_nqh_con"):
+            pv_lookup[r["ten"]] = r["val"]
+
+    # ── Xây bảng so sánh ──
+    rows_ss = []
+    for r in rows_ht:
+        if r.get("la_nqh_con"):
+            continue
+        ten = r["ten"]
+        val_ht = r["val"]
+        val_pv = pv_lookup.get(ten, None) if has_prev else None
+
+        if val_pv is not None and val_ht != 0:
+            cl = val_ht - val_pv
+            tl = round(cl / val_pv * 100, 2) if val_pv else 0
+        else:
+            cl = None
+            tl = None
+
+        rows_ss.append({
+            "Chỉ tiêu": ten,
+            ngay_ht[:25]: _fmt_vnd(val_ht, _is_trieu),
+            ngay_pv[:25] if has_prev else "Kỳ trước": _fmt_vnd(val_pv, _is_trieu) if val_pv is not None else "—",
+            "Chênh lệch": _fmt_vnd(cl, _is_trieu) if cl is not None else "—",
+            "Tỷ lệ %": f"{tl:+.1f}%" if tl is not None else "—",
+            "_ht": val_ht, "_pv": val_pv or 0, "_cl": cl or 0, "_tl": tl or 0,
+        })
+
+    df_ss = pd.DataFrame(rows_ss)
+    return df_ss, has_prev, db_ht_info, db_pv_info
+
+
 def render(tab: DeltaGenerator | None = None, **kwargs) -> None:
     ctx = tab if tab is not None else st.container()
 
-    df_full = kwargs.get("df_full")
-    if df_full is None:
-        df_full = kwargs.get("df")
+    df_full = kwargs.get("df_full") or kwargs.get("df")
     role = kwargs.get("role", "")
     username = kwargs.get("username", "unknown")
 
+    # Biến dùng chung
+    so_lieu: dict = {}
+    bang_pgd = pd.DataFrame()
+    bang_ct = pd.DataFrame()
+    bang_uy_thac = pd.DataFrame()
+    bang_dienbao = pd.DataFrame()
+    chenh_lech: list = []
+
     with ctx:
         st.subheader("📄 Báo cáo KHNV")
-        st.caption("Tổng hợp số liệu & xuất báo cáo — HSTD + Điện báo")
 
-        st.markdown("---")
+        # ═══════════════════════════════════════════
+        # STEP 1: CHỌN NGUỒN + THÁNG/NĂM
+        # ═══════════════════════════════════════════
+        nguon = st.radio(
+            "📡 Nguồn dữ liệu:",
+            ["📡 Điện báo (upload & so sánh)", "📊 HSTD (dữ liệu chi tiết)", "🔄 Đối chiếu HSTD vs Điện báo"],
+            horizontal=True, key="khnv_bc_nguon",
+        )
 
         col1, col2 = st.columns(2)
         with col1:
@@ -55,102 +186,155 @@ def render(tab: DeltaGenerator | None = None, **kwargs) -> None:
         with col2:
             nam = st.selectbox("Năm", list(range(2024, 2031)), index=1, key="khnv_bc_nam")
 
-        # ── Chọn nguồn dữ liệu ──
-        st.markdown("---")
-        nguon = st.radio(
-            "📡 Nguồn dữ liệu:",
-            ["📊 HSTD (dữ liệu chi tiết)", "📡 Điện báo (file tổng hợp CN)", "🔄 So sánh HSTD vs Điện báo"],
-            horizontal=True,
-            key="khnv_bc_nguon",
-        )
+        st.divider()
 
-        st.markdown("---")
+        # ═══════════════════════════════════════════
+        # MODE 1: ĐIỆN BÁO — UPLOAD + SO SÁNH
+        # ═══════════════════════════════════════════
+        if nguon == "📡 Điện báo (upload & so sánh)":
+            # ── Upload Area ──
+            with st.container(border=True):
+                st.caption("📤 **Upload file Điện báo**")
 
-        # ── Tổng hợp số liệu ──
-        so_lieu = {}
-        so_lieu_db = {}
-        chenh_lech = []
+                up_ht, up_prev = st.columns(2)
 
-        if nguon == "📊 HSTD (dữ liệu chi tiết)":
-            if df_full is None or df_full.empty:
-                st.warning("⚠️ Chưa có dữ liệu HSTD. Vui lòng upload dữ liệu trước.")
+                with up_ht:
+                    fp_ht = _find_db_file("ht")
+                    if fp_ht:
+                        st.success(_file_info(fp_ht))
+                    else:
+                        st.warning("⚠️ Chưa có file hiện tại")
+                    f_ht = st.file_uploader("File HIỆN TẠI (.xlsx)", type=["xlsx", "xls"],
+                                            key="khnv_up_ht", label_visibility="collapsed")
+
+                with up_prev:
+                    fp_prev = _find_db_file("prev")
+                    if fp_prev:
+                        st.success(_file_info(fp_prev))
+                    else:
+                        st.info("💡 Upload để so sánh")
+                    f_prev = st.file_uploader("File KỲ TRƯỚC (.xlsx)", type=["xlsx", "xls"],
+                                              key="khnv_up_prev", label_visibility="collapsed")
+
+                # Xử lý upload
+                uploaded = False
+                if f_ht:
+                    kq = luu_dienbao("ht", f_ht.read(), f_ht.name)
+                    kq.hien_thi()
+                    if kq.thanh_cong:
+                        uploaded = True
+                if f_prev:
+                    kq = luu_dienbao("prev", f_prev.read(), f_prev.name)
+                    kq.hien_thi()
+                    if kq.thanh_cong:
+                        uploaded = True
+                if uploaded:
+                    st.cache_data.clear()
+                    st.rerun()
+
+            # ── Lấy lại path sau upload ──
+            fp_ht = _find_db_file("ht")
+            if not fp_ht:
+                st.info("👆 Upload file Điện báo hiện tại để bắt đầu.")
                 return
-            so_lieu = tong_hop_so_lieu_thang(df_full, thang=thang, nam=nam)
+            fp_prev = _find_db_file("prev")
 
-        elif nguon == "📡 Điện báo (file tổng hợp CN)":
-            fp_db = DB_HT_CACHE if os.path.exists(DB_HT_CACHE) else (
-                FILE_PATH_DB if os.path.exists(FILE_PATH_DB) else None
-            )
-            if not fp_db:
-                st.warning("⚠️ Chưa có file Điện báo. Vui lòng upload tại tab 📡 Điện Báo.")
-                st.info("Vào workspace Phòng KH-NV → 📡 Điện báo → Upload file Điện báo hiện tại.")
-                return
+            # ── Chọn sheet ──
+            from data.hstd import liet_ke_sheet_dienbao
+            ds_sheet = liet_ke_sheet_dienbao(fp_ht)
+            sheet_info = {s["sheet"]: s for s in ds_sheet}
+            sheet_opts = [s["sheet"] for s in ds_sheet]
 
-            st.caption(f"📂 File: `{os.path.basename(fp_db)}`")
+            col_sh, col_shp = st.columns(2)
+            with col_sh:
+                default_ix = sheet_opts.index("M") if "M" in sheet_opts else (sheet_opts.index("DB1") if "DB1" in sheet_opts else 0)
+                sheet_ht = st.selectbox("Sheet HIỆN TẠI", sheet_opts, index=default_ix,
+                                        key="khnv_sh_ht",
+                                        format_func=lambda s: f"{s} · {sheet_info[s]['rows']} dòng · {sheet_info[s].get('ngay','')[:30]}")
+            with col_shp:
+                if fp_prev:
+                    ds_sheet_pv = liet_ke_sheet_dienbao(fp_prev)
+                    sheet_opts_pv = [s["sheet"] for s in ds_sheet_pv]
+                    sheet_info_pv = {s["sheet"]: s for s in ds_sheet_pv}
+                    # Tự map: nếu ht chọn M → prev tự chọn Y
+                    auto_prev = {"M": "Y", "DB": "KH_GIAO_DAU_NAM"}.get(sheet_ht, sheet_ht)
+                    default_pv = auto_prev if auto_prev in sheet_opts_pv else (sheet_opts_pv[0] if sheet_opts_pv else None)
+                    sheet_prev = st.selectbox("Sheet KỲ TRƯỚC", sheet_opts_pv,
+                                              index=sheet_opts_pv.index(default_pv) if default_pv else 0,
+                                              key="khnv_sh_pv",
+                                              format_func=lambda s: f"{s} · {sheet_info_pv.get(s, {}).get('rows','?')} dòng")
+                else:
+                    sheet_prev = None
 
-            # Chọn sheet
-            try:
-                from data.hstd import liet_ke_sheet_dienbao
-                ds_sheet = liet_ke_sheet_dienbao(fp_db)
-                sheet_options = [s["sheet"] for s in ds_sheet]
-                sheet_info = {s["sheet"]: s for s in ds_sheet}
+            # ── BUILD SO SÁNH ──
+            df_ss, has_prev, db_ht, db_pv = _build_ss_table(fp_ht, sheet_ht, fp_prev, sheet_prev)
 
-                chon_sheet = st.selectbox(
-                    "Chọn sheet dữ liệu",
-                    sheet_options,
-                    key="khnv_bc_sheet",
-                    format_func=lambda s: f"{s} ({sheet_info[s]['format']}, {sheet_info[s]['rows']} dòng, {sheet_info[s]['ngay'][:40]})"
+            _is_trieu = db_ht.get("is_trieu", False)
+            _suffix = "tỷ đồng" if _is_trieu else "tr đồng"
+            _to_kpi = lambda x: round(x/1000, 1) if _is_trieu else round(x/1e6, 0)
+
+            # ── KPI cards nhanh (hàng đầu của bảng) ──
+            if not df_ss.empty and "Chỉ tiêu" in df_ss.columns:
+                # Tìm dòng "TỔNG DƯ NỢ" để làm KPI tổng
+                ten_dn = next((t for t in ["TỔNG DƯ NỢ", "Tổng dư nợ"] if t in df_ss["Chỉ tiêu"].values), None)
+                if ten_dn:
+                    row_dn = df_ss[df_ss["Chỉ tiêu"] == ten_dn].iloc[0]
+                    st.markdown("### 📊 Tổng quan")
+                    kpi_row([{
+                        "label": "Tổng dư nợ", "value": _to_kpi(row_dn["_ht"]),
+                        "icon": "💰", "suffix": _suffix, "precision": 1,
+                        "delta": _to_kpi(row_dn["_cl"]) if has_prev and row_dn["_cl"] else None,
+                        "delta_label": f"vs kỳ trước" if has_prev else "",
+                        "delta_color": "normal",
+                    }], num_columns=1)
+                    st.caption(f"📅 {db_ht.get('ngay_bao_cao','Hiện tại')[:40]}" +
+                               (f"  —  📅 {db_pv.get('ngay_bao_cao','Kỳ trước')[:40]}" if has_prev else ""))
+
+            # ── Bảng so sánh chính ──
+            st.divider()
+            st.markdown("### 📋 Bảng so sánh chỉ tiêu")
+
+            if not df_ss.empty:
+                col_display = [c for c in df_ss.columns if not c.startswith("_")]
+                # Dùng st.dataframe với column config
+                st.dataframe(
+                    df_ss[col_display],
+                    use_container_width=True,
+                    hide_index=True,
+                    height=600,
+                    column_config={
+                        "Chỉ tiêu": st.column_config.TextColumn("Chỉ tiêu", width="large"),
+                    },
                 )
-            except Exception:
-                chon_sheet = "DB1"
 
-            so_lieu_db = tong_hop_tu_dienbao(sheet_name=chon_sheet)
-            if "error" in so_lieu_db:
-                st.error(so_lieu_db["error"])
-                return
-            so_lieu = so_lieu_db  # dùng chung
+                # ── Download bảng ──
+                buf = BytesIO()
+                with pd.ExcelWriter(buf, engine="openpyxl") as w:
+                    df_ss[col_display].to_excel(w, index=False, sheet_name="So sánh")
+                st.download_button(
+                    f"⬇️ Tải bảng so sánh (.xlsx)",
+                    data=buf.getvalue(),
+                    file_name=f"SoSanh_DienBao_T{thang:02d}_{nam}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    key="khnv_dl_ss",
+                )
+            else:
+                st.warning("Không đọc được dữ liệu từ file.")
 
-        elif nguon == "🔄 So sánh HSTD vs Điện báo":
+            # Lưu để xuất báo cáo
+            so_lieu = {"nguon": "Điện báo", "ngay_bao_cao": db_ht.get("ngay_bao_cao", f"T{thang:02d}/{nam}"),
+                        "tong_du_no": 0, "thang": thang, "nam": nam}
+
+        # ═══════════════════════════════════════════
+        # MODE 2: HSTD
+        # ═══════════════════════════════════════════
+        elif nguon == "📊 HSTD (dữ liệu chi tiết)":
             if df_full is None or df_full.empty:
                 st.warning("⚠️ Chưa có dữ liệu HSTD.")
                 return
-
-            fp_db = DB_HT_CACHE if os.path.exists(DB_HT_CACHE) else (
-                FILE_PATH_DB if os.path.exists(FILE_PATH_DB) else None
-            )
-            if not fp_db:
-                st.warning("⚠️ Chưa có file Điện báo.")
-                return
-
             so_lieu = tong_hop_so_lieu_thang(df_full, thang=thang, nam=nam)
-            so_lieu_db = tong_hop_tu_dienbao(sheet_name="DB1")
 
-            if "error" not in so_lieu_db:
-                chenh_lech = so_sanh_hstd_vs_dienbao(so_lieu, so_lieu_db)
-                so_lieu["nguon"] = "HSTD + Điện báo"
-
-        if not so_lieu:
-            st.info("Không có dữ liệu để hiển thị.")
-            return
-
-        # ── Hiển thị KPI ──
-        st.markdown("### 📊 Số liệu tổng hợp")
-
-        if so_lieu.get("nguon", "").startswith("Điện báo"):
-            kpi_row([
-                {"label": "Tổng dư nợ", "value": so_lieu.get("tong_du_no", 0), "icon": "💰", "suffix": "đồng", "precision": 0},
-                {"label": "Dư nợ KHA", "value": so_lieu.get("du_no_kha", 0), "icon": "📋", "suffix": "đồng", "precision": 0},
-                {"label": "Dư nợ KHB", "value": so_lieu.get("du_no_khb", 0), "icon": "📋", "suffix": "đồng", "precision": 0},
-                {"label": "NQH (KHA+KHB)", "value": (so_lieu.get("du_no_qua_han_kha", 0) + so_lieu.get("du_no_qua_han_khb", 0)), "icon": "⚠️", "suffix": "đồng", "precision": 0},
-            ], num_columns=4)
-
-            kpi_row([
-                {"label": "Vốn TW (KHA)", "value": so_lieu.get("nguon_tw_kha", 0), "icon": "🏦", "suffix": "đồng", "precision": 0},
-                {"label": "Huy động vốn", "value": so_lieu.get("huy_dong_von", 0), "icon": "💵", "suffix": "đồng", "precision": 0},
-                {"label": "UTĐT ĐP", "value": so_lieu.get("utdt_dp", 0), "icon": "🤝", "suffix": "đồng", "precision": 0},
-                {"label": "Vốn An toàn", "value": so_lieu.get("von_an_toan", 0), "icon": "🛡️", "suffix": "đồng", "precision": 0},
-            ], num_columns=4)
-        else:
+            st.markdown("### 📊 Số liệu từ HSTD")
             kpi_row([
                 {"label": "Tổng dư nợ", "value": so_lieu.get("tong_du_no", 0), "icon": "💰", "suffix": "đồng", "precision": 0},
                 {"label": "Nợ quá hạn", "value": so_lieu.get("du_no_qua_han", 0), "icon": "⚠️", "suffix": "đồng", "precision": 0,
@@ -159,153 +343,101 @@ def render(tab: DeltaGenerator | None = None, **kwargs) -> None:
                 {"label": "Giải ngân tháng", "value": so_lieu.get("giai_ngan_trong_thang", 0), "icon": "📤", "suffix": "đồng", "precision": 0},
             ], num_columns=4)
 
-        # ── Đối chiếu (nếu có) ──
-        if chenh_lech:
-            st.markdown("---")
+            bang_pgd = so_lieu.get("bang_pgd", pd.DataFrame())
+            bang_ct = so_lieu.get("bang_chuong_trinh", pd.DataFrame())
+            bang_uy_thac = so_lieu.get("bang_uy_thac", pd.DataFrame())
+
+            st.divider()
+            t1, t2, t3 = st.tabs(["📋 Theo PGD", "📑 Chương trình", "🤝 Ủy thác"])
+            with t1:
+                st.dataframe(bang_pgd, use_container_width=True, hide_index=True) if not bang_pgd.empty else st.info("—")
+            with t2:
+                st.dataframe(bang_ct, use_container_width=True, hide_index=True) if not bang_ct.empty else st.info("—")
+            with t3:
+                st.dataframe(bang_uy_thac, use_container_width=True, hide_index=True) if not bang_uy_thac.empty else st.info("—")
+
+        # ═══════════════════════════════════════════
+        # MODE 3: ĐỐI CHIẾU
+        # ═══════════════════════════════════════════
+        elif nguon == "🔄 Đối chiếu HSTD vs Điện báo":
+            if df_full is None or df_full.empty:
+                st.warning("⚠️ Chưa có HSTD.")
+                return
+            fp_db = _find_db_file("ht")
+            if not fp_db:
+                st.warning("⚠️ Chưa có Điện báo.")
+                return
+
+            so_lieu = tong_hop_so_lieu_thang(df_full, thang=thang, nam=nam)
+            so_lieu_db = tong_hop_tu_dienbao(sheet_name="DB1")
+            if "error" not in so_lieu_db:
+                chenh_lech = so_sanh_hstd_vs_dienbao(so_lieu, so_lieu_db)
+                so_lieu["nguon"] = "HSTD + Điện báo"
+
             st.markdown("### 🔄 Đối chiếu HSTD vs Điện báo")
-            df_cl = pd.DataFrame(chenh_lech)
-            st.dataframe(df_cl, use_container_width=True, hide_index=True)
+            if chenh_lech:
+                st.dataframe(pd.DataFrame(chenh_lech), use_container_width=True, hide_index=True)
+            else:
+                st.info("Không có dữ liệu đối chiếu.")
 
-        st.markdown("---")
+            bang_pgd = so_lieu.get("bang_pgd", pd.DataFrame())
+            bang_ct = so_lieu.get("bang_chuong_trinh", pd.DataFrame())
+            bang_uy_thac = so_lieu.get("bang_uy_thac", pd.DataFrame())
+            bang_dienbao = so_lieu_db.get("bang_theo_dv", pd.DataFrame())
 
-        # ── Bảng chi tiết ──
-        bang_pgd = so_lieu.get("bang_pgd", pd.DataFrame())
-        bang_ct = so_lieu.get("bang_chuong_trinh", pd.DataFrame())
-        bang_uy_thac = so_lieu.get("bang_uy_thac", pd.DataFrame())
-        bang_dienbao = so_lieu.get("bang_theo_dv", pd.DataFrame())
+        # ═══════════════════════════════════════════
+        # 1. XEM & COPY BÁO CÁO (chính)
+        # ═══════════════════════════════════════════
+        st.divider()
+        st.markdown("### 📋 Báo cáo (copy sang Word)")
 
-        tab_labels = []
-        if not bang_pgd.empty:
-            tab_labels.append("📋 Theo PGD")
-        if not bang_ct.empty:
-            tab_labels.append("📑 Chương trình")
-        if not bang_uy_thac.empty:
-            tab_labels.append("🤝 Ủy thác")
-        if not bang_dienbao.empty:
-            tab_labels.append("📡 Điện báo theo ĐV")
-        if so_lieu.get("units"):
-            tab_labels.append("🗺️ Ma trận Điện báo")
-
-        if tab_labels:
-            tabs = st.tabs(tab_labels)
-            tab_idx = 0
-
-            if not bang_pgd.empty:
-                with tabs[tab_idx]:
-                    st.dataframe(bang_pgd, use_container_width=True, hide_index=True)
-                tab_idx += 1
-
-            if not bang_ct.empty:
-                with tabs[tab_idx]:
-                    st.dataframe(bang_ct, use_container_width=True, hide_index=True)
-                tab_idx += 1
-
-            if not bang_uy_thac.empty:
-                with tabs[tab_idx]:
-                    st.dataframe(bang_uy_thac, use_container_width=True, hide_index=True)
-                tab_idx += 1
-
-            if not bang_dienbao.empty:
-                with tabs[tab_idx]:
-                    st.dataframe(bang_dienbao, use_container_width=True, hide_index=True)
-                tab_idx += 1
-
-            if so_lieu.get("units"):
-                with tabs[tab_idx]:
-                    matrix = so_lieu.get("matrix", {})
-                    units = so_lieu.get("units", [])
-                    if matrix and units:
-                        dv_chon = st.multiselect(
-                            "Chọn đơn vị",
-                            units,
-                            default=units[:5] if len(units) >= 5 else units,
-                            key="khnv_bc_matrix_dv",
-                        )
-                        if dv_chon:
-                            data_rows = []
-                            ct_quan_tam = ["Tổng dư nợ", "Dư nợ Kế hoạch A", "Dư nợ Kế hoạch B",
-                                           "Dư nợ Quá hạn KHA", "Dư nợ Quá hạn KHB"]
-                            for ct in ct_quan_tam:
-                                if ct in matrix:
-                                    row_data = {"Chỉ tiêu": ct}
-                                    for dv in dv_chon:
-                                        row_data[dv] = matrix[ct].get(dv, 0)
-                                    data_rows.append(row_data)
-                            df_view = pd.DataFrame(data_rows)
-                            st.dataframe(df_view, use_container_width=True, hide_index=True)
-
-        # ── Xuất báo cáo ──
-        st.markdown("---")
-        st.markdown("### 📥 Xuất báo cáo")
-
-        # Chọn mẫu
         ds_mau = lay_danh_sach_mau()
-        mau_options = [m["ten_hien_thi"] for m in ds_mau]
-        if not mau_options:
-            mau_options = ["Không tìm thấy mẫu"]
-        ten_mau_chon = st.selectbox("Mẫu báo cáo", mau_options, key="khnv_bc_mau")
+        mau_options = [m["ten_hien_thi"] for m in ds_mau] or ["Không tìm thấy mẫu"]
 
-        che_do = st.radio(
-            "Chế độ xuất:",
-            ["📊 Xuất số liệu Excel", "📄 Sinh Word hoàn chỉnh", "📋 Cả hai"],
-            horizontal=True,
-            key="khnv_bc_che_do",
-        )
+        ten_mau_chon = st.selectbox("Chọn loại báo cáo", mau_options, key="khnv_bc_mau")
 
-        col_x1, col_x2 = st.columns(2)
-        file_name_base = f"BC_KHNV_T{thang:02d}_{nam}"
-
-        with col_x1:
-            if che_do in ["📊 Xuất số liệu Excel", "📋 Cả hai"]:
-                try:
-                    excel_bytes = xuat_excel_bao_cao_khnv(
-                        so_lieu, bang_pgd, bang_ct, bang_uy_thac,
-                        bang_dienbao=bang_dienbao if not bang_dienbao.empty else None,
-                        chenh_lech=chenh_lech,
-                    )
-                    st.download_button(
-                        f"⬇️ Tải Excel ({file_name_base}.xlsx)",
-                        data=excel_bytes,
-                        file_name=f"{file_name_base}.xlsx",
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                        key="khnv_bc_dl_excel",
-                        use_container_width=True,
-                    )
-                except Exception as e:
-                    logger.error("Excel: %s", e, exc_info=True)
-                    st.error(f"❌ Lỗi: {e}")
-
-        with col_x2:
-            if che_do in ["📄 Sinh Word hoàn chỉnh", "📋 Cả hai"]:
-                try:
-                    word_bytes = xuat_word_bao_cao_khnv(
-                        so_lieu, ten_mau_chon, bang_pgd, bang_ct,
-                        bang_dienbao=bang_dienbao if not bang_dienbao.empty else None,
-                        chenh_lech=chenh_lech,
-                    )
-                    st.download_button(
-                        f"⬇️ Tải Word ({file_name_base}.docx)",
-                        data=word_bytes,
-                        file_name=f"{file_name_base}.docx",
-                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                        key="khnv_bc_dl_word",
-                        use_container_width=True,
-                    )
-                except Exception as e:
-                    logger.error("Word: %s", e, exc_info=True)
-                    st.error(f"❌ Lỗi: {e}")
-
-        # ── Xem nội dung mẫu ──
-        if ds_mau and ten_mau_chon != "Không tìm thấy mẫu":
+        if ten_mau_chon and ds_mau and so_lieu:
             mau_info = next((m for m in ds_mau if m["ten_hien_thi"] == ten_mau_chon), None)
             if mau_info:
-                with st.expander("📖 Xem nội dung mẫu", expanded=False):
-                    nd = doc_noi_dung_mau(mau_info["ten_file"])
-                    if nd:
-                        st.markdown(nd[:3000] + ("\n\n...(còn tiếp)" if len(nd) > 3000 else ""))
+                vars_map = build_template_vars(so_lieu, bang_pgd, chenh_lech)
+                rendered = render_mau_preview(mau_info["ten_file"], vars_map)
 
-        st.markdown("---")
-        st.caption(
-            "💡 **Mẹo**: Đặt file .md mẫu vào `docs/MAU BAO CAO KHNV/` để tự động hiển thị. "
-            "Upload Điện báo tại tab 📡 Điện Báo trước khi dùng chế độ Điện báo."
-        )
+                # Text area lớn — bôi đen → Ctrl+C → paste vào Word
+                st.text_area(
+                    "Bôi đen toàn bộ → Ctrl+C → mở Word → Ctrl+V",
+                    value=rendered,
+                    height=550,
+                    key="khnv_bc_preview_area",
+                    label_visibility="visible",
+                )
+        else:
+            st.info("👆 Chọn nguồn dữ liệu & tháng/năm ở trên để hiển thị báo cáo.")
+
+        st.divider()
+        st.caption("⬇️ Hoặc tải file:")
+
+        # ═══════════════════════════════════════════
+        # 2. TẢI FILE Excel / Word (phụ)
+        # ═══════════════════════════════════════════
+        col_x1, col_x2 = st.columns(2)
+        fn = f"BC_KHNV_T{thang:02d}_{nam}"
+
+        with col_x1:
+            eb = xuat_excel_bao_cao_khnv(
+                so_lieu, bang_pgd, bang_ct, bang_uy_thac,
+                bang_dienbao=bang_dienbao if not bang_dienbao.empty else None,
+                chenh_lech=chenh_lech,
+            )
+            st.download_button(f"⬇️ Excel ({fn}.xlsx)", data=eb, file_name=f"{fn}.xlsx",
+                               mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                               key="khnv_dl_xl", use_container_width=True)
+
+        with col_x2:
+            wb = xuat_word_bao_cao_khnv(
+                so_lieu, ten_mau_chon, bang_pgd, bang_ct,
+                bang_dienbao=bang_dienbao if not bang_dienbao.empty else None,
+                chenh_lech=chenh_lech,
+            )
+            st.download_button(f"⬇️ Word ({fn}.docx)", data=wb, file_name=f"{fn}.docx",
+                               mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                               key="khnv_dl_wd", use_container_width=True)

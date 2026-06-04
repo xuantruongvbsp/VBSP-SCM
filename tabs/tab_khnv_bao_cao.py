@@ -37,7 +37,9 @@ logger = get_logger(__name__)
 def render(tab: DeltaGenerator | None = None, **kwargs) -> None:
     ctx = tab if tab is not None else st.container()
 
-    df_full = kwargs.get("df_full") or kwargs.get("df")
+    df_full = kwargs.get("df_full")
+    if df_full is None:
+        df_full = kwargs.get("df")
     role = kwargs.get("role", "")
     username = kwargs.get("username", "unknown")
 

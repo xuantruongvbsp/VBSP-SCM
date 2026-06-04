@@ -520,6 +520,7 @@ def xuat_word_bao_cao_khnv(
 
 def _add_df_to_docx_table(doc, df: pd.DataFrame, font_size: int = 8):
     """Thêm DataFrame vào Word dạng bảng."""
+    from docx.shared import Pt
     table = doc.add_table(rows=1, cols=len(df.columns))
     table.style = "Table Grid"
     for i, col in enumerate(df.columns):

@@ -24,11 +24,11 @@ from config import (
 from utils import (
     fmt_ty,
     fmt_cl,
-    fmt_pct,
     xuat_excel,
     ten_file_xuat,
     hien_thi_dataframe_phan_trang,
 )
+from components.delta_card import kpi_row
 from state_manager import SCMStateManager
 import db
 from data import ts_file, doc_dienbao, db_lookup
@@ -38,54 +38,6 @@ from services import luu_dienbao
 
 if TYPE_CHECKING:
     from streamlit.delta_generator import DeltaGenerator
-
-
-def _tao_column_config_candoi(
-    nam_prev: str,
-    nam_ht: str
-) -> dict[str, st.column_config.Column]:
-    """
-    Tạo column_config cho bảng cân đối.
-
-    Args:
-        nam_prev: Năm trước (VD: "2025")
-        nam_ht: Năm hiện tại (VD: "2026")
-
-    Returns:
-        Dict cấu hình column cho st.dataframe
-    """
-    return {
-        f"31/12/{nam_prev}": st.column_config.NumberColumn(
-            f"31/12/{nam_prev}",
-            format="%.0f",
-            help=f"Số liệu ngày 31/12/{nam_prev}"
-        ),
-        f"{nam_ht} (HT)": st.column_config.NumberColumn(
-            f"{nam_ht} (HT)",
-            format="%.0f",
-            help=f"Số liệu hiện tại năm {nam_ht}"
-        ),
-        "Chênh lệch": st.column_config.NumberColumn(
-            "Chênh lệch",
-            format="%.0f",
-            help="Chênh lệch giá trị"
-        ),
-        "Tỷ lệ %": st.column_config.NumberColumn(
-            "Tỷ lệ %",
-            format="%.2f%%",
-            help="Tỷ lệ thay đổi %"
-        ),
-        "NQH hiện tại": st.column_config.NumberColumn(
-            "NQH hiện tại",
-            format="%.0f",
-            help="Nợ quá hạn hiện tại"
-        ),
-        "NQH 31/12": st.column_config.NumberColumn(
-            "NQH 31/12",
-            format="%.0f",
-            help="Nợ quá hạn 31/12"
-        ),
-    }
 
 
 # Định nghĩa nhóm chương trình (dùng cho sub-tab + xuất Excel)
@@ -197,6 +149,15 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                 return (f"+{vfmt_cd(x,1)}%" if x > 0 else f"{vfmt_cd(x,1)}%") if x != 0 else "0%"
             except: return "—"
 
+        def _fmt_trd(x):
+            """Format số triệu đồng kiểu Việt Nam (0 số lẻ). NaN → '—'."""
+            try:
+                if pd.isna(x):
+                    return "—"
+                return vfmt_cd(float(x), 0)
+            except:
+                return "—"
+
         if pgd_mode:
             path_ht = path_dien_ht if os.path.exists(path_dien_ht) else None
             path_prev = path_dien_prev if os.path.exists(path_dien_prev) else None
@@ -234,6 +195,14 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                 "_ht": val_ht, "_pv": val_pv or 0, "_cl": cl or 0,
             }
 
+        # ── Phát hiện đơn vị (dùng chung cho tất cả sub-tab) ──
+        _don_vi_trieu = any(r.get("don_vi_trieu") for r in (db_ht_rows or []))
+        _dv_div = 1000 if _don_vi_trieu else 1_000_000  # chia để hiển thị tỷ đồng
+
+        def _to_ty(x):
+            """trđ → tỷ đồng nếu don_vi_trieu, giữ nguyên nếu là đồng."""
+            return round(x / 1000, 2) if _don_vi_trieu else x
+
         cd_tab1, cd_tab2, cd_tab3, cd_tab4, cd_tab5, cd_tab6 = st.tabs([
             "📊 Tổng quan",
             "🎯 KH vs Thực hiện",
@@ -255,13 +224,11 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                 kha_ht       = db_lookup(db_ht_rows,   "Dư nợ Kế hoạch A")
                 khb_ht       = db_lookup(db_ht_rows,   "Dư nợ Kế hoạch B")
 
-                if pgd_mode:
-                    st.markdown(f"### 📊 Tổng quan — {pgd_user} — {nam_ht}")
-                else:
-                    st.markdown(f"### 📊 Tổng quan toàn Chi nhánh — {nam_ht}")
-                m1, m2, m3, m4, m5, m6 = st.columns(6)
+                title_text = f"📊 Tổng quan {pgd_user} — {nam_ht}" if pgd_mode else f"📊 Tổng quan toàn Chi nhánh — {nam_ht}"
+                st.markdown(f"### {title_text}")
+
                 if db_prev_rows:
-                    label_so_sanh = f"so 31/12/{nam_prev}"
+                    label_so_sanh = f"31/12/{nam_prev}"
                     tong_dn_pv  = db_lookup(db_prev_rows, "Tổng dư nợ")
                     nguon_tw_pv = db_lookup(db_prev_rows, "Nguồn vốn cân đối từ TW (KHA)")
                     huy_dong_pv = db_lookup(db_prev_rows, "Tổng huy động vốn")
@@ -269,28 +236,50 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                     nqh_pv      = db_lookup(db_prev_rows, "Dư nợ Quá hạn KHA") + db_lookup(db_prev_rows, "Dư nợ Quá hạn KHB")
                     kha_pv      = db_lookup(db_prev_rows, "Dư nợ Kế hoạch A")
                     khb_pv      = db_lookup(db_prev_rows, "Dư nợ Kế hoạch B")
-                    m1.metric(f"Tổng dư nợ\n({label_so_sanh})",   fmt_ty(tong_dn_ht),  delta=fmt_cl(tong_dn_ht - tong_dn_pv))
-                    m2.metric(f"Vốn TW (KHA)\n({label_so_sanh})",  fmt_ty(nguon_tw_ht), delta=fmt_cl(nguon_tw_ht - nguon_tw_pv))
-                    m3.metric(f"Huy động vốn\n({label_so_sanh})",  fmt_ty(huy_dong_ht), delta=fmt_cl(huy_dong_ht - huy_dong_pv))
-                    m4.metric(f"Vốn UTĐT ĐP\n({label_so_sanh})",   fmt_ty(utdt_ht),     delta=fmt_cl(utdt_ht - utdt_pv))
-                    m5.metric(f"Dư nợ KHA\n({label_so_sanh})",     fmt_ty(kha_ht),      delta=fmt_cl(kha_ht - kha_pv))
-                    tl_nqh = nqh_ht / tong_dn_ht * 100 if tong_dn_ht else 0
-                    m6.metric(
-                        "NQH (KHA+KHB)",
-                        fmt_ty(nqh_ht),
-                        delta=f"{tl_nqh:.3f}% tổng DN",
-                        delta_color="inverse",
-                        help=f"Tỷ lệ NQH/Tổng dư nợ tại thời điểm hiện tại · So sánh: 31/12/{nam_prev}",
-                    )
+                    tl_nqh = round(nqh_ht / tong_dn_ht * 100, 2) if tong_dn_ht else 0
+
+                    def _pct(ht, pv):
+                        """% thay đổi so kỳ trước — None nếu không có so sánh."""
+                        return round((ht - pv) / pv * 100, 1) if pv else None
+
+                    kpi_row([
+                        {"label": "Tổng dư nợ",  "value": _to_ty(tong_dn_ht),  "icon": "💰", "suffix": "tỷ đồng", "precision": 1,
+                         "delta": _pct(tong_dn_ht, tong_dn_pv), "delta_label": f"vs {label_so_sanh}", "delta_color": "normal"},
+                        {"label": "Vốn TW (KHA)", "value": _to_ty(nguon_tw_ht), "icon": "🏦", "suffix": "tỷ đồng", "precision": 1,
+                         "delta": _pct(nguon_tw_ht, nguon_tw_pv), "delta_label": f"vs {label_so_sanh}", "delta_color": "normal"},
+                        {"label": "Huy động vốn", "value": _to_ty(huy_dong_ht), "icon": "💵", "suffix": "tỷ đồng", "precision": 1,
+                         "delta": _pct(huy_dong_ht, huy_dong_pv), "delta_label": f"vs {label_so_sanh}", "delta_color": "normal"},
+                        {"label": "Vốn UTĐT ĐP",  "value": _to_ty(utdt_ht),     "icon": "🤝", "suffix": "tỷ đồng", "precision": 1,
+                         "delta": _pct(utdt_ht, utdt_pv), "delta_label": f"vs {label_so_sanh}", "delta_color": "normal"},
+                    ], num_columns=4)
+
+                    kpi_row([
+                        {"label": "Dư nợ KHA",    "value": _to_ty(kha_ht),      "icon": "📋", "suffix": "tỷ đồng", "precision": 1,
+                         "delta": _pct(kha_ht, kha_pv), "delta_label": f"vs {label_so_sanh}", "delta_color": "normal"},
+                        {"label": "Dư nợ KHB",    "value": _to_ty(khb_ht),      "icon": "📋", "suffix": "tỷ đồng", "precision": 1,
+                         "delta": _pct(khb_ht, khb_pv), "delta_label": f"vs {label_so_sanh}", "delta_color": "normal"},
+                        {"label": "NQH (KHA+KHB)", "value": _to_ty(nqh_ht),     "icon": "⚠️", "suffix": "tỷ đồng", "precision": 2,
+                         "delta": tl_nqh, "delta_label": "% tổng DN", "delta_color": "inverse",
+                         "help": f"Tỷ lệ NQH/Tổng dư nợ: {tl_nqh}%"},
+                        {"label": "Tổng DN KHA+KHB", "value": _to_ty(kha_ht + khb_ht), "icon": "📊", "suffix": "tỷ đồng", "precision": 1},
+                    ], num_columns=4)
+
                 else:
-                    tl_nqh = nqh_ht / tong_dn_ht * 100 if tong_dn_ht else 0
-                    m1.metric("Tổng dư nợ",  fmt_ty(tong_dn_ht))
-                    m2.metric("Vốn TW (KHA)",fmt_ty(nguon_tw_ht))
-                    m3.metric("Huy động vốn",fmt_ty(huy_dong_ht))
-                    m4.metric("Vốn UTĐT ĐP", fmt_ty(utdt_ht))
-                    m5.metric("Dư nợ KHA",   fmt_ty(kha_ht))
-                    m6.metric("NQH (KHA+KHB)",fmt_ty(nqh_ht),
-                              delta=f"{tl_nqh:.3f}% tổng DN", delta_color="inverse")
+                    tl_nqh = round(nqh_ht / tong_dn_ht * 100, 2) if tong_dn_ht else 0
+                    kpi_row([
+                        {"label": "Tổng dư nợ",  "value": _to_ty(tong_dn_ht),  "icon": "💰", "suffix": "tỷ đồng", "precision": 1},
+                        {"label": "Vốn TW (KHA)", "value": _to_ty(nguon_tw_ht), "icon": "🏦", "suffix": "tỷ đồng", "precision": 1},
+                        {"label": "Huy động vốn", "value": _to_ty(huy_dong_ht), "icon": "💵", "suffix": "tỷ đồng", "precision": 1},
+                        {"label": "Vốn UTĐT ĐP",  "value": _to_ty(utdt_ht),     "icon": "🤝", "suffix": "tỷ đồng", "precision": 1},
+                    ], num_columns=4)
+
+                    kpi_row([
+                        {"label": "Dư nợ KHA",    "value": _to_ty(kha_ht),      "icon": "📋", "suffix": "tỷ đồng", "precision": 1},
+                        {"label": "Dư nợ KHB",    "value": _to_ty(khb_ht),      "icon": "📋", "suffix": "tỷ đồng", "precision": 1},
+                        {"label": "NQH (KHA+KHB)", "value": _to_ty(nqh_ht),     "icon": "⚠️", "suffix": "tỷ đồng", "precision": 2,
+                         "delta": tl_nqh, "delta_label": "% tổng DN", "delta_color": "inverse"},
+                        {"label": "Tổng DN KHA+KHB", "value": _to_ty(kha_ht + khb_ht), "icon": "📊", "suffix": "tỷ đồng", "precision": 1},
+                    ], num_columns=4)
 
         with cd_tab2:
             tab_kehoach.render(
@@ -353,10 +342,13 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
 
                 if rows_tab1:
                     cols_s = ["Chỉ tiêu", f"31/12/{nam_prev}", f"{nam_ht} (HT)", "Chênh lệch", "Tỷ lệ %"]
+                    df_s = pd.DataFrame(rows_tab1)[cols_s].copy()
+                    for _col in [f"31/12/{nam_prev}", f"{nam_ht} (HT)", "Chênh lệch"]:
+                        df_s[_col] = df_s[_col].apply(_fmt_trd)
+                    df_s["Tỷ lệ %"] = df_s["Tỷ lệ %"].apply(fmt_pct)
                     hien_thi_dataframe_phan_trang(
-                        pd.DataFrame(rows_tab1)[cols_s],
+                        df_s,
                         key=f"candoi_ss_chitieu{key_sfx}",
-                        column_config=_tao_column_config_candoi(nam_prev, nam_ht),
                         height=520,
                     )
 
@@ -405,10 +397,13 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                 df_ct = pd.DataFrame(rows_ct)
                 cols_ct = ["Chương trình", f"31/12/{nam_prev}", f"{nam_ht} (HT)",
                            "Chênh lệch", "Tỷ lệ %", "NQH hiện tại", "NQH 31/12"]
+                df_ct_view = df_ct[cols_ct].copy()
+                for _col in [f"31/12/{nam_prev}", f"{nam_ht} (HT)", "Chênh lệch", "NQH hiện tại", "NQH 31/12"]:
+                    df_ct_view[_col] = df_ct_view[_col].apply(_fmt_trd)
+                df_ct_view["Tỷ lệ %"] = df_ct_view["Tỷ lệ %"].apply(fmt_pct)
                 hien_thi_dataframe_phan_trang(
-                    df_ct[cols_ct],
+                    df_ct_view,
                     key=f"candoi_ct_chuong_trinh{key_sfx}",
-                    column_config=_tao_column_config_candoi(nam_prev, nam_ht),
                     height=560,
                 )
 
@@ -471,7 +466,7 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                         ("NSVSMT NT",     "Dư nợ NSVSMT NT"),
                         ("HSSV HCKK",     "Dư nợ HSSV có HCKK"),
                         ("SXKD VKK",      "Dư nợ SXKD VKK"),
-                        ("GQVK KHB",      "Dư nợ GQVK KHB"),
+                        ("GQVL KHB",      "Dư nợ GQVL KHB"),
                         ("NOXH KHA",      "Dư nợ NOXH100 KHA"),
                         ("NOXH KHB",      "Dư nợ NOXH100 KHB"),
                         ("Hộ MTN KHA",    "Dư nợ hộ mới thoát nghèo KHA"),
@@ -482,8 +477,8 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                     horizontal=True, key=f"cd_bd_nhom{key_sfx}")
                 items = BD_GROUPS[chon_bd]
                 ten_ng   = [i[0] for i in items]
-                val_ht_b = [db_lookup(db_ht_rows,   i[1])/1e6 for i in items]
-                val_pv_b = [db_lookup(db_prev_rows, i[1])/1e6 for i in items]
+                val_ht_b = [db_lookup(db_ht_rows,   i[1])/_dv_div for i in items]
+                val_pv_b = [db_lookup(db_prev_rows, i[1])/_dv_div for i in items]
 
                 fig_bd = go.Figure()
                 fig_bd.add_bar(name=f"31/12/{nam_prev}", x=ten_ng, y=val_pv_b,
@@ -570,15 +565,16 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                                     cols_hien = ["Chỉ tiêu", "Cộng"] + dv_chon
                                     df_view = df_view[[c for c in cols_hien if c in df_view.columns]]
 
-                                    column_config = {"Chỉ tiêu": st.column_config.TextColumn("Chỉ tiêu", width="large")}
-                                    for c in df_view.columns:
-                                        if c != "Chỉ tiêu":
-                                            column_config[c] = st.column_config.NumberColumn(c, format="%.0f")
+                                    # Pre-format số triệu đồng kiểu Việt Nam
+                                    df_view_fmt = df_view.copy()
+                                    for _c in df_view_fmt.columns:
+                                        if _c != "Chỉ tiêu":
+                                            df_view_fmt[_c] = df_view_fmt[_c].apply(_fmt_trd)
 
                                     hien_thi_dataframe_phan_trang(
-                                        df_view,
+                                        df_view_fmt,
                                         key=f"cd_raw_table{key_sfx}",
-                                        column_config=column_config,
+                                        column_config={"Chỉ tiêu": st.column_config.TextColumn("Chỉ tiêu", width="large")},
                                         height=500,
                                     )
 

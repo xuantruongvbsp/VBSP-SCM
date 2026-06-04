@@ -788,8 +788,7 @@ def _build_all_items(role: str, username: str, **kwargs) -> list:
             ],
         },
         {"group": "Kế hoạch và Thực hiện KHTD", "label": "Kế hoạch tín dụng", "icon": "file-text",  "fn": lambda: _get_tab("tab_khtd").render(None, **dict(kwargs, khtd_mode="cn"))},
-        {"group": "Kế hoạch và Thực hiện KHTD", "label": "Cân đối - Điện báo", "icon": "chart-line", "fn": lambda: _get_tab("tab_kehoach").render(None, **kwargs)},
-        {"group": "Kế hoạch và Thực hiện KHTD", "label": "📡 Điện báo",            "icon": "antenna",    "fn": lambda: _get_tab("tab_candoi").render(None, **kwargs)},
+        {"group": "Kế hoạch và Thực hiện KHTD", "label": "📡 Điện báo & KH vs TH", "icon": "antenna",   "fn": lambda: _get_tab("tab_candoi").render(None, **kwargs)},
         {"group": "Kế hoạch và Thực hiện KHTD", "label": "Xuất báo cáo KHTD",  "icon": "file-export", "fn": lambda: _get_tab("tab_khtd_xuat").render_xuat_baocao(role=kwargs.get("role", ""), username=kwargs.get("username", ""), df_full=kwargs.get("df"))},
         {
             "group": "Báo cáo",

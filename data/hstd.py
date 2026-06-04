@@ -243,7 +243,7 @@ def doc_dienbao(fp: str, _ts, sheet_name: str | None = None) -> list:
                               từ Cột D trở đi = giá trị từng PGD.
 
     Trả về list[dict]: {ten, val, la_nqh_con, cha}
-    val luôn là giá trị cột C (Cộng/Tổng).
+    val luôn là TỔNG (nếu nhiều cột PGD thì tự cộng).
 
     Nếu sheet_name được chỉ định, chỉ đọc sheet đó.
     """
@@ -252,12 +252,26 @@ def doc_dienbao(fp: str, _ts, sheet_name: str | None = None) -> list:
     else:
         df_raw = pd.read_excel(fp, header=None)
 
-    # Tự động nhận diện format: nếu có >=5 cột và row4 có "Cộng" → matrix
-    is_matrix = False
-    if len(df_raw.columns) >= 5 and len(df_raw) >= 5:
-        v_header = str(df_raw.iloc[4, 2]).strip().lower() if pd.notna(df_raw.iloc[4, 2]) else ""
-        if "cộng" in v_header or "tong" in v_header:
-            is_matrix = True
+    # Tự động nhận diện: col[2] là "Cộng"/"Tổng" → đọc 1 cột, nếu không → cộng tất cả
+    n_cols = len(df_raw.columns)
+    col2_is_tong = False
+    sum_all_cols = False
+    if n_cols >= 5 and len(df_raw) >= 5:
+        v2 = str(df_raw.iloc[4, 2]).strip().lower() if pd.notna(df_raw.iloc[4, 2]) else ""
+        if "cộng" in v2 or "tong" in v2 or "tổng" in v2:
+            col2_is_tong = True
+        else:
+            # col[2] là tên PGD (vd: "Hội sở CN Đồng Nai") → cần cộng tất cả cột
+            sum_all_cols = True
+
+    # ── Phát hiện đơn vị (triệu đồng hay đồng) ──
+    don_vi_trieu = False
+    for i in range(min(5, len(df_raw))):
+        for j in range(min(15, n_cols)):
+            v = str(df_raw.iloc[i, j]).lower() if pd.notna(df_raw.iloc[i, j]) else ""
+            if "triệu đồng" in v:
+                don_vi_trieu = True
+                break
 
     rows, ten_cha = [], None
     skip_keywords = ("", "nan", "chỉ tiêu", "điện báo ngày", "stt", "b.", "a.", "i", "ii", "iii")
@@ -269,21 +283,28 @@ def doc_dienbao(fp: str, _ts, sheet_name: str | None = None) -> list:
         # Bỏ qua dòng tiêu đề / trống
         if ten.lower() in skip_keywords or ten == "":
             continue
-        # Bỏ qua dòng header của bảng (dòng có "sử dụng vốn", "kế hoạch", "nguồn vốn" nhưng là section header)
+        # Bỏ qua dòng header của bảng
         if any(kw in ten.lower() for kw in ("điện báo", "ngân hàng", "chi nhánh", "cân đối")):
             continue
 
-        # Đọc giá trị từ cột C (Cộng) — index 2
-        try:
-            val = float(row.iloc[2]) if pd.notna(row.iloc[2]) else 0.0
-        except (ValueError, TypeError):
+        # Đọc giá trị
+        if sum_all_cols:
+            # Cộng tất cả cột số từ col[2] trở đi
             val = 0.0
+            for j in range(2, n_cols):
+                try:
+                    val += float(row.iloc[j]) if pd.notna(row.iloc[j]) else 0.0
+                except (ValueError, TypeError):
+                    pass
+        else:
+            # Đọc col[2] như cũ (Cộng/Tổng)
+            try:
+                val = float(row.iloc[2]) if pd.notna(row.iloc[2]) else 0.0
+            except (ValueError, TypeError):
+                val = 0.0
 
-        # Phát hiện dòng NQH con (prefix Trđ: hoặc indent)
-        is_nqh_con = False
+        # Phát hiện dòng NQH con
         if ten.startswith("-") or ten.startswith("+"):
-            # Dòng con (có dấu - hoặc + ở đầu)
-            is_nqh_con = True
             ten_clean = ten.lstrip("-+ ").strip()
             rows.append({"ten": f"  NQH: {ten_clean}", "val": val,
                          "la_nqh_con": True, "cha": ten_cha})
@@ -294,7 +315,8 @@ def doc_dienbao(fp: str, _ts, sheet_name: str | None = None) -> list:
             continue
 
         rows.append({"ten": ten, "val": val,
-                     "la_nqh_con": False, "cha": None})
+                     "la_nqh_con": False, "cha": None,
+                     "don_vi_trieu": don_vi_trieu})
         ten_cha = ten
 
     return rows
@@ -329,7 +351,22 @@ def doc_dienbao_matrix(
     unit_codes = []
     for j in range(3, len(df_raw.columns)):
         ten_dv = str(df_raw.iloc[4, j]).strip() if pd.notna(df_raw.iloc[4, j]) else ""
-        ma_dv = str(int(df_raw.iloc[3, j])) if pd.notna(df_raw.iloc[3, j]) else ""
+        raw_ma = df_raw.iloc[3, j]
+        try:
+            ma_dv = str(int(raw_ma)) if pd.notna(raw_ma) else ""
+        except (ValueError, TypeError):
+            # Row 3 chứa text (vd: "Đơn vị tính: Triệu đồng") — thử tìm ở row khác
+            ma_dv = ""
+            for fallback_row in (2, 4, 5):
+                if fallback_row >= len(df_raw):
+                    continue
+                try:
+                    v = df_raw.iloc[fallback_row, j]
+                    if pd.notna(v):
+                        ma_dv = str(int(v))
+                        break
+                except (ValueError, TypeError):
+                    continue
         if ten_dv and ten_dv.lower() != "nan":
             units.append(ten_dv)
             unit_codes.append(ma_dv)

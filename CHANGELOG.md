@@ -1,5 +1,32 @@
 # CHANGELOG
 
+## [2026-06-04] — tab_candoi: fix delta_card nhận % thay đổi thay vì tỷ đồng
+- `tabs/tab_candoi.py` dòng ~241 — kpi_row delta đổi từ _to_ty(ht-pv) → _pct(ht,pv) = (ht-pv)/pv×100; delta_card luôn format "±X%" nên phải pass % change không phải giá trị tuyệt đối
+
+## [2026-06-04] — tab_candoi: chuyển st.metric sang kpi_row + fix thiếu import
+- `tabs/tab_candoi.py` dòng ~232 — thay 6 st.metric thành 2 hàng kpi_row×4 cột (rộng hơn, delta là số thực, có icon)
+- `tabs/tab_candoi.py` dòng ~32 — thêm `from components.delta_card import kpi_row` (thiếu sau edit)
+
+## [2026-06-04] — tab_khtd: fix circular import với tab_khtd_xuat
+- `tabs/tab_khtd.py` dòng ~405 — chuyển `from tabs.tab_khtd_xuat import render_xuat_baocao` từ module-level sang lazy import bên trong hàm render() để phá vòng tròn tab_khtd ↔ tab_khtd_xuat
+
+## [2026-06-04] — ws_management: gộp "Cân đối - Điện báo" + "Điện báo" thành 1 mục
+- `workspaces/ws_management.py` dòng ~791 — xóa mục "Cân đối - Điện báo" (gọi tab_kehoach thừa); đổi tên "📡 Điện báo" → "📡 Điện báo & KH vs TH" gọi tab_candoi (đã embed tab_kehoach tại sub-tab 2)
+
+## [2026-06-04] — tab_candoi: fix bug GQVK typo + format số kiểu Việt Nam
+- `tabs/tab_candoi.py` dòng ~474 — fix typo "GQVK KHB" → "GQVL KHB" trong BD_GROUPS biểu đồ Tab 5 (trước đó luôn hiện 0)
+- `tabs/tab_candoi.py` — xóa `_tao_column_config_candoi()` dùng `NumberColumn` (kiểu Mỹ); thay bằng pre-format cột float → string `_fmt_trd()` kiểu Việt Nam ở Tab 3, 4, 6
+- `tabs/tab_candoi.py` dòng 27 — bỏ import `fmt_pct` thừa (bị shadow bởi local function)
+
+## [2026-06-04] — Fix khnv_bao_cao_service: Pt not defined trong _add_df_to_docx_table
+- `services/khnv_bao_cao_service.py` dòng ~521 — thêm `from docx.shared import Pt` vào đầu hàm `_add_df_to_docx_table`
+
+## [2026-06-04] — Fix tab Báo cáo KHNV: ambiguous DataFrame truth value
+- `tabs/tab_khnv_bao_cao.py` dòng ~40 — thay `or` thành kiểm tra `is None` khi lấy df_full từ kwargs
+
+## [2026-06-04] — Fix doc_dienbao_matrix: crash int() khi row 3 chứa text
+- `data/hstd.py` dòng ~332 — bọc `int(df_raw.iloc[3, j])` trong try/except; fallback tìm mã số ở row 2/4/5 nếu row 3 là text (vd: "Đơn vị tính: Triệu đồng")
+
 ## [2026-06-03] — Fix _render_phan_tich_nqh_pgd: NameError COT_MUC_VAY + format số
 - `workspaces/ws_operation.py` dòng ~73 — thêm `COT_MUC_VAY` vào import từ config (thiếu → NameError crash khi mở tab Phân tích NQH)
 - `workspaces/ws_operation.py` dòng ~4175 — chart bar text: `f"{v/1e6:,.0f}"` (kiểu Mỹ) → `fmt_ty(v)` (kiểu VN)

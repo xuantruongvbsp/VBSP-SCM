@@ -1171,6 +1171,72 @@ def _render_lich_cong_tac(tab, role_n: str, username: str):
                                 st.rerun()
         st.markdown("</div>", unsafe_allow_html=True)
 
+    # ── Xuất Lịch làm việc tuần ra Word ──
+    st.markdown("---")
+    st.subheader("📄 Xuất Lịch làm việc tuần")
+    st.caption("Nhập nội dung công tác tuần tới → sinh file Word gửi BGĐ & HC-TC")
+
+    from services.khnv_lich_tuan_service import (
+        xuat_lich_lam_viec_tuan,
+        lay_tuan_tiep_theo,
+        SECTION_LABELS,
+        MAU_NOI_DUNG_MAC_DINH,
+    )
+
+    t2, t6 = lay_tuan_tiep_theo()
+
+    col_tu, col_den = st.columns(2)
+    with col_tu:
+        tu_ngay = st.date_input("Từ ngày (thứ 2)", value=t2, key="lich_tuan_tu")
+    with col_den:
+        den_ngay = st.date_input("Đến ngày (thứ 6)", value=t6, key="lich_tuan_den")
+
+    ten_tp = st.text_input("Tên Trưởng phòng (để trống → chỉ hiện TRƯỞNG PHÒNG)",
+                           placeholder="VD: Nguyễn Văn A", key="lich_tuan_tp")
+
+    with st.expander("✏️ Chỉnh sửa nội dung từng mục", expanded=True):
+        noi_dung = {}
+        for key, label in SECTION_LABELS:
+            default_text = MAU_NOI_DUNG_MAC_DINH.get(key, "")
+            noi_dung[key] = st.text_area(
+                label,
+                value=default_text,
+                height=160 if key != "noi_dung_khac" else 100,
+                key=f"lich_tuan_{key}",
+            )
+
+    col_x, col_p = st.columns([2, 1])
+    with col_x:
+        if st.button("📥 Sinh file Word Lịch công tác", type="primary",
+                     use_container_width=True, key="btn_lich_tuan"):
+            try:
+                if tu_ngay >= den_ngay:
+                    st.error("❌ Ngày bắt đầu phải trước ngày kết thúc.")
+                else:
+                    doc_bytes = xuat_lich_lam_viec_tuan(
+                        tu_ngay=tu_ngay,
+                        den_ngay=den_ngay,
+                        noi_dung=noi_dung,
+                        ten_truong_phong=ten_tp.strip(),
+                    )
+                    fname = f"Lich_Cong_Tac_Tuan_{tu_ngay.strftime('%d%m')}_{den_ngay.strftime('%d%m%Y')}.docx"
+                    st.session_state["_lich_tuan_docx"] = doc_bytes
+                    st.session_state["_lich_tuan_fname"] = fname
+                    st.success(f"✅ Đã tạo Lịch công tác tuần!")
+            except Exception as e:
+                logger.error("Lỗi sinh lịch tuần: %s", e, exc_info=True)
+                st.error(f"❌ Lỗi: {e}")
+
+    if "_lich_tuan_docx" in st.session_state:
+        st.download_button(
+            f"⬇️ Tải {st.session_state.get('_lich_tuan_fname', 'lich_cong_tac.docx')}",
+            data=st.session_state["_lich_tuan_docx"],
+            file_name=st.session_state.get("_lich_tuan_fname", "lich_cong_tac.docx"),
+            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            key="dl_lich_tuan",
+            use_container_width=True,
+        )
+
 
 # ──────────────────────────────────────────────
 # TAB 6: 📖 Thông tin đầu việc (tham chiếu tĩnh)

@@ -57,8 +57,13 @@ def duong_dan_pgd(ten_pgd: str, loai: str) -> str:
 
 
 def kiem_tra_file_ton_tai_pgd(ten_pgd: str, loai: str) -> bool:
-    """Kiểm tra xem PGD đã upload file loại {loai} chưa."""
-    return Path(duong_dan_pgd(ten_pgd, loai)).exists()
+    """Kiểm tra xem PGD đã upload file loại {loai} chưa.
+    HSTD: kiểm tra cả hstd_latest.xlsx lẫn hstd_khnv.xlsx (KH-NV upload)."""
+    if Path(duong_dan_pgd(ten_pgd, loai)).exists():
+        return True
+    if loai == "hstd" and Path(duong_dan_pgd(ten_pgd, "hstd_khnv")).exists():
+        return True
+    return False
 
 
 # ── Trạng thái chi tiết từng file PGD ────────────────────────────────────────

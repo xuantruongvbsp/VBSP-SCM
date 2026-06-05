@@ -70,6 +70,22 @@ def _hien_thi_bang_trang_thai() -> None:
         st.session_state["trang_thai_upload_pgd"] = lay_trang_thai_upload_pgd(DS_DON_VI)
     df_tt = st.session_state["trang_thai_upload_pgd"].copy()
 
+    # ── Patch: KH-NV upload HSTD → hstd_khnv.xlsx ──
+    # doc_trang_thai_file có @st.cache_data, có thể vẫn trả cache cũ
+    # nếu Streamlit chưa reload module mới. Check trực tiếp ở đây.
+    from pathlib import Path as _P
+    from data.pgd import duong_dan_pgd as _dp
+    import os as _os
+    from datetime import datetime as _dt
+    mask_thieu = df_tt["HSTD"].astype(str).str.startswith("❌", na=False)
+    if mask_thieu.any():
+        for idx in df_tt[mask_thieu].index:
+            dv = df_tt.at[idx, "Đơn vị"]
+            p = _P(_dp(dv, "hstd_khnv"))
+            if p.exists():
+                ngay_up = _dt.fromtimestamp(_os.path.getmtime(p))
+                df_tt.at[idx, "HSTD"] = f"✅ {ngay_up.strftime('%d/%m')}"
+
     # Cột 31/12: kiểm tra CẢ 4 loại (HSTD/NQ11/GQVL/CDTOTKVV), không chỉ HSTD
     if "_blcache_nam_list" not in st.session_state:
         st.session_state["_blcache_nam_list"] = danh_sach_nam_baseline_pgd()

@@ -34,6 +34,7 @@ from services.khnv_bao_cao_service import (
     render_mau_preview,
 )
 from components.delta_card import kpi_row
+from data import ts_file
 from config import DB_HT_CACHE, DB_PREV_CACHE, FILE_PATH_DB, FILE_PATH_DB_PREV
 from services.upload_service import luu_dienbao
 
@@ -82,10 +83,10 @@ def _build_ss_table(
 
     # ── Đọc data hiện tại ──
     try:
-        data_ht = doc_dienbao_matrix(fp_ht, 0, sheet_name=sheet_ht)
+        data_ht = doc_dienbao_matrix(fp_ht, ts_file(fp_ht), sheet_name=sheet_ht)
     except Exception:
         try:
-            rows_ht = doc_dienbao(fp_ht, 0, sheet_name=sheet_ht)
+            rows_ht = doc_dienbao(fp_ht, ts_file(fp_ht), sheet_name=sheet_ht)
             data_ht = {"rows": rows_ht, "units": [], "matrix": {}, "ngay_bao_cao": ""}
         except Exception as e:
             return pd.DataFrame({"Lỗi": [str(e)]}), False, {}, {}
@@ -106,13 +107,13 @@ def _build_ss_table(
     ngay_pv = "Kỳ trước"
     if has_prev:
         try:
-            data_pv = doc_dienbao_matrix(fp_prev, 0, sheet_name=sheet_prev)
+            data_pv = doc_dienbao_matrix(fp_prev, ts_file(fp_prev), sheet_name=sheet_prev)
             rows_pv = data_pv.get("rows", [])
             matrix_pv = data_pv.get("matrix", {})
             ngay_pv = data_pv.get("ngay_bao_cao", "Kỳ trước")
         except Exception:
             try:
-                rows_pv = doc_dienbao(fp_prev, 0, sheet_name=sheet_prev)
+                rows_pv = doc_dienbao(fp_prev, ts_file(fp_prev), sheet_name=sheet_prev)
             except Exception:
                 rows_pv = []
 
@@ -156,7 +157,8 @@ def _build_ss_table(
 def render(tab: DeltaGenerator | None = None, **kwargs) -> None:
     ctx = tab if tab is not None else st.container()
 
-    df_full = kwargs.get("df_full") or kwargs.get("df")
+    _df_full = kwargs.get("df_full")
+    df_full = _df_full if _df_full is not None else kwargs.get("df")
     role = kwargs.get("role", "")
     username = kwargs.get("username", "unknown")
 

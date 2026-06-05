@@ -1,5 +1,49 @@
 # CHANGELOG
 
+## [2026-06-05] — fix bảng Trạng thái Upload không refresh sau bulk import HSTD
+- `tabs/tab_upload_khnv.py` dòng ~404 — merge loop trong `_xu_ly_import_folder` không có try-except: nếu `merge_du_lieu_toan_cn` re-raise lỗi PyArrow thì `st.cache_data.clear()` + session_state update + `st.rerun()` không được gọi → bảng trạng thái không cập nhật → thêm try-except bắt lỗi merge, ghi vào `that_bai`, đảm bảo flow tiếp tục đến rerun
+
+## [2026-06-05] — Fix bảng Trạng thái Upload không cập nhật HSTD từ KH-NV
+- `data/pgd.py` dòng ~151 — `doc_trang_thai_file()`: khi loai="hstd" và `hstd_latest.xlsx` không tồn tại, fallback kiểm tra `hstd_khnv.xlsx` (file KH-NV upload)
+- `tabs/tab_upload_khnv.py` dòng ~1429 — thêm `st.cache_data.clear()` vào nút "🔄 Làm mới" bảng trạng thái — trước đây chỉ pop session_state, nhưng `doc_trang_thai_file` có `@st.cache_data` nên vẫn trả cache cũ → fallback mới không có hiệu lực đến khi cache hết TTL (7200s) hoặc upload lại
+
+## [2026-06-05] — fix doc_dienbao_matrix không bust cache khi file thay đổi
+- `data/hstd.py` dòng ~332 — đổi param `_ts` → `ts` trong `doc_dienbao_matrix` để timestamp được tính vào cache key của `@st.cache_data`
+- `services/khnv_bao_cao_service.py` dòng ~193, ~205 — cập nhật caller truyền `ts_file(fp)` thay vì `0`
+- `tabs/tab_khnv_bao_cao.py` dòng ~86, ~110 — cập nhật caller truyền `ts_file(fp_ht)` / `ts_file(fp_prev)` thay vì `0`
+- `tabs/tab_candoi.py` dòng ~734 — cập nhật caller truyền `ts_file(_fp_matrix)` thay vì `0`
+
+## [2026-06-05] — tối ưu bảng trạng thái upload 22 đơn vị
+- `tabs/tab_upload_khnv.py` dòng ~69 — `st.session_state.get(key, lay_trang_thai_upload_pgd(...))` luôn evaluate default (92 disk I/O mỗi rerun) → đổi thành if-check trước khi gọi
+
+## [2026-06-05] — fix upload file kế hoạch thiếu nhân 1,000,000
+- `tabs/tab_kehoach.py` dòng ~145 — file upload đọc giá trị triệu đồng nhưng không nhân 1,000,000 trước khi lưu → inconsistent với form nhập tay
+
+## [2026-06-05] — fix 2 lỗi sót sau review Điện báo
+- `services/khnv_bao_cao_service.py` dòng ~32 — thêm `from data import ts_file` (bị sót; dùng ở dòng 202 nhưng không import → NameError khi fallback)
+- `tabs/tab_kehoach.py` dòng ~181 — header file mẫu `"Kế hoạch (đồng)"` → `"Kế hoạch (triệu đồng)"` để đồng bộ với label nhập liệu
+
+## [2026-06-05] — fix lỗi "truth value of DataFrame" lần 2 trong Báo cáo KHNV
+- `services/khnv_bao_cao_service.py` — thêm `_sf()` helper convert sang float trước khi dùng `if v`; fix `so_sanh_hstd_vs_dienbao` dùng `float()` explicit thay `if val_hstd and val_db`
+
+## [2026-06-05] — fix lỗi Plotly titlefont tab Toàn cảnh 22 PGD
+- `tabs/tab_pgd_cards.py` dòng ~285–370 — thay `titlefont`/`titlefont_size` (đã xóa ở Plotly 5.x) bằng `title=dict(text=..., font=dict(...))` cho 4 trục xaxis
+
+## [2026-06-05] — Fix cache bust Điện báo: _ts → ts để timestamp vào hash key
+- `data/hstd.py` dòng ~237 — `doc_dienbao(_ts)` → `doc_dienbao(ts=0)`: Streamlit bỏ qua param `_` prefix khỏi cache hash, đổi sang `ts` để timestamp được hash → cache tự bust khi file thay đổi
+- `tabs/tab_khnv_bao_cao.py` dòng ~88,115 — gọi `doc_dienbao(..., ts_file(fp))` thay vì `0`
+- `services/khnv_bao_cao_service.py` dòng ~202 — gọi `doc_dienbao(fp, ts_file(fp))` thay vì `0`
+
+## [2026-06-05] — Fix sai đơn vị KPI Điện báo Chi nhánh (tỷ đồng)
+- `tabs/tab_candoi.py` dòng ~390-394 — `_to_ty` / `_dv_div` chia 1.000.000.000 thay vì 1000 (dữ liệu gốc là đồng VND, không phải triệu đồng)
+
+## [2026-06-05] — Chỉnh đơn vị KH vs TH sang triệu đồng + rút gọn hướng dẫn Điện báo
+- `tabs/tab_kehoach.py` — Đổi toàn bộ label/input/export từ "(đồng)" sang "(triệu đồng)"; nhập/xuất file mẫu chuyển sang triệu đồng; upload Excel nhân ×1.000.000 để lưu VND
+- `docs/HUONG_DAN_DIEN_BAO.md` — Rút gọn chỉ giữ 5 ý tóm tắt nhanh
+
+## [2026-06-05] — fix lỗi render Báo cáo KHNV
+- `tabs/tab_khnv_bao_cao.py` dòng 159 — đổi `or` sang kiểm tra `is not None` để tránh "truth value of a DataFrame is ambiguous" khi df_full được truyền vào
+
 ## [2026-06-04] — tab_candoi: redesign toàn bộ tab Điện báo
 - `tabs/tab_candoi.py` — Redesign toàn bộ (740 dòng → cấu trúc mới sạch hơn):
   - Upload lên đầu (state-based): chưa có file → form nổi bật + return; đã có → compact status bar + expander

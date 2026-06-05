@@ -228,12 +228,6 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
             st.subheader("📌 Điện báo Chi nhánh")
         st.caption("⚖️ Cân đối Nguồn vốn & Sử dụng vốn")
 
-        with st.expander("📖 Hướng dẫn Điện báo", expanded=False):
-            from pathlib import Path
-            _guide = Path(__file__).resolve().parent.parent / "docs" / "HUONG_DAN_DIEN_BAO.md"
-            if _guide.exists():
-                st.markdown(_guide.read_text(encoding="utf-8"))
-
         # ── Format helpers ─────────────────────────────────────────────────
         def vfmt_cd(x, d=1):
             try:
@@ -294,9 +288,6 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
             else ""
         )
         st.caption(f"📂 **{os.path.basename(path_ht)}** · {_kb} KB · {_mtime}{_prev_note}")
-
-        with st.expander("📤 Đổi file / Upload mới", expanded=False):
-            _render_upload_section(store_ht, store_prev, pgd_mode, pgd_user, key_sfx, username, nam_ht, nam_prev)
 
         # ══════════════════════════════════════════════════════════════════
         # SHEET SELECTOR
@@ -387,11 +378,11 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
         # else: db_prev_rows = None → hiển thị KPI không có delta
 
         # ── Helpers phụ thuộc dữ liệu ─────────────────────────────────────
-        _dv_div = 1000  # giá trị gốc (triệu đồng) → tỷ đồng
+        _dv_div = 1_000_000_000  # giá trị gốc (đồng) → tỷ đồng
 
         def _to_ty(x: float) -> float:
-            """Triệu đồng → tỷ đồng (chia 1000)."""
-            return round(x / 1000, 2)
+            """Đồng → tỷ đồng (chia 1 tỷ)."""
+            return round(x / 1_000_000_000, 2)
 
         def _pct(ht: float, pv: float) -> float | None:
             return round((ht - pv) / pv * 100, 1) if pv else None
@@ -740,7 +731,7 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
 
                     if _chon_sheet_raw:
                         try:
-                            data_matrix = doc_dienbao_matrix(_fp_matrix, 0, sheet_name=_chon_sheet_raw)
+                            data_matrix = doc_dienbao_matrix(_fp_matrix, ts_file(_fp_matrix), sheet_name=_chon_sheet_raw)
                             units  = data_matrix.get("units", [])
                             rows_m = data_matrix.get("rows", [])
                             matrix = data_matrix.get("matrix", {})
@@ -863,3 +854,13 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                 key=f"dl_cd_excel{key_sfx}",
             ):
                 state.downloads.clear(f"cd_excel{key_sfx}")
+
+        st.divider()
+        with st.expander("📖 Hướng dẫn Điện báo", expanded=False):
+            from pathlib import Path
+            _guide = Path(__file__).resolve().parent.parent / "docs" / "HUONG_DAN_DIEN_BAO.md"
+            if _guide.exists():
+                st.markdown(_guide.read_text(encoding="utf-8"))
+
+        with st.expander("📤 Đổi file / Upload mới", expanded=False):
+            _render_upload_section(store_ht, store_prev, pgd_mode, pgd_user, key_sfx, username, nam_ht, nam_prev)

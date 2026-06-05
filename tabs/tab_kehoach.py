@@ -125,7 +125,7 @@ def render(tab, **kwargs):
             if not la_phan_he_cn(role) or la_executive(role):
                 st.info("Chỉ Quản lý trở lên mới upload được.")
             else:
-                st.caption("Cấu trúc: Cột A = Tên chỉ tiêu, Cột B = Giá trị (đồng)")
+                st.caption("Cấu trúc: Cột A = Tên chỉ tiêu, Cột B = Giá trị (triệu đồng)")
                 f_kh = st.file_uploader("Chọn file Excel kế hoạch",
                                         type=["xlsx","xls"], key=f"{prefix}_upload_kh")
                 if f_kh:
@@ -142,7 +142,7 @@ def render(tab, **kwargs):
                                 val_raw = row.iloc[1]
                                 if ten in ("", "nan", "Chỉ tiêu"): continue
                                 try:
-                                    new_kh[ten] = float(val_raw) if pd.notna(val_raw) else 0.0
+                                    new_kh[ten] = (float(val_raw) if pd.notna(val_raw) else 0.0) * 1_000_000  # triệu → VND
                                 except:
                                     new_kh[ten] = 0.0
                             luu_kehoach(
@@ -162,11 +162,11 @@ def render(tab, **kwargs):
             else:
                 with st.form(f"nhap_kh_{prefix}"):
                     chon_ct = st.selectbox("Chọn chỉ tiêu", ds_chi_tieu, key=f"{prefix}_kh_ct")
-                    val_kh  = st.number_input("Giá trị kế hoạch (đồng)",
-                                              min_value=0.0, step=1e8,
+                    val_kh  = st.number_input("Giá trị kế hoạch (triệu đồng)",
+                                              min_value=0.0, step=100.0,
                                               format="%.0f")
                     if st.form_submit_button("💾 Lưu", type="primary"):
-                        kh_data[chon_ct] = val_kh
+                        kh_data[chon_ct] = val_kh * 1_000_000  # triệu → VND
                         luu_kehoach(
                             kh_data,
                             ten_pgd=pgd_user if pgd_mode else None,
@@ -178,7 +178,7 @@ def render(tab, **kwargs):
         st.divider()
         if st.button("⬇ Tải file mẫu kế hoạch Excel", key=f"{prefix}_btn_mau_kh"):
             buf = BytesIO()
-            rows_mau = [{"Chỉ tiêu": ten, "Kế hoạch (đồng)": 0}
+            rows_mau = [{"Chỉ tiêu": ten, "Kế hoạch (triệu đồng)": 0}
                         for ten in ds_chi_tieu]
             with pd.ExcelWriter(buf, engine="openpyxl") as w:
                 pd.DataFrame(rows_mau).to_excel(w, index=False, sheet_name="Ke hoach")
@@ -272,8 +272,8 @@ def render(tab, **kwargs):
         if st.button("📥 Xuất báo cáo KH vs TH", key=f"{prefix}_btn_xuat_khvsth"):
             buf = BytesIO()
             rows_ex = [{"Chỉ tiêu": r["Chỉ tiêu"],
-                        "Kế hoạch (đồng)":  df_ss.loc[i, "_kh"],
-                        "Thực hiện (đồng)": df_ss.loc[i, "_th"],
+                        "Kế hoạch (triệu đồng)":  round(df_ss.loc[i, "_kh"] / 1_000_000, 1),
+                        "Thực hiện (triệu đồng)": round(df_ss.loc[i, "_th"] / 1_000_000, 1),
                         "Chênh lệch":       df_ss.loc[i, "_cl"],
                         "Tỷ lệ %":          round(df_ss.loc[i, "_tl"], 2)}
                        for i, r in df_ss.iterrows()]

@@ -234,9 +234,10 @@ def doc_file_sk_gqvl(fp: str, _ts) -> pd.DataFrame:
 
 # ── ĐIỆN BÁO ─────────────────────────────────────────────────────────────────
 @st.cache_data(ttl=7200, show_spinner=False)
-def doc_dienbao(fp: str, _ts, sheet_name: str | None = None) -> list:
+def doc_dienbao(fp: str, ts: float = 0, sheet_name: str | None = None) -> list:
     """
     Đọc file Điện báo — tự động nhận diện format:
+    Tham số ts (timestamp) dùng để cache bust — truyền ts_file(fp) khi gọi.
 
     Format 1 (cũ - dọc): Cột B = tên chỉ tiêu, Cột C = giá trị tổng.
     Format 2 (mới - ma trận): Cột B = tên chỉ tiêu, Cột C = Cộng (tổng),
@@ -328,7 +329,7 @@ def doc_dienbao(fp: str, _ts, sheet_name: str | None = None) -> list:
 
 def doc_dienbao_matrix(
     fp: str,
-    _ts,
+    ts: float = 0,
     sheet_name: str | None = None,
     cot_tong: int = 2,
 ) -> dict[str, list]:

@@ -66,10 +66,9 @@ from services.file_detection_service import (
 def _hien_thi_bang_trang_thai() -> None:
     """Bảng trạng thái 22 hàng × 6 cột: Đơn vị | HSTD | NQ11 | GQVL | CDTOTKVV | 31/12/YYYY."""
     from datetime import date as _date
-    df_tt = st.session_state.get(
-        "trang_thai_upload_pgd",
-        lay_trang_thai_upload_pgd(DS_DON_VI),
-    ).copy()
+    if "trang_thai_upload_pgd" not in st.session_state:
+        st.session_state["trang_thai_upload_pgd"] = lay_trang_thai_upload_pgd(DS_DON_VI)
+    df_tt = st.session_state["trang_thai_upload_pgd"].copy()
 
     # Cột 31/12: kiểm tra CẢ 4 loại (HSTD/NQ11/GQVL/CDTOTKVV), không chỉ HSTD
     if "_blcache_nam_list" not in st.session_state:
@@ -407,17 +406,32 @@ def _xu_ly_import_folder(danh_sach: list[dict], username: str) -> None:
             0.8 + ((j + 1) / max(len(loai_can_merge), 1)) * 0.2,
             text=f"🔄 Tổng hợp {loai.upper()} toàn Chi nhánh...",
         )
-        kq_m = merge_du_lieu_toan_cn(loai)
-        meta_m = lay_meta_merge(loai) if kq_m.thanh_cong else None
-        ket_qua_merge.append(
-            {
-                "loai": loai,
-                "thanh_cong": kq_m.thanh_cong,
-                "thong_bao": kq_m.thong_bao,
-                "so_pgd": (meta_m or {}).get("so_pgd"),
-                "so_dong": (meta_m or {}).get("so_dong"),
-            }
-        )
+        try:
+            kq_m = merge_du_lieu_toan_cn(loai)
+            meta_m = lay_meta_merge(loai) if kq_m.thanh_cong else None
+            ket_qua_merge.append(
+                {
+                    "loai": loai,
+                    "thanh_cong": kq_m.thanh_cong,
+                    "thong_bao": kq_m.thong_bao,
+                    "so_pgd": (meta_m or {}).get("so_pgd"),
+                    "so_dong": (meta_m or {}).get("so_dong"),
+                }
+            )
+        except Exception as _merge_err:
+            logger.error(
+                "_xu_ly_import_folder: merge %s lỗi — %s", loai, _merge_err, exc_info=True
+            )
+            ket_qua_merge.append(
+                {
+                    "loai": loai,
+                    "thanh_cong": False,
+                    "thong_bao": f"Lỗi tổng hợp: {_merge_err}",
+                    "so_pgd": None,
+                    "so_dong": None,
+                }
+            )
+            that_bai.append(f"Tổng hợp {loai.upper()}: {_merge_err}")
 
     progress.empty()
     st.cache_data.clear()
@@ -1426,6 +1440,7 @@ def render(tab=None, **kwargs) -> None:
                 st.session_state.pop("trang_thai_upload_pgd", None)
                 for _k in [k for k in st.session_state if k.startswith("_blcache_")]:
                     st.session_state.pop(_k, None)
+                st.cache_data.clear()
                 st.rerun()
         with st.container(key="khnv_bang_trang_thai_upload"):
             _hien_thi_bang_trang_thai()

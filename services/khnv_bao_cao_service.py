@@ -29,6 +29,7 @@ from config import (
     COT_TEN_XA, DB_HT_CACHE, DB_PREV_CACHE, FILE_PATH_DB,
     DS_PGD, TEN_CHI_NHANH_HIEN_THI,
 )
+from data import ts_file
 from logger import get_logger
 
 logger = get_logger(__name__)
@@ -189,7 +190,7 @@ def tong_hop_tu_dienbao(sheet_name: str = "DB1", file_path_override: str | None 
         return {"nguon": "Điện báo", "error": "Chưa có file Điện báo"}
 
     try:
-        data = doc_dienbao_matrix(fp, 0, sheet_name=sheet_name)
+        data = doc_dienbao_matrix(fp, ts_file(fp), sheet_name=sheet_name)
     except Exception as e:
         # Fallback: đọc sheet đầu tiên có matrix format
         try:
@@ -199,9 +200,9 @@ def tong_hop_tu_dienbao(sheet_name: str = "DB1", file_path_override: str | None 
             if not matrix_sheets:
                 # Thử format cũ
                 from data.hstd import doc_dienbao
-                rows = doc_dienbao(fp, 0)
+                rows = doc_dienbao(fp, ts_file(fp))
                 return _tong_hop_tu_format_cu(rows, fp)
-            data = doc_dienbao_matrix(fp, 0, sheet_name=matrix_sheets[0])
+            data = doc_dienbao_matrix(fp, ts_file(fp), sheet_name=matrix_sheets[0])
         except Exception as e2:
             logger.error("Điện báo: %s / %s", e, e2)
             return {"nguon": "Điện báo", "error": f"Lỗi đọc: {e}"}
@@ -267,8 +268,11 @@ def so_sanh_hstd_vs_dienbao(so_lieu_hstd: dict, so_lieu_db: dict) -> list[dict]:
 
     chenh_lech = []
     for ten, key_hstd, key_db in mapping:
-        val_hstd = so_lieu_hstd.get(key_hstd, 0)
-        val_db = so_lieu_db.get(key_db, 0)
+        try:
+            val_hstd = float(so_lieu_hstd.get(key_hstd, 0))
+            val_db = float(so_lieu_db.get(key_db, 0))
+        except (TypeError, ValueError):
+            continue
         if val_hstd and val_db:
             cl = val_hstd - val_db
             tl = (cl / val_db * 100) if val_db else 0
@@ -571,10 +575,16 @@ def build_template_vars(
     """
     vars_map: dict[str, str] = {}
 
+    def _sf(val, default=0.0) -> float:
+        try:
+            return float(val)
+        except (TypeError, ValueError):
+            return default
+
     # ── Trường text ──
     for k in ("thang", "nam", "nguon", "ngay_bao_cao"):
         v = so_lieu.get(k, "")
-        vars_map[k] = str(v) if v else ""
+        vars_map[k] = str(v) if (v is not None and str(v)) else ""
 
     # ── Số tiền (HSTD) ──
     _money_keys = (
@@ -582,13 +592,13 @@ def build_template_vars(
         "nguon_von_tw", "nguon_von_dp", "giai_ngan_trong_thang",
     )
     for k in _money_keys:
-        v = so_lieu.get(k, 0)
-        vars_map[k] = _fmt_triệu(v) if v else "—"
+        fv = _sf(so_lieu.get(k, 0))
+        vars_map[k] = _fmt_triệu(fv) if fv else "—"
 
     # ── Số đếm / tỷ lệ ──
-    vars_map["ty_le_no_qua_han"] = f"{so_lieu.get('ty_le_no_qua_han', 0)}%"
-    vars_map["so_khach_hang"] = f"{so_lieu.get('so_khach_hang', 0):,}".replace(",", ".")
-    vars_map["so_mon_vay"] = f"{so_lieu.get('so_mon_vay', 0):,}".replace(",", ".")
+    vars_map["ty_le_no_qua_han"] = f"{_sf(so_lieu.get('ty_le_no_qua_han', 0))}%"
+    vars_map["so_khach_hang"] = f"{int(_sf(so_lieu.get('so_khach_hang', 0))):,}".replace(",", ".")
+    vars_map["so_mon_vay"] = f"{int(_sf(so_lieu.get('so_mon_vay', 0))):,}".replace(",", ".")
 
     # ── Số tiền (Điện báo) ──
     _db_keys = (
@@ -598,8 +608,8 @@ def build_template_vars(
         "nguon_tw_kha", "huy_dong_von", "utdt_dp", "von_an_toan",
     )
     for k in _db_keys:
-        v = so_lieu.get(k, 0)
-        vars_map[k] = _fmt_triệu(v) if v else "—"
+        fv = _sf(so_lieu.get(k, 0))
+        vars_map[k] = _fmt_triệu(fv) if fv else "—"
 
     # ── Bảng PGD (text thuần) ──
     if bang_pgd is not None and not bang_pgd.empty:

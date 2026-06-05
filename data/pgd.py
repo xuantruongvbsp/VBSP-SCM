@@ -1,4 +1,5 @@
 """Quản lý file dữ liệu riêng từng PGD (upload, đọc, gộp)."""
+import logging
 import os
 import re
 import unicodedata
@@ -8,6 +9,8 @@ from typing import Literal
 
 import pandas as pd
 import streamlit as st
+
+_log = logging.getLogger(__name__)
 from openpyxl import load_workbook
 from openpyxl.utils import column_index_from_string
 from openpyxl.utils.datetime import from_excel
@@ -148,6 +151,12 @@ def doc_trang_thai_file(ten_don_vi: str, loai: LoaiFile, _mtime: float = 0.0) ->
       khong_co — chưa có file
     """
     path = Path(duong_dan_pgd(ten_don_vi, loai))
+    # Fallback: KH-NV upload HSTD → hstd_khnv.xlsx thay vì hstd_latest.xlsx
+    if loai == "hstd" and not path.exists():
+        path_khnv = Path(duong_dan_pgd(ten_don_vi, "hstd_khnv"))
+        if path_khnv.exists():
+            _log.info("doc_trang_thai_file: fallback hstd_khnv → %s", path_khnv)
+            path = path_khnv
     if not path.exists():
         return {
             "co_file": False,

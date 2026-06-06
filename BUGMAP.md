@@ -1051,6 +1051,42 @@ val = pd.to_numeric(df[COT_X], errors="coerce").sum() if COT_X in df.columns els
 | **Fix** | Tạo `df_bq.copy()`, chạy `pd.to_numeric(df_bq[COT_TONG_DU_NO], errors="coerce").fillna(0)` trước khi groupby — khớp với cách KPI đang tính `tdn` |
 | **Ngày fix** | 2026-06-06 |
 
+### C16 — BQ Xã đếm 96 thay vì 95 do nunique() lẫn NaN/rỗng/"CỘNG"
+| | |
+|---|---|
+| **File** | `tabs/tab_tongquan.py` L344, `workspaces/ws_operation.py` L770, `workspaces/ws_operation.py` L363 |
+| **Dấu hiệu** | Card Dư nợ BQ Xã ghi "96 xã" (thực tế chỉ có 95 xã/phường) |
+| **Nguyên nhân** | Cột `COT_TEN_XA` có dòng NaN/rỗng hoặc dòng tổng "CỘNG" → `nunique()` đếm thành 1 giá trị unique thừa. C14 chỉ fix cho `n_hoi` nhưng bỏ sót `n_xa` |
+| **Fix** | `.dropna().loc[lambda s: (s != "") & (s != "CỘNG")].nunique()` — loại NaN, rỗng, và "CỘNG" trước khi đếm, thống nhất với cách tính `n_hoi` |
+| **Ngày fix** | 2026-06-07 |
+
+### C17 — `so_mon` bảng cơ cấu chương trình cao hơn thực tế (count thay nunique, sai cột)
+| | |
+|---|---|
+| **File** | `services/tongquan_service.py` → `tinh_co_cau_ct()` L116 |
+| **Dấu hiệu** | Cột "Số món vay" trong bảng cơ cấu chương trình tín dụng lớn hơn thực tế |
+| **Nguyên nhân** | Dùng `df.groupby(ct)[cot_ma_kh].count()` — 2 lỗi: (1) `count()` không loại trùng, (2) đếm `Mã KH` thay vì `Số khế ước` |
+| **Fix** | Thêm param `cot_so_ku`, dùng `df_loc.groupby(ct)[cot_so_ku].nunique()`; `so_kh` cũng đổi sang `df_loc` |
+| **Ngày fix** | 2026-06-07 |
+
+### C18 — Kiểm tra cân đối nợ luôn hiện ✅ dù không thực sự kiểm tra
+| | |
+|---|---|
+| **File** | `tabs/tab_tongquan.py` → `render()` L436–442 |
+| **Dấu hiệu** | Caption "Kiểm tra cân đối … = X tỷ ✅" luôn xanh dù số có thể lệch |
+| **Nguyên nhân** | `✅` hardcode trong f-string, không có logic kiểm tra `dth + dqh + dnk == tdn` |
+| **Fix** | `_can_doi_ok = abs((dth+dqh+dnk)-tdn) < 1e4`; icon động theo kết quả |
+| **Ngày fix** | 2026-06-07 |
+
+### C19 — KPI đến hạn dùng `fmt()` hiển thị đồng nguyên, label ghi triệu đồng
+| | |
+|---|---|
+| **File** | `tabs/tab_tongquan.py` → `_bang_den_han()` L1390, L1484; `_xuat_pdf_den_han()` L209 |
+| **Dấu hiệu** | Card "Tổng dư nợ" hiện số rất lớn (1.234.567.890) nhưng label "Đơn vị: triệu đồng" |
+| **Nguyên nhân** | `fmt(tong_no)` format VND nguyên; nên dùng `fmt_ty(tong_no)` chia /1e6 |
+| **Fix** | Đổi toàn bộ `fmt(tong_no)` → `fmt_ty(tong_no)` ở 3 chỗ |
+| **Ngày fix** | 2026-06-07 |
+
 ---
 
 ## Template: Ghi nhận bug mới

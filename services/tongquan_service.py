@@ -93,6 +93,7 @@ def tinh_co_cau_ct(
     cot_dnk: str,
     cot_nv: str,
     cot_ma_kh: str,
+    cot_so_ku: str = "",
 ) -> pd.DataFrame:
     df_loc = df[pd.to_numeric(df[cot_tdn], errors="coerce").fillna(0) > 0].copy()
     cols_to_sum = [cot_tdn, cot_dqh, cot_dnk, cot_nv]
@@ -112,8 +113,10 @@ def tinh_co_cau_ct(
     du_no_tw = df_loc[nv == 1].groupby(cot_ten_ct)[cot_tdn].sum()
     du_no_dp = df_loc[nv == 2].groupby(cot_ten_ct)[cot_tdn].sum()
 
-    so_kh_by_ct = df.groupby(cot_ten_ct)[cot_ma_kh].nunique()
-    so_mon_by_ct = df.groupby(cot_ten_ct)[cot_ma_kh].count()
+    # Dùng df_loc (dư nợ > 0) để nhất quán với các cột tổng tiền
+    so_kh_by_ct = df_loc.groupby(cot_ten_ct)[cot_ma_kh].nunique()
+    _ku_col = cot_so_ku if cot_so_ku and cot_so_ku in df_loc.columns else cot_ma_kh
+    so_mon_by_ct = df_loc.groupby(cot_ten_ct)[_ku_col].nunique()
 
     df_ct = (
         df_loc.groupby(cot_ten_ct)

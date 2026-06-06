@@ -1103,13 +1103,20 @@ def _waterfall_du_no(df_full: pd.DataFrame) -> None:
     cot_tien = COT_TONG_DU_NO if COT_TONG_DU_NO in df_full.columns else COT_DU_NO_TH
     cot_nqh = COT_DU_NO_QH if COT_DU_NO_QH in df_full.columns else None
 
-    tong_dn = df_full[cot_tien].sum() if cot_tien in df_full.columns else 0
-    nqh = df_full[cot_nqh].sum() if cot_nqh and cot_nqh in df_full.columns else 0
+    # Ép kiểu numeric trước khi sum/groupby (cột có thể là string từ parquet)
+    df_wf = df_full.copy()
+    if cot_tien in df_wf.columns:
+        df_wf[cot_tien] = pd.to_numeric(df_wf[cot_tien], errors="coerce").fillna(0)
+    if cot_nqh and cot_nqh in df_wf.columns:
+        df_wf[cot_nqh] = pd.to_numeric(df_wf[cot_nqh], errors="coerce").fillna(0)
+
+    tong_dn = df_wf[cot_tien].sum() if cot_tien in df_wf.columns else 0
+    nqh = df_wf[cot_nqh].sum() if cot_nqh and cot_nqh in df_wf.columns else 0
     th = tong_dn - nqh
 
     # Nhóm theo chương trình
-    if COT_TEN_CT in df_full.columns:
-        ct_groups = df_full.groupby(COT_TEN_CT)[cot_tien].sum().sort_values(ascending=False)
+    if COT_TEN_CT in df_wf.columns:
+        ct_groups = df_wf.groupby(COT_TEN_CT)[cot_tien].sum().sort_values(ascending=False)
         top_ct = ct_groups.head(6)
         khac = ct_groups.iloc[6:].sum()
     else:
@@ -1348,6 +1355,8 @@ def _render_hom_nay(df_full: "pd.DataFrame | None", **kwargs) -> None:
             if len(_ds_ky) >= 2:
                 _snap_prev = doc_snapshot(_ds_ky[-2])
                 if _snap_prev is not None and COT_TEN_PGD in _snap_prev.columns:
+                    _snap_dn = pd.to_numeric(_snap_prev[COT_TONG_DU_NO], errors="coerce").fillna(0)
+                    _snap_prev = _snap_prev.assign(**{COT_TONG_DU_NO: _snap_dn})
                     _snap_grp = _snap_prev.groupby(COT_TEN_PGD, observed=True)[COT_TONG_DU_NO].sum()
                     for _, row in df_pgd_kpi.iterrows():
                         pgd_n = row["PGD"]

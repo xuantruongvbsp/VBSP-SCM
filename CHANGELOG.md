@@ -1,5 +1,27 @@
 # CHANGELOG
 
+## [2026-06-07] — fix 7 lỗi dữ liệu tab Tổng quan danh mục tín dụng (KH-NV)
+- `services/tongquan_service.py` L85–118 — `tinh_co_cau_ct`: thêm param `cot_so_ku`, `so_mon_by_ct` dùng `df_loc[cot_so_ku].nunique()` (fix sai cột + count→nunique); `so_kh_by_ct` đổi sang `df_loc` (nhất quán với dư nợ > 0)
+- `tabs/tab_tongquan.py` L116–128 — `_cache_co_cau_ct`: truyền `cot_so_ku=COT_SO_KU` vào `tinh_co_cau_ct`
+- `tabs/tab_tongquan.py` L436–442 — cân đối nợ thực: thêm `_can_doi_ok = abs((dth+dqh+dnk)-tdn) < 1e4`, chỉ ✅ khi đúng
+- `tabs/tab_tongquan.py` L1390 — KPI đến hạn: `fmt(tong_no)` → `fmt_ty(tong_no)` (đơn vị triệu đồng)
+- `tabs/tab_tongquan.py` L1484 — pie chart annotation: `fmt(tong_no)` → `fmt_ty(tong_no)`
+- `tabs/tab_tongquan.py` L209 — PDF caption: `fmt(tong_no) trđ` → `fmt_ty(tong_no) triệu đồng`
+- `tabs/tab_tongquan.py` L838–889 — xóa first CDTOTKVV merge block (duplicate với lần 2) và TL QH%/Khoanh% tính lần 1 (redundant)
+
+## [2026-06-07] — fix 4 lỗi code review tab_tongquan + ws_operation
+- `tabs/tab_tongquan.py` L321 — xoá `_tdn_delta` hardcode (1.7% tdn giả làm "so kỳ trước")
+- `tabs/tab_tongquan.py` L372 — thay "+delta tỷ so kỳ trước" → "Số liệu đến {ngay_cap_nhat}"
+- `tabs/tab_tongquan.py` CSS — trung tâm hoá màu vào `.soft-*` class + thêm `.tq-label/.tq-value/.tq-sub`; xoá ~36 inline `color:#xxx` khỏi HTML cards
+- `workspaces/ws_operation.py` L759 — Fix 2: thay card "BQ PGD" (luôn = tổng dư nợ, vô nghĩa) → "BQ hộ vay" (tdn / n_kh)
+- `workspaces/ws_operation.py` L761 — Fix 4: dùng `tong_dn` có sẵn thay vì tính lại `tdn`
+
+## [2026-06-07] — fix BQ Xã đếm thừa do nunique() lẫn NaN/rỗng/"CỘNG"
+- `tabs/tab_tongquan.py` L344 — `n_xa`: filter `.dropna().loc[...]` trước `.nunique()` (loại NaN/rỗng/"CỘNG")
+- `workspaces/ws_operation.py` L770 — `n_xa`: tương tự
+- `workspaces/ws_operation.py` L363 — `so_xa`: tương tự
+- Cả 3 nơi giờ thống nhất với cách tính `n_hoi` (đã fix ở C14 trước đó)
+
 ## [2026-06-06] — fix BQ metrics: n_xa & n_hoi đếm nunique() thay vì groupby ngroups
 - `tabs/tab_tongquan.py` L340-345 — n_xa/n_hoi: `.nunique()` thay vì `groupby([PGD, Xã/ĐVUT]).ngroups` (groupby ngroups đếm cặp, không đếm unique values)
 - `workspaces/ws_operation.py` L770-775 — tương tự: nunique cho xã và hội

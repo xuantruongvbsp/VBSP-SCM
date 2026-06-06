@@ -360,7 +360,7 @@ def _kpi_pgd_list_impl(df_pgd: pd.DataFrame, pgd_user: str) -> list[dict]:
 
         # Đếm số lượng các nhóm
 
-        so_xa = df_pgd[COT_TEN_XA].nunique() if COT_TEN_XA in df_pgd.columns else 0
+        so_xa = df_pgd[COT_TEN_XA].dropna().loc[lambda s: (s != "") & (s != "CỘNG")].nunique() if COT_TEN_XA in df_pgd.columns else 0
 
         so_hoi = df_pgd[COT_DVUT].nunique() if COT_DVUT in df_pgd.columns else 0
 
@@ -758,16 +758,18 @@ def _render_trang_chu(tab, df_pgd: pd.DataFrame, role: str, pgd_user: str, kwarg
 
                 df_bq = df_pgd.copy()
                 df_bq[COT_TONG_DU_NO] = pd.to_numeric(df_bq[COT_TONG_DU_NO], errors="coerce").fillna(0)
-                tdn = df_bq[COT_TONG_DU_NO].sum()
+                # Fix 4: dùng tong_dn đã tính sẵn — không tính lại từ df_bq
+                tdn = tong_dn
 
-                _pgd_dn = df_bq.groupby(COT_TEN_PGD)[COT_TONG_DU_NO].sum()
-                n_pgd_co_dn = int((_pgd_dn > 0).sum())
-                bq_pgd = tdn / n_pgd_co_dn if n_pgd_co_dn > 0 else 0
+                # Fix 2: "BQ PGD" không có ý nghĩa với df_pgd 1 PGD (luôn = tổng dư nợ)
+                # → thay bằng "BQ hộ vay" (bình quân trên mỗi khách hàng)
+                n_kh  = int(df_bq[COT_MA_KH].nunique()) if COT_MA_KH in df_bq.columns else 0
+                bq_kh = tdn / n_kh if n_kh > 0 else 0
 
                 n_to  = int(df_bq.groupby([COT_TEN_PGD, COT_TEN_TO]).ngroups) if COT_TEN_TO in df_bq.columns else 0
                 bq_to = tdn / n_to if n_to > 0 else 0
 
-                n_xa  = int(df_bq[COT_TEN_XA].nunique()) if COT_TEN_XA in df_bq.columns else 0
+                n_xa  = int(df_bq[COT_TEN_XA].dropna().loc[lambda s: (s != "") & (s != "CỘNG")].nunique()) if COT_TEN_XA in df_bq.columns else 0
                 bq_xa = tdn / n_xa if n_xa > 0 else 0
 
                 n_hoi = int(df_bq[COT_DVUT].dropna().loc[lambda s: (s != "") & (s != "CỘNG")].nunique()) if COT_DVUT in df_bq.columns else 0
@@ -775,9 +777,9 @@ def _render_trang_chu(tab, df_pgd: pd.DataFrame, role: str, pgd_user: str, kwarg
 
                 kpi_row([
 
-                    {"label": "Dư nợ BQ PGD", "value": f"{vn(bq_pgd/1_000_000,1)} tr",
+                    {"label": "Dư nợ BQ hộ vay", "value": f"{vn(bq_kh/1_000_000,1)} tr" if n_kh > 0 else "—",
 
-                     "icon": "🏢", "help": f"{fmt_so(n_pgd_co_dn)} PGD có dư nợ"},
+                     "icon": "👤", "help": f"{fmt_so(n_kh)} khách hàng có dư nợ"},
 
                     {"label": "Dư nợ BQ tổ TKVV", "value": f"{vn(bq_to/1_000_000,1)} tr" if n_to > 0 else "—",
 

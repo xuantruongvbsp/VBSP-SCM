@@ -124,9 +124,15 @@ def _render_chart_gqvl(df_gqvl: pd.DataFrame) -> None:
     
     tab1, tab2 = st.tabs(["Cơ cấu theo xã", "Dư nợ vs Giải ngân"])
     
+    # Ép kiểu numeric một lần cho toàn bộ biểu đồ (GQVL parquet có thể là string)
+    df_chart = df_gqvl.copy()
+    for _c in [COT_TONG_DU_NO, COT_DU_NO_QH]:
+        if _c in df_chart.columns:
+            df_chart[_c] = pd.to_numeric(df_chart[_c], errors="coerce").fillna(0)
+
     with tab1:
-        if COT_TEN_XA in df_gqvl.columns and COT_TONG_DU_NO in df_gqvl.columns:
-            df_xa = df_gqvl.groupby(COT_TEN_XA)[COT_TONG_DU_NO].sum().reset_index()
+        if COT_TEN_XA in df_chart.columns and COT_TONG_DU_NO in df_chart.columns:
+            df_xa = df_chart.groupby(COT_TEN_XA)[COT_TONG_DU_NO].sum().reset_index()
             df_xa.columns = ["Xã", "Tổng dư nợ"]
 
             fig = px.pie(df_xa, values="Tổng dư nợ", names="Xã",
@@ -137,11 +143,11 @@ def _render_chart_gqvl(df_gqvl: pd.DataFrame) -> None:
             st.info("ℹ️ Không có dữ liệu xã hoặc cột dư nợ")
 
     with tab2:
-        if COT_TONG_DU_NO in df_gqvl.columns and COT_TEN_XA in df_gqvl.columns:
+        if COT_TONG_DU_NO in df_chart.columns and COT_TEN_XA in df_chart.columns:
             comp_agg = {COT_TONG_DU_NO: "sum"}
-            if COT_DU_NO_QH in df_gqvl.columns:
+            if COT_DU_NO_QH in df_chart.columns:
                 comp_agg[COT_DU_NO_QH] = "sum"
-            df_comp = df_gqvl.groupby(COT_TEN_XA).agg(comp_agg).reset_index()
+            df_comp = df_chart.groupby(COT_TEN_XA).agg(comp_agg).reset_index()
             df_comp = df_comp.rename(columns={
                 COT_TEN_XA: "Xã", COT_TONG_DU_NO: "Tổng dư nợ", COT_DU_NO_QH: "Dư nợ QH",
             })

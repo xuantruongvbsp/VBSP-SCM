@@ -124,6 +124,7 @@ def _cache_co_cau_ct(
         cot_dnk=COT_DU_NO_KHOANH,
         cot_nv=COT_NGUON_VON,
         cot_ma_kh=COT_MA_KH,
+        cot_so_ku=COT_SO_KU,
     )
 
 
@@ -205,7 +206,7 @@ def _xuat_pdf_den_han(
     tong_no = df_loc[COT_TONG_DU_NO].sum()
     n_mon = df_loc[COT_SO_KU].nunique()
     n_kh = df_loc[COT_MA_KH].nunique()
-    phu_parts.append(f"Tổng: {fmt_so(n_mon)} món | {fmt_so(n_kh)} KH | {fmt(tong_no)} trđ")
+    phu_parts.append(f"Tổng: {fmt_so(n_mon)} món | {fmt_so(n_kh)} KH | {fmt_ty(tong_no)} triệu đồng")
 
     return xuat_pdf(
         df_pdf,
@@ -242,12 +243,15 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
             .tq-caption{font-size:0.96rem;margin:-6px 0 14px 0;opacity:0.75}
             .tq-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:14px}
             .tq-card{border-radius:10px;padding:12px 10px 10px;border:1px solid #d1d5db;min-height:90px;text-align:center}
-            .tq-card.soft-blue{background:#dbeafe;border-color:#93c5fd}
-            .tq-card.soft-indigo{background:#e0e7ff;border-color:#a5b4fc}
-            .tq-card.soft-green{background:#dcfce7;border-color:#86efac}
-            .tq-card.soft-red{background:#fee2e2;border-color:#fca5a5}
-            .tq-card.soft-amber{background:#fef3c7;border-color:#fcd34d}
-            .tq-card.soft-purple{background:#ede9fe;border-color:#c4b5fd}
+            .tq-card.soft-blue{background:#dbeafe;border-color:#93c5fd;color:#1e3a6e}
+            .tq-card.soft-indigo{background:#e0e7ff;border-color:#a5b4fc;color:#312e81}
+            .tq-card.soft-green{background:#dcfce7;border-color:#86efac;color:#14532d}
+            .tq-card.soft-red{background:#fee2e2;border-color:#fca5a5;color:#7f1d1d}
+            .tq-card.soft-amber{background:#fef3c7;border-color:#fcd34d;color:#78350f}
+            .tq-card.soft-purple{background:#ede9fe;border-color:#c4b5fd;color:#4c1d95}
+            .tq-card .tq-label{font-size:0.82rem;font-weight:600;margin:0 0 4px;opacity:0.9}
+            .tq-card .tq-value{font-size:2rem;font-weight:700;line-height:1;margin:0 0 4px}
+            .tq-card .tq-sub{font-size:0.82rem;opacity:0.8}
             .totkvv-wrap{border:1px solid #e5e7eb;border-radius:12px;padding:12px 14px;margin:4px 0 8px 0;background:#fff}
             .totkvv-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
             .totkvv-title{font-size:1.02rem;font-weight:700;color:#202938}
@@ -318,7 +322,6 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
         _n_kh = fmt_so(n_kh)
         _bq_mon_kh = vn(n_mon_vay / n_kh, 1) if n_kh > 0 else "—"
         _tdn = vn(tdn / 1e9, 3)
-        _tdn_delta = vn(max(tdn / 1e9 * 0.017, 0), 3)
         _dth = vn(dth / 1e9, 3)
         _dth_pct = vn(dth / tdn * 100 if tdn else 0, 3)
         _dnk = vn(dnk / 1e9, 3)
@@ -338,8 +341,8 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
         # n_to: cặp (PGD, Tổ) vì tên Tổ trùng giữa các PGD
         n_to  = int(df_bq.groupby([COT_TEN_PGD, COT_TEN_TO]).ngroups) if COT_TEN_TO in df_bq.columns else 0
         bq_to = tdn / n_to if n_to > 0 else 0
-        # n_xa: unique toàn CN (1 xã thuộc 1 PGD)
-        n_xa  = int(df_bq[COT_TEN_XA].nunique()) if COT_TEN_XA in df_bq.columns else 0
+        # n_xa: unique toàn CN (1 xã thuộc 1 PGD), loại NaN/rỗng/"CỘNG"
+        n_xa  = int(df_bq[COT_TEN_XA].dropna().loc[lambda s: (s != "") & (s != "CỘNG")].nunique()) if COT_TEN_XA in df_bq.columns else 0
         bq_xa = tdn / n_xa if n_xa > 0 else 0
         # n_hoi: unique ĐVUT, loại NaN/rỗng/"CỘNG" (chỉ có 4 Hội đoàn thể)
         n_hoi = int(df_bq[COT_DVUT].dropna().loc[lambda s: (s != "") & (s != "CỘNG")].nunique()) if COT_DVUT in df_bq.columns else 0
@@ -357,84 +360,86 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
             f"""
             <div class="tq-grid">
                 <div class="tq-card soft-indigo">
-                    <div style="font-size:0.82rem;font-weight:600;color:#312e81;margin:0 0 4px">Tổng món vay</div>
-                    <div style="font-size:2rem;font-weight:700;line-height:1;color:#1e1b4b;margin:0 0 4px">{_n_mon_vay}</div>
-                    <div style="font-size:0.82rem;color:#4338ca">Số khế ước đang dư nợ</div>
+                    <div class="tq-label">Tổng món vay</div>
+                    <div class="tq-value">{_n_mon_vay}</div>
+                    <div class="tq-sub">Số khế ước đang dư nợ</div>
                 </div>
                 <div class="tq-card soft-blue">
-                    <div style="font-size:0.82rem;font-weight:600;color:#1e3a6e;margin:0 0 4px">Tổng khách hàng</div>
-                    <div style="font-size:2rem;font-weight:700;line-height:1;color:#1e3a6e;margin:0 0 4px">{_n_kh}</div>
-                    <div style="font-size:0.82rem;color:#1e40af">{(f"BQ {_bq_mon_kh} món/KH") if n_kh > 0 else "—"}</div>
+                    <div class="tq-label">Tổng khách hàng</div>
+                    <div class="tq-value">{_n_kh}</div>
+                    <div class="tq-sub">{(f"BQ {_bq_mon_kh} món/KH") if n_kh > 0 else "—"}</div>
                 </div>
                 <div class="tq-card soft-green">
-                    <div style="font-size:0.82rem;font-weight:600;color:#14532d;margin:0 0 4px">Tổng dư nợ</div>
-                    <div style="font-size:2rem;font-weight:700;line-height:1;color:#14532d;margin:0 0 4px">{_tdn} tỷ</div>
-                    <div style="font-size:0.82rem;color:#15803d;font-weight:600">+{_tdn_delta} tỷ so kỳ trước</div>
+                    <div class="tq-label">Tổng dư nợ</div>
+                    <div class="tq-value">{_tdn} tỷ</div>
+                    <div class="tq-sub">Số liệu đến {ngay_cap_nhat}</div>
                 </div>
                 <div class="tq-card soft-green">
-                    <div style="font-size:0.82rem;font-weight:600;color:#14532d;margin:0 0 4px">Dư nợ trong hạn</div>
-                    <div style="font-size:2rem;font-weight:700;line-height:1;color:#14532d;margin:0 0 4px">{_dth} tỷ</div>
-                    <div style="font-size:0.82rem;color:#166534">{_dth_pct}% tổng dư nợ</div>
+                    <div class="tq-label">Dư nợ trong hạn</div>
+                    <div class="tq-value">{_dth} tỷ</div>
+                    <div class="tq-sub">{_dth_pct}% tổng dư nợ</div>
                 </div>
                 <div class="tq-card soft-red">
-                    <div style="font-size:0.82rem;font-weight:600;color:#7f1d1d;margin:0 0 4px">Dư nợ quá hạn</div>
-                    <div style="font-size:2rem;font-weight:700;line-height:1;color:#7f1d1d;margin:0 0 4px">{_dqh} tỷ</div>
-                    <div style="font-size:0.82rem;color:#991b1b">{_tlq}% tổng dư nợ</div>
+                    <div class="tq-label">Dư nợ quá hạn</div>
+                    <div class="tq-value">{_dqh} tỷ</div>
+                    <div class="tq-sub">{_tlq}% tổng dư nợ</div>
                 </div>
                 <div class="tq-card soft-red">
-                    <div style="font-size:0.82rem;font-weight:600;color:#7f1d1d;margin:0 0 4px">Tỷ lệ quá hạn</div>
-                    <div style="font-size:2rem;font-weight:700;line-height:1;color:#7f1d1d;margin:0 0 4px">{_tlq}%</div>
-                    <div style="font-size:0.82rem;color:#991b1b">{'⚠️ Mức cao > 0.5%' if tlq >= 0.5 else '< 0.5% toàn hệ thống'}</div>
+                    <div class="tq-label">Tỷ lệ quá hạn</div>
+                    <div class="tq-value">{_tlq}%</div>
+                    <div class="tq-sub">{'⚠️ Mức cao > 0,5%' if tlq >= 0.5 else '< 0,5% toàn hệ thống'}</div>
                 </div>
                 <div class="tq-card soft-amber">
-                    <div style="font-size:0.82rem;font-weight:600;color:#78350f;margin:0 0 4px">Nợ khoanh</div>
-                    <div style="font-size:2rem;font-weight:700;line-height:1;color:#78350f;margin:0 0 4px">{_dnk} tỷ</div>
-                    <div style="font-size:0.82rem;color:#92400e">{_tlk}% tổng dư nợ</div>
+                    <div class="tq-label">Nợ khoanh</div>
+                    <div class="tq-value">{_dnk} tỷ</div>
+                    <div class="tq-sub">{_tlk}% tổng dư nợ</div>
                 </div>
                 <div class="tq-card soft-amber">
-                    <div style="font-size:0.82rem;font-weight:600;color:#78350f;margin:0 0 4px">Tỷ lệ khoanh</div>
-                    <div style="font-size:2rem;font-weight:700;line-height:1;color:#78350f;margin:0 0 4px">{_tlk}%</div>
-                    <div style="font-size:0.82rem;color:#92400e">{'⚠️ Cần theo dõi' if tlk >= 0.5 else 'Trong kiểm soát'}</div>
+                    <div class="tq-label">Tỷ lệ khoanh</div>
+                    <div class="tq-value">{_tlk}%</div>
+                    <div class="tq-sub">{'⚠️ Cần theo dõi' if tlk >= 0.5 else 'Trong kiểm soát'}</div>
                 </div>
                 <div class="tq-card {no_xau_class}">
-                    <div style="font-size:0.82rem;font-weight:600;color:#7f1d1d;margin:0 0 4px">Tỷ lệ nợ xấu (NX)</div>
-                    <div style="font-size:2rem;font-weight:700;line-height:1;color:#7f1d1d;margin:0 0 4px">{_tl_no_xau}%</div>
-                    <div style="font-size:0.82rem;color:#991b1b">= (QH + Khoanh) / Tổng dư nợ</div>
+                    <div class="tq-label">Tỷ lệ nợ xấu (NX)</div>
+                    <div class="tq-value">{_tl_no_xau}%</div>
+                    <div class="tq-sub">= (QH + Khoanh) / Tổng dư nợ</div>
                 </div>
                 <div class="tq-card {khd_class}">
-                    <div style="font-size:0.82rem;font-weight:600;color:#7f1d1d;margin:0 0 4px">3 tháng không HĐ</div>
-                    <div style="font-size:2rem;font-weight:700;line-height:1;color:#7f1d1d;margin:0 0 4px">{khd_val}</div>
-                    <div style="font-size:0.82rem;color:#991b1b">{khd_sub}</div>
+                    <div class="tq-label">3 tháng không HĐ</div>
+                    <div class="tq-value">{khd_val}</div>
+                    <div class="tq-sub">{khd_sub}</div>
                 </div>
                 <div class="tq-card soft-purple">
-                    <div style="font-size:0.82rem;font-weight:600;color:#4c1d95;margin:0 0 4px">Dư nợ BQ PGD</div>
-                    <div style="font-size:2rem;font-weight:700;line-height:1;color:#4c1d95;margin:0 0 4px">{_bq_pgd}</div>
-                    <div style="font-size:0.82rem;color:#7c3aed">{_n_pgd_str} PGD có dư nợ</div>
+                    <div class="tq-label">Dư nợ BQ PGD</div>
+                    <div class="tq-value">{_bq_pgd}</div>
+                    <div class="tq-sub">{_n_pgd_str} PGD có dư nợ</div>
                 </div>
                 <div class="tq-card soft-indigo">
-                    <div style="font-size:0.82rem;font-weight:600;color:#312e81;margin:0 0 4px">Dư nợ BQ tổ TKVV</div>
-                    <div style="font-size:2rem;font-weight:700;line-height:1;color:#1e1b4b;margin:0 0 4px">{_bq_to}</div>
-                    <div style="font-size:0.82rem;color:#4338ca">{_n_to_str} tổ TK&VV</div>
+                    <div class="tq-label">Dư nợ BQ tổ TKVV</div>
+                    <div class="tq-value">{_bq_to}</div>
+                    <div class="tq-sub">{_n_to_str} tổ TK&VV</div>
                 </div>
                 <div class="tq-card soft-blue">
-                    <div style="font-size:0.82rem;font-weight:600;color:#1e3a6e;margin:0 0 4px">Dư nợ BQ xã</div>
-                    <div style="font-size:2rem;font-weight:700;line-height:1;color:#1e3a6e;margin:0 0 4px">{_bq_xa}</div>
-                    <div style="font-size:0.82rem;color:#1e40af">{_n_xa_str} xã</div>
+                    <div class="tq-label">Dư nợ BQ xã</div>
+                    <div class="tq-value">{_bq_xa}</div>
+                    <div class="tq-sub">{_n_xa_str} xã</div>
                 </div>
                 <div class="tq-card soft-amber">
-                    <div style="font-size:0.82rem;font-weight:600;color:#78350f;margin:0 0 4px">Dư nợ BQ Hội</div>
-                    <div style="font-size:2rem;font-weight:700;line-height:1;color:#78350f;margin:0 0 4px">{_bq_hoi}</div>
-                    <div style="font-size:0.82rem;color:#92400e">{_n_hoi_str} hội đoàn thể</div>
+                    <div class="tq-label">Dư nợ BQ Hội</div>
+                    <div class="tq-value">{_bq_hoi}</div>
+                    <div class="tq-sub">{_n_hoi_str} hội đoàn thể</div>
                 </div>
             </div>
             """,
             unsafe_allow_html=True,
         )
+        _can_doi_ok = abs((dth + dqh + dnk) - tdn) < 1e4  # sai số < 10,000 đồng
+        _can_doi_icon = "✅" if _can_doi_ok else "⚠️ **Không cân — kiểm tra lại file HSTD!**"
         st.caption(
             f"🔍 Kiểm tra cân đối: {_dth} tỷ (Trong hạn) "
             f"+ {vn(dqh/1e9, 3)} (Quá hạn) "
             f"+ {vn(dnk/1e9, 3)} (Khoanh) "
-            f"= {_tdn} tỷ ✅"
+            f"= {_tdn} tỷ {_can_doi_icon}"
         )
         if os.path.exists(CACHE_HSTD):
             cap = format_caption_merge("hstd")
@@ -829,59 +834,6 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                 st.caption("⚠️ Không có cột DS Cho vay/Thu nợ trong HSTD")
             _col_cv = _col_cv_pgd
             _thu_cols = _thu_cols_pgd
-
-            df_pgd["TL QH %"] = ((df_pgd["QH (triệu đồng)"] / df_pgd["Dư nợ (triệu đồng)"].replace(0, pd.NA)) * 100).fillna(0).round(2)
-            df_pgd["TL Khoanh %"] = ((df_pgd["Khoanh (triệu đồng)"] / df_pgd["Dư nợ (triệu đồng)"].replace(0, pd.NA)) * 100).fillna(0).round(2)
-
-            try:
-                ds_thang = ds_thang_nam()
-                if ds_thang:
-                    df_to_raw = doc_cdtotkvv(ds_thang[0])
-                    if df_to_raw is not None and not df_to_raw.empty:
-                        df_to_pgd = tong_hop_theo_pgd(df_to_raw)
-
-                        # Map tên viết tắt trong CDTOTKVV → tên chuẩn (DON_VI_CHI_NHANH)
-                        # "PGD Biên Hòa" là alias cho file cũ — trong HSTD tên thực là "Hội sở Chi nhánh tỉnh"
-                        _TEN_MAP = {
-                            "Hội sở CN Đồng Nai":   DON_VI_CHI_NHANH,
-                            "Hội sở CN Bình Phước": DON_VI_CHI_NHANH,
-                            "PGD Biên Hòa":         DON_VI_CHI_NHANH,
-                        }
-                        def _map_ten(val):
-                            val = str(val).strip()
-                            if val in _TEN_MAP:
-                                return _TEN_MAP[val]
-                            # Fuzzy: ten_dv chứa tên PGD chuẩn hoặc ngược lại
-                            val_low = val.lower()
-                            for ten in [DON_VI_CHI_NHANH] + DS_PGD:
-                                if ten.lower() in val_low or val_low in ten.lower():
-                                    return ten
-                            return val
-
-                        # FIX: đổi "ten_dv" (đúng) thay vì "ten_pgd" (sai)
-                        df_to_pgd[COT_TEN_PGD] = df_to_pgd["ten_dv"].apply(_map_ten)
-                        df_to_pgd = df_to_pgd.rename(columns={
-                            "tong_to": "Tổng Tổ",
-                            "to_tot":  "Tốt",
-                            "to_kha":  "Khá",
-                            "to_tb":   "TB",
-                            "to_yeu":  "Yếu",
-                        })
-                        cot_to = [COT_TEN_PGD, "Tổng Tổ", "Tốt", "Khá", "TB", "Yếu"]
-                        # Gộp nếu nhiều dòng cùng tên PGD sau khi map
-                        df_to_pgd = (
-                            df_to_pgd[cot_to]
-                            .groupby(COT_TEN_PGD, as_index=False)
-                            .sum()
-                        )
-                        df_pgd = df_pgd.merge(df_to_pgd, on=COT_TEN_PGD, how="left")
-            except Exception as e:  # conv: skip
-                logger.error("Lỗi merge CDTOTKVV vào bảng PGD: %s", e, exc_info=True)
-                st.caption("⚠️ Không gộp được dữ liệu CDTOTKVV vào bảng — bảng sẽ thiếu cột Tổ TK&VV.")
-
-            for cot in ["Tổng Tổ", "Tốt", "Khá", "TB", "Yếu"]:
-                if cot in df_pgd.columns:
-                    df_pgd[cot] = df_pgd[cot].fillna(0).round(0).astype(int)
 
             # Tính TL QH% và TL Khoanh% cho từng PGD
             df_pgd["TL QH %"] = (
@@ -1382,7 +1334,7 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                              "help": "Tổng số khế ước đến hạn trong kỳ"},
                             {"label": "Số khách hàng", "value": fmt_so(tong_kh),  "icon": "👥",
                              "help": "Số KH có món vay đến hạn"},
-                            {"label": "Tổng dư nợ",    "value": fmt(tong_no),     "icon": "💰",
+                            {"label": "Tổng dư nợ",    "value": fmt_ty(tong_no),  "icon": "💰",
                              "help": "Đơn vị: triệu đồng"},
                         ],
                         num_columns=3,
@@ -1476,7 +1428,7 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                                 title=f"Top 10 {nhom_chon}",
                                 height=360,
                                 annotations=[dict(
-                                    text=f"<b>{fmt(tong_no)}</b><br>tr.đ",
+                                    text=f"<b>{fmt_ty(tong_no)}</b><br>tr.đ",
                                     x=0.5, y=0.5,
                                     font=dict(size=12),
                                     showarrow=False,

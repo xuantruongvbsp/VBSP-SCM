@@ -770,7 +770,7 @@ def _render_trang_chu(tab, df_pgd: pd.DataFrame, role: str, pgd_user: str, kwarg
                 n_xa  = int(df_bq[COT_TEN_XA].nunique()) if COT_TEN_XA in df_bq.columns else 0
                 bq_xa = tdn / n_xa if n_xa > 0 else 0
 
-                n_hoi = int(df_bq[COT_DVUT].nunique()) if COT_DVUT in df_bq.columns else 0
+                n_hoi = int(df_bq[COT_DVUT].dropna().loc[lambda s: (s != "") & (s != "CỘNG")].nunique()) if COT_DVUT in df_bq.columns else 0
                 bq_hoi = tdn / n_hoi if n_hoi > 0 else 0
 
                 kpi_row([

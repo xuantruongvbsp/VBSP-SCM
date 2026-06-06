@@ -341,8 +341,8 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
         # n_xa: unique toàn CN (1 xã thuộc 1 PGD)
         n_xa  = int(df_bq[COT_TEN_XA].nunique()) if COT_TEN_XA in df_bq.columns else 0
         bq_xa = tdn / n_xa if n_xa > 0 else 0
-        # n_hoi: unique ĐVUT (chỉ có 4 Hội đoàn thể)
-        n_hoi = int(df_bq[COT_DVUT].nunique()) if COT_DVUT in df_bq.columns else 0
+        # n_hoi: unique ĐVUT, loại NaN/rỗng/"CỘNG" (chỉ có 4 Hội đoàn thể)
+        n_hoi = int(df_bq[COT_DVUT].dropna().loc[lambda s: (s != "") & (s != "CỘNG")].nunique()) if COT_DVUT in df_bq.columns else 0
         bq_hoi = tdn / n_hoi if n_hoi > 0 else 0
         _bq_pgd  = vn(bq_pgd / 1_000_000, 1) + " tr"
         _bq_to   = vn(bq_to / 1_000_000, 1) + " tr" if n_to > 0 else "—"

@@ -4,6 +4,24 @@
 
 ---
 
+## [2026-06-06] 4 card Dư nợ BQ: PGD / Tổ TKVV / Xã / Hội
+
+### `tabs/tab_tongquan.py` — thêm 4 card BQ cuối grid Tổng quan danh mục tín dụng
+- L329-348: tính `df_bq` với `pd.to_numeric()` trước groupby
+- L402-422: 4 card HTML (soft-purple/indigo/blue/amber) hiển thị tr + số đơn vị
+
+### `workspaces/ws_operation.py` — thêm Vùng B2 4 card BQ trong Trang Chủ
+- L754-791: `kpi_row` 4 card, nằm dưới 8 KPI cards, trước divider
+
+### Bug fix: `pd.to_numeric()` trước groupby.sum → sửa BQ PGD sai (2 thay vì 22)
+### Bug fix: `nunique()` thay `groupby.ngroups` → sửa BQ Xã/Hội sai
+### Bug fix: filter NaN/"CỘNG" khỏi nunique → sửa BQ Hội 5→4
+
+### `BUGMAP.md` — ghi C13, C14, C15
+### `.trae/rules/rules.md` — thêm lỗi #13, #14, #15 vào Section 9
+
+---
+
 ## [2026-05-29] GSheet Tiến độ Báo cáo: refactor toàn diện + JWT fix + health check
 
 ### `tabs/tab_tien_do_nop.py` — REFACTOR LỚN (loại bỏ "Kỳ báo cáo")

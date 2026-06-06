@@ -1,7 +1,7 @@
 # CLAUDE.md — VBSP-SCM
 > Hướng dẫn dự án dành riêng cho **Claude Code** / Trae / Cline / Cursor.  
 > Đọc toàn bộ file này trước khi đọc bất kỳ file code nào.  
-> Cập nhật: 30/05/2026
+> Cập nhật: 06/06/2026
 
 ---
 

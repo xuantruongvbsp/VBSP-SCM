@@ -1024,6 +1024,37 @@ val = pd.to_numeric(df[COT_X], errors="coerce").sum() if COT_X in df.columns els
 
 ## Template: Ghi nhận bug mới
 
+### C13 — BQ metrics: `n_xa`/`n_hoi` sai do dùng `groupby ngroups` thay vì `nunique()`
+| | |
+|---|---|
+| **File** | `tabs/tab_tongquan.py` L329-348, `workspaces/ws_operation.py` L756-775 |
+| **Dấu hiệu** | Card Dư nợ BQ Hội ghi chú "10 hội đoàn thể" (thực tế chỉ có 4); card BQ Xã ghi "11 xã" (thực tế ~95) |
+| **Nguyên nhân** | `groupby([COT_TEN_PGD, COT_DVUT]).ngroups` đếm số **cặp** (PGD, ĐVUT) thay vì số giá trị unique của chính cột ĐVUT. Với 4 Hội × 22 PGD → 10-88 cặp tùy dữ liệu thực tế |
+| **Fix** | `df_bq[COT_DVUT].nunique()` và `df_bq[COT_TEN_XA].nunique()` thay vì groupby ngroups. Riêng `n_to` giữ nguyên groupby ngroups vì tên Tổ trùng giữa các PGD |
+| **Ngày fix** | 2026-06-06 |
+
+### C14 — BQ Hội đếm 5 thay vì 4 do dòng rỗng/"CỘNG"
+| | |
+|---|---|
+| **File** | `tabs/tab_tongquan.py` L345, `workspaces/ws_operation.py` L773 |
+| **Dấu hiệu** | Card Dư nợ BQ Hội ghi chú "5 hội đoàn thể" (có 4 hội chính + 1 dòng rỗng hoặc "CỘNG") |
+| **Nguyên nhân** | Cột `COT_DVUT` có dòng NaN/rỗng hoặc dòng tổng "CỘNG" → `nunique()` đếm thành 1 giá trị unique thừa |
+| **Fix** | `.dropna().loc[lambda s: (s != "") & (s != "CỘNG")].nunique()` — loại NaN, rỗng, và dòng tổng trước khi đếm |
+| **Ngày fix** | 2026-06-06 |
+
+### C15 — BQ PGD chỉ hiện 2 PGD thay vì 22 do groupby.sum() trên cột object
+| | |
+|---|---|
+| **File** | `tabs/tab_tongquan.py` L329-334, `workspaces/ws_operation.py` L756-760 |
+| **Dấu hiệu** | Card Dư nợ BQ PGD ghi "2 PGD có dư nợ" (thực tế 22 PGD đều có dữ liệu); giá trị BQ/PGD ~600 tỷ (vô lý) |
+| **Nguyên nhân** | Cột `COT_TONG_DU_NO` trong parquet có mixed dtype (string/float). `groupby().sum()` trên cột object nối chuỗi thay vì cộng số → `> 0` filter cho kết quả sai (chỉ 2 PGD có dư nợ `> 0` sau khi so sánh chuỗi) |
+| **Fix** | Tạo `df_bq.copy()`, chạy `pd.to_numeric(df_bq[COT_TONG_DU_NO], errors="coerce").fillna(0)` trước khi groupby — khớp với cách KPI đang tính `tdn` |
+| **Ngày fix** | 2026-06-06 |
+
+---
+
+## Template: Ghi nhận bug mới
+
 Mỗi khi fix bug, copy template dưới đây và điền vào đúng mục:
 
 ```

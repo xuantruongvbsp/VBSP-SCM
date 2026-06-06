@@ -1,7 +1,7 @@
 # VBSP-SCM — Trae / Claude Code Rules
 > Đọc file này trước khi sinh bất kỳ code nào.
 > Không chứa dữ liệu nhạy cảm — chỉ function names, column names, patterns.
-> Cập nhật: 30/05/2026
+> Cập nhật: 06/06/2026
 
 ---
 
@@ -525,6 +525,36 @@ df = duckdb.query(f"SELECT ... FROM '{CACHE_HSTD}'").df()
 - Mô tả thay đổi ≤ 1 dòng/file
 - Nếu nhiều task trong 1 phiên → gộp chung 1 tóm tắt
 
+### 8.19 Numeric columns — LUÔN pd.to_numeric() trước sum/mean/groupby
+```python
+# ❌ SAI — groupby.sum() trên cột mixed type nối chuỗi
+tong = df.groupby("PGD")["Tổng dư nợ"].sum()
+n_pgd = int((tong > 0).sum())  # kết quả sai
+
+# ✅ ĐÚNG — copy + convert numeric trước
+df_num = df.copy()
+df_num["Tổng dư nợ"] = pd.to_numeric(df_num["Tổng dư nợ"], errors="coerce").fillna(0)
+tong = df_num.groupby("PGD")["Tổng dư nợ"].sum()
+n_pgd = int((tong > 0).sum())
+```
+Lý do: parquet từ Excel thường có mixed dtype (string/float). Groupby.sum trên object = nối chuỗi.
+
+### 8.20 Đếm số chiều cho BQ — chọn đúng hàm đếm
+| Muốn đếm | Dùng | Vì |
+|---|---|---|
+| Số PGD có dư nợ | `groupby(PGD)[DN].sum() > 0 → count` | 1 PGD có thể có dư nợ = 0 |
+| Số Tổ TK&VV | `groupby([PGD, Tổ]).ngroups` | Tên Tổ trùng giữa các PGD |
+| Số Xã | `df["Tên xã"].nunique()` | 1 xã thuộc 1 PGD duy nhất |
+| Số Hội đoàn thể | `df["Tên ĐVUT"].dropna().loc[lambda s: (s!="") & (s!="CỘNG")].nunique()` | Loại NaN, rỗng, dòng tổng |
+
+```python
+# ❌ SAI — ngroups đếm cặp (PGD, Xã), không đếm unique Xã
+n_xa = df.groupby([COT_TEN_PGD, COT_TEN_XA]).ngroups  # ra số cặp
+
+# ✅ ĐÚNG
+n_xa = df[COT_TEN_XA].nunique()  # ra số xã toàn CN
+```
+
 ---
 
 ## 9. Lỗi đã từng mắc — KHÔNG lặp lại
@@ -543,6 +573,9 @@ df = duckdb.query(f"SELECT ... FROM '{CACHE_HSTD}'").df()
 | 10 | width deprecated | `width='stretch'` | `use_container_width=True` |
 | 11 | CSS guard | inject CSS trong session_state guard | Inject vô điều kiện mỗi rerun |
 | 12 | Mixed dtype parquet | float + str rỗng cùng cột | ép str: `str(int(v)) if v==int(v) else str(v)` |
+| 13 | groupby.sum trên object | `df.groupby("PGD")["Tổng dư nợ"].sum()` | `pd.to_numeric(s, errors="coerce")` trước groupby |
+| 14 | ngroups đếm cặp | `df.groupby([PGD, DVUT]).ngroups` | `df[DVUT].nunique()` nếu cần đếm unique values |
+| 15 | nunique có lẫn NaN | `df[DVUT].nunique()` | `.dropna().loc[lambda s: s!=""].nunique()` |
 
 ---
 

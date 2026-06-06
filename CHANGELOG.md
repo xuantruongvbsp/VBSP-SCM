@@ -1,5 +1,36 @@
 # CHANGELOG
 
+## [2026-06-06] — thiết lập 4 card BQ ở cả 2 phân hệ: Trang Chủ (ws_operation) + Tổng quan danh mục tín dụng (tab_tongquan)
+- `workspaces/ws_operation.py` L746-791 — Vùng B2: 4 card Dư nợ BQ trong _render_trang_chu
+- `tabs/tab_tongquan.py` L329-348 — BQ computation block
+- `tabs/tab_tongquan.py` L402-422 — 4 card HTML trong grid tq-grid (Tổng quan danh mục tín dụng)
+- `workspaces/ws_operation.py` L708 — label: "Chi nhánh" → "Toàn địa bàn"
+
+## [2026-06-06] — fix số liệu không khớp tab Tổng quan trong Toàn cảnh 22 PGD
+- `tabs/tab_pgd_cards.py` dòng ~42 — thêm import `vn` từ utils
+- `tabs/tab_pgd_cards.py` dòng ~191 — card: dư nợ đổi từ `fmt_ty` (triệu, không nhãn) → `vn(x/1e9, 3) + " tỷ"` (khớp tab Tổng quan)
+- `tabs/tab_pgd_cards.py` dòng ~210 — nhãn card "Dư nợ" → "Dư nợ (tỷ)"
+- `tabs/tab_pgd_cards.py` dòng ~504–508 — KPI row: đổi `fmt_ty`/US format → `vn` format (tỷ/triệu với nhãn rõ ràng)
+- `tabs/tab_pgd_cards.py` dòng ~527–541 — BQ metrics: đổi `f"{x:,.1f} tr"` (US) → `vn(x, 1) + " tr"` (VN)
+- `tabs/tab_pgd_cards.py` dòng ~444–446 — bảng xếp hạng: đổi format US `{:,.3f}` → lambda `vn()` / `fmt_so()`
+
+## [2026-06-06] — fix bug GQVL mất dòng đầu khi merge + fix test + convention
+- `services/upload_service.py` dòng ~452 — chèn placeholder row trong tach_file_gqvl_toan_cn để _doc_mot_pgd._clean.iloc[1:] không bỏ dòng dữ liệu thật
+- `services/upload_service.py` dòng ~538 — guard early return khi ds_pgd=[] tránh max_workers=0 crash ThreadPoolExecutor
+- `services/upload_service.py` — thêm logger.error cho 2 except trong xu_ly_cdto_toan_cn; thêm conv: skip cho 2 logger.debug
+- `tabs/tab_upload_khnv.py` dòng ~771,~921 — sửa silent merge error (except Exception: pass → log + st.warning)
+
+## [2026-06-06] — thêm upload NQ11 & GQVL toàn CN (1 file tổng → tự tách 22 PGD)
+- `services/upload_service.py` — thêm tach_file_nq11_toan_cn(), xu_ly_nq11_toan_cn(), tach_file_gqvl_toan_cn(), xu_ly_gqvl_toan_cn()
+- `tabs/tab_upload_khnv.py` — thêm _render_nq11_toan_cn(), _render_gqvl_toan_cn(); cập nhật render() gọi 2 section mới
+
+## [2026-06-06] — chuyển 4 card BQ từ Tổng quan danh mục tín dụng về Trang Chủ (ws_operation)
+- `tabs/tab_tongquan.py` dòng ~329-348 — xóa BQ computation block + 4 card HTML khỏi grid tq-grid
+- `workspaces/ws_operation.py` dòng ~746-791 — thêm Vùng B2: 4 card Dư nợ BQ (PGD/Tổ TKVV/Xã/Hội) dùng kpi_row, sau Vùng B KPI cards
+
+## [2026-06-06] — sửa label Trang Chủ: "Chi nhánh" → "Toàn địa bàn"
+- `workspaces/ws_operation.py` dòng ~708 — fallback text khi pgd_user=None
+
 ## [2026-06-06] — thêm KPI Dư nợ BQ/PGD, BQ/Tổ TK&VV, BQ/Hội vào Toàn cảnh 22 PGD
 - `tabs/tab_pgd_cards.py` dòng ~26-38 — import thêm `COT_TEN_TO`, `COT_DVUT` từ config
 - `tabs/tab_pgd_cards.py` dòng ~498-523 — thêm row 3 KPI: BQ/Phòng Giao dịch, BQ/Tổ TK&VV, BQ/Hội (tính từ raw df)

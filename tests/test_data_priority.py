@@ -27,9 +27,9 @@ class TestKiemTraNguonUuTien:
     def test_co_file_tra_pgd_upload(self):
         mock_info = {"co_file": True, "canh_bao": "ok", "so_ngay_cu": 0}
         with patch(
-            "services.data_priority_service.doc_trang_thai_file",
+            "data.pgd.doc_trang_thai_file",
             return_value=mock_info,
-        ), patch("services.data_priority_service.duong_dan_pgd", return_value="/fake/path.xlsx"):
+        ), patch("data.pgd.duong_dan_pgd", return_value="/fake/path.xlsx"):
             result = kiem_tra_nguon_uu_tien("PGD Long Thành", "hstd")
             assert result["nguon_uu_tien"] == NguonDuLieu.PGD_UPLOAD
             assert "✅" in result["ly_do"]
@@ -38,7 +38,7 @@ class TestKiemTraNguonUuTien:
     def test_khong_co_file_tra_chua_upload(self):
         mock_info = {"co_file": False, "canh_bao": "", "so_ngay_cu": 0}
         with patch(
-            "services.data_priority_service.doc_trang_thai_file",
+            "data.pgd.doc_trang_thai_file",
             return_value=mock_info,
         ):
             result = kiem_tra_nguon_uu_tien("PGD Long Thành", "hstd")
@@ -49,9 +49,9 @@ class TestKiemTraNguonUuTien:
     def test_file_cu_co_canh_bao(self):
         mock_info = {"co_file": True, "canh_bao": "cu", "so_ngay_cu": 7}
         with patch(
-            "services.data_priority_service.doc_trang_thai_file",
+            "data.pgd.doc_trang_thai_file",
             return_value=mock_info,
-        ), patch("services.data_priority_service.duong_dan_pgd", return_value="/fake/path.xlsx"):
+        ), patch("data.pgd.duong_dan_pgd", return_value="/fake/path.xlsx"):
             result = kiem_tra_nguon_uu_tien("PGD Long Thành", "hstd")
             assert len(result["canh_bao"]) >= 1
             assert "cũ" in result["canh_bao"][0].lower() or "7" in result["canh_bao"][0]

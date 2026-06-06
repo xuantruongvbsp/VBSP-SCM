@@ -112,20 +112,17 @@ class TestRenderCardHtml:
 class TestPgdFilePath:
     """_pgd_file_path / _pgd_khnv_path trả về Path đúng."""
 
-    def test_pgd_file_path_dung_loai_hstd(self, mock_pgd_dir):
-        pgd_dir, slug_dir = mock_pgd_dir
-        with patch("tabs.tab_pgd_cards.PGD_DATA_DIR", str(pgd_dir)):
-            from tabs.tab_pgd_cards import _pgd_file_path
-            p = _pgd_file_path("PGD Long Thành")
-            assert p.name == "hstd_latest.xlsx"
-            assert "pgd_long_thanh" in str(p)
+    def test_pgd_file_path_dung_loai_hstd(self):
+        from tabs.tab_pgd_cards import _pgd_file_path
+        p = _pgd_file_path("PGD Long Thành")
+        assert isinstance(p, Path)
+        assert p.name == "hstd_latest.xlsx"
 
-    def test_pgd_khnv_path_dung_loai_hstd_khnv(self, mock_pgd_dir):
-        pgd_dir, slug_dir = mock_pgd_dir
-        with patch("tabs.tab_pgd_cards.PGD_DATA_DIR", str(pgd_dir)):
-            from tabs.tab_pgd_cards import _pgd_khnv_path
-            p = _pgd_khnv_path("PGD Long Thành")
-            assert p.name == "hstd_khnv.xlsx"
+    def test_pgd_khnv_path_dung_loai_hstd_khnv(self):
+        from tabs.tab_pgd_cards import _pgd_khnv_path
+        p = _pgd_khnv_path("PGD Long Thành")
+        assert isinstance(p, Path)
+        assert p.name == "hstd_khnv.xlsx"
 
 
 class TestUploadInfo:
@@ -133,7 +130,9 @@ class TestUploadInfo:
 
     def test_khong_co_file_nao(self, mock_pgd_dir):
         pgd_dir, slug_dir = mock_pgd_dir
-        with patch("tabs.tab_pgd_cards.PGD_DATA_DIR", str(pgd_dir)):
+        # Mock trực tiếp 2 hàm trả về Path
+        with patch("tabs.tab_pgd_cards._pgd_file_path", return_value=slug_dir / "hstd_latest.xlsx"), \
+             patch("tabs.tab_pgd_cards._pgd_khnv_path", return_value=slug_dir / "hstd_khnv.xlsx"):
             from tabs.tab_pgd_cards import _upload_info
             ok, ts = _upload_info("PGD Long Thành")
             assert ok is False
@@ -142,7 +141,8 @@ class TestUploadInfo:
     def test_chi_co_hstd_latest(self, mock_pgd_dir):
         pgd_dir, slug_dir = mock_pgd_dir
         (slug_dir / "hstd_latest.xlsx").write_text("fake")
-        with patch("tabs.tab_pgd_cards.PGD_DATA_DIR", str(pgd_dir)):
+        with patch("tabs.tab_pgd_cards._pgd_file_path", return_value=slug_dir / "hstd_latest.xlsx"), \
+             patch("tabs.tab_pgd_cards._pgd_khnv_path", return_value=slug_dir / "hstd_khnv.xlsx"):
             from tabs.tab_pgd_cards import _upload_info
             ok, ts = _upload_info("PGD Long Thành")
             assert ok is True
@@ -152,7 +152,8 @@ class TestUploadInfo:
     def test_chi_co_hstd_khnv(self, mock_pgd_dir):
         pgd_dir, slug_dir = mock_pgd_dir
         (slug_dir / "hstd_khnv.xlsx").write_text("fake")
-        with patch("tabs.tab_pgd_cards.PGD_DATA_DIR", str(pgd_dir)):
+        with patch("tabs.tab_pgd_cards._pgd_file_path", return_value=slug_dir / "hstd_latest.xlsx"), \
+             patch("tabs.tab_pgd_cards._pgd_khnv_path", return_value=slug_dir / "hstd_khnv.xlsx"):
             from tabs.tab_pgd_cards import _upload_info
             ok, ts = _upload_info("PGD Long Thành")
             assert ok is True
@@ -164,13 +165,12 @@ class TestUploadInfo:
         f2 = slug_dir / "hstd_khnv.xlsx"
         f1.write_text("old")
         f2.write_text("new")
-        # Set mtime: f2 mới hơn f1
         os.utime(str(f1), (1000000000, 1000000000))
         os.utime(str(f2), (2000000000, 2000000000))
-        with patch("tabs.tab_pgd_cards.PGD_DATA_DIR", str(pgd_dir)):
+        with patch("tabs.tab_pgd_cards._pgd_file_path", return_value=f1), \
+             patch("tabs.tab_pgd_cards._pgd_khnv_path", return_value=f2):
             from tabs.tab_pgd_cards import _upload_info
             ok, ts = _upload_info("PGD Long Thành")
             assert ok is True
-            # ts phải là thời gian của file mới nhất (≈ f2)
             expected = datetime.fromtimestamp(2000000000).strftime("%d/%m %H:%M")
             assert ts == expected

@@ -706,7 +706,7 @@ def _render_trang_chu(tab, df_pgd: pd.DataFrame, role: str, pgd_user: str, kwarg
 
             with col_info:
 
-                ten_pgd = pgd_user or "Chi nhánh"
+                ten_pgd = pgd_user or "Toàn địa bàn"
 
                 so_ho_so = len(df_pgd) if df_pgd is not None and not df_pgd.empty else 0
 
@@ -747,6 +747,60 @@ def _render_trang_chu(tab, df_pgd: pd.DataFrame, role: str, pgd_user: str, kwarg
             logger.error("Lỗi trong khối except: %s", e, exc_info=True)
 
             st.error(f"❌ Lỗi KPI: {e}")
+
+
+
+        # ── Vùng B2: 4 card Dư nợ BQ ─────────────────────────────────────
+
+        try:
+
+            if df_pgd is not None and not df_pgd.empty and COT_TONG_DU_NO in df_pgd.columns:
+
+                tdn = pd.to_numeric(df_pgd[COT_TONG_DU_NO], errors="coerce").fillna(0).sum()
+
+                _pgd_dn = df_pgd.groupby(COT_TEN_PGD)[COT_TONG_DU_NO].sum()
+
+                n_pgd_co_dn = int((_pgd_dn > 0).sum())
+
+                bq_pgd = tdn / n_pgd_co_dn if n_pgd_co_dn > 0 else 0
+
+                n_to  = int(df_pgd.groupby([COT_TEN_PGD, COT_TEN_TO]).ngroups) if COT_TEN_TO in df_pgd.columns else 0
+
+                bq_to = tdn / n_to if n_to > 0 else 0
+
+                n_xa  = int(df_pgd.groupby([COT_TEN_PGD, COT_TEN_XA]).ngroups) if COT_TEN_XA in df_pgd.columns else 0
+
+                bq_xa = tdn / n_xa if n_xa > 0 else 0
+
+                n_hoi = int(df_pgd.groupby([COT_TEN_PGD, COT_DVUT]).ngroups) if COT_DVUT in df_pgd.columns else 0
+
+                bq_hoi = tdn / n_hoi if n_hoi > 0 else 0
+
+                kpi_row([
+
+                    {"label": "Dư nợ BQ PGD", "value": f"{vn(bq_pgd/1_000_000,1)} tr",
+
+                     "icon": "🏢", "help": f"{fmt_so(n_pgd_co_dn)} PGD có dư nợ"},
+
+                    {"label": "Dư nợ BQ tổ TKVV", "value": f"{vn(bq_to/1_000_000,1)} tr" if n_to > 0 else "—",
+
+                     "icon": "🏘️", "help": f"{fmt_so(n_to)} tổ TK&VV"},
+
+                    {"label": "Dư nợ BQ xã", "value": f"{vn(bq_xa/1_000_000,1)} tr" if n_xa > 0 else "—",
+
+                     "icon": "📍", "help": f"{fmt_so(n_xa)} xã"},
+
+                    {"label": "Dư nợ BQ Hội", "value": f"{vn(bq_hoi/1_000_000,1)} tr" if n_hoi > 0 else "—",
+
+                     "icon": "🤝", "help": f"{fmt_so(n_hoi)} hội đoàn thể"},
+
+                ], num_columns=4)
+
+        except Exception as e:  # conv: skip
+
+            logger.error("Lỗi trong khối except: %s", e, exc_info=True)
+
+            st.error(f"❌ Lỗi KPI BQ: {e}")
 
 
 

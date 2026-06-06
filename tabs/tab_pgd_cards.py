@@ -39,7 +39,7 @@ from config import (
 import plotly.graph_objects as go
 
 from services import tongquan_service as _tqsvc
-from utils import fmt_ty, fmt_so, hien_thi_dataframe_phan_trang
+from utils import fmt_ty, fmt_so, hien_thi_dataframe_phan_trang, vn
 from tabs.base_tab import TabContext
 
 
@@ -188,7 +188,7 @@ def _fmt_bq_ho(dn_binh_quan_ho: float) -> str:
 
 
 def _render_card_html(row: dict, upload_ok: bool, upload_ts: str, rank: int) -> str:
-    du_no_str   = fmt_ty(row["du_no"])
+    du_no_str   = vn(float(row["du_no"]) / 1_000_000_000, 3) + " tỷ"
     nqh_pct     = row["ty_le_nqh"]
     nqh_str     = f"{nqh_pct:.2f}%"
     dh_str      = fmt_so(int(row["no_den_han_thang"] / 1_000_000)) + " tr"
@@ -207,7 +207,7 @@ def _render_card_html(row: dict, upload_ok: bool, upload_ts: str, rank: int) -> 
   <div class="pgd-card-title">🏢 {row['ten_pgd']}</div>
   <div class="pgd-card-kpi">
     <div class="pgd-kpi-block">
-      <div class="pgd-kpi-label">Dư nợ</div>
+      <div class="pgd-kpi-label">Dư nợ (tỷ)</div>
       <div class="pgd-kpi-value">{du_no_str}</div>
     </div>
     <div class="pgd-kpi-block">
@@ -441,9 +441,14 @@ def _render_ranking_table(df_show: pd.DataFrame, upload_info_map: dict) -> None:
         df_out.style
         .map(_style_nqh, subset=["NQH%"])          # pandas 3.0+: map thay applymap
         .map(_style_bq, subset=["BQ/hộ (tr)"])
-        .format({"Dư nợ (tỷ)": "{:,.3f}", "NQH (tỷ)": "{:,.3f}",
-                 "NQH%": "{:.2f}%", "BQ/hộ (tr)": "{:,.1f}",
-                 "Đến hạn T (tr)": "{:,}", "Số KH": "{:,}"})
+        .format({
+            "Dư nợ (tỷ)":     lambda v: vn(v, 3),
+            "NQH (tỷ)":        lambda v: vn(v, 3),
+            "NQH%":            lambda v: f"{vn(v, 2)}%",
+            "BQ/hộ (tr)":      lambda v: vn(v, 1),
+            "Đến hạn T (tr)":  lambda v: fmt_so(v),
+            "Số KH":           lambda v: fmt_so(v),
+        })
     )
     st.dataframe(styled, use_container_width=True, height=min(700, len(df_out) * 36 + 50))
 
@@ -501,10 +506,10 @@ def render(tab_parent=None, **kwargs):
         n_upload  = sum(1 for dv in ds_don_vi if _pgd_file_path(dv).exists() or _pgd_khnv_path(dv).exists())
 
         c1, c2, c3, c4, c5 = st.columns(5)
-        c1.metric("Tổng dư nợ CN",      fmt_ty(tong_dn))
-        c2.metric("NQH% toàn CN",       f"{tl_nqh_cn:.2f}%")
-        c3.metric("Đến hạn tháng này",  fmt_ty(df_cards["no_den_han_thang"].sum()))
-        c4.metric("BQ/hộ toàn CN",      f"{bq_ho_cn/1_000_000:,.1f} tr")
+        c1.metric("Tổng dư nợ CN",      vn(tong_dn / 1_000_000_000, 3) + " tỷ")
+        c2.metric("NQH% toàn CN",       f"{tl_nqh_cn:.2f}%".replace(".", ","))
+        c3.metric("Đến hạn tháng này",  vn(df_cards["no_den_han_thang"].sum() / 1_000_000, 0) + " tr")
+        c4.metric("BQ/hộ toàn CN",      vn(bq_ho_cn / 1_000_000, 1) + " tr")
         c5.metric("File HSTD",           f"{n_upload}/{len(ds_don_vi)} đơn vị")
 
         # ── KPI dư nợ bình quân PGD / Tổ TK&VV / Hội ────────────────────
@@ -526,18 +531,18 @@ def render(tab_parent=None, **kwargs):
         cb1, cb2, cb3 = st.columns(3)
         cb1.metric(
             "BQ/Phòng Giao dịch",
-            f"{bq_pgd / 1_000_000:,.1f} tr",
+            vn(bq_pgd / 1_000_000, 1) + " tr",
             help=f"Dư nợ bình quân mỗi PGD — {n_pgd_co_dn} đơn vị có dư nợ",
         )
         cb2.metric(
             "BQ/Tổ TK&VV",
-            f"{bq_to / 1_000_000:,.1f} tr" if so_to > 0 else "—",
-            help=f"Dư nợ bình quân mỗi tổ Tiết kiệm & Vay vốn — {so_to:,} tổ" if so_to else "Không có cột Tên tổ trong HSTD",
+            vn(bq_to / 1_000_000, 1) + " tr" if so_to > 0 else "—",
+            help=vn(so_to / 1, 0) + " tổ TK&VV" if so_to else "Không có cột Tên tổ trong HSTD",
         )
         cb3.metric(
             "BQ/Hội",
-            f"{bq_hoi / 1_000_000:,.1f} tr" if so_hoi > 0 else "—",
-            help=f"Dư nợ bình quân mỗi Hội ĐVUT — {so_hoi:,} Hội" if so_hoi else "Không có cột Tên ĐVUT trong HSTD",
+            vn(bq_hoi / 1_000_000, 1) + " tr" if so_hoi > 0 else "—",
+            help=vn(so_hoi / 1, 0) + " Hội ĐVUT" if so_hoi else "Không có cột Tên ĐVUT trong HSTD",
         )
 
         st.divider()

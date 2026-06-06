@@ -638,6 +638,310 @@ def _render_cdto_toan_cn(username: str) -> None:
             st.rerun()
 
 
+def _render_nq11_toan_cn(username: str) -> None:
+    """Upload 1 file NQ11 tổng hợp toàn CN → tự tách và lưu 22 PGD."""
+    with st.expander("📑 Upload NQ11 Toàn Chi nhánh", expanded=False):
+        st.info(
+            "Upload 1 file NQ11 tổng hợp của toàn CN — hệ thống tự tách và "
+            "lưu cho từng PGD dựa trên cột **Tên PGD** trong file."
+        )
+
+        _SS_BYTES   = "nq11_cn_bytes"
+        _SS_PREVIEW = "nq11_cn_preview"
+        _SS_FILE_ID = "nq11_cn_file_id"
+        _ver = st.session_state.setdefault("nq11_cn_ver", 0)
+
+        uploaded = st.file_uploader(
+            "Chọn file NQ11 toàn CN",
+            type=["xlsx", "xls"],
+            key=f"nq11_cn_uploader_{_ver}",
+            label_visibility="collapsed",
+        )
+
+        if uploaded is not None:
+            file_id = (uploaded.name, uploaded.size)
+            if st.session_state.get(_SS_FILE_ID) != file_id:
+                st.session_state[_SS_FILE_ID] = file_id
+                st.session_state[_SS_BYTES]   = uploaded.read()
+                st.session_state.pop(_SS_PREVIEW, None)
+
+        if _SS_BYTES not in st.session_state:
+            return
+
+        file_bytes: bytes = st.session_state[_SS_BYTES]
+
+        if _SS_PREVIEW not in st.session_state:
+            with st.spinner("🔍 Đang phân tích file NQ11..."):
+                try:
+                    from services.upload_service import tach_file_nq11_toan_cn
+                    pgd_map = tach_file_nq11_toan_cn(file_bytes)
+                except ValueError as e:
+                    st.error(f"❌ {e}")
+                    return
+                except Exception as e:
+                    logger.error("_render_nq11_toan_cn: lỗi phân tích — %s", e, exc_info=True)
+                    st.error(f"❌ Lỗi phân tích file: {e}")
+                    return
+
+                ds_tat_ca = [DON_VI_CHI_NHANH] + DS_PGD
+                thieu = [dv for dv in ds_tat_ca if dv not in pgd_map]
+
+                preview_rows = []
+                for ten_pgd in ds_tat_ca:
+                    if ten_pgd in pgd_map:
+                        try:
+                            df_tmp = pd.read_excel(BytesIO(pgd_map[ten_pgd]), engine="openpyxl", header=4)
+                            so_dong_val = len(df_tmp.dropna(how="all"))
+                        except Exception:
+                            so_dong_val = "?"
+                    else:
+                        so_dong_val = 0
+                    da_co = kiem_tra_file_ton_tai_pgd(ten_pgd, "nq11")
+                    preview_rows.append({
+                        "Đơn vị": ten_pgd,
+                        "Số dòng": so_dong_val,
+                        "Hiện tại": "🔄 Cập nhật" if da_co else ("—" if so_dong_val == 0 else "🆕 Mới"),
+                        "Trạng thái": "✅ Sẵn sàng" if ten_pgd in pgd_map else "⚠️ Thiếu trong file",
+                    })
+
+                st.session_state[_SS_PREVIEW] = {
+                    "rows": preview_rows,
+                    "thieu": thieu,
+                    "so_dv": len(pgd_map),
+                    "pgd_map": pgd_map,
+                }
+
+        preview = st.session_state.get(_SS_PREVIEW)
+        if not preview:
+            return
+
+        c1, c2 = st.columns(2)
+        c1.metric("Số đơn vị trong file", preview["so_dv"])
+        c2.metric("Tổng số đơn vị CN", len([DON_VI_CHI_NHANH] + DS_PGD))
+
+        if preview["thieu"]:
+            st.warning(
+                f"⚠️ Thiếu **{len(preview['thieu'])}** đơn vị so với danh sách: "
+                + ", ".join(preview["thieu"])
+            )
+
+        def _style_ht(v: str) -> str:
+            if v.startswith("🆕"):
+                return "background-color:#d4edda;color:#155724;font-weight:bold"
+            if v.startswith("🔄"):
+                return "background-color:#fff3cd;color:#856404"
+            return ""
+
+        df_prev = pd.DataFrame(preview["rows"])
+        st.dataframe(
+            df_prev.style.map(_style_ht, subset=["Hiện tại"]),
+            use_container_width=True,
+            hide_index=True,
+            height=min(600, 60 + len(preview["rows"]) * 35),
+        )
+
+        if preview["so_dv"] < 2:
+            st.error("❌ File phải có ít nhất 2 đơn vị.")
+            return
+
+        if st.button(
+            f"📤 Upload {preview['so_dv']} đơn vị",
+            type="primary",
+            key="btn_nq11_cn_upload",
+        ):
+            with st.spinner("⏳ Đang tách và lưu từng PGD..."):
+                from services.upload_service import xu_ly_nq11_toan_cn
+                ket_qua = xu_ly_nq11_toan_cn(file_bytes)
+
+            if "_loi_doc" in ket_qua:
+                st.error(ket_qua["_loi_doc"].thong_bao)
+                return
+
+            for ten_pgd, kq in ket_qua.items():
+                if kq.thanh_cong:
+                    db.ghi_audit(
+                        username, "upload_nq11_toan_cn",
+                        f"NQ11 toàn CN — {ten_pgd}",
+                    )
+
+            so_ok = sum(1 for v in ket_qua.values() if v.thanh_cong)
+            if so_ok:
+                st.success(f"✅ Đã lưu **{so_ok}** đơn vị thành công")
+                # Tự động merge sau upload
+                try:
+                    kq_merge = merge_du_lieu_toan_cn("nq11")
+                    if kq_merge.thanh_cong:
+                        st.success("✅ Dữ liệu NQ11 toàn CN đã được gộp & cập nhật.")
+                    else:
+                        st.warning(f"⚠️ Tổng hợp NQ11: {kq_merge.thong_bao}")
+                except Exception as e:
+                    logger.error("_render_nq11_toan_cn: lỗi merge — %s", e, exc_info=True)
+                    st.warning(f"⚠️ Tổng hợp NQ11 lỗi: {e}")
+            for ten_pgd, kq in ket_qua.items():
+                if not kq.thanh_cong:
+                    st.warning(f"⚠️ {ten_pgd}: {kq.thong_bao}")
+
+            st.cache_data.clear()
+            for _k in (_SS_PREVIEW, _SS_BYTES, _SS_FILE_ID):
+                st.session_state.pop(_k, None)
+            st.session_state.pop("trang_thai_upload_pgd", None)
+            st.session_state["nq11_cn_ver"] = _ver + 1
+            st.rerun()
+
+
+def _render_gqvl_toan_cn(username: str, df_hstd=None) -> None:
+    """Upload 1 file GQVL tổng hợp toàn CN → tự tách và lưu 22 PGD."""
+    with st.expander("📋 Upload GQVL Toàn Chi nhánh", expanded=False):
+        st.info(
+            "Upload 1 file GQVL tổng hợp của toàn CN — hệ thống dùng **Số khế ước** "
+            "đối chiếu với HSTD để tự động phân bổ về từng PGD.  \n"
+            "Số KU không khớp với HSTD sẽ được gán về **Hội sở Chi nhánh tỉnh**."
+        )
+
+        if df_hstd is None or df_hstd.empty:
+            st.warning("⚠️ Chưa có dữ liệu HSTD — không thể phân bổ GQVL về PGD. "
+                       "Hãy upload và merge HSTD trước, sau đó quay lại tab này.")
+            return
+
+        _SS_BYTES   = "gqvl_cn_bytes"
+        _SS_PREVIEW = "gqvl_cn_preview"
+        _SS_FILE_ID = "gqvl_cn_file_id"
+        _ver = st.session_state.setdefault("gqvl_cn_ver", 0)
+
+        uploaded = st.file_uploader(
+            "Chọn file GQVL toàn CN",
+            type=["xlsx", "xls"],
+            key=f"gqvl_cn_uploader_{_ver}",
+            label_visibility="collapsed",
+        )
+
+        if uploaded is not None:
+            file_id = (uploaded.name, uploaded.size)
+            if st.session_state.get(_SS_FILE_ID) != file_id:
+                st.session_state[_SS_FILE_ID] = file_id
+                st.session_state[_SS_BYTES]   = uploaded.read()
+                st.session_state.pop(_SS_PREVIEW, None)
+
+        if _SS_BYTES not in st.session_state:
+            return
+
+        file_bytes: bytes = st.session_state[_SS_BYTES]
+
+        if _SS_PREVIEW not in st.session_state:
+            with st.spinner("🔍 Đang phân tích file GQVL & đối chiếu HSTD..."):
+                try:
+                    from services.upload_service import tach_file_gqvl_toan_cn
+                    pgd_map = tach_file_gqvl_toan_cn(file_bytes, df_hstd=df_hstd)
+                except ValueError as e:
+                    st.error(f"❌ {e}")
+                    return
+                except Exception as e:
+                    logger.error("_render_gqvl_toan_cn: lỗi phân tích — %s", e, exc_info=True)
+                    st.error(f"❌ Lỗi phân tích file: {e}")
+                    return
+
+                ds_tat_ca = [DON_VI_CHI_NHANH] + DS_PGD
+                thieu = [dv for dv in ds_tat_ca if dv not in pgd_map]
+
+                preview_rows = []
+                for ten_pgd in ds_tat_ca:
+                    if ten_pgd in pgd_map:
+                        try:
+                            df_tmp = pd.read_excel(BytesIO(pgd_map[ten_pgd]), engine="openpyxl", header=7)
+                            so_dong_val = len(df_tmp.dropna(how="all"))
+                        except Exception:
+                            so_dong_val = "?"
+                    else:
+                        so_dong_val = 0
+                    da_co = kiem_tra_file_ton_tai_pgd(ten_pgd, "gqvl")
+                    preview_rows.append({
+                        "Đơn vị": ten_pgd,
+                        "Số dòng": so_dong_val,
+                        "Hiện tại": "🔄 Cập nhật" if da_co else ("—" if so_dong_val == 0 else "🆕 Mới"),
+                        "Trạng thái": "✅ Sẵn sàng" if ten_pgd in pgd_map else "⚠️ Thiếu trong file",
+                    })
+
+                st.session_state[_SS_PREVIEW] = {
+                    "rows": preview_rows,
+                    "thieu": thieu,
+                    "so_dv": len(pgd_map),
+                    "pgd_map": pgd_map,
+                }
+
+        preview = st.session_state.get(_SS_PREVIEW)
+        if not preview:
+            return
+
+        c1, c2 = st.columns(2)
+        c1.metric("Số đơn vị có GQVL", preview["so_dv"])
+        c2.metric("Tổng số đơn vị CN", len([DON_VI_CHI_NHANH] + DS_PGD))
+
+        if preview["thieu"]:
+            st.warning(
+                f"⚠️ **{len(preview['thieu'])}** đơn vị không có dữ liệu GQVL: "
+                + ", ".join(preview["thieu"])
+            )
+
+        def _style_ht(v: str) -> str:
+            if v.startswith("🆕"):
+                return "background-color:#d4edda;color:#155724;font-weight:bold"
+            if v.startswith("🔄"):
+                return "background-color:#fff3cd;color:#856404"
+            return ""
+
+        df_prev = pd.DataFrame(preview["rows"])
+        st.dataframe(
+            df_prev.style.map(_style_ht, subset=["Hiện tại"]),
+            use_container_width=True,
+            hide_index=True,
+            height=min(600, 60 + len(preview["rows"]) * 35),
+        )
+
+        if st.button(
+            f"📤 Upload {preview['so_dv']} đơn vị",
+            type="primary",
+            key="btn_gqvl_cn_upload",
+        ):
+            with st.spinner("⏳ Đang tách và lưu từng PGD..."):
+                from services.upload_service import xu_ly_gqvl_toan_cn
+                ket_qua = xu_ly_gqvl_toan_cn(file_bytes, df_hstd=df_hstd)
+
+            if "_loi_doc" in ket_qua:
+                st.error(ket_qua["_loi_doc"].thong_bao)
+                return
+
+            for ten_pgd, kq in ket_qua.items():
+                if kq.thanh_cong:
+                    db.ghi_audit(
+                        username, "upload_gqvl_toan_cn",
+                        f"GQVL toàn CN — {ten_pgd}",
+                    )
+
+            so_ok = sum(1 for v in ket_qua.values() if v.thanh_cong)
+            if so_ok:
+                st.success(f"✅ Đã lưu **{so_ok}** đơn vị thành công")
+                # Tự động merge sau upload
+                try:
+                    kq_merge = merge_du_lieu_toan_cn("gqvl")
+                    if kq_merge.thanh_cong:
+                        st.success("✅ Dữ liệu GQVL toàn CN đã được gộp & cập nhật.")
+                    else:
+                        st.warning(f"⚠️ Tổng hợp GQVL: {kq_merge.thong_bao}")
+                except Exception as e:
+                    logger.error("_render_gqvl_toan_cn: lỗi merge — %s", e, exc_info=True)
+                    st.warning(f"⚠️ Tổng hợp GQVL lỗi: {e}")
+            for ten_pgd, kq in ket_qua.items():
+                if not kq.thanh_cong:
+                    st.warning(f"⚠️ {ten_pgd}: {kq.thong_bao}")
+
+            st.cache_data.clear()
+            for _k in (_SS_PREVIEW, _SS_BYTES, _SS_FILE_ID):
+                st.session_state.pop(_k, None)
+            st.session_state.pop("trang_thai_upload_pgd", None)
+            st.session_state["gqvl_cn_ver"] = _ver + 1
+            st.rerun()
+
+
 def _render_upload_hang_loat(role: str, username: str) -> None:
     """Upload hàng loạt qua trình duyệt — thay thế quét thư mục server."""
     _ = role
@@ -1416,6 +1720,7 @@ def render(tab=None, **kwargs) -> None:
     """
     role     = kwargs.get("role", "")
     username = kwargs.get("username", "unknown")
+    df_full  = kwargs.get("df_full")  # HSTD toàn CN — dùng cho GQVL join
 
     _ctx = tab if tab is not None else st.container()
     with _ctx:
@@ -1473,6 +1778,8 @@ def render(tab=None, **kwargs) -> None:
         with tab_ht:
             _render_upload_hang_loat(role, username)
             _render_cdto_toan_cn(username)
+            _render_nq11_toan_cn(username)
+            _render_gqvl_toan_cn(username, df_full)
 
             with st.expander("🔄 Tổng hợp toàn Chi nhánh thủ công", expanded=False):
                 st.caption(

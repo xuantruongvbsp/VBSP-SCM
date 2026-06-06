@@ -351,6 +351,7 @@ def xu_ly_cdto_toan_cn(file_bytes: bytes) -> dict[str, "KetQuaUpload"]:
     try:
         pgd_map = tach_file_cdto_toan_cn(file_bytes)
     except Exception as e:
+        logger.error("xu_ly_cdto_toan_cn: lỗi đọc/tách file — %s", e, exc_info=True)
         return {"_loi_doc": KetQuaUpload(False, f"Lỗi đọc/tách file: {e}")}
 
     if not pgd_map:
@@ -372,6 +373,155 @@ def xu_ly_cdto_toan_cn(file_bytes: bytes) -> dict[str, "KetQuaUpload"]:
                 msg = f"✅ Lưu OK · {mb:.1f} MB"
             ket_qua[ten_pgd] = KetQuaUpload(True, msg)
         except Exception as e:
+            logger.error("xu_ly_cdto_toan_cn: lỗi lưu PGD %s — %s", ten_pgd, e, exc_info=True)
+            ket_qua[ten_pgd] = KetQuaUpload(False, f"❌ Lỗi: {e}")
+
+    return ket_qua
+
+
+# ── Tách file NQ11 / GQVL toàn CN → lưu riêng từng PGD ──────────────────────
+
+def tach_file_nq11_toan_cn(file_bytes: bytes) -> dict[str, bytes]:
+    """
+    Tách file NQ11 toàn CN thành dict {ten_pgd: excel_bytes}.
+
+    NQ11 có cột "Tên PGD" → groupby trực tiếp.
+    Mỗi file con là 1 sheet BCQUERY với header dòng 4.
+    Raises ValueError nếu không tìm thấy PGD hợp lệ.
+    """
+    from io import BytesIO
+    from config import COT_TEN_PGD as _COT_PGD
+
+    df = pd.read_excel(BytesIO(file_bytes), sheet_name="BCQUERY", header=4, engine="openpyxl")
+    # Bỏ cột đầu tiên (BoQua)
+    df = df.iloc[:, 1:].dropna(how="all").reset_index(drop=True)
+
+    # Lọc các dòng có dữ liệu
+    if _COT_PGD not in df.columns:
+        raise ValueError("File NQ11 toàn CN không có cột 'Tên PGD'. Kiểm tra lại file.")
+
+    df[_COT_PGD] = df[_COT_PGD].astype(str).str.strip()
+    ds_tat_ca = [DON_VI_CHI_NHANH] + DS_PGD
+
+    pgd_map: dict[str, bytes] = {}
+    for ten_pgd, group in df.groupby(_COT_PGD):
+        if ten_pgd not in ds_tat_ca:
+            continue
+        bio = BytesIO()
+        # Tạo lại cấu trúc: cột BoQua rỗng + dữ liệu, ghi từ dòng 4
+        out_df = group.copy()
+        out_df.insert(0, "BoQua", "x")
+        with pd.ExcelWriter(bio, engine="openpyxl") as writer:
+            out_df.to_excel(writer, sheet_name="BCQUERY", startrow=4, index=False)
+        pgd_map[ten_pgd] = bio.getvalue()
+
+    if not pgd_map:
+        raise ValueError("Không tìm thấy dữ liệu của đơn vị nào trong file NQ11 toàn CN.")
+    return pgd_map
+
+
+def tach_file_gqvl_toan_cn(
+    file_bytes: bytes,
+    df_hstd: pd.DataFrame | None = None,
+) -> dict[str, bytes]:
+    """
+    Tách file GQVL toàn CN thành dict {ten_pgd: excel_bytes}.
+
+    GQVL không có cột Tên PGD → join với HSTD qua Số khế ước để lấy Tên PGD.
+    Nếu không có df_hstd → trả về dict 1 key DON_VI_CHI_NHANH (toàn bộ dữ liệu).
+    Raises ValueError nếu không đọc được file.
+    """
+    from io import BytesIO
+    from config import COT_SO_KU, COT_TEN_PGD as _COT_PGD
+
+    df = pd.read_excel(BytesIO(file_bytes), sheet_name="Sheet1", header=7, engine="openpyxl")
+    df = df.iloc[:, 1:].dropna(how="all").iloc[1:].reset_index(drop=True)
+    df = df.rename(columns=GQVL_COT_MAP)
+
+    if df.empty:
+        raise ValueError("File GQVL toàn CN trống hoặc không đúng định dạng.")
+
+    # Gán Tên PGD: mặc định là Hội sở, join với HSTD nếu có
+    df["_TEN_PGD_TMP"] = DON_VI_CHI_NHANH
+    if df_hstd is not None and not df_hstd.empty and COT_SO_KU in df.columns and COT_SO_KU in df_hstd.columns:
+        pgd_lookup = (
+            df_hstd[[COT_SO_KU, _COT_PGD]]
+            .drop_duplicates(subset=COT_SO_KU)
+            .set_index(COT_SO_KU)[_COT_PGD]
+        )
+        df["_TEN_PGD_TMP"] = df[COT_SO_KU].map(pgd_lookup).fillna(DON_VI_CHI_NHANH)
+
+    ds_tat_ca = [DON_VI_CHI_NHANH] + DS_PGD
+    pgd_map: dict[str, bytes] = {}
+    for ten_pgd, group in df.groupby("_TEN_PGD_TMP", sort=False):
+        if ten_pgd not in ds_tat_ca:
+            continue
+        out_df = group.drop(columns=["_TEN_PGD_TMP"])
+        out_df.insert(0, "BoQua", "x")
+        # Chèn 1 dòng placeholder trước dữ liệu thật.
+        # Lý do: _doc_mot_pgd._clean dùng .iloc[1:] để bỏ qua dòng đầu tiên
+        # sau header (đây là dòng tổng/khoảng trống trong file gốc của từng PGD).
+        # Vì tach_file đã loại bỏ dòng đó khi đọc, ta phải chèn placeholder
+        # để .iloc[1:] bỏ qua đúng chỗ, không mất dòng dữ liệu thật.
+        placeholder = pd.DataFrame([[None] * len(out_df.columns)], columns=out_df.columns)
+        placeholder.iloc[0, 1] = "_"  # cột 1 (không phải BoQua) có giá trị → qua dropna(how="all")
+        out_df = pd.concat([placeholder, out_df], ignore_index=True)
+        bio = BytesIO()
+        with pd.ExcelWriter(bio, engine="openpyxl") as writer:
+            out_df.to_excel(writer, sheet_name="Sheet1", startrow=7, index=False)
+        pgd_map[ten_pgd] = bio.getvalue()
+
+    if not pgd_map:
+        raise ValueError("Không tìm thấy dữ liệu của đơn vị nào trong file GQVL toàn CN.")
+    return pgd_map
+
+
+def xu_ly_nq11_toan_cn(file_bytes: bytes) -> dict[str, "KetQuaUpload"]:
+    """
+    Tách file NQ11 toàn CN và lưu cho từng PGD.
+    Trả về {ten_pgd: KetQuaUpload}.
+    """
+    from data.pgd import luu_file_pgd
+
+    try:
+        pgd_map = tach_file_nq11_toan_cn(file_bytes)
+    except Exception as e:  # conv: skip — trả về KetQuaUpload thay vì raise
+        return {"_loi_doc": KetQuaUpload(False, f"Lỗi đọc/tách file NQ11: {e}")}
+
+    ket_qua: dict[str, KetQuaUpload] = {}
+    for ten_pgd, pgd_bytes in pgd_map.items():
+        mb = len(pgd_bytes) / 1024 / 1024
+        try:
+            luu_file_pgd(ten_pgd, "nq11", pgd_bytes)
+            ket_qua[ten_pgd] = KetQuaUpload(True, f"✅ Lưu OK · {mb:.1f} MB")
+        except Exception as e:  # conv: skip
+            ket_qua[ten_pgd] = KetQuaUpload(False, f"❌ Lỗi: {e}")
+
+    return ket_qua
+
+
+def xu_ly_gqvl_toan_cn(
+    file_bytes: bytes,
+    df_hstd: pd.DataFrame | None = None,
+) -> dict[str, "KetQuaUpload"]:
+    """
+    Tách file GQVL toàn CN và lưu cho từng PGD.
+    Trả về {ten_pgd: KetQuaUpload}.
+    """
+    from data.pgd import luu_file_pgd
+
+    try:
+        pgd_map = tach_file_gqvl_toan_cn(file_bytes, df_hstd=df_hstd)
+    except Exception as e:  # conv: skip — trả về KetQuaUpload thay vì raise
+        return {"_loi_doc": KetQuaUpload(False, f"Lỗi đọc/tách file GQVL: {e}")}
+
+    ket_qua: dict[str, KetQuaUpload] = {}
+    for ten_pgd, pgd_bytes in pgd_map.items():
+        mb = len(pgd_bytes) / 1024 / 1024
+        try:
+            luu_file_pgd(ten_pgd, "gqvl", pgd_bytes)
+            ket_qua[ten_pgd] = KetQuaUpload(True, f"✅ Lưu OK · {mb:.1f} MB")
+        except Exception as e:  # conv: skip
             ket_qua[ten_pgd] = KetQuaUpload(False, f"❌ Lỗi: {e}")
 
     return ket_qua
@@ -395,6 +545,8 @@ def merge_du_lieu_toan_cn(
         return KetQuaUpload(False, f"merge_du_lieu_toan_cn không hỗ trợ loai='{loai}'")
 
     tat_ca_dv = ds_pgd if ds_pgd is not None else ([DON_VI_CHI_NHANH] + DS_PGD)
+    if not tat_ca_dv:
+        return KetQuaUpload(False, f"Không có đơn vị nào để gộp {loai.upper()}.")
     logger.info("merge_du_lieu_toan_cn: bắt đầu loai=%s, %d đơn vị", loai, len(tat_ca_dv))
     frames: list[pd.DataFrame] = []
     pgd_da_merge: list[str] = []
@@ -690,7 +842,7 @@ def merge_du_lieu_toan_cn(
                                 _dt_tmp = _pd.to_datetime(_val, errors="coerce")
                                 if _pd.notna(_dt_tmp):
                                     _ky_str = _dt_tmp.strftime("%Y-%m")
-                        except Exception as e:
+                        except Exception as e:  # conv: skip — debug-level, lỗi parse ngày không chặn upload
                             logger.debug("luu_pgd_file: không parse được kỳ từ CDTOTKVV — %s", e)
                 _df_cdtot = _doc_cdtot()
                 if _df_cdtot is not None and not _df_cdtot.empty:
@@ -1056,7 +1208,7 @@ def format_caption_merge(loai: str) -> str | None:
     try:
         thoi_gian = datetime.fromisoformat(meta["thoi_gian"])
         thoi_gian_str = thoi_gian.strftime("%H:%M %d/%m")
-    except Exception as e:
+    except Exception as e:  # conv: skip — debug-level, fallback về str thô
         logger.debug("lay_thong_tin_merge: không parse được thời gian ISO — %s", e)
         thoi_gian_str = str(meta.get("thoi_gian", ""))
 

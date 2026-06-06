@@ -326,6 +326,24 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
         _dqh = vn(dqh / 1e9, 3)
         _tlq = vn(tlq, 3)
         _tl_no_xau = vn(tl_no_xau, 3)
+        # ── BQ metrics ──────────────────────────────────────────────
+        _pgd_co_dn = df.groupby(COT_TEN_PGD)[COT_TONG_DU_NO].sum()
+        n_pgd_co_dn = int((_pgd_co_dn > 0).sum())
+        bq_pgd = tdn / n_pgd_co_dn if n_pgd_co_dn > 0 else 0
+        n_to   = int(df.groupby([COT_TEN_PGD, COT_TEN_TO]).ngroups) if COT_TEN_TO in df.columns else 0
+        bq_to  = tdn / n_to if n_to > 0 else 0
+        n_xa   = int(df.groupby([COT_TEN_PGD, COT_TEN_XA]).ngroups) if COT_TEN_XA in df.columns else 0
+        bq_xa  = tdn / n_xa if n_xa > 0 else 0
+        n_hoi  = int(df.groupby([COT_TEN_PGD, COT_DVUT]).ngroups) if COT_DVUT in df.columns else 0
+        bq_hoi = tdn / n_hoi if n_hoi > 0 else 0
+        _bq_pgd  = vn(bq_pgd / 1_000_000, 1) + " tr"
+        _bq_to   = vn(bq_to / 1_000_000, 1) + " tr" if n_to > 0 else "—"
+        _bq_xa   = vn(bq_xa / 1_000_000, 1) + " tr" if n_xa > 0 else "—"
+        _bq_hoi  = vn(bq_hoi / 1_000_000, 1) + " tr" if n_hoi > 0 else "—"
+        _n_to_str  = fmt_so(n_to)
+        _n_xa_str  = fmt_so(n_xa)
+        _n_hoi_str = fmt_so(n_hoi)
+        _n_pgd_str = fmt_so(n_pgd_co_dn)
         st.markdown(f"<div class='tq-caption'>Cập nhật: {ngay_cap_nhat} · {TEN_CHI_NHANH_HIEN_THI}</div>", unsafe_allow_html=True)
         st.markdown(
             f"""
@@ -379,6 +397,26 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                     <div style="font-size:0.82rem;font-weight:600;color:#7f1d1d;margin:0 0 4px">3 tháng không HĐ</div>
                     <div style="font-size:2rem;font-weight:700;line-height:1;color:#7f1d1d;margin:0 0 4px">{khd_val}</div>
                     <div style="font-size:0.82rem;color:#991b1b">{khd_sub}</div>
+                </div>
+                <div class="tq-card soft-purple">
+                    <div style="font-size:0.82rem;font-weight:600;color:#4c1d95;margin:0 0 4px">Dư nợ BQ PGD</div>
+                    <div style="font-size:2rem;font-weight:700;line-height:1;color:#4c1d95;margin:0 0 4px">{_bq_pgd}</div>
+                    <div style="font-size:0.82rem;color:#7c3aed">{_n_pgd_str} PGD có dư nợ</div>
+                </div>
+                <div class="tq-card soft-indigo">
+                    <div style="font-size:0.82rem;font-weight:600;color:#312e81;margin:0 0 4px">Dư nợ BQ tổ TKVV</div>
+                    <div style="font-size:2rem;font-weight:700;line-height:1;color:#1e1b4b;margin:0 0 4px">{_bq_to}</div>
+                    <div style="font-size:0.82rem;color:#4338ca">{_n_to_str} tổ TK&VV</div>
+                </div>
+                <div class="tq-card soft-blue">
+                    <div style="font-size:0.82rem;font-weight:600;color:#1e3a6e;margin:0 0 4px">Dư nợ BQ xã</div>
+                    <div style="font-size:2rem;font-weight:700;line-height:1;color:#1e3a6e;margin:0 0 4px">{_bq_xa}</div>
+                    <div style="font-size:0.82rem;color:#1e40af">{_n_xa_str} xã</div>
+                </div>
+                <div class="tq-card soft-amber">
+                    <div style="font-size:0.82rem;font-weight:600;color:#78350f;margin:0 0 4px">Dư nợ BQ Hội</div>
+                    <div style="font-size:2rem;font-weight:700;line-height:1;color:#78350f;margin:0 0 4px">{_bq_hoi}</div>
+                    <div style="font-size:0.82rem;color:#92400e">{_n_hoi_str} hội đoàn thể</div>
                 </div>
             </div>
             """,

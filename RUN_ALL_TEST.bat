@@ -23,6 +23,12 @@ echo Thoi gian: %date% %time%
 echo ========================================
 ) > "%LOGFILE%"
 
+echo.
+echo [0/3] Kiem tra dependencies...
+echo.
+pip install pyarrow pytest-cov -q
+echo.
+
 echo [1/3] Health Check he thong...
 echo.
 python health_check.py

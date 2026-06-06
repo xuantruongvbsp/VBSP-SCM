@@ -70,9 +70,9 @@ def _hien_thi_bang_trang_thai() -> None:
         st.session_state["trang_thai_upload_pgd"] = lay_trang_thai_upload_pgd(DS_DON_VI)
     df_tt = st.session_state["trang_thai_upload_pgd"].copy()
 
-    # ── Patch: KH-NV upload HSTD → hstd_khnv.xlsx ──
-    # doc_trang_thai_file có @st.cache_data, có thể vẫn trả cache cũ
-    # nếu Streamlit chưa reload module mới. Check trực tiếp ở đây.
+    # ── Belt-and-suspenders: nếu session_state còn cache ❌ cũ (từ trước khi fix
+    # mtime cache key trong data/pgd.py), patch này sẽ tự sửa bằng cách đọc
+    # thẳng từ đĩa. Root cause đã fix: mtime được truyền vào doc_trang_thai_file.
     from pathlib import Path as _P
     from data.pgd import duong_dan_pgd as _dp
     import os as _os

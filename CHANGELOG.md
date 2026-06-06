@@ -1,5 +1,21 @@
 # CHANGELOG
 
+## [2026-06-06] — thêm KPI Dư nợ BQ/PGD, BQ/Tổ TK&VV, BQ/Hội vào Toàn cảnh 22 PGD
+- `tabs/tab_pgd_cards.py` dòng ~26-38 — import thêm `COT_TEN_TO`, `COT_DVUT` từ config
+- `tabs/tab_pgd_cards.py` dòng ~498-523 — thêm row 3 KPI: BQ/Phòng Giao dịch, BQ/Tổ TK&VV, BQ/Hội (tính từ raw df)
+
+## [2026-06-06] — fix "Toàn cảnh 22 PGD" cột Upload HSTD luôn ❌ dù KH-NV đã upload
+- `tabs/tab_pgd_cards.py` dòng ~44-94 — thêm `_pgd_khnv_path()` và sửa `_upload_info()` check cả `hstd_khnv.xlsx` (KH-NV upload) lẫn `hstd_latest.xlsx` (PGD tự upload)
+- `tabs/tab_pgd_cards.py` dòng ~501, ~588 — `n_upload` và `upload_status` check cả 2 đường dẫn
+- `data/pgd.py` dòng ~310 — `ds_pgd_co_file()` check thêm `hstd_khnv.xlsx` cho HSTD
+
+## [2026-06-06] — fix root cause bảng Trạng thái Upload luôn ❌ dù file đã tồn tại
+- `data/pgd.py` dòng ~104 — `_doc_ngay_so_lieu()`: đổi `_mtime` → `mtime` — underscore prefix khiến param bị LOẠI khỏi `@st.cache_data` key → cache không tự invalidate khi file thay đổi
+- `data/pgd.py` dòng ~140 — `doc_trang_thai_file()`: đổi `_mtime` → `mtime` — cùng lý do trên; cập nhật docstring giải thích cơ chế cache key
+- `data/pgd.py` dòng ~182 — caller nội bộ: `_mtime=` → `mtime=` trong call đến `_doc_ngay_so_lieu`
+- `data/pgd.py` dòng ~210 — `lay_trang_thai_upload_pgd()`: tính mtime thực cho từng loại file (kể cả `hstd_khnv.xlsx`) rồi truyền vào `doc_trang_thai_file` → cache tự bust khi file được upload mới, không cần `st.cache_data.clear()`
+- `tabs/tab_upload_khnv.py` dòng ~73 — cập nhật comment patch từ "workaround" → "belt-and-suspenders"
+
 ## [2026-06-05] — fix bảng Trạng thái Upload không refresh sau bulk import HSTD
 - `tabs/tab_upload_khnv.py` dòng ~404 — merge loop trong `_xu_ly_import_folder` không có try-except: nếu `merge_du_lieu_toan_cn` re-raise lỗi PyArrow thì `st.cache_data.clear()` + session_state update + `st.rerun()` không được gọi → bảng trạng thái không cập nhật → thêm try-except bắt lỗi merge, ghi vào `that_bai`, đảm bảo flow tiếp tục đến rerun
 

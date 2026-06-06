@@ -5,9 +5,9 @@ cd /d D:\VBSP-SCM
 :: Tạo thư mục logs nếu chưa có
 if not exist logs mkdir logs
 
-:: Tên file log theo timestamp (dùng wmic — không cần tee)
-for /f "tokens=2 delims==" %%I in ('wmic os get localdatetime /value') do set _dt=%%I
-set LOGFILE=logs\health_%_dt:~0,8%_%_dt:~8,4%.txt
+:: Tên file log theo timestamp (dùng PowerShell — tránh bug WMIC CR)
+for /f %%I in ('powershell -NoProfile -Command "Get-Date -Format yyyyMMdd_HHmm"') do set _ts=%%I
+set LOGFILE=logs\health_%_ts%.txt
 
 echo.
 echo ========================================

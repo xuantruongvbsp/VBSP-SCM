@@ -3,9 +3,11 @@
 ## [2026-06-05] — fix bảng Trạng thái Upload không refresh sau bulk import HSTD
 - `tabs/tab_upload_khnv.py` dòng ~404 — merge loop trong `_xu_ly_import_folder` không có try-except: nếu `merge_du_lieu_toan_cn` re-raise lỗi PyArrow thì `st.cache_data.clear()` + session_state update + `st.rerun()` không được gọi → bảng trạng thái không cập nhật → thêm try-except bắt lỗi merge, ghi vào `that_bai`, đảm bảo flow tiếp tục đến rerun
 
-## [2026-06-05] — Fix bảng Trạng thái Upload không cập nhật HSTD từ KH-NV
-- `data/pgd.py` dòng ~151 — `doc_trang_thai_file()`: khi loai="hstd" và `hstd_latest.xlsx` không tồn tại, fallback kiểm tra `hstd_khnv.xlsx` (file KH-NV upload)
-- `tabs/tab_upload_khnv.py` dòng ~1429 — thêm `st.cache_data.clear()` vào nút "🔄 Làm mới" bảng trạng thái — trước đây chỉ pop session_state, nhưng `doc_trang_thai_file` có `@st.cache_data` nên vẫn trả cache cũ → fallback mới không có hiệu lực đến khi cache hết TTL (7200s) hoặc upload lại
+## [2026-06-05] — Fix bảng Trạng thái Upload không hiển thị HSTD từ KH-NV (2 tầng)
+- `tabs/tab_upload_khnv.py` dòng ~72 — `_hien_thi_bang_trang_thai()`: **patch trực tiếp** — sau khi lấy df từ session_state, duyệt các dòng HSTD=❌ và check `hstd_khnv.xlsx` ngay trên đĩa. Nếu tồn tại → ghi đè badge ✅. Cách này bypass HOÀN TOÀN `@st.cache_data` của `doc_trang_thai_file` — không phụ thuộc module đã reload hay chưa
+- `data/pgd.py` dòng ~59 — `kiem_tra_file_ton_tai_pgd()`: thêm fallback check `hstd_khnv.xlsx` cho loai="hstd" (dùng cho folder scan preview)
+- `data/pgd.py` dòng ~151 — `doc_trang_thai_file()`: thêm fallback `hstd_khnv.xlsx` (dùng cho `lay_trang_thai_upload_pgd` khi cache đã clear)
+- `tabs/tab_upload_khnv.py` dòng ~1429 — nút "🔄 Làm mới": thêm `st.cache_data.clear()`
 
 ## [2026-06-05] — fix doc_dienbao_matrix không bust cache khi file thay đổi
 - `data/hstd.py` dòng ~332 — đổi param `_ts` → `ts` trong `doc_dienbao_matrix` để timestamp được tính vào cache key của `@st.cache_data`

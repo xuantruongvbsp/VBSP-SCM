@@ -30,6 +30,8 @@ from config import (
     COT_MA_KH,
     COT_SO_KU,
     COT_NGAY_DH,
+    COT_TEN_TO,
+    COT_DVUT,
     DS_PGD,
     DON_VI_CHI_NHANH,
     PGD_DATA_DIR,
@@ -56,12 +58,35 @@ def _pgd_file_path(ten_pgd: str) -> Path:
         return Path(PGD_DATA_DIR) / slug / "hstd_latest.xlsx"
 
 
+def _pgd_khnv_path(ten_pgd: str) -> Path:
+    """Đường dẫn file HSTD do Phòng KH-NV upload (hstd_khnv.xlsx)."""
+    try:
+        from data.pgd import duong_dan_pgd
+        return Path(duong_dan_pgd(ten_pgd, "hstd_khnv"))
+    except Exception as e:
+        logger.error("_pgd_khnv_path(%s): %s", ten_pgd, e, exc_info=True)
+        import re, unicodedata
+        s = unicodedata.normalize("NFD", ten_pgd.lower())
+        s = "".join(c for c in s if unicodedata.category(c) != "Mn")
+        slug = re.sub(r"[^a-z0-9]+", "_", s).strip("_")
+        return Path(PGD_DATA_DIR) / slug / "hstd_khnv.xlsx"
+
+
 def _upload_info(ten_pgd: str) -> tuple[bool, str]:
-    """Trả về (co_file, ngay_cap_nhat_str)."""
+    """Trả về (co_file, ngay_cap_nhat_str).
+    Kiểm tra cả hstd_latest.xlsx (PGD tự upload) và hstd_khnv.xlsx (Phòng KH-NV upload).
+    """
     p = _pgd_file_path(ten_pgd)
-    if not p.exists():
+    p_khnv = _pgd_khnv_path(ten_pgd)
+    exists = p.exists()
+    exists_khnv = p_khnv.exists()
+    if not exists and not exists_khnv:
         return False, "—"
-    ts = os.path.getmtime(str(p))
+    # Lấy file mới nhất trong 2 loại
+    ts = max(
+        os.path.getmtime(str(p)) if exists else 0,
+        os.path.getmtime(str(p_khnv)) if exists_khnv else 0,
+    )
     return True, datetime.fromtimestamp(ts).strftime("%d/%m %H:%M")
 
 
@@ -473,7 +498,7 @@ def render(tab_parent=None, **kwargs):
         tl_nqh_cn = tong_nqh / tong_dn * 100 if tong_dn > 0 else 0
         tong_kh   = int(df_cards["so_kh"].sum())
         bq_ho_cn  = tong_dn / tong_kh if tong_kh > 0 else 0
-        n_upload  = sum(1 for dv in ds_don_vi if _pgd_file_path(dv).exists())
+        n_upload  = sum(1 for dv in ds_don_vi if _pgd_file_path(dv).exists() or _pgd_khnv_path(dv).exists())
 
         c1, c2, c3, c4, c5 = st.columns(5)
         c1.metric("Tổng dư nợ CN",      fmt_ty(tong_dn))
@@ -481,6 +506,39 @@ def render(tab_parent=None, **kwargs):
         c3.metric("Đến hạn tháng này",  fmt_ty(df_cards["no_den_han_thang"].sum()))
         c4.metric("BQ/hộ toàn CN",      f"{bq_ho_cn/1_000_000:,.1f} tr")
         c5.metric("File HSTD",           f"{n_upload}/{len(ds_don_vi)} đơn vị")
+
+        # ── KPI dư nợ bình quân PGD / Tổ TK&VV / Hội ────────────────────
+        n_pgd_co_dn = int((df_cards["du_no"] > 0).sum())
+        bq_pgd      = tong_dn / n_pgd_co_dn if n_pgd_co_dn > 0 else 0
+
+        if COT_TEN_TO in df.columns:
+            so_to = int(df.groupby([COT_TEN_PGD, COT_TEN_TO]).ngroups)
+        else:
+            so_to = 0
+        if COT_DVUT in df.columns:
+            so_hoi = int(df.groupby([COT_TEN_PGD, COT_DVUT]).ngroups)
+        else:
+            so_hoi = 0
+
+        bq_to  = tong_dn / so_to  if so_to  > 0 else 0
+        bq_hoi = tong_dn / so_hoi if so_hoi > 0 else 0
+
+        cb1, cb2, cb3 = st.columns(3)
+        cb1.metric(
+            "BQ/Phòng Giao dịch",
+            f"{bq_pgd / 1_000_000:,.1f} tr",
+            help=f"Dư nợ bình quân mỗi PGD — {n_pgd_co_dn} đơn vị có dư nợ",
+        )
+        cb2.metric(
+            "BQ/Tổ TK&VV",
+            f"{bq_to / 1_000_000:,.1f} tr" if so_to > 0 else "—",
+            help=f"Dư nợ bình quân mỗi tổ Tiết kiệm & Vay vốn — {so_to:,} tổ" if so_to else "Không có cột Tên tổ trong HSTD",
+        )
+        cb3.metric(
+            "BQ/Hội",
+            f"{bq_hoi / 1_000_000:,.1f} tr" if so_hoi > 0 else "—",
+            help=f"Dư nợ bình quân mỗi Hội ĐVUT — {so_hoi:,} Hội" if so_hoi else "Không có cột Tên ĐVUT trong HSTD",
+        )
 
         st.divider()
 
@@ -527,7 +585,7 @@ def render(tab_parent=None, **kwargs):
         df_show = df_cards.sort_values(sort_col, ascending=sort_asc).reset_index(drop=True)
 
         # Lấy trạng thái upload
-        upload_status  = {dv: _pgd_file_path(dv).exists() for dv in ds_don_vi}
+        upload_status  = {dv: (_pgd_file_path(dv).exists() or _pgd_khnv_path(dv).exists()) for dv in ds_don_vi}
         upload_info_map = {dv: _upload_info(dv) for dv in ds_don_vi}
 
         if loc_upload == "Có file HSTD":

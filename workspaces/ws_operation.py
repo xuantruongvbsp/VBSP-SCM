@@ -756,24 +756,21 @@ def _render_trang_chu(tab, df_pgd: pd.DataFrame, role: str, pgd_user: str, kwarg
 
             if df_pgd is not None and not df_pgd.empty and COT_TONG_DU_NO in df_pgd.columns:
 
-                tdn = pd.to_numeric(df_pgd[COT_TONG_DU_NO], errors="coerce").fillna(0).sum()
+                df_bq = df_pgd.copy()
+                df_bq[COT_TONG_DU_NO] = pd.to_numeric(df_bq[COT_TONG_DU_NO], errors="coerce").fillna(0)
+                tdn = df_bq[COT_TONG_DU_NO].sum()
 
-                _pgd_dn = df_pgd.groupby(COT_TEN_PGD)[COT_TONG_DU_NO].sum()
-
+                _pgd_dn = df_bq.groupby(COT_TEN_PGD)[COT_TONG_DU_NO].sum()
                 n_pgd_co_dn = int((_pgd_dn > 0).sum())
-
                 bq_pgd = tdn / n_pgd_co_dn if n_pgd_co_dn > 0 else 0
 
-                n_to  = int(df_pgd.groupby([COT_TEN_PGD, COT_TEN_TO]).ngroups) if COT_TEN_TO in df_pgd.columns else 0
-
+                n_to  = int(df_bq.groupby([COT_TEN_PGD, COT_TEN_TO]).ngroups) if COT_TEN_TO in df_bq.columns else 0
                 bq_to = tdn / n_to if n_to > 0 else 0
 
-                n_xa  = int(df_pgd.groupby([COT_TEN_PGD, COT_TEN_XA]).ngroups) if COT_TEN_XA in df_pgd.columns else 0
-
+                n_xa  = int(df_bq[COT_TEN_XA].nunique()) if COT_TEN_XA in df_bq.columns else 0
                 bq_xa = tdn / n_xa if n_xa > 0 else 0
 
-                n_hoi = int(df_pgd.groupby([COT_TEN_PGD, COT_DVUT]).ngroups) if COT_DVUT in df_pgd.columns else 0
-
+                n_hoi = int(df_bq[COT_DVUT].nunique()) if COT_DVUT in df_bq.columns else 0
                 bq_hoi = tdn / n_hoi if n_hoi > 0 else 0
 
                 kpi_row([

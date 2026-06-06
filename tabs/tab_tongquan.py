@@ -327,14 +327,22 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
         _tlq = vn(tlq, 3)
         _tl_no_xau = vn(tl_no_xau, 3)
         # ── BQ metrics ──────────────────────────────────────────────
-        _pgd_co_dn = df.groupby(COT_TEN_PGD)[COT_TONG_DU_NO].sum()
+        df_bq = df.copy()
+        # Chuyển cột tiền sang numeric (khớp cách KPI tính tdn)
+        if COT_TONG_DU_NO in df_bq.columns:
+            df_bq[COT_TONG_DU_NO] = pd.to_numeric(df_bq[COT_TONG_DU_NO], errors="coerce").fillna(0)
+        # Đếm PGD có dư nợ từ groupby numeric
+        _pgd_co_dn = df_bq.groupby(COT_TEN_PGD)[COT_TONG_DU_NO].sum()
         n_pgd_co_dn = int((_pgd_co_dn > 0).sum())
         bq_pgd = tdn / n_pgd_co_dn if n_pgd_co_dn > 0 else 0
-        n_to   = int(df.groupby([COT_TEN_PGD, COT_TEN_TO]).ngroups) if COT_TEN_TO in df.columns else 0
-        bq_to  = tdn / n_to if n_to > 0 else 0
-        n_xa   = int(df.groupby([COT_TEN_PGD, COT_TEN_XA]).ngroups) if COT_TEN_XA in df.columns else 0
-        bq_xa  = tdn / n_xa if n_xa > 0 else 0
-        n_hoi  = int(df.groupby([COT_TEN_PGD, COT_DVUT]).ngroups) if COT_DVUT in df.columns else 0
+        # n_to: cặp (PGD, Tổ) vì tên Tổ trùng giữa các PGD
+        n_to  = int(df_bq.groupby([COT_TEN_PGD, COT_TEN_TO]).ngroups) if COT_TEN_TO in df_bq.columns else 0
+        bq_to = tdn / n_to if n_to > 0 else 0
+        # n_xa: unique toàn CN (1 xã thuộc 1 PGD)
+        n_xa  = int(df_bq[COT_TEN_XA].nunique()) if COT_TEN_XA in df_bq.columns else 0
+        bq_xa = tdn / n_xa if n_xa > 0 else 0
+        # n_hoi: unique ĐVUT (chỉ có 4 Hội đoàn thể)
+        n_hoi = int(df_bq[COT_DVUT].nunique()) if COT_DVUT in df_bq.columns else 0
         bq_hoi = tdn / n_hoi if n_hoi > 0 else 0
         _bq_pgd  = vn(bq_pgd / 1_000_000, 1) + " tr"
         _bq_to   = vn(bq_to / 1_000_000, 1) + " tr" if n_to > 0 else "—"

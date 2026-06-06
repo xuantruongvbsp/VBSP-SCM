@@ -1,5 +1,14 @@
 # CHANGELOG
 
+## [2026-06-06] — fix BQ metrics: n_xa & n_hoi đếm nunique() thay vì groupby ngroups
+- `tabs/tab_tongquan.py` L340-345 — n_xa/n_hoi: `.nunique()` thay vì `groupby([PGD, Xã/ĐVUT]).ngroups` (groupby ngroups đếm cặp, không đếm unique values)
+- `workspaces/ws_operation.py` L770-775 — tương tự: nunique cho xã và hội
+- n_to giữ nguyên groupby ngroups vì tên Tổ trùng giữa các PGD
+
+## [2026-06-06] — fix BQ metrics: thêm pd.to_numeric cho COT_TONG_DU_NO trước groupby
+- `tabs/tab_tongquan.py` L329-334 — tạo df_bq copy + pd.to_numeric trước groupby (khớp cách KPI tính tdn)
+- `workspaces/ws_operation.py` L756-760 — tương tự: df_bq copy + pd.to_numeric trước groupby
+
 ## [2026-06-06] — thiết lập 4 card BQ ở cả 2 phân hệ: Trang Chủ (ws_operation) + Tổng quan danh mục tín dụng (tab_tongquan)
 - `workspaces/ws_operation.py` L746-791 — Vùng B2: 4 card Dư nợ BQ trong _render_trang_chu
 - `tabs/tab_tongquan.py` L329-348 — BQ computation block

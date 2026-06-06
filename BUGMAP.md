@@ -294,6 +294,16 @@
 | **Pattern nguy hiểm** | `except TypeError: fn()` trong generic dispatch bắt lỗi từ bên trong `fn`, không chỉ từ bước setup — mọi TypeError bên trong fn đều bị nuốt và gọi lại fn theo cách sai |
 | **Ngày fix** | 2026-06-02 |
 
+### B15 — Bảng Trạng thái Upload luôn ❌ dù file đã tồn tại trên đĩa
+| | |
+|---|---|
+| **File** | `data/pgd.py` → `doc_trang_thai_file()` dòng ~140, `_doc_ngay_so_lieu()` dòng ~104, `lay_trang_thai_upload_pgd()` dòng ~210 |
+| **Dấu hiệu** | Cột HSTD (và các loại khác) trong bảng "Trạng thái Upload — 22 Đơn vị" hiển thị toàn ❌ Chưa có dù file đã upload thành công và tồn tại trên đĩa. Xảy ra nhất quán kể cả sau khi reload trang. |
+| **Nguyên nhân** | `@st.cache_data` LOẠI KHỎI cache key tất cả tham số có prefix `_`. Cả `doc_trang_thai_file(…, _mtime)` lẫn `_doc_ngay_so_lieu(…, _mtime)` dùng `_mtime` với underscore → mtime KHÔNG được tính vào cache key → cache entry `(ten_dv, "hstd")` được dùng lại trong 2 giờ (TTL) dù file đã thay đổi. Ngoài ra `lay_trang_thai_upload_pgd` gọi `doc_trang_thai_file(ten_dv, "hstd")` không truyền mtime → luôn dùng cache entry cũ nhất. |
+| **Fix** | Đổi `_mtime` → `mtime` (bỏ underscore) trong cả hai hàm → `mtime` được tính vào cache key. Cập nhật `lay_trang_thai_upload_pgd` tính `mtime` thực từ `os.stat()` cho từng loại file (kể cả `hstd_khnv.xlsx` cho HSTD) rồi truyền vào. Khi file chưa tồn tại: `mtime=0.0`; sau khi upload: `mtime=actual_timestamp` → cache key khác → hàm chạy lại → trả ✅. |
+| **Pattern chuẩn** | Streamlit `@st.cache_data`: **KHÔNG dùng `_` prefix** cho tham số cache-busting. Underscore chỉ dùng cho object không thể hash (như DataFrame) mà bạn KHÔNG muốn bust cache. Với số (mtime), để nguyên tên → luôn nằm trong cache key. |
+| **Ngày fix** | 2026-06-06 |
+
 ### B12 — Nút in báo cáo không phản hồi / app treo (unconditional generation)
 | | |
 |---|---|
@@ -515,6 +525,15 @@
 | **Nguyên nhân** | Hàm `chuan_hoa_ten()` dùng regex xóa luôn các từ "hội/sở/chi/nhánh/tỉnh" → tên Hội sở bị biến thành chuỗi rỗng, không bao giờ khớp. Ngoài ra thiếu bảng alias "Hội sở CN Đồng Nai" → `DON_VI_CHI_NHANH` |
 | **Fix** | Thêm `_TEN_DV_ALIAS` (giống `TEN_DV_ALIAS` trong `file_detection_service.py`); áp alias trước khi so sánh; xóa regex sai |
 | **Ngày fix** | 2026-06-01 |
+
+### E8 — "Toàn cảnh 22 PGD" cột Upload HSTD luôn ❌ dù đã upload
+| | |
+|---|---|
+| **File** | `tabs/tab_pgd_cards.py` → `_upload_info()`, `_render_ranking_table()`, `render()` |
+| **Dấu hiệu** | Bảng xếp hạng tổng hợp / Toàn cảnh 22 PGD cột "Upload HSTD" hiển thị ❌ Thiếu dù Phòng KH-NV đã upload qua tab Upload KHNV |
+| **Nguyên nhân** | KH-NV upload HSTD lưu vào `hstd_khnv.xlsx` (riêng Phòng KH-NV), nhưng `_upload_info()` chỉ kiểm tra `hstd_latest.xlsx` (đường dẫn của PGD tự upload). Tương tự, KPI "File HSTD" và bộ lọc upload cũng chỉ check `hstd_latest.xlsx` |
+| **Fix** | Thêm `_pgd_khnv_path()` kiểm tra `hstd_khnv.xlsx`; `_upload_info()` check cả 2 file lấy timestamp mới nhất; `n_upload` và `upload_status` check cả 2 đường dẫn |
+| **Ngày fix** | 2026-06-06 |
 
 ---
 

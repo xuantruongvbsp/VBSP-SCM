@@ -101,9 +101,9 @@ def _xlsx_val_to_datetime(val) -> datetime | None:
 
 
 @st.cache_data(ttl=7200, show_spinner=False)
-def _doc_ngay_so_lieu(path: Path, loai: str, _mtime: float = 0.0) -> datetime | None:
+def _doc_ngay_so_lieu(path: Path, loai: str, mtime: float = 0.0) -> datetime | None:
     """Đọc ngày số liệu từ trong file xlsx (read_only, tối thiểu ô cần thiết). Lỗi → None.
-    _mtime: os.path.getmtime(path) — dùng làm cache key, tự invalidate khi file thay đổi."""
+    mtime: os.path.getmtime(path) — nằm trong cache key, tự invalidate khi file thay đổi."""
     try:
         wb = load_workbook(filename=str(path), read_only=True, data_only=True)
         try:
@@ -137,10 +137,12 @@ def _doc_ngay_so_lieu(path: Path, loai: str, _mtime: float = 0.0) -> datetime | 
 
 
 @st.cache_data(ttl=7200, show_spinner=False)
-def doc_trang_thai_file(ten_don_vi: str, loai: LoaiFile, _mtime: float = 0.0) -> dict:
+def doc_trang_thai_file(ten_don_vi: str, loai: LoaiFile, mtime: float = 0.0) -> dict:
     """
     Đọc trạng thái file upload của một đơn vị theo loại.
-    _mtime: os.path.getmtime của file — cache key, invalidate khi file thay đổi.
+    mtime: os.path.getmtime của file — nằm trong cache key, tự invalidate khi file thay đổi.
+    Truyền mtime=0 nếu file chưa tồn tại (cache sẽ trả {"co_file": False}).
+    Khi file được upload mới, mtime thay đổi → Streamlit tạo cache entry mới.
 
     Trả về dict:
       {
@@ -177,7 +179,7 @@ def doc_trang_thai_file(ten_don_vi: str, loai: LoaiFile, _mtime: float = 0.0) ->
     canh_bao    = "ok" if so_ngay_cu <= nguong else "cu"
 
     try:
-        ngay_so_lieu = _doc_ngay_so_lieu(path, loai, _mtime=os.path.getmtime(path))
+        ngay_so_lieu = _doc_ngay_so_lieu(path, loai, mtime=os.path.getmtime(path))
     except Exception:
         ngay_so_lieu = None
 
@@ -210,15 +212,28 @@ def lay_trang_thai_upload_pgd(ds_don_vi: list[str]) -> pd.DataFrame:
     Trả về DataFrame trạng thái upload của tất cả đơn vị.
     Columns: Đơn vị | HSTD | NQ11 | GQVL | CDTOTKVV
     Giá trị ô: "✅ dd/mm" | "⚠️ dd/mm (N ngày)" | "❌ Chưa có"
+
+    Truyền mtime thực vào doc_trang_thai_file để cache tự invalidate khi file thay đổi.
+    Khi chưa có file: mtime=0.0 → cache entry riêng, không lẫn với entry sau khi upload.
     """
+    def _mt(ten_pgd: str, loai_: str) -> float:
+        """Lấy mtime của file PGD (0.0 nếu chưa tồn tại)."""
+        try:
+            p = Path(duong_dan_pgd(ten_pgd, loai_))
+            return p.stat().st_mtime if p.exists() else 0.0
+        except Exception:
+            return 0.0
+
     rows = []
     for ten_dv in ds_don_vi:
+        # HSTD: lấy mtime lớn hơn giữa hstd_latest.xlsx và hstd_khnv.xlsx
+        hstd_mt = max(_mt(ten_dv, "hstd"), _mt(ten_dv, "hstd_khnv"))
         rows.append({
             "Đơn vị":   ten_dv,
-            "HSTD":     _format_badge(doc_trang_thai_file(ten_dv, "hstd")),
-            "NQ11":     _format_badge(doc_trang_thai_file(ten_dv, "nq11")),
-            "GQVL":     _format_badge(doc_trang_thai_file(ten_dv, "gqvl")),
-            "CDTOTKVV": _format_badge(doc_trang_thai_file(ten_dv, "cdtotkvv")),
+            "HSTD":     _format_badge(doc_trang_thai_file(ten_dv, "hstd",     hstd_mt)),
+            "NQ11":     _format_badge(doc_trang_thai_file(ten_dv, "nq11",     _mt(ten_dv, "nq11"))),
+            "GQVL":     _format_badge(doc_trang_thai_file(ten_dv, "gqvl",     _mt(ten_dv, "gqvl"))),
+            "CDTOTKVV": _format_badge(doc_trang_thai_file(ten_dv, "cdtotkvv", _mt(ten_dv, "cdtotkvv"))),
         })
     return pd.DataFrame(rows)
 
@@ -293,12 +308,19 @@ def luu_gqvl_pgd(ten_pgd: str, file_bytes: bytes) -> str:
 
 
 def ds_pgd_co_file(loai: str) -> list:
-    """Danh sách tên PGD đã upload file theo loại (hstd/nq11/gqvl)."""
+    """Danh sách tên PGD đã upload file theo loại (hstd/nq11/gqvl).
+    Với HSTD: kiểm tra cả hstd_latest.xlsx (PGD tự upload) và hstd_khnv.xlsx (Phòng KH-NV upload).
+    """
     if not os.path.exists(PGD_DATA_DIR):
         return []
     result = []
     for d in sorted(Path(PGD_DATA_DIR).iterdir()):
-        if d.is_dir() and (d / f"{loai}_latest.xlsx").exists():
+        if not d.is_dir():
+            continue
+        co_file = (d / f"{loai}_latest.xlsx").exists()
+        if not co_file and loai == "hstd":
+            co_file = (d / "hstd_khnv.xlsx").exists()
+        if co_file:
             # Khôi phục tên hiển thị từ slug (gần đúng)
             result.append(d.name.replace("_", " ").title())
     return result

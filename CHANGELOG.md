@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## [2026-06-07] — Auto-merge sau upload từng PGD
+- `tabs/tab_upload_khnv.py` dòng ~286 — `_xu_ly_upload`: thay set flag `can_merge_*` bằng merge trực tiếp sau khi lưu file; kết quả lưu vào `folder_import_ket_qua_merge` để hiển thị sau rerun
+- `tabs/tab_upload_khnv.py` dòng ~161 — cập nhật spinner message: "Đang upload và tổng hợp dữ liệu..."
+
 ## [2026-06-07] — KTNB Phase 2 + KHTD lock mechanism
 - `services/ktnb_service.py` — thêm `lay_ds_loi_dot()`, `xuat_word_bien_ban_ktnb()`, `render_xuat_bien_ban()` (Phase 2 xuất Word biên bản)
 - `services/ktnb_service.py` L953 — `render_ktnb`: thêm tab thứ 5 "📄 E. Xuất biên bản" gọi `render_xuat_bien_ban(dot_id, dot_info, username)`

@@ -1,0 +1,53 @@
+Backup: hstd.parquet.bak
+OK Hội sở Chi nhánh tỉnh: 14,053 rows
+OK PGD Long Thành: 17,076 rows
+OK PGD Trảng Bom: 18,208 rows
+OK PGD Long Khánh: 16,058 rows
+OK PGD Xuân Lộc: 23,085 rows
+OK PGD Định Quán: 18,506 rows
+OK PGD Vĩnh Cửu: 17,153 rows
+OK PGD Tân Phú: 21,367 rows
+OK PGD Thống Nhất: 17,756 rows
+OK PGD Cẩm Mỹ: 18,877 rows
+OK PGD Nhơn Trạch: 17,334 rows
+OK PGD Bình Long: 7,157 rows
+OK PGD Lộc Ninh: 22,057 rows
+OK PGD Bình Phước: 8,229 rows
+OK PGD Phước Long: 7,309 rows
+OK PGD Bù Đăng: 19,890 rows
+OK PGD Đồng Phú: 13,871 rows
+OK PGD Chơn Thành: 9,611 rows
+OK PGD Bù Đốp: 16,487 rows
+OK PGD Bù Gia Mập: 17,514 rows
+OK PGD Phú Riềng: 14,178 rows
+OK PGD Hớn Quản: 13,622 rows
+
+Read: 22/22 OK
+Cols: 174
+
+=== DONE ===
+Time: 40s | Size: 40.7 MB
+PGDs: 22 | Rows: 349,398 | TDN: 13,199.0 ty
+  Hội sở Chi nhánh tỉnh: 14,053 rows, 722.1 ty
+  PGD Bình Long: 7,157 rows, 363.3 ty
+  PGD Bình Phước: 8,229 rows, 385.1 ty
+  PGD Bù Gia Mập: 17,514 rows, 668.5 ty
+  PGD Bù Đăng: 19,890 rows, 787.7 ty
+  PGD Bù Đốp: 16,487 rows, 592.3 ty
+  PGD Chơn Thành: 9,611 rows, 432.0 ty
+  PGD Cẩm Mỹ: 18,877 rows, 566.8 ty
+  PGD Hớn Quản: 13,622 rows, 517.3 ty
+  PGD Long Khánh: 16,058 rows, 751.4 ty
+  PGD Long Thành: 17,076 rows, 578.1 ty
+  PGD Lộc Ninh: 22,057 rows, 769.7 ty
+  PGD Nhơn Trạch: 17,334 rows, 569.4 ty
+  PGD Phú Riềng: 14,178 rows, 654.7 ty
+  PGD Phước Long: 7,309 rows, 377.6 ty
+  PGD Thống Nhất: 17,756 rows, 601.7 ty
+  PGD Trảng Bom: 18,208 rows, 621.9 ty
+  PGD Tân Phú: 21,367 rows, 715.8 ty
+  PGD Vĩnh Cửu: 17,153 rows, 643.6 ty
+  PGD Xuân Lộc: 23,085 rows, 739.4 ty
+  PGD Định Quán: 18,506 rows, 604.7 ty
+  PGD Đồng Phú: 13,871 rows, 536.0 ty
+SUCCESS

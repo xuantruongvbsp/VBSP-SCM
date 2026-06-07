@@ -158,7 +158,7 @@ def _render_upload_form(ten_dv: str, prefix: str, username: str) -> None:
         return
 
     if st.button("📤 Upload", type="primary", key=f"{prefix}_btn_upload"):
-        with st.spinner("⏳ Đang xử lý file..."):
+        with st.spinner("⏳ Đang upload và tổng hợp dữ liệu... Vui lòng chờ."):
             _xu_ly_upload(ten_dv, username,
                           f_hstd, f_nq11, f_gqvl, f_cdtotkvv, prefix)
 
@@ -283,14 +283,37 @@ def _xu_ly_upload(
         else:
             col.warning(f"**{nhan}**\n\n{kq.thong_bao}")
 
-    # Ghi cờ cho fragment merge xử lý sau (không merge đồng bộ ở đây)
+    # Tự động merge ngay sau khi lưu file thành công
+    ket_qua_merge: list[dict] = []
     if can_merge:
-        for loai in ("hstd", "nq11", "gqvl"):
-            if loai in ket_qua_upload and ket_qua_upload[loai].thanh_cong:
-                st.session_state[f"can_merge_{loai}"] = True
-        st.info("✅ File đã lưu. Nhấn nút bên dưới để cập nhật dữ liệu.")
+        loai_can_merge = [
+            loai for loai in ("hstd", "nq11", "gqvl")
+            if loai in ket_qua_upload and ket_qua_upload[loai].thanh_cong
+        ]
+        for loai in loai_can_merge:
+            try:
+                kq_m = merge_du_lieu_toan_cn(loai)
+                meta_m = lay_meta_merge(loai) if kq_m.thanh_cong else None
+                ket_qua_merge.append({
+                    "loai": loai,
+                    "thanh_cong": kq_m.thanh_cong,
+                    "thong_bao": kq_m.thong_bao,
+                    "so_pgd": (meta_m or {}).get("so_pgd"),
+                    "so_dong": (meta_m or {}).get("so_dong"),
+                })
+            except Exception as _merge_err:
+                logger.error("_xu_ly_upload: merge %s lỗi — %s", loai, _merge_err, exc_info=True)
+                ket_qua_merge.append({
+                    "loai": loai,
+                    "thanh_cong": False,
+                    "thong_bao": f"Lỗi tổng hợp: {_merge_err}",
+                    "so_pgd": None,
+                    "so_dong": None,
+                })
 
     st.cache_data.clear()
+    if ket_qua_merge:
+        st.session_state["folder_import_ket_qua_merge"] = ket_qua_merge
     # Lưu kết quả vào session để render sau rerun
     st.session_state["khnv_ket_qua_upload"] = {
         k: {"thanh_cong": v.thanh_cong, "thong_bao": v.thong_bao}

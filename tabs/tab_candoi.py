@@ -460,9 +460,7 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                         {"label": "NQH (KHA+KHB)", "value": _to_ty(nqh_ht),  "icon": "⚠️", "suffix": "tỷ đồng", "precision": 2,
                          "delta": tl_nqh, "delta_label": "% tổng DN", "delta_color": "inverse",
                          "help": f"Tỷ lệ NQH/Tổng dư nợ: {tl_nqh}%"},
-                        {"label": "Tổng DN KHA+KHB", "value": _to_ty(kha_ht + khb_ht), "icon": "📊", "suffix": "tỷ đồng", "precision": 1,
-                         "delta": _pct(kha_ht + khb_ht, kha_pv + khb_pv), "delta_label": f"vs {label_pv}", "delta_color": "normal"},
-                    ], num_columns=4)
+                    ], num_columns=3)
 
                 else:
                     kpi_row([
@@ -477,8 +475,7 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                         {"label": "Dư nợ KHB",     "value": _to_ty(khb_ht),  "icon": "📋", "suffix": "tỷ đồng", "precision": 1},
                         {"label": "NQH (KHA+KHB)", "value": _to_ty(nqh_ht),  "icon": "⚠️", "suffix": "tỷ đồng", "precision": 2,
                          "delta": tl_nqh, "delta_label": "% tổng DN", "delta_color": "inverse"},
-                        {"label": "Tổng DN KHA+KHB", "value": _to_ty(kha_ht + khb_ht), "icon": "📊", "suffix": "tỷ đồng", "precision": 1},
-                    ], num_columns=4)
+                    ], num_columns=3)
 
                 # ── Bảng chi tiết tất cả chỉ tiêu (gộp từ tab cũ) ────────
                 with st.expander("📋 Bảng chi tiết tất cả chỉ tiêu", expanded=False):

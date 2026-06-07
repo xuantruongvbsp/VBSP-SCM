@@ -1,0 +1,56 @@
+# VBSP-SCM — Docker Compose
+# Khởi động: docker-compose up -d
+# Dừng:      docker-compose down
+# Xem log:   docker-compose logs -f app
+
+version: "3.9"
+
+services:
+  app:
+    build: .
+    image: vbsp-scm:latest
+    container_name: vbsp_scm_app
+    restart: unless-stopped
+    ports:
+      - "8501:8501"
+    volumes:
+      # Dữ liệu persistent — bind mount vào thư mục host
+      - ./vbsp_scm.db:/app/vbsp_scm.db
+      - ./cache:/app/cache
+      - ./pgd_data:/app/pgd_data
+      - ./backups:/app/backups
+      - ./logs:/app/logs
+      - ./credentials.json:/app/credentials.json:ro
+      - ./templates:/app/templates:ro
+    environment:
+      - PYTHONUNBUFFERED=1
+      - TZ=Asia/Ho_Chi_Minh
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request; urllib.request.urlopen('http://localhost:8501/_stcore/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  # Backup service — chạy hàng ngày lúc 06:30
+  backup:
+    build: .
+    image: vbsp-scm:latest
+    container_name: vbsp_scm_backup
+    restart: "no"
+    volumes:
+      - ./vbsp_scm.db:/app/vbsp_scm.db:ro
+      - ./cache:/app/cache:ro
+      - ./pgd_data:/app/pgd_data:ro
+      - ./backups:/app/backups
+    environment:
+      - TZ=Asia/Ho_Chi_Minh
+    command: ["python", "scripts/backup_daily.py"]
+    profiles:
+      - backup

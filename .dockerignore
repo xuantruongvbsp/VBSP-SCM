@@ -1,0 +1,47 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+.trae/
+.windsurf/
+
+# Runtime data (mounted as volumes)
+cache/
+pgd_data/
+backups/
+logs/
+
+# Secrets
+credentials.json
+*.env
+.env*
+
+# Tests
+tests/
+pytest.ini
+.coveragerc
+
+# Git
+.git/
+.gitignore
+
+# Docs (not needed at runtime)
+docs/
+*.md
+!README.md
+
+# Windows
+Thumbs.db
+Desktop.ini

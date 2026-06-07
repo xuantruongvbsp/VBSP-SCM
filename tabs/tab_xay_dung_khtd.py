@@ -29,6 +29,7 @@ from services.khtd_import_service import (
     doc_thuyet_minh_tu_bieu_02c,
     doc_trang_thai_approval,
     duyet_ke_hoach_xd,
+    is_khoa,
     luu_bieu_01c,
     luu_bieu_02c,
     luu_thuyet_minh,
@@ -116,20 +117,29 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
             st.warning("⚠️ Chưa xác định đơn vị.")
             return
 
+        # ── Kiểm tra lock — hiển thị banner nếu đã duyệt ─────────────────────
+        _da_khoa = is_khoa(pgd_chon, ds_nam, loai)
+        if _da_khoa:
+            st.error(
+                "🔒 Kế hoạch này **đã được CN phê duyệt** — không thể chỉnh sửa.\n\n"
+                "Liên hệ admin_cn để mở lại nếu cần cập nhật.",
+                icon="🔒",
+            )
+
         # ── Sub-tabs ──────────────────────────────────────────────────────────
         if la_phan_he_cn(role):
             s1, s2, s3, s4 = st.tabs(
                 ["📥 Biểu 01C", "📊 Biểu 02C", "📝 Thuyết minh", "🏛️ Tổng hợp CN"]
             )
-            _render_bieu_01c(s1, pgd_chon, ds_nam, loai, username)
-            _render_bieu_02c(s2, pgd_chon, ds_nam, loai, username, role)
-            _render_thuyet_minh(s3, pgd_chon, ds_nam, loai, username, role)
+            _render_bieu_01c(s1, pgd_chon, ds_nam, loai, username, _da_khoa)
+            _render_bieu_02c(s2, pgd_chon, ds_nam, loai, username, role, _da_khoa)
+            _render_thuyet_minh(s3, pgd_chon, ds_nam, loai, username, role, _da_khoa)
             _render_tong_hop_cn(s4, ds_nam, loai, username, role)
         else:
             s1, s2, s3 = st.tabs(["📥 Biểu 01C", "📊 Biểu 02C", "📝 Thuyết minh"])
-            _render_bieu_01c(s1, pgd_chon, ds_nam, loai, username)
-            _render_bieu_02c(s2, pgd_chon, ds_nam, loai, username, role)
-            _render_thuyet_minh(s3, pgd_chon, ds_nam, loai, username, role)
+            _render_bieu_01c(s1, pgd_chon, ds_nam, loai, username, _da_khoa)
+            _render_bieu_02c(s2, pgd_chon, ds_nam, loai, username, role, _da_khoa)
+            _render_thuyet_minh(s3, pgd_chon, ds_nam, loai, username, role, _da_khoa)
             _render_approval_pgd(pgd_chon, ds_nam, loai, username, role)
 
 
@@ -141,35 +151,39 @@ def _render_bieu_01c(
     ds_nam: list[int],
     loai: str,
     username: str,
+    da_khoa: bool = False,
 ) -> None:
     with tab:
         st.markdown(f"#### Biểu 01C — Nhu cầu vay vốn ({pgd_chon})")
 
         with st.expander("📥 Import từ file KHNV_01C.XLSX (TTBC)", expanded=False):
-            if len(ds_nam) > 1:
-                nam_upload = st.selectbox(
-                    "Nhập cho năm",
-                    ds_nam,
-                    key=f"xd_01c_nam_up_{loai}_{pgd_slug(pgd_chon)}",
-                )
+            if da_khoa:
+                st.warning("🔒 Kế hoạch đã duyệt — không thể import.")
             else:
-                nam_upload = ds_nam[0]
+                if len(ds_nam) > 1:
+                    nam_upload = st.selectbox(
+                        "Nhập cho năm",
+                        ds_nam,
+                        key=f"xd_01c_nam_up_{loai}_{pgd_slug(pgd_chon)}",
+                    )
+                else:
+                    nam_upload = ds_nam[0]
 
-            uploaded = st.file_uploader(
-                f"Chọn file KHNV_01C.XLSX (Năm {nam_upload})",
-                type=["xlsx", "xls"],
-                key=f"xd_01c_upload_{loai}_{pgd_slug(pgd_chon)}_{nam_upload}",
-            )
-            if uploaded is not None:
-                if st.button(
-                    "⬆️ Import Biểu 01C",
-                    key=f"xd_01c_btn_{loai}_{pgd_slug(pgd_chon)}_{nam_upload}",
-                ):
-                    with st.spinner("Đang xử lý file..."):
-                        ket_qua = luu_bieu_01c(
-                            uploaded.read(), pgd_chon, nam_upload, username, loai
-                        )
-                    ket_qua.hien_thi()
+                uploaded = st.file_uploader(
+                    f"Chọn file KHNV_01C.XLSX (Năm {nam_upload})",
+                    type=["xlsx", "xls"],
+                    key=f"xd_01c_upload_{loai}_{pgd_slug(pgd_chon)}_{nam_upload}",
+                )
+                if uploaded is not None:
+                    if st.button(
+                        "⬆️ Import Biểu 01C",
+                        key=f"xd_01c_btn_{loai}_{pgd_slug(pgd_chon)}_{nam_upload}",
+                    ):
+                        with st.spinner("Đang xử lý file..."):
+                            ket_qua = luu_bieu_01c(
+                                uploaded.read(), pgd_chon, nam_upload, username, loai
+                            )
+                        ket_qua.hien_thi()
 
         st.markdown("---")
 
@@ -246,50 +260,54 @@ def _render_bieu_02c(
     loai: str,
     username: str,
     role: str,
+    da_khoa: bool = False,
 ) -> None:
     with tab:
         st.markdown(f"#### Biểu 02C — Kế hoạch tín dụng ({pgd_chon})")
 
-        approval = doc_trang_thai_approval(pgd_chon, ds_nam, loai)
-        locked = approval.get("trang_thai") == "da_duyet"
+        # Dùng da_khoa từ outer render (nhất quán, không đọc lại kv_store)
+        locked = da_khoa
         if locked:
             st.info("🔒 Kế hoạch đã được Chi nhánh duyệt — chỉ xem.")
 
         with st.expander("📥 Import thuyết minh từ file KHNV_02C.XLSX", expanded=False):
-            if len(ds_nam) > 1:
-                nam_tm = st.selectbox(
-                    "Lưu thuyết minh cho năm",
-                    ds_nam,
-                    key=f"xd_02c_tm_nam_{loai}_{pgd_slug(pgd_chon)}",
-                )
+            if locked:
+                st.warning("🔒 Kế hoạch đã duyệt — không thể import.")
             else:
-                nam_tm = ds_nam[0]
+                if len(ds_nam) > 1:
+                    nam_tm = st.selectbox(
+                        "Lưu thuyết minh cho năm",
+                        ds_nam,
+                        key=f"xd_02c_tm_nam_{loai}_{pgd_slug(pgd_chon)}",
+                    )
+                else:
+                    nam_tm = ds_nam[0]
 
-            up2c = st.file_uploader(
-                "Chọn file KHNV_02C.XLSX",
-                type=["xlsx", "xls"],
-                key=f"xd_02c_upload_{loai}_{pgd_slug(pgd_chon)}",
-            )
-            if up2c is not None:
-                if st.button(
-                    "🔄 Đọc & lưu thuyết minh",
-                    key=f"xd_02c_btn_tm_{loai}_{pgd_slug(pgd_chon)}",
-                ):
-                    with st.spinner("Đang đọc file..."):
-                        try:
-                            tm_data = doc_thuyet_minh_tu_bieu_02c(up2c.read())
-                        except Exception as e:  # conv: skip
-                            logger.error("Lỗi đọc Biểu 02C: %s", e, exc_info=True)
-                            st.error(f"❌ Lỗi đọc file: {e}")
-                            tm_data = {}
-                    if tm_data:
-                        luu_thuyet_minh(pgd_chon, nam_tm, tm_data, username, loai)
-                        st.success(
-                            f"✅ Đã lưu {len(tm_data)} chỉ tiêu thuyết minh "
-                            f"(năm {nam_tm}, {loai})."
-                        )
-                    else:
-                        st.warning("⚠️ Không tìm thấy dữ liệu thuyết minh trong file.")
+                up2c = st.file_uploader(
+                    "Chọn file KHNV_02C.XLSX",
+                    type=["xlsx", "xls"],
+                    key=f"xd_02c_upload_{loai}_{pgd_slug(pgd_chon)}",
+                )
+                if up2c is not None:
+                    if st.button(
+                        "🔄 Đọc & lưu thuyết minh",
+                        key=f"xd_02c_btn_tm_{loai}_{pgd_slug(pgd_chon)}",
+                    ):
+                        with st.spinner("Đang đọc file..."):
+                            try:
+                                tm_data = doc_thuyet_minh_tu_bieu_02c(up2c.read())
+                            except Exception as e:  # conv: skip
+                                logger.error("Lỗi đọc Biểu 02C: %s", e, exc_info=True)
+                                st.error(f"❌ Lỗi đọc file: {e}")
+                                tm_data = {}
+                        if tm_data:
+                            luu_thuyet_minh(pgd_chon, nam_tm, tm_data, username, loai)
+                            st.success(
+                                f"✅ Đã lưu {len(tm_data)} chỉ tiêu thuyết minh "
+                                f"(năm {nam_tm}, {loai})."
+                            )
+                        else:
+                            st.warning("⚠️ Không tìm thấy dữ liệu thuyết minh trong file.")
 
         st.markdown("##### Dư nợ dự kiến theo chương trình (triệu đồng)")
 
@@ -420,12 +438,13 @@ def _render_thuyet_minh(
     loai: str,
     username: str,
     role: str,
+    da_khoa: bool = False,
 ) -> None:
     with tab:
         st.markdown(f"#### Thuyết minh chỉ tiêu ({pgd_chon})")
 
-        approval = doc_trang_thai_approval(pgd_chon, ds_nam, loai)
-        locked = approval.get("trang_thai") == "da_duyet"
+        # Dùng da_khoa từ outer render thay vì đọc lại kv_store
+        locked = da_khoa
         if locked:
             st.info("🔒 Kế hoạch đã được Chi nhánh duyệt — chỉ xem.")
 

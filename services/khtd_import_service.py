@@ -435,6 +435,15 @@ def trang_thai_approval_cn(ds_nam: list[int], loai: str) -> dict[str, dict]:
     return result
 
 
+def is_khoa(pgd_ten: str, ds_nam: list[int], loai: str) -> bool:
+    """Trả về True nếu kế hoạch đã được CN duyệt (da_duyet) — hard lock, không cho sửa.
+
+    Chỉ admin_cn mới có thể mở lại qua `mo_lai_ke_hoach()`.
+    """
+    tt = doc_trang_thai_approval(pgd_ten, ds_nam, loai)
+    return tt.get("trang_thai") == "da_duyet"
+
+
 # ── Đọc Thuyết minh từ Biểu 02C (import) ─────────────────────────────────────
 
 def doc_thuyet_minh_tu_bieu_02c(file_bytes: bytes) -> dict[str, float]:

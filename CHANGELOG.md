@@ -1,5 +1,20 @@
 # CHANGELOG
 
+## [2026-06-07] — KTNB Phase 2 + KHTD lock mechanism
+- `services/ktnb_service.py` — thêm `lay_ds_loi_dot()`, `xuat_word_bien_ban_ktnb()`, `render_xuat_bien_ban()` (Phase 2 xuất Word biên bản)
+- `services/ktnb_service.py` L953 — `render_ktnb`: thêm tab thứ 5 "📄 E. Xuất biên bản" gọi `render_xuat_bien_ban(dot_id, dot_info, username)`
+- `services/khtd_import_service.py` L437 — thêm `is_khoa(pgd_ten, ds_nam, loai)` → bool: kiểm tra `trang_thai == "da_duyet"` (hard lock)
+- `tabs/tab_xay_dung_khtd.py` — import `is_khoa`; hiển thị lock banner khi kế hoạch đã duyệt
+- `tabs/tab_xay_dung_khtd.py` — `_render_bieu_01c`, `_render_bieu_02c`, `_render_thuyet_minh`: thêm param `da_khoa: bool = False`, guard import buttons khi locked; 3 sub-functions đọc lock từ outer render thay vì gọi lại kv_store
+
+## [2026-06-07] — fix Điện báo/KH&TH card Tổng dư nợ bị trùng 2 lần
+- `tabs/tab_candoi.py` L455-465, L473-482 — xóa card "Tổng DN KHA+KHB" khỏi kpi_row #2 vì trùng giá trị với "Tổng dư nợ" ở kpi_row #1 (Tổng dư nợ = KHA + KHB)
+
+## [2026-06-07] — scan & fix pattern groupby-sum-without-to_numeric toàn codebase
+- `workspaces/ws_executive.py` L1103 — `_waterfall_du_no`: tạo `df_wf` copy, ép numeric `cot_tien`/`cot_nqh` trước sum/groupby
+- `workspaces/ws_executive.py` L1351 — snapshot so sánh: ép numeric `COT_TONG_DU_NO` trước groupby
+- `tabs/tab_gqvl_pgd.py` L128 — `_render_chart_gqvl`: tạo `df_chart` copy, ép numeric cột tiền trước groupby cả 2 tab (Xã + So sánh)
+
 ## [2026-06-07] — fix 7 lỗi dữ liệu tab Tổng quan danh mục tín dụng (KH-NV)
 - `services/tongquan_service.py` L85–118 — `tinh_co_cau_ct`: thêm param `cot_so_ku`, `so_mon_by_ct` dùng `df_loc[cot_so_ku].nunique()` (fix sai cột + count→nunique); `so_kh_by_ct` đổi sang `df_loc` (nhất quán với dư nợ > 0)
 - `tabs/tab_tongquan.py` L116–128 — `_cache_co_cau_ct`: truyền `cot_so_ku=COT_SO_KU` vào `tinh_co_cau_ct`

@@ -918,6 +918,280 @@ def xuat_bao_cao_ktnb_excel(nam: int | None = None) -> bytes:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# PHASE 2 — XUẤT BIÊN BẢN WORD / PDF
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+def lay_ds_loi_dot(dot_id: int) -> pd.DataFrame:
+    """Lấy danh sách lỗi của một đợt kiểm tra (join danh mục để có tên lỗi)."""
+    with db.get_conn() as conn:
+        df = pd.read_sql_query(
+            """
+            SELECT l.id, l.ma_loi, c.ten_loi, c.khoi_nghiep_vu, c.muc_do,
+                   l.ma_mon_vay, l.mo_ta_cu_the, l.bien_phap_xu_ly,
+                   l.thoi_han_kp, l.don_vi_chiu_trach, l.trang_thai,
+                   l.nguoi_ghi_nhan, l.nguoi_dong_loi, l.ngay_dong_loi,
+                   l.created_at
+            FROM ktnb_ket_qua_loi l
+            LEFT JOIN ktnb_danh_muc_loi_chuan c ON l.ma_loi = c.ma_loi
+            WHERE l.dot_id = ?
+            ORDER BY c.khoi_nghiep_vu, l.ma_loi, l.id
+            """,
+            conn, params=(dot_id,)
+        )
+    return df
+
+
+def xuat_word_bien_ban_ktnb(dot_id: int) -> bytes | None:
+    """
+    Xuất Biên bản Kết luận Kiểm toán Nội bộ ra Word (.docx).
+
+    Nội dung:
+    - Thông tin đợt kiểm tra (số CV, PGD, ngày)
+    - Thành phần đoàn kiểm tra
+    - Danh sách lỗi theo khối nghiệp vụ
+    - Tổng kết & kiến nghị
+    - Khung ký kết (trưởng đoàn & đại diện PGD)
+    """
+    try:
+        from docx import Document
+        from docx.shared import Pt, Cm, RGBColor
+        from docx.enum.text import WD_ALIGN_PARAGRAPH
+        from docx.enum.table import WD_TABLE_ALIGNMENT
+        from io import BytesIO
+    except ImportError:
+        logger.error("python-docx không được cài — pip install python-docx")
+        return None
+
+    dot = lay_dot_by_id(dot_id)
+    if not dot:
+        return None
+
+    df_doan = lay_thanh_phan_doan(dot_id)
+    df_loi  = lay_ds_loi_dot(dot_id)
+    df_stat = thong_ke_loi_theo_khoi(dot_id)
+
+    doc = Document()
+
+    # ── Cài page margin hẹp hơn ─────────────────────────────────
+    for section in doc.sections:
+        section.top_margin    = Cm(2.0)
+        section.bottom_margin = Cm(2.0)
+        section.left_margin   = Cm(2.5)
+        section.right_margin  = Cm(2.0)
+
+    def _heading(text: str, level: int = 1) -> None:
+        p = doc.add_heading(text, level=level)
+        p.alignment = WD_ALIGN_PARAGRAPH.CENTER if level == 0 else WD_ALIGN_PARAGRAPH.LEFT
+
+    def _bold(paragraph, text: str) -> None:
+        run = paragraph.add_run(text)
+        run.bold = True
+
+    # ── Tiêu đề ─────────────────────────────────────────────────
+    p_title = doc.add_paragraph()
+    p_title.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    run = p_title.add_run("NGÂN HÀNG CHÍNH SÁCH XÃ HỘI")
+    run.bold = True
+    run.font.size = Pt(13)
+
+    p_cn = doc.add_paragraph()
+    p_cn.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    run = p_cn.add_run("CHI NHÁNH TỈNH ĐỒNG NAI")
+    run.bold = True
+    run.font.size = Pt(13)
+
+    doc.add_paragraph()
+
+    p_bb = doc.add_paragraph()
+    p_bb.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    run = p_bb.add_run("BIÊN BẢN KẾT LUẬN KIỂM TOÁN NỘI BỘ")
+    run.bold = True
+    run.font.size = Pt(14)
+
+    p_so = doc.add_paragraph()
+    p_so.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    ten_pgd = dot.get("ten_pgd_ks", "")
+    so_cv   = dot.get("so_cv", "")
+    nam     = dot.get("nam", "")
+    p_so.add_run(f"Số: {so_cv} — {ten_pgd} — Năm {nam}")
+
+    doc.add_paragraph()
+
+    # ── I. Thông tin đợt ────────────────────────────────────────
+    doc.add_heading("I. THÔNG TIN ĐỢT KIỂM TRA", level=2)
+    info_table = doc.add_table(rows=5, cols=2)
+    info_table.style = "Table Grid"
+    info_data = [
+        ("PGD được kiểm tra",   dot.get("ten_pgd_ks", "")),
+        ("Loại hình",            dot.get("loai_hinh", "")),
+        ("Ngày bắt đầu",         dot.get("ngay_bat_dau", "")),
+        ("Ngày kết thúc",        dot.get("ngay_ket_thuc", "")),
+        ("Trưởng đoàn",          dot.get("truong_doan", "")),
+    ]
+    for i, (k, v) in enumerate(info_data):
+        info_table.rows[i].cells[0].text = k
+        info_table.rows[i].cells[1].text = str(v)
+    doc.add_paragraph()
+
+    # ── II. Thành phần đoàn ─────────────────────────────────────
+    doc.add_heading("II. THÀNH PHẦN ĐOÀN KIỂM TOÁN", level=2)
+    if not df_doan.empty:
+        cols_doan = ["ho_ten", "chuc_vu", "don_vi", "vai_tro"]
+        headers   = ["Họ tên", "Chức vụ", "Đơn vị", "Vai trò"]
+        t = doc.add_table(rows=1 + len(df_doan), cols=len(cols_doan))
+        t.style = "Table Grid"
+        for j, h in enumerate(headers):
+            t.rows[0].cells[j].text = h
+            t.rows[0].cells[j].paragraphs[0].runs[0].bold = True
+        for i, row in df_doan.iterrows():
+            for j, col in enumerate(cols_doan):
+                t.rows[i + 1].cells[j].text = str(row.get(col, "") or "")
+    doc.add_paragraph()
+
+    # ── III. Kết quả kiểm tra ────────────────────────────────────
+    doc.add_heading("III. KẾT QUẢ KIỂM TRA", level=2)
+
+    tong_loi = len(df_loi)
+    da_kp    = (df_loi["trang_thai"] == "da_khac_phuc").sum() if not df_loi.empty else 0
+    chua_kp  = tong_loi - da_kp
+
+    p_sum = doc.add_paragraph()
+    p_sum.add_run(f"Tổng số lỗi phát hiện: {tong_loi} | "
+                  f"Đã khắc phục: {da_kp} | "
+                  f"Chưa khắc phục: {chua_kp}")
+
+    if not df_loi.empty:
+        doc.add_paragraph()
+        doc.add_heading("Danh sách lỗi chi tiết:", level=3)
+        cols_loi = ["ma_loi", "ten_loi", "khoi_nghiep_vu", "mo_ta_cu_the",
+                    "bien_phap_xu_ly", "thoi_han_kp", "trang_thai"]
+        hdrs_loi = ["Mã lỗi", "Tên lỗi", "Khối NV", "Mô tả",
+                    "Biện pháp XL", "Thời hạn KP", "Trạng thái"]
+        t2 = doc.add_table(rows=1 + len(df_loi), cols=len(cols_loi))
+        t2.style = "Table Grid"
+        for j, h in enumerate(hdrs_loi):
+            c = t2.rows[0].cells[j]
+            c.text = h
+            c.paragraphs[0].runs[0].bold = True
+        for i, row in df_loi.iterrows():
+            for j, col in enumerate(cols_loi):
+                t2.rows[i + 1].cells[j].text = str(row.get(col, "") or "")
+    doc.add_paragraph()
+
+    # ── IV. Kết luận & kiến nghị ─────────────────────────────────
+    doc.add_heading("IV. KẾT LUẬN VÀ KIẾN NGHỊ", level=2)
+    p_kl = doc.add_paragraph(
+        f"Qua đợt kiểm toán tại {ten_pgd}, đoàn kiểm toán phát hiện {tong_loi} lỗi. "
+        f"Đến thời điểm lập biên bản, có {da_kp} lỗi đã được khắc phục, "
+        f"{chua_kp} lỗi chưa khắc phục. "
+        f"Đề nghị {ten_pgd} hoàn thành việc khắc phục các lỗi còn lại theo đúng thời hạn đã cam kết."
+    )
+
+    doc.add_paragraph()
+
+    # ── V. Ký kết ────────────────────────────────────────────────
+    doc.add_heading("V. XÁC NHẬN", level=2)
+    ky_table = doc.add_table(rows=4, cols=2)
+    ky_table.rows[0].cells[0].text = "TRƯỞNG ĐOÀN KIỂM TOÁN"
+    ky_table.rows[0].cells[1].text = f"ĐẠI DIỆN {ten_pgd.upper()}"
+    for i in range(1, 4):
+        ky_table.rows[i].cells[0].text = ""
+        ky_table.rows[i].cells[1].text = ""
+    ky_table.rows[3].cells[0].text = dot.get("truong_doan", "")
+    for c in ky_table.rows[0].cells:
+        try:
+            c.paragraphs[0].runs[0].bold = True
+        except IndexError:
+            pass
+
+    doc.add_paragraph()
+    doc.add_paragraph(
+        f"Lập tại Đồng Nai, ngày {datetime.now().strftime('%d/%m/%Y')}"
+    )
+
+    # ── Xuất ra bytes ────────────────────────────────────────────
+    buf = BytesIO()
+    doc.save(buf)
+    return buf.getvalue()
+
+
+def render_xuat_bien_ban(dot_id: int, dot: dict, username: str) -> None:
+    """UI Phân hệ E — Xuất Biên bản & Báo cáo tổng hợp."""
+    st.subheader("📄 Xuất Biên bản & Báo cáo")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.markdown("**📝 Biên bản kết luận kiểm toán (Word)**")
+        st.caption("Tổng hợp thông tin đợt kiểm tra, thành phần đoàn, danh sách lỗi, ký kết")
+        if st.button("Tạo biên bản Word", key="ktnb_xuat_word", type="primary"):
+            with st.spinner("Đang tạo biên bản..."):
+                docx_bytes = xuat_word_bien_ban_ktnb(dot_id)
+            if docx_bytes:
+                ten_pgd = dot.get("ten_pgd_ks", "PGD").replace(" ", "_")
+                so_cv   = dot.get("so_cv", "").replace("/", "-")
+                fname   = f"BienBan_KTNB_{ten_pgd}_{so_cv}.docx"
+                st.download_button(
+                    "📥 Tải biên bản Word",
+                    data=docx_bytes,
+                    file_name=fname,
+                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    key="ktnb_dl_word",
+                )
+                db.ghi_audit(username, "ktnb_xuat_bien_ban",
+                             f"dot_id={dot_id}, file={fname}")
+                st.success(f"✅ Đã tạo: {fname}")
+            else:
+                st.error("❌ Không tạo được biên bản — kiểm tra log")
+
+    with col2:
+        st.markdown("**📊 Báo cáo tổng hợp theo năm (Excel)**")
+        st.caption("3 sheet: Tổng quan, Chi tiết theo đợt, Theo khối nghiệp vụ")
+        nam = st.number_input("Năm", value=datetime.now().year,
+                              min_value=2020, max_value=2035,
+                              key="ktnb_xuat_nam", step=1)
+        if st.button("Xuất báo cáo Excel", key="ktnb_xuat_excel"):
+            with st.spinner("Đang xuất..."):
+                excel_bytes = xuat_bao_cao_ktnb_excel(int(nam))
+            if excel_bytes:
+                st.download_button(
+                    "📥 Tải Excel báo cáo KTNB",
+                    data=excel_bytes,
+                    file_name=f"BaoCao_KTNB_{int(nam)}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    key="ktnb_dl_excel",
+                )
+                db.ghi_audit(username, "ktnb_xuat_bao_cao_excel", f"nam={nam}")
+            else:
+                st.warning("⚠️ Chưa có dữ liệu để xuất")
+
+    # ── Preview tóm tắt đợt ─────────────────────────────────────
+    st.divider()
+    st.markdown("**📋 Tóm tắt đợt kiểm toán**")
+    df_loi = lay_ds_loi_dot(dot_id)
+    if not df_loi.empty:
+        tong = len(df_loi)
+        da_kp = (df_loi["trang_thai"] == "da_khac_phuc").sum()
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Tổng lỗi", tong)
+        c2.metric("Đã khắc phục", int(da_kp))
+        c3.metric("Chưa khắc phục", tong - int(da_kp))
+
+        st.dataframe(
+            df_loi[["ma_loi", "ten_loi", "khoi_nghiep_vu",
+                    "mo_ta_cu_the", "trang_thai", "thoi_han_kp"]].rename(columns={
+                "ma_loi": "Mã lỗi", "ten_loi": "Tên lỗi",
+                "khoi_nghiep_vu": "Khối NV", "mo_ta_cu_the": "Mô tả",
+                "trang_thai": "Trạng thái", "thoi_han_kp": "Thời hạn KP",
+            }),
+            use_container_width=True, hide_index=True,
+        )
+    else:
+        st.info("ℹ️ Chưa có lỗi nào được ghi nhận cho đợt này")
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # MAIN RENDER FUNCTION
 # ═══════════════════════════════════════════════════════════════════════════════
 
@@ -950,12 +1224,13 @@ def render_ktnb(df_full: pd.DataFrame, role: str, username: str) -> None:
 
     st.divider()
 
-    # 4 sub-tabs
-    tab_a, tab_b, tab_c, tab_d = st.tabs([
+    # 5 sub-tabs (Phase 2: thêm tab E — Xuất biên bản)
+    tab_a, tab_b, tab_c, tab_d, tab_e = st.tabs([
         "📅 A. Kế hoạch & Lịch trình",
         "🎯 B. Chọn mẫu đối chiếu",
         "📝 C. Nhập kết quả đối chiếu",
-        "⚠️ D. Giám sát & Khắc phục lỗi"
+        "⚠️ D. Giám sát & Khắc phục lỗi",
+        "📄 E. Xuất biên bản",
     ])
 
     with tab_a:
@@ -969,3 +1244,7 @@ def render_ktnb(df_full: pd.DataFrame, role: str, username: str) -> None:
 
     with tab_d:
         render_giam_sat_khac_phuc(dot_id, username, readonly)
+
+    with tab_e:
+        dot_info = lay_dot_by_id(dot_id) or {}
+        render_xuat_bien_ban(dot_id, dot_info, username)

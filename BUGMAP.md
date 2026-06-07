@@ -1087,6 +1087,15 @@ val = pd.to_numeric(df[COT_X], errors="coerce").sum() if COT_X in df.columns els
 | **Fix** | Đổi toàn bộ `fmt(tong_no)` → `fmt_ty(tong_no)` ở 3 chỗ |
 | **Ngày fix** | 2026-06-07 |
 
+### C18 — Điện báo/KH&TH card Tổng dư nợ bị trùng 2 lần
+| | |
+|---|---|
+| **File** | `tabs/tab_candoi.py` L455-465, L473-482 |
+| **Dấu hiệu** | Mục Điện báo & KH vs TH hiển thị "Tổng dư nợ" ở kpi_row #1 và "Tổng DN KHA+KHB" ở kpi_row #2 — cùng giá trị, gây hiểu lầm |
+| **Nguyên nhân** | `tong_dn_ht` = tổng dư nợ toàn CN = KHA + KHB. Card "Tổng DN KHA+KHB" tính `kha_ht + khb_ht` cho ra cùng giá trị với card "Tổng dư nợ" ở hàng trên |
+| **Fix** | Xóa card "Tổng DN KHA+KHB" khỏi kpi_row #2 (cả 2 nhánh có/không kỳ trước), đổi `num_columns=3` |
+| **Ngày fix** | 2026-06-07 |
+
 ---
 
 ## Template: Ghi nhận bug mới

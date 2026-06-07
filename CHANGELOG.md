@@ -1,5 +1,15 @@
 # CHANGELOG
 
+## [2026-06-07] — Fix CI compileall flag
+- `.github/workflows/ci.yml` — đổi `--exclude` → `-x` trong bước `compileall` (Python 3.12 không nhận `--exclude`, dùng `-x REGEXP`)
+
+## [2026-06-07] — Gộp "Tổng hợp thủ công" vào fragment Quản lý Cache
+- `tabs/tab_upload_khnv.py` dòng ~1827 — xóa expander "Tổng hợp toàn Chi nhánh thủ công" (trùng chức năng với fragment phía dưới)
+- `tabs/tab_upload_khnv.py` dòng ~1718 — `_fragment_merge_toan_cn`: đổi default rebuild cache từ `["hstd"]` thành `["hstd", "nq11", "gqvl"]`
+
+## [2026-06-07] — Thêm nút Rebuild Cache trong tab Upload KH-NV
+- `tabs/tab_upload_khnv.py` dòng ~1691 — `_fragment_merge_toan_cn`: thêm chế độ "Quản lý Cache" với multiselect chọn loại dữ liệu + nút "Rebuild Cache" luôn hiển thị (kể cả khi không có can_merge flag); giữ nguyên chế độ "Cập nhật" khi có flag từ auto-merge
+
 ## [2026-06-07] — Auto-merge sau upload từng PGD
 - `tabs/tab_upload_khnv.py` dòng ~286 — `_xu_ly_upload`: thay set flag `can_merge_*` bằng merge trực tiếp sau khi lưu file; kết quả lưu vào `folder_import_ket_qua_merge` để hiển thị sau rerun
 - `tabs/tab_upload_khnv.py` dòng ~161 — cập nhật spinner message: "Đang upload và tổng hợp dữ liệu..."

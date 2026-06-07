@@ -1698,23 +1698,43 @@ def _fragment_merge_toan_cn():
         st.session_state.get(f"can_merge_{loai}", False)
         for loai in ["hstd", "nq11", "gqvl"]
     )
-    if not co_cho_merge:
-        return
 
     st.divider()
-    st.subheader("🔄 Cập nhật dữ liệu toàn Chi nhánh")
-    st.caption("Tổng hợp file vừa upload vào hệ thống dữ liệu chung (22 đơn vị).")
+    if co_cho_merge:
+        st.subheader("🔄 Cập nhật dữ liệu toàn Chi nhánh")
+        st.caption("Tổng hợp file vừa upload vào hệ thống dữ liệu chung (22 đơn vị).")
+    else:
+        st.subheader("🔄 Quản lý Cache Dữ liệu")
+        st.caption(
+            "Rebuild cache từ dữ liệu PGD đã upload. "
+            "Dùng khi cần đồng bộ lại dữ liệu toàn Chi nhánh (không cần upload lại file)."
+        )
 
-    if st.button("▶️ Bắt đầu cập nhật", type="primary",
+    loai_merge = ["hstd", "nq11", "gqvl"] if co_cho_merge else None
+    if loai_merge is None:
+        loai_chon = st.multiselect(
+            "Chọn loại dữ liệu cần rebuild cache:",
+            options=["hstd", "nq11", "gqvl"],
+            default=["hstd", "nq11", "gqvl"],
+            format_func=lambda x: {"hstd": "📊 HSTD", "nq11": "📑 NQ11", "gqvl": "📋 GQVL"}.get(x, x),
+            key="rebuild_loai_chon",
+        )
+        loai_merge = loai_chon
+        btn_label = "🔄 Rebuild Cache"
+    else:
+        btn_label = "▶️ Bắt đầu cập nhật"
+
+    if st.button(btn_label, type="primary",
                  key="btn_merge_toan_cn"):
-        with st.spinner("⏳ Đang merge 22 đơn vị... Vui lòng chờ."):
+        if not loai_merge:
+            st.warning("Vui lòng chọn ít nhất một loại dữ liệu.")
+            return
+        with st.spinner(f"⏳ Đang merge {', '.join(loai_merge).upper()}..."):
             try:
                 from services.upload_service import merge_du_lieu_toan_cn
 
-
-                for loai in ("hstd", "nq11", "gqvl"):
-                    if st.session_state.get(f"can_merge_{loai}", False):
-                        merge_du_lieu_toan_cn(loai)
+                for loai in loai_merge:
+                    merge_du_lieu_toan_cn(loai)
 
                 for loai in ("hstd", "nq11", "gqvl"):
                     st.session_state.pop(f"can_merge_{loai}", None)
@@ -1803,72 +1823,6 @@ def render(tab=None, **kwargs) -> None:
             _render_cdto_toan_cn(username)
             _render_nq11_toan_cn(username)
             _render_gqvl_toan_cn(username, df_full)
-
-            with st.expander("🔄 Tổng hợp toàn Chi nhánh thủ công", expanded=False):
-                st.caption(
-                    "Dùng khi merge bị lỗi giữa chừng, hoặc sau khi "
-                    "upload nhiều đơn vị liên tiếp cần gộp lại."
-                )
-                loai_chon = st.multiselect(
-                    "Chọn loại cần tổng hợp",
-                    options=["hstd", "nq11", "gqvl"],
-                    default=["hstd", "nq11", "gqvl"],
-                    format_func=lambda x: x.upper(),
-                    key="khnv_manual_merge_loai",
-                )
-                if st.button("🔄 Tổng hợp ngay", type="primary",
-                             key="btn_manual_merge"):
-                    if not loai_chon:
-                        st.warning("⚠️ Chọn ít nhất 1 loại.")
-                    else:
-                        tong_buoc = len(loai_chon)
-                        progress_bar = st.progress(0, text="⏳ Chuẩn bị tổng hợp...")
-                        status_text = st.empty()
-
-                        for idx, loai in enumerate(loai_chon):
-                            pct_bat_dau = idx / tong_buoc
-                            pct_ket_thuc = (idx + 1) / tong_buoc
-
-                            progress_bar.progress(
-                                pct_bat_dau,
-                                text=f"🔄 Đang đọc và gộp **{loai.upper()}** "
-                                     f"({idx + 1}/{tong_buoc}) — "
-                                     f"đọc 22 đơn vị song song, vui lòng chờ..."
-                            )
-                            status_text.caption(
-                                f"⏳ {loai.upper()}: Đọc file từng PGD → gộp → ghi cache. "
-                                f"File lớn (~14MB) mất 10–30 giây lần đầu, "
-                                f"lần sau nhanh hơn nhờ cache."
-                            )
-
-                            kq = merge_du_lieu_toan_cn(loai)
-                            progress_bar.progress(pct_ket_thuc)
-
-                            if kq.thanh_cong:
-                                meta = lay_meta_merge(loai)
-                                so_pgd  = (meta or {}).get("so_pgd", "?")
-                                so_dong = (meta or {}).get("so_dong", 0)
-                                st.success(
-                                    f"✅ **{loai.upper()}** — "
-                                    f"**{so_pgd}** đơn vị · "
-                                    f"**{fmt_so(so_dong)}** dòng"
-                                )
-                            else:
-                                st.error(f"❌ {loai.upper()}: {kq.thong_bao}")
-
-                        progress_bar.progress(1.0, text="✅ Hoàn tất!")
-                        status_text.empty()
-                        st.cache_data.clear()
-                        for _k in ["_ctx", "_ctx_cache_key", "_pgd_map_cache_ts", "_pgd_xa_map_cached", "_ds_pgd_all_cached", "df_full"]:
-                            st.session_state.pop(_k, None)
-
-                        db.ghi_audit(
-                            username,
-                            "manual_merge_toan_cn",
-                            f"loai={loai_chon}",
-                        )
-                        st.toast("✅ Tổng hợp hoàn tất!", icon="✅")
-                        st.rerun()
 
             if "folder_import_ket_qua_merge" in st.session_state:
                 merge_rows = st.session_state.pop("folder_import_ket_qua_merge")

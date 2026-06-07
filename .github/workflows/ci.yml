@@ -39,7 +39,7 @@ jobs:
       - name: Syntax check (py_compile)
         run: |
           python -m compileall -q . \
-            --exclude ".venv|venv|__pycache__|.git"
+            -x ".venv|venv|__pycache__|\.git"
 
       - name: Convention check
         run: |

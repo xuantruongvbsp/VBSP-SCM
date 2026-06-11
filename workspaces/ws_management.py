@@ -975,22 +975,6 @@ def render_sidebar_menu(role: str, username: str, **kwargs):
         state.nav_ws_mgmt_menu = default_label
         active_label = default_label
 
-    # ── Quick search ───────────────────────────────────────────────────────
-    q = st.text_input("🔍 Tìm khách hàng", placeholder="Tên / CMND / Khế ước...", key="ws_mgmt_search_q", label_visibility="collapsed")
-    if q and len(q) >= 2:
-        _df_search = kwargs.get("df_full") if kwargs.get("df_full") is not None else kwargs.get("df")
-        if _df_search is not None and not _df_search.empty:
-            from config import COT_TEN_KH, COT_CMND, COT_SO_KU, COT_TEN_PGD, COT_TONG_DU_NO
-            _mask = pd.Series(False, index=_df_search.index)
-            for _c in [COT_TEN_KH, COT_CMND, COT_SO_KU]:
-                if _c in _df_search.columns:
-                    _mask |= _df_search[_c].astype(str).str.contains(q, case=False, na=False)
-            _hits = _df_search.loc[_mask, [c for c in [COT_TEN_PGD, COT_TEN_KH, COT_CMND, COT_SO_KU, COT_TONG_DU_NO] if c in _df_search.columns]].head(30)
-            if not _hits.empty:
-                with st.expander(f"Tìm thấy {min(len(_hits), 30)}/{_mask.sum()} kết quả", expanded=True):
-                    st.dataframe(_hits, use_container_width=True, height=min(350, len(_hits) * 40 + 50))
-            else:
-                st.caption("Không tìm thấy kết quả.")
     st.divider()
 
     st.markdown(

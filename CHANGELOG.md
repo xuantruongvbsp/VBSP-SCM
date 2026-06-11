@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## [2026-06-11] — Chuyển tra cứu nhanh sang phân hệ Hỗ trợ địa bàn
+- `workspaces/ws_management.py` — xóa quick search (không hợp lý với Phòng KH-NV)
+- `workspaces/ws_operation.py` dòng ~4382 — thêm quick search vào sidebar Hỗ trợ địa bàn, tìm trên df_pgd (chỉ hồ sơ của PGD)
+
 ## [2026-06-11] — Fix 3 test CI failing (hstd P2 fallback + upload validation parsing)
 - `data/hstd.py` dòng ~593 — `danh_dau_khong_hd()`: thêm Priority-2 fallback lãi tồn/lãi tháng ≥ 3 khi thiếu cột GDGN
 - `services/upload_service.py` dòng ~1036 — `luu_pgd_file()`: sửa đọc Excel validate dùng đúng `header=4, sheet_name="BCQUERY"` thay vì default

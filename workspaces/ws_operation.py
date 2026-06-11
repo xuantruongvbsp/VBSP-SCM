@@ -4381,6 +4381,32 @@ def render_sidebar_menu(role, username, **kwargs):
     st.caption(f"{fmt_so(so_ho_so)} hồ sơ")
     st.divider()
 
+    # ── Tra cứu nhanh — chỉ hợp lý ở phân hệ địa bàn ────────────────────
+    st.markdown(
+        "<p style='font-size:14px;font-weight:700;"
+        "color:#94A3B8;margin-bottom:6px'>TRA CỨU NHANH</p>",
+        unsafe_allow_html=True,
+    )
+    q = st.text_input(
+        "🔍 Tìm khách hàng", placeholder="Tên / CMND / Khế ước...",
+        key="ws_op_search_q", label_visibility="collapsed",
+    )
+    if q and len(q) >= 2:
+        _df_s = df_pgd
+        if _df_s is not None and not _df_s.empty:
+            from config import COT_TEN_KH, COT_CMND, COT_SO_KU, COT_TEN_XA, COT_TONG_DU_NO
+            _mask = pd.Series(False, index=_df_s.index)
+            for _c in [COT_TEN_KH, COT_CMND, COT_SO_KU]:
+                if _c in _df_s.columns:
+                    _mask |= _df_s[_c].astype(str).str.contains(q, case=False, na=False)
+            _hits = _df_s.loc[_mask, [c for c in [COT_TEN_KH, COT_CMND, COT_SO_KU, COT_TEN_XA, COT_TONG_DU_NO] if c in _df_s.columns]].head(30)
+            if not _hits.empty:
+                with st.expander(f"Tìm thấy {min(len(_hits), 30)}/{_mask.sum()} kết quả", expanded=True):
+                    st.dataframe(_hits, use_container_width=True, height=min(300, len(_hits) * 40 + 50))
+            else:
+                st.caption("Không tìm thấy kết quả.")
+    st.divider()
+
     st.markdown(
         "<p style='font-size:14px;font-weight:700;"
         "color:#94A3B8;margin-bottom:6px'>MENU HỖ TRỢ ĐỊA BÀN</p>",

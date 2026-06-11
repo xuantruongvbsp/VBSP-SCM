@@ -34,6 +34,7 @@ from data.cdtotkvv import (
 )
 from data.core import ts_file
 from data.pgd import duong_dan_pgd, luu_file_pgd_voi_lich_su
+from auth import la_phan_he_cn, la_phan_he_pgd
 from utils import fmt, fmt_bang_ty, fmt_so, hien_thi_dataframe_phan_trang, ten_file_xuat, xuat_excel
 
 
@@ -591,9 +592,7 @@ def render(tab: DeltaGenerator | None = None, **kwargs) -> None:
 
     _tab_ctx = tab if tab is not None else __import__('streamlit').container()
     with _tab_ctx:
-        if role not in ("admin", "manager", "user",
-                        "admin_cn", "manager_cn",
-                        "admin_pgd", "manager_pgd", "user_pgd"):
+        if not (la_phan_he_cn(role) or la_phan_he_pgd(role)):
             st.error("Bạn không có quyền truy cập trang này.")
             return
 

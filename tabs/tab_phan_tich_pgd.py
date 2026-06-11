@@ -169,11 +169,9 @@ def _render_heatmap(tab_parent, **kw) -> None:
         st.caption("💡 Thêm dữ liệu cột Chương trình để xem heatmap chi tiết theo từng CT.")
 
     st.divider()
-    if st.button("⬇️ Xuất Excel (chuyên nghiệp)", key="op_hm_xuat", type="primary"):
-        st.download_button(
-            label="⬇️ Xuất Excel",
-            type="primary",
-            data=xuat_excel_chuyen_nghiep(
+    if st.button("⬇️ Tạo Excel (chuyên nghiệp)", key="op_hm_xuat", type="primary"):
+        try:
+            st.session_state["_xls_heatmap_daohn"] = xuat_excel_chuyen_nghiep(
                 df=df_show, title="Heatmap Đáo hạn",
                 subtitle=f"Kỳ: {nam_min}-{nam_max}",
                 nguoi_xuat=st.session_state.get("txt_username", ""),
@@ -181,10 +179,18 @@ def _render_heatmap(tab_parent, **kw) -> None:
                     ("Tổng số tháng", fmt_so(len(pivot)), ""),
                     ("Dư nợ b/q tháng", fmt_ty(pivot.values.mean()), "triệu đồng"),
                 ],
-            ),
+            )
+        except Exception as e:
+            logger.error("tab_phan_tich_pgd xuat_excel_chuyen_nghiep: %s", e, exc_info=True)
+            st.error(f"❌ Lỗi xuất Excel: {e}")
+    if st.session_state.get("_xls_heatmap_daohn"):
+        st.download_button(
+            label="📥 Tải Excel",
+            data=st.session_state["_xls_heatmap_daohn"],
             file_name=excel_ten_file("Heatmap_DaoHan"),
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             use_container_width=True,
+            key="dl_heatmap_daohn",
         )
 
 

@@ -13,6 +13,7 @@ from config import (
 from data import danh_dau_khong_hd_cached
 from utils import fmt, fmt_so, fmt_ty, vn, hien_thi_dataframe_phan_trang
 from logger import get_logger
+from tabs.base_tab import TabContext
 
 logger = get_logger(__name__)
 
@@ -22,7 +23,7 @@ def render(tab=None, **kwargs) -> None:
     pgd_user = kwargs.get("pgd_user")
     role = kwargs.get("role")
 
-    ctx = tab if tab is not None else st.container()
+    ctx = TabContext(tab, **kwargs)
     with ctx:
         st.subheader("📝 Báo cáo Giao ban")
         st.caption("Tổng hợp tình hình dư nợ, cho vay, thu nợ theo ĐVUT và Xã")

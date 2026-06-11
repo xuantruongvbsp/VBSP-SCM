@@ -52,7 +52,8 @@ from services.khtd_mau07_service import (
     xuat_mau07_word,
     TEN_BY_MAKEY,
 )
-from utils import vn, hien_thi_dataframe_phan_trang, get_tab_context
+from utils import vn, hien_thi_dataframe_phan_trang
+from tabs.base_tab import TabContext
 
 
 # ── Hằng số ───────────────────────────────────────────────────────────────────
@@ -126,7 +127,7 @@ def render(tab, **kwargs) -> None:
     username = kwargs.get("username", "system")
     pgd_user = kwargs.get("pgd_user")
 
-    ctx = get_tab_context(tab)
+    ctx = TabContext(tab, **kwargs)
     with ctx:
         st.subheader("📋 Mẫu 07 — Giao/Điều chỉnh Chỉ tiêu KHTD theo Ấp/Thôn")
         st.caption("Biểu số 07/NHCS-KH · Theo CV 7064 · Số QĐ & ngày tháng để trống cho UBND xã điền khi ký")

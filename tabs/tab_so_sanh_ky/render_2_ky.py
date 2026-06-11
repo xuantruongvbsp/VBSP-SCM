@@ -6,7 +6,8 @@ import pandas as pd
 from streamlit.delta_generator import DeltaGenerator
 
 from auth import normalize_role, la_phan_he_pgd
-from utils import get_tab_context, fmt_ty, fmt_so, lazy_expander as _lazy_expander
+from utils import fmt_ty, fmt_so, lazy_expander as _lazy_expander
+from tabs.base_tab import TabContext
 from state_manager import SCMStateManager
 from snapshot_service import (
     danh_sach_ky, doc_snapshot,
@@ -520,10 +521,10 @@ def _render_cached(role: str, username: str, pgd_user: str | None, pgd_mode: boo
     # ── PGD table + chart ──
     if not pgd_mode and (not _loc_pgd or _loc_pgd == "🏢 Tất cả Chi nhánh"):
         st.divider()
-        st.markdown("**🏢 Biến động theo đơn vị**")
-        _render_bang_pgd(df1, df2, ky1, ky2)
-        st.divider()
-        _render_bieu_do(df1, df2, ky1, ky2)
+        if _lazy_expander("🏢 Biến động theo đơn vị", "bang_pgd_2ky"):
+            _render_bang_pgd(df1, df2, ky1, ky2)
+            st.divider()
+            _render_bieu_do(df1, df2, ky1, ky2)
 
     # ── SECTION 3: Export ──
     st.divider()
@@ -571,7 +572,7 @@ def _render_cached(role: str, username: str, pgd_user: str | None, pgd_mode: boo
 
 
 def render_2_ky(tab: DeltaGenerator = None, **kwargs) -> None:
-    ctx = get_tab_context(tab)
+    ctx = TabContext(tab, **kwargs)
     role     = normalize_role(str(kwargs.get("role", "user")))
     username = kwargs.get("username", "unknown")
     pgd_user = kwargs.get("pgd_user")

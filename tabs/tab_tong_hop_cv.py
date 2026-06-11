@@ -7,6 +7,7 @@ import streamlit as st
 import db
 from config import LOAI_CONG_VIEC, UU_TIEN_CV
 from services import tien_do_service
+from tabs.base_tab import TabContext
 from utils import fmt_ngay
 
 
@@ -219,8 +220,7 @@ def _hien_thi_ket_qua_search(tu_khoa: str) -> None:
 
 
 def render(tab=None, **kwargs) -> None:
-    from streamlit.delta_generator import DeltaGenerator
-    _ctx = tab if tab is not None else st.container()
+    _ctx = TabContext(tab, **kwargs)
     with _ctx:
         st.subheader("� Dashboard Tổng quan Công việc")
 

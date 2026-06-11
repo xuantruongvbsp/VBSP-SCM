@@ -10,6 +10,7 @@ import streamlit as st
 import db
 from auth import normalize_role, la_phan_he_cn
 from config import DS_PGD, DON_VI_CHI_NHANH, ROLES_PHAN_HE_CN
+from tabs.base_tab import TabContext
 from utils import fmt_ngay
 
 DS_PGD_ALL = [DON_VI_CHI_NHANH] + DS_PGD
@@ -314,7 +315,7 @@ def render(tab=None, **kwargs) -> None:
     username = kwargs.get("username", "unknown")
     pgd_user = kwargs.get("pgd_user") or ""
 
-    ctx = tab if tab is not None else st.container()
+    ctx = TabContext(tab, **kwargs)
     with ctx:
         st.subheader("🤝 Công tác phối hợp với PGD")
 

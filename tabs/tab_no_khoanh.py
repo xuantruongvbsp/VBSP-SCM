@@ -41,7 +41,8 @@ from config import (
     LY_DO_KHOANH_QD62,
     LY_DO_KHOANH_LABEL,
 )
-from utils import fmt_so, fmt_ty, get_tab_context, hien_thi_dataframe_phan_trang, xuat_excel
+from utils import fmt_so, fmt_ty, hien_thi_dataframe_phan_trang, xuat_excel
+from tabs.base_tab import TabContext
 from tabs import tab_qlnk_dashboard
 from services.no_khoanh_service import (
     loc_khoanh as _loc_khoanh,
@@ -598,7 +599,7 @@ def _render_mau03_cv368(
     c1.text_input("PGD", value=pgd, disabled=True, key=f"{key_prefix}m03_pgd")
     c2.number_input("Năm", value=nam, disabled=True, key=f"{key_prefix}m03_nam", step=1)
     c3.number_input("Đợt", value=int(dot_from_m01), disabled=True, key=f"{key_prefix}m03_dot", step=1)
-    ngay_kt_thuc_te = st.date_input("Ngày kiểm tra thực tế *", value=datetime.now().date(), key=f"{key_prefix}m03_ngay_kt")
+    ngay_kt_thuc_te = st.date_input("Ngày kiểm tra thực tế *", value=datetime.now().date(), key=f"{key_prefix}m03_ngay_kt", format="DD/MM/YYYY")
 
     st.markdown("**Thành phần đoàn**")
     tp_default = nd_m01.get("thanh_phan_doan") or [{"Họ và tên": username, "Chức vụ": "CBTD"}]
@@ -821,7 +822,7 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
     username = kwargs.get("username", "unknown")
     state = SCMStateManager()
 
-    ctx = get_tab_context(tab)
+    ctx = TabContext(tab, **kwargs)
     with ctx:
         st.subheader("🔒 Chuyên Đề Nợ Khoanh")
         st.caption(

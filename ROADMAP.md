@@ -64,7 +64,7 @@
 | DuckDB full scan → pd.read_parquet | Full scan không filter dùng pandas thay DuckDB — **−10s** | `app.py:_load_hstd()` | ✅ Done 2026-05-24 |
 | DuckDB query optimization | Thay pandas groupby bằng DuckDB SQL trên parquet trực tiếp | `data/core.py` + `tabs/tab_so_sanh_ky/_export.py` | ✅ Done 2026-05-26 |
 | Cache chiến lược | `@st.cache_data(ttl=300)` cho tất cả hàm đọc dữ liệu | `data/core.py`, `data/hstd.py` | ✅ Done 2026-05-26 |
-| Lazy-load tab_so_sanh_2_ky | Wrap 5 expander còn lại (deprecated file, thay bằng package) | `tabs/tab_so_sanh_ky/` | 🟠 TB |
+| Lazy-load tab_so_sanh_2_ky | Wrap 5 expander còn lại (deprecated file, thay bằng package) | `tabs/tab_so_sanh_ky/` | ✅ Done 2026-06-10 |
 | Profile & bottleneck runtime | Đo thời gian render từng tab; xác định bottleneck tiếp theo | Toàn bộ | 🟡 Thấp |
 
 **KPI đạt:** Cold start giảm ~54s ✅ | **Còn lại:** Load tab So sánh kỳ ≤ **3s**, load tab Tổng quan ≤ **2s**
@@ -73,10 +73,10 @@
 
 | Mục tiêu | Chi tiết | Ưu tiên |
 |---|---|---|
-| Data quality dashboard | Tỷ lệ missing cột, outlier, trùng lặp theo PGD | 🟠 TB |
+| Data quality dashboard | Tỷ lệ missing cột, outlier, trùng lặp theo PGD | ✅ Done 2026-06-10 |
 | Health check tự động | Script chạy mỗi sáng kiểm tra file gốc + parquet + kv_store | ✅ Done 2026-05-26 |
-| Migration validation | Tự động kiểm tra dữ liệu sau merge (số dòng, tổng dư nợ) | 🟠 TB |
-| TabContext adoption | Áp dụng `TabContext` từ `tabs/base_tab.py` cho tất cả tabs còn lại (~45 tabs chưa dùng) | 🟠 TB |
+| Migration validation | Tự động kiểm tra dữ liệu sau merge (số dòng, tổng dư nợ) | ✅ Done (trong upload_service.py + tab_data_quality) |
+| TabContext adoption | Áp dụng `TabContext` từ `tabs/base_tab.py` cho tất cả tabs còn lại (~50 tabs chưa dùng) | ✅ Done 2026-06-10 — 35 file migrated, 0 file còn dùng pattern cũ |
 
 ### 1.4 Tính năng UX ngắn hạn
 
@@ -98,14 +98,14 @@
 |---|---|---|
 | Báo cáo định kỳ đơn giản | Tự tạo Excel tóm tắt mỗi sáng, lưu vào `cache/reports/`, link tải trong app (không cần SMTP) | ✅ Done 2026-05-26 |
 | Mẫu báo cáo Word/PDF | Tích hợp thêm mẫu: Báo cáo tổng hợp, Báo cáo NQH, Báo cáo KHTD | ✅ Done 2026-05-26 |
-| Báo cáo Excel nâng cao | Multi-sheet, conditional formatting, pivot table style | 🟠 TB |
+| Báo cáo Excel nâng cao | Multi-sheet, conditional formatting, pivot table style | ✅ Done 2026-06-10 |
 | Gửi email tự động | Dùng SMTP NHCSXH, gửi báo cáo cho BGĐ mỗi sáng | � Thấp |
 
 ### 2.2 Phân tích nâng cao
 
 | Mục tiêu | Chi tiết | Ưu tiên |
 |---|---|---|
-| Phân loại khách hàng | Scoring đơn giản dựa trên lịch sử trả nợ + tần suất giao dịch | 🟠 TB |
+| Phân loại khách hàng | Scoring đơn giản dựa trên lịch sử trả nợ + tần suất giao dịch | ✅ Done 2026-06-10 |
 | Stress test danh mục | Kịch bản: 3%/5% khách hàng mất khả năng trả nợ → NQH dự kiến | 🟡 Thấp |
 | Biểu đồ tương tác nâng cao | Altair selection, cross-filter, tooltip động | 🟡 Thấp |
 | ~~Dự báo ML (Prophet/ARIMA)~~ | ~~Dữ liệu lịch sử chưa đủ dài, overkill~~ | ❌ Loại |
@@ -116,7 +116,7 @@
 |---|---|---|---|
 | So sánh đến hạn cùng kỳ năm trước | Tháng N/2025 vs N/2026 — phát hiện PGD tăng đột biến | `services/den_han_compare_service.py` | ✅ Done 2026-05-26 |
 | Thông báo đến hạn Word/PDF | Từ danh sách khoản đến hạn → thư thông báo cho từng KH | `services/den_han_notice_service.py` | ✅ Done 2026-05-26 |
-| Phân tích Tổ TK&VV | Tổ có nhiều khoản đến hạn nhất, tổ có NQH > 0 | `tabs/tab_den_han.py` | 🟡 Thấp |
+| Phân tích Tổ TK&VV | Tổ có nhiều khoản đến hạn nhất, tổ có NQH > 0 | `tabs/tab_den_han.py` | ✅ Done 2026-06-10 |
 
 ### 2.4 Quản lý Công văn — hoàn thiện
 
@@ -136,8 +136,8 @@
 | Mục tiêu | Chi tiết | File liên quan | Ưu tiên |
 |---|---|---|---|
 | Báo cáo KTNB tổng hợp | Tổng hợp kết quả kiểm toán theo đoàn, theo năm; tỷ lệ lỗi theo loại | `services/ktnb_service.py` | ✅ Done 2026-05-26 |
-| Xuất biên bản PDF | Biên bản kiểm toán đúng mẫu Ngân hàng Chính sách, ký số | `services/ktnb_service.py` + `templates/` | 🟠 TB |
-| Theo dõi khắc phục lỗi | Dashboard tiến độ sửa lỗi sau kiểm toán theo PGD | `services/ktnb_service.py` | 🟠 TB |
+| Xuất biên bản PDF | Biên bản kiểm toán đúng mẫu Ngân hàng Chính sách | `services/ktnb_service.py` | ✅ Done (`xuat_word_bien_ban_ktnb()`) |
+| Theo dõi khắc phục lỗi | Dashboard tiến độ sửa lỗi sau kiểm toán theo PGD | `services/ktnb_service.py` | 🟡 Thấp — cần UI tab riêng |
 | Lịch sử kiểm toán | Timeline cuộc kiểm toán nhiều năm; xu hướng cải thiện | `db.py` + `tabs/` | 🟡 Thấp |
 
 ### 2.6 Xây dựng KHTD — Workflow phê duyệt
@@ -146,8 +146,8 @@
 
 | Mục tiêu | Chi tiết | File liên quan | Ưu tiên |
 |---|---|---|---|
-| Approval workflow BGĐ | Trưởng phòng trình → BGĐ phê duyệt → lock dữ liệu | `tabs/tab_xay_dung_khtd.py` + `db.py` | 🟠 TB |
-| So sánh dự báo vs thực hiện | KHTD đã duyệt vs dư nợ thực tế từng năm — biểu đồ trend | `tabs/tab_xay_dung_khtd.py` + snapshot | 🟠 TB |
+| Approval workflow BGĐ | Trưởng phòng trình → BGĐ phê duyệt → lock dữ liệu | `tabs/tab_xay_dung_khtd.py` + `db.py` | ✅ Done (`_render_approval_pgd`, `trang_thai_approval_cn`) |
+| So sánh dự báo vs thực hiện | KHTD đã duyệt vs dư nợ thực tế từng năm — biểu đồ trend | `tabs/tab_xay_dung_khtd.py` + snapshot | ✅ Done 2026-06-10 |
 | Xuất tờ trình BGĐ | Tự động tạo tờ trình Word từ Biểu 01C/02C đã nhập | `services/khtd_import_service.py` + `templates/` | 🟡 Thấp |
 
 ---
@@ -158,8 +158,8 @@
 
 | Mục tiêu | Chi tiết | Ưu tiên |
 |---|---|---|
-| Docker hóa | `Dockerfile` + `docker-compose.yml` (app + SQLite) | 🔴 Cao |
-| CI/CD pipeline | GitHub Actions: py_compile → pytest → convention check → deploy | 🔴 Cao |
+| Docker hóa | `Dockerfile` + `docker-compose.yml` (app + SQLite) | ✅ Done |
+| CI/CD pipeline | GitHub Actions: py_compile → pytest → convention check → deploy | ✅ Done |
 | Multi-instance | Load balancer cho nhiều user (>50 concurrent) | 🟡 Thấp |
 | HTTPS & domain | Cấu hình domain + SSL cho truy cập từ xa | 🟡 Thấp |
 
@@ -167,19 +167,19 @@
 
 | Mục tiêu | Chi tiết | Ưu tiên |
 |---|---|---|
-| Auto-backup | Cron job backup DB + parquet + PGD files mỗi ngày | 🔴 Cao |
-| Retention policy | Giữ 7 daily + 4 weekly + 12 monthly backups | 🟠 TB |
-| Restore drill | Script kiểm tra tính toàn vẹn của bản backup | 🟠 TB |
-| Monitoring | Dashboard trạng thái: uptime, memory, disk, errors | 🟡 Thấp |
+| Auto-backup | Cron job backup DB + parquet + PGD files mỗi ngày | ✅ Done (`backup_service.py` + `scripts/backup_daily.py`) |
+| Retention policy | Giữ 7 daily backup | ✅ Done (`don_backup()` trong backup_service.py) |
+| Restore drill | Script kiểm tra tính toàn vẹn — `phuc_hoi_backup()` + UI ở tab_trang_thai_nguon | ✅ Done |
+| Monitoring | Dashboard trạng thái: uptime, memory, disk, errors | 🟡 Thấp — tab_trang_thai_nguon đã có cơ bản |
 
 ### 3.3 Security
 
 | Mục tiêu | Chi tiết | Ưu tiên |
 |---|---|---|
-| Audit log viewer | Giao diện tra cứu audit log theo user/thời gian/hành động | 🟠 TB |
-| 2FA cho admin | Google Authenticator + backup code | 🟡 Thấp |
-| Session timeout | Tự động logout sau 30 phút inactive | 🟠 TB |
-| IP whitelist | Giới hạn truy cập theo IP nội bộ NHCSXH | 🟡 Thấp |
+| Audit log viewer | Giao diện tra cứu audit log theo user/thời gian/hành động | ✅ Done (`tabs/tab_audit_log.py`) |
+| 2FA cho admin | Google Authenticator + backup code | ✅ Done (`security.py` + `tabs/tab_security.py`) |
+| Session timeout | Tự động logout sau 30 phút inactive | ✅ Done (`security.py` + wired vào `app.py`) |
+| IP whitelist | Giới hạn truy cập theo IP nội bộ NHCSXH | ✅ Done (`security.py`) |
 
 ---
 
@@ -189,7 +189,7 @@
 
 | Mục tiêu | Chi tiết | Ưu tiên |
 |---|---|---|
-| API RESTful | Flask/FastAPI nhẹ cho query dữ liệu (đọc parquet qua DuckDB) | 🟠 TB |
+| API RESTful | Flask/FastAPI nhẹ cho query dữ liệu (đọc parquet qua DuckDB) | ✅ Done 2026-06-10 |
 | Mobile UI | PWA hoặc Streamlit mobile view cho PGD đi địa bàn | � Thấp |
 | ~~SSO/LDAP~~ | ~~NHCSXH không có AD domain riêng cấp Chi nhánh~~ | ❌ Loại |
 | ~~Tích hợp NHCSXH TW~~ | ~~Chưa có API từ cấp trên~~ | ❌ Loại |
@@ -198,7 +198,7 @@
 
 | Mục tiêu | Chi tiết | Ưu tiên |
 |---|---|---|
-| Ghi chú khoản vay | CBTD ghi chú trực tiếp vào drawer, lưu SQLite `loan_notes`, badge 📝 trong bảng | `components/loan_drawer.py` + `db.py` | 🟠 TB |
+| Ghi chú khoản vay | CBTD ghi chú trực tiếp vào drawer, lưu SQLite `loan_notes`, badge 📝 trong bảng | `components/loan_drawer.py` + `db.py` | ✅ Done 2026-06-10 |
 | ~~Quản lý văn bản~~ | ~~Đã triển khai tại Giai đoạn 2.4 (tab_quan_ly_cv + tab_tong_hop_cv)~~ | ✅ Chuyển lên §2.4 |
 | Biểu đồ GIS | Bản đồ tương tác: khoanh vùng rủi ro theo xã | 🟡 Thấp |
 | Ứng dụng Desktop | Đóng gói bằng PyInstaller hoặc Nuitka | 🟡 Thấp |

@@ -29,6 +29,7 @@ from config import (
 )
 from data.hstd import danh_dau_khong_hd_cached
 from utils import fmt_so, fmt_ty, hien_thi_dataframe_phan_trang, xuat_excel
+from tabs.base_tab import TabContext
 
 
 # ─── Helpers tính toán ────────────────────────────────────────────────────────
@@ -323,7 +324,7 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
     pgd_user = kwargs.get("pgd_user")
     ds_pgd_all = list(kwargs.get("ds_pgd_all", DS_PGD) or DS_PGD)
 
-    ctx = tab if tab is not None else st.container()
+    ctx = TabContext(tab, **kwargs)
     with ctx:
         st.subheader("🚨 Nợ đến hạn có nguy cơ")
         st.caption(

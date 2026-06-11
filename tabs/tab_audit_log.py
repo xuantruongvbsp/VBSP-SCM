@@ -11,6 +11,7 @@ from datetime import datetime, timedelta
 import db
 from auth import normalize_role, la_admin_cn
 from utils import format_df_vn
+from tabs.base_tab import TabContext
 
 
 
@@ -91,7 +92,7 @@ def render(tab=None, **kwargs) -> None:
         st.warning("⛔ Chỉ Admin hoặc PGD mới có quyền xem Lịch sử giao dịch.")
         return
 
-    _tab_ctx = tab if tab is not None else st.container()
+    _tab_ctx = TabContext(tab, **kwargs)
     with _tab_ctx:
         if pgd_user:
             st.subheader(f"📋 Nhật ký hoạt động — {pgd_user}")

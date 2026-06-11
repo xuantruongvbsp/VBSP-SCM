@@ -176,7 +176,51 @@ def doc_baseline_merged(nam: int) -> pd.DataFrame | None:
     return doc_baseline(nam)
 
 
-# ── NQ11 ─────────────────────────────────────────────────────────────────────
+# ── NQ11 — kv_store approach (upload 1 lần) ──────────────────────────────────
+
+def doc_so_khe_uoc_nq11() -> set[str]:
+    """Đọc danh sách mã khế ước NQ11 từ kv_store."""
+    import db as _db
+    ids = _db.doc_kv("nq11_so_khe_uoc")
+    return set(ids) if ids else set()
+
+
+def luu_so_khe_uoc_nq11(file_bytes: bytes, username: str) -> tuple[int, str | None]:
+    """Đọc file NQ11, lấy Số khế ước, lưu vào kv_store.
+
+    Trả về (so_luong, None) nếu OK, (0, error_msg) nếu lỗi.
+    """
+    import db as _db
+    from io import BytesIO
+    from datetime import date
+    try:
+        df = pd.read_excel(BytesIO(file_bytes), sheet_name="BCQUERY", header=4)
+        df = df.iloc[:, 1:].dropna(how="all")
+        ku_col = next(
+            (c for c in df.columns if "khế ước" in str(c).lower() or "khe uoc" in str(c).lower()),
+            None,
+        )
+        if ku_col is None:
+            return 0, "Không tìm thấy cột 'Số khế ước' trong file."
+        ids = [
+            x for x in df[ku_col].dropna().astype(str).str.strip().tolist()
+            if x and x.lower() != "nan"
+        ]
+        if not ids:
+            return 0, "File không có mã khế ước nào hợp lệ."
+        _db.ghi_kv("nq11_so_khe_uoc", ids, username)
+        _db.ghi_kv("nq11_meta", {
+            "ngay_upload": date.today().strftime("%d/%m/%Y"),
+            "so_luong": len(ids),
+            "nguoi_upload": username,
+        }, username)
+        _db.ghi_audit(username, "luu_nq11_ids", f"Lưu {len(ids)} mã khế ước NQ11 vào kv_store")
+        return len(ids), None
+    except Exception as e:
+        return 0, str(e)
+
+
+# ── NQ11 — đọc file gốc (legacy / fallback) ──────────────────────────────────
 @st.cache_data(ttl=7200, show_spinner=False)
 def doc_file_nq11(fp: str, _ts) -> pd.DataFrame:
     """Đọc file sao kê NQ11 (BCQUERY sheet, header dòng 4)."""
@@ -502,30 +546,25 @@ def db_nqh_con(rows: list, ten_cha: str) -> float:
 
 def danh_dau_khong_hd(df: "pd.DataFrame") -> "pd.DataFrame":
     """
-    Đánh dấu món vay 3 tháng không hoạt động (KHĐ) theo Mẫu 08/KTNB.
+    Đánh dấu món vay 3 tháng không hoạt động (KHĐ).
 
-    Ưu tiên 1 — có cột \"Ngày giao dịch gần nhất\": khoảng cách tháng từ
-    (Ngày số liệu − ngày GD gần nhất, fallback Ngày vay nếu GDGN null) / 30.44.
+    Công thức: (Ngày báo cáo − Ngày giao dịch gần nhất) / 30.44 >= 3 tháng.
+    Chỉ dùng cột "Ngày giao dịch gần nhất" từ HSTD — không fallback sang Ngày vay
+    hay lãi tồn. Món nào GDGN trống → không bị tính vào KHĐ.
 
-    Ưu tiên 2 — không có cột GDGN (HSTD cũ): giữ logic lãi tồn
-    (Lãi tồn TH > N × Lãi DT tháng và Lãi DT > 0).
+    Loại trừ: (Dư nợ TH + Dư nợ QH) ≤ 0; Dư nợ khoanh > 0;
+    Học sinh sinh viên (Mã chương trình 02 hoặc tên CT chứa "sinh viên"/"học sinh").
 
-    Ngoại lệ không đánh dấu KHĐ: (Dư nợ TH + Dư nợ QH) ≤ 0; Dư nợ khoanh > 0;
-    Mã chương trình 02 (HSSV).
-
-    Thêm cột: is_3m_inactive (bool), so_thang_khong_hd (float, làm tròn 1 chữ số
-    theo nhánh đang dùng).
+    Thêm cột: is_3m_inactive (bool), so_thang_khong_hd (float, làm tròn 1 chữ số).
     """
     from config import (
-        COT_LAI_TON,
-        COT_LAI_THANG,
         NGUONG_KHONG_HĐ_THANG,
         COT_NGAY_GDGN,
-        COT_NGAY_VAY,
         COT_NGAY_SL,
         COT_DU_NO_TH,
         COT_DU_NO_QH,
         COT_MA_CHUONG_TRINH,
+        COT_TEN_CT,
     )
 
     COT_DU_NO_KHOANH = "Dư nợ khoanh"
@@ -535,42 +574,36 @@ def danh_dau_khong_hd(df: "pd.DataFrame") -> "pd.DataFrame":
     du_qh = pd.to_numeric(df[COT_DU_NO_QH], errors="coerce").fillna(0) if COT_DU_NO_QH in df.columns else pd.Series(0.0, index=df.index)
     du_kh = pd.to_numeric(df[COT_DU_NO_KHOANH], errors="coerce").fillna(0) if COT_DU_NO_KHOANH in df.columns else pd.Series(0.0, index=df.index)
 
-    mask_loai_tru = (du_th + du_qh) <= 0
-    mask_loai_tru = mask_loai_tru | (du_kh > 0)
+    # Loại trừ: dư nợ = 0, nợ khoanh
+    mask_loai_tru = ((du_th + du_qh) <= 0) | (du_kh > 0)
+
+    # Loại trừ: Học sinh sinh viên (mã 02 hoặc tên CT chứa từ khóa)
     if COT_MA_CHUONG_TRINH in df.columns:
         ma_raw = df[COT_MA_CHUONG_TRINH]
         ma_num = pd.to_numeric(ma_raw, errors="coerce")
         ma_str = ma_raw.astype(str).str.strip()
         mask_hssv = (ma_num == 2) | (ma_str == "02") | (ma_str == "2")
         mask_loai_tru = mask_loai_tru | mask_hssv
+    if COT_TEN_CT in df.columns:
+        ten_ct_lower = df[COT_TEN_CT].astype(str).str.lower()
+        mask_hssv_ten = ten_ct_lower.str.contains("sinh viên|học sinh|hssv|stem", na=False)
+        mask_loai_tru = mask_loai_tru | mask_hssv_ten
 
-    co_the_dung_ngay = (
-        COT_NGAY_GDGN in df.columns
-        and COT_NGAY_SL in df.columns
-    )
-
-    if co_the_dung_ngay:
-        ngay_sl = pd.to_datetime(df[COT_NGAY_SL].astype(object), errors="coerce", dayfirst=True)
-        ngay_gdgn = pd.to_datetime(df[COT_NGAY_GDGN].astype(object), errors="coerce", dayfirst=True)
-        ngay_vay = pd.to_datetime(df[COT_NGAY_VAY].astype(object), errors="coerce", dayfirst=True) if COT_NGAY_VAY in df.columns else pd.Series(pd.NaT, index=df.index)
-        ref = ngay_gdgn.where(ngay_gdgn.notna(), ngay_vay)
-        days = (ngay_sl - ref).dt.days
-        so_thang = days.astype(float) / 30.44
-        df["so_thang_khong_hd"] = so_thang.round(1)
-        mask_khd = (so_thang >= float(NGUONG_KHONG_HĐ_THANG)) & so_thang.notna()
-        df["is_3m_inactive"] = mask_khd & (~mask_loai_tru)
-        return df
-
-    if COT_LAI_TON not in df.columns or COT_LAI_THANG not in df.columns:
+    # Tính số tháng từ Ngày GDGN đến Ngày báo cáo
+    if COT_NGAY_GDGN not in df.columns or COT_NGAY_SL not in df.columns:
         df["is_3m_inactive"] = False
         df["so_thang_khong_hd"] = float("nan")
         return df
 
-    lai_ton = pd.to_numeric(df[COT_LAI_TON], errors="coerce").fillna(0)
-    lai_thang = pd.to_numeric(df[COT_LAI_THANG], errors="coerce").fillna(0)
-    so_uoc = lai_ton / lai_thang.clip(lower=1e-9)
-    df["so_thang_khong_hd"] = so_uoc.round(1)
-    mask_khd = (lai_ton > NGUONG_KHONG_HĐ_THANG * lai_thang) & (lai_thang > 0)
+    ngay_sl   = pd.to_datetime(df[COT_NGAY_SL].astype(object),   errors="coerce", dayfirst=True)
+    ngay_gdgn = pd.to_datetime(df[COT_NGAY_GDGN].astype(object), errors="coerce", dayfirst=True)
+
+    days      = (ngay_sl - ngay_gdgn).dt.days          # NaT → NaN
+    so_thang  = days.astype(float) / 30.44
+    df["so_thang_khong_hd"] = so_thang.round(1)
+
+    # GDGN trống (NaT) → so_thang = NaN → notna() = False → không tính KHĐ
+    mask_khd = (so_thang >= float(NGUONG_KHONG_HĐ_THANG)) & so_thang.notna()
     df["is_3m_inactive"] = mask_khd & (~mask_loai_tru)
     return df
 

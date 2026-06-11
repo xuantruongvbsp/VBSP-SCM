@@ -50,13 +50,14 @@ def tinh_so_lieu_van_xuoi(
     df_baseline : HSTD mốc 31/12 (toàn CN, chưa lọc) — None nếu chưa có
     nam_moc     : năm của baseline (VD: 2025)
     """
-    dn = pd.to_numeric(df_xa[COT_TONG_DU_NO], errors="coerce").fillna(0)
-    qh = pd.to_numeric(df_xa[COT_DU_NO_QH], errors="coerce").fillna(0)
-    kh = pd.to_numeric(df_xa.get(COT_DU_NO_KHOANH, 0), errors="coerce").fillna(0)
-    tg = pd.to_numeric(df_xa.get(COT_TIEN_GUI, 0), errors="coerce").fillna(0)
-    gn = pd.to_numeric(df_xa.get(COT_DS_CV_THANG, 0), errors="coerce").fillna(0)
-    tn_th = pd.to_numeric(df_xa.get(COT_TN_TH_THANG, 0), errors="coerce").fillna(0)
-    tn_qh = pd.to_numeric(df_xa.get(COT_TN_QH_THANG, 0), errors="coerce").fillna(0)
+    _z = pd.Series(0.0, index=df_xa.index)
+    dn    = pd.to_numeric(df_xa[COT_TONG_DU_NO], errors="coerce").fillna(0)
+    qh    = pd.to_numeric(df_xa[COT_DU_NO_QH], errors="coerce").fillna(0)
+    kh    = pd.to_numeric(df_xa[COT_DU_NO_KHOANH], errors="coerce").fillna(0) if COT_DU_NO_KHOANH in df_xa.columns else _z
+    tg    = pd.to_numeric(df_xa[COT_TIEN_GUI], errors="coerce").fillna(0) if COT_TIEN_GUI in df_xa.columns else _z
+    gn    = pd.to_numeric(df_xa[COT_DS_CV_THANG], errors="coerce").fillna(0) if COT_DS_CV_THANG in df_xa.columns else _z
+    tn_th = pd.to_numeric(df_xa[COT_TN_TH_THANG], errors="coerce").fillna(0) if COT_TN_TH_THANG in df_xa.columns else _z
+    tn_qh = pd.to_numeric(df_xa[COT_TN_QH_THANG], errors="coerce").fillna(0) if COT_TN_QH_THANG in df_xa.columns else _z
 
     tong_dn = dn.sum()
     tong_qh = qh.sum()
@@ -73,7 +74,7 @@ def tinh_so_lieu_van_xuoi(
 
     chenh_lech_dn = pct_dau_nam = 0.0
     tang_giam_dau_nam = "tăng"
-    if df_baseline is not None and COT_TEN_XA in df_baseline.columns:
+    if df_baseline is not None and COT_TEN_XA in df_baseline.columns and not df_xa.empty and COT_TEN_XA in df_xa.columns:
         df_bl_xa = df_baseline[df_baseline[COT_TEN_XA] == df_xa[COT_TEN_XA].iloc[0]]
         dn_bl = pd.to_numeric(df_bl_xa[COT_TONG_DU_NO], errors="coerce").fillna(0).sum()
         chenh_lech_dn = tong_dn - dn_bl

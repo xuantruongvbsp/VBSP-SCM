@@ -797,21 +797,28 @@ def _render_bien_ban(df: pd.DataFrame, pgd_user: str | None) -> None:
             hien[col] = hien[col].apply(fmt)
     st.dataframe(hien, use_container_width=True, hide_index=True)
 
-    buf = xuat_excel({"Tổng hợp ủy thác": hien})
     pgd_scope = pgd_chon or pgd_user or "ToanCN"
     ten_file = f"TongHopUyThac_{pgd_slug(pgd_scope)}_{date.today().strftime('%d%m%Y')}.xlsx"
-    if st.download_button(
-        "📥 Tải Excel",
-        data=buf,
-        file_name=ten_file,
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        key=f"{key_prefix}th_dl",
-    ):
-        db.ghi_audit(
-            st.session_state.get("username", "unknown"),
-            "xuat_bieu_cn",
-            f"Tổng hợp ủy thác — {pgd_chon or pgd_user or '(Tất cả)'}",
-        )
+    _xls_key = f"_xls_{key_prefix}uy_thac_th"
+    if st.button("⬇️ Tạo Excel", key=f"{key_prefix}th_gen", use_container_width=False):
+        try:
+            st.session_state[_xls_key] = xuat_excel({"Tổng hợp ủy thác": hien})
+        except Exception as e:
+            logger.error("tab_uy_thac xuat_excel: %s", e, exc_info=True)
+            st.error(f"❌ Lỗi xuất Excel: {e}")
+    if st.session_state.get(_xls_key):
+        if st.download_button(
+            "📥 Tải Excel",
+            data=st.session_state[_xls_key],
+            file_name=ten_file,
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            key=f"{key_prefix}th_dl",
+        ):
+            db.ghi_audit(
+                st.session_state.get("username", "unknown"),
+                "xuat_bieu_cn",
+                f"Tổng hợp ủy thác — {pgd_chon or pgd_user or '(Tất cả)'}",
+            )
 
 
 def _render_bb_ct_cx(df: pd.DataFrame, pgd_user: str | None,

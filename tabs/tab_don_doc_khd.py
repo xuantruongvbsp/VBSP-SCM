@@ -103,20 +103,27 @@ def render(tab=None, **kwargs) -> None:
             ]
             if COT_LAI_TON in df_dondoc.columns:
                 kpi_don_doc.append(("Lãi tồn", fmt_ty(df_dondoc[COT_LAI_TON].sum()), "triệu đồng"))
-            st.download_button(
-                label=f"⬇️ Xuất Excel chuyên nghiệp ({len(df_dondoc)} hộ)",
-                type="primary",
-                data=xuat_excel_chuyen_nghiep(
-                    df=df_dondoc,
-                    title="Danh sách Đôn đốc 3 tháng KHĐ",
-                    subtitle=f"PGD: {pgd_user} - {loc_label}",
-                    nguoi_xuat=st.session_state.get("txt_username", ""),
-                    kpi_items=kpi_don_doc,
-                ),
-                file_name=excel_ten_file("DonDoc_3m_KHD"),
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                key="op_xuat_khd_pro",
-            )
+            if st.button(f"⬇️ Tạo Excel ({len(df_dondoc)} hộ)",
+                         type="primary", key="btn_gen_khd_pro"):
+                try:
+                    st.session_state["_xls_dondoc_khd"] = xuat_excel_chuyen_nghiep(
+                        df=df_dondoc,
+                        title="Danh sách Đôn đốc 3 tháng KHĐ",
+                        subtitle=f"PGD: {pgd_user} - {loc_label}",
+                        nguoi_xuat=st.session_state.get("txt_username", ""),
+                        kpi_items=kpi_don_doc,
+                    )
+                except Exception as e:
+                    logger.error("tab_don_doc_khd xuat_excel_chuyen_nghiep: %s", e, exc_info=True)
+                    st.error(f"❌ Lỗi xuất Excel: {e}")
+            if st.session_state.get("_xls_dondoc_khd"):
+                st.download_button(
+                    label="📥 Tải Excel chuyên nghiệp",
+                    data=st.session_state["_xls_dondoc_khd"],
+                    file_name=excel_ten_file("DonDoc_3m_KHD"),
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    key="op_xuat_khd_pro",
+                )
 
     if not df_dondoc.empty:
         hien_thi_dataframe_phan_trang(df_dondoc, key="op_khd_dondoc", height=360)

@@ -195,15 +195,16 @@ def render_result_grid(
         ctx.info("ℹ️ Không có kết quả phù hợp với bộ lọc.")
         return
     
-    # Build NQ11/GQVL sets for quick lookup
-    nq11_set = set()
-    gqvl_set = set()
-    
-    if df_nq11 is not None and "Số khế ước" in df_nq11.columns:
-        nq11_set = set(df_nq11["Số khế ước"].astype(str).str.strip())
-    
-    if df_gqvl is not None and "Số khế ước" in df_gqvl.columns:
-        gqvl_set = set(df_gqvl["Số khế ước"].astype(str).str.strip())
+    # Dùng cột __is_nq11/__is_gqvl nếu đã được enrich (ưu tiên)
+    _use_enriched = "__is_nq11" in df.columns and "__is_gqvl" in df.columns
+    # Fallback: build set nếu chưa enrich
+    nq11_set: set[str] = set()
+    gqvl_set: set[str] = set()
+    if not _use_enriched:
+        if df_nq11 is not None and "Số khế ước" in df_nq11.columns:
+            nq11_set = set(df_nq11["Số khế ước"].astype(str).str.strip())
+        if df_gqvl is not None and "Số khế ước" in df_gqvl.columns:
+            gqvl_set = set(df_gqvl["Số khế ước"].astype(str).str.strip())
     
     # Render cards
     so_ku_col = COT_SO_KU if COT_SO_KU in df.columns else None
@@ -215,8 +216,12 @@ def render_result_grid(
         col_idx = idx % columns
         so_ku = str(row.get(so_ku_col, "")).strip() if so_ku_col else ""
         
-        is_nq11 = so_ku in nq11_set if so_ku else False
-        is_gqvl = so_ku in gqvl_set if so_ku else False
+        if _use_enriched:
+            is_nq11 = bool(row.get("__is_nq11", False))
+            is_gqvl = bool(row.get("__is_gqvl", False))
+        else:
+            is_nq11 = so_ku in nq11_set if so_ku else False
+            is_gqvl = so_ku in gqvl_set if so_ku else False
         
         with cols[col_idx]:
             render_result_card(

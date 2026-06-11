@@ -14,8 +14,9 @@ from data.pgd import pgd_slug as _pgd_slug
 from services import khtd_service
 from services.khtd_service import LOAI_DIEU_CHINH, LOAI_GIAO
 from utils import fmt_tien, hien_thi_dataframe_phan_trang, xuat_excel
-from auth import la_phan_he_pgd, normalize_role
+from auth import la_phan_he_pgd, la_quan_ly_cn, normalize_role
 from logger import get_logger
+from tabs.base_tab import TabContext
 
 logger = get_logger(__name__)
 
@@ -652,19 +653,29 @@ def _section_c_tong_hop(
         ]:
             if c in df_x.columns:
                 df_x[c] = df_x[c].map(fmt_tien)
-        st.download_button(
-            "📥 Xuất Excel tổng hợp",
-            data=xuat_excel({f"KHTD_{nam}_{thang}_{dot}": df_x}),
-            file_name=(
-                f"KHTD_{nam}_{thang}_{dot}_"
-                f"{datetime.now().strftime('%Y%m%d')}.xlsx"
-            ),
-            mime=(
-                "application/vnd.openxmlformats-officedocument."
-                "spreadsheetml.sheet"
-            ),
-            key=_SS + "dl_xlsx",
-        )
+        if st.button("📥 Tạo Excel tổng hợp", key=_SS + "btn_gen_xlsx"):
+            try:
+                st.session_state[_SS + "xls_bytes"] = xuat_excel(
+                    {f"KHTD_{nam}_{thang}_{dot}": df_x}
+                )
+                st.session_state[_SS + "xls_fname"] = (
+                    f"KHTD_{nam}_{thang}_{dot}_"
+                    f"{datetime.now().strftime('%Y%m%d')}.xlsx"
+                )
+            except Exception as e:
+                logger.error("tab_khtd_giao_dc xuat_excel: %s", e, exc_info=True)
+                st.error(f"❌ Lỗi xuất Excel: {e}")
+        if st.session_state.get(_SS + "xls_bytes"):
+            st.download_button(
+                "📥 Tải Excel tổng hợp",
+                data=st.session_state[_SS + "xls_bytes"],
+                file_name=st.session_state.get(_SS + "xls_fname", "KHTD.xlsx"),
+                mime=(
+                    "application/vnd.openxmlformats-officedocument."
+                    "spreadsheetml.sheet"
+                ),
+                key=_SS + "dl_xlsx",
+            )
 
 
 def _section_d_user(
@@ -702,7 +713,7 @@ def render(tab=None, **kwargs) -> None:
     pgd_user = kwargs.get("pgd_user")
     df_hstd = kwargs.get("df_full")
 
-    ctx = tab if tab is not None else st.container()
+    ctx = TabContext(tab, **kwargs)
     with ctx:
         st.subheader("📋 Giao & Điều chỉnh KHTD")
         st.caption(
@@ -756,7 +767,7 @@ def render(tab=None, **kwargs) -> None:
 
         nam, thang, dot = _chon_dot()
 
-        if role in ("admin", "manager", "admin_cn", "manager_cn"):
+        if la_quan_ly_cn(role):
             loai_radio = st.radio(
                 "Loại đợt",
                 ["📋 Giao KHTD", "📉 Điều chỉnh KHTD"],

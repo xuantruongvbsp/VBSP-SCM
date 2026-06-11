@@ -10,6 +10,7 @@ import plotly.express as px
 
 import db
 from auth import normalize_role, la_phan_he_cn
+from tabs.base_tab import TabContext
 from config import DS_PGD, LOAI_CONG_VIEC, UU_TIEN_CV
 from services import tien_do_service
 from utils import fmt_so, fmt_ngay, hien_thi_dataframe_phan_trang, xuat_excel
@@ -267,7 +268,7 @@ def render(tab=None, **kwargs) -> None:
     role_raw = kwargs.get("role", "user")
     role = normalize_role(str(role_raw) if role_raw else "user")
 
-    ctx = tab if tab is not None else st.container()
+    ctx = TabContext(tab, **kwargs)
     with ctx:
         st.subheader("📋 Báo cáo Quản lý Công việc & Nhiệm vụ")
 

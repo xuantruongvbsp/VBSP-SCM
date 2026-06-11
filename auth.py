@@ -297,6 +297,14 @@ def la_admin_cn(role: str) -> bool:
     return normalize_role(role) in ("admin_cn", "admin")
 
 
+def la_quan_ly_cn(role: str) -> bool:
+
+    """Kiểm tra role là quản lý CN (admin hoặc manager, không gồm executive/chuyenvien_cn).
+    Dùng khi cần phân biệt quyền ra quyết định cấp CN (giao KHTD, phê duyệt...)."""
+
+    return normalize_role(role) in ("admin_cn", "admin", "manager_cn", "manager")
+
+
 
 
 

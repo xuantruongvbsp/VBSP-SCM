@@ -763,6 +763,7 @@ def _build_all_items(role: str, username: str, **kwargs) -> list:
     ALL_ITEMS = [
         {"group": "Thông tin chung", "label": "📊 Thông tin chung", "icon": "info-circle", "fn": lambda: _get_tab("tab_tongquan").render(None, **kwargs)},
         {"group": "Thông tin chung", "label": "🏢 Toàn cảnh 22 PGD", "icon": "grid", "fn": lambda: _get_tab("tab_pgd_cards").render(None, **kwargs)},
+        {"group": "Thông tin chung", "label": "🔍 Tra cứu Khách hàng", "icon": "search", "fn": lambda: _get_tab("tab_tracuu_v2").render(None, **kwargs)},
         {"group": "Phối hợp với PGD", "label": "📋 Quản lý Công văn", "icon": "file-text", "fn": lambda: _get_tab("tab_quan_ly_cong_van").render(None, **kwargs)},
         {"group": "Phối hợp với PGD", "label": "📊 Quản lý Công việc & Nhiệm vụ", "icon": "layout", "fn": lambda: _get_tab("tab_quan_ly_cv").render(None, **kwargs)},
         {"group": "Phối hợp với PGD", "label": "🗂️ Nội bộ Phòng KH-NV", "icon": "users", "fn": lambda: _get_tab("tab_khnv_noi_bo").render(None, **kwargs)},
@@ -776,7 +777,9 @@ def _build_all_items(role: str, username: str, **kwargs) -> list:
             "fn": lambda: _render_canh_bao_no(df_full, ds_pgd_all, role, username),
         },
         {"group": "Giám sát",     "label": "📊 So sánh kỳ",            "icon": "chart-line", "fn": lambda: _get_tab("tab_so_sanh_ky").render(None, **kwargs)},
+        {"group": "Giám sát",     "label": "🛡️ Chất lượng Dữ liệu",  "icon": "shield-check", "fn": lambda: _get_tab("tab_data_quality").render(None, **kwargs)},
         {"group": "Kiểm soát",     "label": "Kiểm soát nội bộ",    "icon": "search",         "fn": lambda: _get_tab("tab_kiem_soat").render_tab(df_full, role, kwargs.get("username", "unknown"))},
+        {"group": "Kiểm soát",     "label": "🔍 Kiểm toán Nội bộ (KTNB)", "icon": "file-search", "fn": lambda: _get_tab("tab_ktnb").render(None, **kwargs)},
         {"group": "Kiểm soát",     "label": "Xử lý Rủi ro",   "icon": "alert-circle",   "fn": lambda: _get_tab("tab_xu_ly_rui_ro").render(None, **kwargs)},
         {
             "group": "Kiểm soát",
@@ -790,6 +793,7 @@ def _build_all_items(role: str, username: str, **kwargs) -> list:
         {"group": "Kế hoạch và Thực hiện KHTD", "label": "Kế hoạch tín dụng", "icon": "file-text",  "fn": lambda: _get_tab("tab_khtd").render(None, **dict(kwargs, khtd_mode="cn"))},
         {"group": "Kế hoạch và Thực hiện KHTD", "label": "📡 Điện báo & KH vs TH", "icon": "antenna",   "fn": lambda: _get_tab("tab_candoi").render(None, **kwargs)},
         {"group": "Kế hoạch và Thực hiện KHTD", "label": "Xuất báo cáo KHTD",  "icon": "file-export", "fn": lambda: _get_tab("tab_khtd_xuat").render_xuat_baocao(role=kwargs.get("role", ""), username=kwargs.get("username", ""), df_full=kwargs.get("df"))},
+        {"group": "Phân tích", "label": "🏷️ Phân loại Khách hàng", "icon": "tag", "fn": lambda: _get_tab("tab_phan_loai_kh").render(None, **kwargs)},
         {
             "group": "Báo cáo",
             "label": "Báo cáo tín dụng",

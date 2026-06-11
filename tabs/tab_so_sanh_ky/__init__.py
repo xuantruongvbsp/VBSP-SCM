@@ -4,7 +4,7 @@ from __future__ import annotations
 from streamlit.delta_generator import DeltaGenerator
 
 from auth import normalize_role
-from utils import get_tab_context
+from tabs.base_tab import TabContext
 from tabs.tab_so_sanh_ky.render_moc_nam import render_moc_nam
 from tabs.tab_so_sanh_ky.render_2_ky import render_2_ky
 
@@ -13,7 +13,7 @@ import streamlit as st
 
 def render(tab: DeltaGenerator = None, **kwargs) -> None:
     """Entry point: router chọn loại so sánh."""
-    ctx = get_tab_context(tab)
+    ctx = TabContext(tab, **kwargs)
     role = normalize_role(str(kwargs.get("role", "user") or "user"))
     kwargs["role"] = role
 

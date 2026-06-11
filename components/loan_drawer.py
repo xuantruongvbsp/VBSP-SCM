@@ -136,6 +136,7 @@ def loan_detail_drawer(
     title: str | None = None,
     extra_fields: list[tuple[str, str, str | None]] | None = None,
     field_configs: list[dict] | None = None,
+    username: str = "",
 ):
     """Hiển thị drawer chi tiết khoản vay.
 
@@ -144,6 +145,7 @@ def loan_detail_drawer(
         title: Tiêu đề drawer (mặc định: tên khách hàng)
         extra_fields: Các trường bổ sung [(label, column, fmt)]
         field_configs: Định nghĩa nhóm trường (mặc định dùng _field_groups)
+        username: Tên user hiện tại (dùng cho ghi chú khoản vay)
     """
     _init_drawer()
 
@@ -188,3 +190,24 @@ def loan_detail_drawer(
         f'📄 Chi tiết</button>',
         unsafe_allow_html=True,
     )
+
+    # ── Ghi chú CBTD ────────────────────────────────────────────────────────
+    ma_ku = str(row_dict.get(COT_SO_KU, ""))
+    if ma_ku:
+        import db
+        existing = db.doc_ghi_chu_kv(ma_ku)
+        with st.expander("📝 Ghi chú CBTD", expanded=bool(existing)):
+            if existing:
+                st.caption(f"Ghi chú hiện tại ({existing['updated_at'][:10]}): {existing['username']}")
+                st.info(existing["ghi_chu"])
+            note_val = st.text_area(
+                "Nhập ghi chú",
+                value=existing["ghi_chu"] if existing else "",
+                key=f"note_{ma_ku}",
+                height=80,
+            )
+            if st.button("💾 Lưu ghi chú", key=f"save_note_{ma_ku}"):
+                if note_val.strip():
+                    db.luu_ghi_chu_kv(ma_ku, note_val.strip(), username or "unknown")
+                    st.success("Đã lưu")
+                    st.rerun()

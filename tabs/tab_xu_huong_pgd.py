@@ -150,7 +150,7 @@ def _render_chart_xu_huong(df: pd.DataFrame) -> None:
     fig.add_trace(
         go.Scatter(
             x=df["Tháng"],
-            y=df["Tổng dư nợ"],
+            y=df[COT_TONG_DU_NO],
             mode="lines+markers",
             name="Tổng dư nợ",
             line=dict(color="#1f77b4", width=3),
@@ -233,7 +233,7 @@ def _render_phan_tich_tang_truong(df: pd.DataFrame) -> None:
 
     # Tính tăng trưởng tháng-tháng — dùng copy để tránh mutate caller
     df = df.copy()
-    df["Tăng trưởng DN"] = df["Tổng dư nợ"].pct_change() * 100
+    df["Tăng trưởng DN"] = df[COT_TONG_DU_NO].pct_change() * 100
     df["Tăng trưởng QH"] = df["Dư nợ QH"].pct_change() * 100
     
     # Tìm tháng tăng trưởng cao nhất/thấp nhất

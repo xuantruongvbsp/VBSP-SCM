@@ -5,6 +5,7 @@ import streamlit as st
 from typing import TYPE_CHECKING
 
 from logger import get_logger
+from tabs.base_tab import TabContext
 from .dashboard import render_dashboard
 from .tree_navigation import render_tree_navigation, render_compact_navigation, get_report_info
 from .components.metric_cards import render_metric_cards
@@ -41,7 +42,7 @@ __all__ = [
 
 def render(tab: "DeltaGenerator | None" = None, **kwargs) -> None:
     """Entry point tab Báo cáo Tín dụng — được gọi qua _get_tab("tab_baocao").render()."""
-    ctx = tab if tab is not None else st.container()
+    ctx = TabContext(tab, **kwargs)
 
     df = kwargs.get("df")
     df_nq11 = kwargs.get("df_nq11")

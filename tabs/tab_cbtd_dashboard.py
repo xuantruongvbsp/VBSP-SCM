@@ -21,6 +21,7 @@ from logger import get_logger
 from auth import la_phan_he_cn, la_executive, normalize_role
 from components.delta_card import kpi_row
 from data.khtd import doc_cbtd
+from tabs.base_tab import TabContext
 from utils import fmt_so, hien_thi_dataframe_phan_trang
 from services.cbtd_dia_ban_service import (
     canh_bao_cbtd_dia_ban,
@@ -143,8 +144,8 @@ def render(tab: "DeltaGenerator | None" = None, **kwargs) -> None:
     role     = normalize_role(role_raw)
     username = kwargs.get("username", "unknown")
 
-    _tab_ctx = tab if tab is not None else st.container()
-    with _tab_ctx:
+    ctx = TabContext(tab, **kwargs)
+    with ctx:
         st.subheader("📊 Dashboard CBTD & Địa bàn")
         st.caption("Tổng quan liên kết: Cán bộ tín dụng — Điểm giao dịch — Tổ TK&VV")
 

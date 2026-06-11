@@ -1,5 +1,164 @@
 # CHANGELOG
 
+## [2026-06-11] — Fix xuat_excel() gọi sai signature trong tab Tra cứu KH
+- `tabs/tab_tracuu_v2.py` dòng 213, 254 — sửa `xuat_excel(df, tên)` → `xuat_excel({tên: df})` đúng signature
+
+## [2026-06-11] — Fix slider type mismatch trong filter_panel (tab Tra cứu KH)
+- `components/filter_panel.py` dòng ~184 — ép float cho `value` từ session_state và `max_du_no`; thêm guard tránh max=0; bỏ biến `step` trung gian
+
+## [2026-06-11] — Gộp Khảo sát HN/HCN/HTN vào dropdown Theo dõi nhập liệu
+- `tabs/tab_theo_doi_nhap/__init__.py` — thêm "🏠 Khảo sát HN/HCN/HTN" cố định đầu dropdown; khi chọn → render `tab_theo_doi_khao_sat`; các sheet khác offset idx-1
+- `workspaces/ws_management.py` dòng ~773 — xóa entry sidebar riêng "📋 Khảo sát HN/HCN/HTN"
+- `tabs/tab_quan_ly_cv.py` — revert về 4 sub-tab, bỏ sub-tab Khảo sát thừa
+
+## [2026-06-11] — Fix slider type mismatch ở filter_panel
+- `components/filter_panel.py` dòng ~187 — đổi `step = 1000000` → `1000000.0` để khớp kiểu float với min_value/max_value, tránh lỗi "Slider value arguments must be of matching types"
+
+## [2026-06-11] — Thêm tab theo dõi Khảo sát HN/HCN/HTN (Google Sheets)
+- `tabs/tab_theo_doi_khao_sat.py` — tạo mới: duyệt từng worksheet PGD trong Sheet `1BRSNwynHA...`, kiểm tra cột E (Số hộ nghèo) và F (Số cận nghèo) ở hàng 9–12, hiển thị 🟢/🟡/🔴/⚫ cho 21 PGD, phân quyền CN/PGD, nút làm mới cache 5 phút
+- `workspaces/ws_management.py` dòng ~773 — mount tab vào nhóm "Phối hợp với PGD"
+- `tests/test_smoke_imports.py` — thêm `tabs.tab_theo_doi_khao_sat` vào TAB_MODULES
+
+## [2026-06-11] — Thêm tab Tra cứu Khách hàng vào phân hệ KH-NV
+- `workspaces/ws_management.py` dòng ~766 — thêm item "🔍 Tra cứu Khách hàng" vào nhóm "Thông tin chung", mount `tab_tracuu_v2`
+
+## [2026-06-10] — Thiết kế lại Toàn cảnh 22 PGD: từ 1 chiều → 6 chiều đa tiêu chí
+- `services/tongquan_service.py` — thêm `tinh_toan_da_chieu_pgd()`: tính 8+ chỉ số/PGD (NQH, Khoanh, NPL, 3m KHĐ, Lãi tồn, Giải ngân, Đến hạn T/3T) + Điểm RR tổng hợp 0–100
+- `tabs/tab_pgd_cards.py` — viết lại hoàn toàn: card 7 metrics + risk bar, 4 sub-tab (Thẻ PGD / Bảng Đa chiều / Heatmap Rủi ro / Biểu đồ), heatmap 22 PGD × 6 tiêu chí color-coded, bảng 12 cột + điểm RR, bộ lọc mở rộng
+
+## [2026-06-10] — Fix đếm xã tổng quan: dùng DS_XA chuẩn thay nunique thô
+- `tabs/tab_tongquan.py` dòng 345 — đếm xã bằng `isin(DS_XA)` thay `nunique()` để loại trừ tên xã lỗi/typo trong dữ liệu, đảm bảo luôn hiển thị đúng 95 xã
+
+## [2026-06-10] — Sửa công thức 3 tháng không hoạt động
+- `data/hstd.py` `danh_dau_khong_hd()` — chỉ dùng `Ngày giao dịch gần nhất` từ HSTD, bỏ fallback `Ngày vay` và bỏ hoàn toàn nhánh lãi tồn; GDGN trống → không tính KHĐ; mở rộng loại trừ HSSV thêm theo tên chương trình (sinh viên/học sinh/HSSV/STEM)
+
+## [2026-06-10] — NQ11 upload-1-lần: lưu mã khế ước vào kv_store
+- `data/hstd.py` dòng ~179 — thêm `doc_so_khe_uoc_nq11()` và `luu_so_khe_uoc_nq11()`: đọc/ghi danh sách Số khế ước NQ11 vào `kv_store["nq11_so_khe_uoc"]`
+- `app.py` `_enrich_hstd()` — ưu tiên kv_store để build `__is_nq11`; fallback sang `df_nq11` nếu kv_store trống; tính `__dn_nq11`/`__qh_nq11` từ cột HSTD (không join file NQ11)
+- `app.py` dòng ~581 — xóa 6-case logic tạo `df_nq11`; thay bằng: backward-compat fallback (nếu kv_store trống + cache cũ tồn tại), sau enrich tạo `df_nq11 = df[df["__is_nq11"]]` + alias cột HSTD → NQ11
+- `tabs/tab_upload_khnv.py` `_render_nq11_toan_cn()` — thay hàm tách-22-PGD bằng UI đơn giản: upload 1 file → extract Số khế ước → lưu kv_store
+
+## [2026-06-10] — Refactor NQ11/GQVL: tập trung join vào _enrich_hstd() tại app.py
+- `app.py` — thêm `_enrich_hstd(df, df_nq11, df_gqvl)` sau `_load_nq11()`: gắn `__is_nq11`, `__is_gqvl` bool + left-join `__dn_nq11`, `__qh_nq11`, `__ndt_gqvl` vào HSTD một lần duy nhất trước khi build ctx
+- `app.py` — gọi `_enrich_hstd()` cho cả `df` và `df_full` sau khi load `df_gqvl`, trước `ctx = dict(...)`
+- `components/filter_panel.py` — ưu tiên `__is_nq11`/`__is_gqvl` column, fallback set-lookup khi chưa enrich
+- `components/result_card.py` — ưu tiên `row.get("__is_nq11")` thay vì build set mỗi grid render
+- `tabs/tab_den_han.py` — rút gọn block "Gắn nhãn NQ11/GQVL" từ 30 dòng → 10 dòng dùng cột enriched
+- `tabs/tab_tracuu_v2.py` — `_so_nq11_r`/`_so_gqvl_r` dùng `df_filtered["__is_nq11"].sum()` thay set-intersection
+
+## [2026-06-10] — Fix ValueError merge str/float64 trên COT_SO_KU trong _enrich_hstd
+- `app.py` dòng 164–225 — ép `df[COT_SO_KU]`, `_slim[COT_SO_KU]`, `_slim_g[COT_SO_KU]` về `str` trước merge để tránh type mismatch
+
+## [2026-06-10] — Fix NameError COT_SO_KU chưa import trong app.py
+- `app.py` dòng 40 — thêm `COT_SO_KU` vào `from config import`
+
+## [2026-06-10] — Fix lỗi ambiguous DataFrame boolean trong tab KTNB
+- `tabs/tab_ktnb.py` dòng 19 — đổi `ctx.df_full or kwargs.get("df")` → `is not None` guard tránh lỗi truth value of DataFrame
+
+## [2026-06-10] — Fix lỗi ambiguous DataFrame boolean trong tab Chất lượng Dữ liệu
+- `tabs/tab_data_quality.py` dòng 248 — đổi `ctx.df_full or kwargs.get("df")` → `is not None` guard tránh lỗi truth value of DataFrame
+
+## [2026-06-10] — Fix import lỗi la_manager_cn trong tab Xây dựng KHTD
+- `tabs/tab_xay_dung_khtd.py` dòng 16, 686 — đổi `la_manager_cn` → `la_quan_ly_cn` (hàm không tồn tại trong auth.py)
+
+## [2026-06-10] — NQ11/GQVL hiển thị đầy đủ trong tab Tra cứu
+- `tabs/tab_tracuu_v2.py` — sau filter_panel, tính `_so_nq11_r` / `_so_gqvl_r` bằng set-lookup trên COT_SO_KU
+- `tabs/tab_tracuu_v2.py` `_render_results_header()` — thêm param `nq11_count`/`gqvl_count`; cột thứ 5 hiện "✨ NQ11: X · 📋 GQVL: Y" chỉ khi có data
+- `tabs/tab_tracuu_v2.py` `_render_detail_drawer()` — thay raw `st.dataframe(nq11_match)` bằng layout 2 cột format đẹp: cột tiền dùng `fmt_tien()`, bỏ trùng Số KU/Mã KH, graceful khi thiếu cột
+
+## [2026-06-10] — NQ11/GQVL join vào tab Đến hạn (tagging + filter + metric)
+- `tabs/tab_den_han.py` — sau khi build df_loc, gắn nhãn `_ct_db` ("NQ11"/"GQVL"/"NQ11+GQVL"/"—") bằng set lookup trên `Số khế ước`; robust với cả trường hợp không có df_nq11
+- `tabs/tab_den_han.py` — metric thứ 5 "Chương trình ĐB" chỉ hiện khi có NQ11/GQVL trong khoảng đến hạn
+- `tabs/tab_den_han.py` tab_ds — filter radio "Chỉ NQ11 / Chỉ GQVL / NQ11 hoặc GQVL", cột "CT Đặc biệt" trong bảng, sheet NQ11 riêng trong file Excel xuất
+- `tabs/tab_den_han.py` _render_to_tkv — cột NQ11 + GQVL count per tổ trong bảng "Đến hạn theo Tổ"
+
+## [2026-06-10] — Phân tích Tổ TK&VV trong tab Đến hạn
+- `tabs/tab_den_han.py` import — thêm `COT_TEN_TO`, `COT_DU_NO_QH`, `COT_DU_NO_KHOANH`
+- `tabs/tab_den_han.py` L226 — thêm tab thứ 4 "🏘️ Tổ TK&VV" vào st.tabs (giữa Theo nhóm và Danh sách)
+- `tabs/tab_den_han.py` — hàm mới `_render_to_tkv(df_loc, df_full, key_prefix)`:
+  - Sub-tab "📅 Đến hạn theo Tổ": groupby COT_TEN_TO, bảng + bar chart ngang (cam), hiển thị Tổ trưởng
+  - Sub-tab "🔴 Tổ có NQH / Nợ khoanh": tô màu đỏ tổ có nợ xấu, tỷ lệ NQH%, bar chart đỏ Top 20
+
+## [2026-06-10] — 5 ROADMAP items: Ghi chú KV + Lazy SS2Ky + Excel nâng cao + Phân loại KH + API REST
+- `db.py` L525-533, L695-757 — thêm bảng `loan_notes` + 3 hàm: `luu_ghi_chu_kv()`, `doc_ghi_chu_kv()`, `doc_ghi_chu_nhieu()`
+- `components/loan_drawer.py` L139, L194-211 — thêm param `username`, section ghi chú có expander + save button
+- `tabs/tab_so_sanh_ky/render_2_ky.py` L521-527 — wrap `_render_bang_pgd` + `_render_bieu_do` vào `_lazy_expander("🏢 Biến động theo đơn vị", "bang_pgd_2ky")`
+- `tabs/tab_so_sanh_2_ky.py` L13 — thêm comment DEPRECATED
+- `services/report_service.py` — `_tao_sheet_du_lieu()`: thêm auto-filter; hàm mới `_dinh_dang_nqh()` (tô đỏ dòng NQH>0); hàm xuất `xuat_bao_cao_nang_cao()` hỗ trợ pivot_config
+- `services/phan_loai_service.py` — tạo mới: phân loại A/B/C/D theo NQH%/khoanh%, `thong_ke_phan_loai()`, `tom_tat_cn()`
+- `tabs/tab_phan_loai_kh.py` — tạo mới: KPI cards + tab Tổng hợp PGD / Danh sách chi tiết; hỗ trợ CN+PGD role
+- `workspaces/ws_management.py` L795 — thêm "🏷️ Phân loại Khách hàng" vào nhóm Phân tích
+- `workspaces/ws_operation.py` L5457 — thêm tab Phân loại KH vào nghiep_vu_pgd
+- `api/__init__.py`, `api/app.py`, `api/README.md` — tạo mới: Flask read-only API 5 endpoint (health/pgd/du_no/nqh/chuong_trinh)
+- `requirements.txt` — thêm `flask>=3.0`
+- pytest 955 passed, 7/7 syntax OK
+
+## [2026-06-10] — TabContext adoption: migrate 100% tabs (35 files) + pytest 955 passed
+- `tabs/tab_baocao/__init__.py`, `tabs/tab_nhiem_vu.py` + 29 file khác — chuyển từ `get_tab_context()` / `tab if tab is not None else st.container()` sang `TabContext(tab, **kwargs)` từ `tabs.base_tab`
+- `tabs/tab_data_quality.py`, `tabs/tab_ktnb.py`, `tabs/tab_xay_dung_khtd.py` — cũng migrate
+- Zero file còn dùng pattern cũ; pytest 955 passed
+
+## [2026-06-10] — KTNB tab + So sánh KHTD dự báo vs thực hiện + pytest 955 passed
+- `tabs/tab_ktnb.py` — tạo mới: wrapper cho `render_ktnb()` từ ktnb_service (4 phân hệ A/B/C/D + Xuất biên bản)
+- `workspaces/ws_management.py` L780 — thêm "🔍 Kiểm toán Nội bộ (KTNB)" vào nhóm Kiểm soát
+- `tabs/tab_xay_dung_khtd.py` L131 — thêm sub-tab thứ 5 "📈 So sánh thực hiện" (chỉ CN role)
+- `tabs/tab_xay_dung_khtd.py` L888-975 — `_render_so_sanh_thuc_hien()`: biểu đồ Plotly so sánh Biểu 02C vs hstd_snapshot
+
+## [2026-06-10] — Tạo tab Chất lượng Dữ liệu + cập nhật ROADMAP
+- `tabs/tab_data_quality.py` — tạo mới: dashboard chất lượng HSTD/NQ11/GQVL (missing, trùng lặp, dư nợ âm, theo PGD)
+- `workspaces/ws_management.py` L779 — thêm menu "🛡️ Chất lượng Dữ liệu" vào nhóm Giám sát
+- `ROADMAP.md` — cập nhật trạng thái thực tế: Docker/CI/backup/security/KTNB-PDF/KHTD-approval đều đã Done
+
+## [2026-06-09] — Fix KeyError '\n background' trong tab So sánh kỳ
+- `tabs/tab_so_sanh_ky/_kpi_cards.py` L183-191 — `_inject_card_css()`: thay `.format()` bằng `.replace()` để tránh Python parse CSS class braces `{}` thành format placeholder
+
+## [2026-06-09] — Fix rà soát chức năng (đợt 2): cache guard + stale Excel + fmt tiền
+- `services/kiem_soat_service.py` L631-632 — `cache["df_khd_pgd/chi"]` → `cache.get(...)` tránh KeyError
+- `services/kiem_soat_service.py` L690-691,694 — `cache["df_nqh_pgd/chi"]` và `cache["df_kh"]` → `.get()` guards
+- `services/kiem_soat_service.py` L1035 — `fmt_so(tong_dn_th)` → `fmt_ty()` cho cột Tổng dư nợ
+- `tabs/tab_den_han.py` L190 — thêm fingerprint filter để xóa `_xls_den_han` khi filter thay đổi (tránh tải file cũ)
+- `tabs/tab_den_han.py` L400 — `fmt_so` → `fmt_ty` cho cột "Dư nợ", rename header "VND" → "(triệu đ)"
+- `services/kiem_soat_service.py` L651,715 — thêm `if COT_TEN_PGD not in df_th.columns: return` tránh KeyError trong render_3m_khd/render_nqh
+- `tabs/tab_xu_ly_rui_ro.py` L992-1020 — XLRR GOM: sau luu_cn() reset `da_gui_cn=False` trên PGD records đã GOM + luu_pgd() lại, tránh GOM lặp
+- `tabs/tab_uy_thac.py` L800 — B12: xuat_excel() chạy mỗi rerun → đổi sang "Tạo Excel" button + session_state guard
+- `tabs/tab_tien_do_nop.py` L101 — thêm `@st.cache_data(ttl=300)` cho _doc_du_lieu(), tách st.error() ra call site, thêm warning khi df rỗng
+
+## [2026-06-09] — Fix rà soát chức năng: crash + hardcode date + division-by-zero
+- `services/upload_center.py` — fix BOM (U+FEFF) invalid non-printable character gây SyntaxError
+- `workspaces/ws_operation.py` L3253 — `thang_bao_cao=date.today().month` → `tb_ngay.month` (tháng họp thay vì tháng hiện tại)
+- `workspaces/ws_operation.py` L3239 — thêm guard `if df_xa_tb.empty: st.warning` trước khi gọi xuat_thong_bao_ket_luan_giao_ban()
+- `tabs/tab_tongquan.py` L547 — fix division-by-zero trong tỷ lệ QH%: dùng `.replace(0, nan).fillna(0)` thay vì `.any()` guard
+- `data/giao_ban.py` L55-59 — fix deprecated `df_xa.get(COT, scalar)` → guard `if COT in df_xa.columns` trước `pd.to_numeric().fillna()`
+- `data/giao_ban.py` L77 — thêm guard `not df_xa.empty and COT_TEN_XA in df_xa.columns` trước `df_xa[COT_TEN_XA].iloc[0]`
+- `data/khtd.py` L203 — đổi bare `except:` → `except (ValueError, TypeError, IndexError):`
+
+## [2026-06-09] — Fix role check + cache.clear() violations
+- `auth.py` ~L297 — thêm hàm `la_quan_ly_cn(role)` (admin_cn/admin/manager_cn/manager)
+- `app.py` L311 — đổi `role in (...)` → `la_phan_he_cn(role) and not la_executive(role)`
+- `tabs/tab_khtd_giao_dc.py` L17 — import `la_quan_ly_cn`; L769 — đổi `role in (...)` → `la_quan_ly_cn(role)`
+- `tabs/tab_cdtotkvv_pgd.py` L38 — import `la_phan_he_cn, la_phan_he_pgd`; L594 — đổi role list → `not (la_phan_he_cn(role) or la_phan_he_pgd(role))`
+- `tabs/tab_gqvl.py` L191 — thêm `st.cache_data.clear()` trước `st.rerun()` sau upload thành công
+
+## [2026-06-09] — Fix B12 pattern (phần 2): 7 instance còn lại trong tabs/ và ws_operation.py
+- `tabs/tab_don_doc_khd.py` L106 — fix unconditional xuat_excel_chuyen_nghiep() → "Tạo" button + session_state `_xls_dondoc_khd`
+- `tabs/tab_khtd_giao_dc.py` L655 — fix unconditional xuat_excel() → "Tạo" button + session_state `khtd_gdc_xls_bytes`
+- `tabs/tab_phan_tich_pgd.py` L172 — fix nested download_button trong if st.button() → session_state `_xls_heatmap_daohn`
+- `tabs/tab_ban_dai_dien.py` L569 — fix unconditional xuat_excel() → session_state `_xls_bdd_vanban`
+- `tabs/tab_den_han.py` L407 — fix unconditional xuat_excel() → session_state `_xls_den_han`
+- `workspaces/ws_operation.py` L1172 — fix unconditional xuat_excel_chuyen_nghiep() → session_state `_xls_ws_dondoc_khd`
+- `workspaces/ws_operation.py` L4051 — fix unconditional xuat_excel_chuyen_nghiep() giao ban → session_state `_xls_giao_ban`
+- `workspaces/ws_operation.py` L5168 — fix unconditional xuat_excel_chuyen_nghiep() heatmap → session_state `_xls_ws_heatmap_daohn`
+
+## [2026-06-09] — Fix B12 pattern: download_button data=function_call() trong ws_executive.py
+- `workspaces/ws_executive.py` L1521, L1538 — fix 2 PDF button (xuat_pdf_bao_cao, xuat_pdf) từ unconditional generation → "Tạo" button + session_state pattern
+- `workspaces/ws_executive.py` L655, L670, ~L1077, ~L1240 — fix 4 Excel button (xuat_excel_chuyen_nghiep, xuat_excel) cùng pattern
+
+## [2026-06-09] — Fix convention violations phân hệ KH-NV
+- `tabs/tab_khnv_noi_bo.py` dòng ~10 — thêm `from logger import get_logger` + `logger = get_logger(__name__)` (thiếu import dù có dùng logger.error)
+- `tabs/tab_khnv_noi_bo.py` L341, L532, L534, L977, L1193, L1195 — thêm `format="DD/MM/YYYY"` cho 6 `st.date_input`
+- `tabs/tab_no_khoanh.py` L601 — thêm `format="DD/MM/YYYY"` cho `st.date_input`
+- `tabs/tab_xu_huong_pgd.py` L153, L236 — thay hardcode `df["Tổng dư nợ"]` bằng `df[COT_TONG_DU_NO]`
+
 ## [2026-06-07] — Fix CI compileall flag
 - `.github/workflows/ci.yml` — đổi `--exclude` → `-x` trong bước `compileall` (Python 3.12 không nhận `--exclude`, dùng `-x REGEXP`)
 

@@ -34,6 +34,7 @@ from services.upload_service import (
     luu_pgd_file,
 )
 from auth import co_quyen_upload_pgd, la_phan_he_pgd, normalize_role
+from tabs.base_tab import TabContext
 
 
 def _preview_excel(file_bytes: bytes, loai: str, max_rows: int = 10) -> pd.DataFrame | None:
@@ -497,7 +498,7 @@ def render(tab=None, **kwargs) -> None:
         st.warning("⚠️ Bạn không có quyền upload.")
         return
 
-    ctx = tab if tab is not None else st.container()
+    ctx = TabContext(tab, **kwargs)
 
     with ctx:
         st.markdown("### 📤 Upload Dữ liệu — Phòng Giao Dịch")

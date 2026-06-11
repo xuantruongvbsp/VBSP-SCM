@@ -1169,33 +1169,27 @@ def _render_don_doc(df: pd.DataFrame, pgd_user: str, role: str):
 
                 kpi_don_doc.append(("Lãi tồn", fmt_ty(df_dondoc[COT_LAI_TON].sum()), "triệu đồng"))
 
-            st.download_button(
-
-                label=f"⬇️ Xuất Excel chuyên nghiệp ({len(df_dondoc)} hộ)",
-
-                type="primary",
-
-                data=xuat_excel_chuyen_nghiep(
-
-                    df=df_dondoc,
-
-                    title="Danh sách Đôn đốc 3 tháng KHĐ",
-
-                    subtitle=f"PGD: {pgd_user} - {chon_dvut}",
-
-                    nguoi_xuat=st.session_state.get("txt_username", ""),
-
-                    kpi_items=kpi_don_doc,
-
-                ),
-
-                file_name=excel_ten_file("DonDoc_3m_KHD"),
-
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-
-                key="op_xuat_khd_pro",
-
-            )
+            if st.button(f"⬇️ Tạo Excel ({len(df_dondoc)} hộ)",
+                         type="primary", key="op_btn_gen_khd_pro"):
+                try:
+                    st.session_state["_xls_ws_dondoc_khd"] = xuat_excel_chuyen_nghiep(
+                        df=df_dondoc,
+                        title="Danh sách Đôn đốc 3 tháng KHĐ",
+                        subtitle=f"PGD: {pgd_user} - {chon_dvut}",
+                        nguoi_xuat=st.session_state.get("txt_username", ""),
+                        kpi_items=kpi_don_doc,
+                    )
+                except Exception as e:
+                    logger.error("ws_operation dondoc xuat_excel_chuyen_nghiep: %s", e, exc_info=True)
+                    st.error(f"❌ Lỗi xuất Excel: {e}")
+            if st.session_state.get("_xls_ws_dondoc_khd"):
+                st.download_button(
+                    label="📥 Tải Excel chuyên nghiệp",
+                    data=st.session_state["_xls_ws_dondoc_khd"],
+                    file_name=excel_ten_file("DonDoc_3m_KHD"),
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    key="op_xuat_khd_pro",
+                )
 
 
 
@@ -3242,65 +3236,39 @@ def _render_thong_bao_ket_luan(tab, **kwargs):
 
         if st.button("🖨️ Xuất Thông báo Kết luận Word", type="primary", key="tb_xuat"):
 
-            df_xa_tb = df[df[COT_TEN_XA] == chon_xa].copy()
+            df_xa_tb = df[df[COT_TEN_XA] == chon_xa].copy() if COT_TEN_XA in df.columns else pd.DataFrame()
 
-            try:
-
-                data = xuat_thong_bao_ket_luan_giao_ban(
-
-                    df_xa=df_xa_tb,
-
-                    ten_pgd=pgd_user or "",
-
-                    ten_xa=chon_xa,
-
-                    ten_dgd=tb_dgd or chon_xa,
-
-                    thang_bao_cao=date.today().month,
-
-                    nam_bao_cao=date.today().year,
-
-                    ngay_hop=tb_ngay.strftime("%d/%m/%Y"),
-
-                    chinh_sach_moi=tb_cs,
-
-                    ton_tai_han_che=tb_tt,
-
-                    nhiem_vu_tiep=tb_nv,
-
-                    so_van_ban=tb_so_vb,
-
-                    ten_nguoi_ky=tb_ten_ky,
-
-                    giai_ngan_input=giai_ngan_input,
-
-                    df_baseline=df_bl,
-
-                    nam_moc=chon_nam or date.today().year - 1,
-
-                )
-
-                ten_file = (
-
-                    f"TB_KetLuan_{chon_xa.replace(' ', '_')}"
-
-                    f"_{date.today().strftime('%m%Y')}.docx"
-
-                )
-
-                st.session_state["tb_data"] = data
-
-                st.session_state["tb_ten_file"] = ten_file
-
-                st.success("✅ Đã tạo Thông báo Kết luận! Nhấn nút bên dưới để tải về.")
-
-
-
-            except Exception as e:  # conv: skip
-
-                logger.error("Lỗi trong khối except: %s", e, exc_info=True)
-
-                st.error(f"❌ Lỗi tạo file: {e}")
+            if df_xa_tb.empty:
+                st.warning(f"⚠️ Không có dữ liệu cho xã **{chon_xa}**.")
+            else:
+                try:
+                    data = xuat_thong_bao_ket_luan_giao_ban(
+                        df_xa=df_xa_tb,
+                        ten_pgd=pgd_user or "",
+                        ten_xa=chon_xa,
+                        ten_dgd=tb_dgd or chon_xa,
+                        thang_bao_cao=tb_ngay.month,
+                        nam_bao_cao=tb_ngay.year,
+                        ngay_hop=tb_ngay.strftime("%d/%m/%Y"),
+                        chinh_sach_moi=tb_cs,
+                        ton_tai_han_che=tb_tt,
+                        nhiem_vu_tiep=tb_nv,
+                        so_van_ban=tb_so_vb,
+                        ten_nguoi_ky=tb_ten_ky,
+                        giai_ngan_input=giai_ngan_input,
+                        df_baseline=df_bl,
+                        nam_moc=chon_nam or date.today().year - 1,
+                    )
+                    ten_file = (
+                        f"TB_KetLuan_{chon_xa.replace(' ', '_')}"
+                        f"_{date.today().strftime('%m%Y')}.docx"
+                    )
+                    st.session_state["tb_data"] = data
+                    st.session_state["tb_ten_file"] = ten_file
+                    st.success("✅ Đã tạo Thông báo Kết luận! Nhấn nút bên dưới để tải về.")
+                except Exception as e:  # conv: skip
+                    logger.error("xuat_thong_bao_ket_luan_giao_ban: %s", e, exc_info=True)
+                    st.error(f"❌ Lỗi tạo file: {e}")
 
 
 
@@ -4048,53 +4016,38 @@ Doanh số cho vay trong tháng: {ds_cv:,.0f} triệu đồng; doanh số thu n�
 
         with col_excel:
 
-            st.download_button(
-
-                label="⬇️ Xuất Excel chuyên nghiệp",
-
-                type="primary",
-
-                data=xuat_excel_chuyen_nghiep(
-
-                    df=df_bang,
-
-                    title="Báo cáo Giao ban",
-
-                    subtitle=f"Xã {chon_xa} · {ten_dgd or ''} · {datetime.now().strftime('%d/%m/%Y')}",
-
-                    nguoi_xuat=st.session_state.get("txt_username", ""),
-
-                    columns=cols_xuat,
-
-                    kpi_items=[
-
-                        ("Điểm GD", ten_dgd or chon_xa, ""),
-
-                        ("Tổng dư nợ", fmt_ty(tong_dn * 1e6) if tong_dn > 0 else "—", "triệu đồng"),
-
-                        ("Số khách hàng", fmt_so(so_kh) if so_kh > 0 else "—", ""),
-
-                        ("Nợ quá hạn", fmt_ty(nqh * 1e6) if nqh > 0 else "—", "triệu đồng"),
-
-                        ("Tỷ lệ NQH", f"{tl_nqh:.2f}%" if tl_nqh > 0 else "0%", ""),
-
-                        ("Doanh số cho vay", fmt_ty(ds_cv * 1e6) if ds_cv > 0 else "—", "triệu đồng"),
-
-                        ("Doanh số thu nợ", fmt_ty(ds_thu * 1e6) if ds_thu > 0 else "—", "triệu đồng"),
-
-                    ],
-
-                ),
-
-                file_name=f"GiaoBan_{chon_xa}_{datetime.now().strftime('%Y%m%d')}.xlsx",
-
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-
-                key="gb_download",
-
-                use_container_width=True,
-
-            )
+            if st.button("⬇️ Tạo Excel chuyên nghiệp", type="primary",
+                         key="gb_btn_gen_excel", use_container_width=True):
+                try:
+                    st.session_state["_xls_giao_ban"] = xuat_excel_chuyen_nghiep(
+                        df=df_bang,
+                        title="Báo cáo Giao ban",
+                        subtitle=f"Xã {chon_xa} · {ten_dgd or ''} · {datetime.now().strftime('%d/%m/%Y')}",
+                        nguoi_xuat=st.session_state.get("txt_username", ""),
+                        columns=cols_xuat,
+                        kpi_items=[
+                            ("Điểm GD", ten_dgd or chon_xa, ""),
+                            ("Tổng dư nợ", fmt_ty(tong_dn * 1e6) if tong_dn > 0 else "—", "triệu đồng"),
+                            ("Số khách hàng", fmt_so(so_kh) if so_kh > 0 else "—", ""),
+                            ("Nợ quá hạn", fmt_ty(nqh * 1e6) if nqh > 0 else "—", "triệu đồng"),
+                            ("Tỷ lệ NQH", f"{tl_nqh:.2f}%" if tl_nqh > 0 else "0%", ""),
+                            ("Doanh số cho vay", fmt_ty(ds_cv * 1e6) if ds_cv > 0 else "—", "triệu đồng"),
+                            ("Doanh số thu nợ", fmt_ty(ds_thu * 1e6) if ds_thu > 0 else "—", "triệu đồng"),
+                        ],
+                    )
+                    st.session_state["_xls_giao_ban_fname"] = f"GiaoBan_{chon_xa}_{datetime.now().strftime('%Y%m%d')}.xlsx"
+                except Exception as e:
+                    logger.error("ws_operation giao_ban xuat_excel_chuyen_nghiep: %s", e, exc_info=True)
+                    st.error(f"❌ Lỗi xuất Excel: {e}")
+            if st.session_state.get("_xls_giao_ban"):
+                st.download_button(
+                    label="📥 Tải Excel chuyên nghiệp",
+                    data=st.session_state["_xls_giao_ban"],
+                    file_name=st.session_state.get("_xls_giao_ban_fname", "GiaoBan.xlsx"),
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    key="gb_download",
+                    use_container_width=True,
+                )
 
         with col_pdf:
 
@@ -5165,39 +5118,31 @@ def render(**kwargs):
 
             with col1:
 
-                st.download_button(
-
-                    label="⬇️ Xuất Excel (chuyên nghiệp)",
-
-                    type="primary",
-
-                    data=xuat_excel_chuyen_nghiep(
-
-                        df=df_show,
-
-                        title="Heatmap Đáo hạn",
-
-                        subtitle=f"Kỳ: {nam_min}-{nam_max}",
-
-                        nguoi_xuat=st.session_state.get("txt_username", ""),
-
-                        kpi_items=[
-
-                            ("Tổng số tháng", fmt_so(len(pivot)), ""),
-
-                            ("Dư nợ b/q tháng", fmt_ty(pivot.values.mean()), "triệu đồng"),
-
-                        ],
-
-                    ),
-
-                    file_name=excel_ten_file("Heatmap_DaoHan"),
-
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-
-                    use_container_width=True,
-
-                )
+                if st.button("⬇️ Tạo Excel (chuyên nghiệp)", type="primary",
+                             key="op_hm_btn_gen_excel", use_container_width=True):
+                    try:
+                        st.session_state["_xls_ws_heatmap_daohn"] = xuat_excel_chuyen_nghiep(
+                            df=df_show,
+                            title="Heatmap Đáo hạn",
+                            subtitle=f"Kỳ: {nam_min}-{nam_max}",
+                            nguoi_xuat=st.session_state.get("txt_username", ""),
+                            kpi_items=[
+                                ("Tổng số tháng", fmt_so(len(pivot)), ""),
+                                ("Dư nợ b/q tháng", fmt_ty(pivot.values.mean()), "triệu đồng"),
+                            ],
+                        )
+                    except Exception as e:
+                        logger.error("ws_operation heatmap xuat_excel_chuyen_nghiep: %s", e, exc_info=True)
+                        st.error(f"❌ Lỗi xuất Excel: {e}")
+                if st.session_state.get("_xls_ws_heatmap_daohn"):
+                    st.download_button(
+                        label="📥 Tải Excel (chuyên nghiệp)",
+                        data=st.session_state["_xls_ws_heatmap_daohn"],
+                        file_name=excel_ten_file("Heatmap_DaoHan"),
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        use_container_width=True,
+                        key="op_hm_dl_excel",
+                    )
 
 
 
@@ -5508,6 +5453,8 @@ def render(**kwargs):
                 )),
 
                 ("📄 Quản lý Template", lambda tab: _lazy_tab("tab_template_pgd").render(tab, **kwargs)),
+
+                ("🏷️ Phân loại KH", lambda tab: _lazy_tab("tab_phan_loai_kh").render(tab, **_pgd_df_kwargs)),
 
             ],
 

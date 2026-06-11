@@ -18,7 +18,8 @@ logger = get_logger(__name__)
 from config import (
     CACHE_HSTD, COT_TEN_PGD, COT_TEN_KH, COT_TEN_CT,
     COT_TONG_DU_NO, COT_NGAY_DEN_HAN, COT_MA_KH, COT_TEN_XA,
-    COT_SO_KU, COT_DVUT, COT_TEN_TO_TRUONG,
+    COT_SO_KU, COT_DVUT, COT_TEN_TO_TRUONG, COT_TEN_TO,
+    COT_DU_NO_QH, COT_DU_NO_KHOANH,
 )
 from data.den_han import tinh_den_han_df, canh_bao_tap_trung
 from data.hstd import danh_dau_khong_hd_cached
@@ -55,6 +56,202 @@ def _selectbox_safe(label: str, options: list, key: str):
     prev = st.session_state.get(key)
     index = 0 if prev not in options else int(options.index(prev))
     return st.selectbox(label, options=options, index=index, key=key)
+
+
+def _render_to_tkv(
+    df_loc: pd.DataFrame,
+    df_full: pd.DataFrame | None,
+    key_prefix: str = "dh_",
+) -> None:
+    """Phân tích Tổ TK&VV: đến hạn theo tổ + tổ có NQH/khoanh > 0."""
+    sub_dh, sub_nqh = st.tabs(["📅 Đến hạn theo Tổ", "🔴 Tổ có NQH / Nợ khoanh"])
+
+    # ── Phần 1: Đến hạn theo Tổ ─────────────────────────────────────────
+    with sub_dh:
+        if COT_TEN_TO not in df_loc.columns:
+            st.info("Dữ liệu không có cột Tên tổ.")
+        elif df_loc.empty:
+            st.info("Không có khoản vay đến hạn trong khoảng thời gian đã chọn.")
+        else:
+            _agg_to: dict = {
+                "Số khoản": (COT_MA_KH if COT_MA_KH in df_loc.columns else COT_TEN_TO, "count"),
+                "_du_no": (COT_TONG_DU_NO, "sum"),
+            }
+            _to_dh = (
+                df_loc.groupby(COT_TEN_TO, sort=False)
+                .agg(**_agg_to)
+                .reset_index()
+                .sort_values("_du_no", ascending=False)
+            )
+            _to_dh["Dư nợ đến hạn (triệu đ)"] = (
+                _to_dh["_du_no"] / 1e6
+            ).round(0).apply(lambda x: f"{x:,.0f}".replace(",", "."))
+            _to_dh["Số khoản"] = _to_dh["Số khoản"].apply(fmt_so)
+
+            col_to_truong = COT_TEN_TO_TRUONG if COT_TEN_TO_TRUONG in df_loc.columns else None
+            if col_to_truong:
+                _truong_map = (
+                    df_loc.dropna(subset=[COT_TEN_TO, COT_TEN_TO_TRUONG])
+                    .groupby(COT_TEN_TO)[COT_TEN_TO_TRUONG]
+                    .agg(lambda s: s.mode().iloc[0] if len(s) else "")
+                    .to_dict()
+                )
+                _to_dh["Tổ trưởng"] = _to_dh[COT_TEN_TO].map(_truong_map).fillna("")
+
+            # Đếm NQ11/GQVL per tổ nếu đã được gắn nhãn
+            if "_ct_db" in df_loc.columns:
+                _nq11_per_to = (
+                    df_loc[df_loc["_ct_db"].str.contains("NQ11")]
+                    .groupby(COT_TEN_TO).size().rename("NQ11")
+                )
+                _gqvl_per_to = (
+                    df_loc[df_loc["_ct_db"].str.contains("GQVL")]
+                    .groupby(COT_TEN_TO).size().rename("GQVL")
+                )
+                _to_dh = _to_dh.join(_nq11_per_to, on=COT_TEN_TO, how="left")
+                _to_dh = _to_dh.join(_gqvl_per_to, on=COT_TEN_TO, how="left")
+                for _c in ["NQ11", "GQVL"]:
+                    if _c in _to_dh.columns:
+                        _to_dh[_c] = _to_dh[_c].fillna(0).astype(int).apply(
+                            lambda x: str(x) if x > 0 else "—"
+                        )
+
+            cols_show = [COT_TEN_TO]
+            if col_to_truong:
+                cols_show.append("Tổ trưởng")
+            cols_show += ["Số khoản", "Dư nợ đến hạn (triệu đ)"]
+            for _c in ["NQ11", "GQVL"]:
+                if _c in _to_dh.columns:
+                    cols_show.append(_c)
+            _to_dh_show = _to_dh[[c for c in cols_show if c in _to_dh.columns]]
+            st.caption(f"Tổng: **{len(_to_dh_show)}** tổ có khoản đến hạn")
+            st.dataframe(_to_dh_show, use_container_width=True, hide_index=True)
+
+            try:
+                import plotly.express as _px
+                _top_to = _to_dh.nlargest(min(20, len(_to_dh)), "_du_no").sort_values("_du_no")
+                _fig_to = _px.bar(
+                    _top_to,
+                    x="_du_no", y=COT_TEN_TO, orientation="h",
+                    color="_du_no",
+                    color_continuous_scale=[[0.0, "#FFF9C4"], [0.5, "#F9A825"], [1.0, "#E65100"]],
+                    text="Dư nợ đến hạn (triệu đ)",
+                    labels={"_du_no": "Dư nợ", COT_TEN_TO: "Tổ"},
+                    height=max(300, len(_top_to) * 34),
+                )
+                _fig_to.update_traces(textposition="outside",
+                                      hovertemplate="<b>%{y}</b><br>Dư nợ: %{text}<extra></extra>")
+                _fig_to.update_layout(
+                    coloraxis_showscale=False,
+                    xaxis=dict(showticklabels=False, title=""),
+                    yaxis_title="",
+                    margin=dict(l=10, r=140, t=20, b=10),
+                    paper_bgcolor="rgba(0,0,0,0)",
+                    plot_bgcolor="rgba(0,0,0,0)",
+                )
+                st.plotly_chart(_fig_to, use_container_width=True, key=f"{key_prefix}bar_to_dh")
+            except Exception as _e:
+                logger.error("_render_to_tkv chart: %s", _e, exc_info=True)
+
+    # ── Phần 2: Tổ có NQH / Nợ khoanh > 0 ──────────────────────────────
+    with sub_nqh:
+        df_src = df_full if df_full is not None and not df_full.empty else df_loc
+        if COT_TEN_TO not in df_src.columns:
+            st.info("Dữ liệu không có cột Tên tổ.")
+            return
+
+        _has_qh = COT_DU_NO_QH in df_src.columns
+        _has_kh = COT_DU_NO_KHOANH in df_src.columns
+        if not _has_qh and not _has_kh:
+            st.info("Dữ liệu không có cột NQH / Nợ khoanh.")
+            return
+
+        _agg_spec: dict = {
+            "Số khoản": (COT_MA_KH if COT_MA_KH in df_src.columns else COT_TEN_TO, "count"),
+            "_dn": (COT_TONG_DU_NO, "sum"),
+        }
+        if _has_qh:
+            _agg_spec["_nqh"] = (COT_DU_NO_QH, "sum")
+        if _has_kh:
+            _agg_spec["_khoanh"] = (COT_DU_NO_KHOANH, "sum")
+
+        _to_nqh = (
+            df_src.groupby(COT_TEN_TO, sort=False)
+            .agg(**_agg_spec)
+            .reset_index()
+        )
+
+        # Chỉ giữ tổ có NQH > 0 hoặc khoanh > 0
+        _mask_nqh = (_to_nqh.get("_nqh", pd.Series(0, index=_to_nqh.index)) > 0) | \
+                    (_to_nqh.get("_khoanh", pd.Series(0, index=_to_nqh.index)) > 0)
+        _to_nqh_co = _to_nqh[_mask_nqh].copy()
+
+        if _to_nqh_co.empty:
+            st.success("✅ Không có tổ nào có NQH hoặc nợ khoanh.")
+            return
+
+        st.warning(f"⚠️ **{len(_to_nqh_co)}** tổ có NQH hoặc nợ khoanh > 0")
+
+        # Tổ trưởng
+        if COT_TEN_TO_TRUONG in df_src.columns:
+            _truong_map2 = (
+                df_src.dropna(subset=[COT_TEN_TO, COT_TEN_TO_TRUONG])
+                .groupby(COT_TEN_TO)[COT_TEN_TO_TRUONG]
+                .agg(lambda s: s.mode().iloc[0] if len(s) else "")
+                .to_dict()
+            )
+            _to_nqh_co["Tổ trưởng"] = _to_nqh_co[COT_TEN_TO].map(_truong_map2).fillna("")
+
+        # Tỷ lệ NQH
+        if _has_qh:
+            _to_nqh_co["Tỷ lệ NQH"] = (
+                _to_nqh_co["_nqh"] / _to_nqh_co["_dn"].replace(0, float("nan")) * 100
+            ).round(2).apply(lambda x: f"{x:.2f}".replace(".", ",") + "%" if pd.notna(x) else "")
+            _to_nqh_co["NQH (triệu đ)"] = (_to_nqh_co["_nqh"] / 1e6).round(0).apply(
+                lambda x: f"{x:,.0f}".replace(",", "."))
+
+        if _has_kh:
+            _to_nqh_co["Khoanh (triệu đ)"] = (_to_nqh_co["_khoanh"] / 1e6).round(0).apply(
+                lambda x: f"{x:,.0f}".replace(",", "."))
+
+        _out_cols = [c for c in [
+            COT_TEN_TO, "Tổ trưởng", "Số khoản",
+            "NQH (triệu đ)", "Tỷ lệ NQH", "Khoanh (triệu đ)",
+        ] if c in _to_nqh_co.columns]
+        _to_nqh_co["Số khoản"] = _to_nqh_co["Số khoản"].apply(fmt_so)
+        _to_show = _to_nqh_co[_out_cols].sort_values(
+            "NQH (triệu đ)" if "NQH (triệu đ)" in _out_cols else _out_cols[0],
+            ascending=False,
+        )
+        st.dataframe(_to_show, use_container_width=True, hide_index=True)
+
+        # Bar chart NQH
+        if _has_qh:
+            try:
+                import plotly.express as _px2
+                _top_nqh = _to_nqh_co.nlargest(min(20, len(_to_nqh_co)), "_nqh").sort_values("_nqh")
+                _fig_nqh = _px2.bar(
+                    _top_nqh,
+                    x="_nqh", y=COT_TEN_TO, orientation="h",
+                    color="_nqh",
+                    color_continuous_scale=[[0.0, "#FFCDD2"], [0.5, "#E53935"], [1.0, "#B71C1C"]],
+                    text="NQH (triệu đ)" if "NQH (triệu đ)" in _top_nqh.columns else "_nqh",
+                    labels={"_nqh": "NQH", COT_TEN_TO: "Tổ"},
+                    height=max(300, len(_top_nqh) * 34),
+                )
+                _fig_nqh.update_traces(textposition="outside",
+                                       hovertemplate="<b>%{y}</b><br>NQH: %{text}<extra></extra>")
+                _fig_nqh.update_layout(
+                    coloraxis_showscale=False,
+                    xaxis=dict(showticklabels=False, title=""),
+                    yaxis_title="",
+                    margin=dict(l=10, r=140, t=20, b=10),
+                    paper_bgcolor="rgba(0,0,0,0)",
+                    plot_bgcolor="rgba(0,0,0,0)",
+                )
+                st.plotly_chart(_fig_nqh, use_container_width=True, key=f"{key_prefix}bar_to_nqh")
+            except Exception as _e:
+                logger.error("_render_to_tkv nqh chart: %s", _e, exc_info=True)
 
 
 def render(tab=None, role: str = None, **kwargs) -> None:
@@ -187,8 +384,49 @@ def render(tab=None, role: str = None, **kwargs) -> None:
         df_tinh_filtered = df_tinh_filtered[df_tinh_filtered[COT_DVUT] == loc_dvut]
 
 
+    # Xóa cache Excel khi filter thay đổi để tránh tải file cũ
+    _fp = f"{den_thang}|{loc_pgd}|{loc_xa}|{loc_to}|{loc_ct}|{loc_dvut}"
+    if st.session_state.get(f"{key_prefix}_dh_fp") != _fp:
+        st.session_state.pop("_xls_den_han", None)
+        st.session_state[f"{key_prefix}_dh_fp"] = _fp
+
     df_loc = _loc_thang(df_tinh_filtered, 0, den_thang)
     df_loc = df_loc[pd.to_numeric(df_loc[COT_TONG_DU_NO], errors="coerce").fillna(0) > 0]
+
+    # ── Gắn nhãn NQ11 / GQVL ─────────────────────────────────────────
+    # Ưu tiên dùng cột __is_nq11/__is_gqvl từ _enrich_hstd() trong app.py
+    df_loc = df_loc.copy()
+    if "__is_nq11" in df_loc.columns or "__is_gqvl" in df_loc.columns:
+        _is_nq = df_loc.get("__is_nq11", pd.Series(False, index=df_loc.index)).fillna(False).astype(bool)
+        _is_gq = df_loc.get("__is_gqvl", pd.Series(False, index=df_loc.index)).fillna(False).astype(bool)
+        df_loc["_ct_db"] = "—"
+        df_loc.loc[_is_nq & ~_is_gq, "_ct_db"] = "NQ11"
+        df_loc.loc[~_is_nq & _is_gq, "_ct_db"] = "GQVL"
+        df_loc.loc[_is_nq & _is_gq, "_ct_db"] = "NQ11+GQVL"
+    else:
+        # Fallback: set-lookup khi chưa enrich (backward compat)
+        _df_nq11 = kwargs.get("df_nq11")
+        _df_gqvl = kwargs.get("df_sk_gqvl") or kwargs.get("df_gqvl")
+        _set_nq11: set[str] = set()
+        _set_gqvl: set[str] = set()
+        if _df_nq11 is not None and not _df_nq11.empty:
+            _ku_col_nq11 = next(
+                (c for c in ["Số khế ước", COT_SO_KU] if c in _df_nq11.columns), None)
+            if _ku_col_nq11:
+                _set_nq11 = set(_df_nq11[_ku_col_nq11].dropna().astype(str).str.strip())
+        if _df_gqvl is not None and not _df_gqvl.empty:
+            _ku_col_gqvl = next(
+                (c for c in ["Số khế ước", COT_SO_KU] if c in _df_gqvl.columns), None)
+            if _ku_col_gqvl:
+                _set_gqvl = set(_df_gqvl[_ku_col_gqvl].dropna().astype(str).str.strip())
+        if (_set_nq11 or _set_gqvl) and COT_SO_KU in df_loc.columns:
+            _ku = df_loc[COT_SO_KU].astype(str).str.strip()
+            df_loc["_ct_db"] = "—"
+            df_loc.loc[_ku.isin(_set_nq11) & ~_ku.isin(_set_gqvl), "_ct_db"] = "NQ11"
+            df_loc.loc[~_ku.isin(_set_nq11) & _ku.isin(_set_gqvl), "_ct_db"] = "GQVL"
+            df_loc.loc[_ku.isin(_set_nq11) & _ku.isin(_set_gqvl), "_ct_db"] = "NQ11+GQVL"
+        else:
+            df_loc["_ct_db"] = "—"
 
     # ── 4 Metrics ────────────────────────────────────────────────────
     tong_khoan = len(df_loc)
@@ -197,11 +435,26 @@ def render(tab=None, role: str = None, **kwargs) -> None:
     tong_dn_full = pd.to_numeric(df_tinh[COT_TONG_DU_NO], errors="coerce").sum()
     ty_le = tong_tien / tong_dn_full * 100 if tong_dn_full else 0
 
-    m1, m2, m3, m4 = st.columns(4)
+    _so_nq11 = int((df_loc["_ct_db"].str.contains("NQ11")).sum()) if not df_loc.empty else 0
+    _so_gqvl = int((df_loc["_ct_db"].str.contains("GQVL")).sum()) if not df_loc.empty else 0
+    _co_db = _so_nq11 > 0 or _so_gqvl > 0
+
+    if _co_db:
+        m1, m2, m3, m4, m5 = st.columns(5)
+    else:
+        m1, m2, m3, m4 = st.columns(4)
     m1.metric("Số khoản đến hạn", fmt_so(tong_khoan))
     m2.metric("Dư nợ đến hạn (triệu đ)", fmt_ty(tong_tien))
     m3.metric("Số PGD liên quan", so_pgd)
     m4.metric("Tỷ lệ dư nợ/tổng", f"{ty_le:.2f}".replace(".", ",") + "%")
+    if _co_db:
+        _db_parts = []
+        if _so_nq11:
+            _db_parts.append(f"NQ11: {fmt_so(_so_nq11)}")
+        if _so_gqvl:
+            _db_parts.append(f"GQVL: {fmt_so(_so_gqvl)}")
+        m5.metric("Chương trình ĐB", " · ".join(_db_parts),
+                  help="Khoản vay thuộc Nghị Quyết 11 và/hoặc Giải quyết Việc làm")
 
     # ── Cảnh báo tập trung ───────────────────────────────────────────
     if not df_loc.empty:
@@ -217,7 +470,7 @@ def render(tab=None, role: str = None, **kwargs) -> None:
 
     # ── 3 Tabs ───────────────────────────────────────────────────────
     if not df_loc.empty:
-        tab_thang, tab_nhom, tab_ds = st.tabs(["📅 Theo tháng", "🏢 Theo nhóm", "📋 Danh sách"])
+        tab_thang, tab_nhom, tab_to, tab_ds = st.tabs(["📅 Theo tháng", "🏢 Theo nhóm", "🏘️ Tổ TK&VV", "📋 Danh sách"])
 
         with tab_thang:
             df_nam = _loc_thang(df_tinh, 0, 12)
@@ -372,46 +625,107 @@ def render(tab=None, role: str = None, **kwargs) -> None:
                     logger.error("Không thể vẽ biểu đồ nhóm: %s", _e, exc_info=True)
                     st.caption(f"Không thể vẽ biểu đồ: {_e}")
 
+        with tab_to:
+            _render_to_tkv(df_loc, kwargs.get("df"), key_prefix)
+
         with tab_ds:
+            # Filter nhanh NQ11 / GQVL
+            _df_loc_ds = df_loc
+            _co_db_ds = _co_db and "_ct_db" in df_loc.columns
+            if _co_db_ds:
+                _opts_db = ["Tất cả"]
+                if _so_nq11:
+                    _opts_db.append("Chỉ NQ11")
+                if _so_gqvl:
+                    _opts_db.append("Chỉ GQVL")
+                if _so_nq11 and _so_gqvl:
+                    _opts_db.append("NQ11 hoặc GQVL")
+                _loc_db = st.radio(
+                    "Lọc chương trình đặc biệt",
+                    _opts_db, horizontal=True,
+                    key=f"{key_prefix}den_han_loc_db",
+                )
+                if _loc_db == "Chỉ NQ11":
+                    _df_loc_ds = df_loc[df_loc["_ct_db"].str.contains("NQ11")]
+                elif _loc_db == "Chỉ GQVL":
+                    _df_loc_ds = df_loc[df_loc["_ct_db"].str.contains("GQVL")]
+                elif _loc_db == "NQ11 hoặc GQVL":
+                    _df_loc_ds = df_loc[df_loc["_ct_db"] != "—"]
+
             cols_ct_ds = [c for c in [
-                COT_TEN_PGD, COT_TEN_KH, COT_TEN_CT, COT_TONG_DU_NO,
+                COT_TEN_PGD, COT_TEN_KH, COT_TEN_CT, COT_SO_KU, COT_TONG_DU_NO,
                 "Ngày đến hạn", "Số tháng có thể gia hạn",
-            ] if c in df_loc.columns]
-            df_ct = df_loc[cols_ct_ds].copy()
+            ] if c in _df_loc_ds.columns]
+            df_ct = _df_loc_ds[cols_ct_ds].copy()
+            # Gắn nhãn CT đặc biệt nếu có dữ liệu NQ11/GQVL
+            if _co_db_ds:
+                df_ct.insert(
+                    df_ct.columns.get_loc(COT_TEN_CT) + 1 if COT_TEN_CT in df_ct.columns else len(df_ct.columns),
+                    "CT Đặc biệt",
+                    _df_loc_ds["_ct_db"].values,
+                )
             if "Ngày đến hạn" in df_ct.columns:
                 df_ct = df_ct.sort_values("Ngày đến hạn")
                 df_ct["Ngày đến hạn"] = pd.to_datetime(
                     df_ct["Ngày đến hạn"], errors="coerce"
                 ).dt.strftime("%d/%m/%Y").fillna("")
+            df_ct[COT_TONG_DU_NO] = pd.to_numeric(
+                df_ct[COT_TONG_DU_NO], errors="coerce"
+            ).apply(fmt_ty)
             df_ct = df_ct.reset_index(drop=True)
 
             hien_thi_dataframe_phan_trang(df_ct, key="dh_tbl_ds", height=420)
 
-            if COT_TEN_PGD in df_loc.columns:
+            if COT_TEN_PGD in _df_loc_ds.columns:
                 df_th_pgd = (
-                    df_loc.groupby(COT_TEN_PGD)
+                    _df_loc_ds.groupby(COT_TEN_PGD)
                     .agg(**{
                         "Số khoản": (COT_TONG_DU_NO, "count"),
-                        "Dư nợ (VND)": (COT_TONG_DU_NO, "sum"),
+                        "Dư nợ (triệu đ)": (COT_TONG_DU_NO, "sum"),
                     })
                     .reset_index()
-                    .sort_values("Dư nợ (VND)", ascending=False)
+                    .sort_values("Dư nợ (triệu đ)", ascending=False)
                 )
-                df_th_pgd["Dư nợ (VND)"] = df_th_pgd["Dư nợ (VND)"].apply(fmt_so)
+                df_th_pgd["Dư nợ (triệu đ)"] = df_th_pgd["Dư nợ (triệu đ)"].apply(fmt_ty)
                 sheets_xuat = {"TH_PGD": df_th_pgd, "Chi tiết": df_ct}
             else:
                 sheets_xuat = {"Chi tiết": df_ct}
 
+            # Sheet riêng NQ11 vào Excel nếu có
+            if _co_db_ds:
+                _df_nq11_ds = df_loc[df_loc["_ct_db"].str.contains("NQ11")]
+                if not _df_nq11_ds.empty:
+                    _cols_nq11 = [c for c in [
+                        COT_TEN_PGD, COT_TEN_KH, COT_SO_KU, COT_TEN_CT, COT_TONG_DU_NO, "Ngày đến hạn"
+                    ] if c in _df_nq11_ds.columns]
+                    _df_nq11_xuat = _df_nq11_ds[_cols_nq11].copy()
+                    if "Ngày đến hạn" in _df_nq11_xuat.columns:
+                        _df_nq11_xuat["Ngày đến hạn"] = pd.to_datetime(
+                            _df_nq11_xuat["Ngày đến hạn"], errors="coerce"
+                        ).dt.strftime("%d/%m/%Y").fillna("")
+                    _df_nq11_xuat[COT_TONG_DU_NO] = pd.to_numeric(
+                        _df_nq11_xuat[COT_TONG_DU_NO], errors="coerce"
+                    ).apply(fmt_ty)
+                    sheets_xuat["NQ11"] = _df_nq11_xuat
+
             col_ex, col_pdf_tab = st.columns(2)
             with col_ex:
-                st.download_button(
-                    "📥 Xuất Excel",
-                    data=xuat_excel(sheets_xuat),
-                    file_name=ten_file_xuat(f"DenHan_{den_thang}thang"),
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    key="btn_xuat_den_han_excel",
-                    use_container_width=True,
-                )
+                if st.button("📥 Tạo Excel", key="btn_gen_den_han_excel",
+                             use_container_width=True):
+                    try:
+                        st.session_state["_xls_den_han"] = xuat_excel(sheets_xuat)
+                    except Exception as e:
+                        logger.error("tab_den_han xuat_excel: %s", e, exc_info=True)
+                        st.error(f"❌ Lỗi xuất Excel: {e}")
+                if st.session_state.get("_xls_den_han"):
+                    st.download_button(
+                        "📥 Tải Excel",
+                        data=st.session_state["_xls_den_han"],
+                        file_name=ten_file_xuat(f"DenHan_{den_thang}thang"),
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        key="btn_xuat_den_han_excel",
+                        use_container_width=True,
+                    )
             with col_pdf_tab:
                 nut_xuat_pdf(
                     df=df_ct,

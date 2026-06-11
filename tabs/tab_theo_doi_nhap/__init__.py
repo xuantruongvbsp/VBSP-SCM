@@ -13,7 +13,7 @@ from streamlit.delta_generator import DeltaGenerator
 
 from auth import normalize_role
 from logger import get_logger
-from utils import get_tab_context
+from tabs.base_tab import TabContext
 
 from .data import (
     tim_credentials,
@@ -48,7 +48,7 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
     role_n = normalize_role(role_raw)
     username = kwargs.get("username", st.session_state.get("username", "unknown"))
 
-    ctx = get_tab_context(tab)
+    ctx = TabContext(tab, **kwargs)
     with ctx:
         ok, msg = _kiem_tra_ket_noi()
         if not ok:
@@ -61,6 +61,41 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
         ds_sheet = doc_ds_sheet()
         can_config = role_n in ("admin_cn", "manager_cn", "admin", "manager")
 
+        # ── Chọn sheet — "Khảo sát HN/HCN/HTN" luôn là option đầu tiên ─────
+        sheet_labels = [
+            cfg.get("ten_hien_thi") or cfg.get("sheet_tab", f"Sheet {i+1}")
+            for i, cfg in enumerate(ds_sheet)
+        ]
+        all_labels = ["🏠 Khảo sát HN/HCN/HTN"] + sheet_labels
+
+        col_sel, col_ref = st.columns([5, 1])
+        with col_sel:
+            idx = st.selectbox(
+                "📂 Chọn sheet theo dõi",
+                range(len(all_labels)),
+                format_func=lambda i: all_labels[i],
+                key="ttdn_sheet_sel",
+            )
+        with col_ref:
+            st.write("")
+            if st.button(
+                "🔄", key="ttdn_refresh", help="Làm mới dữ liệu",
+                use_container_width=True,
+            ):
+                doc_sheet.clear()
+                st.rerun()
+
+        # ── Nhánh Khảo sát HN/HCN/HTN ─────────────────────────────────────
+        if idx == 0:
+            from tabs import tab_theo_doi_khao_sat as _ks
+            _ks.render(None, **kwargs)
+            if can_config:
+                st.divider()
+                with st.expander("⚙️ Cài đặt sheet theo dõi nhập liệu", expanded=False):
+                    render_cai_dat(ds_sheet, username)
+            return
+
+        # ── Nhánh sheet thông thường (offset -1 vì index 0 là khảo sát) ────
         # Cleanup stale session_state keys
         n_sheets = len(ds_sheet)
         for i in range(n_sheets, n_sheets + 50):
@@ -69,7 +104,6 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
             for sk in (f"cd_mig_{i}", f"cd_mig_{i}_ten"):
                 st.session_state.pop(sk, None)
 
-        # ── Chọn sheet ────────────────────────────────────────────────────
         df_td = pd.DataFrame()
         ds_ct: list[dict] = []
         ten_sheet = ""
@@ -81,29 +115,8 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
         if not ds_sheet:
             st.info("⚙️ Chưa có sheet nào. Vào tab **⚙️ Cài đặt** để thêm.")
         else:
-            labels = [
-                cfg.get("ten_hien_thi") or cfg.get("sheet_tab", f"Sheet {i+1}")
-                for i, cfg in enumerate(ds_sheet)
-            ]
-            col_sel, col_ref = st.columns([5, 1])
-            with col_sel:
-                idx = st.selectbox(
-                    "📂 Chọn sheet theo dõi",
-                    range(len(labels)),
-                    format_func=lambda i: labels[i],
-                    key="ttdn_sheet_sel",
-                )
-            with col_ref:
-                st.write("")
-                if st.button(
-                    "🔄", key="ttdn_refresh", help="Làm mới dữ liệu",
-                    use_container_width=True,
-                ):
-                    doc_sheet.clear()
-                    st.rerun()
-
-            cfg_sel = ds_sheet[idx]
-            ten_sheet = labels[idx]
+            cfg_sel = ds_sheet[idx - 1]
+            ten_sheet = all_labels[idx]
             ds_ct = cfg_sel.get("ds_chuong_trinh", [])
 
             sheet_id = cfg_sel.get("sheet_id", "").strip()
@@ -145,7 +158,7 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                     "Sheet này chưa có Sheet ID. Vào Cài đặt để nhập."
                 )
 
-        # ── Tabs ───────────────────────────────────────────────────────────
+        # ── Tabs nội dung ──────────────────────────────────────────────────
         if can_config:
             t0, t1, t2, t3 = st.tabs([
                 "📊 Tổng quan", "📋 Chi tiết", "⚙️ Cài đặt", "📖 Hướng dẫn",

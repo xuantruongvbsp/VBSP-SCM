@@ -341,8 +341,9 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
         # n_to: cặp (PGD, Tổ) vì tên Tổ trùng giữa các PGD
         n_to  = int(df_bq.groupby([COT_TEN_PGD, COT_TEN_TO]).ngroups) if COT_TEN_TO in df_bq.columns else 0
         bq_to = tdn / n_to if n_to > 0 else 0
-        # n_xa: unique toàn CN (1 xã thuộc 1 PGD), loại NaN/rỗng/"CỘNG"
-        n_xa  = int(df_bq[COT_TEN_XA].dropna().loc[lambda s: (s != "") & (s != "CỘNG")].nunique()) if COT_TEN_XA in df_bq.columns else 0
+        # n_xa: đếm xã hợp lệ — chỉ tính xã nằm trong DS_XA (95 xã/phường chuẩn)
+        # để loại trừ tên xã lỗi/typo trong dữ liệu
+        n_xa  = int(df_bq[COT_TEN_XA].dropna().loc[lambda s: s.isin(set(DS_XA))].nunique()) if COT_TEN_XA in df_bq.columns else 0
         bq_xa = tdn / n_xa if n_xa > 0 else 0
         # n_hoi: unique ĐVUT, loại NaN/rỗng/"CỘNG" (chỉ có 4 Hội đoàn thể)
         n_hoi = int(df_bq[COT_DVUT].dropna().loc[lambda s: (s != "") & (s != "CỘNG")].nunique()) if COT_DVUT in df_bq.columns else 0
@@ -544,7 +545,7 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                 df_hien["Nguồn TW (triệu đồng)"]   = df_hien["du_no_tw"].apply(fmt_ty)
                 df_hien["Nguồn ĐP (triệu đồng)"]   = df_hien["du_no_dp"].apply(fmt_ty)
                 df_hien["Dư nợ QH (triệu đồng)"]   = df_hien["du_no_qh"].apply(fmt_ty)
-                ty_le_qh = ((df_hien["du_no_qh"] / df_hien["du_no"] * 100).round(2)) if (df_hien["du_no"] > 0).any() else pd.Series(0.0, index=df_hien.index)
+                ty_le_qh = (df_hien["du_no_qh"] / df_hien["du_no"].replace(0, float("nan")) * 100).round(2).fillna(0)
                 df_hien["Tỷ lệ QH %"]              = ty_le_qh.apply(lambda x: f"{x:.2f}".replace(".", ",") + "%")
                 df_hien["Dư nợ khoanh (triệu đồng)"] = df_hien["du_no_khoanh"].apply(fmt_ty)
                 df_hien["Giải ngân năm (triệu đồng)"] = df_hien["gn_nam"].apply(fmt_ty)

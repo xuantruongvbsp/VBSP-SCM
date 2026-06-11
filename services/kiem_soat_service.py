@@ -628,8 +628,8 @@ def render_3m_khd(
     readonly: bool,
 ) -> None:
     """3 tháng không hoạt động — tổng hợp PGD + chi tiết (từ cache)."""
-    df_khd_pgd = cache["df_khd_pgd"]
-    df_khd_chi = cache["df_khd_chi"]
+    df_khd_pgd = cache.get("df_khd_pgd")
+    df_khd_chi = cache.get("df_khd_chi")
     if df_khd_pgd is None or df_khd_pgd.empty:
         st.success("Không có hồ sơ 3 tháng không hoạt động.")
         return
@@ -648,13 +648,17 @@ def render_3m_khd(
     st.markdown("**Tổng hợp theo PGD**")
     hien_thi_dataframe_phan_trang(df_th, key="ks_khd_th_pgd", height=320)
 
+    if COT_TEN_PGD not in df_th.columns:
+        return
     ds_pgd_ct = [str(x) for x in df_th[COT_TEN_PGD].tolist() if pd.notna(x)]
     chon_ct = st.selectbox(
         "Chi tiết theo PGD",
         options=ds_pgd_ct,
         key="ks_khd_chon_ct",
     )
-    df_ct = df_chi[df_chi[COT_TEN_PGD] == chon_ct].copy()
+    df_ct = (df_chi[df_chi[COT_TEN_PGD] == chon_ct].copy()
+             if df_chi is not None and COT_TEN_PGD in df_chi.columns
+             else pd.DataFrame())
 
     st.markdown(f"**Chi tiết — {chon_ct}** ({len(df_ct)} dòng)")
     hien_thi_dataframe_phan_trang(df_ct, key="ks_khd_ct", height=400)
@@ -687,11 +691,12 @@ def render_nqh(
     readonly: bool,
 ) -> None:
     """Nợ quá hạn phát sinh — tổng hợp PGD + chi tiết (từ cache)."""
-    df_nqh_pgd = cache["df_nqh_pgd"]
-    df_nqh_chi = cache["df_nqh_chi"]
+    df_nqh_pgd = cache.get("df_nqh_pgd")
+    df_nqh_chi = cache.get("df_nqh_chi")
 
     if df_nqh_chi is None or df_nqh_chi.empty:
-        if COT_DU_NO_QH not in cache["df_kh"].columns:
+        _df_kh = cache.get("df_kh")
+        if _df_kh is None or COT_DU_NO_QH not in _df_kh.columns:
             st.warning("Thiếu cột dư nợ quá hạn trong dữ liệu.")
         else:
             st.success("Không có hồ sơ nợ quá hạn > 0.")
@@ -711,6 +716,8 @@ def render_nqh(
     st.markdown("**Tổng hợp theo PGD**")
     hien_thi_dataframe_phan_trang(df_th, key="ks_nqh_th", height=320)
 
+    if COT_TEN_PGD not in df_th.columns:
+        return
     ds_pgd_ct = [str(x) for x in df_th[COT_TEN_PGD].tolist() if pd.notna(x)]
     chon_ct = st.selectbox(
         "Chi tiết theo PGD",
@@ -1031,8 +1038,8 @@ def render_gia_han_vuot(
     with c2:
         st.markdown(
             _ks_html_metric_card(
-                "Tổng dư nợ",  # noqa: COT
-                fmt_so(tong_dn_th),
+                "Tổng dư nợ (triệu đ)",
+                fmt_ty(tong_dn_th),
                 "Dư nợ trong hạn",  # noqa: COT
                 "#FFF3E0",
                 "#E65100",

@@ -521,6 +521,16 @@ def init_db():
             CREATE INDEX IF NOT EXISTS idx_ktnb_loi_dot     ON ktnb_ket_qua_loi(dot_id);
             CREATE INDEX IF NOT EXISTS idx_ktnb_loi_ma      ON ktnb_ket_qua_loi(ma_loi);
             CREATE INDEX IF NOT EXISTS idx_ktnb_loi_trang_thai ON ktnb_ket_qua_loi(trang_thai);
+
+            CREATE TABLE IF NOT EXISTS loan_notes (
+                id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                ma_so_ku   TEXT NOT NULL,
+                ghi_chu    TEXT NOT NULL,
+                username   TEXT NOT NULL,
+                created_at TEXT DEFAULT (datetime('now','localtime')),
+                updated_at TEXT DEFAULT (datetime('now','localtime'))
+            );
+            CREATE INDEX IF NOT EXISTS idx_loan_notes_ku ON loan_notes(ma_so_ku);
         """)
         # ── Tạo index cho audit_log (sau executescript để tránh lỗi) ──────────
         try:
@@ -680,6 +690,63 @@ def init_db():
         # (indexes đã được tạo sau executescript ở trên)
 
         conn.commit()
+
+
+def luu_ghi_chu_kv(ma_so_ku: str, ghi_chu: str, username: str) -> bool:
+    """Lưu hoặc cập nhật ghi chú cho 1 khoản vay (UPSERT theo ma_so_ku)."""
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    try:
+        with get_conn() as conn:
+            existing = conn.execute(
+                "SELECT id FROM loan_notes WHERE ma_so_ku = ?", (ma_so_ku,)
+            ).fetchone()
+            if existing:
+                conn.execute(
+                    "UPDATE loan_notes SET ghi_chu=?, username=?, updated_at=? WHERE ma_so_ku=?",
+                    (ghi_chu, username, now, ma_so_ku),
+                )
+            else:
+                conn.execute(
+                    "INSERT INTO loan_notes (ma_so_ku, ghi_chu, username, created_at, updated_at) VALUES (?,?,?,?,?)",
+                    (ma_so_ku, ghi_chu, username, now, now),
+                )
+            conn.commit()
+        ghi_audit(username, "luu_ghi_chu_kv", f"ma_so_ku={ma_so_ku}")
+        return True
+    except Exception as e:
+        logger.error("luu_ghi_chu_kv thất bại ma_so_ku=%s: %s", ma_so_ku, e, exc_info=True)
+        return False
+
+
+def doc_ghi_chu_kv(ma_so_ku: str) -> dict | None:
+    """Đọc ghi chú mới nhất cho 1 khoản vay.
+    Trả về {"ghi_chu", "username", "updated_at"} hoặc None nếu chưa có."""
+    try:
+        with get_conn() as conn:
+            row = conn.execute(
+                "SELECT ghi_chu, username, updated_at FROM loan_notes WHERE ma_so_ku = ?",
+                (ma_so_ku,),
+            ).fetchone()
+        return dict(row) if row else None
+    except Exception:
+        return None
+
+
+def doc_ghi_chu_nhieu(ds_ma: list[str]) -> dict[str, dict]:
+    """Đọc ghi chú cho nhiều khoản vay cùng lúc.
+    Trả về {ma_so_ku: {"ghi_chu", "username", "updated_at"}}."""
+    if not ds_ma:
+        return {}
+    try:
+        placeholders = ",".join("?" * len(ds_ma))
+        with get_conn() as conn:
+            rows = conn.execute(
+                f"SELECT ma_so_ku, ghi_chu, username, updated_at FROM loan_notes WHERE ma_so_ku IN ({placeholders})",
+                list(ds_ma),
+            ).fetchall()
+        return {r["ma_so_ku"]: {"ghi_chu": r["ghi_chu"], "username": r["username"], "updated_at": r["updated_at"]} for r in rows}
+    except Exception:
+        return {}
 
 
 _KTNB_LOI_CHUAN = [

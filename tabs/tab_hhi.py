@@ -23,6 +23,7 @@ from config import (
     COT_TEN_XA,
     COT_TONG_DU_NO,
 )
+from tabs.base_tab import TabContext
 from utils import fmt_ty, hien_thi_dataframe_phan_trang, xuat_excel, lazy_tabs
 
 
@@ -155,7 +156,7 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
     df_full = kwargs.get("df_full")
     pgd_user = kwargs.get("pgd_user", "")  # PGD mode filter
 
-    ctx = tab if tab is not None else st.container()
+    ctx = TabContext(tab, **kwargs)
     with ctx:
         st.subheader("🏦 Nguồn vốn địa phương")
         if pgd_user:

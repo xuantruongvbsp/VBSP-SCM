@@ -183,11 +183,14 @@ _CARD_CSS = """
 def _inject_card_css(bg_from: str, bg_to: str, border_color: str, text_color: str,
                      label_color: str, progress_color: str, accent_color: str, icon_bg: str) -> None:
     """Inject CSS với dynamic colors."""
-    css = _CARD_CSS.format(
-        bg_from=bg_from, bg_to=bg_to, border_color=border_color,
-        text_color=text_color, label_color=label_color,
-        progress_color=progress_color, accent_color=accent_color, icon_bg=icon_bg
-    )
+    replacements = {
+        "{bg_from}": bg_from, "{bg_to}": bg_to, "{border_color}": border_color,
+        "{text_color}": text_color, "{label_color}": label_color,
+        "{progress_color}": progress_color, "{accent_color}": accent_color, "{icon_bg}": icon_bg,
+    }
+    css = _CARD_CSS
+    for k, v in replacements.items():
+        css = css.replace(k, v)
     st.markdown(css, unsafe_allow_html=True)
 
 

@@ -271,7 +271,7 @@ def _render_tong_quan_manager(tab, **kwargs):
     """📊 Tổng quan nhiệm vụ — KPI metrics, ma trận PGD, biểu đồ trạng thái."""
     ds_pgd_all: list = kwargs.get("ds_pgd_all", [])
 
-    _tab_ctx = tab if tab is not None else st.container()
+    _tab_ctx = TabContext(tab, **kwargs)
     with _tab_ctx:
         st.subheader("📊 Tổng quan nhiệm vụ")
 
@@ -354,7 +354,7 @@ def _render_danh_sach_manager(tab, **kwargs):
     ds_pgd_all: list = kwargs.get("ds_pgd_all", [])
     username: str    = kwargs.get("username", "")
 
-    _tab_ctx = tab if tab is not None else st.container()
+    _tab_ctx = TabContext(tab, **kwargs)
     with _tab_ctx:
         st.subheader("📥 Danh sách nhiệm vụ")
         chu_ky, ky, pgd_loc = _bo_loc_ky("mgr_ds", hien_pgd=True, ds_pgd=ds_pgd_all)
@@ -525,7 +525,7 @@ def _render_nhap_moi(tab, **kwargs):
     username: str    = kwargs.get("username", "")
     ds_pgd_all: list = kwargs.get("ds_pgd_all", [])
 
-    _tab_ctx = tab if tab is not None else st.container()
+    _tab_ctx = TabContext(tab, **kwargs)
     with _tab_ctx:
         st.subheader("➕ Nhập nhiệm vụ mới")
 
@@ -647,7 +647,7 @@ def _render_hau_kiem(tab, **kwargs):
     username: str    = kwargs.get("username", "")
     ds_pgd_all: list = kwargs.get("ds_pgd_all", [])
 
-    _tab_ctx = tab if tab is not None else st.container()
+    _tab_ctx = TabContext(tab, **kwargs)
     with _tab_ctx:
         st.subheader("🔍 Hậu kiểm kết quả")
         chu_ky, ky, pgd_loc = _bo_loc_ky("hk", hien_pgd=True, ds_pgd=ds_pgd_all)
@@ -738,7 +738,7 @@ def _render_nhiem_vu_duoc_giao(tab, **kwargs):
     """📥 Nhiệm vụ được giao — CBTD xem nhiệm vụ và trạng thái kết quả."""
     pgd_user: str = kwargs.get("pgd_user") or ""
 
-    _tab_ctx = tab if tab is not None else st.container()
+    _tab_ctx = TabContext(tab, **kwargs)
     with _tab_ctx:
         st.subheader("📥 Nhiệm vụ được giao")
         if not pgd_user:
@@ -793,7 +793,7 @@ def _render_nhap_ket_qua(tab, **kwargs):
     username: str = kwargs.get("username", "")
     pgd_user: str = kwargs.get("pgd_user") or ""
 
-    _tab_ctx = tab if tab is not None else st.container()
+    _tab_ctx = TabContext(tab, **kwargs)
     with _tab_ctx:
         st.subheader("✏️ Nhập kết quả nhiệm vụ")
         if not pgd_user:

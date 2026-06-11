@@ -43,6 +43,7 @@ from data.hstd import (
 )
 from pdf_service import nut_xuat_pdf
 from state_manager import SCMStateManager
+from tabs.base_tab import TabContext
 from utils import (
     fmt,
     fmt_so,
@@ -1052,7 +1053,7 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
     df_full  = kwargs.get("df_full", df)   # tránh `or` trên DataFrame → ambiguous truth value
     ds_pgd_all = list(kwargs.get("ds_pgd_all", DS_PGD) or DS_PGD)
 
-    ctx = tab if tab is not None else st.container()
+    ctx = TabContext(tab, **kwargs)
     with ctx:
         st.subheader("Cảnh báo Tín dụng")
         st.caption("Tổng hợp tất cả cảnh báo: đến hạn, không hoạt động, "

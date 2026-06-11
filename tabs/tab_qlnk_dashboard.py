@@ -22,6 +22,7 @@ from config import (
     DS_PGD,
     LY_DO_KHOANH_LABEL,
 )
+from tabs.base_tab import TabContext
 from utils import fmt_so, fmt_ty
 
 try:
@@ -132,7 +133,7 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
     pgd_user = kwargs.get("pgd_user")
     username = kwargs.get("username", "unknown")
 
-    ctx = tab if tab is not None else st.container()
+    ctx = TabContext(tab, **kwargs)
     with ctx:
         st.subheader("📊 Chuyên Đề Nợ Khoanh — Tổng hợp")
         st.caption(

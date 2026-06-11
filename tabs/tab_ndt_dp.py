@@ -13,6 +13,7 @@ from streamlit.delta_generator import DeltaGenerator
 
 import db
 from auth import la_phan_he_cn
+from tabs.base_tab import TabContext
 from utils import hien_thi_dataframe_phan_trang
 
 
@@ -24,7 +25,7 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
     username = kwargs.get("username", "unknown")
     pgd_user = kwargs.get("pgd_user", "")  # PGD mode filter
 
-    ctx = tab if tab is not None else st.container()
+    ctx = TabContext(tab, **kwargs)
 
     with ctx:
         st.subheader("🏦 Mã Nhà đầu tư Địa phương")

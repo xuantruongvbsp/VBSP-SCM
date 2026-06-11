@@ -566,12 +566,20 @@ def _render_van_ban(role: str, username: str) -> None:
             for v in ds_vb
         ]
     )
-    st.download_button(
-        "📥 Xuất danh mục Excel",
-        data=xuat_excel({"Danh mục VB BĐD": df_export}),
-        file_name=ten_file_xuat("BDD_VANBAN"),
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    )
+    if st.button("📥 Tạo Excel danh mục", key="btn_gen_xls_bdd_vanban"):
+        try:
+            st.session_state["_xls_bdd_vanban"] = xuat_excel({"Danh mục VB BĐD": df_export})
+        except Exception as e:
+            logger.error("tab_ban_dai_dien xuat_excel vanban: %s", e, exc_info=True)
+            st.error(f"❌ Lỗi xuất Excel: {e}")
+    if st.session_state.get("_xls_bdd_vanban"):
+        st.download_button(
+            "📥 Tải Excel danh mục",
+            data=st.session_state["_xls_bdd_vanban"],
+            file_name=ten_file_xuat("BDD_VANBAN"),
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            key="dl_bdd_vanban",
+        )
 
 
 def render(tab, cap: str = "xa", **kwargs) -> None:

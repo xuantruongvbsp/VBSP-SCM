@@ -8,6 +8,7 @@ from __future__ import annotations
 import streamlit as st
 import db
 from auth import la_admin_cn, normalize_role
+from tabs.base_tab import TabContext
 from security import (
     get_ip_whitelist,
     add_ip_to_whitelist,
@@ -34,7 +35,7 @@ def render(tab=None, **kwargs) -> None:
         st.warning("⛔ Chỉ Admin CN mới có quyền truy cập trang này.")
         return
 
-    _tab_ctx = tab if tab is not None else st.container()
+    _tab_ctx = TabContext(tab, **kwargs)
     with _tab_ctx:
         st.subheader("🔐 Quản lý Bảo mật NHCSXH")
         st.caption(f"Tuân thủ Thông tư 09/2019/TT-NHNN | Session timeout: {SESSION_TIMEOUT_MINUTES} phút")

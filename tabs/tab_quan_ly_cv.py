@@ -4,13 +4,13 @@ from __future__ import annotations
 import streamlit as st
 from streamlit.delta_generator import DeltaGenerator
 
-from utils import get_tab_context
+from tabs.base_tab import TabContext
 from tabs import tab_tien_do, tab_nhiem_vu, tab_tong_hop_cv
 from tabs import bc_tong_hop, tab_tien_do_nop, tab_checklist_bc, tab_theo_doi_nhap
 
 
 def render(tab: DeltaGenerator = None, **kwargs) -> None:
-    ctx = get_tab_context(tab)
+    ctx = TabContext(tab, **kwargs)
     with ctx:
         t_cv, t_bc = st.tabs([
             "� Dashboard Công việc",

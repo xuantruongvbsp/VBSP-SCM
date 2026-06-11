@@ -15,6 +15,9 @@ from collections import defaultdict
 import streamlit as st
 import pandas as pd
 
+from logger import get_logger
+logger = get_logger(__name__)
+
 from auth import normalize_role, la_phan_he_cn
 from db import doc_kv, ghi_kv, ghi_audit
 from services import khnv_noi_bo_service
@@ -30,7 +33,8 @@ from services.khnv_noi_bo_service import (
     _guess_chuc_vu,
     _safe_date_lt,
 )
-from utils import get_tab_context, xuat_excel
+from utils import xuat_excel
+from tabs.base_tab import TabContext
 
 # ──────────────────────────────────────────────
 # HẰNG SỐ & NHÃN
@@ -336,7 +340,8 @@ def _render_task_card(cv: dict, ds: list, today: date,
             except ValueError:
                 _dl_val = today
             new_dl = st.date_input("Thời gian hoàn thành", value=_dl_val,
-                                   key=f"{key_prefix}dl_edit_{k}")
+                                   key=f"{key_prefix}dl_edit_{k}",
+                                   format="DD/MM/YYYY")
             new_gc = st.text_area("Ghi chú kết quả",
                                   value=cv.get("ghi_chu_ket_qua", ""),
                                   key=f"{key_prefix}gc_edit_{k}")
@@ -526,9 +531,9 @@ def _render_phan_cong_v2(role_n: str, username: str) -> None:
                             index=2, key="pc2_uu",
                         )
                     with _fc2:
-                        ngay_giao_sel = st.date_input("Ngày giao", value=today, key="pc2_ngay_giao")
+                        ngay_giao_sel = st.date_input("Ngày giao", value=today, key="pc2_ngay_giao", format="DD/MM/YYYY")
                     with _fc3:
-                        dl = st.date_input("Thời gian hoàn thành", value=today, key="pc2_dl")
+                        dl = st.date_input("Thời gian hoàn thành", value=today, key="pc2_dl", format="DD/MM/YYYY")
 
                     if st.button("➕ Thêm đầu việc này", type="primary",
                                  key="pc2_btn_add", use_container_width=True):
@@ -971,7 +976,7 @@ def _render_lich_cong_tac(tab, role_n: str, username: str):
             with st.form("form_lich", clear_on_submit=True):
                 tieu_de = st.text_input("Tiêu đề *")
                 loai = st.selectbox("Loại", list(LOAI_LICH.keys()), format_func=lambda x: LOAI_LICH[x])
-                ngay = st.date_input("Ngày *", value=today)
+                ngay = st.date_input("Ngày *", value=today, format="DD/MM/YYYY")
                 dia_diem = st.text_input("Địa điểm")
                 thanh_vien = st.text_area("Thành viên tham dự")
                 ghi_chu = st.text_area("Ghi chú")
@@ -1187,9 +1192,9 @@ def _render_lich_cong_tac(tab, role_n: str, username: str):
 
     col_tu, col_den = st.columns(2)
     with col_tu:
-        tu_ngay = st.date_input("Từ ngày (thứ 2)", value=t2, key="lich_tuan_tu")
+        tu_ngay = st.date_input("Từ ngày (thứ 2)", value=t2, key="lich_tuan_tu", format="DD/MM/YYYY")
     with col_den:
-        den_ngay = st.date_input("Đến ngày (thứ 6)", value=t6, key="lich_tuan_den")
+        den_ngay = st.date_input("Đến ngày (thứ 6)", value=t6, key="lich_tuan_den", format="DD/MM/YYYY")
 
     ten_tp = st.text_input("Tên Trưởng phòng (để trống → chỉ hiện TRƯỞNG PHÒNG)",
                            placeholder="VD: Nguyễn Văn A", key="lich_tuan_tp")
@@ -1347,7 +1352,7 @@ def render(tab=None, **kwargs):
 
     Chỉ khả dụng cho phòng KH-NV (admin_cn, manager_cn, executive).
     """
-    ctx = get_tab_context(tab)
+    ctx = TabContext(tab, **kwargs)
     role_n = normalize_role(str(kwargs.get("role", "user")))
     username = kwargs.get("username", "unknown")
 

@@ -10,6 +10,7 @@ Khác tab_so_sanh_ky.py (so sánh df hiện tại vs baseline 31/12):
 - Hiển thị song song: Kỳ 1 | Kỳ 2 | Δ | % thay đổi
 - Áp dụng cho cả 3 phân hệ (Phòng KH-NV, BGĐ, PGD)
 """
+# DEPRECATED — Dùng tabs/tab_so_sanh_ky/ (package) thay thế. File này không được import ở đâu.
 from __future__ import annotations
 
 import streamlit as st
@@ -18,7 +19,8 @@ import plotly.graph_objects as go
 from streamlit.delta_generator import DeltaGenerator
 
 from auth import normalize_role, la_phan_he_pgd
-from utils import get_tab_context, fmt_ty, fmt_so, xuat_excel, lazy_expander as _lazy_expander
+from utils import fmt_ty, fmt_so, xuat_excel, lazy_expander as _lazy_expander
+from tabs.base_tab import TabContext
 from state_manager import SCMStateManager
 import db
 from snapshot_service import (
@@ -821,7 +823,7 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
         role, username, pgd_user, pgd_mode (bool)
     Không cần df/df_full — lấy dữ liệu từ hstd_snapshot.
     """
-    ctx = get_tab_context(tab)
+    ctx = TabContext(tab, **kwargs)
     role     = normalize_role(str(kwargs.get("role", "user")))
     username = kwargs.get("username", "unknown")
     pgd_user = kwargs.get("pgd_user")

@@ -652,28 +652,43 @@ def _render_heatmap_pgd(**kwargs) -> None:
         ]
         col1, col2 = st.columns([1, 1])
         with col1:
-            st.download_button(
-                label="⬇️ Xuất Excel (chuyên nghiệp)",
-                type="primary",
-                data=xuat_excel_chuyen_nghiep(
-                    df=df_display,
-                    title="Báo cáo Sức khỏe Tín dụng theo PGD",
-                    subtitle="Phân hệ Chi nhánh",
-                    nguoi_xuat=st.session_state.get("txt_username", ""),
-                    kpi_items=kpi_suc_khoe,
-                ),
-                file_name=excel_ten_file("SucKhoe_PGD"),
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                use_container_width=True,
-            )
+            if st.button("⬇️ Tạo Excel (chuyên nghiệp)", type="primary",
+                         key="btn_gen_xls_sk_pgd_cn", use_container_width=True):
+                try:
+                    st.session_state["_xls_sk_pgd_cn"] = xuat_excel_chuyen_nghiep(
+                        df=df_display,
+                        title="Báo cáo Sức khỏe Tín dụng theo PGD",
+                        subtitle="Phân hệ Chi nhánh",
+                        nguoi_xuat=st.session_state.get("txt_username", ""),
+                        kpi_items=kpi_suc_khoe,
+                    )
+                except Exception as e:
+                    logger.error("ws_executive xuat_excel_chuyen_nghiep sk_pgd: %s", e, exc_info=True)
+                    st.error(f"❌ Lỗi xuất Excel: {e}")
+            if st.session_state.get("_xls_sk_pgd_cn"):
+                st.download_button(
+                    label="📥 Tải Excel (chuyên nghiệp)",
+                    data=st.session_state["_xls_sk_pgd_cn"],
+                    file_name=excel_ten_file("SucKhoe_PGD"),
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    use_container_width=True,
+                )
         with col2:
-            st.download_button(
-                label="⬇️ Xuất Excel (cơ bản)",
-                data=xuat_excel({"Sức khỏe PGD": df_display}),
-                file_name=ten_file_xuat("SucKhoe_PGD"),
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                use_container_width=True,
-            )
+            if st.button("⬇️ Tạo Excel (cơ bản)",
+                         key="btn_gen_xls_sk_pgd_basic", use_container_width=True):
+                try:
+                    st.session_state["_xls_sk_pgd_basic"] = xuat_excel({"Sức khỏe PGD": df_display})
+                except Exception as e:
+                    logger.error("ws_executive xuat_excel sk_pgd: %s", e, exc_info=True)
+                    st.error(f"❌ Lỗi xuất Excel: {e}")
+            if st.session_state.get("_xls_sk_pgd_basic"):
+                st.download_button(
+                    label="📥 Tải Excel (cơ bản)",
+                    data=st.session_state["_xls_sk_pgd_basic"],
+                    file_name=ten_file_xuat("SucKhoe_PGD"),
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    use_container_width=True,
+                )
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -1074,19 +1089,26 @@ def _radar_compare_pgd(df_full: pd.DataFrame) -> None:
         )
 
     # Export
-    st.download_button(
-        label="⬇️ Xuất Excel",
-        type="primary",
-        data=xuat_excel_chuyen_nghiep(
-            df=df_radar,
-            title="So sánh PGD đa chiều (Radar)",
-            kpi_items=[("Số PGD so sánh", fmt_so(len(pgd_list)), ""),
-                       ("Chỉ tiêu", ", ".join(norm_cols), "")],
-        ),
-        file_name=excel_ten_file("Radar_SoSanh_PGD"),
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        use_container_width=True,
-    )
+    if st.button("⬇️ Tạo Excel", type="primary",
+                 key="btn_gen_xls_radar_pgd", use_container_width=True):
+        try:
+            st.session_state["_xls_radar_pgd"] = xuat_excel_chuyen_nghiep(
+                df=df_radar,
+                title="So sánh PGD đa chiều (Radar)",
+                kpi_items=[("Số PGD so sánh", fmt_so(len(pgd_list)), ""),
+                           ("Chỉ tiêu", ", ".join(norm_cols), "")],
+            )
+        except Exception as e:
+            logger.error("ws_executive xuat_excel_chuyen_nghiep radar: %s", e, exc_info=True)
+            st.error(f"❌ Lỗi xuất Excel: {e}")
+    if st.session_state.get("_xls_radar_pgd"):
+        st.download_button(
+            label="📥 Tải Excel",
+            data=st.session_state["_xls_radar_pgd"],
+            file_name=excel_ten_file("Radar_SoSanh_PGD"),
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True,
+        )
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -1237,22 +1259,30 @@ def _ranking_pgd(df_full: pd.DataFrame) -> None:
             height=200,
         )
 
-    st.download_button(
-        label="⬇️ Xuất Excel",
-        type="primary",
-        data=xuat_excel_chuyen_nghiep(
-            df=ranking.sort_values("Dư_nợ", ascending=False).reset_index(drop=True),
-            title="Bảng xếp hạng PGD",
-            kpi_items=[
-                ("Tổng PGD", fmt_so(len(ranking)), ""),
-                ("Dư nợ toàn CN", fmt_ty(ranking["Dư_nợ"].sum() / 1e6), "triệu đồng"),
-                ("PGD dẫn đầu", ranking.sort_values("Dư_nợ", ascending=False).iloc[0]["PGD"], ""),
-            ],
-        ),
-        file_name=excel_ten_file("XepHang_PGD"),
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        use_container_width=True,
-    )
+    if st.button("⬇️ Tạo Excel", type="primary",
+                 key="btn_gen_xls_xephang_pgd", use_container_width=True):
+        try:
+            df_xh_export = ranking.sort_values("Dư_nợ", ascending=False).reset_index(drop=True)
+            st.session_state["_xls_xephang_pgd"] = xuat_excel_chuyen_nghiep(
+                df=df_xh_export,
+                title="Bảng xếp hạng PGD",
+                kpi_items=[
+                    ("Tổng PGD", fmt_so(len(ranking)), ""),
+                    ("Dư nợ toàn CN", fmt_ty(ranking["Dư_nợ"].sum() / 1e6), "triệu đồng"),
+                    ("PGD dẫn đầu", df_xh_export.iloc[0]["PGD"] if not df_xh_export.empty else "—", ""),
+                ],
+            )
+        except Exception as e:
+            logger.error("ws_executive xuat_excel_chuyen_nghiep xephang: %s", e, exc_info=True)
+            st.error(f"❌ Lỗi xuất Excel: {e}")
+    if st.session_state.get("_xls_xephang_pgd"):
+        st.download_button(
+            label="📥 Tải Excel",
+            data=st.session_state["_xls_xephang_pgd"],
+            file_name=excel_ten_file("XepHang_PGD"),
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True,
+        )
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -1518,37 +1548,55 @@ def _render_pdf_section(df_full: pd.DataFrame, username: str) -> None:
     cols_tien_pdf = [c for c in [COT_TONG_DU_NO, COT_DU_NO_QH, COT_DU_NO_TH, COT_LAI_TON] if c in df_pdf.columns]
     col_pdf1, col_pdf2 = st.columns([1, 1])
     with col_pdf1:
-        st.download_button(
-            label="📄 Xuất PDF báo cáo đầy đủ",
-            type="primary",
-            data=xuat_pdf_bao_cao(
-                df=df_pdf,
-                tieu_de="Báo cáo Sức khỏe Tín dụng Toàn Chi nhánh",
-                nguoi_xuat=username,
-                kpi_items=_kpi_items,
-                cols_tien=cols_tien_pdf,
-                tieu_de_phu=f"Ngày số liệu: {df_full[COT_NGAY_SL].iloc[0] if COT_NGAY_SL in df_full.columns else '—'}",
-            ),
-            file_name=f"BaoCao_SucKhoeTD_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
-            mime="application/pdf",
-            use_container_width=True,
-            key="pdf_sk_full",
-        )
+        if st.button("📄 Tạo PDF báo cáo đầy đủ", type="primary",
+                     key="btn_gen_pdf_sk_full", use_container_width=True):
+            try:
+                ngay_sl = df_full[COT_NGAY_SL].iloc[0] if COT_NGAY_SL in df_full.columns else "—"
+                st.session_state["_pdf_sk_full_bytes"] = xuat_pdf_bao_cao(
+                    df=df_pdf,
+                    tieu_de="Báo cáo Sức khỏe Tín dụng Toàn Chi nhánh",
+                    nguoi_xuat=username,
+                    kpi_items=_kpi_items,
+                    cols_tien=cols_tien_pdf,
+                    tieu_de_phu=f"Ngày số liệu: {ngay_sl}",
+                )
+                st.session_state["_pdf_sk_full_fname"] = f"BaoCao_SucKhoeTD_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf"
+            except Exception as e:
+                logger.error("_render_pdf_section xuat_pdf_bao_cao: %s", e, exc_info=True)
+                st.error(f"❌ Lỗi xuất PDF: {e}")
+        if st.session_state.get("_pdf_sk_full_bytes"):
+            st.download_button(
+                label="📥 Tải PDF báo cáo đầy đủ",
+                data=st.session_state["_pdf_sk_full_bytes"],
+                file_name=st.session_state.get("_pdf_sk_full_fname", "BaoCao_SucKhoeTD.pdf"),
+                mime="application/pdf",
+                use_container_width=True,
+                key="pdf_sk_full",
+            )
     with col_pdf2:
-        st.download_button(
-            label="📄 PDF bảng dữ liệu (đơn giản)",
-            data=xuat_pdf(
-                df=df_pdf,
-                tieu_de="Báo cáo Sức khỏe Tín dụng",
-                nguoi_xuat=username,
-                cols_tien=cols_tien_pdf,
-                prefix_file="SKTD",
-            ),
-            file_name=f"SKTD_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
-            mime="application/pdf",
-            use_container_width=True,
-            key="pdf_sk_simple",
-        )
+        if st.button("📄 Tạo PDF bảng dữ liệu (đơn giản)",
+                     key="btn_gen_pdf_sk_simple", use_container_width=True):
+            try:
+                st.session_state["_pdf_sk_simple_bytes"] = xuat_pdf(
+                    df=df_pdf,
+                    tieu_de="Báo cáo Sức khỏe Tín dụng",
+                    nguoi_xuat=username,
+                    cols_tien=cols_tien_pdf,
+                    prefix_file="SKTD",
+                )
+                st.session_state["_pdf_sk_simple_fname"] = f"SKTD_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf"
+            except Exception as e:
+                logger.error("_render_pdf_section xuat_pdf: %s", e, exc_info=True)
+                st.error(f"❌ Lỗi xuất PDF: {e}")
+        if st.session_state.get("_pdf_sk_simple_bytes"):
+            st.download_button(
+                label="📥 Tải PDF bảng dữ liệu",
+                data=st.session_state["_pdf_sk_simple_bytes"],
+                file_name=st.session_state.get("_pdf_sk_simple_fname", "SKTD.pdf"),
+                mime="application/pdf",
+                use_container_width=True,
+                key="pdf_sk_simple",
+            )
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

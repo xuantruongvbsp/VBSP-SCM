@@ -68,6 +68,7 @@ TAB_MODULES: list[str] = [
     "tabs.tab_so_sanh_ky",
     "tabs.tab_tien_do",
     "tabs.tab_tien_do_nop",
+    "tabs.tab_theo_doi_khao_sat",
     "tabs.tab_tongquan",
     "tabs.tab_tracuu",
     "tabs.tab_trang_thai_nguon",

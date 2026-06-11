@@ -991,13 +991,15 @@ def _subtab_tong_hop_cn(ctx: TabContext) -> None:
 
     all_pgd_hs = []
     pgd_summary = []
+    # slug → (ds_tat_ca, set id đã gửi) — dùng để reset da_gui_cn sau GOM
+    _pgd_gom_map: dict[str, tuple[list, set]] = {}
     for ten_pgd in DS_PGD:
         slug = pgd_slug(ten_pgd)
-        hs_gui_pgd: list = []
         ds = LuuTruXLRR.doc_pgd(slug, nam, thang_cn)
-        hs_gui_pgd.extend(hs for hs in ds if hs.da_gui_cn)
-        all_pgd_hs.extend(hs_gui_pgd)
+        hs_gui_pgd = [hs for hs in ds if hs.da_gui_cn]
         if hs_gui_pgd:
+            _pgd_gom_map[slug] = (ds, {hs.id for hs in hs_gui_pgd})
+            all_pgd_hs.extend(hs_gui_pgd)
             pgd_summary.append({
                 "PGD": ten_pgd,
                 "Số HS đã gửi": len(hs_gui_pgd),
@@ -1013,6 +1015,12 @@ def _subtab_tong_hop_cn(ctx: TabContext) -> None:
         with col_gom:
             if st.button("🔄 GOM vào CN", type="primary", use_container_width=True, key="xlrr_th_gom"):
                 LuuTruXLRR.luu_cn(all_pgd_hs, nam, thang_cn, ctx.username)
+                # Reset da_gui_cn=False trên PGD records đã GOM để tránh GOM lặp lại
+                for _slug, (_ds_all, _gui_ids) in _pgd_gom_map.items():
+                    for _hs in _ds_all:
+                        if _hs.id in _gui_ids:
+                            _hs.da_gui_cn = False
+                    LuuTruXLRR.luu_pgd(_ds_all, _slug, nam, thang_cn, ctx.username)
                 st.success(f"✅ Đã gom {len(all_pgd_hs)} hồ sơ từ {len(pgd_summary)} PGD vào CN!")
                 db.ghi_audit(ctx.username, "xlrr_gom_cn", f"Đợt {dot.id}: {len(all_pgd_hs)} HS từ {len(pgd_summary)} PGD")
                 st.cache_data.clear()

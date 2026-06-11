@@ -8,6 +8,7 @@ import pandas as pd
 
 from auth import la_phan_he_pgd
 from logger import get_logger
+from tabs.base_tab import TabContext
 
 # Import từ module tab_baocao
 from tabs.tab_baocao.dashboard import render_dashboard
@@ -33,7 +34,7 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
         tab: Streamlit DeltaGenerator
         **kwargs: Chứa df (HSTD), df_nq11, df_gqvl, df_cdtotkvv, role, username, pgd_user
     """
-    ctx = tab if tab is not None else st.container()
+    ctx = TabContext(tab, **kwargs)
     
     # Lấy dữ liệu từ kwargs
     df = kwargs.get("df")  # HSTD

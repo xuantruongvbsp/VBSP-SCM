@@ -24,6 +24,7 @@ from config import (
     COT_TEN_TO, COT_TEN_VC, COT_TEN_HSSV, COT_DIA_CHI,
 )
 from utils import fmt_tien, fmt_so, xuat_excel, vn
+from tabs.base_tab import TabContext
 from components.filter_panel import render_filter_panel
 from components.result_card import render_result_grid
 from data import doc_nq11_toan_cn_pgd, doc_gqvl_toan_cn
@@ -147,20 +148,60 @@ def _render_detail_drawer(
             loan_df = pd.DataFrame(loan_data, columns=["Thông tin", "Giá trị"])
             st.dataframe(loan_df, hide_index=True, use_container_width=True)
         
-        # Check NQ11/GQVL status
+        # Chi tiết NQ11 / GQVL (format đẹp thay vì raw dataframe)
         if df_nq11 is not None and "Số khế ước" in df_nq11.columns:
             nq11_match = df_nq11[df_nq11["Số khế ước"].astype(str).str.strip() == str(so_ku).strip()]
             if not nq11_match.empty:
-                st.success("✨ Hồ sơ thuộc NQ11")
-                with st.expander("Chi tiết NQ11"):
-                    st.dataframe(nq11_match.head(5), use_container_width=True, hide_index=True)
-        
+                st.success("✨ Hồ sơ thuộc Nghị Quyết 11")
+                with st.expander("Chi tiết NQ11", expanded=True):
+                    row_nq = nq11_match.iloc[0]
+                    _skip = {"số khế ước", "mã kh", "mã khách hàng", "tên kh", "tên khách hàng"}
+                    _money_kw = ("dư nợ", "nợ", "vốn", "tiền", "dno", "gốc", "lãi")
+                    _items: list[tuple[str, str]] = []
+                    for col in nq11_match.columns:
+                        if col.lower().strip() in _skip:
+                            continue
+                        val = row_nq.get(col)
+                        if val is None or (isinstance(val, float) and pd.isna(val)):
+                            continue
+                        if any(kw in col.lower() for kw in _money_kw):
+                            try:
+                                _items.append((col, fmt_tien(float(val))))
+                            except (ValueError, TypeError):
+                                _items.append((col, str(val)))
+                        else:
+                            _items.append((col, str(val)))
+                    if _items:
+                        _nc1, _nc2 = st.columns(2)
+                        for i, (k, v) in enumerate(_items):
+                            (_nc1 if i % 2 == 0 else _nc2).markdown(f"**{k}:** {v}")
+
         if df_gqvl is not None and "Số khế ước" in df_gqvl.columns:
             gqvl_match = df_gqvl[df_gqvl["Số khế ước"].astype(str).str.strip() == str(so_ku).strip()]
             if not gqvl_match.empty:
-                st.info("📋 Hồ sơ thuộc GQVL")
-                with st.expander("Chi tiết GQVL"):
-                    st.dataframe(gqvl_match.head(5), use_container_width=True, hide_index=True)
+                st.info("📋 Hồ sơ thuộc GQVL (Giải quyết Việc làm)")
+                with st.expander("Chi tiết GQVL", expanded=True):
+                    row_gq = gqvl_match.iloc[0]
+                    _skip_g = {"số khế ước", "mã kh", "mã khách hàng", "tên kh", "tên khách hàng"}
+                    _money_kw_g = ("dư nợ", "nợ", "vốn", "tiền", "giải ngân", "gốc", "lãi")
+                    _items_g: list[tuple[str, str]] = []
+                    for col in gqvl_match.columns:
+                        if col.lower().strip() in _skip_g:
+                            continue
+                        val = row_gq.get(col)
+                        if val is None or (isinstance(val, float) and pd.isna(val)):
+                            continue
+                        if any(kw in col.lower() for kw in _money_kw_g):
+                            try:
+                                _items_g.append((col, fmt_tien(float(val))))
+                            except (ValueError, TypeError):
+                                _items_g.append((col, str(val)))
+                        else:
+                            _items_g.append((col, str(val)))
+                    if _items_g:
+                        _gc1, _gc2 = st.columns(2)
+                        for i, (k, v) in enumerate(_items_g):
+                            (_gc1 if i % 2 == 0 else _gc2).markdown(f"**{k}:** {v}")
     
     # Action buttons
     st.divider()
@@ -169,7 +210,7 @@ def _render_detail_drawer(
     with col_export:
         # Export single record
         export_data = hs.to_frame().T
-        excel_data = xuat_excel(export_data, f"HS_{so_ku}")
+        excel_data = xuat_excel({f"HS_{so_ku}": export_data})
         st.download_button(
             "📥 Xuất Excel",
             data=excel_data,
@@ -184,26 +225,33 @@ def _render_detail_drawer(
             st.rerun()
 
 
-def _render_results_header(df_filtered: pd.DataFrame, df_original: pd.DataFrame) -> None:
+def _render_results_header(
+    df_filtered: pd.DataFrame,
+    df_original: pd.DataFrame,
+    nq11_count: int = 0,
+    gqvl_count: int = 0,
+) -> None:
     """Render results summary header."""
     total = len(df_original)
     filtered = len(df_filtered)
-    
-    col1, col2, col3, col4 = st.columns([2, 1, 1, 1])
-    
+
+    _co_db = nq11_count > 0 or gqvl_count > 0
+    if _co_db:
+        col1, col2, col3, col4, col5 = st.columns([2, 1, 1, 1, 1])
+    else:
+        col1, col2, col3, col4 = st.columns([2, 1, 1, 1])
+
     with col1:
         st.markdown(f"**📊 Kết quả:** {filtered:,} / {total:,} hồ sơ")
-    
+
     with col2:
-        # Tổng dư nợ
         if COT_TONG_DU_NO in df_filtered.columns:
             tong_no = df_filtered[COT_TONG_DU_NO].sum()
             st.markdown(f"💰 **Tổng DN:** {fmt_tien(tong_no)}")
-    
+
     with col3:
-        # Export filtered results
         if not df_filtered.empty:
-            excel_data = xuat_excel(df_filtered, "KetQua_TraCuu")
+            excel_data = xuat_excel({"KetQua_TraCuu": df_filtered})
             st.download_button(
                 "📊 Excel",
                 data=excel_data,
@@ -212,10 +260,18 @@ def _render_results_header(df_filtered: pd.DataFrame, df_original: pd.DataFrame)
                 use_container_width=True,
                 key="tc_export_excel",
             )
-    
+
     with col4:
-        # PDF export placeholder
         st.button("📄 PDF", disabled=True, use_container_width=True, key="tc_export_pdf")
+
+    if _co_db:
+        with col5:
+            _parts = []
+            if nq11_count:
+                _parts.append(f"✨ NQ11: **{nq11_count:,}**")
+            if gqvl_count:
+                _parts.append(f"📋 GQVL: **{gqvl_count:,}**")
+            st.markdown(" · ".join(_parts))
 
 
 def render(tab: "DeltaGenerator", **kwargs) -> None:
@@ -241,7 +297,7 @@ def render(tab: "DeltaGenerator", **kwargs) -> None:
     df_nq11, df_gqvl = _load_nq11_gqvl_data()
     
     # Tab context
-    ctx = tab if tab is not None else st.container()
+    ctx = TabContext(tab, **kwargs)
     
     with ctx:
         st.subheader("🔍 Tra cứu hồ sơ khách hàng")
@@ -255,9 +311,30 @@ def render(tab: "DeltaGenerator", **kwargs) -> None:
             pgd_user=pgd_user,
         )
         
+        # Đếm NQ11/GQVL trong kết quả — dùng cột enriched nếu có
+        if "__is_nq11" in df_filtered.columns:
+            _so_nq11_r = int(df_filtered["__is_nq11"].fillna(False).sum())
+        elif df_nq11 is not None and not df_nq11.empty and COT_SO_KU in df_filtered.columns:
+            _nq11_ku_col = "Số khế ước" if "Số khế ước" in df_nq11.columns else COT_SO_KU
+            _so_nq11_r = int(df_filtered[COT_SO_KU].astype(str).str.strip().isin(
+                set(df_nq11[_nq11_ku_col].dropna().astype(str).str.strip())
+            ).sum()) if _nq11_ku_col in df_nq11.columns else 0
+        else:
+            _so_nq11_r = 0
+
+        if "__is_gqvl" in df_filtered.columns:
+            _so_gqvl_r = int(df_filtered["__is_gqvl"].fillna(False).sum())
+        elif df_gqvl is not None and not df_gqvl.empty and COT_SO_KU in df_filtered.columns:
+            _gqvl_ku_col = "Số khế ước" if "Số khế ước" in df_gqvl.columns else COT_SO_KU
+            _so_gqvl_r = int(df_filtered[COT_SO_KU].astype(str).str.strip().isin(
+                set(df_gqvl[_gqvl_ku_col].dropna().astype(str).str.strip())
+            ).sum()) if _gqvl_ku_col in df_gqvl.columns else 0
+        else:
+            _so_gqvl_r = 0
+
         # Results header
         st.divider()
-        _render_results_header(df_filtered, df)
+        _render_results_header(df_filtered, df, _so_nq11_r, _so_gqvl_r)
         
         # Results grid
         st.divider()

@@ -172,7 +172,10 @@ def _tao_sheet_du_lieu(wb: Workbook, sheet_name: str, df: pd.DataFrame) -> None:
 
     # Freeze panes tại dòng 3 (giữ tiêu đề + header cố định)
     ws.freeze_panes = "A3"
-    
+
+    # Auto-filter on header row
+    ws.auto_filter.ref = ws.dimensions
+
     # Auto-adjust column width
     _tu_dong_dieu_chinh_do_rong_cot(ws, df)
     
@@ -181,6 +184,9 @@ def _tao_sheet_du_lieu(wb: Workbook, sheet_name: str, df: pd.DataFrame) -> None:
     
     # Thêm border cho toàn bộ dữ liệu
     _them_border(ws, df)
+
+    # Tô màu dòng NQH
+    _dinh_dang_nqh(ws, df)
 
 
 def _dinh_dang_header(ws: Worksheet, header_row: int = 1) -> None:
@@ -256,6 +262,31 @@ def _dinh_dang_cot_tien(ws: Worksheet, df: pd.DataFrame) -> None:
                         pass
 
 
+def _dinh_dang_nqh(ws: Worksheet, df: pd.DataFrame) -> None:
+    """Tô màu đỏ nhạt các dòng có dư nợ quá hạn > 0."""
+    # Tìm index cột NQH
+    nqh_keywords = ["quá hạn", "nqh", "qh"]
+    nqh_col_idx = None
+    for idx, col in enumerate(df.columns, 1):
+        if any(kw in str(col).lower() for kw in nqh_keywords):
+            nqh_col_idx = idx
+            break
+    if nqh_col_idx is None:
+        return
+    red_fill = PatternFill(start_color="FFCCCC", end_color="FFCCCC", fill_type="solid")
+    orange_fill = PatternFill(start_color="FFE0B2", end_color="FFE0B2", fill_type="solid")
+    # Data starts at row 3 (row 1 = title, row 2 = header)
+    for row_idx in range(3, len(df) + 3):
+        cell_val = ws.cell(row=row_idx, column=nqh_col_idx).value
+        try:
+            val = float(str(cell_val).replace(",", "").replace(".", "")) if cell_val else 0
+        except (ValueError, TypeError):
+            val = 0
+        if val > 0:
+            for col_idx in range(1, len(df.columns) + 1):
+                ws.cell(row=row_idx, column=col_idx).fill = red_fill
+
+
 def _them_border(ws: Worksheet, df: pd.DataFrame) -> None:
     """Thêm border mảnh cho toàn bộ vùng dữ liệu."""
     thin_border = Border(
@@ -270,6 +301,40 @@ def _them_border(ws: Worksheet, df: pd.DataFrame) -> None:
         for col in range(1, len(df.columns) + 1):
             cell = ws.cell(row=row, column=col)
             cell.border = thin_border
+
+
+def xuat_bao_cao_nang_cao(
+    sheets: Dict[str, pd.DataFrame],
+    tieu_de: str,
+    nguoi_xuat: str,
+    pivot_config: Dict[str, list] | None = None,
+) -> bytes:
+    """Xuất báo cáo Excel nâng cao với conditional formatting + pivot summary.
+
+    pivot_config: {sheet_name: [col_group_by, col_value]} — tạo thêm sheet pivot tổng hợp
+    """
+    wb = Workbook()
+    _tao_sheet_bia(wb, tieu_de, nguoi_xuat)
+    for sheet_name, df in sheets.items():
+        if df is not None and not df.empty:
+            _tao_sheet_du_lieu(wb, sheet_name, df)
+    if pivot_config:
+        for sheet_name, df in sheets.items():
+            if df is None or df.empty:
+                continue
+            cfg = pivot_config.get(sheet_name)
+            if cfg and len(cfg) >= 2:
+                col_group, col_val = cfg[0], cfg[1]
+                if col_group in df.columns and col_val in df.columns:
+                    try:
+                        piv = df.groupby(col_group, as_index=False)[col_val].sum()
+                        _tao_sheet_du_lieu(wb, f"Pivot_{sheet_name[:20]}", piv)
+                    except Exception:
+                        pass
+    buffer = BytesIO()
+    wb.save(buffer)
+    buffer.seek(0)
+    return buffer.getvalue()
 
 
 def ten_file_bao_cao(prefix: str, ext: str = "xlsx") -> str:

@@ -183,14 +183,18 @@ def render_filter_panel(
         
         # Dư nợ range
         if COT_TONG_DU_NO in df.columns:
-            max_du_no = float(df[COT_TONG_DU_NO].max())
-            step = 1000000  # 1 triệu
+            max_du_no = max(float(df[COT_TONG_DU_NO].max()), 1_000_000.0)
+            raw_range = st.session_state.tracuu_filters["du_no_range"]
+            safe_value = (
+                float(raw_range[0]),
+                min(float(raw_range[1]), max_du_no),
+            )
             du_no_range = st.slider(
                 "Khoảng dư nợ (VNĐ)",
                 min_value=0.0,
                 max_value=max_du_no,
-                value=st.session_state.tracuu_filters["du_no_range"],
-                step=step,
+                value=safe_value,
+                step=1_000_000.0,
                 format="%,.0f",
                 key="tc_du_no",
             )
@@ -351,13 +355,23 @@ def render_filter_panel(
     if filter_qua_han and COT_DU_NO_QH in df_filtered.columns:
         df_filtered = df_filtered[df_filtered[COT_DU_NO_QH] > 0]
     
-    if filter_nq11 and df_nq11 is not None and COT_SO_KU in df_filtered.columns:
-        nq11_ku_set = set(df_nq11["Số khế ước"].astype(str).str.strip())
-        df_filtered = df_filtered[df_filtered[COT_SO_KU].astype(str).str.strip().isin(nq11_ku_set)]
-    
-    if filter_gqvl and df_gqvl is not None and COT_SO_KU in df_filtered.columns:
-        gqvl_ku_set = set(df_gqvl["Số khế ước"].astype(str).str.strip())
-        df_filtered = df_filtered[df_filtered[COT_SO_KU].astype(str).str.strip().isin(gqvl_ku_set)]
+    if filter_nq11:
+        if "__is_nq11" in df_filtered.columns:
+            df_filtered = df_filtered[df_filtered["__is_nq11"]]
+        elif df_nq11 is not None and not df_nq11.empty and COT_SO_KU in df_filtered.columns:
+            _nq_ku_col = "Số khế ước" if "Số khế ước" in df_nq11.columns else COT_SO_KU
+            if _nq_ku_col in df_nq11.columns:
+                _set_nq = set(df_nq11[_nq_ku_col].dropna().astype(str).str.strip())
+                df_filtered = df_filtered[df_filtered[COT_SO_KU].astype(str).str.strip().isin(_set_nq)]
+
+    if filter_gqvl:
+        if "__is_gqvl" in df_filtered.columns:
+            df_filtered = df_filtered[df_filtered["__is_gqvl"]]
+        elif df_gqvl is not None and not df_gqvl.empty and COT_SO_KU in df_filtered.columns:
+            _gq_ku_col = "Số khế ước" if "Số khế ước" in df_gqvl.columns else COT_SO_KU
+            if _gq_ku_col in df_gqvl.columns:
+                _set_gq = set(df_gqvl[_gq_ku_col].dropna().astype(str).str.strip())
+                df_filtered = df_filtered[df_filtered[COT_SO_KU].astype(str).str.strip().isin(_set_gq)]
     
     if filter_khoanh and COT_DU_NO_KHOANH in df_filtered.columns:
         df_filtered = df_filtered[df_filtered[COT_DU_NO_KHOANH] > 0]

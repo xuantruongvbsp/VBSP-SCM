@@ -191,6 +191,7 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                 kq = luu_pgd_file(pgd_up, "gqvl", f_up.read())
                 kq.hien_thi()
                 if kq.thanh_cong:
+                    st.cache_data.clear()
                     st.rerun()
 
             # Danh sách PGD đã có file

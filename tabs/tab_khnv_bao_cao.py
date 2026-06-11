@@ -38,6 +38,8 @@ from data import ts_file
 from config import DB_HT_CACHE, DB_PREV_CACHE, FILE_PATH_DB, FILE_PATH_DB_PREV
 from services.upload_service import luu_dienbao
 
+from tabs.base_tab import TabContext
+
 if TYPE_CHECKING:
     from streamlit.delta_generator import DeltaGenerator
 
@@ -155,7 +157,7 @@ def _build_ss_table(
 
 
 def render(tab: DeltaGenerator | None = None, **kwargs) -> None:
-    ctx = tab if tab is not None else st.container()
+    ctx = TabContext(tab, **kwargs)
 
     _df_full = kwargs.get("df_full")
     df_full = _df_full if _df_full is not None else kwargs.get("df")

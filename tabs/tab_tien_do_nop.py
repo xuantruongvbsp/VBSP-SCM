@@ -16,6 +16,7 @@ from streamlit.delta_generator import DeltaGenerator
 import db
 from auth import la_phan_he_cn, normalize_role
 from config import DS_PGD, DON_VI_CHI_NHANH
+from tabs.base_tab import TabContext
 from utils import xuat_excel
 
 
@@ -98,6 +99,7 @@ def _chuan_hoa_ten_pgd(raw: str) -> str:
     return s
 
 
+@st.cache_data(ttl=300)
 def _doc_du_lieu() -> pd.DataFrame:
     try:
         client = _ket_noi_gsheet()
@@ -110,8 +112,7 @@ def _doc_du_lieu() -> pd.DataFrame:
         df["thoi_gian"] = pd.to_datetime(df["thoi_gian"], dayfirst=True, errors="coerce")
         return df
     except Exception as e:
-        logger.error("Lỗi trong khối except: %s", e, exc_info=True)
-        st.error(f"Lỗi kết nối GSheet: {e}")
+        logger.error("_doc_du_lieu GSheet: %s", e, exc_info=True)
         return pd.DataFrame(columns=COT)
 
 
@@ -800,7 +801,7 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
     pgd_user = kwargs.get("pgd_user")
     username = kwargs.get("username", st.session_state.get("username", "unknown"))
 
-    ctx = tab if tab is not None else st.container()
+    ctx = TabContext(tab, **kwargs)
     with ctx:
         ok, msg = _kiem_tra_ket_noi()
         if not ok:
@@ -818,6 +819,8 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                 st.rerun()
 
         df = _doc_du_lieu()
+        if df.empty:
+            st.warning("⚠️ Không thể kết nối Google Sheets hoặc chưa có dữ liệu. Thử nhấn 🔄 Làm mới.")
         deadline_cfg = _doc_deadline_config()
 
         # PGD role: chỉ thấy dữ liệu của PGD mình

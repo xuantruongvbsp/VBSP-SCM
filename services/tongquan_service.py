@@ -592,3 +592,155 @@ def tinh_card_pgd(
     ).fillna(0).round(0)
 
     return df_pgd.reset_index(drop=True)
+
+
+def tinh_toan_da_chieu_pgd(
+    df: pd.DataFrame,
+    ds_don_vi: list[str],
+) -> pd.DataFrame:
+    """Tính 8 tiêu chí đa chiều cho từng PGD (dùng cho tab Toàn cảnh 22 PGD v2).
+
+    Trả về DataFrame:
+      ten_pgd, du_no, nqh, ty_le_nqh,
+      du_no_khoanh, ty_le_khoanh, ty_le_npl,
+      so_kh, so_mon,
+      no_den_han_thang, no_den_han_3thang,
+      dn_binh_quan_ho,
+      so_3m_khd, pct_3m_khd,
+      lai_ton, pct_lai_ton,
+      giai_ngan_nam, pct_den_han_3t,
+      diem_rui_ro  (0=rủi ro cao, 100=lành mạnh)
+    """
+    import datetime as _dt
+    from config import (
+        COT_TEN_PGD, COT_TONG_DU_NO, COT_DU_NO_QH, COT_DU_NO_KHOANH,
+        COT_MA_KH, COT_SO_KU, COT_NGAY_DH, COT_LAI_TON, COT_LAI_TON_QH,
+        COT_GIAI_NGAN_TRONG_NAM, COT_NGAY_GDGN, COT_NGAY_SL,
+    )
+
+    df = df.copy()
+
+    # Ép kiểu số
+    for c in [COT_TONG_DU_NO, COT_DU_NO_QH, COT_DU_NO_KHOANH,
+              COT_LAI_TON, COT_LAI_TON_QH, COT_GIAI_NGAN_TRONG_NAM]:
+        if c in df.columns:
+            df[c] = pd.to_numeric(df[c], errors="coerce").fillna(0)
+
+    # ── Tổng hợp chính ──────────────────────────────────────────────────────
+    agg: dict = {
+        "du_no":  (COT_TONG_DU_NO, "sum"),
+        "nqh":    (COT_DU_NO_QH, "sum"),
+        "so_kh":  (COT_MA_KH, "nunique"),
+        "so_mon": (COT_SO_KU, "nunique"),
+    }
+    if COT_DU_NO_KHOANH in df.columns:
+        agg["du_no_khoanh"] = (COT_DU_NO_KHOANH, "sum")
+    if COT_GIAI_NGAN_TRONG_NAM in df.columns:
+        agg["giai_ngan_nam"] = (COT_GIAI_NGAN_TRONG_NAM, "sum")
+
+    df_pgd = df.groupby(COT_TEN_PGD, as_index=False).agg(**agg)
+
+    # ── Lãi tồn (TH + QH) ───────────────────────────────────────────────────
+    if COT_LAI_TON in df.columns:
+        df["_lai"] = df[COT_LAI_TON].fillna(0)
+        if COT_LAI_TON_QH in df.columns:
+            df["_lai"] += df[COT_LAI_TON_QH].fillna(0)
+        df_lt = (
+            df.groupby(COT_TEN_PGD, as_index=False)["_lai"]
+            .sum()
+            .rename(columns={"_lai": "lai_ton"})
+        )
+        df_pgd = df_pgd.merge(df_lt, on=COT_TEN_PGD, how="left")
+
+    # ── 3 tháng không hoạt động ──────────────────────────────────────────────
+    if "is_3m_inactive" in df.columns:
+        mask_khd = df["is_3m_inactive"].astype(bool)
+    elif COT_NGAY_GDGN in df.columns:
+        ngay_gdgn = pd.to_datetime(df[COT_NGAY_GDGN], dayfirst=True, errors="coerce")
+        if COT_NGAY_SL in df.columns:
+            ngay_sl = pd.to_datetime(df[COT_NGAY_SL], dayfirst=True, errors="coerce")
+        else:
+            ngay_sl = pd.Series(pd.Timestamp.today(), index=df.index)
+        so_ngay = (ngay_sl - ngay_gdgn).dt.days.fillna(0)
+        mask_khd = so_ngay >= 90
+    else:
+        mask_khd = pd.Series(False, index=df.index)
+
+    if mask_khd.any():
+        df_khd = (
+            df.loc[mask_khd]
+            .groupby(COT_TEN_PGD, as_index=False)
+            .agg(so_3m_khd=(COT_SO_KU, "nunique"))
+        )
+        df_pgd = df_pgd.merge(df_khd, on=COT_TEN_PGD, how="left")
+
+    # ── Nợ đến hạn (tháng + 3 tháng) ───────────────────────────────────────
+    if COT_NGAY_DH in df.columns:
+        today = _dt.date.today()
+        first_m = today.replace(day=1)
+        last_m = (
+            (today.replace(day=28) + _dt.timedelta(days=4)).replace(day=1)
+            - _dt.timedelta(days=1)
+        )
+        next_3m = today + _dt.timedelta(days=90)
+        ngay_dh = pd.to_datetime(df[COT_NGAY_DH], dayfirst=True, errors="coerce")
+
+        mask_t = (ngay_dh.dt.date >= first_m) & (ngay_dh.dt.date <= last_m)
+        mask_3t = (ngay_dh.dt.date >= today) & (ngay_dh.dt.date <= next_3m)
+
+        for suffix, mask in [("thang", mask_t), ("3thang", mask_3t)]:
+            df_dh = (
+                df.loc[mask]
+                .groupby(COT_TEN_PGD, as_index=False)[COT_TONG_DU_NO]
+                .sum()
+                .rename(columns={COT_TONG_DU_NO: f"no_den_han_{suffix}"})
+            )
+            df_pgd = df_pgd.merge(df_dh, on=COT_TEN_PGD, how="left")
+
+    # ── Ghép với danh sách đầy đủ ds_don_vi ─────────────────────────────────
+    df_base = pd.DataFrame({"ten_pgd": ds_don_vi})
+    df_pgd = df_pgd.rename(columns={COT_TEN_PGD: "ten_pgd"})
+    df_pgd = df_base.merge(df_pgd, on="ten_pgd", how="left").fillna(0)
+
+    # Ép int
+    for c in ["so_kh", "so_mon", "so_3m_khd"]:
+        if c in df_pgd.columns:
+            df_pgd[c] = df_pgd[c].astype(int)
+
+    # Đảm bảo cột tồn tại
+    for c in ["du_no_khoanh", "lai_ton", "giai_ngan_nam", "so_3m_khd",
+              "no_den_han_thang", "no_den_han_3thang"]:
+        if c not in df_pgd.columns:
+            df_pgd[c] = 0.0
+
+    # ── Tỷ lệ dẫn xuất ──────────────────────────────────────────────────────
+    dn = df_pgd["du_no"]
+    df_pgd["ty_le_nqh"]      = (df_pgd["nqh"] / dn * 100).where(dn > 0, 0).round(2)
+    df_pgd["ty_le_khoanh"]   = (df_pgd["du_no_khoanh"] / dn * 100).where(dn > 0, 0).round(2)
+    df_pgd["ty_le_npl"]      = (
+        (df_pgd["nqh"] + df_pgd["du_no_khoanh"]) / dn * 100
+    ).where(dn > 0, 0).round(2)
+    df_pgd["pct_3m_khd"]     = (
+        df_pgd["so_3m_khd"] / df_pgd["so_mon"] * 100
+    ).where(df_pgd["so_mon"] > 0, 0).round(2)
+    df_pgd["pct_lai_ton"]    = (df_pgd["lai_ton"] / dn * 100).where(dn > 0, 0).round(2)
+    df_pgd["pct_den_han_3t"] = (
+        df_pgd["no_den_han_3thang"] / dn * 100
+    ).where(dn > 0, 0).round(2)
+    df_pgd["dn_binh_quan_ho"] = (
+        dn / df_pgd["so_kh"].where(df_pgd["so_kh"] > 0)
+    ).fillna(0).round(0)
+
+    # ── Điểm rủi ro tổng hợp (0=rủi ro cao, 100=lành mạnh) ─────────────────
+    # Trọng số: NQH 35% | 3m KHĐ 25% | Khoanh 20% | Lãi tồn 15% | ĐH3T 5%
+    s_nqh    = (100 - (df_pgd["ty_le_nqh"]    * 15.0).clip(0, 100))
+    s_khoanh = (100 - (df_pgd["ty_le_khoanh"] * 30.0).clip(0, 100))
+    s_khd    = (100 - (df_pgd["pct_3m_khd"]   * 10.0).clip(0, 100))
+    s_lai    = (100 - (df_pgd["pct_lai_ton"]   * 25.0).clip(0, 100))
+    s_dh3t   = (100 - (df_pgd["pct_den_han_3t"] * 2.0).clip(0, 100))
+
+    df_pgd["diem_rui_ro"] = (
+        0.35 * s_nqh + 0.25 * s_khd + 0.20 * s_khoanh + 0.15 * s_lai + 0.05 * s_dh3t
+    ).round(1).clip(0, 100)
+
+    return df_pgd.reset_index(drop=True)

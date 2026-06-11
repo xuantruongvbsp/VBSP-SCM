@@ -307,12 +307,13 @@
 ### B12 — Nút in báo cáo không phản hồi / app treo (unconditional generation)
 | | |
 |---|---|
-| **File** | `workspaces/ws_operation.py` — `_render_bao_cao_giao_ban` (~dòng 1293), `_render_heatmap_dao_han` (~dòng 1759); `tabs/tab_baocao/components/export_panel.py` |
+| **File** | `workspaces/ws_executive.py` — `_render_pdf_section` (PDF×2), `_render_suc_khoe_theo_pgd` (Excel×2), `_render_radar_so_sanh` (Excel×1), `_render_xep_hang_pgd` (Excel×1); `workspaces/ws_operation.py` — `_render_bao_cao_giao_ban` (~dòng 1293), `_render_heatmap_dao_han` (~dòng 1759); `tabs/tab_baocao/components/export_panel.py` |
 | **Dấu hiệu** | Bấm nút "Xuất Excel" / "Xuất PDF" không có phản hồi; app treo vài giây hoặc crash âm thầm khi dependency lỗi |
 | **Nguyên nhân** | `st.download_button(data=xuat_excel_chuyen_nghiep(...))` / `download_pdf_button(pdf_bytes=xuat_pdf_co_chart(...))` gọi hàm tạo file **mỗi lần Streamlit rerun** — kể cả khi user chưa bấm nút. Nếu hàm export throw exception → crash thầm lặng (không có try/except). |
 | **Fix** | Tách 2 bước: (1) Button "Tạo file" → gọi hàm → lưu bytes vào `st.session_state`; (2) `st.download_button(data=st.session_state[...])` chỉ render khi bytes đã có. Thêm `try/except` + `logger.error()` + `st.error()` quanh bước tạo file. |
 | **Pattern chuẩn** | `if st.button("Tạo"): st.session_state["_key"] = gen_bytes()` → `if st.session_state.get("_key"): st.download_button(data=st.session_state["_key"])` |
-| **Ngày fix** | 2026-06-02 |
+| **Ngày fix** | 2026-06-02 (ws_operation bản đầu); 2026-06-09 (ws_executive.py — 6 buttons PDF+Excel; tabs/ — tab_ban_dai_dien, tab_den_han, tab_don_doc_khd, tab_khtd_giao_dc, tab_phan_tich_pgd; ws_operation.py — 3 instances L1172, L4051, L5168) |
+| **Còn lại** | `tabs/tab_khtd_nhap.py:L244` — template tĩnh nhỏ, bỏ qua (low risk); tất cả instance khác đã fix |
 
 ---
 
@@ -686,8 +687,9 @@
 | | |
 |---|---|
 | **Nguyên nhân** | Check role bằng chuỗi thô: `if role == "admin"` thay vì dùng helper |
-| **Fix** | Dùng `from auth import la_phan_he_cn, la_phan_he_pgd, la_executive, la_admin_cn, normalize_role` |
-| **Bảng nhanh** | `la_phan_he_cn(role)` → executive/admin_cn/manager_cn/admin/manager. `la_phan_he_pgd(role)` → admin_pgd/manager_pgd/user_pgd/user |
+| **Fix** | Dùng `from auth import la_phan_he_cn, la_phan_he_pgd, la_executive, la_admin_cn, la_quan_ly_cn, normalize_role` |
+| **Bảng nhanh** | `la_phan_he_cn(role)` → executive/admin_cn/manager_cn/admin/manager/chuyenvien_cn. `la_phan_he_pgd(role)` → admin_pgd/manager_pgd/user_pgd/user. `la_quan_ly_cn(role)` → admin_cn/admin/manager_cn/manager (không có executive/chuyenvien_cn). `la_admin_cn(role)` → admin_cn/admin |
+| **Instances đã fix** | `app.py:311` (2026-06-09), `tab_khtd_giao_dc.py:769` (2026-06-09), `tab_cdtotkvv_pgd.py:594` (2026-06-09), `tab_nhiem_vu.py:568` (2026-05-23) |
 
 ### I3 — `chuyenvien_cn` thấy giao diện CBTD thay vì giao diện Manager
 | | |
@@ -730,6 +732,18 @@ with st.sidebar:
 def render(**kwargs):
     ALL_ITEMS = _build_all_items(..., df=kwargs.get("df"), ...)  # df đúng từ ctx
 ```
+
+---
+
+### J7 — KeyError '\n background' khi render tab So sánh kỳ
+
+| | |
+|---|---|
+| **File** | `tabs/tab_so_sanh_ky/_kpi_cards.py` L186 |
+| **Dấu hiệu** | `❌ Lỗi render 📊 So sánh kỳ: '\n background'` |
+| **Nguyên nhân** | `_CARD_CSS.format(bg_from=..., ...)` — Python dùng str `.format()` trên chuỗi CSS có cả format placeholder `{bg_from}` lẫn CSS class braces `{...}`. Khi gặp `.mini-card {\n    background:`, Python mở field mode tại `{`, quét đến `}` đầu tiên → field name = `\n background` → KeyError |
+| **Fix** | Thay `.format(...)` bằng vòng lặp `.replace(k, v)` trong `_inject_card_css()` — str.replace không phân tích cú pháp nên không bị nhầm CSS braces |
+| **Ngày fix** | 2026-06-09 |
 
 ---
 

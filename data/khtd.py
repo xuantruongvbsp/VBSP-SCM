@@ -200,7 +200,7 @@ def doc_phu_luc_qd(filepath_or_bytes) -> dict:
                 try:
                     v   = row.iloc[col_idx]
                     val = float(v) * 1e6 if pd.notna(v) and str(v) != "nan" else 0.0
-                except:
+                except (ValueError, TypeError, IndexError):
                     val = 0.0
                 if val > 0:
                     khtd[f"{ten}|{ma_key}"] = val

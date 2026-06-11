@@ -1,4 +1,4 @@
-﻿"""
+"""
 Trung tâm Upload (Upload Center) — Tab Quản trị hệ thống
 ──────────────────────────────────────────────────────────────────────────────
 Module này quản lý upload file hệ thống (HSTD gốc, NQ11 gốc, Điện báo)

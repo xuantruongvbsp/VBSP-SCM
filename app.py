@@ -37,8 +37,8 @@ from config import (
     FILE_PATH, FILE_PATH_NQ11, FILE_PATH_DB, FILE_PATH_DB_PREV,
     FILE_PATH_SK_GQVL, CACHE_SK_GQVL,
     TEN_FILE, TEN_FILE_NQ11, TEN_FILE_DB, TEN_FILE_DB_PREV,
-    COT_TEN_PGD, COT_MA_KH, COT_NGAY_SL, WORKSPACE_MAP,
-    COT_TONG_DU_NO, COT_DU_NO_QH,
+    COT_TEN_PGD, COT_MA_KH, COT_NGAY_SL, COT_SO_KU, WORKSPACE_MAP,
+    COT_TONG_DU_NO, COT_DU_NO_QH, COT_DU_NO_TH,
     CACHE_HSTD, CACHE_NQ11, DON_VI_CHI_NHANH,
     DS_PGD as _DS_PGD_DEFAULT,
     PGD_XA_MAP as _PGD_XA_MAP_DEFAULT,
@@ -141,6 +141,90 @@ def _load_hstd(
 def _load_nq11(cache_path: str, _ts: float) -> pd.DataFrame:
     return duckdb.query(f"SELECT * FROM '{cache_path}'").df()
 
+
+def _enrich_hstd(
+    df: pd.DataFrame,
+    df_nq11: pd.DataFrame | None,
+    df_gqvl: pd.DataFrame | None,
+) -> pd.DataFrame:
+    """Gắn cột __is_nq11, __is_gqvl (và cột dư nợ bổ sung) vào HSTD.
+
+    Thực hiện một lần duy nhất tại app.py trước khi truyền ctx vào tabs.
+    Tất cả tabs dùng df["__is_nq11"] thay vì tự build set riêng.
+    """
+    if df is None or df.empty:
+        return df
+    if COT_SO_KU not in df.columns:
+        df = df.copy()
+        df["__is_nq11"] = False
+        df["__is_gqvl"] = False
+        return df
+
+    df = df.copy()
+    df[COT_SO_KU] = df[COT_SO_KU].astype(str).str.strip()
+    _ku = df[COT_SO_KU]
+
+    # ── NQ11 ──
+    # Ưu tiên kv_store (upload 1 lần); fallback sang df_nq11 nếu kv_store trống
+    from data.hstd import doc_so_khe_uoc_nq11 as _doc_nq11_ids
+    _nq11_ids = _doc_nq11_ids()
+    if _nq11_ids:
+        df["__is_nq11"] = _ku.isin(_nq11_ids)
+    elif df_nq11 is not None and not df_nq11.empty:
+        _ku_col = next(
+            (c for c in ["Số khế ước", COT_SO_KU] if c in df_nq11.columns), None
+        )
+        if _ku_col:
+            _set_nq = set(df_nq11[_ku_col].dropna().astype(str).str.strip())
+            df["__is_nq11"] = _ku.isin(_set_nq)
+        else:
+            df["__is_nq11"] = False
+    else:
+        df["__is_nq11"] = False
+
+    # Tính __dn_nq11 / __qh_nq11 từ cột HSTD (không cần join từ file NQ11 nữa)
+    if df["__is_nq11"].any():
+        _tong_col = next((c for c in [COT_TONG_DU_NO, "Tổng dư nợ"] if c in df.columns), None)
+        _qh_col   = next((c for c in [COT_DU_NO_QH,   "Dư nợ quá hạn"] if c in df.columns), None)
+        if _tong_col:
+            df["__dn_nq11"] = pd.to_numeric(df[_tong_col], errors="coerce").fillna(0).where(df["__is_nq11"], 0)
+        elif COT_DU_NO_TH in df.columns and _qh_col:
+            df["__dn_nq11"] = (
+                pd.to_numeric(df[COT_DU_NO_TH], errors="coerce").fillna(0)
+                + pd.to_numeric(df[_qh_col],    errors="coerce").fillna(0)
+            ).where(df["__is_nq11"], 0)
+        if _qh_col:
+            df["__qh_nq11"] = pd.to_numeric(df[_qh_col], errors="coerce").fillna(0).where(df["__is_nq11"], 0)
+
+    # ── GQVL ──
+    # Dùng df[COT_SO_KU] thay vì _ku để tránh index mismatch sau NQ11 merge
+    if df_gqvl is not None and not df_gqvl.empty:
+        _ku_col_g = next(
+            (c for c in ["Số khế ước", COT_SO_KU] if c in df_gqvl.columns), None
+        )
+        if _ku_col_g:
+            _set_gq = set(df_gqvl[_ku_col_g].dropna().astype(str).str.strip())
+            df["__is_gqvl"] = df[COT_SO_KU].isin(_set_gq)
+            # Join thêm tên nhà đầu tư
+            _ndt_col = next(
+                (c for c in df_gqvl.columns
+                 if "nhà đầu tư" in c.lower() or c.lower() in ("ten_ndt", "ndt")),
+                None,
+            )
+            if _ndt_col:
+                _slim_g = (
+                    df_gqvl[[_ku_col_g, _ndt_col]]
+                    .drop_duplicates(subset=[_ku_col_g])
+                    .rename(columns={_ku_col_g: COT_SO_KU, _ndt_col: "__ndt_gqvl"})
+                )
+                _slim_g[COT_SO_KU] = _slim_g[COT_SO_KU].astype(str).str.strip()
+                df = df.merge(_slim_g, on=COT_SO_KU, how="left")
+        else:
+            df["__is_gqvl"] = False
+    else:
+        df["__is_gqvl"] = False
+
+    return df
 
 
 # ── Page config ───────────────────────────────────────────────────────────────
@@ -308,7 +392,8 @@ def main():
         # ── Menu điều hành (chỉ hiện khi workspace = management) ──
         if st.session_state.get("workspace") == "management":
             from workspaces.ws_management import render_sidebar_menu
-            can_upload = role in ("admin", "admin_cn", "manager", "manager_cn", "chuyenvien_cn")
+            from auth import la_phan_he_cn, la_executive
+            can_upload = la_phan_he_cn(role) and not la_executive(role)
             _ctx_sb = st.session_state.get("_ctx") or {}
             render_sidebar_menu(
                 role=role,
@@ -493,47 +578,39 @@ def main():
             else:
                 df = df_full
 
-            df_nq11 = None
-            if ws_hien_tai == "operation":
-                if la_phan_he_pgd(role) and pgd_user:
-                    path_nq11_pgd = duong_dan_pgd(pgd_user, "nq11")
-                    if os.path.exists(path_nq11_pgd):
-                        df_nq11 = doc_nq11_pgd(pgd_user, ts_file(path_nq11_pgd))
-                else:
-                    df_nq11 = doc_nq11_toan_cn_pgd()
-
-            if df_nq11 is None and os.path.exists(FILE_PATH_NQ11) and ws_hien_tai != "executive":
-                if not os.path.exists(CACHE_NQ11):
-                    doc_file_nq11(FILE_PATH_NQ11, ts_file(FILE_PATH_NQ11))
-                if la_phan_he_pgd(role) and pgd_user:
-                    _nq11_cache = st.session_state.get("nq11_pgd_cache")
-                    _nq11_ts = ts_file(CACHE_NQ11)
-                    if (
-                        _nq11_cache
-                        and _nq11_cache.get("ts_nq11") == _nq11_ts
-                        and _nq11_cache.get("pgd_user") == pgd_user
-                    ):
-                        df_nq11 = _nq11_cache["data"]
-                    else:
-                        makh_df = df[[COT_MA_KH]].dropna().astype(str).drop_duplicates()
-                        if not makh_df.empty:
-                            df_nq11 = duckdb.query(
-                                f"SELECT n.* FROM '{CACHE_NQ11}' n "
-                                f"JOIN makh_df m ON CAST(n.\"Mã khách hàng\" AS VARCHAR) = m[\"{COT_MA_KH}\"]"
-                            ).df()
-                        else:
-                            df_nq11 = pd.DataFrame()
-                        st.session_state["nq11_pgd_cache"] = {
-                            "data": df_nq11,
-                            "ts_nq11": _nq11_ts,
-                            "pgd_user": pgd_user,
-                        }
-                else:
-                    df_nq11 = _load_nq11(CACHE_NQ11, _nq11_ts)
+            # df_nq11: kv_store approach (upload 1 lần).
+            # Backward compat: nếu kv_store chưa có IDs → đọc parquet cache cũ
+            # để _enrich_hstd() fallback sang df_nq11.
+            from data.hstd import doc_so_khe_uoc_nq11 as _check_nq11_ids
+            _has_nq11_kv = bool(_check_nq11_ids())
+            _df_nq11_fallback = None
+            if not _has_nq11_kv and os.path.exists(CACHE_NQ11) and ws_hien_tai != "executive":
+                _df_nq11_fallback = _load_nq11(CACHE_NQ11, _nq11_ts)
 
             df_gqvl = None
             if os.path.exists(FILE_PATH_SK_GQVL) and ws_hien_tai != "executive":
                 df_gqvl = doc_file_sk_gqvl(FILE_PATH_SK_GQVL, _gqvl_ts)
+
+            # Enrich HSTD với NQ11/GQVL flags — 1 lần, tất cả tabs dùng chung
+            df = _enrich_hstd(df, _df_nq11_fallback, df_gqvl)
+            if df_full is not df:
+                df_full = _enrich_hstd(df_full, _df_nq11_fallback, df_gqvl)
+
+            # Xây df_nq11 cho tabs từ HSTD đã enrich (không cần file riêng)
+            if "__is_nq11" in df.columns and df["__is_nq11"].any():
+                df_nq11 = df[df["__is_nq11"]].copy()
+                # Alias tên cột HSTD → tên cột NQ11 file (để tab_nq11.py không cần sửa)
+                for _src, _dst in (
+                    (COT_TONG_DU_NO, "DNO NQ11"),
+                    (COT_DU_NO_TH,   "Nợ trong hạn"),
+                    (COT_DU_NO_QH,   "Nợ quá hạn"),
+                    (COT_MA_KH,      "Mã khách hàng"),
+                    ("Tên KH",        "Tên khách hàng"),
+                ):
+                    if _src in df_nq11.columns and _dst not in df_nq11.columns:
+                        df_nq11[_dst] = df_nq11[_src]
+            else:
+                df_nq11 = pd.DataFrame()
 
             _map_cache_ts = _hstd_ts
             if st.session_state.get("_pgd_map_cache_ts") != _map_cache_ts:

@@ -1102,7 +1102,6 @@ def render(**kwargs):
     st.title("📋 Phòng KH-NV")
     st.caption("Giám sát chỉ tiêu · Cân đối vốn · Quản lý NQH · GQVL · Quản lý CBTD")
 
-    from config import DS_PGD as _DS_PGD
     _banner_hstd_cu()
 
     filtered_kw = {k: v for k, v in kwargs.items()

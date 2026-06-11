@@ -765,38 +765,24 @@ def _render_quan_ly_template(df: pd.DataFrame):
                 st.exception(e)  # Debug info
 
 
-def _banner_pgd_chua_upload(ds_pgd: list, threshold_days: int = 7) -> None:
-    """Banner cảnh báo PGD chưa upload file HSTD trong threshold_days ngày gần nhất."""
-    from pathlib import Path as _Path
-    from config import PGD_DATA_DIR as _PGD_DATA_DIR
-    from data.pgd import pgd_slug as _pgd_slug
-
-    now = datetime.now()
-    pgd_chua = []
-    pgd_cu = []
-
-    for pgd in ds_pgd:
-        slug = _pgd_slug(pgd)
-        p = _Path(_PGD_DATA_DIR) / slug / "hstd_latest.xlsx"
-        if not p.exists():
-            pgd_chua.append(pgd)
-        else:
-            age = (now - datetime.fromtimestamp(p.stat().st_mtime)).days
-            if age >= threshold_days:
-                pgd_cu.append((pgd, age))
-
-    total = len(pgd_chua) + len(pgd_cu)
-    if total == 0:
+def _banner_hstd_cu(threshold_days: int = 7) -> None:
+    """Banner cảnh báo dữ liệu HSTD tổng hợp (do Phòng KH-NV upload) chưa cập nhật."""
+    from services.upload_service import lay_meta_merge
+    meta = lay_meta_merge("hstd")
+    if not meta:
+        st.warning("⚠️ Chưa có dữ liệu HSTD. Vui lòng upload file tại tab **Upload dữ liệu**.")
         return
-
-    with st.expander(f"⚠️ {total} PGD chưa cập nhật dữ liệu trong {threshold_days} ngày qua", expanded=False):
-        if pgd_chua:
-            st.markdown(f"**❌ Chưa upload lần nào ({len(pgd_chua)} PGD):**")
-            st.markdown("  ".join(f"`{p}`" for p in pgd_chua))
-        if pgd_cu:
-            st.markdown(f"**🕐 Upload đã lâu ({len(pgd_cu)} PGD):**")
-            _rows = [{"PGD": p, "Số ngày từ lần upload cuối": d} for p, d in sorted(pgd_cu, key=lambda x: -x[1])]
-            st.dataframe(pd.DataFrame(_rows), use_container_width=True, height=min(240, len(_rows) * 45 + 50))
+    try:
+        last_update = datetime.fromisoformat(meta["thoi_gian"])
+        age_days = (datetime.now() - last_update).days
+    except Exception:
+        return
+    if age_days >= threshold_days:
+        st.warning(
+            f"⚠️ Dữ liệu HSTD đã **{age_days} ngày** chưa cập nhật "
+            f"(lần cuối: {last_update.strftime('%d/%m/%Y %H:%M')}). "
+            "Vui lòng upload file mới tại tab **Upload dữ liệu**."
+        )
 
 
 @st.cache_data(show_spinner=False, ttl=300)
@@ -1117,7 +1103,7 @@ def render(**kwargs):
     st.caption("Giám sát chỉ tiêu · Cân đối vốn · Quản lý NQH · GQVL · Quản lý CBTD")
 
     from config import DS_PGD as _DS_PGD
-    _banner_pgd_chua_upload([p for p in _DS_PGD if p != "Hội sở Chi nhánh tỉnh"])
+    _banner_hstd_cu()
 
     filtered_kw = {k: v for k, v in kwargs.items()
                    if k not in ("role", "username", "df", "df_full", "ds_pgd_all")}

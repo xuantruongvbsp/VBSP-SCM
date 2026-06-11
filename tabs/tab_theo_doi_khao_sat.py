@@ -7,6 +7,9 @@ Mỗi worksheet có cùng template:
   - Cột E (index 4): Số hộ đang là hộ nghèo
   - Cột F (index 5): Số hộ đang là cận nghèo
 Kiểm tra: ô không None/rỗng → đã nhập (kể cả giá trị 0).
+
+Sheet "Nhật ký" (tạo tự động bởi Apps Script onEdit):
+  Cột: Thời gian | Đơn vị | Hàng | Cột | Giá trị mới | Người nhập
 """
 from __future__ import annotations
 
@@ -26,19 +29,19 @@ from tabs.base_tab import TabContext
 
 # ── Hằng số ──────────────────────────────────────────────────────────────────
 
-SHEET_ID  = "1BRSNwynHAO3FSq5Vsuk3u1WcvJD8asJgi3evuOaDmDw"
-COT_E_IDX = 4   # 0-based — "Số hộ đang là hộ nghèo"
-COT_F_IDX = 5   # 0-based — "Số hộ đang là cận nghèo"
-# Dòng dữ liệu cần kiểm tra (0-based): hàng 9 = index 8, hàng 10–12 = index 9–11
-DATA_ROW_INDICES = [8, 9, 10, 11]
+SHEET_ID        = "1BRSNwynHAO3FSq5Vsuk3u1WcvJD8asJgi3evuOaDmDw"
+SHEET_NHAT_KY   = "Nhật ký"
+COT_E_IDX       = 4   # 0-based — "Số hộ đang là hộ nghèo"
+COT_F_IDX       = 5   # 0-based — "Số hộ đang là cận nghèo"
+DATA_ROW_INDICES = [8, 9, 10, 11]   # hàng 9–12 (0-based)
 
-TEN_COT_E = "Số hộ hộ nghèo (cột E)"
-TEN_COT_F = "Số hộ cận nghèo (cột F)"
+TEN_COT_E = "Số hộ hộ nghèo (E)"
+TEN_COT_F = "Số hộ cận nghèo (F)"
 
 _EMOJI_DU    = "🟢"
 _EMOJI_MOT   = "🟡"
 _EMOJI_TRONG = "🔴"
-_EMOJI_KTT   = "⚫"   # Không tìm thấy worksheet của PGD
+_EMOJI_KTT   = "⚫"
 
 # ── Kết nối Google Sheets ─────────────────────────────────────────────────────
 
@@ -92,7 +95,6 @@ def _chuan_hoa_ten_pgd(raw: str) -> str:
     for prefix in ("Phòng giao dịch ", "Phong giao dich ", "PGD ", "pgd "):
         if s.lower().startswith(prefix.lower()):
             return "PGD " + s[len(prefix):].strip()
-    # Xử lý dạng viết hoa toàn bộ: "PHÒNG GIAO DỊCH LONG THÀNH" → "PGD Long Thành"
     s_upper = s.upper()
     for prefix_upper in ("PHÒNG GIAO DỊCH ", "PHONG GIAO DICH "):
         if s_upper.startswith(prefix_upper):
@@ -106,16 +108,16 @@ def _co_gia_tri(val) -> bool:
         return False
     if isinstance(val, str):
         return val.strip() != ""
-    return True   # số (kể cả 0) → đã điền
+    return True
 
 
-# ── Đọc dữ liệu từ Google Sheets ─────────────────────────────────────────────
+# ── Đọc dữ liệu cột E/F từng worksheet PGD ───────────────────────────────────
 
 @st.cache_data(ttl=300)
 def _doc_khao_sat() -> dict:
-    """Fetch dữ liệu từng worksheet PGD; trả về dict {pgd_name: (co_e, co_f, val_e, val_f)}.
+    """Fetch dữ liệu từng worksheet PGD.
 
-    Trả về {"error": msg} nếu kết nối thất bại.
+    Trả về {"data": {pgd: (has_e, has_f, val_e, val_f)}} hoặc {"error": msg}.
     """
     try:
         client = _ket_noi_gsheet()
@@ -127,23 +129,15 @@ def _doc_khao_sat() -> dict:
         logger.error("_doc_khao_sat: %s", e, exc_info=True)
         return {"error": f"Lỗi kết nối Google Sheets: {e}"}
 
-    # Xây map: tên chuẩn hóa → worksheet object
-    ws_map: dict = {}
-    for ws in all_ws:
-        chuan = _chuan_hoa_ten_pgd(ws.title)
-        ws_map[chuan] = ws
+    ws_map: dict = {_chuan_hoa_ten_pgd(ws.title): ws for ws in all_ws}
 
     ket_qua: dict[str, tuple] = {}
     for pgd in DS_PGD:
-        ws = ws_map.get(pgd)
+        ws = ws_map.get(pgd) or next(
+            (v for k, v in ws_map.items() if k.upper() == pgd.upper()), None
+        )
         if ws is None:
-            # Thử match không dấu / viết hoa khác
-            ws = next(
-                (v for k, v in ws_map.items() if k.upper() == pgd.upper()),
-                None,
-            )
-        if ws is None:
-            ket_qua[pgd] = (None, None, "", "")   # không tìm thấy sheet
+            ket_qua[pgd] = (None, None, "", "")
             continue
 
         try:
@@ -153,9 +147,7 @@ def _doc_khao_sat() -> dict:
             ket_qua[pgd] = (None, None, "", f"Lỗi đọc: {e}")
             continue
 
-        # Kiểm tra các dòng dữ liệu (row 9–12, index 8–11)
-        has_e = False
-        has_f = False
+        has_e, has_f = False, False
         vals_e: list[str] = []
         vals_f: list[str] = []
 
@@ -177,10 +169,49 @@ def _doc_khao_sat() -> dict:
     return {"data": ket_qua}
 
 
+# ── Đọc sheet Nhật ký ─────────────────────────────────────────────────────────
+
+@st.cache_data(ttl=300)
+def _doc_nhat_ky() -> dict[str, dict]:
+    """Đọc sheet 'Nhật ký'; trả về {pgd: {"nguoi": str, "thoi_gian": str}}.
+
+    Mỗi PGD giữ bản ghi mới nhất (dòng cuối cùng trong log).
+    Trả về {} nếu sheet chưa tồn tại hoặc lỗi kết nối.
+    """
+    try:
+        client = _ket_noi_gsheet()
+        spreadsheet = client.open_by_key(SHEET_ID)
+        try:
+            log_ws = spreadsheet.worksheet(SHEET_NHAT_KY)
+        except Exception:
+            return {}   # sheet chưa được tạo bởi Apps Script
+        data = log_ws.get_all_values()
+    except Exception as e:
+        logger.warning("_doc_nhat_ky: %s", e)
+        return {}
+
+    if len(data) < 2:
+        return {}
+
+    # Header: Thời gian(0) | Đơn vị(1) | Hàng(2) | Cột(3) | Giá trị(4) | Người nhập(5)
+    result: dict[str, dict] = {}
+    for row in data[1:]:
+        if len(row) < 6:
+            continue
+        pgd        = _chuan_hoa_ten_pgd(row[1].strip())
+        thoi_gian  = row[0].strip()
+        nguoi_nhap = row[5].strip()
+        if not pgd or pgd not in DS_PGD:
+            continue
+        # Ghi đè liên tục → dòng cuối = mới nhất
+        result[pgd] = {"nguoi": nguoi_nhap, "thoi_gian": thoi_gian}
+
+    return result
+
+
 # ── Render ────────────────────────────────────────────────────────────────────
 
 def _trang_thai(has_e, has_f) -> tuple[str, str]:
-    """Trả về (emoji, label) theo trạng thái cột E/F."""
     if has_e is None and has_f is None:
         return _EMOJI_KTT, "Không tìm thấy sheet"
     if has_e and has_f:
@@ -191,31 +222,39 @@ def _trang_thai(has_e, has_f) -> tuple[str, str]:
 
 
 def _render_metrics(rows_result: list[dict]) -> None:
-    cnt_du = sum(1 for r in rows_result if _EMOJI_DU in r["Trạng thái"])
-    cnt_mot = sum(1 for r in rows_result if _EMOJI_MOT in r["Trạng thái"])
+    cnt_du   = sum(1 for r in rows_result if _EMOJI_DU    in r["Trạng thái"])
+    cnt_mot  = sum(1 for r in rows_result if _EMOJI_MOT   in r["Trạng thái"])
     cnt_chua = sum(1 for r in rows_result if _EMOJI_TRONG in r["Trạng thái"])
-    cnt_ktt = sum(1 for r in rows_result if _EMOJI_KTT in r["Trạng thái"])
-    tong = len(rows_result)
+    cnt_ktt  = sum(1 for r in rows_result if _EMOJI_KTT   in r["Trạng thái"])
 
     c1, c2, c3, c4, c5 = st.columns(5)
-    c1.metric("Tổng PGD",                    tong)
+    c1.metric("Tổng PGD",                    len(rows_result))
     c2.metric(f"{_EMOJI_DU}  Đã nhập đủ",    cnt_du)
     c3.metric(f"{_EMOJI_MOT}  Nhập 1 phần",  cnt_mot)
     c4.metric(f"{_EMOJI_TRONG} Chưa nhập",   cnt_chua)
     c5.metric(f"{_EMOJI_KTT}  Không tìm thấy", cnt_ktt)
 
 
-def _render_bang(ket_qua: dict, ds_pgd: list) -> None:
+def _render_bang(ket_qua: dict, nhat_ky: dict, ds_pgd: list) -> None:
+    co_nhat_ky = bool(nhat_ky)
     rows_result = []
+
     for pgd in ds_pgd:
         has_e, has_f, val_e, val_f = ket_qua.get(pgd, (None, None, "", ""))
         emoji, label = _trang_thai(has_e, has_f)
-        rows_result.append({
+
+        log = nhat_ky.get(pgd, {})
+        row: dict = {
             "Đơn vị":     pgd,
             TEN_COT_E:    val_e if has_e else ("—" if has_e is False else ""),
             TEN_COT_F:    val_f if has_f else ("—" if has_f is False else ""),
             "Trạng thái": f"{emoji} {label}",
-        })
+        }
+        if co_nhat_ky:
+            row["Người nhập"] = log.get("nguoi", "")
+            row["Thời gian"]  = log.get("thoi_gian", "")
+
+        rows_result.append(row)
 
     _render_metrics(rows_result)
     st.dataframe(pd.DataFrame(rows_result), hide_index=True, use_container_width=True)
@@ -252,12 +291,20 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
             return
 
         ket_qua: dict = result.get("data", {})
+        nhat_ky: dict = _doc_nhat_ky()
+
         ds_pgd = DS_PGD if is_cn else ([pgd_user] if pgd_user else [])
         if not ds_pgd:
             st.info("ℹ️ Không xác định được đơn vị cần hiển thị.")
             return
 
-        _render_bang(ket_qua, ds_pgd)
+        if not nhat_ky:
+            st.info(
+                "ℹ️ Chưa có dữ liệu nhật ký — cột **Người nhập** và **Thời gian** sẽ hiển thị "
+                "sau khi thiết lập Apps Script trong Google Sheets."
+            )
+
+        _render_bang(ket_qua, nhat_ky, ds_pgd)
         st.caption(
             "Dữ liệu từ Google Sheets · Tự động cập nhật mỗi 5 phút · "
             f"Kiểm tra: **{TEN_COT_E}** và **{TEN_COT_F}** (hàng 9–12 mỗi worksheet PGD)"

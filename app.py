@@ -592,8 +592,14 @@ def main():
                 df_gqvl = doc_file_sk_gqvl(FILE_PATH_SK_GQVL, _gqvl_ts)
 
             # Enrich HSTD với NQ11/GQVL flags — 1 lần, tất cả tabs dùng chung
+            # QUAN TRỌNG: kiểm tra df is df_full TRƯỚC khi gọi _enrich_hstd vì hàm này
+            # luôn trả về object mới (df.copy()) — nếu check sau thì df_full is not df
+            # luôn True và enrich chạy 2 lần không cần thiết.
+            _df_was_df_full = df is df_full
             df = _enrich_hstd(df, _df_nq11_fallback, df_gqvl)
-            if df_full is not df:
+            if _df_was_df_full:
+                df_full = df  # cùng nguồn dữ liệu — dùng chung 1 bản enrich
+            else:
                 df_full = _enrich_hstd(df_full, _df_nq11_fallback, df_gqvl)
 
             # Xây df_nq11 cho tabs từ HSTD đã enrich (không cần file riêng)

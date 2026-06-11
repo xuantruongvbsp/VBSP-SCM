@@ -85,9 +85,19 @@ def render_result_card(
     tong_du_no = float(hs.get(COT_TONG_DU_NO, 0) or 0)
     du_no_qh = float(hs.get(COT_DU_NO_QH, 0) or 0)
     nguon_von = str(hs.get(COT_NGUON_VON, "—"))
-    ngay_vay = str(hs.get(COT_NGAY_VAY, "—"))
-    thoi_han = str(hs.get(COT_THOI_HAN, "—"))
-    lai_suat = str(hs.get(COT_LAI_SUAT, "—"))
+    def _s(val, default="—") -> str:
+        if val is None:
+            return default
+        try:
+            if pd.isna(val):
+                return default
+        except (TypeError, ValueError):
+            pass
+        return str(val)
+
+    ngay_vay = _s(hs.get(COT_NGAY_VAY))
+    thoi_han = _s(hs.get(COT_THOI_HAN))
+    lai_suat = _s(hs.get(COT_LAI_SUAT))
     
     # Build badges
     badges, border_color = _get_badge_styles(du_no_qh, is_nq11, is_gqvl)

@@ -1,5 +1,19 @@
 # CHANGELOG
 
+## [2026-06-11] — Tối ưu hiệu năng: _enrich_hstd chạy 2 lần mỗi load
+- `app.py` dòng ~595 — sửa `if df_full is not df` chạy SAU `_enrich_hstd` (luôn True vì hàm trả object mới) → chuyển sang `_df_was_df_full = df is df_full` check TRƯỚC; tiết kiệm 1 lần `df.copy()` trên 349K rows
+
+## [2026-06-11] — Thêm nhật ký người nhập / thời gian vào tab Khảo sát HN/HCN/HTN
+- `tabs/tab_theo_doi_khao_sat.py` — thêm `_doc_nhat_ky()`: đọc sheet "Nhật ký" (tạo bởi Apps Script onEdit), hiển thị cột Người nhập + Thời gian; tự ẩn nếu sheet chưa tồn tại
+
+## [2026-06-11] — Tối ưu hiệu năng: loại bỏ DB write mỗi rerun trong alert_center
+- `alert_center.py` — `_lay_da_doc()`: thêm session cache 60s, tránh DB read mỗi rerun
+- `alert_center.py` — `_luu_da_doc()`: cập nhật session cache sau khi ghi DB
+- `alert_center.py` — `_xoa_da_doc_cu()`: chỉ ghi DB khi set thực sự thay đổi (trước: luôn ghi)
+
+## [2026-06-11] — Fix "nan tháng" trong result card
+- `components/result_card.py` dòng ~88 — thêm helper `_s()` xử lý NaN cho `ngay_vay`, `thoi_han`, `lai_suat` thay vì `str()` trực tiếp
+
 ## [2026-06-11] — Fix xuat_excel() gọi sai signature trong tab Tra cứu KH
 - `tabs/tab_tracuu_v2.py` dòng 213, 254 — sửa `xuat_excel(df, tên)` → `xuat_excel({tên: df})` đúng signature
 

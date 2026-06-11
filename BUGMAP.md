@@ -900,6 +900,25 @@ def _duong_dan_pgd(ten_pgd: str, loai: str) -> str:
 | **Fix** | Thêm đoạn convert Categorical → object cho cả `df_full_loc` và `df_kh_loc` trước khi dùng groupby: `if isinstance(_df[COT_TEN_PGD].dtype, pd.CategoricalDtype): _df[COT_TEN_PGD] = _df[COT_TEN_PGD].astype(object)` |
 | **Ngày fix** | 2026-05-25 |
 
+### K6 — `_enrich_hstd` chạy 2 lần mỗi session load
+| | |
+|---|---|
+| **File** | `app.py` dòng ~595 |
+| **Dấu hiệu** | F5 reload / workspace switch chậm hơn cần thiết |
+| **Nguyên nhân** | `_enrich_hstd()` luôn trả về object mới (do `df = df.copy()` bên trong). `if df_full is not df:` được check SAU khi gọi → luôn True → enrich chạy 2 lần dù `df` và `df_full` cùng nguồn |
+| **Fix** | `_df_was_df_full = df is df_full` trước khi gọi. Nếu `_df_was_df_full`: `df_full = df` (dùng chung kết quả). Else: enrich `df_full` riêng |
+| **Ngày fix** | 2026-06-11 |
+
+### K5 — DB write mỗi Streamlit rerun — sidebar reload chậm mỗi lần click
+| | |
+|---|---|
+| **File** | `alert_center.py` → `_xoa_da_doc_cu()`, `_lay_da_doc()` |
+| **Dấu hiệu** | App reload chậm sau mỗi tương tác widget bất kỳ; sidebar giật lag |
+| **Nguyên nhân** | `render_alert_sidebar()` gọi `_xoa_da_doc_cu()` mỗi rerun → luôn gọi `_lay_da_doc()` (SQLite read) + `_luu_da_doc()` (SQLite write + audit_log write). Không có guard "chỉ ghi khi thay đổi". `_lay_da_doc()` cũng được gọi thêm lần 2 ngay sau đó |
+| **Fix** | (1) `_lay_da_doc()`: thêm session_state cache 60s — không đọc DB mỗi rerun. (2) `_luu_da_doc()`: cập nhật session cache sau khi ghi. (3) `_xoa_da_doc_cu()`: guard `if pruned != da_doc` — chỉ ghi khi set thực sự thay đổi. Kết quả: 0 DB I/O trong 60s sau lần ghi/đọc cuối |
+| **Pattern tránh** | Gọi `db.ghi_kv()` / `db.ghi_audit()` trong hàm chạy mỗi rerun mà không có cache/guard |
+| **Ngày fix** | 2026-06-11 |
+
 ---
 
 ## Lệnh debug nhanh

@@ -75,24 +75,34 @@ class AlertItem:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 _KV_READ_KEY = "alert_read_ids"
+_ALERT_DA_DOC_SS_KEY = "_alert_da_doc_ss"  # session_state key cho in-memory cache
+_ALERT_DA_DOC_TTL = 60  # giây — reload từ DB mỗi 60s
 
 
 def _lay_da_doc() -> set[str]:
-    """Đọc tập hợp alert_id đã đọc từ kv_store."""
+    """Đọc tập hợp alert_id đã đọc — cache 60s trong session_state để tránh DB read mỗi rerun."""
+    now = datetime.now()
+    cached = st.session_state.get(_ALERT_DA_DOC_SS_KEY)
+    if cached and (now - cached["ts"]).total_seconds() < _ALERT_DA_DOC_TTL:
+        return set(cached["ids"])
     try:
         data = db.doc_kv(_KV_READ_KEY, {})
-        return set(data.get("ids", []))
+        ids = set(data.get("ids", []))
     except Exception as e:
         logger.error(f"Lỗi đọc danh sách đã đọc: {e}", exc_info=True)
-        return set()
+        ids = set()
+    st.session_state[_ALERT_DA_DOC_SS_KEY] = {"ids": ids, "ts": now}
+    return set(ids)
 
 
 def _luu_da_doc(ids: set[str]) -> None:
-    """Lưu tập hợp alert_id đã đọc vào kv_store."""
+    """Lưu tập hợp alert_id đã đọc vào kv_store và cập nhật session cache."""
     try:
         username = st.session_state.get("username", "system")
         db.ghi_kv(_KV_READ_KEY, {"ids": list(ids)}, username=username)
         db.ghi_audit(username, "alert_danh_dau_da_doc", f"Đã đọc {len(ids)} cảnh báo")
+        # Cập nhật session cache ngay sau khi ghi để rerun tiếp theo không cần đọc lại DB
+        st.session_state[_ALERT_DA_DOC_SS_KEY] = {"ids": set(ids), "ts": datetime.now()}
     except Exception as e:
         logger.error(f"Lỗi lưu danh sách đã đọc: {e}", exc_info=True)
 
@@ -105,11 +115,12 @@ def _danh_dau_da_doc(alert_ids: list[str]) -> None:
 
 
 def _xoa_da_doc_cu(active_ids: set[str]) -> None:
-    """Xóa các alert_id không còn active để tránh bloat kv_store."""
+    """Xóa các alert_id không còn active — chỉ ghi DB khi set thực sự bị thu nhỏ."""
     try:
         da_doc = _lay_da_doc()
-        da_doc &= active_ids
-        _luu_da_doc(da_doc)
+        pruned = da_doc & active_ids
+        if pruned != da_doc:  # Chỉ tốn I/O khi có id cũ cần xóa
+            _luu_da_doc(pruned)
     except Exception as e:
         logger.error(f"Lỗi xóa đã đọc cũ: {e}", exc_info=True)
 

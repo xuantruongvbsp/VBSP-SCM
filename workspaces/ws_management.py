@@ -41,6 +41,7 @@ from utils import (
     auto_fill_klgb,
     auto_fill_document,
     hien_thi_dataframe_phan_trang,
+    lazy_tabs,
 )
 from services.excel_service import xuat_excel_chuyen_nghiep, ten_file_xuat as excel_ten_file
 from pdf_service import render_huong_dan, xuat_pdf_group_header
@@ -229,16 +230,16 @@ def _render_cbtd_dia_ban(tab_parent=None, **kw):
     else:
         ctx = st.container()
     with ctx:
-        _s0, _s1, _s2, _s3 = st.tabs([
-            "📊 Dashboard",
-            "👔 Cán bộ tín dụng",
-            "📍 Điểm Giao Dịch",
-            "🏘️ Tổ TK&VV",
-        ])
-        _get_tab("tab_cbtd_dashboard").render(_s0, **kw)
-        _get_tab("tab_cbtd").render(_s1, **kw)
-        _get_tab("tab_quan_ly_dgd").render(_s2, **kw)
-        _get_tab("tab_cdtotkvv").render(_s3, **dict(kw, cdto_mode="cn"))
+        lazy_tabs(
+            ["📊 Dashboard", "👔 Cán bộ tín dụng", "📍 Điểm Giao Dịch", "🏘️ Tổ TK&VV"],
+            [
+                lambda c: _get_tab("tab_cbtd_dashboard").render(c, **kw),
+                lambda c: _get_tab("tab_cbtd").render(c, **kw),
+                lambda c: _get_tab("tab_quan_ly_dgd").render(c, **kw),
+                lambda c: _get_tab("tab_cdtotkvv").render(c, **dict(kw, cdto_mode="cn")),
+            ],
+            key="mgmt_cbtd",
+        )
 
 
 def _render_ndt_dp(role: str, username: str) -> None:

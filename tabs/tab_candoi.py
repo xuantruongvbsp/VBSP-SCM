@@ -401,19 +401,20 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
             }
 
         # ══════════════════════════════════════════════════════════════════
-        # 4 SUB-TABS
+        # 4 SUB-TABS (lazy: chỉ render tab đang active)
         # ══════════════════════════════════════════════════════════════════
-        cd_tab1, cd_tab2, cd_tab3, cd_tab4 = st.tabs([
-            "📊 Tổng quan",
-            "📌 Theo chương trình",
-            "📊 Biểu đồ",
-            "🔍 Ma trận PGD",
-        ])
+        _cd_sub_labels = ["📊 Tổng quan", "📌 Theo chương trình", "📊 Biểu đồ", "🔍 Ma trận PGD"]
+        _cd_sub = st.radio(
+            "Sub-tab", range(len(_cd_sub_labels)),
+            format_func=lambda i: _cd_sub_labels[i],
+            horizontal=True, key=f"candoi_sub_tab{key_sfx}", label_visibility="collapsed",
+        )
+        st.divider()
 
         # ──────────────────────────────────────────────────────────────────
         # TAB 1: TỔNG QUAN — KPI + bảng chi tiết (expander)
         # ──────────────────────────────────────────────────────────────────
-        with cd_tab1:
+        if _cd_sub == 0:
             if db_ht_rows is None:
                 st.info("⚠️ Không đọc được dữ liệu từ file. Kiểm tra lại file hoặc chọn sheet khác.")
             else:
@@ -532,7 +533,7 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
         # ──────────────────────────────────────────────────────────────────
         # TAB 2: THEO CHƯƠNG TRÌNH
         # ──────────────────────────────────────────────────────────────────
-        with cd_tab2:
+        elif _cd_sub == 1:
             if db_ht_rows is None:
                 st.info("⚠️ Không có dữ liệu.")
             else:
@@ -629,7 +630,7 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
         # ──────────────────────────────────────────────────────────────────
         # TAB 3: BIỂU ĐỒ SO SÁNH
         # ──────────────────────────────────────────────────────────────────
-        with cd_tab3:
+        elif _cd_sub == 2:
             if db_ht_rows is None:
                 st.info("⚠️ Không có dữ liệu.")
             elif not db_prev_rows:
@@ -697,7 +698,7 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
         # ──────────────────────────────────────────────────────────────────
         # TAB 4: MA TRẬN PGD (dữ liệu thô từng đơn vị)
         # ──────────────────────────────────────────────────────────────────
-        with cd_tab4:
+        elif _cd_sub == 3:
             from data.hstd import doc_dienbao_matrix, liet_ke_sheet_dienbao as _lk_sheet
 
             _fp_matrix = path_ht

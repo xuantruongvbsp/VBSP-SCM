@@ -1,5 +1,16 @@
 # CHANGELOG
 
+## [2026-06-11] — Fix: PGD upload file mới không tự reload ở workspace Operation
+- `app.py` — thêm `_pgd_op_ts` vào `_data_version`: PGD role check 1 file mtime; CN role quét 22 thư mục với cache 30s
+- `app.py` — xóa scan thừa bên trong loading block, dùng lại `_pgd_op_ts` đã tính
+
+## [2026-06-11] — Tối ưu hiệu năng: tab load chậm
+
+- `tabs/tab_tongquan.py` dòng ~160 — thêm `_cache_bq_counts()` (`@st.cache_data`); loại bỏ `df.copy()` + 4 groupby chạy mỗi rerun
+- `workspaces/ws_management.py` dòng ~34,~225 — thêm `lazy_tabs` vào import; chuyển `_render_cbtd_dia_ban` từ `st.tabs()` sang `lazy_tabs()` (render 4 tab cùng lúc → chỉ render tab active)
+- `tabs/tab_pgd_cards.py` dòng ~615 — chuyển 4 sub-tab (`st.tabs`) sang `st.radio` + `if/elif` lazy; tiết kiệm `_render_heatmap` + `_render_chart` khi không active
+- `tabs/tab_candoi.py` dòng ~403 — chuyển 4 sub-tab sang lazy (`if/elif`); tiết kiệm biểu đồ Plotly + đọc ma trận Excel khi không active
+
 ## [2026-06-11] — Tối ưu hiệu năng: _enrich_hstd chạy 2 lần mỗi load
 - `app.py` dòng ~595 — sửa `if df_full is not df` chạy SAU `_enrich_hstd` (luôn True vì hàm trả object mới) → chuyển sang `_df_was_df_full = df is df_full` check TRƯỚC; tiết kiệm 1 lần `df.copy()` trên 349K rows
 

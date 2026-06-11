@@ -501,7 +501,34 @@ def main():
     _hstd_ts = ts_file(CACHE_HSTD) if os.path.exists(CACHE_HSTD) else 0.0
     _nq11_ts = ts_file(CACHE_NQ11) if os.path.exists(CACHE_NQ11) else 0.0
     _gqvl_ts = ts_file(FILE_PATH_SK_GQVL) if os.path.exists(FILE_PATH_SK_GQVL) else 0.0
-    _data_version = f"{ws_hien_tai}|{role}|{pgd_user}|{_hstd_ts}|{_nq11_ts}|{_gqvl_ts}"
+
+    # PGD upload mtime — đưa vào _data_version để tự động reload khi PGD upload file mới
+    # mà chưa có merge hệ thống (trường hợp này _hstd_ts không đổi → không detect được).
+    # PGD role: check 1 file → rẻ, không cần cache.
+    # CN role / operation: quét 22 thư mục → cache 30s trong session_state.
+    from auth import la_phan_he_cn as _la_cn_ver, la_phan_he_pgd as _la_pgd_ver
+    _pgd_op_ts = 0.0
+    if ws_hien_tai == "operation":
+        if _la_pgd_ver(role) and pgd_user:
+            _p = duong_dan_pgd(pgd_user, "hstd")
+            _pgd_op_ts = ts_file(_p) if os.path.exists(_p) else 0.0
+        elif _la_cn_ver(role):
+            _pgd_scan_ss = st.session_state.get("_pgd_op_mtime_ss")
+            _now_t = time.time()
+            if _pgd_scan_ss is None or (_now_t - _pgd_scan_ss["ts"]) > 30:
+                from pathlib import Path
+                from config import PGD_DATA_DIR
+                _pgd_op_ts = max(
+                    (ts_file(str(d / "hstd_latest.xlsx"))
+                     for d in Path(PGD_DATA_DIR).iterdir()
+                     if d.is_dir() and (d / "hstd_latest.xlsx").exists()),
+                    default=0.0,
+                )
+                st.session_state["_pgd_op_mtime_ss"] = {"mtime": _pgd_op_ts, "ts": _now_t}
+            else:
+                _pgd_op_ts = _pgd_scan_ss["mtime"]
+
+    _data_version = f"{ws_hien_tai}|{role}|{pgd_user}|{_hstd_ts}|{_nq11_ts}|{_gqvl_ts}|{_pgd_op_ts}"
 
     if st.session_state.get("_ctx_cache_key") != _data_version:
         with st.spinner("⏳ Đang tải dữ liệu, vui lòng chờ..."):
@@ -564,15 +591,8 @@ def main():
                         st.info(f"ℹ️ `{pgd_user}` chưa upload HSTD — "
                                 f"tạm dùng dữ liệu từ Phòng KH-NV.")
                 elif la_phan_he_cn(role):
-                    from pathlib import Path
-                    from config import PGD_DATA_DIR
-                    _pgd_hstd_mtime = max(
-                        (ts_file(str(d / "hstd_latest.xlsx"))
-                         for d in Path(PGD_DATA_DIR).iterdir()
-                         if d.is_dir() and (d / "hstd_latest.xlsx").exists()),
-                        default=0.0,
-                    )
-                    df_op = doc_hstd_toan_cn_pgd(_pgd_hstd_mtime)
+                    # _pgd_op_ts đã được tính và cache bên ngoài block — dùng lại
+                    df_op = doc_hstd_toan_cn_pgd(_pgd_op_ts)
                     if df_op is not None and not df_op.empty:
                         df = df_op
             else:

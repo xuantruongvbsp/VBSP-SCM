@@ -157,6 +157,32 @@ def _cache_tqpgd_extended(
     )
 
 
+@st.cache_data(show_spinner=False)
+def _cache_bq_counts(
+    _df: pd.DataFrame,
+    ts: float,
+    pgd_filter: str,
+) -> tuple:
+    """Cache đếm PGD/Tổ/Xã/Hội cho BQ metrics — tránh df.copy() + 4 groupby mỗi rerun."""
+    _ = (ts, pgd_filter)
+    cols_need = [c for c in [COT_TEN_PGD, COT_TEN_TO, COT_TEN_XA, COT_DVUT, COT_TONG_DU_NO]
+                 if c in _df.columns]
+    df_bq = _df[cols_need].copy()
+    if COT_TONG_DU_NO in df_bq.columns:
+        df_bq[COT_TONG_DU_NO] = pd.to_numeric(df_bq[COT_TONG_DU_NO], errors="coerce").fillna(0)
+    n_pgd_co_dn = 0
+    if COT_TEN_PGD in df_bq.columns and COT_TONG_DU_NO in df_bq.columns:
+        _s = df_bq.groupby(COT_TEN_PGD)[COT_TONG_DU_NO].sum()
+        n_pgd_co_dn = int((_s > 0).sum())
+    n_to = (int(df_bq.groupby([COT_TEN_PGD, COT_TEN_TO]).ngroups)
+            if COT_TEN_TO in df_bq.columns and COT_TEN_PGD in df_bq.columns else 0)
+    n_xa = (int(df_bq[COT_TEN_XA].dropna().loc[lambda s: s.isin(set(DS_XA))].nunique())
+            if COT_TEN_XA in df_bq.columns else 0)
+    n_hoi = (int(df_bq[COT_DVUT].dropna().loc[lambda s: (s != "") & (s != "CỘNG")].nunique())
+             if COT_DVUT in df_bq.columns else 0)
+    return n_pgd_co_dn, n_to, n_xa, n_hoi
+
+
 from tabs.base_tab import TabContext
 
 
@@ -329,24 +355,11 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
         _dqh = vn(dqh / 1e9, 3)
         _tlq = vn(tlq, 3)
         _tl_no_xau = vn(tl_no_xau, 3)
-        # ── BQ metrics ──────────────────────────────────────────────
-        df_bq = df.copy()
-        # Chuyển cột tiền sang numeric (khớp cách KPI tính tdn)
-        if COT_TONG_DU_NO in df_bq.columns:
-            df_bq[COT_TONG_DU_NO] = pd.to_numeric(df_bq[COT_TONG_DU_NO], errors="coerce").fillna(0)
-        # Đếm PGD có dư nợ từ groupby numeric
-        _pgd_co_dn = df_bq.groupby(COT_TEN_PGD)[COT_TONG_DU_NO].sum()
-        n_pgd_co_dn = int((_pgd_co_dn > 0).sum())
+        # ── BQ metrics (cached) ─────────────────────────────────────
+        n_pgd_co_dn, n_to, n_xa, n_hoi = _cache_bq_counts(df, ts, str(pgd_filter))
         bq_pgd = tdn / n_pgd_co_dn if n_pgd_co_dn > 0 else 0
-        # n_to: cặp (PGD, Tổ) vì tên Tổ trùng giữa các PGD
-        n_to  = int(df_bq.groupby([COT_TEN_PGD, COT_TEN_TO]).ngroups) if COT_TEN_TO in df_bq.columns else 0
-        bq_to = tdn / n_to if n_to > 0 else 0
-        # n_xa: đếm xã hợp lệ — chỉ tính xã nằm trong DS_XA (95 xã/phường chuẩn)
-        # để loại trừ tên xã lỗi/typo trong dữ liệu
-        n_xa  = int(df_bq[COT_TEN_XA].dropna().loc[lambda s: s.isin(set(DS_XA))].nunique()) if COT_TEN_XA in df_bq.columns else 0
-        bq_xa = tdn / n_xa if n_xa > 0 else 0
-        # n_hoi: unique ĐVUT, loại NaN/rỗng/"CỘNG" (chỉ có 4 Hội đoàn thể)
-        n_hoi = int(df_bq[COT_DVUT].dropna().loc[lambda s: (s != "") & (s != "CỘNG")].nunique()) if COT_DVUT in df_bq.columns else 0
+        bq_to  = tdn / n_to  if n_to  > 0 else 0
+        bq_xa  = tdn / n_xa  if n_xa  > 0 else 0
         bq_hoi = tdn / n_hoi if n_hoi > 0 else 0
         _bq_pgd  = vn(bq_pgd / 1_000_000, 1) + " tr"
         _bq_to   = vn(bq_to / 1_000_000, 1) + " tr" if n_to > 0 else "—"

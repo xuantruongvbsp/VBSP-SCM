@@ -612,13 +612,17 @@ def render(tab_parent=None, **kwargs):
         # ── Upload info map (dùng cho card + bảng) ───────────────────────
         upload_info_map = {dv: _upload_info(dv) for dv in ds_don_vi}
 
-        # ── 4 Sub-tabs ───────────────────────────────────────────────────
-        t_card, t_table, t_heat, t_chart = st.tabs([
-            "🃏 Thẻ PGD", "📊 Bảng Đa chiều", "🌡️ Heatmap Rủi ro", "📈 Biểu đồ",
-        ])
+        # ── 4 Sub-tabs (lazy: chỉ render tab đang active) ───────────────
+        _sub_labels = ["🃏 Thẻ PGD", "📊 Bảng Đa chiều", "🌡️ Heatmap Rủi ro", "📈 Biểu đồ"]
+        _pgd_sub = st.radio(
+            "Sub-tab", range(len(_sub_labels)),
+            format_func=lambda i: _sub_labels[i],
+            horizontal=True, key="pgd_cards_sub_tab", label_visibility="collapsed",
+        )
+        st.divider()
 
-        # ─── Tab 1: Thẻ PGD ──────────────────────────────────────────────
-        with t_card:
+        # ─── Sub-tab 1: Thẻ PGD ──────────────────────────────────────────
+        if _pgd_sub == 0:
             col_f1, col_f2, col_f3 = st.columns([2, 2, 2])
             with col_f1:
                 sapxep = st.selectbox(
@@ -714,8 +718,8 @@ def render(tab_parent=None, **kwargs):
                     st.rerun()
                 _render_drilldown(df, selected)
 
-        # ─── Tab 2: Bảng Đa chiều ─────────────────────────────────────────
-        with t_table:
+        # ─── Sub-tab 2: Bảng Đa chiều ───────────────────────────────────
+        elif _pgd_sub == 1:
             st.caption(
                 "Xếp hạng từ **tốt nhất** (top) → **cần chú ý** (cuối) theo Điểm RR tổng hợp. "
                 "⭐ Điểm RR: 0–100 (100 = lành mạnh nhất). "
@@ -738,12 +742,12 @@ def render(tab_parent=None, **kwargs):
 Ví dụ: NQH 3% → điểm NQH = 100 − 3×15 = 55 → đóng góp 55×35% = 19,25 điểm.
                 """)
 
-        # ─── Tab 3: Heatmap ───────────────────────────────────────────────
-        with t_heat:
+        # ─── Sub-tab 3: Heatmap ──────────────────────────────────────────
+        elif _pgd_sub == 2:
             _render_heatmap(df_cards)
 
-        # ─── Tab 4: Biểu đồ ──────────────────────────────────────────────
-        with t_chart:
+        # ─── Sub-tab 4: Biểu đồ ─────────────────────────────────────────
+        elif _pgd_sub == 3:
             tab_c1, tab_c2 = st.tabs(["📊 Dư nợ & NQH%", "💰 BQ/hộ xếp hạng"])
             with tab_c1:
                 _render_chart(df_cards)

@@ -900,6 +900,16 @@ def _duong_dan_pgd(ten_pgd: str, loai: str) -> str:
 | **Fix** | Thêm đoạn convert Categorical → object cho cả `df_full_loc` và `df_kh_loc` trước khi dùng groupby: `if isinstance(_df[COT_TEN_PGD].dtype, pd.CategoricalDtype): _df[COT_TEN_PGD] = _df[COT_TEN_PGD].astype(object)` |
 | **Ngày fix** | 2026-05-25 |
 
+### K7 — PGD upload file mới không tự reload dữ liệu ở workspace Operation
+| | |
+|---|---|
+| **File** | `app.py` dòng ~501-504 |
+| **Dấu hiệu** | CN role vào workspace Operation sau khi PGD upload file mới → vẫn thấy dữ liệu cũ; phải bấm "Làm mới cache" thủ công |
+| **Nguyên nhân** | `_data_version` chỉ gồm timestamp của file hệ thống (HSTD/NQ11/GQVL parquet). Khi PGD upload `hstd_latest.xlsx` mà chưa merge, `_hstd_ts` không đổi → `_ctx_cache_key` vẫn khớp → block load data bị skip → PGD data mới không được đọc |
+| **Fix** | Tính `_pgd_op_ts` (mtime PGD upload files) trước `_data_version`. PGD role: check 1 file (rẻ). CN role: quét 22 thư mục với session cache 30s. Thêm `_pgd_op_ts` vào `_data_version`. Bên trong loading block dùng lại giá trị đã tính |
+| **Pattern tránh** | Cache key chỉ dựa vào hệ thống file parquet — nếu có nguồn dữ liệu phụ (PGD upload) cũng cần đưa mtime vào key |
+| **Ngày fix** | 2026-06-11 |
+
 ### K6 — `_enrich_hstd` chạy 2 lần mỗi session load
 | | |
 |---|---|

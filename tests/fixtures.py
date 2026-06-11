@@ -10,6 +10,7 @@ def tao_file_hstd_hop_le() -> bytes:
         {
             "BoQua": ["x", "x"],
             "Số khế ước": ["KU001", "KU002"],
+            "Mã KH": ["KH001", "KH002"],
             "Tên PGD": ["PGD Long Thành", "PGD Long Thành"],
             "Tên xã": ["Xã Long Thành", "Xã Long Thành"],
             "Dư nợ trong hạn": [1000, 2000],

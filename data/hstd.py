@@ -591,8 +591,20 @@ def danh_dau_khong_hd(df: "pd.DataFrame") -> "pd.DataFrame":
 
     # Tính số tháng từ Ngày GDGN đến Ngày báo cáo
     if COT_NGAY_GDGN not in df.columns or COT_NGAY_SL not in df.columns:
-        df["is_3m_inactive"] = False
-        df["so_thang_khong_hd"] = float("nan")
+        # Priority-2 fallback: lãi tồn / lãi tháng ≥ 3 → đánh dấu KHĐ
+        from config import COT_LAI_TON, COT_LAI_THANG
+        if COT_LAI_TON in df.columns and COT_LAI_THANG in df.columns:
+            lai_ton   = pd.to_numeric(df[COT_LAI_TON],   errors="coerce").fillna(0)
+            lai_thang = pd.to_numeric(df[COT_LAI_THANG], errors="coerce").fillna(0)
+            so_thang_p2 = pd.Series(float("nan"), index=df.index, dtype=float)
+            mask_nonzero = lai_thang > 0
+            so_thang_p2[mask_nonzero] = lai_ton[mask_nonzero] / lai_thang[mask_nonzero]
+            mask_p2 = mask_nonzero & (so_thang_p2 >= 3)
+            df["is_3m_inactive"]    = mask_p2 & (~mask_loai_tru)
+            df["so_thang_khong_hd"] = so_thang_p2.round(1)
+        else:
+            df["is_3m_inactive"]    = False
+            df["so_thang_khong_hd"] = float("nan")
         return df
 
     ngay_sl   = pd.to_datetime(df[COT_NGAY_SL].astype(object),   errors="coerce", dayfirst=True)

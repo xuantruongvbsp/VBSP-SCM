@@ -1032,8 +1032,15 @@ def luu_pgd_file(ten_pgd: str, loai: str, file_bytes: bytes) -> KetQuaUpload:
             from io import BytesIO
             import pandas as pd
             
-            # Đọc file để validate
-            df = pd.read_excel(BytesIO(file_bytes))
+            # Đọc file để validate — phải dùng đúng header/sheet như khi parse thật
+            if loai in ("hstd", "nq11"):
+                df = pd.read_excel(BytesIO(file_bytes), sheet_name="BCQUERY", header=4)
+                df = df.iloc[:, 1:].dropna(how="all")
+            elif loai == "gqvl":
+                df = pd.read_excel(BytesIO(file_bytes), sheet_name="Sheet1", header=7)
+                df = df.iloc[:, 1:].dropna(how="all").iloc[1:]
+            else:
+                df = pd.read_excel(BytesIO(file_bytes))
             
             # Validate theo loại bảng
             validation_result = validate_dataframe(df, loai)

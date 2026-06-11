@@ -487,6 +487,15 @@
 | **Nguyên nhân thường gặp** | File PGD lỗi format hoặc thiếu cột bắt buộc |
 | **Fix** | Upload lại file PGD đó. Kiểm tra file có đúng sheet name và header row không |
 
+### E3 — `luu_pgd_file()` trả về `KetQuaUpload(thanh_cong=False, "Thiếu cột bắt buộc: Số khế ước, Mã KH...")`
+| | |
+|---|---|
+| **File** | `services/upload_service.py` dòng ~1036 |
+| **Dấu hiệu** | Tất cả cột required đều báo missing dù file có đủ cột |
+| **Nguyên nhân** | Validation đọc Excel bằng `pd.read_excel(file)` mặc định (header=0), trong khi HSTD có header ở row 4 → cột đọc ra là số nguyên, không phải tên cột thật |
+| **Fix** | Dùng `sheet_name="BCQUERY", header=4` cho hstd/nq11; `sheet_name="Sheet1", header=7` cho gqvl + `df.iloc[:, 1:]` |
+| **Ngày fix** | 2026-06-11 |
+
 ### E3 — File upload xong nhưng mất sau restart
 | | |
 |---|---|

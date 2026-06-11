@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## [2026-06-11] — Fix 3 test CI failing (hstd P2 fallback + upload validation parsing)
+- `data/hstd.py` dòng ~593 — `danh_dau_khong_hd()`: thêm Priority-2 fallback lãi tồn/lãi tháng ≥ 3 khi thiếu cột GDGN
+- `services/upload_service.py` dòng ~1036 — `luu_pgd_file()`: sửa đọc Excel validate dùng đúng `header=4, sheet_name="BCQUERY"` thay vì default
+- `tests/fixtures.py` — `tao_file_hstd_hop_le()`: thêm cột `Mã KH` đủ required columns
+
 ## [2026-06-11] — 8 cải tiến mới: validate upload, banner PGD, NQH delta, quick search, tab memory, auto-report, completeness score
 - `services/validation_service.py` — `_validate_hstd_specific()`: kiểm tra cột bắt buộc, dư nợ âm (CRITICAL), trùng Số Khế ước (WARNING)
 - `workspaces/ws_management.py` — `_banner_pgd_chua_upload()`: banner cảnh báo PGD chưa upload trong 7 ngày

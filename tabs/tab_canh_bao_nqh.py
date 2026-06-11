@@ -1043,6 +1043,92 @@ def _render_gia_han(
                  prefix_file="GiaHanNo", key=f"{key_prefix}gh_pdf")
 
 
+@st.cache_data(show_spinner=False, ttl=300)
+def _doc_snapshot_nqh_delta() -> pd.DataFrame:
+    """Lấy delta NQH giữa 2 kỳ gần nhất từ hstd_snapshot."""
+    import sqlite3
+    from db import get_conn
+    with get_conn() as conn:
+        ky_list = [r[0] for r in conn.execute(
+            "SELECT DISTINCT ky FROM hstd_snapshot ORDER BY ky DESC LIMIT 2"
+        ).fetchall()]
+    if len(ky_list) < 2:
+        return pd.DataFrame()
+    ky_curr, ky_prev = ky_list[0], ky_list[1]
+    with get_conn() as conn:
+        df_c = pd.read_sql_query(
+            "SELECT ten_pgd, SUM(du_no_qh) qh_curr, SUM(tong_du_no) dn_curr "
+            "FROM hstd_snapshot WHERE ky=? GROUP BY ten_pgd",
+            conn, params=(ky_curr,),
+        )
+        df_p = pd.read_sql_query(
+            "SELECT ten_pgd, SUM(du_no_qh) qh_prev, SUM(tong_du_no) dn_prev "
+            "FROM hstd_snapshot WHERE ky=? GROUP BY ten_pgd",
+            conn, params=(ky_prev,),
+        )
+    df = df_c.merge(df_p, on="ten_pgd", how="left").fillna(0)
+    df["delta_qh"] = df["qh_curr"] - df["qh_prev"]
+    df["pct_qh"] = df.apply(
+        lambda r: r["delta_qh"] / r["qh_prev"] * 100 if r["qh_prev"] != 0 else float("nan"), axis=1
+    )
+    df.attrs["ky_curr"] = ky_curr
+    df.attrs["ky_prev"] = ky_prev
+    return df
+
+
+def _render_nqh_so_sanh_ky(key_prefix: str) -> None:
+    """So sánh NQH giữa 2 kỳ gần nhất từ hstd_snapshot."""
+    st.subheader("📈 NQH so sánh kỳ")
+    df = _doc_snapshot_nqh_delta()
+    if df.empty:
+        st.info("ℹ️ Chưa đủ 2 kỳ snapshot để so sánh. Hãy thực hiện merge HSTD ít nhất 2 kỳ liên tiếp.")
+        return
+
+    ky_curr = df.attrs.get("ky_curr", "kỳ hiện tại")
+    ky_prev = df.attrs.get("ky_prev", "kỳ trước")
+    st.caption(f"So sánh kỳ **{ky_curr}** ← **{ky_prev}**")
+
+    df_pgd = df[df["ten_pgd"] != "Hội sở Chi nhánh tỉnh"].copy() if len(df) > 1 else df.copy()
+    df_pgd = df_pgd.sort_values("delta_qh", ascending=False)
+
+    tang = df_pgd[df_pgd["delta_qh"] > 0]
+    giam = df_pgd[df_pgd["delta_qh"] < 0]
+    khong_doi = df_pgd[df_pgd["delta_qh"] == 0]
+
+    c1, c2, c3 = st.columns(3)
+    c1.metric("PGD có NQH tăng", len(tang), delta=f"{len(tang)} đơn vị" if tang.empty else None,
+              delta_color="inverse" if len(tang) > 0 else "off")
+    c2.metric("PGD có NQH giảm", len(giam), delta=f"{len(giam)} đơn vị" if not giam.empty else None,
+              delta_color="normal" if len(giam) > 0 else "off")
+    c3.metric("Không đổi / Mới", len(khong_doi))
+
+    st.divider()
+
+    df_out = df_pgd.copy()
+    df_out[f"NQH kỳ {ky_prev} (triệu)"] = df_out["qh_prev"].apply(fmt_ty)
+    df_out[f"NQH kỳ {ky_curr} (triệu)"] = df_out["qh_curr"].apply(fmt_ty)
+    df_out["Tăng/Giảm (triệu)"] = df_out["delta_qh"].apply(fmt_ty)
+    df_out["% thay đổi"] = df_out["pct_qh"].apply(
+        lambda x: (f"+{x:.1f}" if x > 0 else f"{x:.1f}").replace(".", ",") + "%" if not pd.isna(x) else "—"
+    )
+    cols_show = ["ten_pgd", f"NQH kỳ {ky_prev} (triệu)", f"NQH kỳ {ky_curr} (triệu)", "Tăng/Giảm (triệu)", "% thay đổi"]
+    df_final = df_out[cols_show].rename(columns={"ten_pgd": "PGD"})
+    st.dataframe(df_final, use_container_width=True, height=500)
+
+    if not tang.empty:
+        st.warning(f"⚠️ **{len(tang)} PGD có NQH tăng** — cần theo dõi chặt: " +
+                   ", ".join(tang["ten_pgd"].head(5).tolist()))
+
+    buf = xuat_excel({"NQH_SoSanh": df_final})
+    st.download_button(
+        "⬇️ Xuất Excel so sánh NQH",
+        data=buf,
+        file_name=f"NQH_SoSanh_{ky_curr}_{ky_prev}.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        key=f"{key_prefix}nqh_delta_xl",
+    )
+
+
 # ─── Public render ────────────────────────────────────────────────────────────────
 
 def render(tab: DeltaGenerator = None, **kwargs) -> None:
@@ -1087,6 +1173,7 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
             "3 tháng KHĐ",
             "BT sang Rủi ro",
             "Nợ quá hạn phát sinh",
+            "📈 NQH so sánh kỳ",
             "Khoanh sắp hết hạn",
             "Gia hạn nợ",
         ]
@@ -1109,6 +1196,8 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
             _render_migration(df_kh, ds_pgd_all, la_cn, key_prefix)
         elif tab_chon == "Nợ quá hạn phát sinh":
             _render_nqh(df_kh, ds_pgd_all, la_cn, key_prefix)
+        elif tab_chon == "📈 NQH so sánh kỳ":
+            _render_nqh_so_sanh_ky(key_prefix)
         elif tab_chon == "Khoanh sắp hết hạn":
             _render_khoanh_sap_hh(df_full, ds_pgd_all, la_cn, key_prefix)
         elif tab_chon == "Gia hạn nợ":

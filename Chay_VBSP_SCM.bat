@@ -1,4 +1,4 @@
-@echo off
+﻿@echo off
 setlocal enabledelayedexpansion
 chcp 65001 >nul
 
@@ -8,12 +8,29 @@ set "URL=http://localhost:%PORT%"
 set "VENV=venv"
 set "PY_EXE=%VENV%\Scripts\python.exe"
 
-:: ─── Bước 1: Kiểm tra venv ──────────────────────────────────────
 echo.
 echo ============================================
 echo   VBSP-SCM — He thong Tin dung Noi bo
 echo ============================================
 echo.
+
+:: ─── Kiểm tra xem app đã chạy chưa ──────────────────────────────
+netstat -ano | findstr ":%PORT% " | findstr "LISTENING" >nul 2>&1
+if %errorlevel% == 0 (
+    echo   App da dang chay tren cong %PORT%.
+    echo   Mo trinh duyet...
+    echo.
+    if exist "C:\Program Files\Google\Chrome\Application\chrome.exe" (
+        start "" "C:\Program Files\Google\Chrome\Application\chrome.exe" %URL%
+    ) else if exist "C:\Program Files (x86)\Google\Chrome\Application\chrome.exe" (
+        start "" "C:\Program Files (x86)\Google\Chrome\Application\chrome.exe" %URL%
+    ) else (
+        start "" "chrome.exe" %URL%
+    )
+    exit /b 0
+)
+
+:: ─── Bước 1: Kiểm tra venv ──────────────────────────────────────
 echo [1/3] Kiem tra moi truong ao (venv)...
 
 if not exist "%PY_EXE%" (
@@ -57,7 +74,13 @@ echo   URL: %URL%
 echo   Tat: Nhan Ctrl+C
 echo.
 
-start "" %URL%
+if exist "C:\Program Files\Google\Chrome\Application\chrome.exe" (
+    start "" "C:\Program Files\Google\Chrome\Application\chrome.exe" %URL%
+) else if exist "C:\Program Files (x86)\Google\Chrome\Application\chrome.exe" (
+    start "" "C:\Program Files (x86)\Google\Chrome\Application\chrome.exe" %URL%
+) else (
+    start "" "chrome.exe" %URL%
+)
 
 "%PY_EXE%" -m streamlit run app.py ^
   --server.port %PORT% ^

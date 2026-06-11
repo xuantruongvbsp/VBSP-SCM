@@ -237,9 +237,48 @@ class ValidationService:
             ))
     
     def _validate_hstd_specific(self, df: pd.DataFrame, result: ValidationResult):
-        """Validate riêng cho HSTD"""
-        # Có thể thêm các rule riêng cho HSTD ở đây
-        pass
+        """Validate riêng cho HSTD — kiểm tra cột bắt buộc, dư nợ âm, trùng khế ước."""
+        from config import COT_SO_KU, COT_MA_KH, COT_TONG_DU_NO, COT_DU_NO_TH, COT_DU_NO_QH
+
+        # 1. Cột bắt buộc
+        required = [COT_SO_KU, COT_MA_KH, COT_TEN_PGD, COT_TEN_XA, COT_TONG_DU_NO]
+        missing_cols = [c for c in required if c not in df.columns]
+        if missing_cols:
+            result.add_error(ValidationError(
+                ValidationLevel.CRITICAL,
+                "columns",
+                f"Thiếu cột bắt buộc: {', '.join(missing_cols)}",
+                row_count=0,
+                sample_values=missing_cols,
+            ))
+
+        # 2. Dư nợ âm — không thể có dư nợ âm trong HSTD thực tế
+        for cot in [COT_DU_NO_TH, COT_DU_NO_QH, COT_TONG_DU_NO]:
+            if cot not in df.columns:
+                continue
+            s = pd.to_numeric(df[cot], errors="coerce")
+            so_am = int((s < 0).sum())
+            if so_am > 0:
+                result.add_error(ValidationError(
+                    ValidationLevel.CRITICAL,
+                    cot,
+                    f"Cột '{cot}' có {so_am} dòng giá trị âm — kiểm tra lại nguồn dữ liệu",
+                    row_count=so_am,
+                ))
+
+        # 3. Trùng Số Khế ước — cảnh báo để xác nhận (có thể cố ý)
+        if COT_SO_KU in df.columns:
+            dup_mask = df[COT_SO_KU].astype(str).str.strip().duplicated(keep=False)
+            so_trung = int(dup_mask.sum())
+            if so_trung > 0:
+                samples = df.loc[dup_mask, COT_SO_KU].astype(str).unique()[:5].tolist()
+                result.add_error(ValidationError(
+                    ValidationLevel.WARNING,
+                    COT_SO_KU,
+                    f"Trùng Số Khế ước: {so_trung} dòng — {', '.join(samples)}",
+                    row_count=so_trung,
+                    sample_values=samples,
+                ))
     
     def _validate_gqvl_specific(self, df: pd.DataFrame, result: ValidationResult):
         """Validate riêng cho GQVL"""

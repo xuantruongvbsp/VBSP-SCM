@@ -86,8 +86,22 @@ def _phan_tich_du_no_am(df: pd.DataFrame) -> dict:
     return result
 
 
+def _tinh_completeness(sub: pd.DataFrame) -> float:
+    """Tính điểm hoàn chỉnh (0–100) dựa trên _COT_KEY."""
+    if sub.empty:
+        return 0.0
+    total_cells = len(_COT_KEY) * len(sub)
+    filled = 0
+    for cot in _COT_KEY:
+        if cot not in sub.columns:
+            continue
+        filled += int(sub[cot].notna().sum())
+        filled -= int((sub[cot].astype(str).str.strip() == "").sum())
+    return round(max(0, filled) / max(total_cells, 1) * 100, 1)
+
+
 def _phan_tich_theo_pgd(df: pd.DataFrame) -> pd.DataFrame:
-    """Tổng hợp chất lượng theo PGD."""
+    """Tổng hợp chất lượng theo PGD — bao gồm điểm hoàn chỉnh dữ liệu."""
     if df.empty or COT_TEN_PGD not in df.columns:
         return pd.DataFrame()
     all_pgd = [DON_VI_CHI_NHANH] + DS_PGD
@@ -95,17 +109,20 @@ def _phan_tich_theo_pgd(df: pd.DataFrame) -> pd.DataFrame:
     for pgd in all_pgd:
         sub = df[df[COT_TEN_PGD] == pgd]
         if sub.empty:
-            rows.append({"PGD": pgd, "Số dòng": 0, "Tổng dư nợ (triệu)": "—",
-                         "Có NQH": "—", "Trạng thái": "❌ Không có dữ liệu"})
+            rows.append({"PGD": pgd, "Số dòng": 0, "Dư nợ (triệu)": "—",
+                         "Có NQH": "—", "Hoàn chỉnh": "—", "Trạng thái": "❌ Không có dữ liệu"})
             continue
         so_dong = len(sub)
         tong_dn = sub[COT_TONG_DU_NO].pipe(pd.to_numeric, errors="coerce").sum() if COT_TONG_DU_NO in sub.columns else 0
         co_nqh = "Có" if (pd.to_numeric(sub[COT_DU_NO_QH], errors="coerce").sum() > 0 if COT_DU_NO_QH in sub.columns else False) else "Không"
+        score = _tinh_completeness(sub)
+        badge = "✅" if score >= 95 else ("⚠️" if score >= 80 else "❌")
         rows.append({
             "PGD": pgd,
             "Số dòng": so_dong,
-            "Tổng dư nợ (triệu)": fmt_ty(tong_dn),
+            "Dư nợ (triệu)": fmt_ty(tong_dn),
             "Có NQH": co_nqh,
+            "Hoàn chỉnh": f"{badge} {score:.1f}%",
             "Trạng thái": "✅ OK",
         })
     return pd.DataFrame(rows)

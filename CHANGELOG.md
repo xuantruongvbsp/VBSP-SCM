@@ -1,5 +1,15 @@
 # CHANGELOG
 
+## [2026-06-11] — 8 cải tiến mới: validate upload, banner PGD, NQH delta, quick search, tab memory, auto-report, completeness score
+- `services/validation_service.py` — `_validate_hstd_specific()`: kiểm tra cột bắt buộc, dư nợ âm (CRITICAL), trùng Số Khế ước (WARNING)
+- `workspaces/ws_management.py` — `_banner_pgd_chua_upload()`: banner cảnh báo PGD chưa upload trong 7 ngày
+- `workspaces/ws_management.py` — `_render_nqh_tang_dot_bien()` + `_doc_nqh_delta_snapshot()`: menu item "🔴 NQH tăng đột biến" so sánh 2 kỳ snapshot
+- `workspaces/ws_management.py` — Quick search KH trong sidebar (render_sidebar_menu): tìm theo Tên/CMND/Khế ước
+- `workspaces/ws_management.py` — Tab memory: persist nav vào kv_store theo username, khôi phục sau reload
+- `workspaces/ws_management.py` — Nút "⚡ Xuất nhanh KL Giao ban Toàn CN" 1-click auto-select template đầu tiên
+- `tabs/tab_canh_bao_nqh.py` — Sub-tab mới "📈 NQH so sánh kỳ": `_render_nqh_so_sanh_ky()` so sánh delta NQH từ hstd_snapshot
+- `tabs/tab_data_quality.py` — `_tinh_completeness()` + cột "Hoàn chỉnh" trong bảng theo PGD (điểm 0–100%)
+
 ## [2026-06-11] — Tối ưu hiệu năng: chuyển 9 st.tabs() sang lazy (st.radio + if/elif)
 - `tabs/tab_phan_tich_pgd.py` — 4 sub-tabs (Dự phóng·Heatmap·Histogram·Cơ cấu) → `lazy_tabs()`
 - `tabs/tab_uy_thac.py` — 7 sub-tabs → `st.radio + if/elif`

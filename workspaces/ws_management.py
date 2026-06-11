@@ -15,6 +15,7 @@ from pathlib import Path
 
 import pandas as pd
 import streamlit as st
+import db
 
 from state_manager import SCMStateManager
 from config import (
@@ -169,6 +170,19 @@ def _render_canh_bao(df: pd.DataFrame, ds_pgd_all: list):
         st.info("⚠️ Chưa có mẫu KL giao ban trong thư mục `templates/`. "
                 "Đặt file `.docx` vào thư mục đó và reload.")
     else:
+        # Nút 1-click: tự động dùng template đầu tiên, toàn CN
+        if st.button("⚡ Xuất nhanh KL Giao ban Toàn CN", key="kl_nhanh_btn"):
+            try:
+                path_mau_nhanh = mau_klgb[0][1]
+                data_nhanh = auto_fill_klgb(df_kh, str(path_mau_nhanh), "")
+                fname_nhanh = f"KL_GiaoBan_ToanCN_{datetime.now().strftime('%d%m%Y')}.docx"
+                state_n = SCMStateManager()
+                state_n.downloads.set("kl_giao_ban_docx", data_nhanh, fname_nhanh)
+                st.success("✅ Đã tạo xong — nhấn nút bên dưới để tải về.")
+            except Exception as e:  # conv: skip
+                logger.error("kl_nhanh_btn: %s", e, exc_info=True)
+                st.error(f"Lỗi xuất nhanh: {e}")
+
         col_pgd_kl, col_mau_kl = st.columns(2)
         with col_pgd_kl:
             pgd_kl = st.selectbox("Chọn PGD", ["Toàn CN"] + ds_pgd_all, key="kl_pgd")
@@ -751,6 +765,111 @@ def _render_quan_ly_template(df: pd.DataFrame):
                 st.exception(e)  # Debug info
 
 
+def _banner_pgd_chua_upload(ds_pgd: list, threshold_days: int = 7) -> None:
+    """Banner cảnh báo PGD chưa upload file HSTD trong threshold_days ngày gần nhất."""
+    from pathlib import Path as _Path
+    from config import PGD_DATA_DIR as _PGD_DATA_DIR
+    from data.pgd import pgd_slug as _pgd_slug
+
+    now = datetime.now()
+    pgd_chua = []
+    pgd_cu = []
+
+    for pgd in ds_pgd:
+        slug = _pgd_slug(pgd)
+        p = _Path(_PGD_DATA_DIR) / slug / "hstd_latest.xlsx"
+        if not p.exists():
+            pgd_chua.append(pgd)
+        else:
+            age = (now - datetime.fromtimestamp(p.stat().st_mtime)).days
+            if age >= threshold_days:
+                pgd_cu.append((pgd, age))
+
+    total = len(pgd_chua) + len(pgd_cu)
+    if total == 0:
+        return
+
+    with st.expander(f"⚠️ {total} PGD chưa cập nhật dữ liệu trong {threshold_days} ngày qua", expanded=False):
+        if pgd_chua:
+            st.markdown(f"**❌ Chưa upload lần nào ({len(pgd_chua)} PGD):**")
+            st.markdown("  ".join(f"`{p}`" for p in pgd_chua))
+        if pgd_cu:
+            st.markdown(f"**🕐 Upload đã lâu ({len(pgd_cu)} PGD):**")
+            _rows = [{"PGD": p, "Số ngày từ lần upload cuối": d} for p, d in sorted(pgd_cu, key=lambda x: -x[1])]
+            st.dataframe(pd.DataFrame(_rows), use_container_width=True, height=min(240, len(_rows) * 45 + 50))
+
+
+@st.cache_data(show_spinner=False, ttl=300)
+def _doc_nqh_delta_snapshot() -> pd.DataFrame:
+    """Lấy delta NQH giữa 2 kỳ gần nhất từ hstd_snapshot."""
+    import sqlite3
+    from db import get_conn
+    with get_conn() as conn:
+        ky_list = [r[0] for r in conn.execute(
+            "SELECT DISTINCT ky FROM hstd_snapshot ORDER BY ky DESC LIMIT 2"
+        ).fetchall()]
+    if len(ky_list) < 2:
+        return pd.DataFrame()
+    ky_curr, ky_prev = ky_list[0], ky_list[1]
+    with get_conn() as conn:
+        df_curr = pd.read_sql_query(
+            "SELECT ten_pgd, SUM(du_no_qh) as qh_curr, SUM(tong_du_no) as dn_curr "
+            "FROM hstd_snapshot WHERE ky=? GROUP BY ten_pgd",
+            conn, params=(ky_curr,),
+        )
+        df_prev = pd.read_sql_query(
+            "SELECT ten_pgd, SUM(du_no_qh) as qh_prev, SUM(tong_du_no) as dn_prev "
+            "FROM hstd_snapshot WHERE ky=? GROUP BY ten_pgd",
+            conn, params=(ky_prev,),
+        )
+    df = df_curr.merge(df_prev, on="ten_pgd", how="left").fillna(0)
+    df["delta_qh"] = df["qh_curr"] - df["qh_prev"]
+    df["pct_qh"] = df["delta_qh"] / df["qh_prev"].replace(0, float("nan")) * 100
+    df["ky_curr"] = ky_curr
+    df["ky_prev"] = ky_prev
+    return df
+
+
+def _render_nqh_tang_dot_bien(key_prefix: str = "nqh_db_") -> None:
+    """Hiển thị bảng NQH tăng đột biến dựa trên hstd_snapshot."""
+    from utils import fmt_ty as _fmt_ty, fmt_so as _fmt_so
+
+    df = _doc_nqh_delta_snapshot()
+    if df.empty:
+        st.info("ℹ️ Chưa đủ 2 kỳ snapshot để so sánh. Hãy merge HSTD ít nhất 2 lần.")
+        return
+
+    ky_curr = df["ky_curr"].iloc[0]
+    ky_prev = df["ky_prev"].iloc[0]
+    st.caption(f"So sánh kỳ **{ky_curr}** vs **{ky_prev}**")
+
+    df_show = df[df["ten_pgd"] != "Hội sở Chi nhánh tỉnh"].copy() if len(df) > 1 else df.copy()
+    df_show = df_show.sort_values("delta_qh", ascending=False)
+
+    tang = df_show[df_show["delta_qh"] > 0]
+    giam = df_show[df_show["delta_qh"] < 0]
+
+    c1, c2 = st.columns(2)
+    c1.metric("PGD có NQH tăng", len(tang), delta=f"{len(tang)} đơn vị", delta_color="inverse" if len(tang) else "off")
+    c2.metric("PGD có NQH giảm", len(giam), delta=f"{len(giam)} đơn vị", delta_color="normal" if len(giam) else "off")
+
+    cols_display = {
+        "ten_pgd": "PGD",
+        "qh_prev": f"NQH kỳ {ky_prev} (triệu)",
+        "qh_curr": f"NQH kỳ {ky_curr} (triệu)",
+        "delta_qh": "Tăng/Giảm (triệu)",
+        "pct_qh": "% thay đổi",
+    }
+    df_out = df_show[list(cols_display.keys())].rename(columns=cols_display).copy()
+    for col in [f"NQH kỳ {ky_prev} (triệu)", f"NQH kỳ {ky_curr} (triệu)", "Tăng/Giảm (triệu)"]:
+        if col in df_out.columns:
+            df_out[col] = df_out[col].apply(_fmt_ty)
+    df_out["% thay đổi"] = df_out["% thay đổi"].apply(
+        lambda x: f"+{x:.1f}".replace(".", ",") + "%" if x > 0 else (f"{x:.1f}".replace(".", ",") + "%" if not pd.isna(x) else "—")
+    )
+    st.dataframe(df_out, use_container_width=True, height=500)
+
+
 def _build_all_items(role: str, username: str, **kwargs) -> list:
     """Xây danh sách ALL_ITEMS — dùng chung cho sidebar và render."""
     # Đảm bảo mọi lambda dùng **kwargs đều có đủ role và username
@@ -778,6 +897,7 @@ def _build_all_items(role: str, username: str, **kwargs) -> list:
             "fn": lambda: _render_canh_bao_no(df_full, ds_pgd_all, role, username),
         },
         {"group": "Giám sát",     "label": "📊 So sánh kỳ",            "icon": "chart-line", "fn": lambda: _get_tab("tab_so_sanh_ky").render(None, **kwargs)},
+        {"group": "Giám sát",     "label": "🔴 NQH tăng đột biến",    "icon": "trending-up",  "fn": lambda: _render_nqh_tang_dot_bien()},
         {"group": "Giám sát",     "label": "🛡️ Chất lượng Dữ liệu",  "icon": "shield-check", "fn": lambda: _get_tab("tab_data_quality").render(None, **kwargs)},
         {"group": "Kiểm soát",     "label": "Kiểm soát nội bộ",    "icon": "search",         "fn": lambda: _get_tab("tab_kiem_soat").render_tab(df_full, role, kwargs.get("username", "unknown"))},
         {"group": "Kiểm soát",     "label": "🔍 Kiểm toán Nội bộ (KTNB)", "icon": "file-search", "fn": lambda: _get_tab("tab_ktnb").render(None, **kwargs)},
@@ -854,6 +974,24 @@ def render_sidebar_menu(role: str, username: str, **kwargs):
     if active_label not in valid_labels:
         state.nav_ws_mgmt_menu = default_label
         active_label = default_label
+
+    # ── Quick search ───────────────────────────────────────────────────────
+    q = st.text_input("🔍 Tìm khách hàng", placeholder="Tên / CMND / Khế ước...", key="ws_mgmt_search_q", label_visibility="collapsed")
+    if q and len(q) >= 2:
+        _df_search = kwargs.get("df_full") if kwargs.get("df_full") is not None else kwargs.get("df")
+        if _df_search is not None and not _df_search.empty:
+            from config import COT_TEN_KH, COT_CMND, COT_SO_KU, COT_TEN_PGD, COT_TONG_DU_NO
+            _mask = pd.Series(False, index=_df_search.index)
+            for _c in [COT_TEN_KH, COT_CMND, COT_SO_KU]:
+                if _c in _df_search.columns:
+                    _mask |= _df_search[_c].astype(str).str.contains(q, case=False, na=False)
+            _hits = _df_search.loc[_mask, [c for c in [COT_TEN_PGD, COT_TEN_KH, COT_CMND, COT_SO_KU, COT_TONG_DU_NO] if c in _df_search.columns]].head(30)
+            if not _hits.empty:
+                with st.expander(f"Tìm thấy {min(len(_hits), 30)}/{_mask.sum()} kết quả", expanded=True):
+                    st.dataframe(_hits, use_container_width=True, height=min(350, len(_hits) * 40 + 50))
+            else:
+                st.caption("Không tìm thấy kết quả.")
+    st.divider()
 
     st.markdown(
         "<p style='font-size:14px;font-weight:700;"
@@ -994,6 +1132,9 @@ def render(**kwargs):
     st.title("📋 Phòng KH-NV")
     st.caption("Giám sát chỉ tiêu · Cân đối vốn · Quản lý NQH · GQVL · Quản lý CBTD")
 
+    from config import DS_PGD as _DS_PGD
+    _banner_pgd_chua_upload([p for p in _DS_PGD if p != "Hội sở Chi nhánh tỉnh"])
+
     filtered_kw = {k: v for k, v in kwargs.items()
                    if k not in ("role", "username", "df", "df_full", "ds_pgd_all")}
     _data_id = id(df_full)
@@ -1020,11 +1161,20 @@ def render(**kwargs):
         state.nav_ws_mgmt_menu = jump_label
         st.toast(f"✨ Đã chuyển tới: {jump_label}", icon="👆")
 
-    # Khởi tạo / validate ws_mgmt_menu
+    # Khởi tạo / validate ws_mgmt_menu — khôi phục từ kv_store nếu session mới
     active_label = state.nav_ws_mgmt_menu
-    if active_label not in valid_labels:
-        active_label = ALL_ITEMS[0]["label"]
+    _mem_key = f"nav_ws_mgmt_{username}"
+    if not active_label or active_label not in valid_labels:
+        _saved = db.doc_kv(_mem_key)
+        if _saved and _saved in valid_labels:
+            active_label = _saved
+        else:
+            active_label = ALL_ITEMS[0]["label"]
         state.nav_ws_mgmt_menu = active_label
+    else:
+        _prev_saved = db.doc_kv(_mem_key)
+        if _prev_saved != active_label:
+            db.ghi_kv(_mem_key, active_label, username)
 
     # ── Render DUY NHẤT mục đang chọn ────────────────────────────────────
     active_item = next((x for x in ALL_ITEMS if x["label"] == active_label), None)

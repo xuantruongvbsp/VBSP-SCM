@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING
 
 from config import (
     COT_TEN_KH, COT_MA_KH, COT_SO_KU, COT_CMND, COT_SDT,
-    COT_TEN_PGD, COT_TEN_XA, COT_TEN_THON,
+    COT_TEN_PGD, COT_TEN_XA,
     COT_TEN_CT, COT_NGUON_VON, COT_NGAY_VAY, COT_NGAY_DH,
     COT_DU_NO_TH, COT_DU_NO_QH, COT_TONG_DU_NO, COT_DU_NO_KHOANH,
     COT_THOI_HAN, COT_LAI_SUAT, COT_MUC_VAY, COT_LAI_DA_TRA,
@@ -27,8 +27,8 @@ from utils import fmt_tien, fmt_so, xuat_excel, vn
 from tabs.base_tab import TabContext
 from components.filter_panel import render_filter_panel
 from components.result_card import render_result_grid
+from components.export_pdf import xuat_pdf_co_chart, download_pdf_button
 from data import doc_nq11_toan_cn_pgd, doc_gqvl_toan_cn
-from components.loan_drawer import loan_detail_drawer
 
 if TYPE_CHECKING:
     from streamlit.delta_generator import DeltaGenerator
@@ -230,6 +230,7 @@ def _render_results_header(
     df_original: pd.DataFrame,
     nq11_count: int = 0,
     gqvl_count: int = 0,
+    username: str = "unknown",
 ) -> None:
     """Render results summary header."""
     total = len(df_original)
@@ -249,20 +250,52 @@ def _render_results_header(
             tong_no = df_filtered[COT_TONG_DU_NO].sum()
             st.markdown(f"💰 **Tổng DN:** {fmt_tien(tong_no)}")
 
+    _MAX_EXPORT = 2000
     with col3:
         if not df_filtered.empty:
-            excel_data = xuat_excel({"KetQua_TraCuu": df_filtered})
-            st.download_button(
-                "📊 Excel",
-                data=excel_data,
-                file_name="ket_qua_tra_cuu.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                use_container_width=True,
-                key="tc_export_excel",
-            )
+            if len(df_filtered) <= _MAX_EXPORT:
+                excel_data = xuat_excel({"KetQua_TraCuu": df_filtered})
+                st.download_button(
+                    "📊 Excel",
+                    data=excel_data,
+                    file_name="ket_qua_tra_cuu.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    use_container_width=True,
+                    key="tc_export_excel",
+                )
+            else:
+                st.button(
+                    f"📊 Excel ({len(df_filtered):,} — lọc thêm)",
+                    disabled=True,
+                    use_container_width=True,
+                    key="tc_export_excel",
+                )
 
+    _MAX_PDF = 200
     with col4:
-        st.button("📄 PDF", disabled=True, use_container_width=True, key="tc_export_pdf")
+        _pdf_rendered = False
+        if not df_filtered.empty and len(df_filtered) <= _MAX_PDF:
+            _PDF_COLS = [c for c in [
+                COT_SO_KU, COT_TEN_KH, COT_TEN_PGD, COT_TEN_CT,
+                COT_NGAY_VAY, COT_DU_NO_TH, COT_DU_NO_QH, COT_TONG_DU_NO, COT_TINH_TRANG,
+            ] if c in df_filtered.columns]
+            _cols_tien_pdf = [c for c in [COT_DU_NO_TH, COT_DU_NO_QH, COT_TONG_DU_NO] if c in _PDF_COLS]
+            try:
+                _pdf_bytes = xuat_pdf_co_chart(
+                    df=df_filtered[_PDF_COLS],
+                    tieu_de="KẾT QUẢ TRA CỨU HỒ SƠ",
+                    nguoi_xuat=username,
+                    cols_tien=_cols_tien_pdf,
+                    them_dong_tong=False,
+                )
+                if _pdf_bytes:
+                    download_pdf_button(_pdf_bytes, filename="ket_qua_tra_cuu.pdf", label="📄 PDF", key="tc_export_pdf")
+                    _pdf_rendered = True
+            except Exception:
+                pass
+        if not _pdf_rendered:
+            _lbl = f"📄 PDF ({len(df_filtered):,} — lọc thêm)" if len(df_filtered) > _MAX_PDF else "📄 PDF"
+            st.button(_lbl, disabled=True, use_container_width=True, key="tc_export_pdf")
 
     if _co_db:
         with col5:
@@ -295,20 +328,22 @@ def render(tab: "DeltaGenerator", **kwargs) -> None:
     
     # Load NQ11/GQVL data
     df_nq11, df_gqvl = _load_nq11_gqvl_data()
-    
+    ts_hstd = float(kwargs.get("ts_hstd", 0.0))
+
     # Tab context
     ctx = TabContext(tab, **kwargs)
-    
+
     with ctx:
         st.subheader("🔍 Tra cứu hồ sơ khách hàng")
         st.caption("Tìm kiếm nâng cao với bộ lọc đa chiều — NQ11 · GQVL · Quá hạn")
-        
+
         # Filter panel
         df_filtered = render_filter_panel(
             df=df,
             df_nq11=df_nq11,
             df_gqvl=df_gqvl,
             pgd_user=pgd_user,
+            ts_hstd=ts_hstd,
         )
         
         # Đếm NQ11/GQVL trong kết quả — dùng cột enriched nếu có
@@ -334,7 +369,7 @@ def render(tab: "DeltaGenerator", **kwargs) -> None:
 
         # Results header
         st.divider()
-        _render_results_header(df_filtered, df, _so_nq11_r, _so_gqvl_r)
+        _render_results_header(df_filtered, df, _so_nq11_r, _so_gqvl_r, username)
         
         # Results grid
         st.divider()

@@ -19,12 +19,26 @@ if TYPE_CHECKING:
     from streamlit.delta_generator import DeltaGenerator
 
 
-def _get_unique_values(df: pd.DataFrame, col: str) -> list:
+@st.cache_data(show_spinner=False)
+def _get_unique_values(_df: pd.DataFrame, col: str, ts: float = 0.0) -> list:
     """Get sorted unique values from column, handling missing values."""
-    if col not in df.columns:
+    _ = ts
+    if col not in _df.columns:
         return []
-    values = df[col].dropna().unique().tolist()
+    values = _df[col].dropna().unique().tolist()
     return sorted([str(v) for v in values if v != ""])
+
+
+@st.cache_data(show_spinner=False)
+def _get_options_filtered(
+    _df: pd.DataFrame, filter_col: str, filter_vals: tuple, target_col: str, ts: float = 0.0
+) -> list:
+    """Unique target_col values filtered by filter_col — cached by (filter_vals, ts)."""
+    _ = ts
+    if not filter_vals or filter_col not in _df.columns or target_col not in _df.columns:
+        return _get_unique_values(_df, target_col, ts)
+    mask = _df[filter_col].isin(filter_vals)
+    return sorted(_df.loc[mask, target_col].dropna().unique().tolist())
 
 
 def render_filter_panel(
@@ -33,6 +47,7 @@ def render_filter_panel(
     df_gqvl: pd.DataFrame | None,
     pgd_user: str | None,
     on_filter_change: Callable[[pd.DataFrame], None] | None = None,
+    ts_hstd: float = 0.0,
 ) -> pd.DataFrame:
     """
     Render advanced filter panel and return filtered DataFrame.
@@ -91,7 +106,7 @@ def render_filter_panel(
         col_pgd, col_xa, col_thon = st.columns(3)
         
         with col_pgd:
-            ds_pgd = _get_unique_values(df, COT_TEN_PGD)
+            ds_pgd = _get_unique_values(df, COT_TEN_PGD, ts_hstd)
             if pgd_user:
                 # User PGD chỉ thấy PGD của mình
                 selected_pgd = [pgd_user]
@@ -112,11 +127,7 @@ def render_filter_panel(
                 )
         
         with col_xa:
-            ds_xa = _get_unique_values(df, COT_TEN_XA)
-            if selected_pgd and COT_TEN_PGD in df.columns:
-                # Filter xa by selected PGD
-                mask_pgd = df[COT_TEN_PGD].isin(selected_pgd)
-                ds_xa = sorted(df.loc[mask_pgd, COT_TEN_XA].dropna().unique().tolist())
+            ds_xa = _get_options_filtered(df, COT_TEN_PGD, tuple(selected_pgd), COT_TEN_XA, ts_hstd)
             selected_xa = st.multiselect(
                 "Xã/Phường",
                 options=ds_xa,
@@ -126,11 +137,7 @@ def render_filter_panel(
             )
         
         with col_thon:
-            ds_thon = _get_unique_values(df, COT_TEN_THON)
-            if selected_xa and COT_TEN_XA in df.columns:
-                # Filter thon by selected xa
-                mask_xa = df[COT_TEN_XA].isin(selected_xa)
-                ds_thon = sorted(df.loc[mask_xa, COT_TEN_THON].dropna().unique().tolist())
+            ds_thon = _get_options_filtered(df, COT_TEN_XA, tuple(selected_xa), COT_TEN_THON, ts_hstd)
             selected_thon = st.multiselect(
                 "Thô/Tổ dân phố",
                 options=ds_thon,
@@ -146,7 +153,7 @@ def render_filter_panel(
         col_ct, col_nv = st.columns(2)
         
         with col_ct:
-            ds_ct = _get_unique_values(df, COT_TEN_CT)
+            ds_ct = _get_unique_values(df, COT_TEN_CT, ts_hstd)
             selected_ct = st.multiselect(
                 "Chương trình tín dụng",
                 options=ds_ct,
@@ -156,7 +163,7 @@ def render_filter_panel(
             )
         
         with col_nv:
-            ds_nv = _get_unique_values(df, COT_NGUON_VON)
+            ds_nv = _get_unique_values(df, COT_NGUON_VON, ts_hstd)
             # Map values to labels if available
             nv_options = []
             for nv in ds_nv:
@@ -334,22 +341,22 @@ def render_filter_panel(
             (df_filtered[COT_TONG_DU_NO] <= du_no_range[1])
         ]
     
-    # 5. Date filters
-    if ngay_vay_from and COT_NGAY_VAY in df_filtered.columns:
-        df_filtered[COT_NGAY_VAY] = pd.to_datetime(df_filtered[COT_NGAY_VAY], errors='coerce')
-        df_filtered = df_filtered[df_filtered[COT_NGAY_VAY] >= pd.Timestamp(ngay_vay_from)]
-    
-    if ngay_vay_to and COT_NGAY_VAY in df_filtered.columns:
-        df_filtered[COT_NGAY_VAY] = pd.to_datetime(df_filtered[COT_NGAY_VAY], errors='coerce')
-        df_filtered = df_filtered[df_filtered[COT_NGAY_VAY] <= pd.Timestamp(ngay_vay_to)]
-    
-    if ngay_dh_from and COT_NGAY_DH in df_filtered.columns:
-        df_filtered[COT_NGAY_DH] = pd.to_datetime(df_filtered[COT_NGAY_DH], errors='coerce')
-        df_filtered = df_filtered[df_filtered[COT_NGAY_DH] >= pd.Timestamp(ngay_dh_from)]
-    
-    if ngay_dh_to and COT_NGAY_DH in df_filtered.columns:
-        df_filtered[COT_NGAY_DH] = pd.to_datetime(df_filtered[COT_NGAY_DH], errors='coerce')
-        df_filtered = df_filtered[df_filtered[COT_NGAY_DH] <= pd.Timestamp(ngay_dh_to)]
+    # 5. Date filters — convert each column once
+    if (ngay_vay_from or ngay_vay_to) and COT_NGAY_VAY in df_filtered.columns:
+        _ts_vay = pd.to_datetime(df_filtered[COT_NGAY_VAY], errors='coerce')
+        if ngay_vay_from:
+            df_filtered = df_filtered[_ts_vay >= pd.Timestamp(ngay_vay_from)]
+            _ts_vay = _ts_vay.loc[df_filtered.index]
+        if ngay_vay_to:
+            df_filtered = df_filtered[_ts_vay <= pd.Timestamp(ngay_vay_to)]
+
+    if (ngay_dh_from or ngay_dh_to) and COT_NGAY_DH in df_filtered.columns:
+        _ts_dh = pd.to_datetime(df_filtered[COT_NGAY_DH], errors='coerce')
+        if ngay_dh_from:
+            df_filtered = df_filtered[_ts_dh >= pd.Timestamp(ngay_dh_from)]
+            _ts_dh = _ts_dh.loc[df_filtered.index]
+        if ngay_dh_to:
+            df_filtered = df_filtered[_ts_dh <= pd.Timestamp(ngay_dh_to)]
     
     # 6. Special status filters
     if filter_qua_han and COT_DU_NO_QH in df_filtered.columns:

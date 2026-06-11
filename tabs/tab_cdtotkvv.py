@@ -1107,31 +1107,20 @@ def render(tab: DeltaGenerator | None = None, **kwargs) -> None:
 
         # Tạo 5 sub-tabs
         if cdto_mode == "cn" and la_phan_he_cn(role):
-            # Admin/Manager workspace: đầy đủ chức năng
-            sub1, sub2, sub3, sub4, sub5 = st.tabs([
-                "📤 Upload", 
-                "📊 Tổng hợp", 
-                "📋 Phân tích Chất lượng",
-                "🗺️ Bản đồ Chất lượng", 
-                "📈 Xu hướng"
-            ])
-            
-            with sub1:
-                _sub_upload(role, username)
-            with sub2:
-                _sub_tong_hop(username)
+            _cdto_labels = ["📤 Upload", "📊 Tổng hợp", "📋 Phân tích Chất lượng",
+                            "🗺️ Bản đồ Chất lượng", "📈 Xu hướng"]
         else:
-            # User workspace hoặc PGD mode: chỉ 3 sub-tab phân tích
-            sub3, sub4, sub5 = st.tabs([
-                "📋 Phân tích Chất lượng",
-                "🗺️ Bản đồ Chất lượng", 
-                "📈 Xu hướng"
-            ])
-
-        # Render 3 sub-tab phân tích cho tất cả
-        with sub3:
-            _sub_phan_tich_chat_luong(username, cdto_mode, pgd_user)
-        with sub4:
-            _sub_ban_do_chat_luong(username, cdto_mode, pgd_user) 
-        with sub5:
-            _sub_xu_huong(username, cdto_mode, pgd_user)
+            _cdto_labels = ["📋 Phân tích Chất lượng", "🗺️ Bản đồ Chất lượng", "📈 Xu hướng"]
+        _cdto_sel = st.radio("", range(len(_cdto_labels)), format_func=lambda i: _cdto_labels[i],
+                             horizontal=True, key="cdto_sub_tab", label_visibility="collapsed")
+        st.divider()
+        if cdto_mode == "cn" and la_phan_he_cn(role):
+            if _cdto_sel == 0:   _sub_upload(role, username)
+            elif _cdto_sel == 1: _sub_tong_hop(username)
+            elif _cdto_sel == 2: _sub_phan_tich_chat_luong(username, cdto_mode, pgd_user)
+            elif _cdto_sel == 3: _sub_ban_do_chat_luong(username, cdto_mode, pgd_user)
+            elif _cdto_sel == 4: _sub_xu_huong(username, cdto_mode, pgd_user)
+        else:
+            if _cdto_sel == 0:   _sub_phan_tich_chat_luong(username, cdto_mode, pgd_user)
+            elif _cdto_sel == 1: _sub_ban_do_chat_luong(username, cdto_mode, pgd_user)
+            elif _cdto_sel == 2: _sub_xu_huong(username, cdto_mode, pgd_user)

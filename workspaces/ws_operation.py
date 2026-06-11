@@ -4546,13 +4546,16 @@ def render(**kwargs):
 
         with get_tab_context(tab_parent):
 
-            _sub0, _sub1, _sub2 = st.tabs(["📊 Tổng quan", "📍 Điểm Giao Dịch", "🏘️ Tổ TK&VV"])
-
-            _render_dashboard_pgd_dgd(_sub0, **kw)
-
-            _lazy_tab("tab_diem_gd_pgd").render(_sub1, **kw)
-
-            _lazy_tab("tab_cdtotkvv_pgd").render(_sub2, **kw)
+            _dgd_labels = ["📊 Tổng quan", "📍 Điểm Giao Dịch", "🏘️ Tổ TK&VV"]
+            _dgd_sel = st.radio("", range(len(_dgd_labels)), format_func=lambda i: _dgd_labels[i],
+                                horizontal=True, key="ws_op_dgd_sub", label_visibility="collapsed")
+            st.divider()
+            if _dgd_sel == 0:
+                _render_dashboard_pgd_dgd(None, **kw)
+            elif _dgd_sel == 1:
+                _lazy_tab("tab_diem_gd_pgd").render(None, **kw)
+            elif _dgd_sel == 2:
+                _lazy_tab("tab_cdtotkvv_pgd").render(None, **kw)
 
 
 

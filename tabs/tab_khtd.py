@@ -435,17 +435,16 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
             "Theo dõi chênh lệch phân bổ theo Chương trình"
         )
 
-        tab_cn, tab_xa, tab_cb = st.tabs([
-            "🏛️ KHTD Chi nhánh",
-            "📍 KHTD theo Xã",
-            "⚠️ Cảnh báo chênh lệch",
-        ])
-        with tab_cn:
+        _khtd_labels = ["🏛️ KHTD Chi nhánh", "📍 KHTD theo Xã", "⚠️ Cảnh báo chênh lệch"]
+        _khtd_sel = st.radio("", range(len(_khtd_labels)), format_func=lambda i: _khtd_labels[i],
+                             horizontal=True, key="khtd_sub_tab", label_visibility="collapsed")
+        st.divider()
+        if _khtd_sel == 0:
             from tabs.tab_khtd_nhap import render_nhap_cn  # lazy — tránh circular import
             render_nhap_cn(role, username, df_full, df_gqvl)
-        with tab_xa:
+        elif _khtd_sel == 1:
             from tabs.tab_khtd_nhap import render_nhap_pgd  # lazy — tránh circular import
             render_nhap_pgd(role, username, df_full)
-        with tab_cb:
+        elif _khtd_sel == 2:
             from tabs.tab_khtd_xuat import render_xuat_baocao  # lazy — tránh circular import
             render_xuat_baocao(role, username, df_full)

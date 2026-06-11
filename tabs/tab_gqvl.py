@@ -263,13 +263,13 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
         st.divider()
 
         # ── Tabs nội dung ─────────────────────────────────────────────────
-        tb1, tb2, tb3, tb4 = st.tabs([
-            "📍 Theo địa bàn", "🏭 Theo ngành SXKD",
-            "⚠️ Nợ quá hạn", "📋 Danh sách chi tiết"
-        ])
+        _gqvl_labels = ["📍 Theo địa bàn", "🏭 Theo ngành SXKD", "⚠️ Nợ quá hạn", "📋 Danh sách chi tiết"]
+        _gqvl_sel = st.radio("", range(len(_gqvl_labels)), format_func=lambda i: _gqvl_labels[i],
+                             horizontal=True, key="gqvl_sub_tab", label_visibility="collapsed")
+        st.divider()
 
         # ── Tab 1: Theo địa bàn ───────────────────────────────────────────
-        with tb1:
+        if _gqvl_sel == 0:
             cap = st.radio("Cấp xem", ["Theo xã", "Theo thôn/ấp"],
                            horizontal=True, key="gqvl_cap")
             nhom = G_TEN_XA if cap == "Theo xã" else G_TEN_THON
@@ -310,7 +310,7 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                 )
 
         # ── Tab 2: Theo ngành SXKD ────────────────────────────────────────
-        with tb2:
+        elif _gqvl_sel == 1:
             if G_TEN_NGANH in df.columns:
                 t_ng = df.groupby(G_TEN_NGANH).agg(
                     Số_món  =(G_SO_KU,    "count"),
@@ -343,7 +343,7 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                 )
 
         # ── Tab 3: Nợ quá hạn ────────────────────────────────────────────
-        with tb3:
+        elif _gqvl_sel == 2:
             if G_DU_NO_QH in df.columns:
                 df_qh = df[df[G_DU_NO_QH].fillna(0) > 0].copy()
 
@@ -407,7 +407,7 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                             state.downloads.clear("gqvl_qh_excel")
 
         # ── Tab 4: Danh sách chi tiết ─────────────────────────────────────
-        with tb4:
+        elif _gqvl_sel == 3:
             # Bộ lọc
             fl1, fl2, fl3 = st.columns(3)
             with fl1:

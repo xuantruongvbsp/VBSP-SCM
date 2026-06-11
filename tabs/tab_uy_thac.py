@@ -1221,19 +1221,18 @@ def render(tab: DeltaGenerator | None = None, **kwargs) -> None:
                         f"⚠️ Dữ liệu HSTD cache chưa đầy đủ (chỉ {len(df_cache2.columns)} cột) — "
                         "cần upload/merge HSTD lại để dùng các chức năng Ủy thác."
                     )
-        sub1, sub2, sub3, sub4, sub5, sub6, sub7 = st.tabs([
-            "📊 Theo Hội đoàn thể",
-            "📋 Kế hoạch (01/KH)",
-            "📝 Biên bản CT-XH",
-            "📋 Mẫu 06/TD & 06A/TD",
-            "📋 Mẫu 15/TD",
-            "📋 Biên bản & Báo cáo",
+        _ut_labels = [
+            "📊 Theo Hội đoàn thể", "📋 Kế hoạch (01/KH)", "📝 Biên bản CT-XH",
+            "📋 Mẫu 06/TD & 06A/TD", "📋 Mẫu 15/TD", "📋 Biên bản & Báo cáo",
             "📊 Theo dõi & BC-TH",
-        ])
-        with sub1: _render_theo_dvut(df)
-        with sub2: _render_ke_hoach(df, pgd_user, role)
-        with sub3: _render_bb_ct_cx(df, pgd_user, username, role)
-        with sub4: _render_mau06(df, pgd_user)
-        with sub5: _render_mau15(df, pgd_user)
-        with sub6: _render_bien_ban(df, pgd_user)
-        with sub7: _render_theo_doi_bc_th(pgd_user, username, role)
+        ]
+        _ut_sel = st.radio("", range(len(_ut_labels)), format_func=lambda i: _ut_labels[i],
+                           horizontal=True, key="ut_sub_tab", label_visibility="collapsed")
+        st.divider()
+        if _ut_sel == 0:   _render_theo_dvut(df)
+        elif _ut_sel == 1: _render_ke_hoach(df, pgd_user, role)
+        elif _ut_sel == 2: _render_bb_ct_cx(df, pgd_user, username, role)
+        elif _ut_sel == 3: _render_mau06(df, pgd_user)
+        elif _ut_sel == 4: _render_mau15(df, pgd_user)
+        elif _ut_sel == 5: _render_bien_ban(df, pgd_user)
+        elif _ut_sel == 6: _render_theo_doi_bc_th(pgd_user, username, role)

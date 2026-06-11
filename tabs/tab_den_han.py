@@ -64,10 +64,13 @@ def _render_to_tkv(
     key_prefix: str = "dh_",
 ) -> None:
     """Phân tích Tổ TK&VV: đến hạn theo tổ + tổ có NQH/khoanh > 0."""
-    sub_dh, sub_nqh = st.tabs(["📅 Đến hạn theo Tổ", "🔴 Tổ có NQH / Nợ khoanh"])
+    _dh_sub_labels = ["📅 Đến hạn theo Tổ", "🔴 Tổ có NQH / Nợ khoanh"]
+    _dh_sub_sel = st.radio("", range(len(_dh_sub_labels)), format_func=lambda i: _dh_sub_labels[i],
+                           horizontal=True, key=f"{key_prefix}sub_to_tab", label_visibility="collapsed")
+    st.divider()
 
     # ── Phần 1: Đến hạn theo Tổ ─────────────────────────────────────────
-    with sub_dh:
+    if _dh_sub_sel == 0:
         if COT_TEN_TO not in df_loc.columns:
             st.info("Dữ liệu không có cột Tên tổ.")
         elif df_loc.empty:
@@ -154,7 +157,7 @@ def _render_to_tkv(
                 logger.error("_render_to_tkv chart: %s", _e, exc_info=True)
 
     # ── Phần 2: Tổ có NQH / Nợ khoanh > 0 ──────────────────────────────
-    with sub_nqh:
+    elif _dh_sub_sel == 1:
         df_src = df_full if df_full is not None and not df_full.empty else df_loc
         if COT_TEN_TO not in df_src.columns:
             st.info("Dữ liệu không có cột Tên tổ.")
@@ -470,9 +473,12 @@ def render(tab=None, role: str = None, **kwargs) -> None:
 
     # ── 3 Tabs ───────────────────────────────────────────────────────
     if not df_loc.empty:
-        tab_thang, tab_nhom, tab_to, tab_ds = st.tabs(["📅 Theo tháng", "🏢 Theo nhóm", "🏘️ Tổ TK&VV", "📋 Danh sách"])
+        _dh_labels = ["📅 Theo tháng", "🏢 Theo nhóm", "🏘️ Tổ TK&VV", "📋 Danh sách"]
+        _dh_sel = st.radio("", range(len(_dh_labels)), format_func=lambda i: _dh_labels[i],
+                           horizontal=True, key=f"{key_prefix}main_sub_tab", label_visibility="collapsed")
+        st.divider()
 
-        with tab_thang:
+        if _dh_sel == 0:
             df_nam = _loc_thang(df_tinh, 0, 12)
             df_nam = df_nam[pd.to_numeric(df_nam[COT_TONG_DU_NO], errors="coerce").fillna(0) > 0]
             if loc_pgd != "Tất cả" and COT_TEN_PGD in df_nam.columns:
@@ -569,7 +575,7 @@ def render(tab=None, role: str = None, **kwargs) -> None:
                         logger.error("Không thể vẽ đồ thị đến hạn: %s", _e, exc_info=True)
                         st.warning(f"Không thể vẽ đồ thị: {_e}")
 
-        with tab_nhom:
+        elif _dh_sel == 1:
             nhom_theo = st.radio(
                 "Nhóm theo", ["PGD", "Xã", "Hội đoàn thể"],
                 horizontal=True, key="den_han_nhom")
@@ -625,10 +631,10 @@ def render(tab=None, role: str = None, **kwargs) -> None:
                     logger.error("Không thể vẽ biểu đồ nhóm: %s", _e, exc_info=True)
                     st.caption(f"Không thể vẽ biểu đồ: {_e}")
 
-        with tab_to:
+        elif _dh_sel == 2:
             _render_to_tkv(df_loc, kwargs.get("df"), key_prefix)
 
-        with tab_ds:
+        elif _dh_sel == 3:
             # Filter nhanh NQ11 / GQVL
             _df_loc_ds = df_loc
             _co_db_ds = _co_db and "_ct_db" in df_loc.columns

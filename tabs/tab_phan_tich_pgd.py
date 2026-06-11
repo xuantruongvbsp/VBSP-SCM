@@ -291,12 +291,14 @@ def _render_donut(tab_parent, **kw) -> None:
 
 
 def render(tab=None, **kwargs) -> None:
-    sub_tabs = st.tabs(["📈 Dự phóng", "🔥 Heatmap", "📊 Histogram", "🍩 Cơ cấu CT"])
-    with sub_tabs[0]:
-        _render_du_phong(sub_tabs[0], **kwargs)
-    with sub_tabs[1]:
-        _render_heatmap(sub_tabs[1], **kwargs)
-    with sub_tabs[2]:
-        _render_histogram(sub_tabs[2], **kwargs)
-    with sub_tabs[3]:
-        _render_donut(sub_tabs[3], **kwargs)
+    from utils import lazy_tabs as _lazy_tabs
+    _lazy_tabs(
+        ["📈 Dự phóng", "🔥 Heatmap", "📊 Histogram", "🍩 Cơ cấu CT"],
+        [
+            lambda c: _render_du_phong(c, **kwargs),
+            lambda c: _render_heatmap(c, **kwargs),
+            lambda c: _render_histogram(c, **kwargs),
+            lambda c: _render_donut(c, **kwargs),
+        ],
+        key="phan_tich_pgd_sub",
+    )

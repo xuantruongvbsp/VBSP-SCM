@@ -599,19 +599,11 @@ def render(tab, cap: str = "xa", **kwargs) -> None:
             st.warning("⚠️ Chưa có dữ liệu HSTD. Vui lòng merge HSTD để sử dụng các chức năng tổng hợp/dự báo.")
             return
 
-        sub1, sub2, sub3, sub4 = st.tabs(
-            [
-                "📊 Tổng hợp số liệu",
-                "📈 Dự báo nguồn vốn",
-                "📅 Họp BĐD",
-                "📁 Lưu trữ văn bản",
-            ]
-        )
-        with sub1:
-            _render_tong_hop(df, username)
-        with sub2:
-            _render_du_bao_von(df)
-        with sub3:
-            _render_hop_bdd(role, username)
-        with sub4:
-            _render_van_ban(role, username)
+        _bdd_labels = ["📊 Tổng hợp số liệu", "📈 Dự báo nguồn vốn", "📅 Họp BĐD", "📁 Lưu trữ văn bản"]
+        _bdd_sel = st.radio("", range(len(_bdd_labels)), format_func=lambda i: _bdd_labels[i],
+                            horizontal=True, key="bdd_sub_tab", label_visibility="collapsed")
+        st.divider()
+        if _bdd_sel == 0:   _render_tong_hop(df, username)
+        elif _bdd_sel == 1: _render_du_bao_von(df)
+        elif _bdd_sel == 2: _render_hop_bdd(role, username)
+        elif _bdd_sel == 3: _render_van_ban(role, username)

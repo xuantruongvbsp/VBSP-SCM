@@ -1,5 +1,26 @@
 # CHANGELOG
 
+## [2026-06-11] — Tối ưu hiệu năng: chuyển 9 st.tabs() sang lazy (st.radio + if/elif)
+- `tabs/tab_phan_tich_pgd.py` — 4 sub-tabs (Dự phóng·Heatmap·Histogram·Cơ cấu) → `lazy_tabs()`
+- `tabs/tab_uy_thac.py` — 7 sub-tabs → `st.radio + if/elif`
+- `tabs/tab_ban_dai_dien.py` — 4 sub-tabs → `st.radio + if/elif`
+- `tabs/tab_khtd.py` — 3 sub-tabs (giữ lazy import) → `st.radio + if/elif`
+- `workspaces/ws_operation.py` — 3 sub-tabs Tổng quan·ĐGD·Tổ → `st.radio + if/elif`
+- `tabs/tab_cdtotkvv.py` — conditional 5/3 sub-tabs → `st.radio + if/elif`
+- `tabs/tab_gqvl.py` — 4 sub-tabs (inline charts) → `st.radio + if/elif`
+- `tabs/tab_den_han.py` — 2 sub-tabs `_render_to_tkv` + 4 sub-tabs chính → `if/elif`
+
+## [2026-06-11] — Hoàn thiện tab Tra cứu KH: PDF export + cleanup imports
+- `tabs/tab_tracuu_v2.py` — bỏ import thừa `loan_detail_drawer`, `COT_TEN_THON`
+- `tabs/tab_tracuu_v2.py` — thêm PDF export (≤200 hồ sơ) dùng `xuat_pdf_co_chart`; nút mờ khi >200 hồ sơ
+
+## [2026-06-11] — Tối ưu hiệu năng: tab Tra cứu khách hàng
+- `components/filter_panel.py` dòng ~22 — thêm `@st.cache_data` cho `_get_unique_values()` + param `ts_hstd`; thêm `_get_options_filtered()` cache filtered xa/thon theo PGD/xã đang chọn
+- `components/filter_panel.py` dòng ~37 — thêm param `ts_hstd: float = 0.0` vào `render_filter_panel()`; thay 5 call `_get_unique_values` + 2 inline filter xa/thon → gọi cached helpers
+- `components/filter_panel.py` dòng ~338 — gộp 4 lần `pd.to_datetime()` thành 2 (chuyển đổi mỗi cột 1 lần dù lọc from+to cùng lúc)
+- `tabs/tab_tracuu_v2.py` dòng ~254 — giới hạn `xuat_excel()` chỉ chạy khi ≤2000 hồ sơ; khi >2000 hiện nút disabled để tránh serialize 50k row mỗi rerun
+- `tabs/tab_tracuu_v2.py` dòng ~297 — extract `ts_hstd` từ kwargs, truyền vào `render_filter_panel()`
+
 ## [2026-06-11] — Fix: PGD upload file mới không tự reload ở workspace Operation
 - `app.py` — thêm `_pgd_op_ts` vào `_data_version`: PGD role check 1 file mtime; CN role quét 22 thư mục với cache 30s
 - `app.py` — xóa scan thừa bên trong loading block, dùng lại `_pgd_op_ts` đã tính

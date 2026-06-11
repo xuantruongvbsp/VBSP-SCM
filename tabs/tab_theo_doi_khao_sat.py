@@ -24,7 +24,9 @@ from logger import get_logger
 logger = get_logger(__name__)
 
 from auth import la_phan_he_cn, normalize_role
-from config import DS_PGD
+from config import DS_PGD, DON_VI_CHI_NHANH
+
+_DS_TAT_CA = [DON_VI_CHI_NHANH] + DS_PGD  # 22 đơn vị
 from tabs.base_tab import TabContext
 
 # ── Hằng số ──────────────────────────────────────────────────────────────────
@@ -87,11 +89,18 @@ def _ket_noi_gsheet():
         return gspread.authorize(creds)
 
 
+_ALIAS_HOI_SO = {
+    "hội sở cn đồng nai", "hoi so cn dong nai",
+    "hội sở chi nhánh", "hội sở", "hoi so",
+}
+
 def _chuan_hoa_ten_pgd(raw: str) -> str:
-    """Chuẩn hóa tên PGD về dạng 'PGD Xxx Yyy'."""
+    """Chuẩn hóa tên PGD về dạng 'PGD Xxx Yyy'; map alias Hội sở về DON_VI_CHI_NHANH."""
     if not isinstance(raw, str) or not raw.strip():
         return raw
     s = raw.strip()
+    if s.lower() in _ALIAS_HOI_SO:
+        return DON_VI_CHI_NHANH
     for prefix in ("Phòng giao dịch ", "Phong giao dich ", "PGD ", "pgd "):
         if s.lower().startswith(prefix.lower()):
             return "PGD " + s[len(prefix):].strip()
@@ -132,7 +141,7 @@ def _doc_khao_sat() -> dict:
     ws_map: dict = {_chuan_hoa_ten_pgd(ws.title): ws for ws in all_ws}
 
     ket_qua: dict[str, tuple] = {}
-    for pgd in DS_PGD:
+    for pgd in _DS_TAT_CA:
         ws = ws_map.get(pgd) or next(
             (v for k, v in ws_map.items() if k.upper() == pgd.upper()), None
         )
@@ -201,7 +210,7 @@ def _doc_nhat_ky() -> dict[str, dict]:
         pgd        = _chuan_hoa_ten_pgd(row[1].strip())
         thoi_gian  = row[0].strip()
         nguoi_nhap = row[5].strip()
-        if not pgd or pgd not in DS_PGD:
+        if not pgd or pgd not in _DS_TAT_CA:
             continue
         # Ghi đè liên tục → dòng cuối = mới nhất
         result[pgd] = {"nguoi": nguoi_nhap, "thoi_gian": thoi_gian}
@@ -293,7 +302,7 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
         ket_qua: dict = result.get("data", {})
         nhat_ky: dict = _doc_nhat_ky()
 
-        ds_pgd = DS_PGD if is_cn else ([pgd_user] if pgd_user else [])
+        ds_pgd = _DS_TAT_CA if is_cn else ([pgd_user] if pgd_user else [])
         if not ds_pgd:
             st.info("ℹ️ Không xác định được đơn vị cần hiển thị.")
             return

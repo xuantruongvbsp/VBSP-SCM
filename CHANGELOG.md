@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [2026-06-11] — Fix tab Theo dõi Khảo sát chỉ hiện 21 PGD
+- `tabs/tab_theo_doi_khao_sat.py` — thêm `DON_VI_CHI_NHANH` vào danh sách, thay `DS_PGD` bằng `_DS_TAT_CA` (22 đơn vị) tại 3 chỗ
+- `tabs/tab_theo_doi_khao_sat.py` — `_chuan_hoa_ten_pgd()`: thêm alias map "Hội sở CN Đồng Nai" → `DON_VI_CHI_NHANH`
+
+## [2026-06-11] — Fix banner HSTD báo sai "20 PGD chưa upload"
+- `workspaces/ws_management.py` — thay `_banner_pgd_chua_upload()` (kiểm tra per-PGD file) bằng `_banner_hstd_cu()` (kiểm tra `merge_meta_hstd` trong kv_store); phù hợp luồng KH-NV upload 1 file tổng hợp
+
 ## [2026-06-11] — Chuyển tra cứu nhanh sang phân hệ Hỗ trợ địa bàn
 - `workspaces/ws_management.py` — xóa quick search (không hợp lý với Phòng KH-NV)
 - `workspaces/ws_operation.py` dòng ~4382 — thêm quick search vào sidebar Hỗ trợ địa bàn, tìm trên df_pgd (chỉ hồ sơ của PGD)

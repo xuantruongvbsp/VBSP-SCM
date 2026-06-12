@@ -1,5 +1,33 @@
 # CHANGELOG
 
+## [2026-06-12] — Hoàn chỉnh phần Upload dữ liệu phân hệ KH-NV
+- `tabs/tab_upload_khnv/` (mới) — tái cấu trúc từ monolith 1769 dòng thành 8 module: `__init__.py`, `_state.py`, `_status_board.py`, `_merge_panel.py`, `_upload_don_vi.py`, `_upload_toan_cn.py`, `_baseline.py`, `_delete.py`
+- `tabs/tab_upload_khnv/__init__.py` — UI redesign: thay 7 expanders bằng 6 sub-tabs (Tổng quan / Upload đơn vị / Import hàng loạt / Toàn CN / Mốc 31/12 / Xóa dữ liệu)
+- `tabs/tab_upload_khnv/_state.py` — pending merge queue: `them_vao_hang_cho()` / `lay_hang_cho()` / `xoa_hang_cho()`
+- `tabs/tab_upload_khnv/_merge_panel.py` — Batch merge: upload xong → thêm vào queue → 1 lần bấm "Merge toàn CN" + progress bars
+- `tabs/tab_upload_khnv/_upload_don_vi.py` — resurrect form upload đơn vị (dead code cũ); xóa dead code `_folder_scan_trang_thai_row`, `can_merge_*` flags
+- `tabs/tab_upload_khnv/_upload_toan_cn.py` — fix `render_nq11_toan_cn`: thêm `them_vao_hang_cho("nq11")` sau upload (trước đây thiếu, không trigger merge)
+- `services/upload_service.py` dòng ~757 — fix normalize: dùng `isin()` thay `replace()` để tường minh hơn; thêm `_kiem_tra_tai_chinh_hstd()` với DQ checks: dư nợ âm (CRITICAL block), cân bằng TH+QH+Khoanh (WARNING), mã KH format (INFO)
+
+## [2026-06-11] — Fix: nguồn vốn địa phương bị chia đôi do chuẩn hoá COT_NGUON_VON
+- `snapshot_service.py` dòng ~111 — `_norm_nv()`: chuẩn hoá "2.0"→"2", "1.0"→"1" trước khi groupby tránh tạo 2 nhóm riêng cho cùng nguồn vốn ĐP
+- `tabs/tab_hhi.py` dòng ~30 — `_phan_nguon_von()`: mở rộng mapping nhận "ĐP","TW","2.0","1.0" thay vì chỉ số int/float, tránh giá trị string "ĐP" rơi nhầm vào nhóm "Khác"
+
+## [2026-06-11] — Bỏ trùng lắp upload HSTD 31/12 trong tab Giao & ĐC KHTD
+- `tabs/tab_khtd_giao_dc.py` dòng ~220 — `_section_a()`: ưu tiên đọc từ `baseline_cache_loai(nam-1, "hstd")` (đã tổng hợp qua Tab Upload → Mốc 31/12) thay vì bắt upload lại; nếu có file per-PGD chưa merge → hướng dẫn merge; chỉ hiện uploader thủ công khi chưa có gì; audit log ghi rõ nguồn (cache/session)
+
+## [2026-06-11] — Thiết kế lại Tab So sánh kỳ: nhiều kỳ + 4 tabs ngang + chiều phân tích
+- `snapshot_service.py` — thêm `doc_snapshot_theo_ct()` (chi tiết theo ma_ct) và `doc_snapshot_multi()` (nhiều kỳ tùy chọn)
+- `tabs/tab_so_sanh_ky/_common.py` — thêm `render_trend_chart()`, `render_multi_period_table()`, `render_ct_breakdown_table()`
+- `tabs/tab_so_sanh_ky/render_nhieu_ky.py` — tạo mới: 4 tabs ngang HSTD/NQ11/GQVL/CDTOTKVV, multiselect kỳ (tối đa 6), chỉ tiêu mới DN BQ/hộ, giải ngân BQ/hộ, tỷ lệ nợ xấu, phân tích theo PGD và Chương trình tín dụng
+- `tabs/tab_so_sanh_ky/__init__.py` — thêm "So sánh nhiều kỳ" làm option mặc định, giữ nguyên 2 option cũ
+
+## [2026-06-11] — So sánh kỳ: đổi KPI cards từ triệu → tỷ đồng
+- `tabs/tab_so_sanh_ky/_common.py` — thêm unit `"ty"` vào `delta_str()` → `+X,XXX tỷ`
+- `tabs/tab_so_sanh_ky/_kpi_cards.py` — `render_big_metric_card`: delta và baseline dùng tỷ; sửa dark mode badge
+- `tabs/tab_so_sanh_ky/render_2_ky.py` — `_render_kpi` + NQ11 + GQVL rows: giá trị và delta dùng tỷ
+- `tabs/tab_so_sanh_ky/render_moc_nam.py` — big cards, mini cards, NQ11/GQVL rows: dùng tỷ; sửa badge dark mode
+
 ## [2026-06-11] — Fix tab Theo dõi Khảo sát chỉ hiện 21 PGD
 - `tabs/tab_theo_doi_khao_sat.py` — thêm `DON_VI_CHI_NHANH` vào danh sách, thay `DS_PGD` bằng `_DS_TAT_CA` (22 đơn vị) tại 3 chỗ
 - `tabs/tab_theo_doi_khao_sat.py` — `_chuan_hoa_ten_pgd()`: thêm alias map "Hội sở CN Đồng Nai" → `DON_VI_CHI_NHANH`

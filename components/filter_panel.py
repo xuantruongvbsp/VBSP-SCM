@@ -30,6 +30,29 @@ def _get_unique_values(_df: pd.DataFrame, col: str, ts: float = 0.0) -> list:
 
 
 @st.cache_data(show_spinner=False)
+def _pre_compute_max_du_no(_df: pd.DataFrame, col: str, ts: float = 0.0) -> float:
+    """Cache max dư nợ — tránh full column scan mỗi rerun."""
+    _ = ts
+    if col not in _df.columns:
+        return 1_000_000_000.0
+    try:
+        return max(float(_df[col].max()), 1_000_000.0)
+    except Exception:
+        return 1_000_000_000.0
+
+
+@st.cache_data(show_spinner=False)
+def _pre_convert_dates(_df: pd.DataFrame, cols: tuple[str, ...], ts: float = 0.0) -> dict[str, "pd.Series"]:
+    """Cache pre-converted datetime series — tránh pd.to_datetime() mỗi rerun."""
+    _ = ts
+    result: dict[str, pd.Series] = {}
+    for col in cols:
+        if col in _df.columns:
+            result[col] = pd.to_datetime(_df[col], errors="coerce")
+    return result
+
+
+@st.cache_data(show_spinner=False)
 def _get_options_filtered(
     _df: pd.DataFrame, filter_col: str, filter_vals: tuple, target_col: str, ts: float = 0.0
 ) -> list:
@@ -63,6 +86,10 @@ def render_filter_panel(
         Filtered DataFrame
     """
     
+    # Pre-compute cached values
+    _max_du_no = _pre_compute_max_du_no(df, COT_TONG_DU_NO, ts_hstd)
+    _date_series = _pre_convert_dates(df, (COT_NGAY_VAY, COT_NGAY_DH), ts_hstd)
+
     # Initialize filter state
     if "tracuu_filters" not in st.session_state:
         st.session_state.tracuu_filters = {
@@ -72,7 +99,7 @@ def render_filter_panel(
             "selected_thon": [],
             "selected_ct": [],
             "selected_nv": [],
-            "du_no_range": (0.0, float(df[COT_TONG_DU_NO].max()) if COT_TONG_DU_NO in df.columns else 1000000000.0),
+            "du_no_range": (0.0, _max_du_no),
             "ngay_vay_from": None,
             "ngay_vay_to": None,
             "ngay_dh_from": None,
@@ -190,16 +217,15 @@ def render_filter_panel(
         
         # Dư nợ range
         if COT_TONG_DU_NO in df.columns:
-            max_du_no = max(float(df[COT_TONG_DU_NO].max()), 1_000_000.0)
             raw_range = st.session_state.tracuu_filters["du_no_range"]
             safe_value = (
                 float(raw_range[0]),
-                min(float(raw_range[1]), max_du_no),
+                min(float(raw_range[1]), _max_du_no),
             )
             du_no_range = st.slider(
                 "Khoảng dư nợ (VNĐ)",
                 min_value=0.0,
-                max_value=max_du_no,
+                max_value=_max_du_no,
                 value=safe_value,
                 step=1_000_000.0,
                 format="%,.0f",
@@ -288,7 +314,7 @@ def render_filter_panel(
                     "selected_thon": [],
                     "selected_ct": [],
                     "selected_nv": [],
-                    "du_no_range": (0.0, float(df[COT_TONG_DU_NO].max()) if COT_TONG_DU_NO in df.columns else 1000000000.0),
+                    "du_no_range": (0.0, _max_du_no),
                     "ngay_vay_from": None,
                     "ngay_vay_to": None,
                     "ngay_dh_from": None,

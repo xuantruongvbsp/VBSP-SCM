@@ -8,7 +8,7 @@ from __future__ import annotations
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
-from utils import fmt_ty, fmt_so
+from utils import fmt_ty, fmt_so, vn
 
 
 # ─── FORMAT HELPERS (standalone) ──────────────────────────────────────────
@@ -20,6 +20,8 @@ def delta_str(delta: float, unit: str = "tien") -> str:
     sign = "+" if delta > 0 else ""
     if unit == "tien":
         return f"{sign}{fmt_ty(delta)}"
+    if unit == "ty":
+        return f"{sign}{vn(abs(delta) / 1e9, 3)} tỷ"
     if unit == "so":
         return f"{sign}{fmt_so(int(round(delta)))}"
     return f"{sign}{abs(delta):.2f}".replace(".", ",") + "%"
@@ -242,6 +244,169 @@ def render_hbar_chart(
         showlegend=False,
     )
     st.plotly_chart(fig, use_container_width=True, key=key)
+
+
+# ─── TREND CHART ─────────────────────────────────────────────────────────
+
+def render_trend_chart(
+    df_multi: pd.DataFrame,
+    metric_cols: "str | list[str]",
+    title: str = "",
+    y_label: str = "Triệu đồng",
+    key: str = "trend",
+) -> None:
+    """Line chart xu hướng nhiều kỳ.
+
+    df_multi: DataFrame có cột 'ky' và các cột metric.
+    metric_cols: tên cột (str) hoặc list để vẽ nhiều đường.
+    """
+    if df_multi is None or df_multi.empty or "ky" not in df_multi.columns:
+        st.info("ℹ️ Chưa đủ dữ liệu để vẽ xu hướng.")
+        return
+    if isinstance(metric_cols, str):
+        metric_cols = [metric_cols]
+
+    fig = go.Figure()
+    for col in metric_cols:
+        if col not in df_multi.columns:
+            continue
+        fig.add_trace(go.Scatter(
+            x=df_multi["ky"].astype(str).tolist(),
+            y=df_multi[col].tolist(),
+            mode="lines+markers",
+            name=col,
+            line=dict(width=2),
+            marker=dict(size=6),
+        ))
+    fig.update_layout(
+        title=dict(text=title, font_size=13),
+        height=280,
+        margin=dict(t=36, b=20, l=10, r=10),
+        yaxis_title=y_label,
+        xaxis_title="Kỳ",
+        showlegend=len(metric_cols) > 1,
+        hovermode="x unified",
+    )
+    st.plotly_chart(fig, use_container_width=True, key=key)
+
+
+# ─── MULTI-PERIOD TABLE ───────────────────────────────────────────────────
+
+def render_multi_period_table(
+    rows_multi: list[tuple],
+    ky_list: list[str],
+    title: str = "Chỉ tiêu",
+) -> None:
+    """HTML table so sánh N kỳ.
+
+    rows_multi: list of (label, values_list, inverse, unit)
+      - values_list: list float tương ứng ky_list (cùng thứ tự)
+      - unit: 'tien' | 'so' | 'pct'
+    """
+    n = len(ky_list)
+    head_ky = "".join(
+        f"<th style='padding:9px 10px;text-align:right;white-space:nowrap'>Kỳ {k}</th>"
+        for k in ky_list
+    )
+    rows_html = ""
+    for label, values, inv, unit in rows_multi:
+        cells = ""
+        for i, v in enumerate(values):
+            fv = _fv(v, unit)
+            bold = " font-weight:600;" if i == n - 1 else ""
+            cells += f"<td style='padding:8px 10px;text-align:right;{bold}'>{fv}</td>"
+        if n >= 2 and values[0] != 0:
+            d = values[-1] - values[0]
+            cl = css_delta_class(d, inv)
+            d_str = delta_str(d, unit)
+            pct_str = pct_change_str(values[0], values[-1]) if unit != "pct" else delta_str(d, "pct")
+            delta_cell = (
+                f"<td style='padding:8px 10px;text-align:right' class='{cl}'>"
+                f"<strong>{d_str}</strong></td>"
+                f"<td style='padding:8px 10px;text-align:right' class='{cl}'>{pct_str}</td>"
+            )
+        else:
+            delta_cell = "<td style='padding:8px 10px;text-align:right'>—</td><td style='padding:8px 10px'>—</td>"
+        rows_html += (
+            f"<tr style='border-bottom:1px solid var(--border,#e5e7eb)'>"
+            f"<td style='padding:8px 10px;font-weight:500'>{label}</td>"
+            f"{cells}{delta_cell}</tr>"
+        )
+
+    st.markdown(
+        f"""<div style="overflow-x:auto;border-radius:8px;border:1px solid var(--border,#e5e7eb)">
+        <table style="width:100%;border-collapse:collapse;font-size:0.87rem">
+          <thead>
+            <tr style="background:var(--surface-hi,#1e3a5f);color:var(--text-head,white)">
+              <th style="padding:9px 10px;text-align:left">{title}</th>
+              {head_ky}
+              <th style="padding:9px 10px;text-align:right">Δ (đầu→cuối)</th>
+              <th style="padding:9px 10px;text-align:right">% Δ</th>
+            </tr>
+          </thead>
+          <tbody>{rows_html}</tbody>
+        </table></div>""",
+        unsafe_allow_html=True,
+    )
+
+
+# ─── CT BREAKDOWN TABLE ───────────────────────────────────────────────────
+
+def render_ct_breakdown_table(
+    df_ct: pd.DataFrame,
+    ky_label: str,
+    ct_names: dict,
+) -> None:
+    """HTML table phân tích theo chương trình tín dụng.
+
+    df_ct: cột [ma_ct, tong_du_no, du_no_qh, so_ho, gn_nam]
+    ct_names: {ma_ct_int_or_str: ten_ct}
+    """
+    if df_ct is None or df_ct.empty:
+        st.info("ℹ️ Chưa có dữ liệu chương trình tín dụng cho kỳ này.")
+        return
+
+    tong_dn = float(df_ct["tong_du_no"].sum()) if "tong_du_no" in df_ct.columns else 0.0
+
+    rows_html = ""
+    for _, r in df_ct.iterrows():
+        ma = int(r.get("ma_ct", 0))
+        ten = ct_names.get(ma) or ct_names.get(str(ma)) or f"CT {ma}"
+        dn = float(r.get("tong_du_no", 0))
+        nqh = float(r.get("du_no_qh", 0))
+        ho = int(r.get("so_ho", 0))
+        gn = float(r.get("gn_nam", 0))
+        pct = dn / tong_dn * 100 if tong_dn > 0 else 0
+        tl_nqh_val = nqh / dn * 100 if dn > 0 else 0
+        cl_nqh = "delta-neg" if tl_nqh_val > 1 else "delta-pos"
+        rows_html += (
+            f"<tr style='border-bottom:1px solid var(--border,#e5e7eb)'>"
+            f"<td style='padding:7px 10px'>{ten}</td>"
+            f"<td style='padding:7px 10px;text-align:right'>{fmt_ty(dn)}</td>"
+            f"<td style='padding:7px 10px;text-align:right'>{fmt_pct_vn(pct)}</td>"
+            f"<td style='padding:7px 10px;text-align:right' class='{cl_nqh}'>{fmt_pct_vn(tl_nqh_val)}</td>"
+            f"<td style='padding:7px 10px;text-align:right'>{fmt_so(ho)}</td>"
+            f"<td style='padding:7px 10px;text-align:right'>{fmt_ty(gn)}</td>"
+            f"</tr>"
+        )
+
+    st.markdown(
+        f"""<div style="overflow-x:auto;border-radius:8px;border:1px solid var(--border,#e5e7eb)">
+        <table style="width:100%;border-collapse:collapse;font-size:0.84rem">
+          <thead>
+            <tr style="background:var(--surface-hi,#1e3a5f);color:var(--text-head,white)">
+              <th style="padding:9px 10px;text-align:left">Chương trình (kỳ {ky_label})</th>
+              <th style="padding:9px 10px;text-align:right">Dư nợ (triệu)</th>
+              <th style="padding:9px 10px;text-align:right">Cơ cấu %</th>
+              <th style="padding:9px 10px;text-align:right">TL NQH%</th>
+              <th style="padding:9px 10px;text-align:right">Số hộ</th>
+              <th style="padding:9px 10px;text-align:right">Giải ngân (triệu)</th>
+            </tr>
+          </thead>
+          <tbody>{rows_html}</tbody>
+        </table></div>""",
+        unsafe_allow_html=True,
+    )
 
 
 # ─── FLOW DIAGRAM ────────────────────────────────────────────────────────

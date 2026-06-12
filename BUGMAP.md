@@ -536,6 +536,24 @@
 | **Fix** | Thêm `_TEN_DV_ALIAS` (giống `TEN_DV_ALIAS` trong `file_detection_service.py`); áp alias trước khi so sánh; xóa regex sai |
 | **Ngày fix** | 2026-06-01 |
 
+### E9 — NQ11 upload nhưng không trigger merge
+| | |
+|---|---|
+| **File** | `tabs/tab_upload_khnv/_upload_toan_cn.py` → `render_nq11_toan_cn()` |
+| **Dấu hiệu** | Upload danh sách mã KU NQ11 thành công nhưng HSTD không có nhãn NQ11 mới |
+| **Nguyên nhân** | `_render_nq11_toan_cn()` cũ chỉ lưu danh sách mã KU, không gọi merge HSTD. CDTO và GQVL đều merge sau upload nhưng NQ11 thì không |
+| **Fix** | Thêm `them_vao_hang_cho("nq11")` sau khi lưu thành công — merge sẽ được thực hiện khi user bấm "Merge toàn CN" ở tab Tổng quan |
+| **Ngày fix** | 2026-06-12 |
+
+### E10 — Kết quả merge hiển thị 2 lần sau import hàng loạt
+| | |
+|---|---|
+| **File** | `tabs/tab_upload_khnv/` (đã fix trong tái cấu trúc) |
+| **Dấu hiệu** | Sau import hàng loạt, kết quả merge hiện trong spinner VÀ sau rerun qua `folder_import_ket_qua_merge` session state |
+| **Nguyên nhân** | `_xu_ly_upload()` ghi `ket_qua_merge` vào session state, sau rerun `render()` pop và hiện lại. Cả 2 cùng hiện trước và sau `st.rerun()` |
+| **Fix** | Trong architecture batch merge mới: `_xu_ly_upload()` không merge ngay → không có `ket_qua_merge`. Kết quả merge hiện duy nhất trong `_merge_panel.py` |
+| **Ngày fix** | 2026-06-12 |
+
 ### E8 — "Toàn cảnh 22 PGD" cột Upload HSTD luôn ❌ dù đã upload
 | | |
 |---|---|

@@ -33,12 +33,24 @@ def _phan_nguon_von(df: pd.DataFrame) -> pd.DataFrame:
     if COT_NGUON_VON not in df.columns:
         df["_nv_label"] = "Không rõ"
         return df
-    nv_map = {1: "Trung ương", 2: "Địa phương", 1.0: "Trung ương", 2.0: "Địa phương"}
-    df["_nv_label"] = (
-        pd.to_numeric(df[COT_NGUON_VON], errors="coerce")
-        .map(nv_map)
-        .fillna("Khác")
-    )
+
+    def _map_nv(v):
+        s = str(v).strip().upper()
+        if s in ("1", "1.0", "TW", "TRUNG ƯƠNG"):
+            return "Trung ương"
+        if s in ("2", "2.0", "ĐP", "ĐỊA PHƯƠNG"):
+            return "Địa phương"
+        try:
+            n = int(float(s))
+            if n == 1:
+                return "Trung ương"
+            if n == 2:
+                return "Địa phương"
+        except (ValueError, TypeError):
+            pass
+        return "Khác"
+
+    df["_nv_label"] = df[COT_NGUON_VON].map(_map_nv)
     return df
 
 

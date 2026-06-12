@@ -102,10 +102,63 @@ class KetQuaUpload:
             st.error(self.thong_bao)
 
 
+def _kiem_tra_tai_chinh_hstd(df: "pd.DataFrame", report: dict) -> dict:
+    """Kiểm tra logic tài chính cho HSTD — thêm cảnh báo vào report."""
+    from config import COT_TONG_DU_NO, COT_DU_NO_TH, COT_DU_NO_QH, COT_DU_NO_KHOANH, COT_MA_KH
+
+    warnings: list[str] = []
+    critical: list[str] = []
+    tong_dong = len(df)
+    if tong_dong == 0:
+        return report
+
+    # Kiểm tra dư nợ âm (CRITICAL nếu > 5% rows)
+    if COT_TONG_DU_NO in df.columns:
+        du_no = pd.to_numeric(df[COT_TONG_DU_NO], errors="coerce")
+        so_am = int((du_no < 0).sum())
+        if so_am > 0:
+            pct_am = so_am / tong_dong * 100
+            msg = f"Dư nợ âm: {so_am} dòng ({pct_am:.1f}%)"
+            if pct_am >= 5:
+                critical.append(msg)
+            else:
+                warnings.append(msg)
+
+    # Kiểm tra cân bằng: Tổng dư nợ ≈ TH + QH + Khoanh (cảnh báo nếu lệch > 1K)
+    cols_can_bang = [COT_TONG_DU_NO, COT_DU_NO_TH, COT_DU_NO_QH, COT_DU_NO_KHOANH]
+    if all(c in df.columns for c in cols_can_bang):
+        tong = pd.to_numeric(df[COT_TONG_DU_NO], errors="coerce").fillna(0)
+        phan_chia = (
+            pd.to_numeric(df[COT_DU_NO_TH], errors="coerce").fillna(0)
+            + pd.to_numeric(df[COT_DU_NO_QH], errors="coerce").fillna(0)
+            + pd.to_numeric(df[COT_DU_NO_KHOANH], errors="coerce").fillna(0)
+        )
+        lech = int((abs(tong - phan_chia) > 1000).sum())
+        if lech > 0:
+            warnings.append(f"Tổng dư nợ lệch TH+QH+Khoanh: {lech} dòng")
+
+    # Kiểm tra mã KH format (INFO)
+    if COT_MA_KH in df.columns:
+        import re
+        ma_kh = df[COT_MA_KH].dropna().astype(str)
+        so_sai_format = int((~ma_kh.str.match(r"^\d{8,12}$")).sum())
+        if so_sai_format > 0:
+            warnings.append(f"Mã KH không đúng định dạng (8-12 chữ số): {so_sai_format} dòng")
+
+    updated = dict(report)
+    if critical:
+        updated["canh_bao_critical"] = critical
+        updated["co_loi_critical"] = True
+    if warnings:
+        updated["canh_bao_tai_chinh"] = warnings
+    return updated
+
+
 def danh_gia_chat_luong_file_upload(loai: str, file_bytes: bytes) -> tuple[bool, str, dict]:
     """
     Đánh giá nhanh chất lượng dữ liệu ngay tại bước upload.
     Trả về (hop_le, thong_bao, bao_cao).
+    Với HSTD: bổ sung kiểm tra tài chính (dư nợ âm, cân bằng, mã KH).
     """
     try:
         buf = BytesIO(file_bytes)
@@ -120,13 +173,25 @@ def danh_gia_chat_luong_file_upload(loai: str, file_bytes: bytes) -> tuple[bool,
             return True, "Không áp dụng Data Quality cho loại này.", {}
 
         kq = kiem_tra_chat_luong(df, loai)
-        if kq.report["so_loi"] == 0:
-            return True, "Dữ liệu đạt chuẩn kiểm tra nhanh.", kq.report
-        return (
-            False,
-            f"Dữ liệu có {kq.report['so_loi']} nhóm lỗi, cần rà soát trước khi upload.",
-            kq.report,
-        )
+        report = kq.report
+
+        # Bổ sung kiểm tra tài chính cho HSTD
+        if loai == "hstd":
+            report = _kiem_tra_tai_chinh_hstd(df, report)
+
+        if report.get("co_loi_critical"):
+            loi_str = "; ".join(report.get("canh_bao_critical", []))
+            return False, f"❌ Lỗi nghiêm trọng — {loi_str}", report
+
+        if report["so_loi"] == 0 and not report.get("canh_bao_tai_chinh"):
+            return True, "Dữ liệu đạt chuẩn kiểm tra nhanh.", report
+
+        msgs = []
+        if report["so_loi"] > 0:
+            msgs.append(f"{report['so_loi']} nhóm lỗi cấu trúc")
+        if report.get("canh_bao_tai_chinh"):
+            msgs.append("; ".join(report["canh_bao_tai_chinh"]))
+        return False, "⚠️ " + " · ".join(msgs), report
     except Exception as e:
         logger.error("danh_gia_chat_luong_file_upload: không đọc được file %s — %s", loai, e, exc_info=True)
         return False, f"Không thể đọc file để đánh giá chất lượng: {e}", {}
@@ -753,9 +818,8 @@ def merge_du_lieu_toan_cn(
                     if _whole.any():
                         ser = ser.copy()
                         ser.loc[_whole] = _num.loc[_whole].astype("int64").astype(str)
-            df_toan_cn[col] = (
-                ser.fillna("").astype(str).str.strip().replace(_BAD_VALS_LIST, "")
-            )
+            _ser_str = ser.fillna("").astype(str).str.strip()
+            df_toan_cn[col] = _ser_str.where(~_ser_str.isin(_BAD_VALS), "")
 
     with _MERGE_LOCK[loai]:
         bak_path = cache_path + ".bak"

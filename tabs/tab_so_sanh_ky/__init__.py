@@ -7,6 +7,7 @@ from auth import normalize_role
 from tabs.base_tab import TabContext
 from tabs.tab_so_sanh_ky.render_moc_nam import render_moc_nam
 from tabs.tab_so_sanh_ky.render_2_ky import render_2_ky
+from tabs.tab_so_sanh_ky.render_nhieu_ky import render_nhieu_ky
 
 import streamlit as st
 
@@ -20,13 +21,15 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
     with ctx:
         sub = st.radio(
             "Loại so sánh",
-            ["📊 So sánh mốc năm", "🔄 So sánh 2 kỳ"],
+            ["📊 So sánh nhiều kỳ", "📅 So sánh mốc năm", "🔄 So sánh 2 kỳ"],
             horizontal=True,
             key="ss_ky_sub",
             label_visibility="collapsed",
         )
         st.divider()
-        if sub == "📊 So sánh mốc năm":
+        if sub == "📅 So sánh mốc năm":
             render_moc_nam(None, **kwargs)
-        else:
+        elif sub == "🔄 So sánh 2 kỳ":
             render_2_ky(None, **kwargs)
+        else:
+            render_nhieu_ky(None, **kwargs)

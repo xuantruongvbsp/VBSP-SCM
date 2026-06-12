@@ -52,7 +52,7 @@ from tabs.tab_so_sanh_ky._kpi_cards import (
     render_dashboard_header,
 )
 from tabs.tab_so_sanh_ky._export import render_export_ui, render_export_hstd_ui
-from utils import fmt_ty, fmt_so
+from utils import fmt_ty, fmt_so, vn
 import db
 
 
@@ -326,8 +326,8 @@ def _render_hstd_section(
         
         render_big_metric_card(
             icon="💰",
-            label="Tổng dư nợ (triệu đồng)",
-            value=fmt_ty(agg_ht["tong_du_no"]),
+            label="Tổng dư nợ",
+            value=vn(agg_ht["tong_du_no"] / 1e9, 3) + " tỷ",
             delta_pct=delta_dn_pct,
             delta_value=agg_ht["tong_du_no"] - agg_bl["tong_du_no"],
             baseline_value=agg_bl["tong_du_no"],
@@ -336,16 +336,16 @@ def _render_hstd_section(
             color_scheme="blue" if delta_dn_pct >= 0 else "red",
             key=f"{key_prefix}big_dn",
         )
-    
+
     with col2:
         # Card Nợ xấu - đỏ nếu tăng, xanh nếu giảm
         delta_nx_pct = ((no_xau_ht - no_xau_bl) / no_xau_bl * 100) if no_xau_bl else 0
         progress_nx = (no_xau_ht / no_xau_bl * 100) if no_xau_bl else 100
-        
+
         render_big_metric_card(
             icon="⚠️",
-            label="Nợ xấu QH + Khoanh (triệu đồng)",
-            value=fmt_ty(no_xau_ht),
+            label="Nợ xấu QH + Khoanh",
+            value=vn(no_xau_ht / 1e9, 3) + " tỷ",
             delta_pct=delta_nx_pct,
             delta_value=no_xau_ht - no_xau_bl,
             baseline_value=no_xau_bl,
@@ -358,9 +358,9 @@ def _render_hstd_section(
     # Badge tỷ lệ nợ xấu
     col_badge1, col_badge2, _ = st.columns([1, 1, 2])
     with col_badge1:
-        st.markdown(f"<div style='text-align:center; padding:8px; background:#f0fdf4; border-radius:8px; color:#166534; font-weight:600;'>📉 Tỷ lệ nợ xấu: <b>{fmt_pct_vn(tl_nx_ht)}</b> (mốc: {fmt_pct_vn(tl_nx_bl)})</div>", unsafe_allow_html=True)
+        st.markdown(f"<div style='text-align:center;padding:8px;background:var(--surface-lo,#f0fdf4);border-radius:8px;color:var(--green,#166534);font-weight:600;'>📉 Tỷ lệ nợ xấu: <b>{fmt_pct_vn(tl_nx_ht)}</b> (mốc: {fmt_pct_vn(tl_nx_bl)})</div>", unsafe_allow_html=True)
     with col_badge2:
-        st.markdown(f"<div style='text-align:center; padding:8px; background:#fefce8; border-radius:8px; color:#854d0e; font-weight:600;'>📊 Tỷ lệ NQH: <b>{fmt_pct_vn(tl_nqh_ht)}</b> (mốc: {fmt_pct_vn(tl_nqh_bl)})</div>", unsafe_allow_html=True)
+        st.markdown(f"<div style='text-align:center;padding:8px;background:var(--surface-lo,#fefce8);border-radius:8px;color:var(--text-sub,#854d0e);font-weight:600;'>📊 Tỷ lệ NQH: <b>{fmt_pct_vn(tl_nqh_ht)}</b> (mốc: {fmt_pct_vn(tl_nqh_bl)})</div>", unsafe_allow_html=True)
     
     st.markdown("")  # Spacing
     
@@ -385,18 +385,18 @@ def _render_hstd_section(
         {
             "icon": "💹",
             "label": "Tổng lãi tồn",
-            "value": fmt_ty(agg_ht["tong_lai_ton"]),
+            "value": vn(agg_ht["tong_lai_ton"] / 1e9, 3) + " tỷ",
             "delta": agg_ht["tong_lai_ton"] - agg_bl["tong_lai_ton"],
-            "unit": "tien",
-            "color": "#eab308",  # yellow
+            "unit": "ty",
+            "color": "#eab308",
         },
         {
             "icon": "📈",
             "label": "Giải ngân năm",
-            "value": fmt_ty(agg_ht["gn_nam"]),
+            "value": vn(agg_ht["gn_nam"] / 1e9, 3) + " tỷ",
             "delta": agg_ht["gn_nam"] - agg_bl["gn_nam"],
-            "unit": "tien",
-            "color": "#22c55e",  # green
+            "unit": "ty",
+            "color": "#22c55e",
         },
     ]
     render_mini_cards_row(mini_cards, key_prefix=f"{key_prefix}mini")
@@ -740,13 +740,14 @@ def _render_nq11_section(
     st.divider()
 
     # KPI Row
+    def _ty(x): return vn(float(x) / 1e9, 3) + " tỷ"
     render_kpi_row([
-        {"label": "💰 Tổng dư nợ NQ11", "value": fmt_ty(float(a_ht.get("tong_du_no", 0))),
-         "delta": float(a_ht.get("tong_du_no", 0)) - float(a_bl.get("tong_du_no", 0)), "unit": "tien",
-         "help": f"Mốc: {fmt_ty(float(a_bl.get('tong_du_no', 0)))}"},
-        {"label": "⚠️ Nợ quá hạn NQ11", "value": fmt_ty(float(a_ht.get("no_qh", 0))),
-         "delta": float(a_ht.get("no_qh", 0)) - float(a_bl.get("no_qh", 0)), "unit": "tien", "inverse": True,
-         "help": f"Mốc: {fmt_ty(float(a_bl.get('no_qh', 0)))}"},
+        {"label": "💰 Tổng dư nợ NQ11", "value": _ty(a_ht.get("tong_du_no", 0)),
+         "delta": float(a_ht.get("tong_du_no", 0)) - float(a_bl.get("tong_du_no", 0)), "unit": "ty",
+         "help": f"Mốc: {_ty(a_bl.get('tong_du_no', 0))}"},
+        {"label": "⚠️ Nợ quá hạn NQ11", "value": _ty(a_ht.get("no_qh", 0)),
+         "delta": float(a_ht.get("no_qh", 0)) - float(a_bl.get("no_qh", 0)), "unit": "ty", "inverse": True,
+         "help": f"Mốc: {_ty(a_bl.get('no_qh', 0))}"},
         {"label": "👥 Số KH NQ11", "value": fmt_so(int(a_ht.get("so_kh", 0))),
          "delta": float(a_ht.get("so_kh", 0)) - float(a_bl.get("so_kh", 0)), "unit": "so",
          "help": f"Mốc: {fmt_so(int(a_bl.get('so_kh', 0)))}"},
@@ -859,19 +860,20 @@ def _render_gqvl_section(
     st.divider()
 
     # KPI
+    def _ty(x): return vn(float(x) / 1e9, 3) + " tỷ"
     render_kpi_row([
-        {"label": "💰 DN trong hạn GQVL", "value": fmt_ty(float(a_ht.get("dn_th", 0))),
-         "delta": float(a_ht.get("dn_th", 0)) - float(a_bl.get("dn_th", 0)), "unit": "tien",
-         "help": f"Mốc: {fmt_ty(float(a_bl.get('dn_th', 0)))}"},
-        {"label": "⚠️ DN quá hạn GQVL", "value": fmt_ty(float(a_ht.get("dn_qh", 0))),
-         "delta": float(a_ht.get("dn_qh", 0)) - float(a_bl.get("dn_qh", 0)), "unit": "tien", "inverse": True,
-         "help": f"Mốc: {fmt_ty(float(a_bl.get('dn_qh', 0)))}"},
-        {"label": "🟡 DN khoanh GQVL", "value": fmt_ty(float(a_ht.get("dn_khoanh", 0))),
-         "delta": float(a_ht.get("dn_khoanh", 0)) - float(a_bl.get("dn_khoanh", 0)), "unit": "tien", "inverse": True,
-         "help": f"Mốc: {fmt_ty(float(a_bl.get('dn_khoanh', 0)))}"},
-        {"label": "📈 Giải ngân GQVL", "value": fmt_ty(float(a_ht.get("gn_nam", 0))),
-         "delta": float(a_ht.get("gn_nam", 0)) - float(a_bl.get("gn_nam", 0)), "unit": "tien",
-         "help": f"Mốc: {fmt_ty(float(a_bl.get('gn_nam', 0)))}"},
+        {"label": "💰 DN trong hạn GQVL", "value": _ty(a_ht.get("dn_th", 0)),
+         "delta": float(a_ht.get("dn_th", 0)) - float(a_bl.get("dn_th", 0)), "unit": "ty",
+         "help": f"Mốc: {_ty(a_bl.get('dn_th', 0))}"},
+        {"label": "⚠️ DN quá hạn GQVL", "value": _ty(a_ht.get("dn_qh", 0)),
+         "delta": float(a_ht.get("dn_qh", 0)) - float(a_bl.get("dn_qh", 0)), "unit": "ty", "inverse": True,
+         "help": f"Mốc: {_ty(a_bl.get('dn_qh', 0))}"},
+        {"label": "🟡 DN khoanh GQVL", "value": _ty(a_ht.get("dn_khoanh", 0)),
+         "delta": float(a_ht.get("dn_khoanh", 0)) - float(a_bl.get("dn_khoanh", 0)), "unit": "ty", "inverse": True,
+         "help": f"Mốc: {_ty(a_bl.get('dn_khoanh', 0))}"},
+        {"label": "📈 Giải ngân GQVL", "value": _ty(a_ht.get("gn_nam", 0)),
+         "delta": float(a_ht.get("gn_nam", 0)) - float(a_bl.get("gn_nam", 0)), "unit": "ty",
+         "help": f"Mốc: {_ty(a_bl.get('gn_nam', 0))}"},
     ])
 
     # Table

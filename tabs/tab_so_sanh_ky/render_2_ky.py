@@ -6,7 +6,7 @@ import pandas as pd
 from streamlit.delta_generator import DeltaGenerator
 
 from auth import normalize_role, la_phan_he_pgd
-from utils import fmt_ty, fmt_so, lazy_expander as _lazy_expander
+from utils import fmt_ty, fmt_so, vn, lazy_expander as _lazy_expander
 from tabs.base_tab import TabContext
 from state_manager import SCMStateManager
 from snapshot_service import (
@@ -81,16 +81,18 @@ def _render_kpi(agg1: dict, agg2: dict, ky1: str, ky2: str) -> None:
     tl1 = tl_nqh(agg1["du_no_qh"], agg1["tong_du_no"])
     tl2 = tl_nqh(agg2["du_no_qh"], agg2["tong_du_no"])
 
+    def _ty(x): return vn(x / 1e9, 3) + " tỷ"
+
     render_kpi_row([
-        {"label": "💰 Tổng dư nợ (triệu đồng)", "value": fmt_ty(agg2["tong_du_no"]),
-         "delta": agg2["tong_du_no"] - agg1["tong_du_no"], "unit": "tien",
-         "help": f"Kỳ {ky1}: {fmt_ty(agg1['tong_du_no'])}"},
-        {"label": "⚠️ Dư nợ quá hạn (triệu đồng)", "value": fmt_ty(agg2["du_no_qh"]),
-         "delta": agg2["du_no_qh"] - agg1["du_no_qh"], "unit": "tien", "inverse": True,
-         "help": f"Kỳ {ky1}: {fmt_ty(agg1['du_no_qh'])}"},
-        {"label": "🔒 Dư nợ khoanh (triệu đồng)", "value": fmt_ty(agg2["du_no_khoanh"]),
-         "delta": agg2["du_no_khoanh"] - agg1["du_no_khoanh"], "unit": "tien", "inverse": True,
-         "help": f"Kỳ {ky1}: {fmt_ty(agg1['du_no_khoanh'])}"},
+        {"label": "💰 Tổng dư nợ", "value": _ty(agg2["tong_du_no"]),
+         "delta": agg2["tong_du_no"] - agg1["tong_du_no"], "unit": "ty",
+         "help": f"Kỳ {ky1}: {_ty(agg1['tong_du_no'])}"},
+        {"label": "⚠️ Dư nợ quá hạn", "value": _ty(agg2["du_no_qh"]),
+         "delta": agg2["du_no_qh"] - agg1["du_no_qh"], "unit": "ty", "inverse": True,
+         "help": f"Kỳ {ky1}: {_ty(agg1['du_no_qh'])}"},
+        {"label": "🔒 Dư nợ khoanh", "value": _ty(agg2["du_no_khoanh"]),
+         "delta": agg2["du_no_khoanh"] - agg1["du_no_khoanh"], "unit": "ty", "inverse": True,
+         "help": f"Kỳ {ky1}: {_ty(agg1['du_no_khoanh'])}"},
         {"label": "📊 Tỷ lệ NQH", "value": fmt_pct_vn(tl2),
          "delta": tl2 - tl1, "unit": "pct", "inverse": True,
          "help": f"Kỳ {ky1}: {fmt_pct_vn(tl1)}"},
@@ -104,9 +106,9 @@ def _render_kpi(agg1: dict, agg2: dict, ky1: str, ky2: str) -> None:
         {"label": "📋 Số khế ước", "value": fmt_so(int(agg2["so_ku"])),
          "delta": agg2["so_ku"] - agg1["so_ku"], "unit": "so",
          "help": f"Kỳ {ky1}: {fmt_so(int(agg1['so_ku']))}"},
-        {"label": "💵 Giải ngân trong năm (triệu đồng)", "value": fmt_ty(agg2["gn_nam"]),
-         "delta": agg2["gn_nam"] - agg1["gn_nam"], "unit": "tien",
-         "help": f"Kỳ {ky1}: {fmt_ty(agg1['gn_nam'])}"},
+        {"label": "💵 Giải ngân trong năm", "value": _ty(agg2["gn_nam"]),
+         "delta": agg2["gn_nam"] - agg1["gn_nam"], "unit": "ty",
+         "help": f"Kỳ {ky1}: {_ty(agg1['gn_nam'])}"},
         {"label": "", "value": "", "delta": None},
     ])
 
@@ -266,13 +268,14 @@ def _render_nq11_section(ky1: str, ky2: str, pgd_mode: bool, pgd_user: str | Non
     a1 = df1.iloc[0].to_dict()
     a2 = df2.iloc[0].to_dict()
 
+    def _ty(x): return vn(float(x) / 1e9, 3) + " tỷ"
     render_kpi_row([
-        {"label": "Tổng dư nợ NQ11", "value": fmt_ty(float(a2.get("tong_du_no", 0))),
-         "delta": float(a2.get("tong_du_no", 0)) - float(a1.get("tong_du_no", 0)), "unit": "tien",
-         "help": f"Kỳ {sel_k1}: {fmt_ty(float(a1.get('tong_du_no', 0)))}"},
-        {"label": "Nợ quá hạn NQ11", "value": fmt_ty(float(a2.get("no_qh", 0))),
-         "delta": float(a2.get("no_qh", 0)) - float(a1.get("no_qh", 0)), "unit": "tien", "inverse": True,
-         "help": f"Kỳ {sel_k1}: {fmt_ty(float(a1.get('no_qh', 0)))}"},
+        {"label": "Tổng dư nợ NQ11", "value": _ty(a2.get("tong_du_no", 0)),
+         "delta": float(a2.get("tong_du_no", 0)) - float(a1.get("tong_du_no", 0)), "unit": "ty",
+         "help": f"Kỳ {sel_k1}: {_ty(a1.get('tong_du_no', 0))}"},
+        {"label": "Nợ quá hạn NQ11", "value": _ty(a2.get("no_qh", 0)),
+         "delta": float(a2.get("no_qh", 0)) - float(a1.get("no_qh", 0)), "unit": "ty", "inverse": True,
+         "help": f"Kỳ {sel_k1}: {_ty(a1.get('no_qh', 0))}"},
         {"label": "Số khách hàng NQ11", "value": fmt_so(int(a2.get("so_kh", 0))),
          "delta": float(a2.get("so_kh", 0)) - float(a1.get("so_kh", 0)), "unit": "so",
          "help": f"Kỳ {sel_k1}: {fmt_so(int(a1.get('so_kh', 0)))}"},
@@ -321,19 +324,20 @@ def _render_gqvl_section(ky1: str, ky2: str, pgd_mode: bool, pgd_user: str | Non
     a1 = df1.iloc[0].to_dict()
     a2 = df2.iloc[0].to_dict()
 
+    def _ty(x): return vn(float(x) / 1e9, 3) + " tỷ"
     render_kpi_row([
-        {"label": "DN trong hạn GQVL", "value": fmt_ty(float(a2.get("dn_th", 0))),
-         "delta": float(a2.get("dn_th", 0)) - float(a1.get("dn_th", 0)), "unit": "tien",
-         "help": f"Kỳ {sel_k1}: {fmt_ty(float(a1.get('dn_th', 0)))}"},
-        {"label": "DN quá hạn GQVL", "value": fmt_ty(float(a2.get("dn_qh", 0))),
-         "delta": float(a2.get("dn_qh", 0)) - float(a1.get("dn_qh", 0)), "unit": "tien", "inverse": True,
-         "help": f"Kỳ {sel_k1}: {fmt_ty(float(a1.get('dn_qh', 0)))}"},
-        {"label": "DN khoanh GQVL", "value": fmt_ty(float(a2.get("dn_khoanh", 0))),
-         "delta": float(a2.get("dn_khoanh", 0)) - float(a1.get("dn_khoanh", 0)), "unit": "tien", "inverse": True,
-         "help": f"Kỳ {sel_k1}: {fmt_ty(float(a1.get('dn_khoanh', 0)))}"},
-        {"label": "Giải ngân GQVL", "value": fmt_ty(float(a2.get("gn_nam", 0))),
-         "delta": float(a2.get("gn_nam", 0)) - float(a1.get("gn_nam", 0)), "unit": "tien",
-         "help": f"Kỳ {sel_k1}: {fmt_ty(float(a1.get('gn_nam', 0)))}"},
+        {"label": "DN trong hạn GQVL", "value": _ty(a2.get("dn_th", 0)),
+         "delta": float(a2.get("dn_th", 0)) - float(a1.get("dn_th", 0)), "unit": "ty",
+         "help": f"Kỳ {sel_k1}: {_ty(a1.get('dn_th', 0))}"},
+        {"label": "DN quá hạn GQVL", "value": _ty(a2.get("dn_qh", 0)),
+         "delta": float(a2.get("dn_qh", 0)) - float(a1.get("dn_qh", 0)), "unit": "ty", "inverse": True,
+         "help": f"Kỳ {sel_k1}: {_ty(a1.get('dn_qh', 0))}"},
+        {"label": "DN khoanh GQVL", "value": _ty(a2.get("dn_khoanh", 0)),
+         "delta": float(a2.get("dn_khoanh", 0)) - float(a1.get("dn_khoanh", 0)), "unit": "ty", "inverse": True,
+         "help": f"Kỳ {sel_k1}: {_ty(a1.get('dn_khoanh', 0))}"},
+        {"label": "Giải ngân GQVL", "value": _ty(a2.get("gn_nam", 0)),
+         "delta": float(a2.get("gn_nam", 0)) - float(a1.get("gn_nam", 0)), "unit": "ty",
+         "help": f"Kỳ {sel_k1}: {_ty(a1.get('gn_nam', 0))}"},
     ])
 
     rows_gqvl = [

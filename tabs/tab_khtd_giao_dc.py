@@ -8,8 +8,13 @@ from datetime import datetime
 import pandas as pd
 import streamlit as st
 
+import os
+
 import db
-from config import CHUONG_TRINH_KHTD, DON_VI_CHI_NHANH, DS_PGD, GQVL_MA_KEY_GIAO, PGD_XA_MAP
+from config import (
+    CHUONG_TRINH_KHTD, DON_VI_CHI_NHANH, DS_PGD, GQVL_MA_KEY_GIAO, PGD_XA_MAP,
+    baseline_cache_loai, trang_thai_baseline_pgd,
+)
 from data.pgd import pgd_slug as _pgd_slug
 from services import khtd_service
 from services.khtd_service import LOAI_DIEU_CHINH, LOAI_GIAO
@@ -221,80 +226,122 @@ def _section_a(
     username: str, nam: int, thang: str, dot: str, df_hstd: pd.DataFrame | None
 ) -> None:
     _ = df_hstd
+    nam_baseline = nam - 1
+    cache_path = baseline_cache_loai(nam_baseline, "hstd")
+    co_cache = os.path.exists(cache_path)
 
+    # Đếm file per-PGD đã upload (chỉ khi chưa có cache để tránh I/O thừa)
+    so_co_file = 0
+    if not co_cache:
+        tt = trang_thai_baseline_pgd(nam_baseline)
+        so_co_file = sum(1 for v in tt.values() if v)
+
+    # ── Nguồn dữ liệu HSTD 31/12 ──────────────────────────────────────────────
     with st.expander(
-        "📂 Upload file HSTD 31/12 (dùng cho đợt đầu năm)",
-        expanded=False,
+        "📂 Dữ liệu HSTD 31/12 (dùng cho đợt đầu năm)",
+        expanded=not co_cache,
     ):
-        st.caption(
-            "Upload file HSTD xuất tại ngày 31/12 năm trước "
-            "để làm căn cứ khởi tạo KH đầu năm."
-        )
-        f_up = st.file_uploader(
-            "Chọn file HSTD 31/12",
-            type=["xlsx", "xls"],
-            key=_SS + "hstd_upload",
-        )
-        if f_up:
-            try:
-                df_31_12 = pd.read_excel(f_up)
-                st.session_state["khtd_df_hstd_31_12"] = df_31_12
-                st.success(
-                    f"✅ Đã tải {len(df_31_12):,} dòng từ file HSTD 31/12"
-                )
-                db.ghi_audit(
-                    username,
-                    "upload_khtd_hstd_3112",
-                    f"[{_hostname()}] session · {len(df_31_12)} dòng",
-                )
-            except Exception as e:
-                logger.error("Không đọc được file HSTD 31/12: %s", e, exc_info=True)
-                db.ghi_audit(
-                    username,
-                    "upload_khtd_hstd_3112_loi",
-                    f"[{_hostname()}] {e}",
-                )
-                st.error(f"❌ Không đọc được file: {e}")
-
-    with st.expander("🚀 Khởi tạo đợt đầu năm", expanded=False):
-        df_31_12 = st.session_state.get("khtd_df_hstd_31_12")
-        if df_31_12 is None:
-            st.warning(
-                "⚠️ Chưa upload file HSTD 31/12. "
-                "Vui lòng upload ở mục trên trước."
+        if co_cache:
+            st.success(
+                f"✅ Đã có cache baseline HSTD 31/12/{nam_baseline} — "
+                "không cần upload lại."
+            )
+            st.caption(
+                "Dữ liệu được tổng hợp từ mục **Upload → Mốc 31/12**. "
+                "Nhấn **Khởi tạo đợt đầu năm** bên dưới để tiếp tục."
             )
         else:
-            st.info(
-                f"Sẽ khởi tạo đợt giao đầu năm {nam} "
-                f"cho 22 đơn vị dựa trên dư nợ 31/12/{nam - 1}."
+            if so_co_file > 0:
+                st.warning(
+                    f"⚠️ Có {so_co_file}/22 đơn vị đã upload file HSTD 31/12/{nam_baseline} "
+                    "nhưng chưa tổng hợp cache."
+                )
+                st.caption(
+                    "Vào **Tab Upload → Mốc 31/12** → nhấn **Tổng hợp baseline** "
+                    "để tạo cache, sau đó quay lại đây."
+                )
+                st.divider()
+            st.caption(
+                "Hoặc upload thủ công file HSTD xuất tại ngày 31/12 năm trước "
+                "để dùng ngay trong phiên này."
             )
-            if st.button(
-                f"🚀 Khởi tạo đợt giao {nam}_01_Dot1",
-                key=_SS + "btn_khoi_tao",
-            ):
-                with st.spinner("Đang khởi tạo…"):
-                    ket_qua = khtd_service.tao_dot_giao_dau_nam(
-                        nam, username, df_31_12
+            f_up = st.file_uploader(
+                "Chọn file HSTD 31/12",
+                type=["xlsx", "xls"],
+                key=_SS + "hstd_upload",
+            )
+            if f_up:
+                try:
+                    df_31_12 = pd.read_excel(f_up)
+                    st.session_state["khtd_df_hstd_31_12"] = df_31_12
+                    st.success(
+                        f"✅ Đã tải {len(df_31_12):,} dòng từ file HSTD 31/12"
                     )
-                rows = [
-                    {
-                        "Đơn vị": _slug_to_ten(s),
-                        "Kết quả": (
-                            "✅ ok"
-                            if kq.thanh_cong
-                            else f"❌ {kq.thong_bao[:100]}"
-                        ),
-                    }
-                    for s, kq in ket_qua.items()
-                ]
-                hien_thi_dataframe_phan_trang(
-                    pd.DataFrame(rows), key=_SS + "khoi_tao_result"
+                    db.ghi_audit(
+                        username,
+                        "upload_khtd_hstd_3112",
+                        f"[{_hostname()}] session · {len(df_31_12)} dòng",
+                    )
+                except Exception as e:
+                    logger.error("Không đọc được file HSTD 31/12: %s", e, exc_info=True)
+                    db.ghi_audit(
+                        username,
+                        "upload_khtd_hstd_3112_loi",
+                        f"[{_hostname()}] {e}",
+                    )
+                    st.error(f"❌ Không đọc được file: {e}")
+
+    # ── Khởi tạo đợt đầu năm ──────────────────────────────────────────────────
+    with st.expander("🚀 Khởi tạo đợt đầu năm", expanded=False):
+        # Xác định nguồn: cache disk > session state
+        if co_cache:
+            parquet_to_use: str | None = cache_path
+            df_to_use: pd.DataFrame | None = None
+            st.info(
+                f"Nguồn: cache baseline HSTD 31/12/{nam_baseline}  \n"
+                f"Sẽ khởi tạo đợt giao đầu năm **{nam}** cho 22 đơn vị."
+            )
+        else:
+            parquet_to_use = None
+            df_to_use = st.session_state.get("khtd_df_hstd_31_12")
+            if df_to_use is None:
+                st.warning(
+                    "⚠️ Chưa có dữ liệu HSTD 31/12. "
+                    "Tổng hợp baseline trong Tab Upload hoặc upload thủ công ở mục trên."
                 )
-                db.ghi_audit(
-                    username,
-                    "khoi_tao_dot_giao_dau_nam",
-                    f"[{_hostname()}] nam={nam} · {len(ket_qua)} đơn vị",
+                return
+            st.info(
+                f"Nguồn: file upload phiên này ({len(df_to_use):,} dòng)  \n"
+                f"Sẽ khởi tạo đợt giao đầu năm **{nam}** cho 22 đơn vị."
+            )
+
+        if st.button(
+            f"🚀 Khởi tạo đợt giao {nam}_01_Dot1",
+            key=_SS + "btn_khoi_tao",
+        ):
+            with st.spinner("Đang khởi tạo…"):
+                ket_qua = khtd_service.tao_dot_giao_dau_nam(
+                    nam, username, df_to_use, parquet_path=parquet_to_use
                 )
+            rows = [
+                {
+                    "Đơn vị": _slug_to_ten(s),
+                    "Kết quả": (
+                        "✅ ok"
+                        if kq.thanh_cong
+                        else f"❌ {kq.thong_bao[:100]}"
+                    ),
+                }
+                for s, kq in ket_qua.items()
+            ]
+            hien_thi_dataframe_phan_trang(
+                pd.DataFrame(rows), key=_SS + "khoi_tao_result"
+            )
+            db.ghi_audit(
+                username,
+                "khoi_tao_dot_giao_dau_nam",
+                f"[{_hostname()}] nam={nam} · nguon={'cache' if co_cache else 'session'} · {len(ket_qua)} đơn vị",
+            )
 
     loai_hien_tai = st.session_state.get(_SS + "loai", LOAI_DIEU_CHINH)
     if loai_hien_tai == LOAI_DIEU_CHINH:

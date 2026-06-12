@@ -9,7 +9,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import streamlit as st
 
-from utils import fmt_ty, fmt_so
+from utils import fmt_ty, fmt_so, vn
 from tabs.tab_so_sanh_ky._common import delta_str, pct_change_str, fmt_pct_vn
 
 
@@ -254,7 +254,7 @@ def render_big_metric_card(
     
     delta_class = "delta-up" if is_good else "delta-down" if delta_pct != 0 else "delta-neutral"
     arrow = "↑" if delta_pct > 0 else "↓" if delta_pct < 0 else "→"
-    delta_str_val = f"{arrow} {abs(delta_pct):.1f}% ({delta_str(delta_value, 'tien')})"
+    delta_str_val = f"{arrow} {abs(delta_pct):.1f}% ({delta_str(delta_value, 'ty')})"
     
     # Inject CSS
     _inject_card_css(
@@ -278,7 +278,7 @@ def render_big_metric_card(
             <div class="card-progress-bar" style="width: {bar_width}%; background: {c['progress']};"></div>
         </div>
         <div class="card-progress-labels">
-            <span>Mốc: {fmt_ty(baseline_value)}</span>
+            <span>Mốc: {vn(baseline_value / 1e9, 3)} tỷ</span>
             <span>{progress_pct:.1f}% vs mốc</span>
         </div>
     </div>

@@ -2,11 +2,13 @@
 snapshot_service.py — Lưu và đọc HSTD Snapshot theo tháng vào SQLite.
 
 API:
-    luu_snapshot(df_full, username)        → KetQuaUpload
-    doc_snapshot(ky)                       → pd.DataFrame  (tổng theo PGD, ma_ct='ALL')
-    doc_snapshot_range(tu_ky, den_ky)      → pd.DataFrame  (nhiều kỳ, ten_pgd='__CN__')
-    danh_sach_ky()                         → list[str]      (mới → cũ)
-    xoa_snapshot(ky, username)             → None
+    luu_snapshot(df_full, username)           → KetQuaUpload
+    doc_snapshot(ky)                          → pd.DataFrame  (tổng theo PGD, ma_ct='ALL')
+    doc_snapshot_range(tu_ky, den_ky)         → pd.DataFrame  (nhiều kỳ, ten_pgd='__CN__')
+    doc_snapshot_theo_ct(ky)                  → pd.DataFrame  (chi tiết theo ma_ct, ten_pgd='__CN__')
+    doc_snapshot_multi(ky_list: tuple)        → pd.DataFrame  (tổng CN cho danh sách kỳ tùy chọn)
+    danh_sach_ky()                            → list[str]      (mới → cũ)
+    xoa_snapshot(ky, username)               → None
 """
 
 from __future__ import annotations
@@ -107,8 +109,19 @@ def luu_snapshot(df_full: pd.DataFrame, username: str) -> KetQuaUpload:
     if COT_NGUON_VON not in df.columns:
         df[COT_NGUON_VON] = "ALL"
 
-    df[COT_MA_CHUONG_TRINH] = df[COT_MA_CHUONG_TRINH].astype(str).str.strip()
-    df[COT_NGUON_VON] = df[COT_NGUON_VON].astype(str).str.strip().str.upper()
+    df[COT_MA_CHUONG_TRINH] = (
+        pd.to_numeric(df[COT_MA_CHUONG_TRINH], errors="coerce")
+        .apply(lambda x: str(int(x)) if pd.notna(x) else "0")
+    )
+
+    def _norm_nv(v):
+        # 1.0 → "1", 2.0 → "2", "ALL" → "ALL"
+        try:
+            return str(int(float(v)))
+        except (ValueError, TypeError):
+            return str(v).strip().upper()
+
+    df[COT_NGUON_VON] = df[COT_NGUON_VON].map(_norm_nv)
 
     def _agg(grp_df, pgd_val, ct_val, nv_val):
         return (
@@ -219,6 +232,66 @@ def danh_sach_ky() -> list[str]:
     except Exception as e:
         logger.error("danh_sach_ky: lỗi đọc danh sách kỳ snapshot — %s", e, exc_info=True)
         return []
+
+
+@st.cache_data(ttl=300, show_spinner=False)
+def doc_snapshot_theo_ct(ky: str) -> pd.DataFrame:
+    """Chi tiết theo ma_ct (không ALL) của toàn CN cho 1 kỳ.
+
+    Trả về DataFrame cột: ma_ct, tong_du_no, du_no_th, du_no_qh, du_no_khoanh,
+    so_ho, so_ku, gn_nam — sort by tong_du_no DESC.
+    Dùng cho phân tích chiều chương trình tín dụng.
+    """
+    try:
+        with db.get_conn() as conn:
+            rows = conn.execute(
+                """SELECT ma_ct,
+                          SUM(tong_du_no)   AS tong_du_no,
+                          SUM(du_no_th)     AS du_no_th,
+                          SUM(du_no_qh)     AS du_no_qh,
+                          SUM(du_no_khoanh) AS du_no_khoanh,
+                          SUM(so_ho)        AS so_ho,
+                          SUM(so_ku)        AS so_ku,
+                          SUM(gn_nam)       AS gn_nam
+                   FROM hstd_snapshot
+                   WHERE ky=? AND ten_pgd='__CN__' AND nguon_von='ALL' AND ma_ct!='ALL'
+                   GROUP BY ma_ct
+                   ORDER BY tong_du_no DESC""",
+                (ky,)
+            ).fetchall()
+        return pd.DataFrame([dict(r) for r in rows]) if rows else pd.DataFrame()
+    except Exception as e:
+        logger.error("doc_snapshot_theo_ct: lỗi kỳ %s — %s", ky, e, exc_info=True)
+        return pd.DataFrame()
+
+
+@st.cache_data(ttl=300, show_spinner=False)
+def doc_snapshot_multi(ky_list: tuple) -> pd.DataFrame:
+    """Tổng toàn CN cho danh sách kỳ tùy chọn.
+
+    Nhận tuple (để cache hoạt động đúng), trả về DataFrame cột:
+    ky, tong_du_no, du_no_th, du_no_qh, du_no_khoanh, so_ho, so_ku, gn_nam, ngay_so_lieu
+    sort by ky ASC.
+    Gọi: doc_snapshot_multi(tuple(ky_list))
+    """
+    if not ky_list:
+        return pd.DataFrame()
+    try:
+        placeholders = ",".join("?" * len(ky_list))
+        with db.get_conn() as conn:
+            rows = conn.execute(
+                f"""SELECT ky, tong_du_no, du_no_th, du_no_qh, du_no_khoanh,
+                           so_ho, so_ku, gn_nam, ngay_so_lieu
+                    FROM hstd_snapshot
+                    WHERE ten_pgd='__CN__' AND ma_ct='ALL' AND nguon_von='ALL'
+                      AND ky IN ({placeholders})
+                    ORDER BY ky ASC""",
+                list(ky_list),
+            ).fetchall()
+        return pd.DataFrame([dict(r) for r in rows]) if rows else pd.DataFrame()
+    except Exception as e:
+        logger.error("doc_snapshot_multi: lỗi — %s", e, exc_info=True)
+        return pd.DataFrame()
 
 
 # ─────────────────────────────────────────────────────────────────────────────

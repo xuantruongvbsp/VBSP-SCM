@@ -326,8 +326,15 @@ def render(tab: "DeltaGenerator", **kwargs) -> None:
         st.warning("⚠️ Chưa có dữ liệu HSTD để tra cứu.")
         return
     
-    # Load NQ11/GQVL data
-    df_nq11, df_gqvl = _load_nq11_gqvl_data()
+    # NQ11/GQVL — ưu tiên từ kwargs (app.py đã load sẵn), fallback tự load
+    df_nq11 = kwargs.get("df_nq11")
+    df_gqvl = kwargs.get("df_gqvl")
+    if df_nq11 is None and df_gqvl is None:
+        df_nq11, df_gqvl = _load_nq11_gqvl_data()
+    elif df_nq11 is None:
+        _, df_gqvl = _load_nq11_gqvl_data()
+    elif df_gqvl is None:
+        df_nq11, _ = _load_nq11_gqvl_data()
     ts_hstd = float(kwargs.get("ts_hstd", 0.0))
 
     # Tab context

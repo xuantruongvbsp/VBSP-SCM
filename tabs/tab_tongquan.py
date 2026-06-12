@@ -176,8 +176,7 @@ def _cache_bq_counts(
         n_pgd_co_dn = int((_s > 0).sum())
     n_to = (int(df_bq.groupby([COT_TEN_PGD, COT_TEN_TO]).ngroups)
             if COT_TEN_TO in df_bq.columns and COT_TEN_PGD in df_bq.columns else 0)
-    n_xa = (int(df_bq[COT_TEN_XA].dropna().loc[lambda s: s.isin(set(DS_XA))].nunique())
-            if COT_TEN_XA in df_bq.columns else 0)
+    n_xa = len(DS_XA)
     n_hoi = (int(df_bq[COT_DVUT].dropna().loc[lambda s: (s != "") & (s != "CỘNG")].nunique())
              if COT_DVUT in df_bq.columns else 0)
     return n_pgd_co_dn, n_to, n_xa, n_hoi

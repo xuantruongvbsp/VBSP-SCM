@@ -319,6 +319,15 @@
 
 ## C. Dữ liệu / DataFrame
 
+### C7 — Cột "Thời hạn vay" luôn trả "—" trong card tra cứu
+| | |
+|---|---|
+| **File** | `data/core.py`, `components/result_card.py` |
+| **Dấu hiệu** | `⏱️ — tháng` trong tất cả thẻ kết quả tra cứu |
+| **Nguyên nhân** | Excel BCQUERY lưu header cell có ký tự xuống dòng: `"Thời hạn\nvay"`. `excel_to_parquet()` không normalize → cột trong parquet là `"Thời hạn\nvay"` thay vì `"Thời hạn vay"`. `hs.get(COT_THOI_HAN)` trả `None` |
+| **Fix** | `excel_to_parquet()`: normalize `\n`/`\r` → space khi ghi VÀ khi đọc parquet (để xử lý cả cache cũ). Áp dụng toàn bộ file (HSTD, NQ11, baseline...) |
+| **Ngày fix** | 2026-06-12 |
+
 ### C1 — Metric hiển thị sai (vd: 0,013 thay vì 13,199 tỷ)
 | | |
 |---|---|

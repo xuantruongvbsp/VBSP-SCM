@@ -52,7 +52,7 @@ def _format_du_no(value: float) -> str:
     if pd.isna(value) or value == 0:
         return "<span style='color:#9E9E9E'>—</span>"
     formatted = fmt_tien(value)
-    return f"<span style='font-weight:600;color:#4CAF50'>{formatted}</span>"
+    return f"<span style='font-weight:600;color:#4CAF50'>{formatted} tr</span>"
 
 
 def render_result_card(
@@ -97,6 +97,13 @@ def render_result_card(
 
     ngay_vay = _s(hs.get(COT_NGAY_VAY))
     thoi_han = _s(hs.get(COT_THOI_HAN))
+    # Format thời hạn: "60.0" → "60", giữ nguyên nếu không phải số
+    if thoi_han != "—":
+        try:
+            _th = float(thoi_han)
+            thoi_han = str(int(_th)) if _th == int(_th) else thoi_han
+        except (ValueError, TypeError):
+            pass
     lai_suat = _s(hs.get(COT_LAI_SUAT))
     
     # Build badges

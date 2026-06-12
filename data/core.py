@@ -78,6 +78,13 @@ def excel_to_parquet(
             )
             if post_fn:
                 df = post_fn(df)
+            # Normalize tên cột: xóa ký tự xuống dòng trong header cell Excel
+            # (VD: "Thời hạn\nvay" → "Thời hạn vay")
+            df.columns = [
+                c.replace('\n', ' ').replace('\r', '').strip()
+                if isinstance(c, str) else c
+                for c in df.columns
+            ]
             for col in list(df.columns):
                 if _should_force_str(col):
                     df[col] = _normalize_code_series(df[col])
@@ -108,6 +115,12 @@ def excel_to_parquet(
     # Parquet vừa ghi đã được normalize khi ghi → bỏ qua nếu dtype đã là object/string.
     # Tránh chạy lại 22×N_code_cols normalization khi cache hit.
     result = pd.read_parquet(parquet_path, engine='pyarrow')
+    # Normalize tên cột từ cache cũ (trước khi có fix này)
+    result.columns = [
+        c.replace('\n', ' ').replace('\r', '').strip()
+        if isinstance(c, str) else c
+        for c in result.columns
+    ]
     for col in list(result.columns):
         if _should_force_str(col):
             _s = result[col]

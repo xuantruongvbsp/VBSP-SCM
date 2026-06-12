@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [2026-06-12] — Fix ⏱️ thời hạn vay hiện "—" + thiếu đơn vị triệu
+- `data/core.py` — `excel_to_parquet()`: normalize tên cột khi ghi VÀ khi đọc parquet, xóa `\n`/`\r` trong header cell Excel (VD: "Thời hạn\nvay" → "Thời hạn vay") — fix root cause toàn hệ thống
+- `components/result_card.py` — `_format_du_no()`: thêm " tr" đơn vị vào hiển thị dư nợ; format thời hạn từ "60.0" → "60 tháng"
+
+## [2026-06-12] — Fix Dư nợ BQ xã hiện "0 xã" ở Tổng quan
+- `tabs/tab_tongquan.py` dòng ~179 — `n_xa` dùng `len(DS_XA)` (tổng số xã/phường trong hệ thống) thay vì đếm từ data; đảm bảo mẫu số luôn đúng theo địa bàn thực tế
+
 ## [2026-06-12] — Hoàn chỉnh phần Upload dữ liệu phân hệ KH-NV
 - `tabs/tab_upload_khnv/` (mới) — tái cấu trúc từ monolith 1769 dòng thành 8 module: `__init__.py`, `_state.py`, `_status_board.py`, `_merge_panel.py`, `_upload_don_vi.py`, `_upload_toan_cn.py`, `_baseline.py`, `_delete.py`
 - `tabs/tab_upload_khnv/__init__.py` — UI redesign: thay 7 expanders bằng 6 sub-tabs (Tổng quan / Upload đơn vị / Import hàng loạt / Toàn CN / Mốc 31/12 / Xóa dữ liệu)

@@ -1,5 +1,14 @@
 # CHANGELOG
 
+## [2026-06-14] — Xóa dead code (6 file, ~1934 dòng)
+- `tabs/tab_so_sanh_2_ky.py` — xóa (DEPRECATED, logic đã chuyển sang tab_so_sanh_ky/render_2_ky.py)
+- `tabs/tab_baocao.py` — xóa (shadow bởi package tabs/tab_baocao/, không bao giờ được load)
+- `tabs/tab_baocao_new.py` — xóa (không import từ workspace nào)
+- `services/den_han_compare_service.py` — xóa (ROADMAP §2.3, zero import)
+- `services/den_han_notice_service.py` — xóa (ROADMAP §2.3, zero import)
+- `services/upload_center.py` — xóa (planned feature, zero import)
+- `tests/test_smoke_imports.py` dòng 67 — xóa entry tabs.tab_so_sanh_2_ky
+
 ## [2026-06-14] — Fix hiển thị thời hạn vay null trong result card
 - `components/result_card.py` dòng ~108 — fallback tính thời hạn: COT_NGAY_DH_GDXA − COT_NGAY_GN_DAU_TIEN (tháng) vì HSTD không có cột "Thời hạn vay"
 - `components/result_card.py` dòng ~175 — không nối "tháng" khi giá trị vẫn null sau fallback; `⏱️ — tháng` → `⏱️ —`

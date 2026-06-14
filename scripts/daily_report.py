@@ -332,6 +332,40 @@ def generate_daily_report() -> str | None:
         json.dump(info, f, ensure_ascii=False)
 
     print(f"✅ Đã tạo báo cáo: {filepath} ({info['size'] / 1024:.1f} KB)")
+
+    # Gửi tóm tắt qua Telegram
+    try:
+        from services.telegram_service import gui_bao_cao_sang
+        from config import COT_TONG_DU_NO, COT_DU_NO_QH
+
+        if os.path.exists(parquet_path):
+            sql_sum = f"""
+                SELECT
+                    SUM("{COT_TONG_DU_NO}") AS tong_dn,
+                    SUM("{COT_DU_NO_QH}")   AS tong_qh
+                FROM read_parquet(?)
+                WHERE "{COT_TONG_DU_NO}" IS NOT NULL
+            """
+            df_sum = _duckdb_query(sql_sum, [parquet_path])
+            tong_dn = int(df_sum["tong_dn"].iloc[0] or 0)
+            tong_qh = int(df_sum["tong_qh"].iloc[0] or 0)
+            ty_le_qh = f"{tong_qh / tong_dn * 100:.2f}%" if tong_dn > 0 else "—"
+
+            merge_meta = db.doc_kv("merge_meta_hstd") or {}
+            so_pgd = merge_meta.get("so_pgd", 0)
+
+            from config import DS_PGD
+            gui_bao_cao_sang(
+                ngay=now.strftime("%d/%m/%Y"),
+                tong_du_no=f"{tong_dn / 1e9:,.1f} tỷ".replace(",", "."),
+                tong_qh=f"{tong_qh / 1e6:,.0f} triệu".replace(",", "."),
+                ty_le_qh=ty_le_qh,
+                so_pgd_da_upload=so_pgd,
+                tong_pgd=len(DS_PGD),
+            )
+    except Exception as e:
+        print(f"⚠️ Telegram: {e}")
+
     return str(filepath)
 
 

@@ -113,7 +113,11 @@ def render_result_card(
             _months = (_ngay_dh.year - _ngay_gn.year) * 12 + (_ngay_dh.month - _ngay_gn.month)
             if _months > 0:
                 thoi_han = str(_months)
-    lai_suat = _s(hs.get(COT_LAI_SUAT))
+    _lai_suat_raw = hs.get(COT_LAI_SUAT)
+    try:
+        lai_suat = f"{float(_lai_suat_raw):.3f}".rstrip("0").rstrip(".").replace(".", ",")
+    except (ValueError, TypeError):
+        lai_suat = _s(_lai_suat_raw)
     thoi_han_str = f"{thoi_han} tháng" if thoi_han != "—" else "—"
     
     # Build badges

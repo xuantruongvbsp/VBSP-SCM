@@ -332,9 +332,9 @@ def render(tab: "DeltaGenerator", **kwargs) -> None:
     if df_nq11 is None and df_gqvl is None:
         df_nq11, df_gqvl = _load_nq11_gqvl_data()
     elif df_nq11 is None:
-        _, df_gqvl = _load_nq11_gqvl_data()
-    elif df_gqvl is None:
         df_nq11, _ = _load_nq11_gqvl_data()
+    elif df_gqvl is None:
+        _, df_gqvl = _load_nq11_gqvl_data()
     ts_hstd = float(kwargs.get("ts_hstd", 0.0))
 
     # Tab context
@@ -387,7 +387,13 @@ def render(tab: "DeltaGenerator", **kwargs) -> None:
         
         page_size = 12
         total_pages = (len(df_filtered) + page_size - 1) // page_size if not df_filtered.empty else 0
-        
+
+        # Clamp tc_page khi filter thay đổi làm giảm tổng số trang
+        if total_pages > 0 and st.session_state.tc_page >= total_pages:
+            st.session_state.tc_page = total_pages - 1
+        elif total_pages == 0:
+            st.session_state.tc_page = 0
+
         # Page navigation
         if total_pages > 1:
             col_nav1, col_nav2, col_nav3 = st.columns([1, 2, 1])
@@ -417,10 +423,10 @@ def render(tab: "DeltaGenerator", **kwargs) -> None:
                 on_detail_click="tc_selected_ku",
             )
         
-        # Detail drawer
+        # Detail drawer — dùng df gốc để tìm KU ngay cả khi filter đã thay đổi
         selected_ku = st.session_state.get("tc_selected_ku")
         if selected_ku:
-            _render_detail_drawer(df_filtered, selected_ku, df_nq11, df_gqvl)
+            _render_detail_drawer(df, selected_ku, df_nq11, df_gqvl)
 
 
 # Backward compatibility

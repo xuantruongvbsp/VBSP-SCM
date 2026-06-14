@@ -158,7 +158,7 @@ def render_filter_panel(
             selected_xa = st.multiselect(
                 "Xã/Phường",
                 options=ds_xa,
-                default=st.session_state.tracuu_filters["selected_xa"],
+                default=[x for x in st.session_state.tracuu_filters["selected_xa"] if x in ds_xa],
                 placeholder="Tất cả xã",
                 key="tc_xa",
             )
@@ -168,8 +168,8 @@ def render_filter_panel(
             selected_thon = st.multiselect(
                 "Thô/Tổ dân phố",
                 options=ds_thon,
-                default=st.session_state.tracuu_filters["selected_thon"],
-                placeholder="Tất cả thô",
+                default=[x for x in st.session_state.tracuu_filters["selected_thon"] if x in ds_thon],
+                placeholder="Tất cả thôn",
                 key="tc_thon",
             )
         

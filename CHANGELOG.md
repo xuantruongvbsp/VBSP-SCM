@@ -1,5 +1,19 @@
 # CHANGELOG
 
+## [2026-06-14] — Thêm Telegram push notification
+- `services/telegram_service.py` — tạo mới: gui_tin(), gui_bao_cao_sang(), gui_canh_bao_deadline(), gui_ket_qua_health_check(), gui_thong_bao_merge(), gui_nhac_khoang_den_han()
+- `scripts/daily_report.py` dòng ~335 — hook gửi tóm tắt số liệu qua Telegram sau khi tạo báo cáo sáng
+
+## [2026-06-14] — Fix lãi suất hiển thị sai định dạng trong result card
+- `components/result_card.py` dòng ~116 — `7.488%` → `7,488%` (dấu thập phân kiểu VN)
+
+## [2026-06-14] — Fix 5 bug tab Tra cứu Khách hàng
+- `components/filter_panel.py` dòng ~162 — stale `selected_xa` default crash Streamlit khi đổi PGD filter; lọc default bằng `if x in ds_xa`
+- `components/filter_panel.py` dòng ~168 — tương tự cho `selected_thon`
+- `tabs/tab_tracuu_v2.py` dòng ~334 — NQ11/GQVL load logic bị swap `_` nhầm vị trí → load sai data
+- `tabs/tab_tracuu_v2.py` dòng ~389 — `tc_page` không clamp → trang trống sau khi filter giảm kết quả
+- `tabs/tab_tracuu_v2.py` dòng ~423 — detail drawer dùng `df_filtered` thay vì `df` → "Không tìm thấy" sau khi đổi filter
+
 ## [2026-06-14] — Xóa dead code (6 file, ~1934 dòng)
 - `tabs/tab_so_sanh_2_ky.py` — xóa (DEPRECATED, logic đã chuyển sang tab_so_sanh_ky/render_2_ky.py)
 - `tabs/tab_baocao.py` — xóa (shadow bởi package tabs/tab_baocao/, không bao giờ được load)

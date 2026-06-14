@@ -176,7 +176,12 @@ def _cache_bq_counts(
         n_pgd_co_dn = int((_s > 0).sum())
     n_to = (int(df_bq.groupby([COT_TEN_PGD, COT_TEN_TO]).ngroups)
             if COT_TEN_TO in df_bq.columns and COT_TEN_PGD in df_bq.columns else 0)
-    n_xa = len(DS_XA)
+    n_xa = 0
+    if COT_TEN_XA in df_bq.columns and COT_TONG_DU_NO in df_bq.columns:
+        _mask_pgd = (df_bq[COT_TEN_PGD] != DON_VI_CHI_NHANH) if COT_TEN_PGD in df_bq.columns else True
+        _df_xa = df_bq[_mask_pgd & df_bq[COT_TEN_XA].notna() & (df_bq[COT_TEN_XA] != "") & (df_bq[COT_TEN_XA] != "CỘNG")]
+        _s_xa = _df_xa.groupby(COT_TEN_XA)[COT_TONG_DU_NO].sum()
+        n_xa = int((_s_xa > 0).sum())
     n_hoi = (int(df_bq[COT_DVUT].dropna().loc[lambda s: (s != "") & (s != "CỘNG")].nunique())
              if COT_DVUT in df_bq.columns else 0)
     return n_pgd_co_dn, n_to, n_xa, n_hoi

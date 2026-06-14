@@ -10,6 +10,7 @@ from config import (
     COT_TEN_KH, COT_MA_KH, COT_SO_KU, COT_TEN_PGD, COT_TEN_XA, COT_TEN_THON,
     COT_TEN_CT, COT_TONG_DU_NO, COT_DU_NO_QH, COT_NGUON_VON, NGUON_VON_LABEL,
     COT_TINH_TRANG, COT_NGAY_VAY, COT_THOI_HAN, COT_LAI_SUAT,
+    COT_NGAY_DH_GDXA, COT_NGAY_GN_DAU_TIEN,
 )
 from utils import fmt_tien, fmt_ty, vn
 
@@ -104,7 +105,16 @@ def render_result_card(
             thoi_han = str(int(_th)) if _th == int(_th) else thoi_han
         except (ValueError, TypeError):
             pass
+    else:
+        # Fallback: Ngày ĐH theo GDXA − Ngày GN đầu tiên (tháng)
+        _ngay_gn = pd.to_datetime(hs.get(COT_NGAY_GN_DAU_TIEN), dayfirst=True, errors="coerce")
+        _ngay_dh = pd.to_datetime(hs.get(COT_NGAY_DH_GDXA), dayfirst=True, errors="coerce")
+        if pd.notna(_ngay_gn) and pd.notna(_ngay_dh):
+            _months = (_ngay_dh.year - _ngay_gn.year) * 12 + (_ngay_dh.month - _ngay_gn.month)
+            if _months > 0:
+                thoi_han = str(_months)
     lai_suat = _s(hs.get(COT_LAI_SUAT))
+    thoi_han_str = f"{thoi_han} tháng" if thoi_han != "—" else "—"
     
     # Build badges
     badges, border_color = _get_badge_styles(du_no_qh, is_nq11, is_gqvl)
@@ -172,7 +182,7 @@ def render_result_card(
             font-size: 0.8rem;
             color: #9E9E9E;
         ">
-            <span>📅 {ngay_vay} · ⏱️ {thoi_han} tháng · 📊 {lai_suat}%</span>
+            <span>📅 {ngay_vay} · ⏱️ {thoi_han_str} · 📊 {lai_suat}%</span>
         </div>
     </div>
     '''

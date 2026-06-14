@@ -1,5 +1,15 @@
 # CHANGELOG
 
+## [2026-06-14] — Fix hiển thị thời hạn vay null trong result card
+- `components/result_card.py` dòng ~108 — fallback tính thời hạn: COT_NGAY_DH_GDXA − COT_NGAY_GN_DAU_TIEN (tháng) vì HSTD không có cột "Thời hạn vay"
+- `components/result_card.py` dòng ~175 — không nối "tháng" khi giá trị vẫn null sau fallback; `⏱️ — tháng` → `⏱️ —`
+
+## [2026-06-13] — Fix đếm xã hiển thị 96 thay vì 95
+- `tabs/tab_tongquan.py` dòng ~181 — lọc bỏ hàng Hội sở Chi nhánh tỉnh trước khi đếm số xã trong `_cache_bq_counts()`
+
+## [2026-06-12] — Fix xuat_pdf() thiếu tham số cols_right
+- `pdf_service.py` dòng ~80 — thêm tham số `cols_right: list[str] | None = None` vào `xuat_pdf()`, render cell căn phải khi col nằm trong `cols_right`
+
 ## [2026-06-12] — Fix ⏱️ thời hạn vay hiện "—" + thiếu đơn vị triệu
 - `data/core.py` — `excel_to_parquet()`: normalize tên cột khi ghi VÀ khi đọc parquet, xóa `\n`/`\r` trong header cell Excel (VD: "Thời hạn\nvay" → "Thời hạn vay") — fix root cause toàn hệ thống
 - `components/result_card.py` — `_format_du_no()`: thêm " tr" đơn vị vào hiển thị dư nợ; format thời hạn từ "60.0" → "60 tháng"

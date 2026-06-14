@@ -85,6 +85,7 @@ def xuat_pdf(
     don_vi_tien: str = "đồng",
     prefix_file: str = "",
     them_dong_tong: bool = True,
+    cols_right: list[str] | None = None,
 ) -> bytes:
     if not _REPORTLAB_READY:
         raise ImportError("Chưa cài thư viện reportlab. Chạy: pip install reportlab")
@@ -94,6 +95,7 @@ def xuat_pdf(
     from utils import fmt_so
 
     cols_tien = cols_tien or []
+    cols_right = cols_right or []
 
     dong_tong_cells = None
     if them_dong_tong and cols_tien and len(df) > 0:
@@ -217,6 +219,10 @@ def xuat_pdf(
                         ParagraphStyle("td_r", fontName=fn,
                                        fontSize=font_size, alignment=TA_RIGHT),
                     )
+            elif col in cols_right:
+                p = Paragraph(str(val) if pd.notna(val) else "",
+                              ParagraphStyle("td_r2", fontName=fn, fontSize=font_size,
+                                             alignment=TA_RIGHT))
             else:
                 p = Paragraph(str(val) if pd.notna(val) else "",
                               ParagraphStyle("td", fontName=fn, fontSize=font_size,

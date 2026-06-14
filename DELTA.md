@@ -19,6 +19,12 @@
 - Dòng ~335: gọi `gui_bao_cao_sang()` sau khi lưu file Excel xong (try/except — không làm hỏng báo cáo nếu Telegram lỗi)
 - Dòng ~367: gọi `gui_nhac_khoang_den_han()` — query khoản đến hạn từ hôm nay đến cuối tháng (`calendar.monthrange`), format du_no triệu đồng
 
+### `scripts/nhac_deadline.py` — tạo mới
+- Đọc `bao_cao_deadline_config` từ kv_store + dữ liệu nộp từ Google Sheets
+- Với mỗi deadline ≤ 3 ngày tới hoặc đã qua: tìm PGD chưa nộp → gọi `gui_canh_bao_deadline()`
+- Hỗ trợ manual override qua kv_store key `manual_nop_tdn`
+- Chạy: `python scripts/nhac_deadline.py` hoặc Task Scheduler 7h sáng
+
 ### `test_telegram.py` — file test double-click
 - Gửi tin nhắn test; in "Gửi thành công!" nếu OK
 

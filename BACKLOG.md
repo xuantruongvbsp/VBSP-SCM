@@ -2,6 +2,12 @@
 
 Ghi lại các yêu cầu/user feedback của người dùng để tiện theo dõi.
 
+## ✅ Đã hoàn thành — 2026-06-15 (Telegram notification)
+
+- [x] Tạo `services/telegram_service.py` — push notification 1 chiều qua Telegram Bot API (không cần thư viện mới)
+- [x] Hook gửi tóm tắt số liệu sáng vào `scripts/daily_report.py`
+- [x] `test_telegram.py` — file test double-click cho người dùng cuối
+
 ## ✅ Đã hoàn thành — 2026-05-30 (refactor CDTOTKVV)
 
 - [x] Rà soát `except Exception` còn lại trong `tab_tongquan.py` — sửa `pass` thành `st.caption()` cảnh báo; các chỗ khác đã có `st.error()` hoặc fallback hợp lý

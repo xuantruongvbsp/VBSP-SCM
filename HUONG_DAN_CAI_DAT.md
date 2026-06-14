@@ -56,6 +56,20 @@ Copy toàn bộ thư mục `VBSP-SCM` từ USB/Share/Google Drive vào máy mớ
 
 ---
 
+## Cấu hình Telegram Notification (tùy chọn)
+
+Hệ thống gửi thông báo tự động qua Telegram mỗi sáng sau khi tạo báo cáo.
+
+**Thiết lập lần đầu:**
+1. Mở Telegram → tìm bot của đơn vị → nhấn **Start**
+2. Double-click file `test_telegram.py` trong thư mục `VBSP-SCM` để kiểm tra kết nối
+3. Nếu hiện `Gửi thành công!` và nhận được tin nhắn Telegram → đã kết nối
+
+> Bot token và Chat ID đã được cấu hình sẵn trong `services/telegram_service.py`.  
+> Nếu cần đổi bot: gọi `telegram_service.luu_config(token, chat_id, username)` từ code.
+
+---
+
 ## Các lỗi thường gặp
 
 | Lỗi | Nguyên nhân | Cách khắc phục |

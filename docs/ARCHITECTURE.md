@@ -43,8 +43,11 @@ VBSP-SCM/
 │   │                         # duyệt tập trung, lũy kế đợt
 │   ├── kiem_soat_service.py  # Kiểm soát CN: registry báo cáo, BaoCaoMeta,
 │   │                         # render từng loại báo cáo kiểm soát
-│   └── template_service.py   # Template Word: docxtpl + docx2pdf,
-│                             # dien_template(), nut_tai_word_va_pdf()
+│   ├── template_service.py   # Template Word: docxtpl + docx2pdf,
+│   │                         # dien_template(), nut_tai_word_va_pdf()
+│   └── telegram_service.py   # Push notification Telegram 1 chiều:
+│                             # gui_tin(), gui_bao_cao_sang(),
+│                             # gui_canh_bao_deadline(), gui_thong_bao_merge()
 │
 ├── templates/                # Template Word mẫu chuẩn NHCSXH
 │   ├── mau_06td.docx         # Phiếu KT sử dụng vốn

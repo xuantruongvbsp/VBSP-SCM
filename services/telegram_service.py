@@ -9,7 +9,7 @@ from logger import get_logger
 logger = get_logger(__name__)
 
 _DEFAULT_TOKEN   = "8907687363:AAHNyQlwks9jA5x4TpuMeqbPIP2RXy2VNEg"
-_DEFAULT_CHAT_ID = "5339155216"
+_DEFAULT_CHAT_ID = "-5339155216"
 _API_TIMEOUT     = 10  # giây
 
 

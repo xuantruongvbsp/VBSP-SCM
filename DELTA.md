@@ -4,6 +4,25 @@
 
 ---
 
+## [2026-06-15] Telegram Push Notification
+
+### `services/telegram_service.py` — tạo mới
+- `gui_tin(text)` — gửi bất kỳ tin nhắn văn bản (base)
+- `gui_bao_cao_sang(ngay, tong_du_no, tong_qh, ty_le_qh, so_pgd_da_upload, tong_pgd)` — tóm tắt sáng
+- `gui_canh_bao_deadline(ten_loai, deadline, chua_nop)` — nhắc PGD chưa nộp
+- `gui_ket_qua_health_check(ok, warn, err, ngay, chi_tiet)` — health check
+- `gui_thong_bao_merge(loai, so_pgd, username)` — sau merge toàn CN
+- `gui_nhac_khoang_den_han(ds_khoang)` — khoản đến hạn 7 ngày
+- `luu_config(token, chat_id, username)` — cập nhật bot qua kv_store key `telegram_config`
+
+### `scripts/daily_report.py` — hook Telegram
+- Dòng ~335: gọi `gui_bao_cao_sang()` sau khi lưu file Excel xong (try/except — không làm hỏng báo cáo nếu Telegram lỗi)
+
+### `test_telegram.py` — file test double-click
+- Gửi tin nhắn test; in "Gửi thành công!" nếu OK
+
+---
+
 ## [2026-06-06] 4 card Dư nợ BQ: PGD / Tổ TKVV / Xã / Hội
 
 ### `tabs/tab_tongquan.py` — thêm 4 card BQ cuối grid Tổng quan danh mục tín dụng

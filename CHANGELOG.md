@@ -1,5 +1,8 @@
 # CHANGELOG
 
+## [2026-06-15] — Sửa chat_id Telegram mặc định
+- `services/telegram_service.py` dòng 13 — `_DEFAULT_CHAT_ID` thêm dấu `-` (group chat cần ID âm: `-5339155216`)
+
 ## [2026-06-14] — Thêm Telegram push notification
 - `services/telegram_service.py` — tạo mới: gui_tin(), gui_bao_cao_sang(), gui_canh_bao_deadline(), gui_ket_qua_health_check(), gui_thong_bao_merge(), gui_nhac_khoang_den_han()
 - `scripts/daily_report.py` dòng ~335 — hook gửi tóm tắt số liệu qua Telegram sau khi tạo báo cáo sáng

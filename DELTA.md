@@ -12,11 +12,12 @@
 - `gui_canh_bao_deadline(ten_loai, deadline, chua_nop)` — nhắc PGD chưa nộp
 - `gui_ket_qua_health_check(ok, warn, err, ngay, chi_tiet)` — health check
 - `gui_thong_bao_merge(loai, so_pgd, username)` — sau merge toàn CN
-- `gui_nhac_khoang_den_han(ds_khoang)` — khoản đến hạn 7 ngày
+- `gui_nhac_khoang_den_han(ds_khoang)` — khoản đến hạn trong tháng hiện tại
 - `luu_config(token, chat_id, username)` — cập nhật bot qua kv_store key `telegram_config`
 
 ### `scripts/daily_report.py` — hook Telegram
 - Dòng ~335: gọi `gui_bao_cao_sang()` sau khi lưu file Excel xong (try/except — không làm hỏng báo cáo nếu Telegram lỗi)
+- Dòng ~367: gọi `gui_nhac_khoang_den_han()` — query khoản đến hạn từ hôm nay đến cuối tháng (`calendar.monthrange`), format du_no triệu đồng
 
 ### `test_telegram.py` — file test double-click
 - Gửi tin nhắn test; in "Gửi thành công!" nếu OK

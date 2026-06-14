@@ -1,7 +1,12 @@
 # CHANGELOG
 
-## [2026-06-15] — Sửa chat_id Telegram mặc định
-- `services/telegram_service.py` dòng 13 — `_DEFAULT_CHAT_ID` thêm dấu `-` (group chat cần ID âm: `-5339155216`)
+## [2026-06-15] — Script nhắc deadline nộp BC qua Telegram
+- `scripts/nhac_deadline.py` — tạo mới: script đọc GSheet + deadline config, gửi Telegram nhắc PGD chưa nộp (deadline ≤ 3 ngày tới hoặc đã qua), chạy độc lập qua Task Scheduler
+
+## [2026-06-15] — Gọi gui_nhac_khoang_den_han từ daily_report & lọc đúng tháng
+- `scripts/daily_report.py` dòng ~336 — thêm hook gửi Telegram nhắc khoản đến hạn trong tháng hiện tại (CURRENT_DATE đến cuối tháng), tối đa 20 khoản, gọi `gui_nhac_khoang_den_han()`
+- `services/telegram_service.py` dòng 13 — `_DEFAULT_CHAT_ID` thêm dấu `-` (group chat cần ID âm)
+- `services/telegram_service.py` dòng 105-111 — `gui_nhac_khoang_den_han()` đổi nhãn "7 ngày" → "trong tháng"
 
 ## [2026-06-14] — Thêm Telegram push notification
 - `services/telegram_service.py` — tạo mới: gui_tin(), gui_bao_cao_sang(), gui_canh_bao_deadline(), gui_ket_qua_health_check(), gui_thong_bao_merge(), gui_nhac_khoang_den_han()

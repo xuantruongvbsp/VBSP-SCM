@@ -103,13 +103,13 @@ def gui_thong_bao_merge(loai: str, so_pgd: int, username: str) -> bool:
 
 
 def gui_nhac_khoang_den_han(ds_khoang: list[dict]) -> bool:
-    """Nhắc khoản vay đến hạn trong 7 ngày tới.
+    """Nhắc khoản vay đến hạn trong tháng.
 
     Mỗi item: {"ten_kh": str, "so_ku": str, "ngay_dh": str, "du_no": str, "ten_pgd": str}
     """
     if not ds_khoang:
         return True
-    lines = [f"⏰ <b>Khoản đến hạn trong 7 ngày ({len(ds_khoang)} khoản)</b>", ""]
+    lines = [f"⏰ <b>Khoản đến hạn trong tháng ({len(ds_khoang)} khoản)</b>", ""]
     for k in ds_khoang[:20]:  # tối đa 20 dòng để tránh message quá dài
         lines.append(
             f"  • {k.get('ten_kh','')} — {k.get('so_ku','')} — "

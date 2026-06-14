@@ -366,6 +366,44 @@ def generate_daily_report() -> str | None:
     except Exception as e:
         print(f"⚠️ Telegram: {e}")
 
+    # Gửi nhắc khoản đến hạn trong tháng qua Telegram
+    try:
+        import calendar
+        from services.telegram_service import gui_nhac_khoang_den_han
+
+        last_day = calendar.monthrange(now.year, now.month)[1]
+        end_of_month = date(now.year, now.month, last_day).isoformat()
+
+        sql_dh = f"""
+            SELECT
+                "{COT_TEN_KH}"     AS ten_kh,
+                "{COT_SO_KU}"      AS so_ku,
+                "{COT_NGAY_DH}"    AS ngay_dh,
+                "{COT_TONG_DU_NO}" AS du_no,
+                "{COT_TEN_PGD}"    AS ten_pgd
+            FROM read_parquet(?)
+            WHERE "{COT_NGAY_DH}" IS NOT NULL
+              AND "{COT_NGAY_DH}" >= CURRENT_DATE
+              AND "{COT_NGAY_DH}" <= '{end_of_month}'
+              AND "{COT_TONG_DU_NO}" > 0
+            ORDER BY "{COT_NGAY_DH}", "{COT_TONG_DU_NO}" DESC
+        """
+        if os.path.exists(parquet_path):
+            df_dh = _duckdb_query(sql_dh, [parquet_path])
+            ds_khoang = [
+                {
+                    "ten_kh":  str(row["ten_kh"] or ""),
+                    "so_ku":   str(row["so_ku"] or ""),
+                    "ngay_dh": str(row["ngay_dh"] or ""),
+                    "du_no":   f"{int(row['du_no'] or 0) / 1e6:,.0f} triệu".replace(",", "."),
+                    "ten_pgd": str(row["ten_pgd"] or ""),
+                }
+                for _, row in df_dh.iterrows()
+            ]
+            gui_nhac_khoang_den_han(ds_khoang)
+    except Exception as e:
+        print(f"⚠️ Telegram nhắc đến hạn: {e}")
+
     return str(filepath)
 
 

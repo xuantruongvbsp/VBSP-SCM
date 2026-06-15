@@ -191,7 +191,8 @@ def render_result_card(
     </div>
     '''
     
-    ctx.markdown(card_html, unsafe_allow_html=True)
+    # Dùng st.html() để bypass Markdown parser (blank lines trong HTML gây code block với unsafe_allow_html)
+    st.html(card_html)
     
     # Detail button
     btn_key = f"tc_detail_{so_ku}_{hash(ten_kh) % 10000}"

@@ -1,5 +1,8 @@
 # CHANGELOG
 
+## [2026-06-15] — Fix card tra cứu hiện HTML thô
+- `components/result_card.py` dòng ~194 — đổi `ctx.markdown(unsafe_allow_html=True)` → `st.html()` để bypass Markdown parser; blank lines trong HTML template khiến CommonMark kết thúc HTML block sớm → Info Grid/Footer bị render thành code block
+
 ## [2026-06-15] — Hoàn thiện hệ thống Bot Telegram
 - `services/telegram_service.py` — thêm HTML escape, retry 2 lần, `_la_bat()` bật/tắt từng loại, `_ghi_log()` lịch sử gửi
 - `services/upload_service.py` dòng ~875 — gọi `gui_thong_bao_merge()` sau khi merge 22 PGD thành công

@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [2026-06-15] — Hoàn thiện hệ thống Bot Telegram
+- `services/telegram_service.py` — thêm HTML escape, retry 2 lần, `_la_bat()` bật/tắt từng loại, `_ghi_log()` lịch sử gửi
+- `services/upload_service.py` dòng ~875 — gọi `gui_thong_bao_merge()` sau khi merge 22 PGD thành công
+- `scripts/nhac_deadline.py` dòng ~132 — check toggle `nhap_lieu` trước khi gửi nhắc nhập liệu
+- `tabs/tab_telegram_admin.py` — tạo mới: UI cấu hình token/chat_id, bật/tắt 6 loại thông báo, lịch sử gửi
+- `workspaces/ws_management.py` dòng ~926 — mount tab "🤖 Bot Telegram" vào nhóm Hệ thống (chỉ admin_cn)
+
 ## [2026-06-15] — Fix 2 lỗi nhac_deadline.py
 - `scripts/nhac_deadline.py` dòng ~340 — thêm `_nhac_theo_doi_nhap_lieu()` vào cuối `nhac()` để khi chạy script đều gửi cả 2 loại nhắc
 - `scripts/nhac_deadline.py` dòng ~319 — bỏ điều kiện `nop_date > dl_date → chua_nop`: PGD đã nộp (dù trễ) không bị nhắc tiếp

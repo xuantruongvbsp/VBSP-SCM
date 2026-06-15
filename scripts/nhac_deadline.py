@@ -127,6 +127,9 @@ def _la_pgd_header(stt: str) -> bool:
     return bool(_ROMAN_RE.match(stt.strip().upper()))
 
 def _nhac_theo_doi_nhap_lieu() -> int:
+    cfg_notify = db.doc_kv("telegram_notify_config") or {}
+    if not cfg_notify.get("nhap_lieu", True):
+        return 0
     ds_sheet = db.doc_kv("gsheet_theo_doi_nhap_list")
     if not ds_sheet or not isinstance(ds_sheet, list):
         return 0

@@ -873,6 +873,13 @@ def merge_du_lieu_toan_cn(
             username,
         )
 
+        # Thông báo Telegram sau merge thành công
+        try:
+            from services.telegram_service import gui_thong_bao_merge
+            gui_thong_bao_merge(loai, len(pgd_da_merge), username)
+        except Exception as _tg_err:
+            logger.warning("telegram merge notify: %s", _tg_err)
+
     # Auto-snapshot NGOÀI lock — chạy background thread để không block luồng chính
     import threading as _threading
     _snap_user = st.session_state.get("username", "system")

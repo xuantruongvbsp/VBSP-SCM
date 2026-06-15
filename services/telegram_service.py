@@ -1,6 +1,7 @@
 """Gửi thông báo Telegram 1 chiều cho VBSP-SCM (push notification)."""
 from __future__ import annotations
 
+import os
 import requests
 
 import db
@@ -8,7 +9,7 @@ from logger import get_logger
 
 logger = get_logger(__name__)
 
-_DEFAULT_TOKEN   = "8907687363:AAHNyQlwks9jA5x4TpuMeqbPIP2RXy2VNEg"
+_DEFAULT_TOKEN   = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 _DEFAULT_CHAT_ID = "-5339155216"
 _API_TIMEOUT     = 10  # giây
 

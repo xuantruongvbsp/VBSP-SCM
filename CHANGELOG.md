@@ -1,5 +1,18 @@
 # CHANGELOG
 
+## [2026-06-15] — Fix 2 lỗi nhac_deadline.py
+- `scripts/nhac_deadline.py` dòng ~340 — thêm `_nhac_theo_doi_nhap_lieu()` vào cuối `nhac()` để khi chạy script đều gửi cả 2 loại nhắc
+- `scripts/nhac_deadline.py` dòng ~319 — bỏ điều kiện `nop_date > dl_date → chua_nop`: PGD đã nộp (dù trễ) không bị nhắc tiếp
+
+## [2026-06-15] — Cài đặt deadline nhập liệu + nhắc qua Telegram
+- `tabs/tab_theo_doi_nhap/ui_settings.py` dòng ~398 — `render_cai_dat()` thêm expander "⏰ Cài đặt deadline nhập liệu" hiển thị deadline tất cả sheet, chỉnh nhanh date_input + số ngày còn lại
+- `scripts/nhac_deadline.py` dòng ~106 — thêm `_nhac_theo_doi_nhap_lieu()`: đọc sheet config từ `gsheet_theo_doi_nhap_list`, parse GSheet, tính tiến độ PGD theo chỉ tiêu, gửi Telegram nhắc PGD < 100%
+- `scripts/nhac_deadline.py` — `nhac()` gọi cả 2 nhánh: nộp BC + nhập liệu
+
+## [2026-06-15] — Fix token hardcode + wire health check Telegram
+- `services/telegram_service.py` dòng 11 — `_DEFAULT_TOKEN` chuyển từ hardcode sang `os.environ.get("TELEGRAM_BOT_TOKEN", "")` để tránh lộ token qua Git
+- `health_check.py` dòng ~344 — thêm gọi `gui_ket_qua_health_check()` sau `_ghi_ket_qua_kv()`, gửi tóm tắt OK/lỗi qua Telegram mỗi lần chạy health check
+
 ## [2026-06-15] — Script nhắc deadline nộp BC qua Telegram
 - `scripts/nhac_deadline.py` — tạo mới: script đọc GSheet + deadline config, gửi Telegram nhắc PGD chưa nộp (deadline ≤ 3 ngày tới hoặc đã qua), chạy độc lập qua Task Scheduler
 

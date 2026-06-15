@@ -342,6 +342,23 @@ if __name__ == "__main__":
     exit_code = summary()
     _ghi_ket_qua_kv(exit_code)
 
+    # Gửi kết quả health check qua Telegram
+    try:
+        from services.telegram_service import gui_ket_qua_health_check
+        _passed = sum(1 for ok, _ in _results if ok)
+        _failed = len(_results) - _passed
+        _chi_tiet = "\n".join(f"✗ {lbl}" for ok, lbl in _results if not ok)
+        gui_ket_qua_health_check(
+            ok_count=_passed,
+            warn_count=0,
+            err_count=_failed,
+            ngay=datetime.now().strftime("%d/%m/%Y %H:%M"),
+            chi_tiet=_chi_tiet,
+        )
+        print("  ℹ  Đã gửi kết quả health check qua Telegram")
+    except Exception as _tg_err:
+        print(f"  ⚠  Telegram health check: {_tg_err}", file=sys.stderr)
+
     # Tự động tạo báo cáo sáng nếu chưa có hôm nay
     try:
         from services.daily_report_service import lay_bao_cao_sang_hom_nay, tao_bao_cao_sang

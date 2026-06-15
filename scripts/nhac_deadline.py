@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-nhac_deadline.py — Nhắc các PGD chưa nộp báo cáo trước deadline qua Telegram.
+nhac_deadline.py — Nhắc các PGD chưa nộp báo cáo + chưa hoàn thành nhập liệu qua Telegram.
 Chạy độc lập: python scripts/nhac_deadline.py
 Có thể gọi từ Task Scheduler: chạy 7h sáng mỗi ngày.
 """
@@ -13,6 +13,8 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BASE_DIR))
+
+import re
 
 import pandas as pd
 
@@ -114,6 +116,145 @@ def _doc_manual_log() -> dict:
     return result
 
 
+# ── Nhắc deadline nhập liệu (Theo dõi nhập liệu) ─────────────────────────────
+
+_ROMAN_RE = re.compile(r'^M{0,4}(CM|CD|D?C{0,3})(XC|XL|L?X{0,3})(IX|IV|V?I{0,3})$')
+
+
+def _la_pgd_header(stt: str) -> bool:
+    if not isinstance(stt, str):
+        stt = str(stt)
+    return bool(_ROMAN_RE.match(stt.strip().upper()))
+
+def _nhac_theo_doi_nhap_lieu() -> int:
+    ds_sheet = db.doc_kv("gsheet_theo_doi_nhap_list")
+    if not ds_sheet or not isinstance(ds_sheet, list):
+        return 0
+
+    try:
+        import gspread
+        creds_path = str(_tim_credentials())
+        scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+        client = gspread.service_account(filename=creds_path, scopes=scope)
+    except Exception as e:
+        logger.error("_nhac_theo_doi_nhap_lieu: ket noi GSheet — %s", e)
+        return 0
+
+    from services.telegram_service import gui_tin
+
+    today = date.today()
+    sent_count = 0
+
+    for i, cfg in enumerate(ds_sheet):
+        deadline_str = cfg.get("deadline", "")
+        if not deadline_str:
+            continue
+        try:
+            dl_date = pd.to_datetime(deadline_str).date()
+        except Exception:
+            continue
+
+        days_left = (dl_date - today).days
+        if days_left > 3:
+            continue
+
+        ten_sheet = cfg.get("ten_hien_thi") or cfg.get("sheet_tab", f"Sheet {i+1}")
+        sheet_id = cfg.get("sheet_id", "").strip()
+        sheet_tab = cfg.get("sheet_tab", "")
+        ds_ct = cfg.get("ds_chuong_trinh", [])
+        if not sheet_id or not ds_ct:
+            continue
+
+        try:
+            sheet = client.open_by_key(sheet_id).worksheet(sheet_tab)
+            data = sheet.get_all_values()
+            if len(data) <= 1:
+                continue
+        except Exception as e:
+            logger.warning("Doc sheet '%s': %s", ten_sheet, e)
+            continue
+
+        loai = cfg.get("loai_cau_truc", "phan_cap_stt")
+        header_row = cfg.get("header_row", 10)
+        name_col = cfg.get("name_col", 2) - 1
+        stt_col = cfg.get("stt_col", 1) - 1
+        pgd_col = cfg.get("pgd_col", 1) - 1
+        col_indices = [ct["col"] - 1 for ct in ds_ct]
+
+        pgd_progress: dict[str, dict] = {}
+        current_pgd = ""
+
+        for row in data[header_row:]:
+            if not any(str(c).strip() for c in row):
+                continue
+            if loai == "phang":
+                pgd = str(row[name_col]).strip() if len(row) > name_col else ""
+                if pgd:
+                    current_pgd = pgd
+                    pgd_progress.setdefault(current_pgd, {"total": 0, "filled": 0})
+                    for ci in col_indices:
+                        if ci < len(row):
+                            pgd_progress[current_pgd]["total"] += 1
+                            if str(row[ci]).strip():
+                                pgd_progress[current_pgd]["filled"] += 1
+            elif loai == "cot_pgd":
+                pgd = str(row[pgd_col]).strip() if len(row) > pgd_col else ""
+                if pgd:
+                    current_pgd = pgd
+                    pgd_progress.setdefault(current_pgd, {"total": 0, "filled": 0})
+                    for ci in col_indices:
+                        if ci < len(row):
+                            pgd_progress[current_pgd]["total"] += 1
+                            if str(row[ci]).strip():
+                                pgd_progress[current_pgd]["filled"] += 1
+            else:
+                stt = str(row[stt_col]).strip() if len(row) > stt_col else ""
+                name = str(row[name_col]).strip() if len(row) > name_col else ""
+                if stt and _la_pgd_header(stt):
+                    current_pgd = name
+                elif current_pgd:
+                    pgd_progress.setdefault(current_pgd, {"total": 0, "filled": 0})
+                    for ci in col_indices:
+                        if ci < len(row):
+                            pgd_progress[current_pgd]["total"] += 1
+                            if str(row[ci]).strip():
+                                pgd_progress[current_pgd]["filled"] += 1
+
+        chua_xong: list[str] = []
+        for pgd, prog in sorted(pgd_progress.items()):
+            if prog["total"] == 0:
+                continue
+            pct = prog["filled"] / prog["total"] * 100
+            if pct < 100:
+                chua_xong.append(
+                    f"  • {pgd} — {prog['filled']}/{prog['total']} chỉ tiêu ({pct:.0f}%)"
+                )
+
+        if not chua_xong:
+            logger.info("Nhap lieu '%s': tat ca da hoan thanh", ten_sheet)
+            continue
+
+        icon = "🔴" if days_left < 0 else "🟡" if days_left <= 2 else "🟠"
+        dl_hien = dl_date.strftime("%d/%m/%Y")
+        lines = [
+            f"{icon} <b>Nhắc nhập liệu: {ten_sheet}</b>",
+            f"📅 Hạn chót: <b>{dl_hien}</b>",
+            "",
+            f"<b>{len(chua_xong)} PGD chưa hoàn thành:</b>",
+        ]
+        for line in chua_xong[:15]:
+            lines.append(line)
+        if len(chua_xong) > 15:
+            lines.append(f"  … và {len(chua_xong) - 15} PGD khác")
+
+        ok = gui_tin("\n".join(lines))
+        if ok:
+            logger.info("Da gui nhac nhap lieu '%s': %d PGD", ten_sheet, len(chua_xong))
+            sent_count += 1
+
+    return sent_count
+
+
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 def nhac() -> None:
@@ -175,8 +316,7 @@ def nhac() -> None:
                 else:
                     try:
                         nop_date = ngay_nop.date() if hasattr(ngay_nop, "date") else pd.to_datetime(ngay_nop).date()
-                        if nop_date > dl_date:
-                            chua_nop.append(pgd)
+                        # Đã nộp (dù trễ) → không nhắc nữa
                     except Exception:
                         chua_nop.append(pgd)
 
@@ -197,6 +337,8 @@ def nhac() -> None:
         logger.info("Không có deadline nào cần nhắc hôm nay.")
     else:
         logger.info("Hoàn tất: đã gửi %d nhắc nhở.", sent_count)
+
+    _nhac_theo_doi_nhap_lieu()
 
 
 if __name__ == "__main__":

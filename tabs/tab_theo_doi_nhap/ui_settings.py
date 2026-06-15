@@ -396,6 +396,52 @@ def _render_template_section(username: str) -> None:
 
 
 def render_cai_dat(ds_sheet: list[dict], username: str) -> None:
+    # ── Deadline nhập liệu ──────────────────────────────────────────────
+    ts_now = _date.today()
+    with st.expander("⏰ Cài đặt deadline nhập liệu", expanded=bool(ds_sheet)):
+        if not ds_sheet:
+            st.caption("Thêm sheet bên dưới trước.")
+        else:
+            deadline_changed = False
+            for i, cfg in enumerate(ds_sheet):
+                ten = cfg.get("ten_hien_thi") or cfg.get("sheet_tab", f"Sheet {i+1}")
+                deadline_str = cfg.get("deadline", "")
+                try:
+                    cur = _date.fromisoformat(deadline_str) if deadline_str else None
+                except (ValueError, TypeError):
+                    cur = None
+
+                c1, c2, c3 = st.columns([3, 2, 1])
+                with c1:
+                    st.caption(ten)
+                with c2:
+                    new_dl = st.date_input(
+                        "Hạn chót",
+                        value=cur,
+                        key=f"tdn_dl_{i}",
+                        format="DD/MM/YYYY",
+                        label_visibility="collapsed",
+                    )
+                with c3:
+                    if cur:
+                        days = (cur - ts_now).days
+                        badge = "🟢" if cur >= ts_now else "🔴"
+                        st.caption(f"{badge} {days:+d}d")
+                if new_dl and new_dl.isoformat() != deadline_str:
+                    ds_sheet[i]["deadline"] = new_dl.isoformat()
+                    deadline_changed = True
+                elif not new_dl and deadline_str:
+                    ds_sheet[i]["deadline"] = ""
+                    deadline_changed = True
+
+            if deadline_changed:
+                col_btn1, col_btn2 = st.columns([1, 4])
+                with col_btn1:
+                    if st.button("💾 Lưu deadline", key="tdn_dl_save", type="primary", use_container_width=True):
+                        luu_ds_sheet(ds_sheet, username)
+                        st.success("✅ Đã lưu deadline.")
+                        st.rerun()
+
     with st.expander("📁 Quản lý Template", expanded=False):
         _render_template_section(username)
 

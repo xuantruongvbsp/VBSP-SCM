@@ -786,6 +786,299 @@ def xuat_khtd_theo_xa(role: str, username: str, df_full: "pd.DataFrame | None" =
     return xuat_excel(sheets)
 
 
+def xuat_to_trinh_bgd_word(username: str = "unknown") -> bytes:
+    """Xuất Tờ trình BGĐ Word (.docx) tổng hợp KHTD vs thực hiện thực tế."""
+    import db as _db
+    from docx import Document
+    from docx.shared import Pt, Cm, Mm, RGBColor
+    from docx.enum.text import WD_ALIGN_PARAGRAPH
+    from docx.oxml.ns import qn
+    from docx.oxml import OxmlElement
+    from datetime import date as _date
+    from config import TEN_CHI_NHANH_HIEN_THI, COT_TONG_DU_NO
+
+    kh_cn = _doc_kv(KV_KEY_CN) or {}
+    if not kh_cn:
+        raise ValueError("Chưa có dữ liệu KHTD Chi nhánh. Hãy giao KHTD trước.")
+
+    th_cn: dict[str, float] = {}
+    ngay_sl = _date.today().strftime("%d/%m/%Y")
+    du_no_pgd: dict[str, float] = {}
+
+    if CACHE_HSTD.exists():
+        try:
+            df_h = pd.read_parquet(CACHE_HSTD)
+            if not df_h.empty:
+                th_cn = _tinh_thuc_hien_theo_ct(df_h)
+                if COT_TEN_PGD in df_h.columns and COT_TONG_DU_NO in df_h.columns:
+                    du_no_pgd = (
+                        pd.to_numeric(df_h[COT_TONG_DU_NO], errors="coerce")
+                        .fillna(0)
+                        .groupby(df_h[COT_TEN_PGD])
+                        .sum()
+                        .to_dict()
+                    )
+                meta = _db.doc_kv("merge_meta_hstd") or {}
+                if meta.get("ngay_sl"):
+                    ngay_sl = str(meta["ngay_sl"])
+        except Exception as e:
+            logger.warning("xuat_to_trinh_bgd_word: đọc HSTD: %s", e)
+
+    today = _date.today()
+    GREEN = RGBColor(0x1B, 0x5E, 0x20)
+    DARK = RGBColor(0x21, 0x21, 0x21)
+    GRAY = RGBColor(0x75, 0x75, 0x75)
+
+    doc = Document()
+
+    # ── Trang A4, lề chuẩn hành chính ────────────────────────────────────────
+    sec = doc.sections[0]
+    sec.page_width = Mm(210)
+    sec.page_height = Mm(297)
+    sec.left_margin = Cm(3)
+    sec.right_margin = Cm(2)
+    sec.top_margin = Cm(2)
+    sec.bottom_margin = Cm(2)
+
+    def _p(text="", align=WD_ALIGN_PARAGRAPH.LEFT, bold=False,
+           size=11, color=None, space_after=2):
+        p = doc.add_paragraph()
+        p.alignment = align
+        p.paragraph_format.space_after = Pt(space_after)
+        if text:
+            run = p.add_run(text)
+            run.bold = bold
+            run.font.size = Pt(size)
+            if color:
+                run.font.color.rgb = color
+        return p
+
+    def _shade(cell, fill_hex: str):
+        tc = cell._tc
+        tcPr = tc.get_or_add_tcPr()
+        shd = OxmlElement("w:shd")
+        shd.set(qn("w:fill"), fill_hex)
+        shd.set(qn("w:val"), "clear")
+        tcPr.append(shd)
+
+    def _fmt_ty(vnd: float) -> str:
+        if vnd == 0:
+            return "—"
+        return f"{vnd / 1e9:,.3f}".replace(",", ".")
+
+    def _fmt_pct(kh: float, th: float) -> str:
+        if kh <= 0:
+            return "—"
+        return f"{th / kh * 100:.1f}%".replace(".", ",")
+
+    def _cell_fmt(cell, text: str, align=WD_ALIGN_PARAGRAPH.LEFT, bold=False,
+                  size=9, color: RGBColor | None = None):
+        cell.text = text
+        for p in cell.paragraphs:
+            p.alignment = align
+            for run in p.runs:
+                run.bold = bold
+                run.font.size = Pt(size)
+                if color:
+                    run.font.color.rgb = color
+
+    # ── Header ───────────────────────────────────────────────────────────────
+    _p("NGÂN HÀNG CHÍNH SÁCH XÃ HỘI", WD_ALIGN_PARAGRAPH.CENTER, True, 12, GREEN)
+    _p(TEN_CHI_NHANH_HIEN_THI.upper(), WD_ALIGN_PARAGRAPH.CENTER, True, 11, GREEN)
+    _p("────────────────────────────────────────────",
+       WD_ALIGN_PARAGRAPH.CENTER, False, 9, GRAY, 6)
+
+    _p("TỜ TRÌNH", WD_ALIGN_PARAGRAPH.CENTER, True, 16, DARK, 2)
+    _p("V/v: Báo cáo tiến độ thực hiện Kế hoạch Tín dụng",
+       WD_ALIGN_PARAGRAPH.CENTER, False, 11)
+    _p(f"(Tính đến ngày {ngay_sl})", WD_ALIGN_PARAGRAPH.CENTER, False, 10, GRAY, 8)
+
+    _p("Kính gửi: Ban Giám đốc Chi nhánh NHCSXH tỉnh Đồng Nai",
+       WD_ALIGN_PARAGRAPH.LEFT, False, 11, space_after=6)
+
+    _p(
+        f"Căn cứ số liệu Kế hoạch Tín dụng được giao và kết quả thực hiện tính đến "
+        f"ngày {ngay_sl}, Phòng Kế hoạch - Nghiệp vụ báo cáo Ban Giám đốc như sau:",
+        WD_ALIGN_PARAGRAPH.JUSTIFY, False, 11, space_after=8,
+    )
+
+    # ── Phần I: Tổng hợp theo chương trình ───────────────────────────────────
+    _p("I. KẾT QUẢ THỰC HIỆN KẾ HOẠCH TÍN DỤNG TOÀN CHI NHÁNH",
+       WD_ALIGN_PARAGRAPH.LEFT, True, 12, GREEN, 2)
+    _p("Bảng 1: Tổng hợp thực hiện kế hoạch tín dụng theo chương trình (đơn vị: tỷ đồng)",
+       WD_ALIGN_PARAGRAPH.LEFT, False, 10, GRAY, 4)
+
+    HDR1 = ["STT", "Chương trình tín dụng", "NV", "KH giao", "Thực hiện", "Tỷ lệ %"]
+    WIDTHS1 = [1.0, 8.5, 1.2, 2.2, 2.2, 1.8]
+    t1 = doc.add_table(rows=1, cols=len(HDR1))
+    t1.style = "Table Grid"
+    for i, h in enumerate(HDR1):
+        c = t1.rows[0].cells[i]
+        _cell_fmt(c, h, WD_ALIGN_PARAGRAPH.CENTER, True, 9, RGBColor(0xFF, 0xFF, 0xFF))
+        _shade(c, "1B5E20")
+    for row in t1.rows:
+        for i, w in enumerate(WIDTHS1):
+            if i < len(row.cells):
+                row.cells[i].width = Cm(w)
+
+    ct_tw = [(mk, ten) for mk, _, ten, nv, _ in CHUONG_TRINH_KHTD if nv == "TW"]
+    ct_dp = [(mk, ten) for mk, _, ten, nv, _ in CHUONG_TRINH_KHTD if nv == "DP"]
+    seen_mk: set[str] = set()
+    stt = 0
+    tong_kh = tong_th = 0.0
+
+    for nv_label, ct_list in [("TW", ct_tw), ("ĐP", ct_dp)]:
+        # Group header
+        gr = t1.add_row()
+        merged = gr.cells[0].merge(gr.cells[-1])
+        label = "NGUỒN VỐN TRUNG ƯƠNG" if nv_label == "TW" else "NGUỒN VỐN ĐỊA PHƯƠNG"
+        _cell_fmt(merged, label, WD_ALIGN_PARAGRAPH.LEFT, True, 9)
+        _shade(merged, "E8F4FD")
+
+        sub_kh = sub_th = 0.0
+        for mk, ten in ct_list:
+            if mk in seen_mk:
+                continue
+            kh_v = float(kh_cn.get(mk, 0) or 0)
+            th_v = float(th_cn.get(mk, 0) or 0)
+            if kh_v == 0 and th_v == 0:
+                continue
+            seen_mk.add(mk)
+            stt += 1
+            sub_kh += kh_v
+            sub_th += th_v
+            tong_kh += kh_v
+            tong_th += th_v
+            dr = t1.add_row()
+            vals = [str(stt), ten, nv_label, _fmt_ty(kh_v), _fmt_ty(th_v), _fmt_pct(kh_v, th_v)]
+            for i, v in enumerate(vals):
+                alg = WD_ALIGN_PARAGRAPH.RIGHT if i >= 3 else WD_ALIGN_PARAGRAPH.LEFT
+                _cell_fmt(dr.cells[i], v, alg)
+            for i, w in enumerate(WIDTHS1):
+                if i < len(dr.cells):
+                    dr.cells[i].width = Cm(w)
+
+        # Subtotal
+        sr = t1.add_row()
+        sv = ["", f"Cộng {nv_label}", "", _fmt_ty(sub_kh), _fmt_ty(sub_th), _fmt_pct(sub_kh, sub_th)]
+        for i, v in enumerate(sv):
+            alg = WD_ALIGN_PARAGRAPH.RIGHT if i >= 3 else WD_ALIGN_PARAGRAPH.LEFT
+            _cell_fmt(sr.cells[i], v, alg, True)
+            _shade(sr.cells[i], "F1F8E9")
+        for i, w in enumerate(WIDTHS1):
+            if i < len(sr.cells):
+                sr.cells[i].width = Cm(w)
+
+    # Grand total
+    tr = t1.add_row()
+    tv = ["", "TỔNG CỘNG", "", _fmt_ty(tong_kh), _fmt_ty(tong_th), _fmt_pct(tong_kh, tong_th)]
+    for i, v in enumerate(tv):
+        alg = WD_ALIGN_PARAGRAPH.RIGHT if i >= 3 else WD_ALIGN_PARAGRAPH.LEFT
+        _cell_fmt(tr.cells[i], v, alg, True, 9, RGBColor(0xFF, 0xFF, 0xFF))
+        _shade(tr.cells[i], "1B5E20")
+    for i, w in enumerate(WIDTHS1):
+        if i < len(tr.cells):
+            tr.cells[i].width = Cm(w)
+
+    doc.add_paragraph()
+
+    # ── Phần II: Theo PGD ────────────────────────────────────────────────────
+    if du_no_pgd:
+        _p("II. TIẾN ĐỘ THỰC HIỆN THEO ĐƠN VỊ",
+           WD_ALIGN_PARAGRAPH.LEFT, True, 12, GREEN, 2)
+        _p("Bảng 2: Tổng hợp dư nợ theo đơn vị (đơn vị: tỷ đồng)",
+           WD_ALIGN_PARAGRAPH.LEFT, False, 10, GRAY, 4)
+
+        tong_dn = sum(du_no_pgd.values())
+        HDR2 = ["STT", "Đơn vị", "Dư nợ (tỷ đồng)", "Tỷ trọng"]
+        WIDTHS2 = [1.0, 8.5, 3.5, 2.5]
+        t2 = doc.add_table(rows=1, cols=4)
+        t2.style = "Table Grid"
+        for i, h in enumerate(HDR2):
+            c = t2.rows[0].cells[i]
+            _cell_fmt(c, h, WD_ALIGN_PARAGRAPH.CENTER, True, 9, RGBColor(0xFF, 0xFF, 0xFF))
+            _shade(c, "1B5E20")
+        for row in t2.rows:
+            for i, w in enumerate(WIDTHS2):
+                if i < len(row.cells):
+                    row.cells[i].width = Cm(w)
+
+        stt2 = 0
+        for pgd in [DON_VI_CHI_NHANH] + DS_PGD:
+            dn = float(du_no_pgd.get(pgd, 0))
+            if dn == 0:
+                continue
+            stt2 += 1
+            pct_s = f"{dn / tong_dn * 100:.1f}%".replace(".", ",") if tong_dn else "—"
+            dr2 = t2.add_row()
+            v2 = [str(stt2), pgd, _fmt_ty(dn), pct_s]
+            for i, v in enumerate(v2):
+                alg = WD_ALIGN_PARAGRAPH.RIGHT if i >= 2 else WD_ALIGN_PARAGRAPH.LEFT
+                _cell_fmt(dr2.cells[i], v, alg)
+            for i, w in enumerate(WIDTHS2):
+                if i < len(dr2.cells):
+                    dr2.cells[i].width = Cm(w)
+
+        tot2 = t2.add_row()
+        tv2 = ["", "TỔNG CỘNG", _fmt_ty(tong_dn), "100%"]
+        for i, v in enumerate(tv2):
+            alg = WD_ALIGN_PARAGRAPH.RIGHT if i >= 2 else WD_ALIGN_PARAGRAPH.LEFT
+            _cell_fmt(tot2.cells[i], v, alg, True)
+            _shade(tot2.cells[i], "C8E6C9")
+        for i, w in enumerate(WIDTHS2):
+            if i < len(tot2.cells):
+                tot2.cells[i].width = Cm(w)
+
+        doc.add_paragraph()
+
+    # ── Phần III: Kết luận ───────────────────────────────────────────────────
+    _p("III. NHẬN XÉT VÀ KIẾN NGHỊ",
+       WD_ALIGN_PARAGRAPH.LEFT, True, 12, GREEN, 4)
+    pct_chung = tong_th / tong_kh * 100 if tong_kh > 0 else 0
+    _p(
+        f"Tính đến ngày {ngay_sl}, toàn Chi nhánh đã thực hiện được "
+        f"{_fmt_ty(tong_th)} tỷ đồng dư nợ, đạt "
+        f"{_fmt_pct(tong_kh, tong_th)} so với kế hoạch được giao "
+        f"({_fmt_ty(tong_kh)} tỷ đồng).",
+        WD_ALIGN_PARAGRAPH.JUSTIFY, False, 11, space_after=6,
+    )
+    _p(
+        "Phòng Kế hoạch - Nghiệp vụ kính trình Ban Giám đốc xem xét, chỉ đạo.",
+        WD_ALIGN_PARAGRAPH.JUSTIFY, False, 11, space_after=16,
+    )
+
+    # ── Chữ ký ──────────────────────────────────────────────────────────────
+    sig_t = doc.add_table(rows=1, cols=2)
+    sig_t.cell(0, 0).text = (
+        "Nơi nhận:\n"
+        "- Ban Giám đốc Chi nhánh (để b/c);\n"
+        "- Lưu: VT, KHNV."
+    )
+    for p in sig_t.cell(0, 0).paragraphs:
+        for run in p.runs:
+            run.font.size = Pt(10)
+
+    sig_r = sig_t.cell(0, 1)
+    sig_r.text = (
+        f"Đồng Nai, ngày {today.day:02d} tháng {today.month:02d} năm {today.year}\n"
+        "TM. PHÒNG KẾ HOẠCH - NGHIỆP VỤ\n"
+        "TRƯỞNG PHÒNG\n\n\n"
+        "(Ký, ghi rõ họ tên)"
+    )
+    for p in sig_r.paragraphs:
+        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        for run in p.runs:
+            run.font.size = Pt(11)
+    # In đậm dòng chức danh
+    sig_r.paragraphs[1].runs[0].bold = True
+
+    buf = BytesIO()
+    doc.save(buf)
+    _db.ghi_audit(username, "xuat_to_trinh_bgd_word",
+                  f"Tờ trình BGĐ ngày {today.isoformat()}")
+    return buf.getvalue()
+
+
 def render_xuat_baocao(role: str = "", username: str = "", df_full: "pd.DataFrame | None" = None) -> None:
     sub1, sub2 = st.tabs(["📊 Chênh lệch phân bổ", "🎯 Tiến độ KH vs TH"])
     with sub1:
@@ -856,4 +1149,39 @@ def render_xuat_baocao(role: str = "", username: str = "", df_full: "pd.DataFram
             key="dl_khtd_xa",
         ):
             state.downloads.clear("khtd_xa_excel")
+
+    # ── Xuất Tờ trình BGĐ Word ────────────────────────────────────────────────
+    st.divider()
+    st.subheader("📄 Xuất Tờ trình BGĐ (Word)")
+    st.caption(
+        "Tờ trình tổng hợp Kế hoạch Tín dụng vs Thực hiện — "
+        "định dạng .docx chuẩn hành chính, ký số trực tiếp."
+    )
+
+    c1, _ = st.columns([1, 3])
+    with c1:
+        if st.button("📄 Tạo Tờ trình Word", key="btn_xuat_to_trinh_bgd", type="primary"):
+            with st.spinner("Đang tạo tài liệu..."):
+                try:
+                    word_bytes = xuat_to_trinh_bgd_word(username=username or "unknown")
+                    ten_file = ten_file_xuat("ToTrinh_BGD", ext="docx")
+                    state2 = SCMStateManager()
+                    state2.downloads.set("to_trinh_bgd_word", word_bytes, ten_file)
+                    st.success(f"✅ Đã tạo: {ten_file}")
+                except ValueError as e:
+                    st.warning(f"⚠️ {e}")
+                except Exception as e:
+                    logger.error("xuat_to_trinh_bgd_word UI: %s", e, exc_info=True)
+                    st.error(f"❌ Lỗi: {e}")
+
+    state2 = SCMStateManager()
+    if state2.downloads.has("to_trinh_bgd_word"):
+        if st.download_button(
+            label="⬇️ Tải Tờ trình (.docx)",
+            data=state2.downloads.get_bytes("to_trinh_bgd_word"),
+            file_name=state2.downloads.get_filename("to_trinh_bgd_word") or "ToTrinh_BGD.docx",
+            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            key="dl_to_trinh_bgd",
+        ):
+            state2.downloads.clear("to_trinh_bgd_word")
 

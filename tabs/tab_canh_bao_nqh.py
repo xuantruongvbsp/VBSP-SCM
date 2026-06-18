@@ -1088,7 +1088,7 @@ def _render_nqh_so_sanh_ky(key_prefix: str) -> None:
     ky_prev = df.attrs.get("ky_prev", "kỳ trước")
     st.caption(f"So sánh kỳ **{ky_curr}** ← **{ky_prev}**")
 
-    df_pgd = df[df["ten_pgd"] != "Hội sở Chi nhánh tỉnh"].copy() if len(df) > 1 else df.copy()
+    df_pgd = df.copy()
     df_pgd = df_pgd.sort_values("delta_qh", ascending=False)
 
     tang = df_pgd[df_pgd["delta_qh"] > 0]

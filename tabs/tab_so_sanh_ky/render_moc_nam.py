@@ -278,8 +278,18 @@ def _render_hstd_section(
         st.warning(f"⚠️ Chưa có dữ liệu baseline 31/12/{chon_nam}.")
         return
 
-    if pgd_mode and pgd_user and COT_TEN_PGD in df_bl_full.columns:
-        df_bl = df_bl_full[df_bl_full[COT_TEN_PGD] == pgd_user].copy()
+    if pgd_mode and pgd_user:
+        if COT_TEN_PGD in df_bl_full.columns:
+            df_bl = df_bl_full[df_bl_full[COT_TEN_PGD] == pgd_user].copy()
+            if df_bl.empty:
+                st.warning(f"⚠️ Baseline 31/12/{chon_nam} không có dữ liệu cho **{pgd_user}**.")
+                return
+        else:
+            st.warning(
+                f"⚠️ File baseline 31/12/{chon_nam} không có cột '{COT_TEN_PGD}' — "
+                "không thể lọc theo PGD. Đang hiển thị toàn Chi nhánh làm mốc."
+            )
+            df_bl = df_bl_full.copy()
     else:
         df_bl = df_bl_full.copy()
 
@@ -421,6 +431,7 @@ def _render_hstd_section(
     with col_table:
         # Prepare comparison rows
         comp_rows = [
+            {"label": "Tổng dư nợ", "value_bl": agg_bl["tong_du_no"], "value_ht": agg_ht["tong_du_no"], "is_risk": False, "unit": "tien"},
             {"label": "Dư nợ trong hạn", "value_bl": agg_bl["du_no_th"], "value_ht": agg_ht["du_no_th"], "is_risk": False, "unit": "tien"},
             {"label": "Dư nợ quá hạn", "value_bl": agg_bl["du_no_qh"], "value_ht": agg_ht["du_no_qh"], "is_risk": True, "unit": "tien"},
             {"label": "Dư nợ khoanh", "value_bl": agg_bl["du_no_khoanh"], "value_ht": agg_ht["du_no_khoanh"], "is_risk": True, "unit": "tien"},

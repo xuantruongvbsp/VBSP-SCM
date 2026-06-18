@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import html as _html
 import os
+import re
 import time
 from datetime import datetime
 
@@ -30,9 +31,26 @@ def _get_config() -> tuple[str, str]:
 
 
 def luu_config(token: str, chat_id: str, username: str = "system") -> None:
-    """Cập nhật token/chat_id — gọi từ tab Cài đặt bot."""
-    db.ghi_kv("telegram_config", {"token": token, "chat_id": chat_id}, username)
+    """Cập nhật token/chat_id — giữ nguyên extra_chats đã cấu hình."""
+    cfg = db.doc_kv("telegram_config") or {}
+    cfg["token"]   = token
+    cfg["chat_id"] = chat_id
+    db.ghi_kv("telegram_config", cfg, username)
     db.ghi_audit(username, "telegram_config", f"Cập nhật telegram config (chat_id={chat_id})")
+
+
+def luu_extra_chat(notify_key: str, chat_id: str, username: str = "system") -> None:
+    """Lưu hoặc xóa chat_id phụ cho 1 loại thông báo."""
+    cfg   = db.doc_kv("telegram_config") or {}
+    extra = cfg.get("extra_chats", {})
+    if chat_id.strip():
+        extra[notify_key] = chat_id.strip()
+    else:
+        extra.pop(notify_key, None)
+    cfg["extra_chats"] = extra
+    db.ghi_kv("telegram_config", cfg, username)
+    db.ghi_audit(username, "telegram_extra_chat",
+                 f"Chat ID phụ: {notify_key} = {chat_id.strip() or '(đã xóa)'}")
 
 
 def _la_bat(key: str) -> bool:
@@ -60,7 +78,7 @@ def _ghi_log(func: str, preview: str, ok: bool, error: str = "") -> None:
 # ── Core ───────────────────────────────────────────────────────────────────────
 
 def gui_tin(text: str, parse_mode: str = "HTML") -> bool:
-    """Gửi tin nhắn văn bản. Retry tối đa 2 lần khi lỗi mạng. Trả về True nếu thành công."""
+    """Gửi tin nhắn văn bản đến chat chính. Retry tối đa 2 lần khi lỗi mạng."""
     token, chat_id = _get_config()
     last_err = ""
     for attempt in range(3):
@@ -85,6 +103,34 @@ def gui_tin(text: str, parse_mode: str = "HTML") -> bool:
     return False
 
 
+def _gui_tin_for(text: str, notify_key: str, parse_mode: str = "HTML") -> bool:
+    """Gửi tin nhắn đến chat_id phụ của notify_key nếu có, fallback chat chính."""
+    token, main_chat = _get_config()
+    cfg     = db.doc_kv("telegram_config") or {}
+    chat_id = cfg.get("extra_chats", {}).get(notify_key, main_chat)
+    last_err = ""
+    for attempt in range(3):
+        try:
+            r = requests.post(
+                f"https://api.telegram.org/bot{token}/sendMessage",
+                json={"chat_id": chat_id, "text": text, "parse_mode": parse_mode},
+                timeout=_API_TIMEOUT,
+            )
+            if r.ok:
+                _ghi_log(notify_key, text, True)
+                return True
+            last_err = f"HTTP {r.status_code}: {r.text[:100]}"
+            logger.warning("telegram %s attempt %d: %s", notify_key, attempt + 1, last_err)
+            break
+        except Exception as e:
+            last_err = str(e)
+            logger.warning("telegram %s attempt %d: %s", notify_key, attempt + 1, e)
+            if attempt < 2:
+                time.sleep(2)
+    _ghi_log(notify_key, text, False, last_err)
+    return False
+
+
 # ── Thông báo nghiệp vụ ────────────────────────────────────────────────────────
 
 def gui_canh_bao_deadline(ten_loai: str, deadline: str, chua_nop: list[str]) -> bool:
@@ -99,7 +145,7 @@ def gui_canh_bao_deadline(ten_loai: str, deadline: str, chua_nop: list[str]) -> 
         f"📅 Deadline: <b>{_html.escape(deadline)}</b>\n\n"
         f"<b>{len(chua_nop)} đơn vị chưa nộp:</b>\n{ds}"
     )
-    return gui_tin(text)
+    return _gui_tin_for(text, "deadline_bc")
 
 
 def gui_ket_qua_health_check(
@@ -120,7 +166,7 @@ def gui_ket_qua_health_check(
     if chi_tiet:
         parts.append("")
         parts.append(_html.escape(chi_tiet))
-    return gui_tin("\n".join(parts))
+    return _gui_tin_for("\n".join(parts), "health_check")
 
 
 def gui_thong_bao_merge(loai: str, so_pgd: int, username: str) -> bool:
@@ -131,7 +177,7 @@ def gui_thong_bao_merge(loai: str, so_pgd: int, username: str) -> bool:
         f"✅ <b>Merge {_html.escape(loai.upper())} thành công</b>\n"
         f"👤 {_html.escape(username)} vừa gộp dữ liệu <b>{so_pgd} PGD</b>"
     )
-    return gui_tin(text)
+    return _gui_tin_for(text, "merge_thanh_cong")
 
 
 def gui_nhac_khoang_den_han(ds_khoang: list[dict]) -> bool:
@@ -152,7 +198,162 @@ def gui_nhac_khoang_den_han(ds_khoang: list[dict]) -> bool:
         )
     if len(ds_khoang) > 20:
         lines.append(f"  … và {len(ds_khoang) - 20} khoản khác")
-    return gui_tin("\n".join(lines))
+    return _gui_tin_for("\n".join(lines), "khoang_den_han")
+
+
+def gui_nhac_phan_ky_nxh(
+    ten_pgd: str,
+    ds_khoan: list[dict],
+    ngay_du_lieu: str = "",
+) -> bool:
+    """Gửi danh sách phân kỳ NXH cho 1 PGD, chia 2 nhóm đủ/không đủ số dư.
+    Tự chia nhiều tin nếu > 3800 ký tự.
+
+    Mỗi item: {"ten_kh", "so_ku", "ngay_dh", "du_no", "tong_tgk",
+               "sdt", "ten_xa", "ten_to_truong", "ghi_chu"}
+    """
+    if not _la_bat("phan_ky_nxh"):
+        return True
+    if not ds_khoan:
+        return True
+    from datetime import date
+    thang      = date.today().strftime("%m/%Y")
+    ngay_ref   = ngay_du_lieu or date.today().strftime("%d/%m/%Y")
+    tong_tien  = sum(float(k.get("du_no", 0) or 0) for k in ds_khoan)
+    tong_tien_hien = f"{tong_tien / 1e6:,.0f}".replace(",", ".") + " triệu"
+
+    # ── Chia 2 nhóm: đủ số dư (TK >= dư nợ + lãi tồn) vs không đủ ─────────────
+    def _phai_tra(k: dict) -> float:
+        return float(k.get("du_no", 0) or 0) + float(k.get("lai_ton", 0) or 0)
+
+    du_so_du = [k for k in ds_khoan if float(k.get("tong_tgk", 0) or 0) >= _phai_tra(k)]
+    khong_du  = [k for k in ds_khoan if float(k.get("tong_tgk", 0) or 0) < _phai_tra(k)]
+
+    def _fmt_sdt(raw: str) -> str:
+        """Chuẩn hoá SĐT → 10 chữ số bắt đầu 0, bọc thẻ tel: để nhấn gọi."""
+        s = re.sub(r"[\s\-\.\(\)]", "", raw.strip())
+        if s.startswith("+84"):
+            s = "0" + s[3:]
+        elif re.match(r"^84\d{9}$", s):
+            s = "0" + s[2:]
+        if not re.match(r"^0\d{9}$", s):
+            return _html.escape(raw)       # không nhận dạng được → hiện nguyên
+        return f'<a href="tel:{s}">{s}</a>'
+
+    def _dong_kh(k: dict, show_tgk: bool = False) -> list[str]:
+        ten_kh      = _html.escape(str(k.get("ten_kh", "")))
+        so_ku       = _html.escape(str(k.get("so_ku", "")))
+        ngay        = str(k.get("ngay_dh", ""))
+        du_no_val   = float(k.get("du_no", 0) or 0)
+        lai_ton_val = float(k.get("lai_ton", 0) or 0)
+        so_tien     = f"{du_no_val / 1e6:,.0f}".replace(",", ".") + " tr"
+        sdt_raw     = str(k.get("sdt", "") or "")
+        ten_xa      = _html.escape(str(k.get("ten_xa", "") or ""))
+        co_canh_bao = bool(str(k.get("ghi_chu", "")).strip())
+        marker      = "⚠️ " if co_canh_bao else "  • "
+
+        lai_str = ""
+        if lai_ton_val > 0:
+            lai_str = f" | Lãi tồn: {lai_ton_val / 1e6:,.0f}".replace(",", ".") + " tr"
+
+        tgk_str = ""
+        if show_tgk:
+            tgk       = float(k.get("tong_tgk", 0) or 0)
+            phai_tra  = du_no_val + lai_ton_val
+            con_thieu = phai_tra - tgk
+            tgk_str   = (
+                f" | TK: {tgk / 1e6:,.0f}".replace(",", ".") + " tr"
+                + f", thiếu {con_thieu / 1e6:,.0f}".replace(",", ".") + " tr và lãi phát sinh tháng"
+            )
+
+        sdt_str = _fmt_sdt(sdt_raw) if sdt_raw else ""
+        sub = " | ".join(filter(None, [sdt_str, ten_xa]))
+        rows = [f"{marker}{ten_kh} — {so_ku} — {ngay} — {so_tien}{lai_str}{tgk_str}"]
+        if sub:
+            rows.append(f"    <i>{sub}</i>")
+        return rows
+
+    # ── Đọc mapping xã → cán bộ ───────────────────────────────────────────────
+    can_bo_map: dict[str, str] = {}
+    try:
+        can_bo_map = db.doc_kv("nxh_can_bo_xa") or {}
+    except Exception:
+        pass
+
+    def _build_xa_groups(ds: list[dict], show_tgk: bool) -> list[str]:
+        """Nhóm KH theo xã, mỗi nhóm có header tên xã + cán bộ phụ trách."""
+        lines: list[str] = []
+        # Giữ thứ tự xã theo ds (đã sort xã+ngày từ daily_report)
+        seen: dict[str, list[dict]] = {}
+        for k in ds:
+            xa = str(k.get("ten_xa", "") or "")
+            seen.setdefault(xa, []).append(k)
+        for xa, items in seen.items():
+            can_bo = can_bo_map.get(xa, "")
+            cb_str = f" — CB: <b>{_html.escape(can_bo)}</b>" if can_bo else ""
+            lines.append(f"\n📍 <b>{_html.escape(xa)}</b>{cb_str} ({len(items)} khoản)")
+            for k in items:
+                lines.extend(_dong_kh(k, show_tgk=show_tgk))
+        return lines
+
+    so_canh_bao = sum(1 for k in ds_khoan if str(k.get("ghi_chu", "")).strip())
+    canh_bao_str = f"   ⚠️ <b>{so_canh_bao} cảnh báo</b>" if so_canh_bao else ""
+    pgd_esc = _html.escape(ten_pgd)
+
+    def _gui_nhom(loai_lines: list[str], loai_header: str) -> bool:
+        """Gửi 1 nhóm (đủ hoặc không đủ) — tự chia chunk nếu dài."""
+        _MAX = 3800
+        chunks: list[list[str]] = []
+        cur: list[str] = []
+        cur_len = 0
+        for line in loai_lines:
+            need = len(line) + 1
+            if cur_len + need > _MAX and cur:
+                chunks.append(cur)
+                cur, cur_len = [], 0
+            cur.append(line)
+            cur_len += need
+        if cur:
+            chunks.append(cur)
+
+        n = len(chunks)
+        result = True
+        for i, chunk in enumerate(chunks):
+            page_tag = f" ({i + 1}/{n})" if n > 1 else ""
+            if i == 0:
+                msg_header = (
+                    f"🏠 <b>{pgd_esc}</b> — Phân kỳ NXH tháng {thang}{page_tag}\n"
+                    f"📅 <b>{len(ds_khoan)} khoản</b> | 💰 <b>{tong_tien_hien}</b>"
+                    f" | ✅ {len(du_so_du)}   ❌ {len(khong_du)}{canh_bao_str}\n"
+                    f"{loai_header}\n"
+                )
+            else:
+                msg_header = f"🏠 <b>{pgd_esc}</b> — tiếp theo{page_tag}\n"
+            if not _gui_tin_for(msg_header + "\n".join(chunk), "phan_ky_nxh"):
+                result = False
+        return result
+
+    # ── Tin 1: ĐỦ SỐ DƯ ──────────────────────────────────────────────────────
+    ok = True
+    if du_so_du:
+        lines_du = _build_xa_groups(du_so_du, show_tgk=False)
+        lines_du.append("\n<i>(*) Lãi phát sinh theo dư nợ</i>")
+        if not _gui_nhom(lines_du, f"✅ <b>ĐỦ SỐ DƯ THANH TOÁN ({len(du_so_du)} khoản)</b>"):
+            ok = False
+
+    # ── Tin 2: CHƯA ĐỦ SỐ DƯ ────────────────────────────────────────────────
+    if khong_du:
+        lines_khong = _build_xa_groups(khong_du, show_tgk=True)
+        lines_khong.append("\n<i>(*) Lãi phát sinh theo dư nợ</i>")
+        loai_header_khong = (
+            f"❌ <b>CHƯA ĐỦ SỐ DƯ ({len(khong_du)} khoản)</b>\n"
+            f"<i>Tính đến ngày {_html.escape(ngay_ref)}, các khách hàng dưới đây"
+            f" chưa đủ số dư trong tài khoản để thanh toán nợ:</i>"
+        )
+        if not _gui_nhom(lines_khong, loai_header_khong):
+            ok = False
+
+    return ok
 
 
 def gui_bao_cao_sang(
@@ -173,4 +374,447 @@ def gui_bao_cao_sang(
         f"🔴 Dư nợ quá hạn: <b>{_html.escape(tong_qh)}</b> ({_html.escape(ty_le_qh)})\n"
         f"{pgd_status} PGD đã upload: <b>{so_pgd_da_upload}/{tong_pgd}</b>"
     )
-    return gui_tin(text)
+    return _gui_tin_for(text, "bao_cao_sang")
+
+
+def gui_thong_bao_upload_pgd(ten_pgd: str, loai: str, username: str) -> bool:
+    """Thông báo khi PGD upload file thành công."""
+    if not _la_bat("upload_pgd"):
+        return True
+    now_str = datetime.now().strftime("%H:%M %d/%m/%Y")
+    text = (
+        f"📤 <b>{_html.escape(ten_pgd)}</b> vừa upload <b>{_html.escape(loai.upper())}</b>\n"
+        f"👤 {_html.escape(username)}   ⏰ {now_str}"
+    )
+    return _gui_tin_for(text, "upload_pgd")
+
+
+def gui_khtd_tien_do(ds_pgd: list[dict]) -> bool:
+    """Gửi tóm tắt tiến độ KHTD.
+
+    Mỗi item: {ten_pgd, ke_hoach, thuc_hien, pct}
+    """
+    if not _la_bat("khtd_tien_do"):
+        return True
+    if not ds_pgd:
+        return True
+    from datetime import date as _date
+    lines = [f"📈 <b>Tiến độ KHTD — {_date.today().strftime('%d/%m/%Y')}</b>", ""]
+    for p in ds_pgd:
+        pct  = float(p.get("pct", 0))
+        icon = "⚠️" if pct < 70 else "✅"
+        kh   = float(p.get("ke_hoach", 0)) / 1e9
+        th   = float(p.get("thuc_hien", 0)) / 1e9
+        pct_str = f"{pct:.0f}".replace(".", ",")
+        kh_str  = f"{kh:.1f}".replace(".", ",")
+        th_str  = f"{th:.1f}".replace(".", ",")
+        lines.append(
+            f"{icon} {_html.escape(str(p.get('ten_pgd', '')))} — "
+            f"{th_str}/{kh_str} tỷ ({pct_str}%)"
+        )
+    return _gui_tin_for("\n".join(lines), "khtd_tien_do")
+
+
+def gui_canh_bao_qh_moi(ds_tang: list[dict]) -> bool:
+    """Cảnh báo khi tỷ lệ NQH tăng bất thường.
+
+    Mỗi item: {ten_pgd, ty_le_cu, ty_le_moi, tang}
+    """
+    if not _la_bat("qh_moi"):
+        return True
+    if not ds_tang:
+        return True
+    lines = [f"⚠️ <b>Nợ quá hạn tăng bất thường — {len(ds_tang)} đơn vị</b>", ""]
+    for p in ds_tang:
+        tang = float(p.get("tang", 0))
+        cu   = float(p.get("ty_le_cu", 0))
+        moi  = float(p.get("ty_le_moi", 0))
+        lines.append(
+            f"  🔴 {_html.escape(str(p.get('ten_pgd', '')))} — "
+            f"{cu:.2f}% → {moi:.2f}% (+{tang:.2f}%)"
+        )
+    return _gui_tin_for("\n".join(lines), "qh_moi")
+
+
+def gui_thong_bao_nop_moi_gsheet(ds_nop: list[dict]) -> bool:
+    """Thông báo khi phát hiện submission mới từ Google Form (GSheet).
+
+    Mỗi item: {ten_pgd, loai_bao_cao, thoi_gian, ho_ten}
+    """
+    if not _la_bat("nop_moi_gsheet"):
+        return True
+    if not ds_nop:
+        return True
+    now_str = datetime.now().strftime("%H:%M %d/%m/%Y")
+    lines = [f"📋 <b>Nhận báo cáo mới — {len(ds_nop)} nộp</b>   ⏰ {now_str}", ""]
+    for item in ds_nop[:20]:
+        pgd   = _html.escape(str(item.get("ten_pgd", "")))
+        loai  = _html.escape(str(item.get("loai_bao_cao", "")))
+        ts    = _html.escape(str(item.get("thoi_gian", "")))
+        ho_ten = _html.escape(str(item.get("ho_ten", "") or ""))
+        lines.append(f"  ✅ <b>{pgd}</b> — {loai} ({ts})")
+        if ho_ten:
+            lines.append(f"    <i>Người nộp: {ho_ten}</i>")
+    if len(ds_nop) > 20:
+        lines.append(f"  … và {len(ds_nop) - 20} nộp khác")
+    return _gui_tin_for("\n".join(lines), "nop_moi_gsheet")
+
+
+def gui_bao_cao_nqh_tuan(ds_pgd: list[dict], ngay_sl: str = "") -> bool:
+    """Báo cáo NQH tuần — tổng hợp từng đơn vị + top 5 tệ nhất.
+
+    Mỗi item: {ten_pgd, du_no, nqh, ty_le_nqh}
+    """
+    if not _la_bat("nqh_tuan"):
+        return True
+    if not ds_pgd:
+        return True
+    from datetime import date as _d
+    today = _d.today()
+    ngay_ref = ngay_sl or today.strftime("%d/%m/%Y")
+    tong_dn = sum(float(p.get("du_no", 0) or 0) for p in ds_pgd)
+    tong_qh = sum(float(p.get("nqh", 0) or 0) for p in ds_pgd)
+    tl_cn = tong_qh / tong_dn * 100 if tong_dn else 0.0
+
+    def _icon(tl: float) -> str:
+        if tl >= 3:
+            return "🔴"
+        if tl >= 1:
+            return "🟡"
+        if tl > 0:
+            return "🟠"
+        return "🟢"
+
+    def _fmt(vnd: float) -> str:
+        return f"{vnd / 1e6:,.0f}".replace(",", ".") + " tr"
+
+    lines = [
+        f"📊 <b>Báo cáo NQH tuần</b>   📅 {_html.escape(ngay_ref)}",
+        "",
+        f"💰 Tổng dư nợ CN: <b>{tong_dn / 1e9:,.1f}".replace(",", ".") + " tỷ</b>",
+        f"🔴 Tổng NQH: <b>{_fmt(tong_qh)}</b>  ({tl_cn:.2f}%".replace(".", ",") + ")",
+        "",
+        "<b>Từng đơn vị:</b>",
+    ]
+    ds_sorted = sorted(ds_pgd, key=lambda p: float(p.get("ty_le_nqh", 0) or 0), reverse=True)
+    for p in ds_sorted:
+        pgd = _html.escape(str(p.get("ten_pgd", "")))
+        nqh = float(p.get("nqh", 0) or 0)
+        tl  = float(p.get("ty_le_nqh", 0) or 0)
+        if nqh == 0:
+            lines.append(f"  {_icon(0)} {pgd}: —")
+        else:
+            tl_s = f"{tl:.2f}%".replace(".", ",")
+            lines.append(f"  {_icon(tl)} {pgd}: {_fmt(nqh)} ({tl_s})")
+
+    # Top 3 nếu nhiều PGD
+    top3 = [p for p in ds_sorted if float(p.get("nqh", 0) or 0) > 0][:3]
+    if top3:
+        lines.append("")
+        lines.append("⚠️ <b>Cần chú ý:</b>")
+        for i, p in enumerate(top3, 1):
+            pgd = _html.escape(str(p.get("ten_pgd", "")))
+            tl  = float(p.get("ty_le_nqh", 0) or 0)
+            tl_s = f"{tl:.2f}%".replace(".", ",")
+            lines.append(f"  {i}. {pgd} — {tl_s}")
+
+    return _gui_tin_for("\n".join(lines), "nqh_tuan")
+
+
+def gui_khtd_theo_chuong_trinh(ds_ct: list[dict], ngay: str = "") -> bool:
+    """Báo cáo tiến độ KHTD phân tích theo từng chương trình tín dụng.
+
+    Mỗi item: {ten_ct, nguon_von, ke_hoach, thuc_hien, pct}
+    nguon_von: 'TW' | 'ĐP'
+    """
+    if not _la_bat("khtd_ct"):
+        return True
+    if not ds_ct:
+        return True
+    from datetime import date as _d
+    ngay_ref = ngay or _d.today().strftime("%d/%m/%Y")
+
+    def _icon(pct: float) -> str:
+        if pct >= 100:
+            return "✅"
+        if pct >= 80:
+            return "🟡"
+        return "🔴"
+
+    def _fty(vnd: float) -> str:
+        return f"{vnd / 1e9:,.1f}".replace(",", ".") + " tỷ"
+
+    tong_kh = sum(float(c.get("ke_hoach", 0) or 0) for c in ds_ct)
+    tong_th = sum(float(c.get("thuc_hien", 0) or 0) for c in ds_ct)
+    pct_cn  = tong_th / tong_kh * 100 if tong_kh > 0 else 0.0
+
+    lines = [f"🎯 <b>KHTD theo Chương trình</b>   📅 {_html.escape(ngay_ref)}", ""]
+
+    for nv_label in ("TW", "ĐP"):
+        nhom = [c for c in ds_ct if c.get("nguon_von") == nv_label]
+        if not nhom:
+            continue
+        header = "NGUỒN VỐN TRUNG ƯƠNG" if nv_label == "TW" else "NGUỒN VỐN ĐỊA PHƯƠNG"
+        lines.append(f"<b>{header}</b>")
+        for c in nhom:
+            ten  = _html.escape(str(c.get("ten_ct", "")))
+            kh   = float(c.get("ke_hoach", 0) or 0)
+            th   = float(c.get("thuc_hien", 0) or 0)
+            pct  = float(c.get("pct", 0) or 0)
+            if kh == 0 and th == 0:
+                continue
+            pct_s = f"{pct:.1f}%".replace(".", ",")
+            if kh > 0:
+                lines.append(f"  {_icon(pct)} {ten}: {_fty(th)}/{_fty(kh)} ({pct_s})")
+            else:
+                lines.append(f"  ℹ️ {ten}: {_fty(th)} (KH chưa giao)")
+        lines.append("")
+
+    pct_cn_s = f"{pct_cn:.1f}%".replace(".", ",")
+    lines.append(f"🏆 <b>Tổng CN: {_fty(tong_th)}/{_fty(tong_kh)} ({pct_cn_s})</b>")
+    return _gui_tin_for("\n".join(lines), "khtd_ct")
+
+
+def gui_tong_ket_thang(
+    thang: int,
+    nam: int,
+    du_no: float,
+    ke_hoach: float,
+    nqh: float,
+    so_khoang_den_han: int,
+    du_no_den_han: float,
+    ds_pgd_top: list[dict],
+    ds_pgd_bot: list[dict],
+) -> bool:
+    """Tổng kết tháng — gửi ngày 25–31 hàng tháng.
+
+    ds_pgd_top/bot: [{ten_pgd, pct_kh}] — top hoàn thành / cần cải thiện
+    """
+    if not _la_bat("tong_ket_thang"):
+        return True
+    pct_kh = du_no / ke_hoach * 100 if ke_hoach > 0 else 0.0
+    tl_nqh = nqh / du_no * 100 if du_no > 0 else 0.0
+
+    def _fty(vnd: float) -> str:
+        return f"{vnd / 1e9:,.1f}".replace(",", ".") + " tỷ"
+
+    def _fmt_m(vnd: float) -> str:
+        return f"{vnd / 1e6:,.0f}".replace(",", ".") + " triệu"
+
+    icon_kh = "✅" if pct_kh >= 100 else "🟡" if pct_kh >= 80 else "🔴"
+    icon_nqh = "🔴" if tl_nqh >= 3 else "🟡" if tl_nqh >= 1 else "🟢"
+
+    pct_kh_s  = f"{pct_kh:.1f}%".replace(".", ",")
+    tl_nqh_s  = f"{tl_nqh:.2f}%".replace(".", ",")
+
+    lines = [
+        f"📅 <b>Tổng kết tháng {thang:02d}/{nam}</b>",
+        "",
+        f"{icon_kh} Dư nợ: <b>{_fty(du_no)}</b>  |  KH: {_fty(ke_hoach)}  |  Đạt <b>{pct_kh_s}</b>",
+        f"{icon_nqh} NQH: <b>{_fmt_m(nqh)}</b>  ({tl_nqh_s})",
+    ]
+    if so_khoang_den_han > 0:
+        lines.append(
+            f"⏰ Đến hạn tháng sau: <b>{so_khoang_den_han}</b> khoản "
+            f"({_fty(du_no_den_han)})"
+        )
+
+    if ds_pgd_top:
+        lines.append("")
+        lines.append("🏆 <b>Hoàn thành KH tốt nhất:</b>")
+        for p in ds_pgd_top[:5]:
+            pgd = _html.escape(str(p.get("ten_pgd", "")))
+            pct = float(p.get("pct_kh", 0) or 0)
+            pct_s = f"{pct:.1f}%".replace(".", ",")
+            lines.append(f"  ✅ {pgd} — {pct_s}")
+
+    if ds_pgd_bot:
+        lines.append("")
+        lines.append("⚠️ <b>Cần cải thiện:</b>")
+        for p in ds_pgd_bot[:5]:
+            pgd = _html.escape(str(p.get("ten_pgd", "")))
+            pct = float(p.get("pct_kh", 0) or 0)
+            pct_s = f"{pct:.1f}%".replace(".", ",")
+            lines.append(f"  🔴 {pgd} — {pct_s}")
+
+    return _gui_tin_for("\n".join(lines), "tong_ket_thang")
+
+
+def luu_pgd_chat(ten_pgd: str, chat_id: str, username: str = "system") -> None:
+    """Lưu hoặc xóa chat_id riêng cho từng PGD."""
+    from data.pgd import pgd_slug
+    slug = pgd_slug(ten_pgd)
+    cfg  = db.doc_kv("telegram_config") or {}
+    pgd_chats = cfg.get("pgd_chats", {})
+    if chat_id.strip():
+        pgd_chats[slug] = chat_id.strip()
+    else:
+        pgd_chats.pop(slug, None)
+    cfg["pgd_chats"] = pgd_chats
+    db.ghi_kv("telegram_config", cfg, username)
+    db.ghi_audit(username, "telegram_pgd_chat",
+                 f"Chat ID PGD: {ten_pgd} ({slug}) = {chat_id.strip() or '(đã xóa)'}")
+
+
+def gui_tin_pgd(text: str, ten_pgd: str, notify_key: str = "", parse_mode: str = "HTML") -> bool:
+    """Gửi tin đến chat riêng của PGD (pgd_chats[slug]) → extra_chats[notify_key] → chat chính."""
+    from data.pgd import pgd_slug
+    token, main_chat = _get_config()
+    cfg  = db.doc_kv("telegram_config") or {}
+    slug = pgd_slug(ten_pgd)
+    chat_id = (
+        cfg.get("pgd_chats", {}).get(slug)
+        or (cfg.get("extra_chats", {}).get(notify_key) if notify_key else None)
+        or main_chat
+    )
+    last_err = ""
+    for attempt in range(3):
+        try:
+            r = requests.post(
+                f"https://api.telegram.org/bot{token}/sendMessage",
+                json={"chat_id": chat_id, "text": text, "parse_mode": parse_mode},
+                timeout=_API_TIMEOUT,
+            )
+            if r.ok:
+                _ghi_log(f"pgd:{slug}", text, True)
+                return True
+            last_err = f"HTTP {r.status_code}: {r.text[:100]}"
+            logger.warning("telegram pgd:%s attempt %d: %s", slug, attempt + 1, last_err)
+            break
+        except Exception as e:
+            last_err = str(e)
+            if attempt < 2:
+                time.sleep(2)
+    _ghi_log(f"pgd:{slug}", text, False, last_err)
+    return False
+
+
+def gui_nhac_den_han_phan_tang(buckets: dict[str, list[dict]]) -> bool:
+    """Nhắc khoản đến hạn phân tầng T-1 / T-3 / T-7.
+
+    buckets = {"T-1": [...], "T-3": [...], "T-7": [...]}
+    Mỗi item: {ten_kh, so_ku, ngay_dh, du_no (VND), ten_pgd}
+    """
+    if not _la_bat("den_han_phan_tang"):
+        return True
+    if not any(v for v in buckets.values()):
+        return True
+
+    tiers = [
+        ("T-1", "🔴", "Đến hạn NGÀY MAI"),
+        ("T-3", "🟠", "Đến hạn trong 3 ngày"),
+        ("T-7", "🟡", "Đến hạn trong 7 ngày"),
+    ]
+    lines = ["⏰ <b>Nhắc khoản đến hạn sắp tới</b>", ""]
+    any_tier = False
+    for tier_key, icon, label in tiers:
+        ds = buckets.get(tier_key, [])
+        if not ds:
+            continue
+        any_tier = True
+        tong_vnd = sum(float(k.get("du_no", 0) or 0) for k in ds)
+        tong_s   = f"{tong_vnd / 1e6:,.0f}".replace(",", ".") + " triệu"
+        lines.append(f"{icon} <b>{label} ({len(ds)} khoản — {tong_s}):</b>")
+        for k in ds[:10]:
+            kh   = _html.escape(str(k.get("ten_kh", "")))
+            pgd  = _html.escape(str(k.get("ten_pgd", "")))
+            ngay = _html.escape(str(k.get("ngay_dh", "")))
+            dn_s = f"{float(k.get('du_no', 0) or 0) / 1e6:,.0f}".replace(",", ".") + " tr"
+            lines.append(f"  • {kh} ({pgd}) — {ngay} — {dn_s}")
+        if len(ds) > 10:
+            lines.append(f"  … và {len(ds) - 10} khoản khác")
+        lines.append("")
+    if not any_tier:
+        return True
+    return _gui_tin_for("\n".join(lines), "den_han_phan_tang")
+
+
+def gui_nhac_lich_cong_tac(ds_su_kien: list[dict], ngay_mai: str) -> bool:
+    """Nhắc lịch công tác Phòng KH-NV ngày mai (gửi chiều hôm trước).
+
+    Mỗi item: {gio, noi_dung, nguoi_phu_trach, dia_diem}
+    """
+    if not _la_bat("lich_cong_tac"):
+        return True
+    if not ds_su_kien:
+        return True
+    lines = [f"📅 <b>Lịch công tác ngày mai — {_html.escape(ngay_mai)}</b>", ""]
+    for sv in ds_su_kien:
+        gio = _html.escape(str(sv.get("gio", "") or "")).strip()
+        nd  = _html.escape(str(sv.get("noi_dung", "") or "")).strip()
+        pt  = _html.escape(str(sv.get("nguoi_phu_trach", "") or "")).strip()
+        dd  = _html.escape(str(sv.get("dia_diem", "") or "")).strip()
+        line = f"  🕒 <b>{gio}</b>  {nd}" if gio else f"  📌 {nd}"
+        if pt:
+            line += f"  · {pt}"
+        if dd:
+            line += f"  📍 {dd}"
+        lines.append(line)
+    return _gui_tin_for("\n".join(lines), "lich_cong_tac")
+
+
+def gui_giai_ngan_tuan(ds_pgd: list[dict], tuan_str: str = "") -> bool:
+    """Báo cáo giải ngân (khoản vay mới) 7 ngày qua theo PGD.
+
+    Mỗi item: {ten_pgd, so_khoan, giai_ngan (VND)}
+    """
+    if not _la_bat("giai_ngan_tuan"):
+        return True
+    ds_pgd = [p for p in ds_pgd if float(p.get("giai_ngan", 0) or 0) > 0]
+    if not ds_pgd:
+        return True
+    tong_vnd = sum(float(p.get("giai_ngan", 0) or 0) for p in ds_pgd)
+    tong_n   = sum(int(p.get("so_khoan", 0) or 0) for p in ds_pgd)
+    tong_s   = f"{tong_vnd / 1e9:,.2f}".replace(",", ".") + " tỷ"
+    lines = [
+        f"💸 <b>Giải ngân tuần {_html.escape(tuan_str)}</b>",
+        f"📊 Tổng: <b>{tong_s}</b>  ({tong_n} khoản mới)",
+        "",
+    ]
+    for p in sorted(ds_pgd, key=lambda x: float(x.get("giai_ngan", 0) or 0), reverse=True):
+        pgd = _html.escape(str(p.get("ten_pgd", "")))
+        gn  = float(p.get("giai_ngan", 0) or 0)
+        n   = int(p.get("so_khoan", 0) or 0)
+        gn_s = f"{gn / 1e6:,.0f}".replace(",", ".") + " tr"
+        lines.append(f"  • {pgd}: {gn_s} ({n} khoản)")
+    return _gui_tin_for("\n".join(lines), "giai_ngan_tuan")
+
+
+def gui_canh_bao_khoanh_tang(ds_tang: list[dict]) -> bool:
+    """Cảnh báo đơn vị có nợ khoanh tăng bất thường (≥ 5% so kỳ trước).
+
+    Mỗi item: {ten_pgd, khoanh_cu (VND), khoanh_moi (VND), tang_pct}
+    """
+    if not _la_bat("khoanh_tang"):
+        return True
+    if not ds_tang:
+        return True
+    lines = [f"⚠️ <b>Cảnh báo nợ khoanh tăng</b>  ({len(ds_tang)} đơn vị)", ""]
+    for p in sorted(ds_tang, key=lambda x: float(x.get("tang_pct", 0) or 0), reverse=True):
+        pgd   = _html.escape(str(p.get("ten_pgd", "")))
+        cu    = float(p.get("khoanh_cu", 0) or 0)
+        moi   = float(p.get("khoanh_moi", 0) or 0)
+        tang  = float(p.get("tang_pct", 0) or 0)
+        cu_s  = f"{cu / 1e6:,.0f}".replace(",", ".") + " tr"
+        moi_s = f"{moi / 1e6:,.0f}".replace(",", ".") + " tr"
+        tang_s = f"+{tang:.1f}%".replace(".", ",")
+        lines.append(f"  🔴 {pgd}: {cu_s} → {moi_s} ({tang_s})")
+    return _gui_tin_for("\n".join(lines), "khoanh_tang")
+
+
+def gui_canh_bao_he_thong(loai: str, mo_ta: str) -> bool:
+    """Cảnh báo sự kiện hệ thống (đăng nhập bất thường, lỗi...).
+
+    loai: 'login' | 'loi' | 'canh_bao'
+    """
+    if not _la_bat("he_thong"):
+        return True
+    icon_map = {"login": "🔐", "loi": "❌", "canh_bao": "⚠️"}
+    icon    = icon_map.get(loai, "ℹ️")
+    now_str = datetime.now().strftime("%H:%M %d/%m/%Y")
+    text = (
+        f"{icon} <b>Cảnh báo hệ thống</b>\n"
+        f"⏰ {now_str}\n\n"
+        f"{_html.escape(mo_ta)}"
+    )
+    return _gui_tin_for(text, "he_thong")

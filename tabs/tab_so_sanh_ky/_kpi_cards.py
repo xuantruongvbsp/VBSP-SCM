@@ -83,7 +83,7 @@ _CARD_CSS = """
 
 /* Mini Card */
 .mini-card {
-    background: white;
+    background: var(--surface, #ffffff);
     border-radius: 12px;
     padding: 16px 20px;
     box-shadow: 0 2px 8px -2px rgba(0,0,0,0.08);
@@ -108,12 +108,12 @@ _CARD_CSS = """
 .mini-card-value {
     font-size: 1.4rem;
     font-weight: 700;
-    color: #1f2937;
+    color: var(--text-head, #1f2937);
     line-height: 1.3;
 }
 .mini-card-label {
     font-size: 0.8rem;
-    color: #6b7280;
+    color: var(--text-muted, #6b7280);
     font-weight: 500;
 }
 .mini-card-delta {
@@ -133,8 +133,8 @@ _CARD_CSS = """
     box-shadow: 0 2px 8px -2px rgba(0,0,0,0.08);
 }
 .compact-table th {
-    background: #1e3a5f;
-    color: white;
+    background: var(--surface-hi, #1e3a5f);
+    color: var(--text-head, white);
     padding: 12px 16px;
     text-align: left;
     font-weight: 600;
@@ -142,27 +142,28 @@ _CARD_CSS = """
 }
 .compact-table td {
     padding: 10px 16px;
-    border-bottom: 1px solid #e5e7eb;
-    background: white;
+    border-bottom: 1px solid var(--border, #e5e7eb);
+    background: var(--surface, #ffffff);
+    color: var(--text, inherit);
 }
 .compact-table tr:last-child td {
     border-bottom: none;
 }
 .compact-table tr:hover td {
-    background: #f9fafb;
+    background: var(--surface-lo, #f9fafb);
 }
-.compact-table .row-risk {
-    background: #fef2f2 !important;
+.compact-table .row-risk td {
+    background: var(--red-bg, rgba(220,38,38,0.06)) !important;
 }
-.compact-table .row-risk:hover {
-    background: #fee2e2 !important;
+.compact-table .row-risk:hover td {
+    background: var(--red-bg-hover, rgba(220,38,38,0.10)) !important;
 }
 .compact-table .delta-arrow {
     font-weight: 700;
     font-size: 1.1em;
 }
-.compact-table .arrow-up { color: #16a34a; }
-.compact-table .arrow-down { color: #dc2626; }
+.compact-table .arrow-up { color: var(--green, #16a34a); }
+.compact-table .arrow-down { color: var(--red, #dc2626); }
 .compact-table .value-num {
     font-weight: 600;
     font-family: 'SF Mono', monospace;
@@ -173,9 +174,9 @@ _CARD_CSS = """
     font-size: 0.75rem;
     font-weight: 600;
 }
-.badge-red { background: #fef2f2; color: #dc2626; }
-.badge-green { background: #f0fdf4; color: #16a34a; }
-.badge-yellow { background: #fefce8; color: #ca8a04; }
+.badge-red { background: var(--red-bg, rgba(220,38,38,0.08)); color: var(--red, #dc2626); }
+.badge-green { background: var(--green-bg, rgba(22,163,74,0.08)); color: var(--green, #16a34a); }
+.badge-yellow { background: var(--yellow-bg, rgba(234,179,8,0.10)); color: var(--yellow, #ca8a04); }
 </style>
 """
 
@@ -433,7 +434,7 @@ def render_compact_comparison_table(
     key: str = "comp_table",
 ) -> None:
     """Bảng so sánh compact với màu sắc.
-    
+
     Args:
         rows: list of dict with keys:
             - label: Tên chỉ tiêu
@@ -445,70 +446,65 @@ def render_compact_comparison_table(
         label_ht: Tên kỳ hiện tại
         key: Streamlit key
     """
-    # Inject CSS
-    _inject_card_css(
-        "#ffffff", "#ffffff", "#e5e7eb", "#1f2937",
-        "#6b7280", "#0ea5e9", "#0ea5e9", "#e0f2fe"
-    )
-    
+    _S_TH  = "padding:10px 14px;text-align:left;font-weight:600;font-size:0.85rem;background:#1e3a5f;color:#fff;"
+    _S_TH_R = "padding:10px 14px;text-align:right;font-weight:600;font-size:0.85rem;background:#1e3a5f;color:#fff;"
+    _S_TD  = "padding:9px 14px;border-bottom:1px solid #e5e7eb;font-size:0.9rem;"
+    _S_NUM = "padding:9px 14px;border-bottom:1px solid #e5e7eb;font-size:0.9rem;text-align:right;font-family:'SF Mono',monospace;font-weight:600;"
+    _S_DELTA = "padding:9px 14px;border-bottom:1px solid #e5e7eb;font-size:0.9rem;text-align:right;"
+    _S_RISK  = "background:rgba(220,38,38,0.06);"
+
     rows_html = []
     for row in rows:
         is_risk = row.get("is_risk", False)
-        row_class = "row-risk" if is_risk else ""
-        
+        risk_bg = _S_RISK if is_risk else ""
+
         value_bl = row["value_bl"]
         value_ht = row["value_ht"]
         unit = row.get("unit", "tien")
-        
-        # Format values
+
         if unit == "tien":
             fmt_bl, fmt_ht = fmt_ty(value_bl), fmt_ty(value_ht)
         elif unit == "so":
             fmt_bl, fmt_ht = fmt_so(int(value_bl)), fmt_so(int(value_ht))
-        else:  # pct
+        else:
             fmt_bl, fmt_ht = fmt_pct_vn(value_bl), fmt_pct_vn(value_ht)
-        
-        # Delta
+
         delta_val = value_ht - value_bl
         delta_pct = ((value_ht - value_bl) / abs(value_bl) * 100) if value_bl != 0 else 0
-        
-        arrow = "↑" if delta_val > 0 else "↓" if delta_val < 0 else "→"
-        arrow_class = "arrow-up" if delta_val > 0 else "arrow-down" if delta_val < 0 else ""
-        
-        delta_html = f'<span class="delta-arrow {arrow_class}">{arrow}</span> {abs(delta_pct):.1f}%'
-        
-        # Badge for risk indicators
+
+        arrow      = "↑" if delta_val > 0 else ("↓" if delta_val < 0 else "→")
+        arrow_color = "#16a34a" if delta_val > 0 else ("#dc2626" if delta_val < 0 else "#6b7280")
+        delta_html = f'<span style="font-weight:700;color:{arrow_color}">{arrow}</span> {abs(delta_pct):.1f}%'
+
         badge = ""
         if is_risk:
             if value_ht > value_bl:
-                badge = '<span class="badge badge-red">↑ Tăng</span>'
+                badge = '<span style="padding:2px 7px;border-radius:20px;font-size:0.72rem;font-weight:600;background:rgba(220,38,38,0.09);color:#dc2626;">↑ Tăng</span>'
             else:
-                badge = '<span class="badge badge-green">↓ Giảm</span>'
-        
-        rows_html.append(f"""
-        <tr class="{row_class}">
-            <td><b>{row['label']}</b> {badge}</td>
-            <td class="value-num">{fmt_bl}</td>
-            <td class="value-num"><b>{fmt_ht}</b></td>
-            <td>{delta_html}</td>
-        </tr>
-        """)
-    
-    html = f"""
-    <table class="compact-table">
-        <thead>
-            <tr>
-                <th>Chỉ tiêu</th>
-                <th>{label_bl}</th>
-                <th>{label_ht}</th>
-                <th>Δ %</th>
-            </tr>
-        </thead>
-        <tbody>
-            {''.join(rows_html)}
-        </tbody>
-    </table>
-    """
+                badge = '<span style="padding:2px 7px;border-radius:20px;font-size:0.72rem;font-weight:600;background:rgba(22,163,74,0.09);color:#16a34a;">↓ Giảm</span>'
+
+        rows_html.append(
+            f'<tr>'
+            f'<td style="{_S_TD}{risk_bg}"><b>{row["label"]}</b> {badge}</td>'
+            f'<td style="{_S_NUM}{risk_bg}">{fmt_bl}</td>'
+            f'<td style="{_S_NUM}{risk_bg}"><b>{fmt_ht}</b></td>'
+            f'<td style="{_S_DELTA}{risk_bg}">{delta_html}</td>'
+            f'</tr>'
+        )
+
+    html = (
+        '<div style="overflow-x:auto;border-radius:10px;border:1px solid #e5e7eb;'
+        'box-shadow:0 2px 8px -2px rgba(0,0,0,0.08);">'
+        '<table style="width:100%;border-collapse:collapse;font-size:0.9rem;">'
+        '<thead><tr>'
+        f'<th style="{_S_TH}">Chỉ tiêu</th>'
+        f'<th style="{_S_TH_R}">{label_bl}</th>'
+        f'<th style="{_S_TH_R}">{label_ht}</th>'
+        f'<th style="{_S_TH_R}">Δ %</th>'
+        '</tr></thead>'
+        f'<tbody>{"".join(rows_html)}</tbody>'
+        '</table></div>'
+    )
     st.markdown(html, unsafe_allow_html=True)
 
 

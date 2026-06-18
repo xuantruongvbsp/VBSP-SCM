@@ -18,6 +18,16 @@ from .constants import (
     CACHE_TTL,
 )
 
+DCTT_SHEET_ID = "1spkUfS3XE6D7j4pkXva5x7AhKCd5xb8XBpi0HUN6lwE"
+_DCTT_KEYWORDS = ("điều chỉnh", "tăng trưởng")
+
+
+def _is_dctt_col(cell: str) -> bool:
+    norm = str(cell).strip().lower()
+    if "điều chỉnh" in norm and "tăng trưởng" in norm:
+        return True
+    return norm in ("đctt", "dctt", "dc tt", "dc.tt", "đ/c tăng trưởng")
+
 logger = get_logger(__name__)
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
@@ -274,6 +284,141 @@ def doc_snapshot_truoc(
 
     candidates.sort(key=lambda x: x[0], reverse=True)
     return candidates[0][1]
+
+
+# ── Điều chỉnh tăng trưởng (DCTT) — tự động ──────────────────────────────────
+
+def _parse_so(val) -> float:
+    """Parse số từ GSheet định dạng VN (dấu chấm = ngàn, dấu phẩy = thập phân)."""
+    if val is None:
+        return 0.0
+    s = str(val).strip().replace(" ", "").replace("(", "-").replace(")", "")
+    if not s or s in ("0", "-"):
+        return 0.0
+    s = s.replace(".", "").replace(",", ".")
+    try:
+        return float(s)
+    except (ValueError, TypeError):
+        return 0.0
+
+
+@st.cache_data(ttl=CACHE_TTL)
+def doc_dieu_chinh_tu_dong(sheet_id: str) -> tuple[pd.DataFrame, list[str]]:
+    """Tự động quét tất cả tab, tìm cột 'Điều chỉnh tăng trưởng', trả về bảng PGD × Tab.
+
+    Dùng batch API (1 request) thay vì đọc từng tab riêng lẻ để tránh quota 429.
+    Returns: (df, skipped_tabs)
+    """
+    client = ket_noi_gsheet()
+    ss = client.open_by_key(sheet_id)
+    worksheets = ss.worksheets()
+
+    if not worksheets:
+        return pd.DataFrame(), []
+
+    # 1 request batch lấy toàn bộ dữ liệu (raw API → JSON chuẩn, không phụ thuộc gspread version)
+    ranges = [f"'{ws.title}'" for ws in worksheets]
+    resp = ss.client.request(
+        "get",
+        f"https://sheets.googleapis.com/v4/spreadsheets/{sheet_id}/values:batchGet",
+        params={"ranges": ranges},
+    )
+    # Sheets API trả về {"valueRanges": [{"range": "...", "values": [[...], ...]}, ...]}
+    # Tab rỗng có thể không xuất hiện → map theo tên range
+    raw_map: dict[str, list[list]] = {}
+    for vr in resp.json().get("valueRanges", []):
+        rng = vr.get("range", "")
+        tab_title = rng.split("!")[0].strip("'").strip()
+        raw_map[tab_title] = vr.get("values", [])
+
+    pgd_data: dict[str, dict[str, float]] = {}
+    pgd_order: list[str] = []
+    tab_names_found: list[str] = []
+    skipped: list[str] = []
+
+    for ws in worksheets:
+        ws_title_clean = ws.title.strip()
+        all_rows: list[list] = raw_map.get(ws_title_clean, raw_map.get(ws.title, []))
+        if not all_rows:
+            skipped.append(ws.title)
+            continue
+
+        # Tìm header row + tất cả cột DCTT (scan 50 hàng đầu)
+        header_idx: int | None = None
+        dctt_cols: list[int] = []
+
+        for i, row in enumerate(all_rows[:50]):
+            for j, cell in enumerate(row):
+                if _is_dctt_col(str(cell)):
+                    if header_idx is None:
+                        header_idx = i
+                    dctt_cols.append(j)
+
+        if not dctt_cols or header_idx is None:
+            skipped.append(ws.title)
+            continue
+
+        # Tìm cột STT và Tên trong vùng header (±2 hàng)
+        stt_col_idx = 0
+        name_col_idx = 1
+        scan_start = max(0, header_idx - 2)
+        scan_end = min(len(all_rows), header_idx + 3)
+        for i in range(scan_start, scan_end):
+            for j, cell in enumerate(all_rows[i]):
+                s = str(cell).strip().lower()
+                if s == "stt":
+                    stt_col_idx = j
+                elif any(kw in s for kw in ("tên phòng", "tên pgd", "đơn vị", "phường", "xã")):
+                    if j < dctt_cols[0]:
+                        name_col_idx = j
+
+        tab_names_found.append(ws.title)
+
+        # --- Đọc dữ liệu PGD ---
+        # Bước 1: thử cấu trúc phân cấp (STT La Mã = PGD header)
+        pgd_rows_found = 0
+        for row in all_rows[header_idx + 1:]:
+            if not any(str(c).strip() for c in row):
+                continue
+            stt = row[stt_col_idx] if len(row) > stt_col_idx else ""
+            name = str(row[name_col_idx]).strip() if len(row) > name_col_idx else ""
+            if not la_pgd_header(stt) or not name or la_dong_tong_cong(name):
+                continue
+            total = sum(_parse_so(row[ci]) for ci in dctt_cols if len(row) > ci)
+            if name not in pgd_data:
+                pgd_data[name] = {}
+                pgd_order.append(name)
+            pgd_data[name][ws.title] = total
+            pgd_rows_found += 1
+
+        # Bước 2: fallback — cấu trúc phẳng (mọi dòng đều là PGD, không có STT La Mã)
+        if pgd_rows_found == 0:
+            for row in all_rows[header_idx + 1:]:
+                if not any(str(c).strip() for c in row):
+                    continue
+                name = str(row[name_col_idx]).strip() if len(row) > name_col_idx else ""
+                if not name or la_dong_tong_cong(name):
+                    continue
+                total = sum(_parse_so(row[ci]) for ci in dctt_cols if len(row) > ci)
+                if total == 0:
+                    continue
+                if name not in pgd_data:
+                    pgd_data[name] = {}
+                    pgd_order.append(name)
+                pgd_data[name][ws.title] = total
+
+    if not pgd_data:
+        return pd.DataFrame(), skipped
+
+    rows = []
+    for pgd in pgd_order:
+        row_d: dict = {"Đơn vị": pgd}
+        for tn in tab_names_found:
+            row_d[tn] = pgd_data[pgd].get(tn, 0.0)
+        row_d["Tổng"] = sum(pgd_data[pgd].get(tn, 0.0) for tn in tab_names_found)
+        rows.append(row_d)
+
+    return pd.DataFrame(rows), skipped
 
 
 def cleanup_snapshots_cu(so_ngay_giu: int = 90) -> int:

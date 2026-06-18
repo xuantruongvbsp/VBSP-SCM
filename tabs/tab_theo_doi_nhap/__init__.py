@@ -27,8 +27,26 @@ from .ui_overview import render_tong_quan
 from .ui_detail import render_chi_tiet
 from .ui_settings import render_cai_dat
 from .ui_guide import render_huong_dan
+from .ui_dieu_chinh import render_dieu_chinh_tang_truong
 
 logger = get_logger(__name__)
+
+
+def _deadline_badge(cfg: dict) -> str:
+    from datetime import date as _date
+    dl = cfg.get("deadline", "")
+    if not dl:
+        return ""
+    try:
+        d = _date.fromisoformat(dl)
+        days = (d - _date.today()).days
+        if days < 0:
+            return f" 🔴 QH {abs(days)}d"
+        if days <= 3:
+            return f" 🟡 còn {days}d"
+        return f" 📅 {d.strftime('%d/%m')}"
+    except Exception:
+        return ""
 
 
 def _kiem_tra_ket_noi() -> tuple[bool, str]:
@@ -63,10 +81,11 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
 
         # ── Chọn sheet — "Khảo sát HN/HCN/HTN" luôn là option đầu tiên ─────
         sheet_labels = [
-            cfg.get("ten_hien_thi") or cfg.get("sheet_tab", f"Sheet {i+1}")
+            (cfg.get("ten_hien_thi") or cfg.get("sheet_tab", f"Sheet {i+1}"))
+            + _deadline_badge(cfg)
             for i, cfg in enumerate(ds_sheet)
         ]
-        all_labels = ["🏠 Khảo sát HN/HCN/HTN"] + sheet_labels
+        all_labels = ["🏠 Khảo sát HN/HCN/HTN", "📈 Điều chỉnh tăng trưởng"] + sheet_labels
 
         col_sel, col_ref = st.columns([5, 1])
         with col_sel:
@@ -95,7 +114,12 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                     render_cai_dat(ds_sheet, username)
             return
 
-        # ── Nhánh sheet thông thường (offset -1 vì index 0 là khảo sát) ────
+        # ── Nhánh Điều chỉnh tăng trưởng ──────────────────────────────────
+        if idx == 1:
+            render_dieu_chinh_tang_truong(username=username)
+            return
+
+        # ── Nhánh sheet thông thường (offset -2 vì có 2 mục tĩnh đầu) ────
         # Cleanup stale session_state keys
         n_sheets = len(ds_sheet)
         for i in range(n_sheets, n_sheets + 50):
@@ -115,9 +139,10 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
         if not ds_sheet:
             st.info("⚙️ Chưa có sheet nào. Vào tab **⚙️ Cài đặt** để thêm.")
         else:
-            cfg_sel = ds_sheet[idx - 1]
+            cfg_sel = ds_sheet[idx - 2]
             ten_sheet = all_labels[idx]
             ds_ct = cfg_sel.get("ds_chuong_trinh", [])
+            deadline_str = cfg_sel.get("deadline", "")
 
             sheet_id = cfg_sel.get("sheet_id", "").strip()
             sheet_tab = cfg_sel.get("sheet_tab", "")
@@ -177,6 +202,7 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                 sheet_id=sheet_id,
                 sheet_tab=sheet_tab,
                 username=username,
+                deadline=deadline_str,
             )
 
         with t1:

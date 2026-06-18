@@ -885,6 +885,7 @@ def _build_all_items(role: str, username: str, **kwargs) -> list:
         {"group": "Giám sát",     "label": "📊 So sánh kỳ",            "icon": "chart-line", "fn": lambda: _get_tab("tab_so_sanh_ky").render(None, **kwargs)},
         {"group": "Giám sát",     "label": "🔴 NQH tăng đột biến",    "icon": "trending-up",  "fn": lambda: _render_nqh_tang_dot_bien()},
         {"group": "Giám sát",     "label": "🛡️ Chất lượng Dữ liệu",  "icon": "shield-check", "fn": lambda: _get_tab("tab_data_quality").render(None, **kwargs)},
+        {"group": "Giám sát",     "label": "🏠 Phân kỳ NXH",          "icon": "home",         "fn": lambda: _get_tab("tab_phan_ky_nxh").render(None, **kwargs)},
         {"group": "Kiểm soát",     "label": "Kiểm soát nội bộ",    "icon": "search",         "fn": lambda: _get_tab("tab_kiem_soat").render_tab(df_full, role, kwargs.get("username", "unknown"))},
         {"group": "Kiểm soát",     "label": "🔍 Kiểm toán Nội bộ (KTNB)", "icon": "file-search", "fn": lambda: _get_tab("tab_ktnb").render(None, **kwargs)},
         {"group": "Kiểm soát",     "label": "Xử lý Rủi ro",   "icon": "alert-circle",   "fn": lambda: _get_tab("tab_xu_ly_rui_ro").render(None, **kwargs)},

@@ -3,6 +3,7 @@
 KV_LIST_KEY = "gsheet_theo_doi_nhap_list"
 KV_LEGACY_KEY = "gsheet_theo_doi_nhap_config"
 KV_SNAPSHOT_PREFIX = "tdn_snapshot_"
+KV_DCTT_CONFIG_KEY = "tdn_dctt_config"
 
 DEFAULT_CT = [
     {"ten": "HSSV", "col": 4},

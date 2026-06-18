@@ -294,6 +294,32 @@ def doc_snapshot_multi(ky_list: tuple) -> pd.DataFrame:
         return pd.DataFrame()
 
 
+@st.cache_data(ttl=300, show_spinner=False)
+def doc_snapshot_nvdp_range(tu_ky: str, den_ky: str) -> pd.DataFrame:
+    """TW vs ĐP breakdown qua nhiều kỳ — dùng cho tab Nguồn vốn địa phương.
+
+    Trả về DataFrame cột: ky, nguon_von ('1'|'2'), tong_du_no
+    Sort by ky ASC. Aggregate từ tất cả PGD (bỏ qua dòng __CN__ và ALL).
+    """
+    try:
+        with db.get_conn() as conn:
+            rows = conn.execute(
+                """SELECT ky, nguon_von, SUM(tong_du_no) AS tong_du_no
+                   FROM hstd_snapshot
+                   WHERE nguon_von IN ('1', '2')
+                     AND ma_ct != 'ALL'
+                     AND ten_pgd != '__CN__'
+                     AND ky BETWEEN ? AND ?
+                   GROUP BY ky, nguon_von
+                   ORDER BY ky ASC""",
+                (tu_ky, den_ky),
+            ).fetchall()
+        return pd.DataFrame([dict(r) for r in rows]) if rows else pd.DataFrame()
+    except Exception as e:
+        logger.error("doc_snapshot_nvdp_range: lỗi — %s", e, exc_info=True)
+        return pd.DataFrame()
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # NQ11 SNAPSHOT
 # ─────────────────────────────────────────────────────────────────────────────
@@ -361,6 +387,9 @@ def luu_nq11_snapshot(df_nq11: pd.DataFrame, username: str, ky: str | None = Non
         df[COT_NQ11_MA_KH] = ""
 
     gn_col = COT_NQ11_SO_TIEN_GN if COT_NQ11_SO_TIEN_GN in df.columns else None
+
+    # Chỉ giữ dòng còn dư nợ — so_kh phản ánh KH đang nợ thực, không đếm đã tất toán
+    df = df[df[COT_DNO_NQ11] > 0].copy()
 
     def _agg_nq11(grp_df, pgd_val):
         return (

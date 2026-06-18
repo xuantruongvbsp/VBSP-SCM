@@ -202,6 +202,14 @@ def luu_so_khe_uoc_nq11(file_bytes: bytes, username: str) -> tuple[int, str | No
         )
         if ku_col is None:
             return 0, "Không tìm thấy cột 'Số khế ước' trong file."
+        # Chỉ lấy KU có DNO NQ11 > 0 — tránh đánh badge nhầm cho khoản đã tất toán
+        dno_col = next(
+            (c for c in df.columns if "dno nq11" in str(c).lower()),
+            None,
+        )
+        if dno_col:
+            _dno = pd.to_numeric(df[dno_col], errors="coerce").fillna(0)
+            df = df[_dno > 0]
         ids = [
             x for x in df[ku_col].dropna().astype(str).str.strip().tolist()
             if x and x.lower() != "nan"

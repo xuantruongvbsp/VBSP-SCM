@@ -1,5 +1,144 @@
 # CHANGELOG
 
+## [2026-06-18] — Telegram: 6 tính năng mới (2-way, T-7/T-3/T-1, lịch, giải ngân, per-PGD, khoanh)
+- `scripts/telegram_polling.py` (mới) — bot 2 chiều: lệnh `/help /sl /nqh /khtd /dh /gn /pgd <tên>`, chạy mỗi phút qua Task Scheduler
+- `services/telegram_service.py` — thêm `luu_pgd_chat()`, `gui_tin_pgd()` (routing per-PGD), `gui_nhac_den_han_phan_tang()`, `gui_nhac_lich_cong_tac()`, `gui_giai_ngan_tuan()`, `gui_canh_bao_khoanh_tang()`
+- `scripts/nhac_deadline.py` — thêm `_nhac_den_han_phan_tang()` (T-1/T-3/T-7), `_nhac_lich_cong_tac()` (chỉ chạy 14:00)
+- `scripts/daily_report.py` — thêm `_giai_ngan_tuan()` (Thứ Sáu), `_canh_bao_khoanh_tang()` (hàng ngày)
+- `tabs/tab_telegram_admin.py` — thêm 4 entry `_NOTIFY_META` + 4 handler + UI cấu hình chat riêng từng PGD
+- `scripts/setup_task_scheduler.ps1` — thêm task `VBSP-TelegramPolling` lặp 1 phút/lần
+
+## [2026-06-18] — Xuất lịch làm việc tuần theo 2 mẫu Word
+- `services/khnv_lich_tuan_service.py` — thêm `xuat_lich_bang_tuan()`: A4 Landscape bảng Thời gian × Cán bộ, tự điền từ KHNV_LICH + KHNV_PHAN_CONG
+- `tabs/tab_khnv_noi_bo.py` dòng ~1213 — thêm nút "📋 Sinh bảng lịch làm việc tuần" (Mẫu 1 bảng) bên cạnh nút Mẫu 2 văn bản tự sự hiện có
+
+## [2026-06-18] — Telegram: 3 báo cáo mới (NQH tuần, KHTD chương trình, tổng kết tháng)
+- `services/telegram_service.py` — thêm `gui_bao_cao_nqh_tuan()`, `gui_khtd_theo_chuong_trinh()`, `gui_tong_ket_thang()`
+- `tabs/tab_telegram_admin.py` — thêm 3 entry trong `_NOTIFY_META` + 3 handler trong `_gui_ngay()` (nqh_tuan, khtd_ct, tong_ket_thang)
+- `scripts/daily_report.py` — thêm `_bao_cao_nqh_tuan()`, `_bao_cao_khtd_theo_ct()`, `_tong_ket_thang()` + gọi có điều kiện (Thứ Hai / mỗi ngày / ngày 25–31)
+
+## [2026-06-18] — Fix quyền xóa nhiệm vụ cho manager_cn
+- `tabs/tab_khnv_noi_bo.py` dòng ~245, ~953 — mở rộng `co_quyen_xoa` sang `manager_cn` (trước chỉ `admin_cn`); áp dụng cho cả task card phân công và lịch công tác
+
+## [2026-06-18] — Xuất Tờ trình BGĐ Word từ KHTD
+- `tabs/tab_khtd_xuat.py` — thêm `xuat_to_trinh_bgd_word()`: tạo file .docx chuẩn hành chính tổng hợp KHTD vs thực hiện (bảng theo chương trình + bảng theo PGD + khối chữ ký); thêm nút "📄 Tạo Tờ trình Word" và nút tải về ở cuối `render_xuat_baocao()`
+
+## [2026-06-18] — Telegram: tự nhận báo cáo PGD từ GSheet và nhắc deadline tự động
+- `services/telegram_service.py` — thêm `gui_thong_bao_nop_moi_gsheet()` thông báo submission mới từ Google Form
+- `tabs/tab_tien_do_nop.py` — thêm `doc_du_lieu_gsheet()` (đọc GSheet không cache) và `lay_pgd_chua_nop()` (trả ds PGD chưa nộp + deadline) — dùng cho Streamlit context
+- `scripts/nhac_deadline.py` — thêm `_thong_bao_nop_moi_gsheet()` (detect submission mới so với lần chạy trước, không cần streamlit); gọi trong `nhac()` sau khi nhắc deadline
+- `tabs/tab_telegram_admin.py` — thêm loại thông báo `📋 PGD nộp BC mới (GSheet)` vào `_NOTIFY_META`; sửa `_gui_ngay("deadline_bc")` dùng GSheet thực; thêm `_gui_ngay("nop_moi_gsheet")`; fix `_gui_ngay("khtd_tien_do")` tính thực tế từ khtd_cn + parquet
+- `scripts/setup_task_scheduler.ps1` — script PowerShell cài đặt Task Scheduler: VBSP-DailyReport (07:30) + VBSP-NhacDeadline (08:00 và 14:00)
+
+## [2026-06-18] — Thêm xác nhận trước khi xóa sheet theo dõi nhập liệu
+- `tabs/tab_theo_doi_nhap/ui_settings.py` dòng ~473 — nút "🗑 Xóa" dùng `st.popover` yêu cầu xác nhận thay vì xóa thẳng
+
+## [2026-06-18] — fix: đánh dấu thủ công không hiển thị loại BC mới từ GSheet
+- `tabs/tab_tien_do_nop.py` dòng ~403 — `ds_loai_manual` = union deadline_cfg + GSheet data, dùng cho selectbox "Loại BC" trong phần ✏️ Đánh dấu thủ công (trước đó chỉ dùng deadline_cfg nên thiếu loại BC mới chưa cài deadline)
+
+## [2026-06-17] — tab_tien_do_nop: thêm form nhập tay loại BC + nút xóa tất cả deadline
+- `tabs/tab_tien_do_nop.py` `_render_cai_dat()` — thêm expander "➕ Thêm loại báo cáo mới" để nhập tay tên loại BC mà không cần chờ submission đầu tiên; thêm nút "🗑 Xóa tất cả deadline" với confirm popover
+
+## [2026-06-18] — DCTT: fix chỉ hiện 1/4 tab, 3 tab còn lại bị bỏ qua
+- `tabs/tab_theo_doi_nhap/data.py` — thêm `_is_dctt_col()` linh hoạt hơn (viết tắt đctt/dctt); tăng scan 25→50 hàng; fallback cấu trúc phẳng (STT số thường) khi không tìm thấy STT La Mã; title lookup thêm `.strip()`
+
+## [2026-06-17] — DCTT: fix 'str' has no attribute 'get' khi batch fetch GSheet
+- `tabs/tab_theo_doi_nhap/data.py` dòng ~314 — thay `ss.values_batch_get()` bằng `ss.client.request()` gọi thẳng Sheets REST API (tránh gspread version mismatch với ValueRange); map kết quả theo tên range thay vì index để xử lý tab rỗng đúng
+
+## [2026-06-17] — DCTT: viết lại tự động quét (bỏ config thủ công)
+- `tabs/tab_theo_doi_nhap/data.py` — thêm `DCTT_SHEET_ID`, `doc_dieu_chinh_tu_dong()` tự động scan header + cột DCTT từ tất cả tab; xóa `doc_dctt_config/luu_dctt_config/doc_dieu_chinh_tang_truong`
+- `tabs/tab_theo_doi_nhap/ui_dieu_chinh.py` — viết lại gọn: gọi `doc_dieu_chinh_tu_dong`, không cần config
+- `tabs/tab_theo_doi_nhap/ui_settings.py` — xóa `_render_dctt_settings` và expander DCTT
+- `tabs/tab_theo_doi_nhap/__init__.py` — xóa settings expander khỏi nhánh idx==1
+
+## [2026-06-17] — Tích hợp theo dõi Điều chỉnh tăng trưởng từ GSheet
+- `tabs/tab_theo_doi_nhap/constants.py` — thêm `KV_DCTT_CONFIG_KEY`
+- `tabs/tab_theo_doi_nhap/data.py` — thêm `_parse_so()`, `doc_dctt_config()`, `luu_dctt_config()`, `doc_dieu_chinh_tang_truong()` (cached, đọc PGD-level DCTT từ nhiều tab GSheet)
+- `tabs/tab_theo_doi_nhap/ui_dieu_chinh.py` — file mới: bảng DCTT màu +/−, KPI cards, export Excel
+- `tabs/tab_theo_doi_nhap/ui_settings.py` — thêm `_render_dctt_settings()` và expander "📈 Điều chỉnh tăng trưởng" trong `render_cai_dat()`
+- `tabs/tab_theo_doi_nhap/__init__.py` — thêm "📈 Điều chỉnh tăng trưởng" vào all_labels[1], nhánh idx==1, fix offset idx-2 cho normal sheets
+
+## [2026-06-17] — Hoàn thiện deadline trong Tab Theo dõi Nhập liệu
+- `tabs/tab_theo_doi_nhap/ui_overview.py` — thêm `_render_deadline_banner()` hiển thị banner cảnh báo màu theo trạng thái (quá hạn/hôm nay/sắp đến/còn xa); thêm param `deadline: str = ""` vào `render_tong_quan()`
+- `tabs/tab_theo_doi_nhap/__init__.py` — thêm `_deadline_badge()` hiển thị badge ngày/màu trong sheet selector dropdown; đọc `deadline_str` từ `cfg_sel`; truyền `deadline=deadline_str` vào `render_tong_quan()`
+- `tabs/tab_theo_doi_nhap/ui_settings.py` — xóa deadline field khỏi `_render_form_sheet()` (tránh trùng lặp với expander riêng); khi save form giữ lại `old_deadline` qua merge dict
+
+## [2026-06-17] — Fix HTML hiện thô trong render_compact_comparison_table
+- `tabs/tab_so_sanh_ky/_kpi_cards.py` dòng ~430 — chuyển `render_compact_comparison_table` từ CSS classes sang inline styles; bỏ `_inject_card_css`; wrap table trong `<div>`; giải quyết bug HTML hiển thị dạng text trong Streamlit columns
+
+## [2026-06-17] — Thiết kế lại Telegram Bot Admin: 3 sub-tab, 10 loại, multi-chat, schedule
+- `tabs/tab_telegram_admin.py` — viết lại hoàn toàn: 3 sub-tab (Cấu hình / Thông báo / Lịch sử); phân quyền chỉ admin_cn + manager_cn; bảng 10 loại thông báo với toggle + giờ gửi + badge chat phụ + nút "▶ Gửi ngay"; cấu hình chat_id phụ per loại; lưu `telegram_schedule_config`
+- `services/telegram_service.py` — thêm `_gui_tin_for()` (hỗ trợ extra_chats), `luu_extra_chat()`, fix `luu_config()` preserve extra_chats; thêm 4 hàm: `gui_thong_bao_upload_pgd`, `gui_khtd_tien_do`, `gui_canh_bao_qh_moi`, `gui_canh_bao_he_thong`; cập nhật tất cả `gui_*` dùng `_gui_tin_for`
+- `services/upload_service.py` — hook `gui_thong_bao_upload_pgd()` sau upload PGD thành công
+- `scripts/daily_report.py` — thêm `_trong_gio_gui()` kiểm tra cửa sổ ±15 phút, thêm `_canh_bao_qh_moi()` so snapshot NQH
+
+## [2026-06-17] — NXH: phân công cán bộ lọc theo PGD từ dữ liệu upload
+- `tabs/tab_phan_ky_nxh.py` — expander phân công cán bộ: thêm selectbox chọn PGD (lấy từ dữ liệu upload), hiển thị xã/phường của PGD đó, thêm tóm tắt số xã đã có cán bộ; bỏ lưới hiển thị tất cả xã toàn file
+
+## [2026-06-16] — Tab Nguồn vốn địa phương: cải thiện toàn diện
+- `tabs/tab_hhi.py` — thay `st.metric` × 4 bằng `kpi_row()` với delta so kỳ snapshot; thêm filter PGD drill-down ở CN mode; thêm trend chart TW/ĐP theo kỳ; fix dark mode (transparent bg cho tất cả Plotly chart); fix widget key `nvdp_sub_pgd`/`nvdp_sub_cn`; thêm `kp` prefix cho sub-tab widget
+- `snapshot_service.py` dòng ~296 — thêm `doc_snapshot_nvdp_range(tu_ky, den_ky)` trả về TW/ĐP breakdown qua nhiều kỳ
+
+## [2026-06-16] — Telegram NXH: tách 2 tin nhắn riêng đủ/không đủ số dư
+- `services/telegram_service.py` — tách `gui_nhac_phan_ky_nxh()` gửi 2 tin nhắn độc lập: tin 1 ✅ đủ số dư, tin 2 ❌ chưa đủ số dư; mỗi nhóm tự chia chunk nếu dài, bỏ qua nếu nhóm rỗng
+
+## [2026-06-16] — Telegram NXH: nhóm theo xã + cán bộ phụ trách
+- `tabs/tab_phan_ky_nxh.py` — thêm expander "Phân công Cán bộ theo Xã/Phường": giao diện nhập tên CB cho từng xã, lưu vào kv_store key `nxh_can_bo_xa`
+- `services/telegram_service.py` — đọc `nxh_can_bo_xa`, nhóm KH theo xã trong mỗi nhóm đủ/không đủ, hiển thị header "📍 Tên xã — CB: Tên cán bộ (N khoản)"
+
+## [2026-06-16] — Telegram NXH: SĐT dạng link nhấn gọi, thiếu tính gốc+lãi
+- `services/telegram_service.py` — thêm `_fmt_sdt()`: chuẩn hoá SĐT 10 số, bọc `<a href="tel:...">` để nhấn gọi trong Telegram / copy sang Zalo; sửa con_thieu = dư nợ + lãi tồn − TK; điều kiện chia nhóm dùng tổng gốc+lãi
+
+## [2026-06-16] — Telegram NXH: thêm lãi tồn và dòng chú thích lãi phát sinh
+- `data/phan_ky_nxh.py` — thêm "Lãi tồn" vào `_COT_GIU` và danh sách ép kiểu số (có hiệu lực sau lần upload lại)
+- `scripts/daily_report.py` — thêm field `lai_ton` vào dict item
+- `services/telegram_service.py` `_dong_kh()` — hiện "Lãi tồn: X tr" nếu > 0; thêm dòng cuối "(*) Lãi phát sinh theo dư nợ"
+
+## [2026-06-16] — Cảnh báo NQH: bỏ lọc Hội sở Chi nhánh tỉnh
+- `tabs/tab_canh_bao_nqh.py` dòng ~1091 — bỏ điều kiện lọc `!= "Hội sở Chi nhánh tỉnh"` trong `_render_nqh_so_sanh_ky()`, vì đây là 1 trong 22 đơn vị nên phải xuất hiện trong bảng so sánh NQH
+
+## [2026-06-16] — Telegram NXH: chia 2 nhóm đủ/không đủ số dư, lọc sau ngày dữ liệu
+- `services/telegram_service.py` `gui_nhac_phan_ky_nxh()` — thêm param `ngay_du_lieu`; chia 2 nhóm ✅ đủ / ❌ không đủ dựa trên Tổng TG,TK vs Dư nợ; nhóm không đủ hiện "TK: X tr, thiếu Y tr" và câu "Tính đến ngày..., chưa đủ số dư để thanh toán nợ"
+- `scripts/daily_report.py` `_nhac_phan_ky_nxh()` — filter `>= today` (bỏ khoản đã qua), thêm field `tong_tgk`, truyền `ngay_du_lieu` vào service
+
+## [2026-06-16] — Telegram NXH: gửi toàn bộ danh sách KH, tự chia nhiều tin
+- `services/telegram_service.py` hàm `gui_nhac_phan_ky_nxh()` — bỏ giới hạn 12 dòng; tự chia chunk ≤ 3800 ký tự, gửi nhiều tin liên tiếp nếu cần; đánh số "(1/N)" trên header mỗi phần
+
+## [2026-06-16] — Fix Telegram bot: format số, checkbox rác, hardcode màu
+- `scripts/daily_report.py` dòng ~303 — thêm `_vn()` helper format số VN (`.` ngàn, `,` thập phân); fix format `tong_du_no`/`tong_qh` tránh double-dot khi giá trị ≥ 1.000 tỷ
+- `tabs/tab_telegram_admin.py` dòng ~16 — xóa checkbox `nhap_lieu` ("Nhắc nhập liệu GSheet") chưa có hàm gửi tương ứng trong `telegram_service.py`
+- `tabs/tab_telegram_admin.py` dòng ~125 — xóa `_color()` highlight `#ffeaea` hardcode (vi phạm dark mode rule 5.9); bảng lịch sử gửi dùng `st.dataframe` thuần
+
+## [2026-06-16] — Fix 3 bug bảng so sánh mốc năm (Mục so sánh kỳ)
+- `tabs/tab_so_sanh_ky/_kpi_cards.py` — CSS: thay hardcoded `background:white/color:#1f2937` bằng CSS variables (`var(--surface)`, `var(--text-head)`, `var(--red-bg)`...) để tương thích dark mode; fix selector `.row-risk td` thay vì `.row-risk` (background trên `<tr>` không render đúng cross-browser)
+- `tabs/tab_so_sanh_ky/render_moc_nam.py` dòng ~422 — thêm dòng **Tổng dư nợ** vào đầu bảng compact so sánh (trước đó bị thiếu)
+- `tabs/tab_so_sanh_ky/render_moc_nam.py` dòng ~280 — fix data scope: khi `pgd_mode=True` mà baseline thiếu cột `Tên PGD` → hiện warning thay vì so sánh nhầm toàn CN với 1 PGD
+
+## [2026-06-16] — Fix Telegram bot: import db thiếu, bổ sung ghi_chu vào tin NXH
+- `scripts/daily_report.py` dòng 24 — thêm `import db` top-level (trước đó chỉ import trong `_build_khtd_sheet()` → `NameError` khi gửi Telegram báo cáo sáng, bị nuốt trong try/except)
+- `scripts/daily_report.py` dòng ~462 — `_nhac_phan_ky_nxh()`: thêm `ten_to_truong` và `ghi_chu` vào dict truyền vào `gui_nhac_phan_ky_nxh()`
+- `services/telegram_service.py` dòng ~172 — `gui_nhac_phan_ky_nxh()`: hiển thị số cảnh báo TK không đủ trong header, đánh dấu ⚠️ từng khoản có ghi chú
+
+## [2026-06-16] — Fix phân kỳ NXH: bug header sai, bổ sung cột, cải thiện UI
+- `data/phan_ky_nxh.py` — `luu_phan_ky_nxh()`: sửa `header=4` (file sao kê NHCSXH TW có 4 dòng tiêu đề trước header thực), thêm cột `Tên tổ trưởng`, `Tổng TG, TK`, `Ghi chú` vào `_COT_GIU`, fix `fillna("").astype(str).str.strip()` thay cho `replace("nan","")`
+- `tabs/tab_phan_ky_nxh.py` — thêm bộ lọc tháng (hiện tại/3T/6T/tất cả), hiển thị cột Tên xã/Tổ trưởng/Tổng TG,TK/Ghi chú, metric ⚠️ số khoản có cảnh báo tiết kiệm không đủ
+
+## [2026-06-15] — Fix snapshot NQ11: so_kh bị tính dư KH đã tất toán
+- `snapshot_service.py` dòng ~363 — `luu_nq11_snapshot()`: thêm filter `DNO NQ11 > 0` trước groupby — so_kh giờ chỉ đếm KH đang còn dư nợ thực (trước đó đếm toàn bộ 172K dòng kể cả tất toán)
+
+## [2026-06-15] — Fix badge NQ11 hiện sai trên 52% khách hàng
+- `data/hstd.py` dòng ~205 — `luu_so_khe_uoc_nq11()`: thêm filter `DNO NQ11 > 0` trước khi lưu KU vào kv_store (trước đó lưu toàn bộ 172K KU, kể cả khoản đã tất toán)
+- `app.py` dòng ~177 — `_enrich_hstd()` fallback path: thêm filter `DNO NQ11 > 0` khi đọc từ parquet cũ
+- kv_store `nq11_so_khe_uoc`: tự động fix từ parquet hiện có — giảm từ 0 (rỗng → toàn bộ fallback) → 8.989 KU thực sự có dư nợ NQ11
+
+## [2026-06-15] — Tính năng Phân kỳ NXH: Upload + Telegram tự động theo tháng
+- `data/phan_ky_nxh.py` — tạo mới: module lưu/đọc parquet phân kỳ NXH (158K dòng → 8 cột cần thiết)
+- `tabs/tab_phan_ky_nxh.py` — tạo mới: UI upload Excel + xem danh sách khoản đến hạn tháng hiện tại theo PGD
+- `services/telegram_service.py` — thêm `gui_nhac_phan_ky_nxh()`: 1 tin/PGD, max 12 khoản/tin
+- `tabs/tab_telegram_admin.py` — thêm toggle `phan_ky_nxh` vào `_NOTIFY_ITEMS`
+- `scripts/daily_report.py` — thêm `_nhac_phan_ky_nxh()` + gọi mỗi sáng sau `gui_nhac_khoang_den_han()`
+- `workspaces/ws_management.py` — mount tab "🏠 Phân kỳ NXH" vào group "Giám sát"
+
 ## [2026-06-15] — Fix card tra cứu hiện HTML thô
 - `components/result_card.py` dòng ~194 — đổi `ctx.markdown(unsafe_allow_html=True)` → `st.html()` để bypass Markdown parser; blank lines trong HTML template khiến CommonMark kết thúc HTML block sớm → Info Grid/Footer bị render thành code block
 

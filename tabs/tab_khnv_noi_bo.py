@@ -242,7 +242,7 @@ def _render_task_card(cv: dict, ds: list, today: date,
     k = cv["id"]
     trang_thai = cv.get("trang_thai", "chua_lam")
     co_quyen_ghi = role_n in ("admin_cn", "manager_cn")
-    co_quyen_xoa = role_n == "admin_cn"
+    co_quyen_xoa = role_n in ("admin_cn", "manager_cn")
 
     deadline_str = cv.get("ngay_deadline", "")
     try:
@@ -950,7 +950,7 @@ def _html_lich_ban(ds_loc: list, thang: int, nam: int) -> str:
 def _render_lich_cong_tac(tab, role_n: str, username: str):
     """Quản lý lịch họp / kiểm tra / công tác / tập huấn."""
     co_quyen_ghi = role_n in ("admin_cn", "manager_cn")
-    co_quyen_xoa = role_n == "admin_cn"
+    co_quyen_xoa = role_n in ("admin_cn", "manager_cn")
 
     ds = _doc_ds(KHNV_LICH)
     today = date.today()
@@ -1210,6 +1210,7 @@ def _render_lich_cong_tac(tab, role_n: str, username: str):
                 key=f"lich_tuan_{key}",
             )
 
+    st.markdown("**Mẫu 2 — Lịch công tác (văn bản tự sự):**")
     col_x, col_p = st.columns([2, 1])
     with col_x:
         if st.button("📥 Sinh file Word Lịch công tác", type="primary",
@@ -1227,7 +1228,7 @@ def _render_lich_cong_tac(tab, role_n: str, username: str):
                     fname = f"Lich_Cong_Tac_Tuan_{tu_ngay.strftime('%d%m')}_{den_ngay.strftime('%d%m%Y')}.docx"
                     st.session_state["_lich_tuan_docx"] = doc_bytes
                     st.session_state["_lich_tuan_fname"] = fname
-                    st.success(f"✅ Đã tạo Lịch công tác tuần!")
+                    st.success("✅ Đã tạo Lịch công tác tuần!")
             except Exception as e:
                 logger.error("Lỗi sinh lịch tuần: %s", e, exc_info=True)
                 st.error(f"❌ Lỗi: {e}")
@@ -1239,6 +1240,48 @@ def _render_lich_cong_tac(tab, role_n: str, username: str):
             file_name=st.session_state.get("_lich_tuan_fname", "lich_cong_tac.docx"),
             mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
             key="dl_lich_tuan",
+            use_container_width=True,
+        )
+
+    st.divider()
+    st.markdown("**Mẫu 1 — Bảng lịch làm việc theo ngày/người (A4 Landscape):**")
+    st.caption("Tự động điền từ Lịch công tác + Phân công trong tuần đã chọn")
+
+    col_bang, _ = st.columns([2, 1])
+    with col_bang:
+        if st.button("📋 Sinh bảng lịch làm việc tuần", type="secondary",
+                     use_container_width=True, key="btn_bang_lich"):
+            try:
+                if tu_ngay >= den_ngay:
+                    st.error("❌ Ngày bắt đầu phải trước ngày kết thúc.")
+                else:
+                    from services.khnv_lich_tuan_service import xuat_lich_bang_tuan
+                    can_bo = _doc_ds(KHNV_CAN_BO)
+                    ds_lich_full = _doc_ds(KHNV_LICH)
+                    ds_pc = _doc_ds(KHNV_PHAN_CONG)
+                    bang_bytes = xuat_lich_bang_tuan(
+                        tu_ngay=tu_ngay,
+                        den_ngay=den_ngay,
+                        ds_lich=ds_lich_full,
+                        ds_phan_cong=ds_pc,
+                        can_bo_list=can_bo if can_bo else None,
+                        ten_truong_phong=ten_tp.strip(),
+                    )
+                    bfname = f"Bang_Lich_Tuan_{tu_ngay.strftime('%d%m')}_{den_ngay.strftime('%d%m%Y')}.docx"
+                    st.session_state["_bang_lich_docx"] = bang_bytes
+                    st.session_state["_bang_lich_fname"] = bfname
+                    st.success("✅ Đã tạo bảng lịch làm việc tuần!")
+            except Exception as e:
+                logger.error("Lỗi sinh bảng lịch: %s", e, exc_info=True)
+                st.error(f"❌ Lỗi: {e}")
+
+    if "_bang_lich_docx" in st.session_state:
+        st.download_button(
+            f"⬇️ Tải {st.session_state.get('_bang_lich_fname', 'bang_lich.docx')}",
+            data=st.session_state["_bang_lich_docx"],
+            file_name=st.session_state.get("_bang_lich_fname", "bang_lich.docx"),
+            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            key="dl_bang_lich",
             use_container_width=True,
         )
 

@@ -20,6 +20,7 @@ from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 
+import db
 from data.core import _duckdb_query
 from config import (
     CACHE_HSTD,
@@ -239,7 +240,6 @@ def _build_khtd_sheet(wb: Workbook):
     """Sheet 4: KHTD tiến độ."""
     ws = wb.create_sheet("KHTD tiến độ")
 
-    import db
     data = db.doc_kv("khtd_cn")
     if not data:
         ws.cell(row=1, column=1, value="⚠️ Chưa nhập KHTD Chi nhánh")
@@ -300,6 +300,29 @@ def _build_bia_sheet(wb: Workbook):
     ws.column_dimensions["E"].width = 15
 
 
+def _vn(x: float, decimals: int = 0) -> str:
+    """Format số kiểu Việt Nam: dấu . ngàn, dấu , thập phân."""
+    s = f"{x:,.{decimals}f}"
+    return s.replace(",", "\x00").replace(".", ",").replace("\x00", ".")
+
+
+def _trong_gio_gui(key: str) -> bool:
+    """Kiểm tra giờ hiện tại có nằm trong cửa sổ ±15 phút so với giờ đã cấu hình không.
+    Trả True nếu chưa cấu hình hoặc đang trong cửa sổ gửi.
+    """
+    try:
+        cfg = db.doc_kv("telegram_schedule_config") or {}
+        gio_cfg = cfg.get(key, "")
+        if not gio_cfg or ":" not in gio_cfg:
+            return True
+        h, m = map(int, gio_cfg.split(":", 1))
+        now = datetime.now()
+        diff = abs(now.hour * 60 + now.minute - (h * 60 + m))
+        return diff <= 15
+    except Exception:
+        return True
+
+
 def generate_daily_report() -> str | None:
     """Tạo báo cáo Excel hằng ngày. Trả về đường dẫn file hoặc None nếu lỗi."""
     REPORT_DIR.mkdir(parents=True, exist_ok=True)
@@ -357,8 +380,8 @@ def generate_daily_report() -> str | None:
             from config import DS_PGD
             gui_bao_cao_sang(
                 ngay=now.strftime("%d/%m/%Y"),
-                tong_du_no=f"{tong_dn / 1e9:,.1f} tỷ".replace(",", "."),
-                tong_qh=f"{tong_qh / 1e6:,.0f} triệu".replace(",", "."),
+                tong_du_no=f"{_vn(tong_dn / 1e9, 1)} tỷ",
+                tong_qh=f"{_vn(tong_qh / 1e6, 0)} triệu",
                 ty_le_qh=ty_le_qh,
                 so_pgd_da_upload=so_pgd,
                 tong_pgd=len(DS_PGD),
@@ -404,7 +427,349 @@ def generate_daily_report() -> str | None:
     except Exception as e:
         print(f"⚠️ Telegram nhắc đến hạn: {e}")
 
+    try:
+        _nhac_phan_ky_nxh()
+    except Exception as e:
+        print(f"⚠️ Telegram nhắc phân kỳ NXH: {e}")
+
+    if _trong_gio_gui("qh_moi"):
+        try:
+            _canh_bao_qh_moi()
+        except Exception as e:
+            print(f"⚠️ Telegram cảnh báo NQH: {e}")
+
+    # Thứ Sáu: báo cáo giải ngân tuần
+    if date.today().weekday() == 4 and _trong_gio_gui("giai_ngan_tuan"):
+        try:
+            _giai_ngan_tuan()
+        except Exception as e:
+            print(f"⚠️ Telegram giải ngân tuần: {e}")
+
+    # Mỗi ngày: cảnh báo nợ khoanh tăng
+    if _trong_gio_gui("khoanh_tang"):
+        try:
+            _canh_bao_khoanh_tang()
+        except Exception as e:
+            print(f"⚠️ Telegram nợ khoanh: {e}")
+
+    # Thứ Hai: báo cáo NQH tuần
+    if date.today().weekday() == 0 and _trong_gio_gui("nqh_tuan"):
+        try:
+            _bao_cao_nqh_tuan()
+        except Exception as e:
+            print(f"⚠️ Telegram NQH tuần: {e}")
+
+    # Mỗi ngày (nếu bật): tiến độ KHTD theo chương trình
+    if _trong_gio_gui("khtd_ct"):
+        try:
+            _bao_cao_khtd_theo_ct()
+        except Exception as e:
+            print(f"⚠️ Telegram KHTD chương trình: {e}")
+
+    # Ngày 25–31: tổng kết tháng
+    if date.today().day >= 25 and _trong_gio_gui("tong_ket_thang"):
+        try:
+            _tong_ket_thang()
+        except Exception as e:
+            print(f"⚠️ Telegram tổng kết tháng: {e}")
+
     return str(filepath)
+
+
+def _nhac_phan_ky_nxh() -> int:
+    """Đọc parquet NXH, lọc từ hôm nay đến cuối tháng, gửi 1 tin/PGD qua Telegram."""
+    from data.phan_ky_nxh import doc_phan_ky_nxh
+    from services.telegram_service import gui_nhac_phan_ky_nxh
+
+    df = doc_phan_ky_nxh()
+    if df.empty:
+        return 0
+
+    today_ts  = pd.Timestamp.today().normalize()
+    last_day  = today_ts.replace(day=1) + pd.offsets.MonthEnd(0)
+
+    COL_NGAY = "Ngày đến hạn kỳ con"
+    COL_TIEN = "Dư nợ kỳ con đến hạn"
+    COL_TGK  = "Tổng TG, TK"
+    COL_LAI  = "Lãi tồn"
+    COL_PGD  = "Tên PGD"
+
+    if COL_NGAY not in df.columns or COL_PGD not in df.columns:
+        return 0
+
+    ngay_du_lieu = today_ts.strftime("%d/%m/%Y")
+    # Chỉ lấy khoản đến hạn TỪ HÔM NAY trở đi (bỏ các khoản đã qua)
+    mask = (
+        df[COL_NGAY].notna()
+        & (df[COL_NGAY] >= today_ts)
+        & (df[COL_NGAY] <= last_day)
+    )
+    df_thang = df[mask].sort_values(["Tên xã", COL_NGAY])
+
+    if df_thang.empty:
+        return 0
+
+    sent = 0
+    for ten_pgd, grp in df_thang.groupby(COL_PGD):
+        ds = []
+        for _, row in grp.iterrows():
+            ngay_dh = ""
+            try:
+                if pd.notna(row[COL_NGAY]):
+                    ngay_dh = pd.Timestamp(row[COL_NGAY]).strftime("%d/%m/%Y")
+            except Exception:
+                pass
+            ds.append({
+                "ten_kh":        str(row.get("Tên khách hàng") or ""),
+                "so_ku":         str(row.get("Số khế ước") or ""),
+                "ngay_dh":       ngay_dh,
+                "du_no":         float(row.get(COL_TIEN) or 0),
+                "lai_ton":       float(row.get(COL_LAI) or 0) if COL_LAI in grp.columns else 0.0,
+                "tong_tgk":      float(row.get(COL_TGK) or 0) if COL_TGK in grp.columns else 0.0,
+                "sdt":           str(row.get("Số điện thoại") or ""),
+                "ten_xa":        str(row.get("Tên xã") or ""),
+                "ten_to_truong": str(row.get("Tên tổ trưởng") or ""),
+                "ghi_chu":       str(row.get("Ghi chú") or ""),
+            })
+        ok = gui_nhac_phan_ky_nxh(str(ten_pgd), ds, ngay_du_lieu=ngay_du_lieu)
+        if ok:
+            sent += 1
+    return sent
+
+
+def _canh_bao_qh_moi() -> int:
+    """So sánh snapshot NQH hôm nay vs kỳ trước, gửi cảnh báo nếu tăng bất thường."""
+    from services.telegram_service import gui_canh_bao_qh_moi
+    try:
+        from snapshot_service import doc_snapshot_range
+        from config import COT_TEN_PGD, COT_TONG_DU_NO, COT_DU_NO_QH
+        snapshots = doc_snapshot_range(tu_ky=None, den_ky=None, n_ky=2)
+        if len(snapshots) < 2:
+            return 0
+        df_moi, df_cu = snapshots[0], snapshots[1]
+        _NGUONG = 0.5  # tăng ≥ 0.5pp được coi là bất thường
+        ds_tang = []
+        for pgd in df_moi[COT_TEN_PGD].unique():
+            row_m = df_moi[df_moi[COT_TEN_PGD] == pgd].iloc[0]
+            row_c = df_cu[df_cu[COT_TEN_PGD] == pgd]
+            if row_c.empty:
+                continue
+            row_c = row_c.iloc[0]
+            dn_m = float(row_m.get(COT_TONG_DU_NO, 0) or 0)
+            qh_m = float(row_m.get(COT_DU_NO_QH, 0) or 0)
+            dn_c = float(row_c.get(COT_TONG_DU_NO, 0) or 0)
+            qh_c = float(row_c.get(COT_DU_NO_QH, 0) or 0)
+            tl_m = qh_m / dn_m * 100 if dn_m else 0.0
+            tl_c = qh_c / dn_c * 100 if dn_c else 0.0
+            if tl_m - tl_c >= _NGUONG:
+                ds_tang.append({
+                    "ten_pgd":  str(pgd),
+                    "ty_le_cu": tl_c,
+                    "ty_le_moi": tl_m,
+                    "tang":     tl_m - tl_c,
+                })
+        if ds_tang:
+            gui_canh_bao_qh_moi(ds_tang)
+        return len(ds_tang)
+    except Exception as e:
+        print(f"⚠️ _canh_bao_qh_moi: {e}")
+        return 0
+
+
+def _giai_ngan_tuan() -> int:
+    """Thứ Sáu: tổng hợp giải ngân (khoản vay mới) 7 ngày qua."""
+    from services.telegram_service import gui_giai_ngan_tuan
+    from config import DON_VI_CHI_NHANH
+    try:
+        if not Path(CACHE_HSTD).exists():
+            return 0
+        df = pd.read_parquet(CACHE_HSTD)
+        if COT_NGAY_VAY not in df.columns:
+            return 0
+        today_ts = pd.Timestamp.today().normalize()
+        t7 = today_ts - pd.Timedelta(days=7)
+        mask = df[COT_NGAY_VAY].notna() & (df[COT_NGAY_VAY] >= t7) & (df[COT_NGAY_VAY] <= today_ts)
+        df_gn = df[mask & (df[COT_TEN_PGD] != DON_VI_CHI_NHANH)]
+        if df_gn.empty:
+            return 0
+        # t7_str → hiển thị khoảng tuần
+        tuan_str = f"{t7.strftime('%d/%m')}–{today_ts.strftime('%d/%m/%Y')}"
+        grp = df_gn.groupby(COT_TEN_PGD)[COT_TONG_DU_NO].agg(["sum", "count"]).reset_index()
+        ds_pgd = [
+            {
+                "ten_pgd":  str(r[COT_TEN_PGD]),
+                "so_khoan": int(r["count"]),
+                "giai_ngan": float(r["sum"]),
+            }
+            for _, r in grp.iterrows()
+        ]
+        gui_giai_ngan_tuan(ds_pgd, tuan_str)
+        return len(ds_pgd)
+    except Exception as e:
+        print(f"⚠️ _giai_ngan_tuan: {e}")
+        return 0
+
+
+def _canh_bao_khoanh_tang() -> int:
+    """So sánh nợ khoanh snapshot hôm nay vs kỳ trước, cảnh báo nếu tăng ≥ 5%."""
+    from services.telegram_service import gui_canh_bao_khoanh_tang
+    try:
+        from snapshot_service import doc_snapshot_range
+        from config import COT_DU_NO_KHOANH
+        snapshots = doc_snapshot_range(tu_ky=None, den_ky=None, n_ky=2)
+        if len(snapshots) < 2 or COT_DU_NO_KHOANH not in snapshots[0].columns:
+            return 0
+        df_moi, df_cu = snapshots[0], snapshots[1]
+        _NGUONG_PCT = 5.0  # tăng ≥ 5% giá trị tuyệt đối
+        ds_tang = []
+        for pgd in df_moi[COT_TEN_PGD].unique():
+            row_m = df_moi[df_moi[COT_TEN_PGD] == pgd].iloc[0]
+            row_c = df_cu[df_cu[COT_TEN_PGD] == pgd]
+            if row_c.empty:
+                continue
+            row_c = row_c.iloc[0]
+            kh_moi = float(row_m.get(COT_DU_NO_KHOANH, 0) or 0)
+            kh_cu  = float(row_c.get(COT_DU_NO_KHOANH, 0) or 0)
+            if kh_cu == 0 or kh_moi == 0:
+                continue
+            tang_pct = (kh_moi - kh_cu) / kh_cu * 100
+            if tang_pct >= _NGUONG_PCT:
+                ds_tang.append({
+                    "ten_pgd":   str(pgd),
+                    "khoanh_cu": kh_cu,
+                    "khoanh_moi": kh_moi,
+                    "tang_pct":  tang_pct,
+                })
+        if ds_tang:
+            gui_canh_bao_khoanh_tang(ds_tang)
+        return len(ds_tang)
+    except Exception as e:
+        print(f"⚠️ _canh_bao_khoanh_tang: {e}")
+        return 0
+
+
+def _bao_cao_nqh_tuan() -> int:
+    """Thứ Hai: gửi báo cáo NQH từng đơn vị qua Telegram."""
+    from services.telegram_service import gui_bao_cao_nqh_tuan
+    from config import DON_VI_CHI_NHANH
+    try:
+        if not Path(CACHE_HSTD).exists():
+            return 0
+        df = pd.read_parquet(CACHE_HSTD, columns=[COT_TEN_PGD, COT_TONG_DU_NO, COT_DU_NO_QH])
+        df = df[df[COT_TEN_PGD] != DON_VI_CHI_NHANH]
+        grp = df.groupby(COT_TEN_PGD)[[COT_TONG_DU_NO, COT_DU_NO_QH]].sum().reset_index()
+        meta = db.doc_kv("merge_meta_hstd") or {}
+        ngay_sl = str(meta.get("ngay_sl", date.today().strftime("%d/%m/%Y")))
+        ds_pgd = []
+        for _, r in grp.iterrows():
+            dn  = float(r[COT_TONG_DU_NO] or 0)
+            qh  = float(r[COT_DU_NO_QH]   or 0)
+            tl  = qh / dn * 100 if dn > 0 else 0.0
+            ds_pgd.append({
+                "ten_pgd":   str(r[COT_TEN_PGD]),
+                "du_no":     dn,
+                "nqh":       qh,
+                "ty_le_nqh": round(tl, 2),
+            })
+        gui_bao_cao_nqh_tuan(ds_pgd, ngay_sl)
+        return len(ds_pgd)
+    except Exception as e:
+        print(f"⚠️ _bao_cao_nqh_tuan: {e}")
+        return 0
+
+
+def _bao_cao_khtd_theo_ct() -> int:
+    """Gửi tiến độ KHTD theo từng chương trình tín dụng."""
+    from services.telegram_service import gui_khtd_theo_chuong_trinh
+    try:
+        from config import CHUONG_TRINH_KHTD
+        khtd_cn = db.doc_kv("khtd_cn")
+        if not khtd_cn:
+            return 0
+        if not Path(CACHE_HSTD).exists():
+            return 0
+        # Tính thực hiện theo từng chương trình
+        df = pd.read_parquet(CACHE_HSTD)
+        from tabs.tab_khtd_xuat import _tinh_thuc_hien_theo_ct
+        df_th = _tinh_thuc_hien_theo_ct(df)
+        meta = db.doc_kv("merge_meta_hstd") or {}
+        ngay_sl = str(meta.get("ngay_sl", date.today().strftime("%d/%m/%Y")))
+        ds_ct = []
+        for ma_key, _ma_ct, ten_hien_thi, nguon_von, _tm in CHUONG_TRINH_KHTD:
+            kh_ct  = float((khtd_cn.get(ma_key) or {}).get("_cn", 0) or 0)
+            th_row = df_th[df_th["ma_key"] == ma_key] if not df_th.empty and "ma_key" in df_th.columns else pd.DataFrame()
+            th_val = float(th_row["thuc_hien"].iloc[0]) if not th_row.empty else 0.0
+            pct    = th_val / kh_ct * 100 if kh_ct > 0 else 0.0
+            ds_ct.append({
+                "ten_ct":    ten_hien_thi,
+                "nguon_von": nguon_von,
+                "ke_hoach":  kh_ct,
+                "thuc_hien": th_val,
+                "pct":       round(pct, 1),
+            })
+        gui_khtd_theo_chuong_trinh(ds_ct, ngay_sl)
+        return len(ds_ct)
+    except Exception as e:
+        print(f"⚠️ _bao_cao_khtd_theo_ct: {e}")
+        return 0
+
+
+def _tong_ket_thang() -> None:
+    """Gửi tổng kết tháng — chạy từ ngày 25 đến 31."""
+    from services.telegram_service import gui_tong_ket_thang
+    from config import DON_VI_CHI_NHANH
+    try:
+        if not Path(CACHE_HSTD).exists():
+            return
+        df = pd.read_parquet(CACHE_HSTD)
+        khtd_cn = db.doc_kv("khtd_cn") or {}
+        du_no  = float(df[COT_TONG_DU_NO].sum()) if COT_TONG_DU_NO in df.columns else 0.0
+        nqh    = float(df[COT_DU_NO_QH].sum())   if COT_DU_NO_QH   in df.columns else 0.0
+        # KH tổng CN
+        ke_hoach = 0.0
+        for _ct, targets in khtd_cn.items():
+            if isinstance(targets, dict):
+                ke_hoach += float(targets.get("_cn", 0) or 0)
+        # Khoản đến hạn tháng sau
+        so_dh, dn_dh = 0, 0.0
+        if COT_NGAY_DH in df.columns:
+            today_ts = pd.Timestamp.today().normalize()
+            nm1    = today_ts.replace(day=1) + pd.offsets.MonthBegin(1)
+            nm_end = nm1 + pd.offsets.MonthEnd(0)
+            mask_dh = df[COT_NGAY_DH].notna() & (df[COT_NGAY_DH] >= nm1) & (df[COT_NGAY_DH] <= nm_end)
+            so_dh   = int(mask_dh.sum())
+            dn_dh   = float(df.loc[mask_dh, COT_TONG_DU_NO].sum()) if COT_TONG_DU_NO in df.columns else 0.0
+        # Top/bottom PGD
+        kh_pgd: dict[str, float] = {}
+        for _ct, targets in khtd_cn.items():
+            if isinstance(targets, dict):
+                for pgd, val in targets.items():
+                    if pgd != "_cn" and isinstance(val, (int, float)):
+                        kh_pgd[pgd] = kh_pgd.get(pgd, 0) + float(val)
+        ds_ranked = []
+        if COT_TEN_PGD in df.columns:
+            df_pgd = (
+                df[df[COT_TEN_PGD] != DON_VI_CHI_NHANH]
+                .groupby(COT_TEN_PGD)[COT_TONG_DU_NO].sum()
+                .reset_index()
+            )
+            for _, r in df_pgd.iterrows():
+                pgd = str(r[COT_TEN_PGD])
+                kh  = kh_pgd.get(pgd, 0)
+                th  = float(r[COT_TONG_DU_NO] or 0)
+                pct = th / kh * 100 if kh > 0 else 0.0
+                ds_ranked.append({"ten_pgd": pgd, "pct_kh": round(pct, 1)})
+        ds_ranked.sort(key=lambda x: x["pct_kh"], reverse=True)
+        top5 = ds_ranked[:5]
+        bot5 = list(reversed(ds_ranked[-5:])) if len(ds_ranked) >= 5 else ds_ranked
+        thang = date.today().month
+        nam   = date.today().year
+        gui_tong_ket_thang(
+            thang, nam, du_no, ke_hoach, nqh,
+            so_dh, dn_dh, top5, bot5,
+        )
+    except Exception as e:
+        print(f"⚠️ _tong_ket_thang: {e}")
 
 
 def _cleanup_old(n_days: int = 30):

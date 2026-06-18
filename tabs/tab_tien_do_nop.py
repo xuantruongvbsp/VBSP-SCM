@@ -99,6 +99,50 @@ def _chuan_hoa_ten_pgd(raw: str) -> str:
     return s
 
 
+def doc_du_lieu_gsheet() -> pd.DataFrame:
+    """Đọc GSheet không cache — dùng ngoài Streamlit context (daily_report, script)."""
+    try:
+        client = _ket_noi_gsheet()
+        sheet = client.open_by_key(SHEET_ID).worksheet(SHEET_TAB)
+        data = sheet.get_all_values()
+        if len(data) <= 1:
+            return pd.DataFrame(columns=COT)
+        df = pd.DataFrame([r[:len(COT)] for r in data[1:]], columns=COT)
+        df["ten_pgd"] = df["ten_pgd"].apply(_chuan_hoa_ten_pgd)
+        df["thoi_gian"] = pd.to_datetime(df["thoi_gian"], dayfirst=True, errors="coerce")
+        return df
+    except Exception as e:
+        logger.error("doc_du_lieu_gsheet: %s", e, exc_info=True)
+        return pd.DataFrame(columns=COT)
+
+
+def lay_pgd_chua_nop(
+    loai_bao_cao: str,
+    df: pd.DataFrame | None = None,
+) -> tuple[list[str], str | None]:
+    """Trả (ds_pgd_chua_nop, deadline_str) cho 1 loại báo cáo.
+
+    Xét cả manual override: PGD có ghi đè = xem như đã nộp.
+    """
+    deadline_cfg = _doc_deadline_config()
+    deadline_str = deadline_cfg.get(loai_bao_cao)
+
+    if df is None:
+        df = doc_du_lieu_gsheet()
+
+    manual_map = _doc_manual_log()
+    ds_chua_nop: list[str] = []
+    for pgd in DS_PGD_ALL:
+        entry = manual_map.get((pgd, loai_bao_cao))
+        if entry and entry.get("ghi_de", True):
+            continue  # có ghi đè thủ công → xem như đã nộp
+        match = df[(df["ten_pgd"] == pgd) & (df["loai_bao_cao"] == loai_bao_cao)]
+        if match.empty:
+            ds_chua_nop.append(pgd)
+
+    return ds_chua_nop, deadline_str
+
+
 @st.cache_data(ttl=300)
 def _doc_du_lieu() -> pd.DataFrame:
     try:
@@ -408,11 +452,15 @@ def _render_tong_quan(df: pd.DataFrame, deadline_cfg: dict, is_cn: bool, pgd_use
 
         manual_ds = _doc_manual_log_raw()
 
+        # Bao gồm cả loại BC từ GSheet (dù chưa có deadline) để hỗ trợ đánh dấu
+        ds_loai_gsheet_manual = sorted(df["loai_bao_cao"].dropna().unique().tolist()) if not df.empty else []
+        ds_loai_manual = sorted(set(ds_loai) | set(ds_loai_gsheet_manual))
+
         col_pgd, col_loai, col_ngay = st.columns([2, 2, 1.5])
         with col_pgd:
             pgd_manual = st.selectbox("PGD", ds_pgd_scope, key="man_pgd")
         with col_loai:
-            loai_manual = st.selectbox("Loại BC", ds_loai, key="man_loai")
+            loai_manual = st.selectbox("Loại BC", ds_loai_manual, key="man_loai")
         with col_ngay:
             ngay_manual = st.date_input("Ngày nộp", value=date.today(), format="DD/MM/YYYY", key="man_ngay")
 
@@ -601,14 +649,46 @@ def _render_cai_dat(df: pd.DataFrame, deadline_cfg: dict, username: str) -> None
     st.markdown("**Cấu hình thời hạn hoàn thành cho từng loại báo cáo**")
     st.caption("Sau khi lưu, cột Trạng thái sẽ tự tính 🟢 Đúng hạn / 🟡 Trễ / 🔴 Chưa nộp.")
 
+    # ── Thêm loại báo cáo mới (nhập tay — không cần chờ submission) ──────────
+    with st.expander("➕ Thêm loại báo cáo mới", expanded=False):
+        col_ten, col_dl, col_add = st.columns([3, 2, 1])
+        with col_ten:
+            ten_moi = st.text_input(
+                "Tên loại báo cáo",
+                placeholder="VD: Báo cáo tháng 7/2026",
+                key="cd_ten_moi",
+            )
+        with col_dl:
+            dl_moi_add = st.date_input(
+                "Thời hạn hoàn thành",
+                value=date.today(), format="DD/MM/YYYY",
+                key="cd_dl_moi",
+            )
+        with col_add:
+            st.write("")
+            if st.button("💾 Thêm", key="cd_btn_add", type="primary", use_container_width=True):
+                ten_moi = ten_moi.strip()
+                if not ten_moi:
+                    st.warning("⚠️ Nhập tên loại báo cáo trước.")
+                elif ten_moi in deadline_cfg:
+                    st.warning(f"⚠️ **{ten_moi}** đã tồn tại. Chọn từ danh sách bên dưới để sửa.")
+                else:
+                    cfg_moi = dict(deadline_cfg)
+                    cfg_moi[ten_moi] = dl_moi_add.strftime("%Y-%m-%d")
+                    _luu_deadline_config(cfg_moi, username)
+                    st.success(f"✅ Đã thêm: **{ten_moi}** → {dl_moi_add.strftime('%d/%m/%Y')}")
+                    st.rerun()
+
     # Gộp loại từ GSheet + loại đã có trong deadline_cfg
     ds_loai_gsheet = sorted(df["loai_bao_cao"].dropna().unique().tolist()) if not df.empty else []
     ds_loai_cfg    = sorted(deadline_cfg.keys())
     ds_loai = sorted(set(ds_loai_gsheet) | set(ds_loai_cfg))
 
     if not ds_loai:
-        st.info("Chưa có dữ liệu từ Google Sheets và chưa có thời hạn hoàn thành nào được cài đặt.")
+        st.info("Chưa có loại báo cáo nào. Dùng **➕ Thêm loại báo cáo mới** ở trên để bắt đầu.")
         return
+
+    st.divider()
 
     # Hiển thị label kèm trạng thái đã có thời hạn chưa
     def _label(loai: str) -> str:
@@ -617,7 +697,7 @@ def _render_cai_dat(df: pd.DataFrame, deadline_cfg: dict, username: str) -> None
     loai_options = ds_loai
     loai_labels  = [_label(l) for l in loai_options]
     idx = st.selectbox(
-        "Chọn loại báo cáo",
+        "Chọn loại báo cáo để sửa / xóa",
         range(len(loai_options)),
         format_func=lambda i: loai_labels[i],
         key="cd_loai",
@@ -664,8 +744,16 @@ def _render_cai_dat(df: pd.DataFrame, deadline_cfg: dict, username: str) -> None
             pd.DataFrame(rows),
             hide_index=True, use_container_width=True,
         )
+        # Nút xóa tất cả
+        with st.popover("🗑 Xóa tất cả deadline", use_container_width=False):
+            st.warning(f"Xóa toàn bộ **{len(rows)} deadline** đã cài đặt?")
+            st.caption("Các loại báo cáo sẽ không còn được theo dõi trạng thái ở tab Tổng quan.")
+            if st.button("⚠️ Xác nhận xóa tất cả", key="cd_btn_xoa_het", type="primary", use_container_width=True):
+                _luu_deadline_config({}, username)
+                st.success("✅ Đã xóa toàn bộ deadline.")
+                st.rerun()
     else:
-        st.info("Chưa có thời hạn hoàn thành nào. Dùng form trên để thêm.")
+        st.info("Chưa có thời hạn hoàn thành nào. Dùng **➕ Thêm loại báo cáo mới** ở trên để thêm.")
 
 
 # ── Tab Hướng dẫn với Mockup ───────────────────────────────────────────────────

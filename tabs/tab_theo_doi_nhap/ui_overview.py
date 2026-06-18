@@ -1,6 +1,8 @@
 """Tổng quan tiến độ nhập liệu — Heatmap, Progress bars, KPI mở rộng, So sánh kỳ."""
 from __future__ import annotations
 
+from datetime import date as _date
+
 import pandas as pd
 import streamlit as st
 
@@ -11,6 +13,40 @@ from .constants import EMOJI_PCT, LOAI_LABEL
 from .data import emoji_pct, doc_snapshot_truoc, luu_snapshot
 
 logger = get_logger(__name__)
+
+
+def _render_deadline_banner(deadline_str: str, pct_avg: float) -> None:
+    """Banner trạng thái deadline — hiển thị phía trên KPI cards."""
+    if not deadline_str:
+        return
+    try:
+        dl = _date.fromisoformat(deadline_str)
+    except (ValueError, TypeError):
+        return
+
+    days = (dl - _date.today()).days
+    dl_fmt = dl.strftime("%d/%m/%Y")
+    pct_fmt = f"{pct_avg:.0f}%"
+
+    if days < 0:
+        st.error(
+            f"🔴 **Đã quá hạn {abs(days)} ngày** (hạn chót: {dl_fmt}) "
+            f"— Tiến độ hiện tại: **{pct_fmt}**"
+        )
+    elif days == 0:
+        st.warning(
+            f"⚠️ **HÔM NAY là hạn chót!** ({dl_fmt}) "
+            f"— Tiến độ: **{pct_fmt}**"
+        )
+    elif days <= 3:
+        st.warning(
+            f"🟡 **Còn {days} ngày đến hạn** ({dl_fmt}) "
+            f"— Tiến độ: **{pct_fmt}**"
+        )
+    else:
+        st.info(
+            f"📅 **Hạn chót: {dl_fmt}** — Còn {days} ngày · Tiến độ: **{pct_fmt}**"
+        )
 
 
 def _heatmap_color(pct: float) -> str:
@@ -244,6 +280,7 @@ def render_tong_quan(
     sheet_id: str = "",
     sheet_tab: str = "",
     username: str = "system",
+    deadline: str = "",
 ) -> None:
     if df_td.empty:
         st.info("Chưa có dữ liệu. Kiểm tra lại Sheet ID hoặc cấu hình cột.")
@@ -262,6 +299,9 @@ def render_tong_quan(
             luu_snapshot(sheet_id, sheet_tab, df_td, username)
         except Exception:
             pass
+
+    # ── Deadline Banner ───────────────────────────────────────────────────
+    _render_deadline_banner(deadline, pct_avg)
 
     # ── KPI Row mở rộng (6 cards) ─────────────────────────────────────────
     kpi_row([

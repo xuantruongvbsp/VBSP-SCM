@@ -147,22 +147,6 @@ def _render_form_sheet(cfg: dict, prefix: str) -> dict:
         st.session_state[key_count] = count + 1
         st.rerun()
 
-    # ── Deadline field (⭐ MỚI) ───────────────────────────────────────────
-    st.divider()
-    st.markdown("**⏰ Hạn chót nhập liệu** (tùy chọn)")
-    deadline_val = cfg.get("deadline", "")
-    try:
-        deadline_default = _date.fromisoformat(deadline_val) if deadline_val else None
-    except (ValueError, TypeError):
-        deadline_default = None
-
-    deadline = st.date_input(
-        "Hạn chót",
-        value=deadline_default,
-        key=f"{prefix}_deadline",
-        format="DD/MM/YYYY",
-    )
-
     return {
         "ten_hien_thi": ten.strip(),
         "sheet_id": sid.strip(),
@@ -173,7 +157,6 @@ def _render_form_sheet(cfg: dict, prefix: str) -> dict:
         "pgd_col": int(pgd_col),
         "loai_cau_truc": loai_chon,
         "ds_chuong_trinh": ds_ct_new,
-        "deadline": deadline.isoformat() if deadline else "",
     }
 
 
@@ -480,18 +463,21 @@ def render_cai_dat(ds_sheet: list[dict], username: str) -> None:
                 with col_s:
                     if st.button("💾 Lưu", key=f"cd_{i}_save", type="primary",
                                  use_container_width=True):
-                        ds_sheet[i] = new_cfg
+                        old_deadline = ds_sheet[i].get("deadline", "")
+                        ds_sheet[i] = {**new_cfg, "deadline": old_deadline}
                         doc_sheet.clear()
                         luu_ds_sheet(ds_sheet, username)
                         st.success("✅ Đã lưu")
                         st.rerun()
                 with col_d:
-                    if st.button("🗑 Xóa", key=f"cd_{i}_del",
-                                 use_container_width=True):
-                        ds_sheet.pop(i)
-                        luu_ds_sheet(ds_sheet, username)
-                        st.success("✅ Đã xóa")
-                        st.rerun()
+                    with st.popover("🗑 Xóa", use_container_width=True):
+                        st.warning(f"Xóa **{ten}** khỏi danh sách theo dõi?")
+                        if st.button("✅ Xác nhận xóa", key=f"cd_{i}_del_ok",
+                                     type="primary", use_container_width=True):
+                            ds_sheet.pop(i)
+                            luu_ds_sheet(ds_sheet, username)
+                            st.success("✅ Đã xóa")
+                            st.rerun()
 
                 if st.button("📁 Lưu thành Template", key=f"cd_{i}_to_tpl",
                              use_container_width=True):

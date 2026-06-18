@@ -258,6 +258,149 @@ def _nhac_theo_doi_nhap_lieu() -> int:
     return sent_count
 
 
+# ── Phát hiện submission mới từ GSheet ───────────────────────────────────────
+
+def _thong_bao_nop_moi_gsheet() -> int:
+    """Phát hiện submission mới từ GSheet kể từ lần chạy trước, gửi Telegram.
+
+    Lưu timestamp lần kiểm tra vào kv_store key 'tg_last_gsheet_check_ts'.
+    Lần đầu chạy: chỉ lưu timestamp, không gửi (tránh spam toàn bộ lịch sử).
+    """
+    from services.telegram_service import gui_thong_bao_nop_moi_gsheet
+
+    try:
+        df = _doc_du_lieu()
+        now = datetime.now()
+
+        if df.empty:
+            db.ghi_kv("tg_last_gsheet_check_ts", now.isoformat(), "system")
+            return 0
+
+        last_ts_str = db.doc_kv("tg_last_gsheet_check_ts")
+        db.ghi_kv("tg_last_gsheet_check_ts", now.isoformat(), "system")
+
+        if not last_ts_str:
+            logger.info("_thong_bao_nop_moi_gsheet: lần đầu chạy — chỉ lưu timestamp")
+            return 0
+
+        try:
+            last_ts = pd.to_datetime(last_ts_str)
+        except Exception:
+            return 0
+
+        df_moi = df[df["thoi_gian"] > last_ts].copy()
+        if df_moi.empty:
+            return 0
+
+        ds = []
+        for _, r in df_moi.iterrows():
+            ts_str = ""
+            try:
+                if pd.notna(r.get("thoi_gian")):
+                    ts_str = pd.Timestamp(r["thoi_gian"]).strftime("%d/%m %H:%M")
+            except Exception:
+                pass
+            ds.append({
+                "ten_pgd":      str(r.get("ten_pgd", "") or ""),
+                "loai_bao_cao": str(r.get("loai_bao_cao", "") or ""),
+                "thoi_gian":    ts_str,
+                "ho_ten":       str(r.get("ho_ten", "") or ""),
+            })
+
+        ok = gui_thong_bao_nop_moi_gsheet(ds)
+        if ok:
+            logger.info("_thong_bao_nop_moi_gsheet: đã gửi %d submission mới", len(ds))
+        return len(ds) if ok else 0
+    except Exception as e:
+        logger.error("_thong_bao_nop_moi_gsheet: %s", e, exc_info=True)
+        return 0
+
+
+# ── Nhắc đến hạn phân tầng T-7 / T-3 / T-1 ──────────────────────────────────
+
+def _nhac_den_han_phan_tang() -> int:
+    """Tìm khoản đến hạn trong 1/3/7 ngày tới, gửi cảnh báo phân tầng."""
+    from services.telegram_service import gui_nhac_den_han_phan_tang
+    cfg_notify = db.doc_kv("telegram_notify_config") or {}
+    if not cfg_notify.get("den_han_phan_tang", True):
+        return 0
+    try:
+        from pathlib import Path
+        from config import (
+            CACHE_HSTD, COT_NGAY_DH, COT_TONG_DU_NO,
+            COT_TEN_KH, COT_SO_KU, COT_TEN_PGD,
+        )
+        if not Path(CACHE_HSTD).exists():
+            return 0
+        df = pd.read_parquet(CACHE_HSTD)
+        if COT_NGAY_DH not in df.columns:
+            return 0
+        today_ts = pd.Timestamp.today().normalize()
+        buckets: dict[str, list[dict]] = {"T-1": [], "T-3": [], "T-7": []}
+        tier_map = {1: "T-1", 3: "T-3", 7: "T-7"}
+        for days in (1, 3, 7):
+            target = today_ts + pd.Timedelta(days=days)
+            mask = df[COT_NGAY_DH].notna() & (df[COT_NGAY_DH].dt.normalize() == target)
+            for _, r in df[mask].iterrows():
+                buckets[tier_map[days]].append({
+                    "ten_kh":  str(r.get(COT_TEN_KH, "") or ""),
+                    "so_ku":   str(r.get(COT_SO_KU, "") or ""),
+                    "ngay_dh": target.strftime("%d/%m/%Y"),
+                    "du_no":   float(r.get(COT_TONG_DU_NO, 0) or 0),
+                    "ten_pgd": str(r.get(COT_TEN_PGD, "") or ""),
+                })
+        if not any(v for v in buckets.values()):
+            return 0
+        ok = gui_nhac_den_han_phan_tang(buckets)
+        return 1 if ok else 0
+    except Exception as e:
+        logger.error("_nhac_den_han_phan_tang: %s", e, exc_info=True)
+        return 0
+
+
+# ── Nhắc lịch công tác ngày mai ───────────────────────────────────────────────
+
+def _nhac_lich_cong_tac() -> int:
+    """Đọc khnv_lich_list, tìm sự kiện ngày mai, gửi nhắc Telegram."""
+    from services.telegram_service import gui_nhac_lich_cong_tac
+    cfg_notify = db.doc_kv("telegram_notify_config") or {}
+    if not cfg_notify.get("lich_cong_tac", True):
+        return 0
+    try:
+        ds_lich = db.doc_kv("khnv_lich_list")
+        if not ds_lich or not isinstance(ds_lich, list):
+            return 0
+        tomorrow = (date.today() + __import__("datetime").timedelta(days=1))
+        ngay_mai_str = tomorrow.strftime("%d/%m/%Y")
+        tomorrow_dt  = pd.Timestamp(tomorrow)
+        ds_sv = []
+        for entry in ds_lich:
+            if not isinstance(entry, dict):
+                continue
+            ngay_raw = entry.get("ngay") or entry.get("date") or ""
+            try:
+                ngay_entry = pd.to_datetime(ngay_raw, dayfirst=True).normalize()
+            except Exception:
+                continue
+            if ngay_entry != tomorrow_dt:
+                continue
+            ds_sv.append({
+                "gio":              str(entry.get("gio", "") or entry.get("time", "") or ""),
+                "noi_dung":         str(entry.get("noi_dung", "") or entry.get("content", "") or ""),
+                "nguoi_phu_trach":  str(entry.get("nguoi_phu_trach", "") or entry.get("assignee", "") or ""),
+                "dia_diem":         str(entry.get("dia_diem", "") or entry.get("location", "") or ""),
+            })
+        if not ds_sv:
+            return 0
+        # Sắp xếp theo giờ
+        ds_sv.sort(key=lambda x: x["gio"] or "99:99")
+        ok = gui_nhac_lich_cong_tac(ds_sv, ngay_mai_str)
+        return 1 if ok else 0
+    except Exception as e:
+        logger.error("_nhac_lich_cong_tac: %s", e, exc_info=True)
+        return 0
+
+
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 def nhac() -> None:
@@ -342,6 +485,20 @@ def nhac() -> None:
         logger.info("Hoàn tất: đã gửi %d nhắc nhở.", sent_count)
 
     _nhac_theo_doi_nhap_lieu()
+    _thong_bao_nop_moi_gsheet()
+
+    # Nhắc khoản đến hạn phân tầng T-7/T-3/T-1
+    try:
+        _nhac_den_han_phan_tang()
+    except Exception as e:
+        logger.error("_nhac_den_han_phan_tang: %s", e)
+
+    # Nhắc lịch công tác ngày mai (chỉ chạy buổi chiều — lúc 14:00)
+    if datetime.now().hour >= 13:
+        try:
+            _nhac_lich_cong_tac()
+        except Exception as e:
+            logger.error("_nhac_lich_cong_tac: %s", e)
 
 
 if __name__ == "__main__":

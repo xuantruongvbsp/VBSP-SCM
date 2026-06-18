@@ -1237,6 +1237,12 @@ def luu_pgd_file(ten_pgd: str, loai: str, file_bytes: bytes) -> KetQuaUpload:
     username = st.session_state.get("username", "unknown")
     db.ghi_audit(username, "upload_pgd", f"{loai.upper()} — {ten_pgd}")
 
+    try:
+        from services.telegram_service import gui_thong_bao_upload_pgd
+        gui_thong_bao_upload_pgd(ten_pgd, loai, username)
+    except Exception:
+        pass  # Telegram lỗi không được làm gián đoạn upload
+
     ket_qua = KetQuaUpload(
         True,
         f"✅ Đã lưu {loai.upper()} — {ten_pgd}{thang_label}",

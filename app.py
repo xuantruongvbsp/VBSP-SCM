@@ -175,7 +175,15 @@ def _enrich_hstd(
             (c for c in ["Số khế ước", COT_SO_KU] if c in df_nq11.columns), None
         )
         if _ku_col:
-            _set_nq = set(df_nq11[_ku_col].dropna().astype(str).str.strip())
+            # Chỉ lấy KU có DNO NQ11 > 0 — tránh đánh badge nhầm khoản đã tất toán
+            _dno_col = next(
+                (c for c in df_nq11.columns if "dno nq11" in str(c).lower()), None
+            )
+            _df_nq = df_nq11
+            if _dno_col:
+                _dno = pd.to_numeric(df_nq11[_dno_col], errors="coerce").fillna(0)
+                _df_nq = df_nq11[_dno > 0]
+            _set_nq = set(_df_nq[_ku_col].dropna().astype(str).str.strip())
             df["__is_nq11"] = _ku.isin(_set_nq)
         else:
             df["__is_nq11"] = False

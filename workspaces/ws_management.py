@@ -211,6 +211,7 @@ def _build_all_items(role: str, username: str, **kwargs) -> list:
         {"group": "Giám sát", "label": "🛡️ Chất lượng Dữ liệu",   "icon": "shield-check",  "fn": lambda: _get_tab("tab_data_quality").render(None, **kwargs)},
         {"group": "Giám sát", "label": "🏠 Phân kỳ NXH",           "icon": "home",          "fn": lambda: _get_tab("tab_phan_ky_nxh").render(None, **kwargs)},
         {"group": "Giám sát", "label": "🏷️ Phân loại Khách hàng", "icon": "tag",           "fn": lambda: _get_tab("tab_phan_loai_kh").render(None, **kwargs)},
+        {"group": "Giám sát", "label": "🧪 Stress Test Danh mục", "icon": "flask",         "fn": lambda: _get_tab("tab_stress_test").render(None, **kwargs)},
 
         # ── Kiểm soát ──────────────────────────────────────────────────────────
         {"group": "Kiểm soát", "label": "🔎 Kiểm soát nội bộ",         "icon": "search",       "fn": lambda: _get_tab("tab_kiem_soat").render_tab(df_full, role, kwargs.get("username", "unknown"))},

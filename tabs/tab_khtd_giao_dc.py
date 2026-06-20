@@ -832,132 +832,12 @@ def _section_b_giao(
             st.cache_data.clear()
 
 
-def _section_c_tong_hop(
-    nam: int,
-    thang: str,
-    dot: str,
-    username: str,
-    role: str,
-    loai: str,
-    readonly_exec: bool,
-) -> None:
+def _section_c_tong_hop(nam: int, thang: str, dot: str) -> None:
     c_tw, c_dp = st.tabs(["🏦 Tổng hợp TW", "🏙️ Tổng hợp ĐP"])
     with c_tw:
         st.html(_html_bdd_table(nam, thang, dot, "TW"))
     with c_dp:
         st.html(_html_bdd_table(nam, thang, dot, "DP"))
-
-    st.divider()
-    ds = _ds_slug_label()
-    labels = [x[0] for x in ds]
-    slugs = [x[1] for x in ds]
-    j = st.selectbox(
-        "Duyệt / Từ chối theo đơn vị",
-        range(len(labels)),
-        format_func=lambda i: labels[i],
-        key=_SS + "sel_chi_tiet",
-    )
-    slug_chon = slugs[j]
-
-    if loai == LOAI_DIEU_CHINH:
-        if readonly_exec:
-            cb = khtd_service.kiem_tra_can_bang(nam, thang, dot)
-        else:
-            if st.button(
-                "⚖️ Kiểm tra cân bằng",
-                key=_SS + "btn_can_bang",
-            ):
-                st.session_state[_SS + "can_bang"] = (
-                    khtd_service.kiem_tra_can_bang(nam, thang, dot)
-                )
-            cb = st.session_state.get(_SS + "can_bang")
-
-        if cb:
-            rows_cb = []
-            for ma_key, v in sorted(cb.items()):
-                ok = v.get("can_bang", False)
-                rows_cb.append(
-                    {
-                        "Chương trình": ma_key,
-                        "Tổng ĐC_TW": fmt_tien(v.get("tong_dc_tw", 0)),
-                        "Tổng ĐC_ĐP": fmt_tien(v.get("tong_dc_dp", 0)),
-                        "Cân bằng": "✅" if ok else "❌",
-                    }
-                )
-            hien_thi_dataframe_phan_trang(
-                pd.DataFrame(rows_cb), key=_SS + "can_bang_ct"
-            )
-        all_can_bang = bool(cb) and all(
-            v.get("can_bang") for v in cb.values()
-        )
-    else:
-        all_can_bang = _tat_ca_da_nhap_giao(nam, thang, dot, slugs)
-        if not all_can_bang:
-            st.warning(
-                "⚠️ Còn đơn vị chưa nhập đủ KH giao (hoặc chưa đúng loại Giao)."
-            )
-
-    if not readonly_exec and normalize_role(role) in ("admin_cn", "manager_cn"):
-        y_all = st.text_input("Ý kiến duyệt tất cả", key=_SS + "y_kien_all")
-        if st.button(
-            "✅ Duyệt tất cả",
-            key=_SS + "btn_duyet_all",
-            disabled=not all_can_bang,
-        ):
-            for slug in slugs:
-                raw = db.doc_kv(
-                    khtd_service.kv_key_dot(slug, nam, thang, dot)
-                )
-                if raw and raw.get("trang_thai") == "cho_duyet":
-                    khtd_service.duyet(
-                        slug,
-                        nam,
-                        thang,
-                        dot,
-                        "da_duyet",
-                        y_all,
-                        username,
-                    )
-            st.cache_data.clear()
-            st.session_state.pop(_SS + "can_bang", None)
-            st.success("✅ Đã duyệt tất cả.")
-            db.ghi_audit(
-                username,
-                "duyet_khtd_tat_ca",
-                f"[{_hostname()}] {nam}/{thang}/{dot}",
-            )
-
-        st.markdown("**Duyệt / Từ chối từng đơn vị**")
-        y_kien = st.text_area("Ý kiến", key=_SS + "y_kien_mot")
-        c1, c2 = st.columns(2)
-        with c1:
-            if st.button("✅ Duyệt", key=_SS + "btn_duyet_1"):
-                khtd_service.duyet(
-                    slug_chon,
-                    nam,
-                    thang,
-                    dot,
-                    "da_duyet",
-                    y_kien,
-                    username,
-                )
-                st.cache_data.clear()
-                st.success("Đã duyệt.")
-        with c2:
-            if st.button("❌ Từ chối", key=_SS + "btn_tu_choi"):
-                khtd_service.duyet(
-                    slug_chon,
-                    nam,
-                    thang,
-                    dot,
-                    "tu_choi",
-                    y_kien,
-                    username,
-                )
-                st.cache_data.clear()
-                st.warning("Đã từ chối.")
-    else:
-        st.caption("*(Chế độ xem — không thực hiện duyệt.)*")
 
     df_raw = khtd_service.tong_hop(nam, thang, dot)
     if not df_raw.empty:
@@ -1393,7 +1273,7 @@ def render(tab=None, **kwargs) -> None:
             tab_labels.append("⚙️ Khởi tạo")
         if loai_val == LOAI_GIAO:
             tab_labels.append("📝 Nhập KH Giao")
-        tab_labels += ["✅ Tổng hợp & Duyệt", "📊 So sánh KH/TH"]
+        tab_labels += ["📊 Tổng hợp KH", "📈 So sánh KH/TH"]
 
         tabs_ui = st.tabs(tab_labels)
         t_idx = 0

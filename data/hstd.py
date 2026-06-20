@@ -13,7 +13,7 @@ from config import (
 
 
 # ── HSTD ─────────────────────────────────────────────────────────────────────
-@st.cache_data(ttl=7200, show_spinner=False)
+@st.cache_data(ttl=300, show_spinner=False)
 def doc_file(fp: str, _ts) -> pd.DataFrame:
     """Đọc file HSTD (BCQUERY sheet, header dòng 4).
     Không chạy kiem_tra_chat_luong ở đây — merge_du_lieu_toan_cn đã chạy DQ rồi.
@@ -229,7 +229,7 @@ def luu_so_khe_uoc_nq11(file_bytes: bytes, username: str) -> tuple[int, str | No
 
 
 # ── NQ11 — đọc file gốc (legacy / fallback) ──────────────────────────────────
-@st.cache_data(ttl=7200, show_spinner=False)
+@st.cache_data(ttl=300, show_spinner=False)
 def doc_file_nq11(fp: str, _ts) -> pd.DataFrame:
     """Đọc file sao kê NQ11 (BCQUERY sheet, header dòng 4)."""
     def clean(df): return df.iloc[:, 1:].dropna(how="all")
@@ -242,7 +242,7 @@ def doc_file_nq11(fp: str, _ts) -> pd.DataFrame:
 
 
 # ── GQVL ─────────────────────────────────────────────────────────────────────
-@st.cache_data(ttl=7200, show_spinner=False)
+@st.cache_data(ttl=300, show_spinner=False)
 def doc_file_gqvl(fp: str, _ts) -> pd.DataFrame:
     """Đọc file sao kê GQVL, chuẩn hoá tên cột."""
     from services.data_quality import kiem_tra_chat_luong
@@ -263,7 +263,7 @@ def doc_file_gqvl(fp: str, _ts) -> pd.DataFrame:
 
 
 # ── SK GQVL (tra NQ11 cho món vay dư nợ = 0) ─────────────────────────────────
-@st.cache_data(ttl=7200, show_spinner=False)
+@st.cache_data(ttl=300, show_spinner=False)
 def doc_file_sk_gqvl(fp: str, _ts) -> pd.DataFrame:
     """
     Đọc file sao kê GQVL chi tiết (SK_GQVL_du_lieu_tho.xlsx).
@@ -628,20 +628,20 @@ def danh_dau_khong_hd(df: "pd.DataFrame") -> "pd.DataFrame":
     return df
 
 
-@st.cache_data(show_spinner=False, ttl=7200)
+@st.cache_data(show_spinner=False, ttl=300)
 def danh_dau_khong_hd_cached(_df: "pd.DataFrame", ts: float = 0.0) -> "pd.DataFrame":
     """Cache by ts — không hash DataFrame để tránh chậm trên tập dữ liệu lớn."""
     _ = ts
     return danh_dau_khong_hd(_df)
 
 
-@st.cache_data(show_spinner=False, ttl=7200)
+@st.cache_data(show_spinner=False, ttl=300)
 def tong_hop_khong_hd_cached(_df: "pd.DataFrame", nhom_theo: str = "Tên ĐVUT", ts: float = 0.0) -> "pd.DataFrame":
     _ = ts
     return tong_hop_khong_hd(_df, nhom_theo=nhom_theo)
 
 
-@st.cache_data(show_spinner=False, ttl=7200)
+@st.cache_data(show_spinner=False, ttl=300)
 def canh_bao_migration_cached(_df: "pd.DataFrame", ts: float = 0.0) -> "pd.DataFrame":
     _ = ts
     return canh_bao_migration(_df)

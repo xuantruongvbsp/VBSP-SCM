@@ -8,6 +8,7 @@ import pandas as pd
 
 import db
 from auth import la_phan_he_cn, normalize_role
+from config import PGD_XA_MAP
 from data.phan_ky_nxh import doc_phan_ky_nxh, luu_phan_ky_nxh
 from utils import fmt_ty, fmt_so
 
@@ -61,65 +62,55 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
 
         # ── Expander 2: Phân công Cán bộ theo Xã/Phường ──────────────────────
         with st.expander("👤 Phân công Cán bộ theo Xã/Phường", expanded=False):
-            df_nxh = doc_phan_ky_nxh()
-            if df_nxh.empty:
-                st.caption("Chưa có dữ liệu — upload file trước.")
-            elif "Tên PGD" not in df_nxh.columns:
-                st.caption("⚠️ File upload thiếu cột 'Tên PGD'.")
+            can_bo_map: dict = db.doc_kv("nxh_can_bo_xa") or {}
+
+            # Tóm tắt hiện trạng phân công
+            so_xa_da_phan = sum(1 for v in can_bo_map.values() if v.strip())
+            if so_xa_da_phan:
+                st.caption(f"Đã phân công: **{so_xa_da_phan}** xã/phường có cán bộ phụ trách.")
             else:
-                can_bo_map: dict = db.doc_kv("nxh_can_bo_xa") or {}
+                st.caption("Chưa có xã/phường nào được phân công cán bộ.")
 
-                # Danh sách PGD có trong dữ liệu upload
-                ds_pgd_co_du_lieu = sorted(df_nxh["Tên PGD"].dropna().unique().tolist())
+            # Danh sách PGD từ config — đầy đủ, không phụ thuộc file upload
+            ds_pgd = list(PGD_XA_MAP.keys())
+            pgd_sel = st.selectbox(
+                "Chọn PGD để phân công cán bộ",
+                options=["— Chọn PGD —"] + ds_pgd,
+                key="nxh_cb_pgd_sel",
+            )
 
-                # Tóm tắt hiện trạng phân công
-                so_xa_da_phan = sum(1 for v in can_bo_map.values() if v.strip())
-                if so_xa_da_phan:
-                    st.caption(f"Đã phân công: **{so_xa_da_phan}** xã/phường có cán bộ phụ trách.")
+            if pgd_sel and pgd_sel != "— Chọn PGD —":
+                # Xã/phường theo PGD từ config — đúng và đầy đủ
+                ds_xa = PGD_XA_MAP.get(pgd_sel, [])
+
+                if not ds_xa:
+                    st.caption("PGD này chưa có danh sách xã/phường trong cấu hình.")
                 else:
-                    st.caption("Chưa có xã/phường nào được phân công cán bộ.")
+                    st.caption(f"{pgd_sel} — {len(ds_xa)} xã/phường")
+                    new_map = dict(can_bo_map)
+                    changed = False
+                    cols_cb = st.columns(2)
+                    for i, xa in enumerate(ds_xa):
+                        with cols_cb[i % 2]:
+                            val = st.text_input(
+                                xa,
+                                value=can_bo_map.get(xa, ""),
+                                placeholder="Họ tên cán bộ...",
+                                key=f"nxh_cb_{i}_{pgd_sel}",
+                            )
+                            new_map[xa] = val.strip()
+                            if val.strip() != can_bo_map.get(xa, ""):
+                                changed = True
 
-                pgd_sel = st.selectbox(
-                    "Chọn PGD để phân công cán bộ",
-                    options=["— Chọn PGD —"] + ds_pgd_co_du_lieu,
-                    key="nxh_cb_pgd_sel",
-                )
+                    if st.button("💾 Lưu phân công", key="nxh_cb_save", type="primary", disabled=not changed):
+                        db.ghi_kv("nxh_can_bo_xa", new_map, username)
+                        db.ghi_audit(username, "luu_nxh_can_bo_xa",
+                                     f"Phân công cán bộ NXH: {pgd_sel} — {len(ds_xa)} xã")
+                        st.success("✅ Đã lưu phân công.")
+                        st.rerun()
 
-                if pgd_sel and pgd_sel != "— Chọn PGD —":
-                    df_pgd = df_nxh[df_nxh["Tên PGD"] == pgd_sel]
-                    ds_xa = (
-                        sorted(df_pgd["Tên xã"].dropna().unique().tolist())
-                        if "Tên xã" in df_pgd.columns else []
-                    )
-
-                    if not ds_xa:
-                        st.caption("PGD này không có dữ liệu xã/phường.")
-                    else:
-                        st.caption(f"{pgd_sel} — {len(ds_xa)} xã/phường")
-                        new_map = dict(can_bo_map)
-                        changed = False
-                        cols_cb = st.columns(2)
-                        for i, xa in enumerate(ds_xa):
-                            with cols_cb[i % 2]:
-                                val = st.text_input(
-                                    xa,
-                                    value=can_bo_map.get(xa, ""),
-                                    placeholder="Họ tên cán bộ...",
-                                    key=f"nxh_cb_{i}_{pgd_sel}",
-                                )
-                                new_map[xa] = val.strip()
-                                if val.strip() != can_bo_map.get(xa, ""):
-                                    changed = True
-
-                        if st.button("💾 Lưu phân công", key="nxh_cb_save", type="primary", disabled=not changed):
-                            db.ghi_kv("nxh_can_bo_xa", new_map, username)
-                            db.ghi_audit(username, "luu_nxh_can_bo_xa",
-                                         f"Phân công cán bộ NXH: {pgd_sel} — {len(ds_xa)} xã")
-                            st.success("✅ Đã lưu phân công.")
-                            st.rerun()
-
-                        if not changed:
-                            st.caption("Thay đổi nội dung để kích hoạt nút Lưu.")
+                    if not changed:
+                        st.caption("Thay đổi nội dung để kích hoạt nút Lưu.")
 
         # ── Expander 3: Xem danh sách tháng hiện tại ──────────────────────────
         with st.expander("📋 Danh sách tháng hiện tại", expanded=True):

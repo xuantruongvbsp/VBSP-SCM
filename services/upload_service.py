@@ -75,7 +75,8 @@ FILES_HE_THONG: dict[str, dict] = {
     TEN_FILE: {
         "mo_ta":  "📊 HSTD Chi tiết",
         "path":   FILE_PATH,
-        "cache":  str(CACHE_DIR / "hstd.parquet"),
+        # Không xóa hstd.parquet (cache merged 22 PGD) khi upload file hệ thống cũ —
+        # việc cập nhật parquet phải qua merge_du_lieu_toan_cn() trong tab Upload HSTD.
     },
     TEN_FILE_NQ11: {
         "mo_ta":  "📑 Sao kê NQ11",

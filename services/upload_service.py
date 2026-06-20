@@ -56,10 +56,10 @@ from config import (
     UPLOAD_CANH_BAO_NGAY,
 )
 
-_MERGE_LOCK: dict[str, threading.Lock] = {
-    "hstd": threading.Lock(),
-    "nq11": threading.Lock(),
-    "gqvl": threading.Lock(),
+_MERGE_LOCK: dict[str, threading.RLock] = {
+    "hstd": threading.RLock(),
+    "nq11": threading.RLock(),
+    "gqvl": threading.RLock(),
 }
 
 _BAD_VALS = {"nan", "None", "<NA>", "NaT"}
@@ -594,13 +594,6 @@ def xu_ly_gqvl_toan_cn(
 
 
 # ── Gộp dữ liệu toàn Chi nhánh từ 22 đơn vị ─────────────────────────────────
-
-# Lock toàn cục — ngăn 2 session merge đồng thời (gây freeze do tranh GIL)
-_MERGE_LOCK: dict[str, threading.Lock] = {
-    "hstd": threading.Lock(),
-    "nq11": threading.Lock(),
-    "gqvl": threading.Lock(),
-}
 
 
 def merge_du_lieu_toan_cn(

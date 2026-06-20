@@ -344,7 +344,7 @@ def _tab_khtd_chi_nhanh(
     hr1 = st.columns(_colw)
     hr1[0].markdown(_khtd_cn_hdr_cell("", "#f0f4fa"), unsafe_allow_html=True)
     hr1[1].markdown(
-        _khtd_cn_hdr_cell("NGUỒN VỐN TRUNG ƯƠNG", "#0D2137", "#1565c0"),
+        _khtd_cn_hdr_cell("NGUỒN VỐN TRUNG ƯƠNG", "#bbdefb", "#1565c0"),
         unsafe_allow_html=True,
     )
     for j in (2, 3):

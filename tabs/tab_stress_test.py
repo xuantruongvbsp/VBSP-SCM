@@ -142,7 +142,9 @@ def _color_row(row) -> list[str]:
 
 def render(tab: DeltaGenerator = None, **kwargs) -> None:
     """Stress test danh mục tín dụng."""
-    df_full  = kwargs.get("df_full") or kwargs.get("df")
+    df_full  = kwargs.get("df_full")
+    if df_full is None:
+        df_full = kwargs.get("df")
     role_raw = str(kwargs.get("role", "user") or "user")
     role     = normalize_role(role_raw)
 

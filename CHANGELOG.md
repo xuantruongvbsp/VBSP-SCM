@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## [2026-06-20] — Fix merge chạy 2 lần đồng thời + giảm max_workers
+- `services/upload_service.py` dòng 59 — đổi `_MERGE_LOCK` từ `Lock` → `RLock` (reentrant)
+- `services/upload_service.py` dòng 606 — `merge_du_lieu_toan_cn()`: thêm `acquire(blocking=False)` → trả lỗi ngay nếu session khác đang merge cùng loại; tách logic thực thi ra `_merge_du_lieu_toan_cn_impl()`
+- `services/upload_service.py` dòng 704 — giảm `max_workers` từ 12 → 6, giảm tranh GIL với UI thread
+
 ## [2026-06-20] — Phân công cán bộ NXH: lấy danh sách xã từ PGD_XA_MAP thay vì file upload
 - `tabs/tab_phan_ky_nxh.py` dòng ~63 — expander "Phân công Cán bộ": dùng `PGD_XA_MAP` từ `config.py` để lấy danh sách PGD + xã/phường, thay vì lọc từ file NXH upload (trước đây thiếu xã không có khoản vay NXH)
 

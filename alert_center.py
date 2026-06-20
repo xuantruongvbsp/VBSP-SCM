@@ -391,6 +391,40 @@ def _get_khoanh_alert_data(df_full):
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# Công văn quá hạn xử lý
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def _kiem_tra_cong_van_den_han() -> list[AlertItem]:
+    """Cảnh báo công văn chưa xử lý quá 7/14 ngày kể từ ngày nhận."""
+    try:
+        from services.cong_van_service import ds_cv_sap_den_han
+        from datetime import date, timedelta
+
+        ngay_hom_nay = date.today()
+        cv_khan = ds_cv_sap_den_han((ngay_hom_nay - timedelta(days=14)).isoformat())
+        cv_tat_ca = ds_cv_sap_den_han((ngay_hom_nay - timedelta(days=7)).isoformat())
+        ids_khan = {cv["id"] for cv in cv_khan}
+        cv_canh_bao = [cv for cv in cv_tat_ca if cv["id"] not in ids_khan]
+    except Exception:
+        return []
+
+    items: list[AlertItem] = []
+    if cv_khan:
+        items.append(AlertItem(
+            muc=MUC_KHAN,
+            tieu_de=f"{len(cv_khan)} công văn quá hạn xử lý (>14 ngày)",
+            mo_ta="Cần xử lý ngay — tab Quản lý Công văn",
+        ))
+    if cv_canh_bao:
+        items.append(AlertItem(
+            muc=MUC_CANH_BAO,
+            tieu_de=f"{len(cv_canh_bao)} công văn chưa xử lý (7–14 ngày)",
+            mo_ta="Kiểm tra và xử lý — tab Quản lý Công văn",
+        ))
+    return items
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # Health check tự động
 # ═══════════════════════════════════════════════════════════════════════════════
 
@@ -477,6 +511,10 @@ def _build_alert_items(
 
     # Nợ đến hạn trong 30 ngày
     items += _kiem_tra_no_den_han(df_full, pgd_filter)
+
+    # Công văn quá hạn xử lý — chỉ CN thấy
+    if la_phan_he_cn(role):
+        items += _kiem_tra_cong_van_den_han()
 
     # Health check tự động (kết quả lần chạy gần nhất)
     if la_phan_he_cn(role):

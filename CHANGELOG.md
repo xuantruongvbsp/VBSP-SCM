@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## [2026-06-21] — Fix PGD data scope + docstring tab_tracuu_v2
+- `workspaces/ws_operation.py` dòng ~911 — đổi `**kwargs` → `**_pgd_df_kwargs` cho tab_tracuu_v2: PGD user giờ nhận df đã lọc theo PGD (nhất quán với các tab khác, modal lookup dùng df_pgd)
+- `tabs/tab_tracuu_v2.py` dòng 1-9 — cập nhật docstring cho đúng với thiết kế sau refactor
+
 ## [2026-06-21] — Tách 2 luồng dữ liệu KHNV / Hỗ trợ địa bàn cho ws_operation
 - `data/pgd.py` — `doc_hstd_pgd()`: ưu tiên `hstd_latest.xlsx`, fallback `hstd_khnv.xlsx` thay vì trả None
 - `data/pgd.py` — `doc_hstd_toan_cn_pgd()`: quét cả `hstd_khnv.xlsx` khi PGD chưa có `hstd_latest.xlsx`

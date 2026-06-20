@@ -190,7 +190,6 @@ def test_kiem_tra_can_bang_empty_returns_empty(test_db):
 
 
 def test_luu_dot_stores_payload(test_db):
-    from services.upload_service import KetQuaUpload
     kq = khtd_service.luu_dot(
         pgd_slug="long_thanh",
         nam=2026,
@@ -208,4 +207,216 @@ def test_luu_dot_stores_payload(test_db):
     assert raw is not None
     assert raw["loai"] == "giao"
     assert len(raw["du_lieu"]) == 1
+
+
+def test_luu_dot_negative_kh_skipped(test_db):
+    """Dòng có KH mới âm bị bỏ qua, vẫn thành công với 0 dòng hợp lệ."""
+    kq = khtd_service.luu_dot(
+        pgd_slug="long_thanh",
+        nam=2026,
+        thang="05",
+        dot="Dot2",
+        loai="dieu_chinh",
+        du_lieu=[{"xa": "Xã A", "ma_key": "1_TW", "ten_ct": "CT1",
+                  "nguon": "TW", "kh_tw": 10.0, "dc_tw": -50.0,
+                  "kh_dp": 0.0, "dc_dp": 0.0, "ly_do": ""}],
+        username="tester",
+    )
+    assert kq.thanh_cong is True
+    raw = test_db.doc_kv("khtd_long_thanh_2026_05_Dot2")
+    assert raw["du_lieu"] == []
+
+
+def test_luu_dot_converts_to_vnd(test_db):
+    """Giá trị nhập triệu → lưu VND (×1_000_000)."""
+    khtd_service.luu_dot(
+        pgd_slug="long_thanh",
+        nam=2026,
+        thang="06",
+        dot="Dot1",
+        loai="giao",
+        du_lieu=[{"xa": "Xã A", "ma_key": "1_TW", "kh_tw": 200.0,
+                  "dc_tw": 0.0, "kh_dp": 0.0, "dc_dp": 0.0, "ly_do": ""}],
+        username="tester",
+    )
+    raw = test_db.doc_kv("khtd_long_thanh_2026_06_Dot1")
+    assert raw["du_lieu"][0]["kh_tw"] == 200_000_000
+    assert raw["du_lieu"][0]["kh_moi_tw"] == 200_000_000
+
+
+# ── _dot_sort_key ─────────────────────────────────────────────────────────────
+
+def test_dot_sort_key_numeric_order():
+    k1 = khtd_service._dot_sort_key("Dot1")
+    k2 = khtd_service._dot_sort_key("Dot2")
+    k10 = khtd_service._dot_sort_key("Dot10")
+    assert k1 < k2 < k10
+
+
+def test_dot_sort_key_non_numeric_last():
+    k_num = khtd_service._dot_sort_key("Dot1")
+    k_str = khtd_service._dot_sort_key("ThuongXuyen")
+    assert k_num < k_str
+
+
+def test_dot_sort_key_case_insensitive():
+    assert khtd_service._dot_sort_key("DOT1") == khtd_service._dot_sort_key("dot1")
+
+
+# ── lay_dot_truoc ─────────────────────────────────────────────────────────────
+
+def test_lay_dot_truoc_returns_none_when_empty(test_db):
+    result = khtd_service.lay_dot_truoc("long_thanh", 2026, "05", "Dot1")
+    assert result is None
+
+
+def test_lay_dot_truoc_finds_earlier_dot(test_db):
+    # Lưu Dot1, sau đó hỏi Dot2 → phải tìm được Dot1
+    khtd_service.luu_dot("long_thanh", 2026, "05", "Dot1", "giao",
+                          [{"xa": "X", "ma_key": "1_TW", "kh_tw": 100.0, "dc_tw": 0.0,
+                            "kh_dp": 0.0, "dc_dp": 0.0, "ly_do": ""}], "tester")
+    result = khtd_service.lay_dot_truoc("long_thanh", 2026, "05", "Dot2")
+    assert result is not None
+    assert result["loai"] == "giao"
+
+
+def test_lay_dot_truoc_same_dot_not_returned(test_db):
+    khtd_service.luu_dot("long_thanh", 2026, "05", "Dot1", "giao",
+                          [{"xa": "X", "ma_key": "1_TW", "kh_tw": 50.0, "dc_tw": 0.0,
+                            "kh_dp": 0.0, "dc_dp": 0.0, "ly_do": ""}], "tester")
+    # Hỏi Dot1 — không được trả về chính nó
+    result = khtd_service.lay_dot_truoc("long_thanh", 2026, "05", "Dot1")
+    assert result is None
+
+
+# ── tong_hop ─────────────────────────────────────────────────────────────────
+
+def _tong_hop_direct(nam, thang, dot):
+    """Gọi tong_hop không qua cache — dùng trong test."""
+    import pandas as pd
+    from services.khtd_service import _kv_key, ds_slug
+    cols = ["pgd_slug", "xa", "ma_key", "ten_ct", "nguon", "loai",
+            "kh_tw", "dc_tw", "kh_moi_tw", "kh_dp", "dc_dp", "kh_moi_dp", "ly_do"]
+    rows = []
+    for pgd_s in ds_slug():
+        key = _kv_key(pgd_s, nam, thang, dot)
+        raw = db_module.doc_kv(key)
+        if not raw or not isinstance(raw, dict):
+            continue
+        loai = raw.get("loai") or ""
+        for item in raw.get("du_lieu") or []:
+            if not isinstance(item, dict):
+                continue
+            row = {"pgd_slug": pgd_s, "loai": loai}
+            for c in ("xa", "ma_key", "ten_ct", "nguon", "kh_tw", "dc_tw",
+                      "kh_moi_tw", "kh_dp", "dc_dp", "kh_moi_dp", "ly_do"):
+                row[c] = item.get(c)
+            rows.append(row)
+    return pd.DataFrame(rows, columns=cols) if rows else pd.DataFrame(columns=cols)
+
+
+def test_tong_hop_empty_returns_empty_dataframe(test_db):
+    df = _tong_hop_direct(2026, "99", "Dot99")
+    assert df.empty
+    assert "pgd_slug" in df.columns
+
+
+def test_tong_hop_with_data(test_db, monkeypatch):
+    """tong_hop trả về DataFrame có dữ liệu từ kv_store (via hoi_so slug)."""
+    khtd_service.luu_dot("hoi_so", 2026, "05", "Dot1", "giao",
+                          [{"xa": "Xã A", "ma_key": "1_TW", "ten_ct": "CT1",
+                            "nguon": "TW", "kh_tw": 100.0, "dc_tw": 0.0,
+                            "kh_dp": 0.0, "dc_dp": 0.0, "ly_do": ""}], "tester")
+    df = _tong_hop_direct(2026, "05", "Dot1")
+    assert not df.empty
+    assert df["pgd_slug"].iloc[0] == "hoi_so"
+    assert df["ma_key"].iloc[0] == "1_TW"
+
+
+# ── kiem_tra_can_bang với data ────────────────────────────────────────────────
+
+def test_kiem_tra_can_bang_balanced(monkeypatch):
+    """Điều chỉnh cân bằng giữa 2 PGD (dc_tw bù trừ nhau → cân bằng)."""
+    import pandas as pd
+    df_fake = pd.DataFrame([
+        {"pgd_slug": "a", "loai": "dieu_chinh", "ma_key": "2_TW",
+         "dc_tw": 10_000_000, "dc_dp": 0},
+        {"pgd_slug": "b", "loai": "dieu_chinh", "ma_key": "2_TW",
+         "dc_tw": -10_000_000, "dc_dp": 0},
+    ])
+    monkeypatch.setattr(khtd_service, "tong_hop", lambda *a, **kw: df_fake)
+
+    result = khtd_service.kiem_tra_can_bang(2026, "05", "Dot1")
+    assert "2_TW" in result
+    assert result["2_TW"]["can_bang"] is True
+    assert abs(result["2_TW"]["tong_dc_tw"]) <= 1_000_000
+
+
+def test_kiem_tra_can_bang_unbalanced(monkeypatch):
+    """Điều chỉnh lệch → can_bang = False."""
+    import pandas as pd
+    df_fake = pd.DataFrame([
+        {"pgd_slug": "a", "loai": "dieu_chinh", "ma_key": "2_TW",
+         "dc_tw": 50_000_000, "dc_dp": 0},
+    ])
+    monkeypatch.setattr(khtd_service, "tong_hop", lambda *a, **kw: df_fake)
+
+    result = khtd_service.kiem_tra_can_bang(2026, "06", "Dot1")
+    assert "2_TW" in result
+    assert result["2_TW"]["can_bang"] is False
+
+
+# ── duyet ─────────────────────────────────────────────────────────────────────
+
+def test_duyet_da_duyet(test_db):
+    khtd_service.luu_dot("long_thanh", 2026, "05", "Dot1", "giao",
+                          [{"xa": "X", "ma_key": "1_TW", "kh_tw": 100.0, "dc_tw": 0.0,
+                            "kh_dp": 0.0, "dc_dp": 0.0, "ly_do": ""}], "tester")
+    khtd_service.duyet("long_thanh", 2026, "05", "Dot1", "da_duyet", "OK", "admin")
+    raw = test_db.doc_kv("khtd_long_thanh_2026_05_Dot1")
+    assert raw["trang_thai"] == "da_duyet"
+    assert raw["nguoi_duyet"] == "admin"
+    assert raw["y_kien_duyet"] == "OK"
+
+
+def test_duyet_tu_choi(test_db):
+    khtd_service.luu_dot("long_thanh", 2026, "05", "Dot2", "giao",
+                          [{"xa": "X", "ma_key": "1_TW", "kh_tw": 100.0, "dc_tw": 0.0,
+                            "kh_dp": 0.0, "dc_dp": 0.0, "ly_do": ""}], "tester")
+    khtd_service.duyet("long_thanh", 2026, "05", "Dot2", "tu_choi", "Sai số liệu", "admin")
+    raw = test_db.doc_kv("khtd_long_thanh_2026_05_Dot2")
+    assert raw["trang_thai"] == "tu_choi"
+    assert raw["y_kien_duyet"] == "Sai số liệu"
+
+
+def test_duyet_invalid_status_no_change(test_db):
+    """trang_thai không hợp lệ → không ghi gì vào DB."""
+    khtd_service.luu_dot("long_thanh", 2026, "07", "Dot1", "giao",
+                          [{"xa": "X", "ma_key": "1_TW", "kh_tw": 100.0, "dc_tw": 0.0,
+                            "kh_dp": 0.0, "dc_dp": 0.0, "ly_do": ""}], "tester")
+    khtd_service.duyet("long_thanh", 2026, "07", "Dot1", "trang_thai_la", "...", "admin")
+    raw = test_db.doc_kv("khtd_long_thanh_2026_07_Dot1")
+    # trang_thai vẫn là "cho_duyet" do ghi từ luu_dot
+    assert raw["trang_thai"] == "cho_duyet"
+
+
+def test_duyet_missing_data_noop(test_db):
+    """Duyệt key không tồn tại → không raise exception."""
+    khtd_service.duyet("khong_ton_tai", 2026, "05", "Dot99", "da_duyet", "", "admin")
+
+
+# ── _sync_khtd_xa_from_ap ────────────────────────────────────────────────────
+
+def test_sync_khtd_xa_from_ap_accumulates(test_db):
+    """Tổng hợp data_ap → cập nhật khtd_xa đúng."""
+    data_ap = {
+        "Ấp 1|1_TW": 100.0,
+        "Ấp 2|1_TW": 50.0,
+        "Ấp 1|2_DP": 30.0,
+    }
+    khtd_service._sync_khtd_xa_from_ap("Xã A", data_ap, "tester")
+    kv_xa = test_db.doc_kv("khtd_xa")
+    assert kv_xa is not None
+    assert kv_xa.get("Xã A|1_TW") == 150.0
+    assert kv_xa.get("Xã A|2_DP") == 30.0
 

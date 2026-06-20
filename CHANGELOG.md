@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## [2026-06-20] — Thanh trạng thái merge trên sidebar
+- `services/upload_service.py` dòng ~728 — ghi `_merge_progress` vào kv_store: khi bắt đầu, mỗi 5 PGD, khi kết thúc (dùng `try/finally` để đảm bảo luôn ghi `running=False`)
+- `app.py` dòng ~465 — sidebar đọc `_merge_progress` và hiển thị badge: 🔄 khi đang chạy, ✅ trong 5 phút sau khi xong
+
 ## [2026-06-20] — Fix merge chạy 2 lần đồng thời + giảm max_workers
 - `services/upload_service.py` dòng 59 — đổi `_MERGE_LOCK` từ `Lock` → `RLock` (reentrant)
 - `services/upload_service.py` dòng 606 — `merge_du_lieu_toan_cn()`: thêm `acquire(blocking=False)` → trả lỗi ngay nếu session khác đang merge cùng loại; tách logic thực thi ra `_merge_du_lieu_toan_cn_impl()`

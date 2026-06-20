@@ -1,5 +1,75 @@
 # CHANGELOG
 
+## [2026-06-20] — khtd: redesign Section B & C theo định dạng BĐD (wide pivot)
+- `tabs/tab_khtd_giao_dc.py` dòng ~34–280 — thêm helper: `_SHORT_CT`, `_CT_MAP`, `_ten_ngan()`, `_rows_to_wide()`, `_wide_col_config()`, `_wide_to_du_lieu()`, `_ROMAN`, `_html_bdd_table()`
+- `tabs/tab_khtd_giao_dc.py` `_section_b_giao()` — viết lại dùng wide pivot với TW/ĐP sub-tabs; data_editor mỗi nguồn riêng; save button ngoài tabs
+- `tabs/tab_khtd_giao_dc.py` `_section_c_tong_hop()` — thay 2 DataFrame cũ bằng HTML BĐD pivot (hàng = PGD/xã phân cấp, cột = nhóm CT) với TW/ĐP tabs; giữ nguyên logic duyệt
+
+## [2026-06-20] — khtd: cải thiện UI tab Giao & Điều chỉnh KHTD
+- `tabs/tab_khtd_giao_dc.py` — thêm `st.tabs()` cho sections A/B/C/E thay vì đổ thẳng; `_chon_dot()` wrapped trong `st.container(border=True)`; xóa `\n` khỏi tên cột data_editor và label st.metric(); thêm column widths cho data_editor
+
+## [2026-06-20] — khtd: cache tong_hop() + _bang_pivot_tom_tat() giảm tải SQLite
+- `services/khtd_service.py` — thêm `import streamlit`; `@st.cache_data(ttl=60)` trên `tong_hop()` — tất cả caller (kiem_tra_can_bang, _tinh_so_sanh_kh_th, section C) đều hưởng lợi tự động
+- `tabs/tab_khtd_giao_dc.py` — `@st.cache_data(ttl=60)` trên `_bang_pivot_tom_tat()` — loại 22 `db.doc_kv()` riêng lẻ mỗi render; tổng giảm từ 66–88 reads/render xuống ~0 sau lần đầu
+
+## [2026-06-20] — khtd: Section E thêm chế độ xem "Danh sách xã theo PGD"
+- `tabs/tab_khtd_giao_dc.py` — thêm `_tinh_so_sanh_kh_th_xa()`: join theo (pgd, xã, mã CT, nguồn); Section E thêm radio option "📋 Danh sách xã theo PGD"; Excel export thêm sheet "Chi tiết xã"
+
+## [2026-06-20] — khtd: Section E — Báo cáo So sánh Kế hoạch vs Thực hiện
+- `tabs/tab_khtd_giao_dc.py` — thêm `_MAKEY_TO_MACT` lookup dict, `_tinh_so_sanh_kh_th()`, `_dinh_dang_so_sanh()`, `_section_e_so_sanh_kh_th()`: so sánh KH (từ tong_hop) vs TH (từ HSTD) theo (PGD, mã CT, nguồn); metric tổng CN; 2 chế độ xem (CN/PGD); xuất Excel 2 sheet; gọi từ render() cho CN roles
+
+## [2026-06-20] — khtd: fix join Dư nợ TH theo mã CT + nguồn vốn (thay vì tên)
+- `tabs/tab_khtd_giao_dc.py` — `_build_du_no_map()`: đổi key từ `(xa, ten_ct)` sang `(xa, ma_ct_int, nguon_int)` — tránh mismatch khi tên hiển thị KHTD khác tên HSTD và chương trình ĐP luôn về 0; import thêm COT_MA_CHUONG_TRINH, COT_NGUON_VON
+
+## [2026-06-20] — khtd: validate kh_moi âm, warning PGD trống, min_value=0
+- `services/khtd_service.py` — `_du_lieu_chuyen_trieu_sang_vnd()` đổi return thành tuple `(list, list_loi)`: bỏ qua dòng có kh_moi < 0, báo lỗi chi tiết; `luu_dot()` surface cảnh báo vào KetQuaUpload
+- `tabs/tab_khtd_giao_dc.py` — Section B: cảnh báo khi PGD không có xã trong config; thêm `min_value=0` cho cột KH giao TW/ĐP
+- `tests/test_khtd_service.py` — cập nhật 3 test cũ + thêm test case kh_moi âm
+
+## [2026-06-20] — tab_khtd_giao_dc: thêm cột Dư nợ TH vào Section B
+- `tabs/tab_khtd_giao_dc.py` — thêm hàm `_build_du_no_map()`, bổ sung 2 cột readonly "Dư nợ TH (triệu đồng)" và "% TH/KH trước" vào bảng nhập KH giao; truyền `df_hstd` từ `render()` xuống
+- `tabs/tab_khtd_giao_dc.py` — `_build_du_no_map()` đồng nhất với project: dùng COT_TONG_DU_NO (đã validated TH+QH+Khoanh khi upload), fallback tính thủ công nếu cột vắng
+
+## [2026-06-19] — Kiến trúc: tách ws_operation.py đợt 4 — 5 tab mới, fix syntax error
+- `tabs/tab_du_phong_dong_tien_pgd.py` (mới) — tách `_render_du_phong_dong_tien` (247 dòng): dự phóng dòng tiền thu gốc theo tháng
+- `tabs/tab_heatmap_dao_han_pgd.py` (mới) — tách `_render_heatmap_dao_han` (179 dòng): heatmap đáo hạn Tháng × Chương trình
+- `tabs/tab_dashboard_dgd_pgd.py` (mới) — tách `_render_dashboard_pgd_dgd` (155 dòng): KPI Điểm GD & Tổ TK&VV
+- `tabs/tab_histogram_du_no_pgd.py` (mới) — tách `_render_histogram_du_no` (107 dòng): histogram phân bố dư nợ
+- `tabs/tab_donut_co_cau_pgd.py` (mới) — tách `_render_donut_co_cau` (135 dòng): donut cơ cấu chương trình
+- `workspaces/ws_operation.py` — xóa 842 dòng dead code + tách hàm; 1,996 → 1,154 dòng; fix syntax error U+25A0 ở dòng 555
+
+## [2026-06-19] — Kiến trúc: tách ws_operation.py đợt 3 — 2 tab mới
+- `tabs/tab_kiem_soat_du_lieu_pgd.py` (mới) — tách `_render_kiem_soat_pgd` (222 dòng): kiểm soát NQH + 3m KHĐ theo xã, xuất Excel
+- `tabs/tab_doc_hub.py` (mới) — tách `_render_doc_hub` + `_init_gb2_session_for_doc_hub` (304 dòng): trung tâm điền mẫu Word hàng loạt
+- `workspaces/ws_operation.py` — 3,307 → 2,774 dòng (−533)
+
+## [2026-06-19] — Kiến trúc: tiếp tục tách ws_operation.py — 3 tab mới, xóa dead code
+- `tabs/tab_bien_ban_giao_ban.py` (mới) — tách `_render_bien_ban_giao_ban` (194 dòng)
+- `tabs/tab_thong_bao_ket_luan.py` (mới) — tách `_render_thong_bao_ket_luan` (430 dòng)
+- `tabs/tab_bao_cao_giao_ban_pgd.py` (ghi đè file dead code 195 dòng) — tách `_render_bao_cao_giao_ban` (672 dòng) thành tab module chuẩn
+- `workspaces/ws_operation.py` — xóa `_render_canh_bao_som_pgd_full` (309 dòng dead code), inline 2 thin wrappers, 3 hàm lớn → lazy_tab; tổng giảm 5,707 → 3,307 dòng (−2,400 dòng)
+
+## [2026-06-19] — Fix dropdown "Chọn sheet theo dõi" còn hiện tên sau khi xóa
+- `tabs/tab_theo_doi_nhap/__init__.py` dòng ~90 — reset `ttdn_sheet_sel` về 0 nếu index cũ vượt quá số sheet sau khi xóa
+
+## [2026-06-19] — Kiến trúc: tách ws_operation.py, xóa dead code
+- `tabs/tab_phan_tich_nqh_pgd.py` (mới) — tách `_render_phan_tich_nqh_pgd` (~110 dòng) thành tab module độc lập với `render(tab=None, **kwargs)`
+- `workspaces/ws_operation.py` — xóa 4 hàm (871 dòng): `_render_phan_tich_nqh_pgd` (tách ra tab), `_render_kiem_soat_noi_bo_pgd` (dead code, lazy_tab đã thay), `_render_don_doc` (dead code), `_render_dashboard_nang_cao_pgd` (dead code); cập nhật routing "📈 Phân tích NQH" dùng `_lazy_tab("tab_phan_tich_nqh_pgd")`; tổng giảm từ 5,707 → 4,836 dòng
+
+## [2026-06-19] — Fix toàn bộ: hiệu năng + type conversion + audit retention + integration test
+- `data/core.py` dòng ~61 — `excel_to_parquet()`: trả `df` trực tiếp sau khi ghi parquet, không đọc lại; tiết kiệm ~0.5s/file × 22 PGD = ~11s/lần merge
+- `services/upload_service.py` dòng ~876 — thêm `st.cache_data.clear()` trong `merge_du_lieu_toan_cn()` sau khi ghi parquet thành công; UI nhận dữ liệu mới ngay lập tức
+- `data/hstd.py` — hạ TTL `@st.cache_data` từ 7200s → 300s cho 7 hàm đọc dữ liệu sống
+- `tabs/tab_so_sanh_ky/render_2_ky.py` dòng ~225 — thêm `pd.to_numeric` cho cột `dn1`, `dn2` sau `fillna(0)` để tránh lỗi subtract trên dtype object
+- `snapshot_service.py` dòng ~630 — thêm `pd.to_numeric(..., errors='coerce')` trước `.astype(int)` cho cột count sau merge
+- `db.py` dòng ~1553 — thêm hàm `xoa_audit_cu(ngay_giu_lai=90)` xóa audit_log cũ hơn 90 ngày
+- `app.py` dòng ~260 — gọi `xoa_audit_cu()` trong `main()` startup, 1 lần/ngày bằng kv_store checkpoint
+- `tests/test_integration_upload_merge.py` (mới) — integration test: `excel_to_parquet` (4 test), audit retention (2 test), merge flow (1 test)
+
+## [2026-06-19] — Tái cơ cấu menu sidebar ws_management + fix ws_operation
+- `workspaces/ws_management.py` — đổi tên nhóm "Thông tin chung"→"Tổng quan", "Phối hợp với PGD"→"Nội bộ Phòng", "Kế hoạch và Thực hiện KHTD"→"Kế hoạch Tín dụng"; xóa nhóm "Phân tích" (dời "Phân loại KH" vào Giám sát); thêm icon cho 6 mục; thêm "📥 Tiến độ nộp BC" vào Báo cáo; cập nhật GROUP_COLORS
+- `workspaces/ws_operation.py` — thêm "🏷️ Phân loại KH" vào sidebar "Tác nghiệp"; thêm "🏘️ Tổ TK&VV" vào sidebar "Kiểm soát"; đổi icon "📊→📍 Tổng quan ĐGD & Tổ TK&VV" trong cả _WS_OP_MENU_ITEMS lẫn CAC_NHOM
+
 ## [2026-06-18] — Telegram: 6 tính năng mới (2-way, T-7/T-3/T-1, lịch, giải ngân, per-PGD, khoanh)
 - `scripts/telegram_polling.py` (mới) — bot 2 chiều: lệnh `/help /sl /nqh /khtd /dh /gn /pgd <tên>`, chạy mỗi phút qua Task Scheduler
 - `services/telegram_service.py` — thêm `luu_pgd_chat()`, `gui_tin_pgd()` (routing per-PGD), `gui_nhac_den_han_phan_tang()`, `gui_nhac_lich_cong_tac()`, `gui_giai_ngan_tuan()`, `gui_canh_bao_khoanh_tang()`

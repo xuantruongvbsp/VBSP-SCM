@@ -908,7 +908,7 @@ def render(**kwargs):
 
                 ("📈 Tiến độ công việc", lambda tab: _lazy_tab("tab_tien_do").render(tab, **kwargs)),
 
-                ("🔍 Tra cứu hồ sơ", lambda tab: _lazy_tab("tab_tracuu_v2").render(tab, **kwargs)),
+                ("🔍 Tra cứu hồ sơ", lambda tab: _lazy_tab("tab_tracuu_v2").render(tab, **_pgd_df_kwargs)),
 
                 ("📋 Danh sách & Lọc", lambda tab: _lazy_tab("tab_danhsach").render(tab, **kwargs)),
 

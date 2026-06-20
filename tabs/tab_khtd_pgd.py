@@ -33,7 +33,7 @@ from services.khtd_nhap_service import (
 from config import (
 
     CHUONG_TRINH_KHTD, TEN_CHINH_THUC_CT,
-    COT_TEN_PGD, COT_TEN_CT, COT_MA_CHUONG_TRINH, COT_NGUON_VON, COT_TONG_DU_NO, COT_DU_NO_TH,
+    COT_TEN_PGD, COT_TEN_CT, COT_TEN_XA, COT_MA_CHUONG_TRINH, COT_NGUON_VON, COT_TONG_DU_NO, COT_DU_NO_TH,
     DS_PGD, PGD_XA_MAP,
 )
 
@@ -53,6 +53,158 @@ for mk, ma_ct, ten, _nv, _ in CHUONG_TRINH_KHTD:
 # Thư mục lưu văn bản QĐ cấp PGD
 DATA_DIR     = Path(__file__).parent.parent / "data"
 PGD_DATA_DIR = DATA_DIR / "pgd_data"
+
+_SHORT_CT_PGD: dict[str, str] = {
+    "1_TW": "Hộ nghèo",       "2_TW": "HSSV",           "3_TW_NHCSXH": "GQVL HĐ",
+    "3_TW_NSNN": "GQVL NS",   "4_TW": "XKLĐ",            "6_TW": "NS sạch",
+    "7_TW": "Nhà ở HN",       "9_TW": "Mới TN",           "10_TW": "SXKD KK",
+    "12_TW": "Nhà ở XH",      "15_TW": "TN KK",           "17_TW": "DTTS 755",
+    "19_TW": "Cận nghèo",     "21_TW": "DTTS 2085",       "25_TW": "Vùng DTTS",
+    "26_TW": "Chấp hành",     "99_TW": "Khác TW",
+    "1_DP": "HN (ĐP)",        "2_DP": "SV (ĐP)",          "3_DP_TINH": "GQVL tỉnh",
+    "3_DP_XA": "GQVL xã",    "6_DP": "NS ĐP",             "9_DP": "Mới TN ĐP",
+    "10_DP": "SXKD KK ĐP",   "12_DP": "NOXH ĐP",         "15_DP": "TN KK ĐP",
+    "17_DP": "DTTS 755 ĐP",  "19_DP": "Cận nghèo ĐP",    "21_DP": "DTTS 2085 ĐP",
+    "25_DP": "Vùng DTTS ĐP", "26_DP": "Chấp hành ĐP",    "99_DP": "Khác ĐP",
+}
+
+_LOOKUP_XA_CT: dict[tuple[int, int], str] = {}
+for _mk, _ma_ct, _, _nv, _ in CHUONG_TRINH_KHTD:
+    _LOOKUP_XA_CT.setdefault((int(_ma_ct), 1 if _nv == "TW" else 2), _mk)
+
+
+def _ten_ngan_pgd(ma_key: str) -> str:
+    return _SHORT_CT_PGD.get(ma_key, ma_key)
+
+
+def _tinh_th_xa_ct(df: "pd.DataFrame") -> dict[tuple, float]:
+    """Returns {(ten_xa, ma_key): vnd_sum} từ HSTD DataFrame."""
+    if df is None or df.empty:
+        return {}
+    required = (COT_TEN_XA, COT_MA_CHUONG_TRINH, COT_NGUON_VON)
+    if not all(c in df.columns for c in required):
+        return {}
+    col_th = COT_TONG_DU_NO if COT_TONG_DU_NO in df.columns else (
+        COT_DU_NO_TH if COT_DU_NO_TH in df.columns else None
+    )
+    if not col_th:
+        return {}
+    tmp = df[[COT_TEN_XA, COT_MA_CHUONG_TRINH, COT_NGUON_VON, col_th]].copy()
+    tmp[COT_MA_CHUONG_TRINH] = pd.to_numeric(tmp[COT_MA_CHUONG_TRINH], errors="coerce").fillna(0).astype(int)
+    tmp[COT_NGUON_VON] = pd.to_numeric(tmp[COT_NGUON_VON], errors="coerce").fillna(0).astype(int)
+    tmp[col_th] = pd.to_numeric(tmp[col_th], errors="coerce").fillna(0)
+    tmp = tmp[(tmp[COT_MA_CHUONG_TRINH] > 0) & (tmp[COT_NGUON_VON].isin([1, 2]))]
+    out: dict[tuple, float] = {}
+    for (xa, ma_ct, nv), s in tmp.groupby([COT_TEN_XA, COT_MA_CHUONG_TRINH, COT_NGUON_VON])[col_th].sum().items():
+        mk = _LOOKUP_XA_CT.get((int(ma_ct), int(nv)))
+        if mk:
+            out[(str(xa), mk)] = float(s)
+    return out
+
+
+def _html_bdd_pgd_table(pgd: str, kh_xa: dict, th_xa_ct: dict, nguon: str) -> str:
+    """HTML pivot table dạng BĐD cho PGD: hàng = xã, cột = CT × (KH | TH | %)."""
+    ds_xa = PGD_XA_MAP.get(pgd, [])
+    if not ds_xa:
+        return f"<p style='color:#64748b;padding:12px'>⚠️ Chưa có danh sách xã cho {pgd}.</p>"
+
+    active_mk: list[str] = []
+    mk_set: set[str] = set()
+    for mk, _, _, nv, _ in CHUONG_TRINH_KHTD:
+        if nv != nguon or mk in mk_set:
+            continue
+        has_kh = any(float(kh_xa.get(f"{xa}|{mk}", 0)) > 0 for xa in ds_xa)
+        has_th = any(th_xa_ct.get((xa, mk), 0) > 0 for xa in ds_xa)
+        if has_kh or has_th:
+            active_mk.append(mk)
+            mk_set.add(mk)
+
+    if not active_mk:
+        return f"<p style='color:#64748b;padding:12px'>Chưa có dữ liệu nguồn {nguon}.</p>"
+
+    def fn(v: float) -> str:
+        return "" if v == 0 else f"{v:,.1f}".replace(",", ".")
+
+    def fp(v) -> str:
+        return "" if v is None else f"{v:.1f}".replace(".", ",") + "%"
+
+    td = "border:1px solid #e2e8f0;padding:3px 7px"
+    th_hdr = "border:1px solid #1e40af;padding:5px 8px;background:rgba(30,64,175,0.85);color:#fff;text-align:center;font-size:11px;white-space:nowrap"
+    th_sub = "border:1px solid #2563eb;padding:3px 6px;background:rgba(37,99,235,0.75);color:#fff;text-align:center;font-size:10px;white-space:nowrap"
+    th_base = "border:1px solid #e2e8f0;padding:4px 8px;background:rgba(239,246,255,0.9);text-align:center;font-size:11px;font-weight:600;white-space:nowrap"
+
+    html: list[str] = [
+        "<div style='overflow-x:auto;font-size:12px;margin-top:8px'>",
+        "<table style='border-collapse:collapse;white-space:nowrap'>",
+        "<thead>",
+        "<tr>",
+        f'<th rowspan="2" style="{th_base}">STT</th>',
+        f'<th rowspan="2" style="{th_base}">Xã / Phường</th>',
+    ]
+    for mk in active_mk:
+        html.append(f'<th colspan="3" style="{th_hdr}">{_ten_ngan_pgd(mk)}</th>')
+    html += ["</tr>", "<tr>"]
+    for _ in active_mk:
+        html += [
+            f'<th style="{th_sub}">KH (tr.đ)</th>',
+            f'<th style="{th_sub}">TH (tr.đ)</th>',
+            f'<th style="{th_sub}">% TH/KH</th>',
+        ]
+    html += ["</tr>", "</thead>", "<tbody>"]
+
+    tong_kh = {mk: 0.0 for mk in active_mk}
+    tong_th_mk = {mk: 0.0 for mk in active_mk}
+
+    for stt, xa in enumerate(ds_xa, 1):
+        html.append("<tr>")
+        html.append(f'<td style="{td};text-align:center;opacity:.55">{stt}</td>')
+        html.append(f'<td style="{td}">{xa}</td>')
+        for mk in active_mk:
+            kh = float(kh_xa.get(f"{xa}|{mk}", 0)) / 1e6
+            th = th_xa_ct.get((xa, mk), 0.0) / 1e6
+            pct = (th / kh * 100) if kh > 0 else None
+            tong_kh[mk] += kh
+            tong_th_mk[mk] += th
+            if pct is None:
+                ps = ""
+            elif pct >= 100:
+                ps = "color:#059669;font-weight:500"
+            elif pct >= 80:
+                ps = "color:#d97706"
+            else:
+                ps = "color:#dc2626"
+            html += [
+                f'<td style="{td};text-align:right">{fn(round(kh, 1))}</td>',
+                f'<td style="{td};text-align:right">{fn(round(th, 1))}</td>',
+                f'<td style="{td};text-align:right;{ps}">{fp(pct)}</td>',
+            ]
+        html.append("</tr>")
+
+    html.append("<tr style='background:rgba(240,253,244,0.8);font-weight:700'>")
+    html.append(f'<td style="{td}" colspan="2">Tổng cộng</td>')
+    for mk in active_mk:
+        kh = round(tong_kh[mk], 1)
+        th = round(tong_th_mk[mk], 1)
+        pct = (th / kh * 100) if kh > 0 else None
+        if pct is None:
+            ps = ""
+        elif pct >= 100:
+            ps = "color:#059669"
+        elif pct >= 80:
+            ps = "color:#d97706"
+        else:
+            ps = "color:#dc2626"
+        html += [
+            f'<td style="{td};text-align:right">{fn(kh)}</td>',
+            f'<td style="{td};text-align:right">{fn(th)}</td>',
+            f'<td style="{td};text-align:right;{ps}">{fp(pct)}</td>',
+        ]
+    html += [
+        "</tr>", "</tbody>", "</table>",
+        "<p style='font-size:11px;margin-top:4px;color:#64748b'>Đơn vị: triệu đồng  |  TH = Tổng dư nợ (HSTD)</p>",
+        "</div>",
+    ]
+    return "\n".join(html)
 
 
 # ── Trợ lý văn bản QĐ ────────────────────────────────────────────────────────
@@ -549,18 +701,7 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
         # ── Văn bản QĐ theo PGD ──────────────────────────────────────────
         _section_van_ban_qd_pgd(pgd_hien_tai, role, username)
 
-        # ── Lọc nguồn vốn ────────────────────────────────────────────────
-        col_nv, _ = st.columns([2, 3])
-        with col_nv:
-            nv_chon = st.radio(
-                "Nguồn vốn",
-                ["Tất cả", "Trung ương", "Địa phương"],
-                horizontal=True,
-                key="khtd_pgd_nv_filter",
-            )
-        st.divider()
-
-        # ── Đọc dữ liệu & dựng bảng ──────────────────────────────────────
+        # ── Đọc dữ liệu ──────────────────────────────────────────────────
         kh_xa = _doc_khtd_xa()
 
         df_th_pgd = df
@@ -569,27 +710,35 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                 df_th_pgd = df_th_pgd[df_th_pgd[COT_TEN_PGD] == pgd_hien_tai]
         th_theo_ct = _tinh_thuc_hien_theo_ct(df_th_pgd) if df_th_pgd is not None else {}
         th_theo_ct = {k: v for k, v in th_theo_ct.items() if float(v) > 0}
+        th_xa_ct = _tinh_th_xa_ct(df_th_pgd) if df_th_pgd is not None else {}
         ten_ct_map = _ten_ct_map_tu_df(df_th_pgd)
 
-        ds_xa = set(PGD_XA_MAP.get(pgd_hien_tai, []))
+        ds_xa_set = set(PGD_XA_MAP.get(pgd_hien_tai, []))
         keys_kh_pgd: set[str] = set()
         for khoa in kh_xa.keys():
             try:
                 xa, ma_key = khoa.split("|", 1)
             except ValueError:
                 continue
-            if xa in ds_xa:
+            if xa in ds_xa_set:
                 keys_kh_pgd.add(ma_key)
+
+        if not PGD_XA_MAP.get(pgd_hien_tai):
+            st.warning(
+                f"Chưa có danh sách xã cho **{pgd_hien_tai}**. "
+                "Kiểm tra cấu hình `PGD_XA_MAP` trong config.py."
+            )
+            return
+        if not keys_kh_pgd and not th_xa_ct:
+            st.info(
+                f"Chưa có dữ liệu kế hoạch xã cho **{pgd_hien_tai}**. "
+                "Yêu cầu Phòng KH-NV nhập dữ liệu trên tab **KHTD theo Xã**."
+            )
 
         keys_show = set(keys_kh_pgd) | set(th_theo_ct.keys())
         base_all = [(mk, ten) for mk, _, ten, _, _ in CHUONG_TRINH_KHTD]
         if not keys_show:
             keys_show = {mk for mk, _ in base_all}
-
-        if nv_chon == "Trung ương":
-            keys_show = {k for k in keys_show if _nv_int_tu_ma_key(k) == 1}
-        elif nv_chon == "Địa phương":
-            keys_show = {k for k in keys_show if _nv_int_tu_ma_key(k) == 2}
 
         base_keys = [mk for mk, _ in base_all if mk in keys_show]
         base_key_set = {mk for mk, _ in base_all}
@@ -602,29 +751,15 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                 k,
             ),
         )
-
         ds_ct_loc: list[tuple[str, str]] = []
         for mk in base_keys + extra_keys:
             ds_ct_loc.append((mk, TEN_CHINH_THUC_CT.get(mk, ten_ct_map.get(mk, mk)) or mk))
 
         df_pgd = _xay_dung_bang_pgd(pgd_hien_tai, kh_xa, ds_ct_loc)
-        if df_pgd.empty:
-            if not PGD_XA_MAP.get(pgd_hien_tai):
-                st.warning(
-                    f"Chưa có danh sách xã cho **{pgd_hien_tai}**. "
-                    "Kiểm tra cấu hình `PGD_XA_MAP` trong config.py."
-                )
-            else:
-                st.info(
-                    f"Chưa có dữ liệu kế hoạch xã cho **{pgd_hien_tai}**. "
-                    "Yêu cầu Phòng KH-NV nhập dữ liệu trên tab **KHTD theo Xã**."
-                )
-            return
-
         kh_theo_ct = _tinh_ke_hoach_pgd_theo_ct(pgd_hien_tai, kh_xa, ds_ct_loc)
         df_ss = _bang_so_sanh_kh_th(ds_ct_loc, kh_theo_ct, th_theo_ct)
 
-        # ── Metrics tổng ─────────────────────────────────────────────────
+        # ── Metrics ──────────────────────────────────────────────────────
         tong_pgd = sum(float(v) for v in kh_theo_ct.values()) / 1_000_000
         tong_th = sum(float(v) for v in th_theo_ct.values()) / 1_000_000
         tl_all = (tong_th / tong_pgd * 100) if tong_pgd > 0 else None
@@ -637,38 +772,13 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
         m4.metric("Số xã có kế hoạch", str(so_xa))
 
         st.divider()
-        st.subheader(f"📊 So sánh KHTD theo Chương trình — {pgd_hien_tai}")
-        if df_ss.empty:
-            st.info("Chưa có dữ liệu để so sánh Kế hoạch vs Thực hiện theo chương trình.")
-        else:
-            hien_thi_dataframe_phan_trang(
-                df_ss,
-                key="khtd_pgd_so_sanh",
-                column_config=_tao_column_config_ss(),
-                height=380,
-            )
-            st.caption("*Đơn vị: triệu đồng · Thực hiện lấy theo Tổng dư nợ (HSTD).*")
 
-        st.divider()
-        st.subheader(f"📋 Bảng KHTD theo Chỉ tiêu × Xã — {pgd_hien_tai}")
-
-        cot_so = [c for c in df_pgd.columns if c not in ("STT", "Chỉ Tiêu", "_nhom")]
-
-        def _to_mau_ma_tran(row: pd.Series) -> list[str]:
-            nhom = str(row.get("_nhom", ""))
-            if nhom in ("A", "I", "II"):
-                return ["font-weight: bold; background-color: #f0f4fa"] * len(row)
-            if nhom == "tong":
-                return ["font-weight: bold; background-color: #e8f4fd"] * len(row)
-            return [""] * len(row)
-
-        hien_thi_dataframe_phan_trang(
-            df_pgd.drop(columns=["_nhom"]).style.apply(_to_mau_ma_tran, axis=1),
-            key="khtd_pgd_matrix",
-            column_config=_tao_column_config_khtd_pgd(cot_so),
-            height=min(60 + 32 * len(df_pgd), 760),
-        )
-        st.caption("Đơn vị: triệu đồng")
+        # ── Bảng BĐD — hàng = xã, cột = nhóm CT ─────────────────────────
+        t_tw, t_dp = st.tabs(["🏦 Nguồn TW", "🏙️ Nguồn ĐP"])
+        with t_tw:
+            st.html(_html_bdd_pgd_table(pgd_hien_tai, kh_xa, th_xa_ct, "TW"))
+        with t_dp:
+            st.html(_html_bdd_pgd_table(pgd_hien_tai, kh_xa, th_xa_ct, "DP"))
 
         # ── Xuất Excel ────────────────────────────────────────────────────
         st.divider()

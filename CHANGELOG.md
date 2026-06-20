@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## [2026-06-20] — Tối ưu sidebar menu: st.button → st.radio (giảm widget count)
+- `workspaces/ws_management.py` dòng ~334 — `render_sidebar_menu()`: thay N `st.button` riêng lẻ (1 per item) bằng 1 `st.radio` per nhóm → từ ~25 widget call xuống còn ~8, rerun sidebar nhanh hơn đáng kể
+- Accordion children cũng dùng `st.radio` thay vì N `st.button`
+
 ## [2026-06-20] — Thanh trạng thái merge trên sidebar
 - `services/upload_service.py` dòng ~728 — ghi `_merge_progress` vào kv_store: khi bắt đầu, mỗi 5 PGD, khi kết thúc (dùng `try/finally` để đảm bảo luôn ghi `running=False`)
 - `app.py` dòng ~465 — sidebar đọc `_merge_progress` và hiển thị badge: 🔄 khi đang chạy, ✅ trong 5 phút sau khi xong

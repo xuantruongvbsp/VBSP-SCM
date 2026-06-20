@@ -873,6 +873,12 @@ def merge_du_lieu_toan_cn(
             username,
         )
 
+        # Clear Streamlit cache để UI đọc dữ liệu mới ngay lập tức
+        try:
+            st.cache_data.clear()
+        except Exception:
+            pass
+
         # Thông báo Telegram sau merge thành công
         try:
             from services.telegram_service import gui_thong_bao_merge

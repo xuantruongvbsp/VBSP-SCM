@@ -87,6 +87,10 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
         ]
         all_labels = ["🏠 Khảo sát HN/HCN/HTN", "📈 Điều chỉnh tăng trưởng"] + sheet_labels
 
+        # Reset index nếu danh sách sheet thay đổi (vd: xóa sheet)
+        if st.session_state.get("ttdn_sheet_sel", 0) >= len(all_labels):
+            st.session_state["ttdn_sheet_sel"] = 0
+
         col_sel, col_ref = st.columns([5, 1])
         with col_sel:
             idx = st.selectbox(

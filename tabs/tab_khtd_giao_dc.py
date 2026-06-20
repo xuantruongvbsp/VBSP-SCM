@@ -1265,7 +1265,6 @@ def render(tab=None, **kwargs) -> None:
             _section_d_user(pgd_user, nam, thang, dot)
             return
 
-        readonly_exec = normalize_role(role) == "executive"
         is_admin = normalize_role(role) in ("admin_cn", "admin")
 
         tab_labels: list[str] = []
@@ -1289,7 +1288,7 @@ def render(tab=None, **kwargs) -> None:
             t_idx += 1
 
         with tabs_ui[t_idx]:
-            _section_c_tong_hop(nam, thang, dot, username, role, loai_val, readonly_exec)
+            _section_c_tong_hop(nam, thang, dot)
         t_idx += 1
 
         with tabs_ui[t_idx]:

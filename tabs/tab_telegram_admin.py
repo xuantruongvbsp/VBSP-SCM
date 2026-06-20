@@ -124,6 +124,27 @@ _NOTIFY_META = [
     },
 ]
 
+# ── Phân nhóm cơ chế gửi (quyết định ô "Giờ gửi" có hiển thị không) ────────────
+# Chỉ các loại đi qua _trong_gio_gui() trong daily_report.py mới đọc giờ admin nhập.
+_SCHEDULE_KEYS = {
+    "qh_moi", "giai_ngan_tuan", "khoanh_tang",
+    "nqh_tuan", "khtd_ct", "tong_ket_thang",
+}
+# Loại chạy theo Task Scheduler giờ cố định — giờ KHÔNG sửa được ở UI này.
+_TASK_GIO = {
+    "bao_cao_sang":      "07:30",
+    "khoang_den_han":    "07:45",
+    "phan_ky_nxh":       "08:00",
+    "health_check":      "06:30",
+    "deadline_bc":       "08:00 / 14:00",
+    "den_han_phan_tang": "08:00 / 14:00",
+    "nop_moi_gsheet":    "08:00 / 14:00",
+    "lich_cong_tac":     "14:00",
+}
+# Loại kích hoạt theo sự kiện nghiệp vụ (không có khái niệm giờ).
+_EVENT_KEYS = {"merge_thanh_cong", "upload_pgd"}
+# Các loại còn lại (he_thong, khtd_tien_do) chỉ gửi thủ công qua nút "▶ Gửi ngay".
+
 
 def _gui_ngay(key: str) -> tuple[bool, str]:
     """Load dữ liệu thực và gửi thông báo ngay lập tức. Trả (ok, thông tin)."""
@@ -692,7 +713,7 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
             extra_chats = (db.doc_kv("telegram_config") or {}).get("extra_chats", {})
 
             new_notify: dict[str, bool] = {}
-            new_sched:  dict[str, str]  = {}
+            new_sched:  dict[str, str]  = dict(sched_cfg)  # giữ giá trị cũ, chỉ cập nhật loại schedule
             notify_changed = False
             sched_changed  = False
 
@@ -700,7 +721,7 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
             hdr = st.columns([2.5, 2.5, 1.5, 1, 1.5])
             hdr[0].markdown("**Loại thông báo**")
             hdr[1].markdown("**Mô tả**")
-            hdr[2].markdown("**Giờ gửi**")
+            hdr[2].markdown("**Lịch / Giờ gửi**")
             hdr[3].markdown("**Chat phụ**")
             hdr[4].markdown("**Thao tác**")
             st.divider()
@@ -727,16 +748,26 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                     st.caption(m["mo_ta"])
 
                 with c3:
-                    new_gio = st.text_input(
-                        "Giờ",
-                        value=cur_gio,
-                        placeholder="HH:MM",
-                        key=f"tg_gio_{key}",
-                        label_visibility="collapsed",
-                    )
-                    new_sched[key] = new_gio.strip()
-                    if new_gio.strip() != cur_gio:
-                        sched_changed = True
+                    if key in _SCHEDULE_KEYS:
+                        new_gio = st.text_input(
+                            "Giờ",
+                            value=cur_gio,
+                            placeholder="HH:MM",
+                            key=f"tg_gio_{key}",
+                            label_visibility="collapsed",
+                        )
+                        new_sched[key] = new_gio.strip()
+                        if new_gio.strip() != cur_gio:
+                            sched_changed = True
+                    elif key in _TASK_GIO:
+                        st.caption(
+                            f"🕐 {_TASK_GIO[key]}",
+                            help="Theo lịch hệ thống (Task Scheduler) — không chỉnh tại đây",
+                        )
+                    elif key in _EVENT_KEYS:
+                        st.caption("⚡ Sự kiện tự động")
+                    else:
+                        st.caption("✋ Chỉ gửi thủ công")
 
                 with c4:
                     if has_extra:

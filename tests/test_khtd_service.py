@@ -126,8 +126,9 @@ def test_so_trieu_tu_oa_float_value():
 
 def test_du_lieu_chuyen_trieu_sang_vnd_basic():
     data = [{"kh_tw": 100.0, "kh_dp": 50.0, "dc_tw": 10.0, "dc_dp": 5.0, "xa": "Xã A", "ma_key": "1_TW"}]
-    result = khtd_service._du_lieu_chuyen_trieu_sang_vnd("giao", data)
+    result, loi = khtd_service._du_lieu_chuyen_trieu_sang_vnd("giao", data)
     assert len(result) == 1
+    assert loi == []
     r = result[0]
     assert r["kh_tw"] == 100_000_000
     assert r["kh_dp"] == 50_000_000
@@ -137,15 +138,26 @@ def test_du_lieu_chuyen_trieu_sang_vnd_basic():
 
 def test_du_lieu_chuyen_trieu_sang_vnd_zero_dc():
     data = [{"kh_tw": 200.0, "kh_dp": 0.0, "dc_tw": 0.0, "dc_dp": 0.0}]
-    result = khtd_service._du_lieu_chuyen_trieu_sang_vnd("giao", data)
+    result, loi = khtd_service._du_lieu_chuyen_trieu_sang_vnd("giao", data)
+    assert loi == []
     r = result[0]
     assert r["kh_moi_tw"] == 200_000_000
     assert r["kh_moi_dp"] == 0.0
 
 
 def test_du_lieu_chuyen_trieu_sang_vnd_empty_list():
-    result = khtd_service._du_lieu_chuyen_trieu_sang_vnd("giao", [])
+    result, loi = khtd_service._du_lieu_chuyen_trieu_sang_vnd("giao", [])
     assert result == []
+    assert loi == []
+
+
+def test_du_lieu_chuyen_trieu_sang_vnd_kh_moi_am():
+    # dc_tw âm quá lớn → kh_moi_tw < 0 → dòng bị bỏ qua, trả lỗi
+    data = [{"kh_tw": 10.0, "kh_dp": 0.0, "dc_tw": -50.0, "dc_dp": 0.0, "xa": "Xã A", "ma_key": "1_TW"}]
+    result, loi = khtd_service._du_lieu_chuyen_trieu_sang_vnd("dieu_chinh", data)
+    assert result == []
+    assert len(loi) == 1
+    assert "âm" in loi[0]
 
 
 # ── _parse_key_suffix ─────────────────────────────────────────────────────────

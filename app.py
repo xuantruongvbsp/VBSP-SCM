@@ -462,6 +462,28 @@ def main():
                     icon = "✅" if ngay.date() >= date.today() else "⚠️"
                     st.caption(f"{icon} `{ten}` {mb:.1f}MB")
 
+        _mp = db.doc_kv("_merge_progress")
+        if _mp:
+            _loai_upper = str(_mp.get("loai", "")).upper()
+            if _mp.get("running"):
+                _done = _mp.get("done", 0)
+                _total = _mp.get("total", 22)
+                st.divider()
+                st.warning(
+                    f"🔄 Đang merge {_loai_upper}: **{_done}/{_total} PGD**\n\n"
+                    "_Chuyển tab bình thường — merge chạy nền._"
+                )
+            else:
+                _end_str = _mp.get("end")
+                if _end_str:
+                    try:
+                        _age = (datetime.now() - datetime.fromisoformat(_end_str)).total_seconds()
+                        if _age < 300:
+                            st.divider()
+                            st.success(f"✅ Merge {_loai_upper} xong · {_mp.get('done', 0)} PGD")
+                    except Exception:
+                        pass
+
         from alert_center import render_alert_sidebar
         render_alert_sidebar(
             df_full=st.session_state.get("df_full"),

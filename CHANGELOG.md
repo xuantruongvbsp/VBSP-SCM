@@ -1,5 +1,19 @@
 # CHANGELOG
 
+## [2026-06-20] — Phân công cán bộ NXH: lấy danh sách xã từ PGD_XA_MAP thay vì file upload
+- `tabs/tab_phan_ky_nxh.py` dòng ~63 — expander "Phân công Cán bộ": dùng `PGD_XA_MAP` từ `config.py` để lấy danh sách PGD + xã/phường, thay vì lọc từ file NXH upload (trước đây thiếu xã không có khoản vay NXH)
+
+## [2026-06-20] — Fix bug ghi đè parquet 22 PGD bằng dữ liệu đơn lẻ
+- `services/upload_service.py` dòng ~74 — bỏ `"cache": CACHE_HSTD` khỏi `FILES_HE_THONG[TEN_FILE]`: `luu_file_he_thong()` không còn xóa parquet merged 22 PGD khi upload file hệ thống cũ
+- `data/hstd.py` dòng ~17 — `doc_file()` cache vào `.parquet` cùng thư mục thay vì ghi thẳng vào `CACHE_HSTD`: tránh fallback overwrite parquet 22 PGD bằng 1 file đơn
+
+## [2026-06-20] — Fix lỗi render tab Stress Test Danh mục
+- `tabs/tab_stress_test.py` dòng 145 — đổi `or` thành `is None` check khi lấy df_full từ kwargs, tránh "truth value of DataFrame is ambiguous"
+
+## [2026-06-20] — Fix Windows fatal exception trong test merge + fix streamlit import chain
+- `tests/test_merge_du_lieu_toan_cn.py` — thêm autouse fixture `mock_telegram_service`: patch `gui_thong_bao_merge` để ngăn gọi HTTP Telegram thật → tránh access violation C-level ở Python 3.14 SSL (không catch được bằng try/except Python)
+- `services/__init__.py` — bọc toàn bộ eager import bằng `try/except ImportError` để `health_check.py` standalone không bị lỗi "No module named 'streamlit'" khi import `telegram_service` (do `services/__init__.py` kéo `upload_service` → streamlit)
+
 ## [2026-06-20] — Icons ws_operation + tests khtd_service + stress test + nhắc CV
 - `workspaces/ws_operation.py` — thêm icon 4 parent accordion label (📋 Báo cáo, 🎯 Kế hoạch, 🛡️ Kiểm soát, ⚙️ Công cụ); fix 3 icon duplicate trong nhóm Tác nghiệp (💵 Dự phóng, 📉 Histogram, 🔄 So sánh kỳ)
 - `tests/test_khtd_service.py` — thêm 27 test mới (tổng 38): `lay_dot_truoc`, `tong_hop`, `kiem_tra_can_bang`, `duyet`, `_dot_sort_key`, `_sync_khtd_xa_from_ap`, `luu_dot` edge cases; tất cả 38/38 PASS

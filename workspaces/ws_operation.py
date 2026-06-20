@@ -536,17 +536,17 @@ _WS_OP_MENU_ITEMS = [
     {"group": "Tác nghiệp", "label": "🔍 Tra cứu hồ sơ"},
     {"group": "Tác nghiệp", "label": "📋 Danh sách & Lọc"},
     {"group": "Tác nghiệp", "label": "⏰ Đến hạn"},
-    {"group": "Tác nghiệp", "label": "📈 Dự phóng Dòng tiền"},
+    {"group": "Tác nghiệp", "label": "💵 Dự phóng Dòng tiền"},
     {"group": "Tác nghiệp", "label": "🔥 Heatmap Đáo hạn"},
-    {"group": "Tác nghiệp", "label": "📊 Histogram Dư nợ"},
+    {"group": "Tác nghiệp", "label": "📉 Histogram Dư nợ"},
     {"group": "Tác nghiệp", "label": "🍩 Cơ cấu CT"},
-    {"group": "Tác nghiệp", "label": "📊 So sánh kỳ"},
+    {"group": "Tác nghiệp", "label": "🔄 So sánh kỳ"},
     {"group": "Tác nghiệp", "label": "🏷️ Phân loại KH"},
     {"group": "Tác nghiệp", "label": "📄 Quản lý Template"},
     # ── Báo cáo ──
     {
         "group": "Báo cáo",
-        "label": "Báo cáo tín dụng",
+        "label": "📋 Báo cáo tín dụng",
         "children": [
             {"label": "📊 Báo cáo tín dụng"},
             {"label": "📅 Báo cáo định kỳ"},
@@ -563,7 +563,7 @@ _WS_OP_MENU_ITEMS = [
     # ── Kế hoạch ──
     {
         "group": "Kế hoạch",
-        "label": "Kế hoạch tín dụng",
+        "label": "🎯 Kế hoạch tín dụng",
         "children": [
             {"label": "🎯 KHTD"},
             {"label": "⚖️ Kế hoạch/Cân đối"},
@@ -578,7 +578,7 @@ _WS_OP_MENU_ITEMS = [
     # ── Kiểm soát ──
     {
         "group": "Kiểm soát",
-        "label": "Kiểm soát chất lượng",
+        "label": "🛡️ Kiểm soát chất lượng",
         "children": [
             {"label": "🚨 Cảnh báo Tín dụng"},
             {"label": "🔔 Đôn đốc KHĐ"},
@@ -600,7 +600,7 @@ _WS_OP_MENU_ITEMS = [
     # ── Công cụ ──
     {
         "group": "Công cụ",
-        "label": "Công cụ & Hệ thống",
+        "label": "⚙️ Công cụ & Hệ thống",
         "children": [
             {"label": "✅ Nhiệm vụ"},
             {"label": "📤 Upload Dữ liệu"},

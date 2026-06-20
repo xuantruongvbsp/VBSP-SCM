@@ -223,6 +223,9 @@ def _render_bieu_do(df1: pd.DataFrame, df2: pd.DataFrame,
     m1 = df1[["ten_pgd", "tong_du_no"]].rename(columns={"tong_du_no": "dn1"})
     m2 = df2[["ten_pgd", "tong_du_no"]].rename(columns={"tong_du_no": "dn2"})
     jn = pd.merge(m1, m2, on="ten_pgd", how="outer").fillna(0)
+    for _c in ["dn1", "dn2"]:
+        if _c in jn.columns:
+            jn[_c] = pd.to_numeric(jn[_c], errors="coerce").fillna(0)
     jn["delta"] = jn["dn2"] - jn["dn1"]
     jn = jn[~jn["ten_pgd"].str.startswith("__")].sort_values("delta")
 

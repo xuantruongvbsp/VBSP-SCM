@@ -551,6 +551,8 @@ def main():
     if ws_hien_tai == "operation":
         if _la_pgd_ver(role) and pgd_user:
             _p = duong_dan_pgd(pgd_user, "hstd")
+            if not os.path.exists(_p):
+                _p = duong_dan_pgd(pgd_user, "hstd_khnv")
             _pgd_op_ts = ts_file(_p) if os.path.exists(_p) else 0.0
         elif _la_cn_ver(role):
             _pgd_scan_ss = st.session_state.get("_pgd_op_mtime_ss")
@@ -559,9 +561,13 @@ def main():
                 from pathlib import Path
                 from config import PGD_DATA_DIR
                 _pgd_op_ts = max(
-                    (ts_file(str(d / "hstd_latest.xlsx"))
-                     for d in Path(PGD_DATA_DIR).iterdir()
-                     if d.is_dir() and (d / "hstd_latest.xlsx").exists()),
+                    (
+                        ts_file(str(d / "hstd_latest.xlsx")) if (d / "hstd_latest.xlsx").exists()
+                        else ts_file(str(d / "hstd_khnv.xlsx")) if (d / "hstd_khnv.xlsx").exists()
+                        else 0.0
+                        for d in Path(PGD_DATA_DIR).iterdir()
+                        if d.is_dir()
+                    ),
                     default=0.0,
                 )
                 st.session_state["_pgd_op_mtime_ss"] = {"mtime": _pgd_op_ts, "ts": _now_t}
@@ -619,17 +625,17 @@ def main():
 
             if ws_hien_tai == "operation":
                 if la_phan_he_pgd(role) and pgd_user:
-                    path_hstd_pgd = duong_dan_pgd(pgd_user, "hstd")
+                    _p_latest = duong_dan_pgd(pgd_user, "hstd")
+                    _p_khnv = duong_dan_pgd(pgd_user, "hstd_khnv")
+                    path_hstd_pgd = _p_latest if os.path.exists(_p_latest) else _p_khnv
                     if os.path.exists(path_hstd_pgd):
                         df_pgd = doc_hstd_pgd(pgd_user, ts_file(path_hstd_pgd))
                         if df_pgd is not None and not df_pgd.empty:
                             df = df_pgd
                         else:
-                            st.warning(f"⚠️ File Upload HSTD của `{pgd_user}` rỗng, "
-                                       f"tạm dùng dữ liệu Phòng KH-NV.")
+                            st.warning(f"⚠️ File HSTD của `{pgd_user}` rỗng.")
                     else:
-                        st.info(f"ℹ️ `{pgd_user}` chưa upload HSTD — "
-                                f"tạm dùng dữ liệu từ Phòng KH-NV.")
+                        st.warning(f"⚠️ `{pgd_user}` chưa có dữ liệu HSTD.")
                 elif la_phan_he_cn(role):
                     # _pgd_op_ts đã được tính và cache bên ngoài block — dùng lại
                     df_op = doc_hstd_toan_cn_pgd(_pgd_op_ts)

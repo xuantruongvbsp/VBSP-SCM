@@ -421,23 +421,23 @@ def _gui_ngay(key: str) -> tuple[bool, str]:
 
         elif key == "khoanh_tang":
             try:
-                from snapshot_service import doc_snapshot_range
-                from config import COT_DU_NO_KHOANH, COT_TEN_PGD
-                snapshots = doc_snapshot_range(tu_ky=None, den_ky=None, n_ky=2)
-                if len(snapshots) < 2:
+                from snapshot_service import doc_snapshot, danh_sach_ky
+                ky_list = danh_sach_ky()
+                if len(ky_list) < 2:
                     return True, "Không đủ snapshot để so sánh (cần ≥ 2 kỳ)"
-                df_moi, df_cu = snapshots[0], snapshots[1]
-                if COT_DU_NO_KHOANH not in df_moi.columns:
-                    return False, f"Thiếu cột {COT_DU_NO_KHOANH} trong snapshot."
+                df_moi = doc_snapshot(ky_list[0])
+                df_cu  = doc_snapshot(ky_list[1])
+                if df_moi.empty or "du_no_khoanh" not in df_moi.columns:
+                    return False, "Thiếu dữ liệu snapshot hoặc cột du_no_khoanh."
                 ds_tang = []
-                for pgd in df_moi[COT_TEN_PGD].unique():
-                    row_m = df_moi[df_moi[COT_TEN_PGD] == pgd].iloc[0]
-                    row_c = df_cu[df_cu[COT_TEN_PGD] == pgd]
-                    if row_c.empty:
+                for _, row_m in df_moi.iterrows():
+                    pgd   = row_m["ten_pgd"]
+                    match = df_cu[df_cu["ten_pgd"] == pgd]
+                    if match.empty:
                         continue
-                    row_c = row_c.iloc[0]
-                    kh_moi = float(row_m.get(COT_DU_NO_KHOANH, 0) or 0)
-                    kh_cu  = float(row_c.get(COT_DU_NO_KHOANH, 0) or 0)
+                    row_c  = match.iloc[0]
+                    kh_moi = float(row_m.get("du_no_khoanh") or 0)
+                    kh_cu  = float(row_c.get("du_no_khoanh") or 0)
                     if kh_cu == 0 or kh_moi == 0:
                         continue
                     tang_pct = (kh_moi - kh_cu) / kh_cu * 100
@@ -483,15 +483,15 @@ def _gui_ngay(key: str) -> tuple[bool, str]:
             if not CACHE_HSTD.exists():
                 return False, "Chưa có dữ liệu HSTD (cần merge trước)."
             # Tính thực hiện theo chương trình từ HSTD
+            # _tinh_thuc_hien_theo_ct trả về dict[ma_key -> float], không phải DataFrame
             from tabs.tab_khtd_xuat import _tinh_thuc_hien_theo_ct
-            df_th = _tinh_thuc_hien_theo_ct(pd.read_parquet(CACHE_HSTD))
+            th_dict = _tinh_thuc_hien_theo_ct(pd.read_parquet(CACHE_HSTD))
             meta = db.doc_kv("merge_meta_hstd") or {}
             ngay_sl = str(meta.get("ngay_sl", date.today().strftime("%d/%m/%Y")))
             ds_ct = []
             for ma_key, ma_ct, ten_hien_thi, nguon_von, _tm in CHUONG_TRINH_KHTD:
                 kh_ct  = float(khtd_cn.get(ma_key, {}).get("_cn", 0) or 0)
-                th_row = df_th[df_th["ma_key"] == ma_key] if not df_th.empty and "ma_key" in df_th.columns else pd.DataFrame()
-                th_val = float(th_row["thuc_hien"].iloc[0]) if not th_row.empty else 0.0
+                th_val = float(th_dict.get(ma_key, 0.0))
                 pct    = th_val / kh_ct * 100 if kh_ct > 0 else 0.0
                 ds_ct.append({
                     "ten_ct":    ten_hien_thi,

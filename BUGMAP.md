@@ -767,6 +767,26 @@
 
 ## J. Python / Code Pattern
 
+### J3 — Integration test patch sai target → ghi đè cache/hstd.parquet thật
+
+| | |
+|---|---|
+| **File** | `tests/test_merge_regression.py` |
+| **Dấu hiệu** | `cache/hstd.parquet` bị ghi đè từ 359.158 dòng (22 PGD) xuống ~36.350 dòng (2 PGD) lúc test chạy; audit log có entry `merge_hstd` từ test_regression với 2 PGD |
+| **Nguyên nhân** | Test patch `config.CACHE_DIR` và `config.PGD_DATA_DIR` KHÔNG có tác dụng: `upload_service.py` import `CACHE_HSTD` ở module-level (đã bind trước khi patch chạy); `data/pgd.py` cũng import `PGD_DATA_DIR` ở module-level nên `duong_dan_pgd()` vẫn đọc pgd_data thật. Kết quả: merge đọc file Excel thật của 2 PGD, ghi 36.350 dòng vào `cache/hstd.parquet` thật |
+| **Fix** | Thay `patch("config.CACHE_DIR", ...)` bằng `patch.object(svc, "CACHE_HSTD", str(tmp_path / "hstd.parquet"))` và thay `patch("config.PGD_DATA_DIR", ...)` bằng `patch.object(svc, "duong_dan_pgd", side_effect=fake_fn)`. Thêm autouse fixture block Telegram + snapshot background threads |
+| **Ngày fix** | 2026-06-21 |
+
+### J4 — Background snapshot thread ghi vào DB thật sau khi mock_db đã exit
+
+| | |
+|---|---|
+| **File** | `tests/test_merge_du_lieu_toan_cn.py` — `TestMergeGQVL` (và HSTD, NQ11) |
+| **Dấu hiệu** | audit_log có entry `luu_gqvl_snapshot` từ `test_user` với 2 dòng trong giờ test chạy; gqvl_snapshot table có data test nhỏ từ `test_user` |
+| **Nguyên nhân** | `merge_du_lieu_toan_cn()` spawn daemon thread gọi `luu_gqvl_snapshot()` NGOÀI lock lock (dòng ~987 upload_service.py). Thread bắt đầu trong `with patch.object(svc.db, "ghi_audit")` nhưng có thể hoàn thành sau khi context exit → gọi `db.ghi_audit()` thật + `db.get_conn()` thật → ghi DB production |
+| **Fix** | Thêm autouse fixture `mock_snapshot_services` trong test file: patch 4 hàm `luu_*_snapshot` trong module `snapshot_service` → background thread gọi mock thay vì DB thật |
+| **Ngày fix** | 2026-06-21 |
+
 ### J2 — Stale closure df=None: sidebar render trước data load → tab trắng
 
 | | |

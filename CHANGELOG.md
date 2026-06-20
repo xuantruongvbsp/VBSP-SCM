@@ -1,5 +1,40 @@
 # CHANGELOG
 
+## [2026-06-21] — Tách 2 luồng dữ liệu KHNV / Hỗ trợ địa bàn cho ws_operation
+- `data/pgd.py` — `doc_hstd_pgd()`: ưu tiên `hstd_latest.xlsx`, fallback `hstd_khnv.xlsx` thay vì trả None
+- `data/pgd.py` — `doc_hstd_toan_cn_pgd()`: quét cả `hstd_khnv.xlsx` khi PGD chưa có `hstd_latest.xlsx`
+- `app.py` — tính `_pgd_op_ts` và resolve `path_hstd_pgd` kiểm tra cả 2 file; ws_operation không còn phụ thuộc CACHE_HSTD
+
+## [2026-06-21] — Fix test isolation: patch sai target làm ghi đè cache/hstd.parquet thật
+- `tests/test_merge_regression.py` — viết lại toàn bộ: thay patch `config.CACHE_DIR/PGD_DATA_DIR` (vô hiệu vì module đã bind constant) bằng `patch.object(svc, "CACHE_HSTD", ...)` + `patch.object(svc, "duong_dan_pgd", ...)` để output vào tmp_path; thêm autouse fixture block Telegram + snapshot background threads
+- `tests/test_merge_du_lieu_toan_cn.py` — thêm autouse fixture `mock_snapshot_services`: block 4 hàm luu_*_snapshot trong snapshot_service để background thread không ghi vào DB/file thật sau khi mock_db context đã exit
+
+## [2026-06-21] — Fix crash nested expander + duplicate search bar trong tab_tracuu_v2
+- `tabs/tab_tracuu_v2.py` — bỏ `st.expander` bọc `render_filter_panel` (nested expander crash StreamlitAPIException); bỏ outer `tc_search` + hàm `_ap_dung_tim_kiem` trùng với search nội bộ của filter_panel; bỏ import `vn` không dùng
+
+## [2026-06-20] — Tăng tốc merge: dùng calamine engine thay openpyxl (~7× nhanh hơn)
+- `data/core.py` dòng ~77 — thêm `engine="calamine"` vào `pd.read_excel()` trong `excel_to_parquet()`: calamine (Rust-based) đọc xlsx nhanh hơn openpyxl ~7×, và release GIL nên 12 workers chạy thật song song; merge 22 PGD từ >30 phút giảm xuống ~30-60 giây
+
+## [2026-06-20] — Tăng tốc merge toàn CN: nâng max_workers từ 6 → 12
+- `services/upload_service.py` dòng ~737 — `ThreadPoolExecutor(max_workers=12)` thay vì 6 để đọc song song nhiều PGD hơn, giảm thời gian merge lần đầu
+
+## [2026-06-20] — Thiết kế lại tab "🔍 Tra cứu Khách hàng" (gọn nhẹ, search-first)
+- `tabs/tab_tracuu_v2.py` — viết lại `render()`: (1) thêm 1 ô tìm kiếm thông minh (Tên KH/Mã KH/CMND/SĐT/Số KU) qua `_ap_dung_tim_kiem()` dùng `vn()` normalize; (2) gói `render_filter_panel()` vào `st.expander(expanded=False)`; (3) thay header KPI thủ công bằng `kpi_row()` chuẩn (5 thẻ: Hồ sơ/Tổng DN/NQ11/GQVL/Quá hạn); (4) thay lưới thẻ + phân trang thủ công bằng `st.dataframe(selection_mode="single-row", on_select="rerun")` qua `_build_bang_ket_qua()`; (5) chuyển chi tiết hồ sơ inline → modal `@st.dialog`; cột tiền dùng `fmt_ty()` + header "(triệu đồng)"; ngừng phụ thuộc `components/result_card`
+
+## [2026-06-20] — Fix Toàn cảnh 22 PGD: thẻ chưa có dữ liệu nổi lên đầu
+- `services/tongquan_service.py` dòng ~744 — đặt `diem_rui_ro = 0` cho PGD không có dư nợ, tránh PGD rỗng bị tính điểm = 100 (giả tạo) và hiện lên đầu khi sort "Điểm RR tốt nhất"
+- `tabs/tab_pgd_cards.py` dòng ~177 — `_render_card_html()` thêm early-return hiển thị "📭 Chưa có dữ liệu tổng hợp" (opacity mờ) thay vì thẻ toàn số 0
+
+## [2026-06-20] — Fix sidebar menu mất hết tab khi dùng st.radio
+- `workspaces/ws_management.py` dòng ~343 — đổi `if sel != active_label: rerun()` → `on_change=_nav_flat` cho flat items và `on_change=_nav_child` cho accordion children; `on_change` chỉ fires khi user click thực sự, không fires khi script rerun tự động → tránh bug radio nhóm khác cướp navigation khi active_label không thuộc nhóm đó
+
+## [2026-06-20] — Fix 2 lỗi crash trong _gui_ngay (khoanh_tang + khtd_ct)
+- `tabs/tab_telegram_admin.py` dòng ~422 — `khoanh_tang`: đổi `doc_snapshot_range(n_ky=2)` (sai API) thành `danh_sach_ky()` + `doc_snapshot(ky)` × 2 kỳ; đổi tên cột `COT_DU_NO_KHOANH` → `"du_no_khoanh"` (tên cột trong snapshot table)
+- `tabs/tab_telegram_admin.py` dòng ~487 — `khtd_ct`: `_tinh_thuc_hien_theo_ct()` trả về `dict[str,float]` không phải DataFrame; đổi DataFrame indexing → `th_dict.get(ma_key, 0.0)`
+
+## [2026-06-20] — Telegram Admin: ẩn ô "Giờ gửi" với loại không đọc lịch admin (tránh hiểu nhầm)
+- `tabs/tab_telegram_admin.py` — thêm `_SCHEDULE_KEYS`/`_TASK_GIO`/`_EVENT_KEYS`; sub-tab Thông báo chỉ hiện ô nhập giờ cho 6 loại đi qua `_trong_gio_gui()`, còn lại hiển thị caption "🕐 theo Task Scheduler" / "⚡ sự kiện tự động" / "✋ chỉ gửi thủ công"; `new_sched` khởi tạo từ bản cũ để không xóa key khác khi lưu
+
 ## [2026-06-20] — Tối ưu sidebar menu: st.button → st.radio (giảm widget count)
 - `workspaces/ws_management.py` dòng ~334 — `render_sidebar_menu()`: thay N `st.button` riêng lẻ (1 per item) bằng 1 `st.radio` per nhóm → từ ~25 widget call xuống còn ~8, rerun sidebar nhanh hơn đáng kể
 - Accordion children cũng dùng `st.radio` thay vì N `st.button`

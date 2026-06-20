@@ -175,6 +175,25 @@ def _fmt_bq_ho(dn_binh_quan_ho: float) -> str:
 # ── Card HTML ─────────────────────────────────────────────────────────────────
 
 def _render_card_html(row: dict, upload_ok: bool, upload_ts: str, rank: int) -> str:
+    if float(row.get("du_no", 0)) == 0:
+        upload_cls  = "pgd-upload-ok"   if upload_ok else "pgd-upload-miss"
+        upload_icon = "✅"              if upload_ok else "❌"
+        return f"""
+<div class="pgd-card" style="opacity:0.45">
+  <div class="pgd-card-title">
+    <span>🏢 {row['ten_pgd']}</span>
+    <span style="font-size:10px;color:#455A64">—</span>
+  </div>
+  <div style="text-align:center;padding:20px 0;color:#607D8B;font-size:12px">
+    📭 Chưa có dữ liệu tổng hợp
+  </div>
+  <div class="pgd-risk-bar-wrap"><div style="width:0%;height:100%;background:#37474F;border-radius:2px"></div></div>
+  <div class="pgd-upload-row">
+    <span class="{upload_cls}">{upload_icon} HSTD {upload_ts}</span>
+    <span style="color:#546E7A;font-size:9.5px">—</span>
+  </div>
+</div>"""
+
     du_no_str  = vn(float(row["du_no"]) / 1_000_000_000, 3) + " tỷ"
     nqh_pct    = float(row.get("ty_le_nqh", 0))
     khoanh_pct = float(row.get("ty_le_khoanh", 0))

@@ -743,4 +743,7 @@ def tinh_toan_da_chieu_pgd(
         0.35 * s_nqh + 0.25 * s_khd + 0.20 * s_khoanh + 0.15 * s_lai + 0.05 * s_dh3t
     ).round(1).clip(0, 100)
 
+    # PGD không có dư nợ → điểm = 0 để sort xuống cuối (tránh 100 giả tạo)
+    df_pgd.loc[df_pgd["du_no"] == 0, "diem_rui_ro"] = 0.0
+
     return df_pgd.reset_index(drop=True)

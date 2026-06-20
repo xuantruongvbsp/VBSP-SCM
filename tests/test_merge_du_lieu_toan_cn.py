@@ -83,6 +83,23 @@ def mock_telegram_service():
         yield
 
 
+@pytest.fixture(autouse=True)
+def mock_snapshot_services():
+    """Block tất cả background snapshot threads để không ghi vào DB/file thật.
+
+    merge_du_lieu_toan_cn() khởi động daemon thread gọi luu_*_snapshot() NGOÀI
+    mock_db context — nếu không chặn, thread chạy sau khi mock đã được gỡ và ghi
+    thẳng vào audit_log + snapshot tables thật (đây là nguyên nhân test_user xuất
+    hiện trong audit log production ngày 2026-06-20).
+    """
+    _ok = MagicMock(thanh_cong=True, thong_bao="mocked")
+    with patch("snapshot_service.luu_snapshot", return_value=_ok), \
+         patch("snapshot_service.luu_gqvl_snapshot", return_value=_ok), \
+         patch("snapshot_service.luu_nq11_snapshot", return_value=_ok), \
+         patch("snapshot_service.luu_cdtotkvv_snapshot", return_value=_ok):
+        yield
+
+
 @pytest.fixture
 def mock_streamlit():
     """Mock toàn bộ Streamlit — không cần chạy trong browser."""

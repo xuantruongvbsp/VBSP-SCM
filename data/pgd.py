@@ -352,7 +352,10 @@ def doc_hstd_pgd(ten_pgd: str, file_mtime: float = 0.0) -> pd.DataFrame | None:
     """
     from data.hstd import doc_file
 
+    # Ưu tiên hstd_latest.xlsx (PGD tự upload) → fallback hstd_khnv.xlsx (Phòng KH-NV)
     path = duong_dan_pgd(ten_pgd, "hstd")
+    if not os.path.exists(path):
+        path = duong_dan_pgd(ten_pgd, "hstd_khnv")
     return doc_file(path, file_mtime) if os.path.exists(path) else None
 
 
@@ -383,9 +386,10 @@ def doc_gqvl_pgd(ten_pgd: str, _ts):
 # ── Gộp toàn CN ──────────────────────────────────────────────────────────────
 @st.cache_data(ttl=7200, show_spinner=False)
 def doc_hstd_toan_cn_pgd(pgd_dir_mtime: float = 0.0) -> pd.DataFrame | None:
-    """Gộp HSTD tất cả PGD đã upload (từ cấu trúc mới).
+    """Gộp HSTD tất cả PGD — ws_operation, độc lập với CACHE_HSTD.
 
-    `pgd_dir_mtime` = max mtime của các file hstd_latest.xlsx → cache key.
+    Ưu tiên hstd_latest.xlsx (PGD tự upload); fallback hstd_khnv.xlsx (Phòng KH-NV).
+    `pgd_dir_mtime` = max mtime của các file nguồn → cache key.
     (Không dùng tiền tố `_` để Streamlit đưa vào cache key.)
     """
     from data.hstd import doc_file
@@ -394,8 +398,12 @@ def doc_hstd_toan_cn_pgd(pgd_dir_mtime: float = 0.0) -> pd.DataFrame | None:
         return None
     frames = []
     for d in sorted(Path(PGD_DATA_DIR).iterdir()):
+        if not d.is_dir():
+            continue
         path = d / "hstd_latest.xlsx"
-        if d.is_dir() and path.exists():
+        if not path.exists():
+            path = d / "hstd_khnv.xlsx"
+        if path.exists():
             try:
                 frames.append(doc_file(str(path), ts_file(str(path))))
             except Exception:

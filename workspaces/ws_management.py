@@ -320,15 +320,6 @@ def render_sidebar_menu(role: str, username: str, **kwargs):
     if cur_flat or cur_acc:
         groups.append((current_grp, cur_flat, cur_acc))
 
-    # CSS m\u1ed9t l\u1ea7n \u2014 b\u1ecf bullet m\u1eb7c \u0111\u1ecbnh c\u1ee7a st.radio
-    st.markdown(
-        "<style>"
-        "[data-testid='stRadio'] label {font-size:14px !important; padding:4px 0 !important}"
-        "[data-testid='stRadio'] [data-testid='stMarkdownContainer'] p {margin:0}"
-        "</style>",
-        unsafe_allow_html=True,
-    )
-
     for grp_name, flat_items, acc_items in groups:
         clr = GROUP_COLORS.get(grp_name, {"bg": "#F1EFE8", "border": "#888", "text": "#444"})
 
@@ -340,25 +331,24 @@ def render_sidebar_menu(role: str, username: str, **kwargs):
             unsafe_allow_html=True,
         )
 
-        # Flat items \u2014 1 st.radio thay v\u00ec N st.button
-        if flat_items:
-            labels = [x["label"] for x in flat_items]
-            try:
-                cur_idx = labels.index(active_label)
-            except ValueError:
-                cur_idx = 0
-            sel = st.radio(
-                grp_name,
-                labels,
-                index=cur_idx,
-                key=f"menu_radio_{grp_name}",
-                label_visibility="collapsed",
-            )
-            if sel != active_label:
-                state.nav_ws_mgmt_menu = sel
-                st.rerun()
+        for item in flat_items:
+            lbl = item["label"]
+            if lbl == active_label:
+                st.markdown(
+                    f"<div style='"
+                    f"background:linear-gradient(135deg,#1565C0,#1976D2);"
+                    f"border-left:4px solid #0D47A1;"
+                    f"color:#FFFFFF;font-size:14px;font-weight:700;"
+                    f"padding:10px 12px;border-radius:0 8px 8px 0;margin-bottom:4px;"
+                    f"box-shadow:0 2px 8px rgba(21,101,192,0.35)'>"
+                    f"\u25b6 {lbl}</div>",
+                    unsafe_allow_html=True,
+                )
+            else:
+                if st.button(lbl, key=f"menu_btn_{lbl}", use_container_width=True):
+                    state.nav_ws_mgmt_menu = lbl
+                    st.rerun()
 
-        # Accordion items \u2014 gi\u1eef nguy\u00ean (\u00edt item h\u01a1n, c\u00f3 state expand/collapse)
         for item in acc_items:
             children = item.get("children", [])
             child_labels = [c["label"] for c in children]
@@ -394,21 +384,22 @@ def render_sidebar_menu(role: str, username: str, **kwargs):
                     st.rerun()
 
             if is_open:
-                child_labels_open = [c["label"] for c in children]
-                try:
-                    child_idx = child_labels_open.index(active_label)
-                except ValueError:
-                    child_idx = 0
-                sel_child = st.radio(
-                    f"child_{item['label']}",
-                    child_labels_open,
-                    index=child_idx,
-                    key=f"menu_child_radio_{item['label']}",
-                    label_visibility="collapsed",
-                )
-                if sel_child != active_label:
-                    state.nav_ws_mgmt_menu = sel_child
-                    st.rerun()
+                for child in children:
+                    clbl = child["label"]
+                    if clbl == active_label:
+                        st.markdown(
+                            f"<div style='"
+                            f"background:linear-gradient(135deg,#1565C0,#1976D2);"
+                            f"border-left:4px solid #0D47A1;"
+                            f"color:#FFFFFF;font-size:13px;font-weight:700;"
+                            f"padding:8px 12px 8px 20px;border-radius:0 8px 8px 0;margin-bottom:3px'>"
+                            f"\u25b6 {clbl}</div>",
+                            unsafe_allow_html=True,
+                        )
+                    else:
+                        if st.button(clbl, key=f"menu_btn_{clbl}", use_container_width=True):
+                            state.nav_ws_mgmt_menu = clbl
+                            st.rerun()
 
 def render(**kwargs):
     _wl = st.session_state.pop("_data_load_warning", None)

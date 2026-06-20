@@ -76,6 +76,7 @@ def excel_to_parquet(
         try:
             df_fresh = pd.read_excel(
                 excel_path, sheet_name=sheet, header=header,
+                engine="calamine",
             )
             if post_fn:
                 df_fresh = post_fn(df_fresh)

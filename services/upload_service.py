@@ -734,7 +734,7 @@ def _merge_du_lieu_toan_cn_impl(
     prog = st.progress(0, text=f"⏳ Đang đọc 0/{tong} PGD...")
     da_xong = 0
     try:
-        with ThreadPoolExecutor(max_workers=min(len(tat_ca_dv), 6)) as ex:
+        with ThreadPoolExecutor(max_workers=min(len(tat_ca_dv), 12)) as ex:
             futures = {ex.submit(_doc_mot_pgd, dv, loai): dv for dv in tat_ca_dv}
             for future in as_completed(futures):
                 da_xong += 1

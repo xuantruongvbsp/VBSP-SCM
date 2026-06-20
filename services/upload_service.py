@@ -595,6 +595,14 @@ def xu_ly_gqvl_toan_cn(
 
 # ── Gộp dữ liệu toàn Chi nhánh từ 22 đơn vị ─────────────────────────────────
 
+# Lock toàn cục — ngăn 2 session merge đồng thời (gây freeze do tranh GIL)
+_MERGE_LOCK: dict[str, threading.Lock] = {
+    "hstd": threading.Lock(),
+    "nq11": threading.Lock(),
+    "gqvl": threading.Lock(),
+}
+
+
 def merge_du_lieu_toan_cn(
     loai: str,
     ds_pgd: list[str] | None = None,
@@ -610,6 +618,23 @@ def merge_du_lieu_toan_cn(
     if loai not in ("hstd", "nq11", "gqvl"):
         return KetQuaUpload(False, f"merge_du_lieu_toan_cn không hỗ trợ loai='{loai}'")
 
+    lock = _MERGE_LOCK[loai]
+    if not lock.acquire(blocking=False):
+        logger.warning("merge_du_lieu_toan_cn: loai=%s đang được merge bởi session khác — bỏ qua", loai)
+        return KetQuaUpload(False, f"⏳ Hệ thống đang merge {loai.upper()} — vui lòng chờ vài giây rồi thử lại.")
+
+    try:
+        return _merge_du_lieu_toan_cn_impl(loai, ds_pgd, pgd_moi_upload)
+    finally:
+        lock.release()
+
+
+def _merge_du_lieu_toan_cn_impl(
+    loai: str,
+    ds_pgd: list[str] | None = None,
+    pgd_moi_upload: str | None = None,
+) -> KetQuaUpload:
+    """Thực thi merge — chỉ gọi qua merge_du_lieu_toan_cn() đã giữ lock."""
     tat_ca_dv = ds_pgd if ds_pgd is not None else ([DON_VI_CHI_NHANH] + DS_PGD)
     if not tat_ca_dv:
         return KetQuaUpload(False, f"Không có đơn vị nào để gộp {loai.upper()}.")

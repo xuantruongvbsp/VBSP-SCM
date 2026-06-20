@@ -1,0 +1,82 @@
+VBSP-SCM Health Check + Test Run
+Thoi gian: 20/06/2026 20:40:41,03
+========================================
+  ⚠  Telegram health check: No module named 'streamlit'
+
+  ⚠   Báo cáo sáng: không tạo được — No module named 'streamlit'
+
+VBSP-SCM Health Check  —  20/06/2026 20:40:43
+DB   : D:\VBSP-SCM\vbsp_scm.db
+Root : D:\VBSP-SCM
+
+1. Cơ sở dữ liệu SQLite
+  ─────────────────────────
+  ✅ File vbsp_scm.db tồn tại  →  D:\VBSP-SCM\vbsp_scm.db
+  ✅ Kết nối SQLite
+  ✅ Bảng 'kv_store' tồn tại
+  ✅ Bảng 'users' tồn tại
+  ✅ Bảng 'audit_log' tồn tại
+
+2. kv_store — toàn vẹn & dữ liệu nghiệp vụ
+  ────────────────────────────────────────────
+  ✅ Không có key kv_store bị corrupt  →  62 key, tất cả hợp lệ
+  ❌ khtd_cn tồn tại  →  Chưa nhập KHTD Chi nhánh
+  ✅ merge HSTD đã chạy  →  Lần cuối: 2026-06-20T15:53:07.864874 | 22 PGD
+  ℹ  Tổng số key trong kv_store: 62
+
+3. Parquet cache
+  ──────────────────
+  ✅ hstd.parquet tồn tại  →  3.4 MB | cập nhật 20/06 20:06 (1h trước)
+  ✅ nq11.parquet tồn tại  →  7.2 MB | cập nhật 20/06 15:53 (5h trước)
+  ✅ gqvl.parquet tồn tại  →  3.1 MB | cập nhật 20/06 15:53 (5h trước)
+
+4. Upload file PGD — hstd_latest.xlsx
+  ───────────────────────────────────────
+  ❌ Tất cả 22 đơn vị đã upload HSTD  →  2/22 đã có file
+    ✗ Chưa upload: PGD Trảng Bom
+    ✗ Chưa upload: PGD Long Khánh
+    ✗ Chưa upload: PGD Xuân Lộc
+    ✗ Chưa upload: PGD Định Quán
+    ✗ Chưa upload: PGD Vĩnh Cửu
+    ✗ Chưa upload: PGD Tân Phú
+    ✗ Chưa upload: PGD Thống Nhất
+    ✗ Chưa upload: PGD Cẩm Mỹ
+    ✗ Chưa upload: PGD Nhơn Trạch
+    ✗ Chưa upload: PGD Bình Long
+    ✗ Chưa upload: PGD Lộc Ninh
+    ✗ Chưa upload: PGD Bình Phước
+    ✗ Chưa upload: PGD Phước Long
+    ✗ Chưa upload: PGD Bù Đăng
+    ✗ Chưa upload: PGD Đồng Phú
+    ✗ Chưa upload: PGD Chơn Thành
+    ✗ Chưa upload: PGD Bù Đốp
+    ✗ Chưa upload: PGD Bù Gia Mập
+    ✗ Chưa upload: PGD Phú Riềng
+    ✗ Chưa upload: PGD Hớn Quản
+    ⚠  File cũ > 3 ngày: Hội sở Chi nhánh tỉnh (19d)
+    ⚠  File cũ > 3 ngày: PGD Long Thành (13d)
+
+5. Audit log 24h gần nhất
+  ───────────────────────────
+  ✅ Có hoạt động trong 24h  →  569 log trong 24h | tổng cộng 11683
+
+  Thời gian              User             Action                   Detail
+  ────────────────────────────────────────────────────────────────────────────────────────
+  2026-06-20T20:40:02    system           seed_configs             seeded dynamic configs vào kv_store
+  2026-06-20T20:39:02    system           seed_configs             seeded dynamic configs vào kv_store
+  2026-06-20T20:38:02    system           seed_configs             seeded dynamic configs vào kv_store
+  2026-06-20T20:37:02    system           seed_configs             seeded dynamic configs vào kv_store
+  2026-06-20T20:36:02    system           seed_configs             seeded dynamic configs vào kv_store
+
+════════════════════════════════════════════════════════
+TỔNG KẾT
+════════════════════════════════════════════════════════
+  Tổng checks : 13
+  Đạt        : 11
+  Lỗi        : 2
+
+    ✗ khtd_cn tồn tại
+    ✗ Tất cả 22 đơn vị đã upload HSTD
+════════════════════════════════════════════════════════
+
+  ℹ  Đã ghi kết quả vào kv_store → key: health_check_result

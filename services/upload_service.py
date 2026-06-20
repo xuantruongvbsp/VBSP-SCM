@@ -724,28 +724,46 @@ def _merge_du_lieu_toan_cn_impl(
 
     raw_results: list[tuple[str, pd.DataFrame, bool, bool]] = []
     tong = len(tat_ca_dv)
+
+    _start_iso = datetime.now().isoformat()
+    db.ghi_kv("_merge_progress", {
+        "loai": loai, "total": tong, "done": 0,
+        "running": True, "start": _start_iso,
+    }, _u)
+
     prog = st.progress(0, text=f"⏳ Đang đọc 0/{tong} PGD...")
     da_xong = 0
-    with ThreadPoolExecutor(max_workers=min(len(tat_ca_dv), 6)) as ex:
-        futures = {ex.submit(_doc_mot_pgd, dv, loai): dv for dv in tat_ca_dv}
-        for future in as_completed(futures):
-            da_xong += 1
-            prog.progress(min(1.0, da_xong / max(tong, 1)), text=f"⏳ Đang đọc {da_xong}/{tong} PGD...")
-            ten_pgd, df, canh_bao_str = future.result()
-            if canh_bao_str:
-                pgd_loi.append(f"{ten_pgd}: {canh_bao_str}")
-                logger.warning("merge_du_lieu_toan_cn: PGD lỗi đọc file — %s: %s", ten_pgd, canh_bao_str)
-                db.ghi_audit(
-                    _u,
-                    "merge_toan_cn_pgd_loi",
-                    f"{loai.upper()} — {ten_pgd} — {canh_bao_str}",
-                )
-                continue
-            if df is None:
-                continue
-            da_dung_cache, qua_nguong = meta_map.get(ten_pgd, (False, False))
-            raw_results.append((ten_pgd, df, da_dung_cache, qua_nguong))
-    prog.empty()
+    try:
+        with ThreadPoolExecutor(max_workers=min(len(tat_ca_dv), 6)) as ex:
+            futures = {ex.submit(_doc_mot_pgd, dv, loai): dv for dv in tat_ca_dv}
+            for future in as_completed(futures):
+                da_xong += 1
+                prog.progress(min(1.0, da_xong / max(tong, 1)), text=f"⏳ Đang đọc {da_xong}/{tong} PGD...")
+                if da_xong % 5 == 0 or da_xong == tong:
+                    db.ghi_kv("_merge_progress", {
+                        "loai": loai, "total": tong, "done": da_xong,
+                        "running": True, "start": _start_iso,
+                    }, _u)
+                ten_pgd, df, canh_bao_str = future.result()
+                if canh_bao_str:
+                    pgd_loi.append(f"{ten_pgd}: {canh_bao_str}")
+                    logger.warning("merge_du_lieu_toan_cn: PGD lỗi đọc file — %s: %s", ten_pgd, canh_bao_str)
+                    db.ghi_audit(
+                        _u,
+                        "merge_toan_cn_pgd_loi",
+                        f"{loai.upper()} — {ten_pgd} — {canh_bao_str}",
+                    )
+                    continue
+                if df is None:
+                    continue
+                da_dung_cache, qua_nguong = meta_map.get(ten_pgd, (False, False))
+                raw_results.append((ten_pgd, df, da_dung_cache, qua_nguong))
+    finally:
+        prog.empty()
+        db.ghi_kv("_merge_progress", {
+            "loai": loai, "total": tong, "done": da_xong,
+            "running": False, "start": _start_iso, "end": datetime.now().isoformat(),
+        }, _u)
 
     # Kiểm tra chất lượng sau khi tất cả luồng đọc file đã hoàn thành
     for ten_pgd, df, da_dung_cache, qua_nguong in raw_results:

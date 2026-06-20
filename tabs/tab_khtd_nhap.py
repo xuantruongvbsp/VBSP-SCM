@@ -350,7 +350,7 @@ def _tab_khtd_chi_nhanh(
     for j in (2, 3):
         hr1[j].markdown(_khtd_cn_hdr_cell("", "#bbdefb"), unsafe_allow_html=True)
     hr1[4].markdown(
-        _khtd_cn_hdr_cell("NGUỒN VỐN ĐỊA PHƯƠNG", "#c8e6c9", "#81C784"),
+        _khtd_cn_hdr_cell("NGUỒN VỐN ĐỊA PHƯƠNG", "#c8e6c9", "#2e7d32"),
         unsafe_allow_html=True,
     )
     for j in (5, 6):
@@ -430,7 +430,7 @@ def _tab_khtd_chi_nhanh(
     def _fvn_form(x: float, d: int = 1) -> str:
         return f"{float(x):,.{d}f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
-    def _md_right(val: str, color: str = "#212121") -> str:
+    def _md_right(val: str, color: str = "var(--text-color)") -> str:
         return (
             f"<div style='text-align:right;color:{color};font-size:0.88rem;"
             f"padding:2px 0'>{val}</div>"
@@ -444,7 +444,7 @@ def _tab_khtd_chi_nhanh(
     padding: 2px 0 !important;
 }
 [data-testid="stHorizontalBlock"]:hover {
-    background-color: #f8fafc !important;
+    background-color: rgba(128,128,128,0.12) !important;
 }
 </style>
 """,
@@ -457,7 +457,7 @@ def _tab_khtd_chi_nhanh(
         idx_nhom += 1
         st.markdown(
             f"<p style='margin:0.8rem 0 0.4rem 0;padding:7px 12px;"
-            f"background-color:{bg};border-radius:6px;font-weight:600;"
+            f"background-color:{bg};color:#1f2937;border-radius:6px;font-weight:600;"
             f"font-size:0.9rem'>{tieu_de_nhom}</p>",
             unsafe_allow_html=True,
         )
@@ -494,7 +494,7 @@ def _tab_khtd_chi_nhanh(
                     cols_sub = st.columns(_colw)
                     # Tên sub: thụt vào, màu nhạt hơn
                     cols_sub[0].markdown(
-                        f"<div style='font-size:0.83rem;color:#555;"
+                        f"<div style='font-size:0.83rem;color:var(--text-color);opacity:0.75;"
                         f"padding:3px 0 3px 16px'>  {sub_ten}</div>",
                         unsafe_allow_html=True
                     )
@@ -1118,7 +1118,7 @@ def _tab_khtd_theo_xa(role: str, username: str, df_full: "pd.DataFrame | None") 
     margin: 0 !important;
 }
 [data-testid="stHorizontalBlock"]:hover {
-    background-color: #f8fafc !important;
+    background-color: rgba(128,128,128,0.12) !important;
 }
 [data-testid="column"] {
     border-right: 1px solid #e2e8f0 !important;
@@ -1164,7 +1164,7 @@ def _tab_khtd_theo_xa(role: str, username: str, df_full: "pd.DataFrame | None") 
             idx_nhom += 1
             st.markdown(
                 f"<p style='margin:0.8rem 0 0.4rem 0;padding:7px 12px;"
-                f"background-color:{bg};border-radius:6px;font-weight:600;"
+                f"background-color:{bg};color:#1f2937;border-radius:6px;font-weight:600;"
                 f"font-size:0.9rem'>{tieu_de_nhom}</p>",
                 unsafe_allow_html=True,
             )

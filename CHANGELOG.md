@@ -1,5 +1,18 @@
 # CHANGELOG
 
+## [2026-06-20] — Icons ws_operation + tests khtd_service + stress test + nhắc CV
+- `workspaces/ws_operation.py` — thêm icon 4 parent accordion label (📋 Báo cáo, 🎯 Kế hoạch, 🛡️ Kiểm soát, ⚙️ Công cụ); fix 3 icon duplicate trong nhóm Tác nghiệp (💵 Dự phóng, 📉 Histogram, 🔄 So sánh kỳ)
+- `tests/test_khtd_service.py` — thêm 27 test mới (tổng 38): `lay_dot_truoc`, `tong_hop`, `kiem_tra_can_bang`, `duyet`, `_dot_sort_key`, `_sync_khtd_xa_from_ap`, `luu_dot` edge cases; tất cả 38/38 PASS
+
+## [2026-06-20] — Stress test danh mục + nhắc deadline công văn + tái cơ cấu menu
+- `tabs/tab_stress_test.py` (mới) — mô phỏng kịch bản rủi ro: X% KH mất KN trả nợ → NQH dự kiến theo PGD + CT; 3 phương pháp chọn KH; KPI + bảng + cảnh báo vượt ngưỡng
+- `workspaces/ws_management.py` — thêm "🧪 Stress Test Danh mục" vào nhóm Giám sát
+- `alert_center.py` — thêm `_kiem_tra_cong_van_den_han()`: cảnh báo công văn chưa xử lý >7 ngày (🟠) / >14 ngày (🔴)
+
+## [2026-06-20] — khtd: bỏ phần duyệt + áp dụng BĐD pivot cho tab PGD
+- `tabs/tab_khtd_giao_dc.py` `_section_c_tong_hop()` — đơn giản hóa: bỏ toàn bộ approval flow (duyệt, từ chối, kiểm tra cân bằng); chỉ giữ HTML BĐD pivot + Excel export; đổi tab label thành "📊 Tổng hợp KH"
+- `tabs/tab_khtd_pgd.py` — thêm `_tinh_th_xa_ct()`, `_html_bdd_pgd_table()`, `_SHORT_CT_PGD`, `_ten_ngan_pgd()`; import thêm `COT_TEN_XA`; bỏ radio filter nguồn vốn; thay 2 bảng cũ (so sánh CT + ma trận CT×xã) bằng HTML BĐD pivot TW/ĐP tabs (hàng = xã, cột = CT groups × KH|TH|%)
+
 ## [2026-06-20] — khtd: redesign Section B & C theo định dạng BĐD (wide pivot)
 - `tabs/tab_khtd_giao_dc.py` dòng ~34–280 — thêm helper: `_SHORT_CT`, `_CT_MAP`, `_ten_ngan()`, `_rows_to_wide()`, `_wide_col_config()`, `_wide_to_du_lieu()`, `_ROMAN`, `_html_bdd_table()`
 - `tabs/tab_khtd_giao_dc.py` `_section_b_giao()` — viết lại dùng wide pivot với TW/ĐP sub-tabs; data_editor mỗi nguồn riêng; save button ngoài tabs

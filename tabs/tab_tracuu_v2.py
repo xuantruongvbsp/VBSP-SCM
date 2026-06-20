@@ -1,10 +1,9 @@
-"""Tab Tra cứu hồ sơ — Phiên bản 2.0 (thiết kế lại: gọn nhẹ, search-first).
+"""Tab Tra cứu hồ sơ — Phiên bản 2.0.
 
 Bố cục:
-- 1 ô tìm kiếm thông minh (Tên KH / Mã KH / CMND / SĐT / Số KU)
-- Bộ lọc nâng cao thu gọn trong expander (PGD, xã, chương trình, dư nợ, ngày, NQ11/GQVL/QH)
+- Bộ lọc đa tiêu chí qua render_filter_panel (tích hợp search + expander nâng cao)
 - KPI chuẩn bằng kpi_row() + xuất Excel/PDF
-- Bảng kết quả native (st.dataframe, chọn 1 dòng) thay lưới thẻ + phân trang thủ công
+- Bảng kết quả native (st.dataframe, chọn 1 dòng)
 - Chi tiết hồ sơ mở bằng modal st.dialog
 """
 

@@ -261,6 +261,16 @@ def main():
     # Splash screen — tạm tắt để debug
     st.session_state["_splash_done"] = True
 
+    # ── Dọn audit_log cũ — 1 lần/ngày ───────────────────────────────────────
+    from datetime import date as _date
+    _today = _date.today().isoformat()
+    if db.doc_kv("_last_audit_cleanup") != _today:
+        try:
+            db.xoa_audit_cu(90)
+            db.ghi_kv("_last_audit_cleanup", _today, "system")
+        except Exception:
+            pass
+
     # ── Session state ─────────────────────────────────────────────────────────
     for k, v in [("logged_in",False),("user_info",None),("username",""),("workspace",None)]:
         if k not in st.session_state:

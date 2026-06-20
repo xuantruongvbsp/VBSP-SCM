@@ -1550,6 +1550,20 @@ def doc_mau_bieu_cv368_by_id(mb_id: int) -> dict | None:
         return None
 
 
+def xoa_audit_cu(ngay_giu_lai: int = 90) -> int:
+    """Xóa audit_log cũ hơn ngay_giu_lai ngày. Trả về số dòng đã xóa."""
+    try:
+        with get_conn() as conn:
+            cur = conn.execute(
+                "DELETE FROM audit_log WHERE ts < datetime('now', ?)",
+                (f"-{ngay_giu_lai} days",),
+            )
+            conn.commit()
+            return cur.rowcount
+    except Exception:
+        return 0
+
+
 # Khởi tạo DB, migrate dữ liệu cũ, sau đó seed cấu hình động
 init_db()
 migrate_from_json()

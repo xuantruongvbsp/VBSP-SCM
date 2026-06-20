@@ -15,12 +15,15 @@ from config import (
 # ── HSTD ─────────────────────────────────────────────────────────────────────
 @st.cache_data(ttl=300, show_spinner=False)
 def doc_file(fp: str, _ts) -> pd.DataFrame:
-    """Đọc file HSTD (BCQUERY sheet, header dòng 4).
-    Không chạy kiem_tra_chat_luong ở đây — merge_du_lieu_toan_cn đã chạy DQ rồi.
+    """Đọc file HSTD đơn lẻ (BCQUERY sheet, header dòng 4).
+    Cache vào file .parquet cùng thư mục với Excel — KHÔNG ghi vào CACHE_HSTD
+    để tránh ghi đè parquet đã merge 22 PGD.
     """
+    from pathlib import Path as _Path
     def clean(df): return df.iloc[:, 1:].dropna(how="all")
+    fp_pq = str(_Path(fp).with_suffix(".parquet"))
     try:
-        return excel_to_parquet(fp, CACHE_HSTD, "BCQUERY", 4, clean)
+        return excel_to_parquet(fp, fp_pq, "BCQUERY", 4, clean)
     except Exception:
         return pd.read_excel(fp, sheet_name="BCQUERY", header=4).iloc[:, 1:].dropna(how="all")
 

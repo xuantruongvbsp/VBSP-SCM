@@ -646,6 +646,16 @@
 | **Nguyên nhân** | `df_full` chưa được truyền vào `_tab_khtd_xa()` |
 | **Fix** | Kiểm tra signature hàm và chỗ gọi trong `render()` |
 
+### G4 — CI smoke render fail: `TypeError: takes 3 positional arguments but 7 were given`
+| | |
+|---|---|
+| **File** | `tabs/tab_khtd_giao_dc.py` — `render()` dòng ~1292 |
+| **Dấu hiệu** | CI `test_smoke_imports.py::TestSmokeRender::test_render[tabs.tab_khtd_giao_dc]` fail với `TypeError` |
+| **Nguyên nhân** | Refactor `_section_c_tong_hop()` bỏ 4 param (username, role, loai_val, readonly_exec) nhưng call site trong `render()` vẫn truyền 7 args |
+| **Fix** | Đổi call thành `_section_c_tong_hop(nam, thang, dot)` |
+| **Bài học** | Khi rút gọn signature hàm helper, grep tất cả call site trong cùng file: `grep -n "_section_c_tong_hop" tabs/tab_khtd_giao_dc.py` |
+| **Ngày fix** | 2026-06-20 |
+
 ---
 
 ## H. GSheet / Google Sheets

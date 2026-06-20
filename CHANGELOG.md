@@ -1,5 +1,8 @@
 # CHANGELOG
 
+## [2026-06-21] — Fix Dư nợ BQ xã đếm thiếu xã (87 thay vì 95)
+- `tabs/tab_tongquan.py` dòng ~183 — `_cache_bq_counts()`: đổi đếm xã dư nợ > 0 → `nunique()` tất cả xã trong HSTD; mẫu số BQ phải là toàn địa bàn 95 xã
+
 ## [2026-06-21] — Fix PGD data scope + docstring tab_tracuu_v2
 - `workspaces/ws_operation.py` dòng ~911 — đổi `**kwargs` → `**_pgd_df_kwargs` cho tab_tracuu_v2: PGD user giờ nhận df đã lọc theo PGD (nhất quán với các tab khác, modal lookup dùng df_pgd)
 - `tabs/tab_tracuu_v2.py` dòng 1-9 — cập nhật docstring cho đúng với thiết kế sau refactor

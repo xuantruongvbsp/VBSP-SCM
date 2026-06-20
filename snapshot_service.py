@@ -627,7 +627,7 @@ def luu_cdtotkvv_snapshot(df_cdtotkvv: pd.DataFrame, ky: str, username: str) -> 
             df_pgd = df_pgd.merge(sub_cnt, on=grp_key, how="left")
         if col_name not in df_pgd.columns:
             df_pgd[col_name] = 0
-        df_pgd[col_name] = df_pgd[col_name].fillna(0).astype(int)
+        df_pgd[col_name] = pd.to_numeric(df_pgd[col_name], errors="coerce").fillna(0).astype(int)
 
     if df_pgd is None or df_pgd.empty:
         return KetQuaUpload(False, "Không tổng hợp được CDTOTKVV theo PGD.")

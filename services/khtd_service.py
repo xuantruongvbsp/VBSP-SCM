@@ -9,6 +9,7 @@ from datetime import datetime
 from typing import Any
 
 import pandas as pd
+import streamlit as st
 
 import db
 from logger import get_logger
@@ -389,12 +390,16 @@ def doc_tu_sheet(pgd_slug: str) -> tuple[list[dict], list[str]]:
     return du_lieu_hop_le, danh_sach_loi
 
 
-def _du_lieu_chuyen_trieu_sang_vnd(_loai: str, du_lieu: list[dict]) -> list[dict]:
+def _du_lieu_chuyen_trieu_sang_vnd(
+    _loai: str, du_lieu: list[dict]
+) -> tuple[list[dict], list[str]]:
     """
     Quy đổi triệu → VND (kh_tw, kh_dp, dc_tw, dc_dp), rồi
     kh_moi_tw = kh_tw + dc_tw, kh_moi_dp = kh_dp + dc_dp (đơn vị VND).
+    Trả về (danh_sach_hop_le, danh_sach_loi_am).
     """
     out: list[dict] = []
+    loi_am: list[str] = []
     for r in du_lieu:
         d = dict(r)
         ktw = float(d.get("kh_tw") or 0)
@@ -405,14 +410,24 @@ def _du_lieu_chuyen_trieu_sang_vnd(_loai: str, du_lieu: list[dict]) -> list[dict
         kdp_v = kdp * 1_000_000
         dtw_v = dtw * 1_000_000
         ddp_v = ddp * 1_000_000
+        kh_moi_tw = ktw_v + dtw_v
+        kh_moi_dp = kdp_v + ddp_v
+        if kh_moi_tw < 0 or kh_moi_dp < 0:
+            ma = d.get("ma_key", "?")
+            xa = d.get("xa", "?")
+            loi_am.append(
+                f"xa={xa} · ma_key={ma}: KH mới âm "
+                f"(TW={kh_moi_tw/1e6:.1f}M, ĐP={kh_moi_dp/1e6:.1f}M)"
+            )
+            continue
         d["kh_tw"] = ktw_v
         d["kh_dp"] = kdp_v
         d["dc_tw"] = dtw_v
         d["dc_dp"] = ddp_v
-        d["kh_moi_tw"] = ktw_v + dtw_v
-        d["kh_moi_dp"] = kdp_v + ddp_v
+        d["kh_moi_tw"] = kh_moi_tw
+        d["kh_moi_dp"] = kh_moi_dp
         out.append(d)
-    return out
+    return out, loi_am
 
 
 def luu_dot(
@@ -426,7 +441,7 @@ def luu_dot(
 ) -> KetQuaUpload:
     key = _kv_key(pgd_slug, nam, thang, dot)
     try:
-        du_lieu_vnd = _du_lieu_chuyen_trieu_sang_vnd(loai, du_lieu)
+        du_lieu_vnd, loi_am = _du_lieu_chuyen_trieu_sang_vnd(loai, du_lieu)
         payload = {
             "loai": loai,
             "du_lieu": du_lieu_vnd,
@@ -437,14 +452,16 @@ def luu_dot(
         db.ghi_audit(
             username,
             "luu_dot_khtd",
-            f"PGD: {pgd_slug} · {nam}/{thang}/{dot} · loai={loai} · {len(du_lieu)} dòng",
+            f"PGD: {pgd_slug} · {nam}/{thang}/{dot} · loai={loai} · {len(du_lieu_vnd)} dòng"
+            + (f" · {len(loi_am)} dòng bỏ qua (KH mới âm)" if loi_am else ""),
         )
-        return KetQuaUpload(
-            True,
+        msg = (
             f"✅ Đã lưu KHTD — {pgd_slug} · năm {nam} · tháng {thang} · đợt {dot} · "
-            f"{len(du_lieu)} dòng (chờ duyệt).",
-            key,
+            f"{len(du_lieu_vnd)} dòng (chờ duyệt)."
         )
+        if loi_am:
+            msg += f"\n⚠️ Bỏ qua {len(loi_am)} dòng có KH mới âm:\n" + "\n".join(loi_am)
+        return KetQuaUpload(True, msg, key)
     except Exception as e:
         msg = f"❌ Lưu KHTD thất bại: {e}"
         logger.error("luu_dot_khtd [%s]: %s", key, e, exc_info=True)
@@ -606,6 +623,7 @@ def tai_tat_ca(
     return ket_qua
 
 
+@st.cache_data(ttl=60, show_spinner=False)
 def tong_hop(nam: str | int, thang: str | int, dot: str | int) -> pd.DataFrame:
     cols = [
         "pgd_slug",

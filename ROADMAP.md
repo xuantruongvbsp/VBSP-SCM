@@ -106,7 +106,7 @@
 | Mục tiêu | Chi tiết | Ưu tiên |
 |---|---|---|
 | Phân loại khách hàng | Scoring đơn giản dựa trên lịch sử trả nợ + tần suất giao dịch | ✅ Done 2026-06-10 |
-| Stress test danh mục | Kịch bản: 3%/5% khách hàng mất khả năng trả nợ → NQH dự kiến | 🟡 Thấp |
+| Stress test danh mục | Kịch bản: 3%/5% khách hàng mất khả năng trả nợ → NQH dự kiến | ✅ Done 2026-06-20 |
 | Biểu đồ tương tác nâng cao | Altair selection, cross-filter, tooltip động | 🟡 Thấp |
 | ~~Dự báo ML (Prophet/ARIMA)~~ | ~~Dữ liệu lịch sử chưa đủ dài, overkill~~ | ❌ Loại |
 
@@ -127,7 +127,7 @@
 | Tìm kiếm full-text | Tra cứu công văn theo số hiệu, ngày, từ khóa nội dung, tag, loại, trạng thái | `tabs/tab_quan_ly_cong_van.py` + `services/cong_van_service.py` | ✅ Done 2026-05-26 |
 | Gắn tag & phân loại | Phân loại: Công văn / Quyết định / Thông báo / Báo cáo / Hướng dẫn; tag multi-select (TW, HĐQT, Tín dụng...16 tags) | `tabs/tab_quan_ly_cong_van.py` | ✅ Done 2026-05-26 |
 | Xuất danh sách Excel/PDF | Danh sách công văn theo kỳ, trạng thái xử lý (3 sheet: DS + Theo loại + Theo TT) | `services/cong_van_service.py` | ✅ Done 2026-05-26 |
-| Nhắc nhở deadline | Cảnh báo công văn cần xử lý trước ngày X | `alert_center.py` | 🟡 Thấp |
+| Nhắc nhở deadline | Cảnh báo công văn cần xử lý trước ngày X | `alert_center.py` | ✅ Done 2026-06-20 |
 
 ### 2.5 KTNB — Kiểm toán Nội bộ Phase 2
 

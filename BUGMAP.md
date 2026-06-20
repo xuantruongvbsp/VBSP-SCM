@@ -563,6 +563,16 @@
 | **Fix** | Trong architecture batch merge mới: `_xu_ly_upload()` không merge ngay → không có `ket_qua_merge`. Kết quả merge hiện duy nhất trong `_merge_panel.py` |
 | **Ngày fix** | 2026-06-12 |
 
+### E11 — "Tổng quan danh mục" hiển thị ít dữ liệu hơn sau upload 22 PGD
+| | |
+|---|---|
+| **File** | `services/upload_service.py` ~dòng 74; `data/hstd.py` ~dòng 17 |
+| **Dấu hiệu** | Upload đủ 22 PGD + Hội sở, parquet hstd chỉ có ~36,350 dòng (2 PGD) thay vì ~359,000 dòng (22 PGD). Tab Tổng quan danh mục tín dụng hiển thị dữ liệu ít hơn thực tế |
+| **Nguyên nhân** | 2 bug kết hợp: (1) `FILES_HE_THONG[TEN_FILE]` có `"cache": CACHE_HSTD` → `luu_file_he_thong()` gọi `os.remove(CACHE_HSTD)` khi upload file hệ thống cũ → xóa parquet merged 22 PGD. (2) `doc_file()` trong `data/hstd.py` gọi `excel_to_parquet(FILE_PATH, CACHE_HSTD, ...)` → rebuild CACHE_HSTD từ file đơn lẻ (chỉ 2 PGD: Trảng Bom + Long Thành). Kết quả: CACHE_HSTD bị ghi đè bằng dữ liệu 2 PGD thay vì 22 PGD |
+| **Fix** | (1) Xóa `"cache"` khỏi `FILES_HE_THONG[TEN_FILE]` — file hệ thống cũ không được xóa/ghi CACHE_HSTD. (2) `doc_file()` cache vào `fp_pq = fp.with_suffix(".parquet")` (cùng thư mục với Excel) thay vì `CACHE_HSTD` |
+| **Khắc phục tức thời** | Vào tab Upload HSTD → bấm Merge để rebuild parquet từ 22 file khnv đã upload |
+| **Ngày fix** | 2026-06-20 |
+
 ### E8 — "Toàn cảnh 22 PGD" cột Upload HSTD luôn ❌ dù đã upload
 | | |
 |---|---|

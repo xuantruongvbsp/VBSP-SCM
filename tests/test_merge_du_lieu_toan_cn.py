@@ -71,6 +71,18 @@ def _df_gqvl_mau(ten_pgd: str = "PGD Test") -> pd.DataFrame:
     })
 
 
+@pytest.fixture(autouse=True)
+def mock_telegram_service():
+    """Block mọi HTTP call tới Telegram trong toàn bộ test file này.
+
+    Nếu không mock, merge thành công sẽ gọi gui_thong_bao_merge() → requests.post()
+    → SSL handshake thật → access violation ở C-level trong Python 3.14 trên Windows,
+    không thể catch bằng try/except Python thông thường.
+    """
+    with patch("services.telegram_service.gui_thong_bao_merge", return_value=True):
+        yield
+
+
 @pytest.fixture
 def mock_streamlit():
     """Mock toàn bộ Streamlit — không cần chạy trong browser."""

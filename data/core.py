@@ -71,38 +71,39 @@ def excel_to_parquet(
     RAM giảm 50-70% nhờ PyArrow zero-copy; cache nhỏ hơn ~30% nhờ zstd.
     """
     os.makedirs(os.path.dirname(parquet_path), exist_ok=True)
+    df_fresh: pd.DataFrame | None = None
     if ts_file(parquet_path) < ts_file(excel_path):
         try:
-            df = pd.read_excel(
+            df_fresh = pd.read_excel(
                 excel_path, sheet_name=sheet, header=header,
             )
             if post_fn:
-                df = post_fn(df)
+                df_fresh = post_fn(df_fresh)
             # Normalize tên cột: xóa ký tự xuống dòng trong header cell Excel
             # (VD: "Thời hạn\nvay" → "Thời hạn vay")
-            df.columns = [
+            df_fresh.columns = [
                 c.replace('\n', ' ').replace('\r', '').strip()
                 if isinstance(c, str) else c
-                for c in df.columns
+                for c in df_fresh.columns
             ]
-            for col in list(df.columns):
+            for col in list(df_fresh.columns):
                 if _should_force_str(col):
-                    df[col] = _normalize_code_series(df[col])
+                    df_fresh[col] = _normalize_code_series(df_fresh[col])
             # Sanitize object columns: bytes → str để tránh PyArrow
             # "Expected bytes, got a 'float' object" khi gặp NaN trong cột binary
-            for col in list(df.columns):
-                if df[col].dtype == object:
+            for col in list(df_fresh.columns):
+                if df_fresh[col].dtype == object:
                     try:
-                        _non_null = df[col].dropna()
+                        _non_null = df_fresh[col].dropna()
                         if len(_non_null) > 0 and any(
                             isinstance(v, bytes) for v in _non_null.iloc[:100]
                         ):
-                            df[col] = df[col].apply(
+                            df_fresh[col] = df_fresh[col].apply(
                                 lambda x: x.decode("utf-8", errors="replace") if isinstance(x, bytes) else x
                             )
                     except Exception:
                         pass
-            df.to_parquet(parquet_path, index=False, engine='pyarrow', compression='zstd', compression_level=3)
+            df_fresh.to_parquet(parquet_path, index=False, engine='pyarrow', compression='zstd', compression_level=3)
         except Exception as e:
             logger.error("excel_to_parquet: lỗi xử lý file %s → %s — %s", excel_path, parquet_path, e, exc_info=True)
             try:
@@ -111,11 +112,11 @@ def excel_to_parquet(
             except Exception as e2:
                 logger.error("excel_to_parquet: không thể xóa cache parquet lỗi — %s", e2, exc_info=True)
             raise
-    # Chuẩn hóa code columns — CHỈ khi dtype sai (int64/float64 = cache cũ chưa normalize).
-    # Parquet vừa ghi đã được normalize khi ghi → bỏ qua nếu dtype đã là object/string.
-    # Tránh chạy lại 22×N_code_cols normalization khi cache hit.
+        # Vừa ghi xong — df_fresh đã normalize, trả thẳng, không đọc lại parquet
+        return df_fresh
+
+    # Cache hit — đọc từ parquet, xử lý cache cũ có dtype sai (int64/float64)
     result = pd.read_parquet(parquet_path, engine='pyarrow')
-    # Normalize tên cột từ cache cũ (trước khi có fix này)
     result.columns = [
         c.replace('\n', ' ').replace('\r', '').strip()
         if isinstance(c, str) else c

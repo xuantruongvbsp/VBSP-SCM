@@ -320,7 +320,7 @@ def _tab_khtd_chi_nhanh(
 
     st.markdown(
         f"<div style='padding:8px 14px;background:{mau};border-left:4px solid {vien};"
-        f"border-radius:6px;font-size:0.9rem;font-weight:500;margin-bottom:8px'>"
+        f"border-radius:6px;font-size:0.9rem;font-weight:500;margin-bottom:8px;color:#1f2937'>"
         f"{icon} {noi_dung}</div>",
         unsafe_allow_html=True,
     )

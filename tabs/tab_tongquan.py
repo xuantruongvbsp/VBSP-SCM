@@ -178,8 +178,10 @@ def _cache_bq_counts(
             if COT_TEN_TO in df_bq.columns and COT_TEN_PGD in df_bq.columns else 0)
     n_xa = 0
     if COT_TEN_XA in df_bq.columns:
-        _mask_pgd = (df_bq[COT_TEN_PGD] != DON_VI_CHI_NHANH) if COT_TEN_PGD in df_bq.columns else True
-        _df_xa = df_bq[_mask_pgd & df_bq[COT_TEN_XA].notna() & (df_bq[COT_TEN_XA] != "") & (df_bq[COT_TEN_XA] != "CỘNG")]
+        # Không lọc theo PGD — Hội sở cũng có địa bàn xã riêng
+        # Loại trừ: rỗng, "CỘNG", "Vay trực tiếp" (không phải tên xã thực)
+        _xa_exclude = {"", "CỘNG", "Vay trực tiếp"}
+        _df_xa = df_bq[df_bq[COT_TEN_XA].notna() & ~df_bq[COT_TEN_XA].isin(_xa_exclude)]
         n_xa = int(_df_xa[COT_TEN_XA].nunique())
     n_hoi = (int(df_bq[COT_DVUT].dropna().loc[lambda s: (s != "") & (s != "CỘNG")].nunique())
              if COT_DVUT in df_bq.columns else 0)

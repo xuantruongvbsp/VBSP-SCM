@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mockup — KHTD Chi nhánh (sau fix màu dark mode)</title>
+<style>
+  /* Mô phỏng biến theme của Streamlit */
+  :root{
+    --bg: #ffffff;
+    --text-color: #1f2937;
+    --panel: #ffffff;
+    --grid: #e2e8f0;
+    --hover: rgba(128,128,128,0.12);
+  }
+  body.dark{
+    --bg: #0e1117;
+    --text-color: #e6edf3;
+    --panel: #161b22;
+    --grid: #30363d;
+    --hover: rgba(128,128,128,0.12);
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; padding:28px; background:var(--bg); color:var(--text-color);
+    font-family:-apple-system,"Segoe UI",Roboto,Arial,sans-serif; font-size:15px;
+    transition:background .2s,color .2s;
+  }
+  .toolbar{display:flex;align-items:center;gap:14px;margin-bottom:20px;flex-wrap:wrap}
+  .title{font-size:1.4rem;font-weight:700;margin:0}
+  .caption{opacity:.75;font-size:.9rem;margin:4px 0 18px}
+  .btn{
+    cursor:pointer;border:1px solid var(--grid);background:var(--panel);color:var(--text-color);
+    padding:8px 16px;border-radius:8px;font-weight:600;font-size:.9rem;
+  }
+  .tabs{display:flex;gap:10px;margin-bottom:16px}
+  .pill{padding:7px 14px;border-radius:20px;border:1px solid var(--grid);font-size:.85rem;opacity:.7}
+  .pill.active{background:#1565c0;color:#fff;border-color:#1565c0;opacity:1}
+
+  /* ── Header bảng (2 tầng) ── */
+  .grid{width:100%;border-collapse:separate;border-spacing:4px 0}
+  .row{display:grid;grid-template-columns:3fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr;gap:4px;align-items:stretch}
+  .hcell{
+    padding:8px 6px;border-radius:4px;font-weight:600;font-size:.8rem;
+    text-align:center;line-height:1.35;
+  }
+  /* các block nền cố định SÁNG -> chữ tối cố định */
+  .h-tw{background:#bbdefb;color:#1565c0}
+  .h-tw2{background:#e3f2fd;color:#1565c0}
+  .h-dp{background:#c8e6c9;color:#2e7d32}
+  .h-dp2{background:#e8f5e9;color:#2e7d32}
+  .h-tong{background:#ffe0b2;color:#e65100}
+  .h-tong2{background:#fff3e0;color:#e65100}
+  .h-ct{background:#f0f4fa;color:#37474f}
+  .h-blank{background:#f0f4fa}
+
+  /* ── Tiêu đề nhóm: nền pastel cố định + color tối cố định ── */
+  .group{
+    margin:14px 0 6px;padding:7px 12px;border-radius:6px;font-weight:600;font-size:.92rem;
+    color:#1f2937;
+  }
+  .g0{background:#eef6ff}
+  .g1{background:#eefaf3}
+  .g2{background:#fff8ee}
+
+  /* ── Dòng dữ liệu: KHÔNG set nền -> chữ theo var(--text-color) ── */
+  .drow{padding:3px 0;border-bottom:1px solid var(--grid)}
+  .drow:hover{background:var(--hover)}
+  .name{padding:6px 0;font-size:.95rem}
+  .sub{padding:3px 0 3px 16px;font-size:.83rem;color:var(--text-color);opacity:.75}
+  .num{text-align:right;font-size:.88rem;padding:2px 6px;color:var(--text-color)}
+  .num.input{
+    text-align:right;border:1px solid var(--grid);border-radius:6px;background:var(--panel);
+    color:var(--text-color);padding:5px 8px;font-weight:500;
+  }
+  .neg{color:#c62828}
+  .ok{color:#2e7d32}
+  .muted{color:#64748b}
+  .legend{margin-top:22px;font-size:.82rem;opacity:.7;line-height:1.7}
+  .legend code{background:var(--hover);padding:1px 6px;border-radius:4px}
+</style>
+</head>
+<body>
+  <div class="toolbar">
+    <h1 class="title">🏛️ Kế hoạch Tín dụng — Phòng KH-NV</h1>
+    <button class="btn" id="toggle">🌙 Chuyển Dark mode</button>
+  </div>
+  <p class="caption">Quản lý KHTD cấp Chi nhánh và phân bổ xuống Xã · Theo dõi chênh lệch phân bổ theo Chương trình</p>
+
+  <div class="tabs">
+    <span class="pill active">🏛️ KHTD Chi nhánh</span>
+    <span class="pill">📍 KHTD theo Xã</span>
+    <span class="pill">⚠️ Cảnh báo chênh lệch</span>
+  </div>
+
+  <div class="grid">
+    <!-- Header tầng 1 -->
+    <div class="row" style="margin-bottom:4px">
+      <div class="hcell h-blank">&nbsp;</div>
+      <div class="hcell h-tw">NGUỒN VỐN TRUNG ƯƠNG</div>
+      <div class="hcell h-tw">&nbsp;</div>
+      <div class="hcell h-tw">&nbsp;</div>
+      <div class="hcell h-dp">NGUỒN VỐN ĐỊA PHƯƠNG</div>
+      <div class="hcell h-dp">&nbsp;</div>
+      <div class="hcell h-dp">&nbsp;</div>
+      <div class="hcell h-tong">TỔNG CỘNG</div>
+      <div class="hcell h-tong">&nbsp;</div>
+    </div>
+    <!-- Header tầng 2 -->
+    <div class="row" style="margin-bottom:6px">
+      <div class="hcell h-ct">Chương trình</div>
+      <div class="hcell h-tw2">Kế hoạch TW<br>(triệu đồng)</div>
+      <div class="hcell h-tw2">Thực hiện TW<br>(triệu đồng)</div>
+      <div class="hcell h-tw2">Còn phải TH TW<br>(triệu đồng)</div>
+      <div class="hcell h-dp2">Kế hoạch ĐP<br>(triệu đồng)</div>
+      <div class="hcell h-dp2">Thực hiện ĐP<br>(triệu đồng)</div>
+      <div class="hcell h-dp2">Còn phải TH ĐP<br>(triệu đồng)</div>
+      <div class="hcell h-tong2">TH cả hai nguồn<br>(triệu đồng)</div>
+      <div class="hcell h-tong2">Còn phải TH Tổng<br>(triệu đồng)</div>
+    </div>
+
+    <!-- Nhóm 1 -->
+    <div class="group g0">I. Cho vay hộ nghèo và các đối tượng chính sách</div>
+
+    <div class="row drow">
+      <div class="name">Hộ nghèo</div>
+      <input class="num input" value="120.000">
+      <div class="num">98.500</div>
+      <div class="num ok">0 ✓</div>
+      <input class="num input" value="0">
+      <div class="num muted">—</div>
+      <div class="num muted">—</div>
+      <div class="num">98.500</div>
+      <div class="num neg">-21.500</div>
+    </div>
+
+    <div class="row drow">
+      <div class="name">Hộ cận nghèo</div>
+      <input class="num input" value="85.000">
+      <div class="num">85.000</div>
+      <div class="num ok">0 ✓</div>
+      <input class="num input" value="0">
+      <div class="num muted">—</div>
+      <div class="num muted">—</div>
+      <div class="num">85.000</div>
+      <div class="num ok">0 ✓</div>
+    </div>
+
+    <!-- Nhóm 2 -->
+    <div class="group g1">II. Cho vay giải quyết việc làm</div>
+
+    <div class="row drow">
+      <div class="name">Giải quyết việc làm (GQVL)</div>
+      <div class="num muted">—</div><div class="num muted">—</div><div class="num muted">—</div>
+      <div class="num muted">—</div><div class="num muted">—</div><div class="num muted">—</div>
+      <div class="num muted">—</div><div class="num muted">—</div>
+    </div>
+    <div class="row drow">
+      <div class="sub">GQVL TW — NHCSXH</div>
+      <input class="num input" value="60.000">
+      <div class="num">52.300</div>
+      <div class="num neg">-7.700</div>
+      <div></div><div></div><div></div><div></div><div></div>
+    </div>
+    <div class="row drow">
+      <div class="sub">GQVL ĐP — Cấp tỉnh</div>
+      <div></div><div></div><div></div>
+      <input class="num input" value="40.000">
+      <div class="num">40.000</div>
+      <div class="num ok">0 ✓</div>
+      <div></div><div></div>
+    </div>
+
+    <!-- Nhóm 3 -->
+    <div class="group g2">III. Chương trình khác</div>
+    <div class="row drow">
+      <div class="name">Nước sạch & VSMT nông thôn</div>
+      <input class="num input" value="30.000">
+      <div class="num">12.000</div>
+      <div class="num neg">-18.000</div>
+      <input class="num input" value="0">
+      <div class="num muted">—</div>
+      <div class="num muted">—</div>
+      <div class="num">12.000</div>
+      <div class="num neg">-18.000</div>
+    </div>
+  </div>
+
+  <div class="legend">
+    <strong>Quy ước màu (rule 8.16):</strong><br>
+    • Header / nhóm có nền cố định SÁNG → kèm <code>color</code> tối cố định (đọc rõ ở cả 2 theme).<br>
+    • Ô số liệu / tên dòng KHÔNG đặt nền → dùng <code>var(--text-color)</code> để tự đổi theo theme.<br>
+    • <span class="ok">0 ✓</span> = đã đạt KH · <span class="neg">số âm</span> = vượt KH · <span class="muted">—</span> = chưa có KH.
+  </div>
+
+<script>
+  const b=document.body,t=document.getElementById('toggle');
+  t.onclick=()=>{b.classList.toggle('dark');
+    t.textContent=b.classList.contains('dark')?'☀️ Chuyển Light mode':'🌙 Chuyển Dark mode';};
+</script>
+</body>
+</html>

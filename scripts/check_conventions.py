@@ -73,6 +73,55 @@ _EXC_INFO   = re.compile(r'exc_info\s*=\s*True')
 _GET_LOGGER  = re.compile(r'get_logger\s*\(')
 _FROM_LOGGER = re.compile(r'from\s+logger\s+import')
 
+# 10. Hardcode màu nguy hiểm cho dark mode trong HTML/CSS inline (rule 8.16 + BUGMAP B15)
+#   - Chữ TỐI cố định mà KHÔNG đặt nền cùng dòng  → chìm trên nền tối
+#   - Nền SÁNG cố định mà KHÔNG đặt màu chữ cùng dòng → chữ theo theme sáng → chìm
+# Dùng luminance để phân loại; cặp "nền sáng + chữ tối" (B15) được coi là HỢP LỆ.
+_CSS_COLOR     = re.compile(r'(?<!-)\bcolor\s*:\s*([#a-zA-Z0-9]+)')
+_CSS_BG        = re.compile(r'\bbackground(?:-color)?\s*:\s*([#a-zA-Z0-9]+)')
+_NAMED_LUM     = {"black": 0.0, "white": 1.0}
+
+
+def _luminance(token: str) -> float | None:
+    """Độ sáng cảm nhận 0..1 của 1 màu CSS (#rgb/#rrggbb/black/white). None nếu không xác định."""
+    t = token.strip().lower()
+    if t in _NAMED_LUM:
+        return _NAMED_LUM[t]
+    if not t.startswith("#"):
+        return None  # rgb()/rgba()/var()/biến f-string → bỏ qua (an toàn)
+    hex_part = t[1:]
+    if len(hex_part) == 3:
+        hex_part = "".join(c * 2 for c in hex_part)
+    if len(hex_part) != 6:
+        return None
+    try:
+        r, g, b = (int(hex_part[k:k + 2], 16) for k in (0, 2, 4))
+    except ValueError:
+        return None
+    return (0.299 * r + 0.587 * g + 0.114 * b) / 255.0
+
+
+def _check_darkmode(line: str) -> str | None:
+    """Trả về mô tả vi phạm dark mode nếu có, ngược lại None."""
+    m_color = _CSS_COLOR.search(line)
+    m_bg = _CSS_BG.search(line)
+    has_bg = "background" in line  # gồm cả nền là biến f-string {bg}
+    has_color = m_color is not None
+
+    if m_color:
+        lum = _luminance(m_color.group(1))
+        # Chữ tối cố định, KHÔNG kèm bất kỳ khai báo nền nào → chìm trên dark mode
+        if lum is not None and lum < 0.45 and not has_bg:
+            return ("chữ tối cố định không kèm nền — sẽ chìm trên dark mode; "
+                    "dùng color:var(--text-color)")
+    if m_bg:
+        lum_bg = _luminance(m_bg.group(1))
+        # Nền sáng cố định, KHÔNG kèm khai báo màu chữ → chữ theo theme sáng → chìm
+        if lum_bg is not None and lum_bg > 0.75 and not has_color:
+            return ("nền sáng cố định thiếu color chữ kèm theo — "
+                    "thêm color tối cố định (cặp khóa, BUGMAP B15)")
+    return None
+
 # ── Các thư mục/file bỏ qua ─────────────────────────────────────────────────
 _SKIP_DIRS  = {"_archive", ".git", "__pycache__", "node_modules",
                "khtd-targets-app", "tests", "scripts", ".venv", ".ruff_cache"}
@@ -149,6 +198,14 @@ def kiem_tra_file(path: Path) -> list[str]:
                 loi.append(
                     f"  Dòng {i:4d}: [LOGGER] except Exception as e: — "
                     f"dùng logger.error(... , exc_info=True)\n"
+                    f"           → {stripped[:100]}"
+                )
+
+        if "# conv: skip" not in line:
+            _dm = _check_darkmode(line)
+            if _dm:
+                loi.append(
+                    f"  Dòng {i:4d}: [DARKMODE] {_dm}\n"
                     f"           → {stripped[:100]}"
                 )
 

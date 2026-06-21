@@ -170,11 +170,8 @@ def _hien_thi_bang_cn_readonly(
         bg = WHITE if stt_i % 2 == 0 else ALT
         stt_i += 1
 
-        kh_str = _fvn(kh_v, 3) if kh_v > 0 else ("—" if indent else _fvn(kh_v, 3))
-        if kh_vnd == 0:
-            kh_str = "—"
-
-        th_str = _fvn(th_v, 3) if th_v > 0 else "—"
+        kh_str = _fvn(kh_v, 0) if kh_v > 0 else "—"
+        th_str = _fvn(th_v, 0) if th_v > 0 else "—"
         tl_str = f"{_fvn(tl, 1)}%" if tl is not None else "—"
         tl_c = _tl_color(tl)
         stt_s = _tl_text(tl)
@@ -196,6 +193,10 @@ def _hien_thi_bang_cn_readonly(
 
         kh_v = kh_vnd / 1e6
         th_v = th_vnd / 1e6
+
+        if kh_v == 0 and th_v == 0:
+            return
+
         tl = th_v / kh_v * 100 if kh_v > 0 else None
 
         if kh_v > 0 or th_v > 0:
@@ -207,8 +208,8 @@ def _hien_thi_bang_cn_readonly(
         bg = WHITE if stt_i % 2 == 0 else ALT
         stt_i += 1
 
-        kh_str = "—" if sub_key == sub_key_3_dp_xa else (_fvn(kh_v, 3) if kh_v > 0 else _fvn(kh_v, 3))
-        th_str = _fvn(th_v, 3) if th_v > 0 else "—"
+        kh_str = _fvn(kh_v, 0) if kh_v > 0 else "—"
+        th_str = _fvn(th_v, 0) if th_v > 0 else "—"
         tl_str = f"{_fvn(tl, 1)}%" if tl is not None else "—"
         tl_c = _tl_color(tl)
         stt_s = _tl_text(tl)
@@ -235,7 +236,7 @@ def _hien_thi_bang_cn_readonly(
         ten_base = _ten_ct_base(ma_ct, {})
 
         if ma_ct == 3:
-            nhom_moi = "I. Trung ương"
+            nhom_moi = "I. Nguồn vốn Trung ương"
             if nhom_hien != nhom_moi:
                 _add_group_hdr(nhom_moi)
             for sub_key, sub_ten, sub_nv in GQVL_SUB_NHOM:
@@ -264,16 +265,16 @@ def _hien_thi_bang_cn_readonly(
     tds_tong = (
         _td("", "center", "#1f2937", TONG_BG, "bold") +
         _td("TỔNG CỘNG", "left", "#1f2937", TONG_BG, "bold") +
-        _td(_fvn(tong_kh / 1e6, 3), "right", "#1f2937", TONG_BG, "bold") +
-        _td(_fvn(tong_th / 1e6, 3), "right", "#1f2937", TONG_BG, "bold") +
+        _td(_fvn(tong_kh / 1e6, 0), "right", "#1f2937", TONG_BG, "bold") +
+        _td(_fvn(tong_th / 1e6, 0), "right", "#1f2937", TONG_BG, "bold") +
         _td(f"{_fvn(tong_tl, 1)}%" if tong_tl is not None else "—", "right", _tl_color(tong_tl), TONG_BG, "bold") +
         _td(_tl_text(tong_tl), "left", _tl_color(tong_tl), TONG_BG, "bold")
     )
     html_rows.append(f"<tr>{tds_tong}</tr>")
 
     k1, k2, k3, k4 = st.columns(4)
-    k1.metric("Tổng KH (triệu đồng)", f"{_fvn(tong_kh / 1e6, 3)}")
-    k2.metric("Tổng TH (triệu đồng)", f"{_fvn(tong_th / 1e6, 3)}")
+    k1.metric("Tổng KH (triệu đồng)", f"{_fvn(tong_kh / 1e6, 0)}")
+    k2.metric("Tổng TH (triệu đồng)", f"{_fvn(tong_th / 1e6, 0)}")
     k3.metric(
         "Tỷ lệ đạt KH",
         f"{_fvn(tong_tl, 1)}%" if tong_tl is not None else "—",

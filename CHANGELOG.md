@@ -1,7 +1,19 @@
 # CHANGELOG
 
+## [2026-06-21] — Sắp xếp lại phần Báo cáo tab KHTD thành 4 sub-tab
+- `tabs/tab_khtd_xuat.py` — tách 2 section nổi ("Xuất KHTD theo Xã", "Tờ trình BGĐ") thành hàm `_tab_xuat_khtd_xa()` và `_tab_xuat_to_trinh_bgd()`; `render_xuat_baocao()` dùng 4 tab (Tiến độ KH vs TH → Chênh lệch phân bổ → KHTD theo Xã → Tờ trình BGĐ)
+- `tabs/tab_khtd.py` dòng ~438 — đổi nhãn radio "⚠️ Cảnh báo chênh lệch" → "📊 Báo cáo & Xuất file"
+
+## [2026-06-21] — Fix màu khó đọc trên dark mode tab KHTD (Kế hoạch Tín dụng — Phòng KH-NV)
+- `tabs/tab_khtd_nhap.py` dòng ~347 — header "NGUỒN VỐN TRUNG ƯƠNG" bảng CN: nền tối `#0D2137` → `#bbdefb` (đồng nhất bảng PGD, hết cảnh nền tối + chữ tối)
+- `tabs/tab_khtd_nhap.py` dòng ~353 — header "NGUỒN VỐN ĐỊA PHƯƠNG": chữ nhạt `#81C784` → `#2e7d32`
+- `tabs/tab_khtd_nhap.py` dòng ~460 & ~1167 — tiêu đề nhóm chương trình: thêm `color:#1f2937` (trước đây thiếu color → chữ theo theme sáng nằm trên nền pastel sáng → khó đọc)
+- `tabs/tab_khtd_nhap.py` dòng ~433 — `_md_right()` default `#212121` (đen) → `var(--text-color)` (ô số liệu tự thích nghi dark/light)
+- `tabs/tab_khtd_nhap.py` dòng ~497 — tên sub GQVL `#555` → `var(--text-color);opacity:0.75`
+- `tabs/tab_khtd_nhap.py` dòng ~447 & ~1121 — hover hàng bảng `#f8fafc` → `rgba(128,128,128,0.12)` (tương thích cả 2 theme)
+
 ## [2026-06-21] — Fix Dư nợ BQ xã đếm thiếu xã (87 thay vì 95)
-- `tabs/tab_tongquan.py` dòng ~183 — `_cache_bq_counts()`: đổi đếm xã dư nợ > 0 → `nunique()` tất cả xã trong HSTD; mẫu số BQ phải là toàn địa bàn 95 xã
+- `tabs/tab_tongquan.py` dòng ~179 — `_cache_bq_counts()`: bỏ lọc `mask_pgd != DON_VI_CHI_NHANH` (9 xã Hội sở bị loại nhầm: Biên Hòa, Hố Nai, Long Bình, Long Hưng, Phước Tân, Tam Hiệp, Tam Phước, Trảng Dài, Trấn Biên); thêm loại trừ `"Vay trực tiếp"` (không phải tên xã thực); kết quả đúng: 95 xã
 
 ## [2026-06-21] — Fix PGD data scope + docstring tab_tracuu_v2
 - `workspaces/ws_operation.py` dòng ~911 — đổi `**kwargs` → `**_pgd_df_kwargs` cho tab_tracuu_v2: PGD user giờ nhận df đã lọc theo PGD (nhất quán với các tab khác, modal lookup dùng df_pgd)

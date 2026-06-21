@@ -101,23 +101,29 @@ def _luminance(token: str) -> float | None:
     return (0.299 * r + 0.587 * g + 0.114 * b) / 255.0
 
 
-def _check_darkmode(line: str) -> str | None:
-    """Trả về mô tả vi phạm dark mode nếu có, ngược lại None."""
+def _check_darkmode(line: str, neighborhood: str = "") -> str | None:
+    """Trả về mô tả vi phạm dark mode nếu có, ngược lại None.
+
+    `line`: dòng chứa literal màu (để báo đúng số dòng).
+    `neighborhood`: vài dòng lân cận ghép lại — nhận diện cặp màu/nền bị tách
+    qua nhiều dòng f-string (CSS Streamlit thường viết kiểu này).
+    """
+    ctx = neighborhood or line
     m_color = _CSS_COLOR.search(line)
     m_bg = _CSS_BG.search(line)
-    has_bg = "background" in line  # gồm cả nền là biến f-string {bg}
-    has_color = m_color is not None
+    co_bg_quanh = "background" in ctx              # nền có thể ở dòng f-string kề
+    co_color_quanh = _CSS_COLOR.search(ctx) is not None
 
     if m_color:
         lum = _luminance(m_color.group(1))
-        # Chữ tối cố định, KHÔNG kèm bất kỳ khai báo nền nào → chìm trên dark mode
-        if lum is not None and lum < 0.45 and not has_bg:
+        # Chữ tối cố định mà KHÔNG có khai báo nền nào quanh đó → chìm trên dark
+        if lum is not None and lum < 0.45 and not co_bg_quanh:
             return ("chữ tối cố định không kèm nền — sẽ chìm trên dark mode; "
                     "dùng color:var(--text-color)")
     if m_bg:
         lum_bg = _luminance(m_bg.group(1))
-        # Nền sáng cố định, KHÔNG kèm khai báo màu chữ → chữ theo theme sáng → chìm
-        if lum_bg is not None and lum_bg > 0.75 and not has_color:
+        # Nền sáng cố định mà KHÔNG có khai báo màu chữ quanh đó → chữ theo theme sáng
+        if lum_bg is not None and lum_bg > 0.75 and not co_color_quanh:
             return ("nền sáng cố định thiếu color chữ kèm theo — "
                     "thêm color tối cố định (cặp khóa, BUGMAP B15)")
     return None
@@ -202,7 +208,8 @@ def kiem_tra_file(path: Path) -> list[str]:
                 )
 
         if "# conv: skip" not in line:
-            _dm = _check_darkmode(line)
+            _window = "\n".join(lines[max(0, i - 4): i + 3])
+            _dm = _check_darkmode(line, _window)
             if _dm:
                 loi.append(
                     f"  Dòng {i:4d}: [DARKMODE] {_dm}\n"

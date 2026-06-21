@@ -304,7 +304,7 @@
 | **Pattern nguy hiểm** | `except TypeError: fn()` trong generic dispatch bắt lỗi từ bên trong `fn`, không chỉ từ bước setup — mọi TypeError bên trong fn đều bị nuốt và gọi lại fn theo cách sai |
 | **Ngày fix** | 2026-06-02 |
 
-### B15 — Bảng Trạng thái Upload luôn ❌ dù file đã tồn tại trên đĩa
+### B16 — Bảng Trạng thái Upload luôn ❌ dù file đã tồn tại trên đĩa
 | | |
 |---|---|
 | **File** | `data/pgd.py` → `doc_trang_thai_file()` dòng ~140, `_doc_ngay_so_lieu()` dòng ~104, `lay_trang_thai_upload_pgd()` dòng ~210 |

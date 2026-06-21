@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## [2026-06-21] — Fix dark mode: text vô hình trên nền pastel ở tab KHTD
+- `tabs/tab_khtd_nhap.py` dòng ~324 — Banner trạng thái KH: thêm `color:#1f2937` vào div (dark mode kế thừa text trắng trên nền vàng/xanh = vô hình)
+- `tabs/tab_khtd_xuat.py` dòng ~224 — GQVL sub-row: bỏ `style='background:{bg}'` khỏi `<tr>` (nền trắng hardcode → chữ trắng Streamlit dark mode = vô hình)
+- `tabs/tab_khtd_xuat.py` dòng ~265 — Dòng TỔNG CỘNG: thêm `color:#1f2937` vào 3 ô dùng `TONG_BG=#E8F4FD` (nền sáng không có màu chữ rõ ràng)
+
 ## [2026-06-21] — Fix CI: calamine fallback → openpyxl tại call site
 - `data/core.py` dòng ~84-91 — `pd.read_excel(engine="calamine")` → try calamine, except ImportError dùng openpyxl (fix 8 test fail trên Python 3.12 Ubuntu)
 - `.github/workflows/ci.yml` — thêm `--cov-report=html` + `--junitxml=pytest-results.xml` để annotation chi tiết hơn

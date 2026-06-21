@@ -10,6 +10,13 @@ from logger import get_logger
 
 logger = get_logger(__name__)
 
+try:
+    import python_calamine  # noqa: F401
+    _EXCEL_ENGINE = "calamine"
+except ImportError:
+    _EXCEL_ENGINE = "openpyxl"
+    logger.warning("python-calamine không khả dụng, dùng openpyxl")
+
 
 def ts_file(fp: str) -> float:
     """Timestamp file — 0 nếu không tồn tại."""
@@ -76,7 +83,7 @@ def excel_to_parquet(
         try:
             df_fresh = pd.read_excel(
                 excel_path, sheet_name=sheet, header=header,
-                engine="calamine",
+                engine=_EXCEL_ENGINE,
             )
             if post_fn:
                 df_fresh = post_fn(df_fresh)

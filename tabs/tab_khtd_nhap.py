@@ -340,7 +340,7 @@ def _tab_khtd_chi_nhanh(
 > ⚠️ Đơn vị: **triệu đồng**, số nguyên. Cột Thực hiện và Còn phải TH tự động tính từ HSTD — không cần nhập.
 """)
 
-    _colw = [3, 1, 1, 1, 1, 1, 1, 1, 1]
+    _colw = [2, 1, 1, 1, 1, 1, 1, 1, 1]
     hr1 = st.columns(_colw)
     hr1[0].markdown(_khtd_cn_hdr_cell("", "#f0f4fa"), unsafe_allow_html=True)
     hr1[1].markdown(

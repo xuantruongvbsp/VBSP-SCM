@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## [2026-06-21] — Linter chặn lỗi màu dark mode tự động (scripts/check_conventions.py)
+- `scripts/check_conventions.py` — thêm rule `[DARKMODE]`: dùng luminance phát hiện (1) chữ tối cố định không kèm nền → chìm trên dark; (2) nền sáng cố định thiếu màu chữ → chữ theo theme sáng → chìm. Cặp "nền sáng + chữ tối" (BUGMAP B15) được coi hợp lệ; xét cửa sổ ±3 dòng để tránh false positive khi CSS f-string trải nhiều dòng; bỏ qua qua `# conv: skip`. Pre-commit chỉ kiểm file đang sửa → "chạm tới đâu dọn tới đó"
+- Verify: file đã sửa (tab_khtd_nhap/tab_tracuu_v2) PASS; tab_canh_bao_nqh bắt đúng 1 lỗi thật (`background:#f8fafc` thiếu color)
+
 ## [2026-06-21] — Fix dark mode: text vô hình trên nền pastel ở tab KHTD
 - `tabs/tab_khtd_nhap.py` dòng ~324 — Banner trạng thái KH: thêm `color:#1f2937` vào div (dark mode kế thừa text trắng trên nền vàng/xanh = vô hình)
 - `tabs/tab_khtd_xuat.py` dòng ~224 — GQVL sub-row: bỏ `style='background:{bg}'` khỏi `<tr>` (nền trắng hardcode → chữ trắng Streamlit dark mode = vô hình)

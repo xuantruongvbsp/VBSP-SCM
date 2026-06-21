@@ -1079,16 +1079,10 @@ def xuat_to_trinh_bgd_word(username: str = "unknown") -> bytes:
     return buf.getvalue()
 
 
-def render_xuat_baocao(role: str = "", username: str = "", df_full: "pd.DataFrame | None" = None) -> None:
-    sub1, sub2 = st.tabs(["📊 Chênh lệch phân bổ", "🎯 Tiến độ KH vs TH"])
-    with sub1:
-        _tab_canh_bao_chenh_lech()
-    with sub2:
-        _tab_tien_do_kh_th()
-
-    st.divider()
-    st.subheader("📍 Xuất KHTD theo Xã")
-    st.caption("Bảng tổng hợp kế hoạch tín dụng phân bổ đến từng xã/phường — đơn vị: triệu đồng")
+def _tab_xuat_khtd_xa(role: str, username: str, df_full: "pd.DataFrame | None") -> None:
+    """Tab xuất Excel KHTD phân bổ theo Xã — ma trận 95 xã × chương trình."""
+    st.subheader("📍 KHTD phân bổ theo Xã/Phường")
+    st.caption("Ma trận kế hoạch tín dụng phân bổ đến từng xã/phường — đơn vị: triệu đồng · 23 sheet (Tổng hợp CN + 22 đơn vị)")
 
     with st.expander("👁️ Xem trước dữ liệu", expanded=False):
         try:
@@ -1125,7 +1119,7 @@ def render_xuat_baocao(role: str = "", username: str = "", df_full: "pd.DataFram
             logger.error("Lỗi trong khối except: %s", e, exc_info=True)
             st.warning(f"Không thể xem trước: {e}")
 
-    col1, col2 = st.columns([1, 3])
+    col1, _col2 = st.columns([1, 3])
     with col1:
         if st.button("📥 Xuất Excel KHTD/Xã", key="btn_xuat_khtd_xa"):
             with st.spinner("Đang tạo file..."):
@@ -1150,9 +1144,10 @@ def render_xuat_baocao(role: str = "", username: str = "", df_full: "pd.DataFram
         ):
             state.downloads.clear("khtd_xa_excel")
 
-    # ── Xuất Tờ trình BGĐ Word ────────────────────────────────────────────────
-    st.divider()
-    st.subheader("📄 Xuất Tờ trình BGĐ (Word)")
+
+def _tab_xuat_to_trinh_bgd(username: str) -> None:
+    """Tab xuất Tờ trình BGĐ dạng Word."""
+    st.subheader("📄 Tờ trình Ban Giám đốc")
     st.caption(
         "Tờ trình tổng hợp Kế hoạch Tín dụng vs Thực hiện — "
         "định dạng .docx chuẩn hành chính, ký số trực tiếp."
@@ -1184,4 +1179,21 @@ def render_xuat_baocao(role: str = "", username: str = "", df_full: "pd.DataFram
             key="dl_to_trinh_bgd",
         ):
             state2.downloads.clear("to_trinh_bgd_word")
+
+
+def render_xuat_baocao(role: str = "", username: str = "", df_full: "pd.DataFrame | None" = None) -> None:
+    sub1, sub2, sub3, sub4 = st.tabs([
+        "📋 Tiến độ KH vs TH",
+        "⚠️ Chênh lệch phân bổ",
+        "📍 KHTD theo Xã",
+        "📄 Tờ trình BGĐ",
+    ])
+    with sub1:
+        _tab_tien_do_kh_th()
+    with sub2:
+        _tab_canh_bao_chenh_lech()
+    with sub3:
+        _tab_xuat_khtd_xa(role, username, df_full)
+    with sub4:
+        _tab_xuat_to_trinh_bgd(username)
 

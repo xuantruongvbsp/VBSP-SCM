@@ -1,5 +1,8 @@
 # CHANGELOG
 
+## [2026-06-21] — Fix bảng Tóm tắt hiện trạng KHTD khó đọc
+- `tabs/tab_khtd_xuat.py` — `_hien_thi_bang_cn_readonly`: đổi 3 số lẻ → 0 số lẻ (triệu đồng, số nguyên); sửa header nhóm GQVL từ "I. Trung ương" → "I. Nguồn vốn Trung ương" (khớp với nhóm TW khác, tránh header lặp 3 lần); thêm guard bỏ qua GQVL sub-row khi KH=0 và TH=0 (ẩn hàng trống)
+
 ## [2026-06-21] — Linter chặn lỗi màu dark mode tự động (scripts/check_conventions.py)
 - `scripts/check_conventions.py` — thêm rule `[DARKMODE]`: dùng luminance phát hiện (1) chữ tối cố định không kèm nền → chìm trên dark; (2) nền sáng cố định thiếu màu chữ → chữ theo theme sáng → chìm. Cặp "nền sáng + chữ tối" (BUGMAP B15) được coi hợp lệ; xét cửa sổ ±3 dòng để tránh false positive khi CSS f-string trải nhiều dòng; bỏ qua qua `# conv: skip`. Pre-commit chỉ kiểm file đang sửa → "chạm tới đâu dọn tới đó"
 - Verify: file đã sửa (tab_khtd_nhap/tab_tracuu_v2) PASS; tab_canh_bao_nqh bắt đúng 1 lỗi thật (`background:#f8fafc` thiếu color)

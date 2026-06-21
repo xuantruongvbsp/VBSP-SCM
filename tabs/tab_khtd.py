@@ -435,7 +435,7 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
             "Theo dõi chênh lệch phân bổ theo Chương trình"
         )
 
-        _khtd_labels = ["🏛️ KHTD Chi nhánh", "📍 KHTD theo Xã", "⚠️ Cảnh báo chênh lệch"]
+        _khtd_labels = ["🏛️ KHTD Chi nhánh", "📍 KHTD theo Xã", "📊 Báo cáo & Xuất file"]
         _khtd_sel = st.radio("", range(len(_khtd_labels)), format_func=lambda i: _khtd_labels[i],
                              horizontal=True, key="khtd_sub_tab", label_visibility="collapsed")
         st.divider()

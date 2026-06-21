@@ -10,12 +10,6 @@ from logger import get_logger
 
 logger = get_logger(__name__)
 
-try:
-    import python_calamine  # noqa: F401
-    _EXCEL_ENGINE = "calamine"
-except ImportError:
-    _EXCEL_ENGINE = "openpyxl"
-    logger.warning("python-calamine không khả dụng, dùng openpyxl")
 
 
 def ts_file(fp: str) -> float:
@@ -81,10 +75,16 @@ def excel_to_parquet(
     df_fresh: pd.DataFrame | None = None
     if ts_file(parquet_path) < ts_file(excel_path):
         try:
-            df_fresh = pd.read_excel(
-                excel_path, sheet_name=sheet, header=header,
-                engine=_EXCEL_ENGINE,
-            )
+            try:
+                df_fresh = pd.read_excel(
+                    excel_path, sheet_name=sheet, header=header,
+                    engine="calamine",
+                )
+            except ImportError:
+                df_fresh = pd.read_excel(
+                    excel_path, sheet_name=sheet, header=header,
+                    engine="openpyxl",
+                )
             if post_fn:
                 df_fresh = post_fn(df_fresh)
             # Normalize tên cột: xóa ký tự xuống dòng trong header cell Excel

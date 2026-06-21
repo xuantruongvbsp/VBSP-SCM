@@ -221,7 +221,7 @@ def _hien_thi_bang_cn_readonly(
             _td(tl_str, "right", tl_c) +
             _td(stt_s, "left", tl_c)
         )
-        html_rows.append(f"<tr style='background:{bg}'>{tds}</tr>")
+        html_rows.append(f"<tr>{tds}</tr>")
 
     for ma_ct in order_ma_ct:
         mk_tw = _ma_key_tu_ma_ct_nv(ma_ct, 1)
@@ -262,10 +262,10 @@ def _hien_thi_bang_cn_readonly(
     tong_tl = tong_th / tong_kh * 100 if tong_kh > 0 else None
 
     tds_tong = (
-        _td("", "center", "", TONG_BG, "bold") +
-        _td("TỔNG CỘNG", "left", "", TONG_BG, "bold") +
-        _td(_fvn(tong_kh / 1e6, 3), "right", "", TONG_BG, "bold") +
-        _td(_fvn(tong_th / 1e6, 3), "right", "", TONG_BG, "bold") +
+        _td("", "center", "#1f2937", TONG_BG, "bold") +
+        _td("TỔNG CỘNG", "left", "#1f2937", TONG_BG, "bold") +
+        _td(_fvn(tong_kh / 1e6, 3), "right", "#1f2937", TONG_BG, "bold") +
+        _td(_fvn(tong_th / 1e6, 3), "right", "#1f2937", TONG_BG, "bold") +
         _td(f"{_fvn(tong_tl, 1)}%" if tong_tl is not None else "—", "right", _tl_color(tong_tl), TONG_BG, "bold") +
         _td(_tl_text(tong_tl), "left", _tl_color(tong_tl), TONG_BG, "bold")
     )

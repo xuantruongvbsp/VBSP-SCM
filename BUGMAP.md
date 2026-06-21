@@ -666,6 +666,16 @@
 | **Nguyên nhân** | `df_full` chưa được truyền vào `_tab_khtd_xa()` |
 | **Fix** | Kiểm tra signature hàm và chỗ gọi trong `render()` |
 
+### G5 — KHTD dark mode: text vô hình trên nền pastel / nền trắng hardcode
+| | |
+|---|---|
+| **File** | `tabs/tab_khtd_nhap.py` dòng ~324, `tabs/tab_khtd_xuat.py` dòng ~224 & ~265 |
+| **Dấu hiệu** | Trong Streamlit dark mode: banner trạng thái KH không đọc được; dòng GQVL và TỔNG CỘNG trong bảng readonly mờ/vô hình |
+| **Nguyên nhân** | 1. Banner div có nền pastel sáng nhưng không set `color` → Streamlit dark mode kế thừa text màu trắng → chữ trắng trên nền vàng = vô hình. 2. GQVL sub-row dùng `background:#ffffff` hardcode trên `<tr>` → tương tự. 3. Dòng TỔNG CỘNG dùng `TONG_BG=#E8F4FD` (sáng) không set `color` |
+| **Fix** | Thêm `color:#1f2937` cho mọi element có nền sáng cố định. Bỏ `background` hardcode trên `<tr>` GQVL sub-row để kế thừa nền trang |
+| **Quy tắc** | Bất kỳ HTML inline nào set `background` sáng → PHẢI set `color` tối tương ứng. Không set background → kế thừa dark/light theme tự động |
+| **Ngày fix** | 2026-06-21 |
+
 ### G4 — CI smoke render fail: `TypeError: takes 3 positional arguments but 7 were given`
 | | |
 |---|---|

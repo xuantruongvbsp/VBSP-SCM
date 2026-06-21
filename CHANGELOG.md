@@ -1,5 +1,16 @@
 # CHANGELOG
 
+## [2026-06-21] — Fix CI: calamine fallback → openpyxl khi Rust extension không load được
+- `data/core.py` dòng ~12-16 — thêm `_EXCEL_ENGINE` auto-detect: dùng `calamine` nếu import được, fallback `openpyxl` nếu không (fix 8 test fail trên Python 3.12 Ubuntu)
+- `data/core.py` dòng ~79 — `engine="calamine"` → `engine=_EXCEL_ENGINE`
+- `.github/workflows/ci.yml` — thêm `--cov-report=html` + `--junitxml=pytest-results.xml` để annotation chi tiết hơn
+
+## [2026-06-21] — Giãn cột + rút gọn header bảng KHTD (tab Kế hoạch Tín dụng) cho đỡ chật
+- `tabs/tab_khtd_nhap.py` dòng ~343 — bảng CN: `_colw [3,1,...]` → `[2,1,...]` để giãn 8 cột số liệu
+- `tabs/tab_khtd_nhap.py` dòng ~369-399 — bảng CN: rút header tầng 2 (bỏ "Trung ương/Địa phương/(triệu đồng)" lặp vì tầng 1 đã ghi nhóm + caption đã ghi đơn vị): "Kế hoạch", "Thực hiện", "Còn phải TH", "TH cả hai nguồn"
+- `tabs/tab_khtd_nhap.py` dòng ~1057-1072 — bảng theo Xã: rút header tương tự cho đồng bộ
+- `docs/mockup_khtd_darkmode.html` — cập nhật mockup khớp header rút gọn + cột tên 3fr→2fr
+
 ## [2026-06-21] — Fix CI: thêm python-calamine vào requirements.txt
 - `requirements.txt` — thêm `python-calamine>=0.6.0` (thiếu → `pd.read_excel(engine="calamine")` fail trên CI Python 3.12 Ubuntu)
 

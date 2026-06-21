@@ -1,8 +1,7 @@
 # CHANGELOG
 
-## [2026-06-21] — Fix CI: calamine fallback → openpyxl khi Rust extension không load được
-- `data/core.py` dòng ~12-16 — thêm `_EXCEL_ENGINE` auto-detect: dùng `calamine` nếu import được, fallback `openpyxl` nếu không (fix 8 test fail trên Python 3.12 Ubuntu)
-- `data/core.py` dòng ~79 — `engine="calamine"` → `engine=_EXCEL_ENGINE`
+## [2026-06-21] — Fix CI: calamine fallback → openpyxl tại call site
+- `data/core.py` dòng ~84-91 — `pd.read_excel(engine="calamine")` → try calamine, except ImportError dùng openpyxl (fix 8 test fail trên Python 3.12 Ubuntu)
 - `.github/workflows/ci.yml` — thêm `--cov-report=html` + `--junitxml=pytest-results.xml` để annotation chi tiết hơn
 
 ## [2026-06-21] — Giãn cột + rút gọn header bảng KHTD (tab Kế hoạch Tín dụng) cho đỡ chật

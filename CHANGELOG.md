@@ -1,5 +1,8 @@
 # CHANGELOG
 
+## [2026-06-21] — Fix CI: thêm python-calamine vào requirements.txt
+- `requirements.txt` — thêm `python-calamine>=0.6.0` (thiếu → `pd.read_excel(engine="calamine")` fail trên CI Python 3.12 Ubuntu)
+
 ## [2026-06-21] — Sắp xếp lại phần Báo cáo tab KHTD thành 4 sub-tab
 - `tabs/tab_khtd_xuat.py` — tách 2 section nổi ("Xuất KHTD theo Xã", "Tờ trình BGĐ") thành hàm `_tab_xuat_khtd_xa()` và `_tab_xuat_to_trinh_bgd()`; `render_xuat_baocao()` dùng 4 tab (Tiến độ KH vs TH → Chênh lệch phân bổ → KHTD theo Xã → Tờ trình BGĐ)
 - `tabs/tab_khtd.py` dòng ~438 — đổi nhãn radio "⚠️ Cảnh báo chênh lệch" → "📊 Báo cáo & Xuất file"

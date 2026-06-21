@@ -48,7 +48,8 @@ jobs:
       - name: Run test suite
         run: |
           pytest tests/ -q --tb=short \
-            --cov=. --cov-report=term-missing \
+            --cov=. --cov-report=term-missing --cov-report=html \
+            --junitxml=pytest-results.xml \
             --ignore=.venv --ignore=venv
 
       - name: Upload coverage report
@@ -56,7 +57,9 @@ jobs:
         if: always()
         with:
           name: coverage-report
-          path: htmlcov/
+          path: |
+            htmlcov/
+            pytest-results.xml
           retention-days: 7
 
   docker-build:

@@ -274,6 +274,16 @@
 | **Load time** | Giảm từ 8-12s → 2-3s |
 | **Ngày fix** | 2026-05-24 |
 
+### B15 — Chữ tối/khó đọc trên dark mode trong bảng KHTD (HTML hardcode màu)
+| | |
+|---|---|
+| **File** | `tabs/tab_khtd_nhap.py` (header bảng CN, tiêu đề nhóm, `_md_right`, sub GQVL, hover) |
+| **Dấu hiệu** | Tab "🏛️ Kế hoạch Tín dụng — Phòng KH-NV": header "NGUỒN VỐN TRUNG ƯƠNG" nền tối + chữ tối; ô số liệu/tiêu đề nhóm chữ chìm trên nền tối |
+| **Nguyên nhân** | (1) Header CN dùng nền tối `#0D2137` + chữ `#1565c0` (lỗi copy, bảng PGD dùng nền sáng); (2) `<p>` tiêu đề nhóm set nền pastel sáng cố định nhưng KHÔNG set `color` → chữ kế thừa `var(--text-color)` sáng của dark mode → sáng-trên-sáng; (3) `_md_right()` default `color:#212121` (đen) cho ô số liệu trên nền theme tối |
+| **Fix** | Nền cố định sáng PHẢI kèm `color` tối cố định (`#1f2937`); ô không set nền dùng `color:var(--text-color)`; hover đổi `#f8fafc` → `rgba(128,128,128,0.12)` |
+| **Bài học** | Khi `st.markdown(unsafe_allow_html)` đặt nền cố định sáng thì bắt buộc đặt luôn `color` tối cố định (cặp khóa). Khi KHÔNG đặt nền → dùng `var(--text-color)`. Không bao giờ để 1 vế cố định, 1 vế theo theme. (rule 8.16) |
+| **Ngày fix** | 2026-06-21 |
+
 ### B14 — Lambda params với default values khiến `lazy_tabs` truyền sai tham số
 | | |
 |---|---|

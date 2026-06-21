@@ -367,63 +367,35 @@ def _tab_khtd_chi_nhanh(
         unsafe_allow_html=True,
     )
     hr2[1].markdown(
-        _khtd_cn_hdr_cell(
-            "Kế hoạch Trung ương (triệu đồng)", "#e3f2fd", "#1565c0", bold=True
-        ),
+        _khtd_cn_hdr_cell("Kế hoạch", "#e3f2fd", "#1565c0", bold=True),
         unsafe_allow_html=True,
     )
     hr2[2].markdown(
-        _khtd_cn_hdr_cell(
-            "Thực hiện Trung ương (triệu đồng)", "#e3f2fd", "#1565c0", bold=True
-        ),
+        _khtd_cn_hdr_cell("Thực hiện", "#e3f2fd", "#1565c0", bold=True),
         unsafe_allow_html=True,
     )
     hr2[3].markdown(
-        _khtd_cn_hdr_cell(
-            "Còn phải thực hiện Trung ương (triệu đồng)",
-            "#e3f2fd",
-            "#1565c0",
-            bold=True,
-        ),
+        _khtd_cn_hdr_cell("Còn phải TH", "#e3f2fd", "#1565c0", bold=True),
         unsafe_allow_html=True,
     )
     hr2[4].markdown(
-        _khtd_cn_hdr_cell(
-            "Kế hoạch Địa phương (triệu đồng)", "#e8f5e9", "#2e7d32", bold=True
-        ),
+        _khtd_cn_hdr_cell("Kế hoạch", "#e8f5e9", "#2e7d32", bold=True),
         unsafe_allow_html=True,
     )
     hr2[5].markdown(
-        _khtd_cn_hdr_cell(
-            "Thực hiện Địa phương (triệu đồng)", "#e8f5e9", "#2e7d32", bold=True
-        ),
+        _khtd_cn_hdr_cell("Thực hiện", "#e8f5e9", "#2e7d32", bold=True),
         unsafe_allow_html=True,
     )
     hr2[6].markdown(
-        _khtd_cn_hdr_cell(
-            "Còn phải thực hiện Địa phương (triệu đồng)",
-            "#e8f5e9",
-            "#2e7d32",
-            bold=True,
-        ),
+        _khtd_cn_hdr_cell("Còn phải TH", "#e8f5e9", "#2e7d32", bold=True),
         unsafe_allow_html=True,
     )
     hr2[7].markdown(
-        _khtd_cn_hdr_cell(
-            "Thực hiện cả hai nguồn (triệu đồng)",
-            "#fff3e0",
-            "#e65100",
-            bold=True,
-        ),
+        _khtd_cn_hdr_cell("TH cả hai nguồn", "#fff3e0", "#e65100", bold=True),
         unsafe_allow_html=True,
     )
     hr2[8].markdown(
-        _khtd_cn_hdr_cell(
-            "Còn phải thực hiện Tổng cộng (triệu đồng)",
-            "#fff3e0",
-            "#e65100",
-            bold=True,
-        ),
+        _khtd_cn_hdr_cell("Còn phải TH", "#fff3e0", "#e65100", bold=True),
         unsafe_allow_html=True,
     )
 
@@ -1083,27 +1055,19 @@ def _tab_khtd_theo_xa(role: str, username: str, df_full: "pd.DataFrame | None") 
         unsafe_allow_html=True,
     )
     hr2[1].markdown(
-        _khtd_cn_hdr_cell(
-            "Kế hoạch Trung ương (triệu đồng)", "#e3f2fd", "#1565c0", bold=True
-        ),
+        _khtd_cn_hdr_cell("Kế hoạch", "#e3f2fd", "#1565c0", bold=True),
         unsafe_allow_html=True,
     )
     hr2[2].markdown(
-        _khtd_cn_hdr_cell(
-            "Thực hiện TW (triệu đồng)", "#e3f2fd", "#1565c0", bold=True
-        ),
+        _khtd_cn_hdr_cell("Thực hiện", "#e3f2fd", "#1565c0", bold=True),
         unsafe_allow_html=True,
     )
     hr2[3].markdown(
-        _khtd_cn_hdr_cell(
-            "Kế hoạch Địa phương (triệu đồng)", "#e8f5e9", "#2e7d32", bold=True
-        ),
+        _khtd_cn_hdr_cell("Kế hoạch", "#e8f5e9", "#2e7d32", bold=True),
         unsafe_allow_html=True,
     )
     hr2[4].markdown(
-        _khtd_cn_hdr_cell(
-            "Thực hiện ĐP (triệu đồng)", "#e8f5e9", "#2e7d32", bold=True
-        ),
+        _khtd_cn_hdr_cell("Thực hiện", "#e8f5e9", "#2e7d32", bold=True),
         unsafe_allow_html=True,
     )
 

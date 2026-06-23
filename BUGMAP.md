@@ -1315,6 +1315,17 @@ val = pd.to_numeric(df[COT_X], errors="coerce").sum() if COT_X in df.columns els
 
 ---
 
+### C20 — Tra cứu không ra hồ sơ dù dữ liệu có (lọc dính state / mismatch dtype)
+| | |
+|---|---|
+| **File** | `components/filter_panel.py` → `render_filter_panel()` |
+| **Dấu hiệu** | Một số hộ tra cứu không ra, trong khi chắc chắn có trong HSTD; thường xảy ra khi đã từng chọn PGD/CT/Nguồn vốn hoặc khi nhập từ khóa không dấu |
+| **Nguyên nhân** | (1) Bộ lọc nâng cao nằm trong expander nên dễ "dính" filter cũ trong `st.session_state`. (2) Lọc `.isin()`/so sánh trực tiếp trên cột mixed dtype (string/int/float) làm loại nhầm dữ liệu. (3) `Nguồn vốn` có thể là `01/02/TW/ĐP` nhưng UI chọn `1/2` → không match. (4) Keyword search chỉ `.lower()` nên gõ không dấu không match tên có dấu |
+| **Fix** | Thêm nút `🔄 Reset` luôn hiển thị; ép numeric trước khi lọc dư nợ/quá hạn/khoanh; chuẩn hóa `Nguồn vốn` về `1/2` trước khi hiển thị/lọc; keyword search hỗ trợ có dấu/không dấu bằng `vn()` |
+| **Ngày fix** | 2026-06-23 |
+
+---
+
 ## Template: Ghi nhận bug mới
 
 Mỗi khi fix bug, copy template dưới đây và điền vào đúng mục:

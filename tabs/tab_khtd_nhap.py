@@ -27,6 +27,7 @@ from tabs.tab_khtd import (
     KHTD_CN_NHOM_MA_CT,
     MA_KEYS_CO_KHTD,
     GQVL_SUB_NHOM,
+    NSVSMT_DP_SUB_NHOM,
     _chon_ds_ct,
     _doc_kv,
     _fvn,
@@ -36,6 +37,7 @@ from tabs.tab_khtd import (
     _quet_ct_co_du_no,
     _ten_ct_base,
     _tinh_thuc_hien_theo_ct,
+    _tinh_th_nsvsmt_dp_phan_tang,
 )
 # NOTE: _hien_thi_bang_cn_readonly import lazy (tránh circular import)
 # tab_khtd_xuat → tab_khtd → tab_khtd_nhap → tab_khtd_xuat (vòng tròn)
@@ -53,6 +55,44 @@ from services.khtd_nhap_service import (
     doc_excel_khtd_xa_upload as _svc_doc_excel_khtd_xa_upload,
     luu_pdf_khtd_xa as _svc_luu_pdf_khtd_xa,
 )
+
+
+# Nhãn ngắn cho bảng nhập KHTD CN để cột "Chương trình" dễ đọc hơn.
+_TEN_CT_NGAN_CN: dict[int, str] = {
+    1: "Hộ nghèo",
+    2: "HSSV",
+    4: "XKLĐ",
+    6: "Nước sạch",
+    7: "Nhà ở hộ nghèo",
+    9: "Hộ mới thoát nghèo",
+    10: "SXKD vùng khó khăn",
+    12: "Nhà ở xã hội",
+    15: "Thương nhân vùng khó khăn",
+    17: "DTTS QĐ 755",
+    19: "Hộ cận nghèo",
+    21: "DTTS QĐ 2085",
+    25: "Vùng DTTS và miền núi",
+    26: "Chấp hành xong án",
+    99: "Cho vay khác",
+}
+
+
+def _ten_ct_hien_thi_nhap_cn(ma_ct: int, ten_map: dict[str, str] | None = None) -> str:
+    """Tên hiển thị ngắn, rõ cho cột Chương trình ở bảng nhập KHTD Chi nhánh."""
+    return _TEN_CT_NGAN_CN.get(int(ma_ct), _ten_ct_base(ma_ct, ten_map))
+
+
+def _dong_bo_nsvsmt_dp_keys(data: dict[str, float]) -> dict[str, float]:
+    """Giữ tương thích giữa key tổng `6_DP` và 2 sub-key chi tiết."""
+    out = dict(data or {})
+    base = float(out.get("6_DP", 0.0) or 0.0)
+    co_split = "6_DP_TINH" in out or "6_DP_XA" in out
+    if not co_split and base > 0:
+        out["6_DP_TINH"] = base
+        out["6_DP_XA"] = 0.0
+    if co_split:
+        out["6_DP"] = float(out.get("6_DP_TINH", 0.0) or 0.0) + float(out.get("6_DP_XA", 0.0) or 0.0)
+    return out
 
 
 # Thư mục lưu văn bản QĐ cấp Chi nhánh
@@ -215,8 +255,11 @@ def _tab_khtd_chi_nhanh(
     st.subheader("🏛️ Kế hoạch Tín dụng Chi nhánh")
 
     co_quyen = get_permissions(role)["can_edit_khtd"]
-    kh_cn = _doc_kv(KV_KEY_CN)
+    kh_cn = _dong_bo_nsvsmt_dp_keys(_doc_kv(KV_KEY_CN))
     th_cn = _tinh_thuc_hien_theo_ct(df_full) if df_full is not None else {}
+    # Merge TH NSVSMT phân tầng (6_DP_TINH / 6_DP_XA) vào th_cn
+    th_nsvsmt = _tinh_th_nsvsmt_dp_phan_tang(df_full)
+    th_cn = {**(th_cn or {}), **th_nsvsmt}
     # Tính TH GQVL phân tầng 4 nhóm
     th_gqvl = _tinh_th_gqvl_phan_tang(df_gqvl)
 
@@ -237,51 +280,6 @@ def _tab_khtd_chi_nhanh(
     )
     df_loc = df_full
     ds_ct = _chon_ds_ct(nv_chon, df_loc, them_keys=set(kh_cn.keys()) | set(th_cn.keys()))
-
-    # ── Phương thức 1: Upload Excel ─────────────────────────────────────
-    with st.expander("📥 Upload Excel kế hoạch — nhanh nhất", expanded=True):
-        df_mau = _tao_df_mau_khtd_cn()
-        st.download_button(
-            "⬇️ Tải file mẫu Excel",
-            data=xuat_excel({"KHTD_CN": df_mau}),
-            file_name=ten_file_xuat("Mau_KHTD_Chi_nhanh", "xlsx"),
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            key="khtd_cn_dl_mau",
-        )
-        f_up = st.file_uploader(
-            "Chọn file Excel đã điền KH (triệu đồng)",
-            type=["xlsx", "xls"],
-            key="khtd_cn_upload",
-        )
-        if f_up:
-            _uid = f"khtd_cn_up_done_{f_up.name}_{f_up.size}"
-            if not st.session_state.get(_uid):
-                try:
-                    parsed = _doc_excel_khtd_cn_upload(f_up.getvalue())
-                    if parsed is not None:
-                        patch, dem, _bo_qua = parsed
-                        if dem == 0:
-                            st.session_state[_uid] = True
-                            st.info(
-                                "Không có dòng KH > 0 để lưu (đã bỏ qua giá trị 0 và ô trống)."
-                            )
-                        else:
-                            kh_moi = dict(kh_cn)
-                            kh_moi.update(patch)
-                            if _luu_kv(KV_KEY_CN, kh_moi, username):
-                                db.ghi_audit(
-                                    username,
-                                    "upload_khtd_cn",
-                                    f"{dem} chỉ tiêu từ Excel",
-                                )
-                                st.session_state[_uid] = True
-                                st.success(
-                                    f"✅ Đã lưu **{dem}** chỉ tiêu kế hoạch Chi nhánh từ Excel."
-                                )
-                                st.rerun()
-                except Exception as e:
-                    logger.error("Lỗi trong khối except: %s", e, exc_info=True)
-                    st.error(f"Lỗi xử lý file: {e}")
 
     # ── Phương thức 2: Nhập thủ công (bảng gọn) ──────────────────────────
     _, ten_map_q = _quet_ct_co_du_no(df_loc)
@@ -327,75 +325,39 @@ def _tab_khtd_chi_nhanh(
 
     st.caption("📌 Đơn vị nhập và hiển thị: triệu đồng — số nguyên, không có thập phân")
 
-    with st.expander("ℹ️ Hướng dẫn nhập kế hoạch", expanded=False):
-        st.markdown("""
-**Cách 1 — Upload Excel** (khuyến nghị):
-1. Nhấn **⬇️ Tải file mẫu Excel** → điền số KH vào cột **KH (triệu đồng)** → lưu file
-2. Kéo thả file vào ô Upload → nhấn **✅ Xác nhận lưu**
-
-**Cách 2 — Nhập thủ công**:
-1. Điền số kế hoạch vào cột **KH Trung ương** và/hoặc **KH Địa phương**
-2. Nhấn **💾 Lưu kế hoạch**
-
-> ⚠️ Đơn vị: **triệu đồng**, số nguyên. Cột Thực hiện và Còn phải TH tự động tính từ HSTD — không cần nhập.
-""")
-
     _colw = [2, 1, 1, 1, 1, 1, 1, 1, 1]
-    hr1 = st.columns(_colw)
-    hr1[0].markdown(_khtd_cn_hdr_cell("", "#f0f4fa"), unsafe_allow_html=True)
-    hr1[1].markdown(
-        _khtd_cn_hdr_cell("NGUỒN VỐN TRUNG ƯƠNG", "#bbdefb", "#1565c0"),
-        unsafe_allow_html=True,
+    _ths = (
+        "font-size:0.82rem;font-weight:600;text-align:center;"
+        "padding:7px 6px;border-radius:4px;white-space:nowrap"
     )
-    for j in (2, 3):
-        hr1[j].markdown(_khtd_cn_hdr_cell("", "#bbdefb"), unsafe_allow_html=True)
-    hr1[4].markdown(
-        _khtd_cn_hdr_cell("NGUỒN VỐN ĐỊA PHƯƠNG", "#c8e6c9", "#2e7d32"),
-        unsafe_allow_html=True,
-    )
-    for j in (5, 6):
-        hr1[j].markdown(_khtd_cn_hdr_cell("", "#c8e6c9"), unsafe_allow_html=True)
-    hr1[7].markdown(
-        _khtd_cn_hdr_cell("TỔNG CỘNG", "#ffe0b2", "#e65100"),
-        unsafe_allow_html=True,
-    )
-    hr1[8].markdown(_khtd_cn_hdr_cell("", "#ffe0b2"), unsafe_allow_html=True)
-
-    hr2 = st.columns(_colw)
-    hr2[0].markdown(
-        _khtd_cn_hdr_cell("Chương trình", "#f0f4fa", "#37474f"),
-        unsafe_allow_html=True,
-    )
-    hr2[1].markdown(
-        _khtd_cn_hdr_cell("Kế hoạch", "#e3f2fd", "#1565c0", bold=True),
-        unsafe_allow_html=True,
-    )
-    hr2[2].markdown(
-        _khtd_cn_hdr_cell("Thực hiện", "#e3f2fd", "#1565c0", bold=True),
-        unsafe_allow_html=True,
-    )
-    hr2[3].markdown(
-        _khtd_cn_hdr_cell("Còn phải TH", "#e3f2fd", "#1565c0", bold=True),
-        unsafe_allow_html=True,
-    )
-    hr2[4].markdown(
-        _khtd_cn_hdr_cell("Kế hoạch", "#e8f5e9", "#2e7d32", bold=True),
-        unsafe_allow_html=True,
-    )
-    hr2[5].markdown(
-        _khtd_cn_hdr_cell("Thực hiện", "#e8f5e9", "#2e7d32", bold=True),
-        unsafe_allow_html=True,
-    )
-    hr2[6].markdown(
-        _khtd_cn_hdr_cell("Còn phải TH", "#e8f5e9", "#2e7d32", bold=True),
-        unsafe_allow_html=True,
-    )
-    hr2[7].markdown(
-        _khtd_cn_hdr_cell("TH cả hai nguồn", "#fff3e0", "#e65100", bold=True),
-        unsafe_allow_html=True,
-    )
-    hr2[8].markdown(
-        _khtd_cn_hdr_cell("Còn phải TH", "#fff3e0", "#e65100", bold=True),
+    st.markdown(
+        f"""
+<table style="width:100%;border-collapse:collapse;border-spacing:0;
+  table-layout:fixed;margin-bottom:2px;border:1px solid #cbd5e1">
+<colgroup>
+  <col style="width:20%">
+  <col style="width:10%"><col style="width:10%"><col style="width:10%">
+  <col style="width:10%"><col style="width:10%"><col style="width:10%">
+  <col style="width:10%"><col style="width:10%">
+</colgroup>
+<tr>
+  <th style="{_ths};background:#f0f4fa;border:1px solid #cbd5e1"></th>
+  <th colspan="3" style="{_ths};background:#bbdefb;color:#1565c0;border:1px solid #cbd5e1">NGUỒN VỐN TRUNG ƯƠNG</th>
+  <th colspan="3" style="{_ths};background:#c8e6c9;color:#2e7d32;border:1px solid #cbd5e1">NGUỒN VỐN ĐỊA PHƯƠNG</th>
+  <th colspan="2" style="{_ths};background:#ffe0b2;color:#e65100;border:1px solid #cbd5e1">TỔNG CỘNG</th>
+</tr>
+<tr>
+  <th style="{_ths};background:#f0f4fa;color:#37474f;border:1px solid #cbd5e1">Chương trình</th>
+  <th style="{_ths};background:#e3f2fd;color:#1565c0;border:1px solid #cbd5e1">Kế hoạch</th>
+  <th style="{_ths};background:#e3f2fd;color:#1565c0;border:1px solid #cbd5e1">Thực hiện</th>
+  <th style="{_ths};background:#e3f2fd;color:#1565c0;border:1px solid #cbd5e1">Còn phải TH</th>
+  <th style="{_ths};background:#e8f5e9;color:#2e7d32;border:1px solid #cbd5e1">Kế hoạch</th>
+  <th style="{_ths};background:#e8f5e9;color:#2e7d32;border:1px solid #cbd5e1">Thực hiện</th>
+  <th style="{_ths};background:#e8f5e9;color:#2e7d32;border:1px solid #cbd5e1">Còn phải TH</th>
+  <th style="{_ths};background:#fff3e0;color:#e65100;border:1px solid #cbd5e1">TH cả hai nguồn</th>
+  <th style="{_ths};background:#fff3e0;color:#e65100;border:1px solid #cbd5e1">Còn phải TH</th>
+</tr>
+</table>""",
         unsafe_allow_html=True,
     )
 
@@ -411,9 +373,30 @@ def _tab_khtd_chi_nhanh(
     st.markdown(
         """
 <style>
+:root {
+  --khtd-neg: #c62828;
+  --khtd-ok: #2e7d32;
+  --khtd-muted: #64748b;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --khtd-neg: #ff8787;
+    --khtd-ok: #69db7c;
+    --khtd-muted: #9ca3af;
+  }
+}
 [data-testid="stHorizontalBlock"] {
     border-bottom: 1px solid #e2e8f0 !important;
+    border-right: 1px solid #e2e8f0 !important;
+    border-left: 1px solid #e2e8f0 !important;
     padding: 2px 0 !important;
+}
+[data-testid="stHorizontalBlock"] > div {
+    border-right: 1px solid #e2e8f0 !important;
+    padding: 4px 8px !important;
+}
+[data-testid="stHorizontalBlock"] > div:last-child {
+    border-right: none !important;
 }
 [data-testid="stHorizontalBlock"]:hover {
     background-color: rgba(128,128,128,0.12) !important;
@@ -422,15 +405,20 @@ def _tab_khtd_chi_nhanh(
 """,
         unsafe_allow_html=True,
     )
-    nhom_mau_nen = ["#eef6ff", "#eefaf3", "#fff8ee"]
+    nhom_style = [
+        ("#1d4ed8", "#ffffff"),
+        ("#15803d", "#ffffff"),
+        ("#b45309", "#ffffff"),
+    ]
     idx_nhom = 0
     for tieu_de_nhom, ds_ma_ct in KHTD_CN_NHOM_MA_CT:
-        bg = nhom_mau_nen[idx_nhom % len(nhom_mau_nen)]
+        bg, fg = nhom_style[idx_nhom % len(nhom_style)]
         idx_nhom += 1
         st.markdown(
             f"<p style='margin:0.8rem 0 0.4rem 0;padding:7px 12px;"
-            f"background-color:{bg};color:#1f2937;border-radius:6px;font-weight:600;"
-            f"font-size:0.9rem'>{tieu_de_nhom}</p>",
+            f"background-color:{bg};color:{fg};border-radius:6px;font-weight:700;"
+            f"font-size:0.9rem;border-left:4px solid rgba(255,255,255,0.45);"
+            f"letter-spacing:0.1px'>{tieu_de_nhom}</p>",
             unsafe_allow_html=True,
         )
         for ma_ct in ds_ma_ct:
@@ -440,7 +428,8 @@ def _tab_khtd_chi_nhanh(
                 cols_hdr = st.columns(_colw)
                 cols_hdr[0].markdown(
                     "<div style='font-size:0.88rem;font-weight:600;"
-                    "padding:4px 0'>Cho vay giải quyết việc làm</div>",
+                    "padding:4px 0;color:var(--text-color, inherit);line-height:1.35'>"
+                    "Cho vay giải quyết việc làm</div>",
                     unsafe_allow_html=True
                 )
                 # Tổng TW và ĐP để hiển thị ở header
@@ -493,15 +482,15 @@ def _tab_khtd_chi_nhanh(
                     cpth = kh_inp - th_trieu
                     if kh_inp == 0:
                         cols_sub[col_cp_idx].markdown(
-                            _md_right("—", "#64748B"), unsafe_allow_html=True
+                            _md_right("—", "var(--khtd-muted)"), unsafe_allow_html=True
                         )
                     elif cpth < 0:
                         cols_sub[col_cp_idx].markdown(
-                            _md_right(_fvn_form(cpth, 0), "#c62828"), unsafe_allow_html=True
+                            _md_right(_fvn_form(cpth, 0), "var(--khtd-neg)"), unsafe_allow_html=True
                         )
                     elif cpth == 0:
                         cols_sub[col_cp_idx].markdown(
-                            _md_right("0 ✓", "#2e7d32"), unsafe_allow_html=True
+                            _md_right("0 ✓", "var(--khtd-ok)"), unsafe_allow_html=True
                         )
                     else:
                         cols_sub[col_cp_idx].markdown(
@@ -509,6 +498,122 @@ def _tab_khtd_chi_nhanh(
                         )
                     # Các cột tổng để trống cho sub-dòng
                 continue  # Bỏ qua xử lý mặc định cho ma_ct == 3
+
+            if ma_ct == 6:
+                cols_hdr = st.columns(_colw)
+                cols_hdr[0].markdown(
+                    "<div style='font-size:0.88rem;font-weight:600;"
+                    "padding:4px 0;color:var(--text-color, inherit);line-height:1.35'>"
+                    "Cho vay nước sạch và vệ sinh môi trường nông thôn</div>",
+                    unsafe_allow_html=True,
+                )
+
+                k_tw = "khtd_cn_inp_6_tw"
+                kh_tw_vnd = float(kh_cn.get("6_TW", 0.0))
+                kh_tw_trieu_ht = kh_tw_vnd / 1_000_000
+                th_tw_trieu = float((th_cn or {}).get("6_TW", 0.0)) / 1e6
+                cols_hdr[1].number_input(
+                    "tw_6",
+                    value=kh_tw_trieu_ht,
+                    min_value=0.0,
+                    step=1000.0,
+                    format="%.0f",
+                    label_visibility="collapsed",
+                    help="Kế hoạch Trung ương — đơn vị: triệu đồng",
+                    key=k_tw,
+                )
+                kh_tw_trieu = float(st.session_state.get(k_tw, kh_tw_trieu_ht))
+                cols_hdr[2].markdown(_md_right(_fvn_form(th_tw_trieu, 0)), unsafe_allow_html=True)
+                cpth_tw = kh_tw_trieu - th_tw_trieu
+                if kh_tw_trieu == 0:
+                    cols_hdr[3].markdown(_md_right("—", "var(--khtd-muted)"), unsafe_allow_html=True)
+                elif cpth_tw < 0:
+                    cols_hdr[3].markdown(
+                        _md_right(_fvn_form(cpth_tw, 0), "var(--khtd-neg)"),
+                        unsafe_allow_html=True,
+                    )
+                elif cpth_tw == 0:
+                    cols_hdr[3].markdown(_md_right("0 ✓", "var(--khtd-ok)"), unsafe_allow_html=True)
+                else:
+                    cols_hdr[3].markdown(_md_right(_fvn_form(cpth_tw, 0)), unsafe_allow_html=True)
+
+                kh_6_dp_tinh = float(kh_cn.get("6_DP_TINH", kh_cn.get("6_DP", 0.0)))
+                kh_6_dp_xa = float(kh_cn.get("6_DP_XA", 0.0))
+                kh_6_dp_tong_trieu = (kh_6_dp_tinh + kh_6_dp_xa) / 1_000_000
+                th_6_dp_tinh = float((th_cn or {}).get("6_DP_TINH", 0.0)) / 1e6
+                th_6_dp_xa = float((th_cn or {}).get("6_DP_XA", 0.0)) / 1e6
+                th_6_dp_tong = th_6_dp_tinh + th_6_dp_xa
+                cols_hdr[4].markdown(_md_right(_fvn_form(kh_6_dp_tong_trieu, 0)), unsafe_allow_html=True)
+                cols_hdr[5].markdown(_md_right(_fvn_form(th_6_dp_tong, 0)), unsafe_allow_html=True)
+                cpth_6_dp = kh_6_dp_tong_trieu - th_6_dp_tong
+                if kh_6_dp_tong_trieu == 0:
+                    cols_hdr[6].markdown(_md_right("—", "var(--khtd-muted)"), unsafe_allow_html=True)
+                elif cpth_6_dp < 0:
+                    cols_hdr[6].markdown(
+                        _md_right(_fvn_form(cpth_6_dp, 0), "var(--khtd-neg)"),
+                        unsafe_allow_html=True,
+                    )
+                elif cpth_6_dp == 0:
+                    cols_hdr[6].markdown(_md_right("0 ✓", "var(--khtd-ok)"), unsafe_allow_html=True)
+                else:
+                    cols_hdr[6].markdown(_md_right(_fvn_form(cpth_6_dp, 0)), unsafe_allow_html=True)
+
+                th_tong = th_tw_trieu + th_6_dp_tong
+                cols_hdr[7].markdown(_md_right(_fvn_form(th_tong, 0)), unsafe_allow_html=True)
+                kh_tong = kh_tw_trieu + kh_6_dp_tong_trieu
+                cpth_tong = kh_tong - th_tong
+                if kh_tong == 0:
+                    cols_hdr[8].markdown(_md_right("—", "var(--khtd-muted)"), unsafe_allow_html=True)
+                elif cpth_tong < 0:
+                    cols_hdr[8].markdown(
+                        _md_right(_fvn_form(cpth_tong, 0), "var(--khtd-neg)"),
+                        unsafe_allow_html=True,
+                    )
+                elif cpth_tong == 0:
+                    cols_hdr[8].markdown(_md_right("0 ✓", "var(--khtd-ok)"), unsafe_allow_html=True)
+                else:
+                    cols_hdr[8].markdown(_md_right(_fvn_form(cpth_tong, 0)), unsafe_allow_html=True)
+
+                NSVSMT_SUB_ROWS = [
+                    ("NSVSMT ĐP — Cấp tỉnh", "6_DP_TINH"),
+                    ("NSVSMT ĐP — Cấp xã/khác", "6_DP_XA"),
+                ]
+                for sub_ten, sub_key in NSVSMT_SUB_ROWS:
+                    k_inp = f"khtd_cn_inp_{sub_key}"
+                    kh_vnd = float(kh_cn.get(sub_key, 0.0))
+                    kh_trieu = kh_vnd / 1_000_000
+                    th_trieu = float((th_cn or {}).get(sub_key, 0.0)) / 1e6
+
+                    cols_sub = st.columns(_colw)
+                    cols_sub[0].markdown(
+                        f"<div style='font-size:0.83rem;color:var(--text-color);opacity:0.75;"
+                        f"padding:3px 0 3px 16px'>  {sub_ten}</div>",
+                        unsafe_allow_html=True,
+                    )
+                    cols_sub[4].number_input(
+                        sub_ten,
+                        value=kh_trieu,
+                        min_value=0.0,
+                        step=1000.0,
+                        format="%.0f",
+                        label_visibility="collapsed",
+                        key=k_inp,
+                    )
+                    kh_inp = float(st.session_state.get(k_inp, kh_trieu))
+                    cols_sub[5].markdown(_md_right(_fvn_form(th_trieu, 0)), unsafe_allow_html=True)
+                    cpth = kh_inp - th_trieu
+                    if kh_inp == 0:
+                        cols_sub[6].markdown(_md_right("—", "var(--khtd-muted)"), unsafe_allow_html=True)
+                    elif cpth < 0:
+                        cols_sub[6].markdown(
+                            _md_right(_fvn_form(cpth, 0), "var(--khtd-neg)"),
+                            unsafe_allow_html=True,
+                        )
+                    elif cpth == 0:
+                        cols_sub[6].markdown(_md_right("0 ✓", "var(--khtd-ok)"), unsafe_allow_html=True)
+                    else:
+                        cols_sub[6].markdown(_md_right(_fvn_form(cpth, 0)), unsafe_allow_html=True)
+                continue
 
             # ── Xử lý mặc định cho các CT khác ────────────────────────────────────
             mk_tw = f"{ma_ct}_TW"
@@ -518,9 +623,10 @@ def _tab_khtd_chi_nhanh(
             if not co_tw and not co_dp:
                 continue
             cols = st.columns(_colw)
-            ten_hang = _ten_ct_base(ma_ct, ten_map_q)
+            ten_hang = _ten_ct_hien_thi_nhap_cn(ma_ct, ten_map_q)
             cols[0].markdown(
-                f"<div style='font-size:0.88rem;padding:4px 0'>{ten_hang}</div>",
+                f"<div style='font-size:0.88rem;padding:4px 0;color:var(--text-color, inherit);"
+                f"font-weight:600;line-height:1.35'>{ten_hang}</div>",
                 unsafe_allow_html=True,
             )
 
@@ -558,18 +664,18 @@ def _tab_khtd_chi_nhanh(
             )
             if kh_tw_trieu == 0:
                 cols[3].markdown(
-                    _md_right("—", "#9e9e9e"), unsafe_allow_html=True
+                    _md_right("—", "var(--khtd-muted)"), unsafe_allow_html=True
                 )
             else:
                 cpth_tw = kh_tw_trieu - th_tw_trieu
                 if cpth_tw < 0:
                     cols[3].markdown(
-                        _md_right(_fvn_form(cpth_tw, 0), "#c62828"),
+                        _md_right(_fvn_form(cpth_tw, 0), "var(--khtd-neg)"),
                         unsafe_allow_html=True,
                     )
                 elif cpth_tw == 0:
                     cols[3].markdown(
-                        _md_right("0,0 ✓", "#2e7d32"), unsafe_allow_html=True
+                        _md_right("0,0 ✓", "var(--khtd-ok)"), unsafe_allow_html=True
                     )
                 else:
                     cols[3].markdown(
@@ -601,18 +707,18 @@ def _tab_khtd_chi_nhanh(
             )
             if kh_dp_trieu == 0:
                 cols[6].markdown(
-                    _md_right("—", "#9e9e9e"), unsafe_allow_html=True
+                    _md_right("—", "var(--khtd-muted)"), unsafe_allow_html=True
                 )
             else:
                 cpth_dp = kh_dp_trieu - th_dp_trieu
                 if cpth_dp < 0:
                     cols[6].markdown(
-                        _md_right(_fvn_form(cpth_dp, 0), "#c62828"),
+                        _md_right(_fvn_form(cpth_dp, 0), "var(--khtd-neg)"),
                         unsafe_allow_html=True,
                     )
                 elif cpth_dp == 0:
                     cols[6].markdown(
-                        _md_right("0,0 ✓", "#2e7d32"), unsafe_allow_html=True
+                        _md_right("0,0 ✓", "var(--khtd-ok)"), unsafe_allow_html=True
                     )
                 else:
                     cols[6].markdown(
@@ -627,16 +733,16 @@ def _tab_khtd_chi_nhanh(
             cpth_tong = kh_tong - th_tong
             if kh_tong == 0:
                 cols[8].markdown(
-                    _md_right("—", "#9e9e9e"), unsafe_allow_html=True
+                    _md_right("—", "var(--khtd-muted)"), unsafe_allow_html=True
                 )
             elif cpth_tong < 0:
                 cols[8].markdown(
-                    _md_right(_fvn_form(cpth_tong, 0), "#c62828"),
+                    _md_right(_fvn_form(cpth_tong, 0), "var(--khtd-neg)"),
                     unsafe_allow_html=True,
                 )
             elif cpth_tong == 0:
                 cols[8].markdown(
-                    _md_right("0,0 ✓", "#2e7d32"), unsafe_allow_html=True
+                    _md_right("0,0 ✓", "var(--khtd-ok)"), unsafe_allow_html=True
                 )
             else:
                 cols[8].markdown(
@@ -648,6 +754,22 @@ def _tab_khtd_chi_nhanh(
         for ma_ct in ds_ma_ct:
             # Bỏ qua CT 3 (GQVL) - đã tính qua sub-key bên dưới
             if ma_ct == 3:
+                continue
+            if ma_ct == 6:
+                tong_kh_trieu_hien_tai += float(
+                    st.session_state.get(
+                        "khtd_cn_inp_6_tw",
+                        float(kh_cn.get("6_TW", 0.0)) / 1_000_000,
+                    )
+                )
+                for sub_key, _, _ in NSVSMT_DP_SUB_NHOM:
+                    k_inp = f"khtd_cn_inp_{sub_key}"
+                    tong_kh_trieu_hien_tai += float(
+                        st.session_state.get(
+                            k_inp,
+                            float(kh_cn.get(sub_key, 0.0)) / 1_000_000,
+                        )
+                    )
                 continue
             mk_tw = f"{ma_ct}_TW"
             mk_dp = f"{ma_ct}_DP"
@@ -685,6 +807,13 @@ def _tab_khtd_chi_nhanh(
             for ma_ct in ds_ma_ct:
                 # Bỏ qua CT 3 khi lưu mặc định - sẽ lưu qua sub-key
                 if ma_ct == 3:
+                    continue
+                if ma_ct == 6:
+                    patch["6_TW"] = float(st.session_state.get("khtd_cn_inp_6_tw", 0.0))
+                    for sub_key, _, _ in NSVSMT_DP_SUB_NHOM:
+                        k_inp = f"khtd_cn_inp_{sub_key}"
+                        patch[sub_key] = float(st.session_state.get(k_inp, 0.0))
+                    patch["6_DP"] = patch.get("6_DP_TINH", 0.0) + patch.get("6_DP_XA", 0.0)
                     continue
                 mk_tw = f"{ma_ct}_TW"
                 mk_dp = f"{ma_ct}_DP"
@@ -853,6 +982,64 @@ def _tab_khtd_chi_nhanh(
                                     st.error("Không tìm thấy phiên bản.")
                     except (ValueError, StopIteration):
                         st.error("Không tìm thấy phiên bản.")
+
+    with st.expander("📥 Upload Excel kế hoạch — nhanh nhất", expanded=False):
+        df_mau = _tao_df_mau_khtd_cn()
+        st.download_button(
+            "⬇️ Tải file mẫu Excel",
+            data=xuat_excel({"KHTD_CN": df_mau}),
+            file_name=ten_file_xuat("Mau_KHTD_Chi_nhanh", "xlsx"),
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            key="khtd_cn_dl_mau",
+        )
+        f_up = st.file_uploader(
+            "Chọn file Excel đã điền KH (triệu đồng)",
+            type=["xlsx", "xls"],
+            key="khtd_cn_upload",
+        )
+        if f_up:
+            _uid = f"khtd_cn_up_done_{f_up.name}_{f_up.size}"
+            if not st.session_state.get(_uid):
+                try:
+                    parsed = _doc_excel_khtd_cn_upload(f_up.getvalue())
+                    if parsed is not None:
+                        patch, dem, _bo_qua = parsed
+                        if dem == 0:
+                            st.session_state[_uid] = True
+                            st.info(
+                                "Không có dòng KH > 0 để lưu (đã bỏ qua giá trị 0 và ô trống)."
+                            )
+                        else:
+                            kh_moi = dict(kh_cn)
+                            kh_moi.update(patch)
+                            kh_moi = _dong_bo_nsvsmt_dp_keys(kh_moi)
+                            if _luu_kv(KV_KEY_CN, kh_moi, username):
+                                db.ghi_audit(
+                                    username,
+                                    "upload_khtd_cn",
+                                    f"{dem} chỉ tiêu từ Excel",
+                                )
+                                st.session_state[_uid] = True
+                                st.success(
+                                    f"✅ Đã lưu **{dem}** chỉ tiêu kế hoạch Chi nhánh từ Excel."
+                                )
+                                st.rerun()
+                except Exception as e:
+                    logger.error("Lỗi trong khối except: %s", e, exc_info=True)
+                    st.error(f"Lỗi xử lý file: {e}")
+
+    with st.expander("ℹ️ Hướng dẫn nhập kế hoạch", expanded=False):
+        st.markdown("""
+**Cách 1 — Upload Excel** (khuyến nghị):
+1. Nhấn **⬇️ Tải file mẫu Excel** → điền số KH vào cột **KH (triệu đồng)** → lưu file
+2. Kéo thả file vào ô Upload → nhấn **✅ Xác nhận lưu**
+
+**Cách 2 — Nhập thủ công**:
+1. Điền số kế hoạch vào cột **KH Trung ương** và/hoặc **KH Địa phương**
+2. Nhấn **💾 Lưu kế hoạch**
+
+> ⚠️ Đơn vị: **triệu đồng**, số nguyên. Cột Thực hiện và Còn phải TH tự động tính từ HSTD — không cần nhập.
+""")
 
 
 def _tab_khtd_theo_xa(role: str, username: str, df_full: "pd.DataFrame | None") -> None:
@@ -1034,40 +1221,32 @@ def _tab_khtd_theo_xa(role: str, username: str, df_full: "pd.DataFrame | None") 
 
     _colw_xa = [3, 1, 1, 1, 1]  # Chương trình | KH TW | TH TW | KH ĐP | TH ĐP
 
-    # ── Header dòng 1 ──
-    hr1 = st.columns(_colw_xa)
-    hr1[0].markdown(_khtd_cn_hdr_cell("", "#f0f4fa"), unsafe_allow_html=True)
-    hr1[1].markdown(
-        _khtd_cn_hdr_cell("NGUỒN VỐN TRUNG ƯƠNG", "#bbdefb", "#1565c0"),
-        unsafe_allow_html=True,
+    _ths_xa = (
+        "font-size:0.82rem;font-weight:600;text-align:center;"
+        "padding:7px 6px;border-radius:4px;white-space:nowrap"
     )
-    hr1[2].markdown(_khtd_cn_hdr_cell("", "#bbdefb"), unsafe_allow_html=True)
-    hr1[3].markdown(
-        _khtd_cn_hdr_cell("NGUỒN VỐN ĐỊA PHƯƠNG", "#c8e6c9", "#2e7d32"),
-        unsafe_allow_html=True,
-    )
-    hr1[4].markdown(_khtd_cn_hdr_cell("", "#c8e6c9"), unsafe_allow_html=True)
-
-    # ── Header dòng 2 ──
-    hr2 = st.columns(_colw_xa)
-    hr2[0].markdown(
-        _khtd_cn_hdr_cell("Chương trình", "#f0f4fa", "#37474f", bold=True),
-        unsafe_allow_html=True,
-    )
-    hr2[1].markdown(
-        _khtd_cn_hdr_cell("Kế hoạch", "#e3f2fd", "#1565c0", bold=True),
-        unsafe_allow_html=True,
-    )
-    hr2[2].markdown(
-        _khtd_cn_hdr_cell("Thực hiện", "#e3f2fd", "#1565c0", bold=True),
-        unsafe_allow_html=True,
-    )
-    hr2[3].markdown(
-        _khtd_cn_hdr_cell("Kế hoạch", "#e8f5e9", "#2e7d32", bold=True),
-        unsafe_allow_html=True,
-    )
-    hr2[4].markdown(
-        _khtd_cn_hdr_cell("Thực hiện", "#e8f5e9", "#2e7d32", bold=True),
+    st.markdown(
+        f"""
+<table style="width:100%;border-collapse:separate;border-spacing:3px 3px;
+  table-layout:fixed;margin-bottom:2px">
+<colgroup>
+  <col style="width:42.86%">
+  <col style="width:14.28%"><col style="width:14.28%">
+  <col style="width:14.28%"><col style="width:14.28%">
+</colgroup>
+<tr>
+  <th style="{_ths_xa};background:#f0f4fa"></th>
+  <th colspan="2" style="{_ths_xa};background:#bbdefb;color:#1565c0">NGUỒN VỐN TRUNG ƯƠNG</th>
+  <th colspan="2" style="{_ths_xa};background:#c8e6c9;color:#2e7d32">NGUỒN VỐN ĐỊA PHƯƠNG</th>
+</tr>
+<tr>
+  <th style="{_ths_xa};background:#f0f4fa;color:#37474f">Chương trình</th>
+  <th style="{_ths_xa};background:#e3f2fd;color:#1565c0">Kế hoạch</th>
+  <th style="{_ths_xa};background:#e3f2fd;color:#1565c0">Thực hiện</th>
+  <th style="{_ths_xa};background:#e8f5e9;color:#2e7d32">Kế hoạch</th>
+  <th style="{_ths_xa};background:#e8f5e9;color:#2e7d32">Thực hiện</th>
+</tr>
+</table>""",
         unsafe_allow_html=True,
     )
 

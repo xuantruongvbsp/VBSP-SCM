@@ -22,6 +22,7 @@ from config import (
     COT_GOC_TRA, COT_NGAY_SINH,
     COT_NOI_CAP_CMND, COT_NGAY_CAP_CMND, COT_TINH_TRANG,
     COT_TEN_TO, COT_TEN_VC, COT_TEN_HSSV, COT_DIA_CHI,
+    COT_LAI_TON, COT_SO_DU_TG,
 )
 from utils import fmt_tien, fmt_ty, xuat_excel
 from tabs.base_tab import TabContext
@@ -38,10 +39,23 @@ if TYPE_CHECKING:
 _MONEY_COLS = [
     COT_DU_NO_TH, COT_DU_NO_QH, COT_TONG_DU_NO,
     COT_MUC_VAY, COT_GOC_TRA, COT_LAI_DA_TRA, COT_DU_NO_KHOANH,
+    COT_LAI_TON, COT_SO_DU_TG,
 ]
 
 _MAX_EXPORT_EXCEL = 2000
 _MAX_EXPORT_PDF = 200
+
+
+def _hien_thi_nguon_von(value) -> str:
+    """Chuẩn hóa hiển thị nguồn vốn từ mã số sang nhãn nghiệp vụ."""
+    if value is None or (isinstance(value, float) and pd.isna(value)):
+        return ""
+    s = str(value).strip()
+    if s in {"1", "01", "1.0", "01.0", "TW"}:
+        return "Trung ương"
+    if s in {"2", "02", "2.0", "02.0", "ĐP", "DP"}:
+        return "Địa phương"
+    return s
 
 
 def _load_nq11_gqvl_data() -> tuple[pd.DataFrame | None, pd.DataFrame | None]:
@@ -98,15 +112,40 @@ def _render_chi_tiet_phu(df_kia: pd.DataFrame, so_ku: str, money_kw: tuple[str, 
             (c1 if i % 2 == 0 else c2).markdown(f"**{k}:** {v}")
 
 
+def _tao_pdf_ho_so(
+    hs: pd.Series,
+    info_data: list[tuple[str, str]],
+    loan_data: list[tuple[str, str]],
+    username: str,
+) -> bytes:
+    """Tạo PDF gọn cho một hồ sơ tra cứu."""
+    so_ku = str(hs.get(COT_SO_KU, "")).strip()
+    ten_kh = str(hs.get(COT_TEN_KH, "—") or "—").strip()
+    rows = list(info_data)
+    if rows and loan_data:
+        rows.append(("", ""))
+    rows.extend(loan_data)
+    df_pdf = pd.DataFrame(rows, columns=["Thông tin", "Giá trị"])
+    return xuat_pdf_co_chart(
+        df=df_pdf,
+        tieu_de=f"HỒ SƠ KHÁCH HÀNG — {ten_kh}",
+        nguoi_xuat=username,
+        them_dong_tong=False,
+        prefix_file=f"HS_{so_ku}",
+    )
+
+
 @st.dialog("📋 Chi tiết hồ sơ", width="large")
 def _detail_dialog(
     hs: pd.Series,
     df_nq11: pd.DataFrame | None,
     df_gqvl: pd.DataFrame | None,
+    username: str,
 ) -> None:
     """Modal hiển thị chi tiết 1 hồ sơ."""
     so_ku = str(hs.get(COT_SO_KU, "")).strip()
     st.markdown(f"### {hs.get(COT_TEN_KH, '—')}")
+    pdf_state_key = f"tc_pdf_hoso_{so_ku}"
 
     col1, col2 = st.columns([2, 1])
 
@@ -152,6 +191,8 @@ def _detail_dialog(
             ("Dư nợ trong hạn (triệu đồng)", COT_DU_NO_TH),
             ("Dư nợ quá hạn (triệu đồng)", COT_DU_NO_QH),
             ("Tổng dư nợ (triệu đồng)", COT_TONG_DU_NO),
+            ("Lãi tồn (triệu đồng)", COT_LAI_TON),
+            ("Số dư TK 105 (triệu đồng)", COT_SO_DU_TG),
             ("Gốc đã trả (triệu đồng)", COT_GOC_TRA),
             ("Lãi đã trả (triệu đồng)", COT_LAI_DA_TRA),
             ("Tình trạng", COT_TINH_TRANG),
@@ -161,7 +202,12 @@ def _detail_dialog(
             if col in hs.index:
                 value = hs[col]
                 if pd.notna(value):
-                    formatted = fmt_ty(value) if col in _MONEY_COLS else str(value)
+                    if col in _MONEY_COLS:
+                        formatted = fmt_ty(value)
+                    elif col == COT_NGUON_VON:
+                        formatted = _hien_thi_nguon_von(value)
+                    else:
+                        formatted = str(value)
                     loan_data.append((label, formatted))
         if loan_data:
             st.dataframe(
@@ -182,14 +228,33 @@ def _detail_dialog(
 
     st.divider()
     excel_data = xuat_excel({f"HS_{so_ku}": hs.to_frame().T})
-    st.download_button(
-        "📥 Xuất Excel hồ sơ",
-        data=excel_data,
-        file_name=f"ho_so_{so_ku}.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        use_container_width=True,
-        key="tc_dialog_export",
-    )
+    col_xl, col_pdf = st.columns(2)
+    with col_xl:
+        st.download_button(
+            "📥 Xuất Excel hồ sơ",
+            data=excel_data,
+            file_name=f"ho_so_{so_ku}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True,
+            key=f"tc_dialog_export_{so_ku}",
+        )
+    with col_pdf:
+        if st.button("📄 Xuất PDF hồ sơ", use_container_width=True, key=f"tc_make_pdf_{so_ku}"):
+            try:
+                with st.spinner("Đang tạo PDF hồ sơ..."):
+                    st.session_state[pdf_state_key] = _tao_pdf_ho_so(hs, info_data, loan_data, username)
+                st.success("Đã tạo PDF hồ sơ. Bấm nút tải bên dưới để tải file.")
+            except Exception:
+                st.session_state.pop(pdf_state_key, None)
+                st.error("Không tạo được PDF hồ sơ.")
+        pdf_bytes = st.session_state.get(pdf_state_key)
+        if pdf_bytes:
+            download_pdf_button(
+                pdf_bytes=pdf_bytes,
+                filename=f"ho_so_{so_ku}.pdf",
+                label="📥 Tải PDF hồ sơ",
+                key=f"tc_dialog_pdf_{so_ku}",
+            )
 
 
 def _render_kpi_va_xuat(
@@ -208,7 +273,8 @@ def _render_kpi_va_xuat(
              "help": "Tổng dư nợ kết quả lọc (đơn vị: triệu đồng)"},
             {"label": "NQ11", "value": nq11_count, "icon": "✨"},
             {"label": "GQVL", "value": gqvl_count, "icon": "📋"},
-            {"label": "Quá hạn", "value": qh_count, "icon": "⚠️"},
+            {"label": "Quá hạn (món)", "value": qh_count, "icon": "⚠️",
+             "help": "Đơn vị: món vay có dư nợ quá hạn > 0, không phải số khách hàng."},
         ],
         num_columns=5,
     )
@@ -259,47 +325,32 @@ def _render_kpi_va_xuat(
 
 def _build_bang_ket_qua(df_f: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series]:
     """Tạo DataFrame hiển thị (cột chọn lọc, tiền đã format) + Series Số KU theo vị trí."""
-    n = len(df_f)
-    qh_src = df_f[COT_DU_NO_QH] if COT_DU_NO_QH in df_f.columns else pd.Series([0] * n)
-    qh = pd.to_numeric(qh_src, errors="coerce").fillna(0).reset_index(drop=True)
-    isn = (df_f["__is_nq11"].fillna(False).reset_index(drop=True)
-           if "__is_nq11" in df_f.columns else pd.Series([False] * n))
-    isg = (df_f["__is_gqvl"].fillna(False).reset_index(drop=True)
-           if "__is_gqvl" in df_f.columns else pd.Series([False] * n))
-
-    dau_hieu = []
-    for i in range(n):
-        marks = []
-        if qh.iat[i] > 0:
-            marks.append("⚠️ QH")
-        if bool(isn.iat[i]):
-            marks.append("✨ NQ11")
-        if bool(isg.iat[i]):
-            marks.append("📋 GQVL")
-        dau_hieu.append(" · ".join(marks))
-
     view_cols = [
         (COT_SO_KU, "Số khế ước"),
         (COT_TEN_KH, "Tên KH"),
         (COT_TEN_PGD, "PGD"),
         (COT_TEN_XA, "Xã/Phường"),
+        (COT_TEN_TO, "Tên tổ"),
         (COT_TEN_CT, "Chương trình"),
         (COT_TONG_DU_NO, "Tổng dư nợ (triệu đồng)"),
+        (COT_LAI_TON, "Lãi tồn (triệu đồng)"),
+        (COT_SO_DU_TG, "Số dư TK 105 (triệu đồng)"),
         (COT_TINH_TRANG, "Tình trạng"),
     ]
     data: dict[str, list] = {}
     for src, label in view_cols:
         if src not in df_f.columns:
             continue
-        if src == COT_TONG_DU_NO:
+        if src in {COT_TONG_DU_NO, COT_LAI_TON, COT_SO_DU_TG}:
             data[label] = pd.to_numeric(df_f[src], errors="coerce").apply(fmt_ty).reset_index(drop=True)
         else:
             data[label] = df_f[src].astype(str).replace({"nan": "", "None": ""}).reset_index(drop=True)
-    data["Dấu hiệu"] = dau_hieu
 
     df_view = pd.DataFrame(data)
+    if "Tên tổ" not in df_view.columns:
+        df_view["Tên tổ"] = ""
     ku_series = (df_f[COT_SO_KU].astype(str).reset_index(drop=True)
-                 if COT_SO_KU in df_f.columns else pd.Series([""] * n))
+                 if COT_SO_KU in df_f.columns else pd.Series([""] * len(df_f)))
     return df_view, ku_series
 
 
@@ -378,7 +429,7 @@ def render(tab: "DeltaGenerator", **kwargs) -> None:
                 mask = df[COT_SO_KU].astype(str).str.strip() == so_ku.strip()
                 df_match = df[mask]
                 if not df_match.empty:
-                    _detail_dialog(df_match.iloc[0], df_nq11, df_gqvl)
+                    _detail_dialog(df_match.iloc[0], df_nq11, df_gqvl, username)
         else:
             st.session_state["tc_last_ku"] = None
 

@@ -284,6 +284,15 @@
 | **Bài học** | Khi `st.markdown(unsafe_allow_html)` đặt nền cố định sáng thì bắt buộc đặt luôn `color` tối cố định (cặp khóa). Khi KHÔNG đặt nền → dùng `var(--text-color)`. Không bao giờ để 1 vế cố định, 1 vế theo theme. (rule 8.16) |
 | **Ngày fix** | 2026-06-21 |
 
+### B15b — Cột "Chương trình" trong bảng KHTD CN không thấy tên / tên quá chìm
+| | |
+|---|---|
+| **File** | `tabs/tab_khtd_nhap.py` ~dòng 58, ~381, ~475 |
+| **Dấu hiệu** | Màn `📈 Kế hoạch tín dụng` → `🏛️ Kế hoạch Tín dụng Chi nhánh`: cột đầu của bảng nhập không nổi tên chương trình; user khó thấy các dòng như `Hộ nghèo`, `Hộ cận nghèo`, `Hộ mới thoát nghèo`. Ngoài ra thanh tiêu đề nhóm nền pastel sáng cũng làm chữ khó nhìn |
+| **Nguyên nhân** | Cột `Chương trình` render tên dài từ `_ten_ct_base()` với style quá nhẹ (`font-size` + `padding`), không có `color`/`font-weight` rõ ràng; đồng thời thanh tiêu đề nhóm dùng nền pastel sáng nên độ tương phản tổng thể còn thấp trên một số giao diện |
+| **Fix** | Thêm helper nhãn ngắn `_ten_ct_hien_thi_nhap_cn()` cho bảng nhập KHTD CN và set style cột đầu với `color:var(--text-color, inherit)` + `font-weight:600` + `line-height` rõ hơn; đổi thanh tiêu đề nhóm sang nền đậm hơn + chữ trắng đậm để tăng tương phản |
+| **Ngày fix** | 2026-06-21 |
+
 ### B14 — Lambda params với default values khiến `lazy_tabs` truyền sai tham số
 | | |
 |---|---|
@@ -313,6 +322,26 @@
 | **Fix** | Đổi `_mtime` → `mtime` (bỏ underscore) trong cả hai hàm → `mtime` được tính vào cache key. Cập nhật `lay_trang_thai_upload_pgd` tính `mtime` thực từ `os.stat()` cho từng loại file (kể cả `hstd_khnv.xlsx` cho HSTD) rồi truyền vào. Khi file chưa tồn tại: `mtime=0.0`; sau khi upload: `mtime=actual_timestamp` → cache key khác → hàm chạy lại → trả ✅. |
 | **Pattern chuẩn** | Streamlit `@st.cache_data`: **KHÔNG dùng `_` prefix** cho tham số cache-busting. Underscore chỉ dùng cho object không thể hash (như DataFrame) mà bạn KHÔNG muốn bust cache. Với số (mtime), để nguyên tên → luôn nằm trong cache key. |
 | **Ngày fix** | 2026-06-06 |
+
+### B17 — Bảng tra cứu hồ sơ đổi sang `Tên tổ trưởng` nên cột bị trống
+| | |
+|---|---|
+| **File** | `tabs/tab_tracuu_v2.py` |
+| **Dấu hiệu** | Màn `🔍 Tra cứu hồ sơ khách hàng` hiện cột tổ nhưng toàn bộ dữ liệu trống dù HSTD đã upload bình thường |
+| **Nguyên nhân** | Bảng kết quả bị đổi sang đọc `COT_TEN_TO_TRUONG`, trong khi HSTD thực tế đang có cột `Tên tổ` chứ không có `Tên tổ trưởng`; code fallback tạo chuỗi rỗng nên nhìn như mất dữ liệu |
+| **Fix** | Đổi lại bảng tra cứu về đúng cột `COT_TEN_TO` với nhãn `Tên tổ`; bỏ fallback `Tên tổ trưởng` trong màn tra cứu |
+| **Bài học** | Trước khi đổi cột hiển thị từ HSTD phải kiểm tra schema thực tế của `cache/hstd.parquet` hoặc file `hstd_khnv.xlsx`; không suy đoán rằng file đang có `Tên tổ trưởng` nếu chưa thấy header thật |
+| **Ngày fix** | 2026-06-21 |
+
+### B18 — Nút `Xuất PDF hồ sơ` trong popup tra cứu bấm không thấy phản hồi
+| | |
+|---|---|
+| **File** | `tabs/tab_tracuu_v2.py` |
+| **Dấu hiệu** | Trong popup chi tiết hồ sơ, bấm `📄 Xuất PDF hồ sơ` nhưng user không thấy thay đổi gì rõ ràng nên tưởng nút không hoạt động |
+| **Nguyên nhân** | Luồng cũ lưu PDF bytes vào `st.session_state` rồi gọi `st.rerun()` ngay trong dialog. Với popup tra cứu, rerun này không tạo tín hiệu thị giác rõ ràng; nút tải PDF chỉ xuất hiện sau rerun nên dễ bị hiểu là "không có phản hồi" |
+| **Fix** | Bỏ `st.rerun()`; khi bấm nút thì tạo PDF ngay trong `st.spinner()`, hiện `st.success()` sau khi tạo xong, và render luôn nút `📥 Tải PDF hồ sơ` ngay bên dưới trong cùng lần bấm |
+| **Bài học** | Với export trong dialog/modal, tránh `st.rerun()` nếu không thật sự cần. Ưu tiên phản hồi tại chỗ (`spinner`, `success`, `download_button` hiện ngay) để user thấy luồng thao tác đang chạy và đã xong |
+| **Ngày fix** | 2026-06-21 |
 
 ### B12 — Nút in báo cáo không phản hồi / app treo (unconditional generation)
 | | |
@@ -592,6 +621,15 @@
 | **Fix** | Thêm `_pgd_khnv_path()` kiểm tra `hstd_khnv.xlsx`; `_upload_info()` check cả 2 file lấy timestamp mới nhất; `n_upload` và `upload_status` check cả 2 đường dẫn |
 | **Ngày fix** | 2026-06-06 |
 
+### E9 — CDTOTKVV gắn nhầm tháng (tháng 4 vs tháng 5) giữa 2 luồng upload
+| | |
+|---|---|
+| **File** | `services/upload_service.py` ~dòng 428, `tabs/tab_upload_khnv/_upload_toan_cn.py` ~dòng 60, `tabs/tab_upload_khnv.py` ~dòng 553 |
+| **Dấu hiệu** | Card "Xếp loại Tổ TK&VV toàn Chi nhánh" hiển thị tháng không nhất quán: luồng 22 PGD tự upload gắn tháng 4 (ngày chốt 30/4), luồng upload 1 file tổng có thể gắn tháng 5 (đọc tiêu đề/ngày xuất). Cùng kỳ chấm điểm nhưng bị tách thành 2 tháng → card chọn tháng mới nhất và báo "thiếu PGD" |
+| **Nguyên nhân** | Luồng file tổng ưu tiên `doc_thang_nam_tu_file()` (đọc header/tiêu đề — có thể là kỳ báo cáo / ngày xuất tháng 5), chỉ fallback sang `doc_thang_tu_cdto_toan_cn()` (đọc NGAYBC cột S = ngày chốt số liệu = tháng 4). Luồng PGD tự upload lại đọc ngày chốt trong thân file → lệch tháng |
+| **Fix** | Đảo thứ tự ở cả 3 nơi: `doc_thang_tu_cdto_toan_cn(file_bytes) or doc_thang_nam_tu_file(file_bytes)` → thống nhất gắn tháng theo NGÀY CHỐT SỐ LIỆU (NGAYBC), khớp với luồng PGD tự upload |
+| **Ngày fix** | 2026-06-21 |
+
 ---
 
 ## F. PDF / Word
@@ -676,6 +714,16 @@
 | **Quy tắc** | Bất kỳ HTML inline nào set `background` sáng → PHẢI set `color` tối tương ứng. Không set background → kế thừa dark/light theme tự động |
 | **Ngày fix** | 2026-06-21 |
 
+### G6 — Tóm tắt hiện trạng: CT có 2 nguồn vốn (TW+ĐP) bị "nhảy lên" nhóm Trung ương
+| | |
+|---|---|
+| **File** | `tabs/tab_khtd_xuat.py` — `_hien_thi_bang_cn_readonly()` vòng lặp `for ma_ct in order_ma_ct` |
+| **Dấu hiệu** | Chương trình có cả 2 nguồn vốn TW và ĐP hiển thị gộp 1 dòng dưới nhóm "I. Nguồn vốn Trung ương", phần ĐP biến mất khỏi nhóm "II". GQVL phần ĐP cũng nằm nhầm nhóm I |
+| **Nguyên nhân** | Code gộp `kh_tong = kh_tw + kh_dp` thành 1 dòng rồi gán nhóm theo điều kiện `if kh_tw > 0: nhóm I else nhóm II` → có TW là cả CT vào nhóm I. Header nhóm ghi lazy trong vòng lặp theo thứ tự mã CT → lặp header / sai thứ tự |
+| **Fix** | Duyệt 2 lượt: lượt 1 chỉ render phần TW (kh_tw/th_tw) vào nhóm I, lượt 2 chỉ render phần ĐP (kh_dp/th_dp) vào nhóm II; GQVL lọc sub-row theo `t[2]=="TW"/"ĐP"` về đúng nhóm. Header chỉ ghi 1 lần khi nhóm có dòng. STT dùng counter `stt_no` liên tục; `Số CT có KH` đếm CT duy nhất (tránh nhân đôi) |
+| **Bài học** | Khi 1 thực thể có nhiều phân loại (TW/ĐP) cần tách dòng theo phân loại, KHÔNG gộp tổng rồi gán nhóm theo phân loại đầu tiên gặp |
+| **Ngày fix** | 2026-06-21 |
+
 ### G4 — CI smoke render fail: `TypeError: takes 3 positional arguments but 7 were given`
 | | |
 |---|---|
@@ -685,6 +733,36 @@
 | **Fix** | Đổi call thành `_section_c_tong_hop(nam, thang, dot)` |
 | **Bài học** | Khi rút gọn signature hàm helper, grep tất cả call site trong cùng file: `grep -n "_section_c_tong_hop" tabs/tab_khtd_giao_dc.py` |
 | **Ngày fix** | 2026-06-20 |
+
+### G7 — NSVSMT ĐP (mã 06) bị gộp chung `6_DP`, không tách nguồn cấp tỉnh / cấp xã
+| | |
+|---|---|
+| **File** | `tabs/tab_khtd.py`, `tabs/tab_khtd_nhap.py`, `tabs/tab_khtd_xuat.py`, `config.py` |
+| **Dấu hiệu** | HSTD mới có `Mã chương trình = 06`, `Nguồn vốn = ĐP`, kèm `Mã nhà đầu tư` nhưng màn `🏛️ Kế hoạch Tín dụng Chi nhánh` và phần `📊 Báo cáo & Xuất file` chỉ hiện 1 dòng `6_DP`; không nhìn ra dư nợ `NSVSMT ĐP` thuộc nguồn cấp tỉnh hay cấp xã |
+| **Nguyên nhân** | Logic `_tinh_thuc_hien_theo_ct()` trước đó chỉ group theo `(Mã chương trình, Nguồn vốn)` nên toàn bộ `ma_ct=6`, `nv=2` bị cộng chung vào `6_DP`; UI KHTD cũng chỉ có 1 dòng `NSVSMT ĐP` |
+| **Fix** | Giữ `6_DP` tổng hợp để tương thích dữ liệu cũ, đồng thời bổ sung 2 sub-key `6_DP_TINH` / `6_DP_XA`; phân tầng TH từ HSTD theo `Mã nhà đầu tư` (thuộc danh mục NĐT cấp tỉnh → `6_DP_TINH`, còn lại/thiếu mã → `6_DP_XA`); màn nhập/xuất KHTD CN render 2 sub-row chi tiết. File Excel cũ chỉ có `6_DP` được fallback sang `6_DP_TINH` để không mất số |
+| **Bài học** | Với chương trình ĐP mà nghiệp vụ cần tách nguồn bên trong cùng `ma_ct`, không được chỉ group theo `(ma_ct, nv)`; phải đọc thêm chiều phân loại nghiệp vụ (`Mã nhà đầu tư`, `Phân loại NV`...) và vẫn giữ key tổng hợp cũ nếu hệ thống đang có dữ liệu lịch sử |
+| **Ngày fix** | 2026-06-21 |
+
+### G9 — `tong_kh` trong tab Tiến độ KH vs TH tính kép backward-compat keys
+| | |
+|---|---|
+| **File** | `tabs/tab_khtd_xuat.py` dòng ~562 hàm `_tab_tien_do_kh_th()` |
+| **Dấu hiệu** | Metric "Tổng KH" hiển thị cao hơn thực tế; "Tỷ lệ CN" bị thấp hơn thực tế |
+| **Nguyên nhân** | `kh_cn` từ kv_store chứa cả sub-key lẫn backward-compat total (`6_DP_TINH` + `6_DP_XA` + `6_DP`; `3_TW_NHCSXH` + `3_TW_NSNN` + `3_TW`; `3_DP_TINH` + `3_DP_XA` + `3_DP`). Dùng `sum(kh_cn.values())` sẽ tính kép nhóm GQVL và NSVSMT ĐP |
+| **Fix** | Đổi sang `sum(kh_cn.get(mk, 0) for mk, *_ in CHUONG_TRINH_KHTD)` — chỉ tổng hợp các key "chính" trong CHUONG_TRINH_KHTD, không bao gồm backward-compat alias; khớp cách tính `tong_th` |
+| **Bài học** | Khi lưu cả sub-key lẫn total vào cùng dict để tương thích, KHÔNG dùng `dict.values()` để tổng hợp — phải lọc theo tập key chuẩn |
+| **Ngày fix** | 2026-06-21 |
+
+### G8 — Danh mục Mã NĐT ĐP thiếu `Mã CT áp dụng` nên rule dễ bị dùng nhầm giữa các chương trình
+| | |
+|---|---|
+| **File** | `db.py`, `tabs/tab_khtd.py`, `tabs/tab_quan_ly_ndt_dp.py`, `tabs/tab_ndt_dp.py` |
+| **Dấu hiệu** | Danh mục NĐT ĐP trước đây chỉ lưu `ma` + `cap`; khi thêm NSVSMT ĐP phải tách riêng thêm 1 list khác. Người dùng khó biết một mã đang áp cho CT nào, còn code thì dễ mặc định dùng chung rule giữa `03_DP` và `06_DP` |
+| **Nguyên nhân** | Thiết kế danh mục thiếu chiều nghiệp vụ `Mã CT áp dụng`, nên không thể tra chắc theo cặp `(ma_ct, ma_ndt)`; phải ngầm hiểu danh sách nào thuộc chương trình nào |
+| **Fix** | Chuẩn hóa sang danh mục rule `ndt_dp_rule_list` với cấu trúc `{"ma_ct", "ma", "ghi_chu", "cap"}`; thêm helper `phan_loai_ndt_dp_cap(ma_ct, ma_ndt)` ưu tiên match exact `(ma_ct, ma_ndt)`, fallback rule chung `ma_ct=None`; UI quản lý/xem-only hiển thị thêm `CT 03` / `CT 06` |
+| **Bài học** | Với danh mục dùng để phân loại nhiều chương trình, phải lưu đủ khóa nghiệp vụ tối thiểu ngay từ đầu; đừng dựa vào tên tab hoặc key kv riêng để ngầm suy ra ngữ cảnh chương trình |
+| **Ngày fix** | 2026-06-21 |
 
 ---
 

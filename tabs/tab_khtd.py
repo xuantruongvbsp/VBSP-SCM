@@ -69,6 +69,11 @@ GQVL_SUB_NHOM = [
     ("3_DP_TINH",   "↳ ĐP — Cấp tỉnh",          "ĐP"),
     ("3_DP_XA",     "↳ ĐP — Cấp xã/khác",       "ĐP"),
 ]
+# Sub-nhóm NSVSMT ĐP theo Mã nhà đầu tư trong HSTD mới.
+NSVSMT_DP_SUB_NHOM = [
+    ("6_DP_TINH",   "↳ ĐP — Cấp tỉnh",          "ĐP"),
+    ("6_DP_XA",     "↳ ĐP — Cấp xã/khác",       "ĐP"),
+]
 MAKEY_BY_MACT_NV: dict[tuple[int, int], str] = {}
 TEN_BASE_BY_MACT: dict[int, str] = {}
 for mk, ma_ct, ten, nv, _ in CHUONG_TRINH_KHTD:
@@ -296,9 +301,11 @@ def _tinh_thuc_hien_theo_ct(df: "pd.DataFrame") -> dict[str, float]:
     Tính 'Thực hiện' theo chương trình (ma_key) từ dữ liệu HSTD.
     Thực hiện = Tổng dư nợ (fallback: Dư nợ trong hạn nếu thiếu cột Tổng dư nợ).
 
-    Lưu ý: nếu nhiều ma_key cùng (ma_ct, nv_int),
-    giá trị dư nợ được chia đều — xem CHUONG_TRINH_KHTD
-    để kiểm tra trùng mã.
+    Lưu ý:
+    - nếu nhiều ma_key cùng (ma_ct, nv_int), giá trị dư nợ được chia đều
+      — xem CHUONG_TRINH_KHTD để kiểm tra trùng mã.
+    - riêng NSVSMT ĐP (ma_ct=6, nv=2) vẫn giữ key tổng `6_DP`, đồng thời
+      bổ sung 2 sub-key theo Mã nhà đầu tư: `6_DP_TINH`, `6_DP_XA`.
     """
     if df is None or df.empty:
         return {}
@@ -354,6 +361,13 @@ def _tinh_thuc_hien_theo_ct(df: "pd.DataFrame") -> dict[str, float]:
             float(tmp["th"].sum()),
         )
 
+    th_nsvsmt_dp = _tinh_th_nsvsmt_dp_phan_tang(df)
+    tong_6_dp = float(th_nsvsmt_dp.get("6_DP_TINH", 0.0)) + float(th_nsvsmt_dp.get("6_DP_XA", 0.0))
+    if tong_6_dp > 0:
+        out["6_DP_TINH"] = float(th_nsvsmt_dp.get("6_DP_TINH", 0.0))
+        out["6_DP_XA"] = float(th_nsvsmt_dp.get("6_DP_XA", 0.0))
+        out["6_DP"] = tong_6_dp
+
     return out
 
 
@@ -375,8 +389,7 @@ def _tinh_th_gqvl_phan_tang(df_gqvl: "pd.DataFrame | None") -> dict[str, float]:
     if col_dn is None:
         return result
 
-    from db import doc_ndt_dp_ma_list
-    ndt_list = doc_ndt_dp_ma_list()
+    from db import phan_loai_ndt_dp_cap
 
     for _, row in df_gqvl.iterrows():
         nv  = str(row.get(COT_NGUON_VON, "")).strip()
@@ -394,10 +407,55 @@ def _tinh_th_gqvl_phan_tang(df_gqvl: "pd.DataFrame | None") -> dict[str, float]:
                 result["3_TW_NSNN"]   += dn
         elif nv == "ĐP":
             ma = str(row.get(COT_MA_NHA_DAU_TU, "")).strip()
-            if ma in ndt_list:
+            if phan_loai_ndt_dp_cap(3, ma) == "tinh":
                 result["3_DP_TINH"] += dn
             else:
                 result["3_DP_XA"]   += dn
+    return result
+
+
+def _tinh_th_nsvsmt_dp_phan_tang(df_hstd: "pd.DataFrame | None") -> dict[str, float]:
+    """
+    Tính TH thực tế cho NSVSMT ĐP từ HSTD:
+    - `6_DP_TINH`: Mã NĐT thuộc danh mục cấp tỉnh
+    - `6_DP_XA`: còn lại / thiếu Mã NĐT
+    """
+    result = {"6_DP_TINH": 0.0, "6_DP_XA": 0.0}
+    if df_hstd is None or df_hstd.empty:
+        return result
+
+    if COT_MA_CHUONG_TRINH not in df_hstd.columns or COT_NGUON_VON not in df_hstd.columns:
+        return result
+
+    col_dn = COT_TONG_DU_NO if COT_TONG_DU_NO in df_hstd.columns else (
+        COT_DU_NO_TH if COT_DU_NO_TH in df_hstd.columns else None
+    )
+    if col_dn is None:
+        return result
+
+    ma_ndt_s = (
+        df_hstd[COT_MA_NHA_DAU_TU].astype(str).fillna("").str.strip()
+        if COT_MA_NHA_DAU_TU in df_hstd.columns
+        else pd.Series("", index=df_hstd.index, dtype="object")
+    )
+    tmp = pd.DataFrame(
+        {
+            "ma_ct": pd.to_numeric(df_hstd[COT_MA_CHUONG_TRINH], errors="coerce").fillna(0).astype(int),
+            "nv": pd.to_numeric(df_hstd[COT_NGUON_VON], errors="coerce").fillna(0).astype(int),
+            "th": pd.to_numeric(df_hstd[col_dn], errors="coerce").fillna(0).astype(float),
+            "ma_ndt": ma_ndt_s,
+        }
+    )
+    tmp = tmp[(tmp["ma_ct"] == 6) & (tmp["nv"] == 2) & (tmp["th"] != 0)]
+    if tmp.empty:
+        return result
+
+    from db import phan_loai_ndt_dp_cap
+
+    cap_s = tmp["ma_ndt"].map(lambda ma: phan_loai_ndt_dp_cap(6, ma))
+    la_tinh = cap_s.eq("tinh")
+    result["6_DP_TINH"] = float(tmp.loc[la_tinh, "th"].sum())
+    result["6_DP_XA"] = float(tmp.loc[~la_tinh, "th"].sum())
     return result
 
 

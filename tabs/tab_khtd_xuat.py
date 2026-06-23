@@ -52,7 +52,22 @@ from tabs.tab_khtd import (
     _ten_ct_base,
     _tinh_thuc_hien_theo_ct,
     GQVL_SUB_NHOM,
+    NSVSMT_DP_SUB_NHOM,
 )
+
+
+def _kh_nsvsmt_dp_split(kh_data: dict) -> dict[str, float]:
+    """Fallback `6_DP` cũ sang 2 sub-key chi tiết để hiển thị không bị mất số."""
+    has_split = "6_DP_TINH" in kh_data or "6_DP_XA" in kh_data
+    if has_split:
+        return {
+            "6_DP_TINH": float(kh_data.get("6_DP_TINH", 0.0) or 0.0),
+            "6_DP_XA": float(kh_data.get("6_DP_XA", 0.0) or 0.0),
+        }
+    return {
+        "6_DP_TINH": float(kh_data.get("6_DP", 0.0) or 0.0),
+        "6_DP_XA": 0.0,
+    }
 
 
 def _hien_thi_bang_cn_readonly(
@@ -108,6 +123,7 @@ def _hien_thi_bang_cn_readonly(
     so_ct_co_kh = 0
     tong_ct = len(order_ma_ct)
     stt_i = 0
+    stt_no = 0
 
     html_rows: list[str] = []
     nhom_hien = ""
@@ -154,9 +170,9 @@ def _hien_thi_bang_cn_readonly(
         html_rows.append(f"<tr>{tds}</tr>")
 
     def _add_row(
-        stt: str, ten: str, kh_vnd: float, th_vnd: float, indent: str = ""
+        ten: str, kh_vnd: float, th_vnd: float, indent: str = ""
     ) -> None:
-        nonlocal tong_kh, tong_th, so_ct_co_kh, stt_i
+        nonlocal tong_kh, tong_th, stt_i, stt_no
         kh_v = kh_vnd / 1e6
         th_v = th_vnd / 1e6
         tl = th_v / kh_v * 100 if kh_v > 0 else None
@@ -164,11 +180,9 @@ def _hien_thi_bang_cn_readonly(
         if kh_v > 0 or th_v > 0:
             tong_kh += kh_vnd
             tong_th += th_vnd
-            if kh_v > 0:
-                so_ct_co_kh += 1
 
-        bg = WHITE if stt_i % 2 == 0 else ALT
         stt_i += 1
+        stt_no += 1
 
         kh_str = _fvn(kh_v, 0) if kh_v > 0 else "—"
         th_str = _fvn(th_v, 0) if th_v > 0 else "—"
@@ -177,7 +191,7 @@ def _hien_thi_bang_cn_readonly(
         stt_s = _tl_text(tl)
 
         tds = (
-            _td(stt, "center", "", "", "") +
+            _td(str(stt_no), "center", "", "", "") +
             _td(f"{indent}{ten}", "left", "", "", "") +
             _td(kh_str, "right", "", "", "") +
             _td(th_str, "right", "", "", "") +
@@ -186,8 +200,8 @@ def _hien_thi_bang_cn_readonly(
         )
         html_rows.append(f"<tr>{tds}</tr>")
 
-    def _add_gqvl_sub_ten(sub_key: str, sub_ten: str, sub_nv: str) -> None:
-        nonlocal tong_kh, tong_th, so_ct_co_kh, stt_i
+    def _add_sub_ten(sub_key: str, sub_ten: str) -> None:
+        nonlocal tong_kh, tong_th, stt_i
         kh_vnd = float(kh_d.get(sub_key, 0.0))
         th_vnd = float(th_d.get(sub_key, 0.0))
 
@@ -202,8 +216,6 @@ def _hien_thi_bang_cn_readonly(
         if kh_v > 0 or th_v > 0:
             tong_kh += kh_vnd
             tong_th += th_vnd
-            if kh_v > 0:
-                so_ct_co_kh += 1
 
         bg = WHITE if stt_i % 2 == 0 else ALT
         stt_i += 1
@@ -224,41 +236,87 @@ def _hien_thi_bang_cn_readonly(
         )
         html_rows.append(f"<tr>{tds}</tr>")
 
+    # ── Nhóm I — Nguồn vốn Trung ương ────────────────────────────────────
+    da_ghi_hdr_tw = False
     for ma_ct in order_ma_ct:
-        mk_tw = _ma_key_tu_ma_ct_nv(ma_ct, 1)
-        mk_dp = _ma_key_tu_ma_ct_nv(ma_ct, 2)
+        if ma_ct == 3:
+            subs_tw = [t for t in GQVL_SUB_NHOM if t[2] == "TW"]
+            if any(
+                float(kh_d.get(sk, 0.0)) > 0 or float(th_d.get(sk, 0.0)) > 0
+                for sk, _, _ in subs_tw
+            ):
+                if not da_ghi_hdr_tw:
+                    _add_group_hdr("I. Nguồn vốn Trung ương")
+                    da_ghi_hdr_tw = True
+                for sk, sten, snv in subs_tw:
+                    _add_sub_ten(sk, sten)
+            continue
 
+        mk_tw = _ma_key_tu_ma_ct_nv(ma_ct, 1)
         kh_tw = float(kh_d.get(mk_tw, 0.0))
         th_tw = float(th_d.get(mk_tw, 0.0))
+        if (kh_tw > 0 or th_tw > 0) and mk_tw in MA_KEYS_CO_KHTD:
+            if not da_ghi_hdr_tw:
+                _add_group_hdr("I. Nguồn vốn Trung ương")
+                da_ghi_hdr_tw = True
+            _add_row(_ten_ct_base(ma_ct, {}), kh_tw, th_tw, "  ")
+
+    # ── Nhóm II — Nguồn vốn Địa phương ───────────────────────────────────
+    da_ghi_hdr_dp = False
+    kh_nsvsmt = _kh_nsvsmt_dp_split(kh_d)
+    kh_d.update(kh_nsvsmt)
+    for ma_ct in order_ma_ct:
+        if ma_ct == 3:
+            subs_dp = [t for t in GQVL_SUB_NHOM if t[2] == "ĐP"]
+            if any(
+                float(kh_d.get(sk, 0.0)) > 0 or float(th_d.get(sk, 0.0)) > 0
+                for sk, _, _ in subs_dp
+            ):
+                if not da_ghi_hdr_dp:
+                    _add_group_hdr("II. Nguồn vốn Địa phương")
+                    da_ghi_hdr_dp = True
+                for sk, sten, snv in subs_dp:
+                    _add_sub_ten(sk, sten)
+            continue
+
+        if ma_ct == 6:
+            if any(
+                float(kh_d.get(sk, 0.0)) > 0 or float(th_d.get(sk, 0.0)) > 0
+                for sk, _, _ in NSVSMT_DP_SUB_NHOM
+            ):
+                if not da_ghi_hdr_dp:
+                    _add_group_hdr("II. Nguồn vốn Địa phương")
+                    da_ghi_hdr_dp = True
+                for sk, sten, _snv in NSVSMT_DP_SUB_NHOM:
+                    _add_sub_ten(sk, f"NSVSMT ĐP — {sten.replace('↳ ĐP — ', '')}")
+            continue
+
+        mk_dp = _ma_key_tu_ma_ct_nv(ma_ct, 2)
         kh_dp = float(kh_d.get(mk_dp, 0.0))
         th_dp = float(th_d.get(mk_dp, 0.0))
+        if (kh_dp > 0 or th_dp > 0) and mk_dp in MA_KEYS_CO_KHTD:
+            if not da_ghi_hdr_dp:
+                _add_group_hdr("II. Nguồn vốn Địa phương")
+                da_ghi_hdr_dp = True
+            _add_row(_ten_ct_base(ma_ct, {}), kh_dp, th_dp, "  ")
 
-        ten_base = _ten_ct_base(ma_ct, {})
-
+    # Số chương trình có KH (đếm theo CT duy nhất, không nhân đôi TW/ĐP)
+    for ma_ct in order_ma_ct:
         if ma_ct == 3:
-            nhom_moi = "I. Nguồn vốn Trung ương"
-            if nhom_hien != nhom_moi:
-                _add_group_hdr(nhom_moi)
-            for sub_key, sub_ten, sub_nv in GQVL_SUB_NHOM:
-                _add_gqvl_sub_ten(sub_key, sub_ten, sub_nv)
-        else:
-            show_tw = (kh_tw > 0 or th_tw > 0) and mk_tw in MA_KEYS_CO_KHTD
-            show_dp = (kh_dp > 0 or th_dp > 0) and mk_dp in MA_KEYS_CO_KHTD
-            if not show_tw and not show_dp:
-                continue
-
-            kh_tong = kh_tw + kh_dp
-            th_tong = th_tw + th_dp
-
-            if kh_tw > 0 or th_tw > 0:
-                nhom_moi = "I. Nguồn vốn Trung ương"
-            else:
-                nhom_moi = "II. Nguồn vốn Địa phương"
-
-            if nhom_hien != nhom_moi:
-                _add_group_hdr(nhom_moi)
-
-            _add_row(str(len([r for r in html_rows if "<td" in r]) + 1), ten_base, kh_tong, th_tong, "  ")
+            if any(float(kh_d.get(sk, 0.0)) > 0 for sk, _, _ in GQVL_SUB_NHOM):
+                so_ct_co_kh += 1
+        elif ma_ct == 6:
+            if (
+                float(kh_d.get("6_TW", 0.0)) > 0
+                or float(kh_d.get("6_DP_TINH", 0.0)) > 0
+                or float(kh_d.get("6_DP_XA", 0.0)) > 0
+            ):
+                so_ct_co_kh += 1
+        elif (
+            float(kh_d.get(_ma_key_tu_ma_ct_nv(ma_ct, 1), 0.0)) > 0
+            or float(kh_d.get(_ma_key_tu_ma_ct_nv(ma_ct, 2), 0.0)) > 0
+        ):
+            so_ct_co_kh += 1
 
     tong_tl = tong_th / tong_kh * 100 if tong_kh > 0 else None
 
@@ -294,7 +352,7 @@ def _hien_thi_bang_cn_readonly(
   <thead><tr>{thead}</tr></thead>
   <tbody>{"".join(html_rows)}</tbody>
 </table>
-<p style="font-size:0.78rem;color:#6B7280;margin:4px 0 0 0">
+<p style="font-size:0.78rem;color:var(--text-color, #6B7280);margin:4px 0 0 0">
   * Đơn vị: triệu đồng · KH từ nhập liệu, TH từ Tổng dư nợ HSTD + GQVL phân tầng<br>
   <span style="color:{GREEN}">🟢</span> TL ≥ 100% &nbsp;
   <span style="color:{AMBER}">🟡</span> TL ≥ 95% &nbsp;
@@ -411,9 +469,9 @@ def _tab_canh_bao_chenh_lech() -> None:
     # ── Tô màu bảng theo trạng thái ──────────────────────────────────────
     def _to_mau_hang(row: pd.Series) -> list[str]:
         if "🔴" in str(row.get("Trạng thái", "")):
-            return ["background-color: #ffd6d6"] * len(row)
+            return ["background-color: #ffd6d6; color:#1f2937"] * len(row)
         if "🟡" in str(row.get("Trạng thái", "")):
-            return ["background-color: #fff9d6"] * len(row)
+            return ["background-color: #fff9d6; color:#1f2937"] * len(row)
         return [""] * len(row)
 
     # Column config cho bảng cảnh báo
@@ -501,7 +559,8 @@ def _tab_tien_do_kh_th() -> None:
     for sub_key, val in th_gqvl.items():
         th_cn[sub_key] = val
 
-    tong_kh = sum(float(v) for v in kh_cn.values())
+    tong_kh = sum(float(kh_cn.get(mk, 0))
+                  for mk, *_ in CHUONG_TRINH_KHTD)
     tong_th = sum(float(th_cn.get(mk, 0))
                   for mk, *_ in CHUONG_TRINH_KHTD)
     tl_cn = tong_th / tong_kh * 100 if tong_kh > 0 else 0
@@ -526,8 +585,46 @@ def _tab_tien_do_kh_th() -> None:
     st.markdown("#### 📋 Chi tiết theo Chương trình")
 
     rows_ct = []
+    kh_nsvsmt = _kh_nsvsmt_dp_split(kh_cn)
     nhom_hien = ""
     for mk, _ma_ct, ten_ct, nv, *_ in CHUONG_TRINH_KHTD:
+        if mk == "6_DP":
+            rows_6_dp: list[dict] = []
+            for sub_key, sub_ten, _ in NSVSMT_DP_SUB_NHOM:
+                kh_val = float(kh_nsvsmt.get(sub_key, 0))
+                th_val = float(th_cn.get(sub_key, 0))
+                if kh_val == 0 and th_val == 0:
+                    continue
+                tl_val = th_val / kh_val * 100 if kh_val > 0 else None
+                if tl_val is None:
+                    trang_thai = "—"
+                elif tl_val >= 100:
+                    trang_thai = "🟢 Đạt"
+                elif tl_val >= 95:
+                    trang_thai = "🟡 Đang thực hiện"
+                else:
+                    trang_thai = "🔴 Chậm"
+                rows_6_dp.append({
+                    "STT": "",
+                    "Chỉ tiêu": f"  NSVSMT ĐP — {sub_ten.replace('↳ ĐP — ', '')}",
+                    "KH (triệu đồng)": round(kh_val/1e6, 0) if kh_val else None,
+                    "TH (triệu đồng)": round(th_val/1e6, 0) if th_val else None,
+                    "TL%": round(tl_val, 1) if tl_val is not None else None,
+                    "Trạng thái": trang_thai,
+                    "_nhom": False,
+                })
+            if rows_6_dp:
+                nhom_moi = "II. Địa phương"
+                if nhom_moi != nhom_hien:
+                    nhom_hien = nhom_moi
+                    rows_ct.append({
+                        "STT": nhom_hien,
+                        "Chỉ tiêu": nhom_hien,
+                        "KH (triệu đồng)": None, "TH (triệu đồng)": None, "TL%": None,
+                        "Trạng thái": "", "_nhom": True,
+                    })
+                rows_ct.extend(rows_6_dp)
+            continue
         kh_val = float(kh_cn.get(mk, 0))
         th_val = float(th_cn.get(mk, 0))
         tl_val = th_val / kh_val * 100 if kh_val > 0 else None
@@ -577,11 +674,11 @@ def _tab_tien_do_kh_th() -> None:
 
     def _to_mau_ct(row):
         if row.get("_nhom"):
-            return ["background-color: #D9E1F2; font-weight: bold"] * len(row)
+            return ["background-color: #D9E1F2; color:#1f2937; font-weight: bold"] * len(row)
         if "🔴" in str(row.get("Trạng thái", "")):
-            return ["background-color: #ffd6d6"] * len(row)
+            return ["background-color: #ffd6d6; color:#1f2937"] * len(row)
         if "🟡" in str(row.get("Trạng thái", "")):
-            return ["background-color: #fff9d6"] * len(row)
+            return ["background-color: #fff9d6; color:#1f2937"] * len(row)
         return [""] * len(row)
 
     cols_show = ["Chỉ tiêu", "KH (triệu đồng)", "TH (triệu đồng)", "TL%", "Trạng thái"]
@@ -823,7 +920,7 @@ def xuat_to_trinh_bgd_word(username: str = "unknown") -> bytes:
                 if meta.get("ngay_sl"):
                     ngay_sl = str(meta["ngay_sl"])
         except Exception as e:
-            logger.warning("xuat_to_trinh_bgd_word: đọc HSTD: %s", e)
+            logger.error("xuat_to_trinh_bgd_word: đọc HSTD lỗi — %s", e, exc_info=True)
 
     today = _date.today()
     GREEN = RGBColor(0x1B, 0x5E, 0x20)

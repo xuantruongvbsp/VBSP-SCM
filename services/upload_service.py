@@ -423,9 +423,9 @@ def xu_ly_cdto_toan_cn(file_bytes: bytes) -> dict[str, "KetQuaUpload"]:
     if not pgd_map:
         return {"_loi_doc": KetQuaUpload(False, "Không tìm thấy dữ liệu đơn vị nào trong file")}
 
-    # Ưu tiên đọc kỳ từ tiêu đề file (ghi "Tháng X năm YYYY") vì chính xác hơn.
-    # NGAYBC (cột S) chứa ngày xuất/finalize, có thể khác kỳ báo cáo.
-    thang = doc_thang_nam_tu_file(file_bytes) or doc_thang_tu_cdto_toan_cn(file_bytes)
+    # Thống nhất tháng theo NGÀY CHỐT SỐ LIỆU (NGAYBC, cột S) — khớp với luồng
+    # upload từng PGD. Tiêu đề file có thể ghi kỳ báo cáo / ngày xuất khác tháng.
+    thang = doc_thang_tu_cdto_toan_cn(file_bytes) or doc_thang_nam_tu_file(file_bytes)
     ket_qua: dict[str, KetQuaUpload] = {}
 
     for ten_pgd, pgd_bytes in pgd_map.items():

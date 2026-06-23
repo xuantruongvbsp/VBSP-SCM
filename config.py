@@ -206,6 +206,10 @@ GQVL_MA_KEY_THEO_DOI = frozenset({
 
 # ── Tên chính thức (hiển thị) theo ma_key — dùng cho báo cáo ─────────────────
 TEN_CHINH_THUC_CT = {row[0]: row[2] for row in CHUONG_TRINH_KHTD}
+TEN_CHINH_THUC_CT.update({
+    "6_DP_TINH": "NSVSMT ĐP — Cấp tỉnh",
+    "6_DP_XA": "NSVSMT ĐP — Cấp xã/khác",
+})
 
 # Chỉ tiêu nguồn vốn (Phần I của KHTD)
 NGUON_VON_KHTD = [

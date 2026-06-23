@@ -54,6 +54,7 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
             cap = x.get("cap", "tinh")
             cap_label = "Cấp Tỉnh 🏛️" if cap == "tinh" else "Cấp Xã 🏘️"
             rows.append({
+                "Mã CT áp dụng": f"{int(x.get('ma_ct', 3)):02d}",
                 "Mã NĐT": x["ma"],
                 "Ghi chú": x.get("ghi_chu", ""),
                 "Phân loại cấp": cap_label,
@@ -67,7 +68,7 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
             st.success(f"✅ Hiển thị toàn bộ {len(df_ndt)} mã NĐT từ danh sách Cấp tỉnh.")
             st.info(
                 "💡 Mã NĐT này dùng để phân loại GQVL ĐP Cấp tỉnh trong báo cáo. "
-                "PGD không cần quản lý trực tiếp."
+                "Danh mục hiện có lưu kèm mã chương trình áp dụng; PGD không cần quản lý trực tiếp."
             )
 
         hien_thi_dataframe_phan_trang(df_ndt, key="ndt_dp_table", height=400)

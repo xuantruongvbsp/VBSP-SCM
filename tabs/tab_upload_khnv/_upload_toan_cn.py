@@ -57,7 +57,7 @@ def render_cdto_toan_cn(username: str) -> None:
                 )
 
                 pgd_map = tach_file_cdto_toan_cn(file_bytes)
-                thang   = doc_thang_nam_tu_file(file_bytes) or doc_thang_tu_cdto_toan_cn(file_bytes)
+                thang   = doc_thang_tu_cdto_toan_cn(file_bytes) or doc_thang_nam_tu_file(file_bytes)
                 ds_tat_ca = [DON_VI_CHI_NHANH] + DS_PGD
                 thieu = [dv for dv in ds_tat_ca if dv not in pgd_map]
 

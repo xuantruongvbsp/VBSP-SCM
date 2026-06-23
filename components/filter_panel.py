@@ -7,6 +7,7 @@ import pandas as pd
 from typing import TYPE_CHECKING, Callable
 from datetime import date, datetime
 
+from utils import vn
 from config import (
     COT_TEN_PGD, COT_TEN_XA, COT_TEN_THON,
     COT_TEN_CT, COT_NGUON_VON, COT_NGAY_VAY, COT_NGAY_DH,
@@ -36,7 +37,9 @@ def _pre_compute_max_du_no(_df: pd.DataFrame, col: str, ts: float = 0.0) -> floa
     if col not in _df.columns:
         return 1_000_000_000.0
     try:
-        return max(float(_df[col].max()), 1_000_000.0)
+        ser = pd.to_numeric(_df[col], errors="coerce")
+        m = float(ser.max()) if not ser.empty and pd.notna(ser.max()) else 0.0
+        return max(m, 1_000_000.0)
     except Exception:
         return 1_000_000_000.0
 
@@ -62,6 +65,15 @@ def _get_options_filtered(
         return _get_unique_values(_df, target_col, ts)
     mask = _df[filter_col].isin(filter_vals)
     return sorted(_df.loc[mask, target_col].dropna().unique().tolist())
+
+
+def _normalize_nguon_von_code(value) -> str:
+    s = str(value).strip()
+    if s in {"1", "01", "1.0", "01.0", "TW", "tw"}:
+        return "1"
+    if s in {"2", "02", "2.0", "02.0", "DP", "dp", "ĐP", "đp"}:
+        return "2"
+    return s
 
 
 def render_filter_panel(
@@ -112,7 +124,7 @@ def render_filter_panel(
         }
     
     # Quick search bar
-    col1, col2 = st.columns([5, 1])
+    col1, col2, col3 = st.columns([5, 1, 1])
     with col1:
         search_kw = st.text_input(
             "🔍 Tìm kiếm nhanh",
@@ -124,6 +136,50 @@ def render_filter_panel(
         st.write("")
         st.write("")
         search_clicked = st.button("🔍 Tìm", use_container_width=True, type="primary")
+    with col3:
+        st.write("")
+        st.write("")
+        _has_any_filter = bool(
+            st.session_state.tracuu_filters.get("search_keyword")
+            or st.session_state.tracuu_filters.get("selected_pgd")
+            or st.session_state.tracuu_filters.get("selected_xa")
+            or st.session_state.tracuu_filters.get("selected_thon")
+            or st.session_state.tracuu_filters.get("selected_ct")
+            or st.session_state.tracuu_filters.get("selected_nv")
+            or st.session_state.tracuu_filters.get("ngay_vay_from")
+            or st.session_state.tracuu_filters.get("ngay_vay_to")
+            or st.session_state.tracuu_filters.get("ngay_dh_from")
+            or st.session_state.tracuu_filters.get("ngay_dh_to")
+            or st.session_state.tracuu_filters.get("filter_qua_han")
+            or st.session_state.tracuu_filters.get("filter_nq11")
+            or st.session_state.tracuu_filters.get("filter_gqvl")
+            or st.session_state.tracuu_filters.get("filter_khoanh")
+        )
+        if st.button(
+            "🔄 Reset",
+            use_container_width=True,
+            key="tc_reset_top",
+            disabled=not _has_any_filter,
+        ):
+            st.session_state.tracuu_filters = {
+                "search_keyword": "",
+                "selected_pgd": [] if pgd_user is None else [pgd_user],
+                "selected_xa": [],
+                "selected_thon": [],
+                "selected_ct": [],
+                "selected_nv": [],
+                "du_no_range": (0.0, _max_du_no),
+                "ngay_vay_from": None,
+                "ngay_vay_to": None,
+                "ngay_dh_from": None,
+                "ngay_dh_to": None,
+                "filter_qua_han": False,
+                "filter_nq11": False,
+                "filter_gqvl": False,
+                "filter_khoanh": False,
+                "filter_active": True,
+            }
+            st.rerun()
     
     # Advanced filters expander
     with st.expander("📋 Bộ lọc nâng cao", expanded=False):
@@ -191,16 +247,16 @@ def render_filter_panel(
         
         with col_nv:
             ds_nv = _get_unique_values(df, COT_NGUON_VON, ts_hstd)
-            # Map values to labels if available
+            ds_nv_norm = sorted({v for v in (_normalize_nguon_von_code(x) for x in ds_nv) if v != ""})
             nv_options = []
-            for nv in ds_nv:
-                label = NGUON_VON_LABEL.get(str(nv), nv)
+            for nv in ds_nv_norm:
+                label = NGUON_VON_LABEL.get(nv, NGUON_VON_LABEL.get(str(nv), nv))
                 nv_options.append((nv, f"{nv} - {label}"))
             selected_nv_labels = st.multiselect(
                 "Nguồn vốn",
                 options=[opt[1] for opt in nv_options],
                 default=[
-                    f"{nv} - {NGUON_VON_LABEL.get(str(nv), nv)}"
+                    f"{nv} - {NGUON_VON_LABEL.get(nv, NGUON_VON_LABEL.get(str(nv), nv))}"
                     for nv in st.session_state.tracuu_filters["selected_nv"]
                     if any(opt[0] == nv for opt in nv_options)
                 ],
@@ -338,38 +394,51 @@ def render_filter_panel(
         search_cols = [c for c in search_cols if c in df_filtered.columns]
         if search_cols:
             mask = pd.Series(False, index=df_filtered.index)
-            kw_lower = search_kw.lower()
+            kw_raw = str(search_kw).strip()
+            kw_lower = kw_raw.lower()
+            kw_norm = vn(kw_lower)
             for col in search_cols:
-                mask |= df_filtered[col].fillna("").astype(str).str.lower().str.contains(kw_lower, na=False)
+                s = df_filtered[col].fillna("").astype(str)
+                mask |= s.str.lower().str.contains(kw_lower, na=False)
+                if kw_norm and kw_norm != kw_lower:
+                    mask |= s.map(vn).str.contains(kw_norm, na=False)
             df_filtered = df_filtered[mask]
     
     # 2. Địa bàn filters
     if selected_pgd and COT_TEN_PGD in df_filtered.columns:
-        df_filtered = df_filtered[df_filtered[COT_TEN_PGD].isin(selected_pgd)]
+        _set = {str(v).strip() for v in selected_pgd}
+        df_filtered = df_filtered[df_filtered[COT_TEN_PGD].astype(str).str.strip().isin(_set)]
     
     if selected_xa and COT_TEN_XA in df_filtered.columns:
-        df_filtered = df_filtered[df_filtered[COT_TEN_XA].isin(selected_xa)]
+        _set = {str(v).strip() for v in selected_xa}
+        df_filtered = df_filtered[df_filtered[COT_TEN_XA].astype(str).str.strip().isin(_set)]
     
     if selected_thon and COT_TEN_THON in df_filtered.columns:
-        df_filtered = df_filtered[df_filtered[COT_TEN_THON].isin(selected_thon)]
+        _set = {str(v).strip() for v in selected_thon}
+        df_filtered = df_filtered[df_filtered[COT_TEN_THON].astype(str).str.strip().isin(_set)]
     
     # 3. Chương trình & Nguồn vốn
     if selected_ct and COT_TEN_CT in df_filtered.columns:
-        df_filtered = df_filtered[df_filtered[COT_TEN_CT].isin(selected_ct)]
+        _set = {str(v).strip() for v in selected_ct}
+        df_filtered = df_filtered[df_filtered[COT_TEN_CT].astype(str).str.strip().isin(_set)]
     
     if selected_nv and COT_NGUON_VON in df_filtered.columns:
-        df_filtered = df_filtered[df_filtered[COT_NGUON_VON].isin(selected_nv)]
+        _set = {str(v).strip() for v in selected_nv}
+        _nv_norm = df_filtered[COT_NGUON_VON].map(_normalize_nguon_von_code)
+        df_filtered = df_filtered[_nv_norm.astype(str).str.strip().isin(_set)]
     
     # 4. Dư nợ range
     if COT_TONG_DU_NO in df_filtered.columns:
+        _dn = pd.to_numeric(df_filtered[COT_TONG_DU_NO], errors="coerce").fillna(0)
         df_filtered = df_filtered[
-            (df_filtered[COT_TONG_DU_NO] >= du_no_range[0]) &
-            (df_filtered[COT_TONG_DU_NO] <= du_no_range[1])
+            (_dn >= float(du_no_range[0])) &
+            (_dn <= float(du_no_range[1]))
         ]
     
     # 5. Date filters — convert each column once
     if (ngay_vay_from or ngay_vay_to) and COT_NGAY_VAY in df_filtered.columns:
-        _ts_vay = pd.to_datetime(df_filtered[COT_NGAY_VAY], errors='coerce')
+        _ts_vay = _date_series.get(COT_NGAY_VAY)
+        _ts_vay = _ts_vay.loc[df_filtered.index] if _ts_vay is not None else pd.to_datetime(df_filtered[COT_NGAY_VAY], errors="coerce")
         if ngay_vay_from:
             df_filtered = df_filtered[_ts_vay >= pd.Timestamp(ngay_vay_from)]
             _ts_vay = _ts_vay.loc[df_filtered.index]
@@ -377,7 +446,8 @@ def render_filter_panel(
             df_filtered = df_filtered[_ts_vay <= pd.Timestamp(ngay_vay_to)]
 
     if (ngay_dh_from or ngay_dh_to) and COT_NGAY_DH in df_filtered.columns:
-        _ts_dh = pd.to_datetime(df_filtered[COT_NGAY_DH], errors='coerce')
+        _ts_dh = _date_series.get(COT_NGAY_DH)
+        _ts_dh = _ts_dh.loc[df_filtered.index] if _ts_dh is not None else pd.to_datetime(df_filtered[COT_NGAY_DH], errors="coerce")
         if ngay_dh_from:
             df_filtered = df_filtered[_ts_dh >= pd.Timestamp(ngay_dh_from)]
             _ts_dh = _ts_dh.loc[df_filtered.index]
@@ -386,7 +456,8 @@ def render_filter_panel(
     
     # 6. Special status filters
     if filter_qua_han and COT_DU_NO_QH in df_filtered.columns:
-        df_filtered = df_filtered[df_filtered[COT_DU_NO_QH] > 0]
+        _qh = pd.to_numeric(df_filtered[COT_DU_NO_QH], errors="coerce").fillna(0)
+        df_filtered = df_filtered[_qh > 0]
     
     if filter_nq11:
         if "__is_nq11" in df_filtered.columns:
@@ -407,7 +478,8 @@ def render_filter_panel(
                 df_filtered = df_filtered[df_filtered[COT_SO_KU].astype(str).str.strip().isin(_set_gq)]
     
     if filter_khoanh and COT_DU_NO_KHOANH in df_filtered.columns:
-        df_filtered = df_filtered[df_filtered[COT_DU_NO_KHOANH] > 0]
+        _kn = pd.to_numeric(df_filtered[COT_DU_NO_KHOANH], errors="coerce").fillna(0)
+        df_filtered = df_filtered[_kn > 0]
     
     # Update session state
     st.session_state.tracuu_filters.update({
@@ -432,5 +504,37 @@ def render_filter_panel(
     if on_filter_change:
         on_filter_change(df_filtered)
     
-    return df_filtered
+    with st.expander("🧪 Debug bộ lọc", expanded=False):
+        st.write({"rows_before": int(len(df)), "rows_after": int(len(df_filtered))})
+        st.write(
+            {
+                "keyword": search_kw,
+                "selected_pgd": selected_pgd,
+                "selected_xa": selected_xa,
+                "selected_thon": selected_thon,
+                "selected_ct": selected_ct,
+                "selected_nv": selected_nv,
+                "du_no_range": du_no_range,
+                "ngay_vay_from": ngay_vay_from,
+                "ngay_vay_to": ngay_vay_to,
+                "ngay_dh_from": ngay_dh_from,
+                "ngay_dh_to": ngay_dh_to,
+                "filter_qua_han": filter_qua_han,
+                "filter_nq11": filter_nq11,
+                "filter_gqvl": filter_gqvl,
+                "filter_khoanh": filter_khoanh,
+            }
+        )
+        _cols = [
+            COT_TONG_DU_NO,
+            COT_DU_NO_QH,
+            COT_DU_NO_KHOANH,
+            COT_NGUON_VON,
+            COT_TEN_PGD,
+            COT_TEN_CT,
+        ]
+        _present = [c for c in _cols if c in df.columns]
+        if _present:
+            st.write({c: str(df[c].dtype) for c in _present})
 
+    return df_filtered

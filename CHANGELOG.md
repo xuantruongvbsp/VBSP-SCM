@@ -1,5 +1,75 @@
 # CHANGELOG
 
+## [2026-06-21] — Tra cứu hồ sơ: chuẩn hóa hiển thị `Nguồn vốn`
+- `tabs/tab_tracuu_v2.py` dòng ~46, ~190 — thêm helper `_hien_thi_nguon_von()` để map `1/01/TW` thành `Trung ương` và `2/02/ĐP/DP` thành `Địa phương` trong popup chi tiết hồ sơ
+
+## [2026-06-21] — Tra cứu hồ sơ: fix nút PDF bấm không thấy phản hồi
+- `tabs/tab_tracuu_v2.py` dòng ~212-240 — bỏ `st.rerun()` ngay sau khi tạo PDF trong popup hồ sơ; đổi sang `st.spinner()` + `st.success()` và render nút `📥 Tải PDF hồ sơ` ngay bên dưới trong cùng lần bấm để user thấy phản hồi tức thì
+
+## [2026-06-21] — Tra cứu hồ sơ: thêm nút PDF cho từng hộ
+- `tabs/tab_tracuu_v2.py` dòng ~101-220, ~360 — thêm helper `_tao_pdf_ho_so()` và nút hợp nhất `📄 Xuất PDF hồ sơ` trong popup chi tiết từng hộ; lần bấm đầu tạo PDF, sau rerun cùng vị trí đó đổi thành nút tải PDF của riêng hồ sơ đang chọn
+
+## [2026-06-21] — Tra cứu hồ sơ: ghi rõ đơn vị KPI `Quá hạn`
+- `tabs/tab_tracuu_v2.py` dòng ~208 — đổi nhãn KPI từ `Quá hạn` thành `Quá hạn (món)` và thêm help text giải thích đang đếm số món vay có dư nợ quá hạn > 0, không phải số khách hàng
+
+## [2026-06-21] — Tra cứu hồ sơ: bổ sung `Lãi tồn` và `Số dư TK 105`
+- `tabs/tab_tracuu_v2.py` dòng ~16, ~38, ~144, ~260 — thêm import `COT_LAI_TON`, `COT_SO_DU_TG`; bổ sung 2 trường tiền `Lãi tồn` và `Số dư TK 105` vào phần chi tiết khoản vay và bảng kết quả `🔍 Tra cứu hồ sơ khách hàng`; format bằng `fmt_ty` như các cột tiền khác
+
+## [2026-06-21] — Tra cứu hồ sơ: đổi lại cột đúng từ `Tên tổ trưởng` về `Tên tổ`
+- `tabs/tab_tracuu_v2.py` dòng ~16, ~260 — bảng kết quả `🔍 Tra cứu hồ sơ khách hàng` hiển thị lại đúng cột `Tên tổ` từ HSTD; bỏ import/logic fallback của `Tên tổ trưởng` vì dữ liệu HSTD hiện tại chỉ có `Tên tổ`
+
+## [2026-06-21] — Thiết kế lại tab Mã NĐT địa phương theo mô hình quản lý thống nhất
+- `tabs/tab_quan_ly_ndt_dp.py` dòng ~1-330 — bỏ bố cục cũ dạng 2 khối copy-paste (`GQVL` và `NSVSMT`), thay bằng 3 chế độ `📊 Tổng quan` / `⚙️ Quản lý` / `🔎 Phân tích`; quản lý theo từng chương trình `CT 03` / `CT 06`, có KPI tổng, bảng lọc tổng hợp, khu vực thêm/chỉnh sửa dùng chung helper, và 2 tab phân tích riêng cho GQVL ĐP + NSVSMT ĐP
+
+## [2026-06-21] — Fix double-count tong_kh trong tab Tiến độ KH vs TH
+- `tabs/tab_khtd_xuat.py` dòng ~562 — đổi `sum(kh_cn.values())` sang `sum(kh_cn.get(mk) for mk in CHUONG_TRINH_KHTD)` để tránh tính kép backward-compat keys (`6_DP` + `6_DP_TINH`/`6_DP_XA`, `3_TW`/`3_DP` + sub-key GQVL); metric "Tổng KH" và "Tỷ lệ CN" nay khớp với tong_th
+
+## [2026-06-21] — Danh mục Mã NĐT ĐP lưu theo `Mã CT + Mã NĐT`
+- `db.py` dòng ~1156 — thêm mô hình rule chuẩn `ndt_dp_rule_list` với field `ma_ct`; fallback/migrate từ 2 key cũ `ndt_dp_list` (GQVL, CT03) và `ndt_dp_nsvsmt_list` (NSVSMT, CT06); thêm `phan_loai_ndt_dp_cap(ma_ct, ma_ndt)` để tra theo cặp `Mã CT + Mã NĐT`, fallback rule chung `ma_ct=None`
+- `tabs/tab_khtd.py` dòng ~392, ~454 — GQVL ĐP và NSVSMT ĐP cùng dùng helper phân loại mới theo `ma_ct`; không còn phụ thuộc vào list mã tỉnh dùng chung ngầm giữa các chương trình
+- `tabs/tab_quan_ly_ndt_dp.py` dòng ~27, ~80, ~230 — màn quản lý hiển thị rõ `CT 03` / `CT 06`, lưu rule kèm `ma_ct`, export thêm cột `Mã CT áp dụng`
+- `tabs/tab_ndt_dp.py` dòng ~52 — tab xem-only hiển thị thêm cột `Mã CT áp dụng`
+
+## [2026-06-21] — NSVSMT ĐP: kết nối Thực hiện + quản lý Mã NĐT hoàn chỉnh
+- `db.py` — thêm `doc_ndt_dp_nsvsmt_list()`, `doc_ndt_dp_nsvsmt_ma_list()`, `luu_ndt_dp_nsvsmt_list()`; seed 3 mã từ HSTD thực tế, mặc định `cap=tinh`
+- `tabs/tab_khtd.py` dòng ~454 — `_tinh_th_nsvsmt_dp_phan_tang()` dùng `doc_ndt_dp_nsvsmt_ma_list()` (tách khỏi list GQVL)
+- `tabs/tab_khtd_nhap.py` dòng ~39, ~261 — import + merge NSVSMT vào `th_cn`; cột Thực hiện sub-rows hiển thị đúng
+- `tabs/tab_quan_ly_ndt_dp.py` — thêm section `🚰 NSVSMT` với 3 tab Cấp Tỉnh / Cấp Xã / Chỉnh sửa; Admin CN đổi phân loại sau khi xác nhận nghiệp vụ
+
+## [2026-06-21] — KHTD: tách NSVSMT ĐP theo nguồn cấp tỉnh / cấp xã từ HSTD
+- `tabs/tab_khtd.py` dòng ~64, ~294, ~418 — thêm `NSVSMT_DP_SUB_NHOM`; `_tinh_thuc_hien_theo_ct()` giữ `6_DP` tổng hợp và bổ sung `6_DP_TINH` / `6_DP_XA` theo `Mã nhà đầu tư` trong HSTD (danh mục NĐT cấp tỉnh → `6_DP_TINH`, còn lại/thiếu mã → `6_DP_XA`)
+- `tabs/tab_khtd_nhap.py` dòng ~81, ~487, ~735, ~857 — thêm đồng bộ backward-compatible giữa `6_DP` và 2 sub-key; màn `🏛️ Kế hoạch Tín dụng Chi nhánh` hiển thị `NSVSMT ĐP — Cấp tỉnh` / `Cấp xã/khác` thành 2 sub-row riêng; upload Excel cũ chỉ có `6_DP` vẫn fallback vào `6_DP_TINH`
+- `tabs/tab_khtd_xuat.py` dòng ~58, ~249, ~550 — bảng readonly và bảng `📋 Chi tiết theo Chương trình` render `NSVSMT ĐP` thành 2 dòng chi tiết, nhưng vẫn giữ `6_DP` tổng hợp cho các tổng số/liên kết cũ
+- `config.py` dòng ~208 — bổ sung tên hiển thị chính thức cho `6_DP_TINH` / `6_DP_XA` để tránh lộ mã kỹ thuật trên filter/danh sách phụ
+
+## [2026-06-21] — KHTD CN: cột Chương trình hiển thị rõ tên ngắn
+- `tabs/tab_khtd_nhap.py` dòng ~58, ~397, ~475 — thêm map nhãn ngắn cho bảng nhập KHTD Chi nhánh (`Hộ nghèo`, `Hộ cận nghèo`, `Hộ mới thoát nghèo`...); cột `Chương trình` render chữ đậm + màu theo theme để tránh chìm/mất tên; bổ sung `color:var(--text-color, inherit)` vào header dòng GQVL cho đồng bộ
+- `tabs/tab_khtd_nhap.py` dòng ~381 — đổi thanh tiêu đề nhóm từ nền pastel sáng sang nền đậm hơn + chữ trắng đậm để tăng tương phản, dễ đọc hơn trên giao diện hiện tại
+- `tabs/tab_khtd_nhap.py` dòng ~314, ~370 — thêm đường viền cho header HTML và từng hàng/cột của bảng nhập KHTD CN để hiển thị rõ dạng bảng có ô
+
+## [2026-06-21] — KHTD CN: đưa cả Upload Excel và Hướng dẫn xuống cuối màn
+- `tabs/tab_khtd_nhap.py` dòng ~242, ~833 — di chuyển cả 2 expander `📥 Upload Excel kế hoạch — nhanh nhất` và `ℹ️ Hướng dẫn nhập kế hoạch` xuống cuối cùng của phần nhập KHTD Chi nhánh, dưới các mục tóm tắt/văn bản/lịch sử
+
+## [2026-06-21] — Tra cứu hồ sơ: thay cột Dấu hiệu bằng Tên tổ trưởng
+- `tabs/tab_tracuu_v2.py` dòng ~16, ~260 — thêm import `COT_TEN_TO_TRUONG`; bảng kết quả `🔍 Tra cứu hồ sơ khách hàng` bỏ cột `Dấu hiệu`, thêm cột `Tên tổ trưởng`; giữ fallback rỗng nếu dữ liệu chưa có cột này
+
+## [2026-06-21] — CDTOTKVV thống nhất tháng theo ngày chốt số liệu (fix nhầm tháng 4/5)
+- `services/upload_service.py` dòng ~428 — `xu_ly_cdto_toan_cn`: đảo thứ tự đọc tháng thành `doc_thang_tu_cdto_toan_cn() or doc_thang_nam_tu_file()` → ưu tiên NGAYBC (ngày chốt số liệu) thay vì tiêu đề/ngày xuất; cập nhật comment
+- `tabs/tab_upload_khnv/_upload_toan_cn.py` dòng ~60 — preview "Tháng báo cáo": cùng đảo thứ tự để khớp logic lưu
+- `tabs/tab_upload_khnv.py` dòng ~553 — preview "Tháng báo cáo": cùng đảo thứ tự
+- Lý do: luồng upload 1 file tổng gắn tháng theo header (có thể là tháng 5), trong khi luồng 22 PGD tự upload gắn theo ngày chốt (tháng 4) → card "Xếp loại Tổ TK&VV" hiển thị tháng không nhất quán. Nay cả 2 luồng đều theo ngày chốt số liệu (NGAYBC)
+
+## [2026-06-21] — Header KHTD dùng colspan HTML thực thay vì giả lập ô trống
+- `tabs/tab_khtd_nhap.py` dòng ~343 — Header "KHTD Chi nhánh": thay 18 dòng `st.columns` + `st.markdown` riêng lẻ bằng 1 `st.markdown` dùng HTML `<table colspan>` → "NGUỒN VỐN TRUNG ƯƠNG" thực sự span 3 cột, "NGUỒN VỐN ĐỊA PHƯƠNG" span 3 cột, "TỔNG CỘNG" span 2 cột
+- `tabs/tab_khtd_nhap.py` dòng ~1050 — Header "KHTD theo Xã": tương tự, "NGUỒN VỐN TRUNG ƯƠNG" span 2 cột, "NGUỒN VỐN ĐỊA PHƯƠNG" span 2 cột
+
+## [2026-06-21] — Fix bảng Tóm tắt hiện trạng: CT có 2 nguồn vốn bị xếp nhầm nhóm
+- `tabs/tab_khtd_xuat.py` — `_hien_thi_bang_cn_readonly`: trước đây gộp TW+ĐP của 1 CT vào 1 dòng và xếp toàn bộ vào nhóm "I. Trung ương" (vì kh_tw>0), khiến CT có cả 2 nguồn vốn bị "nhảy lên" nhóm TW; GQVL ĐP cũng bị xếp nhầm nhóm I. Sửa: duyệt 2 lượt — lượt 1 chỉ phần TW vào nhóm I, lượt 2 chỉ phần ĐP vào nhóm II (GQVL tách sub-row TW/ĐP về đúng nhóm). Header nhóm chỉ ghi 1 lần khi có dòng. STT đánh số liên tục bằng counter riêng; `Số CT có KH` đếm theo CT duy nhất (không nhân đôi TW/ĐP)
+
+## [2026-06-21] — Fix dark mode: màu chữ số liệu KHTD CN tương phản thấp
+- `tabs/tab_khtd_nhap.py` dòng ~413 — Thêm CSS vars `--khtd-neg/ok/muted` + `@media (prefers-color-scheme: dark)` (sáng: `#c62828/#2e7d32/#64748b`; tối: `#ff8787/#69db7c/#9ca3af`)
+- `tabs/tab_khtd_nhap.py` — Đổi toàn bộ `_md_right` màu hex cứng → `var(--khtd-neg/ok/muted)`, header cells giữ nguyên `#2e7d32` (nền sáng)
+
 ## [2026-06-21] — Fix bảng Tóm tắt hiện trạng KHTD khó đọc
 - `tabs/tab_khtd_xuat.py` — `_hien_thi_bang_cn_readonly`: đổi 3 số lẻ → 0 số lẻ (triệu đồng, số nguyên); sửa header nhóm GQVL từ "I. Trung ương" → "I. Nguồn vốn Trung ương" (khớp với nhóm TW khác, tránh header lặp 3 lần); thêm guard bỏ qua GQVL sub-row khi KH=0 và TH=0 (ẩn hàng trống)
 

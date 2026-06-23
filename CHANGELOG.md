@@ -1,5 +1,8 @@
 # CHANGELOG
 
+## [2026-06-23] — Tra cứu hồ sơ: fix lọc không ra dù dữ liệu có
+- `components/filter_panel.py` — chuẩn hóa lọc: keyword search hỗ trợ có dấu/không dấu (`vn()`), ép numeric trước khi lọc theo dư nợ/quá hạn/khoanh, chuẩn hóa `Nguồn vốn` (1/01/TW và 2/02/ĐP/DP), và thêm nút `🔄 Reset` luôn hiển thị để tránh dính bộ lọc cũ
+
 ## [2026-06-21] — Tra cứu hồ sơ: chuẩn hóa hiển thị `Nguồn vốn`
 - `tabs/tab_tracuu_v2.py` dòng ~46, ~190 — thêm helper `_hien_thi_nguon_von()` để map `1/01/TW` thành `Trung ương` và `2/02/ĐP/DP` thành `Địa phương` trong popup chi tiết hồ sơ
 

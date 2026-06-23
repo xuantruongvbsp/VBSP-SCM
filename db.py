@@ -1153,28 +1153,155 @@ def migrate_pgd_bien_hoa() -> None:
         ghi_audit("system", "migrate_pgd_bien_hoa_error", str(e))
 
 
-def doc_ndt_dp_list() -> list[dict]:
-    """
-    Đọc danh sách Mã NĐT địa phương từ kv_store.
-    Mỗi phần tử: {"ma": "INV...", "ghi_chu": "...", "cap": "tinh"|"xa"}
-    Fallback về seed data nếu chưa có.
-    """
-    val = doc_kv("ndt_dp_list")
-    if val and isinstance(val, list) and len(val) > 0:
-        # Đảm bảo backward compat: bổ sung "cap" nếu phần tử cũ chưa có
-        for item in val:
-            item.setdefault("cap", "tinh")
-        return val
-    # Seed mặc định
+def _seed_ndt_dp_rules() -> list[dict]:
     return [
-        {"ma": "INV0802140002662", "ghi_chu": "UBND tỉnh Đồng Nai",              "cap": "tinh"},
-        {"ma": "INV0603170027393", "ghi_chu": "Nguồn vốn cho vay đào tạo nghề",  "cap": "tinh"},
+        {"ma_ct": 3, "ma": "INV0802140002662", "ghi_chu": "UBND tỉnh Đồng Nai", "cap": "tinh"},
+        {"ma_ct": 3, "ma": "INV0603170027393", "ghi_chu": "Nguồn vốn cho vay đào tạo nghề", "cap": "tinh"},
+        {"ma_ct": 6, "ma": "INV1907190050748", "ghi_chu": "(chưa xác nhận nghiệp vụ — mặc định cấp tỉnh)", "cap": "tinh"},
+        {"ma_ct": 6, "ma": "INV1201260090198", "ghi_chu": "(chưa xác nhận nghiệp vụ — mặc định cấp tỉnh)", "cap": "tinh"},
+        {"ma_ct": 6, "ma": "INV0802140002661", "ghi_chu": "(chưa xác nhận nghiệp vụ — mặc định cấp tỉnh)", "cap": "tinh"},
     ]
 
 
-def doc_ndt_dp_ma_list() -> list[str]:
-    """Trả về list mã Cấp Tỉnh (str) để dùng trong phân tầng GQVL."""
-    return [item["ma"] for item in doc_ndt_dp_list() if item.get("cap", "tinh") == "tinh"]
+def _normalize_ndt_dp_rule(item: dict, default_ma_ct: int | None = None) -> dict | None:
+    if not isinstance(item, dict):
+        return None
+    ma = str(item.get("ma", "") or "").strip()
+    if not ma:
+        return None
+    ma_ct_raw = item.get("ma_ct", default_ma_ct)
+    try:
+        ma_ct = int(ma_ct_raw) if ma_ct_raw not in (None, "", "ALL") else None
+    except Exception:
+        ma_ct = default_ma_ct
+    return {
+        "ma_ct": ma_ct,
+        "ma": ma,
+        "ghi_chu": str(item.get("ghi_chu", "") or "").strip(),
+        "cap": "xa" if str(item.get("cap", "tinh")).strip().lower() == "xa" else "tinh",
+    }
+
+
+def doc_ndt_dp_rule_list() -> list[dict]:
+    """
+    Danh mục rule Mã NĐT ĐP chuẩn:
+    {"ma_ct": 3|6|None, "ma": "INV...", "ghi_chu": "...", "cap": "tinh"|"xa"}
+    Ưu tiên key mới `ndt_dp_rule_list`, fallback dữ liệu cũ theo từng chương trình.
+    """
+    val = doc_kv("ndt_dp_rule_list")
+    raw_rules: list[dict] = val if isinstance(val, list) and val else []
+    if not raw_rules:
+        raw_gqvl = doc_kv("ndt_dp_list")
+        raw_nsvsmt = doc_kv("ndt_dp_nsvsmt_list")
+        if isinstance(raw_gqvl, list):
+            raw_rules.extend(_normalize_ndt_dp_rule(x, 3) for x in raw_gqvl)
+        if isinstance(raw_nsvsmt, list):
+            raw_rules.extend(_normalize_ndt_dp_rule(x, 6) for x in raw_nsvsmt)
+        raw_rules = [x for x in raw_rules if x]
+    if not raw_rules:
+        raw_rules = _seed_ndt_dp_rules()
+
+    out: list[dict] = []
+    seen: set[tuple[int | None, str]] = set()
+    for item in raw_rules:
+        norm = item if isinstance(item, dict) and "ma_ct" in item else _normalize_ndt_dp_rule(item)
+        norm = _normalize_ndt_dp_rule(norm or {})
+        if not norm:
+            continue
+        key = (norm.get("ma_ct"), norm["ma"])
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(norm)
+    return out
+
+
+def _loc_ndt_dp_rule_theo_ct(ma_ct: int) -> list[dict]:
+    ma_ct_i = int(ma_ct)
+    return [x for x in doc_ndt_dp_rule_list() if x.get("ma_ct") == ma_ct_i]
+
+
+def luu_ndt_dp_rule_list(ds: list[dict], username: str) -> None:
+    """Lưu danh mục rule Mã NĐT ĐP chuẩn vào kv_store."""
+    norm = []
+    for item in ds:
+        item_n = _normalize_ndt_dp_rule(item)
+        if item_n:
+            norm.append(item_n)
+    ghi_kv("ndt_dp_rule_list", norm, username)
+
+
+def doc_ndt_dp_list() -> list[dict]:
+    """
+    Danh sách Mã NĐT ĐP áp dụng cho GQVL (ma_ct=3).
+    Mỗi phần tử: {"ma_ct": 3, "ma": "INV...", "ghi_chu": "...", "cap": "tinh"|"xa"}
+    """
+    return _loc_ndt_dp_rule_theo_ct(3)
+
+
+def luu_ndt_dp_list(ds: list[dict], username: str) -> None:
+    """Ghi đè rule Mã NĐT áp dụng cho GQVL (ma_ct=3), giữ nguyên rule CT khác."""
+    ds_khac = [x for x in doc_ndt_dp_rule_list() if x.get("ma_ct") != 3]
+    ds_gqvl = []
+    for item in ds:
+        item2 = dict(item)
+        item2["ma_ct"] = 3
+        item_n = _normalize_ndt_dp_rule(item2, 3)
+        if item_n:
+            ds_gqvl.append(item_n)
+    luu_ndt_dp_rule_list(ds_khac + ds_gqvl, username)
+
+
+def doc_ndt_dp_ma_list(ma_ct: int = 3) -> list[str]:
+    """Trả về list mã Cấp Tỉnh cho chương trình ĐP tương ứng (mặc định GQVL=3)."""
+    return [item["ma"] for item in _loc_ndt_dp_rule_theo_ct(ma_ct) if item.get("cap", "tinh") == "tinh"]
+
+
+def phan_loai_ndt_dp_cap(ma_ct: int, ma_ndt: str) -> str:
+    """
+    Phân loại cấp theo ưu tiên:
+    1. match exact cặp (ma_ct, ma_ndt)
+    2. fallback rule chung (ma_ct=None, ma_ndt)
+    3. mặc định `xa`
+    """
+    ma = str(ma_ndt or "").strip()
+    if not ma:
+        return "xa"
+    rules = doc_ndt_dp_rule_list()
+    ma_ct_i = int(ma_ct)
+    for item in rules:
+        if item.get("ma_ct") == ma_ct_i and item.get("ma") == ma:
+            return item.get("cap", "tinh")
+    for item in rules:
+        if item.get("ma_ct") is None and item.get("ma") == ma:
+            return item.get("cap", "tinh")
+    return "xa"
+
+
+def doc_ndt_dp_nsvsmt_list() -> list[dict]:
+    """
+    Mã NĐT cho NSVSMT (ma_ct=6) ĐP.
+    Mỗi phần tử: {"ma_ct": 6, "ma": "INV...", "ghi_chu": "...", "cap": "tinh"|"xa"}
+    """
+    return _loc_ndt_dp_rule_theo_ct(6)
+
+
+def doc_ndt_dp_nsvsmt_ma_list() -> list[str]:
+    """Trả về list mã Cấp Tỉnh cho NSVSMT ĐP để dùng trong phân tầng 6_DP."""
+    return doc_ndt_dp_ma_list(6)
+
+
+def luu_ndt_dp_nsvsmt_list(ds: list[dict], username: str) -> None:
+    """Ghi đè rule Mã NĐT áp dụng cho NSVSMT (ma_ct=6), giữ nguyên rule CT khác."""
+    ds_khac = [x for x in doc_ndt_dp_rule_list() if x.get("ma_ct") != 6]
+    ds_ns = []
+    for item in ds:
+        item2 = dict(item)
+        item2["ma_ct"] = 6
+        item_n = _normalize_ndt_dp_rule(item2, 6)
+        if item_n:
+            ds_ns.append(item_n)
+    luu_ndt_dp_rule_list(ds_khac + ds_ns, username)
 
 
 # ══════════════════════════════════════════════════════════════════════════════

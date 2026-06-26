@@ -424,12 +424,27 @@ def render(tab: "DeltaGenerator", **kwargs) -> None:
         if rows:
             pos = rows[0]
             so_ku = str(ku_series.iat[pos]) if pos < len(ku_series) else ""
-            if so_ku and so_ku != st.session_state.get("tc_last_ku"):
-                st.session_state["tc_last_ku"] = so_ku
+            if so_ku:
                 mask = df[COT_SO_KU].astype(str).str.strip() == so_ku.strip()
                 df_match = df[mask]
                 if not df_match.empty:
-                    _detail_dialog(df_match.iloc[0], df_nq11, df_gqvl, username)
+                    hs_selected = df_match.iloc[0]
+                    ten_selected = str(hs_selected.get(COT_TEN_KH, "") or "").strip()
+                    col_info, col_open = st.columns([4, 1])
+                    with col_info:
+                        st.caption(
+                            f"Đã chọn: **{ten_selected or 'Hồ sơ'}**"
+                            f"{f' · Số KU: `{so_ku}`' if so_ku else ''}"
+                        )
+                    should_auto_open = so_ku != st.session_state.get("tc_last_ku")
+                    should_open_again = col_open.button(
+                        "📋 Chi tiết",
+                        key=f"tc_open_selected_{so_ku}",
+                        use_container_width=True,
+                    )
+                    if should_auto_open or should_open_again:
+                        st.session_state["tc_last_ku"] = so_ku
+                        _detail_dialog(hs_selected, df_nq11, df_gqvl, username)
         else:
             st.session_state["tc_last_ku"] = None
 

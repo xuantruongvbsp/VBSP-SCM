@@ -66,9 +66,16 @@ def _bo_dau(s: str) -> str:
 
     """Loại bỏ dấu tiếng Việt để tìm kiếm không phân biệt dấu."""
 
-    s = unicodedata.normalize("NFD", s)
+    if s is None:
+        return ""
 
-    return "".join(c for c in s if unicodedata.category(c) != "Mn").lower()
+    text = str(s).strip().casefold().replace("đ", "d")
+
+    text = unicodedata.normalize("NFD", text)
+
+    text = "".join(c for c in text if unicodedata.category(c) != "Mn")
+
+    return " ".join(text.split())
 
 
 
@@ -98,11 +105,15 @@ def _tim_mem(df: pd.DataFrame, cols: list[str], tu_khoa: str) -> pd.Series:
 
     """
 
-    kw = tu_khoa.strip().lower()
+    kw = str(tu_khoa or "").strip().lower()
 
-    kw_bdau = _bo_dau(tu_khoa.strip())
+    kw_bdau = _bo_dau(tu_khoa)
 
     mask = pd.Series(False, index=df.index)
+
+    if not kw:
+
+        return mask
 
     for col in cols:
 
@@ -110,11 +121,13 @@ def _tim_mem(df: pd.DataFrame, cols: list[str], tu_khoa: str) -> pd.Series:
 
             continue
 
-        s = df[col].fillna("").astype(str).str.lower()
+        s_raw = df[col].fillna("").astype(str)
 
-        # Vectorized bỏ dấu cho toàn cột
+        s = s_raw.str.lower()
 
-        s_bdau = s.str.normalize("NFD").str.replace(r"[^\w\s]", "", regex=False)
+        # Bỏ dấu cho toàn cột, bao gồm cả Đ/đ -> D/d.
+
+        s_bdau = s_raw.map(_bo_dau)
 
         mask |= s.str.contains(kw, regex=False, na=False)
 

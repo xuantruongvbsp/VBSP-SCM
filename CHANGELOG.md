@@ -1,5 +1,8 @@
 # CHANGELOG
 
+## [2026-06-25] — KHTD Chi nhánh: gom bảng nhập vào `st.form`, thêm nút Xem trước
+- `tabs/tab_khtd_nhap.py` dòng ~415–912 — bọc toàn bộ bảng nhập `🏛️ Kế hoạch Tín dụng Chi nhánh` trong `st.form` (enter/exit thủ công để giữ nguyên indent). Thay nút `💾 Lưu` đơn lẻ bằng 2 nút `👁 Xem trước tính toán` và `💾 Lưu kế hoạch Chi nhánh`. Khi chưa submit, các ô `number_input` không gây rerun — màn hình mượt như Excel. `Xem trước` cập nhật cột "Còn phải TH" mà không lưu; `Lưu` mới ghi `kv_store`. Tóm tắt hiện trạng hiển thị sau form.
+
 ## [2026-06-25] — Trạng thái Upload HSTD: ưu tiên file mới hơn giữa `hstd_latest` và `hstd_khnv`
 - `data/pgd.py` — `doc_trang_thai_file()` với `loai="hstd"` nay chọn file có `mtime` mới hơn giữa `pgd_data/{slug}/hstd_latest.xlsx` và `pgd_data/{slug}/hstd_khnv.xlsx`; sửa trường hợp import hàng loạt HSTD từ KH-NV đã ghi `hstd_khnv.xlsx` mới nhưng bảng `📋 Trạng thái Upload — 22 Đơn vị` vẫn đọc ngày cũ từ `hstd_latest.xlsx`
 

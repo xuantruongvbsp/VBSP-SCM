@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import re
+import unicodedata
+
 import streamlit as st
 import pandas as pd
 from typing import TYPE_CHECKING, Callable
 from datetime import date, datetime
 
-from utils import vn
 from config import (
     COT_TEN_PGD, COT_TEN_XA, COT_TEN_THON,
     COT_TEN_CT, COT_NGUON_VON, COT_NGAY_VAY, COT_NGAY_DH,
@@ -74,6 +76,46 @@ def _normalize_nguon_von_code(value) -> str:
     if s in {"2", "02", "2.0", "02.0", "DP", "dp", "ĐP", "đp"}:
         return "2"
     return s
+
+
+def _normalize_search_text(value) -> str:
+    """Chuẩn hóa chữ để tìm kiếm tiếng Việt không phân biệt dấu/hoa thường."""
+    if value is None:
+        return ""
+    try:
+        if pd.isna(value):
+            return ""
+    except (TypeError, ValueError):
+        pass
+
+    text = str(value).strip().casefold().replace("đ", "d")
+    text = unicodedata.normalize("NFD", text)
+    text = "".join(ch for ch in text if unicodedata.category(ch) != "Mn")
+    return re.sub(r"\s+", " ", text)
+
+
+def _keyword_search_mask(
+    df: pd.DataFrame,
+    keyword: str,
+    search_cols: list[str],
+) -> pd.Series:
+    """Tạo mask tìm kiếm nhanh, hỗ trợ nhập tên có dấu hoặc không dấu."""
+    mask = pd.Series(False, index=df.index)
+    kw_raw = str(keyword or "").strip()
+    if not kw_raw:
+        return mask
+
+    kw_lower = kw_raw.lower()
+    kw_norm = _normalize_search_text(kw_raw)
+
+    for col in search_cols:
+        if col not in df.columns:
+            continue
+        s = df[col].fillna("").astype(str)
+        mask |= s.str.lower().str.contains(kw_lower, regex=False, na=False)
+        if kw_norm:
+            mask |= s.map(_normalize_search_text).str.contains(kw_norm, regex=False, na=False)
+    return mask
 
 
 def render_filter_panel(
@@ -393,16 +435,7 @@ def render_filter_panel(
         search_cols = [COT_TEN_KH, COT_MA_KH, COT_SO_KU, COT_CMND, COT_SDT]
         search_cols = [c for c in search_cols if c in df_filtered.columns]
         if search_cols:
-            mask = pd.Series(False, index=df_filtered.index)
-            kw_raw = str(search_kw).strip()
-            kw_lower = kw_raw.lower()
-            kw_norm = vn(kw_lower)
-            for col in search_cols:
-                s = df_filtered[col].fillna("").astype(str)
-                mask |= s.str.lower().str.contains(kw_lower, na=False)
-                if kw_norm and kw_norm != kw_lower:
-                    mask |= s.map(vn).str.contains(kw_norm, na=False)
-            df_filtered = df_filtered[mask]
+            df_filtered = df_filtered[_keyword_search_mask(df_filtered, search_kw, search_cols)]
     
     # 2. Địa bàn filters
     if selected_pgd and COT_TEN_PGD in df_filtered.columns:

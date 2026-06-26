@@ -412,6 +412,11 @@ def _tab_khtd_chi_nhanh(
 """,
         unsafe_allow_html=True,
     )
+    # ── Bọc toàn bộ bảng nhập trong st.form (enter/exit thủ công
+    # để giữ nguyên indent, tránh rerun từng ô number_input) ──────────
+    _form = st.form("khtd_cn_form")
+    _form.__enter__()
+
     nhom_style = [
         ("#1d4ed8", "#ffffff"),
         ("#15803d", "#ffffff"),
@@ -808,7 +813,13 @@ def _tab_khtd_chi_nhanh(
             "⚠️ Tất cả chỉ tiêu đang = 0, kiểm tra lại trước khi lưu"
         )
 
-    if st.button("💾 Lưu kế hoạch Chi nhánh", type="primary", key="btn_luu_khtd_cn"):
+    col_f1, col_f2 = st.columns([1, 1])
+    with col_f1:
+        xem_truoc = st.form_submit_button("👁 Xem trước tính toán")
+    with col_f2:
+        luu = st.form_submit_button("💾 Lưu kế hoạch Chi nhánh", type="primary")
+
+    if xem_truoc or luu:
         patch: dict[str, float] = {}
         for tieu_de_nhom, ds_ma_ct in KHTD_CN_NHOM_MA_CT:
             for ma_ct in ds_ma_ct:
@@ -841,10 +852,11 @@ def _tab_khtd_chi_nhanh(
         patch["3_DP"] = patch.get("3_DP_TINH", 0.0) + patch.get("3_DP_XA", 0.0)
         tong_kh_luu = sum(v * 1_000_000 for v in patch.values())
         if tong_kh_luu <= 0:
-            st.warning(
-                "⚠️ Tất cả chỉ tiêu đang = 0, kiểm tra lại trước khi lưu"
-            )
-        else:
+            if luu:
+                st.warning(
+                    "⚠️ Tất cả chỉ tiêu đang = 0, kiểm tra lại trước khi lưu"
+                )
+        elif luu:
             for ma_key, gia_tri_trieu in patch.items():
                 kh_cn[ma_key] = gia_tri_trieu * 1_000_000
             if _luu_kv(KV_KEY_CN, kh_cn, username):
@@ -897,6 +909,8 @@ def _tab_khtd_chi_nhanh(
                     pt_all,
                 )
                 st.rerun()
+
+    _form.__exit__(None, None, None)
 
     _info_luu = st.session_state.pop("khtd_cn_save_info", None)
     if isinstance(_info_luu, tuple) and len(_info_luu) == 9:

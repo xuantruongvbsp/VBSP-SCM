@@ -33,6 +33,19 @@ _PREFIX_MAP = {
 }
 
 
+def _ids_file_upload(uploaded) -> list[tuple[int, str, int]]:
+    """ID ổn định theo thứ tự chọn; giữ được nhiều file trùng tên."""
+    return [(idx, f.name, f.size) for idx, f in enumerate(uploaded)]
+
+
+def _doc_uploaded_files(uploaded) -> list[dict]:
+    """Đọc UploadedFile thành list thay vì dict theo tên để không ghi đè file trùng tên."""
+    return [
+        {"idx": idx, "ten_file": f.name, "data": f.read()}
+        for idx, f in enumerate(uploaded)
+    ]
+
+
 def _nhan_dien_loai_ten_file(ten_file: str) -> str | None:
     upper = ten_file.upper()
     for loai, prefixes in _PREFIX_MAP.items():
@@ -333,6 +346,7 @@ def _xu_ly_import_folder(danh_sach: list[dict], username: str) -> None:
     st.session_state["khnv_bulk_uploader_ver"] = (
         st.session_state.get("khnv_bulk_uploader_ver", 0) + 1
     )
+    st.session_state.pop("khnv_bulk_files", None)
     st.session_state.pop("khnv_bulk_bytes", None)
     st.session_state.pop("khnv_bulk_ids", None)
 
@@ -379,19 +393,22 @@ def render_import_hang_loat(role: str, username: str) -> None:
         key="khnv_force_import",
     )
 
-    cache_key = "khnv_bulk_bytes"
-    file_ids_now = [(f.name, f.size) for f in uploaded]
+    cache_key = "khnv_bulk_files"
+    file_ids_now = _ids_file_upload(uploaded)
     if st.session_state.get("khnv_bulk_ids") != file_ids_now:
         st.session_state["khnv_bulk_ids"] = file_ids_now
-        st.session_state[cache_key] = {f.name: f.read() for f in uploaded}
+        st.session_state[cache_key] = _doc_uploaded_files(uploaded)
+        st.session_state.pop("khnv_bulk_bytes", None)
 
-    bytes_map: dict[str, bytes] = st.session_state.get(cache_key, {})
+    file_entries: list[dict] = st.session_state.get(cache_key, [])
 
     rows: list[dict] = []
     seen: dict[str, int] = {}
 
     with st.spinner("🔍 Đang nhận diện file..."):
-        for ten_file, data in bytes_map.items():
+        for entry in file_entries:
+            ten_file = entry["ten_file"]
+            data = entry["data"]
             loai = _nhan_dien_loai_tu_noi_dung(data)
             if loai is None:
                 loai = _nhan_dien_loai_ten_file(ten_file)

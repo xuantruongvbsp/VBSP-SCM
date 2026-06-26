@@ -48,6 +48,20 @@ def chuan_hoa_ten(ten: str) -> str:
     return TEN_DV_ALIAS.get(ten.strip(), ten.strip())
 
 
+def _ma_pgd_tu_gia_tri(raw) -> str | None:
+    """Chuẩn hóa mã PGD đọc từ Excel: 4602, 4602.0, "004602" -> "004602"."""
+    if raw is None or (isinstance(raw, float) and pd.isna(raw)):
+        return None
+    text = str(raw).strip()
+    if not text or text.lower() in ("nan", "none"):
+        return None
+    try:
+        return str(int(float(text))).zfill(6)
+    except (ValueError, TypeError):
+        digits = "".join(ch for ch in text if ch.isdigit())
+        return digits.zfill(6) if digits else text.zfill(6)
+
+
 def ten_doc_ve_don_vi_chuan(val: str) -> str | None:
     """Map tên đọc từ file → đúng một phần tử trong DS_DON_VI."""
     if not val or str(val).strip().lower() in ("nan", "none", ""):
@@ -91,14 +105,7 @@ def lay_ten_don_vi_trong_file(file_bytes: bytes, loai: str) -> str | None:
             if cot is None:
                 return None
             raw = df[cot].dropna().iloc[0] if not df[cot].dropna().empty else None
-            if raw is None:
-                ma_pgd = None
-            else:
-                try:
-                    # Xử lý trường hợp pandas đọc ô số dạng float (vd: 4602.0 → "004602")
-                    ma_pgd = str(int(float(raw))).zfill(6)
-                except (ValueError, TypeError):
-                    ma_pgd = str(raw).strip().zfill(6)
+            ma_pgd = _ma_pgd_tu_gia_tri(raw)
             if ma_pgd is None:
                 return None
             return MA_PGD_MAP.get(ma_pgd)
@@ -276,8 +283,8 @@ def tim_ten_pgd_tu_noi_dung(file_bytes: bytes, loai: str) -> str | None:
                     None,
                 )
                 if cot_ma is not None and not df_m[cot_ma].dropna().empty:
-                    ma_pgd = str(df_m[cot_ma].dropna().iloc[0]).strip().zfill(6)
-                    ten_ma = MA_PGD_MAP.get(ma_pgd)
+                    ma_pgd = _ma_pgd_tu_gia_tri(df_m[cot_ma].dropna().iloc[0])
+                    ten_ma = MA_PGD_MAP.get(ma_pgd) if ma_pgd else None
                     if ten_ma and ten_ma in DS_DON_VI:
                         return ten_ma
             return None
@@ -304,13 +311,9 @@ def tim_ten_pgd_tu_noi_dung(file_bytes: bytes, loai: str) -> str | None:
                 return None
 
             raw = s.iloc[0]
-            try:
-                ma = str(int(float(raw))).zfill(6)
-            except Exception:  # conv: skip — string fallback for non-numeric cell
-                ma = str(raw).strip()
-                digits = "".join(ch for ch in ma if ch.isdigit())
-                if digits:
-                    ma = digits.zfill(6)
+            ma = _ma_pgd_tu_gia_tri(raw)
+            if ma is None:
+                return None
 
             ten_ma = MA_PGD_MAP.get(ma)
             if ten_ma and ten_ma in DS_DON_VI:

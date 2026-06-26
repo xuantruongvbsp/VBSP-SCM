@@ -46,6 +46,7 @@ from config import (
 from data import ts_file, doc_file, doc_file_nq11, doc_file_sk_gqvl
 from data.pgd import (
     duong_dan_pgd,
+    duong_dan_hstd_hien_hanh,
     doc_hstd_pgd,
     doc_nq11_pgd,
     doc_hstd_toan_cn_pgd,
@@ -550,9 +551,7 @@ def main():
     _pgd_op_ts = 0.0
     if ws_hien_tai == "operation":
         if _la_pgd_ver(role) and pgd_user:
-            _p = duong_dan_pgd(pgd_user, "hstd")
-            if not os.path.exists(_p):
-                _p = duong_dan_pgd(pgd_user, "hstd_khnv")
+            _p = duong_dan_hstd_hien_hanh(pgd_user)
             _pgd_op_ts = ts_file(_p) if os.path.exists(_p) else 0.0
         elif _la_cn_ver(role):
             _pgd_scan_ss = st.session_state.get("_pgd_op_mtime_ss")
@@ -562,9 +561,10 @@ def main():
                 from config import PGD_DATA_DIR
                 _pgd_op_ts = max(
                     (
-                        ts_file(str(d / "hstd_latest.xlsx")) if (d / "hstd_latest.xlsx").exists()
-                        else ts_file(str(d / "hstd_khnv.xlsx")) if (d / "hstd_khnv.xlsx").exists()
-                        else 0.0
+                        max(
+                            ts_file(str(d / "hstd_latest.xlsx")) if (d / "hstd_latest.xlsx").exists() else 0.0,
+                            ts_file(str(d / "hstd_khnv.xlsx")) if (d / "hstd_khnv.xlsx").exists() else 0.0,
+                        )
                         for d in Path(PGD_DATA_DIR).iterdir()
                         if d.is_dir()
                     ),
@@ -625,9 +625,7 @@ def main():
 
             if ws_hien_tai == "operation":
                 if la_phan_he_pgd(role) and pgd_user:
-                    _p_latest = duong_dan_pgd(pgd_user, "hstd")
-                    _p_khnv = duong_dan_pgd(pgd_user, "hstd_khnv")
-                    path_hstd_pgd = _p_latest if os.path.exists(_p_latest) else _p_khnv
+                    path_hstd_pgd = duong_dan_hstd_hien_hanh(pgd_user)
                     if os.path.exists(path_hstd_pgd):
                         df_pgd = doc_hstd_pgd(pgd_user, ts_file(path_hstd_pgd))
                         if df_pgd is not None and not df_pgd.empty:

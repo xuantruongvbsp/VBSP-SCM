@@ -66,6 +66,19 @@ def kiem_tra_file_ton_tai_pgd(ten_pgd: str, loai: str) -> bool:
     return False
 
 
+def duong_dan_hstd_hien_hanh(ten_pgd: str) -> str:
+    """
+    Chọn file HSTD hiện hành theo mtime giữa PGD upload và KH-NV upload.
+    Nếu chưa có file nào, trả về đường dẫn chuẩn hstd_latest.xlsx.
+    """
+    path_latest = Path(duong_dan_pgd(ten_pgd, "hstd"))
+    path_khnv = Path(duong_dan_pgd(ten_pgd, "hstd_khnv"))
+    candidates = [p for p in (path_latest, path_khnv) if p.exists()]
+    if not candidates:
+        return str(path_latest)
+    return str(max(candidates, key=lambda p: p.stat().st_mtime))
+
+
 # ── Trạng thái chi tiết từng file PGD ────────────────────────────────────────
 
 LoaiFile = Literal["hstd", "nq11", "gqvl", "cdtotkvv"]
@@ -161,11 +174,7 @@ def doc_trang_thai_file(ten_don_vi: str, loai: LoaiFile, mtime: float = 0.0) -> 
     # Với HSTD: ưu tiên file mới hơn giữa PGD upload (`hstd_latest.xlsx`)
     # và KH-NV upload (`hstd_khnv.xlsx`).
     if loai == "hstd":
-        path_khnv = Path(duong_dan_pgd(ten_don_vi, "hstd_khnv"))
-        if path_khnv.exists():
-            if (not path.exists()) or path_khnv.stat().st_mtime >= path.stat().st_mtime:
-                _log.info("doc_trang_thai_file: uu tien hstd_khnv moi hon → %s", path_khnv)
-                path = path_khnv
+        path = Path(duong_dan_hstd_hien_hanh(ten_don_vi))
     if not path.exists():
         return {
             "co_file": False,
@@ -354,10 +363,7 @@ def doc_hstd_pgd(ten_pgd: str, file_mtime: float = 0.0) -> pd.DataFrame | None:
     """
     from data.hstd import doc_file
 
-    # Ưu tiên hstd_latest.xlsx (PGD tự upload) → fallback hstd_khnv.xlsx (Phòng KH-NV)
-    path = duong_dan_pgd(ten_pgd, "hstd")
-    if not os.path.exists(path):
-        path = duong_dan_pgd(ten_pgd, "hstd_khnv")
+    path = duong_dan_hstd_hien_hanh(ten_pgd)
     return doc_file(path, file_mtime) if os.path.exists(path) else None
 
 
@@ -390,7 +396,7 @@ def doc_gqvl_pgd(ten_pgd: str, _ts):
 def doc_hstd_toan_cn_pgd(pgd_dir_mtime: float = 0.0) -> pd.DataFrame | None:
     """Gộp HSTD tất cả PGD — ws_operation, độc lập với CACHE_HSTD.
 
-    Ưu tiên hstd_latest.xlsx (PGD tự upload); fallback hstd_khnv.xlsx (Phòng KH-NV).
+    Chọn file mới hơn giữa hstd_latest.xlsx (PGD upload) và hstd_khnv.xlsx (KH-NV).
     `pgd_dir_mtime` = max mtime của các file nguồn → cache key.
     (Không dùng tiền tố `_` để Streamlit đưa vào cache key.)
     """
@@ -402,9 +408,8 @@ def doc_hstd_toan_cn_pgd(pgd_dir_mtime: float = 0.0) -> pd.DataFrame | None:
     for d in sorted(Path(PGD_DATA_DIR).iterdir()):
         if not d.is_dir():
             continue
-        path = d / "hstd_latest.xlsx"
-        if not path.exists():
-            path = d / "hstd_khnv.xlsx"
+        ten_pgd = d.name.replace("_", " ").title()
+        path = Path(duong_dan_hstd_hien_hanh(ten_pgd))
         if path.exists():
             try:
                 frames.append(doc_file(str(path), ts_file(str(path))))

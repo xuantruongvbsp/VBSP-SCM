@@ -222,7 +222,7 @@ def render_filter_panel(
         with col_thon:
             ds_thon = _get_options_filtered(df, COT_TEN_XA, tuple(selected_xa), COT_TEN_THON, ts_hstd)
             selected_thon = st.multiselect(
-                "Thô/Tổ dân phố",
+                "Thôn/Tổ dân phố",
                 options=ds_thon,
                 default=[x for x in st.session_state.tracuu_filters["selected_thon"] if x in ds_thon],
                 placeholder="Tất cả thôn",
@@ -504,37 +504,38 @@ def render_filter_panel(
     if on_filter_change:
         on_filter_change(df_filtered)
     
-    with st.expander("🧪 Debug bộ lọc", expanded=False):
-        st.write({"rows_before": int(len(df)), "rows_after": int(len(df_filtered))})
-        st.write(
-            {
-                "keyword": search_kw,
-                "selected_pgd": selected_pgd,
-                "selected_xa": selected_xa,
-                "selected_thon": selected_thon,
-                "selected_ct": selected_ct,
-                "selected_nv": selected_nv,
-                "du_no_range": du_no_range,
-                "ngay_vay_from": ngay_vay_from,
-                "ngay_vay_to": ngay_vay_to,
-                "ngay_dh_from": ngay_dh_from,
-                "ngay_dh_to": ngay_dh_to,
-                "filter_qua_han": filter_qua_han,
-                "filter_nq11": filter_nq11,
-                "filter_gqvl": filter_gqvl,
-                "filter_khoanh": filter_khoanh,
-            }
-        )
-        _cols = [
-            COT_TONG_DU_NO,
-            COT_DU_NO_QH,
-            COT_DU_NO_KHOANH,
-            COT_NGUON_VON,
-            COT_TEN_PGD,
-            COT_TEN_CT,
-        ]
-        _present = [c for c in _cols if c in df.columns]
-        if _present:
-            st.write({c: str(df[c].dtype) for c in _present})
+    if st.session_state.get("_debug_tracuu_filters", False):
+        with st.expander("🧪 Debug bộ lọc", expanded=False):
+            st.write({"rows_before": int(len(df)), "rows_after": int(len(df_filtered))})
+            st.write(
+                {
+                    "keyword": search_kw,
+                    "selected_pgd": selected_pgd,
+                    "selected_xa": selected_xa,
+                    "selected_thon": selected_thon,
+                    "selected_ct": selected_ct,
+                    "selected_nv": selected_nv,
+                    "du_no_range": du_no_range,
+                    "ngay_vay_from": ngay_vay_from,
+                    "ngay_vay_to": ngay_vay_to,
+                    "ngay_dh_from": ngay_dh_from,
+                    "ngay_dh_to": ngay_dh_to,
+                    "filter_qua_han": filter_qua_han,
+                    "filter_nq11": filter_nq11,
+                    "filter_gqvl": filter_gqvl,
+                    "filter_khoanh": filter_khoanh,
+                }
+            )
+            _cols = [
+                COT_TONG_DU_NO,
+                COT_DU_NO_QH,
+                COT_DU_NO_KHOANH,
+                COT_NGUON_VON,
+                COT_TEN_PGD,
+                COT_TEN_CT,
+            ]
+            _present = [c for c in _cols if c in df.columns]
+            if _present:
+                st.write({c: str(df[c].dtype) for c in _present})
 
     return df_filtered

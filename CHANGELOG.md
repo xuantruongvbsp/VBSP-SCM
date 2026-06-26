@@ -1,5 +1,8 @@
 # CHANGELOG
 
+## [2026-06-25] — KHTD: thêm hàng tổng cộng cho Phần I và II trong Tóm tắt hiện trạng
+- `tabs/tab_khtd_xuat.py` — `_hien_thi_bang_cn_readonly()` nay cộng riêng từng phần `I. Nguồn vốn Trung ương` và `II. Nguồn vốn Địa phương`, sau đó thêm 2 hàng `TỔNG CỘNG PHẦN I` và `TỔNG CỘNG PHẦN II` ngay trong bảng `📊 Tóm tắt hiện trạng`; vẫn giữ hàng `TỔNG CỘNG` toàn bảng ở cuối như cũ.
+
 ## [2026-06-25] — KHTD: khôi phục format hợp lệ cho `st.number_input`
 - `tabs/tab_khtd_nhap.py` — đổi 7 ô nhập kế hoạch từ `format=",.0f"` về `format="%.0f"` để tránh lỗi render `Format string for st.number_input contains invalid characters`. `st.number_input` không hỗ trợ format có dấu phân cách hàng nghìn như `,.0f`; nếu cần hiển thị có dấu phân cách sau khi blur phải đổi sang cơ chế nhập khác (ví dụ `text_input` + parse/format).
 

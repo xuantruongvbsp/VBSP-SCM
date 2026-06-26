@@ -1,5 +1,8 @@
 # CHANGELOG
 
+## [2026-06-25] — KHTD: khôi phục format hợp lệ cho `st.number_input`
+- `tabs/tab_khtd_nhap.py` — đổi 7 ô nhập kế hoạch từ `format=",.0f"` về `format="%.0f"` để tránh lỗi render `Format string for st.number_input contains invalid characters`. `st.number_input` không hỗ trợ format có dấu phân cách hàng nghìn như `,.0f`; nếu cần hiển thị có dấu phân cách sau khi blur phải đổi sang cơ chế nhập khác (ví dụ `text_input` + parse/format).
+
 ## [2026-06-25] — KHTD Chi nhánh: gom bảng nhập vào `st.form`, thêm nút Xem trước
 - `tabs/tab_khtd_nhap.py` dòng ~415–912 — bọc toàn bộ bảng nhập `🏛️ Kế hoạch Tín dụng Chi nhánh` trong `st.form` (enter/exit thủ công để giữ nguyên indent). Thay nút `💾 Lưu` đơn lẻ bằng 2 nút `👁 Xem trước tính toán` và `💾 Lưu kế hoạch Chi nhánh`. Khi chưa submit, các ô `number_input` không gây rerun — màn hình mượt như Excel. `Xem trước` cập nhật cột "Còn phải TH" mà không lưu; `Lưu` mới ghi `kv_store`. Tóm tắt hiện trạng hiển thị sau form.
 

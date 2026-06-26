@@ -33,15 +33,34 @@ _PREFIX_MAP = {
 }
 
 
-def _ids_file_upload(uploaded) -> list[tuple[int, str, int]]:
+def _uploaded_file_bytes(f) -> bytes:
+    if hasattr(f, "getvalue"):
+        return f.getvalue()
+    try:
+        pos = f.tell()
+    except Exception:
+        pos = None
+    data = f.read()
+    if pos is not None:
+        try:
+            f.seek(pos)
+        except Exception:
+            pass
+    return data
+
+
+def _ids_file_upload(uploaded) -> list[tuple[int, str, int, str]]:
     """ID ổn định theo thứ tự chọn; giữ được nhiều file trùng tên."""
-    return [(idx, f.name, f.size) for idx, f in enumerate(uploaded)]
+    return [
+        (idx, f.name, f.size, _md5_bytes(_uploaded_file_bytes(f)))
+        for idx, f in enumerate(uploaded)
+    ]
 
 
 def _doc_uploaded_files(uploaded) -> list[dict]:
     """Đọc UploadedFile thành list thay vì dict theo tên để không ghi đè file trùng tên."""
     return [
-        {"idx": idx, "ten_file": f.name, "data": f.read()}
+        {"idx": idx, "ten_file": f.name, "data": _uploaded_file_bytes(f)}
         for idx, f in enumerate(uploaded)
     ]
 

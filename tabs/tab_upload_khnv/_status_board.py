@@ -1,9 +1,7 @@
 """Bảng trạng thái upload 22 đơn vị × 5 loại."""
 from __future__ import annotations
 
-import os
-from datetime import date as _date, datetime as _dt
-from pathlib import Path as _P
+from datetime import date as _date
 
 import streamlit as st
 
@@ -13,7 +11,7 @@ from config import (
     danh_sach_nam_baseline_pgd,
     trang_thai_baseline_pgd_loai,
 )
-from data.pgd import duong_dan_pgd as _dp, lay_trang_thai_upload_pgd
+from data.pgd import lay_trang_thai_upload_pgd
 from services.file_detection_service import DS_DON_VI
 from utils import hien_thi_dataframe_phan_trang
 from ._state import lay_hang_cho
@@ -21,19 +19,10 @@ from ._state import lay_hang_cho
 
 def render_bang_trang_thai() -> None:
     """Bảng trạng thái 22 hàng × 6 cột: Đơn vị | HSTD | NQ11 | GQVL | CDTOTKVV | 31/12."""
-    if "trang_thai_upload_pgd" not in st.session_state:
-        st.session_state["trang_thai_upload_pgd"] = lay_trang_thai_upload_pgd(DS_DON_VI)
-    df_tt = st.session_state["trang_thai_upload_pgd"].copy()
-
-    # Patch: nếu session còn cache ❌ cũ, đọc thẳng từ đĩa để kiểm tra hstd_khnv
-    mask_thieu = df_tt["HSTD"].astype(str).str.startswith("❌", na=False)
-    if mask_thieu.any():
-        for idx in df_tt[mask_thieu].index:
-            dv = df_tt.at[idx, "Đơn vị"]
-            p = _P(_dp(dv, "hstd_khnv"))
-            if p.exists():
-                ngay_up = _dt.fromtimestamp(os.path.getmtime(p))
-                df_tt.at[idx, "HSTD"] = f"✅ {ngay_up.strftime('%d/%m')}"
+    # Không giữ bảng trạng thái hiện tại trong session_state:
+    # badge phải phản ánh file mới nhất trên đĩa ngay sau khi upload.
+    # Hàm nguồn đã có cache theo mtime ở data/pgd.py, nên gọi lại mỗi render vẫn nhẹ.
+    df_tt = lay_trang_thai_upload_pgd(DS_DON_VI).copy()
 
     # Cột 31/12: kiểm tra cả 4 loại
     if "_blcache_nam_list" not in st.session_state:

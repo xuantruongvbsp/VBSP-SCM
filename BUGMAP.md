@@ -293,6 +293,26 @@
 | **Fix** | Thêm helper nhãn ngắn `_ten_ct_hien_thi_nhap_cn()` cho bảng nhập KHTD CN và set style cột đầu với `color:var(--text-color, inherit)` + `font-weight:600` + `line-height` rõ hơn; đổi thanh tiêu đề nhóm sang nền đậm hơn + chữ trắng đậm để tăng tương phản |
 | **Ngày fix** | 2026-06-21 |
 
+### B16b — `📋 Trạng thái Upload — 22 Đơn vị` giữ ngày cũ sau khi đã upload file mới
+| | |
+|---|---|
+| **File** | `tabs/tab_upload_khnv/_status_board.py` |
+| **Dấu hiệu** | Vừa upload file HSTD/NQ11/GQVL/CDTOTKVV mới nhưng bảng `📋 Trạng thái Upload — 22 Đơn vị` vẫn hiện badge ngày cũ; ví dụ file HSTD Hội sở đã lên ngày `23/06/2026` nhưng ô HSTD vẫn hiện `31/05/2026` |
+| **Nguyên nhân** | Bảng trạng thái bị giữ snapshot cũ trong `st.session_state["trang_thai_upload_pgd"]`; khi rerun lại tab, code tái sử dụng DataFrame cũ thay vì đọc lại trạng thái mới từ đĩa. Nhánh vá cũ chỉ sửa riêng trường hợp HSTD đang là `❌`, nên các badge `✅/⚠️` cũ vẫn bị kẹt |
+| **Fix** | Không cache toàn bộ bảng trạng thái trong `session_state`; mỗi lần render gọi lại `lay_trang_thai_upload_pgd(DS_DON_VI)`. Việc đọc ngày trong file vẫn được cache theo `mtime` tại `data/pgd.py`, nên vẫn hiệu quả mà badge luôn phản ánh file mới nhất |
+| **Bài học** | Với bảng trạng thái runtime, chỉ cache ở tầng hàm nguồn theo `mtime`; không giữ snapshot DataFrame hoàn chỉnh trong session nếu yêu cầu UI phải cập nhật ngay sau upload |
+| **Ngày fix** | 2026-06-25 |
+
+### B16c — HSTD trạng thái vẫn hiện ngày cũ vì đọc nhầm `hstd_latest.xlsx` thay vì `hstd_khnv.xlsx` mới hơn
+| | |
+|---|---|
+| **File** | `data/pgd.py` |
+| **Dấu hiệu** | Vừa import/upload HSTD từ KH-NV cho một đơn vị nhưng bảng `📋 Trạng thái Upload — 22 Đơn vị` vẫn hiện ngày số liệu cũ; kiểm tra trên đĩa thấy cả `hstd_latest.xlsx` và `hstd_khnv.xlsx` cùng tồn tại, trong đó `hstd_khnv.xlsx` mới hơn |
+| **Nguyên nhân** | `doc_trang_thai_file(loai="hstd")` chỉ fallback sang `hstd_khnv.xlsx` khi `hstd_latest.xlsx` không tồn tại. Nếu cả hai file cùng tồn tại thì hàm luôn đọc `hstd_latest.xlsx`, dù file `hstd_khnv.xlsx` vừa được KH-NV cập nhật mới hơn |
+| **Fix** | Với `loai="hstd"`, chọn file có `mtime` mới hơn giữa `hstd_latest.xlsx` và `hstd_khnv.xlsx` rồi mới đọc `ngày upload` / `ngày số liệu` |
+| **Bài học** | Khi một loại dữ liệu có nhiều nguồn file song song, fallback “nếu file A không tồn tại thì dùng file B” là chưa đủ; cần xác định rõ file nào là bản hiện hành, thường là file mới hơn theo `mtime` |
+| **Ngày fix** | 2026-06-25 |
+
 ### B14 — Lambda params với default values khiến `lazy_tabs` truyền sai tham số
 | | |
 |---|---|
@@ -763,6 +783,16 @@
 | **Fix** | Chuẩn hóa sang danh mục rule `ndt_dp_rule_list` với cấu trúc `{"ma_ct", "ma", "ghi_chu", "cap"}`; thêm helper `phan_loai_ndt_dp_cap(ma_ct, ma_ndt)` ưu tiên match exact `(ma_ct, ma_ndt)`, fallback rule chung `ma_ct=None`; UI quản lý/xem-only hiển thị thêm `CT 03` / `CT 06` |
 | **Bài học** | Với danh mục dùng để phân loại nhiều chương trình, phải lưu đủ khóa nghiệp vụ tối thiểu ngay từ đầu; đừng dựa vào tên tab hoặc key kv riêng để ngầm suy ra ngữ cảnh chương trình |
 | **Ngày fix** | 2026-06-21 |
+
+### G10 — `🏛️ KHTD Chi nhánh`: `TH` GQVL bị lấy nhầm tiền từ `GQVL.parquet` thay vì `HSTD`
+| | |
+|---|---|
+| **File** | `services/khtd_nhap_service.py`, `tabs/tab_khtd_nhap.py`, `tabs/tab_khtd_xuat.py` |
+| **Dấu hiệu** | Mục `🏛️ Kế hoạch Tín dụng Chi nhánh` cần theo dõi `TH` theo `HSTD`, nhưng phân tầng GQVL lại cộng trực tiếp tiền từ `GQVL.parquet`; số từng nhóm có thể không khớp với tổng `TH` nghiệp vụ đang dùng ở HSTD |
+| **Nguyên nhân** | Hiểu sai vai trò của file `GQVL`: file này chỉ là nguồn tham chiếu để biết mỗi `Số khế ước` GQVL thuộc nhóm `TW/ĐP/tỉnh/xã`, còn số `TH` chính thức vẫn phải lấy từ `HSTD`. Hàm cũ `tinh_th_gqvl_phan_tang(df_gqvl)` lấy cả phân tầng lẫn số tiền từ `GQVL.parquet` |
+| **Fix** | Đổi `tinh_th_gqvl_phan_tang(df_hstd, df_gqvl)` sang lấy dư nợ từ `HSTD`, join `GQVL` theo `Số khế ước` để xác định nhóm; nếu thiếu tham chiếu thì fallback chia đều theo nguồn như logic cũ để không hụt tổng |
+| **Bài học** | Với dữ liệu tham chiếu chéo, phải tách rõ: file nào là nguồn số tiền chính, file nào chỉ dùng để gắn nhãn/phân loại; không được lấy nhầm số tiền từ file tham chiếu |
+| **Ngày fix** | 2026-06-25 |
 
 ---
 

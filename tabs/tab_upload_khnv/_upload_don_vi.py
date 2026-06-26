@@ -542,4 +542,4 @@ def render_import_hang_loat(role: str, username: str) -> None:
                 try:
                     os.unlink(p)
                 except Exception as e:
-                    logger.error("unlink tmp: %s", e)
+                    logger.error("unlink tmp: %s", e, exc_info=True)

@@ -84,7 +84,7 @@ def _hien_thi_bang_cn_readonly(
     th_d = dict(th_cn or {})
 
     df_gqvl = _doc_gqvl_cached(ts_file(CACHE_GQVL))
-    th_gqvl = _tinh_th_gqvl_phan_tang(df_gqvl)
+    th_gqvl = _tinh_th_gqvl_phan_tang(df_loc, df_gqvl)
     for sk, sv in th_gqvl.items():
         if sv:
             th_d[sk] = sv
@@ -555,7 +555,7 @@ def _tab_tien_do_kh_th() -> None:
 
     df_gqvl = _doc_gqvl_cached(ts_file(CACHE_GQVL))
 
-    th_gqvl = _tinh_th_gqvl_phan_tang(df_gqvl)
+    th_gqvl = _tinh_th_gqvl_phan_tang(df_hstd, df_gqvl)
     for sub_key, val in th_gqvl.items():
         th_cn[sub_key] = val
 
@@ -713,7 +713,7 @@ def _tab_tien_do_kh_th() -> None:
         except Exception as e:
             logger.error("Lỗi trong khối except: %s", e, exc_info=True)
             df_gqvl_pgd = pd.DataFrame()
-        th_gqvl_pgd = _tinh_th_gqvl_phan_tang(df_gqvl_pgd)
+        th_gqvl_pgd = _tinh_th_gqvl_phan_tang(df_pgd, df_gqvl_pgd)
         for sk, sv in th_gqvl_pgd.items():
             th_pgd[sk] = sv
 

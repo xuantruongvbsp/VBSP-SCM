@@ -261,13 +261,20 @@ def _tab_khtd_chi_nhanh(
     th_nsvsmt = _tinh_th_nsvsmt_dp_phan_tang(df_full)
     th_cn = {**(th_cn or {}), **th_nsvsmt}
     # Tính TH GQVL phân tầng 4 nhóm
-    th_gqvl = _tinh_th_gqvl_phan_tang(df_gqvl)
+    th_gqvl = _tinh_th_gqvl_phan_tang(df_full, df_gqvl)
+    for ma_key, gia_tri in th_gqvl.items():
+        th_cn[ma_key] = float(gia_tri or 0.0)
 
     if not co_quyen:
         st.warning("⚠️ Chỉ Admin / Manager mới được nhập kế hoạch cấp Chi nhánh.")
         df_loc = df_full
         from tabs.tab_khtd_xuat import _hien_thi_bang_cn_readonly  # lazy – tránh circular import
-        _hien_thi_bang_cn_readonly(kh_cn, th_cn, df_loc=df_loc, username=username)
+        _hien_thi_bang_cn_readonly(
+            kh_cn,
+            th_cn,
+            df_loc=df_loc,
+            username=username,
+        )
         st.divider()
         _section_van_ban_qd_cn(role, username)
         return
@@ -852,12 +859,12 @@ def _tab_khtd_chi_nhanh(
                     if nv == "DP"
                 )
                 tw_th_d = sum(
-                    float((th_cn or {}).get(mk, 0.0))
+                    float(th_cn.get(mk, 0.0))
                     for mk, _mc, _t, nv, _tm in CHUONG_TRINH_KHTD
                     if nv == "TW"
                 )
                 dp_th_d = sum(
-                    float((th_cn or {}).get(mk, 0.0))
+                    float(th_cn.get(mk, 0.0))
                     for mk, _mc, _t, nv, _tm in CHUONG_TRINH_KHTD
                     if nv == "DP"
                 )

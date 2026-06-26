@@ -21,6 +21,7 @@ from services.khtd_nhap_service import (
     doc_excel_khtd_xa_upload,
     format_kich_thuoc,
     luu_pdf_khtd_xa,
+    tinh_th_gqvl_phan_tang,
 )
 
 
@@ -183,6 +184,54 @@ class TestDocExcelKhtdXaUpload:
         data = self._xa_excel([["Xã Bất Kỳ", "1_TW", 10.0]])
         updates, dem, _ = doc_excel_khtd_xa_upload(data, set(), self.MA_KEYS)
         assert dem == 1
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# tinh_th_gqvl_phan_tang()
+# ══════════════════════════════════════════════════════════════════════════════
+
+class TestTinhThGqvlPhanTang:
+
+    def test_lay_tien_tu_hstd_va_phan_tang_bang_gqvl(self, monkeypatch):
+        monkeypatch.setattr(
+            "db.phan_loai_ndt_dp_cap",
+            lambda ma_ct, ma_ndt: "tinh" if ma_ndt == "INV_TINH" else "xa",
+        )
+
+        df_hstd = pd.DataFrame([
+            {"Mã chương trình": 3, "Nguồn vốn": 1, "Số khế ước": "KU1", "Tổng dư nợ": 100.0},
+            {"Mã chương trình": 3, "Nguồn vốn": 1, "Số khế ước": "KU2", "Tổng dư nợ": 200.0},
+            {"Mã chương trình": 3, "Nguồn vốn": 2, "Số khế ước": "KU3", "Tổng dư nợ": 300.0},
+            {"Mã chương trình": 3, "Nguồn vốn": 2, "Số khế ước": "KU4", "Tổng dư nợ": 400.0},
+        ])
+        df_gqvl = pd.DataFrame([
+            {"Số khế ước": "KU1", "Phân loại NV": 2, "Mã nhà đầu tư": ""},
+            {"Số khế ước": "KU2", "Phân loại NV": 1, "Mã nhà đầu tư": ""},
+            {"Số khế ước": "KU3", "Phân loại NV": 2, "Mã nhà đầu tư": "INV_TINH"},
+            {"Số khế ước": "KU4", "Phân loại NV": 2, "Mã nhà đầu tư": "INV_XA"},
+        ])
+
+        out = tinh_th_gqvl_phan_tang(df_hstd, df_gqvl)
+
+        assert out["3_TW_NHCSXH"] == 100.0
+        assert out["3_TW_NSNN"] == 200.0
+        assert out["3_DP_TINH"] == 300.0
+        assert out["3_DP_XA"] == 400.0
+
+    def test_fallback_chia_deu_khi_khong_co_tham_chieu_gqvl(self):
+        df_hstd = pd.DataFrame([
+            {"Mã chương trình": 3, "Nguồn vốn": 1, "Số khế ước": "KU1", "Tổng dư nợ": 100.0},
+            {"Mã chương trình": 3, "Nguồn vốn": 1, "Số khế ước": "KU2", "Tổng dư nợ": 300.0},
+            {"Mã chương trình": 3, "Nguồn vốn": 2, "Số khế ước": "KU3", "Tổng dư nợ": 200.0},
+            {"Mã chương trình": 3, "Nguồn vốn": 2, "Số khế ước": "KU4", "Tổng dư nợ": 600.0},
+        ])
+
+        out = tinh_th_gqvl_phan_tang(df_hstd, pd.DataFrame())
+
+        assert out["3_TW_NHCSXH"] == 200.0
+        assert out["3_TW_NSNN"] == 200.0
+        assert out["3_DP_TINH"] == 400.0
+        assert out["3_DP_XA"] == 400.0
 
 
 # ══════════════════════════════════════════════════════════════════════════════

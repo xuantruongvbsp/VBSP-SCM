@@ -371,49 +371,6 @@ def _tinh_thuc_hien_theo_ct(df: "pd.DataFrame") -> dict[str, float]:
     return out
 
 
-def _tinh_th_gqvl_phan_tang(df_gqvl: "pd.DataFrame | None") -> dict[str, float]:
-    """
-    Tính TH thực tế cho 4 nhóm GQVL từ file GQVL (df sau merge toàn CN).
-    Dùng cùng logic phân tầng với gen_dcgiam_sheet._phan_loai_4_nhom().
-    Trả về: {"3_TW_NHCSXH": VND, "3_TW_NSNN": VND,
-             "3_DP_TINH": VND, "3_DP_XA": VND}
-    """
-    result = {"3_TW_NHCSXH": 0.0, "3_TW_NSNN": 0.0,
-              "3_DP_TINH": 0.0,   "3_DP_XA": 0.0}
-    if df_gqvl is None or df_gqvl.empty:
-        return result
-
-    # Cột dư nợ: ưu tiên COT_TONG_DU_NO, fallback COT_DU_NO_TH
-    col_dn = COT_TONG_DU_NO if COT_TONG_DU_NO in df_gqvl.columns \
-             else (COT_DU_NO_TH if COT_DU_NO_TH in df_gqvl.columns else None)
-    if col_dn is None:
-        return result
-
-    from db import phan_loai_ndt_dp_cap
-
-    for _, row in df_gqvl.iterrows():
-        nv  = str(row.get(COT_NGUON_VON, "")).strip()
-        dn  = float(pd.to_numeric(row.get(col_dn, 0), errors="coerce") or 0)
-        if dn == 0:
-            continue
-        if nv == "TW":
-            try:
-                pl = int(float(row.get("Phân loại NV", 0)))
-            except:
-                continue
-            if pl == 2:
-                result["3_TW_NHCSXH"] += dn
-            elif pl == 1:
-                result["3_TW_NSNN"]   += dn
-        elif nv == "ĐP":
-            ma = str(row.get(COT_MA_NHA_DAU_TU, "")).strip()
-            if phan_loai_ndt_dp_cap(3, ma) == "tinh":
-                result["3_DP_TINH"] += dn
-            else:
-                result["3_DP_XA"]   += dn
-    return result
-
-
 def _tinh_th_nsvsmt_dp_phan_tang(df_hstd: "pd.DataFrame | None") -> dict[str, float]:
     """
     Tính TH thực tế cho NSVSMT ĐP từ HSTD:

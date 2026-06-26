@@ -11,7 +11,7 @@ def kiem_tra_nguon_uu_tien(ten_don_vi: str, loai_file: str) -> Dict:
     from pathlib import Path
     path = Path(duong_dan_pgd(ten_don_vi, loai_file))
     _mtime = os.path.getmtime(path) if path.exists() else 0.0
-    pgd_info = doc_trang_thai_file(ten_don_vi, loai_file, _mtime=_mtime)
+    pgd_info = doc_trang_thai_file(ten_don_vi, loai_file, mtime=_mtime)
     
     if pgd_info["co_file"]:
         return {

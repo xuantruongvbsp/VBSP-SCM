@@ -158,12 +158,14 @@ def doc_trang_thai_file(ten_don_vi: str, loai: LoaiFile, mtime: float = 0.0) -> 
       khong_co — chưa có file
     """
     path = Path(duong_dan_pgd(ten_don_vi, loai))
-    # Fallback: KH-NV upload HSTD → hstd_khnv.xlsx thay vì hstd_latest.xlsx
-    if loai == "hstd" and not path.exists():
+    # Với HSTD: ưu tiên file mới hơn giữa PGD upload (`hstd_latest.xlsx`)
+    # và KH-NV upload (`hstd_khnv.xlsx`).
+    if loai == "hstd":
         path_khnv = Path(duong_dan_pgd(ten_don_vi, "hstd_khnv"))
         if path_khnv.exists():
-            _log.info("doc_trang_thai_file: fallback hstd_khnv → %s", path_khnv)
-            path = path_khnv
+            if (not path.exists()) or path_khnv.stat().st_mtime >= path.stat().st_mtime:
+                _log.info("doc_trang_thai_file: uu tien hstd_khnv moi hon → %s", path_khnv)
+                path = path_khnv
     if not path.exists():
         return {
             "co_file": False,

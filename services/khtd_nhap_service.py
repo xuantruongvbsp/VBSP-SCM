@@ -10,7 +10,7 @@ from pathlib import Path
 import pandas as pd
 
 import db
-from config import CHUONG_TRINH_KHTD
+from config import CHUONG_TRINH_KHTD, COT_MA_CHUONG_TRINH, COT_NGUON_VON, COT_TONG_DU_NO, COT_DU_NO_TH, COT_SO_KU
 try:
     from logger import get_logger
     logger = get_logger(__name__)
@@ -26,23 +26,59 @@ def clean_sheet_name(name: str) -> str:
     return cleaned[:31]
 
 
-def tinh_th_gqvl_phan_tang(df_gqvl: pd.DataFrame) -> dict[str, float]:
-    """
-    Tính TH GQVL phân tầng 4 nhóm từ gqvl.parquet.
-    Dùng config.GQVL_PHAN_TANG, config.COT_PL_NV, config.MA_NDT_CAP_TINH_DUOI.
+def _norm_so_ku(v) -> str:
+    """Chuẩn hóa Số khế ước để join HSTD <-> GQVL ổn định."""
+    if pd.isna(v):
+        return ""
+    s = str(v).strip()
+    if re.fullmatch(r"\d+\.0", s):
+        return s[:-2]
+    return s
 
-    Trả về dict: {sub_key: tong_du_no_VND}
-    sub_key theo GQVL_PHAN_TANG[i][3]:
-      "cap_tinh_tw_nhcsxh", "cap_tinh_tw_nsnn", "cap_tinh", "cap_xa"
 
-    Logic phân loại:
-    - TW + PL NV=2 (NHCSXH HĐ) → "cap_tinh_tw_nhcsxh"
-    - TW + PL NV=1 (NSNN/Quỹ QG) → "cap_tinh_tw_nsnn"
-    - DP + Mã NĐT endswith bất kỳ trong MA_NDT_CAP_TINH_DUOI → "cap_tinh"
-    - DP + còn lại → "cap_xa"
+def _fallback_gqvl_tu_hstd(df_hstd: pd.DataFrame) -> dict[str, float]:
+    """Fallback cũ: chia đều TH HSTD của mã CT=3 theo từng nguồn vốn."""
+    result = {
+        "3_TW_NHCSXH": 0.0,
+        "3_TW_NSNN": 0.0,
+        "3_DP_TINH": 0.0,
+        "3_DP_XA": 0.0,
+    }
+    if df_hstd is None or df_hstd.empty:
+        return result
+    col_dn = COT_TONG_DU_NO if COT_TONG_DU_NO in df_hstd.columns else (
+        COT_DU_NO_TH if COT_DU_NO_TH in df_hstd.columns else None
+    )
+    if not col_dn or COT_MA_CHUONG_TRINH not in df_hstd.columns or COT_NGUON_VON not in df_hstd.columns:
+        return result
+
+    ma_ct = pd.to_numeric(df_hstd[COT_MA_CHUONG_TRINH], errors="coerce").fillna(0).astype(int)
+    nv = pd.to_numeric(df_hstd[COT_NGUON_VON], errors="coerce").fillna(0).astype(int)
+    dn = pd.to_numeric(df_hstd[col_dn], errors="coerce").fillna(0).astype(float)
+
+    tong_tw = float(dn[(ma_ct == 3) & (nv == 1)].sum())
+    tong_dp = float(dn[(ma_ct == 3) & (nv == 2)].sum())
+    result["3_TW_NHCSXH"] = tong_tw / 2.0
+    result["3_TW_NSNN"] = tong_tw / 2.0
+    result["3_DP_TINH"] = tong_dp / 2.0
+    result["3_DP_XA"] = tong_dp / 2.0
+    return result
+
+
+def tinh_th_gqvl_phan_tang(
+    df_hstd: pd.DataFrame | None,
+    df_gqvl: pd.DataFrame | None,
+) -> dict[str, float]:
     """
-    from config import GQVL_PHAN_TANG, COT_PL_NV, MA_NDT_CAP_TINH_DUOI
-    from config import COT_NGUON_VON, COT_TONG_DU_NO, COT_DU_NO_TH, COT_MA_NHA_DAU_TU
+    Tính TH GQVL phân tầng 4 nhóm.
+
+    - Số TH luôn lấy từ HSTD.
+    - GQVL chỉ dùng làm bảng tham chiếu để xác định mỗi Số khế ước thuộc nhóm nào.
+    - Nếu một phần khoản vay không match được sang GQVL thì phần còn lại fallback về cách chia cũ
+      theo nguồn vốn để không làm hụt tổng TH.
+    """
+    from config import GQVL_PHAN_TANG, COT_PL_NV, COT_MA_NHA_DAU_TU
+    from db import phan_loai_ndt_dp_cap
 
     result = {row[3]: 0.0 for row in GQVL_PHAN_TANG}
     result.setdefault("3_TW_NHCSXH", 0.0)
@@ -50,36 +86,65 @@ def tinh_th_gqvl_phan_tang(df_gqvl: pd.DataFrame) -> dict[str, float]:
     result.setdefault("3_DP_TINH", 0.0)
     result.setdefault("3_DP_XA", 0.0)
 
-    if df_gqvl is None or df_gqvl.empty:
+    if df_hstd is None or df_hstd.empty:
         return result
 
-    col_dn = COT_TONG_DU_NO if COT_TONG_DU_NO in df_gqvl.columns else (
-        COT_DU_NO_TH if COT_DU_NO_TH in df_gqvl.columns else None
+    col_dn = COT_TONG_DU_NO if COT_TONG_DU_NO in df_hstd.columns else (
+        COT_DU_NO_TH if COT_DU_NO_TH in df_hstd.columns else None
     )
-    if not col_dn:
+    if (
+        not col_dn
+        or COT_MA_CHUONG_TRINH not in df_hstd.columns
+        or COT_NGUON_VON not in df_hstd.columns
+        or COT_SO_KU not in df_hstd.columns
+    ):
         return result
 
-    df = df_gqvl.copy()
-    nv_raw = df.get(COT_NGUON_VON, pd.Series(dtype=object))
-    nv = pd.to_numeric(nv_raw, errors="coerce")
-    if nv.isna().all():
-        nv_str = nv_raw.fillna("").astype(str).str.strip().str.upper()
-        nv = nv_str.map({"TW": 1, "ĐP": 2, "DP": 2}).fillna(0)
-    else:
-        nv = nv.fillna(0)
+    fallback = _fallback_gqvl_tu_hstd(df_hstd)
+    if df_gqvl is None or df_gqvl.empty or COT_SO_KU not in df_gqvl.columns:
+        return fallback
 
-    plnv = pd.to_numeric(df.get(COT_PL_NV, pd.Series(dtype=object)), errors="coerce").fillna(0)
-    mandt = df.get(COT_MA_NHA_DAU_TU, pd.Series(dtype=str)).fillna("").astype(str)
-    dn = pd.to_numeric(df[col_dn], errors="coerce").fillna(0)
+    df_h = pd.DataFrame(
+        {
+            "so_ku": df_hstd[COT_SO_KU].map(_norm_so_ku),
+            "ma_ct": pd.to_numeric(df_hstd[COT_MA_CHUONG_TRINH], errors="coerce").fillna(0).astype(int),
+            "nv": pd.to_numeric(df_hstd[COT_NGUON_VON], errors="coerce").fillna(0).astype(int),
+            "th": pd.to_numeric(df_hstd[col_dn], errors="coerce").fillna(0).astype(float),
+        }
+    )
+    df_h = df_h[(df_h["ma_ct"] == 3) & (df_h["nv"].isin([1, 2])) & (df_h["th"] != 0)]
+    if df_h.empty:
+        return result
 
-    mask_tw = nv == 1
-    result["cap_tinh_tw_nhcsxh"] = float(dn[mask_tw & (plnv == 2)].sum())
-    result["cap_tinh_tw_nsnn"] = float(dn[mask_tw & (plnv == 1)].sum())
+    df_g = pd.DataFrame(
+        {
+            "so_ku": df_gqvl[COT_SO_KU].map(_norm_so_ku),
+            "pl_nv": pd.to_numeric(df_gqvl.get(COT_PL_NV, pd.Series(dtype=object)), errors="coerce"),
+            "ma_ndt": df_gqvl.get(COT_MA_NHA_DAU_TU, pd.Series(dtype=object)).fillna("").astype(str).str.strip(),
+        }
+    )
+    df_g = df_g[df_g["so_ku"] != ""].drop_duplicates(subset=["so_ku"], keep="first")
+    if df_g.empty:
+        return fallback
 
-    mask_dp = nv == 2
-    mask_cap_tinh = mandt.apply(lambda x: any(str(x).endswith(m) for m in MA_NDT_CAP_TINH_DUOI))
-    result["cap_tinh"] = float(dn[mask_dp & mask_cap_tinh].sum())
-    result["cap_xa"] = float(dn[mask_dp & ~mask_cap_tinh].sum())
+    df_m = df_h.merge(df_g, on="so_ku", how="left")
+
+    mask_tw = df_m["nv"] == 1
+    th_tw_nhcsxh = float(df_m.loc[mask_tw & (df_m["pl_nv"] == 2), "th"].sum())
+    th_tw_nsnn = float(df_m.loc[mask_tw & (df_m["pl_nv"] == 1), "th"].sum())
+    tong_tw = float(df_m.loc[mask_tw, "th"].sum())
+    con_lai_tw = max(0.0, tong_tw - th_tw_nhcsxh - th_tw_nsnn)
+    result["cap_tinh_tw_nhcsxh"] = th_tw_nhcsxh + con_lai_tw / 2.0
+    result["cap_tinh_tw_nsnn"] = th_tw_nsnn + con_lai_tw / 2.0
+
+    mask_dp = df_m["nv"] == 2
+    cap_dp = df_m["ma_ndt"].map(lambda ma: phan_loai_ndt_dp_cap(3, ma))
+    th_dp_tinh = float(df_m.loc[mask_dp & cap_dp.eq("tinh"), "th"].sum())
+    th_dp_xa = float(df_m.loc[mask_dp & cap_dp.eq("xa"), "th"].sum())
+    tong_dp = float(df_m.loc[mask_dp, "th"].sum())
+    con_lai_dp = max(0.0, tong_dp - th_dp_tinh - th_dp_xa)
+    result["cap_tinh"] = th_dp_tinh + con_lai_dp / 2.0
+    result["cap_xa"] = th_dp_xa + con_lai_dp / 2.0
 
     result["3_TW_NHCSXH"] = result.get("cap_tinh_tw_nhcsxh", 0.0)
     result["3_TW_NSNN"] = result.get("cap_tinh_tw_nsnn", 0.0)

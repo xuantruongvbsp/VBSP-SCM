@@ -1,5 +1,17 @@
 # CHANGELOG
 
+## [2026-06-25] — Trạng thái Upload HSTD: ưu tiên file mới hơn giữa `hstd_latest` và `hstd_khnv`
+- `data/pgd.py` — `doc_trang_thai_file()` với `loai="hstd"` nay chọn file có `mtime` mới hơn giữa `pgd_data/{slug}/hstd_latest.xlsx` và `pgd_data/{slug}/hstd_khnv.xlsx`; sửa trường hợp import hàng loạt HSTD từ KH-NV đã ghi `hstd_khnv.xlsx` mới nhưng bảng `📋 Trạng thái Upload — 22 Đơn vị` vẫn đọc ngày cũ từ `hstd_latest.xlsx`
+
+## [2026-06-25] — Trạng thái Upload: bỏ stale session cache cho bảng 22 đơn vị
+- `tabs/tab_upload_khnv/_status_board.py` — bảng `📋 Trạng thái Upload — 22 Đơn vị` không còn giữ `trang_thai_upload_pgd` trong `session_state`; mỗi lần render sẽ đọc lại trạng thái hiện tại từ đĩa, vẫn tận dụng cache theo `mtime` ở `data/pgd.py`, nên badge HSTD/NQ11/GQVL/CDTOTKVV phản ánh file mới nhất ngay sau upload
+
+## [2026-06-25] — KHTD Chi nhánh: `TH` lấy từ HSTD, GQVL chỉ làm tham chiếu phân tầng
+- `services/khtd_nhap_service.py` — đổi `tinh_th_gqvl_phan_tang()` sang lấy số tiền `TH` từ `HSTD`, join `GQVL` theo `Số khế ước` để phân tầng `3_TW_NHCSXH` / `3_TW_NSNN` / `3_DP_TINH` / `3_DP_XA`; nếu thiếu tham chiếu thì fallback chia đều theo nguồn như logic cũ để không hụt tổng
+- `tabs/tab_khtd_nhap.py` — màn `🏛️ KHTD Chi nhánh` dùng lại map `TH` mới, bỏ logic ưu tiên số tiền từ `GQVL.parquet`
+- `tabs/tab_khtd_xuat.py` — các bảng readonly / tiến độ / cảnh báo PGD dùng cùng logic `TH từ HSTD + phân tầng theo GQVL`
+- `tests/test_khtd_nhap_service.py` — thêm test cho 2 case: phân tầng theo tham chiếu GQVL và fallback khi thiếu tham chiếu
+
 ## [2026-06-23] — Tra cứu hồ sơ: fix lọc không ra dù dữ liệu có
 - `components/filter_panel.py` — chuẩn hóa lọc: keyword search hỗ trợ có dấu/không dấu (`vn()`), ép numeric trước khi lọc theo dư nợ/quá hạn/khoanh, chuẩn hóa `Nguồn vốn` (1/01/TW và 2/02/ĐP/DP), và thêm nút `🔄 Reset` luôn hiển thị để tránh dính bộ lọc cũ
 

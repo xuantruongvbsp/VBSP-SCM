@@ -120,6 +120,10 @@ def _hien_thi_bang_cn_readonly(
 
     tong_kh = 0.0
     tong_th = 0.0
+    tong_kh_i = 0.0
+    tong_th_i = 0.0
+    tong_kh_ii = 0.0
+    tong_th_ii = 0.0
     so_ct_co_kh = 0
     tong_ct = len(order_ma_ct)
     stt_i = 0
@@ -172,7 +176,7 @@ def _hien_thi_bang_cn_readonly(
     def _add_row(
         ten: str, kh_vnd: float, th_vnd: float, indent: str = ""
     ) -> None:
-        nonlocal tong_kh, tong_th, stt_i, stt_no
+        nonlocal tong_kh, tong_th, tong_kh_i, tong_th_i, tong_kh_ii, tong_th_ii, stt_i, stt_no
         kh_v = kh_vnd / 1e6
         th_v = th_vnd / 1e6
         tl = th_v / kh_v * 100 if kh_v > 0 else None
@@ -180,6 +184,12 @@ def _hien_thi_bang_cn_readonly(
         if kh_v > 0 or th_v > 0:
             tong_kh += kh_vnd
             tong_th += th_vnd
+            if nhom_hien.startswith("I."):
+                tong_kh_i += kh_vnd
+                tong_th_i += th_vnd
+            elif nhom_hien.startswith("II."):
+                tong_kh_ii += kh_vnd
+                tong_th_ii += th_vnd
 
         stt_i += 1
         stt_no += 1
@@ -201,7 +211,7 @@ def _hien_thi_bang_cn_readonly(
         html_rows.append(f"<tr>{tds}</tr>")
 
     def _add_sub_ten(sub_key: str, sub_ten: str) -> None:
-        nonlocal tong_kh, tong_th, stt_i
+        nonlocal tong_kh, tong_th, tong_kh_i, tong_th_i, tong_kh_ii, tong_th_ii, stt_i
         kh_vnd = float(kh_d.get(sub_key, 0.0))
         th_vnd = float(th_d.get(sub_key, 0.0))
 
@@ -216,6 +226,12 @@ def _hien_thi_bang_cn_readonly(
         if kh_v > 0 or th_v > 0:
             tong_kh += kh_vnd
             tong_th += th_vnd
+            if nhom_hien.startswith("I."):
+                tong_kh_i += kh_vnd
+                tong_th_i += th_vnd
+            elif nhom_hien.startswith("II."):
+                tong_kh_ii += kh_vnd
+                tong_th_ii += th_vnd
 
         bg = WHITE if stt_i % 2 == 0 else ALT
         stt_i += 1
@@ -233,6 +249,20 @@ def _hien_thi_bang_cn_readonly(
             _td(th_str, "right") +
             _td(tl_str, "right", tl_c) +
             _td(stt_s, "left", tl_c)
+        )
+        html_rows.append(f"<tr>{tds}</tr>")
+
+    def _add_section_total(label: str, kh_vnd: float, th_vnd: float) -> None:
+        kh_v = kh_vnd / 1e6
+        th_v = th_vnd / 1e6
+        tl = th_v / kh_v * 100 if kh_v > 0 else None
+        tds = (
+            _td("", "center", "#1f2937", TONG_BG, "bold") +
+            _td(label, "left", "#1f2937", TONG_BG, "bold") +
+            _td(_fvn(kh_v, 0) if kh_v > 0 else "—", "right", "#1f2937", TONG_BG, "bold") +
+            _td(_fvn(th_v, 0) if th_v > 0 else "—", "right", "#1f2937", TONG_BG, "bold") +
+            _td(f"{_fvn(tl, 1)}%" if tl is not None else "—", "right", _tl_color(tl), TONG_BG, "bold") +
+            _td(_tl_text(tl), "left", _tl_color(tl), TONG_BG, "bold")
         )
         html_rows.append(f"<tr>{tds}</tr>")
 
@@ -260,6 +290,8 @@ def _hien_thi_bang_cn_readonly(
                 _add_group_hdr("I. Nguồn vốn Trung ương")
                 da_ghi_hdr_tw = True
             _add_row(_ten_ct_base(ma_ct, {}), kh_tw, th_tw, "  ")
+    if da_ghi_hdr_tw:
+        _add_section_total("TỔNG CỘNG PHẦN I", tong_kh_i, tong_th_i)
 
     # ── Nhóm II — Nguồn vốn Địa phương ───────────────────────────────────
     da_ghi_hdr_dp = False
@@ -299,6 +331,8 @@ def _hien_thi_bang_cn_readonly(
                 _add_group_hdr("II. Nguồn vốn Địa phương")
                 da_ghi_hdr_dp = True
             _add_row(_ten_ct_base(ma_ct, {}), kh_dp, th_dp, "  ")
+    if da_ghi_hdr_dp:
+        _add_section_total("TỔNG CỘNG PHẦN II", tong_kh_ii, tong_th_ii)
 
     # Số chương trình có KH (đếm theo CT duy nhất, không nhân đôi TW/ĐP)
     for ma_ct in order_ma_ct:

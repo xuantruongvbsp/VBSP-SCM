@@ -17,7 +17,8 @@ import db
 from auth import get_permissions, normalize_role
 from pdf_service import xuat_pdf_bang
 from state_manager import SCMStateManager
-from config import CHUONG_TRINH_KHTD, COT_TEN_PGD, DS_PGD, PGD_XA_MAP
+from config import CHUONG_TRINH_KHTD, COT_TEN_PGD, DS_PGD, PGD_XA_MAP, CACHE_GQVL, CACHE_HSTD
+from data.core import ts_file
 from utils import fmt, xuat_excel, ten_file_xuat, vn
 
 from tabs.tab_khtd import (
@@ -37,7 +38,6 @@ from tabs.tab_khtd import (
     _quet_ct_co_du_no,
     _ten_ct_base,
     _tinh_thuc_hien_theo_ct,
-    _tinh_th_nsvsmt_dp_phan_tang,
 )
 # NOTE: _hien_thi_bang_cn_readonly import lazy (tránh circular import)
 # tab_khtd_xuat → tab_khtd → tab_khtd_nhap → tab_khtd_xuat (vòng tròn)
@@ -93,6 +93,118 @@ def _dong_bo_nsvsmt_dp_keys(data: dict[str, float]) -> dict[str, float]:
     if co_split:
         out["6_DP"] = float(out.get("6_DP_TINH", 0.0) or 0.0) + float(out.get("6_DP_XA", 0.0) or 0.0)
     return out
+
+
+def _fmt_trieu_input(value: float | int | None) -> str:
+    """Format số triệu đồng theo kiểu 1.234.567 để dễ rà soát trước khi lưu."""
+    try:
+        num = int(round(float(value or 0.0)))
+    except Exception:
+        return ""
+    if num <= 0:
+        return ""
+    return f"{num:,}".replace(",", ".")
+
+
+def _parse_trieu_input(raw: object, field_label: str = "") -> float:
+    """Parse chuỗi nhập liệu triệu đồng; chấp nhận cả dạng 1250000 và 1.250.000."""
+    text = str(raw or "").strip()
+    if not text:
+        return 0.0
+    normalized = text.replace(" ", "").replace(".", "").replace(",", "")
+    if not normalized.isdigit():
+        ten_truong = field_label or "Giá trị nhập"
+        raise ValueError(
+            f"{ten_truong}: chỉ nhập số nguyên triệu đồng; có thể gõ `1250000` hoặc `1.250.000`."
+        )
+    return float(int(normalized))
+
+
+def _doc_trieu_input_safe(widget_key: str, fallback: float = 0.0) -> float:
+    """Đọc nhanh giá trị hiện có trong session_state mà không làm vỡ UI nếu user gõ lỗi."""
+    try:
+        return _parse_trieu_input(st.session_state.get(widget_key, ""), widget_key)
+    except ValueError:
+        return float(fallback or 0.0)
+
+
+def _apply_pending_trieu_inputs(state_key: str) -> None:
+    """Áp lại giá trị đã parse vào text_input ở lần rerun kế tiếp để hiện dấu phân cách."""
+    pending = st.session_state.pop(state_key, None)
+    if not isinstance(pending, dict):
+        return
+    for widget_key, value_trieu in pending.items():
+        st.session_state[widget_key] = _fmt_trieu_input(value_trieu)
+
+
+def _render_trieu_text_input(
+    container,
+    *,
+    label: str,
+    widget_key: str,
+    value_trieu: float,
+    help_text: str | None = None,
+) -> float:
+    """Ô nhập KH dạng text để có thể chuẩn hóa dấu phân cách sau khi xem trước/lưu."""
+    if widget_key not in st.session_state:
+        st.session_state[widget_key] = _fmt_trieu_input(value_trieu)
+    container.text_input(
+        label,
+        key=widget_key,
+        help=help_text,
+        label_visibility="collapsed",
+        placeholder="0",
+    )
+    return _doc_trieu_input_safe(widget_key, value_trieu)
+
+
+@st.cache_data(show_spinner=False)
+def _tinh_th_cn_cached(
+    _df_full: "pd.DataFrame | None",
+    _df_gqvl: "pd.DataFrame | None",
+    hstd_mtime: float = 0.0,
+    gqvl_mtime: float = 0.0,
+) -> tuple[dict[str, float], dict[str, float]]:
+    """Tính TH KHTD Chi nhánh theo mtime parquet để tránh quét lại mỗi rerun."""
+    _ = (hstd_mtime, gqvl_mtime)
+    th_cn = _tinh_thuc_hien_theo_ct(_df_full) if _df_full is not None else {}
+    th_gqvl = _tinh_th_gqvl_phan_tang(_df_full, _df_gqvl)
+    for ma_key, gia_tri in th_gqvl.items():
+        th_cn[ma_key] = float(gia_tri or 0.0)
+    return th_cn, th_gqvl
+
+
+@st.cache_data(show_spinner=False)
+def _du_lieu_khtd_pgd_cached(
+    _df_full: "pd.DataFrame | None",
+    pgd_chon: str,
+    hstd_mtime: float = 0.0,
+) -> tuple[dict[str, float], dict[str, str]]:
+    """Lọc dữ liệu theo PGD rồi tính TH/ten_map một lần theo mtime HSTD."""
+    _ = hstd_mtime
+    if _df_full is None or _df_full.empty or COT_TEN_PGD not in _df_full.columns:
+        return {}, {}
+
+    pgd_norm = str(pgd_chon).strip()
+    s_pgd = _df_full[COT_TEN_PGD].astype(str).str.strip()
+    df_loc = _df_full[s_pgd == pgd_norm]
+    th_xa = _tinh_thuc_hien_theo_ct(df_loc) if not df_loc.empty else {}
+    _, ten_map_q = _quet_ct_co_du_no(df_loc)
+    return th_xa, ten_map_q
+
+
+@st.cache_data(show_spinner=False)
+def _du_lieu_hien_thi_khtd_cn_cached(
+    _df_full: "pd.DataFrame | None",
+    nv_chon: str,
+    them_keys: tuple[str, ...],
+    hstd_mtime: float = 0.0,
+) -> tuple[list[tuple[str, str]], dict[str, str]]:
+    """Cache danh sách CT hiển thị và ten_map cho màn KHTD Chi nhánh."""
+    _ = hstd_mtime
+    ds_ct = _chon_ds_ct(nv_chon, _df_full, them_keys=set(them_keys))
+    _, ten_map_q = _quet_ct_co_du_no(_df_full)
+    return ds_ct, ten_map_q
 
 
 # Thư mục lưu văn bản QĐ cấp Chi nhánh
@@ -256,14 +368,9 @@ def _tab_khtd_chi_nhanh(
 
     co_quyen = get_permissions(role)["can_edit_khtd"]
     kh_cn = _dong_bo_nsvsmt_dp_keys(_doc_kv(KV_KEY_CN))
-    th_cn = _tinh_thuc_hien_theo_ct(df_full) if df_full is not None else {}
-    # Merge TH NSVSMT phân tầng (6_DP_TINH / 6_DP_XA) vào th_cn
-    th_nsvsmt = _tinh_th_nsvsmt_dp_phan_tang(df_full)
-    th_cn = {**(th_cn or {}), **th_nsvsmt}
-    # Tính TH GQVL phân tầng 4 nhóm
-    th_gqvl = _tinh_th_gqvl_phan_tang(df_full, df_gqvl)
-    for ma_key, gia_tri in th_gqvl.items():
-        th_cn[ma_key] = float(gia_tri or 0.0)
+    hstd_mtime = ts_file(CACHE_HSTD)
+    gqvl_mtime = ts_file(CACHE_GQVL)
+    th_cn, th_gqvl = _tinh_th_cn_cached(df_full, df_gqvl, hstd_mtime, gqvl_mtime)
 
     if not co_quyen:
         st.warning("⚠️ Chỉ Admin / Manager mới được nhập kế hoạch cấp Chi nhánh.")
@@ -273,6 +380,7 @@ def _tab_khtd_chi_nhanh(
             kh_cn,
             th_cn,
             df_loc=df_loc,
+            th_gqvl=th_gqvl,
             username=username,
         )
         st.divider()
@@ -286,10 +394,12 @@ def _tab_khtd_chi_nhanh(
         key="khtd_cn_nv_radio",
     )
     df_loc = df_full
-    ds_ct = _chon_ds_ct(nv_chon, df_loc, them_keys=set(kh_cn.keys()) | set(th_cn.keys()))
-
-    # ── Phương thức 2: Nhập thủ công (bảng gọn) ──────────────────────────
-    _, ten_map_q = _quet_ct_co_du_no(df_loc)
+    ds_ct, ten_map_q = _du_lieu_hien_thi_khtd_cn_cached(
+        df_loc,
+        nv_chon,
+        tuple(sorted(set(kh_cn.keys()) | set(th_cn.keys()))),
+        hstd_mtime,
+    )
 
     # ── Banner trạng thái KH ──
     tong_ct = len(MA_KEYS_CO_KHTD)
@@ -330,9 +440,26 @@ def _tab_khtd_chi_nhanh(
         unsafe_allow_html=True,
     )
 
-    st.caption("📌 Đơn vị nhập và hiển thị: triệu đồng — số nguyên, không có thập phân")
+    # ── Tóm tắt hiện trạng (luôn hiển thị) ───────────────────────────────
+    st.markdown("##### 📊 Tóm tắt hiện trạng")
+    from tabs.tab_khtd_xuat import _hien_thi_bang_cn_readonly  # lazy – tránh circular import
+    _hien_thi_bang_cn_readonly(
+        kh_cn,
+        th_cn,
+        ds_ct_loc=[mk for mk, _ in ds_ct],
+        df_loc=df_loc,
+        th_gqvl=th_gqvl,
+        username=username,
+    )
 
-    _colw = [2, 1, 1, 1, 1, 1, 1, 1, 1]
+    st.caption(
+        "📌 Đơn vị nhập và hiển thị: triệu đồng — số nguyên. "
+        "Có thể gõ `1250000` hoặc `1.250.000`; bấm `👁 Xem trước tính toán` để chuẩn hóa dấu phân cách ngay trên ô nhập."
+    )
+
+    _apply_pending_trieu_inputs("khtd_cn_pending_inputs")
+
+    _colw = [3.4, 1.2, 1.05, 1.1, 1.2, 1.05, 1.1, 1.15, 1.15]
     _ths = (
         "font-size:0.82rem;font-weight:600;text-align:center;"
         "padding:7px 6px;border-radius:4px;white-space:nowrap"
@@ -342,10 +469,10 @@ def _tab_khtd_chi_nhanh(
 <table style="width:100%;border-collapse:collapse;border-spacing:0;
   table-layout:fixed;margin-bottom:2px;border:1px solid #cbd5e1">
 <colgroup>
-  <col style="width:20%">
-  <col style="width:10%"><col style="width:10%"><col style="width:10%">
-  <col style="width:10%"><col style="width:10%"><col style="width:10%">
-  <col style="width:10%"><col style="width:10%">
+  <col style="width:24%">
+  <col style="width:9.5%"><col style="width:9.5%"><col style="width:9.5%">
+  <col style="width:9.5%"><col style="width:9.5%"><col style="width:9.5%">
+  <col style="width:9.5%"><col style="width:9.5%">
 </colgroup>
 <tr>
   <th style="{_ths};background:#f0f4fa;border:1px solid #cbd5e1"></th>
@@ -384,29 +511,44 @@ def _tab_khtd_chi_nhanh(
   --khtd-neg: #c62828;
   --khtd-ok: #2e7d32;
   --khtd-muted: #64748b;
+  --khtd-bd: #e2e8f0;
 }
 @media (prefers-color-scheme: dark) {
   :root {
     --khtd-neg: #ff8787;
     --khtd-ok: #69db7c;
     --khtd-muted: #9ca3af;
+    --khtd-bd: #334155;
   }
 }
 [data-testid="stHorizontalBlock"] {
-    border-bottom: 1px solid #e2e8f0 !important;
-    border-right: 1px solid #e2e8f0 !important;
-    border-left: 1px solid #e2e8f0 !important;
-    padding: 2px 0 !important;
+    border-bottom: 1px solid var(--khtd-bd) !important;
+    border-right: 1px solid var(--khtd-bd) !important;
+    border-left: 1px solid var(--khtd-bd) !important;
+    padding: 4px 0 !important;
 }
 [data-testid="stHorizontalBlock"] > div {
-    border-right: 1px solid #e2e8f0 !important;
-    padding: 4px 8px !important;
+    border-right: 1px solid var(--khtd-bd) !important;
+    padding: 6px 10px !important;
 }
 [data-testid="stHorizontalBlock"] > div:last-child {
     border-right: none !important;
 }
 [data-testid="stHorizontalBlock"]:hover {
     background-color: rgba(128,128,128,0.12) !important;
+}
+.stTextInput input {
+    font-size: 16px !important;
+    font-weight: 600 !important;
+    text-align: right !important;
+    padding: 8px 10px !important;
+    min-height: 38px !important;
+}
+.stTextInput > div {
+    width: 100% !important;
+}
+.stTextInput {
+    margin: 2px 0 !important;
 }
 </style>
 """,
@@ -423,6 +565,7 @@ def _tab_khtd_chi_nhanh(
         ("#b45309", "#ffffff"),
     ]
     idx_nhom = 0
+    nhap_help = "Nhập số nguyên triệu đồng; có thể gõ 1250000 hoặc 1.250.000."
     for tieu_de_nhom, ds_ma_ct in KHTD_CN_NHOM_MA_CT:
         bg, fg = nhom_style[idx_nhom % len(nhom_style)]
         idx_nhom += 1
@@ -437,7 +580,7 @@ def _tab_khtd_chi_nhanh(
             # ── Xử lý đặc biệt: GQVL (ma_ct=3) phân tầng 4 nhóm ─────────────────
             if ma_ct == 3:
                 # Header GQVL (chỉ hiển thị, không có input)
-                cols_hdr = st.columns(_colw)
+                cols_hdr = st.columns(_colw, gap="medium")
                 cols_hdr[0].markdown(
                     "<div style='font-size:0.88rem;font-weight:600;"
                     "padding:4px 0;color:var(--text-color, inherit);line-height:1.35'>"
@@ -464,7 +607,7 @@ def _tab_khtd_chi_nhanh(
                     kh_trieu = kh_vnd / 1_000_000
                     th_trieu = th_gqvl.get(sub_key, 0.0) / 1e6
 
-                    cols_sub = st.columns(_colw)
+                    cols_sub = st.columns(_colw, gap="medium")
                     # Tên sub: thụt vào, màu nhạt hơn
                     cols_sub[0].markdown(
                         f"<div style='font-size:0.83rem;color:var(--text-color);opacity:0.75;"
@@ -476,16 +619,13 @@ def _tab_khtd_chi_nhanh(
                     col_th_idx = 2 if sub_nv == "TW" else 5
                     col_cp_idx = 3 if sub_nv == "TW" else 6
 
-                    cols_sub[col_kh_idx].number_input(
-                        sub_ten,
-                        value=kh_trieu,
-                        min_value=0.0,
-                        step=1000.0,
-                        format="%.0f",
-                        label_visibility="collapsed",
-                        key=k_inp,
+                    kh_inp = _render_trieu_text_input(
+                        cols_sub[col_kh_idx],
+                        label=sub_ten,
+                        widget_key=k_inp,
+                        value_trieu=kh_trieu,
+                        help_text=nhap_help,
                     )
-                    kh_inp = float(st.session_state.get(k_inp, kh_trieu))
 
                     cols_sub[col_th_idx].markdown(
                         _md_right(_fvn_form(th_trieu, 0)), unsafe_allow_html=True
@@ -512,7 +652,7 @@ def _tab_khtd_chi_nhanh(
                 continue  # Bỏ qua xử lý mặc định cho ma_ct == 3
 
             if ma_ct == 6:
-                cols_hdr = st.columns(_colw)
+                cols_hdr = st.columns(_colw, gap="medium")
                 cols_hdr[0].markdown(
                     "<div style='font-size:0.88rem;font-weight:600;"
                     "padding:4px 0;color:var(--text-color, inherit);line-height:1.35'>"
@@ -524,17 +664,13 @@ def _tab_khtd_chi_nhanh(
                 kh_tw_vnd = float(kh_cn.get("6_TW", 0.0))
                 kh_tw_trieu_ht = kh_tw_vnd / 1_000_000
                 th_tw_trieu = float((th_cn or {}).get("6_TW", 0.0)) / 1e6
-                cols_hdr[1].number_input(
-                    "tw_6",
-                    value=kh_tw_trieu_ht,
-                    min_value=0.0,
-                    step=1000.0,
-                    format="%.0f",
-                    label_visibility="collapsed",
-                    help="Kế hoạch Trung ương — đơn vị: triệu đồng",
-                    key=k_tw,
+                kh_tw_trieu = _render_trieu_text_input(
+                    cols_hdr[1],
+                    label="tw_6",
+                    widget_key=k_tw,
+                    value_trieu=kh_tw_trieu_ht,
+                    help_text=nhap_help,
                 )
-                kh_tw_trieu = float(st.session_state.get(k_tw, kh_tw_trieu_ht))
                 cols_hdr[2].markdown(_md_right(_fvn_form(th_tw_trieu, 0)), unsafe_allow_html=True)
                 cpth_tw = kh_tw_trieu - th_tw_trieu
                 if kh_tw_trieu == 0:
@@ -596,22 +732,19 @@ def _tab_khtd_chi_nhanh(
                     kh_trieu = kh_vnd / 1_000_000
                     th_trieu = float((th_cn or {}).get(sub_key, 0.0)) / 1e6
 
-                    cols_sub = st.columns(_colw)
+                    cols_sub = st.columns(_colw, gap="medium")
                     cols_sub[0].markdown(
                         f"<div style='font-size:0.83rem;color:var(--text-color);opacity:0.75;"
                         f"padding:3px 0 3px 16px'>  {sub_ten}</div>",
                         unsafe_allow_html=True,
                     )
-                    cols_sub[4].number_input(
-                        sub_ten,
-                        value=kh_trieu,
-                        min_value=0.0,
-                        step=1000.0,
-                        format="%.0f",
-                        label_visibility="collapsed",
-                        key=k_inp,
+                    kh_inp = _render_trieu_text_input(
+                        cols_sub[4],
+                        label=sub_ten,
+                        widget_key=k_inp,
+                        value_trieu=kh_trieu,
+                        help_text=nhap_help,
                     )
-                    kh_inp = float(st.session_state.get(k_inp, kh_trieu))
                     cols_sub[5].markdown(_md_right(_fvn_form(th_trieu, 0)), unsafe_allow_html=True)
                     cpth = kh_inp - th_trieu
                     if kh_inp == 0:
@@ -634,7 +767,7 @@ def _tab_khtd_chi_nhanh(
             co_dp = mk_dp in MA_KEYS_CO_KHTD
             if not co_tw and not co_dp:
                 continue
-            cols = st.columns(_colw)
+            cols = st.columns(_colw, gap="medium")
             ten_hang = _ten_ct_hien_thi_nhap_cn(ma_ct, ten_map_q)
             cols[0].markdown(
                 f"<div style='font-size:0.88rem;padding:4px 0;color:var(--text-color, inherit);"
@@ -652,20 +785,12 @@ def _tab_khtd_chi_nhanh(
             th_dp_trieu = float((th_cn or {}).get(mk_dp, 0.0)) / 1e6
 
             if co_tw:
-                cols[1].number_input(
-                    f"tw_{ma_ct}",
-                    value=ht_tw,
-                    min_value=0.0,
-                    step=1000.0,
-                    format="%.0f",
-                    label_visibility="collapsed",
-                    help="Kế hoạch Trung ương — đơn vị: triệu đồng",
-                    key=k_tw,
-                )
-                kh_tw_trieu = float(
-                    st.session_state[k_tw]
-                    if k_tw in st.session_state
-                    else ht_tw
+                kh_tw_trieu = _render_trieu_text_input(
+                    cols[1],
+                    label=f"tw_{ma_ct}",
+                    widget_key=k_tw,
+                    value_trieu=ht_tw,
+                    help_text=nhap_help,
                 )
             else:
                 cols[1].caption("—")
@@ -695,20 +820,12 @@ def _tab_khtd_chi_nhanh(
                     )
 
             if co_dp:
-                cols[4].number_input(
-                    f"dp_{ma_ct}",
-                    value=ht_dp,
-                    min_value=0.0,
-                    step=1000.0,
-                    format="%.0f",
-                    label_visibility="collapsed",
-                    help="Kế hoạch Địa phương — đơn vị: triệu đồng",
-                    key=k_dp,
-                )
-                kh_dp_trieu = float(
-                    st.session_state[k_dp]
-                    if k_dp in st.session_state
-                    else ht_dp
+                kh_dp_trieu = _render_trieu_text_input(
+                    cols[4],
+                    label=f"dp_{ma_ct}",
+                    widget_key=k_dp,
+                    value_trieu=ht_dp,
+                    help_text=nhap_help,
                 )
             else:
                 cols[4].caption("—")
@@ -769,7 +886,7 @@ def _tab_khtd_chi_nhanh(
                 continue
             if ma_ct == 6:
                 tong_kh_trieu_hien_tai += float(
-                    st.session_state.get(
+                    _doc_trieu_input_safe(
                         "khtd_cn_inp_6_tw",
                         float(kh_cn.get("6_TW", 0.0)) / 1_000_000,
                     )
@@ -777,7 +894,7 @@ def _tab_khtd_chi_nhanh(
                 for sub_key, _, _ in NSVSMT_DP_SUB_NHOM:
                     k_inp = f"khtd_cn_inp_{sub_key}"
                     tong_kh_trieu_hien_tai += float(
-                        st.session_state.get(
+                        _doc_trieu_input_safe(
                             k_inp,
                             float(kh_cn.get(sub_key, 0.0)) / 1_000_000,
                         )
@@ -788,23 +905,27 @@ def _tab_khtd_chi_nhanh(
             if mk_tw in MA_KEYS_CO_KHTD:
                 k_tw = f"khtd_cn_inp_{ma_ct}_tw"
                 tong_kh_trieu_hien_tai += float(
-                    st.session_state[k_tw]
-                    if k_tw in st.session_state
-                    else float(kh_cn.get(mk_tw, 0.0)) / 1_000_000
+                    _doc_trieu_input_safe(
+                        k_tw,
+                        float(kh_cn.get(mk_tw, 0.0)) / 1_000_000,
+                    )
                 )
             if mk_dp in MA_KEYS_CO_KHTD:
                 k_dp = f"khtd_cn_inp_{ma_ct}_dp"
                 tong_kh_trieu_hien_tai += float(
-                    st.session_state[k_dp]
-                    if k_dp in st.session_state
-                    else float(kh_cn.get(mk_dp, 0.0)) / 1_000_000
+                    _doc_trieu_input_safe(
+                        k_dp,
+                        float(kh_cn.get(mk_dp, 0.0)) / 1_000_000,
+                    )
                 )
     # Thêm 4 sub-key GQVL vào tổng (thay vì đếm 3_TW/3_DP)
     for sub_key, _, _ in GQVL_SUB_NHOM:
         k_inp = f"khtd_cn_inp_{sub_key}"
         tong_kh_trieu_hien_tai += float(
-            st.session_state.get(k_inp,
-                float(kh_cn.get(sub_key, 0.0)) / 1_000_000)
+            _doc_trieu_input_safe(
+                k_inp,
+                float(kh_cn.get(sub_key, 0.0)) / 1_000_000,
+            )
         )
     tong_kh_nhap_form = tong_kh_trieu_hien_tai * 1_000_000
 
@@ -821,42 +942,78 @@ def _tab_khtd_chi_nhanh(
 
     if xem_truoc or luu:
         patch: dict[str, float] = {}
+        pending_inputs: dict[str, float] = {}
+        errors: list[str] = []
         for tieu_de_nhom, ds_ma_ct in KHTD_CN_NHOM_MA_CT:
             for ma_ct in ds_ma_ct:
                 # Bỏ qua CT 3 khi lưu mặc định - sẽ lưu qua sub-key
                 if ma_ct == 3:
                     continue
                 if ma_ct == 6:
-                    patch["6_TW"] = float(st.session_state.get("khtd_cn_inp_6_tw", 0.0))
+                    try:
+                        val_6_tw = _parse_trieu_input(
+                            st.session_state.get("khtd_cn_inp_6_tw", ""),
+                            "NSVSMT TW",
+                        )
+                        patch["6_TW"] = val_6_tw
+                        pending_inputs["khtd_cn_inp_6_tw"] = val_6_tw
+                    except ValueError as e:
+                        errors.append(str(e))
                     for sub_key, _, _ in NSVSMT_DP_SUB_NHOM:
                         k_inp = f"khtd_cn_inp_{sub_key}"
-                        patch[sub_key] = float(st.session_state.get(k_inp, 0.0))
+                        try:
+                            val_sub = _parse_trieu_input(st.session_state.get(k_inp, ""), sub_key)
+                            patch[sub_key] = val_sub
+                            pending_inputs[k_inp] = val_sub
+                        except ValueError as e:
+                            errors.append(str(e))
                     patch["6_DP"] = patch.get("6_DP_TINH", 0.0) + patch.get("6_DP_XA", 0.0)
                     continue
                 mk_tw = f"{ma_ct}_TW"
                 mk_dp = f"{ma_ct}_DP"
                 if mk_tw in MA_KEYS_CO_KHTD:
-                    patch[mk_tw] = float(
-                        st.session_state.get(f"khtd_cn_inp_{ma_ct}_tw", 0.0)
-                    )
+                    widget_key_tw = f"khtd_cn_inp_{ma_ct}_tw"
+                    try:
+                        val_tw = _parse_trieu_input(st.session_state.get(widget_key_tw, ""), mk_tw)
+                        patch[mk_tw] = val_tw
+                        pending_inputs[widget_key_tw] = val_tw
+                    except ValueError as e:
+                        errors.append(str(e))
                 if mk_dp in MA_KEYS_CO_KHTD:
-                    patch[mk_dp] = float(
-                        st.session_state.get(f"khtd_cn_inp_{ma_ct}_dp", 0.0)
-                    )
+                    widget_key_dp = f"khtd_cn_inp_{ma_ct}_dp"
+                    try:
+                        val_dp = _parse_trieu_input(st.session_state.get(widget_key_dp, ""), mk_dp)
+                        patch[mk_dp] = val_dp
+                        pending_inputs[widget_key_dp] = val_dp
+                    except ValueError as e:
+                        errors.append(str(e))
         # Lưu 4 sub-key GQVL
         for sub_key, _, _ in GQVL_SUB_NHOM:
             k_inp = f"khtd_cn_inp_{sub_key}"
-            patch[sub_key] = float(st.session_state.get(k_inp, 0.0))
+            try:
+                val_sub = _parse_trieu_input(st.session_state.get(k_inp, ""), sub_key)
+                patch[sub_key] = val_sub
+                pending_inputs[k_inp] = val_sub
+            except ValueError as e:
+                errors.append(str(e))
         # Backward compat: ghi tổng vào key cũ
         patch["3_TW"] = patch.get("3_TW_NHCSXH", 0.0) + patch.get("3_TW_NSNN", 0.0)
         patch["3_DP"] = patch.get("3_DP_TINH", 0.0) + patch.get("3_DP_XA", 0.0)
+        if errors:
+            st.error("⚠️ Có ô nhập chưa đúng định dạng:\n- " + "\n- ".join(errors[:10]))
+        else:
+            st.session_state["khtd_cn_pending_inputs"] = pending_inputs
         tong_kh_luu = sum(v * 1_000_000 for v in patch.values())
-        if tong_kh_luu <= 0:
+        if not errors and tong_kh_luu <= 0:
             if luu:
                 st.warning(
                     "⚠️ Tất cả chỉ tiêu đang = 0, kiểm tra lại trước khi lưu"
                 )
-        elif luu:
+            elif xem_truoc:
+                st.rerun()
+        elif not errors and xem_truoc and not luu:
+            st.rerun()
+        elif not errors and luu:
             for ma_key, gia_tri_trieu in patch.items():
                 kh_cn[ma_key] = gia_tri_trieu * 1_000_000
             if _luu_kv(KV_KEY_CN, kh_cn, username):
@@ -938,17 +1095,6 @@ def _tab_khtd_chi_nhanh(
             f"Thực hiện: **{_fvn(all_th_d / 1e6, 0)}** triệu đồng · "
             f"Đạt **{_pt(pt_all)}**"
         )
-
-    # ── Tóm tắt hiện trạng (luôn hiển thị) ───────────────────────────────
-    st.markdown("##### 📊 Tóm tắt hiện trạng")
-    from tabs.tab_khtd_xuat import _hien_thi_bang_cn_readonly  # lazy – tránh circular import
-    _hien_thi_bang_cn_readonly(
-        kh_cn,
-        th_cn,
-        ds_ct_loc=[mk for mk, _ in ds_ct],
-        df_loc=df_loc,
-        username=username,
-    )
 
     st.divider()
     _section_van_ban_qd_cn(role, username)
@@ -1073,17 +1219,9 @@ def _tab_khtd_theo_xa(role: str, username: str, df_full: "pd.DataFrame | None") 
 
     kh_xa = _doc_kv(KV_KEY_XA)
 
-    # ── Chọn PGD → Xã ────────────────────────────────────────────────────
-    col_pgd, col_xa = st.columns(2)
-    with col_pgd:
-        pgd_chon = st.selectbox("Chọn PGD", DS_PGD, key="khtd_xa_pgd_sel")
+    # ── Chọn PGD ─────────────────────────────────────────────────────────
+    pgd_chon = st.selectbox("Chọn PGD", DS_PGD, key="khtd_xa_pgd_sel")
     danh_sach_xa = PGD_XA_MAP.get(pgd_chon, [])
-    with col_xa:
-        xa_chon = st.selectbox(
-            "Chọn Xã", danh_sach_xa if danh_sach_xa else ["(Không có xã)"],
-            key="khtd_xa_xa_sel",
-        )
-
     if not danh_sach_xa:
         st.warning(f"Chưa có danh sách xã cho **{pgd_chon}**.")
         return
@@ -1224,20 +1362,10 @@ def _tab_khtd_theo_xa(role: str, username: str, df_full: "pd.DataFrame | None") 
                 logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                 st.error(f"Lỗi đọc file Excel: {e}")
 
-    df_loc = df_full
-    if df_loc is not None and not df_loc.empty and COT_TEN_PGD in df_loc.columns:
-        pgd_norm = str(pgd_chon).strip()
-        s_pgd = df_loc[COT_TEN_PGD].astype(str).str.strip()
-        df_loc = df_loc[s_pgd == pgd_norm]
-
-    th_xa = (
-        _tinh_thuc_hien_theo_ct(df_loc)
-        if df_loc is not None and not df_loc.empty
-        else {}
-    )
+    hstd_mtime = ts_file(CACHE_HSTD)
+    th_xa, ten_map_q = _du_lieu_khtd_pgd_cached(df_full, pgd_chon, hstd_mtime)
 
     st.divider()
-    _, ten_map_q = _quet_ct_co_du_no(df_loc)
     st.caption("📌 Đơn vị nhập và hiển thị: triệu đồng")
 
     _colw_xa = [3, 1, 1, 1, 1]  # Chương trình | KH TW | TH TW | KH ĐP | TH ĐP
@@ -1268,6 +1396,39 @@ def _tab_khtd_theo_xa(role: str, username: str, df_full: "pd.DataFrame | None") 
   <th style="{_ths_xa};background:#e8f5e9;color:#2e7d32">Thực hiện</th>
 </tr>
 </table>""",
+        unsafe_allow_html=True,
+    )
+
+    # ── Dòng tổng cộng ───────────────────────────────────────────────────
+    tong_kh_tw = sum(
+        float(kh_xa.get(f"{xa_chon}|{mk}", 0.0))
+        for mk in MA_KEYS_CO_KHTD if mk.endswith("_TW")
+    ) / 1_000_000
+    tong_kh_dp = sum(
+        float(kh_xa.get(f"{xa_chon}|{mk}", 0.0))
+        for mk in MA_KEYS_CO_KHTD if mk.endswith("_DP")
+    ) / 1_000_000
+    tong_th_tw = sum(
+        float(th_xa.get(mk, 0.0))
+        for mk in MA_KEYS_CO_KHTD if mk.endswith("_TW")
+    ) / 1e6
+    tong_th_dp = sum(
+        float(th_xa.get(mk, 0.0))
+        for mk in MA_KEYS_CO_KHTD if mk.endswith("_DP")
+    ) / 1e6
+    _txt_kh_tw = f"{_fmt_vn(int(tong_kh_tw), 0)} tr" if tong_kh_tw > 0 else "—"
+    _txt_th_tw = f"{_fmt_vn(int(tong_th_tw), 0)} tr" if tong_th_tw > 0 else "—"
+    _txt_kh_dp = f"{_fmt_vn(int(tong_kh_dp), 0)} tr" if tong_kh_dp > 0 else "—"
+    _txt_th_dp = f"{_fmt_vn(int(tong_th_dp), 0)} tr" if tong_th_dp > 0 else "—"
+    st.markdown(
+        f"<div style='display:flex;gap:12px;padding:8px 14px;background:#e8f4fd;color:#1f2937;"
+        f"border-radius:6px;margin:6px 0;font-size:0.9rem'>"
+        f"<span style='font-weight:600'>📊 Tổng cộng:</span>"
+        f"<span>KH TW: <b>{_txt_kh_tw}</b></span>"
+        f"<span>TH TW: <b>{_txt_th_tw}</b></span>"
+        f"<span>KH ĐP: <b>{_txt_kh_dp}</b></span>"
+        f"<span>TH ĐP: <b>{_txt_th_dp}</b></span>"
+        f"</div>",
         unsafe_allow_html=True,
     )
 
@@ -1308,6 +1469,18 @@ def _tab_khtd_theo_xa(role: str, username: str, df_full: "pd.DataFrame | None") 
     padding: 6px 8px !important;
     height: 36px !important;
 }
+.stTextInput input {
+    font-size: 16px !important;
+    font-weight: 600 !important;
+    text-align: right !important;
+    padding: 8px 10px !important;
+    min-height: 38px !important;
+}
+.stTextInput > div,
+.stNumberInput > div {
+    width: 100% !important;
+}
+.stTextInput,
 .stNumberInput {
     margin: 2px 0 !important;
 }

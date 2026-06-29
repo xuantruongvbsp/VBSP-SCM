@@ -794,6 +794,26 @@
 | **Bài học** | Với dữ liệu tham chiếu chéo, phải tách rõ: file nào là nguồn số tiền chính, file nào chỉ dùng để gắn nhãn/phân loại; không được lấy nhầm số tiền từ file tham chiếu |
 | **Ngày fix** | 2026-06-25 |
 
+### G11 — `📊 Tóm tắt hiện trạng` sinh đúng subtotal nhưng UI chưa hiện đủ hàng HTML
+| | |
+|---|---|
+| **File** | `tabs/tab_khtd_xuat.py` |
+| **Dấu hiệu** | Màn `📈 Kế hoạch tín dụng` → `🏛️ KHTD Chi nhánh` reload xong vẫn không thấy các hàng `TỔNG CỘNG PHẦN I` / `TỔNG CỘNG PHẦN II`, dù helper `_hien_thi_bang_cn_readonly()` đã append đủ các dòng subtotal vào HTML |
+| **Nguyên nhân** | Bảng readonly được render bằng `st.markdown(html, unsafe_allow_html=True)`. Với HTML table dài, runtime/frontend hiện tại có thể không phản ánh đầy đủ các hàng subtotal dù chuỗi HTML đầu ra đã đúng |
+| **Fix** | Đổi `_hien_thi_bang_cn_readonly()` sang ưu tiên `st.html(html)` để render HTML table đúng hơn; chỉ fallback `st.markdown(..., unsafe_allow_html=True)` khi runtime cũ chưa hỗ trợ `st.html` |
+| **Bài học** | Với bảng HTML thuần nhiều dòng/cột trong Streamlit, ưu tiên `st.html()` nếu version hỗ trợ; không nên mặc định tin rằng `st.markdown(..., unsafe_allow_html=True)` sẽ luôn render đúng toàn bộ cấu trúc bảng |
+| **Ngày fix** | 2026-06-27 |
+
+### G12 — `🏛️ KHTD Chi nhánh`: ô nhập KH không có dấu phân cách nên khó kiểm tra trước khi lưu
+| | |
+|---|---|
+| **File** | `tabs/tab_khtd_nhap.py` |
+| **Dấu hiệu** | Ở bảng nhập `🏛️ KHTD Chi nhánh`, người dùng gõ các số lớn như `1250000` nhưng ô nhập không hiện dạng `1.250.000`, nên khó rà soát đã nhập đúng hay chưa; cột số cũng khá sít nhau nên nhìn mỏi mắt |
+| **Nguyên nhân** | `st.number_input` chỉ dùng `format="%.0f"` để tránh lỗi render trước đó, nên không hỗ trợ hiển thị dấu phân cách hàng nghìn trong ô nhập. Bố cục `st.columns()` cũ cũng dành hơi ít không gian cho các cột số |
+| **Fix** | Đổi riêng phần nhập KH của `🏛️ KHTD Chi nhánh` sang `text_input` + parse số nguyên triệu đồng an toàn; sau khi bấm `👁 Xem trước tính toán` hoặc `💾 Lưu`, giá trị được chuẩn hóa lại thành dạng `1.234.567` ngay trên ô nhập. Đồng thời nới tỷ lệ cột và padding để bảng thoáng hơn |
+| **Bài học** | Với form cần tránh rerun liên tục nhưng vẫn muốn user tự rà số lớn, không nên ép `number_input` làm việc nó không hỗ trợ; dùng `text_input` + parse/format ở bước preview/save sẽ an toàn và rõ ràng hơn |
+| **Ngày fix** | 2026-06-29 |
+
 ---
 
 ## H. GSheet / Google Sheets
@@ -866,6 +886,15 @@
 | **Nguyên nhân** | `tab_tongquan.py` gọi `load_cdto_toan_cn()` + `render_totkvv_html()` mà không lọc theo `pgd_user`; `render_totkvv_html()` hardcode title "toàn Chi nhánh" |
 | **Fix** | Khi `pgd_user` có giá trị: filter `cdto["df_raw"]` qua `loc_df(df, "pgd", pgd_user)`, recompute KPI, truyền `ten_don_vi=pgd_user` vào `render_totkvv_html()`; thêm param `ten_don_vi` vào hàm này |
 | **Ngày fix** | 2026-06-02 |
+
+### I4 — Menu `🗺️ Hỗ trợ địa bàn` hiển thị số liệu toàn CN dưới nhãn PGD (Biên Hòa)
+| | |
+|---|---|
+| **File** | `app.py` → block sidebar workspace `operation` |
+| **Dấu hiệu** | Sidebar hiển thị tiêu đề `🏦 PGD/Biên Hòa` nhưng số hồ sơ / tra cứu nhanh lại dựa trên DataFrame toàn Chi nhánh |
+| **Nguyên nhân** | `pgd_user` có thể là alias (`PGD Biên Hòa`) không khớp giá trị thực trong cột `Tên PGD` (đang dùng `Hội sở Chi nhánh tỉnh`), và logic build `df_pgd` có nhánh rơi về `_df_op` (toàn CN) khi không lọc được |
+| **Fix** | Chuẩn hóa `pgd_user` qua `ten_doc_ve_don_vi_chuan()` trước khi filter theo `Tên PGD`; với ngữ cảnh PGD thì không fallback về dữ liệu toàn CN |
+| **Ngày fix** | 2026-06-29 |
 
 ### I1 — Logic role sai / bỏ sót role mới
 | | |
@@ -1133,6 +1162,15 @@ def _duong_dan_pgd(ten_pgd: str, loai: str) -> str:
 | **Pattern tránh** | Gọi `db.ghi_kv()` / `db.ghi_audit()` trong hàm chạy mỗi rerun mà không có cache/guard |
 | **Ngày fix** | 2026-06-11 |
 
+### K8 — `📈 Kế hoạch tín dụng` phần nhập load chậm do quét HSTD/GQVL lặp lại mỗi rerun
+| | |
+|---|---|
+| **File** | `tabs/tab_khtd_nhap.py`, `tabs/tab_khtd_xuat.py` |
+| **Dấu hiệu** | Mở tab `🏛️ KHTD Chi nhánh` hoặc đổi lựa chọn trong phần nhập thấy màn hình khựng/lâu; sau khi bấm lưu hoặc xem trước phải chờ lâu mới render lại |
+| **Nguyên nhân** | Cùng một rerun đang quét `df_full` nhiều lần: `_tab_khtd_chi_nhanh()` tự tính `TH theo CT` + `GQVL phân tầng`, rồi `_hien_thi_bang_cn_readonly()` lại đọc `gqvl.parquet` và tính `GQVL phân tầng` thêm lần nữa. Ngoài ra caller còn gọi lại `_tinh_th_nsvsmt_dp_phan_tang()` dù `_tinh_thuc_hien_theo_ct()` đã gộp sẵn. Một nhánh phụ nữa là helper đọc parquet lớn dùng tham số `_ts`; với Streamlit, prefix `_` bị loại khỏi cache key nên `mtime` không thực sự bust cache. |
+| **Fix** | (1) Thêm cache theo `mtime` cho `TH` KHTD Chi nhánh, dữ liệu TH/ten_map theo PGD, và danh sách CT hiển thị màn Chi nhánh. (2) Bỏ lần tính trùng `NSVSMT`. (3) Cho `_hien_thi_bang_cn_readonly()` nhận `th_gqvl` từ caller để không tự đọc lại `gqvl.parquet` khi caller đã có sẵn kết quả. (4) Đổi reader parquet lớn sang `st.cache_resource` và đổi tham số `_ts` → `ts` để `mtime` thật sự nằm trong cache key. |
+| **Ngày fix** | 2026-06-27 |
+
 ---
 
 ## Lệnh debug nhanh
@@ -1353,6 +1391,33 @@ val = pd.to_numeric(df[COT_X], errors="coerce").sum() if COT_X in df.columns els
 | **Nguyên nhân** | (1) Bộ lọc nâng cao nằm trong expander nên dễ "dính" filter cũ trong `st.session_state`. (2) Lọc `.isin()`/so sánh trực tiếp trên cột mixed dtype (string/int/float) làm loại nhầm dữ liệu. (3) `Nguồn vốn` có thể là `01/02/TW/ĐP` nhưng UI chọn `1/2` → không match. (4) Keyword search chỉ `.lower()` nên gõ không dấu không match tên có dấu |
 | **Fix** | Thêm nút `🔄 Reset` luôn hiển thị; ép numeric trước khi lọc dư nợ/quá hạn/khoanh; chuẩn hóa `Nguồn vốn` về `1/2` trước khi hiển thị/lọc; keyword search hỗ trợ có dấu/không dấu bằng `vn()` |
 | **Ngày fix** | 2026-06-23 |
+
+### C21 — Ủy thác: `Số Tổ TK&VV` theo Hội đoàn thể bị thấp do trùng tên Tổ giữa các PGD
+| | |
+|---|---|
+| **File** | `services/uy_thac_service.py` → `tinh_theo_dvut()` |
+| **Dấu hiệu** | Tab `🤝 Ủy thác` → `📊 Theo Hội đoàn thể`: cột/metric `Số Tổ` nhỏ hơn thực tế, nhất là khi tổng hợp toàn Chi nhánh |
+| **Nguyên nhân** | Đếm bằng `nunique(COT_TEN_TO)` theo Hội → undercount vì tên Tổ có thể trùng giữa nhiều PGD (hoặc nhiều xã) |
+| **Fix** | Đếm theo tổ hợp định danh: ưu tiên `(Hội, PGD, Xã, Tổ)`; nếu thiếu Xã/PGD thì fallback `(Hội, PGD, Tổ)` hoặc `(Hội, Xã, Tổ)`; đồng thời `pd.to_numeric(..., errors='coerce')` trước các phép `sum()` để tránh lỗi mixed dtype |
+| **Ngày fix** | 2026-06-29 |
+
+### C22 — Ủy thác: metric `Tổng Tổ TK&VV` bị double-count khi 1 Tổ xuất hiện với nhiều Hội
+| | |
+|---|---|
+| **File** | `tabs/tab_uy_thac.py` → `_render_theo_dvut()` |
+| **Dấu hiệu** | Metric `Tổng Tổ TK&VV` (tính bằng `sum(Số Tổ theo Hội)`) lớn hơn tổng số Tổ unique toàn Chi nhánh |
+| **Nguyên nhân** | Một số bản ghi HSTD có cùng `(PGD, Xã, Tổ)` nhưng gán khác `Hội đoàn thể` → nếu cộng số tổ theo từng Hội sẽ đếm trùng |
+| **Fix** | Metric tổng hiển thị theo total unique `(PGD, Xã, Tổ)` khi đủ cột; fallback `(PGD, Tổ)` hoặc `(Xã, Tổ)` nếu thiếu cột; thêm caption cảnh báo khi phát hiện Tổ đa Hội |
+| **Ngày fix** | 2026-06-29 |
+
+### C23 — Chênh lệch số Tổ giữa `🏘️ Xếp loại Tổ TK&VV` và `🤝 Ủy thác` do khác nguồn dữ liệu/định nghĩa
+| | |
+|---|---|
+| **File** | `tabs/tab_cdtotkvv.py` → `_sub_tong_hop()`, `tabs/tab_uy_thac.py` → `_render_theo_dvut()` |
+| **Dấu hiệu** | `▶ 📊 Thông tin chung` trong `🏘️ Xếp loại Tổ TK&VV toàn Chi nhánh` có tổng Tổ khác với tab `🤝 Ủy thác` |
+| **Nguyên nhân** | CDTOTKVV là danh sách Tổ được chấm điểm theo kỳ (có thể thiếu PGD/Tổ hoặc có dòng trùng), còn `Ủy thác` đếm Tổ từ HSTD (tổ có món vay phát sinh). Hai nguồn dữ liệu không nhất thiết bằng nhau |
+| **Fix** | Trong `Xếp loại Tổ`, hiển thị tổng Tổ theo CDTOTKVV unique `(PGD, Mã Tổ)`, dùng mẫu số unique cho các tỷ lệ xếp loại, và kèm tham chiếu tổng Tổ từ HSTD theo `(PGD, Xã, Tổ)`; thêm caption giải thích chênh lệch |
+| **Ngày fix** | 2026-06-29 |
 
 ---
 

@@ -68,6 +68,17 @@ from security import (
 )
 
 
+def _chuan_hoa_pgd_user(ten_pgd: str | None) -> str | None:
+    if not ten_pgd:
+        return None
+    try:
+        from services.file_detection_service import ten_doc_ve_don_vi_chuan
+
+        return ten_doc_ve_don_vi_chuan(str(ten_pgd)) or str(ten_pgd)
+    except Exception:
+        return str(ten_pgd)
+
+
 def _toi_uu_dtype(df: pd.DataFrame) -> pd.DataFrame:
     """
     Reduce DataFrame memory after load:
@@ -322,7 +333,8 @@ def main():
 
     ho_ten    = user_info["ho_ten"]
     role      = user_info["role"]
-    pgd_user  = user_info.get("pgd")
+    pgd_user_label = user_info.get("pgd")
+    pgd_user  = _chuan_hoa_pgd_user(pgd_user_label)
     username  = st.session_state.username
 
     # Chuẩn hóa role về dạng mới (backward-compatible)
@@ -384,7 +396,7 @@ def main():
         }
         st.markdown(f"**{ho_ten}**")
         st.markdown(badge_map.get(role,""), unsafe_allow_html=True)
-        if pgd_user: st.caption(f"📍 {pgd_user}")
+        if pgd_user_label or pgd_user: st.caption(f"📍 {pgd_user_label or pgd_user}")
 
         st.divider()
         st.markdown("**Không gian làm việc**")
@@ -431,16 +443,21 @@ def main():
             _ctx_sb = st.session_state.get("_ctx") or {}
             _df_op = _ctx_sb.get("df")
             _pgd_user_op = pgd_user
+            _pgd_user_label_op = pgd_user_label or pgd_user
             _df_pgd_op = None
-            if _df_op is not None and not _df_op.empty and is_pgd_role(role) and _pgd_user_op and COT_TEN_PGD in _df_op.columns:
-                _df_pgd_op = _df_op[_df_op[COT_TEN_PGD] == _pgd_user_op].copy()
-            elif _df_op is not None and not _df_op.empty:
+            if _df_op is not None and not _df_op.empty and _pgd_user_op and COT_TEN_PGD in _df_op.columns:
+                _pgd_key = str(_pgd_user_op)
+                _df_pgd_op = _df_op[_df_op[COT_TEN_PGD] == _pgd_key].copy()
+            elif _df_op is not None and not _df_op.empty and is_pgd_role(role):
+                _df_pgd_op = None
+            elif _df_op is not None and not _df_op.empty and (not is_pgd_role(role)):
                 _df_pgd_op = _df_op
             render_sidebar_menu(
                 role=role,
                 username=username,
                 df_pgd=_df_pgd_op,
                 pgd_user=_pgd_user_op,
+                pgd_user_label=_pgd_user_label_op,
                 tab_perm=_tab_perm,
             )
 
@@ -723,6 +740,7 @@ def main():
                 df_full=df_full,
                 role=role,
                 pgd_user=pgd_user,
+                pgd_user_label=pgd_user_label,
                 username=username,
                 df_nq11=df_nq11,
                 df_gqvl=df_gqvl,

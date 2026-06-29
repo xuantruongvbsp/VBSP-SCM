@@ -17,6 +17,7 @@ from config import (
     COT_SO_KU,
     COT_TEN_CT,
     COT_TEN_KH,
+    COT_TEN_PGD,
     COT_TEN_TO,
     COT_TEN_XA,
     COT_TONG_DU_NO,
@@ -32,21 +33,54 @@ def tinh_theo_dvut(df: pd.DataFrame, dvut_order: list[str] | None = None) -> pd.
     if COT_DVUT not in df.columns:
         return pd.DataFrame()
 
-    agg: dict[str, tuple[str, str]] = {}
-    if COT_TEN_TO in df.columns:
-        agg["so_to"] = (COT_TEN_TO, "nunique")
-    if COT_SO_KU in df.columns:
-        agg["so_kh"] = (COT_SO_KU, "nunique")
-    if COT_TONG_DU_NO in df.columns:
-        agg["tong_dn"] = (COT_TONG_DU_NO, "sum")
-    if COT_DU_NO_QH in df.columns:
-        agg["nqh"] = (COT_DU_NO_QH, "sum")
-    if COT_LAI_TON in df.columns:
-        agg["lai_ton"] = (COT_LAI_TON, "sum")
-    if not agg:
+    df_src = df.copy()
+    for col in [COT_DVUT, COT_TEN_PGD, COT_TEN_XA, COT_TEN_TO, COT_SO_KU]:
+        if col in df_src.columns:
+            try:
+                s = df_src[col].astype("string").str.strip()
+                df_src[col] = s.replace("", pd.NA)
+            except Exception:
+                df_src[col] = df_src[col]
+
+    for col in [COT_TONG_DU_NO, COT_DU_NO_QH, COT_LAI_TON]:
+        if col in df_src.columns:
+            df_src[col] = pd.to_numeric(df_src[col], errors="coerce").fillna(0)
+
+    out_parts: list[pd.Series] = []
+
+    if COT_TEN_TO in df_src.columns:
+        if COT_TEN_PGD in df_src.columns and COT_TEN_XA in df_src.columns:
+            dims = [COT_DVUT, COT_TEN_PGD, COT_TEN_XA, COT_TEN_TO]
+        elif COT_TEN_PGD in df_src.columns:
+            dims = [COT_DVUT, COT_TEN_PGD, COT_TEN_TO]
+        elif COT_TEN_XA in df_src.columns:
+            dims = [COT_DVUT, COT_TEN_XA, COT_TEN_TO]
+        else:
+            dims = [COT_DVUT, COT_TEN_TO]
+        so_to = (
+            df_src[dims]
+            .dropna(subset=[COT_DVUT, COT_TEN_TO])
+            .drop_duplicates()
+            .groupby(COT_DVUT)
+            .size()
+            .rename("so_to")
+        )
+        out_parts.append(so_to)
+
+    if COT_SO_KU in df_src.columns:
+        out_parts.append(df_src.groupby(COT_DVUT)[COT_SO_KU].nunique().rename("so_kh"))
+
+    if COT_TONG_DU_NO in df_src.columns:
+        out_parts.append(df_src.groupby(COT_DVUT)[COT_TONG_DU_NO].sum().rename("tong_dn"))
+    if COT_DU_NO_QH in df_src.columns:
+        out_parts.append(df_src.groupby(COT_DVUT)[COT_DU_NO_QH].sum().rename("nqh"))
+    if COT_LAI_TON in df_src.columns:
+        out_parts.append(df_src.groupby(COT_DVUT)[COT_LAI_TON].sum().rename("lai_ton"))
+
+    if not out_parts:
         return pd.DataFrame()
 
-    t = df.groupby(COT_DVUT).agg(**agg).reset_index()
+    t = pd.concat(out_parts, axis=1).reset_index()
     if dvut_order:
         t["_ord"] = t[COT_DVUT].apply(lambda x: dvut_order.index(x) if x in dvut_order else 99)
         return t.sort_values("_ord").drop(columns="_ord")

@@ -19,8 +19,9 @@ from config import TEN_CHINH_THUC_CT, CHUONG_TRINH_KHTD, DS_PGD, COT_TEN_PGD, CA
 from data.core import ts_file
 
 
-@st.cache_data(show_spinner=False)
-def _doc_hstd_cached(_ts: float = 0) -> pd.DataFrame:
+@st.cache_resource(show_spinner=False)
+def _doc_hstd_cached(ts: float = 0) -> pd.DataFrame:
+    _ = ts
     try:
         return pd.read_parquet(CACHE_HSTD)
     except Exception as e:
@@ -28,8 +29,9 @@ def _doc_hstd_cached(_ts: float = 0) -> pd.DataFrame:
         return pd.DataFrame()
 
 
-@st.cache_data(show_spinner=False)
-def _doc_gqvl_cached(_ts: float = 0) -> pd.DataFrame:
+@st.cache_resource(show_spinner=False)
+def _doc_gqvl_cached(ts: float = 0) -> pd.DataFrame:
+    _ = ts
     try:
         return pd.read_parquet(CACHE_GQVL)
     except Exception as e:
@@ -75,17 +77,20 @@ def _hien_thi_bang_cn_readonly(
     th_cn: dict[str, float] | None = None,
     ds_ct_loc: list[str] | None = None,
     df_loc: "pd.DataFrame | None" = None,
+    th_gqvl: dict[str, float] | None = None,
     username: str = "",
 ) -> None:
-    """Bảng tóm tắt KHTD Chi nhánh — HTML thuần: STT | Chỉ tiêu | KH (triệu đồng) | TH (triệu đồng) | TL% | Trạng thái."""
-    from tabs.tab_khtd_nhap import _tinh_th_gqvl_phan_tang
-
+    """Bảng tóm tắt KHTD Chi nhánh — HTML thuần: STT | Chỉ tiêu | KH | Thực hiện | Còn phải thực hiện | TL%."""
     kh_d = dict(kh_cn or {})
     th_d = dict(th_cn or {})
 
-    df_gqvl = _doc_gqvl_cached(ts_file(CACHE_GQVL))
-    th_gqvl = _tinh_th_gqvl_phan_tang(df_loc, df_gqvl)
-    for sk, sv in th_gqvl.items():
+    if th_gqvl is None and df_loc is not None:
+        from tabs.tab_khtd_nhap import _tinh_th_gqvl_phan_tang
+
+        df_gqvl = _doc_gqvl_cached(ts_file(CACHE_GQVL))
+        th_gqvl = _tinh_th_gqvl_phan_tang(df_loc, df_gqvl)
+
+    for sk, sv in dict(th_gqvl or {}).items():
         if sv:
             th_d[sk] = sv
 
@@ -141,15 +146,6 @@ def _hien_thi_bang_cn_readonly(
             return AMBER
         return RED
 
-    def _tl_text(tl: float | None) -> str:
-        if tl is None:
-            return "—"
-        if tl >= 100:
-            return "🟢 Đạt"
-        if tl >= 95:
-            return "🟡 Đang thực hiện"
-        return "🔴 Chậm"
-
     def _td(v: str, align: str = "right", color: str = "", bg: str = "", fw: str = "") -> str:
         s = f'text-align:{align};padding:5px 8px;border:1px solid {BD};font-size:0.82rem;white-space:nowrap'
         if color:
@@ -179,6 +175,7 @@ def _hien_thi_bang_cn_readonly(
         nonlocal tong_kh, tong_th, tong_kh_i, tong_th_i, tong_kh_ii, tong_th_ii, stt_i, stt_no
         kh_v = kh_vnd / 1e6
         th_v = th_vnd / 1e6
+        con_phai_th_v = (kh_vnd - th_vnd) / 1e6
         tl = th_v / kh_v * 100 if kh_v > 0 else None
 
         if kh_v > 0 or th_v > 0:
@@ -196,17 +193,17 @@ def _hien_thi_bang_cn_readonly(
 
         kh_str = _fvn(kh_v, 0) if kh_v > 0 else "—"
         th_str = _fvn(th_v, 0) if th_v > 0 else "—"
+        con_phai_th_str = _fvn(con_phai_th_v, 0)
         tl_str = f"{_fvn(tl, 1)}%" if tl is not None else "—"
         tl_c = _tl_color(tl)
-        stt_s = _tl_text(tl)
 
         tds = (
             _td(str(stt_no), "center", "", "", "") +
             _td(f"{indent}{ten}", "left", "", "", "") +
             _td(kh_str, "right", "", "", "") +
             _td(th_str, "right", "", "", "") +
-            _td(tl_str, "right", tl_c, "", "") +
-            _td(stt_s, "left", tl_c, "", "")
+            _td(con_phai_th_str, "right", "", "", "") +
+            _td(tl_str, "right", tl_c, "", "")
         )
         html_rows.append(f"<tr>{tds}</tr>")
 
@@ -221,6 +218,7 @@ def _hien_thi_bang_cn_readonly(
         if kh_v == 0 and th_v == 0:
             return
 
+        con_phai_th_v = (kh_vnd - th_vnd) / 1e6
         tl = th_v / kh_v * 100 if kh_v > 0 else None
 
         if kh_v > 0 or th_v > 0:
@@ -238,31 +236,32 @@ def _hien_thi_bang_cn_readonly(
 
         kh_str = _fvn(kh_v, 0) if kh_v > 0 else "—"
         th_str = _fvn(th_v, 0) if th_v > 0 else "—"
+        con_phai_th_str = _fvn(con_phai_th_v, 0)
         tl_str = f"{_fvn(tl, 1)}%" if tl is not None else "—"
         tl_c = _tl_color(tl)
-        stt_s = _tl_text(tl)
 
         tds = (
             _td("", "center") +
             _td(f"    {sub_ten}", "left") +
             _td(kh_str, "right") +
             _td(th_str, "right") +
-            _td(tl_str, "right", tl_c) +
-            _td(stt_s, "left", tl_c)
+            _td(con_phai_th_str, "right") +
+            _td(tl_str, "right", tl_c)
         )
         html_rows.append(f"<tr>{tds}</tr>")
 
     def _add_section_total(label: str, kh_vnd: float, th_vnd: float) -> None:
         kh_v = kh_vnd / 1e6
         th_v = th_vnd / 1e6
+        con_phai_th_v = (kh_vnd - th_vnd) / 1e6
         tl = th_v / kh_v * 100 if kh_v > 0 else None
         tds = (
             _td("", "center", "#1f2937", TONG_BG, "bold") +
             _td(label, "left", "#1f2937", TONG_BG, "bold") +
             _td(_fvn(kh_v, 0) if kh_v > 0 else "—", "right", "#1f2937", TONG_BG, "bold") +
             _td(_fvn(th_v, 0) if th_v > 0 else "—", "right", "#1f2937", TONG_BG, "bold") +
-            _td(f"{_fvn(tl, 1)}%" if tl is not None else "—", "right", _tl_color(tl), TONG_BG, "bold") +
-            _td(_tl_text(tl), "left", _tl_color(tl), TONG_BG, "bold")
+            _td(_fvn(con_phai_th_v, 0), "right", "#1f2937", TONG_BG, "bold") +
+            _td(f"{_fvn(tl, 1)}%" if tl is not None else "—", "right", _tl_color(tl), TONG_BG, "bold")
         )
         html_rows.append(f"<tr>{tds}</tr>")
 
@@ -353,16 +352,26 @@ def _hien_thi_bang_cn_readonly(
             so_ct_co_kh += 1
 
     tong_tl = tong_th / tong_kh * 100 if tong_kh > 0 else None
+    tong_con_phai_th = (tong_kh - tong_th) / 1e6
 
     tds_tong = (
         _td("", "center", "#1f2937", TONG_BG, "bold") +
         _td("TỔNG CỘNG", "left", "#1f2937", TONG_BG, "bold") +
         _td(_fvn(tong_kh / 1e6, 0), "right", "#1f2937", TONG_BG, "bold") +
         _td(_fvn(tong_th / 1e6, 0), "right", "#1f2937", TONG_BG, "bold") +
-        _td(f"{_fvn(tong_tl, 1)}%" if tong_tl is not None else "—", "right", _tl_color(tong_tl), TONG_BG, "bold") +
-        _td(_tl_text(tong_tl), "left", _tl_color(tong_tl), TONG_BG, "bold")
+        _td(_fvn(tong_con_phai_th, 0), "right", "#1f2937", TONG_BG, "bold") +
+        _td(f"{_fvn(tong_tl, 1)}%" if tong_tl is not None else "—", "right", _tl_color(tong_tl), TONG_BG, "bold")
     )
-    html_rows.append(f"<tr>{tds_tong}</tr>")
+    # Chèn TỔNG CỘNG vào giữa PHẦN I và PHẦN II (ngang với I và II)
+    insert_idx = None
+    for _i, _row in enumerate(html_rows):
+        if "TỔNG CỘNG PHẦN I" in _row:
+            insert_idx = _i + 1
+            break
+    if insert_idx is not None:
+        html_rows.insert(insert_idx, f"<tr>{tds_tong}</tr>")
+    else:
+        html_rows.append(f"<tr>{tds_tong}</tr>")
 
     k1, k2, k3, k4 = st.columns(4)
     k1.metric("Tổng KH (triệu đồng)", f"{_fvn(tong_kh / 1e6, 0)}")
@@ -373,7 +382,7 @@ def _hien_thi_bang_cn_readonly(
     )
     k4.metric("Số CT có KH / tổng", f"{so_ct_co_kh}/{tong_ct}")
 
-    headers = ["STT", "Chỉ tiêu", "KH (triệu đồng)", "TH (triệu đồng)", "TL%", "Trạng thái"]
+    headers = ["STT", "Chỉ tiêu", "KH (triệu đồng)", "Thực hiện (triệu đồng)", "Còn phải thực hiện (triệu đồng)", "TL%"]
     thead = "".join(
         f'<th style="background:{H_BG};color:#fff;text-align:{"center" if i==0 else "left" if i==1 else "right"};'
         f'padding:6px 8px;border:1px solid {BD};font-size:0.82rem;white-space:nowrap">{h}</th>'
@@ -387,14 +396,18 @@ def _hien_thi_bang_cn_readonly(
   <tbody>{"".join(html_rows)}</tbody>
 </table>
 <p style="font-size:0.78rem;color:var(--text-color, #6B7280);margin:4px 0 0 0">
-  * Đơn vị: triệu đồng · KH từ nhập liệu, TH từ Tổng dư nợ HSTD + GQVL phân tầng<br>
-  <span style="color:{GREEN}">🟢</span> TL ≥ 100% &nbsp;
-  <span style="color:{AMBER}">🟡</span> TL ≥ 95% &nbsp;
-  <span style="color:{RED}">🔴</span> TL &lt; 95%
+  * Đơn vị: triệu đồng · KH từ nhập liệu, Thực hiện từ Tổng dư nợ HSTD + GQVL phân tầng · Còn phải thực hiện = KH - Thực hiện<br>
+  TL% tô màu: <span style="color:{GREEN}">xanh</span> ≥ 100% &nbsp;
+  <span style="color:{AMBER}">vàng</span> ≥ 95% &nbsp;
+  <span style="color:{RED}">đỏ</span> &lt; 95%
 </p>
 </div>
 """
-    st.markdown(html, unsafe_allow_html=True)
+    render_html = getattr(st, "html", None)
+    if callable(render_html):
+        render_html(html)
+    else:
+        st.markdown(html, unsafe_allow_html=True)
 
 
 def _tab_canh_bao_chenh_lech() -> None:

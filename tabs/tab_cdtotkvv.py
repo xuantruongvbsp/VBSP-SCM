@@ -26,7 +26,7 @@ import plotly.graph_objects as go
 
 import db
 from auth import la_phan_he_cn, la_phan_he_pgd, normalize_role
-from config import DS_PGD
+from config import DS_PGD, CACHE_HSTD, COT_TEN_PGD, COT_TEN_TO, COT_TEN_XA
 from utils import fmt_so, vn, xuat_excel, ten_file_xuat, hien_thi_dataframe_phan_trang
 from state_manager import SCMStateManager
 from services.cdtotkvv_service import (
@@ -41,6 +41,64 @@ from data.cdtotkvv import (
     doc_cdtotkvv, ds_thang_nam, tong_hop_theo_pgd,
     _XEP_LOAI_TOT, _XEP_LOAI_KHA, _XEP_LOAI_TB, _XEP_LOAI_YEU
 )
+
+# ══════════════════════════════════════════════════════════════════════════════
+# HELPERS
+# ══════════════════════════════════════════════════════════════════════════════
+
+@st.cache_data(show_spinner=False, ttl=300)
+def _tong_to_hstd(ts: float = 0.0) -> int:
+    try:
+        import pyarrow.parquet as pq
+
+        cols_available = set(pq.read_schema(CACHE_HSTD).names)
+        if COT_TEN_PGD not in cols_available or COT_TEN_TO not in cols_available:
+            return 0
+        cols = [COT_TEN_PGD, COT_TEN_TO]
+        if COT_TEN_XA in cols_available:
+            cols.insert(1, COT_TEN_XA)
+        df = pd.read_parquet(CACHE_HSTD, columns=cols)
+    except Exception:
+        return 0
+    for col in df.columns:
+        try:
+            df[col] = df[col].astype("string").str.strip().replace("", pd.NA)
+        except Exception:
+            df[col] = df[col]
+    return int(df.dropna().drop_duplicates().shape[0])
+
+
+def _cdtotkvv_key_cols(df: pd.DataFrame) -> list[str]:
+    if df is None or df.empty or "ma_to" not in df.columns:
+        return []
+    if "ma_dv" in df.columns:
+        return ["ma_dv", "ma_to"]
+    if "ten_dv" in df.columns:
+        return ["ten_dv", "ma_to"]
+    return ["ma_to"]
+
+
+def _dedupe_cdtotkvv_to(df: pd.DataFrame) -> pd.DataFrame:
+    if df is None or df.empty:
+        return pd.DataFrame()
+    key_cols = _cdtotkvv_key_cols(df)
+    if not key_cols:
+        return df.copy()
+    df_u = df.copy()
+    for col in key_cols:
+        df_u[col] = df_u[col].astype("string").str.strip().replace("", pd.NA)
+    return df_u.dropna(subset=key_cols).drop_duplicates(key_cols).copy()
+
+
+def _tong_to_cdtotkvv_unique(df: pd.DataFrame) -> int:
+    return int(len(_dedupe_cdtotkvv_to(df)))
+
+
+def _count_xep_loai(df: pd.DataFrame, label: str) -> int:
+    if df is None or df.empty or "xep_loai" not in df.columns:
+        return 0
+    return int((df["xep_loai"].astype("string").str.strip() == label).sum())
+
 
 # Điểm tối đa / nhãn tiêu chí — dùng chung bảng phân tích & xuất Excel Tổ không đạt
 _CDTOTKVV_DIEM_TOI_DA: dict[str, int] = {
@@ -321,20 +379,46 @@ def _sub_tong_hop(username: str) -> None:
         st.info("Không tính được KPI từ dữ liệu hiện có.")
         return
 
-    tong_to = kpi["tong_to"]
-    tong_tot = kpi["to_tot"]
-    tong_kha = kpi["to_kha"]
-    tong_tb = kpi["to_tb"]
-    tong_yeu = kpi["to_yeu"]
-    diem_tb = kpi["diem_tb"]
+    tong_to_dong = int(kpi["tong_to"])
+    df_unique_to = _dedupe_cdtotkvv_to(df)
+    tong_to = int(len(df_unique_to))
+    tong_to_unique_cdto = tong_to
+    try:
+        import os
+
+        ts_hstd = os.path.getmtime(CACHE_HSTD) if os.path.exists(CACHE_HSTD) else 0.0
+    except Exception:
+        ts_hstd = 0.0
+    tong_to_hstd = _tong_to_hstd(ts_hstd) if ts_hstd else 0
+    tong_tot = _count_xep_loai(df_unique_to, _XEP_LOAI_TOT)
+    tong_kha = _count_xep_loai(df_unique_to, _XEP_LOAI_KHA)
+    tong_tb = _count_xep_loai(df_unique_to, _XEP_LOAI_TB)
+    tong_yeu = _count_xep_loai(df_unique_to, _XEP_LOAI_YEU)
+    diem_tb = (
+        pd.to_numeric(df_unique_to["tong_diem"], errors="coerce").mean()
+        if "tong_diem" in df_unique_to.columns and not df_unique_to.empty
+        else kpi["diem_tb"]
+    )
     ty_le_dat = ((tong_tot + tong_kha) / tong_to * 100) if tong_to else 0.0
     ty_le_yeu_kem = (tong_yeu / tong_to * 100) if tong_to else 0.0
 
     c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Tổng số Tổ", fmt_so(tong_to))
+    delta_hstd = f"HSTD: {fmt_so(tong_to_hstd)}" if tong_to_hstd else "HSTD: —"
+    c1.metric("Tổng số Tổ (CDTOTKVV)", fmt_so(tong_to_unique_cdto), delta=delta_hstd)
     c2.metric("Điểm TB toàn CN", f"{diem_tb:.2f}")
     c3.metric("% Đạt (Tốt+Khá)", f"{ty_le_dat:.1f}%")
     c4.metric("% Yếu+Kém", f"{ty_le_yeu_kem:.1f}%")
+    if tong_to_unique_cdto != tong_to_dong:
+        st.caption(
+            f"ℹ️ CDTOTKVV: {fmt_so(tong_to_dong)} dòng dữ liệu, "
+            f"unique theo (PGD, Mã Tổ) = {fmt_so(tong_to_unique_cdto)}. "
+            "Các tỷ lệ xếp loại bên dưới cũng dùng mẫu số unique này."
+        )
+    if tong_to_hstd and tong_to_hstd != tong_to_unique_cdto:
+        st.caption(
+            "ℹ️ Hai tab có thể khác nhau vì CDTOTKVV phản ánh danh sách Tổ được chấm điểm theo kỳ "
+            "và có thể thiếu PGD/Tổ; HSTD phản ánh Tổ phát sinh trong dữ liệu cho vay (có món vay)."
+        )
 
     def _render_xep_loai_card(col, label: str, count: int, bg: str, color: str) -> None:
         pct = (count / tong_to * 100) if tong_to else 0.0
@@ -488,7 +572,7 @@ def _sub_phan_tich_chat_luong(username: str, cdto_mode: str, pgd_user: str) -> N
 
     def highlight_rows(row):
         if ser_bi_tru.loc[row.name] > 2:
-            return ["background-color: #ffebee"] * len(row)
+            return ["background-color: #ffebee; color: #7f1d1d"] * len(row)
         elif ser_bi_tru.loc[row.name] <= 0:
             return [""] * len(row)
         return [""] * len(row)

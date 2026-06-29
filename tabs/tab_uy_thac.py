@@ -142,11 +142,52 @@ def _render_theo_dvut(df: pd.DataFrame) -> None:
     if t.empty:
         st.info("Không có dữ liệu."); return
 
+    tong_to_unique: int | None = None
+    so_to_da_hoi: int | None = None
+    try:
+        if COT_TEN_TO in df.columns:
+            if COT_TEN_PGD in df.columns and COT_TEN_XA in df.columns:
+                to_cols = [COT_TEN_PGD, COT_TEN_XA, COT_TEN_TO]
+            elif COT_TEN_PGD in df.columns:
+                to_cols = [COT_TEN_PGD, COT_TEN_TO]
+            elif COT_TEN_XA in df.columns:
+                to_cols = [COT_TEN_XA, COT_TEN_TO]
+            else:
+                to_cols = [COT_TEN_TO]
+
+            df_to = df[to_cols].copy()
+            for col in to_cols:
+                df_to[col] = df_to[col].astype("string").str.strip().replace("", pd.NA)
+            tong_to_unique = int(df_to.dropna().drop_duplicates().shape[0])
+
+            if COT_DVUT in df.columns:
+                amb_cols = to_cols + [COT_DVUT]
+                df_amb = df[amb_cols].copy()
+                for col in amb_cols:
+                    df_amb[col] = df_amb[col].astype("string").str.strip().replace("", pd.NA)
+                amb = (
+                    df_amb.dropna()
+                    .drop_duplicates(amb_cols)
+                    .groupby(to_cols)[COT_DVUT]
+                    .nunique()
+                )
+                so_to_da_hoi = int((amb > 1).sum())
+    except Exception as e:
+        logger.error("_render_theo_dvut: lỗi tính tổng tổ unique — %s", e, exc_info=True)
+
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("Hội đoàn thể", len(t))
-    c2.metric("Tổng Tổ TK&VV", fmt_so(int(t.get("so_to", pd.Series([0])).sum())))
+    c2.metric(
+        "Tổng Tổ TK&VV",
+        fmt_so(tong_to_unique) if tong_to_unique is not None else fmt_so(int(t.get("so_to", pd.Series([0])).sum())),
+    )
     c3.metric("Tổng KH", fmt_so(int(t.get("so_kh", pd.Series([0])).sum())))
     c4.metric("Tổng dư nợ (triệu đồng)", fmt(t.get("tong_dn", pd.Series([0])).sum()))
+    if so_to_da_hoi:
+        st.caption(
+            f"⚠️ Có {so_to_da_hoi} Tổ xuất hiện với hơn 1 Hội trong HSTD "
+            "→ tổng theo từng Hội có thể lớn hơn tổng Tổ unique."
+        )
     st.divider()
     hien = t.rename(columns={
         COT_DVUT: "Hội đoàn thể", "so_to": "Số Tổ",

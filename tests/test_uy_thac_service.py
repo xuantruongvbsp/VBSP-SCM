@@ -20,6 +20,7 @@ from config import (
     COT_SO_KU,
     COT_TEN_CT,
     COT_TEN_KH,
+    COT_TEN_PGD,
     COT_TEN_TO,
     COT_TEN_XA,
     COT_TONG_DU_NO,
@@ -77,6 +78,22 @@ def test_tinh_theo_dvut_aggregates_correctly():
     assert row_a["tong_dn"] == 3_000_000
     assert row_a["nqh"] == 100_000
     assert row_a["so_to"] == 2
+
+
+def test_tinh_theo_dvut_counts_same_to_name_in_different_xa():
+    df = pd.DataFrame({
+        COT_DVUT: ["DVUT A", "DVUT A"],
+        COT_TEN_PGD: ["PGD 1", "PGD 1"],
+        COT_TEN_XA: ["Xã 1", "Xã 2"],
+        COT_TEN_TO: ["Tổ 1", "Tổ 1"],
+        COT_SO_KU: ["KU1", "KU2"],
+        COT_TONG_DU_NO: [1_000_000, 2_000_000],
+    })
+
+    result = svc.tinh_theo_dvut(df)
+
+    row = result[result[COT_DVUT] == "DVUT A"].iloc[0]
+    assert row["so_to"] == 2
 
 
 def test_tinh_theo_dvut_respects_order():

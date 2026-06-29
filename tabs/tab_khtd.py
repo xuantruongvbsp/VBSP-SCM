@@ -420,9 +420,10 @@ def _tinh_th_nsvsmt_dp_phan_tang(df_hstd: "pd.DataFrame | None") -> dict[str, fl
 
 
 # ── Helper đọc GQVL parquet toàn CN ─────────────────────────────────────────
-@st.cache_data(show_spinner=False)
-def _doc_gqvl_parquet(_ts: float = 0) -> "pd.DataFrame | None":
-    """Đọc GQVL từ cache parquet nếu có. _ts bust cache khi file thay đổi."""
+@st.cache_resource(show_spinner=False)
+def _doc_gqvl_parquet(ts: float = 0) -> "pd.DataFrame | None":
+    """Đọc GQVL từ cache parquet nếu có. ts bust cache khi file thay đổi."""
+    _ = ts
     if not os.path.exists(CACHE_GQVL):
         return None
     try:
@@ -440,8 +441,6 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
     role = ctx.role_norm
     username = ctx.username
     df_full = ctx.df_full
-    # Đọc GQVL toàn CN để tính TH phân tầng 4 nhóm
-    df_gqvl = _doc_gqvl_parquet(ts_file(CACHE_GQVL))
 
     with ctx:
         st.title("🏛️ Kế hoạch Tín dụng — Phòng KH-NV")
@@ -455,6 +454,8 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                              horizontal=True, key="khtd_sub_tab", label_visibility="collapsed")
         st.divider()
         if _khtd_sel == 0:
+            # Chỉ đọc GQVL khi vào màn Chi nhánh; tab Xã không dùng dữ liệu này.
+            df_gqvl = _doc_gqvl_parquet(ts_file(CACHE_GQVL))
             from tabs.tab_khtd_nhap import render_nhap_cn  # lazy — tránh circular import
             render_nhap_cn(role, username, df_full, df_gqvl)
         elif _khtd_sel == 1:

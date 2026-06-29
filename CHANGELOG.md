@@ -1,5 +1,33 @@
 # CHANGELOG
 
+## [2026-06-29] — KHTD Chi nhánh: dễ rà soát số nhập trước khi lưu, giãn cột dễ nhìn
+- `tabs/tab_khtd_nhap.py` — đổi các ô nhập KH trong bảng `🏛️ KHTD Chi nhánh` từ `number_input` sang `text_input` có thể chuẩn hóa lại thành dạng `1.234.567` sau nút `👁 Xem trước tính toán` hoặc `💾 Lưu`, thêm parse/validate số nguyên triệu đồng an toàn, nới tỉ lệ cột và padding ô nhập để số liệu dễ đọc hơn
+
+## [2026-06-29] — Ủy thác: sửa số liệu đếm Tổ TK&VV theo Hội đoàn thể
+- `services/uy_thac_service.py` — `tinh_theo_dvut()` đếm Tổ theo `(PGD, Xã, Tổ)` khi đủ cột, fallback `(PGD, Tổ)`/`(Xã, Tổ)` khi thiếu cột để tránh undercount do trùng tên Tổ, đồng thời ép numeric trước khi sum để tránh lỗi nối chuỗi khi parquet có mixed dtype
+- `tabs/tab_uy_thac.py` — metric "Tổng Tổ TK&VV" hiển thị theo tổng unique cùng định danh `(PGD, Xã, Tổ)` với bảng theo Hội; thêm cảnh báo nhẹ nếu phát hiện tổ đa Hội
+- `tabs/tab_cdtotkvv.py` — phần `Tổng hợp dữ liệu` hiển thị tổng Tổ theo CDTOTKVV unique `(PGD, Mã Tổ)`, dùng mẫu số unique cho các tỷ lệ xếp loại, và kèm tham chiếu tổng Tổ HSTD theo `(PGD, Xã, Tổ)` để giải thích chênh lệch giữa `🏘️ Tổ TK&VV` và `🤝 Ủy thác`
+- `tests/test_uy_thac_service.py` — thêm regression test cho trường hợp cùng PGD khác Xã nhưng trùng tên Tổ
+- `app.py` — menu `🗺️ Hỗ trợ địa bàn` ở workspace Operation chuẩn hóa tên PGD (alias `PGD Biên Hòa` → `Hội sở Chi nhánh tỉnh`) và tránh hiển thị nhầm dữ liệu toàn CN khi đang ở ngữ cảnh PGD
+
+## [2026-06-27] — KHTD: giảm load chậm ở phần nhập số liệu kế hoạch
+- `tabs/tab_khtd_nhap.py` — thêm cache tính `TH` KHTD Chi nhánh theo `mtime` của `hstd.parquet`/`gqvl.parquet`, bỏ lần tính trùng `NSVSMT`, cache dữ liệu TH/ten_map cho phần theo PGD, và cache danh sách CT hiển thị/ten_map cho màn Chi nhánh để tránh quét lại HSTD mỗi rerun
+- `tabs/tab_khtd_xuat.py` — `_hien_thi_bang_cn_readonly()` nhận `th_gqvl` từ caller để không tự đọc lại `gqvl.parquet` và không tính lại phân tầng GQVL khi màn nhập đã có sẵn; đổi reader parquet lớn sang `st.cache_resource` với tham số `ts` nằm trong cache key
+- `tabs/tab_khtd.py` — chỉ đọc `gqvl.parquet` khi user mở nhánh `🏛️ KHTD Chi nhánh` và đổi helper đọc GQVL sang `st.cache_resource` với `ts` đúng cache key
+
+## [2026-06-27] — KHTD: đổi cột bảng Tóm tắt hiện trạng sang "Thực hiện" và "Còn phải thực hiện"
+- `tabs/tab_khtd_xuat.py` — `_hien_thi_bang_cn_readonly()`: bỏ cột `Trạng thái`, đổi header `TH` thành `Thực hiện (triệu đồng)`, thêm cột `Còn phải thực hiện (triệu đồng)` với công thức `KH - Thực hiện`, đồng thời cập nhật hàng subtotal/tổng cộng và chú thích cuối bảng
+
+## [2026-06-27] — KHTD: đưa TỔNG CỘNG lên ngang với I và II trong bảng Tóm tắt hiện trạng
+- `tabs/tab_khtd_xuat.py` — `_hien_thi_bang_cn_readonly()`: thay vì append TỔNG CỘNG ở cuối bảng, nay chèn vào giữa PHẦN I và PHẦN II (ngang hàng với I, II)
+
+## [2026-06-27] — KHTD: đưa số liệu tổng cộng lên đầu mỗi phần (Chi nhánh + Xã)
+- `tabs/tab_khtd_nhap.py` — `_tab_khtd_chi_nhanh()`: di chuyển block "📊 Tóm tắt hiện trạng" từ sau form lên sau banner (trước caption và form) để người dùng thấy tổng quan ngay
+- `tabs/tab_khtd_nhap.py` — `_tab_khtd_theo_xa()`: thêm dòng tổng cộng KH TW / TH TW / KH ĐP / TH ĐP ngay sau header table, trước CSS và form
+
+## [2026-06-27] — KHTD: đổi bảng Tóm tắt hiện trạng sang `st.html()` để hiện đủ subtotal
+- `tabs/tab_khtd_xuat.py` — `_hien_thi_bang_cn_readonly()` nay ưu tiên render HTML bằng `st.html(html)` và chỉ fallback `st.markdown(..., unsafe_allow_html=True)` khi runtime cũ chưa hỗ trợ; khắc phục trường hợp code đã sinh đủ `TỔNG CỘNG PHẦN I/II` nhưng UI tab `📈 Kế hoạch tín dụng` không phản ánh đầy đủ hàng subtotal.
+
 ## [2026-06-25] — KHTD: thêm hàng tổng cộng cho Phần I và II trong Tóm tắt hiện trạng
 - `tabs/tab_khtd_xuat.py` — `_hien_thi_bang_cn_readonly()` nay cộng riêng từng phần `I. Nguồn vốn Trung ương` và `II. Nguồn vốn Địa phương`, sau đó thêm 2 hàng `TỔNG CỘNG PHẦN I` và `TỔNG CỘNG PHẦN II` ngay trong bảng `📊 Tóm tắt hiện trạng`; vẫn giữ hàng `TỔNG CỘNG` toàn bảng ở cuối như cũ.
 

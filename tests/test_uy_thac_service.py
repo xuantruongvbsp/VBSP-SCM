@@ -16,6 +16,7 @@ from config import (
     COT_DVUT,
     COT_LAI_TON,
     COT_LAI_TON_QH,
+    COT_MA_KH,
     COT_NGAY_VAY,
     COT_SO_KU,
     COT_TEN_CT,
@@ -45,6 +46,7 @@ def _df_ut():
     return pd.DataFrame({
         COT_DVUT:       ["DVUT A", "DVUT A", "DVUT B"],
         COT_TEN_TO:     ["Tổ 1", "Tổ 2", "Tổ 3"],
+        COT_MA_KH:      ["KH001", "KH002", "KH003"],
         COT_SO_KU:      ["KU1", "KU2", "KU3"],
         COT_TONG_DU_NO: [1_000_000, 2_000_000, 500_000],
         COT_DU_NO_QH:   [0, 100_000, 50_000],
@@ -78,6 +80,21 @@ def test_tinh_theo_dvut_aggregates_correctly():
     assert row_a["tong_dn"] == 3_000_000
     assert row_a["nqh"] == 100_000
     assert row_a["so_to"] == 2
+    assert row_a["so_kh"] == 2
+
+
+def test_tinh_theo_dvut_counts_distinct_ma_kh_not_so_ku():
+    df = pd.DataFrame({
+        COT_DVUT: ["DVUT A", "DVUT A", "DVUT A"],
+        COT_MA_KH: ["KH001", "KH001", "KH002"],
+        COT_SO_KU: ["KU1", "KU2", "KU3"],
+        COT_TONG_DU_NO: [1_000_000, 2_000_000, 3_000_000],
+    })
+
+    result = svc.tinh_theo_dvut(df)
+
+    row = result[result[COT_DVUT] == "DVUT A"].iloc[0]
+    assert row["so_kh"] == 2
 
 
 def test_tinh_theo_dvut_counts_same_to_name_in_different_xa():

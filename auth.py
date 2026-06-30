@@ -69,6 +69,58 @@ ALL_ROLES = [
 ]
 
 
+ROLE_LABELS = {
+
+    "executive": "👑 Ban Giám đốc",
+
+    "admin_cn": "⭐ Quản trị Phòng KH-NV",
+
+    "manager_cn": "🔑 Lãnh đạo Phòng KH-NV",
+
+    "chuyenvien_cn": "🧩 Chuyên viên Phòng KH-NV",
+
+    "admin_pgd": "⭐ Quản trị Hỗ trợ địa bàn",
+
+    "manager_pgd": "🔑 Lãnh đạo Hỗ trợ địa bàn",
+
+    "user_pgd": "👤 User Hỗ trợ địa bàn",
+
+    "admin": "⭐ Quản trị viên (legacy)",
+
+    "manager": "🔑 Quản lý (legacy)",
+
+    "user": "👤 Nhân viên (legacy)",
+
+}
+
+
+ROLE_DESCRIPTIONS = {
+
+    "executive": "Ban Giám đốc — dashboard vĩ mô, chỉ đọc",
+
+    "admin_cn": "Admin Phòng KH-NV — quản lý user và toàn bộ phân hệ KH-NV",
+
+    "manager_cn": "Lãnh đạo Phòng KH-NV — điều hành, báo cáo, kế hoạch",
+
+    "chuyenvien_cn": "Chuyên viên Phòng KH-NV — tác nghiệp KH-NV, không quản lý user",
+
+    "admin_pgd": "Admin Hỗ trợ địa bàn — quản lý user PGD, upload, cấu hình PGD",
+
+    "manager_pgd": "Lãnh đạo Hỗ trợ địa bàn — nghiệp vụ đầy đủ tại PGD",
+
+    "user_pgd": "User Hỗ trợ địa bàn — nghiệp vụ và báo cáo cơ bản của PGD",
+
+}
+
+
+ROLE_OPTIONS_BY_ADMIN = {
+
+    "admin_cn": ["executive", "admin_cn", "manager_cn", "chuyenvien_cn"],
+
+    "admin_pgd": ["admin_pgd", "manager_pgd", "user_pgd"],
+
+}
+
 
 # Mapping role cũ → role mới tương đương
 
@@ -135,7 +187,25 @@ def normalize_role(role: str) -> str:
     return ROLE_MAP.get(role, role)
 
 
+def role_label(role: str) -> str:
 
+    """Trả label hiển thị thống nhất cho role."""
+
+    return ROLE_LABELS.get(normalize_role(role), str(role))
+
+
+def role_requires_pgd(role: str) -> bool:
+
+    """Role nào bắt buộc gắn với một PGD cụ thể."""
+
+    return normalize_role(role) in {"admin_pgd", "manager_pgd", "user_pgd"}
+
+
+def manageable_roles_for(role: str) -> list[str]:
+
+    """Role mà người dùng hiện tại được phép tạo/sửa."""
+
+    return ROLE_OPTIONS_BY_ADMIN.get(normalize_role(role), [])
 
 
 def is_cn_role(role: str) -> bool:
@@ -370,15 +440,13 @@ def get_tab_permissions(role: str) -> dict:
 
         return {
 
-            "nhom_duoc_phep": ["nghiep_vu_pgd", "bao_cao_giao_ban",
+            "nhom_duoc_phep": ["nghiep_vu_pgd", "bao_cao_giao_ban"],
 
-                               "ke_hoach_pgd", "kiem_soat_rr", "quan_tri_pgd"],
+            "co_quyen_khtd": False,
 
-            "co_quyen_khtd": True,
+            "co_quyen_kiem_soat": False,
 
-            "co_quyen_kiem_soat": True,
-
-            "co_quyen_quan_tri": True,
+            "co_quyen_quan_tri": False,
 
             "co_quyen_upload_hstd": False,
 
@@ -444,15 +512,13 @@ def get_tab_permissions(role: str) -> dict:
 
     return {
 
-        "nhom_duoc_phep": ["nghiep_vu_pgd", "bao_cao_giao_ban",
+        "nhom_duoc_phep": ["nghiep_vu_pgd", "bao_cao_giao_ban"],
 
-                           "ke_hoach_pgd", "kiem_soat_rr", "quan_tri_pgd"],
+        "co_quyen_khtd": False,
 
-        "co_quyen_khtd": True,
+        "co_quyen_kiem_soat": False,
 
-        "co_quyen_kiem_soat": True,
-
-        "co_quyen_quan_tri": True,
+        "co_quyen_quan_tri": False,
 
         "co_quyen_upload_hstd": False,
 
@@ -472,7 +538,7 @@ ADMIN_DEFAULT = {
 
         "password": "$2b$12$13AAMr4DZ0eazOM3xmHJ0.1aRY8OQCAyyk869vQSgvxf79C4URENC",
 
-        "role": "admin", "pgd": None, "ngay_tao": "mac-dinh"
+        "role": "admin_cn", "pgd": None, "ngay_tao": "mac-dinh"
 
     }
 
@@ -632,52 +698,28 @@ def dang_nhap(un: str, pw: str):
 
 # ── Trang login ───────────────────────────────────────────────────────────────
 
+_LOGIN_WORKSPACE_META = {
+    "management": ("📋 Phòng KH-NV", "Đăng nhập vào phân hệ điều hành KH-NV"),
+    "operation": ("🗺️ Hỗ trợ địa bàn", "Đăng nhập vào phân hệ tác nghiệp PGD"),
+    "executive": ("📊 Ban Giám đốc", "Đăng nhập vào dashboard điều hành"),
+}
+
+
 @st.cache_data(show_spinner=False)
 
-def _build_login_html() -> str:
+def _build_login_html(workspace_label: str) -> str:
 
     """Cache HTML header login (chứa logo base64 nặng)."""
 
     return f"""
-
-<div style="background:linear-gradient(160deg,#1b5e20,#2e7d32);
-
-            border-radius:12px 12px 0 0; margin:-40px -40px 20px;
-
-            padding:28px 24px 20px; text-align:center">
-
-  <img src="data:image/jpeg;base64,{LOGO_NHCSXH_B64}"
-
-       width="88"
-
-       style="border-radius:50%;border:3px solid rgba(255,255,255,0.5);
-
-              display:block;margin:0 auto 12px">
-
-  <div style="color:#fff;font-size:13.5px;font-weight:700;
-
-              letter-spacing:0.4px;line-height:1.5">
-
-    NGÂN HÀNG CHÍNH SÁCH XÃ HỘI
-
-  </div>
-
-  <hr style="border:none;border-top:1px solid rgba(255,255,255,0.3);
-
-             margin:8px 20px">
-
+<div style="background:linear-gradient(160deg,#1b5e20,#2e7d32);border-radius:12px 12px 0 0;margin:-40px -40px 20px;padding:28px 24px 20px;text-align:center">
+  <img src="data:image/jpeg;base64,{LOGO_NHCSXH_B64}" width="88" style="border-radius:50%;border:3px solid rgba(255,255,255,0.5);display:block;margin:0 auto 12px">
+  <div style="color:#fff;font-size:13.5px;font-weight:700;letter-spacing:0.4px;line-height:1.5">NGÂN HÀNG CHÍNH SÁCH XÃ HỘI</div>
+  <hr style="border:none;border-top:1px solid rgba(255,255,255,0.3);margin:8px 20px">
   <div style="color:#c8e6c9;font-size:11.5px">Chi nhánh Đồng Nai</div>
-
-  <div style="color:rgba(255,255,255,0.55);font-size:10.5px;
-
-              margin-top:3px">
-
-    Hệ thống Quản trị Tín dụng Nội bộ · VBSP-SCM
-
-  </div>
-
+  <div style="color:rgba(255,255,255,0.55);font-size:10.5px;margin-top:3px">Hệ thống Quản trị Tín dụng Nội bộ · VBSP-SCM</div>
+  <div style="margin:14px auto 0;padding:8px 12px;border-radius:999px;width:max-content;max-width:100%;background:rgba(255,255,255,0.14);color:#ffffff;font-size:13px;font-weight:700">{workspace_label}</div>
 </div>
-
 """
 
 
@@ -717,6 +759,8 @@ def hien_thi_login():
   form[data-testid="stForm"] {
 
     background: #ffffff !important;
+
+    color: #1f2937 !important;
 
     border-radius: 16px;
 
@@ -795,12 +839,28 @@ def hien_thi_login():
     with col:
 
         so_tai_khoan = len(doc_users())
+        selected_workspace = st.session_state.get("prelogin_workspace")
+        workspace_label, workspace_hint = _LOGIN_WORKSPACE_META.get(
+            selected_workspace,
+            ("VBSP-SCM", "Đăng nhập hệ thống"),
+        )
 
 
 
         # HEADER
 
-        st.markdown(_build_login_html(), unsafe_allow_html=True)
+        st.html(_build_login_html(workspace_label))
+        st.html(
+            f"""
+<div style="margin:-4px 0 14px;padding:10px 12px;border-radius:8px;background:rgba(15,23,42,0.28);color:#dcfce7;border:1px solid rgba(187,247,208,0.20);font-size:13px;text-align:center;font-weight:700">
+  {workspace_hint}
+</div>
+"""
+        )
+        if st.button("← Đổi không gian làm việc", key="login_change_workspace", use_container_width=True):
+            st.session_state["prelogin_workspace"] = None
+            st.session_state.workspace = None
+            st.rerun()
 
 
 
@@ -834,10 +894,25 @@ def hien_thi_login():
 
                         st.session_state.logged_in = True
 
+                        if selected_workspace in _LOGIN_WORKSPACE_META:
+                            st.session_state.workspace = selected_workspace
+                        else:
+                            st.session_state.workspace = None
+                        for _k in [
+                            "_ctx",
+                            "_ctx_cache_key",
+                            "_pgd_map_cache_ts",
+                            "_pgd_xa_map_cached",
+                            "_ds_pgd_all_cached",
+                            "_pgd_op_mtime_ss",
+                            "df_full",
+                        ]:
+                            st.session_state.pop(_k, None)
+                        role_norm = normalize_role(str(info.get("role", "") or ""))
+                        info["role"] = role_norm
                         st.session_state.user_info = info
-
                         st.session_state.username = un.strip().lower()
-
+                        st.session_state["role"] = role_norm
                         st.rerun()
 
                     else:
@@ -2148,6 +2223,447 @@ def render(tab, df_full, role, username):
 
                                 db.ghi_audit(_username, "restore_kv_store", f"{n} keys")
 
+                                st.cache_data.clear()
+
+                            except Exception as e:  # conv: skip
+
+                                st.error(f"Lỗi restore: {e}")
+
+            else:
+
+                _render_cau_hinh_danh_muc(username)
+
+
+def render(tab, df_full, role, username):
+
+    """Màn quản lý user theo đúng phân hệ: admin_cn quản CN, admin_pgd quản PGD mình."""
+
+    with tab:
+
+        st.subheader("👥 Quản lý người dùng")
+
+        users = doc_users()
+        role_n = normalize_role(role)
+        username_n = str(username or "").strip().lower()
+        manageable_roles = manageable_roles_for(role_n)
+
+        if not manageable_roles:
+
+            st.error("Bạn không có quyền quản lý tài khoản ở phân hệ này.")
+
+            return
+
+        user_hien_tai = users.get(username_n, {})
+        pgd_hien_tai = user_hien_tai.get("pgd")
+
+        if role_n == "admin_pgd" and not pgd_hien_tai:
+
+            st.error("Tài khoản admin PGD chưa được gắn PGD nên chưa thể quản lý user.")
+
+            return
+
+        def _co_the_quan_ly(info: dict[str, Any]) -> bool:
+
+            info_role = normalize_role(info.get("role", ""))
+
+            if info_role not in manageable_roles:
+
+                return False
+
+            if role_n == "admin_pgd":
+
+                return (info.get("pgd") or "") == (pgd_hien_tai or "")
+
+            return True
+
+        users_hien_thi = {
+
+            u: i for u, i in sorted(users.items())
+
+            if _co_the_quan_ly(i)
+
+        }
+
+        ten_phan_he = "Phòng KH-NV" if role_n == "admin_cn" else f"Hỗ trợ địa bàn — {pgd_hien_tai}"
+        st.caption(
+
+            f"Bạn đang quản lý user của **{ten_phan_he}**. "
+
+            "Role được tạo và cập nhật sẽ bám đúng phân hệ này."
+
+        )
+
+        st.markdown("**Danh sách tài khoản hiện tại**")
+
+        rows = [
+
+            {
+
+                "Tên đăng nhập": u,
+
+                "Họ tên": i["ho_ten"],
+
+                "Quyền": role_label(i["role"]),
+
+                "PGD": i.get("pgd") or "Tất cả",
+
+                "Ngày tạo": i.get("ngay_tao", ""),
+
+            }
+
+            for u, i in users_hien_thi.items()
+
+        ]
+
+        if rows:
+
+            st.dataframe(
+
+                format_df_vn(pd.DataFrame(rows)),
+
+                use_container_width=True,
+
+                hide_index=True,
+
+            )
+
+        else:
+
+            st.caption("Chưa có tài khoản nào trong phạm vi quản lý hiện tại.")
+
+        st.divider()
+
+        st.markdown("**➕ Thêm tài khoản mới**")
+
+        with st.form("them_user", clear_on_submit=False):
+
+            c1, c2 = st.columns(2)
+
+            with c1:
+
+                new_un = st.text_input("Tên đăng nhập *", placeholder="vd: nv03")
+
+                new_ht = st.text_input("Họ và tên *", placeholder="vd: Nguyễn Văn A")
+
+                new_pw = st.text_input("Mật khẩu *", type="password")
+
+                new_pw2 = st.text_input("Nhập lại mật khẩu *", type="password")
+
+            with c2:
+
+                new_role = st.selectbox(
+
+                    "Quyền",
+
+                    manageable_roles,
+
+                    format_func=lambda x: f"{role_label(x)} — {ROLE_DESCRIPTIONS.get(x, '')}",
+
+                    key=f"ql_role_{role_n}",
+
+                )
+
+                if role_n == "admin_pgd":
+
+                    st.text_input("PGD phụ trách", value=pgd_hien_tai or "", disabled=True)
+
+                else:
+
+                    st.text_input("Phân hệ", value="Phòng KH-NV", disabled=True)
+
+                st.info("💡 Mật khẩu được mã hóa tự động.")
+
+            if st.form_submit_button("✅ Tạo tài khoản", type="primary", use_container_width=True):
+
+                err = []
+
+                if not new_un:
+
+                    err.append("Thiếu tên đăng nhập")
+
+                if not new_ht:
+
+                    err.append("Thiếu họ tên")
+
+                if len(new_pw) < 6:
+
+                    err.append("Mật khẩu ≥ 6 ký tự")
+
+                if new_pw != new_pw2:
+
+                    err.append("Mật khẩu nhập lại không khớp")
+
+                if new_un.strip().lower() in users:
+
+                    err.append("Tên đăng nhập đã tồn tại")
+
+                if err:
+
+                    for e in err:
+
+                        st.error(f"❌ {e}")
+
+                else:
+
+                    new_role_n = normalize_role(new_role)
+                    pgd_luu = pgd_hien_tai if role_requires_pgd(new_role_n) else None
+
+                    users[new_un.strip().lower()] = {
+
+                        "ho_ten": new_ht.strip(),
+
+                        "password": ma_hoa(new_pw),
+
+                        "role": new_role_n,
+
+                        "pgd": pgd_luu,
+
+                        "ngay_tao": datetime.today().strftime("%d/%m/%Y %H:%M"),
+
+                    }
+
+                    luu_users(users)
+
+                    st.success(f"✅ Đã tạo **{new_un.strip().lower()}**")
+
+                    db.ghi_audit(
+                        username,
+                        "create_user",
+                        f"created {new_un.strip().lower()} role={new_role_n} pgd={pgd_luu or '-'}",
+                    )
+
+                    st.rerun()
+
+        st.divider()
+
+        st.markdown("**⚙️ Sửa / Xóa tài khoản**")
+
+        others = [u for u in users_hien_thi if u != username_n]
+
+        if not others:
+
+            st.caption("Không có tài khoản nào khác.")
+
+        else:
+
+            chon_u = st.selectbox(
+                "Chọn tài khoản",
+                others,
+                format_func=lambda u: f"{u} — {users_hien_thi[u]['ho_ten']}",
+                key="ql_chon_user_v2",
+            )
+
+            role_mac_dinh = normalize_role(users[chon_u].get("role", manageable_roles[0]))
+            idx_mac_dinh = manageable_roles.index(role_mac_dinh) if role_mac_dinh in manageable_roles else 0
+
+            st.markdown("**✏️ Cập nhật quyền**")
+            with st.form("cap_nhat_quyen_user"):
+
+                sua_role = st.selectbox(
+                    "Quyền mới",
+                    manageable_roles,
+                    index=idx_mac_dinh,
+                    format_func=lambda x: f"{role_label(x)} — {ROLE_DESCRIPTIONS.get(x, '')}",
+                    key=f"ql_edit_role_{chon_u}",
+                )
+
+                if role_n == "admin_pgd":
+
+                    st.text_input("PGD phụ trách", value=pgd_hien_tai or "", disabled=True)
+
+                else:
+
+                    st.text_input("Phân hệ", value="Phòng KH-NV", disabled=True)
+
+                if st.form_submit_button("Lưu quyền", use_container_width=True):
+
+                    sua_role_n = normalize_role(sua_role)
+                    pgd_moi = pgd_hien_tai if role_requires_pgd(sua_role_n) else None
+
+                    if users[chon_u].get("role") == sua_role_n and users[chon_u].get("pgd") == pgd_moi:
+
+                        st.info("Không có thay đổi quyền nào để lưu.")
+
+                    else:
+
+                        users[chon_u]["role"] = sua_role_n
+                        users[chon_u]["pgd"] = pgd_moi
+                        luu_users(users)
+                        st.success(f"✅ Đã cập nhật quyền cho **{chon_u}**")
+                        db.ghi_audit(
+                            username,
+                            "update_user_role",
+                            f"updated {chon_u} role={sua_role_n} pgd={pgd_moi or '-'}",
+                        )
+                        st.rerun()
+
+            ca, cb = st.columns(2)
+
+            with ca:
+
+                st.markdown("**🔑 Đặt lại mật khẩu**")
+
+                with st.form("doi_mk_v2"):
+
+                    mk1 = st.text_input("Mật khẩu mới", type="password")
+
+                    mk2 = st.text_input("Nhập lại", type="password")
+
+                    if st.form_submit_button("Đặt lại", use_container_width=True):
+
+                        if len(mk1) < 6:
+
+                            st.error("Mật khẩu ≥ 6 ký tự")
+
+                        elif mk1 != mk2:
+
+                            st.error("Không khớp")
+
+                        else:
+
+                            users[chon_u]["password"] = ma_hoa(mk1)
+
+                            luu_users(users)
+
+                            st.success(f"✅ Đã đặt lại mật khẩu cho **{chon_u}**")
+
+                            db.ghi_audit(username, "reset_password", f"reset pw for {chon_u}")
+
+            with cb:
+
+                st.markdown("**🗑️ Xóa tài khoản**")
+
+                st.warning(f"Sẽ xóa: **{chon_u}** — {users[chon_u]['ho_ten']}")
+
+                xn = st.checkbox("Tôi xác nhận muốn xóa", key=f"ql_xoa_{chon_u}")
+
+                if st.button("Xóa tài khoản", type="primary", disabled=not xn, use_container_width=True):
+
+                    del users[chon_u]
+
+                    luu_users(users)
+
+                    st.success(f"✅ Đã xóa **{chon_u}**")
+
+                    db.ghi_audit(username, "delete_user", f"deleted {chon_u}")
+
+                    st.rerun()
+
+        st.divider()
+
+        with st.expander("⚙️ Cấu hình Danh mục", expanded=False):
+
+            if la_admin_cn(role):
+
+                tab_dm, tab_bk = st.tabs(["🗂️ Danh mục", "💾 Backup dữ liệu"])
+
+                with tab_dm:
+
+                    _render_cau_hinh_danh_muc(username)
+
+                with tab_bk:
+
+                    _username = st.session_state.get("username", "unknown")
+
+                    with db.get_conn() as conn:
+
+                        rows = conn.execute(
+                            "SELECT key, value, updated_at, updated_by FROM kv_store"
+                        ).fetchall()
+
+                    records = [
+                        {
+                            "key": r["key"],
+                            "value": r["value"],
+                            "updated_at": r["updated_at"],
+                            "updated_by": r["updated_by"],
+                        }
+                        for r in rows
+                    ]
+
+                    payload = json.dumps(records, ensure_ascii=False, indent=2).encode("utf-8")
+                    file_name = f"kv_store_backup_{datetime.now().strftime('%Y-%m-%d')}.json"
+
+                    st.download_button(
+                        "📥 Export kv_store",
+                        data=payload,
+                        file_name=file_name,
+                        mime="application/json",
+                        use_container_width=True,
+                        on_click=lambda: db.ghi_audit(
+                            _username, "export_kv_store", f"{len(records)} keys"
+                        ),
+                    )
+
+                    st.divider()
+                    st.error("⚠️ Restore sẽ ghi đè dữ liệu hiện tại. Chỉ thực hiện khi cần thiết.")
+                    up = st.file_uploader(
+                        "Chọn file JSON backup kv_store",
+                        type=["json"],
+                        key="kv_store_restore_file_v2",
+                    )
+
+                    if st.button(
+                        "📤 Restore kv_store",
+                        type="primary",
+                        use_container_width=True,
+                        key="btn_restore_kv_store_v2",
+                    ):
+
+                        if up is None:
+
+                            st.error("Vui lòng chọn file JSON để restore.")
+
+                        else:
+
+                            try:
+
+                                raw = up.getvalue().decode("utf-8-sig")
+                                data = json.loads(raw)
+
+                                if isinstance(data, dict) and "rows" in data:
+
+                                    data = data["rows"]
+
+                                if isinstance(data, dict):
+
+                                    data = [{"key": k, "value": v} for k, v in data.items()]
+
+                                if not isinstance(data, list):
+
+                                    raise ValueError("JSON không đúng định dạng.")
+
+                                now_iso = datetime.now().isoformat()
+                                n = 0
+
+                                with db.get_conn() as conn:
+
+                                    for item in data:
+
+                                        if not isinstance(item, dict):
+
+                                            continue
+
+                                        k = item.get("key")
+
+                                        if not k:
+
+                                            continue
+
+                                        v = item.get("value")
+                                        ua = item.get("updated_at") or now_iso
+                                        ub = item.get("updated_by") or _username
+
+                                        conn.execute(
+                                            "INSERT OR REPLACE INTO kv_store (key, value, updated_at, updated_by) VALUES (?,?,?,?)",
+                                            (k, v if v is not None else "{}", ua, ub),
+                                        )
+                                        n += 1
+
+                                    conn.commit()
+
+                                st.success(f"✅ Đã restore **{n}** keys vào kv_store.")
+                                db.ghi_audit(_username, "restore_kv_store", f"{n} keys")
                                 st.cache_data.clear()
 
                             except Exception as e:  # conv: skip

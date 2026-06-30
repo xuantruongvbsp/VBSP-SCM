@@ -1499,6 +1499,15 @@ val = pd.to_numeric(df[COT_X], errors="coerce").sum() if COT_X in df.columns els
 | **Nguyên nhân** | Caption dùng `datetime.now()` thay vì đọc `COT_NGAY_SL`/`merge_meta_hstd`; card chỉ hiển thị tổng, chưa tách cấu phần |
 | **Fix** | Lấy ngày ưu tiên từ `COT_NGAY_SL`, fallback `merge_meta_hstd`; bổ sung dòng phụ `Ủy thác X tỷ · Trực tiếp Y tỷ`, trong đó `trực tiếp` là các món không có `Tổ TK&VV` và không có `ĐVUT` |
 | **Ngày fix** | 2026-06-29 |
+
+### C27 — `Thông tin chung`: `Dư nợ BQ xã` chỉ hiện 82 do đếm theo HSTD active thay vì danh mục địa bàn
+| | |
+|---|---|
+| **File** | `tabs/tab_tongquan.py` → `_cache_bq_counts()` |
+| **Dấu hiệu** | Trong `▶ 📊 Thông tin chung`, card `Dư nợ BQ xã` chỉ hiện `82 xã` dù danh mục địa bàn toàn CN có `95 xã/phường` |
+| **Nguyên nhân** | App nạp HSTD CN với `active_only=True`, nên helper đếm xã trực tiếp từ HSTD chỉ phản ánh xã đang có hồ sơ dư nợ; đồng thời tên xã trong HSTD thường bỏ prefix `Xã/Phường`, không phải mẫu số địa bàn quản lý |
+| **Fix** | Đếm xã/phường theo `PGD_XA_MAP`: toàn CN dùng `95`, theo PGD dùng số xã cấu hình của PGD; chỉ fallback sang HSTD nếu PGD không có trong danh mục cấu hình |
+| **Ngày fix** | 2026-06-30 |
 | **Ngày fix** | 2026-06-29 |
 
 ---

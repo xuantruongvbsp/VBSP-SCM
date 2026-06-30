@@ -1,8 +1,8 @@
 # CHANGELOG
 
 ## [2026-06-30] — CDTOTKVV toàn CN: sửa parser file tổng hợp bị lệch cột
-- `data/cdtotkvv.py` — `tach_file_cdto_toan_cn()` và `doc_thang_tu_cdto_toan_cn()` nay dò header/cột linh hoạt thay vì khóa cứng vị trí `Mã PGD`/`NGAYBC`; đồng thời chọn cột có nhiều mã PGD hợp lệ nhất để tránh bắt nhầm cột mã khác làm file toàn CN bị nhận thành `1 đơn vị`
-- `tests/test_cdtotkvv_service.py` — thêm regression test cho file CDTOTKVV toàn CN bị lệch 1 cột, đọc đúng tháng báo cáo và case có thêm cột `Mã đơn vị` khác nhưng vẫn phải tách đúng theo `Mã PGD`
+- `data/cdtotkvv.py` — `tach_file_cdto_toan_cn()` và `doc_thang_tu_cdto_toan_cn()` nay dò header/cột linh hoạt thay vì khóa cứng vị trí `Mã PGD`/`NGAYBC`; đồng thời chọn cột có nhiều mã PGD hợp lệ nhất và dùng chính cột đó khi ghi file con để tránh bắt nhầm cột mã khác làm file toàn CN bị nhận thành `1 đơn vị`
+- `tests/test_cdtotkvv_service.py` — thêm regression test cho file CDTOTKVV toàn CN bị lệch 1 cột, đọc đúng tháng báo cáo, case có thêm cột `Mã đơn vị` khác và case header ban đầu trỏ sai nhưng vẫn phải tách/ghi đúng theo `Mã PGD`
 
 ## [2026-06-30] — Tổng quan: số xã trong `Thông tin chung` dùng danh mục địa bàn
 - `tabs/tab_tongquan.py` — card `Dư nợ BQ xã` nay đếm xã/phường theo `PGD_XA_MAP` (toàn CN = 95, theo PGD = số xã cấu hình của PGD) thay vì đếm trực tiếp từ HSTD active; cập nhật subtitle để làm rõ đây là số xã/phường theo địa bàn

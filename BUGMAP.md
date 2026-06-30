@@ -668,6 +668,25 @@
 | **Fix** | Chuẩn hóa tên đơn vị CDTOTKVV qua alias về key nội bộ, đếm theo `22 đơn vị` kỳ vọng và hiển thị chú thích rõ nguồn `pgd_data/*/cdtotkvv_*.xlsx`; tháng hiển thị lấy theo ngày báo cáo trong file CDTOTKVV |
 | **Ngày fix** | 2026-06-30 |
 
+### E12 — Upload `CDTOTKVV toàn CN` fail khi file tổng hợp lệch 1 cột
+| | |
+|---|---|
+| **File** | `data/cdtotkvv.py` |
+| **Dấu hiệu** | Upload file tổng hợp `CT_CDT...052026.xlsx` báo `Không tìm thấy dòng dữ liệu hợp lệ trong file (cột 'Mã PGD' phải chứa mã 6 số...)` dù file thực tế có dữ liệu |
+| **Nguyên nhân** | `tach_file_cdto_toan_cn()` và `doc_thang_tu_cdto_toan_cn()` khóa cứng vị trí cột theo layout cũ (ví dụ `Mã PGD` ở cột C, `NGAYBC` ở cột S). Khi file export không có cột trống đầu dòng hoặc header dịch 1 cột, parser không tìm được mã PGD hợp lệ |
+| **Fix** | Dò header theo tên cột chuẩn hóa (`STT`, `Mã PGD`, `Tên PGD`, `NGAYBC`...) rồi map index động; chỉ fallback về index cũ khi không dò được header. Đồng thời bỏ thông báo lỗi hardcode `cột B` để tránh gây hiểu nhầm |
+| **Ngày fix** | 2026-06-30 |
+
+### E13 — CDTOTKVV mất số 0 đầu ở mã đơn vị/xã/tổ sau khi đọc Excel
+| | |
+|---|---|
+| **File** | `data/cdtotkvv.py` → `doc_cdtotkvv_path()` |
+| **Dấu hiệu** | File CDTOTKVV có `Mã đơn vị`/`Mã tổ` như `004601`, `0126259` nhưng sau khi đọc bằng pandas thành `4601`, `126259` |
+| **Nguyên nhân** | `pd.read_excel()` infer các cột mã dạng số nguyên, rồi code cũ chỉ `astype(str)`/xóa `.0` nên không khôi phục được số 0 đầu |
+| **Fix** | Chuẩn hóa các cột định danh bằng `_normalize_code_value()`: `ma_dv` zfill 6, `ma_xa` zfill 6, `ma_to` zfill 7 khi giá trị là số |
+| **Test** | `tests/test_cdtotkvv_service.py::TestCdtotkvvToanCnParser::test_tach_file_doc_lai_dung_cot_cho_ca_layout_cu_va_moi` |
+| **Ngày fix** | 2026-06-30 |
+
 ---
 
 ## F. PDF / Word

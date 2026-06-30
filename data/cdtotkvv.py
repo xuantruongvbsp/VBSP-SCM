@@ -1,6 +1,7 @@
 """Đọc và tổng hợp dữ liệu Chấm điểm Tổ TK&VV (CDTOTKVV)."""
-import re
 import os
+import re
+import unicodedata
 from pathlib import Path
 
 import pandas as pd
@@ -13,6 +14,7 @@ from data.pgd import duong_dan_pgd
 
 _COLS_FLOAT = ["du_no", "so_du_tk", "tong_diem"]
 _COLS_STR   = ["ma_dv", "ma_xa", "ma_to"]
+_CODE_WIDTHS = {"ma_dv": 6, "ma_xa": 6, "ma_to": 7}
 _XEP_LOAI_TOT = "T\u1ed1t"
 _XEP_LOAI_KHA = "Kh\u00e1"
 _XEP_LOAI_TB  = "Trung b\u00ecnh"
@@ -20,6 +22,61 @@ _XEP_LOAI_YEU = "Y\u1ebfu"
 _TINH_TRANG_A = "A"
 _TINH_TRANG_B = "B"
 _TINH_TRANG_C = "C"
+
+
+def _norm_text_key(val) -> str:
+    """Chuẩn hóa text header Excel để dò cột linh hoạt hơn."""
+    if val is None:
+        return ""
+    text = unicodedata.normalize("NFKD", str(val))
+    text = "".join(ch for ch in text if not unicodedata.combining(ch))
+    text = text.replace("đ", "d").replace("Đ", "D").lower().strip()
+    return "".join(ch for ch in text if ch.isalnum())
+
+
+def _normalize_code_value(val, width: int | None = None):
+    """Chuẩn hóa mã đọc từ Excel, giữ số 0 đầu cho các cột định danh."""
+    if val is None or pd.isna(val):
+        return pd.NA
+    text = str(val).strip()
+    if not text or text.lower() in {"nan", "none", "nat"}:
+        return pd.NA
+    text = re.sub(r"\.0+$", "", text)
+    if width and re.fullmatch(r"\d+", text):
+        return text.zfill(width)
+    return text
+
+
+def _tim_header_cdto_toan_cn(all_rows: list[list]) -> tuple[int | None, dict[str, int]]:
+    """Tìm dòng header và map tên trường -> index cột trong file toàn CN."""
+    alias_map = {
+        "stt": {"stt"},
+        "ma_dv": {"mapgd", "madonvi", "madv"},
+        "ten_dv": {"tenpgd", "tendonvi", "tendv"},
+        "ma_xa": {"maxa"},
+        "ten_xa": {"tenxa"},
+        "ma_to": {"mato"},
+        "ten_to_truong": {"tento", "tentotruong"},
+        "loai_to": {"loaito"},
+        "dvut": {"dvut", "madvut", "tendvut"},
+        "du_no": {"duno"},
+        "tong_diem": {"tongdiem"},
+        "xep_loai": {"xeploai"},
+        "ngaybc": {"ngaybc", "ngaybaocao"},
+    }
+    for row_idx, row in enumerate(all_rows[:20]):
+        idx_map: dict[str, int] = {}
+        for col_idx, cell in enumerate(row):
+            key = _norm_text_key(cell)
+            if not key:
+                continue
+            for field, aliases in alias_map.items():
+                if key in aliases and field not in idx_map:
+                    idx_map[field] = col_idx
+                    break
+        if "stt" in idx_map and "ma_dv" in idx_map:
+            return row_idx, idx_map
+    return None, {}
 
 
 def _ten_file(thang_nam: str) -> Path:
@@ -104,13 +161,8 @@ def doc_cdtotkvv_path(duong_dan: str, _ts) -> pd.DataFrame | None:
             df[col] = pd.to_numeric(df[col], errors="coerce")
     for col in _COLS_STR:
         if col in df.columns:
-            df[col] = (
-                df[col]
-                .astype(str)
-                .str.strip()
-                .str.replace(r"\.0$", "", regex=True)
-                .replace("nan", pd.NA)
-            )
+            width = _CODE_WIDTHS.get(col)
+            df[col] = df[col].map(lambda v, w=width: _normalize_code_value(v, w))
     return df
 
 
@@ -212,9 +264,6 @@ def doc_thang_tu_cdto_toan_cn(file_bytes: bytes) -> str | None:
 
     from config import MA_PGD_MAP
 
-    COL_MAPGD  = 2   # cột C
-    COL_NGAYBC = 18  # cột S
-
     def _norm_ma(val) -> str | None:
         try:
             return str(int(float(str(val).strip()))).zfill(6)
@@ -224,17 +273,39 @@ def doc_thang_tu_cdto_toan_cn(file_bytes: bytes) -> str | None:
     try:
         wb = openpyxl.load_workbook(BytesIO(file_bytes), read_only=True, data_only=True)
         ws = wb.active
-        for row in ws.iter_rows(values_only=True):
+        all_rows = [list(r) for r in ws.iter_rows(values_only=True)]
+        wb.close()
+        _header_row, idx_map = _tim_header_cdto_toan_cn(all_rows)
+        col_mapgd = idx_map.get("ma_dv")
+        col_ngaybc = idx_map.get("ngaybc")
+
+        for row in all_rows:
             row = list(row)
-            if len(row) <= COL_MAPGD:
-                continue
-            ma_dv = _norm_ma(row[COL_MAPGD])
+            if col_mapgd is None:
+                ma_dv = next(
+                    (
+                        ma
+                        for idx in (2, 1)
+                        if len(row) > idx
+                        for ma in [_norm_ma(row[idx])]
+                        if ma and ma in MA_PGD_MAP
+                    ),
+                    None,
+                )
+            else:
+                if len(row) <= col_mapgd:
+                    continue
+                ma_dv = _norm_ma(row[col_mapgd])
             if not ma_dv or ma_dv not in MA_PGD_MAP:
                 continue
-            # Dòng data hợp lệ — đọc NGAYBC
-            if len(row) <= COL_NGAYBC:
+            if col_ngaybc is None:
+                val = next((row[idx] for idx in (18, 17) if len(row) > idx), None)
+            else:
+                if len(row) <= col_ngaybc:
+                    break
+                val = row[col_ngaybc]
+            if val is None:
                 break
-            val = row[COL_NGAYBC]
             if isinstance(val, (datetime, _date)):
                 return val.strftime("%m/%Y")
             if val:
@@ -242,7 +313,6 @@ def doc_thang_tu_cdto_toan_cn(file_bytes: bytes) -> str | None:
                 if m:
                     return f"{m.group(2).zfill(2)}/{m.group(3)}"
             break
-        wb.close()
     except Exception:
         pass
     return None
@@ -276,9 +346,20 @@ def tach_file_cdto_toan_cn(file_bytes: bytes) -> dict[str, bytes]:
 
     # Số cột đầu ra cố định theo CDTOTKVV_COLS
     N_COLS_OUT = 20
-    # Vị trí cột MAPGD trong file toàn CN — cột A trống, data bắt đầu từ cột B
-    # nên: B=STT(1), C=MAPGD(2), D=TEN_PGD(3), ...
-    COL_MA_DV_IN = 2
+    FALLBACK_IDX = {
+        "stt": 1,
+        "ma_dv": 2,
+        "ten_dv": 3,
+        "ma_xa": 4,
+        "ten_xa": 5,
+        "ma_to": 6,
+        "ten_to_truong": 7,
+        "loai_to": 8,
+        "dvut": 9,
+        "du_no": 10,
+        "tong_diem": 16,
+        "xep_loai": 17,
+    }
 
     def _norm_ma(val) -> str | None:
         if val is None:
@@ -291,24 +372,25 @@ def tach_file_cdto_toan_cn(file_bytes: bytes) -> dict[str, bytes]:
     def _get(row: list, idx: int):
         return row[idx] if idx < len(row) else None
 
+    def _src(row: list, field: str):
+        idx = idx_map.get(field, FALLBACK_IDX.get(field))
+        if idx is None:
+            return None
+        return _get(row, idx)
+
     def _map_row(src: list) -> list:
-        """Chuyển 1 data row từ format toàn CN → CDTOTKVV_COLS (20 cột).
-        Cột A trống nên index lệch +1 so với tên cột:
-          B(1)=STT  C(2)=MAPGD  D(3)=TEN_PGD  E(4)=MAXA  F(5)=TENXA
-          G(6)=MATO  H(7)=TENTO  I(8)=LOAITO  J(9)=DVUT  K(10)=DUNO
-          L(11)=Tham gia GDX  ...  Q(16)=TONGDIEM  R(17)=XEPLOAI  S(18)=NGAYBC
-        """
+        """Chuyển 1 data row từ format toàn CN → CDTOTKVV_COLS (20 cột)."""
         return [
-            _get(src,  1),  # stt          ← B: STT
-            _get(src,  2),  # ma_dv        ← C: MAPGD
-            _get(src,  3),  # ten_dv       ← D: TEN_PGD
-            _get(src,  4),  # ma_xa        ← E: MAXA
-            _get(src,  5),  # ten_xa       ← F: TENXA
-            _get(src,  6),  # ma_to        ← G: MATO
-            _get(src,  7),  # ten_to_truong← H: TENTO
-            _get(src,  9),  # dvut         ← J: DVUT  (đổi chỗ với LOAITO)
-            _get(src,  8),  # loai_to      ← I: LOAITO (đổi chỗ với DVUT)
-            _get(src, 10),  # du_no        ← K: DUNO
+            _src(src, "stt"),
+            _src(src, "ma_dv"),
+            _src(src, "ten_dv"),
+            _src(src, "ma_xa"),
+            _src(src, "ten_xa"),
+            _src(src, "ma_to"),
+            _src(src, "ten_to_truong"),
+            _src(src, "dvut"),
+            _src(src, "loai_to"),
+            _src(src, "du_no"),
             None,           # so_du_tk     (không có trong toàn CN)
             None,           # diem_gdtx    (không có)
             None,           # diem_nqh     (không có)
@@ -316,8 +398,8 @@ def tach_file_cdto_toan_cn(file_bytes: bytes) -> dict[str, bytes]:
             None,           # diem_thu_lai (không có)
             None,           # diem_tv_tiengui (không có)
             None,           # diem_ds_tg   (không có)
-            _get(src, 16),  # tong_diem    ← Q: TONGDIEM
-            _get(src, 17),  # xep_loai     ← R: XEPLOAI
+            _src(src, "tong_diem"),
+            _src(src, "xep_loai"),
             None,           # tinh_trang   (không có trong toàn CN)
         ]
 
@@ -327,12 +409,14 @@ def tach_file_cdto_toan_cn(file_bytes: bytes) -> dict[str, bytes]:
     ws = wb.active
     all_rows = [list(r) for r in ws.iter_rows(values_only=True)]
     wb.close()
+    _header_row, idx_map = _tim_header_cdto_toan_cn(all_rows)
+    col_ma_dv_in = idx_map.get("ma_dv", FALLBACK_IDX["ma_dv"])
 
     data_start = None
     for i, row in enumerate(all_rows):
-        if not row or len(row) <= COL_MA_DV_IN:
+        if not row or len(row) <= col_ma_dv_in:
             continue
-        ma_dv = _norm_ma(row[COL_MA_DV_IN])
+        ma_dv = _norm_ma(row[col_ma_dv_in])
         if ma_dv and ma_dv in MA_PGD_MAP:
             data_start = i
             break
@@ -340,7 +424,7 @@ def tach_file_cdto_toan_cn(file_bytes: bytes) -> dict[str, bytes]:
     if data_start is None:
         raise ValueError(
             "Không tìm thấy dòng dữ liệu hợp lệ trong file "
-            "(cột B 'Mã PGD' phải chứa mã 6 số như 004601, 004602…)"
+            "(cột 'Mã PGD' phải chứa mã 6 số như 004601, 004602…)"
         )
 
     raw_headers = all_rows[:data_start]
@@ -355,16 +439,16 @@ def tach_file_cdto_toan_cn(file_bytes: bytes) -> dict[str, bytes]:
 
     groups: dict[str, list] = defaultdict(list)
     for row in data_rows:
-        if not row or len(row) <= COL_MA_DV_IN:
+        if not row or len(row) <= col_ma_dv_in:
             continue
-        ma_dv = _norm_ma(row[COL_MA_DV_IN])
+        ma_dv = _norm_ma(row[col_ma_dv_in])
         if ma_dv and ma_dv in MA_PGD_MAP:
             groups[ma_dv].append(row)
 
     if not groups:
         raise ValueError(
             "Không tìm thấy mã đơn vị hợp lệ trong file "
-            "(kiểm tra cột B 'Mã PGD' có giá trị 6 chữ số như 004601)"
+            "(kiểm tra cột 'Mã PGD' có giá trị 6 chữ số như 004601)"
         )
 
     result: dict[str, bytes] = {}

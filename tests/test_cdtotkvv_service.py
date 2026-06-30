@@ -1,8 +1,13 @@
 """Unit tests cho services/cdtotkvv_service.py — Chấm điểm Tổ TK&VV."""
 from __future__ import annotations
 
+from io import BytesIO
+
+import openpyxl
 import pandas as pd
 
+from config import DON_VI_CHI_NHANH
+from data.cdtotkvv import doc_cdtotkvv_path, doc_thang_tu_cdto_toan_cn, tach_file_cdto_toan_cn
 from services.cdtotkvv_service import (
     loc_df,
     cdtotkvv_ten_sheet_excel,
@@ -97,3 +102,105 @@ class TestFmtXuatToKhongDatVn:
         df_in = pd.DataFrame({"A": [1]})
         df_out = fmt_xuat_to_khong_dat_vn(df_in)
         assert len(df_out) == 1
+
+
+def _build_cdto_toan_cn_bytes(leading_blank: bool) -> bytes:
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.append(["BÁO CÁO CDTOTKVV"])
+    ws.append(["Kỳ chấm điểm tháng 05/2026"])
+    ws.append([])
+    ws.append([])
+    ws.append([])
+    ws.append([])
+    ws.append([])
+    header = [
+        "STT",
+        "Mã PGD",
+        "Tên PGD",
+        "Mã xã",
+        "Tên xã",
+        "Mã tổ",
+        "Tên tổ trưởng",
+        "Loại tổ",
+        "ĐVUT",
+        "Dư nợ",
+        "Tham gia GDX",
+        "TL thu nợ gốc",
+        "TL thu lãi",
+        "TG Tổ TKVV",
+        "TL nợ quá hạn",
+        "Tổng điểm",
+        "Xếp loại",
+        "NGAYBC",
+    ]
+    row = [
+        1,
+        "004601",
+        DON_VI_CHI_NHANH,
+        "460001",
+        "Xã A",
+        "T01",
+        "Nguyễn Văn A",
+        "Tổ tốt",
+        "Hội Phụ nữ",
+        100_000_000,
+        10,
+        10,
+        10,
+        10,
+        10,
+        95,
+        "Tốt",
+        "31/05/2026",
+    ]
+    if leading_blank:
+        header = [None] + header
+        row = [None] + row
+    ws.append(header)
+    ws.append(row)
+
+    buf = BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
+
+
+class TestCdtotkvvToanCnParser:
+    def test_tach_file_nhan_dien_duoc_khi_khong_co_cot_trong_dau(self):
+        file_bytes = _build_cdto_toan_cn_bytes(leading_blank=False)
+
+        pgd_map = tach_file_cdto_toan_cn(file_bytes)
+
+        assert DON_VI_CHI_NHANH in pgd_map
+        assert isinstance(pgd_map[DON_VI_CHI_NHANH], bytes)
+
+    def test_doc_thang_tu_file_toan_cn_khi_lech_cot(self):
+        file_bytes = _build_cdto_toan_cn_bytes(leading_blank=False)
+
+        thang = doc_thang_tu_cdto_toan_cn(file_bytes)
+
+        assert thang == "05/2026"
+
+    def test_tach_file_doc_lai_dung_cot_cho_ca_layout_cu_va_moi(self, tmp_path):
+        for leading_blank in (False, True):
+            file_bytes = _build_cdto_toan_cn_bytes(leading_blank=leading_blank)
+            pgd_map = tach_file_cdto_toan_cn(file_bytes)
+            path = tmp_path / f"cdtotkvv_{leading_blank}.xlsx"
+            path.write_bytes(pgd_map[DON_VI_CHI_NHANH])
+
+            df = doc_cdtotkvv_path(str(path), 1)
+
+            assert df is not None
+            assert len(df) == 1
+            row = df.iloc[0]
+            assert row["ma_dv"] == "004601"
+            assert row["ten_dv"] == DON_VI_CHI_NHANH
+            assert row["ma_xa"] == "460001"
+            assert row["ten_xa"] == "Xã A"
+            assert row["ma_to"] == "T01"
+            assert row["ten_to_truong"] == "Nguyễn Văn A"
+            assert row["dvut"] == "Hội Phụ nữ"
+            assert row["loai_to"] == "Tổ tốt"
+            assert row["du_no"] == 100_000_000
+            assert row["tong_diem"] == 95
+            assert row["xep_loai"] == "Tốt"

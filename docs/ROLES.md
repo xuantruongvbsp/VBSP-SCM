@@ -13,6 +13,7 @@ Dành cho TP/PTP KH-NV, CBTD Hội sở, Ban Giám đốc tại **Hội sở Chi
 | `executive` | Ban Giám đốc | Chỉ đọc dashboard vĩ mô | — |
 | `admin_cn` | Quản trị CN | Toàn quyền CN (users, config, upload, merge) | `admin` |
 | `manager_cn` | Lãnh đạo CN | Upload CN, giao chỉ tiêu, xem báo cáo | `manager` |
+| `chuyenvien_cn` | Chuyên viên CN | Tác nghiệp KH-NV, báo cáo, kế hoạch; không quản lý user | — |
 | `admin` (cũ) | = `admin_cn` | Toàn quyền CN | `admin_cn` |
 | `manager` (cũ) | = `manager_cn` | Upload CN, giao chỉ tiêu | `manager_cn` |
 
@@ -43,6 +44,7 @@ Dành cho Giám đốc PGD, Tổ trưởng KHNV, CBTD tại **21 Phòng giao d�
 │  ├── executive        ──→ ws_executive (dashboard vĩ mô)    │
 │  ├── admin_cn         ──→ ws_management                     │
 │  ├── manager_cn       ──→ ws_management                     │
+│  ├── chuyenvien_cn    ──→ ws_management                     │
 │  ├── admin (cũ)       ──→ ws_management                     │
 │  └── manager (cũ)     ──→ ws_management                     │
 ├─────────────────────────────────────────────────────────────┤
@@ -144,6 +146,12 @@ ROLES_CO_QUYEN_GIAO_NHIEM_VU    = ["admin_pgd", "manager_pgd", "admin", "manager
 ---
 
 ## Tài khoản mặc định theo PGD
+
+## Quản lý user theo phân hệ
+
+- `admin_cn` chỉ tạo/sửa user của **Phòng KH-NV** với các role: `executive`, `admin_cn`, `manager_cn`, `chuyenvien_cn`
+- `admin_pgd` chỉ tạo/sửa user của **Hỗ trợ địa bàn / PGD mình phụ trách** với các role: `admin_pgd`, `manager_pgd`, `user_pgd`
+- Màn `👥 Quản lý Users` không còn sinh role legacy `admin/manager/user`
 
 Format: `admin_{slug_pgd}` / mật khẩu: `123456`
 

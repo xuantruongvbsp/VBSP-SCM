@@ -139,6 +139,17 @@ from components.loan_drawer import loan_detail_drawer
 from components.export_pdf import download_pdf_button, xuat_pdf_co_chart
 
 
+def _chuan_hoa_pgd_user(ten_pgd: str | None) -> str | None:
+    if not ten_pgd:
+        return None
+    try:
+        from services.file_detection_service import ten_doc_ve_don_vi_chuan
+
+        return ten_doc_ve_don_vi_chuan(str(ten_pgd)) or str(ten_pgd)
+    except Exception:
+        return str(ten_pgd)
+
+
 
 
 
@@ -642,10 +653,11 @@ def render_sidebar_menu(role, username, **kwargs):
 
     df_pgd = kwargs.get("df_pgd")
     pgd_user_op = kwargs.get("pgd_user")
+    pgd_user_label = kwargs.get("pgd_user_label") or pgd_user_op
     tab_perm = kwargs.get("tab_perm", {})
     nhom_duoc_phep = tab_perm.get("nhom_duoc_phep", [])
 
-    _ten_hien_thi = pgd_user_op or "Toàn địa bàn"
+    _ten_hien_thi = pgd_user_label or "Toàn địa bàn"
 
     # ── Filter to allowed groups ──────────────────────────────────────
     allowed_items = []
@@ -841,7 +853,7 @@ def render(**kwargs):
 
     role = kwargs.get("role")
 
-    pgd_user = kwargs.get("pgd_user")
+    pgd_user = _chuan_hoa_pgd_user(kwargs.get("pgd_user"))
 
     username = kwargs.get("username", "unknown")
 

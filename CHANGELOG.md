@@ -1,5 +1,49 @@
 # CHANGELOG
 
+## [2026-06-30] — CDTOTKVV: sửa đếm đơn vị và làm rõ nguồn/tháng dữ liệu
+- `services/tongquan_cdto_service.py` — chuẩn hóa tên đơn vị CDTOTKVV về key nội bộ (`Hội sở CN Đồng Nai`/`PGD Biên Hòa` → `Hội sở Chi nhánh tỉnh`), đếm đúng theo 22 đơn vị kỳ vọng và giữ key cũ để tương thích
+- `tabs/tab_tongquan.py` — badge CDTOTKVV ở `Thông tin chung` hiển thị theo `x/22 đơn vị`, không còn `22/21 PGD`; bổ sung chú thích nguồn `pgd_data/*/cdtotkvv_*.xlsx` và tháng lấy theo ngày báo cáo trong file
+- `tabs/tab_cdtotkvv.py` — phần tổng hợp tập trung dùng cùng mẫu số 22 đơn vị và thêm caption giải thích nguồn/tháng CDTOTKVV
+
+## [2026-06-30] — Login: chọn không gian làm việc trước khi đăng nhập
+- `app.py` — thêm màn chọn `Phòng KH-NV` / `Hỗ trợ địa bàn` / `Ban Giám đốc` sau splash và trước form đăng nhập; lưu lựa chọn vào session, validate lại theo quyền role sau login, reset khi đăng xuất
+- `auth.py` — form đăng nhập hiển thị không gian đã chọn, có nút quay lại đổi không gian và giữ lựa chọn đó khi đăng nhập thành công
+
+## [2026-06-30] — Splash: thiết kế lại màn khởi động, tăng cỡ chữ
+- `app.py` — redesign `render_splash()` thành panel 2 vùng, tăng cỡ chữ tiêu đề/nội dung, làm rõ 3 không gian làm việc và trạng thái khởi tạo; chuyển render splash sang `st.html()`
+
+## [2026-06-30] — Login: sửa HTML header bị hiện thô sau splash
+- `auth.py` — compact HTML header đăng nhập và render bằng `st.html()` thay vì `st.markdown(..., unsafe_allow_html=True)` để tránh Markdown hiểu các dòng `style` thụt vào là code block
+
+## [2026-06-29] — Khôi phục splash khởi động hệ thống
+- `app.py` — thêm splash nhẹ khi mở app với logo, tên hệ thống và 3 phân hệ chính; splash chỉ hiện 1 lần mỗi phiên và hiện lại sau khi đăng xuất
+
+## [2026-06-29] — Đăng nhập: dọn sạch context cache khi đổi phiên
+- `auth.py` — sau login thành công, xóa đồng bộ `_ctx`, `_ctx_cache_key`, map cache PGD và `df_full`; đồng thời lưu role đã normalize để tránh state cũ làm lệch phân hệ
+- `app.py` — khi đăng xuất, xóa thêm `role` và toàn bộ context cache liên quan để phiên sau không dùng lại cache key cũ
+
+## [2026-06-29] — Phục hồi đăng nhập theo phân hệ
+- `app.py` — bỏ `DEV MODE` auto-login `admin_cn` để khôi phục màn đăng nhập thật và cho phép vào đúng phân hệ theo tài khoản
+- `auth.py` — sau login thành công, reset `workspace`, xóa `_ctx` cũ, lưu lại `username`/`role` vào session để app chọn lại không gian làm việc đúng theo role
+
+## [2026-06-29] — Ủy thác: metric tổng trong tab Hội chỉ tính đúng phạm vi các dòng có Hội
+- `tabs/tab_uy_thac.py` — các metric `Tổng Tổ TK&VV` / `Tổng KH` / `Tổng dư nợ (triệu đồng)` trong `📊 Thống kê theo Hội đoàn thể` nay cùng tính trên subset có `Tên ĐVUT`, không kéo toàn bộ HSTD; đồng thời vẫn tránh đếm trùng bằng cách lấy unique trực tiếp trên subset này
+
+## [2026-06-29] — Tổng quan: card Tổng dư nợ ghi rõ Ủy thác/Trực tiếp và ngày HSTD
+- `tabs/tab_tongquan.py` — card `Tổng dư nợ` trong `Thông tin chung` nay tách chú thích `Ủy thác` / `Trực tiếp` từ HSTD và hiển thị `Số liệu HSTD đến ...` theo `COT_NGAY_SL` hoặc `merge_meta_hstd`, không còn dùng ngày hiện tại của hệ thống
+
+## [2026-06-29] — Ủy thác: sửa Tổng KH theo Hội đoàn thể đếm nhầm món vay
+- `services/uy_thac_service.py` — `tinh_theo_dvut()` nay tính `so_kh` bằng `Mã KH` unique, chỉ fallback sang `Số khế ước` khi thiếu cột khách hàng; tránh metric `Tổng KH` thực chất là tổng món vay
+- `tabs/tab_uy_thac.py` — metric `Tổng KH` trong `📊 Thống kê theo Hội đoàn thể` lấy unique trực tiếp trên subset có `Tên ĐVUT`, nên không còn đếm món vay và vẫn giữ đúng phạm vi tab Hội
+- `tests/test_uy_thac_service.py` — thêm regression test cho trường hợp 1 khách hàng có nhiều khế ước nhưng chỉ được tính 1 KH
+
+## [2026-06-29] — Phân quyền user: tách dứt điểm Phòng KH-NV và Hỗ trợ địa bàn
+- `auth.py` — màn `👥 Quản lý người dùng` nay quản lý theo đúng phân hệ: `admin_cn` chỉ tạo/sửa role KH-NV (`executive`, `admin_cn`, `manager_cn`, `chuyenvien_cn`), `admin_pgd` chỉ tạo/sửa role Hỗ trợ địa bàn của PGD mình (`admin_pgd`, `manager_pgd`, `user_pgd`); thêm cập nhật role cho user hiện có và đổi label role sang hệ mới
+- `auth.py` — siết `get_tab_permissions("user_pgd")` về đúng quyền user cơ bản (`nghiep_vu_pgd` + `bao_cao_giao_ban`), không còn full nhóm Kế hoạch/Kiểm soát/Quản trị
+- `app.py` — workspace `admin_users` cho phép mở đúng với cả `admin_cn` và `admin_pgd`; tránh trường hợp admin PGD bấm `👥 Quản lý Users` rồi bị trả ngược về Operation
+- `db.py` — thêm migration chuẩn hóa role legacy trong bảng `users`: `admin -> admin_cn`, `manager -> manager_cn`, `user -> user_pgd`, đồng thời bỏ `pgd` khỏi role cấp Chi nhánh để tránh lẫn phân hệ
+- `tests/test_auth.py` — thêm regression test cho `get_tab_permissions()` của `user_pgd` / `manager_pgd` / fallback role lạ
+
 ## [2026-06-29] — KHTD Chi nhánh: dễ rà soát số nhập trước khi lưu, giãn cột dễ nhìn
 - `tabs/tab_khtd_nhap.py` — đổi các ô nhập KH trong bảng `🏛️ KHTD Chi nhánh` từ `number_input` sang `text_input` có thể chuẩn hóa lại thành dạng `1.234.567` sau nút `👁 Xem trước tính toán` hoặc `💾 Lưu`, thêm parse/validate số nguyên triệu đồng an toàn, nới tỉ lệ cột và padding ô nhập để số liệu dễ đọc hơn
 
@@ -8,7 +52,8 @@
 - `tabs/tab_uy_thac.py` — metric "Tổng Tổ TK&VV" hiển thị theo tổng unique cùng định danh `(PGD, Xã, Tổ)` với bảng theo Hội; thêm cảnh báo nhẹ nếu phát hiện tổ đa Hội
 - `tabs/tab_cdtotkvv.py` — phần `Tổng hợp dữ liệu` hiển thị tổng Tổ theo CDTOTKVV unique `(PGD, Mã Tổ)`, dùng mẫu số unique cho các tỷ lệ xếp loại, và kèm tham chiếu tổng Tổ HSTD theo `(PGD, Xã, Tổ)` để giải thích chênh lệch giữa `🏘️ Tổ TK&VV` và `🤝 Ủy thác`
 - `tests/test_uy_thac_service.py` — thêm regression test cho trường hợp cùng PGD khác Xã nhưng trùng tên Tổ
-- `app.py` — menu `🗺️ Hỗ trợ địa bàn` ở workspace Operation chuẩn hóa tên PGD (alias `PGD Biên Hòa` → `Hội sở Chi nhánh tỉnh`) và tránh hiển thị nhầm dữ liệu toàn CN khi đang ở ngữ cảnh PGD
+- `app.py` — workspace Operation chuẩn hóa tên PGD ngay sau login (alias `PGD Biên Hòa` → `Hội sở Chi nhánh tỉnh`) để load cache, đọc file PGD upload, context và sidebar dùng cùng key nội bộ; tránh hiển thị nhầm dữ liệu toàn CN khi đang ở ngữ cảnh PGD
+- `workspaces/ws_operation.py` — `render_sidebar_menu()` tách tên PGD hiển thị khỏi key lọc nội bộ và `render()` tự chuẩn hóa `pgd_user` trước khi lọc `df`
 
 ## [2026-06-27] — KHTD: giảm load chậm ở phần nhập số liệu kế hoạch
 - `tabs/tab_khtd_nhap.py` — thêm cache tính `TH` KHTD Chi nhánh theo `mtime` của `hstd.parquet`/`gqvl.parquet`, bỏ lần tính trùng `NSVSMT`, cache dữ liệu TH/ten_map cho phần theo PGD, và cache danh sách CT hiển thị/ten_map cho màn Chi nhánh để tránh quét lại HSTD mỗi rerun

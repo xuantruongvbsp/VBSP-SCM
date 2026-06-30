@@ -365,15 +365,19 @@ def _sub_tong_hop(username: str) -> None:
 
     th = tong_hop_theo_pgd(df)
 
-    if cdto["so_pgd_thieu"] > 0:
-        ten_thieu = ", ".join(cdto["ds_pgd_thieu"][:5])
-        duoi = f" và {cdto['so_pgd_thieu'] - 5} đơn vị khác" if cdto["so_pgd_thieu"] > 5 else ""
+    if cdto["so_don_vi_thieu"] > 0:
+        ten_thieu = ", ".join(cdto["ds_don_vi_thieu"][:5])
+        duoi = f" và {cdto['so_don_vi_thieu'] - 5} đơn vị khác" if cdto["so_don_vi_thieu"] > 5 else ""
         st.info(
-            f"📊 Dữ liệu từ **{cdto['so_pgd_co']}/{len(DS_PGD)} PGD** · "
+            f"📊 Dữ liệu từ **{cdto['so_don_vi_co']}/{cdto['tong_don_vi_ky_vong']} đơn vị** · "
             f"Thiếu: **{ten_thieu}{duoi}**"
         )
     if thang_hien:
         st.caption(f"📅 Kỳ: Tháng {thang_hien}")
+    st.caption(
+        "Nguồn: `pgd_data/*/cdtotkvv_YYYY_MM.xlsx` hoặc `cdtotkvv_latest.xlsx`; "
+        "tháng hiển thị lấy theo ngày báo cáo trong file CDTOTKVV."
+    )
 
     if kpi is None:
         st.info("Không tính được KPI từ dữ liệu hiện có.")

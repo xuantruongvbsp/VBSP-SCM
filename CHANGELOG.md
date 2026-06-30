@@ -10,6 +10,7 @@
 
 ## [2026-06-30] — Login: chọn không gian làm việc trước khi đăng nhập
 - `app.py` — thêm màn chọn `Phòng KH-NV` / `Hỗ trợ địa bàn` / `Ban Giám đốc` sau splash và trước form đăng nhập; lưu lựa chọn vào session, validate lại theo quyền role sau login, reset khi đăng xuất
+- `app.py` — màn chọn không gian làm việc: đưa card `📋 Phòng KH-NV` vào vị trí giữa
 - `auth.py` — form đăng nhập hiển thị không gian đã chọn, có nút quay lại đổi không gian và giữ lựa chọn đó khi đăng nhập thành công
 
 ## [2026-06-30] — Splash: thiết kế lại màn khởi động, tăng cỡ chữ

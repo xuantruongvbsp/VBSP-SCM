@@ -1153,6 +1153,47 @@ def migrate_pgd_bien_hoa() -> None:
         ghi_audit("system", "migrate_pgd_bien_hoa_error", str(e))
 
 
+def migrate_legacy_user_roles() -> None:
+    """
+    Chuẩn hóa role người dùng cũ sang hệ role mới.
+    admin -> admin_cn, manager -> manager_cn, user -> user_pgd.
+    Đồng thời bỏ PGD khỏi các role cấp Chi nhánh để tránh lẫn phân hệ.
+    """
+    try:
+        with get_conn() as conn:
+            tong_cap_nhat = 0
+            for role_cu, role_moi in (
+                ("admin", "admin_cn"),
+                ("manager", "manager_cn"),
+                ("user", "user_pgd"),
+            ):
+                cur = conn.execute(
+                    "UPDATE users SET role = ? WHERE role = ?",
+                    (role_moi, role_cu),
+                )
+                tong_cap_nhat += max(cur.rowcount, 0)
+
+            cur_cn = conn.execute(
+                """UPDATE users
+                   SET pgd = NULL
+                   WHERE role IN ('executive', 'admin_cn', 'manager_cn', 'chuyenvien_cn')
+                   AND pgd IS NOT NULL"""
+            )
+            tong_cap_nhat += max(cur_cn.rowcount, 0)
+
+            conn.commit()
+
+            if tong_cap_nhat > 0:
+                ghi_audit(
+                    "system",
+                    "migrate_legacy_user_roles",
+                    f"Đã chuẩn hóa {tong_cap_nhat} bản ghi users sang role mới",
+                )
+    except Exception as e:  # conv: skip
+        logger.error("migrate_legacy_user_roles thất bại: %s", e, exc_info=True)
+        ghi_audit("system", "migrate_legacy_user_roles_error", str(e))
+
+
 def _seed_ndt_dp_rules() -> list[dict]:
     return [
         {"ma_ct": 3, "ma": "INV0802140002662", "ghi_chu": "UBND tỉnh Đồng Nai", "cap": "tinh"},
@@ -1696,4 +1737,5 @@ init_db()
 migrate_from_json()
 seed_dynamic_configs()
 migrate_pgd_bien_hoa()
+migrate_legacy_user_roles()
 _ = seed_ktnb_danh_muc_loi()

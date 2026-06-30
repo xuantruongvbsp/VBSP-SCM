@@ -5,7 +5,7 @@ from auth import (
     la_phan_he_cn, la_phan_he_pgd,
     co_quyen_upload_pgd, co_quyen_quan_ly_user_pgd,
     co_quyen_giao_nhiem_vu, la_chuyen_vien_cn,
-    get_permissions, ROLE_MAP, ROLES_CN, ROLES_PGD,
+    get_permissions, get_tab_permissions, ROLE_MAP, ROLES_CN, ROLES_PGD,
 )
 
 
@@ -223,6 +223,35 @@ class TestGetPermissions:
                 f"get_permissions('{role}')['{key}'] phải là {val}, "
                 f"nhưng được {perms[key]}"
             )
+
+
+class TestGetTabPermissions:
+    """Test phân quyền nhóm tab của workspace Operation."""
+
+    def test_user_pgd_chi_duoc_nghiep_vu_va_bao_cao(self):
+        perms = get_tab_permissions("user_pgd")
+        assert perms["nhom_duoc_phep"] == ["nghiep_vu_pgd", "bao_cao_giao_ban"]
+        assert perms["co_quyen_khtd"] is False
+        assert perms["co_quyen_kiem_soat"] is False
+        assert perms["co_quyen_quan_tri"] is False
+        assert perms["co_quyen_upload_hstd"] is False
+
+    def test_manager_pgd_duoc_day_du_nhom(self):
+        perms = get_tab_permissions("manager_pgd")
+        assert perms["nhom_duoc_phep"] == [
+            "nghiep_vu_pgd", "bao_cao_giao_ban", "ke_hoach_pgd", "kiem_soat_rr", "quan_tri_pgd"
+        ]
+        assert perms["co_quyen_khtd"] is True
+        assert perms["co_quyen_kiem_soat"] is True
+        assert perms["co_quyen_quan_tri"] is True
+        assert perms["co_quyen_upload_hstd"] is True
+
+    def test_role_la_fallback_chi_lay_quyen_toi_thieu(self):
+        perms = get_tab_permissions("role_la")
+        assert perms["nhom_duoc_phep"] == ["nghiep_vu_pgd", "bao_cao_giao_ban"]
+        assert perms["co_quyen_khtd"] is False
+        assert perms["co_quyen_kiem_soat"] is False
+        assert perms["co_quyen_quan_tri"] is False
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

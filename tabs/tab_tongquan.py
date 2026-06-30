@@ -177,9 +177,18 @@ def _cache_bq_counts(
     n_to = (int(df_bq.groupby([COT_TEN_PGD, COT_TEN_TO]).ngroups)
             if COT_TEN_TO in df_bq.columns and COT_TEN_PGD in df_bq.columns else 0)
     n_xa = 0
-    if COT_TEN_XA in df_bq.columns:
-        # Không lọc theo PGD — Hội sở cũng có địa bàn xã riêng
-        # Loại trừ: rỗng, "CỘNG", "Vay trực tiếp" (không phải tên xã thực)
+    try:
+        from services.file_detection_service import ten_doc_ve_don_vi_chuan as _norm_dv
+
+        _pgd_key = _norm_dv(str(pgd_filter)) if pgd_filter else None
+    except Exception:
+        _pgd_key = str(pgd_filter) if pgd_filter else None
+    if _pgd_key and _pgd_key in PGD_XA_MAP:
+        n_xa = int(len(PGD_XA_MAP.get(_pgd_key, [])))
+    elif not _pgd_key:
+        n_xa = int(len(DS_XA))
+    elif COT_TEN_XA in df_bq.columns:
+        # Fallback: đếm theo HSTD nếu PGD chưa có trong danh mục cấu hình.
         _xa_exclude = {"", "CỘNG", "Vay trực tiếp"}
         _df_xa = df_bq[df_bq[COT_TEN_XA].notna() & ~df_bq[COT_TEN_XA].isin(_xa_exclude)]
         n_xa = int(_df_xa[COT_TEN_XA].nunique())
@@ -467,7 +476,7 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                 <div class="tq-card soft-blue">
                     <div class="tq-label">Dư nợ BQ xã</div>
                     <div class="tq-value">{_bq_xa}</div>
-                    <div class="tq-sub">{_n_xa_str} xã</div>
+                    <div class="tq-sub">{_n_xa_str} xã/phường theo địa bàn</div>
                 </div>
                 <div class="tq-card soft-amber">
                     <div class="tq-label">Dư nợ BQ Hội</div>

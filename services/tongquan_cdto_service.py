@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import pandas as pd
 
-from config import DS_PGD
+from config import DON_VI_CHI_NHANH, DS_PGD
 from utils import fmt_so, vn
 
 try:
@@ -62,9 +62,28 @@ def load_cdto_toan_cn() -> dict:
     so_pgd_co = 0
     so_pgd_thieu = 0
     ds_pgd_thieu: list[str] = []
+    tong_don_vi_ky_vong = len(DS_PGD) + 1
+    so_don_vi_co = 0
+    so_don_vi_thieu = tong_don_vi_ky_vong
+    ds_don_vi_thieu: list[str] = [DON_VI_CHI_NHANH] + DS_PGD
 
     if df_raw is not None and not df_raw.empty and "ten_dv" in df_raw.columns:
-        pgd_da_co = set(df_raw["ten_dv"].dropna().astype(str).unique())
+        from services.file_detection_service import ten_doc_ve_don_vi_chuan
+
+        dv_ky_vong = {DON_VI_CHI_NHANH, *DS_PGD}
+        dv_da_co = {
+            ten_doc_ve_don_vi_chuan(str(val)) or str(val).strip()
+            for val in df_raw["ten_dv"].dropna().astype(str)
+            if str(val).strip()
+        }
+        dv_da_co &= dv_ky_vong
+
+        ds_don_vi_thieu = sorted(dv_ky_vong - dv_da_co)
+        so_don_vi_co = len(dv_da_co)
+        so_don_vi_thieu = len(ds_don_vi_thieu)
+
+        # Giữ key cũ để tương thích: chỉ đếm 21 PGD, không gồm Hội sở Chi nhánh tỉnh.
+        pgd_da_co = {dv for dv in dv_da_co if dv != DON_VI_CHI_NHANH}
         ds_pgd_thieu = sorted(set(DS_PGD) - pgd_da_co)
         so_pgd_co = len(pgd_da_co)
         so_pgd_thieu = len(ds_pgd_thieu)
@@ -75,6 +94,10 @@ def load_cdto_toan_cn() -> dict:
         "so_pgd_co": so_pgd_co,
         "so_pgd_thieu": so_pgd_thieu,
         "ds_pgd_thieu": ds_pgd_thieu,
+        "so_don_vi_co": so_don_vi_co,
+        "so_don_vi_thieu": so_don_vi_thieu,
+        "ds_don_vi_thieu": ds_don_vi_thieu,
+        "tong_don_vi_ky_vong": tong_don_vi_ky_vong,
         "co_du_lieu": df_raw is not None and not df_raw.empty,
         "kpi": compute_totkvv_kpi(df_raw) if (df_raw is not None and not df_raw.empty) else None,
     }
@@ -198,5 +221,9 @@ def health_check_cdto() -> dict:
         "so_pgd_co": result["so_pgd_co"],
         "so_pgd_thieu": result["so_pgd_thieu"],
         "ds_pgd_thieu": result["ds_pgd_thieu"],
+        "so_don_vi_co": result["so_don_vi_co"],
+        "so_don_vi_thieu": result["so_don_vi_thieu"],
+        "ds_don_vi_thieu": result["ds_don_vi_thieu"],
+        "tong_don_vi_ky_vong": result["tong_don_vi_ky_vong"],
         "thang_hien": result["thang_hien"],
     }

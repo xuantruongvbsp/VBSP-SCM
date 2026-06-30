@@ -12,6 +12,7 @@ from config import (
     COT_DVUT,
     COT_LAI_TON,
     COT_LAI_TON_QH,
+    COT_MA_KH,
     COT_NGAY_VAY,
     COT_SO_DU_TG,
     COT_SO_KU,
@@ -34,7 +35,7 @@ def tinh_theo_dvut(df: pd.DataFrame, dvut_order: list[str] | None = None) -> pd.
         return pd.DataFrame()
 
     df_src = df.copy()
-    for col in [COT_DVUT, COT_TEN_PGD, COT_TEN_XA, COT_TEN_TO, COT_SO_KU]:
+    for col in [COT_DVUT, COT_TEN_PGD, COT_TEN_XA, COT_TEN_TO, COT_SO_KU, COT_MA_KH]:
         if col in df_src.columns:
             try:
                 s = df_src[col].astype("string").str.strip()
@@ -67,8 +68,17 @@ def tinh_theo_dvut(df: pd.DataFrame, dvut_order: list[str] | None = None) -> pd.
         )
         out_parts.append(so_to)
 
-    if COT_SO_KU in df_src.columns:
-        out_parts.append(df_src.groupby(COT_DVUT)[COT_SO_KU].nunique().rename("so_kh"))
+    kh_col = COT_MA_KH if COT_MA_KH in df_src.columns else (
+        COT_SO_KU if COT_SO_KU in df_src.columns else None
+    )
+    if kh_col:
+        so_kh = (
+            df_src.dropna(subset=[COT_DVUT, kh_col])
+            .groupby(COT_DVUT)[kh_col]
+            .nunique()
+            .rename("so_kh")
+        )
+        out_parts.append(so_kh)
 
     if COT_TONG_DU_NO in df_src.columns:
         out_parts.append(df_src.groupby(COT_DVUT)[COT_TONG_DU_NO].sum().rename("tong_dn"))

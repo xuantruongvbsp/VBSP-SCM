@@ -308,7 +308,7 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
             @media(max-width:1200px){.ct-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
             @media (max-width: 1200px){.tq-grid,.totkvv-grid{grid-template-columns:repeat(2,minmax(0,1fr));}}
             table.ct-table, table.ct-table td, table.ct-table tr, table.ct-table tbody {
-                color:#1e293b !important;
+                color:var(--text-color) !important;
             }
             table.ct-table th {
                 color:#fff !important;
@@ -347,12 +347,38 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
         tl_no_xau = ((dqh + dnk) / tdn * 100) if tdn > 0 else 0
         no_xau_class = "soft-red" if tl_no_xau >= 1.0 else (
                        "soft-amber" if tl_no_xau >= 0.5 else "soft-green")
-        ngay_cap_nhat = datetime.now().strftime("%d/%m/%Y")
+        ngay_cap_nhat = ""
+        if COT_NGAY_SL in df.columns:
+            _sl = pd.to_datetime(df[COT_NGAY_SL], dayfirst=True, errors="coerce").dropna()
+            if not _sl.empty:
+                ngay_cap_nhat = _sl.max().strftime("%d/%m/%Y")
+        if not ngay_cap_nhat:
+            _meta_hstd = db.doc_kv("merge_meta_hstd") or {}
+            ngay_cap_nhat = str(_meta_hstd.get("ngay_sl", "") or "")
+        if not ngay_cap_nhat:
+            ngay_cap_nhat = datetime.now().strftime("%d/%m/%Y")
+
+        tong_dn_uy_thac = 0.0
+        tong_dn_truc_tiep = 0.0
+        if COT_TONG_DU_NO in df.columns:
+            _dn_series = pd.to_numeric(df[COT_TONG_DU_NO], errors="coerce").fillna(0)
+            _mask_uy_thac = pd.Series(False, index=df.index)
+            if COT_TEN_TO in df.columns:
+                _to = df[COT_TEN_TO].astype("string").str.strip().replace("", pd.NA)
+                _mask_uy_thac |= _to.notna()
+            if COT_DVUT in df.columns:
+                _dvut = df[COT_DVUT].astype("string").str.strip().replace("", pd.NA)
+                _mask_uy_thac |= _dvut.notna() & (_dvut != "CỘNG")
+            tong_dn_uy_thac = float(_dn_series[_mask_uy_thac].sum())
+            tong_dn_truc_tiep = float(_dn_series[~_mask_uy_thac].sum())
+
         # Tính sẵn format VN trước khi đưa vào HTML
         _n_mon_vay = fmt_so(n_mon_vay)
         _n_kh = fmt_so(n_kh)
         _bq_mon_kh = vn(n_mon_vay / n_kh, 1) if n_kh > 0 else "—"
         _tdn = vn(tdn / 1e9, 3)
+        _tdn_uy_thac = vn(tong_dn_uy_thac / 1e9, 3)
+        _tdn_truc_tiep = vn(tong_dn_truc_tiep / 1e9, 3)
         _dth = vn(dth / 1e9, 3)
         _dth_pct = vn(dth / tdn * 100 if tdn else 0, 3)
         _dnk = vn(dnk / 1e9, 3)
@@ -391,7 +417,7 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                 <div class="tq-card soft-green">
                     <div class="tq-label">Tổng dư nợ</div>
                     <div class="tq-value">{_tdn} tỷ</div>
-                    <div class="tq-sub">Số liệu đến {ngay_cap_nhat}</div>
+                    <div class="tq-sub">Ủy thác {_tdn_uy_thac} tỷ · Trực tiếp {_tdn_truc_tiep} tỷ<br>Số liệu HSTD đến {ngay_cap_nhat}</div>
                 </div>
                 <div class="tq-card soft-green">
                     <div class="tq-label">Dư nợ trong hạn</div>
@@ -503,17 +529,21 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
 
             if cdto["co_du_lieu"]:
                 if not pgd_user:
-                    if cdto["so_pgd_thieu"] == 0:
+                    if cdto["so_don_vi_thieu"] == 0:
                         st.success(
-                            f"✅ CDTOTKVV (chấm điểm Tổ): đủ **{cdto['so_pgd_co']}/{len(DS_PGD)} PGD**"
+                            f"✅ CDTOTKVV (chấm điểm Tổ): đủ **{cdto['so_don_vi_co']}/{cdto['tong_don_vi_ky_vong']} đơn vị**"
                             + (f" · Tháng {cdto['thang_hien']}" if cdto["thang_hien"] else "")
                         )
                     else:
                         st.warning(
-                            f"⚠️ CDTOTKVV: **{cdto['so_pgd_co']}/{len(DS_PGD)} PGD**"
+                            f"⚠️ CDTOTKVV: **{cdto['so_don_vi_co']}/{cdto['tong_don_vi_ky_vong']} đơn vị**"
                             + (f" · Tháng {cdto['thang_hien']}" if cdto["thang_hien"] else "")
-                            + f" — còn thiếu {cdto['so_pgd_thieu']} đơn vị"
+                            + f" — còn thiếu {cdto['so_don_vi_thieu']} đơn vị"
                         )
+                    st.caption(
+                        "Nguồn: `pgd_data/*/cdtotkvv_YYYY_MM.xlsx` hoặc `cdtotkvv_latest.xlsx`; "
+                        "tháng hiển thị lấy theo ngày báo cáo trong file CDTOTKVV."
+                    )
             else:
                 st.info("ℹ️ CDTOTKVV (chấm điểm Tổ): chưa có dữ liệu.")
 
@@ -521,11 +551,11 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                 html_card = render_totkvv_html(cdto["kpi"], cdto["thang_hien"], ten_don_vi=_ten_don_vi)
                 st.markdown(html_card, unsafe_allow_html=True)
 
-                if not pgd_user and cdto["so_pgd_thieu"] > 0:
-                    ten_thieu = ", ".join(cdto["ds_pgd_thieu"][:5])
-                    duoi = f" và {cdto['so_pgd_thieu'] - 5} đơn vị khác" if cdto["so_pgd_thieu"] > 5 else ""
+                if not pgd_user and cdto["so_don_vi_thieu"] > 0:
+                    ten_thieu = ", ".join(cdto["ds_don_vi_thieu"][:5])
+                    duoi = f" và {cdto['so_don_vi_thieu'] - 5} đơn vị khác" if cdto["so_don_vi_thieu"] > 5 else ""
                     st.warning(
-                        f"⚠️ Dữ liệu CDTOTKVV từ **{cdto['so_pgd_co']}/{len(DS_PGD)} PGD**. "
+                        f"⚠️ Dữ liệu CDTOTKVV từ **{cdto['so_don_vi_co']}/{cdto['tong_don_vi_ky_vong']} đơn vị**. "
                         f"Thiếu: **{ten_thieu}{duoi}** — card được tính từ dữ liệu hiện có."
                     )
                 st.divider()
@@ -1044,9 +1074,9 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                     f'<td style="padding:6px 7px;border:1px solid #E0E0E0;'
                     f'text-align:{"left" if c == cot_hien[0] else "right"};'
                     f'font-weight:{fw};font-size:{row_fs};white-space:nowrap;'
-                    f'{"color:#C62828;font-weight:800" if c == "TL QH %" and pd.to_numeric(row.get(c, 0), errors="coerce") > 0.5 else ""}'
-                    f'{"color:#C62828;font-weight:800" if c == "Tỷ lệ Nợ xấu" and pd.to_numeric(row.get(c, 0), errors="coerce") > 0.3 else ""}'
-                    f'{"color:#C62828;font-weight:800" if c == "TL Khoanh %" and pd.to_numeric(row.get(c, 0), errors="coerce") > 1 else ""}'
+                    f'{"background:#FDECEC;color:#C62828;font-weight:800" if c == "TL QH %" and pd.to_numeric(row.get(c, 0), errors="coerce") > 0.5 else ""}'
+                    f'{"background:#FDECEC;color:#C62828;font-weight:800" if c == "Tỷ lệ Nợ xấu" and pd.to_numeric(row.get(c, 0), errors="coerce") > 0.3 else ""}'
+                    f'{"background:#FDECEC;color:#C62828;font-weight:800" if c == "TL Khoanh %" and pd.to_numeric(row.get(c, 0), errors="coerce") > 1 else ""}'
                     f'">'
                     f'{_fmt_cell(row[c], c)}</td>'
                     for c in cot_hien

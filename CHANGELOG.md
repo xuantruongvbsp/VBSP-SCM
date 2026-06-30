@@ -1,5 +1,8 @@
 # CHANGELOG
 
+## [2026-06-30] — Tổng quan: số xã trong `Thông tin chung` dùng danh mục địa bàn
+- `tabs/tab_tongquan.py` — card `Dư nợ BQ xã` nay đếm xã/phường theo `PGD_XA_MAP` (toàn CN = 95, theo PGD = số xã cấu hình của PGD) thay vì đếm trực tiếp từ HSTD active; cập nhật subtitle để làm rõ đây là số xã/phường theo địa bàn
+
 ## [2026-06-30] — CDTOTKVV: sửa đếm đơn vị và làm rõ nguồn/tháng dữ liệu
 - `services/tongquan_cdto_service.py` — chuẩn hóa tên đơn vị CDTOTKVV về key nội bộ (`Hội sở CN Đồng Nai`/`PGD Biên Hòa` → `Hội sở Chi nhánh tỉnh`), đếm đúng theo 22 đơn vị kỳ vọng và giữ key cũ để tương thích
 - `tabs/tab_tongquan.py` — badge CDTOTKVV ở `Thông tin chung` hiển thị theo `x/22 đơn vị`, không còn `22/21 PGD`; bổ sung chú thích nguồn `pgd_data/*/cdtotkvv_*.xlsx` và tháng lấy theo ngày báo cáo trong file

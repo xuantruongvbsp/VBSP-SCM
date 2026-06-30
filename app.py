@@ -306,18 +306,18 @@ WS_LABELS = {
 
 PRELOGIN_WORKSPACES = [
     {
-        "key": "management",
-        "icon": "📋",
-        "title": "Phòng KH-NV",
-        "body": "Điều hành kế hoạch, upload toàn Chi nhánh và xử lý nghiệp vụ KH-NV.",
-        "tone": "green",
-    },
-    {
         "key": "operation",
         "icon": "🗺️",
         "title": "Hỗ trợ địa bàn",
         "body": "Tác nghiệp theo PGD, theo dõi xã/phường và xử lý dữ liệu địa bàn.",
         "tone": "blue",
+    },
+    {
+        "key": "management",
+        "icon": "📋",
+        "title": "Phòng KH-NV",
+        "body": "Điều hành kế hoạch, upload toàn Chi nhánh và xử lý nghiệp vụ KH-NV.",
+        "tone": "green",
     },
     {
         "key": "executive",

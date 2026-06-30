@@ -269,10 +269,348 @@ def show_logo(width=80):
     )
 
 
-def main():
-    # Splash screen — tạm tắt để debug
-    st.session_state["_splash_done"] = True
+WS_DEFAULT = {
+    "executive": "executive",
+    "admin": "management",
+    "manager": "management",
+    "user": "operation",
+    "admin_cn": "management",
+    "manager_cn": "management",
+    "chuyenvien_cn": "management",
+    "admin_pgd": "operation",
+    "manager_pgd": "operation",
+    "user_pgd": "operation",
+}
 
+
+WS_ALLOWED = {
+    "executive": ["executive"],
+    "admin": ["executive", "management", "operation"],
+    "manager": ["management", "operation"],
+    "user": ["operation"],
+    "admin_cn": ["executive", "management", "operation"],
+    "manager_cn": ["management", "operation"],
+    "chuyenvien_cn": ["management", "operation"],
+    "admin_pgd": ["operation"],
+    "manager_pgd": ["operation"],
+    "user_pgd": ["operation"],
+}
+
+
+WS_LABELS = {
+    "executive": "📊 Ban Giám đốc",
+    "management": "📋 Phòng KH-NV",
+    "operation": "🗺️ Hỗ trợ địa bàn",
+}
+
+
+PRELOGIN_WORKSPACES = [
+    {
+        "key": "management",
+        "icon": "📋",
+        "title": "Phòng KH-NV",
+        "body": "Điều hành kế hoạch, upload toàn Chi nhánh và xử lý nghiệp vụ KH-NV.",
+        "tone": "green",
+    },
+    {
+        "key": "operation",
+        "icon": "🗺️",
+        "title": "Hỗ trợ địa bàn",
+        "body": "Tác nghiệp theo PGD, theo dõi xã/phường và xử lý dữ liệu địa bàn.",
+        "tone": "blue",
+    },
+    {
+        "key": "executive",
+        "icon": "📊",
+        "title": "Ban Giám đốc",
+        "body": "Theo dõi dashboard tổng quan, chỉ số điều hành và báo cáo nhanh.",
+        "tone": "amber",
+    },
+]
+
+
+def render_splash() -> None:
+    st.html(
+        f"""
+        <style>
+          .vbsp-splash {{
+            min-height: 82vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+            background:
+              linear-gradient(180deg, rgba(20,83,45,0.12), rgba(15,23,42,0)),
+              radial-gradient(circle at center top, rgba(34,197,94,0.10), transparent 42%);
+          }}
+          .vbsp-splash-card {{
+            width: min(1040px, 100%);
+            display: grid;
+            grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr);
+            gap: 0;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid rgba(148, 163, 184, 0.22);
+            background: #111827;
+            box-shadow: 0 24px 64px rgba(0, 0, 0, 0.34);
+            }}
+          .vbsp-splash-main {{
+            padding: 3rem 3.25rem 3rem;
+            background: linear-gradient(150deg, #14532d 0%, #166534 54%, #1d4ed8 150%);
+            color: #f8fafc;
+          }}
+          .vbsp-splash-side {{
+            padding: 3rem 2.5rem;
+            background: linear-gradient(180deg, rgba(15, 23, 42, 0.98), rgba(17, 24, 39, 0.94));
+            color: #e5e7eb;
+            border-left: 1px solid rgba(148, 163, 184, 0.18);
+          }}
+          .vbsp-splash-brand {{
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 2.15rem;
+          }}
+          .vbsp-splash-logo {{
+            width: 92px;
+            height: 92px;
+            display: grid;
+            place-items: center;
+            border-radius: 50%;
+            background: #ffffff;
+            color: #1f2937;
+            border: 4px solid rgba(255,255,255,0.36);
+            box-shadow: 0 12px 28px rgba(0,0,0,0.22);
+          }}
+          .vbsp-splash-logo img {{
+            width: 76px;
+            display: block;
+            border-radius: 50%;
+          }}
+          .vbsp-splash-kicker {{
+            font-size: 1rem;
+            font-weight: 700;
+            color: #dcfce7;
+            margin-bottom: 0.2rem;
+          }}
+          .vbsp-splash-title {{
+            font-size: 3.15rem;
+            font-weight: 850;
+            line-height: 1.04;
+            margin: 0 0 0.75rem;
+          }}
+          .vbsp-splash-sub {{
+            max-width: 620px;
+            font-size: 1.35rem;
+            line-height: 1.5;
+            color: rgba(248, 250, 252, 0.94);
+            margin: 0;
+          }}
+          .vbsp-splash-unit {{
+            margin-top: 1.7rem;
+            padding-top: 1.2rem;
+            border-top: 1px solid rgba(255,255,255,0.18);
+            font-size: 1.05rem;
+            color: #bbf7d0;
+            font-weight: 700;
+          }}
+          .vbsp-splash-side-title {{
+            font-size: 1.15rem;
+            font-weight: 800;
+            color: #f8fafc;
+            margin-bottom: 1rem;
+          }}
+          .vbsp-splash-pill-wrap {{
+            display: grid;
+            gap: 0.75rem;
+          }}
+          .vbsp-splash-pill {{
+            display: flex;
+            align-items: center;
+            gap: 0.72rem;
+            min-height: 54px;
+            padding: 0.85rem 1rem;
+            border-radius: 8px;
+            background: rgba(30, 41, 59, 0.82);
+            border: 1px solid rgba(148,163,184,0.20);
+            font-size: 1.02rem;
+            font-weight: 700;
+          }}
+          .vbsp-splash-pill span {{
+            font-size: 1.25rem;
+          }}
+          .vbsp-splash-status {{
+            margin-top: 2rem;
+            padding-top: 1.25rem;
+            border-top: 1px solid rgba(148,163,184,0.18);
+          }}
+          .vbsp-splash-note {{
+            display: flex;
+            align-items: center;
+            gap: 0.8rem;
+            font-size: 1.08rem;
+            font-weight: 700;
+            color: #d1fae5;
+          }}
+          .vbsp-splash-loader {{
+            width: 46px;
+            height: 4px;
+            border-radius: 999px;
+            background: #22c55e;
+            box-shadow: 0 0 0 6px rgba(34,197,94,0.12);
+          }}
+          .vbsp-splash-hint {{
+            margin-top: 0.8rem;
+            font-size: 0.95rem;
+            line-height: 1.45;
+            color: #94a3b8;
+          }}
+          @media (max-width: 860px) {{
+            .vbsp-splash {{
+              padding: 1rem;
+            }}
+            .vbsp-splash-card {{
+              grid-template-columns: 1fr;
+            }}
+            .vbsp-splash-side {{
+              border-left: 0;
+              border-top: 1px solid rgba(148, 163, 184, 0.18);
+            }}
+            .vbsp-splash-main,
+            .vbsp-splash-side {{
+              padding: 2rem 1.35rem;
+            }}
+            .vbsp-splash-title {{
+              font-size: 2.4rem;
+            }}
+            .vbsp-splash-sub {{
+              font-size: 1.12rem;
+            }}
+          }}
+        </style>
+        <div class="vbsp-splash">
+          <div class="vbsp-splash-card">
+            <div class="vbsp-splash-main">
+              <div class="vbsp-splash-brand">
+                <div class="vbsp-splash-logo">
+                  <img src="data:image/png;base64,{LOGO_B64}" alt="VBSP logo">
+                </div>
+                <div>
+                  <div class="vbsp-splash-kicker">NHCSXH Chi nhánh Đồng Nai</div>
+                  <div class="vbsp-splash-title">VBSP-SCM</div>
+                </div>
+              </div>
+              <p class="vbsp-splash-sub">Hệ thống Quản trị Tín dụng Nội bộ cho quản lý số liệu, tác nghiệp và điều hành tín dụng.</p>
+              <div class="vbsp-splash-unit">Phòng KH-NV · Hỗ trợ địa bàn · Ban Giám đốc</div>
+            </div>
+            <div class="vbsp-splash-side">
+              <div class="vbsp-splash-side-title">Không gian làm việc</div>
+              <div class="vbsp-splash-pill-wrap">
+                <div class="vbsp-splash-pill"><span>📋</span> Phòng KH-NV</div>
+                <div class="vbsp-splash-pill"><span>🗺️</span> Hỗ trợ địa bàn</div>
+                <div class="vbsp-splash-pill"><span>📊</span> Ban Giám đốc</div>
+              </div>
+              <div class="vbsp-splash-status">
+                <div class="vbsp-splash-note"><div class="vbsp-splash-loader"></div> Đang khởi tạo hệ thống</div>
+                <div class="vbsp-splash-hint">Đang chuẩn bị phiên làm việc và chuyển đến màn đăng nhập.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        """,
+    )
+    time.sleep(1.1)
+    st.session_state["_splash_done"] = True
+    st.rerun()
+
+
+def render_workspace_picker() -> None:
+    st.markdown(
+        """
+<style>
+  [data-testid="stSidebar"] {
+    display: none !important;
+  }
+  [data-testid="stHeader"] {
+    background: transparent !important;
+  }
+  .stApp {
+    background:
+      linear-gradient(180deg, rgba(20, 83, 45, 0.18), rgba(15, 23, 42, 0)),
+      radial-gradient(circle at 50% 0%, rgba(34, 197, 94, 0.14), transparent 42%),
+      #0b1120 !important;
+    color: #e5e7eb !important;
+  }
+  section[data-testid="stMain"] {
+    color: #e5e7eb !important;
+  }
+  div[data-testid="stButton"] > button {
+    min-height: 48px;
+    border-radius: 8px;
+    border: 1px solid rgba(34, 197, 94, 0.36);
+    background: linear-gradient(135deg, #166534, #1d4ed8);
+    color: #ffffff;
+    font-weight: 800;
+  }
+  div[data-testid="stButton"] > button:hover {
+    border-color: rgba(134, 239, 172, 0.8);
+    color: #ffffff;
+    filter: brightness(1.06);
+  }
+</style>
+""",
+        unsafe_allow_html=True,
+    )
+
+    st.html(
+        f"""
+<div style="min-height:22vh;display:flex;align-items:flex-end;justify-content:center;padding:2.5rem 1rem 1rem">
+  <div style="width:min(1060px,100%);display:flex;align-items:center;gap:1.1rem">
+    <div style="width:78px;height:78px;border-radius:50%;display:grid;place-items:center;background:#ffffff;color:#1f2937;border:4px solid rgba(255,255,255,0.28);box-shadow:0 16px 36px rgba(0,0,0,0.28)">
+      <img src="data:image/png;base64,{LOGO_B64}" alt="VBSP logo" style="width:62px;border-radius:50%;display:block">
+    </div>
+    <div>
+      <div style="color:#bbf7d0;font-size:1rem;font-weight:800;margin-bottom:.25rem">VBSP-SCM</div>
+      <div style="color:#f8fafc;font-size:2.55rem;line-height:1.05;font-weight:900">Chọn không gian làm việc</div>
+      <div style="color:#94a3b8;font-size:1.06rem;margin-top:.55rem">NHCSXH Chi nhánh Đồng Nai · Hệ thống Quản trị Tín dụng Nội bộ</div>
+    </div>
+  </div>
+</div>
+""",
+    )
+
+    cols = st.columns(3, gap="large")
+    for i, item in enumerate(PRELOGIN_WORKSPACES):
+        tone = item["tone"]
+        color = {
+            "green": "#22c55e",
+            "blue": "#38bdf8",
+            "amber": "#fbbf24",
+        }.get(tone, "#22c55e")
+        with cols[i]:
+            st.html(
+                f"""
+<div style="min-height:218px;border-radius:8px;padding:1.35rem 1.25rem;margin-bottom:.85rem;background:linear-gradient(180deg,rgba(30,41,59,.94),rgba(15,23,42,.98));color:#e5e7eb;border:1px solid rgba(148,163,184,.22);box-shadow:0 18px 42px rgba(0,0,0,.26)">
+  <div style="display:flex;align-items:center;justify-content:space-between;gap:1rem;margin-bottom:1.35rem">
+    <div style="width:54px;height:54px;border-radius:8px;display:grid;place-items:center;background:rgba(15,23,42,.72);border:1px solid rgba(148,163,184,.22);font-size:1.7rem">{item["icon"]}</div>
+    <div style="height:4px;width:86px;border-radius:999px;background:{color};box-shadow:0 0 0 5px color-mix(in srgb, {color} 18%, transparent)"></div>
+  </div>
+  <div style="color:#f8fafc;font-size:1.5rem;line-height:1.15;font-weight:900;margin-bottom:.7rem">{item["title"]}</div>
+  <div style="color:#cbd5e1;font-size:1.02rem;line-height:1.55">{item["body"]}</div>
+</div>
+""",
+            )
+            if st.button(
+                f"{item['icon']} Chọn {item['title']}",
+                key=f"prelogin_workspace_{item['key']}",
+                use_container_width=True,
+            ):
+                st.session_state["prelogin_workspace"] = item["key"]
+                st.session_state.workspace = item["key"]
+                st.rerun()
+
+
+def main():
     # ── Dọn audit_log cũ — 1 lần/ngày ───────────────────────────────────────
     from datetime import date as _date
     _today = _date.today().isoformat()
@@ -284,25 +622,26 @@ def main():
             pass
 
     # ── Session state ─────────────────────────────────────────────────────────
-    for k, v in [("logged_in",False),("user_info",None),("username",""),("workspace",None)]:
+    for k, v in [
+        ("logged_in", False),
+        ("user_info", None),
+        ("username", ""),
+        ("workspace", None),
+        ("prelogin_workspace", None),
+        ("_splash_done", False),
+    ]:
         if k not in st.session_state:
             st.session_state[k] = v
 
+    if not st.session_state.get("_splash_done"):
+        render_splash()
+        st.stop()
+
     # ── Login ─────────────────────────────────────────────────────────────────
-    # DEV MODE: tự động đăng nhập admin (xóa block này khi deploy)
     if not st.session_state.logged_in:
-        st.session_state.logged_in = True
-        st.session_state.username  = "admin"
-        st.session_state.user_info = {
-            "username": "admin",
-            "ho_ten": "Admin Dev",
-            "role":   "admin_cn",
-            "pgd":    None,
-        }
-        st.session_state["role"] = "admin_cn"
-        st.session_state["username"] = "admin"
-    # END DEV MODE
-    if not st.session_state.logged_in:
+        if st.session_state.get("prelogin_workspace") is None:
+            render_workspace_picker()
+            st.stop()
         auth.hien_thi_login()
         st.stop()
 
@@ -340,42 +679,11 @@ def main():
     # Chuẩn hóa role về dạng mới (backward-compatible)
     role = normalize_role(role)
 
-    # Workspace mặc định theo role
-    WS_DEFAULT = {
-        "executive":   "executive",
-        "admin":       "management",
-        "manager":     "management",
-        "user":        "operation",
-        "admin_cn":    "management",
-        "manager_cn":  "management",
-        "chuyenvien_cn":"management",
-        "admin_pgd":   "operation",
-        "manager_pgd": "operation",
-        "user_pgd":    "operation",
-    }
-    if st.session_state.workspace is None:
-        st.session_state.workspace = WS_DEFAULT.get(role, "operation")
-
-    # Workspace được phép dùng
-    WS_ALLOWED = {
-        "executive":   ["executive"],
-        "admin":       ["executive","management","operation"],
-        "manager":     ["management","operation"],
-        "user":        ["operation"],
-        "admin_cn":    ["executive","management","operation"],
-        "manager_cn":  ["management","operation"],
-        "chuyenvien_cn":["management","operation"],
-        "admin_pgd":   ["operation"],
-        "manager_pgd": ["operation"],
-        "user_pgd":    ["operation"],
-    }
+    # Workspace được phép dùng theo role; lựa chọn trước đăng nhập được giữ
+    # nếu role có quyền, còn không sẽ rơi về workspace mặc định hợp lệ.
     allowed = WS_ALLOWED.get(role, ["operation"])
-
-    WS_LABELS = {
-        "executive": "📊 Tổng Quan Chi Nhánh",
-        "management":"📋 Phòng KH-NV",
-        "operation": "🗺️ Hỗ Trợ Địa Bàn PGD/Biên Hòa",
-    }
+    if st.session_state.workspace not in allowed:
+        st.session_state.workspace = WS_DEFAULT.get(role, allowed[0])
 
     # ── Sidebar ───────────────────────────────────────────────────────────────────
     with st.sidebar:
@@ -544,9 +852,12 @@ def main():
 
         st.divider()
         if st.button("🚪 Đăng xuất", use_container_width=True):
-            for k in ["logged_in","user_info","username","workspace"]:
+            for k in ["logged_in","user_info","username","workspace","prelogin_workspace","role"]:
                 st.session_state[k] = False if k=="logged_in" else None
+            st.session_state["_splash_done"] = False
             st.session_state.username = ""
+            for k in ["_ctx", "_ctx_cache_key", "_pgd_map_cache_ts", "_pgd_xa_map_cached", "_ds_pgd_all_cached", "_pgd_op_mtime_ss", "df_full"]:
+                st.session_state.pop(k, None)
             for k in list(st.session_state.keys()):
                 if str(k).startswith("_scm_"):
                     st.session_state.pop(k, None)
@@ -768,7 +1079,7 @@ def main():
         workspaces.ws_management.render(**ctx)
     elif ws == "operation":
         workspaces.ws_operation.render(**ctx)
-    elif ws == "admin_users" and normalize_role(role) == "admin_cn":
+    elif ws == "admin_users" and normalize_role(role) in ("admin_cn", "admin_pgd"):
         st.title("👥 Quản lý người dùng")
         class _FakeTab:
             def __enter__(self): return self

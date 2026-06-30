@@ -466,6 +466,7 @@ def tach_file_cdto_toan_cn(file_bytes: bytes) -> dict[str, bytes]:
     )
     if col_ma_dv_in is None:
         col_ma_dv_in = idx_map.get("ma_dv", FALLBACK_IDX["ma_dv"])
+    idx_map["ma_dv"] = col_ma_dv_in
 
     data_start = None
     for i, row in enumerate(all_rows):

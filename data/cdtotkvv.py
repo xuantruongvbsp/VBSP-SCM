@@ -51,7 +51,7 @@ def _tim_header_cdto_toan_cn(all_rows: list[list]) -> tuple[int | None, dict[str
     """Tìm dòng header và map tên trường -> index cột trong file toàn CN."""
     alias_map = {
         "stt": {"stt"},
-        "ma_dv": {"mapgd", "madonvi", "madv"},
+        "ma_dv": {"mapgd", "maphonggiaodich", "mapgd6so"},
         "ten_dv": {"tenpgd", "tendonvi", "tendv"},
         "ma_xa": {"maxa"},
         "ten_xa": {"tenxa"},
@@ -77,6 +77,49 @@ def _tim_header_cdto_toan_cn(all_rows: list[list]) -> tuple[int | None, dict[str
         if "stt" in idx_map and "ma_dv" in idx_map:
             return row_idx, idx_map
     return None, {}
+
+
+def _chon_cot_ma_pgd_tot_nhat(
+    all_rows: list[list],
+    valid_codes: set[str],
+    preferred_idx: int | None = None,
+    start_row: int = 0,
+) -> int | None:
+    """Chọn cột có nhiều mã PGD hợp lệ/đa dạng nhất trong phần data."""
+
+    def _norm_ma_local(val) -> str | None:
+        if val is None:
+            return None
+        try:
+            return str(int(float(str(val).strip()))).zfill(6)
+        except (ValueError, TypeError):
+            return None
+
+    sample_rows = all_rows[start_row : start_row + 300]
+    max_cols = max((len(r) for r in sample_rows), default=0)
+    best_idx = None
+    best_score = (-1, -1, -1)
+    for col_idx in range(max_cols):
+        hits = 0
+        unique_codes: set[str] = set()
+        for row in sample_rows:
+            if len(row) <= col_idx:
+                continue
+            ma = _norm_ma_local(row[col_idx])
+            if ma and ma in valid_codes:
+                hits += 1
+                unique_codes.add(ma)
+        if not hits:
+            continue
+        score = (
+            len(unique_codes),
+            hits,
+            1 if preferred_idx is not None and col_idx == preferred_idx else 0,
+        )
+        if score > best_score:
+            best_score = score
+            best_idx = col_idx
+    return best_idx
 
 
 def _ten_file(thang_nam: str) -> Path:
@@ -276,7 +319,12 @@ def doc_thang_tu_cdto_toan_cn(file_bytes: bytes) -> str | None:
         all_rows = [list(r) for r in ws.iter_rows(values_only=True)]
         wb.close()
         _header_row, idx_map = _tim_header_cdto_toan_cn(all_rows)
-        col_mapgd = idx_map.get("ma_dv")
+        col_mapgd = _chon_cot_ma_pgd_tot_nhat(
+            all_rows,
+            set(MA_PGD_MAP),
+            preferred_idx=idx_map.get("ma_dv"),
+            start_row=(_header_row or 0) + 1,
+        )
         col_ngaybc = idx_map.get("ngaybc")
 
         for row in all_rows:
@@ -410,7 +458,14 @@ def tach_file_cdto_toan_cn(file_bytes: bytes) -> dict[str, bytes]:
     all_rows = [list(r) for r in ws.iter_rows(values_only=True)]
     wb.close()
     _header_row, idx_map = _tim_header_cdto_toan_cn(all_rows)
-    col_ma_dv_in = idx_map.get("ma_dv", FALLBACK_IDX["ma_dv"])
+    col_ma_dv_in = _chon_cot_ma_pgd_tot_nhat(
+        all_rows,
+        set(MA_PGD_MAP),
+        preferred_idx=idx_map.get("ma_dv", FALLBACK_IDX["ma_dv"]),
+        start_row=(_header_row or 0) + 1,
+    )
+    if col_ma_dv_in is None:
+        col_ma_dv_in = idx_map.get("ma_dv", FALLBACK_IDX["ma_dv"])
 
     data_start = None
     for i, row in enumerate(all_rows):

@@ -181,6 +181,42 @@ class TestCdtotkvvToanCnParser:
 
         assert thang == "05/2026"
 
+    def test_tach_file_khong_bat_nham_cot_ma_don_vi_khac(self):
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.append(["BÁO CÁO CDTOTKVV"])
+        ws.append(["Kỳ chấm điểm tháng 05/2026"])
+        for _ in range(5):
+            ws.append([])
+        ws.append([
+            "STT",
+            "Mã đơn vị",
+            "Tên đơn vị",
+            "Mã PGD",
+            "Tên PGD",
+            "Mã xã",
+            "Tên xã",
+            "Mã tổ",
+            "Tên tổ trưởng",
+            "Loại tổ",
+            "ĐVUT",
+            "Dư nợ",
+            "Tổng điểm",
+            "Xếp loại",
+            "NGAYBC",
+        ])
+        ws.append([1, "999999", "ĐVUT A", "004601", DON_VI_CHI_NHANH, "001", "Xã A", "T01", "A", "Tổ tốt", "Hội PN", 1, 90, "Tốt", "31/05/2026"])
+        ws.append([2, "999999", "ĐVUT A", "004602", "PGD Long Thành", "002", "Xã B", "T02", "B", "Tổ tốt", "Hội ND", 1, 91, "Tốt", "31/05/2026"])
+
+        buf = BytesIO()
+        wb.save(buf)
+
+        pgd_map = tach_file_cdto_toan_cn(buf.getvalue())
+
+        assert DON_VI_CHI_NHANH in pgd_map
+        assert "PGD Long Thành" in pgd_map
+        assert len(pgd_map) == 2
+
     def test_tach_file_doc_lai_dung_cot_cho_ca_layout_cu_va_moi(self, tmp_path):
         for leading_blank in (False, True):
             file_bytes = _build_cdto_toan_cn_bytes(leading_blank=leading_blank)

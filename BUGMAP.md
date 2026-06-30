@@ -672,9 +672,9 @@
 | | |
 |---|---|
 | **File** | `data/cdtotkvv.py` |
-| **Dấu hiệu** | Upload file tổng hợp `CT_CDT...052026.xlsx` báo `Không tìm thấy dòng dữ liệu hợp lệ trong file (cột 'Mã PGD' phải chứa mã 6 số...)` dù file thực tế có dữ liệu |
-| **Nguyên nhân** | `tach_file_cdto_toan_cn()` và `doc_thang_tu_cdto_toan_cn()` khóa cứng vị trí cột theo layout cũ (ví dụ `Mã PGD` ở cột C, `NGAYBC` ở cột S). Khi file export không có cột trống đầu dòng hoặc header dịch 1 cột, parser không tìm được mã PGD hợp lệ |
-| **Fix** | Dò header theo tên cột chuẩn hóa (`STT`, `Mã PGD`, `Tên PGD`, `NGAYBC`...) rồi map index động; chỉ fallback về index cũ khi không dò được header. Đồng thời bỏ thông báo lỗi hardcode `cột B` để tránh gây hiểu nhầm |
+| **Dấu hiệu** | Upload file tổng hợp `CT_CDT...052026.xlsx` có lúc báo `Không tìm thấy dòng dữ liệu hợp lệ...`, có lúc preview chỉ nhận `1 đơn vị` dù file là toàn CN |
+| **Nguyên nhân** | Parser vừa khóa cứng vị trí cột theo layout cũ, vừa có thể bắt nhầm cột mã khác khi file chứa nhiều cột kiểu `Mã đơn vị` / `Mã PGD`. Hậu quả là mã PGD không được đọc đúng hoặc toàn bộ file bị gom về 1 mã |
+| **Fix** | Dò header theo tên cột chuẩn hóa (`STT`, `Mã PGD`, `Tên PGD`, `NGAYBC`...) rồi map index động; sau đó chọn cột có nhiều mã PGD hợp lệ nhất thay vì tin tuyệt đối vào header đầu tiên. Đồng thời bỏ thông báo lỗi hardcode `cột B` để tránh gây hiểu nhầm |
 | **Ngày fix** | 2026-06-30 |
 
 ### E13 — CDTOTKVV mất số 0 đầu ở mã đơn vị/xã/tổ sau khi đọc Excel

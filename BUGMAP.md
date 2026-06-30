@@ -264,6 +264,15 @@
 | **Fix** | Chuyển outer navigation sang `st.radio` + inner dùng `lazy_tabs()` (render 1 tab); jump-tab đọc one-shot từ `SCMStateManager.nav_ws_op_jump_tab` và set `st.session_state[f\"_{inner_key}_idx\"]` |
 | **Ngày fix** | 2026-05-24 |
 
+### B12 — Login header hiện thô HTML/base64 sau splash
+| | |
+|---|---|
+| **File** | `auth.py` → `_build_login_html()` / `hien_thi_login()` |
+| **Dấu hiệu** | Sau splash, màn đăng nhập hiển thị nguyên đoạn `border-radius:12px...` và chuỗi `data:image/jpeg;base64,...` thay vì card logo đăng nhập |
+| **Nguyên nhân** | HTML header được đưa qua `st.markdown(..., unsafe_allow_html=True)` với các dòng `style` thụt vào; Markdown coi các dòng này là code block nên escape HTML |
+| **Fix** | Compact HTML attribute về một dòng và render bằng `st.html(_build_login_html())` để không đi qua Markdown parser |
+| **Ngày fix** | 2026-06-30 |
+
 ### B11 — Tab Tổng quan load lâu + không hiển thị "Thông tin tổng quát theo PGD"
 | | |
 |---|---|
@@ -650,6 +659,15 @@
 | **Fix** | Đảo thứ tự ở cả 3 nơi: `doc_thang_tu_cdto_toan_cn(file_bytes) or doc_thang_nam_tu_file(file_bytes)` → thống nhất gắn tháng theo NGÀY CHỐT SỐ LIỆU (NGAYBC), khớp với luồng PGD tự upload |
 | **Ngày fix** | 2026-06-21 |
 
+### E10 — CDTOTKVV hiển thị `22/21 PGD` do lẫn Hội sở với mẫu số 21 PGD
+| | |
+|---|---|
+| **File** | `services/tongquan_cdto_service.py`, `tabs/tab_tongquan.py`, `tabs/tab_cdtotkvv.py` |
+| **Dấu hiệu** | Badge CDTOTKVV hiện kiểu `đủ 22/21 PGD`; người dùng khó hiểu dữ liệu lấy từ đâu, có tính Biên Hòa/Hội sở hay không |
+| **Nguyên nhân** | Dữ liệu CDTOTKVV thực tế có 22 đơn vị (Hội sở Chi nhánh tỉnh + 21 PGD) và tên trong file có thể là alias `Hội sở CN Đồng Nai`, nhưng UI lại lấy tử số từ `ten_dv` raw còn mẫu số từ `len(DS_PGD)=21` |
+| **Fix** | Chuẩn hóa tên đơn vị CDTOTKVV qua alias về key nội bộ, đếm theo `22 đơn vị` kỳ vọng và hiển thị chú thích rõ nguồn `pgd_data/*/cdtotkvv_*.xlsx`; tháng hiển thị lấy theo ngày báo cáo trong file CDTOTKVV |
+| **Ngày fix** | 2026-06-30 |
+
 ---
 
 ## F. PDF / Word
@@ -890,10 +908,46 @@
 ### I4 — Menu `🗺️ Hỗ trợ địa bàn` hiển thị số liệu toàn CN dưới nhãn PGD (Biên Hòa)
 | | |
 |---|---|
-| **File** | `app.py` → block sidebar workspace `operation` |
+| **File** | `app.py` → build context workspace `operation`; `workspaces/ws_operation.py` → `render_sidebar_menu()`, `render()` |
 | **Dấu hiệu** | Sidebar hiển thị tiêu đề `🏦 PGD/Biên Hòa` nhưng số hồ sơ / tra cứu nhanh lại dựa trên DataFrame toàn Chi nhánh |
-| **Nguyên nhân** | `pgd_user` có thể là alias (`PGD Biên Hòa`) không khớp giá trị thực trong cột `Tên PGD` (đang dùng `Hội sở Chi nhánh tỉnh`), và logic build `df_pgd` có nhánh rơi về `_df_op` (toàn CN) khi không lọc được |
-| **Fix** | Chuẩn hóa `pgd_user` qua `ten_doc_ve_don_vi_chuan()` trước khi filter theo `Tên PGD`; với ngữ cảnh PGD thì không fallback về dữ liệu toàn CN |
+| **Nguyên nhân** | `pgd_user` có thể là alias (`PGD Biên Hòa`) không khớp giá trị thực trong cột `Tên PGD` (đang dùng `Hội sở Chi nhánh tỉnh`), trong đường dẫn `pgd_data/hoi_so_chi_nhanh_tinh`, và logic build `df_pgd` có nhánh rơi về `_df_op` (toàn CN) khi không lọc được |
+| **Fix** | Chuẩn hóa `pgd_user` qua `ten_doc_ve_don_vi_chuan()` ngay sau login để load cache, đọc file PGD upload, context, sidebar và `ws_operation.render()` dùng cùng key nội bộ; với ngữ cảnh PGD thì không fallback về dữ liệu toàn CN |
+| **Ngày fix** | 2026-06-29 |
+
+### I5 — Quản lý user bị lẫn role giữa `📋 Phòng KH-NV` và `🗺️ Hỗ trợ địa bàn`
+| | |
+|---|---|
+| **File** | `auth.py`, `app.py`, `db.py` |
+| **Dấu hiệu** | Màn `👥 Quản lý Users` vẫn sinh role legacy `admin/manager/user`, admin PGD bấm vào màn quản lý user thì bị bật ngược về workspace Operation, còn `user_pgd` lại thấy gần như full menu PGD |
+| **Nguyên nhân** | App đã route/workspace theo role mới (`admin_cn`, `admin_pgd`, `user_pgd`...) nhưng UI quản lý user vẫn tạo role cũ; nhánh `admin_users` chỉ render cho `admin_cn`; `get_tab_permissions("user_pgd")` cấp quá nhiều nhóm quyền |
+| **Fix** | Tách quản lý user theo phân hệ: `admin_cn` chỉ tạo/sửa role KH-NV (`executive`, `admin_cn`, `manager_cn`, `chuyenvien_cn`), `admin_pgd` chỉ quản lý role PGD của đơn vị mình (`admin_pgd`, `manager_pgd`, `user_pgd`); cho `admin_pgd` mở được workspace `admin_users`; migration DB chuẩn hóa role legacy sang role mới; siết `user_pgd` về đúng quyền cơ bản |
+| **Ngày fix** | 2026-06-29 |
+
+### I6 — Không đăng nhập được theo phân hệ vì app auto-login `admin_cn`
+| | |
+|---|---|
+| **File** | `app.py`, `auth.py` |
+| **Dấu hiệu** | Mở app là vào thẳng tài khoản admin của `📋 Phòng KH-NV`, không hiện màn đăng nhập và không kiểm tra tài khoản/role thực tế; chuyển user khác dễ bị giữ lại `workspace`/context cũ |
+| **Nguyên nhân** | Block `DEV MODE` trong `app.py` ép `logged_in=True` + `user_info=admin_cn`; sau login thật cũng chưa reset đầy đủ session liên quan đến phân hệ |
+| **Fix** | Bỏ block auto-login; khi login thành công thì reset `workspace`, xóa `_ctx`, lưu lại `username`/`role` trong session để app tự route lại đúng phân hệ mặc định |
+| **Ngày fix** | 2026-06-29 |
+
+### I7 — Đăng nhập lại cùng phân hệ có thể crash vì `_ctx_cache_key` còn sót
+| | |
+|---|---|
+| **File** | `auth.py`, `app.py` |
+| **Dấu hiệu** | Sau khi đăng xuất rồi đăng nhập lại bằng tài khoản cùng role/PGD, app có thể crash ở nhánh đọc `st.session_state["_ctx"]` dù `_ctx` đã bị xóa |
+| **Nguyên nhân** | Login chỉ xóa `_ctx` nhưng giữ `_ctx_cache_key`; nếu `_data_version` phiên mới trùng phiên cũ, `app.py` bỏ qua block load dữ liệu và cố dùng `_ctx` không còn tồn tại |
+| **Fix** | Khi login/logout, xóa đồng bộ `_ctx`, `_ctx_cache_key`, map cache PGD, `_pgd_op_mtime_ss`, `df_full`; login cũng lưu `role` đã `normalize_role()` |
+| **Ngày fix** | 2026-06-29 |
+
+### I8 — Splash khởi động bị tắt nên không còn màn nhận diện hệ thống/phân hệ
+| | |
+|---|---|
+| **File** | `app.py` |
+| **Dấu hiệu** | Mở app đi thẳng vào login/workspace, không còn màn splash báo hiệu `VBSP-SCM`, `Phòng KH-NV`, `Hỗ trợ địa bàn`, `Ban Giám đốc` |
+| **Nguyên nhân** | `main()` gán cứng `st.session_state["_splash_done"] = True` để debug nên splash không bao giờ hiển thị |
+| **Fix** | Khôi phục `render_splash()` trong `app.py`, cho splash hiện 1 lần mỗi phiên và reset lại sau khi đăng xuất |
 | **Ngày fix** | 2026-06-29 |
 
 ### I1 — Logic role sai / bỏ sót role mới
@@ -1417,6 +1471,34 @@ val = pd.to_numeric(df[COT_X], errors="coerce").sum() if COT_X in df.columns els
 | **Dấu hiệu** | `▶ 📊 Thông tin chung` trong `🏘️ Xếp loại Tổ TK&VV toàn Chi nhánh` có tổng Tổ khác với tab `🤝 Ủy thác` |
 | **Nguyên nhân** | CDTOTKVV là danh sách Tổ được chấm điểm theo kỳ (có thể thiếu PGD/Tổ hoặc có dòng trùng), còn `Ủy thác` đếm Tổ từ HSTD (tổ có món vay phát sinh). Hai nguồn dữ liệu không nhất thiết bằng nhau |
 | **Fix** | Trong `Xếp loại Tổ`, hiển thị tổng Tổ theo CDTOTKVV unique `(PGD, Mã Tổ)`, dùng mẫu số unique cho các tỷ lệ xếp loại, và kèm tham chiếu tổng Tổ từ HSTD theo `(PGD, Xã, Tổ)`; thêm caption giải thích chênh lệch |
+| **Ngày fix** | 2026-06-29 |
+
+### C24 — Ủy thác: `Tổng KH` theo Hội đoàn thể đếm nhầm số khế ước
+| | |
+|---|---|
+| **File** | `services/uy_thac_service.py` → `tinh_theo_dvut()`, `tabs/tab_uy_thac.py` → `_render_theo_dvut()` |
+| **Dấu hiệu** | Tab `🤝 Ủy thác` → `📊 Thống kê theo Hội đoàn thể`: metric `Tổng KH` bằng tổng món vay (vd `291.522`) thay vì khớp `📊 Thông tin chung` `Tổng khách hàng` (vd `213.343`, BQ `1,4 món/KH`) |
+| **Nguyên nhân** | Service đặt tên cột `so_kh` nhưng lại tính bằng `nunique(COT_SO_KU)`; `Số khế ước` là món vay, không phải khách hàng |
+| **Fix** | Tính `so_kh` bằng `nunique(COT_MA_KH)` khi có cột `Mã KH`, chỉ fallback sang `Số khế ước` nếu dữ liệu thiếu mã khách hàng; metric tổng trong tab lấy unique trực tiếp trên subset có `Tên ĐVUT` để vừa đúng phạm vi Hội vừa không double-count |
+| **Test** | `tests/test_uy_thac_service.py::test_tinh_theo_dvut_counts_distinct_ma_kh_not_so_ku` |
+| **Ngày fix** | 2026-06-29 |
+
+### C25 — Ủy thác: `Tổng dư nợ` theo Hội đoàn thể bị thấp hơn `Thông tin chung`
+| | |
+|---|---|
+| **File** | `tabs/tab_uy_thac.py` → `_render_theo_dvut()` |
+| **Dấu hiệu** | Tab `🤝 Ủy thác` → `📊 Thống kê theo Hội đoàn thể`: metric `Tổng dư nợ (triệu đồng)` ra `13.291.942` thay vì khớp tổng dư nợ ở `📊 Thông tin chung` |
+| **Nguyên nhân** | `Thông tin chung` và `Thống kê theo Hội đoàn thể` là hai phạm vi khác nhau: tab Hội chỉ nên tính trên các dòng có `Tên ĐVUT`, không phải toàn bộ HSTD |
+| **Fix** | Giữ metric `Tổng dư nợ` theo đúng subset có `Tên ĐVUT`, và chuẩn hóa để các metric tổng khác trong block (`Tổ`, `KH`) cũng cùng bám subset này thay vì lẫn với phạm vi toàn HSTD |
+
+### C26 — `Thông tin chung`: card `Tổng dư nợ` ghi ngày hệ thống thay vì ngày HSTD và thiếu tách `Ủy thác / Trực tiếp`
+| | |
+|---|---|
+| **File** | `tabs/tab_tongquan.py` → `render()` |
+| **Dấu hiệu** | Card `Tổng dư nợ` hiển thị `Số liệu đến ...` theo ngày hiện tại của máy chủ, không phản ánh đúng ngày số liệu HSTD; người dùng cũng không biết trong tổng dư nợ có bao nhiêu là qua ủy thác, bao nhiêu là trực tiếp |
+| **Nguyên nhân** | Caption dùng `datetime.now()` thay vì đọc `COT_NGAY_SL`/`merge_meta_hstd`; card chỉ hiển thị tổng, chưa tách cấu phần |
+| **Fix** | Lấy ngày ưu tiên từ `COT_NGAY_SL`, fallback `merge_meta_hstd`; bổ sung dòng phụ `Ủy thác X tỷ · Trực tiếp Y tỷ`, trong đó `trực tiếp` là các món không có `Tổ TK&VV` và không có `ĐVUT` |
+| **Ngày fix** | 2026-06-29 |
 | **Ngày fix** | 2026-06-29 |
 
 ---

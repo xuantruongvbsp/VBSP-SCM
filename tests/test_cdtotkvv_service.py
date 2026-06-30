@@ -217,6 +217,86 @@ class TestCdtotkvvToanCnParser:
         assert "PGD Long Thành" in pgd_map
         assert len(pgd_map) == 2
 
+    def test_tach_file_van_tach_don_vi_theo_ten_khi_ma_pgd_trong(self):
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.append(["BÁO CÁO CDTOTKVV"])
+        ws.append(["Kỳ chấm điểm tháng 05/2026"])
+        for _ in range(5):
+            ws.append([])
+        ws.append([
+            "STT",
+            "Mã PGD",
+            "Tên PGD",
+            "Mã xã",
+            "Tên xã",
+            "Mã tổ",
+            "Tên tổ trưởng",
+            "Loại tổ",
+            "ĐVUT",
+            "Dư nợ",
+            "Tổng điểm",
+            "Xếp loại",
+            "NGAYBC",
+        ])
+        ws.append([1, None, DON_VI_CHI_NHANH, "001", "Xã A", "T01", "A", "Tổ tốt", "Hội PN", 1, 90, "Tốt", "31/05/2026"])
+        ws.append([2, None, "PGD Long Thành", "002", "Xã B", "T02", "B", "Tổ tốt", "Hội ND", 1, 91, "Tốt", "31/05/2026"])
+
+        buf = BytesIO()
+        wb.save(buf)
+
+        pgd_map = tach_file_cdto_toan_cn(buf.getvalue())
+
+        assert DON_VI_CHI_NHANH in pgd_map
+        assert "PGD Long Thành" in pgd_map
+        assert len(pgd_map) == 2
+
+    def test_tach_file_ke_thua_don_vi_theo_block_khi_ma_va_ten_trong(self, tmp_path):
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.append(["BÁO CÁO CDTOTKVV"])
+        ws.append(["Kỳ chấm điểm tháng 05/2026"])
+        for _ in range(5):
+            ws.append([])
+        ws.append([
+            "STT",
+            "Mã PGD",
+            "Tên PGD",
+            "Mã xã",
+            "Tên xã",
+            "Mã tổ",
+            "Tên tổ trưởng",
+            "Loại tổ",
+            "ĐVUT",
+            "Dư nợ",
+            "Tổng điểm",
+            "Xếp loại",
+            "NGAYBC",
+        ])
+        ws.append([1, None, DON_VI_CHI_NHANH, "001", "Xã A", "T01", "A", "Tổ tốt", "Hội PN", 1, 90, "Tốt", "31/05/2026"])
+        ws.append([2, None, None, "001", "Xã A", "T02", "B", "Tổ tốt", "Hội PN", 1, 91, "Tốt", "31/05/2026"])
+        ws.append([3, None, "PGD Long Thành", "002", "Xã B", "T03", "C", "Tổ tốt", "Hội ND", 1, 92, "Tốt", "31/05/2026"])
+        ws.append([4, None, None, "002", "Xã B", "T04", "D", "Tổ tốt", "Hội ND", 1, 93, "Tốt", "31/05/2026"])
+
+        buf = BytesIO()
+        wb.save(buf)
+
+        pgd_map = tach_file_cdto_toan_cn(buf.getvalue())
+        hoi_so_path = tmp_path / "hoi_so.xlsx"
+        long_thanh_path = tmp_path / "long_thanh.xlsx"
+        hoi_so_path.write_bytes(pgd_map[DON_VI_CHI_NHANH])
+        long_thanh_path.write_bytes(pgd_map["PGD Long Thành"])
+
+        df_hoi_so = doc_cdtotkvv_path(str(hoi_so_path), 1)
+        df_long_thanh = doc_cdtotkvv_path(str(long_thanh_path), 1)
+
+        assert df_hoi_so is not None
+        assert df_long_thanh is not None
+        assert len(df_hoi_so) == 2
+        assert len(df_long_thanh) == 2
+        assert set(df_hoi_so["ten_dv"]) == {DON_VI_CHI_NHANH}
+        assert set(df_long_thanh["ma_dv"]) == {"004602"}
+
     def test_tach_file_ghi_ma_dv_theo_cot_duoc_chon_tot_nhat(self, tmp_path):
         wb = openpyxl.Workbook()
         ws = wb.active

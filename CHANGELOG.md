@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## [2026-06-30] — CDTOTKVV toàn CN: fallback theo tên đơn vị khi thiếu Mã PGD
+- `data/cdtotkvv.py` — thêm dò cột `Tên PGD/Tên đơn vị` và `_resolve_unit()` để nhận diện đơn vị bằng mã hợp lệ, tên đơn vị chuẩn hóa hoặc kế thừa theo block khi `Mã PGD` bị trống/không lặp đầy đủ; file con được ghi lại `ma_dv` và `ten_dv` chuẩn
+- `tests/test_cdtotkvv_service.py` — thêm regression test cho file toàn CN có `Mã PGD` trống nhưng vẫn có `Tên PGD`, và case các dòng sau trong block để trống cả mã/tên nhưng phải kế thừa đúng đơn vị thay vì gom về 1 đơn vị
+- `BUGMAP.md` — cập nhật E12 với nguyên nhân/fix mới cho trường hợp preview CDTOTKVV toàn CN chỉ nhận `1 đơn vị` do phụ thuộc quá chặt vào `Mã PGD`
+
 ## [2026-06-30] — CDTOTKVV toàn CN: sửa parser file tổng hợp bị lệch cột
 - `data/cdtotkvv.py` — `tach_file_cdto_toan_cn()` và `doc_thang_tu_cdto_toan_cn()` nay dò header/cột linh hoạt thay vì khóa cứng vị trí `Mã PGD`/`NGAYBC`; đồng thời chọn cột có nhiều mã PGD hợp lệ nhất và dùng chính cột đó khi ghi file con để tránh bắt nhầm cột mã khác làm file toàn CN bị nhận thành `1 đơn vị`
 - `tests/test_cdtotkvv_service.py` — thêm regression test cho file CDTOTKVV toàn CN bị lệch 1 cột, đọc đúng tháng báo cáo, case có thêm cột `Mã đơn vị` khác và case header ban đầu trỏ sai nhưng vẫn phải tách/ghi đúng theo `Mã PGD`

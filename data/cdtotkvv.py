@@ -7,7 +7,13 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
-from config import BASE_DIR, CDTOTKVV_DIR, CDTOTKVV_COLS, CDTOTKVV_DATA_ROW_START
+from config import (
+    BASE_DIR,
+    CDTOTKVV_DIR,
+    CDTOTKVV_COLS,
+    CDTOTKVV_DATA_ROW_START,
+    TEN_PGD_TO_MA,
+)
 from config import PGD_DATA_DIR
 from data.core import ts_file
 from data.pgd import duong_dan_pgd
@@ -113,6 +119,41 @@ def _chon_cot_ma_pgd_tot_nhat(
             continue
         score = (
             len(unique_codes),
+            hits,
+            1 if preferred_idx is not None and col_idx == preferred_idx else 0,
+        )
+        if score > best_score:
+            best_score = score
+            best_idx = col_idx
+    return best_idx
+
+
+def _chon_cot_ten_dv_tot_nhat(
+    all_rows: list[list],
+    preferred_idx: int | None = None,
+    start_row: int = 0,
+) -> int | None:
+    """Chọn cột có nhiều tên đơn vị chuẩn hóa hợp lệ nhất trong phần data."""
+    from services.file_detection_service import ten_doc_ve_don_vi_chuan
+
+    sample_rows = all_rows[start_row : start_row + 300]
+    max_cols = max((len(r) for r in sample_rows), default=0)
+    best_idx = None
+    best_score = (-1, -1, -1)
+    for col_idx in range(max_cols):
+        hits = 0
+        unique_names: set[str] = set()
+        for row in sample_rows:
+            if len(row) <= col_idx:
+                continue
+            ten = ten_doc_ve_don_vi_chuan(row[col_idx])
+            if ten:
+                hits += 1
+                unique_names.add(ten)
+        if not hits:
+            continue
+        score = (
+            len(unique_names),
             hits,
             1 if preferred_idx is not None and col_idx == preferred_idx else 0,
         )
@@ -318,6 +359,8 @@ def doc_thang_tu_cdto_toan_cn(file_bytes: bytes) -> str | None:
         ws = wb.active
         all_rows = [list(r) for r in ws.iter_rows(values_only=True)]
         wb.close()
+        from services.file_detection_service import ten_doc_ve_don_vi_chuan
+
         _header_row, idx_map = _tim_header_cdto_toan_cn(all_rows)
         col_mapgd = _chon_cot_ma_pgd_tot_nhat(
             all_rows,
@@ -325,7 +368,13 @@ def doc_thang_tu_cdto_toan_cn(file_bytes: bytes) -> str | None:
             preferred_idx=idx_map.get("ma_dv"),
             start_row=(_header_row or 0) + 1,
         )
+        col_tendv = _chon_cot_ten_dv_tot_nhat(
+            all_rows,
+            preferred_idx=idx_map.get("ten_dv"),
+            start_row=(_header_row or 0) + 1,
+        )
         col_ngaybc = idx_map.get("ngaybc")
+        current_unit = None
 
         for row in all_rows:
             row = list(row)
@@ -342,10 +391,16 @@ def doc_thang_tu_cdto_toan_cn(file_bytes: bytes) -> str | None:
                 )
             else:
                 if len(row) <= col_mapgd:
-                    continue
-                ma_dv = _norm_ma(row[col_mapgd])
-            if not ma_dv or ma_dv not in MA_PGD_MAP:
+                    ma_dv = None
+                else:
+                    ma_dv = _norm_ma(row[col_mapgd])
+            ten_dv = None
+            if col_tendv is not None and len(row) > col_tendv:
+                ten_dv = ten_doc_ve_don_vi_chuan(row[col_tendv])
+            unit = MA_PGD_MAP.get(ma_dv) if ma_dv in MA_PGD_MAP else ten_dv or current_unit
+            if not unit:
                 continue
+            current_unit = unit
             if col_ngaybc is None:
                 val = next((row[idx] for idx in (18, 17) if len(row) > idx), None)
             else:
@@ -457,6 +512,8 @@ def tach_file_cdto_toan_cn(file_bytes: bytes) -> dict[str, bytes]:
     ws = wb.active
     all_rows = [list(r) for r in ws.iter_rows(values_only=True)]
     wb.close()
+    from services.file_detection_service import ten_doc_ve_don_vi_chuan
+
     _header_row, idx_map = _tim_header_cdto_toan_cn(all_rows)
     col_ma_dv_in = _chon_cot_ma_pgd_tot_nhat(
         all_rows,
@@ -466,14 +523,34 @@ def tach_file_cdto_toan_cn(file_bytes: bytes) -> dict[str, bytes]:
     )
     if col_ma_dv_in is None:
         col_ma_dv_in = idx_map.get("ma_dv", FALLBACK_IDX["ma_dv"])
+    col_ten_dv_in = _chon_cot_ten_dv_tot_nhat(
+        all_rows,
+        preferred_idx=idx_map.get("ten_dv", FALLBACK_IDX["ten_dv"]),
+        start_row=(_header_row or 0) + 1,
+    )
+    if col_ten_dv_in is None:
+        col_ten_dv_in = idx_map.get("ten_dv", FALLBACK_IDX["ten_dv"])
+
+    def _resolve_unit(row: list, current_unit: str | None = None) -> tuple[str | None, str | None]:
+        ma_dv = None
+        if col_ma_dv_in is not None and len(row) > col_ma_dv_in:
+            ma_dv = _norm_ma(row[col_ma_dv_in])
+        ten_dv = None
+        if col_ten_dv_in is not None and len(row) > col_ten_dv_in:
+            ten_dv = ten_doc_ve_don_vi_chuan(row[col_ten_dv_in])
+        unit = MA_PGD_MAP.get(ma_dv) if ma_dv in MA_PGD_MAP else ten_dv or current_unit
+        ma_std = ma_dv if ma_dv in MA_PGD_MAP else (TEN_PGD_TO_MA.get(unit) if unit else None)
+        return unit, ma_std
     idx_map["ma_dv"] = col_ma_dv_in
 
+    current_unit = None
     data_start = None
     for i, row in enumerate(all_rows):
-        if not row or len(row) <= col_ma_dv_in:
+        if not row:
             continue
-        ma_dv = _norm_ma(row[col_ma_dv_in])
-        if ma_dv and ma_dv in MA_PGD_MAP:
+        unit, ma_dv = _resolve_unit(row, current_unit)
+        if unit and ma_dv:
+            current_unit = unit
             data_start = i
             break
 
@@ -494,11 +571,13 @@ def tach_file_cdto_toan_cn(file_bytes: bytes) -> dict[str, bytes]:
         header_rows.append(empty_row)
 
     groups: dict[str, list] = defaultdict(list)
+    current_unit = None
     for row in data_rows:
-        if not row or len(row) <= col_ma_dv_in:
+        if not row:
             continue
-        ma_dv = _norm_ma(row[col_ma_dv_in])
-        if ma_dv and ma_dv in MA_PGD_MAP:
+        unit, ma_dv = _resolve_unit(row, current_unit)
+        if unit and ma_dv:
+            current_unit = unit
             groups[ma_dv].append(row)
 
     if not groups:
@@ -510,6 +589,7 @@ def tach_file_cdto_toan_cn(file_bytes: bytes) -> dict[str, bytes]:
     result: dict[str, bytes] = {}
     for ma_dv, rows in groups.items():
         ten_pgd = MA_PGD_MAP[ma_dv]
+        last_unit = ten_pgd
         wb_out  = openpyxl.Workbook(write_only=True)
         ws_out  = wb_out.create_sheet()
 
@@ -519,7 +599,12 @@ def tach_file_cdto_toan_cn(file_bytes: bytes) -> dict[str, bytes]:
 
         # Ghi data rows đã chuẩn hóa theo CDTOTKVV_COLS
         for drow in rows:
-            ws_out.append(_map_row(drow))
+            unit_row, ma_row = _resolve_unit(drow, last_unit)
+            last_unit = unit_row or last_unit
+            mapped = _map_row(drow)
+            mapped[1] = ma_row or mapped[1]
+            mapped[2] = last_unit or mapped[2]
+            ws_out.append(mapped)
 
         buf = BytesIO()
         wb_out.save(buf)

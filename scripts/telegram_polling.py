@@ -23,8 +23,8 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BASE_DIR))
 
-import requests
 import pandas as pd
+import requests
 
 import db
 from config import (
@@ -60,16 +60,18 @@ def _get_bot_config() -> tuple[str, str]:
 
 
 def _send(token: str, chat_id: str | int, text: str) -> bool:
-    try:
-        r = requests.post(
-            f"https://api.telegram.org/bot{token}/sendMessage",
-            json={"chat_id": chat_id, "text": text, "parse_mode": "HTML"},
-            timeout=_API_TIMEOUT,
-        )
-        return r.ok
-    except Exception as e:
-        logger.warning("_send: %s", e)
-        return False
+    from services.telegram_service import gui_tin_chi_tiet_voi_config
+
+    ok, err = gui_tin_chi_tiet_voi_config(
+        token,
+        str(chat_id),
+        text,
+        parse_mode="HTML",
+        log_func=None,
+    )
+    if not ok:
+        logger.error("_send chat_id=%s: %s", chat_id, err)
+    return ok
 
 
 def _get_updates(token: str, offset: int) -> list[dict]:

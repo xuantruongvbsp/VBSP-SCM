@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [2026-06-30] — CDTOTKVV toàn CN: nhận layout không có cột Mã PGD
+- `data/cdtotkvv.py` — `_tim_header_cdto_toan_cn()` nay chấp nhận header có `Tên PGD/Tên đơn vị` dù thiếu `Mã PGD`; chỉ dùng fallback index cũ khi không dò được header, tránh map lệch cột và gom file toàn CN còn 1 đơn vị
+- `services/file_detection_service.py` — `ten_doc_ve_don_vi_chuan()` nhận thêm tên PGD rút gọn như `Long Thành` hoặc có ngữ cảnh `NHCSXH huyện Long Thành`, map về tên nội bộ `PGD Long Thành`
+- `tests/test_cdtotkvv_service.py` — thêm regression test cho file CDTOTKVV toàn CN không có cột `Mã PGD`, chỉ có `Tên đơn vị`, vẫn tách đúng Hội sở và PGD Long Thành
+- `tests/test_file_detection_service.py` — thêm test cho nhận diện tên PGD rút gọn/có ngữ cảnh
+- `BUGMAP.md` — thêm E14 cho biến thể file CDTOTKVV thiếu hẳn `Mã PGD`
+
 ## [2026-06-30] — CDTOTKVV toàn CN: fallback theo tên đơn vị khi thiếu Mã PGD
 - `data/cdtotkvv.py` — thêm dò cột `Tên PGD/Tên đơn vị` và `_resolve_unit()` để nhận diện đơn vị bằng mã hợp lệ, tên đơn vị chuẩn hóa hoặc kế thừa theo block khi `Mã PGD` bị trống/không lặp đầy đủ; file con được ghi lại `ma_dv` và `ten_dv` chuẩn
 - `tests/test_cdtotkvv_service.py` — thêm regression test cho file toàn CN có `Mã PGD` trống nhưng vẫn có `Tên PGD`, và case các dòng sau trong block để trống cả mã/tên nhưng phải kế thừa đúng đơn vị thay vì gom về 1 đơn vị

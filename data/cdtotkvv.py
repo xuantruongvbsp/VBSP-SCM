@@ -57,7 +57,7 @@ def _tim_header_cdto_toan_cn(all_rows: list[list]) -> tuple[int | None, dict[str
     """Tìm dòng header và map tên trường -> index cột trong file toàn CN."""
     alias_map = {
         "stt": {"stt"},
-        "ma_dv": {"mapgd", "maphonggiaodich", "mapgd6so"},
+        "ma_dv": {"mapgd", "madonvi", "maphonggiaodich", "mapgd6so"},
         "ten_dv": {"tenpgd", "tendonvi", "tendv"},
         "ma_xa": {"maxa"},
         "ten_xa": {"tenxa"},
@@ -80,7 +80,12 @@ def _tim_header_cdto_toan_cn(all_rows: list[list]) -> tuple[int | None, dict[str
                 if key in aliases and field not in idx_map:
                     idx_map[field] = col_idx
                     break
-        if "stt" in idx_map and "ma_dv" in idx_map:
+        has_unit_col = "ma_dv" in idx_map or "ten_dv" in idx_map
+        has_data_col = any(
+            field in idx_map
+            for field in ("ma_xa", "ten_xa", "ma_to", "ten_to_truong", "tong_diem", "xep_loai")
+        )
+        if "stt" in idx_map and has_unit_col and has_data_col:
             return row_idx, idx_map
     return None, {}
 
@@ -522,14 +527,18 @@ def tach_file_cdto_toan_cn(file_bytes: bytes) -> dict[str, bytes]:
         start_row=(_header_row or 0) + 1,
     )
     if col_ma_dv_in is None:
-        col_ma_dv_in = idx_map.get("ma_dv", FALLBACK_IDX["ma_dv"])
+        col_ma_dv_in = idx_map.get("ma_dv")
+    if col_ma_dv_in is None and not idx_map:
+        col_ma_dv_in = FALLBACK_IDX["ma_dv"]
     col_ten_dv_in = _chon_cot_ten_dv_tot_nhat(
         all_rows,
         preferred_idx=idx_map.get("ten_dv", FALLBACK_IDX["ten_dv"]),
         start_row=(_header_row or 0) + 1,
     )
     if col_ten_dv_in is None:
-        col_ten_dv_in = idx_map.get("ten_dv", FALLBACK_IDX["ten_dv"])
+        col_ten_dv_in = idx_map.get("ten_dv")
+    if col_ten_dv_in is None and not idx_map:
+        col_ten_dv_in = FALLBACK_IDX["ten_dv"]
 
     def _resolve_unit(row: list, current_unit: str | None = None) -> tuple[str | None, str | None]:
         ma_dv = None
@@ -557,7 +566,7 @@ def tach_file_cdto_toan_cn(file_bytes: bytes) -> dict[str, bytes]:
     if data_start is None:
         raise ValueError(
             "Không tìm thấy dòng dữ liệu hợp lệ trong file "
-            "(cột 'Mã PGD' phải chứa mã 6 số như 004601, 004602…)"
+            "(cần có 'Mã PGD' hợp lệ hoặc 'Tên PGD/Tên đơn vị' nhận diện được)"
         )
 
     raw_headers = all_rows[:data_start]
@@ -583,7 +592,7 @@ def tach_file_cdto_toan_cn(file_bytes: bytes) -> dict[str, bytes]:
     if not groups:
         raise ValueError(
             "Không tìm thấy mã đơn vị hợp lệ trong file "
-            "(kiểm tra cột 'Mã PGD' có giá trị 6 chữ số như 004601)"
+            "(kiểm tra cột 'Mã PGD' hoặc 'Tên PGD/Tên đơn vị')"
         )
 
     result: dict[str, bytes] = {}

@@ -687,6 +687,16 @@
 | **Test** | `tests/test_cdtotkvv_service.py::TestCdtotkvvToanCnParser::test_tach_file_doc_lai_dung_cot_cho_ca_layout_cu_va_moi` |
 | **Ngày fix** | 2026-06-30 |
 
+### E14 — CDTOTKVV toàn CN vẫn nhận 1 đơn vị khi file thiếu hẳn cột `Mã PGD`
+| | |
+|---|---|
+| **File** | `data/cdtotkvv.py` → `_tim_header_cdto_toan_cn()` / `tach_file_cdto_toan_cn()`; `services/file_detection_service.py` → `ten_doc_ve_don_vi_chuan()` |
+| **Dấu hiệu** | Upload CDTOTKVV toàn CN vẫn báo `Số đơn vị nhận diện: 1` dù đã fallback theo tên; thường gặp khi file chỉ có `Tên đơn vị` hoặc tên rút gọn như `Long Thành`, không có cột `Mã PGD` |
+| **Nguyên nhân** | Hàm dò header vẫn yêu cầu `STT` + `Mã PGD` nên bỏ qua header chỉ có `Tên đơn vị`, rơi về index fallback cũ và map lệch cột. Đồng thời chuẩn hóa tên đơn vị chưa nhận tên PGD rút gọn không có tiền tố `PGD` |
+| **Fix** | Chấp nhận header có `Tên PGD/Tên đơn vị` dù thiếu `Mã PGD`; chỉ dùng fallback index khi không dò được header; mở rộng `ten_doc_ve_don_vi_chuan()` để map tên rút gọn/có ngữ cảnh NHCSXH về tên nội bộ |
+| **Test** | `tests/test_cdtotkvv_service.py::TestCdtotkvvToanCnParser::test_tach_file_van_map_dung_khi_header_khong_co_ma_pgd`; `tests/test_file_detection_service.py::test_ten_doc_ve_don_vi_chuan_short_pgd_name` |
+| **Ngày fix** | 2026-06-30 |
+
 ---
 
 ## F. PDF / Word

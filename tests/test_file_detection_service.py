@@ -117,6 +117,14 @@ def test_ten_doc_ve_don_vi_chuan_partial_match():
     assert result == pgd
 
 
+def test_ten_doc_ve_don_vi_chuan_short_pgd_name():
+    assert ten_doc_ve_don_vi_chuan("Long Thành") == "PGD Long Thành"
+
+
+def test_ten_doc_ve_don_vi_chuan_short_pgd_name_with_context():
+    assert ten_doc_ve_don_vi_chuan("NHCSXH huyện Long Thành") == "PGD Long Thành"
+
+
 # ── kiem_tra_don_vi ───────────────────────────────────────────────────────────
 
 def test_kiem_tra_don_vi_match(monkeypatch):

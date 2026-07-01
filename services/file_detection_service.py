@@ -73,6 +73,16 @@ def ten_doc_ve_don_vi_chuan(val: str) -> str | None:
     for ten_dv in DS_DON_VI:
         if ten_dv.lower() in tl:
             return ten_dv
+        ten_rut_gon = ten_dv[4:] if ten_dv.lower().startswith("pgd ") else ten_dv
+        ten_rut_gon_l = ten_rut_gon.lower()
+        if tl == ten_rut_gon_l:
+            return ten_dv
+        co_ngu_canh_don_vi = any(
+            marker in tl
+            for marker in ("pgd", "phòng giao dịch", "phong giao dich", "nhcsxh")
+        )
+        if co_ngu_canh_don_vi and ten_rut_gon_l in tl:
+            return ten_dv
     return None
 
 

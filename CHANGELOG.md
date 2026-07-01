@@ -1,5 +1,19 @@
 # CHANGELOG
 
+## [2026-07-01] — Telegram: đưa `nhap_lieu` vào Admin và chuẩn hóa sender cho polling bot
+- `tabs/tab_telegram_admin.py` — thêm loại thông báo `📝 Nhắc nhập liệu` vào danh sách quản trị, cấu hình đúng giờ Task Scheduler, hỗ trợ `▶ Gửi ngay` cho nhắc nhập liệu; đồng thời đồng bộ giờ `health_check` về `06:30`
+- `scripts/nhac_deadline.py` — `_nhac_theo_doi_nhap_lieu()` nay trả về trạng thái chi tiết `(đã gửi / đang cần nhắc / lỗi đầu tiên)` và gửi qua `notify_key='nhap_lieu'` để dùng đúng toggle/chat phụ trong tab Admin
+- `services/telegram_service.py` — thêm `gui_tin_theo_notify_chi_tiet()` và cho `gui_tin_chi_tiet_voi_config()` hỗ trợ `log_func=None` để tái dùng sender chuẩn hóa lỗi mà không bắt buộc ghi lịch sử
+- `scripts/telegram_polling.py` — bot 2 chiều trả lời lệnh qua sender chuẩn hóa lỗi Telegram, log rõ `chat_id` và nguyên nhân thật khi gửi phản hồi thất bại
+
+## [2026-07-01] — Telegram Bot admin: test theo config đang nhập và `Gửi ngay` trả lỗi thật
+- `services/telegram_service.py` — thêm `lay_loi_gui_gan_nhat()` và `gui_tin_chi_tiet_voi_config()` để test bằng token/chat đang nhập thay vì config đã lưu; đồng thời refactor `gui_tin_pgd()` dùng chung `_gui_tin_core()` để mọi nhánh gửi giữ lỗi Telegram đầy đủ
+- `tabs/tab_telegram_admin.py` — `🧪 Test kết nối` nay dùng ngay Token/Chat ID trên form, không cần lưu trước; các nút `▶ Gửi ngay` map đúng lỗi Telegram từ log thay vì hiện info nghiệp vụ, đồng thời xử lý đúng batch `phan_ky_nxh` / `deadline_bc` và bổ sung `logger.error(..., exc_info=True)` cho nhánh `khoanh_tang`
+
+## [2026-06-30] — Telegram Bot: hiện đúng lỗi HTTP 400 và fallback test plain text
+- `services/telegram_service.py` — thêm `_rut_gon_loi_telegram()`, `_gui_tin_core()` và `gui_tin_chi_tiet()` để bóc tách `description` từ JSON Telegram thay vì cắt cụt `r.text`; giữ `gui_tin()` tương thích cũ
+- `tabs/tab_telegram_admin.py` — nút `🧪 Test kết nối` nay hiển thị chi tiết lỗi thực (`chat not found`, `can't parse entities`...) và tự thử lại bằng plain text nếu lỗi do `parse_mode=HTML`; tab `📋 Lịch sử` cũng hiển thị chuỗi lỗi dài hơn
+
 ## [2026-06-30] — CDTOTKVV toàn CN: nhận layout không có cột Mã PGD
 - `data/cdtotkvv.py` — `_tim_header_cdto_toan_cn()` nay chấp nhận header có `Tên PGD/Tên đơn vị` dù thiếu `Mã PGD`; chỉ dùng fallback index cũ khi không dò được header, tránh map lệch cột và gom file toàn CN còn 1 đơn vị
 - `services/file_detection_service.py` — `ten_doc_ve_don_vi_chuan()` nhận thêm tên PGD rút gọn như `Long Thành` hoặc có ngữ cảnh `NHCSXH huyện Long Thành`, map về tên nội bộ `PGD Long Thành`

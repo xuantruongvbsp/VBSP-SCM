@@ -383,6 +383,33 @@
 | **Ngày fix** | 2026-06-02 (ws_operation bản đầu); 2026-06-09 (ws_executive.py — 6 buttons PDF+Excel; tabs/ — tab_ban_dai_dien, tab_den_han, tab_don_doc_khd, tab_khtd_giao_dc, tab_phan_tich_pgd; ws_operation.py — 3 instances L1172, L4051, L5168) |
 | **Còn lại** | `tabs/tab_khtd_nhap.py:L244` — template tĩnh nhỏ, bỏ qua (low risk); tất cả instance khác đã fix |
 
+### B19 — Telegram Bot chỉ hiện lỗi HTTP 400 bị cắt cụt `Bad Re...`
+| | |
+|---|---|
+| **File** | `services/telegram_service.py`, `tabs/tab_telegram_admin.py` |
+| **Dấu hiệu** | Màn `🤖 Quản trị Telegram Bot` báo lỗi kiểu `❌ HTTP 400: {"ok":false,...,"description":"Bad Re...` nên không biết là sai `Chat ID`, `Token` hay lỗi parse HTML |
+| **Nguyên nhân** | `gui_tin()` chỉ trả `bool`, còn lỗi HTTP bị cắt ngắn bằng `r.text[:100]`; tab admin lại chỉ hiện chung chung `Gửi thất bại — kiểm tra Token và Chat ID.` nên che mất nguyên nhân thật từ Telegram |
+| **Fix** | Tách core sender trả `(ok, err)`, bóc `description` từ JSON Telegram để hiện đúng lỗi thực; nút test hiển thị lỗi chi tiết và tự fallback gửi plain text nếu lỗi do `parse_mode=HTML`; bảng lịch sử tăng độ dài chuỗi lỗi hiển thị |
+| **Ngày fix** | 2026-06-30 |
+
+### B20 — Telegram Admin test nhầm config cũ, `Gửi ngay` báo sai lỗi
+| | |
+|---|---|
+| **File** | `services/telegram_service.py`, `tabs/tab_telegram_admin.py` |
+| **Dấu hiệu** | Bấm `🧪 Test kết nối` sau khi sửa Token/Chat ID nhưng chưa lưu vẫn test cấu hình cũ; bấm `▶ Gửi ngay` thất bại nhưng toast lại hiện chuỗi kiểu `22/22 PGD`, `(Test thủ công)` hoặc số lượng nghiệp vụ thay vì lỗi Telegram thật |
+| **Nguyên nhân** | Nút test gọi hàm đọc config từ `kv_store`, không dùng giá trị đang nhập trên form; `_gui_ngay()` trả `(ok, info nghiệp vụ)` nên UI dùng sai chuỗi ở nhánh fail; các nhánh batch `phan_ky_nxh` và `deadline_bc` còn có thể nuốt lỗi từng lượt gửi |
+| **Fix** | Thêm sender chi tiết nhận `token/chat_id` trực tiếp cho admin test; thêm helper đọc lỗi log gần nhất theo `notify_key` để chuẩn hóa toast lỗi; refactor nhánh batch đếm `sent/failed` và trả lỗi đầu tiên; `gui_tin_pgd()` dùng chung `_gui_tin_core()` để log lỗi không bị cắt cụt |
+| **Ngày fix** | 2026-07-01 |
+
+### B21 — Telegram `nhap_lieu` chạy ngầm nhưng không quản trị được từ tab Admin
+| | |
+|---|---|
+| **File** | `tabs/tab_telegram_admin.py`, `scripts/nhac_deadline.py`, `scripts/telegram_polling.py`, `services/telegram_service.py` |
+| **Dấu hiệu** | Script `nhac_deadline.py` vẫn gửi nhắc nhập liệu theo key `nhap_lieu`, nhưng tab `🤖 Quản trị Telegram Bot` không có toggle/chat phụ/`Gửi ngay` cho loại này; bot polling 2 chiều cũng dùng sender riêng nên khi Telegram từ chối phản hồi lệnh thì khó biết lỗi thật |
+| **Nguyên nhân** | `nhap_lieu` chỉ tồn tại trong script scheduler, không được khai báo trong `_NOTIFY_META`; sender trong `telegram_polling.py` gọi `requests.post` trực tiếp và chỉ trả `bool`, không tái dùng helper đã chuẩn hóa lỗi Telegram |
+| **Fix** | Thêm `nhap_lieu` vào metadata quản trị + giờ Task Scheduler + nhánh `▶ Gửi ngay`; đổi `_nhac_theo_doi_nhap_lieu()` sang trả trạng thái chi tiết và gửi theo `notify_key='nhap_lieu'`; refactor polling bot dùng sender chuẩn hóa lỗi từ `telegram_service.py` |
+| **Ngày fix** | 2026-07-01 |
+
 ---
 
 ## C. Dữ liệu / DataFrame

@@ -126,13 +126,13 @@ def _la_pgd_header(stt: str) -> bool:
         stt = str(stt)
     return bool(_ROMAN_RE.match(stt.strip().upper()))
 
-def _nhac_theo_doi_nhap_lieu() -> int:
+def _nhac_theo_doi_nhap_lieu() -> tuple[int, int, str]:
     cfg_notify = db.doc_kv("telegram_notify_config") or {}
     if not cfg_notify.get("nhap_lieu", True):
-        return 0
+        return 0, 0, ""
     ds_sheet = db.doc_kv("gsheet_theo_doi_nhap_list")
     if not ds_sheet or not isinstance(ds_sheet, list):
-        return 0
+        return 0, 0, ""
 
     try:
         import gspread
@@ -141,12 +141,14 @@ def _nhac_theo_doi_nhap_lieu() -> int:
         client = gspread.service_account(filename=creds_path, scopes=scope)
     except Exception as e:
         logger.error("_nhac_theo_doi_nhap_lieu: ket noi GSheet — %s", e)
-        return 0
+        return 0, 0, str(e)
 
-    from services.telegram_service import gui_tin
+    from services.telegram_service import gui_tin_theo_notify_chi_tiet
 
     today = date.today()
     sent_count = 0
+    pending_count = 0
+    first_err = ""
 
     for i, cfg in enumerate(ds_sheet):
         deadline_str = cfg.get("deadline", "")
@@ -237,6 +239,7 @@ def _nhac_theo_doi_nhap_lieu() -> int:
             logger.info("Nhap lieu '%s': tat ca da hoan thanh", ten_sheet)
             continue
 
+        pending_count += 1
         icon = "🔴" if days_left < 0 else "🟡" if days_left <= 2 else "🟠"
         dl_hien = dl_date.strftime("%d/%m/%Y")
         lines = [
@@ -250,12 +253,16 @@ def _nhac_theo_doi_nhap_lieu() -> int:
         if len(chua_xong) > 15:
             lines.append(f"  … và {len(chua_xong) - 15} PGD khác")
 
-        ok = gui_tin("\n".join(lines))
+        ok, err = gui_tin_theo_notify_chi_tiet("\n".join(lines), "nhap_lieu")
         if ok:
             logger.info("Da gui nhac nhap lieu '%s': %d PGD", ten_sheet, len(chua_xong))
             sent_count += 1
+        else:
+            logger.error("Nhac nhap lieu '%s' that bai: %s", ten_sheet, err)
+            if not first_err:
+                first_err = err
 
-    return sent_count
+    return sent_count, pending_count, first_err
 
 
 # ── Phát hiện submission mới từ GSheet ───────────────────────────────────────

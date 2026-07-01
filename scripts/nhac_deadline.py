@@ -426,9 +426,13 @@ def nhac() -> None:
     today = date.today()
 
     from services.telegram_service import gui_canh_bao_deadline
+    from services.telegram_service import doc_deadline_bc_allowlist
+    allowlist = doc_deadline_bc_allowlist()
 
     sent_count = 0
     for loai, deadline_str in sorted(deadline_cfg.items()):
+        if allowlist is not None and loai not in allowlist:
+            continue
         # Parse deadline date
         try:
             dl_date = pd.to_datetime(deadline_str).date()

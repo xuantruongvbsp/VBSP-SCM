@@ -54,6 +54,28 @@ def luu_extra_chat(notify_key: str, chat_id: str, username: str = "system") -> N
                  f"Chat ID phụ: {notify_key} = {chat_id.strip() or '(đã xóa)'}")
 
 
+def doc_deadline_bc_allowlist() -> list[str] | None:
+    """Danh sách loại báo cáo được phép gửi nhắc deadline (None = tất cả)."""
+    val = db.doc_kv("telegram_deadline_bc_allowlist")
+    if not val:
+        return None
+    if isinstance(val, list):
+        return [str(x) for x in val if str(x).strip()]
+    return None
+
+
+def luu_deadline_bc_allowlist(ds_loai: list[str] | None, username: str = "system") -> None:
+    """Lưu allowlist loại báo cáo cho nhắc deadline (None/[] = gửi tất cả)."""
+    if ds_loai:
+        ds = [str(x).strip() for x in ds_loai if str(x).strip()]
+        ds = sorted(set(ds))
+        db.ghi_kv("telegram_deadline_bc_allowlist", ds, username)
+        db.ghi_audit(username, "telegram_deadline_bc_allowlist", f"Allowlist {len(ds)} loại báo cáo")
+    else:
+        db.ghi_kv("telegram_deadline_bc_allowlist", None, username)
+        db.ghi_audit(username, "telegram_deadline_bc_allowlist", "Allowlist: ALL (None)")
+
+
 def _la_bat(key: str) -> bool:
     """Kiểm tra loại thông báo có được bật không (mặc định BẬT)."""
     cfg = db.doc_kv("telegram_notify_config") or {}

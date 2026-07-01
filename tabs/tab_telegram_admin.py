@@ -315,11 +315,17 @@ def _gui_ngay(key: str) -> tuple[bool, str]:
             deadline_cfg = db.doc_kv("bao_cao_deadline_config") or {}
             if not deadline_cfg:
                 return False, "Chưa cài đặt deadline (vào tab Tiến độ → ⚙️ Cài đặt thời hạn)."
+            from services.telegram_service import doc_deadline_bc_allowlist
+            allowlist = doc_deadline_bc_allowlist()
             df_gs = doc_du_lieu_gsheet()
             total_sent = 0
             failed_count = 0
             first_err = ""
+            skipped = 0
             for loai_bao_cao in deadline_cfg:
+                if allowlist is not None and loai_bao_cao not in allowlist:
+                    skipped += 1
+                    continue
                 ds_chua_nop, deadline_str = lay_pgd_chua_nop(loai_bao_cao, df_gs)
                 if not ds_chua_nop:
                     continue
@@ -340,7 +346,11 @@ def _gui_ngay(key: str) -> tuple[bool, str]:
                     return False, f"Đã gửi {total_sent} loại báo cáo, lỗi {failed_count} loại — {first_err}"
                 return False, first_err
             if total_sent == 0:
+                if allowlist is not None:
+                    return True, "Không có loại báo cáo nào cần nhắc trong allowlist"
                 return True, "Tất cả PGD đã nộp hoặc chưa đến deadline"
+            if allowlist is not None:
+                return True, f"Đã gửi {total_sent} loại báo cáo (lọc {len(allowlist)} loại, bỏ qua {skipped} loại)"
             return True, f"Đã gửi {total_sent} loại báo cáo"
 
         elif key == "nhap_lieu":
@@ -903,6 +913,43 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
 
             if not notify_changed and not sched_changed:
                 st.caption("Thay đổi toggle hoặc giờ gửi để kích hoạt nút Lưu.")
+
+            st.divider()
+            with st.expander("🧾 Nhắc nộp báo cáo — chọn loại báo cáo muốn gửi", expanded=False):
+                deadline_cfg = db.doc_kv("bao_cao_deadline_config") or {}
+                ds_loai = sorted([str(k) for k in deadline_cfg.keys()]) if isinstance(deadline_cfg, dict) else []
+                from services.telegram_service import doc_deadline_bc_allowlist, luu_deadline_bc_allowlist
+                allowlist = doc_deadline_bc_allowlist()
+
+                if not ds_loai:
+                    st.info("Chưa có danh mục deadline báo cáo. Vào tab Tiến độ nộp BC để cài đặt trước.")
+                else:
+                    mode = st.radio(
+                        "Phạm vi gửi nhắc deadline",
+                        options=["Tất cả loại báo cáo", "Chỉ một số loại (lọc)"],
+                        index=0 if allowlist is None else 1,
+                        horizontal=True,
+                        key="tg_deadline_mode",
+                    )
+                    sel = None
+                    if mode.startswith("Chỉ"):
+                        sel = st.multiselect(
+                            "Chọn loại báo cáo sẽ gửi Telegram",
+                            options=ds_loai,
+                            default=allowlist if allowlist is not None else ds_loai,
+                            key="tg_deadline_allowlist",
+                        )
+                        st.caption(f"Đang chọn {len(sel)}/{len(ds_loai)} loại.")
+                    else:
+                        st.caption(f"Đang bật: gửi tất cả {len(ds_loai)} loại báo cáo.")
+
+                    if st.button("💾 Lưu lọc loại báo cáo", key="tg_deadline_save", type="primary"):
+                        if mode.startswith("Chỉ") and not sel:
+                            st.error("❌ Chưa chọn loại báo cáo nào.")
+                        else:
+                            luu_deadline_bc_allowlist(sel if mode.startswith("Chỉ") else None, username)
+                            st.success("✅ Đã lưu cấu hình lọc loại báo cáo.")
+                            st.rerun()
 
         # ── Sub-tab 3: Lịch sử gửi ────────────────────────────────────────────
         with tab_log:

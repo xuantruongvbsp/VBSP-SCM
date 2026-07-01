@@ -14,6 +14,11 @@
 - `services/telegram_service.py` — thêm `_rut_gon_loi_telegram()`, `_gui_tin_core()` và `gui_tin_chi_tiet()` để bóc tách `description` từ JSON Telegram thay vì cắt cụt `r.text`; giữ `gui_tin()` tương thích cũ
 - `tabs/tab_telegram_admin.py` — nút `🧪 Test kết nối` nay hiển thị chi tiết lỗi thực (`chat not found`, `can't parse entities`...) và tự thử lại bằng plain text nếu lỗi do `parse_mode=HTML`; tab `📋 Lịch sử` cũng hiển thị chuỗi lỗi dài hơn
 
+## [2026-06-30] — Telegram: Nhắc nộp báo cáo cho phép chọn loại báo cáo
+- `tabs/tab_telegram_admin.py` — thêm cấu hình lọc allowlist loại báo cáo cho `🧾 Nhắc nộp báo cáo` (gửi tất cả hoặc chỉ các loại đã chọn)
+- `services/telegram_service.py` — thêm `doc_deadline_bc_allowlist()`/`luu_deadline_bc_allowlist()` lưu allowlist vào kv_store
+- `scripts/nhac_deadline.py` — nhắc deadline tự động chỉ gửi cho các loại trong allowlist (nếu có)
+
 ## [2026-06-30] — CDTOTKVV toàn CN: nhận layout không có cột Mã PGD
 - `data/cdtotkvv.py` — `_tim_header_cdto_toan_cn()` nay chấp nhận header có `Tên PGD/Tên đơn vị` dù thiếu `Mã PGD`; chỉ dùng fallback index cũ khi không dò được header, tránh map lệch cột và gom file toàn CN còn 1 đơn vị
 - `services/file_detection_service.py` — `ten_doc_ve_don_vi_chuan()` nhận thêm tên PGD rút gọn như `Long Thành` hoặc có ngữ cảnh `NHCSXH huyện Long Thành`, map về tên nội bộ `PGD Long Thành`

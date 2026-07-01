@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import html as _html
+import json
 import os
 import re
 import time
@@ -72,7 +73,59 @@ def _ghi_log(func: str, preview: str, ok: bool, error: str = "") -> None:
         })
         db.ghi_kv("telegram_send_log", log[:100], "system")
     except Exception as e:
-        logger.warning("_ghi_log: %s", e)
+        logger.error("_ghi_log: %s", e, exc_info=True)
+
+
+def lay_loi_gui_gan_nhat(func: str) -> str:
+    """Lấy lỗi gửi gần nhất theo func/log key."""
+    try:
+        log = db.doc_kv("telegram_send_log") or []
+    except Exception as e:
+        logger.error("lay_loi_gui_gan_nhat(%s): %s", func, e, exc_info=True)
+        return ""
+    for entry in log:
+        if str(entry.get("func", "")) == func and not bool(entry.get("ok", False)):
+            return str(entry.get("error", "") or "")
+    return ""
+
+
+def _rut_gon_loi_telegram(resp: requests.Response) -> str:
+    """Rút gọn lỗi Telegram từ JSON/raw text để UI hiển thị dễ hiểu hơn."""
+    try:
+        data = resp.json()
+        mo_ta = str(data.get("description") or "").strip()
+        if mo_ta:
+            return f"HTTP {resp.status_code}: {mo_ta}"
+    except (ValueError, json.JSONDecodeError, AttributeError):
+        pass
+    text = (resp.text or "").strip()
+    return f"HTTP {resp.status_code}: {text[:300]}"
+
+
+def _gui_tin_core(token: str, chat_id: str, text: str, parse_mode: str = "HTML") -> tuple[bool, str]:
+    """Core sender cho chat bất kỳ, trả về (ok, chi_tiet_loi)."""
+    last_err = ""
+    payload = {"chat_id": chat_id, "text": text}
+    if parse_mode:
+        payload["parse_mode"] = parse_mode
+    for attempt in range(3):
+        try:
+            r = requests.post(
+                f"https://api.telegram.org/bot{token}/sendMessage",
+                json=payload,
+                timeout=_API_TIMEOUT,
+            )
+            if r.ok:
+                return True, ""
+            last_err = _rut_gon_loi_telegram(r)
+            logger.warning("telegram send attempt %d: %s", attempt + 1, last_err)
+            break  # HTTP error → không retry (lỗi config/nội dung)
+        except Exception as e:
+            last_err = str(e)
+            logger.error("telegram send attempt %d: %s", attempt + 1, e, exc_info=True)
+            if attempt < 2:
+                time.sleep(2)
+    return False, last_err
 
 
 # ── Core ───────────────────────────────────────────────────────────────────────
@@ -80,55 +133,66 @@ def _ghi_log(func: str, preview: str, ok: bool, error: str = "") -> None:
 def gui_tin(text: str, parse_mode: str = "HTML") -> bool:
     """Gửi tin nhắn văn bản đến chat chính. Retry tối đa 2 lần khi lỗi mạng."""
     token, chat_id = _get_config()
-    last_err = ""
-    for attempt in range(3):
-        try:
-            r = requests.post(
-                f"https://api.telegram.org/bot{token}/sendMessage",
-                json={"chat_id": chat_id, "text": text, "parse_mode": parse_mode},
-                timeout=_API_TIMEOUT,
-            )
-            if r.ok:
-                _ghi_log("gui_tin", text, True)
-                return True
-            last_err = f"HTTP {r.status_code}: {r.text[:100]}"
-            logger.warning("telegram gui_tin attempt %d: %s", attempt + 1, last_err)
-            break  # HTTP error → không retry (lỗi config/nội dung)
-        except Exception as e:
-            last_err = str(e)
-            logger.warning("telegram gui_tin attempt %d: %s", attempt + 1, e)
-            if attempt < 2:
-                time.sleep(2)
+    ok, last_err = _gui_tin_core(token, chat_id, text, parse_mode=parse_mode)
+    if ok:
+        _ghi_log("gui_tin", text, True)
+        return True
     _ghi_log("gui_tin", text, False, last_err)
     return False
 
 
+def gui_tin_chi_tiet(text: str, parse_mode: str = "HTML") -> tuple[bool, str]:
+    """Gửi tin tới chat chính, trả về chi tiết lỗi để UI hiển thị."""
+    token, chat_id = _get_config()
+    ok, err = _gui_tin_core(token, chat_id, text, parse_mode=parse_mode)
+    _ghi_log("gui_tin", text, ok, err)
+    return ok, err
+
+
+def gui_tin_chi_tiet_voi_config(
+    token: str,
+    chat_id: str,
+    text: str,
+    parse_mode: str = "HTML",
+    log_func: str | None = "gui_tin_test",
+) -> tuple[bool, str]:
+    """Gửi tin với token/chat_id truyền vào, không phụ thuộc config đã lưu."""
+    token = (token or "").strip()
+    chat_id = str(chat_id or "").strip()
+    if not token:
+        err = "Token Telegram đang trống."
+        if log_func:
+            _ghi_log(log_func, text, False, err)
+        return False, err
+    if not chat_id:
+        err = "Chat ID Telegram đang trống."
+        if log_func:
+            _ghi_log(log_func, text, False, err)
+        return False, err
+    ok, err = _gui_tin_core(token, chat_id, text, parse_mode=parse_mode)
+    if log_func:
+        _ghi_log(log_func, text, ok, err)
+    return ok, err
+
+
+def gui_tin_theo_notify_chi_tiet(
+    text: str,
+    notify_key: str,
+    parse_mode: str = "HTML",
+) -> tuple[bool, str]:
+    """Gửi tin theo notify_key, trả về chi tiết lỗi để caller xử lý."""
+    token, main_chat = _get_config()
+    cfg = db.doc_kv("telegram_config") or {}
+    chat_id = cfg.get("extra_chats", {}).get(notify_key, main_chat)
+    ok, err = _gui_tin_core(token, chat_id, text, parse_mode=parse_mode)
+    _ghi_log(notify_key, text, ok, err)
+    return ok, err
+
+
 def _gui_tin_for(text: str, notify_key: str, parse_mode: str = "HTML") -> bool:
     """Gửi tin nhắn đến chat_id phụ của notify_key nếu có, fallback chat chính."""
-    token, main_chat = _get_config()
-    cfg     = db.doc_kv("telegram_config") or {}
-    chat_id = cfg.get("extra_chats", {}).get(notify_key, main_chat)
-    last_err = ""
-    for attempt in range(3):
-        try:
-            r = requests.post(
-                f"https://api.telegram.org/bot{token}/sendMessage",
-                json={"chat_id": chat_id, "text": text, "parse_mode": parse_mode},
-                timeout=_API_TIMEOUT,
-            )
-            if r.ok:
-                _ghi_log(notify_key, text, True)
-                return True
-            last_err = f"HTTP {r.status_code}: {r.text[:100]}"
-            logger.warning("telegram %s attempt %d: %s", notify_key, attempt + 1, last_err)
-            break
-        except Exception as e:
-            last_err = str(e)
-            logger.warning("telegram %s attempt %d: %s", notify_key, attempt + 1, e)
-            if attempt < 2:
-                time.sleep(2)
-    _ghi_log(notify_key, text, False, last_err)
-    return False
+    ok, _err = gui_tin_theo_notify_chi_tiet(text, notify_key, parse_mode=parse_mode)
+    return ok
 
 
 # ── Thông báo nghiệp vụ ────────────────────────────────────────────────────────
@@ -667,24 +731,10 @@ def gui_tin_pgd(text: str, ten_pgd: str, notify_key: str = "", parse_mode: str =
         or (cfg.get("extra_chats", {}).get(notify_key) if notify_key else None)
         or main_chat
     )
-    last_err = ""
-    for attempt in range(3):
-        try:
-            r = requests.post(
-                f"https://api.telegram.org/bot{token}/sendMessage",
-                json={"chat_id": chat_id, "text": text, "parse_mode": parse_mode},
-                timeout=_API_TIMEOUT,
-            )
-            if r.ok:
-                _ghi_log(f"pgd:{slug}", text, True)
-                return True
-            last_err = f"HTTP {r.status_code}: {r.text[:100]}"
-            logger.warning("telegram pgd:%s attempt %d: %s", slug, attempt + 1, last_err)
-            break
-        except Exception as e:
-            last_err = str(e)
-            if attempt < 2:
-                time.sleep(2)
+    ok, last_err = _gui_tin_core(token, chat_id, text, parse_mode=parse_mode)
+    if ok:
+        _ghi_log(f"pgd:{slug}", text, True)
+        return True
     _ghi_log(f"pgd:{slug}", text, False, last_err)
     return False
 

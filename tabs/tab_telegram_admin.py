@@ -51,10 +51,16 @@ _NOTIFY_META = [
         "gio_mac_dinh": "",
     },
     {
+        "key": "nhap_lieu",
+        "icon": "📝", "ten": "Nhắc nhập liệu",
+        "mo_ta": "Nhắc PGD chưa hoàn thành nhập liệu theo cấu hình Google Sheets",
+        "gio_mac_dinh": "",
+    },
+    {
         "key": "health_check",
         "icon": "🔍", "ten": "Kết quả Health Check",
         "mo_ta": "Trạng thái hệ thống mỗi buổi sáng",
-        "gio_mac_dinh": "07:00",
+        "gio_mac_dinh": "06:30",
     },
     {
         "key": "merge_thanh_cong",
@@ -135,8 +141,9 @@ _TASK_GIO = {
     "bao_cao_sang":      "07:30",
     "khoang_den_han":    "07:45",
     "phan_ky_nxh":       "08:00",
-    "health_check":      "06:30",
     "deadline_bc":       "08:00 / 14:00",
+    "nhap_lieu":         "08:00 / 14:00",
+    "health_check":      "06:30",
     "den_han_phan_tang": "08:00 / 14:00",
     "nop_moi_gsheet":    "08:00 / 14:00",
     "lich_cong_tac":     "14:00",
@@ -146,8 +153,28 @@ _EVENT_KEYS = {"merge_thanh_cong", "upload_pgd"}
 # Các loại còn lại (he_thong, khtd_tien_do) chỉ gửi thủ công qua nút "▶ Gửi ngay".
 
 
+def _loi_gui_telegram(log_key: str, fallback: str = "") -> str:
+    """Lấy lỗi Telegram gần nhất cho log key tương ứng."""
+    from services import telegram_service as tg
+
+    err = tg.lay_loi_gui_gan_nhat(log_key)
+    return err or fallback or "Telegram không trả về chi tiết lỗi."
+
+
+def _ket_qua_gui_telegram(
+    ok: bool,
+    thong_tin_thanh_cong: str,
+    log_key: str,
+    fallback_err: str = "",
+) -> tuple[bool, str]:
+    """Chuẩn hóa tuple trả về cho UI: thành công thì giữ info, thất bại thì trả lỗi thật."""
+    if ok:
+        return True, thong_tin_thanh_cong
+    return False, _loi_gui_telegram(log_key, fallback_err)
+
+
 def _gui_ngay(key: str) -> tuple[bool, str]:
-    """Load dữ liệu thực và gửi thông báo ngay lập tức. Trả (ok, thông tin)."""
+    """Load dữ liệu thực và gửi thông báo ngay lập tức. Trả (ok, thông tin/lỗi)."""
     from services import telegram_service as tg
     try:
         if key == "bao_cao_sang":
@@ -167,7 +194,7 @@ def _gui_ngay(key: str) -> tuple[bool, str]:
                 f"{tong_qh / 1e6:.0f} triệu",
                 ty_le, so_pgd, len(DS_PGD),
             )
-            return ok, f"{so_pgd}/{len(DS_PGD)} PGD"
+            return _ket_qua_gui_telegram(ok, f"{so_pgd}/{len(DS_PGD)} PGD", "bao_cao_sang")
 
         elif key == "khoang_den_han":
             from data.core import CACHE_HSTD
@@ -196,7 +223,7 @@ def _gui_ngay(key: str) -> tuple[bool, str]:
                 for _, r in df_dh.iterrows()
             ]
             ok = tg.gui_nhac_khoang_den_han(ds)
-            return ok, f"{len(ds)} khoản"
+            return _ket_qua_gui_telegram(ok, f"{len(ds)} khoản", "khoang_den_han")
 
         elif key == "phan_ky_nxh":
             from data.phan_ky_nxh import doc_phan_ky_nxh
@@ -214,7 +241,9 @@ def _gui_ngay(key: str) -> tuple[bool, str]:
             df_t = df[mask].sort_values(["Tên xã", COL_NGAY])
             if df_t.empty:
                 return True, "Không có khoản đến hạn tháng này"
-            count = 0
+            sent_count = 0
+            failed_count = 0
+            first_err = ""
             for ten_pgd, grp in df_t.groupby("Tên PGD"):
                 ds = [
                     {
@@ -231,9 +260,18 @@ def _gui_ngay(key: str) -> tuple[bool, str]:
                     }
                     for _, r in grp.iterrows()
                 ]
-                tg.gui_nhac_phan_ky_nxh(str(ten_pgd), ds, today_ts.strftime("%d/%m/%Y"))
-                count += 1
-            return True, f"Đã gửi {count} PGD"
+                ok_pgd = tg.gui_nhac_phan_ky_nxh(str(ten_pgd), ds, today_ts.strftime("%d/%m/%Y"))
+                if ok_pgd:
+                    sent_count += 1
+                else:
+                    failed_count += 1
+                    if not first_err:
+                        first_err = _loi_gui_telegram("phan_ky_nxh")
+            if failed_count:
+                if sent_count:
+                    return False, f"Đã gửi {sent_count} PGD, lỗi {failed_count} PGD — {first_err}"
+                return False, first_err
+            return True, f"Đã gửi {sent_count} PGD"
 
         elif key == "khtd_tien_do":
             from data.core import CACHE_HSTD
@@ -266,7 +304,7 @@ def _gui_ngay(key: str) -> tuple[bool, str]:
                     "pct":       round(pct, 1),
                 })
             ok = tg.gui_khtd_tien_do(ds_pgd)
-            return ok, f"{len(ds_pgd)} PGD"
+            return _ket_qua_gui_telegram(ok, f"{len(ds_pgd)} PGD", "khtd_tien_do")
 
         elif key == "qh_moi":
             ok = tg.gui_canh_bao_qh_moi([])
@@ -279,6 +317,8 @@ def _gui_ngay(key: str) -> tuple[bool, str]:
                 return False, "Chưa cài đặt deadline (vào tab Tiến độ → ⚙️ Cài đặt thời hạn)."
             df_gs = doc_du_lieu_gsheet()
             total_sent = 0
+            failed_count = 0
+            first_err = ""
             for loai_bao_cao in deadline_cfg:
                 ds_chua_nop, deadline_str = lay_pgd_chua_nop(loai_bao_cao, df_gs)
                 if not ds_chua_nop:
@@ -291,27 +331,47 @@ def _gui_ngay(key: str) -> tuple[bool, str]:
                 ok = tg.gui_canh_bao_deadline(loai_bao_cao, dl_hien, ds_chua_nop)
                 if ok:
                     total_sent += 1
+                else:
+                    failed_count += 1
+                    if not first_err:
+                        first_err = _loi_gui_telegram("deadline_bc")
+            if failed_count:
+                if total_sent:
+                    return False, f"Đã gửi {total_sent} loại báo cáo, lỗi {failed_count} loại — {first_err}"
+                return False, first_err
             if total_sent == 0:
                 return True, "Tất cả PGD đã nộp hoặc chưa đến deadline"
             return True, f"Đã gửi {total_sent} loại báo cáo"
+
+        elif key == "nhap_lieu":
+            from scripts.nhac_deadline import _nhac_theo_doi_nhap_lieu
+
+            sent_count, pending_count, first_err = _nhac_theo_doi_nhap_lieu()
+            if pending_count == 0:
+                return True, "Không có sheet nhập liệu nào cần nhắc"
+            if sent_count == pending_count:
+                return True, f"Đã gửi {sent_count} nhắc nhập liệu"
+            if sent_count > 0:
+                return False, f"Đã gửi {sent_count}/{pending_count} nhắc nhập liệu — {first_err}"
+            return False, first_err or "Gửi nhắc nhập liệu thất bại."
 
         elif key == "health_check":
             ok = tg.gui_ket_qua_health_check(
                 0, 0, 0, date.today().strftime("%d/%m/%Y"), "Test thủ công từ Admin"
             )
-            return ok, ""
+            return _ket_qua_gui_telegram(ok, "", "health_check")
 
         elif key == "merge_thanh_cong":
             ok = tg.gui_thong_bao_merge("HSTD", 22, "admin")
-            return ok, "(Test thủ công)"
+            return _ket_qua_gui_telegram(ok, "(Test thủ công)", "merge_thanh_cong")
 
         elif key == "upload_pgd":
             ok = tg.gui_thong_bao_upload_pgd("(Test PGD)", "HSTD", "admin")
-            return ok, "(Test thủ công)"
+            return _ket_qua_gui_telegram(ok, "(Test thủ công)", "upload_pgd")
 
         elif key == "he_thong":
             ok = tg.gui_canh_bao_he_thong("canh_bao", "Test thủ công từ Admin")
-            return ok, "(Test thủ công)"
+            return _ket_qua_gui_telegram(ok, "(Test thủ công)", "he_thong")
 
         elif key == "nop_moi_gsheet":
             from tabs.tab_tien_do_nop import doc_du_lieu_gsheet
@@ -337,7 +397,7 @@ def _gui_ngay(key: str) -> tuple[bool, str]:
                     "ho_ten":       str(r.get("ho_ten", "") or ""),
                 })
             ok = tg.gui_thong_bao_nop_moi_gsheet(ds)
-            return ok, f"{len(ds)} submission trong 24h qua"
+            return _ket_qua_gui_telegram(ok, f"{len(ds)} submission trong 24h qua", "nop_moi_gsheet")
 
         elif key == "den_han_phan_tang":
             from data.core import CACHE_HSTD
@@ -363,7 +423,11 @@ def _gui_ngay(key: str) -> tuple[bool, str]:
                     })
             total = sum(len(v) for v in buckets.values())
             ok = tg.gui_nhac_den_han_phan_tang(buckets)
-            return ok, f"{total} khoản (T-1:{len(buckets['T-1'])}, T-3:{len(buckets['T-3'])}, T-7:{len(buckets['T-7'])})"
+            return _ket_qua_gui_telegram(
+                ok,
+                f"{total} khoản (T-1:{len(buckets['T-1'])}, T-3:{len(buckets['T-3'])}, T-7:{len(buckets['T-7'])})",
+                "den_han_phan_tang",
+            )
 
         elif key == "lich_cong_tac":
             ds_lich = db.doc_kv("khnv_lich_list")
@@ -394,7 +458,7 @@ def _gui_ngay(key: str) -> tuple[bool, str]:
                 return True, f"Không có lịch ngày mai ({ngay_mai_str})"
             ds_sv.sort(key=lambda x: x["gio"] or "99:99")
             ok = tg.gui_nhac_lich_cong_tac(ds_sv, ngay_mai_str)
-            return ok, f"{len(ds_sv)} sự kiện ngày {ngay_mai_str}"
+            return _ket_qua_gui_telegram(ok, f"{len(ds_sv)} sự kiện ngày {ngay_mai_str}", "lich_cong_tac")
 
         elif key == "giai_ngan_tuan":
             from data.core import CACHE_HSTD
@@ -417,7 +481,7 @@ def _gui_ngay(key: str) -> tuple[bool, str]:
                 for _, r in grp.iterrows()
             ]
             ok = tg.gui_giai_ngan_tuan(ds_pgd, tuan_str)
-            return ok, f"{len(df_gn)} khoản vay mới"
+            return _ket_qua_gui_telegram(ok, f"{len(df_gn)} khoản vay mới", "giai_ngan_tuan")
 
         elif key == "khoanh_tang":
             try:
@@ -446,8 +510,9 @@ def _gui_ngay(key: str) -> tuple[bool, str]:
                 if not ds_tang:
                     return True, "Không có đơn vị nào tăng nợ khoanh ≥ 5%"
                 ok = tg.gui_canh_bao_khoanh_tang(ds_tang)
-                return ok, f"{len(ds_tang)} đơn vị tăng nợ khoanh"
+                return _ket_qua_gui_telegram(ok, f"{len(ds_tang)} đơn vị tăng nợ khoanh", "khoanh_tang")
             except Exception as e:
+                logger.error("_gui_ngay khoanh_tang: %s", e, exc_info=True)
                 return False, str(e)
 
         elif key == "nqh_tuan":
@@ -472,7 +537,7 @@ def _gui_ngay(key: str) -> tuple[bool, str]:
                     "ty_le_nqh": round(tl, 2),
                 })
             ok = tg.gui_bao_cao_nqh_tuan(ds_pgd, str(ngay_sl))
-            return ok, f"{len(ds_pgd)} đơn vị"
+            return _ket_qua_gui_telegram(ok, f"{len(ds_pgd)} đơn vị", "nqh_tuan")
 
         elif key == "khtd_ct":
             from data.core import CACHE_HSTD
@@ -501,7 +566,7 @@ def _gui_ngay(key: str) -> tuple[bool, str]:
                     "pct":       round(pct, 1),
                 })
             ok = tg.gui_khtd_theo_chuong_trinh(ds_ct, ngay_sl)
-            return ok, f"{len(ds_ct)} chương trình"
+            return _ket_qua_gui_telegram(ok, f"{len(ds_ct)} chương trình", "khtd_ct")
 
         elif key == "tong_ket_thang":
             from data.core import CACHE_HSTD
@@ -555,7 +620,7 @@ def _gui_ngay(key: str) -> tuple[bool, str]:
                 thang, nam, du_no, ke_hoach, nqh,
                 so_dh, dn_dh, top5, bot5,
             )
-            return ok, f"Tháng {thang:02d}/{nam}"
+            return _ket_qua_gui_telegram(ok, f"Tháng {thang:02d}/{nam}", "tong_ket_thang")
 
         else:
             return False, f"Chưa hỗ trợ loại: {key}"
@@ -619,12 +684,36 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                         st.success("✅ Đã lưu cấu hình bot.")
             with c_test:
                 if st.button("🧪 Test kết nối", key="tg_btn_test", use_container_width=True):
-                    from services.telegram_service import gui_tin
-                    ok = gui_tin("✅ <b>VBSP-SCM</b> kết nối Telegram thành công!")
+                    from services.telegram_service import gui_tin_chi_tiet_voi_config
+
+                    msg_html = "✅ <b>VBSP-SCM</b> kết nối Telegram thành công!"
+                    err_html = ""
+                    da_fallback_plain_text = False
+                    ok, err = gui_tin_chi_tiet_voi_config(
+                        new_token.strip(),
+                        new_chat_id.strip(),
+                        msg_html,
+                        parse_mode="HTML",
+                    )
+                    # Nếu lỗi do parse HTML, thử lại plain text để tách lỗi nội dung khỏi lỗi cấu hình.
+                    if (not ok) and err and "parse" in err.lower():
+                        err_html = err
+                        da_fallback_plain_text = True
+                        ok, err = gui_tin_chi_tiet_voi_config(
+                            new_token.strip(),
+                            new_chat_id.strip(),
+                            "VBSP-SCM ket noi Telegram thanh cong!",
+                            parse_mode="",
+                        )
                     if ok:
                         st.success("✅ Gửi thành công — kiểm tra group Telegram.")
+                        if da_fallback_plain_text and err_html:
+                            st.warning(
+                                "⚠️ Token/Chat ID hợp lệ nhưng Telegram từ chối parse HTML. "
+                                f"Chi tiết: {err_html}"
+                            )
                     else:
-                        st.error("❌ Gửi thất bại — kiểm tra Token và Chat ID.")
+                        st.error(f"❌ Gửi thất bại — {err or 'kiểm tra Token và Chat ID.'}")
 
             if cur_token:
                 st.caption(f"Token: `...{cur_token[-8:]}`   |   Chat ID chính: `{cur_chat_id}`")
@@ -828,7 +917,7 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                     preview = entry.get("preview", "")
                     ok      = entry.get("ok", False)
                     err     = entry.get("error", "")
-                    ket_qua = "✅" if ok else f"❌ {err[:60]}"
+                    ket_qua = "✅" if ok else f"❌ {err[:180]}"
                     rows.append({
                         "Thời gian": ts,
                         "Loại": func,

@@ -47,6 +47,14 @@ class TestPhatHienTenLechTen:
         assert len(ds) == 1
         assert ds[0]["ten_form"] == ""
 
+    def test_goi_y_khi_ten_form_chen_them_cum_tu(self, mock_kv):
+        cfg = {"RÀ SOÁT XÂY DỰNG KHTD 2023-2026": "2026-07-15"}
+        gsheet = ["RÀ SOÁT XÂY DỰNG KHTD GIAI ĐOẠN 2027-2030"]
+        ds = svc.phat_hien_ten_lech_ten(cfg, gsheet)
+        assert len(ds) == 1
+        assert ds[0]["ten_form"] == "RÀ SOÁT XÂY DỰNG KHTD GIAI ĐOẠN 2027-2030"
+        assert ds[0]["ly_do"] == "gan_dung_ten_goc"
+
 
 class TestDanhMucTheoDoi:
     def test_uu_tien_hien_ten_tren_form_khi_khac_giai_doan_nam(self, mock_kv):
@@ -72,11 +80,26 @@ class TestDanhMucTheoDoi:
             ]
         )
 
-        out = svc.gan_trang_thai(df, cfg)
+        out, _ = svc.gan_trang_thai(df, cfg)
 
         assert out.iloc[0]["_loai_theo_doi"] == "RÀ SOÁT XÂY DỰNG KHTD 2023-2026"
         assert out.iloc[0]["_loai_hien_thi"] == "RÀ SOÁT XÂY DỰNG KHTD 2027-2030"
         assert out.iloc[0]["tt"] == "dung_han"
+
+    def test_hien_ten_form_khi_ten_moi_chen_them_cum_tu(self, mock_kv):
+        cfg = {"RÀ SOÁT XÂY DỰNG KHTD 2023-2026": "2026-07-15"}
+        gsheet = ["RÀ SOÁT XÂY DỰNG KHTD GIAI ĐOẠN 2027-2030"]
+
+        dm = svc.xay_dung_danh_muc_theo_doi(cfg, gsheet)
+
+        assert (
+            dm["tracked_to_display"]["RÀ SOÁT XÂY DỰNG KHTD 2023-2026"]
+            == "RÀ SOÁT XÂY DỰNG KHTD GIAI ĐOẠN 2027-2030"
+        )
+        assert (
+            dm["display_to_tracked"]["RÀ SOÁT XÂY DỰNG KHTD GIAI ĐOẠN 2027-2030"]
+            == "RÀ SOÁT XÂY DỰNG KHTD 2023-2026"
+        )
 
 
 class TestDoiTenLoaiTheoDoi:

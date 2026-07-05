@@ -15,7 +15,6 @@ Dùng chung giữa:
 
 from __future__ import annotations
 
-import os
 import re
 import sys
 import time
@@ -49,7 +48,7 @@ KV_DEADLINE = "bao_cao_deadline_config"
 KV_MANUAL = "manual_nop_tdn"
 KV_ALLOWLIST = "telegram_deadline_bc_allowlist"
 
-_YEAR_RANGE_RE = re.compile(r"\s*\d{4}\s*[-–]\s*\d{4}\s*$", re.IGNORECASE)
+_YEAR_RANGE_RE = re.compile(r"\b\d{4}\s*[-–]\s*\d{4}\b", re.IGNORECASE)
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -210,7 +209,7 @@ def _doc_raw_values_sheet(
             )
             break
     _LAST_GSHEET_ERROR = (
-        f"{type(last_err).__name__}: {last_err}{_goi_y_loi_gsheet(last_err)}"
+        "{}: {}{}".format(type(last_err).__name__, last_err, _goi_y_loi_gsheet(last_err))
         if last_err
         else "Không đọc được GSheet"
     )
@@ -289,9 +288,59 @@ def _chuan_hoa_ten_loai(ten: str) -> str:
 
 
 def _ten_loai_khong_nam(ten: str) -> str:
-    """Bỏ giai đoạn năm cuối chuỗi — VD: 'KHTD 2023-2026' → 'KHTD'."""
+    """Bỏ mọi giai đoạn năm trong chuỗi để so khớp tên báo cáo."""
     s = _chuan_hoa_ten_loai(ten)
-    return _YEAR_RANGE_RE.sub("", s).strip().upper()
+    return _chuan_hoa_chuoi_so_khop(_YEAR_RANGE_RE.sub(" ", s))
+
+
+def _chuan_hoa_chuoi_so_khop(ten: str) -> str:
+    """Chuẩn hóa chuỗi để so khớp mềm: uppercase, bỏ dấu câu, gộp khoảng trắng."""
+    s = _chuan_hoa_ten_loai(ten).upper()
+    s = re.sub(r"[^\w\s]", " ", s, flags=re.UNICODE)
+    return re.sub(r"\s+", " ", s).strip()
+
+
+def _tim_ten_form_goi_y(
+    ten_theo_doi: str,
+    ds_loai_gsheet: list[str],
+) -> tuple[str, str]:
+    """Tìm tên trên Form tương ứng với loại đang theo dõi.
+
+    Ưu tiên:
+      1. Khớp exact sau khi bỏ giai đoạn năm.
+      2. Khớp containment sau khi bỏ giai đoạn năm và chuẩn hóa dấu câu.
+    Chỉ trả gợi ý khi có đúng 1 candidate rõ ràng để tránh match nhầm.
+    """
+    ten_norm = _chuan_hoa_ten_loai(ten_theo_doi)
+    base = _ten_loai_khong_nam(ten_theo_doi)
+    if not base:
+        return "", "khong_co_tren_form"
+
+    gsheet_map: dict[str, str] = {}
+    for item in ds_loai_gsheet:
+        raw = _chuan_hoa_ten_loai(item)
+        if raw and raw not in gsheet_map:
+            gsheet_map[raw] = raw
+
+    exact_matches: list[str] = []
+    loose_matches: list[str] = []
+    for g_norm, g_display in gsheet_map.items():
+        if g_norm == ten_norm:
+            continue
+        base_g = _ten_loai_khong_nam(g_norm)
+        if not base_g:
+            continue
+        if base_g == base:
+            exact_matches.append(g_display)
+            continue
+        if base in base_g or base_g in base:
+            loose_matches.append(g_display)
+
+    if len(exact_matches) == 1:
+        return exact_matches[0], "khac_giai_doan_nam"
+    if len(loose_matches) == 1:
+        return loose_matches[0], "gan_dung_ten_goc"
+    return "", "khong_co_tren_form"
 
 
 def xay_dung_danh_muc_theo_doi(
@@ -386,7 +435,6 @@ def phat_hien_ten_lech_ten(
         return []
 
     gsheet_set = {_chuan_hoa_ten_loai(x) for x in ds_loai_gsheet if x}
-    gsheet_list = sorted(gsheet_set)
     ket_qua: list[dict[str, str]] = []
 
     for ten_theo_doi in sorted(deadline_cfg.keys()):
@@ -394,17 +442,7 @@ def phat_hien_ten_lech_ten(
         if ten_norm in gsheet_set:
             continue
 
-        base = _ten_loai_khong_nam(ten_theo_doi)
-        goi_y = ""
-        ly_do = "khong_co_tren_form"
-        if base:
-            candidates = [
-                g for g in gsheet_list
-                if _ten_loai_khong_nam(g) == base and g != ten_norm
-            ]
-            if candidates:
-                goi_y = candidates[0]
-                ly_do = "khac_giai_doan_nam"
+        goi_y, ly_do = _tim_ten_form_goi_y(ten_theo_doi, ds_loai_gsheet)
 
         ket_qua.append({
             "ten_theo_doi": ten_theo_doi,
@@ -431,7 +469,7 @@ def _migrate_allowlist_loai(ten_cu: str, ten_moi: str, username: str) -> bool:
             ds_moi.append(ten_moi)
             da_doi = True
         else:
-            ds_moi.append(loai)
+            ds_moi.append(item)  # giữ nguyên item gốc, không chuẩn hóa
     if da_doi:
         db.ghi_kv(KV_ALLOWLIST, ds_moi, username)
         db.ghi_audit(
@@ -554,7 +592,7 @@ def phan_loai_trang_thai(ngay_nop, deadline_str: str | None) -> str:
     - dung_han: ngày nộp <= deadline
     - tre:      ngày nộp > deadline
     """
-    if ngay_nop is None or (hasattr(ngay_nop, "__class__") and pd.isna(ngay_nop)):
+    if pd.isna(ngay_nop):
         return "chua_nop"
     if not deadline_str:
         return "da_nop"
@@ -567,14 +605,20 @@ def phan_loai_trang_thai(ngay_nop, deadline_str: str | None) -> str:
         return "da_nop"
 
 
-def gan_trang_thai(df: pd.DataFrame, deadline_cfg: dict[str, str]) -> pd.DataFrame:
-    """Gán cột 'tt' cho DataFrame dựa trên deadline config."""
-    df, _ = _gan_khoa_theo_doi(df, deadline_cfg)
+def gan_trang_thai(
+    df: pd.DataFrame, deadline_cfg: dict[str, str]
+) -> tuple[pd.DataFrame, dict[str, Any]]:
+    """Gán cột 'tt' cho DataFrame dựa trên deadline config.
+
+    Returns:
+        (df, dm) — DataFrame đã gán trạng thái + danh mục theo dõi.
+    """
+    df, dm = _gan_khoa_theo_doi(df, deadline_cfg)
     df["tt"] = df.apply(
         lambda r: phan_loai_trang_thai(r["thoi_gian"], deadline_cfg.get(r["_loai_theo_doi"])),
         axis=1,
     )
-    return df
+    return df, dm
 
 
 # ── Manual override ───────────────────────────────────────────────────────────
@@ -710,7 +754,7 @@ def lay_danh_sach_can_nhac(
             else:
                 last = match.sort_values("thoi_gian").iloc[-1]
                 ngay_nop = last["thoi_gian"]
-                if ngay_nop is None or (hasattr(ngay_nop, "__class__") and pd.isna(ngay_nop)):
+                if pd.isna(ngay_nop):
                     chua_nop.append(pgd)
 
         if chua_nop:
@@ -741,8 +785,7 @@ def tao_ma_tran_tien_do(
     if ds_pgd_scope is None:
         ds_pgd_scope = DS_PGD_ALL
 
-    df = gan_trang_thai(df, deadline_cfg)
-    _, dm = _gan_khoa_theo_doi(df, deadline_cfg)
+    df, dm = gan_trang_thai(df, deadline_cfg)
     tracked_keys = sorted(deadline_cfg.keys(), key=lambda x: dm["tracked_to_display"].get(x, x))
     manual_map = doc_manual_log()
 

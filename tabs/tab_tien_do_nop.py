@@ -381,7 +381,7 @@ def _render_danh_sach(df: pd.DataFrame, deadline_cfg: dict, is_cn: bool, pgd_use
     if pgd_chon and pgd_chon != "Tất cả":
         df_loc = df_loc[df_loc["ten_pgd"] == pgd_chon]
 
-    df_loc = gan_trang_thai(df_loc, deadline_cfg)
+    df_loc, _ = gan_trang_thai(df_loc, deadline_cfg)
     df_loc["tt_hien"] = df_loc["tt"].map(lambda x: f"{EMOJI.get(x, '')} {LABEL.get(x, x)}")
 
     st.caption(f"Hiển thị {len(df_loc)} / {len(df)} lượt nộp")

@@ -1516,7 +1516,45 @@ val = pd.to_numeric(df[COT_X], errors="coerce").sum() if COT_X in df.columns els
 ```
 
 ---
+## Template: Ghi nhận bug mới
 
+### J09 — `hasattr(ngay_nop, "__class__")` redundant check in phan_loai_trang_thai
+| | |
+|---|---|
+| **File** | `services/report_submission_service.py` → `phan_loai_trang_thai()` L557, `lay_danh_sach_can_nhac()` L713 |
+| **Dấu hiệu** | Code dùng `ngay_nop is None or (hasattr(ngay_nop, "__class__") and pd.isna(ngay_nop))` — `hasattr` luôn True với mọi object Python, check dư thừa |
+| **Nguyên nhân** | Cố gắng phân biệt None với NaN, nhưng `pd.isna(None)` đã trả True → điều kiện đơn giản có thể là `pd.isna(ngay_nop)` |
+| **Fix** | Rút gọn thành `if pd.isna(ngay_nop): return "chua_nop"` ở cả 2 nơi |
+| **Ngày fix** | 2026-07-05 |
+
+### J10 — `_gan_khoa_theo_doi` double call in `tao_ma_tran_tien_do`
+| | |
+|---|---|
+| **File** | `services/report_submission_service.py` → `tao_ma_tran_tien_do()` L744-745 |
+| **Dấu hiệu** | `df = gan_trang_thai(df, deadline_cfg)` (gọi `_gan_khoa_theo_doi` lần 1) rồi `_, dm = _gan_khoa_theo_doi(df, deadline_cfg)` (lần 2) — lãng phí |
+| **Nguyên nhân** | `gan_trang_thai` không trả về `dm` nên phải gọi lại để lấy danh mục |
+| **Fix** | Đổi `gan_trang_thai` trả về tuple `(df, dm)`. Cập nhật 3 call site: `tao_ma_tran_tien_do`, `tab_tien_do_nop.py`, test |
+| **Ngày fix** | 2026-07-05 |
+
+### J11 — f-string with error object may crash in `_doc_raw_values_sheet`
+| | |
+|---|---|
+| **File** | `services/report_submission_service.py` → `_doc_raw_values_sheet()` L213 |
+| **Dấu hiệu** | `f"{type(last_err).__name__}: {last_err}{...}"` — nếu `str(last_err)` chứa ngoặc nhọn `{` `}`, f-string sẽ raise `KeyError` |
+| **Nguyên nhân** | Python f-string parse `{last_err}` trong template → nếu error message chứa `{field}`, Python cố tìm biến `field` |
+| **Fix** | Dùng `"...{}...".format(...)` thay vì f-string để tránh parse ngoặc nhọn trong message |
+| **Ngày fix** | 2026-07-05 |
+
+### J12 — `_migrate_allowlist_loai` silently normalizes non-matching allowlist items
+| | |
+|---|---|
+| **File** | `services/report_submission_service.py` → `_migrate_allowlist_loai()` L430-434 |
+| **Dấu hiệu** | Item trong Telegram allowlist không khớp tên đổi bị thay bằng bản chuẩn hóa (`_chuan_hoa_ten_loai`) thay vì giữ nguyên giá trị gốc |
+| **Nguyên nhân** | Vòng lặp `else: ds_moi.append(loai)` thay vì `ds_moi.append(item)` — ghi đè item gốc bằng bản đã trim whitespace, mất định dạng ban đầu |
+| **Fix** | `ds_moi.append(item)` — giữ nguyên item gốc, không normalize khi không cần đổi tên |
+| **Ngày fix** | 2026-07-05 |
+
+---
 ## Template: Ghi nhận bug mới
 
 ### C13 — BQ metrics: `n_xa`/`n_hoi` sai do dùng `groupby ngroups` thay vì `nunique()`
@@ -1683,6 +1721,18 @@ val = pd.to_numeric(df[COT_X], errors="coerce").sum() if COT_X in df.columns els
 | **Dấu hiệu** | Sau fix C28, card vẫn có thể hiện ~4.555 tổ (fallback `PGD+Xã+Tên tổ`) thay vì ~4.559 theo `Mã tổ` |
 | **Nguyên nhân** | `cols_need` khi copy `df_bq` không gồm `COT_MA_TO` → `dem_so_to_hstd()` không thấy cột Mã tổ |
 | **Fix** | Thêm `COT_MA_TO` vào `cols_need` |
+| **Ngày fix** | 2026-07-05 |
+
+---
+
+### H11 — Đổi tên giai đoạn KHTD không lên UI khi tên Form chèn thêm cụm từ
+| | |
+|---|---|
+| **File** | `services/report_submission_service.py` → `_ten_loai_khong_nam()`, `_tim_ten_form_goi_y()`, `phat_hien_ten_lech_ten()` |
+| **Dấu hiệu** | Mục `RÀ SOÁT XÂY DỰNG KHTD 2023-2026` vẫn hiện tên cũ ở `⚙️ Cài đặt thời hạn` / `📊 Tổng quan` dù Google Form đã đổi sang tên mới cùng nghĩa nhưng có chèn thêm cụm như `GIAI ĐOẠN 2027-2030` |
+| **Nguyên nhân** | Logic cũ chỉ match khi phần tên sau khi bỏ năm phải bằng nhau tuyệt đối; nếu Form thêm vài từ trung gian thì không còn match exact nên `tracked_to_display` vẫn giữ key cũ |
+| **Fix** | Bỏ year-range ở mọi vị trí trong chuỗi, chuẩn hóa dấu câu + khoảng trắng, rồi thêm bước match containment có kiểm soát: chỉ nhận gợi ý khi có đúng 1 candidate rõ ràng trên Form |
+| **Test** | `tests/test_report_submission_service.py::TestPhatHienTenLechTen::test_goi_y_khi_ten_form_chen_them_cum_tu`, `tests/test_report_submission_service.py::TestDanhMucTheoDoi::test_hien_ten_form_khi_ten_moi_chen_them_cum_tu` |
 | **Ngày fix** | 2026-07-05 |
 
 ---

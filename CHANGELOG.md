@@ -1,5 +1,14 @@
 # CHANGELOG
 
+## [2026-07-05] — Mở rộng match tên báo cáo khi Google Form chèn thêm cụm từ
+- `services/report_submission_service.py` — mở rộng match tên lệch bằng cách bỏ year-range ở mọi vị trí, chuẩn hóa dấu câu/khoảng trắng và cho phép match containment duy nhất; giúp các tên như `RÀ SOÁT XÂY DỰNG KHTD 2023-2026` tự hiển thị theo tên Form mới có thêm cụm `GIAI ĐOẠN`
+- `tests/test_report_submission_service.py` — thêm regression tests cho trường hợp tên Form chèn thêm cụm từ nhưng vẫn là cùng một báo cáo
+
+## [2026-07-05] — Review & refactor report_submission_service.py
+- `services/report_submission_service.py` — sửa 5 lỗi code quality: `hasattr` dư thừa trong `phan_loai_trang_thai`/`lay_danh_sach_can_nhac`, double call `_gan_khoa_theo_doi` trong `tao_ma_tran_tien_do`, f-string crash risk với error object, side-effect trong `_migrate_allowlist_loai`, xóa unused import `os`; `gan_trang_thai` giờ trả về tuple `(df, dm)` thay vì chỉ `df`
+- `tabs/tab_tien_do_nop.py` — cập nhật call site `gan_trang_thai` theo signature mới
+- `tests/test_report_submission_service.py` — cập nhật call site `gan_trang_thai` theo signature mới
+
 ## [2026-07-05] — Hoàn thiện phân hệ Tiến độ báo cáo PGD: ưu tiên tên trên Google Form
 - `services/report_submission_service.py` — thêm danh mục theo dõi hiệu lực, tự match tên cũ↔tên Form theo giai đoạn năm, hỗ trợ chuẩn hóa hàng loạt và dùng chung cho trạng thái/nhắc hạn/ma trận
 - `tabs/tab_tien_do_nop.py` — tab Tổng quan và Cài đặt hiển thị theo tên Form khi match rõ ràng; thêm nút `🔗 Chuẩn hóa tất cả` và dùng service chung để dựng ma trận

@@ -191,3 +191,30 @@ def test_den_han_filters_and_groupby():
     assert tg.iloc[0]["_mon"] == 1
     assert tg.iloc[0]["_kh"] == 1
     assert tg.iloc[0]["_no"] == 100
+
+
+def test_dem_so_to_hstd_uu_tien_ma_to():
+    from config import COT_TEN_TO, COT_MA_TO, COT_TEN_XA
+
+    df = pd.DataFrame({
+        COT_TEN_PGD: ["PGD A", "PGD A", "PGD A"],
+        COT_TEN_XA: ["Xã 1", "Xã 1", "Xã 2"],
+        COT_TEN_TO: ["Tổ 1", "Tổ 1", "Tổ 1"],
+        COT_MA_TO: ["0000001", "0000002", "0000003"],
+        COT_TONG_DU_NO: [1_000_000, 2_000_000, 3_000_000],
+    })
+    # (PGD, Tên tổ) chỉ đếm 1; (PGD, Mã tổ) đếm đúng 3
+    assert tongquan_service.dem_so_to_hstd(
+        df, COT_TEN_PGD, COT_TEN_TO, COT_MA_TO, COT_TEN_XA,
+    ) == 3
+
+
+def test_dem_so_to_hstd_bo_qua_ten_rong():
+    from config import COT_TEN_TO
+
+    df = pd.DataFrame({
+        COT_TEN_PGD: ["PGD A", "PGD A", "PGD B"],
+        COT_TEN_TO: ["Tổ 1", "", None],
+        COT_TONG_DU_NO: [1_000_000, 2_000_000, 3_000_000],
+    })
+    assert tongquan_service.dem_so_to_hstd(df, COT_TEN_PGD, COT_TEN_TO) == 1

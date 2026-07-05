@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## [2026-07-05] — Tổng quan DN: `_cache_bq_counts` thiếu cột Mã tổ → BQ tổ vẫn fallback tên tổ
+- `tabs/tab_tongquan.py` — bổ sung `COT_MA_TO` vào `cols_need` của `_cache_bq_counts()` để `dem_so_to_hstd()` đếm đúng `(PGD, Mã tổ)`
+
+## [2026-07-05] — Tổng quan DN: Dư nợ BQ tổ TKVV đếm theo Mã tổ HSTD (không gộp trùng tên)
+- `services/tongquan_service.py` — `dem_so_to_hstd()` ưu tiên `(PGD, Mã tổ)`, fallback `(PGD, Xã, Tên tổ)`
+- `tabs/tab_tongquan.py` — card BQ tổ dùng đếm mới; bỏ mẫu số từ CDTOTKVV (hai nguồn gần khớp khi đếm đúng khóa)
+- `tests/test_tongquan_service.py` — test ưu tiên Mã tổ khi trùng tên tổ
+
 ## [2026-07-04] — Tiến độ nộp BC: liên kết tên Form ↔ theo dõi (fix lệch KHTD)
 - `services/report_submission_service.py` — thêm `phat_hien_ten_lech_ten()`, `doi_ten_loai_theo_doi()` migrate deadline + manual log + `telegram_deadline_bc_allowlist`
 - `tabs/tab_tien_do_nop.py` — khối cảnh báo ⚠️ + nút 🔗 Liên kết; cảnh báo trên tab Tổng quan khi tên chưa khớp Form

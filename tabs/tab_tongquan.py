@@ -165,7 +165,7 @@ def _cache_bq_counts(
 ) -> tuple:
     """Cache đếm PGD/Tổ/Xã/Hội cho BQ metrics — tránh df.copy() + 4 groupby mỗi rerun."""
     _ = (ts, pgd_filter)
-    cols_need = [c for c in [COT_TEN_PGD, COT_TEN_TO, COT_TEN_XA, COT_DVUT, COT_TONG_DU_NO]
+    cols_need = [c for c in [COT_TEN_PGD, COT_TEN_TO, COT_MA_TO, COT_TEN_XA, COT_DVUT, COT_TONG_DU_NO]
                  if c in _df.columns]
     df_bq = _df[cols_need].copy()
     if COT_TONG_DU_NO in df_bq.columns:
@@ -174,8 +174,9 @@ def _cache_bq_counts(
     if COT_TEN_PGD in df_bq.columns and COT_TONG_DU_NO in df_bq.columns:
         _s = df_bq.groupby(COT_TEN_PGD)[COT_TONG_DU_NO].sum()
         n_pgd_co_dn = int((_s > 0).sum())
-    n_to = (int(df_bq.groupby([COT_TEN_PGD, COT_TEN_TO]).ngroups)
-            if COT_TEN_TO in df_bq.columns and COT_TEN_PGD in df_bq.columns else 0)
+    n_to = _tqsvc.dem_so_to_hstd(
+        df_bq, COT_TEN_PGD, COT_TEN_TO, COT_MA_TO, COT_TEN_XA,
+    )
     n_xa = 0
     try:
         from services.file_detection_service import ten_doc_ve_don_vi_chuan as _norm_dv
@@ -478,7 +479,7 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                 <div class="tq-card soft-indigo">
                     <div class="tq-label">Dư nợ BQ tổ TKVV</div>
                     <div class="tq-value">{_bq_to}</div>
-                    <div class="tq-sub">{_n_to_str} tổ TK&VV</div>
+                    <div class="tq-sub">{_n_to_str} tổ TK&VV · theo Mã tổ HSTD</div>
                 </div>
                 <div class="tq-card soft-blue">
                     <div class="tq-label">Dư nợ BQ xã</div>

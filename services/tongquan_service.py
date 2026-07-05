@@ -10,6 +10,48 @@ from io import BytesIO
 import pandas as pd
 
 
+def dem_so_to_hstd(
+    df: pd.DataFrame,
+    cot_pgd: str,
+    cot_ten_to: str,
+    cot_ma_to: str | None = None,
+    cot_ten_xa: str | None = None,
+) -> int:
+    """Đếm số tổ TK&VV unique từ HSTD (cùng phạm vi df đang hiển thị).
+
+    Ưu tiên (PGD, Mã tổ) — khớp định danh HSTD/CDTOTKVV; fallback (PGD, Xã, Tên tổ)
+    khi thiếu mã tổ; cuối cùng (PGD, Tên tổ).
+  """
+    if cot_pgd not in df.columns:
+        return 0
+
+    if cot_ma_to and cot_ma_to in df.columns:
+        sub = df[[cot_pgd, cot_ma_to]].copy()
+        sub[cot_ma_to] = sub[cot_ma_to].astype("string").str.strip().replace("", pd.NA)
+        sub = sub.dropna(subset=[cot_ma_to])
+        if not sub.empty:
+            return int(sub.groupby([cot_pgd, cot_ma_to]).ngroups)
+
+    if (
+        cot_ten_xa
+        and cot_ten_xa in df.columns
+        and cot_ten_to in df.columns
+    ):
+        sub = df[[cot_pgd, cot_ten_xa, cot_ten_to]].copy()
+        sub[cot_ten_to] = sub[cot_ten_to].astype("string").str.strip().replace("", pd.NA)
+        sub = sub[sub[cot_ten_to].notna()]
+        if not sub.empty:
+            return int(sub.groupby([cot_pgd, cot_ten_xa, cot_ten_to]).ngroups)
+
+    if cot_ten_to not in df.columns:
+        return 0
+    _to = df[cot_ten_to].astype("string").str.strip().replace("", pd.NA)
+    _df = df.loc[_to.notna(), [cot_pgd, cot_ten_to]]
+    if _df.empty:
+        return 0
+    return int(_df.groupby([cot_pgd, cot_ten_to]).ngroups)
+
+
 def tinh_kpi_tongquan(
     df: pd.DataFrame,
     cot_tdn: str,

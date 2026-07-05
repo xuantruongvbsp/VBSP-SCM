@@ -153,6 +153,29 @@ _EVENT_KEYS = {"merge_thanh_cong", "upload_pgd"}
 # Các loại còn lại (he_thong, khtd_tien_do) chỉ gửi thủ công qua nút "▶ Gửi ngay".
 
 
+def _loc_allowlist_deadline(
+    allowlist: list[str] | None,
+    ds_loai: list[str],
+) -> tuple[list[str] | None, list[str]]:
+    """Lọc allowlist theo danh mục deadline hiện có để tránh state stale làm vỡ UI."""
+    if allowlist is None:
+        return None, []
+
+    ds_loai_hop_le = {str(loai).strip() for loai in ds_loai if str(loai).strip()}
+    ds_chon: list[str] = []
+    ds_stale: list[str] = []
+    for loai in allowlist:
+        loai_str = str(loai).strip()
+        if not loai_str:
+            continue
+        if loai_str in ds_loai_hop_le:
+            if loai_str not in ds_chon:
+                ds_chon.append(loai_str)
+        else:
+            ds_stale.append(loai_str)
+    return ds_chon, ds_stale
+
+
 def _loi_gui_telegram(log_key: str, fallback: str = "") -> str:
     """Lấy lỗi Telegram gần nhất cho log key tương ứng."""
     from services import telegram_service as tg
@@ -311,12 +334,14 @@ def _gui_ngay(key: str) -> tuple[bool, str]:
             return True, "Không có PGD nào tăng NQH (test)"
 
         elif key == "deadline_bc":
-            from tabs.tab_tien_do_nop import doc_du_lieu_gsheet, lay_pgd_chua_nop
+            from services.report_submission_service import doc_du_lieu_gsheet, lay_pgd_chua_nop
             deadline_cfg = db.doc_kv("bao_cao_deadline_config") or {}
             if not deadline_cfg:
                 return False, "Chưa cài đặt deadline (vào tab Tiến độ → ⚙️ Cài đặt thời hạn)."
             from services.telegram_service import doc_deadline_bc_allowlist
-            allowlist = doc_deadline_bc_allowlist()
+            ds_loai = sorted([str(k) for k in deadline_cfg.keys()]) if isinstance(deadline_cfg, dict) else []
+            allowlist_raw = doc_deadline_bc_allowlist()
+            allowlist, stale_allowlist = _loc_allowlist_deadline(allowlist_raw, ds_loai)
             df_gs = doc_du_lieu_gsheet()
             total_sent = 0
             failed_count = 0
@@ -350,7 +375,10 @@ def _gui_ngay(key: str) -> tuple[bool, str]:
                     return True, "Không có loại báo cáo nào cần nhắc trong allowlist"
                 return True, "Tất cả PGD đã nộp hoặc chưa đến deadline"
             if allowlist is not None:
-                return True, f"Đã gửi {total_sent} loại báo cáo (lọc {len(allowlist)} loại, bỏ qua {skipped} loại)"
+                msg = f"Đã gửi {total_sent} loại báo cáo (lọc {len(allowlist)} loại, bỏ qua {skipped} loại)"
+                if stale_allowlist:
+                    msg += f"; bỏ {len(stale_allowlist)} loại stale"
+                return True, msg
             return True, f"Đã gửi {total_sent} loại báo cáo"
 
         elif key == "nhap_lieu":
@@ -384,7 +412,7 @@ def _gui_ngay(key: str) -> tuple[bool, str]:
             return _ket_qua_gui_telegram(ok, "(Test thủ công)", "he_thong")
 
         elif key == "nop_moi_gsheet":
-            from tabs.tab_tien_do_nop import doc_du_lieu_gsheet
+            from services.report_submission_service import doc_du_lieu_gsheet
             df_gs = doc_du_lieu_gsheet()
             if df_gs.empty:
                 return False, "Không có dữ liệu GSheet (kiểm tra credentials.json)."
@@ -919,7 +947,8 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                 deadline_cfg = db.doc_kv("bao_cao_deadline_config") or {}
                 ds_loai = sorted([str(k) for k in deadline_cfg.keys()]) if isinstance(deadline_cfg, dict) else []
                 from services.telegram_service import doc_deadline_bc_allowlist, luu_deadline_bc_allowlist
-                allowlist = doc_deadline_bc_allowlist()
+                allowlist_raw = doc_deadline_bc_allowlist()
+                allowlist, stale_allowlist = _loc_allowlist_deadline(allowlist_raw, ds_loai)
 
                 if not ds_loai:
                     st.info("Chưa có danh mục deadline báo cáo. Vào tab Tiến độ nộp BC để cài đặt trước.")
@@ -927,7 +956,7 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                     mode = st.radio(
                         "Phạm vi gửi nhắc deadline",
                         options=["Tất cả loại báo cáo", "Chỉ một số loại (lọc)"],
-                        index=0 if allowlist is None else 1,
+                        index=0 if allowlist_raw is None else 1,
                         horizontal=True,
                         key="tg_deadline_mode",
                     )
@@ -940,6 +969,13 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                             key="tg_deadline_allowlist",
                         )
                         st.caption(f"Đang chọn {len(sel)}/{len(ds_loai)} loại.")
+                        if stale_allowlist:
+                            preview = ", ".join(stale_allowlist[:3])
+                            if len(stale_allowlist) > 3:
+                                preview += ", ..."
+                            st.warning(
+                                f"⚠️ Allowlist cũ có {len(stale_allowlist)} loại không còn trong deadline hiện tại: {preview}"
+                            )
                     else:
                         st.caption(f"Đang bật: gửi tất cả {len(ds_loai)} loại báo cáo.")
 

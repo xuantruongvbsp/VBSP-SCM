@@ -4,6 +4,7 @@ from __future__ import annotations
 import streamlit as st
 from typing import TYPE_CHECKING
 
+from auth import la_phan_he_pgd, normalize_role
 from logger import get_logger
 from tabs.base_tab import TabContext
 from .dashboard import render_dashboard
@@ -51,6 +52,27 @@ def render(tab: "DeltaGenerator | None" = None, **kwargs) -> None:
     role = kwargs.get("role", "")
     username = kwargs.get("username", "unknown")
     pgd_user = kwargs.get("pgd_user", "")
+    role_norm = normalize_role(str(role or "user"))
+
+    if df_cdtotkvv is None or df_cdtotkvv.empty:
+        try:
+            from services.tongquan_cdto_service import load_cdto_toan_cn
+
+            cdto_state = load_cdto_toan_cn()
+            df_cdtotkvv = cdto_state.get("df_raw")
+
+            if (
+                df_cdtotkvv is not None
+                and not df_cdtotkvv.empty
+                and la_phan_he_pgd(role_norm)
+                and pgd_user
+            ):
+                from services.cdtotkvv_service import loc_df as _loc_df_cdtotkvv
+
+                df_cdtotkvv = _loc_df_cdtotkvv(df_cdtotkvv, "pgd", pgd_user)
+        except Exception as e:
+            logger.error("tab_baocao: load df_cdtotkvv fallback lỗi — %s", e, exc_info=True)
+            df_cdtotkvv = None
 
     with ctx:
         st.subheader("📈 Báo cáo Tín dụng")

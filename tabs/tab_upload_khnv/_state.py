@@ -21,3 +21,29 @@ def xoa_cache_trang_thai() -> None:
     st.session_state.pop("trang_thai_upload_pgd", None)
     for k in [k for k in st.session_state if k.startswith("_blcache_")]:
         st.session_state.pop(k, None)
+
+
+def lam_moi_du_lieu_app() -> None:
+    """
+    Buộc app.py nạp lại parquet sau merge/upload.
+    Chỉ cache_data.clear() không đủ — _load_hstd dùng @st.cache_resource
+  và app.py giữ _ctx khi _ctx_cache_key khớp _data_version.
+    """
+    try:
+        st.cache_data.clear()
+    except Exception:
+        pass
+    try:
+        st.cache_resource.clear()
+    except Exception:
+        pass
+    for _k in (
+        "_ctx",
+        "_ctx_cache_key",
+        "_pgd_map_cache_ts",
+        "_pgd_xa_map_cached",
+        "_ds_pgd_all_cached",
+        "_pgd_op_mtime_ss",
+        "df_full",
+    ):
+        st.session_state.pop(_k, None)

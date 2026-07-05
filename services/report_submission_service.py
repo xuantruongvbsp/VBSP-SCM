@@ -1,0 +1,691 @@
+"""report_submission_service.py — Service lõi cho luồng PGD nộp báo cáo về Chi nhánh.
+
+Là nơi DUY NHẤT xử lý logic nghiệp vụ:
+  - Đọc dữ liệu từ Google Sheets.
+  - Chuẩn hóa tên PGD và dữ liệu.
+  - Đọc/ghi deadline config và manual override.
+  - Phân loại trạng thái nộp báo cáo.
+  - Sinh ma trận tiến độ và danh sách cần nhắc.
+  - Kiểm tra sức khỏe nguồn dữ liệu.
+
+Dùng chung giữa:
+  - tabs/tab_tien_do_nop.py  (UI)
+  - scripts/nhac_deadline.py (scheduler Telegram)
+"""
+
+from __future__ import annotations
+
+import os
+import re
+import sys
+import time
+from datetime import date
+from pathlib import Path
+from typing import Any
+from urllib.parse import quote
+
+import pandas as pd
+
+import db
+from config import DS_PGD, DON_VI_CHI_NHANH
+from logger import get_logger
+
+logger = get_logger(__name__)
+
+# ── Constants ─────────────────────────────────────────────────────────────────
+
+SHEET_ID = "15Ev2rTv6khLFaMpAiMwqJCVC_33ocJ-6cp016RGNkYk"
+SHEET_TAB = "TIENDO_BAOCAO"
+COT = ["thoi_gian", "email", "ten_pgd", "loai_bao_cao",
+       "ky_bao_cao", "noi_dung", "file_dinh_kem", "ho_ten"]
+
+DS_PGD_ALL = [DON_VI_CHI_NHANH] + DS_PGD
+
+EMOJI = {"dung_han": "🟢", "tre": "🟡", "chua_nop": "🔴", "da_nop": "⚪"}
+LABEL = {"dung_han": "Đúng hạn", "tre": "Trễ hạn", "chua_nop": "Chưa nộp", "da_nop": "Đã nộp"}
+
+# KV keys
+KV_DEADLINE = "bao_cao_deadline_config"
+KV_MANUAL = "manual_nop_tdn"
+KV_ALLOWLIST = "telegram_deadline_bc_allowlist"
+
+_YEAR_RANGE_RE = re.compile(r"\s*\d{4}\s*[-–]\s*\d{4}\s*$", re.IGNORECASE)
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+_GSHEET_READ_RETRIES = 3
+_GSHEET_READ_BACKOFF_S = 1.5
+_LAST_GSHEET_ERROR: str | None = None
+
+# ── Kết nối Google Sheets ─────────────────────────────────────────────────────
+
+def _tim_credentials() -> Path:
+    """Tìm file credentials.json cho Google Sheets."""
+    candidates = [
+        BASE_DIR / "credentials.json",
+        BASE_DIR.parent / "credentials.json",
+        Path.cwd() / "credentials.json",
+        Path("credentials.json"),
+    ]
+    for cand in candidates:
+        if cand.exists():
+            return cand.resolve()
+    raise FileNotFoundError(
+        f"Không tìm thấy credentials.json. Đã thử: {[str(c) for c in candidates]}"
+    )
+
+
+def _ket_noi_gsheet():
+    """Kết nối Google Sheets bằng Service Account, có fallback oauth2client."""
+    try:
+        import gspread
+    except ImportError:
+        raise RuntimeError("Thiếu thư viện gspread. Cài: pip install gspread google-auth")
+
+    creds_path = str(_tim_credentials())
+    scope = [
+        "https://spreadsheets.google.com/feeds",
+        "https://www.googleapis.com/auth/drive",
+    ]
+    try:
+        return gspread.service_account(filename=creds_path, scopes=scope)
+    except Exception as e:
+        logger.warning("_ket_noi_gsheet: fallback oauth2client — %s", e, exc_info=True)
+        try:
+            from oauth2client.service_account import ServiceAccountCredentials
+        except ImportError:
+            raise RuntimeError(
+                "Không thể kết nối GSheet: cần cài google-auth hoặc oauth2client."
+            )
+        creds = ServiceAccountCredentials.from_json_keyfile_name(creds_path, scope)
+        return gspread.authorize(creds)
+
+
+def chuan_hoa_ten_pgd(raw: str) -> str:
+    """Chuẩn hóa tên PGD từ Google Form: bỏ prefix 'Phòng giao dịch' / 'PGD'."""
+    if not isinstance(raw, str) or not raw.strip():
+        return raw
+    s = raw.strip()
+    for prefix in ("Phòng giao dịch ", "Phong giao dich ", "PGD ", "pgd "):
+        if s.lower().startswith(prefix.lower()):
+            return "PGD " + s[len(prefix):].strip()
+    return s
+
+
+# ── Đọc dữ liệu GSheet ───────────────────────────────────────────────────────
+
+def lay_loi_doc_gsheet_gan_nhat() -> str | None:
+    """Lỗi đọc GSheet lần gần nhất — dùng khi DataFrame trả về rỗng."""
+    return _LAST_GSHEET_ERROR
+
+
+def _la_loi_gsheet_tam_thoi(exc: BaseException) -> bool:
+    msg = str(exc).lower()
+    markers = (
+        "500", "502", "503", "504", "429",
+        "internal error", "backend error", "rate limit",
+        "service unavailable", "temporarily unavailable",
+    )
+    return any(m in msg for m in markers)
+
+
+def _goi_y_loi_gsheet(exc: BaseException) -> str:
+    if _la_loi_gsheet_tam_thoi(exc):
+        return " — lỗi tạm thời phía Google, thử 🔄 Làm mới sau 1–2 phút"
+    return ""
+
+
+def _doc_raw_values_sheet(
+    sheet_id: str = SHEET_ID,
+    tab: str = SHEET_TAB,
+) -> list[list[str]]:
+    """Đọc toàn bộ ô trên 1 tab — REST API v4 + retry khi Google trả 5xx/429."""
+    global _LAST_GSHEET_ERROR
+    last_err: Exception | None = None
+    for attempt in range(_GSHEET_READ_RETRIES):
+        try:
+            client = _ket_noi_gsheet()
+            range_path = quote(tab, safe="!")
+            resp = client.request(
+                "get",
+                f"https://sheets.googleapis.com/v4/spreadsheets/{sheet_id}/values/{range_path}",
+            )
+            _LAST_GSHEET_ERROR = None
+            return resp.json().get("values", []) or []
+        except Exception:
+            last_err = sys.exc_info()[1]
+            if (
+                isinstance(last_err, BaseException)
+                and _la_loi_gsheet_tam_thoi(last_err)
+                and attempt < _GSHEET_READ_RETRIES - 1
+            ):
+                logger.warning(
+                    "_doc_raw_values_sheet: attempt %d/%d tạm thời — %s",
+                    attempt + 1,
+                    _GSHEET_READ_RETRIES,
+                    last_err,
+                )
+                time.sleep(_GSHEET_READ_BACKOFF_S * (attempt + 1))
+                continue
+            logger.error(
+                "_doc_raw_values_sheet: đọc sheet thất bại — %s",
+                last_err,
+                exc_info=True,
+            )
+            break
+    _LAST_GSHEET_ERROR = (
+        f"{type(last_err).__name__}: {last_err}{_goi_y_loi_gsheet(last_err)}"
+        if last_err
+        else "Không đọc được GSheet"
+    )
+    if last_err:
+        raise last_err
+    return []
+
+
+def kiem_tra_ket_noi_gsheet() -> tuple[bool, str]:
+    """Kiểm tra credentials + đọc thử sheet TIENDO_BAOCAO."""
+    try:
+        cred_path = _tim_credentials()
+    except FileNotFoundError as e:
+        return False, str(e)
+    except Exception as e:
+        logger.error("kiem_tra_ket_noi_gsheet: credentials — %s", e, exc_info=True)
+        return False, f"Lỗi credentials: {e}"
+
+    try:
+        data = _doc_raw_values_sheet()
+        return True, f"OK — {cred_path.name}/{SHEET_TAB}: {len(data)} dòng"
+    except Exception as e:
+        logger.error("kiem_tra_ket_noi_gsheet: %s", e, exc_info=True)
+        return False, f"{type(e).__name__}: {e}{_goi_y_loi_gsheet(e)}"
+
+
+def doc_du_lieu_gsheet() -> pd.DataFrame:
+    """Đọc dữ liệu nộp báo cáo từ Google Sheets (không cache).
+
+    Dùng cho cả UI và scheduler.
+    """
+    try:
+        data = _doc_raw_values_sheet()
+        if len(data) <= 1:
+            return pd.DataFrame(columns=COT)
+        df = pd.DataFrame([r[:len(COT)] for r in data[1:]], columns=COT)
+        df["ten_pgd"] = df["ten_pgd"].apply(chuan_hoa_ten_pgd)
+        df["thoi_gian"] = pd.to_datetime(df["thoi_gian"], dayfirst=True, errors="coerce")
+        return df
+    except Exception as e:
+        logger.error("doc_du_lieu_gsheet: %s", e, exc_info=True)
+        global _LAST_GSHEET_ERROR
+        if not _LAST_GSHEET_ERROR:
+            _LAST_GSHEET_ERROR = f"{type(e).__name__}: {e}{_goi_y_loi_gsheet(e)}"
+        return pd.DataFrame(columns=COT)
+
+
+# ── Deadline config ───────────────────────────────────────────────────────────
+
+def doc_deadline_config() -> dict[str, str]:
+    """Đọc cấu hình deadline: {loai_bao_cao: 'YYYY-MM-DD'}.
+
+    Tự normalize từ định dạng cũ (dict lồng).
+    """
+    raw = db.doc_kv(KV_DEADLINE) or {}
+    normalized: dict[str, str] = {}
+    for key, val in raw.items():
+        if isinstance(val, dict):
+            vals = [v for v in val.values() if isinstance(v, str)]
+            if vals:
+                normalized[key] = vals[0]
+        elif isinstance(val, str):
+            normalized[key] = val
+    return normalized
+
+
+def luu_deadline_config(cfg: dict, username: str) -> None:
+    """Lưu cấu hình deadline vào kv_store."""
+    db.ghi_kv(KV_DEADLINE, cfg, username)
+    db.ghi_audit(username, "luu_deadline_bao_cao", f"{len(cfg)} deadline đã lưu")
+
+
+def _chuan_hoa_ten_loai(ten: str) -> str:
+    """Chuẩn hóa tên loại báo cáo để so sánh (không đổi giá trị lưu)."""
+    return re.sub(r"\s+", " ", str(ten or "").strip())
+
+
+def _ten_loai_khong_nam(ten: str) -> str:
+    """Bỏ giai đoạn năm cuối chuỗi — VD: 'KHTD 2023-2026' → 'KHTD'."""
+    s = _chuan_hoa_ten_loai(ten)
+    return _YEAR_RANGE_RE.sub("", s).strip().upper()
+
+
+def phat_hien_ten_lech_ten(
+    deadline_cfg: dict[str, str],
+    ds_loai_gsheet: list[str],
+) -> list[dict[str, str]]:
+    """Tìm loại đang theo dõi không khớp tên trên Google Form.
+
+    Returns:
+        list dict: ten_theo_doi, ten_form (gợi ý hoặc ""), ly_do
+    """
+    if not deadline_cfg:
+        return []
+
+    gsheet_set = {_chuan_hoa_ten_loai(x) for x in ds_loai_gsheet if x}
+    gsheet_list = sorted(gsheet_set)
+    ket_qua: list[dict[str, str]] = []
+
+    for ten_theo_doi in sorted(deadline_cfg.keys()):
+        ten_norm = _chuan_hoa_ten_loai(ten_theo_doi)
+        if ten_norm in gsheet_set:
+            continue
+
+        base = _ten_loai_khong_nam(ten_theo_doi)
+        goi_y = ""
+        ly_do = "khong_co_tren_form"
+        if base:
+            candidates = [
+                g for g in gsheet_list
+                if _ten_loai_khong_nam(g) == base and g != ten_norm
+            ]
+            if candidates:
+                goi_y = candidates[0]
+                ly_do = "khac_giai_doan_nam"
+
+        ket_qua.append({
+            "ten_theo_doi": ten_theo_doi,
+            "ten_form": goi_y,
+            "ly_do": ly_do,
+        })
+
+    return ket_qua
+
+
+def _migrate_allowlist_loai(ten_cu: str, ten_moi: str, username: str) -> bool:
+    """Đổi tên loại trong telegram_deadline_bc_allowlist nếu có."""
+    raw = db.doc_kv(KV_ALLOWLIST)
+    if raw is None:
+        return False
+    if not isinstance(raw, list):
+        return False
+
+    da_doi = False
+    ds_moi: list[str] = []
+    for item in raw:
+        loai = _chuan_hoa_ten_loai(str(item))
+        if loai == _chuan_hoa_ten_loai(ten_cu):
+            ds_moi.append(ten_moi)
+            da_doi = True
+        else:
+            ds_moi.append(loai)
+    if da_doi:
+        db.ghi_kv(KV_ALLOWLIST, ds_moi, username)
+        db.ghi_audit(
+            username,
+            "telegram_deadline_bc_allowlist",
+            f"Đổi tên allowlist: {ten_cu} → {ten_moi}",
+        )
+    return da_doi
+
+
+def doi_ten_loai_theo_doi(
+    ten_cu: str,
+    ten_moi: str,
+    username: str,
+) -> dict[str, Any]:
+    """Đổi key loại báo cáo trong deadline + manual log + Telegram allowlist.
+
+    Dùng khi tên trên Form khác tên đã cài theo dõi (VD: đổi giai đoạn năm).
+  """
+    ten_cu = _chuan_hoa_ten_loai(ten_cu)
+    ten_moi = _chuan_hoa_ten_loai(ten_moi)
+    ket_qua: dict[str, Any] = {
+        "ok": False,
+        "msg": "",
+        "so_manual_cap_nhat": 0,
+        "allowlist_cap_nhat": False,
+    }
+
+    if not ten_cu or not ten_moi:
+        ket_qua["msg"] = "Tên cũ và tên mới không được để trống."
+        return ket_qua
+    if ten_cu == ten_moi:
+        ket_qua["msg"] = "Tên cũ và tên mới giống nhau."
+        return ket_qua
+
+    cfg = doc_deadline_config()
+    if ten_cu not in cfg:
+        ket_qua["msg"] = f"Không tìm thấy loại đang theo dõi: {ten_cu}"
+        return ket_qua
+    if ten_moi in cfg:
+        ket_qua["msg"] = f"Tên mới đã tồn tại trong danh mục theo dõi: {ten_moi}"
+        return ket_qua
+
+    dl = cfg.pop(ten_cu)
+    cfg[ten_moi] = dl
+    luu_deadline_config(cfg, username)
+
+    manual_raw = doc_manual_log_raw()
+    so_manual = 0
+    for entry in manual_raw:
+        if not isinstance(entry, dict):
+            continue
+        if _chuan_hoa_ten_loai(str(entry.get("loai", ""))) == ten_cu:
+            entry["loai"] = ten_moi
+            so_manual += 1
+    if so_manual:
+        luu_manual_log(manual_raw, username)
+
+    allowlist_ok = _migrate_allowlist_loai(ten_cu, ten_moi, username)
+
+    db.ghi_audit(
+        username,
+        "doi_ten_loai_bao_cao",
+        f"{ten_cu} → {ten_moi} (manual={so_manual}, allowlist={allowlist_ok})",
+    )
+
+    ket_qua["ok"] = True
+    ket_qua["so_manual_cap_nhat"] = so_manual
+    ket_qua["allowlist_cap_nhat"] = allowlist_ok
+    ket_qua["msg"] = f"Đã liên kết: {ten_cu} → {ten_moi}"
+    return ket_qua
+
+
+# ── Phân loại trạng thái ─────────────────────────────────────────────────────
+
+def phan_loai_trang_thai(ngay_nop, deadline_str: str | None) -> str:
+    """Phân loại một lượt nộp: 'dung_han' | 'tre' | 'chua_nop' | 'da_nop'.
+
+    - chua_nop: không có ngày nộp (NaN/None)
+    - da_nop:  có ngày nộp nhưng loại BC chưa cài deadline
+    - dung_han: ngày nộp <= deadline
+    - tre:      ngày nộp > deadline
+    """
+    if ngay_nop is None or (hasattr(ngay_nop, "__class__") and pd.isna(ngay_nop)):
+        return "chua_nop"
+    if not deadline_str:
+        return "da_nop"
+    try:
+        dl = pd.to_datetime(deadline_str).date()
+        nop = ngay_nop.date() if hasattr(ngay_nop, "date") else pd.to_datetime(ngay_nop).date()
+        return "dung_han" if nop <= dl else "tre"
+    except Exception as e:
+        logger.error("phan_loai_trang_thai: parse ngay loi — %s", e, exc_info=True)
+        return "da_nop"
+
+
+def gan_trang_thai(df: pd.DataFrame, deadline_cfg: dict[str, str]) -> pd.DataFrame:
+    """Gán cột 'tt' cho DataFrame dựa trên deadline config."""
+    df = df.copy()
+    df["tt"] = df.apply(
+        lambda r: phan_loai_trang_thai(r["thoi_gian"], deadline_cfg.get(r["loai_bao_cao"])),
+        axis=1,
+    )
+    return df
+
+
+# ── Manual override ───────────────────────────────────────────────────────────
+
+def doc_manual_log() -> dict[tuple[str, str], dict]:
+    """Đọc danh sách đánh dấu thủ công: {(pgd, loai): entry_dict}."""
+    raw = db.doc_kv(KV_MANUAL)
+    if not isinstance(raw, list):
+        return {}
+    result: dict[tuple[str, str], dict] = {}
+    for entry in raw:
+        if not isinstance(entry, dict):
+            continue
+        pgd = entry.get("pgd")
+        loai = entry.get("loai")
+        if pgd and loai:
+            result[(pgd, loai)] = entry
+    return result
+
+
+def doc_manual_log_raw() -> list[dict]:
+    """Đọc danh sách đánh dấu thủ công dạng list nguyên gốc."""
+    raw = db.doc_kv(KV_MANUAL)
+    if isinstance(raw, list):
+        return raw
+    return []
+
+
+def luu_manual_log(ds: list[dict], username: str) -> None:
+    """Lưu danh sách đánh dấu thủ công vào kv_store."""
+    db.ghi_kv(KV_MANUAL, ds, username)
+    db.ghi_audit(username, "tdn_manual_submit", f"{len(ds)} đánh dấu thủ công")
+
+
+# ── Tổng hợp nghiệp vụ ───────────────────────────────────────────────────────
+
+def lay_pgd_chua_nop(
+    loai_bao_cao: str,
+    df: pd.DataFrame | None = None,
+) -> tuple[list[str], str | None]:
+    """Trả về (ds_pgd_chua_nop, deadline_str) cho 1 loại báo cáo.
+
+    Xét cả manual override: PGD có ghi đè = xem như đã nộp.
+    """
+    deadline_cfg = doc_deadline_config()
+    deadline_str = deadline_cfg.get(loai_bao_cao)
+
+    if df is None:
+        df = doc_du_lieu_gsheet()
+
+    manual_map = doc_manual_log()
+    ds_chua_nop: list[str] = []
+    for pgd in DS_PGD_ALL:
+        entry = manual_map.get((pgd, loai_bao_cao))
+        if entry and entry.get("ghi_de", True):
+            continue  # có ghi đè thủ công → xem như đã nộp
+        match = df[(df["ten_pgd"] == pgd) & (df["loai_bao_cao"] == loai_bao_cao)]
+        if match.empty:
+            ds_chua_nop.append(pgd)
+
+    return ds_chua_nop, deadline_str
+
+
+def lay_danh_sach_can_nhac(
+    df: pd.DataFrame | None = None,
+    allowlist: set[str] | None = None,
+) -> list[dict]:
+    """Trả danh sách các loại báo cáo cần nhắc Telegram.
+
+    Mỗi phần tử: {"loai": str, "deadline_str": str, "deadline_date": date,
+                   "days_left": int, "ds_chua_nop": list[str]}
+
+    Chỉ trả các loại:
+      - Có deadline đã qua hoặc trong 3 ngày tới.
+      - Nằm trong allowlist (nếu allowlist không None).
+      - Còn ít nhất 1 PGD chưa nộp.
+    """
+    deadline_cfg = doc_deadline_config()
+    if not deadline_cfg:
+        return []
+
+    if df is None:
+        df = doc_du_lieu_gsheet()
+    if df.empty:
+        return []
+
+    manual_map = doc_manual_log()
+    today = date.today()
+    result: list[dict] = []
+
+    for loai, deadline_str in sorted(deadline_cfg.items()):
+        # Lọc allowlist
+        if allowlist is not None and loai not in allowlist:
+            continue
+
+        # Parse deadline
+        try:
+            dl_date = pd.to_datetime(deadline_str).date()
+        except Exception:
+            logger.warning("Bỏ qua deadline '%s': không parse được '%s'", loai, deadline_str)
+            continue
+
+        days_left = (dl_date - today).days
+        if days_left > 3:
+            continue
+
+        # Tìm PGD chưa nộp
+        chua_nop: list[str] = []
+        for pgd in DS_PGD_ALL:
+            manual_entry = manual_map.get((pgd, loai))
+            if manual_entry and manual_entry.get("ghi_de", False):
+                ngay = pd.to_datetime(manual_entry.get("ngay_nop"))
+                try:
+                    nop_date = ngay.date() if hasattr(ngay, "date") else pd.to_datetime(ngay).date()
+                    if nop_date <= dl_date:
+                        continue
+                except Exception:
+                    pass
+
+            match = df[(df["ten_pgd"] == pgd) & (df["loai_bao_cao"] == loai)]
+            if match.empty:
+                chua_nop.append(pgd)
+            else:
+                last = match.sort_values("thoi_gian").iloc[-1]
+                ngay_nop = last["thoi_gian"]
+                if ngay_nop is None or (hasattr(ngay_nop, "__class__") and pd.isna(ngay_nop)):
+                    chua_nop.append(pgd)
+
+        if chua_nop:
+            result.append({
+                "loai": loai,
+                "deadline_str": deadline_str,
+                "deadline_date": dl_date,
+                "days_left": days_left,
+                "ds_chua_nop": chua_nop,
+            })
+
+    return result
+
+
+def tao_ma_tran_tien_do(
+    df: pd.DataFrame,
+    deadline_cfg: dict[str, str],
+    ds_pgd_scope: list[str] | None = None,
+) -> tuple[list[dict], dict[str, int]]:
+    """Tạo ma trận PGD × Loại báo cáo và metrics.
+
+    Returns:
+        (rows, metrics)
+        rows: list[dict] mỗi dòng = {"Đơn vị": pgd, loai_1: emoji_status, ...}
+        metrics: {"dung_han": int, "tre": int, "chua_nop": int, "da_nop": int}
+    """
+    if ds_pgd_scope is None:
+        ds_pgd_scope = DS_PGD_ALL
+
+    ds_loai = sorted(deadline_cfg.keys())
+    df = gan_trang_thai(df, deadline_cfg)
+    manual_map = doc_manual_log()
+
+    rows = []
+    for pgd in ds_pgd_scope:
+        row: dict = {"Đơn vị": pgd}
+        for loai in ds_loai:
+            manual_key = (pgd, loai)
+            entry = manual_map.get(manual_key)
+            ghi_de = entry.get("ghi_de", True) if entry else False
+
+            if entry and ghi_de:
+                ngay = pd.to_datetime(entry.get("ngay_nop"))
+                tt = phan_loai_trang_thai(ngay, deadline_cfg.get(loai))
+                row[loai] = f"{EMOJI[tt]} {LABEL[tt]} *"
+            else:
+                match = df[(df["ten_pgd"] == pgd) & (df["loai_bao_cao"] == loai)]
+                if match.empty:
+                    row[loai] = "🔴 Chưa nộp" if loai in deadline_cfg else "⚪ Chưa nộp"
+                else:
+                    last = match.sort_values("thoi_gian").iloc[-1]
+                    tt = last["tt"]
+                    co_file = str(last.get("file_dinh_kem", "")).strip()
+                    badge_file = " ⚠️" if not co_file else ""
+                    badge_note = " 📝" if entry and not ghi_de else ""
+                    row[loai] = f"{EMOJI[tt]} {LABEL[tt]}{badge_file}{badge_note}"
+        rows.append(row)
+
+    dung_han = sum(1 for r in rows for l in ds_loai if "🟢" in str(r.get(l, "")))
+    tre = sum(1 for r in rows for l in ds_loai if "🟡" in str(r.get(l, "")))
+    chua_nop = sum(1 for r in rows for l in ds_loai if "🔴" in str(r.get(l, "")))
+    da_nop = dung_han + tre
+
+    metrics = {"dung_han": dung_han, "tre": tre, "chua_nop": chua_nop, "da_nop": da_nop}
+    return rows, metrics
+
+
+# ── Health-check nguồn dữ liệu ────────────────────────────────────────────────
+
+def kiem_tra_suc_khoe_nguon() -> dict[str, Any]:
+    """Kiểm tra sức khỏe kết nối GSheet và chất lượng dữ liệu.
+
+    Returns:
+        {
+            "ok": bool,
+            "credentials_ok": bool,
+            "ket_noi_ok": bool,
+            "so_dong": int,
+            "so_pgd": int,
+            "so_loai_bc": int,
+            "lan_cap_nhat_cuoi": str | None,
+            "loi": str | None,
+        }
+    """
+    result: dict[str, Any] = {
+        "ok": False,
+        "credentials_ok": False,
+        "ket_noi_ok": False,
+        "so_dong": 0,
+        "so_pgd": 0,
+        "so_loai_bc": 0,
+        "lan_cap_nhat_cuoi": None,
+        "loi": None,
+    }
+
+    # Check credentials
+    try:
+        _tim_credentials()
+        result["credentials_ok"] = True
+    except FileNotFoundError as e:
+        result["loi"] = str(e)
+        return result
+    except Exception as e:
+        logger.error("kiem_tra_suc_khoe_nguon: credentials — %s", e, exc_info=True)
+        result["loi"] = f"Lỗi credentials: {e}"
+        return result
+
+    # Check connection + data
+    df = doc_du_lieu_gsheet()
+    result["ket_noi_ok"] = not lay_loi_doc_gsheet_gan_nhat()
+    if lay_loi_doc_gsheet_gan_nhat():
+        result["loi"] = lay_loi_doc_gsheet_gan_nhat()
+        return result
+
+    if df.empty:
+        result["loi"] = "GSheet trả về dữ liệu rỗng (không có dòng nào)"
+        return result
+
+    result["ok"] = True
+    result["so_dong"] = len(df)
+    result["so_pgd"] = df["ten_pgd"].dropna().nunique()
+    result["so_loai_bc"] = df["loai_bao_cao"].dropna().nunique()
+
+    if "thoi_gian" in df.columns and df["thoi_gian"].notna().any():
+        lan_cuoi = df["thoi_gian"].max()
+        try:
+            result["lan_cap_nhat_cuoi"] = pd.Timestamp(lan_cuoi).strftime("%d/%m/%Y %H:%M")
+        except Exception:
+            result["lan_cap_nhat_cuoi"] = str(lan_cuoi)
+
+    return result
+
+
+def doc_du_lieu_gsheet_cached(ttl: int = 300):
+    """Trả về callable để UI dùng với @st.cache_data."""
+    import streamlit as st
+
+    @st.cache_data(ttl=ttl)
+    def _cached():
+        return doc_du_lieu_gsheet()
+
+    return _cached

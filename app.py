@@ -309,21 +309,27 @@ PRELOGIN_WORKSPACES = [
         "key": "operation",
         "icon": "🗺️",
         "title": "Hỗ trợ địa bàn",
+        "eyebrow": "Tác nghiệp PGD",
         "body": "Tác nghiệp theo PGD, theo dõi xã/phường và xử lý dữ liệu địa bàn.",
+        "highlights": ["Theo dõi địa bàn", "Xử lý tác nghiệp", "Hỗ trợ PGD"],
         "tone": "blue",
     },
     {
         "key": "management",
         "icon": "📋",
         "title": "Phòng KH-NV",
+        "eyebrow": "Điều hành Chi nhánh",
         "body": "Điều hành kế hoạch, upload toàn Chi nhánh và xử lý nghiệp vụ KH-NV.",
+        "highlights": ["Upload toàn CN", "Kế hoạch tín dụng", "Nghiệp vụ KH-NV"],
         "tone": "green",
     },
     {
         "key": "executive",
         "icon": "📊",
         "title": "Ban Giám đốc",
+        "eyebrow": "Điều hành tổng quan",
         "body": "Theo dõi dashboard tổng quan, chỉ số điều hành và báo cáo nhanh.",
+        "highlights": ["Dashboard nhanh", "Chỉ số điều hành", "Báo cáo tổng hợp"],
         "tone": "amber",
     },
 ]
@@ -536,8 +542,9 @@ def render_workspace_picker() -> None:
   }
   .stApp {
     background:
+      radial-gradient(circle at 15% 0%, rgba(59, 130, 246, 0.18), transparent 28%),
+      radial-gradient(circle at 85% 10%, rgba(34, 197, 94, 0.16), transparent 32%),
       linear-gradient(180deg, rgba(20, 83, 45, 0.18), rgba(15, 23, 42, 0)),
-      radial-gradient(circle at 50% 0%, rgba(34, 197, 94, 0.14), transparent 42%),
       #0b1120 !important;
     color: #e5e7eb !important;
   }
@@ -546,16 +553,198 @@ def render_workspace_picker() -> None:
   }
   div[data-testid="stButton"] > button {
     min-height: 48px;
-    border-radius: 8px;
-    border: 1px solid rgba(34, 197, 94, 0.36);
-    background: linear-gradient(135deg, #166534, #1d4ed8);
+    border-radius: 14px;
+    border: 1px solid rgba(148, 163, 184, 0.26);
+    background: linear-gradient(135deg, rgba(22, 101, 52, 0.94), rgba(29, 78, 216, 0.94));
     color: #ffffff;
     font-weight: 800;
+    box-shadow: 0 14px 30px rgba(8, 15, 32, 0.28);
   }
   div[data-testid="stButton"] > button:hover {
     border-color: rgba(134, 239, 172, 0.8);
     color: #ffffff;
     filter: brightness(1.06);
+  }
+  .ws-hero {
+    width: min(1120px, 100%);
+    margin: 0 auto 1rem;
+    border-radius: 24px;
+    padding: 2rem 2rem 1.6rem;
+    background:
+      radial-gradient(circle at top right, rgba(255,255,255,0.10), transparent 34%),
+      linear-gradient(135deg, rgba(21, 101, 52, 0.96), rgba(15, 23, 42, 0.92) 55%, rgba(29, 78, 216, 0.92));
+    border: 1px solid rgba(255,255,255,0.10);
+    box-shadow: 0 28px 72px rgba(0,0,0,0.34);
+    overflow: hidden;
+  }
+  .ws-hero-top {
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:1rem;
+    flex-wrap:wrap;
+  }
+  .ws-brand {
+    display:flex;
+    align-items:center;
+    gap:1rem;
+  }
+  .ws-brand-logo {
+    width:88px;
+    height:88px;
+    border-radius:50%;
+    display:grid;
+    place-items:center;
+    background:rgba(255,255,255,0.96);
+    border:4px solid rgba(255,255,255,0.18);
+    box-shadow:0 16px 36px rgba(0,0,0,0.24);
+  }
+  .ws-brand-logo img {
+    width:70px;
+    border-radius:50%;
+    display:block;
+  }
+  .ws-kicker {
+    color:#bbf7d0;
+    text-transform:uppercase;
+    letter-spacing:.12em;
+    font-size:.78rem;
+    font-weight:800;
+    margin-bottom:.4rem;
+  }
+  .ws-title {
+    color:#f8fafc;
+    font-size:2.7rem;
+    line-height:1.04;
+    font-weight:900;
+    margin:0 0 .55rem;
+  }
+  .ws-sub {
+    color:rgba(248,250,252,.84);
+    font-size:1.02rem;
+    line-height:1.6;
+    max-width:720px;
+    margin:0;
+  }
+  .ws-chip-wrap {
+    display:flex;
+    flex-wrap:wrap;
+    gap:.7rem;
+    justify-content:flex-end;
+  }
+  .ws-chip {
+    padding:.58rem .9rem;
+    border-radius:999px;
+    font-size:.84rem;
+    font-weight:700;
+    color:#e2e8f0;
+    background:rgba(255,255,255,0.08);
+    border:1px solid rgba(255,255,255,0.12);
+    backdrop-filter:blur(10px);
+  }
+  .ws-note {
+    margin-top:1.2rem;
+    padding-top:1rem;
+    border-top:1px solid rgba(255,255,255,0.12);
+    color:#d1fae5;
+    font-size:.92rem;
+    font-weight:600;
+  }
+  .ws-card {
+    min-height: 280px;
+    border-radius: 22px;
+    padding: 1.35rem 1.25rem 1.1rem;
+    margin-bottom: .9rem;
+    background:
+      linear-gradient(180deg, rgba(30,41,59,.94), rgba(15,23,42,.98));
+    color:#e5e7eb;
+    border:1px solid rgba(148,163,184,.18);
+    box-shadow:0 20px 44px rgba(0,0,0,.24);
+    transition: transform .24s ease, box-shadow .24s ease, border-color .24s ease;
+    position: relative;
+    overflow: hidden;
+  }
+  .ws-card::before {
+    content:"";
+    position:absolute;
+    inset:0;
+    background:linear-gradient(135deg, rgba(255,255,255,.12), transparent 34%);
+    pointer-events:none;
+  }
+  .ws-card:hover {
+    transform: translateY(-5px);
+    border-color: rgba(255,255,255,.24);
+    box-shadow:0 24px 54px rgba(0,0,0,.30);
+  }
+  .ws-card-head {
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:1rem;
+    margin-bottom:1rem;
+  }
+  .ws-card-icon {
+    width:56px;
+    height:56px;
+    border-radius:18px;
+    display:grid;
+    place-items:center;
+    font-size:1.72rem;
+    background:rgba(15,23,42,.72);
+    border:1px solid rgba(148,163,184,.16);
+  }
+  .ws-card-line {
+    height:5px;
+    width:92px;
+    border-radius:999px;
+  }
+  .ws-card-eyebrow {
+    display:inline-block;
+    padding:.26rem .58rem;
+    border-radius:999px;
+    font-size:.74rem;
+    font-weight:800;
+    letter-spacing:.02em;
+    margin-bottom:.65rem;
+    background:rgba(255,255,255,.06);
+    color:#cbd5e1;
+  }
+  .ws-card-title {
+    color:#f8fafc;
+    font-size:1.42rem;
+    line-height:1.16;
+    font-weight:900;
+    margin-bottom:.7rem;
+  }
+  .ws-card-body {
+    color:#cbd5e1;
+    font-size:.99rem;
+    line-height:1.58;
+    margin-bottom:1rem;
+    min-height:72px;
+  }
+  .ws-tag-wrap {
+    display:flex;
+    flex-wrap:wrap;
+    gap:.5rem;
+  }
+  .ws-tag {
+    padding:.34rem .64rem;
+    border-radius:999px;
+    font-size:.76rem;
+    font-weight:700;
+    background:rgba(255,255,255,.06);
+    border:1px solid rgba(148,163,184,.14);
+    color:#dbeafe;
+  }
+  .ws-card-hint {
+    margin-top:1rem;
+    padding-top:.9rem;
+    border-top:1px solid rgba(148,163,184,.12);
+    color:#94a3b8;
+    font-size:.8rem;
+    font-weight:700;
+    letter-spacing:.01em;
   }
 </style>
 """,
@@ -565,14 +754,25 @@ def render_workspace_picker() -> None:
     st.html(
         f"""
 <div style="min-height:22vh;display:flex;align-items:flex-end;justify-content:center;padding:2.5rem 1rem 1rem">
-  <div style="width:min(1060px,100%);display:flex;align-items:center;gap:1.1rem">
-    <div style="width:78px;height:78px;border-radius:50%;display:grid;place-items:center;background:#ffffff;color:#1f2937;border:4px solid rgba(255,255,255,0.28);box-shadow:0 16px 36px rgba(0,0,0,0.28)">
-      <img src="data:image/png;base64,{LOGO_B64}" alt="VBSP logo" style="width:62px;border-radius:50%;display:block">
+  <div class="ws-hero">
+    <div class="ws-hero-top">
+      <div class="ws-brand">
+        <div class="ws-brand-logo">
+          <img src="data:image/png;base64,{LOGO_B64}" alt="VBSP logo">
+        </div>
+        <div>
+          <div class="ws-kicker">VBSP logo · VBSP-SCM</div>
+          <div class="ws-title">Chọn không gian làm việc</div>
+          <p class="ws-sub">NHCSXH Chi nhánh Đồng Nai · Hệ thống Quản trị Tín dụng Nội bộ. Chọn đúng không gian để vào nhanh đúng nhóm chức năng và phạm vi dữ liệu.</p>
+        </div>
+      </div>
+      <div class="ws-chip-wrap">
+        <div class="ws-chip">22 đơn vị báo cáo</div>
+        <div class="ws-chip">3 không gian chuyên biệt</div>
+        <div class="ws-chip">Role-based access</div>
+      </div>
     </div>
-    <div>
-      <div style="color:#bbf7d0;font-size:1rem;font-weight:800;margin-bottom:.25rem">VBSP-SCM</div>
-      <div style="color:#f8fafc;font-size:2.55rem;line-height:1.05;font-weight:900">Chọn không gian làm việc</div>
-      <div style="color:#94a3b8;font-size:1.06rem;margin-top:.55rem">NHCSXH Chi nhánh Đồng Nai · Hệ thống Quản trị Tín dụng Nội bộ</div>
+    <div class="ws-note">Gợi ý: Phòng KH-NV dùng cho điều hành toàn Chi nhánh, Hỗ trợ địa bàn dùng cho tác nghiệp theo PGD, Ban Giám đốc dùng cho theo dõi dashboard và báo cáo nhanh.</div>
     </div>
   </div>
 </div>
@@ -588,15 +788,19 @@ def render_workspace_picker() -> None:
             "amber": "#fbbf24",
         }.get(tone, "#22c55e")
         with cols[i]:
+            tags_html = "".join(f'<span class="ws-tag">{tag}</span>' for tag in item.get("highlights", []))
             st.html(
                 f"""
-<div style="min-height:218px;border-radius:8px;padding:1.35rem 1.25rem;margin-bottom:.85rem;background:linear-gradient(180deg,rgba(30,41,59,.94),rgba(15,23,42,.98));color:#e5e7eb;border:1px solid rgba(148,163,184,.22);box-shadow:0 18px 42px rgba(0,0,0,.26)">
-  <div style="display:flex;align-items:center;justify-content:space-between;gap:1rem;margin-bottom:1.35rem">
-    <div style="width:54px;height:54px;border-radius:8px;display:grid;place-items:center;background:rgba(15,23,42,.72);border:1px solid rgba(148,163,184,.22);font-size:1.7rem">{item["icon"]}</div>
-    <div style="height:4px;width:86px;border-radius:999px;background:{color};box-shadow:0 0 0 5px color-mix(in srgb, {color} 18%, transparent)"></div>
+<div class="ws-card">
+  <div class="ws-card-head">
+    <div class="ws-card-icon">{item["icon"]}</div>
+    <div class="ws-card-line" style="background:{color};box-shadow:0 0 0 5px color-mix(in srgb, {color} 18%, transparent)"></div>
   </div>
-  <div style="color:#f8fafc;font-size:1.5rem;line-height:1.15;font-weight:900;margin-bottom:.7rem">{item["title"]}</div>
-  <div style="color:#cbd5e1;font-size:1.02rem;line-height:1.55">{item["body"]}</div>
+  <div class="ws-card-eyebrow">{item.get("eyebrow", "")}</div>
+  <div class="ws-card-title">{item["title"]}</div>
+  <div class="ws-card-body">{item["body"]}</div>
+  <div class="ws-tag-wrap">{tags_html}</div>
+  <div class="ws-card-hint">Không gian chuyên biệt · chọn để tiếp tục</div>
 </div>
 """,
             )

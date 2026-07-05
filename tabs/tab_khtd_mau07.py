@@ -250,14 +250,15 @@ def render(tab, **kwargs) -> None:
                 baseline_pgd_path, baseline_path,
                 danh_sach_nam_baseline_pgd,
             )
-            from data.hstd import doc_baseline_merged, doc_baseline
+            from data.hstd import doc_baseline_merged, doc_baseline, ts_baseline_merged
 
 
             ds_nam_bl = danh_sach_nam_baseline_pgd()
             if nam_baseline in ds_nam_bl:
-                fp = baseline_pgd_path(pgd_chon, nam_baseline)
-                _ts = os.path.getmtime(fp) if os.path.exists(fp) else 0
-                df_baseline = doc_baseline_merged(nam_baseline, _ts=_ts)
+                df_baseline = doc_baseline_merged(
+                    nam_baseline,
+                    ts=ts_baseline_merged(nam_baseline),
+                )
                 co_baseline = df_baseline is not None and not df_baseline.empty
 
             if not co_baseline:
@@ -434,7 +435,7 @@ def render(tab, **kwargs) -> None:
                 tong_kh = total_row.iloc[0][col_kh]
                 _giao_str = (f"+{vn(tong_giao, 0)}" if tong_giao > 0 else vn(tong_giao, 0))
                 st.markdown(
-                    f"<div style='background:#e3f2fd;padding:10px 14px;border-radius:6px;"
+                    f"<div style='background:#e3f2fd;color:#1e3a5f;padding:10px 14px;border-radius:6px;"
                     f"font-weight:700;font-size:14px;margin-top:8px'>"
                     f"📊 TỔNG CỘNG TOÀN XÃ: Số gốc {vn(tong_so_goc, 0)} · "
                     f"Giao tăng/giảm {_giao_str} · "

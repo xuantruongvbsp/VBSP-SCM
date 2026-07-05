@@ -9,7 +9,7 @@ Mục tiêu:
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -46,6 +46,23 @@ class ValidationError:
     def __post_init__(self):
         if self.sample_values is None:
             self.sample_values = []
+
+
+@dataclass
+class CrossPgdDuplicateReport:
+    """Chẩn đoán khoản vay HSTD bị trùng chéo giữa nhiều PGD."""
+    is_valid: bool = True
+    reason: str = ""
+    key_columns: Tuple[str, ...] = field(default_factory=tuple)
+    duplicate_group_count: int = 0
+    duplicate_row_count: int = 0
+    duplicate_pair_count: int = 0
+    total_duplicate_amount: float = 0.0
+    estimated_excess_amount: float = 0.0
+    blank_name_row_count: int = 0
+    top_pairs: List[Dict[str, Any]] = field(default_factory=list)
+    top_units: List[Dict[str, Any]] = field(default_factory=list)
+    sample_rows: List[Dict[str, Any]] = field(default_factory=list)
 
 
 class ValidationResult:
@@ -306,6 +323,209 @@ class ValidationService:
             "total_dgd_ma": len(self.dgd_ma),
             "pgd_to_xa_mapping": {pgd: len(xas) for pgd, xas in self.pgd_to_xa.items()},
         }
+
+
+_BAD_TEXT_VALUES = {"", "nan", "none", "<na>", "nat"}
+
+
+def _normalize_text_series(series: pd.Series) -> pd.Series:
+    """Chuẩn hóa cột định danh để so khớp khóa khoản vay ổn định."""
+    ser = series.copy()
+    if isinstance(ser.dtype, pd.CategoricalDtype):
+        ser = ser.astype(object)
+    elif pd.api.types.is_integer_dtype(ser.dtype):
+        ser = ser.astype(object)
+    elif pd.api.types.is_float_dtype(ser.dtype):
+        so = pd.to_numeric(ser, errors="coerce")
+        nguyen = so.notna() & (so % 1 == 0)
+        ser = ser.astype(object)
+        if nguyen.any():
+            ser = ser.copy()
+            ser.loc[nguyen] = so.loc[nguyen].astype("int64").astype(str)
+
+    if ser.dtype == object:
+        mau = pd.to_numeric(ser.iloc[:200], errors="coerce")
+        if mau.notna().any():
+            so = pd.to_numeric(ser, errors="coerce")
+            nguyen = so.notna() & (so % 1 == 0) & ser.notna()
+            if nguyen.any():
+                ser = ser.copy()
+                ser.loc[nguyen] = so.loc[nguyen].astype("int64").astype(str)
+
+    out = ser.fillna("").astype(str).str.strip()
+    lower = out.str.lower()
+    return out.where(~lower.isin(_BAD_TEXT_VALUES), "")
+
+
+def _join_unique_values(values: pd.Series) -> str:
+    vals = sorted({str(v).strip() for v in values if str(v).strip()})
+    return " | ".join(vals)
+
+
+def validate_hstd_cross_pgd_duplicates(df: pd.DataFrame) -> CrossPgdDuplicateReport:
+    """
+    Phát hiện khoản vay HSTD trùng chéo giữa nhiều PGD theo khóa:
+    (Mã KH, Số khế ước).
+
+    Trả về report chi tiết để caller quyết định block publish/cache.
+    """
+    from config import (
+        COT_MA_KH,
+        COT_NGAY_VAY,
+        COT_SO_KU,
+        COT_TEN_KH,
+        COT_TEN_PGD,
+        COT_TONG_DU_NO,
+    )
+
+    report = CrossPgdDuplicateReport(key_columns=(COT_MA_KH, COT_SO_KU))
+    required = [COT_MA_KH, COT_SO_KU, COT_TEN_PGD]
+    missing = [col for col in required if col not in df.columns]
+    if missing:
+        report.reason = f"Thiếu cột để kiểm tra trùng chéo: {', '.join(missing)}"
+        return report
+
+    du_no_series = (
+        pd.to_numeric(df[COT_TONG_DU_NO], errors="coerce").fillna(0)
+        if COT_TONG_DU_NO in df.columns
+        else pd.Series(0, index=df.index, dtype="float64")
+    )
+    ten_kh_series = (
+        _normalize_text_series(df[COT_TEN_KH])
+        if COT_TEN_KH in df.columns
+        else pd.Series("", index=df.index, dtype="object")
+    )
+    ngay_vay_series = (
+        _normalize_text_series(df[COT_NGAY_VAY])
+        if COT_NGAY_VAY in df.columns
+        else pd.Series("", index=df.index, dtype="object")
+    )
+
+    work = pd.DataFrame(
+        {
+            "ma_kh": _normalize_text_series(df[COT_MA_KH]),
+            "so_ku": _normalize_text_series(df[COT_SO_KU]),
+            "ten_pgd": _normalize_text_series(df[COT_TEN_PGD]),
+            "ten_kh": ten_kh_series,
+            "ngay_vay": ngay_vay_series,
+            "tong_du_no": du_no_series,
+        }
+    )
+    work = work[
+        (work["ma_kh"] != "")
+        & (work["so_ku"] != "")
+        & (work["ten_pgd"] != "")
+    ].copy()
+    if work.empty:
+        report.reason = "Không có dòng nào đủ khóa Mã KH + Số khế ước để đối chiếu."
+        return report
+
+    work["loan_key"] = work["ma_kh"] + "|" + work["so_ku"]
+    work["ten_kh_trong"] = work["ten_kh"] == ""
+
+    per_key = (
+        work.groupby(["ma_kh", "so_ku"], sort=False)
+        .agg(
+            so_dong=("ten_pgd", "size"),
+            so_pgd=("ten_pgd", "nunique"),
+            tong_du_no=("tong_du_no", "sum"),
+            du_no_lon_nhat=("tong_du_no", "max"),
+        )
+        .reset_index()
+    )
+    cross_keys = per_key[per_key["so_pgd"] > 1].copy()
+    if cross_keys.empty:
+        return report
+
+    report.is_valid = False
+    cross_keys["uoc_du_no_thua"] = (
+        cross_keys["tong_du_no"] - cross_keys["du_no_lon_nhat"]
+    ).clip(lower=0)
+
+    cross_rows = cross_keys[["ma_kh", "so_ku"]].merge(
+        work,
+        on=["ma_kh", "so_ku"],
+        how="left",
+    )
+    pair_map = (
+        cross_rows[["ma_kh", "so_ku", "ten_pgd"]]
+        .drop_duplicates()
+        .groupby(["ma_kh", "so_ku"], sort=False)["ten_pgd"]
+        .agg(_join_unique_values)
+        .reset_index(name="cap_pgd")
+    )
+    cross_keys = cross_keys.merge(pair_map, on=["ma_kh", "so_ku"], how="left")
+    cross_rows = cross_rows.merge(pair_map, on=["ma_kh", "so_ku"], how="left")
+
+    report.duplicate_group_count = int(len(cross_keys))
+    report.duplicate_row_count = int(len(cross_rows))
+    report.duplicate_pair_count = int(cross_keys["cap_pgd"].nunique())
+    report.total_duplicate_amount = float(cross_keys["tong_du_no"].sum())
+    report.estimated_excess_amount = float(cross_keys["uoc_du_no_thua"].sum())
+    report.blank_name_row_count = int(cross_rows["ten_kh_trong"].sum())
+
+    top_pairs = (
+        cross_keys.groupby("cap_pgd", as_index=False)
+        .agg(
+            so_mon_trung=("ma_kh", "size"),
+            tong_du_no_trung=("tong_du_no", "sum"),
+            uoc_du_no_thua=("uoc_du_no_thua", "sum"),
+        )
+        .sort_values(
+            by=["tong_du_no_trung", "so_mon_trung"],
+            ascending=[False, False],
+        )
+    )
+    report.top_pairs = top_pairs.head(10).to_dict("records")
+
+    top_units = (
+        cross_rows.groupby("ten_pgd", as_index=False)
+        .agg(
+            so_dong_trung=("loan_key", "size"),
+            so_mon_trung=("loan_key", "nunique"),
+            tong_du_no_trung=("tong_du_no", "sum"),
+            so_dong_ten_trong=("ten_kh_trong", "sum"),
+        )
+        .sort_values(
+            by=["tong_du_no_trung", "so_mon_trung"],
+            ascending=[False, False],
+        )
+    )
+    report.top_units = top_units.head(10).to_dict("records")
+
+    sample_rows = (
+        cross_rows[
+            [
+                "cap_pgd",
+                "ten_pgd",
+                "ma_kh",
+                "so_ku",
+                "ten_kh",
+                "ngay_vay",
+                "tong_du_no",
+                "ten_kh_trong",
+            ]
+        ]
+        .sort_values(
+            by=["cap_pgd", "ma_kh", "so_ku", "ten_pgd"],
+            ascending=[True, True, True, True],
+        )
+        .head(20)
+        .rename(
+            columns={
+                "cap_pgd": "cap_pgd",
+                "ten_pgd": "ten_pgd",
+                "ma_kh": COT_MA_KH,
+                "so_ku": COT_SO_KU,
+                "ten_kh": COT_TEN_KH,
+                "ngay_vay": COT_NGAY_VAY,
+                "tong_du_no": COT_TONG_DU_NO,
+                "ten_kh_trong": "ten_kh_trong",
+            }
+        )
+    )
+    report.sample_rows = sample_rows.to_dict("records")
+    return report
 
 
 # Singleton instance

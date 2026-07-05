@@ -6,10 +6,32 @@ import pandas as pd
 import streamlit as st
 
 from data.core import ts_file, excel_to_parquet, _should_force_str, _normalize_code_series
+from logger import get_logger
 from config import (
-    CACHE_HSTD, CACHE_NQ11,
+    CACHE_HSTD, CACHE_NQ11, DON_VI_CHI_NHANH,
     GQVL_COT_MAP, CACHE_GQVL, CACHE_SK_GQVL,
 )
+
+logger = get_logger(__name__)
+
+_HOI_SO_BASELINE_ALIAS = frozenset({
+    "hội sở cn đồng nai",
+    "hội sở cn tỉnh",
+    "cn đồng nai",
+    "pgd biên hòa",
+})
+
+
+def _canon_ten_pgd_baseline(val: object) -> str:
+    """Chuẩn hóa alias Hội sở trong baseline về key nội bộ duy nhất."""
+    if val is None or pd.isna(val):
+        return ""
+    text = str(val).strip()
+    if not text or text.lower() in {"nan", "none"}:
+        return ""
+    if text.casefold() in _HOI_SO_BASELINE_ALIAS:
+        return DON_VI_CHI_NHANH
+    return text
 
 
 # ── HSTD ─────────────────────────────────────────────────────────────────────
@@ -57,16 +79,47 @@ def doc_baseline_pgd(ten_pgd: str, nam: int, _ts=0) -> pd.DataFrame | None:
         return pd.read_excel(fp, sheet_name="BCQUERY", header=4).iloc[:, 1:].dropna(how="all")
 
 
+def ts_baseline_merged(nam: int) -> float:
+    """Timestamp tổng hợp của baseline 31/12 để bust cache đúng sau khi upload/rebuild.
+
+    Không cache helper này: chỉ quét 22 file nên rất rẻ, trong khi cache 5 phút sẽ giữ
+    `ts` cũ và làm `doc_baseline_merged(..., ts=...)` tiếp tục trả object baseline stale.
+    """
+    from config import DS_PGD, baseline_cache_loai, baseline_pgd_path, baseline_path
+
+    ds = [DON_VI_CHI_NHANH] + DS_PGD
+    ts_values = [0.0]
+    co_file_pgd = False
+
+    cache_path = baseline_cache_loai(nam, "hstd")
+    if os.path.exists(cache_path):
+        ts_values.append(os.path.getmtime(cache_path))
+
+    for dv in ds:
+        fp = baseline_pgd_path(dv, nam)
+        if os.path.exists(fp):
+            co_file_pgd = True
+            ts_values.append(os.path.getmtime(fp))
+
+    if not co_file_pgd:
+        fp_legacy = baseline_path(nam)
+        if os.path.exists(fp_legacy):
+            ts_values.append(os.path.getmtime(fp_legacy))
+
+    return max(ts_values)
+
+
 @st.cache_resource(show_spinner="Đang tổng hợp mốc 31/12...")
-def doc_baseline_merged(nam: int) -> pd.DataFrame | None:
+def doc_baseline_merged(nam: int, ts: float = 0.0) -> pd.DataFrame | None:
     """
     Đọc và merge HSTD mốc 31/12 từ tất cả đơn vị đã upload.
     Sử dụng parquet cache sau lần merge đầu tiên để load nhanh ở lần sau.
     Ưu tiên baseline_pgd_path; fallback về baseline_path cũ nếu không có đơn vị nào.
     Trả None nếu không có dữ liệu.
     """
+    _ = ts
     from config import BASELINE_PGD_DIR, baseline_pgd_path, baseline_path, baseline_cache_loai
-    from config import DS_PGD, DON_VI_CHI_NHANH
+    from config import DS_PGD
     from config import COT_TEN_PGD as _COT_TEN_PGD   # cần trước cache-check block
     ds = [DON_VI_CHI_NHANH] + DS_PGD
 
@@ -79,18 +132,32 @@ def doc_baseline_merged(nam: int) -> pd.DataFrame | None:
     # Check cache hợp lệ: mtime trước, rồi mới đọc full parquet (tránh đọc file lớn khi không cần)
     if os.path.exists(cache_path) and os.path.getsize(cache_path) >= 1000:
         cache_mtime = os.path.getmtime(cache_path)
-        _stale = any(
+        _co_file_pgd = any(os.path.exists(baseline_pgd_path(dv, nam)) for dv in ds)
+        _stale_pgd = any(
             os.path.exists(baseline_pgd_path(dv, nam))
             and os.path.getmtime(baseline_pgd_path(dv, nam)) > cache_mtime
             for dv in ds
         )
+        _fp_legacy = baseline_path(nam)
+        _stale_legacy = (
+            not _co_file_pgd
+            and os.path.exists(_fp_legacy)
+            and os.path.getmtime(_fp_legacy) > cache_mtime
+        )
+        _stale = _stale_pgd or _stale_legacy
         if not _stale:
             try:
                 df_cache = pd.read_parquet(cache_path)
                 if not df_cache.empty and len(df_cache.columns) >= _MIN_COLS:
                     _ds_co_file = [dv for dv in ds if os.path.exists(baseline_pgd_path(dv, nam))]
                     if _COT_TEN_PGD in df_cache.columns:
-                        _pgd_cache = set(df_cache[_COT_TEN_PGD].dropna().unique())
+                        df_cache = df_cache.copy()
+                        _ten_pgd_cache = df_cache[_COT_TEN_PGD].map(_canon_ten_pgd_baseline)
+                        df_cache[_COT_TEN_PGD] = _ten_pgd_cache.mask(_ten_pgd_cache == "", pd.NA)
+                        _pgd_cache = {
+                            v for v in df_cache[_COT_TEN_PGD].dropna().unique()
+                            if str(v).strip()
+                        }
                         _pgd_disk = set(_ds_co_file)
                         _thieu = _pgd_disk - _pgd_cache
                         if _thieu:
@@ -119,9 +186,11 @@ def doc_baseline_merged(nam: int) -> pd.DataFrame | None:
             path_pq_ = str(Path(fp_).with_suffix(".parquet"))
             df_ = excel_to_parquet(fp_, path_pq_, "BCQUERY", 4, _clean_fn)
             if df_ is not None and not df_.empty and len(df_.columns) >= _MIN_COLS:
+                df_ = df_.copy()
                 if _COT_TEN_PGD not in df_.columns:
-                    df_ = df_.copy()
                     df_[_COT_TEN_PGD] = dv_
+                _ten_pgd = df_[_COT_TEN_PGD].map(_canon_ten_pgd_baseline)
+                df_[_COT_TEN_PGD] = _ten_pgd.mask(_ten_pgd == "", pd.NA)
                 return df_
         except Exception as e_:
             _rb_logger.error(
@@ -228,6 +297,7 @@ def luu_so_khe_uoc_nq11(file_bytes: bytes, username: str) -> tuple[int, str | No
         _db.ghi_audit(username, "luu_nq11_ids", f"Lưu {len(ids)} mã khế ước NQ11 vào kv_store")
         return len(ids), None
     except Exception as e:
+        logger.error("luu_so_khe_uoc_nq11: %s", e, exc_info=True)
         return 0, str(e)
 
 

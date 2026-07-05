@@ -18,7 +18,7 @@ from config import (
     baseline_pgd_path, DON_VI_CHI_NHANH,
 )
 from auth import is_pgd_role
-from data.hstd import doc_baseline_merged
+from data.hstd import doc_baseline_merged, ts_baseline_merged
 from data.giao_ban import xuat_thong_bao_ket_luan_giao_ban
 from utils import fmt
 from logger import get_logger
@@ -69,11 +69,7 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
             chon_nam = ds_nam[0]
         df_bl = None
         if ds_nam and chon_nam is not None:
-            fp_check = baseline_pgd_path(
-                DON_VI_CHI_NHANH if not pgd_user else pgd_user, chon_nam
-            )
-            _ts = os.path.getmtime(fp_check) if os.path.exists(fp_check) else 0
-            df_bl = doc_baseline_merged(chon_nam, _ts=_ts)
+            df_bl = doc_baseline_merged(chon_nam, ts=ts_baseline_merged(chon_nam))
 
         col_a, col_b = st.columns(2)
         with col_a:

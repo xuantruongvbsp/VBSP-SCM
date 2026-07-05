@@ -21,7 +21,7 @@ import os
 import shutil
 import socket
 import threading
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from datetime import datetime
 from io import BytesIO
 from pathlib import Path
@@ -33,7 +33,7 @@ from logger import get_logger
 
 logger = get_logger(__name__)
 from utils import fmt_so, vn
-from data.core import ts_file, excel_to_parquet
+from data.core import ts_file, excel_to_parquet, _should_force_str, _normalize_code_series
 
 
 def duong_dan_pgd(ten_pgd: str, loai: str) -> str:
@@ -94,6 +94,7 @@ class KetQuaUpload:
     thanh_cong: bool
     thong_bao: str
     duong_dan: str = ""
+    chi_tiet: dict | None = None
 
     def hien_thi(self) -> None:
         """Hiển thị kết quả bằng st.success hoặc st.error."""
@@ -101,6 +102,105 @@ class KetQuaUpload:
             st.success(self.thong_bao)
         else:
             st.error(self.thong_bao)
+
+
+def _fmt_ty_inline(gia_tri_vnd: float | int) -> str:
+    """Format nhanh VND -> tỷ đồng theo kiểu VN để dùng trong cảnh báo ngắn."""
+    return vn((float(gia_tri_vnd) if gia_tri_vnd else 0) / 1e9, 3) + " tỷ"
+
+
+def _tom_tat_trung_cheo_hstd(report: dict, pham_vi: str, giu_nguyen_cache: bool) -> str:
+    """Tạo thông báo ngắn gọn khi phát hiện khoản vay HSTD bị trùng chéo giữa PGD."""
+    top_pairs = report.get("top_pairs") or []
+    top_text = "; ".join(
+        f"{row.get('cap_pgd', 'N/A')} ({_fmt_ty_inline(row.get('tong_du_no_trung', 0))})"
+        for row in top_pairs[:3]
+    )
+    thong_bao = (
+        f"Phát hiện **{fmt_so(report.get('duplicate_group_count', 0))}** món vay {pham_vi} "
+        f"bị trùng chéo giữa **{report.get('duplicate_pair_count', 0)}** cặp/nhóm PGD "
+        f"(khóa: **Mã KH + Số khế ước**), ước cộng thừa "
+        f"**{_fmt_ty_inline(report.get('estimated_excess_amount', 0))}**."
+    )
+    if top_text:
+        thong_bao += f" Top chênh lớn: {top_text}."
+    if giu_nguyen_cache:
+        thong_bao += " Cache đang dùng được giữ nguyên, chưa ghi đè số sai."
+    return thong_bao
+
+
+def _normalize_merge_dataframe_for_parquet(df_toan_cn: pd.DataFrame) -> pd.DataFrame:
+    """Chuẩn hóa dtype trước khi ghi parquet để dùng chung cho merge hiện tại và baseline."""
+    df_out = df_toan_cn
+    _cols_so_cn = [
+        COT_DU_NO_TH, COT_DU_NO_QH, COT_DU_NO_KHOANH,
+        "Tổng giải ngân", COT_GIAI_NGAN_TRONG_NAM, "Dư tài khoản",
+        COT_THOI_HAN,
+        COT_MUC_VAY, COT_TONG_DU_NO, COT_LAI_TON, COT_LAI_TON_QH,
+        COT_LAI_THANG, COT_GOC_TRA,
+    ]
+    for col in _cols_so_cn:
+        if col in df_out.columns:
+            df_out[col] = pd.to_numeric(df_out[col], errors="coerce")
+
+    _bad_vals_lower = {v.lower() for v in _BAD_VALS}
+    for col in df_out.columns:
+        if col in _cols_so_cn:
+            continue
+        ser = df_out[col]
+        if _should_force_str(col):
+            if pd.api.types.is_numeric_dtype(ser.dtype):
+                df_out[col] = _normalize_code_series(ser)
+            continue
+        if isinstance(ser.dtype, pd.CategoricalDtype):
+            ser = ser.astype(object)
+        elif not ser.dtype == object:
+            continue
+        _ser_str = ser.fillna("").astype(str).str.strip()
+        df_out[col] = _ser_str.where(~_ser_str.str.lower().isin(_bad_vals_lower), "")
+    return df_out
+
+
+def _tao_ket_qua_block_trung_cheo_hstd(
+    df_hstd: pd.DataFrame,
+    *,
+    pham_vi: str,
+    action_audit: str,
+    giu_nguyen_cache: bool = True,
+) -> KetQuaUpload | None:
+    """Trả về KetQuaUpload lỗi nếu phát hiện khoản vay HSTD bị trùng chéo giữa PGD."""
+    from services.validation_service import validate_hstd_cross_pgd_duplicates
+
+    report = validate_hstd_cross_pgd_duplicates(df_hstd)
+    if report.is_valid:
+        return None
+
+    report_dict = asdict(report)
+    thong_bao = _tom_tat_trung_cheo_hstd(report_dict, pham_vi, giu_nguyen_cache)
+    username = st.session_state.get("username", "unknown")
+    db.ghi_audit(
+        username,
+        action_audit,
+        f"{pham_vi} — trung_cheo={report.duplicate_group_count} mon "
+        f"| cap_nhom={report.duplicate_pair_count} "
+        f"| uoc_thua={_fmt_ty_inline(report.estimated_excess_amount)}",
+    )
+    logger.warning(
+        "block merge HSTD do trùng chéo liên PGD: %s | groups=%d | pairs=%d | excess=%s",
+        pham_vi,
+        report.duplicate_group_count,
+        report.duplicate_pair_count,
+        _fmt_ty_inline(report.estimated_excess_amount),
+    )
+    return KetQuaUpload(
+        False,
+        thong_bao,
+        chi_tiet={
+            "kind": "hstd_cross_pgd_duplicates",
+            "scope": pham_vi,
+            "report": report_dict,
+        },
+    )
 
 
 def _kiem_tra_tai_chinh_hstd(df: "pd.DataFrame", report: dict) -> dict:
@@ -596,6 +696,109 @@ def xu_ly_gqvl_toan_cn(
 # ── Gộp dữ liệu toàn Chi nhánh từ 22 đơn vị ─────────────────────────────────
 
 
+def _path_merge_pgd(ten_pgd: str, loai: str) -> str:
+    """
+    Trả về đường dẫn file nguồn cho merge.
+    HSTD: ưu tiên hstd_khnv.xlsx (Phòng KH-NV) → fallback hstd_latest.xlsx.
+    """
+    if loai == "hstd":
+        path_khnv = duong_dan_pgd(ten_pgd, "hstd_khnv")
+        if Path(path_khnv).exists():
+            return path_khnv
+    return duong_dan_pgd(ten_pgd, loai)
+
+
+def _doc_excel_pgd_thanh_df(path_excel: str, loai: str) -> pd.DataFrame:
+    """Đọc Excel PGD → DataFrame, dùng cache parquet per-PGD nếu còn mới."""
+    path_pq = str(Path(path_excel).with_suffix(".parquet"))
+    if loai in ("hstd", "nq11"):
+        def _clean(df: pd.DataFrame) -> pd.DataFrame:
+            return df.iloc[:, 1:].dropna(how="all")
+
+        return excel_to_parquet(
+            path_excel,
+            path_pq,
+            sheet="BCQUERY",
+            header=4,
+            post_fn=_clean,
+        )
+
+    def _clean_gqvl(df: pd.DataFrame) -> pd.DataFrame:
+        d = df.iloc[:, 1:].dropna(how="all").iloc[1:]
+        d = d.rename(columns=GQVL_COT_MAP).reset_index(drop=True)
+        _cols_so = [
+            COT_DU_NO_TH, COT_DU_NO_QH, COT_DU_NO_KHOANH,
+            "Tổng giải ngân", COT_GIAI_NGAN_TRONG_NAM, "Dư tài khoản",
+            COT_THOI_HAN,
+        ]
+        for col in _cols_so:
+            if col in d.columns:
+                d[col] = pd.to_numeric(d[col], errors="coerce")
+        return d
+
+    return excel_to_parquet(
+        path_excel,
+        path_pq,
+        sheet="Sheet1",
+        header=7,
+        post_fn=_clean_gqvl,
+    )
+
+
+def prewarm_pgd_parquet(ten_pgd: str, loai: str) -> bool:
+    """
+    Tạo sẵn parquet per-PGD sau khi lưu Excel.
+    Merge toàn CN sau đó đọc parquet (~200x nhanh hơn đọc Excel).
+    """
+    if loai not in ("hstd", "nq11", "gqvl"):
+        return False
+    path_excel = _path_merge_pgd(ten_pgd, loai)
+    if not Path(path_excel).exists():
+        return False
+    try:
+        _doc_excel_pgd_thanh_df(path_excel, loai)
+        return True
+    except Exception as e:
+        logger.warning(
+            "prewarm_pgd_parquet: lỗi %s/%s — %s", ten_pgd, loai, e, exc_info=True
+        )
+        return False
+
+
+def merge_nhieu_loai_toan_cn(loai_list: list[str]) -> list[dict]:
+    """
+    Merge nhiều loại (hstd/nq11/gqvl).
+    Chạy tuần tự — merge_du_lieu_toan_cn() dùng st.progress/session_state,
+    không an toàn khi gọi từ worker thread.
+    """
+    if not loai_list:
+        return []
+
+    ket_qua: list[dict] = []
+    for loai in loai_list:
+        try:
+            kq = merge_du_lieu_toan_cn(loai)
+            meta = lay_meta_merge(loai) if kq.thanh_cong else None
+            ket_qua.append({
+                "loai": loai,
+                "thanh_cong": kq.thanh_cong,
+                "thong_bao": kq.thong_bao,
+                "so_pgd": (meta or {}).get("so_pgd"),
+                "so_dong": (meta or {}).get("so_dong"),
+                "chi_tiet": kq.chi_tiet,
+            })
+        except Exception as e:
+            logger.error("merge_nhieu_loai_toan_cn: merge %s lỗi — %s", loai, e, exc_info=True)
+            ket_qua.append({
+                "loai": loai,
+                "thanh_cong": False,
+                "thong_bao": f"Lỗi tổng hợp: {e}",
+                "so_pgd": None,
+                "so_dong": None,
+            })
+    return ket_qua
+
+
 def merge_du_lieu_toan_cn(
     loai: str,
     ds_pgd: list[str] | None = None,
@@ -642,21 +845,9 @@ def _merge_du_lieu_toan_cn_impl(
 
     _u = st.session_state.get("username", "unknown")
 
-    def _path_merge(ten_pgd: str, loai: str) -> str:
-        """
-        Trả về đường dẫn file nguồn cho merge.
-        HSTD: ưu tiên hstd_khnv.xlsx (Phòng KH-NV) → fallback hstd_latest.xlsx (PGD support).
-        Các loại khác: dùng đường dẫn chuẩn.
-        """
-        if loai == "hstd":
-            path_khnv = duong_dan_pgd(ten_pgd, "hstd_khnv")
-            if Path(path_khnv).exists():
-                return path_khnv
-        return duong_dan_pgd(ten_pgd, loai)
-
     meta_map: dict[str, tuple[bool, bool]] = {}
     for ten_pgd in tat_ca_dv:
-        path_excel = _path_merge(ten_pgd, loai)
+        path_excel = _path_merge_pgd(ten_pgd, loai)
         if not Path(path_excel).exists():
             meta_map[ten_pgd] = (False, False)
             continue
@@ -676,44 +867,11 @@ def _merge_du_lieu_toan_cn_impl(
         ten_pgd: str, loai: str
     ) -> tuple[str, pd.DataFrame | None, str | None]:
         """Trả về (ten_pgd, df | None, canh_bao_str | None)."""
-        path_excel = _path_merge(ten_pgd, loai)
+        path_excel = _path_merge_pgd(ten_pgd, loai)
         if not Path(path_excel).exists():
             return ten_pgd, None, None
         try:
-            path_pq = Path(path_excel).with_suffix(".parquet")
-            if loai in ("hstd", "nq11"):
-                def _clean(df: pd.DataFrame) -> pd.DataFrame:
-                    return df.iloc[:, 1:].dropna(how="all")
-
-                df = excel_to_parquet(
-                    path_excel,
-                    str(path_pq),
-                    sheet="BCQUERY",
-                    header=4,
-                    post_fn=_clean,
-                )
-            else:
-                def _clean(df: pd.DataFrame) -> pd.DataFrame:
-                    d = df.iloc[:, 1:].dropna(how="all").iloc[1:]
-                    d = d.rename(columns=GQVL_COT_MAP).reset_index(drop=True)
-                    _cols_so = [
-                        COT_DU_NO_TH, COT_DU_NO_QH, COT_DU_NO_KHOANH,
-                        "Tổng giải ngân", COT_GIAI_NGAN_TRONG_NAM, "Dư tài khoản",
-                        COT_THOI_HAN,
-                        # "Nguồn vốn" là text "TW"/"ĐP" — không chuyển sang numeric
-                    ]
-                    for col in _cols_so:
-                        if col in d.columns:
-                            d[col] = pd.to_numeric(d[col], errors="coerce")
-                    return d
-
-                df = excel_to_parquet(
-                    path_excel,
-                    str(path_pq),
-                    sheet="Sheet1",
-                    header=7,
-                    post_fn=_clean,
-                )
+            df = _doc_excel_pgd_thanh_df(path_excel, loai)
             df[COT_TEN_PGD] = ten_pgd
             return ten_pgd, df, None
         except Exception as e:
@@ -739,11 +897,6 @@ def _merge_du_lieu_toan_cn_impl(
             for future in as_completed(futures):
                 da_xong += 1
                 prog.progress(min(1.0, da_xong / max(tong, 1)), text=f"⏳ Đang đọc {da_xong}/{tong} PGD...")
-                if da_xong % 5 == 0 or da_xong == tong:
-                    db.ghi_kv("_merge_progress", {
-                        "loai": loai, "total": tong, "done": da_xong,
-                        "running": True, "start": _start_iso,
-                    }, _u)
                 ten_pgd, df, canh_bao_str = future.result()
                 if canh_bao_str:
                     pgd_loi.append(f"{ten_pgd}: {canh_bao_str}")
@@ -807,56 +960,17 @@ def _merge_du_lieu_toan_cn_impl(
     # Ghi trực tiếp vào parquet cache (không qua Excel)
     os.makedirs(os.path.dirname(os.path.abspath(cache_path)), exist_ok=True)
 
-    # Ép kiểu thủ công để tránh DataType(null) từ PyArrow
-    _cols_so_cn = [
-        COT_DU_NO_TH, COT_DU_NO_QH, COT_DU_NO_KHOANH,
-        "Tổng giải ngân", COT_GIAI_NGAN_TRONG_NAM, "Dư tài khoản",
-        COT_THOI_HAN,
-        # "Nguồn vốn" là text "TW"/"ĐP" — KHÔNG ép numeric, sẽ thành NaN
-        COT_MUC_VAY, COT_TONG_DU_NO, COT_LAI_TON, COT_LAI_TON_QH,
-        COT_LAI_THANG, COT_GOC_TRA,
-    ]
-    for col in _cols_so_cn:
-        if col in df_toan_cn.columns:
-            df_toan_cn[col] = pd.to_numeric(df_toan_cn[col], errors="coerce")
-    # Chuẩn hóa dtype cột chuỗi: ép toàn bộ về str đồng nhất
-    # Xử lý mixed type (int + str rỗng) → tránh ArrowInvalid khi ghi parquet
-    # category columns → astype(object) trước, nếu không apply() giữ nguyên
-    # category dtype và pd.to_datetime() downstream sẽ lỗi
-    _BAD_VALS_LIST = list(_BAD_VALS)  # precompute 1 lần — tránh tạo list mới mỗi vòng lặp
-    _str_cols = [c for c in df_toan_cn.columns if c not in _cols_so_cn]
-    if _str_cols:
-        for col in _str_cols:
-            ser = df_toan_cn[col]
-            if isinstance(ser.dtype, pd.CategoricalDtype):
-                ser = ser.astype(object)
-            # Ép int64/uint64 về object — tránh ValueError fillna("") trên int64
-            # Trường hợp: Mã thôn (46007818), Mã xã đọc từ Excel thành int64
-            elif pd.api.types.is_integer_dtype(ser.dtype):
-                ser = ser.astype(object)
-            # Ép float64 về object — chuyển 46007818.0 → "46007818", NaN → None
-            elif pd.api.types.is_float_dtype(ser.dtype):
-                _whole_f = ser.notna() & (ser % 1 == 0)
-                ser = ser.astype(object)
-                if _whole_f.any():
-                    ser = ser.copy()
-                    ser.loc[_whole_f] = (
-                        pd.to_numeric(ser.loc[_whole_f], errors="coerce")
-                        .astype("int64").astype(str)
-                    )
-            # Xử lý float nguyên trong object dtype (mã KH 12345.0 → "12345")
-            # Probe 200 dòng đầu trước — bỏ qua hoàn toàn cột text thuần
-            # (Tên KH, Địa chỉ...) không chứa float → tiết kiệm pd.to_numeric() trên 100K dòng
-            if ser.dtype == object:
-                _probe = pd.to_numeric(ser.iloc[:200], errors="coerce")
-                if _probe.notna().any():
-                    _num = pd.to_numeric(ser, errors="coerce")
-                    _whole = _num.notna() & (_num % 1 == 0) & ser.notna()
-                    if _whole.any():
-                        ser = ser.copy()
-                        ser.loc[_whole] = _num.loc[_whole].astype("int64").astype(str)
-            _ser_str = ser.fillna("").astype(str).str.strip()
-            df_toan_cn[col] = _ser_str.where(~_ser_str.isin(_BAD_VALS), "")
+    df_toan_cn = _normalize_merge_dataframe_for_parquet(df_toan_cn)
+
+    if loai == "hstd":
+        kq_block = _tao_ket_qua_block_trung_cheo_hstd(
+            df_toan_cn,
+            pham_vi="HSTD hiện tại toàn Chi nhánh",
+            action_audit="merge_toan_cn_blocked",
+            giu_nguyen_cache=True,
+        )
+        if kq_block is not None:
+            return kq_block
 
     with _MERGE_LOCK[loai]:
         bak_path = cache_path + ".bak"
@@ -913,6 +1027,7 @@ def _merge_du_lieu_toan_cn_impl(
         # Clear Streamlit cache để UI đọc dữ liệu mới ngay lập tức
         try:
             st.cache_data.clear()
+            st.cache_resource.clear()
         except Exception:
             pass
 
@@ -926,13 +1041,15 @@ def _merge_du_lieu_toan_cn_impl(
     # Auto-snapshot NGOÀI lock — chạy background thread để không block luồng chính
     import threading as _threading
     _snap_user = st.session_state.get("username", "system")
-    _snap_df = df_toan_cn.copy()
+    _snap_cache_path = cache_path
 
     if loai == "hstd":
         def _snap_bg() -> None:
+            df_snap = None
             try:
                 from snapshot_service import luu_snapshot as _luu_snap
-                _luu_snap(_snap_df, _snap_user)
+                df_snap = pd.read_parquet(_snap_cache_path, engine="pyarrow")
+                _luu_snap(df_snap, _snap_user)
             except Exception as e:
                 logger.error("auto-snapshot HSTD background thread thất bại — %s", e, exc_info=True)
             # Sau HSTD snapshot, thử lưu CDTOTKVV snapshot cùng kỳ
@@ -942,10 +1059,11 @@ def _merge_du_lieu_toan_cn_impl(
                 from config import COT_NGAY_SL as _COT_NGAY_SL
                 from data.cdtotkvv import doc_cdtotkvv_toan_cn_pgd as _doc_cdtot
                 from snapshot_service import luu_cdtotkvv_snapshot as _luu_cdtot
-                # Xác định kỳ từ HSTD df
+                if df_snap is None:
+                    df_snap = pd.read_parquet(_snap_cache_path, engine="pyarrow")
                 _ky_str = _dt_cls.now().strftime("%Y-%m")
-                if _COT_NGAY_SL in _snap_df.columns:
-                    _sl = _snap_df[_COT_NGAY_SL].dropna()
+                if _COT_NGAY_SL in df_snap.columns:
+                    _sl = df_snap[_COT_NGAY_SL].dropna()
                     if len(_sl):
                         _val = str(_sl.iloc[0])
                         try:
@@ -956,8 +1074,8 @@ def _merge_du_lieu_toan_cn_impl(
                                 _dt_tmp = _pd.to_datetime(_val, errors="coerce")
                                 if _pd.notna(_dt_tmp):
                                     _ky_str = _dt_tmp.strftime("%Y-%m")
-                        except Exception as e:  # conv: skip — debug-level, lỗi parse ngày không chặn upload
-                            logger.debug("luu_pgd_file: không parse được kỳ từ CDTOTKVV — %s", e)
+                        except Exception:
+                            logger.debug("luu_pgd_file: không parse được kỳ từ ngày số liệu HSTD")
                 _df_cdtot = _doc_cdtot()
                 if _df_cdtot is not None and not _df_cdtot.empty:
                     _luu_cdtot(_df_cdtot, _ky_str, _snap_user)
@@ -970,7 +1088,8 @@ def _merge_du_lieu_toan_cn_impl(
         def _snap_nq11_bg() -> None:
             try:
                 from snapshot_service import luu_nq11_snapshot as _luu_nq11
-                _luu_nq11(_snap_df, _snap_user)
+                df_snap = pd.read_parquet(_snap_cache_path, engine="pyarrow")
+                _luu_nq11(df_snap, _snap_user)
             except Exception as e:
                 logger.error("auto-snapshot NQ11 background thread thất bại — %s", e, exc_info=True)
 
@@ -980,7 +1099,8 @@ def _merge_du_lieu_toan_cn_impl(
         def _snap_gqvl_bg() -> None:
             try:
                 from snapshot_service import luu_gqvl_snapshot as _luu_gqvl
-                _luu_gqvl(_snap_df, _snap_user)
+                df_snap = pd.read_parquet(_snap_cache_path, engine="pyarrow")
+                _luu_gqvl(df_snap, _snap_user)
             except Exception as e:
                 logger.error("auto-snapshot GQVL background thread thất bại — %s", e, exc_info=True)
 
@@ -1077,6 +1197,17 @@ def merge_baseline_toan_cn(loai: str, nam: int) -> KetQuaUpload:
         )
 
     df_all = pd.concat(frames, ignore_index=True)
+    df_all = _normalize_merge_dataframe_for_parquet(df_all)
+
+    if loai == "hstd":
+        kq_block = _tao_ket_qua_block_trung_cheo_hstd(
+            df_all,
+            pham_vi=f"baseline HSTD 31/12/{nam}",
+            action_audit="merge_baseline_blocked",
+            giu_nguyen_cache=True,
+        )
+        if kq_block is not None:
+            return kq_block
 
     cache_path = baseline_cache_loai(nam, loai)
     os.makedirs(os.path.dirname(os.path.abspath(cache_path)), exist_ok=True)

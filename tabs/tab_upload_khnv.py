@@ -43,10 +43,12 @@ from services.upload_service import (
     kiem_tra_file,
     lay_meta_merge,
     merge_du_lieu_toan_cn,
+    merge_nhieu_loai_toan_cn,
+    prewarm_pgd_parquet,
     merge_baseline_toan_cn,
     danh_gia_chat_luong_file_upload,
 )
-from utils import fmt_so, hien_thi_dataframe_phan_trang
+from utils import fmt_so, hien_thi_dataframe_phan_trang, vn
 from tabs.base_tab import TabContext
 from services.file_detection_service import (
 
@@ -291,29 +293,14 @@ def _xu_ly_upload(
             loai for loai in ("hstd", "nq11", "gqvl")
             if loai in ket_qua_upload and ket_qua_upload[loai].thanh_cong
         ]
-        for loai in loai_can_merge:
-            try:
-                kq_m = merge_du_lieu_toan_cn(loai)
-                meta_m = lay_meta_merge(loai) if kq_m.thanh_cong else None
-                ket_qua_merge.append({
-                    "loai": loai,
-                    "thanh_cong": kq_m.thanh_cong,
-                    "thong_bao": kq_m.thong_bao,
-                    "so_pgd": (meta_m or {}).get("so_pgd"),
-                    "so_dong": (meta_m or {}).get("so_dong"),
-                })
-            except Exception as _merge_err:
-                logger.error("_xu_ly_upload: merge %s lỗi — %s", loai, _merge_err, exc_info=True)
-                ket_qua_merge.append({
-                    "loai": loai,
-                    "thanh_cong": False,
-                    "thong_bao": f"Lỗi tổng hợp: {_merge_err}",
-                    "so_pgd": None,
-                    "so_dong": None,
-                })
+        ket_qua_merge = merge_nhieu_loai_toan_cn(loai_can_merge)
 
-    st.cache_data.clear()
     if ket_qua_merge:
+        if any(row.get("thanh_cong") for row in ket_qua_merge):
+            from tabs.tab_upload_khnv._state import lam_moi_du_lieu_app
+            lam_moi_du_lieu_app()
+        else:
+            st.cache_data.clear()
         st.session_state["folder_import_ket_qua_merge"] = ket_qua_merge
     # Lưu kết quả vào session để render sau rerun
     st.session_state["khnv_ket_qua_upload"] = {
@@ -410,6 +397,8 @@ def _xu_ly_import_folder(danh_sach: list[dict], username: str) -> None:
                 # HSTD → lưu vào hstd_khnv.xlsx (riêng Phòng KH-NV)
                 loai_luu = "hstd_khnv" if r["loai"] == "hstd" else r["loai"]
                 _ghi_file_pgd(r["ten_pgd"], loai_luu, data)
+                if r["loai"] in ("hstd", "nq11", "gqvl"):
+                    prewarm_pgd_parquet(r["ten_pgd"], r["loai"])
                 audit = (
                     "folder_import_file",
                     f"{r['loai'].upper()} — {r['ten_pgd']} ({r['ten_file']})",
@@ -440,41 +429,22 @@ def _xu_ly_import_folder(danh_sach: list[dict], username: str) -> None:
             db.ghi_audit(username, action, detail)
 
     loai_can_merge = sorted(loai_da_luu & {"hstd", "nq11", "gqvl"})
-    ket_qua_merge: list[dict] = []
-    for j, loai in enumerate(loai_can_merge):
-        progress.progress(
-            0.8 + ((j + 1) / max(len(loai_can_merge), 1)) * 0.2,
-            text=f"🔄 Tổng hợp {loai.upper()} toàn Chi nhánh...",
-        )
-        try:
-            kq_m = merge_du_lieu_toan_cn(loai)
-            meta_m = lay_meta_merge(loai) if kq_m.thanh_cong else None
-            ket_qua_merge.append(
-                {
-                    "loai": loai,
-                    "thanh_cong": kq_m.thanh_cong,
-                    "thong_bao": kq_m.thong_bao,
-                    "so_pgd": (meta_m or {}).get("so_pgd"),
-                    "so_dong": (meta_m or {}).get("so_dong"),
-                }
+    progress.progress(0.85, text="🔄 Tổng hợp toàn Chi nhánh...")
+    ket_qua_merge = merge_nhieu_loai_toan_cn(loai_can_merge)
+    for row in ket_qua_merge:
+        if not row.get("thanh_cong"):
+            that_bai.append(
+                f"Tổng hợp {str(row.get('loai', '')).upper()}: {row.get('thong_bao', '')}"
             )
-        except Exception as _merge_err:
-            logger.error(
-                "_xu_ly_import_folder: merge %s lỗi — %s", loai, _merge_err, exc_info=True
-            )
-            ket_qua_merge.append(
-                {
-                    "loai": loai,
-                    "thanh_cong": False,
-                    "thong_bao": f"Lỗi tổng hợp: {_merge_err}",
-                    "so_pgd": None,
-                    "so_dong": None,
-                }
-            )
-            that_bai.append(f"Tổng hợp {loai.upper()}: {_merge_err}")
 
     progress.empty()
-    st.cache_data.clear()
+
+    thanh_cong_merge = [row for row in ket_qua_merge if row.get("thanh_cong")]
+    if thanh_cong_merge:
+        from tabs.tab_upload_khnv._state import lam_moi_du_lieu_app
+        lam_moi_du_lieu_app()
+    else:
+        st.cache_data.clear()
 
     # Force refresh bảng trạng thái upload sau khi import
     from data.pgd import lay_trang_thai_upload_pgd as _lay_tt_upload
@@ -1294,6 +1264,88 @@ _NHAN_BASELINE = {
 }
 
 
+def _fmt_ty_report(gia_tri_vnd: float | int) -> str:
+    return vn((float(gia_tri_vnd) if gia_tri_vnd else 0) / 1e9, 3) + " tỷ"
+
+
+def _render_hstd_cross_pgd_report(chi_tiet: dict) -> None:
+    """Hiển thị chẩn đoán trùng chéo khoản vay HSTD giữa các PGD."""
+    report = (chi_tiet or {}).get("report") or {}
+    if not report:
+        return
+
+    with st.expander("🔎 Xem chi tiết khoản vay bị trùng chéo giữa các PGD", expanded=True):
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("Món vay trùng", fmt_so(report.get("duplicate_group_count", 0)))
+        c2.metric("Cặp/nhóm PGD", fmt_so(report.get("duplicate_pair_count", 0)))
+        c3.metric("DN cộng thừa ước tính", _fmt_ty_report(report.get("estimated_excess_amount", 0)))
+        c4.metric("Dòng thiếu Tên KH", fmt_so(report.get("blank_name_row_count", 0)))
+
+        top_pairs = report.get("top_pairs") or []
+        if top_pairs:
+            df_pairs = pd.DataFrame(top_pairs).rename(
+                columns={
+                    "cap_pgd": "Cặp/nhóm PGD",
+                    "so_mon_trung": "Số món trùng",
+                    "tong_du_no_trung": "Tổng dư nợ trùng",
+                    "uoc_du_no_thua": "Ước dư nợ thừa",
+                }
+            )
+            df_pairs["Tổng dư nợ trùng"] = df_pairs["Tổng dư nợ trùng"].apply(_fmt_ty_report)
+            df_pairs["Ước dư nợ thừa"] = df_pairs["Ước dư nợ thừa"].apply(_fmt_ty_report)
+            st.markdown("**Top cặp/nhóm PGD lệch nhiều nhất**")
+            st.dataframe(df_pairs, use_container_width=True, hide_index=True)
+
+        top_units = report.get("top_units") or []
+        if top_units:
+            df_units = pd.DataFrame(top_units).rename(
+                columns={
+                    "ten_pgd": "Đơn vị",
+                    "so_dong_trung": "Số dòng trùng",
+                    "so_mon_trung": "Số món trùng",
+                    "tong_du_no_trung": "Tổng dư nợ trùng",
+                    "so_dong_ten_trong": "Dòng trống Tên KH",
+                }
+            )
+            df_units["Tổng dư nợ trùng"] = df_units["Tổng dư nợ trùng"].apply(_fmt_ty_report)
+            st.markdown("**Đơn vị bị ảnh hưởng nhiều nhất**")
+            st.dataframe(df_units, use_container_width=True, hide_index=True)
+
+        sample_rows = report.get("sample_rows") or []
+        if sample_rows:
+            df_samples = pd.DataFrame(sample_rows).rename(
+                columns={
+                    "cap_pgd": "Cặp/nhóm PGD",
+                    "ten_pgd": "Đơn vị",
+                    "ten_kh_trong": "Tên KH trống",
+                }
+            )
+            if "Tổng dư nợ" in df_samples.columns:
+                df_samples["Tổng dư nợ"] = df_samples["Tổng dư nợ"].apply(_fmt_ty_report)
+            if "Tên KH trống" in df_samples.columns:
+                df_samples["Tên KH trống"] = df_samples["Tên KH trống"].map(
+                    lambda v: "Có" if bool(v) else ""
+                )
+            st.markdown("**Mẫu khoản vay cần rà lại file nguồn**")
+            st.dataframe(df_samples, use_container_width=True, hide_index=True)
+
+
+def _render_merge_result_rows(rows: list[dict], tieu_de: str) -> None:
+    """Render danh sách kết quả merge và bung chi tiết nếu có chẩn đoán."""
+    if not rows:
+        return
+    st.markdown(f"##### {tieu_de}")
+    for row in rows:
+        thong_bao = str(row.get("thong_bao", "") or "")
+        chi_tiet = row.get("chi_tiet") or {}
+        if row.get("thanh_cong"):
+            st.success(thong_bao)
+        else:
+            st.warning(thong_bao)
+            if chi_tiet.get("kind") == "hstd_cross_pgd_duplicates":
+                _render_hstd_cross_pgd_report(chi_tiet)
+
+
 def _render_upload_baseline(username: str) -> None:
     """Upload file mốc 31/12 (4 loại) per-PGD — bulk upload + tổng hợp thủ công."""
     st.caption(
@@ -1313,6 +1365,15 @@ def _render_upload_baseline(username: str) -> None:
         key="upload_baseline_nam",
     )
     nam = int(chon_nam)
+
+    if "baseline_manual_merge_results" in st.session_state:
+        kq_bl = st.session_state.pop("baseline_manual_merge_results")
+        if kq_bl and int(kq_bl.get("nam", nam)) == nam:
+            _render_merge_result_rows(
+                kq_bl.get("rows", []),
+                f"📅 Kết quả tổng hợp baseline 31/12/{nam}",
+            )
+            st.divider()
 
     # ── Trạng thái 22 đơn vị × 4 loại — cache vào session_state (92 os.path.exists/lần) ──
     _tt_loai_key = f"_blcache_tt_loai_{nam}"
@@ -1571,6 +1632,7 @@ def _render_upload_baseline(username: str) -> None:
         else:
             tong_buoc = len(loai_bl_chon)
             progress_bar = st.progress(0, text="⏳ Chuẩn bị tổng hợp baseline...")
+            ket_qua_merge: list[dict] = []
             for idx, loai in enumerate(loai_bl_chon):
                 progress_bar.progress(
                     idx / tong_buoc,
@@ -1579,10 +1641,14 @@ def _render_upload_baseline(username: str) -> None:
                 )
                 kq = merge_baseline_toan_cn(loai, nam)
                 progress_bar.progress((idx + 1) / tong_buoc)
-                if kq.thanh_cong:
-                    st.success(kq.thong_bao)
-                else:
-                    st.error(f"❌ {_NHAN_BASELINE.get(loai, loai.upper())}: {kq.thong_bao}")
+                ket_qua_merge.append(
+                    {
+                        "loai": loai,
+                        "thanh_cong": kq.thanh_cong,
+                        "thong_bao": kq.thong_bao,
+                        "chi_tiet": kq.chi_tiet,
+                    }
+                )
 
             progress_bar.progress(1.0, text="✅ Hoàn tất!")
             st.cache_data.clear()
@@ -1590,7 +1656,14 @@ def _render_upload_baseline(username: str) -> None:
                 username, "manual_merge_baseline",
                 f"loai={loai_bl_chon} nam={nam}",
             )
-            st.toast("✅ Tổng hợp baseline hoàn tất!", icon="✅")
+            st.session_state["baseline_manual_merge_results"] = {
+                "nam": nam,
+                "rows": ket_qua_merge,
+            }
+            if all(row.get("thanh_cong") for row in ket_qua_merge):
+                st.toast("✅ Tổng hợp baseline hoàn tất!", icon="✅")
+            else:
+                st.toast("⚠️ Baseline có loại chưa tổng hợp được.", icon="⚠️")
             st.rerun()
 
 
@@ -1637,23 +1710,46 @@ def _fragment_merge_toan_cn():
             try:
                 from services.upload_service import merge_du_lieu_toan_cn
 
+                ket_qua_merge: list[dict] = []
                 for loai in loai_merge:
-                    merge_du_lieu_toan_cn(loai)
+                    kq = merge_du_lieu_toan_cn(loai)
+                    ket_qua_merge.append(
+                        {
+                            "loai": loai,
+                            "thanh_cong": kq.thanh_cong,
+                            "thong_bao": kq.thong_bao,
+                            "chi_tiet": kq.chi_tiet,
+                        }
+                    )
 
-                for loai in ("hstd", "nq11", "gqvl"):
+                thanh_cong_loai = {
+                    row["loai"] for row in ket_qua_merge if row.get("thanh_cong")
+                }
+                for loai in thanh_cong_loai:
                     st.session_state.pop(f"can_merge_{loai}", None)
 
-                st.cache_data.clear()
-                for _k in ["_ctx", "_ctx_cache_key", "_pgd_map_cache_ts", "_pgd_xa_map_cached", "_ds_pgd_all_cached", "df_full"]:
-                    st.session_state.pop(_k, None)
+                if thanh_cong_loai:
+                    from tabs.tab_upload_khnv._state import lam_moi_du_lieu_app
+                    lam_moi_du_lieu_app()
 
                 username = st.session_state.get("username", "unknown")
-                db.ghi_audit(username, "merge_toan_cn",
-                             "Merge thành công (non-blocking fragment)")
+                if all(row.get("thanh_cong") for row in ket_qua_merge):
+                    db.ghi_audit(username, "merge_toan_cn",
+                                 "Merge thành công (non-blocking fragment)")
+                    st.success("✅ Cập nhật hoàn tất! Dữ liệu mới sẵn sàng.")
+                    st.balloons()
+                    st.rerun()
 
-                st.success("✅ Cập nhật hoàn tất! Dữ liệu mới sẵn sàng.")
-                st.balloons()
-                st.rerun()
+                db.ghi_audit(
+                    username,
+                    "merge_toan_cn_blocked_ui",
+                    f"loai={[row['loai'] for row in ket_qua_merge if not row.get('thanh_cong')]}",
+                )
+                st.warning(
+                    "⚠️ Có loại dữ liệu chưa merge được. "
+                    "Các cache bị lỗi không bị ghi đè."
+                )
+                _render_merge_result_rows(ket_qua_merge, "Kết quả cập nhật")
 
             except Exception as e:
                 logger.error("Lỗi trong khối except: %s", e, exc_info=True)
@@ -1730,21 +1826,7 @@ def render(tab=None, **kwargs) -> None:
 
             if "folder_import_ket_qua_merge" in st.session_state:
                 merge_rows = st.session_state.pop("folder_import_ket_qua_merge")
-                if merge_rows:
-                    st.markdown("##### 🔄 Tổng hợp toàn Chi nhánh")
-                    cols_merge = st.columns(len(merge_rows)) if merge_rows else []
-                    for col_m, row in zip(cols_merge, merge_rows):
-                        loai_m = str(row.get("loai", "")).upper()
-                        sp = row.get("so_pgd")
-                        sd = row.get("so_dong")
-                        if row.get("thanh_cong"):
-                            col_m.success(
-                                f"**{loai_m}**\n\n"
-                                f"{'**' + str(sp) + '** đơn vị' if sp else ''}"
-                                f"{' · **' + fmt_so(sd) + '** dòng' if sd else ''}"
-                            )
-                        else:
-                            col_m.warning(f"**{loai_m}**\n\n{row.get('thong_bao', '')}")
+                _render_merge_result_rows(merge_rows, "🔄 Tổng hợp toàn Chi nhánh")
 
             if "khnv_ket_qua_upload" in st.session_state:
                 kq_map = st.session_state.pop("khnv_ket_qua_upload")

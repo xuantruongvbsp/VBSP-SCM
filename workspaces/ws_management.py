@@ -204,6 +204,13 @@ def _build_all_items(role: str, username: str, **kwargs) -> list:
         {"group": "Nội bộ Phòng", "label": "📋 Quản lý Công văn",                "icon": "file-text","fn": lambda: _get_tab("tab_quan_ly_cong_van").render(None, **kwargs)},
         {"group": "Nội bộ Phòng", "label": "📝 Quản lý Công việc & Nhiệm vụ",   "icon": "layout",   "fn": lambda: _get_tab("tab_quan_ly_cv").render(None, **kwargs)},
 
+        # ── Báo cáo ────────────────────────────────────────────────────────────
+        {"group": "Báo cáo", "label": "📊 Báo cáo tín dụng",    "icon": "file",          "fn": lambda: _get_tab("tab_baocao").render(None, **kwargs)},
+        {"group": "Báo cáo", "label": "⏰ Nợ Đến Hạn",           "icon": "clock",         "fn": lambda: _get_tab("tab_canh_bao_nqh").render(None, role=role, username=username, df_full=df_full, ds_pgd_all=ds_pgd_all)},
+        {"group": "Báo cáo", "label": "📅 Báo cáo định kỳ",      "icon": "calendar",      "fn": lambda: _get_tab("tab_bao_cao_dinh_ky").render(None, **kwargs)},
+        {"group": "Báo cáo", "label": "📄 Báo cáo KHNV",         "icon": "file-report",   "fn": lambda: _get_tab("tab_khnv_bao_cao").render(None, **kwargs)},
+        {"group": "Báo cáo", "label": "📥 Tiến độ nộp BC",       "icon": "inbox",         "fn": lambda: _get_tab("tab_tien_do_nop").render(None, **kwargs)},
+
         # ── Giám sát ───────────────────────────────────────────────────────────
         {"group": "Giám sát", "label": "⚠️ Cảnh báo Tín dụng",    "icon": "alert-triangle","fn": lambda: _get_tab("tab_canh_bao_nqh").render(None, role=role, username=username, df_full=df_full, ds_pgd_all=ds_pgd_all)},
         {"group": "Giám sát", "label": "📊 So sánh kỳ",            "icon": "chart-line",    "fn": lambda: _get_tab("tab_so_sanh_ky").render(None, **kwargs)},
@@ -234,13 +241,6 @@ def _build_all_items(role: str, username: str, **kwargs) -> list:
         {"group": "Kế hoạch Tín dụng", "label": "📡 Điện báo & KH vs TH",     "icon": "antenna",      "fn": lambda: _get_tab("tab_candoi").render(None, **kwargs)},
         {"group": "Kế hoạch Tín dụng", "label": "📤 Xuất báo cáo KHTD",       "icon": "file-export",  "fn": lambda: _get_tab("tab_khtd_xuat").render_xuat_baocao(role=kwargs.get("role", ""), username=kwargs.get("username", ""), df_full=kwargs.get("df"))},
         {"group": "Kế hoạch Tín dụng", "label": "🏦 Nguồn vốn địa phương",    "icon": "bank",         "fn": lambda: _get_tab("tab_hhi").render(None, **kwargs)},
-
-        # ── Báo cáo ────────────────────────────────────────────────────────────
-        {"group": "Báo cáo", "label": "📊 Báo cáo tín dụng",    "icon": "file",          "fn": lambda: _get_tab("tab_baocao").render(None, **kwargs)},
-        {"group": "Báo cáo", "label": "⏰ Nợ Đến Hạn",           "icon": "clock",         "fn": lambda: _get_tab("tab_canh_bao_nqh").render(None, role=role, username=username, df_full=df_full, ds_pgd_all=ds_pgd_all)},
-        {"group": "Báo cáo", "label": "📅 Báo cáo định kỳ",      "icon": "calendar",      "fn": lambda: _get_tab("tab_bao_cao_dinh_ky").render(None, **kwargs)},
-        {"group": "Báo cáo", "label": "📄 Báo cáo KHNV",         "icon": "file-report",   "fn": lambda: _get_tab("tab_khnv_bao_cao").render(None, **kwargs)},
-        {"group": "Báo cáo", "label": "📥 Tiến độ nộp BC",       "icon": "inbox",         "fn": lambda: _get_tab("tab_tien_do_nop").render(None, **kwargs)},
 
         # ── Ủy Thác ────────────────────────────────────────────────────────────
         {"group": "Ủy Thác", "label": "🏛️ Ban Đại Diện",  "icon": "building",  "fn": lambda: _get_tab("tab_ban_dai_dien").render(None, cap="tinh", **kwargs)},

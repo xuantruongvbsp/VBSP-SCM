@@ -19,17 +19,34 @@ from config import DS_PGD, DON_VI_CHI_NHANH
 from tabs.base_tab import TabContext
 from utils import xuat_excel
 
+# ── Import từ service lõi (single source of truth) ──
+from services.report_submission_service import (
+    SHEET_ID,
+    SHEET_TAB,
+    COT,
+    DS_PGD_ALL,
+    EMOJI,
+    LABEL,
+    _tim_credentials,
+    _ket_noi_gsheet,
+    chuan_hoa_ten_pgd,
+    doc_du_lieu_gsheet,
+    doc_deadline_config,
+    luu_deadline_config,
+    phan_loai_trang_thai,
+    gan_trang_thai,
+    doc_manual_log,
+    doc_manual_log_raw,
+    luu_manual_log,
+    lay_pgd_chua_nop,
+    kiem_tra_suc_khoe_nguon,
+    kiem_tra_ket_noi_gsheet,
+    lay_loi_doc_gsheet_gan_nhat,
+    phat_hien_ten_lech_ten,
+    doi_ten_loai_theo_doi,
+)
 
-SHEET_ID = "15Ev2rTv6khLFaMpAiMwqJCVC_33ocJ-6cp016RGNkYk"
-SHEET_TAB = "TIENDO_BAOCAO"
-COT = ["thoi_gian", "email", "ten_pgd", "loai_bao_cao",
-       "ky_bao_cao", "noi_dung", "file_dinh_kem", "ho_ten"]
-
-DS_PGD_ALL = [DON_VI_CHI_NHANH] + DS_PGD
-
-_EMOJI = {"dung_han": "🟢", "tre": "🟡", "chua_nop": "🔴", "da_nop": "⚪"}
-_LABEL = {"dung_han": "Đúng hạn", "tre": "Trễ hạn", "chua_nop": "Chưa nộp", "da_nop": "Đã nộp"}
-
+# ── UI constants ──
 _EMOJI_STRIP = ("🟢", "🟡", "🔴", "⚪", "⚠️", "📝")
 
 def _clean_trang_thai(val: str) -> str:
@@ -49,191 +66,12 @@ def _clear_export_cache():
         st.session_state.pop(k, None)
 
 
-# ── Kết nối & đọc Google Sheets ──────────────────────────────────────────────
-
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
-
-def _tim_credentials() -> Path:
-    candidates = [
-        PROJECT_ROOT / "credentials.json",
-        PROJECT_ROOT.parent / "credentials.json",
-        Path.cwd() / "credentials.json",
-        Path("credentials.json"),
-    ]
-    from config import BASE_DIR as _bd
-    candidates.append(_bd / "credentials.json")
-    for cand in candidates:
-        if cand.exists():
-            return cand.resolve()
-    raise FileNotFoundError(f"Không tìm thấy credentials.json. Đã thử: {[str(c) for c in candidates]}")
-
-def _ket_noi_gsheet():
-    _p = _tim_credentials()
-    scope = [
-        "https://spreadsheets.google.com/feeds",
-        "https://www.googleapis.com/auth/drive",
-    ]
-    try:
-        import gspread
-    except ImportError:
-        raise RuntimeError("Thiếu thư viện gspread. Cài đặt: pip install gspread google-auth")
-    try:
-        return gspread.service_account(filename=str(_p), scopes=scope)
-    except Exception as e:
-        logger.error("_ket_noi_gsheet: fallback oauth2client — %s", e, exc_info=True)
-        try:
-            from oauth2client.service_account import ServiceAccountCredentials
-        except ImportError:
-            raise RuntimeError("Không thể kết nối GSheet: cần cài google-auth hoặc oauth2client.")
-        creds = ServiceAccountCredentials.from_json_keyfile_name(str(_p), scope)
-        return gspread.authorize(creds)
-
-
-def _chuan_hoa_ten_pgd(raw: str) -> str:
-    if not isinstance(raw, str) or not raw.strip():
-        return raw
-    s = raw.strip()
-    for prefix in ("Phòng giao dịch ", "Phong giao dich ", "PGD ", "pgd "):
-        if s.lower().startswith(prefix.lower()):
-            return "PGD " + s[len(prefix):].strip()
-    return s
-
-
-def doc_du_lieu_gsheet() -> pd.DataFrame:
-    """Đọc GSheet không cache — dùng ngoài Streamlit context (daily_report, script)."""
-    try:
-        client = _ket_noi_gsheet()
-        sheet = client.open_by_key(SHEET_ID).worksheet(SHEET_TAB)
-        data = sheet.get_all_values()
-        if len(data) <= 1:
-            return pd.DataFrame(columns=COT)
-        df = pd.DataFrame([r[:len(COT)] for r in data[1:]], columns=COT)
-        df["ten_pgd"] = df["ten_pgd"].apply(_chuan_hoa_ten_pgd)
-        df["thoi_gian"] = pd.to_datetime(df["thoi_gian"], dayfirst=True, errors="coerce")
-        return df
-    except Exception as e:
-        logger.error("doc_du_lieu_gsheet: %s", e, exc_info=True)
-        return pd.DataFrame(columns=COT)
-
-
-def lay_pgd_chua_nop(
-    loai_bao_cao: str,
-    df: pd.DataFrame | None = None,
-) -> tuple[list[str], str | None]:
-    """Trả (ds_pgd_chua_nop, deadline_str) cho 1 loại báo cáo.
-
-    Xét cả manual override: PGD có ghi đè = xem như đã nộp.
-    """
-    deadline_cfg = _doc_deadline_config()
-    deadline_str = deadline_cfg.get(loai_bao_cao)
-
-    if df is None:
-        df = doc_du_lieu_gsheet()
-
-    manual_map = _doc_manual_log()
-    ds_chua_nop: list[str] = []
-    for pgd in DS_PGD_ALL:
-        entry = manual_map.get((pgd, loai_bao_cao))
-        if entry and entry.get("ghi_de", True):
-            continue  # có ghi đè thủ công → xem như đã nộp
-        match = df[(df["ten_pgd"] == pgd) & (df["loai_bao_cao"] == loai_bao_cao)]
-        if match.empty:
-            ds_chua_nop.append(pgd)
-
-    return ds_chua_nop, deadline_str
-
+# ── GSheet data (cached wrapper) ────────────────────────────────────────────
 
 @st.cache_data(ttl=300)
 def _doc_du_lieu() -> pd.DataFrame:
-    try:
-        client = _ket_noi_gsheet()
-        sheet = client.open_by_key(SHEET_ID).worksheet(SHEET_TAB)
-        data = sheet.get_all_values()
-        if len(data) <= 1:
-            return pd.DataFrame(columns=COT)
-        df = pd.DataFrame([r[:len(COT)] for r in data[1:]], columns=COT)
-        df["ten_pgd"] = df["ten_pgd"].apply(_chuan_hoa_ten_pgd)
-        df["thoi_gian"] = pd.to_datetime(df["thoi_gian"], dayfirst=True, errors="coerce")
-        return df
-    except Exception as e:
-        logger.error("_doc_du_lieu GSheet: %s", e, exc_info=True)
-        return pd.DataFrame(columns=COT)
-
-
-# ── Thời hạn hoàn thành ────────────────────────────────────────────────────
-
-def _doc_deadline_config() -> dict:
-    """Đọc cấu hình deadline: {loai_bao_cao: 'YYYY-MM-DD'} — tự normalize từ định dạng cũ."""
-    raw = db.doc_kv("bao_cao_deadline_config") or {}
-    normalized = {}
-    for key, val in raw.items():
-        if isinstance(val, dict):
-            vals = [v for v in val.values() if isinstance(v, str)]
-            if vals:
-                normalized[key] = vals[0]
-        elif isinstance(val, str):
-            normalized[key] = val
-    return normalized
-
-
-def _luu_deadline_config(cfg: dict, username: str) -> None:
-    db.ghi_kv("bao_cao_deadline_config", cfg, username)
-    db.ghi_audit(username, "luu_deadline_bao_cao", f"{len(cfg)} deadline đã lưu")
-
-
-def _phan_loai(ngay_nop, deadline_str: str | None) -> str:
-    """Trả về: 'dung_han' | 'tre' | 'chua_nop' | 'da_nop' (không có deadline)."""
-    if ngay_nop is None or (hasattr(ngay_nop, "__class__") and pd.isna(ngay_nop)):
-        return "chua_nop"
-    if not deadline_str:
-        return "da_nop"
-    try:
-        dl = pd.to_datetime(deadline_str).date()
-        nop = ngay_nop.date() if hasattr(ngay_nop, "date") else pd.to_datetime(ngay_nop).date()
-        return "dung_han" if nop <= dl else "tre"
-    except Exception as e:
-        logger.error("_phan_loai: parse ngay loi — %s", e, exc_info=True)
-        return "da_nop"
-
-
-def _gan_trang_thai(df: pd.DataFrame, deadline_cfg: dict) -> pd.DataFrame:
-    df = df.copy()
-    df["tt"] = df.apply(
-        lambda r: _phan_loai(r["thoi_gian"], deadline_cfg.get(r["loai_bao_cao"])),
-        axis=1,
-    )
-    return df
-
-
-# ── Manual submit log ─────────────────────────────────────────────────────────
-
-_MANUAL_KV_KEY = "manual_nop_tdn"
-
-def _doc_manual_log() -> dict:
-    """Đọc danh sách đánh dấu thủ công: {(pgd, loai): entry_dict}"""
-    raw = db.doc_kv(_MANUAL_KV_KEY)
-    if not isinstance(raw, list):
-        return {}
-    result = {}
-    for entry in raw:
-        if not isinstance(entry, dict):
-            continue
-        pgd = entry.get("pgd")
-        loai = entry.get("loai")
-        if pgd and loai:
-            result[(pgd, loai)] = entry
-    return result
-
-def _doc_manual_log_raw() -> list[dict]:
-    """Đọc danh sách đánh dấu thủ công dạng list nguyên gốc."""
-    raw = db.doc_kv(_MANUAL_KV_KEY)
-    if isinstance(raw, list):
-        return raw
-    return []
-
-def _luu_manual_log(ds: list[dict], username: str) -> None:
-    db.ghi_kv(_MANUAL_KV_KEY, ds, username)
-    db.ghi_audit(username, "tdn_manual_submit", f"{len(ds)} đánh dấu thủ công")
+    """Đọc dữ liệu GSheet có cache 5 phút — dùng trong UI."""
+    return doc_du_lieu_gsheet()
 
 
 # ── Tab 1: Tổng quan ──────────────────────────────────────────────────────────
@@ -247,12 +85,22 @@ def _render_tong_quan(df: pd.DataFrame, deadline_cfg: dict, is_cn: bool, pgd_use
         st.info("ℹ️ Chưa có thời hạn hoàn thành nào được cài đặt. Vào tab **⚙️ Cài đặt thời hạn** để thêm.")
         return
 
+    ds_loai_gsheet_hint = sorted(df["loai_bao_cao"].dropna().unique().tolist()) if not df.empty else []
+    ds_lech = phat_hien_ten_lech_ten(deadline_cfg, ds_loai_gsheet_hint)
+    if ds_lech and can_config:
+        n_co_goi_y = sum(1 for x in ds_lech if x.get("ten_form"))
+        st.warning(
+            f"⚠️ **{len(ds_lech)}** loại đang theo dõi chưa khớp tên Google Form"
+            + (f" ({n_co_goi_y} có gợi ý liên kết)" if n_co_goi_y else "")
+            + " — vào **⚙️ Cài đặt thời hạn** để **🔗 Liên kết**."
+        )
+
     # Chỉ hiển thị loại báo cáo có thời hạn — xóa thời hạn là không còn theo dõi
     ds_loai = sorted(deadline_cfg.keys())
     ds_pgd_scope = [pgd_user] if (not is_cn and pgd_user) else DS_PGD_ALL
 
-    df = _gan_trang_thai(df, deadline_cfg)
-    manual_map = _doc_manual_log()
+    df = gan_trang_thai(df, deadline_cfg)
+    manual_map = doc_manual_log()
 
     # Build ma trận trước — metrics tính từ đây để nhất quán với những gì hiển thị
     rows = []
@@ -266,8 +114,8 @@ def _render_tong_quan(df: pd.DataFrame, deadline_cfg: dict, is_cn: bool, pgd_use
             if entry and ghi_de:
                 # Ghi đè: trạng thái tính từ ngày manual, badge *
                 ngay = pd.to_datetime(entry.get("ngay_nop"))
-                tt = _phan_loai(ngay, deadline_cfg.get(loai))
-                row[loai] = f"{_EMOJI[tt]} {_LABEL[tt]} *"
+                tt = phan_loai_trang_thai(ngay, deadline_cfg.get(loai))
+                row[loai] = f"{EMOJI[tt]} {LABEL[tt]} *"
             else:
                 match = df[(df["ten_pgd"] == pgd) & (df["loai_bao_cao"] == loai)]
                 if match.empty:
@@ -280,7 +128,7 @@ def _render_tong_quan(df: pd.DataFrame, deadline_cfg: dict, is_cn: bool, pgd_use
                     badge_file = " ⚠️" if not co_file else ""
                     # 📝 có ghi chú nhưng không ghi đè
                     badge_note = " 📝" if entry and not ghi_de else ""
-                    row[loai] = f"{_EMOJI[tt]} {_LABEL[tt]}{badge_file}{badge_note}"
+                    row[loai] = f"{EMOJI[tt]} {LABEL[tt]}{badge_file}{badge_note}"
         rows.append(row)
 
     # Metrics từ rows — khớp chính xác với ma trận
@@ -450,7 +298,7 @@ def _render_tong_quan(df: pd.DataFrame, deadline_cfg: dict, is_cn: bool, pgd_use
         st.markdown("### ✏️ Đánh dấu thủ công")
         st.caption("Dùng khi PGD gửi báo cáo ngoài Google Form (email, Zip...)")
 
-        manual_ds = _doc_manual_log_raw()
+        manual_ds = doc_manual_log_raw()
 
         # Bao gồm cả loại BC từ GSheet (dù chưa có deadline) để hỗ trợ đánh dấu
         ds_loai_gsheet_manual = sorted(df["loai_bao_cao"].dropna().unique().tolist()) if not df.empty else []
@@ -493,7 +341,7 @@ def _render_tong_quan(df: pd.DataFrame, deadline_cfg: dict, is_cn: bool, pgd_use
                     "username_tao": username,
                     "tao_luc": pd.Timestamp.now().isoformat(),
                 })
-                _luu_manual_log(ds_moi, username)
+                luu_manual_log(ds_moi, username)
                 st.success(f"✅ Đã đánh dấu: **{pgd_manual}** — **{loai_manual}**")
                 st.rerun()
 
@@ -530,7 +378,7 @@ def _render_tong_quan(df: pd.DataFrame, deadline_cfg: dict, is_cn: bool, pgd_use
                 with c4:
                     if st.button("↩️ Bỏ", key=f"man_del_{i}", use_container_width=True):
                         ds_moi = [e for j, e in enumerate(manual_ds) if j != i]
-                        _luu_manual_log(ds_moi, username)
+                        luu_manual_log(ds_moi, username)
                         st.success(f"✅ Đã bỏ: **{e_pgd}** — **{e_loai}**")
                         st.rerun()
 
@@ -560,8 +408,8 @@ def _render_danh_sach(df: pd.DataFrame, deadline_cfg: dict, is_cn: bool, pgd_use
     if pgd_chon and pgd_chon != "Tất cả":
         df_loc = df_loc[df_loc["ten_pgd"] == pgd_chon]
 
-    df_loc = _gan_trang_thai(df_loc, deadline_cfg)
-    df_loc["tt_hien"] = df_loc["tt"].map(lambda x: f"{_EMOJI.get(x, '')} {_LABEL.get(x, x)}")
+    df_loc = gan_trang_thai(df_loc, deadline_cfg)
+    df_loc["tt_hien"] = df_loc["tt"].map(lambda x: f"{EMOJI.get(x, '')} {LABEL.get(x, x)}")
 
     st.caption(f"Hiển thị {len(df_loc)} / {len(df)} lượt nộp")
 
@@ -645,115 +493,334 @@ def _render_danh_sach(df: pd.DataFrame, deadline_cfg: dict, is_cn: bool, pgd_use
 
 # ── Tab 3: Cài đặt thời hạn hoàn thành ────────────────────────────────────────
 
-def _render_cai_dat(df: pd.DataFrame, deadline_cfg: dict, username: str) -> None:
-    st.markdown("**Cấu hình thời hạn hoàn thành cho từng loại báo cáo**")
-    st.caption("Sau khi lưu, cột Trạng thái sẽ tự tính 🟢 Đúng hạn / 🟡 Trễ / 🔴 Chưa nộp.")
-
-    # ── Thêm loại báo cáo mới (nhập tay — không cần chờ submission) ──────────
-    with st.expander("➕ Thêm loại báo cáo mới", expanded=False):
-        col_ten, col_dl, col_add = st.columns([3, 2, 1])
-        with col_ten:
-            ten_moi = st.text_input(
-                "Tên loại báo cáo",
-                placeholder="VD: Báo cáo tháng 7/2026",
-                key="cd_ten_moi",
-            )
-        with col_dl:
-            dl_moi_add = st.date_input(
-                "Thời hạn hoàn thành",
-                value=date.today(), format="DD/MM/YYYY",
-                key="cd_dl_moi",
-            )
-        with col_add:
-            st.write("")
-            if st.button("💾 Thêm", key="cd_btn_add", type="primary", use_container_width=True):
-                ten_moi = ten_moi.strip()
-                if not ten_moi:
-                    st.warning("⚠️ Nhập tên loại báo cáo trước.")
-                elif ten_moi in deadline_cfg:
-                    st.warning(f"⚠️ **{ten_moi}** đã tồn tại. Chọn từ danh sách bên dưới để sửa.")
-                else:
-                    cfg_moi = dict(deadline_cfg)
-                    cfg_moi[ten_moi] = dl_moi_add.strftime("%Y-%m-%d")
-                    _luu_deadline_config(cfg_moi, username)
-                    st.success(f"✅ Đã thêm: **{ten_moi}** → {dl_moi_add.strftime('%d/%m/%Y')}")
-                    st.rerun()
-
-    # Gộp loại từ GSheet + loại đã có trong deadline_cfg
-    ds_loai_gsheet = sorted(df["loai_bao_cao"].dropna().unique().tolist()) if not df.empty else []
-    ds_loai_cfg    = sorted(deadline_cfg.keys())
-    ds_loai = sorted(set(ds_loai_gsheet) | set(ds_loai_cfg))
-
-    if not ds_loai:
-        st.info("Chưa có loại báo cáo nào. Dùng **➕ Thêm loại báo cáo mới** ở trên để bắt đầu.")
+def _render_canh_bao_lech_ten(
+    deadline_cfg: dict,
+    ds_loai_gsheet: list[str],
+    username: str,
+) -> None:
+    """Cảnh báo tên theo dõi ≠ Google Form + nút liên kết một lần bấm."""
+    ds_lech = phat_hien_ten_lech_ten(deadline_cfg, ds_loai_gsheet)
+    if not ds_lech:
         return
 
+    with st.container(border=True):
+        st.markdown("#### ⚠️ Tên theo dõi chưa khớp Google Form")
+        st.caption(
+            "Ma trận Tổng quan và Telegram nhắc hạn so khớp **đúng từng chữ**. "
+            "Nếu Form đổi tên (VD giai đoạn năm), hãy **liên kết** với tên trên Form."
+        )
+
+        for idx, item in enumerate(ds_lech):
+            ten_cu = item["ten_theo_doi"]
+            ten_form = item.get("ten_form") or ""
+            col_a, col_b = st.columns([3, 1])
+            with col_a:
+                if ten_form:
+                    st.markdown(
+                        f"**{ten_cu}**  \n"
+                        f"→ Gợi ý trên Form: **{ten_form}**"
+                    )
+                else:
+                    st.markdown(f"**{ten_cu}** — không thấy trên Form")
+            with col_b:
+                if ten_form:
+                    if st.button(
+                        "🔗 Liên kết",
+                        key=f"cd_link_form_{idx}",
+                        use_container_width=True,
+                        type="primary",
+                    ):
+                        kq = doi_ten_loai_theo_doi(ten_cu, ten_form, username)
+                        if kq.get("ok"):
+                            extra = []
+                            if kq.get("so_manual_cap_nhat"):
+                                extra.append(f"{kq['so_manual_cap_nhat']} đánh dấu thủ công")
+                            if kq.get("allowlist_cap_nhat"):
+                                extra.append("Telegram allowlist")
+                            msg = kq.get("msg", "Đã liên kết")
+                            if extra:
+                                msg += f" (+ cập nhật {', '.join(extra)})"
+                            st.success(f"✅ {msg}")
+                            st.cache_data.clear()
+                            st.rerun()
+                        else:
+                            st.error(f"❌ {kq.get('msg', 'Lỗi')}")
+                else:
+                    st.caption("Chờ Form có tên mới")
+
+
+def _render_cai_dat(df: pd.DataFrame, deadline_cfg: dict, username: str) -> None:
+    """Tab ⚙️ Cài đặt thời hạn — thiết kế kiểu 2 khối rõ: cần cài / đang theo dõi."""
+
+    # ── CSS inline (dùng CSS variable để tương thích dark mode) ─────
+    st.html("""
+    <style>
+    .cd-header-bar {
+        background: linear-gradient(135deg, var(--primary-color) 0%, color-mix(in srgb, var(--primary-color) 70%, #2563eb) 100%);
+        border-radius: 12px;
+        padding: 16px 20px;
+        margin-bottom: 4px;
+    }
+    .cd-header-bar h3 { color: white; margin: 0 0 2px; font-size: 1.05rem; }
+    .cd-header-bar p  { color: rgba(255,255,255,0.85); margin: 0; font-size: 0.82rem; }
+    .cd-stat-card {
+        border-radius: 10px;
+        padding: 14px 16px;
+        text-align: center;
+        margin-bottom: 4px;
+    }
+    .cd-stat-card .num { font-size: 1.6rem; font-weight: 800; margin:0; line-height:1.2; }
+    .cd-stat-card .lbl { font-size: 0.8rem; opacity:0.85; margin:0; }
+    .cd-stat-green  { background: #e6f7ec; border: 1px solid #a3e4b8; }
+    .cd-stat-amber  { background: #fff7e0; border: 1px solid #fcd34d; }
+    .cd-stat-green .num { color: #15803d; }
+    .cd-stat-amber .num { color: #b45309; }
+    .cd-section-title {
+        display: flex; align-items: center; gap: 8px;
+        padding: 8px 12px; border-radius: 8px; margin-bottom: 8px;
+        font-weight: 700; font-size: 0.92rem;
+    }
+    .cd-title-amber { background: #fff7e0; color: #92400e; }
+    .cd-title-green { background: #e6f7ec; color: #15803d; }
+    .cd-dot { width:10px; height:10px; border-radius:50%; display:inline-block; }
+    .cd-dot-amber { background:#f59e0b; }
+    .cd-dot-green { background:#22c55e; }
+    .cd-table-badge {
+        display: inline-block; padding: 2px 10px; border-radius: 12px;
+        font-size: 0.78rem; font-weight: 600;
+    }
+    .cd-badge-green { background: #dcfce7; color: #166534; }
+    .cd-badge-gray  { background: #f3f4f6; color: #6b7280; }
+    </style>
+    """)
+
+    # ── Gom dữ liệu ───────────────────────────────────────────────
+    ds_loai_gsheet  = sorted(df["loai_bao_cao"].dropna().unique().tolist()) if not df.empty else []
+    ds_loai_cfg     = sorted(deadline_cfg.keys())
+    ds_loai         = sorted(set(ds_loai_gsheet) | set(ds_loai_cfg))
+    ds_loai_chua_cai = sorted(set(ds_loai) - set(ds_loai_cfg))
+
+    if not ds_loai:
+        st.info("📭 Chưa có loại báo cáo nào từ Google Form. Sau khi PGD gửi form, các loại báo cáo sẽ xuất hiện ở đây.")
+        with st.expander("✏️ Tạo thủ công loại báo cáo chưa có trong Form", expanded=False):
+            _render_them_loai_thu_cong(deadline_cfg, username)
+        return
+
+    # ── Banner header màu ──────────────────────────────────────────
+    st.html(f"""
+    <div class="cd-header-bar">
+        <h3>⚙️ Cài đặt thời hạn hoàn thành</h3>
+        <p>Các loại báo cáo có deadline sẽ tự hiện 🟢 Đúng hạn · 🟡 Trễ · 🔴 Chưa nộp trong tab Tổng quan</p>
+    </div>
+    """)
+
+    # ── 2 thẻ số liệu màu ──────────────────────────────────────────
+    c1, c2, c3 = st.columns([1, 1, 4])
+    with c1:
+        st.html(f"""
+        <div class="cd-stat-card cd-stat-green">
+            <div class="num">{len(ds_loai_cfg)}</div>
+            <div class="lbl">✅ Đang theo dõi</div>
+        </div>
+        """)
+    with c2:
+        st.html(f"""
+        <div class="cd-stat-card cd-stat-amber">
+            <div class="num">{len(ds_loai_chua_cai)}</div>
+            <div class="lbl">📋 Cần cài</div>
+        </div>
+        """)
+    with c3:
+        st.write("")
+
+    if ds_loai_cfg:
+        _render_canh_bao_lech_ten(deadline_cfg, ds_loai_gsheet, username)
+
     st.divider()
 
-    # Hiển thị label kèm trạng thái đã có thời hạn chưa
-    def _label(loai: str) -> str:
-        return f"{loai}  ✅" if loai in deadline_cfg else loai
+    # ════════════════════════════════════════════════════════════════
+    # KHỐI 1: CẦN CÀI DEADLINE
+    # ════════════════════════════════════════════════════════════════
+    if ds_loai_chua_cai:
+        with st.container(border=True):
+            st.html(
+                '<div class="cd-section-title cd-title-amber">'
+                '<span class="cd-dot cd-dot-amber"></span> CẦN CÀI DEADLINE'
+                '</div>'
+            )
+            st.caption(f"Đã ghi nhận từ Google Form — chọn loại và deadline để bắt đầu theo dõi.")
 
-    loai_options = ds_loai
-    loai_labels  = [_label(l) for l in loai_options]
-    idx = st.selectbox(
-        "Chọn loại báo cáo để sửa / xóa",
-        range(len(loai_options)),
-        format_func=lambda i: loai_labels[i],
-        key="cd_loai",
-    )
-    loai_chon = loai_options[idx]
-
-    dl_hien   = deadline_cfg.get(loai_chon)
-    dl_default = pd.to_datetime(dl_hien).date() if dl_hien else date.today()
-
-    col_input, col_btn, col_del = st.columns([3, 1, 1])
-    with col_input:
-        dl_moi = st.date_input(
-            f"Thời hạn hoàn thành — **{loai_chon}**",
-            value=dl_default, format="DD/MM/YYYY",
-            key="cd_dl_input",
-        )
-    with col_btn:
-        st.write("")  # spacing
-        if st.button("💾 Lưu", key="cd_btn_luu", type="primary", use_container_width=True):
-            cfg_moi = dict(deadline_cfg)
-            cfg_moi[loai_chon] = dl_moi.strftime("%Y-%m-%d")
-            _luu_deadline_config(cfg_moi, username)
-            st.success(f"✅ Đã lưu: **{loai_chon}** → {dl_moi.strftime('%d/%m/%Y')}")
-            st.rerun()
-    with col_del:
-        st.write("")  # spacing
-        if dl_hien:
-            with st.popover("🗑 Xóa", use_container_width=True):
-                st.warning(f"Xóa thời hạn hoàn thành của **{loai_chon}**?")
-                st.caption("Loại báo cáo này sẽ không còn được theo dõi ở tab Tổng quan.")
-                if st.button("⚠️ Xác nhận xóa", key="cd_btn_xoa_cf", type="primary", use_container_width=True):
+            col_left, col_right = st.columns([2, 1])
+            with col_left:
+                loai_can_them = st.multiselect(
+                    "Chọn loại báo cáo",
+                    options=ds_loai_chua_cai,
+                    default=[],
+                    key="cd_loai_chua_cai",
+                    placeholder=f"Chọn trong {len(ds_loai_chua_cai)} loại...",
+                    label_visibility="collapsed",
+                )
+            with col_right:
+                dl_moi_auto = st.date_input(
+                    "Deadline",
+                    value=date.today(),
+                    format="DD/MM/YYYY",
+                    key="cd_dl_auto",
+                    label_visibility="collapsed",
+                )
+                if st.button(
+                    "➕ Thêm vào theo dõi",
+                    key="cd_btn_add_auto",
+                    type="primary",
+                    use_container_width=True,
+                    disabled=not loai_can_them,
+                ):
                     cfg_moi = dict(deadline_cfg)
-                    cfg_moi.pop(loai_chon, None)
-                    _luu_deadline_config(cfg_moi, username)
-                    st.success(f"✅ Đã xóa thời hạn: **{loai_chon}**")
+                    for loai in loai_can_them:
+                        cfg_moi[loai] = dl_moi_auto.strftime("%Y-%m-%d")
+                    luu_deadline_config(cfg_moi, username)
+                    st.success(f"✅ Đã thêm {len(loai_can_them)} loại — deadline {dl_moi_auto.strftime('%d/%m/%Y')}")
                     st.rerun()
 
+            st.dataframe(
+                pd.DataFrame({"Loại báo cáo chưa theo dõi": ds_loai_chua_cai}),
+                hide_index=True,
+                use_container_width=True,
+                height=max(120, min(400, len(ds_loai_chua_cai) * 35 + 38)),
+            )
+
+    # ════════════════════════════════════════════════════════════════
+    # KHỐI 2: ĐANG THEO DÕI
+    # ════════════════════════════════════════════════════════════════
+    if ds_loai_cfg:
+        with st.container(border=True):
+            st.html(
+                '<div class="cd-section-title cd-title-green">'
+                '<span class="cd-dot cd-dot-green"></span> ĐANG THEO DÕI'
+                '</div>'
+            )
+            st.caption("Chọn một loại bên dưới để sửa deadline hoặc ngừng theo dõi.")
+
+            loai_chon = st.selectbox(
+                "Chọn loại đang theo dõi",
+                ds_loai_cfg,
+                key="cd_loai_cfg",
+                label_visibility="collapsed",
+            )
+
+            goi_y_form = next(
+                (x.get("ten_form") for x in phat_hien_ten_lech_ten(deadline_cfg, ds_loai_gsheet)
+                 if x.get("ten_theo_doi") == loai_chon and x.get("ten_form")),
+                None,
+            )
+            if goi_y_form:
+                st.info(
+                    f"ℹ️ Tên trên Form: **{goi_y_form}**. "
+                    f"Dùng **🔗 Liên kết** ở khối cảnh báo phía trên để đồng bộ Telegram + ma trận."
+                )
+
+            dl_hien = deadline_cfg.get(loai_chon)
+            dl_default = pd.to_datetime(dl_hien).date() if dl_hien else date.today()
+
+            col_a, col_b, col_c = st.columns([2, 1, 1])
+            with col_a:
+                dl_moi = st.date_input(
+                    "Deadline mới",
+                    value=dl_default,
+                    format="DD/MM/YYYY",
+                    key="cd_dl_input",
+                    label_visibility="collapsed",
+                )
+            with col_b:
+                if st.button("💾 Cập nhật", key="cd_btn_luu", use_container_width=True):
+                    cfg_moi = dict(deadline_cfg)
+                    cfg_moi[loai_chon] = dl_moi.strftime("%Y-%m-%d")
+                    luu_deadline_config(cfg_moi, username)
+                    st.success(f"✅ {loai_chon} → {dl_moi.strftime('%d/%m/%Y')}")
+                    st.rerun()
+            with col_c:
+                if st.button("🗑 Ngưng", key="cd_btn_ngung_nhanh", use_container_width=True,
+                             help=f"Ngưng theo dõi {loai_chon}"):
+                    cfg_moi = dict(deadline_cfg)
+                    cfg_moi.pop(loai_chon, None)
+                    luu_deadline_config(cfg_moi, username)
+                    st.success(f"✅ Đã ngưng theo dõi: {loai_chon}")
+                    st.rerun()
+
+            # Bảng tóm tắt nhanh — đánh dấu màu deadline sắp đến / đã qua
+            rows = []
+            today = date.today()
+            for loai, dl in sorted(deadline_cfg.items()):
+                dl_dt = pd.to_datetime(dl).date() if dl else None
+                dl_str = dl_dt.strftime("%d/%m/%Y") if dl_dt else "—"
+                if dl_dt is None:
+                    badge = '<span class="cd-table-badge cd-badge-gray">Chưa đặt</span>'
+                elif dl_dt < today:
+                    badge = f'<span class="cd-table-badge cd-badge-gray">🔴 {dl_str}</span>'
+                elif (dl_dt - today).days <= 3:
+                    badge = f'<span class="cd-table-badge cd-badge-gray">🟡 {dl_str}</span>'
+                else:
+                    badge = f'<span class="cd-table-badge cd-badge-gray">🟢 {dl_str}</span>'
+                rows.append({"Loại báo cáo": loai, "Thời hạn": badge})
+
+            df_rows = pd.DataFrame(rows)
+            st.dataframe(
+                df_rows,
+                hide_index=True,
+                use_container_width=True,
+                height=max(120, min(400, len(rows) * 35 + 38)),
+                column_config={
+                    "Thời hạn": st.column_config.Column("Thời hạn", width="small"),
+                },
+            )
+
+    # ── Góc dưới: thêm thủ công + xóa tất cả ──────────────────────
     st.divider()
-    st.markdown("**Danh sách thời hạn hoàn thành đã cài đặt**")
-    rows = [{"Loại báo cáo": loai, "Thời hạn": pd.to_datetime(dl).strftime("%d/%m/%Y") if dl else dl}
-            for loai, dl in sorted(deadline_cfg.items())]
-    if rows:
-        st.dataframe(
-            pd.DataFrame(rows),
-            hide_index=True, use_container_width=True,
-        )
-        # Nút xóa tất cả
+    with st.expander("✏️ Thêm thủ công loại báo cáo chưa có trong Form", expanded=False):
+        _render_them_loai_thu_cong(deadline_cfg, username)
+
+    if ds_loai_cfg:
         with st.popover("🗑 Xóa tất cả deadline", use_container_width=False):
-            st.warning(f"Xóa toàn bộ **{len(rows)} deadline** đã cài đặt?")
-            st.caption("Các loại báo cáo sẽ không còn được theo dõi trạng thái ở tab Tổng quan.")
+            st.warning(f"Xóa toàn bộ **{len(ds_loai_cfg)} deadline** đã cài?")
+            st.caption("Các loại báo cáo sẽ không còn được theo dõi ở tab Tổng quan.")
             if st.button("⚠️ Xác nhận xóa tất cả", key="cd_btn_xoa_het", type="primary", use_container_width=True):
-                _luu_deadline_config({}, username)
+                luu_deadline_config({}, username)
                 st.success("✅ Đã xóa toàn bộ deadline.")
                 st.rerun()
-    else:
-        st.info("Chưa có thời hạn hoàn thành nào. Dùng **➕ Thêm loại báo cáo mới** ở trên để thêm.")
+
+
+def _render_them_loai_thu_cong(deadline_cfg: dict, username: str) -> None:
+    """Thêm loại báo cáo bằng tay (chưa có trong Google Form)."""
+    col_ten, col_dl, col_add = st.columns([3, 2, 1])
+    with col_ten:
+        ten_moi = st.text_input(
+            "Tên loại báo cáo",
+            placeholder="VD: Báo cáo tháng 7/2026",
+            key="cd_ten_moi",
+            label_visibility="collapsed",
+        )
+    with col_dl:
+        dl_moi_add = st.date_input(
+            "Deadline",
+            value=date.today(),
+            format="DD/MM/YYYY",
+            key="cd_dl_moi",
+            label_visibility="collapsed",
+        )
+    with col_add:
+        st.write("")
+        if st.button("💾 Thêm", key="cd_btn_add", type="primary", use_container_width=True):
+            ten_moi = ten_moi.strip()
+            if not ten_moi:
+                st.warning("⚠️ Nhập tên loại báo cáo.")
+            elif ten_moi in deadline_cfg:
+                st.warning(f"⚠️ **{ten_moi}** đã tồn tại.")
+            else:
+                cfg_moi = dict(deadline_cfg)
+                cfg_moi[ten_moi] = dl_moi_add.strftime("%Y-%m-%d")
+                luu_deadline_config(cfg_moi, username)
+                st.success(f"✅ Đã thêm **{ten_moi}** → {dl_moi_add.strftime('%d/%m/%Y')}")
+                st.rerun()
 
 
 # ── Tab Hướng dẫn với Mockup ───────────────────────────────────────────────────
@@ -860,28 +927,6 @@ def _render_huong_dan_mockup() -> None:
 
 _CACHE_VER = "v2"
 
-def _kiem_tra_ket_noi():
-    """Kiểm tra toàn bộ chuỗi kết nối GSheet — trả về (ok, msg)."""
-    from pathlib import Path
-    root = Path(__file__).resolve().parent.parent
-    cred_path = root / "credentials.json"
-    if not cred_path.exists():
-        return False, f"KHÔNG tìm thấy {cred_path}"
-    try:
-        import gspread
-    except ImportError:
-        return False, "Thiếu thư viện gspread"
-    try:
-        scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-        client = gspread.service_account(filename=str(cred_path), scopes=scope)
-        sheet = client.open_by_key(SHEET_ID)
-        ws = sheet.worksheet(SHEET_TAB)
-        data = ws.get_all_values()
-        return True, f"OK — {sheet.title}/{ws.title}: {len(data)} dòng"
-    except Exception as e:
-        logger.error("_kiem_tra_ket_noi: %s", e, exc_info=True)
-        return False, f"LỖI: {type(e).__name__}: {e}"
-
 def render(tab: DeltaGenerator = None, **kwargs) -> None:
     role_raw = str(kwargs.get("role", "user") or "user")
     role_n = normalize_role(role_raw)
@@ -891,7 +936,7 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
 
     ctx = TabContext(tab, **kwargs)
     with ctx:
-        ok, msg = _kiem_tra_ket_noi()
+        ok, msg = kiem_tra_ket_noi_gsheet()
         if not ok:
             st.error(f"🔴 **GSheet lỗi:** {msg}")
         else:
@@ -908,8 +953,12 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
 
         df = _doc_du_lieu()
         if df.empty:
-            st.warning("⚠️ Không thể kết nối Google Sheets hoặc chưa có dữ liệu. Thử nhấn 🔄 Làm mới.")
-        deadline_cfg = _doc_deadline_config()
+            loi_gs = lay_loi_doc_gsheet_gan_nhat()
+            if loi_gs:
+                st.warning(f"⚠️ Không đọc được Google Sheets: {loi_gs}")
+            else:
+                st.warning("⚠️ Chưa có dữ liệu từ Google Sheets. Thử nhấn 🔄 Làm mới.")
+        deadline_cfg = doc_deadline_config()
 
         # PGD role: chỉ thấy dữ liệu của PGD mình
         if not is_cn and pgd_user:

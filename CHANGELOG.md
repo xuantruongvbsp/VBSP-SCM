@@ -1,5 +1,75 @@
 # CHANGELOG
 
+## [2026-07-04] — Tiến độ nộp BC: liên kết tên Form ↔ theo dõi (fix lệch KHTD)
+- `services/report_submission_service.py` — thêm `phat_hien_ten_lech_ten()`, `doi_ten_loai_theo_doi()` migrate deadline + manual log + `telegram_deadline_bc_allowlist`
+- `tabs/tab_tien_do_nop.py` — khối cảnh báo ⚠️ + nút 🔗 Liên kết; cảnh báo trên tab Tổng quan khi tên chưa khớp Form
+- `tabs/tab_telegram_admin.py` — import `doc_du_lieu_gsheet`/`lay_pgd_chua_nop` từ service thay tab
+- `tests/test_report_submission_service.py` — test phát hiện lệch tên giai đoạn năm + migrate allowlist
+
+## [2026-07-04] — GSheet Tiến độ nộp BC: retry API 500 + đọc REST ổn định hơn
+- `services/report_submission_service.py` — `_doc_raw_values_sheet()` đọc REST v4 + retry 3 lần khi Google trả 5xx/429; thêm `kiem_tra_ket_noi_gsheet()`, `lay_loi_doc_gsheet_gan_nhat()`
+- `tabs/tab_tien_do_nop.py` — dùng health-check từ service; hiển thị lỗi chi tiết khi sheet rỗng do lỗi kết nối
+
+## [2026-07-04] — Menu Điều hành: nhóm Báo cáo lên trên Giám sát
+- `workspaces/ws_management.py` — đổi thứ tự `ALL_ITEMS`: nhóm **Báo cáo** hiển thị ngay sau **Nội bộ Phòng**, trước **Giám sát**
+
+## [2026-07-04] — Fix Tổng quan trống sau Import hàng loạt + Merge
+- `tabs/tab_upload_khnv/_state.py` — thêm `lam_moi_du_lieu_app()`: xóa `_ctx`, `_ctx_cache_key`, `df_full` và `cache_resource` sau merge (chỉ `cache_data.clear()` không đủ)
+- `tabs/tab_upload_khnv.py` — gọi `lam_moi_du_lieu_app()` sau import folder / upload đơn vị khi merge thành công
+- `tabs/tab_upload_khnv/_merge_panel.py` — dùng `lam_moi_du_lieu_app()` thay `cache_data.clear()`
+- `tabs/tab_tongquan.py` — cảnh báo rõ khi `df` rỗng sau merge (không chỉ `None`)
+
+## [2026-07-04] — Tối ưu hiệu năng Merge & Rebuild Cache sau import HSTD hàng loạt
+- `services/upload_service.py` — thêm `prewarm_pgd_parquet()`, `merge_nhieu_loai_toan_cn()`, gom logic đọc PGD vào `_doc_excel_pgd_thanh_df()`; tối ưu `_normalize_merge_dataframe_for_parquet()` (bỏ copy + bỏ re-normalize cột mã đã xử lý ở tầng PGD); snapshot background đọc từ parquet thay vì `df.copy()`
+- `tabs/tab_upload_khnv.py` — import folder: prewarm parquet ngay sau khi lưu Excel; merge nhiều loại song song qua `merge_nhieu_loai_toan_cn()`
+- `tabs/tab_upload_khnv/_merge_panel.py` — Rebuild Cache chạy song song hstd/nq11/gqvl thay vì tuần tự
+
+## [2026-07-03] — Chặn merge HSTD khi baseline/dữ liệu hiện tại bị trùng chéo giữa các PGD
+- `services/validation_service.py` dòng ~365 — thêm `validate_hstd_cross_pgd_duplicates()` để phát hiện khoản vay trùng chéo liên PGD theo khóa `Mã KH + Số khế ước`, tổng hợp top cặp PGD, đơn vị ảnh hưởng và mẫu dòng cần rà nguồn
+- `services/upload_service.py` dòng ~132, ~177, ~928, ~1159 — gom chuẩn hóa dtype merge vào helper dùng chung cho current/baseline, block publish cache HSTD nếu phát hiện trùng chéo, ghi audit riêng cho merge bị chặn và giữ nguyên cache đang dùng
+- `tabs/tab_upload_khnv.py` dòng ~1303, ~1365, ~1381, ~1705 — hiển thị chẩn đoán trùng chéo sau rerun ở tab upload baseline/current merge, đồng thời sửa luồng fragment để không còn báo thành công khi merge thực tế bị block
+- `tests/test_merge_du_lieu_toan_cn.py` dòng ~810 — thêm regression tests cho 2 case: merge HSTD hiện tại bị block khi dữ liệu trùng chéo, và baseline HSTD giữ nguyên cache cũ khi file mới bị lỗi tương tự
+
+## [2026-07-03] — Đợt 1: Tách service lõi cho luồng báo cáo từ Phòng giao dịch
+- `services/report_submission_service.py` — tạo mới, gom toàn bộ logic nghiệp vụ: đọc GSheet, deadline, manual override, phân loại trạng thái, ma trận tiến độ, danh sách nhắc hạn, health-check nguồn
+- `scripts/nhac_deadline.py` — xóa logic trùng lặp (~100 dòng), thay bằng import từ service; `nhac()` dùng `lay_danh_sach_can_nhac()` thay vì tự duyệt deadline
+- `tabs/tab_tien_do_nop.py` — xóa logic trùng lặp (~180 dòng), thay bằng import từ service; giữ UI render và cache wrapper `_doc_du_lieu()`
+
+## [2026-07-03] — Lập kế hoạch nâng cấp chức năng báo cáo từ Phòng giao dịch
+- `KE_HOACH_BAO_CAO_PGD.md` — thêm kế hoạch triển khai chi tiết cho luồng `PGD nộp báo cáo về Chi nhánh`, gồm phạm vi, phase thực hiện, backlog ưu tiên, mapping file và tiêu chí nghiệm thu
+- `BACKLOG.md` — bổ sung nhóm việc ưu tiên tiếp theo cho mảng báo cáo PGD để theo dõi tiến độ triển khai theo từng đợt
+
+## [2026-07-03] — Baseline 31/12: bỏ cache helper `ts` để hết giữ mốc cũ trong 5 phút
+- `data/hstd.py` — bỏ `@st.cache_data(ttl=300)` khỏi `ts_baseline_merged()`; helper này chỉ stat ~22 file nên đủ nhẹ để tính trực tiếp, đổi lại tránh trường hợp file baseline đã đổi nhưng `doc_baseline_merged(..., ts=...)` vẫn dùng `ts` cũ và giữ số `Tổng dư nợ 31/12/2025` stale trong cùng process
+- `BUGMAP.md` — ghi nhận lỗi `ts_baseline_merged()` tự cache làm hỏng cơ chế bust-cache của baseline HSTD
+
+## [2026-07-03] — Baseline 31/12: tránh rebuild giả do alias Hội sở trong cache
+- `data/hstd.py` — chuẩn hóa alias Hội sở (`Hội sở CN Đồng Nai`, `CN Đồng Nai`, `PGD Biên Hòa`...) về `DON_VI_CHI_NHANH` ngay khi đọc cache/rebuild baseline, đồng thời đưa file baseline tổng cũ `data/baseline/HSTD_3112_YYYY.XLSX` vào nhánh bust-cache/stale-check khi chưa có per-PGD
+- `BUGMAP.md` — ghi nhận lỗi cache baseline tự rebuild do lệch tên Hội sở giữa parquet và constant nội bộ
+
+## [2026-07-02] — Baseline 31/12: đồng bộ cache theo mtime để tránh giữ số liệu cũ
+- `data/hstd.py` — thêm `ts_baseline_merged()` và cho `doc_baseline_merged()` nhận `ts` để bust cache đúng khi file baseline/cached parquet thay đổi
+- `tabs/tab_so_sanh_ky/render_moc_nam.py` — truyền `ts_baseline_merged(chon_nam)` khi đọc baseline 31/12 để `Tổng dư nợ` toàn Chi nhánh cập nhật ngay sau upload/rebuild
+- `tabs/tab_bien_ban_giao_ban.py` — đồng bộ cách đọc baseline 31/12 sang tham số `ts`, tránh giữ object baseline cũ trong phiên
+- `tabs/tab_thong_bao_ket_luan.py` — đồng bộ cách đọc baseline 31/12 sang tham số `ts`, tránh lấy số liệu mốc stale
+- `tabs/tab_khtd_mau07.py` — sửa call-site baseline 31/12 sang tham số `ts` mới để vừa đúng runtime vừa đồng bộ cache-busting
+
+## [2026-06-30] — Luồng workspace/login: làm mới giao diện chọn không gian và màn đăng nhập
+- `app.py` — giữ 3 card workspace theo giao diện phẳng, đồng bộ phong cách thương hiệu VBSP-SCM với hero banner, chip thông tin và card có vai trò/điểm nhấn rõ hơn
+- `auth.py` — thiết kế lại màn đăng nhập sau khi chọn workspace theo bố cục 2 cột: hero thông tin bên trái, login card bên phải, hiển thị rõ không gian đã chọn và mô tả phân hệ
+
+## [2026-06-30] — Tiến độ nộp BC: làm rõ mục sửa/xóa loại báo cáo và đưa nút xóa ra ngoài
+- `tabs/tab_tien_do_nop.py` — tách riêng loại đã cài deadline với loại chỉ mới xuất hiện từ Google Form, đổi wording để tránh hiểu nhầm với xóa dữ liệu nộp, và thêm thao tác `🗑 Xóa khỏi danh sách theo dõi` hiển thị trực tiếp cho loại báo cáo đã hoàn thành kỳ theo dõi
+- `tabs/tab_tien_do_nop.py` — bổ sung khối cài nhanh deadline cho các loại báo cáo đã xuất hiện từ Google Form nhưng chưa theo dõi, hỗ trợ chọn nhiều loại và gán cùng một deadline
+
+## [2026-06-30] — Báo cáo tín dụng: tự nạp CDTOTKVV khi context chưa truyền vào
+- `tabs/tab_baocao/__init__.py` — fallback nạp `df_cdtotkvv` từ `load_cdto_toan_cn()` khi `app.py`/workspace chưa truyền context; PGD mode lọc đúng theo `pgd_user` để thẻ và báo cáo `🔴 CDTOTKVV` không còn báo trống dù đã upload
+
+## [2026-07-01] — Telegram Admin: tránh crash allowlist stale ở Nhắc nộp báo cáo
+- `tabs/tab_telegram_admin.py` — chuẩn hóa allowlist theo danh mục deadline hiện có trước khi render `st.multiselect()` và trước khi `▶ Gửi ngay`, đồng thời cảnh báo khi phát hiện loại báo cáo stale đã bị xóa/đổi tên
+- `BUGMAP.md` — ghi bug mới về `multiselect default` lệch `options` khi allowlist stale làm tab Telegram Admin có thể crash
+- `CHANGELOG.md` — bổ sung entry fix ngày thực tế 2026-07-01 và chỉnh lại entry allowlist cũ bị ghi nhầm ngày
+
 ## [2026-07-01] — Telegram: đưa `nhap_lieu` vào Admin và chuẩn hóa sender cho polling bot
 - `tabs/tab_telegram_admin.py` — thêm loại thông báo `📝 Nhắc nhập liệu` vào danh sách quản trị, cấu hình đúng giờ Task Scheduler, hỗ trợ `▶ Gửi ngay` cho nhắc nhập liệu; đồng thời đồng bộ giờ `health_check` về `06:30`
 - `scripts/nhac_deadline.py` — `_nhac_theo_doi_nhap_lieu()` nay trả về trạng thái chi tiết `(đã gửi / đang cần nhắc / lỗi đầu tiên)` và gửi qua `notify_key='nhap_lieu'` để dùng đúng toggle/chat phụ trong tab Admin
@@ -14,7 +84,7 @@
 - `services/telegram_service.py` — thêm `_rut_gon_loi_telegram()`, `_gui_tin_core()` và `gui_tin_chi_tiet()` để bóc tách `description` từ JSON Telegram thay vì cắt cụt `r.text`; giữ `gui_tin()` tương thích cũ
 - `tabs/tab_telegram_admin.py` — nút `🧪 Test kết nối` nay hiển thị chi tiết lỗi thực (`chat not found`, `can't parse entities`...) và tự thử lại bằng plain text nếu lỗi do `parse_mode=HTML`; tab `📋 Lịch sử` cũng hiển thị chuỗi lỗi dài hơn
 
-## [2026-06-30] — Telegram: Nhắc nộp báo cáo cho phép chọn loại báo cáo
+## [2026-07-01] — Telegram: Nhắc nộp báo cáo cho phép chọn loại báo cáo
 - `tabs/tab_telegram_admin.py` — thêm cấu hình lọc allowlist loại báo cáo cho `🧾 Nhắc nộp báo cáo` (gửi tất cả hoặc chỉ các loại đã chọn)
 - `services/telegram_service.py` — thêm `doc_deadline_bc_allowlist()`/`luu_deadline_bc_allowlist()` lưu allowlist vào kv_store
 - `scripts/nhac_deadline.py` — nhắc deadline tự động chỉ gửi cho các loại trong allowlist (nếu có)

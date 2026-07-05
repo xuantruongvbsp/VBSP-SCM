@@ -106,6 +106,42 @@
 | **Fix** | Sau khi đọc cache parquet, kiểm tra tính đầy đủ: nếu có PGD nào trên đĩa (`os.path.exists`) mà thiếu trong cột `COT_TEN_PGD` của cache → coi cache không hợp lệ → tự rebuild. |
 | **Ngày fix** | 2026-05-25 |
 
+### A4f — Baseline 31/12 giữ số liệu cũ sau khi upload/rebuild trong cùng phiên
+| | |
+|---|---|
+| **File** | `data/hstd.py` → `doc_baseline_merged()`; `tabs/tab_so_sanh_ky/render_moc_nam.py`; `tabs/tab_bien_ban_giao_ban.py`; `tabs/tab_thong_bao_ket_luan.py`; `tabs/tab_khtd_mau07.py` |
+| **Dấu hiệu** | Màn `📈 So sánh mốc năm` hoặc các chức năng dùng baseline 31/12 vẫn hiện `Tổng dư nợ 31/12/YYYY` cũ dù đã upload lại file mốc hoặc vừa bấm `🔄 Tổng hợp baseline ngay` |
+| **Nguyên nhân** | `doc_baseline_merged()` dùng `@st.cache_resource` nhưng không nhận tham số bust-cache theo `mtime`; trong khi luồng upload/rebuild baseline chủ yếu chỉ `st.rerun()`/`st.cache_data.clear()`. Kết quả: Streamlit giữ lại object baseline cũ trong cùng phiên |
+| **Fix** | Thêm helper `ts_baseline_merged(nam)` lấy `mtime` lớn nhất của cache parquet + toàn bộ file `HSTD_3112_YYYY.XLSX`, đổi `doc_baseline_merged(nam, ts=...)`, và tất cả call-site baseline 31/12 truyền `ts` này để tự reload đúng khi nguồn đổi |
+| **Ngày fix** | 2026-07-02 |
+
+### A4g — Cache baseline tự rebuild mỗi lần vì lệch alias Hội sở
+| | |
+|---|---|
+| **File** | `data/hstd.py` → `_canon_ten_pgd_baseline()`, `doc_baseline_merged()` |
+| **Dấu hiệu** | Tab `📈 So sánh mốc năm` vẫn load chậm và log `cache thiếu 1 PGD (22/22 đơn vị có file) → rebuild` ở mỗi lần mở, dù tổng số đơn vị và số liệu sau rebuild đều đúng |
+| **Nguyên nhân** | File/cache baseline có dòng Hội sở với tên `Hội sở CN Đồng Nai` trong khi completeness check lại so với key nội bộ `DON_VI_CHI_NHANH = "Hội sở Chi nhánh tỉnh"`. Kết quả: cache luôn bị xem là thiếu 1 đơn vị giả |
+| **Fix** | Chuẩn hóa alias Hội sở về `DON_VI_CHI_NHANH` ngay khi đọc cache parquet và khi rebuild từ từng file PGD, rồi mới so tập đơn vị có file trên đĩa |
+| **Ngày fix** | 2026-07-03 |
+
+### A4h — Fallback baseline tổng cũ không bust cache khi file `HSTD_3112_YYYY.XLSX` đổi
+| | |
+|---|---|
+| **File** | `data/hstd.py` → `ts_baseline_merged()`, `doc_baseline_merged()` |
+| **Dấu hiệu** | Ở môi trường chưa có baseline per-PGD, thay file tổng `data/baseline/HSTD_3112_YYYY.XLSX` rồi reload app nhưng màn `📈 So sánh mốc năm` vẫn giữ số cũ trong cùng phiên |
+| **Nguyên nhân** | Helper `ts_baseline_merged()` và stale-check của `doc_baseline_merged()` chỉ nhìn cache parquet + file per-PGD; nhánh fallback `doc_baseline(nam)` dùng file tổng cũ không được đưa vào cache key |
+| **Fix** | Khi chưa có file baseline per-PGD, thêm `baseline_path(nam)` vào timestamp tổng hợp và so luôn `mtime` file tổng với `cache_mtime` trước khi quyết định dùng lại cache |
+| **Ngày fix** | 2026-07-03 |
+
+### A4i — `ts_baseline_merged()` tự cache 5 phút làm baseline HSTD vẫn stale
+| | |
+|---|---|
+| **File** | `data/hstd.py` → `ts_baseline_merged()` |
+| **Dấu hiệu** | File baseline HSTD 31/12 đã đổi nhưng màn `📈 So sánh mốc năm` vẫn giữ `Tổng dư nợ 31/12/YYYY` cũ trong cùng process; `Ctrl+F5` không đổi số ngay |
+| **Nguyên nhân** | `doc_baseline_merged()` đã nhận tham số `ts` để bust cache, nhưng chính helper `ts_baseline_merged()` lại bị `@st.cache_data(ttl=300)`. Khi file đổi trong vòng 5 phút, helper vẫn trả `ts` cũ nên `cache_resource` của baseline không bị invalidated |
+| **Fix** | Bỏ cache khỏi `ts_baseline_merged()`. Hàm này chỉ `stat` ~22 file nên rất nhẹ, và cần luôn phản ánh `mtime` mới nhất của cache parquet/file baseline |
+| **Ngày fix** | 2026-07-03 |
+
 ### A5 — DuckDB `Binder Error: Referenced column not found in FROM clause`
 | | |
 |---|---|
@@ -409,6 +445,33 @@
 | **Nguyên nhân** | `nhap_lieu` chỉ tồn tại trong script scheduler, không được khai báo trong `_NOTIFY_META`; sender trong `telegram_polling.py` gọi `requests.post` trực tiếp và chỉ trả `bool`, không tái dùng helper đã chuẩn hóa lỗi Telegram |
 | **Fix** | Thêm `nhap_lieu` vào metadata quản trị + giờ Task Scheduler + nhánh `▶ Gửi ngay`; đổi `_nhac_theo_doi_nhap_lieu()` sang trả trạng thái chi tiết và gửi theo `notify_key='nhap_lieu'`; refactor polling bot dùng sender chuẩn hóa lỗi từ `telegram_service.py` |
 | **Ngày fix** | 2026-07-01 |
+
+### B22 — Telegram Admin crash khi allowlist deadline chứa loại báo cáo stale
+| | |
+|---|---|
+| **File** | `tabs/tab_telegram_admin.py` → expander `🧾 Nhắc nộp báo cáo`, `_gui_ngay("deadline_bc")` |
+| **Dấu hiệu** | Mở tab `🤖 Quản trị Telegram Bot` có thể crash ở `st.multiselect`, hoặc `▶ Gửi ngay` báo số loại lọc sai, sau khi một loại báo cáo trong `bao_cao_deadline_config` đã bị xóa/đổi tên nhưng vẫn còn trong kv key `telegram_deadline_bc_allowlist` |
+| **Nguyên nhân** | `st.multiselect` yêu cầu `default` phải là tập con của `options`. Code dùng thẳng allowlist đã lưu làm `default`, nên state stale từ kv_store không còn khớp danh mục deadline hiện tại |
+| **Fix** | Chuẩn hóa allowlist trước khi render/gửi: chỉ giữ các loại còn tồn tại trong `deadline_cfg`, cảnh báo số loại stale bị loại bỏ, và khi user bấm lưu thì chỉ persist danh sách đã được làm sạch |
+| **Ngày fix** | 2026-07-01 |
+
+### B23 — Báo cáo tín dụng `🔴 CDTOTKVV` báo trống dù đã upload
+| | |
+|---|---|
+| **File** | `tabs/tab_baocao/__init__.py` |
+| **Dấu hiệu** | Vào `📊 Báo cáo tín dụng` thấy card/report `🔴 CDTOTKVV` báo `⚠️ Chưa có dữ liệu CDTOTKVV.` dù tab `🏘️ Mạng lưới Tổ TK&VV` hoặc trạng thái upload cho thấy file đã tồn tại |
+| **Nguyên nhân** | `tab_baocao` chỉ đọc `df_cdtotkvv` từ `kwargs`, nhưng `app.py`/workspace hiện không nạp và không truyền context này; kết quả là riêng màn Báo cáo tín dụng luôn nhận `None` và hiển thị trống |
+| **Fix** | Thêm fallback ngay trong `tab_baocao`: nếu `df_cdtotkvv` chưa được truyền thì tự gọi `load_cdto_toan_cn()` để nạp từ `pgd_data/*/cdtotkvv_*.xlsx` hoặc `cdtotkvv_latest.xlsx`; PGD mode lọc tiếp theo `pgd_user` |
+| **Ngày fix** | 2026-06-30 |
+
+### B24 — Mục “Chọn loại báo cáo để sửa / xóa” gây hiểu nhầm, nút xóa khó thấy
+| | |
+|---|---|
+| **File** | `tabs/tab_tien_do_nop.py` → `_render_cai_dat()` |
+| **Dấu hiệu** | Trong `📋 Tiến độ Báo cáo của PGD → ⚙️ Cài đặt thời hạn`, người dùng khó phân biệt giữa xóa dữ liệu báo cáo đã nộp và xóa cấu hình deadline; nút xóa bị ẩn trong `popover`, danh sách chọn lại trộn cả loại đã cài deadline với loại chỉ mới xuất hiện từ Google Form nên giao diện rối và khó thao tác |
+| **Nguyên nhân** | UI đang dùng chung một `selectbox` cho toàn bộ `set(GSheet ∪ deadline_cfg)` và label `sửa / xóa` quá chung; hành động xóa chỉ hiện khi đã mở `popover`, không đủ nổi bật cho thao tác “ngừng theo dõi” |
+| **Fix** | Tách rõ 2 nhóm: loại đã cài deadline và loại chưa cài; chỉ cho sửa/xóa trên nhóm đang theo dõi; đổi wording thành “ngừng theo dõi” để tránh hiểu nhầm; đưa nút `🗑 Xóa khỏi danh sách theo dõi` ra hiển thị trực tiếp kèm checkbox xác nhận; đồng thời thêm khối cài nhanh deadline cho các loại đã xuất hiện từ Google Form nhưng chưa theo dõi |
+| **Ngày fix** | 2026-06-30 |
 
 ---
 
@@ -724,6 +787,16 @@
 | **Test** | `tests/test_cdtotkvv_service.py::TestCdtotkvvToanCnParser::test_tach_file_van_map_dung_khi_header_khong_co_ma_pgd`; `tests/test_file_detection_service.py::test_ten_doc_ve_don_vi_chuan_short_pgd_name` |
 | **Ngày fix** | 2026-06-30 |
 
+### E15 — Baseline/HSTD toàn CN bị cộng dư nợ do cùng khoản vay xuất hiện ở nhiều PGD
+| | |
+|---|---|
+| **File** | `services/validation_service.py` → `validate_hstd_cross_pgd_duplicates()`; `services/upload_service.py` → `merge_du_lieu_toan_cn()` / `merge_baseline_toan_cn()`; `tabs/tab_upload_khnv.py` |
+| **Dấu hiệu** | Màn `📈 So sánh mốc năm` hoặc merge HSTD toàn Chi nhánh cho tổng dư nợ cao bất thường so với báo cáo tổng hợp THDNO46; kiểm tra sâu thấy cùng `Mã KH + Số khế ước` xuất hiện ở 2 PGD khác nhau |
+| **Nguyên nhân** | Luồng merge cũ chỉ `concat` 22 file chi tiết rồi ghi cache, không hề kiểm tra trùng chéo khoản vay giữa các đơn vị. Vì vậy khi file nguồn baseline/HSTD bị overlap liên PGD, dư nợ toàn Chi nhánh bị cộng đúp nhưng app vẫn publish cache như dữ liệu hợp lệ |
+| **Fix** | Thêm validator liên PGD cho HSTD theo khóa `Mã KH + Số khế ước`, tổng hợp top cặp PGD lệch nhiều nhất + mẫu dòng để rà nguồn. Nếu phát hiện trùng chéo thì block merge cả ở dữ liệu hiện tại lẫn baseline, giữ nguyên cache đang dùng và hiển thị chẩn đoán thay vì ghi đè số sai |
+| **Test** | `tests/test_merge_du_lieu_toan_cn.py::TestMergeCrossPgdDuplicateBlock::test_hstd_hien_tai_trung_cheo_bi_chan_khong_ghi_cache`; `tests/test_merge_du_lieu_toan_cn.py::TestMergeCrossPgdDuplicateBlock::test_baseline_hstd_trung_cheo_giu_nguyen_cache_cu` |
+| **Ngày fix** | 2026-07-03 |
+
 ---
 
 ## F. PDF / Word
@@ -938,6 +1011,15 @@
 | **Nguyên nhân** | Google Form lưu tên PGD dạng `"Phòng giao dịch Long Thành"` nhưng `DS_PGD` dùng `"PGD Long Thành"` → `df[df["ten_pgd"] == pgd]` không match |
 | **Fix** | Thêm hàm `_chuan_hoa_ten_pgd(raw)` normalize prefix: `"Phòng giao dịch "` / `"Phong giao dich "` / `"pgd "` → `"PGD "`. Gọi trong `_doc_du_lieu()` sau khi đọc sheet |
 | **Ngày fix** | 2026-05-30 |
+
+### H8 — GSheet API 500 Internal error khi đọc TIENDO_BAOCAO
+| | |
+|---|---|
+| **File** | `services/report_submission_service.py` → `_doc_raw_values_sheet()`, `kiem_tra_ket_noi_gsheet()`; `tabs/tab_tien_do_nop.py` |
+| **Dấu hiệu** | Tab Tiến độ nộp BC báo `🔴 GSheet lỗi: APIError: [500]: Internal error encountered` |
+| **Nguyên nhân** | Lỗi tạm thời phía Google Sheets API; `get_all_values()` qua gspread không retry; health-check tab chỉ tìm `credentials.json` ở 1 path |
+| **Fix** | Đọc qua REST `values/{tab}` trực tiếp, retry 3 lần khi 5xx/429; gom `kiem_tra_ket_noi_gsheet()` vào service; UI hiện gợi ý thử Làm mới |
+| **Ngày fix** | 2026-07-04 |
 
 ### H5 — Loại bỏ "Kỳ báo cáo" khỏi Form/Sheet toàn bộ
 | | |

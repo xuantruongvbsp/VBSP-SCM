@@ -15,7 +15,7 @@ from config import (
     trang_thai_baseline_pgd, DON_VI_CHI_NHANH,
 )
 from auth import is_pgd_role
-from data.hstd import doc_baseline_merged
+from data.hstd import doc_baseline_merged, ts_baseline_merged
 from data.giao_ban import xuat_bien_ban_giao_ban
 from state_manager import SCMStateManager
 from logger import get_logger
@@ -57,9 +57,7 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                 "So sánh với mốc năm", ds_nam,
                 format_func=lambda n: f"31/12/{n}",
                 key="op_gb2_nam")
-            fp_check = baseline_pgd_path(DON_VI_CHI_NHANH if not pgd_user else pgd_user, chon_nam)
-            _ts = os.path.getmtime(fp_check) if os.path.exists(fp_check) else 0
-            df_bl = doc_baseline_merged(chon_nam, _ts=_ts)
+            df_bl = doc_baseline_merged(chon_nam, ts=ts_baseline_merged(chon_nam))
 
         # 3. Nhập giải ngân (tuỳ chọn)
         with st.expander("✏️ Nhập kế hoạch giải ngân tháng tới (tuỳ chọn)"):

@@ -277,6 +277,13 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                 "Vui lòng upload file HSTD qua tab **📤 Upload HSTD** → Merge dữ liệu."
             )
             return
+        if hasattr(df, "empty") and df.empty:
+            st.warning(
+                "⚠️ **Dữ liệu HSTD trống sau khi lọc hồ sơ còn dư nợ.** "
+                "Kiểm tra tab **📤 Upload HSTD** → kết quả merge có thành công không, "
+                "hoặc bấm **🔄 Rebuild Cache** nếu vừa import hàng loạt."
+            )
+            return
         st.markdown(
             """
             <style>

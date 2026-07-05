@@ -24,7 +24,7 @@ from config import (
     COT_TEN_XA, COT_TONG_DU_NO,
     danh_sach_nam_baseline, danh_sach_nam_baseline_pgd,
 )
-from data.hstd import doc_baseline_merged
+from data.hstd import doc_baseline_merged, ts_baseline_merged
 from data.pgd import pgd_slug
 from snapshot_service import (
     doc_nq11_snapshot, danh_sach_ky_nq11, luu_nq11_snapshot,
@@ -273,7 +273,7 @@ def _render_hstd_section(
 
     chon_nam = st.selectbox("So sánh với mốc 31/12 năm", ds_nam, key=f"{key_prefix}ssk_nam")
 
-    df_bl_full = doc_baseline_merged(chon_nam)
+    df_bl_full = doc_baseline_merged(chon_nam, ts=ts_baseline_merged(chon_nam))
     if df_bl_full is None or df_bl_full.empty:
         st.warning(f"⚠️ Chưa có dữ liệu baseline 31/12/{chon_nam}.")
         return

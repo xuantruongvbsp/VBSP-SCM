@@ -804,7 +804,105 @@ class TestMergeGQVL:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# 12. LOCK AN TOÀN — KHÔNG RACE CONDITION
+# 12. HSTD TRÙNG CHÉO GIỮA CÁC PGD — PHẢI BLOCK MERGE
+# ══════════════════════════════════════════════════════════════════════════════
+
+class TestMergeCrossPgdDuplicateBlock:
+    @staticmethod
+    def _df_trung_cheo(du_no: int, ten_kh: str) -> pd.DataFrame:
+        return pd.DataFrame(
+            {
+                "Mã KH": ["4600104408"],
+                "Số khế ước": ["6600000724577947"],
+                "Tên KH": [ten_kh],
+                "Tên xã": ["Xã Test"],
+                "Dư nợ trong hạn": [du_no],
+                "Dư nợ quá hạn": [0],
+                "Tổng dư nợ": [du_no],
+            }
+        )
+
+    def test_hstd_hien_tai_trung_cheo_bi_chan_khong_ghi_cache(
+        self, tmp_path, mock_streamlit, mock_db, duong_dan_pgd_factory
+    ):
+        mock_audit, _ = mock_db
+        ten_a, ten_b = "PGD A", "PGD B"
+        fake_duong_dan = duong_dan_pgd_factory([ten_a, ten_b], "hstd")
+        cache_path = str(tmp_path / "hstd_blocked.parquet")
+
+        path_a = fake_duong_dan(ten_a, "hstd")
+        path_b = fake_duong_dan(ten_b, "hstd")
+        df_map = {
+            path_a: self._df_trung_cheo(120_000_000, "Nguyễn A"),
+            path_b: self._df_trung_cheo(160_000_000, "Nguyễn B"),
+        }
+
+        def _fake_excel_to_parquet(path, *_args, **_kwargs):
+            return df_map[path].copy()
+
+        with patch.object(svc, "duong_dan_pgd", side_effect=fake_duong_dan), \
+             patch.object(svc, "DS_PGD", [ten_a, ten_b]), \
+             patch.object(svc, "DON_VI_CHI_NHANH", "Hội sở"), \
+             patch.object(svc, "CACHE_HSTD", cache_path), \
+             patch.object(svc, "UPLOAD_CANH_BAO_NGAY", {"hstd": 3}), \
+             patch.object(svc, "excel_to_parquet", side_effect=_fake_excel_to_parquet):
+            kq = merge_du_lieu_toan_cn("hstd", ds_pgd=[ten_a, ten_b])
+
+        assert kq.thanh_cong is False
+        assert "trùng chéo" in kq.thong_bao.lower()
+        assert kq.chi_tiet is not None
+        assert kq.chi_tiet["kind"] == "hstd_cross_pgd_duplicates"
+        assert not Path(cache_path).exists(), "Cache mới không được ghi khi dữ liệu bị block"
+
+        audit_actions = [c.args[1] for c in mock_audit.call_args_list]
+        assert "merge_toan_cn_blocked" in audit_actions
+
+    def test_baseline_hstd_trung_cheo_giu_nguyen_cache_cu(
+        self, tmp_path, mock_streamlit, mock_db
+    ):
+        mock_audit, _ = mock_db
+        ten_a, ten_b = "PGD A", "PGD B"
+        nam = 2025
+        cache_path = tmp_path / "hstd_baseline_2025.parquet"
+        pd.DataFrame({"marker": ["old"], "Tổng dư nợ": [123]}).to_parquet(cache_path, index=False)
+
+        file_map = {
+            ten_a: tmp_path / "pgd_a_hstd_3112_2025.xlsx",
+            ten_b: tmp_path / "pgd_b_hstd_3112_2025.xlsx",
+        }
+        for path in file_map.values():
+            path.write_bytes(b"PK\x03\x04" + b"\x00" * 2000)
+
+        df_map = {
+            str(file_map[ten_a]): self._df_trung_cheo(120_000_000, "Nguyễn A"),
+            str(file_map[ten_b]): self._df_trung_cheo(160_000_000, ""),
+        }
+
+        def _fake_baseline_path(ten_pgd: str, _nam: int, _loai: str) -> str:
+            return str(file_map.get(ten_pgd, tmp_path / f"missing_{ten_pgd}.xlsx"))
+
+        def _fake_excel_to_parquet(path, *_args, **_kwargs):
+            return df_map[path].copy()
+
+        with patch("config.baseline_pgd_path_loai", side_effect=_fake_baseline_path), \
+             patch("config.baseline_cache_loai", return_value=str(cache_path)), \
+             patch.object(svc, "DS_PGD", [ten_a, ten_b]), \
+             patch.object(svc, "DON_VI_CHI_NHANH", "Hội sở"), \
+             patch.object(svc, "excel_to_parquet", side_effect=_fake_excel_to_parquet):
+            kq = svc.merge_baseline_toan_cn("hstd", nam)
+
+        assert kq.thanh_cong is False
+        assert "trùng chéo" in kq.thong_bao.lower()
+        assert kq.chi_tiet is not None
+        df_old = pd.read_parquet(cache_path)
+        assert df_old["marker"].tolist() == ["old"], "Cache baseline cũ phải được giữ nguyên"
+
+        audit_actions = [c.args[1] for c in mock_audit.call_args_list]
+        assert "merge_baseline_blocked" in audit_actions
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 13. LOCK AN TOÀN — KHÔNG RACE CONDITION
 # ══════════════════════════════════════════════════════════════════════════════
 
 class TestMergeConcurrency:

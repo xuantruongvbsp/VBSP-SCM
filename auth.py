@@ -699,26 +699,63 @@ def dang_nhap(un: str, pw: str):
 # ── Trang login ───────────────────────────────────────────────────────────────
 
 _LOGIN_WORKSPACE_META = {
-    "management": ("📋 Phòng KH-NV", "Đăng nhập vào phân hệ điều hành KH-NV"),
-    "operation": ("🗺️ Hỗ trợ địa bàn", "Đăng nhập vào phân hệ tác nghiệp PGD"),
-    "executive": ("📊 Ban Giám đốc", "Đăng nhập vào dashboard điều hành"),
+    "management": {
+        "label": "📋 Phòng KH-NV",
+        "hint": "Đăng nhập vào phân hệ điều hành KH-NV",
+        "title": "Điều hành nghiệp vụ toàn Chi nhánh",
+        "desc": "Phù hợp cho upload dữ liệu toàn CN, theo dõi kế hoạch tín dụng và xử lý nghiệp vụ tập trung.",
+        "chips": ["Upload toàn CN", "Kế hoạch tín dụng", "Nghiệp vụ KH-NV"],
+        "accent": "#22c55e",
+        "accent_soft": "rgba(34, 197, 94, 0.18)",
+    },
+    "operation": {
+        "label": "🗺️ Hỗ trợ địa bàn",
+        "hint": "Đăng nhập vào phân hệ tác nghiệp PGD",
+        "title": "Tác nghiệp theo địa bàn và PGD",
+        "desc": "Phù hợp cho theo dõi xã/phường, xử lý dữ liệu theo PGD và bám sát tiến độ tác nghiệp tại cơ sở.",
+        "chips": ["Theo dõi địa bàn", "Tác nghiệp PGD", "Dữ liệu cơ sở"],
+        "accent": "#38bdf8",
+        "accent_soft": "rgba(56, 189, 248, 0.18)",
+    },
+    "executive": {
+        "label": "📊 Ban Giám đốc",
+        "hint": "Đăng nhập vào dashboard điều hành",
+        "title": "Theo dõi chỉ số điều hành tổng quan",
+        "desc": "Phù hợp cho theo dõi dashboard nhanh, xem các chỉ số trọng yếu và nắm báo cáo điều hành theo thời gian thực.",
+        "chips": ["Dashboard nhanh", "Chỉ số điều hành", "Báo cáo tổng hợp"],
+        "accent": "#f59e0b",
+        "accent_soft": "rgba(245, 158, 11, 0.18)",
+    },
 }
 
 
 @st.cache_data(show_spinner=False)
-
-def _build_login_html(workspace_label: str) -> str:
-
-    """Cache HTML header login (chứa logo base64 nặng)."""
-
+def _build_login_hero(
+    workspace_label: str,
+    workspace_title: str,
+    workspace_desc: str,
+    chips: tuple[str, ...],
+    accent: str,
+    accent_soft: str,
+) -> str:
+    """Cache HTML hero login (chứa logo base64 nặng)."""
+    chips_html = "".join(f'<span class="login-chip">{chip}</span>' for chip in chips)
     return f"""
-<div style="background:linear-gradient(160deg,#1b5e20,#2e7d32);border-radius:12px 12px 0 0;margin:-40px -40px 20px;padding:28px 24px 20px;text-align:center">
-  <img src="data:image/jpeg;base64,{LOGO_NHCSXH_B64}" width="88" style="border-radius:50%;border:3px solid rgba(255,255,255,0.5);display:block;margin:0 auto 12px">
-  <div style="color:#fff;font-size:13.5px;font-weight:700;letter-spacing:0.4px;line-height:1.5">NGÂN HÀNG CHÍNH SÁCH XÃ HỘI</div>
-  <hr style="border:none;border-top:1px solid rgba(255,255,255,0.3);margin:8px 20px">
-  <div style="color:#c8e6c9;font-size:11.5px">Chi nhánh Đồng Nai</div>
-  <div style="color:rgba(255,255,255,0.55);font-size:10.5px;margin-top:3px">Hệ thống Quản trị Tín dụng Nội bộ · VBSP-SCM</div>
-  <div style="margin:14px auto 0;padding:8px 12px;border-radius:999px;width:max-content;max-width:100%;background:rgba(255,255,255,0.14);color:#ffffff;font-size:13px;font-weight:700">{workspace_label}</div>
+<div class="login-hero" style="--login-accent:{accent};--login-accent-soft:{accent_soft};">
+  <div class="login-brand-row">
+    <div class="login-brand-logo">
+      <img src="data:image/jpeg;base64,{LOGO_NHCSXH_B64}" alt="VBSP logo">
+    </div>
+    <div>
+      <div class="login-kicker">VBSP-SCM · NHCSXH Chi nhánh Đồng Nai</div>
+      <div class="login-main-title">Đăng nhập không gian làm việc</div>
+      <div class="login-workspace-pill">{workspace_label}</div>
+    </div>
+  </div>
+  <div class="login-hero-title">{workspace_title}</div>
+  <div class="login-hero-desc">{workspace_desc}</div>
+  <div class="login-chip-wrap">{chips_html}</div>
+  <div class="login-hero-note">Chọn đúng tài khoản theo vai trò để hệ thống tự điều hướng đến đúng phân hệ và phạm vi dữ liệu.</div>
 </div>
 """
 
@@ -734,98 +771,202 @@ def hien_thi_login():
 
 <style>
 
-  /* Nền trang đăng nhập */
-
   .stApp {
-
-    background: linear-gradient(160deg, #1b5e20 0%, #2e7d32 100%) !important;
-
+    background:
+      radial-gradient(circle at 12% 0%, rgba(56, 189, 248, 0.16), transparent 22%),
+      radial-gradient(circle at 88% 8%, rgba(34, 197, 94, 0.16), transparent 24%),
+      linear-gradient(180deg, #0b1120 0%, #0f172a 100%) !important;
   }
-
   [data-testid="stHeader"] {
-
     background: transparent !important;
-
   }
-
   [data-testid="stSidebar"] {
-
     display: none !important;
-
   }
-
-  /* Card trắng bao quanh form */
-
-  form[data-testid="stForm"] {
-
-    background: #ffffff !important;
-
-    color: #1f2937 !important;
-
-    border-radius: 16px;
-
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.22);
-
-    padding: 1.25rem 1.5rem 1.5rem;
-
-    border: 1px solid rgba(27, 94, 32, 0.12);
-
-    overflow: hidden;
-
-    position: relative;
-
+  section[data-testid="stMain"] > div {
+    padding-top: 0.5rem;
   }
-
-  /* Header card giả lập phía trên form */
-
-  form[data-testid="stForm"]::before {
-
-    content: "";
-
+  .login-hero {
+    border-radius: 26px;
+    padding: 1.8rem 1.6rem;
+    min-height: 100%;
+    background:
+      radial-gradient(circle at top right, rgba(255,255,255,0.10), transparent 34%),
+      linear-gradient(145deg, rgba(15, 23, 42, 0.96), rgba(15, 23, 42, 0.92) 48%, var(--login-accent-soft) 100%);
+    border: 1px solid rgba(148, 163, 184, 0.16);
+    box-shadow: 0 28px 72px rgba(0, 0, 0, 0.30);
+    color: #f8fafc;
+  }
+  .login-brand-row {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1.2rem;
+  }
+  .login-brand-logo {
+    width: 82px;
+    height: 82px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    background: rgba(255,255,255,0.96);
+    border: 4px solid rgba(255,255,255,0.16);
+    box-shadow: 0 14px 32px rgba(0,0,0,0.26);
+  }
+  .login-brand-logo img {
+    width: 64px;
+    border-radius: 50%;
     display: block;
-
-    margin: -20px -24px 20px;
-
-    height: 0;
-
-    border-top: 0;
-
   }
-
-  /* Nút đăng nhập */
-
+  .login-kicker {
+    color: #bbf7d0;
+    text-transform: uppercase;
+    letter-spacing: .12em;
+    font-size: .76rem;
+    font-weight: 800;
+    margin-bottom: .35rem;
+  }
+  .login-main-title {
+    color: #f8fafc;
+    font-size: 2rem;
+    line-height: 1.08;
+    font-weight: 900;
+    margin-bottom: .45rem;
+  }
+  .login-workspace-pill {
+    display: inline-block;
+    padding: .45rem .85rem;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.14);
+    color: #e2e8f0;
+    font-size: .84rem;
+    font-weight: 800;
+  }
+  .login-hero-title {
+    font-size: 1.28rem;
+    line-height: 1.3;
+    font-weight: 800;
+    margin-bottom: .7rem;
+  }
+  .login-hero-desc {
+    color: rgba(226, 232, 240, 0.86);
+    font-size: .98rem;
+    line-height: 1.65;
+    margin-bottom: 1rem;
+  }
+  .login-chip-wrap {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .55rem;
+    margin-bottom: 1rem;
+  }
+  .login-chip {
+    padding: .35rem .68rem;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.07);
+    border: 1px solid rgba(148,163,184,0.16);
+    color: #dbeafe;
+    font-size: .76rem;
+    font-weight: 700;
+  }
+  .login-hero-note {
+    border-top: 1px solid rgba(148,163,184,0.16);
+    padding-top: .9rem;
+    color: #cbd5e1;
+    font-size: .88rem;
+    line-height: 1.6;
+  }
+  .login-side-card {
+    margin-top: 1rem;
+    border-radius: 18px;
+    padding: 1rem 1.05rem;
+    background: rgba(15, 23, 42, 0.46);
+    border: 1px solid rgba(148, 163, 184, 0.14);
+    color: #e2e8f0;
+  }
+  .login-side-card-title {
+    color: #f8fafc;
+    font-size: .92rem;
+    font-weight: 800;
+    margin-bottom: .45rem;
+  }
+  .login-side-card p {
+    margin: 0;
+    color: #cbd5e1;
+    font-size: .9rem;
+    line-height: 1.6;
+  }
+  .login-form-card {
+    --login-form-text: #0f172a;
+    --login-form-muted: #64748b;
+    --login-form-accent: #16a34a;
+    border-radius: 26px;
+    padding: 1.1rem;
+    background: rgba(255,255,255,0.98);
+    border: 1px solid rgba(203, 213, 225, 0.85);
+    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.28);
+  }
+  .login-form-header {
+    padding: .35rem .2rem 1rem;
+    border-bottom: 1px solid rgba(226, 232, 240, 0.95);
+    margin-bottom: 1rem;
+  }
+  .login-form-kicker {
+    color: var(--login-form-accent);
+    text-transform: uppercase;
+    letter-spacing: .1em;
+    font-size: .74rem;
+    font-weight: 800;
+    margin-bottom: .35rem;
+  }
+  .login-form-title {
+    color: var(--login-form-text);
+    font-size: 1.42rem;
+    font-weight: 900;
+    margin-bottom: .3rem;
+  }
+  .login-form-sub {
+    color: var(--login-form-muted);
+    font-size: .92rem;
+    line-height: 1.55;
+  }
+  form[data-testid="stForm"] {
+    background: rgba(255,255,255,0.98) !important;
+    color: var(--login-form-text) !important;
+    border-radius: 22px;
+    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.20);
+    padding: 1.15rem 1.2rem 1.2rem;
+    border: 1px solid rgba(203, 213, 225, 0.85);
+    overflow: visible;
+    position: relative;
+  }
+  div[data-testid="stTextInput"] label p {
+    color: var(--login-form-text) !important;
+    font-weight: 700 !important;
+  }
+  div[data-testid="stTextInput"] input {
+    border-radius: 14px !important;
+    border: 1px solid #cbd5e1 !important;
+    background: #f8fafc !important; color: var(--login-form-text) !important;
+    min-height: 48px !important;
+  }
   form[data-testid="stForm"] button[kind="primary"] {
-
-    background: #2e7d32 !important;
-
-    border-radius: 8px !important;
-
-    border: 1px solid #2e7d32 !important;
-
-    font-weight: 600 !important;
-
+    min-height: 48px;
+    background: linear-gradient(135deg, #166534, #1d4ed8) !important;
+    border-radius: 14px !important;
+    border: 1px solid rgba(22, 101, 52, 0.95) !important;
+    font-weight: 800 !important;
+    box-shadow: 0 14px 28px rgba(22, 101, 52, 0.18);
   }
-
   form[data-testid="stForm"] button[kind="primary"]:hover {
-
-    background: #1b5e20 !important;
-
-    border-color: #1b5e20 !important;
-
+    filter: brightness(1.04);
   }
-
-  /* Chú thích dưới form — căn giữa, tương phản với nền gradient */
-
   section[data-testid="stMain"] [data-testid="stCaption"] {
-
     text-align: center !important;
-
-    color: rgba(232, 245, 233, 0.78) !important;
-
+    color: rgba(226, 232, 240, 0.74) !important;
     font-size: 0.78rem !important;
-
   }
-
 </style>
 
 """,
@@ -834,26 +975,39 @@ def hien_thi_login():
 
     )
 
-    _, col, _ = st.columns([1, 1.1, 1])
+    so_tai_khoan = len(doc_users())
+    selected_workspace = st.session_state.get("prelogin_workspace")
+    workspace_meta = _LOGIN_WORKSPACE_META.get(
+        selected_workspace,
+        {
+            "label": "VBSP-SCM",
+            "hint": "Đăng nhập hệ thống",
+            "title": "Đăng nhập vào hệ thống",
+            "desc": "Sử dụng tài khoản được cấp để truy cập đúng không gian làm việc.",
+            "chips": ["Tài khoản nội bộ", "Role-based access"],
+            "accent": "#22c55e",
+            "accent_soft": "rgba(34, 197, 94, 0.18)",
+        },
+    )
 
-    with col:
+    col_info, col_form = st.columns([1.15, 0.95], gap="large")
 
-        so_tai_khoan = len(doc_users())
-        selected_workspace = st.session_state.get("prelogin_workspace")
-        workspace_label, workspace_hint = _LOGIN_WORKSPACE_META.get(
-            selected_workspace,
-            ("VBSP-SCM", "Đăng nhập hệ thống"),
+    with col_info:
+        st.html(
+            _build_login_hero(
+                workspace_meta["label"],
+                workspace_meta["title"],
+                workspace_meta["desc"],
+                tuple(workspace_meta["chips"]),
+                workspace_meta["accent"],
+                workspace_meta["accent_soft"],
+            )
         )
-
-
-
-        # HEADER
-
-        st.html(_build_login_html(workspace_label))
         st.html(
             f"""
-<div style="margin:-4px 0 14px;padding:10px 12px;border-radius:8px;background:rgba(15,23,42,0.28);color:#dcfce7;border:1px solid rgba(187,247,208,0.20);font-size:13px;text-align:center;font-weight:700">
-  {workspace_hint}
+<div class="login-side-card">
+  <div class="login-side-card-title">Không gian đã chọn</div>
+  <p>{workspace_meta["hint"]}</p>
 </div>
 """
         )
@@ -862,15 +1016,24 @@ def hien_thi_login():
             st.session_state.workspace = None
             st.rerun()
 
-
-
-        # FORM (logic giữ nguyên)
+    with col_form:
+        st.html(
+            f"""
+<div class="login-form-card">
+  <div class="login-form-header">
+    <div class="login-form-kicker">Bảo mật đăng nhập</div>
+    <div class="login-form-title">Đăng nhập tài khoản</div>
+    <div class="login-form-sub">{workspace_meta["hint"]}. Nhập đúng tên đăng nhập và mật khẩu để tiếp tục.</div>
+  </div>
+</div>
+"""
+        )
 
         with st.form("login"):
 
-            un = st.text_input("Tên đăng nhập")
+            un = st.text_input("Tên đăng nhập", placeholder="Nhập username")
 
-            pw = st.text_input("Mật khẩu", type="password")
+            pw = st.text_input("Mật khẩu", type="password", placeholder="Nhập mật khẩu")
 
             if st.form_submit_button(
 
@@ -919,19 +1082,11 @@ def hien_thi_login():
 
                         st.error("Tên đăng nhập hoặc mật khẩu không đúng.")
 
+    st.caption("© 2025 NHCSXH Chi nhánh Đồng Nai · Phòng KH-NV")
 
+    if so_tai_khoan <= 1:
 
-        # FOOTER — st.caption căn giữa (CSS ở đầu hàm)
-
-        _, col_ft, _ = st.columns([0.2, 2.6, 0.2])
-
-        with col_ft:
-
-            st.caption("© 2025 NHCSXH Chi nhánh Đồng Nai · Phòng KH-NV")
-
-            if so_tai_khoan <= 1:
-
-                st.caption("Tài khoản mặc định: **admin** / **admin123**")
+        st.caption("Tài khoản mặc định: **admin** / **admin123**")
 
 
 

@@ -1648,6 +1648,25 @@ val = pd.to_numeric(df[COT_X], errors="coerce").sum() if COT_X in df.columns els
 | **Ngày fix** | 2026-06-30 |
 | **Ngày fix** | 2026-06-29 |
 
+### C28 — `Tổng quan danh mục tín dụng`: `Dư nợ BQ tổ TKVV` đếm sai do `groupby(PGD, Tên tổ)`
+| | |
+|---|---|
+| **File** | `tabs/tab_tongquan.py` → `_cache_bq_counts()`, `services/tongquan_service.py` |
+| **Dấu hiệu** | Card hiện `4.536 tổ` / BQ `3.012,1 tr` trong khi CDTOTKVV ~`4.552` tổ — chênh ~16 tổ, dễ hiểu nhầm là hai nguồn lệch lớn |
+| **Nguyên nhân** | Đếm `groupby([PGD, Tên tổ])` gộp nhầm các tổ **trùng tên** trong cùng PGD (khác xã/mã tổ); HSTD active có ~99,8% dòng có `Mã tổ`, đối chiếu CDTO khớp ~4.317/4.5k tổ |
+| **Fix** | `dem_so_to_hstd()` ưu tiên `(PGD, Mã tổ)`, fallback `(PGD, Xã, Tên tổ)`; mẫu số BQ lấy từ cùng `df` HSTD đang hiển thị, không thay bằng CDTOTKVV |
+| **Test** | `tests/test_tongquan_service.py::test_dem_so_to_hstd_uu_tien_ma_to` |
+| **Ngày fix** | 2026-07-05 |
+
+### C29 — `_cache_bq_counts` thiếu `COT_MA_TO` → fix C28 chưa có hiệu lực trên UI
+| | |
+|---|---|
+| **File** | `tabs/tab_tongquan.py` → `_cache_bq_counts()` |
+| **Dấu hiệu** | Sau fix C28, card vẫn có thể hiện ~4.555 tổ (fallback `PGD+Xã+Tên tổ`) thay vì ~4.559 theo `Mã tổ` |
+| **Nguyên nhân** | `cols_need` khi copy `df_bq` không gồm `COT_MA_TO` → `dem_so_to_hstd()` không thấy cột Mã tổ |
+| **Fix** | Thêm `COT_MA_TO` vào `cols_need` |
+| **Ngày fix** | 2026-07-05 |
+
 ---
 
 ## Template: Ghi nhận bug mới

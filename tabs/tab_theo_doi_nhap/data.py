@@ -33,6 +33,36 @@ logger = get_logger(__name__)
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 
 
+def _gsheet_request_json(client_like, method: str, url: str, params: dict | None = None) -> dict:
+    """Gọi Google Sheets REST API qua adapter tương thích nhiều version gspread."""
+    candidates = [client_like]
+    nested = getattr(client_like, "client", None)
+    if nested is not None:
+        candidates.append(nested)
+
+    for candidate in candidates:
+        if candidate is None:
+            continue
+
+        request_fn = getattr(candidate, "request", None)
+        if callable(request_fn):
+            return request_fn(method, url, params=params).json()
+
+        http_client = getattr(candidate, "http_client", None)
+        http_request = getattr(http_client, "request", None)
+        if callable(http_request):
+            return http_request(method, url, params=params).json()
+
+        session = getattr(candidate, "session", None)
+        session_request = getattr(session, "request", None)
+        if callable(session_request):
+            resp = session_request(method=method, url=url, params=params)
+            resp.raise_for_status()
+            return resp.json()
+
+    raise AttributeError("GSpread client không hỗ trợ request/http_client/session.request")
+
+
 def tim_credentials() -> Path:
     candidates = [
         PROJECT_ROOT / "credentials.json",
@@ -318,7 +348,8 @@ def doc_dieu_chinh_tu_dong(sheet_id: str) -> tuple[pd.DataFrame, list[str]]:
 
     # 1 request batch lấy toàn bộ dữ liệu (raw API → JSON chuẩn, không phụ thuộc gspread version)
     ranges = [f"'{ws.title}'" for ws in worksheets]
-    resp = ss.client.request(
+    resp = _gsheet_request_json(
+        ss,
         "get",
         f"https://sheets.googleapis.com/v4/spreadsheets/{sheet_id}/values:batchGet",
         params={"ranges": ranges},
@@ -326,7 +357,7 @@ def doc_dieu_chinh_tu_dong(sheet_id: str) -> tuple[pd.DataFrame, list[str]]:
     # Sheets API trả về {"valueRanges": [{"range": "...", "values": [[...], ...]}, ...]}
     # Tab rỗng có thể không xuất hiện → map theo tên range
     raw_map: dict[str, list[list]] = {}
-    for vr in resp.json().get("valueRanges", []):
+    for vr in resp.get("valueRanges", []):
         rng = vr.get("range", "")
         tab_title = rng.split("!")[0].strip("'").strip()
         raw_map[tab_title] = vr.get("values", [])

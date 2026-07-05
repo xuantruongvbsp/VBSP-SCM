@@ -1021,6 +1021,24 @@
 | **Fix** | Đọc qua REST `values/{tab}` trực tiếp, retry 3 lần khi 5xx/429; gom `kiem_tra_ket_noi_gsheet()` vào service; UI hiện gợi ý thử Làm mới |
 | **Ngày fix** | 2026-07-04 |
 
+### H9 — `AttributeError: 'Client' object has no attribute 'request'` khi đọc GSheet REST
+| | |
+|---|---|
+| **File** | `services/report_submission_service.py` → `_doc_raw_values_sheet()`; `tabs/tab_theo_doi_nhap/data.py` → `doc_dieu_chinh_tu_dong()` |
+| **Dấu hiệu** | UI báo `🔴 GSheet lỗi: AttributeError: 'Client' object has no attribute 'request'` hoặc màn theo dõi nhập liệu crash ở batchGet |
+| **Nguyên nhân** | Code gọi thẳng `client.request(...)` / `ss.client.request(...)`, nhưng ở một số version `gspread` đối tượng `Client` không expose method này; request nằm ở `http_client.request(...)` hoặc `session.request(...)` |
+| **Fix** | Thêm adapter `_gsheet_request_json()` để dò lần lượt `request` → `http_client.request` → `session.request`, rồi mới gọi REST API; giữ nguyên payload/flow hiện tại nhưng bỏ phụ thuộc vào 1 shape cụ thể của `gspread` |
+| **Ngày fix** | 2026-07-05 |
+
+### H10 — Tên báo cáo ở Cài đặt/Tổng quan lệch với Google Form khi đổi giai đoạn năm
+| | |
+|---|---|
+| **File** | `services/report_submission_service.py` → `xay_dung_danh_muc_theo_doi()`, `gan_trang_thai()`, `tao_ma_tran_tien_do()`; `tabs/tab_tien_do_nop.py` |
+| **Dấu hiệu** | `⚙️ Cài đặt thời hạn` vẫn hiện tên cũ như `Rà soát KHTD 2023-2026` trong khi Form đã dùng `Rà soát KHTD 2027-2030`; tab Tổng quan/Telegram có thể hiểu như 2 loại khác nhau nếu chưa bấm liên kết tay |
+| **Nguyên nhân** | Deadline config lưu key lịch sử trong `kv_store`, còn dữ liệu GSheet dùng tên hiện tại trên Form; code trước đây chỉ match exact string, còn gợi ý lệch tên chỉ dùng để cảnh báo chứ chưa được áp dụng runtime |
+| **Fix** | Tạo danh mục theo dõi hiệu lực: alias tên Form → key đang theo dõi khi match rõ ràng theo base name bỏ giai đoạn năm; UI ưu tiên hiển thị tên trên Form, trạng thái/ma trận/nhắc hạn dùng cùng mapping; thêm nút `🔗 Chuẩn hóa tất cả` để persist hàng loạt khi muốn |
+| **Ngày fix** | 2026-07-05 |
+
 ### H5 — Loại bỏ "Kỳ báo cáo" khỏi Form/Sheet toàn bộ
 | | |
 |---|---|

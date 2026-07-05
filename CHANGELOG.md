@@ -1,5 +1,15 @@
 # CHANGELOG
 
+## [2026-07-05] — Hoàn thiện phân hệ Tiến độ báo cáo PGD: ưu tiên tên trên Google Form
+- `services/report_submission_service.py` — thêm danh mục theo dõi hiệu lực, tự match tên cũ↔tên Form theo giai đoạn năm, hỗ trợ chuẩn hóa hàng loạt và dùng chung cho trạng thái/nhắc hạn/ma trận
+- `tabs/tab_tien_do_nop.py` — tab Tổng quan và Cài đặt hiển thị theo tên Form khi match rõ ràng; thêm nút `🔗 Chuẩn hóa tất cả` và dùng service chung để dựng ma trận
+- `tests/test_report_submission_service.py` — thêm regression tests cho auto-match tên Form, trạng thái theo deadline cũ và chuẩn hóa hàng loạt
+
+## [2026-07-05] — GSheet: tương thích `gspread` mới không còn `Client.request`
+- `services/report_submission_service.py` — thêm adapter `_gsheet_request_json()` và đổi đọc REST sang `http_client.request/session.request` fallback thay vì gọi thẳng `client.request`
+- `tabs/tab_theo_doi_nhap/data.py` — sửa batchGet REST dùng adapter tương thích nhiều version `gspread`, tránh lỗi `AttributeError: 'Client' object has no attribute 'request'`
+- `BUGMAP.md` — ghi lỗi tương thích API `gspread` khi gọi REST trực tiếp
+
 ## [2026-07-05] — Tổng quan DN: `_cache_bq_counts` thiếu cột Mã tổ → BQ tổ vẫn fallback tên tổ
 - `tabs/tab_tongquan.py` — bổ sung `COT_MA_TO` vào `cols_need` của `_cache_bq_counts()` để `dem_so_to_hstd()` đếm đúng `(PGD, Mã tổ)`
 

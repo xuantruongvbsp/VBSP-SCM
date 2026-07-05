@@ -135,6 +135,41 @@ def _goi_y_loi_gsheet(exc: BaseException) -> str:
     return ""
 
 
+def _gsheet_request_json(
+    client_like: Any,
+    method: str,
+    url: str,
+    params: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Gọi Google Sheets REST API qua adapter tương thích nhiều version gspread."""
+    candidates = [client_like]
+    nested = getattr(client_like, "client", None)
+    if nested is not None:
+        candidates.append(nested)
+
+    for candidate in candidates:
+        if candidate is None:
+            continue
+
+        request_fn = getattr(candidate, "request", None)
+        if callable(request_fn):
+            return request_fn(method, url, params=params).json()
+
+        http_client = getattr(candidate, "http_client", None)
+        http_request = getattr(http_client, "request", None)
+        if callable(http_request):
+            return http_request(method, url, params=params).json()
+
+        session = getattr(candidate, "session", None)
+        session_request = getattr(session, "request", None)
+        if callable(session_request):
+            resp = session_request(method=method, url=url, params=params)
+            resp.raise_for_status()
+            return resp.json()
+
+    raise AttributeError("GSpread client không hỗ trợ request/http_client/session.request")
+
+
 def _doc_raw_values_sheet(
     sheet_id: str = SHEET_ID,
     tab: str = SHEET_TAB,
@@ -146,12 +181,13 @@ def _doc_raw_values_sheet(
         try:
             client = _ket_noi_gsheet()
             range_path = quote(tab, safe="!")
-            resp = client.request(
+            payload = _gsheet_request_json(
+                client,
                 "get",
                 f"https://sheets.googleapis.com/v4/spreadsheets/{sheet_id}/values/{range_path}",
             )
             _LAST_GSHEET_ERROR = None
-            return resp.json().get("values", []) or []
+            return payload.get("values", []) or []
         except Exception:
             last_err = sys.exc_info()[1]
             if (
@@ -256,6 +292,85 @@ def _ten_loai_khong_nam(ten: str) -> str:
     """Bỏ giai đoạn năm cuối chuỗi — VD: 'KHTD 2023-2026' → 'KHTD'."""
     s = _chuan_hoa_ten_loai(ten)
     return _YEAR_RANGE_RE.sub("", s).strip().upper()
+
+
+def xay_dung_danh_muc_theo_doi(
+    deadline_cfg: dict[str, str],
+    ds_loai_gsheet: list[str],
+) -> dict[str, Any]:
+    """Xây danh mục theo dõi hiệu lực, ưu tiên tên đang xuất hiện trên Form.
+
+    Không tự ghi vào kv_store. Chỉ tạo mapping runtime để:
+      - match đúng dữ liệu GSheet dù tên đã đổi giai đoạn năm,
+      - hiển thị UI theo tên Form khi có thể,
+      - không đòi user phải bấm "Liên kết" thì hệ thống mới chạy đúng.
+    """
+    tracked_keys = sorted(deadline_cfg.keys())
+    alias_to_tracked: dict[str, str] = {}
+    tracked_to_display: dict[str, str] = {}
+
+    for tracked in tracked_keys:
+        alias_to_tracked[_chuan_hoa_ten_loai(tracked)] = tracked
+        tracked_to_display[tracked] = tracked
+
+    ds_lech = phat_hien_ten_lech_ten(deadline_cfg, ds_loai_gsheet)
+    for item in ds_lech:
+        tracked = item["ten_theo_doi"]
+        ten_form = item.get("ten_form") or ""
+        if not ten_form:
+            continue
+        alias_to_tracked[_chuan_hoa_ten_loai(ten_form)] = tracked
+        tracked_to_display[tracked] = ten_form
+
+    display_to_tracked: dict[str, str] = {}
+    for tracked in tracked_keys:
+        display = tracked_to_display.get(tracked, tracked)
+        if display in display_to_tracked and display_to_tracked[display] != tracked:
+            tracked_to_display[tracked] = tracked
+            display = tracked
+        display_to_tracked[display] = tracked
+
+    ds_loai_chua_cai: list[str] = []
+    for loai in sorted({_chuan_hoa_ten_loai(x): x for x in ds_loai_gsheet if x}.values()):
+        if _chuan_hoa_ten_loai(loai) not in alias_to_tracked:
+            ds_loai_chua_cai.append(loai)
+
+    display_cfg = {
+        tracked_to_display.get(tracked, tracked): deadline_cfg[tracked]
+        for tracked in tracked_keys
+    }
+
+    return {
+        "tracked_keys": tracked_keys,
+        "display_keys": sorted(display_to_tracked.keys()),
+        "alias_to_tracked": alias_to_tracked,
+        "tracked_to_display": tracked_to_display,
+        "display_to_tracked": display_to_tracked,
+        "display_cfg": display_cfg,
+        "ds_loai_chua_cai": ds_loai_chua_cai,
+        "ds_lech": ds_lech,
+    }
+
+
+def _gan_khoa_theo_doi(df: pd.DataFrame, deadline_cfg: dict[str, str]) -> tuple[pd.DataFrame, dict[str, Any]]:
+    """Thêm khóa theo dõi nội bộ để match dữ liệu GSheet với deadline config."""
+    if df is None:
+        df = pd.DataFrame(columns=COT)
+    df = df.copy()
+    ds_loai_gsheet = sorted(df["loai_bao_cao"].dropna().unique().tolist()) if "loai_bao_cao" in df.columns else []
+    dm = xay_dung_danh_muc_theo_doi(deadline_cfg, ds_loai_gsheet)
+    alias_to_tracked = dm["alias_to_tracked"]
+
+    if "loai_bao_cao" not in df.columns:
+        df["_loai_theo_doi"] = pd.Series(dtype="object")
+        df["_loai_hien_thi"] = pd.Series(dtype="object")
+        return df, dm
+
+    df["_loai_theo_doi"] = df["loai_bao_cao"].apply(
+        lambda x: alias_to_tracked.get(_chuan_hoa_ten_loai(x), _chuan_hoa_ten_loai(x))
+    )
+    df["_loai_hien_thi"] = df["_loai_theo_doi"].map(dm["tracked_to_display"]).fillna(df["loai_bao_cao"])
+    return df, dm
 
 
 def phat_hien_ten_lech_ten(
@@ -390,6 +505,45 @@ def doi_ten_loai_theo_doi(
     return ket_qua
 
 
+def dong_bo_tat_ca_ten_theo_form(
+    deadline_cfg: dict[str, str],
+    ds_loai_gsheet: list[str],
+    username: str,
+) -> dict[str, Any]:
+    """Đồng bộ hàng loạt các tên theo dõi có gợi ý rõ ràng từ Google Form."""
+    ds_lech = phat_hien_ten_lech_ten(deadline_cfg, ds_loai_gsheet)
+    ds_can_doi = [x for x in ds_lech if x.get("ten_form")]
+    ket_qua = {
+        "ok": False,
+        "so_doi": 0,
+        "so_loi": 0,
+        "chi_tiet": [],
+        "msg": "",
+    }
+    if not ds_can_doi:
+        ket_qua["msg"] = "Không có tên nào cần chuẩn hóa theo Form."
+        return ket_qua
+
+    for item in ds_can_doi:
+        kq = doi_ten_loai_theo_doi(
+            item["ten_theo_doi"],
+            item["ten_form"],
+            username,
+        )
+        ket_qua["chi_tiet"].append(kq)
+        if kq.get("ok"):
+            ket_qua["so_doi"] += 1
+        else:
+            ket_qua["so_loi"] += 1
+
+    ket_qua["ok"] = ket_qua["so_doi"] > 0 and ket_qua["so_loi"] == 0
+    ket_qua["msg"] = (
+        f"Đã chuẩn hóa {ket_qua['so_doi']} tên theo Form"
+        + (f", lỗi {ket_qua['so_loi']} mục" if ket_qua["so_loi"] else "")
+    )
+    return ket_qua
+
+
 # ── Phân loại trạng thái ─────────────────────────────────────────────────────
 
 def phan_loai_trang_thai(ngay_nop, deadline_str: str | None) -> str:
@@ -415,9 +569,9 @@ def phan_loai_trang_thai(ngay_nop, deadline_str: str | None) -> str:
 
 def gan_trang_thai(df: pd.DataFrame, deadline_cfg: dict[str, str]) -> pd.DataFrame:
     """Gán cột 'tt' cho DataFrame dựa trên deadline config."""
-    df = df.copy()
+    df, _ = _gan_khoa_theo_doi(df, deadline_cfg)
     df["tt"] = df.apply(
-        lambda r: phan_loai_trang_thai(r["thoi_gian"], deadline_cfg.get(r["loai_bao_cao"])),
+        lambda r: phan_loai_trang_thai(r["thoi_gian"], deadline_cfg.get(r["_loai_theo_doi"])),
         axis=1,
     )
     return df
@@ -466,18 +620,26 @@ def lay_pgd_chua_nop(
     Xét cả manual override: PGD có ghi đè = xem như đã nộp.
     """
     deadline_cfg = doc_deadline_config()
-    deadline_str = deadline_cfg.get(loai_bao_cao)
 
     if df is None:
         df = doc_du_lieu_gsheet()
+    df, dm = _gan_khoa_theo_doi(df, deadline_cfg)
+
+    loai_norm = _chuan_hoa_ten_loai(loai_bao_cao)
+    tracked_loai = (
+        deadline_cfg.get(loai_bao_cao) and loai_bao_cao
+    ) or dm["display_to_tracked"].get(loai_bao_cao) or dm["alias_to_tracked"].get(loai_norm)
+    if tracked_loai is None and loai_bao_cao in deadline_cfg:
+        tracked_loai = loai_bao_cao
+    deadline_str = deadline_cfg.get(tracked_loai) if tracked_loai else None
 
     manual_map = doc_manual_log()
     ds_chua_nop: list[str] = []
     for pgd in DS_PGD_ALL:
-        entry = manual_map.get((pgd, loai_bao_cao))
+        entry = manual_map.get((pgd, tracked_loai))
         if entry and entry.get("ghi_de", True):
             continue  # có ghi đè thủ công → xem như đã nộp
-        match = df[(df["ten_pgd"] == pgd) & (df["loai_bao_cao"] == loai_bao_cao)]
+        match = df[(df["ten_pgd"] == pgd) & (df["_loai_theo_doi"] == tracked_loai)]
         if match.empty:
             ds_chua_nop.append(pgd)
 
@@ -507,13 +669,15 @@ def lay_danh_sach_can_nhac(
     if df.empty:
         return []
 
+    df, dm = _gan_khoa_theo_doi(df, deadline_cfg)
     manual_map = doc_manual_log()
     today = date.today()
     result: list[dict] = []
 
     for loai, deadline_str in sorted(deadline_cfg.items()):
+        loai_hien = dm["tracked_to_display"].get(loai, loai)
         # Lọc allowlist
-        if allowlist is not None and loai not in allowlist:
+        if allowlist is not None and loai not in allowlist and loai_hien not in allowlist:
             continue
 
         # Parse deadline
@@ -540,7 +704,7 @@ def lay_danh_sach_can_nhac(
                 except Exception:
                     pass
 
-            match = df[(df["ten_pgd"] == pgd) & (df["loai_bao_cao"] == loai)]
+            match = df[(df["ten_pgd"] == pgd) & (df["_loai_theo_doi"] == loai)]
             if match.empty:
                 chua_nop.append(pgd)
             else:
@@ -551,7 +715,8 @@ def lay_danh_sach_can_nhac(
 
         if chua_nop:
             result.append({
-                "loai": loai,
+                "loai": loai_hien,
+                "loai_theo_doi": loai,
                 "deadline_str": deadline_str,
                 "deadline_date": dl_date,
                 "days_left": days_left,
@@ -576,14 +741,16 @@ def tao_ma_tran_tien_do(
     if ds_pgd_scope is None:
         ds_pgd_scope = DS_PGD_ALL
 
-    ds_loai = sorted(deadline_cfg.keys())
     df = gan_trang_thai(df, deadline_cfg)
+    _, dm = _gan_khoa_theo_doi(df, deadline_cfg)
+    tracked_keys = sorted(deadline_cfg.keys(), key=lambda x: dm["tracked_to_display"].get(x, x))
     manual_map = doc_manual_log()
 
     rows = []
     for pgd in ds_pgd_scope:
         row: dict = {"Đơn vị": pgd}
-        for loai in ds_loai:
+        for loai in tracked_keys:
+            loai_hien = dm["tracked_to_display"].get(loai, loai)
             manual_key = (pgd, loai)
             entry = manual_map.get(manual_key)
             ghi_de = entry.get("ghi_de", True) if entry else False
@@ -591,23 +758,24 @@ def tao_ma_tran_tien_do(
             if entry and ghi_de:
                 ngay = pd.to_datetime(entry.get("ngay_nop"))
                 tt = phan_loai_trang_thai(ngay, deadline_cfg.get(loai))
-                row[loai] = f"{EMOJI[tt]} {LABEL[tt]} *"
+                row[loai_hien] = f"{EMOJI[tt]} {LABEL[tt]} *"
             else:
-                match = df[(df["ten_pgd"] == pgd) & (df["loai_bao_cao"] == loai)]
+                match = df[(df["ten_pgd"] == pgd) & (df["_loai_theo_doi"] == loai)]
                 if match.empty:
-                    row[loai] = "🔴 Chưa nộp" if loai in deadline_cfg else "⚪ Chưa nộp"
+                    row[loai_hien] = "🔴 Chưa nộp" if loai in deadline_cfg else "⚪ Chưa nộp"
                 else:
                     last = match.sort_values("thoi_gian").iloc[-1]
                     tt = last["tt"]
                     co_file = str(last.get("file_dinh_kem", "")).strip()
                     badge_file = " ⚠️" if not co_file else ""
                     badge_note = " 📝" if entry and not ghi_de else ""
-                    row[loai] = f"{EMOJI[tt]} {LABEL[tt]}{badge_file}{badge_note}"
+                    row[loai_hien] = f"{EMOJI[tt]} {LABEL[tt]}{badge_file}{badge_note}"
         rows.append(row)
 
-    dung_han = sum(1 for r in rows for l in ds_loai if "🟢" in str(r.get(l, "")))
-    tre = sum(1 for r in rows for l in ds_loai if "🟡" in str(r.get(l, "")))
-    chua_nop = sum(1 for r in rows for l in ds_loai if "🔴" in str(r.get(l, "")))
+    ds_loai_hien = [dm["tracked_to_display"].get(loai, loai) for loai in tracked_keys]
+    dung_han = sum(1 for r in rows for l in ds_loai_hien if "🟢" in str(r.get(l, "")))
+    tre = sum(1 for r in rows for l in ds_loai_hien if "🟡" in str(r.get(l, "")))
+    chua_nop = sum(1 for r in rows for l in ds_loai_hien if "🔴" in str(r.get(l, "")))
     da_nop = dung_han + tre
 
     metrics = {"dung_han": dung_han, "tre": tre, "chua_nop": chua_nop, "da_nop": da_nop}

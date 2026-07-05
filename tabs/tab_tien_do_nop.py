@@ -44,6 +44,9 @@ from services.report_submission_service import (
     lay_loi_doc_gsheet_gan_nhat,
     phat_hien_ten_lech_ten,
     doi_ten_loai_theo_doi,
+    dong_bo_tat_ca_ten_theo_form,
+    tao_ma_tran_tien_do,
+    xay_dung_danh_muc_theo_doi,
 )
 
 # ── UI constants ──
@@ -86,56 +89,26 @@ def _render_tong_quan(df: pd.DataFrame, deadline_cfg: dict, is_cn: bool, pgd_use
         return
 
     ds_loai_gsheet_hint = sorted(df["loai_bao_cao"].dropna().unique().tolist()) if not df.empty else []
+    dm = xay_dung_danh_muc_theo_doi(deadline_cfg, ds_loai_gsheet_hint)
     ds_lech = phat_hien_ten_lech_ten(deadline_cfg, ds_loai_gsheet_hint)
     if ds_lech and can_config:
         n_co_goi_y = sum(1 for x in ds_lech if x.get("ten_form"))
         st.warning(
             f"⚠️ **{len(ds_lech)}** loại đang theo dõi chưa khớp tên Google Form"
             + (f" ({n_co_goi_y} có gợi ý liên kết)" if n_co_goi_y else "")
-            + " — vào **⚙️ Cài đặt thời hạn** để **🔗 Liên kết**."
+            + " — hệ thống đang tự ghép tạm theo tên Form khi đủ rõ, nhưng vẫn nên vào **⚙️ Cài đặt thời hạn** để **🔗 Liên kết**."
         )
 
     # Chỉ hiển thị loại báo cáo có thời hạn — xóa thời hạn là không còn theo dõi
-    ds_loai = sorted(deadline_cfg.keys())
+    ds_loai = dm["display_keys"]
+    deadline_cfg_hien = dm["display_cfg"]
     ds_pgd_scope = [pgd_user] if (not is_cn and pgd_user) else DS_PGD_ALL
 
-    df = gan_trang_thai(df, deadline_cfg)
-    manual_map = doc_manual_log()
-
-    # Build ma trận trước — metrics tính từ đây để nhất quán với những gì hiển thị
-    rows = []
-    for pgd in ds_pgd_scope:
-        row: dict = {"Đơn vị": pgd}
-        for loai in ds_loai:
-            manual_key = (pgd, loai)
-            entry = manual_map.get(manual_key)
-            ghi_de = entry.get("ghi_de", True) if entry else False
-
-            if entry and ghi_de:
-                # Ghi đè: trạng thái tính từ ngày manual, badge *
-                ngay = pd.to_datetime(entry.get("ngay_nop"))
-                tt = phan_loai_trang_thai(ngay, deadline_cfg.get(loai))
-                row[loai] = f"{EMOJI[tt]} {LABEL[tt]} *"
-            else:
-                match = df[(df["ten_pgd"] == pgd) & (df["loai_bao_cao"] == loai)]
-                if match.empty:
-                    row[loai] = "🔴 Chưa nộp" if loai in deadline_cfg else "⚪ Chưa nộp"
-                else:
-                    last = match.sort_values("thoi_gian").iloc[-1]
-                    tt = last["tt"]
-                    # ⚠️ auto-detect thiếu file từ GSheet
-                    co_file = str(last.get("file_dinh_kem", "")).strip()
-                    badge_file = " ⚠️" if not co_file else ""
-                    # 📝 có ghi chú nhưng không ghi đè
-                    badge_note = " 📝" if entry and not ghi_de else ""
-                    row[loai] = f"{EMOJI[tt]} {LABEL[tt]}{badge_file}{badge_note}"
-        rows.append(row)
-
-    # Metrics từ rows — khớp chính xác với ma trận
-    dung_han = sum(1 for r in rows for l in ds_loai if "🟢" in str(r.get(l, "")))
-    tre      = sum(1 for r in rows for l in ds_loai if "🟡" in str(r.get(l, "")))
-    chua_nop = sum(1 for r in rows for l in ds_loai if "🔴" in str(r.get(l, "")))
-    da_nop   = dung_han + tre
+    rows, metrics = tao_ma_tran_tien_do(df, deadline_cfg, ds_pgd_scope)
+    dung_han = metrics["dung_han"]
+    tre = metrics["tre"]
+    chua_nop = metrics["chua_nop"]
+    da_nop = metrics["da_nop"]
 
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("Đã nộp (đơn vị × loại)", da_nop)
@@ -155,7 +128,7 @@ def _render_tong_quan(df: pd.DataFrame, deadline_cfg: dict, is_cn: bool, pgd_use
     for r in rows:
         for loai in ds_loai:
             cell = str(r.get(loai, ""))
-            dl = deadline_cfg.get(loai, "")
+            dl = deadline_cfg_hien.get(loai, "")
             dl_hien = dl
             if dl:
                 try:
@@ -509,6 +482,21 @@ def _render_canh_bao_lech_ten(
             "Ma trận Tổng quan và Telegram nhắc hạn so khớp **đúng từng chữ**. "
             "Nếu Form đổi tên (VD giai đoạn năm), hãy **liên kết** với tên trên Form."
         )
+        ds_goi_y = [x for x in ds_lech if x.get("ten_form")]
+        if ds_goi_y:
+            if st.button(
+                f"🔗 Chuẩn hóa tất cả ({len(ds_goi_y)} mục)",
+                key="cd_link_all_form",
+                type="primary",
+                use_container_width=False,
+            ):
+                kq = dong_bo_tat_ca_ten_theo_form(deadline_cfg, ds_loai_gsheet, username)
+                if kq.get("so_doi"):
+                    st.success(f"✅ {kq.get('msg')}")
+                    st.cache_data.clear()
+                    st.rerun()
+                else:
+                    st.warning(kq.get("msg", "Không có tên nào được cập nhật."))
 
         for idx, item in enumerate(ds_lech):
             ten_cu = item["ten_theo_doi"]
@@ -596,9 +584,10 @@ def _render_cai_dat(df: pd.DataFrame, deadline_cfg: dict, username: str) -> None
 
     # ── Gom dữ liệu ───────────────────────────────────────────────
     ds_loai_gsheet  = sorted(df["loai_bao_cao"].dropna().unique().tolist()) if not df.empty else []
-    ds_loai_cfg     = sorted(deadline_cfg.keys())
-    ds_loai         = sorted(set(ds_loai_gsheet) | set(ds_loai_cfg))
-    ds_loai_chua_cai = sorted(set(ds_loai) - set(ds_loai_cfg))
+    dm = xay_dung_danh_muc_theo_doi(deadline_cfg, ds_loai_gsheet)
+    ds_loai_cfg = dm["display_keys"]
+    ds_loai = sorted(set(ds_loai_gsheet) | set(ds_loai_cfg))
+    ds_loai_chua_cai = dm["ds_loai_chua_cai"]
 
     if not ds_loai:
         st.info("📭 Chưa có loại báo cáo nào từ Google Form. Sau khi PGD gửi form, các loại báo cáo sẽ xuất hiện ở đây.")
@@ -707,10 +696,11 @@ def _render_cai_dat(df: pd.DataFrame, deadline_cfg: dict, username: str) -> None
                 key="cd_loai_cfg",
                 label_visibility="collapsed",
             )
+            loai_chon_track = dm["display_to_tracked"].get(loai_chon, loai_chon)
 
             goi_y_form = next(
                 (x.get("ten_form") for x in phat_hien_ten_lech_ten(deadline_cfg, ds_loai_gsheet)
-                 if x.get("ten_theo_doi") == loai_chon and x.get("ten_form")),
+                 if x.get("ten_theo_doi") == loai_chon_track and x.get("ten_form")),
                 None,
             )
             if goi_y_form:
@@ -719,7 +709,7 @@ def _render_cai_dat(df: pd.DataFrame, deadline_cfg: dict, username: str) -> None
                     f"Dùng **🔗 Liên kết** ở khối cảnh báo phía trên để đồng bộ Telegram + ma trận."
                 )
 
-            dl_hien = deadline_cfg.get(loai_chon)
+            dl_hien = deadline_cfg.get(loai_chon_track)
             dl_default = pd.to_datetime(dl_hien).date() if dl_hien else date.today()
 
             col_a, col_b, col_c = st.columns([2, 1, 1])
@@ -734,7 +724,7 @@ def _render_cai_dat(df: pd.DataFrame, deadline_cfg: dict, username: str) -> None
             with col_b:
                 if st.button("💾 Cập nhật", key="cd_btn_luu", use_container_width=True):
                     cfg_moi = dict(deadline_cfg)
-                    cfg_moi[loai_chon] = dl_moi.strftime("%Y-%m-%d")
+                    cfg_moi[loai_chon_track] = dl_moi.strftime("%Y-%m-%d")
                     luu_deadline_config(cfg_moi, username)
                     st.success(f"✅ {loai_chon} → {dl_moi.strftime('%d/%m/%Y')}")
                     st.rerun()
@@ -742,7 +732,7 @@ def _render_cai_dat(df: pd.DataFrame, deadline_cfg: dict, username: str) -> None
                 if st.button("🗑 Ngưng", key="cd_btn_ngung_nhanh", use_container_width=True,
                              help=f"Ngưng theo dõi {loai_chon}"):
                     cfg_moi = dict(deadline_cfg)
-                    cfg_moi.pop(loai_chon, None)
+                    cfg_moi.pop(loai_chon_track, None)
                     luu_deadline_config(cfg_moi, username)
                     st.success(f"✅ Đã ngưng theo dõi: {loai_chon}")
                     st.rerun()
@@ -750,7 +740,7 @@ def _render_cai_dat(df: pd.DataFrame, deadline_cfg: dict, username: str) -> None
             # Bảng tóm tắt nhanh — đánh dấu màu deadline sắp đến / đã qua
             rows = []
             today = date.today()
-            for loai, dl in sorted(deadline_cfg.items()):
+            for loai_hien, dl in sorted(dm["display_cfg"].items()):
                 dl_dt = pd.to_datetime(dl).date() if dl else None
                 dl_str = dl_dt.strftime("%d/%m/%Y") if dl_dt else "—"
                 if dl_dt is None:
@@ -761,7 +751,7 @@ def _render_cai_dat(df: pd.DataFrame, deadline_cfg: dict, username: str) -> None
                     badge = f'<span class="cd-table-badge cd-badge-gray">🟡 {dl_str}</span>'
                 else:
                     badge = f'<span class="cd-table-badge cd-badge-gray">🟢 {dl_str}</span>'
-                rows.append({"Loại báo cáo": loai, "Thời hạn": badge})
+                rows.append({"Loại báo cáo": loai_hien, "Thời hạn": badge})
 
             df_rows = pd.DataFrame(rows)
             st.dataframe(

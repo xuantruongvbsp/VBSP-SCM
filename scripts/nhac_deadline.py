@@ -285,6 +285,104 @@ def _nhac_den_han_phan_tang() -> int:
         return 0
 
 
+# ── Nhắc phân kỳ NXH ─────────────────────────────────────────────────────────
+
+def _nhac_phan_ky_nxh() -> int:
+    """Gửi danh sách phân kỳ NXH toàn tháng vào ngày 1–3 đầu tháng (1 lần/tháng).
+
+    - Chỉ chạy khi today là ngày 1, 2, hoặc 3 (backup nếu ngày 1 lỡ).
+    - Dùng kv_store key 'nxh_nhac_thang_da_gui' để chống gửi trùng trong tháng.
+    - Lấy toàn bộ khoản đến hạn trong tháng (ngày 1 → cuối tháng).
+    """
+    from services.telegram_service import gui_nhac_phan_ky_nxh, _la_bat
+    if not _la_bat("phan_ky_nxh"):
+        return 0
+
+    today = date.today()
+    if today.day > 3:
+        return 0
+
+    # Chống gửi trùng trong cùng tháng
+    ky_thang = today.strftime("%Y-%m")
+    da_gui = db.doc_kv("nxh_nhac_thang_da_gui")
+    if da_gui == ky_thang:
+        logger.info("_nhac_phan_ky_nxh: tháng %s đã gửi, bỏ qua", ky_thang)
+        return 0
+
+    try:
+        from data.phan_ky_nxh import doc_phan_ky_nxh
+        df = doc_phan_ky_nxh()
+        if df.empty:
+            logger.warning("_nhac_phan_ky_nxh: chưa có dữ liệu parquet NXH")
+            return 0
+
+        COL_NGAY = "Ngày đến hạn kỳ con"
+        COL_TIEN = "Dư nợ kỳ con đến hạn"
+        COL_TGK  = "Tổng TG, TK"
+        COL_LAI  = "Lãi tồn"
+        COL_PGD  = "Tên PGD"
+
+        if COL_NGAY not in df.columns or COL_PGD not in df.columns:
+            logger.warning("_nhac_phan_ky_nxh: thiếu cột %s hoặc %s", COL_NGAY, COL_PGD)
+            return 0
+
+        # Toàn bộ khoản trong tháng hiện tại (ngày 1 → cuối tháng)
+        today_ts  = pd.Timestamp(today).normalize()
+        first_day = today_ts.replace(day=1)
+        last_day  = first_day + pd.offsets.MonthEnd(0)
+        ngay_du_lieu = first_day.strftime("%d/%m/%Y")
+
+        mask = (
+            df[COL_NGAY].notna()
+            & (df[COL_NGAY] >= first_day)
+            & (df[COL_NGAY] <= last_day)
+        )
+        df_thang = df[mask].sort_values(["Tên xã", COL_NGAY])
+        if df_thang.empty:
+            logger.info(
+                "_nhac_phan_ky_nxh: không có khoản nào tháng %s — đánh dấu đã gửi", ky_thang
+            )
+            db.ghi_kv("nxh_nhac_thang_da_gui", ky_thang, "system")
+            return 0
+
+        sent = 0
+        for ten_pgd, grp in df_thang.groupby(COL_PGD):
+            ds = []
+            for _, row in grp.iterrows():
+                ngay_dh = ""
+                try:
+                    if pd.notna(row[COL_NGAY]):
+                        ngay_dh = pd.Timestamp(row[COL_NGAY]).strftime("%d/%m/%Y")
+                except Exception:
+                    pass
+                ds.append({
+                    "ten_kh":        str(row.get("Tên khách hàng") or ""),
+                    "so_ku":         str(row.get("Số khế ước") or ""),
+                    "ngay_dh":       ngay_dh,
+                    "du_no":         float(row.get(COL_TIEN) or 0),
+                    "lai_ton":       float(row.get(COL_LAI) or 0) if COL_LAI in grp.columns else 0.0,
+                    "tong_tgk":      float(row.get(COL_TGK) or 0) if COL_TGK in grp.columns else 0.0,
+                    "sdt":           str(row.get("Số điện thoại") or ""),
+                    "ten_xa":        str(row.get("Tên xã") or ""),
+                    "ten_to_truong": str(row.get("Tên tổ trưởng") or ""),
+                    "ghi_chu":       str(row.get("Ghi chú") or ""),
+                })
+            ok = gui_nhac_phan_ky_nxh(str(ten_pgd), ds, ngay_du_lieu=ngay_du_lieu)
+            if ok:
+                sent += 1
+
+        # Đánh dấu đã gửi tháng này
+        db.ghi_kv("nxh_nhac_thang_da_gui", ky_thang, "system")
+        logger.info(
+            "_nhac_phan_ky_nxh: tháng %s — đã gửi %d/%d PGD, %d khoản",
+            ky_thang, sent, df_thang[COL_PGD].nunique(), len(df_thang),
+        )
+        return sent
+    except Exception as e:
+        logger.error("_nhac_phan_ky_nxh: %s", e, exc_info=True)
+        return 0
+
+
 # ── Nhắc lịch công tác ngày mai ───────────────────────────────────────────────
 
 def _nhac_lich_cong_tac() -> int:
@@ -362,6 +460,12 @@ def nhac() -> None:
 
     _nhac_theo_doi_nhap_lieu()
     _thong_bao_nop_moi_gsheet()
+
+    # Nhắc phân kỳ NXH — khoản đến hạn tháng này
+    try:
+        _nhac_phan_ky_nxh()
+    except Exception as e:
+        logger.error("_nhac_phan_ky_nxh: %s", e)
 
     # Nhắc khoản đến hạn phân tầng T-7/T-3/T-1
     try:

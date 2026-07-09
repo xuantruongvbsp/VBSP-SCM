@@ -3,7 +3,7 @@ setlocal enabledelayedexpansion
 chcp 65001 >nul
 
 cd /d "%~dp0"
-set "PORT=8501"
+set "PORT=8502"
 set "URL=http://localhost:%PORT%"
 set "VENV=venv"
 set "PY_EXE=%VENV%\Scripts\python.exe"

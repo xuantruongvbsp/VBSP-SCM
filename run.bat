@@ -13,13 +13,13 @@ if not exist "venv\Scripts\python.exe" (
 
 echo ============================================================
 echo   VBSP-SCM — Dang khoi dong...
-echo   Mo trinh duyet: http://localhost:8501
+echo   Mo trinh duyet: http://localhost:8502
 echo   Nhan Ctrl+C de dung.
 echo ============================================================
 echo.
 
-start "" http://localhost:8501
+start "" http://localhost:8502
 
-venv\Scripts\streamlit run app.py --server.port 8501
+venv\Scripts\streamlit run app.py --server.port 8502
 
 pause

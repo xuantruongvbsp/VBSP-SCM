@@ -1,5 +1,20 @@
 # CHANGELOG
 
+## [2026-07-07] — Thêm ghi chú đường dẫn TTBC trong tab upload NXH
+- `tabs/tab_phan_ky_nxh.py` — thêm caption hướng dẫn lấy file từ TTBC: Báo cáo theo truy vấn → Nhóm BC tín dụng → Sao kê nợ đến hạn kỳ con theo chương trình vay
+
+## [2026-07-07] — Tạo data/phan_ky_nxh.py — module đọc/ghi NXH bị thiếu
+- `data/phan_ky_nxh.py` — tạo mới: `luu_phan_ky_nxh()` + `doc_phan_ky_nxh()`, hỗ trợ header dòng 4 + fallback, alias "Lãi tồn", lưu Parquet `cache/phan_ky_nxh.parquet` + meta kv_store
+
+## [2026-07-07] — Đổi port VBSP-SCM sang 8502 tránh xung đột với dự án khác
+- `.streamlit/config.toml` — thêm `port = 8502` ngăn xung đột port 8501 với dự án "PHẦN MỀM CÂN ĐỐI"
+- `run.bat` — cập nhật port 8501 → 8502
+- `Chay_VBSP_SCM.bat` — cập nhật PORT=8501 → PORT=8502
+- `.vscode/launch.json` — tạo mới, cấu hình nút Run trong Cursor dùng venv + port 8502
+
+## [2026-07-07] — Fix: thêm nhắc phân kỳ NXH vào nhac_deadline.py, gửi 1 lần/tháng
+- `scripts/nhac_deadline.py` — thêm hàm `_nhac_phan_ky_nxh()` gửi toàn bộ khoản tháng, chỉ chạy ngày 1–3 đầu tháng, chống trùng qua kv_store `nxh_nhac_thang_da_gui`; khắc phục lỗi không gửi Telegram tháng 7 do `daily_report.py` không chạy được qua Task Scheduler
+
 ## [2026-07-05] — Mở rộng match tên báo cáo khi Google Form chèn thêm cụm từ
 - `services/report_submission_service.py` — mở rộng match tên lệch bằng cách bỏ year-range ở mọi vị trí, chuẩn hóa dấu câu/khoảng trắng và cho phép match containment duy nhất; giúp các tên như `RÀ SOÁT XÂY DỰNG KHTD 2023-2026` tự hiển thị theo tên Form mới có thêm cụm `GIAI ĐOẠN`
 - `tests/test_report_submission_service.py` — thêm regression tests cho trường hợp tên Form chèn thêm cụm từ nhưng vẫn là cùng một báo cáo

@@ -43,11 +43,17 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
             else:
                 st.caption("Chưa có dữ liệu — hãy upload file Excel.")
 
+            st.caption(
+                "📂 Lấy file từ TTBC: "
+                "**Báo cáo theo truy vấn** → **Nhóm BC tín dụng** "
+                "→ **Sao kê nợ đến hạn kỳ con theo chương trình vay**"
+            )
+
             uploaded = st.file_uploader(
                 "Chọn file Excel danh sách phân kỳ NXH",
                 type=["xlsx"],
                 key="phan_ky_nxh_uploader",
-                help="File xuất từ hệ thống NHCSXH TW — cột 'Ngày đến hạn kỳ con', 'Dư nợ kỳ con đến hạn'...",
+                help="File xuất từ TTBC: Báo cáo theo truy vấn / Nhóm BC tín dụng / Sao kê nợ đến hạn kỳ con theo chương trình vay",
             )
             if uploaded is not None:
                 if st.button("💾 Xử lý & Lưu", key="phan_ky_nxh_btn_luu", type="primary"):

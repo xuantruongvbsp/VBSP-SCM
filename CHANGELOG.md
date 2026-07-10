@@ -1,5 +1,87 @@
 # CHANGELOG
 
+## [2026-07-10] — Thêm nút "Dọn deadline cũ" trong tab Tiến độ BC
+- `tabs/tab_tien_do_nop.py` dòng ~775 — thêm popover "🧹 Dọn deadline cũ": tự phát hiện loại BC đang theo dõi nhưng không còn trong GSheet, xóa hàng loạt + ghi audit log; nút disabled kèm tooltip khi không có gì cần dọn; bố cục 2 cột cạnh "🗑 Xóa tất cả deadline"
+
+## [2026-07-10] — Chuyển SHEET_ID và tên cột NXH ra constants
+- `config.py` dòng ~1115 — thêm `TIENDO_BAOCAO_SHEET_ID` và `TIENDO_BAOCAO_SHEET_TAB`
+- `data/phan_ky_nxh.py` dòng ~17 — expose module-level constants `COL_NXH_NGAY/TIEN/TGK/LAI/PGD`
+- `services/report_submission_service.py` dòng ~29,36 — import `TIENDO_BAOCAO_SHEET_ID/TAB` từ config thay vì hardcode
+- `scripts/nhac_deadline.py` — import `COL_NXH_*` từ `data.phan_ky_nxh`; xóa 5 dòng hardcode tên cột trong `_nhac_phan_ky_nxh()`
+
+## [2026-07-10] — Tách trạng thái "Thiếu file" khỏi "Đã nộp" trong Tiến độ BC
+- `services/report_submission_service.py` dòng ~43 — thêm `"thieu_file": "⚠️"/"Thiếu file"` vào EMOJI/LABEL
+- `services/report_submission_service.py` dòng ~820 — `tao_ma_tran_tien_do()`: nộp form không có file → hiển thị "⚠️ Thiếu file" (không còn là "🟢 Đúng hạn ⚠️")
+- `services/report_submission_service.py` dòng ~834 — thêm `thieu_file` vào metrics, không tính vào `da_nop`
+- `tabs/tab_tien_do_nop.py` dòng ~113 — 5 cột metric thay vì 4: thêm "⚠️ Thiếu file"
+- `tabs/tab_tien_do_nop.py` dòng ~57 — `_clean_trang_thai`: ⚠️ → "Thiếu file" (trước là "Trễ hạn")
+- `tabs/tab_tien_do_nop.py` dòng ~407 — thêm gợi ý set quyền Drive "Anyone with the link can view"
+- `tabs/tab_tien_do_nop.py` dòng ~834 — cập nhật hướng dẫn PGD: thêm bước set quyền Drive
+
+## [2026-07-10] — Fix nhac_deadline.py (3 lỗi) + pdf_service.py font path
+- `scripts/nhac_deadline.py` dòng ~11 — thêm `timedelta` vào import thay vì dùng `__import__("datetime")` hack
+- `scripts/nhac_deadline.py` dòng ~398 — thay `__import__("datetime").timedelta(days=1)` bằng `timedelta(days=1)`
+- `scripts/nhac_deadline.py` dòng ~456 — sửa log: tách "không có deadline" vs "gửi thất bại" thành `logger.info` / `logger.warning` riêng biệt
+- `scripts/nhac_deadline.py` dòng ~465 — xóa double try/except dư thừa bọc ngoài các hàm đã tự handle exception
+- `pdf_service.py` dòng ~44 — font path dùng `Path(__file__).resolve().parent / "assets"` làm ưu tiên 1; fallback `C:/Windows/Fonts` vẫn giữ nhưng xuống sau
+
+## [2026-07-10] — Fix ghi_de default mâu thuẫn giữa ma trận và Telegram
+- `services/report_submission_service.py` dòng ~750 — `lay_danh_sach_can_nhac()`: đổi default `ghi_de` từ `False` → `True` để nhất quán với `lay_pgd_chua_nop()` và `tao_ma_tran_tien_do()`; tránh tình trạng ma trận hiện "đã nộp \*" nhưng Telegram vẫn nhắc
+
+## [2026-07-10] — Fix phan_loai_trang_thai trả sai "da_nop" khi deadline lỗi
+- `services/report_submission_service.py` dòng ~612 — đổi fallback exception từ `"da_nop"` → `"chua_nop"` để tránh PGD bị bỏ sót nhắc nhở khi deadline_str không parse được
+
+## [2026-07-10] — Fix auto-link ghi đè alias khi cả tên cũ & mới cùng được theo dõi
+- `services/report_submission_service.py` dòng ~371 — `xay_dung_danh_muc_theo_doi()`: không ghi đè alias nếu form_norm đã trỏ đến tracked key khác (tránh map sai "KHTD 2027-2030" → "KHTD 2023-2026")
+
+## [2026-07-10] — Fix cache cũ tab Tiến độ nộp BC không clear khi vào tab
+- `tabs/tab_tien_do_nop.py` dòng ~922 — thêm `_doc_du_lieu.clear()` đầu render() để clear cache GSheet cũ mỗi khi vào tab
+
+## [2026-07-10] — Xóa tính năng Quản lý Công văn khỏi dự án
+- `tabs/tab_quan_ly_cong_van.py` — xóa (470 dòng, 4 sub-tab: Tìm kiếm, Thêm mới, Xuất Excel, OneDrive)
+- `services/cong_van_service.py` — xóa (241 dòng, CRUD + tìm kiếm + thống kê + xuất Excel)
+- `workspaces/ws_management.py` — xóa mục menu "📋 Quản lý Công văn" khỏi nhóm Nội bộ Phòng
+- `alert_center.py` — xóa hàm `_kiem_tra_cong_van_den_han()` và lời gọi trong `_build_alert_items()`
+- `db.py` — xóa `CREATE TABLE cong_van` + 3 index + migration `onedrive_url`
+- `tests/test_smoke_imports.py` — xóa `tab_quan_ly_cong_van` khỏi danh sách tab
+
+## [2026-07-10] — Fix test gửi tin nhắn Telegram thật khi chạy pytest
+- `tests/test_upload_supplement.py` — thêm `@pytest.fixture(autouse=True)` mock `gui_thong_bao_upload_pgd` để `luu_pgd_file()` không gửi HTTP request thật
+- `tests/conftest.py` — thêm fixture toàn cục `_block_telegram_notifications` mock cả `gui_thong_bao_upload_pgd` + `gui_thong_bao_merge` để bảo vệ toàn bộ test suite
+
+## [2026-07-10] — Fix 2 bug card grid tổng quan nhanh PGD
+- `tabs/tab_tongquan.py` dòng ~213 — guard `_cache_pgd_quick_cards`: thay `if not need` bằng check đủ `cot_pgd + cot_tdn` tránh KeyError khi thiếu cột số
+- `tabs/tab_tongquan.py` dòng ~845 — dùng `df` (đã lọc hồ sơ còn dư nợ) thay vì `df_full` thô để tỷ lệ nợ xấu chính xác
+
+## [2026-07-10] — Thêm card grid tổng quan nhanh 22 PGD ở Tổng quan
+- `tabs/tab_tongquan.py` — thêm `_cache_pgd_quick_cards()` + card grid hiển thị dư nợ (tỷ) & tỷ lệ nợ xấu cho từng PGD, đặt trước bảng chi tiết Thông tin tổng quát theo PGD
+
+## [2026-07-10] — Thêm bảng xã có dư nợ cao nhất/thấp nhất ở Tổng quan
+- `tabs/tab_tongquan.py` — thêm `_cache_xa_ranking()` và UI hiển thị top/bottom 5 xã theo dư nợ ngay sau mục Thông tin chung
+
+## [2026-07-10] — Import hàng loạt KH-NV tự động merge toàn Chi nhánh
+- `tabs/tab_upload_khnv/_upload_don_vi.py` — sau khi import hàng loạt thành công, tự gọi merge HSTD/NQ11/GQVL toàn Chi nhánh, làm mới cache app và hiển thị kết quả merge sau rerun
+- `tabs/tab_upload_khnv/_state.py` — thêm `xoa_khoi_hang_cho()` để chỉ xóa các loại đã merge thành công khỏi pending queue
+- `tabs/tab_upload_khnv/__init__.py` — cập nhật mô tả flow: import hàng loạt tự merge, upload đơn vị vẫn dùng hàng chờ/merge thủ công
+
+## [2026-07-10] — Fix bảng Upload KH-NV hiển thị ngày số liệu HSTD
+- `data/pgd.py` — `_doc_ngay_so_lieu()` với HSTD tự tìm cột `Ngày số liệu` trong header dòng 5 thay vì hardcode cột `FS`; đọc đúng cả file cũ (`FS`) và file mới (`FT`) để bảng `📋 Trạng thái Upload — 22 Đơn vị` hiện `SL: dd/mm`
+- `tests/test_pgd.py` — thêm regression tests cho 2 layout HSTD có cột `Ngày số liệu` ở `FS` và `FT`
+
+## [2026-07-10] — Fix ngày số liệu ở Ban Đại Diện và Tờ trình BGĐ
+- `utils.py` — thêm `lay_ngay_so_lieu()` dùng chung, xử lý cả datetime64 lẫn string
+- `tabs/tab_ban_dai_dien.py` — thay `_ngay_so_lieu()` dùng `strptime` (fail với datetime64) bằng `lay_ngay_so_lieu()`
+- `tabs/tab_khtd_xuat.py` — bỏ `date.today()` fallback, dùng metadata + `lay_ngay_so_lieu()` trước
+
+## [2026-07-10] — Fix "Ngày cập nhật" ở Tổng quan hiển thị sai (1/7 thay vì 30/6)
+- `services/upload_service.py` — thêm lưu `ngay_sl` vào `merge_meta_{loai}` để các tab tra cứu ngày số liệu từ metadata
+- `tabs/tab_tongquan.py` — thay `datetime.now()` fallback bằng `"—"` tránh hiển thị ngày hiện tại khi không có ngày số liệu
+
+## [2026-07-10] — Fix Thông tin chung Tổng quan đếm cả hồ sơ dư nợ 0
+- `services/tongquan_service.py` — thêm `loc_ho_so_con_du_no()` và cho `tinh_kpi_tongquan()` chỉ đếm hồ sơ còn dư nợ/quá hạn/khoanh, tránh phóng đại Tổng món vay/Tổng khách hàng
+- `tabs/tab_tongquan.py` — lọc phạm vi dữ liệu ngay đầu render để các card BQ và Ủy thác/Trực tiếp dùng đúng hồ sơ đang còn số dư
+- `tests/test_tongquan_service.py` — thêm regression test cho case hồ sơ dư nợ 0 không được tính vào số món/KH
+
 ## [2026-07-07] — Thêm ghi chú đường dẫn TTBC trong tab upload NXH
 - `tabs/tab_phan_ky_nxh.py` — thêm caption hướng dẫn lấy file từ TTBC: Báo cáo theo truy vấn → Nhóm BC tín dụng → Sao kê nợ đến hạn kỳ con theo chương trình vay
 

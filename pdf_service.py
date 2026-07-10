@@ -41,14 +41,19 @@ def _dang_ky_font():
     import warnings
     from pathlib import Path
 
-    candidates = [
+    _BASE = Path(__file__).resolve().parent
+    candidates_regular = [
+        _BASE / "assets" / "times.ttf",
         Path("assets/times.ttf"),
-        Path("assets/timesbd.ttf"),
         Path("C:/Windows/Fonts/times.ttf"),
+    ]
+    candidates_bold = [
+        _BASE / "assets" / "timesbd.ttf",
+        Path("assets/timesbd.ttf"),
         Path("C:/Windows/Fonts/timesbd.ttf"),
     ]
-    regular = next((p for p in candidates[:2] + [candidates[2]] if p.exists()), None)
-    bold = next((p for p in [candidates[1], candidates[3]] if p.exists()), None)
+    regular = next((p for p in candidates_regular if p.exists()), None)
+    bold = next((p for p in candidates_bold if p.exists()), None)
 
     if regular:
         pdfmetrics.registerFont(TTFont("TNR", str(regular)))

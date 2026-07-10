@@ -4,7 +4,7 @@ Tab Upload KH-NV — Phòng Kế hoạch Nghiệp vụ.
 Quyền: role in ("admin", "manager", "admin_cn", "manager_cn")
 
 Cấu trúc 6 sub-tabs:
-  📊 Tổng quan & Merge  — bảng trạng thái + pending queue + nút Merge
+  📊 Tổng quan & Merge  — bảng trạng thái + pending queue + nút Merge thủ công
   📤 Upload đơn vị      — form upload 4 file cho 1 đơn vị
   📦 Import hàng loạt   — multi-file bulk import
   🏢 Toàn Chi nhánh     — CDTOTKVV / NQ11 / GQVL toàn CN
@@ -12,8 +12,8 @@ Cấu trúc 6 sub-tabs:
   🗑️ Xóa dữ liệu        — xóa file + rebuild cache
 
 Flow batch merge:
-  Upload file → lưu vào pgd_data/ → thêm vào pending queue
-  → user bấm "Merge toàn CN" trong tab Tổng quan → merge → cache clear
+  Upload đơn vị → lưu vào pgd_data/ → thêm vào pending queue
+  Import hàng loạt → lưu vào pgd_data/ → tự merge toàn CN → cache clear
 """
 from __future__ import annotations
 

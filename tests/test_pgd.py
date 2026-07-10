@@ -1,6 +1,10 @@
 """tests/test_pgd.py — data/pgd.py: pgd_slug(), duong_dan_pgd()"""
 from __future__ import annotations
-from data.pgd import pgd_slug, duong_dan_pgd
+from datetime import datetime
+
+from openpyxl import Workbook
+
+from data.pgd import pgd_slug, duong_dan_pgd, _doc_ngay_so_lieu
 
 
 class TestPgdSlug:
@@ -79,3 +83,28 @@ class TestDuongDanPgd:
     def test_path_la_chuoi(self):
         result = duong_dan_pgd("PGD Long Thành", "hstd")
         assert isinstance(result, str)
+
+
+class TestDocNgaySoLieuHstd:
+
+    def _make_hstd_file(self, tmp_path, ngay_col: int):
+        fp = tmp_path / f"hstd_col_{ngay_col}.xlsx"
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "BCQUERY"
+        ws.cell(row=5, column=4, value="Tên PGD")
+        ws.cell(row=6, column=4, value="PGD Test")
+        ws.cell(row=5, column=ngay_col, value="Ngày số liệu")
+        ws.cell(row=6, column=ngay_col, value="30/06/2026")
+        wb.save(fp)
+        return fp
+
+    def test_doc_ngay_so_lieu_hstd_layout_cu_fs(self, tmp_path):
+        fp = self._make_hstd_file(tmp_path, 175)
+
+        assert _doc_ngay_so_lieu(fp, "hstd", fp.stat().st_mtime) == datetime(2026, 6, 30)
+
+    def test_doc_ngay_so_lieu_hstd_layout_moi_ft(self, tmp_path):
+        fp = self._make_hstd_file(tmp_path, 176)
+
+        assert _doc_ngay_so_lieu(fp, "hstd", fp.stat().st_mtime) == datetime(2026, 6, 30)

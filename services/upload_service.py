@@ -52,7 +52,7 @@ from config import (
     DS_PGD, DON_VI_CHI_NHANH, GQVL_COT_MAP, COT_TEN_PGD,
     COT_DU_NO_TH, COT_DU_NO_QH, COT_DU_NO_KHOANH, COT_THOI_HAN, COT_GIAI_NGAN_TRONG_NAM,
     COT_MUC_VAY, COT_TONG_DU_NO, COT_LAI_TON, COT_LAI_TON_QH,
-    COT_LAI_THANG, COT_GOC_TRA,
+    COT_LAI_THANG, COT_GOC_TRA, COT_NGAY_SL,
     UPLOAD_CANH_BAO_NGAY,
 )
 
@@ -1002,6 +1002,13 @@ def _merge_du_lieu_toan_cn_impl(
             f"{loai.upper()} — {fmt_so(len(df_toan_cn))} dòng, {len(pgd_da_merge)} PGD{canh_bao}",
         )
 
+        # Xác định ngày số liệu từ dữ liệu merged
+        ngay_sl = ""
+        if COT_NGAY_SL in df_toan_cn.columns:
+            _sl = pd.to_datetime(df_toan_cn[COT_NGAY_SL], dayfirst=True, errors="coerce").dropna()
+            if not _sl.empty:
+                ngay_sl = _sl.max().strftime("%d/%m/%Y")
+
         # Ghi metadata vào kv_store để các tab phân tích hiển thị caption
         db.ghi_kv(
             f"merge_meta_{loai}",
@@ -1010,6 +1017,7 @@ def _merge_du_lieu_toan_cn_impl(
                 "so_pgd":    len(pgd_da_merge),
                 "so_dong":   len(df_toan_cn),
                 "pgd_cu":    pgd_cu,
+                "ngay_sl":   ngay_sl,
             },
             username,
         )

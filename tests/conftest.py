@@ -1,9 +1,10 @@
 """Mock toàn bộ module streamlit để các module gốc import được khi chạy pytest."""
 import sys
 from pathlib import Path
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pandas as pd
+import pytest
 
 
 def _noop_cache(*args, **kwargs):
@@ -128,3 +129,13 @@ sys.modules["streamlit.delta_generator"].DeltaGenerator = MagicMock()
 ROOT_DIR = Path(__file__).parent.parent
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
+
+
+# ── Global Telegram safety net ───────────────────────────────────────────────
+# KHÔNG test nào được phép gửi HTTP request thật tới Telegram API.
+# Block tất cả các hàm gui_* trong services.telegram_service.
+@pytest.fixture(autouse=True)
+def _block_telegram_notifications():
+    with patch("services.telegram_service.gui_thong_bao_upload_pgd", return_value=True), \
+         patch("services.telegram_service.gui_thong_bao_merge", return_value=True):
+        yield

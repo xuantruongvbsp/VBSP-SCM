@@ -358,6 +358,16 @@
 | **Bài học** | Khi một loại dữ liệu có nhiều nguồn file song song, fallback “nếu file A không tồn tại thì dùng file B” là chưa đủ; cần xác định rõ file nào là bản hiện hành, thường là file mới hơn theo `mtime` |
 | **Ngày fix** | 2026-06-25 |
 
+### B16d — Bảng Upload KH-NV hiện ngày upload vì đọc sai cột `Ngày số liệu` HSTD
+| | |
+|---|---|
+| **File** | `data/pgd.py` → `_doc_ngay_so_lieu()` |
+| **Dấu hiệu** | Bảng `📋 Trạng thái Upload — 22 Đơn vị` hiển thị ngày file được upload/lưu thay vì ngày trong HSTD; các file HSTD mới có `Ngày số liệu = 30/06/2026` nhưng badge không hiện `SL: 30/06` |
+| **Nguyên nhân** | Hàm đọc ngày HSTD hardcode cột `FS`, trong khi một số file mới có thêm 1 cột và đẩy `Ngày số liệu` sang `FT`; khi đọc không ra ngày thì `_format_badge()` fallback về `ngay_upload` |
+| **Fix** | Với HSTD, đọc nhanh XML của worksheet, tự tìm header `Ngày số liệu` ở dòng 5 rồi lấy ngày ở đúng cột đó; hỗ trợ cả layout cũ `FS` và layout mới `FT` |
+| **Test** | `tests/test_pgd.py::TestDocNgaySoLieuHstd::test_doc_ngay_so_lieu_hstd_layout_cu_fs`, `tests/test_pgd.py::TestDocNgaySoLieuHstd::test_doc_ngay_so_lieu_hstd_layout_moi_ft` |
+| **Ngày fix** | 2026-07-10 |
+
 ### B14 — Lambda params với default values khiến `lazy_tabs` truyền sai tham số
 | | |
 |---|---|
@@ -796,6 +806,43 @@
 | **Fix** | Thêm validator liên PGD cho HSTD theo khóa `Mã KH + Số khế ước`, tổng hợp top cặp PGD lệch nhiều nhất + mẫu dòng để rà nguồn. Nếu phát hiện trùng chéo thì block merge cả ở dữ liệu hiện tại lẫn baseline, giữ nguyên cache đang dùng và hiển thị chẩn đoán thay vì ghi đè số sai |
 | **Test** | `tests/test_merge_du_lieu_toan_cn.py::TestMergeCrossPgdDuplicateBlock::test_hstd_hien_tai_trung_cheo_bi_chan_khong_ghi_cache`; `tests/test_merge_du_lieu_toan_cn.py::TestMergeCrossPgdDuplicateBlock::test_baseline_hstd_trung_cheo_giu_nguyen_cache_cu` |
 | **Ngày fix** | 2026-07-03 |
+
+---
+### E16 — "Ngày cập nhật" ở tab Tổng quan hiển thị ngày hiện tại thay vì ngày số liệu HSTD
+| | |
+|---|---|
+| **Dấu hiệu** | Tab Tổng quan hiển thị "Cập nhật: 01/07/2026" trong khi dữ liệu HSTD là ngày 30/06/2026 |
+| **File** | `services/upload_service.py` (~d.1006-1015); `tabs/tab_tongquan.py` (~d.384-388) |
+| **Nguyên nhân** | 2 bug kết hợp: (1) `merge_meta_hstd` không lưu trường `ngay_sl` → fallback `merge_meta_hstd.get("ngay_sl")` luôn thất bại. (2) Fallback cuối dùng `datetime.now()` → hiển thị sai ngày |
+| **Fix** | (1) Thêm logic trích xuất `COT_NGAY_SL` max từ `df_toan_cn` và lưu vào `merge_meta_{loai}`. (2) Thay `datetime.now()` bằng `"—"` |
+| **Ngày fix** | 2026-07-10 |
+
+### E17 — Tab Ban Đại Diện, section "Dự báo vốn" bị ẩn do `_ngay_so_lieu()` fail
+| | |
+|---|---|
+| **Dấu hiệu** | Tab Ban Đại Diện → "Dự báo Nguồn vốn" không hiển thị, chỉ thấy "⚠️ Không xác định được ngày số liệu." |
+| **File** | `tabs/tab_ban_dai_dien.py` dòng ~82-92 (cũ) |
+| **Nguyên nhân** | `_ngay_so_lieu()` dùng `datetime.strptime(str(sl.iloc[0]), "%d/%m/%Y")` — khi Parquet lưu "Ngày số liệu" dạng datetime64, `str(datetime64)` ra định dạng `"2026-06-30 00:00:00"` không khớp `%d/%m/%Y` → luôn vào except → return None |
+| **Fix** | Thay bằng `lay_ngay_so_lieu()` từ utils — dùng `pd.to_datetime()` với `dayfirst=True`, xử lý cả string lẫn datetime64 |
+| **Ngày fix** | 2026-07-10 |
+
+### E18 — Tờ trình BGĐ hiển thị ngày hiện tại thay vì ngày số liệu HSTD
+| | |
+|---|---|
+| **Dấu hiệu** | Tờ trình BGĐ ghi "Tính đến ngày 10/07/2026" trong khi số liệu HSTD là 30/06/2026 |
+| **File** | `tabs/tab_khtd_xuat.py` dòng ~950 (cũ) |
+| **Nguyên nhân** | `ngay_sl = _date.today().strftime("%d/%m/%Y")` gán trước — nếu metadata không có `ngay_sl` (do lỗi E16) thì dùng luôn ngày hiện tại |
+| **Fix** | Khởi tạo `ngay_sl = ""`, đọc metadata trước, nếu metadata không có thì fallback `lay_ngay_so_lieu()` đọc trực tiếp từ DataFrame HSTD |
+| **Ngày fix** | 2026-07-10 |
+
+### E19 — Import hàng loạt KH-NV xong nhưng Tổng quan vẫn dùng cache cũ
+| | |
+|---|---|
+| **Dấu hiệu** | Import hàng loạt HSTD/NQ11/GQVL thành công, bảng trạng thái file đã đổi nhưng `📊 Thông tin chung`/cache toàn CN vẫn giữ số liệu cũ cho đến khi người dùng tự bấm `Merge toàn CN` |
+| **File** | `tabs/tab_upload_khnv/_upload_don_vi.py` → `_xu_ly_import_folder()` |
+| **Nguyên nhân** | Luồng import chỉ lưu file vào `pgd_data` và thêm loại vào pending queue (`them_vao_hang_cho`), không gọi merge ngay. Người dùng dễ hiểu import là đã áp dụng số liệu toàn CN |
+| **Fix** | Sau import hàng loạt, tự gọi `merge_nhieu_loai_toan_cn()` cho các loại HSTD/NQ11/GQVL vừa lưu, xóa các loại merge thành công khỏi pending queue và gọi `lam_moi_du_lieu_app()` để app đọc cache mới |
+| **Ngày fix** | 2026-07-10 |
 
 ---
 
@@ -1455,6 +1502,15 @@ DEBUG=1 streamlit run app.py
 | **Fix** | Xóa `from utils import fmt` dư thừa — `fmt` đã được import ở module level (dòng 55) |
 | **Ngày fix** | 2026-05-25 |
 
+### J13 — Test gửi tin nhắn Telegram thật khi chạy `luu_pgd_file()`
+| | |
+|---|---|
+| **File** | `tests/test_upload_supplement.py`, `tests/conftest.py` |
+| **Dấu hiệu** | Khi chạy `pytest` (RUN ALL TEST), Telegram nhận tin nhắn thật "📤 PGD Long Thành vừa upload HSTD" — mỗi test gọi `luu_pgd_file()` gửi 1 HTTP request tới Telegram API |
+| **Nguyên nhân** | `luu_pgd_file()` trong `upload_service.py` gọi `gui_thong_bao_upload_pgd()` — hàm này gửi HTTP POST thật qua `requests`. Test không mock `services.telegram_service.gui_thong_bao_upload_pgd`. Các test merge khác đã mock `gui_thong_bao_merge` nhưng bỏ sót `gui_thong_bao_upload_pgd` |
+| **Fix** | (1) `test_upload_supplement.py`: thêm `@pytest.fixture(autouse=True)` mock `gui_thong_bao_upload_pgd`. (2) `conftest.py`: thêm fixture toàn cục block cả `gui_thong_bao_upload_pgd` + `gui_thong_bao_merge` để bảo vệ toàn bộ test suite |
+| **Ngày fix** | 2026-07-10 |
+
 ### J06 — GOM vào CN luôn dùng tháng hiện tại, bỏ qua tháng user chọn
 | | |
 |---|---|
@@ -1722,6 +1778,16 @@ val = pd.to_numeric(df[COT_X], errors="coerce").sum() if COT_X in df.columns els
 | **Nguyên nhân** | `cols_need` khi copy `df_bq` không gồm `COT_MA_TO` → `dem_so_to_hstd()` không thấy cột Mã tổ |
 | **Fix** | Thêm `COT_MA_TO` vào `cols_need` |
 | **Ngày fix** | 2026-07-05 |
+
+### C30 — `Thông tin chung`: Tổng món vay/Tổng khách hàng đếm cả hồ sơ dư nợ 0
+| | |
+|---|---|
+| **File** | `services/tongquan_service.py` → `tinh_kpi_tongquan()`; `tabs/tab_tongquan.py` → `render()` |
+| **Dấu hiệu** | `📊 Thông tin chung` có thể hiện Tổng món vay/Tổng khách hàng cao hơn thực tế nếu tab nhận HSTD chưa lọc active; cache hiện tại chênh `337.186` vs `293.067` món khi đếm toàn bộ HSTD |
+| **Nguyên nhân** | Phân hệ CN nạp `active_only=True`, nhưng luồng PGD/standalone có thể truyền cả các dòng `Tổng dư nợ = 0`. KPI dùng `nunique()` trên toàn bộ `df`, nên đếm cả hồ sơ đã tất toán |
+| **Fix** | Thêm `loc_ho_so_con_du_no()` lọc theo `Tổng dư nợ > 0 OR Dư nợ quá hạn > 0 OR Dư nợ khoanh > 0`; dùng trong KPI service và đầu `tab_tongquan.render()` |
+| **Test** | `tests/test_tongquan_service.py::test_tinh_kpi_tongquan_bo_qua_ho_so_du_no_0_khi_dem` |
+| **Ngày fix** | 2026-07-10 |
 
 ---
 

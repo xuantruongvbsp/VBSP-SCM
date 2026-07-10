@@ -361,6 +361,27 @@ hr {{ border: none !important; border-top: 1px solid {c['border']} !important; m
 /* ── 18. SPINNER ── */
 [data-testid="stSpinner"] > div {{ border-top-color: {c['spinner']} !important; }}
 
+/* ── 19. DATA SOURCE STATUS PILLS ── */
+.ds-pill {{
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 6px 14px; border-radius: 20px;
+    font-size: 0.82rem; font-weight: 500;
+    border: 1px solid transparent;
+    white-space: nowrap;
+}}
+.ds-pill.status-ok {{
+    background: {c['success_bg']}; color: {c['success_text']};
+    border-color: {c['success_border']};
+}}
+.ds-pill.status-warn {{
+    background: {c['warn_bg']}; color: {c['warn_text']};
+    border-color: {c['warn_border']};
+}}
+.ds-pill.status-error {{
+    background: {c['error_bg']}; color: {c['error_text']};
+    border-color: {c['error_border']};
+}}
+
 </style>"""
 
 

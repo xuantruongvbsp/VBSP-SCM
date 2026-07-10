@@ -1112,6 +1112,10 @@ def tim_ten_xa_trong_hstd(ten_xa_config: str) -> str:
 DCGIAM_SHEET_ID  = "15Ev2rTv6khLFaMpAiMwqJCVC_33ocJ-6cp016RGNkYk"
 DCGIAM_CRED_FILE = str(BASE_DIR / "credentials.json")
 
+# Google Sheets — Tiến độ nộp báo cáo PGD
+TIENDO_BAOCAO_SHEET_ID  = "15Ev2rTv6khLFaMpAiMwqJCVC_33ocJ-6cp016RGNkYk"
+TIENDO_BAOCAO_SHEET_TAB = "TIENDO_BAOCAO"
+
 
 # ── Mapping mã Điểm Giao Dịch theo PGD (nguồn: file Excel MÃ ĐIỂM GIAO DỊCH ĐỒNG NAI.xlsx) ──────
 DGD_MA_MAP: dict[str, dict[str, str]] = {

@@ -17,6 +17,17 @@ def xoa_hang_cho() -> None:
     st.session_state.pop(PENDING_MERGE_KEY, None)
 
 
+def xoa_khoi_hang_cho(cac_loai: list[str] | set[str]) -> None:
+    queue: set[str] = st.session_state.get(PENDING_MERGE_KEY, set())
+    if not queue:
+        return
+    queue.difference_update(set(cac_loai))
+    if queue:
+        st.session_state[PENDING_MERGE_KEY] = queue
+    else:
+        xoa_hang_cho()
+
+
 def xoa_cache_trang_thai() -> None:
     st.session_state.pop("trang_thai_upload_pgd", None)
     for k in [k for k in st.session_state if k.startswith("_blcache_")]:

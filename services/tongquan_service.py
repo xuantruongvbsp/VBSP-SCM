@@ -52,6 +52,22 @@ def dem_so_to_hstd(
     return int(_df.groupby([cot_pgd, cot_ten_to]).ngroups)
 
 
+def loc_ho_so_con_du_no(
+    df: pd.DataFrame,
+    cot_tdn: str,
+    cot_dqh: str = "",
+    cot_dnk: str = "",
+) -> pd.DataFrame:
+    """Lọc hồ sơ đang còn số dư, khớp điều kiện active_only trong app.py."""
+    cols = [c for c in [cot_tdn, cot_dqh, cot_dnk] if c and c in df.columns]
+    if not cols:
+        return df
+    mask = pd.Series(False, index=df.index)
+    for c in cols:
+        mask |= pd.to_numeric(df[c], errors="coerce").fillna(0) > 0
+    return df.loc[mask].copy()
+
+
 def tinh_kpi_tongquan(
     df: pd.DataFrame,
     cot_tdn: str,
@@ -61,7 +77,7 @@ def tinh_kpi_tongquan(
     cot_ku: str,
     cot_ma_kh: str,
 ) -> dict:
-    df_loc = df
+    df_loc = loc_ho_so_con_du_no(df, cot_tdn, cot_dqh, cot_nk)
     for c in [cot_tdn, cot_dth, cot_dqh, cot_nk]:
         if c and c in df_loc.columns:
             df_loc = df_loc.copy()

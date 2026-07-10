@@ -10,6 +10,13 @@ from services.upload_service import luu_pgd_file, KetQuaUpload
 from tests.fixtures import tao_file_hstd_hop_le
 
 
+# Block Telegram HTTP calls — tránh gửi tin nhắn thật khi chạy test
+@pytest.fixture(autouse=True)
+def _mock_telegram_upload_pgd():
+    with patch("services.telegram_service.gui_thong_bao_upload_pgd", return_value=True):
+        yield
+
+
 class TestLuuPgdFileHstdKhnv:
     """luu_pgd_file() — upload HSTD lưu vào đúng loại file."""
 

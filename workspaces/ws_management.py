@@ -201,8 +201,7 @@ def _build_all_items(role: str, username: str, **kwargs) -> list:
 
         # ── Nội bộ Phòng KH-NV ─────────────────────────────────────────────────
         {"group": "Nội bộ Phòng", "label": "🗂️ Nội bộ Phòng KH-NV",             "icon": "users",    "fn": lambda: _get_tab("tab_khnv_noi_bo").render(None, **kwargs)},
-        {"group": "Nội bộ Phòng", "label": "📋 Quản lý Công văn",                "icon": "file-text","fn": lambda: _get_tab("tab_quan_ly_cong_van").render(None, **kwargs)},
-        {"group": "Nội bộ Phòng", "label": "📝 Quản lý Công việc & Nhiệm vụ",   "icon": "layout",   "fn": lambda: _get_tab("tab_quan_ly_cv").render(None, **kwargs)},
+        {"group": "Nội bộ Phòng", "label": " Quản lý Công việc & Nhiệm vụ",   "icon": "layout",   "fn": lambda: _get_tab("tab_quan_ly_cv").render(None, **kwargs)},
 
         # ── Báo cáo ────────────────────────────────────────────────────────────
         {"group": "Báo cáo", "label": "📊 Báo cáo tín dụng",    "icon": "file",          "fn": lambda: _get_tab("tab_baocao").render(None, **kwargs)},

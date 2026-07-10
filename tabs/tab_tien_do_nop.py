@@ -53,9 +53,9 @@ from services.report_submission_service import (
 _EMOJI_STRIP = ("🟢", "🟡", "🔴", "⚪", "⚠️", "📝")
 
 def _clean_trang_thai(val: str) -> str:
-    """Bỏ emoji + badge cho PDF — thiếu file → Trễ hạn."""
+    """Bỏ emoji + badge cho PDF — thiếu file / trễ hạn."""
     if "⚠️" in str(val):
-        return "Trễ hạn"
+        return "Thiếu file"
     text = str(val)
     for ch in _EMOJI_STRIP:
         text = text.replace(ch, "")
@@ -108,19 +108,21 @@ def _render_tong_quan(df: pd.DataFrame, deadline_cfg: dict, is_cn: bool, pgd_use
     dung_han = metrics["dung_han"]
     tre = metrics["tre"]
     chua_nop = metrics["chua_nop"]
+    thieu_file = metrics.get("thieu_file", 0)
     da_nop = metrics["da_nop"]
 
-    c1, c2, c3, c4 = st.columns(4)
+    c1, c2, c3, c4, c5 = st.columns(5)
     c1.metric("Đã nộp (đơn vị × loại)", da_nop)
     c2.metric("🟢 Đúng hạn", dung_han)
     c3.metric("🟡 Trễ hạn", tre)
-    c4.metric("🔴 Chưa nộp", chua_nop)
+    c4.metric("⚠️ Thiếu file", thieu_file)
+    c5.metric("🔴 Chưa nộp", chua_nop)
 
     st.divider()
     st.markdown("**Ma trận trạng thái — PGD × Loại báo cáo**")
 
     st.dataframe(pd.DataFrame(rows), hide_index=True, use_container_width=True)
-    st.caption("* Ghi đè thủ công  ·  ⚠️ Thiếu file đính kèm  ·  📝 Có ghi chú")
+    st.caption("* Ghi đè thủ công  ·  📝 Có ghi chú")
 
     ds_tat_ca = []
     ds_chua = []
@@ -401,6 +403,7 @@ def _render_danh_sach(df: pd.DataFrame, deadline_cfg: dict, is_cn: bool, pgd_use
             "Nội dung": st.column_config.TextColumn(width="large"),
         },
     )
+    st.caption("💡 Nếu link Drive không mở được: PGD cần set quyền chia sẻ file là **\"Anyone with the link can view\"** trước khi paste vào Form.")
 
     st.divider()
     st.markdown("### 📥 Xuất báo cáo")
@@ -770,13 +773,48 @@ def _render_cai_dat(df: pd.DataFrame, deadline_cfg: dict, username: str) -> None
         _render_them_loai_thu_cong(deadline_cfg, username)
 
     if ds_loai_cfg:
-        with st.popover("🗑 Xóa tất cả deadline", use_container_width=False):
-            st.warning(f"Xóa toàn bộ **{len(ds_loai_cfg)} deadline** đã cài?")
-            st.caption("Các loại báo cáo sẽ không còn được theo dõi ở tab Tổng quan.")
-            if st.button("⚠️ Xác nhận xóa tất cả", key="cd_btn_xoa_het", type="primary", use_container_width=True):
-                luu_deadline_config({}, username)
-                st.success("✅ Đã xóa toàn bộ deadline.")
-                st.rerun()
+        # Tìm deadline "cũ" — đang theo dõi nhưng không còn xuất hiện trong GSheet
+        ds_deadline_cu = [loai for loai in deadline_cfg if loai not in ds_loai_gsheet]
+
+        col_don, col_xoa = st.columns([1, 1])
+        with col_don:
+            if ds_deadline_cu:
+                with st.popover(f"🧹 Dọn thời hạn cũ ({len(ds_deadline_cu)})", use_container_width=True):
+                    st.warning(
+                        f"**{len(ds_deadline_cu)} loại** đang theo dõi nhưng **không còn xuất hiện** "
+                        f"trong Google Sheet (PGD chưa từng nộp hoặc Sheet đã xóa dữ liệu):"
+                    )
+                    for loai in ds_deadline_cu:
+                        dl = deadline_cfg.get(loai, "")
+                        try:
+                            dl_str = pd.to_datetime(dl).strftime("%d/%m/%Y") if dl else "—"
+                        except Exception:
+                            dl_str = str(dl)
+                        st.caption(f"• **{loai}** (thời hạn: {dl_str})")
+                    st.caption("Xóa các loại này sẽ không ảnh hưởng loại BC đang có dữ liệu trong Sheet.")
+                    if st.button(
+                        f"🧹 Xóa {len(ds_deadline_cu)} thời hạn cũ",
+                        key="cd_btn_don_cu",
+                        type="primary",
+                        use_container_width=True,
+                    ):
+                        cfg_moi = {k: v for k, v in deadline_cfg.items() if k not in ds_deadline_cu}
+                        luu_deadline_config(cfg_moi, username)
+                        db.ghi_audit(username, "don_deadline_cu", f"Xóa {len(ds_deadline_cu)} thời hạn cũ: {', '.join(ds_deadline_cu)}")
+                        st.success(f"✅ Đã dọn {len(ds_deadline_cu)} thời hạn cũ.")
+                        st.rerun()
+            else:
+                st.button("🧹 Dọn thời hạn cũ", disabled=True, use_container_width=True,
+                          help="Tất cả thời hạn đang theo dõi đều có dữ liệu trong Google Sheet — không có gì cần dọn.")
+
+        with col_xoa:
+            with st.popover("🗑 Xóa tất cả thời hạn", use_container_width=True):
+                st.warning(f"Xóa toàn bộ **{len(ds_loai_cfg)} deadline** đã cài?")
+                st.caption("Các loại báo cáo sẽ không còn được theo dõi ở tab Tổng quan.")
+                if st.button("⚠️ Xác nhận xóa tất cả", key="cd_btn_xoa_het", type="primary", use_container_width=True):
+                    luu_deadline_config({}, username)
+                    st.success("✅ Đã xóa toàn bộ deadline.")
+                    st.rerun()
 
 
 def _render_them_loai_thu_cong(deadline_cfg: dict, username: str) -> None:
@@ -827,9 +865,10 @@ def _render_huong_dan_mockup() -> None:
         1. Nhận **link Google Form** từ Phòng KH-NV
         2. Truy cập Form → điền đầy đủ thông tin
         3. Upload file báo cáo lên **Google Drive**
-        4. Copy link Drive dán vào Form
-        5. Bấm **"Gửi báo cáo"**
-        6. Đợi ~5 phút, kiểm tra tab *Danh sách nộp*
+        4. **Set quyền "Anyone with the link can view"** cho file trên Drive
+        5. Copy link Drive dán vào Form
+        6. Bấm **"Gửi báo cáo"**
+        7. Đợi ~5 phút, kiểm tra tab *Danh sách nộp*
         """)
     with col2:
         st.success("""
@@ -918,6 +957,9 @@ def _render_huong_dan_mockup() -> None:
 _CACHE_VER = "v2"
 
 def render(tab: DeltaGenerator = None, **kwargs) -> None:
+    # Clear cache cũ mỗi khi vào tab — đảm bảo data GSheet luôn mới
+    _doc_du_lieu.clear()
+
     role_raw = str(kwargs.get("role", "user") or "user")
     role_n = normalize_role(role_raw)
     is_cn = la_phan_he_cn(role_n)

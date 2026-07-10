@@ -48,6 +48,7 @@ from utils import (
     vn,
     xuat_excel,
     ten_file_xuat,
+    lay_ngay_so_lieu,
 )
 from tabs.base_tab import TabContext
 
@@ -77,19 +78,6 @@ def _find_col(df: pd.DataFrame, aliases: tuple) -> str | None:
         if a in df.columns:
             return a
     return None
-
-
-def _ngay_so_lieu(df: pd.DataFrame) -> datetime | None:
-    if COT_NGAY_SL not in df.columns:
-        return None
-    sl = df[COT_NGAY_SL].dropna()
-    if sl.empty:
-        return None
-    try:
-        return datetime.strptime(str(sl.iloc[0]), "%d/%m/%Y")
-    except Exception as e:
-        logger.error("Lỗi trong khối except: %s", e, exc_info=True)
-        return None
 
 
 def _tong_hop_kpi(df: pd.DataFrame) -> dict:
@@ -265,7 +253,7 @@ def _render_du_bao_von(df: pd.DataFrame) -> None:
     st.subheader("📈 Dự báo Nguồn vốn")
     st.caption("Tốc độ giải ngân & thu nợ hiện tại → ước tính đến cuối năm")
 
-    ngay_sl = _ngay_so_lieu(df)
+    ngay_sl = lay_ngay_so_lieu(df)
     if ngay_sl is None:
         st.warning("⚠️ Không xác định được ngày số liệu.")
         return

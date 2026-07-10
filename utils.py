@@ -106,6 +106,22 @@ def lay_config(key: str, fallback):
         return fallback
 
 
+def lay_ngay_so_lieu(df: pd.DataFrame) -> datetime | None:
+    """Lấy ngày số liệu mới nhất từ DataFrame HSTD.
+
+    Trả về datetime object hoặc None nếu không xác định được.
+    Dùng pd.to_datetime() để xử lý cả datetime64 lẫn string.
+    """
+    from config import COT_NGAY_SL
+
+    if df is None or df.empty or COT_NGAY_SL not in df.columns:
+        return None
+    sl = pd.to_datetime(df[COT_NGAY_SL], dayfirst=True, errors="coerce").dropna()
+    if sl.empty:
+        return None
+    return sl.max().to_pydatetime()
+
+
 def format_df_vn(df: pd.DataFrame) -> pd.DataFrame:
     """
     Tự động format tất cả cột số trong DataFrame sang chuẩn Việt Nam.

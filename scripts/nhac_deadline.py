@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import os
 import sys
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -31,6 +31,13 @@ from services.report_submission_service import (
     doc_deadline_config,
     doc_manual_log,
     lay_danh_sach_can_nhac,
+)
+from data.phan_ky_nxh import (
+    COL_NXH_NGAY,
+    COL_NXH_TIEN,
+    COL_NXH_TGK,
+    COL_NXH_LAI,
+    COL_NXH_PGD,
 )
 
 logger = get_logger(__name__)
@@ -316,14 +323,8 @@ def _nhac_phan_ky_nxh() -> int:
             logger.warning("_nhac_phan_ky_nxh: chưa có dữ liệu parquet NXH")
             return 0
 
-        COL_NGAY = "Ngày đến hạn kỳ con"
-        COL_TIEN = "Dư nợ kỳ con đến hạn"
-        COL_TGK  = "Tổng TG, TK"
-        COL_LAI  = "Lãi tồn"
-        COL_PGD  = "Tên PGD"
-
-        if COL_NGAY not in df.columns or COL_PGD not in df.columns:
-            logger.warning("_nhac_phan_ky_nxh: thiếu cột %s hoặc %s", COL_NGAY, COL_PGD)
+        if COL_NXH_NGAY not in df.columns or COL_NXH_PGD not in df.columns:
+            logger.warning("_nhac_phan_ky_nxh: thiếu cột %s hoặc %s", COL_NXH_NGAY, COL_NXH_PGD)
             return 0
 
         # Toàn bộ khoản trong tháng hiện tại (ngày 1 → cuối tháng)
@@ -333,11 +334,11 @@ def _nhac_phan_ky_nxh() -> int:
         ngay_du_lieu = first_day.strftime("%d/%m/%Y")
 
         mask = (
-            df[COL_NGAY].notna()
-            & (df[COL_NGAY] >= first_day)
-            & (df[COL_NGAY] <= last_day)
+            df[COL_NXH_NGAY].notna()
+            & (df[COL_NXH_NGAY] >= first_day)
+            & (df[COL_NXH_NGAY] <= last_day)
         )
-        df_thang = df[mask].sort_values(["Tên xã", COL_NGAY])
+        df_thang = df[mask].sort_values(["Tên xã", COL_NXH_NGAY])
         if df_thang.empty:
             logger.info(
                 "_nhac_phan_ky_nxh: không có khoản nào tháng %s — đánh dấu đã gửi", ky_thang
@@ -346,22 +347,22 @@ def _nhac_phan_ky_nxh() -> int:
             return 0
 
         sent = 0
-        for ten_pgd, grp in df_thang.groupby(COL_PGD):
+        for ten_pgd, grp in df_thang.groupby(COL_NXH_PGD):
             ds = []
             for _, row in grp.iterrows():
                 ngay_dh = ""
                 try:
-                    if pd.notna(row[COL_NGAY]):
-                        ngay_dh = pd.Timestamp(row[COL_NGAY]).strftime("%d/%m/%Y")
+                    if pd.notna(row[COL_NXH_NGAY]):
+                        ngay_dh = pd.Timestamp(row[COL_NXH_NGAY]).strftime("%d/%m/%Y")
                 except Exception:
                     pass
                 ds.append({
                     "ten_kh":        str(row.get("Tên khách hàng") or ""),
                     "so_ku":         str(row.get("Số khế ước") or ""),
                     "ngay_dh":       ngay_dh,
-                    "du_no":         float(row.get(COL_TIEN) or 0),
-                    "lai_ton":       float(row.get(COL_LAI) or 0) if COL_LAI in grp.columns else 0.0,
-                    "tong_tgk":      float(row.get(COL_TGK) or 0) if COL_TGK in grp.columns else 0.0,
+                    "du_no":         float(row.get(COL_NXH_TIEN) or 0),
+                    "lai_ton":       float(row.get(COL_NXH_LAI) or 0) if COL_NXH_LAI in grp.columns else 0.0,
+                    "tong_tgk":      float(row.get(COL_NXH_TGK) or 0) if COL_NXH_TGK in grp.columns else 0.0,
                     "sdt":           str(row.get("Số điện thoại") or ""),
                     "ten_xa":        str(row.get("Tên xã") or ""),
                     "ten_to_truong": str(row.get("Tên tổ trưởng") or ""),
@@ -395,7 +396,7 @@ def _nhac_lich_cong_tac() -> int:
         ds_lich = db.doc_kv("khnv_lich_list")
         if not ds_lich or not isinstance(ds_lich, list):
             return 0
-        tomorrow = (date.today() + __import__("datetime").timedelta(days=1))
+        tomorrow = date.today() + timedelta(days=1)
         ngay_mai_str = tomorrow.strftime("%d/%m/%Y")
         tomorrow_dt  = pd.Timestamp(tomorrow)
         ds_sv = []
@@ -453,8 +454,13 @@ def nhac() -> None:
             else:
                 logger.error("Gửi nhắc '%s' thất bại", loai)
 
-        if sent_count == 0:
+        if not ds_can_nhac:
             logger.info("Không có deadline nào cần nhắc hôm nay.")
+        elif sent_count == 0:
+            logger.warning(
+                "Có %d deadline cần nhắc nhưng tất cả gửi Telegram đều thất bại!",
+                len(ds_can_nhac),
+            )
         else:
             logger.info("Hoàn tất: đã gửi %d nhắc nhở.", sent_count)
 
@@ -462,23 +468,14 @@ def nhac() -> None:
     _thong_bao_nop_moi_gsheet()
 
     # Nhắc phân kỳ NXH — khoản đến hạn tháng này
-    try:
-        _nhac_phan_ky_nxh()
-    except Exception as e:
-        logger.error("_nhac_phan_ky_nxh: %s", e)
+    _nhac_phan_ky_nxh()
 
     # Nhắc khoản đến hạn phân tầng T-7/T-3/T-1
-    try:
-        _nhac_den_han_phan_tang()
-    except Exception as e:
-        logger.error("_nhac_den_han_phan_tang: %s", e)
+    _nhac_den_han_phan_tang()
 
     # Nhắc lịch công tác ngày mai (chỉ chạy buổi chiều — lúc 14:00)
     if datetime.now().hour >= 13:
-        try:
-            _nhac_lich_cong_tac()
-        except Exception as e:
-            logger.error("_nhac_lich_cong_tac: %s", e)
+        _nhac_lich_cong_tac()
 
 
 if __name__ == "__main__":

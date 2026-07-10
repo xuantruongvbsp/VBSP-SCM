@@ -3,6 +3,8 @@ import logging
 import os
 import re
 import unicodedata
+import html
+import zipfile
 from datetime import date, datetime
 from pathlib import Path
 from typing import Literal
@@ -84,6 +86,83 @@ def duong_dan_hstd_hien_hanh(ten_pgd: str) -> str:
 LoaiFile = Literal["hstd", "nq11", "gqvl", "cdtotkvv"]
 
 _RE_NGAY_SO_LIEU_VN = re.compile(r"Ngày\s+(\d+)\s+tháng\s+(\d+)\s+năm\s+(\d+)")
+_HSTD_NGAY_SO_LIEU_LABEL = "Ng\u00e0y s\u1ed1 li\u1ec7u"
+_RE_XLSX_CELL = re.compile(rb"<c[^>]* r=\"([A-Z]+)(\d+)\"[^>]*>.*?</c>", re.S)
+_RE_XLSX_TEXT = re.compile(rb"<t[^>]*>(.*?)</t>", re.S)
+_RE_XLSX_VALUE = re.compile(rb"<v[^>]*>(.*?)</v>", re.S)
+
+
+def _decode_xlsx_xml_text(raw: bytes) -> str:
+    return html.unescape(raw.decode("utf-8", errors="ignore")).strip()
+
+
+def _xlsx_cell_text(cell_xml: bytes, shared_strings: list[str]) -> str:
+    texts = [_decode_xlsx_xml_text(m.group(1)) for m in _RE_XLSX_TEXT.finditer(cell_xml)]
+    if texts:
+        return "".join(texts).strip()
+
+    m = _RE_XLSX_VALUE.search(cell_xml)
+    if not m:
+        return ""
+
+    val = _decode_xlsx_xml_text(m.group(1))
+    if b't="s"' in cell_xml:
+        try:
+            return shared_strings[int(val)]
+        except Exception:
+            return ""
+    return val
+
+
+def _xlsx_shared_strings(zf: zipfile.ZipFile) -> list[str]:
+    try:
+        data = zf.read("xl/sharedStrings.xml")
+    except KeyError:
+        return []
+    items: list[str] = []
+    for si in re.finditer(rb"<si[^>]*>.*?</si>", data, re.S):
+        parts = [_decode_xlsx_xml_text(m.group(1)) for m in _RE_XLSX_TEXT.finditer(si.group(0))]
+        items.append("".join(parts).strip())
+    return items
+
+
+def _doc_ngay_so_lieu_hstd_xml(path: Path) -> datetime | None:
+    """Đọc nhanh ngày số liệu HSTD từ sheet XML, tự tìm cột theo header dòng 5."""
+    try:
+        with zipfile.ZipFile(path) as zf:
+            shared_strings = _xlsx_shared_strings(zf)
+            sheet_name = next(
+                name for name in zf.namelist()
+                if name.startswith("xl/worksheets/") and name.endswith(".xml")
+            )
+            sheet = zf.read(sheet_name)
+    except Exception:
+        return None
+
+    col_ngay = ""
+    for cell in _RE_XLSX_CELL.finditer(sheet):
+        col, row_s = cell.group(1).decode("ascii"), cell.group(2).decode("ascii")
+        if row_s != "5":
+            continue
+        if _xlsx_cell_text(cell.group(0), shared_strings) == _HSTD_NGAY_SO_LIEU_LABEL:
+            col_ngay = col
+            break
+    if not col_ngay:
+        return None
+
+    for cell in _RE_XLSX_CELL.finditer(sheet):
+        col, row_s = cell.group(1).decode("ascii"), cell.group(2).decode("ascii")
+        if col != col_ngay:
+            continue
+        try:
+            if int(row_s) < 6:
+                continue
+        except ValueError:
+            continue
+        dt = _xlsx_val_to_datetime(_xlsx_cell_text(cell.group(0), shared_strings))
+        if dt is not None:
+            return dt
+    return None
 
 
 def _xlsx_val_to_datetime(val) -> datetime | None:
@@ -117,13 +196,15 @@ def _xlsx_val_to_datetime(val) -> datetime | None:
 def _doc_ngay_so_lieu(path: Path, loai: str, mtime: float = 0.0) -> datetime | None:
     """Đọc ngày số liệu từ trong file xlsx (read_only, tối thiểu ô cần thiết). Lỗi → None.
     mtime: os.path.getmtime(path) — nằm trong cache key, tự invalidate khi file thay đổi."""
+    if loai == "hstd":
+        return _doc_ngay_so_lieu_hstd_xml(path)
+
     try:
         wb = load_workbook(filename=str(path), read_only=True, data_only=True)
         try:
-            if loai in ("hstd", "nq11"):
+            if loai == "nq11":
                 ws = wb["BCQUERY"]
-                col_letter = "FS" if loai == "hstd" else "BA"
-                cidx = column_index_from_string(col_letter)
+                cidx = column_index_from_string("BA")
                 val = None
                 for row in ws.iter_rows(min_row=6, max_row=6, min_col=cidx, max_col=cidx):
                     for cell in row:

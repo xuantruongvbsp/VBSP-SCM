@@ -49,6 +49,34 @@ def test_tinh_kpi_tongquan_basic_and_no_mutation():
     assert df.equals(df_before)
 
 
+def test_tinh_kpi_tongquan_bo_qua_ho_so_du_no_0_khi_dem():
+    df = pd.DataFrame(
+        [
+            {COT_TONG_DU_NO: "1000", COT_DU_NO_TH: "1000", COT_DU_NO_QH: "0", COT_DU_NO_KHOANH: "0",
+             COT_SO_KU: "KU_ACTIVE", COT_MA_KH: "KH_ACTIVE"},
+            {COT_TONG_DU_NO: "0", COT_DU_NO_TH: "0", COT_DU_NO_QH: "0", COT_DU_NO_KHOANH: "0",
+             COT_SO_KU: "KU_CLOSED", COT_MA_KH: "KH_CLOSED"},
+            {COT_TONG_DU_NO: "0", COT_DU_NO_TH: "0", COT_DU_NO_QH: "10", COT_DU_NO_KHOANH: "0",
+             COT_SO_KU: "KU_QH", COT_MA_KH: "KH_QH"},
+        ]
+    )
+
+    kpi = tongquan_service.tinh_kpi_tongquan(
+        df,
+        cot_tdn=COT_TONG_DU_NO,
+        cot_dth=COT_DU_NO_TH,
+        cot_dqh=COT_DU_NO_QH,
+        cot_nk=COT_DU_NO_KHOANH,
+        cot_ku=COT_SO_KU,
+        cot_ma_kh=COT_MA_KH,
+    )
+
+    assert kpi["n_mon_vay"] == 2
+    assert kpi["n_kh"] == 2
+    assert kpi["tdn"] == 1000
+    assert kpi["dqh"] == 10
+
+
 def test_tinh_heatmap_pgd_basic():
     df = pd.DataFrame(
         [

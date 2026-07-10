@@ -75,8 +75,7 @@ def render(tab: "DeltaGenerator | None" = None, **kwargs) -> None:
             df_cdtotkvv = None
 
     with ctx:
-        st.subheader("📈 Báo cáo Tín dụng")
-        st.caption("📡 Dữ liệu: HSTD | NQ11 | GQVL | CDTOTKVV")
+        st.subheader("📊 Dashboard Báo cáo Tín dụng")
 
         selected_report = render_dashboard(
             tab=None,

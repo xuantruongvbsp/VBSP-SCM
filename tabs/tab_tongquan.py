@@ -198,6 +198,34 @@ def _cache_bq_counts(
     return n_pgd_co_dn, n_to, n_xa, n_hoi
 
 
+@st.cache_data(show_spinner=False)
+def _cache_pgd_quick_cards(
+    _df: pd.DataFrame,
+    ts: float,
+    pgd_filter: str,
+    cot_pgd: str,
+    cot_tdn: str,
+    cot_dqh: str,
+    cot_dnk: str,
+) -> pd.DataFrame:
+    """Cache per-PGD summary for quick-view card grid (dư nợ, nợ xấu, tỷ lệ)."""
+    _ = (ts, pgd_filter)
+    need = [c for c in [cot_pgd, cot_tdn, cot_dqh, cot_dnk] if c in _df.columns]
+    # Cần ít nhất cot_pgd + cot_tdn mới tính được tỷ lệ nợ xấu
+    if cot_pgd not in need or cot_tdn not in need:
+        return pd.DataFrame()
+    df_w = _df[need].copy()
+    for c in [cot_tdn, cot_dqh, cot_dnk]:
+        if c in df_w.columns:
+            df_w[c] = pd.to_numeric(df_w[c], errors="coerce").fillna(0)
+    gb = df_w.groupby(cot_pgd, as_index=False)[
+        [c for c in [cot_tdn, cot_dqh, cot_dnk] if c in df_w.columns]
+    ].sum()
+    gb["_no_xau"] = gb[[c for c in [cot_dqh, cot_dnk] if c in gb.columns]].sum(axis=1)
+    gb["_tl_nx"] = (gb["_no_xau"] / gb[cot_tdn].replace(0, pd.NA) * 100).fillna(0)
+    return gb.sort_values(cot_pgd).reset_index(drop=True)
+
+
 from tabs.base_tab import TabContext
 
 
@@ -283,6 +311,18 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                 "⚠️ **Dữ liệu HSTD trống sau khi lọc hồ sơ còn dư nợ.** "
                 "Kiểm tra tab **📤 Upload HSTD** → kết quả merge có thành công không, "
                 "hoặc bấm **🔄 Rebuild Cache** nếu vừa import hàng loạt."
+            )
+            return
+        df = _tqsvc.loc_ho_so_con_du_no(
+            df,
+            COT_TONG_DU_NO,
+            COT_DU_NO_QH,
+            COT_DU_NO_KHOANH,
+        )
+        if df.empty:
+            st.warning(
+                "⚠️ **Không có hồ sơ đang còn số dư.** "
+                "Mục Thông tin chung chỉ tính các khoản có dư nợ/quá hạn/khoanh."
             )
             return
         st.markdown(
@@ -373,7 +413,7 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
             _meta_hstd = db.doc_kv("merge_meta_hstd") or {}
             ngay_cap_nhat = str(_meta_hstd.get("ngay_sl", "") or "")
         if not ngay_cap_nhat:
-            ngay_cap_nhat = datetime.now().strftime("%d/%m/%Y")
+            ngay_cap_nhat = "—"
 
         tong_dn_uy_thac = 0.0
         tong_dn_truc_tiep = 0.0
@@ -417,6 +457,26 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
         _n_xa_str  = fmt_so(n_xa)
         _n_hoi_str = fmt_so(n_hoi)
         _n_pgd_str = fmt_so(n_pgd_co_dn)
+        # ── Xã dư nợ cao nhất / thấp nhất ──────────────────────────
+        _xa_top_name = "—"; _xa_top_pgd = ""; _xa_top_val = "—"
+        _xa_bot_name = "—"; _xa_bot_pgd = ""; _xa_bot_val = "—"
+        if COT_TEN_XA in df.columns and COT_TONG_DU_NO in df.columns:
+            _dn = pd.to_numeric(df[COT_TONG_DU_NO], errors="coerce").fillna(0)
+            _xa = df[[COT_TEN_PGD, COT_TEN_XA]].copy()
+            _xa[COT_TONG_DU_NO] = _dn
+            _xa = _xa.groupby([COT_TEN_PGD, COT_TEN_XA], as_index=False)[COT_TONG_DU_NO].sum()
+            _xa = _xa[_xa[COT_TONG_DU_NO] > 0]
+            _xa = _xa[~_xa[COT_TEN_XA].astype(str).str.lower().str.contains("vay trực tiếp", na=False)]
+            _xa = _xa.sort_values(COT_TONG_DU_NO, ascending=False).reset_index(drop=True)
+            if not _xa.empty:
+                _tr = _xa.iloc[0]
+                _xa_top_name = str(_tr.get(COT_TEN_XA, ""))
+                _xa_top_pgd  = str(_tr.get(COT_TEN_PGD, ""))
+                _xa_top_val  = vn((_tr.get(COT_TONG_DU_NO, 0) or 0) / 1e9, 2) + " tỷ"
+                _br = _xa.iloc[-1]
+                _xa_bot_name = str(_br.get(COT_TEN_XA, ""))
+                _xa_bot_pgd  = str(_br.get(COT_TEN_PGD, ""))
+                _xa_bot_val  = vn((_br.get(COT_TONG_DU_NO, 0) or 0) / 1e9, 2) + " tỷ"
         st.markdown(f"<div class='tq-caption'>Cập nhật: {ngay_cap_nhat} · {TEN_CHI_NHANH_HIEN_THI}</div>", unsafe_allow_html=True)
         st.markdown(
             f"""
@@ -491,6 +551,16 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                     <div class="tq-value">{_bq_hoi}</div>
                     <div class="tq-sub">{_n_hoi_str} hội đoàn thể</div>
                 </div>
+                <div class="tq-card soft-green">
+                    <div class="tq-label">🏆 Xã dư nợ cao nhất</div>
+                    <div class="tq-value">{_xa_top_val}</div>
+                    <div class="tq-sub">{_xa_top_name} ({_xa_top_pgd})</div>
+                </div>
+                <div class="tq-card soft-blue">
+                    <div class="tq-label">⬇️ Xã dư nợ thấp nhất</div>
+                    <div class="tq-value">{_xa_bot_val}</div>
+                    <div class="tq-sub">{_xa_bot_name} ({_xa_bot_pgd})</div>
+                </div>
             </div>
             """,
             unsafe_allow_html=True,
@@ -527,7 +597,6 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                     f"⚠️ Dữ liệu KHĐ tổng hợp từ **{so_co}/{len(pgd_tat_ca)} PGD** đã upload. "
                     f"Còn thiếu: **{ten_thieu}{duoi}**"
                 )
-
         st.divider()
 
         try:
@@ -771,6 +840,52 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                 f"thiếu cột: **{', '.join(_miss_ct)}**. "
                 "Hãy kiểm tra file HSTD hoặc merge lại dữ liệu."
             )
+
+        # ── Tổng quan nhanh 22 PGD (card grid) ──────────────────────────
+        if COT_TEN_PGD in df.columns and not pgd_user:
+            # Dùng df (đã lọc hồ sơ còn dư nợ) thay vì df_full để tỷ lệ nợ xấu chính xác;
+            # df_full thô còn chứa hồ sơ đã trả hết nợ → thổi phồng dư nợ mẫu số
+            _qc_source = df
+            _qc = _cache_pgd_quick_cards(
+                _qc_source, ts, str(pgd_filter),
+                COT_TEN_PGD, COT_TONG_DU_NO, COT_DU_NO_QH, COT_DU_NO_KHOANH,
+            )
+            if not _qc.empty:
+                st.markdown("**📊 Tổng quan nhanh các PGD** — dư nợ (tỷ) & tỷ lệ nợ xấu")
+                cards_html = ""
+                _low_bg, _low_bc, _low_tc = "#dcfce7", "#86efac", "#14532d"
+                _med_bg, _med_bc, _med_tc = "#fef3c7", "#fcd34d", "#78350f"
+                _high_bg, _high_bc, _high_tc = "#fee2e2", "#fca5a5", "#7f1d1d"
+                for _, r in _qc.iterrows():
+                    _ten = str(r.get(COT_TEN_PGD, ""))
+                    _dn = r.get(COT_TONG_DU_NO, 0) / 1e9
+                    _tl = r["_tl_nx"]
+                    if _tl >= 1.0:
+                        _bg, _bc, _tc = _high_bg, _high_bc, _high_tc
+                        _badge = "⚠️"
+                    elif _tl >= 0.5:
+                        _bg, _bc, _tc = _med_bg, _med_bc, _med_tc
+                        _badge = "⚡"
+                    else:
+                        _bg, _bc, _tc = _low_bg, _low_bc, _low_tc
+                        _badge = "✅"
+                    _dn_str = vn(_dn, 2)
+                    _tl_str = vn(_tl, 1)
+                    cards_html += f"""
+                    <div style="background:{_bg};border:1px solid {_bc};border-radius:8px;
+                                padding:7px 5px;text-align:center;min-width:0">
+                        <div style="font-size:0.65rem;font-weight:600;color:{_tc};
+                                    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+                                    margin-bottom:1px" title="{_ten}">{_ten}</div>
+                        <div style="font-size:0.9rem;font-weight:700;color:{_tc}">{_dn_str}</div>
+                        <div style="font-size:0.75rem;color:{_tc};font-weight:600">{_badge} {_tl_str}%</div>
+                    </div>"""
+                st.html(f"""
+                <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(105px,1fr));
+                            gap:5px;margin:6px 0 16px 0">
+                    {cards_html}
+                </div>
+                """)
 
         st.markdown("**🟢 Thông tin tổng quát theo PGD**")
         if COT_TEN_PGD in df.columns:

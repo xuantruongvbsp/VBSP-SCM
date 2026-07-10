@@ -98,5 +98,3 @@ def render_metric_cards(
             f"{_fmt_ty(dno_nq11)} tỷ",
             help="Dư nợ Nghị quyết 11"
         )
-    
-    ctx.divider()

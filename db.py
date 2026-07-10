@@ -640,39 +640,6 @@ def init_db():
         except sqlite3.OperationalError:
             pass
 
-        conn.execute(
-            """CREATE TABLE IF NOT EXISTS cong_van (
-                id              INTEGER PRIMARY KEY AUTOINCREMENT,
-                so_hieu         TEXT NOT NULL,
-                trich_yeu       TEXT NOT NULL,
-                ngay_ban_hanh   TEXT NOT NULL,
-                ngay_nhan       TEXT NOT NULL,
-                loai            TEXT NOT NULL DEFAULT 'cong_van',
-                co_quan_ban_hanh TEXT NOT NULL DEFAULT '',
-                nguoi_ky        TEXT NOT NULL DEFAULT '',
-                tag             TEXT NOT NULL DEFAULT '',
-                noi_dung_tom_tat TEXT NOT NULL DEFAULT '',
-                file_path       TEXT,
-                trang_thai      TEXT NOT NULL DEFAULT 'chua_xu_ly',
-                nguoi_tao       TEXT NOT NULL DEFAULT '',
-                created_at      TEXT NOT NULL DEFAULT (datetime('now','localtime')),
-                updated_at      TEXT NOT NULL DEFAULT (datetime('now','localtime'))
-            )"""
-        )
-        conn.execute(
-            """CREATE INDEX IF NOT EXISTS idx_cong_van_so_hieu ON cong_van(so_hieu)"""
-        )
-        conn.execute(
-            """CREATE INDEX IF NOT EXISTS idx_cong_van_ngay ON cong_van(ngay_ban_hanh)"""
-        )
-        conn.execute(
-            """CREATE INDEX IF NOT EXISTS idx_cong_van_loai ON cong_van(loai)"""
-        )
-        try:
-            conn.execute("ALTER TABLE cong_van ADD COLUMN onedrive_url TEXT")
-        except sqlite3.OperationalError:
-            pass
-
         # ── Migration: Mở rộng audit_log cho NHCSXH compliance ─────────────────
         # (index đã được tạo ở trên, chỉ cần migration columns)
         for col, typ in [

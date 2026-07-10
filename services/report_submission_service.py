@@ -26,22 +26,22 @@ from urllib.parse import quote
 import pandas as pd
 
 import db
-from config import DS_PGD, DON_VI_CHI_NHANH
+from config import DS_PGD, DON_VI_CHI_NHANH, TIENDO_BAOCAO_SHEET_ID, TIENDO_BAOCAO_SHEET_TAB
 from logger import get_logger
 
 logger = get_logger(__name__)
 
 # ── Constants ─────────────────────────────────────────────────────────────────
 
-SHEET_ID = "15Ev2rTv6khLFaMpAiMwqJCVC_33ocJ-6cp016RGNkYk"
-SHEET_TAB = "TIENDO_BAOCAO"
+SHEET_ID = TIENDO_BAOCAO_SHEET_ID
+SHEET_TAB = TIENDO_BAOCAO_SHEET_TAB
 COT = ["thoi_gian", "email", "ten_pgd", "loai_bao_cao",
        "ky_bao_cao", "noi_dung", "file_dinh_kem", "ho_ten"]
 
 DS_PGD_ALL = [DON_VI_CHI_NHANH] + DS_PGD
 
-EMOJI = {"dung_han": "🟢", "tre": "🟡", "chua_nop": "🔴", "da_nop": "⚪"}
-LABEL = {"dung_han": "Đúng hạn", "tre": "Trễ hạn", "chua_nop": "Chưa nộp", "da_nop": "Đã nộp"}
+EMOJI = {"dung_han": "🟢", "tre": "🟡", "chua_nop": "🔴", "da_nop": "⚪", "thieu_file": "⚠️"}
+LABEL = {"dung_han": "Đúng hạn", "tre": "Trễ hạn", "chua_nop": "Chưa nộp", "da_nop": "Đã nộp", "thieu_file": "Thiếu file"}
 
 # KV keys
 KV_DEADLINE = "bao_cao_deadline_config"
@@ -368,7 +368,14 @@ def xay_dung_danh_muc_theo_doi(
         ten_form = item.get("ten_form") or ""
         if not ten_form:
             continue
-        alias_to_tracked[_chuan_hoa_ten_loai(ten_form)] = tracked
+        form_norm = _chuan_hoa_ten_loai(ten_form)
+        # Tránh ghi đè alias đang trỏ đến tracked key khác.
+        # VD: cả "KHTD 2023-2026" và "KHTD 2027-2030" đều được theo dõi —
+        #     auto-link không được map "KHTD 2027-2030" → "KHTD 2023-2026".
+        existing = alias_to_tracked.get(form_norm)
+        if existing is not None and existing != tracked:
+            continue
+        alias_to_tracked[form_norm] = tracked
         tracked_to_display[tracked] = ten_form
 
     display_to_tracked: dict[str, str] = {}
@@ -602,7 +609,8 @@ def phan_loai_trang_thai(ngay_nop, deadline_str: str | None) -> str:
         return "dung_han" if nop <= dl else "tre"
     except Exception as e:
         logger.error("phan_loai_trang_thai: parse ngay loi — %s", e, exc_info=True)
-        return "da_nop"
+        # deadline_str không parse được → không thể so sánh → coi như chưa nộp
+        return "chua_nop"
 
 
 def gan_trang_thai(
@@ -739,7 +747,7 @@ def lay_danh_sach_can_nhac(
         chua_nop: list[str] = []
         for pgd in DS_PGD_ALL:
             manual_entry = manual_map.get((pgd, loai))
-            if manual_entry and manual_entry.get("ghi_de", False):
+            if manual_entry and manual_entry.get("ghi_de", True):
                 ngay = pd.to_datetime(manual_entry.get("ngay_nop"))
                 try:
                     nop_date = ngay.date() if hasattr(ngay, "date") else pd.to_datetime(ngay).date()
@@ -808,20 +816,24 @@ def tao_ma_tran_tien_do(
                     row[loai_hien] = "🔴 Chưa nộp" if loai in deadline_cfg else "⚪ Chưa nộp"
                 else:
                     last = match.sort_values("thoi_gian").iloc[-1]
-                    tt = last["tt"]
                     co_file = str(last.get("file_dinh_kem", "")).strip()
-                    badge_file = " ⚠️" if not co_file else ""
                     badge_note = " 📝" if entry and not ghi_de else ""
-                    row[loai_hien] = f"{EMOJI[tt]} {LABEL[tt]}{badge_file}{badge_note}"
+                    if not co_file:
+                        # Đã nộp form nhưng không có file đính kèm → Thiếu file
+                        row[loai_hien] = f"{EMOJI['thieu_file']} {LABEL['thieu_file']}{badge_note}"
+                    else:
+                        tt = last["tt"]
+                        row[loai_hien] = f"{EMOJI[tt]} {LABEL[tt]}{badge_note}"
         rows.append(row)
 
     ds_loai_hien = [dm["tracked_to_display"].get(loai, loai) for loai in tracked_keys]
     dung_han = sum(1 for r in rows for l in ds_loai_hien if "🟢" in str(r.get(l, "")))
     tre = sum(1 for r in rows for l in ds_loai_hien if "🟡" in str(r.get(l, "")))
     chua_nop = sum(1 for r in rows for l in ds_loai_hien if "🔴" in str(r.get(l, "")))
+    thieu_file = sum(1 for r in rows for l in ds_loai_hien if "⚠️" in str(r.get(l, "")))
     da_nop = dung_han + tre
 
-    metrics = {"dung_han": dung_han, "tre": tre, "chua_nop": chua_nop, "da_nop": da_nop}
+    metrics = {"dung_han": dung_han, "tre": tre, "chua_nop": chua_nop, "thieu_file": thieu_file, "da_nop": da_nop}
     return rows, metrics
 
 

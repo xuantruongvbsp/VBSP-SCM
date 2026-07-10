@@ -22,7 +22,14 @@ from services.file_detection_service import (
     kiem_tra_don_vi as _kiem_tra_don_vi,
 )
 from services.upload_service import KetQuaUpload, kiem_tra_file, danh_gia_chat_luong_file_upload
-from ._state import them_vao_hang_cho, xoa_cache_trang_thai
+from services.upload_service import merge_nhieu_loai_toan_cn
+from utils import fmt_so
+from ._state import (
+    them_vao_hang_cho,
+    xoa_cache_trang_thai,
+    xoa_khoi_hang_cho,
+    lam_moi_du_lieu_app,
+)
 
 logger = get_logger(__name__)
 
@@ -31,6 +38,25 @@ _PREFIX_MAP = {
     "nq11":     ("NQ11", "SAO_KE_CT"),
     "cdtotkvv": ("CDTOTKVV", "CT_CDTOTKVV"),
 }
+
+_AUTO_MERGE_RESULT_KEY = "khnv_last_auto_merge_result"
+
+
+def _hien_thi_ket_qua_auto_merge() -> None:
+    ket_qua = st.session_state.pop(_AUTO_MERGE_RESULT_KEY, None)
+    if not ket_qua:
+        return
+    st.success("✅ Import xong và đã tự động merge dữ liệu toàn Chi nhánh.")
+    rows = []
+    for row in ket_qua:
+        rows.append({
+            "Loại": str(row.get("loai", "")).upper(),
+            "Trạng thái": "✅ Thành công" if row.get("thanh_cong") else "⚠️ Lỗi",
+            "Đơn vị": row.get("so_pgd") or "—",
+            "Số dòng": fmt_so(row.get("so_dong") or 0) if row.get("so_dong") else "—",
+            "Thông báo": row.get("thong_bao", ""),
+        })
+    st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
 
 
 def _uploaded_file_bytes(f) -> bytes:
@@ -376,21 +402,44 @@ def _xu_ly_import_folder(danh_sach: list[dict], username: str) -> None:
 
     loai_cho = sorted(loai_da_luu & {"hstd", "nq11", "gqvl"})
     if loai_cho:
-        st.info(
-            f"⏳ **{', '.join(loai_cho).upper()}** đã lưu. "
-            "Chuyển sang tab **📊 Tổng quan** → bấm **🔄 Merge toàn CN**."
+        progress = st.progress(
+            0.0,
+            text=f"🔄 Đang tự động merge {', '.join(loai_cho).upper()} toàn Chi nhánh...",
         )
+        ket_qua_merge = merge_nhieu_loai_toan_cn(loai_cho)
+        progress.progress(1.0, text="✅ Merge toàn Chi nhánh hoàn tất")
+        loai_merge_ok = {
+            str(row.get("loai", ""))
+            for row in ket_qua_merge
+            if row.get("thanh_cong")
+        }
+        if loai_merge_ok:
+            xoa_khoi_hang_cho(loai_merge_ok)
+            lam_moi_du_lieu_app()
+            xoa_cache_trang_thai()
+        db.ghi_audit(
+            username,
+            "merge_toan_cn_auto",
+            "Auto merge sau import hàng loạt: " + ", ".join(loai_cho),
+        )
+        st.session_state[_AUTO_MERGE_RESULT_KEY] = ket_qua_merge
+        if any(not row.get("thanh_cong") for row in ket_qua_merge):
+            st.warning("⚠️ Có lỗi khi auto-merge. Xem kết quả sau khi tải lại màn hình.")
+        else:
+            st.success("✅ Đã tự động merge toàn Chi nhánh sau import.")
     st.rerun()
 
 
 def render_import_hang_loat(role: str, username: str) -> None:
     """Upload hàng loạt qua trình duyệt."""
     _ = role
+    _hien_thi_ket_qua_auto_merge()
     st.info(
         "**Cách chọn nhiều file:**  \n"
         "• Windows: giữ **Ctrl** rồi click từng file, hoặc **Ctrl+A**  \n"
         "• Mac: giữ **⌘ Cmd** rồi click từng file  \n"
-        "• Hỗ trợ tối đa 66 file (22 PGD × HSTD + NQ11 + GQVL)"
+        "• Hỗ trợ tối đa 66 file (22 PGD × HSTD + NQ11 + GQVL)  \n"
+        "• Sau khi import thành công, HSTD/NQ11/GQVL sẽ tự động merge toàn Chi nhánh"
     )
 
     _ver = st.session_state.setdefault("khnv_bulk_uploader_ver", 0)
@@ -549,7 +598,7 @@ def render_import_hang_loat(role: str, username: str) -> None:
         return
 
     if st.button(
-        f"📥 Import {len(co_the_import_list)} file → hàng chờ",
+        f"📥 Import {len(co_the_import_list)} file → tự động merge",
         type="primary",
         key="btn_bulk_import",
     ):

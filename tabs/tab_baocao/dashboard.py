@@ -48,16 +48,15 @@ def render_dashboard(
     """
     ctx = tab if tab is not None else st
     
-    ctx.markdown("## 📊 Dashboard Báo cáo Tín dụng")
-    ctx.caption("Dữ liệu từ: HSTD, NQ11, GQVL, CDTOTKVV")
-    
     # Hiển thị trạng thái nguồn dữ liệu
     render_data_source_status(df, df_nq11, df_gqvl, df_cdtotkvv, container=ctx)
     
     # Hiển thị metrics tổng quan
     render_metric_cards(df, df_nq11, df_gqvl, container=ctx)
     
-    # Chọn loại báo cáo chính
+    ctx.divider()
+    
+    # Chọn loại báo cáo
     ctx.markdown("### 🔍 Chọn báo cáo")
     
     # Lọc theo role

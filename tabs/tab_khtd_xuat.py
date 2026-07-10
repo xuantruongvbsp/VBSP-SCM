@@ -17,6 +17,7 @@ from openpyxl.styles import Font, PatternFill
 from state_manager import SCMStateManager
 from config import TEN_CHINH_THUC_CT, CHUONG_TRINH_KHTD, DS_PGD, COT_TEN_PGD, CACHE_HSTD, CACHE_GQVL, XA_TO_PGD, PGD_XA_MAP, DON_VI_CHI_NHANH
 from data.core import ts_file
+from utils import lay_ngay_so_lieu
 
 
 @st.cache_resource(show_spinner=False)
@@ -947,7 +948,7 @@ def xuat_to_trinh_bgd_word(username: str = "unknown") -> bytes:
         raise ValueError("Chưa có dữ liệu KHTD Chi nhánh. Hãy giao KHTD trước.")
 
     th_cn: dict[str, float] = {}
-    ngay_sl = _date.today().strftime("%d/%m/%Y")
+    ngay_sl = ""
     du_no_pgd: dict[str, float] = {}
 
     if CACHE_HSTD.exists():
@@ -966,6 +967,9 @@ def xuat_to_trinh_bgd_word(username: str = "unknown") -> bytes:
                 meta = _db.doc_kv("merge_meta_hstd") or {}
                 if meta.get("ngay_sl"):
                     ngay_sl = str(meta["ngay_sl"])
+                if not ngay_sl:
+                    _dt_ns = lay_ngay_so_lieu(df_h)
+                    ngay_sl = _dt_ns.strftime("%d/%m/%Y") if _dt_ns else ""
         except Exception as e:
             logger.error("xuat_to_trinh_bgd_word: đọc HSTD lỗi — %s", e, exc_info=True)
 

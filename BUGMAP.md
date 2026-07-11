@@ -181,6 +181,15 @@
 | **Fix** | Chuyển màn nhập sang bảng dài: mỗi dòng là một Xã/Phường × Chương trình, sáu cột hiển thị ổn định và chỉ cột `KH giao (triệu đồng)` được phép sửa; giữ nguyên cấu trúc payload khi lưu |
 | **Ngày fix** | 2026-07-11 |
 
+### B27 — Tổng hợp KHTD thấp hơn dư nợ nhưng không giải thích chương trình chỉ thu hồi
+| | |
+|---|---|
+| **File** | `tabs/tab_khtd_giao_dc.py` → `_section_c_tong_hop()` |
+| **Dấu hiệu** | Tổng KH thấp hơn dư nợ thực hiện dù các số đều cùng đơn vị triệu đồng, khiến người dùng nghi ngờ sai quy đổi |
+| **Nguyên nhân** | Mã 24 và mã 7 nguồn ĐP là chương trình chỉ thu hồi, không giao kế hoạch nên bị loại đúng nghiệp vụ nhưng giao diện chưa chú thích |
+| **Fix** | Thêm một dòng ghi chú ngay dưới bảng Tổng hợp TW/ĐP, nêu tên hai chương trình và lý do Tổng KH có thể thấp hơn dư nợ |
+| **Ngày fix** | 2026-07-11 |
+
 ### B7 — Card grid HTML hiển thị raw code thay vì render
 | | |
 |---|---|
@@ -1840,6 +1849,18 @@ val = pd.to_numeric(df[COT_X], errors="coerce").sum() if COT_X in df.columns els
 ---
 
 ## Template: Ghi nhận bug mới
+
+### J13 — `_upload_info()` đổi kiểu trả về làm test unpack bị lỗi
+| | |
+|---|---|
+| **File** | `tabs/tab_pgd_cards.py` → `_upload_info()` ~dòng 71 |
+| **Dấu hiệu** | 4 test trong `TestUploadInfo` lỗi `TypeError: cannot unpack non-iterable bool object` |
+| **Nguyên nhân** | Fix B25 đổi helper từ tuple `(ok, timestamp)` sang `bool`, phá vỡ hợp đồng API đang được test dù UI chỉ cần trạng thái upload |
+| **Fix** | Khôi phục tuple tương thích; `upload_info_map` chỉ lấy phần tử trạng thái, nên UI vẫn dùng ngày số liệu HSTD và không quay lại hiển thị mtime |
+| **Test** | `tests/test_pgd_cards.py::TestUploadInfo` |
+| **Ngày fix** | 2026-07-11 |
+
+---
 
 Mỗi khi fix bug, copy template dưới đây và điền vào đúng mục:
 

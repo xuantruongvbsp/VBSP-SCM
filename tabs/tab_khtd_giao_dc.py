@@ -16,6 +16,7 @@ from config import (
     COT_DU_NO_TH, COT_DU_NO_QH, COT_DU_NO_KHOANH, COT_TONG_DU_NO,
     COT_MA_CHUONG_TRINH, COT_NGUON_VON,
     DON_VI_CHI_NHANH, DS_PGD, GQVL_MA_KEY_GIAO, PGD_XA_MAP,
+    tim_ten_xa_trong_hstd,
     baseline_cache_loai, trang_thai_baseline_pgd,
 )
 from data.pgd import pgd_slug as _pgd_slug
@@ -773,9 +774,16 @@ def _build_du_no_map(
             df_pgd[c] = pd.to_numeric(df_pgd[c], errors="coerce").fillna(0)
         df_pgd["_dn"] = df_pgd[cols].sum(axis=1)
 
-    agg = df_pgd.groupby([COT_TEN_XA, "_ma_ct", "_nguon"])["_dn"].sum().reset_index()
+    # PGD_XA_MAP lưu tên đầy đủ ("Xã ...", "Phường ..."), trong khi HSTD
+    # thường bỏ tiền tố hành chính. Chuẩn hóa cùng một khóa trước khi group/lookup.
+    df_pgd["_xa_key"] = df_pgd[COT_TEN_XA].map(
+        lambda value: tim_ten_xa_trong_hstd(str(value).strip()).casefold()
+        if pd.notna(value)
+        else ""
+    )
+    agg = df_pgd.groupby(["_xa_key", "_ma_ct", "_nguon"])["_dn"].sum().reset_index()
     return {
-        (row[COT_TEN_XA], int(row["_ma_ct"]), int(row["_nguon"])): row["_dn"] / 1e6
+        (row["_xa_key"], int(row["_ma_ct"]), int(row["_nguon"])): row["_dn"] / 1e6
         for _, row in agg.iterrows()
     }
 
@@ -815,7 +823,8 @@ def _section_b_giao(
                 else kh_prev.get("kh_moi_dp", 0) / 1e6
             )
             nguon_int = 1 if nguon == "TW" else 2
-            du_no_trieu = du_no_map.get((xa, int(_ma_ct), nguon_int), 0.0)
+            xa_key = tim_ten_xa_trong_hstd(str(xa).strip()).casefold()
+            du_no_trieu = du_no_map.get((xa_key, int(_ma_ct), nguon_int), 0.0)
             pct_th = (
                 round(du_no_trieu / kh_prev_trieu * 100, 1)
                 if kh_prev_trieu

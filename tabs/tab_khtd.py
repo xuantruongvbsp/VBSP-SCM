@@ -37,6 +37,7 @@ from config import (
     DS_PGD, PGD_XA_MAP, CACHE_GQVL, COT_MA_NHA_DAU_TU,
 )
 from data.core import ts_file
+from services.khtd_nhap_service import tinh_th_gqvl_phan_tang as _tinh_th_gqvl_phan_tang
 
 if TYPE_CHECKING:
     from streamlit.delta_generator import DeltaGenerator
@@ -58,7 +59,7 @@ KHTD_CN_NHOM_MA_CT: list[tuple[str, list[int]]] = [
     ("HSSV · GQVL", [2, 3]),
     ("Nhà ở · DTTS · Xuất khẩu lao động", [4, 7, 17, 21, 25]),
     ("Vùng khó khăn", [10, 15]),
-    ("Nước sạch · SXKD · Khác", [6, 12, 26, 99]),
+    ("Nước sạch · Hỗ trợ khác", [6, 12, 13, 26, 99]),
 ]
 # Sub-nhóm GQVL phân tầng 4 nhóm (TW: PL NV, ĐP: Mã NĐT)
 GQVL_SUB_NHOM = [
@@ -73,6 +74,41 @@ GQVL_SUB_NHOM = [
 NSVSMT_DP_SUB_NHOM = [
     ("6_DP_TINH",   "↳ ĐP — Cấp tỉnh",          "ĐP"),
     ("6_DP_XA",     "↳ ĐP — Cấp xã/khác",       "ĐP"),
+]
+TEN_BASE_BY_MACT_OVERRIDE: dict[int, str] = {
+    3: "Cho vay giải quyết việc làm",
+}
+GQVL_TW_TONG_KEY = "3_TW"
+GQVL_DP_TONG_KEY = "3_DP"
+GQVL_CN_SUB_ROWS: list[dict[str, str | None]] = [
+    {
+        "type": "gqvl_sub",
+        "ma_ct": 3,
+        "label": "Cho vay giải quyết việc làm — TW — Ngân sách Trung ương cấp",
+        "key_tw": "3_TW_NSNN",
+        "key_dp": None,
+    },
+    {
+        "type": "gqvl_sub",
+        "ma_ct": 3,
+        "label": "Cho vay giải quyết việc làm — TW — NHCSXH huy động",
+        "key_tw": "3_TW_NHCSXH",
+        "key_dp": None,
+    },
+    {
+        "type": "gqvl_sub",
+        "ma_ct": 3,
+        "label": "Cho vay giải quyết việc làm — ĐP — Cấp tỉnh",
+        "key_tw": None,
+        "key_dp": "3_DP_TINH",
+    },
+    {
+        "type": "gqvl_sub",
+        "ma_ct": 3,
+        "label": "Cho vay giải quyết việc làm — ĐP — Cấp xã",
+        "key_tw": None,
+        "key_dp": "3_DP_XA",
+    },
 ]
 MAKEY_BY_MACT_NV: dict[tuple[int, int], str] = {}
 TEN_BASE_BY_MACT: dict[int, str] = {}
@@ -204,6 +240,9 @@ def _ma_key_tu_ma_ct_nv(ma_ct: int, nv_int: int) -> str:
 
 
 def _ten_ct_base(ma_ct: int, ten_map: dict[str, str] | None = None) -> str:
+    ten_override = TEN_BASE_BY_MACT_OVERRIDE.get(int(ma_ct))
+    if ten_override:
+        return ten_override
     ten = TEN_BASE_BY_MACT.get(int(ma_ct))
     if ten:
         return ten
@@ -212,6 +251,103 @@ def _ten_ct_base(ma_ct: int, ten_map: dict[str, str] | None = None) -> str:
         if _ma_ct_tu_ma_key(mk) == int(ma_ct):
             return t
     return str(ma_ct)
+
+
+def _tong_tu_keys(data: dict[str, float] | None, keys: list[str]) -> float:
+    data = data or {}
+    return float(sum(float(data.get(key, 0.0) or 0.0) for key in keys))
+
+
+def _dong_bo_gqvl_tong_keys(data: dict[str, float] | None) -> dict[str, float]:
+    """Giữ tương thích giữa key tổng GQVL và 4 sub-key chi tiết."""
+    out = dict(data or {})
+    tong_tw = _tong_tu_keys(out, ["3_TW_NHCSXH", "3_TW_NSNN"])
+    tong_dp = _tong_tu_keys(out, ["3_DP_TINH", "3_DP_XA"])
+    if tong_tw > 0 or any(k in out for k in ["3_TW_NHCSXH", "3_TW_NSNN"]):
+        out[GQVL_TW_TONG_KEY] = tong_tw
+    if tong_dp > 0 or any(k in out for k in ["3_DP_TINH", "3_DP_XA"]):
+        out[GQVL_DP_TONG_KEY] = tong_dp
+    return out
+
+
+def _iter_khtd_cn_group_rows(ten_map: dict[str, str] | None = None) -> list[tuple[str, list[dict[str, object]]]]:
+    """Danh sách dòng chuẩn cho KHTD Chi nhánh: chỉ GQVL có phân tầng ngang."""
+    out: list[tuple[str, list[dict[str, object]]]] = []
+    for tieu_de_nhom, ds_ma_ct in KHTD_CN_NHOM_MA_CT:
+        rows: list[dict[str, object]] = []
+        for ma_ct in ds_ma_ct:
+            if ma_ct == 3:
+                rows.extend(GQVL_CN_SUB_ROWS)
+                continue
+            mk_tw = f"{ma_ct}_TW"
+            mk_dp = f"{ma_ct}_DP"
+            co_tw = mk_tw in MA_KEYS_CO_KHTD
+            co_dp = mk_dp in MA_KEYS_CO_KHTD
+            if not co_tw and not co_dp:
+                continue
+            rows.append(
+                {
+                    "type": "normal",
+                    "ma_ct": ma_ct,
+                    "label": _ten_ct_base(ma_ct, ten_map),
+                    "key_tw": mk_tw if co_tw else None,
+                    "key_dp": mk_dp if co_dp else None,
+                }
+            )
+        out.append((tieu_de_nhom, rows))
+    return out
+
+
+def _tinh_thuc_hien_khtd_cn(
+    df_hstd: "pd.DataFrame | None",
+    df_gqvl: "pd.DataFrame | None" = None,
+) -> tuple[dict[str, float], dict[str, float]]:
+    """
+    Tính TH chuẩn cho màn KHTD Chi nhánh.
+
+    - HSTD là nguồn chính.
+    - GQVL chỉ dùng để phân tầng `3_TW` thành 2 nguồn con.
+    - GQVL ĐP tách theo Mã NĐT địa phương.
+    - Các chương trình khác giữ trục dọc TW/ĐP nhưng không phân tầng ngang.
+    """
+    if df_hstd is None or df_hstd.empty:
+        return {}, {}
+
+    if COT_MA_CHUONG_TRINH not in df_hstd.columns or COT_NGUON_VON not in df_hstd.columns:
+        return {}, {}
+
+    col_th = COT_TONG_DU_NO if COT_TONG_DU_NO in df_hstd.columns else (
+        COT_DU_NO_TH if COT_DU_NO_TH in df_hstd.columns else None
+    )
+    if not col_th:
+        return {}, {}
+
+    ma_ct_s = pd.to_numeric(df_hstd[COT_MA_CHUONG_TRINH], errors="coerce").fillna(0).astype(int)
+    nv_s = pd.to_numeric(df_hstd[COT_NGUON_VON], errors="coerce").fillna(0).astype(int)
+    th_s = pd.to_numeric(df_hstd[col_th], errors="coerce").fillna(0).astype(float)
+
+    tmp = pd.DataFrame({"ma_ct": ma_ct_s, "nv": nv_s, "th": th_s})
+    tmp = tmp[(tmp["ma_ct"] > 0) & (tmp["nv"].isin([1, 2])) & (tmp["th"] != 0)]
+    if tmp.empty:
+        return {}, {}
+
+    out: dict[str, float] = {}
+    g = tmp.groupby(["ma_ct", "nv"])["th"].sum()
+    for (ma_ct, nv_int), val in g.items():
+        if int(ma_ct) == 3:
+            out[GQVL_TW_TONG_KEY if int(nv_int) == 1 else GQVL_DP_TONG_KEY] = float(val)
+            continue
+        mk = MAKEY_BY_MACT_NV.get((int(ma_ct), int(nv_int)))
+        if mk:
+            out[mk] = float(val)
+
+    th_gqvl = _tinh_th_gqvl_phan_tang(df_hstd, df_gqvl)
+    if th_gqvl:
+        out.update({k: float(v or 0.0) for k, v in th_gqvl.items()})
+        out[GQVL_TW_TONG_KEY] = _tong_tu_keys(out, ["3_TW_NHCSXH", "3_TW_NSNN"])
+        out[GQVL_DP_TONG_KEY] = _tong_tu_keys(out, ["3_DP_TINH", "3_DP_XA"])
+
+    return _dong_bo_gqvl_tong_keys(out), th_gqvl
 
 
 def _quet_ct_co_du_no(df: "pd.DataFrame | None") -> tuple[set[str], dict[str, str]]:

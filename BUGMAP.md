@@ -190,6 +190,16 @@
 | **Fix** | Thêm một dòng ghi chú ngay dưới bảng Tổng hợp TW/ĐP, nêu tên hai chương trình và lý do Tổng KH có thể thấp hơn dư nợ |
 | **Ngày fix** | 2026-07-11 |
 
+### B28 — Nhập KH Giao hiển thị toàn bộ Dư nợ TH bằng 0
+| | |
+|---|---|
+| **File** | `tabs/tab_khtd_giao_dc.py` → `_build_du_no_map()`, `_section_b_giao()` |
+| **Dấu hiệu** | Cột `Dư nợ TH (triệu đồng)` bằng 0 ở mọi xã/chương trình dù HSTD đã có dư nợ |
+| **Nguyên nhân** | `PGD_XA_MAP` dùng tên đầy đủ như `Xã Phước Thái`, còn HSTD thường lưu `Phước Thái`; code ghép bằng chuỗi tuyệt đối nên không tìm được khóa và luôn fallback `0.0` |
+| **Fix** | Dùng `tim_ten_xa_trong_hstd()` và `casefold()` để chuẩn hóa tên xã ở cả HSTD lẫn danh mục trước khi group và lookup; giữ nguyên khóa mã chương trình + nguồn vốn |
+| **Test** | `tests/test_khtd_giao_dc.py::test_build_du_no_map_chuan_hoa_tien_to_xa_phuong` |
+| **Ngày fix** | 2026-07-11 |
+
 ### B7 — Card grid HTML hiển thị raw code thay vì render
 | | |
 |---|---|
@@ -1052,6 +1062,56 @@
 | **Fix** | Đổi riêng phần nhập KH của `🏛️ KHTD Chi nhánh` sang `text_input` + parse số nguyên triệu đồng an toàn; sau khi bấm `👁 Xem trước tính toán` hoặc `💾 Lưu`, giá trị được chuẩn hóa lại thành dạng `1.234.567` ngay trên ô nhập. Đồng thời nới tỷ lệ cột và padding để bảng thoáng hơn |
 | **Bài học** | Với form cần tránh rerun liên tục nhưng vẫn muốn user tự rà số lớn, không nên ép `number_input` làm việc nó không hỗ trợ; dùng `text_input` + parse/format ở bước preview/save sẽ an toàn và rõ ràng hơn |
 | **Ngày fix** | 2026-06-29 |
+
+### G13 — `🏛️ KHTD Chi nhánh`: phần nhập dạng nhiều cột rời khó dò ngang và khó nhập liên tục
+| | |
+|---|---|
+| **File** | `tabs/tab_khtd_nhap.py` |
+| **Dấu hiệu** | Ở màn `📈 Kế hoạch tín dụng` → `🏛️ KHTD Chi nhánh`, khu vực nhập KH bên dưới dù đã có viền CSS nhưng thực chất là nhiều `st.columns()` ghép lại; khi rà theo hàng hoặc nhập liên tiếp dễ hụt cột, nhất là với các nhóm GQVL/NSVSMT có dòng tách nhỏ |
+| **Nguyên nhân** | UI cũ mô phỏng bảng bằng HTML header + `st.columns()` cho từng dòng, nên không có lưới bảng thật, không khóa được nhịp mắt theo hàng/cột như spreadsheet |
+| **Fix** | Dựng lại phần nhập thành `st.data_editor` với các cột `KH/TH/Còn TH` cho TW và ĐP, giữ cột tính toán ở chế độ read-only, đồng thời lưu draft vào `session_state` để số liệu tính lại ngay sau mỗi lần chỉnh |
+| **Bài học** | Với màn nhập số liệu nhiều dòng, nhiều cột và cần đối chiếu ngang, nên ưu tiên grid editor thật thay vì dựng giả bằng `st.columns()` + CSS; cách này dễ nhìn hơn và ít lỗi thao tác hơn |
+| **Ngày fix** | 2026-07-11 |
+
+### G14 — `🏛️ KHTD Chi nhánh`: bảng nhập `data_editor` hiện `,0f` và `None` thay vì số
+| | |
+|---|---|
+| **File** | `tabs/tab_khtd_nhap.py` |
+| **Dấu hiệu** | Sau khi đổi sang bảng `data_editor`, các cột `TH` / `Còn TH` hiển thị literal như `,0f` và chữ `None`, làm bảng rất khó đọc dù dữ liệu tính toán vẫn có |
+| **Nguyên nhân** | Các cột chỉ đọc vẫn được khai báo `NumberColumn(format=\"...")` trong runtime hiện tại, trong khi dữ liệu có nhiều giá trị `None` cho dòng không áp dụng; frontend render không ổn định nên lộ cả format literal lẫn `None` |
+| **Fix** | Giữ lại chỉ 2 cột `KH TW` và `KH ĐP` là số editable; chuyển toàn bộ cột `TH` / `Còn TH` / `TH tổng` sang text đã format sẵn bằng helper, đồng thời dùng `Int64` nullable cho cột KH để nhập số nguyên gọn hơn |
+| **Bài học** | Với `data_editor`, các cột chỉ dùng để xem nên format sẵn thành text nếu runtime render NumberColumn không ổn định; không nên cố ép mọi cột sang NumberColumn khi có nhiều ô trống/không áp dụng |
+| **Ngày fix** | 2026-07-11 |
+
+### G15 — `🏛️ KHTD Chi nhánh`: vừa sửa ô `KH` là bị mất focus, không nhập liên tục được
+| | |
+|---|---|
+| **File** | `tabs/tab_khtd_nhap.py` |
+| **Dấu hiệu** | Sau khi đổi sang `data_editor`, người dùng vừa chạm sửa cột `KH TW` / `KH ĐP` thì bảng refresh ngay, ô nhập mất focus nên cảm giác "không nhập được" hoặc rất khó gõ liên tiếp |
+| **Nguyên nhân** | Code gọi `st.rerun()` ngay sau khi phát hiện dữ liệu editor thay đổi; điều này làm widget bị dựng lại tức thì ở mỗi lần edit |
+| **Fix** | Bỏ `st.rerun()` cưỡng bức; chỉ cập nhật draft vào `session_state` và để editor tiếp tục giữ phiên nhập hiện tại |
+| **Bài học** | Với `st.data_editor`, không nên tự `st.rerun()` ngay sau mỗi thay đổi của chính editor nếu mục tiêu là cho phép người dùng nhập liên tục; rerun cưỡng bức rất dễ làm mất focus và khóa thao tác |
+| **Ngày fix** | 2026-07-11 |
+
+### G16 — `📈 KHTD Chi nhánh`: mô hình chương trình tách ngang sai nghiệp vụ, tên CT lệch HSTD
+| | |
+|---|---|
+| **File** | `tabs/tab_khtd.py`, `tabs/tab_khtd_nhap.py`, `tabs/tab_khtd_xuat.py` |
+| **Dấu hiệu** | Màn nhập/xuất KHTD tách ngang cho nhiều chương trình, `NSVSMT ĐP` còn chia tỉnh/xã, tên chương trình ở màn nhập không khớp tên HSTD, và GQVL không bám đúng rule dùng HSTD làm chính + GQVL làm file phụ để tách nguồn |
+| **Nguyên nhân** | Model hiển thị và model nghiệp vụ bị trộn lẫn: dùng nhiều `ma_key` chi tiết để render trực tiếp UI thay vì có một lớp row model chuẩn cho KHTD Chi nhánh; vì vậy UI bị kéo theo cấu trúc key cũ thay vì phản ánh rule nghiệp vụ thật |
+| **Fix** | Thêm helper chuẩn cho KHTD CN trong `tab_khtd.py`: chỉ GQVL có 4 dòng con; chương trình thường giữ 1 dòng với trục dọc `TW/ĐP`; TH lấy từ HSTD làm chính, GQVL chỉ dùng để tách `TW` thành `NS Trung ương cấp` và `NHCSXH huy động`, còn `ĐP` tách theo `Mã NĐT địa phương`; đồng bộ lại tab nhập và tab xuất theo cùng model |
+| **Bài học** | Với màn nghiệp vụ có nhiều nguồn dữ liệu, không nên render trực tiếp từ `ma_key` lưu trữ. Cần có một row model trung gian phản ánh đúng nghiệp vụ trước, rồi mới map sang key lưu dữ liệu và số TH thực tế |
+| **Ngày fix** | 2026-07-11 |
+
+### G17 — `📈 KHTD`: thiếu `7_DP` và `ma_ct 13` làm tổng TH lệch `Tổng dư nợ` HSTD
+| | |
+|---|---|
+| **File** | `config.py`, `tabs/tab_khtd.py` |
+| **Dấu hiệu** | Tổng `TH` trên KHTD nhỏ hơn `Tổng dư nợ` HSTD đúng 508.000.000 đồng dù logic lấy `TH` đã dùng `COT_TONG_DU_NO` |
+| **Nguyên nhân** | Danh mục `CHUONG_TRINH_KHTD` chưa bao phủ hết các cặp `(Mã chương trình, Nguồn vốn)` đang tồn tại trong HSTD: thiếu `7_DP` (8 triệu) và thiếu `ma_ct 13` phía ĐP (500 triệu) |
+| **Fix** | Bổ sung `7_DP` và `13_DP` vào `CHUONG_TRINH_KHTD`, đồng thời đưa `ma_ct 13` vào nhóm hiển thị KHTD Chi nhánh để row model mới tự map đủ vào nhập/xuất/tính TH |
+| **Bài học** | Mỗi khi đối chiếu `TH` với HSTD, phải kiểm tra đủ coverage của danh mục `(ma_ct, nguồn vốn)` trước khi nghi ngờ helper tính tổng; thiếu một mã nhỏ cũng làm lệch toàn bộ số tổng |
+| **Ngày fix** | 2026-07-11 |
 
 ---
 

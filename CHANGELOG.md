@@ -1,5 +1,33 @@
 # CHANGELOG
 
+## [2026-07-11] — Bổ sung 7_DP và ma_ct 13 vào KHTD để khớp Tổng dư nợ HSTD
+- `config.py` dòng ~170-179 — thêm `7_DP` và `13_DP` vào danh mục `CHUONG_TRINH_KHTD` để bao phủ đủ dư nợ HSTD phía Địa phương
+- `tabs/tab_khtd.py` dòng ~57-62 — đưa `ma_ct 13` vào nhóm hiển thị KHTD Chi nhánh để tự đồng bộ nhập/xuất/tính TH theo row model hiện tại
+- `BUGMAP.md` — thêm G17 ghi nhận bài học thiếu mapping danh mục KHTD làm lệch tổng TH so với HSTD
+
+## [2026-07-11] — Thiết kế lại KHTD Chi nhánh theo HSTD, chỉ GQVL phân tầng ngang
+- `tabs/tab_khtd.py` dòng ~78-350 — thêm helper chuẩn hóa tên CT, đồng bộ key tổng GQVL, dựng row model KHTD CN và tính TH mới lấy HSTD làm chính, GQVL chỉ để phân tách 4 nhóm con
+- `tabs/tab_khtd_nhap.py` dòng ~17-640 — đổi bảng nhập KHTD CN sang model mới: chương trình thường 1 dòng `TW/ĐP`, NSVSMT bỏ tách tỉnh/xã, GQVL giữ 4 dòng con và lưu tương thích dữ liệu cũ
+- `tabs/tab_khtd_xuat.py` dòng ~40-820 — đồng bộ bảng readonly, tab tiến độ và xuất Word để hiển thị/tính tổng theo cùng mô hình KHTD CN mới
+- `BUGMAP.md` — thêm G16 ghi nhận lỗi mô hình KHTD tách ngang sai nghiệp vụ
+
+## [2026-07-11] — Fix bảng nhập KHTD Chi nhánh bị khóa ô KH sau khi edit
+- `tabs/tab_khtd_nhap.py` dòng ~660-662 — bỏ `st.rerun()` ngay sau khi nhận giá trị từ `data_editor`; chỉ lưu draft vào session_state để người dùng nhập liên tục được
+- `BUGMAP.md` — thêm G15 ghi nhận anti-pattern rerun cưỡng bức làm khóa ô nhập trong data_editor
+
+## [2026-07-11] — Fix bảng nhập KHTD Chi nhánh hiển thị `,0f` và `None`
+- `tabs/tab_khtd_nhap.py` dòng ~181-265, ~615-647 — tách data_editor thành view riêng: chỉ giữ 2 cột KH là số editable, còn các cột TH/Còn TH chuyển sang text format sẵn để không còn lộ format literal hoặc `None`
+- `BUGMAP.md` — thêm G14 ghi nhận lỗi render NumberColumn/read-only trong data_editor của KHTD
+
+## [2026-07-11] — KHTD Chi nhánh: đổi phần nhập sang bảng kẻ dễ nhìn, dễ nhập
+- `tabs/tab_khtd_nhap.py` dòng ~181-243, ~614-723 — thay khối nhập `st.columns` + CSS giả lập bằng `st.data_editor` dạng lưới; giữ nguyên logic tính TH, lưu kv_store, audit và thêm nút khôi phục số đã lưu
+- `BUGMAP.md` — thêm G13 ghi nhận giao diện nhập KHTD dạng cột rời khó dò ngang, nên dùng grid editor
+
+## [2026-07-11] — Fix Dư nợ TH trong màn Nhập KH Giao luôn bằng 0
+- `tabs/tab_khtd_giao_dc.py` dòng ~742–825 — chuẩn hóa tên xã/phường giữa `PGD_XA_MAP` và HSTD trước khi ghép dư nợ theo xã, mã chương trình và nguồn vốn
+- `tests/test_khtd_giao_dc.py` — thêm test hồi quy cho HSTD có tên xã không tiền tố và có tiền tố phường
+- `BUGMAP.md` — thêm B28 ghi nhận lỗi ghép tên xã làm dư nợ thực hiện về 0
+
 ## [2026-07-11] — Fix API `_upload_info()` làm 4 test Toàn cảnh PGD thất bại
 - `tabs/tab_pgd_cards.py` dòng ~15–80, ~646 — khôi phục kiểu trả về `(bool, timestamp)` để tương thích test/caller cũ; UI chỉ lấy trạng thái và tiếp tục hiển thị ngày số liệu HSTD theo fix B25
 - `BUGMAP.md` — thêm J13 ghi nhận thay đổi kiểu trả về helper không tương thích ngược

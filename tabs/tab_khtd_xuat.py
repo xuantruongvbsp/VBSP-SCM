@@ -45,32 +45,16 @@ from tabs.tab_khtd import (
 
     KV_KEY_CN,
     KV_KEY_XA,
-    MA_KEYS_CO_KHTD,
     _doc_kv,
+    _dong_bo_gqvl_tong_keys,
     _fvn,
     _fmt_vn,
     _fmt_vn_signed,
-    _ma_key_tu_ma_ct_nv,
+    _iter_khtd_cn_group_rows,
     _nv_int_tu_ma_key,
-    _ten_ct_base,
+    _tinh_thuc_hien_khtd_cn,
     _tinh_thuc_hien_theo_ct,
-    GQVL_SUB_NHOM,
-    NSVSMT_DP_SUB_NHOM,
 )
-
-
-def _kh_nsvsmt_dp_split(kh_data: dict) -> dict[str, float]:
-    """Fallback `6_DP` cũ sang 2 sub-key chi tiết để hiển thị không bị mất số."""
-    has_split = "6_DP_TINH" in kh_data or "6_DP_XA" in kh_data
-    if has_split:
-        return {
-            "6_DP_TINH": float(kh_data.get("6_DP_TINH", 0.0) or 0.0),
-            "6_DP_XA": float(kh_data.get("6_DP_XA", 0.0) or 0.0),
-        }
-    return {
-        "6_DP_TINH": float(kh_data.get("6_DP", 0.0) or 0.0),
-        "6_DP_XA": 0.0,
-    }
 
 
 def _hien_thi_bang_cn_readonly(
@@ -82,44 +66,26 @@ def _hien_thi_bang_cn_readonly(
     username: str = "",
 ) -> None:
     """Bảng tóm tắt KHTD Chi nhánh — HTML thuần: STT | Chỉ tiêu | KH | Thực hiện | Còn phải thực hiện | TL%."""
-    kh_d = dict(kh_cn or {})
-    th_d = dict(th_cn or {})
+    kh_d = _dong_bo_gqvl_tong_keys(dict(kh_cn or {}))
+    th_d = _dong_bo_gqvl_tong_keys(dict(th_cn or {}))
 
-    if th_gqvl is None and df_loc is not None:
-        from tabs.tab_khtd_nhap import _tinh_th_gqvl_phan_tang
-
+    if df_loc is not None and (not th_d or th_gqvl is None):
         df_gqvl = _doc_gqvl_cached(ts_file(CACHE_GQVL))
-        th_gqvl = _tinh_th_gqvl_phan_tang(df_loc, df_gqvl)
+        th_d_moi, th_gqvl = _tinh_thuc_hien_khtd_cn(df_loc, df_gqvl)
+        if not th_d:
+            th_d = th_d_moi
 
-    for sk, sv in dict(th_gqvl or {}).items():
-        if sv:
-            th_d[sk] = sv
-
-    if ds_ct_loc:
-        loc_set = set(ds_ct_loc)
-        kh_d = {k: v for k, v in kh_d.items() if k in loc_set}
-        th_d = {k: v for k, v in th_d.items() if k in loc_set}
+    if th_gqvl:
+        th_d.update(_dong_bo_gqvl_tong_keys(dict(th_gqvl)))
 
     if not kh_d and not th_d:
         st.info("Chưa có dữ liệu.")
         return
 
-    sub_key_3_dp_xa = "3_DP_XA"
-
-    seen_ma_ct: set[int] = set()
-    order_ma_ct: list[int] = []
-    for mk, ma_ct, _ten, _nv, *_ in CHUONG_TRINH_KHTD:
-        mci = int(ma_ct)
-        if mci not in seen_ma_ct:
-            seen_ma_ct.add(mci)
-            order_ma_ct.append(mci)
-
     BD = "#d1d5db"
     H_BG = "#003D7A"
     NHOM_BG = "#e8f0f8"
     TONG_BG = "#E8F4FD"
-    WHITE = "#ffffff"
-    ALT = "#F8FAFC"
     RED = "#DC2626"
     AMBER = "#D97706"
     GREEN = "#16A34A"
@@ -132,7 +98,6 @@ def _hien_thi_bang_cn_readonly(
     tong_th_ii = 0.0
     so_ct_co_kh = 0
     tong_ct = len(order_ma_ct)
-    stt_i = 0
     stt_no = 0
 
     html_rows: list[str] = []
@@ -171,9 +136,9 @@ def _hien_thi_bang_cn_readonly(
         html_rows.append(f"<tr>{tds}</tr>")
 
     def _add_row(
-        ten: str, kh_vnd: float, th_vnd: float, indent: str = ""
+        ten: str, kh_vnd: float, th_vnd: float
     ) -> None:
-        nonlocal tong_kh, tong_th, tong_kh_i, tong_th_i, tong_kh_ii, tong_th_ii, stt_i, stt_no
+        nonlocal tong_kh, tong_th, tong_kh_i, tong_th_i, tong_kh_ii, tong_th_ii, stt_no
         kh_v = kh_vnd / 1e6
         th_v = th_vnd / 1e6
         con_phai_th_v = (kh_vnd - th_vnd) / 1e6
@@ -189,7 +154,6 @@ def _hien_thi_bang_cn_readonly(
                 tong_kh_ii += kh_vnd
                 tong_th_ii += th_vnd
 
-        stt_i += 1
         stt_no += 1
 
         kh_str = _fvn(kh_v, 0) if kh_v > 0 else "—"
@@ -200,54 +164,11 @@ def _hien_thi_bang_cn_readonly(
 
         tds = (
             _td(str(stt_no), "center", "", "", "") +
-            _td(f"{indent}{ten}", "left", "", "", "") +
+            _td(ten, "left", "", "", "") +
             _td(kh_str, "right", "", "", "") +
             _td(th_str, "right", "", "", "") +
             _td(con_phai_th_str, "right", "", "", "") +
             _td(tl_str, "right", tl_c, "", "")
-        )
-        html_rows.append(f"<tr>{tds}</tr>")
-
-    def _add_sub_ten(sub_key: str, sub_ten: str) -> None:
-        nonlocal tong_kh, tong_th, tong_kh_i, tong_th_i, tong_kh_ii, tong_th_ii, stt_i
-        kh_vnd = float(kh_d.get(sub_key, 0.0))
-        th_vnd = float(th_d.get(sub_key, 0.0))
-
-        kh_v = kh_vnd / 1e6
-        th_v = th_vnd / 1e6
-
-        if kh_v == 0 and th_v == 0:
-            return
-
-        con_phai_th_v = (kh_vnd - th_vnd) / 1e6
-        tl = th_v / kh_v * 100 if kh_v > 0 else None
-
-        if kh_v > 0 or th_v > 0:
-            tong_kh += kh_vnd
-            tong_th += th_vnd
-            if nhom_hien.startswith("I."):
-                tong_kh_i += kh_vnd
-                tong_th_i += th_vnd
-            elif nhom_hien.startswith("II."):
-                tong_kh_ii += kh_vnd
-                tong_th_ii += th_vnd
-
-        bg = WHITE if stt_i % 2 == 0 else ALT
-        stt_i += 1
-
-        kh_str = _fvn(kh_v, 0) if kh_v > 0 else "—"
-        th_str = _fvn(th_v, 0) if th_v > 0 else "—"
-        con_phai_th_str = _fvn(con_phai_th_v, 0)
-        tl_str = f"{_fvn(tl, 1)}%" if tl is not None else "—"
-        tl_c = _tl_color(tl)
-
-        tds = (
-            _td("", "center") +
-            _td(f"    {sub_ten}", "left") +
-            _td(kh_str, "right") +
-            _td(th_str, "right") +
-            _td(con_phai_th_str, "right") +
-            _td(tl_str, "right", tl_c)
         )
         html_rows.append(f"<tr>{tds}</tr>")
 
@@ -266,91 +187,51 @@ def _hien_thi_bang_cn_readonly(
         )
         html_rows.append(f"<tr>{tds}</tr>")
 
-    # ── Nhóm I — Nguồn vốn Trung ương ────────────────────────────────────
-    da_ghi_hdr_tw = False
-    for ma_ct in order_ma_ct:
-        if ma_ct == 3:
-            subs_tw = [t for t in GQVL_SUB_NHOM if t[2] == "TW"]
-            if any(
-                float(kh_d.get(sk, 0.0)) > 0 or float(th_d.get(sk, 0.0)) > 0
-                for sk, _, _ in subs_tw
-            ):
-                if not da_ghi_hdr_tw:
-                    _add_group_hdr("I. Nguồn vốn Trung ương")
-                    da_ghi_hdr_tw = True
-                for sk, sten, snv in subs_tw:
-                    _add_sub_ten(sk, sten)
-            continue
+    loc_set = set(ds_ct_loc or [])
 
-        mk_tw = _ma_key_tu_ma_ct_nv(ma_ct, 1)
-        kh_tw = float(kh_d.get(mk_tw, 0.0))
-        th_tw = float(th_d.get(mk_tw, 0.0))
-        if (kh_tw > 0 or th_tw > 0) and mk_tw in MA_KEYS_CO_KHTD:
-            if not da_ghi_hdr_tw:
-                _add_group_hdr("I. Nguồn vốn Trung ương")
-                da_ghi_hdr_tw = True
-            _add_row(_ten_ct_base(ma_ct, {}), kh_tw, th_tw, "  ")
-    if da_ghi_hdr_tw:
-        _add_section_total("TỔNG CỘNG PHẦN I", tong_kh_i, tong_th_i)
+    def _duoc_loc(key_name: str | None) -> bool:
+        if not loc_set:
+            return True
+        if not key_name:
+            return False
+        return key_name in loc_set
 
-    # ── Nhóm II — Nguồn vốn Địa phương ───────────────────────────────────
-    da_ghi_hdr_dp = False
-    kh_nsvsmt = _kh_nsvsmt_dp_split(kh_d)
-    kh_d.update(kh_nsvsmt)
-    for ma_ct in order_ma_ct:
-        if ma_ct == 3:
-            subs_dp = [t for t in GQVL_SUB_NHOM if t[2] == "ĐP"]
-            if any(
-                float(kh_d.get(sk, 0.0)) > 0 or float(th_d.get(sk, 0.0)) > 0
-                for sk, _, _ in subs_dp
-            ):
-                if not da_ghi_hdr_dp:
-                    _add_group_hdr("II. Nguồn vốn Địa phương")
-                    da_ghi_hdr_dp = True
-                for sk, sten, snv in subs_dp:
-                    _add_sub_ten(sk, sten)
-            continue
+    for tieu_de, side_key, tong_label in [
+        ("I. Nguồn vốn Trung ương", "key_tw", "TỔNG CỘNG PHẦN I"),
+        ("II. Nguồn vốn Địa phương", "key_dp", "TỔNG CỘNG PHẦN II"),
+    ]:
+        da_co_dong = False
+        for _ten_nhom, ds_rows in _iter_khtd_cn_group_rows():
+            for row in ds_rows:
+                key_name = row.get(side_key)
+                if not _duoc_loc(str(key_name) if key_name else None):
+                    continue
+                kh_vnd = float(kh_d.get(str(key_name), 0.0) or 0.0) if key_name else 0.0
+                th_vnd = float(th_d.get(str(key_name), 0.0) or 0.0) if key_name else 0.0
+                if kh_vnd == 0 and th_vnd == 0:
+                    continue
+                if not da_co_dong:
+                    _add_group_hdr(tieu_de)
+                    da_co_dong = True
+                _add_row(str(row.get("label", "") or ""), kh_vnd, th_vnd)
+        if da_co_dong:
+            if side_key == "key_tw":
+                _add_section_total(tong_label, tong_kh_i, tong_th_i)
+            else:
+                _add_section_total(tong_label, tong_kh_ii, tong_th_ii)
 
-        if ma_ct == 6:
-            if any(
-                float(kh_d.get(sk, 0.0)) > 0 or float(th_d.get(sk, 0.0)) > 0
-                for sk, _, _ in NSVSMT_DP_SUB_NHOM
-            ):
-                if not da_ghi_hdr_dp:
-                    _add_group_hdr("II. Nguồn vốn Địa phương")
-                    da_ghi_hdr_dp = True
-                for sk, sten, _snv in NSVSMT_DP_SUB_NHOM:
-                    _add_sub_ten(sk, f"NSVSMT ĐP — {sten.replace('↳ ĐP — ', '')}")
-            continue
-
-        mk_dp = _ma_key_tu_ma_ct_nv(ma_ct, 2)
-        kh_dp = float(kh_d.get(mk_dp, 0.0))
-        th_dp = float(th_d.get(mk_dp, 0.0))
-        if (kh_dp > 0 or th_dp > 0) and mk_dp in MA_KEYS_CO_KHTD:
-            if not da_ghi_hdr_dp:
-                _add_group_hdr("II. Nguồn vốn Địa phương")
-                da_ghi_hdr_dp = True
-            _add_row(_ten_ct_base(ma_ct, {}), kh_dp, th_dp, "  ")
-    if da_ghi_hdr_dp:
-        _add_section_total("TỔNG CỘNG PHẦN II", tong_kh_ii, tong_th_ii)
-
-    # Số chương trình có KH (đếm theo CT duy nhất, không nhân đôi TW/ĐP)
-    for ma_ct in order_ma_ct:
-        if ma_ct == 3:
-            if any(float(kh_d.get(sk, 0.0)) > 0 for sk, _, _ in GQVL_SUB_NHOM):
-                so_ct_co_kh += 1
-        elif ma_ct == 6:
-            if (
-                float(kh_d.get("6_TW", 0.0)) > 0
-                or float(kh_d.get("6_DP_TINH", 0.0)) > 0
-                or float(kh_d.get("6_DP_XA", 0.0)) > 0
-            ):
-                so_ct_co_kh += 1
-        elif (
-            float(kh_d.get(_ma_key_tu_ma_ct_nv(ma_ct, 1), 0.0)) > 0
-            or float(kh_d.get(_ma_key_tu_ma_ct_nv(ma_ct, 2), 0.0)) > 0
-        ):
-            so_ct_co_kh += 1
+    dem_ma_ct: set[int] = set()
+    tat_ca_rows = _iter_khtd_cn_group_rows()
+    for _ten_nhom, ds_rows in tat_ca_rows:
+        for row in ds_rows:
+            ma_ct = row.get("ma_ct")
+            key_tw = str(row.get("key_tw") or "")
+            key_dp = str(row.get("key_dp") or "")
+            kh_val = float(kh_d.get(key_tw, 0.0) or 0.0) + float(kh_d.get(key_dp, 0.0) or 0.0)
+            if ma_ct is not None and kh_val > 0:
+                dem_ma_ct.add(int(ma_ct))
+    so_ct_co_kh = len(dem_ma_ct)
+    tong_ct = len({int(row.get("ma_ct")) for _g, rows in tat_ca_rows for row in rows if row.get("ma_ct") is not None})
 
     tong_tl = tong_th / tong_kh * 100 if tong_kh > 0 else None
     tong_con_phai_th = (tong_kh - tong_th) / 1e6
@@ -580,16 +461,13 @@ def _tab_canh_bao_chenh_lech() -> None:
 
 def _tab_tien_do_kh_th() -> None:
     """Dashboard cảnh báo tiến độ KH vs TH thực hiện theo PGD."""
-    from tabs.tab_khtd_nhap import _tinh_th_gqvl_phan_tang
-
-
     st.subheader("🎯 Tiến độ Kế hoạch vs Thực hiện")
     st.caption(
         "So sánh KH đã nhập với TH thực tế từ HSTD + GQVL. "
         "Cảnh báo 🔴 khi PGD đạt < 95% KH."
     )
 
-    kh_cn = _doc_kv(KV_KEY_CN)
+    kh_cn = _dong_bo_gqvl_tong_keys(_doc_kv(KV_KEY_CN) or {})
     if not kh_cn:
         st.warning("⚠️ Chưa có KH Chi nhánh. Vào tab **🏛️ KHTD Chi nhánh** nhập trước.")
         return
@@ -599,26 +477,30 @@ def _tab_tien_do_kh_th() -> None:
         st.warning("⚠️ Chưa có dữ liệu HSTD. Upload file trước.")
         return
 
-    th_cn = _tinh_thuc_hien_theo_ct(df_hstd)
-
     df_gqvl = _doc_gqvl_cached(ts_file(CACHE_GQVL))
+    th_cn, _th_gqvl = _tinh_thuc_hien_khtd_cn(df_hstd, df_gqvl)
 
-    th_gqvl = _tinh_th_gqvl_phan_tang(df_hstd, df_gqvl)
-    for sub_key, val in th_gqvl.items():
-        th_cn[sub_key] = val
+    chi_tieu_theo_ma_ct: dict[int, dict[str, float]] = {}
+    for _ten_nhom, ds_rows in _iter_khtd_cn_group_rows():
+        for row in ds_rows:
+            ma_ct = row.get("ma_ct")
+            if ma_ct is None:
+                continue
+            key_tw = str(row.get("key_tw") or "")
+            key_dp = str(row.get("key_dp") or "")
+            entry = chi_tieu_theo_ma_ct.setdefault(int(ma_ct), {"kh": 0.0, "th": 0.0})
+            entry["kh"] += float(kh_cn.get(key_tw, 0.0) or 0.0) + float(kh_cn.get(key_dp, 0.0) or 0.0)
+            entry["th"] += float(th_cn.get(key_tw, 0.0) or 0.0) + float(th_cn.get(key_dp, 0.0) or 0.0)
 
-    tong_kh = sum(float(kh_cn.get(mk, 0))
-                  for mk, *_ in CHUONG_TRINH_KHTD)
-    tong_th = sum(float(th_cn.get(mk, 0))
-                  for mk, *_ in CHUONG_TRINH_KHTD)
+    tong_kh = sum(v["kh"] for v in chi_tieu_theo_ma_ct.values())
+    tong_th = sum(v["th"] for v in chi_tieu_theo_ma_ct.values())
     tl_cn = tong_th / tong_kh * 100 if tong_kh > 0 else 0
 
-    so_dat = sum(1 for mk, *_ in CHUONG_TRINH_KHTD
-                 if float(kh_cn.get(mk, 0)) > 0
-                 and float(th_cn.get(mk, 0)) / float(kh_cn.get(mk, 1)) >= 0.7)
-    so_chua = sum(1 for mk, *_ in CHUONG_TRINH_KHTD
-                  if float(kh_cn.get(mk, 0)) > 0
-                  and float(th_cn.get(mk, 0)) / float(kh_cn.get(mk, 1)) < 0.7)
+    so_chua = sum(
+        1
+        for vals in chi_tieu_theo_ma_ct.values()
+        if vals["kh"] > 0 and (vals["th"] / vals["kh"] * 100) < 95
+    )
 
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("Tổng KH (triệu đồng)", f"{_fvn(tong_kh/1e6, 0)}")
@@ -632,17 +514,29 @@ def _tab_tien_do_kh_th() -> None:
 
     st.markdown("#### 📋 Chi tiết theo Chương trình")
 
-    rows_ct = []
-    kh_nsvsmt = _kh_nsvsmt_dp_split(kh_cn)
-    nhom_hien = ""
-    for mk, _ma_ct, ten_ct, nv, *_ in CHUONG_TRINH_KHTD:
-        if mk == "6_DP":
-            rows_6_dp: list[dict] = []
-            for sub_key, sub_ten, _ in NSVSMT_DP_SUB_NHOM:
-                kh_val = float(kh_nsvsmt.get(sub_key, 0))
-                th_val = float(th_cn.get(sub_key, 0))
+    rows_ct: list[dict[str, object]] = []
+    for tieu_de, side_key in [("I. Trung ương", "key_tw"), ("II. Địa phương", "key_dp")]:
+        da_co_dong = False
+        for _ten_nhom, ds_rows in _iter_khtd_cn_group_rows():
+            for row in ds_rows:
+                key_name = str(row.get(side_key) or "")
+                if not key_name:
+                    continue
+                kh_val = float(kh_cn.get(key_name, 0.0) or 0.0)
+                th_val = float(th_cn.get(key_name, 0.0) or 0.0)
                 if kh_val == 0 and th_val == 0:
                     continue
+                if not da_co_dong:
+                    da_co_dong = True
+                    rows_ct.append({
+                        "STT": tieu_de,
+                        "Chỉ tiêu": tieu_de,
+                        "KH (triệu đồng)": None,
+                        "TH (triệu đồng)": None,
+                        "TL%": None,
+                        "Trạng thái": "",
+                        "_nhom": True,
+                    })
                 tl_val = th_val / kh_val * 100 if kh_val > 0 else None
                 if tl_val is None:
                     trang_thai = "—"
@@ -652,62 +546,15 @@ def _tab_tien_do_kh_th() -> None:
                     trang_thai = "🟡 Đang thực hiện"
                 else:
                     trang_thai = "🔴 Chậm"
-                rows_6_dp.append({
+                rows_ct.append({
                     "STT": "",
-                    "Chỉ tiêu": f"  NSVSMT ĐP — {sub_ten.replace('↳ ĐP — ', '')}",
-                    "KH (triệu đồng)": round(kh_val/1e6, 0) if kh_val else None,
-                    "TH (triệu đồng)": round(th_val/1e6, 0) if th_val else None,
+                    "Chỉ tiêu": str(row.get("label", "") or ""),
+                    "KH (triệu đồng)": round(kh_val / 1e6, 0) if kh_val else None,
+                    "TH (triệu đồng)": round(th_val / 1e6, 0) if th_val else None,
                     "TL%": round(tl_val, 1) if tl_val is not None else None,
                     "Trạng thái": trang_thai,
                     "_nhom": False,
                 })
-            if rows_6_dp:
-                nhom_moi = "II. Địa phương"
-                if nhom_moi != nhom_hien:
-                    nhom_hien = nhom_moi
-                    rows_ct.append({
-                        "STT": nhom_hien,
-                        "Chỉ tiêu": nhom_hien,
-                        "KH (triệu đồng)": None, "TH (triệu đồng)": None, "TL%": None,
-                        "Trạng thái": "", "_nhom": True,
-                    })
-                rows_ct.extend(rows_6_dp)
-            continue
-        kh_val = float(kh_cn.get(mk, 0))
-        th_val = float(th_cn.get(mk, 0))
-        tl_val = th_val / kh_val * 100 if kh_val > 0 else None
-
-        nhom_moi = "I. Trung ương" if nv == "TW" else "II. Địa phương"
-        if nhom_moi != nhom_hien:
-            nhom_hien = nhom_moi
-            rows_ct.append({
-                "STT": nhom_hien,
-                "Chỉ tiêu": nhom_hien,
-                "KH (triệu đồng)": None, "TH (triệu đồng)": None, "TL%": None,
-                "Trạng thái": "", "_nhom": True,
-            })
-
-        if kh_val == 0 and th_val == 0:
-            continue
-
-        if tl_val is None:
-            trang_thai = "—"
-        elif tl_val >= 100:
-            trang_thai = "🟢 Đạt"
-        elif tl_val >= 95:
-            trang_thai = "🟡 Đang thực hiện"
-        else:
-            trang_thai = "🔴 Chậm"
-
-        rows_ct.append({
-            "STT": "",
-            "Chỉ tiêu": f"  {ten_ct}",
-            "KH (triệu đồng)": round(kh_val/1e6, 0) if kh_val else None,
-            "TH (triệu đồng)": round(th_val/1e6, 0) if th_val else None,
-            "TL%": round(tl_val, 1) if tl_val is not None else None,
-            "Trạng thái": trang_thai,
-            "_nhom": False,
-        })
 
     rows_ct.append({
         "STT": "", "Chỉ tiêu": "TỔNG CỘNG",
@@ -752,22 +599,24 @@ def _tab_tien_do_kh_th() -> None:
     rows_pgd = []
     for ten_pgd in DS_PGD:
         df_pgd = df_hstd[df_hstd[COT_TEN_PGD] == ten_pgd]
-        th_pgd = _tinh_thuc_hien_theo_ct(df_pgd)
-
         try:
-            df_gqvl_pgd = df_gqvl[df_gqvl[COT_TEN_PGD] == ten_pgd] \
-                if not df_gqvl.empty and COT_TEN_PGD in df_gqvl.columns \
+            df_gqvl_pgd = (
+                df_gqvl[df_gqvl[COT_TEN_PGD] == ten_pgd]
+                if not df_gqvl.empty and COT_TEN_PGD in df_gqvl.columns
                 else pd.DataFrame()
+            )
         except Exception as e:
             logger.error("Lỗi trong khối except: %s", e, exc_info=True)
             df_gqvl_pgd = pd.DataFrame()
-        th_gqvl_pgd = _tinh_th_gqvl_phan_tang(df_pgd, df_gqvl_pgd)
-        for sk, sv in th_gqvl_pgd.items():
-            th_pgd[sk] = sv
+        th_pgd, _ = _tinh_thuc_hien_khtd_cn(df_pgd, df_gqvl_pgd)
 
         tong_kh_pgd = tong_kh
-        tong_th_pgd = sum(float(th_pgd.get(mk, 0))
-                          for mk, *_ in CHUONG_TRINH_KHTD)
+        tong_th_pgd = sum(
+            float(th_pgd.get(str(row.get("key_tw") or ""), 0.0) or 0.0)
+            + float(th_pgd.get(str(row.get("key_dp") or ""), 0.0) or 0.0)
+            for _ten_nhom, ds_rows in _iter_khtd_cn_group_rows()
+            for row in ds_rows
+        )
         tl_pgd = tong_th_pgd / tong_kh_pgd * 100 if tong_kh_pgd > 0 else 0
 
         if tl_pgd < 95:
@@ -943,7 +792,7 @@ def xuat_to_trinh_bgd_word(username: str = "unknown") -> bytes:
     from datetime import date as _date
     from config import TEN_CHI_NHANH_HIEN_THI, COT_TONG_DU_NO
 
-    kh_cn = _doc_kv(KV_KEY_CN) or {}
+    kh_cn = _dong_bo_gqvl_tong_keys(_doc_kv(KV_KEY_CN) or {})
     if not kh_cn:
         raise ValueError("Chưa có dữ liệu KHTD Chi nhánh. Hãy giao KHTD trước.")
 
@@ -955,7 +804,8 @@ def xuat_to_trinh_bgd_word(username: str = "unknown") -> bytes:
         try:
             df_h = pd.read_parquet(CACHE_HSTD)
             if not df_h.empty:
-                th_cn = _tinh_thuc_hien_theo_ct(df_h)
+                df_gqvl_word = _doc_gqvl_cached(ts_file(CACHE_GQVL))
+                th_cn, _ = _tinh_thuc_hien_khtd_cn(df_h, df_gqvl_word)
                 if COT_TEN_PGD in df_h.columns and COT_TONG_DU_NO in df_h.columns:
                     du_no_pgd = (
                         pd.to_numeric(df_h[COT_TONG_DU_NO], errors="coerce")

@@ -934,6 +934,11 @@ def _section_c_tong_hop(nam: int, thang: str, dot: str) -> None:
         st.html(_html_bdd_table(nam, thang, dot, "TW"))
     with c_dp:
         st.html(_html_bdd_table(nam, thang, dot, "DP"))
+    st.caption(
+        "ℹ️ Tổng KH không bao gồm các chương trình chỉ thu hồi, không giao kế hoạch: "
+        "mã 24 — Cơ sở giáo dục mầm non, tiểu học ngoài công lập; "
+        "mã 7 nguồn ĐP — Hộ nghèo về nhà ở. Vì vậy Tổng KH có thể thấp hơn dư nợ thực hiện."
+    )
 
     df_raw = khtd_service.tong_hop(nam, thang, dot)
     if not df_raw.empty:

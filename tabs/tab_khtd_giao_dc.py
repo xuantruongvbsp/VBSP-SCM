@@ -135,15 +135,90 @@ def _wide_to_du_lieu(
     return rows
 
 
+def _rows_to_long(rows: list[dict], nguon: str) -> pd.DataFrame:
+    """Đưa dữ liệu giao KH về bảng dài, mỗi dòng là một xã × chương trình."""
+    if not rows:
+        return pd.DataFrame()
+    kh_col = "KH giao TW (tr.đ)" if nguon == "TW" else "KH giao ĐP (tr.đ)"
+    return pd.DataFrame(
+        [
+            {
+                "Xã/phường": row["Xã"],
+                "Chương trình": row["Chương trình"],
+                "Mã CT": row["Mã CT"],
+                "KH trước (triệu đồng)": row.get("KH trước (tr.đ)", 0.0),
+                "Dư nợ TH (triệu đồng)": row.get("Dư nợ TH (tr.đ)", 0.0),
+                "Tỷ lệ TH/KH": row.get("% TH/KH", 0.0),
+                "KH giao (triệu đồng)": row.get(kh_col, 0.0),
+            }
+            for row in rows
+        ]
+    )
+
+
+def _long_col_config(readonly: bool) -> dict:
+    """Cấu hình bảng nhập dài; chỉ cột KH giao được phép sửa."""
+    return {
+        "Xã/phường": st.column_config.TextColumn(
+            disabled=True, width="medium",
+        ),
+        "Chương trình": st.column_config.TextColumn(
+            disabled=True, width="large",
+        ),
+        "Mã CT": None,
+        "KH trước (triệu đồng)": st.column_config.NumberColumn(
+            disabled=True, format="%.1f",
+        ),
+        "Dư nợ TH (triệu đồng)": st.column_config.NumberColumn(
+            disabled=True, format="%.1f",
+        ),
+        "Tỷ lệ TH/KH": st.column_config.NumberColumn(
+            disabled=True, format="%.1f%%",
+        ),
+        "KH giao (triệu đồng)": st.column_config.NumberColumn(
+            disabled=readonly,
+            format="%.1f",
+            min_value=0.0,
+            help="Nhập kế hoạch giao, đơn vị triệu đồng.",
+        ),
+    }
+
+
+def _long_to_du_lieu(df_tw: pd.DataFrame, df_dp: pd.DataFrame) -> list[dict]:
+    """Đổi hai bảng nhập dài về payload chuẩn của khtd_service.luu_dot()."""
+    rows: list[dict] = []
+    for nguon, df in (("TW", df_tw), ("DP", df_dp)):
+        if df.empty:
+            continue
+        for _, row in df.iterrows():
+            kh = float(row.get("KH giao (triệu đồng)", 0) or 0)
+            rows.append(
+                {
+                    "xa": row.get("Xã/phường", ""),
+                    "ma_key": row.get("Mã CT", ""),
+                    "ten_ct": row.get("Chương trình", ""),
+                    "nguon": nguon,
+                    "kh_tw": kh if nguon == "TW" else 0.0,
+                    "dc_tw": 0.0,
+                    "kh_moi_tw": kh if nguon == "TW" else 0.0,
+                    "kh_dp": kh if nguon == "DP" else 0.0,
+                    "dc_dp": 0.0,
+                    "kh_moi_dp": kh if nguon == "DP" else 0.0,
+                    "ly_do": "",
+                }
+            )
+    return rows
+
+
 def _html_bdd_table(nam: int, thang: str, dot: str, nguon: str) -> str:
     """HTML pivot table dạng BĐD: hàng = PGD/xã phân cấp, cột = nhóm chương trình."""
     df_raw = khtd_service.tong_hop(nam, thang, dot)
     if df_raw.empty:
-        return "<p style='color:#64748b;padding:12px'>⚠️ Chưa có dữ liệu KHTD cho đợt này.</p>"
+        return "<p style='color:var(--text-color);padding:12px'>⚠️ Chưa có dữ liệu KHTD cho đợt này.</p>"
 
     df = df_raw[df_raw["nguon"] == nguon].copy()
     if df.empty:
-        return f"<p style='color:#64748b;padding:12px'>⚠️ Không có dữ liệu nguồn {nguon}.</p>"
+        return f"<p style='color:var(--text-color);padding:12px'>⚠️ Không có dữ liệu nguồn {nguon}.</p>"
 
     kh_c = "kh_tw" if nguon == "TW" else "kh_dp"
     dc_c = "dc_tw" if nguon == "TW" else "dc_dp"
@@ -257,7 +332,7 @@ def _html_bdd_table(nam: int, thang: str, dot: str, nguon: str) -> str:
         ]
     html += [
         "</tr>", "</tbody>", "</table>",
-        "<p style='font-size:11px;margin-top:4px;color:#64748b'>Đơn vị: triệu đồng</p>",
+        "<p style='font-size:11px;margin-top:4px;color:var(--text-color)'>Đơn vị: triệu đồng</p>",
         "</div>",
     ]
     return "\n".join(html)
@@ -762,58 +837,79 @@ def _section_b_giao(
 
     rows_tw = [r for r in rows_nhap if r["Nguồn"] == "TW"]
     rows_dp = [r for r in rows_nhap if r["Nguồn"] == "DP"]
-    df_wide_tw, mk_tw = _rows_to_wide(rows_tw, "TW")
-    df_wide_dp, mk_dp = _rows_to_wide(rows_dp, "DP")
+    df_long_tw = _rows_to_long(rows_tw, "TW")
+    df_long_dp = _rows_to_long(rows_dp, "DP")
 
     readonly = normalize_role(role) == "executive"
 
     tab_tw, tab_dp = st.tabs(["🏦 Nguồn TW", "🏙️ Nguồn ĐP"])
-    df_edited_tw = df_wide_tw.copy()
-    df_edited_dp = df_wide_dp.copy()
+    df_edited_tw = df_long_tw.copy()
+    df_edited_dp = df_long_dp.copy()
 
     if not readonly:
         with tab_tw:
-            if not df_wide_tw.empty:
+            st.caption("Mỗi dòng là một xã/phường × chương trình · Đơn vị: triệu đồng")
+            if not df_long_tw.empty:
                 df_edited_tw = st.data_editor(
-                    df_wide_tw,
-                    column_config=_wide_col_config(df_wide_tw, readonly=False),
+                    df_long_tw,
+                    column_config=_long_col_config(readonly=False),
                     key=_SS + f"editor_tw_{slug_chon}",
                     hide_index=True,
+                    disabled=[
+                        "Xã/phường", "Chương trình", "Mã CT",
+                        "KH trước (triệu đồng)", "Dư nợ TH (triệu đồng)",
+                        "Tỷ lệ TH/KH",
+                    ],
+                    column_order=[
+                        "Xã/phường", "Chương trình",
+                        "KH trước (triệu đồng)", "Dư nợ TH (triệu đồng)",
+                        "Tỷ lệ TH/KH", "KH giao (triệu đồng)",
+                    ],
                     use_container_width=True,
-                    height=min(420, 38 * (len(df_wide_tw) + 2)),
+                    height=520,
                 )
             else:
                 st.info("Không có chương trình TW.")
         with tab_dp:
-            if not df_wide_dp.empty:
+            st.caption("Mỗi dòng là một xã/phường × chương trình · Đơn vị: triệu đồng")
+            if not df_long_dp.empty:
                 df_edited_dp = st.data_editor(
-                    df_wide_dp,
-                    column_config=_wide_col_config(df_wide_dp, readonly=False),
+                    df_long_dp,
+                    column_config=_long_col_config(readonly=False),
                     key=_SS + f"editor_dp_{slug_chon}",
                     hide_index=True,
+                    disabled=[
+                        "Xã/phường", "Chương trình", "Mã CT",
+                        "KH trước (triệu đồng)", "Dư nợ TH (triệu đồng)",
+                        "Tỷ lệ TH/KH",
+                    ],
+                    column_order=[
+                        "Xã/phường", "Chương trình",
+                        "KH trước (triệu đồng)", "Dư nợ TH (triệu đồng)",
+                        "Tỷ lệ TH/KH", "KH giao (triệu đồng)",
+                    ],
                     use_container_width=True,
-                    height=min(420, 38 * (len(df_wide_dp) + 2)),
+                    height=520,
                 )
             else:
                 st.info("Không có chương trình ĐP.")
     else:
         with tab_tw:
-            if not df_wide_tw.empty:
-                hien_thi_dataframe_phan_trang(df_wide_tw, key=_SS + "view_tw")
+            if not df_long_tw.empty:
+                hien_thi_dataframe_phan_trang(df_long_tw, key=_SS + "view_tw")
             else:
                 st.info("Không có chương trình TW.")
         with tab_dp:
-            if not df_wide_dp.empty:
-                hien_thi_dataframe_phan_trang(df_wide_dp, key=_SS + "view_dp")
+            if not df_long_dp.empty:
+                hien_thi_dataframe_phan_trang(df_long_dp, key=_SS + "view_dp")
             else:
                 st.info("Không có chương trình ĐP.")
         st.caption("*(Chế độ xem — không thực hiện nhập.)*")
         return
 
-    kh_tw_cols = [c for c in df_edited_tw.columns if "/ KH giao" in c]
-    kh_dp_cols = [c for c in df_edited_dp.columns if "/ KH giao" in c]
-    tong_tw = float(df_edited_tw[kh_tw_cols].sum().sum()) if kh_tw_cols else 0.0
-    tong_dp = float(df_edited_dp[kh_dp_cols].sum().sum()) if kh_dp_cols else 0.0
+    kh_col = "KH giao (triệu đồng)"
+    tong_tw = float(pd.to_numeric(df_edited_tw.get(kh_col), errors="coerce").fillna(0).sum()) if kh_col in df_edited_tw else 0.0
+    tong_dp = float(pd.to_numeric(df_edited_dp.get(kh_col), errors="coerce").fillna(0).sum()) if kh_col in df_edited_dp else 0.0
     c1, c2 = st.columns(2)
     c1.metric("Tổng KH giao TW (triệu đồng)", f"{tong_tw:,.0f}".replace(",", "."))
     c2.metric("Tổng KH giao ĐP (triệu đồng)", f"{tong_dp:,.0f}".replace(",", "."))
@@ -823,7 +919,7 @@ def _section_b_giao(
         key=_SS + "btn_luu_giao",
         type="primary",
     ):
-        du_lieu = _wide_to_du_lieu(df_edited_tw, mk_tw, df_edited_dp, mk_dp)
+        du_lieu = _long_to_du_lieu(df_edited_tw, df_edited_dp)
         kq = khtd_service.luu_dot(
             slug_chon, nam, thang, dot, LOAI_GIAO, du_lieu, username,
         )

@@ -12,12 +12,11 @@ from __future__ import annotations
 from logger import get_logger
 logger = get_logger(__name__)
 
-import os
-from datetime import datetime
 from pathlib import Path
 
 import pandas as pd
 import streamlit as st
+import db
 
 from config import (
     COT_TEN_PGD,
@@ -26,6 +25,7 @@ from config import (
     COT_MA_KH,
     COT_SO_KU,
     COT_NGAY_DH,
+    COT_NGAY_SL,
     COT_TEN_TO,
     COT_DVUT,
     DS_PGD,
@@ -67,17 +67,11 @@ def _pgd_khnv_path(ten_pgd: str) -> Path:
         return Path(PGD_DATA_DIR) / slug / "hstd_khnv.xlsx"
 
 
-def _upload_info(ten_pgd: str) -> tuple[bool, str]:
+def _upload_info(ten_pgd: str) -> bool:
+    """Trả về True khi PGD có ít nhất một nguồn HSTD đã upload."""
     p = _pgd_file_path(ten_pgd)
     p_khnv = _pgd_khnv_path(ten_pgd)
-    exists, exists_khnv = p.exists(), p_khnv.exists()
-    if not exists and not exists_khnv:
-        return False, "—"
-    ts = max(
-        os.path.getmtime(str(p)) if exists else 0,
-        os.path.getmtime(str(p_khnv)) if exists_khnv else 0,
-    )
-    return True, datetime.fromtimestamp(ts).strftime("%d/%m %H:%M")
+    return p.exists() or p_khnv.exists()
 
 
 # ── Cache ─────────────────────────────────────────────────────────────────────
@@ -466,7 +460,7 @@ def _render_heatmap(df_cards: pd.DataFrame) -> None:
 
 # ── Bảng đa chiều ─────────────────────────────────────────────────────────────
 
-def _render_ranking_table(df_show: pd.DataFrame, upload_info_map: dict) -> None:
+def _render_ranking_table(df_show: pd.DataFrame, upload_info_map: dict, ngay_so_lieu: str) -> None:
     """Bảng 12 tiêu chí đa chiều, xếp hạng theo Điểm RR tổng hợp."""
     df_t = df_show.copy().sort_values("diem_rui_ro", ascending=False).reset_index(drop=True)
     df_t.insert(0, "#", range(1, len(df_t) + 1))
@@ -484,8 +478,8 @@ def _render_ranking_table(df_show: pd.DataFrame, upload_info_map: dict) -> None:
     df_t["BQ/hộ (tr)"]        = (df_t["dn_binh_quan_ho"] / 1e6).round(1)
     df_t["⭐ Điểm RR"]        = df_t["diem_rui_ro"].round(1)
     df_t["HSTD"]              = df_t["ten_pgd"].map(
-        lambda dv: ("✅ " + upload_info_map.get(dv, (False, "—"))[1])
-        if upload_info_map.get(dv, (False, ""))[0] else "❌"
+        lambda dv: ("✅ " + ngay_so_lieu)
+        if upload_info_map.get(dv, False) else "❌"
     )
 
     cols_out = [
@@ -572,6 +566,18 @@ def render(tab_parent=None, **kwargs):
         from config import CACHE_HSTD
         from data.core import ts_file as _ts_file
         ts = _ts_file(CACHE_HSTD)
+
+        # Lấy ngày số liệu thực từ HSTD (ưu tiên COT_NGAY_SL, fallback merge_meta)
+        ngay_so_lieu = ""
+        if COT_NGAY_SL in df.columns:
+            _sl = pd.to_datetime(df[COT_NGAY_SL], dayfirst=True, errors="coerce").dropna()
+            if not _sl.empty:
+                ngay_so_lieu = _sl.max().strftime("%d/%m/%Y")
+        if not ngay_so_lieu:
+            _meta_hstd = db.doc_kv("merge_meta_hstd") or {}
+            ngay_so_lieu = str(_meta_hstd.get("ngay_sl", "") or "")
+        if not ngay_so_lieu:
+            ngay_so_lieu = "—"
 
         try:
             df_cards = _cache_da_chieu_pgd(df, ts, "|".join(ds_don_vi))
@@ -712,10 +718,10 @@ def render(tab_parent=None, **kwargs):
                 cols = st.columns(COLS)
                 for col, (_, row) in zip(cols, chunk.iterrows()):
                     with col:
-                        ok, ts_str = upload_info_map.get(row["ten_pgd"], (False, "—"))
+                        ok = upload_info_map.get(row["ten_pgd"], False)
                         rank = rank_map.get(row["ten_pgd"], 0)
                         st.markdown(
-                            _render_card_html(row.to_dict(), ok, ts_str, rank),
+                            _render_card_html(row.to_dict(), ok, ngay_so_lieu, rank),
                             unsafe_allow_html=True,
                         )
                         if st.button(
@@ -744,7 +750,7 @@ def render(tab_parent=None, **kwargs):
                 "⭐ Điểm RR: 0–100 (100 = lành mạnh nhất). "
                 "Màu 🟢 ≥80 | 🟡 60–79 | 🔴 <60."
             )
-            _render_ranking_table(df_cards, upload_info_map)
+            _render_ranking_table(df_cards, upload_info_map, ngay_so_lieu)
 
             # Chú thích công thức điểm RR
             with st.expander("ℹ️ Công thức Điểm RR tổng hợp"):

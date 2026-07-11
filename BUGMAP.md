@@ -163,6 +163,33 @@
 
 ## B. Streamlit UI
 
+### B25 — Toàn cảnh 22 PGD hiển thị thời gian sửa file thay vì ngày số liệu HSTD
+| | |
+|---|---|
+| **File** | `tabs/tab_pgd_cards.py` → `render()`, `_render_ranking_table()`, `_upload_info()` |
+| **Dấu hiệu** | Thẻ PGD và cột HSTD trong bảng xếp hạng hiện thời điểm như `09/07 21:42`, trong khi ngày số liệu thực trong HSTD là `30/06/2026` |
+| **Nguyên nhân** | `_upload_info()` dùng `os.path.getmtime()` nên lấy thời gian file được ghi lên đĩa, không phải giá trị nghiệp vụ trong cột `Ngày số liệu` |
+| **Fix** | Đọc ngày lớn nhất hợp lệ từ `COT_NGAY_SL`, fallback `merge_meta_hstd["ngay_sl"]`; `_upload_info()` chỉ còn kiểm tra sự tồn tại của file để xác định trạng thái ✅/❌ |
+| **Ngày fix** | 2026-07-11 |
+
+### B26 — Giao KHTD dùng bảng ngang quá rộng, khó nhập và đối chiếu
+| | |
+|---|---|
+| **File** | `tabs/tab_khtd_giao_dc.py` → `_section_b_giao()` |
+| **Dấu hiệu** | Mỗi chương trình tạo ba cột `KH trước / Dư nợ / KH giao`; một PGD có nhiều chương trình khiến bảng phải cuộn ngang dài và khó xác định ô cần nhập |
+| **Nguyên nhân** | Dữ liệu Xã × Chương trình bị pivot sang dạng wide phục vụ nhập liệu, làm số cột tăng theo số chương trình tín dụng |
+| **Fix** | Chuyển màn nhập sang bảng dài: mỗi dòng là một Xã/Phường × Chương trình, sáu cột hiển thị ổn định và chỉ cột `KH giao (triệu đồng)` được phép sửa; giữ nguyên cấu trúc payload khi lưu |
+| **Ngày fix** | 2026-07-11 |
+
+### B7 — Card grid HTML hiển thị raw code thay vì render
+| | |
+|---|---|
+| **File** | `tabs/tab_tongquan.py` dòng ~883 |
+| **Dấu hiệu** | Khối "Tổng quan nhanh các PGD" hiển thị toàn bộ HTML thô (`<div style=...>`) thay vì card grid đúng |
+| **Nguyên nhân** | Streamlit 1.36+ không render HTML qua `st.markdown(..., unsafe_allow_html=True)` đáng tin cậy trong một số context — cần dùng `st.html()` |
+| **Fix** | Thay `st.markdown(f"""...""", unsafe_allow_html=True)` bằng `st.html(f"""...""")` |
+| **Ngày fix** | 2026-07-11 |
+
 ### B6 — `cannot import name 'render_nhap_cn' from partially initialized module 'tabs.tab_khtd_nhap'`
 | | |
 |---|---|
@@ -919,6 +946,15 @@
 | **Fix** | Kiểm tra signature hàm và chỗ gọi trong `render()` |
 
 ### G5 — KHTD dark mode: text vô hình trên nền pastel / nền trắng hardcode
+
+### G6 — NameError: name 'xa_chon' is not defined trong tab Kế hoạch theo Xã
+| | |
+|---|---|
+| **File** | `tabs/tab_khtd_nhap.py` — hàm `_tab_khtd_theo_xa()` |
+| **Dấu hiệu** | Tab "📈 Kế hoạch tín dụng" báo `NameError: name 'xa_chon' is not defined` |
+| **Nguyên nhân** | `xa_chon` được dùng từ dòng ~1404 nhưng chưa bao giờ được định nghĩa (selectbox chọn xã bị thiếu) |
+| **Fix** | Thêm `xa_chon = st.selectbox("Chọn Xã/Phường", danh_sach_xa, key="khtd_xa_xa_sel")` ngay sau `st.divider()` tại dòng ~1368 |
+| **Ngày fix** | 2026-07-11 |
 | | |
 |---|---|
 | **File** | `tabs/tab_khtd_nhap.py` dòng ~324, `tabs/tab_khtd_xuat.py` dòng ~224 & ~265 |

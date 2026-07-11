@@ -295,17 +295,24 @@ def tinh_kh_dau_nam(
                 return {}
             con = duckdb.connect()
             con.register("t", df_hstd)
+            where_parts = [
+                f'"{COT_MA_CHUONG_TRINH}" IS NOT NULL',
+                f'"{COT_NGUON_VON}" IS NOT NULL',
+            ]
+            params: list[str] = []
+            if ten_pgd and COT_TEN_PGD in df_hstd.columns:
+                where_parts.append(f'"{COT_TEN_PGD}" = ?')
+                params.append(ten_pgd)
             sql = f"""
                 SELECT
                     TRY_CAST("{COT_MA_CHUONG_TRINH}" AS INTEGER) AS ma_ct,
                     TRY_CAST("{COT_NGUON_VON}"        AS INTEGER) AS nv,
                     SUM(COALESCE(TRY_CAST("{COT_TONG_DU_NO}" AS DOUBLE), 0)) AS tong_vnd
                 FROM t
-                WHERE "{COT_MA_CHUONG_TRINH}" IS NOT NULL
-                  AND "{COT_NGUON_VON}" IS NOT NULL
+                WHERE {" AND ".join(where_parts)}
                 GROUP BY ma_ct, nv
             """
-            rows = con.execute(sql).fetchall()
+            rows = con.execute(sql, params).fetchall()
 
         out: dict[str, dict[str, float]] = {}
         for ma_ct, nv, tong_vnd in rows:
@@ -738,13 +745,14 @@ def tao_dot_giao_dau_nam(
     *,
     parquet_path: str | None = None,
 ) -> dict[str, KetQuaUpload]:
-    kh_base = tinh_kh_dau_nam(df_hstd, parquet_path=parquet_path)
+    # Kiểm tra nhanh: tinh_kh_dau_nam có chạy được ở cấp CN không
+    kh_test = tinh_kh_dau_nam(df_hstd, parquet_path=parquet_path)
     loi_chung = KetQuaUpload(
         False,
         "❌ Không tính được KH đầu năm từ HSTD (thiếu cột hoặc không có dữ liệu).",
         "",
     )
-    if not kh_base:
+    if not kh_test:
         out = {slug: loi_chung for slug in ds_slug()}
         try:
             import streamlit as st
@@ -758,16 +766,26 @@ def tao_dot_giao_dau_nam(
     for slug in ds_slug():
         ten_pgd = _slug_to_ten_dv(slug)
         ds_xa = PGD_XA_MAP.get(ten_pgd, [])
+        n_xa = len(ds_xa) or 1
+
+        # Tính dư nợ đầu năm theo từng PGD — KHÔNG dùng toàn CN
+        kh_pgd = tinh_kh_dau_nam(df_hstd, parquet_path=parquet_path, ten_pgd=ten_pgd)
+        if not kh_pgd:
+            continue
+
         du_lieu: list[dict] = []
         for xa in ds_xa:
             for ma_key, _ma_ct, ten_ct, nguon, _ten_match in CHUONG_TRINH_KHTD:
                 if ma_key.startswith("3_") and ma_key not in GQVL_MA_KEY_GIAO:
                     continue
-                kh_prev = kh_base.get(ma_key, {})
+                kh_prev = kh_pgd.get(ma_key, {})
                 tw_vnd = float(kh_prev.get("kh_moi_tw") or 0)
                 dp_vnd = float(kh_prev.get("kh_moi_dp") or 0)
-                tw_trieu = tw_vnd / 1_000_000
-                dp_trieu = dp_vnd / 1_000_000
+                if tw_vnd <= 0 and dp_vnd <= 0:
+                    continue
+                # Chia đều dư nợ PGD cho các xã trong PGD đó
+                tw_trieu = (tw_vnd / 1_000_000) / n_xa
+                dp_trieu = (dp_vnd / 1_000_000) / n_xa
                 du_lieu.append(
                     {
                         "xa": xa,
@@ -783,6 +801,8 @@ def tao_dot_giao_dau_nam(
                         "ly_do": "",
                     }
                 )
+        if not du_lieu:
+            continue
         ket_qua[slug] = luu_dot(
             slug,
             nam,

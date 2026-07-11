@@ -1366,6 +1366,7 @@ def _tab_khtd_theo_xa(role: str, username: str, df_full: "pd.DataFrame | None") 
     th_xa, ten_map_q = _du_lieu_khtd_pgd_cached(df_full, pgd_chon, hstd_mtime)
 
     st.divider()
+    xa_chon = st.selectbox("Chọn Xã/Phường", danh_sach_xa, key="khtd_xa_xa_sel")
     st.caption("📌 Đơn vị nhập và hiển thị: triệu đồng")
 
     _colw_xa = [3, 1, 1, 1, 1]  # Chương trình | KH TW | TH TW | KH ĐP | TH ĐP

@@ -1,5 +1,22 @@
 # CHANGELOG
 
+## [2026-07-11] — Giao KHTD: đổi màn nhập sang bảng dài dễ theo dõi
+- `tabs/tab_khtd_giao_dc.py` dòng ~61–930 — thay bảng ngang mỗi chương trình 3 cột bằng bảng dài mỗi dòng là Xã/Phường × Chương trình; giữ riêng tab TW/ĐP, chỉ cho sửa cột KH giao và giữ nguyên payload lưu KHTD
+- `BUGMAP.md` — thêm B26 ghi nhận giao diện nhập Giao KHTD quá rộng, khó đối chiếu
+
+## [2026-07-11] — Fix lỗi tạo đợt giao đầu năm sai số liệu cho PGD khi không có cache baseline
+- `services/khtd_service.py` dòng ~290–308 — thêm filter `ten_pgd` vào nhánh DataFrame của `tinh_kh_dau_nam()`; trước đây nhánh này bỏ qua `ten_pgd` nên mọi PGD đều nhận số tổng CN
+
+## [2026-07-11] — Fix ngày số liệu HSTD trong Toàn cảnh 22 PGD
+- `tabs/tab_pgd_cards.py` dòng ~22–761 — hiển thị ngày số liệu thực từ `COT_NGAY_SL`, fallback `merge_meta_hstd`; bỏ tính file modification time không còn sử dụng trong `_upload_info()`
+- `BUGMAP.md` — thêm B25 ghi nhận lỗi thẻ và bảng xếp hạng dùng thời gian sửa file thay cho ngày số liệu HSTD
+
+## [2026-07-11] — Fix NameError xa_chon trong tab Kế hoạch theo Xã
+- `tabs/tab_khtd_nhap.py` dòng ~1368 — thêm `st.selectbox("Chọn Xã/Phường", ...)` để định nghĩa `xa_chon` trước khi sử dụng
+
+## [2026-07-11] — Fix card grid Tổng quan nhanh PGD hiển thị raw HTML
+- `tabs/tab_tongquan.py` dòng ~883 — thay `st.markdown(..., unsafe_allow_html=True)` bằng `st.html(...)` để card grid render đúng trên Streamlit 1.58.0
+
 ## [2026-07-10] — Thêm nút "Dọn deadline cũ" trong tab Tiến độ BC
 - `tabs/tab_tien_do_nop.py` dòng ~775 — thêm popover "🧹 Dọn deadline cũ": tự phát hiện loại BC đang theo dõi nhưng không còn trong GSheet, xóa hàng loạt + ghi audit log; nút disabled kèm tooltip khi không có gì cần dọn; bố cục 2 cột cạnh "🗑 Xóa tất cả deadline"
 

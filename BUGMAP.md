@@ -1099,7 +1099,7 @@
 | **File** | `tabs/tab_khtd.py`, `tabs/tab_khtd_nhap.py`, `tabs/tab_khtd_xuat.py` |
 | **Dấu hiệu** | Màn nhập/xuất KHTD tách ngang cho nhiều chương trình, `NSVSMT ĐP` còn chia tỉnh/xã, tên chương trình ở màn nhập không khớp tên HSTD, và GQVL không bám đúng rule dùng HSTD làm chính + GQVL làm file phụ để tách nguồn |
 | **Nguyên nhân** | Model hiển thị và model nghiệp vụ bị trộn lẫn: dùng nhiều `ma_key` chi tiết để render trực tiếp UI thay vì có một lớp row model chuẩn cho KHTD Chi nhánh; vì vậy UI bị kéo theo cấu trúc key cũ thay vì phản ánh rule nghiệp vụ thật |
-| **Fix** | Thêm helper chuẩn cho KHTD CN trong `tab_khtd.py`: chỉ GQVL có 4 dòng con; chương trình thường giữ 1 dòng với trục dọc `TW/ĐP`; TH lấy từ HSTD làm chính, GQVL chỉ dùng để tách `TW` thành `NS Trung ương cấp` và `NHCSXH huy động`, còn `ĐP` tách theo `Mã NĐT địa phương`; đồng bộ lại tab nhập và tab xuất theo cùng model |
+| **Fix** | Thêm helper chuẩn cho KHTD CN trong `tab_khtd.py`: chỉ GQVL có 4 dòng con; chương trình thường giữ 1 dòng với trục dọc `TW/ĐP`; TH lấy từ HSTD làm chính, GQVL chỉ dùng để tách `TW` thành `NS Trung ương cấp` và `NHCSXH huy động`, còn `ĐP` tách theo `Mã NĐT địa phương`; ưu tiên tên CT từ HSTD; đồng bộ màn nhập, readonly và xuất Word qua cùng `_iter_khtd_cn_group_rows()` thay vì lặp trực tiếp danh mục key lưu trữ |
 | **Bài học** | Với màn nghiệp vụ có nhiều nguồn dữ liệu, không nên render trực tiếp từ `ma_key` lưu trữ. Cần có một row model trung gian phản ánh đúng nghiệp vụ trước, rồi mới map sang key lưu dữ liệu và số TH thực tế |
 | **Ngày fix** | 2026-07-11 |
 
@@ -1111,6 +1111,26 @@
 | **Nguyên nhân** | Danh mục `CHUONG_TRINH_KHTD` chưa bao phủ hết các cặp `(Mã chương trình, Nguồn vốn)` đang tồn tại trong HSTD: thiếu `7_DP` (8 triệu) và thiếu `ma_ct 13` phía ĐP (500 triệu) |
 | **Fix** | Bổ sung `7_DP` và `13_DP` vào `CHUONG_TRINH_KHTD`, đồng thời đưa `ma_ct 13` vào nhóm hiển thị KHTD Chi nhánh để row model mới tự map đủ vào nhập/xuất/tính TH |
 | **Bài học** | Mỗi khi đối chiếu `TH` với HSTD, phải kiểm tra đủ coverage của danh mục `(ma_ct, nguồn vốn)` trước khi nghi ngờ helper tính tổng; thiếu một mã nhỏ cũng làm lệch toàn bộ số tổng |
+| **Ngày fix** | 2026-07-11 |
+
+### G18 — `📈 KHTD`: lỗi render `name 'MA_KEYS_CO_KHTD' is not defined` sau refactor
+| | |
+|---|---|
+| **File** | `tabs/tab_khtd_nhap.py` |
+| **Dấu hiệu** | Mở tab `📈 Kế hoạch tín dụng` bị crash ngay khi render với thông báo `name 'MA_KEYS_CO_KHTD' is not defined` |
+| **Nguyên nhân** | Sau khi refactor row model KHTD, `tab_khtd_nhap.py` vẫn dùng `MA_KEYS_CO_KHTD` ở nhiều nhánh nhập/xuất theo xã nhưng danh sách import từ `tab_khtd.py` đã bị rơi mất constant này |
+| **Fix** | Bổ sung lại `MA_KEYS_CO_KHTD` vào import list của `tab_khtd_nhap.py` |
+| **Bài học** | Khi tách hoặc dọn import sau refactor, cần grep lại toàn file theo tên constant dùng chung; lỗi thiếu import ở module-level sẽ chỉ lộ ra lúc render runtime |
+| **Ngày fix** | 2026-07-11 |
+
+### G19 — `📈 KHTD`: lỗi render `order_ma_ct is not defined` trong bảng readonly xuất
+| | |
+|---|---|
+| **File** | `tabs/tab_khtd_xuat.py` |
+| **Dấu hiệu** | Mở phần xuất/readonly của `📈 Kế hoạch tín dụng` bị crash tại `_hien_thi_bang_cn_readonly()` với lỗi `name 'order_ma_ct' is not defined` |
+| **Nguyên nhân** | Sau refactor sang row model `_iter_khtd_cn_group_rows()`, biến cũ `order_ma_ct` đã bị loại bỏ nhưng dòng tính `tong_ct = len(order_ma_ct)` còn sót lại trong đầu hàm |
+| **Fix** | Tính `tong_ct` trực tiếp từ tập `ma_ct` lấy ra từ row model mới, đồng thời tái sử dụng luôn `tat_ca_rows` cho phần đếm số CT có KH ở cuối hàm |
+| **Bài học** | Khi thay mô hình lặp chính của một hàm, cần rà toàn bộ các biến phụ trợ như đếm tổng, thứ tự, header state; các biến này thường không còn compile error nhưng sẽ nổ khi runtime đi qua nhánh cũ |
 | **Ngày fix** | 2026-07-11 |
 
 ---
@@ -1532,6 +1552,16 @@ def _duong_dan_pgd(ten_pgd: str, loai: str) -> str:
 | **Nguyên nhân** | Cùng một rerun đang quét `df_full` nhiều lần: `_tab_khtd_chi_nhanh()` tự tính `TH theo CT` + `GQVL phân tầng`, rồi `_hien_thi_bang_cn_readonly()` lại đọc `gqvl.parquet` và tính `GQVL phân tầng` thêm lần nữa. Ngoài ra caller còn gọi lại `_tinh_th_nsvsmt_dp_phan_tang()` dù `_tinh_thuc_hien_theo_ct()` đã gộp sẵn. Một nhánh phụ nữa là helper đọc parquet lớn dùng tham số `_ts`; với Streamlit, prefix `_` bị loại khỏi cache key nên `mtime` không thực sự bust cache. |
 | **Fix** | (1) Thêm cache theo `mtime` cho `TH` KHTD Chi nhánh, dữ liệu TH/ten_map theo PGD, và danh sách CT hiển thị màn Chi nhánh. (2) Bỏ lần tính trùng `NSVSMT`. (3) Cho `_hien_thi_bang_cn_readonly()` nhận `th_gqvl` từ caller để không tự đọc lại `gqvl.parquet` khi caller đã có sẵn kết quả. (4) Đổi reader parquet lớn sang `st.cache_resource` và đổi tham số `_ts` → `ts` để `mtime` thật sự nằm trong cache key. |
 | **Ngày fix** | 2026-06-27 |
+
+### K9 — `📈 Kế hoạch tín dụng` vẫn mất 10 giây do quét từng dòng HSTD
+| | |
+|---|---|
+| **File** | `tabs/tab_khtd.py` → `_quet_ct_co_du_no()` |
+| **Dấu hiệu** | Sau tối ưu K8, lần cache miss đầu tiên vẫn chờ lâu; profiler ghi nhận riêng helper quét chương trình mất khoảng 10 giây |
+| **Nguyên nhân** | Helper dùng vòng lặp Python với `.iat` qua 366.503 dòng HSTD để tìm vài chục cặp `(Mã CT, Nguồn vốn)` duy nhất |
+| **Fix** | Lọc và `drop_duplicates()` bằng pandas vector hóa trước, sau đó chỉ map các cặp duy nhất; đồng thời lấy tên HSTD đầu tiên không rỗng theo từng cặp |
+| **Test** | `tests/test_khtd_quets.py::test_quet_ct_vectorized_loc_du_no_va_uu_tien_ten_hstd` |
+| **Ngày fix** | 2026-07-11 |
 
 ---
 

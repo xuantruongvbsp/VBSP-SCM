@@ -97,7 +97,8 @@ def _hien_thi_bang_cn_readonly(
     tong_kh_ii = 0.0
     tong_th_ii = 0.0
     so_ct_co_kh = 0
-    tong_ct = len(order_ma_ct)
+    tat_ca_rows = _iter_khtd_cn_group_rows()
+    tong_ct = len({int(row.get("ma_ct")) for _g, rows in tat_ca_rows for row in rows if row.get("ma_ct") is not None})
     stt_no = 0
 
     html_rows: list[str] = []
@@ -221,7 +222,6 @@ def _hien_thi_bang_cn_readonly(
                 _add_section_total(tong_label, tong_kh_ii, tong_th_ii)
 
     dem_ma_ct: set[int] = set()
-    tat_ca_rows = _iter_khtd_cn_group_rows()
     for _ten_nhom, ds_rows in tat_ca_rows:
         for row in ds_rows:
             ma_ct = row.get("ma_ct")
@@ -797,6 +797,7 @@ def xuat_to_trinh_bgd_word(username: str = "unknown") -> bytes:
         raise ValueError("Chưa có dữ liệu KHTD Chi nhánh. Hãy giao KHTD trước.")
 
     th_cn: dict[str, float] = {}
+    ten_map_word: dict[str, str] = {}
     ngay_sl = ""
     du_no_pgd: dict[str, float] = {}
 
@@ -806,6 +807,7 @@ def xuat_to_trinh_bgd_word(username: str = "unknown") -> bytes:
             if not df_h.empty:
                 df_gqvl_word = _doc_gqvl_cached(ts_file(CACHE_GQVL))
                 th_cn, _ = _tinh_thuc_hien_khtd_cn(df_h, df_gqvl_word)
+                _, ten_map_word = _quet_ct_co_du_no(df_h)
                 if COT_TEN_PGD in df_h.columns and COT_TONG_DU_NO in df_h.columns:
                     du_no_pgd = (
                         pd.to_numeric(df_h[COT_TONG_DU_NO], errors="coerce")
@@ -920,13 +922,11 @@ def xuat_to_trinh_bgd_word(username: str = "unknown") -> bytes:
             if i < len(row.cells):
                 row.cells[i].width = Cm(w)
 
-    ct_tw = [(mk, ten) for mk, _, ten, nv, _ in CHUONG_TRINH_KHTD if nv == "TW"]
-    ct_dp = [(mk, ten) for mk, _, ten, nv, _ in CHUONG_TRINH_KHTD if nv == "DP"]
-    seen_mk: set[str] = set()
     stt = 0
     tong_kh = tong_th = 0.0
 
-    for nv_label, ct_list in [("TW", ct_tw), ("ĐP", ct_dp)]:
+    row_groups = _iter_khtd_cn_group_rows(ten_map_word)
+    for nv_label, side_key in [("TW", "key_tw"), ("ĐP", "key_dp")]:
         # Group header
         gr = t1.add_row()
         merged = gr.cells[0].merge(gr.cells[-1])
@@ -935,27 +935,29 @@ def xuat_to_trinh_bgd_word(username: str = "unknown") -> bytes:
         _shade(merged, "E8F4FD")
 
         sub_kh = sub_th = 0.0
-        for mk, ten in ct_list:
-            if mk in seen_mk:
-                continue
-            kh_v = float(kh_cn.get(mk, 0) or 0)
-            th_v = float(th_cn.get(mk, 0) or 0)
-            if kh_v == 0 and th_v == 0:
-                continue
-            seen_mk.add(mk)
-            stt += 1
-            sub_kh += kh_v
-            sub_th += th_v
-            tong_kh += kh_v
-            tong_th += th_v
-            dr = t1.add_row()
-            vals = [str(stt), ten, nv_label, _fmt_ty(kh_v), _fmt_ty(th_v), _fmt_pct(kh_v, th_v)]
-            for i, v in enumerate(vals):
-                alg = WD_ALIGN_PARAGRAPH.RIGHT if i >= 3 else WD_ALIGN_PARAGRAPH.LEFT
-                _cell_fmt(dr.cells[i], v, alg)
-            for i, w in enumerate(WIDTHS1):
-                if i < len(dr.cells):
-                    dr.cells[i].width = Cm(w)
+        for _ten_nhom, ds_rows in row_groups:
+            for row_model in ds_rows:
+                mk = str(row_model.get(side_key) or "")
+                if not mk:
+                    continue
+                ten = str(row_model.get("label", "") or "")
+                kh_v = float(kh_cn.get(mk, 0) or 0)
+                th_v = float(th_cn.get(mk, 0) or 0)
+                if kh_v == 0 and th_v == 0:
+                    continue
+                stt += 1
+                sub_kh += kh_v
+                sub_th += th_v
+                tong_kh += kh_v
+                tong_th += th_v
+                dr = t1.add_row()
+                vals = [str(stt), ten, nv_label, _fmt_ty(kh_v), _fmt_ty(th_v), _fmt_pct(kh_v, th_v)]
+                for i, v in enumerate(vals):
+                    alg = WD_ALIGN_PARAGRAPH.RIGHT if i >= 3 else WD_ALIGN_PARAGRAPH.LEFT
+                    _cell_fmt(dr.cells[i], v, alg)
+                for i, w in enumerate(WIDTHS1):
+                    if i < len(dr.cells):
+                        dr.cells[i].width = Cm(w)
 
         # Subtotal
         sr = t1.add_row()

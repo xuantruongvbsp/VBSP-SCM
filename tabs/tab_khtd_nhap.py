@@ -25,6 +25,7 @@ from tabs.tab_khtd import (
     DATA_DIR,
     KV_KEY_CN,
     KV_KEY_XA,
+    MA_KEYS_CO_KHTD,
     _chon_ds_ct,
     _doc_kv,
     _dong_bo_gqvl_tong_keys,

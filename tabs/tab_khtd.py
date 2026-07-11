@@ -243,13 +243,13 @@ def _ten_ct_base(ma_ct: int, ten_map: dict[str, str] | None = None) -> str:
     ten_override = TEN_BASE_BY_MACT_OVERRIDE.get(int(ma_ct))
     if ten_override:
         return ten_override
+    ten_map = ten_map or {}
+    for mk, t in ten_map.items():
+        if _ma_ct_tu_ma_key(mk) == int(ma_ct) and str(t or "").strip():
+            return str(t).strip()
     ten = TEN_BASE_BY_MACT.get(int(ma_ct))
     if ten:
         return ten
-    ten_map = ten_map or {}
-    for mk, t in ten_map.items():
-        if _ma_ct_tu_ma_key(mk) == int(ma_ct):
-            return t
     return str(ma_ct)
 
 
@@ -371,34 +371,39 @@ def _quet_ct_co_du_no(df: "pd.DataFrame | None") -> tuple[set[str], dict[str, st
         if (int(ma_ct), nv_int) not in lookup:
             lookup[(int(ma_ct), nv_int)] = ma_key
 
-    ma_ct_s = pd.to_numeric(df[COT_MA_CHUONG_TRINH], errors="coerce").fillna(0).astype(int)
-    nv_s = pd.to_numeric(df[COT_NGUON_VON], errors="coerce").fillna(0).astype(int)
-    du_no_s = pd.to_numeric(df[col_du_no], errors="coerce").fillna(0).astype(float)
+    tmp = pd.DataFrame(
+        {
+            "ma_ct": pd.to_numeric(df[COT_MA_CHUONG_TRINH], errors="coerce").fillna(0).astype(int),
+            "nv": pd.to_numeric(df[COT_NGUON_VON], errors="coerce").fillna(0).astype(int),
+            "du_no": pd.to_numeric(df[col_du_no], errors="coerce").fillna(0).astype(float),
+        }
+    )
+    tmp["ten_ct"] = (
+        df[COT_TEN_CT].fillna("").astype(str).str.strip()
+        if COT_TEN_CT in df.columns
+        else ""
+    )
+    tmp = tmp[(tmp["du_no"] > 0) & (tmp["ma_ct"] > 0) & tmp["nv"].isin([1, 2])]
+    if tmp.empty:
+        return set(), {}
 
-    ten_ct_s = df[COT_TEN_CT].astype(str).fillna("").str.strip() if COT_TEN_CT in df.columns else None
+    # Giảm 300k+ hồ sơ xuống vài chục cặp trước khi map bằng Python.
+    pairs = tmp.drop_duplicates(subset=["ma_ct", "nv"])[["ma_ct", "nv"]]
+    ten_pairs = (
+        tmp[tmp["ten_ct"] != ""]
+        .drop_duplicates(subset=["ma_ct", "nv"])
+        .set_index(["ma_ct", "nv"])["ten_ct"]
+        .to_dict()
+    )
+    key_by_pair: dict[tuple[int, int], str] = {}
+    for row in pairs.itertuples(index=False):
+        pair = (int(row.ma_ct), int(row.nv))
+        key_by_pair[pair] = lookup.get(pair, f"{pair[0]}|{pair[1]}")
 
-    mk_list: list[str] = []
-    ten_list: list[str] = []
-    for i in range(len(ma_ct_s)):
-        if du_no_s.iat[i] <= 0:
-            continue
-        ma_ct = int(ma_ct_s.iat[i])
-        nv_int = int(nv_s.iat[i])
-        if ma_ct <= 0 or nv_int not in (1, 2):
-            continue
-        mk = lookup.get((ma_ct, nv_int), f"{ma_ct}|{nv_int}")
-        mk_list.append(mk)
-        if ten_ct_s is not None:
-            ten_list.append(str(ten_ct_s.iat[i]))
-        else:
-            ten_list.append("")
-
-    keys = set(mk_list)
+    keys = set(key_by_pair.values())
     ten_map: dict[str, str] = {}
-    for mk, ten in zip(mk_list, ten_list):
-        if mk in ten_map:
-            continue
-        ten_map[mk] = TEN_CHINH_THUC_CT.get(mk, ten) or mk
+    for pair, mk in key_by_pair.items():
+        ten_map[mk] = str(ten_pairs.get(pair, "") or TEN_CHINH_THUC_CT.get(mk, mk)).strip()
     return keys, ten_map
 
 

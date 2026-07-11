@@ -1,5 +1,23 @@
 # CHANGELOG
 
+## [2026-07-11] — Fix lỗi render KHTD export do còn sót `order_ma_ct`
+- `tabs/tab_khtd_xuat.py` dòng ~89-100 — bỏ phụ thuộc vào biến cũ `order_ma_ct`, chuyển sang đếm `tong_ct` trực tiếp từ row model `_iter_khtd_cn_group_rows()` sau refactor
+- `BUGMAP.md` — thêm G19 ghi nhận lỗi biến cũ còn sót trong bảng readonly KHTD
+
+## [2026-07-11] — Tăng tốc tải tab Kế hoạch tín dụng
+- `tabs/tab_khtd.py` dòng ~352-410 — vector hóa `_quet_ct_co_du_no()`, chỉ lặp trên các cặp chương trình/nguồn vốn duy nhất thay vì 366 nghìn dòng HSTD
+- `tests/test_khtd_quets.py` — thêm test hồi quy lọc dư nợ dương, mapping `7_DP`/`13_DP` và ưu tiên tên chương trình HSTD
+- `BUGMAP.md` — thêm K9 ghi nhận vòng lặp từng dòng HSTD làm tab KHTD mất khoảng 10 giây khi cache miss
+
+## [2026-07-11] — Fix lỗi render KHTD do thiếu import `MA_KEYS_CO_KHTD`
+- `tabs/tab_khtd_nhap.py` dòng ~22-36 — bổ sung lại import `MA_KEYS_CO_KHTD` từ `tab_khtd.py` sau refactor để các khối nhập/xuất theo xã không còn lỗi `name is not defined`
+- `BUGMAP.md` — thêm G18 ghi nhận lỗi thiếu import constant sau refactor KHTD
+
+## [2026-07-11] — Fix tên chương trình HSTD và đồng bộ row model khi xuất Word KHTD
+- `tabs/tab_khtd.py` dòng ~248 — ưu tiên tên chương trình đọc từ HSTD trước tên fallback trong config, giữ override nghiệp vụ riêng cho GQVL
+- `tabs/tab_khtd_xuat.py` dòng ~795-990 — xuất Tờ trình Word bằng `_iter_khtd_cn_group_rows()` giống màn nhập/readonly, dùng tên HSTD và trục key TW/ĐP thống nhất
+- `BUGMAP.md` — bổ sung G16 với lỗi còn sót sau refactor: helper ưu tiên sai nguồn tên và Word vẫn lặp danh mục lưu trữ trực tiếp
+
 ## [2026-07-11] — Bổ sung 7_DP và ma_ct 13 vào KHTD để khớp Tổng dư nợ HSTD
 - `config.py` dòng ~170-179 — thêm `7_DP` và `13_DP` vào danh mục `CHUONG_TRINH_KHTD` để bao phủ đủ dư nợ HSTD phía Địa phương
 - `tabs/tab_khtd.py` dòng ~57-62 — đưa `ma_ct 13` vào nhóm hiển thị KHTD Chi nhánh để tự đồng bộ nhập/xuất/tính TH theo row model hiện tại

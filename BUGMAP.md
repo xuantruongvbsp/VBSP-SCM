@@ -1133,6 +1133,16 @@
 | **Bài học** | Khi thay mô hình lặp chính của một hàm, cần rà toàn bộ các biến phụ trợ như đếm tổng, thứ tự, header state; các biến này thường không còn compile error nhưng sẽ nổ khi runtime đi qua nhánh cũ |
 | **Ngày fix** | 2026-07-11 |
 
+### G20 — `📈 KHTD`: cột nhập KH hiển thị số thô, không có phân cách hàng nghìn nên khó rà
+| | |
+|---|---|
+| **File** | `tabs/tab_khtd_nhap.py` |
+| **Dấu hiệu** | Ở phần nhập KHTD Chi nhánh, các ô `KH TW` / `KH ĐP` hiển thị số nguyên thô như `1250000`, rất khó nhìn và dễ nhập nhầm khi số lớn |
+| **Nguyên nhân** | `data_editor` đang dùng `NumberColumn` cho cột KH editable, nên khi render/nhập Streamlit giữ số thô thay vì format theo kiểu `1.250.000` như người dùng mong muốn |
+| **Fix** | Chuyển `KH TW` / `KH ĐP` sang `TextColumn`, dựng giá trị hiển thị bằng `_fmt_trieu_input()`, parse lại bằng `_parse_trieu_input()` khi trích patch lưu; nếu user gõ sai định dạng thì tạm giữ giá trị cũ và hiện cảnh báo |
+| **Bài học** | Với màn nhập số liệu hành chính nhiều chữ số, ưu tiên hiển thị string đã format hơn là để `NumberColumn` số thô; readability quan trọng hơn việc ép kiểu số ngay ở lớp UI |
+| **Ngày fix** | 2026-07-11 |
+
 ---
 
 ## H. GSheet / Google Sheets

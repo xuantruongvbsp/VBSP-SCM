@@ -246,13 +246,24 @@ def _trich_patch_khtd_cn_tu_bang(
 ) -> dict[str, float]:
     """Trích draft kế hoạch (triệu đồng) từ data_editor theo key kỹ thuật."""
     out: dict[str, float] = {}
+    loi_parse: list[str] = []
     for idx, meta in df_meta.reset_index(drop=True).iterrows():
         key_tw = str(meta.get("_key_tw", "") or "").strip()
         key_dp = str(meta.get("_key_dp", "") or "").strip()
         if key_tw:
-            out[key_tw] = _editor_num(df_values.at[idx, "KH TW"])
+            try:
+                out[key_tw] = _parse_trieu_input(df_values.at[idx, "KH TW"], "KH TW")
+            except ValueError:
+                out[key_tw] = _editor_num(meta.get("KH TW"))
+                loi_parse.append(str(meta.get("Chương trình", "KH TW")))
         if key_dp:
-            out[key_dp] = _editor_num(df_values.at[idx, "KH ĐP"])
+            try:
+                out[key_dp] = _parse_trieu_input(df_values.at[idx, "KH ĐP"], "KH ĐP")
+            except ValueError:
+                out[key_dp] = _editor_num(meta.get("KH ĐP"))
+                loi_parse.append(str(meta.get("Chương trình", "KH ĐP")))
+    if loi_parse:
+        st.warning("⚠️ Có ô kế hoạch nhập chưa đúng định dạng số nguyên triệu đồng; hệ thống đang giữ tạm giá trị cũ.")
     return out
 
 
@@ -272,8 +283,8 @@ def _tao_view_editor_khtd_cn(df_editor_meta: pd.DataFrame) -> pd.DataFrame:
             "Còn TH tổng",
         ]
     ].copy()
-    df_view["KH TW"] = _series_editor_int(df_view["KH TW"].tolist())
-    df_view["KH ĐP"] = _series_editor_int(df_view["KH ĐP"].tolist())
+    for col in ["KH TW", "KH ĐP"]:
+        df_view[col] = df_view[col].map(_fmt_trieu_input)
     for col in ["TH TW", "Còn TH TW", "TH ĐP", "Còn TH ĐP", "TH tổng", "Còn TH tổng"]:
         df_view[col] = df_view[col].map(_fmt_khtd_editor_cell)
     return df_view
@@ -574,7 +585,8 @@ def _tab_khtd_chi_nhanh(
     st.caption(
         "📌 Đơn vị nhập và hiển thị: triệu đồng — số nguyên. "
         "HSTD là nguồn chính để tính thực hiện; riêng GQVL được tách 4 dòng theo nguồn TW/ĐP. "
-        "Bảng bên dưới là lưới nhập liệu trực tiếp; số thực hiện và còn phải thực hiện sẽ tự tính lại ngay khi chỉnh sửa."
+        "Bảng bên dưới là lưới nhập liệu trực tiếp; số kế hoạch hiển thị có phân cách hàng nghìn để dễ nhìn, "
+        "số thực hiện và còn phải thực hiện sẽ tự tính lại ngay khi chỉnh sửa."
     )
     draft_cn = st.session_state.get("khtd_cn_editor_draft", {})
     df_editor_meta = _tao_bang_nhap_khtd_cn(kh_cn, th_cn, th_gqvl, ten_map_q, draft_cn)
@@ -591,10 +603,10 @@ def _tab_khtd_chi_nhanh(
         column_config={
             "Nhóm": st.column_config.TextColumn(width="medium"),
             "Chương trình": st.column_config.TextColumn(width="large"),
-            "KH TW": st.column_config.NumberColumn("KH TW", min_value=0, step=1000, width="small"),
+            "KH TW": st.column_config.TextColumn("KH TW", width="small"),
             "TH TW": st.column_config.TextColumn("TH TW", width="small"),
             "Còn TH TW": st.column_config.TextColumn("Còn TH TW", width="small"),
-            "KH ĐP": st.column_config.NumberColumn("KH ĐP", min_value=0, step=1000, width="small"),
+            "KH ĐP": st.column_config.TextColumn("KH ĐP", width="small"),
             "TH ĐP": st.column_config.TextColumn("TH ĐP", width="small"),
             "Còn TH ĐP": st.column_config.TextColumn("Còn TH ĐP", width="small"),
             "TH tổng": st.column_config.TextColumn("TH tổng", width="small"),

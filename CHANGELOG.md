@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## [2026-07-11] — Format cột nhập KH KHTD bằng phân cách hàng nghìn
+- `tabs/tab_khtd_nhap.py` dòng ~236-625 — đổi `KH TW` / `KH ĐP` trong `data_editor` sang text đã format `1.234.567`, parse lại khi lưu và giữ giá trị cũ nếu user gõ sai định dạng
+- `BUGMAP.md` — thêm G20 ghi nhận bài học không nên để cột KH editable dạng số thô trong `data_editor` của KHTD
+
 ## [2026-07-11] — Fix lỗi render KHTD export do còn sót `order_ma_ct`
 - `tabs/tab_khtd_xuat.py` dòng ~89-100 — bỏ phụ thuộc vào biến cũ `order_ma_ct`, chuyển sang đếm `tong_ct` trực tiếp từ row model `_iter_khtd_cn_group_rows()` sau refactor
 - `BUGMAP.md` — thêm G19 ghi nhận lỗi biến cũ còn sót trong bảng readonly KHTD

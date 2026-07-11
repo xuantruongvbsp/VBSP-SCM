@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## [2026-07-11] — Fix API `_upload_info()` làm 4 test Toàn cảnh PGD thất bại
+- `tabs/tab_pgd_cards.py` dòng ~15–80, ~646 — khôi phục kiểu trả về `(bool, timestamp)` để tương thích test/caller cũ; UI chỉ lấy trạng thái và tiếp tục hiển thị ngày số liệu HSTD theo fix B25
+- `BUGMAP.md` — thêm J13 ghi nhận thay đổi kiểu trả về helper không tương thích ngược
+
+## [2026-07-11] — Tổng hợp KHTD: giải thích chênh lệch với dư nợ thực hiện
+- `tabs/tab_khtd_giao_dc.py` dòng ~930 — thêm ghi chú hai chương trình chỉ thu hồi, không giao KH (mã 24 và mã 7 nguồn ĐP), giúp người dùng hiểu vì sao Tổng KH thấp hơn dư nợ thực hiện
+- `BUGMAP.md` — thêm B27 ghi nhận thiếu chú thích nghiệp vụ tại Tổng hợp KH
+
 ## [2026-07-11] — Giao KHTD: đổi màn nhập sang bảng dài dễ theo dõi
 - `tabs/tab_khtd_giao_dc.py` dòng ~61–930 — thay bảng ngang mỗi chương trình 3 cột bằng bảng dài mỗi dòng là Xã/Phường × Chương trình; giữ riêng tab TW/ĐP, chỉ cho sửa cột KH giao và giữ nguyên payload lưu KHTD
 - `BUGMAP.md` — thêm B26 ghi nhận giao diện nhập Giao KHTD quá rộng, khó đối chiếu

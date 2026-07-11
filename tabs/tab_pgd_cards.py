@@ -12,6 +12,7 @@ from __future__ import annotations
 from logger import get_logger
 logger = get_logger(__name__)
 
+from datetime import datetime
 from pathlib import Path
 
 import pandas as pd
@@ -67,11 +68,19 @@ def _pgd_khnv_path(ten_pgd: str) -> Path:
         return Path(PGD_DATA_DIR) / slug / "hstd_khnv.xlsx"
 
 
-def _upload_info(ten_pgd: str) -> bool:
-    """Trả về True khi PGD có ít nhất một nguồn HSTD đã upload."""
+def _upload_info(ten_pgd: str) -> tuple[bool, str]:
+    """Trả về trạng thái upload và thời gian file mới nhất.
+
+    Timestamp được giữ để tương thích API helper; UI dùng ngày số liệu HSTD
+    được tính trong ``render()`` thay vì hiển thị thời gian sửa file.
+    """
     p = _pgd_file_path(ten_pgd)
     p_khnv = _pgd_khnv_path(ten_pgd)
-    return p.exists() or p_khnv.exists()
+    files = [path for path in (p, p_khnv) if path.exists()]
+    if not files:
+        return False, "—"
+    latest_mtime = max(path.stat().st_mtime for path in files)
+    return True, datetime.fromtimestamp(latest_mtime).strftime("%d/%m %H:%M")
 
 
 # ── Cache ─────────────────────────────────────────────────────────────────────
@@ -635,7 +644,7 @@ def render(tab_parent=None, **kwargs):
         st.divider()
 
         # ── Upload info map (dùng cho card + bảng) ───────────────────────
-        upload_info_map = {dv: _upload_info(dv) for dv in ds_don_vi}
+        upload_info_map = {dv: _upload_info(dv)[0] for dv in ds_don_vi}
 
         # ── 4 Sub-tabs (lazy: chỉ render tab đang active) ───────────────
         _sub_labels = ["🃏 Thẻ PGD", "📊 Bảng Đa chiều", "🌡️ Heatmap Rủi ro", "📈 Biểu đồ"]

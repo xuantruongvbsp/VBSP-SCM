@@ -450,31 +450,39 @@ def _render_merge_cache(la_cn: bool) -> None:
             )
 
 
+def _doc_snapshot_status() -> pd.DataFrame:
+    """Chỉ đọc lớp tổng PGD, tránh cộng chồng các lớp CT/NV/CN."""
+    conn = db.get_conn()
+    rows = conn.execute(
+        """
+        SELECT ky, COUNT(DISTINCT ten_pgd) as so_pgd,
+               SUM(tong_du_no) as tong_du_no,
+               MIN(created_at) as tao_luc
+        FROM hstd_snapshot
+        WHERE ma_ct='ALL' AND nguon_von='ALL' AND ten_pgd!='__CN__'
+        GROUP BY ky
+        ORDER BY ky DESC
+        LIMIT 24
+        """
+    ).fetchall()
+    return pd.DataFrame(rows, columns=["Kỳ", "Số đơn vị", "Tổng dư nợ (VND)", "Tạo lúc"])
+
+
 # ── Sub-tab 3: Snapshot ───────────────────────────────────────────────────
 def _render_snapshot() -> None:
     st.subheader("📸 Snapshot HSTD")
     try:
-        conn = db.get_conn()
-        rows = conn.execute(
-            """
-            SELECT ky, COUNT(DISTINCT ten_pgd) as so_pgd,
-                   SUM(tong_du_no) as tong_du_no,
-                   MIN(created_at) as tao_luc
-            FROM hstd_snapshot
-            GROUP BY ky
-            ORDER BY ky DESC
-            LIMIT 24
-            """
-        ).fetchall()
-
-        if not rows:
+        df_snap = _doc_snapshot_status()
+        if df_snap.empty:
             st.warning("❌ Chưa có snapshot nào. Dữ liệu lịch sử sẽ trống trước khi upload lần đầu.")
             return
 
-        st.success(f"✅ Snapshot mới nhất: **{rows[0][0]}** ({rows[0][1]} đơn vị)")
+        st.success(
+            f"✅ Snapshot mới nhất: **{df_snap.iloc[0]['Kỳ']}** "
+            f"({df_snap.iloc[0]['Số đơn vị']} đơn vị)"
+        )
 
-        df_snap = pd.DataFrame(rows, columns=["Kỳ", "Số đơn vị", "Tổng dư nợ (VND)", "Tạo lúc"])
-        df_snap["Tổng dư nợ (tỷ đ)"] = (df_snap["Tổng dư nợ (VND)"] / 1e12).round(1)
+        df_snap["Tổng dư nợ (tỷ đ)"] = (df_snap["Tổng dư nợ (VND)"] / 1e9).round(1)
         df_snap = df_snap.drop(columns=["Tổng dư nợ (VND)"])
         st.dataframe(df_snap, use_container_width=True, hide_index=True)
 

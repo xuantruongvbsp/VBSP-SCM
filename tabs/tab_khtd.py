@@ -55,11 +55,12 @@ MA_CT_BY_MAKEY = {mk: int(ma_ct) for mk, ma_ct, _, _, _ in CHUONG_TRINH_KHTD}
 MA_KEYS_CO_KHTD = {row[0] for row in CHUONG_TRINH_KHTD}
 # Nhóm giao diện nhập thủ công KHTD Chi nhánh (theo ma_ct HSTD)
 KHTD_CN_NHOM_MA_CT: list[tuple[str, list[int]]] = [
-    ("Hộ nghèo · Cận nghèo · Thoát nghèo", [1, 9, 19]),
-    ("HSSV · GQVL", [2, 3]),
-    ("Nhà ở · DTTS · Xuất khẩu lao động", [4, 7, 17, 21, 25]),
+    ("Hộ nghèo · Cận nghèo · Mới thoát nghèo", [1, 19, 9]),
+    ("HSSV · Việc làm · Xuất khẩu lao động", [2, 3, 4]),
+    ("Nhà ở · Nước sạch", [7, 12, 6]),
     ("Vùng khó khăn", [10, 15]),
-    ("Nước sạch · Hỗ trợ khác", [6, 12, 13, 26, 99]),
+    ("DTTS · Miền núi", [17, 21, 25]),
+    ("Đối tượng đặc thù · Khác", [13, 26, 99]),
 ]
 # Sub-nhóm GQVL phân tầng 4 nhóm (TW: PL NV, ĐP: Mã NĐT)
 GQVL_SUB_NHOM = [

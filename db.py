@@ -303,6 +303,31 @@ def init_db():
             CREATE INDEX IF NOT EXISTS idx_snapshot_ky     ON hstd_snapshot(ky);
             CREATE INDEX IF NOT EXISTS idx_snapshot_pgd    ON hstd_snapshot(ky, ten_pgd);
 
+            CREATE TABLE IF NOT EXISTS uy_thac_snapshot (
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                ky           TEXT    NOT NULL,
+                cap_tong_hop TEXT    NOT NULL,
+                ten_pgd      TEXT    NOT NULL DEFAULT '__ALL__',
+                ten_xa       TEXT    NOT NULL DEFAULT '__ALL__',
+                dvut         TEXT    NOT NULL DEFAULT '__ALL__',
+                ten_to       TEXT    NOT NULL DEFAULT '__ALL__',
+                tong_du_no   REAL    NOT NULL DEFAULT 0,
+                du_no_qh     REAL    NOT NULL DEFAULT 0,
+                lai_ton      REAL    NOT NULL DEFAULT 0,
+                so_du_tg     REAL    NOT NULL DEFAULT 0,
+                so_kh        INTEGER NOT NULL DEFAULT 0,
+                so_ku        INTEGER NOT NULL DEFAULT 0,
+                so_to        INTEGER NOT NULL DEFAULT 0,
+                ngay_so_lieu TEXT,
+                created_at   TEXT    NOT NULL DEFAULT (datetime('now','localtime')),
+                created_by   TEXT    NOT NULL DEFAULT 'system',
+                UNIQUE(ky, cap_tong_hop, ten_pgd, ten_xa, dvut, ten_to)
+            );
+            CREATE INDEX IF NOT EXISTS idx_uy_thac_snap_ky
+                ON uy_thac_snapshot(ky, cap_tong_hop);
+            CREATE INDEX IF NOT EXISTS idx_uy_thac_snap_pgd
+                ON uy_thac_snapshot(ky, ten_pgd);
+
             CREATE TABLE IF NOT EXISTS nq11_snapshot (
                 id           INTEGER PRIMARY KEY AUTOINCREMENT,
                 ky           TEXT    NOT NULL,

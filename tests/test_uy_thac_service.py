@@ -25,6 +25,7 @@ from config import (
     COT_TEN_TO,
     COT_TEN_XA,
     COT_TONG_DU_NO,
+    COT_SO_DU_TG,
 )
 from data.pgd import pgd_slug
 from services import uy_thac_service as svc
@@ -118,6 +119,235 @@ def test_tinh_theo_dvut_respects_order():
     order = ["DVUT B", "DVUT A"]
     result = svc.tinh_theo_dvut(df, dvut_order=order)
     assert list(result[COT_DVUT]) == order
+
+
+# ── tong_quan_uy_thac / tong_hop_uy_thac_theo / loc_chi_tiet_uy_thac ───────
+
+def test_tong_quan_uy_thac_returns_core_metrics():
+    df = _df_ut()
+    df[COT_TEN_PGD] = ["PGD 1", "PGD 1", "PGD 2"]
+    df[COT_SO_DU_TG] = [100_000, 50_000, 25_000]
+
+    result = svc.tong_quan_uy_thac(df)
+
+    assert result["so_hoi"] == 2
+    assert result["so_pgd"] == 2
+    assert result["so_xa"] == 2
+    assert result["so_to"] == 3
+    assert result["so_kh"] == 3
+    assert result["tong_dn"] == 3_500_000
+    assert result["nqh"] == 150_000
+    assert result["so_du_tg"] == 175_000
+
+
+def test_tong_quan_uy_thac_excludes_direct_loans_and_deduplicates_multi_hoi_to():
+    df = _df_ut()
+    df[COT_TEN_PGD] = ["PGD 1", "PGD 1", "PGD 1"]
+    df[COT_TEN_XA] = ["Xã A", "Xã A", "Xã B"]
+    df[COT_TEN_TO] = ["Tổ 1", "Tổ 1", "Tổ trực tiếp"]
+    df[COT_DVUT] = ["DVUT A", "DVUT B", pd.NA]
+    df[COT_TONG_DU_NO] = [1_000_000, 2_000_000, 9_000_000]
+
+    result = svc.tong_quan_uy_thac(df)
+
+    assert result["so_to"] == 1
+    assert result["tong_dn"] == 3_000_000
+
+
+def test_tong_quan_dieu_hanh_uy_thac_counts_problem_to_uniquely_for_multi_hoi_to():
+    df = pd.DataFrame({
+        COT_TEN_PGD: ["PGD 1", "PGD 1", "PGD 1"],
+        COT_TEN_XA: ["Xã 1", "Xã 1", "Xã 2"],
+        COT_DVUT: ["DVUT A", "DVUT B", "DVUT A"],
+        COT_TEN_TO: ["Tổ 1", "Tổ 1", "Tổ 2"],
+        COT_MA_KH: ["KH001", "KH002", "KH003"],
+        COT_SO_KU: ["KU1", "KU2", "KU3"],
+        COT_TONG_DU_NO: [1_000_000, 2_000_000, 500_000],
+        COT_DU_NO_QH: [50_000, 10_000, 0],
+        COT_LAI_TON: [5_000, 2_000, 0],
+        COT_LAI_TON_QH: [0, 1_000, 0],
+        COT_SO_DU_TG: [20_000, 30_000, 10_000],
+    })
+
+    result = svc.tong_quan_dieu_hanh_uy_thac(df)
+
+    assert result["so_to"] == 2
+    assert result["so_to_nqh"] == 1
+    assert result["so_to_lai_ton"] == 1
+    assert result["ty_le_to_nqh"] == 50
+    assert result["ty_le_to_lai_ton"] == 50
+    assert result["tg_bq_kh"] == 20_000
+
+
+def test_danh_sach_to_co_lai_ton_tong_hop_theo_to_va_hoi():
+    df = pd.DataFrame({
+        COT_TEN_PGD: ["PGD 1", "PGD 1", "PGD 1"],
+        COT_TEN_XA: ["Xã 1", "Xã 1", "Xã 2"],
+        COT_DVUT: ["Hội A", "Hội A", "Hội B"],
+        COT_TEN_TO: ["Tổ 1", "Tổ 1", "Tổ 2"],
+        COT_MA_KH: ["KH001", "KH002", "KH003"],
+        COT_TONG_DU_NO: [1_000_000, 2_000_000, 3_000_000],
+        COT_DU_NO_QH: [0, 100_000, 0],
+        COT_LAI_TON: [5_000, 0, 0],
+        COT_LAI_TON_QH: [0, 2_000, 0],
+    })
+
+    result = svc.danh_sach_to_co_lai_ton(df)
+
+    assert len(result) == 1
+    assert result.iloc[0][COT_TEN_TO] == "Tổ 1"
+    assert result.iloc[0]["so_kh"] == 2
+    assert result.iloc[0]["lai_ton"] == 7_000
+
+
+def test_danh_sach_to_da_hoi_hien_day_du_cac_hoi():
+    df = pd.DataFrame({
+        COT_TEN_PGD: ["PGD 1", "PGD 1", "PGD 1", "PGD 1"],
+        COT_TEN_XA: ["Xã 1", "Xã 1", "Xã 1", "Xã 2"],
+        COT_DVUT: ["Hội B", "Hội A", "Hội A", "Hội A"],
+        COT_TEN_TO: ["Tổ 1", "Tổ 1", "Tổ 1", "Tổ 2"],
+        COT_MA_KH: ["KH001", "KH002", "KH003", "KH004"],
+    })
+
+    result = svc.danh_sach_to_da_hoi(df)
+
+    assert len(result) == 1
+    assert result.iloc[0][COT_TEN_TO] == "Tổ 1"
+    assert result.iloc[0]["so_hoi"] == 2
+    assert result.iloc[0]["ds_hoi"] == "Hội A · Hội B"
+
+
+def test_tong_hop_uy_thac_theo_pgd_aggregates_metrics():
+    df = _df_ut()
+    df[COT_TEN_PGD] = ["PGD 1", "PGD 1", "PGD 2"]
+    df[COT_SO_DU_TG] = [100_000, 50_000, 25_000]
+
+    result = svc.tong_hop_uy_thac_theo(df, [COT_TEN_PGD])
+
+    row = result[result[COT_TEN_PGD] == "PGD 1"].iloc[0]
+    assert row["so_hoi"] == 1
+    assert row["so_to"] == 2
+    assert row["so_kh"] == 2
+    assert row["tong_dn"] == 3_000_000
+    assert row["nqh"] == 100_000
+    assert row["so_du_tg"] == 150_000
+
+
+def test_tong_hop_uy_thac_theo_dvut_respects_order():
+    df = _df_ut()
+    order = ["DVUT B", "DVUT A"]
+
+    result = svc.tong_hop_uy_thac_theo(df, [COT_DVUT], dvut_order=order)
+
+    assert list(result[COT_DVUT]) == order
+
+
+def test_tao_bao_cao_dieu_hanh_uy_thac_adds_derived_metrics():
+    df = _df_ut()
+    df[COT_TEN_PGD] = ["PGD 1", "PGD 1", "PGD 2"]
+    df[COT_SO_DU_TG] = [100_000, 50_000, 25_000]
+    df[COT_LAI_TON_QH] = [5_000, 8_000, 3_000]
+
+    result = svc.tao_bao_cao_dieu_hanh_uy_thac(df, [COT_TEN_PGD])
+
+    row = result[result[COT_TEN_PGD] == "PGD 1"].iloc[0]
+    assert row["ty_trong_dn"] == pytest.approx(85.71, rel=1e-3)
+    assert row["dn_bq_to"] == 1_500_000
+    assert row["dn_bq_kh"] == 1_500_000
+    assert row["kh_bq_to"] == 1
+    assert row["tg_bq_kh"] == 75_000
+    assert row["so_to_nqh"] == 1
+    assert row["so_to_lai_ton"] == 2
+    assert row["ty_le_to_nqh"] == 50
+    assert row["ty_le_to_lai_ton"] == 100
+
+
+def test_tao_bao_cao_dieu_hanh_uy_thac_counts_problem_to_uniquely():
+    df = pd.DataFrame({
+        COT_TEN_PGD: ["PGD 1", "PGD 1", "PGD 1"],
+        COT_TEN_XA: ["Xã 1", "Xã 1", "Xã 1"],
+        COT_DVUT: ["DVUT A", "DVUT A", "DVUT A"],
+        COT_TEN_TO: ["Tổ 1", "Tổ 1", "Tổ 2"],
+        COT_MA_KH: ["KH001", "KH002", "KH003"],
+        COT_SO_KU: ["KU1", "KU2", "KU3"],
+        COT_TONG_DU_NO: [1_000_000, 2_000_000, 1_500_000],
+        COT_DU_NO_QH: [50_000, 10_000, 0],
+        COT_LAI_TON: [5_000, 2_000, 0],
+        COT_LAI_TON_QH: [0, 1_000, 0],
+        COT_SO_DU_TG: [20_000, 30_000, 10_000],
+    })
+
+    result = svc.tao_bao_cao_dieu_hanh_uy_thac(df, [COT_TEN_PGD])
+
+    row = result.iloc[0]
+    assert row["so_to"] == 2
+    assert row["so_to_nqh"] == 1
+    assert row["so_to_lai_ton"] == 1
+    assert row["ty_le_to_nqh"] == 50
+    assert row["ty_le_to_lai_ton"] == 50
+
+
+def test_loc_chi_tiet_uy_thac_filters_and_adds_no_lai():
+    df = _df_ut()
+    df[COT_TEN_PGD] = ["PGD 1", "PGD 1", "PGD 2"]
+    df[COT_SO_DU_TG] = [100_000, 50_000, 25_000]
+    df[COT_LAI_TON_QH] = [5_000, 8_000, 3_000]
+
+    result = svc.loc_chi_tiet_uy_thac(
+        df,
+        bo_loc={COT_TEN_PGD: "PGD 1", COT_DVUT: "DVUT A"},
+    )
+
+    assert len(result) == 2
+    assert "Nợ lãi" in result.columns
+    assert result.iloc[0]["Nợ lãi"] == 15_000
+
+
+def test_xep_hang_chat_luong_uy_thac_ranks_higher_risk_first():
+    df = _df_ut()
+    df[COT_TEN_PGD] = ["PGD A", "PGD A", "PGD B"]
+
+    result = svc.xep_hang_chat_luong_uy_thac(df, [COT_TEN_PGD])
+
+    assert result.iloc[0]["xep_hang"] == 1
+    assert result.iloc[0][COT_TEN_PGD] == "PGD B"
+    assert {"dn_bq_to", "kh_bq_to", "lai_ton_tren_dn", "diem_rui_ro"}.issubset(result.columns)
+
+
+def test_tao_canh_bao_trong_diem_combines_data_and_overdue_records():
+    df = _df_ut()
+    df[COT_TEN_PGD] = ["PGD A", "PGD A", "PGD B"]
+    records = [{
+        "trang_thai": "cho_xu_ly",
+        "han_hoan_thanh": "2026-07-01",
+        "ten_don_vi": "Hội A",
+    }]
+
+    result = svc.tao_canh_bao_trong_diem(df, records, ngay_ref=date(2026, 7, 11))
+
+    assert {"Nợ quá hạn", "Lãi tồn", "Kiến nghị quá hạn"}.issubset(set(result["Nhóm cảnh báo"]))
+    assert result.iloc[0]["Mức độ"] == "🔴 Cao"
+
+
+def test_tinh_bien_dong_snapshot_adds_period_deltas():
+    df = pd.DataFrame({
+        "ky": ["2026-01", "2026-02"],
+        "tong_du_no": [100, 120],
+        "du_no_qh": [2, 3],
+        "so_ho": [10, 12],
+        "so_ku": [11, 14],
+        "lai_ton": [1, 4],
+        "so_du_tg": [5, 7],
+        "so_to": [2, 3],
+    })
+
+    result = svc.tinh_bien_dong_snapshot(df)
+
+    assert result.iloc[1]["delta_tong_du_no"] == 20
+    assert result.iloc[1]["delta_so_ho"] == 2
+    assert result.iloc[1]["ty_le_nqh"] == 2.5
+    assert result.iloc[1]["delta_lai_ton"] == 3
+    assert result.iloc[1]["delta_so_to"] == 1
 
 
 # ── loc_mau06 ─────────────────────────────────────────────────────────────────
@@ -325,3 +555,53 @@ def test_cap_nhat_trang_thai_empty_list(test_db):
 
     ok = svc.cap_nhat_trang_thai_bien_ban(key, "r1", "Xử lý", "tester")
     assert ok is False
+
+
+def test_tong_hop_kien_nghi_dem_dung_trang_thai_va_han():
+    records = [
+        {"trang_thai": "cho_xu_ly", "han_hoan_thanh": "2026-07-05"},
+        {"trang_thai": "cho_xu_ly", "han_hoan_thanh": "2026-07-15"},
+        {"trang_thai": "da_xu_ly", "han_hoan_thanh": "2026-07-01"},
+        {"trang_thai": "khong_ton_tai", "han_hoan_thanh": "2026-07-01"},
+    ]
+
+    result = svc.tong_hop_kien_nghi(records, ngay_ref=date(2026, 7, 11))
+
+    assert result == {
+        "tong": 4,
+        "cho_xu_ly": 2,
+        "da_xu_ly": 1,
+        "khong_ton_tai": 1,
+        "qua_han": 1,
+        "sap_den_han": 1,
+    }
+
+
+def test_tao_bang_theo_doi_kien_nghi_them_canh_bao_han():
+    records = [
+        {
+            "id": "r1",
+            "loai": "CT",
+            "ngay_kt": "2026-07-10",
+            "ten_don_vi": "DV A",
+            "kien_nghi": "KN A",
+            "han_hoan_thanh": "2026-07-05",
+            "trang_thai": "cho_xu_ly",
+            "ket_qua_xu_ly": "",
+        },
+        {
+            "id": "r2",
+            "loai": "CX",
+            "ngay_kt": "2026-07-09",
+            "ten_don_vi": "DV B",
+            "kien_nghi": "KN B",
+            "han_hoan_thanh": "2026-07-20",
+            "trang_thai": "da_xu_ly",
+            "ket_qua_xu_ly": "OK",
+        },
+    ]
+
+    result = svc.tao_bang_theo_doi_kien_nghi(records, ngay_ref=date(2026, 7, 11))
+
+    assert list(result["Cảnh báo hạn"]) == ["🔴 Quá hạn", "✅ Đã xử lý"]
+    assert list(result["Mẫu số"]) == ["02/BB-CT", "03/BB-CX"]

@@ -371,9 +371,15 @@ def _xu_ly_import_folder(danh_sach: list[dict], username: str) -> None:
     def _ghi(r: dict, data: bytes) -> tuple[dict, str | None, tuple[str, str] | None]:
         try:
             if r["loai"] == "cdtotkvv":
-                from data.cdtotkvv import doc_thang_nam_tu_file
+                from data.cdtotkvv import doc_thang_nam_tu_file, tach_file_cdto_toan_cn
                 from data.pgd import luu_file_pgd_voi_lich_su
 
+                don_vi_trong_file = tach_file_cdto_toan_cn(data)
+                if len(don_vi_trong_file) > 1:
+                    raise ValueError(
+                        "File CDTO chứa nhiều đơn vị; hãy dùng chức năng "
+                        "Upload CDTO toàn Chi nhánh để hệ thống tách đúng 22 đơn vị."
+                    )
                 thang = doc_thang_nam_tu_file(data)
                 if thang:
                     _ghi_file_pgd(r["ten_pgd"], r["loai"], data)

@@ -1,7 +1,7 @@
 # SCHEMA.md — Sơ đồ Cơ sở Dữ liệu VBSP-SCM
 > Nguồn thực tế: `db.py` → `init_db()`. Cập nhật khi thêm bảng/cột migration.
 > **Tra ở đây trước khi viết query SQL** — không cần đọc db.py.
-> Cập nhật: 2026-05-22
+> Cập nhật: 2026-07-11
 
 ---
 
@@ -18,6 +18,7 @@
 | 7 | `tien_do_task` | Task tiến độ 95 xã | cap_theo_doi: xa/pgd |
 | 8 | `tien_do_ketqua` | Kết quả từng xã/PGD | FK → tien_do_task.id, UNIQUE(task_id, ten_xa) |
 | 9 | `hstd_snapshot` | Snapshot HSTD theo kỳ | UNIQUE(ky, ten_pgd, ma_ct, nguon_von) |
+| 9a | `uy_thac_snapshot` | Snapshot ủy thác đa chiều | UNIQUE theo kỳ/cấp/PGD/xã/Hội/Tổ |
 | 10 | `nq11_snapshot` | Snapshot NQ11 theo kỳ | UNIQUE(ky, ten_pgd) |
 | 11 | `gqvl_snapshot` | Snapshot GQVL theo kỳ | UNIQUE(ky, ten_pgd) |
 | 12 | `cdtotkvv_snapshot` | Snapshot chất lượng tổ TKV | UNIQUE(ky, ten_pgd) |
@@ -199,6 +200,31 @@ created_by   TEXT    NOT NULL DEFAULT 'system'
 UNIQUE(ky, ten_pgd, ma_ct, nguon_von)
 ```
 > ⚠️ Upsert-safe: dùng `INSERT OR REPLACE` hoặc `ON CONFLICT DO UPDATE`
+
+---
+
+### 9a. `uy_thac_snapshot`
+```sql
+id           INTEGER PRIMARY KEY AUTOINCREMENT
+ky           TEXT    NOT NULL
+cap_tong_hop TEXT    NOT NULL  -- CN | PGD | XA | HOI | TO
+ten_pgd      TEXT    NOT NULL DEFAULT '__ALL__'
+ten_xa       TEXT    NOT NULL DEFAULT '__ALL__'
+dvut         TEXT    NOT NULL DEFAULT '__ALL__'
+ten_to       TEXT    NOT NULL DEFAULT '__ALL__'
+tong_du_no   REAL    NOT NULL DEFAULT 0
+du_no_qh     REAL    NOT NULL DEFAULT 0
+lai_ton      REAL    NOT NULL DEFAULT 0
+so_du_tg     REAL    NOT NULL DEFAULT 0
+so_kh        INTEGER NOT NULL DEFAULT 0
+so_ku        INTEGER NOT NULL DEFAULT 0
+so_to        INTEGER NOT NULL DEFAULT 0
+ngay_so_lieu TEXT
+created_at   TEXT    NOT NULL DEFAULT (datetime('now','localtime'))
+created_by   TEXT    NOT NULL DEFAULT 'system'
+UNIQUE(ky, cap_tong_hop, ten_pgd, ten_xa, dvut, ten_to)
+```
+> Tự tạo sau merge HSTD. Lưu riêng từng cấp tổng hợp để số KH/Tổ dùng `nunique()` đúng cấp, không cộng dồn từ cấp dưới.
 
 ---
 

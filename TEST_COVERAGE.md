@@ -55,6 +55,7 @@
 | `services/file_detection_service.py` | `test_file_detection_service.py` | 21 | ✅ Cao | md5, alias, unit name detection, file-type sniffing |
 | `services/uy_thac_service.py` | `test_uy_thac_service.py` | 26 | ✅ Cao | tinh_theo_dvut, loc_mau06/15, co_du_lieu_to, kv_key, payload builders, bien_ban CRUD |
 | `services/tien_do_excel_service.py` | `test_tien_do_excel_service.py` | 8 | ✅ Cao | 3 sheets, styling, empty df |
+| `services/telegram_service.py` | `test_telegram_service.py` | 4 | 🟡 Trung bình | Routing Upload PGD: chat PGD → chat phụ → chat chính; log lỗi theo notify key |
 
 ---
 

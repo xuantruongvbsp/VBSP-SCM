@@ -38,6 +38,12 @@ from config import (
     COT_DU_NO_QH,
     COT_GIAI_NGAN_TRONG_NAM,
     DON_VI_CHI_NHANH,
+    COT_DVUT,
+    COT_LAI_TON,
+    COT_LAI_TON_QH,
+    COT_SO_DU_TG,
+    COT_TEN_TO,
+    COT_TEN_XA,
 )
 
 _COT_DNK = "Dư nợ khoanh"
@@ -45,22 +51,30 @@ _GN_NAM_ALIASES = (COT_GIAI_NGAN_TRONG_NAM, "Giải ngân Năm", "Giải ngân n
 
 
 def _ky_tu_df(df: pd.DataFrame) -> str:
-    """Suy ra kỳ 'YYYY-MM' từ cột Ngày số liệu. Fallback: tháng hiện tại."""
+    """Suy ra kỳ từ ngày số liệu lớn nhất; fallback tháng hiện tại."""
     if COT_NGAY_SL in df.columns:
         sl = df[COT_NGAY_SL].dropna()
         if len(sl):
             try:
-                val = str(sl.iloc[0])
-                if "/" in val:
-                    parts = val.split("/")
-                    return f"{parts[2][:4]}-{parts[1].zfill(2)}"
-                dt = pd.to_datetime(val, errors="coerce")
-                if pd.notna(dt):
-                    return dt.strftime("%Y-%m")
+                dt = pd.to_datetime(sl, errors="coerce", dayfirst=True, format="mixed").dropna()
+                if not dt.empty:
+                    return dt.max().strftime("%Y-%m")
             except Exception as e:
-                logger.error("Lỗi trong khối except: %s", e, exc_info=True)
-                pass
+                logger.error("_ky_tu_df: lỗi parse ngày số liệu — %s", e, exc_info=True)
     return datetime.now().strftime("%Y-%m")
+
+
+def _ngay_so_lieu_max(df: pd.DataFrame) -> str | None:
+    if COT_NGAY_SL not in df.columns:
+        return None
+    try:
+        dt = pd.to_datetime(
+            df[COT_NGAY_SL], errors="coerce", dayfirst=True, format="mixed"
+        ).dropna()
+        return dt.max().strftime("%d/%m/%Y") if not dt.empty else None
+    except Exception as e:
+        logger.error("_ngay_so_lieu_max: lỗi parse ngày số liệu — %s", e, exc_info=True)
+        return None
 
 
 def _gn_col(df: pd.DataFrame):
@@ -83,11 +97,7 @@ def luu_snapshot(df_full: pd.DataFrame, username: str) -> KetQuaUpload:
         return KetQuaUpload(False, "Không có dữ liệu HSTD để tạo snapshot.")
 
     ky = _ky_tu_df(df_full)
-    ngay_sl = (
-        str(df_full[COT_NGAY_SL].dropna().iloc[0])
-        if COT_NGAY_SL in df_full.columns and len(df_full[COT_NGAY_SL].dropna())
-        else None
-    )
+    ngay_sl = _ngay_so_lieu_max(df_full)
 
     df = df_full.copy()
     for col in (COT_TONG_DU_NO, COT_DU_NO_TH, COT_DU_NO_QH, _COT_DNK):
@@ -175,6 +185,7 @@ def luu_snapshot(df_full: pd.DataFrame, username: str) -> KetQuaUpload:
             conn.commit()
         logger.info("luu_snapshot: hoàn thành kỳ=%s, đã ghi %d dòng", ky, so_dong)
         db.ghi_audit(username, "luu_snapshot", f"Kỳ {ky} — {so_dong} dòng")
+        st.cache_data.clear()
         return KetQuaUpload(True, f"✅ Đã lưu snapshot kỳ **{ky}** ({so_dong} dòng tổng hợp)")
     except Exception as e:
         logger.error("luu_snapshot: thất bại kỳ=%s — %s", ky, e, exc_info=True)
@@ -234,9 +245,199 @@ def danh_sach_ky() -> list[str]:
         return []
 
 
+def _tong_hop_uy_thac_snapshot(
+    df: pd.DataFrame,
+    group_cols: list[str],
+    cap_tong_hop: str,
+) -> list[tuple]:
+    """Tổng hợp một cấp snapshot từ HSTD đã lọc hồ sơ có ĐVUT."""
+    groups = [((), df)] if not group_cols else df.groupby(group_cols, dropna=False, sort=False)
+    rows: list[tuple] = []
+    for keys, grp in groups:
+        if not isinstance(keys, tuple):
+            keys = (keys,)
+        dims = dict(zip(group_cols, keys))
+        to_cols = [c for c in [COT_TEN_PGD, COT_TEN_XA, COT_TEN_TO] if c in grp.columns]
+        so_to = int(grp[to_cols].dropna(subset=[COT_TEN_TO]).drop_duplicates().shape[0]) if COT_TEN_TO in to_cols else 0
+        rows.append((
+            cap_tong_hop,
+            str(dims.get(COT_TEN_PGD, "__ALL__")),
+            str(dims.get(COT_TEN_XA, "__ALL__")),
+            str(dims.get(COT_DVUT, "__ALL__")),
+            str(dims.get(COT_TEN_TO, "__ALL__")),
+            float(grp[COT_TONG_DU_NO].sum()),
+            float(grp[COT_DU_NO_QH].sum()),
+            float(grp["__lai_ton__"].sum()),
+            float(grp[COT_SO_DU_TG].sum()),
+            int(grp[COT_MA_KH].dropna().nunique()),
+            int(grp[COT_SO_KU].dropna().nunique()),
+            so_to,
+        ))
+    return rows
+
+
+def luu_uy_thac_snapshot(
+    df_full: pd.DataFrame,
+    username: str,
+    ky: str | None = None,
+) -> KetQuaUpload:
+    """Lưu snapshot ủy thác theo cấp CN/PGD/XA/HOI/TO, upsert-safe."""
+    if df_full is None or df_full.empty or COT_DVUT not in df_full.columns:
+        return KetQuaUpload(False, "Không có dữ liệu ĐVUT để tạo snapshot ủy thác.")
+    ky_str = str(ky or "").strip() or _ky_tu_df(df_full)
+    ngay_sl = _ngay_so_lieu_max(df_full)
+
+    df = df_full.copy()
+    df[COT_DVUT] = df[COT_DVUT].astype("string").str.strip().replace("", pd.NA)
+    df = df[df[COT_DVUT].notna()].copy()
+    if df.empty:
+        return KetQuaUpload(False, "HSTD không có hồ sơ ủy thác hợp lệ.")
+    for col in [COT_TONG_DU_NO, COT_DU_NO_QH, COT_LAI_TON, COT_LAI_TON_QH, COT_SO_DU_TG]:
+        if col not in df.columns:
+            df[col] = 0.0
+        df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0.0)
+    for col in [COT_MA_KH, COT_SO_KU, COT_TEN_PGD, COT_TEN_XA, COT_TEN_TO]:
+        if col not in df.columns:
+            df[col] = pd.NA
+    df["__lai_ton__"] = df[COT_LAI_TON] + df[COT_LAI_TON_QH]
+
+    specs = [
+        ("CN", []),
+        ("PGD", [COT_TEN_PGD]),
+        ("XA", [COT_TEN_PGD, COT_TEN_XA]),
+        ("HOI", [COT_DVUT]),
+        ("HOI", [COT_TEN_PGD, COT_DVUT]),
+        ("TO", [COT_TEN_PGD, COT_TEN_XA, COT_DVUT, COT_TEN_TO]),
+    ]
+    rows: list[tuple] = []
+    for cap, cols in specs:
+        rows.extend(_tong_hop_uy_thac_snapshot(df, cols, cap))
+
+    sql = """INSERT OR REPLACE INTO uy_thac_snapshot
+             (ky, cap_tong_hop, ten_pgd, ten_xa, dvut, ten_to,
+              tong_du_no, du_no_qh, lai_ton, so_du_tg, so_kh, so_ku, so_to,
+              ngay_so_lieu, created_by)
+             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"""
+    try:
+        with db.get_conn() as conn:
+            conn.executemany(sql, [(ky_str, *row, ngay_sl, username) for row in rows])
+            conn.commit()
+        db.ghi_audit(username, "luu_uy_thac_snapshot", f"Kỳ {ky_str} — {len(rows)} dòng")
+        danh_sach_ky_uy_thac.clear()
+        doc_uy_thac_snapshot_multi.clear()
+        st.cache_data.clear()
+        return KetQuaUpload(True, f"✅ Đã lưu snapshot ủy thác kỳ **{ky_str}** ({len(rows)} dòng)")
+    except Exception as e:
+        logger.error("luu_uy_thac_snapshot: kỳ=%s — %s", ky_str, e, exc_info=True)
+        db.ghi_audit(username, "luu_uy_thac_snapshot_loi", f"Kỳ {ky_str} — {e}")
+        return KetQuaUpload(False, f"❌ Lỗi lưu snapshot ủy thác: {e}")
+
+
+@st.cache_data(ttl=300, show_spinner=False)
+def danh_sach_ky_uy_thac() -> list[str]:
+    try:
+        with db.get_conn() as conn:
+            rows = conn.execute("SELECT DISTINCT ky FROM uy_thac_snapshot ORDER BY ky DESC").fetchall()
+        return [r["ky"] for r in rows]
+    except Exception as e:
+        logger.error("danh_sach_ky_uy_thac: %s", e, exc_info=True)
+        return []
+
+
+@st.cache_data(ttl=300, show_spinner=False)
+def doc_uy_thac_snapshot_multi(
+    ky_list: tuple,
+    ten_pgd: str | None = None,
+    cap_tong_hop: str | None = None,
+    ten_xa: str | None = None,
+    dvut: str | None = None,
+) -> pd.DataFrame:
+    """Đọc chuỗi snapshot ủy thác theo CN/PGD/XA/HOI.
+
+    Tương thích ngược:
+    - Không truyền gì thêm -> CN
+    - Truyền ten_pgd -> PGD
+    - Truyền dvut nhưng không truyền ten_pgd -> HOI toàn CN (`ten_pgd='__ALL__'`)
+    - Truyền dvut + ten_pgd -> HOI theo từng PGD
+    """
+    if not ky_list:
+        return pd.DataFrame()
+
+    cap = str(cap_tong_hop or "").strip().upper()
+    if not cap:
+        if dvut:
+            cap = "HOI"
+        elif ten_xa:
+            cap = "XA"
+        elif ten_pgd:
+            cap = "PGD"
+        else:
+            cap = "CN"
+
+    placeholders = ",".join("?" * len(ky_list))
+    where_clauses = [f"cap_tong_hop=? AND ky IN ({placeholders})"]
+    params: list[object] = [cap, *list(ky_list)]
+
+    if cap == "HOI" and not ten_pgd:
+        where_clauses.append("ten_pgd=?")
+        params.append("__ALL__")
+    elif ten_pgd and cap in {"PGD", "XA", "HOI", "TO"}:
+        where_clauses.append("ten_pgd=?")
+        params.append(ten_pgd)
+    if ten_xa and cap in {"XA", "TO"}:
+        where_clauses.append("ten_xa=?")
+        params.append(ten_xa)
+    if dvut and cap in {"HOI", "TO"}:
+        where_clauses.append("dvut=?")
+        params.append(dvut)
+
+    try:
+        with db.get_conn() as conn:
+            rows = conn.execute(
+                f"""SELECT ky, cap_tong_hop, ten_pgd, ten_xa, dvut, ten_to,
+                            tong_du_no, du_no_qh, lai_ton, so_du_tg,
+                            so_kh, so_ku, so_to, ngay_so_lieu
+                     FROM uy_thac_snapshot
+                     WHERE {' AND '.join(where_clauses)}
+                     ORDER BY ky""",
+                params,
+            ).fetchall()
+        return pd.DataFrame([dict(r) for r in rows]) if rows else pd.DataFrame()
+    except Exception as e:
+        logger.error("doc_uy_thac_snapshot_multi: %s", e, exc_info=True)
+        return pd.DataFrame()
+
+
+def doc_uy_thac_snapshot_hoi_cn(ky_list: tuple, dvut: str) -> pd.DataFrame:
+    """Đọc chuỗi snapshot của một Hội ở grain toàn Chi nhánh."""
+    if not str(dvut or "").strip():
+        return pd.DataFrame()
+    return doc_uy_thac_snapshot_multi(
+        ky_list,
+        cap_tong_hop="HOI",
+        dvut=dvut,
+    )
+
+
+def doc_uy_thac_snapshot_hoi_pgd(
+    ky_list: tuple,
+    ten_pgd: str,
+    dvut: str,
+) -> pd.DataFrame:
+    """Đọc chuỗi snapshot của một Hội trong đúng một PGD."""
+    if not str(ten_pgd or "").strip() or not str(dvut or "").strip():
+        return pd.DataFrame()
+    return doc_uy_thac_snapshot_multi(
+        ky_list,
+        ten_pgd=ten_pgd,
+        cap_tong_hop="HOI",
+        dvut=dvut,
+    )
+
+
 @st.cache_data(ttl=300, show_spinner=False)
 def doc_snapshot_theo_ct(ky: str) -> pd.DataFrame:
-    """Chi tiết theo ma_ct (không ALL) của toàn CN cho 1 kỳ.
+    """Cộng các dòng chi tiết PGD thành tổng theo chương trình của toàn CN.
 
     Trả về DataFrame cột: ma_ct, tong_du_no, du_no_th, du_no_qh, du_no_khoanh,
     so_ho, so_ku, gn_nam — sort by tong_du_no DESC.
@@ -254,7 +455,7 @@ def doc_snapshot_theo_ct(ky: str) -> pd.DataFrame:
                           SUM(so_ku)        AS so_ku,
                           SUM(gn_nam)       AS gn_nam
                    FROM hstd_snapshot
-                   WHERE ky=? AND ten_pgd='__CN__' AND nguon_von='ALL' AND ma_ct!='ALL'
+                   WHERE ky=? AND ten_pgd!='__CN__' AND ma_ct!='ALL'
                    GROUP BY ma_ct
                    ORDER BY tong_du_no DESC""",
                 (ky,)
@@ -601,7 +802,11 @@ def luu_cdtotkvv_snapshot(df_cdtotkvv: pd.DataFrame, ky: str, username: str) -> 
     _XEP_TB  = "Trung bình"
     _XEP_YEU = "Yếu"
 
-    df_src = df_cdtotkvv.copy()
+    from data.cdtotkvv import chuan_hoa_cdtotkvv_phan_tich
+
+    df_src = chuan_hoa_cdtotkvv_phan_tich(df_cdtotkvv)
+    if df_src.empty:
+        return KetQuaUpload(False, "Không có Tổ CDTOTKVV còn dư nợ để tạo snapshot.")
     # Chuẩn hóa cột bắt buộc
     if "tong_diem" not in df_src.columns:
         df_src["tong_diem"] = 0.0
@@ -714,6 +919,7 @@ def xoa_snapshot(ky: str, username: str) -> None:
             conn.execute("DELETE FROM hstd_snapshot WHERE ky=?", (ky,))
             conn.commit()
         db.ghi_audit(username, "xoa_snapshot", f"Đã xóa snapshot kỳ {ky}")
+        st.cache_data.clear()
     except Exception as e:
         logger.error("xoa_snapshot: lỗi xóa snapshot kỳ %s — %s", ky, e, exc_info=True)
         db.ghi_audit(username, "xoa_snapshot_loi", str(e))

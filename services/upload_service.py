@@ -532,7 +532,13 @@ def xu_ly_cdto_toan_cn(file_bytes: bytes) -> dict[str, "KetQuaUpload"]:
         mb = len(pgd_bytes) / 1024 / 1024
         try:
             if thang:
-                luu_file_pgd_voi_lich_su(ten_pgd, "cdtotkvv", pgd_bytes, thang)
+                luu_file_pgd_voi_lich_su(
+                    ten_pgd,
+                    "cdtotkvv",
+                    pgd_bytes,
+                    thang,
+                    ghi_de_lich_su=True,
+                )
                 msg = f"✅ Lưu OK · tháng {thang} · {mb:.1f} MB"
             else:
                 luu_file_pgd(ten_pgd, "cdtotkvv", pgd_bytes)
@@ -1055,40 +1061,32 @@ def _merge_du_lieu_toan_cn_impl(
         def _snap_bg() -> None:
             df_snap = None
             try:
-                from snapshot_service import luu_snapshot as _luu_snap
+                from snapshot_service import (
+                    _ky_tu_df as _ky_hstd,
+                    luu_snapshot as _luu_snap,
+                    luu_uy_thac_snapshot as _luu_uy_thac_snap,
+                )
                 df_snap = pd.read_parquet(_snap_cache_path, engine="pyarrow")
                 _luu_snap(df_snap, _snap_user)
+                _luu_uy_thac_snap(df_snap, _snap_user)
             except Exception as e:
                 logger.error("auto-snapshot HSTD background thread thất bại — %s", e, exc_info=True)
             # Sau HSTD snapshot, thử lưu CDTOTKVV snapshot cùng kỳ
             try:
-                import pandas as _pd
-                from datetime import datetime as _dt_cls
-                from config import COT_NGAY_SL as _COT_NGAY_SL
                 from data.cdtotkvv import doc_cdtotkvv_toan_cn_pgd as _doc_cdtot
                 from snapshot_service import luu_cdtotkvv_snapshot as _luu_cdtot
                 if df_snap is None:
                     df_snap = pd.read_parquet(_snap_cache_path, engine="pyarrow")
-                _ky_str = _dt_cls.now().strftime("%Y-%m")
-                if _COT_NGAY_SL in df_snap.columns:
-                    _sl = df_snap[_COT_NGAY_SL].dropna()
-                    if len(_sl):
-                        _val = str(_sl.iloc[0])
-                        try:
-                            if "/" in _val:
-                                _p = _val.split("/")
-                                _ky_str = f"{_p[2][:4]}-{_p[1].zfill(2)}"
-                            else:
-                                _dt_tmp = _pd.to_datetime(_val, errors="coerce")
-                                if _pd.notna(_dt_tmp):
-                                    _ky_str = _dt_tmp.strftime("%Y-%m")
-                        except Exception:
-                            logger.debug("luu_pgd_file: không parse được kỳ từ ngày số liệu HSTD")
+                _ky_str = _ky_hstd(df_snap)
                 _df_cdtot = _doc_cdtot()
                 if _df_cdtot is not None and not _df_cdtot.empty:
                     _luu_cdtot(_df_cdtot, _ky_str, _snap_user)
             except Exception as e:
                 logger.error("auto-snapshot CDTOTKVV background thread thất bại — %s", e, exc_info=True)
+            try:
+                st.cache_data.clear()
+            except Exception as e:
+                logger.error("auto-snapshot: không clear được cache — %s", e, exc_info=True)
 
         _threading.Thread(target=_snap_bg, daemon=True).start()
 
@@ -1246,12 +1244,20 @@ def merge_baseline_toan_cn(loai: str, nam: int) -> KetQuaUpload:
             else:
                 logger.warning("merge_baseline_toan_cn: GQVL snapshot lỗi — %s", kq_snap.thong_bao)
         elif loai == "hstd":
-            from snapshot_service import luu_snapshot as _luu_snap
+            from snapshot_service import (
+                luu_snapshot as _luu_snap,
+                luu_uy_thac_snapshot as _luu_uy_thac_snap,
+            )
             kq_snap = _luu_snap(df_all, username)
             if kq_snap.thanh_cong:
                 logger.info("merge_baseline_toan_cn: HSTD snapshot %s OK", ky_baseline)
             else:
                 logger.warning("merge_baseline_toan_cn: HSTD snapshot lỗi — %s", kq_snap.thong_bao)
+            kq_uy_thac = _luu_uy_thac_snap(df_all, username, ky=ky_baseline)
+            if kq_uy_thac.thanh_cong:
+                logger.info("merge_baseline_toan_cn: Uy thac snapshot %s OK", ky_baseline)
+            else:
+                logger.warning("merge_baseline_toan_cn: Uy thac snapshot lỗi — %s", kq_uy_thac.thong_bao)
     except Exception as e:
         logger.error("merge_baseline_toan_cn: lỗi tạo snapshot %s — %s", loai, e, exc_info=True)
 

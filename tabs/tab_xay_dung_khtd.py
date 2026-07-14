@@ -921,13 +921,14 @@ def _render_so_sanh_thuc_hien(tab, ds_nam: list[int], loai: str) -> None:
                     FROM hstd_snapshot s
                     JOIN latest l ON s.ky = l.ky_max
                     WHERE s.ma_ct = 'ALL' AND s.nguon_von = 'ALL'
+                      AND s.ten_pgd = '__CN__'
                     GROUP BY l.nam
                     ORDER BY l.nam
                 """).fetchall()
             snap_vnd = {row[0]: row[2] for row in df_snap}
             snap_ky  = {row[0]: row[1] for row in df_snap}
         except Exception as e:
-            logger.error("_render_so_sanh_thuc_hien snapshot: %s", e)
+            logger.error("_render_so_sanh_thuc_hien snapshot: %s", e, exc_info=True)
             snap_vnd = {}
             snap_ky  = {}
 

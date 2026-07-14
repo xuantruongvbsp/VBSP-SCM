@@ -26,8 +26,18 @@ import plotly.graph_objects as go
 
 import db
 from auth import la_phan_he_cn, la_phan_he_pgd, normalize_role
-from config import DS_PGD, CACHE_HSTD, COT_TEN_PGD, COT_TEN_TO, COT_TEN_XA
-from utils import fmt_so, vn, xuat_excel, ten_file_xuat, hien_thi_dataframe_phan_trang
+from config import (
+    DS_PGD,
+    CACHE_HSTD,
+    COT_TEN_PGD,
+    COT_TEN_TO,
+    COT_TEN_XA,
+    COT_MA_PGD,
+    COT_MA_TO,
+    COT_HINH_THUC_VAY,
+    COT_TONG_DU_NO,
+)
+from utils import fmt_so, fmt_ty, vn, xuat_excel, ten_file_xuat, hien_thi_dataframe_phan_trang
 from state_manager import SCMStateManager
 from services.cdtotkvv_service import (
     bang_trang_thai_cdtotkvv as _bang_trang_thai_cdtotkvv,
@@ -38,7 +48,7 @@ from services.cdtotkvv_service import (
 from services.tongquan_cdto_service import load_cdto_toan_cn
 from data.cdtotkvv import (
 
-    doc_cdtotkvv, ds_thang_nam, tong_hop_theo_pgd,
+    doc_cdtotkvv, ds_thang_nam, tong_hop_theo_pgd, doi_chieu_cdtotkvv_hstd,
     _XEP_LOAI_TOT, _XEP_LOAI_KHA, _XEP_LOAI_TB, _XEP_LOAI_YEU
 )
 
@@ -47,25 +57,22 @@ from data.cdtotkvv import (
 # ══════════════════════════════════════════════════════════════════════════════
 
 @st.cache_data(show_spinner=False, ttl=300)
-def _tong_to_hstd(ts: float = 0.0) -> int:
+def _doi_chieu_hstd_cdto(df_cdto: pd.DataFrame, ts: float = 0.0) -> dict:
     try:
         import pyarrow.parquet as pq
 
         cols_available = set(pq.read_schema(CACHE_HSTD).names)
-        if COT_TEN_PGD not in cols_available or COT_TEN_TO not in cols_available:
-            return 0
-        cols = [COT_TEN_PGD, COT_TEN_TO]
-        if COT_TEN_XA in cols_available:
-            cols.insert(1, COT_TEN_XA)
-        df = pd.read_parquet(CACHE_HSTD, columns=cols)
+        required = {COT_MA_PGD, COT_MA_TO, COT_TONG_DU_NO}
+        if not required.issubset(cols_available):
+            return {}
+        cols = [COT_MA_PGD, COT_MA_TO, COT_TONG_DU_NO]
+        for col in (COT_TEN_PGD, COT_TEN_TO, COT_HINH_THUC_VAY):
+            if col in cols_available:
+                cols.append(col)
+        df_hstd = pd.read_parquet(CACHE_HSTD, columns=cols)
     except Exception:
-        return 0
-    for col in df.columns:
-        try:
-            df[col] = df[col].astype("string").str.strip().replace("", pd.NA)
-        except Exception:
-            df[col] = df[col]
-    return int(df.dropna().drop_duplicates().shape[0])
+        return {}
+    return doi_chieu_cdtotkvv_hstd(df_cdto, df_hstd)
 
 
 def _cdtotkvv_key_cols(df: pd.DataFrame) -> list[str]:
@@ -393,7 +400,9 @@ def _sub_tong_hop(username: str) -> None:
         ts_hstd = os.path.getmtime(CACHE_HSTD) if os.path.exists(CACHE_HSTD) else 0.0
     except Exception:
         ts_hstd = 0.0
-    tong_to_hstd = _tong_to_hstd(ts_hstd) if ts_hstd else 0
+    doi_chieu = _doi_chieu_hstd_cdto(df_unique_to, ts_hstd) if ts_hstd else {}
+    tong_to_hstd = int(doi_chieu.get("tong_hstd", 0) or 0)
+    so_to_khop = int(doi_chieu.get("so_khop", 0) or 0)
     tong_tot = _count_xep_loai(df_unique_to, _XEP_LOAI_TOT)
     tong_kha = _count_xep_loai(df_unique_to, _XEP_LOAI_KHA)
     tong_tb = _count_xep_loai(df_unique_to, _XEP_LOAI_TB)
@@ -407,7 +416,10 @@ def _sub_tong_hop(username: str) -> None:
     ty_le_yeu_kem = (tong_yeu / tong_to * 100) if tong_to else 0.0
 
     c1, c2, c3, c4 = st.columns(4)
-    delta_hstd = f"HSTD: {fmt_so(tong_to_hstd)}" if tong_to_hstd else "HSTD: —"
+    delta_hstd = (
+        f"Khớp HSTD: {fmt_so(so_to_khop)}/{fmt_so(tong_to_hstd)}"
+        if tong_to_hstd else "HSTD: —"
+    )
     c1.metric("Tổng số Tổ (CDTOTKVV)", fmt_so(tong_to_unique_cdto), delta=delta_hstd)
     c2.metric("Điểm TB toàn CN", f"{diem_tb:.2f}")
     c3.metric("% Đạt (Tốt+Khá)", f"{ty_le_dat:.1f}%")
@@ -418,10 +430,56 @@ def _sub_tong_hop(username: str) -> None:
             f"unique theo (PGD, Mã Tổ) = {fmt_so(tong_to_unique_cdto)}. "
             "Các tỷ lệ xếp loại bên dưới cũng dùng mẫu số unique này."
         )
-    if tong_to_hstd and tong_to_hstd != tong_to_unique_cdto:
-        st.caption(
-            "ℹ️ Hai tab có thể khác nhau vì CDTOTKVV phản ánh danh sách Tổ được chấm điểm theo kỳ "
-            "và có thể thiếu PGD/Tổ; HSTD phản ánh Tổ phát sinh trong dữ liệu cho vay (có món vay)."
+    df_chi_hstd = doi_chieu.get("chi_hstd", pd.DataFrame())
+    df_chi_cdto = doi_chieu.get("chi_cdto", pd.DataFrame())
+    df_truc_tiep = doi_chieu.get("cho_vay_truc_tiep", pd.DataFrame())
+    if isinstance(df_truc_tiep, pd.DataFrame) and not df_truc_tiep.empty:
+        st.info(
+            f"ℹ️ HSTD có **{fmt_so(len(df_truc_tiep))} mã cho vay trực tiếp** "
+            "(`Hình thức vay = 1`), không thuộc phạm vi chấm điểm Tổ TK&VV."
+        )
+        hien_tt = df_truc_tiep.copy()
+        hien_tt["Ghi chú"] = "Cho vay trực tiếp — không thuộc CDTO"
+        hien_tt = hien_tt.rename(columns={
+            "ten_dv": "Đơn vị",
+            "ma_to_chuan": "Mã",
+            "ten_to": "Tên hiển thị trong HSTD",
+            "du_no": "Dư nợ (triệu đồng)",
+        })
+        hien_tt["Dư nợ (triệu đồng)"] = hien_tt["Dư nợ (triệu đồng)"].apply(fmt_ty)
+        cols_tt = [
+            col for col in (
+                "Đơn vị", "Mã", "Tên hiển thị trong HSTD",
+                "Dư nợ (triệu đồng)", "Ghi chú",
+            ) if col in hien_tt.columns
+        ]
+        hien_thi_dataframe_phan_trang(
+            hien_tt[cols_tt],
+            key="cdtotkvv_hstd_cho_vay_truc_tiep",
+        )
+    if isinstance(df_chi_hstd, pd.DataFrame) and not df_chi_hstd.empty:
+        st.warning(
+            f"⚠️ HSTD có **{fmt_so(len(df_chi_hstd))} Tổ** còn dư nợ nhưng chưa có trong CDTO kỳ này."
+        )
+        hien = df_chi_hstd.copy()
+        hien = hien.rename(columns={
+            "ten_dv": "Đơn vị",
+            "ma_to_chuan": "Mã Tổ",
+            "ten_to": "Tên Tổ/Tổ trưởng HSTD",
+            "du_no": "Dư nợ (triệu đồng)",
+        })
+        hien["Dư nợ (triệu đồng)"] = hien["Dư nợ (triệu đồng)"].apply(fmt_ty)
+        cols_hien = [
+            col for col in ("Đơn vị", "Mã Tổ", "Tên Tổ/Tổ trưởng HSTD", "Dư nợ (triệu đồng)")
+            if col in hien.columns
+        ]
+        hien_thi_dataframe_phan_trang(
+            hien[cols_hien],
+            key="cdtotkvv_hstd_thieu_cham_diem",
+        )
+    if isinstance(df_chi_cdto, pd.DataFrame) and not df_chi_cdto.empty:
+        st.info(
+            f"ℹ️ CDTO có **{fmt_so(len(df_chi_cdto))} Tổ** không còn dư nợ tương ứng trong HSTD."
         )
 
     def _render_xep_loai_card(col, label: str, count: int, bg: str, color: str) -> None:

@@ -12,6 +12,12 @@ from config import (
     CDTOTKVV_DIR,
     CDTOTKVV_COLS,
     CDTOTKVV_DATA_ROW_START,
+    COT_MA_PGD,
+    COT_MA_TO,
+    COT_HINH_THUC_VAY,
+    COT_TEN_PGD,
+    COT_TEN_TO,
+    COT_TONG_DU_NO,
     TEN_PGD_TO_MA,
 )
 from config import PGD_DATA_DIR
@@ -51,6 +57,126 @@ def _normalize_code_value(val, width: int | None = None):
     if width and re.fullmatch(r"\d+", text):
         return text.zfill(width)
     return text
+
+
+def chuan_hoa_cdtotkvv_phan_tich(df: pd.DataFrame | None) -> pd.DataFrame:
+    """Chuẩn hóa tập CDTO dùng cho KPI/báo cáo, không sửa DataFrame đầu vào.
+
+    - Chỉ giữ Tổ còn dư nợ dương.
+    - Quy đổi các biến thể ``Yếu kém``/``Yếu`` về nhãn chuẩn ``Yếu``.
+
+    Nếu thiếu cột ``du_no`` thì giữ nguyên dữ liệu để tương thích với các tập
+    tối giản trong kiểm thử và các file lịch sử cũ chưa đủ schema.
+    """
+    if df is None or df.empty:
+        return pd.DataFrame() if df is None else df.copy()
+
+    out = df.copy()
+    if "du_no" in out.columns:
+        out["du_no"] = pd.to_numeric(out["du_no"], errors="coerce")
+        out = out[out["du_no"].fillna(0) > 0].copy()
+
+    if "xep_loai" in out.columns:
+        def _xep_loai_chuan(value):
+            if value is None or pd.isna(value):
+                return pd.NA
+            text = str(value).strip()
+            if _norm_text_key(text) in {"yeu", "yeukem"}:
+                return _XEP_LOAI_YEU
+            return text
+
+        out["xep_loai"] = out["xep_loai"].map(_xep_loai_chuan)
+
+    return out.reset_index(drop=True)
+
+
+def doi_chieu_cdtotkvv_hstd(
+    df_cdto: pd.DataFrame | None,
+    df_hstd: pd.DataFrame | None,
+) -> dict:
+    """Đối chiếu CDTO/HSTD bằng khóa chuẩn ``Mã PGD + Mã tổ``.
+
+    HSTD chỉ tính mã Tổ có tổng dư nợ dương và loại ``0000000`` (dư nợ
+    không qua Tổ). Kết quả giữ hai danh sách ngoại lệ để UI cho phép đối chiếu
+    dữ liệu nguồn, không tự ghép theo tên Tổ trưởng.
+    """
+    empty = {
+        "tong_cdto": 0,
+        "tong_hstd": 0,
+        "so_khop": 0,
+        "chi_hstd": pd.DataFrame(),
+        "chi_cdto": pd.DataFrame(),
+        "cho_vay_truc_tiep": pd.DataFrame(),
+    }
+    if df_cdto is None or df_cdto.empty or df_hstd is None or df_hstd.empty:
+        return empty
+
+    required_cdto = {"ma_dv", "ma_to"}
+    required_hstd = {COT_MA_PGD, COT_MA_TO, COT_TONG_DU_NO}
+    if not required_cdto.issubset(df_cdto.columns) or not required_hstd.issubset(df_hstd.columns):
+        return empty
+
+    cdto = chuan_hoa_cdtotkvv_phan_tich(df_cdto)
+    cdto["ma_dv_chuan"] = cdto["ma_dv"].map(
+        lambda value: _normalize_code_value(value, 6)
+    )
+    cdto["ma_to_chuan"] = cdto["ma_to"].map(
+        lambda value: _normalize_code_value(value, 7)
+    )
+    cdto = cdto.dropna(subset=["ma_dv_chuan", "ma_to_chuan"]).copy()
+    cdto = cdto[cdto["ma_to_chuan"] != "0000000"].copy()
+    cdto["_key"] = cdto["ma_dv_chuan"].astype(str) + "|" + cdto["ma_to_chuan"].astype(str)
+    cdto = cdto.drop_duplicates("_key", keep="last")
+
+    hstd = df_hstd.copy()
+    hstd["ma_dv_chuan"] = hstd[COT_MA_PGD].map(
+        lambda value: _normalize_code_value(value, 6)
+    )
+    hstd["ma_to_chuan"] = hstd[COT_MA_TO].map(
+        lambda value: _normalize_code_value(value, 7)
+    )
+    hstd[COT_TONG_DU_NO] = pd.to_numeric(hstd[COT_TONG_DU_NO], errors="coerce").fillna(0)
+    if COT_HINH_THUC_VAY in hstd.columns:
+        hinh_thuc = pd.to_numeric(hstd[COT_HINH_THUC_VAY], errors="coerce")
+        hstd["_du_no_truc_tiep"] = hstd[COT_TONG_DU_NO].where(hinh_thuc == 1, 0)
+    else:
+        hstd["_du_no_truc_tiep"] = 0
+    hstd = hstd.dropna(subset=["ma_dv_chuan", "ma_to_chuan"]).copy()
+    hstd = hstd[hstd["ma_to_chuan"] != "0000000"].copy()
+
+    agg_kwargs: dict[str, tuple[str, str]] = {
+        "du_no": (COT_TONG_DU_NO, "sum"),
+        "du_no_truc_tiep": ("_du_no_truc_tiep", "sum"),
+    }
+    if COT_TEN_PGD in hstd.columns:
+        agg_kwargs["ten_dv"] = (COT_TEN_PGD, "first")
+    if COT_TEN_TO in hstd.columns:
+        agg_kwargs["ten_to"] = (COT_TEN_TO, "first")
+    hstd_to = (
+        hstd.groupby(["ma_dv_chuan", "ma_to_chuan"], as_index=False)
+        .agg(**agg_kwargs)
+    )
+    hstd_to = hstd_to[hstd_to["du_no"] > 0].copy()
+    cho_vay_truc_tiep = hstd_to[
+        (hstd_to["du_no_truc_tiep"] > 0)
+        & (hstd_to["du_no_truc_tiep"] == hstd_to["du_no"])
+    ].copy()
+    hstd_to = hstd_to.drop(index=cho_vay_truc_tiep.index).copy()
+    hstd_to["_key"] = hstd_to["ma_dv_chuan"].astype(str) + "|" + hstd_to["ma_to_chuan"].astype(str)
+
+    keys_cdto = set(cdto["_key"])
+    keys_hstd = set(hstd_to["_key"])
+    chi_hstd = hstd_to[~hstd_to["_key"].isin(keys_cdto)].copy()
+    chi_cdto = cdto[~cdto["_key"].isin(keys_hstd)].copy()
+
+    return {
+        "tong_cdto": len(keys_cdto),
+        "tong_hstd": len(keys_hstd),
+        "so_khop": len(keys_cdto & keys_hstd),
+        "chi_hstd": chi_hstd.reset_index(drop=True),
+        "chi_cdto": chi_cdto.reset_index(drop=True),
+        "cho_vay_truc_tiep": cho_vay_truc_tiep.reset_index(drop=True),
+    }
 
 
 def _tim_header_cdto_toan_cn(all_rows: list[list]) -> tuple[int | None, dict[str, int]]:
@@ -252,7 +378,7 @@ def doc_cdtotkvv_path(duong_dan: str, _ts) -> pd.DataFrame | None:
         if col in df.columns:
             width = _CODE_WIDTHS.get(col)
             df[col] = df[col].map(lambda v, w=width: _normalize_code_value(v, w))
-    return df
+    return chuan_hoa_cdtotkvv_phan_tich(df)
 
 
 @st.cache_data(show_spinner=False)
@@ -264,7 +390,13 @@ def doc_cdtotkvv(thang_nam: str) -> pd.DataFrame | None:
         return None
     pgd_data = BASE_DIR / "pgd_data"
     frames = []
-    for f in pgd_data.rglob(f"cdtotkvv_{suffix}.xlsx"):
+    # Đọc file cũ trước, file được cập nhật sau đọc sau để khi loại trùng sẽ
+    # ưu tiên bản sửa mới nhất của cùng một Tổ.
+    files = sorted(
+        pgd_data.rglob(f"cdtotkvv_{suffix}.xlsx"),
+        key=lambda path: path.stat().st_mtime,
+    )
+    for f in files:
         df = doc_cdtotkvv_path(str(f), ts_file(str(f)))
         if df is not None and not df.empty:
             frames.append(df)
@@ -280,7 +412,21 @@ def doc_cdtotkvv(thang_nam: str) -> pd.DataFrame | None:
                 pass
     if not frames:
         return None
-    return pd.concat(frames, ignore_index=True)
+    result = pd.concat(frames, ignore_index=True)
+
+    # Phòng vệ dữ liệu lịch sử: một file toàn CN từng có thể bị đặt nhầm trong
+    # thư mục một đơn vị, khiến cùng Tổ xuất hiện thêm lần nữa khi concat.
+    # Chỉ loại trùng các dòng có đủ định danh để không làm mất dòng lỗi cần rà soát.
+    key_cols = [col for col in ("ma_dv", "ma_to") if col in result.columns]
+    if len(key_cols) == 2:
+        complete_key = result[key_cols].notna().all(axis=1)
+        rows_valid = result.loc[complete_key].drop_duplicates(
+            subset=key_cols,
+            keep="last",
+        )
+        rows_incomplete = result.loc[~complete_key]
+        result = pd.concat([rows_valid, rows_incomplete], ignore_index=True)
+    return result
 
 
 @st.cache_data(show_spinner=False)
@@ -632,6 +778,15 @@ def tong_hop_theo_pgd(df: pd.DataFrame) -> pd.DataFrame:
     - to_tinh_trang_a/b/c : số tổ theo tình trạng A/B/C
     Trả về DataFrame sort theo ma_dv.
     """
+    df = chuan_hoa_cdtotkvv_phan_tich(df)
+    if df.empty:
+        return pd.DataFrame(
+            columns=[
+                "ma_dv", "ten_dv", "tong_to", "tong_diem_tb",
+                "to_tot", "to_kha", "to_tb", "to_yeu",
+                "to_tinh_trang_a", "to_tinh_trang_b", "to_tinh_trang_c",
+            ]
+        )
     nhom = df.groupby(["ma_dv", "ten_dv"], as_index=False)
     tong_hop = nhom.agg(
         tong_to=("stt", "count"),

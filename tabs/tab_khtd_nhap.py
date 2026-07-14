@@ -271,7 +271,6 @@ def _tao_view_editor_khtd_cn(df_editor_meta: pd.DataFrame) -> pd.DataFrame:
     """Tạo DataFrame hiển thị cho data_editor: cột tính toán là text, cột KH là số nguyên editable."""
     df_view = df_editor_meta[
         [
-            "Nhóm",
             "Chương trình",
             "KH TW",
             "TH TW",
@@ -601,7 +600,6 @@ def _tab_khtd_chi_nhanh(
         height=720,
         num_rows="fixed",
         column_config={
-            "Nhóm": st.column_config.TextColumn(width="medium"),
             "Chương trình": st.column_config.TextColumn(width="large"),
             "KH TW": st.column_config.TextColumn("KH TW", width="small"),
             "TH TW": st.column_config.TextColumn("TH TW", width="small"),
@@ -613,7 +611,6 @@ def _tab_khtd_chi_nhanh(
             "Còn TH tổng": st.column_config.TextColumn("Còn TH tổng", width="small"),
         },
         disabled=[
-            "Nhóm",
             "Chương trình",
             "TH TW",
             "Còn TH TW",

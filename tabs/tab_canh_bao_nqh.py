@@ -430,7 +430,7 @@ def _render_tong_hop(
         {''.join(rows_h)}
         </tbody>
         </table>
-        <div class="tfoot" style="background:#f8fafc;border-radius:0 0 12px 12px">
+        <div class="tfoot" style="background:var(--secondary-background-color);border-radius:0 0 12px 12px">
             <span>🔴 <strong>{so_nh}</strong> nguy hiểm</span>
             <span>🟡 <strong>{so_td}</strong> theo dõi</span>
             <span>🟢 <strong>{so_od}</strong> ổn định</span>
@@ -1058,12 +1058,14 @@ def _doc_snapshot_nqh_delta() -> pd.DataFrame:
     with get_conn() as conn:
         df_c = pd.read_sql_query(
             "SELECT ten_pgd, SUM(du_no_qh) qh_curr, SUM(tong_du_no) dn_curr "
-            "FROM hstd_snapshot WHERE ky=? GROUP BY ten_pgd",
+            "FROM hstd_snapshot WHERE ky=? AND ma_ct='ALL' AND nguon_von='ALL' "
+            "AND ten_pgd!='__CN__' GROUP BY ten_pgd",
             conn, params=(ky_curr,),
         )
         df_p = pd.read_sql_query(
             "SELECT ten_pgd, SUM(du_no_qh) qh_prev, SUM(tong_du_no) dn_prev "
-            "FROM hstd_snapshot WHERE ky=? GROUP BY ten_pgd",
+            "FROM hstd_snapshot WHERE ky=? AND ma_ct='ALL' AND nguon_von='ALL' "
+            "AND ten_pgd!='__CN__' GROUP BY ten_pgd",
             conn, params=(ky_prev,),
         )
     df = df_c.merge(df_p, on="ten_pgd", how="left").fillna(0)

@@ -1,5 +1,150 @@
 # CHANGELOG
 
+## [2026-07-14] — Bổ sung test hồi quy routing Telegram Upload PGD
+- `tests/test_telegram_service.py` — thêm 4 case khóa thứ tự chat PGD → chat phụ `upload_pgd` → chat chính và xác nhận lỗi được log theo key `upload_pgd`, không gọi HTTP thật
+- `TEST_COVERAGE.md` — cập nhật coverage cho `services/telegram_service.py`
+- `CHANGELOG.md` — ghi nhận bộ test hồi quy Telegram Upload PGD
+
+## [2026-07-14] — Telegram: Thông báo Upload PGD gửi đúng vào chat PGD (nếu đã cấu hình)
+- `services/telegram_service.py` — `gui_thong_bao_upload_pgd()` dùng routing `gui_tin_pgd()` để ưu tiên chat riêng từng PGD; log vẫn theo `notify_key='upload_pgd'` để tab Telegram admin tra lỗi đúng
+
+## [2026-07-14] — Đối chiếu CDTO/HSTD thống nhất theo Mã Tổ
+- `data/cdtotkvv.py` — thêm bộ đối chiếu theo `Mã PGD + Mã tổ`, loại mã `0000000`, Tổ không còn dư nợ và tách cho vay trực tiếp theo `Hình thức vay = 1`
+- `tabs/tab_cdtotkvv.py` — thay phép đếm HSTD theo tên bằng tỷ lệ mã khớp, hiện ghi chú riêng cho vay trực tiếp và danh sách Tổ ủy thác thiếu CDTO
+- `tests/test_cdtotkvv_history.py` — kiểm thử đổi tên không làm lệch định danh, loại dư nợ trực tiếp và phát hiện Tổ thiếu chấm điểm
+- `BUGMAP.md` — ghi nhận lỗi đối chiếu HSTD dùng tên Tổ dù parquet đã có Mã tổ
+
+## [2026-07-14] — Chuẩn hóa CDTO chỉ tính Tổ còn dư nợ
+- `data/cdtotkvv.py` — tạo tập phân tích chỉ gồm Tổ có dư nợ dương và chuẩn hóa nhãn `Yếu kém` thành `Yếu`
+- `services/cdtotkvv_service.py` — luồng latest của dashboard dùng parser chuẩn thay vì tự đọc Excel bỏ qua quy tắc nghiệp vụ
+- `snapshot_service.py` — phòng vệ lọc dư nợ dương và chuẩn hóa xếp loại trước khi ghi snapshot CDTO
+- `tabs/tab_cdtotkvv.py` — đối chiếu HSTD chỉ đếm Tổ có tổng dư nợ dương
+- `tests/test_cdtotkvv_history.py` — kiểm thử loại Tổ dư nợ 0, giữ nguyên nguồn và đếm đúng nhãn Yếu kém
+- `BUGMAP.md` — ghi nhận sai lệch KPI do Tổ dư nợ 0 và nhãn `Yếu kém` không đồng nhất
+
+## [2026-07-14] — Sửa CDTO toàn Chi nhánh bị cộng trùng sau upload
+- `data/pgd.py` — cho phép riêng luồng upload toàn Chi nhánh ghi đè bản lịch sử CDTO đã tách lại cùng kỳ
+- `services/upload_service.py` — upload CDTO toàn Chi nhánh luôn cập nhật cả file latest và file lịch sử của đủ 22 đơn vị
+- `data/cdtotkvv.py` — loại trùng phòng vệ theo mã đơn vị + mã Tổ khi đọc dữ liệu lịch sử theo tháng
+- `tabs/tab_upload_khnv.py` — chặn import file CDTO chứa nhiều đơn vị vào một đơn vị
+- `tabs/tab_upload_khnv/_upload_don_vi.py` — áp dụng cùng kiểm tra cho giao diện upload KH-NV dạng module
+- `tests/test_cdtotkvv_history.py` — kiểm thử ghi đè lịch sử có chủ đích và loại trùng dữ liệu CDTO
+- `BUGMAP.md` — ghi nhận nguyên nhân file toàn CN bị lưu nhầm vào lịch sử Hội sở và cách phòng ngừa
+
+## [2026-07-14] — Nâng cấp toàn diện PDF báo cáo Ủy thác
+- `services/uy_thac_pdf_service.py` — tạo mới engine ReportLab cho PDF báo cáo đang xem và PDF điều hành nhiều phần, có logo, KPI, nhận định, biểu đồ, bảng lặp header, số trang và quy đổi VND sang triệu đồng
+- `tabs/tab_uy_thac.py` — bổ sung hai luồng tạo/tải PDF theo đúng phạm vi và bộ lọc hiện tại, ghi audit sau khi tải thành công
+- `tests/test_uy_thac_pdf_service.py` — thêm test nội dung, số trang và chặn lỗi hiển thị VND dưới nhãn triệu đồng
+- `BUGMAP.md` — ghi nhận điểm yếu của PDF Ủy thác cũ và hướng thay thế không phụ thuộc Microsoft Word
+
+## [2026-07-14] — Hiện danh sách chi tiết ngay tại cảnh báo Ủy thác
+- `services/uy_thac_service.py` — bổ sung danh sách Tổ/Hội có lãi tồn và danh sách Tổ đa hội theo định danh PGD + Xã + Tổ
+- `tabs/tab_uy_thac.py` — hiện hai bảng phân tích ngay dưới cảnh báo lãi tồn và Tổ xuất hiện ở hơn một Hội
+- `tests/test_uy_thac_service.py` — thêm test tổng hợp lãi tồn và liệt kê đầy đủ các Hội của Tổ đa hội
+- `BUGMAP.md` — ghi nhận cảnh báo Ủy thác trước đây chỉ có số lượng, chưa có danh sách để đối chiếu
+
+## [2026-07-12] — Làm rõ bố cục hiển thị của mục Tổng quan Ủy thác
+- `tabs/tab_uy_thac.py` — sắp lại `Tổng quan Ủy thác` theo các khối `Thông tin phạm vi / Nhận định nhanh / Quy mô / Chất lượng / Chỉ số bình quân`, gom bảng vào tab `Theo Hội đoàn thể / Theo địa bàn / Top trọng điểm` để màn hình dễ đọc hơn
+
+## [2026-07-12] — Backfill snapshot Ủy thác cho kỳ cũ
+- `snapshot_service.py` — `luu_uy_thac_snapshot()` nhận `ky` override để backfill an toàn theo kỳ lịch sử, clear cache sau ghi và audit lỗi khi snapshot thất bại
+- `services/upload_service.py` — `merge_baseline_toan_cn(loai="hstd")` gọi thêm backfill `uy_thac_snapshot` với kỳ `YYYY-12` để sinh grain `PGD + Hội` cho snapshot cũ
+- `tests/test_snapshot_service.py` — thêm test chặn regression `ky` override khi lưu snapshot Ủy thác
+- `tests/test_merge_du_lieu_toan_cn.py` — thêm test đảm bảo baseline HSTD gọi cả `hstd_snapshot` lẫn `uy_thac_snapshot` với đúng kỳ backfill
+- `BUGMAP.md` — ghi nhận lỗi pipeline baseline HSTD chỉ sinh `hstd_snapshot`, làm thiếu snapshot `Ủy thác` cho kỳ cũ
+
+## [2026-07-12] — Tách API đọc snapshot Hội theo đúng grain
+- `snapshot_service.py` — thêm API chuyên biệt đọc `Hội toàn Chi nhánh` và `Hội trong PGD`, giữ nguyên API tổng quát để tương thích ngược
+- `tabs/tab_uy_thac.py` — nhánh `Biến động nhiều kỳ theo Hội` gọi API rõ grain theo phạm vi người dùng chọn
+- `tests/test_snapshot_service.py` — thêm test chặn API Hội toàn CN/PGD đọc lẫn grain và chặn truy vấn PGD khi thiếu phạm vi
+- `BUGMAP.md` — ghi nhận pattern API tổng quát dễ bị call-site truyền thiếu `ten_pgd` và đọc nhầm grain Hội
+
+## [2026-07-12] — Siết đúng dữ liệu biến động Hội theo PGD trong tab Ủy thác
+- `tabs/tab_uy_thac.py` — sheet `BienDongNhieuKy` trong bộ Excel nay ưu tiên đúng báo cáo biến động đang xem; thêm cảnh báo khi chuỗi `Hội trong PGD` thiếu kỳ do snapshot lịch sử chưa có grain mới
+- `tests/test_snapshot_service.py` — thêm test chặn lẫn `HOI` toàn CN với `HOI` theo từng PGD khi cùng một Hội xuất hiện ở nhiều PGD, và test suy luận backward-compatible khi truyền `dvut + ten_pgd`
+- `BUGMAP.md` — thêm lỗi bundle `BienDongNhieuKy` lấy sai scope và rủi ro thiếu kỳ ở snapshot Hội trong PGD
+
+## [2026-07-12] — Bổ sung biến động nhiều kỳ theo Hội trong từng PGD cho tab Ủy thác
+- `snapshot_service.py` — lưu thêm snapshot cấp `HOI` theo cặp `PGD + Hội` và giữ tương thích ngược khi đọc `Hội` toàn Chi nhánh
+- `tabs/tab_uy_thac.py` — cho phép chọn phạm vi `Toàn Chi nhánh / PGD cụ thể` trước khi xem `Biến động nhiều kỳ` theo Hội đoàn thể
+- `tests/test_snapshot_service.py` — thêm test hồi quy cho đọc snapshot `HOI` theo từng PGD mà không lẫn với bản tổng toàn Chi nhánh
+- `BUGMAP.md` — thêm lỗi snapshot `Hội` chỉ lưu ở cấp toàn Chi nhánh nên không xem được biến động theo từng PGD
+
+## [2026-07-12] — Vá lỗi hồi quy của báo cáo điều hành tab Ủy thác
+- `services/uy_thac_service.py` — thêm `tong_quan_dieu_hanh_uy_thac()` để đếm `Tổ có NQH/lãi tồn` theo identity unique toàn phạm vi, tránh KPI vượt thực tế khi Tổ xuất hiện đa Hội
+- `tabs/tab_uy_thac.py` — KPI nhanh dùng helper tổng quan điều hành; sheet `DiemNongXa/DiemNongTo` trong bộ Excel nay dùng đúng dữ liệu đã lọc; bundle Excel luôn kèm `XepHangChatLuong`, `CanhBaoTrongDiem`, `BienDongNhieuKy`
+- `tests/test_uy_thac_service.py` — thêm test hồi quy cho trường hợp Tổ đa Hội nhưng chỉ được tính 1 lần ở KPI điều hành
+- `BUGMAP.md` — thêm lỗi hồi quy bundle/kpi của tab Ủy thác sau đợt mở rộng báo cáo điều hành
+
+## [2026-07-12] — Mở rộng biến động nhiều kỳ của tab Ủy thác theo Hội và Xã
+- `snapshot_service.py` — mở rộng `doc_uy_thac_snapshot_multi()` để đọc chuỗi snapshot theo `CN/PGD/XA/HOI` và lọc theo PGD, xã, hội đoàn thể
+- `tabs/tab_uy_thac.py` — bổ sung chọn cấp biến động `Tổng phạm vi / Hội đoàn thể / Xã-phường`, thêm chọn đối tượng snapshot và đưa sheet biến động vào bộ Excel khi đang xem báo cáo này
+- `tests/test_snapshot_service.py` — thêm test hồi quy cho đọc snapshot Ủy thác theo `HOI` và `XA`
+- `BUGMAP.md` — thêm lỗi `Biến động nhiều kỳ` mới đọc được tổng CN/PGD nên thiếu chiều Hội/Xã
+
+## [2026-07-12] — Mở rộng báo cáo điều hành cho tab Ủy thác
+- `services/uy_thac_service.py` — thêm helper báo cáo điều hành với tỷ trọng dư nợ, bình quân/Tổ, bình quân/KH và số Tổ có NQH/lãi tồn
+- `tabs/tab_uy_thac.py` — bổ sung KPI điều hành nhanh, 3 loại báo cáo mới `Điều hành theo PGD / Điều hành theo Hội / Điểm nóng xã-Tổ` và mở rộng bộ Excel với các sheet điều hành
+- `tests/test_uy_thac_service.py` — thêm test hồi quy cho helper điều hành, chặn lỗi đếm trùng Tổ và sai chỉ tiêu bình quân/tỷ lệ
+- `BUGMAP.md` — thêm lỗi tab Ủy thác dùng chung chỉ tiêu nền nên báo cáo điều hành còn mỏng
+
+## [2026-07-12] — Sửa format bảng tổng hợp theo PGD của Ban Đại Diện
+- `tabs/tab_ban_dai_dien.py` — dùng chung helper format kiểu Việt Nam cho `Bảng tổng hợp theo PGD` trên màn hình và khi xuất PDF để in
+- `BUGMAP.md` — thêm lỗi UI bảng Ban Đại Diện thiếu phân cách hàng nghìn
+
+## [2026-07-11] — Fix 4 lỗi độ tin cậy của snapshot HSTD
+- `snapshot_service.py` — sửa tổng hợp theo chương trình từ dòng chi tiết PGD; lấy kỳ/ngày số liệu lớn nhất; clear cache ngay sau lưu/xóa snapshot
+- `tabs/tab_trang_thai_nguon.py`, `tabs/tab_canh_bao_nqh.py`, `tabs/tab_xay_dung_khtd.py` — các query chỉ đọc đúng lớp tổng cần dùng, không cộng chồng chi tiết PGD với tổng CN; status board sửa thêm quy đổi tỷ đồng từ `/1e12` thành `/1e9`
+- `services/upload_service.py` — dùng chung `_ky_tu_df()` cho snapshot CDTOTKVV và clear cache sau khi background snapshot hoàn tất
+- `tests/test_snapshot_service.py`, `tests/test_tab_trang_thai_nguon.py` — thêm test hồi quy cho CT, ngày lớn nhất, invalidation cache và query status board không cộng chồng
+- `tabs/tab_canh_bao_nqh.py` — thay nền footer cố định bằng CSS variable để giữ tương thích dark mode khi sửa query snapshot trong cùng file
+- `BUGMAP.md` — thêm A7–A10 ghi nhận bốn lỗi snapshot và cách phòng ngừa
+
+## [2026-07-11] — Nâng cấp snapshot riêng cho dữ liệu Ủy thác
+- `db.py` — thêm bảng `uy_thac_snapshot` và index bằng migration cộng thêm `CREATE TABLE IF NOT EXISTS`; không sửa/xóa `hstd_snapshot`
+- `snapshot_service.py` — thêm API ghi snapshot upsert-safe theo 5 cấp `CN/PGD/XA/HOI/TO`, đọc danh sách kỳ và chuỗi nhiều kỳ theo toàn CN hoặc PGD
+- `services/upload_service.py` — tự tạo snapshot ủy thác trong background sau merge HSTD thành công
+- `tabs/tab_uy_thac.py` — chuyển `Biến động nhiều kỳ` sang snapshot ủy thác thật, bổ sung lãi tồn, tiền gửi và số Tổ cùng delta kỳ trước
+- `services/uy_thac_service.py` — mở rộng helper delta cho các chỉ tiêu mới của snapshot ủy thác
+- `tests/test_db.py`, `tests/test_snapshot_service.py`, `tests/test_uy_thac_service.py`, `tests/test_merge_du_lieu_toan_cn.py` — thêm test tạo schema trên DB tạm, upsert, đọc CN/PGD, delta và chặn background snapshot trong test merge
+- `SCHEMA.md` — bổ sung schema và khóa duy nhất của `uy_thac_snapshot`
+
+## [2026-07-11] — Thêm 3 báo cáo điều hành sâu cho tab Ủy thác
+- `tabs/tab_uy_thac.py` — bổ sung `Xếp hạng chất lượng`, `Cảnh báo trọng điểm` và `Biến động nhiều kỳ` vào trung tâm báo cáo; hỗ trợ drill-down hiện có và xuất Excel báo cáo đang xem
+- `services/uy_thac_service.py` — thêm điểm rủi ro tương đối theo NQH/lãi tồn/KH bình quân Tổ, hợp nhất cảnh báo hành động và tính delta snapshot theo kỳ
+- `tests/test_uy_thac_service.py` — thêm test xếp hạng, cảnh báo hợp nhất và biến động kỳ trước; tổng bộ test service tăng lên 39
+- `CHANGELOG.md` — ghi nhận giới hạn hiện tại: snapshot lịch sử là tổng HSTD theo PGD, chưa lưu chiều Hội/Tổ/lãi tồn nên màn nhiều kỳ được ghi rõ là số tham chiếu
+
+## [2026-07-11] — Review và sửa lỗi hồi quy tab Ủy thác
+- `tabs/tab_uy_thac.py` — sửa call `xuat_excel()` sai signature, bộ lọc lãi tồn, và chuẩn hóa hiển thị tiền theo triệu đồng
+- `services/uy_thac_service.py` — giới hạn đúng hồ sơ có Hội nhận ủy thác và tránh đếm trùng Tổ đa hội trong KPI tổng
+- `tests/test_uy_thac_service.py` — thêm test loại khoản vay trực tiếp và khử trùng Tổ đa hội
+- `BUGMAP.md` — thêm J19 ghi nhận các lỗi hồi quy phát hiện trong vòng review
+
+## [2026-07-11] — Hoàn thiện 3 khu chính của tab Ủy thác
+- `tabs/tab_uy_thac.py` dòng ~120-1775 — nâng `Tổng quan Ủy thác` với KPI sâu và bảng điểm nóng; mở rộng `Báo cáo số liệu` theo PGD/xã/Hội/tổ kèm drill-down và export; hoàn thiện `Theo dõi kiến nghị` với KPI hạn xử lý và Excel theo dõi
+- `services/uy_thac_service.py` dòng ~166-286 — thêm helper tổng hợp trạng thái kiến nghị và dựng bảng theo dõi có cảnh báo hạn
+- `tests/test_uy_thac_service.py` — thêm test cho tổng hợp kiến nghị và cảnh báo hạn trong bảng theo dõi
+
+## [2026-07-11] — Bỏ mục số 4 khỏi điều hướng tab Ủy thác
+- `tabs/tab_uy_thac.py` dòng ~287-1676 — xóa hẳn mục `🗂️ Kho mẫu biểu` khỏi thanh điều hướng; tab `Ủy thác` hiện chỉ còn 3 khu `Tổng quan Ủy thác / Báo cáo số liệu / Theo dõi kiến nghị`
+
+## [2026-07-11] — Thiết kế lại tab Ủy thác theo hướng ưu tiên báo cáo số liệu
+- `tabs/tab_uy_thac.py` dòng ~99-1701 — đổi điều hướng chính sang 4 khu `Tổng quan Ủy thác / Báo cáo số liệu / Theo dõi kiến nghị / Kho mẫu biểu`, chuyển trọng tâm từ mẫu biểu kiểm tra sang dashboard và export Excel báo cáo
+- `services/uy_thac_service.py` dòng ~31-205 — bổ sung helper tổng quan, tổng hợp theo chiều và lọc danh sách chi tiết để dùng chung cho màn hình báo cáo mới
+- `tests/test_uy_thac_service.py` — thêm test hồi quy cho tổng quan Ủy thác, tổng hợp theo PGD/Hội và danh sách chi tiết có cột `Nợ lãi`
+
+## [2026-07-11] — Fix lỗi render Ban Đại Diện do còn sót `_ngay_so_lieu`
+- `tabs/tab_ban_dai_dien.py` dòng ~169 — đổi call `_ngay_so_lieu(df)` còn sót sang `lay_ngay_so_lieu(df)` để tab Tổng hợp số liệu không còn `NameError`
+- `BUGMAP.md` — thêm J16 ghi nhận lỗi còn sót helper cũ sau refactor ngày số liệu
+
+## [2026-07-11] — Bỏ cột phân nhóm khỏi bảng nhập KHTD Chi nhánh
+- `tabs/tab_khtd_nhap.py` dòng ~275-620 — ẩn hẳn cột `Nhóm` khỏi `data_editor`, giữ nguyên thứ tự chương trình và toàn bộ logic nhập/lưu để bảng gọn và dễ nhìn hơn
+
+## [2026-07-11] — Sắp lại nhóm hiển thị KHTD Chi nhánh cho logic hơn
+- `tabs/tab_khtd.py` dòng ~57-63 — tổ chức lại `KHTD_CN_NHOM_MA_CT` theo nhóm nghiệp vụ rõ hơn: hộ nghèo, việc làm, nhà ở/nước sạch, vùng khó khăn, DTTS/miền núi, đối tượng đặc thù/khác
+- `BUGMAP.md` — thêm G21 ghi nhận bài học nhóm hiển thị nên bám ngữ nghĩa nghiệp vụ thay vì gom tạm theo lịch sử phát sinh mã
+
 ## [2026-07-11] — Format cột nhập KH KHTD bằng phân cách hàng nghìn
 - `tabs/tab_khtd_nhap.py` dòng ~236-625 — đổi `KH TW` / `KH ĐP` trong `data_editor` sang text đã format `1.234.567`, parse lại khi lưu và giữ giá trị cũ nếu user gõ sai định dạng
 - `BUGMAP.md` — thêm G20 ghi nhận bài học không nên để cột KH editable dạng số thô trong `data_editor` của KHTD

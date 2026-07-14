@@ -159,6 +159,46 @@
 | **Fix** | Kiểm tra `if os.path.exists(path) and os.path.getsize(path) > 0` trước khi `read_parquet()`; nếu không → `st.info("Chưa có dữ liệu GQVL")` thay vì crash |
 | **Ngày fix** | 2026-05-22 |
 
+### A7 — Báo cáo snapshot theo chương trình luôn rỗng
+| | |
+|---|---|
+| **File** | `snapshot_service.py` → `doc_snapshot_theo_ct()` |
+| **Dấu hiệu** | Màn nhiều kỳ có dữ liệu tổng nhưng phần `Theo CT` không có dòng nào |
+| **Nguyên nhân** | Query tìm `ten_pgd='__CN__' AND ma_ct!='ALL'`, trong khi luồng ghi chỉ tạo dòng `__CN__/ALL/ALL`; chi tiết chương trình chỉ tồn tại ở các dòng PGD |
+| **Fix** | Cộng các dòng `ten_pgd!='__CN__' AND ma_ct!='ALL'` theo `ma_ct` |
+| **Test** | `tests/test_snapshot_service.py::TestDocSnapshot::test_doc_theo_ct_cong_tu_dong_chi_tiet_pgd` |
+| **Ngày fix** | 2026-07-11 |
+
+### A8 — Status board Snapshot HSTD cộng chồng nhiều lớp dữ liệu
+| | |
+|---|---|
+| **File** | `tabs/tab_trang_thai_nguon.py` → `_doc_snapshot_status()`, `tabs/tab_canh_bao_nqh.py`, `tabs/tab_xay_dung_khtd.py` |
+| **Dấu hiệu** | Tổng dư nợ snapshot cao gấp nhiều lần thực tế và số đơn vị có thể gồm cả `__CN__` |
+| **Nguyên nhân** | Query cộng đồng thời dòng chi tiết CT/NV, tổng PGD và tổng CN; phần hiển thị tỷ đồng còn chia nhầm `/1e12` |
+| **Fix** | Chỉ lấy `ma_ct='ALL' AND nguon_von='ALL' AND ten_pgd!='__CN__'`; quy đổi tỷ đồng bằng `/1e9` |
+| **Test** | `tests/test_tab_trang_thai_nguon.py::test_snapshot_status_chi_cong_lop_tong_pgd` |
+| **Ngày fix** | 2026-07-11 |
+
+### A9 — Kỳ snapshot lấy dòng ngày số liệu đầu tiên thay vì ngày lớn nhất
+| | |
+|---|---|
+| **File** | `snapshot_service.py` → `_ky_tu_df()`, `_ngay_so_lieu_max()`; `services/upload_service.py` |
+| **Dấu hiệu** | Dữ liệu merge có nhiều mốc ngày nhưng snapshot bị gán vào tháng của dòng đầu tiên |
+| **Nguyên nhân** | Logic cũ dùng `dropna().iloc[0]`, lệch với metadata merge vốn dùng ngày lớn nhất |
+| **Fix** | Parse toàn bộ ngày với `format='mixed', dayfirst=True`, dùng `max()` cho cả kỳ và ngày lưu; hook CDTOTKVV gọi chung helper này |
+| **Test** | `tests/test_snapshot_service.py::TestKyTuDf::test_nhieu_ngay_lay_ngay_lon_nhat` |
+| **Ngày fix** | 2026-07-11 |
+
+### A10 — Cache snapshot stale sau thao tác ghi hoặc xóa
+| | |
+|---|---|
+| **File** | `snapshot_service.py` → `luu_snapshot()`, `xoa_snapshot()`; `services/upload_service.py` → `_snap_bg()` |
+| **Dấu hiệu** | UI vẫn hiển thị danh sách kỳ/số liệu cũ tối đa 5 phút sau lưu, xóa hoặc auto-snapshot |
+| **Nguyên nhân** | Các reader dùng `@st.cache_data(ttl=300)` nhưng writer không invalid cache sau commit |
+| **Fix** | Gọi `st.cache_data.clear()` ngay sau ghi/xóa thành công và khi background snapshot hoàn tất |
+| **Test** | `tests/test_snapshot_service.py::TestLuuSnapshot::test_luu_clear_cache`, `tests/test_snapshot_service.py::TestXoaSnapshot::test_xoa_clear_cache` |
+| **Ngày fix** | 2026-07-11 |
+
 ---
 
 ## B. Streamlit UI
@@ -199,6 +239,15 @@
 | **Fix** | Dùng `tim_ten_xa_trong_hstd()` và `casefold()` để chuẩn hóa tên xã ở cả HSTD lẫn danh mục trước khi group và lookup; giữ nguyên khóa mã chương trình + nguồn vốn |
 | **Test** | `tests/test_khtd_giao_dc.py::test_build_du_no_map_chuan_hoa_tien_to_xa_phuong` |
 | **Ngày fix** | 2026-07-11 |
+
+### B29 — Ban Đại Diện: Bảng tổng hợp theo PGD thiếu phân cách hàng nghìn
+| | |
+|---|---|
+| **File** | `tabs/tab_ban_dai_dien.py` → `_render_tong_hop()` |
+| **Dấu hiệu** | Mục `🏛️ Ban Đại Diện → Bảng tổng hợp theo PGD` hiển thị các cột triệu đồng dạng số thô, khó đọc vì không có phân cách hàng nghìn kiểu Việt Nam |
+| **Nguyên nhân** | `st.dataframe()` nhận trực tiếp `df_pgd` số thật; code chưa tạo bản hiển thị đã format cho các cột tiền/số lượng trước khi render |
+| **Fix** | Giữ `df_pgd` số thật cho Excel/PDF, đồng thời tạo `df_pgd_display` và format các cột triệu đồng bằng `fmt_so()`, cột `Số KH` bằng `fmt_so()`, cột `NQH%` sang chuỗi `%` kiểu Việt Nam trước khi `st.dataframe()` |
+| **Ngày fix** | 2026-07-12 |
 
 ### B7 — Card grid HTML hiển thị raw code thay vì render
 | | |
@@ -510,6 +559,15 @@
 | **Nguyên nhân** | `st.multiselect` yêu cầu `default` phải là tập con của `options`. Code dùng thẳng allowlist đã lưu làm `default`, nên state stale từ kv_store không còn khớp danh mục deadline hiện tại |
 | **Fix** | Chuẩn hóa allowlist trước khi render/gửi: chỉ giữ các loại còn tồn tại trong `deadline_cfg`, cảnh báo số loại stale bị loại bỏ, và khi user bấm lưu thì chỉ persist danh sách đã được làm sạch |
 | **Ngày fix** | 2026-07-01 |
+
+### B22a — Telegram: Upload PGD không gửi vào chat PGD dù đã cấu hình
+| | |
+|---|---|
+| **File** | `services/telegram_service.py`, `tabs/tab_telegram_admin.py` |
+| **Dấu hiệu** | Đã cấu hình `Chat ID riêng từng PGD` nhưng tin `📤 PGD upload file` vẫn chỉ gửi vào chat chính (hoặc chat phụ `upload_pgd`), không đi vào group của PGD |
+| **Nguyên nhân** | `gui_thong_bao_upload_pgd()` dùng `_gui_tin_for(..., notify_key='upload_pgd')` nên bỏ qua routing `pgd_chats[slug]` |
+| **Fix** | Đổi `gui_thong_bao_upload_pgd()` dùng `gui_tin_pgd(..., notify_key='upload_pgd')` để ưu tiên chat PGD; log vẫn theo `upload_pgd` để tab admin hiển thị lỗi đúng loại thông báo |
+| **Ngày fix** | 2026-07-14 |
 
 ### B23 — Báo cáo tín dụng `🔴 CDTOTKVV` báo trống dù đã upload
 | | |
@@ -944,6 +1002,25 @@
 | **Fix** | Dùng `.strftime("%d/%m/%Y")` hoặc `fmt_ngay()` từ `utils.py` trước khi đưa vào PDF |
 | **Ngày fix** | 2026-05-16 |
 
+### F7 — Ban Đại Diện: PDF bảng tổng hợp theo PGD chưa format phân cách hàng nghìn
+| | |
+|---|---|
+| **File** | `tabs/tab_ban_dai_dien.py` → `_render_tong_hop()` |
+| **Dấu hiệu** | Màn hình `Bảng tổng hợp theo PGD` đã có format kiểu Việt Nam nhưng bản `Xuất PDF` để in vẫn còn các giá trị số chưa đồng nhất, đặc biệt ở `GN năm`, `Số KH`, `NQH%` |
+| **Nguyên nhân** | Luồng PDF dùng `df_pgd` gần như thô; chỉ một phần cột được đưa qua nhánh `cols_tien`, còn các cột số khác đi thẳng vào PDF dưới dạng raw |
+| **Fix** | Tạo helper format dùng chung cho bảng tổng hợp theo PGD, rồi tái sử dụng cho cả `st.dataframe()` và `xuat_pdf()`; PDF in dùng chính bản đã format và tắt dòng tổng số tự động để tránh lệch kiểu dữ liệu |
+| **Ngày fix** | 2026-07-12 |
+
+### F8 — Tab Ủy thác thiếu PDF báo cáo điều hành và phụ thuộc Microsoft Word
+| | |
+|---|---|
+| **File** | `tabs/tab_uy_thac.py`, `services/uy_thac_pdf_service.py` |
+| **Dấu hiệu** | Khu Báo cáo số liệu chỉ xuất Excel; PDF chỉ có ở các mẫu Word, thiếu KPI, biểu đồ, cảnh báo, điểm nóng và biến động nhiều kỳ |
+| **Nguyên nhân** | Tab chưa có engine PDF chuyên biệt; luồng cũ chủ yếu gọi `docx2pdf`, phụ thuộc Microsoft Word và không phù hợp báo cáo điều hành nhiều bảng |
+| **Fix** | Tạo engine ReportLab riêng với hai lựa chọn `PDF báo cáo đang xem` và `PDF điều hành Ủy thác`; hỗ trợ logo, Times New Roman, KPI, nhận định, biểu đồ, bảng rộng chia nhóm cột, header lặp, số trang và quy đổi VND sang triệu đồng |
+| **Test** | `tests/test_uy_thac_pdf_service.py::test_tao_pdf_bao_cao_dang_xem_dung_don_vi_trieu`, `tests/test_uy_thac_pdf_service.py::test_tao_pdf_dieu_hanh_co_du_cac_phan_va_nhieu_trang` |
+| **Ngày fix** | 2026-07-14 |
+
 ---
 
 ## G. Kế hoạch tín dụng
@@ -1141,6 +1218,16 @@
 | **Nguyên nhân** | `data_editor` đang dùng `NumberColumn` cho cột KH editable, nên khi render/nhập Streamlit giữ số thô thay vì format theo kiểu `1.250.000` như người dùng mong muốn |
 | **Fix** | Chuyển `KH TW` / `KH ĐP` sang `TextColumn`, dựng giá trị hiển thị bằng `_fmt_trieu_input()`, parse lại bằng `_parse_trieu_input()` khi trích patch lưu; nếu user gõ sai định dạng thì tạm giữ giá trị cũ và hiện cảnh báo |
 | **Bài học** | Với màn nhập số liệu hành chính nhiều chữ số, ưu tiên hiển thị string đã format hơn là để `NumberColumn` số thô; readability quan trọng hơn việc ép kiểu số ngay ở lớp UI |
+| **Ngày fix** | 2026-07-11 |
+
+### G21 — `📈 KHTD`: nhóm hiển thị trong bảng nhập thiếu logic nghiệp vụ, gây khó rà soát
+| | |
+|---|---|
+| **File** | `tabs/tab_khtd.py` |
+| **Dấu hiệu** | Các nhóm trong bảng nhập KHTD Chi nhánh trộn các chương trình không cùng bản chất như `Nhà ở · DTTS · Xuất khẩu lao động` hoặc gom `13/26/99` vào `Hỗ trợ khác`, khiến người nhập phải dò lại từng dòng |
+| **Nguyên nhân** | `KHTD_CN_NHOM_MA_CT` được gom chủ yếu theo lịch sử phát sinh mã và nhu cầu hiển thị tạm thời, chưa phản ánh nhóm nghiệp vụ dễ hiểu cho người dùng |
+| **Fix** | Sắp lại nhóm theo ngữ nghĩa nghiệp vụ: hộ nghèo/cận nghèo/mới thoát nghèo; HSSV/việc làm/xuất khẩu lao động; nhà ở/nước sạch; vùng khó khăn; DTTS/miền núi; đối tượng đặc thù/khác |
+| **Bài học** | Với màn nhập liệu nhiều dòng, chất lượng grouping ảnh hưởng trực tiếp đến tốc độ nhập và khả năng soát số; nên ưu tiên nhóm theo tư duy nghiệp vụ của người nhập hơn là theo cấu trúc mã nội bộ |
 | **Ngày fix** | 2026-07-11 |
 
 ---
@@ -1959,6 +2046,155 @@ val = pd.to_numeric(df[COT_X], errors="coerce").sum() if COT_X in df.columns els
 | **Fix** | Khôi phục tuple tương thích; `upload_info_map` chỉ lấy phần tử trạng thái, nên UI vẫn dùng ngày số liệu HSTD và không quay lại hiển thị mtime |
 | **Test** | `tests/test_pgd_cards.py::TestUploadInfo` |
 | **Ngày fix** | 2026-07-11 |
+
+### J16 — Ban Đại Diện còn sót call `_ngay_so_lieu()` sau khi đã chuyển sang helper mới
+| | |
+|---|---|
+| **File** | `tabs/tab_ban_dai_dien.py` |
+| **Dấu hiệu** | Mở `🏛️ Ban Đại Diện` → `📊 Tổng hợp số liệu tín dụng chính sách` bị lỗi `NameError: name '_ngay_so_lieu' is not defined` |
+| **Nguyên nhân** | File đã import `lay_ngay_so_lieu()` từ `utils`, nhưng trong `_render_tong_hop()` vẫn còn 1 call cũ `_ngay_so_lieu(df)` từ trước đợt refactor helper ngày số liệu |
+| **Fix** | Đổi call còn sót sang `lay_ngay_so_lieu(df)` và chạy lại compile + convention check |
+| **Ngày fix** | 2026-07-11 |
+
+### J17 — Tab Ủy thác trộn báo cáo số liệu với mẫu biểu kiểm tra ngang hàng
+| | |
+|---|---|
+| **File** | `tabs/tab_uy_thac.py`, `services/uy_thac_service.py` |
+| **Dấu hiệu** | Người dùng vào tab `🤝 Ủy thác` phải đi qua nhiều nhánh `01/KH`, `06`, `15`, `16`, biên bản... trước khi tới được phần báo cáo số liệu; luồng dùng tab bị lệch sang “soạn biểu mẫu” thay vì “xem và xuất báo cáo” |
+| **Nguyên nhân** | Điều hướng cũ đặt báo cáo số liệu và các mẫu kiểm tra ở cùng cấp độ ưu tiên, trong khi service mới mạnh ở thống kê cơ bản theo Hội và chưa có lớp tổng hợp báo cáo đa chiều riêng |
+| **Fix** | Tách lại thành 4 khu `Tổng quan Ủy thác / Báo cáo số liệu / Theo dõi kiến nghị / Kho mẫu biểu`; bổ sung helper tổng quan, tổng hợp theo chiều và danh sách chi tiết để báo cáo số liệu trở thành luồng mặc định |
+| **Test** | `tests/test_uy_thac_service.py` |
+| **Ngày fix** | 2026-07-11 |
+
+### J18 — Tab Ủy thác mới có khung 3 khu nhưng chưa đủ chiều sâu báo cáo và theo dõi kiến nghị
+| | |
+|---|---|
+| **File** | `tabs/tab_uy_thac.py`, `services/uy_thac_service.py` |
+| **Dấu hiệu** | Sau khi bỏ `Kho mẫu biểu`, tab `Ủy thác` đã gọn hơn nhưng `Tổng quan` còn mỏng, `Báo cáo số liệu` chưa có đủ lát cắt theo PGD/xã/Hội/tổ, còn `Theo dõi kiến nghị` chủ yếu là danh sách thô chưa có KPI hạn xử lý |
+| **Nguyên nhân** | Đợt redesign đầu mới dừng ở việc đổi điều hướng và thêm lớp tổng hợp cơ bản; chưa hoàn thiện phần quản trị điểm nóng, drill-down và cảnh báo quá hạn cho kiến nghị |
+| **Fix** | Bổ sung KPI sâu + bảng top điểm nóng ở `Tổng quan`; mở rộng `Báo cáo số liệu` theo PGD/xã/Hội/tổ, thêm drill-down chi tiết và bộ export nhiều sheet; thêm helper `tong_hop_kien_nghi()` / `tao_bang_theo_doi_kien_nghi()` để `Theo dõi kiến nghị` có KPI, cảnh báo hạn và Excel theo dõi |
+| **Test** | `tests/test_uy_thac_service.py::test_tong_hop_kien_nghi_dem_dung_trang_thai_va_han`, `tests/test_uy_thac_service.py::test_tao_bang_theo_doi_kien_nghi_them_canh_bao_han` |
+| **Ngày fix** | 2026-07-11 |
+
+### J19 — Tab Ủy thác lỗi export, lọc lãi tồn và sai phạm vi/đơn vị hiển thị
+| | |
+|---|---|
+| **File** | `tabs/tab_uy_thac.py`, `services/uy_thac_service.py` |
+| **Dấu hiệu** | Nút tạo Excel phát sinh `TypeError`; lọc khoản có lãi tồn không lọc; số gắn nhãn triệu đồng vẫn hiện VND; KPI có thể gồm khoản trực tiếp và đếm trùng Tổ đa hội |
+| **Nguyên nhân** | Gọi `xuat_excel()` với tham số `ten_file` không có trong signature; chi tiết đã đổi cột lãi thành `Nợ lãi` nhưng filter còn kiểm tra constant cũ; dùng `fmt()` thay `fmt_ty()`; lớp chuẩn hóa chưa giới hạn dòng có ĐVUT và tổng Tổ cộng theo từng Hội |
+| **Fix** | Gọi đúng signature; lọc theo `Nợ lãi`; dùng `fmt_ty()` cho cột/card triệu đồng; lọc hồ sơ có ĐVUT và đếm unique `(PGD, Xã, Tổ)` cho KPI tổng |
+| **Test** | `tests/test_uy_thac_service.py::test_tong_quan_uy_thac_excludes_direct_loans_and_deduplicates_multi_hoi_to` |
+| **Ngày fix** | 2026-07-11 |
+
+### J20 — Tab Ủy thác có nhiều lát cắt nhưng vẫn thiếu số liệu điều hành
+| | |
+|---|---|
+| **File** | `tabs/tab_uy_thac.py`, `services/uy_thac_service.py` |
+| **Dấu hiệu** | `Báo cáo số liệu` đã có nhiều kiểu group nhưng các bảng chủ yếu lặp lại cùng bộ chỉ tiêu nền; thiếu góc nhìn điều hành như tỷ trọng dư nợ, bình quân/Tổ, bình quân/KH, số Tổ có NQH/lãi tồn và danh sách điểm nóng xã/tổ |
+| **Nguyên nhân** | Lớp tổng hợp chung `tong_hop_uy_thac_theo()` mới dừng ở các chỉ tiêu cơ bản (`so_to/so_kh/tong_dn/nqh/lai_ton`) nên tab chỉ đổi chiều group chứ chưa có lớp báo cáo điều hành dẫn xuất |
+| **Fix** | Thêm helper `tao_bao_cao_dieu_hanh_uy_thac()` để tính chỉ tiêu điều hành và số Tổ có vấn đề theo từng nhóm; gắn vào `tab_uy_thac.py` qua các báo cáo mới `Điều hành theo PGD`, `Điều hành theo Hội`, `Điểm nóng xã/Tổ`, kèm KPI nhanh và sheet Excel điều hành |
+| **Test** | `tests/test_uy_thac_service.py::test_tao_bao_cao_dieu_hanh_uy_thac_adds_derived_metrics`, `tests/test_uy_thac_service.py::test_tao_bao_cao_dieu_hanh_uy_thac_counts_problem_to_uniquely` |
+| **Ngày fix** | 2026-07-12 |
+
+### J21 — Ủy thác: `Biến động nhiều kỳ` chỉ đọc tổng CN/PGD nên thiếu chiều Hội/Xã
+| | |
+|---|---|
+| **File** | `snapshot_service.py`, `tabs/tab_uy_thac.py` |
+| **Dấu hiệu** | Màn `Biến động nhiều kỳ` chỉ xem được toàn CN hoặc 1 PGD; không thể theo dõi xu hướng riêng của từng Hội đoàn thể hoặc từng xã/phường qua các kỳ snapshot |
+| **Nguyên nhân** | Snapshot Ủy thác đã lưu đủ các cấp `CN/PGD/XA/HOI/TO`, nhưng reader `doc_uy_thac_snapshot_multi()` chỉ suy luận `CN/PGD`; nhánh UI cũng chưa có chọn cấp biến động và đối tượng snapshot |
+| **Fix** | Mở rộng `doc_uy_thac_snapshot_multi()` để đọc theo `HOI/XA` với tham số lọc `dvut/ten_xa/ten_pgd`; cập nhật `tab_uy_thac.py` để chọn `Tổng phạm vi / Hội đoàn thể / Xã-phường` và xuất được sheet biến động đang xem |
+| **Test** | `tests/test_snapshot_service.py::TestUyThacSnapshot::test_doc_theo_hoi`, `tests/test_snapshot_service.py::TestUyThacSnapshot::test_doc_theo_xa` |
+| **Ngày fix** | 2026-07-12 |
+
+### J22 — Ủy thác: KPI nhanh và bundle Excel lệch dữ liệu sau đợt mở rộng báo cáo điều hành
+| | |
+|---|---|
+| **File** | `tabs/tab_uy_thac.py`, `services/uy_thac_service.py` |
+| **Dấu hiệu** | KPI `Tổ có NQH`/`Tỷ lệ Tổ có NQH` có thể vượt thực tế khi 1 Tổ xuất hiện đa Hội; sheet `DiemNongXa`/`DiemNongTo` trong bộ Excel chứa cả dòng không phải điểm nóng; bundle Excel thiếu `Cảnh báo trọng điểm` hoặc `Biến động nhiều kỳ` nếu user không đứng đúng radio tương ứng |
+| **Nguyên nhân** | KPI nhanh cộng `so_to_nqh` từ bảng đã group theo `PGD/Xã/Hội/Tổ` nhưng lại chia cho `so_to` unique toàn phạm vi; bundle Excel dùng bản report điểm nóng chưa lọc và phụ thuộc `current_export/current_name` của UI hiện tại |
+| **Fix** | Thêm `tong_quan_dieu_hanh_uy_thac()` để tính KPI điều hành toàn phạm vi theo identity unique; tách helper lọc `DiemNongXa/DiemNongTo`; bundle Excel luôn build sẵn `XepHangChatLuong`, `CanhBaoTrongDiem`, `BienDongNhieuKy` từ dữ liệu scope hiện tại |
+| **Test** | `tests/test_uy_thac_service.py::test_tong_quan_dieu_hanh_uy_thac_counts_problem_to_uniquely_for_multi_hoi_to` |
+| **Ngày fix** | 2026-07-12 |
+
+### J23 — Ủy thác: Snapshot `Hội` chỉ lưu toàn Chi nhánh nên không xem được biến động theo từng PGD
+| | |
+|---|---|
+| **File** | `snapshot_service.py`, `tabs/tab_uy_thac.py` |
+| **Dấu hiệu** | Màn `Biến động nhiều kỳ` theo `Hội đoàn thể` chỉ xem được xu hướng toàn Chi nhánh; không thể trả lời các câu hỏi kiểu “Hội Phụ nữ ở PGD X biến động thế nào qua các kỳ” |
+| **Nguyên nhân** | `luu_uy_thac_snapshot()` chỉ lưu snapshot cấp `HOI` theo `dvut`, không lưu thêm grain `PGD + Hội`; vì vậy reader và UI không có dữ liệu để drill xuống từng PGD |
+| **Fix** | Lưu thêm snapshot `HOI` theo cặp `PGD + Hội`; khi đọc `HOI` không có `ten_pgd` thì mặc định lấy bản `__ALL__` để giữ tương thích ngược, còn UI cho phép chọn `Toàn Chi nhánh / PGD cụ thể` trước khi chọn Hội |
+| **Test** | `tests/test_snapshot_service.py::TestUyThacSnapshot::test_doc_theo_hoi`, `tests/test_snapshot_service.py::TestUyThacSnapshot::test_doc_theo_hoi_trong_tung_pgd` |
+| **Ngày fix** | 2026-07-12 |
+
+### J24 — Ủy thác: bundle `BienDongNhieuKy` xuất sai scope khi đang xem `Hội trong PGD`
+| | |
+|---|---|
+| **File** | `tabs/tab_uy_thac.py`, `tests/test_snapshot_service.py` |
+| **Dấu hiệu** | Màn `Biến động nhiều kỳ` đang xem đúng `PGD X - Hội A`, nhưng sheet Excel `BienDongNhieuKy` trong bộ báo cáo vẫn có thể lấy bản tổng phạm vi `CN/PGD`; với snapshot lịch sử cũ, chuỗi `Hội trong PGD` còn có thể thiếu kỳ mà user không biết lý do |
+| **Nguyên nhân** | Bundle Excel dùng `report_bd_bundle` build sẵn theo snapshot tổng phạm vi, không bám `current_export` của nhánh biến động đang mở; UI chưa nhắc khi dữ liệu lịch sử chưa có grain `PGD + Hội` |
+| **Fix** | Sheet `BienDongNhieuKy` trong bundle ưu tiên `current_export` khi user đang đứng ở một báo cáo biến động; thêm cảnh báo nhẹ khi chuỗi `Hội trong PGD` thiếu kỳ do snapshot lịch sử chưa backfill grain mới |
+| **Test** | `tests/test_snapshot_service.py::TestUyThacSnapshot::test_doc_theo_hoi_khong_lan_cn_va_pgd_khi_cung_hoi_o_nhieu_pgd`, `tests/test_snapshot_service.py::TestUyThacSnapshot::test_doc_theo_hoi_suy_luan_dung_backward_compatible_khi_truyen_dvut_va_ten_pgd` |
+| **Ngày fix** | 2026-07-12 |
+
+### J25 — Ủy thác: API snapshot Hội dễ chọn nhầm grain tại call-site
+| | |
+|---|---|
+| **File** | `snapshot_service.py`, `tabs/tab_uy_thac.py` |
+| **Dấu hiệu** | Call-site muốn đọc `Hội trong PGD` nhưng quên truyền `ten_pgd` sẽ nhận dữ liệu Hội toàn Chi nhánh mà không có lỗi |
+| **Nguyên nhân** | Một API tổng quát dùng tổ hợp tham số tùy chọn để suy luận cả hai grain `HOI`; khác biệt chỉ nằm ở sentinel `ten_pgd='__ALL__'` nên ý định của call-site không được thể hiện trong tên hàm |
+| **Fix** | Thêm API chuyên biệt `doc_uy_thac_snapshot_hoi_cn()` và `doc_uy_thac_snapshot_hoi_pgd()`; API PGD từ chối truy vấn khi thiếu `ten_pgd`; UI dùng API tương ứng theo phạm vi đã chọn, đồng thời giữ API cũ để tương thích ngược |
+| **Test** | `tests/test_snapshot_service.py::TestUyThacSnapshot::test_api_hoi_cn_chi_doc_grain_toan_chi_nhanh`, `tests/test_snapshot_service.py::TestUyThacSnapshot::test_api_hoi_pgd_chi_doc_grain_pgd`, `tests/test_snapshot_service.py::TestUyThacSnapshot::test_api_hoi_pgd_khong_truy_van_khi_thieu_pham_vi` |
+| **Ngày fix** | 2026-07-12 |
+
+### J26 — Backfill baseline HSTD không sinh snapshot Ủy thác nên kỳ cũ thiếu grain `PGD + Hội`
+| | |
+|---|---|
+| **File** | `services/upload_service.py` → `merge_baseline_toan_cn()`; `snapshot_service.py` → `luu_uy_thac_snapshot()` |
+| **Dấu hiệu** | Màn `Ủy thác → Biến động nhiều kỳ → Theo Hội đoàn thể → chọn PGD` chỉ đầy đủ từ các kỳ snapshot mới; các kỳ cũ đã rebuild HSTD vẫn thiếu dữ liệu `Hội trong PGD` |
+| **Nguyên nhân** | Pipeline baseline `loai="hstd"` chỉ gọi `luu_snapshot()` nên chỉ sinh `hstd_snapshot`; bảng `uy_thac_snapshot` không được backfill. Đồng thời writer `luu_uy_thac_snapshot()` không có `ky` override nên khó chạy backfill an toàn theo kỳ lịch sử |
+| **Fix** | Thêm tham số `ky` cho `luu_uy_thac_snapshot()` để backfill đúng kỳ; sau `merge_baseline_toan_cn(loai="hstd")` gọi thêm `luu_uy_thac_snapshot(df_all, username, ky=f"{nam}-12")` để sinh đủ grain `PGD + Hội` cho snapshot cũ |
+| **Test** | `tests/test_snapshot_service.py::TestUyThacSnapshot::test_luu_uy_thac_cho_phep_override_ky_backfill`, `tests/test_merge_du_lieu_toan_cn.py::TestMergeBaselineUyThacSnapshot::test_baseline_hstd_goi_ca_hstd_va_uy_thac_snapshot` |
+| **Ngày fix** | 2026-07-12 |
+
+### J27 — Cảnh báo lãi tồn và Tổ đa hội không có danh sách đối chiếu ngay tại chỗ
+| | |
+|---|---|
+| **File** | `tabs/tab_uy_thac.py`, `services/uy_thac_service.py` |
+| **Dấu hiệu** | Mục Tổng quan chỉ báo có lãi tồn và số Tổ xuất hiện ở hơn một Hội, nhưng người dùng không biết hồ sơ/Tổ nào cần kiểm tra |
+| **Nguyên nhân** | Khối cảnh báo chỉ dùng chỉ tiêu tổng và hàm đếm; chưa dựng bảng chi tiết theo cùng phạm vi PGD đang xem |
+| **Fix** | Tổng hợp danh sách Tổ/Hội có lãi tồn và danh sách Tổ đa hội theo `PGD + Xã + Tổ`, rồi hiển thị hai bảng mở ngay dưới cảnh báo |
+| **Test** | `tests/test_uy_thac_service.py::test_danh_sach_to_co_lai_ton_tong_hop_theo_to_va_hoi`, `tests/test_uy_thac_service.py::test_danh_sach_to_da_hoi_hien_day_du_cac_hoi` |
+| **Ngày fix** | 2026-07-14 |
+
+### C31 — CDTO toàn Chi nhánh bị cộng gần gấp đôi sau upload
+| | |
+|---|---|
+| **File** | `data/cdtotkvv.py`, `data/pgd.py`, `services/upload_service.py`, `tabs/tab_upload_khnv.py` |
+| **Dấu hiệu** | Kỳ 06/2026 có 4.560 Tổ thực tế nhưng một số màn hình đọc lịch sử ghi nhận 8.885 dòng |
+| **Nguyên nhân** | File toàn CN 4.560 dòng từng bị import như file Hội sở; lần upload toàn CN sau đó tách đúng 22 đơn vị nhưng bản lịch sử Hội sở không được ghi đè, nên loader concat file sai với 21 file PGD và cộng dư 4.325 dòng |
+| **Fix** | Cho luồng upload toàn CN ghi đè lịch sử đã tách, chặn import file nhiều đơn vị vào một đơn vị, đồng thời loại trùng phòng vệ theo `ma_dv + ma_to` khi đọc lịch sử |
+| **Test** | `tests/test_cdtotkvv_history.py` |
+| **Ngày fix** | 2026-07-14 |
+
+### C32 — KPI CDTO tính cả Tổ dư nợ 0 và bỏ sót nhãn `Yếu kém`
+| | |
+|---|---|
+| **File** | `data/cdtotkvv.py`, `services/cdtotkvv_service.py`, `snapshot_service.py`, `tabs/tab_cdtotkvv.py` |
+| **Dấu hiệu** | Kỳ 06/2026 hiển thị 4.560 Tổ thay vì 4.557 Tổ còn dư nợ; sáu Tổ `Yếu kém` có thể bị hiển thị thành 0 Tổ Yếu |
+| **Nguyên nhân** | Các loader chỉ kiểm tra STT hợp lệ, không lọc `du_no > 0`; code tổng hợp so sánh đúng chuỗi `Yếu` trong khi file nguồn dùng `Yếu kém` |
+| **Fix** | Chuẩn hóa tập phân tích dùng chung: giữ `du_no > 0`, quy đổi `Yếu kém` về `Yếu`; áp dụng phòng vệ tại aggregator/snapshot và lọc dư nợ dương khi đối chiếu HSTD |
+| **Test** | `tests/test_cdtotkvv_history.py::test_chuan_hoa_phan_tich_bo_to_du_no_0_va_gop_nhan_yeu_kem`, `tests/test_cdtotkvv_history.py::test_tong_hop_theo_pgd_chi_dem_to_co_du_no_va_dem_yeu_kem`, `tests/test_cdtotkvv_history.py::test_snapshot_cdto_phong_ve_loai_du_no_0_va_dem_yeu_kem` |
+| **Ngày fix** | 2026-07-14 |
+
+### C33 — Đối chiếu CDTO/HSTD đếm theo tên Tổ thay vì Mã Tổ
+| | |
+|---|---|
+| **File** | `data/cdtotkvv.py`, `tabs/tab_cdtotkvv.py` |
+| **Dấu hiệu** | CDTO có 4.557 Tổ nhưng đối chiếu HSTD báo 4.555; các Tổ đổi tên hoặc cùng Tổ trưởng làm số lượng khó giải thích |
+| **Nguyên nhân** | Hàm đối chiếu cũ bỏ qua cột `Mã tổ` đã có trong `hstd.parquet`, group theo `PGD + Xã + Tên tổ`; đồng thời chưa loại mã `0000000` là dư nợ không qua Tổ |
+| **Fix** | Đối chiếu bằng `Mã PGD + Mã tổ`, chỉ tính tổng dư nợ dương, loại `0000000`; tách `Hình thức vay = 1` thành ghi chú cho vay trực tiếp; hiển thị số mã khớp và danh sách Tổ ủy thác còn thiếu CDTO |
+| **Test** | `tests/test_cdtotkvv_history.py::test_doi_chieu_hstd_theo_ma_to_loai_ma_0_va_hien_to_thieu_cdto` |
+| **Ngày fix** | 2026-07-14 |
 
 ---
 

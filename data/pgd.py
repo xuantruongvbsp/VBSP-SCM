@@ -351,11 +351,14 @@ def luu_file_pgd_voi_lich_su(
     loai: str,
     file_bytes: bytes,
     thang_nam: str,          # "MM/YYYY"
+    *,
+    ghi_de_lich_su: bool = False,
 ) -> str:
     """
     Lưu song song 2 bản:
       1. {loai}_latest.xlsx      — ghi đè (realtime)
-      2. {loai}_{YYYY}_{MM}.xlsx — lưu lịch sử, KHÔNG ghi đè
+      2. {loai}_{YYYY}_{MM}.xlsx — mặc định không ghi đè; luồng upload
+         toàn Chi nhánh có thể chủ động ghi đè bản đã tách lại cùng kỳ
     Trả về đường dẫn latest.
     """
     thu_muc = thu_muc_pgd(ten_pgd)
@@ -372,8 +375,9 @@ def luu_file_pgd_voi_lich_su(
     # Ghi latest (luôn ghi đè)
     path_latest.write_bytes(file_bytes)
 
-    # Ghi version (chỉ ghi nếu chưa có)
-    if not path_version.exists():
+    # Ghi version. Chỉ luồng upload toàn CN được phép chủ động thay bản đã tách
+    # cùng kỳ; upload đơn vị vẫn giữ nguyên tính bất biến của lịch sử.
+    if ghi_de_lich_su or not path_version.exists():
         path_version.write_bytes(file_bytes)
 
     # Xóa parquet cache

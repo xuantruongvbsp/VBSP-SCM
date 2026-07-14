@@ -163,10 +163,28 @@ def _tong_hop_theo_pgd(df: pd.DataFrame) -> pd.DataFrame:
     return out.sort_values("Dư nợ (triệu đồng)", ascending=False).reset_index(drop=True)
 
 
+def _tao_bang_tong_hop_pgd_hien_thi(df_pgd: pd.DataFrame) -> pd.DataFrame:
+    """Format bảng PGD theo kiểu Việt Nam để dùng chung cho UI và PDF."""
+    df_display = df_pgd.copy()
+    for col in [
+        "Dư nợ (triệu đồng)",
+        "Trong hạn (triệu đồng)",
+        "Quá hạn (triệu đồng)",
+        "GN năm (triệu đồng)",
+    ]:
+        if col in df_display.columns:
+            df_display[col] = df_display[col].apply(lambda x: fmt_so(round(x, 0)))
+    if "Số KH" in df_display.columns:
+        df_display["Số KH"] = df_display["Số KH"].apply(fmt_so)
+    if "NQH%" in df_display.columns:
+        df_display["NQH%"] = df_display["NQH%"].apply(lambda x: f"{x:.3f}".replace(".", ",") + "%")
+    return df_display
+
+
 def _render_tong_hop(df: pd.DataFrame, username: str) -> None:
     st.subheader("📊 Tổng hợp số liệu tín dụng chính sách")
 
-    ngay = _ngay_so_lieu(df)
+    ngay = lay_ngay_so_lieu(df)
     if ngay:
         st.caption(
             f"Số liệu ngày **{ngay.strftime('%d/%m/%Y')}** · "
@@ -194,7 +212,8 @@ def _render_tong_hop(df: pd.DataFrame, username: str) -> None:
         st.info("Không đủ dữ liệu để tổng hợp theo PGD.")
         return
 
-    st.dataframe(df_pgd, use_container_width=True, hide_index=True)
+    df_pgd_display = _tao_bang_tong_hop_pgd_hien_thi(df_pgd)
+    st.dataframe(df_pgd_display, use_container_width=True, hide_index=True)
 
     col_xl, col_pdf = st.columns([1, 1])
     with col_xl:
@@ -229,12 +248,21 @@ def _render_tong_hop(df: pd.DataFrame, username: str) -> None:
 
 
             if st.button("📄 Xuất PDF", use_container_width=True, key="bdd_xuat_pdf", type="primary"):
+                df_pgd_pdf = _tao_bang_tong_hop_pgd_hien_thi(df_pgd)
                 pdf_bytes = xuat_pdf(
-                    df_pgd,
+                    df_pgd_pdf,
                     tieu_de=f"Tổng hợp tín dụng chính sách — {TEN_CHI_NHANH_HIEN_THI}",
                     nguoi_xuat=username,
-                    cols_tien=["Dư nợ (triệu đồng)", "Trong hạn (triệu đồng)", "Quá hạn (triệu đồng)"],
+                    them_dong_tong=False,
                     prefix_file="BDD_TONGHOP",
+                    cols_right=[
+                        "Dư nợ (triệu đồng)",
+                        "Trong hạn (triệu đồng)",
+                        "Quá hạn (triệu đồng)",
+                        "GN năm (triệu đồng)",
+                        "Số KH",
+                        "NQH%",
+                    ],
                 )
                 st.download_button(
                     "⬇️ Tải PDF",

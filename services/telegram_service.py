@@ -472,7 +472,7 @@ def gui_thong_bao_upload_pgd(ten_pgd: str, loai: str, username: str) -> bool:
         f"📤 <b>{_html.escape(ten_pgd)}</b> vừa upload <b>{_html.escape(loai.upper())}</b>\n"
         f"👤 {_html.escape(username)}   ⏰ {now_str}"
     )
-    return _gui_tin_for(text, "upload_pgd")
+    return gui_tin_pgd(text, ten_pgd, notify_key="upload_pgd")
 
 
 def gui_khtd_tien_do(ds_pgd: list[dict]) -> bool:
@@ -755,9 +755,9 @@ def gui_tin_pgd(text: str, ten_pgd: str, notify_key: str = "", parse_mode: str =
     )
     ok, last_err = _gui_tin_core(token, chat_id, text, parse_mode=parse_mode)
     if ok:
-        _ghi_log(f"pgd:{slug}", text, True)
+        _ghi_log(notify_key or f"pgd:{slug}", text, True)
         return True
-    _ghi_log(f"pgd:{slug}", text, False, last_err)
+    _ghi_log(notify_key or f"pgd:{slug}", text, False, last_err)
     return False
 
 

@@ -94,6 +94,7 @@ def mock_snapshot_services():
     """
     _ok = MagicMock(thanh_cong=True, thong_bao="mocked")
     with patch("snapshot_service.luu_snapshot", return_value=_ok), \
+         patch("snapshot_service.luu_uy_thac_snapshot", return_value=_ok), \
          patch("snapshot_service.luu_gqvl_snapshot", return_value=_ok), \
          patch("snapshot_service.luu_nq11_snapshot", return_value=_ok), \
          patch("snapshot_service.luu_cdtotkvv_snapshot", return_value=_ok):
@@ -744,6 +745,54 @@ class TestMergeAuditLog:
         detail = merge_call.args[2]
         assert "HSTD" in detail
         assert "7" in detail
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 10b. BASELINE HSTD — PHẢI BACKFILL CẢ UỶ THÁC SNAPSHOT
+# ══════════════════════════════════════════════════════════════════════════════
+
+class TestMergeBaselineUyThacSnapshot:
+    def test_baseline_hstd_goi_ca_hstd_va_uy_thac_snapshot(self, tmp_path):
+        ten_pgd = "PGD Biên Hòa"
+        nam = 2025
+        ky_baseline = "2025-12"
+        df_mau = pd.DataFrame(
+            {
+                "Mã KH": ["KH001"],
+                "Số khế ước": ["KU001"],
+                "Tổng dư nợ": [10_000_000.0],
+                "Dư nợ trong hạn": [10_000_000.0],
+                "Dư nợ quá hạn": [0.0],
+                "Tên ĐVUT": ["Hội A"],
+                "Tên xã": ["Xã 1"],
+                "Tên tổ": ["Tổ 1"],
+                "Ngày số liệu": ["31/12/2025"],
+            }
+        )
+        baseline_file = tmp_path / "baseline_hstd.xlsx"
+        baseline_file.write_bytes(b"PK\x03\x04" + b"\x00" * 2000)
+        cache_path = str(tmp_path / "baseline_hstd.parquet")
+
+        mock_snap = MagicMock(thanh_cong=True, thong_bao="ok")
+        mock_uy_thac = MagicMock(thanh_cong=True, thong_bao="ok")
+        prog_mock = MagicMock()
+
+        with patch.object(svc.st, "progress", return_value=prog_mock), \
+             patch.object(svc.st, "session_state", {"username": "test_user"}), \
+             patch("config.baseline_pgd_path_loai", side_effect=lambda ten, _nam, _loai: str(baseline_file) if ten == ten_pgd else str(tmp_path / f"missing_{ten}.xlsx")), \
+             patch("config.baseline_cache_loai", return_value=cache_path), \
+             patch.object(svc, "DS_PGD", [ten_pgd]), \
+             patch.object(svc, "DON_VI_CHI_NHANH", "Hội sở"), \
+             patch.object(svc, "excel_to_parquet", return_value=df_mau), \
+             patch.object(svc.db, "ghi_audit"), \
+             patch("snapshot_service.luu_snapshot", return_value=mock_snap) as p_snap, \
+             patch("snapshot_service.luu_uy_thac_snapshot", return_value=mock_uy_thac) as p_uy_thac:
+            kq = svc.merge_baseline_toan_cn("hstd", nam)
+
+        assert kq.thanh_cong is True
+        p_snap.assert_called_once()
+        p_uy_thac.assert_called_once()
+        assert p_uy_thac.call_args.kwargs["ky"] == ky_baseline
 
 
 # ══════════════════════════════════════════════════════════════════════════════

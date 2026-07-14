@@ -43,6 +43,12 @@ class TestKvRoundtrip:
             f"Kiểu dữ liệu bị thay đổi: {type(result['so_tien'])} thay vì int"
         )
 
+    def test_init_db_tao_bang_uy_thac_snapshot(self, test_db):
+        row = test_db.get_conn().execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='uy_thac_snapshot'"
+        ).fetchone()
+        assert row is not None
+
     def test_doc_kv_key_khong_ton_tai(self, test_db):
         """doc_kv key không tồn tại → None."""
         result = test_db.doc_kv("key_khong_ton_tai")

@@ -10,12 +10,11 @@ import os
 import pandas as pd
 
 from config import (
-    CDTOTKVV_COLS,
-    CDTOTKVV_DATA_ROW_START,
     DS_PGD,
     DON_VI_CHI_NHANH,
 )
 from data.pgd import duong_dan_pgd as _duong_dan_pgd
+from data.core import ts_file
 from utils import fmt_so
 try:
     from logger import get_logger
@@ -28,6 +27,8 @@ except Exception as e:
 
 def tong_hop_tu_pgd_data() -> "pd.DataFrame | None":
     """Đọc cdtotkvv_latest.xlsx từ pgd_data/{slug}/ của tất cả đơn vị, concat lại."""
+    from data.cdtotkvv import doc_cdtotkvv_path
+
     tat_ca_dv = [DON_VI_CHI_NHANH] + DS_PGD
     frames = []
     for ten_dv in tat_ca_dv:
@@ -35,11 +36,9 @@ def tong_hop_tu_pgd_data() -> "pd.DataFrame | None":
             dd = _duong_dan_pgd(ten_dv, "cdtotkvv")
             if not dd or not os.path.exists(dd):
                 continue
-            df = pd.read_excel(dd, engine="openpyxl", header=None,
-                               skiprows=CDTOTKVV_DATA_ROW_START)
-            df = df.iloc[:, :len(CDTOTKVV_COLS)].copy()
-            df.columns = CDTOTKVV_COLS
-            df = df[pd.to_numeric(df["stt"], errors="coerce").notna()].reset_index(drop=True)
+            df = doc_cdtotkvv_path(dd, ts_file(dd))
+            if df is None:
+                continue
             if not df.empty:
                 frames.append(df)
         except Exception as e:

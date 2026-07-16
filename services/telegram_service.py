@@ -19,6 +19,101 @@ _DEFAULT_TOKEN   = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 _DEFAULT_CHAT_ID = "-5339155216"
 _API_TIMEOUT     = 10  # giây
 
+# Metadata dùng để chuẩn hóa cấu trúc mọi tin gửi theo notify_key.
+_NOTIFY_PRESENTATION = {
+    "bao_cao_sang":      ("Báo cáo tổng hợp sáng", "Toàn Chi nhánh", "HSTD"),
+    "khoang_den_han":    ("Nhắc khoản đến hạn", "Toàn Chi nhánh", "HSTD"),
+    "phan_ky_nxh":       ("Nhắc phân kỳ nhà ở xã hội", "Theo PGD", "HSTD/Tiền gửi"),
+    "khtd_tien_do":     ("Tiến độ KHTD", "Toàn Chi nhánh", "HSTD/KHTD"),
+    "qh_moi":            ("Cảnh báo NQH tăng", "Toàn Chi nhánh", "HSTD/Snapshot"),
+    "deadline_bc":       ("Nhắc nộp báo cáo", "Toàn Chi nhánh", "Google Sheets"),
+    "nhap_lieu":         ("Nhắc nhập liệu", "Toàn Chi nhánh", "Google Sheets"),
+    "health_check":      ("Kết quả Health Check", "Hệ thống VBSP-SCM", "Health Check"),
+    "merge_thanh_cong": ("Merge dữ liệu thành công", "Toàn Chi nhánh", "Hệ thống merge"),
+    "upload_pgd":        ("PGD upload dữ liệu", "Theo PGD", "File upload"),
+    "he_thong":          ("Cảnh báo hệ thống", "Hệ thống VBSP-SCM", "Hệ thống"),
+    "nop_moi_gsheet":   ("PGD nộp báo cáo mới", "Toàn Chi nhánh", "Google Sheets"),
+    "den_han_phan_tang": ("Nhắc đến hạn T-7/T-3/T-1", "Toàn Chi nhánh", "HSTD"),
+    "lich_cong_tac":     ("Lịch công tác", "Phòng KH-NV", "Kế hoạch công tác"),
+    "giai_ngan_tuan":   ("Báo cáo giải ngân tuần", "Toàn Chi nhánh", "HSTD"),
+    "khoanh_tang":       ("Cảnh báo nợ khoanh tăng", "Toàn Chi nhánh", "HSTD/Snapshot"),
+    "nqh_tuan":          ("Báo cáo NQH tuần", "Toàn Chi nhánh", "HSTD"),
+    "khtd_ct":           ("KHTD theo chương trình", "Toàn Chi nhánh", "HSTD/KHTD"),
+    "tong_ket_thang":   ("Tổng kết tháng", "Toàn Chi nhánh", "HSTD/KHTD"),
+}
+
+
+def _bo_the_html(value: str) -> str:
+    """Rút text thuần từ một dòng HTML ngắn để dùng làm tóm tắt."""
+    return _html.unescape(re.sub(r"<[^>]+>", "", value or "")).strip()
+
+
+def _dinh_dang_ngay_so_lieu(value: object) -> str:
+    """Chuẩn hóa ngày về DD/MM/YYYY; trả chuỗi gốc nếu không parse được."""
+    raw = str(value or "").strip()
+    if not raw:
+        return ""
+    match = re.search(r"(\d{1,2})/(\d{1,2})/(\d{4})", raw)
+    if match:
+        day, month, year = match.groups()
+        return f"{int(day):02d}/{int(month):02d}/{year}"
+    match = re.search(r"(\d{4})-(\d{1,2})-(\d{1,2})", raw)
+    if match:
+        year, month, day = match.groups()
+        return f"{int(day):02d}/{int(month):02d}/{year}"
+    return raw
+
+
+def _lay_ngay_so_lieu_thong_bao(notify_key: str, text: str, nguon: str) -> str:
+    """Lấy ngày nghiệp vụ; nguồn HSTD ưu tiên metadata merge thay vì ngày gửi."""
+    if "HSTD" in nguon:
+        try:
+            meta = db.doc_kv("merge_meta_hstd") or {}
+            ngay_meta = _dinh_dang_ngay_so_lieu(meta.get("ngay_sl"))
+            if ngay_meta:
+                return ngay_meta
+        except Exception as e:
+            logger.error("lay ngay so lieu Telegram (%s): %s", notify_key, e, exc_info=True)
+
+    # Các tin Health Check/lịch công tác thường đã mang ngày nghiệp vụ trong nội dung.
+    if notify_key not in {"deadline_bc", "nhap_lieu"}:
+        ngay_trong_tin = _dinh_dang_ngay_so_lieu(text)
+        if re.fullmatch(r"\d{2}/\d{2}/\d{4}", ngay_trong_tin):
+            return ngay_trong_tin
+
+    # GSheet và sự kiện hệ thống phản ánh trạng thái tại lần quét hiện tại.
+    return datetime.now().strftime("%d/%m/%Y")
+
+
+def _chuan_hoa_thong_bao(text: str, notify_key: str) -> str:
+    """Bọc tin nghiệp vụ theo một khung thống nhất, idempotent."""
+    if notify_key not in _NOTIFY_PRESENTATION or "<b>Ngày số liệu:</b>" in text:
+        return text
+
+    tieu_de, pham_vi, nguon = _NOTIFY_PRESENTATION[notify_key]
+    raw_lines = text.splitlines()
+    first_index = next((i for i, line in enumerate(raw_lines) if line.strip()), None)
+    if first_index is None:
+        tom_tat = "Không có nội dung tóm tắt"
+        chi_tiet = "—"
+    else:
+        tom_tat = _bo_the_html(raw_lines[first_index]) or tieu_de
+        detail_lines = raw_lines[first_index + 1:]
+        while detail_lines and not detail_lines[0].strip():
+            detail_lines.pop(0)
+        chi_tiet = "\n".join(detail_lines).strip() or "—"
+
+    ngay_so_lieu = _lay_ngay_so_lieu_thong_bao(notify_key, text, nguon)
+    cap_nhat_luc = datetime.now().strftime("%H:%M %d/%m/%Y")
+    return (
+        f"📌 <b>{_html.escape(tieu_de)} — {_html.escape(pham_vi)}</b>\n"
+        f"📅 <b>Ngày số liệu:</b> {_html.escape(ngay_so_lieu or '—')}\n"
+        f"🧾 <b>Tóm tắt:</b> {_html.escape(tom_tat)}\n"
+        f"🔎 <b>Chi tiết / top cảnh báo:</b>\n{chi_tiet}\n"
+        f"🗂 <b>Nguồn dữ liệu:</b> {_html.escape(nguon)}\n"
+        f"🕒 <b>Cập nhật lúc:</b> {cap_nhat_luc}"
+    )
+
 
 # ── Config ─────────────────────────────────────────────────────────────────────
 
@@ -55,20 +150,75 @@ def luu_extra_chat(notify_key: str, chat_id: str, username: str = "system") -> N
 
 
 def doc_deadline_bc_allowlist() -> list[str] | None:
-    """Danh sách loại báo cáo được phép gửi nhắc deadline (None = tất cả)."""
+    """Danh sách loại báo cáo được phép gửi nhắc deadline (None = tất cả).
+
+    Tự động lọc stale entries (loại BC không còn trong deadline config).
+    Ghi log cảnh báo để admin biết nếu có stale.
+    """
     val = db.doc_kv("telegram_deadline_bc_allowlist")
     if not val:
         return None
-    if isinstance(val, list):
-        return [str(x) for x in val if str(x).strip()]
-    return None
+    if not isinstance(val, list):
+        return None
+    ds_raw = [str(x) for x in val if str(x).strip()]
+    if not ds_raw:
+        return None
+
+    # Lọc stale: loại BC không còn trong deadline config hiện tại
+    try:
+        from services.report_submission_service import doc_deadline_config
+        ds_hop_le = {str(k).strip() for k in doc_deadline_config() if str(k).strip()}
+    except Exception:
+        ds_hop_le = set()
+
+    ds_loc = [loai for loai in ds_raw if loai in ds_hop_le] if ds_hop_le else ds_raw
+    stale_count = len(ds_raw) - len(ds_loc)
+    if stale_count > 0:
+        stale_items = [loai for loai in ds_raw if loai not in ds_hop_le]
+        logger.warning(
+            "doc_deadline_bc_allowlist: %d stale entries đã bị lọc — %s",
+            stale_count,
+            ", ".join(stale_items[:5]),
+        )
+        # Tự động lưu bản đã lọc để tránh stale tích lũy
+        if ds_loc:
+            db.ghi_kv("telegram_deadline_bc_allowlist", ds_loc, "system")
+        else:
+            db.ghi_kv("telegram_deadline_bc_allowlist", None, "system")
+            return None
+    return ds_loc
 
 
 def luu_deadline_bc_allowlist(ds_loai: list[str] | None, username: str = "system") -> None:
-    """Lưu allowlist loại báo cáo cho nhắc deadline (None/[] = gửi tất cả)."""
+    """Lưu allowlist loại báo cáo cho nhắc deadline (None/[] = gửi tất cả).
+
+    Tự động lọc stale entries (loại BC không còn trong deadline config).
+    """
     if ds_loai:
-        ds = [str(x).strip() for x in ds_loai if str(x).strip()]
-        ds = sorted(set(ds))
+        ds = sorted({str(x).strip() for x in ds_loai if str(x).strip()})
+
+        # Lọc stale trước khi lưu
+        try:
+            from services.report_submission_service import doc_deadline_config
+            ds_hop_le = {str(k).strip() for k in doc_deadline_config() if str(k).strip()}
+        except Exception:
+            ds_hop_le = set()
+
+        if ds_hop_le:
+            ds_raw = ds
+            ds = [loai for loai in ds_raw if loai in ds_hop_le]
+            stale = len(ds_raw) - len(ds)
+            if stale > 0:
+                logger.warning(
+                    "luu_deadline_bc_allowlist: %d stale entries đã bị lọc khi lưu",
+                    stale,
+                )
+
+        if not ds:
+            db.ghi_kv("telegram_deadline_bc_allowlist", None, username)
+            db.ghi_audit(username, "telegram_deadline_bc_allowlist", "Allowlist rỗng sau lọc → ALL (None)")
+            return
+
         db.ghi_kv("telegram_deadline_bc_allowlist", ds, username)
         db.ghi_audit(username, "telegram_deadline_bc_allowlist", f"Allowlist {len(ds)} loại báo cáo")
     else:
@@ -203,6 +353,8 @@ def gui_tin_theo_notify_chi_tiet(
     parse_mode: str = "HTML",
 ) -> tuple[bool, str]:
     """Gửi tin theo notify_key, trả về chi tiết lỗi để caller xử lý."""
+    if parse_mode == "HTML":
+        text = _chuan_hoa_thong_bao(text, notify_key)
     token, main_chat = _get_config()
     cfg = db.doc_kv("telegram_config") or {}
     chat_id = cfg.get("extra_chats", {}).get(notify_key, main_chat)
@@ -388,7 +540,8 @@ def gui_nhac_phan_ky_nxh(
 
     def _gui_nhom(loai_lines: list[str], loai_header: str) -> bool:
         """Gửi 1 nhóm (đủ hoặc không đủ) — tự chia chunk nếu dài."""
-        _MAX = 3800
+        # Chừa dung lượng cho khung chuẩn (ngày SL, nguồn, thời điểm cập nhật).
+        _MAX = 3400
         chunks: list[list[str]] = []
         cur: list[str] = []
         cur_len = 0
@@ -745,6 +898,8 @@ def luu_pgd_chat(ten_pgd: str, chat_id: str, username: str = "system") -> None:
 def gui_tin_pgd(text: str, ten_pgd: str, notify_key: str = "", parse_mode: str = "HTML") -> bool:
     """Gửi tin đến chat riêng của PGD (pgd_chats[slug]) → extra_chats[notify_key] → chat chính."""
     from data.pgd import pgd_slug
+    if notify_key and parse_mode == "HTML":
+        text = _chuan_hoa_thong_bao(text, notify_key)
     token, main_chat = _get_config()
     cfg  = db.doc_kv("telegram_config") or {}
     slug = pgd_slug(ten_pgd)

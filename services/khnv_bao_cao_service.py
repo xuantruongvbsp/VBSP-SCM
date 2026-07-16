@@ -26,7 +26,7 @@ from config import (
     COT_TEN_PGD, COT_TONG_DU_NO, COT_DU_NO_TH, COT_DU_NO_QH,
     COT_DU_NO_KHOANH, COT_TEN_CT, COT_NGUON_VON, COT_DVUT,
     COT_TEN_KH, COT_GIAI_NGAN_TRONG_THANG, COT_NGAY_VAY,
-    COT_TEN_XA, DB_HT_CACHE, DB_PREV_CACHE, FILE_PATH_DB,
+    COT_TEN_XA, COT_NGAY_SL, DB_HT_CACHE, DB_PREV_CACHE, FILE_PATH_DB,
     DS_PGD, TEN_CHI_NHANH_HIEN_THI,
 )
 from data import ts_file
@@ -41,10 +41,12 @@ def _fmt(v) -> str:
     try:
         n = float(v)
         if abs(n) >= 1_000_000_000:
-            return f"{n/1_000_000_000:,.2f} tỷ"
+            value = f"{n/1_000_000_000:,.2f}"
+            return value.replace(",", "_").replace(".", ",").replace("_", ".") + " tỷ"
         elif abs(n) >= 1_000_000:
-            return f"{n/1_000_000:,.0f} tr"
-        return f"{n:,.0f}"
+            value = f"{n/1_000_000:,.0f}"
+            return value.replace(",", ".") + " tr"
+        return f"{n:,.0f}".replace(",", ".")
     except (ValueError, TypeError):
         return str(v)
 
@@ -67,6 +69,11 @@ def tong_hop_so_lieu_thang(
     nam = nam or today.year
 
     df = df.copy()
+    ngay_bao_cao = today.strftime("%d/%m/%Y")
+    if COT_NGAY_SL in df.columns:
+        ngay_series = pd.to_datetime(df[COT_NGAY_SL], errors="coerce", dayfirst=True)
+        if ngay_series.notna().any():
+            ngay_bao_cao = ngay_series.max().strftime("%d/%m/%Y")
     tong_du_no = pd.to_numeric(df[COT_TONG_DU_NO], errors="coerce").sum()
     du_no_th = pd.to_numeric(df[COT_DU_NO_TH], errors="coerce").sum()
     du_no_qh = pd.to_numeric(df[COT_DU_NO_QH], errors="coerce").sum()
@@ -87,7 +94,7 @@ def tong_hop_so_lieu_thang(
 
     return {
         "thang": thang, "nam": nam,
-        "ngay_bao_cao": today.strftime("%d/%m/%Y"),
+        "ngay_bao_cao": ngay_bao_cao,
         "tong_du_no": tong_du_no, "du_no_trong_han": du_no_th,
         "du_no_qua_han": du_no_qh, "du_no_khoanh": du_no_khoanh,
         "so_khach_hang": so_kh, "so_mon_vay": so_mon,
@@ -192,6 +199,7 @@ def tong_hop_tu_dienbao(sheet_name: str = "DB1", file_path_override: str | None 
     try:
         data = doc_dienbao_matrix(fp, ts_file(fp), sheet_name=sheet_name)
     except Exception as e:
+        logger.error("Đọc Điện báo sheet %s theo matrix thất bại: %s", sheet_name, e, exc_info=True)
         # Fallback: đọc sheet đầu tiên có matrix format
         try:
             from data.hstd import liet_ke_sheet_dienbao
@@ -204,21 +212,41 @@ def tong_hop_tu_dienbao(sheet_name: str = "DB1", file_path_override: str | None 
                 return _tong_hop_tu_format_cu(rows, fp)
             data = doc_dienbao_matrix(fp, ts_file(fp), sheet_name=matrix_sheets[0])
         except Exception as e2:
-            logger.error("Điện báo: %s / %s", e, e2)
+            logger.error("Điện báo: %s / %s", e, e2, exc_info=True)
             return {"nguon": "Điện báo", "error": f"Lỗi đọc: {e}"}
 
     rows = data.get("rows", [])
-    result = {"nguon": "Điện báo", "file_path": fp, "ngay_bao_cao": data.get("ngay_bao_cao", "")}
+    don_vi_trieu = bool(
+        data.get("don_vi_trieu", any(row.get("don_vi_trieu") for row in rows))
+    )
+    he_so_vnd = 1_000_000 if don_vi_trieu else 1
+    result = {
+        "nguon": "Điện báo",
+        "file_path": fp,
+        "ngay_bao_cao": data.get("ngay_bao_cao", ""),
+        "don_vi_nguon": "triệu đồng" if don_vi_trieu else "đồng",
+    }
 
     for key, ten_ct in CAC_CHI_TIEU_DIEN_BAO.items():
-        result[key] = db_lookup(rows, ten_ct)
+        result[key] = db_lookup(rows, ten_ct) * he_so_vnd
+
+    result["du_no_qua_han"] = (
+        result.get("du_no_qua_han_kha", 0) + result.get("du_no_qua_han_khb", 0)
+    )
+    result["du_no_khoanh"] = (
+        result.get("du_no_khoanh_kha", 0) + result.get("du_no_khoanh_khb", 0)
+    )
 
     # Ma trận đầy đủ
-    result["matrix"] = data.get("matrix", {})
+    matrix_vnd = {
+        chi_tieu: {don_vi: float(value or 0) * he_so_vnd for don_vi, value in values.items()}
+        for chi_tieu, values in data.get("matrix", {}).items()
+    }
+    result["matrix"] = matrix_vnd
     result["units"] = data.get("units", [])
 
     # Bảng tổng hợp theo đơn vị
-    bang_dv = _bang_theo_dv_tu_matrix(data.get("matrix", {}), data.get("units", []),
+    bang_dv = _bang_theo_dv_tu_matrix(matrix_vnd, data.get("units", []),
                                        ["Tổng dư nợ", "Dư nợ Kế hoạch A", "Dư nợ Kế hoạch B",
                                         "Dư nợ Quá hạn KHA", "Dư nợ Quá hạn KHB"])
     result["bang_theo_dv"] = bang_dv
@@ -229,9 +257,21 @@ def tong_hop_tu_dienbao(sheet_name: str = "DB1", file_path_override: str | None 
 def _tong_hop_tu_format_cu(rows: list, fp: str) -> dict:
     """Fallback: đọc Điện báo format cũ (chỉ có cột Cộng)."""
     from data.hstd import db_lookup
-    result = {"nguon": "Điện báo (format cũ)", "file_path": fp}
+    don_vi_trieu = any(row.get("don_vi_trieu") for row in rows)
+    he_so_vnd = 1_000_000 if don_vi_trieu else 1
+    result = {
+        "nguon": "Điện báo (format cũ)",
+        "file_path": fp,
+        "don_vi_nguon": "triệu đồng" if don_vi_trieu else "đồng",
+    }
     for key, ten_ct in CAC_CHI_TIEU_DIEN_BAO.items():
-        result[key] = db_lookup(rows, ten_ct)
+        result[key] = db_lookup(rows, ten_ct) * he_so_vnd
+    result["du_no_qua_han"] = (
+        result.get("du_no_qua_han_kha", 0) + result.get("du_no_qua_han_khb", 0)
+    )
+    result["du_no_khoanh"] = (
+        result.get("du_no_khoanh_kha", 0) + result.get("du_no_khoanh_khb", 0)
+    )
     return result
 
 
@@ -262,8 +302,9 @@ def so_sanh_hstd_vs_dienbao(so_lieu_hstd: dict, so_lieu_db: dict) -> list[dict]:
         return []
 
     mapping = [
-        ("Tổng dư nợ",         "tong_du_no",      "tong_du_no"),
-        ("Dư nợ quá hạn KHA",  "du_no_qua_han",   "du_no_qua_han_kha"),
+        ("Tổng dư nợ", "tong_du_no", "tong_du_no"),
+        ("Dư nợ quá hạn", "du_no_qua_han", "du_no_qua_han"),
+        ("Dư nợ khoanh", "du_no_khoanh", "du_no_khoanh"),
     ]
 
     chenh_lech = []
@@ -273,14 +314,15 @@ def so_sanh_hstd_vs_dienbao(so_lieu_hstd: dict, so_lieu_db: dict) -> list[dict]:
             val_db = float(so_lieu_db.get(key_db, 0))
         except (TypeError, ValueError):
             continue
-        if val_hstd and val_db:
-            cl = val_hstd - val_db
-            tl = (cl / val_db * 100) if val_db else 0
-            chenh_lech.append({
-                "Chỉ tiêu": ten, "HSTD": val_hstd, "Điện báo": val_db,
-                "Chênh lệch": cl, "Tỷ lệ %": round(tl, 2),
-                "Cảnh báo": "⚠️" if abs(tl) > 1 else "✅",
-            })
+        if val_hstd == 0 and val_db == 0:
+            continue
+        cl = val_hstd - val_db
+        tl = (cl / val_db * 100) if val_db else 100.0
+        chenh_lech.append({
+            "Chỉ tiêu": ten, "HSTD": val_hstd, "Điện báo": val_db,
+            "Chênh lệch": cl, "Tỷ lệ %": round(tl, 2),
+            "Cảnh báo": "⚠️" if abs(tl) > 1 else "✅",
+        })
 
     return chenh_lech
 

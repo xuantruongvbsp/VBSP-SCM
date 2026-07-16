@@ -18,7 +18,7 @@ from __future__ import annotations
 import re
 import sys
 import time
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 from urllib.parse import quote
@@ -47,6 +47,7 @@ LABEL = {"dung_han": "Đúng hạn", "tre": "Trễ hạn", "chua_nop": "Chưa n�
 KV_DEADLINE = "bao_cao_deadline_config"
 KV_MANUAL = "manual_nop_tdn"
 KV_ALLOWLIST = "telegram_deadline_bc_allowlist"
+KV_ARCHIVE = "bao_cao_archive_config"
 
 _YEAR_RANGE_RE = re.compile(r"\b\d{4}\s*[-–]\s*\d{4}\b", re.IGNORECASE)
 
@@ -280,6 +281,138 @@ def luu_deadline_config(cfg: dict, username: str) -> None:
     """Lưu cấu hình deadline vào kv_store."""
     db.ghi_kv(KV_DEADLINE, cfg, username)
     db.ghi_audit(username, "luu_deadline_bao_cao", f"{len(cfg)} deadline đã lưu")
+
+
+def doc_luu_tru_config() -> dict[str, dict[str, Any]]:
+    """Đọc danh mục loại báo cáo đã hoàn thành và đưa vào lưu trữ."""
+    raw = db.doc_kv(KV_ARCHIVE) or {}
+    if not isinstance(raw, dict):
+        return {}
+    result: dict[str, dict[str, Any]] = {}
+    for key, value in raw.items():
+        ten = _chuan_hoa_ten_loai(key)
+        if not ten:
+            continue
+        meta = dict(value) if isinstance(value, dict) else {}
+        meta.setdefault("ten_hien_thi", ten)
+        meta.setdefault("ten_theo_doi", ten)
+        result[ten] = meta
+    return result
+
+
+def _tap_ten_luu_tru(config: dict[str, dict[str, Any]] | None = None) -> set[str]:
+    cfg = config if config is not None else doc_luu_tru_config()
+    names: set[str] = set()
+    for key, meta in cfg.items():
+        for value in (
+            key,
+            meta.get("ten_hien_thi", "") if isinstance(meta, dict) else "",
+            meta.get("ten_theo_doi", "") if isinstance(meta, dict) else "",
+        ):
+            normalized = _chuan_hoa_ten_loai(value).casefold()
+            if normalized:
+                names.add(normalized)
+    return names
+
+
+def la_loai_bao_cao_luu_tru(
+    ten_loai: str,
+    config: dict[str, dict[str, Any]] | None = None,
+) -> bool:
+    """Kiểm tra một tên Form/tracked key có thuộc danh mục lưu trữ không."""
+    return _chuan_hoa_ten_loai(ten_loai).casefold() in _tap_ten_luu_tru(config)
+
+
+def loc_du_lieu_luu_tru(
+    df: pd.DataFrame,
+    config: dict[str, dict[str, Any]] | None = None,
+    *,
+    archived: bool,
+) -> pd.DataFrame:
+    """Lọc dòng Google Form đang hoạt động hoặc đã lưu trữ mà không xóa dữ liệu gốc."""
+    if df is None or df.empty or "loai_bao_cao" not in df.columns:
+        return df.copy() if isinstance(df, pd.DataFrame) else pd.DataFrame(columns=COT)
+    names = _tap_ten_luu_tru(config)
+    mask = df["loai_bao_cao"].apply(
+        lambda value: _chuan_hoa_ten_loai(value).casefold() in names
+    )
+    return df.loc[mask if archived else ~mask].copy()
+
+
+def loc_deadline_dang_hoat_dong(
+    deadline_cfg: dict[str, str],
+    config: dict[str, dict[str, Any]] | None = None,
+) -> dict[str, str]:
+    """Loại deadline thuộc báo cáo lưu trữ không được tham gia ma trận/nhắc hạn."""
+    return {
+        key: value
+        for key, value in deadline_cfg.items()
+        if not la_loai_bao_cao_luu_tru(key, config)
+    }
+
+
+def luu_tru_loai_bao_cao(
+    ten_hien_thi: str,
+    username: str,
+    ten_theo_doi: str | None = None,
+) -> dict[str, Any]:
+    """Lưu trữ một loại báo cáo, đồng thời gỡ deadline để dừng nhắc tự động."""
+    ten_hien = _chuan_hoa_ten_loai(ten_hien_thi)
+    ten_track = _chuan_hoa_ten_loai(ten_theo_doi or ten_hien)
+    if not ten_hien:
+        raise ValueError("Tên loại báo cáo không được để trống.")
+
+    deadline_cfg = doc_deadline_config()
+    deadline_cu = deadline_cfg.pop(ten_track, None)
+    if ten_hien != ten_track:
+        deadline_cu = deadline_cfg.pop(ten_hien, None) or deadline_cu
+
+    archive_cfg = doc_luu_tru_config()
+    archive_cfg[ten_hien] = {
+        "ten_hien_thi": ten_hien,
+        "ten_theo_doi": ten_track,
+        "deadline_cu": deadline_cu or "",
+        "luu_tru_luc": datetime.now().isoformat(),
+        "luu_tru_boi": username,
+    }
+
+    db.ghi_kv(KV_DEADLINE, deadline_cfg, username)
+    db.ghi_kv(KV_ARCHIVE, archive_cfg, username)
+    db.ghi_audit(
+        username,
+        "luu_tru_bao_cao",
+        f"Lưu trữ '{ten_hien}'; gỡ deadline={bool(deadline_cu)}",
+    )
+    return archive_cfg[ten_hien]
+
+
+def khoi_phuc_loai_bao_cao(ten_luu_tru: str, username: str) -> bool:
+    """Bỏ trạng thái lưu trữ; deadline cũ không tự bật lại để tránh nhắc quá hạn."""
+    archive_cfg = doc_luu_tru_config()
+    target_norm = _chuan_hoa_ten_loai(ten_luu_tru).casefold()
+    key = next(
+        (
+            item_key
+            for item_key, meta in archive_cfg.items()
+            if target_norm
+            in {
+                _chuan_hoa_ten_loai(item_key).casefold(),
+                _chuan_hoa_ten_loai(meta.get("ten_hien_thi", "")).casefold(),
+                _chuan_hoa_ten_loai(meta.get("ten_theo_doi", "")).casefold(),
+            }
+        ),
+        None,
+    )
+    if key is None:
+        return False
+    meta = archive_cfg.pop(key)
+    db.ghi_kv(KV_ARCHIVE, archive_cfg, username)
+    db.ghi_audit(
+        username,
+        "khoi_phuc_bao_cao",
+        f"Khôi phục '{meta.get('ten_hien_thi', key)}'; chưa bật lại deadline",
+    )
+    return True
 
 
 def _chuan_hoa_ten_loai(ten: str) -> str:
@@ -673,6 +806,9 @@ def lay_pgd_chua_nop(
     """
     deadline_cfg = doc_deadline_config()
 
+    if la_loai_bao_cao_luu_tru(loai_bao_cao):
+        return [], None
+
     if df is None:
         df = doc_du_lieu_gsheet()
     df, dm = _gan_khoa_theo_doi(df, deadline_cfg)
@@ -728,6 +864,8 @@ def lay_danh_sach_can_nhac(
 
     for loai, deadline_str in sorted(deadline_cfg.items()):
         loai_hien = dm["tracked_to_display"].get(loai, loai)
+        if la_loai_bao_cao_luu_tru(loai) or la_loai_bao_cao_luu_tru(loai_hien):
+            continue
         # Lọc allowlist
         if allowlist is not None and loai not in allowlist and loai_hien not in allowlist:
             continue
@@ -835,6 +973,286 @@ def tao_ma_tran_tien_do(
 
     metrics = {"dung_han": dung_han, "tre": tre, "chua_nop": chua_nop, "thieu_file": thieu_file, "da_nop": da_nop}
     return rows, metrics
+
+
+def _fmt_ngay_vn(value) -> str:
+    """Format ngày theo DD/MM/YYYY; giá trị rỗng trả về '—'."""
+    if pd.isna(value):
+        return "—"
+    try:
+        return pd.to_datetime(value).strftime("%d/%m/%Y")
+    except Exception:
+        return str(value or "—")
+
+
+def _parse_deadline(deadline_str: str | None) -> date | None:
+    """Parse deadline từ chuỗi YYYY-MM-DD."""
+    if not deadline_str:
+        return None
+    try:
+        return pd.to_datetime(deadline_str).date()
+    except Exception:
+        return None
+
+
+def lap_bang_nghia_vu_bao_cao(
+    df: pd.DataFrame,
+    deadline_cfg: dict[str, str],
+    ds_pgd_scope: list[str] | None = None,
+) -> tuple[pd.DataFrame, dict[str, Any]]:
+    """Sinh bảng nghĩa vụ nộp báo cáo theo PGD × loại deadline."""
+    if ds_pgd_scope is None:
+        ds_pgd_scope = DS_PGD_ALL
+
+    if not deadline_cfg:
+        return pd.DataFrame(), {
+            "danh_muc": {"tracked_keys": [], "tracked_to_display": {}},
+            "metrics": {
+                "tong_nghia_vu": 0,
+                "tong_loai": 0,
+                "tong_don_vi": len(ds_pgd_scope),
+                "da_hoan_thanh": 0,
+                "chua_hoan_thanh": 0,
+            },
+        }
+
+    df, dm = gan_trang_thai(df, deadline_cfg)
+    tracked_keys = sorted(deadline_cfg.keys(), key=lambda x: dm["tracked_to_display"].get(x, x))
+    manual_map = doc_manual_log()
+    hom_nay = date.today()
+    rows: list[dict[str, Any]] = []
+
+    for pgd in ds_pgd_scope:
+        for loai in tracked_keys:
+            loai_hien = dm["tracked_to_display"].get(loai, loai)
+            deadline_str = deadline_cfg.get(loai)
+            deadline_dt = _parse_deadline(deadline_str)
+            match = df[(df["ten_pgd"] == pgd) & (df["_loai_theo_doi"] == loai)].sort_values("thoi_gian")
+            manual_entry = manual_map.get((pgd, loai))
+            ghi_de = manual_entry.get("ghi_de", True) if manual_entry else False
+
+            nguon = "Chưa có dữ liệu"
+            ghi_chu = ""
+            ky_bao_cao = ""
+            file_dinh_kem = ""
+            ngay_nop = pd.NaT
+            co_file = False
+
+            if manual_entry and ghi_de:
+                ngay_nop = pd.to_datetime(manual_entry.get("ngay_nop"), errors="coerce")
+                ma_tt = phan_loai_trang_thai(ngay_nop, deadline_str)
+                nguon = "Thủ công"
+                ghi_chu = str(manual_entry.get("ghi_chu", "") or "").strip()
+            elif match.empty:
+                ma_tt = "chua_nop"
+                if manual_entry:
+                    ghi_chu = str(manual_entry.get("ghi_chu", "") or "").strip()
+                    nguon = "Chưa có dữ liệu + ghi chú"
+            else:
+                lan_cuoi = match.iloc[-1]
+                ngay_nop = lan_cuoi.get("thoi_gian")
+                ky_bao_cao = str(lan_cuoi.get("ky_bao_cao", "") or "").strip()
+                file_dinh_kem = str(lan_cuoi.get("file_dinh_kem", "") or "").strip()
+                co_file = bool(file_dinh_kem)
+                ma_tt = "thieu_file" if not co_file else str(lan_cuoi.get("tt", "chua_nop"))
+                nguon = "Google Form"
+                if manual_entry and not ghi_de:
+                    ghi_chu = str(manual_entry.get("ghi_chu", "") or "").strip()
+                    nguon = "Google Form + ghi chú"
+
+            hoan_thanh = ma_tt in {"dung_han", "tre"}
+            can_xu_ly = ma_tt in {"chua_nop", "thieu_file"}
+            sap_den_han = bool(deadline_dt and not hoan_thanh and 0 <= (deadline_dt - hom_nay).days <= 3)
+
+            if deadline_dt is None:
+                so_ngay_tre = 0
+            elif ma_tt == "tre" and not pd.isna(ngay_nop):
+                nop_date = pd.to_datetime(ngay_nop).date()
+                so_ngay_tre = max((nop_date - deadline_dt).days, 0)
+            elif ma_tt in {"chua_nop", "thieu_file"}:
+                so_ngay_tre = max((hom_nay - deadline_dt).days, 0)
+            else:
+                so_ngay_tre = 0
+
+            if ma_tt == "thieu_file":
+                nhom_hanh_dong = "Thiếu file"
+            elif ma_tt == "chua_nop" and so_ngay_tre > 0:
+                nhom_hanh_dong = "Quá hạn chưa nộp"
+            elif ma_tt == "chua_nop":
+                nhom_hanh_dong = "Sắp đến hạn"
+            elif ma_tt == "tre":
+                nhom_hanh_dong = "Đã nộp trễ"
+            else:
+                nhom_hanh_dong = "Hoàn thành"
+
+            rows.append(
+                {
+                    "Đơn vị": pgd,
+                    "Loại báo cáo": loai_hien,
+                    "Trạng thái": f"{EMOJI.get(ma_tt, '')} {LABEL.get(ma_tt, ma_tt)}".strip(),
+                    "Mã trạng thái": ma_tt,
+                    "Thời hạn": _fmt_ngay_vn(deadline_str),
+                    "Ngày nộp cuối": _fmt_ngay_vn(ngay_nop),
+                    "Kỳ báo cáo": ky_bao_cao or "—",
+                    "Nguồn trạng thái": nguon,
+                    "Có file": "Có" if co_file else "Không",
+                    "Quá hạn (ngày)": int(so_ngay_tre),
+                    "Cần xử lý": can_xu_ly,
+                    "Sắp đến hạn": sap_den_han,
+                    "Hoàn thành": hoan_thanh,
+                    "Nhóm hành động": nhom_hanh_dong,
+                    "Ghi chú": ghi_chu or "—",
+                    "_deadline_raw": deadline_str or "",
+                    "_ngay_nop_raw": ngay_nop,
+                    "_file_dinh_kem": file_dinh_kem,
+                }
+            )
+
+    df_nghia_vu = pd.DataFrame(rows)
+    metrics = {
+        "tong_nghia_vu": int(len(df_nghia_vu)),
+        "tong_loai": int(len(tracked_keys)),
+        "tong_don_vi": int(len(ds_pgd_scope)),
+        "da_hoan_thanh": int(df_nghia_vu["Hoàn thành"].sum()) if not df_nghia_vu.empty else 0,
+        "chua_hoan_thanh": int((~df_nghia_vu["Hoàn thành"]).sum()) if not df_nghia_vu.empty else 0,
+    }
+    return df_nghia_vu, {"danh_muc": dm, "metrics": metrics}
+
+
+def tong_hop_bao_cao_dieu_hanh(
+    df: pd.DataFrame,
+    deadline_cfg: dict[str, str],
+    ds_pgd_scope: list[str] | None = None,
+) -> dict[str, Any]:
+    """Tổng hợp dữ liệu điều hành từ bảng nghĩa vụ nộp báo cáo."""
+    df_nghia_vu, extra = lap_bang_nghia_vu_bao_cao(df, deadline_cfg, ds_pgd_scope)
+    metrics = dict(extra.get("metrics", {}))
+
+    if df_nghia_vu.empty:
+        metrics.update(
+            {
+                "ty_le_hoan_thanh": 0.0,
+                "so_don_vi_hoan_thanh_100": 0,
+                "so_don_vi_con_thieu": 0,
+                "so_tre_han": 0,
+                "so_thieu_file": 0,
+                "so_sap_den_han": 0,
+                "so_qua_han_chua_nop": 0,
+                "so_luot_nop": int(len(df)) if df is not None else 0,
+            }
+        )
+        return {
+            "df_chi_tiet": df_nghia_vu,
+            "df_da_hoan_thanh": df_nghia_vu,
+            "df_chua_hoan_thanh": df_nghia_vu,
+            "df_can_xu_ly": df_nghia_vu,
+            "df_sap_den_han": df_nghia_vu,
+            "df_top_don_vi": pd.DataFrame(),
+            "df_top_loai": pd.DataFrame(),
+            "metrics": metrics,
+            "nhan_dinh": [],
+        }
+
+    tong_nghia_vu = max(int(metrics.get("tong_nghia_vu", 0)), 1)
+    metrics.update(
+        {
+            "ty_le_hoan_thanh": metrics.get("da_hoan_thanh", 0) / tong_nghia_vu,
+            "so_tre_han": int((df_nghia_vu["Mã trạng thái"] == "tre").sum()),
+            "so_thieu_file": int((df_nghia_vu["Mã trạng thái"] == "thieu_file").sum()),
+            "so_sap_den_han": int(df_nghia_vu["Sắp đến hạn"].sum()),
+            "so_qua_han_chua_nop": int(
+                (
+                    (df_nghia_vu["Mã trạng thái"] == "chua_nop")
+                    & (df_nghia_vu["Quá hạn (ngày)"] > 0)
+                ).sum()
+            ),
+            "so_luot_nop": int(len(df)) if df is not None else 0,
+        }
+    )
+
+    unit_stats = (
+        df_nghia_vu.groupby("Đơn vị")
+        .agg(
+            tong_nghia_vu=("Đơn vị", "size"),
+            da_hoan_thanh=("Hoàn thành", "sum"),
+            chua_hoan_thanh=("Cần xử lý", "sum"),
+            tre_han=("Mã trạng thái", lambda s: int((s == "tre").sum())),
+            thieu_file=("Mã trạng thái", lambda s: int((s == "thieu_file").sum())),
+            qua_han_max=("Quá hạn (ngày)", "max"),
+        )
+        .reset_index()
+    )
+    unit_stats["ty_le_hoan_thanh"] = (
+        unit_stats["da_hoan_thanh"] / unit_stats["tong_nghia_vu"]
+    ).fillna(0.0)
+    metrics["so_don_vi_hoan_thanh_100"] = int((unit_stats["chua_hoan_thanh"] == 0).sum())
+    metrics["so_don_vi_con_thieu"] = int((unit_stats["chua_hoan_thanh"] > 0).sum())
+
+    loai_stats = (
+        df_nghia_vu.groupby("Loại báo cáo")
+        .agg(
+            tong_nghia_vu=("Loại báo cáo", "size"),
+            da_hoan_thanh=("Hoàn thành", "sum"),
+            chua_hoan_thanh=("Cần xử lý", "sum"),
+            tre_han=("Mã trạng thái", lambda s: int((s == "tre").sum())),
+            thieu_file=("Mã trạng thái", lambda s: int((s == "thieu_file").sum())),
+            qua_han_max=("Quá hạn (ngày)", "max"),
+        )
+        .reset_index()
+    )
+    loai_stats["ty_le_hoan_thanh"] = (
+        loai_stats["da_hoan_thanh"] / loai_stats["tong_nghia_vu"]
+    ).fillna(0.0)
+
+    df_chua_hoan_thanh = df_nghia_vu[~df_nghia_vu["Hoàn thành"]].copy()
+    df_can_xu_ly = df_nghia_vu[df_nghia_vu["Cần xử lý"]].copy()
+    df_sap_den_han = df_nghia_vu[df_nghia_vu["Sắp đến hạn"]].copy()
+    df_da_hoan_thanh = df_nghia_vu[df_nghia_vu["Hoàn thành"]].copy()
+
+    df_top_don_vi = unit_stats.sort_values(
+        ["chua_hoan_thanh", "thieu_file", "qua_han_max", "Đơn vị"],
+        ascending=[False, False, False, True],
+    )
+    df_top_loai = loai_stats.sort_values(
+        ["chua_hoan_thanh", "thieu_file", "qua_han_max", "Loại báo cáo"],
+        ascending=[False, False, False, True],
+    )
+    df_can_xu_ly = df_can_xu_ly.sort_values(
+        ["Quá hạn (ngày)", "_deadline_raw", "Đơn vị", "Loại báo cáo"],
+        ascending=[False, True, True, True],
+    )
+    df_sap_den_han = df_sap_den_han.sort_values(
+        ["_deadline_raw", "Đơn vị", "Loại báo cáo"],
+        ascending=[True, True, True],
+    )
+
+    nhan_dinh: list[str] = []
+    if metrics["so_qua_han_chua_nop"]:
+        nhan_dinh.append(
+            f"Còn {metrics['so_qua_han_chua_nop']} nghĩa vụ đã quá hạn nhưng chưa nộp."
+        )
+    if metrics["so_thieu_file"]:
+        nhan_dinh.append(
+            f"Có {metrics['so_thieu_file']} báo cáo đã gửi Form nhưng chưa có file đính kèm."
+        )
+    if metrics["so_sap_den_han"]:
+        nhan_dinh.append(
+            f"Có {metrics['so_sap_den_han']} nghĩa vụ sắp đến hạn trong 3 ngày tới."
+        )
+    if not nhan_dinh:
+        nhan_dinh.append("Tiến độ đang ổn định, chưa thấy điểm nghẽn cần đôn đốc gấp.")
+
+    return {
+        "df_chi_tiet": df_nghia_vu,
+        "df_da_hoan_thanh": df_da_hoan_thanh,
+        "df_chua_hoan_thanh": df_chua_hoan_thanh,
+        "df_can_xu_ly": df_can_xu_ly,
+        "df_sap_den_han": df_sap_den_han,
+        "df_top_don_vi": df_top_don_vi,
+        "df_top_loai": df_top_loai,
+        "metrics": metrics,
+        "nhan_dinh": nhan_dinh,
+    }
 
 
 # ── Health-check nguồn dữ liệu ────────────────────────────────────────────────

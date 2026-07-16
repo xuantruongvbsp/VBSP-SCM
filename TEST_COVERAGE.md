@@ -9,7 +9,7 @@
 | | Số lượng |
 |---|---|
 | File test | 45 |
-| Test cases (ước tính) | ~820 |
+| Test cases (ước tính) | ~826 |
 | Modules có test | 28/~60 |
 | 🔴 Modules chưa có test | ~32 |
 
@@ -56,6 +56,9 @@
 | `services/uy_thac_service.py` | `test_uy_thac_service.py` | 26 | ✅ Cao | tinh_theo_dvut, loc_mau06/15, co_du_lieu_to, kv_key, payload builders, bien_ban CRUD |
 | `services/tien_do_excel_service.py` | `test_tien_do_excel_service.py` | 8 | ✅ Cao | 3 sheets, styling, empty df |
 | `services/telegram_service.py` | `test_telegram_service.py` | 4 | 🟡 Trung bình | Routing Upload PGD: chat PGD → chat phụ → chat chính; log lỗi theo notify key |
+| `services/telegram_schedule_service.py` | `test_telegram_schedule_service.py` | 14 | 🟢 Khá | Validate rule, daily/weekly due slot, chống gửi trùng, retry cooldown, toggle, legacy ownership, chạy thử, heartbeat và baseline full→delta reset theo ngày |
+| `services/telegram_delta.py` | `test_telegram_jobs_delta.py` | 5 | 🟢 Khá | So sánh PGD nộp báo cáo, tiến độ nhập liệu, khoản đến hạn mới/mất và dư nợ thay đổi với snapshot đầu ngày; không đổi thì trả rỗng |
+| `services/report_submission_service.py` | `test_report_submission_service.py` | 16 | 🟢 Khá | Alias tên Form, nghĩa vụ theo deadline, thiếu file, lưu trữ/khôi phục và chặn Telegram nhắc báo cáo đã lưu trữ |
 
 ---
 
@@ -103,8 +106,7 @@
 
 | Module | Rủi ro | Ưu tiên |
 |---|---|---|
-| `data/hstd.py` — `danh_dau_khong_hd()` | ✅ Có test (29 cases, test_hstd.py) | — |
-| `data/hstd.py` — `canh_bao_migration()` | ✅ Có test (29 cases, test_hstd.py) | — |
+| `data/hstd.py` — `danh_dau_khong_hd()`, `canh_bao_migration()`, nhận diện đơn vị Điện báo | ✅ Có test (31 cases, test_hstd.py) | — |
 | `data/core.py` — `excel_to_parquet()` | ✅ Có test (21 cases, test_core.py) | — |
 | `data/core.py` — `tong_hop_du_no_pgd()`, `dem_no_qua_han_pgd()`, `tong_hop_theo_xa()` | ✅ Có test (21 cases, test_core.py) | — |
 | `data/pgd.py` — `pgd_slug()`, `duong_dan_pgd()` | ✅ Có test (19 cases, test_pgd.py) | — |
@@ -122,6 +124,7 @@
 | `services/file_detection_service.py` | ✅ Có test (21 cases, test_file_detection_service.py) | — |
 | `services/uy_thac_service.py` | ✅ Có test (26 cases, test_uy_thac_service.py) | — |
 | `services/tien_do_excel_service.py` | ✅ Có test (8 cases, test_tien_do_excel_service.py) | — |
+| `services/khnv_bao_cao_service.py` | ✅ Có test (10 cases, test_khnv_bao_cao.py), gồm ngày snapshot và chuẩn hóa Điện báo | — |
 
 ### D4. Components chưa test (`components/`)
 

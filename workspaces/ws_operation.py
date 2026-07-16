@@ -80,7 +80,7 @@ from config import (
 
     COT_LAI_TON_QH,
 
-    TEMPLATES_DIR, TAG_MAP, PGD_XA_MAP,
+    PGD_XA_MAP,
 
 )
 
@@ -107,15 +107,6 @@ from utils import (
     fmt_so,
 
     vn,
-
-    auto_fill_document,
-
-    auto_fill_batch,
-
-    auto_fill_klgb,
-
-    quet_templates,
-
     xuat_excel,
 
     hien_thi_dataframe_phan_trang,
@@ -553,7 +544,6 @@ _WS_OP_MENU_ITEMS = [
     {"group": "Tác nghiệp", "label": "🍩 Cơ cấu CT"},
     {"group": "Tác nghiệp", "label": "🔄 So sánh kỳ"},
     {"group": "Tác nghiệp", "label": "🏷️ Phân loại KH"},
-    {"group": "Tác nghiệp", "label": "📄 Quản lý Template"},
     # ── Báo cáo ──
     {
         "group": "Báo cáo",
@@ -941,8 +931,6 @@ def render(**kwargs):
                     pgd_user=pgd_user, pgd_mode=True,
 
                 )),
-
-                ("📄 Quản lý Template", lambda tab: _lazy_tab("tab_template_pgd").render(tab, **kwargs)),
 
                 ("🏷️ Phân loại KH", lambda tab: _lazy_tab("tab_phan_loai_kh").render(tab, **_pgd_df_kwargs)),
 

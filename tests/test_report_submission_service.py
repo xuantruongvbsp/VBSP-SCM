@@ -171,3 +171,171 @@ class TestDoiTenLoaiTheoDoi:
         cfg = mock_kv[svc.KV_DEADLINE]
         assert "RÀ SOÁT XÂY DỰNG KHTD 2027-2030" in cfg
         assert "BÁO CÁO KẾ HOẠCH 2026-2027" in cfg
+
+
+class TestBaoCaoDieuHanh:
+    def test_lap_bang_nghia_vu_tinh_ca_don_vi_chua_co_dong_nop(self, mock_kv):
+        cfg = {"BC tuần": "2026-07-15"}
+        df = pd.DataFrame(
+            [
+                {
+                    "thoi_gian": pd.Timestamp("2026-07-10"),
+                    "ten_pgd": "PGD A",
+                    "loai_bao_cao": "BC tuần",
+                    "ky_bao_cao": "Tuần 28",
+                    "file_dinh_kem": "https://example.com/a",
+                }
+            ]
+        )
+
+        df_nghia_vu, extra = svc.lap_bang_nghia_vu_bao_cao(
+            df,
+            cfg,
+            ds_pgd_scope=["PGD A", "PGD B"],
+        )
+
+        assert len(df_nghia_vu) == 2
+        assert extra["metrics"]["tong_nghia_vu"] == 2
+
+        row_a = df_nghia_vu[df_nghia_vu["Đơn vị"] == "PGD A"].iloc[0]
+        row_b = df_nghia_vu[df_nghia_vu["Đơn vị"] == "PGD B"].iloc[0]
+
+        assert row_a["Mã trạng thái"] == "dung_han"
+        assert bool(row_a["Hoàn thành"]) is True
+        assert row_b["Mã trạng thái"] == "chua_nop"
+        assert bool(row_b["Cần xử lý"]) is True
+
+    def test_tong_hop_bao_cao_dieu_hanh_tach_thieu_file_khoi_da_hoan_thanh(self, mock_kv):
+        cfg = {"BC tháng": "2026-07-15"}
+        df = pd.DataFrame(
+            [
+                {
+                    "thoi_gian": pd.Timestamp("2026-07-10"),
+                    "ten_pgd": "PGD A",
+                    "loai_bao_cao": "BC tháng",
+                    "ky_bao_cao": "06/2026",
+                    "file_dinh_kem": "",
+                }
+            ]
+        )
+
+        bao_cao = svc.tong_hop_bao_cao_dieu_hanh(
+            df,
+            cfg,
+            ds_pgd_scope=["PGD A"],
+        )
+
+        assert len(bao_cao["df_chua_hoan_thanh"]) == 1
+        assert bao_cao["metrics"]["so_thieu_file"] == 1
+        assert bao_cao["metrics"]["da_hoan_thanh"] == 0
+        assert bao_cao["df_chua_hoan_thanh"].iloc[0]["Mã trạng thái"] == "thieu_file"
+
+
+class TestLuuTruBaoCao:
+    def test_luu_tru_giu_du_lieu_gsheet_va_go_deadline(self, mock_kv):
+        mock_kv[svc.KV_DEADLINE] = {"BC tháng 6": "2026-07-15"}
+        df = pd.DataFrame(
+            [
+                {
+                    "thoi_gian": pd.Timestamp("2026-07-10"),
+                    "ten_pgd": "PGD A",
+                    "loai_bao_cao": "BC tháng 6",
+                    "file_dinh_kem": "https://example.com/a",
+                }
+            ]
+        )
+
+        meta = svc.luu_tru_loai_bao_cao("BC tháng 6", "admin_test")
+
+        assert meta["deadline_cu"] == "2026-07-15"
+        assert mock_kv[svc.KV_DEADLINE] == {}
+        assert "BC tháng 6" in mock_kv[svc.KV_ARCHIVE]
+        assert svc.loc_du_lieu_luu_tru(df, archived=False).empty
+        assert len(svc.loc_du_lieu_luu_tru(df, archived=True)) == 1
+
+    def test_khoi_phuc_khong_tu_bat_lai_deadline_cu(self, mock_kv):
+        mock_kv[svc.KV_ARCHIVE] = {
+            "BC tháng 6": {
+                "ten_hien_thi": "BC tháng 6",
+                "ten_theo_doi": "BC tháng 6",
+                "deadline_cu": "2026-07-15",
+            }
+        }
+        mock_kv[svc.KV_DEADLINE] = {}
+
+        assert svc.khoi_phuc_loai_bao_cao("BC tháng 6", "admin_test") is True
+        assert mock_kv[svc.KV_ARCHIVE] == {}
+        assert mock_kv[svc.KV_DEADLINE] == {}
+
+    def test_telegram_bo_qua_deadline_luu_tru_con_sot(self, mock_kv):
+        mock_kv[svc.KV_DEADLINE] = {"BC tháng 6": "2026-07-15"}
+        mock_kv[svc.KV_ARCHIVE] = {
+            "BC tháng 6": {
+                "ten_hien_thi": "BC tháng 6",
+                "ten_theo_doi": "BC tháng 6",
+            }
+        }
+        df = pd.DataFrame(
+            [
+                {
+                    "thoi_gian": pd.Timestamp("2026-07-10"),
+                    "ten_pgd": "PGD A",
+                    "loai_bao_cao": "BC tháng 6",
+                    "file_dinh_kem": "https://example.com/a",
+                }
+            ]
+        )
+
+        assert svc.lay_danh_sach_can_nhac(df=df) == []
+
+
+class TestLayDanhSachCanNhacAllowlist:
+    def test_allowlist_loc_dung_loai_bc(self, mock_kv):
+        mock_kv[svc.KV_DEADLINE] = {"BC A": "2026-07-15", "BC B": "2026-07-16"}
+        df = pd.DataFrame([
+            {"thoi_gian": pd.Timestamp("2026-07-10"), "ten_pgd": "PGD A", "loai_bao_cao": "BC A", "file_dinh_kem": "https://x.com"},
+        ])
+
+        ds = svc.lay_danh_sach_can_nhac(df=df, allowlist={"BC A"})
+        assert len(ds) == 1
+        assert ds[0]["loai"] == "BC A"
+
+    def test_allowlist_loai_bo_bc_khong_trong_danh_sach(self, mock_kv):
+        mock_kv[svc.KV_DEADLINE] = {"BC A": "2026-07-15", "BC B": "2026-07-16"}
+        df = pd.DataFrame([
+            {"thoi_gian": pd.Timestamp("2026-07-10"), "ten_pgd": "PGD A", "loai_bao_cao": "BC A", "file_dinh_kem": "https://x.com"},
+            {"thoi_gian": pd.Timestamp("2026-07-10"), "ten_pgd": "PGD B", "loai_bao_cao": "BC B", "file_dinh_kem": "https://x.com"},
+        ])
+
+        ds = svc.lay_danh_sach_can_nhac(df=df, allowlist={"BC A"})
+        assert len(ds) == 1
+        assert ds[0]["loai"] == "BC A"
+
+    def test_allowlist_none_la_tat_ca(self, mock_kv):
+        mock_kv[svc.KV_DEADLINE] = {"BC A": "2026-07-15", "BC B": "2026-07-16"}
+        df = pd.DataFrame([
+            {"thoi_gian": pd.Timestamp("2026-07-10"), "ten_pgd": "PGD A", "loai_bao_cao": "BC A", "file_dinh_kem": "https://x.com"},
+        ])
+
+        ds = svc.lay_danh_sach_can_nhac(df=df, allowlist=None)
+        assert len(ds) == 2  # Cả 2 loại đều cần nhắc
+
+    def test_allowlist_rong_tra_rong(self, mock_kv):
+        mock_kv[svc.KV_DEADLINE] = {"BC A": "2026-07-15"}
+        df = pd.DataFrame([
+            {"thoi_gian": pd.Timestamp("2026-07-10"), "ten_pgd": "PGD A", "loai_bao_cao": "BC A", "file_dinh_kem": "https://x.com"},
+        ])
+
+        ds = svc.lay_danh_sach_can_nhac(df=df, allowlist=set())
+        assert ds == []
+
+    def test_allowlist_khong_anh_huong_loc_deadline_qua_han(self, mock_kv):
+        mock_kv[svc.KV_DEADLINE] = {"BC A": "2026-07-15", "BC B": "2026-08-01"}
+        df = pd.DataFrame([
+            {"thoi_gian": pd.Timestamp("2026-07-10"), "ten_pgd": "PGD A", "loai_bao_cao": "BC A", "file_dinh_kem": "https://x.com"},
+        ])
+
+        ds = svc.lay_danh_sach_can_nhac(df=df, allowlist={"BC A", "BC B"})
+        # BC B có deadline > 3 ngày, không cần nhắc
+        assert len(ds) == 1
+        assert ds[0]["loai"] == "BC A"

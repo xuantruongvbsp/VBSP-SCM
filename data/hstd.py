@@ -358,6 +358,25 @@ def doc_file_sk_gqvl(fp: str, _ts) -> pd.DataFrame:
 
 
 # ── ĐIỆN BÁO ─────────────────────────────────────────────────────────────────
+def _dienbao_don_vi_trieu(df_raw: pd.DataFrame) -> bool:
+    """Nhận diện đơn vị nguồn; ưu tiên cụm rõ nghĩa `triệu đồng`."""
+    texts = [
+        str(df_raw.iloc[i, j]).lower()
+        for i in range(min(8, len(df_raw)))
+        for j in range(min(30, len(df_raw.columns)))
+        if pd.notna(df_raw.iloc[i, j])
+    ]
+    if any("triệu đồng" in value for value in texts):
+        return True
+    if any(
+        "nghìn đồng" in value
+        or ("đồng" in value and "triệu" not in value and "tỷ" not in value)
+        for value in texts
+    ):
+        return False
+    return True
+
+
 @st.cache_data(ttl=7200, show_spinner=False)
 def doc_dienbao(fp: str, ts: float = 0, sheet_name: str | None = None) -> list:
     """
@@ -390,18 +409,7 @@ def doc_dienbao(fp: str, ts: float = 0, sheet_name: str | None = None) -> list:
             # col[2] là tên PGD (vd: "Hội sở CN Đồng Nai") → cần cộng tất cả cột
             sum_all_cols = True
 
-    # ── Phát hiện đơn vị (triệu đồng hay đồng) ──
-    # Mặc định coi là triệu đồng (VBSP dùng đơn vị này)
-    don_vi_trieu = True
-    # Kiểm tra text "đồng" mà không có "triệu" → đơn vị là đồng
-    for i in range(min(8, len(df_raw))):
-        for j in range(min(30, n_cols)):
-            v = str(df_raw.iloc[i, j]).lower() if pd.notna(df_raw.iloc[i, j]) else ""
-            if "triệu đồng" in v:
-                don_vi_trieu = True
-                break
-            if "nghìn đồng" in v or ("đồng" in v and "triệu" not in v and "tỷ" not in v):
-                don_vi_trieu = False
+    don_vi_trieu = _dienbao_don_vi_trieu(df_raw)
 
     rows, ten_cha = [], None
     skip_keywords = ("", "nan", "chỉ tiêu", "điện báo ngày", "stt", "b.", "a.", "i", "ii", "iii")
@@ -476,6 +484,9 @@ def doc_dienbao_matrix(
     else:
         df_raw = pd.read_excel(fp, header=None)
 
+    # Trả metadata để service quy đổi về VND trước khi đối chiếu với HSTD.
+    don_vi_trieu = _dienbao_don_vi_trieu(df_raw)
+
     # ── Trích xuất danh sách đơn vị (từ row 4, từ cột 3 trở đi) ──
     units = []
     unit_codes = []
@@ -545,10 +556,12 @@ def doc_dienbao_matrix(
         if ten.startswith("-") or ten.startswith("+"):
             ten_clean = ten.lstrip("-+ ").strip()
             rows.append({"ten": f"  NQH: {ten_clean}", "val": val_tong,
-                         "la_nqh_con": True, "cha": ten_cha})
+                         "la_nqh_con": True, "cha": ten_cha,
+                         "don_vi_trieu": don_vi_trieu})
         else:
             rows.append({"ten": ten, "val": val_tong,
-                         "la_nqh_con": False, "cha": None})
+                         "la_nqh_con": False, "cha": None,
+                         "don_vi_trieu": don_vi_trieu})
             ten_cha = ten
 
     return {
@@ -558,6 +571,7 @@ def doc_dienbao_matrix(
         "matrix": matrix,
         "ngay_bao_cao": ngay_bc,
         "sheet_name": sheet_name or "",
+        "don_vi_trieu": don_vi_trieu,
     }
 
 

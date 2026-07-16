@@ -1,9 +1,11 @@
 """Quản trị Telegram Bot — cấu hình, bật/tắt, lịch gửi, thao tác thủ công."""
 from __future__ import annotations
 
+import json
+
 import streamlit as st
 import pandas as pd
-from datetime import date
+from datetime import date, time
 from streamlit.delta_generator import DeltaGenerator
 
 import db
@@ -12,7 +14,7 @@ from logger import get_logger
 
 logger = get_logger(__name__)
 
-# ── Metadata 10 loại thông báo ────────────────────────────────────────────────
+# ── Metadata các loại thông báo ────────────────────────────────────────────
 _NOTIFY_META = [
     {
         "key": "bao_cao_sang",
@@ -127,6 +129,40 @@ _NOTIFY_META = [
         "icon": "📅", "ten": "Tổng kết tháng",
         "mo_ta": "Ngày 25–31: dư nợ vs KH%, NQH%, top/bottom 5 PGD",
         "gio_mac_dinh": "07:30",
+    },
+]
+
+# Chỉ phân nhóm trình bày UI; key cấu hình và cơ chế gửi giữ nguyên.
+_NOTIFY_GROUPS = [
+    {
+        "icon": "📊",
+        "ten": "Báo cáo định kỳ",
+        "mo_ta": "Tổng hợp số liệu theo ngày, tuần, tháng và tiến độ KHTD.",
+        "keys": (
+            "bao_cao_sang", "khtd_tien_do", "giai_ngan_tuan",
+            "nqh_tuan", "khtd_ct", "tong_ket_thang",
+        ),
+    },
+    {
+        "icon": "🔔",
+        "ten": "Nhắc nghiệp vụ",
+        "mo_ta": "Nhắc đến hạn, nộp báo cáo, nhập liệu và lịch công tác.",
+        "keys": (
+            "khoang_den_han", "phan_ky_nxh", "deadline_bc", "nhap_lieu",
+            "nop_moi_gsheet", "den_han_phan_tang", "lich_cong_tac",
+        ),
+    },
+    {
+        "icon": "⚠️",
+        "ten": "Cảnh báo rủi ro",
+        "mo_ta": "Cảnh báo biến động nợ quá hạn và nợ khoanh.",
+        "keys": ("qh_moi", "khoanh_tang"),
+    },
+    {
+        "icon": "⚙️",
+        "ten": "Sự kiện hệ thống",
+        "mo_ta": "Theo dõi upload, merge, Health Check và cảnh báo hệ thống.",
+        "keys": ("upload_pgd", "merge_thanh_cong", "health_check", "he_thong"),
     },
 ]
 
@@ -334,64 +370,16 @@ def _gui_ngay(key: str) -> tuple[bool, str]:
             return True, "Không có PGD nào tăng NQH (test)"
 
         elif key == "deadline_bc":
-            from services.report_submission_service import doc_du_lieu_gsheet, lay_pgd_chua_nop
-            deadline_cfg = db.doc_kv("bao_cao_deadline_config") or {}
-            if not deadline_cfg:
-                return False, "Chưa cài đặt deadline (vào tab Tiến độ → ⚙️ Cài đặt thời hạn)."
-            from services.telegram_service import doc_deadline_bc_allowlist
-            ds_loai = sorted([str(k) for k in deadline_cfg.keys()]) if isinstance(deadline_cfg, dict) else []
-            allowlist_raw = doc_deadline_bc_allowlist()
-            allowlist, stale_allowlist = _loc_allowlist_deadline(allowlist_raw, ds_loai)
-            df_gs = doc_du_lieu_gsheet()
-            total_sent = 0
-            failed_count = 0
-            first_err = ""
-            skipped = 0
-            for loai_bao_cao in deadline_cfg:
-                if allowlist is not None and loai_bao_cao not in allowlist:
-                    skipped += 1
-                    continue
-                ds_chua_nop, deadline_str = lay_pgd_chua_nop(loai_bao_cao, df_gs)
-                if not ds_chua_nop:
-                    continue
-                dl_hien = deadline_str or "—"
-                try:
-                    dl_hien = pd.to_datetime(deadline_str).strftime("%d/%m/%Y")
-                except Exception:
-                    pass
-                ok = tg.gui_canh_bao_deadline(loai_bao_cao, dl_hien, ds_chua_nop)
-                if ok:
-                    total_sent += 1
-                else:
-                    failed_count += 1
-                    if not first_err:
-                        first_err = _loi_gui_telegram("deadline_bc")
-            if failed_count:
-                if total_sent:
-                    return False, f"Đã gửi {total_sent} loại báo cáo, lỗi {failed_count} loại — {first_err}"
-                return False, first_err
-            if total_sent == 0:
-                if allowlist is not None:
-                    return True, "Không có loại báo cáo nào cần nhắc trong allowlist"
-                return True, "Tất cả PGD đã nộp hoặc chưa đến deadline"
-            if allowlist is not None:
-                msg = f"Đã gửi {total_sent} loại báo cáo (lọc {len(allowlist)} loại, bỏ qua {skipped} loại)"
-                if stale_allowlist:
-                    msg += f"; bỏ {len(stale_allowlist)} loại stale"
-                return True, msg
-            return True, f"Đã gửi {total_sent} loại báo cáo"
+            from services.telegram_jobs import run_telegram_job
+
+            result = run_telegram_job("deadline_bc")
+            return result.ok, result.info if result.ok else result.error
 
         elif key == "nhap_lieu":
-            from scripts.nhac_deadline import _nhac_theo_doi_nhap_lieu
+            from services.telegram_jobs import run_telegram_job
 
-            sent_count, pending_count, first_err = _nhac_theo_doi_nhap_lieu()
-            if pending_count == 0:
-                return True, "Không có sheet nhập liệu nào cần nhắc"
-            if sent_count == pending_count:
-                return True, f"Đã gửi {sent_count} nhắc nhập liệu"
-            if sent_count > 0:
-                return False, f"Đã gửi {sent_count}/{pending_count} nhắc nhập liệu — {first_err}"
-            return False, first_err or "Gửi nhắc nhập liệu thất bại."
+            result = run_telegram_job("nhap_lieu")
+            return result.ok, result.info if result.ok else result.error
 
         elif key == "health_check":
             ok = tg.gui_ket_qua_health_check(
@@ -438,34 +426,10 @@ def _gui_ngay(key: str) -> tuple[bool, str]:
             return _ket_qua_gui_telegram(ok, f"{len(ds)} submission trong 24h qua", "nop_moi_gsheet")
 
         elif key == "den_han_phan_tang":
-            from data.core import CACHE_HSTD
-            from config import COT_NGAY_DH, COT_TONG_DU_NO, COT_TEN_KH, COT_SO_KU, COT_TEN_PGD
-            if not CACHE_HSTD.exists():
-                return False, "Chưa có dữ liệu HSTD."
-            df = pd.read_parquet(CACHE_HSTD)
-            if COT_NGAY_DH not in df.columns:
-                return False, f"Thiếu cột {COT_NGAY_DH}."
-            today_ts = pd.Timestamp.today().normalize()
-            buckets: dict[str, list[dict]] = {"T-1": [], "T-3": [], "T-7": []}
-            tier_map = {1: "T-1", 3: "T-3", 7: "T-7"}
-            for days in (1, 3, 7):
-                target = today_ts + pd.Timedelta(days=days)
-                mask = df[COT_NGAY_DH].notna() & (df[COT_NGAY_DH].dt.normalize() == target)
-                for _, r in df[mask].iterrows():
-                    buckets[tier_map[days]].append({
-                        "ten_kh":  str(r.get(COT_TEN_KH, "") or ""),
-                        "so_ku":   str(r.get(COT_SO_KU, "") or ""),
-                        "ngay_dh": target.strftime("%d/%m/%Y"),
-                        "du_no":   float(r.get(COT_TONG_DU_NO, 0) or 0),
-                        "ten_pgd": str(r.get(COT_TEN_PGD, "") or ""),
-                    })
-            total = sum(len(v) for v in buckets.values())
-            ok = tg.gui_nhac_den_han_phan_tang(buckets)
-            return _ket_qua_gui_telegram(
-                ok,
-                f"{total} khoản (T-1:{len(buckets['T-1'])}, T-3:{len(buckets['T-3'])}, T-7:{len(buckets['T-7'])})",
-                "den_han_phan_tang",
-            )
+            from services.telegram_jobs import run_telegram_job
+
+            result = run_telegram_job("den_han_phan_tang")
+            return result.ok, result.info if result.ok else result.error
 
         elif key == "lich_cong_tac":
             ds_lich = db.doc_kv("khnv_lich_list")
@@ -668,6 +632,533 @@ def _gui_ngay(key: str) -> tuple[bool, str]:
         return False, str(e)
 
 
+_SCHEDULER_FORM_KEYS = (
+    "tg_rule_name", "tg_rule_notify", "tg_rule_mode", "tg_rule_times",
+    "tg_rule_weekdays", "tg_rule_max_runs", "tg_rule_grace",
+    "tg_rule_attempts", "tg_rule_cooldown", "tg_rule_enabled",
+)
+
+
+def _reset_scheduler_rule_form() -> None:
+    for key in _SCHEDULER_FORM_KEYS:
+        st.session_state.pop(key, None)
+    st.session_state.pop("_tg_scheduler_preset_defaults", None)
+
+
+def _apply_scheduler_preset(preset: str) -> None:
+    presets = {
+        "morning": {"mode": "daily", "times": ["08:00"], "weekdays": [], "max_runs": 1},
+        "twice": {"mode": "daily", "times": ["08:00", "14:00"], "weekdays": [], "max_runs": 2},
+        "monday": {"mode": "weekly", "times": ["08:00"], "weekdays": [0], "max_runs": 1},
+        "weekdays": {
+            "mode": "weekly", "times": ["08:00"], "weekdays": [0, 1, 2, 3, 4], "max_runs": 1,
+        },
+    }
+    for key in _SCHEDULER_FORM_KEYS:
+        st.session_state.pop(key, None)
+    st.session_state["_tg_scheduler_preset_defaults"] = presets[preset]
+
+
+def _fmt_scheduler_dt(value) -> str:
+    return value.strftime("%H:%M %d/%m/%Y") if value is not None else "—"
+
+
+def _render_scheduler_rules(username: str) -> None:
+    """UI cấu hình MVP scheduler daily/weekly nhiều mốc giờ."""
+    from services.telegram_jobs import telegram_job_keys
+    from services.telegram_schedule_service import (
+        RUNLOG_PREFIX,
+        doc_schedule_config,
+        luu_schedule_config,
+        run_rule_now,
+        scheduler_health,
+    )
+
+    cfg = doc_schedule_config()
+    st.markdown("##### Lịch gửi Telegram tự động")
+    st.caption(
+        "Chọn nội dung, ngày và giờ gửi. Hệ thống sẽ tự chạy theo lịch đã lưu."
+    )
+    with st.expander("📘 Hướng dẫn cài đặt và chuyển sang máy mới", expanded=False):
+        st.markdown(
+            """
+**Nguyên tắc quan trọng:** chỉ để **một máy** chạy `VBSP-TelegramScheduler`.
+
+Nếu máy cũ và máy mới cùng chạy, Telegram có thể gửi thông báo hai lần.
+
+**Bước 1 — Trên máy cũ (nếu còn sử dụng)**
+
+Mở PowerShell bằng **Run as administrator**, rồi tắt scheduler:
+"""
+        )
+        st.code(
+            'Disable-ScheduledTask -TaskName "VBSP-TelegramScheduler"',
+            language="powershell",
+        )
+        st.markdown(
+            """
+**Bước 2 — Chuyển chương trình sang máy mới**
+
+- Copy toàn bộ thư mục dự án vào `D:\\VBSP-SCM`.
+- Copy an toàn file `vbsp_scm.db` nếu muốn giữ Token, Chat ID và các rule hiện có.
+- Hoặc dùng mục **Xuất/Nhập cấu hình rule** phía dưới; file xuất không chứa Token và Chat ID.
+- File database có thông tin cấu hình Telegram: **không gửi qua nhóm chat, email công khai hoặc đưa lên GitHub**.
+- Nếu không copy database, nhập lại Token/Chat ID và tạo lại rule trong màn hình này.
+
+**Bước 3 — Cài Windows Task Scheduler trên máy mới**
+
+Mở PowerShell bằng **Run as administrator**, dán lần lượt:
+"""
+        )
+        st.code(
+            """cd D:\\VBSP-SCM
+Set-ExecutionPolicy -Scope Process Bypass
+.\\scripts\\setup_task_scheduler.ps1""",
+            language="powershell",
+        )
+        st.markdown("Nếu dự án nằm ở thư mục khác, dùng lệnh:")
+        st.code(
+            '.\\scripts\\setup_task_scheduler.ps1 -ProjectDir "D:\\ThuMucKhac"',
+            language="powershell",
+        )
+        st.markdown(
+            """
+**Bước 4 — Kiểm tra task đã được cài**
+"""
+        )
+        st.code(
+            'Get-ScheduledTask -TaskName "VBSP-TelegramScheduler"',
+            language="powershell",
+        )
+        st.markdown(
+            """
+Kết quả cần có trạng thái `Ready` hoặc `Running`.
+
+**Bước 5 — Tạo lịch và bật gửi**
+
+1. Tạo hoặc kiểm tra các rule ở phía dưới.
+2. Bật **Bật rule-based scheduler**.
+3. Bấm **💾 Lưu trạng thái Scheduler**.
+4. Xem mục **Runlog hôm nay** để kiểm tra lần chạy.
+
+**Gợi ý lịch đơn giản:** nhập `08:00, 14:00`, đặt `Lượt chạy tối đa/ngày = 2`,
+`Cửa sổ chạy = 10 phút`, `Thử lại tối đa = 1`.
+"""
+        )
+        st.info(
+            "Nếu máy mới chưa gửi: kiểm tra task Windows, Token/Chat ID, toggle loại thông báo "
+            "và trạng thái Scheduler trong màn hình này."
+        )
+
+    health = scheduler_health()
+    labels = {
+        "deadline_bc": "⚠️ PGD chưa nộp báo cáo",
+        "nhap_lieu": "📝 PGD chưa hoàn thành nhập liệu",
+        "den_han_phan_tang": "⏰ Khoản vay đến hạn T-7/T-3/T-1",
+    }
+    rules = list(cfg["rules"])
+    has_active_rule = bool(cfg["enabled"] and any(rule["enabled"] for rule in rules))
+    if not has_active_rule:
+        st.info("ℹ️ Chưa có lịch gửi tự động đang bật.")
+    elif health["status"] == "stale":
+        st.error("❌ Hệ thống gửi tự động đang ngừng hoạt động. Hãy kiểm tra Windows Task Scheduler.")
+    elif health["status"] == "never" and cfg["enabled"]:
+        st.warning("⚠️ Đã bật lịch nhưng hệ thống gửi tự động chưa chạy lần nào.")
+    elif health["status"] == "ok":
+        next_text = _fmt_scheduler_dt(health["next_run"])
+        st.success(f"✅ Hệ thống gửi tự động đang hoạt động. Lần gửi kế tiếp: {next_text}")
+    else:
+        st.info("ℹ️ Chưa bật lịch gửi tự động.")
+
+    if rules:
+        st.markdown("##### Lịch đã tạo")
+        for rule in rules:
+            trang_thai = "Đang bật" if rule["enabled"] and cfg["enabled"] else "Đang tắt"
+            if rule["mode"] == "daily":
+                ngay_gui = "Mỗi ngày"
+            elif rule["weekdays"] == [0, 1, 2, 3, 4]:
+                ngay_gui = "Thứ Hai–Thứ Sáu"
+            else:
+                ngay_gui = "Theo các thứ đã chọn"
+            st.write(
+                f"• **{labels.get(rule['notify_key'], rule['name'])}** — "
+                f"{ngay_gui}, lúc {', '.join(rule['times'])} — {trang_thai}"
+                + (" — lần sau chỉ gửi thay đổi" if rule.get("delivery_mode") == "full_then_delta" else "")
+            )
+
+    st.markdown("##### Tạo hoặc thay đổi lịch")
+    simple_notify = st.selectbox(
+        "Chọn nội dung nhắc tự động",
+        options=list(telegram_job_keys()),
+        format_func=lambda x: labels.get(x, x),
+        key="tg_simple_notify",
+    )
+    existing = next((rule for rule in rules if rule["notify_key"] == simple_notify), None)
+    existing_times = existing["times"] if existing else ["08:00"]
+    default_period = "daily" if not existing or existing["mode"] == "daily" else "weekdays"
+    period = st.radio(
+        "Gửi vào ngày nào?",
+        options=["daily", "weekdays"],
+        index=0 if default_period == "daily" else 1,
+        format_func=lambda x: "Mỗi ngày" if x == "daily" else "Thứ Hai đến Thứ Sáu",
+        horizontal=True,
+        key=f"tg_simple_period_{simple_notify}",
+    )
+    so_lan_mac_dinh = min(max(len(existing_times), 1), 4)
+    so_lan = st.radio(
+        "Mỗi ngày gửi mấy lần?",
+        options=[1, 2, 3, 4],
+        index=so_lan_mac_dinh - 1,
+        format_func=lambda x: f"{x} lần",
+        horizontal=True,
+        key=f"tg_simple_count_v2_{simple_notify}",
+    )
+
+    def _to_time(value: str, fallback: time) -> time:
+        try:
+            hour, minute = map(int, value.split(":"))
+            return time(hour, minute)
+        except (TypeError, ValueError):
+            return fallback
+
+    gio_mac_dinh = [time(8, 0), time(10, 0), time(14, 0), time(16, 0)]
+    gio_gui: list[time] = []
+    time_cols = st.columns(so_lan)
+    for index in range(so_lan):
+        current_time = existing_times[index] if index < len(existing_times) else ""
+        with time_cols[index]:
+            gio_gui.append(st.time_input(
+                f"Giờ gửi lần {index + 1}",
+                value=_to_time(current_time, gio_mac_dinh[index]),
+                step=300,
+                key=f"tg_simple_time{index + 1}_{simple_notify}",
+            ))
+
+    delivery_mode = "full_each_time"
+    if so_lan > 1:
+        current_delivery = existing.get("delivery_mode", "full_then_delta") if existing else "full_then_delta"
+        delivery_mode = st.radio(
+            "Nội dung các lần gửi sau",
+            options=["full_then_delta", "full_each_time"],
+            index=0 if current_delivery == "full_then_delta" else 1,
+            format_func=lambda x: (
+                "Chỉ gửi thay đổi so với lần đầu" if x == "full_then_delta"
+                else "Gửi lại toàn bộ nội dung"
+            ),
+            key=f"tg_simple_delivery_{simple_notify}",
+        )
+
+    save_col, test_col, stop_col = st.columns(3)
+    with save_col:
+        save_simple = st.button(
+            "💾 Lưu và bật lịch",
+            type="primary",
+            key="tg_simple_save",
+            use_container_width=True,
+        )
+    with test_col:
+        test_simple = st.button(
+            "▶ Gửi thử ngay",
+            key="tg_simple_test",
+            disabled=existing is None,
+            use_container_width=True,
+        )
+    with stop_col:
+        stop_simple = st.button(
+            "⏸ Tắt lịch này",
+            key="tg_simple_stop",
+            disabled=existing is None or not existing["enabled"],
+            use_container_width=True,
+        )
+
+    if save_simple:
+        times = [value.strftime("%H:%M") for value in gio_gui]
+        payload = {
+            "id": existing.get("id") if existing else None,
+            "name": labels.get(simple_notify, simple_notify),
+            "notify_key": simple_notify,
+            "enabled": True,
+            "mode": "daily" if period == "daily" else "weekly",
+            "delivery_mode": delivery_mode,
+            "times": times,
+            "weekdays": [] if period == "daily" else [0, 1, 2, 3, 4],
+            "timezone": "Asia/Bangkok",
+            "grace_minutes": 10,
+            "max_runs_per_day": len(times),
+            "max_attempts_per_slot": 1,
+            "cooldown_minutes": 15,
+        }
+        new_rules = [rule for rule in rules if rule.get("notify_key") != simple_notify]
+        new_rules.append(payload)
+        try:
+            if len(set(times)) != len(times):
+                raise ValueError("Các lần gửi phải có giờ khác nhau.")
+            luu_schedule_config({**cfg, "enabled": True, "rules": new_rules}, username)
+            st.success("✅ Đã lưu và bật lịch gửi.")
+            st.rerun()
+        except Exception as e:
+            logger.error("Lưu lịch Telegram đơn giản: %s", e, exc_info=True)
+            st.error(f"❌ Không lưu được lịch: {e}")
+
+    if test_simple and existing is not None:
+        try:
+            with st.spinner("Đang gửi thử..."):
+                result = run_rule_now(existing["id"], username)
+            if result.ok:
+                st.success("✅ Đã gửi thử thành công.")
+            else:
+                st.error(f"❌ Gửi thử thất bại: {result.error or result.info}")
+        except Exception as e:
+            logger.error("Gửi thử lịch Telegram đơn giản: %s", e, exc_info=True)
+            st.error(f"❌ Không gửi thử được: {e}")
+
+    if stop_simple and existing is not None:
+        try:
+            new_rules = [
+                {**rule, "enabled": False} if rule["id"] == existing["id"] else rule
+                for rule in rules
+            ]
+            luu_schedule_config({**cfg, "rules": new_rules}, username)
+            st.success("✅ Đã tắt lịch này.")
+            st.rerun()
+        except Exception as e:
+            logger.error("Tắt lịch Telegram đơn giản: %s", e, exc_info=True)
+            st.error(f"❌ Không tắt được lịch: {e}")
+
+    st.divider()
+    if not st.toggle("⚙️ Hiện cài đặt nâng cao", value=False, key="tg_show_advanced"):
+        return
+
+    st.caption("Phần dưới chỉ dành cho người cần chỉnh retry, cooldown, runlog hoặc chuyển máy.")
+    status_labels = {
+        "ok": "🟢 Đang hoạt động",
+        "stale": "🔴 Mất heartbeat",
+        "never": "🟠 Chưa chạy lần nào",
+        "disabled": "⚪ Scheduler đang tắt",
+    }
+    h1, h2, h3, h4 = st.columns(4)
+    h1.metric("Trạng thái", status_labels[health["status"]])
+    h2.metric("Kiểm tra gần nhất", _fmt_scheduler_dt(health["heartbeat"]))
+    h3.metric("Gửi thành công gần nhất", _fmt_scheduler_dt(health["last_success"]))
+    h4.metric("Lần chạy kế tiếp", _fmt_scheduler_dt(health["next_run"]))
+
+    global_enabled = st.toggle(
+        "Bật rule-based scheduler",
+        value=bool(cfg["enabled"]),
+        key="tg_scheduler_enabled",
+        help="Khi bật, các job có rule hoạt động sẽ được bỏ qua ở task nhac_deadline.py cũ để tránh gửi trùng.",
+    )
+    if st.button("💾 Lưu trạng thái Scheduler", key="tg_scheduler_enabled_save"):
+        try:
+            luu_schedule_config({**cfg, "enabled": global_enabled}, username)
+            st.success("✅ Đã lưu trạng thái Scheduler.")
+            st.rerun()
+        except Exception as e:
+            logger.error("Lưu trạng thái Telegram scheduler: %s", e, exc_info=True)
+            st.error(f"❌ Không lưu được Scheduler: {e}")
+
+    rule_map = {rule["id"]: rule for rule in rules}
+    options = ["__new__", *rule_map]
+    selected_id = st.selectbox(
+        "Chọn rule để sửa",
+        options=options,
+        format_func=lambda x: "➕ Tạo rule mới" if x == "__new__" else rule_map[x]["name"],
+        key="tg_scheduler_rule_select",
+        on_change=_reset_scheduler_rule_form,
+    )
+    current = rule_map.get(selected_id, {})
+    weekday_labels = {
+        0: "Thứ Hai", 1: "Thứ Ba", 2: "Thứ Tư", 3: "Thứ Năm",
+        4: "Thứ Sáu", 5: "Thứ Bảy", 6: "Chủ nhật",
+    }
+    if selected_id != "__new__":
+        if st.button("▶ Chạy thử rule đang chọn", key="tg_scheduler_rule_test", type="secondary"):
+            try:
+                with st.spinner("Đang chạy thử..."):
+                    result = run_rule_now(selected_id, username)
+                if result.ok:
+                    st.success(f"✅ Chạy thử thành công — {result.info or f'đã gửi {result.sent} tin'}")
+                else:
+                    st.error(f"❌ Chạy thử thất bại: {result.error or result.info}")
+            except Exception as e:
+                logger.error("Chạy thử Telegram schedule rule: %s", e, exc_info=True)
+                st.error(f"❌ Không chạy thử được: {e}")
+
+    st.markdown("**Mẫu lịch tạo nhanh:**")
+    p1, p2, p3, p4 = st.columns(4)
+    p1.button("🌅 08:00 hằng ngày", key="tg_preset_morning", on_click=_apply_scheduler_preset, args=("morning",))
+    p2.button("🔁 08:00 · 14:00", key="tg_preset_twice", on_click=_apply_scheduler_preset, args=("twice",))
+    p3.button("📅 Thứ Hai", key="tg_preset_monday", on_click=_apply_scheduler_preset, args=("monday",))
+    p4.button("💼 Thứ Hai–Sáu", key="tg_preset_weekdays", on_click=_apply_scheduler_preset, args=("weekdays",))
+    preset_defaults = st.session_state.pop("_tg_scheduler_preset_defaults", {})
+    default_mode = preset_defaults.get("mode", current.get("mode", "daily"))
+    default_times = preset_defaults.get("times", current.get("times", ["08:00"]))
+    default_weekdays = preset_defaults.get("weekdays", current.get("weekdays", [0, 1, 2, 3, 4]))
+    default_max_runs = preset_defaults.get("max_runs", current.get("max_runs_per_day", 2))
+
+    with st.form("tg_scheduler_rule_form"):
+        name = st.text_input(
+            "Tên rule",
+            value=str(current.get("name", "")),
+            placeholder="Ví dụ: Nhắc deadline sáng và chiều",
+            key="tg_rule_name",
+        )
+        notify_key = st.selectbox(
+            "Loại thông báo",
+            options=list(telegram_job_keys()),
+            index=max(0, list(telegram_job_keys()).index(current.get("notify_key")))
+            if current.get("notify_key") in telegram_job_keys() else 0,
+            format_func=lambda x: labels.get(x, x),
+            key="tg_rule_notify",
+        )
+        mode = st.radio(
+            "Chu kỳ",
+            options=["daily", "weekly"],
+            index=1 if default_mode == "weekly" else 0,
+            format_func=lambda x: "Hằng ngày" if x == "daily" else "Hằng tuần",
+            horizontal=True,
+            key="tg_rule_mode",
+        )
+        times_text = st.text_input(
+            "Các mốc giờ (phân cách bằng dấu phẩy)",
+            value=", ".join(default_times),
+            placeholder="08:00, 14:00",
+            key="tg_rule_times",
+        )
+        weekdays = st.multiselect(
+            "Các thứ áp dụng (chỉ dùng cho lịch tuần)",
+            options=list(weekday_labels),
+            default=default_weekdays,
+            format_func=lambda x: weekday_labels[x],
+            key="tg_rule_weekdays",
+        )
+        c1, c2, c3, c4 = st.columns(4)
+        with c1:
+            max_runs = st.number_input(
+                "Lượt chạy tối đa/ngày", min_value=1, max_value=20,
+                value=int(default_max_runs), step=1, key="tg_rule_max_runs",
+            )
+        with c2:
+            grace = st.number_input(
+                "Cửa sổ chạy (phút)", min_value=1, max_value=60,
+                value=int(current.get("grace_minutes", 10)), step=1, key="tg_rule_grace",
+            )
+        with c3:
+            attempts = st.number_input(
+                "Thử lại tối đa/slot", min_value=1, max_value=3,
+                value=int(current.get("max_attempts_per_slot", 1)), step=1, key="tg_rule_attempts",
+            )
+        with c4:
+            cooldown = st.number_input(
+                "Cooldown (phút)", min_value=0, max_value=1440,
+                value=int(current.get("cooldown_minutes", 15)), step=5, key="tg_rule_cooldown",
+            )
+        rule_enabled = st.toggle(
+            "Bật rule này", value=bool(current.get("enabled", True)), key="tg_rule_enabled"
+        )
+        submitted = st.form_submit_button("💾 Lưu rule", type="primary")
+
+    if submitted:
+        times = [x.strip() for x in times_text.split(",") if x.strip()]
+        payload = {
+            "id": current.get("id"),
+            "name": name or labels.get(notify_key, notify_key),
+            "notify_key": notify_key,
+            "enabled": rule_enabled,
+            "mode": mode,
+            "delivery_mode": current.get("delivery_mode", "full_each_time"),
+            "times": times,
+            "weekdays": weekdays if mode == "weekly" else [],
+            "timezone": "Asia/Bangkok",
+            "grace_minutes": int(grace),
+            "max_runs_per_day": int(max_runs),
+            "max_attempts_per_slot": int(attempts),
+            "cooldown_minutes": int(cooldown),
+        }
+        new_rules = [rule for rule in rules if rule["id"] != selected_id]
+        new_rules.append(payload)
+        try:
+            luu_schedule_config({**cfg, "rules": new_rules}, username)
+            st.success("✅ Đã lưu rule Telegram.")
+            st.rerun()
+        except Exception as e:
+            logger.error("Lưu Telegram schedule rule: %s", e, exc_info=True)
+            st.error(f"❌ Rule không hợp lệ: {e}")
+
+    if selected_id != "__new__" and st.button("🗑️ Xóa rule đang chọn", key="tg_scheduler_rule_delete"):
+        try:
+            luu_schedule_config(
+                {**cfg, "rules": [rule for rule in rules if rule["id"] != selected_id]},
+                username,
+            )
+            st.success("✅ Đã xóa rule.")
+            st.rerun()
+        except Exception as e:
+            logger.error("Xóa Telegram schedule rule: %s", e, exc_info=True)
+            st.error(f"❌ Không xóa được rule: {e}")
+
+    st.divider()
+    st.markdown("##### Xuất / nhập cấu hình rule")
+    st.caption("File JSON chỉ chứa lịch gửi, không chứa Bot Token hoặc Chat ID. Khi nhập, Scheduler luôn để Tắt.")
+    export_payload = {"schema_version": cfg["schema_version"], "enabled": False, "rules": rules}
+    export_bytes = json.dumps(export_payload, ensure_ascii=False, indent=2).encode("utf-8")
+    ex1, ex2 = st.columns(2)
+    with ex1:
+        st.download_button(
+            "⬇️ Xuất cấu hình rule",
+            data=export_bytes,
+            file_name=f"telegram_schedule_rules_{date.today():%Y%m%d}.json",
+            mime="application/json",
+            key="tg_scheduler_export",
+            use_container_width=True,
+        )
+    with ex2:
+        import_file = st.file_uploader(
+            "Chọn file rule JSON",
+            type=["json"],
+            key="tg_scheduler_import_file",
+            label_visibility="collapsed",
+        )
+    if st.button(
+        "⬆️ Nhập cấu hình rule",
+        key="tg_scheduler_import",
+        disabled=import_file is None,
+    ):
+        try:
+            imported = json.loads(import_file.getvalue().decode("utf-8-sig"))
+            if not isinstance(imported, dict):
+                raise ValueError("File JSON phải chứa một object cấu hình.")
+            imported["enabled"] = False
+            saved = luu_schedule_config(imported, username)
+            st.success(f"✅ Đã nhập {len(saved['rules'])} rule. Scheduler đang Tắt để kiểm tra an toàn.")
+            _reset_scheduler_rule_form()
+            st.rerun()
+        except (UnicodeDecodeError, json.JSONDecodeError, ValueError, RuntimeError) as e:
+            logger.error("Nhập Telegram schedule rules: %s", e, exc_info=True)
+            st.error(f"❌ Không nhập được cấu hình: {e}")
+
+    st.divider()
+    today_key = date.today().strftime("%Y%m%d")
+    runlog = db.doc_kv(f"{RUNLOG_PREFIX}{today_key}") or {}
+    st.markdown("##### Runlog hôm nay")
+    if not runlog:
+        st.caption("Chưa có slot Scheduler nào chạy hôm nay.")
+    else:
+        rows = [
+            {
+                "Slot": entry.get("slot_id", slot_id),
+                "Loại": labels.get(entry.get("notify_key"), entry.get("notify_key", "")),
+                "Trạng thái": entry.get("status", ""),
+                "Lần thử": entry.get("attempts", 0),
+                "Đã gửi": entry.get("sent", 0),
+                "Lỗi": entry.get("error", ""),
+                "Cập nhật": str(entry.get("updated_at", ""))[:19].replace("T", " "),
+            }
+            for slot_id, entry in sorted(runlog.items(), reverse=True)
+        ]
+        st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+
+
 def render(tab: DeltaGenerator = None, **kwargs) -> None:
     role_raw = str(kwargs.get("role", "user") or "user")
     role     = normalize_role(role_raw)
@@ -682,7 +1173,9 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
 
         st.subheader("🤖 Quản trị Telegram Bot")
 
-        tab_cfg, tab_tb, tab_log = st.tabs(["⚙️ Cấu hình Bot", "🔔 Thông báo", "📋 Lịch sử"])
+        tab_cfg, tab_tb, tab_sched, tab_log = st.tabs(
+            ["⚙️ Cấu hình Bot", "🔔 Thông báo", "🗓️ Lịch nâng cao", "📋 Lịch sử"]
+        )
 
         # ── Sub-tab 1: Cấu hình Bot ───────────────────────────────────────────
         with tab_cfg:
@@ -838,28 +1331,58 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
             notify_cfg  = db.doc_kv("telegram_notify_config") or {}
             sched_cfg   = db.doc_kv("telegram_schedule_config") or {}
             extra_chats = (db.doc_kv("telegram_config") or {}).get("extra_chats", {})
+            from services.telegram_schedule_service import doc_schedule_config
+
+            advanced_cfg = doc_schedule_config()
+            advanced_keys = {
+                rule["notify_key"] for rule in advanced_cfg["rules"]
+                if advanced_cfg["enabled"] and rule["enabled"]
+            }
 
             new_notify: dict[str, bool] = {}
             new_sched:  dict[str, str]  = dict(sched_cfg)  # giữ giá trị cũ, chỉ cập nhật loại schedule
             notify_changed = False
             sched_changed  = False
 
-            # Header
-            hdr = st.columns([2.5, 2.5, 1.5, 1, 1.5])
-            hdr[0].markdown("**Loại thông báo**")
-            hdr[1].markdown("**Mô tả**")
-            hdr[2].markdown("**Lịch / Giờ gửi**")
-            hdr[3].markdown("**Chat phụ**")
-            hdr[4].markdown("**Thao tác**")
-            st.divider()
+            meta_by_key = {m["key"]: m for m in _NOTIFY_META}
+            group_by_key = {
+                key: group
+                for group in _NOTIFY_GROUPS
+                for key in group["keys"]
+            }
+            ordered_meta = [
+                meta_by_key[key]
+                for group in _NOTIFY_GROUPS
+                for key in group["keys"]
+            ]
+            st.caption(
+                f"{len(_NOTIFY_META)} loại thông báo được sắp xếp theo 4 nhóm nghiệp vụ."
+            )
 
-            for m in _NOTIFY_META:
+            current_group = None
+            group_container = None
+            for m in ordered_meta:
                 key       = m["key"]
                 cur_on    = bool(notify_cfg.get(key, True))
                 cur_gio   = sched_cfg.get(key, m["gio_mac_dinh"])
                 has_extra = bool(extra_chats.get(key, ""))
 
-                c1, c2, c3, c4, c5 = st.columns([2.5, 2.5, 1.5, 1, 1.5])
+                group = group_by_key[key]
+                if group["ten"] != current_group:
+                    group_container = st.expander(
+                        f"{group['icon']} {group['ten']} ({len(group['keys'])})",
+                        expanded=current_group is None,
+                    )
+                    group_container.caption(group["mo_ta"])
+                    hdr = group_container.columns([2.5, 2.5, 1.5, 1, 1.5])
+                    hdr[0].markdown("**Loại thông báo**")
+                    hdr[1].markdown("**Mô tả**")
+                    hdr[2].markdown("**Lịch / Giờ gửi**")
+                    hdr[3].markdown("**Chat phụ**")
+                    hdr[4].markdown("**Thao tác**")
+                    current_group = group["ten"]
+
+                c1, c2, c3, c4, c5 = group_container.columns([2.5, 2.5, 1.5, 1, 1.5])
 
                 with c1:
                     new_on = st.toggle(
@@ -875,7 +1398,9 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                     st.caption(m["mo_ta"])
 
                 with c3:
-                    if key in _SCHEDULE_KEYS:
+                    if key in advanced_keys:
+                        st.caption("🗓️ Theo rule", help="Cấu hình tại tab Lịch nâng cao")
+                    elif key in _SCHEDULE_KEYS:
                         new_gio = st.text_input(
                             "Giờ",
                             value=cur_gio,
@@ -987,7 +1512,10 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                             st.success("✅ Đã lưu cấu hình lọc loại báo cáo.")
                             st.rerun()
 
-        # ── Sub-tab 3: Lịch sử gửi ────────────────────────────────────────────
+        with tab_sched:
+            _render_scheduler_rules(username)
+
+        # ── Sub-tab 4: Lịch sử gửi ────────────────────────────────────────────
         with tab_log:
             log = db.doc_kv("telegram_send_log") or []
             if not log:

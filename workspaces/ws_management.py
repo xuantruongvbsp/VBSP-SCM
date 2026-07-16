@@ -24,7 +24,6 @@ from config import (
     COT_NGAY_DH, COT_TINH_TRANG, COT_SDT,
     COT_LAI_TON, COT_LAI_TON_QH, COT_LAI_THANG, COT_DVUT, COT_MUC_VAY,
     COT_NGAY_VAY, COT_THOI_HAN, COT_LAI_SUAT,
-    TEMPLATES_DIR, TAG_MAP,
 )
 from auth import is_cn_role, is_pgd_role, get_permissions, normalize_role, la_phan_he_cn
 from data import (
@@ -38,9 +37,6 @@ from utils import (
     fmt_ty,
     vn,
     xuat_excel,
-    quet_templates,
-    auto_fill_klgb,
-    auto_fill_document,
     hien_thi_dataframe_phan_trang,
     lazy_tabs,
 )
@@ -247,8 +243,6 @@ def _build_all_items(role: str, username: str, **kwargs) -> list:
         {"group": "Ủy Thác", "label": "👔 CBTD & Địa bàn", "icon": "user",      "fn": lambda: _render_cbtd_dia_ban(None, **kwargs)},
     ]
 
-    if can_upload:
-        ALL_ITEMS.append({"group": "Hệ thống", "label": "Template văn bản", "icon": "template", "fn": lambda: _get_tab("tab_quan_ly_template").render(None, df=df_full)})
     if role_n in ("admin_cn", "manager_cn"):
         ALL_ITEMS.append({"group": "Hệ thống", "label": "Mã NĐT địa phương", "icon": "building-bank", "fn": lambda: _get_tab("tab_quan_ly_ndt_dp").render(None, role=role_n, username=kwargs.get("username", "unknown"))})
     if role_n == "admin_cn":

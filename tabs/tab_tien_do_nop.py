@@ -33,6 +33,11 @@ from services.report_submission_service import (
     doc_du_lieu_gsheet,
     doc_deadline_config,
     luu_deadline_config,
+    doc_luu_tru_config,
+    khoi_phuc_loai_bao_cao,
+    loc_deadline_dang_hoat_dong,
+    loc_du_lieu_luu_tru,
+    luu_tru_loai_bao_cao,
     phan_loai_trang_thai,
     gan_trang_thai,
     doc_manual_log,
@@ -46,6 +51,7 @@ from services.report_submission_service import (
     doi_ten_loai_theo_doi,
     dong_bo_tat_ca_ten_theo_form,
     tao_ma_tran_tien_do,
+    tong_hop_bao_cao_dieu_hanh,
     xay_dung_danh_muc_theo_doi,
 )
 
@@ -77,9 +83,145 @@ def _doc_du_lieu() -> pd.DataFrame:
     return doc_du_lieu_gsheet()
 
 
+def _fmt_pct_vn(rate: float) -> str:
+    """Format tỷ lệ phần trăm theo kiểu VN."""
+    try:
+        return f"{rate * 100:.1f}".replace(".", ",") + "%"
+    except Exception:
+        return "0,0%"
+
+
+def _chon_cot_chi_tiet(df: pd.DataFrame) -> pd.DataFrame:
+    """Lấy các cột nghiệp vụ gọn để hiển thị/xuất báo cáo điều hành."""
+    cols = [
+        "Đơn vị",
+        "Loại báo cáo",
+        "Trạng thái",
+        "Thời hạn",
+        "Ngày nộp cuối",
+        "Kỳ báo cáo",
+        "Nguồn trạng thái",
+        "Có file",
+        "Quá hạn (ngày)",
+        "Nhóm hành động",
+        "Ghi chú",
+    ]
+    cols = [c for c in cols if c in df.columns]
+    return df[cols].copy()
+
+
+def _render_bao_cao_dieu_hanh(bao_cao: dict) -> None:
+    """Khối báo cáo điều hành gọn cho tab Tổng quan."""
+    df_chi_tiet = bao_cao.get("df_chi_tiet", pd.DataFrame())
+    metrics = bao_cao.get("metrics", {})
+    if df_chi_tiet.empty:
+        st.info("Chưa có danh mục deadline để tổng hợp báo cáo điều hành.")
+        return
+
+    st.markdown("### 📌 Báo cáo điều hành")
+    st.caption(
+        f"Phạm vi theo dõi: **{metrics.get('tong_don_vi', 0)} đơn vị** × "
+        f"**{metrics.get('tong_loai', 0)} loại báo cáo** = "
+        f"**{metrics.get('tong_nghia_vu', 0)} nghĩa vụ**"
+    )
+
+    c1, c2, c3, c4, c5 = st.columns(5)
+    c1.metric("Tỷ lệ hoàn thành", _fmt_pct_vn(metrics.get("ty_le_hoan_thanh", 0.0)))
+    c2.metric("Đơn vị hoàn thành 100%", metrics.get("so_don_vi_hoan_thanh_100", 0))
+    c3.metric("Đơn vị còn thiếu", metrics.get("so_don_vi_con_thieu", 0))
+    c4.metric("Quá hạn chưa nộp", metrics.get("so_qua_han_chua_nop", 0))
+    c5.metric("Sắp đến hạn ≤ 3 ngày", metrics.get("so_sap_den_han", 0))
+
+    for nhan_dinh in bao_cao.get("nhan_dinh", []):
+        st.write(f"- {nhan_dinh}")
+
+    tab_dv, tab_loai, tab_xuly = st.tabs(
+        ["🏢 Đơn vị cần đôn đốc", "🗂 Loại báo cáo trọng điểm", "📌 Cần xử lý hôm nay"]
+    )
+
+    with tab_dv:
+        df_dv = bao_cao.get("df_top_don_vi", pd.DataFrame()).head(10).copy()
+        if df_dv.empty:
+            st.info("Không có đơn vị nào cần đôn đốc.")
+        else:
+            df_dv["ty_le_hoan_thanh"] = df_dv["ty_le_hoan_thanh"].apply(_fmt_pct_vn)
+            df_dv = df_dv.rename(
+                columns={
+                    "chua_hoan_thanh": "Cần xử lý",
+                    "tre_han": "Đã nộp trễ",
+                    "thieu_file": "Thiếu file",
+                    "qua_han_max": "Quá hạn max (ngày)",
+                    "ty_le_hoan_thanh": "Tỷ lệ hoàn thành",
+                    "tong_nghia_vu": "Tổng nghĩa vụ",
+                }
+            )
+            st.dataframe(
+                df_dv[
+                    [
+                        "Đơn vị",
+                        "Tổng nghĩa vụ",
+                        "Cần xử lý",
+                        "Đã nộp trễ",
+                        "Thiếu file",
+                        "Quá hạn max (ngày)",
+                        "Tỷ lệ hoàn thành",
+                    ]
+                ],
+                hide_index=True,
+                use_container_width=True,
+            )
+
+    with tab_loai:
+        df_loai = bao_cao.get("df_top_loai", pd.DataFrame()).head(10).copy()
+        if df_loai.empty:
+            st.info("Không có loại báo cáo nào cần lưu ý.")
+        else:
+            df_loai["ty_le_hoan_thanh"] = df_loai["ty_le_hoan_thanh"].apply(_fmt_pct_vn)
+            df_loai = df_loai.rename(
+                columns={
+                    "chua_hoan_thanh": "Cần xử lý",
+                    "tre_han": "Đã nộp trễ",
+                    "thieu_file": "Thiếu file",
+                    "qua_han_max": "Quá hạn max (ngày)",
+                    "ty_le_hoan_thanh": "Tỷ lệ hoàn thành",
+                    "tong_nghia_vu": "Tổng nghĩa vụ",
+                }
+            )
+            st.dataframe(
+                df_loai[
+                    [
+                        "Loại báo cáo",
+                        "Tổng nghĩa vụ",
+                        "Cần xử lý",
+                        "Đã nộp trễ",
+                        "Thiếu file",
+                        "Quá hạn max (ngày)",
+                        "Tỷ lệ hoàn thành",
+                    ]
+                ],
+                hide_index=True,
+                use_container_width=True,
+            )
+
+    with tab_xuly:
+        df_xu_ly = _chon_cot_chi_tiet(bao_cao.get("df_can_xu_ly", pd.DataFrame()).head(20))
+        if df_xu_ly.empty:
+            st.success("Không còn nghĩa vụ nào cần xử lý ngay.")
+        else:
+            st.dataframe(df_xu_ly, hide_index=True, use_container_width=True)
+
+
 # ── Tab 1: Tổng quan ──────────────────────────────────────────────────────────
 
-def _render_tong_quan(df: pd.DataFrame, deadline_cfg: dict, is_cn: bool, pgd_user: str | None, username: str, can_config: bool) -> None:
+def _render_tong_quan(
+    df: pd.DataFrame,
+    deadline_cfg: dict,
+    is_cn: bool,
+    pgd_user: str | None,
+    username: str,
+    can_config: bool,
+    bao_cao_tien_do: dict,
+) -> None:
     if df.empty:
         st.info("Chưa có dữ liệu từ Google Sheets.")
         return
@@ -90,6 +232,7 @@ def _render_tong_quan(df: pd.DataFrame, deadline_cfg: dict, is_cn: bool, pgd_use
 
     ds_loai_gsheet_hint = sorted(df["loai_bao_cao"].dropna().unique().tolist()) if not df.empty else []
     dm = xay_dung_danh_muc_theo_doi(deadline_cfg, ds_loai_gsheet_hint)
+    ds_loai = dm["display_keys"]
     ds_lech = phat_hien_ten_lech_ten(deadline_cfg, ds_loai_gsheet_hint)
     if ds_lech and can_config:
         n_co_goi_y = sum(1 for x in ds_lech if x.get("ten_form"))
@@ -99,11 +242,7 @@ def _render_tong_quan(df: pd.DataFrame, deadline_cfg: dict, is_cn: bool, pgd_use
             + " — hệ thống đang tự ghép tạm theo tên Form khi đủ rõ, nhưng vẫn nên vào **⚙️ Cài đặt thời hạn** để **🔗 Liên kết**."
         )
 
-    # Chỉ hiển thị loại báo cáo có thời hạn — xóa thời hạn là không còn theo dõi
-    ds_loai = dm["display_keys"]
-    deadline_cfg_hien = dm["display_cfg"]
     ds_pgd_scope = [pgd_user] if (not is_cn and pgd_user) else DS_PGD_ALL
-
     rows, metrics = tao_ma_tran_tien_do(df, deadline_cfg, ds_pgd_scope)
     dung_han = metrics["dung_han"]
     tre = metrics["tre"]
@@ -111,6 +250,9 @@ def _render_tong_quan(df: pd.DataFrame, deadline_cfg: dict, is_cn: bool, pgd_use
     thieu_file = metrics.get("thieu_file", 0)
     da_nop = metrics["da_nop"]
 
+    _render_bao_cao_dieu_hanh(bao_cao_tien_do)
+
+    st.divider()
     c1, c2, c3, c4, c5 = st.columns(5)
     c1.metric("Đã nộp (đơn vị × loại)", da_nop)
     c2.metric("🟢 Đúng hạn", dung_han)
@@ -118,39 +260,12 @@ def _render_tong_quan(df: pd.DataFrame, deadline_cfg: dict, is_cn: bool, pgd_use
     c4.metric("⚠️ Thiếu file", thieu_file)
     c5.metric("🔴 Chưa nộp", chua_nop)
 
-    st.divider()
     st.markdown("**Ma trận trạng thái — PGD × Loại báo cáo**")
-
     st.dataframe(pd.DataFrame(rows), hide_index=True, use_container_width=True)
     st.caption("* Ghi đè thủ công  ·  📝 Có ghi chú")
 
-    ds_tat_ca = []
-    ds_chua = []
-    ds_da = []
-    for r in rows:
-        for loai in ds_loai:
-            cell = str(r.get(loai, ""))
-            dl = deadline_cfg_hien.get(loai, "")
-            dl_hien = dl
-            if dl:
-                try:
-                    dl_hien = pd.to_datetime(dl).strftime("%d/%m/%Y")
-                except Exception:
-                    dl_hien = dl
-            entry = {
-                "Đơn vị": r["Đơn vị"],
-                "Loại báo cáo": loai,
-                "Trạng thái": cell,
-                "Thời hạn": dl_hien or "Chưa cài",
-            }
-            ds_tat_ca.append(entry)
-            if "🔴" in cell or "⚠️" in cell:
-                ds_chua.append(entry)
-            elif "🟢" in cell or "🟡" in cell:
-                ds_da.append(entry)
-
     st.divider()
-    st.markdown("### 📥 Xuất báo cáo")
+    st.markdown("### 📥 Xuất báo cáo điều hành")
 
     loai_xuat = st.radio(
         "Chọn loại danh sách để xuất",
@@ -161,23 +276,29 @@ def _render_tong_quan(df: pd.DataFrame, deadline_cfg: dict, is_cn: bool, pgd_use
     )
 
     if loai_xuat == "Tất cả":
-        ds_xuat = ds_tat_ca
+        df_xuat_full = bao_cao_tien_do.get("df_chi_tiet", pd.DataFrame()).copy()
     elif loai_xuat == "Đã hoàn thành":
-        ds_xuat = ds_da
+        df_xuat_full = bao_cao_tien_do.get("df_da_hoan_thanh", pd.DataFrame()).copy()
     else:
-        ds_xuat = ds_chua
+        df_xuat_full = bao_cao_tien_do.get("df_chua_hoan_thanh", pd.DataFrame()).copy()
 
-    if not ds_xuat:
+    df_xuat_full = _chon_cot_chi_tiet(df_xuat_full)
+
+    if df_xuat_full.empty:
         st.info(f"Không có báo cáo **{loai_xuat.lower()}**.")
     else:
         if loai_xuat == "Chưa hoàn thành":
-            st.warning(f"⚠️ **{len(ds_xuat)} báo cáo chưa hoàn thành**")
+            st.warning(f"⚠️ **{len(df_xuat_full)} báo cáo chưa hoàn thành**")
         else:
-            st.caption(f"📋 {len(ds_xuat)} báo cáo — **{loai_xuat}**")
+            st.caption(f"📋 {len(df_xuat_full)} báo cáo — **{loai_xuat}**")
 
-        df_xuat_full = pd.DataFrame(ds_xuat)
         ds_pgd_thieu = ["Tất cả"] + sorted(df_xuat_full["Đơn vị"].unique().tolist())
-        pgd_xuat = st.selectbox("Lọc đơn vị trước khi xuất", ds_pgd_thieu, key="dd_pgd_xuat", on_change=_clear_export_cache)
+        pgd_xuat = st.selectbox(
+            "Lọc đơn vị trước khi xuất",
+            ds_pgd_thieu,
+            key="dd_pgd_xuat",
+            on_change=_clear_export_cache,
+        )
         df_xuat = df_xuat_full if pgd_xuat == "Tất cả" else df_xuat_full[df_xuat_full["Đơn vị"] == pgd_xuat]
 
         st.dataframe(df_xuat, hide_index=True, use_container_width=True)
@@ -186,15 +307,12 @@ def _render_tong_quan(df: pd.DataFrame, deadline_cfg: dict, is_cn: bool, pgd_use
         ten_file_goc = f"tien_do_{_slug_map.get(loai_xuat, 'xuat')}"
         username_xuat = st.session_state.get("username", "unknown")
 
-        # Import 1 lần — tránh lặp trong từng handler
         from pdf_service import xuat_pdf, xuat_pdf_group_header
 
-        # df đã clean emoji — dùng chung cho cả 2 loại PDF
         df_pdf_base = df_xuat.copy()
         if "Trạng thái" in df_pdf_base.columns:
             df_pdf_base["Trạng thái"] = df_pdf_base["Trạng thái"].apply(_clean_trang_thai)
 
-        # df Excel — clean emoji cho nhất quán với file công vụ
         df_excel = df_xuat.copy()
         if "Trạng thái" in df_excel.columns:
             df_excel["Trạng thái"] = df_excel["Trạng thái"].apply(_clean_trang_thai)
@@ -360,12 +478,18 @@ def _render_tong_quan(df: pd.DataFrame, deadline_cfg: dict, is_cn: bool, pgd_use
 
 # ── Tab 2: Danh sách nộp ─────────────────────────────────────────────────────
 
-def _render_danh_sach(df: pd.DataFrame, deadline_cfg: dict, is_cn: bool, pgd_user: str | None) -> None:
+def _render_danh_sach(
+    df: pd.DataFrame,
+    deadline_cfg: dict,
+    is_cn: bool,
+    pgd_user: str | None,
+    bao_cao_tien_do: dict,
+) -> None:
     if df.empty:
         st.info("Chưa có dữ liệu.")
         return
 
-    col1, col2 = st.columns(2)
+    col1, col2, col3 = st.columns(3)
     with col1:
         ds_loai = ["Tất cả"] + sorted(df["loai_bao_cao"].dropna().unique().tolist())
         loai_chon = st.selectbox("Loại báo cáo", ds_loai, key="ds_loai")
@@ -376,28 +500,87 @@ def _render_danh_sach(df: pd.DataFrame, deadline_cfg: dict, is_cn: bool, pgd_use
         else:
             pgd_chon = pgd_user or "Tất cả"
             st.caption(f"Đơn vị: **{pgd_chon}**")
+    with col3:
+        ds_ky = sorted({str(x).strip() for x in df["ky_bao_cao"].dropna().tolist() if str(x).strip()})
+        ky_chon = st.selectbox("Kỳ báo cáo", ["Tất cả"] + ds_ky, key="ds_ky")
+
+    col4, col5 = st.columns(2)
+    with col4:
+        trang_thai_chon = st.selectbox(
+            "Trạng thái",
+            ["Tất cả", "Đúng hạn", "Trễ hạn", "Đã nộp chưa cài hạn", "Thiếu file"],
+            key="ds_tt",
+        )
+    with col5:
+        chat_luong_file = st.selectbox(
+            "Chất lượng file",
+            ["Tất cả", "Có file", "Thiếu file"],
+            key="ds_file_status",
+        )
 
     df_loc = df.copy()
     if loai_chon != "Tất cả":
         df_loc = df_loc[df_loc["loai_bao_cao"] == loai_chon]
     if pgd_chon and pgd_chon != "Tất cả":
         df_loc = df_loc[df_loc["ten_pgd"] == pgd_chon]
+    if ky_chon != "Tất cả":
+        df_loc = df_loc[df_loc["ky_bao_cao"].astype(str).str.strip() == ky_chon]
 
     df_loc, _ = gan_trang_thai(df_loc, deadline_cfg)
-    df_loc["tt_hien"] = df_loc["tt"].map(lambda x: f"{EMOJI.get(x, '')} {LABEL.get(x, x)}")
+    df_loc["co_file_bool"] = df_loc["file_dinh_kem"].fillna("").astype(str).str.strip().ne("")
+    df_loc["tt_hien"] = df_loc.apply(
+        lambda r: f"{EMOJI['thieu_file']} {LABEL['thieu_file']}"
+        if not r["co_file_bool"]
+        else f"{EMOJI.get(r['tt'], '')} {LABEL.get(r['tt'], r['tt'])}",
+        axis=1,
+    )
 
-    st.caption(f"Hiển thị {len(df_loc)} / {len(df)} lượt nộp")
+    if trang_thai_chon == "Đúng hạn":
+        df_loc = df_loc[(df_loc["tt"] == "dung_han") & df_loc["co_file_bool"]]
+    elif trang_thai_chon == "Trễ hạn":
+        df_loc = df_loc[(df_loc["tt"] == "tre") & df_loc["co_file_bool"]]
+    elif trang_thai_chon == "Đã nộp chưa cài hạn":
+        df_loc = df_loc[(df_loc["tt"] == "da_nop") & df_loc["co_file_bool"]]
+    elif trang_thai_chon == "Thiếu file":
+        df_loc = df_loc[~df_loc["co_file_bool"]]
 
-    df_hien = df_loc[["thoi_gian", "ho_ten", "ten_pgd", "loai_bao_cao",
-                       "tt_hien", "noi_dung", "file_dinh_kem"]].copy()
+    if chat_luong_file == "Có file":
+        df_loc = df_loc[df_loc["co_file_bool"]]
+    elif chat_luong_file == "Thiếu file":
+        df_loc = df_loc[~df_loc["co_file_bool"]]
+
+    st.caption(f"Hiển thị {len(df_loc)} / {len(df)} lượt nộp từ Google Form")
+
+    df_hien = df_loc[
+        [
+            "thoi_gian",
+            "ho_ten",
+            "ten_pgd",
+            "loai_bao_cao",
+            "ky_bao_cao",
+            "tt_hien",
+            "noi_dung",
+            "file_dinh_kem",
+        ]
+    ].copy()
     df_hien["thoi_gian"] = df_hien["thoi_gian"].dt.strftime("%d/%m/%Y %H:%M")
-    df_hien = df_hien.rename(columns={
-        "thoi_gian": "Thời gian", "ho_ten": "Họ tên", "ten_pgd": "Đơn vị",
-        "loai_bao_cao": "Loại", "tt_hien": "Trạng thái",
-        "noi_dung": "Nội dung", "file_dinh_kem": "File",
-    })
+    df_hien["ky_bao_cao"] = df_hien["ky_bao_cao"].fillna("").astype(str).replace("", "—")
+    df_hien = df_hien.rename(
+        columns={
+            "thoi_gian": "Thời gian",
+            "ho_ten": "Họ tên",
+            "ten_pgd": "Đơn vị",
+            "loai_bao_cao": "Loại",
+            "ky_bao_cao": "Kỳ báo cáo",
+            "tt_hien": "Trạng thái",
+            "noi_dung": "Nội dung",
+            "file_dinh_kem": "File",
+        }
+    )
     st.dataframe(
-        df_hien, use_container_width=True, hide_index=True,
+        df_hien,
+        use_container_width=True,
+        hide_index=True,
         column_config={
             "File": st.column_config.LinkColumn("File", display_text="📎 Xem"),
             "Nội dung": st.column_config.TextColumn(width="large"),
@@ -406,17 +589,61 @@ def _render_danh_sach(df: pd.DataFrame, deadline_cfg: dict, is_cn: bool, pgd_use
     st.caption("💡 Nếu link Drive không mở được: PGD cần set quyền chia sẻ file là **\"Anyone with the link can view\"** trước khi paste vào Form.")
 
     st.divider()
-    st.markdown("### 📥 Xuất báo cáo")
+    st.markdown("### 📌 Kiểm soát nghĩa vụ theo deadline")
+    loai_theo_doi = st.radio(
+        "Chọn lớp theo dõi",
+        ["Tất cả nghĩa vụ", "Chưa hoàn thành", "Cần xử lý hôm nay", "Sắp đến hạn"],
+        horizontal=True,
+        key="ds_nghia_vu_mode",
+    )
+
+    if loai_theo_doi == "Chưa hoàn thành":
+        df_nghia_vu = bao_cao_tien_do.get("df_chua_hoan_thanh", pd.DataFrame()).copy()
+    elif loai_theo_doi == "Cần xử lý hôm nay":
+        df_nghia_vu = bao_cao_tien_do.get("df_can_xu_ly", pd.DataFrame()).copy()
+    elif loai_theo_doi == "Sắp đến hạn":
+        df_nghia_vu = bao_cao_tien_do.get("df_sap_den_han", pd.DataFrame()).copy()
+    else:
+        df_nghia_vu = bao_cao_tien_do.get("df_chi_tiet", pd.DataFrame()).copy()
+
+    if not df_nghia_vu.empty:
+        if loai_chon != "Tất cả":
+            df_nghia_vu = df_nghia_vu[df_nghia_vu["Loại báo cáo"] == loai_chon]
+        if pgd_chon and pgd_chon != "Tất cả":
+            df_nghia_vu = df_nghia_vu[df_nghia_vu["Đơn vị"] == pgd_chon]
+        if ky_chon != "Tất cả":
+            df_nghia_vu = df_nghia_vu[df_nghia_vu["Kỳ báo cáo"] == ky_chon]
+        if trang_thai_chon == "Đúng hạn":
+            df_nghia_vu = df_nghia_vu[df_nghia_vu["Mã trạng thái"] == "dung_han"]
+        elif trang_thai_chon == "Trễ hạn":
+            df_nghia_vu = df_nghia_vu[df_nghia_vu["Mã trạng thái"] == "tre"]
+        elif trang_thai_chon == "Đã nộp chưa cài hạn":
+            df_nghia_vu = df_nghia_vu[df_nghia_vu["Mã trạng thái"] == "da_nop"]
+        elif trang_thai_chon == "Thiếu file":
+            df_nghia_vu = df_nghia_vu[df_nghia_vu["Mã trạng thái"] == "thieu_file"]
+        if chat_luong_file == "Có file":
+            df_nghia_vu = df_nghia_vu[df_nghia_vu["Có file"] == "Có"]
+        elif chat_luong_file == "Thiếu file":
+            df_nghia_vu = df_nghia_vu[df_nghia_vu["Có file"] == "Không"]
+
+    if df_nghia_vu.empty:
+        st.info("Không có nghĩa vụ nào khớp bộ lọc hiện tại.")
+    else:
+        st.caption(f"📋 {len(df_nghia_vu)} nghĩa vụ — **{loai_theo_doi}**")
+        st.dataframe(_chon_cot_chi_tiet(df_nghia_vu), hide_index=True, use_container_width=True)
+
+    st.divider()
+    st.markdown("### 📥 Xuất danh sách lượt nộp")
     loai_xuat_ds = st.radio(
-        "Chọn trạng thái để xuất",
-        ["Tất cả", "Đã hoàn thành", "Chưa hoàn thành"],
+        "Chọn loại lượt nộp để xuất",
+        ["Tất cả", "Có file hợp lệ", "Thiếu file"],
         horizontal=True,
         key="ds_loai_xuat",
     )
-    if loai_xuat_ds == "Đã hoàn thành":
-        df_xuat_ds = df_loc[df_loc["tt"].isin(["dung_han", "tre", "da_nop"])]
-    elif loai_xuat_ds == "Chưa hoàn thành":
-        df_xuat_ds = df_loc[df_loc["tt"] == "chua_nop"]
+    if loai_xuat_ds == "Có file hợp lệ":
+        df_xuat_ds = df_loc[df_loc["tt"].isin(["dung_han", "tre", "da_nop"]) & df_loc["co_file_bool"]]
+    elif loai_xuat_ds == "Thiếu file":
+        df_xuat_ds = df_loc[~df_loc["co_file_bool"]]
     else:
         df_xuat_ds = df_loc
 
@@ -428,7 +655,7 @@ def _render_danh_sach(df: pd.DataFrame, deadline_cfg: dict, is_cn: bool, pgd_use
         col_excel, col_pdf, _ = st.columns([1, 1, 5])
         with col_excel:
             if st.button("📥 Xuất Excel", key="btn_xuat_tdn", use_container_width=True, type="primary"):
-                df_export = df_xuat_ds.drop(columns=["tt", "tt_hien"], errors="ignore")
+                df_export = df_xuat_ds.drop(columns=["tt", "tt_hien", "co_file_bool"], errors="ignore")
                 st.session_state["_excel_tdn_bytes"] = xuat_excel({f"Tiến độ nộp — {loai_xuat_ds}": df_export})
                 st.session_state["_excel_tdn_ten"] = f"{ten_file_ds}.xlsx"
         if st.session_state.get("_excel_tdn_bytes"):
@@ -442,20 +669,24 @@ def _render_danh_sach(df: pd.DataFrame, deadline_cfg: dict, is_cn: bool, pgd_use
         with col_pdf:
             from pdf_service import nut_xuat_pdf
 
-            # Chuẩn bị DataFrame sạch cho PDF: bỏ cột nội bộ/URL dài, format datetime
-            df_for_pdf = df_xuat_ds.drop(columns=["tt", "tt_hien", "file_dinh_kem", "email"], errors="ignore").copy()
+            df_for_pdf = df_xuat_ds.drop(
+                columns=["tt", "tt_hien", "co_file_bool", "file_dinh_kem", "email"],
+                errors="ignore",
+            ).copy()
             if "thoi_gian" in df_for_pdf.columns:
                 df_for_pdf["thoi_gian"] = df_for_pdf["thoi_gian"].dt.strftime("%d/%m/%Y")
             if "noi_dung" in df_for_pdf.columns:
                 df_for_pdf["noi_dung"] = df_for_pdf["noi_dung"].astype(str).str[:80]
-            df_for_pdf = df_for_pdf.rename(columns={
-                "thoi_gian":    "Thời gian",
-                "ho_ten":       "Họ tên",
-                "ten_pgd":      "Đơn vị",
-                "loai_bao_cao": "Loại BC",
-                "ky_bao_cao":   "Kỳ",
-                "noi_dung":     "Nội dung",
-            })
+            df_for_pdf = df_for_pdf.rename(
+                columns={
+                    "thoi_gian": "Thời gian",
+                    "ho_ten": "Họ tên",
+                    "ten_pgd": "Đơn vị",
+                    "loai_bao_cao": "Loại BC",
+                    "ky_bao_cao": "Kỳ",
+                    "noi_dung": "Nội dung",
+                }
+            )
 
             nut_xuat_pdf(
                 df_for_pdf,
@@ -465,6 +696,118 @@ def _render_danh_sach(df: pd.DataFrame, deadline_cfg: dict, is_cn: bool, pgd_use
                 prefix_file=ten_file_ds,
                 key="pdf_tdn",
             )
+
+
+def _render_luu_tru(
+    df: pd.DataFrame,
+    archive_cfg: dict[str, dict],
+    username: str,
+    can_config: bool,
+) -> None:
+    """Hiển thị lịch sử báo cáo đã lưu trữ và cho phép khôi phục."""
+    st.subheader("🗃️ Báo cáo đã lưu trữ")
+    st.caption(
+        "Dữ liệu vẫn nằm trong Google Sheet và được tách khỏi deadline, Tổng quan đang hoạt động "
+        "và Telegram."
+    )
+    if not archive_cfg:
+        st.info("Chưa có loại báo cáo nào được lưu trữ.")
+        return
+
+    options = sorted(archive_cfg)
+
+    def _archive_label(key: str) -> str:
+        return str(archive_cfg.get(key, {}).get("ten_hien_thi") or key)
+
+    selected = st.selectbox(
+        "Loại báo cáo lưu trữ",
+        options=options,
+        format_func=_archive_label,
+        key="tdn_archive_view_type",
+    )
+    selected_cfg = {selected: archive_cfg[selected]}
+    df_luu = loc_du_lieu_luu_tru(df, selected_cfg, archived=True)
+    meta = archive_cfg[selected]
+
+    archived_at = meta.get("luu_tru_luc", "")
+    try:
+        archived_at_text = pd.to_datetime(archived_at).strftime("%H:%M %d/%m/%Y")
+    except Exception:
+        archived_at_text = "—"
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("Loại lưu trữ", "1")
+    m2.metric("Lượt nộp", len(df_luu))
+    m3.metric("Đơn vị đã nộp", df_luu["ten_pgd"].nunique() if not df_luu.empty else 0)
+    m4.metric("Lưu trữ lúc", archived_at_text)
+    st.caption(
+        f"Người lưu trữ: **{meta.get('luu_tru_boi', '—')}** · "
+        f"Deadline cũ: **{meta.get('deadline_cu') or '—'}**"
+    )
+
+    if df_luu.empty:
+        st.warning("Loại này đã được đánh dấu lưu trữ nhưng chưa có lượt nộp trong phạm vi bạn được xem.")
+    else:
+        df_hien = df_luu[
+            [
+                "thoi_gian",
+                "ten_pgd",
+                "loai_bao_cao",
+                "ky_bao_cao",
+                "ho_ten",
+                "noi_dung",
+                "file_dinh_kem",
+            ]
+        ].copy()
+        df_hien["thoi_gian"] = pd.to_datetime(df_hien["thoi_gian"], errors="coerce").dt.strftime(
+            "%d/%m/%Y %H:%M"
+        )
+        df_hien = df_hien.rename(
+            columns={
+                "thoi_gian": "Thời gian",
+                "ten_pgd": "Đơn vị",
+                "loai_bao_cao": "Loại báo cáo",
+                "ky_bao_cao": "Kỳ báo cáo",
+                "ho_ten": "Người nộp",
+                "noi_dung": "Nội dung",
+                "file_dinh_kem": "File",
+            }
+        )
+        st.dataframe(
+            df_hien,
+            hide_index=True,
+            use_container_width=True,
+            column_config={"File": st.column_config.LinkColumn("File", display_text="📎 Xem")},
+        )
+        excel_bytes = xuat_excel({"Báo cáo đã lưu trữ": df_hien})
+        st.download_button(
+            "📥 Xuất Excel lịch sử",
+            data=excel_bytes,
+            file_name="bao_cao_da_luu_tru.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            key="tdn_archive_excel",
+        )
+
+    if can_config:
+        st.divider()
+        st.markdown("#### Khôi phục loại báo cáo")
+        st.caption(
+            "Sau khi khôi phục, báo cáo trở lại nhóm Cần cài deadline. Deadline cũ không tự bật lại."
+        )
+        confirm_restore = st.checkbox(
+            "Tôi xác nhận muốn khôi phục loại báo cáo này",
+            key="tdn_archive_restore_confirm",
+        )
+        if st.button(
+            "↩️ Khôi phục",
+            key="tdn_archive_restore",
+            disabled=not confirm_restore,
+        ):
+            if khoi_phuc_loai_bao_cao(selected, username):
+                st.cache_data.clear()
+                st.success(f"✅ Đã khôi phục: **{_archive_label(selected)}**")
+                st.rerun()
+            else:
+                st.warning("Loại báo cáo này không còn trong danh mục lưu trữ.")
 
 
 # ── Tab 3: Cài đặt thời hạn hoàn thành ────────────────────────────────────────
@@ -594,8 +937,6 @@ def _render_cai_dat(df: pd.DataFrame, deadline_cfg: dict, username: str) -> None
 
     if not ds_loai:
         st.info("📭 Chưa có loại báo cáo nào từ Google Form. Sau khi PGD gửi form, các loại báo cáo sẽ xuất hiện ở đây.")
-        with st.expander("✏️ Tạo thủ công loại báo cáo chưa có trong Form", expanded=False):
-            _render_them_loai_thu_cong(deadline_cfg, username)
         return
 
     # ── Banner header màu ──────────────────────────────────────────
@@ -767,11 +1108,44 @@ def _render_cai_dat(df: pd.DataFrame, deadline_cfg: dict, username: str) -> None
                 },
             )
 
-    # ── Góc dưới: thêm thủ công + xóa tất cả ──────────────────────
     st.divider()
-    with st.expander("✏️ Thêm thủ công loại báo cáo chưa có trong Form", expanded=False):
-        _render_them_loai_thu_cong(deadline_cfg, username)
+    with st.expander("📦 Hoàn thành và lưu trữ loại báo cáo", expanded=False):
+        st.caption(
+            "Dữ liệu Google Form vẫn được giữ nguyên. Loại đã lưu trữ sẽ không còn ở "
+            "Cài deadline, Tổng quan hoặc Telegram và được chuyển sang tab Đã lưu trữ."
+        )
+        loai_luu_tru = st.selectbox(
+            "Chọn loại báo cáo đã hoàn thành",
+            options=ds_loai,
+            key="cd_archive_type",
+        )
+        ten_track = dm["display_to_tracked"].get(loai_luu_tru, loai_luu_tru)
+        so_luot = int((df["loai_bao_cao"] == loai_luu_tru).sum()) if not df.empty else 0
+        st.info(
+            f"Sẽ lưu trữ **{loai_luu_tru}** — hiện có **{so_luot} lượt nộp**. "
+            "Deadline hiện tại (nếu có) sẽ được gỡ."
+        )
+        xac_nhan = st.checkbox(
+            "Tôi xác nhận loại báo cáo này đã hoàn thành",
+            key="cd_archive_confirm",
+        )
+        if st.button(
+            "📦 Lưu trữ báo cáo",
+            key="cd_archive_save",
+            type="primary",
+            disabled=not xac_nhan,
+        ):
+            try:
+                luu_tru_loai_bao_cao(loai_luu_tru, username, ten_track)
+                st.cache_data.clear()
+                st.success(f"✅ Đã lưu trữ: **{loai_luu_tru}**")
+                st.rerun()
+            except Exception as e:
+                logger.error("Lưu trữ loại báo cáo: %s", e, exc_info=True)
+                st.error(f"❌ Không lưu trữ được: {e}")
 
+    # ── Góc dưới: dọn / xóa deadline ──────────────────────────────
+    st.divider()
     if ds_loai_cfg:
         # Tìm deadline "cũ" — đang theo dõi nhưng không còn xuất hiện trong GSheet
         ds_deadline_cu = [loai for loai in deadline_cfg if loai not in ds_loai_gsheet]
@@ -815,41 +1189,6 @@ def _render_cai_dat(df: pd.DataFrame, deadline_cfg: dict, username: str) -> None
                     luu_deadline_config({}, username)
                     st.success("✅ Đã xóa toàn bộ deadline.")
                     st.rerun()
-
-
-def _render_them_loai_thu_cong(deadline_cfg: dict, username: str) -> None:
-    """Thêm loại báo cáo bằng tay (chưa có trong Google Form)."""
-    col_ten, col_dl, col_add = st.columns([3, 2, 1])
-    with col_ten:
-        ten_moi = st.text_input(
-            "Tên loại báo cáo",
-            placeholder="VD: Báo cáo tháng 7/2026",
-            key="cd_ten_moi",
-            label_visibility="collapsed",
-        )
-    with col_dl:
-        dl_moi_add = st.date_input(
-            "Deadline",
-            value=date.today(),
-            format="DD/MM/YYYY",
-            key="cd_dl_moi",
-            label_visibility="collapsed",
-        )
-    with col_add:
-        st.write("")
-        if st.button("💾 Thêm", key="cd_btn_add", type="primary", use_container_width=True):
-            ten_moi = ten_moi.strip()
-            if not ten_moi:
-                st.warning("⚠️ Nhập tên loại báo cáo.")
-            elif ten_moi in deadline_cfg:
-                st.warning(f"⚠️ **{ten_moi}** đã tồn tại.")
-            else:
-                cfg_moi = dict(deadline_cfg)
-                cfg_moi[ten_moi] = dl_moi_add.strftime("%Y-%m-%d")
-                luu_deadline_config(cfg_moi, username)
-                st.success(f"✅ Đã thêm **{ten_moi}** → {dl_moi_add.strftime('%d/%m/%Y')}")
-                st.rerun()
-
 
 # ── Tab Hướng dẫn với Mockup ───────────────────────────────────────────────────
 
@@ -957,9 +1296,6 @@ def _render_huong_dan_mockup() -> None:
 _CACHE_VER = "v2"
 
 def render(tab: DeltaGenerator = None, **kwargs) -> None:
-    # Clear cache cũ mỗi khi vào tab — đảm bảo data GSheet luôn mới
-    _doc_du_lieu.clear()
-
     role_raw = str(kwargs.get("role", "user") or "user")
     role_n = normalize_role(role_raw)
     is_cn = la_phan_he_cn(role_n)
@@ -991,20 +1327,40 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
             else:
                 st.warning("⚠️ Chưa có dữ liệu từ Google Sheets. Thử nhấn 🔄 Làm mới.")
         deadline_cfg = doc_deadline_config()
+        archive_cfg = doc_luu_tru_config()
+        deadline_cfg = loc_deadline_dang_hoat_dong(deadline_cfg, archive_cfg)
 
         # PGD role: chỉ thấy dữ liệu của PGD mình
         if not is_cn and pgd_user:
             df = df[df["ten_pgd"] == pgd_user]
 
         can_config = role_n in ("admin_cn", "manager_cn", "admin", "manager")
+        df_hoat_dong = loc_du_lieu_luu_tru(df, archive_cfg, archived=False)
+        ds_pgd_scope = [pgd_user] if (not is_cn and pgd_user) else DS_PGD_ALL
+        bao_cao_tien_do = tong_hop_bao_cao_dieu_hanh(
+            df_hoat_dong,
+            deadline_cfg,
+            ds_pgd_scope,
+        )
 
         # Tab hướng dẫn hiển thị cho tất cả users
         if can_config:
             # Thứ tự tab theo quy trình vận hành trong hướng dẫn:
             # Bước 1: Cài đặt thời hạn → Bước 2: Tổng quan → Bước 4: Danh sách nộp
-            t0, t1, t2, t3 = st.tabs(["📖 Hướng dẫn PGD gửi BC về CN", "⚙️ Cài đặt thời hạn", "📊 Tổng quan", "📋 Danh sách nộp"])
+            t0, t1, t2, t3, t4 = st.tabs([
+                "📖 Hướng dẫn PGD gửi BC về CN",
+                "⚙️ Cài đặt thời hạn",
+                "📊 Tổng quan",
+                "📋 Danh sách nộp",
+                "🗃️ Đã lưu trữ",
+            ])
         else:
-            t0, t2, t3 = st.tabs(["📖 Hướng dẫn PGD gửi BC về CN", "📊 Tổng quan", "📋 Danh sách nộp"])
+            t0, t2, t3, t4 = st.tabs([
+                "📖 Hướng dẫn PGD gửi BC về CN",
+                "📊 Tổng quan",
+                "📋 Danh sách nộp",
+                "🗃️ Đã lưu trữ",
+            ])
             t1 = None
 
         with t0:
@@ -1012,10 +1368,27 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
 
         if t1 is not None:
             with t1:
-                _render_cai_dat(df, deadline_cfg, username)
+                _render_cai_dat(df_hoat_dong, deadline_cfg, username)
 
         with t2:
-            _render_tong_quan(df, deadline_cfg, is_cn, pgd_user, username, can_config)
+            _render_tong_quan(
+                df_hoat_dong,
+                deadline_cfg,
+                is_cn,
+                pgd_user,
+                username,
+                can_config,
+                bao_cao_tien_do,
+            )
 
         with t3:
-            _render_danh_sach(df, deadline_cfg, is_cn, pgd_user)
+            _render_danh_sach(
+                df_hoat_dong,
+                deadline_cfg,
+                is_cn,
+                pgd_user,
+                bao_cao_tien_do,
+            )
+
+        with t4:
+            _render_luu_tru(df, archive_cfg, username, can_config)

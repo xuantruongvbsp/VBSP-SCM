@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import os
 import sys
+import html
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
@@ -39,6 +40,7 @@ from data.phan_ky_nxh import (
     COL_NXH_LAI,
     COL_NXH_PGD,
 )
+from services.telegram_delta import diff_deadline, diff_due_loans, diff_progress
 
 logger = get_logger(__name__)
 
@@ -53,13 +55,16 @@ def _la_pgd_header(stt: str) -> bool:
         stt = str(stt)
     return bool(_ROMAN_RE.match(stt.strip().upper()))
 
-def _nhac_theo_doi_nhap_lieu() -> tuple[int, int, str]:
+def run_nhap_lieu(
+    baseline_snapshot: dict | None = None,
+) -> tuple[int, int, str, dict]:
+    """Gửi nhắc nhập liệu đầy đủ hoặc phần thay đổi so với baseline đầu ngày."""
     cfg_notify = db.doc_kv("telegram_notify_config") or {}
     if not cfg_notify.get("nhap_lieu", True):
-        return 0, 0, ""
+        return 0, 0, "", {}
     ds_sheet = db.doc_kv("gsheet_theo_doi_nhap_list")
     if not ds_sheet or not isinstance(ds_sheet, list):
-        return 0, 0, ""
+        return 0, 0, "", {}
 
     try:
         import gspread
@@ -68,7 +73,7 @@ def _nhac_theo_doi_nhap_lieu() -> tuple[int, int, str]:
         client = gspread.service_account(filename=creds_path, scopes=scope)
     except Exception as e:
         logger.error("_nhac_theo_doi_nhap_lieu: ket noi GSheet — %s", e)
-        return 0, 0, str(e)
+        return 0, 0, str(e), {}
 
     from services.telegram_service import gui_tin_theo_notify_chi_tiet
 
@@ -76,6 +81,7 @@ def _nhac_theo_doi_nhap_lieu() -> tuple[int, int, str]:
     sent_count = 0
     pending_count = 0
     first_err = ""
+    snapshot: dict[str, dict] = {}
 
     for i, cfg in enumerate(ds_sheet):
         deadline_str = cfg.get("deadline", "")
@@ -152,44 +158,85 @@ def _nhac_theo_doi_nhap_lieu() -> tuple[int, int, str]:
                             if str(row[ci]).strip():
                                 pgd_progress[current_pgd]["filled"] += 1
 
-        chua_xong: list[str] = []
-        for pgd, prog in sorted(pgd_progress.items()):
-            if prog["total"] == 0:
-                continue
-            pct = prog["filled"] / prog["total"] * 100
-            if pct < 100:
-                chua_xong.append(
-                    f"  • {pgd} — {prog['filled']}/{prog['total']} chỉ tiêu ({pct:.0f}%)"
-                )
-
-        if not chua_xong:
-            logger.info("Nhap lieu '%s': tat ca da hoan thanh", ten_sheet)
-            continue
-
-        pending_count += 1
-        icon = "🔴" if days_left < 0 else "🟡" if days_left <= 2 else "🟠"
+        progress_snapshot = {
+            str(pgd): {"filled": int(prog["filled"]), "total": int(prog["total"])}
+            for pgd, prog in sorted(pgd_progress.items())
+            if prog["total"] > 0
+        }
         dl_hien = dl_date.strftime("%d/%m/%Y")
-        lines = [
-            f"{icon} <b>Nhắc nhập liệu: {ten_sheet}</b>",
-            f"📅 Hạn chót: <b>{dl_hien}</b>",
-            "",
-            f"<b>{len(chua_xong)} PGD chưa hoàn thành:</b>",
-        ]
-        for line in chua_xong[:15]:
-            lines.append(line)
-        if len(chua_xong) > 15:
-            lines.append(f"  … và {len(chua_xong) - 15} PGD khác")
+        snapshot[str(ten_sheet)] = {
+            "deadline": dl_hien,
+            "progress": progress_snapshot,
+        }
+
+        if baseline_snapshot is not None:
+            old_progress = (
+                baseline_snapshot.get(str(ten_sheet), {}).get("progress", {})
+                if isinstance(baseline_snapshot, dict) else {}
+            )
+            changed: list[str] = []
+            for change in diff_progress(old_progress, progress_snapshot):
+                pgd = change["pgd"]
+                old = change["old"]
+                new = change["new"]
+                old_text = f"{old.get('filled', 0)}/{old.get('total', 0)}"
+                new_text = f"{new.get('filled', 0)}/{new.get('total', 0)}"
+                icon = "✅" if new.get("total", 0) and new.get("filled", 0) >= new.get("total", 0) else "🔄"
+                changed.append(f"  {icon} {pgd}: {old_text} → {new_text}")
+            if not changed:
+                continue
+            pending_count += 1
+            lines = [
+                f"🔄 <b>Cập nhật nhập liệu: {ten_sheet}</b>",
+                "So với bản đầu tiên trong ngày:",
+                "",
+                *changed[:20],
+            ]
+            if len(changed) > 20:
+                lines.append(f"  … và {len(changed) - 20} PGD khác")
+        else:
+            chua_xong: list[str] = []
+            for pgd, prog in sorted(pgd_progress.items()):
+                if prog["total"] == 0:
+                    continue
+                pct = prog["filled"] / prog["total"] * 100
+                if pct < 100:
+                    chua_xong.append(
+                        f"  • {pgd} — {prog['filled']}/{prog['total']} chỉ tiêu ({pct:.0f}%)"
+                    )
+
+            if not chua_xong:
+                logger.info("Nhap lieu '%s': tat ca da hoan thanh", ten_sheet)
+                continue
+
+            pending_count += 1
+            icon = "🔴" if days_left < 0 else "🟡" if days_left <= 2 else "🟠"
+            lines = [
+                f"{icon} <b>Nhắc nhập liệu: {ten_sheet}</b>",
+                f"📅 Hạn chót: <b>{dl_hien}</b>",
+                "",
+                f"<b>{len(chua_xong)} PGD chưa hoàn thành:</b>",
+                *chua_xong[:15],
+            ]
+            if len(chua_xong) > 15:
+                lines.append(f"  … và {len(chua_xong) - 15} PGD khác")
 
         ok, err = gui_tin_theo_notify_chi_tiet("\n".join(lines), "nhap_lieu")
         if ok:
-            logger.info("Da gui nhac nhap lieu '%s': %d PGD", ten_sheet, len(chua_xong))
+            logger.info("Da gui nhac nhap lieu '%s'", ten_sheet)
             sent_count += 1
         else:
             logger.error("Nhac nhap lieu '%s' that bai: %s", ten_sheet, err)
             if not first_err:
                 first_err = err
 
-    return sent_count, pending_count, first_err
+    return sent_count, pending_count, first_err, snapshot
+
+
+def _nhac_theo_doi_nhap_lieu() -> tuple[int, int, str]:
+    """Wrapper tương thích ngược cho task nhắc deadline cũ."""
+    sent, pending, error, _snapshot = run_nhap_lieu()
+    return sent, pending, error
 
 
 # ── Phát hiện submission mới từ GSheet ───────────────────────────────────────
@@ -252,12 +299,17 @@ def _thong_bao_nop_moi_gsheet() -> int:
 
 # ── Nhắc đến hạn phân tầng T-7 / T-3 / T-1 ──────────────────────────────────
 
-def _nhac_den_han_phan_tang() -> int:
-    """Tìm khoản đến hạn trong 1/3/7 ngày tới, gửi cảnh báo phân tầng."""
-    from services.telegram_service import gui_nhac_den_han_phan_tang
+def run_den_han_phan_tang_with_snapshot(
+    baseline_snapshot: dict | None = None,
+) -> tuple[bool, int, int, str, dict]:
+    """Gửi nhắc đến hạn đầy đủ hoặc thay đổi, kèm snapshot đầu ngày."""
+    from services.telegram_service import (
+        gui_nhac_den_han_phan_tang,
+        gui_tin_theo_notify_chi_tiet,
+    )
     cfg_notify = db.doc_kv("telegram_notify_config") or {}
     if not cfg_notify.get("den_han_phan_tang", True):
-        return 0
+        return True, 0, 0, "", {}
     try:
         from pathlib import Path
         from config import (
@@ -265,10 +317,10 @@ def _nhac_den_han_phan_tang() -> int:
             COT_TEN_KH, COT_SO_KU, COT_TEN_PGD,
         )
         if not Path(CACHE_HSTD).exists():
-            return 0
+            return False, 0, 0, f"Chưa có dữ liệu HSTD: {CACHE_HSTD}", {}
         df = pd.read_parquet(CACHE_HSTD)
         if COT_NGAY_DH not in df.columns:
-            return 0
+            return False, 0, 0, f"Thiếu cột {COT_NGAY_DH}.", {}
         today_ts = pd.Timestamp.today().normalize()
         buckets: dict[str, list[dict]] = {"T-1": [], "T-3": [], "T-7": []}
         tier_map = {1: "T-1", 3: "T-3", 7: "T-7"}
@@ -283,13 +335,77 @@ def _nhac_den_han_phan_tang() -> int:
                     "du_no":   float(r.get(COT_TONG_DU_NO, 0) or 0),
                     "ten_pgd": str(r.get(COT_TEN_PGD, "") or ""),
                 })
+        snapshot = {}
+        for tier, items in buckets.items():
+            for item in items:
+                item_id = "|".join([
+                    tier,
+                    item["ten_pgd"],
+                    item["so_ku"] or item["ten_kh"],
+                    item["ngay_dh"],
+                ])
+                snapshot[item_id] = {**item, "tier": tier}
+
+        if baseline_snapshot is not None:
+            added_ids, removed_ids, changed_ids = diff_due_loans(baseline_snapshot, snapshot)
+            if not added_ids and not removed_ids and not changed_ids:
+                return True, 0, 0, "", snapshot
+            lines = [
+                "🔄 <b>Cập nhật khoản đến hạn</b>",
+                "So với bản đầu tiên trong ngày:",
+                "",
+            ]
+            for item_id in added_ids[:15]:
+                item = snapshot[item_id]
+                lines.append(
+                    f"  ⚠️ Mới: {html.escape(item['ten_kh'])} "
+                    f"({html.escape(item['ten_pgd'])}) — {item['tier']}"
+                )
+            for item_id in removed_ids[:15]:
+                item = baseline_snapshot[item_id]
+                lines.append(
+                    f"  ✅ Không còn: {html.escape(str(item.get('ten_kh', '')))} "
+                    f"({html.escape(str(item.get('ten_pgd', '')))}) — {item.get('tier', '')}"
+                )
+            for item_id in changed_ids[:15]:
+                item = snapshot[item_id]
+                lines.append(
+                    f"  🔄 Cập nhật: {html.escape(item['ten_kh'])} "
+                    f"({html.escape(item['ten_pgd'])}) — {item['tier']}"
+                )
+            hidden = sum(max(len(items) - 15, 0) for items in (added_ids, removed_ids, changed_ids))
+            if hidden > 0:
+                lines.append(f"  … và {hidden} thay đổi khác")
+            ok, err = gui_tin_theo_notify_chi_tiet(
+                "\n".join(lines),
+                "den_han_phan_tang",
+            )
+            total_changes = len(added_ids) + len(removed_ids) + len(changed_ids)
+            return ok, 1 if ok else 0, total_changes, err, snapshot
+
         if not any(v for v in buckets.values()):
-            return 0
+            return True, 0, 0, "", snapshot
+        total = sum(len(v) for v in buckets.values())
         ok = gui_nhac_den_han_phan_tang(buckets)
-        return 1 if ok else 0
+        if ok:
+            return True, 1, total, "", snapshot
+        from services.telegram_service import lay_loi_gui_gan_nhat
+        return False, 0, total, lay_loi_gui_gan_nhat("den_han_phan_tang"), snapshot
     except Exception as e:
-        logger.error("_nhac_den_han_phan_tang: %s", e, exc_info=True)
-        return 0
+        logger.error("run_den_han_phan_tang: %s", e, exc_info=True)
+        return False, 0, 0, str(e), {}
+
+
+def run_den_han_phan_tang() -> tuple[bool, int, int, str]:
+    """Wrapper tương thích ngược, gửi bản đến hạn đầy đủ."""
+    ok, sent, total, error, _snapshot = run_den_han_phan_tang_with_snapshot()
+    return ok, sent, total, error
+
+
+def _nhac_den_han_phan_tang() -> int:
+    """Wrapper tương thích ngược, trả số tin đã gửi."""
+    _ok, sent, _total, _error = run_den_han_phan_tang()
+    return sent
 
 
 # ── Nhắc phân kỳ NXH ─────────────────────────────────────────────────────────
@@ -429,49 +545,99 @@ def _nhac_lich_cong_tac() -> int:
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 
-def nhac() -> None:
-    """Duyệt deadline, tìm PGD chưa nộp, gửi Telegram."""
+
+def run_deadline_bc_with_snapshot(
+    baseline_snapshot: dict | None = None,
+) -> tuple[int, int, int, str, dict]:
+    """Gửi deadline đầy đủ hoặc thay đổi, kèm snapshot để scheduler lưu mốc."""
     from services.telegram_service import gui_canh_bao_deadline
-    from services.telegram_service import doc_deadline_bc_allowlist
+    from services.telegram_service import (
+        doc_deadline_bc_allowlist,
+        gui_tin_theo_notify_chi_tiet,
+        lay_loi_gui_gan_nhat,
+    )
 
     allowlist_set = doc_deadline_bc_allowlist()
-
     ds_can_nhac = lay_danh_sach_can_nhac(allowlist=allowlist_set)
-    if not ds_can_nhac:
-        logger.info("Không có deadline nào cần nhắc hôm nay.")
-        # Vẫn chạy các nhắc khác
-    else:
-        sent_count = 0
-        for item in ds_can_nhac:
-            loai = item["loai"]
-            dl_hien = item["deadline_date"].strftime("%d/%m/%Y")
-            chua_nop = item["ds_chua_nop"]
+    snapshot = {
+        str(item["loai"]): {
+            "deadline": item["deadline_date"].strftime("%d/%m/%Y"),
+            "missing": sorted(str(pgd) for pgd in item["ds_chua_nop"]),
+        }
+        for item in ds_can_nhac
+    }
+    sent_count = 0
+    failed_count = 0
+    first_error = ""
 
-            ok = gui_canh_bao_deadline(loai, dl_hien, chua_nop)
-            if ok:
-                logger.info("Đã gửi nhắc '%s': %d PGD chưa nộp", loai, len(chua_nop))
-                sent_count += 1
-            else:
-                logger.error("Gửi nhắc '%s' thất bại", loai)
+    if baseline_snapshot is not None:
+        lines = ["🔄 <b>Cập nhật nộp báo cáo</b>", "So với bản đầu tiên trong ngày:", ""]
+        changed_count = 0
+        for change in diff_deadline(baseline_snapshot, snapshot):
+            loai = change["name"]
+            da_nop = change["submitted"]
+            moi_thieu = change["new_missing"]
+            changed_count += 1
+            lines.append(f"<b>{html.escape(loai)}</b>")
+            if da_nop:
+                lines.append(f"  ✅ Đã nộp thêm: {html.escape(', '.join(da_nop))}")
+            if moi_thieu:
+                lines.append(f"  ⚠️ Mới phát sinh chưa nộp: {html.escape(', '.join(moi_thieu))}")
+        if changed_count == 0:
+            return 0, 0, 0, "", snapshot
+        ok, err = gui_tin_theo_notify_chi_tiet("\n".join(lines), "deadline_bc")
+        if ok:
+            return 1, changed_count, 0, "", snapshot
+        return 0, changed_count, 1, err, snapshot
 
-        if not ds_can_nhac:
-            logger.info("Không có deadline nào cần nhắc hôm nay.")
-        elif sent_count == 0:
-            logger.warning(
-                "Có %d deadline cần nhắc nhưng tất cả gửi Telegram đều thất bại!",
-                len(ds_can_nhac),
-            )
+    for item in ds_can_nhac:
+        loai = item["loai"]
+        dl_hien = item["deadline_date"].strftime("%d/%m/%Y")
+        chua_nop = item["ds_chua_nop"]
+        ok = gui_canh_bao_deadline(loai, dl_hien, chua_nop)
+        if ok:
+            logger.info("Đã gửi nhắc '%s': %d PGD chưa nộp", loai, len(chua_nop))
+            sent_count += 1
         else:
-            logger.info("Hoàn tất: đã gửi %d nhắc nhở.", sent_count)
+            failed_count += 1
+            if not first_error:
+                first_error = lay_loi_gui_gan_nhat("deadline_bc")
+            logger.error("Gửi nhắc '%s' thất bại: %s", loai, first_error)
+    return sent_count, len(ds_can_nhac), failed_count, first_error, snapshot
 
-    _nhac_theo_doi_nhap_lieu()
+
+def run_deadline_bc() -> tuple[int, int, int, str]:
+    """Wrapper tương thích ngược, gửi bản deadline đầy đủ."""
+    sent, pending, failed, error, _snapshot = run_deadline_bc_with_snapshot()
+    return sent, pending, failed, error
+
+def nhac() -> None:
+    """Duyệt deadline, tìm PGD chưa nộp, gửi Telegram."""
+    from services.telegram_schedule_service import is_scheduler_managed
+
+    if not is_scheduler_managed("deadline_bc"):
+        sent_count, pending_count, _failed, _error = run_deadline_bc()
+        if pending_count == 0:
+            logger.info("Không có deadline nào cần nhắc hôm nay.")
+        else:
+            logger.info("Hoàn tất deadline: đã gửi %d/%d nhắc nhở.", sent_count, pending_count)
+    else:
+        logger.info("deadline_bc do Telegram scheduler quản lý; legacy task bỏ qua.")
+
+    if not is_scheduler_managed("nhap_lieu"):
+        _nhac_theo_doi_nhap_lieu()
+    else:
+        logger.info("nhap_lieu do Telegram scheduler quản lý; legacy task bỏ qua.")
     _thong_bao_nop_moi_gsheet()
 
     # Nhắc phân kỳ NXH — khoản đến hạn tháng này
     _nhac_phan_ky_nxh()
 
     # Nhắc khoản đến hạn phân tầng T-7/T-3/T-1
-    _nhac_den_han_phan_tang()
+    if not is_scheduler_managed("den_han_phan_tang"):
+        _nhac_den_han_phan_tang()
+    else:
+        logger.info("den_han_phan_tang do Telegram scheduler quản lý; legacy task bỏ qua.")
 
     # Nhắc lịch công tác ngày mai (chỉ chạy buổi chiều — lúc 14:00)
     if datetime.now().hour >= 13:

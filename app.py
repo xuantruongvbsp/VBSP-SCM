@@ -39,7 +39,7 @@ from config import (
     TEN_FILE, TEN_FILE_NQ11, TEN_FILE_DB, TEN_FILE_DB_PREV,
     COT_TEN_PGD, COT_MA_KH, COT_NGAY_SL, COT_SO_KU, WORKSPACE_MAP,
     COT_TONG_DU_NO, COT_DU_NO_QH, COT_DU_NO_TH,
-    CACHE_HSTD, CACHE_NQ11, DON_VI_CHI_NHANH,
+    CACHE_HSTD, CACHE_NQ11, DON_VI_CHI_NHANH, TEN_CHI_NHANH_HIEN_THI,
     DS_PGD as _DS_PGD_DEFAULT,
     PGD_XA_MAP as _PGD_XA_MAP_DEFAULT,
 )
@@ -531,6 +531,8 @@ def render_splash() -> None:
 
 
 def render_workspace_picker() -> None:
+    from datetime import date as _dt
+
     st.markdown(
         """
 <style>
@@ -560,10 +562,15 @@ def render_workspace_picker() -> None:
     font-weight: 800;
     box-shadow: 0 14px 30px rgba(8, 15, 32, 0.28);
   }
+  div[data-testid="stButton"] > button {
+    transition: all .22s ease;
+  }
   div[data-testid="stButton"] > button:hover {
     border-color: rgba(134, 239, 172, 0.8);
     color: #ffffff;
-    filter: brightness(1.06);
+    filter: brightness(1.08);
+    transform: translateY(-1px);
+    box-shadow: 0 18px 42px rgba(34, 197, 94, 0.28);
   }
   .ws-hero {
     width: min(1120px, 100%);
@@ -663,6 +670,7 @@ def render_workspace_picker() -> None:
     transition: transform .24s ease, box-shadow .24s ease, border-color .24s ease;
     position: relative;
     overflow: hidden;
+    cursor: pointer;
   }
   .ws-card::before {
     content:"";
@@ -670,11 +678,29 @@ def render_workspace_picker() -> None:
     inset:0;
     background:linear-gradient(135deg, rgba(255,255,255,.12), transparent 34%);
     pointer-events:none;
+    transition: background .24s ease;
+  }
+  .ws-card::after {
+    content:"";
+    position:absolute;
+    inset:-2px;
+    border-radius:24px;
+    background:transparent;
+    z-index:-1;
+    opacity:0;
+    transition: opacity .28s ease;
+    pointer-events:none;
   }
   .ws-card:hover {
-    transform: translateY(-5px);
-    border-color: rgba(255,255,255,.24);
-    box-shadow:0 24px 54px rgba(0,0,0,.30);
+    transform: translateY(-6px) scale(1.025);
+    border-color: rgba(255,255,255,.28);
+    box-shadow:0 28px 60px rgba(0,0,0,.34);
+  }
+  .ws-card:hover::after {
+    opacity:1;
+  }
+  .ws-card:hover::before {
+    background:linear-gradient(135deg, rgba(255,255,255,.18), transparent 40%);
   }
   .ws-card-head {
     display:flex;
@@ -692,11 +718,19 @@ def render_workspace_picker() -> None:
     font-size:1.72rem;
     background:rgba(15,23,42,.72);
     border:1px solid rgba(148,163,184,.16);
+    transition: transform .24s ease, box-shadow .24s ease;
+  }
+  .ws-card:hover .ws-card-icon {
+    transform: scale(1.08);
   }
   .ws-card-line {
     height:5px;
     width:92px;
     border-radius:999px;
+    transition: width .24s ease, box-shadow .24s ease;
+  }
+  .ws-card:hover .ws-card-line {
+    width:112px;
   }
   .ws-card-eyebrow {
     display:inline-block;
@@ -746,6 +780,92 @@ def render_workspace_picker() -> None:
     font-weight:700;
     letter-spacing:.01em;
   }
+  .ws-suggest {
+    width: min(1120px, 100%);
+    margin: 0 auto 1.5rem;
+    padding: 0 0.2rem;
+  }
+  .ws-suggest-title {
+    color:#94a3b8;
+    font-size:.82rem;
+    font-weight:700;
+    text-transform:uppercase;
+    letter-spacing:.08em;
+    margin-bottom:.65rem;
+    padding-left:.3rem;
+  }
+  .ws-suggest-row {
+    display:flex;
+    flex-wrap:wrap;
+    gap:.55rem;
+  }
+  .ws-suggest-pill {
+    display:flex;
+    align-items:center;
+    gap:.48rem;
+    padding:.42rem .82rem;
+    border-radius:999px;
+    background:rgba(255,255,255,0.04);
+    border:1px solid rgba(148,163,184,0.14);
+    color:#cbd5e1;
+    font-size:.78rem;
+    font-weight:600;
+  }
+  .ws-suggest-pill .sug-icon {
+    font-size:.9rem;
+  }
+  .ws-suggest-pill .sug-sep {
+    color:var(--text-color);
+    margin:0 .15rem;
+  }
+  .ws-footer {
+    width: min(1120px, 100%);
+    margin: 2rem auto 0;
+    padding: 1rem 0.3rem;
+    border-top: 1px solid rgba(148,163,184,0.12);
+    color: var(--text-color);
+    font-size: .76rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: .6rem;
+  }
+  .ws-footer span {
+    color: #94a3b8;
+    font-weight: 600;
+  }
+  @media (max-width: 860px) {
+    .ws-hero-top {
+      flex-direction:column;
+      align-items:flex-start;
+    }
+    .ws-chip-wrap {
+      justify-content:flex-start;
+    }
+    .ws-title {
+      font-size:1.9rem;
+    }
+    .ws-sub {
+      font-size:.94rem;
+    }
+    .ws-hero {
+      padding:1.5rem 1.2rem;
+    }
+    .ws-card {
+      min-height: auto;
+    }
+    .ws-card-body {
+      min-height: auto;
+    }
+    .ws-suggest-row {
+      flex-direction: column;
+    }
+    .ws-footer {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+  }
 </style>
 """,
         unsafe_allow_html=True,
@@ -753,7 +873,7 @@ def render_workspace_picker() -> None:
 
     st.html(
         f"""
-<div style="min-height:22vh;display:flex;align-items:flex-end;justify-content:center;padding:2.5rem 1rem 1rem">
+<div style="min-height:20vh;display:flex;align-items:flex-end;justify-content:center;padding:2.5rem 1rem 1rem">
   <div class="ws-hero">
     <div class="ws-hero-top">
       <div class="ws-brand">
@@ -763,17 +883,24 @@ def render_workspace_picker() -> None:
         <div>
           <div class="ws-kicker">VBSP logo · VBSP-SCM</div>
           <div class="ws-title">Chọn không gian làm việc</div>
-          <p class="ws-sub">NHCSXH Chi nhánh Đồng Nai · Hệ thống Quản trị Tín dụng Nội bộ. Chọn đúng không gian để vào nhanh đúng nhóm chức năng và phạm vi dữ liệu.</p>
+          <p class="ws-sub">{TEN_CHI_NHANH_HIEN_THI} · Hệ thống Quản trị Tín dụng Nội bộ. Chọn đúng không gian để vào nhanh đúng nhóm chức năng và phạm vi dữ liệu.</p>
         </div>
       </div>
       <div class="ws-chip-wrap">
         <div class="ws-chip">22 đơn vị báo cáo</div>
         <div class="ws-chip">3 không gian chuyên biệt</div>
-        <div class="ws-chip">Role-based access</div>
+        <div class="ws-chip">9 vai trò phân quyền</div>
       </div>
     </div>
-    <div class="ws-note">Gợi ý: Phòng KH-NV dùng cho điều hành toàn Chi nhánh, Hỗ trợ địa bàn dùng cho tác nghiệp theo PGD, Ban Giám đốc dùng cho theo dõi dashboard và báo cáo nhanh.</div>
-    </div>
+    <div class="ws-note">Chọn không gian phù hợp với vai trò của bạn. Mỗi không gian có nhóm chức năng và phạm vi dữ liệu riêng biệt.</div>
+  </div>
+</div>
+<div class="ws-suggest">
+  <div class="ws-suggest-title">Phân hệ phù hợp theo vai trò</div>
+  <div class="ws-suggest-row">
+    <div class="ws-suggest-pill"><span class="sug-icon">👑</span> Ban Giám đốc <span class="sug-sep">→</span> <span>📊 Ban Giám đốc</span></div>
+    <div class="ws-suggest-pill"><span class="sug-icon">⭐</span> Q.trị CN / L.đạo CN / Ch.viên CN <span class="sug-sep">→</span> <span>📋 Phòng KH-NV</span></div>
+    <div class="ws-suggest-pill"><span class="sug-icon">🔑</span> Q.trị PGD / L.đạo PGD / CBTD <span class="sug-sep">→</span> <span>🗺️ Hỗ trợ địa bàn</span></div>
   </div>
 </div>
 """,
@@ -800,7 +927,7 @@ def render_workspace_picker() -> None:
   <div class="ws-card-title">{item["title"]}</div>
   <div class="ws-card-body">{item["body"]}</div>
   <div class="ws-tag-wrap">{tags_html}</div>
-  <div class="ws-card-hint">Không gian chuyên biệt · chọn để tiếp tục</div>
+  <div class="ws-card-hint">Nhấn vào card hoặc nút bên dưới để chọn</div>
 </div>
 """,
             )
@@ -812,6 +939,15 @@ def render_workspace_picker() -> None:
                 st.session_state["prelogin_workspace"] = item["key"]
                 st.session_state.workspace = item["key"]
                 st.rerun()
+
+    st.html(
+        f"""
+<div class="ws-footer">
+  <div>{TEN_CHI_NHANH_HIEN_THI} · <span>VBSP-SCM</span> v2.5</div>
+  <div>Hôm nay: <span>{_dt.today().strftime('%d/%m/%Y')}</span> · Phòng KH-NV — Hỗ trợ địa bàn — Ban Giám đốc</div>
+</div>
+""",
+    )
 
 
 def main():

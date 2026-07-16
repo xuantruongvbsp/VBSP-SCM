@@ -1,14 +1,19 @@
-"""Regression tests cho routing thông báo Telegram theo PGD."""
+"""Regression tests cho routing thông báo Telegram theo PGD + allowlist auto-clean."""
 from __future__ import annotations
 
 import sys
+from datetime import datetime
 from types import ModuleType
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 import pytest
 
 from services import telegram_service as tg
-from services.telegram_service import gui_thong_bao_upload_pgd as _gui_upload_pgd_goc
+from services.telegram_service import (
+    gui_thong_bao_upload_pgd as _gui_upload_pgd_goc,
+    doc_deadline_bc_allowlist,
+    luu_deadline_bc_allowlist,
+)
 
 
 TEN_PGD = "PGD Long Thành"
@@ -87,3 +92,148 @@ def test_upload_pgd_gui_loi_ghi_dung_log_key(monkeypatch) -> None:
     assert sender.call_args.args[1] == "CHAT_PGD"
     assert ghi_log.call_args.args[0] == "upload_pgd"
     assert ghi_log.call_args.args[2:] == (False, "HTTP 400: chat not found")
+
+
+# ── Standard notification structure tests ─────────────────────────────────────
+
+class TestChuanHoaThongBao:
+    def test_hstd_uu_tien_ngay_so_lieu_merge_meta(self, monkeypatch) -> None:
+        monkeypatch.setattr(
+            tg.db,
+            "doc_kv",
+            lambda key: {"ngay_sl": "2026-06-30 00:00:00"}
+            if key == "merge_meta_hstd" else None,
+        )
+
+        result = tg._chuan_hoa_thong_bao(
+            "📊 <b>Báo cáo sáng 16/07/2026</b>\n\n💰 Dư nợ: <b>25.000 tỷ</b>",
+            "bao_cao_sang",
+        )
+
+        assert "<b>Báo cáo tổng hợp sáng — Toàn Chi nhánh</b>" in result
+        assert "<b>Ngày số liệu:</b> 30/06/2026" in result
+        assert "<b>Tóm tắt:</b> 📊 Báo cáo sáng 16/07/2026" in result
+        assert "💰 Dư nợ: <b>25.000 tỷ</b>" in result
+        assert "<b>Nguồn dữ liệu:</b> HSTD" in result
+        assert "<b>Cập nhật lúc:</b>" in result
+
+    def test_gsheet_khong_nham_deadline_la_ngay_so_lieu(self, monkeypatch) -> None:
+        monkeypatch.setattr(tg.db, "doc_kv", lambda _key: None)
+        result = tg._chuan_hoa_thong_bao(
+            "⚠️ <b>Nhắc nộp báo cáo</b>\n📅 Deadline: <b>31/12/2026</b>",
+            "deadline_bc",
+        )
+
+        assert f"<b>Ngày số liệu:</b> {datetime.now():%d/%m/%Y}" in result
+        assert "<b>Nguồn dữ liệu:</b> Google Sheets" in result
+
+    def test_chuan_hoa_idempotent(self, monkeypatch) -> None:
+        monkeypatch.setattr(tg.db, "doc_kv", lambda _key: None)
+        once = tg._chuan_hoa_thong_bao("Tiêu đề\nChi tiết", "health_check")
+        twice = tg._chuan_hoa_thong_bao(once, "health_check")
+        assert twice == once
+
+    def test_du_19_notify_key(self) -> None:
+        assert len(tg._NOTIFY_PRESENTATION) == 19
+        assert len(set(tg._NOTIFY_PRESENTATION)) == 19
+
+
+# ── Allowlist auto-clean tests ────────────────────────────────────────────────
+
+class TestDocDeadlineBcAllowlist:
+    def test_tra_ve_none_khi_chua_co_allowlist(self, monkeypatch):
+        monkeypatch.setattr(tg.db, "doc_kv", lambda _key: None)
+        assert doc_deadline_bc_allowlist() is None
+
+    def test_tra_ve_none_khi_list_rong(self, monkeypatch):
+        monkeypatch.setattr(tg.db, "doc_kv", lambda _key: [])
+        assert doc_deadline_bc_allowlist() is None
+
+    def test_loc_stale_khi_deadline_da_xoa(self, monkeypatch):
+        monkeypatch.setattr(tg.db, "doc_kv", _make_stale_doc_kv({
+            "telegram_deadline_bc_allowlist": ["BC A", "BC B", "BC C"],
+            "bao_cao_deadline_config": {"BC A": "2026-07-15"},
+        }))
+        result = doc_deadline_bc_allowlist()
+        assert result == ["BC A"]
+
+    def test_loc_toan_bo_stale_tra_none(self, monkeypatch):
+        monkeypatch.setattr(tg.db, "doc_kv", _make_stale_doc_kv({
+            "telegram_deadline_bc_allowlist": ["BC X", "BC Y"],
+            "bao_cao_deadline_config": {"BC A": "2026-07-15"},
+        }))
+        result = doc_deadline_bc_allowlist()
+        assert result is None
+
+    def test_khong_co_deadline_config_thi_giu_nguyen(self, monkeypatch):
+        monkeypatch.setattr(tg.db, "doc_kv", _make_stale_doc_kv({
+            "telegram_deadline_bc_allowlist": ["BC A", "BC B"],
+            "bao_cao_deadline_config": {},
+        }))
+        result = doc_deadline_bc_allowlist()
+        assert result == ["BC A", "BC B"]
+
+    def test_allowlist_none_thi_khong_loc_stale(self, monkeypatch):
+        monkeypatch.setattr(tg.db, "doc_kv", _make_stale_doc_kv({
+            "telegram_deadline_bc_allowlist": None,
+            "bao_cao_deadline_config": {"BC A": "2026-07-15"},
+        }))
+        assert doc_deadline_bc_allowlist() is None
+
+
+class TestLuuDeadlineBcAllowlist:
+    def test_luu_allowlist_bt_thuong(self, monkeypatch):
+        store = _make_stale_store({"bao_cao_deadline_config": {"BC A": "2026-07-15", "BC B": "2026-08-01"}})
+        monkeypatch.setattr(tg.db, "doc_kv", store.__getitem__)
+        monkeypatch.setattr(tg.db, "ghi_kv", _ghi_store(store))
+        monkeypatch.setattr(tg.db, "ghi_audit", Mock())
+
+        luu_deadline_bc_allowlist(["BC A", "BC B"], "test_user")
+        assert store["telegram_deadline_bc_allowlist"] == ["BC A", "BC B"]
+
+    def test_luu_allowlist_tu_loc_stale(self, monkeypatch):
+        store = _make_stale_store({"bao_cao_deadline_config": {"BC A": "2026-07-15"}})
+        monkeypatch.setattr(tg.db, "doc_kv", store.__getitem__)
+        monkeypatch.setattr(tg.db, "ghi_kv", _ghi_store(store))
+        monkeypatch.setattr(tg.db, "ghi_audit", Mock())
+
+        luu_deadline_bc_allowlist(["BC A", "BC Stale"], "test_user")
+        assert store["telegram_deadline_bc_allowlist"] == ["BC A"]
+
+    def test_luu_allowlist_rong_tra_ve_none(self, monkeypatch):
+        monkeypatch.setattr(tg.db, "doc_kv", lambda _key: {})
+        monkeypatch.setattr(tg.db, "ghi_kv", Mock())
+        monkeypatch.setattr(tg.db, "ghi_audit", Mock())
+
+        luu_deadline_bc_allowlist(None, "test_user")
+        ghi_kv_args = tg.db.ghi_kv.call_args.args
+        assert ghi_kv_args[1] is None
+
+    def test_luu_allowlist_toan_bo_stale_thanh_none(self, monkeypatch):
+        store = _make_stale_store({"bao_cao_deadline_config": {"BC A": "2026-07-15"}})
+        monkeypatch.setattr(tg.db, "doc_kv", store.__getitem__)
+        monkeypatch.setattr(tg.db, "ghi_kv", _ghi_store(store))
+        monkeypatch.setattr(tg.db, "ghi_audit", Mock())
+
+        luu_deadline_bc_allowlist(["BC Stale 1", "BC Stale 2"], "test_user")
+        # Tất cả stale → trả về None
+        assert store["telegram_deadline_bc_allowlist"] is None
+
+
+# ── Helpers ───────────────────────────────────────────────────────────────────
+
+def _make_stale_doc_kv(values: dict):
+    """Mock doc_kv trả về giá trị từ dict."""
+    return lambda key: values.get(key)
+
+
+def _make_stale_store(values: dict) -> dict:
+    """Tạo dict store với ghi_kv ghi thật vào dict."""
+    return dict(values)
+
+
+def _ghi_store(store: dict):
+    """Hàm ghi_kv mock: ghi trực tiếp vào store dict."""
+    def _ghi(key, value, username):
+        store[key] = value
+    return _ghi

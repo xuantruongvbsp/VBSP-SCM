@@ -1,5 +1,120 @@
 # CHANGELOG
 
+## [2026-07-16] — Fix lỗi mở màn chọn workspace
+- `app.py` — import `TEN_CHI_NHANH_HIEN_THI` từ `config.py`, sửa `NameError` trong `render_workspace_picker()`
+- `app.py` — đổi hai màu chữ tối hardcode trong workspace picker sang `var(--text-color)` để đạt convention dark mode
+- `BUGMAP.md` — thêm J28 ghi nhận lỗi dùng hằng số giao diện nhưng thiếu import
+
+## [2026-07-16] — Cải thiện giao diện màn chọn workspace
+- `app.py` `render_workspace_picker()` — thêm hiệu ứng glow/scale/cursor hover card, icon + line animation; thêm footer (tên CN, ngày, version); thêm gợi ý vai trò → workspace; cải thiện responsive mobile; dùng `TEN_CHI_NHANH_HIEN_THI`
+
+## [2026-07-16] — Dọn import thừa tab_ban_dai_dien.py
+- `tabs/tab_ban_dai_dien.py` — xóa 7 import không dùng (`os`, `BytesIO`, `Any`, `COT_NGAY_SL`, `NAM_HT`, `fmt_bang_ty`, `fmt_pct`); compile OK
+
+## [2026-07-16] — Dọn code chết tab_uy_thac.py
+- `tabs/tab_uy_thac.py` — xóa ~1000 dòng code chết: 6 hàm render không dùng (_render_theo_dvut, _render_ke_hoach, _render_mau06, _render_mau15, _render_bien_ban, _render_bb_ct_cx), 3 cache functions chết, import không dùng (pickle, io, timedelta, template_service, các builder payload không mount); file từ 2570 → 1576 dòng
+
+## [2026-07-16] — Chuẩn hóa cấu trúc thông báo Telegram
+- `services/telegram_service.py` — bọc 19 loại thông báo theo khung chung gồm tên/phạm vi, ngày số liệu, tóm tắt, chi tiết, nguồn dữ liệu và thời điểm cập nhật; nguồn HSTD ưu tiên ngày từ metadata merge
+- `tests/test_telegram_service.py` — kiểm thử ngày HSTD, phân biệt deadline GSheet, tính idempotent và đủ 19 notify key
+- `BUGMAP.md` — thêm B33 cho lỗi nhầm ngày gửi với ngày số liệu Telegram
+- `CHANGELOG.md` — ghi nhận chuẩn hóa thông báo Telegram
+
+## [2026-07-16] — Phân nhóm danh mục thông báo Telegram
+- `tabs/tab_telegram_admin.py` — chia 19 loại thông báo thành 4 nhóm: Báo cáo định kỳ, Nhắc nghiệp vụ, Cảnh báo rủi ro và Sự kiện hệ thống; giữ nguyên key, lịch và logic gửi
+- `CHANGELOG.md` — ghi nhận thay đổi giao diện quản trị Telegram
+
+## [2026-07-16] — Nâng cấp tab Báo cáo KHNV
+- `tabs/tab_khnv_bao_cao.py` — chọn đúng năm hiện tại và sheet Điện báo, hiển thị KPI/bảng theo định dạng Việt Nam, cảnh báo lệch kỳ HSTD và dùng số liệu thật khi xuất Word/Excel
+- `services/khnv_bao_cao_service.py` — chuẩn hóa Điện báo về VND, cộng KHA+KHB khi đối chiếu, bổ sung ngày số liệu HSTD và hoàn thiện logging lỗi
+- `data/hstd.py` — nhận diện đơn vị Đồng/Triệu đồng cho cả Điện báo thường và matrix
+- `tests/test_khnv_bao_cao.py` — bổ sung hồi quy ngày snapshot, quy đổi đơn vị và đối chiếu KHA+KHB (10 cases)
+- `tests/test_hstd.py` — bổ sung kiểm thử nhận diện đơn vị Điện báo (31 cases)
+- `TEST_COVERAGE.md` — cập nhật coverage của bộ đọc Điện báo và dịch vụ Báo cáo KHNV
+- `BUGMAP.md` — thêm B32 cho lỗi xuất Điện báo bằng 0 và đối chiếu sai đơn vị
+- `CHANGELOG.md` — ghi nhận toàn bộ nâng cấp tab Báo cáo KHNV
+
+## [2026-07-15] — Xóa tính năng Template văn bản
+- Xóa `tabs/tab_quan_ly_template.py` và `tabs/tab_template_pgd.py`
+- `workspaces/ws_management.py` — xóa menu "Template văn bản" + dọn import thừa (TEMPLATES_DIR, TAG_MAP, quet_templates, auto_fill_klgb, auto_fill_document)
+- `workspaces/ws_operation.py` — xóa menu "Quản lý Template" + dọn import thừa
+- Các hàm `quet_templates`, `auto_fill_*` trong utils.py vẫn giữ nguyên (tab_doc_hub, tab_canh_bao_som_pgd còn dùng)
+
+## [2026-07-15] — Chuẩn hóa allowlist Telegram: tự động lọc stale entries
+- `services/telegram_service.py` — `doc_deadline_bc_allowlist()` tự động lọc loại BC không còn trong deadline config; `luu_deadline_bc_allowlist()` kiểm tra stale trước khi lưu, fallback về None nếu tất cả stale
+- `tests/test_telegram_service.py` — thêm 10 test cho doc/luu allowlist auto-clean stale
+- `tests/test_report_submission_service.py` — thêm 5 test `TestLayDanhSachCanNhacAllowlist` cho allowlist filtering
+- `CHANGELOG.md` — ghi nhận chuẩn hóa allowlist
+
+## [2026-07-15] — Bỏ tạo thủ công loại báo cáo chưa có trên Form
+- `tabs/tab_tien_do_nop.py` — xóa mục và helper tạo thủ công loại báo cáo; loại báo cáo chỉ được đưa vào Cài deadline sau khi đã xuất hiện trong dữ liệu Google Form
+- `CHANGELOG.md` — ghi nhận tinh gọn luồng Cài đặt thời hạn theo quy trình thực tế
+
+## [2026-07-15] — Lưu trữ báo cáo đã hoàn thành trong ứng dụng
+- `services/report_submission_service.py` — thêm key `bao_cao_archive_config`, API lưu trữ/khôi phục, lọc dữ liệu đang hoạt động và chặn Telegram nhắc loại đã lưu trữ mà không xóa dữ liệu Google Form
+- `tabs/tab_tien_do_nop.py` — thêm thao tác `Hoàn thành và lưu trữ`, tab `Đã lưu trữ`, bảng lịch sử, xuất Excel và khôi phục không tự bật lại deadline cũ
+- `tests/test_report_submission_service.py` — thêm test giữ dữ liệu GSheet, gỡ deadline, khôi phục và Telegram bỏ qua báo cáo lưu trữ
+- `TEST_COVERAGE.md` — cập nhật coverage cho `report_submission_service.py`
+- `BUGMAP.md` — thêm B31 ghi nhận khoảng trống thiết kế khiến báo cáo hoàn thành không thể ẩn an toàn khỏi Cài deadline
+- `CHANGELOG.md` — ghi nhận tính năng lưu trữ báo cáo hoàn thành
+
+## [2026-07-15] — Nâng cấp báo cáo cho tab tiến độ nộp báo cáo
+- `services/report_submission_service.py` — thêm bảng nghĩa vụ PGD × loại deadline và bộ tổng hợp báo cáo điều hành để tách rõ hoàn thành, quá hạn, thiếu file, sắp đến hạn
+- `tabs/tab_tien_do_nop.py` — thêm khối `Báo cáo điều hành`, bảng `Kiểm soát nghĩa vụ theo deadline`, filter `Kỳ báo cáo`/`Chất lượng file`, đổi xuất tổng quan sang dữ liệu nghĩa vụ thật và bỏ clear cache GSheet vô điều kiện mỗi lần mở tab
+- `tests/test_report_submission_service.py` — thêm 2 test hồi quy cho danh sách nghĩa vụ và trạng thái thiếu file
+- `CHANGELOG.md` — ghi nhận nâng cấp báo cáo tab tiến độ
+
+## [2026-07-14] — Làm rõ tên nhóm nhắc tự động Telegram
+- `tabs/tab_telegram_admin.py` — đổi nhãn chọn lịch thành `Chọn nội dung nhắc tự động` và mô tả rõ ba nhóm PGD chưa nộp báo cáo, chưa hoàn thành nhập liệu, khoản vay đến hạn; không thay đổi logic gửi
+- `CHANGELOG.md` — ghi nhận chỉnh nhãn giao diện Telegram Scheduler
+
+## [2026-07-14] — Cho phép lịch Telegram gửi tối đa 4 lần/ngày
+- `tabs/tab_telegram_admin.py` — mở rộng lựa chọn từ 1–2 thành 1–4 lần, hiện đúng số ô giờ, đặt sẵn gợi ý 08:00/10:00/14:00/16:00 và chặn các mốc giờ trùng nhau; các lần sau vẫn có thể chỉ gửi thay đổi so với lần đầu
+- `CHANGELOG.md` — ghi nhận mở rộng số mốc gửi trong ngày
+
+## [2026-07-14] — Telegram gửi bản đầy đủ đầu ngày và cập nhật ở các mốc sau
+- `services/telegram_delta.py` — thêm phép so sánh thuần cho PGD đã nộp/mới thiếu, tiến độ nhập liệu thay đổi và khoản đến hạn mới/không còn
+- `services/telegram_jobs.py` — job Telegram nhận baseline tùy chọn, trả snapshot hiện tại và phân biệt kết quả bản đầy đủ với bản cập nhật
+- `services/telegram_schedule_service.py` — thêm `delivery_mode=full_then_delta`; lưu baseline đầu ngày theo từng rule trong kv_store, xác minh sau ghi, audit và tự ghi đè khi sang ngày mới
+- `scripts/nhac_deadline.py` — tách snapshot cho nhắc nộp báo cáo, nhập liệu và khoản đến hạn; các lần sau chỉ gửi phần khác so với bản đầu ngày, không đổi thì không gửi
+- `tabs/tab_telegram_admin.py` — khi chọn hai lần gửi, thêm lựa chọn dễ hiểu `Chỉ gửi thay đổi so với lần đầu` hoặc `Gửi lại toàn bộ nội dung`
+- `tests/test_telegram_schedule_service.py` — thêm test validate delivery mode, lưu/dùng lại baseline trong ngày và reset baseline ngày mới
+- `tests/test_telegram_jobs_delta.py` — thêm 5 test so sánh deadline, tiến độ nhập liệu, khoản đến hạn mới/mất và dư nợ thay đổi mà không gọi nguồn dữ liệu hay Telegram thật
+- `TEST_COVERAGE.md` — cập nhật coverage full→delta cho Telegram Scheduler
+- `CHANGELOG.md` — ghi nhận chế độ bản đầy đủ đầu ngày và bản cập nhật trong ngày
+
+## [2026-07-14] — Đơn giản hóa màn hình lịch gửi Telegram
+- `tabs/tab_telegram_admin.py` — thay màn hình chính bằng luồng chọn thông báo, chọn ngày, chọn một/hai giờ rồi `Lưu và bật lịch`; thêm nút gửi thử/tắt lịch và giấu rule ID, heartbeat, retry, cooldown, runlog trong `Cài đặt nâng cao`
+- `CHANGELOG.md` — ghi nhận giao diện lịch gửi đơn giản dành cho người dùng không chuyên kỹ thuật
+
+## [2026-07-14] — Hoàn thiện vận hành Telegram Scheduler
+- `services/telegram_schedule_service.py` — thêm chạy thử rule không claim slot, tính lần chạy kế tiếp và tổng hợp sức khỏe Scheduler từ heartbeat/runlog
+- `scripts/telegram_scheduler.py` — cập nhật thời gian heartbeat trên file khóa ở mỗi lượt Windows Task Scheduler gọi script
+- `tabs/tab_telegram_admin.py` — thêm trạng thái hoạt động, cảnh báo mất heartbeat, 4 mẫu lịch tạo nhanh, nút chạy thử và xuất/nhập rule JSON không chứa Token/Chat ID; cấu hình nhập luôn ở trạng thái tắt
+- `tests/test_telegram_schedule_service.py` — thêm 4 test hồi quy cho lần chạy kế tiếp, chạy thử không tạo runlog và heartbeat bình thường/quá hạn
+- `TEST_COVERAGE.md` — nâng coverage Telegram schedule service từ 8 lên 12 test
+- `CHANGELOG.md` — ghi nhận các tiện ích vận hành và di chuyển Telegram Scheduler
+
+## [2026-07-14] — Fix cài Telegram Scheduler trên Windows PowerShell
+- `scripts/setup_task_scheduler.ps1` — bỏ cmdlet không tồn tại `New-ScheduledTaskRepetitionPattern`; tạo trực tiếp trigger lặp 5 phút/1 phút bằng tham số của `New-ScheduledTaskTrigger`, tương thích ScheduledTasks module trên máy triển khai
+- `BUGMAP.md` — thêm B30 ghi nhận lỗi script dừng giữa chừng khiến Scheduler và Polling chưa được tạo
+- `CHANGELOG.md` — ghi nhận bản sửa tương thích Windows Task Scheduler
+
+## [2026-07-14] — Thêm hướng dẫn chuyển Telegram Scheduler sang máy mới
+- `tabs/tab_telegram_admin.py` — thêm expander hướng dẫn ngay tại `Lịch nâng cao`: tắt task máy cũ, chuyển dự án/database an toàn, cài và kiểm tra Windows Task Scheduler, tạo rule và bật gửi trên máy mới
+- `CHANGELOG.md` — ghi nhận bổ sung hướng dẫn vận hành Telegram Scheduler
+
+## [2026-07-14] — Telegram Scheduler MVP theo rule
+- `services/telegram_schedule_service.py` — thêm schema rule daily/weekly nhiều mốc giờ, whitelist, due-slot theo timezone/grace window, giới hạn lượt/ngày, retry cooldown và runlog claim/finish xác minh qua kv_store
+- `services/telegram_jobs.py` — thêm registry whitelist dùng chung cho `deadline_bc`, `nhap_lieu`, `den_han_phan_tang`, trả kết quả gửi có cấu trúc
+- `scripts/telegram_scheduler.py` — thêm entrypoint chạy mỗi 5 phút với khóa liên tiến trình Windows để tránh hai scheduler chạy đồng thời
+- `scripts/nhac_deadline.py` — tách job deadline/đến hạn có kết quả chi tiết và bỏ qua 3 job legacy khi rule scheduler tương ứng đang quản lý
+- `tabs/tab_telegram_admin.py` — thêm tab `Lịch nâng cao` để bật scheduler, tạo/sửa/xóa rule, cấu hình nhiều giờ/lượt/retry/cooldown và xem runlog hôm nay; nút gửi thủ công dùng chung job registry
+- `scripts/setup_task_scheduler.ps1` — đăng ký `VBSP-TelegramScheduler` chạy mỗi 5 phút, `IgnoreNew`, giới hạn thực thi 4 phút
+- `tests/test_telegram_schedule_service.py` — thêm 8 test rule validation, due window, weekly, chống gửi trùng, retry, toggle và ownership legacy
+- `TEST_COVERAGE.md` — cập nhật coverage cho Telegram schedule service
+- `CHANGELOG.md` — ghi nhận triển khai Telegram Scheduler MVP
+
 ## [2026-07-14] — Bổ sung test hồi quy routing Telegram Upload PGD
 - `tests/test_telegram_service.py` — thêm 4 case khóa thứ tự chat PGD → chat phụ `upload_pgd` → chat chính và xác nhận lỗi được log theo key `upload_pgd`, không gọi HTTP thật
 - `TEST_COVERAGE.md` — cập nhật coverage cho `services/telegram_service.py`

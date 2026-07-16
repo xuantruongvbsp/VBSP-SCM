@@ -249,6 +249,45 @@
 | **Fix** | Giữ `df_pgd` số thật cho Excel/PDF, đồng thời tạo `df_pgd_display` và format các cột triệu đồng bằng `fmt_so()`, cột `Số KH` bằng `fmt_so()`, cột `NQH%` sang chuỗi `%` kiểu Việt Nam trước khi `st.dataframe()` |
 | **Ngày fix** | 2026-07-12 |
 
+### B30 — Script cài Telegram Scheduler gọi cmdlet repetition không tồn tại
+| | |
+|---|---|
+| **File** | `scripts/setup_task_scheduler.ps1` |
+| **Dấu hiệu** | Chạy script bằng PowerShell Administrator cài được `VBSP-DailyReport` và `VBSP-NhacDeadline`, sau đó dừng tại lỗi `New-ScheduledTaskRepetitionPattern is not recognized`; Scheduler 5 phút và Polling 1 phút không được tạo |
+| **Nguyên nhân** | Windows ScheduledTasks module trên máy có tham số `RepetitionInterval` / `RepetitionDuration` ngay trong `New-ScheduledTaskTrigger`, nhưng không cung cấp cmdlet riêng `New-ScheduledTaskRepetitionPattern` |
+| **Fix** | Tạo trigger `-Once -At (Get-Date).AddMinutes(1)` và truyền trực tiếp `-RepetitionInterval` / `-RepetitionDuration` cho cả Scheduler 5 phút và Polling 1 phút; thời hạn lặp 3650 ngày |
+| **Ngày fix** | 2026-07-14 |
+
+### B31 — Báo cáo hoàn thành không thể ẩn khỏi Cài deadline mà vẫn giữ lịch sử
+| | |
+|---|---|
+| **File** | `tabs/tab_tien_do_nop.py`, `services/report_submission_service.py` |
+| **Dấu hiệu** | Bấm `Ngưng` chỉ gỡ deadline nhưng loại báo cáo vẫn quay lại nhóm `Cần cài`; nếu xóa dòng Google Sheet để làm nó biến mất thì mất luôn lịch sử nộp trong ứng dụng |
+| **Nguyên nhân** | Hệ thống chỉ có hai lớp dữ liệu Google Form và deadline, chưa có trạng thái nghiệp vụ `đã lưu trữ` độc lập |
+| **Fix** | Lưu trạng thái theo loại báo cáo vào `bao_cao_archive_config`; loại lưu trữ được gỡ deadline và loại khỏi Tổng quan/Telegram nhưng dữ liệu Google Form vẫn hiện trong tab `Đã lưu trữ`, có xuất Excel và khôi phục |
+| **Test** | `tests/test_report_submission_service.py::TestLuuTruBaoCao` |
+| **Ngày fix** | 2026-07-15 |
+
+### B32 — Báo cáo KHNV xuất số Điện báo bằng 0 và đối chiếu sai đơn vị
+| | |
+|---|---|
+| **File** | `tabs/tab_khnv_bao_cao.py`, `services/khnv_bao_cao_service.py`, `data/hstd.py` |
+| **Dấu hiệu** | Màn hình đọc được Điện báo nhưng file Word/Excel vẫn xuất tổng dư nợ bằng 0; bảng đối chiếu có thể lệch 1.000.000 lần hoặc bỏ sót phần KHB |
+| **Nguyên nhân** | UI tạo dữ liệu xuất giả bằng 0; bộ đọc matrix chưa trả về đơn vị nguồn; đối chiếu chỉ dùng KHA và cố định sheet `DB1` |
+| **Fix** | Dùng số Điện báo thực khi xuất, nhận diện và chuẩn hóa Đồng/Triệu đồng về VND, cộng KHA+KHB cho nợ quá hạn/nợ khoanh, cho chọn sheet thực tế và định dạng số Việt Nam |
+| **Test** | `tests/test_khnv_bao_cao.py::TestTongHopDienBao`, `tests/test_hstd.py::TestDienBaoDonVi` |
+| **Ngày fix** | 2026-07-16 |
+
+### B33 — Thông báo Telegram nhầm ngày gửi với ngày số liệu
+| | |
+|---|---|
+| **File** | `services/telegram_service.py`, `tests/test_telegram_service.py` |
+| **Dấu hiệu** | Các tin Telegram trình bày không đồng nhất; một số tin chỉ hiện ngày gửi hoặc deadline nên người đọc có thể hiểu nhầm cache HSTD là số liệu mới nhất |
+| **Nguyên nhân** | Từng hàm tự ghép nội dung, không có khung chung cho phạm vi, ngày số liệu, nguồn và thời điểm cập nhật |
+| **Fix** | Chuẩn hóa tập trung tại cổng gửi theo `notify_key`; tin HSTD ưu tiên `merge_meta_hstd.ngay_sl`, tin GSheet dùng ngày quét hiện tại và không lấy nhầm deadline; bổ sung đủ tên, phạm vi, tóm tắt, chi tiết, nguồn và thời điểm cập nhật cho 19 loại |
+| **Test** | `tests/test_telegram_service.py::TestChuanHoaThongBao` |
+| **Ngày fix** | 2026-07-16 |
+
 ### B7 — Card grid HTML hiển thị raw code thay vì render
 | | |
 |---|---|
@@ -2035,6 +2074,18 @@ val = pd.to_numeric(df[COT_X], errors="coerce").sum() if COT_X in df.columns els
 
 ---
 
+### H12 — “Chưa hoàn thành” ở tab tiến độ bị hiểu sai theo raw rows Google Form
+| | |
+|---|---|
+| **File** | `tabs/tab_tien_do_nop.py`, `services/report_submission_service.py` |
+| **Dấu hiệu** | Tab `📋 Danh sách nộp` và phần xuất báo cáo có thể coi “chưa hoàn thành” là các dòng raw từ Google Form, nên PGD chưa hề nộp một dòng nào cho loại báo cáo đang theo dõi không xuất hiện đầy đủ trong danh sách cần đôn đốc |
+| **Nguyên nhân** | Logic cũ chỉ lọc trên DataFrame các lượt nộp thực tế từ GSheet; nguồn này không có bản ghi cho nghĩa vụ chưa phát sinh submission, nên không thể đại diện đúng cho ma trận `PGD × loại deadline` |
+| **Fix** | Tạo helper `lap_bang_nghia_vu_bao_cao()` và `tong_hop_bao_cao_dieu_hanh()` để sinh bảng nghĩa vụ đầy đủ theo `PGD × loại báo cáo`; UI tổng quan và kiểm soát deadline đọc từ bảng này, còn tab `Danh sách nộp` chỉ còn là lớp raw submissions |
+| **Test** | `tests/test_report_submission_service.py::TestBaoCaoDieuHanh::test_lap_bang_nghia_vu_tinh_ca_don_vi_chua_co_dong_nop`, `tests/test_report_submission_service.py::TestBaoCaoDieuHanh::test_tong_hop_bao_cao_dieu_hanh_tach_thieu_file_khoi_da_hoan_thanh` |
+| **Ngày fix** | 2026-07-15 |
+
+---
+
 ## Template: Ghi nhận bug mới
 
 ### J13 — `_upload_info()` đổi kiểu trả về làm test unpack bị lỗi
@@ -2165,6 +2216,16 @@ val = pd.to_numeric(df[COT_X], errors="coerce").sum() if COT_X in df.columns els
 | **Fix** | Tổng hợp danh sách Tổ/Hội có lãi tồn và danh sách Tổ đa hội theo `PGD + Xã + Tổ`, rồi hiển thị hai bảng mở ngay dưới cảnh báo |
 | **Test** | `tests/test_uy_thac_service.py::test_danh_sach_to_co_lai_ton_tong_hop_theo_to_va_hoi`, `tests/test_uy_thac_service.py::test_danh_sach_to_da_hoi_hien_day_du_cac_hoi` |
 | **Ngày fix** | 2026-07-14 |
+
+### J28 — Màn chọn workspace dùng hằng số tên Chi nhánh nhưng thiếu import
+| | |
+|---|---|
+| **File** | `app.py` → `render_workspace_picker()` |
+| **Dấu hiệu** | Ứng dụng dừng với `NameError: name 'TEN_CHI_NHANH_HIEN_THI' is not defined` khi mở màn chọn workspace |
+| **Nguyên nhân** | Giao diện mới tham chiếu `TEN_CHI_NHANH_HIEN_THI` trong hai f-string nhưng hằng số chưa được thêm vào danh sách import từ `config.py` |
+| **Fix** | Import `TEN_CHI_NHANH_HIEN_THI` ở module-level cùng các hằng số cấu hình khác |
+| **Test** | Compile `app.py`, kiểm tra convention và import module thành công |
+| **Ngày fix** | 2026-07-16 |
 
 ### C31 — CDTO toàn Chi nhánh bị cộng gần gấp đôi sau upload
 | | |

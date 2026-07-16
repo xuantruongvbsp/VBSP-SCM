@@ -11,7 +11,17 @@ from __future__ import annotations
 import pandas as pd
 import pytest
 
-from data.hstd import canh_bao_migration, danh_dau_khong_hd
+from data.hstd import _dienbao_don_vi_trieu, canh_bao_migration, danh_dau_khong_hd
+
+
+class TestDonViDienBao:
+    def test_nhan_dien_trieu_dong(self):
+        df = pd.DataFrame([["Đơn vị tính: Triệu đồng"]])
+        assert _dienbao_don_vi_trieu(df) is True
+
+    def test_nhan_dien_dong(self):
+        df = pd.DataFrame([["Đơn vị tính: Đồng"]])
+        assert _dienbao_don_vi_trieu(df) is False
 
 
 # ══════════════════════════════════════════════════════════════════════════════

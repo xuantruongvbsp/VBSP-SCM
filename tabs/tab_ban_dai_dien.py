@@ -15,10 +15,7 @@ from logger import get_logger
 logger = get_logger(__name__)
 
 import base64
-import os
 from datetime import datetime, date
-from io import BytesIO
-from typing import Any
 
 import pandas as pd
 import streamlit as st
@@ -31,20 +28,16 @@ from config import (
     COT_TONG_DU_NO,
     COT_DU_NO_TH,
     COT_DU_NO_QH,
-    COT_NGAY_SL,
     COT_MA_CHUONG_TRINH,
     COT_NGUON_VON,
     COT_GIAI_NGAN_TRONG_NAM,
     TEN_CHI_NHANH_HIEN_THI,
-    NAM_HT,
     CACHE_HSTD,
 )
 from data.core import ts_file
 from utils import (
     fmt_ty,
-    fmt_bang_ty,
     fmt_so,
-    fmt_pct,
     vn,
     xuat_excel,
     ten_file_xuat,

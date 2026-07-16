@@ -112,7 +112,40 @@ New-VbspTask `
     -Trigger "08:00,14:00" `
     -Description "VBSP-SCM: Nhắc PGD chưa nộp BC + phát hiện nộp mới từ GSheet"
 
-# 3. Telegram 2 chiều — polling lệnh từ user (mỗi phút)
+# 3. Rule-based Telegram scheduler — mỗi 5 phút
+$schedulerAction = New-ScheduledTaskAction `
+    -Execute $PythonPath `
+    -Argument "$ProjectDir\scripts\telegram_scheduler.py" `
+    -WorkingDirectory $ProjectDir
+
+$schedulerTrigger = New-ScheduledTaskTrigger `
+    -Once `
+    -At (Get-Date).AddMinutes(1) `
+    -RepetitionInterval (New-TimeSpan -Minutes 5) `
+    -RepetitionDuration (New-TimeSpan -Days 3650)
+
+$schedulerSettings = New-ScheduledTaskSettingsSet `
+    -ExecutionTimeLimit "00:04:00" `
+    -MultipleInstances IgnoreNew `
+    -StartWhenAvailable
+
+$schedulerPrincipal = New-ScheduledTaskPrincipal `
+    -UserId "SYSTEM" -LogonType ServiceAccount -RunLevel Highest
+
+if (Get-ScheduledTask -TaskName "VBSP-TelegramScheduler" -ErrorAction SilentlyContinue) {
+    Unregister-ScheduledTask -TaskName "VBSP-TelegramScheduler" -Confirm:$false
+    Write-Host "  Đã xóa task cũ: VBSP-TelegramScheduler"
+}
+Register-ScheduledTask `
+    -TaskName "VBSP-TelegramScheduler" `
+    -Action $schedulerAction `
+    -Trigger $schedulerTrigger `
+    -Settings $schedulerSettings `
+    -Principal $schedulerPrincipal `
+    -Description "VBSP-SCM: Rule-based Telegram scheduler — kiểm tra lịch mỗi 5 phút" | Out-Null
+Write-Host "  [OK] VBSP-TelegramScheduler  ->  telegram_scheduler.py  @  mỗi 5 phút"
+
+# 4. Telegram 2 chiều — polling lệnh từ user (mỗi phút)
 # Task Scheduler không hỗ trợ interval < 1 phút qua trigger Daily,
 # nên dùng trigger RepetitionInterval 1 phút.
 $pollingAction = New-ScheduledTaskAction `
@@ -120,10 +153,11 @@ $pollingAction = New-ScheduledTaskAction `
     -Argument "$ProjectDir\scripts\telegram_polling.py" `
     -WorkingDirectory $ProjectDir
 
-$pollingTrigger = New-ScheduledTaskTrigger -Daily -At "00:00"
-$pollingTrigger.Repetition = New-ScheduledTaskRepetitionPattern `
+$pollingTrigger = New-ScheduledTaskTrigger `
+    -Once `
+    -At (Get-Date).AddMinutes(1) `
     -RepetitionInterval (New-TimeSpan -Minutes 1) `
-    -RepetitionDuration (New-TimeSpan -Hours 24)
+    -RepetitionDuration (New-TimeSpan -Days 3650)
 
 $pollingSettings = New-ScheduledTaskSettingsSet `
     -ExecutionTimeLimit "00:00:30" `
@@ -159,4 +193,5 @@ Get-ScheduledTask | Where-Object { $_.TaskName -like "VBSP-*" } | `
 Write-Host "Chạy thủ công để test:" -ForegroundColor Cyan
 Write-Host "  Start-ScheduledTask -TaskName 'VBSP-DailyReport'"
 Write-Host "  Start-ScheduledTask -TaskName 'VBSP-NhacDeadline'"
+Write-Host "  Start-ScheduledTask -TaskName 'VBSP-TelegramScheduler'"
 Write-Host "  Start-ScheduledTask -TaskName 'VBSP-TelegramPolling'"

@@ -37,6 +37,7 @@ from components.delta_card import kpi_row
 from data import ts_file
 from config import DB_HT_CACHE, DB_PREV_CACHE, FILE_PATH_DB, FILE_PATH_DB_PREV
 from services.upload_service import luu_dienbao
+from utils import fmt_so, fmt_ty
 
 from tabs.base_tab import TabContext
 
@@ -68,10 +69,56 @@ def _fmt_vnd(x, don_vi_trieu: bool = False) -> str:
     try:
         x = float(x)
         if don_vi_trieu:
-            return f"{x/1000:,.1f}"
-        return f"{x/1_000_000:,.0f}"
+            value = f"{x/1000:,.1f}"
+        else:
+            value = f"{x/1_000_000:,.0f}"
+        return value.replace(",", "_").replace(".", ",").replace("_", ".")
     except Exception:
         return "—"
+
+
+def _bang_hstd_hien_thi(df: pd.DataFrame) -> pd.DataFrame:
+    """Tạo bản hiển thị Việt Nam; giữ DataFrame số gốc cho Excel/Word."""
+    if df is None or df.empty:
+        return pd.DataFrame()
+    result = df.copy()
+    rename: dict[str, str] = {}
+    for col in result.columns:
+        col_norm = str(col).casefold().replace("_", " ")
+        if "dư nợ" in col_norm:
+            result[col] = pd.to_numeric(result[col], errors="coerce").apply(fmt_ty)
+            rename[col] = f"{str(col).replace('_', ' ')} (triệu đồng)"
+        elif "số khách hàng" in col_norm or "số món" in col_norm:
+            result[col] = pd.to_numeric(result[col], errors="coerce").apply(fmt_so)
+            rename[col] = str(col).replace("_", " ")
+        elif "tỷ lệ" in col_norm:
+            result[col] = pd.to_numeric(result[col], errors="coerce").apply(
+                lambda value: f"{value:.2f}".replace(".", ",") + "%"
+            )
+            rename[col] = str(col).replace("_", " ")
+        else:
+            rename[col] = str(col).replace("_", " ")
+    return result.rename(columns=rename)
+
+
+def _bang_doi_chieu_hien_thi(chenh_lech: list[dict]) -> pd.DataFrame:
+    result = pd.DataFrame(chenh_lech)
+    if result.empty:
+        return result
+    for col in ("HSTD", "Điện báo", "Chênh lệch"):
+        if col in result.columns:
+            result[col] = pd.to_numeric(result[col], errors="coerce").apply(fmt_ty)
+    if "Tỷ lệ %" in result.columns:
+        result["Tỷ lệ %"] = pd.to_numeric(result["Tỷ lệ %"], errors="coerce").apply(
+            lambda value: f"{value:+.2f}".replace(".", ",") + "%"
+        )
+    return result.rename(
+        columns={
+            "HSTD": "HSTD (triệu đồng)",
+            "Điện báo": "Điện báo (triệu đồng)",
+            "Chênh lệch": "Chênh lệch (triệu đồng)",
+        }
+    )
 
 
 def _build_ss_table(
@@ -86,11 +133,17 @@ def _build_ss_table(
     # ── Đọc data hiện tại ──
     try:
         data_ht = doc_dienbao_matrix(fp_ht, ts_file(fp_ht), sheet_name=sheet_ht)
-    except Exception:
+    except Exception as matrix_error:
+        logger.warning(
+            "Đọc Điện báo matrix thất bại, thử format dọc: %s",
+            matrix_error,
+            exc_info=True,
+        )
         try:
             rows_ht = doc_dienbao(fp_ht, ts_file(fp_ht), sheet_name=sheet_ht)
             data_ht = {"rows": rows_ht, "units": [], "matrix": {}, "ngay_bao_cao": ""}
         except Exception as e:
+            logger.error("Không đọc được Điện báo hiện tại: %s", e, exc_info=True)
             return pd.DataFrame({"Lỗi": [str(e)]}), False, {}, {}
 
     rows_ht = data_ht.get("rows", [])
@@ -136,9 +189,9 @@ def _build_ss_table(
         val_ht = r["val"]
         val_pv = pv_lookup.get(ten, None) if has_prev else None
 
-        if val_pv is not None and val_ht != 0:
+        if val_pv is not None:
             cl = val_ht - val_pv
-            tl = round(cl / val_pv * 100, 2) if val_pv else 0
+            tl = round(cl / val_pv * 100, 2) if val_pv else (100.0 if val_ht else 0.0)
         else:
             cl = None
             tl = None
@@ -185,10 +238,16 @@ def render(tab: DeltaGenerator | None = None, **kwargs) -> None:
         )
 
         col1, col2 = st.columns(2)
+        nam_options = list(range(2024, max(2030, date.today().year) + 1))
         with col1:
             thang = st.selectbox("Tháng", list(range(1, 13)), index=date.today().month - 1, key="khnv_bc_thang")
         with col2:
-            nam = st.selectbox("Năm", list(range(2024, 2031)), index=1, key="khnv_bc_nam")
+            nam = st.selectbox(
+                "Năm",
+                nam_options,
+                index=nam_options.index(date.today().year),
+                key="khnv_bc_nam",
+            )
 
         st.divider()
 
@@ -272,9 +331,18 @@ def render(tab: DeltaGenerator | None = None, **kwargs) -> None:
 
             # ── BUILD SO SÁNH ──
             df_ss, has_prev, db_ht, db_pv = _build_ss_table(fp_ht, sheet_ht, fp_prev, sheet_prev)
+            so_lieu_db = tong_hop_tu_dienbao(
+                sheet_name=sheet_ht,
+                file_path_override=fp_ht,
+            )
+            if "error" not in so_lieu_db:
+                so_lieu = {**so_lieu_db, "thang": thang, "nam": nam}
+                bang_dienbao = so_lieu_db.get("bang_theo_dv", pd.DataFrame())
+            else:
+                st.error(f"❌ Không tổng hợp được Điện báo: {so_lieu_db['error']}")
 
             _is_trieu = db_ht.get("is_trieu", False)
-            _suffix = "tỷ đồng" if _is_trieu else "tr đồng"
+            _suffix = "tỷ đồng" if _is_trieu else "triệu đồng"
             _to_kpi = lambda x: round(x/1000, 1) if _is_trieu else round(x/1e6, 0)
 
             # ── KPI cards nhanh (hàng đầu của bảng) ──
@@ -297,6 +365,7 @@ def render(tab: DeltaGenerator | None = None, **kwargs) -> None:
             # ── Bảng so sánh chính ──
             st.divider()
             st.markdown("### 📋 Bảng so sánh chỉ tiêu")
+            st.caption(f"Đơn vị hiển thị: **{_suffix}**")
 
             if not df_ss.empty:
                 col_display = [c for c in df_ss.columns if not c.startswith("_")]
@@ -325,9 +394,11 @@ def render(tab: DeltaGenerator | None = None, **kwargs) -> None:
             else:
                 st.warning("Không đọc được dữ liệu từ file.")
 
-            # Lưu để xuất báo cáo
-            so_lieu = {"nguon": "Điện báo", "ngay_bao_cao": db_ht.get("ngay_bao_cao", f"T{thang:02d}/{nam}"),
-                        "tong_du_no": 0, "thang": thang, "nam": nam}
+            if so_lieu:
+                st.caption(
+                    f"Đã chuẩn hóa số liệu nguồn từ **{so_lieu.get('don_vi_nguon', 'đồng')}** "
+                    "sang VND để xuất và đối chiếu."
+                )
 
         # ═══════════════════════════════════════════
         # MODE 2: HSTD
@@ -337,14 +408,26 @@ def render(tab: DeltaGenerator | None = None, **kwargs) -> None:
                 st.warning("⚠️ Chưa có dữ liệu HSTD.")
                 return
             so_lieu = tong_hop_so_lieu_thang(df_full, thang=thang, nam=nam)
+            try:
+                ngay_nguon = pd.to_datetime(
+                    so_lieu.get("ngay_bao_cao"),
+                    dayfirst=True,
+                ).date()
+                if (ngay_nguon.month, ngay_nguon.year) != (thang, nam):
+                    st.warning(
+                        f"⚠️ HSTD hiện là snapshot ngày {ngay_nguon.strftime('%d/%m/%Y')}; "
+                        f"tháng/năm đã chọn ({thang:02d}/{nam}) chỉ dùng làm kỳ ghi trên báo cáo."
+                    )
+            except (TypeError, ValueError):
+                pass
 
             st.markdown("### 📊 Số liệu từ HSTD")
             kpi_row([
-                {"label": "Tổng dư nợ", "value": so_lieu.get("tong_du_no", 0), "icon": "💰", "suffix": "đồng", "precision": 0},
-                {"label": "Nợ quá hạn", "value": so_lieu.get("du_no_qua_han", 0), "icon": "⚠️", "suffix": "đồng", "precision": 0,
+                {"label": "Tổng dư nợ", "value": so_lieu.get("tong_du_no", 0) / 1e9, "icon": "💰", "suffix": "tỷ", "precision": 3},
+                {"label": "Nợ quá hạn", "value": so_lieu.get("du_no_qua_han", 0) / 1e9, "icon": "⚠️", "suffix": "tỷ", "precision": 3,
                  "delta": so_lieu.get("ty_le_no_qua_han", 0), "delta_label": "%", "delta_color": "inverse"},
                 {"label": "Số KH", "value": so_lieu.get("so_khach_hang", 0), "icon": "👥", "suffix": "", "precision": 0},
-                {"label": "Giải ngân tháng", "value": so_lieu.get("giai_ngan_trong_thang", 0), "icon": "📤", "suffix": "đồng", "precision": 0},
+                {"label": "Giải ngân tháng", "value": so_lieu.get("giai_ngan_trong_thang", 0) / 1e9, "icon": "📤", "suffix": "tỷ", "precision": 3},
             ], num_columns=4)
 
             bang_pgd = so_lieu.get("bang_pgd", pd.DataFrame())
@@ -354,11 +437,11 @@ def render(tab: DeltaGenerator | None = None, **kwargs) -> None:
             st.divider()
             t1, t2, t3 = st.tabs(["📋 Theo PGD", "📑 Chương trình", "🤝 Ủy thác"])
             with t1:
-                st.dataframe(bang_pgd, use_container_width=True, hide_index=True) if not bang_pgd.empty else st.info("—")
+                st.dataframe(_bang_hstd_hien_thi(bang_pgd), use_container_width=True, hide_index=True) if not bang_pgd.empty else st.info("—")
             with t2:
-                st.dataframe(bang_ct, use_container_width=True, hide_index=True) if not bang_ct.empty else st.info("—")
+                st.dataframe(_bang_hstd_hien_thi(bang_ct), use_container_width=True, hide_index=True) if not bang_ct.empty else st.info("—")
             with t3:
-                st.dataframe(bang_uy_thac, use_container_width=True, hide_index=True) if not bang_uy_thac.empty else st.info("—")
+                st.dataframe(_bang_hstd_hien_thi(bang_uy_thac), use_container_width=True, hide_index=True) if not bang_uy_thac.empty else st.info("—")
 
         # ═══════════════════════════════════════════
         # MODE 3: ĐỐI CHIẾU
@@ -372,15 +455,46 @@ def render(tab: DeltaGenerator | None = None, **kwargs) -> None:
                 st.warning("⚠️ Chưa có Điện báo.")
                 return
 
+            from data.hstd import liet_ke_sheet_dienbao
+            sheets_db = liet_ke_sheet_dienbao(fp_db)
+            sheet_options_db = [item["sheet"] for item in sheets_db]
+            if not sheet_options_db:
+                st.warning("⚠️ File Điện báo không có sheet dữ liệu.")
+                return
+            default_sheet = "DB1" if "DB1" in sheet_options_db else (
+                "M" if "M" in sheet_options_db else sheet_options_db[0]
+            )
+            sheet_db = st.selectbox(
+                "Sheet Điện báo dùng để đối chiếu",
+                sheet_options_db,
+                index=sheet_options_db.index(default_sheet),
+                key="khnv_compare_sheet",
+            )
             so_lieu = tong_hop_so_lieu_thang(df_full, thang=thang, nam=nam)
-            so_lieu_db = tong_hop_tu_dienbao(sheet_name="DB1")
+            so_lieu_db = tong_hop_tu_dienbao(
+                sheet_name=sheet_db,
+                file_path_override=fp_db,
+            )
             if "error" not in so_lieu_db:
                 chenh_lech = so_sanh_hstd_vs_dienbao(so_lieu, so_lieu_db)
                 so_lieu["nguon"] = "HSTD + Điện báo"
 
             st.markdown("### 🔄 Đối chiếu HSTD vs Điện báo")
             if chenh_lech:
-                st.dataframe(pd.DataFrame(chenh_lech), use_container_width=True, hide_index=True)
+                so_khop = sum(item.get("Cảnh báo") == "✅" for item in chenh_lech)
+                so_canh_bao = len(chenh_lech) - so_khop
+                max_tl = max(abs(float(item.get("Tỷ lệ %", 0))) for item in chenh_lech)
+                kpi_row([
+                    {"label": "Chỉ tiêu đã kiểm tra", "value": len(chenh_lech), "icon": "🔎", "precision": 0},
+                    {"label": "Khớp trong 1%", "value": so_khop, "icon": "✅", "precision": 0},
+                    {"label": "Cần kiểm tra", "value": so_canh_bao, "icon": "⚠️", "precision": 0},
+                    {"label": "Lệch lớn nhất", "value": max_tl, "icon": "📐", "suffix": "%", "precision": 2},
+                ], num_columns=4)
+                st.dataframe(
+                    _bang_doi_chieu_hien_thi(chenh_lech),
+                    use_container_width=True,
+                    hide_index=True,
+                )
             else:
                 st.info("Không có dữ liệu đối chiếu.")
 

@@ -9,11 +9,11 @@ Ghi lại các yêu cầu/user feedback của người dùng để tiện theo d
 - [ ] Refactor `tabs/tab_tien_do_nop.py` sang gọi service chung, giảm logic xử lý trực tiếp trong tab
 - [ ] Refactor `scripts/nhac_deadline.py` dùng chung service với UI để tránh lệch trạng thái nhắc hạn
 - [ ] Thêm health-check nguồn Google Sheets: credentials, kết nối, dữ liệu rỗng bất thường, lần cập nhật gần nhất
-- [ ] Chuẩn hóa quản lý danh mục báo cáo, deadline và chống stale config cho `allowlist` Telegram
+- [x] Chuẩn hóa quản lý danh mục báo cáo, deadline và chống stale config cho `allowlist` Telegram
 - [ ] Bổ sung log/nhật ký đầy đủ cho thao tác override thủ công: ai sửa, lúc nào, vì lý do gì
 - [ ] Thêm dashboard điều hành tại `Tiến độ nộp BC`: KPI đúng hạn/trễ/chưa nộp, top PGD trễ, top loại báo cáo quá hạn
 - [ ] Chuẩn hóa export Excel/PDF dùng cùng nguồn dữ liệu đã xử lý
-- [ ] Bổ sung test/regression cho rule trạng thái báo cáo PGD và danh sách cần nhắc Telegram
+- [x] Bổ sung test/regression cho rule trạng thái báo cáo PGD và danh sách cần nhắc Telegram
 
 Tham chiếu chi tiết: `KE_HOACH_BAO_CAO_PGD.md`
 

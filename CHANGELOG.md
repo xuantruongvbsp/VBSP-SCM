@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## [2026-07-18] — Hoàn thiện xuất báo cáo Excel/PDF tab Nợ Đến Hạn
+- `tabs/tab_den_han.py` dòng ~53–292 — thêm 6 helper mới: `_fmt_trieu()`, `_build_thang_stats()`, `_build_nhom_stats()`, `_build_chi_tiet_sheet()`, `_xay_dung_sheets_excel()` (8 sheets: Tổng hợp, Theo tháng, PGD, Xã, Hội, Tổ, Chi tiết, NQ11), `_xuat_pdf_den_han()` (biểu đồ bar urgency theo tháng + bảng chi tiết dùng `xuat_pdf_co_chart()`); refactor export inline trong sub-tab "Danh sách" → gọi helper; bỏ import `nut_xuat_pdf`
+
+## [2026-07-18] — Nâng cấp điều hành Mã NĐT nguồn vốn địa phương
+- `tabs/tab_quan_ly_ndt_dp.py` — thêm khối tình trạng mã mới từ HSTD: cảnh báo số cặp mã chưa rule, dư nợ ảnh hưởng, số món, lượt PGD phát sinh, bảng theo chương trình và top mã ưu tiên xử lý theo dư nợ
+- `tabs/tab_quan_ly_ndt_dp.py` — thêm nút chuyển nhanh sang danh sách `🆕 Mã mới từ HSTD` để gắn rule ngay sau khi xem tóm tắt
+- `CHANGELOG.md` — ghi nhận nâng cấp UX điều hành cho chuyên đề Nguồn vốn địa phương
+
 ## [2026-07-18] — Sửa vị trí dòng TỔNG CỘNG trong bảng Tóm tắt hiện trạng KHTD
 - `tabs/tab_khtd_xuat.py` dòng ~247-256 — chuyển dòng "TỔNG CỘNG" (tổng toàn bảng) từ sau "TỔNG CỘNG PHẦN I" xuống sau "TỔNG CỘNG PHẦN II" (cuối bảng), tránh hiển thị tổng trước khi người đọc thấy dữ liệu Phần II
 

@@ -23,7 +23,7 @@ from config import (
 )
 from data.den_han import tinh_den_han_df, canh_bao_tap_trung
 from data.hstd import danh_dau_khong_hd_cached
-from pdf_service import xuat_pdf_group_header, nut_xuat_pdf
+from pdf_service import xuat_pdf_group_header
 from utils import fmt_ty, fmt_so, xuat_excel, ten_file_xuat, hien_thi_dataframe_phan_trang
 from state_manager import SCMStateManager
 
@@ -56,6 +56,249 @@ def _selectbox_safe(label: str, options: list, key: str):
     prev = st.session_state.get(key)
     index = 0 if prev not in options else int(options.index(prev))
     return st.selectbox(label, options=options, index=index, key=key)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# EXPORT HELPERS — Excel & PDF
+# ══════════════════════════════════════════════════════════════════════════════
+
+
+def _fmt_trieu(x) -> str:
+    """Format số triệu đồng kiểu VN."""
+    try:
+        v = float(x)
+        return f"{v:,.0f}".replace(",", ".")
+    except (ValueError, TypeError):
+        return str(x)
+
+
+def _build_thang_stats(df_loc: pd.DataFrame) -> pd.DataFrame:
+    """Xây dựng bảng thống kê theo tháng (12 tháng tới) cho export."""
+    if df_loc.empty or "Ngày đến hạn" not in df_loc.columns:
+        return pd.DataFrame()
+    df_n = df_loc.copy()
+    df_n["_ngay_dh"] = pd.to_datetime(df_n["Ngày đến hạn"], errors="coerce")
+    df_n["_thang_label"] = df_n["_ngay_dh"].dt.strftime("%m/%Y")
+    df_n["_sort_key"] = df_n["_ngay_dh"].dt.to_period("M")
+    df_n = df_n.dropna(subset=["_thang_label"])
+
+    stats = (
+        df_n.groupby(["_sort_key", "_thang_label"], sort=True)
+        .agg(**{"Số khoản": (COT_TONG_DU_NO, "count"), "Dư nợ (VND)": (COT_TONG_DU_NO, "sum")})
+        .reset_index()
+        .sort_values("_sort_key")
+    )
+    tong_dn = pd.to_numeric(stats["Dư nợ (VND)"], errors="coerce").sum()
+    stats["Dư nợ (triệu đồng)"] = (stats["Dư nợ (VND)"] / 1e6).round(0)
+    stats["Tỷ trọng %"] = (
+        (stats["Dư nợ (VND)"] / tong_dn * 100) if tong_dn > 0 else 0
+    ).round(1)
+    # Format hiển thị
+    out = pd.DataFrame({
+        "Tháng": stats["_thang_label"].values,
+        "Số khoản": stats["Số khoản"].apply(fmt_so).values,
+        "Dư nợ (triệu đồng)": stats["Dư nợ (triệu đồng)"].apply(_fmt_trieu).values,
+        "Tỷ trọng %": stats["Tỷ trọng %"].apply(lambda x: f"{x:.1f}".replace(".", ",") + "%").values,
+    })
+    return out
+
+
+def _build_nhom_stats(df_loc: pd.DataFrame, cot_nhom: str, ten_nhom: str) -> pd.DataFrame:
+    """Xây dựng bảng thống kê theo nhóm (PGD/Xã/Hội/Tổ)."""
+    if df_loc.empty or cot_nhom not in df_loc.columns:
+        return pd.DataFrame()
+    agg = (
+        df_loc.groupby(cot_nhom, sort=False)
+        .agg(**{
+            "Số khoản": (COT_MA_KH if COT_MA_KH in df_loc.columns else cot_nhom, "count"),
+            "_du_no": (COT_TONG_DU_NO, "sum"),
+        })
+        .reset_index()
+        .sort_values("_du_no", ascending=False)
+    )
+    out = pd.DataFrame({
+        ten_nhom: agg[cot_nhom].values,
+        "Số khoản": agg["Số khoản"].apply(fmt_so).values,
+        "Dư nợ (triệu đồng)": (agg["_du_no"] / 1e6).round(0).apply(_fmt_trieu).values,
+    })
+    return out
+
+
+def _build_chi_tiet_sheet(df_loc: pd.DataFrame) -> pd.DataFrame:
+    """Xây dựng sheet chi tiết cho Excel."""
+    cols = [c for c in [
+        COT_TEN_PGD, COT_TEN_KH, COT_TEN_CT, COT_SO_KU,
+        COT_TONG_DU_NO, "Ngày đến hạn", "Số tháng có thể gia hạn",
+    ] if c in df_loc.columns]
+    df = df_loc[cols].copy()
+    if "Ngày đến hạn" in df.columns:
+        df["Ngày đến hạn"] = pd.to_datetime(
+            df["Ngày đến hạn"], errors="coerce"
+        ).dt.strftime("%d/%m/%Y").fillna("")
+    if COT_TONG_DU_NO in df.columns:
+        df[COT_TONG_DU_NO] = pd.to_numeric(
+            df[COT_TONG_DU_NO], errors="coerce"
+        ).apply(fmt_ty)
+    return df.sort_values("Ngày đến hạn" if "Ngày đến hạn" in df.columns else cols[0]).reset_index(drop=True)
+
+
+def _xay_dung_sheets_excel(
+    df_loc: pd.DataFrame,
+    den_thang: int,
+    _co_db: bool = False,
+) -> dict[str, pd.DataFrame]:
+    """Xây dựng dict sheets đầy đủ cho export Excel."""
+    sheets: dict[str, pd.DataFrame] = {}
+
+    # 1. Tổng hợp
+    tong_khoan = len(df_loc)
+    tong_tien = pd.to_numeric(df_loc[COT_TONG_DU_NO], errors="coerce").sum()
+    so_pgd = df_loc[COT_TEN_PGD].nunique() if COT_TEN_PGD in df_loc.columns else 0
+    so_xa = df_loc[COT_TEN_XA].nunique() if COT_TEN_XA in df_loc.columns else 0
+    so_to = df_loc[COT_TEN_TO].nunique() if COT_TEN_TO in df_loc.columns else 0
+
+    th_data = {
+        "Chỉ tiêu": [
+            "Khoảng thời gian", "Số khoản đến hạn", "Dư nợ đến hạn (triệu đồng)",
+            "Số PGD", "Số Xã/Phường", "Số Tổ TK&VV",
+        ],
+        "Giá trị": [
+            f"{den_thang} tháng", fmt_so(tong_khoan), fmt_ty(tong_tien),
+            fmt_so(so_pgd), fmt_so(so_xa), fmt_so(so_to),
+        ],
+    }
+    sheets["Tổng hợp"] = pd.DataFrame(th_data)
+
+    # 2. Theo tháng
+    th_thang = _build_thang_stats(df_loc)
+    if not th_thang.empty:
+        sheets["Theo tháng"] = th_thang
+
+    # 3. Theo PGD
+    th_pgd = _build_nhom_stats(df_loc, COT_TEN_PGD, "PGD")
+    if not th_pgd.empty:
+        sheets["Theo PGD"] = th_pgd
+
+    # 4. Theo Xã
+    th_xa = _build_nhom_stats(df_loc, COT_TEN_XA, "Xã/Phường")
+    if not th_xa.empty:
+        sheets["Theo Xã"] = th_xa
+
+    # 5. Theo Hội đoàn thể
+    th_hoi = _build_nhom_stats(df_loc, COT_DVUT, "Hội đoàn thể")
+    if not th_hoi.empty:
+        sheets["Theo Hội"] = th_hoi
+
+    # 6. Theo Tổ TK&VV
+    th_to = _build_nhom_stats(df_loc, COT_TEN_TO, "Tổ TK&VV")
+    if not th_to.empty:
+        sheets["Theo Tổ"] = th_to
+
+    # 7. Chi tiết
+    sheets["Chi tiết"] = _build_chi_tiet_sheet(df_loc)
+
+    # 8. NQ11 (nếu có)
+    if _co_db and "_ct_db" in df_loc.columns:
+        df_nq11 = df_loc[df_loc["_ct_db"].str.contains("NQ11")]
+        if not df_nq11.empty:
+            cols_nq11 = [c for c in [
+                COT_TEN_PGD, COT_TEN_KH, COT_SO_KU, COT_TEN_CT,
+                COT_TONG_DU_NO, "Ngày đến hạn",
+            ] if c in df_nq11.columns]
+            df_nq11_xuat = df_nq11[cols_nq11].copy()
+            if "Ngày đến hạn" in df_nq11_xuat.columns:
+                df_nq11_xuat["Ngày đến hạn"] = pd.to_datetime(
+                    df_nq11_xuat["Ngày đến hạn"], errors="coerce"
+                ).dt.strftime("%d/%m/%Y").fillna("")
+            if COT_TONG_DU_NO in df_nq11_xuat.columns:
+                df_nq11_xuat[COT_TONG_DU_NO] = pd.to_numeric(
+                    df_nq11_xuat[COT_TONG_DU_NO], errors="coerce"
+                ).apply(fmt_ty)
+            sheets["NQ11"] = df_nq11_xuat
+
+    return sheets
+
+
+def _xuat_pdf_den_han(
+    df_loc: pd.DataFrame,
+    den_thang: int,
+    username: str,
+) -> bytes:
+    """Xuất PDF hoàn chỉnh: biểu đồ phân bổ theo tháng + bảng chi tiết."""
+    from components.export_pdf import xuat_pdf_co_chart
+
+    # Build biểu đồ phân bổ theo tháng
+    figs = []
+    th_thang = _build_thang_stats(df_loc)
+    if not th_thang.empty:
+        try:
+            import plotly.graph_objects as go
+
+            # Đọc lại số thô cho chart
+            df_chart = df_loc.copy()
+            df_chart["_ngay_dh"] = pd.to_datetime(df_chart["Ngày đến hạn"], errors="coerce")
+            df_chart["_thang_label"] = df_chart["_ngay_dh"].dt.strftime("%m/%Y")
+            df_chart["_sort_key"] = df_chart["_ngay_dh"].dt.to_period("M")
+            df_chart = df_chart.dropna(subset=["_thang_label"])
+
+            stats = (
+                df_chart.groupby(["_sort_key", "_thang_label"], sort=True)
+                .agg(du_no=(COT_TONG_DU_NO, "sum"), so_khoan=(COT_TONG_DU_NO, "count"))
+                .reset_index()
+                .sort_values("_sort_key")
+            )
+            _today_period = pd.Period(pd.Timestamp.today().strftime("%Y-%m"), freq="M")
+            stats["_thang_so"] = stats["_sort_key"].apply(
+                lambda p: max(0, (p - _today_period).n)
+            )
+
+            def _mau(n: int) -> str:
+                if n <= 2: return "#EF5350"
+                if n <= 4: return "#FF7043"
+                if n <= 6: return "#FFA726"
+                return "#66BB6A"
+
+            du_no_tr = (stats["du_no"] / 1e6).round(0)
+            colors_bar = [_mau(int(t)) for t in stats["_thang_so"]]
+
+            fig = go.Figure(go.Bar(
+                x=stats["_thang_label"],
+                y=du_no_tr,
+                text=du_no_tr.apply(lambda x: f"{x:,.0f}".replace(",", ".")),
+                textposition="outside",
+                marker_color=colors_bar,
+                customdata=stats["so_khoan"],
+                hovertemplate=(
+                    "<b>%{x}</b><br>Dư nợ: %{y:,.0f} triệu<br>"
+                    "Số khoản: %{customdata}<extra></extra>"
+                ),
+            ))
+            fig.update_layout(
+                title=f"Phân bổ dư nợ đến hạn theo tháng (trong {den_thang} tháng)",
+                xaxis_title="Tháng đến hạn",
+                yaxis_title="Dư nợ (triệu đồng)",
+                height=400,
+                margin=dict(t=50, b=40, l=10, r=10),
+                showlegend=False,
+            )
+            figs.append((fig, f"Phân bổ dư nợ đến hạn {den_thang} tháng tới"))
+        except Exception as _e:
+            logger.error("_xuat_pdf_den_han chart: %s", _e, exc_info=True)
+
+    # Build bảng chi tiết
+    df_pdf = _build_chi_tiet_sheet(df_loc)
+
+    return xuat_pdf_co_chart(
+        df=df_pdf,
+        tieu_de=f"Báo cáo Khoản vay Đến hạn trong {den_thang} tháng",
+        nguoi_xuat=username,
+        figs=figs if figs else None,
+        cols_tien=[COT_TONG_DU_NO],
+        don_vi_tien="triệu đồng",
+        prefix_file=f"DenHan_{den_thang}thang",
+        them_dong_tong=False,
+        them_ngay_xuat=True,
+    )
 
 
 def _render_to_tkv(
@@ -682,43 +925,13 @@ def render(tab=None, role: str = None, **kwargs) -> None:
 
             hien_thi_dataframe_phan_trang(df_ct, key="dh_tbl_ds", height=420)
 
-            if COT_TEN_PGD in _df_loc_ds.columns:
-                df_th_pgd = (
-                    _df_loc_ds.groupby(COT_TEN_PGD)
-                    .agg(**{
-                        "Số khoản": (COT_TONG_DU_NO, "count"),
-                        "Dư nợ (triệu đ)": (COT_TONG_DU_NO, "sum"),
-                    })
-                    .reset_index()
-                    .sort_values("Dư nợ (triệu đ)", ascending=False)
-                )
-                df_th_pgd["Dư nợ (triệu đ)"] = df_th_pgd["Dư nợ (triệu đ)"].apply(fmt_ty)
-                sheets_xuat = {"TH_PGD": df_th_pgd, "Chi tiết": df_ct}
-            else:
-                sheets_xuat = {"Chi tiết": df_ct}
-
-            # Sheet riêng NQ11 vào Excel nếu có
-            if _co_db_ds:
-                _df_nq11_ds = df_loc[df_loc["_ct_db"].str.contains("NQ11")]
-                if not _df_nq11_ds.empty:
-                    _cols_nq11 = [c for c in [
-                        COT_TEN_PGD, COT_TEN_KH, COT_SO_KU, COT_TEN_CT, COT_TONG_DU_NO, "Ngày đến hạn"
-                    ] if c in _df_nq11_ds.columns]
-                    _df_nq11_xuat = _df_nq11_ds[_cols_nq11].copy()
-                    if "Ngày đến hạn" in _df_nq11_xuat.columns:
-                        _df_nq11_xuat["Ngày đến hạn"] = pd.to_datetime(
-                            _df_nq11_xuat["Ngày đến hạn"], errors="coerce"
-                        ).dt.strftime("%d/%m/%Y").fillna("")
-                    _df_nq11_xuat[COT_TONG_DU_NO] = pd.to_numeric(
-                        _df_nq11_xuat[COT_TONG_DU_NO], errors="coerce"
-                    ).apply(fmt_ty)
-                    sheets_xuat["NQ11"] = _df_nq11_xuat
-
+            # ── Nút xuất báo cáo Excel + PDF ───────────────────────────
             col_ex, col_pdf_tab = st.columns(2)
             with col_ex:
                 if st.button("📥 Tạo Excel", key="btn_gen_den_han_excel",
                              use_container_width=True):
                     try:
+                        sheets_xuat = _xay_dung_sheets_excel(df_loc, den_thang, _co_db)
                         st.session_state["_xls_den_han"] = xuat_excel(sheets_xuat)
                     except Exception as e:
                         logger.error("tab_den_han xuat_excel: %s", e, exc_info=True)
@@ -728,19 +941,35 @@ def render(tab=None, role: str = None, **kwargs) -> None:
                         "📥 Tải Excel",
                         data=st.session_state["_xls_den_han"],
                         file_name=ten_file_xuat(f"DenHan_{den_thang}thang"),
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetsml.sheet",
                         key="btn_xuat_den_han_excel",
                         use_container_width=True,
                     )
             with col_pdf_tab:
-                nut_xuat_pdf(
-                    df=df_ct,
-                    tieu_de=f"Hồ sơ đến hạn trong {den_thang} tháng",
-                    username=kwargs.get("username", ""),
-                    cols_tien=[COT_TONG_DU_NO],
-                    prefix_file=f"DenHan_{den_thang}thang",
-                    key="btn_pdf_den_han",
-                )
+                if st.button("📄 Tạo PDF", key="btn_gen_pdf_den_han",
+                             use_container_width=True):
+                    try:
+                        username = kwargs.get("username", st.session_state.get("username", "VBSP-SCM"))
+                        pdf_bytes = _xuat_pdf_den_han(df_loc, den_thang, username)
+                        state.downloads.set(
+                            "den_han_full_pdf",
+                            pdf_bytes,
+                            f"DenHan_{den_thang}thang_{datetime.now().strftime('%d%m%Y_%H%M')}.pdf",
+                        )
+                    except Exception as e:
+                        logger.error("tab_den_han _xuat_pdf_den_han: %s", e, exc_info=True)
+                        st.error(f"❌ Lỗi xuất PDF: {e}")
+                if state.downloads.has("den_han_full_pdf"):
+                    if st.download_button(
+                        "� Tải PDF",
+                        data=state.downloads.get_bytes("den_han_full_pdf"),
+                        file_name=state.downloads.get_filename("den_han_full_pdf")
+                            or f"DenHan_{den_thang}thang_{datetime.now().strftime('%d%m%Y_%H%M')}.pdf",
+                        mime="application/pdf",
+                        key="btn_dl_pdf_den_han",
+                        use_container_width=True,
+                    ):
+                        state.downloads.clear("den_han_full_pdf")
     else:
         st.info("Không có khoản vay đến hạn trong khoảng thời gian đã chọn.")
 

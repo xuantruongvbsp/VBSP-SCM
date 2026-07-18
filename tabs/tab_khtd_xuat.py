@@ -244,10 +244,10 @@ def _hien_thi_bang_cn_readonly(
         _td(_fvn(tong_con_phai_th, 0), "right", "#1f2937", TONG_BG, "bold") +
         _td(f"{_fvn(tong_tl, 1)}%" if tong_tl is not None else "—", "right", _tl_color(tong_tl), TONG_BG, "bold")
     )
-    # Chèn TỔNG CỘNG vào giữa PHẦN I và PHẦN II (ngang với I và II)
+    # Chèn TỔNG CỘNG vào cuối bảng (sau TỔNG CỘNG PHẦN II)
     insert_idx = None
     for _i, _row in enumerate(html_rows):
-        if "TỔNG CỘNG PHẦN I" in _row:
+        if "TỔNG CỘNG PHẦN II" in _row:
             insert_idx = _i + 1
             break
     if insert_idx is not None:

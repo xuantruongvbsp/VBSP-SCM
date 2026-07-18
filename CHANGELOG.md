@@ -1,5 +1,124 @@
 # CHANGELOG
 
+## [2026-07-18] — Sửa vị trí dòng TỔNG CỘNG trong bảng Tóm tắt hiện trạng KHTD
+- `tabs/tab_khtd_xuat.py` dòng ~247-256 — chuyển dòng "TỔNG CỘNG" (tổng toàn bảng) từ sau "TỔNG CỘNG PHẦN I" xuống sau "TỔNG CỘNG PHẦN II" (cuối bảng), tránh hiển thị tổng trước khi người đọc thấy dữ liệu Phần II
+
+## [2026-07-18] — Hiện ngay danh sách Mã NĐT địa phương mới
+- `tabs/tab_quan_ly_ndt_dp.py` — khi HSTD còn mã NĐT ĐP mới chưa cấu hình, tab `🏷️ Mã NĐT địa phương` tự mở chế độ `🆕 Mã mới từ HSTD` lần đầu trong session để người dùng thấy ngay danh sách phát sinh thay vì đứng ở `📊 Tổng quan`
+- `BUGMAP.md` — thêm J37 ghi nhận lỗi badge báo mã mới nhưng nội dung mặc định không hiện danh sách mới
+- `CHANGELOG.md` — ghi nhận bản sửa điều hướng nội bộ của tab Mã NĐT địa phương
+
+## [2026-07-18] — Fix session cũ giữ menu Nguồn vốn địa phương
+- `workspaces/ws_management.py` — bỏ cache `_mgmt_all_items_cache` trong `render()` để vùng nội dung luôn dùng cấu trúc menu mới nhất giống sidebar; tránh trường hợp click `🏦 Nguồn vốn địa phương` nhưng panel phải vẫn render theo menu cũ hoặc giữ `📊 Thông tin chung`
+- `BUGMAP.md` — thêm J36 ghi nhận lỗi cache danh sách menu/lambda trong session Streamlit làm điều hướng lệch sau khi đổi layout
+- `CHANGELOG.md` — ghi nhận bản sửa bổ sung cho chuyên đề Nguồn vốn địa phương
+
+## [2026-07-18] — Fix không thấy layout mới Nguồn vốn địa phương
+- `workspaces/ws_management.py` — bật page cha `Nguồn vốn địa phương` cho toàn bộ role CN, chỉ ẩn tab `Mã NĐT địa phương` với role không có quyền quản lý; đồng thời map label navigation cũ trước bước validate để session cũ không bị rơi về trang mặc định
+- `CHANGELOG.md` — ghi nhận bản sửa để người dùng thấy layout mới nhất quán
+
+## [2026-07-18] — Hoàn thiện điều hướng Nguồn vốn địa phương
+- `workspaces/ws_management.py` — thêm số lượng mã mới vào nhãn tab `Mã NĐT địa phương`, map các navigation cũ của `Phân tích nguồn vốn`/`Mã NĐT địa phương` về trang cha `Nguồn vốn địa phương`, và bỏ caption điều hướng dư thừa
+- `CHANGELOG.md` — ghi nhận bước hoàn thiện UI cho chuyên đề Nguồn vốn địa phương
+
+## [2026-07-18] — Thêm Tổng quan nhanh cho chuyên đề Nguồn vốn địa phương
+- `workspaces/ws_management.py` — thêm KPI đầu trang cho `🏦 Nguồn vốn địa phương`: dư nợ nguồn ĐP, tỷ trọng ĐP, tổng rule Mã NĐT và số cặp Mã CT + Mã NĐT mới chưa có rule
+- `CHANGELOG.md` — ghi nhận bổ sung lớp tổng quan chung cho chuyên đề Nguồn vốn địa phương
+
+## [2026-07-18] — Gộp Nguồn vốn địa phương thành 1 trang 2 tab con
+- `workspaces/ws_management.py` — đổi `🏦 Nguồn vốn địa phương` từ accordion 2 mục con ở sidebar thành 1 mục duy nhất; bên trong trang dùng 2 tab `Phân tích nguồn vốn` và `Mã NĐT địa phương` để điều hướng cùng ngữ cảnh
+- `CHANGELOG.md` — ghi nhận thay đổi bố cục điều hướng cho chuyên đề Nguồn vốn địa phương
+
+## [2026-07-17] — Báo cáo NQH tuần đổi baseline sang 31/12 năm trước
+- `services/telegram_service.py` — đổi logic tăng/giảm NQH tuần từ snapshot gần nhất sang baseline HSTD `31/12` của năm trước, cộng NQH theo từng PGD từ `doc_baseline_merged()` và hiển thị đúng mốc `31/12/YYYY`
+- `tests/test_telegram_service.py` — cập nhật regression test theo baseline năm trước, kiểm tra cộng dồn NQH nhiều dòng của cùng PGD và mốc `31/12/2025`
+- `CHANGELOG.md` — ghi nhận thay đổi quy tắc baseline cho Báo cáo NQH tuần
+
+## [2026-07-18] — Báo cáo NQH tuần thêm số liệu tăng giảm trong kỳ
+- `services/telegram_service.py` — lấy snapshot gần nhất trước tháng số liệu, hiển thị chênh lệch NQH tổng Chi nhánh và từng PGD, ghi rõ ngày mốc; thiếu snapshot vẫn gửi báo cáo bình thường; đồng thời chuẩn hóa định dạng số Việt Nam và giữ một số lẻ cho chênh lệch dưới 1 triệu đồng
+- `tests/test_telegram_service.py` — thêm regression test cho định dạng tăng/giảm, định dạng tổng dư nợ và lựa chọn đúng snapshot trước kỳ hiện tại
+- `BUGMAP.md` — thêm B35 ghi nhận lỗi định dạng tổng dư nợ và chênh lệch nhỏ trong tin NQH tuần
+- `CHANGELOG.md` — ghi nhận phần biến động NQH trong Báo cáo NQH tuần
+
+## [2026-07-18] — Fix Báo cáo NQH tuần lỗi import CACHE_HSTD
+- `tabs/tab_telegram_admin.py` — import `CACHE_HSTD` đúng từ `config.py`, dùng `Path(CACHE_HSTD).exists()` và sửa đồng bộ 7 nhánh gửi báo cáo Telegram dùng dữ liệu HSTD
+- `BUGMAP.md` — thêm B34 ghi nhận lỗi Telegram Admin import constant từ sai module và gọi `.exists()` trực tiếp trên chuỗi đường dẫn
+- `CHANGELOG.md` — ghi nhận bản sửa Báo cáo NQH tuần
+
+## [2026-07-18] — Fix nhấp parent Nguồn vốn địa phương không đổi nội dung
+- `workspaces/ws_management.py` — khi nhấp một mục accordion ở sidebar, đồng thời chọn child đầu tiên; nhấp `🏦 Nguồn vốn địa phương` giờ mở menu con và hiển thị ngay `📊 Phân tích nguồn vốn` bên phải, kể cả accordion đang lưu trạng thái mở từ trước
+- `BUGMAP.md` — thêm J35 ghi nhận handler accordion chỉ mở menu nhưng không cập nhật state điều hướng
+- `CHANGELOG.md` — ghi nhận bản sửa hành vi nhấp parent accordion
+
+## [2026-07-17] — Hoàn thiện fix điều hướng accordion Nguồn vốn địa phương
+- `workspaces/ws_management.py` — chuẩn hóa `active_label` từ label parent accordion sang child đầu tiên ở cả sidebar lẫn phần render chính, nên session cũ lưu `🏦 Nguồn vốn địa phương` sẽ mở đúng `📊 Phân tích nguồn vốn` thay vì chỉ chữa phần thân tab
+- `BUGMAP.md` — ghi nhận lỗi state điều hướng giữ label parent không render được child tương ứng
+- `CHANGELOG.md` — ghi nhận bước hoàn thiện fix điều hướng này
+
+## [2026-07-17] — Fix tab Nguồn vốn địa phương không hiển thị nội dung khi là admin_cn/manager_cn
+- `workspaces/ws_management.py` dòng ~474 — thêm nhánh xử lý: khi parent accordion item không có `fn` nhưng có `children`, tự động render child đầu tiên (thay vì hiển thị "đang phát triển")
+
+## [2026-07-17] — Review/fix validate_data và test tongquan sau đợt tách module
+- `scripts/validate_data.py` — bổ sung check `Mã tổ` vào nhóm mã bắt buộc của HSTD, tách kiểm danh mục đơn vị theo từng parquet (`HSTD` bắt buộc đủ 22 đơn vị; `NQ11` chỉ báo thông tin khi thiếu dữ liệu), và rút gọn báo cáo cột chưa map `COT_*` để còn đúng 2 cảnh báo nghiệp vụ thật: 594 dòng thiếu `Mã tổ`, 14 dòng trùng khóa
+- `tests/test_tongquan_service.py` — thay bộ test lỏng bằng 15 assertion chặt hơn, phục hồi coverage quan trọng cho `tinh_tqpgd_extended`/đến hạn, dùng `COT_*` đúng convention và vẫn giữ baseline 15/15 pass
+- `BUGMAP.md` — thêm lỗi validate bỏ sót `Mã tổ` và lỗi test ghi đè coverage cũ
+- `CHANGELOG.md` — ghi nhận đợt review/fix này
+
+## [2026-07-17] — Mở rộng validate_data.py + tests tongquan_service
+- `scripts/validate_data.py` — thêm check NQ11 (giá trị âm, DNO, số PGD), GQVL (số PGD), phát hiện cột lạ trong HSTD không có trong config; phát hiện 2 cảnh báo thật: 594 dòng thiếu Mã tổ, 14 dòng trùng khóa (PGD, Số khế ước)
+- `tests/test_tongquan_service.py` — tạo mới 15 tests cho các hàm pure: loc_ho_so_con_du_no, tinh_kpi_tongquan, dem_so_to_hstd, tinh_co_cau_ct, loc_du_no_duong, chuan_hoa_ngay, ap_dung_loc_ket_hop, tong_chi_tieu_den_han — 15/15 pass
+
+## [2026-07-17] — Tách file tab_xu_ly_rui_ro.py: chuyển 3 sub-tab lớn sang services/xlrr_subtabs.py
+- `services/xlrr_subtabs.py` — tạo mới, chứa `_subtab_lap_hs_pgd`, `_subtab_tong_hop_cn`, `_subtab_gui_cn_pgd` + helpers `_cap_nhat_hs`/`_xoa_hs`/`_hs_to_du_lieu_02` + constants `LABEL_TW/LABEL_DP/BIEN_PHAP_*/TRANG_THAI_BADGE` (move nguyên vẹn, không đổi logic)
+- `tabs/tab_xu_ly_rui_ro.py` — giảm 2210 → 701 dòng; import 3 sub-tab + `TRANG_THAI_BADGE` từ `services.xlrr_subtabs`; dọn imports không còn dùng (uuid, dataclasses, COT_*, HoSoRuiRo, word_xln_service, xlrr_export_service...)
+
+## [2026-07-17] — Gộp menu nguồn vốn địa phương và quét mã NĐT mới từ HSTD
+- `workspaces/ws_management.py` — gộp “Nguồn vốn địa phương” và “Mã NĐT địa phương” thành một mục cha trong nhóm Kế hoạch Tín dụng; Admin/Manager CN thấy 2 mục con `Phân tích nguồn vốn` và `Mã NĐT địa phương`
+- `tabs/tab_quan_ly_ndt_dp.py` — thêm chế độ `🆕 Mã mới từ HSTD` để quét cặp `Mã CT + Mã NĐT` nguồn ĐP từ HSTD chi tiết, cho Admin CN gắn thuộc tính hàng loạt và lưu qua `kv_store` kèm audit + clear cache
+- `CHANGELOG.md` — ghi nhận thay đổi tính năng
+
+## [2026-07-17] — Tách file word_xln_service.py thành 2 file
+- `services/word_xln_service_full.py` — tạo mới, chứa 7 hàm template tổng hợp XLN (mẫu 04/05 v2, thông báo kết quả XLRR)
+- `services/word_xln_service.py` — cắt 574 dòng cuối, thêm re-export ở cuối file (tránh circular import)
+- `tests/test_word_xln_service.py` — 31/31 pass, không đổi
+
+## [2026-07-17] — Gỡ card Tổng Top 10 CT khỏi Tổng quan danh mục tín dụng
+- `tabs/tab_tongquan.py` — gỡ card “Tổng Top 10 CT” và phép tính chỉ phục vụ card này; giữ nguyên hai card Nguồn TW/ĐP của Top 10 chương trình
+- `CHANGELOG.md` — ghi nhận thay đổi giao diện
+
+## [2026-07-17] — Gỡ mục Xây dựng KHTD 1-3-5 năm
+- `workspaces/ws_management.py` — gỡ mục “🔭 Xây dựng KHTD 1-3-5 năm” khỏi menu Kế hoạch Tín dụng cấp Chi nhánh
+- `workspaces/ws_operation.py` — gỡ mục “🔭 Xây dựng KHTD TL” tương ứng khỏi nhóm Kế hoạch PGD
+- `CHANGELOG.md` — ghi nhận thay đổi giao diện
+
+## [2026-07-17] — Rà soát và sửa pre-commit, DB logging, validate dữ liệu
+- `pre_commit.bat` — convention check xử lý từng file truyền vào; compile-all không bỏ sót `scripts/*.py`, tránh false negative với script kiểm tra dữ liệu
+- `db.py` — chuẩn hóa `key/username/action/detail` trong `ghi_kv()`, `ghi_audit()`, `ghi_audit_full()` để `None` không làm hỏng audit log và lỗi key rỗng được log rõ
+- `scripts/validate_data.py` — bổ sung kiểm đủ 22 đơn vị, tên đơn vị ngoài danh mục, khóa nghiệp vụ trống, trùng `PGD + Số khế ước`, ngày số liệu không parse/phân tán và sửa schema phụ chỉ áp cho HSTD
+- `BUGMAP.md` — thêm J31 ghi nhận lỗ hổng validate/pre-commit bỏ sót script
+
+## [2026-07-17] — Hoàn thiện pre-commit check và logging hàm đọc DB
+- `pre_commit.bat` — chạy từ đúng thư mục dự án; tự chọn Python qua `VBSP_PYTHON`, `venv`, `.venv` hoặc PATH; xử lý an toàn đường dẫn có khoảng trắng, chỉ compile file `.py` và báo rõ file không tồn tại
+- `scripts/check_conventions.py` — bổ sung `venv` và `backups` vào danh sách thư mục bỏ qua để đồng nhất với compile check
+- `db.py` — các hàm đọc KV/ghi chú giữ nguyên fallback nhưng ghi traceback khi DB hoặc JSON lỗi, không còn im lặng đồng nhất lỗi với trạng thái không có dữ liệu
+- `BUGMAP.md` — thêm J29–J30 ghi nhận lỗi pre-commit phụ thuộc môi trường và hàm đọc DB nuốt lỗi
+- `CHANGELOG.md` — ghi nhận đợt hoàn thiện kiểm soát chất lượng
+
+## [2026-07-17] — Cải thiện kiểm soát chất lượng dự án
+- `pre_commit.bat` — **mới**: script tự động kiểm tra convention + compile toàn project trước commit; chạy `pre_commit.bat` hoặc `pre_commit.bat file1.py file2.py` để chỉ check file cụ thể
+- `db.py` dòng ~812, ~941, ~992 — thêm `logger.error(exc_info=True)` vào 3 `except Exception: pass` nguy hiểm nhất (ghi_kv, ghi_audit, ghi_audit_full) để không nuốt lỗi ghi dữ liệu; các hàm chỉ đọc (doc_*) giữ nguyên pattern return default
+- `scripts/validate_data.py` — **mới**: script kiểm tra toàn vẹn dữ liệu (schema parquet, giá trị âm, nhất quán PGD, số KH/món vay); chạy `python scripts/validate_data.py` độc lập không cần Streamlit
+
+## [2026-07-17] — Di chuyển card Top 10 CT lên Tổng quan danh mục tín dụng
+- `tabs/tab_tongquan.py` — 3 card (Tổng Top 10 CT, Nguồn TW, Nguồn ĐP) di chuyển từ phần Cơ cấu dư nợ lên nhóm cùng các card Tổng quan danh mục tín dụng, dùng chung style `.tq-card`; tính `df_ct` trước grid để lấy tổng Top 10
+
+## [2026-07-17] — Dọn code chết chắc chắn tab Thông tin chung
+- `tabs/tab_tongquan.py` — xóa 8 import không dùng, cache heatmap không có caller, hai biến context không được đọc và một phép gán dư thừa; không thay đổi nghiệp vụ hoặc giao diện
+- `CHANGELOG.md` — ghi nhận việc dọn code chết trong tab Thông tin chung
+
+## [2026-07-16] — Thêm hàng Tổng cộng bảng Cơ cấu dư nợ theo chương trình tín dụng
+- `tabs/tab_tongquan.py` — bảng **Cơ cấu dư nợ theo chương trình tín dụng** (tab 📊 Thông tin chung) hiện có hàng "Tổng cộng" ở cuối, tổng các cột Số món vay, Số KH, Dư nợ, Nguồn TW/ĐP, Dư nợ QH, Dư nợ khoanh, Giải ngân năm, Thu nợ năm; tỷ lệ QH và tỷ trọng tính lại cho tổng
+
 ## [2026-07-16] — Fix lỗi mở màn chọn workspace
 - `app.py` — import `TEN_CHI_NHANH_HIEN_THI` từ `config.py`, sửa `NameError` trong `render_workspace_picker()`
 - `app.py` — đổi hai màu chữ tối hardcode trong workspace picker sang `var(--text-color)` để đạt convention dark mode

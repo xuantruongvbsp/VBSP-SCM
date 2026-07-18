@@ -19,6 +19,9 @@ from config import (
     COT_MA_NDT,
     COT_MA_NHA_DAU_TU,
     COT_NGUON_VON,
+    COT_TEN_CT,
+    COT_TEN_NHA_DAU_TU,
+    COT_TEN_PGD,
     COT_TONG_DU_NO,
 )
 from logger import get_logger
@@ -29,6 +32,14 @@ logger = get_logger(__name__)
 _CAP_OPTS = ["Cấp Tỉnh 🏛️", "Cấp Xã/Khác 🏘️"]
 _CAP_TO = {"Cấp Tỉnh 🏛️": "tinh", "Cấp Xã/Khác 🏘️": "xa"}
 _CAP_FROM = {"tinh": "Cấp Tỉnh 🏛️", "xa": "Cấp Xã/Khác 🏘️"}
+_COL_SO_MON = "Số món"
+_COL_SO_PGD = "Số PGD"
+_COL_TONG_DU_NO = "Tổng dư nợ"
+_COL_TEN_CT_VIEW = "Tên CT"
+_COL_TEN_NDT_VIEW = "Tên NĐT"
+_COL_PGD_PHAT_SINH = "PGD phát sinh"
+_COL_DA_CO_RULE = "Đã có rule"
+_COL_CHUONG_TRINH_VIEW = "Chương trình"
 _CT_META = {
     3: {
         "label": "GQVL ĐP",
@@ -74,6 +85,150 @@ def _action_suffix(ma_ct: int) -> str:
 
 def _ghi_audit_them_sua_xoa(username: str, ma_ct: int, action: str, detail: str) -> None:
     db.ghi_audit(username, action, f"CT{int(ma_ct):02d} · {detail}")
+
+
+def _text_or_empty(value) -> str:
+    if value is None or pd.isna(value):
+        return ""
+    return str(value).strip()
+
+
+def _first_non_empty(series: pd.Series) -> str:
+    for value in series:
+        text = _text_or_empty(value)
+        if text:
+            return text
+    return ""
+
+
+def _join_distinct_short(series: pd.Series, limit: int = 4) -> str:
+    values = []
+    for value in series:
+        text = _text_or_empty(value)
+        if text and text not in values:
+            values.append(text)
+    if len(values) <= limit:
+        return ", ".join(values)
+    return ", ".join(values[:limit]) + f" +{len(values) - limit}"
+
+
+def _normalize_ma_ct(value) -> int | None:
+    text = _text_or_empty(value)
+    if not text:
+        return None
+    try:
+        number = pd.to_numeric(pd.Series([text]), errors="coerce").iloc[0]
+    except Exception:
+        return None
+    if pd.isna(number):
+        return None
+    return int(number)
+
+
+def _is_nguon_von_dp(value) -> bool:
+    text = _text_or_empty(value).lower()
+    if not text:
+        return False
+    compact = text.replace(" ", "")
+    return compact in {"2", "2.0", "đp", "dp", "địaphương", "diaphuong"}
+
+
+def _tong_du_no_series(df: pd.DataFrame) -> pd.Series:
+    if COT_TONG_DU_NO in df.columns:
+        return pd.to_numeric(df[COT_TONG_DU_NO], errors="coerce").fillna(0)
+    du_no_th = (
+        pd.to_numeric(df[COT_DU_NO_TH], errors="coerce").fillna(0)
+        if COT_DU_NO_TH in df.columns
+        else 0
+    )
+    du_no_qh = (
+        pd.to_numeric(df[COT_DU_NO_QH], errors="coerce").fillna(0)
+        if COT_DU_NO_QH in df.columns
+        else 0
+    )
+    return du_no_th + du_no_qh
+
+
+def _quet_ma_tu_hstd(df_full: pd.DataFrame | None, ds_all: list[dict]) -> pd.DataFrame:
+    required = {COT_NGUON_VON, COT_MA_CHUONG_TRINH, COT_MA_NHA_DAU_TU}
+    if df_full is None or df_full.empty or not required.issubset(df_full.columns):
+        return pd.DataFrame()
+
+    cols = [
+        col
+        for col in (
+            COT_NGUON_VON,
+            COT_MA_CHUONG_TRINH,
+            COT_MA_NHA_DAU_TU,
+            COT_TEN_NHA_DAU_TU,
+            COT_TEN_CT,
+            COT_TEN_PGD,
+            COT_TONG_DU_NO,
+            COT_DU_NO_TH,
+            COT_DU_NO_QH,
+        )
+        if col in df_full.columns
+    ]
+    df_work = df_full[cols].copy()
+    df_work = df_work[df_work[COT_NGUON_VON].map(_is_nguon_von_dp)]
+    if df_work.empty:
+        return pd.DataFrame()
+
+    df_work["_ma_ct"] = df_work[COT_MA_CHUONG_TRINH].map(_normalize_ma_ct)
+    df_work["_ma_ndt"] = df_work[COT_MA_NHA_DAU_TU].map(_text_or_empty)
+    df_work = df_work[
+        df_work["_ma_ct"].isin(sorted(_CT_META))
+        & df_work["_ma_ndt"].ne("")
+    ].copy()
+    if df_work.empty:
+        return pd.DataFrame()
+
+    df_work["_tong_du_no"] = _tong_du_no_series(df_work)
+    agg_dict: dict = {
+        _COL_SO_MON: ("_ma_ndt", "size"),
+        _COL_SO_PGD: (COT_TEN_PGD, lambda s: len({_text_or_empty(x) for x in s if _text_or_empty(x)}))
+        if COT_TEN_PGD in df_work.columns
+        else ("_ma_ndt", "size"),
+        _COL_TONG_DU_NO: ("_tong_du_no", "sum"),
+    }
+    if COT_TEN_CT in df_work.columns:
+        agg_dict[_COL_TEN_CT_VIEW] = (COT_TEN_CT, _first_non_empty)
+    if COT_TEN_NHA_DAU_TU in df_work.columns:
+        agg_dict[_COL_TEN_NDT_VIEW] = (COT_TEN_NHA_DAU_TU, _first_non_empty)
+    if COT_TEN_PGD in df_work.columns:
+        agg_dict[_COL_PGD_PHAT_SINH] = (COT_TEN_PGD, _join_distinct_short)
+
+    df_agg = (
+        df_work.groupby(["_ma_ct", "_ma_ndt"], dropna=False)
+        .agg(**agg_dict)
+        .reset_index()
+        .rename(columns={"_ma_ct": "Mã CT", "_ma_ndt": "Mã NĐT"})
+    )
+    if _COL_TEN_CT_VIEW not in df_agg.columns:
+        df_agg[_COL_TEN_CT_VIEW] = df_agg["Mã CT"].map(lambda ma: _CT_META.get(int(ma), {}).get("label", ""))
+    if _COL_TEN_NDT_VIEW not in df_agg.columns:
+        df_agg[_COL_TEN_NDT_VIEW] = ""
+    if _COL_PGD_PHAT_SINH not in df_agg.columns:
+        df_agg[_COL_PGD_PHAT_SINH] = ""
+
+    existing_exact = {
+        (int(item.get("ma_ct", 0) or 0), _text_or_empty(item.get("ma", "")))
+        for item in ds_all
+        if item.get("ma_ct") is not None and _text_or_empty(item.get("ma", ""))
+    }
+    df_agg[_COL_DA_CO_RULE] = df_agg.apply(
+        lambda row: (int(row["Mã CT"]), _text_or_empty(row["Mã NĐT"])) in existing_exact,
+        axis=1,
+    )
+    df_agg[_COL_CHUONG_TRINH_VIEW] = df_agg.apply(
+        lambda row: f"CT {int(row['Mã CT']):02d} — {_text_or_empty(row[_COL_TEN_CT_VIEW]) or _CT_META.get(int(row['Mã CT']), {}).get('label', '')}",
+        axis=1,
+    )
+    df_agg = df_agg.sort_values(
+        by=[_COL_DA_CO_RULE, _COL_TONG_DU_NO, _COL_SO_MON, "Mã CT", "Mã NĐT"],
+        ascending=[True, False, False, True, True],
+    ).reset_index(drop=True)
+    return df_agg
 
 
 def _df_rules(ds: list[dict]) -> pd.DataFrame:
@@ -171,6 +326,230 @@ def _render_tong_quan(ds_all: list[dict]) -> None:
     st.dataframe(df_loc, hide_index=True, use_container_width=True)
 
 
+def _render_tinh_trang_ma_moi(df_full: pd.DataFrame | None, ds_all: list[dict]) -> int:
+    df_scan = _quet_ma_tu_hstd(df_full, ds_all)
+    if df_scan.empty or _COL_DA_CO_RULE not in df_scan.columns:
+        st.caption("Chưa phát hiện mã NĐT ĐP mới từ HSTD hiện tại.")
+        return 0
+
+    df_new = df_scan[~df_scan[_COL_DA_CO_RULE]].copy()
+    so_ma_moi = len(df_new)
+    if so_ma_moi == 0:
+        st.success("Tất cả cặp Mã CT + Mã NĐT nguồn ĐP trong HSTD hiện tại đã có rule.")
+        return 0
+
+    tong_du_no_moi = float(df_new[_COL_TONG_DU_NO].sum())
+    so_mon_moi = int(df_new[_COL_SO_MON].sum())
+    so_pgd_anh_huong = int(df_new[_COL_SO_PGD].sum())
+
+    st.warning(
+        f"Còn **{fmt_so(so_ma_moi)}** cặp Mã CT + Mã NĐT mới, "
+        f"ảnh hưởng **{fmt_ty(tong_du_no_moi)} triệu đồng** dư nợ."
+    )
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Mã mới cần gắn rule", fmt_so(so_ma_moi))
+    c2.metric("Số món liên quan", fmt_so(so_mon_moi))
+    c3.metric("Lượt PGD phát sinh", fmt_so(so_pgd_anh_huong))
+
+    df_ct = (
+        df_new.groupby(_COL_CHUONG_TRINH_VIEW, as_index=False)
+        .agg(
+            **{
+                "Mã mới": ("Mã NĐT", "count"),
+                "Số món": (_COL_SO_MON, "sum"),
+                "Dư nợ (triệu đồng)": (_COL_TONG_DU_NO, "sum"),
+            }
+        )
+        .sort_values("Dư nợ (triệu đồng)", ascending=False)
+    )
+    df_ct["Dư nợ (triệu đồng)"] = df_ct["Dư nợ (triệu đồng)"].apply(fmt_ty)
+
+    df_top = df_new.head(8)[
+        [
+            _COL_CHUONG_TRINH_VIEW,
+            "Mã NĐT",
+            _COL_TEN_NDT_VIEW,
+            _COL_PGD_PHAT_SINH,
+            _COL_SO_MON,
+            _COL_TONG_DU_NO,
+        ]
+    ].rename(
+        columns={
+            _COL_CHUONG_TRINH_VIEW: "Chương trình",
+            _COL_TEN_NDT_VIEW: "Tên NĐT",
+            _COL_PGD_PHAT_SINH: "PGD phát sinh",
+            _COL_SO_MON: "Số món",
+            _COL_TONG_DU_NO: "Dư nợ (triệu đồng)",
+        }
+    )
+    df_top["Dư nợ (triệu đồng)"] = df_top["Dư nợ (triệu đồng)"].apply(fmt_ty)
+
+    col_ct, col_top = st.columns([1, 2])
+    with col_ct:
+        st.markdown("###### Theo chương trình")
+        st.dataframe(df_ct, hide_index=True, use_container_width=True, height=180)
+    with col_top:
+        st.markdown("###### Ưu tiên xử lý theo dư nợ")
+        st.dataframe(df_top, hide_index=True, use_container_width=True, height=260)
+
+    if st.button("Mở danh sách mã mới để gắn rule", key="btn_open_ndt_dp_new", type="primary"):
+        st.session_state["ndt_dp_mode"] = "🆕 Mã mới từ HSTD"
+        st.rerun()
+    return so_ma_moi
+
+
+def _render_ma_moi_tu_hstd(df_full: pd.DataFrame | None, ds_all: list[dict], can_edit: bool, username: str) -> None:
+    st.markdown("##### 🆕 Mã mới từ HSTD chi tiết")
+    st.caption("Quét các cặp `Mã CT + Mã NĐT` thuộc nguồn ĐP trong HSTD, hiện chỉ áp dụng cho CT 03 và CT 06.")
+
+    if df_full is None or df_full.empty:
+        st.info("Chưa có `df_full` để quét HSTD chi tiết.")
+        return
+
+    required = {COT_NGUON_VON, COT_MA_CHUONG_TRINH, COT_MA_NHA_DAU_TU}
+    if not required.issubset(df_full.columns):
+        st.warning("HSTD hiện tại thiếu một trong các cột: `Nguồn vốn`, `Mã chương trình`, `Mã nhà đầu tư`.")
+        return
+
+    df_scan = _quet_ma_tu_hstd(df_full, ds_all)
+    if df_scan.empty:
+        st.info("Không tìm thấy dữ liệu nguồn ĐP thuộc CT 03/CT 06 trong HSTD hiện tại.")
+        return
+
+    df_new = df_scan[~df_scan[_COL_DA_CO_RULE]].copy()
+
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Cặp mã ĐP quét được", fmt_so(len(df_scan)))
+    c2.metric("Mã mới chưa cấu hình", fmt_so(len(df_new)))
+    c3.metric("Dư nợ mã mới (triệu đồng)", fmt_ty(df_new[_COL_TONG_DU_NO].sum() if not df_new.empty else 0))
+
+    if df_new.empty:
+        st.success("Không còn mã NĐT mới nào cần gắn thuộc tính trong HSTD hiện tại.")
+        return
+
+    ct_options = ["Tất cả"] + list(dict.fromkeys(df_new[_COL_CHUONG_TRINH_VIEW].tolist()))
+    ct_chon = st.selectbox("Lọc theo chương trình", ct_options, key="ndt_dp_hstd_ct")
+    df_view = df_new.copy()
+    if ct_chon != "Tất cả":
+        df_view = df_view[df_view[_COL_CHUONG_TRINH_VIEW] == ct_chon].copy()
+
+    df_view["Phát sinh"] = [
+        f"{fmt_so(so_pgd)} PGD · {fmt_so(so_mon)} món · {fmt_ty(tong_du_no)} tr"
+        for so_pgd, so_mon, tong_du_no in zip(
+            df_view[_COL_SO_PGD],
+            df_view[_COL_SO_MON],
+            df_view[_COL_TONG_DU_NO],
+        )
+    ]
+    df_view["Chọn"] = False
+    df_view["Phân loại cấp"] = _CAP_OPTS[0]
+    df_view["Ghi chú"] = df_view[_COL_TEN_NDT_VIEW].astype(str).str.strip()
+
+    editor_cols = [
+        "Chọn",
+        _COL_CHUONG_TRINH_VIEW,
+        "Mã NĐT",
+        _COL_TEN_NDT_VIEW,
+        "Phát sinh",
+        "Phân loại cấp",
+        "Ghi chú",
+    ]
+    df_editor = df_view[editor_cols].copy()
+
+    with st.expander("Chi tiết phát sinh theo PGD", expanded=False):
+        st.dataframe(
+            df_view[
+                [
+                    _COL_CHUONG_TRINH_VIEW,
+                    "Mã NĐT",
+                    _COL_TEN_NDT_VIEW,
+                    _COL_PGD_PHAT_SINH,
+                    _COL_SO_PGD,
+                    _COL_SO_MON,
+                    _COL_TONG_DU_NO,
+                ]
+            ].assign(**{_COL_TONG_DU_NO: lambda x: x[_COL_TONG_DU_NO].apply(fmt_ty)}),
+            hide_index=True,
+            use_container_width=True,
+        )
+
+    if not can_edit:
+        st.warning("⚠️ Chỉ Admin CN mới có thể gắn thuộc tính và lưu các mã mới từ HSTD.")
+        st.dataframe(
+            df_editor.drop(columns=["Chọn", "Phân loại cấp", "Ghi chú"]),
+            hide_index=True,
+            use_container_width=True,
+        )
+        return
+
+    edited = st.data_editor(
+        df_editor,
+        hide_index=True,
+        use_container_width=True,
+        key="ndt_dp_hstd_editor",
+        disabled=[_COL_CHUONG_TRINH_VIEW, "Mã NĐT", _COL_TEN_NDT_VIEW, "Phát sinh"],
+        column_config={
+            "Chọn": st.column_config.CheckboxColumn("Chọn"),
+            "Phân loại cấp": st.column_config.SelectboxColumn("Phân loại cấp", options=_CAP_OPTS, required=True),
+            "Ghi chú": st.column_config.TextColumn("Ghi chú", help="Có thể sửa lại tên/diễn giải trước khi lưu"),
+        },
+    )
+
+    if not st.button("💾 Lưu các mã đã chọn", key="btn_luu_ndt_dp_hstd", type="primary"):
+        return
+
+    df_selected = edited[edited["Chọn"] == True].copy()
+    if df_selected.empty:
+        st.warning("Vui lòng chọn ít nhất 1 mã để lưu.")
+        return
+
+    ds_moi = list(ds_all)
+    existing_exact = {
+        (int(item.get("ma_ct", 0) or 0), _text_or_empty(item.get("ma", "")))
+        for item in ds_all
+        if item.get("ma_ct") is not None and _text_or_empty(item.get("ma", ""))
+    }
+    added_labels: list[str] = []
+
+    for _, row in df_selected.iterrows():
+        chuong_trinh = _text_or_empty(row[_COL_CHUONG_TRINH_VIEW])
+        try:
+            ma_ct = int(chuong_trinh[3:5])
+        except Exception:
+            continue
+        ma_ndt = _text_or_empty(row["Mã NĐT"])
+        cap_label = _text_or_empty(row["Phân loại cấp"])
+        if not ma_ndt or cap_label not in _CAP_TO:
+            continue
+        if (ma_ct, ma_ndt) in existing_exact:
+            continue
+        ds_moi.append(
+            {
+                "ma_ct": ma_ct,
+                "ma": ma_ndt,
+                "ghi_chu": _text_or_empty(row["Ghi chú"]),
+                "cap": _CAP_TO[cap_label],
+            }
+        )
+        existing_exact.add((ma_ct, ma_ndt))
+        added_labels.append(f"CT{ma_ct:02d}:{ma_ndt}")
+
+    if not added_labels:
+        st.warning("Không có mã mới hợp lệ để lưu. Có thể các mã này đã được cấu hình trước đó.")
+        return
+
+    db.luu_ndt_dp_rule_list(ds_moi, username)
+    db.ghi_audit(
+        username,
+        "them_ndt_dp_tu_hstd",
+        f"Thêm {len(added_labels)} mã NĐT ĐP từ HSTD: {', '.join(added_labels[:8])}"
+        + ("..." if len(added_labels) > 8 else ""),
+    )
+    st.cache_data.clear()
+    st.success(f"✅ Đã lưu {len(added_labels)} mã mới từ HSTD.")
+    st.rerun()
+
+
 def _render_danh_sach_theo_cap(ds: list[dict], ma_ct: int) -> None:
     ds_tinh = [x for x in ds if x.get("cap", "tinh") == "tinh"]
     ds_xa = [x for x in ds if x.get("cap", "tinh") == "xa"]
@@ -245,6 +624,7 @@ def _render_them_moi(ds: list[dict], ma_ct: int, can_edit: bool, username: str) 
         f"them_{_action_suffix(ma_ct)}",
         f"Thêm mã {ma_them} ({cap_them})",
     )
+    st.cache_data.clear()
     st.success(f"✅ Đã thêm mã **{ma_them}** cho `{_label_ct(ma_ct)}`.")
     st.rerun()
 
@@ -287,6 +667,7 @@ def _render_chinh_sua(ds: list[dict], ma_ct: int, can_edit: bool, username: str)
                 f"sua_{_action_suffix(ma_ct)}",
                 f"Sửa mã {item['ma']} → ghi chú: {gc_edit}, cấp: {cap_edit}",
             )
+            st.cache_data.clear()
             st.rerun()
         if cols[4].button(
             "🗑️",
@@ -302,6 +683,7 @@ def _render_chinh_sua(ds: list[dict], ma_ct: int, can_edit: bool, username: str)
                 f"xoa_{_action_suffix(ma_ct)}",
                 f"Xóa mã {item['ma']}",
             )
+            st.cache_data.clear()
             st.rerun()
 
 
@@ -436,6 +818,7 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
     """CRUD Mã NĐT địa phương — quản lý theo Mã CT + Mã NĐT."""
     role = kwargs.get("role", "user")
     username = kwargs.get("username", "unknown")
+    df_full = kwargs.get("df_full", kwargs.get("df"))
 
     ctx = tab if tab is not None else st.container()
     with ctx:
@@ -452,15 +835,24 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
         _render_huong_dan()
         _render_kpi_rules(ds_all)
 
+        mode_options = ["📊 Tổng quan", "🆕 Mã mới từ HSTD", "⚙️ Quản lý", "🔎 Phân tích"]
+        so_ma_moi = _render_tinh_trang_ma_moi(df_full, ds_all)
+        auto_open_key = "ndt_dp_auto_opened_new"
+        if so_ma_moi > 0 and not st.session_state.get(auto_open_key):
+            st.session_state["ndt_dp_mode"] = "🆕 Mã mới từ HSTD"
+            st.session_state[auto_open_key] = True
+
         che_do = st.radio(
             "Chế độ",
-            ["📊 Tổng quan", "⚙️ Quản lý", "🔎 Phân tích"],
+            mode_options,
             horizontal=True,
             key="ndt_dp_mode",
         )
 
         if che_do == "📊 Tổng quan":
             _render_tong_quan(ds_all)
+        elif che_do == "🆕 Mã mới từ HSTD":
+            _render_ma_moi_tu_hstd(df_full, ds_all, can_edit, username)
         elif che_do == "⚙️ Quản lý":
             ct_label = st.radio(
                 "Chương trình",

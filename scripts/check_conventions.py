@@ -130,7 +130,8 @@ def _check_darkmode(line: str, neighborhood: str = "") -> str | None:
 
 # ── Các thư mục/file bỏ qua ─────────────────────────────────────────────────
 _SKIP_DIRS  = {"_archive", ".git", "__pycache__", "node_modules",
-               "khtd-targets-app", "tests", "scripts", ".venv", ".ruff_cache"}
+               "khtd-targets-app", "tests", "scripts", "backups",
+               "venv", ".venv", ".ruff_cache"}
 _SKIP_FILES = {"check_conventions.py", "backup_service.py"}
 
 

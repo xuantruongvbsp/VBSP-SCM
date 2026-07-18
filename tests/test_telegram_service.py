@@ -7,6 +7,7 @@ from types import ModuleType
 from unittest.mock import Mock, patch
 
 import pytest
+import pandas as pd
 
 from services import telegram_service as tg
 from services.telegram_service import (
@@ -14,6 +15,7 @@ from services.telegram_service import (
     doc_deadline_bc_allowlist,
     luu_deadline_bc_allowlist,
 )
+from config import COT_DU_NO_QH, COT_TEN_PGD
 
 
 TEN_PGD = "PGD Long Thành"
@@ -136,6 +138,54 @@ class TestChuanHoaThongBao:
     def test_du_19_notify_key(self) -> None:
         assert len(tg._NOTIFY_PRESENTATION) == 19
         assert len(set(tg._NOTIFY_PRESENTATION)) == 19
+
+
+class TestBaoCaoNqhTuan:
+    def test_hien_thi_tang_giam_tong_va_tung_pgd(self, monkeypatch) -> None:
+        sender = Mock(return_value=True)
+        monkeypatch.setattr(tg, "_la_bat", lambda _key: True)
+        monkeypatch.setattr(tg, "_gui_tin_for", sender)
+        monkeypatch.setattr(
+            tg,
+            "_lay_moc_nqh_nam",
+            lambda _ngay: ({"PGD A": 100_000_000.0, "PGD B": 50_000_000.0}, "31/12/2025"),
+        )
+
+        ok = tg.gui_bao_cao_nqh_tuan(
+            [
+                {"ten_pgd": "PGD A", "du_no": 12_883_400_000_000.0, "nqh": 120_000_000.0, "ty_le_nqh": 1.2},
+                {"ten_pgd": "PGD B", "du_no": 20_000_000_000.0, "nqh": 40_000_000.0, "ty_le_nqh": 0.2},
+            ],
+            "18/07/2026",
+        )
+
+        assert ok is True
+        text_gui = sender.call_args.args[0]
+        assert "Tổng dư nợ CN: <b>12.903,4 tỷ</b>" in text_gui
+        assert "Tổng NQH: <b>160 tr</b>" in text_gui
+        assert "Tăng/giảm trong kỳ" in text_gui
+        assert "🔺 +10 tr" in text_gui
+        assert "PGD A: 120 tr (1,20%) · 🔺 +20 tr" in text_gui
+        assert "PGD B: 40 tr (0,20%) · 🔻 -10 tr" in text_gui
+
+    def test_lay_moc_baseline_3112_nam_truoc(self, monkeypatch) -> None:
+        import data.hstd as hstd_data
+
+        monkeypatch.setattr(hstd_data, "ts_baseline_merged", lambda _nam: 123.0)
+        monkeypatch.setattr(
+            hstd_data,
+            "doc_baseline_merged",
+            lambda nam, ts=0.0: pd.DataFrame([
+                {COT_TEN_PGD: "PGD A", COT_DU_NO_QH: 10_000_000.0},
+                {COT_TEN_PGD: "PGD A", COT_DU_NO_QH: 2_000_000.0},
+                {COT_TEN_PGD: "PGD B", COT_DU_NO_QH: 5_000_000.0},
+            ]) if nam == 2025 and ts == 123.0 else pd.DataFrame(),
+        )
+
+        nqh_moc, ngay_moc = tg._lay_moc_nqh_nam("18/07/2026")
+
+        assert nqh_moc == {"PGD A": 12_000_000.0, "PGD B": 5_000_000.0}
+        assert ngay_moc == "31/12/2025"
 
 
 # ── Allowlist auto-clean tests ────────────────────────────────────────────────

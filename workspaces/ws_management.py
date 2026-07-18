@@ -24,6 +24,7 @@ from config import (
     COT_NGAY_DH, COT_TINH_TRANG, COT_SDT,
     COT_LAI_TON, COT_LAI_TON_QH, COT_LAI_THANG, COT_DVUT, COT_MUC_VAY,
     COT_NGAY_VAY, COT_THOI_HAN, COT_LAI_SUAT,
+    COT_MA_CHUONG_TRINH, COT_MA_NHA_DAU_TU, COT_NGUON_VON,
 )
 from auth import is_cn_role, is_pgd_role, get_permissions, normalize_role, la_phan_he_cn
 from data import (
@@ -81,6 +82,129 @@ def _render_cbtd_dia_ban(tab_parent=None, **kw):
                 lambda c: _get_tab("tab_cdtotkvv").render(c, **dict(kw, cdto_mode="cn")),
             ],
             key="mgmt_cbtd",
+        )
+
+
+def _la_nguon_von_dia_phuong(value) -> bool:
+    text = str(value or "").strip().casefold()
+    if not text or text in {"nan", "none"}:
+        return False
+    compact = text.replace(" ", "")
+    return compact in {"2", "2.0", "đp", "dp", "địaphương", "diaphuong"}
+
+
+def _ma_ct_int(value) -> int | None:
+    try:
+        number = pd.to_numeric(pd.Series([value]), errors="coerce").iloc[0]
+    except Exception:
+        return None
+    if pd.isna(number):
+        return None
+    return int(number)
+
+
+def _text_sach(value) -> str:
+    if value is None or pd.isna(value):
+        return ""
+    text = str(value).strip()
+    return "" if text.lower() in {"nan", "none"} else text
+
+
+def _tinh_tong_quan_nguon_von_dp(df_full: pd.DataFrame | None, ds_rule: list[dict]) -> dict:
+    """Tính KPI đầu trang cho chuyên đề nguồn vốn địa phương."""
+    result = {
+        "tong_du_no": 0.0,
+        "du_no_dp": 0.0,
+        "ty_trong_dp": 0.0,
+        "so_rule": len(ds_rule),
+        "so_ma_moi": 0,
+    }
+    required = {COT_NGUON_VON, COT_TONG_DU_NO}
+    if df_full is None or df_full.empty or not required.issubset(df_full.columns):
+        return result
+
+    df_work = df_full.copy()
+    tong_du_no = pd.to_numeric(df_work[COT_TONG_DU_NO], errors="coerce").fillna(0)
+    mask_dp = df_work[COT_NGUON_VON].map(_la_nguon_von_dia_phuong)
+    result["tong_du_no"] = float(tong_du_no.sum())
+    result["du_no_dp"] = float(tong_du_no[mask_dp].sum())
+    result["ty_trong_dp"] = result["du_no_dp"] / result["tong_du_no"] * 100 if result["tong_du_no"] else 0.0
+
+    required_ma = {COT_MA_CHUONG_TRINH, COT_MA_NHA_DAU_TU}
+    if not required_ma.issubset(df_work.columns):
+        return result
+
+    existing_rules = {
+        (int(item.get("ma_ct", 0) or 0), _text_sach(item.get("ma", "")))
+        for item in ds_rule
+        if item.get("ma_ct") is not None and _text_sach(item.get("ma", ""))
+    }
+    df_dp = df_work.loc[mask_dp, [COT_MA_CHUONG_TRINH, COT_MA_NHA_DAU_TU]].copy()
+    df_dp["_ma_ct"] = df_dp[COT_MA_CHUONG_TRINH].map(_ma_ct_int)
+    df_dp["_ma_ndt"] = df_dp[COT_MA_NHA_DAU_TU].map(_text_sach)
+    ma_phat_sinh = {
+        (int(row["_ma_ct"]), row["_ma_ndt"])
+        for row in df_dp.to_dict("records")
+        if row.get("_ma_ct") in {3, 6} and row.get("_ma_ndt")
+    }
+    result["so_ma_moi"] = len(ma_phat_sinh - existing_rules)
+    return result
+
+
+def _render_tong_quan_nguon_von_dp(df_full: pd.DataFrame | None, ds_rule: list[dict]) -> dict:
+    summary = _tinh_tong_quan_nguon_von_dp(df_full, ds_rule)
+    kpi_row(
+        [
+            {
+                "label": "Dư nợ nguồn ĐP",
+                "value": f"{vn(summary['du_no_dp'] / 1e9, 1)} tỷ",
+                "help": "Tổng dư nợ các khoản có Nguồn vốn = Địa phương trong HSTD hiện tại.",
+            },
+            {
+                "label": "Tỷ trọng ĐP",
+                "value": f"{vn(summary['ty_trong_dp'], 2)}%",
+                "help": "Dư nợ nguồn địa phương chia tổng dư nợ HSTD hiện tại.",
+            },
+            {
+                "label": "Rule Mã NĐT",
+                "value": fmt_so(summary["so_rule"]),
+                "help": "Tổng số quy tắc phân loại Mã CT + Mã NĐT địa phương đang lưu.",
+            },
+            {
+                "label": "Mã mới chưa rule",
+                "value": fmt_so(summary["so_ma_moi"]),
+                "help": "Số cặp Mã CT + Mã NĐT nguồn ĐP phát sinh trong HSTD nhưng chưa có rule.",
+            },
+        ],
+        num_columns=4,
+    )
+    if summary["so_ma_moi"] > 0:
+        st.caption(
+            f"Có {fmt_so(summary['so_ma_moi'])} cặp Mã CT + Mã NĐT mới cần rà soát trong tab Mã NĐT địa phương."
+        )
+    return summary
+
+
+def _render_nguon_von_dia_phuong(tab_parent=None, **kw):
+    """Chuyên đề Nguồn vốn địa phương — gom phân tích và quản lý Mã NĐT trên cùng 1 trang."""
+    ctx = tab_parent if tab_parent is not None else st.container()
+    with ctx:
+        role_n = normalize_role(str(kw.get("role", "user") or "user"))
+        ds_rule = db.doc_ndt_dp_rule_list()
+        summary = _render_tong_quan_nguon_von_dp(kw.get("df_full", kw.get("df")), ds_rule)
+        st.divider()
+        labels = ["📊 Phân tích nguồn vốn"]
+        renderers = [lambda c: _get_tab("tab_hhi").render(c, **kw)]
+        if role_n in ("admin_cn", "manager_cn"):
+            tab_ndt = "🏷️ Mã NĐT địa phương"
+            if summary["so_ma_moi"] > 0:
+                tab_ndt = f"{tab_ndt} ({fmt_so(summary['so_ma_moi'])} mới)"
+            labels.append(tab_ndt)
+            renderers.append(lambda c: _get_tab("tab_quan_ly_ndt_dp").render(c, **kw))
+        lazy_tabs(
+            labels,
+            renderers,
+            key="mgmt_nvdp",
         )
 
 
@@ -188,6 +312,12 @@ def _build_all_items(role: str, username: str, **kwargs) -> list:
     ds_pgd_all = kwargs.get("ds_pgd_all", [])
     can_upload = kwargs.get("can_upload", False)
     role_n = normalize_role(str(role or "user"))
+    nguon_von_item = {
+        "group": "Kế hoạch Tín dụng",
+        "label": "🏦 Nguồn vốn địa phương",
+        "icon": "bank",
+        "fn": lambda: _render_nguon_von_dia_phuong(None, **kwargs),
+    }
 
     ALL_ITEMS = [
         # ── Tổng quan ──────────────────────────────────────────────────────────
@@ -232,10 +362,9 @@ def _build_all_items(role: str, username: str, **kwargs) -> list:
         # ── Kế hoạch Tín dụng ──────────────────────────────────────────────────
         {"group": "Kế hoạch Tín dụng", "label": "📈 Kế hoạch tín dụng",       "icon": "file-text",   "fn": lambda: _get_tab("tab_khtd").render(None, **dict(kwargs, khtd_mode="cn"))},
         {"group": "Kế hoạch Tín dụng", "label": "📋 Giao & ĐC KHTD",          "icon": "upload",       "fn": lambda: _get_tab("tab_khtd_giao_dc").render(None, **kwargs)},
-        {"group": "Kế hoạch Tín dụng", "label": "🔭 Xây dựng KHTD 1-3-5 năm","icon": "calendar-plus","fn": lambda: _get_tab("tab_xay_dung_khtd").render(None, **kwargs)},
         {"group": "Kế hoạch Tín dụng", "label": "📡 Điện báo & KH vs TH",     "icon": "antenna",      "fn": lambda: _get_tab("tab_candoi").render(None, **kwargs)},
         {"group": "Kế hoạch Tín dụng", "label": "📤 Xuất báo cáo KHTD",       "icon": "file-export",  "fn": lambda: _get_tab("tab_khtd_xuat").render_xuat_baocao(role=kwargs.get("role", ""), username=kwargs.get("username", ""), df_full=kwargs.get("df"))},
-        {"group": "Kế hoạch Tín dụng", "label": "🏦 Nguồn vốn địa phương",    "icon": "bank",         "fn": lambda: _get_tab("tab_hhi").render(None, **kwargs)},
+        nguon_von_item,
 
         # ── Ủy Thác ────────────────────────────────────────────────────────────
         {"group": "Ủy Thác", "label": "🏛️ Ban Đại Diện",  "icon": "building",  "fn": lambda: _get_tab("tab_ban_dai_dien").render(None, cap="tinh", **kwargs)},
@@ -243,8 +372,6 @@ def _build_all_items(role: str, username: str, **kwargs) -> list:
         {"group": "Ủy Thác", "label": "👔 CBTD & Địa bàn", "icon": "user",      "fn": lambda: _render_cbtd_dia_ban(None, **kwargs)},
     ]
 
-    if role_n in ("admin_cn", "manager_cn"):
-        ALL_ITEMS.append({"group": "Hệ thống", "label": "Mã NĐT địa phương", "icon": "building-bank", "fn": lambda: _get_tab("tab_quan_ly_ndt_dp").render(None, role=role_n, username=kwargs.get("username", "unknown"))})
     if role_n == "admin_cn":
         ALL_ITEMS.append({"group": "Hệ thống", "label": "Nhật ký hệ thống", "icon": "list", "fn": lambda: _get_tab("tab_audit_log").render(None, **kwargs)})
         ALL_ITEMS.append({"group": "Hệ thống", "label": "🔐 Quản lý bảo mật", "icon": "shield", "fn": lambda: _get_tab("tab_security").render(None, **kwargs)})
@@ -254,6 +381,27 @@ def _build_all_items(role: str, username: str, **kwargs) -> list:
     ALL_ITEMS.append({"group": "Hệ thống", "label": "📖 Hướng dẫn", "icon": "book", "fn": lambda: render_huong_dan()})
 
     return ALL_ITEMS
+
+
+def _normalize_active_label(all_items: list, active_label: str | None) -> str | None:
+    """Chuẩn hóa label đang active: parent accordion -> child đầu tiên."""
+    if not active_label:
+        return active_label
+    legacy_labels = {
+        "📊 Phân tích nguồn vốn": "🏦 Nguồn vốn địa phương",
+        "🏷️ Mã NĐT địa phương": "🏦 Nguồn vốn địa phương",
+        "Mã NĐT địa phương": "🏦 Nguồn vốn địa phương",
+    }
+    if active_label in legacy_labels:
+        return legacy_labels[active_label]
+    for item in all_items:
+        if item.get("label") != active_label:
+            continue
+        children = item.get("children", [])
+        if not item.get("fn") and children:
+            return children[0]["label"]
+        return active_label
+    return active_label
 
 
 def render_sidebar_menu(role: str, username: str, **kwargs):
@@ -282,9 +430,12 @@ def render_sidebar_menu(role: str, username: str, **kwargs):
 
     default_label = all_items[0]["label"]
     active_label = state.nav_ws_mgmt_menu
+    active_label = _normalize_active_label(all_items, active_label)
     if active_label not in valid_labels:
         state.nav_ws_mgmt_menu = default_label
         active_label = default_label
+    if active_label != state.nav_ws_mgmt_menu:
+        state.nav_ws_mgmt_menu = active_label
 
     st.divider()
 
@@ -373,7 +524,10 @@ def render_sidebar_menu(role: str, username: str, **kwargs):
                     key=f"menu_acc_{item['label']}",
                     use_container_width=True,
                 ):
-                    st.session_state[open_key] = not is_open
+                    mo_accordion = not is_open
+                    st.session_state[open_key] = mo_accordion
+                    if children:
+                        state.nav_ws_mgmt_menu = children[0]["label"]
                     st.rerun()
 
             if is_open:
@@ -418,17 +572,11 @@ def render(**kwargs):
 
     filtered_kw = {k: v for k, v in kwargs.items()
                    if k not in ("role", "username", "df", "df_full", "ds_pgd_all")}
-    _data_id = id(df_full)
-    if "_mgmt_all_items_cache" not in st.session_state or st.session_state.get("_mgmt_all_items_data_id") != _data_id:
-        ALL_ITEMS = _build_all_items(
-            role, username,
-            df=df, df_full=df_full, ds_pgd_all=ds_pgd_all,
-            can_upload=can_upload, **filtered_kw
-        )
-        st.session_state["_mgmt_all_items_cache"] = ALL_ITEMS
-        st.session_state["_mgmt_all_items_data_id"] = _data_id
-    else:
-        ALL_ITEMS = st.session_state["_mgmt_all_items_cache"]
+    ALL_ITEMS = _build_all_items(
+        role, username,
+        df=df, df_full=df_full, ds_pgd_all=ds_pgd_all,
+        can_upload=can_upload, **filtered_kw
+    )
 
     # ── Navigation: điều hướng hoàn toàn qua sidebar (render_sidebar_menu) ──
     valid_labels = [x["label"] for x in ALL_ITEMS] + [
@@ -444,18 +592,23 @@ def render(**kwargs):
 
     # Khởi tạo / validate ws_mgmt_menu — khôi phục từ kv_store nếu session mới
     active_label = state.nav_ws_mgmt_menu
+    active_label = _normalize_active_label(ALL_ITEMS, active_label)
     _mem_key = f"nav_ws_mgmt_{username}"
     if not active_label or active_label not in valid_labels:
         _saved = db.doc_kv(_mem_key)
+        _saved = _normalize_active_label(ALL_ITEMS, _saved)
         if _saved and _saved in valid_labels:
             active_label = _saved
         else:
             active_label = ALL_ITEMS[0]["label"]
         state.nav_ws_mgmt_menu = active_label
-    else:
-        _prev_saved = db.doc_kv(_mem_key)
-        if _prev_saved != active_label:
-            db.ghi_kv(_mem_key, active_label, username)
+    if active_label != state.nav_ws_mgmt_menu:
+        state.nav_ws_mgmt_menu = active_label
+
+    _prev_saved = db.doc_kv(_mem_key)
+    if _prev_saved != active_label:
+        db.ghi_kv(_mem_key, active_label, username)
+        db.ghi_audit(username, "luu_nav_ws_mgmt", f"Lưu menu điều hành: {active_label}")
 
     # ── Render DUY NHẤT mục đang chọn ────────────────────────────────────
     active_item = next((x for x in ALL_ITEMS if x["label"] == active_label), None)

@@ -6,9 +6,7 @@ from __future__ import annotations
 from logger import get_logger
 logger = get_logger(__name__)
 
-import logging
 import os
-from io import BytesIO
 from datetime import datetime, date, timedelta
 from typing import TYPE_CHECKING
 
@@ -23,12 +21,9 @@ from config import *
 from config import DS_PGD, CACHE_HSTD, DON_VI_CHI_NHANH, TEN_CHI_NHANH_HIEN_THI
 
 from utils import (
-    fmt,
-    fmt_tien,
     fmt_so,
     vn,
     fmt_ty,
-    fmt_pct,
     fmt_bang_ty,
     xuat_excel,
     ten_file_xuat,
@@ -37,7 +32,7 @@ from utils import (
 )
 from data.pgd import ds_pgd_co_file
 from data.cdtotkvv import doc_cdtotkvv, ds_thang_nam, tong_hop_theo_pgd
-from pdf_service import nut_xuat_pdf, xuat_pdf
+from pdf_service import xuat_pdf
 from services.giao_ban_thang_service import tao_bao_cao_giao_ban_thang
 from services.hstd_word_service import xuat_word_hstd_tong_hop
 from services.upload_service import format_caption_merge
@@ -48,7 +43,6 @@ from services.tongquan_cdto_service import (
 )
 from services import tongquan_service as _tqsvc
 from services.tongquan_service import xuat_excel_tqpgd as _xuat_excel_tqpgd
-from components.filter_bar import filter_bar, apply_filters
 from components.delta_card import kpi_row
 
 if TYPE_CHECKING:
@@ -77,27 +71,6 @@ def _cache_kpi_tongquan(
         cot_nk=cot_nk,
         cot_ku=cot_ku,
         cot_ma_kh=cot_ma_kh,
-    )
-
-
-@st.cache_data(show_spinner=False)
-def _cache_heatmap_pgd(
-    _df: pd.DataFrame,
-    ts: float,
-    pgd_user: str,
-    pgd_filter: str,
-    cot_pgd: str,
-    cot_tdn: str,
-    cot_ma_kh: str,
-    cot_dqh: str,
-) -> pd.DataFrame:
-    _ = (ts, pgd_user, pgd_filter)  # tham gia cache key; tránh unused-argument
-    return _tqsvc.tinh_heatmap_pgd(
-        _df,
-        cot_pgd=cot_pgd,
-        cot_tdn=cot_tdn,
-        cot_ma_kh=cot_ma_kh,
-        cot_dqh=cot_dqh,
     )
 
 
@@ -291,11 +264,9 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
     ctx = TabContext(tab, **kwargs)
     df       = kwargs.get("df")
     df_full  = ctx.df_full if ctx.df_full is not None and not ctx.df_full.empty else df
-    role     = ctx.role_norm
     pgd_user = ctx.pgd_user
     pgd_filter = kwargs.get("pgd_filter") or pgd_user
     username = ctx.username
-    df_nq11  = kwargs.get("df_nq11")
     ts = kwargs.get("ts_hstd", 0.0)
 
     with ctx:
@@ -375,6 +346,21 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
             unsafe_allow_html=True,
         )
         st.subheader("Tổng quan danh mục tín dụng")
+
+        # ── Nguồn TW, ĐP của Top 10 CT (từ Cơ cấu dư nợ) ──
+        _t10_tw, _t10_dp = 0.0, 0.0
+        if COT_TEN_CT in df.columns and COT_TONG_DU_NO in df.columns:
+            _col_khoanh_ct = COT_DU_NO_KHOANH if COT_DU_NO_KHOANH in df.columns else ""
+            _col_gn_ct = next((c for c in HSTD_DS_CHO_VAY_NAM_ALIASES if c in df.columns), "")
+            _cols_tn_ct = ",".join(c for c in HSTD_THU_NO_NAM_ALIASES if c in df.columns)
+            _df_ct_for_card = _cache_co_cau_ct(
+                df, ts, str(pgd_filter), _col_khoanh_ct, _col_gn_ct, _cols_tn_ct
+            )
+            if not _df_ct_for_card.empty:
+                _df_t10_card = _df_ct_for_card.nlargest(10, "du_no")
+                _t10_tw = float(_df_t10_card["du_no_tw"].sum()) / 1e9
+                _t10_dp = float(_df_t10_card["du_no_dp"].sum()) / 1e9
+
         _kpi = _cache_kpi_tongquan(
             df,
             ts,
@@ -561,6 +547,16 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                     <div class="tq-value">{_xa_bot_val}</div>
                     <div class="tq-sub">{_xa_bot_name} ({_xa_bot_pgd})</div>
                 </div>
+                <div class="tq-card soft-green">
+                    <div class="tq-label">Nguồn TW (Top 10)</div>
+                    <div class="tq-value">{vn(_t10_tw, 1)} tỷ</div>
+                    <div class="tq-sub">Ngân sách Trung ương cấp</div>
+                </div>
+                <div class="tq-card soft-amber">
+                    <div class="tq-label">Nguồn ĐP (Top 10)</div>
+                    <div class="tq-value">{vn(_t10_dp, 1)} tỷ</div>
+                    <div class="tq-sub">Ngân sách Địa phương cấp</div>
+                </div>
             </div>
             """,
             unsafe_allow_html=True,
@@ -667,8 +663,6 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
             df_ct = _cache_co_cau_ct(
                 df, ts, str(pgd_filter), _col_khoanh_ct, _col_gn_ct, _cols_tn_ct
             )
-            col_khoanh = _col_khoanh_ct or None
-
             if df_ct.empty:
                 st.info("ℹ️ Chưa có dư nợ trong dữ liệu — bảng chương trình tín dụng trống.")
             else:
@@ -703,8 +697,33 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                     "Thu nợ năm (triệu đồng)": "TN năm",
                 }
                 st.caption("Đơn vị các cột tiền: triệu đồng")
+
+                # ── Hàng tổng cộng ──
+                _tong_du_no = df_ct["du_no"].sum()
+                _tong_qh = df_ct["du_no_qh"].sum()
+                _ty_le_qh_tong = (
+                    f"{(_tong_qh / _tong_du_no * 100):.2f}".replace(".", ",") + "%"
+                    if _tong_du_no > 0
+                    else "0,00%"
+                )
+                _row_tong = {
+                    "Chương trình": "Tổng cộng",
+                    "Số món vay": fmt_so(df_ct["so_mon"].sum()),
+                    "Số KH": fmt_so(df_ct["so_kh"].sum()),
+                    "Dư nợ (triệu đồng)": fmt_ty(_tong_du_no),
+                    "Nguồn TW (triệu đồng)": fmt_ty(df_ct["du_no_tw"].sum()),
+                    "Nguồn ĐP (triệu đồng)": fmt_ty(df_ct["du_no_dp"].sum()),
+                    "Dư nợ QH (triệu đồng)": fmt_ty(_tong_qh),
+                    "Tỷ lệ QH %": _ty_le_qh_tong,
+                    "Dư nợ khoanh (triệu đồng)": fmt_ty(df_ct["du_no_khoanh"].sum()),
+                    "Giải ngân năm (triệu đồng)": fmt_ty(df_ct["gn_nam"].sum()),
+                    "Thu nợ năm (triệu đồng)": fmt_ty(df_ct["tn_nam"].sum()),
+                    "Tỷ trọng %": "100,0%",
+                }
+                df_hien_tong = pd.concat([df_hien[cols_hien], pd.DataFrame([_row_tong])], ignore_index=True)
+
                 hien_thi_dataframe_phan_trang(
-                    df_hien[cols_hien].rename(columns=_rename_short),
+                    df_hien_tong.rename(columns=_rename_short),
                     key="ct_cocau",
                 )
 
@@ -719,38 +738,12 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                 df_top10["du_no_tw_ty"] = df_top10["du_no_tw_ty"].where(df_top10["du_no_tw_ty"] > 0, 0)
                 df_top10["du_no_dp_ty"] = df_top10["du_no_dp_ty"].where(df_top10["du_no_dp_ty"] > 0, 0)
                 
-                # Tính tổng để hiển thị (VND → tỷ đồng)
-                tong_top10 = df_top10["du_no"].sum() / 1e9
-                tong_tw = df_top10["du_no_tw"].sum() / 1e9
-                tong_dp = df_top10["du_no_dp"].sum() / 1e9
-
                 # Thêm cột STT và tỷ lệ — reset index để STT đúng 1..N
                 df_top10 = df_top10.reset_index(drop=True)
                 df_top10["ty_le"] = (df_top10["du_no"] / df_top10["du_no"].sum() * 100).round(1)
                 df_top10["label_display"] = df_top10.apply(
                     lambda x: f"#{int(x.name)+1} {x['label']} ({x['ty_le']}%)", axis=1
                 )
-                
-                # Card tổng quan
-                st.markdown(f"""
-                <div style="display: flex; gap: 16px; margin-bottom: 20px;">
-                    <div style="flex: 1; background: linear-gradient(135deg, #1e3a5f 0%, #3b5998 100%); 
-                                color: white; padding: 16px; border-radius: 12px; text-align: center;">
-                        <div style="font-size: 0.85rem; opacity: 0.9;">Tổng Top 10 CT</div>
-                        <div style="font-size: 1.6rem; font-weight: 700;">{vn(tong_top10, 1)} tỷ</div>
-                    </div>
-                    <div style="flex: 1; background: linear-gradient(135deg, #059669 0%, #10b981 100%); 
-                                color: white; padding: 16px; border-radius: 12px; text-align: center;">
-                        <div style="font-size: 0.85rem; opacity: 0.9;">Nguồn TW</div>
-                        <div style="font-size: 1.6rem; font-weight: 700;">{vn(tong_tw, 1)} tỷ</div>
-                    </div>
-                    <div style="flex: 1; background: linear-gradient(135deg, #ea580c 0%, #f97316 100%); 
-                                color: white; padding: 16px; border-radius: 12px; text-align: center;">
-                        <div style="font-size: 0.85rem; opacity: 0.9;">Nguồn ĐP</div>
-                        <div style="font-size: 1.6rem; font-weight: 700;">{vn(tong_dp, 1)} tỷ</div>
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
                 
                 # Biểu đồ cải tiến
                 fig_ct = go.Figure()

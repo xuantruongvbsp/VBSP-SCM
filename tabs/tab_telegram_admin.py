@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import streamlit as st
 import pandas as pd
@@ -10,6 +11,7 @@ from streamlit.delta_generator import DeltaGenerator
 
 import db
 from auth import la_phan_he_cn, la_executive, la_chuyen_vien_cn, normalize_role
+from config import CACHE_HSTD
 from logger import get_logger
 
 logger = get_logger(__name__)
@@ -176,7 +178,7 @@ _SCHEDULE_KEYS = {
 _TASK_GIO = {
     "bao_cao_sang":      "07:30",
     "khoang_den_han":    "07:45",
-    "phan_ky_nxh":       "08:00",
+    "phan_ky_nxh":       "06:00 (ngày 1–3 hàng tháng)",
     "deadline_bc":       "08:00 / 14:00",
     "nhap_lieu":         "08:00 / 14:00",
     "health_check":      "06:30",
@@ -237,9 +239,8 @@ def _gui_ngay(key: str) -> tuple[bool, str]:
     from services import telegram_service as tg
     try:
         if key == "bao_cao_sang":
-            from data.core import CACHE_HSTD
             from config import DS_PGD, COT_TONG_DU_NO, COT_DU_NO_QH
-            if not CACHE_HSTD.exists():
+            if not Path(CACHE_HSTD).exists():
                 return False, "Chưa có dữ liệu HSTD."
             df = pd.read_parquet(CACHE_HSTD, columns=[COT_TONG_DU_NO, COT_DU_NO_QH])
             tong_dn = df[COT_TONG_DU_NO].sum()
@@ -256,9 +257,8 @@ def _gui_ngay(key: str) -> tuple[bool, str]:
             return _ket_qua_gui_telegram(ok, f"{so_pgd}/{len(DS_PGD)} PGD", "bao_cao_sang")
 
         elif key == "khoang_den_han":
-            from data.core import CACHE_HSTD
             from config import COT_NGAY_DH, COT_TONG_DU_NO, COT_TEN_PGD, COT_TEN_KH, COT_SO_KU
-            if not CACHE_HSTD.exists():
+            if not Path(CACHE_HSTD).exists():
                 return False, "Chưa có dữ liệu HSTD."
             df = pd.read_parquet(CACHE_HSTD)
             today_ts = pd.Timestamp.today().normalize()
@@ -333,12 +333,11 @@ def _gui_ngay(key: str) -> tuple[bool, str]:
             return True, f"Đã gửi {sent_count} PGD"
 
         elif key == "khtd_tien_do":
-            from data.core import CACHE_HSTD
             from config import COT_TEN_PGD, COT_TONG_DU_NO
             khtd_cn = db.doc_kv("khtd_cn")
             if not khtd_cn:
                 return False, "Chưa có dữ liệu KHTD (cần giao KHTD trước)."
-            if not CACHE_HSTD.exists():
+            if not Path(CACHE_HSTD).exists():
                 return False, "Chưa có dữ liệu HSTD (cần merge trước)."
             df_dn = pd.read_parquet(CACHE_HSTD, columns=[COT_TEN_PGD, COT_TONG_DU_NO])
             du_no_pgd = df_dn.groupby(COT_TEN_PGD)[COT_TONG_DU_NO].sum().to_dict()
@@ -463,9 +462,8 @@ def _gui_ngay(key: str) -> tuple[bool, str]:
             return _ket_qua_gui_telegram(ok, f"{len(ds_sv)} sự kiện ngày {ngay_mai_str}", "lich_cong_tac")
 
         elif key == "giai_ngan_tuan":
-            from data.core import CACHE_HSTD
             from config import COT_NGAY_VAY, COT_TEN_PGD, COT_TONG_DU_NO, DON_VI_CHI_NHANH
-            if not CACHE_HSTD.exists():
+            if not Path(CACHE_HSTD).exists():
                 return False, "Chưa có dữ liệu HSTD."
             df = pd.read_parquet(CACHE_HSTD)
             if COT_NGAY_VAY not in df.columns:
@@ -518,9 +516,8 @@ def _gui_ngay(key: str) -> tuple[bool, str]:
                 return False, str(e)
 
         elif key == "nqh_tuan":
-            from data.core import CACHE_HSTD
             from config import COT_TEN_PGD, COT_TONG_DU_NO, COT_DU_NO_QH, DON_VI_CHI_NHANH
-            if not CACHE_HSTD.exists():
+            if not Path(CACHE_HSTD).exists():
                 return False, "Chưa có dữ liệu HSTD."
             df = pd.read_parquet(CACHE_HSTD, columns=[COT_TEN_PGD, COT_TONG_DU_NO, COT_DU_NO_QH])
             df = df[df[COT_TEN_PGD] != DON_VI_CHI_NHANH]
@@ -542,12 +539,11 @@ def _gui_ngay(key: str) -> tuple[bool, str]:
             return _ket_qua_gui_telegram(ok, f"{len(ds_pgd)} đơn vị", "nqh_tuan")
 
         elif key == "khtd_ct":
-            from data.core import CACHE_HSTD
             from config import COT_TONG_DU_NO, CHUONG_TRINH_KHTD
             khtd_cn = db.doc_kv("khtd_cn")
             if not khtd_cn:
                 return False, "Chưa có dữ liệu KHTD (cần giao KHTD trước)."
-            if not CACHE_HSTD.exists():
+            if not Path(CACHE_HSTD).exists():
                 return False, "Chưa có dữ liệu HSTD (cần merge trước)."
             # Tính thực hiện theo chương trình từ HSTD
             # _tinh_thuc_hien_theo_ct trả về dict[ma_key -> float], không phải DataFrame
@@ -571,9 +567,8 @@ def _gui_ngay(key: str) -> tuple[bool, str]:
             return _ket_qua_gui_telegram(ok, f"{len(ds_ct)} chương trình", "khtd_ct")
 
         elif key == "tong_ket_thang":
-            from data.core import CACHE_HSTD
             from config import COT_TEN_PGD, COT_TONG_DU_NO, COT_DU_NO_QH, COT_NGAY_DH, DON_VI_CHI_NHANH
-            if not CACHE_HSTD.exists():
+            if not Path(CACHE_HSTD).exists():
                 return False, "Chưa có dữ liệu HSTD."
             df = pd.read_parquet(CACHE_HSTD)
             khtd_cn = db.doc_kv("khtd_cn") or {}

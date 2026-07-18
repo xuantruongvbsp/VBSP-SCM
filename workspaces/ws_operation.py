@@ -570,7 +570,6 @@ _WS_OP_MENU_ITEMS = [
             {"label": "⚖️ Kế hoạch/Cân đối"},
             {"label": "📋 Giao & ĐC KHTD"},
             {"label": "📋 Mẫu 07 Giao KH"},
-            {"label": "🔭 Xây dựng KHTD TL"},
             {"label": "📋 NQ11"},
             {"label": "📊 Dashboard GQVL"},
             {"label": "📊 Xuất báo cáo KHTD"},
@@ -991,8 +990,6 @@ def render(**kwargs):
                 ("📋 Giao & ĐC KHTD", lambda tab: _lazy_tab("tab_khtd_giao_dc").render(tab, **kwargs)),
 
                 ("📋 Mẫu 07 Giao KH", lambda tab: _lazy_tab("tab_khtd_mau07").render(tab, **kwargs)),
-
-                ("🔭 Xây dựng KHTD TL", lambda tab: _lazy_tab("tab_xay_dung_khtd").render(tab, **kwargs)),
 
                 ("📋 NQ11", lambda tab: _lazy_tab("tab_nq11").render(tab, **_pgd_df_kwargs)),
 

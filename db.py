@@ -14,6 +14,25 @@ logger = get_logger(__name__)
 _local = threading.local()
 
 
+def _safe_text(value, default: str = "") -> str:
+    """Chuẩn hóa giá trị audit/log để None hoặc object lạ không làm hỏng ghi DB."""
+    if value is None:
+        return default
+    try:
+        text = str(value).strip()
+    except Exception:
+        return default
+    return text or default
+
+
+def _safe_username(username) -> str:
+    return _safe_text(username, "unknown")
+
+
+def _safe_action(action) -> str:
+    return _safe_text(action, "unknown_action")
+
+
 def get_db_path() -> str:
     return os.getenv("VBSP_SCM_DB_PATH") or str(BASE_DIR / "vbsp_scm.db")
 
@@ -721,6 +740,7 @@ def doc_ghi_chu_kv(ma_so_ku: str) -> dict | None:
             ).fetchone()
         return dict(row) if row else None
     except Exception:
+        logger.error("doc_ghi_chu_kv thất bại ma_so_ku=%s", ma_so_ku, exc_info=True)
         return None
 
 
@@ -738,6 +758,7 @@ def doc_ghi_chu_nhieu(ds_ma: list[str]) -> dict[str, dict]:
             ).fetchall()
         return {r["ma_so_ku"]: {"ghi_chu": r["ghi_chu"], "username": r["username"], "updated_at": r["updated_at"]} for r in rows}
     except Exception:
+        logger.error("doc_ghi_chu_nhieu thất bại so_ma=%s", len(ds_ma), exc_info=True)
         return {}
 
 
@@ -789,27 +810,32 @@ def seed_ktnb_danh_muc_loi() -> int:
 
 def ghi_kv(key: str, value: dict, username: str = "system", note: str = None) -> None:
     """Ghi hoặc cập nhật một cặp key-value vào bảng kv_store."""
+    key_safe = _safe_text(key)
+    username_safe = _safe_username(username)
+    note_safe = None if note is None else _safe_text(note)
     try:
+        if not key_safe:
+            raise ValueError("kv_store key không được rỗng")
         with get_conn() as conn:
             old_row = conn.execute(
-                "SELECT value FROM kv_store WHERE key = ?", (key,)
+                "SELECT value FROM kv_store WHERE key = ?", (key_safe,)
             ).fetchone()
             new_value_str = json.dumps(value, ensure_ascii=False)
             if old_row and old_row["value"] != new_value_str:
                 conn.execute(
                     """INSERT INTO kv_history (key, value, changed_by, note)
                        VALUES (?, ?, ?, ?)""",
-                    (key, old_row["value"], username, note),
+                    (key_safe, old_row["value"], username_safe, note_safe),
                 )
             conn.execute(
                 """INSERT OR REPLACE INTO kv_store (key, value, updated_at, updated_by)
                    VALUES (?, ?, ?, ?)""",
-                (key, new_value_str,
-                 datetime.now().isoformat(), username),
+                (key_safe, new_value_str,
+                 datetime.now().isoformat(), username_safe),
             )
             conn.commit()
     except Exception:
-        pass
+        logger.error("ghi_kv thất bại key=%s", key_safe or "<empty>", exc_info=True)
 
 
 def doc_kv(key: str, default=None):
@@ -823,6 +849,7 @@ def doc_kv(key: str, default=None):
             return json.loads(row["value"])
         return default
     except Exception:
+        logger.error("doc_kv thất bại key=%s", key, exc_info=True)
         return default
 
 
@@ -836,6 +863,7 @@ def list_kv_prefix(prefix: str) -> list[str]:
             ).fetchall()
         return [r["key"] for r in rows]
     except Exception:
+        logger.error("list_kv_prefix thất bại prefix=%s", prefix, exc_info=True)
         return []
 
 
@@ -860,6 +888,7 @@ def doc_kv_prefix(prefix: str) -> dict[str, Any]:
             ).fetchall()
         return {row["key"]: json.loads(row["value"]) for row in rows}
     except Exception:
+        logger.error("doc_kv_prefix thất bại prefix=%s", prefix, exc_info=True)
         return {}
 
 
@@ -883,6 +912,7 @@ def doc_kv_nhieu(keys: list[str]) -> dict[str, Any]:
             ).fetchall()
         return {row["key"]: json.loads(row["value"]) for row in rows}
     except Exception:
+        logger.error("doc_kv_nhieu thất bại so_key=%s", len(keys), exc_info=True)
         return {}
 
 
@@ -903,6 +933,7 @@ def doc_kv_history(key: str, limit: int = 10) -> list[dict]:
             ).fetchall()
         return [dict(row) for row in rows]
     except Exception:
+        logger.error("doc_kv_history thất bại key=%s", key, exc_info=True)
         return []
 
 
@@ -930,15 +961,18 @@ def khoi_phuc_kv(key: str, history_id: int, username: str) -> bool:
 
 def ghi_audit(username: str, action: str, detail: str = "") -> None:
     """Ghi audit log cơ bản (backward compatible)."""
+    username_safe = _safe_username(username)
+    action_safe = _safe_action(action)
+    detail_safe = "" if detail is None else _safe_text(detail)
     try:
         with get_conn() as conn:
             conn.execute(
                 "INSERT INTO audit_log (ts, username, action, detail) VALUES (?,?,?,?)",
-                (datetime.now().isoformat(), username, action, detail)
+                (datetime.now().isoformat(), username_safe, action_safe, detail_safe)
             )
             conn.commit()
     except Exception:
-        pass
+        logger.error("ghi_audit thất bại username=%s action=%s", username_safe, action_safe, exc_info=True)
 
 
 def ghi_audit_full(
@@ -966,6 +1000,9 @@ def ghi_audit_full(
         ip_address: IP address của client
         user_agent: User agent string
     """
+    username_safe = _safe_username(username)
+    action_safe = _safe_action(action)
+    detail_safe = "" if detail is None else _safe_text(detail)
     try:
         import json
         with get_conn() as conn:
@@ -976,9 +1013,9 @@ def ghi_audit_full(
                    VALUES (?,?,?,?,?,?,?,?,?,?)""",
                 (
                     datetime.now().isoformat(),
-                    username,
-                    action,
-                    detail,
+                    username_safe,
+                    action_safe,
+                    detail_safe,
                     table_name,
                     str(record_id) if record_id is not None else None,
                     json.dumps(old_value, ensure_ascii=False) if old_value else None,
@@ -989,7 +1026,7 @@ def ghi_audit_full(
             )
             conn.commit()
     except Exception:
-        pass
+        logger.error("ghi_audit_full thất bại username=%s action=%s", username_safe, action_safe, exc_info=True)
 
 
 def seed_dynamic_configs() -> None:

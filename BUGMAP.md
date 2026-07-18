@@ -203,6 +203,24 @@
 
 ## B. Streamlit UI
 
+### B35 — Telegram NQH tuần hiển thị `12.903.4 tỷ` và chênh lệch `-0 tr`
+| | |
+|---|---|
+| **File** | `services/telegram_service.py` → `gui_bao_cao_nqh_tuan()` |
+| **Dấu hiệu** | Tổng dư nợ có hai dấu chấm thập phân; chênh lệch NQH dưới 1 triệu đồng có thể hiện tăng/giảm `0 tr` |
+| **Nguyên nhân** | Thay dấu phân cách bằng `.replace(",", ".")` một bước làm lẫn dấu nghìn với dấu thập phân; mọi chênh lệch đều format 0 số lẻ |
+| **Fix** | Đổi dấu qua ký tự trung gian để ra chuẩn Việt Nam (`12.903,4`); chênh lệch khác 0 nhưng dưới 1 triệu đồng hiển thị 1 số lẻ |
+| **Ngày fix** | 2026-07-18 |
+
+### B34 — Báo cáo NQH tuần lỗi import `CACHE_HSTD` từ sai module
+| | |
+|---|---|
+| **File** | `tabs/tab_telegram_admin.py` dòng ~13, ~235–580 |
+| **Dấu hiệu** | Bấm gửi Báo cáo NQH tuần báo `cannot import name 'CACHE_HSTD' from 'data.core'` |
+| **Nguyên nhân** | Các nhánh gửi báo cáo Telegram import `CACHE_HSTD` từ `data.core`, trong khi constant được khai báo tại `config.py`; sau khi sửa nguồn import, gọi `.exists()` trực tiếp cũng sai vì `CACHE_HSTD` là `str` |
+| **Fix** | Import `CACHE_HSTD` từ `config.py` ở module-level; kiểm tra file bằng `Path(CACHE_HSTD).exists()` cho cả 7 nhánh báo cáo dùng HSTD |
+| **Ngày fix** | 2026-07-18 |
+
 ### B25 — Toàn cảnh 22 PGD hiển thị thời gian sửa file thay vì ngày số liệu HSTD
 | | |
 |---|---|
@@ -2256,6 +2274,96 @@ val = pd.to_numeric(df[COT_X], errors="coerce").sum() if COT_X in df.columns els
 | **Fix** | Đối chiếu bằng `Mã PGD + Mã tổ`, chỉ tính tổng dư nợ dương, loại `0000000`; tách `Hình thức vay = 1` thành ghi chú cho vay trực tiếp; hiển thị số mã khớp và danh sách Tổ ủy thác còn thiếu CDTO |
 | **Test** | `tests/test_cdtotkvv_history.py::test_doi_chieu_hstd_theo_ma_to_loai_ma_0_va_hien_to_thieu_cdto` |
 | **Ngày fix** | 2026-07-14 |
+
+### J29 — Pre-commit phụ thuộc PATH và xử lý đối số file chưa an toàn
+| | |
+|---|---|
+| **File** | `pre_commit.bat`, `scripts/check_conventions.py` |
+| **Dấu hiệu** | Batch trả exit 1 với thông báo `python is not recognized` dù dự án có venv; gọi từ thư mục khác hoặc truyền đường dẫn có khoảng trắng có thể không chạy đúng; `backups` vẫn bị convention checker quét |
+| **Nguyên nhân** | Script gọi thẳng `python`, dùng đường dẫn tương đối theo current directory và nội suy tên file trực tiếp vào Python source; danh sách skip giữa hai bước không đồng nhất |
+| **Fix** | Chuyển về thư mục chứa batch; kiểm tra lần lượt `VBSP_PYTHON`, hai venv và PATH; truyền tên file qua `sys.argv`; xử lý từng đối số bằng `%~f1`; thêm `venv` và `backups` vào `_SKIP_DIRS` |
+| **Test** | Chạy `pre_commit.bat db.py`, chạy batch từ thư mục ngoài dự án, truyền file `.py` bằng đường dẫn tuyệt đối có khoảng trắng |
+| **Ngày fix** | 2026-07-17 |
+
+### J30 — Hàm đọc DB trả fallback nhưng không ghi nhận lỗi thật
+| | |
+|---|---|
+| **File** | `db.py` → `doc_kv()`, `doc_kv_prefix()`, `doc_kv_nhieu()`, `doc_kv_history()`, các hàm đọc ghi chú |
+| **Dấu hiệu** | Lỗi SQLite hoặc JSON hỏng bị hiển thị giống trạng thái không có dữ liệu, không có traceback để điều tra |
+| **Nguyên nhân** | Các hàm bắt rộng `Exception` rồi trả `None`, `{}` hoặc `[]` mà không logging |
+| **Fix** | Giữ nguyên giá trị fallback để tương thích UI, đồng thời thêm `logger.error(..., exc_info=True)` với key/prefix hoặc số lượng phần tử, không log nội dung dữ liệu |
+| **Test** | Convention check và compile `db.py`; kiểm tra các test DB hiện có giữ nguyên kiểu trả về |
+| **Ngày fix** | 2026-07-17 |
+
+### J31 — Data validation và compile-all bỏ sót lỗi trong scripts
+| | |
+|---|---|
+| **File** | `pre_commit.bat`, `scripts/validate_data.py`, `db.py` |
+| **Dấu hiệu** | `pre_commit.bat` chạy toàn project nhưng không compile `scripts/*.py`; `validate_data.py` có thể báo schema nhiễu cho NQ11/GQVL và chưa phát hiện thiếu đơn vị, trùng khế ước hoặc ngày số liệu phân tán |
+| **Nguyên nhân** | Compile-all dùng filter loại cả thư mục `scripts`; validate chỉ kiểm tổng/số âm cơ bản và dùng danh sách cột phụ HSTD cho mọi loại parquet |
+| **Fix** | Cho compile-all kiểm cả `scripts/*.py`; validate tách required/nice columns theo từng parquet, kiểm đủ 22 đơn vị, khóa nghiệp vụ trống, trùng `PGD + Số khế ước`, ngày số liệu không parse/phân tán; DB writer chuẩn hóa `None` trước khi ghi audit |
+| **Test** | Compile `db.py` và `scripts/validate_data.py`; chạy `python scripts/validate_data.py` |
+| **Ngày fix** | 2026-07-17 |
+
+### J32 — Validate HSTD bỏ sót `Mã tổ` và báo cột lạ quá nhiễu
+| | |
+|---|---|
+| **File** | `scripts/validate_data.py` |
+| **Dấu hiệu** | Script chỉ báo 14 dòng trùng khóa, không phát hiện 594 dòng dư nợ dương nhưng thiếu `Mã tổ`; mục “cột lạ” in gần như toàn bộ schema HSTD nên khó đọc |
+| **Nguyên nhân** | `_HSTD_CODE_COLS` chỉ kiểm `Mã PGD` và `Mã xã`, bỏ quên `Mã tổ`; whitelist cột HSTD viết tay ngắn hơn schema thực tế nên sinh nhiều nhiễu |
+| **Fix** | Thêm `COT_MA_TO` vào nhóm mã bắt buộc, dựng tập cột chuẩn từ các hằng `COT_*` trong `config.py`, rút gọn đầu ra cột chưa map và tách kiểm đủ đơn vị theo từng parquet |
+| **Test** | Compile + convention `scripts/validate_data.py`; chạy `python scripts/validate_data.py` xác nhận còn đúng 2 cảnh báo nghiệp vụ thật |
+| **Ngày fix** | 2026-07-17 |
+
+### J33 — Test tongquan ghi đè coverage cũ bằng assertion quá lỏng
+| | |
+|---|---|
+| **File** | `tests/test_tongquan_service.py` |
+| **Dấu hiệu** | Bộ test vẫn 15/15 pass nhưng có assertion dạng `>= 4`, comment sai dữ liệu mẫu, và làm rơi coverage cũ cho `tinh_tqpgd_extended`/luồng đến hạn |
+| **Nguyên nhân** | File tracked cũ bị thay thế bằng bộ test mới tối giản, thiên về “pass” hơn là khóa hành vi nghiệp vụ |
+| **Fix** | Viết lại 15 test với assertion chặt, dùng `COT_*` đúng convention, phục hồi các case quan trọng về lọc dư nợ, KPI, cơ cấu CT, tổng quan PGD mở rộng và tổng hợp đến hạn |
+| **Test** | Compile + convention `tests/test_tongquan_service.py`; chạy `pytest tests/test_tongquan_service.py` và bộ tổng 149 test |
+| **Ngày fix** | 2026-07-17 |
+
+### J34 — State điều hướng giữ label parent accordion làm workspace render sai tab con
+| | |
+|---|---|
+| **File** | `workspaces/ws_management.py` |
+| **Dấu hiệu** | Role `admin_cn`/`manager_cn` mở lại session cũ có thể thấy nội dung hoặc sidebar của `🏦 Nguồn vốn địa phương` không khớp, vì state còn giữ label parent thay vì label child thực thi được |
+| **Nguyên nhân** | Menu mới đổi `🏦 Nguồn vốn địa phương` từ item có `fn` sang accordion có `children`; `valid_labels` vẫn chấp nhận label parent nên nav cũ không bị loại, nhưng luồng render/sidebar không chuẩn hóa về child đầu tiên |
+| **Fix** | Thêm `_normalize_active_label()` để map label parent accordion sang child đầu tiên ở cả `render_sidebar_menu()` và `render()`, sau đó persist lại state/kv bằng label child chuẩn hóa |
+| **Test** | Compile + convention `workspaces/ws_management.py`; import `workspaces.ws_management` thành công |
+| **Ngày fix** | 2026-07-17 |
+
+### J35 — Nhấp parent accordion chỉ mở menu, không đổi nội dung workspace
+| | |
+|---|---|
+| **File** | `workspaces/ws_management.py` → `render_sidebar_menu()` ~dòng 401 |
+| **Dấu hiệu** | Nhấp `🏦 Nguồn vốn địa phương` chỉ mở danh sách con; vùng bên phải vẫn hiển thị tab `📊 Thông tin chung` |
+| **Nguyên nhân** | Handler nút parent chỉ đảo `ws_mgmt_acc_*` rồi rerun, không cập nhật `state.nav_ws_mgmt_menu`; `_normalize_active_label()` vì thế không có label parent mới để chuẩn hóa |
+| **Fix** | Mỗi khi nhấp parent có children, gán `state.nav_ws_mgmt_menu` bằng label child đầu tiên trước `st.rerun()`; child active sẽ giữ accordion mở sau rerun |
+| **Test** | Compile, convention check và kiểm tra tĩnh handler cập nhật child đầu tiên trước rerun |
+| **Ngày fix** | 2026-07-18 |
+
+### J36 — Session Streamlit giữ cache menu cũ làm sidebar và nội dung lệch nhau
+| | |
+|---|---|
+| **File** | `workspaces/ws_management.py` → `render()` ~dòng 575 |
+| **Dấu hiệu** | Sau khi đổi `🏦 Nguồn vốn địa phương` từ accordion sang một trang gộp, sidebar có thể đã đúng nhưng vùng bên phải vẫn giữ `📊 Thông tin chung` hoặc render theo cấu trúc menu cũ trong cùng session |
+| **Nguyên nhân** | `render()` lưu `_mgmt_all_items_cache` trong `st.session_state` theo `id(df_full)`, nên hot-reload/code mới vẫn có thể dùng danh sách item và lambda cũ; trong khi sidebar build lại menu mới trực tiếp |
+| **Fix** | Bỏ cache danh sách menu trong `render()`; `_build_all_items()` rẻ và được gọi lại mỗi rerun để sidebar và nội dung luôn dùng cùng cấu trúc mới nhất |
+| **Test** | Compile, convention check và kiểm tra tĩnh không còn tham chiếu `_mgmt_all_items_cache` trong `workspaces/ws_management.py` |
+| **Ngày fix** | 2026-07-18 |
+
+### J37 — Badge Mã NĐT mới có số nhưng tab mặc định không hiện danh sách phát sinh
+| | |
+|---|---|
+| **File** | `tabs/tab_quan_ly_ndt_dp.py` → `render()` ~dòng 766 |
+| **Dấu hiệu** | Nhãn tab hiển thị `🏷️ Mã NĐT địa phương (87 mới)` nhưng khi mở tab người dùng chỉ thấy màn `📊 Tổng quan`/danh mục rule, không thấy danh sách 87 mã mới |
+| **Nguyên nhân** | Số mới được tính ở trang cha, còn tab quản lý dùng radio mặc định `📊 Tổng quan`; danh sách phát sinh nằm ở chế độ `🆕 Mã mới từ HSTD` nên dễ bị hiểu là không có dữ liệu |
+| **Fix** | Đếm nhanh mã mới từ `df_full`; nếu còn mã mới và session chưa tự mở lần nào, đặt `st.session_state["ndt_dp_mode"] = "🆕 Mã mới từ HSTD"` để hiện ngay bảng phát sinh |
+| **Test** | Compile, convention check và kiểm tra tĩnh có helper `_dem_ma_moi_tu_hstd()` cùng auto-open mode trước `st.radio()` |
+| **Ngày fix** | 2026-07-18 |
 
 ---
 

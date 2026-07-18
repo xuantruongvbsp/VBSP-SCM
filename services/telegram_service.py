@@ -37,7 +37,7 @@ _NOTIFY_PRESENTATION = {
     "lich_cong_tac":     ("Lịch công tác", "Phòng KH-NV", "Kế hoạch công tác"),
     "giai_ngan_tuan":   ("Báo cáo giải ngân tuần", "Toàn Chi nhánh", "HSTD"),
     "khoanh_tang":       ("Cảnh báo nợ khoanh tăng", "Toàn Chi nhánh", "HSTD/Snapshot"),
-    "nqh_tuan":          ("Báo cáo NQH tuần", "Toàn Chi nhánh", "HSTD"),
+    "nqh_tuan":          ("Báo cáo NQH tuần", "Toàn Chi nhánh", "HSTD/Baseline"),
     "khtd_ct":           ("KHTD theo chương trình", "Toàn Chi nhánh", "HSTD/KHTD"),
     "tong_ket_thang":   ("Tổng kết tháng", "Toàn Chi nhánh", "HSTD/KHTD"),
 }
@@ -699,8 +699,38 @@ def gui_thong_bao_nop_moi_gsheet(ds_nop: list[dict]) -> bool:
     return _gui_tin_for("\n".join(lines), "nop_moi_gsheet")
 
 
+def _lay_moc_nqh_nam(ngay_sl: str) -> tuple[dict[str, float], str]:
+    """Đọc NQH từng PGD tại baseline 31/12 của năm trước."""
+    try:
+        from config import COT_DU_NO_QH, COT_TEN_PGD
+        from data.hstd import doc_baseline_merged, ts_baseline_merged
+
+        ngay_chuan = _dinh_dang_ngay_so_lieu(ngay_sl)
+        match = re.fullmatch(r"\d{2}/(\d{2})/(\d{4})", ngay_chuan)
+        nam_hien_tai = int(match.group(2)) if match else datetime.now().year
+        nam_moc = nam_hien_tai - 1
+        if nam_moc <= 0:
+            return {}, ""
+
+        df_moc = doc_baseline_merged(nam_moc, ts=ts_baseline_merged(nam_moc))
+        if df_moc is None or df_moc.empty:
+            return {}, ""
+
+        nqh_moc: dict[str, float] = {}
+        for row in df_moc.to_dict("records"):
+            ten_pgd = str(row.get(COT_TEN_PGD, "") or "").strip()
+            if not ten_pgd:
+                continue
+            nqh_moc[ten_pgd] = nqh_moc.get(ten_pgd, 0.0) + float(row.get(COT_DU_NO_QH, 0) or 0)
+
+        return nqh_moc, f"31/12/{nam_moc}"
+    except Exception as e:
+        logger.error("_lay_moc_nqh_nam: %s", e, exc_info=True)
+        return {}, ""
+
+
 def gui_bao_cao_nqh_tuan(ds_pgd: list[dict], ngay_sl: str = "") -> bool:
-    """Báo cáo NQH tuần — tổng hợp từng đơn vị + top 5 tệ nhất.
+    """Báo cáo NQH tuần — từng đơn vị, top 3 và biến động so baseline 31/12 năm trước.
 
     Mỗi item: {ten_pgd, du_no, nqh, ty_le_nqh}
     """
@@ -724,27 +754,56 @@ def gui_bao_cao_nqh_tuan(ds_pgd: list[dict], ngay_sl: str = "") -> bool:
             return "🟠"
         return "🟢"
 
-    def _fmt(vnd: float) -> str:
-        return f"{vnd / 1e6:,.0f}".replace(",", ".") + " tr"
+    def _fmt_so_vn(value: float, decimals: int = 0) -> str:
+        raw = f"{value:,.{decimals}f}"
+        return raw.replace(",", "_").replace(".", ",").replace("_", ".")
+
+    def _fmt(vnd: float, decimals: int = 0) -> str:
+        return _fmt_so_vn(vnd / 1e6, decimals) + " tr"
+
+    def _fmt_delta(vnd: float) -> str:
+        decimals = 1 if 0 < abs(vnd) < 1_000_000 else 0
+        if vnd > 0:
+            return f"🔺 +{_fmt(vnd, decimals)}"
+        if vnd < 0:
+            return f"🔻 -{_fmt(abs(vnd), decimals)}"
+        return "➖ 0 tr"
+
+    nqh_moc, ngay_moc = _lay_moc_nqh_nam(ngay_ref)
+    ten_pgd_hien_tai = [str(p.get("ten_pgd", "") or "").strip() for p in ds_pgd]
+    du_moc_tong = bool(nqh_moc) and all(ten in nqh_moc for ten in ten_pgd_hien_tai)
+    tong_qh_moc = sum(nqh_moc[ten] for ten in ten_pgd_hien_tai) if du_moc_tong else 0.0
+    tl_cn_s = f"{tl_cn:.2f}".replace(".", ",")
 
     lines = [
         f"📊 <b>Báo cáo NQH tuần</b>   📅 {_html.escape(ngay_ref)}",
         "",
-        f"💰 Tổng dư nợ CN: <b>{tong_dn / 1e9:,.1f}".replace(",", ".") + " tỷ</b>",
-        f"🔴 Tổng NQH: <b>{_fmt(tong_qh)}</b>  ({tl_cn:.2f}%".replace(".", ",") + ")",
-        "",
-        "<b>Từng đơn vị:</b>",
+        f"💰 Tổng dư nợ CN: <b>{_fmt_so_vn(tong_dn / 1e9, 1)} tỷ</b>",
+        f"🔴 Tổng NQH: <b>{_fmt(tong_qh)}</b>  ({tl_cn_s}%)",
     ]
+    if du_moc_tong and ngay_moc:
+        lines.append(
+            f"📈 Tăng/giảm trong kỳ: <b>{_fmt_delta(tong_qh - tong_qh_moc)}</b> "
+            f"so mốc {_html.escape(ngay_moc)}"
+        )
+    elif ngay_moc:
+        lines.append(f"ℹ️ Chưa đủ dữ liệu PGD để tính tổng so mốc {_html.escape(ngay_moc)}")
+    else:
+        lines.append("ℹ️ Chưa có baseline 31/12 năm trước để tính tăng/giảm")
+    lines.extend(["", "<b>Từng đơn vị:</b>"])
+
     ds_sorted = sorted(ds_pgd, key=lambda p: float(p.get("ty_le_nqh", 0) or 0), reverse=True)
     for p in ds_sorted:
-        pgd = _html.escape(str(p.get("ten_pgd", "")))
+        ten_pgd = str(p.get("ten_pgd", "") or "").strip()
+        pgd = _html.escape(ten_pgd)
         nqh = float(p.get("nqh", 0) or 0)
         tl  = float(p.get("ty_le_nqh", 0) or 0)
+        delta_s = f" · {_fmt_delta(nqh - nqh_moc[ten_pgd])}" if ten_pgd in nqh_moc else ""
         if nqh == 0:
-            lines.append(f"  {_icon(0)} {pgd}: —")
+            lines.append(f"  {_icon(0)} {pgd}: —{delta_s}")
         else:
             tl_s = f"{tl:.2f}%".replace(".", ",")
-            lines.append(f"  {_icon(tl)} {pgd}: {_fmt(nqh)} ({tl_s})")
+            lines.append(f"  {_icon(tl)} {pgd}: {_fmt(nqh)} ({tl_s}){delta_s}")
 
     # Top 3 nếu nhiều PGD
     top3 = [p for p in ds_sorted if float(p.get("nqh", 0) or 0) > 0][:3]

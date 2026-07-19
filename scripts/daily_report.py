@@ -538,35 +538,43 @@ def _nhac_phan_ky_nxh() -> int:
 
 
 def _canh_bao_qh_moi() -> int:
-    """So sánh snapshot NQH hôm nay vs kỳ trước, gửi cảnh báo nếu tăng bất thường."""
+    """So sánh snapshot NQH kỳ mới nhất vs baseline 31/12 năm trước."""
     from services.telegram_service import gui_canh_bao_qh_moi
     try:
-        from snapshot_service import doc_snapshot_range
-        from config import COT_TEN_PGD, COT_TONG_DU_NO, COT_DU_NO_QH
-        snapshots = doc_snapshot_range(tu_ky=None, den_ky=None, n_ky=2)
-        if len(snapshots) < 2:
+        from snapshot_service import danh_sach_ky, doc_snapshot, ky_baseline
+        ky_list = danh_sach_ky()
+        if not ky_list:
             return 0
-        df_moi, df_cu = snapshots[0], snapshots[1]
+        ky_moi = ky_list[0]
+        ky_cu = ky_baseline(ky_list, ky_moi)
+        if not ky_cu or ky_cu == ky_moi:
+            return 0
+        df_moi = doc_snapshot(ky_moi)
+        df_cu  = doc_snapshot(ky_cu)
+        if df_moi.empty or df_cu.empty:
+            return 0
         _NGUONG = 0.5  # tăng ≥ 0.5pp được coi là bất thường
         ds_tang = []
-        for pgd in df_moi[COT_TEN_PGD].unique():
-            row_m = df_moi[df_moi[COT_TEN_PGD] == pgd].iloc[0]
-            row_c = df_cu[df_cu[COT_TEN_PGD] == pgd]
+        for pgd in df_moi["ten_pgd"].unique():
+            if str(pgd).startswith("__"):
+                continue
+            row_m = df_moi[df_moi["ten_pgd"] == pgd].iloc[0]
+            row_c = df_cu[df_cu["ten_pgd"] == pgd]
             if row_c.empty:
                 continue
             row_c = row_c.iloc[0]
-            dn_m = float(row_m.get(COT_TONG_DU_NO, 0) or 0)
-            qh_m = float(row_m.get(COT_DU_NO_QH, 0) or 0)
-            dn_c = float(row_c.get(COT_TONG_DU_NO, 0) or 0)
-            qh_c = float(row_c.get(COT_DU_NO_QH, 0) or 0)
+            dn_m = float(row_m.get("tong_du_no", 0) or 0)
+            qh_m = float(row_m.get("du_no_qh", 0) or 0)
+            dn_c = float(row_c.get("tong_du_no", 0) or 0)
+            qh_c = float(row_c.get("du_no_qh", 0) or 0)
             tl_m = qh_m / dn_m * 100 if dn_m else 0.0
             tl_c = qh_c / dn_c * 100 if dn_c else 0.0
             if tl_m - tl_c >= _NGUONG:
                 ds_tang.append({
-                    "ten_pgd":  str(pgd),
-                    "ty_le_cu": tl_c,
+                    "ten_pgd":   str(pgd),
+                    "ty_le_cu":  tl_c,
                     "ty_le_moi": tl_m,
-                    "tang":     tl_m - tl_c,
+                    "tang":      tl_m - tl_c,
                 })
         if ds_tang:
             gui_canh_bao_qh_moi(ds_tang)
@@ -611,34 +619,42 @@ def _giai_ngan_tuan() -> int:
 
 
 def _canh_bao_khoanh_tang() -> int:
-    """So sánh nợ khoanh snapshot hôm nay vs kỳ trước, cảnh báo nếu tăng ≥ 5%."""
+    """So sánh nợ khoanh snapshot kỳ mới nhất vs baseline 31/12 năm trước."""
     from services.telegram_service import gui_canh_bao_khoanh_tang
     try:
-        from snapshot_service import doc_snapshot_range
-        from config import COT_DU_NO_KHOANH
-        snapshots = doc_snapshot_range(tu_ky=None, den_ky=None, n_ky=2)
-        if len(snapshots) < 2 or COT_DU_NO_KHOANH not in snapshots[0].columns:
+        from snapshot_service import danh_sach_ky, doc_snapshot, ky_baseline
+        ky_list = danh_sach_ky()
+        if not ky_list:
             return 0
-        df_moi, df_cu = snapshots[0], snapshots[1]
-        _NGUONG_PCT = 5.0  # tăng ≥ 5% giá trị tuyệt đối
+        ky_moi = ky_list[0]
+        ky_cu = ky_baseline(ky_list, ky_moi)
+        if not ky_cu or ky_cu == ky_moi:
+            return 0
+        df_moi = doc_snapshot(ky_moi)
+        df_cu  = doc_snapshot(ky_cu)
+        if df_moi.empty or df_cu.empty or "du_no_khoanh" not in df_moi.columns:
+            return 0
+        _NGUONG_PCT = 5.0
         ds_tang = []
-        for pgd in df_moi[COT_TEN_PGD].unique():
-            row_m = df_moi[df_moi[COT_TEN_PGD] == pgd].iloc[0]
-            row_c = df_cu[df_cu[COT_TEN_PGD] == pgd]
+        for pgd in df_moi["ten_pgd"].unique():
+            if str(pgd).startswith("__"):
+                continue
+            row_m = df_moi[df_moi["ten_pgd"] == pgd].iloc[0]
+            row_c = df_cu[df_cu["ten_pgd"] == pgd]
             if row_c.empty:
                 continue
             row_c = row_c.iloc[0]
-            kh_moi = float(row_m.get(COT_DU_NO_KHOANH, 0) or 0)
-            kh_cu  = float(row_c.get(COT_DU_NO_KHOANH, 0) or 0)
+            kh_moi = float(row_m.get("du_no_khoanh", 0) or 0)
+            kh_cu  = float(row_c.get("du_no_khoanh", 0) or 0)
             if kh_cu == 0 or kh_moi == 0:
                 continue
             tang_pct = (kh_moi - kh_cu) / kh_cu * 100
             if tang_pct >= _NGUONG_PCT:
                 ds_tang.append({
-                    "ten_pgd":   str(pgd),
-                    "khoanh_cu": kh_cu,
+                    "ten_pgd":    str(pgd),
+                    "khoanh_cu":  kh_cu,
                     "khoanh_moi": kh_moi,
-                    "tang_pct":  tang_pct,
+                    "tang_pct":   tang_pct,
                 })
         if ds_tang:
             gui_canh_bao_khoanh_tang(ds_tang)

@@ -154,8 +154,8 @@ def tinh_du_no_ap_baseline(df_baseline: pd.DataFrame, ten_xa: str) -> dict:
             du_no = float(grp[col_dn].sum())
             if du_no <= 0:
                 continue
-            ma_key = MAKEY_BY_MACT_NV.get((int(ma_ct), int(nv_int)))
-            if ma_key:
+            mk_list = MAKEY_BY_MACT_NV.get((int(ma_ct), int(nv_int)), [])
+            for ma_key in mk_list:
                 result[f"{str(ten_thon).strip()}|{ma_key}"] = round(du_no / 1_000_000, 1)
         return result
     except Exception as e:  # conv: skip
@@ -213,8 +213,7 @@ def _lay_ds_ma_key_co_du_lieu(
             for _, row in df_xa.iterrows():
                 ma_ct = int(row[col_mact])
                 nguon_von_code = int(row[col_nv])
-                ma_key = MAKEY_BY_MACT_NV.get((ma_ct, nguon_von_code))
-                if ma_key:
+                for ma_key in MAKEY_BY_MACT_NV.get((ma_ct, nguon_von_code), []):
                     ds_ma_key.add(ma_key)
 
     # Từ lịch sử

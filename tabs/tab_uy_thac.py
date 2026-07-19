@@ -45,6 +45,7 @@ from snapshot_service import (
     doc_uy_thac_snapshot_hoi_cn,
     doc_uy_thac_snapshot_hoi_pgd,
     doc_uy_thac_snapshot_multi,
+    ky_baseline,
 )
 from services.template_service import docx_bytes_to_pdf, tao_word_uythac_bc_th
 from services.uy_thac_pdf_service import (
@@ -814,8 +815,13 @@ def _render_bao_cao_so_lieu(
         doc_bien_ban_theo_nam(nam=date.today().year, pgd_user=pgd_scope or pgd_user),
         ngay_ref=date.today(),
     )
+    _ky_all_pdf = danh_sach_ky_uy_thac()
+    _bl_pdf = ky_baseline(_ky_all_pdf, _ky_all_pdf[0]) if _ky_all_pdf else None
+    _ky_6_pdf = _ky_all_pdf[:6]
+    if _bl_pdf and _bl_pdf not in _ky_6_pdf:
+        _ky_6_pdf = sorted(set(_ky_6_pdf + [_bl_pdf]), reverse=True)[:6]
     report_bd_bundle = tinh_bien_dong_snapshot(
-        doc_uy_thac_snapshot_multi(tuple(list(reversed(danh_sach_ky_uy_thac()[:6]))), ten_pgd=pgd_scope or pgd_user)
+        doc_uy_thac_snapshot_multi(tuple(list(reversed(_ky_6_pdf))), ten_pgd=pgd_scope or pgd_user)
     ).rename(columns={
         "ky": "Kỳ",
         "tong_du_no": "Tổng dư nợ (triệu đồng)",
@@ -1042,7 +1048,11 @@ def _render_bao_cao_so_lieu(
         st.caption("Danh sách đã được sắp theo mức độ và giá trị để ưu tiên hành động; Tổ đa hội là cảnh báo kiểm tra dữ liệu.")
     else:
         ky_all = danh_sach_ky_uy_thac()
-        ky_chon = list(reversed(ky_all[:6]))
+        _bl_ut = ky_baseline(ky_all, ky_all[0]) if ky_all else None
+        _ky_6 = ky_all[:6]
+        if _bl_ut and _bl_ut not in _ky_6:
+            _ky_6 = sorted(set(_ky_6 + [_bl_ut]), reverse=True)[:6]
+        ky_chon = list(reversed(_ky_6))
         cap_bd_options = ["Tổng phạm vi", "Theo Xã/phường"]
         if not (pgd_scope or pgd_user):
             cap_bd_options.insert(1, "Theo Hội đoàn thể")

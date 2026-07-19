@@ -149,7 +149,11 @@ def _tong_du_no_series(df: pd.DataFrame) -> pd.Series:
     return du_no_th + du_no_qh
 
 
-def _quet_ma_tu_hstd(df_full: pd.DataFrame | None, ds_all: list[dict]) -> pd.DataFrame:
+@st.cache_data(show_spinner=False, ttl=300)
+def _quet_ma_tu_hstd(_df_full: pd.DataFrame | None, _ds_all: list[dict], ts: float = 0.0) -> pd.DataFrame:
+    _ = ts
+    df_full = _df_full
+    ds_all = _ds_all
     required = {COT_NGUON_VON, COT_MA_CHUONG_TRINH, COT_MA_NHA_DAU_TU}
     if df_full is None or df_full.empty or not required.issubset(df_full.columns):
         return pd.DataFrame()
@@ -326,8 +330,8 @@ def _render_tong_quan(ds_all: list[dict]) -> None:
     st.dataframe(df_loc, hide_index=True, use_container_width=True)
 
 
-def _render_tinh_trang_ma_moi(df_full: pd.DataFrame | None, ds_all: list[dict]) -> int:
-    df_scan = _quet_ma_tu_hstd(df_full, ds_all)
+def _render_tinh_trang_ma_moi(df_full: pd.DataFrame | None, ds_all: list[dict], ts_hstd: float = 0.0) -> int:
+    df_scan = _quet_ma_tu_hstd(df_full, ds_all, ts_hstd)
     if df_scan.empty or _COL_DA_CO_RULE not in df_scan.columns:
         st.caption("Chưa phát hiện mã NĐT ĐP mới từ HSTD hiện tại.")
         return 0
@@ -398,7 +402,7 @@ def _render_tinh_trang_ma_moi(df_full: pd.DataFrame | None, ds_all: list[dict]) 
     return so_ma_moi
 
 
-def _render_ma_moi_tu_hstd(df_full: pd.DataFrame | None, ds_all: list[dict], can_edit: bool, username: str) -> None:
+def _render_ma_moi_tu_hstd(df_full: pd.DataFrame | None, ds_all: list[dict], can_edit: bool, username: str, ts_hstd: float = 0.0) -> None:
     st.markdown("##### 🆕 Mã mới từ HSTD chi tiết")
     st.caption("Quét các cặp `Mã CT + Mã NĐT` thuộc nguồn ĐP trong HSTD, hiện chỉ áp dụng cho CT 03 và CT 06.")
 
@@ -411,7 +415,7 @@ def _render_ma_moi_tu_hstd(df_full: pd.DataFrame | None, ds_all: list[dict], can
         st.warning("HSTD hiện tại thiếu một trong các cột: `Nguồn vốn`, `Mã chương trình`, `Mã nhà đầu tư`.")
         return
 
-    df_scan = _quet_ma_tu_hstd(df_full, ds_all)
+    df_scan = _quet_ma_tu_hstd(df_full, ds_all, ts_hstd)
     if df_scan.empty:
         st.info("Không tìm thấy dữ liệu nguồn ĐP thuộc CT 03/CT 06 trong HSTD hiện tại.")
         return
@@ -819,6 +823,7 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
     role = kwargs.get("role", "user")
     username = kwargs.get("username", "unknown")
     df_full = kwargs.get("df_full", kwargs.get("df"))
+    ts_hstd = float(kwargs.get("ts_hstd", 0.0))
 
     ctx = tab if tab is not None else st.container()
     with ctx:
@@ -836,7 +841,7 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
         _render_kpi_rules(ds_all)
 
         mode_options = ["📊 Tổng quan", "🆕 Mã mới từ HSTD", "⚙️ Quản lý", "🔎 Phân tích"]
-        so_ma_moi = _render_tinh_trang_ma_moi(df_full, ds_all)
+        so_ma_moi = _render_tinh_trang_ma_moi(df_full, ds_all, ts_hstd)
         auto_open_key = "ndt_dp_auto_opened_new"
         if so_ma_moi > 0 and not st.session_state.get(auto_open_key):
             st.session_state["ndt_dp_mode"] = "🆕 Mã mới từ HSTD"
@@ -852,7 +857,7 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
         if che_do == "📊 Tổng quan":
             _render_tong_quan(ds_all)
         elif che_do == "🆕 Mã mới từ HSTD":
-            _render_ma_moi_tu_hstd(df_full, ds_all, can_edit, username)
+            _render_ma_moi_tu_hstd(df_full, ds_all, can_edit, username, ts_hstd)
         elif che_do == "⚙️ Quản lý":
             ct_label = st.radio(
                 "Chương trình",

@@ -11,7 +11,9 @@ Hệ thống Quản trị Tín dụng Nội bộ — **Ngân hàng Chính sách 
 (đã sáp nhập Bình Phước 2025).
 
 - **Stack:** Streamlit + Python + SQLite + PyArrow/Parquet
-- **Chạy:** `streamlit run app.py` → `http://localhost:8501`
+- **Chạy:** `venv\Scripts\python.exe -m streamlit run app.py --server.port 8502` → `http://localhost:8502`
+- **Python chuẩn:** `D:\VBSP-SCM\venv\Scripts\python.exe` (Python 3.12)
+- **Không dùng:** `D:\VBSP-SCM\.venv` / `.venv*` vì đây là môi trường cũ Python 3.14, dễ làm IDE/agent probe nhầm và gây cửa sổ CMD chớp
 - **Người dùng:** ~20 users, 9 vai trò, 2 phân hệ
 - **Phạm vi:** 22 đơn vị (Hội sở + 21 PGD), 95 xã/phường
 

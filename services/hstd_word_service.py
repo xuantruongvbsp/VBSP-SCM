@@ -35,6 +35,18 @@ try:
     from docx.oxml.ns import qn
     _DOCX_READY = True
 except ImportError:
+    Document = None
+    Pt = Cm = Inches = RGBColor = None
+    OxmlElement = qn = None
+
+    class _WdAlignFallback:
+        LEFT = CENTER = RIGHT = JUSTIFY = None
+
+    class _WdTableAlignFallback:
+        CENTER = None
+
+    WD_ALIGN_PARAGRAPH = _WdAlignFallback()
+    WD_TABLE_ALIGNMENT = _WdTableAlignFallback()
     _DOCX_READY = False
 
 VBSP_GREEN = (0x2E, 0x7D, 0x32)

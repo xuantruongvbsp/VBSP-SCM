@@ -4,26 +4,22 @@ Hệ thống Quản trị & Tác nghiệp Tín dụng Nội bộ — NHCSXH Chi 
 
 ## Yêu cầu hệ thống
 
-- **Python** 3.10 trở lên
+- **Python** 3.12
 - **Windows** (hỗ trợ font Times New Roman cho PDF)
 
 ## 1. Cài đặt môi trường
 
 ```bash
-# Kiểm tra phiên bản Python
-python --version
-
-# Tạo môi trường ảo (khuyến nghị)
-python -m venv .venv
-
-# Kích hoạt môi trường ảo (Windows)
-.venv\Scripts\activate
+# Cài/tạo lại môi trường chuẩn của dự án
+setup_env.bat
 ```
+
+Môi trường chuẩn là `venv\Scripts\python.exe`. Không dùng `.venv`; nếu thấy `.venv*` thì đó là môi trường cũ/đã vô hiệu hóa.
 
 ## 2. Cài đặt thư viện
 
 ```bash
-pip install -r requirements.txt
+venv\Scripts\python.exe -m pip install -r requirements.txt
 ```
 
 **Thư viện PDF** (cài riêh nếu cần xuất PDF):
@@ -48,10 +44,10 @@ copy C:\Windows\Fonts\timesbd.ttf assets\
 ## 4. Chạy ứng dụng
 
 ```bash
-streamlit run app.py
+Chay_VBSP_SCM.bat
 ```
 
-Truy cập: **http://localhost:8501**
+Truy cập: **http://localhost:8502**
 
 ## 5. Cấu trúc dự án
 

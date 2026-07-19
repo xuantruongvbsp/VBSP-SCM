@@ -407,12 +407,34 @@ def render(tab: "DeltaGenerator", **kwargs) -> None:
 
         st.caption("💡 Bấm chọn một dòng để xem chi tiết hồ sơ.")
         df_view, ku_series = _build_bang_ket_qua(df_f)
+
+        # ── Phân trang (giữ nguyên selection mode) ──
+        PAGE_SIZE = 200
+        total_rows = len(df_view)
+        total_pages = max(1, (total_rows + PAGE_SIZE - 1) // PAGE_SIZE)
+        if total_pages > 1:
+            c_pg, c_info = st.columns([1, 3])
+            with c_pg:
+                page = st.number_input(
+                    f"Trang",
+                    min_value=1, max_value=total_pages, value=1,
+                    key="tc_page",
+                )
+            with c_info:
+                st.caption(f"Hiển thị {(page-1)*PAGE_SIZE+1:,}–{min(page*PAGE_SIZE, total_rows):,} / {total_rows:,} dòng")
+        else:
+            page = 1
+
+        start = (page - 1) * PAGE_SIZE
+        end = min(start + PAGE_SIZE, total_rows)
+        chunk = df_view.iloc[start:end]
+
         event = st.dataframe(
-            df_view,
+            chunk,
             hide_index=True,
             use_container_width=True,
             height=460,
-            key="tc_table",
+            key=f"tc_table_p{page}",
             on_select="rerun",
             selection_mode="single-row",
         )
@@ -422,7 +444,7 @@ def render(tab: "DeltaGenerator", **kwargs) -> None:
         if event and getattr(event, "selection", None):
             rows = event.selection.get("rows", [])
         if rows:
-            pos = rows[0]
+            pos = rows[0] + start  # map vị trí chunk → vị trí gốc
             so_ku = str(ku_series.iat[pos]) if pos < len(ku_series) else ""
             if so_ku:
                 mask = df[COT_SO_KU].astype(str).str.strip() == so_ku.strip()

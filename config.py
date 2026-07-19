@@ -865,83 +865,87 @@ MA_PGD_MAP: dict[str, str] = {
 TEN_PGD_TO_MA: dict[str, str] = {v: k for k, v in MA_PGD_MAP.items()}
 
 # Cấu trúc phân cấp: PGD → danh sách xã/phường trực thuộc
+# Tên xã/phường khớp CHÍNH XÁC cột "Tên xã" trong HSTD parquet:
+#   - Xã: không có prefix (ví dụ "La Ngà", không phải "Xã La Ngà")
+#   - Phường đô thị hoá gần đây: lowercase "phường " (ví dụ "phường Tân Phú")
+#   - Phường cũ (Hội sở, Bình Long...): không prefix (ví dụ "Biên Hòa")
 PGD_XA_MAP: dict[str, list[str]] = {
     "Hội sở Chi nhánh tỉnh": [
-        "Phường Phước Tân", "Phường Biên Hòa", "Phường Trấn Biên",
-        "Phường Long Hưng", "Phường Long Bình", "Phường Trảng Dài",
-        "Phường Tam Phước", "Phường Hố Nai", "Phường Tam Hiệp",
+        "Phước Tân", "Biên Hòa", "Trấn Biên",
+        "Long Hưng", "Long Bình", "Trảng Dài",
+        "Tam Phước", "Hố Nai", "Tam Hiệp",
     ],
     "PGD Long Thành": [
-        "Xã Phước Thái", "Xã An Phước", "Xã Bình An",
-        "Xã Long Thành", "Xã Long Phước",
+        "Phước Thái", "An Phước", "Bình An",
+        "phường Long Thành", "Long Phước",
     ],
     "PGD Trảng Bom": [
-        "Xã An Viễn", "Xã Hưng Thịnh", "Xã Trảng Bom",
-        "Xã Bàu Hàm", "Xã Bình Minh",
+        "An Viễn", "Hưng Thịnh", "phường Trảng Bom",
+        "Bàu Hàm", "Bình Minh",
     ],
     "PGD Long Khánh": [
-        "Phường Bảo Vinh", "Phường Xuân Lập", "Phường Long Khánh",
-        "Phường Bình Lộc", "Phường Hàng Gòn",
+        "Bảo Vinh", "Xuân Lập", "Long Khánh",
+        "Bình Lộc", "Hàng Gòn",
     ],
     "PGD Xuân Lộc": [
-        "Xã Xuân Thành", "Xã Xuân Bắc", "Xã Xuân Định",
-        "Xã Xuân Lộc", "Xã Xuân Phú", "Xã Xuân Hòa",
+        "Xuân Thành", "Xuân Bắc", "Xuân Định",
+        "phường Xuân Lộc", "Xuân Phú", "Xuân Hòa",
     ],
     "PGD Định Quán": [
-        "Xã Phú Vinh", "Xã Định Quán", "Xã Thanh Sơn",
-        "Xã Phú Hòa", "Xã La Ngà",
+        "Phú Vinh", "Định Quán", "Thanh Sơn",
+        "Phú Hòa", "La Ngà",
     ],
     "PGD Vĩnh Cửu": [
-        "Xã Tân An", "Phường Tân Triều", "Xã Trị An", "Xã Phú Lý",
+        "Tân An", "Tân Triều", "phường Trị An", "Phú Lý",
     ],
     "PGD Tân Phú": [
-        "Xã Phú Lâm", "Xã Nam Cát Tiên", "Xã Tân Phú",
-        "Xã Tà Lài", "Xã Dak Lua",
+        "Phú Lâm", "Nam Cát Tiên", "phường Tân Phú",
+        "Tà Lài", "Dak Lua",
     ],
     "PGD Thống Nhất": [
-        "Xã Dầu Giây", "Xã Thống Nhất", "Xã Gia Kiệm",
+        "phường Dầu Giây", "Thống Nhất", "Gia Kiệm",
     ],
     "PGD Cẩm Mỹ": [
-        "Xã Xuân Quế", "Xã Xuân Đường", "Xã Cẩm Mỹ",
-        "Xã Xuân Đông", "Xã Sông Ray",
+        "Xuân Quế", "Xuân Đường", "Cẩm Mỹ",
+        "Xuân Đông", "Sông Ray",
     ],
     "PGD Nhơn Trạch": [
-        "Xã Đại Phước", "Xã Nhơn Trạch", "Xã Phước An",
+        "Đại Phước", "phường Nhơn Trạch", "Phước An",
     ],
     "PGD Bình Long": [
-        "Phường An Lộc", "Phường Bình Long",
+        "An Lộc", "Bình Long",
     ],
     "PGD Lộc Ninh": [
-        "Xã Lộc Tấn", "Xã Lộc Thạnh", "Xã Lộc Thành",
-        "Xã Lộc Quang", "Xã Lộc Ninh", "Xã Lộc Hưng",
+        "Lộc Tấn", "Lộc Thạnh", "Lộc Thành",
+        "Lộc Quang", "phường Lộc Ninh", "Lộc Hưng",
     ],
     "PGD Bình Phước": [
-        "Phường Đồng Xoài", "Phường Bình Phước",
+        "Đồng Xoài", "Bình Phước",
     ],
     "PGD Phước Long": [
-        "Phường Phước Long", "Phường Phước Bình",
+        "Phước Long", "Phước Bình",
     ],
     "PGD Bù Đăng": [
-        "Xã Thọ Sơn", "Xã Bù Đăng", "Xã Đăk Nhau",
-        "Xã Phước Sơn", "Xã Bom Bo", "Xã Nghĩa Trung",
+        "Thọ Sơn", "Bù Đăng", "Đăk Nhau",
+        "Phước Sơn", "Bom Bo", "Nghĩa Trung",
     ],
     "PGD Đồng Phú": [
-        "Xã Thuận Lợi", "Xã Đồng Phú", "Xã Đồng Tâm", "Xã Tân Lợi",
+        "Thuận Lợi", "phường Đồng Phú", "Đồng Tâm", "Tân Lợi",
     ],
     "PGD Chơn Thành": [
-        "Phường Minh Hưng", "Xã Nha Bích", "Phường Chơn Thành",
+        "Minh Hưng", "Nha Bích", "Chơn Thành",
     ],
     "PGD Bù Đốp": [
-        "Xã Hưng Phước", "Xã Thiện Hưng", "Xã Tân Tiến",
+        "Hưng Phước", "Thiện Hưng", "Tân Tiến",
     ],
     "PGD Bù Gia Mập": [
-        "Xã Bù Gia Mập", "Xã Phú Nghĩa", "Xã Đa Kia", "Xã Đăk Ơ",
+        "Bù Gia Mập", "Phú Nghĩa", "Đa Kia", "Đăk Ơ",
     ],
     "PGD Phú Riềng": [
-        "Xã Bình Tân", "Xã Long Hà", "Xã Phú Trung", "Xã Phú Riềng",
+        "Bình Tân", "Long Hà", "Phú Trung", "Phú Riềng",
     ],
     "PGD Hớn Quản": [
-        "Xã Minh Đức", "Xã Tân Hưng", "Xã Tân Khai", "Xã Tân Quan",
+        "Minh Đức", "Tân Hưng", "phường Tân Khai", "Tân Quan",
     ],
 }
 
@@ -1117,6 +1121,33 @@ DCGIAM_CRED_FILE = str(BASE_DIR / "credentials.json")
 # Google Sheets — Tiến độ nộp báo cáo PGD
 TIENDO_BAOCAO_SHEET_ID  = "15Ev2rTv6khLFaMpAiMwqJCVC_33ocJ-6cp016RGNkYk"
 TIENDO_BAOCAO_SHEET_TAB = "TIENDO_BAOCAO"
+
+# Google Sheets — Kế hoạch & kết quả công việc nội bộ Phòng KH-NV
+# SHEET_ID để trống trong config; runtime đọc từ kv_store key
+# `khnv_ke_hoach_cv_config` để người vận hành tự cấu hình trong UI.
+KE_HOACH_CV_KHNV_SHEET_ID = ""
+KE_HOACH_CV_KHNV_SHEET_KH = "KhHoach"
+KE_HOACH_CV_KHNV_SHEET_KQ = "KetQua"
+KE_HOACH_CV_KHNV_NHOM = [
+    "Công tác tham mưu",
+    "Công tác tổng hợp",
+    "Công tác trên địa bàn, Hội sở",
+]
+KE_HOACH_CV_KHNV_DAU_VIEC = [
+    "Tham mưu văn bản chỉ đạo",
+    "Tham mưu văn bản Kế hoạch",
+    "Tham mưu KHTD",
+    "Tổng hợp Báo cáo KHTD",
+    "Tổng hợp sáp nhập thôn",
+    "Tổng hợp sáp nhập điểm giao dịch xã",
+    "Tập hợp, kiểm tra hồ sơ vay từ Tổ TK&VV, trình lãnh đạo phê duyệt",
+    "Huy động tiền gửi tiết kiệm từ tổ chức, cá nhân trên địa bàn",
+    "Đôn đốc thu nợ đến hạn, quá hạn; lập danh sách nợ chây ỳ",
+    "Đánh giá chất lượng hoạt động Tổ TK&VV; đề xuất củng cố tổ yếu kém",
+    "Tham gia sinh hoạt Tổ TK&VV theo lịch; kiểm tra sổ sách của Tổ",
+    "Kiểm soát, chỉnh sửa các cảnh báo trên chương trình TTBC-IMS",
+    "Khác",
+]
 
 
 # ── Mapping mã Điểm Giao Dịch theo PGD (nguồn: file Excel MÃ ĐIỂM GIAO DỊCH ĐỒNG NAI.xlsx) ──────

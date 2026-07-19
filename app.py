@@ -57,7 +57,7 @@ import auth
 from auth import LOGO_NHCSXH_B64 as LOGO_B64, normalize_role
 import workspaces
 import db
-from utils_theme import init_theme, get_theme_css
+from utils_theme import init_theme, _css_part1, _css_part2
 from state_manager import SCMStateManager
 from security import (
     init_session_security,
@@ -256,7 +256,8 @@ st.set_page_config(
 
 # ── Theme init + CSS ────────────────────────────────────────────────────────────
 init_theme()
-st.markdown(get_theme_css(), unsafe_allow_html=True)
+st.markdown(_css_part1(), unsafe_allow_html=True)
+st.markdown(_css_part2(), unsafe_allow_html=True)
 
 # ── Logo VBSP ────────────────────────────────────────────────────────────────
 
@@ -1257,8 +1258,10 @@ def main():
             import tracemalloc as _tm
             _tm.start()
             if la_phan_he_cn(role) or not pgd_user:
-                df_full = _load_hstd(CACHE_HSTD, _hstd_ts, active_only=True)
-                df = df_full
+                # df_full: toàn bộ hồ sơ (kể cả dư nợ = 0) — dùng cho báo cáo KHNV
+                # df: chỉ hồ sơ còn dư nợ — dùng cho tìm kiếm / duyệt hồ sơ
+                df_full = _load_hstd(CACHE_HSTD, _hstd_ts, active_only=False)
+                df = _load_hstd(CACHE_HSTD, _hstd_ts, active_only=True)
                 # Kiểm tra schema — parquet từ file template chỉ có ~6 cột
                 # (xảy ra khi cache bị xóa và app fallback đọc raw Excel)
                 _MIN_COLS = 15
@@ -1307,8 +1310,9 @@ def main():
                     df_op = doc_hstd_toan_cn_pgd(_pgd_op_ts)
                     if df_op is not None and not df_op.empty:
                         df = df_op
-            else:
-                df = df_full
+            # management/executive: df = active_only (cho tìm kiếm, tổng quan)
+            # df_full = full (cho báo cáo KHNV, tabs cần tất cả hồ sơ)
+            # Không gán df = df_full — hai object riêng biệt để enrich độc lập.
 
             # df_nq11: kv_store approach (upload 1 lần).
             # Backward compat: nếu kv_store chưa có IDs → đọc parquet cache cũ

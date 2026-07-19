@@ -34,6 +34,13 @@ from utils import fmt_ngay, lazy_tabs
 DS_PGD_ALL = [DON_VI_CHI_NHANH] + DS_PGD
 _PGD_BIEN_HOA = "Địa bàn Biên Hòa"
 
+def _to_int(val: object, default: int = 0) -> int:
+    try:
+        return int(val)
+    except (TypeError, ValueError):
+        return default
+
+
 LOAI_TASK = {
     "chung":            "📋 Công việc chung",
     "chi_tieu_khtd":    "🎯 Chỉ tiêu KHTD",
@@ -101,7 +108,7 @@ def _render_tong_quan(tab, **kwargs):
         )
         # Tính % trung bình từ pct_hoan_thanh (nếu có dữ liệu)
         all_pct = [
-            int(r.get("pct_hoan_thanh") or 0)
+            _to_int(r.get("pct_hoan_thanh"))
             for v in all_kq.values()
             for r in v
         ]
@@ -892,7 +899,7 @@ def _render_cap_nhat(tab, **kwargs):
                     ten_cot: r["ten_xa"],
                     "Trạng thái": TS_KQ_LABEL.get(r["trang_thai"], r["trang_thai"]),
                     "Hoàn thành": r["trang_thai"] == "da_hoan_thanh",
-                    "% HT": int(r.get("pct_hoan_thanh") or 0),
+                    "% HT": _to_int(r.get("pct_hoan_thanh")),
                     "Ngày hoàn thành": _parse_date(r.get("ngay_hoan_thanh")),
                     "Ghi chú": r.get("ghi_chu") or "",
                 }
@@ -1033,8 +1040,8 @@ def _render_cap_nhat(tab, **kwargs):
                         "PGD":        r.get("pgd") or "",
                         "Trước":      _TS_LABEL.get(r.get("trang_thai_cu") or "", r.get("trang_thai_cu") or "—"),
                         "Sau":        _TS_LABEL.get(r.get("trang_thai_moi") or "", r.get("trang_thai_moi") or "—"),
-                        "% trước":    int(r.get("pct_cu") or 0),
-                        "% sau":      int(r.get("pct_moi") or 0),
+                        "% trước":    _to_int(r.get("pct_cu")),
+                        "% sau":      _to_int(r.get("pct_moi")),
                         "Ghi chú":    r.get("ghi_chu") or "",
                         "Người nhập": r.get("nguoi_nhap") or "",
                     }

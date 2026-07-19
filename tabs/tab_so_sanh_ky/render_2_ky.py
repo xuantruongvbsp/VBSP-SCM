@@ -5,12 +5,13 @@ import streamlit as st
 import pandas as pd
 from streamlit.delta_generator import DeltaGenerator
 
+import db
 from auth import normalize_role, la_phan_he_pgd
 from utils import fmt_ty, fmt_so, vn, lazy_expander as _lazy_expander
 from tabs.base_tab import TabContext
 from state_manager import SCMStateManager
 from snapshot_service import (
-    danh_sach_ky, doc_snapshot,
+    compare_snapshot_2_ky, danh_sach_ky, doc_snapshot, export_snapshot_excel, ky_baseline,
     danh_sach_ky_nq11, doc_nq11_snapshot,
     danh_sach_ky_gqvl, doc_gqvl_snapshot,
     danh_sach_ky_cdtotkvv, doc_cdtotkvv_snapshot,
@@ -143,19 +144,21 @@ def _render_bang_chi_tiet(agg1: dict, agg2: dict, ky1: str, ky2: str) -> None:
 
 def _render_bang_pgd(df1: pd.DataFrame, df2: pd.DataFrame,
                      ky1: str, ky2: str) -> None:
-    m1 = df1[["ten_pgd", "tong_du_no", "du_no_qh", "so_ho"]].rename(columns={
-        "tong_du_no": "dn1", "du_no_qh": "nqh1", "so_ho": "ho1",
+    comp = compare_snapshot_2_ky(ky1, ky2)
+    if comp.empty:
+        return
+    jn = comp.rename(columns={
+        "tong_du_no_prev": "dn1",
+        "tong_du_no": "dn2",
+        "du_no_qh_prev": "nqh1",
+        "du_no_qh": "nqh2",
+        "so_ho_prev": "ho1",
+        "so_ho": "ho2",
+        "tong_du_no_delta": "delta_dn",
+        "du_no_qh_delta": "delta_nqh",
+        "so_ho_delta": "delta_ho",
     })
-    m2 = df2[["ten_pgd", "tong_du_no", "du_no_qh", "so_ho"]].rename(columns={
-        "tong_du_no": "dn2", "du_no_qh": "nqh2", "so_ho": "ho2",
-    })
-    jn = pd.merge(m1, m2, on="ten_pgd", how="outer").fillna(0)
-    for col in ["dn1", "dn2", "nqh1", "nqh2", "ho1", "ho2"]:
-        if col in jn.columns:
-            jn[col] = pd.to_numeric(jn[col], errors="coerce").fillna(0)
-    jn["delta_dn"]  = jn["dn2"]  - jn["dn1"]
-    jn["delta_nqh"] = jn["nqh2"] - jn["nqh1"]
-    jn["delta_ho"]  = jn["ho2"]  - jn["ho1"]
+    jn = jn[~jn["ten_pgd"].astype(str).str.startswith("__")].copy()
     jn["tl_nqh1"] = (jn["nqh1"] / jn["dn1"].replace(0, float("nan")) * 100).fillna(0.0)
     jn["tl_nqh2"] = (jn["nqh2"] / jn["dn2"].replace(0, float("nan")) * 100).fillna(0.0)
 
@@ -220,14 +223,11 @@ def _render_bang_pgd(df1: pd.DataFrame, df2: pd.DataFrame,
 
 def _render_bieu_do(df1: pd.DataFrame, df2: pd.DataFrame,
                     ky1: str, ky2: str) -> None:
-    m1 = df1[["ten_pgd", "tong_du_no"]].rename(columns={"tong_du_no": "dn1"})
-    m2 = df2[["ten_pgd", "tong_du_no"]].rename(columns={"tong_du_no": "dn2"})
-    jn = pd.merge(m1, m2, on="ten_pgd", how="outer").fillna(0)
-    for _c in ["dn1", "dn2"]:
-        if _c in jn.columns:
-            jn[_c] = pd.to_numeric(jn[_c], errors="coerce").fillna(0)
-    jn["delta"] = jn["dn2"] - jn["dn1"]
-    jn = jn[~jn["ten_pgd"].str.startswith("__")].sort_values("delta")
+    jn = compare_snapshot_2_ky(ky1, ky2)
+    if jn.empty:
+        return
+    jn = jn.rename(columns={"tong_du_no_delta": "delta"})
+    jn = jn[~jn["ten_pgd"].astype(str).str.startswith("__")].sort_values("delta")
 
     if jn.empty:
         return
@@ -469,7 +469,8 @@ def _render_cached(role: str, username: str, pgd_user: str | None, pgd_mode: boo
         st.warning("⚠️ Cần ít nhất **2 kỳ snapshot** để so sánh.")
         return
 
-    ky_sel = _ky_selector(ds_ky, ds_ky[min(1, len(ds_ky)-1)], ds_ky[0], "", label="")
+    _ky1_default = ky_baseline(ds_ky, ds_ky[0]) or ds_ky[min(1, len(ds_ky) - 1)]
+    ky_sel = _ky_selector(ds_ky, _ky1_default, ds_ky[0], "", label="")
     if ky_sel is None:
         return
     ky1, ky2 = ky_sel
@@ -567,6 +568,19 @@ def _render_cached(role: str, username: str, pgd_user: str | None, pgd_mode: boo
         sheets_extra = build_excel_sheets_pgd(df1, df2, ky1, ky2)
     render_export_ui(rows_data, ky1, ky2, username, sheets_extra,
                      action="xuat_bieu_cn", key_prefix="2ky")
+    if not pgd_mode:
+        raw_key = f"_2ky_snapshot_raw_{ky1}_{ky2}"
+        if raw_key not in st.session_state:
+            st.session_state[raw_key] = export_snapshot_excel([ky1, ky2], "hstd")
+        if st.download_button(
+            "📦 Xuất Excel snapshot gốc",
+            data=st.session_state[raw_key],
+            file_name=f"snapshot_hstd_{ky1}_vs_{ky2}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            key="2ky_dl_snapshot_raw",
+            use_container_width=True,
+        ):
+            db.ghi_audit(username, "xuat_bieu_cn", f"Xuất Excel snapshot HSTD gốc: {ky1} vs {ky2}")
 
     # ── Lazy sections ──
     st.divider()

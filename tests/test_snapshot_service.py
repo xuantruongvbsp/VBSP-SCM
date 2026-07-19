@@ -90,6 +90,53 @@ def db_memory():
         )
     """)
     conn.execute("""
+        CREATE TABLE nq11_snapshot (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ky TEXT NOT NULL,
+            ten_pgd TEXT NOT NULL DEFAULT '__CN__',
+            tong_du_no REAL DEFAULT 0,
+            no_th REAL DEFAULT 0,
+            no_qh REAL DEFAULT 0,
+            so_kh INTEGER DEFAULT 0,
+            gn_nam REAL DEFAULT 0,
+            ngay_bc TEXT,
+            created_by TEXT DEFAULT 'system',
+            created_at TEXT DEFAULT (datetime('now')),
+            UNIQUE(ky, ten_pgd)
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE gqvl_snapshot (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ky TEXT NOT NULL,
+            ten_pgd TEXT NOT NULL DEFAULT '__CN__',
+            dn_th REAL DEFAULT 0,
+            dn_qh REAL DEFAULT 0,
+            dn_khoanh REAL DEFAULT 0,
+            so_kh INTEGER DEFAULT 0,
+            gn_nam REAL DEFAULT 0,
+            created_by TEXT DEFAULT 'system',
+            created_at TEXT DEFAULT (datetime('now')),
+            UNIQUE(ky, ten_pgd)
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE cdtotkvv_snapshot (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ky TEXT NOT NULL,
+            ten_pgd TEXT NOT NULL DEFAULT '__CN__',
+            so_to INTEGER DEFAULT 0,
+            so_tot INTEGER DEFAULT 0,
+            so_kha INTEGER DEFAULT 0,
+            so_tb INTEGER DEFAULT 0,
+            so_yeu INTEGER DEFAULT 0,
+            diem_tb REAL DEFAULT 0,
+            created_by TEXT DEFAULT 'system',
+            created_at TEXT DEFAULT (datetime('now')),
+            UNIQUE(ky, ten_pgd)
+        )
+    """)
+    conn.execute("""
         CREATE TABLE IF NOT EXISTS audit_log (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             ts TEXT,
@@ -188,7 +235,7 @@ class TestLuuSnapshot:
         assert kq.thanh_cong is False
 
     def test_luu_clear_cache(self, df_hstd_gias, db_memory):
-        with patch.object(svc.st.cache_data, "clear") as clear_mock:
+        with patch.object(svc, "_clear_snapshot_cache") as clear_mock:
             svc.luu_snapshot(df_hstd_gias, "test_user")
         clear_mock.assert_called_once()
 
@@ -408,6 +455,22 @@ class TestXoaSnapshot:
         ds = svc.danh_sach_ky()
         assert "2026-03" not in ds
 
+    def test_xoa_dong_bo_ca_5_bang(self, df_hstd_gias, db_memory):
+        svc.luu_snapshot(df_hstd_gias, "test_user")
+        db_memory.execute(
+            "INSERT INTO uy_thac_snapshot (ky, cap_tong_hop, ten_pgd) VALUES (?, ?, ?)",
+            ("2026-03", "CN", "__ALL__"),
+        )
+        for table in ("nq11_snapshot", "gqvl_snapshot", "cdtotkvv_snapshot"):
+            db_memory.execute(f"INSERT INTO {table} (ky, ten_pgd) VALUES (?, ?)", ("2026-03", "__CN__"))
+        db_memory.commit()
+
+        svc.xoa_snapshot("2026-03", "test_user")
+
+        for table in ("hstd_snapshot", "uy_thac_snapshot", "nq11_snapshot", "gqvl_snapshot", "cdtotkvv_snapshot"):
+            count = db_memory.execute(f"SELECT COUNT(*) FROM {table} WHERE ky='2026-03'").fetchone()[0]
+            assert count == 0
+
     def test_xoa_ky_khong_ton_tai(self, db_memory):
         """Xóa kỳ không tồn tại không được raise exception."""
         try:
@@ -417,6 +480,37 @@ class TestXoaSnapshot:
 
     def test_xoa_clear_cache(self, df_hstd_gias, db_memory):
         svc.luu_snapshot(df_hstd_gias, "test_user")
-        with patch.object(svc.st.cache_data, "clear") as clear_mock:
+        with patch.object(svc, "_clear_snapshot_cache") as clear_mock:
             svc.xoa_snapshot("2026-03", "test_user")
         clear_mock.assert_called_once()
+
+
+class TestSnapshotServiceHelpers:
+    def test_compare_snapshot_2_ky_co_delta(self, df_hstd_gias, db_memory):
+        svc.luu_snapshot(df_hstd_gias, "u1")
+        df2 = df_hstd_gias.copy()
+        df2["Ngày số liệu"] = "30/04/2026"
+        df2.loc[df2["Tên PGD"] == "PGD Biên Hòa", "Tổng dư nợ"] += 5_000_000.0
+        df2["Dư nợ trong hạn"] = df2["Tổng dư nợ"] - df2["Dư nợ quá hạn"]
+        svc.luu_snapshot(df2, "u2")
+
+        df_cmp = svc.compare_snapshot_2_ky("2026-03", "2026-04")
+
+        row = df_cmp[df_cmp["ten_pgd"] == "PGD Biên Hòa"].iloc[0]
+        assert row["tong_du_no_delta"] == 10_000_000.0
+        assert "tong_du_no_pct" in df_cmp.columns
+
+    def test_validate_snapshot_bat_thieu_pgd(self, df_hstd_gias, db_memory):
+        svc.luu_snapshot(df_hstd_gias, "test_user")
+
+        result = svc.validate_snapshot("2026-03")
+
+        assert result["ok"] is False
+        assert any("Thiếu dữ liệu" in issue for issue in result["issues"])
+
+    def test_export_snapshot_excel_tra_bytes_xlsx(self, df_hstd_gias, db_memory):
+        svc.luu_snapshot(df_hstd_gias, "test_user")
+
+        data = svc.export_snapshot_excel(["2026-03"], "hstd")
+
+        assert data[:2] == b"PK"

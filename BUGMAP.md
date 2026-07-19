@@ -195,9 +195,19 @@
 | **File** | `snapshot_service.py` → `luu_snapshot()`, `xoa_snapshot()`; `services/upload_service.py` → `_snap_bg()` |
 | **Dấu hiệu** | UI vẫn hiển thị danh sách kỳ/số liệu cũ tối đa 5 phút sau lưu, xóa hoặc auto-snapshot |
 | **Nguyên nhân** | Các reader dùng `@st.cache_data(ttl=300)` nhưng writer không invalid cache sau commit |
-| **Fix** | Gọi `st.cache_data.clear()` ngay sau ghi/xóa thành công và khi background snapshot hoàn tất |
+| **Fix** | Gọi helper `_clear_snapshot_cache()` sau ghi/xóa thành công để clear riêng các reader snapshot, không xóa toàn bộ cache app |
 | **Test** | `tests/test_snapshot_service.py::TestLuuSnapshot::test_luu_clear_cache`, `tests/test_snapshot_service.py::TestXoaSnapshot::test_xoa_clear_cache` |
 | **Ngày fix** | 2026-07-11 |
+
+### A11 — Xóa snapshot chỉ xóa HSTD và cache helper có thể crash
+| | |
+|---|---|
+| **File** | `snapshot_service.py` → `xoa_snapshot()`, `_clear_snapshot_cache()` ~dòng 1013 |
+| **Dấu hiệu** | Xóa một kỳ snapshot nhưng các bảng `uy_thac_snapshot`, `nq11_snapshot`, `gqvl_snapshot`, `cdtotkvv_snapshot` vẫn còn dữ liệu; hoặc writer gọi `.clear()` trực tiếp gây lỗi khi cache function chưa sẵn sàng |
+| **Nguyên nhân** | `xoa_snapshot()` chỉ DELETE `hstd_snapshot`; cache invalidation vừa dùng global clear rộng, vừa có nơi gọi `.clear()` không qua guard |
+| **Fix** | Khai báo `_SNAPSHOT_TABLES` và xóa cả 5 bảng trong một transaction; gom cache invalidation vào `_clear_snapshot_cache()` với `hasattr(fn, "clear")` và logging `exc_info=True` |
+| **Test** | `tests/test_snapshot_service.py::TestXoaSnapshot::test_xoa_dong_bo_ca_5_bang`, `tests/test_snapshot_service.py::TestSnapshotServiceHelpers::test_compare_snapshot_2_ky_co_delta` |
+| **Ngày fix** | 2026-07-19 |
 
 ---
 
@@ -760,6 +770,33 @@
 | **Fix** | Luôn dùng `except Exception as e:` — không bao giờ `except Exception:` |
 | **Ngày fix** | 2026-05-21 |
 
+### C8 — Nguồn vốn TW/ĐP = 0 trong Báo cáo KHNV
+| | |
+|---|---|
+| **File** | `services/khnv_bao_cao_service.py` dòng ~88 |
+| **Dấu hiệu** | `nguon_von_tw = 0`, `nguon_von_dp = 0` trong tab Báo cáo KHNV mode HSTD |
+| **Nguyên nhân** | Excel lưu Nguồn vốn là số float → đọc vào parquet là `'1.0'`, `'2.0'`. Service dùng `.isin(["1", "TW"])` và `.isin(["2", "ĐP"])` → không khớp vì `'1.0' ≠ '1'` |
+| **Fix** | Chuẩn hoá: `pd.to_numeric(..., errors='coerce').fillna(-1).astype(int).astype(str)` rồi mới isin() |
+| **Ngày fix** | 2026-07-19 |
+
+### C10 — Số KH Báo cáo KHNV tính nhầm vì Tên KH trùng lặp
+| | |
+|---|---|
+| **File** | `services/khnv_bao_cao_service.py` dòng ~81 |
+| **Dấu hiệu** | Số KH = 109.372 thay vì ~214.120 |
+| **Nguyên nhân** | `Tên KH.nunique()` không phân biệt được nhiều người cùng tên. Trong data có 12.721 tên có từ 3+ Mã KH khác nhau — rõ ràng là các người khác nhau. Mỗi Mã KH ↔ 1 Số CMND (1-to-1) nên Mã KH là định danh đúng. |
+| **Fix** | Đổi sang `Mã KH.nunique()` với filter active (dư nợ > 0) trên df được truyền vào, để đếm đúng KH còn dư nợ dù df_full hay df_active được dùng |
+| **Ngày fix** | 2026-07-19 |
+
+### C9 — Số KH và Giải ngân tháng trong Báo cáo KHNV thấp hơn thực tế
+| | |
+|---|---|
+| **File** | `app.py` dòng ~1259-1313 |
+| **Dấu hiệu** | Số KH = 109.372 thay vì 123.963; Giải ngân = 459,05 tỷ thay vì 459,93 tỷ |
+| **Nguyên nhân** | `df_full` được load với `active_only=True` → bỏ 73K hồ sơ đã tất toán (dư nợ=0). Trong số đó có 14.591 KH unique và 12 hồ sơ có giải ngân tháng 0,88 tỷ |
+| **Fix** | Tách `df_full = _load_hstd(..., active_only=False)` và `df = _load_hstd(..., active_only=True)`. Bỏ dòng `df = df_full` cho management/executive workspace để `df` (tìm kiếm) vẫn là active_only |
+| **Ngày fix** | 2026-07-19 |
+
 ---
 
 ## D. Database / kv_store
@@ -1078,6 +1115,15 @@
 | **Test** | `tests/test_uy_thac_pdf_service.py::test_tao_pdf_bao_cao_dang_xem_dung_don_vi_trieu`, `tests/test_uy_thac_pdf_service.py::test_tao_pdf_dieu_hanh_co_du_cac_phan_va_nhieu_trang` |
 | **Ngày fix** | 2026-07-14 |
 
+### F9 — `NameError: WD_ALIGN_PARAGRAPH` làm crash tab Thông tin chung
+| | |
+|---|---|
+| **File** | `services/hstd_word_service.py` dòng ~28-48; import từ `tabs/tab_tongquan.py` |
+| **Dấu hiệu** | Mở `📊 Thông tin chung` báo `Lỗi render **📊 Thông tin chung**: name 'WD_ALIGN_PARAGRAPH' is not defined`; log có `ModuleNotFoundError: No module named 'docx'` hoặc import `docx` lỗi trước đó |
+| **Nguyên nhân** | `python-docx` là dependency tùy chọn ở runtime, nhưng file service dùng `WD_ALIGN_PARAGRAPH.LEFT` và `.CENTER` trong default argument của helper module-level. Khi import `docx` thất bại, `except ImportError` chỉ set `_DOCX_READY=False`, còn symbol enum không tồn tại nên module crash ngay lúc định nghĩa hàm |
+| **Fix** | Trong nhánh `except ImportError`, khai báo fallback object có các thuộc tính `LEFT/CENTER/RIGHT/JUSTIFY` và `WD_TABLE_ALIGNMENT.CENTER`. Nhờ vậy tab Tổng quan import/render bình thường; hàm xuất Word vẫn dừng sớm với thông báo thiếu `python-docx` khi được gọi |
+| **Ngày fix** | 2026-07-19 |
+
 ---
 
 ## G. Kế hoạch tín dụng
@@ -1166,6 +1212,36 @@
 | **Fix** | Chuẩn hóa sang danh mục rule `ndt_dp_rule_list` với cấu trúc `{"ma_ct", "ma", "ghi_chu", "cap"}`; thêm helper `phan_loai_ndt_dp_cap(ma_ct, ma_ndt)` ưu tiên match exact `(ma_ct, ma_ndt)`, fallback rule chung `ma_ct=None`; UI quản lý/xem-only hiển thị thêm `CT 03` / `CT 06` |
 | **Bài học** | Với danh mục dùng để phân loại nhiều chương trình, phải lưu đủ khóa nghiệp vụ tối thiểu ngay từ đầu; đừng dựa vào tên tab hoặc key kv riêng để ngầm suy ra ngữ cảnh chương trình |
 | **Ngày fix** | 2026-06-21 |
+
+### G25 — Tab Nguồn vốn địa phương vẫn gộp cấp tỉnh/cấp xã dù đã có rule Mã NĐT
+| | |
+|---|---|
+| **File** | `tabs/tab_hhi.py` |
+| **Dấu hiệu** | Sau khi cấu hình mã nhà đầu tư cấp tỉnh/cấp xã, màn `🏦 Nguồn vốn địa phương` vẫn chỉ có `Trung ương` và `Địa phương`; KPI, biểu đồ, bảng và Excel không cho biết phần ĐP nào thuộc cấp tỉnh hay cấp xã/khác |
+| **Nguyên nhân** | Tab phân tích chỉ map theo cột `Nguồn vốn`, chưa đọc rule `Mã CT + Mã nhà đầu tư` từ `ndt_dp_rule_list`; vì vậy lớp nghiệp vụ mới ở tab quản lý mã NĐT không được phản ánh vào báo cáo điều hành |
+| **Fix** | Thêm `_nv_cap_label` trong bước chuẩn hóa dữ liệu, dựng lookup rule một lần mỗi render, tách ĐP thành `ĐP cấp tỉnh` và `ĐP cấp xã/khác`; cập nhật KPI, pie, treemap, bảng chi tiết và Excel export theo 2 cấp này |
+| **Bài học** | Khi đã có danh mục phân loại nghiệp vụ, mọi báo cáo cùng chuyên đề phải dùng lại danh mục đó; không dừng ở chiều tổng hợp cũ nếu người dùng đã cung cấp khóa phân loại chi tiết |
+| **Ngày fix** | 2026-07-19 |
+
+### G26 — `_tinh_thuc_hien_theo_ct` chia 50/50 GQVL ĐP thay vì theo Mã NĐT
+| | |
+|---|---|
+| **File** | `tabs/tab_khtd.py` ~dòng 484 |
+| **Dấu hiệu** | Tab KHTD — TH hiển thị cho GQVL ĐP: `3_DP_TINH` = `3_DP_XA` = 50% thay vì tỷ lệ thực tế (vd 95%/5%) |
+| **Nguyên nhân** | `_tinh_thuc_hien_theo_ct()` không có logic phân tầng cho GQVL ĐP. Khi lookup `(ma_ct=3, nv=2)` trả về 2 key `["3_DP_TINH", "3_DP_XA"]`, code chia đều `float(val) / len(mk_list)` → luôn 50/50. Khác với NSVSMT ĐP (ma_ct=6) đã có `_tinh_th_nsvsmt_dp_phan_tang` dùng Mã NĐT để phân tầng |
+| **Fix** | Tạo `_tinh_th_gqvl_dp_phan_tang()` — copy pattern từ `_tinh_th_nsvsmt_dp_phan_tang`, đổi `ma_ct == 6` → `ma_ct == 3` và key `6_DP_*` → `3_DP_*`. Sau groupby loop, thêm block override GQVL ĐP (tương tự block NSVSMT ĐP ở dòng 506-511) |
+| **Bài học** | Mọi chương trình DP có 2 sub-key (TINH/XA) trong `CHUONG_TRINH_KHTD` đều cần hàm phân tầng riêng dựa trên Mã NĐT; không được dùng `len(mk_list)` chia đều |
+| **Ngày fix** | 2026-07-19 |
+
+### G27 — `_tinh_thuc_hien_theo_ct` (tab PGD) ép 100% GQVL ĐP vào `3_DP_TINH`, `3_DP_XA` luôn = 0
+| | |
+|---|---|
+| **File** | `tabs/tab_khtd_pgd.py` ~dòng 540 |
+| **Dấu hiệu** | Bảng KH/TH PGD — cột `3_DP_XA` (GQVL xã) luôn bằng 0, toàn bộ GQVL ĐP dồn vào `3_DP_TINH`. Tương tự, NSVSMT ĐP (ma_ct=6) không tách được `6_DP_TINH`/`6_DP_XA` |
+| **Nguyên nhân** | `lookup` trong `_tinh_thuc_hien_theo_ct` dùng first-win: `(3, 2)` → `"3_DP_TINH"`, `"3_DP_XA"` không bao giờ được gán. Groupby gộp toàn bộ GQVL ĐP vào `3_DP_TINH`. Không có block phân tầng theo Mã NĐT như G26 đã fix ở `tab_khtd.py` |
+| **Fix** | Sau groupby loop, thêm block override: với mask `(ma_ct==3, nv==2)` và `(ma_ct==6, nv==2)`, map từng dòng sang `phan_loai_ndt_dp_cap()` rồi tổng hợp lại thành `3_DP_TINH`/`3_DP_XA` và `6_DP_TINH`/`6_DP_XA`. Xóa key tạm `6_DP` sau khi tách |
+| **Bài học** | Mọi fix phân tầng ĐP phải áp dụng đồng bộ cho cả `tab_khtd.py` (màn CN) lẫn `tab_khtd_pgd.py` (màn PGD). Khi fix G26 chỉ sửa tab CN, tab PGD vẫn mang bug cũ |
+| **Ngày fix** | 2026-07-19 |
 
 ### G10 — `🏛️ KHTD Chi nhánh`: `TH` GQVL bị lấy nhầm tiền từ `GQVL.parquet` thay vì `HSTD`
 | | |
@@ -1286,6 +1362,35 @@
 | **Fix** | Sắp lại nhóm theo ngữ nghĩa nghiệp vụ: hộ nghèo/cận nghèo/mới thoát nghèo; HSSV/việc làm/xuất khẩu lao động; nhà ở/nước sạch; vùng khó khăn; DTTS/miền núi; đối tượng đặc thù/khác |
 | **Bài học** | Với màn nhập liệu nhiều dòng, chất lượng grouping ảnh hưởng trực tiếp đến tốc độ nhập và khả năng soát số; nên ưu tiên nhóm theo tư duy nghiệp vụ của người nhập hơn là theo cấu trúc mã nội bộ |
 | **Ngày fix** | 2026-07-11 |
+
+### G22 — `📈 KHTD`: lỗi render `KHTD_CN_NHOM_MA_CT is not defined`
+| | |
+|---|---|
+| **File** | `tabs/tab_khtd_nhap.py` |
+| **Dấu hiệu** | Mở `📈 Kế hoạch tín dụng` báo `name 'KHTD_CN_NHOM_MA_CT' is not defined`, thường khi vào phần KHTD theo Xã hoặc xuất Excel/PDF theo xã |
+| **Nguyên nhân** | `KHTD_CN_NHOM_MA_CT` được định nghĩa trong `tabs.tab_khtd` và `tab_khtd_nhap.py` vẫn dùng ở nhiều vòng lặp theo xã, nhưng import list sau refactor chỉ kéo `MA_KEYS_CO_KHTD` và helper, thiếu constant nhóm chương trình |
+| **Fix** | Bổ sung `KHTD_CN_NHOM_MA_CT` vào import list từ `tabs.tab_khtd` trong `tab_khtd_nhap.py` |
+| **Bài học** | Sau khi refactor constant dùng chung của KHTD, grep toàn bộ module con theo tên constant và kiểm tra import list tương ứng, nhất là các nhánh render lazy chỉ nổ khi user mở đúng sub-tab |
+| **Ngày fix** | 2026-07-19 |
+
+### G24 — `PGD_XA_MAP` tên xã không khớp HSTD — toàn bộ 22 PGD
+| | |
+|---|---|
+| **File** | `config.py` dòng ~868-946 |
+| **Dấu hiệu** | Mọi filter `df[df['Tên xã'].isin(PGD_XA_MAP[pgd])]` trả DataFrame rỗng; số liệu TH theo xã/phân tầng GQVL ĐP đều bằng 0 |
+| **Nguyên nhân** | `PGD_XA_MAP` dùng "Xã La Ngà", "Phường Biên Hòa"... còn HSTD dùng "La Ngà", "Biên Hòa" (không prefix), hoặc lowercase "phường Tân Phú" cho đơn vị đô thị hóa gần đây. Prefix không khớp → join/isin fail hoàn toàn |
+| **Fix** | Bỏ prefix "Xã "/"Phường " thừa; giữ lowercase "phường " cho đơn vị đã đô thị hóa; xác minh từng PGD bằng so sánh `HSTD parquet` với `PGD_XA_MAP`. 22/22 PGD đạt OK |
+| **Ngày fix** | 2026-07-19 |
+
+### G23 — `📈 KHTD theo Xã`: tóm tắt hiện trạng lấy số cả PGD và hiện nhiều dòng 0
+| | |
+|---|---|
+| **File** | `tabs/tab_khtd_nhap.py` |
+| **Dấu hiệu** | Trong `📈 Kế hoạch tín dụng` → `📍 KHTD theo Xã`, chọn một xã nhưng `Tổng cộng` và cột `TH` giống số toàn PGD; bảng tóm tắt/form vẫn hiện nhiều chương trình xã không có dư nợ, không giải ngân, không thu nợ trong năm |
+| **Nguyên nhân** | `_du_lieu_khtd_pgd_cached()` chỉ lọc theo `COT_TEN_PGD`, chưa lọc tiếp `COT_TEN_XA`, rồi truyền dict `th_xa` đó cho từng xã. Bảng tóm tắt cũng render toàn bộ `KHTD_CN_NHOM_MA_CT` trước khi biết dòng nào thật sự có dữ liệu |
+| **Fix** | Thêm `_du_lieu_khtd_xa_cached()` lọc đúng PGD + xã, tính `TH` từ `df_xa`; thêm `_ma_keys_phat_sinh_nam()` để giữ các chương trình có dư nợ/giải ngân/thu nợ năm; bảng tóm tắt và form mặc định chỉ hiện dòng có KH hoặc có phát sinh, kèm checkbox `Hiện tất cả chương trình` |
+| **Bài học** | Tên biến `th_xa` phải phản ánh đúng cấp lọc dữ liệu. Với màn theo xã, không được tái sử dụng dict đã tính ở cấp PGD nếu không kèm lọc xã trước khi groupby |
+| **Ngày fix** | 2026-07-19 |
 
 ---
 
@@ -2364,6 +2469,259 @@ val = pd.to_numeric(df[COT_X], errors="coerce").sum() if COT_X in df.columns els
 | **Fix** | Đếm nhanh mã mới từ `df_full`; nếu còn mã mới và session chưa tự mở lần nào, đặt `st.session_state["ndt_dp_mode"] = "🆕 Mã mới từ HSTD"` để hiện ngay bảng phát sinh |
 | **Test** | Compile, convention check và kiểm tra tĩnh có helper `_dem_ma_moi_tu_hstd()` cùng auto-open mode trước `st.radio()` |
 | **Ngày fix** | 2026-07-18 |
+
+### J38 — Launcher mở browser quá sớm và thoát ngay không hiện lỗi
+| | |
+|---|---|
+| **File** | `Chay_VBSP_SCM.bat` |
+| **Dấu hiệu** | Double-click launcher không vào app; người dùng chỉ thấy cửa sổ console đen chớp/tắt hoặc Chrome mở `localhost:8502` khi server chưa sẵn sàng |
+| **Nguyên nhân** | Batch mở trình duyệt trước khi Streamlit lắng nghe port; kiểm tra `import streamlit` nuốt stderr nên lỗi môi trường không rõ; nếu Streamlit thoát mã 0 thì console cũng đóng ngay |
+| **Fix** | Kiểm tra import trực tiếp trên console; helper ẩn chờ port 8502 rồi mới mở browser; truyền `--server.headless true`; sau khi Streamlit thoát luôn in trạng thái và `pause` để đọc lỗi |
+| **Test** | Chạy `cmd /c Chay_VBSP_SCM.bat` trong sandbox xác nhận lỗi import được in ra; kiểm tra diff và trạng thái git |
+| **Ngày fix** | 2026-07-19 |
+
+### J39 — Helper tự mở trình duyệt trong launcher vẫn tạo cửa sổ chớp
+| | |
+|---|---|
+| **File** | `Chay_VBSP_SCM.bat`, `run.bat` |
+| **Dấu hiệu** | Sau khi thêm logic chờ server, máy người dùng vẫn còn hiện tượng cửa sổ đen chớp liên tục và app không vào được |
+| **Nguyên nhân** | `start powershell -WindowStyle Hidden ...` vẫn có thể tạo process/cửa sổ phụ trên một số máy; shortcut cũng có thể trỏ sang `run.bat` cũ còn `start "" http://localhost:8502` |
+| **Fix** | Bỏ hoàn toàn tự mở browser/helper PowerShell ở cả hai launcher; chỉ chạy Streamlit foreground và in URL để người dùng mở thủ công sau khi thấy dòng `Local URL` |
+| **Test** | Kiểm tra tĩnh `Chay_VBSP_SCM.bat` và `run.bat` không còn lệnh `start`; chạy batch trong sandbox xác nhận lỗi hiện trực tiếp, không spawn browser/helper |
+| **Ngày fix** | 2026-07-19 |
+
+### J40 — Python venv trả mã 0 nhưng không thực thi lệnh
+| | |
+|---|---|
+| **File** | `Chay_VBSP_SCM.bat`, `run.bat` |
+| **Dấu hiệu** | `python -m streamlit run app.py` thoát mã 0 ngay, không in `Local URL`, không mở port 8502; app không vào được dù bước kiểm tra Streamlit có thể báo OK |
+| **Nguyên nhân** | Venv/Python nền hỏng hoặc không tương thích, khiến `python.exe` trả về nhưng không thực thi nội dung `-c`/script; kiểm tra bằng exit code đơn thuần không phát hiện được |
+| **Fix** | Thêm probe bắt buộc Python ghi file `tmp/python_exec_check.txt`; nếu file không xuất hiện hoặc nội dung không đúng thì dừng launcher và yêu cầu cài Python 3.12 + chạy lại `setup_env.bat`. `setup_env.bat` cũng có probe riêng, ưu tiên `py -3.12`/`py -3.13` và chặn Python 3.14+ để không tái tạo venv lỗi |
+| **Test** | Chạy batch trong sandbox xác nhận lỗi Python không bị hiểu nhầm là Streamlit OK; probe không phụ thuộc stdout/stderr |
+| **Ngày fix** | 2026-07-19 |
+
+### J41 — Khó phân biệt launcher thật bị gọi lặp hay cửa sổ từ nguồn khác
+| | |
+|---|---|
+| **File** | `Chay_VBSP_SCM.bat` |
+| **Dấu hiệu** | Sau khi bỏ `start`/PowerShell, người dùng vẫn thấy cửa sổ đen bật tắt liên tục khi chạy launcher sau khởi động máy |
+| **Nguyên nhân** | Cần phân biệt `Chay_VBSP_SCM.bat` thật có bị gọi lặp hay cửa sổ đến từ task/shortcut/process khác; quan sát bằng mắt không đủ vì process có thể sống rất ngắn |
+| **Fix** | Thêm khóa single-instance `tmp/vbsp_launcher.lock` và log từng bước vào `logs/launcher_last.log`; nếu file thật chạy, log luôn ghi mốc `START`, bước kiểm tra và lỗi cuối |
+| **Test** | Chạy `cmd /c Chay_VBSP_SCM.bat` xác nhận log ghi lỗi Python probe và batch dừng ở `pause`, không lặp |
+| **Ngày fix** | 2026-07-19 |
+
+### J42 — `setup_env.bat` báo `'t'/'not' is not recognized`
+| | |
+|---|---|
+| **File** | `setup_env.bat` |
+| **Dấu hiệu** | Ngay bước `[0/6] Kiem tra Python...`, CMD in `'t' is not recognized` và `'not' is not recognized` trước khi báo lỗi Python |
+| **Nguyên nhân** | Batch dùng biến lệnh Python có khoảng trắng (`py -3.12`) trong các block `if (...)` lồng nhau; CMD parse/expand sớm làm vỡ câu lệnh thành token rác |
+| **Fix** | Viết lại `setup_env.bat` bản ASCII tối giản, chỉ dùng `py -3.12`, dùng nhãn `goto` thay cho block lồng phức tạp và probe Python bằng file tạm |
+| **Test** | Chạy `cmd /c setup_env.bat` khi chưa có Python 3.12: báo gọn `Khong tim thay Python 3.12`, không còn `'t'/'not'` |
+| **Ngày fix** | 2026-07-19 |
+
+### J43 — Streamlit lỗi `ModuleNotFoundError: google.protobuf` dù pip báo installed
+| | |
+|---|---|
+| **File** | `setup_env.bat`, `venv` |
+| **Dấu hiệu** | `Chay_VBSP_SCM.bat` qua được Python probe nhưng lỗi ở bước `Kiem tra Streamlit`; log có `ModuleNotFoundError: No module named 'google.protobuf'` hoặc trước đó thiếu `blinker` |
+| **Nguyên nhân** | Lần cài requirements bị nửa vời: `.dist-info` tồn tại nên pip tưởng đã cài, nhưng thư mục module thật trong `site-packages` bị thiếu; `pip check` có thể không bắt lỗi namespace package này |
+| **Fix** | Chạy lại `pip install -r requirements.txt`, ép `pip install --force-reinstall protobuf`; thêm bước force reinstall `protobuf` và `pip check` vào `setup_env.bat` |
+| **Test** | `python -c "import streamlit; print(streamlit.__version__)"` trả `1.59.2`; `pip check` báo `No broken requirements found` |
+| **Ngày fix** | 2026-07-19 |
+
+### J44 — Launcher chạy ổn nhưng không tự mở Chrome
+| | |
+|---|---|
+| **File** | `Chay_VBSP_SCM.bat`, `run.bat` |
+| **Dấu hiệu** | Server Streamlit đã lên `Local URL: http://localhost:8502` nhưng Chrome không tự bật như trước |
+| **Nguyên nhân** | Trong lúc xử lý lỗi cửa sổ đen chớp, launcher được chuyển sang `--server.headless true` và bỏ mọi lệnh tự mở trình duyệt để loại trừ nguồn spawn cửa sổ phụ |
+| **Fix** | Đổi sang `--server.headless false` để chính Streamlit tự mở trình duyệt sau khi server sẵn sàng; vẫn không dùng `start chrome`/PowerShell phụ |
+| **Test** | Kiểm tra tĩnh hai launcher dùng `--server.headless false` và không có `start chrome`/PowerShell |
+| **Ngày fix** | 2026-07-19 |
+
+### J45 — Launcher báo còn lần khởi động khác dù app đã tắt
+| | |
+|---|---|
+| **File** | `Chay_VBSP_SCM.bat` |
+| **Dấu hiệu** | Batch báo `VBSP-SCM dang co mot lan khoi dong khac dang chay` và yêu cầu xóa `tmp/vbsp_launcher.lock`, dù port 8502 không chạy |
+| **Nguyên nhân** | Lần chạy trước bị dừng bằng cách đóng cửa sổ hoặc bị ngắt trước nhãn cleanup, làm thư mục lock còn sót |
+| **Fix** | Khi lock tồn tại, launcher kiểm tra port 8502; nếu port không listening thì tự xóa lock cũ và chạy tiếp |
+| **Test** | Xóa lock thủ công lần hiện tại; kiểm tra tĩnh nhánh stale lock trong `Chay_VBSP_SCM.bat` |
+| **Ngày fix** | 2026-07-19 |
+
+### J46 — Pandas báo thiếu dependency dateutil
+| | |
+|---|---|
+| **File** | `setup_env.bat`, `Chay_VBSP_SCM.bat`, `venv` |
+| **Dấu hiệu** | App báo `ImportError: Unable to import required dependency dateutil`; kiểm tra `venv\Scripts\python.exe` có thể báo đang trỏ về `C:\Users\Administrator\AppData\Local\Programs\Python\Python312\python.exe` đã không còn tồn tại |
+| **Nguyên nhân** | Python 3.12 gốc bị gỡ hoặc venv bị cài nửa vời, làm pandas còn metadata nhưng thiếu module `dateutil`/`python-dateutil` hoặc venv không chạy được Python nền |
+| **Fix** | `setup_env.bat` force-reinstall `python-dateutil` cùng `protobuf`, kiểm tra `import dateutil`, và fallback sang Python 3.12 trực tiếp trong `%LOCALAPPDATA%` nếu Python Launcher `py -3.12` không nhận bản cài; launcher kiểm tra sớm `pandas/dateutil` để dừng với thông báo rõ |
+| **Test** | Cài lại `python-dateutil` và `pandas` trong venv; `import pandas/dateutil/streamlit/google.protobuf/blinker` OK; `pip check` OK; `app.py` compile OK |
+| **Ngày fix** | 2026-07-19 |
+
+### J47 — Launcher báo app đang chạy dù không có CMD nào
+| | |
+|---|---|
+| **File** | `Chay_VBSP_SCM.bat` |
+| **Dấu hiệu** | Launcher báo `App dang chay tren cong 8502` nhưng người dùng không thấy cửa sổ CMD/Streamlit; `localhost:8502` không truy cập được |
+| **Nguyên nhân** | Batch dùng `%errorlevel%` bên trong block `if exist "%LOCK_DIR%" (...)`; CMD mở rộng biến trước khi chạy `netstat`, nên có thể dùng giá trị cũ và nhận nhầm port đang listening |
+| **Fix** | Đổi các nhánh kiểm tra port/lock sang `if not errorlevel 1` và `if errorlevel 1` để đọc trạng thái runtime đúng; xóa lock cũ `tmp\vbsp_launcher.lock` |
+| **Test** | Sau khi xóa lock: `Test-Path tmp\vbsp_launcher.lock` = False; `netstat :8502` không có dòng listening; health endpoint không còn kết nối khi app đã tắt |
+| **Ngày fix** | 2026-07-19 |
+
+### J50 — daily_report.py: 2 hàm cảnh báo chết im do sai signature + sai cột
+| | |
+|---|---|
+| **File** | `scripts/daily_report.py` → `_canh_bao_qh_moi()` dòng ~540, `_canh_bao_khoanh_tang()` dòng ~621 |
+| **Dấu hiệu** | Hàm không raise exception nhưng luôn trả về 0; không gửi Telegram |
+| **Nguyên nhân** | (1) Gọi `doc_snapshot_range(tu_ky=None, den_ky=None, n_ky=2)` — param `n_ky` không tồn tại trong hàm thật, gọi sai signature. (2) Dùng `COT_TEN_PGD`, `COT_TONG_DU_NO`, `COT_DU_NO_QH`, `COT_DU_NO_KHOANH` (tên cột tiếng Việt) nhưng `doc_snapshot()` trả về DataFrame với cột snake_case: `ten_pgd`, `tong_du_no`, `du_no_qh`, `du_no_khoanh` |
+| **Fix** | Thay `doc_snapshot_range(n_ky=2)` bằng `danh_sach_ky()` + `ky_baseline()` + `doc_snapshot()`; đổi tham chiếu cột sang snake_case; lọc bỏ dòng `__CN__` |
+| **Ngày fix** | 2026-07-19 |
+
+### J49 — ws_executive.py: biến động PGD dùng `_ds_ky[-2]` = kỳ gần cũ nhất thay vì kỳ trước
+| | |
+|---|---|
+| **File** | `workspaces/ws_executive.py` → `_render_hom_nay()` dòng ~1104 |
+| **Dấu hiệu** | Bảng "PGD biến động ≥ 5%" so sánh với kỳ rất xa trong quá khứ (gần cuối danh sách), biến động luôn rất lớn |
+| **Nguyên nhân** | `danh_sach_ky()` sorted giảm dần (mới → cũ), nên `_ds_ky[-2]` là kỳ thứ hai từ cuối — gần kỳ cũ nhất, không phải kỳ trước |
+| **Fix** | Dùng `ky_baseline(_ds_ky, _ds_ky[0])` thay vì `_ds_ky[-2]`; đồng thời sửa `COT_TEN_PGD`/`COT_TONG_DU_NO` → snake_case `ten_pgd`/`tong_du_no` |
+| **Ngày fix** | 2026-07-19 |
+
+### J48 — Cửa sổ đen chớp do `.venv` Python 3.14 cũ bị probe liên tục
+| | |
+|---|---|
+| **File** | `.venv`, `venv` |
+| **Dấu hiệu** | Nhiều cửa sổ đen/conhost chớp liên tục dù `Chay_VBSP_SCM.bat` không ghi log START mới; process monitor bắt được nhiều `D:\VBSP-SCM\.venv\Scripts\python.exe -I -c "...sys.version_info..."` sinh ra rồi tắt rất nhanh |
+| **Nguyên nhân** | Trong repo còn `.venv` cũ tạo bằng Python 3.14 (`C:\Users\dell\AppData\Local\Programs\Python\Python314`); IDE/agent khác tự quét interpreter `.venv` liên tục, mỗi lần probe tạo `conhost.exe` nên thấy màn hình CMD chớp |
+| **Fix** | Đổi tên `.venv` cũ thành `.venv_py314_disabled_20260719`; app tiếp tục dùng `venv` Python 3.12 |
+| **Test** | Sau khi đổi tên: bắt process 8 giây không còn match `VBSP-SCM\.venv`; `venv\Scripts\python.exe -c "import pandas; import streamlit"` OK |
+| **Ngày fix** | 2026-07-19 |
+
+### J51 — `st.cache_data` không bust cache vì tham số sentinel bắt đầu bằng `_`
+| | |
+|---|---|
+| **File** | `tabs/tab_hhi.py`, `tabs/tab_quan_ly_ndt_dp.py` |
+| **Dấu hiệu** | Mã NĐT mới từ HSTD hoặc file Excel xuất ở tab Nguồn vốn địa phương có thể giữ dữ liệu cũ sau khi HSTD đổi; Excel còn có nguy cơ dùng lại dữ liệu giữa view CN/PGD |
+| **Nguyên nhân** | Streamlit bỏ qua tham số bắt đầu bằng `_` khi hash cache. Các helper cache dùng `_ts`, `_is_pgd_view`, `_extra_cols`, nên sentinel `ts_hstd` và view context không tham gia cache key |
+| **Fix** | Đổi sentinel/cache key thành tham số không có `_`: `ts`, `is_pgd_view`, `extra_cols`, `view_key`; truyền `ts_hstd` xuống đầy đủ tới `_render_ma_moi_tu_hstd()` |
+| **Ngày fix** | 2026-07-19 |
+
+### J52 — Fallback xuất Excel rỗng có thể crash tiếp
+| | |
+|---|---|
+| **File** | `tabs/tab_hhi.py` → `render()` phần xuất Excel ~dòng 555 |
+| **Dấu hiệu** | Nếu `_cached_excel_sheets()` lỗi, nhánh `except` gọi `xuat_excel({})`; openpyxl có thể lỗi tiếp vì workbook không có sheet nào |
+| **Nguyên nhân** | Fallback tạo workbook từ dict rỗng và không log exception gốc, trái pattern không nuốt lỗi |
+| **Fix** | Log `logger.error(..., exc_info=True)`, hiện cảnh báo Streamlit, và tạo workbook fallback có sheet `Lỗi xuất file` chứa thông tin lỗi |
+| **Test** | Kiểm tra tĩnh phần `except Exception as e` không còn gọi `xuat_excel({})`; compile bị chặn do venv Python 3.12 nền không tạo được process |
+| **Ngày fix** | 2026-07-19 |
+
+---
+
+### B36 — Sub-tab "Đến hạn" trong tab Cảnh báo Tín dụng chồng chức năng với tab_den_han
+| | |
+|---|---|
+| **File** | `tabs/tab_canh_bao_nqh.py` → `render()` sub_labels + `_render_den_han_tab()`; `workspaces/ws_management.py` dòng 334 |
+| **Dấu hiệu** | Tab "⏰ Nợ Đến Hạn" trong menu gọi `tab_canh_bao_nqh` → user phải chọn sub-tab "Đến hạn" 2 lần để xem; code trùng logic |
+| **Nguyên nhân** | Sub-tab "Đến hạn" trong `tab_canh_bao_nqh.py` delegate qua `_render_den_han_tab()` → `tab_den_han.render()`, chồng với menu "⏰ Nợ Đến Hạn" cũng gọi `tab_canh_bao_nqh` |
+| **Fix** | Xóa sub-tab "Đến hạn" khỏi `sub_labels` và `_render_den_han_tab()`; menu "⏰ Nợ Đến Hạn" trỏ thẳng `tab_den_han` |
+| **Ngày fix** | 2026-07-19 |
+
+### B37 — Dropdown PGD trong tab Nợ khoanh thiếu Hội sở
+| | |
+|---|---|
+| **File** | `tabs/tab_no_khoanh.py` → `render()` dòng 867, `_render_cv368_kt()` dòng 722 |
+| **Dấu hiệu** | User CN không lọc được Hội sở trong tab Nợ khoanh và CV 368 |
+| **Nguyên nhân** | `_opts_pgd = ["Tất cả"] + DS_PGD` thiếu `DON_VI_CHI_NHANH` |
+| **Fix** | Đổi thành `["Tất cả"] + [DON_VI_CHI_NHANH] + DS_PGD` ở cả 2 vị trí |
+| **Ngày fix** | 2026-07-19 |
+
+### B38 — Lọc NQH "trong tháng" sai kỳ khi dữ liệu cũ chạy sang tháng mới
+| | |
+|---|---|
+| **File** | `tabs/tab_canh_bao_nqh.py` → `_render_nqh()` dòng 608, `_render_tong_hop()` dòng 221 |
+| **Dấu hiệu** | Lọc "Chuyển nợ quá hạn trong tháng" dùng `datetime.now()` → nếu dữ liệu kỳ cũ (vd tháng 6) chạy sang tháng 7, kết quả lọc sai |
+| **Nguyên nhân** | Fallback `datetime.now()` không dùng mốc thời gian từ dữ liệu |
+| **Fix** | Dùng `lay_ngay_so_lieu(df)` từ `utils.py` (đọc `COT_NGAY_SL` max), fallback `datetime.now()` |
+| **Ngày fix** | 2026-07-19 |
+
+### B39 — Tổng hợp Cảnh báo Tín dụng còn dùng ngày máy và quyền session_state
+| | |
+|---|---|
+| **File** | `tabs/tab_canh_bao_nqh.py` → `_dem_den_han()`, `_render_tong_hop()`, `_render_risk_heatmap()`, `_render_khoanh_sap_hh()`, `_render_gia_han()`, `_render_nqh_so_sanh_ky()` |
+| **Dấu hiệu** | Card/bảng "Đến hạn ≤ 3 tháng" có thể lệch giữa kỳ dữ liệu cũ và ngày chạy app; admin được truyền qua workspace có thể không thấy cấu hình ngưỡng; trend chart N kỳ lỗi nhưng UI im lặng |
+| **Nguyên nhân** | `_dem_den_han()` và bảng PGD dùng `pd.Timestamp.today()`; quyền đọc từ `st.session_state["role"]` thay vì role đã normalize trong render; `except Exception: pass` ở chart |
+| **Fix** | `_dem_den_han(df, n_thang, ref_date)` nhận mốc `lay_ngay_so_lieu()`, `_render_tong_hop()` truyền `role` và dùng `la_admin_cn(role)`, chart log `logger.error(..., exc_info=True)` + hiện caption |
+| **Test** | Compile + convention `tabs/tab_canh_bao_nqh.py`; kiểm tra tĩnh `_dem_den_han()` nhận `ref_date` và call site truyền mốc ngày số liệu |
+| **Ngày fix** | 2026-07-19 |
+
+### B41 — Tra cứu: chọn nhầm hồ sơ khi phân trang (static dataframe key)
+| | |
+|---|---|
+| **File** | `tabs/tab_tracuu_v2.py` dòng ~437 |
+| **Dấu hiệu** | User chọn row X trang 1, chuyển sang trang 2 → dialog mở hồ sơ sai (vị trí X + start_trang2) |
+| **Nguyên nhân** | `key="tc_table"` cố định → Streamlit giữ nguyên `event.selection.rows` khi data chunk đổi, `pos = rows[0] + start` tính sai vị trí trong `ku_series` |
+| **Fix** | Đổi thành `key=f"tc_table_p{page}"` để widget key đổi theo trang, reset selection tự động |
+| **Test** | Compile OK |
+| **Ngày fix** | 2026-07-19 |
+
+### B40 — Badge mức độ rủi ro nợ khoanh phụ thuộc index nguồn
+| | |
+|---|---|
+| **File** | `tabs/tab_no_khoanh.py` → bảng chi tiết nợ khoanh dòng ~1043 |
+| **Dấu hiệu** | Cột `⚠️ Mức độ` có thể lệch dòng nếu DataFrame nguồn/hiển thị thay đổi index hoặc thứ tự trước khi gán |
+| **Nguyên nhân** | Tính `con_lai` từ `df_kh[COT_NGAY_HH_KHOANH]` rồi gán vào `df_hien`, phụ thuộc align index ngầm |
+| **Fix** | Tính trực tiếp từ `df_hien[COT_NGAY_HH_KHOANH]` trước khi gán badge |
+| **Test** | Compile + convention `tabs/tab_no_khoanh.py` |
+| **Ngày fix** | 2026-07-19 |
+
+---
+
+### J8 — `int(x or 0)` crash với whitespace-only string → `invalid literal for int() with base 10: ''`
+
+| | |
+|---|---|
+| **File** | `tabs/tab_tien_do.py` → `_render_tong_quan()` dòng ~104, `_render_cap_nhat()` ~895, `_render_xuat()` ~1036-1037 |
+| **Dấu hiệu** | `❌ Lỗi render ** Quản lý Công việc & Nhiệm vụ**: invalid literal for int() with base 10: ''` — cả tab bị crash qua ws_management.py line ~621 |
+| **Nguyên nhân** | Pattern `int(r.get("pct_hoan_thanh") or 0)` dùng để guard `None`/`0`/`""`. Nhưng khi DB có giá trị whitespace-only `"  "`: `"  " or 0` = `"  "` (non-empty string là truthy), rồi `int("  ")` Python tự strip → raises `ValueError: invalid literal for int() with base 10: ''`. Nằm trong list comprehension không có try/except nên crash toàn tab. |
+| **Fix** | Thêm helper `_to_int(val, default=0)` dùng try/except, thay 4 chỗ `int(x or 0)` → `_to_int(x)` |
+| **Ngày fix** | 2026-07-19 |
+
+**Pattern nguy hiểm — tránh lặp:**
+```python
+# ❌ SAI — whitespace-only string vượt qua guard `or 0`
+int(r.get("pct_hoan_thanh") or 0)   # "  " or 0 = "  " → int("  ") → crash
+
+# ✅ ĐÚNG — try/except bắt mọi giá trị lạ
+def _to_int(val, default=0):
+    try:
+        return int(val)
+    except (TypeError, ValueError):
+        return default
+```
+
+---
+
+### J53 — Launcher mất biến trong block CMD
+| | |
+|---|---|
+| **File** | `Chay_VBSP_SCM.bat` dòng ~2-155 |
+| **Dấu hiệu** | Launcher in `ECHO is off.`, báo `'""' is not recognized`, hoặc thoát mã `9009`; log/console cho thấy `%URL%` hoặc `%PY_EXE%` rỗng ở bước launch |
+| **Nguyên nhân** | Batch bật delayed expansion nhưng vẫn đọc các biến vừa set trong block bằng `%VAR%`; CMD mở rộng `%VAR%` trước khi block chạy nên `PROBE_OK`, `PYVER`, `PY_CMD` hoặc `%errorlevel%` có thể stale/rỗng. Ngoài ra `PY_CMD=py -3.12` dùng chung với đường dẫn Python có khoảng trắng dễ làm vỡ command; ký tự Unicode trang trí và LF line endings có thể khiến CMD đọc sai encoding/label. |
+| **Fix** | Dùng `!VAR!`/`!errorlevel!` trong block, tách `PY_CMD` và `PY_ARGS`, đổi auto-setup sang flow `goto` tuyến tính, chỉ chọn candidate Python nếu chạy được `--version`, và chuyển launcher về ASCII + CRLF. |
+| **Test** | Kiểm tra tĩnh không còn `%errorlevel%` trong block probe, không còn `%PY_CMD%/%PYVER%/%PROBE_OK%`; quét file xác nhận `PY_EXE` được join bằng `%ROOT%\venv\Scripts\python.exe` sau khi strip trailing slash; chạy `cmd /v:on /c "Chay_VBSP_SCM.bat < NUL"` trên nhánh không có Python 3.12 để xác nhận batch dừng đúng ở thông báo thiếu Python và không chạy tiếp Streamlit. |
+| **Ngày fix** | 2026-07-19 |
+
+### J54 — Launcher không tự tắt Streamlit cũ đang chiếm port
+| | |
+|---|---|
+| **File** | `Chay_VBSP_SCM.bat` dòng ~34-86, ~303-319 |
+| **Dấu hiệu** | Double-click launcher khi còn cửa sổ Streamlit/CMD cũ: batch chỉ báo app đang chạy hoặc mở URL cũ, không tạo phiên app mới sạch |
+| **Nguyên nhân** | Logic port conflict cũ coi `localhost:8502` đang `LISTENING` là thành công và thoát; lock cũ + port đang nghe cũng không xử lý process cũ |
+| **Fix** | Thêm `:kill_port_processes`: lấy PID đang `LISTENING` trên `%PORT%` bằng `netstat`, kill đúng PID đó bằng `taskkill /F /PID`, chờ 2 giây rồi kiểm tra lại port trước khi chạy tiếp. Không kill đại trà mọi `python.exe`. |
+| **Test** | Kiểm tra tĩnh có call `:kill_port_processes` ở cả nhánh lock và port conflict; chạy `cmd /v:on /c "Chay_VBSP_SCM.bat < NUL"` trên máy chưa có Python 3.12 để xác nhận batch vẫn dừng đúng ở lỗi môi trường, không vỡ cú pháp. |
+| **Ngày fix** | 2026-07-19 |
 
 ---
 

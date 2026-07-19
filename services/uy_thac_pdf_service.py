@@ -486,10 +486,11 @@ def _insights(
         f"{len(to_da_hoi) if to_da_hoi is not None else 0} Tổ xuất hiện ở nhiều Hội."
     )
     if bien_dong is not None and len(bien_dong) >= 2 and "Tổng dư nợ (triệu đồng)" in bien_dong.columns:
-        latest = float(pd.to_numeric(bien_dong["Tổng dư nợ (triệu đồng)"], errors="coerce").fillna(0).iloc[-1])
-        previous = float(pd.to_numeric(bien_dong["Tổng dư nợ (triệu đồng)"], errors="coerce").fillna(0).iloc[-2])
+        _col = pd.to_numeric(bien_dong["Tổng dư nợ (triệu đồng)"], errors="coerce").fillna(0)
+        latest = float(_col.iloc[-1])    # kỳ mới nhất
+        previous = float(_col.iloc[0])  # kỳ gốc / baseline (đầu DataFrame = cũ nhất)
         result.append(
-            f"So với kỳ liền trước, tổng dư nợ thay đổi {_fmt_vn((latest - previous) / 1e6, signed=True)} triệu đồng."
+            f"So với kỳ gốc, tổng dư nợ thay đổi {_fmt_vn((latest - previous) / 1e6, signed=True)} triệu đồng."
         )
     return result
 

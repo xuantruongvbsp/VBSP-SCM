@@ -719,7 +719,7 @@ def _render_cv368_kt(
     if la_phan_he_cn(role):
         pgd_hien_tai = st.selectbox(
             "📍 Chọn PGD",
-            ["— Chọn —"] + DS_PGD,
+            ["— Chọn —"] + [DON_VI_CHI_NHANH] + DS_PGD,
             key=f"{key_prefix}cv368_pgd",
         )
         if pgd_hien_tai == "— Chọn —":
@@ -863,9 +863,9 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
         # ── Lọc PGD (CN only) — thực hiện TRƯỚC khi tính KPI ─────────────
         key_prefix = "cn_"
         if la_phan_he_cn(role):
-            col_f, _ = st.columns([2, 4])
+            col_f, col_rr = st.columns([2, 2])
             with col_f:
-                _opts_pgd = ["Tất cả"] + DS_PGD
+                _opts_pgd = ["Tất cả"] + [DON_VI_CHI_NHANH] + DS_PGD
                 _desired_pgd = state.filter_pgd or "Tất cả"
                 if "khoanh_pgd_loc" not in st.session_state:
                     st.session_state["khoanh_pgd_loc"] = _desired_pgd if _desired_pgd in _opts_pgd else "Tất cả"
@@ -876,9 +876,30 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                     _opts_pgd,
                     key="khoanh_pgd_loc",
                 )
+
+            # ── P2.6: Lọc mức độ rủi ro khoanh ──────────────────────────
+            with col_rr:
+                muc_do_rr = st.selectbox(
+                    "⚠️ Mức độ rủi ro",
+                    ["Tất cả", "🔴 Khẩn cấp (≤30 ngày)", "🟡 Theo dõi (31–180 ngày)", "🟢 Bình thường (>180 ngày)"],
+                    key="khoanh_muc_do_rr",
+                )
+
             state.filter_pgd = None if pgd_chon == "Tất cả" else pgd_chon
             if pgd_chon != "Tất cả" and COT_TEN_PGD in df_kh.columns:
                 df_kh = df_kh[df_kh[COT_TEN_PGD] == pgd_chon]
+
+            # Apply urgency filter
+            if muc_do_rr != "Tất cả" and COT_NGAY_HH_KHOANH in df_kh.columns:
+                today = datetime.now()
+                ngay_hh = pd.to_datetime(df_kh[COT_NGAY_HH_KHOANH], errors="coerce", dayfirst=True)
+                con_lai = (ngay_hh - today).dt.days
+                if muc_do_rr == "🔴 Khẩn cấp (≤30 ngày)":
+                    df_kh = df_kh[(con_lai.notna()) & (con_lai <= 30)]
+                elif muc_do_rr == "🟡 Theo dõi (31–180 ngày)":
+                    df_kh = df_kh[(con_lai.notna()) & (con_lai > 30) & (con_lai <= 180)]
+                elif muc_do_rr == "🟢 Bình thường (>180 ngày)":
+                    df_kh = df_kh[(con_lai.notna()) & (con_lai > 180)]
         else:
             from data.pgd import pgd_slug
             key_prefix = f"pgd_{pgd_slug(pgd_user)}_" if pgd_user else "pgd_"
@@ -1017,6 +1038,21 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                     df_hien[COT_DU_NO_QH] = (
                         pd.to_numeric(df_hien[COT_DU_NO_QH], errors="coerce")
                         .fillna(0).apply(_fmt_dong)
+                    )
+
+                # ── P2.6: Badge mức độ rủi ro ─────────────────────────
+                if COT_NGAY_HH_KHOANH in df_hien.columns:
+                    today = datetime.now()
+                    ngay_hh = pd.to_datetime(
+                        df_hien[COT_NGAY_HH_KHOANH],
+                        errors="coerce",
+                        dayfirst=True,
+                    )
+                    con_lai = (ngay_hh - today).dt.days
+                    df_hien["⚠️ Mức độ"] = con_lai.apply(
+                        lambda d: "🔴 Khẩn cấp" if pd.notna(d) and d <= 30
+                        else ("🟡 Theo dõi" if pd.notna(d) and d <= 180
+                              else ("🟢 Bình thường" if pd.notna(d) else "—"))
                     )
 
                 hien_thi_dataframe_phan_trang(

@@ -500,6 +500,37 @@ def _render_to_tkv(
                 logger.error("_render_to_tkv nqh chart: %s", _e, exc_info=True)
 
 
+def _tinh_diem_rui_ro(row: pd.Series) -> int:
+    """Tính điểm rủi ro 0–100 cho 1 hồ sơ."""
+    score = 0
+    # NQH > 0 → +40
+    if COT_DU_NO_QH in row.index:
+        nqh = pd.to_numeric(row[COT_DU_NO_QH], errors="coerce")
+        if pd.notna(nqh) and nqh > 0:
+            score += 40
+    # Lãi tồn > 3 tháng → +20
+    if COT_LAI_TON in row.index:
+        lai = pd.to_numeric(row[COT_LAI_TON], errors="coerce")
+        if pd.notna(lai) and lai > 0:
+            score += 20
+    # KHĐ > 90 ngày → +15
+    if "is_3m_inactive" in row.index:
+        if row.get("is_3m_inactive", False):
+            score += 15
+    # Gia hạn → +15
+    if "Số tháng có thể gia hạn" in row.index:
+        gh = pd.to_numeric(row["Số tháng có thể gia hạn"], errors="coerce")
+        if pd.notna(gh) and gh > 0:
+            score += 15
+    return min(score, 100)
+
+
+def _badge_rui_ro(score: int) -> str:
+    if score >= 60: return "🔴 Cao"
+    if score >= 30: return "🟡 Trung bình"
+    return "🟢 Thấp"
+
+
 def render(tab=None, role: str = None, **kwargs) -> None:
     state = SCMStateManager()
     st.subheader("⏰ Cảnh báo Khoản vay Đến hạn & Nợ đến hạn có nguy cơ")
@@ -913,6 +944,8 @@ def render(tab=None, role: str = None, **kwargs) -> None:
                     "CT Đặc biệt",
                     _df_loc_ds["_ct_db"].values,
                 )
+            # ── P3.2: Cột điểm rủi ro ──
+            df_ct["🎯 Rủi ro"] = _df_loc_ds.apply(_tinh_diem_rui_ro, axis=1).apply(_badge_rui_ro)
             if "Ngày đến hạn" in df_ct.columns:
                 df_ct = df_ct.sort_values("Ngày đến hạn")
                 df_ct["Ngày đến hạn"] = pd.to_datetime(

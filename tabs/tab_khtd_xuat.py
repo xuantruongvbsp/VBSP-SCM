@@ -15,7 +15,7 @@ import streamlit as st
 from openpyxl.styles import Font, PatternFill
 
 from state_manager import SCMStateManager
-from config import TEN_CHINH_THUC_CT, CHUONG_TRINH_KHTD, DS_PGD, COT_TEN_PGD, CACHE_HSTD, CACHE_GQVL, XA_TO_PGD, PGD_XA_MAP, DON_VI_CHI_NHANH
+from config import TEN_CHINH_THUC_CT, CHUONG_TRINH_KHTD, DS_PGD, COT_TEN_PGD, CACHE_HSTD, CACHE_GQVL, XA_TO_PGD, PGD_XA_MAP, DON_VI_CHI_NHANH, COT_TONG_DU_NO, COT_DU_NO_TH, COT_MA_CHUONG_TRINH, COT_NGUON_VON
 from data.core import ts_file
 from utils import lay_ngay_so_lieu
 
@@ -137,12 +137,12 @@ def _hien_thi_bang_cn_readonly(
         html_rows.append(f"<tr>{tds}</tr>")
 
     def _add_row(
-        ten: str, kh_vnd: float, th_vnd: float
+        ten: str, kh_vnd: float, th_vnd: float, thu_hoi_nq11_vnd: float = 0.0
     ) -> None:
         nonlocal tong_kh, tong_th, tong_kh_i, tong_th_i, tong_kh_ii, tong_th_ii, stt_no
         kh_v = kh_vnd / 1e6
         th_v = th_vnd / 1e6
-        con_phai_th_v = (kh_vnd - th_vnd) / 1e6
+        con_phai_th_v = (kh_vnd - th_vnd - thu_hoi_nq11_vnd) / 1e6
         tl = th_v / kh_v * 100 if kh_v > 0 else None
 
         if kh_v > 0 or th_v > 0:
@@ -197,11 +197,92 @@ def _hien_thi_bang_cn_readonly(
             return False
         return key_name in loc_set
 
+    # Pre-calculate NQ11 dư nợ theo (ma_ct, nv_int) từ df_loc
+    nq11_by_mact_nv: dict[tuple[int, int], float] = {}
+    if df_loc is not None and not df_loc.empty and "__is_nq11" in df_loc.columns:
+        _col_dn = (
+            COT_TONG_DU_NO if COT_TONG_DU_NO in df_loc.columns
+            else COT_DU_NO_TH if COT_DU_NO_TH in df_loc.columns
+            else None
+        )
+        if _col_dn and COT_MA_CHUONG_TRINH in df_loc.columns and COT_NGUON_VON in df_loc.columns:
+            _mask = df_loc["__is_nq11"].fillna(False).astype(bool)
+            _df_nq = df_loc[_mask]
+            if not _df_nq.empty:
+                _ma_s = pd.to_numeric(_df_nq[COT_MA_CHUONG_TRINH], errors="coerce").fillna(0).astype(int)
+                _nv_s = pd.to_numeric(_df_nq[COT_NGUON_VON], errors="coerce").fillna(0).astype(int)
+                _dn_s = pd.to_numeric(_df_nq[_col_dn], errors="coerce").fillna(0)
+                _tmp = pd.DataFrame({"ma_ct": _ma_s, "nv": _nv_s, "dn": _dn_s})
+                _tmp = _tmp[(_tmp["ma_ct"] > 0) & _tmp["nv"].isin([1, 2])]
+                for (_mc, _nv), _v in _tmp.groupby(["ma_ct", "nv"])["dn"].sum().items():
+                    nq11_by_mact_nv[(_mc, _nv)] = float(_v)
+
+    # Pre-calculate NQ11 thu hồi trong năm theo (ma_ct, nv_int) từ df_loc
+    nq11_thuhoi_nam_by_mact_nv: dict[tuple[int, int], float] = {}
+    if df_loc is not None and not df_loc.empty and "__is_nq11" in df_loc.columns:
+        _cols_th_nam = ["Thu nợ TH Năm", "Thu nợ QH Năm", "Thu nợ Khoanh Năm"]
+        _cols_ok = [c for c in _cols_th_nam if c in df_loc.columns]
+        if _cols_ok and COT_MA_CHUONG_TRINH in df_loc.columns and COT_NGUON_VON in df_loc.columns:
+            _mask2 = df_loc["__is_nq11"].fillna(False).astype(bool)
+            _df_nq2 = df_loc[_mask2]
+            if not _df_nq2.empty:
+                _ma_s2 = pd.to_numeric(_df_nq2[COT_MA_CHUONG_TRINH], errors="coerce").fillna(0).astype(int)
+                _nv_s2 = pd.to_numeric(_df_nq2[COT_NGUON_VON], errors="coerce").fillna(0).astype(int)
+                _th_s2 = sum(
+                    pd.to_numeric(_df_nq2[c], errors="coerce").fillna(0) for c in _cols_ok
+                )
+                _tmp2 = pd.DataFrame({"ma_ct": _ma_s2, "nv": _nv_s2, "th": _th_s2})
+                _tmp2 = _tmp2[(_tmp2["ma_ct"] > 0) & _tmp2["nv"].isin([1, 2]) & (_tmp2["th"] > 0)]
+                for (_mc2, _nv2), _v2 in _tmp2.groupby(["ma_ct", "nv"])["th"].sum().items():
+                    nq11_thuhoi_nam_by_mact_nv[(_mc2, _nv2)] = float(_v2)
+
+    NQ11_BG = "#EFF6FF"
+
+    def _add_nq11_subrow(
+        dn_vnd: float,
+        thu_hoi_nam_vnd: float = 0.0,
+        da_tru_o_dong_tren: bool = False,
+    ) -> None:
+        dn_trieu = dn_vnd / 1e6
+        if da_tru_o_dong_tren:
+            # Với hàng "normal": thu hồi đã trừ vào Còn phải TH của dòng trên
+            label = "&nbsp;&nbsp;&nbsp;↳ Trong đó: Dư nợ ch.trình NQ11 (thu hồi NQ11 đã trừ vào Còn phải TH)"
+            con_str = "—"
+            con_color = "#9ca3af"
+        elif thu_hoi_nam_vnd > 0:
+            # Với GQVL sub-rows: hiển thị điều chỉnh Còn phải TH tại đây
+            thu_hoi_trieu = thu_hoi_nam_vnd / 1e6
+            label = (
+                f"&nbsp;&nbsp;&nbsp;↳ Trong đó: Dư nợ NQ11 = {_fvn(dn_trieu, 0)} | "
+                f"Thu hồi NQ11 trong năm (điều chỉnh Còn phải TH): −{_fvn(thu_hoi_trieu, 0)}"
+            )
+            con_str = f"−{_fvn(thu_hoi_trieu, 0)}"
+            con_color = "#dc2626"
+        else:
+            label = "&nbsp;&nbsp;&nbsp;↳ Trong đó: Dư nợ ch.trình các món vay Nghị quyết 11"
+            con_str = "—"
+            con_color = "#9ca3af"
+
+        dn_td = "—" if thu_hoi_nam_vnd > 0 else _fvn(dn_trieu, 0)
+        tds = (
+            _td("", "center", "", NQ11_BG, "") +
+            _td(label, "left", "#1D4ED8", NQ11_BG, "400") +
+            _td("—", "right", "#9ca3af", NQ11_BG, "") +
+            _td(dn_td, "right", "#1D4ED8", NQ11_BG, "") +
+            _td(con_str, "right", con_color, NQ11_BG, "bold" if con_color != "#9ca3af" else "") +
+            _td("—", "right", "#9ca3af", NQ11_BG, "")
+        )
+        html_rows.append(f"<tr>{tds}</tr>")
+
     for tieu_de, side_key, tong_label in [
         ("I. Nguồn vốn Trung ương", "key_tw", "TỔNG CỘNG PHẦN I"),
         ("II. Nguồn vốn Địa phương", "key_dp", "TỔNG CỘNG PHẦN II"),
     ]:
+        nv_int_cur = 1 if side_key == "key_tw" else 2
         da_co_dong = False
+
+        # Pre-collect visible rows để có look-ahead (biết hàng nào là hàng cuối của mỗi ma_ct)
+        vis: list[dict] = []
         for _ten_nhom, ds_rows in _iter_khtd_cn_group_rows():
             for row in ds_rows:
                 key_name = row.get(side_key)
@@ -209,12 +290,40 @@ def _hien_thi_bang_cn_readonly(
                     continue
                 kh_vnd = float(kh_d.get(str(key_name), 0.0) or 0.0) if key_name else 0.0
                 th_vnd = float(th_d.get(str(key_name), 0.0) or 0.0) if key_name else 0.0
-                if kh_vnd == 0 and th_vnd == 0:
-                    continue
-                if not da_co_dong:
-                    _add_group_hdr(tieu_de)
-                    da_co_dong = True
-                _add_row(str(row.get("label", "") or ""), kh_vnd, th_vnd)
+                if kh_vnd > 0 or th_vnd > 0:
+                    vis.append(row)
+
+        for idx, row in enumerate(vis):
+            key_name = row.get(side_key)
+            kh_vnd = float(kh_d.get(str(key_name), 0.0) or 0.0) if key_name else 0.0
+            th_vnd = float(th_d.get(str(key_name), 0.0) or 0.0) if key_name else 0.0
+            ma_ct = int(row.get("ma_ct") or 0)
+            row_type = row.get("type", "normal")
+
+            next_ma_ct = int(vis[idx + 1].get("ma_ct") or 0) if idx + 1 < len(vis) else None
+            is_last_mact = next_ma_ct != ma_ct
+
+            # Với hàng "normal" (không phải gqvl_sub): trừ thu hồi NQ11 vào Còn phải TH
+            thu_hoi_row = 0.0
+            if is_last_mact and row_type != "gqvl_sub":
+                thu_hoi_row = nq11_thuhoi_nam_by_mact_nv.get((ma_ct, nv_int_cur), 0.0)
+
+            if not da_co_dong:
+                _add_group_hdr(tieu_de)
+                da_co_dong = True
+            _add_row(str(row.get("label", "") or ""), kh_vnd, th_vnd, thu_hoi_row)
+
+            # Chèn hàng NQ11 sau hàng cuối của mỗi nhóm ma_ct
+            if is_last_mact and nq11_by_mact_nv:
+                nq11_vnd = nq11_by_mact_nv.get((ma_ct, nv_int_cur), 0.0)
+                if nq11_vnd > 0:
+                    thu_hoi_nq11 = nq11_thuhoi_nam_by_mact_nv.get((ma_ct, nv_int_cur), 0.0)
+                    _add_nq11_subrow(
+                        nq11_vnd,
+                        thu_hoi_nam_vnd=thu_hoi_nq11 if row_type == "gqvl_sub" else 0.0,
+                        da_tru_o_dong_tren=(row_type != "gqvl_sub" and thu_hoi_nq11 > 0),
+                    )
+
         if da_co_dong:
             if side_key == "key_tw":
                 _add_section_total(tong_label, tong_kh_i, tong_th_i)

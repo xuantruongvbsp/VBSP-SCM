@@ -45,7 +45,7 @@ from utils import (
 )
 from services.excel_service import ExcelReport, xuat_excel_chuyen_nghiep, ten_file_xuat as excel_ten_file
 from pdf_service import xuat_pdf_bao_cao, xuat_pdf, kiem_tra_pdf_dependency, render_huong_dan
-from snapshot_service import doc_snapshot, doc_snapshot_range, danh_sach_ky
+from snapshot_service import doc_snapshot, doc_snapshot_range, danh_sach_ky, ky_baseline
 from services.hhi_service import tinh_hhi, tinh_hhi_breakdown, danh_gia_hhi
 from components.delta_card import delta_card, kpi_row
 
@@ -217,11 +217,13 @@ def _kpi_tang_truong(df_full: pd.DataFrame) -> None:
 
     ds_ky = danh_sach_ky()
     prev = None
-    if len(ds_ky) >= 2:
-        df_p = doc_snapshot(ds_ky[1])
-        cn = df_p[df_p["ten_pgd"] == "__CN__"] if not df_p.empty else pd.DataFrame()
-        if not cn.empty:
-            prev = cn.iloc[0]
+    if ds_ky:
+        _ky_prev = ky_baseline(ds_ky, ds_ky[0]) or (ds_ky[1] if len(ds_ky) > 1 else None)
+        if _ky_prev and _ky_prev != ds_ky[0]:
+            df_p = doc_snapshot(_ky_prev)
+            cn = df_p[df_p["ten_pgd"] == "__CN__"] if not df_p.empty else pd.DataFrame()
+            if not cn.empty:
+                prev = cn.iloc[0]
 
     def _d(now, col, scale=1e6):
         if prev is None:
@@ -284,8 +286,9 @@ def _heatmap_rui_ro_pgd(df_full: pd.DataFrame) -> None:
 
     ds_ky = danh_sach_ky()
     t["tt"] = None
-    if len(ds_ky) >= 2:
-        _df_prev = doc_snapshot(ds_ky[1])
+    _ky_prev_hm = ky_baseline(ds_ky, ds_ky[0]) if ds_ky else None
+    if _ky_prev_hm and _ky_prev_hm != (ds_ky[0] if ds_ky else None):
+        _df_prev = doc_snapshot(_ky_prev_hm)
         prev_map = (
             _df_prev.set_index("ten_pgd")["tong_du_no"].to_dict()
             if _df_prev is not None and not _df_prev.empty
@@ -1100,12 +1103,13 @@ def _render_hom_nay(df_full: "pd.DataFrame | None", **kwargs) -> None:
         _bao_cao_bt: list[str] = []
         try:
             _ds_ky = danh_sach_ky()
-            if len(_ds_ky) >= 2:
-                _snap_prev = doc_snapshot(_ds_ky[-2])
-                if _snap_prev is not None and COT_TEN_PGD in _snap_prev.columns:
-                    _snap_dn = pd.to_numeric(_snap_prev[COT_TONG_DU_NO], errors="coerce").fillna(0)
-                    _snap_prev = _snap_prev.assign(**{COT_TONG_DU_NO: _snap_dn})
-                    _snap_grp = _snap_prev.groupby(COT_TEN_PGD, observed=True)[COT_TONG_DU_NO].sum()
+            _ky_snap_prev = ky_baseline(_ds_ky, _ds_ky[0]) if _ds_ky else None
+            if _ky_snap_prev and _ky_snap_prev != (_ds_ky[0] if _ds_ky else None):
+                _snap_prev = doc_snapshot(_ky_snap_prev)
+                if _snap_prev is not None and "ten_pgd" in _snap_prev.columns:
+                    _snap_dn = pd.to_numeric(_snap_prev["tong_du_no"], errors="coerce").fillna(0)
+                    _snap_prev = _snap_prev.assign(tong_du_no=_snap_dn)
+                    _snap_grp = _snap_prev.groupby("ten_pgd", observed=True)["tong_du_no"].sum()
                     for _, row in df_pgd_kpi.iterrows():
                         pgd_n = row["PGD"]
                         _tdn_ht  = row["Dư nợ (tr.đ)"] * 1e6
@@ -1115,13 +1119,13 @@ def _render_hom_nay(df_full: "pd.DataFrame | None", **kwargs) -> None:
                             if abs(_bien_dong) >= 5:
                                 _dau = "📈" if _bien_dong > 0 else "📉"
                                 _bao_cao_bt.append(
-                                    f"**{pgd_n}**: {_dau} {_bien_dong:+.1f}% so kỳ trước"
+                                    f"**{pgd_n}**: {_dau} {_bien_dong:+.1f}% so baseline 31/12"
                                 )
         except Exception as e:
             logger.error("_render_hom_nay: so sánh snapshot — %s", e, exc_info=True)
 
         if _bao_cao_bt:
-            with st.expander(f"⚡ {len(_bao_cao_bt)} PGD biến động dư nợ ≥ 5% so kỳ trước", expanded=True):
+            with st.expander(f"⚡ {len(_bao_cao_bt)} PGD biến động dư nợ ≥ 5% so baseline 31/12", expanded=True):
                 for _msg in _bao_cao_bt:
                     st.markdown(f"- {_msg}")
 

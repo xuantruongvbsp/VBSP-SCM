@@ -86,11 +86,16 @@ def _render_cbtd_dia_ban(tab_parent=None, **kw):
 
 
 def _la_nguon_von_dia_phuong(value) -> bool:
-    text = str(value or "").strip().casefold()
-    if not text or text in {"nan", "none"}:
+    """Kiểm tra nguồn vốn Địa phương — đồng bộ với tab_hhi._map_nguon_von."""
+    s = str(value or "").strip().upper()
+    if not s or s in {"NAN", "NONE"}:
         return False
-    compact = text.replace(" ", "")
-    return compact in {"2", "2.0", "đp", "dp", "địaphương", "diaphuong"}
+    if s in ("2", "2.0", "ĐP", "ĐỊA PHƯƠNG", "DP", "ĐIAPHƯƠNG", "DIAPHUONG"):
+        return True
+    try:
+        return int(float(s)) == 2
+    except (ValueError, TypeError):
+        return False
 
 
 def _ma_ct_int(value) -> int | None:
@@ -234,16 +239,19 @@ def _banner_hstd_cu(threshold_days: int = 7) -> None:
 
 @st.cache_data(show_spinner=False, ttl=300)
 def _doc_nqh_delta_snapshot() -> pd.DataFrame:
-    """Lấy delta NQH giữa 2 kỳ gần nhất từ hstd_snapshot."""
-    import sqlite3
+    """Lấy delta NQH kỳ hiện tại vs kỳ baseline 31/12 năm trước từ hstd_snapshot."""
     from db import get_conn
+    from snapshot_service import ky_baseline
     with get_conn() as conn:
         ky_list = [r[0] for r in conn.execute(
-            "SELECT DISTINCT ky FROM hstd_snapshot ORDER BY ky DESC LIMIT 2"
+            "SELECT DISTINCT ky FROM hstd_snapshot ORDER BY ky DESC"
         ).fetchall()]
-    if len(ky_list) < 2:
+    if not ky_list:
         return pd.DataFrame()
-    ky_curr, ky_prev = ky_list[0], ky_list[1]
+    ky_curr = ky_list[0]
+    ky_prev = ky_baseline(ky_list, ky_curr)
+    if not ky_prev or ky_prev == ky_curr:
+        return pd.DataFrame()
     with get_conn() as conn:
         df_curr = pd.read_sql_query(
             "SELECT ten_pgd, SUM(du_no_qh) as qh_curr, SUM(tong_du_no) as dn_curr "
@@ -274,7 +282,7 @@ def _render_nqh_tang_dot_bien(key_prefix: str = "nqh_db_") -> None:
 
     ky_curr = df["ky_curr"].iloc[0]
     ky_prev = df["ky_prev"].iloc[0]
-    st.caption(f"So sánh kỳ **{ky_curr}** vs **{ky_prev}**")
+    st.caption(f"So sánh kỳ **{ky_curr}** vs baseline **{ky_prev}** (31/12 năm trước)")
 
     df_show = df[df["ten_pgd"] != "Hội sở Chi nhánh tỉnh"].copy() if len(df) > 1 else df.copy()
     df_show = df_show.sort_values("delta_qh", ascending=False)
@@ -331,7 +339,7 @@ def _build_all_items(role: str, username: str, **kwargs) -> list:
 
         # ── Báo cáo ────────────────────────────────────────────────────────────
         {"group": "Báo cáo", "label": "📊 Báo cáo tín dụng",    "icon": "file",          "fn": lambda: _get_tab("tab_baocao").render(None, **kwargs)},
-        {"group": "Báo cáo", "label": "⏰ Nợ Đến Hạn",           "icon": "clock",         "fn": lambda: _get_tab("tab_canh_bao_nqh").render(None, role=role, username=username, df_full=df_full, ds_pgd_all=ds_pgd_all)},
+        {"group": "Báo cáo", "label": "⏰ Nợ Đến Hạn",           "icon": "clock",         "fn": lambda: _get_tab("tab_den_han").render(None, role=role, username=username, df_full=df_full)},
         {"group": "Báo cáo", "label": "📅 Báo cáo định kỳ",      "icon": "calendar",      "fn": lambda: _get_tab("tab_bao_cao_dinh_ky").render(None, **kwargs)},
         {"group": "Báo cáo", "label": "📄 Báo cáo KHNV",         "icon": "file-report",   "fn": lambda: _get_tab("tab_khnv_bao_cao").render(None, **kwargs)},
         {"group": "Báo cáo", "label": "📥 Tiến độ nộp BC",       "icon": "inbox",         "fn": lambda: _get_tab("tab_tien_do_nop").render(None, **kwargs)},

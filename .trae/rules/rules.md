@@ -9,8 +9,19 @@
 
 - **Tên:** Hệ thống Quản trị Tín dụng Nội bộ — NHCSXH Chi nhánh Đồng Nai
 - **Stack:** Streamlit + Python + SQLite + PyArrow/Parquet
-- **Chạy:** `streamlit run app.py` → `http://localhost:8501`
+- **Chạy:** `venv\Scripts\python.exe -m streamlit run app.py --server.port 8502` → `http://localhost:8502`
 - **Phạm vi:** 22 đơn vị (Hội sở + 21 PGD), 95 xã/phường, ~20 users, 9 role
+
+### 1.1 Môi trường Python — BẮT BUỘC
+
+- **Chỉ dùng:** `D:\VBSP-SCM\venv\Scripts\python.exe` (Python 3.12).
+- **Không dùng / không probe / không tạo lại:** `D:\VBSP-SCM\.venv`.
+- Nếu thấy thư mục `.venv*` thì coi là môi trường cũ hoặc đã vô hiệu hóa; bỏ qua hoàn toàn.
+- Không chạy `python` trần, không chạy `.venv\Scripts\python.exe`, không tạo `python -m venv .venv`.
+- Khi cần compile/import/test, dùng rõ:
+  - `venv\Scripts\python.exe -c "import py_compile; py_compile.compile('file.py', doraise=True); print('OK')"`
+  - `venv\Scripts\python.exe -m pytest ...`
+- Nếu thiếu môi trường, chạy `setup_env.bat`; script này tạo/cài lại `venv`, không tạo `.venv`.
 
 ---
 
@@ -113,9 +124,9 @@ Bước 1: ĐỌC hàm gốc trước khi gọi — KHÔNG đoán tham số
 Bước 2: Dùng COT_* từ config.py — KHÔNG hardcode tên cột tiếng Việt
 Bước 3: Sau khi tạo hàm mới → grep xem có được gọi chưa
 Bước 4: Compile check:
-  python -c "import py_compile; py_compile.compile('file.py', doraise=True); print('OK')"
+  venv\Scripts\python.exe -c "import py_compile; py_compile.compile('file.py', doraise=True); print('OK')"
 Bước 5: Import check (nếu tạo component mới):
-  python -c "from components.xxx import yyy; print('OK')"
+  venv\Scripts\python.exe -c "from components.xxx import yyy; print('OK')"
 ```
 
 ---

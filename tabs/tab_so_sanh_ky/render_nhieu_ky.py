@@ -12,12 +12,14 @@ from streamlit.delta_generator import DeltaGenerator
 
 import plotly.graph_objects as go
 
+import db
 from auth import normalize_role, la_phan_he_pgd, la_phan_he_cn
 from utils import fmt_ty, fmt_so
 from tabs.base_tab import TabContext
 from state_manager import SCMStateManager
 from snapshot_service import (
-    danh_sach_ky, doc_snapshot, doc_snapshot_multi, doc_snapshot_theo_ct,
+    compare_snapshot_2_ky, danh_sach_ky, doc_snapshot, doc_snapshot_multi,
+    doc_snapshot_theo_ct, export_snapshot_excel, ky_baseline,
     danh_sach_ky_nq11, doc_nq11_snapshot,
     danh_sach_ky_gqvl, doc_gqvl_snapshot,
     danh_sach_ky_cdtotkvv, doc_cdtotkvv_snapshot,
@@ -77,7 +79,14 @@ def _render_bo_loc(
     col_ky, col_pgd = st.columns([3, 2])
 
     with col_ky:
-        default_ky = ds_ky[:3] if len(ds_ky) >= 3 else ds_ky
+        _bl = ky_baseline(ds_ky, ds_ky[0]) if ds_ky else None
+        _seen: set[str] = set()
+        _default: list[str] = []
+        for _k in ([ds_ky[0]] if ds_ky else []) + ([_bl] if _bl else []) + ds_ky[1:]:
+            if _k and _k not in _seen and len(_default) < 3:
+                _default.append(_k)
+                _seen.add(_k)
+        default_ky = sorted(_default, reverse=True)
         ky_chon = st.multiselect(
             "📅 Chọn kỳ so sánh (tối đa 6)",
             options=ds_ky,
@@ -357,24 +366,39 @@ def _render_hstd_tab(
     # ── Section F: Xuất Excel ──
     st.divider()
     _render_export_hstd(agg_dau, agg_cuoi, ky_dau, ky_cuoi, df_dau_raw, df_cuoi_raw, username, pgd_mode)
+    if not pgd_mode:
+        raw_key = f"_mnk_snapshot_raw_{'_'.join(ky_list)}"
+        if raw_key not in st.session_state:
+            st.session_state[raw_key] = export_snapshot_excel(ky_list, "hstd")
+        if st.download_button(
+            "📦 Xuất Excel snapshot gốc các kỳ đã chọn",
+            data=st.session_state[raw_key],
+            file_name=f"snapshot_hstd_{ky_dau}_den_{ky_cuoi}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            key="mnk_dl_snapshot_raw",
+            use_container_width=True,
+        ):
+            db.ghi_audit(username, "xuat_bieu_cn", f"Xuất Excel snapshot HSTD gốc: {', '.join(ky_list)}")
 
 
 def _render_bang_pgd_2ky(df1: pd.DataFrame, df2: pd.DataFrame,
                           ky1: str, ky2: str) -> None:
     """Bảng biến động PGD kỳ đầu vs kỳ cuối (dùng lại logic từ render_2_ky)."""
-    m1 = df1[["ten_pgd", "tong_du_no", "du_no_qh", "so_ho"]].rename(columns={
-        "tong_du_no": "dn1", "du_no_qh": "nqh1", "so_ho": "ho1",
+    comp = compare_snapshot_2_ky(ky1, ky2)
+    if comp.empty:
+        return
+    jn = comp.rename(columns={
+        "tong_du_no_prev": "dn1",
+        "tong_du_no": "dn2",
+        "du_no_qh_prev": "nqh1",
+        "du_no_qh": "nqh2",
+        "so_ho_prev": "ho1",
+        "so_ho": "ho2",
+        "tong_du_no_delta": "delta_dn",
+        "du_no_qh_delta": "delta_nqh",
+        "so_ho_delta": "delta_ho",
     })
-    m2 = df2[["ten_pgd", "tong_du_no", "du_no_qh", "so_ho"]].rename(columns={
-        "tong_du_no": "dn2", "du_no_qh": "nqh2", "so_ho": "ho2",
-    })
-    jn = pd.merge(m1, m2, on="ten_pgd", how="outer").fillna(0)
-    for col in ["dn1", "dn2", "nqh1", "nqh2", "ho1", "ho2"]:
-        if col in jn.columns:
-            jn[col] = pd.to_numeric(jn[col], errors="coerce").fillna(0)
-    jn["delta_dn"]  = jn["dn2"]  - jn["dn1"]
-    jn["delta_nqh"] = jn["nqh2"] - jn["nqh1"]
-    jn["delta_ho"]  = jn["ho2"]  - jn["ho1"]
+    jn = jn[~jn["ten_pgd"].astype(str).str.startswith("__")].copy()
     jn["tl_nqh1"] = (jn["nqh1"] / jn["dn1"].replace(0, float("nan")) * 100).fillna(0.0)
     jn["tl_nqh2"] = (jn["nqh2"] / jn["dn2"].replace(0, float("nan")) * 100).fillna(0.0)
 

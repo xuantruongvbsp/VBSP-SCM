@@ -7,6 +7,8 @@ from logger import get_logger
 logger = get_logger(__name__)
 
 import json
+import re
+import unicodedata
 from pathlib import Path
 from datetime import datetime
 
@@ -17,12 +19,26 @@ import db
 from auth import get_permissions, normalize_role
 from pdf_service import xuat_pdf_bang
 from state_manager import SCMStateManager
-from config import CHUONG_TRINH_KHTD, COT_TEN_PGD, DS_PGD, PGD_XA_MAP, CACHE_GQVL, CACHE_HSTD
+from config import (
+    CHUONG_TRINH_KHTD,
+    COT_MA_CHUONG_TRINH,
+    COT_NGUON_VON,
+    COT_TEN_PGD,
+    COT_TEN_XA,
+    COT_TONG_DU_NO,
+    DS_PGD,
+    PGD_XA_MAP,
+    CACHE_GQVL,
+    CACHE_HSTD,
+    HSTD_DS_CHO_VAY_NAM_ALIASES,
+    HSTD_THU_NO_NAM_ALIASES,
+)
 from data.core import ts_file
 from utils import fmt, xuat_excel, ten_file_xuat, vn
 
 from tabs.tab_khtd import (
     DATA_DIR,
+    KHTD_CN_NHOM_MA_CT,
     KV_KEY_CN,
     KV_KEY_XA,
     MA_KEYS_CO_KHTD,
@@ -308,9 +324,10 @@ def _du_lieu_khtd_pgd_cached(
     _df_full: "pd.DataFrame | None",
     pgd_chon: str,
     hstd_mtime: float = 0.0,
+    rules_ver: int = 0,
 ) -> tuple[dict[str, float], dict[str, str]]:
     """Lọc dữ liệu theo PGD rồi tính TH/ten_map một lần theo mtime HSTD."""
-    _ = hstd_mtime
+    _ = (hstd_mtime, rules_ver)
     if _df_full is None or _df_full.empty or COT_TEN_PGD not in _df_full.columns:
         return {}, {}
 
@@ -320,6 +337,82 @@ def _du_lieu_khtd_pgd_cached(
     th_xa = _tinh_thuc_hien_theo_ct(df_loc) if not df_loc.empty else {}
     _, ten_map_q = _quet_ct_co_du_no(df_loc)
     return th_xa, ten_map_q
+
+
+def _norm_xa_text(text: object) -> str:
+    """Chuẩn hóa tên xã/phường để khớp PGD_XA_MAP với HSTD."""
+    s = unicodedata.normalize("NFD", str(text or "").strip().lower())
+    s = "".join(c for c in s if unicodedata.category(c) != "Mn")
+    s = s.replace("đ", "d")
+    s = re.sub(r"^(xa|phuong|thi tran)\s+", "", s)
+    return re.sub(r"[^a-z0-9]+", " ", s).strip()
+
+
+def _ma_keys_phat_sinh_nam(df_xa: "pd.DataFrame | None") -> set[str]:
+    """Các ma_key có dư nợ hiện tại hoặc phát sinh giải ngân/thu nợ trong năm."""
+    if df_xa is None or df_xa.empty:
+        return set()
+    if COT_MA_CHUONG_TRINH not in df_xa.columns or COT_NGUON_VON not in df_xa.columns:
+        return set()
+
+    active = pd.Series(False, index=df_xa.index)
+    cols_phat_sinh = [COT_TONG_DU_NO]
+    cols_phat_sinh.extend(c for c in HSTD_DS_CHO_VAY_NAM_ALIASES if c in df_xa.columns)
+    cols_phat_sinh.extend(c for c in HSTD_THU_NO_NAM_ALIASES if c in df_xa.columns)
+
+    for col in dict.fromkeys(cols_phat_sinh):
+        if col in df_xa.columns:
+            active = active | (pd.to_numeric(df_xa[col], errors="coerce").fillna(0) > 0)
+    if not active.any():
+        return set()
+
+    lookup: dict[tuple[int, int], list[str]] = {}
+    for ma_key, ma_ct, _, nguon_von, _ in CHUONG_TRINH_KHTD:
+        nv_int = 1 if nguon_von == "TW" else 2
+        lookup.setdefault((int(ma_ct), nv_int), []).append(ma_key)
+
+    tmp = pd.DataFrame(
+        {
+            "ma_ct": pd.to_numeric(df_xa.loc[active, COT_MA_CHUONG_TRINH], errors="coerce").fillna(0).astype(int),
+            "nv": pd.to_numeric(df_xa.loc[active, COT_NGUON_VON], errors="coerce").fillna(0).astype(int),
+        }
+    )
+    keys: set[str] = set()
+    for row in tmp.itertuples(index=False):
+        keys.update(lookup.get((int(row.ma_ct), int(row.nv)), []))
+    return keys
+
+
+@st.cache_data(show_spinner=False)
+def _du_lieu_khtd_xa_cached(
+    _df_full: "pd.DataFrame | None",
+    pgd_chon: str,
+    xa_chon: str,
+    hstd_mtime: float = 0.0,
+    rules_ver: int = 0,
+) -> tuple[dict[str, float], dict[str, str], set[str]]:
+    """Lọc đúng PGD + xã rồi tính TH và danh sách chương trình có phát sinh."""
+    _ = (hstd_mtime, rules_ver)
+    if _df_full is None or _df_full.empty:
+        return {}, {}, set()
+    if COT_TEN_PGD not in _df_full.columns or COT_TEN_XA not in _df_full.columns:
+        return {}, {}, set()
+
+    s_pgd = _df_full[COT_TEN_PGD].astype(str).str.strip()
+    df_pgd = _df_full[s_pgd == str(pgd_chon).strip()]
+    if df_pgd.empty:
+        return {}, {}, set()
+
+    xa_norm = _norm_xa_text(xa_chon)
+    s_xa = df_pgd[COT_TEN_XA].map(_norm_xa_text)
+    df_xa = df_pgd[s_xa == xa_norm]
+    if df_xa.empty:
+        return {}, {}, set()
+
+    th_xa = _tinh_thuc_hien_theo_ct(df_xa)
+    _, ten_map_q = _quet_ct_co_du_no(df_xa)
+    keys_phat_sinh = _ma_keys_phat_sinh_nam(df_xa)
+    return th_xa, ten_map_q, keys_phat_sinh
 
 
 @st.cache_data(show_spinner=False)
@@ -726,57 +819,6 @@ def _tab_khtd_chi_nhanh(
     st.divider()
     _section_van_ban_qd_cn(role, username)
 
-    # ── Lịch sử phiên bản (chỉ admin / admin_cn) ───────────────────────────
-    if normalize_role(str(role or "user")) == "admin_cn":
-        with st.expander("🕐 Lịch sử chỉnh sửa KHTD Chi nhánh", expanded=False):
-            history = db.doc_kv_history(KV_KEY_CN, limit=15)
-            if not history:
-                st.info("Chưa có lịch sử chỉnh sửa.")
-            else:
-                df_hist = pd.DataFrame(history)
-                df_hist_display = df_hist.rename(columns={
-                    "changed_at": "Thời điểm",
-                    "changed_by": "Người sửa",
-                    "note": "Ghi chú",
-                })
-                st.dataframe(
-                    df_hist_display[["Thời điểm", "Người sửa", "Ghi chú"]],
-                    use_container_width=True,
-                    hide_index=True,
-                )
-
-                options = ["-- Chọn --"] + [
-                    f"#{row['id']} — {row['changed_at']} ({row['changed_by']})"
-                    for row in history
-                ]
-                lua_chon = st.selectbox(
-                    "Chọn phiên bản để xem trước",
-                    options=options,
-                    key="khtd_cn_history_select",
-                )
-                if lua_chon != "-- Chọn --":
-                    try:
-                        hist_id = int(lua_chon.split(" — ")[0].lstrip("#"))
-                        row_match = next((r for r in history if r["id"] == hist_id), None)
-                        if row_match:
-                            value_preview = json.loads(row_match["value"])
-                            st.json(value_preview)
-                            if st.button(
-                                "♻️ Khôi phục phiên bản này",
-                                type="secondary",
-                                key=f"khtd_restore_{hist_id}",
-                            ):
-                                ok = db.khoi_phuc_kv(
-                                    KV_KEY_CN, hist_id, username
-                                )
-                                if ok:
-                                    st.success("✅ Đã khôi phục. Tải lại trang để xem.")
-                                    st.cache_data.clear()
-                                else:
-                                    st.error("Không tìm thấy phiên bản.")
-                    except (ValueError, StopIteration):
-                        st.error("Không tìm thấy phiên bản.")
-
     with st.expander("📥 Upload Excel kế hoạch — nhanh nhất", expanded=False):
         df_mau = _tao_df_mau_khtd_cn()
         st.download_button(
@@ -834,6 +876,215 @@ def _tab_khtd_chi_nhanh(
 
 > ⚠️ Đơn vị: **triệu đồng**, số nguyên. Cột Thực hiện và Còn phải TH tự động tính từ HSTD — không cần nhập.
 """)
+
+    # ── Lịch sử phiên bản (chỉ admin / admin_cn) ───────────────────────────
+    if normalize_role(str(role or "user")) == "admin_cn":
+        with st.expander("🕐 Lịch sử chỉnh sửa KHTD Chi nhánh", expanded=False):
+            history = db.doc_kv_history(KV_KEY_CN, limit=15)
+            if not history:
+                st.info("Chưa có lịch sử chỉnh sửa.")
+            else:
+                df_hist = pd.DataFrame(history)
+                df_hist_display = df_hist.rename(columns={
+                    "changed_at": "Thời điểm",
+                    "changed_by": "Người sửa",
+                    "note": "Ghi chú",
+                })
+                st.dataframe(
+                    df_hist_display[["Thời điểm", "Người sửa", "Ghi chú"]],
+                    use_container_width=True,
+                    hide_index=True,
+                )
+
+                options = ["-- Chọn --"] + [
+                    f"#{row['id']} — {row['changed_at']} ({row['changed_by']})"
+                    for row in history
+                ]
+                lua_chon = st.selectbox(
+                    "Chọn phiên bản để xem trước",
+                    options=options,
+                    key="khtd_cn_history_select",
+                )
+                if lua_chon != "-- Chọn --":
+                    try:
+                        hist_id = int(lua_chon.split(" — ")[0].lstrip("#"))
+                        row_match = next((r for r in history if r["id"] == hist_id), None)
+                        if row_match:
+                            value_preview = json.loads(row_match["value"])
+                            st.json(value_preview)
+                            if st.button(
+                                "♻️ Khôi phục phiên bản này",
+                                type="secondary",
+                                key=f"khtd_restore_{hist_id}",
+                            ):
+                                ok = db.khoi_phuc_kv(
+                                    KV_KEY_CN, hist_id, username
+                                )
+                                if ok:
+                                    st.success("✅ Đã khôi phục. Tải lại trang để xem.")
+                                    st.cache_data.clear()
+                                else:
+                                    st.error("Không tìm thấy phiên bản.")
+                    except (ValueError, StopIteration):
+                        st.error("Không tìm thấy phiên bản.")
+
+
+def _hien_thi_bang_tom_tat_xa(
+    xa_chon: str,
+    kh_xa: dict,
+    th_xa: dict[str, float],
+    keys_phat_sinh: set[str] | None = None,
+    show_all: bool = False,
+) -> None:
+    """Bảng tóm tắt hiện trạng KHTD theo Xã — giống format CN read-only."""
+    st.markdown("##### 📊 Tóm tắt hiện trạng")
+    keys_phat_sinh = set(keys_phat_sinh or set())
+
+    BD = "#d1d5db"
+    H_BG = "#003D7A"
+    NHOM_BG = "#e8f0f8"
+    TONG_BG = "#E8F4FD"
+    RED = "#DC2626"
+    AMBER = "#D97706"
+    GREEN = "#16A34A"
+
+    def _tl_color(tl: float | None) -> str:
+        if tl is None:
+            return "#9ca3af"
+        if tl >= 100:
+            return GREEN
+        if tl >= 95:
+            return AMBER
+        return RED
+
+    def _td(v: str, align: str = "right", color: str = "", bg: str = "", fw: str = "") -> str:
+        s = f'text-align:{align};padding:5px 8px;border:1px solid {BD};font-size:0.82rem;white-space:nowrap'
+        if color:
+            s += f";color:{color}"
+        if bg:
+            s += f";background:{bg}"
+        if fw:
+            s += f";font-weight:{fw}"
+        return f"<td style='{s}'>{v}</td>"
+
+    def _co_du_lieu(ma_ct: int) -> bool:
+        if show_all:
+            return True
+        for mk in (f"{ma_ct}_TW", f"{ma_ct}_DP"):
+            if mk not in MA_KEYS_CO_KHTD:
+                continue
+            if float(kh_xa.get(f"{xa_chon}|{mk}", 0.0) or 0.0) > 0:
+                return True
+            if float(th_xa.get(mk, 0.0) or 0.0) > 0:
+                return True
+            if mk in keys_phat_sinh:
+                return True
+        return False
+
+    html_rows: list[str] = []
+    stt_no = 0
+    tong_kh = 0.0
+    tong_th = 0.0
+
+    html_rows.append(
+        "<table style='width:100%;border-collapse:collapse;font-size:0.82rem'>"
+        "<colgroup>"
+        "<col style='width:4%'><col style='width:36%'>"
+        "<col style='width:15%'><col style='width:15%'>"
+        "<col style='width:15%'><col style='width:15%'>"
+        "</colgroup>"
+        "<tr>"
+        + _td("STT", "center", "", H_BG, "bold")
+        + _td("Chỉ tiêu", "left", "#fff", H_BG, "bold")
+        + _td("KH (tr.đ)", "right", "#fff", H_BG, "bold")
+        + _td("TH (tr.đ)", "right", "#fff", H_BG, "bold")
+        + _td("Còn phải TH (tr.đ)", "right", "#fff", H_BG, "bold")
+        + _td("TL%", "right", "#fff", H_BG, "bold")
+        + "</tr>"
+    )
+
+    for tieu_de_nhom, ds_ma_ct in KHTD_CN_NHOM_MA_CT:
+        group_rows: list[str] = []
+        for ma_ct in ds_ma_ct:
+            mk_tw = f"{ma_ct}_TW"
+            mk_dp = f"{ma_ct}_DP"
+            co_tw = mk_tw in MA_KEYS_CO_KHTD
+            co_dp = mk_dp in MA_KEYS_CO_KHTD
+            if not co_tw and not co_dp:
+                continue
+            if not _co_du_lieu(ma_ct):
+                continue
+
+            kh_vnd = 0.0
+            th_vnd = 0.0
+            if co_tw:
+                kh_vnd += float(kh_xa.get(f"{xa_chon}|{mk_tw}", 0.0) or 0.0)
+                th_vnd += float(th_xa.get(mk_tw, 0.0) or 0.0)
+            if co_dp:
+                kh_vnd += float(kh_xa.get(f"{xa_chon}|{mk_dp}", 0.0) or 0.0)
+                th_vnd += float(th_xa.get(mk_dp, 0.0) or 0.0)
+
+            kh_v = kh_vnd / 1e6
+            th_v = th_vnd / 1e6
+            con_phai_th_v = max(kh_vnd - th_vnd, 0) / 1e6
+            tl = th_v / kh_v * 100 if kh_v > 0 else None
+
+            if kh_vnd > 0 or th_vnd > 0:
+                tong_kh += kh_vnd
+                tong_th += th_vnd
+
+            stt_no += 1
+            kh_str = _fvn(kh_v, 0) if kh_v > 0 else "—"
+            th_str = _fvn(th_v, 0) if th_v > 0 else "—"
+            con_str = _fvn(con_phai_th_v, 0)
+            tl_str = f"{_fvn(tl, 1)}%" if tl is not None else "—"
+            tl_c = _tl_color(tl)
+
+            tds = (
+                _td(str(stt_no), "center")
+                + _td(_ten_ct_base(ma_ct), "left")
+                + _td(kh_str, "right")
+                + _td(th_str, "right")
+                + _td(con_str, "right")
+                + _td(tl_str, "right", tl_c)
+            )
+            group_rows.append(f"<tr>{tds}</tr>")
+
+        if group_rows:
+            tds = (
+                _td("", "center", "", NHOM_BG, "bold")
+                + _td(tieu_de_nhom, "left", "#1f2937", NHOM_BG, "bold")
+                + _td("", "right", "", NHOM_BG)
+                + _td("", "right", "", NHOM_BG)
+                + _td("", "right", "", NHOM_BG)
+                + _td("", "right", "", NHOM_BG)
+            )
+            html_rows.append(f"<tr>{tds}</tr>")
+            html_rows.extend(group_rows)
+
+    if stt_no == 0:
+        st.info("Xã này chưa có dư nợ, giải ngân, thu nợ trong năm hoặc kế hoạch đã nhập.")
+        return
+
+    # Dòng tổng cộng
+    tong_kh_v = tong_kh / 1e6
+    tong_th_v = tong_th / 1e6
+    tong_con_v = max(tong_kh - tong_th, 0) / 1e6
+    tong_tl = tong_th_v / tong_kh_v * 100 if tong_kh_v > 0 else None
+    tds_tong = (
+        _td("", "center", "#1f2937", TONG_BG, "bold")
+        + _td("Tổng cộng", "left", "#1f2937", TONG_BG, "bold")
+        + _td(_fvn(tong_kh_v, 0) if tong_kh_v > 0 else "—", "right", "#1f2937", TONG_BG, "bold")
+        + _td(_fvn(tong_th_v, 0) if tong_th_v > 0 else "—", "right", "#1f2937", TONG_BG, "bold")
+        + _td(_fvn(tong_con_v, 0), "right", "#1f2937", TONG_BG, "bold")
+        + _td(f"{_fvn(tong_tl, 1)}%" if tong_tl is not None else "—", "right",
+              _tl_color(tong_tl), TONG_BG, "bold")
+    )
+    html_rows.append(f"<tr>{tds_tong}</tr>")
+    html_rows.append("</table>")
+
+    st.markdown("".join(html_rows), unsafe_allow_html=True)
+    st.caption("📌 Đơn vị: triệu đồng. Mặc định chỉ hiện chương trình có KH hoặc có dư nợ/giải ngân/thu nợ trong năm của xã đang chọn.")
 
 
 def _tab_khtd_theo_xa(role: str, username: str, df_full: "pd.DataFrame | None") -> None:
@@ -989,12 +1240,47 @@ def _tab_khtd_theo_xa(role: str, username: str, df_full: "pd.DataFrame | None") 
                 logger.error("Lỗi trong khối except: %s", e, exc_info=True)
                 st.error(f"Lỗi đọc file Excel: {e}")
 
-    hstd_mtime = ts_file(CACHE_HSTD)
-    th_xa, ten_map_q = _du_lieu_khtd_pgd_cached(df_full, pgd_chon, hstd_mtime)
-
     st.divider()
     xa_chon = st.selectbox("Chọn Xã/Phường", danh_sach_xa, key="khtd_xa_xa_sel")
     st.caption("📌 Đơn vị nhập và hiển thị: triệu đồng")
+
+    hstd_mtime = ts_file(CACHE_HSTD)
+    rules_ver = len(db.doc_ndt_dp_rule_list())
+    th_xa, ten_map_q, keys_phat_sinh = _du_lieu_khtd_xa_cached(
+        df_full,
+        pgd_chon,
+        xa_chon,
+        hstd_mtime,
+        rules_ver,
+    )
+    hien_tat_ca_ct = st.checkbox(
+        "Hiện tất cả chương trình",
+        value=False,
+        key="khtd_xa_show_all_ct",
+    )
+
+    def _ma_ct_hien_thi(ma_ct: int) -> bool:
+        if hien_tat_ca_ct:
+            return True
+        for mk in (f"{ma_ct}_TW", f"{ma_ct}_DP"):
+            if mk not in MA_KEYS_CO_KHTD:
+                continue
+            if float(kh_xa.get(f"{xa_chon}|{mk}", 0.0) or 0.0) > 0:
+                return True
+            if float(th_xa.get(mk, 0.0) or 0.0) > 0:
+                return True
+            if mk in keys_phat_sinh:
+                return True
+        return False
+
+    # ── Tóm tắt hiện trạng ─────────────────────────────────────────────
+    _hien_thi_bang_tom_tat_xa(
+        xa_chon,
+        kh_xa,
+        th_xa,
+        keys_phat_sinh,
+        show_all=hien_tat_ca_ct,
+    )
 
     _colw_xa = [3, 1, 1, 1, 1]  # Chương trình | KH TW | TH TW | KH ĐP | TH ĐP
 
@@ -1028,22 +1314,18 @@ def _tab_khtd_theo_xa(role: str, username: str, df_full: "pd.DataFrame | None") 
     )
 
     # ── Dòng tổng cộng ───────────────────────────────────────────────────
-    tong_kh_tw = sum(
-        float(kh_xa.get(f"{xa_chon}|{mk}", 0.0))
-        for mk in MA_KEYS_CO_KHTD if mk.endswith("_TW")
-    ) / 1_000_000
-    tong_kh_dp = sum(
-        float(kh_xa.get(f"{xa_chon}|{mk}", 0.0))
-        for mk in MA_KEYS_CO_KHTD if mk.endswith("_DP")
-    ) / 1_000_000
-    tong_th_tw = sum(
-        float(th_xa.get(mk, 0.0))
-        for mk in MA_KEYS_CO_KHTD if mk.endswith("_TW")
-    ) / 1e6
-    tong_th_dp = sum(
-        float(th_xa.get(mk, 0.0))
-        for mk in MA_KEYS_CO_KHTD if mk.endswith("_DP")
-    ) / 1e6
+    ma_ct_hien_thi = [
+        int(ma_ct)
+        for _, ds_ma_ct in KHTD_CN_NHOM_MA_CT
+        for ma_ct in ds_ma_ct
+        if _ma_ct_hien_thi(int(ma_ct))
+    ]
+    keys_tw_hien = {f"{ma_ct}_TW" for ma_ct in ma_ct_hien_thi if f"{ma_ct}_TW" in MA_KEYS_CO_KHTD}
+    keys_dp_hien = {f"{ma_ct}_DP" for ma_ct in ma_ct_hien_thi if f"{ma_ct}_DP" in MA_KEYS_CO_KHTD}
+    tong_kh_tw = sum(float(kh_xa.get(f"{xa_chon}|{mk}", 0.0) or 0.0) for mk in keys_tw_hien) / 1_000_000
+    tong_kh_dp = sum(float(kh_xa.get(f"{xa_chon}|{mk}", 0.0) or 0.0) for mk in keys_dp_hien) / 1_000_000
+    tong_th_tw = sum(float(th_xa.get(mk, 0.0) or 0.0) for mk in keys_tw_hien) / 1e6
+    tong_th_dp = sum(float(th_xa.get(mk, 0.0) or 0.0) for mk in keys_dp_hien) / 1e6
     _txt_kh_tw = f"{_fmt_vn(int(tong_kh_tw), 0)} tr" if tong_kh_tw > 0 else "—"
     _txt_th_tw = f"{_fmt_vn(int(tong_th_tw), 0)} tr" if tong_th_tw > 0 else "—"
     _txt_kh_dp = f"{_fmt_vn(int(tong_kh_dp), 0)} tr" if tong_kh_dp > 0 else "—"
@@ -1125,6 +1407,9 @@ def _tab_khtd_theo_xa(role: str, username: str, df_full: "pd.DataFrame | None") 
         gia_tri_moi: dict[str, float] = {}
 
         for tieu_de_nhom, ds_ma_ct in KHTD_CN_NHOM_MA_CT:
+            ds_ma_ct_hien = [ma_ct for ma_ct in ds_ma_ct if _ma_ct_hien_thi(int(ma_ct))]
+            if not ds_ma_ct_hien:
+                continue
             bg = nhom_mau_nen[idx_nhom % len(nhom_mau_nen)]
             idx_nhom += 1
             st.markdown(
@@ -1133,7 +1418,7 @@ def _tab_khtd_theo_xa(role: str, username: str, df_full: "pd.DataFrame | None") 
                 f"font-size:0.9rem'>{tieu_de_nhom}</p>",
                 unsafe_allow_html=True,
             )
-            for ma_ct in ds_ma_ct:
+            for ma_ct in ds_ma_ct_hien:
                 mk_tw = f"{ma_ct}_TW"
                 mk_dp = f"{ma_ct}_DP"
                 khoa_tw = f"{xa_chon}|{mk_tw}"

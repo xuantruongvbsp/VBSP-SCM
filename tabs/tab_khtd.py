@@ -111,12 +111,12 @@ GQVL_CN_SUB_ROWS: list[dict[str, str | None]] = [
         "key_dp": "3_DP_XA",
     },
 ]
-MAKEY_BY_MACT_NV: dict[tuple[int, int], str] = {}
+MAKEY_BY_MACT_NV: dict[tuple[int, int], list[str]] = {}
 TEN_BASE_BY_MACT: dict[int, str] = {}
 for mk, ma_ct, ten, nv, _ in CHUONG_TRINH_KHTD:
     ma_ct_i = int(ma_ct)
     nv_int = 1 if nv == "TW" else 2
-    MAKEY_BY_MACT_NV[(ma_ct_i, nv_int)] = mk
+    MAKEY_BY_MACT_NV.setdefault((ma_ct_i, nv_int), []).append(mk)
     TEN_BASE_BY_MACT.setdefault(ma_ct_i, str(ten))
 
 # Thư mục gốc dữ liệu
@@ -237,7 +237,10 @@ def _ma_ct_tu_ma_key(ma_key: str) -> int | None:
 
 
 def _ma_key_tu_ma_ct_nv(ma_ct: int, nv_int: int) -> str:
-    return MAKEY_BY_MACT_NV.get((int(ma_ct), int(nv_int)), f"{int(ma_ct)}|{int(nv_int)}")
+    mk_list = MAKEY_BY_MACT_NV.get((int(ma_ct), int(nv_int)))
+    if mk_list:
+        return mk_list[0]
+    return f"{int(ma_ct)}|{int(nv_int)}"
 
 
 def _ten_ct_base(ma_ct: int, ten_map: dict[str, str] | None = None) -> str:
@@ -338,8 +341,7 @@ def _tinh_thuc_hien_khtd_cn(
         if int(ma_ct) == 3:
             out[GQVL_TW_TONG_KEY if int(nv_int) == 1 else GQVL_DP_TONG_KEY] = float(val)
             continue
-        mk = MAKEY_BY_MACT_NV.get((int(ma_ct), int(nv_int)))
-        if mk:
+        for mk in MAKEY_BY_MACT_NV.get((int(ma_ct), int(nv_int)), []):
             out[mk] = float(val)
 
     th_gqvl = _tinh_th_gqvl_phan_tang(df_hstd, df_gqvl)
@@ -510,7 +512,58 @@ def _tinh_thuc_hien_theo_ct(df: "pd.DataFrame") -> dict[str, float]:
         out["6_DP_XA"] = float(th_nsvsmt_dp.get("6_DP_XA", 0.0))
         out["6_DP"] = tong_6_dp
 
+    th_gqvl_dp = _tinh_th_gqvl_dp_phan_tang(df)
+    tong_3_dp = float(th_gqvl_dp.get("3_DP_TINH", 0.0)) + float(th_gqvl_dp.get("3_DP_XA", 0.0))
+    if tong_3_dp > 0:
+        out["3_DP_TINH"] = float(th_gqvl_dp.get("3_DP_TINH", 0.0))
+        out["3_DP_XA"] = float(th_gqvl_dp.get("3_DP_XA", 0.0))
+
     return out
+
+
+def _tinh_th_gqvl_dp_phan_tang(df_hstd: "pd.DataFrame | None") -> dict[str, float]:
+    """
+    Tính TH thực tế cho GQVL ĐP từ HSTD, phân tầng theo Mã NĐT:
+    - `3_DP_TINH`: Mã NĐT thuộc danh mục cấp tỉnh
+    - `3_DP_XA`: còn lại / thiếu Mã NĐT
+    """
+    result = {"3_DP_TINH": 0.0, "3_DP_XA": 0.0}
+    if df_hstd is None or df_hstd.empty:
+        return result
+
+    if COT_MA_CHUONG_TRINH not in df_hstd.columns or COT_NGUON_VON not in df_hstd.columns:
+        return result
+
+    col_dn = COT_TONG_DU_NO if COT_TONG_DU_NO in df_hstd.columns else (
+        COT_DU_NO_TH if COT_DU_NO_TH in df_hstd.columns else None
+    )
+    if col_dn is None:
+        return result
+
+    ma_ndt_s = (
+        df_hstd[COT_MA_NHA_DAU_TU].astype(str).fillna("").str.strip()
+        if COT_MA_NHA_DAU_TU in df_hstd.columns
+        else pd.Series("", index=df_hstd.index, dtype="object")
+    )
+    tmp = pd.DataFrame(
+        {
+            "ma_ct": pd.to_numeric(df_hstd[COT_MA_CHUONG_TRINH], errors="coerce").fillna(0).astype(int),
+            "nv": pd.to_numeric(df_hstd[COT_NGUON_VON], errors="coerce").fillna(0).astype(int),
+            "th": pd.to_numeric(df_hstd[col_dn], errors="coerce").fillna(0).astype(float),
+            "ma_ndt": ma_ndt_s,
+        }
+    )
+    tmp = tmp[(tmp["ma_ct"] == 3) & (tmp["nv"] == 2) & (tmp["th"] != 0)]
+    if tmp.empty:
+        return result
+
+    from db import phan_loai_ndt_dp_cap
+
+    cap_s = tmp["ma_ndt"].map(lambda ma: phan_loai_ndt_dp_cap(3, ma))
+    la_tinh = cap_s.eq("tinh")
+    result["3_DP_TINH"] = float(tmp.loc[la_tinh, "th"].sum())
+    result["3_DP_XA"] = float(tmp.loc[~la_tinh, "th"].sum())
+    return result
 
 
 def _tinh_th_nsvsmt_dp_phan_tang(df_hstd: "pd.DataFrame | None") -> dict[str, float]:

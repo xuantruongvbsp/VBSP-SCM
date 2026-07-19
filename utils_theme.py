@@ -54,15 +54,11 @@ _TOKENS = {
 
 
 @st.cache_resource
-def get_theme_css() -> str:
-    """Trả về CSS đầy đủ cho dark theme — cached, chỉ build 1 lần."""
+def _css_part1() -> str:
+    """CSS chunk 1: typography, canvas, sidebar, header, tabs, expander, metric, dataframe, inputs."""
     c = _TOKENS
-
     return f"""<style>
-/* ══════════════════════════════════════════════════════════════
-   VBSP-SCM UI — Theme: DARK
-   Semantic Token System  (shadcn / Linear pattern)
-══════════════════════════════════════════════════════════════ */
+/* VBSP-SCM UI — Dark Theme (1/2) */
 
 /* ── 1. TYPOGRAPHY ── */
 html, body, [class*="css"] {{
@@ -93,7 +89,7 @@ h3 {{ font-size: 1.1rem !important; font-weight: 600 !important;
 }}
 .main .block-container {{ background-color: {c['bg']} !important; padding-top: 1.5rem; }}
 
-/* ── 3. SIDEBAR (luôn dark — tạo contrast với content area) ── */
+/* ── 3. SIDEBAR ── */
 [data-testid="stSidebar"] {{
     background: {c['sidebar_bg']} !important;
     border-right: 1px solid {c['sidebar_border']} !important;
@@ -193,7 +189,6 @@ header[data-testid="stHeader"] {{
 }}
 
 /* ── 7. METRIC / KPI CARD ── */
-/* border=True → Streamlit dùng secondaryBackgroundColor tự động; chỉ tùy chỉnh thêm */
 [data-testid="stMetric"] {{
     border-left: 4px solid {c['accent']} !important;
     box-shadow: 0 2px 8px rgba(0,0,0,0.12) !important;
@@ -263,6 +258,15 @@ header[data-testid="stHeader"] {{
     box-shadow: 0 0 0 3px rgba(46,125,50,0.15) !important;
     outline: none !important; background: {c['surface']} !important;
 }}
+</style>"""
+
+
+@st.cache_resource
+def _css_part2() -> str:
+    """CSS chunk 2: buttons, alerts, badges, form, scrollbar, progress, chip, spinner, pills."""
+    c = _TOKENS
+    return f"""<style>
+/* VBSP-SCM UI — Dark Theme (2/2) */
 
 /* ── 10. BUTTON (main content area) ── */
 .stButton > button {{
@@ -381,8 +385,12 @@ hr {{ border: none !important; border-top: 1px solid {c['border']} !important; m
     background: {c['error_bg']}; color: {c['error_text']};
     border-color: {c['error_border']};
 }}
-
 </style>"""
+
+
+def get_theme_css() -> str:
+    """Trả về CSS đầy đủ — giữ cho tương thích ngược."""
+    return _css_part1() + _css_part2()
 
 
 def init_theme() -> str:

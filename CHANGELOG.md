@@ -1,5 +1,211 @@
 # CHANGELOG
 
+## [2026-07-19] — Fix lỗi Failed to fetch dynamically imported module Html.js: chia CSS thành 2 chunk
+- `utils_theme.py` — tách `get_theme_css()` thành `_css_part1()` (sections 1–9) và `_css_part2()` (sections 10–19); `get_theme_css()` giữ lại cho tương thích ngược
+- `app.py` dòng 259 — inject 2 chunk riêng biệt thay vì 1 block lớn để tránh JS dynamic import payload quá lớn
+
+## [2026-07-19] — Fix MAKEY_BY_MACT_NV build logic: last-wins → list[str] để handle multi-key (3,2)
+- `tabs/tab_khtd.py` dòng 114–120 — đổi type từ `dict[tuple,str]` sang `dict[tuple,list[str]]`, dùng `setdefault(...,[]).append(mk)`; cập nhật `_ma_key_tu_ma_ct_nv()` và groupby loop trong `_tinh_thuc_hien_khtd_cn()`
+- `services/khtd_mau07_service.py` dòng 157, 216 — cập nhật 2 caller dùng vòng lặp `for mk in mk_list`
+- `scripts/debug_khtd_th.py` dòng 46–48, 110 — đồng bộ build loop và caller cục bộ
+
+## [2026-07-19] — Fix bug G27: tab_khtd_pgd ép 100% GQVL ĐP vào 3_DP_TINH, 3_DP_XA luôn = 0
+- `tabs/tab_khtd_pgd.py` dòng ~540 — thêm `COT_MA_NHA_DAU_TU` vào import; sau groupby loop trong `_tinh_thuc_hien_theo_ct`, ghi đè `3_DP_TINH`/`3_DP_XA` và `6_DP_TINH`/`6_DP_XA` bằng phân tầng per-row theo `phan_loai_ndt_dp_cap()`, xóa key tổng `6_DP` cũ
+- `BUGMAP.md` — thêm G27
+
+## [2026-07-19] — Fix bug G26: GQVL ĐP bị chia 50/50 thay vì theo Mã NĐT trong _tinh_thuc_hien_theo_ct
+- `tabs/tab_khtd.py` — thêm `_tinh_th_gqvl_dp_phan_tang()` phân tầng GQVL ĐP theo Mã NĐT; thêm block override `3_DP_TINH`/`3_DP_XA` sau groupby loop
+- `BUGMAP.md` — thêm G26
+
+## [2026-07-19] — Tách cấp tỉnh/cấp xã trong tab Nguồn vốn địa phương
+- `tabs/tab_hhi.py` dòng ~20-610 — phân loại nguồn ĐP theo rule `Mã CT + Mã nhà đầu tư`, thêm KPI/biểu đồ/bảng/Excel cho `ĐP cấp tỉnh` và `ĐP cấp xã/khác` bên cạnh tổng ĐP; đổi cache trend snapshot sang tham số `tu_ky/den_ky` để tránh bỏ qua key kỳ
+- `tests/test_tab_hhi.py` — thêm test bảng nguồn vốn ĐP tách đúng cấp tỉnh/cấp xã và fallback mã chưa có rule về cấp xã/khác
+- `BUGMAP.md` — thêm G25 ghi nhận lỗi phân tích Nguồn vốn địa phương gộp cấp tỉnh/cấp xã sau khi đã có rule Mã NĐT
+
+## [2026-07-19] — Tối ưu hiệu năng tab Nguồn vốn địa phương
+- `tabs/tab_hhi.py` — thêm `@st.cache_data` cho `_nhan_nv_numeric` (cache pre-compute label + numeric)
+- `tabs/tab_hhi.py` — thêm `_load_snapshot_context` + `_cached_snapshot_range` cache snapshot queries, giảm 3 lần DB query mỗi render xuống 0 (khi cache hit)
+
+## [2026-07-19] — Fix cache key: bust khi rules Mã NĐT thay đổi
+- `tabs/tab_khtd_nhap.py` dòng 327, 392 — thêm param `rules_ver: int = 0` vào `_du_lieu_khtd_pgd_cached` và `_du_lieu_khtd_xa_cached`; sửa `_ = hstd_mtime` → `_ = (hstd_mtime, rules_ver)`
+- `tabs/tab_khtd_nhap.py` dòng 1248 — tính `rules_ver = len(db.doc_ndt_dp_rule_list())` và truyền vào `_du_lieu_khtd_xa_cached`; cache tự bust ngay khi admin thêm/xóa rules mà không cần upload lại HSTD
+
+## [2026-07-19] — Fix rules Mã NĐT: đính chính 3 mã cap_xa bị seed nhầm tinh
+- `db.ndt_dp_rule_list` (kv_store) — xóa rule của INV1309250088457/INV1309250088466/INV1309250088458 (ma_ct=3); 3 mã này là cap_xa, mặc định fallback đúng; DB còn 15 rules toàn cap_tinh
+
+## [2026-07-19] — Fix rules Mã NĐT: xóa INV1201260090198 khỏi cap=tinh
+- `db.ndt_dp_rule_list` (kv_store) — xóa INV1201260090198 (ma_ct=6) vì không có trong danh sách cap_tinh do người dùng xác nhận; mã này sẽ mặc định về cap=xa theo logic fallback
+
+## [2026-07-19] — Seed 14 rules Mã NĐT cấp tỉnh vào kv_store
+- `db.ndt_dp_rule_list` (kv_store) — từ 5 lên 19 rules; thêm đủ (ma_ct, ma) cho INV0612160025335/INV1907190050745/INV1411170034237/INV1203140004990/INV1203140005010/INV2407190050819/INV2211160024943/INV1311230072614/INV1309250088457/INV1309250088466/INV1309250088458; bổ sung ma_ct=1/9/19 cho INV0802140002661; INV1005170029145 không có trong HSTD nv=2 (bỏ qua)
+- Xác minh: 18/18 cặp (ma_ct, ma) trả đúng cap=tinh — PASS
+
+## [2026-07-19] — Fix PGD_XA_MAP: tên xã/phường khớp HSTD (toàn bộ 22 PGD)
+- `config.py` dòng ~868-946 — bỏ prefix "Xã "/"Phường " thừa; đổi "phường " thường cho đúng cột "Tên xã" HSTD; fix một số tên sai loại (Xã→phường). 22/22 PGD đạt OK sau xác minh bằng script.
+- `BUGMAP.md` — thêm G24 ghi nhận lỗi PGD_XA_MAP tên xã không khớp HSTD
+
+## [2026-07-19] — Fix KHTD theo Xã: tóm tắt đúng xã và ẩn chương trình không phát sinh
+- `tabs/tab_khtd_nhap.py` dòng ~22-413 — thêm helper lọc đúng `PGD + Xã/Phường`, tính `TH` theo xã đang chọn và xác định chương trình có dư nợ/giải ngân/thu nợ trong năm
+- `tabs/tab_khtd_nhap.py` dòng ~930-1510 — bảng `Tóm tắt hiện trạng` và form nhập KHTD theo Xã mặc định chỉ hiện chương trình có KH hoặc có phát sinh trong năm; thêm checkbox `Hiện tất cả chương trình` khi cần nhập chương trình mới
+- `BUGMAP.md` — thêm G23 ghi nhận lỗi tóm tắt KHTD theo Xã lấy số TH của cả PGD và hiển thị quá nhiều dòng 0
+
+## [2026-07-19] — Fix render KHTD thiếu import nhóm chương trình
+- `tabs/tab_khtd_nhap.py` dòng ~24-29 — bổ sung import `KHTD_CN_NHOM_MA_CT` từ `tabs.tab_khtd` để phần KHTD theo Xã không còn lỗi `name 'KHTD_CN_NHOM_MA_CT' is not defined`
+- `BUGMAP.md` — thêm G22 ghi nhận lỗi thiếu import constant nhóm chương trình sau refactor KHTD
+
+## [2026-07-19] — Launcher tự tắt Streamlit cũ trên port 8502
+- `Chay_VBSP_SCM.bat` dòng ~34-86, ~303-319 — nếu lock/port 8502 còn app cũ đang `LISTENING`, tự lấy PID bằng `netstat` và `taskkill /F /PID` đúng process đó trước khi chạy app mới
+- `BUGMAP.md` — thêm J54 ghi nhận lỗi launcher chỉ mở URL/thoát khi Streamlit cũ còn chiếm port
+
+## [2026-07-19] — Fix launcher mất biến trong block CMD
+- `Chay_VBSP_SCM.bat` dòng ~2-158 — dùng `EnableDelayedExpansion` đúng cách cho biến runtime, đổi auto-detect Python sang flow `goto` tuyến tính, tách `PY_CMD/PY_ARGS`, chỉ chọn candidate Python nếu chạy được `--version`, chuyển echo/comment launcher về ASCII và CRLF để CMD không vỡ encoding/label
+- `BUGMAP.md` — thêm J53 ghi nhận lỗi `%PY_EXE%`/`%URL%` rỗng hoặc `%errorlevel%` đọc stale trong batch block
+
+## [2026-07-19] — Tab KHTD theo Xã: thêm bảng Tóm tắt hiện trạng
+- `tabs/tab_khtd_nhap.py` — Thêm `_hien_thi_bang_tom_tat_xa()`: bảng HTML tóm tắt per-chương-trình (KH / TH / Còn phải TH / TL%), gọi sau khi chọn Xã
+
+## [2026-07-19] — Fix fallback xuất Excel Nguồn vốn địa phương
+- `tabs/tab_hhi.py` — log lỗi khi cache/export Excel thất bại và tạo workbook fallback có sheet `Lỗi xuất file` thay vì gọi `xuat_excel({})`
+- `BUGMAP.md` — thêm J52 ghi nhận lỗi fallback Excel rỗng có thể crash tiếp
+
+## [2026-07-19] — Fix cache sentinel tab Nguồn vốn địa phương
+- `tabs/tab_hhi.py` — đổi cache key Excel export từ tham số `_ts/_is_pgd_view/_extra_cols` sang `ts/is_pgd_view/extra_cols/view_key` để không stale giữa CN/PGD hoặc sau khi HSTD đổi
+- `tabs/tab_quan_ly_ndt_dp.py` — đổi `_quet_ma_tu_hstd(..., _ts)` thành `(..., ts)` và truyền `ts_hstd` tới `_render_ma_moi_tu_hstd()`
+- `BUGMAP.md` — thêm J51 ghi nhận lỗi `st.cache_data` bỏ qua tham số bắt đầu bằng `_`
+
+## [2026-07-19] — Nâng cấp toàn diện tab Nguồn vốn địa phương
+- `tabs/tab_hhi.py` — `_map_nv` → module-level `_map_nguon_von()`; `_phan_nguon_von()` skip copy nếu đã có `_nv_label`
+- `tabs/tab_hhi.py` — Thêm `_nhan_nv_numeric()`: pre-label + pre-convert numeric 1 lần duy nhất, giảm 5-7 lần `pd.to_numeric()`
+- `tabs/tab_hhi.py` — `_bang_theo_nv()`: thay `pivot_table` → `groupby` thủ công, nhận `df_labeled` pre-computed
+- `tabs/tab_hhi.py` — Thêm treemap chart TW vs ĐP theo PGD/CT; Top 5 đơn vị tỷ trọng ĐP cao nhất
+- `tabs/tab_hhi.py` — Cache Excel export: `_cached_excel_sheets()` với `@st.cache_data`
+- `tabs/tab_quan_ly_ndt_dp.py` — `_quet_ma_tu_hstd()` → `@st.cache_data(ttl=300)` + `ts_hstd` sentinel, pipe ts_hstd qua tất cả helper
+- `workspaces/ws_management.py` — `_la_nguon_von_dia_phuong()` đồng bộ với `tab_hhi._map_nguon_von()`
+
+## [2026-07-19] — KHTD: điều chỉnh "Còn phải TH" trừ thu hồi NQ11 trong năm
+- `tabs/tab_khtd_xuat.py` — thêm pre-calc `nq11_thuhoi_nam_by_mact_nv` từ cột `Thu nợ TH/QH/Khoanh Năm` trong `df_loc`
+- `tabs/tab_khtd_xuat.py` — `_add_row` nhận thêm `thu_hoi_nq11_vnd`; Còn phải TH = KH − TH − thu_hoi (cho hàng "normal" cuối nhóm ma_ct)
+- `tabs/tab_khtd_xuat.py` — `_add_nq11_subrow` cập nhật: hàng "normal" báo "thu hồi đã trừ"; hàng gqvl_sub hiển thị "−thu_hoi" đỏ trong cột Còn phải TH
+
+## [2026-07-19] — KHTD: dời Lịch sử chỉnh sửa xuống cuối; thêm hàng phụ NQ11
+- `tabs/tab_khtd_nhap.py` — dời expander "🕐 Lịch sử chỉnh sửa KHTD Chi nhánh" xuống cuối trang (sau Upload Excel và Hướng dẫn)
+- `tabs/tab_khtd_xuat.py` — thêm hàng phụ "↳ Trong đó: Dư nợ ch.trình các món vay Nghị quyết 11" ngay dưới mỗi chương trình có dư nợ NQ11; tính từ `__is_nq11` trong `df_loc`
+
+## [2026-07-19] — Fix crash tab Quản lý Công việc: `int('')` whitespace-only string
+- `tabs/tab_tien_do.py` dòng ~37 — thêm helper `_to_int(val, default=0)` dùng try/except
+- `tabs/tab_tien_do.py` dòng ~104 (`_render_tong_quan`) — `int(r.get("pct_hoan_thanh") or 0)` → `_to_int(...)`
+- `tabs/tab_tien_do.py` dòng ~895 (`_render_cap_nhat`) — `int(r.get("pct_hoan_thanh") or 0)` → `_to_int(...)`
+- `tabs/tab_tien_do.py` dòng ~1036-1037 (`_render_xuat`) — `int(r.get("pct_cu/moi") or 0)` → `_to_int(...)`
+- `BUGMAP.md` — thêm J8 ghi nhận lỗi `int(x or 0)` với whitespace-only string
+
+## [2026-07-19] — Fix bug chọn nhầm hồ sơ khi phân trang Tra cứu
+- `tabs/tab_tracuu_v2.py` dòng ~437 — đổi `key="tc_table"` → `key=f"tc_table_p{page}"` để reset selection khi chuyển trang (tránh `rows[0] + start` trỏ sai record)
+
+## [2026-07-19] — Tối ưu tốc độ Tra cứu Khách hàng
+- `components/filter_panel.py` — Gom tất cả filter vào 1 composite mask vectorized (thay vì ~10 lần chained boolean indexing → copy DataFrame trung gian)
+- `components/filter_panel.py` — Bỏ `df.copy()` đầu hàm, chỉ copy 1 lần cuối `df.loc[mask].copy()`
+- `components/filter_panel.py` — Thêm `_pre_compute_search_text()` cached: ghép + normalize 5 cột tìm kiếm 1 lần duy nhất, `_keyword_search_mask()` dùng pre-computed column thay vì normalize từng cột mỗi rerun
+- `tabs/tab_tracuu_v2.py` — Thêm phân trang 200 dòng/trang cho bảng kết quả, giữ nguyên `on_select` chọn dòng xem chi tiết
+
+## [2026-07-19] — Nâng cấp xuất báo cáo Excel + PDF tab KH-NV Công việc
+- `tabs/tab_ke_hoach_cv_khnv.py` — `_render_ke_hoach()`: nâng Excel sang `xuat_excel_chuyen_nghiep` (bìa + KPI + bảng styled), thêm nút Tạo PDF bằng ReportLab
+- `tabs/tab_ke_hoach_cv_khnv.py` — `_render_ket_qua()`: tương tự, Excel có thêm sheet "Tổng hợp cán bộ", PDF cho bảng kết quả
+- `tabs/tab_ke_hoach_cv_khnv.py` — `_render_tong_quan()`: thêm nút "Xuất Excel tổng quan" (sheet Ma trận + Đầu việc + KPI)
+
+## [2026-07-19] — Fix crash tab Thông tin chung khi thiếu python-docx
+- `services/hstd_word_service.py` dòng ~28-48 — thêm fallback cho `WD_ALIGN_PARAGRAPH`/`WD_TABLE_ALIGNMENT` khi `docx` không import được, để `tab_tongquan` vẫn render; chức năng xuất Word tiếp tục báo thiếu thư viện khi người dùng bấm xuất
+- `BUGMAP.md` — thêm F9 ghi nhận lỗi default argument dùng symbol import tùy chọn
+
+## [2026-07-19] — Fix lỗi python-docx không import được (gây crash tab Tổng quan)
+- `services/hstd_word_service.py` — `WD_ALIGN_PARAGRAPH` không import được do `python-docx` cài lỗi; fix: `pip install --force-reinstall python-docx` trong `venv`
+
+## [2026-07-19] — Chốt review nhóm Cảnh báo Tín dụng
+- `tabs/tab_canh_bao_nqh.py` dòng ~75-1530 — `_dem_den_han()` nhận mốc ngày số liệu; tổng hợp, heatmap, khoanh sắp hết hạn và gia hạn nợ dùng `lay_ngay_so_lieu()`; quyền cấu hình ngưỡng dùng `la_admin_cn(role)`; trend chart N kỳ không còn nuốt lỗi im lặng
+- `tabs/tab_no_khoanh.py` dòng ~1043-1052 — badge mức độ rủi ro tính từ `df_hien[COT_NGAY_HH_KHOANH]`, tránh align nhầm index với DataFrame nguồn
+- `BUGMAP.md` — thêm B39-B40 ghi nhận lỗi ngày tham chiếu/quyền cấu hình và badge rủi ro nợ khoanh
+
+## [2026-07-19] — Quy ước baseline 31/12: mọi so sánh kỳ mặc định vs mốc cuối năm trước
+- `snapshot_service.py` — thêm `ky_baseline(ds_ky, ky_hien_tai)`: trả về YYYY-12 năm trước, fallback kỳ gần nhất ≤ mốc
+- `tabs/tab_so_sanh_ky/render_2_ky.py` — kỳ 1 mặc định đổi sang baseline (thay `ds_ky[1]`)
+- `tabs/tab_so_sanh_ky/render_nhieu_ky.py` — default_ky multiselect luôn kèm kỳ baseline
+- `workspaces/ws_executive.py` — KPI/heatmap/biến động ≥5% so baseline; fix bug `_ds_ky[-2]` (sai kỳ) + `COT_*` vs snake_case trên snapshot
+- `workspaces/ws_management.py` — `_doc_nqh_delta_snapshot()`: kỳ prev = baseline thay vì `LIMIT 2`; caption cập nhật
+- `tabs/tab_hhi.py` — delta TW/ĐP so baseline; fix bug `prev_ky = ky_list[0]` (tự so với mình)
+- `tabs/tab_cbtd_dashboard.py` — rename `_doc_cdtotkvv_thang_truoc` → `_doc_cdtotkvv_ky_goc`; fix sort MM/YYYY lexicographic; mốc = 12/năm trước
+- `tabs/tab_uy_thac.py` — `ky_chon` biến động luôn kèm baseline (2 call site: PDF + interactive)
+- `services/uy_thac_pdf_service.py` — nhận định PDF: "so kỳ liền trước" (`iloc[-2]`) → "so kỳ gốc" (`iloc[0]`)
+- `tabs/tab_telegram_admin.py` — test `khoanh_tang` dùng baseline thay `ky_list[1]`
+- `scripts/daily_report.py` — fix 2 hàm chết im: thay `doc_snapshot_range(n_ky=2)` (signature sai) + `COT_*` vs snake_case snapshot → dùng `danh_sach_ky()` + `ky_baseline()` + `doc_snapshot()`
+
+## [2026-07-19] — Nâng cấp toàn diện nhóm tab "Cảnh báo Tín dụng"
+- `tabs/tab_canh_bao_nqh.py` — Fix B38 (dùng COT_NGAY_SL thay datetime.now()); Fix B36 (xóa sub-tab Đến hạn trùng); P2.4 ngưỡng cảnh báo cấu hình qua kv_store; P2.3 trend chart NQH 12 kỳ từ snapshot; P3.1 risk heatmap ma trận PGD; P3.3 xuất báo cáo tổng hợp 5 sheets; P3.4 so sánh N kỳ (3/6/12) từ snapshot với trend chart
+- `tabs/tab_no_khoanh.py` — Fix B37 (thêm Hội sở vào dropdown PGD); P2.6 lọc mức độ rủi ro khoanh + badge màu trong bảng chi tiết
+- `tabs/tab_canh_bao_som.py` — Chuẩn hóa mốc thời gian qua lay_ngay_so_lieu(); P2.5 cải thiện heatmap đến hạn (gradient màu, top PGD tooltip, fallback COT_TONG_DU_NO)
+- `tabs/tab_den_han.py` — P3.2 thêm cột điểm rủi ro khách hàng (🎯 Rủi ro) dựa trên NQH/Lãi tồn/KHĐ/Gia hạn
+- `workspaces/ws_management.py` — Fix B36: menu "⏰ Nợ Đến Hạn" trỏ thẳng tab_den_han thay vì tab_canh_bao_nqh
+- `utils.py` — Đã có sẵn lay_ngay_so_lieu(), refactor các tab dùng chung
+
+## [2026-07-19] — Thêm Form kế hoạch/kết quả công việc KH-NV qua Google Sheets
+- `config.py` dòng ~1117-1150 — thêm constants Sheet/tab/danh mục nhóm và đầu việc gợi ý cho luồng kế hoạch công việc Phòng KH-NV
+- `services/ke_hoach_cv_khnv_service.py` — tạo service đọc Google Sheets `KhHoach`/`KetQua`, lưu cấu hình runtime qua kv_store, kiểm tra kết nối và tổng hợp KPI/matrix
+- `tabs/tab_ke_hoach_cv_khnv.py` — tạo tab UI Hướng dẫn/Cài đặt/Tổng quan/Kế hoạch đăng ký/Kết quả báo cáo, filter theo Sheet distinct values và xuất Excel
+- `tabs/tab_quan_ly_cv.py` dòng ~7-30 — gắn sub-tab `KH Cán bộ KHNV` vào Dashboard Công việc
+
+## [2026-07-19] — Fix Số KH Báo cáo KHNV dùng Mã KH thay vì Tên KH
+- `services/khnv_bao_cao_service.py` dòng ~81-90 — đổi `Tên KH.nunique()` → `Mã KH.nunique()` với filter active (dư nợ>0) bên trong hàm, để đếm đúng dù df_full hay df_active được truyền vào; thêm `COT_MA_KH` vào import block
+
+## [2026-07-19] — Fix 3 lỗi số liệu Báo cáo KHNV
+- `app.py` dòng ~1262-1263 — tách df_full (active_only=False, 366K rows) và df (active_only=True, 293K rows) để KHNV dùng df_full cho báo cáo
+- `app.py` dòng ~1312-1313 — bỏ `df = df_full` cho management workspace, giữ df là active_only riêng biệt, tránh tab tìm kiếm/tổng quan hiển thị hồ sơ đã tất toán
+- `services/khnv_bao_cao_service.py` dòng ~88-91 — fix filter Nguồn vốn: chuẩn hoá '1.0'→'1', '2.0'→'2' trước khi isin() vì Excel đọc vào là float-as-string; trước fix nguon_tw=0, nguon_dp=0 thay vì 11.000 tỷ và 2.702 tỷ
+
+## [2026-07-19] — Nâng cấp Snapshot service và UI so sánh kỳ
+- `snapshot_service.py` dòng ~53-1057 — gộp helper suy kỳ, thay clear cache rộng bằng `_clear_snapshot_cache()`, sửa `xoa_snapshot()` xóa đồng bộ 5 bảng, thêm `compare_snapshot_2_ky()`, `validate_snapshot()`, `export_snapshot_excel()`
+- `tabs/tab_so_sanh_ky/render_2_ky.py` dòng ~12-579 — bảng/biểu đồ biến động PGD dùng `compare_snapshot_2_ky()` và thêm nút xuất Excel snapshot gốc 2 kỳ
+- `tabs/tab_so_sanh_ky/render_nhieu_ky.py` dòng ~19-397 — dùng service compare cho bảng PGD đầu-cuối và thêm nút xuất Excel snapshot gốc nhiều kỳ
+- `tabs/tab_so_sanh_ky/__init__.py` dòng ~3-122 — thêm màn quản lý snapshot cho `admin_cn`: inventory 5 loại, validate HSTD, xóa kỳ snapshot
+- `tests/test_snapshot_service.py` dòng ~42-517 — mở rộng fixture đủ 5 bảng snapshot và thêm regression test cho xóa 5 bảng, compare, validate, export Excel
+- `BUGMAP.md` — thêm A11 ghi nhận lỗi xóa snapshot thiếu bảng và cache helper chưa an toàn
+
+## [2026-07-19] — Fix df_full báo cáo KHNV mất 14.591 KH và 0,88 tỷ giải ngân
+- `app.py` dòng ~1259-1261 — tách `df_full` (active_only=False, toàn bộ hồ sơ cho báo cáo) và `df` (active_only=True, chỉ hồ sơ còn dư nợ cho tìm kiếm)
+
+## [2026-07-19] — Khóa rule để Trae không chọn nhầm .venv
+- `.trae/rules/rules.md` dòng ~10-32 — thêm quy tắc bắt buộc chỉ dùng `D:\VBSP-SCM\venv\Scripts\python.exe`, bỏ qua `.venv*`, và cập nhật lệnh compile/import sang `venv\Scripts\python.exe`
+- `README.md` dòng ~5-54 — đổi hướng dẫn cài/chạy sang Python 3.12, `setup_env.bat`, `Chay_VBSP_SCM.bat`, port 8502, và cảnh báo không dùng `.venv`
+- `AGENTS.md` dòng ~13-16 — ghi rõ Python chuẩn là `venv` Python 3.12 và không dùng `.venv*` cũ Python 3.14
+
+## [2026-07-19] — Chặn cửa sổ đen chớp do .venv Python 3.14 cũ
+- `.venv` — đổi tên môi trường cũ Python 3.14 thành `.venv_py314_disabled_20260719` để các IDE/agent không tự probe `D:\VBSP-SCM\.venv\Scripts\python.exe` liên tục gây chớp cửa sổ `conhost`
+- `BUGMAP.md` — thêm J48 ghi nhận lỗi cửa sổ đen chớp không xuất phát từ launcher mà từ tool quét interpreter `.venv` cũ
+
+## [2026-07-19] — Sửa launcher nhận nhầm app đang chạy
+- `Chay_VBSP_SCM.bat` dòng ~22-65 — đổi kiểm tra `errorlevel` trong block lock/port sang dạng runtime-safe để CMD không đọc nhầm trạng thái cổng 8502
+- `BUGMAP.md` — thêm J47 ghi nhận lỗi launcher báo app đang chạy dù không còn CMD/Streamlit
+
+## [2026-07-19] — Bắt lỗi thiếu python-dateutil và venv trỏ Python cũ
+- `setup_env.bat` dòng ~69-90 — force-reinstall thêm `python-dateutil` cùng `protobuf`, và kiểm tra `import dateutil` sau khi cài requirements để bắt lỗi pandas thiếu dependency
+- `setup_env.bat` dòng ~10-31 — nếu Python Launcher `py -3.12` không nhận Python, fallback sang `%LOCALAPPDATA%\Programs\Python\Python312\python.exe`
+- `Chay_VBSP_SCM.bat` dòng ~103-125 — kiểm tra sớm `pandas/dateutil` trước khi chạy Streamlit app, báo cần cài lại Python 3.12 + chạy setup nếu venv bị thiếu dependency hoặc trỏ Python cũ
+- `BUGMAP.md` — thêm J46 ghi nhận lỗi `ImportError: Unable to import required dependency dateutil` do venv hỏng/cài thiếu gói
+
+## [2026-07-19] — Khôi phục tự mở trình duyệt khi launcher chạy ổn
+- `Chay_VBSP_SCM.bat` dòng ~101-114 — đổi `--server.headless false` để Streamlit tự mở trình duyệt sau khi server sẵn sàng, không dùng `start chrome`/PowerShell phụ gây chớp
+- `Chay_VBSP_SCM.bat` dòng ~19-37 — nếu `tmp/vbsp_launcher.lock` còn sót nhưng port 8502 không chạy, launcher tự xóa lock cũ thay vì báo kẹt mãi
+- `run.bat` dòng ~33-44 — đồng bộ hành vi tự mở trình duyệt bằng Streamlit và giữ URL thủ công làm fallback
+- `BUGMAP.md` — thêm J44 ghi nhận cách bật lại browser an toàn sau lỗi launcher chớp
+
+## [2026-07-19] — Sửa launcher Chay_VBSP_SCM tránh chớp cửa sổ
+- `Chay_VBSP_SCM.bat` dòng ~6-96 — kiểm tra import Streamlit trực tiếp trên console, thêm `--server.headless true`, và luôn dừng màn hình khi Streamlit thoát để người dùng đọc lỗi thay vì cửa sổ đen chớp tắt
+- `Chay_VBSP_SCM.bat` dòng ~21-96 — bỏ hoàn toàn helper `start powershell`/tự mở trình duyệt và không tự chạy `setup_env.bat` khi import Streamlit lỗi, tránh tạo thêm cửa sổ chớp lặp
+- `run.bat` dòng ~14-24 — bỏ `start "" http://localhost:8502`, chuyển sang `python -m streamlit` headless và yêu cầu mở URL thủ công
+- `Chay_VBSP_SCM.bat`, `run.bat` — thêm probe bắt buộc Python trong venv phải ghi được file `tmp/python_exec_check.txt`; nếu Python trả mã 0 nhưng không thực thi, launcher báo venv/Python hỏng thay vì chạy Streamlit giả
+- `Chay_VBSP_SCM.bat` dòng ~9-136 — thêm khóa single-instance `tmp/vbsp_launcher.lock` và log `logs/launcher_last.log` để phát hiện file có bị gọi lặp sau khi khởi động máy hay không
+- `setup_env.bat` dòng ~13-78 — thêm probe Python phải ghi được file kiểm tra, ưu tiên `VBSP_PYTHON`/`py -3.12`/`py -3.13`, và chặn Python 3.14+ để tránh tạo lại venv làm Streamlit thoát ngay
+- `setup_env.bat` dòng ~1-156 — viết lại bản ASCII tối giản, chỉ dùng `py -3.12`, bỏ các block CMD lồng nhau gây lỗi `'t'/'not' is not recognized`
+- `setup_env.bat` dòng ~66-101 — sau khi cài requirements, force-reinstall `protobuf` và chạy `pip check` để bắt lỗi cài nửa vời kiểu có metadata nhưng thiếu module `google.protobuf`
+- `BUGMAP.md` — thêm J38 ghi nhận lỗi launcher mở browser quá sớm/thoát ngay không hiện lỗi
+
 ## [2026-07-18] — Hoàn thiện xuất báo cáo Excel/PDF tab Nợ Đến Hạn
 - `tabs/tab_den_han.py` dòng ~53–292 — thêm 6 helper mới: `_fmt_trieu()`, `_build_thang_stats()`, `_build_nhom_stats()`, `_build_chi_tiet_sheet()`, `_xay_dung_sheets_excel()` (8 sheets: Tổng hợp, Theo tháng, PGD, Xã, Hội, Tổ, Chi tiết, NQ11), `_xuat_pdf_den_han()` (biểu đồ bar urgency theo tháng + bảng chi tiết dùng `xuat_pdf_co_chart()`); refactor export inline trong sub-tab "Danh sách" → gọi helper; bỏ import `nut_xuat_pdf`
 

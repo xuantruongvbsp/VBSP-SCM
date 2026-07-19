@@ -485,12 +485,16 @@ def _gui_ngay(key: str) -> tuple[bool, str]:
 
         elif key == "khoanh_tang":
             try:
-                from snapshot_service import doc_snapshot, danh_sach_ky
+                from snapshot_service import doc_snapshot, danh_sach_ky, ky_baseline
                 ky_list = danh_sach_ky()
-                if len(ky_list) < 2:
+                if not ky_list:
                     return True, "Không đủ snapshot để so sánh (cần ≥ 2 kỳ)"
-                df_moi = doc_snapshot(ky_list[0])
-                df_cu  = doc_snapshot(ky_list[1])
+                ky_moi = ky_list[0]
+                ky_cu = ky_baseline(ky_list, ky_moi)
+                if not ky_cu or ky_cu == ky_moi:
+                    return True, "Không đủ snapshot để so sánh (cần ≥ 2 kỳ)"
+                df_moi = doc_snapshot(ky_moi)
+                df_cu  = doc_snapshot(ky_cu)
                 if df_moi.empty or "du_no_khoanh" not in df_moi.columns:
                     return False, "Thiếu dữ liệu snapshot hoặc cột du_no_khoanh."
                 ds_tang = []

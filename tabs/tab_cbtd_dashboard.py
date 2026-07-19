@@ -45,15 +45,39 @@ def _doc_cdtotkvv_moi_nhat() -> "pd.DataFrame | None":
         return None
 
 
-def _doc_cdtotkvv_thang_truoc() -> "pd.DataFrame | None":
-    """Đọc CDTOTKVV tháng liền trước để so sánh liên tiếp."""
+def _doc_cdtotkvv_ky_goc() -> "pd.DataFrame | None":
+    """Đọc CDTOTKVV kỳ gốc: tháng 12 năm trước, fallback kỳ cũ nhất."""
     try:
         from data.cdtotkvv import doc_cdtotkvv, ds_thang_nam
-        ds = sorted(ds_thang_nam())
-        if len(ds) < 2:
+
+        def _sort_key(s: str) -> tuple:
+            try:
+                mm, yyyy = s.split("/")
+                return (int(yyyy), int(mm))
+            except (ValueError, IndexError):
+                return (0, 0)
+
+        ds = sorted(ds_thang_nam(), key=_sort_key)
+        if not ds:
             return None
-        return doc_cdtotkvv(ds[-2])
-    except Exception:
+        latest = ds[-1]
+        try:
+            mm_l, yyyy_l = latest.split("/")
+            moc = f"12/{int(yyyy_l) - 1}"
+        except (ValueError, IndexError):
+            return doc_cdtotkvv(ds[0])
+        if moc in ds:
+            return doc_cdtotkvv(moc)
+        for ky in reversed(ds):
+            try:
+                mm_k, yyyy_k = ky.split("/")
+                if (int(yyyy_k), int(mm_k)) <= (int(yyyy_l) - 1, 12):
+                    return doc_cdtotkvv(ky)
+            except (ValueError, IndexError):
+                continue
+        return doc_cdtotkvv(ds[0])
+    except Exception as e:
+        logger.error("_doc_cdtotkvv_ky_goc: %s", e, exc_info=True)
         return None
 
 
@@ -154,7 +178,7 @@ def render(tab: "DeltaGenerator | None" = None, **kwargs) -> None:
 
         # Dữ liệu Tổ TK&VV
         df_cdto = _doc_cdtotkvv_moi_nhat()
-        df_cdto_truoc = _doc_cdtotkvv_thang_truoc()
+        df_cdto_truoc = _doc_cdtotkvv_ky_goc()
 
         # ── KPI Row ───────────────────────────────────────────────────────────
         kpi = tom_tat_kpi(cbtd_data, dgd_map, df_cdto)

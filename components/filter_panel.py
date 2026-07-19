@@ -69,6 +69,24 @@ def _get_options_filtered(
     return sorted(_df.loc[mask, target_col].dropna().unique().tolist())
 
 
+@st.cache_data(show_spinner=False)
+def _pre_compute_search_text(_df: pd.DataFrame, search_cols: tuple[str, ...], ts: float = 0.0) -> "pd.Series":
+    """Cache chuỗi tìm kiếm đã chuẩn hóa — ghép các cột, normalize 1 lần duy nhất."""
+    _ = ts
+    parts: list[pd.Series] = []
+    for col in search_cols:
+        if col in _df.columns:
+            s = _df[col].fillna("").astype(str)
+            s = s.str.lower().str.replace("đ", "d", regex=False)
+            s = s.map(lambda x: unicodedata.normalize("NFD", str(x)) if x else "")
+            s = s.map(lambda x: "".join(ch for ch in x if unicodedata.category(ch) != "Mn") if x else "")
+            s = s.str.replace(r"\s+", " ", regex=True).str.strip()
+            parts.append(s)
+    if parts:
+        return pd.concat(parts, axis=0).groupby(level=0).agg(" | ".join)
+    return pd.Series("", index=_df.index)
+
+
 def _normalize_nguon_von_code(value) -> str:
     s = str(value).strip()
     if s in {"1", "01", "1.0", "01.0", "TW", "tw"}:
@@ -98,16 +116,30 @@ def _keyword_search_mask(
     df: pd.DataFrame,
     keyword: str,
     search_cols: list[str],
+    search_text: "pd.Series | None" = None,
 ) -> pd.Series:
-    """Tạo mask tìm kiếm nhanh, hỗ trợ nhập tên có dấu hoặc không dấu."""
-    mask = pd.Series(False, index=df.index)
+    """Tạo mask tìm kiếm nhanh, hỗ trợ nhập tên có dấu hoặc không dấu.
+
+    Args:
+        search_text: Pre-computed normalized search text (để tránh normalize lại mỗi lần).
+                     Nếu có, chỉ scan 1 cột này thay vì normalize từng cột.
+    """
     kw_raw = str(keyword or "").strip()
     if not kw_raw:
-        return mask
+        return pd.Series(True, index=df.index)
 
     kw_lower = kw_raw.lower()
     kw_norm = _normalize_search_text(kw_raw)
 
+    # Fast path: dùng pre-computed search text column
+    if search_text is not None and len(search_text) == len(df):
+        mask = search_text.str.contains(kw_norm, regex=False, na=False)
+        if kw_lower != kw_norm:
+            mask |= search_text.str.lower().str.contains(kw_lower, regex=False, na=False)
+        return mask
+
+    # Slow path: scan từng cột
+    mask = pd.Series(False, index=df.index)
     for col in search_cols:
         if col not in df.columns:
             continue
@@ -427,92 +459,88 @@ def render_filter_panel(
         with col_save:
             st.button("💾 Lưu bộ lọc", use_container_width=True, disabled=True, key="tc_save_filter")
     
-    # Apply all filters
-    df_filtered = df.copy()
-    
+    # ── Xây dựng composite mask (1 Series bool duy nhất, không copy) ──
+    mask = pd.Series(True, index=df.index)
+
+    # -- Pre-compute search text (cached, chỉ tính 1 lần) --
+    _search_cols = (COT_TEN_KH, COT_MA_KH, COT_SO_KU, COT_CMND, COT_SDT)
+    _search_text = _pre_compute_search_text(df, _search_cols, ts_hstd)
+
     # 1. Keyword search
     if search_kw:
-        search_cols = [COT_TEN_KH, COT_MA_KH, COT_SO_KU, COT_CMND, COT_SDT]
-        search_cols = [c for c in search_cols if c in df_filtered.columns]
-        if search_cols:
-            df_filtered = df_filtered[_keyword_search_mask(df_filtered, search_kw, search_cols)]
-    
-    # 2. Địa bàn filters
-    if selected_pgd and COT_TEN_PGD in df_filtered.columns:
-        _set = {str(v).strip() for v in selected_pgd}
-        df_filtered = df_filtered[df_filtered[COT_TEN_PGD].astype(str).str.strip().isin(_set)]
-    
-    if selected_xa and COT_TEN_XA in df_filtered.columns:
-        _set = {str(v).strip() for v in selected_xa}
-        df_filtered = df_filtered[df_filtered[COT_TEN_XA].astype(str).str.strip().isin(_set)]
-    
-    if selected_thon and COT_TEN_THON in df_filtered.columns:
-        _set = {str(v).strip() for v in selected_thon}
-        df_filtered = df_filtered[df_filtered[COT_TEN_THON].astype(str).str.strip().isin(_set)]
-    
-    # 3. Chương trình & Nguồn vốn
-    if selected_ct and COT_TEN_CT in df_filtered.columns:
-        _set = {str(v).strip() for v in selected_ct}
-        df_filtered = df_filtered[df_filtered[COT_TEN_CT].astype(str).str.strip().isin(_set)]
-    
-    if selected_nv and COT_NGUON_VON in df_filtered.columns:
-        _set = {str(v).strip() for v in selected_nv}
-        _nv_norm = df_filtered[COT_NGUON_VON].map(_normalize_nguon_von_code)
-        df_filtered = df_filtered[_nv_norm.astype(str).str.strip().isin(_set)]
-    
-    # 4. Dư nợ range
-    if COT_TONG_DU_NO in df_filtered.columns:
-        _dn = pd.to_numeric(df_filtered[COT_TONG_DU_NO], errors="coerce").fillna(0)
-        df_filtered = df_filtered[
-            (_dn >= float(du_no_range[0])) &
-            (_dn <= float(du_no_range[1]))
-        ]
-    
-    # 5. Date filters — convert each column once
-    if (ngay_vay_from or ngay_vay_to) and COT_NGAY_VAY in df_filtered.columns:
-        _ts_vay = _date_series.get(COT_NGAY_VAY)
-        _ts_vay = _ts_vay.loc[df_filtered.index] if _ts_vay is not None else pd.to_datetime(df_filtered[COT_NGAY_VAY], errors="coerce")
-        if ngay_vay_from:
-            df_filtered = df_filtered[_ts_vay >= pd.Timestamp(ngay_vay_from)]
-            _ts_vay = _ts_vay.loc[df_filtered.index]
-        if ngay_vay_to:
-            df_filtered = df_filtered[_ts_vay <= pd.Timestamp(ngay_vay_to)]
+        mask &= _keyword_search_mask(df, search_kw, list(_search_cols), _search_text)
 
-    if (ngay_dh_from or ngay_dh_to) and COT_NGAY_DH in df_filtered.columns:
+    # 2. Địa bàn filters
+    if selected_pgd and COT_TEN_PGD in df.columns:
+        mask &= df[COT_TEN_PGD].astype(str).str.strip().isin({str(v).strip() for v in selected_pgd})
+
+    if selected_xa and COT_TEN_XA in df.columns:
+        mask &= df[COT_TEN_XA].astype(str).str.strip().isin({str(v).strip() for v in selected_xa})
+
+    if selected_thon and COT_TEN_THON in df.columns:
+        mask &= df[COT_TEN_THON].astype(str).str.strip().isin({str(v).strip() for v in selected_thon})
+
+    # 3. Chương trình & Nguồn vốn
+    if selected_ct and COT_TEN_CT in df.columns:
+        mask &= df[COT_TEN_CT].astype(str).str.strip().isin({str(v).strip() for v in selected_ct})
+
+    if selected_nv and COT_NGUON_VON in df.columns:
+        _nv_norm = df[COT_NGUON_VON].map(_normalize_nguon_von_code)
+        mask &= _nv_norm.astype(str).str.strip().isin({str(v).strip() for v in selected_nv})
+
+    # 4. Dư nợ range
+    if COT_TONG_DU_NO in df.columns:
+        _dn = pd.to_numeric(df[COT_TONG_DU_NO], errors="coerce").fillna(0)
+        mask &= (_dn >= float(du_no_range[0])) & (_dn <= float(du_no_range[1]))
+
+    # 5. Date filters
+    if (ngay_vay_from or ngay_vay_to) and COT_NGAY_VAY in df.columns:
+        _ts_vay = _date_series.get(COT_NGAY_VAY)
+        if _ts_vay is None:
+            _ts_vay = pd.to_datetime(df[COT_NGAY_VAY], errors="coerce")
+        if ngay_vay_from:
+            mask &= _ts_vay >= pd.Timestamp(ngay_vay_from)
+        if ngay_vay_to:
+            mask &= _ts_vay <= pd.Timestamp(ngay_vay_to)
+
+    if (ngay_dh_from or ngay_dh_to) and COT_NGAY_DH in df.columns:
         _ts_dh = _date_series.get(COT_NGAY_DH)
-        _ts_dh = _ts_dh.loc[df_filtered.index] if _ts_dh is not None else pd.to_datetime(df_filtered[COT_NGAY_DH], errors="coerce")
+        if _ts_dh is None:
+            _ts_dh = pd.to_datetime(df[COT_NGAY_DH], errors="coerce")
         if ngay_dh_from:
-            df_filtered = df_filtered[_ts_dh >= pd.Timestamp(ngay_dh_from)]
-            _ts_dh = _ts_dh.loc[df_filtered.index]
+            mask &= _ts_dh >= pd.Timestamp(ngay_dh_from)
         if ngay_dh_to:
-            df_filtered = df_filtered[_ts_dh <= pd.Timestamp(ngay_dh_to)]
-    
+            mask &= _ts_dh <= pd.Timestamp(ngay_dh_to)
+
     # 6. Special status filters
-    if filter_qua_han and COT_DU_NO_QH in df_filtered.columns:
-        _qh = pd.to_numeric(df_filtered[COT_DU_NO_QH], errors="coerce").fillna(0)
-        df_filtered = df_filtered[_qh > 0]
-    
+    if filter_qua_han and COT_DU_NO_QH in df.columns:
+        _qh = pd.to_numeric(df[COT_DU_NO_QH], errors="coerce").fillna(0)
+        mask &= _qh > 0
+
     if filter_nq11:
-        if "__is_nq11" in df_filtered.columns:
-            df_filtered = df_filtered[df_filtered["__is_nq11"]]
-        elif df_nq11 is not None and not df_nq11.empty and COT_SO_KU in df_filtered.columns:
+        if "__is_nq11" in df.columns:
+            mask &= df["__is_nq11"]
+        elif df_nq11 is not None and not df_nq11.empty and COT_SO_KU in df.columns:
             _nq_ku_col = "Số khế ước" if "Số khế ước" in df_nq11.columns else COT_SO_KU
             if _nq_ku_col in df_nq11.columns:
                 _set_nq = set(df_nq11[_nq_ku_col].dropna().astype(str).str.strip())
-                df_filtered = df_filtered[df_filtered[COT_SO_KU].astype(str).str.strip().isin(_set_nq)]
+                mask &= df[COT_SO_KU].astype(str).str.strip().isin(_set_nq)
 
     if filter_gqvl:
-        if "__is_gqvl" in df_filtered.columns:
-            df_filtered = df_filtered[df_filtered["__is_gqvl"]]
-        elif df_gqvl is not None and not df_gqvl.empty and COT_SO_KU in df_filtered.columns:
+        if "__is_gqvl" in df.columns:
+            mask &= df["__is_gqvl"]
+        elif df_gqvl is not None and not df_gqvl.empty and COT_SO_KU in df.columns:
             _gq_ku_col = "Số khế ước" if "Số khế ước" in df_gqvl.columns else COT_SO_KU
             if _gq_ku_col in df_gqvl.columns:
                 _set_gq = set(df_gqvl[_gq_ku_col].dropna().astype(str).str.strip())
-                df_filtered = df_filtered[df_filtered[COT_SO_KU].astype(str).str.strip().isin(_set_gq)]
-    
-    if filter_khoanh and COT_DU_NO_KHOANH in df_filtered.columns:
-        _kn = pd.to_numeric(df_filtered[COT_DU_NO_KHOANH], errors="coerce").fillna(0)
-        df_filtered = df_filtered[_kn > 0]
+                mask &= df[COT_SO_KU].astype(str).str.strip().isin(_set_gq)
+
+    if filter_khoanh and COT_DU_NO_KHOANH in df.columns:
+        _kn = pd.to_numeric(df[COT_DU_NO_KHOANH], errors="coerce").fillna(0)
+        mask &= _kn > 0
+
+    # ── Copy 1 lần duy nhất tại đây ──
+    df_filtered = df.loc[mask].copy()
     
     # Update session state
     st.session_state.tracuu_filters.update({

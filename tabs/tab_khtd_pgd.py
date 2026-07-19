@@ -34,6 +34,7 @@ from config import (
 
     CHUONG_TRINH_KHTD, TEN_CHINH_THUC_CT,
     COT_TEN_PGD, COT_TEN_CT, COT_TEN_XA, COT_MA_CHUONG_TRINH, COT_NGUON_VON, COT_TONG_DU_NO, COT_DU_NO_TH,
+    COT_MA_NHA_DAU_TU,
     DS_PGD, PGD_XA_MAP,
 )
 
@@ -567,6 +568,35 @@ def _tinh_thuc_hien_theo_ct(df: "pd.DataFrame") -> dict[str, float]:
     for (ma_ct, nv_int), val in g.items():
         mk = lookup.get((int(ma_ct), int(nv_int)), f"{int(ma_ct)}|{int(nv_int)}")
         out[mk] = float(val)
+
+    # Phân tầng GQVL ĐP (ma_ct=3, nv=2) và NSVSMT ĐP (ma_ct=6, nv=2) theo Mã NĐT thực tế.
+    # first-win lookup ở trên chỉ gán (3,2)→"3_DP_TINH", (6,2)→"6_DP" — ghi đè bằng split đúng.
+    if COT_MA_NHA_DAU_TU in df.columns:
+        import db as _db
+        ma_ndt_arr = df[COT_MA_NHA_DAU_TU].astype(str).fillna("").str.strip().values
+        ma_ct_arr = ma_ct_s.values
+        nv_arr = nv_s.values
+        th_arr = th_s.values
+
+        # GQVL ĐP → 3_DP_TINH / 3_DP_XA
+        mask3 = (ma_ct_arr == 3) & (nv_arr == 2) & (th_arr != 0)
+        if mask3.any():
+            th3 = th_arr[mask3]
+            cap3 = [_db.phan_loai_ndt_dp_cap(3, ma) for ma in ma_ndt_arr[mask3]]
+            is_tinh3 = [c == "tinh" for c in cap3]
+            out["3_DP_TINH"] = float(sum(v for v, t in zip(th3, is_tinh3) if t))
+            out["3_DP_XA"] = float(sum(v for v, t in zip(th3, is_tinh3) if not t))
+
+        # NSVSMT ĐP → 6_DP_TINH / 6_DP_XA (xóa key tổng "6_DP" cũ)
+        mask6 = (ma_ct_arr == 6) & (nv_arr == 2) & (th_arr != 0)
+        if mask6.any():
+            th6 = th_arr[mask6]
+            cap6 = [_db.phan_loai_ndt_dp_cap(6, ma) for ma in ma_ndt_arr[mask6]]
+            is_tinh6 = [c == "tinh" for c in cap6]
+            out["6_DP_TINH"] = float(sum(v for v, t in zip(th6, is_tinh6) if t))
+            out["6_DP_XA"] = float(sum(v for v, t in zip(th6, is_tinh6) if not t))
+            out.pop("6_DP", None)
+
     return out
 
 

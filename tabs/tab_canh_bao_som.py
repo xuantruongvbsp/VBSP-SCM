@@ -28,7 +28,7 @@ from config import (
     DS_PGD,
 )
 from data.hstd import danh_dau_khong_hd_cached
-from utils import fmt_so, fmt_ty, hien_thi_dataframe_phan_trang, xuat_excel
+from utils import fmt_so, fmt_ty, hien_thi_dataframe_phan_trang, lay_ngay_so_lieu, xuat_excel
 from tabs.base_tab import TabContext
 
 
@@ -157,7 +157,7 @@ def _bang_hien_thi(df: pd.DataFrame) -> pd.DataFrame:
 # ─── Biểu đồ heatmap tháng ────────────────────────────────────────────────────
 
 def _heatmap_thang(df_soon: pd.DataFrame, key_prefix: str) -> None:
-    """Bar chart: số khoản sắp đến hạn theo tháng (tối đa 18 tháng tới)."""
+    """Bar chart: số khoản sắp đến hạn theo tháng với gradient màu + top PGD tooltip."""
     if df_soon.empty or "_ngay_dh" not in df_soon.columns:
         return
 
@@ -171,36 +171,61 @@ def _heatmap_thang(df_soon: pd.DataFrame, key_prefix: str) -> None:
     df_plot["_ym"] = ngay_dh.dt.to_period("M").astype(str)
 
     agg: dict = {"so_mon": ("_ym", "count")}
-    if COT_TONG_DU_NO in df_plot.columns:
-        agg["tong_dn"] = (COT_TONG_DU_NO, "sum")
+    has_dn = COT_TONG_DU_NO in df_plot.columns
+    if has_dn:
+        df_plot["_dn_num"] = pd.to_numeric(df_plot[COT_TONG_DU_NO], errors="coerce").fillna(0)
+        agg["tong_dn"] = ("_dn_num", "sum")
+    if COT_TEN_PGD in df_plot.columns:
+        agg["top_pgd"] = (COT_TEN_PGD, lambda s: s.mode().iloc[0] if len(s) > 0 else "")
 
     nhom = df_plot.groupby("_ym").agg(**agg).reset_index().sort_values("_ym")
     if nhom.empty:
         return
 
-    hover_text = nhom["so_mon"].astype(str) + " món"
-    if "tong_dn" in nhom.columns:
-        hover_text = hover_text + "<br>" + nhom["tong_dn"].apply(
-            lambda x: fmt_ty(x) if pd.notna(x) else ""
-        )
+    # Color gradient based on % of max
+    max_val = nhom["so_mon"].max()
+    colors = []
+    for v in nhom["so_mon"]:
+        ratio = v / max_val if max_val > 0 else 0
+        if ratio >= 0.7:
+            colors.append("#ef5350")  # red
+        elif ratio >= 0.4:
+            colors.append("#ff9800")  # orange
+        else:
+            colors.append("#66bb6a")  # green
+
+    # Build hover text
+    hover_lines = []
+    for _, r in nhom.iterrows():
+        parts = [f"<b>{r['_ym']}</b>", f"Số khoản: {r['so_mon']}"]
+        if has_dn and "tong_dn" in r:
+            parts.append(f"Dư nợ: {fmt_ty(r['tong_dn']) if pd.notna(r['tong_dn']) else '—'}")
+        if "top_pgd" in r and r["top_pgd"]:
+            parts.append(f"Top PGD: {r['top_pgd']}")
+        hover_lines.append("<br>".join(parts))
 
     fig = go.Figure(go.Bar(
         x=nhom["_ym"],
         y=nhom["so_mon"],
-        marker_color="#ef5350",
+        marker_color=colors,
         text=nhom["so_mon"].astype(str),
         textposition="outside",
-        hovertext=hover_text,
-        hoverinfo="x+text",
+        hovertext=hover_lines,
+        hoverinfo="text",
     ))
     fig.update_layout(
         xaxis_title="Tháng đáo hạn",
         yaxis_title="Số khoản",
-        height=280,
+        height=300,
         margin=dict(t=20, b=30, l=40, r=20),
     )
     st.markdown("**📅 Phân bổ theo tháng đáo hạn**")
+    st.caption("🔴 ≥70% &nbsp;·&nbsp; 🟠 40–70% &nbsp;·&nbsp; 🟢 <40% của đỉnh")
     st.plotly_chart(fig, use_container_width=True, key=f"{key_prefix}som_hm_bar")
+
+    # Fallback warning
+    if not has_dn:
+        st.caption("ℹ️ Dữ liệu không có cột Tổng dư nợ — chỉ hiển thị số khoản.")
 
 
 # ─── Render core ──────────────────────────────────────────────────────────────
@@ -212,7 +237,7 @@ def _render_canh_bao(
     la_cn: bool,
 ) -> None:
     """Core render — dùng chung cho CN và PGD."""
-    today = datetime.now()
+    today = lay_ngay_so_lieu(df_kh) or datetime.now()
 
     # ── Scope toggle ──────────────────────────────────────────────
     scope_label = st.radio(

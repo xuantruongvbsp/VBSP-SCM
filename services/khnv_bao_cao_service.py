@@ -25,7 +25,7 @@ import pandas as pd
 from config import (
     COT_TEN_PGD, COT_TONG_DU_NO, COT_DU_NO_TH, COT_DU_NO_QH,
     COT_DU_NO_KHOANH, COT_TEN_CT, COT_NGUON_VON, COT_DVUT,
-    COT_TEN_KH, COT_GIAI_NGAN_TRONG_THANG, COT_NGAY_VAY,
+    COT_TEN_KH, COT_MA_KH, COT_GIAI_NGAN_TRONG_THANG, COT_NGAY_VAY,
     COT_TEN_XA, COT_NGAY_SL, DB_HT_CACHE, DB_PREV_CACHE, FILE_PATH_DB,
     DS_PGD, TEN_CHI_NHANH_HIEN_THI,
 )
@@ -78,15 +78,28 @@ def tong_hop_so_lieu_thang(
     du_no_th = pd.to_numeric(df[COT_DU_NO_TH], errors="coerce").sum()
     du_no_qh = pd.to_numeric(df[COT_DU_NO_QH], errors="coerce").sum()
     du_no_khoanh = pd.to_numeric(df[COT_DU_NO_KHOANH], errors="coerce").sum() if COT_DU_NO_KHOANH in df.columns else 0
-    so_kh = df[COT_TEN_KH].nunique() if COT_TEN_KH in df.columns else len(df)
-    so_mon = len(df)
+    # Số KH = Mã KH còn dư nợ (active) — luôn filter dù df được truyền vào là full hay active
+    # Không dùng Tên KH vì trùng tên dẫn đến đếm thiếu (~50% nhầm)
+    _active_mask = (pd.to_numeric(df[COT_TONG_DU_NO], errors="coerce").fillna(0) > 0)
+    if COT_DU_NO_QH in df.columns:
+        _active_mask |= (pd.to_numeric(df[COT_DU_NO_QH], errors="coerce").fillna(0) > 0)
+    if COT_DU_NO_KHOANH in df.columns:
+        _active_mask |= (pd.to_numeric(df[COT_DU_NO_KHOANH], errors="coerce").fillna(0) > 0)
+    df_active = df[_active_mask]
+    so_kh = df_active[COT_MA_KH].nunique() if COT_MA_KH in df.columns else (
+        df_active[COT_TEN_KH].nunique() if COT_TEN_KH in df.columns else _active_mask.sum()
+    )
+    so_mon = len(df_active)  # số món vay đang dư nợ
     tl_qh = (du_no_qh / tong_du_no * 100) if tong_du_no > 0 else 0
 
     nguon_tw = 0.0
     nguon_dp = 0.0
     if COT_NGUON_VON in df.columns:
-        mask_tw = df[COT_NGUON_VON].astype(str).str.strip().isin(["1", "TW", "Trung ương"])
-        mask_dp = df[COT_NGUON_VON].astype(str).str.strip().isin(["2", "ĐP", "Địa phương"])
+        # Chuẩn hoá: '1.0' → '1', '2.0' → '2' (float-as-string từ Excel)
+        nv_norm = pd.to_numeric(df[COT_NGUON_VON], errors="coerce").fillna(-1).astype(int).astype(str)
+        nv_str  = df[COT_NGUON_VON].astype(str).str.strip()
+        mask_tw = nv_norm.isin(["1"]) | nv_str.isin(["TW", "Trung ương"])
+        mask_dp = nv_norm.isin(["2"]) | nv_str.isin(["ĐP", "Địa phương"])
         nguon_tw = pd.to_numeric(df.loc[mask_tw, COT_TONG_DU_NO], errors="coerce").sum()
         nguon_dp = pd.to_numeric(df.loc[mask_dp, COT_TONG_DU_NO], errors="coerce").sum()
 
@@ -115,7 +128,7 @@ def _bang_theo_pgd(df: pd.DataFrame) -> pd.DataFrame:
         Tổng_dư_nợ=(COT_TONG_DU_NO, lambda x: pd.to_numeric(x, errors="coerce").sum()),
         Dư_nợ_trong_hạn=(COT_DU_NO_TH, lambda x: pd.to_numeric(x, errors="coerce").sum()),
         Dư_nợ_quá_hạn=(COT_DU_NO_QH, lambda x: pd.to_numeric(x, errors="coerce").sum()),
-        Số_khách_hàng=(COT_TEN_KH, "nunique") if COT_TEN_KH in df.columns else (COT_TONG_DU_NO, "count"),
+        Số_khách_hàng=(COT_MA_KH, "nunique") if COT_MA_KH in df.columns else (COT_TEN_KH, "nunique") if COT_TEN_KH in df.columns else (COT_TONG_DU_NO, "count"),
     ).reset_index()
     grouped["Tỷ_lệ_QH_%"] = grouped.apply(
         lambda r: round(r["Dư_nợ_quá_hạn"] / r["Tổng_dư_nợ"] * 100, 2) if r["Tổng_dư_nợ"] > 0 else 0, axis=1
@@ -138,7 +151,7 @@ def _bang_theo_uy_thac(df: pd.DataFrame) -> pd.DataFrame:
         return pd.DataFrame()
     grouped = df.groupby(COT_DVUT).agg(
         Tổng_dư_nợ=(COT_TONG_DU_NO, lambda x: pd.to_numeric(x, errors="coerce").sum()),
-        Số_khách_hàng=(COT_TEN_KH, "nunique") if COT_TEN_KH in df.columns else (COT_TONG_DU_NO, "count"),
+        Số_khách_hàng=(COT_MA_KH, "nunique") if COT_MA_KH in df.columns else (COT_TEN_KH, "nunique") if COT_TEN_KH in df.columns else (COT_TONG_DU_NO, "count"),
     ).reset_index()
     return grouped.sort_values("Tổng_dư_nợ", ascending=False)
 

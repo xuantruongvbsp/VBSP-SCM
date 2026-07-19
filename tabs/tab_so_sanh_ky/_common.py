@@ -248,17 +248,68 @@ def render_hbar_chart(
 
 # ─── TREND CHART ─────────────────────────────────────────────────────────
 
+_COL_LABEL_MAP: dict[str, str] = {
+    "tong_du_no":   "Tổng dư nợ",
+    "du_no_th":     "Dư nợ trong hạn",
+    "du_no_qh":     "Dư nợ quá hạn",
+    "du_no_khoanh": "Dư nợ khoanh",
+    "so_ho":        "Số hộ vay",
+    "so_ku":        "Số khế ước",
+    "gn_nam":       "Giải ngân",
+    "tl_nqh_pct":   "Tỷ lệ NQH%",
+    "diem_tb":      "Điểm TB",
+    "no_qh":        "Nợ quá hạn NQ11",
+    "no_th":        "Nợ trong hạn NQ11",
+    "dn_th":        "DN trong hạn",
+    "dn_qh":        "DN quá hạn",
+    "dn_khoanh":    "DN khoanh",
+    "so_tot":       "Tổ Tốt",
+    "so_yeu":       "Tổ Yếu",
+}
+
+_COL_COLOR_MAP: dict[str, str] = {
+    "tong_du_no":   "#2563eb",
+    "du_no_th":     "#16a34a",
+    "du_no_qh":     "#dc2626",
+    "du_no_khoanh": "#f59e0b",
+    "so_ho":        "#7c3aed",
+    "so_ku":        "#0891b2",
+    "gn_nam":       "#0891b2",
+    "tl_nqh_pct":   "#dc2626",
+    "diem_tb":      "#2563eb",
+    "no_qh":        "#dc2626",
+    "no_th":        "#16a34a",
+    "dn_th":        "#16a34a",
+    "dn_qh":        "#dc2626",
+    "dn_khoanh":    "#f59e0b",
+    "so_tot":       "#16a34a",
+    "so_yeu":       "#dc2626",
+}
+
+_PALETTE = ["#2563eb", "#16a34a", "#dc2626", "#f59e0b", "#7c3aed", "#0891b2"]
+
+
+def _hex_to_rgb(hex_color: str) -> str:
+    """#rrggbb → 'r,g,b' để dùng trong fillcolor rgba(...)."""
+    h = hex_color.lstrip("#")
+    if len(h) != 6:
+        return "37,99,235"
+    return f"{int(h[0:2],16)},{int(h[2:4],16)},{int(h[4:6],16)}"
+
+
 def render_trend_chart(
     df_multi: pd.DataFrame,
     metric_cols: "str | list[str]",
     title: str = "",
     y_label: str = "Triệu đồng",
     key: str = "trend",
+    col_labels: "dict[str, str] | None" = None,
 ) -> None:
-    """Line chart xu hướng nhiều kỳ.
+    """Line chart xu hướng nhiều kỳ — area fill, màu semantic, hover tiếng Việt.
 
-    df_multi: DataFrame có cột 'ky' và các cột metric.
+    df_multi   : DataFrame có cột 'ky' và các cột metric.
     metric_cols: tên cột (str) hoặc list để vẽ nhiều đường.
+    col_labels : override nhãn tiếng Việt {col: label}.
     """
     if df_multi is None or df_multi.empty or "ky" not in df_multi.columns:
         st.info("ℹ️ Chưa đủ dữ liệu để vẽ xu hướng.")
@@ -266,26 +317,68 @@ def render_trend_chart(
     if isinstance(metric_cols, str):
         metric_cols = [metric_cols]
 
+    valid_cols = [c for c in metric_cols if c in df_multi.columns]
+    if not valid_cols:
+        st.info("ℹ️ Không tìm thấy cột dữ liệu để vẽ xu hướng.")
+        return
+
+    x_vals = df_multi["ky"].astype(str).tolist()
+    is_single = len(valid_cols) == 1
+    is_pct_axis = "%" in y_label or y_label in ("Điểm",)
+
     fig = go.Figure()
-    for col in metric_cols:
-        if col not in df_multi.columns:
-            continue
-        fig.add_trace(go.Scatter(
-            x=df_multi["ky"].astype(str).tolist(),
-            y=df_multi[col].tolist(),
+    for i, col in enumerate(valid_cols):
+        color = _COL_COLOR_MAP.get(col) or _PALETTE[i % len(_PALETTE)]
+        label = (col_labels or {}).get(col) or _COL_LABEL_MAP.get(col) or col
+        y_vals = df_multi[col].tolist()
+
+        if is_pct_axis:
+            htmpl = f"<b>%{{x}}</b><br>{label}: %{{y:.2f}}<extra></extra>"
+        else:
+            htmpl = f"<b>%{{x}}</b><br>{label}: %{{y:,.0f}} {y_label}<extra></extra>"
+
+        trace = dict(
+            x=x_vals,
+            y=y_vals,
             mode="lines+markers",
-            name=col,
-            line=dict(width=2),
-            marker=dict(size=6),
-        ))
+            name=label,
+            line=dict(color=color, width=2.5, shape="spline", smoothing=0.5),
+            marker=dict(size=7, color=color, symbol="circle",
+                        line=dict(width=1.5, color="white")),
+            hovertemplate=htmpl,
+            fill="tozeroy" if is_single else "none",
+        )
+        if is_single:
+            trace["fillcolor"] = f"rgba({_hex_to_rgb(color)},0.10)"
+
+        fig.add_trace(go.Scatter(**trace))
+
     fig.update_layout(
-        title=dict(text=title, font_size=13),
-        height=280,
-        margin=dict(t=36, b=20, l=10, r=10),
-        yaxis_title=y_label,
-        xaxis_title="Kỳ",
-        showlegend=len(metric_cols) > 1,
+        title=dict(text=title, font_size=13, x=0, xanchor="left"),
+        height=310,
+        margin=dict(t=40, b=30, l=10, r=10),
+        yaxis=dict(
+            title=y_label,
+            gridcolor="rgba(128,128,128,0.12)",
+            zerolinecolor="rgba(128,128,128,0.18)",
+            tickformat=",d" if not is_pct_axis else ".2f",
+        ),
+        xaxis=dict(
+            tickangle=-30 if len(x_vals) > 6 else 0,
+            gridcolor="rgba(128,128,128,0.08)",
+        ),
+        showlegend=not is_single,
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="right",
+            x=1,
+            font_size=11,
+        ),
         hovermode="x unified",
+        plot_bgcolor="rgba(0,0,0,0)",
+        paper_bgcolor="rgba(0,0,0,0)",
     )
     st.plotly_chart(fig, use_container_width=True, key=key)
 

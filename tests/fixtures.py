@@ -12,7 +12,7 @@ def tao_file_hstd_hop_le() -> bytes:
             "Số khế ước": ["KU001", "KU002"],
             "Mã KH": ["KH001", "KH002"],
             "Tên PGD": ["PGD Long Thành", "PGD Long Thành"],
-            "Tên xã": ["Xã Long Thành", "Xã Long Thành"],
+            "Tên xã": ["Phước Thái", "Phước Thái"],
             "Dư nợ trong hạn": [1000, 2000],
             "Dư nợ quá hạn": [0, 0],
             "Tổng dư nợ": [1000, 2000],

@@ -1,5 +1,15 @@
 # CHANGELOG
 
+## [2026-07-19] — Fix test failure: ke_hoach_cv_khnv_service int(sum()) khi Series rỗng
+- `services/ke_hoach_cv_khnv_service.py` dòng 373 — thêm `or 0` cho `int(.sum())` tránh crash khi `pd.Series(dtype=str).sum()` trả `""` thay vì `0`
+
+## [2026-07-19] — Fix 3 test failures CI: bc_tong_hop int('') + fixture Xã Long Thành
+- `tabs/bc_tong_hop.py` dòng 523 — thay `int(st.session_state.get("bc_cq_nam", 2026))` bằng `int(nam) if nam else 2026` để tránh crash khi mock test
+- `tests/fixtures.py` dòng 15 — đổi `"Xã Long Thành"` thành `"Phước Thái"` để khớp `PGD_XA_MAP["PGD Long Thành"]`
+
+## [2026-07-19] — Nâng cấp đồ thị xu hướng theo kỳ snapshot
+- `tabs/tab_so_sanh_ky/_common.py` dòng ~249 — thêm `_COL_LABEL_MAP`, `_COL_COLOR_MAP`, `_PALETTE`, `_hex_to_rgb()`; cải thiện `render_trend_chart()`: area fill, màu semantic, hover tiếng Việt, label Vietnamese, background transparent dark-mode-safe
+
 ## [2026-07-19] — Fix lỗi Failed to fetch dynamically imported module Html.js: chia CSS thành 2 chunk
 - `utils_theme.py` — tách `get_theme_css()` thành `_css_part1()` (sections 1–9) và `_css_part2()` (sections 10–19); `get_theme_css()` giữ lại cho tương thích ngược
 - `app.py` dòng 259 — inject 2 chunk riêng biệt thay vì 1 block lớn để tránh JS dynamic import payload quá lớn

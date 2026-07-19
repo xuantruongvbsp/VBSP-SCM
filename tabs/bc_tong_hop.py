@@ -520,7 +520,7 @@ def _render_tong_hop_kpi(kpi_td: dict, kpi_nv: dict, username: str) -> None:
         with subtabs[2]:
             st.subheader("Nhiệm vụ đang chờ duyệt")
             df_cho_duyet = _lay_ds_nhiem_vu_cho_duyet(
-                int(st.session_state.get("bc_cq_nam", 2026))
+                int(nam) if nam else 2026
             )
             if not df_cho_duyet.empty:
                 st.caption(f"Hiển thị {len(df_cho_duyet)} kết quả (tối đa 50)")

@@ -370,7 +370,7 @@ def tinh_tong_hop(df_kh: pd.DataFrame, df_kq: pd.DataFrame) -> dict[str, Any]:
 
     kh_tuan = kh[kh.get("tuan").eq(today_monday)] if "tuan" in kh.columns else pd.DataFrame()
     kq_tuan = kq[kq.get("tuan").eq(today_monday)] if "tuan" in kq.columns else pd.DataFrame()
-    hoan_thanh = int(kq_tuan.get("trang_thai", pd.Series(dtype=str)).apply(_is_done).sum())
+    hoan_thanh = int(kq_tuan.get("trang_thai", pd.Series(dtype=str)).apply(_is_done).sum() or 0)
     tong_kh_tuan = int(len(kh_tuan))
     da_bao_cao = int(len(kq_tuan))
 

@@ -1,5 +1,21 @@
 # CHANGELOG
 
+## [2026-07-19] — Đối chiếu nguồn vốn xã GQVL/NSVSMT tại tab Nguồn vốn địa phương
+- `tabs/tab_hhi.py` dòng ~82 — thêm fingerprint rule Mã NĐT vào cache key để đổi rule cấp tỉnh/cấp xã không giữ số cũ
+- `tabs/tab_hhi.py` dòng ~257/~564 — thêm bảng và sheet Excel đối chiếu 02 chương trình nguồn vốn ngân sách cấp xã: GQVL, NS&VSMTNT và tổng cộng theo đơn vị
+- `db.py` dòng ~1226 — bỏ seed CT06 `INV1201260090198` khỏi danh mục cấp tỉnh mặc định để DB mới không tái sinh rule sai
+- `tests/test_tab_hhi.py` — thêm test khóa số chuẩn 93.479 / 2.480 / 95.959 triệu và test loại trừ CT06 có rule cấp tỉnh
+- `BUGMAP.md` — thêm G28 ghi nhận lỗi tab Nguồn vốn địa phương thiếu bảng đối chiếu nguồn xã và cache stale khi đổi rule
+
+## [2026-07-19] — Tối ưu hiệu suất tab Nguồn vốn địa phương
+- `tabs/tab_hhi.py` dòng ~144 — vectorize `_bang_theo_nv()`: thay Python `for` loop bằng `groupby().sum().unstack()`, tốc độ nhanh hơn đáng kể trên dataset lớn
+- `tabs/tab_hhi.py` dòng ~366 — `_render_sub_pgd()`: bỏ lần gọi `_bang_theo_nv` thứ 2 (từ 2 lần → 1 lần), reuse kết quả có `them_dong_tong=True`
+
+## [2026-07-19] — Thêm dòng tổng bảng PGD Nguồn vốn địa phương
+- `tabs/tab_hhi.py` dòng ~144 — thêm tùy chọn `them_dong_tong` cho `_bang_theo_nv()` và bật ở bảng/Excel `Theo PGD` để có dòng `Tổng cộng` cuối bảng
+- `tests/test_tab_hhi.py` — thêm test xác nhận dòng tổng PGD cộng đúng TW/ĐP/Tổng và tỷ trọng ĐP
+- `BUGMAP.md` — thêm B42 ghi nhận bảng chi tiết theo PGD thiếu dòng tổng cộng
+
 ## [2026-07-19] — Fix test failure: ke_hoach_cv_khnv_service int(sum()) khi Series rỗng
 - `services/ke_hoach_cv_khnv_service.py` dòng 373 — thêm `or 0` cho `int(.sum())` tránh crash khi `pd.Series(dtype=str).sum()` trả `""` thay vì `0`
 

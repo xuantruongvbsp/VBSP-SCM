@@ -1243,6 +1243,16 @@
 | **Bài học** | Mọi fix phân tầng ĐP phải áp dụng đồng bộ cho cả `tab_khtd.py` (màn CN) lẫn `tab_khtd_pgd.py` (màn PGD). Khi fix G26 chỉ sửa tab CN, tab PGD vẫn mang bug cũ |
 | **Ngày fix** | 2026-07-19 |
 
+### G28 — Tab Nguồn vốn địa phương thiếu bảng đối chiếu 02 chương trình nguồn vốn xã
+| | |
+|---|---|
+| **File** | `tabs/tab_hhi.py` → `_bang_nguon_von_xa_02_ct()` ~dòng 257; `db.py` → `_seed_ndt_dp_rules()` ~dòng 1226 |
+| **Dấu hiệu** | User cần đối chiếu riêng dư nợ GQVL và NS&VSMTNT nguồn ngân sách cấp xã theo 22 đơn vị, nhưng tab chỉ hiển thị tổng TW/ĐP/cấp tỉnh/cấp xã; sau khi sửa rule Mã NĐT, số có thể vẫn cũ trong session vì cache label nguồn vốn không phụ thuộc version rule |
+| **Nguyên nhân** | Báo cáo tổng hợp `_bang_theo_nv()` không tách riêng trục chương trình 03/06 cho phần `ĐP cấp xã/khác`; `_nhan_nv_numeric()` dùng cache key theo `ts_hstd` nhưng chưa fingerprint `ndt_dp_rule_list`; seed mặc định còn mã CT06 `INV1201260090198` đã được xác nhận không thuộc cấp tỉnh |
+| **Fix** | Thêm bảng đối chiếu riêng lọc `Nguồn vốn = Địa phương`, `_nv_cap_label = ĐP cấp xã/khác`, `Mã CT in (3, 6)`; thêm `_rules_cache_key()` vào `nv_cache_key`; bỏ seed CT06 `INV1201260090198`; khóa test tổng chuẩn `GQVL=93.479`, `NS&VSMTNT=2.480`, `Tổng=95.959` triệu |
+| **Test** | `tests/test_tab_hhi.py::test_bang_nguon_von_xa_02_ct_khop_so_chuan`, `tests/test_tab_hhi.py::test_bang_nguon_von_xa_02_ct_loai_tru_rule_cap_tinh` |
+| **Ngày fix** | 2026-07-19 |
+
 ### G10 — `🏛️ KHTD Chi nhánh`: `TH` GQVL bị lấy nhầm tiền từ `GQVL.parquet` thay vì `HSTD`
 | | |
 |---|---|
@@ -2674,6 +2684,16 @@ val = pd.to_numeric(df[COT_X], errors="coerce").sum() if COT_X in df.columns els
 | **Nguyên nhân** | Tính `con_lai` từ `df_kh[COT_NGAY_HH_KHOANH]` rồi gán vào `df_hien`, phụ thuộc align index ngầm |
 | **Fix** | Tính trực tiếp từ `df_hien[COT_NGAY_HH_KHOANH]` trước khi gán badge |
 | **Test** | Compile + convention `tabs/tab_no_khoanh.py` |
+| **Ngày fix** | 2026-07-19 |
+
+### B42 — Bảng PGD Nguồn vốn địa phương thiếu dòng tổng cộng
+| | |
+|---|---|
+| **File** | `tabs/tab_hhi.py` → `_bang_theo_nv()`, `_render_sub_pgd()` dòng ~144, ~355 |
+| **Dấu hiệu** | Bảng `Bảng chi tiết theo PGD` chỉ liệt kê từng PGD, không có dòng cuối để đối chiếu nhanh tổng TW/ĐP/Tổng toàn Chi nhánh |
+| **Nguyên nhân** | `_bang_theo_nv()` chỉ trả dữ liệu đã group theo đơn vị và format hiển thị, chưa có tùy chọn chèn tổng sau khi cộng các nhóm |
+| **Fix** | Thêm tham số `them_dong_tong`; khi bật, cộng các cột tiền trên số VND gốc, tính lại `Tỷ trọng ĐP (%)`, rồi append dòng `Tổng cộng` cuối bảng |
+| **Test** | `tests/test_tab_hhi.py::test_bang_theo_nv_them_dong_tong_cuoi_bang` |
 | **Ngày fix** | 2026-07-19 |
 
 ---

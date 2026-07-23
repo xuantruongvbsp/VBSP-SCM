@@ -1228,7 +1228,6 @@ def _seed_ndt_dp_rules() -> list[dict]:
         {"ma_ct": 3, "ma": "INV0802140002662", "ghi_chu": "UBND tỉnh Đồng Nai", "cap": "tinh"},
         {"ma_ct": 3, "ma": "INV0603170027393", "ghi_chu": "Nguồn vốn cho vay đào tạo nghề", "cap": "tinh"},
         {"ma_ct": 6, "ma": "INV1907190050748", "ghi_chu": "(chưa xác nhận nghiệp vụ — mặc định cấp tỉnh)", "cap": "tinh"},
-        {"ma_ct": 6, "ma": "INV1201260090198", "ghi_chu": "(chưa xác nhận nghiệp vụ — mặc định cấp tỉnh)", "cap": "tinh"},
         {"ma_ct": 6, "ma": "INV0802140002661", "ghi_chu": "(chưa xác nhận nghiệp vụ — mặc định cấp tỉnh)", "cap": "tinh"},
     ]
 

@@ -126,29 +126,33 @@ def _render_pgd(pgd_filter: str, username: str) -> None:
                 ho_ten = st.text_input("Họ tên khách hàng *", placeholder="Nguyễn Văn A", key="qd62_ho_ten")
                 so_cccd = st.text_input("Số CCCD/CMND *", placeholder="0790xxxxxx", key="qd62_so_cccd")
                 ds_xa = _lay_ds_xa(slug)
-                xa = st.selectbox("Xã/Phường *", ds_xa if ds_xa else [""])
+                xa = st.selectbox("Xã/Phường *", ds_xa if ds_xa else [""], key="qd62_pgd_xa")
             with col_b:
                 ds_ct = _lay_ct_registry(slug)
                 chuong_trinh = st.selectbox(
                     "Chương trình tín dụng",
                     ds_ct if ds_ct else ["-- Chưa có dữ liệu --"],
+                    key="qd62_pgd_chuong_trinh",
                 )
                 du_no_goc = st.number_input(
                     "Dư nợ gốc (triệu đồng) *",
                     min_value=0.0, step=0.1, format="%.1f",
+                    key="qd62_pgd_du_no_goc",
                 )
                 du_no_lai = st.number_input(
                     "Dư nợ lãi (triệu đồng)",
                     min_value=0.0, step=0.1, format="%.1f",
+                    key="qd62_pgd_du_no_lai",
                 )
 
-            ly_do = st.selectbox("Lý do rủi ro *", LY_DO_RUI_RO)
+            ly_do = st.selectbox("Lý do rủi ro *", LY_DO_RUI_RO, key="qd62_pgd_ly_do")
             ghi_chu = st.text_area("Ghi chú", placeholder="Thông tin bổ sung (nếu có)", height=80)
 
             file_ho_so = st.file_uploader(
                 "File hồ sơ đính kèm (PDF/XLSX/DOCX)",
                 type=["pdf", "xlsx", "docx"],
                 accept_multiple_files=False,
+                key="qd62_pgd_file_hs",
             )
 
             submitted = st.form_submit_button("💾 Lưu hồ sơ", type="primary")

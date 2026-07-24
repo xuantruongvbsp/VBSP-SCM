@@ -856,6 +856,7 @@ def _render_nhap_ket_qua(tab, **kwargs):
                             "Số liệu kết quả",
                             value=val_so_lieu,
                             placeholder="Ví dụ: 1,250 triệu đồng / 45 hộ",
+                            key=f"nv_so_lieu_{nv_id}",
                         )
                         submitted = st.form_submit_button(
                             "💾 Lưu kết quả", type="primary"

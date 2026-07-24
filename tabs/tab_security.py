@@ -231,7 +231,7 @@ def _render_audit_settings(username: str) -> None:
         key="audit_retention",
     )
 
-    if st.button("🗑️ Xóa bản ghi cũ", type="secondary"):
+    if st.button("🗑️ Xóa bản ghi cũ", type="secondary", key="sec_btn_xoa_audit"):
         try:
             with db.get_conn() as conn:
                 deleted = conn.execute(

@@ -229,7 +229,8 @@ def _render_chinh_sua(username: str) -> None:
     sel_id = st.selectbox(
         "Chọn phiếu",
         options=list(id_map.keys()),
-        format_func=lambda x: f"#{x} · {id_map[x]['tieu_de'][:60]} · {TRANG_THAI.get(id_map[x].get('trang_thai',''),'')}"
+        format_func=lambda x: f"#{x} · {id_map[x]['tieu_de'][:60]} · {TRANG_THAI.get(id_map[x].get('trang_thai',''),'')}",
+        key="ph_sua_chon_phieu",
     )
     item = id_map.get(sel_id)
     if not item:
@@ -243,19 +244,23 @@ def _render_chinh_sua(username: str) -> None:
             loai = st.selectbox("Loại", loai_keys,
                                 format_func=lambda x: LOAI_PHOI_HOP[x],
                                 index=loai_keys.index(item.get("loai", loai_keys[0]))
-                                if item.get("loai") in loai_keys else 0)
+                                if item.get("loai") in loai_keys else 0,
+                                key="ph_sua_loai")
             uu_keys = list(UU_TIEN.keys())
             uu_tien = st.selectbox("Ưu tiên", uu_keys,
                                    format_func=lambda x: UU_TIEN[x],
                                    index=uu_keys.index(item.get("uu_tien", "binh_thuong"))
-                                   if item.get("uu_tien") in uu_keys else 2)
+                                   if item.get("uu_tien") in uu_keys else 2,
+                                   key="ph_sua_uu_tien")
             nguoi_phu_trach = st.text_input("CB phụ trách",
-                                            value=item.get("nguoi_phu_trach") or "")
+                                            value=item.get("nguoi_phu_trach") or "",
+                                            key="ph_sua_cb_pt")
             tt_keys = list(TRANG_THAI.keys())
             trang_thai = st.selectbox("Trạng thái", tt_keys,
                                       format_func=lambda x: TRANG_THAI[x],
                                       index=tt_keys.index(item.get("trang_thai", "cho_xu_ly"))
-                                      if item.get("trang_thai") in tt_keys else 0)
+                                      if item.get("trang_thai") in tt_keys else 0,
+                                      key="ph_sua_trang_thai")
         with c2:
             try:
                 ngay_giao_def = date.fromisoformat(item.get("ngay_giao") or date.today().isoformat())
@@ -265,8 +270,8 @@ def _render_chinh_sua(username: str) -> None:
                 ngay_kt_def = date.fromisoformat(item.get("ngay_ket_thuc") or date.today().isoformat())
             except Exception:
                 ngay_kt_def = date.today()
-            ngay_giao = st.date_input("Ngày giao", value=ngay_giao_def, format="DD/MM/YYYY")
-            ngay_ket_thuc = st.date_input("Ngày kết thúc", value=ngay_kt_def, format="DD/MM/YYYY")
+            ngay_giao = st.date_input("Ngày giao", value=ngay_giao_def, format="DD/MM/YYYY", key="ph_sua_ngay_giao")
+            ngay_ket_thuc = st.date_input("Ngày kết thúc", value=ngay_kt_def, format="DD/MM/YYYY", key="ph_sua_ngay_kt")
         noi_dung = st.text_area("Ghi chú", value=item.get("noi_dung") or "", height=80)
         submitted = st.form_submit_button("💾 Lưu thay đổi", type="primary")
 

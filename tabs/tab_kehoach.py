@@ -164,7 +164,8 @@ def render(tab, **kwargs):
                     chon_ct = st.selectbox("Chọn chỉ tiêu", ds_chi_tieu, key=f"{prefix}_kh_ct")
                     val_kh  = st.number_input("Giá trị kế hoạch (triệu đồng)",
                                               min_value=0.0, step=100.0,
-                                              format="%.0f")
+                                              format="%.0f",
+                                              key=f"{prefix}_kh_val")
                     if st.form_submit_button("💾 Lưu", type="primary"):
                         kh_data[chon_ct] = val_kh * 1_000_000  # triệu → VND
                         luu_kehoach(

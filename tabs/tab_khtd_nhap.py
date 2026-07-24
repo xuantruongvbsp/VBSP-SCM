@@ -1204,7 +1204,7 @@ def _tab_khtd_theo_xa(role: str, username: str, df_full: "pd.DataFrame | None") 
     
     with col_btn:
         st.markdown("<br>", unsafe_allow_html=True)
-        xuat_pdf_clicked = st.button("🖨️ Xuất PDF", use_container_width=True, type="primary")
+        xuat_pdf_clicked = st.button("🖨️ Xuất PDF", use_container_width=True, type="primary", key="khtd_xuat_pdf")
 
     # ── Upload Excel hàng loạt ────────────────────────────────────────────
     with st.expander("📤 Upload Excel kế hoạch hàng loạt", expanded=False):

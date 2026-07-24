@@ -51,7 +51,7 @@
 | Chức năng | File | Hàm chính |
 |---|---|---|
 | Upload PGD | `services/upload_service.py` | `luu_pgd_file()`, `luu_file_he_thong()` |
-| Merge toàn CN | `services/upload_service.py:288-480` | `merge_du_lieu_toan_cn()` |
+| Merge toàn CN | `services/upload_service.py` dòng 288-480 | `merge_du_lieu_toan_cn()` |
 
 ### KHTD
 

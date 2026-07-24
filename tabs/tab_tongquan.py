@@ -17,8 +17,14 @@ import plotly.express as px
 import plotly.graph_objects as go
 
 from state_manager import SCMStateManager
-from config import *
-from config import DS_PGD, CACHE_HSTD, DON_VI_CHI_NHANH, TEN_CHI_NHANH_HIEN_THI
+from config import (
+    DS_PGD, DS_XA, CACHE_HSTD, DON_VI_CHI_NHANH, TEN_CHI_NHANH_HIEN_THI,
+    PGD_XA_MAP, NAM_HT, HSTD_DS_CHO_VAY_NAM_ALIASES, HSTD_THU_NO_NAM_ALIASES,
+    COT_TEN_PGD, COT_TEN_TO, COT_MA_TO, COT_TEN_XA, COT_DVUT,
+    COT_TONG_DU_NO, COT_DU_NO_QH, COT_DU_NO_KHOANH, COT_DU_NO_TH,
+    COT_TEN_CT, COT_NGUON_VON, COT_MA_KH, COT_TEN_KH, COT_SO_KU,
+    COT_NGAY_DH, COT_LAI_TON, COT_NGAY_SL,
+)
 
 from utils import (
     fmt_so,

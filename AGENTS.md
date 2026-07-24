@@ -27,6 +27,7 @@ Hệ thống Quản trị Tín dụng Nội bộ — **Ngân hàng Chính sách 
 ├── config.py               # Hằng số toàn hệ thống (DS_PGD, cột, chương trình...)
 ├── db.py                   # SQLite: kv_store, users, audit_log, hstd_snapshot
 ├── utils.py                # fmt(), Excel helpers, get_tab_context()
+├── snapshot_service.py     # HSTD snapshot theo kỳ (nền tảng Direction A/B/C)
 │
 ├── data/
 │   ├── core.py             # ts_file(), parquet cache
@@ -40,7 +41,7 @@ Hệ thống Quản trị Tín dụng Nội bộ — **Ngân hàng Chính sách 
 │   ├── report_service.py   # Tạo báo cáo Excel
 │   ├── khtd_service.py     # Giao & Điều chỉnh KHTD
 │   ├── kiem_soat_service.py# Kiểm soát Chi nhánh
-│   └── snapshot_service.py # HSTD snapshot theo kỳ (nền tảng Direction A/B/C)
+│   └── ...
 │
 ├── tabs/                   # Mỗi file = 1 tab UI
 │   ├── tab_ban_dai_dien.py # Ban Đại Diện (mount cả ws_management lẫn ws_operation)
@@ -61,29 +62,29 @@ Hệ thống Quản trị Tín dụng Nội bộ — **Ngân hàng Chính sách 
 | Muốn sửa | Đọc trước | Sửa ở đây |
 |---|---|---|
 | Logic giao diện tab | `tabs/tab_*.py` liên quan | Tab đó |
-| Merge 22 PGD | `upload_service.py` dòng 288–480 | `merge_du_lieu_toan_cn()` |
+| Merge 22 PGD | `services/upload_service.py` dòng 288-480 | `merge_du_lieu_toan_cn()` |
 | Đọc Excel → Parquet | `data/core.py` | `excel_to_parquet()` |
-| Phân quyền / role | `auth.py`, `ROLES.md` | `auth.py` |
+| Phân quyền / role | `auth.py`, `docs/ROLES.md` | `auth.py` |
 | Hằng số cột / chương trình | `config.py` | `config.py` |
 | Xuất Word / PDF | `services/template_service.py` | Template + service |
-| Xuất biểu mẫu XLN | `tab_no_rui_ro.py` | Hàm `_tao_word_*xln()` |
+| Xuất biểu mẫu XLN | `services/word_xln_service.py` | Hàm `_tao_word_*xln()`; UI ở `services/xlrr_subtabs.py` |
 | Workspace CN | `workspaces/ws_management.py` | File đó |
 | Workspace PGD | `workspaces/ws_operation.py` | File đó |
-| Xử lý Rủi ro | `tab_xu_ly_rui_ro.py` + `services/xlrr_service.py` | File đó |
+| Xử lý Rủi ro | `tabs/tab_xu_ly_rui_ro.py` + `services/xlrr_service.py` | File đó |
 | Tiến độ Báo cáo PGD (GSheet) | `tabs/tab_tien_do_nop.py` + Google Form | Tab đó; credentials ở `credentials.json` |
 | Upload file | `services/upload_service.py` | `luu_pgd_file()` / `luu_file_he_thong()` |
 | Dữ liệu kv_store | `db.py` | `doc_kv()` / `ghi_kv()` |
-| Thêm tab PGD | `tabs/tab_*.py` + `ws_operation.py` | File đó |
-| Thêm tab toàn CN | `tabs/tab_*.py` + `ws_management.py` | File đó |
+| Thêm tab PGD | `tabs/tab_*.py` + `workspaces/ws_operation.py` | File đó |
+| Thêm tab toàn CN | `tabs/tab_*.py` + `workspaces/ws_management.py` | File đó |
 | Thêm chương trình TD | `config.py` | `CHUONG_TRINH_KHTD` |
 | Thêm PGD mới | `config.py` | `DS_PGD`, `MA_PGD_MAP`, `PGD_XA_MAP` |
 | Sửa format tiền | `utils.py` | `fmt_ty()` |
-| Thêm báo cáo kiểm soát | `kiem_soat_service.py` | Thêm `BaoCaoMeta` |
-| Sửa giao KHTD | `khtd_service.py` + `tab_khtd_giao_dc.py` | File đó |
-| Sửa số liệu giao ban | `giao_ban.py` | `tinh_so_lieu_van_xuoi()` |
-| Xuất Thông báo Kết luận Giao ban | `giao_ban.py` | `xuat_thong_bao_ket_luan_giao_ban()` |
+| Thêm báo cáo kiểm soát | `services/kiem_soat_service.py` | Thêm `BaoCaoMeta` |
+| Sửa giao KHTD | `services/khtd_service.py` + `tabs/tab_khtd_giao_dc.py` | File đó |
+| Sửa số liệu giao ban | `data/giao_ban.py` | `tinh_so_lieu_van_xuoi()` |
+| Xuất Thông báo Kết luận Giao ban | `data/giao_ban.py` | `xuat_thong_bao_ket_luan_giao_ban()` |
 | Snapshot HSTD theo kỳ | `snapshot_service.py` | upsert-safe, tự trigger sau merge |
-| Tab Ban Đại Diện | `tab_ban_dai_dien.py` | Tham số `cap="tinh"` (CN) / `cap="xa"` (PGD) |
+| Tab Ban Đại Diện | `tabs/tab_ban_dai_dien.py` | Tham số `cap="tinh"` (CN) / `cap="xa"` (PGD) |
 
 ---
 
@@ -318,10 +319,10 @@ Mỗi khi fix bug, thêm entry vào `BUGMAP.md` theo template có sẵn (cuối 
 | Fill hàng loạt | `auto_fill_batch(df_rows, template_path, tag_map, ...)` — `utils.py` |
 | Ghi audit log tự động | `auto_audit(action, clear_cache=True)` — `utils.py` |
 | Lazy loading tabs | `lazy_tabs(labels, renderers, key="lt")` — `utils.py` |
-| Nút tải Word + PDF | `nut_tai_word_va_pdf(docx_bytes, ten_file, key)` — `template_service.py` |
+| Nút tải Word + PDF | `nut_tai_word_va_pdf(docx_bytes, ten_file_goc, key_prefix)` — `services/template_service.py` |
 | Đọc kv_store nhiều key | `db.doc_kv_prefix("prefix_")` — `db.py` |
-| Gộp 22 PGD | `merge_du_lieu_toan_cn(loai)` — `upload_service.py` |
-| Metadata merge | `lay_meta_merge(loai)` — `upload_service.py` |
+| Gộp 22 PGD | `merge_du_lieu_toan_cn(loai)` — `services/upload_service.py` |
+| Metadata merge | `lay_meta_merge(loai)` — `services/upload_service.py` |
 | Kiểm tra quyền upload | `co_quyen_upload_pgd(role)` — `auth.py` |
 | Quản lý điểm GD | `db.doc_dgd_map()` / `db.luu_dgd_map()` — `db.py` |
 
@@ -332,11 +333,11 @@ Mỗi khi fix bug, thêm entry vào `BUGMAP.md` theo template có sẵn (cuối 
 | File | Đọc khi nào |
 |---|---|
 | `DELTA.md` | **ĐỌC ĐẦU MỖI PHIÊN** — thay đổi gần đây, component mới, signature đã cập nhật |
-| `ARCHITECTURE.md` | Cần hiểu quan hệ import giữa các module |
+| `docs/ARCHITECTURE.md` | Cần hiểu quan hệ import giữa các module |
 | `CONVENTIONS.md` | Cần biết quy ước chi tiết về kv_store, upload, CSS |
-| `UI_GUIDELINES.md` | Bảng màu, typography |
-| `ROLES.md` | Cần phân quyền chi tiết theo role mới |
-| `TROUBLESHOOTING.md` | Gặp lỗi thường gặp về dữ liệu, cache, upload |
+| `docs/UI_GUIDELINES.md` | Bảng màu, typography |
+| `docs/ROLES.md` | Cần phân quyền chi tiết theo role mới |
+| `docs/TROUBLESHOOTING.md` | Gặp lỗi thường gặp về dữ liệu, cache, upload |
 | `BUGMAP.md` | ĐỌC TRƯỚC KHI CODE — tra lỗi đã mắc để tránh lặp; sau khi fix bug thì ghi thêm |
 | `SCHEMA.md` | **ĐỌC TRƯỚC KHI VIẾT SQL** — schema 16 bảng SQLite + parquet + query mẫu |
 | `TEST_COVERAGE.md` | Bản đồ 31 file test, lỗ hổng cần test — đọc khi viết test mới |
@@ -347,9 +348,9 @@ Mỗi khi fix bug, thêm entry vào `BUGMAP.md` theo template có sẵn (cuối 
 | `CHANGELOG.md` | Lịch sử thay đổi |
 | `BACKLOG.md` | Yêu cầu người dùng — đã làm & sẽ làm |
 | `ROADMAP.md` | Sprint + backlog |
-| `TEMPLATES.md` | Hướng dẫn quản lý template Word |
-| `HUONG_DAN_PHAN_HE.md` | Hướng dẫn sử dụng theo phân hệ |
-| `HUONG_DAN_NGUON_DU_LIEU.md` | Luồng upload, cache, 2 luồng dữ liệu |
+| `docs/TEMPLATES.md` | Hướng dẫn quản lý template Word |
+| `docs/HUONG_DAN_PHAN_HE.md` | Hướng dẫn sử dụng theo phân hệ |
+| `docs/HUONG_DAN_NGUON_DU_LIEU.md` | Luồng upload, cache, 2 luồng dữ liệu |
 
 ---
 

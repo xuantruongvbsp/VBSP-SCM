@@ -1,9 +1,23 @@
 # CHANGELOG
 
+## [2026-07-24] — Dọn trùng lặp documentation
+- `.trae/rules/rules.md` — xóa section 6.6 trùng section 4 (Tên cột — dùng COT_*) và renumber các heading 6.x phía sau
+- `docs/AGENTS.md` — xóa file cũ (302 dòng, 22/05/2026), root `AGENTS.md` là bản chính
+
+## [2026-07-24] — Fix thiếu import và pointer sau bỏ wildcard
+- `tabs/tab_nq11.py` dòng ~14 — thêm import `FILE_PATH_NQ11`, tránh `NameError` khi chưa có dữ liệu NQ11 và UI hiển thị hướng dẫn đường dẫn file
+- `tabs/tab_tongquan.py` dòng ~21 — thêm import `DS_XA`, `NAM_HT`, `HSTD_DS_CHO_VAY_NAM_ALIASES`, `HSTD_THU_NO_NAM_ALIASES`, tránh `NameError` runtime ở nhánh KPI/cơ cấu/chỉ tiêu PGD
+- `CODE_INDEX.md` dòng ~54 — đổi `services/upload_service.py:288-480` thành path thật + mô tả dòng, tránh path-check/agent hiểu nhầm là file không tồn tại
+- `AGENTS.md` dòng ~27/~43/~65/~73/~77/~82/~321 — đưa `snapshot_service.py` về root, sửa pointer thiếu prefix thư mục, thay `tab_no_rui_ro.py` đã xóa bằng `services/word_xln_service.py`, và sửa signature quick-ref `nut_tai_word_va_pdf(docx_bytes, ten_file_goc, key_prefix)`
+- `.trae/rules/rules.md` dòng ~70/~79/~141/~330 — sửa pointer thiếu prefix thư mục, `ROLES.md`/`UI_GUIDELINES.md` sang `docs/...`, và mô tả `COT_REF.md` khớp danh sách đầy đủ theo `config.py`
+- `CHANGELOG.md` — ghi nhận fix thiếu import/pointer sau tối ưu wildcard
+- `BUGMAP.md` — thêm J62 cho pattern compile OK nhưng runtime thiếu tên sau khi bỏ `from config import *`
+
 ## [2026-07-24] — Fix tài liệu ref sau tối ưu token
 - `COT_REF.md` — bổ sung đầy đủ danh sách `COT_*` theo `config.py` thay vì chỉ nhóm cột thường dùng
 - `SIGNATURES.md` — sửa signature tra nhanh lệch code gốc cho `filter_bar`, `loan_detail_drawer`, `xuat_excel`, `auto_fill_document`, `auto_fill_batch`, `lazy_tabs`, `vn`
-- `AGENTS.md` dòng ~267/~317 — đổi section 8 thành "Function Signatures & Checklist", phục hồi heading checklist, sửa ví dụ `auto_fill_document()`
+- `AGENTS.md` dòng ~267/~317/~334 — đổi section 8 thành "Function Signatures & Checklist", phục hồi heading checklist, sửa ví dụ `auto_fill_document()` và pointer tài liệu trong `docs/`
+- `.trae/rules/rules.md` dòng ~478 — sửa pointer `ARCHITECTURE.md`/`TROUBLESHOOTING.md` sang `docs/...`
 - `BUGMAP.md` — thêm J61 ghi nhận rủi ro tài liệu ref thiếu/sai sau khi tách khỏi rules chính
 
 ## [2026-07-24] — Sửa CODE_INDEX để agent tra file chính xác
@@ -11,12 +25,16 @@
 - `CODE_INDEX.md` dòng ~112 — làm rõ không phải mọi file tab/submodule đều có `render(tab=None, **kwargs)`, tránh agent gọi sai entrypoint và tránh prose bị checker bắt nhầm thành path
 - `BUGMAP.md` — thêm J60 ghi nhận lỗi index tài liệu trỏ sai path và mô tả signature quá rộng
 
-## [2026-07-24] — Tối ưu token: tạo CODE_INDEX.md + tách rules.md + trim AGENTS.md
+## [2026-07-24] — Tối ưu token: tạo CODE_INDEX.md + tách rules.md + trim AGENTS.md + sửa wildcard import
 - `CODE_INDEX.md` — tạo mới, map chức năng → file → hàm chính cho agent tra nhanh (~180 dòng)
 - `COT_REF.md` — tạo mới, tách toàn bộ COT_* constants từ rules.md (tra cứu khi cần)
 - `SIGNATURES.md` — tạo mới, tách toàn bộ function signatures từ rules.md (tra cứu khi cần)
 - `.trae/rules/rules.md` — cắt section 4 (COT_*) và 5-7 (signatures), thay bằng pointer → giảm ~25% (651→487 dòng)
 - `AGENTS.md` — cắt section 5 (quy tắc) từ 327→26 dòng, section 8 (signatures) từ 80→12 dòng, checklist trùng → pointer → giảm ~50% (810→410 dòng)
+- `tabs/tab_kehoach.py` — thay `from config import *` → `from config import DB_HT_CACHE, FILE_PATH_DB` (file này không dùng COT_* nào)
+- `tabs/tab_tongquan.py` — thay `from config import *` → import cụ thể 22 tên (DS_PGD, COT_*, ...)
+- `tabs/tab_danhsach.py` — thay `from config import *` → import cụ thể 19 COT_*
+- `tabs/tab_nq11.py` — thay `from config import *` → import cụ thể 15 COT_*
 
 ## [2026-07-24] — Fix daily_report parse ngày đến hạn dạng DD/MM/YYYY
 - `scripts/daily_report.py` dòng ~84 — thêm helper parse ngày DuckDB/Pandas cho cột HSTD lưu dạng `DD/MM/YYYY` thay vì chỉ `TRY_CAST(... AS DATE)`

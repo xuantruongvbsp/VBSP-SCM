@@ -2820,11 +2820,23 @@ def _to_int(val, default=0):
 ### J61 — File ref sau tách rules thiếu COT và sai signature
 | | |
 |---|---|
-| **File** | `COT_REF.md`, `SIGNATURES.md`, `AGENTS.md` |
-| **Dấu hiệu** | `COT_REF.md` tự mô tả là danh sách đầy đủ nhưng chỉ có 53/200 `COT_*`; `SIGNATURES.md` ghi sai một số hàm như `xuat_excel(sheets, ten_file)`, thiếu `username` ở `filter_bar()`/`loan_detail_drawer()`; checklist trong `AGENTS.md` bị rơi khỏi heading và ví dụ `auto_fill_document()` còn tham số cũ |
-| **Nguyên nhân** | Khi tách rules chính sang file tra cứu, nội dung ref được rút gọn theo nhóm thường dùng nhưng pointer vẫn ghi "đầy đủ"; signature được chép theo tài liệu cũ thay vì đối chiếu lại code gốc |
-| **Fix** | Bổ sung toàn bộ `COT_*` theo `config.py`; sửa signature tra nhanh theo code gốc; đổi heading section 8 trong `AGENTS.md` để checklist là subsection rõ ràng |
-| **Test** | Đối chiếu count `COT_*` unique giữa `config.py` và `COT_REF.md`; grep lại các signature đã sửa trong code gốc |
+| **File** | `COT_REF.md`, `SIGNATURES.md`, `AGENTS.md`, `.trae/rules/rules.md` |
+| **Dấu hiệu** | `COT_REF.md` tự mô tả là danh sách đầy đủ nhưng chỉ có 53/200 `COT_*`; `SIGNATURES.md` ghi sai một số hàm như `xuat_excel(sheets, ten_file)`, thiếu `username` ở `filter_bar()`/`loan_detail_drawer()`; checklist trong `AGENTS.md` bị rơi khỏi heading và ví dụ `auto_fill_document()` còn tham số cũ; một số pointer docs thiếu tiền tố `docs/` |
+| **Nguyên nhân** | Khi tách rules chính sang file tra cứu, nội dung ref được rút gọn theo nhóm thường dùng nhưng pointer vẫn ghi "đầy đủ"; signature được chép theo tài liệu cũ thay vì đối chiếu lại code gốc; bảng tài liệu dùng tên hiển thị cũ thay vì path thật |
+| **Fix** | Bổ sung toàn bộ `COT_*` theo `config.py`; sửa signature tra nhanh theo code gốc; đổi heading section 8 trong `AGENTS.md` để checklist là subsection rõ ràng; sửa pointer tài liệu sang `docs/...` nơi cần |
+| **Test** | Đối chiếu count `COT_*` unique giữa `config.py` và `COT_REF.md`; grep lại các signature đã sửa trong code gốc; kiểm `Test-Path` các pointer tài liệu |
+| **Ngày fix** | 2026-07-24 |
+
+---
+
+### J62 — Compile OK nhưng thiếu import sau bỏ wildcard
+| | |
+|---|---|
+| **File** | `tabs/tab_nq11.py`, `tabs/tab_tongquan.py` → import từ `config.py`; `AGENTS.md`; `.trae/rules/rules.md` |
+| **Dấu hiệu** | `py_compile` OK nhưng khi đi vào nhánh runtime có thể lỗi `NameError`: `FILE_PATH_NQ11` ở NQ11, hoặc `DS_XA`/`HSTD_DS_CHO_VAY_NAM_ALIASES`/`HSTD_THU_NO_NAM_ALIASES`/`NAM_HT` ở Tổng quan; một số pointer doc vẫn trỏ path trần thiếu prefix thư mục (`upload_service.py`, `ws_operation.py`, `giao_ban.py`...), `ROLES.md`/`UI_GUIDELINES.md` ở root, `template_service.py` ở root, `tab_no_rui_ro.py` đã xóa, mô tả nhầm `snapshot_service.py` nằm trong `services/`, quick-ref ghi sai tham số `nut_tai_word_va_pdf()`, hoặc `CODE_INDEX.md` ghi path kèm `:288-480` khiến path-check hiểu nhầm là file không tồn tại |
+| **Nguyên nhân** | Sau khi thay `from config import *` bằng import cụ thể, một số tên từ `config.py` vẫn được dùng trong các nhánh UI/cache nhưng chưa được đưa vào import list; compile không bắt lỗi tên chưa định nghĩa trong thân hàm. Khi dời/tách tài liệu và refactor/archive module, một vài pointer rải rác chưa được đổi path |
+| **Fix** | Thêm đủ các import cụ thể còn thiếu; đổi pointer sang `docs/...`, `services/template_service.py`, `services/word_xln_service.py`; cập nhật cây thư mục để `snapshot_service.py` nằm ở root; sửa `nut_tai_word_va_pdf(docx_bytes, ten_file_goc, key_prefix)`; đổi `services/upload_service.py:288-480` thành path thật + mô tả dòng; và chạy AST/path check |
+| **Test** | `venv\Scripts\python.exe -m py_compile tabs\tab_danhsach.py tabs\tab_kehoach.py tabs\tab_nq11.py tabs\tab_tongquan.py`; AST check `missing_config_names=[]` cho 4 tab đã bỏ wildcard; path check không còn markdown pointer cũ đã biết |
 | **Ngày fix** | 2026-07-24 |
 
 ---

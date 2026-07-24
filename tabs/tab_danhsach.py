@@ -9,7 +9,14 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 
-from config import *
+from config import (
+    COT_DU_NO_KHOANH, COT_MUC_VAY, COT_DU_NO_TH, COT_DU_NO_QH, COT_TONG_DU_NO,
+    COT_LAI_SUAT,
+    COT_TEN_XA, COT_DVUT, COT_TEN_TO, COT_TEN_CT,
+    COT_MA_KH, COT_TEN_KH, COT_SO_KU, COT_SDT,
+    COT_NGAY_VAY, COT_NGAY_DH, COT_THOI_HAN,
+    COT_TINH_TRANG, COT_TEN_PGD,
+)
 from utils import (
     fmt_so,
     fmt_tien,

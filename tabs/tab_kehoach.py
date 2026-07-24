@@ -11,7 +11,7 @@ from io import BytesIO
 from datetime import datetime
 import os
 
-from config import *
+from config import DB_HT_CACHE, FILE_PATH_DB
 from data import doc_dienbao, db_lookup, ts_file
 from data.khtd import doc_kehoach, luu_kehoach
 from data.pgd import duong_dan_pgd, pgd_slug

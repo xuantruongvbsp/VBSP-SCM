@@ -10,7 +10,15 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 
-from config import *
+from config import (
+    FILE_PATH_NQ11,
+    COT_DNO_NQ11, COT_NQ11_NO_TH, COT_NQ11_NO_QH,
+    COT_NQ11_SO_TIEN, COT_NQ11_DU_NO, COT_NQ11_SO_TIEN_GN,
+    COT_NQ11_MA_KH, COT_NQ11_TEN_KH,
+    COT_NQ11_DEN_HAN_SC, COT_NQ11_NGAY_BC,
+    COT_TEN_CT, COT_TEN_XA, COT_TEN_THON,
+    COT_SDT, COT_SO_KU,
+)
 from utils import fmt_ty, xuat_excel, ten_file_xuat, hien_thi_dataframe_phan_trang
 from data import ts_file
 from state_manager import SCMStateManager

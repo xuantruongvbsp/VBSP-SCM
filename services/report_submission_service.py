@@ -46,6 +46,7 @@ LABEL = {"dung_han": "Đúng hạn", "tre": "Trễ hạn", "chua_nop": "Chưa n�
 # KV keys
 KV_DEADLINE = "bao_cao_deadline_config"
 KV_MANUAL = "manual_nop_tdn"
+KV_MANUAL_AUDIT = "manual_nop_tdn_audit"
 KV_ALLOWLIST = "telegram_deadline_bc_allowlist"
 KV_ARCHIVE = "bao_cao_archive_config"
 
@@ -792,6 +793,113 @@ def luu_manual_log(ds: list[dict], username: str) -> None:
     """Lưu danh sách đánh dấu thủ công vào kv_store."""
     db.ghi_kv(KV_MANUAL, ds, username)
     db.ghi_audit(username, "tdn_manual_submit", f"{len(ds)} đánh dấu thủ công")
+
+
+def doc_manual_audit_log() -> list[dict]:
+    """Đọc nhật ký thao tác override thủ công."""
+    raw = db.doc_kv(KV_MANUAL_AUDIT)
+    if isinstance(raw, list):
+        return raw
+    return []
+
+
+def _manual_entry_key(entry: dict[str, Any]) -> tuple[str, str]:
+    return (
+        str(entry.get("pgd", "") or "").strip(),
+        _chuan_hoa_ten_loai(str(entry.get("loai", "") or "")),
+    )
+
+
+def _append_manual_audit(
+    hanh_dong: str,
+    entry: dict[str, Any],
+    username: str,
+    ly_do: str = "",
+) -> None:
+    """Ghi 1 dòng audit chi tiết cho thao tác manual override."""
+    now = datetime.now().isoformat()
+    ds_audit = doc_manual_audit_log()
+    audit_entry = {
+        "hanh_dong": hanh_dong,
+        "pgd": entry.get("pgd", ""),
+        "loai": entry.get("loai", ""),
+        "ngay_nop": entry.get("ngay_nop", ""),
+        "ghi_chu": entry.get("ghi_chu", ""),
+        "ghi_de": bool(entry.get("ghi_de", True)),
+        "ly_do": ly_do or entry.get("ghi_chu", "") or hanh_dong,
+        "username": username,
+        "thoi_gian": now,
+    }
+    ds_audit.append(audit_entry)
+    db.ghi_kv(KV_MANUAL_AUDIT, ds_audit, username)
+    db.ghi_audit(
+        username,
+        f"tdn_manual_{hanh_dong}",
+        f"{audit_entry['pgd']} — {audit_entry['loai']} — {audit_entry['ly_do']}",
+    )
+
+
+def luu_manual_override(
+    entry: dict[str, Any],
+    username: str,
+    ds_hien_tai: list[dict] | None = None,
+    ly_do: str = "",
+) -> list[dict]:
+    """Thêm/cập nhật một override thủ công và ghi nhật ký chi tiết."""
+    if ds_hien_tai is None:
+        ds_hien_tai = doc_manual_log_raw()
+
+    key = _manual_entry_key(entry)
+    old_entry = next((e for e in ds_hien_tai if _manual_entry_key(e) == key), None)
+    ds_moi = [e for e in ds_hien_tai if _manual_entry_key(e) != key]
+
+    now = datetime.now().isoformat()
+    entry_moi = dict(entry)
+    if old_entry:
+        entry_moi.setdefault("username_tao", old_entry.get("username_tao", username))
+        entry_moi.setdefault("tao_luc", old_entry.get("tao_luc", now))
+        hanh_dong = "cap_nhat"
+    else:
+        entry_moi.setdefault("username_tao", username)
+        entry_moi.setdefault("tao_luc", now)
+        hanh_dong = "them"
+    entry_moi["username_cap_nhat"] = username
+    entry_moi["cap_nhat_luc"] = now
+    entry_moi["ly_do"] = ly_do or entry_moi.get("ghi_chu", "") or "Đánh dấu thủ công"
+
+    ds_moi.append(entry_moi)
+    db.ghi_kv(KV_MANUAL, ds_moi, username)
+    db.ghi_audit(
+        username,
+        "tdn_manual_submit",
+        f"{hanh_dong}: {entry_moi.get('pgd', '')} — {entry_moi.get('loai', '')}",
+    )
+    _append_manual_audit(hanh_dong, entry_moi, username, entry_moi["ly_do"])
+    return ds_moi
+
+
+def xoa_manual_override(
+    index: int,
+    username: str,
+    ds_hien_tai: list[dict] | None = None,
+    ly_do: str = "Bỏ đánh dấu thủ công",
+) -> list[dict]:
+    """Xóa một override thủ công theo index hiển thị và ghi nhật ký chi tiết."""
+    if ds_hien_tai is None:
+        ds_hien_tai = doc_manual_log_raw()
+    if index < 0 or index >= len(ds_hien_tai):
+        raise IndexError("Index đánh dấu thủ công không hợp lệ.")
+
+    ds_moi = list(ds_hien_tai)
+    entry = ds_moi.pop(index)
+    db.ghi_kv(KV_MANUAL, ds_moi, username)
+    db.ghi_audit(
+        username,
+        "tdn_manual_delete",
+        f"{entry.get('pgd', '')} — {entry.get('loai', '')}",
+    )
+    _append_manual_audit("xoa", entry, username, ly_do)
+    return ds_moi
 
 
 # ── Tổng hợp nghiệp vụ ───────────────────────────────────────────────────────

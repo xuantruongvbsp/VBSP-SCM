@@ -14,42 +14,34 @@
 
 ### 1.1 Môi trường Python — BẮT BUỘC
 
-- **Chỉ dùng:** `D:\VBSP-SCM\venv\Scripts\python.exe` (Python 3.12).
-- **Không dùng / không probe / không tạo lại:** `D:\VBSP-SCM\.venv`.
-- Nếu thấy thư mục `.venv*` thì coi là môi trường cũ hoặc đã vô hiệu hóa; bỏ qua hoàn toàn.
-- Không chạy `python` trần, không chạy `.venv\Scripts\python.exe`, không tạo `python -m venv .venv`.
-- Khi cần compile/import/test, dùng rõ:
-  - `venv\Scripts\python.exe -c "import py_compile; py_compile.compile('file.py', doraise=True); print('OK')"`
-  - `venv\Scripts\python.exe -m pytest ...`
-- Nếu thiếu môi trường, chạy `setup_env.bat`; script này tạo/cài lại `venv`, không tạo `.venv`.
+- **Chỉ dùng:** `D:\VBSP-SCM\venv\Scripts\python.exe` (Python 3.12)
+- **KHÔNG dùng:** `D:\VBSP-SCM\.venv` (môi trường cũ Python 3.14)
+- Compile: `venv\Scripts\python.exe -c "import py_compile; py_compile.compile('file.py', doraise=True); print('OK')"`
+- Thiếu môi trường → chạy `setup_env.bat`
 
 ---
 
 ## 2. Cấu trúc thư mục
 
 ```
-app.py              ← entry point, routing, session
-auth.py             ← RBAC, normalize_role(), la_phan_he_*()
-config.py           ← MỌI hằng số: COT_*, DS_PGD, ROLE, TAG_MAP...
-db.py               ← kv_store, audit_log, get_conn()
-utils.py            ← fmt(), fmt_ty(), get_tab_context()
-data/               ← core.py, hstd.py, pgd.py, khtd.py
-components/         ← delta_card.py, export_pdf.py, filter_bar.py, loan_drawer.py, movers.py
-services/           ← upload_service.py, report_service.py, khtd_service.py, kiem_soat_service.py
-tabs/tab_*.py       ← mỗi file = 1 tab UI
-workspaces/         ← ws_executive.py (BGĐ), ws_management.py (KH-NV), ws_operation.py (PGD)
-cache/              ← parquet (không commit)
-pgd_data/           ← file upload PGD (không commit)
+app.py          ← entry point, routing, session
+auth.py         ← RBAC, normalize_role(), la_phan_he_*()
+config.py       ← MỌI hằng số: COT_*, DS_PGD, ROLE, TAG_MAP...
+db.py           ← kv_store, audit_log, get_conn()
+utils.py        ← fmt(), fmt_ty(), get_tab_context()
+data/           ← core.py, hstd.py, pgd.py, khtd.py
+components/     ← delta_card.py, export_pdf.py, filter_bar.py, loan_drawer.py, movers.py
+services/       ← upload_service.py, report_service.py, khtd_service.py, kiem_soat_service.py
+tabs/tab_*.py   ← mỗi file = 1 tab UI
+workspaces/     ← ws_executive.py (BGĐ), ws_management.py (KH-NV), ws_operation.py (PGD)
+cache/          ← parquet (không commit)
+pgd_data/       ← file upload PGD (không commit)
 ```
 
 ---
 
 ## 2.1 Bản đồ file — xem CODE_INDEX.md
-Chi tiết map chức năng → file → hàm trong `CODE_INDEX.md`. Các file quan trọng nhất:
-- Upload/Merge: `services/upload_service.py` (`luu_pgd_file`, `merge_du_lieu_toan_cn`)
-- Đọc dữ liệu: `data/hstd.py`, `data/pgd.py`, `data/core.py`
-- Workspaces: `ws_executive.py` (BGĐ), `ws_management.py` (KH-NV), `ws_operation.py` (PGD)
-- Tabs: `tabs/tab_*.py` (mỗi file = 1 tab UI)
+Chi tiết map chức năng → file → hàm trong `CODE_INDEX.md`. File quan trọng: `upload_service.py`, `data/hstd.py`, `data/pgd.py`, `ws_*.py`, `tabs/tab_*.py`.
 
 ---
 
@@ -64,14 +56,9 @@ Chi tiết map chức năng → file → hàm trong `CODE_INDEX.md`. Các file q
 ---
 
 ## 3. Quy trình bắt buộc khi viết code
-
 ```
-Bước 0: ĐỌC BUGMAP.md — kiểm tra lỗi liên quan
-Bước 1: ĐỌC hàm gốc trước khi gọi — KHÔNG đoán tham số
-Bước 2: Dùng COT_* từ config.py — KHÔNG hardcode tên cột tiếng Việt
-Bước 3: Sau khi tạo hàm mới → grep xem có được gọi chưa
-Bước 4: Compile check: venv\Scripts\python.exe -c "import py_compile; py_compile.compile('file.py', doraise=True); print('OK')"
-Bước 5: Import check (nếu tạo component mới): venv\Scripts\python.exe -c "from components.xxx import yyy; print('OK')"
+Bước 0: ĐỌC BUGMAP.md  Bước 1: ĐỌC hàm gốc  Bước 2: Dùng COT_*
+Bước 3: Grep hàm mới  Bước 4: Compile check  Bước 5: Import check
 ```
 
 ---
@@ -103,7 +90,7 @@ db.ghi_kv("key", value, username)   # ghi
 ```
 **KHÔNG** dùng `json.dump()`, `open(file,'w')`, `session_state` để persist.
 
-**Key chuẩn:** Xem đầy đủ trong `CODE_INDEX.md` (section Core). Các key thường dùng: `khtd_cn`, `khtd_pgd_{slug}`, `merge_meta_{loai}`, `kehoach`, `dgd_map`, `khnv_phan_cong_list`, `bao_cao_deadline_config`.
+**Key chuẩn:** Xem trong `CODE_INDEX.md`. Các key thường dùng: `khtd_cn`, `khtd_pgd_{slug}`, `merge_meta_{loai}`, `kehoach`, `dgd_map`, `khnv_phan_cong_list`, `bao_cao_deadline_config`.
 
 `slug` = `pgd_slug(ten_pgd)` từ `data/pgd.py`
 
@@ -113,38 +100,23 @@ username = st.session_state.get("username", "unknown")
 db.ghi_kv(key, value, username)
 db.ghi_audit(username, "ten_action", "mô tả cụ thể")  # NGAY SAU
 ```
-Action chuẩn: `luu_khtd_cn`, `luu_khtd_pgd`, `upload_hstd`, `upload_nq11`,
-`upload_gqvl`, `upload_dienbao`, `merge_hstd`, `merge_nq11`, `merge_gqvl`,
-`luu_no_rui_ro`, `xuat_bieu_cn`, `xuat_01xln`, `xuat_02xln`
 
 ### 6.3 Upload — LUÔN qua upload_service.py
 ```python
 from services.upload_service import luu_pgd_file, luu_file_he_thong, KetQuaUpload
-ket_qua = luu_pgd_file(ten_pgd, loai, file_bytes)  # 3 tham số, không có username
+ket_qua = luu_pgd_file(ten_pgd, loai, file_bytes)  # 3 tham số
 ket_qua.hien_thi()
-st.cache_data.clear()  # BẮT BUỘC sau upload thành công
+st.cache_data.clear()  # BẮT BUỘC sau upload
 ```
 
 ### 6.4 Tiền tệ — 3 lớp
 | Lớp | Đơn vị | Xử lý |
 |---|---|---|
 | Nhập | Triệu đồng | `number_input` |
-| Lưu | VND (×1_000_000) | kv_store / DataFrame |
-| Hiển thị | `fmt_ty()` | từ utils.py |
+| Lưu | VND (×1_000_000) | kv_store/DataFrame |
+| Hiển thị | `fmt_ty()` | triệu đồng, 0 số lẻ, header "(triệu đồng)" |
 
-```python
-fmt_ty(x)   # → "1.500" (triệu đồng, 0 số lẻ, KHÔNG có hậu tố "tỷ")
-            # Cột bảng phải ghi header "(triệu đồng)"
-# KHÔNG dùng NumberColumn cho cột tiền tệ → .apply(fmt_ty) trước st.dataframe()
-# KHÔNG dùng /1e9 hay /1e12 trực tiếp
-```
-
-**NumberColumn dùng d3-format:**
-```python
-st.column_config.NumberColumn(format=",.0f")   # ✅ số nguyên
-st.column_config.NumberColumn(format=".2%")    # ✅ phần trăm
-# ❌ SAI: format="%.0f", format="%d", format="%.2f%%"
-```
+**NumberColumn:** `format=",.0f"` (số nguyên), `format=".2%"` (phần trăm). **KHÔNG** dùng `%.0f`, `%.2f%%`.
 
 ### 6.5 Phân quyền — KHÔNG check chuỗi thô
 ```python
@@ -167,7 +139,6 @@ if la_phan_he_pgd(role): ...  # admin_pgd/manager_pgd/user_pgd/user
 ```python
 key_prefix = f"pgd_{pgd_slug(pgd_user)}_"  # hoặc "cn_"
 st.selectbox(..., key=f"{key_prefix}filter")
-# KHÔNG dùng index loop làm key
 ```
 
 ### 6.7 render() — fallback khi tab=None
@@ -188,10 +159,10 @@ logger = get_logger(__name__)
 try: ...
 except Exception as e:
     logger.error("ten_ham: mo_ta — %s", e, exc_info=True)
-# KHÔNG: except Exception: pass
 ```
+**KHÔNG** `except Exception: pass` hoặc `print(e)`.
 
-### 6.10 Tên đơn vị — dùng constant
+### 6.9 Tên đơn vị — dùng constant
 ```python
 from config import DON_VI_CHI_NHANH, TEN_CHI_NHANH_HIEN_THI
 ```
@@ -199,21 +170,16 @@ from config import DON_VI_CHI_NHANH, TEN_CHI_NHANH_HIEN_THI
 
 ### 6.10 Git — TUYỆT ĐỐI không tự commit/push
 - Sửa tại `D:/VBSP-SCM` (worktree gốc, branch main)
-- KHÔNG tự `git add`, `git commit`, `git push`
-- Người dùng tự commit qua GitHub Desktop
+- **KHÔNG** tự `git add`, `git commit`, `git push` — user tự commit qua GitHub Desktop
 
 ### 6.11 Không thêm dependency mới
-Đã có: `pandas`, `openpyxl`, `pyarrow`, `streamlit`, `duckdb`,
-`python-docx`, `docx2pdf`, `concurrent.futures`, `threading`
+Đã có: `pandas`, `openpyxl`, `pyarrow`, `streamlit`, `duckdb`, `python-docx`, `docx2pdf`, `concurrent.futures`, `threading`
 
-### 6.13 CHANGELOG.md — cập nhật sau mỗi lần sửa
+### 6.12 CHANGELOG.md — cập nhật sau mỗi lần sửa
 Thêm lên ĐẦU FILE: `## [YYYY-MM-DD] — mô tả ngắn` + list file thay đổi. Dùng ngày thực tế, KHÔNG xóa entry cũ.
 
 ### 6.13 BUGMAP.md — cập nhật sau mỗi lần fix bug
-- **BẮT BUỘC**: Mỗi khi fix bug, thêm entry mới vào BUGMAP.md theo template có sẵn (cuối file)
-- Phân loại đúng section (A. Parquet, B. Streamlit UI, C. DataFrame, D. Database, E. Upload, F. PDF/Word, G. KHTD, H. GSheet, I. Role, J. Code Pattern)
-- Nếu là dạng lỗi mới chưa có section phù hợp → tạo section mới
-- Format: `### XX — [Tên lỗi]` với bảng `| | |` gồm: File, Dấu hiệu, Nguyên nhân, Fix, Ngày fix
+**BẮT BUỘC**: Thêm entry vào `BUGMAP.md` theo template (cuối file). Phân loại đúng section (A-J). Format: `### XX — [Tên lỗi]` với bảng File/Dấu hiệu/Nguyên nhân/Fix/Ngày fix.
 
 ### 6.14 pgd_mode — pattern song song 2 phân hệ
 ```python
@@ -226,25 +192,20 @@ else:
     key = "kehoach"
 ```
 
-### 6.16 CSS & UI
+### 6.15 CSS & UI
 - Inject CSS 1 lần trong `app.py`
 - Bảng ≥ 8 cột → HTML + `st.html()` hoặc `st.markdown(unsafe_allow_html=True)`
 - **KHÔNG** hardcode `color:black`/`background:white` (dùng CSS variable cho dark mode)
 - `st.date_input` bắt buộc `format="DD/MM/YYYY"`
 - Màu sắc → xem `docs/UI_GUIDELINES.md`
 
-### 6.16 DuckDB — LUÔN kiểm tra schema trước khi query
+### 6.16 DuckDB — kiểm tra schema trước khi query
 ```python
-import duckdb, pyarrow.parquet as pq
-
-# PHẢI kiểm tra schema trước
 schema = pq.read_schema(CACHE_HSTD)
 cols = [f.name for f in schema]
 if "Ten_ct" not in cols:
     st.warning("⚠️ Parquet thiếu cột Ten_ct")
     return
-
-# Sau đó mới query
 df = duckdb.query(f"SELECT ... FROM '{CACHE_HSTD}'").df()
 ```
 
@@ -271,14 +232,7 @@ tong = df_num.groupby("PGD")["Tổng dư nợ"].sum()
 ---
 
 ## 7. Lỗi đã từng mắc — xem BUGMAP.md
-Chi tiết trong `BUGMAP.md`. Các lỗi phổ biến:
-- `kpi_row(num_columns=4)` không phải `cols=4`
-- `download_pdf_button(pdf_bytes=...)` nhận PDF bytes
-- `loan_detail_drawer(row: pd.Series)` nhận row
-- `luu_pgd_file(ten_pgd, loai, file_bytes)` — 3 tham số
-- Dùng `COT_SDT` không phải `COT_DIEN_THOAI`; `COT_TEN_TO` không phải `COT_TEN_TKVV`
-- `pd.to_numeric()` trước groupby.sum()
-- `nunique()` để đếm unique, không dùng `ngroups`
+Chi tiết trong `BUGMAP.md`. Các lỗi phổ biến: `kpi_row(num_columns=4)`, `download_pdf_button(pdf_bytes=...)`, `loan_detail_drawer(row: pd.Series)`, `luu_pgd_file(3 tham số)`, `COT_SDT` không phải `COT_DIEN_THOAI`, `pd.to_numeric()` trước groupby, `nunique()` không dùng `ngroups`.
 
 ---
 
@@ -304,11 +258,11 @@ Chi tiết trong `BUGMAP.md`. Các lỗi phổ biến:
 ## 9. Tài liệu tham chiếu
 | File | Đọc khi |
 |---|---|
-| `DELTA.md` | **ĐẦU MỖI PHIÊN** — thay đổi gần đây |
-| `CLAUDE.md` | Convention đầy đủ |
+| `DELTA.md` | **ĐẦU MỖI PHIÊN** |
+| `CLAUDE.md` | Convention |
 | `BUGMAP.md` | Gặp lỗi |
 | `CODE_INDEX.md` | Map chức năng → file |
 | `COT_REF.md` | Tên cột COT_* |
 | `SIGNATURES.md` | Function signatures |
 | `docs/ARCHITECTURE.md` | Quan hệ import |
-| `CHANGELOG.md` | Lịch sử thay đổi |
+| `CHANGELOG.md` | Lịch sử |

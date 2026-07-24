@@ -231,6 +231,92 @@ class TestBaoCaoDieuHanh:
         assert bao_cao["df_chua_hoan_thanh"].iloc[0]["Mã trạng thái"] == "thieu_file"
 
 
+class TestManualOverrideAudit:
+    def test_luu_manual_override_tao_metadata_va_audit(self, mock_kv):
+        ds = svc.luu_manual_override(
+            {
+                "pgd": "PGD A",
+                "loai": "BC tháng",
+                "ngay_nop": "2026-07-20",
+                "ghi_chu": "Nộp qua email",
+                "ghi_de": True,
+            },
+            "admin_test",
+            ly_do="Nộp qua email",
+        )
+
+        assert len(ds) == 1
+        entry = mock_kv[svc.KV_MANUAL][0]
+        assert entry["username_tao"] == "admin_test"
+        assert entry["username_cap_nhat"] == "admin_test"
+        assert entry["ly_do"] == "Nộp qua email"
+
+        audit = mock_kv[svc.KV_MANUAL_AUDIT]
+        assert len(audit) == 1
+        assert audit[0]["hanh_dong"] == "them"
+        assert audit[0]["pgd"] == "PGD A"
+        assert audit[0]["loai"] == "BC tháng"
+        assert audit[0]["username"] == "admin_test"
+
+    def test_luu_manual_override_cap_nhat_giu_nguoi_tao_ban_dau(self, mock_kv):
+        mock_kv[svc.KV_MANUAL] = [
+            {
+                "pgd": "PGD A",
+                "loai": "BC tháng",
+                "ngay_nop": "2026-07-20",
+                "ghi_chu": "Cũ",
+                "ghi_de": True,
+                "username_tao": "admin_cu",
+                "tao_luc": "2026-07-20T08:00:00",
+            }
+        ]
+
+        svc.luu_manual_override(
+            {
+                "pgd": "PGD A",
+                "loai": "BC tháng",
+                "ngay_nop": "2026-07-21",
+                "ghi_chu": "Cập nhật file bổ sung",
+                "ghi_de": False,
+            },
+            "admin_moi",
+            mock_kv[svc.KV_MANUAL],
+            ly_do="Cập nhật file bổ sung",
+        )
+
+        entry = mock_kv[svc.KV_MANUAL][0]
+        assert entry["username_tao"] == "admin_cu"
+        assert entry["username_cap_nhat"] == "admin_moi"
+        assert entry["ngay_nop"] == "2026-07-21"
+        assert entry["ghi_de"] is False
+        assert mock_kv[svc.KV_MANUAL_AUDIT][0]["hanh_dong"] == "cap_nhat"
+
+    def test_xoa_manual_override_van_luu_audit_chi_tiet(self, mock_kv):
+        mock_kv[svc.KV_MANUAL] = [
+            {
+                "pgd": "PGD A",
+                "loai": "BC tháng",
+                "ngay_nop": "2026-07-20",
+                "ghi_chu": "Nộp qua email",
+                "ghi_de": True,
+            }
+        ]
+
+        ds = svc.xoa_manual_override(
+            0,
+            "admin_test",
+            mock_kv[svc.KV_MANUAL],
+            ly_do="PGD đã nộp qua Form",
+        )
+
+        assert ds == []
+        assert mock_kv[svc.KV_MANUAL] == []
+        audit = mock_kv[svc.KV_MANUAL_AUDIT][0]
+        assert audit["hanh_dong"] == "xoa"
+        assert audit["pgd"] == "PGD A"
+        assert audit["ly_do"] == "PGD đã nộp qua Form"
+
+
 class TestLuuTruBaoCao:
     def test_luu_tru_giu_du_lieu_gsheet_va_go_deadline(self, mock_kv):
         mock_kv[svc.KV_DEADLINE] = {"BC tháng 6": "2026-07-15"}

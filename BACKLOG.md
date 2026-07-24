@@ -4,15 +4,15 @@ Ghi lại các yêu cầu/user feedback của người dùng để tiện theo d
 
 ## 🚧 Ưu tiên tiếp theo — 2026-07-03 (Báo cáo từ Phòng giao dịch)
 
-- [ ] Chốt phạm vi đợt 1 chỉ cho luồng `PGD nộp báo cáo về Chi nhánh`, chưa mở rộng sang các tab `PGD tự xuất báo cáo nghiệp vụ`
-- [ ] Tạo `services/report_submission_service.py` để gom logic đọc GSheet, deadline, override và phân loại trạng thái về một đầu mối
-- [ ] Refactor `tabs/tab_tien_do_nop.py` sang gọi service chung, giảm logic xử lý trực tiếp trong tab
-- [ ] Refactor `scripts/nhac_deadline.py` dùng chung service với UI để tránh lệch trạng thái nhắc hạn
-- [ ] Thêm health-check nguồn Google Sheets: credentials, kết nối, dữ liệu rỗng bất thường, lần cập nhật gần nhất
+- [x] Chốt phạm vi đợt 1 chỉ cho luồng `PGD nộp báo cáo về Chi nhánh`, chưa mở rộng sang các tab `PGD tự xuất báo cáo nghiệp vụ`
+- [x] Tạo `services/report_submission_service.py` để gom logic đọc GSheet, deadline, override và phân loại trạng thái về một đầu mối
+- [x] Refactor `tabs/tab_tien_do_nop.py` sang gọi service chung, giảm logic xử lý trực tiếp trong tab
+- [x] Refactor `scripts/nhac_deadline.py` dùng chung service với UI để tránh lệch trạng thái nhắc hạn
+- [x] Thêm health-check nguồn Google Sheets: credentials, kết nối, dữ liệu rỗng bất thường, lần cập nhật gần nhất
 - [x] Chuẩn hóa quản lý danh mục báo cáo, deadline và chống stale config cho `allowlist` Telegram
-- [ ] Bổ sung log/nhật ký đầy đủ cho thao tác override thủ công: ai sửa, lúc nào, vì lý do gì
-- [ ] Thêm dashboard điều hành tại `Tiến độ nộp BC`: KPI đúng hạn/trễ/chưa nộp, top PGD trễ, top loại báo cáo quá hạn
-- [ ] Chuẩn hóa export Excel/PDF dùng cùng nguồn dữ liệu đã xử lý
+- [x] Bổ sung log/nhật ký đầy đủ cho thao tác override thủ công: ai sửa, lúc nào, vì lý do gì
+- [x] Thêm dashboard điều hành tại `Tiến độ nộp BC`: KPI đúng hạn/trễ/chưa nộp, top PGD trễ, top loại báo cáo quá hạn
+- [x] Chuẩn hóa export Excel/PDF dùng cùng nguồn dữ liệu đã xử lý
 - [x] Bổ sung test/regression cho rule trạng thái báo cáo PGD và danh sách cần nhắc Telegram
 
 Tham chiếu chi tiết: `KE_HOACH_BAO_CAO_PGD.md`

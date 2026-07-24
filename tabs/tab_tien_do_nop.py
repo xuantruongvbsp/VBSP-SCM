@@ -17,6 +17,7 @@ import db
 from auth import la_phan_he_cn, normalize_role
 from config import DS_PGD, DON_VI_CHI_NHANH
 from tabs.base_tab import TabContext
+from tabs.tab_tien_do_nop_manual import render_manual_override
 from utils import xuat_excel
 
 # ── Import từ service lõi (single source of truth) ──
@@ -40,9 +41,6 @@ from services.report_submission_service import (
     luu_tru_loai_bao_cao,
     phan_loai_trang_thai,
     gan_trang_thai,
-    doc_manual_log,
-    doc_manual_log_raw,
-    luu_manual_log,
     lay_pgd_chua_nop,
     kiem_tra_suc_khoe_nguon,
     kiem_tra_ket_noi_gsheet,
@@ -424,17 +422,13 @@ def _render_tong_quan(
         col_btn, _ = st.columns([1, 5])
         with col_btn:
             if st.button("✅ Đánh dấu", key="man_btn", type="primary", use_container_width=True):
-                ds_moi = [e for e in manual_ds if not (e.get("pgd") == pgd_manual and e.get("loai") == loai_manual)]
-                ds_moi.append({
+                luu_manual_override({
                     "pgd": pgd_manual,
                     "loai": loai_manual,
                     "ngay_nop": ngay_manual.strftime("%Y-%m-%d"),
                     "ghi_chu": ghi_chu_manual.strip(),
                     "ghi_de": ghi_de_manual,
-                    "username_tao": username,
-                    "tao_luc": pd.Timestamp.now().isoformat(),
-                })
-                luu_manual_log(ds_moi, username)
+                }, username, manual_ds, ly_do=ghi_chu_manual.strip() or "Đánh dấu thủ công từ UI")
                 st.success(f"✅ Đã đánh dấu: **{pgd_manual}** — **{loai_manual}**")
                 st.rerun()
 
@@ -456,10 +450,16 @@ def _render_tong_quan(
                 e_ngay = entry.get("ngay_nop", "?")
                 e_note = entry.get("ghi_chu", "")
                 e_gde  = entry.get("ghi_de", True)
+                e_user = entry.get("username_cap_nhat") or entry.get("username_tao") or "?"
+                e_luc = entry.get("cap_nhat_luc") or entry.get("tao_luc") or ""
                 try:
                     e_ngay_str = pd.to_datetime(e_ngay).strftime("%d/%m/%Y")
                 except Exception:
                     e_ngay_str = str(e_ngay)
+                try:
+                    e_luc_str = pd.to_datetime(e_luc).strftime("%d/%m/%Y %H:%M") if e_luc else "—"
+                except Exception:
+                    e_luc_str = str(e_luc or "—")
                 loai_str = "* ghi đè" if e_gde else "📝 ghi chú"
                 c1, c2, c3, c4 = st.columns([2, 2, 3, 1])
                 with c1:
@@ -468,10 +468,10 @@ def _render_tong_quan(
                     st.write(f"{e_loai} — {e_ngay_str} ({loai_str})")
                 with c3:
                     st.write(e_note if e_note else "—")
+                    st.caption(f"{e_user} · {e_luc_str}")
                 with c4:
                     if st.button("↩️ Bỏ", key=f"man_del_{i}", use_container_width=True):
-                        ds_moi = [e for j, e in enumerate(manual_ds) if j != i]
-                        luu_manual_log(ds_moi, username)
+                        xoa_manual_override(i, username, manual_ds, ly_do="Bỏ đánh dấu từ UI")
                         st.success(f"✅ Đã bỏ: **{e_pgd}** — **{e_loai}**")
                         st.rerun()
 

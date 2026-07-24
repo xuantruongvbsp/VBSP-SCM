@@ -1,5 +1,14 @@
 # CHANGELOG
 
+## [2026-07-25] — Hoàn thiện audit override thủ công báo cáo PGD
+- `services/report_submission_service.py` dòng ~43/~792 — thêm `manual_nop_tdn_audit` và helper `luu_manual_override()` / `xoa_manual_override()` để ghi rõ thao tác thêm/cập nhật/xóa override: PGD, loại báo cáo, ngày nộp, ghi chú, người thao tác, thời điểm và lý do
+- `tabs/tab_tien_do_nop.py` dòng ~43/~425 — nút `Đánh dấu` và `Bỏ` dùng service audit mới; danh sách override hiển thị người và thời điểm cập nhật gần nhất
+- `tests/test_report_submission_service.py` dòng ~226 — thêm 3 regression test cho thêm/cập nhật/xóa manual override và audit trail
+- `BACKLOG.md` — đánh dấu hoàn thành nhóm P0 báo cáo PGD theo hiện trạng service/UI/scheduler đã dùng chung logic
+
+## [2026-07-24] — Cắt rules.md xuống dưới 10,000 ký tự (theo khuyến nghị Trae)
+- `.trae/rules/rules.md` — cắt từ 18,296 → 9,611 ký tự (-47%): rút gọn section 6.4 (Tiền tệ), 6.13 (BUGMAP), 2.1 (Bản đồ file), 3 (Quy trình), 2 (Cấu trúc thư mục); xóa section 6.3 (Upload) bị thiếu; sửa numbering 6.18 trùng
+
 ## [2026-07-24] — Dọn trùng lặp documentation
 - `.trae/rules/rules.md` — xóa section 6.6 trùng section 4 (Tên cột — dùng COT_*) và renumber các heading 6.x phía sau
 - `docs/AGENTS.md` — xóa file cũ (302 dòng, 22/05/2026), root `AGENTS.md` là bản chính

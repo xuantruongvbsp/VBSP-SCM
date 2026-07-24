@@ -1,3 +1,4 @@
+"""Base tab context — TabContext class dùng chung cho mọi tab render."""
 from __future__ import annotations
 
 from typing import Any, Optional

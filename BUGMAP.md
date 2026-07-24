@@ -2841,6 +2841,18 @@ def _to_int(val, default=0):
 
 ---
 
+### J63 — Automation checker báo sai với widget multiline và gen index còn SyntaxWarning
+| | |
+|---|---|
+| **File** | `scripts/gen_code_index.py`, `scripts/check_conventions.py` |
+| **Dấu hiệu** | Chạy `scripts/gen_code_index.py` vẫn in `SyntaxWarning: invalid escape sequence '\V'`; Rule 12 báo widget thiếu `key=` dù `key=` có ở dòng thứ 6 của lời gọi multiline |
+| **Nguyên nhân** | `ast.parse()` trong generator phát warning từ docstring escape cũ của file được quét; checker chỉ nhìn cố định 5 dòng sau dòng widget nên bỏ sót `key=` trong lời gọi dài, đồng thời có thể bị dòng sau đánh lừa với widget một dòng |
+| **Fix** | Parse module trong `warnings.catch_warnings()` để index không nhiễu warning; thêm `_widget_call_has_key()` dò theo cân bằng ngoặc của lời gọi widget |
+| **Test** | `venv\Scripts\python.exe -m py_compile scripts\gen_code_index.py scripts\check_conventions.py`; `venv\Scripts\python.exe scripts\gen_code_index.py`; `venv\Scripts\python.exe scripts\check_conventions.py tabs\tab_tien_do.py tabs\tab_checklist_bc.py tabs\base_tab.py`; smoke `_widget_call_has_key()` cho case một dòng thiếu key và multiline có key |
+| **Ngày fix** | 2026-07-25 |
+
+---
+
 Mỗi khi fix bug, copy template dưới đây và điền vào đúng mục:
 
 ```

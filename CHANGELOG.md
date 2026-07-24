@@ -1,5 +1,29 @@
 # CHANGELOG
 
+## [2026-07-25] — Tách UI danh sách nộp khỏi tab Tiến độ nộp BC
+- `tabs/tab_tien_do_nop_list.py` — tạo mới module render tab `Danh sách nộp`, gồm lọc lượt nộp Google Form, kiểm soát nghĩa vụ theo deadline và export Excel/PDF
+- `tabs/tab_tien_do_nop.py` dòng ~18/~563 — thay hàm `_render_danh_sach()` bằng `render_submission_list(...)`, tiếp tục rút gọn tab chính về vai trò điều phối
+- `tests/test_smoke_imports.py` dòng ~92 — thêm smoke import cho module list mới
+
+## [2026-07-25] — Review gen_code_index và convention checker
+- `scripts/gen_code_index.py` — bỏ `SyntaxWarning` phát sinh từ docstring escape cũ trong các file được AST parse khi sinh `CODE_INDEX.md`
+- `scripts/check_conventions.py` — sửa Rule 11 bắt wildcard import có thụt dòng; sửa Rule 12 dò `key=` theo toàn bộ lời gọi widget multiline, tránh false positive khi `key=` nằm ngoài 5 dòng đầu và tránh false negative với widget một dòng
+- `CODE_INDEX.md` — sinh lại sau khi vá generator, giữ 22.900 ký tự / 229 dòng
+- `BUGMAP.md` — thêm J63 cho lỗi warning/false positive của automation checker
+
+## [2026-07-25] — Tự động hóa: gen_code_index + mở rộng convention checker + docstring
+- `scripts/gen_code_index.py` — tạo mới, tự sinh CODE_INDEX.md từ AST (quét hàm public + docstring); fix SyntaxWarning `\V` trong docstring
+- `CODE_INDEX.md` — sinh lại tự động (22900 ký tự, 229 dòng)
+- `scripts/check_conventions.py` — thêm rule 11 (wildcard `from config import *`), rule 12 (widget thiếu `key=` trong tabs/); fix bug `is_tab_file` NameError (di chuyển lên trước vòng lặp); thêm skip `.venv*` dirs
+- `tabs/tab_tien_do.py` — thêm module docstring
+- `tabs/tab_checklist_bc.py` — thêm module docstring
+- `tabs/base_tab.py` — thêm module docstring
+
+## [2026-07-25] — Tách UI cài đặt thời hạn khỏi tab Tiến độ nộp BC
+- `tabs/tab_tien_do_nop_settings.py` — tạo mới module render tab `Cài đặt thời hạn`, gồm cảnh báo lệch tên Form, thêm/sửa/ngưng deadline, lưu trữ báo cáo và dọn deadline cũ
+- `tabs/tab_tien_do_nop.py` dòng ~20/~785 — thay khối `_render_cai_dat()` bằng `render_settings(...)`, dọn các import service settings không còn dùng trong tab chính
+- `tests/test_smoke_imports.py` dòng ~93 — thêm smoke import cho module settings mới
+
 ## [2026-07-25] — Tách UI lưu trữ khỏi tab Tiến độ nộp BC
 - `tabs/tab_tien_do_nop_archive.py` — tạo mới module render tab `Đã lưu trữ`, gồm xem lịch sử nộp, xuất Excel và khôi phục loại báo cáo đã lưu trữ
 - `tabs/tab_tien_do_nop.py` dòng ~20/~1192 — thay hàm `_render_luu_tru()` bằng `render_archive(...)`, tiếp tục giảm trách nhiệm UI chi tiết trong tab chính

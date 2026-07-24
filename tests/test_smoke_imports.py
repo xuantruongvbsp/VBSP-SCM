@@ -89,7 +89,9 @@ WORKSPACE_MODULES: list[str] = [
 
 SERVICE_MODULES: list[str] = [
     "tabs.tab_tien_do_nop_archive",
+    "tabs.tab_tien_do_nop_list",
     "tabs.tab_tien_do_nop_manual",
+    "tabs.tab_tien_do_nop_settings",
     "services.upload_service",
     "services.uy_thac_service",
     "services.tien_do_service",

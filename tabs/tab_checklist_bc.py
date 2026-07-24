@@ -1,3 +1,4 @@
+"""Tab Checklist Báo cáo — Quản lý checklist kiểm soát báo cáo định kỳ."""
 import streamlit as st
 import pandas as pd
 from datetime import datetime, date, timedelta

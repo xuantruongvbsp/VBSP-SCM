@@ -1,5 +1,6 @@
 
 
+"""Tab Tiến độ — Theo dõi tiến độ thực hiện chỉ tiêu tín dụng theo PGD/Xã."""
 from __future__ import annotations
 
 from logger import get_logger

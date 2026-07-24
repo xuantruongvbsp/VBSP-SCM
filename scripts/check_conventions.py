@@ -78,6 +78,17 @@ _FROM_LOGGER = re.compile(r'from\s+logger\s+import')
 #   - Nền SÁNG cố định mà KHÔNG đặt màu chữ cùng dòng → chữ theo theme sáng → chìm
 # Dùng luminance để phân loại; cặp "nền sáng + chữ tối" (B15) được coi là HỢP LỆ.
 _CSS_COLOR     = re.compile(r'(?<!-)\bcolor\s*:\s*([#a-zA-Z0-9]+)')
+
+# 11. Wildcard import từ config — nạp 150+ tên không cần thiết
+_WILDCARD_CONFIG = re.compile(r'^\s*from\s+config\s+import\s+\*')
+
+# 12. st.selectbox/button/text_input/number_input/date_input trong tabs/ thiếu key=
+# Chỉ warn trong tabs/ vì workspace có thể dùng key ở nơi khác
+_ST_WIDGET_NO_KEY = re.compile(
+    r'\bst\.(selectbox|multiselect|button|text_input|number_input|date_input'
+    r'|radio|checkbox|toggle|slider|color_picker|file_uploader)\s*\('
+)
+_ST_HAS_KEY = re.compile(r'\bkey\s*=')
 _CSS_BG        = re.compile(r'\bbackground(?:-color)?\s*:\s*([#a-zA-Z0-9]+)')
 _NAMED_LUM     = {"black": 0.0, "white": 1.0}
 
@@ -139,9 +150,25 @@ def _nen_kiem_tra(path: Path) -> bool:
     parts = set(path.parts)
     if parts & _SKIP_DIRS:
         return False
+    # Bỏ qua mọi thư mục .venv* (môi trường cũ, venv phụ...)
+    if any(p.startswith(".venv") for p in path.parts):
+        return False
     if path.name in _SKIP_FILES:
         return False
     return path.suffix == ".py"
+
+
+def _widget_call_has_key(lines: list[str], start_idx: int, max_lines: int = 12) -> bool:
+    """Heuristic kiểm tra `key=` trong toàn bộ lời gọi widget multiline."""
+    balance = 0
+    for offset, idx in enumerate(range(start_idx, min(start_idx + max_lines, len(lines)))):
+        line = lines[idx]
+        if _ST_HAS_KEY.search(line):
+            return True
+        balance += line.count("(") - line.count(")")
+        if balance <= 0:
+            break
+    return False
 
 
 def kiem_tra_file(path: Path) -> list[str]:
@@ -153,6 +180,7 @@ def kiem_tra_file(path: Path) -> list[str]:
         return [f"Không đọc được file: {e}"]
 
     lines = content.splitlines()
+    is_tab_file = "tabs" in path.parts
 
     for i, line in enumerate(lines, start=1):
         # Bỏ qua dòng comment
@@ -217,6 +245,23 @@ def kiem_tra_file(path: Path) -> list[str]:
                     f"           → {stripped[:100]}"
                 )
 
+        # Rule 11: wildcard import từ config
+        if _WILDCARD_CONFIG.search(line) and "# conv: skip" not in line:
+            loi.append(
+                f"  Dòng {i:4d}: [IMPORT] from config import * — "
+                f"import cụ thể các tên cần dùng\n"
+                f"           → {stripped[:100]}"
+            )
+
+        # Rule 12: widget thiếu key= (chỉ warn trong tabs/)
+        if is_tab_file and _ST_WIDGET_NO_KEY.search(line) and "# conv: skip" not in line:
+            if not _widget_call_has_key(lines, i - 1):
+                loi.append(
+                    f"  Dòng {i:4d}: [KEY] Widget thiếu key= — "
+                    f"thêm key=f\"{{key_prefix}}...\" để tránh DuplicateElementKey\n"
+                    f"           → {stripped[:100]}"
+                )
+
     # Kiểm tra ghi_kv không có ghi_audit (warn nhẹ)
     if _GHI_KV.search(content) and not _GHI_AUDIT.search(content):
         loi.append(
@@ -225,7 +270,6 @@ def kiem_tra_file(path: Path) -> list[str]:
         )
 
     # Kiểm tra except Exception nhưng không có exc_info=True trong file
-    is_tab_file = "tabs" in path.parts
     if is_tab_file and _EXCEPT_EXC.search(content) and not _EXC_INFO.search(content):
         loi.append(
             f"  [LOGGER] File có except Exception nhưng không có exc_info=True — "

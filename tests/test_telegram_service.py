@@ -135,9 +135,9 @@ class TestChuanHoaThongBao:
         twice = tg._chuan_hoa_thong_bao(once, "health_check")
         assert twice == once
 
-    def test_du_19_notify_key(self) -> None:
-        assert len(tg._NOTIFY_PRESENTATION) == 19
-        assert len(set(tg._NOTIFY_PRESENTATION)) == 19
+    def test_du_20_notify_key(self) -> None:
+        assert len(tg._NOTIFY_PRESENTATION) == 20
+        assert len(set(tg._NOTIFY_PRESENTATION)) == 20
 
 
 class TestBaoCaoNqhTuan:
@@ -186,6 +186,26 @@ class TestBaoCaoNqhTuan:
 
         assert nqh_moc == {"PGD A": 12_000_000.0, "PGD B": 5_000_000.0}
         assert ngay_moc == "31/12/2025"
+
+
+class TestCanhBaoTongHopRuiRo:
+    def test_gui_gop_dung_key_moc_va_format_vn(self, monkeypatch) -> None:
+        sender = Mock(return_value=True)
+        monkeypatch.setattr(tg, "_la_bat", lambda _key: True)
+        monkeypatch.setattr(tg, "_gui_tin_for", sender)
+
+        ok = tg.gui_canh_bao_tong_hop_rui_ro(
+            [{"ten_pgd": "PGD A", "ty_le_cu": 1.23, "ty_le_moi": 2.45, "tang": 1.22}],
+            [{"ten_pgd": "PGD B", "khoanh_cu": 217_000_000, "khoanh_moi": 267_000_000, "tang_pct": 23.0}],
+            "31/12/2025",
+        )
+
+        assert ok is True
+        assert sender.call_args.args[1] == "rui_ro_tin_dung"
+        text_gui = sender.call_args.args[0]
+        assert "so với mốc 31/12/2025" in text_gui
+        assert "1,23% → 2,45% (+1,22%)" in text_gui
+        assert "217 tr → 267 tr (+23,0%)" in text_gui
 
 
 # ── Allowlist auto-clean tests ────────────────────────────────────────────────

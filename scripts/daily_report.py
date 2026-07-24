@@ -81,10 +81,25 @@ def _auto_width(ws, ncols: int):
         ws.column_dimensions[get_column_letter(col)].width = min(max_len + 4, 40)
 
 
+def _duckdb_date_expr(col: str) -> str:
+    """Parse cột ngày HSTD khi parquet lưu DATE hoặc chuỗi DD/MM/YYYY."""
+    qcol = f'"{col}"'
+    return (
+        f"COALESCE("
+        f"TRY_CAST({qcol} AS DATE), "
+        f"CAST(TRY_STRPTIME(CAST({qcol} AS VARCHAR), '%d/%m/%Y') AS DATE), "
+        f"CAST(TRY_STRPTIME(CAST({qcol} AS VARCHAR), '%Y-%m-%d') AS DATE)"
+        f")"
+    )
+
+
+def _parse_date_series(series: pd.Series) -> pd.Series:
+    return pd.to_datetime(series, errors="coerce", format="mixed", dayfirst=True)
+
+
 def _build_tong_quan_sheet(wb: Workbook, parquet_path: str):
     """Sheet 1: Tổng quan dư nợ theo PGD."""
-    ws = wb.active
-    ws.title = "Tổng quan PGD"
+    ws = wb.create_sheet("Tổng quan PGD")
 
     if not os.path.exists(parquet_path):
         ws.cell(row=1, column=1, value="⚠️ Chưa có dữ liệu parquet").font = Font(bold=True, color="FF0000")
@@ -199,22 +214,34 @@ def _build_den_han_sheet(wb: Workbook, parquet_path: str):
         return
 
     cutoff = (date.today() + timedelta(days=30)).isoformat()
+    ngay_dh_expr = _duckdb_date_expr(COT_NGAY_DH)
 
     sql = f"""
+        WITH src AS (
+            SELECT
+                "{COT_TEN_PGD}"    AS "PGD",
+                "{COT_TEN_KH}"     AS "Tên KH",
+                "{COT_SO_KU}"      AS "Số KU",
+                {ngay_dh_expr}     AS ngay_dh_date,
+                "{COT_TEN_CT}"     AS "CT",
+                "{COT_TONG_DU_NO}" AS "Dư nợ",
+                "{COT_TEN_TO}"     AS "Tổ TK&VV"
+            FROM read_parquet(?)
+        )
         SELECT
-            "{COT_TEN_PGD}"   AS "PGD",
-            "{COT_TEN_KH}"    AS "Tên KH",
-            "{COT_SO_KU}"     AS "Số KU",
-            "{COT_NGAY_DH}"   AS "Ngày đến hạn",
-            "{COT_TEN_CT}"    AS "CT",
-            "{COT_TONG_DU_NO}" AS "Dư nợ",
-            "{COT_TEN_TO}"    AS "Tổ TK&VV"
-        FROM read_parquet(?)
-        WHERE "{COT_NGAY_DH}" IS NOT NULL
-          AND "{COT_NGAY_DH}" <= '{cutoff}'
-          AND "{COT_NGAY_DH}" >= CURRENT_DATE
-          AND "{COT_TONG_DU_NO}" > 0
-        ORDER BY "{COT_NGAY_DH}", "{COT_TONG_DU_NO}" DESC
+            "PGD",
+            "Tên KH",
+            "Số KU",
+            STRFTIME(ngay_dh_date, '%d/%m/%Y') AS "Ngày đến hạn",
+            "CT",
+            "Dư nợ",
+            "Tổ TK&VV"
+        FROM src
+        WHERE ngay_dh_date IS NOT NULL
+          AND ngay_dh_date <= DATE '{cutoff}'
+          AND ngay_dh_date >= CURRENT_DATE
+          AND "Dư nợ" > 0
+        ORDER BY ngay_dh_date, "Dư nợ" DESC
     """
     try:
         df = _duckdb_query(sql, [parquet_path])
@@ -323,6 +350,19 @@ def _trong_gio_gui(key: str) -> bool:
         return True
 
 
+def _den_gio_gui_rui_ro() -> bool:
+    """Tin rủi ro gộp chạy khi tới giờ của một trong hai cấu phần đang bật."""
+    try:
+        notify_cfg = db.doc_kv("telegram_notify_config") or {}
+        keys = [
+            key for key in ("qh_moi", "khoanh_tang")
+            if bool(notify_cfg.get(key, True))
+        ]
+        return any(_trong_gio_gui(key) for key in keys)
+    except Exception:
+        return _trong_gio_gui("qh_moi") or _trong_gio_gui("khoanh_tang")
+
+
 def generate_daily_report() -> str | None:
     """Tạo báo cáo Excel hằng ngày. Trả về đường dẫn file hoặc None nếu lỗi."""
     REPORT_DIR.mkdir(parents=True, exist_ok=True)
@@ -338,6 +378,9 @@ def generate_daily_report() -> str | None:
     _build_nqh_top_sheet(wb, parquet_path)
     _build_den_han_sheet(wb, parquet_path)
     _build_khtd_sheet(wb)
+    # Xóa sheet mặc định "Sheet" nếu còn trống
+    if "Sheet" in wb.sheetnames:
+        del wb["Sheet"]
 
     now = datetime.now()
     filename = f"BaoCao_Ngay_{now.strftime('%Y%m%d_%H%M')}.xlsx"
@@ -396,20 +439,30 @@ def generate_daily_report() -> str | None:
 
         last_day = calendar.monthrange(now.year, now.month)[1]
         end_of_month = date(now.year, now.month, last_day).isoformat()
+        ngay_dh_expr = _duckdb_date_expr(COT_NGAY_DH)
 
         sql_dh = f"""
+            WITH src AS (
+                SELECT
+                    "{COT_TEN_KH}"     AS ten_kh,
+                    "{COT_SO_KU}"      AS so_ku,
+                    {ngay_dh_expr}     AS ngay_dh_date,
+                    "{COT_TONG_DU_NO}" AS du_no,
+                    "{COT_TEN_PGD}"    AS ten_pgd
+                FROM read_parquet(?)
+            )
             SELECT
-                "{COT_TEN_KH}"     AS ten_kh,
-                "{COT_SO_KU}"      AS so_ku,
-                "{COT_NGAY_DH}"    AS ngay_dh,
-                "{COT_TONG_DU_NO}" AS du_no,
-                "{COT_TEN_PGD}"    AS ten_pgd
-            FROM read_parquet(?)
-            WHERE "{COT_NGAY_DH}" IS NOT NULL
-              AND "{COT_NGAY_DH}" >= CURRENT_DATE
-              AND "{COT_NGAY_DH}" <= '{end_of_month}'
-              AND "{COT_TONG_DU_NO}" > 0
-            ORDER BY "{COT_NGAY_DH}", "{COT_TONG_DU_NO}" DESC
+                ten_kh,
+                so_ku,
+                STRFTIME(ngay_dh_date, '%d/%m/%Y') AS ngay_dh,
+                du_no,
+                ten_pgd
+            FROM src
+            WHERE ngay_dh_date IS NOT NULL
+              AND ngay_dh_date >= CURRENT_DATE
+              AND ngay_dh_date <= DATE '{end_of_month}'
+              AND du_no > 0
+            ORDER BY ngay_dh_date, du_no DESC
         """
         if os.path.exists(parquet_path):
             df_dh = _duckdb_query(sql_dh, [parquet_path])
@@ -432,11 +485,11 @@ def generate_daily_report() -> str | None:
     except Exception as e:
         print(f"⚠️ Telegram nhắc phân kỳ NXH: {e}")
 
-    if _trong_gio_gui("qh_moi"):
+    if _den_gio_gui_rui_ro():
         try:
-            _canh_bao_qh_moi()
+            _canh_bao_tong_hop_rui_ro()
         except Exception as e:
-            print(f"⚠️ Telegram cảnh báo NQH: {e}")
+            print(f"⚠️ Telegram cảnh báo rủi ro: {e}")
 
     # Thứ Sáu: báo cáo giải ngân tuần
     if date.today().weekday() == 4 and _trong_gio_gui("giai_ngan_tuan"):
@@ -444,13 +497,6 @@ def generate_daily_report() -> str | None:
             _giai_ngan_tuan()
         except Exception as e:
             print(f"⚠️ Telegram giải ngân tuần: {e}")
-
-    # Mỗi ngày: cảnh báo nợ khoanh tăng
-    if _trong_gio_gui("khoanh_tang"):
-        try:
-            _canh_bao_khoanh_tang()
-        except Exception as e:
-            print(f"⚠️ Telegram nợ khoanh: {e}")
 
     # Thứ Hai: báo cáo NQH tuần
     if date.today().weekday() == 0 and _trong_gio_gui("nqh_tuan"):
@@ -538,62 +584,21 @@ def _nhac_phan_ky_nxh() -> int:
 
 
 def _canh_bao_qh_moi() -> int:
-    """So sánh snapshot NQH kỳ mới nhất vs baseline 31/12 năm trước."""
-    from services.telegram_service import gui_canh_bao_qh_moi
-    try:
-        from snapshot_service import danh_sach_ky, doc_snapshot, ky_baseline
-        ky_list = danh_sach_ky()
-        if not ky_list:
-            return 0
-        ky_moi = ky_list[0]
-        ky_cu = ky_baseline(ky_list, ky_moi)
-        if not ky_cu or ky_cu == ky_moi:
-            return 0
-        df_moi = doc_snapshot(ky_moi)
-        df_cu  = doc_snapshot(ky_cu)
-        if df_moi.empty or df_cu.empty:
-            return 0
-        _NGUONG = 0.5  # tăng ≥ 0.5pp được coi là bất thường
-        ds_tang = []
-        for pgd in df_moi["ten_pgd"].unique():
-            if str(pgd).startswith("__"):
-                continue
-            row_m = df_moi[df_moi["ten_pgd"] == pgd].iloc[0]
-            row_c = df_cu[df_cu["ten_pgd"] == pgd]
-            if row_c.empty:
-                continue
-            row_c = row_c.iloc[0]
-            dn_m = float(row_m.get("tong_du_no", 0) or 0)
-            qh_m = float(row_m.get("du_no_qh", 0) or 0)
-            dn_c = float(row_c.get("tong_du_no", 0) or 0)
-            qh_c = float(row_c.get("du_no_qh", 0) or 0)
-            tl_m = qh_m / dn_m * 100 if dn_m else 0.0
-            tl_c = qh_c / dn_c * 100 if dn_c else 0.0
-            if tl_m - tl_c >= _NGUONG:
-                ds_tang.append({
-                    "ten_pgd":   str(pgd),
-                    "ty_le_cu":  tl_c,
-                    "ty_le_moi": tl_m,
-                    "tang":      tl_m - tl_c,
-                })
-        if ds_tang:
-            gui_canh_bao_qh_moi(ds_tang)
-        return len(ds_tang)
-    except Exception as e:
-        print(f"⚠️ _canh_bao_qh_moi: {e}")
-        return 0
+    """Compat: cảnh báo NQH giờ đi qua tin gộp rủi ro."""
+    return _canh_bao_tong_hop_rui_ro()
 
 
 def _giai_ngan_tuan() -> int:
     """Thứ Sáu: tổng hợp giải ngân (khoản vay mới) 7 ngày qua."""
     from services.telegram_service import gui_giai_ngan_tuan
-    from config import DON_VI_CHI_NHANH
+    from config import DON_VI_CHI_NHANH, COT_NGAY_VAY
     try:
         if not Path(CACHE_HSTD).exists():
             return 0
         df = pd.read_parquet(CACHE_HSTD)
         if COT_NGAY_VAY not in df.columns:
             return 0
+        df[COT_NGAY_VAY] = pd.to_datetime(df[COT_NGAY_VAY], errors="coerce", dayfirst=True)
         today_ts = pd.Timestamp.today().normalize()
         t7 = today_ts - pd.Timedelta(days=7)
         mask = df[COT_NGAY_VAY].notna() & (df[COT_NGAY_VAY] >= t7) & (df[COT_NGAY_VAY] <= today_ts)
@@ -619,48 +624,99 @@ def _giai_ngan_tuan() -> int:
 
 
 def _canh_bao_khoanh_tang() -> int:
-    """So sánh nợ khoanh snapshot kỳ mới nhất vs baseline 31/12 năm trước."""
-    from services.telegram_service import gui_canh_bao_khoanh_tang
+    """Compat: cảnh báo nợ khoanh giờ đi qua tin gộp rủi ro."""
+    return _canh_bao_tong_hop_rui_ro()
+
+
+def _canh_bao_tong_hop_rui_ro() -> int:
+    """Tính toán cả NQH tăng và nợ khoanh tăng, gửi gộp 1 tin Telegram."""
+    from services.telegram_service import gui_canh_bao_tong_hop_rui_ro
     try:
         from snapshot_service import danh_sach_ky, doc_snapshot, ky_baseline
         ky_list = danh_sach_ky()
         if not ky_list:
             return 0
         ky_moi = ky_list[0]
-        ky_cu = ky_baseline(ky_list, ky_moi)
+        ky_cu  = ky_baseline(ky_list, ky_moi)
         if not ky_cu or ky_cu == ky_moi:
             return 0
-        df_moi = doc_snapshot(ky_moi)
-        df_cu  = doc_snapshot(ky_cu)
-        if df_moi.empty or df_cu.empty or "du_no_khoanh" not in df_moi.columns:
-            return 0
-        _NGUONG_PCT = 5.0
-        ds_tang = []
-        for pgd in df_moi["ten_pgd"].unique():
-            if str(pgd).startswith("__"):
-                continue
-            row_m = df_moi[df_moi["ten_pgd"] == pgd].iloc[0]
-            row_c = df_cu[df_cu["ten_pgd"] == pgd]
-            if row_c.empty:
-                continue
-            row_c = row_c.iloc[0]
-            kh_moi = float(row_m.get("du_no_khoanh", 0) or 0)
-            kh_cu  = float(row_c.get("du_no_khoanh", 0) or 0)
-            if kh_cu == 0 or kh_moi == 0:
-                continue
-            tang_pct = (kh_moi - kh_cu) / kh_cu * 100
-            if tang_pct >= _NGUONG_PCT:
-                ds_tang.append({
-                    "ten_pgd":    str(pgd),
-                    "khoanh_cu":  kh_cu,
-                    "khoanh_moi": kh_moi,
-                    "tang_pct":   tang_pct,
-                })
-        if ds_tang:
-            gui_canh_bao_khoanh_tang(ds_tang)
-        return len(ds_tang)
+
+        # Format mốc baseline: "2025-12" → "31/12/2025"
+        ngay_moc = ""
+        try:
+            parts = str(ky_cu).split("-")
+            nam, thang = int(parts[0]), int(parts[1])
+            import calendar
+            last_day = calendar.monthrange(nam, thang)[1]
+            ngay_moc = f"{last_day:02d}/{thang:02d}/{nam}"
+        except Exception:
+            ngay_moc = str(ky_cu)
+
+        # ── Tính NQH tăng ────────────────────────────────────────────────
+        ds_qh: list[dict] = []
+        notify_cfg = db.doc_kv("telegram_notify_config") or {}
+        has_qh = bool(notify_cfg.get("qh_moi", True))
+        if has_qh:
+            df_moi = doc_snapshot(ky_moi)
+            df_cu  = doc_snapshot(ky_cu)
+            if not df_moi.empty and not df_cu.empty:
+                _NGUONG_QH = 0.5
+                for pgd in df_moi["ten_pgd"].unique():
+                    if str(pgd).startswith("__"):
+                        continue
+                    row_m = df_moi[df_moi["ten_pgd"] == pgd].iloc[0]
+                    row_c = df_cu[df_cu["ten_pgd"] == pgd]
+                    if row_c.empty:
+                        continue
+                    row_c = row_c.iloc[0]
+                    dn_m = float(row_m.get("tong_du_no", 0) or 0)
+                    qh_m = float(row_m.get("du_no_qh", 0) or 0)
+                    dn_c = float(row_c.get("tong_du_no", 0) or 0)
+                    qh_c = float(row_c.get("du_no_qh", 0) or 0)
+                    tl_m = qh_m / dn_m * 100 if dn_m else 0.0
+                    tl_c = qh_c / dn_c * 100 if dn_c else 0.0
+                    if tl_m - tl_c >= _NGUONG_QH:
+                        ds_qh.append({
+                            "ten_pgd":  str(pgd),
+                            "ty_le_cu": tl_c,
+                            "ty_le_moi": tl_m,
+                            "tang":     tl_m - tl_c,
+                        })
+
+        # ── Tính nợ khoanh tăng ──────────────────────────────────────────
+        ds_khoanh: list[dict] = []
+        has_khoanh = bool(notify_cfg.get("khoanh_tang", True))
+        if has_khoanh:
+            df_moi = doc_snapshot(ky_moi)
+            df_cu  = doc_snapshot(ky_cu)
+            if not df_moi.empty and not df_cu.empty and "du_no_khoanh" in df_moi.columns:
+                _NGUONG_KHOANH = 5.0
+                for pgd in df_moi["ten_pgd"].unique():
+                    if str(pgd).startswith("__"):
+                        continue
+                    row_m = df_moi[df_moi["ten_pgd"] == pgd].iloc[0]
+                    row_c = df_cu[df_cu["ten_pgd"] == pgd]
+                    if row_c.empty:
+                        continue
+                    row_c = row_c.iloc[0]
+                    kh_moi = float(row_m.get("du_no_khoanh", 0) or 0)
+                    kh_cu  = float(row_c.get("du_no_khoanh", 0) or 0)
+                    if kh_cu == 0 or kh_moi == 0:
+                        continue
+                    tang_pct = (kh_moi - kh_cu) / kh_cu * 100
+                    if tang_pct >= _NGUONG_KHOANH:
+                        ds_khoanh.append({
+                            "ten_pgd":    str(pgd),
+                            "khoanh_cu":  kh_cu,
+                            "khoanh_moi": kh_moi,
+                            "tang_pct":   tang_pct,
+                        })
+
+        if ds_qh or ds_khoanh:
+            gui_canh_bao_tong_hop_rui_ro(ds_qh, ds_khoanh, ngay_moc)
+        return len(ds_qh) + len(ds_khoanh)
     except Exception as e:
-        print(f"⚠️ _canh_bao_khoanh_tang: {e}")
+        print(f"⚠️ _canh_bao_tong_hop_rui_ro: {e}")
         return 0
 
 
@@ -708,11 +764,17 @@ def _bao_cao_khtd_theo_ct() -> int:
         df = pd.read_parquet(CACHE_HSTD)
         from tabs.tab_khtd_xuat import _tinh_thuc_hien_theo_ct
         df_th = _tinh_thuc_hien_theo_ct(df)
+        if not isinstance(df_th, pd.DataFrame) or df_th.empty:
+            return 0
         meta = db.doc_kv("merge_meta_hstd") or {}
         ngay_sl = str(meta.get("ngay_sl", date.today().strftime("%d/%m/%Y")))
         ds_ct = []
         for ma_key, _ma_ct, ten_hien_thi, nguon_von, _tm in CHUONG_TRINH_KHTD:
-            kh_ct  = float((khtd_cn.get(ma_key) or {}).get("_cn", 0) or 0)
+            target = khtd_cn.get(ma_key)
+            if isinstance(target, dict):
+                kh_ct = float(target.get("_cn", 0) or 0)
+            else:
+                kh_ct = float(target or 0)
             th_row = df_th[df_th["ma_key"] == ma_key] if not df_th.empty and "ma_key" in df_th.columns else pd.DataFrame()
             th_val = float(th_row["thuc_hien"].iloc[0]) if not th_row.empty else 0.0
             pct    = th_val / kh_ct * 100 if kh_ct > 0 else 0.0
@@ -752,7 +814,8 @@ def _tong_ket_thang() -> None:
             today_ts = pd.Timestamp.today().normalize()
             nm1    = today_ts.replace(day=1) + pd.offsets.MonthBegin(1)
             nm_end = nm1 + pd.offsets.MonthEnd(0)
-            mask_dh = df[COT_NGAY_DH].notna() & (df[COT_NGAY_DH] >= nm1) & (df[COT_NGAY_DH] <= nm_end)
+            ngay_dh = _parse_date_series(df[COT_NGAY_DH])
+            mask_dh = ngay_dh.notna() & (ngay_dh >= nm1) & (ngay_dh <= nm_end)
             so_dh   = int(mask_dh.sum())
             dn_dh   = float(df.loc[mask_dh, COT_TONG_DU_NO].sum()) if COT_TONG_DU_NO in df.columns else 0.0
         # Top/bottom PGD

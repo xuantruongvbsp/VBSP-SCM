@@ -28,6 +28,7 @@ from .ui_detail import render_chi_tiet
 from .ui_settings import render_cai_dat
 from .ui_guide import render_huong_dan
 from .ui_dieu_chinh import render_dieu_chinh_tang_truong
+from .ui_trang_thai_chot import render_trang_thai_chot
 
 logger = get_logger(__name__)
 
@@ -85,7 +86,11 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
             + _deadline_badge(cfg)
             for i, cfg in enumerate(ds_sheet)
         ]
-        all_labels = ["🏠 Khảo sát HN/HCN/HTN", "📈 Điều chỉnh tăng trưởng"] + sheet_labels
+        all_labels = [
+            "🏠 Khảo sát HN/HCN/HTN",
+            "📈 Điều chỉnh tăng trưởng",
+            "🏁 Trạng thái chốt KHTD",
+        ] + sheet_labels
 
         # Reset index nếu danh sách sheet thay đổi (vd: xóa sheet)
         if st.session_state.get("ttdn_sheet_sel", 0) >= len(all_labels):
@@ -123,7 +128,12 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
             render_dieu_chinh_tang_truong(username=username)
             return
 
-        # ── Nhánh sheet thông thường (offset -2 vì có 2 mục tĩnh đầu) ────
+        # ── Nhánh Trạng thái chốt KHTD ────────────────────────────────────
+        if idx == 2:
+            render_trang_thai_chot(username=username)
+            return
+
+        # ── Nhánh sheet thông thường (offset -3 vì có 3 mục tĩnh đầu) ────
         # Cleanup stale session_state keys
         n_sheets = len(ds_sheet)
         for i in range(n_sheets, n_sheets + 50):
@@ -143,7 +153,7 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
         if not ds_sheet:
             st.info("⚙️ Chưa có sheet nào. Vào tab **⚙️ Cài đặt** để thêm.")
         else:
-            cfg_sel = ds_sheet[idx - 2]
+            cfg_sel = ds_sheet[idx - 3]
             ten_sheet = all_labels[idx]
             ds_ct = cfg_sel.get("ds_chuong_trinh", [])
             deadline_str = cfg_sel.get("deadline", "")

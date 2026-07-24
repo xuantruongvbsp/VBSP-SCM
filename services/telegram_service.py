@@ -26,6 +26,7 @@ _NOTIFY_PRESENTATION = {
     "phan_ky_nxh":       ("Nhắc phân kỳ nhà ở xã hội", "Theo PGD", "HSTD/Tiền gửi"),
     "khtd_tien_do":     ("Tiến độ KHTD", "Toàn Chi nhánh", "HSTD/KHTD"),
     "qh_moi":            ("Cảnh báo NQH tăng", "Toàn Chi nhánh", "HSTD/Snapshot"),
+    "rui_ro_tin_dung":   ("Cảnh báo rủi ro tín dụng", "Toàn Chi nhánh", "HSTD/Snapshot"),
     "deadline_bc":       ("Nhắc nộp báo cáo", "Toàn Chi nhánh", "Google Sheets"),
     "nhap_lieu":         ("Nhắc nhập liệu", "Toàn Chi nhánh", "Google Sheets"),
     "health_check":      ("Kết quả Health Check", "Hệ thống VBSP-SCM", "Health Check"),
@@ -1086,6 +1087,59 @@ def gui_canh_bao_khoanh_tang(ds_tang: list[dict]) -> bool:
         tang_s = f"+{tang:.1f}%".replace(".", ",")
         lines.append(f"  🔴 {pgd}: {cu_s} → {moi_s} ({tang_s})")
     return _gui_tin_for("\n".join(lines), "khoanh_tang")
+
+
+def gui_canh_bao_tong_hop_rui_ro(
+    ds_qh: list[dict],
+    ds_khoanh: list[dict],
+    ngay_moc: str = "",
+) -> bool:
+    """Gộp cảnh báo NQH tăng + nợ khoanh tăng vào 1 tin, hiển thị rõ mốc baseline.
+
+    ds_qh:     [{ten_pgd, ty_le_cu, ty_le_moi, tang}]
+    ds_khoanh: [{ten_pgd, khoanh_cu, khoanh_moi, tang_pct}]
+    ngay_moc:  "31/12/2025"
+    """
+    if not _la_bat("rui_ro_tin_dung"):
+        return True
+    has_qh      = bool(ds_qh)
+    has_khoanh  = bool(ds_khoanh)
+    if not has_qh and not has_khoanh:
+        return True
+
+    moc_str = f" — so với mốc {_html.escape(ngay_moc)}" if ngay_moc else ""
+    lines = [f"⚠️ <b>Cảnh báo rủi ro tín dụng{moc_str}</b>", ""]
+
+    # ── Phần 1: Nợ quá hạn tăng ──────────────────────────────────────────
+    if has_qh:
+        lines.append(f"🔴 <b>NỢ QUÁ HẠN TĂNG ({len(ds_qh)} đơn vị):</b>")
+        for p in ds_qh:
+            tang = float(p.get("tang", 0))
+            cu   = float(p.get("ty_le_cu", 0))
+            moi  = float(p.get("ty_le_moi", 0))
+            cu_s  = f"{cu:.2f}%".replace(".", ",")
+            moi_s = f"{moi:.2f}%".replace(".", ",")
+            tang_s = f"+{tang:.2f}%".replace(".", ",")
+            lines.append(
+                f"  🔴 {_html.escape(str(p.get('ten_pgd', '')))} — "
+                f"{cu_s} → {moi_s} ({tang_s})"
+            )
+        lines.append("")
+
+    # ── Phần 2: Nợ khoanh tăng ──────────────────────────────────────────
+    if has_khoanh:
+        lines.append(f"⚠️ <b>NỢ KHOANH TĂNG ({len(ds_khoanh)} đơn vị):</b>")
+        for p in sorted(ds_khoanh, key=lambda x: float(x.get("tang_pct", 0) or 0), reverse=True):
+            pgd   = _html.escape(str(p.get("ten_pgd", "")))
+            cu    = float(p.get("khoanh_cu", 0) or 0)
+            moi   = float(p.get("khoanh_moi", 0) or 0)
+            tang  = float(p.get("tang_pct", 0) or 0)
+            cu_s  = f"{cu / 1e6:,.0f}".replace(",", ".") + " tr"
+            moi_s = f"{moi / 1e6:,.0f}".replace(",", ".") + " tr"
+            tang_s = f"+{tang:.1f}%".replace(".", ",")
+            lines.append(f"  🔴 {pgd}: {cu_s} → {moi_s} ({tang_s})")
+
+    return _gui_tin_for("\n".join(lines), "rui_ro_tin_dung")
 
 
 def gui_canh_bao_he_thong(loai: str, mo_ta: str) -> bool:

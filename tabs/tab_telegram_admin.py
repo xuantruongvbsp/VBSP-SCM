@@ -365,8 +365,12 @@ def _gui_ngay(key: str) -> tuple[bool, str]:
             return _ket_qua_gui_telegram(ok, f"{len(ds_pgd)} PGD", "khtd_tien_do")
 
         elif key == "qh_moi":
-            ok = tg.gui_canh_bao_qh_moi([])
-            return True, "Không có PGD nào tăng NQH (test)"
+            from scripts.daily_report import _canh_bao_tong_hop_rui_ro
+
+            sent = _canh_bao_tong_hop_rui_ro()
+            if sent:
+                return True, f"Đã gửi tin gộp cảnh báo rủi ro ({sent} cảnh báo)"
+            return True, "Không có cảnh báo rủi ro tín dụng để gửi"
 
         elif key == "deadline_bc":
             from services.telegram_jobs import run_telegram_job
@@ -485,36 +489,12 @@ def _gui_ngay(key: str) -> tuple[bool, str]:
 
         elif key == "khoanh_tang":
             try:
-                from snapshot_service import doc_snapshot, danh_sach_ky, ky_baseline
-                ky_list = danh_sach_ky()
-                if not ky_list:
-                    return True, "Không đủ snapshot để so sánh (cần ≥ 2 kỳ)"
-                ky_moi = ky_list[0]
-                ky_cu = ky_baseline(ky_list, ky_moi)
-                if not ky_cu or ky_cu == ky_moi:
-                    return True, "Không đủ snapshot để so sánh (cần ≥ 2 kỳ)"
-                df_moi = doc_snapshot(ky_moi)
-                df_cu  = doc_snapshot(ky_cu)
-                if df_moi.empty or "du_no_khoanh" not in df_moi.columns:
-                    return False, "Thiếu dữ liệu snapshot hoặc cột du_no_khoanh."
-                ds_tang = []
-                for _, row_m in df_moi.iterrows():
-                    pgd   = row_m["ten_pgd"]
-                    match = df_cu[df_cu["ten_pgd"] == pgd]
-                    if match.empty:
-                        continue
-                    row_c  = match.iloc[0]
-                    kh_moi = float(row_m.get("du_no_khoanh") or 0)
-                    kh_cu  = float(row_c.get("du_no_khoanh") or 0)
-                    if kh_cu == 0 or kh_moi == 0:
-                        continue
-                    tang_pct = (kh_moi - kh_cu) / kh_cu * 100
-                    if tang_pct >= 5.0:
-                        ds_tang.append({"ten_pgd": str(pgd), "khoanh_cu": kh_cu, "khoanh_moi": kh_moi, "tang_pct": tang_pct})
-                if not ds_tang:
-                    return True, "Không có đơn vị nào tăng nợ khoanh ≥ 5%"
-                ok = tg.gui_canh_bao_khoanh_tang(ds_tang)
-                return _ket_qua_gui_telegram(ok, f"{len(ds_tang)} đơn vị tăng nợ khoanh", "khoanh_tang")
+                from scripts.daily_report import _canh_bao_tong_hop_rui_ro
+
+                sent = _canh_bao_tong_hop_rui_ro()
+                if sent:
+                    return True, f"Đã gửi tin gộp cảnh báo rủi ro ({sent} cảnh báo)"
+                return True, "Không có cảnh báo rủi ro tín dụng để gửi"
             except Exception as e:
                 logger.error("_gui_ngay khoanh_tang: %s", e, exc_info=True)
                 return False, str(e)

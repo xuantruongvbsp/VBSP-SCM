@@ -2745,6 +2745,78 @@ def _to_int(val, default=0):
 
 ---
 
+### J55 — `venv` báo `Unable to create process` vì mất Python 3.12 nền
+| | |
+|---|---|
+| **File** | `venv/pyvenv.cfg`, Python nền `C:\Users\Administrator\AppData\Local\Programs\Python\Python312` |
+| **Dấu hiệu** | Chạy `venv\Scripts\python.exe` báo `Unable to create process using '"...\Python312\python.exe" ...'`; `py -0p` báo `No installed Pythons found`; Streamlit/app không khởi động dù thư mục `venv` còn tồn tại |
+| **Nguyên nhân** | Virtualenv trên Windows phụ thuộc interpreter nền ghi trong `pyvenv.cfg`. Python 3.12 nền đã bị gỡ hoặc mất khỏi `AppData`, nên launcher trong `venv\Scripts` không tạo được process. Có thể kèm lock stale `tmp/vbsp_launcher.lock` khiến launcher nhận nhầm app đang chạy |
+| **Fix** | Cài lại Python 3.12.7 vào đúng `...\Python312`, đổi tên `venv` cũ để backup, tạo lại `venv`, cài `requirements.txt`, chạy `pip check`, import smoke, compile app; xóa `tmp/vbsp_launcher.lock` nếu port 8502 không `LISTENING`. Nếu Python nền lại mất nhưng packages trong `venv` còn nguyên, có thể sửa nhanh `venv/pyvenv.cfg` trỏ sang Python 3.12.x còn tồn tại rồi chạy import smoke lại. |
+| **Test** | `venv\Scripts\python.exe -c "import streamlit, pandas, gspread"` OK; `venv\Scripts\python.exe -m pip check` OK; `/_stcore/health` trả `200 ok`; browser mở được màn đăng nhập Phòng KH-NV |
+| **Ngày fix** | 2026-07-23 |
+
+---
+
+### J56 — Đăng nhập Phòng KH-NV chậm do load/enrich HSTD lặp
+| | |
+|---|---|
+| **File** | `app.py` → block load dữ liệu sau đăng nhập ~dòng 1260 |
+| **Dấu hiệu** | Nhập mật khẩu/bấm đăng nhập xong phải chờ lâu ở lần đầu sau restart; log `app.ram` ghi `load_hstd: role=admin_cn ... rows=293496` |
+| **Nguyên nhân** | Không phải `bcrypt` vì `checkpw` chỉ khoảng 0,24s. Sau `st.rerun()`, role Chi nhánh đọc `cache/hstd.parquet` full rồi đọc thêm bản `active_only`, sau đó `_enrich_hstd()` chạy cho cả hai DataFrame trên dataset lớn |
+| **Fix** | Chỉ `_load_hstd(... active_only=False)` một lần cho role Chi nhánh, enrich bản full một lần, rồi dùng `_loc_hstd_active()` lọc hồ sơ còn dư nợ từ bản full đã enrich |
+| **Test** | `venv\Scripts\python.exe -m py_compile app.py`; `venv\Scripts\python.exe scripts\check_conventions.py app.py` |
+| **Ngày fix** | 2026-07-23 |
+
+---
+
+### J57 — daily_report.py không parse được ngày đến hạn `DD/MM/YYYY`
+| | |
+|---|---|
+| **File** | `scripts/daily_report.py` → `_build_den_han_sheet()`, `generate_daily_report()`, `_tong_ket_thang()` |
+| **Dấu hiệu** | Sheet `Đến hạn 30 ngày` chỉ có `⚠️ Lỗi truy vấn`; Telegram nhắc khoản đến hạn trong tháng có thể gửi rỗng dù HSTD có dữ liệu; kiểm DuckDB thấy `count(TRY_CAST("Ngày ĐH theo Gia hạn" AS DATE)) = 0` |
+| **Nguyên nhân** | Parquet HSTD đang lưu `COT_NGAY_DH` dạng chuỗi Việt Nam `DD/MM/YYYY`. DuckDB `TRY_CAST(... AS DATE)` không parse được format này, còn các chỗ Pandas so sánh trực tiếp chuỗi với `Timestamp`/date làm lỗi hoặc lọc sai |
+| **Fix** | Thêm `_duckdb_date_expr()` dùng `TRY_CAST` + `TRY_STRPTIME('%d/%m/%Y')`, dùng ngày đã parse cho Excel/Telegram; thêm `_parse_date_series()` với `dayfirst=True` cho tổng kết tháng |
+| **Test** | `venv\Scripts\python.exe -m py_compile scripts\daily_report.py`; `venv\Scripts\python.exe scripts\check_conventions.py scripts\daily_report.py`; kiểm workbook tạm sheet `Đến hạn 30 ngày` ra 1.540 khoản với HSTD hiện tại |
+| **Ngày fix** | 2026-07-24 |
+
+---
+
+### J58 — Scheduled Tasks VBSP trỏ về Python 3.14 cũ
+| | |
+|---|---|
+| **File** | `scripts/setup_task_scheduler.ps1`; Windows Task Scheduler |
+| **Dấu hiệu** | Task ở trạng thái `Ready` nhưng `LastTaskResult=2147942402` (`0x80070002`) hoặc `1`; Telegram/daily_report không chạy đều dù task đã bật |
+| **Nguyên nhân** | Action của `VBSP-DailyReport`, `VBSP-NhacDeadline`, `VBSP-TelegramScheduler`, `VBSP-TelegramPolling` trỏ tới `C:\Users\Administrator\AppData\Local\Programs\Python\Python314\python.exe`, trong khi repo chuẩn dùng `D:\VBSP-SCM\venv\Scripts\python.exe` Python 3.12. Script setup cũng ưu tiên Python 3.14 nên có thể tái tạo cấu hình sai |
+| **Fix** | Sửa `scripts/setup_task_scheduler.ps1` ưu tiên `$ProjectDir\venv\Scripts\python.exe`; chạy lại setup với `-PythonPath D:\VBSP-SCM\venv\Scripts\python.exe`; kiểm action 4 task Python đều trỏ đúng venv |
+| **Test** | `Get-ScheduledTask` kiểm 5 task `Ready`; kiểm action/path không còn Python 3.14; `venv\Scripts\python.exe --version` = Python 3.12.13 |
+| **Ngày fix** | 2026-07-24 |
+
+---
+
+### J59 — Cảnh báo rủi ro gộp vẫn phụ thuộc key/lịch NQH
+| | |
+|---|---|
+| **File** | `scripts/daily_report.py`, `services/telegram_service.py`, `tabs/tab_telegram_admin.py` |
+| **Dấu hiệu** | Sau khi gộp NQH + nợ khoanh, nếu `qh_moi` tắt hoặc không đúng giờ thì nợ khoanh có thể không gửi; nút `Gửi ngay` nợ khoanh vẫn dùng format tin riêng; phần trăm nợ khoanh hiển thị `+23.0%` thay vì `+23,0%` |
+| **Nguyên nhân** | Job gộp chỉ được gọi qua `_trong_gio_gui("qh_moi")` và gửi bằng notify key `qh_moi`; đường gửi thủ công của `khoanh_tang` vẫn gọi `gui_canh_bao_khoanh_tang()` riêng; format `tang_pct` dùng `.replace(",", ",")` không đổi dấu thập phân |
+| **Fix** | Thêm `_den_gio_gui_rui_ro()` chạy khi tới giờ của `qh_moi` hoặc `khoanh_tang` đang bật; thêm notify key `rui_ro_tin_dung`; chuyển helper cũ và nút `Gửi ngay` sang `_canh_bao_tong_hop_rui_ro()`; sửa format phần trăm nợ khoanh `.replace(".", ",")` |
+| **Test** | `venv\Scripts\python.exe -m py_compile scripts\daily_report.py services\telegram_service.py tabs\tab_telegram_admin.py tests\test_telegram_service.py`; `venv\Scripts\python.exe scripts\check_conventions.py scripts\daily_report.py services\telegram_service.py tabs\tab_telegram_admin.py`; smoke inline xác nhận key `rui_ro_tin_dung`, mốc `31/12/2025`, format `+23,0%`, và lịch vẫn chạy khi chỉ bật `khoanh_tang`; pytest chưa chạy được vì venv thiếu module `pytest` |
+| **Ngày fix** | 2026-07-24 |
+
+---
+
+### J60 — CODE_INDEX trỏ sai path và mô tả quá rộng về tab render
+| | |
+|---|---|
+| **File** | `CODE_INDEX.md` |
+| **Dấu hiệu** | Agent tra CĐ Tổ TK&VV gặp path không tồn tại `data/cdotkvv.py`; hoặc giả định mọi tab/submodule đều có `render(tab=None, **kwargs)` |
+| **Nguyên nhân** | Typo tên module `cdtotkvv` và câu mô tả gom chung entrypoint tab với các submodule báo cáo/so sánh/upload |
+| **Fix** | Sửa path sang `data/cdtotkvv.py`; đổi heading Tabs để nói rõ chỉ entrypoint thường có `render(...)`, submodule có thể dùng `render_*()` hoặc được gọi qua module init/workspace |
+| **Test** | Kiểm tra lại path trong `CODE_INDEX.md` bằng filesystem; kiểm `CODE_INDEX` đã có entry trong `CHANGELOG.md` |
+| **Ngày fix** | 2026-07-24 |
+
+---
+
 Mỗi khi fix bug, copy template dưới đây và điền vào đúng mục:
 
 ```

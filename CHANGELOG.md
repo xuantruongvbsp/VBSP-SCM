@@ -1,5 +1,51 @@
 # CHANGELOG
 
+## [2026-07-24] — Sửa CODE_INDEX để agent tra file chính xác
+- `CODE_INDEX.md` dòng ~38 — sửa path CĐ Tổ TK&VV từ `data/cdotkvv.py` sang `data/cdtotkvv.py`
+- `CODE_INDEX.md` dòng ~112 — làm rõ không phải mọi file tab/submodule đều có `render(tab=None, **kwargs)`, tránh agent gọi sai entrypoint và tránh prose bị checker bắt nhầm thành path
+- `BUGMAP.md` — thêm J60 ghi nhận lỗi index tài liệu trỏ sai path và mô tả signature quá rộng
+
+## [2026-07-24] — Tối ưu token: tạo CODE_INDEX.md + tách rules.md + trim AGENTS.md
+- `CODE_INDEX.md` — tạo mới, map chức năng → file → hàm chính cho agent tra nhanh (~180 dòng)
+- `COT_REF.md` — tạo mới, tách toàn bộ COT_* constants từ rules.md (tra cứu khi cần)
+- `SIGNATURES.md` — tạo mới, tách toàn bộ function signatures từ rules.md (tra cứu khi cần)
+- `.trae/rules/rules.md` — cắt section 4 (COT_*) và 5-7 (signatures), thay bằng pointer → giảm ~25% (651→487 dòng)
+- `AGENTS.md` — cắt section 5 (quy tắc) từ 327→26 dòng, section 8 (signatures) từ 80→12 dòng, checklist trùng → pointer → giảm ~50% (810→410 dòng)
+
+## [2026-07-24] — Fix daily_report parse ngày đến hạn dạng DD/MM/YYYY
+- `scripts/daily_report.py` dòng ~84 — thêm helper parse ngày DuckDB/Pandas cho cột HSTD lưu dạng `DD/MM/YYYY` thay vì chỉ `TRY_CAST(... AS DATE)`
+- `scripts/daily_report.py` dòng ~220/~432 — sửa sheet `Đến hạn 30 ngày` và Telegram nhắc khoản đến hạn trong tháng để lọc theo ngày đã parse, không còn rỗng/lỗi truy vấn âm thầm
+- `scripts/daily_report.py` dòng ~353/~488/~586 — lịch cảnh báo rủi ro gộp chạy theo giờ của `qh_moi` hoặc `khoanh_tang` đang bật; hai helper cũ chỉ còn wrapper sang tin gộp để tránh gửi riêng/trùng
+- `scripts/daily_report.py` dòng ~885 — sửa tổng kết tháng parse `COT_NGAY_DH` bằng `pd.to_datetime(..., dayfirst=True)` trước khi so sánh tháng sau
+- `services/telegram_service.py` dòng ~29/~1092 — thêm notify key `rui_ro_tin_dung` cho tin gộp NQH + nợ khoanh, giữ mốc baseline động và sửa format phần trăm nợ khoanh sang dấu phẩy
+- `tabs/tab_telegram_admin.py` dòng ~367/~490 — nút `Gửi ngay` của NQH/nợ khoanh đều đi qua tin gộp rủi ro thay vì gửi riêng từng loại
+- `tests/test_telegram_service.py` dòng ~138/~191 — cập nhật số notify key và thêm regression test cho tin gộp rủi ro
+- `scripts/setup_task_scheduler.ps1` dòng ~19 — ưu tiên `venv\Scripts\python.exe` Python 3.12 khi tạo task, tránh tái trỏ về Python 3.14 cũ
+- Windows Task Scheduler — cập nhật `VBSP-DailyReport`, `VBSP-NhacDeadline`, `VBSP-TelegramScheduler`, `VBSP-TelegramPolling` sang `D:\VBSP-SCM\venv\Scripts\python.exe`; 5 task VBSP đều `Ready`
+- `BUGMAP.md` — thêm J57/J58/J59 ghi nhận lỗi ngày Việt Nam trong `daily_report.py`, lỗi Scheduled Tasks trỏ Python 3.14 cũ và lỗi cảnh báo rủi ro còn tách lịch/key gửi
+
+## [2026-07-23] — Đếm báo cáo cũ và sửa lại venv trỏ sai Python nền
+- `venv/pyvenv.cfg` — đổi interpreter nền sang Python 3.12.13 đi kèm Codex runtime vì `C:\Users\Administrator\AppData\Local\Programs\Python\Python312` không còn tồn tại
+- `BUGMAP.md` — bổ sung J55 với nhánh fix nhanh khi `venv` còn packages nhưng `pyvenv.cfg` trỏ sai interpreter nền
+
+## [2026-07-23] — Đưa Theo dõi nhập liệu ra menu Báo cáo
+- `workspaces/ws_management.py` dòng ~345 — thêm mục sidebar `📋 Theo dõi nhập liệu` trong nhóm `Báo cáo` để mở trực tiếp tab Google Sheet, không phải đi qua `Quản lý Công việc & Nhiệm vụ`
+
+## [2026-07-23] — Tối ưu đăng nhập Phòng KH-NV bị chậm do load HSTD hai lượt
+- `app.py` dòng ~249 — thêm `_loc_hstd_active()` để lọc hồ sơ còn dư nợ từ DataFrame full đã load sẵn
+- `app.py` dòng ~1275 — role Chi nhánh chỉ đọc/enrich HSTD full một lần sau đăng nhập, sau đó lọc active từ bản đã enrich thay vì gọi `_load_hstd()` lần hai
+- `BUGMAP.md` — thêm J56 ghi nhận đăng nhập chậm do load/enrich HSTD lặp trên dataset ~293k dòng
+
+## [2026-07-23] — Sửa venv Python 3.12 bị mất interpreter nền
+- `venv` — cài lại Python 3.12.7 vào `C:\Users\Administrator\AppData\Local\Programs\Python\Python312`, tạo lại `D:\VBSP-SCM\venv` và cài `requirements.txt`
+- `tmp/vbsp_launcher.lock` — xóa lock stale khi port 8502 không có process listening để launcher không nhận nhầm app đang chạy
+- `BUGMAP.md` — thêm J55 ghi nhận lỗi `Unable to create process` do `venv` trỏ tới Python nền đã bị mất
+
+## [2026-07-23] — Theo dõi trạng thái chốt KHTD từ Google Sheet
+- `tabs/tab_theo_doi_nhap/data.py` dòng ~16/~174 — thêm reader cache cho tab `TRẠNG THÁI CHỐT` của Sheet điều chỉnh KHTD
+- `tabs/tab_theo_doi_nhap/ui_trang_thai_chot.py` — thêm màn KPI, lọc thiếu hạng mục, bảng chi tiết và xuất Excel trạng thái chốt
+- `tabs/tab_theo_doi_nhap/__init__.py` dòng ~18/~87 — thêm lựa chọn `🏁 Trạng thái chốt KHTD` trong dropdown Theo dõi nhập liệu
+
 ## [2026-07-19] — Đối chiếu nguồn vốn xã GQVL/NSVSMT tại tab Nguồn vốn địa phương
 - `tabs/tab_hhi.py` dòng ~82 — thêm fingerprint rule Mã NĐT vào cache key để đổi rule cấp tỉnh/cấp xã không giữ số cũ
 - `tabs/tab_hhi.py` dòng ~257/~564 — thêm bảng và sheet Excel đối chiếu 02 chương trình nguồn vốn ngân sách cấp xã: GQVL, NS&VSMTNT và tổng cộng theo đơn vị

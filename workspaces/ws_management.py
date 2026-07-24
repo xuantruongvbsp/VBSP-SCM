@@ -343,6 +343,7 @@ def _build_all_items(role: str, username: str, **kwargs) -> list:
         {"group": "Báo cáo", "label": "📅 Báo cáo định kỳ",      "icon": "calendar",      "fn": lambda: _get_tab("tab_bao_cao_dinh_ky").render(None, **kwargs)},
         {"group": "Báo cáo", "label": "📄 Báo cáo KHNV",         "icon": "file-report",   "fn": lambda: _get_tab("tab_khnv_bao_cao").render(None, **kwargs)},
         {"group": "Báo cáo", "label": "📥 Tiến độ nộp BC",       "icon": "inbox",         "fn": lambda: _get_tab("tab_tien_do_nop").render(None, **kwargs)},
+        {"group": "Báo cáo", "label": "📋 Theo dõi nhập liệu",   "icon": "clipboard-list","fn": lambda: _get_tab("tab_theo_doi_nhap").render(None, **kwargs)},
 
         # ── Giám sát ───────────────────────────────────────────────────────────
         {"group": "Giám sát", "label": "⚠️ Cảnh báo Tín dụng",    "icon": "alert-triangle","fn": lambda: _get_tab("tab_canh_bao_nqh").render(None, role=role, username=username, df_full=df_full, ds_pgd_all=ds_pgd_all)},

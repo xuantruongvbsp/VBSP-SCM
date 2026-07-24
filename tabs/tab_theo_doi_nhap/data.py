@@ -19,6 +19,7 @@ from .constants import (
 )
 
 DCTT_SHEET_ID = "1spkUfS3XE6D7j4pkXva5x7AhKCd5xb8XBpi0HUN6lwE"
+TRANG_THAI_CHOT_TAB = "TRẠNG THÁI CHỐT"
 _DCTT_KEYWORDS = ("điều chỉnh", "tăng trưởng")
 
 
@@ -207,6 +208,56 @@ def tinh_tien_do(pgd_groups: dict, ds_ct: list[dict]) -> pd.DataFrame:
         row["Tổng_pct"] = round(sum_pct / ap_dung_count, 1) if ap_dung_count else 0.0
         rows_out.append(row)
     return pd.DataFrame(rows_out) if rows_out else pd.DataFrame()
+
+
+@st.cache_data(ttl=CACHE_TTL)
+def doc_trang_thai_chot(
+    sheet_id: str = DCTT_SHEET_ID,
+    sheet_tab: str = TRANG_THAI_CHOT_TAB,
+) -> tuple[dict, pd.DataFrame]:
+    """Đọc tab trạng thái chốt kế hoạch tín dụng."""
+    try:
+        client = ket_noi_gsheet()
+        ws = client.open_by_key(sheet_id).worksheet(sheet_tab)
+        rows = ws.get_all_values()
+    except Exception as e:
+        logger.error("doc_trang_thai_chot: %s", e, exc_info=True)
+        raise
+
+    meta = {
+        "title": rows[0][0].strip() if rows and rows[0] else "",
+        "deadline_text": rows[1][0].strip() if len(rows) > 1 and rows[1] else "",
+        "summary_text": rows[2][0].strip() if len(rows) > 2 and rows[2] else "",
+        "sheet_tab": sheet_tab,
+        "sheet_id": sheet_id,
+    }
+
+    header_idx: int | None = None
+    for i, row in enumerate(rows[:30]):
+        cells = [str(c).strip().lower() for c in row]
+        has_unit = any("đơn vị" in c or "pgd" in c for c in cells)
+        has_result = any("kết quả chung" in c for c in cells)
+        if has_unit and has_result:
+            header_idx = i
+            break
+
+    if header_idx is None:
+        logger.warning("doc_trang_thai_chot: không tìm thấy header trong %s", sheet_tab)
+        return meta, pd.DataFrame()
+
+    headers = [str(c).strip() for c in rows[header_idx]]
+    data_rows: list[dict] = []
+    for raw in rows[header_idx + 1:]:
+        if not any(str(c).strip() for c in raw):
+            continue
+        padded = list(raw) + [""] * max(0, len(headers) - len(raw))
+        item = {headers[i]: str(padded[i]).strip() for i in range(len(headers))}
+        ten_dv = item.get("Đơn vị/PGD", "").strip()
+        if not ten_dv or "tổng" in ten_dv.lower():
+            continue
+        data_rows.append(item)
+
+    return meta, pd.DataFrame(data_rows)
 
 
 def emoji_pct(pct: float | None) -> str:

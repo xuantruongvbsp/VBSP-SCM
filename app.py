@@ -247,6 +247,21 @@ def _enrich_hstd(
     return df
 
 
+def _loc_hstd_active(df: pd.DataFrame) -> pd.DataFrame:
+    """Lọc hồ sơ còn dư nợ từ bản HSTD full đã load sẵn."""
+    if df is None or df.empty:
+        return df
+
+    mask = pd.Series(False, index=df.index)
+    for col in (COT_TONG_DU_NO, COT_DU_NO_QH, COT_DU_NO_KHOANH):
+        if col in df.columns:
+            mask |= pd.to_numeric(df[col], errors="coerce").fillna(0) > 0
+
+    if bool(mask.all()):
+        return df
+    return df.loc[mask].copy()
+
+
 # ── Page config ───────────────────────────────────────────────────────────────
 st.set_page_config(
     page_title="VBSP-SCM | Tín dụng Nội bộ",
@@ -1257,11 +1272,14 @@ def main():
             from auth import la_phan_he_cn
             import tracemalloc as _tm
             _tm.start()
+            _filter_active_from_full = False
+            _using_operation_upload = False
             if la_phan_he_cn(role) or not pgd_user:
                 # df_full: toàn bộ hồ sơ (kể cả dư nợ = 0) — dùng cho báo cáo KHNV
-                # df: chỉ hồ sơ còn dư nợ — dùng cho tìm kiếm / duyệt hồ sơ
+                # df: lọc từ df_full sau enrich để tránh đọc/enrich HSTD 2 lần khi đăng nhập
                 df_full = _load_hstd(CACHE_HSTD, _hstd_ts, active_only=False)
-                df = _load_hstd(CACHE_HSTD, _hstd_ts, active_only=True)
+                df = df_full
+                _filter_active_from_full = True
                 # Kiểm tra schema — parquet từ file template chỉ có ~6 cột
                 # (xảy ra khi cache bị xóa và app fallback đọc raw Excel)
                 _MIN_COLS = 15
@@ -1310,6 +1328,7 @@ def main():
                     df_op = doc_hstd_toan_cn_pgd(_pgd_op_ts)
                     if df_op is not None and not df_op.empty:
                         df = df_op
+                        _using_operation_upload = True
             # management/executive: df = active_only (cho tìm kiếm, tổng quan)
             # df_full = full (cho báo cáo KHNV, tabs cần tất cả hồ sơ)
             # Không gán df = df_full — hai object riêng biệt để enrich độc lập.
@@ -1337,6 +1356,9 @@ def main():
                 df_full = df  # cùng nguồn dữ liệu — dùng chung 1 bản enrich
             else:
                 df_full = _enrich_hstd(df_full, _df_nq11_fallback, df_gqvl)
+
+            if _filter_active_from_full and not _using_operation_upload:
+                df = _loc_hstd_active(df_full)
 
             # Xây df_nq11 cho tabs từ HSTD đã enrich (không cần file riêng)
             if "__is_nq11" in df.columns and df["__is_nq11"].any():

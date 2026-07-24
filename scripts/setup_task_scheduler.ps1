@@ -17,7 +17,9 @@ $ErrorActionPreference = "Stop"
 
 if (-not $PythonPath) {
     $candidates = @(
-        "C:\Users\Administrator\AppData\Local\Programs\Python\Python314\python.exe",
+        "$ProjectDir\venv\Scripts\python.exe",
+        "D:\VBSP-SCM\venv\Scripts\python.exe",
+        "C:\Users\Administrator\AppData\Local\Programs\Python\Python312\python.exe",
         "C:\Python312\python.exe",
         "C:\Python311\python.exe",
         "python.exe"

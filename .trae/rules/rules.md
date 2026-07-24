@@ -131,202 +131,32 @@ Bước 5: Import check (nếu tạo component mới):
 
 ---
 
-## 4. COT_* Constants (từ config.py)
+## 4. Tên cột — dùng COT_* từ config.py
 
 ```python
-# Core
-COT_TEN_PGD      = "Tên PGD"
-COT_MA_KH        = "Mã KH"
-COT_TEN_KH       = "Tên KH"
-COT_SO_KU        = "Số khế ước"
-COT_NGAY_VAY     = "Ngày vay"
-COT_NGAY_DH      = "Ngày ĐH theo Gia hạn"
-COT_NGAY_DH_HD   = "Ngày ĐH theo hợp đồng"
-COT_THOI_HAN     = "Thời hạn vay"
-COT_LAI_SUAT     = "Lãi suất"
-COT_MUC_VAY      = "Mức vay"
-COT_DU_NO_TH     = "Dư nợ trong hạn"
-COT_DU_NO_QH     = "Dư nợ quá hạn"
-COT_TONG_DU_NO   = "Tổng dư nợ"
-COT_DU_NO_KHOANH = "Dư nợ khoanh"
-COT_TEN_CT       = "Tên chương trình"
-COT_TINH_TRANG   = "Tình trạng món vay"
-COT_DIA_CHI      = "Địa chỉ"
-COT_SDT          = "Số điện thoại"       # KHÔNG dùng COT_DIEN_THOAI
-COT_NGAY_SL      = "Ngày số liệu"
-COT_GOC_TRA      = "Gốc đã trả"
-
-# Extended
-COT_CMND              = "Số CMND"
-COT_TEN_TO            = "Tên tổ"          # KHÔNG dùng COT_TEN_TKVV
-COT_TEN_XA            = "Tên xã"
-COT_TEN_THON          = "Tên thôn"
-COT_NGUON_VON         = "Nguồn vốn"       # 1=TW, 2=ĐP
-COT_MA_CHUONG_TRINH   = "Mã chương trình"
-COT_PL_NV             = "Phân loại NV"    # KHÔNG hardcode "PL NV"
-COT_MA_NHA_DAU_TU     = "Mã nhà đầu tư"
-COT_TEN_NHA_DAU_TU     = "Tên nhà đầu tư"
-COT_TEN_TO_TRUONG      = "Tên tổ trưởng"
-
-# Personal
-COT_NGAY_SINH       = "Ngày sinh"
-COT_NGAY_CAP_CMND  = "Ngày cấp CMND"
-COT_NOI_CAP_CMND   = "Nơi cấp CMND"
-COT_NGAY_HH_KHOANH = "Ngày hết hạn khoanh"
-COT_TEN_HSSV       = "Họ tên HSSV"
-COT_TEN_VC         = "Họ tên vợ/chồng"
-COT_HINH_THUC_VAY  = "Hình thức vay"
-
-# NQ11
-COT_DNO_NQ11       = "Dư nợ gốc NQ11"
-COT_NQ11_NO_TH     = "Nợ trong hạn NQ11"
-COT_NQ11_NO_QH     = "Nợ quá hạn NQ11"
-COT_NQ11_MA_KH     = "Mã KH NQ11"
-COT_NQ11_TEN_KH    = "Tên KH NQ11"
-COT_NQ11_SO_TIEN   = "Số tiền NQ11"
-COT_NQ11_DU_NO     = "Dư nợ NQ11"
-COT_NQ11_SO_TIEN_GN = "Số tiền giải ngân NQ11"
-COT_NQ11_DEN_HAN_SC = "Đến hạn sổ cuối NQ11"
-COT_NQ11_NGAY_BC   = "Ngày báo cáo NQ11"
-
-# GQVL
-COT_GQVL_MA_PGD       = "Mã PGD GQVL"
-COT_GQVL_DU_NO_KHOANH = "Dư nợ khoanh GQVL"
-
-# Risk/Activity
-COT_LAI_TON    = "Lãi tồn TH"
-COT_LAI_TON_QH = "Lãi tồn QH"
-COT_LAI_THANG  = "Lãi DT trong tháng"
-COT_DVUT       = "Tên ĐVUT"
+df[COT_TONG_DU_NO]    # ✅
+df["Tổng dư nợ"]      # ❌
 ```
+
+> **Tra cứu đầy đủ:** đọc `COT_REF.md` — liệt kê tất cả COT_* (Core, Extended, Personal, NQ11, GQVL, Risk).
 
 ---
 
-## 5. Function Signatures — Components
+## 5. Function Signatures — tra nhanh
 
-### delta_card.py
-```python
-# ⚠️ THAM SỐ: num_columns (KHÔNG phải cols)
-def kpi_row(cols: list[dict], num_columns: int = 4): ...
+> **Tra cứu đầy đủ:** đọc `SIGNATURES.md` — tất cả signatures của Components, Utils, Auth.
 
-def delta_card(
-    label: str,
-    value: str | float | int,
-    delta: float | None = None,
-    delta_label: str = "so với kỳ trước",
-    delta_color: str = "normal",   # "normal"|"inverse"|"off"
-    help: str | None = None,
-    icon: str = "",
-    suffix: str = "",
-    precision: int = 0,
-    key: str | None = None,
-    use_container_width: bool = True,
-): ...
-```
-
-### export_pdf.py
-```python
-# ⚠️ download_pdf_button nhận PDF BYTES — không phải df, tieu_de
-def download_pdf_button(
-    pdf_bytes: bytes,
-    filename: str = "bao_cao.pdf",
-    label: str = "📥 Tải PDF",
-    key: str | None = None,
-): ...
-
-def xuat_pdf_co_chart(
-    df: pd.DataFrame,
-    tieu_de: str,
-    nguoi_xuat: str,
-    figs: list[tuple[go.Figure, str]] | None = None,
-    cols_tien: list[str] | None = None,
-    don_vi_tien: str = "đồng",
-    prefix_file: str = "",
-    them_dong_tong: bool = True,
-    them_ngay_xuat: bool = True,
-) -> bytes: ...
-```
-
-### filter_bar.py
-```python
-def filter_bar(
-    df: pd.DataFrame,
-    filters: list[dict],    # [{"field": "Tên xã", "label": "Xã", "type": "select"}]
-    key_prefix: str = "fb", # type: "select"|"multiselect"|"text"|"range"
-    on_change=None,
-) -> dict: ...              # {field: value} — None = "Tất cả"
-
-def apply_filters(df: pd.DataFrame, filter_values: dict) -> pd.DataFrame: ...
-```
-
-### loan_drawer.py
-```python
-# ⚠️ Nhận ROW (pd.Series | dict) — KHÔNG phải DataFrame
-def loan_detail_drawer(
-    row: pd.Series | dict,
-    title: str | None = None,
-    extra_fields: list[tuple] | None = None,
-    field_configs: list[dict] | None = None,
-): ...
-```
-
-### movers.py
-```python
-def movers_analysis(
-    df_curr: pd.DataFrame,
-    df_prev: pd.DataFrame | None = None,
-    top_n: int = 10,
-    key_prefix: str = "mover",
-    on_select_dimension=None,
-    on_select_metric=None,
-    show_title: bool = True,
-): ...
-```
+Các lỗi tham số phổ biến cần nhớ:
+- `kpi_row(cols, num_columns=4)` — **KHÔNG** phải `cols=4`
+- `download_pdf_button(pdf_bytes=...)` — nhận **PDF bytes**, không phải df
+- `loan_detail_drawer(row: pd.Series)` — nhận **row**, không phải DataFrame
+- `luu_pgd_file(ten_pgd, loai, file_bytes)` — **3 tham số**, không có username
 
 ---
 
-## 6. Function Signatures — Utils (utils.py)
+## 6. Quy tắc bắt buộc
 
-```python
-def fmt_so(x) -> str           # "1.234"
-def fmt_tien(x) -> str         # triệu đồng
-def fmt_ty(x) -> str           # "1.500" (triệu đồng, 0 số lẻ — KHÔNG có hậu tố "tỷ")
-def fmt_pct(x) -> str          # "12,34%"
-def fmt(x) -> str              # "1.234.567.890"
-def vn(s: str) -> str          # normalize tiếng Việt
-def get_tab_context(tab)       # fallback st.container() khi tab=None
-def hien_thi_dataframe_phan_trang(df, key, page_size=50): ...
-def xuat_excel(sheets: dict, ten_file: str) -> bytes: ...
-def auto_fill_document(template_path, tag_map, output_path): ...
-def auto_audit(action: str = "", clear_cache: bool = True): ...
-def auto_fill_batch(df_rows, template_path, tag_map, ...): ...
-def lazy_tabs(labels: list[str], renderers: list, key: str = "lt"): ...
-```
-
-⚠️ `pgd_slug()` ở `data/pgd.py` (KHÔNG phải utils)
-
----
-
-## 7. Function Signatures — Auth (auth.py)
-
-```python
-def normalize_role(role: str) -> str      # "admin"→"admin_cn", "user"→"user_pgd"
-def la_phan_he_cn(role: str) -> bool      # executive/admin_cn/manager_cn/admin/manager/chuyenvien_cn
-def la_phan_he_pgd(role: str) -> bool     # admin_pgd/manager_pgd/user_pgd/user
-def la_executive(role: str) -> bool
-def la_admin_cn(role: str) -> bool
-def la_chuyen_vien_cn(role: str) -> bool
-def co_quyen_upload_pgd(role: str) -> bool
-def co_quyen_quan_ly_user_pgd(role: str) -> bool
-def co_quyen_giao_nhiem_vu(role: str) -> bool
-def get_permissions(role: str) -> dict
-```
-
----
-
-## 8. Quy tắc bắt buộc
-
-### 8.1 Lưu dữ liệu — CHỈ kv_store
+### 6.1 Lưu dữ liệu — CHỈ kv_store
 ```python
 db.doc_kv("key")                    # đọc → None nếu không có
 db.doc_kv_prefix("khtd_pgd_")       # đọc nhiều key
@@ -352,7 +182,7 @@ db.ghi_kv("key", value, username)   # ghi
 
 `slug` = `pgd_slug(ten_pgd)` từ `data/pgd.py`
 
-### 8.2 Audit — BẮT BUỘC sau MỌI thao tác ghi
+### 6.2 Audit — BẮT BUỘC sau MỌI thao tác ghi
 ```python
 username = st.session_state.get("username", "unknown")
 db.ghi_kv(key, value, username)
@@ -362,7 +192,7 @@ Action chuẩn: `luu_khtd_cn`, `luu_khtd_pgd`, `upload_hstd`, `upload_nq11`,
 `upload_gqvl`, `upload_dienbao`, `merge_hstd`, `merge_nq11`, `merge_gqvl`,
 `luu_no_rui_ro`, `xuat_bieu_cn`, `xuat_01xln`, `xuat_02xln`
 
-### 8.3 Upload — LUÔN qua upload_service.py
+### 6.3 Upload — LUÔN qua upload_service.py
 ```python
 from services.upload_service import luu_pgd_file, luu_file_he_thong, KetQuaUpload
 ket_qua = luu_pgd_file(ten_pgd, loai, file_bytes)  # 3 tham số, không có username
@@ -370,7 +200,7 @@ ket_qua.hien_thi()
 st.cache_data.clear()  # BẮT BUỘC sau upload thành công
 ```
 
-### 8.4 Tiền tệ — 3 lớp
+### 6.4 Tiền tệ — 3 lớp
 | Lớp | Đơn vị | Xử lý |
 |---|---|---|
 | Nhập | Triệu đồng | `number_input` |
@@ -391,7 +221,7 @@ st.column_config.NumberColumn(format=".2%")    # ✅ phần trăm
 # ❌ SAI: format="%.0f", format="%d", format="%.2f%%"
 ```
 
-### 8.5 Phân quyền — KHÔNG check chuỗi thô
+### 6.5 Phân quyền — KHÔNG check chuỗi thô
 ```python
 role = normalize_role(role)
 if la_phan_he_cn(role): ...   # ✅  (executive/admin_cn/manager_cn/chuyenvien_cn/admin/manager)
@@ -409,20 +239,20 @@ if role == "admin": ...        # ❌
 | `manager_pgd` | PGD | Upload + nhập kế hoạch |
 | `user_pgd` / `user` | PGD | Tác nghiệp, chỉ thấy PGD mình |
 
-### 8.6 Tên cột — dùng COT_* từ config
+### 6.6 Tên cột — dùng COT_* từ config
 ```python
 df[COT_TONG_DU_NO]    # ✅
 df["Tổng dư nợ"]      # ❌
 ```
 
-### 8.7 Widget key — unique
+### 6.7 Widget key — unique
 ```python
 key_prefix = f"pgd_{pgd_slug(pgd_user)}_"  # hoặc "cn_"
 st.selectbox(..., key=f"{key_prefix}filter")
 # KHÔNG dùng index loop làm key
 ```
 
-### 8.8 render() — fallback khi tab=None
+### 6.8 render() — fallback khi tab=None
 ```python
 def render(tab=None, **kwargs) -> None:
     role     = normalize_role(str(kwargs.get("role", "user") or "user"))
@@ -439,7 +269,7 @@ def render(tab=None, **kwargs) -> None:
 # KHÔNG dùng "with tab:" trực tiếp
 ```
 
-### 8.9 Logging — không nuốt lỗi
+### 6.9 Logging — không nuốt lỗi
 ```python
 from logger import get_logger
 logger = get_logger(__name__)
@@ -449,36 +279,36 @@ except Exception as e:
 # KHÔNG: except Exception: pass
 ```
 
-### 8.10 Tên đơn vị — dùng constant
+### 6.10 Tên đơn vị — dùng constant
 ```python
 from config import DON_VI_CHI_NHANH, TEN_CHI_NHANH_HIEN_THI
 # DON_VI_CHI_NHANH        → dùng để LỌC df
 # TEN_CHI_NHANH_HIEN_THI  → dùng để HIỂN THỊ UI
 ```
 
-### 8.11 Git — TUYỆT ĐỐI không tự commit/push
+### 6.11 Git — TUYỆT ĐỐI không tự commit/push
 - Sửa tại `D:/VBSP-SCM` (worktree gốc, branch main)
 - KHÔNG tự `git add`, `git commit`, `git push`
 - Người dùng tự commit qua GitHub Desktop
 
-### 8.12 Không thêm dependency mới
+### 6.12 Không thêm dependency mới
 Đã có: `pandas`, `openpyxl`, `pyarrow`, `streamlit`, `duckdb`,
 `python-docx`, `docx2pdf`, `concurrent.futures`, `threading`
 
-### 8.13 CHANGELOG.md — cập nhật sau mỗi lần sửa
+### 6.13 CHANGELOG.md — cập nhật sau mỗi lần sửa
 ```
 ## [YYYY-MM-DD] — mô tả ngắn
 - filename.py dòng ~X — mô tả thay đổi
 ```
 Thêm lên ĐẦU FILE, dùng ngày thực tế, KHÔNG xóa entry cũ.
 
-### 8.14 BUGMAP.md — cập nhật sau mỗi lần fix bug
+### 6.14 BUGMAP.md — cập nhật sau mỗi lần fix bug
 - **BẮT BUỘC**: Mỗi khi fix bug, thêm entry mới vào BUGMAP.md theo template có sẵn (cuối file)
 - Phân loại đúng section (A. Parquet, B. Streamlit UI, C. DataFrame, D. Database, E. Upload, F. PDF/Word, G. KHTD, H. GSheet, I. Role, J. Code Pattern)
 - Nếu là dạng lỗi mới chưa có section phù hợp → tạo section mới
 - Format: `### XX — [Tên lỗi]` với bảng `| | |` gồm: File, Dấu hiệu, Nguyên nhân, Fix, Ngày fix
 
-### 8.15 pgd_mode — pattern song song 2 phân hệ
+### 6.15 pgd_mode — pattern song song 2 phân hệ
 ```python
 pgd_mode = kwargs.get("pgd_mode", False)
 pgd_user = kwargs.get("pgd_user")
@@ -492,14 +322,14 @@ else:
     key  = "kehoach"
 ```
 
-### 8.16 CSS & UI
+### 6.16 CSS & UI
 - Inject CSS **một lần** trong `app.py` — không inject trong tab
 - Bảng ≥ 8 cột → HTML thuần + `st.html(html_str)` (Streamlit ≥1.36) hoặc `st.markdown(html_str, unsafe_allow_html=True)` (cũ hơn)
 - HTML: **KHÔNG** hardcode `color:black` / `background:white` — dùng CSS variable tương thích dark mode
 - `st.date_input` bắt buộc có `format="DD/MM/YYYY"`
 - Màu sắc → xem `UI_GUIDELINES.md`
 
-### 8.17 DuckDB — LUÔN kiểm tra schema trước khi query
+### 6.17 DuckDB — LUÔN kiểm tra schema trước khi query
 ```python
 import duckdb, pyarrow.parquet as pq
 
@@ -514,7 +344,7 @@ if "Ten_ct" not in cols:
 df = duckdb.query(f"SELECT ... FROM '{CACHE_HSTD}'").df()
 ```
 
-### 8.18 Tóm tắt sau mỗi task — gửi Sonnet kiểm tra
+### 6.18 Tóm tắt sau mỗi task — gửi Sonnet kiểm tra
 **BẮT BUỘC**: Sau khi hoàn thành MỌI task, kết thúc bằng một đoạn tóm tắt ngắn gọn để người dùng copy gửi qua Sonnet kiểm tra. Format:
 
 ```
@@ -536,7 +366,7 @@ df = duckdb.query(f"SELECT ... FROM '{CACHE_HSTD}'").df()
 - Mô tả thay đổi ≤ 1 dòng/file
 - Nếu nhiều task trong 1 phiên → gộp chung 1 tóm tắt
 
-### 8.19 Numeric columns — LUÔN pd.to_numeric() trước sum/mean/groupby
+### 6.19 Numeric columns — LUÔN pd.to_numeric() trước sum/mean/groupby
 ```python
 # ❌ SAI — groupby.sum() trên cột mixed type nối chuỗi
 tong = df.groupby("PGD")["Tổng dư nợ"].sum()
@@ -550,7 +380,7 @@ n_pgd = int((tong > 0).sum())
 ```
 Lý do: parquet từ Excel thường có mixed dtype (string/float). Groupby.sum trên object = nối chuỗi.
 
-### 8.20 Đếm số chiều cho BQ — chọn đúng hàm đếm
+### 6.20 Đếm số chiều cho BQ — chọn đúng hàm đếm
 | Muốn đếm | Dùng | Vì |
 |---|---|---|
 | Số PGD có dư nợ | `groupby(PGD)[DN].sum() > 0 → count` | 1 PGD có thể có dư nợ = 0 |
@@ -568,7 +398,7 @@ n_xa = df[COT_TEN_XA].nunique()  # ra số xã toàn CN
 
 ---
 
-## 9. Lỗi đã từng mắc — KHÔNG lặp lại
+## 7. Lỗi đã từng mắc — KHÔNG lặp lại
 
 | # | Lỗi | Sai | Đúng |
 |---|-----|-----|------|
@@ -590,7 +420,7 @@ n_xa = df[COT_TEN_XA].nunique()  # ra số xã toàn CN
 
 ---
 
-## 10. Checklist trước khi báo "xong"
+## 8. Checklist trước khi báo "xong"
 
 ```
 □ python -c "py_compile.compile('file.py', doraise=True)" → OK
@@ -603,13 +433,13 @@ n_xa = df[COT_TEN_XA].nunique()  # ra số xã toàn CN
 □ render(tab=None) với fallback st.container()
 □ KHÔNG tự git commit/push
 □ st.date_input có format="DD/MM/YYYY"
-□ DuckDB: check schema parquet trước khi query (8.17)
+□ DuckDB: check schema parquet trước khi query (mục 6.17)
 □ HTML: KHÔNG hardcode color:black/background:white (dark mode)
 □ CHANGELOG.md đã cập nhật
 □ BUGMAP.md đã cập nhật (nếu fix bug)
 ```
 
-### 10.1 Rà soát sau khi xong task (đảm bảo đã “ghi vào chức năng”)
+### 8.1 Rà soát sau khi xong task (đảm bảo đã "ghi vào chức năng")
 
 ```
 □ Xác nhận điểm gắn (entry point):
@@ -637,7 +467,7 @@ n_xa = df[COT_TEN_XA].nunique()  # ra số xã toàn CN
 
 ---
 
-## 11. Tài liệu tham chiếu (tự đọc khi cần)
+## 9. Tài liệu tham chiếu (tự đọc khi cần)
 
 | File | Đọc khi |
 |---|---|

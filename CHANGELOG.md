@@ -1,5 +1,15 @@
 # CHANGELOG
 
+## [2026-07-25] — Tách UI lưu trữ khỏi tab Tiến độ nộp BC
+- `tabs/tab_tien_do_nop_archive.py` — tạo mới module render tab `Đã lưu trữ`, gồm xem lịch sử nộp, xuất Excel và khôi phục loại báo cáo đã lưu trữ
+- `tabs/tab_tien_do_nop.py` dòng ~20/~1192 — thay hàm `_render_luu_tru()` bằng `render_archive(...)`, tiếp tục giảm trách nhiệm UI chi tiết trong tab chính
+- `tests/test_smoke_imports.py` dòng ~91 — thêm smoke import cho module archive mới
+
+## [2026-07-25] — Tách UI đánh dấu thủ công khỏi tab Tiến độ nộp BC
+- `tabs/tab_tien_do_nop_manual.py` — dùng module render khối `Đánh dấu thủ công`, giữ toàn bộ thao tác thêm/cập nhật/xóa override đi qua service audit chung
+- `tabs/tab_tien_do_nop.py` dòng ~20/~386 — thay khối manual override dài bằng `render_manual_override(...)`, giảm trách nhiệm UI chi tiết trong tab chính
+- `tests/test_smoke_imports.py` dòng ~91 — thêm smoke import cho module helper mới để bắt lỗi import sớm
+
 ## [2026-07-25] — Hoàn thiện audit override thủ công báo cáo PGD
 - `services/report_submission_service.py` dòng ~43/~792 — thêm `manual_nop_tdn_audit` và helper `luu_manual_override()` / `xoa_manual_override()` để ghi rõ thao tác thêm/cập nhật/xóa override: PGD, loại báo cáo, ngày nộp, ghi chú, người thao tác, thời điểm và lý do
 - `tabs/tab_tien_do_nop.py` dòng ~43/~425 — nút `Đánh dấu` và `Bỏ` dùng service audit mới; danh sách override hiển thị người và thời điểm cập nhật gần nhất

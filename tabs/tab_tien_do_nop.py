@@ -17,6 +17,7 @@ import db
 from auth import la_phan_he_cn, normalize_role
 from config import DS_PGD, DON_VI_CHI_NHANH
 from tabs.base_tab import TabContext
+from tabs.tab_tien_do_nop_archive import render_archive
 from tabs.tab_tien_do_nop_manual import render_manual_override
 from utils import xuat_excel
 
@@ -35,7 +36,6 @@ from services.report_submission_service import (
     doc_deadline_config,
     luu_deadline_config,
     doc_luu_tru_config,
-    khoi_phuc_loai_bao_cao,
     loc_deadline_dang_hoat_dong,
     loc_du_lieu_luu_tru,
     luu_tru_loai_bao_cao,
@@ -383,97 +383,7 @@ def _render_tong_quan(
             ),
         )
 
-    # ── Đánh dấu thủ công (chỉ admin CN) ────────────────────────────────────
-    if can_config:
-        st.divider()
-        st.markdown("### ✏️ Đánh dấu thủ công")
-        st.caption("Dùng khi PGD gửi báo cáo ngoài Google Form (email, Zip...)")
-
-        manual_ds = doc_manual_log_raw()
-
-        # Bao gồm cả loại BC từ GSheet (dù chưa có deadline) để hỗ trợ đánh dấu
-        ds_loai_gsheet_manual = sorted(df["loai_bao_cao"].dropna().unique().tolist()) if not df.empty else []
-        ds_loai_manual = sorted(set(ds_loai) | set(ds_loai_gsheet_manual))
-
-        col_pgd, col_loai, col_ngay = st.columns([2, 2, 1.5])
-        with col_pgd:
-            pgd_manual = st.selectbox("PGD", ds_pgd_scope, key="man_pgd")
-        with col_loai:
-            loai_manual = st.selectbox("Loại BC", ds_loai_manual, key="man_loai")
-        with col_ngay:
-            ngay_manual = st.date_input("Ngày nộp", value=date.today(), format="DD/MM/YYYY", key="man_ngay")
-
-        col_note, col_opt = st.columns([4, 2])
-        with col_note:
-            ghi_chu_manual = st.text_input(
-                "Ghi chú (tùy chọn)",
-                placeholder="VD: Nộp qua email, thiếu file BCTC",
-                key="man_ghi_chu",
-            )
-        with col_opt:
-            st.write("")
-            ghi_de_manual = st.checkbox(
-                "Ghi đè trạng thái trên ma trận",
-                value=True,
-                key="man_ghi_de",
-                help="Bỏ chọn nếu chỉ muốn lưu ghi chú, không thay đổi trạng thái 🟢/🟡/🔴",
-            )
-
-        col_btn, _ = st.columns([1, 5])
-        with col_btn:
-            if st.button("✅ Đánh dấu", key="man_btn", type="primary", use_container_width=True):
-                luu_manual_override({
-                    "pgd": pgd_manual,
-                    "loai": loai_manual,
-                    "ngay_nop": ngay_manual.strftime("%Y-%m-%d"),
-                    "ghi_chu": ghi_chu_manual.strip(),
-                    "ghi_de": ghi_de_manual,
-                }, username, manual_ds, ly_do=ghi_chu_manual.strip() or "Đánh dấu thủ công từ UI")
-                st.success(f"✅ Đã đánh dấu: **{pgd_manual}** — **{loai_manual}**")
-                st.rerun()
-
-        match_form = df[(df["ten_pgd"] == pgd_manual) & (df["loai_bao_cao"] == loai_manual)]
-        if not match_form.empty and ghi_de_manual:
-            lan_cuoi = match_form.sort_values("thoi_gian").iloc[-1]
-            ngay_form = pd.to_datetime(lan_cuoi["thoi_gian"]).strftime("%d/%m/%Y")
-            st.warning(
-                f"⚠️ **{pgd_manual}** đã nộp **{loai_manual}** qua Google Form "
-                f"vào **{ngay_form}**. Đánh dấu sẽ ghi đè trạng thái này trên ma trận."
-            )
-
-        if manual_ds:
-            st.divider()
-            st.caption(f"📌 {len(manual_ds)} đánh dấu thủ công hiện tại:")
-            for i, entry in enumerate(manual_ds):
-                e_pgd  = entry.get("pgd", "?")
-                e_loai = entry.get("loai", "?")
-                e_ngay = entry.get("ngay_nop", "?")
-                e_note = entry.get("ghi_chu", "")
-                e_gde  = entry.get("ghi_de", True)
-                e_user = entry.get("username_cap_nhat") or entry.get("username_tao") or "?"
-                e_luc = entry.get("cap_nhat_luc") or entry.get("tao_luc") or ""
-                try:
-                    e_ngay_str = pd.to_datetime(e_ngay).strftime("%d/%m/%Y")
-                except Exception:
-                    e_ngay_str = str(e_ngay)
-                try:
-                    e_luc_str = pd.to_datetime(e_luc).strftime("%d/%m/%Y %H:%M") if e_luc else "—"
-                except Exception:
-                    e_luc_str = str(e_luc or "—")
-                loai_str = "* ghi đè" if e_gde else "📝 ghi chú"
-                c1, c2, c3, c4 = st.columns([2, 2, 3, 1])
-                with c1:
-                    st.write(f"**{e_pgd}**")
-                with c2:
-                    st.write(f"{e_loai} — {e_ngay_str} ({loai_str})")
-                with c3:
-                    st.write(e_note if e_note else "—")
-                    st.caption(f"{e_user} · {e_luc_str}")
-                with c4:
-                    if st.button("↩️ Bỏ", key=f"man_del_{i}", use_container_width=True):
-                        xoa_manual_override(i, username, manual_ds, ly_do="Bỏ đánh dấu từ UI")
-                        st.success(f"✅ Đã bỏ: **{e_pgd}** — **{e_loai}**")
-                        st.rerun()
+    render_manual_override(df, ds_pgd_scope, ds_loai, username, can_config)
 
 
 # ── Tab 2: Danh sách nộp ─────────────────────────────────────────────────────
@@ -696,118 +606,6 @@ def _render_danh_sach(
                 prefix_file=ten_file_ds,
                 key="pdf_tdn",
             )
-
-
-def _render_luu_tru(
-    df: pd.DataFrame,
-    archive_cfg: dict[str, dict],
-    username: str,
-    can_config: bool,
-) -> None:
-    """Hiển thị lịch sử báo cáo đã lưu trữ và cho phép khôi phục."""
-    st.subheader("🗃️ Báo cáo đã lưu trữ")
-    st.caption(
-        "Dữ liệu vẫn nằm trong Google Sheet và được tách khỏi deadline, Tổng quan đang hoạt động "
-        "và Telegram."
-    )
-    if not archive_cfg:
-        st.info("Chưa có loại báo cáo nào được lưu trữ.")
-        return
-
-    options = sorted(archive_cfg)
-
-    def _archive_label(key: str) -> str:
-        return str(archive_cfg.get(key, {}).get("ten_hien_thi") or key)
-
-    selected = st.selectbox(
-        "Loại báo cáo lưu trữ",
-        options=options,
-        format_func=_archive_label,
-        key="tdn_archive_view_type",
-    )
-    selected_cfg = {selected: archive_cfg[selected]}
-    df_luu = loc_du_lieu_luu_tru(df, selected_cfg, archived=True)
-    meta = archive_cfg[selected]
-
-    archived_at = meta.get("luu_tru_luc", "")
-    try:
-        archived_at_text = pd.to_datetime(archived_at).strftime("%H:%M %d/%m/%Y")
-    except Exception:
-        archived_at_text = "—"
-    m1, m2, m3, m4 = st.columns(4)
-    m1.metric("Loại lưu trữ", "1")
-    m2.metric("Lượt nộp", len(df_luu))
-    m3.metric("Đơn vị đã nộp", df_luu["ten_pgd"].nunique() if not df_luu.empty else 0)
-    m4.metric("Lưu trữ lúc", archived_at_text)
-    st.caption(
-        f"Người lưu trữ: **{meta.get('luu_tru_boi', '—')}** · "
-        f"Deadline cũ: **{meta.get('deadline_cu') or '—'}**"
-    )
-
-    if df_luu.empty:
-        st.warning("Loại này đã được đánh dấu lưu trữ nhưng chưa có lượt nộp trong phạm vi bạn được xem.")
-    else:
-        df_hien = df_luu[
-            [
-                "thoi_gian",
-                "ten_pgd",
-                "loai_bao_cao",
-                "ky_bao_cao",
-                "ho_ten",
-                "noi_dung",
-                "file_dinh_kem",
-            ]
-        ].copy()
-        df_hien["thoi_gian"] = pd.to_datetime(df_hien["thoi_gian"], errors="coerce").dt.strftime(
-            "%d/%m/%Y %H:%M"
-        )
-        df_hien = df_hien.rename(
-            columns={
-                "thoi_gian": "Thời gian",
-                "ten_pgd": "Đơn vị",
-                "loai_bao_cao": "Loại báo cáo",
-                "ky_bao_cao": "Kỳ báo cáo",
-                "ho_ten": "Người nộp",
-                "noi_dung": "Nội dung",
-                "file_dinh_kem": "File",
-            }
-        )
-        st.dataframe(
-            df_hien,
-            hide_index=True,
-            use_container_width=True,
-            column_config={"File": st.column_config.LinkColumn("File", display_text="📎 Xem")},
-        )
-        excel_bytes = xuat_excel({"Báo cáo đã lưu trữ": df_hien})
-        st.download_button(
-            "📥 Xuất Excel lịch sử",
-            data=excel_bytes,
-            file_name="bao_cao_da_luu_tru.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            key="tdn_archive_excel",
-        )
-
-    if can_config:
-        st.divider()
-        st.markdown("#### Khôi phục loại báo cáo")
-        st.caption(
-            "Sau khi khôi phục, báo cáo trở lại nhóm Cần cài deadline. Deadline cũ không tự bật lại."
-        )
-        confirm_restore = st.checkbox(
-            "Tôi xác nhận muốn khôi phục loại báo cáo này",
-            key="tdn_archive_restore_confirm",
-        )
-        if st.button(
-            "↩️ Khôi phục",
-            key="tdn_archive_restore",
-            disabled=not confirm_restore,
-        ):
-            if khoi_phuc_loai_bao_cao(selected, username):
-                st.cache_data.clear()
-                st.success(f"✅ Đã khôi phục: **{_archive_label(selected)}**")
-                st.rerun()
-            else:
-                st.warning("Loại báo cáo này không còn trong danh mục lưu trữ.")
 
 
 # ── Tab 3: Cài đặt thời hạn hoàn thành ────────────────────────────────────────
@@ -1391,4 +1189,4 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
             )
 
         with t4:
-            _render_luu_tru(df, archive_cfg, username, can_config)
+            render_archive(df, archive_cfg, username, can_config)

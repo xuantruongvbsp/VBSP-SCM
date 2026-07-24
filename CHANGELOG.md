@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## [2026-07-24] — Fix tài liệu ref sau tối ưu token
+- `COT_REF.md` — bổ sung đầy đủ danh sách `COT_*` theo `config.py` thay vì chỉ nhóm cột thường dùng
+- `SIGNATURES.md` — sửa signature tra nhanh lệch code gốc cho `filter_bar`, `loan_detail_drawer`, `xuat_excel`, `auto_fill_document`, `auto_fill_batch`, `lazy_tabs`, `vn`
+- `AGENTS.md` dòng ~267/~317 — đổi section 8 thành "Function Signatures & Checklist", phục hồi heading checklist, sửa ví dụ `auto_fill_document()`
+- `BUGMAP.md` — thêm J61 ghi nhận rủi ro tài liệu ref thiếu/sai sau khi tách khỏi rules chính
+
 ## [2026-07-24] — Sửa CODE_INDEX để agent tra file chính xác
 - `CODE_INDEX.md` dòng ~38 — sửa path CĐ Tổ TK&VV từ `data/cdotkvv.py` sang `data/cdtotkvv.py`
 - `CODE_INDEX.md` dòng ~112 — làm rõ không phải mọi file tab/submodule đều có `render(tab=None, **kwargs)`, tránh agent gọi sai entrypoint và tránh prose bị checker bắt nhầm thành path

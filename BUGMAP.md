@@ -2817,6 +2817,18 @@ def _to_int(val, default=0):
 
 ---
 
+### J61 — File ref sau tách rules thiếu COT và sai signature
+| | |
+|---|---|
+| **File** | `COT_REF.md`, `SIGNATURES.md`, `AGENTS.md` |
+| **Dấu hiệu** | `COT_REF.md` tự mô tả là danh sách đầy đủ nhưng chỉ có 53/200 `COT_*`; `SIGNATURES.md` ghi sai một số hàm như `xuat_excel(sheets, ten_file)`, thiếu `username` ở `filter_bar()`/`loan_detail_drawer()`; checklist trong `AGENTS.md` bị rơi khỏi heading và ví dụ `auto_fill_document()` còn tham số cũ |
+| **Nguyên nhân** | Khi tách rules chính sang file tra cứu, nội dung ref được rút gọn theo nhóm thường dùng nhưng pointer vẫn ghi "đầy đủ"; signature được chép theo tài liệu cũ thay vì đối chiếu lại code gốc |
+| **Fix** | Bổ sung toàn bộ `COT_*` theo `config.py`; sửa signature tra nhanh theo code gốc; đổi heading section 8 trong `AGENTS.md` để checklist là subsection rõ ràng |
+| **Test** | Đối chiếu count `COT_*` unique giữa `config.py` và `COT_REF.md`; grep lại các signature đã sửa trong code gốc |
+| **Ngày fix** | 2026-07-24 |
+
+---
+
 Mỗi khi fix bug, copy template dưới đây và điền vào đúng mục:
 
 ```

@@ -1,89 +1,215 @@
 # COT_REF — Tra cứu nhanh tên cột
 
-> Tách từ rules.md để tiết kiệm token. Agent chỉ đọc khi cần dùng tên cột.
-> Mọi tên cột đều định nghĩa trong `config.py`. Dùng COT_*, không hardcode tiếng Việt.
+> Tách từ `config.py` để tiết kiệm token. Agent chỉ đọc khi cần dùng tên cột.
+> Mọi tên cột đều định nghĩa trong `config.py`. Dùng `COT_*`, không hardcode tiếng Việt.
 
 ---
 
-## Core
+## Tất Cả COT_*
+
+Các dòng dưới đây giữ theo thứ tự định nghĩa trong `config.py`; alias được giữ nguyên.
 
 ```python
-COT_TEN_PGD      = "Tên PGD"
-COT_MA_KH        = "Mã KH"
-COT_TEN_KH       = "Tên KH"
-COT_SO_KU        = "Số khế ước"
-COT_NGAY_VAY     = "Ngày vay"
-COT_NGAY_DH      = "Ngày ĐH theo Gia hạn"
-COT_NGAY_DH_HD   = "Ngày ĐH theo hợp đồng"
-COT_THOI_HAN     = "Thời hạn vay"
-COT_LAI_SUAT     = "Lãi suất"
-COT_MUC_VAY      = "Mức vay"
-COT_DU_NO_TH     = "Dư nợ trong hạn"
-COT_DU_NO_QH     = "Dư nợ quá hạn"
-COT_TONG_DU_NO   = "Tổng dư nợ"
-COT_DU_NO_KHOANH = "Dư nợ khoanh"
-COT_TEN_CT       = "Tên chương trình"
-COT_TINH_TRANG   = "Tình trạng món vay"
-COT_DIA_CHI      = "Địa chỉ"
-COT_SDT          = "Số điện thoại"       # KHÔNG dùng COT_DIEN_THOAI
-COT_NGAY_SL      = "Ngày số liệu"
-COT_GOC_TRA      = "Gốc đã trả"
-```
-
-## Extended
-
-```python
-COT_CMND              = "Số CMND"
-COT_TEN_TO            = "Tên tổ"          # KHÔNG dùng COT_TEN_TKVV
-COT_TEN_XA            = "Tên xã"
-COT_TEN_THON          = "Tên thôn"
-COT_NGUON_VON         = "Nguồn vốn"       # 1=TW, 2=ĐP
-COT_MA_CHUONG_TRINH   = "Mã chương trình"
-COT_PL_NV             = "Phân loại NV"    # KHÔNG hardcode "PL NV"
-COT_MA_NHA_DAU_TU     = "Mã nhà đầu tư"
-COT_TEN_NHA_DAU_TU    = "Tên nhà đầu tư"
-COT_TEN_TO_TRUONG     = "Tên tổ trưởng"
-```
-
-## Personal
-
-```python
-COT_NGAY_SINH        = "Ngày sinh"
-COT_NGAY_CAP_CMND    = "Ngày cấp CMND"
-COT_NOI_CAP_CMND     = "Nơi cấp CMND"
-COT_NGAY_HH_KHOANH   = "Ngày hết hạn khoanh"
-COT_TEN_HSSV         = "Họ tên HSSV"
-COT_TEN_VC           = "Họ tên vợ/chồng"
-COT_HINH_THUC_VAY    = "Hình thức vay"
-```
-
-## NQ11
-
-```python
-COT_DNO_NQ11          = "Dư nợ gốc NQ11"
-COT_NQ11_NO_TH        = "Nợ trong hạn NQ11"
-COT_NQ11_NO_QH        = "Nợ quá hạn NQ11"
-COT_NQ11_MA_KH        = "Mã KH NQ11"
-COT_NQ11_TEN_KH       = "Tên KH NQ11"
-COT_NQ11_SO_TIEN      = "Số tiền NQ11"
-COT_NQ11_DU_NO        = "Dư nợ NQ11"
-COT_NQ11_SO_TIEN_GN   = "Số tiền giải ngân NQ11"
-COT_NQ11_DEN_HAN_SC   = "Đến hạn sổ cuối NQ11"
-COT_NQ11_NGAY_BC      = "Ngày báo cáo NQ11"
-```
-
-## GQVL
-
-```python
-COT_GQVL_MA_PGD       = "Mã PGD GQVL"
-COT_GQVL_DU_NO_KHOANH = "Dư nợ khoanh GQVL"
-```
-
-## Risk / Activity
-
-```python
+COT_PL_NV  = "Phân loại NV"    # sau khi rename từ "PL NV"
+COT_MA_NDT = "Mã nhà đầu tư"
+COT_GIAI_NGAN_TRONG_NAM = "Giải ngân trong năm"   # cột GQVL — dùng /1e6 khi hiển thị (fmt_ty)
+COT_TEN_PGD    = "Tên PGD"
+COT_MA_KH      = "Mã KH"
+COT_TEN_KH     = "Tên KH"
+COT_SO_KU      = "Số khế ước"
+COT_NGAY_VAY   = "Ngày vay"
+COT_NGAY_DH    = "Ngày ĐH theo Gia hạn"
+COT_NGAY_DEN_HAN = COT_NGAY_DH  # alias cho module đến hạn
+COT_NGAY_DH_HD   = "Ngày ĐH theo hợp đồng"   # cột gốc HĐ — chỉ dùng cho kiểm soát gia hạn
+COT_THOI_HAN   = "Thời hạn vay"
+COT_LAI_SUAT   = "Lãi suất"
+COT_MUC_VAY    = "Mức vay"
+COT_DU_NO_TH   = "Dư nợ trong hạn"
+COT_DU_NO_QH   = "Dư nợ quá hạn"
+COT_TONG_DU_NO = "Tổng dư nợ"
+COT_TEN_CT     = "Tên chương trình"
+COT_TINH_TRANG = "Tình trạng món vay"
+COT_DIA_CHI    = "Địa chỉ"
+COT_SDT        = "Số điện thoại"
+COT_NGAY_SL       = "Ngày số liệu"
+COT_GOC_TRA       = "Gốc đã trả"
+COT_LAI_DA_TRA    = "Lãi đã trả"
+COT_DU_NO_KHOANH    = "Dư nợ khoanh"
+COT_NGAY_HH_KHOANH = "Ngày hết hạn Khoanh"
+COT_CMND          = "Số CMND"           # hoặc CCCD
+COT_NGAY_SINH     = "Ngày sinh"
+COT_NGAY_CAP_CMND = "Ngày cấp CMND"
+COT_NOI_CAP_CMND  = "Nơi cấp CMND"
+COT_TEN_TO        = "Tên tổ"
+COT_TEN_XA        = "Tên xã"
+COT_TEN_THON      = "Tên thôn"
+COT_NGUON_VON     = "Nguồn vốn"         # 1=TW, 2=ĐP
+COT_MA_NHA_DAU_TU = "Mã nhà đầu tư"    # chỉ có khi ĐP
+COT_TEN_NHA_DAU_TU = "Tên nhà đầu tư"
+COT_MA_CHUONG_TRINH = "Mã chương trình"
+COT_TEN_HSSV      = "Họ tên HSSV"       # tên học sinh sinh viên
+COT_TEN_VC        = "Họ tên vợ/chồng"   # tên vợ / chồng
 COT_LAI_TON    = "Lãi tồn TH"
-COT_LAI_TON_QH = "Lãi tồn QH"
+COT_LAI_TON_QH = "Lãi tồn QH"          # Lãi tồn quá hạn
+COT_SO_DU_TG   = "Số dư tiền gửi 105"   # Số dư tiền gửi tiết kiệm TK105
 COT_LAI_THANG  = "Lãi DT trong tháng"
 COT_DVUT       = "Tên ĐVUT"
+COT_PHAN_LOAI  = "Phân loại"
+COT_NGAY_GDGN = "Ngày giao dịch gần nhất"
+COT_HINH_THUC_VAY = "Hình thức vay"      # hình thức vay (1=NHCSXH, 2=ủy thác,...)
+COT_SO_LAN_GH    = "Số lần gia hạn"    # số lượt đã gia hạn nợ (từ HSTD)
+COT_NGAY_GH_GN   = "Ngày gia hạn gần nhất"  # ngày quyết định gia hạn gần nhất (từ HSTD)
+COT_MA_CN                   = "Mã CN"
+COT_MA_PGD                  = "Mã PGD"
+COT_MA_XA                   = "Mã xã"
+COT_MA_THON                 = "Mã thôn"
+COT_LOAI_KH                 = "Loại KH"
+COT_GIOI_TINH               = "Giới tính"
+COT_MA_DAN_TOC              = "Mã dân tộc"
+COT_TEN_DT                  = "Tên DT"
+COT_NGAY_CAP_CMND           = "Ngày cấp CMND"
+COT_NOI_CAP_CMND            = "Nơi cấp CMND"
+COT_MA_TO                   = "Mã tổ"
+COT_TEN_TO_TRUONG            = "Tên tổ trưởng"
+COT_LOAI_TO                 = "Loại tổ"
+COT_MA_DGD                  = "Mã điểm giao dịch"
+COT_TEN_DGD                 = "Tên điểm giao dịch"
+COT_DIA_DIEM_DGD            = "Địa điểm ĐGD"
+COT_NGAY_GD                 = "Ngày giao dịch"
+COT_GIO_GD                  = "Giờ giao dịch"
+COT_XA_DGD                  = "Xã ĐGD"
+COT_PGD_DGD                 = "PGD ĐGD"
+COT_MA_CIF_TT               = "Mã CIF TT"
+COT_MA_DVUT                 = "Mã ĐVUT"
+COT_NGAY_DH_GDXA            = "Ngày ĐH theo GDXA"
+COT_NGAY_BD_TRA_GOC         = "Ngày BĐ trả gốc"
+COT_NGAY_BD_TRA_LAI         = "Ngày BĐ trả lãi"
+COT_NGAY_KTAHSV             = "Ngày KTAHSV"
+COT_NGAY_GDXA               = "Ngày GDXA"
+COT_CAP_QL_VON              = "Cấp QL vốn"
+COT_TEN_CAP_QLV             = "Tên cấp QLV"
+COT_DOI_TUONG_THU_HUONG     = "Đối tượng thụ hưởng"
+COT_TEN_DTTH                = "Tên ĐTTH"
+COT_MA_SP_CU_THE            = "Mã sản phẩm cụ thể"
+COT_MA_SP_TIN_DUNG          = "Mã SP tín dụng"
+COT_MA_DM_SP                = "Mã DM sản phẩm"
+COT_MA_QUYET_DINH           = "Mã Quyết định"
+COT_TEN_QUYET_DINH          = "Tên Quyết định"
+COT_TONG_GIAI_NGAN          = "Tổng giải ngân"
+COT_NGAY_GN_DAU_TIEN        = "Ngày GN đầu tiên"
+COT_NGAY_GN_CUOI_CUNG       = "Ngày GN cuối cùng"
+COT_GOC_DEN_HAN_LK          = "Gốc đến hạn LK"
+COT_GOC_XOA                 = "Gốc xóa"
+COT_LAI_XOA                 = "Lãi xóa"
+COT_TONG_THU_LAI_TH         = "Tổng thu lãi TH"
+COT_TONG_THU_LAI_QH         = "Tổng thu lãi QH"
+COT_LAI_DT_CHUA_DEN_HAN     = "Lãi DT chưa đến hạn"
+COT_LAI_TT_TRONG_THANG      = "Lãi TT trong tháng"
+COT_THU_LAI_TH_THANG        = "Thu lãi TH tháng"
+COT_THU_LAI_QH_THANG        = "Thu lãi QH Tháng"
+COT_GIAI_NGAN_TRONG_THANG   = "Giải ngân trong tháng"
+COT_DAO_KHOAN_GN_THANG      = "Đảo khoản GN tháng"
+COT_LUU_VU_TRONG_THANG      = "Lưu vụ trong tháng"
+COT_GIA_HAN_TRONG_THANG     = "Gia hạn trong tháng"
+COT_CHUYEN_QH_TRONG_THANG   = "Chuyển QH trong tháng"
+COT_CHUYEN_KHOANH_TRONG_THANG= "Chuyển khoanh trong tháng"
+COT_THU_NO_TH_THANG         = "Thu nợ TH tháng"
+COT_THU_NO_QH_THANG         = "Thu nợ QH tháng"
+COT_THU_NO_KHOANH_THANG     = "Thu nợ khoanh tháng"
+COT_GOC_XOA_TRONG_THANG     = "Gốc xóa trong tháng"
+COT_LAI_DT_QUY              = "Lãi DT Quý"
+COT_LAI_TT_QUY              = "Lãi TT Quý"
+COT_THU_LAI_TH_QUY          = "Thu lãi TH Quý"
+COT_THU_LAI_QH_QUY          = "Thu lãi QH Quý"
+COT_GIAI_NGAN_TRONG_QUY     = "Giải ngân trong Quý"
+COT_DAO_KHOAN_GN_QUY        = "Đảo khoản GN Quý"
+COT_LUU_VU_TRONG_QUY        = "Lưu vụ trong Quý"
+COT_GIA_HAN_TRONG_QUY       = "Gia hạn trong Quý"
+COT_CQH_TRONG_QUY           = "CQH trong Quý"
+COT_CHUYEN_KHOANH_QUY       = "Chuyển Khoanh Quý"
+COT_THU_NO_TH_QUY           = "Thu nợ TH Quý"
+COT_THU_NO_QH_QUY           = "Thu nợ QH Quý"
+COT_THU_NO_KHOANH_QUY       = "Thu nợ Khoanh Quý"
+COT_GOC_XOA_TRONG_QUY       = "Gốc xóa trong Quý"
+COT_LAI_DT_NAM              = "Lãi DT Năm"
+COT_LAI_TT_NAM              = "Lãi TT Năm"
+COT_THU_LAI_TH_NAM          = "Thu lãi TH Năm"
+COT_THU_LAI_QH_NAM          = "Thu lãi QH Năm"
+COT_GIAI_NGAN_NAM           = "Giải ngân Năm"
+COT_DAO_KHOAN_GN_NAM        = "Đảo khoản GN Năm"
+COT_LUU_VU_NAM              = "Lưu vụ Năm"
+COT_GIA_HAN_NAM             = "Gia hạn Năm"
+COT_CQH_NAM                 = "CQH Năm"
+COT_CHUYEN_KHOANH_NAM       = "Chuyển Khoanh Năm"
+COT_THU_NO_TH_NAM           = "Thu nợ TH Năm"
+COT_THU_NO_QH_NAM           = "Thu nợ QH Năm"
+COT_THU_NO_KHOANH_NAM       = "Thu nợ Khoanh Năm"
+COT_XOA_TRONG_NAM           = "Xóa trong Năm"
+COT_TAI_KHOAN_TH            = "Tài khoản TH"
+COT_TAI_KHOAN_QH            = "Tài khoản QH"
+COT_TAI_KHOAN_KHOANH        = "Tài khoản khoanh"
+COT_TAI_KHOAN_THU_LAI       = "Tài khoản thu lãi"
+COT_TONG_THU_NO_TH          = "Tổng thu nợ TH"
+COT_TONG_THU_NO_QH          = "Tổng thu nợ QH"
+COT_TONG_THU_NO_KHOANH      = "Tổng thu nợ Khoanh"
+COT_TONG_GIA_HAN_NO         = "Tổng gia hạn nợ"
+COT_SO_THANG_DA_GH          = "Số tháng đã GH"
+COT_TONG_CHUYEN_NO_QH       = "Tổng chuyển nợ QH"
+COT_NGAY_CNQH_GN            = "Ngày CNQH gần nhất"
+COT_TONG_CHUYEN_NO_KHOANH   = "Tổng chuyển nợ khoanh"
+COT_GOC_HH_KHOANH           = "Gốc hết hạn Khoanh"
+COT_NGAY_LUU_VU             = "Ngày lưu vụ"
+COT_TON_RPA                 = "Tồn RPA"
+COT_NGAY_DU_THU             = "Ngày dự thu"
+COT_TONG_LAI_PHAI_HT        = "Tổng Lãi phải HT"
+COT_LAI_CHUA_HO_TRO         = "Lãi chưa hỗ trợ"
+COT_CHUAN_NGHEO_DP          = "Chuẩn nghèo ĐP"
+COT_MA_PNKT51               = "Mã PNKT51"
+COT_TEN_PNKT51              = "Tên PNKT51"
+COT_MA_PNKT52               = "Mã PNKT52"
+COT_MA_HQDT                 = "Mã HQĐT"
+COT_TEN_HQDT                = "Tên HQĐT"
+COT_GIA_TRI_HQDT1           = "Giá trị HQĐT1"
+COT_GIA_TRI_HQDT2           = "Giá trị HQĐT2"
+COT_KY_QUY                  = "Ký quý"
+COT_MUC_DICH_NHA            = "Mục đích nhà"
+COT_MUC_DICH_30A            = "Mục đích 30A"
+COT_MA_DU_AN                = "Mã dự án"
+COT_MA_HSSV                 = "Mã HSSV"
+COT_CMND_HSSV               = "CMND HSSV"
+COT_MA_TRUONG_HSSV          = "Mã trường HSSV"
+COT_TEN_TRUONG              = "Tên trường"
+COT_MA_HE_DAO_TAO           = "Mã Hệ đào tạo"
+COT_TEN_HE_DT               = "Tên Hệ ĐT"
+COT_MA_NGANH_DT             = "Mã ngành ĐT"
+COT_TEN_NGANH_DT            = "Tên Ngành ĐT"
+COT_MA_DT_HOC_PHI           = "Mã ĐT học phí"
+COT_TEN_DT_HOC_PHI          = "Tên ĐT học phí"
+COT_NGAY_NHAP_HOC           = "Ngày nhập học"
+COT_NGAY_RA_TRUONG          = "Ngày ra trường"
+COT_SO_ATM                  = "Số ATM"
+COT_DON_VI_CAP_THE          = "Đơn vị cấp thẻ"
+COT_TEN_LDXK                = "Tên LĐXK"
+COT_NGAY_SINH_LDXK          = "Ngày sinh LĐXK"
+COT_SO_THE_LDXK             = "Số thẻ LĐXK"
+COT_NGAY_HOP_DONG_XK        = "Ngày hợp đồng XK"
+COT_NGAY_HH_XK              = "Ngày hết hạn XK"
+COT_LINH_VUC_LDXK           = "Lĩnh vực LĐXK"
+COT_CONG_TY_XK              = "Công ty xuất khẩu"
+COT_QUOC_GIA_XK             = "Quốc gia xuất khẩu"
+COT_TEN_QUOC_GIA            = "Tên Quốc Gia"
+COT_CONG_TY_MOI_GIOI_XK     = "Công ty môi giới XK"
+COT_SO_TIET_KIEM_105        = "Sổ tiết kiệm 105"
+COT_DNO_NQ11        = "DNO NQ11"
+COT_NQ11_NO_TH      = "Nợ trong hạn"
+COT_NQ11_NO_QH      = "Nợ quá hạn"
+COT_NQ11_MA_KH      = "Mã khách hàng"
+COT_NQ11_TEN_KH     = "Tên khách hàng"
+COT_NQ11_SO_TIEN    = "Số tiền"
+COT_NQ11_DU_NO      = "Dư nợ"
+COT_NQ11_SO_TIEN_GN = "Số tiền giải ngân"
+COT_NQ11_DEN_HAN_SC = "Đến hạn sau cùng"
+COT_NQ11_NGAY_BC    = "Ngày báo cáo"
+COT_GQVL_MA_PGD         = "Mã PGD"
+COT_GQVL_DU_NO_KHOANH   = "Dư nợ khoanh"
 ```

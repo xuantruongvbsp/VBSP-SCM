@@ -264,7 +264,7 @@ except Exception as e:
 
 ---
 
-## 8. Function Signatures — tra nhanh
+## 8. Function Signatures & Checklist — tra nhanh
 
 > **Tra cứu đầy đủ:** đọc `SIGNATURES.md` — tất cả signatures của Components, Utils, Auth.
 > Cũng tham khảo `CODE_INDEX.md` để map chức năng → file → hàm.
@@ -277,7 +277,7 @@ Các lỗi tham số phổ biến cần nhớ:
 
 ---
 
- Checklist trước khi sửa
+### 8.1 Checklist trước khi sửa
 
 > **Đầy đủ:** xem `.trae/rules/rules.md` section 8 (Checklist) + section 8.1 (Rà soát). Tóm tắt nhanh:
 
@@ -314,7 +314,7 @@ Mỗi khi fix bug, thêm entry vào `BUGMAP.md` theo template có sẵn (cuối 
 | Format tiền tệ | `fmt()`, `fmt_ty()`, `fmt_so()` — `utils.py` |
 | Hiển thị bảng phân trang | `hien_thi_dataframe_phan_trang(df, key=...)` — `utils.py` |
 | Xuất Excel nhiều sheet | `xuat_excel({"Sheet1": df1, "Sheet2": df2})` — `utils.py` |
-| Fill hợp đồng Word | `auto_fill_document(data_row, template_path, tag_map, output_path)` — `utils.py` |
+| Fill hợp đồng Word | `auto_fill_document(data_row, template_path, tag_map, extra=None)` — `utils.py` |
 | Fill hàng loạt | `auto_fill_batch(df_rows, template_path, tag_map, ...)` — `utils.py` |
 | Ghi audit log tự động | `auto_audit(action, clear_cache=True)` — `utils.py` |
 | Lazy loading tabs | `lazy_tabs(labels, renderers, key="lt")` — `utils.py` |

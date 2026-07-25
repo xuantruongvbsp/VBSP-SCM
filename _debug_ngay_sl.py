@@ -6,6 +6,10 @@ import pyarrow.parquet as pq
 import pandas as pd
 from datetime import datetime
 import db
+from config import COT_NGAY_SL
+from logger import get_logger
+
+logger = get_logger(__name__)
 
 # ── 1. Kiểm tra merged parquet ──────────────────────────────────────
 print("=" * 60)
@@ -14,7 +18,7 @@ print("=" * 60)
 schema = pq.read_schema('d:/VBSP-SCM/cache/hstd.parquet')
 cols = [f.name for f in schema]
 print(f"Số cột: {len(cols)}")
-print(f"Có cột 'Ngày số liệu': {'Ngày số liệu' in cols}")
+print(f"Có cột '{COT_NGAY_SL}': {COT_NGAY_SL in cols}")
 
 # Tìm cột liên quan ngày
 for c in cols:
@@ -25,11 +29,11 @@ for c in cols:
 df = pq.read_table('d:/VBSP-SCM/cache/hstd.parquet').to_pandas()
 print(f"Số dòng: {len(df)}")
 
-if 'Ngày số liệu' in cols:
-    vals = df['Ngày số liệu'].dropna().unique()
-    print(f"Giá trị 'Ngày số liệu' unique (first 10): {list(vals[:10])}")
+if COT_NGAY_SL in cols:
+    vals = df[COT_NGAY_SL].dropna().unique()
+    print(f"Giá trị '{COT_NGAY_SL}' unique (first 10): {list(vals[:10])}")
     # Parse thử
-    parsed = pd.to_datetime(df['Ngày số liệu'], dayfirst=True, errors='coerce')
+    parsed = pd.to_datetime(df[COT_NGAY_SL], dayfirst=True, errors='coerce')
     print(f"  Số dòng parse được: {parsed.notna().sum()}")
     if parsed.notna().sum() > 0:
         print(f"  Min: {parsed.min()}, Max: {parsed.max()}")
@@ -74,6 +78,7 @@ for ten_pgd in ["PGD Biên Hòa", "PGD Long Khánh", "PGD Trảng Bom", "PGD Vĩ
             val2 = df_cell.iloc[5, fs_col] if df_cell.shape[1] > fs_col else "N/A"
             print(f"  Cell at [5, {fs_col}]: {repr(val2)}")
         except Exception as e:
+            logger.error("_debug_ngay_sl: lỗi đọc Excel %s", path, exc_info=True)
             print(f"  LỖI đọc Excel: {e}")
     else:
         print(f"\n--- {ten_pgd}: KHÔNG có file ---")

@@ -2853,6 +2853,30 @@ def _to_int(val, default=0):
 
 ---
 
+### J64 — Widget form thiếu key, checker báo sai radio option dài và màu inline chìm dark mode
+| | |
+|---|---|
+| **File** | `tabs/tab_security.py`, `tabs/tab_khnv_noi_bo.py`, `scripts/check_conventions.py` |
+| **Dấu hiệu** | Convention checker báo `[KEY] Widget thiếu key=` ở các form nội bộ; riêng radio `tab_uy_thac.py` bị báo sai dù đã có `key=` sau danh sách option dài; một số text/background inline trong tab KH-NV có thể chìm trên dark mode |
+| **Nguyên nhân** | Một số widget trong form dùng label làm key ngầm, dễ trùng khi tab render lại ở nhiều ngữ cảnh; Rule 12 chỉ dò 12 dòng nên không thấy `key=` ở các lời gọi widget có danh sách option dài; HTML inline dùng chữ tối hoặc nền sáng thiếu cặp màu chữ |
+| **Fix** | Thêm key rõ ràng cho nút thêm IP, nút vô hiệu hóa 2FA, form thêm cán bộ và form thêm lịch; nới `_widget_call_has_key()` lên 40 dòng để bao được widget multiline dài; đổi các màu inline sang cặp màu dark-mode rõ ràng |
+| **Test** | `venv\Scripts\python.exe -m py_compile scripts\check_conventions.py tabs\tab_security.py tabs\tab_khnv_noi_bo.py tabs\tab_uy_thac.py`; `venv\Scripts\python.exe scripts\check_conventions.py scripts\check_conventions.py tabs\tab_security.py tabs\tab_khnv_noi_bo.py tabs\tab_uy_thac.py` |
+| **Ngày fix** | 2026-07-25 |
+
+---
+
+### J65 — Convention checker còn nợ nền sau nhiều batch nhỏ
+| | |
+|---|---|
+| **File** | `api/app.py`, `services/*`, `tabs/*`, `_debug_ngay_sl.py`, `test_khtd_so_lieu.py` |
+| **Dấu hiệu** | Full `scripts/check_conventions.py` còn hàng chục lỗi `[LOGGER]`, `[DARKMODE]`, `[RENDER]`, `[AUDIT]`, `[COT]` dù các nhóm file riêng lẻ đã compile OK |
+| **Nguyên nhân** | Nhiều pattern cũ: catch exception không ghi stacktrace, màu HTML/CSS inline từ light theme, submodule render chưa theo signature tab-first, token cache OneDrive ghi kv_store chưa audit, script debug dùng literal `"Ngày số liệu"` |
+| **Fix** | Thêm `exc_info=True`, audit cache OneDrive, dùng `COT_NGAY_SL`, raw docstring cho path Windows, chuẩn hóa `_delete.render(tab=None, **kwargs)`, và ghép lại toàn bộ màu inline theo dark mode/cặp màu nền-chữ |
+| **Test** | `venv\Scripts\python.exe scripts\check_conventions.py` → OK; targeted `py_compile` các file sửa; smoke import/render `tests/test_smoke_imports.py` |
+| **Ngày fix** | 2026-07-25 |
+
+---
+
 Mỗi khi fix bug, copy template dưới đây và điền vào đúng mục:
 
 ```

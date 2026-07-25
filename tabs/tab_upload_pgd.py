@@ -59,7 +59,7 @@ def _preview_excel(file_bytes: bytes, loai: str, max_rows: int = 10) -> pd.DataF
         
         return df.dropna(how="all")
     except Exception as e:
-        logger.warning("Preview %s lỗi: %s", loai, e)
+        logger.error("_preview: lỗi đọc %s — %s", loai, e, exc_info=True)
         return None
 
 
@@ -476,7 +476,7 @@ def _bang_trang_thai_don_vi(ten_dv: str) -> None:
                 icon = "✅" if canh_bao == "ok" else "⚠️"
                 st.markdown(
                     f"**{nhan}**  \n{icon} {ngay}  \n"
-                    f"<span style='font-size:0.82rem;color:#6b7280'>"
+                    f"<span style='font-size:0.82rem;color:#94A3B8'>"
                     f"{so_ngay} ngày trước</span>",
                     unsafe_allow_html=True,
                 )

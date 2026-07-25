@@ -94,12 +94,25 @@ def _thuc_hien_xoa(ds_don_vi: list[str], loai_xoa: list[str], username: str) -> 
     st.rerun()
 
 
-def render(role: str, username: str) -> None:
+def render(tab=None, role: str = "", username: str = "unknown", **kwargs) -> None:
     """Xóa dữ liệu PGD — chỉ admin/manager."""
-    if not la_phan_he_cn(role) or normalize_role(role) == "executive":
-        st.error("🔒 Chức năng này chỉ dành cho admin/manager.")
-        return
+    if isinstance(tab, str):
+        username = role or username
+        role = tab
+        tab = None
 
+    role = role or kwargs.get("role", "")
+    username = username or kwargs.get("username", "unknown")
+    ctx = tab if tab is not None else st.container()
+    with ctx:
+        if not la_phan_he_cn(role) or normalize_role(role) == "executive":
+            st.error("🔒 Chức năng này chỉ dành cho admin/manager.")
+            return
+
+        _render_delete_ui(role, username)
+
+
+def _render_delete_ui(role: str, username: str) -> None:
     st.caption(
         "Xóa file pgd_data/ của PGD — hệ thống tự động rebuild CACHE sau khi xóa."
     )

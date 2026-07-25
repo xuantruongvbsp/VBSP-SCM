@@ -15,8 +15,10 @@ except ImportError:
 import duckdb
 import db as _db
 from config import CACHE_HSTD, DS_PGD, COT_TEN_PGD, COT_TONG_DU_NO, COT_DU_NO_QH, COT_DU_NO_KHOANH, COT_TEN_CT
+from logger import get_logger
 
 app = Flask(__name__)
+logger = get_logger(__name__)
 
 def _check_parquet():
     return Path(CACHE_HSTD).exists()
@@ -49,6 +51,7 @@ def du_no():
         """).df()
         return jsonify(df.to_dict(orient="records"))
     except Exception as e:
+        logger.error("API /api/du_no lỗi", exc_info=True)
         return jsonify({"error": str(e)}), 500
 
 @app.route("/api/nqh")
@@ -70,6 +73,7 @@ def nqh():
         """).df()
         return jsonify(df.to_dict(orient="records"))
     except Exception as e:
+        logger.error("API /api/nqh lỗi", exc_info=True)
         return jsonify({"error": str(e)}), 500
 
 @app.route("/api/chuong_trinh")
@@ -88,6 +92,7 @@ def chuong_trinh():
         """).df()
         return jsonify(df.to_dict(orient="records"))
     except Exception as e:
+        logger.error("API /api/chuong_trinh lỗi", exc_info=True)
         return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":

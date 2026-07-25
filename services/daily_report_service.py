@@ -112,7 +112,7 @@ def _build_sheets(now: datetime) -> dict[str, pd.DataFrame]:
         if df is not None and not df.empty:
             sheets["Tổng quan"] = df
     except Exception as e:
-        logger.warning("_build_sheets Tổng quan: %s", e)
+        logger.warning("_build_sheets Tổng quan: %s", e, exc_info=True)
 
     # Sheet 2: Dư nợ theo PGD (tất cả chỉ số)
     try:
@@ -120,7 +120,7 @@ def _build_sheets(now: datetime) -> dict[str, pd.DataFrame]:
         if df is not None and not df.empty:
             sheets["Dư nợ theo PGD"] = df
     except Exception as e:
-        logger.warning("_build_sheets Dư nợ PGD: %s", e)
+        logger.warning("_build_sheets Dư nợ PGD: %s", e, exc_info=True)
 
     # Sheet 3: NQH theo PGD
     try:
@@ -128,7 +128,7 @@ def _build_sheets(now: datetime) -> dict[str, pd.DataFrame]:
         if df is not None and not df.empty:
             sheets["NQH theo PGD"] = df
     except Exception as e:
-        logger.warning("_build_sheets NQH PGD: %s", e)
+        logger.warning("_build_sheets NQH PGD: %s", e, exc_info=True)
 
     # Sheet 4: Đến hạn tháng này
     try:
@@ -136,7 +136,7 @@ def _build_sheets(now: datetime) -> dict[str, pd.DataFrame]:
         if df is not None and not df.empty:
             sheets["Đến hạn tháng này"] = df
     except Exception as e:
-        logger.warning("_build_sheets Đến hạn: %s", e)
+        logger.warning("_build_sheets Đến hạn: %s", e, exc_info=True)
 
     if not sheets:
         raise ValueError("Không build được sheet nào — parquet có thể chưa có dữ liệu")

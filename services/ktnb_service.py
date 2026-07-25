@@ -361,7 +361,7 @@ def luu_mau_doi_chieu(dot_id: int, df_mau: pd.DataFrame, username: str) -> int:
                 )
                 count += 1
             except Exception as e:
-                logger.error("Lỗi lưu mẫu đối chiếu: %s", e)
+                logger.error("Lỗi lưu mẫu đối chiếu: %s", e, exc_info=True)
         conn.commit()
     db.ghi_audit(username, "ktnb_luu_mau", f"dot_id={dot_id}, count={count}")
     return count

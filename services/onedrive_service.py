@@ -90,6 +90,7 @@ def _lay_token() -> str:
         },
         username="system",
     )
+    db.ghi_audit("system", "onedrive_token_cache", "Cập nhật token cache OneDrive")
     return token
 
 
@@ -182,7 +183,7 @@ def kiem_tra_ket_noi() -> dict:
             "quota_total_gb": round(data.get("quota", {}).get("total", 1) / 1e9, 2),
         }
     except Exception as e:
-        logger.error("kiem_tra_ket_noi OneDrive: %s", e)
+        logger.error("kiem_tra_ket_noi OneDrive: %s", e, exc_info=True)
         return {"ok": False, "loi": str(e)}
 
 

@@ -11,10 +11,13 @@ from streamlit.delta_generator import DeltaGenerator
 
 from auth import la_phan_he_cn, la_quan_ly_cn, normalize_role
 from config import KE_HOACH_CV_KHNV_DAU_VIEC, KE_HOACH_CV_KHNV_NHOM
+from logger import get_logger
 from services import ke_hoach_cv_khnv_service as svc
 from services.excel_service import xuat_excel_chuyen_nghiep, ten_file_xuat as excel_ten_file
 from tabs.base_tab import TabContext
 from utils import xuat_excel
+
+logger = get_logger(__name__)
 
 KEY_PREFIX = "khnv_cv_"
 
@@ -289,6 +292,7 @@ def _render_tong_quan(df_kh: pd.DataFrame, df_kq: pd.DataFrame, username: str = 
                 use_container_width=False,
             )
         except Exception as e:
+            logger.error("_render_tong_quan: lỗi tạo Excel tổng quan — %s", e, exc_info=True)
             st.warning(f"Không thể tạo Excel tổng quan: {e}")
 
 
@@ -343,7 +347,8 @@ def _render_ke_hoach(df_kh: pd.DataFrame, username: str = "unknown") -> None:
             columns=cols_excel,
             kpi_items=kpi_items,
         )
-    except Exception:
+    except Exception as e:
+        logger.warning("_render_ke_hoach: fallback Excel thường — %s", e, exc_info=True)
         excel_bytes = xuat_excel({"Kế hoạch": display})
 
     c_xl, c_pdf = st.columns(2)
@@ -367,6 +372,7 @@ def _render_ke_hoach(df_kh: pd.DataFrame, username: str = "unknown") -> None:
                 )
                 st.session_state[f"{KEY_PREFIX}kh_pdf"] = pdf
             except Exception as e:
+                logger.error("_render_ke_hoach: lỗi tạo PDF — %s", e, exc_info=True)
                 st.error(f"❌ Lỗi tạo PDF: {e}")
         if st.session_state.get(f"{KEY_PREFIX}kh_pdf"):
             from components.export_pdf import download_pdf_button
@@ -445,7 +451,8 @@ def _render_ket_qua(df_kq: pd.DataFrame, username: str = "unknown") -> None:
             kpi_items=kpi_items,
             extra_sheets=extra_sheets,
         )
-    except Exception:
+    except Exception as e:
+        logger.warning("_render_ket_qua: fallback Excel thường — %s", e, exc_info=True)
         excel_bytes = xuat_excel({"Kết quả": display})
 
     c_xl, c_pdf = st.columns(2)
@@ -469,6 +476,7 @@ def _render_ket_qua(df_kq: pd.DataFrame, username: str = "unknown") -> None:
                 )
                 st.session_state[f"{KEY_PREFIX}kq_pdf"] = pdf
             except Exception as e:
+                logger.error("_render_ket_qua: lỗi tạo PDF — %s", e, exc_info=True)
                 st.error(f"❌ Lỗi tạo PDF: {e}")
         if st.session_state.get(f"{KEY_PREFIX}kq_pdf"):
             from components.export_pdf import download_pdf_button

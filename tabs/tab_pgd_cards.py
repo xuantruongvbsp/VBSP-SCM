@@ -118,7 +118,7 @@ _CARD_CSS = """
 }
 .pgd-card-row { display: flex; gap: 5px; flex-wrap: wrap; margin-bottom: 5px; }
 .pgd-kpi-block { flex: 1 1 22%; min-width: 68px; }
-.pgd-kpi-label { font-size: 9px; color: #607D8B; margin-bottom: 2px; text-transform: uppercase; letter-spacing: 0.4px; }
+.pgd-kpi-label { font-size: 9px; color: #94A3B8; margin-bottom: 2px; text-transform: uppercase; letter-spacing: 0.4px; }
 .pgd-kpi-value { font-size: 13px; font-weight: 700; color: #E3F2FD; }
 .pgd-kpi-value.red   { color: #EF5350; }
 .pgd-kpi-value.amber { color: #FFA726; }
@@ -185,15 +185,15 @@ def _render_card_html(row: dict, upload_ok: bool, upload_ts: str, rank: int) -> 
 <div class="pgd-card" style="opacity:0.45">
   <div class="pgd-card-title">
     <span>🏢 {row['ten_pgd']}</span>
-    <span style="font-size:10px;color:#455A64">—</span>
+    <span style="font-size:10px;color:#94A3B8">—</span>
   </div>
-  <div style="text-align:center;padding:20px 0;color:#607D8B;font-size:12px">
+  <div style="text-align:center;padding:20px 0;color:#94A3B8;font-size:12px">
     📭 Chưa có dữ liệu tổng hợp
   </div>
   <div class="pgd-risk-bar-wrap"><div style="width:0%;height:100%;background:#37474F;border-radius:2px"></div></div>
   <div class="pgd-upload-row">
     <span class="{upload_cls}">{upload_icon} HSTD {upload_ts}</span>
-    <span style="color:#546E7A;font-size:9.5px">—</span>
+    <span style="color:#94A3B8;font-size:9.5px">—</span>
   </div>
 </div>"""
 
@@ -217,7 +217,7 @@ def _render_card_html(row: dict, upload_ok: bool, upload_ts: str, rank: int) -> 
 <div class="pgd-card">
   <div class="pgd-card-title">
     <span>🏢 {row['ten_pgd']}</span>
-    <span style="font-size:10px;color:#455A64">{rank_lbl} &nbsp;
+    <span style="font-size:10px;color:#94A3B8">{rank_lbl} &nbsp;
       <span style="color:{rr_css};font-weight:700">⭐ {diem_rr:.0f}</span>
     </span>
   </div>
@@ -262,7 +262,7 @@ def _render_card_html(row: dict, upload_ok: bool, upload_ts: str, rank: int) -> 
   </div>
   <div class="pgd-upload-row">
     <span class="{upload_cls}">{upload_icon} HSTD {upload_ts}</span>
-    <span style="color:#546E7A;font-size:9.5px">{fmt_so(so_mon)} món</span>
+    <span style="color:#94A3B8;font-size:9.5px">{fmt_so(so_mon)} món</span>
   </div>
 </div>"""
 

@@ -95,21 +95,23 @@ def render_tree_navigation(
         font-size: 14px;
     }
     .tree-node:hover {
-        background: #f3f4f6;
+        background: #262B3D;
+        color: #E0E6ED;
     }
     .tree-node.active {
-        background: #dbeafe;
+        background: #1a2744;
+        color: #E0E6ED;
         border-left: 3px solid #3b82f6;
         font-weight: 500;
     }
     .tree-parent {
         font-weight: 600;
-        color: #374151;
+        color: #E0E6ED;
         padding-left: 8px;
     }
     .tree-child {
         padding-left: 32px;
-        color: #6b7280;
+        color: #94A3B8;
         font-size: 13px;
     }
     .tree-desc {

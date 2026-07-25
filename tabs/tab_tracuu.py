@@ -848,7 +848,7 @@ def _render_bang(
 
                 if float(raw) > 0:
 
-                    styles[idx] = "color:#c62828;font-weight:700"
+                    styles[idx] = "color:#EF9A9A;font-weight:700"
 
             except Exception:
 

@@ -53,32 +53,32 @@ MOCKUP_HTML = """
     </tr>
     <tr style="background:#d4edda;">
       <td style="border:1px solid #ccc;padding:4px 8px;">9</td>
-      <td style="border:1px solid #ccc;padding:4px 8px; font-weight:600; color:#155724;">I ← chữ = PGD</td>
-      <td style="border:1px solid #ccc;padding:4px 8px; font-weight:600; color:#155724;">Hội sở chi nhánh tỉnh</td>
+      <td style="border:1px solid #ccc;padding:4px 8px; font-weight:600; color:#86efac;">I ← chữ = PGD</td>
+      <td style="border:1px solid #ccc;padding:4px 8px; font-weight:600; color:#86efac;">Hội sở chi nhánh tỉnh</td>
       <td style="border:1px solid #ccc;padding:4px 8px;">92.539</td>
       <td style="border:1px solid #ccc;padding:4px 8px; color:#e67e22;">0</td>
       <td style="border:1px solid #ccc;padding:4px 8px;"></td>
     </tr>
     <tr>
       <td style="border:1px solid #ccc;padding:4px 8px;">10</td>
-      <td style="border:1px solid #ccc;padding:4px 8px; color:#0c5460;">1 ← số = xã</td>
-      <td style="border:1px solid #ccc;padding:4px 8px; color:#0c5460;">Phường Phước Tân</td>
+      <td style="border:1px solid #ccc;padding:4px 8px; color:#80CBC4;">1 ← số = xã</td>
+      <td style="border:1px solid #ccc;padding:4px 8px; color:#80CBC4;">Phường Phước Tân</td>
       <td style="border:1px solid #ccc;padding:4px 8px;">4.336</td>
       <td style="border:1px solid #ccc;padding:4px 8px; color:#e67e22;"></td>
       <td style="border:1px solid #ccc;padding:4px 8px;"></td>
     </tr>
     <tr>
       <td style="border:1px solid #ccc;padding:4px 8px;">11</td>
-      <td style="border:1px solid #ccc;padding:4px 8px; color:#0c5460;">2</td>
-      <td style="border:1px solid #ccc;padding:4px 8px; color:#0c5460;">Phường Biên Hòa</td>
+      <td style="border:1px solid #ccc;padding:4px 8px; color:#80CBC4;">2</td>
+      <td style="border:1px solid #ccc;padding:4px 8px; color:#80CBC4;">Phường Biên Hòa</td>
       <td style="border:1px solid #ccc;padding:4px 8px;">14.662</td>
       <td style="border:1px solid #ccc;padding:4px 8px; color:#e67e22;"></td>
       <td style="border:1px solid #ccc;padding:4px 8px;"></td>
     </tr>
     <tr style="background:#d4edda;">
       <td style="border:1px solid #ccc;padding:4px 8px;">...</td>
-      <td style="border:1px solid #ccc;padding:4px 8px; font-weight:600; color:#155724;">II ← chữ = PGD tiếp</td>
-      <td style="border:1px solid #ccc;padding:4px 8px; font-weight:600; color:#155724;">PGD Long Thành</td>
+      <td style="border:1px solid #ccc;padding:4px 8px; font-weight:600; color:#86efac;">II ← chữ = PGD tiếp</td>
+      <td style="border:1px solid #ccc;padding:4px 8px; font-weight:600; color:#86efac;">PGD Long Thành</td>
       <td style="border:1px solid #ccc;padding:4px 8px;">...</td>
       <td style="border:1px solid #ccc;padding:4px 8px;">...</td>
       <td style="border:1px solid #ccc;padding:4px 8px;">...</td>

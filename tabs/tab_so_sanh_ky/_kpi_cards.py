@@ -55,9 +55,9 @@ _CARD_CSS = """
     align-items: center;
     gap: 8px;
 }
-.delta-up { color: #16a34a; }
-.delta-down { color: #dc2626; }
-.delta-neutral { color: #6b7280; }
+.delta-up { color: #81C784; }
+.delta-down { color: #EF9A9A; }
+.delta-neutral { color: #94A3B8; }
 
 /* Progress bar in card */
 .card-progress-wrap {

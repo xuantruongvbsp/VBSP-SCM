@@ -159,20 +159,20 @@ def render_alert_card(
     
     # Màu theo mức độ
     colors = {
-        "high": {"bg": "#fef2f2", "border": "#ef4444", "icon": "🚨"},
-        "medium": {"bg": "#fffbeb", "border": "#f59e0b", "icon": "⚠️"},
-        "low": {"bg": "#eff6ff", "border": "#3b82f6", "icon": "ℹ️"},
+        "high": {"bg": "#2d1b1b", "border": "#ef4444", "icon": "🚨"},
+        "medium": {"bg": "#2d2410", "border": "#f59e0b", "icon": "⚠️"},
+        "low": {"bg": "#1a2332", "border": "#3b82f6", "icon": "ℹ️"},
     }
     
     color = colors.get(alert["level"], colors["medium"])
     
     alert_html = f"""
-        <div style="background:{color['bg']};border-left:4px solid {color['border']};
+        <div style="background:{color['bg']};color:#E0E6ED;border-left:4px solid {color['border']};
                     border-radius:4px;padding:12px;margin:8px 0;">
-            <div style="font-weight:600;color:#374151;margin-bottom:4px;">
+            <div style="font-weight:600;margin-bottom:4px;">
                 {alert['title']}
             </div>
-            <div style="color:#6b7280;font-size:14px;">
+            <div style="font-size:14px;color:#94A3B8;">
                 {alert['message']}
             </div>
         </div>
@@ -230,17 +230,17 @@ def render_suggestions_panel(
     
     for sugg in suggestions:
         sugg_html = f"""
-            <div style="background:#f0fdf4;border-left:4px solid #22c55e;
+            <div style="background:#1a2e1a;color:#E0E6ED;border-left:4px solid #22c55e;
                         border-radius:4px;padding:12px;margin:8px 0;">
                 <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
                     <span style="font-size:18px;">{sugg['icon']}</span>
-                    <span style="font-weight:600;color:#374151;">{sugg['title']}</span>
-                    <span style="background:#dcfce7;color:#166534;padding:2px 8px;
+                    <span style="font-weight:600;">{sugg['title']}</span>
+                    <span style="background:#1a3a2a;color:#4ade80;padding:2px 8px;
                                border-radius:12px;font-size:12px;font-weight:500;">
                         {sugg['priority']}
                     </span>
                 </div>
-                <div style="color:#6b7280;font-size:14px;margin-left:26px;">
+                <div style="font-size:14px;margin-left:26px;color:#94A3B8;">
                     {sugg['action']}
                 </div>
             </div>

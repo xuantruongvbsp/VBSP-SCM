@@ -90,7 +90,7 @@ def _render_ip_whitelist(username: str) -> None:
         )
     with col2:
         st.markdown("<br>", unsafe_allow_html=True)
-        if st.button("➕ Thêm", use_container_width=True):
+        if st.button("➕ Thêm", use_container_width=True, key="security_add_ip"):
             if new_ip.strip():
                 ok, msg = add_ip_to_whitelist(new_ip.strip(), username)
                 if ok:
@@ -126,7 +126,7 @@ def _render_2fa_manager(username: str) -> None:
         with st.expander("⚠️ Vô hiệu hóa 2FA", expanded=False):
             st.warning("Vô hiệu hóa 2FA sẽ làm giảm bảo mật tài khoản.")
             pw = st.text_input("Nhập mật khẩu để xác nhận", type="password", key="2fa_disable_pw")
-            if st.button("🔓 Vô hiệu hóa 2FA", type="secondary"):
+            if st.button("🔓 Vô hiệu hóa 2FA", type="secondary", key="security_disable_2fa"):
                 # Cần hàm kiểm tra password — giả định dùng từ auth
                 from auth import kiem_tra, doc_users
                 users = doc_users()

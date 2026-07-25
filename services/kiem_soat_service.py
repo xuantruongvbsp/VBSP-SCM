@@ -500,9 +500,9 @@ def _style_tonghop_pgd(df: pd.DataFrame) -> Any:
         except (TypeError, ValueError):
             tt = 0
         if tv > 0:
-            return ["background-color: #FFEBEE"] * n
+            return ["background-color: #FFEBEE; color: #111827"] * n
         if tt > 0:
-            return ["background-color: #FFF3E0"] * n
+            return ["background-color: #FFF3E0; color: #111827"] * n
         return [""] * n
 
     return styler.apply(_row_colors, axis=1)
@@ -512,9 +512,9 @@ def _style_chitiet(row: pd.Series) -> list[str]:
     mo = str(row.get("Mô tả", ""))
     n = len(row)
     if mo.startswith("Vượt"):
-        return ["background-color: #FFEBEE"] * n
+        return ["background-color: #FFEBEE; color: #111827"] * n
     if mo.startswith("Thiếu"):
-        return ["background-color: #FFF3E0"] * n
+        return ["background-color: #FFF3E0; color: #111827"] * n
     return [""] * n
 
 
@@ -526,9 +526,9 @@ def _style_ghv_tonghop_row(row: pd.Series) -> list[str]:
     except (TypeError, ValueError):
         vm = 0.0
     if vm > 12:
-        return ["background-color: #FFEBEE"] * n
+        return ["background-color: #FFEBEE; color: #111827"] * n
     if vm >= 6:
-        return ["background-color: #FFF3E0"] * n
+        return ["background-color: #FFF3E0; color: #111827"] * n
     return [""] * n
 
 
@@ -547,11 +547,11 @@ def _style_ghv_chitiet_row(row: pd.Series) -> list[str]:
     if v is None:
         return styles
     if v > 12:
-        styles[j] = "background-color: #FFEBEE"
+        styles[j] = "background-color: #FFEBEE; color: #111827"
     elif v >= 6:
-        styles[j] = "background-color: #FFF3E0"
+        styles[j] = "background-color: #FFF3E0; color: #111827"
     else:
-        styles[j] = "background-color: #FFFDE7"
+        styles[j] = "background-color: #FFFDE7; color: #111827"
     return styles
 
 

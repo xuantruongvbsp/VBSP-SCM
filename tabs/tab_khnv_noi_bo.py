@@ -215,13 +215,13 @@ def _render_mini_tien_do(ds: list, today: date) -> None:
                 "#ef4444"
             )
             tre_badge = (
-                f' <span style="color:#b91c1c;font-size:0.72rem;font-weight:700">⛔{s["tre_han"]}</span>'
+                f' <span style="color:#fca5a5;font-size:0.72rem;font-weight:700">⛔{s["tre_han"]}</span>'
                 if s["tre_han"] else ""
             )
             bars_html += (
                 f'<div style="display:flex;align-items:center;gap:8px;margin:3px 0;font-size:0.83rem">'
                 f'<span style="min-width:140px;font-weight:600">{nguoi}{tre_badge}</span>'
-                f'<div style="flex:1;background:#e5e7eb;border-radius:4px;height:10px">'
+                f'<div style="flex:1;background:#e5e7eb;color:#111827;border-radius:4px;height:10px">'
                 f'<div style="background:{color};width:{pct}%;height:100%;border-radius:4px"></div></div>'
                 f'<span style="min-width:60px;text-align:right;opacity:0.65">{s["hoan_thanh"]}/{s["total"]} ({pct}%)</span>'
                 f'</div>'
@@ -253,13 +253,13 @@ def _render_task_card(cv: dict, ds: list, today: date,
     # Màu nền theo mức độ trễ
     row_style = ""
     if trang_thai == "tre_han":
-        row_style = "background:#ffe0e0;"
+        row_style = "background:#ffe0e0;color:#111827;"
     elif deadline_date and trang_thai in ("chua_lam", "dang_lam"):
         delta = (deadline_date - today).days
         if delta < 0:
-            row_style = "background:#ffe0e0;"
+            row_style = "background:#ffe0e0;color:#111827;"
         elif delta <= 3:
-            row_style = "background:#fff3cd;"
+            row_style = "background:#fff3cd;color:#111827;"
 
     st.markdown(
         f"<div style='{row_style}padding:8px;border-radius:4px;margin-bottom:4px;'>",
@@ -452,7 +452,7 @@ def _render_nhan_su(role_n: str, username: str) -> None:
         st.divider()
         with st.expander("➕ Thêm cán bộ", expanded=not can_bo):
             with st.form("form_them_can_bo", clear_on_submit=True):
-                ho_ten = st.text_input("Họ và tên *")
+                ho_ten = st.text_input("Họ và tên *", key="them_cb_ho_ten")
                 chuc_vu_sel = st.selectbox(
                     "Chức vụ / Vị trí",
                     list(_CHUC_VU_LABEL.keys()),
@@ -922,7 +922,7 @@ def _html_lich_ban(ds_loc: list, thang: int, nam: int) -> str:
             overflow = len(evs) - MAX_CHIPS
             if overflow > 0:
                 chips += (
-                    f'<div style="font-size:0.68rem;color:#6b7280;'
+                    f'<div style="font-size:0.68rem;color:#9ca3af;'
                     f'padding:1px 4px;font-style:italic">+{overflow} sự kiện</div>'
                 )
 
@@ -974,10 +974,20 @@ def _render_lich_cong_tac(tab, role_n: str, username: str):
     if co_quyen_ghi:
         with st.expander("➕ Thêm sự kiện", expanded=False):
             with st.form("form_lich", clear_on_submit=True):
-                tieu_de = st.text_input("Tiêu đề *")
-                loai = st.selectbox("Loại", list(LOAI_LICH.keys()), format_func=lambda x: LOAI_LICH[x])
-                ngay = st.date_input("Ngày *", value=today, format="DD/MM/YYYY")
-                dia_diem = st.text_input("Địa điểm")
+                tieu_de = st.text_input("Tiêu đề *", key="khnv_lich_tieu_de")
+                loai = st.selectbox(
+                    "Loại",
+                    list(LOAI_LICH.keys()),
+                    format_func=lambda x: LOAI_LICH[x],
+                    key="khnv_lich_loai",
+                )
+                ngay = st.date_input(
+                    "Ngày *",
+                    value=today,
+                    format="DD/MM/YYYY",
+                    key="khnv_lich_ngay",
+                )
+                dia_diem = st.text_input("Địa điểm", key="khnv_lich_dia_diem")
                 thanh_vien = st.text_area("Thành viên tham dự")
                 ghi_chu = st.text_area("Ghi chú")
                 submitted = st.form_submit_button("🚀 Thêm", type="primary")

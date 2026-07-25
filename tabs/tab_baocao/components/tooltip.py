@@ -76,7 +76,7 @@ def render_header_with_tooltip(
         header_html = f"""
             <div style="display:flex;align-items:center;gap:8px;">
                 <span style="font-weight:600;">{header_text}</span>
-                <span style="cursor:help;color:#6b7280;font-size:14px;" 
+                <span style="cursor:help;color:#94A3B8;font-size:14px;" 
                       title="{tooltip_text}">ⓘ</span>
             </div>
         """
@@ -122,14 +122,14 @@ def render_metric_with_tooltip(
     
     tooltip_icon = ""
     if tooltip_text:
-        tooltip_icon = f'<span style="cursor:help;color:#9ca3af;font-size:12px;margin-left:4px;" title="{tooltip_text}">ⓘ</span>'
+        tooltip_icon = f'<span style="cursor:help;color:#94A3B8;font-size:12px;margin-left:4px;" title="{tooltip_text}">ⓘ</span>'
     
     metric_html = f"""
-        <div style="background:white;border-radius:8px;padding:16px;border:1px solid #e5e7eb;">
-            <div style="color:#6b7280;font-size:14px;margin-bottom:4px;display:flex;align-items:center;">
+        <div style="background:#1E2130;color:#E0E6ED;border-radius:8px;padding:16px;border:1px solid #2A2D3E;">
+            <div style="color:#94A3B8;font-size:14px;margin-bottom:4px;display:flex;align-items:center;">
                 {label}{tooltip_icon}
             </div>
-            <div style="font-size:24px;font-weight:700;color:#111827;">{value}</div>
+            <div style="font-size:24px;font-weight:700;color:#E0E6ED;">{value}</div>
             {delta_html}
         </div>
     """

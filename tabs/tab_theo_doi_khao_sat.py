@@ -152,7 +152,7 @@ def _doc_khao_sat() -> dict:
         try:
             data = ws.get_all_values()
         except Exception as e:
-            logger.warning("_doc_khao_sat: lỗi đọc sheet '%s' — %s", pgd, e)
+            logger.error("_doc_khao_sat: lỗi đọc sheet '%s' — %s", pgd, e, exc_info=True)
             ket_qua[pgd] = (None, None, "", f"Lỗi đọc: {e}")
             continue
 
@@ -196,7 +196,7 @@ def _doc_nhat_ky() -> dict[str, dict]:
             return {}   # sheet chưa được tạo bởi Apps Script
         data = log_ws.get_all_values()
     except Exception as e:
-        logger.warning("_doc_nhat_ky: %s", e)
+        logger.error("_doc_nhat_ky: %s", e, exc_info=True)
         return {}
 
     if len(data) < 2:

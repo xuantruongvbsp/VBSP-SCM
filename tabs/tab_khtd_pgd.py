@@ -107,7 +107,7 @@ def _html_bdd_pgd_table(pgd: str, kh_xa: dict, th_xa_ct: dict, nguon: str) -> st
     """HTML pivot table dạng BĐD cho PGD: hàng = xã, cột = CT × (KH | TH | %)."""
     ds_xa = PGD_XA_MAP.get(pgd, [])
     if not ds_xa:
-        return f"<p style='color:#64748b;padding:12px'>⚠️ Chưa có danh sách xã cho {pgd}.</p>"
+        return f"<p style='color:#94A3B8;padding:12px'>⚠️ Chưa có danh sách xã cho {pgd}.</p>"
 
     active_mk: list[str] = []
     mk_set: set[str] = set()
@@ -121,7 +121,7 @@ def _html_bdd_pgd_table(pgd: str, kh_xa: dict, th_xa_ct: dict, nguon: str) -> st
             mk_set.add(mk)
 
     if not active_mk:
-        return f"<p style='color:#64748b;padding:12px'>Chưa có dữ liệu nguồn {nguon}.</p>"
+        return f"<p style='color:#94A3B8;padding:12px'>Chưa có dữ liệu nguồn {nguon}.</p>"
 
     def fn(v: float) -> str:
         return "" if v == 0 else f"{v:,.1f}".replace(",", ".")
@@ -169,11 +169,11 @@ def _html_bdd_pgd_table(pgd: str, kh_xa: dict, th_xa_ct: dict, nguon: str) -> st
             if pct is None:
                 ps = ""
             elif pct >= 100:
-                ps = "color:#059669;font-weight:500"
+                ps = "color:#81C784;font-weight:500"
             elif pct >= 80:
-                ps = "color:#d97706"
+                ps = "color:#FFB74D"
             else:
-                ps = "color:#dc2626"
+                ps = "color:#EF9A9A"
             html += [
                 f'<td style="{td};text-align:right">{fn(round(kh, 1))}</td>',
                 f'<td style="{td};text-align:right">{fn(round(th, 1))}</td>',
@@ -181,7 +181,7 @@ def _html_bdd_pgd_table(pgd: str, kh_xa: dict, th_xa_ct: dict, nguon: str) -> st
             ]
         html.append("</tr>")
 
-    html.append("<tr style='background:rgba(240,253,244,0.8);font-weight:700'>")
+    html.append("<tr style='background:rgba(30,45,35,0.8);font-weight:700'>")
     html.append(f'<td style="{td}" colspan="2">Tổng cộng</td>')
     for mk in active_mk:
         kh = round(tong_kh[mk], 1)
@@ -190,11 +190,11 @@ def _html_bdd_pgd_table(pgd: str, kh_xa: dict, th_xa_ct: dict, nguon: str) -> st
         if pct is None:
             ps = ""
         elif pct >= 100:
-            ps = "color:#059669"
+            ps = "color:#81C784"
         elif pct >= 80:
-            ps = "color:#d97706"
+            ps = "color:#FFB74D"
         else:
-            ps = "color:#dc2626"
+            ps = "color:#EF9A9A"
         html += [
             f'<td style="{td};text-align:right">{fn(kh)}</td>',
             f'<td style="{td};text-align:right">{fn(th)}</td>',
@@ -202,7 +202,7 @@ def _html_bdd_pgd_table(pgd: str, kh_xa: dict, th_xa_ct: dict, nguon: str) -> st
         ]
     html += [
         "</tr>", "</tbody>", "</table>",
-        "<p style='font-size:11px;margin-top:4px;color:#64748b'>Đơn vị: triệu đồng  |  TH = Tổng dư nợ (HSTD)</p>",
+        "<p style='font-size:11px;margin-top:4px;color:#94A3B8'>Đơn vị: triệu đồng  |  TH = Tổng dư nợ (HSTD)</p>",
         "</div>",
     ]
     return "\n".join(html)

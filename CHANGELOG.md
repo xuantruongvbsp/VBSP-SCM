@@ -1,5 +1,49 @@
 # CHANGELOG
 
+## [2026-07-25] — Convention checker toàn project sạch
+- `_debug_ngay_sl.py`, `api/app.py`, `services/daily_report_service.py`, `services/ktnb_service.py`, `services/onedrive_service.py` — bổ sung stacktrace logging, COT constant và audit token cache OneDrive
+- `tabs/tab_upload_khnv/_delete.py`, `tabs/tab_upload_khnv/__init__.py` — chuẩn hóa signature submodule xóa dữ liệu về `render(tab=None, **kwargs)` và gọi bằng keyword
+- `services/kiem_soat_service.py`, `tabs/tab_baocao/*`, `tabs/tab_cdtotkvv_pgd.py`, `tabs/tab_khtd_pgd.py`, `tabs/tab_pgd_cards.py`, `tabs/tab_so_sanh_ky/_kpi_cards.py`, `tabs/tab_theo_doi_nhap/constants.py`, `tabs/tab_tracuu.py`, `tabs/tab_upload_pgd.py` — sửa toàn bộ cảnh báo dark mode còn lại
+- `test_khtd_so_lieu.py` — chuyển module docstring sang raw string để hết `SyntaxWarning \V`
+- Kết quả: `scripts/check_conventions.py` toàn project OK
+
+## [2026-07-25] — Fix hardcoded CSS colors phá dark mode trong 7 file tabs
+- `tabs/tab_cdtotkvv_pgd.py` dòng ~214 — nền highlight #ffebee → #2D0D14, thêm chữ #EF9A9A
+- `tabs/tab_khtd_pgd.py` dòng ~110,124,172,176,184,193,197,205 — chữ #64748b → #94A3B8, #059669 → #81C784, #dc2626 → #EF9A9A, #d97706 → #FFB74D, nền tổng cộng rgba(240,253,244) → rgba(30,45,35)
+- `tabs/tab_pgd_cards.py` dòng ~188,196,220,265 — chữ #455A64/#546E7A → #94A3B8
+- `tabs/tab_so_sanh_ky/_kpi_cards.py` dòng ~58-60 — .delta-up #16a34a → #81C784, .delta-down #dc2626 → #EF9A9A, .delta-neutral #6b7280 → #94A3B8
+- `tabs/tab_theo_doi_nhap/constants.py` dòng ~64,65,72,73 — chữ #0c5460 → #80CBC4
+- `tabs/tab_tracuu.py` dòng ~851 — chữ #c62828 → #EF9A9A
+- `tabs/tab_upload_pgd.py` dòng ~479 — chữ #9ca3af → #94A3B8
+
+## [2026-07-25] — Fix hardcoded CSS colors phá dark mode trong tab_baocao components
+- `tabs/tab_baocao/components/alert_suggestion.py` — đổi nền sáng (#fef2f2, #f0fdf4, #dcfce7) sang nền tối, chữ #111827 → #E0E6ED/#94A3B8
+- `tabs/tab_baocao/components/skeleton_loader.py` — đổi nền #f0f0f0/white sang #1E2130/#262B3D, border #e5e7eb → #2A2D3E
+- `tabs/tab_baocao/components/sticky_table.py` — đổi nền header #f9fafb → #262B3D, chữ #111827 → #E0E6ED, border → #2A2D3E
+- `tabs/tab_baocao/components/tooltip.py` — đổi nền white → #1E2130, chữ #6b7280/#111827 → #94A3B8/#E0E6ED, border → #2A2D3E
+- `tabs/tab_baocao/tree_navigation.py` — đổi hover #f3f4f6 → #262B3D, active #dbeafe → #1a2744, chữ #374151/#6b7280 → #E0E6ED/#94A3B8
+
+## [2026-07-25] — Archive DELTA.md + fix widget key + fix logger exc_info
+- `DELTA.md` — archive bản cũ (1073 dòng) vào `_archive/DELTA_2026-07-25.md`, tạo mới 35 dòng với entry gần nhất
+- `scripts/gen_code_index.py` — giới hạn 5 hàm/file (thay 8), CODE_INDEX.md còn 22900 ký tự
+- `tabs/tab_phoi_hop_pgd.py` — thêm key= cho 7 widget trong _render_chinh_sua
+- `tabs/tab_qd62.py` — thêm key= cho 6 widget trong _render_pgd
+- `tabs/tab_kehoach.py` — thêm key= cho st.number_input
+- `tabs/tab_khtd_nhap.py` — thêm key= cho st.button xuất PDF
+- `tabs/tab_nhiem_vu.py` — thêm key= cho st.text_input
+- `services/onedrive_service.py` — thêm exc_info=True vào logger.error
+- `tabs/tab_ke_hoach_cv_khnv.py` — thêm logger import + exc_info=True cho 3 except blocks
+- `tabs/tab_theo_doi_khao_sat.py` — đổi logger.warning → logger.error exc_info=True
+- `tabs/tab_upload_khnv/_baseline.py` — thêm exc_info=True
+- `tabs/tab_upload_pgd.py` — đổi logger.warning → logger.error exc_info=True
+- `test_khtd_so_lieu.py` — thêm logger import + exc_info=True
+
+## [2026-07-25] — Fix widget key checker và key thiếu trong tab KH-NV/Security
+- `scripts/check_conventions.py` — nới Rule 12 để dò `key=` trong lời gọi widget dài tối đa 40 dòng, tránh báo sai radio có danh sách option dài
+- `tabs/tab_security.py` — thêm key cho nút thêm IP whitelist và nút vô hiệu hóa 2FA
+- `tabs/tab_khnv_noi_bo.py` — thêm key cho form thêm cán bộ/form thêm lịch công tác; sửa các màu inline còn chìm trên dark mode trong task card và lịch
+- `BUGMAP.md` — thêm J64 cho pattern checker quá hẹp và widget thiếu key trong form nội bộ
+
 ## [2026-07-25] — Tách UI danh sách nộp khỏi tab Tiến độ nộp BC
 - `tabs/tab_tien_do_nop_list.py` — tạo mới module render tab `Danh sách nộp`, gồm lọc lượt nộp Google Form, kiểm soát nghĩa vụ theo deadline và export Excel/PDF
 - `tabs/tab_tien_do_nop.py` dòng ~18/~563 — thay hàm `_render_danh_sach()` bằng `render_submission_list(...)`, tiếp tục rút gọn tab chính về vai trò điều phối

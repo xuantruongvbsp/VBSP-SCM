@@ -1,4 +1,4 @@
-"""
+r"""
 Kiểm tra so sánh số liệu KHTD — CN vs 95 xã/phường.
 Phát hiện chênh lệch và tìm nguyên nhân.
 
@@ -11,6 +11,9 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import db
 import pandas as pd
+from logger import get_logger
+
+logger = get_logger(__name__)
 from config import (
     CHUONG_TRINH_KHTD, DS_PGD, DON_VI_CHI_NHANH, PGD_XA_MAP,
     COT_TEN_PGD, COT_TEN_XA, COT_MA_CHUONG_TRINH, COT_NGUON_VON,
@@ -134,6 +137,7 @@ def _doc_hstd():
         print(f"  → HSTD rows: {len(df):,}")
         return df
     except Exception as e:
+        logger.error("doc_hstd: lỗi đọc HSTD — %s", e, exc_info=True)
         print(f"  ⚠️ Lỗi đọc HSTD: {e}")
         return pd.DataFrame()
 

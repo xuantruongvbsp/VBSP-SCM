@@ -211,7 +211,7 @@ def _sub_phan_tich(pgd_user: str, username: str) -> None:
 
         def highlight_rows(row: pd.Series):
             if row["% Tổ bị ảnh hưởng"] > 20:
-                return ["background-color: #ffebee"] * len(row)
+                return ["background-color: #2D0D14; color: #EF9A9A"] * len(row)
             return [""] * len(row)
 
         hien_thi_dataframe_phan_trang(

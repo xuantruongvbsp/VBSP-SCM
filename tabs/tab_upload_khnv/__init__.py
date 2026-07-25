@@ -126,4 +126,4 @@ def render(tab=None, **kwargs) -> None:
         # ── Tab 6: Xóa dữ liệu ──────────────────────────────────────────────
         with tab_xoa:
             st.markdown("#### 🗑️ Xóa dữ liệu PGD")
-            _delete.render(role, username)
+            _delete.render(role=role, username=username)

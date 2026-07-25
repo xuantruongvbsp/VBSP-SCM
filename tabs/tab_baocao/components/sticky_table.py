@@ -35,33 +35,37 @@ def render_sticky_table(
         position: relative;
         height: {height}px;
         overflow: auto;
-        border: 1px solid #e5e7eb;
+        border: 1px solid #2A2D3E;
         border-radius: 8px;
     }}
     .sticky-table-{key} thead {{
         position: sticky;
         top: 0;
         z-index: 10;
-        background: #f9fafb;
+        background: #262B3D;
+        color: #E0E6ED;
     }}
     .sticky-table-{key} th {{
-        background: #f9fafb;
+        background: #262B3D;
+        color: #E0E6ED;
         font-weight: 600;
         padding: 12px;
-        border-bottom: 2px solid #e5e7eb;
+        border-bottom: 2px solid #2A2D3E;
         text-align: left;
         font-size: 13px;
     }}
     .sticky-table-{key} td {{
         padding: 10px 12px;
-        border-bottom: 1px solid #f3f4f6;
+        border-bottom: 1px solid #2A2D3E;
         font-size: 13px;
     }}
     .sticky-table-{key} tr:hover td {{
-        background: #f9fafb;
+        background: #262B3D;
+        color: #E0E6ED;
     }}
     .sticky-table-{key} tbody tr:nth-child(even) {{
-        background: #fafafa;
+        background: #1E2130;
+        color: #E0E6ED;
     }}
     </style>
     """

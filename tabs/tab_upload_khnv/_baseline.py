@@ -115,7 +115,7 @@ def render(username: str) -> None:
                         try:
                             _bm[f.name] = f.read_bytes()
                         except Exception as e:
-                            logger.error("bl scan: %s", e)
+                            logger.error("bl scan: %s", e, exc_info=True)
                     st.session_state["_bl_bytes"] = _bm
                     st.session_state["_bl_ids"] = [(k, len(v)) for k, v in _bm.items()]
                     st.success(f"✅ Tìm thấy {len(_bm)} file.")

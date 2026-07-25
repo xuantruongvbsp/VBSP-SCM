@@ -158,7 +158,7 @@ def _nen_kiem_tra(path: Path) -> bool:
     return path.suffix == ".py"
 
 
-def _widget_call_has_key(lines: list[str], start_idx: int, max_lines: int = 12) -> bool:
+def _widget_call_has_key(lines: list[str], start_idx: int, max_lines: int = 40) -> bool:
     """Heuristic kiểm tra `key=` trong toàn bộ lời gọi widget multiline."""
     balance = 0
     for offset, idx in enumerate(range(start_idx, min(start_idx + max_lines, len(lines)))):

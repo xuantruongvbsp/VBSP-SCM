@@ -213,6 +213,15 @@
 
 ## B. Streamlit UI
 
+### B45 — Theo dõi nhập lỗi stale `ttdn_sheet_sel` kiểu chuỗi
+| | |
+|---|---|
+| **File** | `tabs/tab_theo_doi_nhap/__init__.py` → `render()` |
+| **Dấu hiệu** | Mở tab Theo dõi nhập liệu có thể lỗi `TypeError: '>=' not supported between instances of 'str' and 'int'` tại đoạn reset dropdown |
+| **Nguyên nhân** | `st.session_state["ttdn_sheet_sel"]` còn giá trị stale từ phiên/layout cũ và có thể là `str`; code so sánh trực tiếp `_sel >= len(all_labels)` |
+| **Fix** | Đọc `_sel = st.session_state.get(...)`; nếu `_sel` không phải `int` hoặc vượt số option thì reset `st.session_state["ttdn_sheet_sel"] = 0` trước khi gọi `st.selectbox` |
+| **Ngày fix** | 2026-07-25 |
+
 ### B44 — Theo dõi nhập crash khi ẩn hết module tích hợp và chưa có sheet
 | | |
 |---|---|

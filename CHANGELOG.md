@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## [2026-07-25] — Fix stale session_state dropdown Theo dõi nhập
+- `tabs/tab_theo_doi_nhap/__init__.py` dòng ~108 — reset `ttdn_sheet_sel` về `0` nếu session state cũ không phải `int`, tránh `TypeError` khi so sánh với số lượng option
+- `BUGMAP.md` — thêm mục B45 cho lỗi stale `selectbox` state kiểu chuỗi trong tab Theo dõi nhập liệu
+
 ## [2026-07-25] — Fix migration DB cũ fail khi tạo index trước cột
 - `migrations/001_initial.py` dòng ~410 — chạy từng statement thay vì `executescript()` nguyên khối; nếu DB legacy thiếu cột cho index thì bỏ qua index đó thay vì dừng toàn bộ migration
 - `BUGMAP.md` — thêm mục D7 cho lỗi migration `no such column` khi DB đã có bảng schema cũ

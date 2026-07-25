@@ -822,6 +822,15 @@
 
 ## D. Database / kv_store
 
+### D7 — Migration DB cũ fail `no such column` khi tạo index
+| | |
+|---|---|
+| **File** | `migrations/001_initial.py` → `upgrade()` |
+| **Dấu hiệu** | `db.init_db()` trên DB legacy có thể lỗi `sqlite3.OperationalError: no such column: trang_thai` hoặc cột khác trong lúc chạy migration 001 |
+| **Nguyên nhân** | `CREATE TABLE IF NOT EXISTS` không nâng cấp bảng đã tồn tại; migration 001 chạy `executescript()` nguyên khối gồm cả `CREATE INDEX ... ON bảng(cột_mới)`, nên DB cũ thiếu cột sẽ dừng trước khi migration 002 kịp `ALTER TABLE` |
+| **Fix** | Chạy từng SQL statement; riêng lỗi `CREATE INDEX` do thiếu cột thì bỏ qua để migration tiếp tục, các `ALTER TABLE` backward-compatible ở migration sau bổ sung schema |
+| **Ngày fix** | 2026-07-25 |
+
 ### D1 — `database is locked`
 | | |
 |---|---|

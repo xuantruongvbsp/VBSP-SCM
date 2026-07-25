@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## [2026-07-25] — Fix migration DB cũ fail khi tạo index trước cột
+- `migrations/001_initial.py` dòng ~410 — chạy từng statement thay vì `executescript()` nguyên khối; nếu DB legacy thiếu cột cho index thì bỏ qua index đó thay vì dừng toàn bộ migration
+- `BUGMAP.md` — thêm mục D7 cho lỗi migration `no such column` khi DB đã có bảng schema cũ
+
 ## [2026-07-25] — Fix dropdown rỗng khi ẩn hết module Theo dõi nhập
 - `tabs/tab_theo_doi_nhap/__init__.py` dòng ~97 — guard danh sách lựa chọn rỗng trước `st.selectbox`, vẫn mở Cài đặt cho admin để bật lại module
 - `BUGMAP.md` — thêm mục B44 cho lỗi `st.selectbox` không nhận options rỗng sau khi tắt toàn bộ module tích hợp

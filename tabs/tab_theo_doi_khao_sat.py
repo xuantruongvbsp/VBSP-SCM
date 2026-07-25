@@ -25,6 +25,7 @@ logger = get_logger(__name__)
 
 from auth import la_phan_he_cn, normalize_role
 from config import DS_PGD, DON_VI_CHI_NHANH
+from tabs.tab_theo_doi_nhap.data import doc_builtin_visibility, luu_builtin_visibility
 
 _DS_TAT_CA = [DON_VI_CHI_NHANH] + DS_PGD  # 22 đơn vị
 from tabs.base_tab import TabContext
@@ -275,10 +276,12 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
     role     = normalize_role(role_raw)
     is_cn    = la_phan_he_cn(role)
     pgd_user = kwargs.get("pgd_user")
+    username = kwargs.get("username", "unknown")
+    can_config = role in ("admin_cn", "manager_cn", "admin", "manager")
 
     ctx = tab if tab is not None else st.container()
     with ctx:
-        col_title, col_btn = st.columns([8, 1])
+        col_title, col_btn, col_del = st.columns([7, 1, 1])
         with col_title:
             st.subheader("📋 Theo dõi Khảo sát HN / HCN / HTN")
         with col_btn:
@@ -286,6 +289,20 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                          key="khaosat_btn_refresh", use_container_width=True):
                 st.cache_data.clear()
                 st.rerun()
+        with col_del:
+            if can_config:
+                with st.popover("🗑", use_container_width=True,
+                                help="Bỏ theo dõi báo cáo này"):
+                    st.warning("Ẩn **Khảo sát HN/HCN/HTN** khỏi dropdown theo dõi?")
+                    st.caption("Dữ liệu không bị xóa. Bật lại trong ⚙️ Cài đặt.")
+                    if st.button("✅ Xác nhận bỏ theo dõi",
+                                 key="khaosat_btn_untrack", type="primary",
+                                 use_container_width=True):
+                        vis = doc_builtin_visibility()
+                        vis["khao_sat"] = False
+                        luu_builtin_visibility(vis, username)
+                        st.success("✅ Đã bỏ theo dõi Khảo sát HN/HCN/HTN.")
+                        st.rerun()
 
         result = _doc_khao_sat()
 

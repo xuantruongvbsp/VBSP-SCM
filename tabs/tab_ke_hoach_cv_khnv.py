@@ -32,6 +32,11 @@ def _doc_ket_qua_cached() -> pd.DataFrame:
     return svc.doc_ket_qua()
 
 
+@st.cache_data(ttl=300)
+def _doc_nhiem_vu_gsheet_cached() -> pd.DataFrame:
+    return svc.doc_nhiem_vu_gsheet()
+
+
 def _fmt_date(value: Any) -> str:
     if pd.isna(value):
         return ""
@@ -90,6 +95,17 @@ def _unique_weeks(*frames: pd.DataFrame) -> list[date]:
     return sorted(weeks, reverse=True)
 
 
+def _unique_dates(df: pd.DataFrame, col: str) -> list[date]:
+    if df.empty:
+        return []
+    if "tuan" in df.columns:
+        return _unique_weeks(df)
+    if col not in df.columns:
+        return []
+    parsed = pd.to_datetime(df[col], dayfirst=True, errors="coerce")
+    return sorted({x.date() for x in parsed.dropna()}, reverse=True)
+
+
 def _filter_common(
     df: pd.DataFrame,
     *,
@@ -101,7 +117,7 @@ def _filter_common(
         return df
 
     result = df.copy()
-    weeks = _unique_weeks(result)
+    weeks = _unique_dates(result, week_col)
     col_week, *cols = st.columns([1.3] + [1] * len(text_filters))
     with col_week:
         week_choice = st.selectbox(
@@ -112,6 +128,9 @@ def _filter_common(
         )
     if week_choice != "Tất cả" and "tuan" in result.columns:
         result = result[result["tuan"] == week_choice]
+    elif week_choice != "Tất cả" and week_col in result.columns:
+        parsed = pd.to_datetime(result[week_col], dayfirst=True, errors="coerce").dt.date
+        result = result[parsed == week_choice]
 
     for col_ui, (field, label) in zip(cols, text_filters):
         with col_ui:
@@ -130,7 +149,8 @@ def _render_huong_dan(cfg: dict[str, Any]) -> None:
 
     form_kh = str(cfg.get("form_ke_hoach_url", "") or "").strip()
     form_kq = str(cfg.get("form_ket_qua_url", "") or "").strip()
-    c1, c2 = st.columns(2)
+    form_nv = str(cfg.get("form_nhiem_vu_url", "") or "").strip()
+    c1, c2, c3 = st.columns(3)
     with c1:
         if form_kh:
             st.link_button("Mở Form đăng ký kế hoạch", form_kh, use_container_width=True)
@@ -141,15 +161,21 @@ def _render_huong_dan(cfg: dict[str, Any]) -> None:
             st.link_button("Mở Form báo cáo kết quả", form_kq, use_container_width=True)
         else:
             st.info("Chưa cấu hình URL Form báo cáo kết quả.")
+    with c3:
+        if form_nv:
+            st.link_button("Mở Form nhiệm vụ giao", form_nv, use_container_width=True)
+        else:
+            st.info("Chưa cấu hình URL Form nhiệm vụ giao.")
 
     st.divider()
     st.markdown("### Cấu trúc Google Forms")
-    st.write("Cả hai Form dùng cấu trúc phẳng, không branching. Hai Form cùng ghi vào một Spreadsheet.")
+    st.write("Ba Form dùng cấu trúc phẳng, không branching. Các Form cùng ghi vào một Spreadsheet.")
     st.dataframe(
         pd.DataFrame(
             [
                 {"Tab Sheet": "KhHoach", "Dữ liệu": "Đăng ký kế hoạch công việc"},
                 {"Tab Sheet": "KetQua", "Dữ liệu": "Báo cáo kết quả công việc"},
+                {"Tab Sheet": "NhiemVuGiao", "Dữ liệu": "Nhiệm vụ lãnh đạo phòng giao"},
             ]
         ),
         hide_index=True,
@@ -175,6 +201,11 @@ def _render_cai_dat(cfg: dict[str, Any], username: str) -> None:
             "URL Form báo cáo kết quả",
             value=str(cfg.get("form_ket_qua_url", "") or ""),
             key=f"{KEY_PREFIX}form_kq",
+        )
+        form_nhiem_vu_url = st.text_input(
+            "URL Form nhiệm vụ lãnh đạo giao",
+            value=str(cfg.get("form_nhiem_vu_url", "") or ""),
+            key=f"{KEY_PREFIX}form_nv",
         )
 
         st.markdown("### Danh mục gợi ý")
@@ -207,6 +238,7 @@ def _render_cai_dat(cfg: dict[str, Any], username: str) -> None:
                 "sheet_id": sheet_id,
                 "form_ke_hoach_url": form_ke_hoach_url,
                 "form_ket_qua_url": form_ket_qua_url,
+                "form_nhiem_vu_url": form_nhiem_vu_url,
                 "dau_viec_custom": dau_viec_custom,
             },
             username,
@@ -226,17 +258,24 @@ def _render_cai_dat(cfg: dict[str, Any], username: str) -> None:
                 st.error(msg)
 
 
-def _render_tong_quan(df_kh: pd.DataFrame, df_kq: pd.DataFrame, username: str = "unknown") -> None:
+def _render_tong_quan(
+    df_kh: pd.DataFrame,
+    df_kq: pd.DataFrame,
+    df_nv: pd.DataFrame,
+    username: str = "unknown",
+) -> None:
     tong_hop = svc.tinh_tong_hop(df_kh, df_kq)
+    tong_hop_nv = svc.tinh_tong_hop_nhiem_vu(df_nv)
     metrics = tong_hop["metrics"]
     tuan_ht = tong_hop["tuan_hien_tai"]
 
     st.caption(f"Tuần hiện tại bắt đầu ngày {_fmt_date(tuan_ht)}")
-    c1, c2, c3, c4 = st.columns(4)
+    c1, c2, c3, c4, c5 = st.columns(5)
     c1.metric("Tổng KH tuần hiện tại", metrics["tong_kh_tuan"])
     c2.metric("Đã báo cáo", metrics["da_bao_cao"])
     c3.metric("Hoàn thành", metrics["hoan_thanh"])
     c4.metric("Tỷ lệ hoàn thành", _fmt_pct_vn(metrics["ty_le_hoan_thanh"]))
+    c5.metric("NV đang mở", tong_hop_nv["dang_mo"], delta=f"{tong_hop_nv['qua_han']} quá hạn")
 
     st.divider()
     st.markdown("### Ma trận cán bộ × tuần")
@@ -294,6 +333,190 @@ def _render_tong_quan(df_kh: pd.DataFrame, df_kq: pd.DataFrame, username: str = 
         except Exception as e:
             logger.error("_render_tong_quan: lỗi tạo Excel tổng quan — %s", e, exc_info=True)
             st.warning(f"Không thể tạo Excel tổng quan: {e}")
+
+
+def _render_nhiem_vu_giao(
+    df_nv_app: pd.DataFrame,
+    df_nv_gsheet: pd.DataFrame,
+    *,
+    can_config: bool,
+    username: str,
+    cfg: dict[str, Any],
+) -> None:
+    st.markdown("### Nhiệm vụ lãnh đạo phòng giao")
+    df_nv = svc.gop_nhiem_vu(df_nv_app, df_nv_gsheet)
+    metrics = svc.tinh_tong_hop_nhiem_vu(df_nv)
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Tổng nhiệm vụ", metrics["tong"])
+    c2.metric("Đang mở", metrics["dang_mo"])
+    c3.metric("Hoàn thành", metrics["hoan_thanh"])
+    c4.metric("Quá hạn", metrics["qua_han"])
+
+    if can_config:
+        st.divider()
+        st.markdown("#### Giao nhiệm vụ trong VBSP-SCM")
+        with st.form(f"{KEY_PREFIX}nv_form", clear_on_submit=True):
+            c_ngay, c_han, c_uu_tien, c_trang_thai = st.columns([1, 1, 1, 1])
+            with c_ngay:
+                ngay_giao = st.date_input(
+                    "Ngày giao",
+                    value=date.today(),
+                    format="DD/MM/YYYY",
+                    key=f"{KEY_PREFIX}nv_ngay_giao",
+                )
+            with c_han:
+                han_hoan_thanh = st.date_input(
+                    "Hạn hoàn thành",
+                    value=date.today(),
+                    format="DD/MM/YYYY",
+                    key=f"{KEY_PREFIX}nv_han",
+                )
+            with c_uu_tien:
+                uu_tien = st.selectbox("Ưu tiên", svc.UU_TIEN_NHIEM_VU, key=f"{KEY_PREFIX}nv_uu_tien")
+            with c_trang_thai:
+                trang_thai = st.selectbox("Trạng thái", svc.TRANG_THAI_NHIEM_VU, key=f"{KEY_PREFIX}nv_trang_thai")
+
+            c_giao, c_nhan = st.columns(2)
+            with c_giao:
+                nguoi_giao = st.text_input(
+                    "Người giao",
+                    value=username,
+                    key=f"{KEY_PREFIX}nv_nguoi_giao",
+                )
+            with c_nhan:
+                can_bo_nhan = st.text_input(
+                    "Cán bộ nhận",
+                    placeholder="VD: Nguyễn Văn A; Trần Thị B",
+                    key=f"{KEY_PREFIX}nv_can_bo_nhan",
+                )
+
+            nhom = st.selectbox("Nhóm công tác", KE_HOACH_CV_KHNV_NHOM, key=f"{KEY_PREFIX}nv_nhom")
+            noi_dung = st.text_area("Nội dung nhiệm vụ", height=90, key=f"{KEY_PREFIX}nv_noi_dung")
+            san_pham = st.text_area(
+                "Sản phẩm/Yêu cầu đầu ra",
+                height=70,
+                key=f"{KEY_PREFIX}nv_san_pham",
+            )
+            ghi_chu = st.text_area("Ghi chú", height=70, key=f"{KEY_PREFIX}nv_ghi_chu")
+            submitted = st.form_submit_button("Giao nhiệm vụ", type="primary")
+
+        if submitted:
+            try:
+                svc.them_nhiem_vu_app(
+                    {
+                        "ngay_giao": ngay_giao,
+                        "nguoi_giao": nguoi_giao,
+                        "can_bo_nhan": can_bo_nhan,
+                        "nhom_cong_tac": nhom,
+                        "noi_dung": noi_dung,
+                        "san_pham": san_pham,
+                        "han_hoan_thanh": han_hoan_thanh,
+                        "uu_tien": uu_tien,
+                        "trang_thai": trang_thai,
+                        "ghi_chu": ghi_chu,
+                    },
+                    username,
+                )
+                st.cache_data.clear()
+                st.success("Đã giao nhiệm vụ.")
+                st.rerun()
+            except Exception as e:
+                logger.error("_render_nhiem_vu_giao: thêm nhiệm vụ lỗi — %s", e, exc_info=True)
+                st.error(f"Không thể giao nhiệm vụ: {e}")
+
+    st.divider()
+    st.markdown("#### Danh sách nhiệm vụ")
+    form_nv = str(cfg.get("form_nhiem_vu_url", "") or "").strip()
+    if form_nv:
+        st.link_button("Mở Form nhiệm vụ giao", form_nv, use_container_width=False)
+
+    if df_nv.empty:
+        st.info("Chưa có nhiệm vụ lãnh đạo giao.")
+        return
+
+    filtered = _filter_common(
+        df_nv,
+        key_prefix=f"{KEY_PREFIX}nv_",
+        week_col="han_hoan_thanh",
+        text_filters=[
+            ("can_bo_nhan", "Cán bộ nhận"),
+            ("trang_thai", "Trạng thái"),
+            ("uu_tien", "Ưu tiên"),
+            ("nguon", "Nguồn"),
+        ],
+    )
+    display = _display_df(filtered, ["ngay_giao", "han_hoan_thanh"])
+    display = display.rename(
+        columns={
+            "thoi_gian": "Thời gian ghi nhận",
+            "ma_nhiem_vu": "Mã nhiệm vụ",
+            "ngay_giao": "Ngày giao",
+            "nguoi_giao": "Người giao",
+            "can_bo_nhan": "Cán bộ nhận",
+            "nhom_cong_tac": "Nhóm công tác",
+            "noi_dung": "Nội dung",
+            "san_pham": "Sản phẩm/Yêu cầu",
+            "han_hoan_thanh": "Hạn hoàn thành",
+            "uu_tien": "Ưu tiên",
+            "trang_thai": "Trạng thái",
+            "ghi_chu": "Ghi chú",
+            "nguon": "Nguồn",
+            "qua_han": "Quá hạn",
+        }
+    )
+    display = display.drop(columns=[c for c in ["han", "tuan"] if c in display.columns])
+    st.dataframe(display, hide_index=True, use_container_width=True)
+
+    if can_config:
+        app_codes = sorted(_unique_text(df_nv_app, "ma_nhiem_vu"))
+        if app_codes:
+            with st.expander("Cập nhật trạng thái nhiệm vụ nhập trong app"):
+                ma_chon = st.selectbox("Mã nhiệm vụ", app_codes, key=f"{KEY_PREFIX}nv_update_code")
+                trang_thai_moi = st.selectbox(
+                    "Trạng thái mới",
+                    svc.TRANG_THAI_NHIEM_VU,
+                    key=f"{KEY_PREFIX}nv_update_status",
+                )
+                ghi_chu_moi = st.text_area("Ghi chú cập nhật", key=f"{KEY_PREFIX}nv_update_note")
+                c_up, c_del = st.columns(2)
+                with c_up:
+                    if st.button("Cập nhật", key=f"{KEY_PREFIX}nv_update_btn", use_container_width=True):
+                        if svc.cap_nhat_trang_thai_nhiem_vu_app(ma_chon, trang_thai_moi, ghi_chu_moi, username):
+                            st.cache_data.clear()
+                            st.success("Đã cập nhật nhiệm vụ.")
+                            st.rerun()
+                with c_del:
+                    if st.button("Xóa nhiệm vụ", key=f"{KEY_PREFIX}nv_delete_btn", use_container_width=True):
+                        if svc.xoa_nhiem_vu_app(ma_chon, username):
+                            st.cache_data.clear()
+                            st.success("Đã xóa nhiệm vụ.")
+                            st.rerun()
+
+    try:
+        excel_bytes = xuat_excel_chuyen_nghiep(
+            display,
+            title="Nhiệm vụ Lãnh đạo Phòng giao — KH-NV",
+            nguoi_xuat=username,
+            subtitle=f"Xuất ngày {date.today().strftime('%d/%m/%Y')}",
+            columns=[(c, c, "text") for c in display.columns],
+            kpi_items=[
+                ("Tổng nhiệm vụ", metrics["tong"], "nhiệm vụ"),
+                ("Đang mở", metrics["dang_mo"], "nhiệm vụ"),
+                ("Hoàn thành", metrics["hoan_thanh"], "nhiệm vụ"),
+                ("Quá hạn", metrics["qua_han"], "nhiệm vụ"),
+            ],
+        )
+    except Exception as e:
+        logger.warning("_render_nhiem_vu_giao: fallback Excel thường — %s", e, exc_info=True)
+        excel_bytes = xuat_excel({"Nhiệm vụ giao": display})
+    st.download_button(
+        "📥 Tải Excel nhiệm vụ giao",
+        data=excel_bytes,
+        file_name=excel_ten_file("khnv_nhiem_vu_giao"),
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        key=f"{KEY_PREFIX}nv_excel",
+        use_container_width=False,
+    )
 
 
 def _render_ke_hoach(df_kh: pd.DataFrame, username: str = "unknown") -> None:
@@ -515,17 +738,19 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
 
         df_kh = _doc_ke_hoach_cached()
         df_kq = _doc_ket_qua_cached()
+        df_nv_gsheet = _doc_nhiem_vu_gsheet_cached()
+        df_nv_app = svc.doc_nhiem_vu_app()
         loi = svc.lay_loi_doc_gsheet_gan_nhat()
         if loi:
             st.warning(f"Không đọc được Google Sheets: {loi}")
 
         if can_config:
-            t0, t1, t2, t3, t4 = st.tabs(
-                ["Hướng dẫn", "Cài đặt", "Tổng quan", "Kế hoạch đăng ký", "Kết quả báo cáo"]
+            t0, t1, t2, t3, t4, t5 = st.tabs(
+                ["Hướng dẫn", "Cài đặt", "Tổng quan", "Nhiệm vụ giao", "Kế hoạch đăng ký", "Kết quả báo cáo"]
             )
         else:
-            t0, t2, t3, t4 = st.tabs(
-                ["Hướng dẫn", "Tổng quan", "Kế hoạch đăng ký", "Kết quả báo cáo"]
+            t0, t2, t3, t4, t5 = st.tabs(
+                ["Hướng dẫn", "Tổng quan", "Nhiệm vụ giao", "Kế hoạch đăng ký", "Kết quả báo cáo"]
             )
             t1 = None
 
@@ -535,8 +760,16 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
             with t1:
                 _render_cai_dat(cfg, username)
         with t2:
-            _render_tong_quan(df_kh, df_kq, username)
+            _render_tong_quan(df_kh, df_kq, svc.gop_nhiem_vu(df_nv_app, df_nv_gsheet), username)
         with t3:
-            _render_ke_hoach(df_kh, username)
+            _render_nhiem_vu_giao(
+                df_nv_app,
+                df_nv_gsheet,
+                can_config=can_config,
+                username=username,
+                cfg=cfg,
+            )
         with t4:
+            _render_ke_hoach(df_kh, username)
+        with t5:
             _render_ket_qua(df_kq, username)

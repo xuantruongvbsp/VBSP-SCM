@@ -213,6 +213,15 @@
 
 ## B. Streamlit UI
 
+### B44 — Theo dõi nhập crash khi ẩn hết module tích hợp và chưa có sheet
+| | |
+|---|---|
+| **File** | `tabs/tab_theo_doi_nhap/__init__.py` → `render()` |
+| **Dấu hiệu** | Sau khi tắt cả 3 module tích hợp sẵn và chưa cấu hình sheet tùy chỉnh, tab Theo dõi nhập liệu có thể lỗi `StreamlitAPIException: Selectbox has no options` |
+| **Nguyên nhân** | Dropdown `Chọn sheet theo dõi` được dựng từ `visible_builtins + ds_sheet`; khi cả hai đều rỗng, code vẫn gọi `st.selectbox(range(0))` |
+| **Fix** | Guard `if not all_labels` trước selectbox; hiển thị thông báo và mở expander Cài đặt cho admin để bật lại module hoặc thêm sheet |
+| **Ngày fix** | 2026-07-25 |
+
 ### B35 — Telegram NQH tuần hiển thị `12.903.4 tỷ` và chênh lệch `-0 tr`
 | | |
 |---|---|

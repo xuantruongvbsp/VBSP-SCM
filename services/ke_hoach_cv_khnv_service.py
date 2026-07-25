@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import sys
 import time
+import uuid
 from datetime import date
 from pathlib import Path
 from typing import Any
@@ -17,12 +18,14 @@ from config import (
     KE_HOACH_CV_KHNV_SHEET_ID,
     KE_HOACH_CV_KHNV_SHEET_KH,
     KE_HOACH_CV_KHNV_SHEET_KQ,
+    KE_HOACH_CV_KHNV_SHEET_NV,
 )
 from logger import get_logger
 
 logger = get_logger(__name__)
 
 KV_CONFIG = "khnv_ke_hoach_cv_config"
+KV_NHIEM_VU_GIAO = "khnv_nhiem_vu_giao_list"
 
 COT_KH = [
     "thoi_gian",
@@ -47,6 +50,24 @@ COT_KQ = [
     "ket_qua",
 ]
 
+COT_NV_GIAO = [
+    "thoi_gian",
+    "ma_nhiem_vu",
+    "ngay_giao",
+    "nguoi_giao",
+    "can_bo_nhan",
+    "nhom_cong_tac",
+    "noi_dung",
+    "san_pham",
+    "han_hoan_thanh",
+    "uu_tien",
+    "trang_thai",
+    "ghi_chu",
+]
+
+TRANG_THAI_NHIEM_VU = ["Mới giao", "Đang thực hiện", "Hoàn thành", "Tạm dừng"]
+UU_TIEN_NHIEM_VU = ["Khẩn cấp", "Quan trọng", "Bình thường"]
+
 _GSHEET_READ_RETRIES = 3
 _GSHEET_READ_BACKOFF_S = 1.5
 _LAST_ERROR: str | None = None
@@ -61,6 +82,7 @@ def doc_config() -> dict[str, Any]:
     cfg.setdefault("sheet_id", "")
     cfg.setdefault("form_ke_hoach_url", "")
     cfg.setdefault("form_ket_qua_url", "")
+    cfg.setdefault("form_nhiem_vu_url", "")
     cfg.setdefault("dau_viec_custom", [])
     if not isinstance(cfg["dau_viec_custom"], list):
         cfg["dau_viec_custom"] = []
@@ -73,6 +95,7 @@ def luu_config(cfg: dict[str, Any], username: str) -> None:
         "sheet_id": str(cfg.get("sheet_id", "") or "").strip(),
         "form_ke_hoach_url": str(cfg.get("form_ke_hoach_url", "") or "").strip(),
         "form_ket_qua_url": str(cfg.get("form_ket_qua_url", "") or "").strip(),
+        "form_nhiem_vu_url": str(cfg.get("form_nhiem_vu_url", "") or "").strip(),
         "dau_viec_custom": [
             str(item).strip()
             for item in cfg.get("dau_viec_custom", [])
@@ -277,6 +300,21 @@ def _chuan_hoa_df(df: pd.DataFrame, week_col: str) -> pd.DataFrame:
     return result
 
 
+def _chuan_hoa_nhiem_vu_gsheet(df: pd.DataFrame) -> pd.DataFrame:
+    """Chuẩn hóa dữ liệu nhiệm vụ lãnh đạo giao đọc từ Google Sheets."""
+    if df.empty:
+        return pd.DataFrame(columns=COT_NV_GIAO + ["han", "nguon"])
+    result = df.copy()
+    for col in result.columns:
+        if col not in {"thoi_gian", "ngay_giao", "han_hoan_thanh"}:
+            result[col] = result[col].apply(_clean_text)
+    for col in ["thoi_gian", "ngay_giao", "han_hoan_thanh"]:
+        result[col] = pd.to_datetime(result[col], dayfirst=True, errors="coerce")
+    result["han"] = result["han_hoan_thanh"].dt.date
+    result["nguon"] = "Google Sheet"
+    return result
+
+
 def doc_ke_hoach() -> pd.DataFrame:
     """Đọc tab KhHoach từ Google Sheets, không cache."""
     try:
@@ -295,6 +333,16 @@ def doc_ket_qua() -> pd.DataFrame:
     except Exception as e:
         logger.error("doc_ket_qua: %s", e, exc_info=True)
         return pd.DataFrame(columns=COT_KQ + ["tuan"])
+
+
+def doc_nhiem_vu_gsheet() -> pd.DataFrame:
+    """Đọc tab NhiemVuGiao từ Google Sheets, không cache."""
+    try:
+        data = _doc_raw_values_sheet(KE_HOACH_CV_KHNV_SHEET_NV)
+        return _chuan_hoa_nhiem_vu_gsheet(_rows_to_df(data, COT_NV_GIAO))
+    except Exception as e:
+        logger.error("doc_nhiem_vu_gsheet: %s", e, exc_info=True)
+        return pd.DataFrame(columns=COT_NV_GIAO + ["han", "nguon"])
 
 
 def doc_ke_hoach_cached(ttl: int = 300):
@@ -319,8 +367,19 @@ def doc_ket_qua_cached(ttl: int = 300):
     return _cached
 
 
+def doc_nhiem_vu_gsheet_cached(ttl: int = 300):
+    """Trả về callable để UI dùng với @st.cache_data."""
+    import streamlit as st
+
+    @st.cache_data(ttl=ttl)
+    def _cached():
+        return doc_nhiem_vu_gsheet()
+
+    return _cached
+
+
 def kiem_tra_ket_noi() -> tuple[bool, str]:
-    """Kiểm tra credentials, Sheet ID và hai tab KhHoach/KetQua."""
+    """Kiểm tra credentials, Sheet ID và ba tab KhHoach/KetQua/NhiemVuGiao."""
     try:
         cred_path = _tim_credentials()
     except Exception as e:
@@ -334,10 +393,12 @@ def kiem_tra_ket_noi() -> tuple[bool, str]:
     try:
         kh = _doc_raw_values_sheet(KE_HOACH_CV_KHNV_SHEET_KH, sheet_id)
         kq = _doc_raw_values_sheet(KE_HOACH_CV_KHNV_SHEET_KQ, sheet_id)
+        nv = _doc_raw_values_sheet(KE_HOACH_CV_KHNV_SHEET_NV, sheet_id)
         return (
             True,
             f"OK — {cred_path.name}: {KE_HOACH_CV_KHNV_SHEET_KH} {len(kh)} dòng, "
-            f"{KE_HOACH_CV_KHNV_SHEET_KQ} {len(kq)} dòng",
+            f"{KE_HOACH_CV_KHNV_SHEET_KQ} {len(kq)} dòng, "
+            f"{KE_HOACH_CV_KHNV_SHEET_NV} {len(nv)} dòng",
         )
     except Exception as e:
         logger.error("kiem_tra_ket_noi: %s", e, exc_info=True)
@@ -360,6 +421,204 @@ def _week_label(value: Any) -> str:
 def _is_done(value: Any) -> bool:
     text = _clean_text(value).casefold()
     return "hoàn thành" in text or "hoan thanh" in text
+
+
+def _today_iso() -> str:
+    return date.today().isoformat()
+
+
+def _normal_date_iso(value: Any) -> str:
+    if isinstance(value, date):
+        return value.isoformat()
+    if pd.isna(value):
+        return ""
+    try:
+        ts = pd.to_datetime(value, dayfirst=True, errors="coerce")
+        if pd.isna(ts):
+            return ""
+        return ts.date().isoformat()
+    except Exception:
+        return ""
+
+
+def _doc_nhiem_vu_app_raw() -> list[dict[str, Any]]:
+    raw = db.doc_kv(KV_NHIEM_VU_GIAO) or []
+    return raw if isinstance(raw, list) else []
+
+
+def doc_nhiem_vu_app() -> pd.DataFrame:
+    """Đọc nhiệm vụ lãnh đạo giao được nhập trực tiếp trong app."""
+    rows = []
+    for item in _doc_nhiem_vu_app_raw():
+        if not isinstance(item, dict):
+            continue
+        row = {
+            "thoi_gian": item.get("created_at", ""),
+            "ma_nhiem_vu": item.get("ma_nhiem_vu", ""),
+            "ngay_giao": item.get("ngay_giao", ""),
+            "nguoi_giao": item.get("nguoi_giao", ""),
+            "can_bo_nhan": item.get("can_bo_nhan", ""),
+            "nhom_cong_tac": item.get("nhom_cong_tac", ""),
+            "noi_dung": item.get("noi_dung", ""),
+            "san_pham": item.get("san_pham", ""),
+            "han_hoan_thanh": item.get("han_hoan_thanh", ""),
+            "uu_tien": item.get("uu_tien", ""),
+            "trang_thai": item.get("trang_thai", ""),
+            "ghi_chu": item.get("ghi_chu", ""),
+            "nguon": "VBSP-SCM",
+        }
+        rows.append(row)
+    if not rows:
+        return pd.DataFrame(columns=COT_NV_GIAO + ["han", "nguon"])
+    result = pd.DataFrame(rows)
+    for col in ["thoi_gian", "ngay_giao", "han_hoan_thanh"]:
+        result[col] = pd.to_datetime(result[col], errors="coerce")
+    for col in result.columns:
+        if col not in {"thoi_gian", "ngay_giao", "han_hoan_thanh", "han"}:
+            result[col] = result[col].apply(_clean_text)
+    result["han"] = result["han_hoan_thanh"].dt.date
+    return result
+
+
+def tao_ma_nhiem_vu(ds_hien_tai: list[dict[str, Any]] | None = None) -> str:
+    """Tạo mã nhiệm vụ ngắn, đủ ổn định để cán bộ đối chiếu khi báo cáo."""
+    today = date.today()
+    prefix = f"NV-{today:%Y%m%d}-"
+    ds = ds_hien_tai if ds_hien_tai is not None else _doc_nhiem_vu_app_raw()
+    max_seq = 0
+    for item in ds:
+        ma = str(item.get("ma_nhiem_vu", "") if isinstance(item, dict) else "")
+        if ma.startswith(prefix):
+            try:
+                max_seq = max(max_seq, int(ma.rsplit("-", 1)[-1]))
+            except ValueError:
+                continue
+    return f"{prefix}{max_seq + 1:03d}"
+
+
+def them_nhiem_vu_app(payload: dict[str, Any], username: str) -> dict[str, Any]:
+    """Thêm nhiệm vụ lãnh đạo giao vào kv_store và ghi audit."""
+    ds = _doc_nhiem_vu_app_raw()
+    ma_nv = _clean_text(payload.get("ma_nhiem_vu")) or tao_ma_nhiem_vu(ds)
+    now_iso = pd.Timestamp.now().isoformat(timespec="seconds")
+    item = {
+        "id": str(uuid.uuid4()),
+        "ma_nhiem_vu": ma_nv,
+        "ngay_giao": _normal_date_iso(payload.get("ngay_giao")) or _today_iso(),
+        "nguoi_giao": _clean_text(payload.get("nguoi_giao")) or username,
+        "can_bo_nhan": _clean_text(payload.get("can_bo_nhan")),
+        "nhom_cong_tac": _clean_text(payload.get("nhom_cong_tac")),
+        "noi_dung": _clean_text(payload.get("noi_dung")),
+        "san_pham": _clean_text(payload.get("san_pham")),
+        "han_hoan_thanh": _normal_date_iso(payload.get("han_hoan_thanh")),
+        "uu_tien": _clean_text(payload.get("uu_tien")) or "Bình thường",
+        "trang_thai": _clean_text(payload.get("trang_thai")) or "Mới giao",
+        "ghi_chu": _clean_text(payload.get("ghi_chu")),
+        "created_at": now_iso,
+        "created_by": username,
+        "updated_at": now_iso,
+        "updated_by": username,
+    }
+    if not item["can_bo_nhan"]:
+        raise ValueError("Thiếu cán bộ nhận nhiệm vụ")
+    if not item["noi_dung"]:
+        raise ValueError("Thiếu nội dung nhiệm vụ")
+    if not item["han_hoan_thanh"]:
+        raise ValueError("Thiếu hạn hoàn thành")
+    ds.insert(0, item)
+    db.ghi_kv(KV_NHIEM_VU_GIAO, ds, username)
+    db.ghi_audit(
+        username,
+        "khnv_them_nhiem_vu_giao",
+        f"{ma_nv} — {item['can_bo_nhan']} — hạn {item['han_hoan_thanh']}",
+    )
+    return item
+
+
+def cap_nhat_trang_thai_nhiem_vu_app(
+    ma_nhiem_vu: str,
+    trang_thai: str,
+    ghi_chu: str,
+    username: str,
+) -> bool:
+    """Cập nhật trạng thái nhiệm vụ app theo mã nhiệm vụ."""
+    ma = _clean_text(ma_nhiem_vu)
+    ds = _doc_nhiem_vu_app_raw()
+    changed = False
+    now_iso = pd.Timestamp.now().isoformat(timespec="seconds")
+    for item in ds:
+        if isinstance(item, dict) and _clean_text(item.get("ma_nhiem_vu")) == ma:
+            item["trang_thai"] = _clean_text(trang_thai) or item.get("trang_thai", "")
+            item["ghi_chu"] = _clean_text(ghi_chu)
+            item["updated_at"] = now_iso
+            item["updated_by"] = username
+            changed = True
+            break
+    if not changed:
+        return False
+    db.ghi_kv(KV_NHIEM_VU_GIAO, ds, username)
+    db.ghi_audit(username, "khnv_cap_nhat_nhiem_vu_giao", f"{ma} — {trang_thai}")
+    return True
+
+
+def xoa_nhiem_vu_app(ma_nhiem_vu: str, username: str) -> bool:
+    """Xóa nhiệm vụ app theo mã nhiệm vụ."""
+    ma = _clean_text(ma_nhiem_vu)
+    ds = _doc_nhiem_vu_app_raw()
+    ds_moi = [
+        item
+        for item in ds
+        if not (isinstance(item, dict) and _clean_text(item.get("ma_nhiem_vu")) == ma)
+    ]
+    if len(ds_moi) == len(ds):
+        return False
+    db.ghi_kv(KV_NHIEM_VU_GIAO, ds_moi, username)
+    db.ghi_audit(username, "khnv_xoa_nhiem_vu_giao", ma)
+    return True
+
+
+def gop_nhiem_vu(df_app: pd.DataFrame, df_gsheet: pd.DataFrame) -> pd.DataFrame:
+    """Gộp nhiệm vụ từ VBSP-SCM và Google Sheet, ưu tiên dòng app khi trùng mã."""
+    frames = [
+        frame
+        for frame in [df_app, df_gsheet]
+        if isinstance(frame, pd.DataFrame) and not frame.empty
+    ]
+    if not frames:
+        return pd.DataFrame(columns=COT_NV_GIAO + ["han", "nguon", "qua_han"])
+    result = pd.concat(frames, ignore_index=True, sort=False)
+    if "ma_nhiem_vu" in result.columns:
+        result["_source_rank"] = result.get("nguon", "").map({"VBSP-SCM": 0}).fillna(1)
+        result = (
+            result.sort_values(["ma_nhiem_vu", "_source_rank"])
+            .drop_duplicates("ma_nhiem_vu", keep="first")
+            .drop(columns=["_source_rank"])
+        )
+    today = date.today()
+    result["qua_han"] = result.apply(
+        lambda row: bool(
+            isinstance(row.get("han"), date)
+            and row.get("han") < today
+            and not _is_done(row.get("trang_thai"))
+        ),
+        axis=1,
+    )
+    return result.sort_values(["qua_han", "han"], ascending=[False, True], na_position="last")
+
+
+def tinh_tong_hop_nhiem_vu(df_nv: pd.DataFrame) -> dict[str, int]:
+    """Tính KPI nhiệm vụ lãnh đạo giao."""
+    if not isinstance(df_nv, pd.DataFrame) or df_nv.empty:
+        return {"tong": 0, "hoan_thanh": 0, "qua_han": 0, "dang_mo": 0}
+    hoan_thanh = int(df_nv.get("trang_thai", pd.Series(dtype=str)).apply(_is_done).sum())
+    qua_han = int(df_nv.get("qua_han", pd.Series(dtype=bool)).fillna(False).sum())
+    tong = int(len(df_nv))
+    return {
+        "tong": tong,
+        "hoan_thanh": hoan_thanh,
+        "qua_han": qua_han,
+        "dang_mo": max(0, tong - hoan_thanh),
+    }
 
 
 def tinh_tong_hop(df_kh: pd.DataFrame, df_kq: pd.DataFrame) -> dict[str, Any]:

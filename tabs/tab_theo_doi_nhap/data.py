@@ -14,6 +14,8 @@ from .constants import (
     KV_LIST_KEY,
     KV_LEGACY_KEY,
     KV_SNAPSHOT_PREFIX,
+    KV_BUILTIN_VIS,
+    BUILTIN_MODULES,
     DEFAULT_CT,
     CACHE_TTL,
 )
@@ -292,6 +294,21 @@ def doc_ds_sheet() -> list[dict]:
 def luu_ds_sheet(ds: list[dict], username: str) -> None:
     db.ghi_kv(KV_LIST_KEY, ds, username)
     db.ghi_audit(username, "luu_theo_doi_nhap_config", f"{len(ds)} sheet(s)")
+
+
+# ── Built-in module visibility ───────────────────────────────────────────────
+
+def doc_builtin_visibility() -> dict[str, bool]:
+    """Đọc cấu hình hiển thị module tích hợp. Chưa có key → tất cả bật."""
+    cfg = db.doc_kv(KV_BUILTIN_VIS)
+    if not isinstance(cfg, dict):
+        return {m["id"]: True for m in BUILTIN_MODULES}
+    return cfg
+
+
+def luu_builtin_visibility(cfg: dict[str, bool], username: str) -> None:
+    db.ghi_kv(KV_BUILTIN_VIS, cfg, username)
+    db.ghi_audit(username, "tdn_builtin_visibility", str(cfg))
 
 
 def sheet_moi() -> dict:

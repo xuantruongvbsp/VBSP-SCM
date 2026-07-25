@@ -1,5 +1,40 @@
 # CHANGELOG
 
+## [2026-07-25] — Fix dropdown rỗng khi ẩn hết module Theo dõi nhập
+- `tabs/tab_theo_doi_nhap/__init__.py` dòng ~97 — guard danh sách lựa chọn rỗng trước `st.selectbox`, vẫn mở Cài đặt cho admin để bật lại module
+- `BUGMAP.md` — thêm mục B44 cho lỗi `st.selectbox` không nhận options rỗng sau khi tắt toàn bộ module tích hợp
+
+## [2026-07-25] — Bỏ theo dõi module tích hợp sẵn (Khảo sát, ĐCTT, Trạng thái chốt)
+- `tabs/tab_theo_doi_nhap/constants.py` — thêm `KV_BUILTIN_VIS`, `BUILTIN_MODULES` (3 module tích hợp)
+- `tabs/tab_theo_doi_nhap/data.py` — thêm `doc_builtin_visibility()`, `luu_builtin_visibility()` (kv_store + audit)
+- `tabs/tab_theo_doi_nhap/__init__.py` — dropdown lọc theo visibility, map index động thay vì hardcode 0/1/2
+- `tabs/tab_theo_doi_nhap/ui_settings.py` — thêm section "🧩 Module tích hợp sẵn" với checkbox bật/tắt
+- `tabs/tab_theo_doi_khao_sat.py` — thêm nút "🗑 Bỏ theo dõi" (admin only, popover xác nhận)
+
+## [2026-07-25] — Hoàn thiện nhiệm vụ lãnh đạo giao cho KH/KQ công việc KH-NV
+- `config.py` dòng ~1129 — thêm constant sheet `NhiemVuGiao` cho nguồn Google Sheet nhiệm vụ lãnh đạo phòng giao
+- `services/ke_hoach_cv_khnv_service.py` — thêm schema `COT_NV_GIAO`, đọc sheet `NhiemVuGiao`, lưu/cập nhật/xóa nhiệm vụ giao trong `kv_store` kèm audit, gộp nguồn VBSP-SCM + Google Sheet và KPI quá hạn
+- `tabs/tab_ke_hoach_cv_khnv.py` — thêm URL Form nhiệm vụ, sub-tab `Nhiệm vụ giao`, form lãnh đạo giao nhiệm vụ trong app, bảng theo dõi hợp nhất và export Excel
+- `tests/test_ke_hoach_cv_khnv_service.py` — file mới: 5 tests cho config, đọc sheet nhiệm vụ, thêm/cập nhật/xóa nhiệm vụ app, validate bắt buộc và KPI/gộp nguồn
+- `khnv_ke_hoach_ket_qua_cong_viec_template.xlsx` — tạo workbook mẫu Google Sheet 3 tab `KhHoach`, `KetQua`, `NhiemVuGiao` trong thư mục visualizations để import thủ công hoặc import qua connector sau khi xác nhận tài khoản Google
+
+## [2026-07-25] — Nâng cấp hạ tầng: Migration DB + Tab Registry + Validation Schema
+- `migrations/001_initial.py` — tạo mới, 25 bảng + 36 index (CREATE TABLE IF NOT EXISTS)
+- `migrations/002_add_columns.py` — tạo mới, 26 ALTER TABLE ADD COLUMN (backward compat)
+- `db.py` — init_db() dùng PRAGMA user_version + migration runner (thay 530 dòng inline SQL)
+- `tab_registry.py` — tạo mới, 93 TabDef (33 CN + 54 PGD + 6 Exec), register()/get_tabs()/get_groups()
+- `services/validation_schema.py` — tạo mới, 5 schema (hstd/nq11/gqvl/pgd/cdtotkvv), single source of truth cho validation rules
+- 1159 tests, exit code 0
+
+## [2026-07-25] — Tab registry: tập trung hóa định nghĩa tab
+- `tab_registry.py` — tạo mới, registry 93 TabDef cho 3 workspace (cn: 33, pgd: 54, exec: 6), dataclass TabDef, register(), get_tabs(), get_groups(); tab nội bộ giữ nguyên trong workspace
+
+## [2026-07-25] — Versioned migration system cho SQLite database
+- `migrations/__init__.py` — tạo mới, package init
+- `migrations/001_initial.py` — tạo mới, VERSION=1, chứa toàn bộ CREATE TABLE IF NOT EXISTS + CREATE INDEX (25 bảng)
+- `migrations/002_add_columns.py` — tạo mới, VERSION=2, chứa toàn bộ ALTER TABLE ADD COLUMN (backward compatibility DB cũ)
+- `db.py` dòng ~176-198 — thay init_db() inline SQL bằng migration runner dùng PRAGMA user_version + _discover_migrations()
+
 ## [2026-07-25] — Test hàm xương sống: +20 tests cho upload/pgd backbone
 - `tests/test_luu_pgd_file.py` — tạo mới, 9 tests: NQ11/GQVL upload, file sai định dạng, file quá nhỏ, xóa parquet cache, audit log, validation critical block, validation warning, CDTOTKVV lịch sử
 - `tests/test_doc_hstd_pgd.py` — tạo mới, 6 tests: doc_hstd_pgd (file không tồn tại→None, chọn file mới hơn, đọc DataFrame) + luu_file_he_thong (lưu thành công, tên sai, audit)

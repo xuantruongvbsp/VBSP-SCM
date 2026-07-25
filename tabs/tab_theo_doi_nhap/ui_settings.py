@@ -19,13 +19,15 @@ from services.template_manager import (
 from services.template_detection_service import phat_hien_cau_truc
 
 from config import DS_PGD, DON_VI_CHI_NHANH
-from .constants import DEFAULT_CT, LOAI_OPTIONS
+from .constants import DEFAULT_CT, LOAI_OPTIONS, BUILTIN_MODULES
 from .data import (
     doc_ds_sheet,
     luu_ds_sheet,
     sheet_moi,
     doc_sheet,
     ket_noi_gsheet,
+    doc_builtin_visibility,
+    luu_builtin_visibility,
 )
 
 _DS_PGD_ALL = [DON_VI_CHI_NHANH] + DS_PGD
@@ -379,6 +381,34 @@ def _render_template_section(username: str) -> None:
 
 
 def render_cai_dat(ds_sheet: list[dict], username: str) -> None:
+    # ── Module tích hợp sẵn ─────────────────────────────────────────────
+    vis = doc_builtin_visibility()
+    with st.expander("🧩 Module tích hợp sẵn (bật/tắt theo dõi)", expanded=False):
+        st.caption(
+            "Tắt module sẽ ẩn khỏi dropdown **Chọn sheet theo dõi**. "
+            "Dữ liệu không bị xóa — bật lại bất kỳ lúc nào."
+        )
+        changed = False
+        for m in BUILTIN_MODULES:
+            mid = m["id"]
+            cur = vis.get(mid, True)
+            new_val = st.checkbox(
+                m["label"], value=cur, key=f"tdn_vis_{mid}",
+            )
+            if new_val != cur:
+                changed = True
+        if changed:
+            if st.button("💾 Lưu", key="tdn_vis_save", type="primary",
+                         use_container_width=True):
+                cfg_moi = {}
+                for m in BUILTIN_MODULES:
+                    cfg_moi[m["id"]] = st.session_state.get(
+                        f"tdn_vis_{m['id']}", True,
+                    )
+                luu_builtin_visibility(cfg_moi, username)
+                st.success("✅ Đã lưu cấu hình module.")
+                st.rerun()
+
     # ── Deadline nhập liệu ──────────────────────────────────────────────
     ts_now = _date.today()
     with st.expander("⏰ Cài đặt deadline nhập liệu", expanded=bool(ds_sheet)):

@@ -4,6 +4,14 @@ KV_LIST_KEY = "gsheet_theo_doi_nhap_list"
 KV_LEGACY_KEY = "gsheet_theo_doi_nhap_config"
 KV_SNAPSHOT_PREFIX = "tdn_snapshot_"
 KV_DCTT_CONFIG_KEY = "tdn_dctt_config"
+KV_BUILTIN_VIS = "tdn_builtin_visibility"
+
+# Module tích hợp sẵn — id dùng trong kv_store, label hiển thị trong dropdown
+BUILTIN_MODULES = [
+    {"id": "khao_sat",        "label": "🏠 Khảo sát HN/HCN/HTN"},
+    {"id": "dctt",            "label": "📈 Điều chỉnh tăng trưởng"},
+    {"id": "trang_thai_chot", "label": "🏁 Trạng thái chốt KHTD"},
+]
 
 DEFAULT_CT = [
     {"ten": "HSSV", "col": 4},

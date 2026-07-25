@@ -21,8 +21,10 @@ from .data import (
     phan_nhom_pgd,
     tinh_tien_do,
     doc_ds_sheet,
+    doc_builtin_visibility,
     cleanup_snapshots_cu,
 )
+from .constants import BUILTIN_MODULES
 from .ui_overview import render_tong_quan
 from .ui_detail import render_chi_tiet
 from .ui_settings import render_cai_dat
@@ -80,20 +82,31 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
         ds_sheet = doc_ds_sheet()
         can_config = role_n in ("admin_cn", "manager_cn", "admin", "manager")
 
-        # ── Chọn sheet — "Khảo sát HN/HCN/HTN" luôn là option đầu tiên ─────
+        # ── Chọn sheet — lọc module tích hợp theo visibility ─────────────
+        vis = doc_builtin_visibility()
+        visible_builtins = [m for m in BUILTIN_MODULES if vis.get(m["id"], True)]
+        n_builtins = len(visible_builtins)
+
         sheet_labels = [
             (cfg.get("ten_hien_thi") or cfg.get("sheet_tab", f"Sheet {i+1}"))
             + _deadline_badge(cfg)
             for i, cfg in enumerate(ds_sheet)
         ]
-        all_labels = [
-            "🏠 Khảo sát HN/HCN/HTN",
-            "📈 Điều chỉnh tăng trưởng",
-            "🏁 Trạng thái chốt KHTD",
-        ] + sheet_labels
+        all_labels = [m["label"] for m in visible_builtins] + sheet_labels
 
-        # Reset index nếu danh sách sheet thay đổi (vd: xóa sheet)
-        if st.session_state.get("ttdn_sheet_sel", 0) >= len(all_labels):
+        if not all_labels:
+            st.info(
+                "⚙️ Chưa có module hoặc sheet nào đang bật. "
+                "Bật lại module tích hợp hoặc thêm sheet theo dõi trong Cài đặt."
+            )
+            if can_config:
+                with st.expander("⚙️ Cài đặt sheet theo dõi nhập liệu", expanded=True):
+                    render_cai_dat(ds_sheet, username)
+            return
+
+        # Reset index nếu danh sách sheet thay đổi (vd: xóa sheet, ẩn module)
+        _sel = st.session_state.get("ttdn_sheet_sel", 0)
+        if not isinstance(_sel, int) or _sel >= len(all_labels):
             st.session_state["ttdn_sheet_sel"] = 0
 
         col_sel, col_ref = st.columns([5, 1])
@@ -113,27 +126,25 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                 doc_sheet.clear()
                 st.rerun()
 
-        # ── Nhánh Khảo sát HN/HCN/HTN ─────────────────────────────────────
-        if idx == 0:
-            from tabs import tab_theo_doi_khao_sat as _ks
-            _ks.render(None, **kwargs)
+        # ── Nhánh module tích hợp sẵn ────────────────────────────────────
+        if idx < n_builtins:
+            module_id = visible_builtins[idx]["id"]
+
+            if module_id == "khao_sat":
+                from tabs import tab_theo_doi_khao_sat as _ks
+                _ks.render(None, **kwargs)
+            elif module_id == "dctt":
+                render_dieu_chinh_tang_truong(username=username)
+            elif module_id == "trang_thai_chot":
+                render_trang_thai_chot(username=username)
+
             if can_config:
                 st.divider()
                 with st.expander("⚙️ Cài đặt sheet theo dõi nhập liệu", expanded=False):
                     render_cai_dat(ds_sheet, username)
             return
 
-        # ── Nhánh Điều chỉnh tăng trưởng ──────────────────────────────────
-        if idx == 1:
-            render_dieu_chinh_tang_truong(username=username)
-            return
-
-        # ── Nhánh Trạng thái chốt KHTD ────────────────────────────────────
-        if idx == 2:
-            render_trang_thai_chot(username=username)
-            return
-
-        # ── Nhánh sheet thông thường (offset -3 vì có 3 mục tĩnh đầu) ────
+        # ── Nhánh sheet thông thường (offset = số module tích hợp) ───────
         # Cleanup stale session_state keys
         n_sheets = len(ds_sheet)
         for i in range(n_sheets, n_sheets + 50):
@@ -153,7 +164,7 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
         if not ds_sheet:
             st.info("⚙️ Chưa có sheet nào. Vào tab **⚙️ Cài đặt** để thêm.")
         else:
-            cfg_sel = ds_sheet[idx - 3]
+            cfg_sel = ds_sheet[idx - n_builtins]
             ten_sheet = all_labels[idx]
             ds_ct = cfg_sel.get("ds_chuong_trinh", [])
             deadline_str = cfg_sel.get("deadline", "")

@@ -345,7 +345,7 @@ def render(tab=None, **kwargs) -> None:
 
             # ④ BIỂU ĐỒ & BẢNG (tabs theo mảng)
             if mang == "📊 Tổng hợp KPI":
-                _render_tong_hop_kpi(kpi_td, kpi_nv, username)
+                _render_tong_hop_kpi(kpi_td, kpi_nv, int(nam), username)
             elif mang == "📈 Phân tích chi tiết":
                 _render_phan_tich(kpi_td, kpi_nv, int(nam))
             else:
@@ -463,7 +463,7 @@ def _build_df_tien_do(ds_task: list[dict]) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def _render_tong_hop_kpi(kpi_td: dict, kpi_nv: dict, username: str) -> None:
+def _render_tong_hop_kpi(kpi_td: dict, kpi_nv: dict, filter_nam: int, username: str) -> None:
     """Render mảng Tổng hợp KPI: Ma trận + Pie chart."""
     try:
         subtabs = st.tabs(["📊 Ma trận PGD", "📈 Biểu đồ trạng thái", "📌 Chờ duyệt NV"])
@@ -519,9 +519,7 @@ def _render_tong_hop_kpi(kpi_td: dict, kpi_nv: dict, username: str) -> None:
 
         with subtabs[2]:
             st.subheader("Nhiệm vụ đang chờ duyệt")
-            df_cho_duyet = _lay_ds_nhiem_vu_cho_duyet(
-                int(nam) if nam else 2026
-            )
+            df_cho_duyet = _lay_ds_nhiem_vu_cho_duyet(filter_nam)
             if not df_cho_duyet.empty:
                 st.caption(f"Hiển thị {len(df_cho_duyet)} kết quả (tối đa 50)")
                 hien_thi_dataframe_phan_trang(df_cho_duyet, key="bc_cho_duyet")

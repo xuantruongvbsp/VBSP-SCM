@@ -656,6 +656,18 @@
 
 ---
 
+### B43 — Báo cáo tổng hợp Công việc lỗi `nam` ngoài scope
+| | |
+|---|---|
+| **File** | `tabs/bc_tong_hop.py` → `_render_tong_hop_kpi()` ~dòng 466 |
+| **Dấu hiệu** | Log/UI báo `❌ Lỗi hiển thị Tổng hợp KPI: name 'nam' is not defined` khi mở tab `📊 Báo cáo tổng hợp` trong `Quản lý Công việc & Nhiệm vụ` |
+| **Nguyên nhân** | `nam` được khai báo trong `render()` nhưng `_render_tong_hop_kpi()` là helper module-level, không nhìn thấy biến local của caller. |
+| **Fix** | Thêm tham số `filter_nam` vào `_render_tong_hop_kpi()` và truyền `int(nam)` từ `render()`. |
+| **Test** | `venv\Scripts\python.exe -m py_compile tabs\bc_tong_hop.py tabs\tab_tien_do_nop.py tabs\tab_quan_ly_cv.py` |
+| **Ngày fix** | 2026-07-25 |
+
+---
+
 ## C. Dữ liệu / DataFrame
 
 ### C7 — Cột "Thời hạn vay" luôn trả "—" trong card tra cứu
@@ -2873,6 +2885,18 @@ def _to_int(val, default=0):
 | **Nguyên nhân** | Nhiều pattern cũ: catch exception không ghi stacktrace, màu HTML/CSS inline từ light theme, submodule render chưa theo signature tab-first, token cache OneDrive ghi kv_store chưa audit, script debug dùng literal `"Ngày số liệu"` |
 | **Fix** | Thêm `exc_info=True`, audit cache OneDrive, dùng `COT_NGAY_SL`, raw docstring cho path Windows, chuẩn hóa `_delete.render(tab=None, **kwargs)`, và ghép lại toàn bộ màu inline theo dark mode/cặp màu nền-chữ |
 | **Test** | `venv\Scripts\python.exe scripts\check_conventions.py` → OK; targeted `py_compile` các file sửa; smoke import/render `tests/test_smoke_imports.py` |
+| **Ngày fix** | 2026-07-25 |
+
+---
+
+### H13 — Tab Tiến độ nộp BC thiếu import helper cảnh báo lệch tên
+| | |
+|---|---|
+| **File** | `tabs/tab_tien_do_nop.py` → `_render_tong_quan()` ~dòng 216 |
+| **Dấu hiệu** | `❌ Lỗi render ** Quản lý Công việc & Nhiệm vụ**: name 'phat_hien_ten_lech_ten' is not defined` khi mở nhóm báo cáo trong tab Quản lý Công việc |
+| **Nguyên nhân** | Sau khi tách UI `tab_tien_do_nop_settings.py`, helper `phat_hien_ten_lech_ten()` được import ở file settings nhưng `tab_tien_do_nop.py` vẫn gọi trực tiếp trong Tổng quan mà thiếu import runtime. `py_compile` không bắt lỗi tên trong thân hàm. |
+| **Fix** | Import `phat_hien_ten_lech_ten` từ `services.report_submission_service` cùng nhóm helper GSheet lõi; tại `_render_tong_quan()` gọi qua import cục bộ để Streamlit hot-reload không giữ global namespace cũ. |
+| **Test** | `venv\Scripts\python.exe -m py_compile tabs\tab_tien_do_nop.py`; `venv\Scripts\python.exe -m pytest tests\test_report_submission_service.py` |
 | **Ngày fix** | 2026-07-25 |
 
 ---

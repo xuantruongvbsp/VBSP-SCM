@@ -1,10 +1,13 @@
 """tests/test_pgd.py — data/pgd.py: pgd_slug(), duong_dan_pgd()"""
 from __future__ import annotations
+import tempfile
 from datetime import datetime
+from pathlib import Path
+from unittest.mock import patch
 
 from openpyxl import Workbook
 
-from data.pgd import pgd_slug, duong_dan_pgd, _doc_ngay_so_lieu
+from data.pgd import pgd_slug, duong_dan_pgd, thu_muc_pgd, _doc_ngay_so_lieu
 
 
 class TestPgdSlug:
@@ -83,6 +86,40 @@ class TestDuongDanPgd:
     def test_path_la_chuoi(self):
         result = duong_dan_pgd("PGD Long Thành", "hstd")
         assert isinstance(result, str)
+
+    def test_hstd_khnv_ket_thuc_dung_ten_file(self):
+        assert duong_dan_pgd("PGD Long Thành", "hstd_khnv").endswith("hstd_khnv.xlsx")
+
+    def test_hstd_khnv_slug_co_trong_path(self):
+        path = duong_dan_pgd("PGD Long Thành", "hstd_khnv")
+        assert "pgd_long_thanh" in path
+
+
+class TestThuMucPgdTaoDirectory:
+
+    def test_hstd_tao_thu_muc(self):
+        """duong_dan_pgd('hstd') tạo thư mục PGD qua thu_muc_pgd."""
+        with tempfile.TemporaryDirectory() as tmp:
+            with patch("data.pgd.PGD_DATA_DIR", tmp):
+                path = duong_dan_pgd("PGD Long Thành", "hstd")
+                assert Path(path).parent.exists()
+                assert Path(path).parent.is_dir()
+
+    def test_nq11_tao_thu_muc(self):
+        """duong_dan_pgd('nq11') tạo thư mục PGD qua thu_muc_pgd."""
+        with tempfile.TemporaryDirectory() as tmp:
+            with patch("data.pgd.PGD_DATA_DIR", tmp):
+                path = duong_dan_pgd("PGD Nhơn Trạch", "nq11")
+                assert Path(path).parent.exists()
+                assert Path(path).parent.is_dir()
+
+    def test_gqvl_tao_thu_muc(self):
+        """duong_dan_pgd('gqvl') tạo thư mục PGD qua thu_muc_pgd."""
+        with tempfile.TemporaryDirectory() as tmp:
+            with patch("data.pgd.PGD_DATA_DIR", tmp):
+                path = duong_dan_pgd("PGD Xuân Lộc", "gqvl")
+                assert Path(path).parent.exists()
+                assert Path(path).parent.is_dir()
 
 
 class TestDocNgaySoLieuHstd:

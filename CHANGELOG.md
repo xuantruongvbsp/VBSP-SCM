@@ -1,5 +1,23 @@
 # CHANGELOG
 
+## [2026-07-25] — Test hàm xương sống: +20 tests cho upload/pgd backbone
+- `tests/test_luu_pgd_file.py` — tạo mới, 9 tests: NQ11/GQVL upload, file sai định dạng, file quá nhỏ, xóa parquet cache, audit log, validation critical block, validation warning, CDTOTKVV lịch sử
+- `tests/test_doc_hstd_pgd.py` — tạo mới, 6 tests: doc_hstd_pgd (file không tồn tại→None, chọn file mới hơn, đọc DataFrame) + luu_file_he_thong (lưu thành công, tên sai, audit)
+- `tests/test_pgd.py` — thêm 5 tests: duong_dan_pgd hstd_khnv, slug trong path, tạo thư mục cho hstd/nq11/gqvl
+- Tổng: 1159 tests, exit code 0
+
+## [2026-07-25] — Fix render KPI Công việc thiếu biến năm
+- `tabs/bc_tong_hop.py` dòng ~348, ~466, ~522 — truyền `filter_nam` vào `_render_tong_hop_kpi()` thay vì dùng biến `nam` ngoài scope
+- `BUGMAP.md` — thêm mục B43 cho lỗi scope helper trong báo cáo tổng hợp Công việc & Nhiệm vụ
+
+## [2026-07-25] — Thêm test cho doc_hstd_pgd() và luu_file_he_thong()
+- `tests/test_doc_hstd_pgd.py` — file mới: TestDocHstdPgd (3 test) + TestLuuFileHeThong (3 test)
+- `tests/test_pgd.py` — thêm TestThuMucPgdTaoDirectory (3 test) + 2 test hstd_khnv trong TestDuongDanPgd
+
+## [2026-07-25] — Fix render tab Quản lý Công việc thiếu import GSheet
+- `tabs/tab_tien_do_nop.py` dòng ~33, ~217 — import `phat_hien_ten_lech_ten()` từ `services.report_submission_service` và gọi qua import cục bộ trong Tổng quan để không lỗi NameError khi cảnh báo lệch tên Form
+- `BUGMAP.md` — thêm mục H13 cho pattern thiếu import runtime sau khi tách UI tab Tiến độ nộp BC
+
 ## [2026-07-25] — Convention checker toàn project sạch
 - `_debug_ngay_sl.py`, `api/app.py`, `services/daily_report_service.py`, `services/ktnb_service.py`, `services/onedrive_service.py` — bổ sung stacktrace logging, COT constant và audit token cache OneDrive
 - `tabs/tab_upload_khnv/_delete.py`, `tabs/tab_upload_khnv/__init__.py` — chuẩn hóa signature submodule xóa dữ liệu về `render(tab=None, **kwargs)` và gọi bằng keyword

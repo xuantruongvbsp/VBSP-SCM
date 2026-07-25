@@ -30,6 +30,7 @@ from services.report_submission_service import (
     loc_du_lieu_luu_tru,
     kiem_tra_ket_noi_gsheet,
     lay_loi_doc_gsheet_gan_nhat,
+    phat_hien_ten_lech_ten,
     tao_ma_tran_tien_do,
     tong_hop_bao_cao_dieu_hanh,
     xay_dung_danh_muc_theo_doi,
@@ -213,7 +214,8 @@ def _render_tong_quan(
     ds_loai_gsheet_hint = sorted(df["loai_bao_cao"].dropna().unique().tolist()) if not df.empty else []
     dm = xay_dung_danh_muc_theo_doi(deadline_cfg, ds_loai_gsheet_hint)
     ds_loai = dm["display_keys"]
-    ds_lech = phat_hien_ten_lech_ten(deadline_cfg, ds_loai_gsheet_hint)
+    from services.report_submission_service import phat_hien_ten_lech_ten as _phat_hien_ten_lech_ten
+    ds_lech = _phat_hien_ten_lech_ten(deadline_cfg, ds_loai_gsheet_hint)
     if ds_lech and can_config:
         n_co_goi_y = sum(1 for x in ds_lech if x.get("ten_form"))
         st.warning(

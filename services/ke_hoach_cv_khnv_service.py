@@ -96,6 +96,11 @@ def luu_config(cfg: dict[str, Any], username: str) -> None:
         "form_ke_hoach_url": str(cfg.get("form_ke_hoach_url", "") or "").strip(),
         "form_ket_qua_url": str(cfg.get("form_ket_qua_url", "") or "").strip(),
         "form_nhiem_vu_url": str(cfg.get("form_nhiem_vu_url", "") or "").strip(),
+        "nhom_custom": [
+            str(item).strip()
+            for item in cfg.get("nhom_custom", [])
+            if str(item).strip()
+        ],
         "dau_viec_custom": [
             str(item).strip()
             for item in cfg.get("dau_viec_custom", [])
@@ -223,8 +228,30 @@ def _goi_y_loi_gsheet(exc: BaseException) -> str:
     return ""
 
 
-def _doc_raw_values_sheet(tab: str, sheet_id: str | None = None) -> list[list[str]]:
-    """Đọc toàn bộ ô của một tab Google Sheets."""
+def _la_loi_tab_khong_ton_tai(err: BaseException | None) -> bool:
+    """Nhận diện lỗi Google Sheets do tên tab không khớp sheet nào.
+
+    Khi truyền chỉ tên tab vào endpoint values/{range} mà tab chưa được tạo
+    (hoặc sai tên), Google trả 400 "Unable to parse range: <tên>". Đây là lỗi
+    cấu hình nhẹ của tab TUỲ CHỌN, không phải lỗi kết nối/auth toàn cục.
+    """
+    if err is None:
+        return False
+    msg = str(err).lower()
+    return "unable to parse range" in msg or (
+        "400" in str(err) and "range" in msg
+    )
+
+
+def _doc_raw_values_sheet(
+    tab: str, sheet_id: str | None = None, *, optional: bool = False,
+) -> list[list[str]]:
+    """Đọc toàn bộ ô của một tab Google Sheets.
+
+    optional=True: tab tuỳ chọn (vd NhiemVuGiao). Nếu tab chưa tồn tại thì trả
+    danh sách rỗng ÊM — không ghi _LAST_ERROR toàn cục, không raise — để một
+    tab thiếu không làm banner lỗi che mất các tab còn đọc tốt.
+    """
     global _LAST_ERROR
     sheet_id = str(sheet_id or _lay_sheet_id() or "").strip()
     if not sheet_id:
@@ -245,6 +272,13 @@ def _doc_raw_values_sheet(tab: str, sheet_id: str | None = None) -> list[list[st
             return payload.get("values", []) or []
         except Exception:
             last_err = sys.exc_info()[1]
+            # Tab tuỳ chọn chưa tạo → trả rỗng êm, không làm bẩn lỗi toàn cục.
+            if optional and _la_loi_tab_khong_ton_tai(last_err):
+                logger.warning(
+                    "_doc_raw_values_sheet(%s): tab chưa tồn tại (tuỳ chọn) — bỏ qua",
+                    tab,
+                )
+                return []
             if (
                 isinstance(last_err, BaseException)
                 and _la_loi_gsheet_tam_thoi(last_err)
@@ -336,9 +370,13 @@ def doc_ket_qua() -> pd.DataFrame:
 
 
 def doc_nhiem_vu_gsheet() -> pd.DataFrame:
-    """Đọc tab NhiemVuGiao từ Google Sheets, không cache."""
+    """Đọc tab NhiemVuGiao từ Google Sheets, không cache.
+
+    Tab này TUỲ CHỌN: nếu spreadsheet chưa tạo tab thì trả DataFrame rỗng êm,
+    không làm bẩn lỗi Google Sheets toàn cục (optional=True).
+    """
     try:
-        data = _doc_raw_values_sheet(KE_HOACH_CV_KHNV_SHEET_NV)
+        data = _doc_raw_values_sheet(KE_HOACH_CV_KHNV_SHEET_NV, optional=True)
         return _chuan_hoa_nhiem_vu_gsheet(_rows_to_df(data, COT_NV_GIAO))
     except Exception as e:
         logger.error("doc_nhiem_vu_gsheet: %s", e, exc_info=True)
@@ -393,16 +431,26 @@ def kiem_tra_ket_noi() -> tuple[bool, str]:
     try:
         kh = _doc_raw_values_sheet(KE_HOACH_CV_KHNV_SHEET_KH, sheet_id)
         kq = _doc_raw_values_sheet(KE_HOACH_CV_KHNV_SHEET_KQ, sheet_id)
-        nv = _doc_raw_values_sheet(KE_HOACH_CV_KHNV_SHEET_NV, sheet_id)
-        return (
-            True,
-            f"OK — {cred_path.name}: {KE_HOACH_CV_KHNV_SHEET_KH} {len(kh)} dòng, "
-            f"{KE_HOACH_CV_KHNV_SHEET_KQ} {len(kq)} dòng, "
-            f"{KE_HOACH_CV_KHNV_SHEET_NV} {len(nv)} dòng",
-        )
     except Exception as e:
         logger.error("kiem_tra_ket_noi: %s", e, exc_info=True)
         return False, f"{type(e).__name__}: {e}{_goi_y_loi_gsheet(e)}"
+
+    # Tab NhiemVuGiao tuỳ chọn: thiếu thì cảnh báo nhẹ, không fail toàn bộ.
+    try:
+        nv = _doc_raw_values_sheet(KE_HOACH_CV_KHNV_SHEET_NV, sheet_id)
+        nv_msg = f"{KE_HOACH_CV_KHNV_SHEET_NV} {len(nv)} dòng"
+    except Exception as e:
+        if _la_loi_tab_khong_ton_tai(e):
+            nv_msg = f"{KE_HOACH_CV_KHNV_SHEET_NV} chưa tạo (tuỳ chọn)"
+        else:
+            logger.error("kiem_tra_ket_noi: %s", e, exc_info=True)
+            return False, f"{type(e).__name__}: {e}{_goi_y_loi_gsheet(e)}"
+
+    return (
+        True,
+        f"OK — {cred_path.name}: {KE_HOACH_CV_KHNV_SHEET_KH} {len(kh)} dòng, "
+        f"{KE_HOACH_CV_KHNV_SHEET_KQ} {len(kq)} dòng, {nv_msg}",
+    )
 
 
 def _monday_of(d: date) -> date:

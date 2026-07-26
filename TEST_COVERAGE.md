@@ -8,9 +8,9 @@
 
 | | Số lượng |
 |---|---|
-| File test | 46 |
-| Test cases (ước tính) | ~844 |
-| Modules có test | 30/~60 |
+| File test | 47 |
+| Test cases (ước tính) | ~851 |
+| Modules có test | 31/~60 |
 | 🔴 Modules chưa có test | ~30 |
 
 ---
@@ -72,6 +72,7 @@
 | `db.py` | `test_db.py` | 7 | 🟡 Trung bình | kv_store CRUD, audit, prefix |
 | `utils.py` (currency) | `test_utils.py` + `test_currency.py` | 28 + 14 | ✅ Cao | fmt_ty, fmt_so, fmt_pct |
 | `pdf_service.py` | `test_pdf_service.py` | 5 | 🟡 Trung bình | reportlab dependency, smoke |
+| Windows launcher (`Chay_VBSP_SCM.bat`, `run.bat`) | `test_launcher_batch.py` | 7 | 🟢 Khá | Launcher chính, PID guard, requirements hash, log rotation, CMD self-test và ASCII/CRLF |
 
 ---
 

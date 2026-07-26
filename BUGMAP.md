@@ -213,13 +213,23 @@
 
 ## B. Streamlit UI
 
+### B48 — Panel quản lý Theo dõi nhập liệu chiếm chỗ, làm loãng nội dung
+| | |
+|---|---|
+| **File** | `tabs/tab_theo_doi_nhap/__init__.py`, `tabs/tab_theo_doi_nhap/ui_settings.py`, `tabs/tab_theo_doi_khao_sat.py` |
+| **Dấu hiệu** | Khối `Quản lý danh sách theo dõi` luôn mở giữa dropdown và báo cáo, đẩy nội dung chính xuống dưới; logic quyền còn phụ thuộc ngược vào tab Khảo sát |
+| **Nguyên nhân** | Panel hai cột được render trực tiếp sau dropdown dù đây là thao tác ít dùng; helper quyền đặt trong module báo cáo thay vì module cài đặt |
+| **Fix** | Đưa nút `⚙️ Quản lý` lên toolbar và mở nội dung dạng popover xếp dọc; giữ expander khôi phục khi ẩn hết báo cáo; tập trung helper quyền trong `ui_settings.py` và chỉ ghi KV/audit cho nhóm có thay đổi |
+| **Test** | Compile 5 file tính năng; `tests/test_tab_theo_doi_nhap_builtin_visibility.py` + `tests/test_smoke_imports.py`: 125 passed |
+| **Ngày fix** | 2026-07-26 |
+
 ### B47 — Ô đăng nhập (tài khoản / mật khẩu) bị trắng, không thấy chữ
 | | |
 |---|---|
 | **File** | `auth.py` (khối CSS login ~dòng 934) |
 | **Dấu hiệu** | Nhãn "Tên đăng nhập"/"Mật khẩu" và chữ gõ vào ô không hiện (trắng trên nền trắng) ở màn hình đăng nhập khi app ở dark mode |
-| **Nguyên nhân** | Biến CSS `--login-form-text` chỉ định nghĩa trong `.login-form-card`, nhưng `st.form("login")` nằm NGOÀI div đó (header đóng div trước form). Nên `color: var(--login-form-text)` trong `form`/`input`/`label` không resolve → rớt về màu inherit (sáng trong dark mode) trên nền input `#f8fafc` trắng |
-| **Fix** | Định nghĩa lại `--login-form-text/muted/accent` ngay trên `form[data-testid="stForm"]` (form đăng nhập luôn là bề mặt sáng cố định) để var resolve đúng trong form và các input/label con |
+| **Nguyên nhân** | Rule theme `[data-testid="stTextInput"] input { color:#E0E6ED !important }` (chữ sáng). Rule login cũ `color: var(--login-form-text)` nằm ngoài `.login-form-card` nên var không resolve → khai báo `color` bị vô hiệu → chữ rớt về màu sáng của theme trên nền ô `#f8fafc` sáng => trắng |
+| **Fix** | Đổi rule input/label login sang màu literal `#0f172a` + prefix `form[data-testid="stForm"]` (tăng specificity thắng theme) + `-webkit-text-fill-color`/`caret-color` literal; thêm `::placeholder` tối mờ. Không dùng `var()` cho màu chữ ô nhập |
 | **Ngày fix** | 2026-07-26 |
 
 ### B46 — Theo dõi nhập lệch quyền và stale state khi ẩn module tích hợp
@@ -2935,6 +2945,18 @@ def _to_int(val, default=0):
 
 ---
 
+### J66 — Launcher có thể kill nhầm process và bỏ sót dependency mới
+| | |
+|---|---|
+| **File** | `Chay_VBSP_SCM.bat`, `run.bat` |
+| **Dấu hiệu** | Port 8502 bị tiến trình khác chiếm vẫn có thể bị `taskkill /F`; `requirements.txt` thay đổi nhưng venv cũ chỉ kiểm tra import lõi nên không tự cài dependency mới; hai launcher có nguy cơ lệch logic |
+| **Nguyên nhân** | Logic cũ tin mọi PID đang listen port 8502 là VBSP-SCM, chưa dùng trạng thái/hash requirements; `run.bat` sao chép một luồng launch riêng; log cuối bị ghi đè mà không lưu lịch sử |
+| **Fix** | Đọc metadata PID qua CIM và chỉ kill khi đúng `%ROOT%\venv\Scripts\python.exe` + `streamlit` + `app.py`; lưu SHA-256 requirements vào `tmp/.vbsp_setup_done`; archive log theo timestamp, dọn sau 30 ngày; cho `run.bat` gọi launcher chính |
+| **Test** | `tests/test_launcher_batch.py`: 7 passed; `cmd /d /v:on /c Chay_VBSP_SCM.bat --self-test`: OK |
+| **Ngày fix** | 2026-07-26 |
+
+---
+
 ### H13 — Tab Tiến độ nộp BC thiếu import helper cảnh báo lệch tên
 | | |
 |---|---|
@@ -2944,6 +2966,18 @@ def _to_int(val, default=0):
 | **Fix** | Import `phat_hien_ten_lech_ten` từ `services.report_submission_service` cùng nhóm helper GSheet lõi; tại `_render_tong_quan()` gọi qua import cục bộ để Streamlit hot-reload không giữ global namespace cũ. |
 | **Test** | `venv\Scripts\python.exe -m py_compile tabs\tab_tien_do_nop.py`; `venv\Scripts\python.exe -m pytest tests\test_report_submission_service.py` |
 | **Ngày fix** | 2026-07-25 |
+
+---
+
+### H14 — Banner "Không đọc được Google Sheets" khi tab NhiemVuGiao chưa tạo
+| | |
+|---|---|
+| **File** | `services/ke_hoach_cv_khnv_service.py` → `_doc_raw_values_sheet()` / `doc_nhiem_vu_gsheet()` / `kiem_tra_ket_noi()` |
+| **Dấu hiệu** | `Không đọc được Google Sheets: APIError: [400]: Unable to parse range: NhiemVuGiao` dù tab KhHoach/KetQua vẫn đọc tốt |
+| **Nguyên nhân** | Spreadsheet chưa có tab `NhiemVuGiao` (tab tuỳ chọn). Google trả 400 parse range; `_doc_raw_values_sheet` ghi biến toàn cục `_LAST_ERROR` rồi raise; `doc_nhiem_vu_gsheet` catch trả df rỗng nhưng `_LAST_ERROR` vẫn bẩn → UI hiện banner như thể toàn bộ GSheet hỏng |
+| **Fix** | Thêm `_la_loi_tab_khong_ton_tai()` + cờ `optional` cho `_doc_raw_values_sheet`: tab tuỳ chọn đọc hụt (parse range) thì trả `[]` êm, không ghi `_LAST_ERROR`, không raise. `doc_nhiem_vu_gsheet` gọi `optional=True`; `kiem_tra_ket_noi` tách đọc NV, thiếu thì báo "chưa tạo (tuỳ chọn)" thay vì fail |
+| **Test** | `venv\Scripts\python.exe -c "import py_compile; py_compile.compile('services/ke_hoach_cv_khnv_service.py', doraise=True)"` |
+| **Ngày fix** | 2026-07-26 |
 
 ---
 

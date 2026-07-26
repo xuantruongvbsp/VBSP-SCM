@@ -1,7 +1,29 @@
 # CHANGELOG
 
+## [2026-07-26] — Fix banner lỗi GSheet khi tab NhiemVuGiao chưa tạo (H14)
+- `services/ke_hoach_cv_khnv_service.py` — thêm `_la_loi_tab_khong_ton_tai()` + cờ `optional` cho `_doc_raw_values_sheet`: tab tuỳ chọn đọc hụt (400 parse range) trả `[]` êm, không ghi `_LAST_ERROR`, không raise; `doc_nhiem_vu_gsheet` dùng `optional=True`; `kiem_tra_ket_noi` tách đọc NV, thiếu báo "chưa tạo (tuỳ chọn)"
+
+## [2026-07-26] — Nhóm công tác: cho sửa trong Danh mục gợi ý + đồng bộ selectbox giao nhiệm vụ
+- `tabs/tab_ke_hoach_cv_khnv.py` — thêm helper `_danh_muc_nhom(cfg)` (ưu tiên `nhom_custom` đã lưu, fallback `KE_HOACH_CV_KHNV_NHOM`); đổi bảng Nhóm công tác từ `st.dataframe` chỉ đọc sang `st.data_editor` dynamic; lưu `nhom_custom` khi submit; selectbox giao nhiệm vụ đọc `_danh_muc_nhom(cfg)` thay vì hardcode; thêm nhãn "Đầu việc" cho nhất quán
+- `services/ke_hoach_cv_khnv_service.py` dòng ~99 — `luu_config` payload thêm `nhom_custom` (trước đó payload tường minh nên bỏ qua giá trị tab truyền)
+
+## [2026-07-26] — Nâng cấp launcher chính `Chay_VBSP_SCM.bat`
+- `Chay_VBSP_SCM.bat` — chỉ `taskkill` PID trên port 8502 sau khi xác minh executable thuộc `venv`, command line có `streamlit` và `app.py`; từ chối kill tiến trình không xác định
+- `Chay_VBSP_SCM.bat` — dùng SHA-256 của `requirements.txt` với `tmp/.vbsp_setup_done` để tự đồng bộ package và chạy `pip check` khi dependency thay đổi
+- `Chay_VBSP_SCM.bat` — giữ `logs/launcher_last.log`, lưu log lần trước theo timestamp và tự dọn log launcher quá 30 ngày; thêm chế độ an toàn `--self-test`
+- `run.bat` — chuyển thành wrapper tương thích gọi launcher chính `Chay_VBSP_SCM.bat`, không còn duy trì luồng khởi động riêng
+- `tests/test_launcher_batch.py` — thêm 7 regression tests cho launcher chính, bảo vệ PID, requirements hash, log rotation, runtime contract, self-test CMD và định dạng ASCII/CRLF
+- `TEST_COVERAGE.md`, `BUGMAP.md` — cập nhật bản đồ kiểm thử và thêm J66
+
+## [2026-07-26] — Tinh gọn giao diện Theo dõi nhập liệu
+- `tabs/tab_theo_doi_nhap/__init__.py` dòng ~140 — đưa quản lý danh sách vào popover trên cùng hàng với dropdown/làm mới; khi ẩn hết báo cáo vẫn mở vùng khôi phục để bật lại
+- `tabs/tab_theo_doi_nhap/ui_settings.py` dòng ~59, ~415 — xếp nội dung quản lý theo chiều dọc phù hợp popover, tập trung kiểm tra quyền tại module cài đặt và chỉ ghi KV/audit cho nhóm thực sự thay đổi
+- `tabs/tab_theo_doi_khao_sat.py` dòng ~26, ~272 — bỏ helper quyền cũ và phụ thuộc ngược từ phần cài đặt sang tab Khảo sát
+- `tests/test_tab_theo_doi_nhap_builtin_visibility.py` — chuyển regression test quyền sang helper quản lý tập trung; toàn bộ 125 test mục tiêu và smoke import đạt
+- `BUGMAP.md` — thêm B48 cho lỗi panel quản lý chiếm chỗ, làm nội dung báo cáo bị đẩy xuống
+
 ## [2026-07-26] — Fix ô đăng nhập bị trắng (chữ/label không thấy)
-- `auth.py` dòng ~934 — định nghĩa lại `--login-form-text/muted/accent` trên `form[data-testid="stForm"]` vì form nằm ngoài `.login-form-card` nên var không resolve, chữ inherit màu sáng trên nền input trắng
+- `auth.py` dòng ~948 — rule input/label login đổi sang màu literal `#0f172a` + prefix `form[data-testid="stForm"]` (thắng rule theme chữ sáng) + `-webkit-text-fill-color`/`caret-color`; thêm `::placeholder` tối mờ. Bỏ `var()` cho màu chữ ô nhập vì var ngoài `.login-form-card` không resolve khiến color bị vô hiệu
 
 ## [2026-07-26] — Thống nhất UX "Quản lý danh sách theo dõi" (panel tập trung)
 - `tabs/tab_theo_doi_nhap/ui_settings.py` dòng ~404 — panel `render_quan_ly_danh_sach` nhận `role`, phân quyền `disabled`: cột hệ thống chỉ admin CN tắt được (qua `_can_untrack_builtin`), cột sheet theo quyền cấu hình; đổi tiêu đề cấu hình chi tiết

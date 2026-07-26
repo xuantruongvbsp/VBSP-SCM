@@ -67,6 +67,25 @@ def _danh_muc_dau_viec(cfg: dict[str, Any]) -> list[str]:
     return result
 
 
+def _danh_muc_nhom(cfg: dict[str, Any]) -> list[str]:
+    """Danh sách Nhóm công tác: ưu tiên bản admin đã lưu, fallback chuẩn config.
+
+    Dùng cho cả block Danh mục gợi ý (đối chiếu/sửa khi tạo Form) lẫn selectbox
+    giao nhiệm vụ, để hai nơi luôn đồng bộ một nguồn.
+    """
+    configured = [
+        str(item).strip()
+        for item in cfg.get("nhom_custom", [])
+        if str(item).strip()
+    ]
+    source = configured if configured else KE_HOACH_CV_KHNV_NHOM
+    result: list[str] = []
+    for item in source:
+        if item not in result:
+            result.append(item)
+    return result
+
+
 def _display_df(df: pd.DataFrame, date_cols: list[str]) -> pd.DataFrame:
     result = df.copy()
     for col in date_cols:
@@ -210,13 +229,16 @@ def _render_cai_dat(cfg: dict[str, Any], username: str) -> None:
 
         st.markdown("### Danh mục gợi ý")
         st.caption("Filter thực tế vẫn đọc distinct value từ Sheet; danh mục này chỉ để đối chiếu khi tạo Form.")
-        st.write("Nhóm công tác")
-        st.dataframe(
-            pd.DataFrame({"Nhóm công tác": KE_HOACH_CV_KHNV_NHOM}),
+        st.write("Nhóm công tác (đồng bộ selectbox giao nhiệm vụ)")
+        nhom_edited = st.data_editor(
+            pd.DataFrame({"Nhóm công tác": _danh_muc_nhom(cfg)}),
             hide_index=True,
+            num_rows="dynamic",
             use_container_width=True,
+            key=f"{KEY_PREFIX}nhom_editor",
         )
 
+        st.write("Đầu việc")
         dau_viec_df = pd.DataFrame({"Đầu việc": _danh_muc_dau_viec(cfg)})
         edited = st.data_editor(
             dau_viec_df,
@@ -228,6 +250,11 @@ def _render_cai_dat(cfg: dict[str, Any], username: str) -> None:
         submitted = st.form_submit_button("Lưu cấu hình", type="primary")
 
     if submitted:
+        nhom_custom = (
+            nhom_edited["Nhóm công tác"].dropna().astype(str).str.strip().replace("", pd.NA).dropna().tolist()
+            if "Nhóm công tác" in nhom_edited.columns
+            else []
+        )
         dau_viec_custom = (
             edited["Đầu việc"].dropna().astype(str).str.strip().replace("", pd.NA).dropna().tolist()
             if "Đầu việc" in edited.columns
@@ -239,6 +266,7 @@ def _render_cai_dat(cfg: dict[str, Any], username: str) -> None:
                 "form_ke_hoach_url": form_ke_hoach_url,
                 "form_ket_qua_url": form_ket_qua_url,
                 "form_nhiem_vu_url": form_nhiem_vu_url,
+                "nhom_custom": nhom_custom,
                 "dau_viec_custom": dau_viec_custom,
             },
             username,
@@ -390,7 +418,7 @@ def _render_nhiem_vu_giao(
                     key=f"{KEY_PREFIX}nv_can_bo_nhan",
                 )
 
-            nhom = st.selectbox("Nhóm công tác", KE_HOACH_CV_KHNV_NHOM, key=f"{KEY_PREFIX}nv_nhom")
+            nhom = st.selectbox("Nhóm công tác", _danh_muc_nhom(cfg), key=f"{KEY_PREFIX}nv_nhom")
             noi_dung = st.text_area("Nội dung nhiệm vụ", height=90, key=f"{KEY_PREFIX}nv_noi_dung")
             san_pham = st.text_area(
                 "Sản phẩm/Yêu cầu đầu ra",

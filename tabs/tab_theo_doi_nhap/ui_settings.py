@@ -7,6 +7,7 @@ from datetime import date as _date
 import streamlit as st
 
 import db
+from auth import la_admin_cn, la_quan_ly_cn, normalize_role
 from logger import get_logger
 from services.template_manager import (
     doc_ds_template,
@@ -54,6 +55,16 @@ def _sync_builtin_visibility_state(
     for module_id, is_visible in signature:
         target[f"tdn_vis_{module_id}"] = is_visible
     target[_BUILTIN_VIS_STATE_KEY] = signature
+
+
+def _can_manage_builtin(role: str) -> bool:
+    """Chỉ admin Chi nhánh được bật/tắt báo cáo hệ thống."""
+    return la_admin_cn(role)
+
+
+def _can_manage_sheets(role: str) -> bool:
+    """Admin/manager Chi nhánh được bật/tắt sheet cấu hình."""
+    return la_quan_ly_cn(role)
 
 
 def _render_form_sheet(cfg: dict, prefix: str) -> dict:
@@ -404,75 +415,71 @@ def _render_template_section(username: str) -> None:
 def render_quan_ly_danh_sach(
     ds_sheet: list[dict], username: str, role: str,
 ) -> None:
-    """Panel bật/tắt thống nhất cho báo cáo hệ thống + sheet cấu hình.
-
-    Đặt ngay dưới dropdown chọn báo cáo, luôn hiển thị (không expander).
-    Cột hệ thống chỉ admin Chi nhánh được tắt; cột sheet theo quyền cấu hình.
-    Xóa vĩnh viễn / sửa cấu hình / thêm sheet mới nằm ở ⚙️ Cài đặt.
-    """
-    from auth import normalize_role
-    from tabs.tab_theo_doi_khao_sat import _can_untrack_builtin
-
+    """Nội dung bật/tắt báo cáo dùng trong popover hoặc vùng khôi phục."""
     role_n = normalize_role(role)
-    allow_builtin = _can_untrack_builtin(role_n)
-    allow_sheet = role_n in ("admin_cn", "manager_cn", "admin", "manager")
+    allow_builtin = _can_manage_builtin(role_n)
+    allow_sheet = _can_manage_sheets(role_n)
 
     vis = doc_builtin_visibility()
     _sync_builtin_visibility_state(vis)
-    with st.container(border=True):
-        st.markdown("**📋 Quản lý danh sách theo dõi**")
-        st.caption(
-            "Bỏ tick = ẩn khỏi **Chọn báo cáo để xem** bên trên. "
-            "Không xóa dữ liệu — tick lại để hiện. "
-            "Xóa vĩnh viễn / sửa cấu hình → ⚙️ Cài đặt."
+    st.caption(
+        "Bỏ tick để ẩn khỏi danh sách chọn. Dữ liệu không bị xóa và có thể "
+        "bật lại bất cứ lúc nào."
+    )
+    if not allow_builtin and not allow_sheet:
+        st.caption("🔒 Bạn chỉ có quyền xem danh sách theo dõi.")
+
+    st.markdown("**📌 Báo cáo hệ thống**")
+    new_vis: dict[str, bool] = {}
+    builtin_changed = False
+    for module in BUILTIN_MODULES:
+        mid = module["id"]
+        current = vis.get(mid, True)
+        value = st.checkbox(
+            module["label"],
+            value=current,
+            key=f"tdn_vis_{mid}",
+            disabled=not allow_builtin,
         )
-        if not allow_builtin and not allow_sheet:
-            st.caption("🔒 Bạn chỉ có quyền xem danh sách theo dõi.")
-        col_ht, col_sh = st.columns(2)
-        changed = False
+        new_vis[mid] = value
+        if allow_builtin and value != current:
+            builtin_changed = True
 
-        with col_ht:
-            st.markdown("📌 **Báo cáo hệ thống**")
-            new_vis: dict[str, bool] = {}
-            for m in BUILTIN_MODULES:
-                mid = m["id"]
-                cur = vis.get(mid, True)
-                val = st.checkbox(
-                    m["label"], value=cur, key=f"tdn_vis_{mid}",
-                    disabled=not allow_builtin,
-                )
-                new_vis[mid] = val
-                if allow_builtin and val != cur:
-                    changed = True
+    st.divider()
+    st.markdown("**📄 Sheet cấu hình**")
+    new_enabled: dict[int, bool] = {}
+    sheet_changed = False
+    if not ds_sheet:
+        st.caption("Chưa có sheet — thêm trong ⚙️ Cài đặt.")
+    for i, cfg in enumerate(ds_sheet):
+        ten = cfg.get("ten_hien_thi") or cfg.get("sheet_tab", f"Sheet {i+1}")
+        current = cfg.get("enabled", True)
+        value = st.checkbox(
+            ten,
+            value=current,
+            key=f"tdn_en_{i}",
+            disabled=not allow_sheet,
+        )
+        new_enabled[i] = value
+        if allow_sheet and value != current:
+            sheet_changed = True
 
-        with col_sh:
-            st.markdown("📄 **Sheet cấu hình**")
-            new_enabled: dict[int, bool] = {}
-            if not ds_sheet:
-                st.caption("Chưa có sheet — thêm trong ⚙️ Cài đặt.")
-            for i, cfg in enumerate(ds_sheet):
-                ten = cfg.get("ten_hien_thi") or cfg.get("sheet_tab", f"Sheet {i+1}")
-                cur = cfg.get("enabled", True)
-                val = st.checkbox(
-                    ten, value=cur, key=f"tdn_en_{i}",
-                    disabled=not allow_sheet,
-                )
-                new_enabled[i] = val
-                if allow_sheet and val != cur:
-                    changed = True
-
-        if changed:
-            if st.button(
-                "💾 Lưu danh sách theo dõi", key="tdn_manage_save",
-                type="primary", use_container_width=True,
-            ):
+    if builtin_changed or sheet_changed:
+        if st.button(
+            "💾 Lưu danh sách theo dõi",
+            key="tdn_manage_save",
+            type="primary",
+            use_container_width=True,
+        ):
+            if builtin_changed:
                 luu_builtin_visibility(new_vis, username)
+            if sheet_changed:
                 for i, cfg in enumerate(ds_sheet):
                     ds_sheet[i]["enabled"] = new_enabled[i]
                 doc_sheet.clear()
                 luu_ds_sheet(ds_sheet, username)
-                st.success("✅ Đã cập nhật danh sách theo dõi.")
-                st.rerun()
+            st.success("✅ Đã cập nhật danh sách theo dõi.")
+            st.rerun()
 
 
 def render_cai_dat(ds_sheet: list[dict], username: str) -> None:

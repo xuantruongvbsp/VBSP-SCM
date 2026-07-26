@@ -23,7 +23,7 @@ from logger import get_logger
 
 logger = get_logger(__name__)
 
-from auth import la_admin_cn, la_phan_he_cn, normalize_role
+from auth import la_phan_he_cn, normalize_role
 from config import DS_PGD, DON_VI_CHI_NHANH
 
 _DS_TAT_CA = [DON_VI_CHI_NHANH] + DS_PGD  # 22 đơn vị
@@ -267,11 +267,6 @@ def _render_bang(ket_qua: dict, nhat_ky: dict, ds_pgd: list) -> None:
 
     _render_metrics(rows_result)
     st.dataframe(pd.DataFrame(rows_result), hide_index=True, use_container_width=True)
-
-
-def _can_untrack_builtin(role: str) -> bool:
-    """Chỉ admin Chi nhánh được bỏ theo dõi module tích hợp."""
-    return la_admin_cn(role)
 
 
 def render(tab: DeltaGenerator = None, **kwargs) -> None:

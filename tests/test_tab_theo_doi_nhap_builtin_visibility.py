@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import pytest
 
-from tabs.tab_theo_doi_khao_sat import _can_untrack_builtin
 from tabs.tab_theo_doi_nhap import (
     _selection_needs_reset,
     _visible_sheet_entries,
@@ -15,6 +14,7 @@ from tabs.tab_theo_doi_nhap.data import (
 )
 from tabs.tab_theo_doi_nhap.ui_settings import (
     _BUILTIN_VIS_STATE_KEY,
+    _can_manage_builtin,
     _sync_builtin_visibility_state,
 )
 
@@ -131,5 +131,5 @@ def test_visible_sheet_entries_exclude_disabled_and_keep_original_index() -> Non
         ("executive", False),
     ],
 )
-def test_only_admin_can_untrack_builtin(role: str, expected: bool) -> None:
-    assert _can_untrack_builtin(role) is expected
+def test_only_admin_can_manage_builtin(role: str, expected: bool) -> None:
+    assert _can_manage_builtin(role) is expected

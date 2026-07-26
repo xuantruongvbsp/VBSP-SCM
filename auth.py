@@ -947,15 +947,28 @@ def hien_thi_login():
     overflow: visible;
     position: relative;
   }
-  div[data-testid="stTextInput"] label p {
-    color: var(--login-form-text) !important;
+  form[data-testid="stForm"] div[data-testid="stTextInput"] label,
+  form[data-testid="stForm"] div[data-testid="stTextInput"] label p {
+    color: #0f172a !important;
     font-weight: 700 !important;
   }
-  div[data-testid="stTextInput"] input {
+  form[data-testid="stForm"] div[data-testid="stTextInput"] input {
     border-radius: 14px !important;
     border: 1px solid #cbd5e1 !important;
-    background: #f8fafc !important; color: var(--login-form-text) !important;
+    background: #f8fafc !important;
+    /* Màu literal + specificity cao (form+div+attr+input) để thắng rule
+       theme `[data-testid=stTextInput] input { color:#E0E6ED }`. KHÔNG dùng
+       var() ở đây: nếu var chưa resolve thì khai báo color bị vô hiệu và
+       chữ rớt về màu sáng của theme trên nền ô sáng => trắng. */
+    color: #0f172a !important;
+    -webkit-text-fill-color: #0f172a !important;
+    caret-color: #0f172a !important;
     min-height: 48px !important;
+  }
+  form[data-testid="stForm"] div[data-testid="stTextInput"] input::placeholder {
+    color: #64748b !important;
+    -webkit-text-fill-color: #64748b !important;
+    opacity: 1 !important;
   }
   form[data-testid="stForm"] button[kind="primary"] {
     min-height: 48px;

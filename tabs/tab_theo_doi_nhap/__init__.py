@@ -11,7 +11,7 @@ import pandas as pd
 import streamlit as st
 from streamlit.delta_generator import DeltaGenerator
 
-from auth import normalize_role
+from auth import la_quan_ly_cn, normalize_role
 from logger import get_logger
 from tabs.base_tab import TabContext
 
@@ -108,7 +108,7 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
         st.subheader("📋 Theo dõi tiến trình nhập liệu PGD")
 
         ds_sheet = doc_ds_sheet()
-        can_config = role_n in ("admin_cn", "manager_cn", "admin", "manager")
+        can_config = la_quan_ly_cn(role_n)
 
         # ── Chọn sheet — lọc module tích hợp theo visibility ─────────────
         vis = doc_builtin_visibility()
@@ -143,7 +143,11 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                 "Bật lại module tích hợp hoặc thêm sheet theo dõi trong Cài đặt."
             )
             if can_config:
-                render_quan_ly_danh_sach(ds_sheet, username, role_n)
+                with st.expander(
+                    "⚙️ Quản lý danh sách theo dõi",
+                    expanded=True,
+                ):
+                    render_quan_ly_danh_sach(ds_sheet, username, role_n)
                 with st.expander(
                     "⚙️ Cài đặt sheet theo dõi nhập liệu",
                     expanded=True,
@@ -162,7 +166,10 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
             st.session_state["ttdn_sheet_sel"] = 0
         st.session_state[_SHEET_OPTIONS_STATE_KEY] = current_option_ids
 
-        col_sel, col_ref = st.columns([5, 1])
+        if can_config:
+            col_sel, col_ref, col_manage = st.columns([6, 1, 2])
+        else:
+            col_sel, col_ref = st.columns([5, 1])
         with col_sel:
             idx = st.selectbox(
                 "📂 Chọn báo cáo để xem",
@@ -180,8 +187,10 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                 st.rerun()
 
         if can_config:
-            st.divider()
-            render_quan_ly_danh_sach(ds_sheet, username, role_n)
+            with col_manage:
+                st.write("")
+                with st.popover("⚙️ Quản lý", use_container_width=True):
+                    render_quan_ly_danh_sach(ds_sheet, username, role_n)
 
         # ── Nhánh module tích hợp sẵn ────────────────────────────────────
         if idx < n_builtins:

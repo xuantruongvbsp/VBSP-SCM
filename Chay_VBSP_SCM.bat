@@ -17,6 +17,9 @@ set "PROBE_FILE=%TMP_DIR%\python_exec_check.txt"
 set "VBSP_PROBE_FILE=%PROBE_FILE%"
 set "LAUNCH_LOG=%LOG_DIR%\launcher_last.log"
 set "SETUP_DONE_FILE=%TMP_DIR%\.vbsp_setup_done"
+set "REQUIREMENTS_FILE=%ROOT%\requirements.txt"
+set "LOG_RETENTION_DAYS=30"
+set "JUST_INSTALLED=0"
 
 rem Python 3.12 mac dinh; fallback path co dinh o buoc auto-detect
 set "PY_CMD=py"
@@ -24,6 +27,21 @@ set "PY_ARGS=-3.12"
 
 if not exist "%TMP_DIR%" mkdir "%TMP_DIR%" >nul 2>&1
 if not exist "%LOG_DIR%" mkdir "%LOG_DIR%" >nul 2>&1
+
+if /I "%~1"=="--self-test" goto :self_test
+
+rem Archive log cua lan chay truoc, sau do xoa log launcher qua han.
+set "RUN_STAMP=%date%_%time%"
+set "RUN_STAMP=%RUN_STAMP:/=-%"
+set "RUN_STAMP=%RUN_STAMP:\=-%"
+set "RUN_STAMP=%RUN_STAMP::=-%"
+set "RUN_STAMP=%RUN_STAMP:.=-%"
+set "RUN_STAMP=%RUN_STAMP:,=-%"
+set "RUN_STAMP=%RUN_STAMP: =0%"
+if exist "%LAUNCH_LOG%" (
+    copy /y "%LAUNCH_LOG%" "%LOG_DIR%\launcher_%RUN_STAMP%.log" >nul 2>&1
+)
+forfiles /p "%LOG_DIR%" /m "launcher_*.log" /d -%LOG_RETENTION_DAYS% /c "cmd /c del /q @path" >nul 2>&1
 
 echo [%date% %time%] START Chay_VBSP_SCM.bat > "%LAUNCH_LOG%"
 echo CWD=%CD% >> "%LAUNCH_LOG%"
@@ -40,6 +58,11 @@ if exist "%LOCK_DIR%" (
         echo Dang tat app cu de khoi dong lai ban moi...
         echo.
         call :kill_port_processes
+        if errorlevel 1 (
+            echo   LOI: Port %PORT% khong thuoc VBSP-SCM, launcher se khong tu tat.
+            echo   Hay dong ung dung dang chiem port hoac doi port cua ung dung do.
+            goto :error_pause
+        )
     )
     echo [%date% %time%] Remove stale launcher lock >> "%LAUNCH_LOG%"
     rmdir "%LOCK_DIR%" >nul 2>&1
@@ -78,6 +101,11 @@ if not errorlevel 1 (
     echo   Dang tat app cu de khoi dong lai ban moi...
     echo.
     call :kill_port_processes
+    if errorlevel 1 (
+        echo   LOI: Port %PORT% khong thuoc VBSP-SCM, launcher se khong tu tat.
+        echo   Hay dong ung dung dang chiem port hoac doi port cua ung dung do.
+        goto :error_pause
+    )
     netstat -ano | findstr ":%PORT% " | findstr "LISTENING" >nul 2>&1
     if not errorlevel 1 (
         echo [%date% %time%] ERROR: port %PORT% still listening after taskkill >> "%LAUNCH_LOG%"
@@ -203,9 +231,27 @@ if errorlevel 1 (
 echo   Setup hoan tat!
 echo.
 echo [%date% %time%] Auto-setup completed >> "%LAUNCH_LOG%"
+set "JUST_INSTALLED=1"
 
 :venv_ready
 echo   Venv da san sang.
+
+rem ============================================================================
+rem  4g. Dong bo requirements khi file thay doi
+rem ============================================================================
+if "!JUST_INSTALLED!"=="1" (
+    "%PY_EXE%" -m pip check >> "%LAUNCH_LOG%" 2>&1
+    if errorlevel 1 (
+        echo [%date% %time%] ERROR: pip check failed after setup >> "%LAUNCH_LOG%"
+        echo   LOI: Dependency vua cai dat chua day du.
+        goto :error_pause
+    )
+    call :write_setup_state
+    if errorlevel 1 goto :error_pause
+) else (
+    call :sync_requirements
+    if errorlevel 1 goto :error_pause
+)
 
 rem ============================================================================
 rem  5. Kiem tra cac file/thu muc thiet yeu
@@ -308,18 +354,127 @@ exit /b 1
 
 :kill_port_processes
 set "KILLED_PIDS="
+set "KILL_FAILED=0"
 for /f "tokens=5" %%p in ('netstat -ano ^| findstr ":%PORT% " ^| findstr "LISTENING"') do (
-    echo [%date% %time%] Stop old app on port %PORT%, PID %%p >> "%LAUNCH_LOG%"
-    echo   Tat process cu PID %%p...
-    taskkill /F /PID %%p >nul 2>&1
+    call :is_vbsp_process %%p
     if errorlevel 1 (
-        echo [%date% %time%] WARN: taskkill failed for PID %%p >> "%LAUNCH_LOG%"
-        echo   CANH BAO: Khong tat duoc PID %%p.
+        echo [%date% %time%] REFUSE: PID %%p is not verified as VBSP-SCM >> "%LAUNCH_LOG%"
+        echo   CANH BAO: PID %%p khong duoc xac minh la VBSP-SCM.
+        set "KILL_FAILED=1"
     ) else (
-        set "KILLED_PIDS=!KILLED_PIDS! %%p"
+        echo [%date% %time%] Stop verified VBSP-SCM on port %PORT%, PID %%p >> "%LAUNCH_LOG%"
+        echo   Tat phien VBSP-SCM cu PID %%p...
+        taskkill /F /PID %%p >nul 2>&1
+        if errorlevel 1 (
+            echo [%date% %time%] WARN: taskkill failed for PID %%p >> "%LAUNCH_LOG%"
+            echo   CANH BAO: Khong tat duoc PID %%p.
+            set "KILL_FAILED=1"
+        ) else (
+            set "KILLED_PIDS=!KILLED_PIDS! %%p"
+        )
     )
 )
 if not "!KILLED_PIDS!"=="" timeout /t 2 >nul
+if "!KILL_FAILED!"=="1" (
+    netstat -ano | findstr ":%PORT% " | findstr "LISTENING" >nul 2>&1
+    if not errorlevel 1 exit /b 1
+)
+exit /b 0
+
+:is_vbsp_process
+set "CHECK_PID=%~1"
+set "PID_INFO_FILE=%TMP_DIR%\vbsp_pid_%CHECK_PID%.txt"
+set "IS_VBSP_PROCESS=1"
+del "%PID_INFO_FILE%" >nul 2>&1
+
+rem PowerShell chay dong bo trong cung console, chi doc metadata process.
+powershell.exe -NoLogo -NoProfile -NonInteractive -Command "$p=Get-CimInstance Win32_Process -Filter 'ProcessId=%CHECK_PID%' -ErrorAction SilentlyContinue; if ($null -ne $p) { Write-Output $p.ExecutablePath; Write-Output $p.CommandLine }" > "%PID_INFO_FILE%" 2>nul
+if not exist "%PID_INFO_FILE%" exit /b 1
+for %%z in ("%PID_INFO_FILE%") do if %%~zz EQU 0 set "IS_VBSP_PROCESS=0"
+
+findstr /I /L /C:"%PY_EXE%" "%PID_INFO_FILE%" >nul 2>&1
+if errorlevel 1 set "IS_VBSP_PROCESS=0"
+findstr /I /L /C:"streamlit" "%PID_INFO_FILE%" >nul 2>&1
+if errorlevel 1 set "IS_VBSP_PROCESS=0"
+findstr /I /L /C:"app.py" "%PID_INFO_FILE%" >nul 2>&1
+if errorlevel 1 set "IS_VBSP_PROCESS=0"
+
+del "%PID_INFO_FILE%" >nul 2>&1
+if "%IS_VBSP_PROCESS%"=="1" exit /b 0
+exit /b 1
+
+:calculate_requirements_hash
+set "REQ_HASH="
+set "REQ_HASH_FILE=%TMP_DIR%\requirements_hash.txt"
+if not exist "%REQUIREMENTS_FILE%" (
+    echo [%date% %time%] ERROR: requirements.txt not found >> "%LAUNCH_LOG%"
+    echo   LOI: Khong tim thay %REQUIREMENTS_FILE%
+    exit /b 1
+)
+del "%REQ_HASH_FILE%" >nul 2>&1
+set "VBSP_REQUIREMENTS_FILE=%REQUIREMENTS_FILE%"
+set "VBSP_REQUIREMENTS_HASH_FILE=%REQ_HASH_FILE%"
+"%PY_EXE%" -c "import hashlib, os; from pathlib import Path; src=Path(os.environ['VBSP_REQUIREMENTS_FILE']); dst=Path(os.environ['VBSP_REQUIREMENTS_HASH_FILE']); dst.write_text(hashlib.sha256(src.read_bytes()).hexdigest(), encoding='ascii')" >nul 2>&1
+if exist "%REQ_HASH_FILE%" set /p "REQ_HASH="<"%REQ_HASH_FILE%"
+del "%REQ_HASH_FILE%" >nul 2>&1
+if not defined REQ_HASH (
+    echo [%date% %time%] ERROR: cannot hash requirements.txt >> "%LAUNCH_LOG%"
+    echo   LOI: Khong the kiem tra thay doi requirements.txt.
+    exit /b 1
+)
+exit /b 0
+
+:write_setup_state
+call :calculate_requirements_hash
+if errorlevel 1 exit /b 1
+> "%SETUP_DONE_FILE%" echo %REQ_HASH%
+echo [%date% %time%] Saved requirements hash %REQ_HASH% >> "%LAUNCH_LOG%"
+exit /b 0
+
+:sync_requirements
+call :calculate_requirements_hash
+if errorlevel 1 exit /b 1
+
+set "SAVED_REQ_HASH="
+if exist "%SETUP_DONE_FILE%" set /p "SAVED_REQ_HASH="<"%SETUP_DONE_FILE%"
+if /I "%REQ_HASH%"=="%SAVED_REQ_HASH%" (
+    echo [%date% %time%] requirements.txt unchanged >> "%LAUNCH_LOG%"
+    exit /b 0
+)
+
+echo.
+echo -- requirements.txt da thay doi, dang dong bo thu vien... --
+echo   Chi chay khi requirements thay doi hoac lan dau nang cap launcher.
+echo [%date% %time%] requirements hash changed: %SAVED_REQ_HASH% to %REQ_HASH% >> "%LAUNCH_LOG%"
+"%PY_EXE%" -m pip install -r "%REQUIREMENTS_FILE%" >> "%LAUNCH_LOG%" 2>&1
+if errorlevel 1 (
+    echo [%date% %time%] ERROR: dependency sync failed >> "%LAUNCH_LOG%"
+    echo   LOI: Dong bo dependency that bai. Xem log: %LAUNCH_LOG%
+    exit /b 1
+)
+"%PY_EXE%" -m pip check >> "%LAUNCH_LOG%" 2>&1
+if errorlevel 1 (
+    echo [%date% %time%] ERROR: pip check failed after dependency sync >> "%LAUNCH_LOG%"
+    echo   LOI: Dependency bi xung dot. Xem log: %LAUNCH_LOG%
+    exit /b 1
+)
+> "%SETUP_DONE_FILE%" echo %REQ_HASH%
+echo [%date% %time%] Dependency sync completed >> "%LAUNCH_LOG%"
+echo   Dong bo dependency hoan tat.
+exit /b 0
+
+:self_test
+call :calculate_requirements_hash
+if errorlevel 1 (
+    echo LAUNCHER SELF-TEST FAILED: requirements hash
+    exit /b 1
+)
+call :is_vbsp_process 0
+if not errorlevel 1 (
+    echo LAUNCHER SELF-TEST FAILED: PID ownership guard
+    exit /b 1
+)
+echo LAUNCHER SELF-TEST OK
 exit /b 0
 
 :cleanup

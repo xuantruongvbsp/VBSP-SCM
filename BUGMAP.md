@@ -1560,6 +1560,16 @@
 
 ## I. Phân quyền / Role
 
+### I9 — Module KH Công việc KH-NV hiển thị trong phân hệ PGD
+| | |
+|---|---|
+| **File** | `tabs/tab_theo_doi_nhap/constants.py`, `tabs/tab_theo_doi_nhap/__init__.py` |
+| **Dấu hiệu** | Người dùng PGD thấy lựa chọn `📝 KH Công việc KH-NV` trong dropdown Theo dõi nhập liệu, nhưng khi mở chỉ nhận cảnh báo chức năng dành cho phân hệ Chi nhánh |
+| **Nguyên nhân** | Builtin `khcv` được thêm vào danh sách dùng chung và chỉ lọc theo visibility đã lưu, trong khi tab Theo dõi nhập liệu được mount ở cả workspace Chi nhánh và PGD |
+| **Fix** | Gắn `scope="cn"` cho `khcv`; lọc builtin theo `la_phan_he_cn(role)` trước khi tạo labels và dispatch |
+| **Test** | `tests/test_tab_theo_doi_nhap_builtin_visibility.py::test_builtin_modules_respect_role_scope`, `::test_builtin_modules_respect_saved_visibility` |
+| **Ngày fix** | 2026-07-26 |
+
 ### I3 — Card Xếp loại Tổ TK&VV tại Phân hệ Hỗ trợ địa bàn hiện toàn Chi nhánh
 
 | | |
@@ -2965,6 +2975,18 @@ def _to_int(val, default=0):
 | **Nguyên nhân** | 2 test launcher gọi `cmd.exe` và kiểm tra CRLF — chỉ đúng trên Windows. Test `doc_nhiem_vu_gsheet_chuan_hoa` mock `_doc_raw_values_sheet` nhưng `doc_nhiem_vu_gsheet()` có try/except nuốt lỗi → trả DataFrame rỗng trên CI |
 | **Fix** | Thêm `@pytest.mark.skipif(sys.platform != "win32")` cho 2 test launcher. Test GSheet gọi trực tiếp `_rows_to_df()` + `_chuan_hoa_nhiem_vu_gsheet()` để lỗi không bị nuốt |
 | **Test** | `venv\Scripts\python.exe -m pytest tests/test_launcher_batch.py tests/test_ke_hoach_cv_khnv_service.py -q` |
+| **Ngày fix** | 2026-07-26 |
+
+---
+
+### J68 — Pin requirements trực tiếp nhưng venv mới vẫn có thể drift dependency
+| | |
+|---|---|
+| **File** | `requirements.txt`, `requirements.lock.txt`, `Chay_VBSP_SCM.bat`, `setup_env.bat` |
+| **Dấu hiệu** | `pip install --dry-run` báo thỏa mãn trên venv hiện tại nhưng khi xóa/tạo lại venv, phiên bản dependency bắc cầu có thể khác; `protobuf` còn bị nâng ngoài requirements |
+| **Nguyên nhân** | `requirements.txt` chỉ pin 33 package trực tiếp trong khi runtime có 83 package thuộc dependency closure; launcher còn chạy `--force-reinstall protobuf python-dateutil` không kèm version |
+| **Fix** | Tạo `requirements.lock.txt` khóa đủ 83 package Windows/Python 3.12; launcher/setup cài bằng `--no-deps`, cố định pip 26.1.2, chạy `pip check`, hash cả requirements + lockfile và bỏ force-reinstall ngoài kiểm soát. Validator stdlib-only chặn chạy nếu dependency trực tiếp và lockfile lệch nhau |
+| **Test** | `tests/test_launcher_batch.py`; clean-venv install từ lockfile + `pip check` + so `pip freeze` |
 | **Ngày fix** | 2026-07-26 |
 
 ---

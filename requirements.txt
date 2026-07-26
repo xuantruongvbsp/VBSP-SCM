@@ -1,57 +1,60 @@
-# VBSP-SCM — Runtime dependencies
-# Generated 2026-06-07 — Python 3.12
+# VBSP-SCM — Direct runtime dependencies
+# Generated 2026-07-26 — Python 3.12
+# Đây là danh sách package cấp cao để quản lý/nâng cấp có chủ đích.
+# Launcher cài môi trường từ requirements.lock.txt, không cài trực tiếp file này.
+# Khi nâng cấp: sửa version, tái tạo lockfile trên Python 3.12 rồi chạy setup_env.bat.
 
 # ── Core framework ─────────────────────────────────────────────
-streamlit>=1.36.0,<2.0
+streamlit==1.60.0
 
 # ── Data ───────────────────────────────────────────────────────
-pandas>=2.2,<4.0
-pyarrow>=14.0
-numpy>=1.26
-duckdb>=1.0
+pandas==3.0.5
+pyarrow==24.0.0
+numpy==2.5.1
+duckdb==1.5.5
 
 # ── Excel / Office ─────────────────────────────────────────────
-openpyxl>=3.1
-xlrd>=2.0
-python-calamine>=0.6.0
-xlsxwriter>=3.0
-python-docx>=1.0
-docxtpl>=0.18
-python-pptx>=0.6
+openpyxl==3.1.5
+xlrd==2.0.2
+python-calamine==0.8.2
+xlsxwriter==3.2.9
+python-docx==1.2.0
+docxtpl==0.20.2
+python-pptx==1.0.2
 
 # ── PDF ────────────────────────────────────────────────────────
-reportlab>=4.0
-pdfplumber>=0.10
-pdf2image>=1.16
-pypdfium2>=4.0
+reportlab==5.0.0
+pdfplumber==0.11.10
+pdf2image==1.17.0
+pypdfium2==5.12.1
 
 # ── OCR (cần tesseract binary trên host) ───────────────────────
-pytesseract>=0.3.10
-pillow>=10.0
+pytesseract==0.3.13
+pillow==12.3.0
 
 # ── Google APIs ────────────────────────────────────────────────
-gspread>=6.0
-google-auth>=2.20
-google-api-core>=2.10
-google-cloud-vision>=3.0
+gspread==6.2.1
+google-auth==2.56.2
+google-api-core==2.33.0
+google-cloud-vision==3.15.0
 
 # ── HTTP / Crypto / Security ───────────────────────────────────
-requests>=2.31
-httpx>=0.27
-bcrypt>=4.0
-cryptography>=41.0
+requests==2.34.2
+httpx==0.28.1
+bcrypt==5.0.0
+cryptography==49.0.0
 
 # ── Visualisation ──────────────────────────────────────────────
-plotly>=5.18
+plotly==6.9.0
 
 # ── Parsing / HTML ─────────────────────────────────────────────
-lxml>=5.0
-beautifulsoup4>=4.12
-markdownify>=0.11
+lxml==6.1.1
+beautifulsoup4==4.15.0
+markdownify==1.2.3
 
 # ── REST API ───────────────────────────────────────────────────
-flask>=3.0
+flask==3.1.3
 
 # ── Misc ───────────────────────────────────────────────────────
-python-dateutil>=2.9
-jinja2>=3.1
+python-dateutil==2.9.0.post0
+jinja2==3.1.6

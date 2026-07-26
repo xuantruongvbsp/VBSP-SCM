@@ -5,6 +5,7 @@ import pytest
 
 from tabs.tab_theo_doi_nhap import (
     _selection_needs_reset,
+    _visible_builtin_modules,
     _visible_sheet_entries,
 )
 from tabs.tab_theo_doi_nhap.constants import BUILTIN_MODULES, KV_BUILTIN_VIS
@@ -118,6 +119,41 @@ def test_visible_sheet_entries_exclude_disabled_and_keep_original_index() -> Non
     ]
 
     assert _visible_sheet_entries(sheets) == [(1, sheets[1])]
+
+
+@pytest.mark.parametrize(
+    ("role", "khcv_visible"),
+    [
+        ("admin_cn", True),
+        ("manager_cn", True),
+        ("chuyenvien_cn", True),
+        ("admin_pgd", False),
+        ("manager_pgd", False),
+        ("user_pgd", False),
+    ],
+)
+def test_builtin_modules_respect_role_scope(
+    role: str,
+    khcv_visible: bool,
+) -> None:
+    visible_ids = {
+        module["id"]
+        for module in _visible_builtin_modules(_all_visible(), role)
+    }
+
+    assert ("khcv" in visible_ids) is khcv_visible
+    assert {"khao_sat", "dctt", "trang_thai_chot"} <= visible_ids
+
+
+def test_builtin_modules_respect_saved_visibility() -> None:
+    visibility = {**_all_visible(), "khcv": False}
+
+    visible_ids = {
+        module["id"]
+        for module in _visible_builtin_modules(visibility, "admin_cn")
+    }
+
+    assert "khcv" not in visible_ids
 
 
 @pytest.mark.parametrize(

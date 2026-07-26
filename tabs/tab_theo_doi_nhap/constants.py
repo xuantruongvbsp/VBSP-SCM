@@ -11,6 +11,7 @@ BUILTIN_MODULES = [
     {"id": "khao_sat",        "label": "🏠 Khảo sát HN/HCN/HTN"},
     {"id": "dctt",            "label": "📈 Điều chỉnh tăng trưởng"},
     {"id": "trang_thai_chot", "label": "🏁 Trạng thái chốt KHTD"},
+    {"id": "khcv",            "label": "📝 KH Công việc KH-NV", "scope": "cn"},
 ]
 
 DEFAULT_CT = [

@@ -9,6 +9,8 @@ set "TMP_DIR=%ROOT%tmp"
 set "PY_PROBE=%TMP_DIR%\setup_python_probe.txt"
 set "PY_CMD=py -3.12"
 set "PY312_EXE=%LOCALAPPDATA%\Programs\Python\Python312\python.exe"
+set "LOCK_FILE=%ROOT%requirements.lock.txt"
+set "PIP_VERSION=26.1.2"
 
 echo.
 echo ============================================================
@@ -16,6 +18,8 @@ echo   VBSP-SCM - Cai dat moi truong 1 lan duy nhat
 echo   He thong Quan tri Tin dung Noi bo NHCSXH CN Dong Nai
 echo ============================================================
 echo.
+
+if not exist "%LOCK_FILE%" goto :lock_missing
 
 echo [0/6] Kiem tra Python 3.12...
 %PY_CMD% --version >nul 2>&1
@@ -35,6 +39,9 @@ if not exist "%PY_PROBE%" goto :python_probe_failed
 
 set /p "PYVER_SHORT="<"%PY_PROBE%"
 if not "%PYVER_SHORT%"=="3.12" goto :wrong_python
+
+%PY_CMD% scripts\validate_dependency_lock.py requirements.txt "%LOCK_FILE%"
+if errorlevel 1 goto :lock_invalid
 
 for /f "tokens=2 delims= " %%v in ('%PY_CMD% --version 2^>^&1') do set "PYVER=%%v"
 echo        Python %PYVER% - OK
@@ -61,20 +68,16 @@ if errorlevel 1 goto :venv_failed
 echo        OK - da tao venv
 echo.
 
-echo [3/6] Nang cap pip...
-"%VENV%\Scripts\python.exe" -m pip install --upgrade pip --quiet
+echo [3/6] Cai pip %PIP_VERSION%...
+"%VENV%\Scripts\python.exe" -m pip install "pip==%PIP_VERSION%" --quiet
 if errorlevel 1 goto :pip_failed
 echo        OK
 echo.
 
-echo [4/6] Cai dat packages tu requirements.txt...
+echo [4/6] Cai dat packages tu requirements.lock.txt...
 echo        Co the mat 3-5 phut, vui long cho...
 echo.
-"%VENV%\Scripts\python.exe" -m pip install -r requirements.txt
-if errorlevel 1 goto :packages_failed
-echo.
-echo        Sua loi package cai thieu file neu pip cache bi loi...
-"%VENV%\Scripts\python.exe" -m pip install --force-reinstall protobuf python-dateutil
+"%VENV%\Scripts\python.exe" -m pip install --no-deps -r "%LOCK_FILE%"
 if errorlevel 1 goto :packages_failed
 echo.
 echo        OK - da cai dat packages
@@ -122,6 +125,18 @@ echo ============================================================
 echo.
 pause
 exit /b 0
+
+:lock_missing
+echo [LOI] Khong tim thay requirements.lock.txt.
+echo        Khong xoa hoac tao lai venv de tranh moi truong cai dat nua voi.
+pause
+exit /b 1
+
+:lock_invalid
+echo [LOI] requirements.txt va requirements.lock.txt khong dong bo.
+echo        Hay tao lai lockfile truoc khi tao lai venv.
+pause
+exit /b 1
 
 :no_python312
 echo [LOI] Khong tim thay Python 3.12 qua lenh: %PY_CMD%

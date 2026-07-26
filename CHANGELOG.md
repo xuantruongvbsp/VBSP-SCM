@@ -1,5 +1,32 @@
 # CHANGELOG
 
+## [2026-07-26] — Ẩn module KH Công việc KH-NV khỏi phân hệ PGD
+- `tabs/tab_theo_doi_nhap/constants.py` — gắn phạm vi `cn` cho builtin module `khcv`.
+- `tabs/tab_theo_doi_nhap/__init__.py` — lọc builtin module theo visibility và phân hệ trước khi tạo dropdown.
+- `tests/test_tab_theo_doi_nhap_builtin_visibility.py` — thêm regression test cho role CN/PGD và visibility đã lưu.
+- `BUGMAP.md` — thêm I9 về module chỉ dành cho Chi nhánh bị hiển thị trong workspace PGD.
+
+## [2026-07-26] — Bổ sung bảng chọn model Codex
+- `AGENTS.md` — thêm mapping `gpt-5.4` cho đọc/hiểu, `gpt-5.5` cho review/fix và `gpt-5.6-sol` cho task rủi ro cao; yêu cầu báo đúng model thực tế và không tự tạo task/thread chỉ để đổi model.
+- `CHANGELOG.md` — ghi nhận cập nhật hướng dẫn lựa chọn model Codex.
+
+## [2026-07-26] — Gom "Theo dõi nhập liệu" về 1 tab duy nhất trong menu Báo cáo
+- `tabs/tab_quan_ly_cv.py` — xóa sub-tab "📋 Theo dõi nhập liệu" và "📝 KH Cán bộ KHNV" khỏi Dashboard Công việc; giảm từ 4→3 sub-tab mỗi nhóm.
+- `tabs/tab_theo_doi_nhap/constants.py` — thêm builtin module `khcv` (📝 KH Công việc KH-NV) vào dropdown.
+- `tabs/tab_theo_doi_nhap/__init__.py` — thêm nhánh render `tab_ke_hoach_cv_khnv` khi chọn module `khcv`.
+
+## [2026-07-26] — Hoàn thiện lock dependency tái lập cho Python 3.12
+- `requirements.txt` — xác định rõ đây là 33 dependency trực tiếp; giữ pin chính xác làm đầu vào nâng cấp có chủ đích.
+- `requirements.lock.txt` — thêm lockfile đầy đủ 83 dependency trực tiếp + bắc cầu theo môi trường runtime Windows/Python 3.12 đang hoạt động ổn định.
+- `Chay_VBSP_SCM.bat` — cài lockfile bằng `--no-deps`, cố định pip 26.1.2, hash đồng thời requirements + lockfile và bỏ force-reinstall ngoài kiểm soát.
+- `setup_env.bat` — kiểm tra lockfile trước khi xóa venv, cài đúng lockfile và bỏ nâng `protobuf`/`python-dateutil` không khóa.
+- `scripts/validate_dependency_lock.py` — thêm validator stdlib-only, chặn thiếu pin, lệch version, duplicate hoặc dòng không dùng `==`.
+- `tests/test_launcher_batch.py` — thêm regression test bảo vệ lockfile đầy đủ, validator, combined hash và cấm force-reinstall không khóa.
+- `BUGMAP.md` — thêm J68 về hiện tượng dependency bắc cầu vẫn drift dù requirements trực tiếp đã pin.
+
+## [2026-07-26] — Khóa version trực tiếp trong requirements.txt
+- `requirements.txt` — đổi toàn bộ dependency trực tiếp từ `>=` sang `==` theo version đang chạy ổn định; bước khóa dependency bắc cầu được hoàn thiện bằng `requirements.lock.txt` ở entry phía trên.
+
 ## [2026-07-26] — Fix 3 test failures trên CI Linux
 - `tests/test_launcher_batch.py` — thêm `@pytest.mark.skipif(sys.platform != "win32")` cho 2 test Windows-only (cmd.exe self-test, CRLF check)
 - `tests/test_ke_hoach_cv_khnv_service.py` — `test_doc_nhiem_vu_gsheet_chuan_hoa` gọi trực tiếp `_rows_to_df` + `_chuan_hoa_nhiem_vu_gsheet` thay vì qua `doc_nhiem_vu_gsheet()` (try/except nuốt lỗi trên CI)

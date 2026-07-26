@@ -11,7 +11,7 @@ import pandas as pd
 import streamlit as st
 from streamlit.delta_generator import DeltaGenerator
 
-from auth import la_quan_ly_cn, normalize_role
+from auth import la_phan_he_cn, la_quan_ly_cn, normalize_role
 from logger import get_logger
 from tabs.base_tab import TabContext
 
@@ -60,6 +60,23 @@ def _visible_sheet_entries(
         (index, cfg)
         for index, cfg in enumerate(ds_sheet)
         if cfg.get("enabled", True)
+    ]
+
+
+def _visible_builtin_modules(
+    visibility: dict[str, bool],
+    role: str,
+) -> list[dict]:
+    """Lọc module đang bật và phù hợp phân hệ của người dùng."""
+    is_cn = la_phan_he_cn(role)
+    return [
+        module
+        for module in BUILTIN_MODULES
+        if visibility.get(module["id"], True)
+        and (
+            module.get("scope", "all") == "all"
+            or (module.get("scope") == "cn" and is_cn)
+        )
     ]
 
 
@@ -112,7 +129,7 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
 
         # ── Chọn sheet — lọc module tích hợp theo visibility ─────────────
         vis = doc_builtin_visibility()
-        visible_builtins = [m for m in BUILTIN_MODULES if vis.get(m["id"], True)]
+        visible_builtins = _visible_builtin_modules(vis, role_n)
         n_builtins = len(visible_builtins)
         visible_sheets = _visible_sheet_entries(ds_sheet)
 
@@ -203,6 +220,9 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                 render_dieu_chinh_tang_truong(username=username)
             elif module_id == "trang_thai_chot":
                 render_trang_thai_chot(username=username)
+            elif module_id == "khcv":
+                from tabs import tab_ke_hoach_cv_khnv as _khcv
+                _khcv.render(None, **kwargs)
 
             return
 

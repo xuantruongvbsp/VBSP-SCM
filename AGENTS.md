@@ -356,67 +356,77 @@ Mỗi khi fix bug, thêm entry vào `BUGMAP.md` theo template có sẵn (cuối 
 
 ## 12. Tự động chọn model cho subagent
 
-**Workflow thực tế:** AI khác (Cascade/Trae/Windsurf) viết code → **Sonnet chỉ review + fix**.  
-Khi nhận task review, tự đánh giá và spawn model phù hợp — không dùng Sonnet cho mọi bước.
+**Workflow thực tế:** AI khác (Cascade/Trae/Windsurf/Codex) viết code → model phù hợp đọc, review và fix.
+Khi nhận task review, tự đánh giá mức độ phức tạp/rủi ro rồi chọn model phù hợp — không dùng model mạnh nhất cho mọi bước.
+
+Trong Codex, chỉ chọn model khi surface/host hiện tại thực sự hỗ trợ. Nếu không đổi được model, tiếp tục bằng model đang chạy và ghi đúng tên model thực tế; **không được tuyên bố đã chuyển model**. Không tự tạo task/thread riêng chỉ để đổi model khi user chưa yêu cầu.
 
 ### 12.1 Bảng chọn model theo bước review
 
-| Bước | Model | Làm gì |
-|---|---|---|
-| **Đọc + hiểu** code mới viết | `haiku` | Đọc file, grep pattern, hiểu cấu trúc, tóm tắt thay đổi |
-| **Review + fix** bug thường | `sonnet` | Phân tích logic, tìm bug, sửa code `tabs/`, `services/` |
-| **Review** code chạm `auth.py` / `db.py` / migration | `opus` | Gợi ý user restart — KHÔNG tự spawn Opus |
+| Bước | Claude | Codex | Làm gì |
+|---|---|---|---|
+| **Đọc + hiểu** code mới viết | `haiku` | `gpt-5.4` | Đọc file, grep pattern, hiểu cấu trúc, tóm tắt thay đổi |
+| **Review + fix** bug thường | `sonnet` | `gpt-5.5` | Phân tích logic, tìm bug, sửa code `tabs/`, `services/` |
+| **Review rủi ro cao** — chạm `auth.py` / `db.py` / migration | `opus` | `gpt-5.6-sol` | Phân tích sâu, ưu tiên độ tin cậy; cảnh báo user trước khi đổi model/restart |
+
+> Tên model Codex dùng đúng slug: `gpt-5.4`, `gpt-5.5`, `gpt-5.6-sol`.
+> `gpt-5.6` là alias trỏ tới Sol, nhưng tài liệu dự án ưu tiên slug tường minh `gpt-5.6-sol`.
 
 ### 12.2 Quy tắc bắt buộc
 
 **Trước khi review, đánh giá:**
 
 ```
-Chưa đọc file nào  →  spawn Haiku đọc + tóm tắt trước, Sonnet review + fix sau
-Đã có summary      →  Sonnet review + fix trực tiếp
-Code chạm auth/db  →  Cảnh báo user: "nên dùng Opus"
+Chưa đọc file nào  →  Claude: Haiku đọc; Codex: GPT-5.4 đọc + tóm tắt
+Đã có summary      →  Claude: Sonnet; Codex: GPT-5.5 review + fix trực tiếp
+Code chạm auth/db  →  Claude: đề xuất Opus; Codex: đề xuất GPT-5.6 Sol
+Task ≤ 2 file nhỏ  →  Làm trực tiếp bằng model hiện tại, không tạo subagent chỉ để đổi model
 ```
 
 **Ví dụ thực tế:**
 
 ```python
-# Bước 1: Haiku đọc code mới để hiểu cấu trúc
+# Claude — bước 1: Haiku đọc code mới để hiểu cấu trúc
 Agent(subagent_type="Explore", model="haiku",
       prompt="Đọc tab_xu_ly_rui_ro.py và xlrr_service.py, tóm tắt các hàm chính, luồng dữ liệu")
 
-# Bước 2: Sonnet nhận tóm tắt → review logic → fix bug
+# Claude — bước 2: Sonnet nhận tóm tắt → review logic → fix bug
 # (làm trực tiếp, không spawn thêm)
 
-# Nếu code chạm auth.py/db.py → KHÔNG spawn Opus, thay vào đó nói:
-# "⚠️ Code này sửa db.py — sai thì mất dữ liệu. Nên dùng Opus.
-#  Bạn restart với `Codex --model Codex-opus-4-7` không?"
+# Codex — nếu surface hỗ trợ chọn model:
+# Đọc/hiểu: gpt-5.4 | Review/fix: gpt-5.5 | Rủi ro cao: gpt-5.6-sol
+#
+# Nếu code chạm auth.py/db.py, nói:
+# "⚠️ Code này sửa db.py — sai có thể mất dữ liệu.
+#  Model đề xuất: GPT-5.6 Sol (`gpt-5.6-sol`)."
 ```
 
 ### 12.3 Khi nào KHÔNG spawn subagent
 
-- User đã gửi kèm summary/tóm tắt thay đổi → Sonnet review trực tiếp, bỏ bước Haiku
+- User đã gửi kèm summary/tóm tắt thay đổi → Claude dùng Sonnet hoặc Codex dùng GPT-5.5 trực tiếp, bỏ bước đọc riêng
 - Chỉ sửa ≤ 2 file nhỏ → làm trực tiếp không cần spawn
 - User đang hỏi/giải thích → trả lời trực tiếp
+- Surface hiện tại không hỗ trợ model đề xuất → dùng model đang chạy và báo đúng tên, không tạo task/thread riêng để né giới hạn
 
 ### 12.4 BẮT BUỘC — Hiện model ở đầu mỗi task
 
 **Mỗi khi bắt đầu làm task (không phải hỏi/trả lời thường), PHẢI hiện dòng:**
 
 ```
-🤖 Model: Sonnet 4.6  |  Lý do: [1 câu ngắn]
+🤖 Model: GPT-5.5  |  Lý do: [1 câu ngắn]
 ```
 
 Hoặc khi spawn subagent:
 
 ```
-🤖 Bước 1 — Haiku đọc file  |  Bước 2 — Sonnet review + fix
+🤖 Bước 1 — GPT-5.4 đọc file  |  Bước 2 — GPT-5.5 review + fix
 ```
 
-Hoặc khi cần Opus:
+Hoặc khi cần model Codex mạnh hơn:
 
 ```
-⚠️ Model đề xuất: Opus 4.7  |  Lý do: task chạm db.py — sai thì mất dữ liệu
-   → Restart: Codex --model Codex-opus-4-7
+⚠️ Model đề xuất: GPT-5.6 Sol  |  Lý do: task chạm db.py — sai có thể mất dữ liệu
+   → Chọn model: `gpt-5.6-sol` (nếu surface hiện tại hỗ trợ)
 ```
 
 **Mục đích:** User luôn biết model nào đang xử lý task, tự kiểm soát chi phí và độ tin cậy.

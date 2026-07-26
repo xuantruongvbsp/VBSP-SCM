@@ -5,8 +5,8 @@ import streamlit as st
 from streamlit.delta_generator import DeltaGenerator
 
 from tabs.base_tab import TabContext
-from tabs import tab_tien_do, tab_nhiem_vu, tab_tong_hop_cv, tab_ke_hoach_cv_khnv
-from tabs import bc_tong_hop, tab_tien_do_nop, tab_checklist_bc, tab_theo_doi_nhap
+from tabs import tab_tien_do, tab_nhiem_vu, tab_tong_hop_cv
+from tabs import bc_tong_hop, tab_tien_do_nop, tab_checklist_bc
 
 
 def render(tab: DeltaGenerator = None, **kwargs) -> None:
@@ -17,11 +17,10 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
             "� Báo cáo",
         ])
         with t_cv:
-            s1, s2, s3, s4 = st.tabs([
-                "� Tổng quan toàn bộ",
+            s1, s2, s3 = st.tabs([
+                "📊 Tổng quan toàn bộ",
                 "📅 Tiến độ Công việc",
                 "📌 Nhiệm vụ định kỳ",
-                "📝 KH Cán bộ KHNV",
             ])
             with s1:
                 tab_tong_hop_cv.render(s1, **kwargs)
@@ -29,14 +28,11 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                 tab_tien_do.render(s2, **kwargs)
             with s3:
                 tab_nhiem_vu.render(s3, **kwargs)
-            with s4:
-                tab_ke_hoach_cv_khnv.render(s4, **kwargs)
         with t_bc:
-            s1, s2, s3, s4 = st.tabs([
+            s1, s2, s3 = st.tabs([
                 "📊 Báo cáo tổng hợp",
                 "📥 Báo cáo từ PGD",
                 "📤 Báo cáo lên cấp trên",
-                "📋 Theo dõi nhập liệu",
             ])
             with s1:
                 bc_tong_hop.render(s1, **kwargs)
@@ -44,5 +40,3 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                 tab_tien_do_nop.render(s2, **kwargs)
             with s3:
                 tab_checklist_bc.render(s3, **kwargs)
-            with s4:
-                tab_theo_doi_nhap.render(s4, **kwargs)

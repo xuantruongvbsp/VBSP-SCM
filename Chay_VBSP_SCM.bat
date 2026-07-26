@@ -18,6 +18,8 @@ set "VBSP_PROBE_FILE=%PROBE_FILE%"
 set "LAUNCH_LOG=%LOG_DIR%\launcher_last.log"
 set "SETUP_DONE_FILE=%TMP_DIR%\.vbsp_setup_done"
 set "REQUIREMENTS_FILE=%ROOT%\requirements.txt"
+set "REQUIREMENTS_LOCK_FILE=%ROOT%\requirements.lock.txt"
+set "PIP_VERSION=26.1.2"
 set "LOG_RETENTION_DAYS=30"
 set "JUST_INSTALLED=0"
 
@@ -183,7 +185,21 @@ for /f "tokens=2 delims= " %%v in ('"!PY_CMD!" !PY_ARGS! --version 2^>^&1') do s
 echo   Tim thay: Python !PYVER! (!PY_CMD! !PY_ARGS!)
 echo [%date% %time%] Found Python: !PY_CMD! !PY_ARGS! version !PYVER! >> "%LAUNCH_LOG%"
 
-rem 4c. Tao/Xoa venv cu
+rem 4c. Kiem tra lockfile truoc khi tao/xoa venv
+if not exist "%REQUIREMENTS_LOCK_FILE%" (
+    echo [%date% %time%] ERROR: requirements.lock.txt not found >> "%LAUNCH_LOG%"
+    echo   LOI: Khong tim thay %REQUIREMENTS_LOCK_FILE%
+    goto :error_pause
+)
+"!PY_CMD!" !PY_ARGS! "%ROOT%\scripts\validate_dependency_lock.py" "%REQUIREMENTS_FILE%" "%REQUIREMENTS_LOCK_FILE%" >> "%LAUNCH_LOG%" 2>&1
+if errorlevel 1 (
+    echo [%date% %time%] ERROR: dependency lock is inconsistent >> "%LAUNCH_LOG%"
+    echo   LOI: requirements.txt va requirements.lock.txt khong dong bo.
+    echo   Hay tao lai lockfile truoc khi tao lai venv.
+    goto :error_pause
+)
+
+rem 4d. Tao/Xoa venv cu
 if exist "%ROOT%\venv" (
     echo   Dang xoa venv cu...
     rmdir /s /q "%ROOT%\venv" >nul 2>&1
@@ -196,31 +212,28 @@ if errorlevel 1 (
     goto :error_pause
 )
 
-rem 4d. Cai packages
-echo   Dang nang cap pip...
-"%PY_EXE%" -m pip install --upgrade pip --quiet >> "%LAUNCH_LOG%" 2>&1
+rem 4e. Cai packages tu lockfile
+echo   Dang cai pip %PIP_VERSION%...
+"%PY_EXE%" -m pip install "pip==%PIP_VERSION%" --quiet >> "%LAUNCH_LOG%" 2>&1
 
 echo   Dang cai dat packages (co the mat 3-5 phut)...
 echo   Vui long cho...
 echo.
-"%PY_EXE%" -m pip install -r requirements.txt
+"%PY_EXE%" -m pip install --no-deps -r "%REQUIREMENTS_LOCK_FILE%"
 if errorlevel 1 (
     echo [%date% %time%] ERROR: pip install failed >> "%LAUNCH_LOG%"
     echo   LOI: Cai dat packages that bai. Kiem tra ket noi Internet.
     goto :error_pause
 )
 
-rem Fix cac package thuong loi
-"%PY_EXE%" -m pip install --force-reinstall protobuf python-dateutil --quiet >> "%LAUNCH_LOG%" 2>&1
-
-rem 4e. Tao thu muc can thiet
+rem 4f. Tao thu muc can thiet
 if not exist "%ROOT%\cache" mkdir "%ROOT%\cache"
 if not exist "%ROOT%\pgd_data" mkdir "%ROOT%\pgd_data"
 if not exist "%ROOT%\backups" mkdir "%ROOT%\backups"
 if not exist "%ROOT%\logs" mkdir "%ROOT%\logs"
 if not exist "%ROOT%\tmp" mkdir "%ROOT%\tmp"
 
-rem 4f. Verify import
+rem 4g. Verify import
 "%PY_EXE%" -c "import streamlit, pandas, duckdb, pyarrow, plotly, openpyxl, docx, bcrypt" >> "%LAUNCH_LOG%" 2>&1
 if errorlevel 1 (
     echo [%date% %time%] ERROR: module import failed after install >> "%LAUNCH_LOG%"
@@ -237,7 +250,7 @@ set "JUST_INSTALLED=1"
 echo   Venv da san sang.
 
 rem ============================================================================
-rem  4g. Dong bo requirements khi file thay doi
+rem  4h. Dong bo requirements/lockfile khi file thay doi
 rem ============================================================================
 if "!JUST_INSTALLED!"=="1" (
     "%PY_EXE%" -m pip check >> "%LAUNCH_LOG%" 2>&1
@@ -411,15 +424,27 @@ if not exist "%REQUIREMENTS_FILE%" (
     echo   LOI: Khong tim thay %REQUIREMENTS_FILE%
     exit /b 1
 )
+if not exist "%REQUIREMENTS_LOCK_FILE%" (
+    echo [%date% %time%] ERROR: requirements.lock.txt not found >> "%LAUNCH_LOG%"
+    echo   LOI: Khong tim thay %REQUIREMENTS_LOCK_FILE%
+    exit /b 1
+)
+"%PY_EXE%" "%ROOT%\scripts\validate_dependency_lock.py" "%REQUIREMENTS_FILE%" "%REQUIREMENTS_LOCK_FILE%" >> "%LAUNCH_LOG%" 2>&1
+if errorlevel 1 (
+    echo [%date% %time%] ERROR: dependency lock is inconsistent >> "%LAUNCH_LOG%"
+    echo   LOI: requirements.txt va requirements.lock.txt khong dong bo.
+    exit /b 1
+)
 del "%REQ_HASH_FILE%" >nul 2>&1
 set "VBSP_REQUIREMENTS_FILE=%REQUIREMENTS_FILE%"
+set "VBSP_REQUIREMENTS_LOCK_FILE=%REQUIREMENTS_LOCK_FILE%"
 set "VBSP_REQUIREMENTS_HASH_FILE=%REQ_HASH_FILE%"
-"%PY_EXE%" -c "import hashlib, os; from pathlib import Path; src=Path(os.environ['VBSP_REQUIREMENTS_FILE']); dst=Path(os.environ['VBSP_REQUIREMENTS_HASH_FILE']); dst.write_text(hashlib.sha256(src.read_bytes()).hexdigest(), encoding='ascii')" >nul 2>&1
+"%PY_EXE%" -c "import hashlib, os; from pathlib import Path; src=Path(os.environ['VBSP_REQUIREMENTS_FILE']); lock=Path(os.environ['VBSP_REQUIREMENTS_LOCK_FILE']); dst=Path(os.environ['VBSP_REQUIREMENTS_HASH_FILE']); dst.write_text(hashlib.sha256(src.read_bytes()+b'\0'+lock.read_bytes()).hexdigest(), encoding='ascii')" >nul 2>&1
 if exist "%REQ_HASH_FILE%" set /p "REQ_HASH="<"%REQ_HASH_FILE%"
 del "%REQ_HASH_FILE%" >nul 2>&1
 if not defined REQ_HASH (
-    echo [%date% %time%] ERROR: cannot hash requirements.txt >> "%LAUNCH_LOG%"
-    echo   LOI: Khong the kiem tra thay doi requirements.txt.
+    echo [%date% %time%] ERROR: cannot hash dependency files >> "%LAUNCH_LOG%"
+    echo   LOI: Khong the kiem tra thay doi dependency.
     exit /b 1
 )
 exit /b 0
@@ -438,15 +463,21 @@ if errorlevel 1 exit /b 1
 set "SAVED_REQ_HASH="
 if exist "%SETUP_DONE_FILE%" set /p "SAVED_REQ_HASH="<"%SETUP_DONE_FILE%"
 if /I "%REQ_HASH%"=="%SAVED_REQ_HASH%" (
-    echo [%date% %time%] requirements.txt unchanged >> "%LAUNCH_LOG%"
+    echo [%date% %time%] dependency lock unchanged >> "%LAUNCH_LOG%"
     exit /b 0
 )
 
 echo.
-echo -- requirements.txt da thay doi, dang dong bo thu vien... --
-echo   Chi chay khi requirements thay doi hoac lan dau nang cap launcher.
-echo [%date% %time%] requirements hash changed: %SAVED_REQ_HASH% to %REQ_HASH% >> "%LAUNCH_LOG%"
-"%PY_EXE%" -m pip install -r "%REQUIREMENTS_FILE%" >> "%LAUNCH_LOG%" 2>&1
+echo -- Dependency lock da thay doi, dang dong bo thu vien... --
+echo   Chi chay khi requirements/lockfile thay doi.
+echo [%date% %time%] dependency hash changed: %SAVED_REQ_HASH% to %REQ_HASH% >> "%LAUNCH_LOG%"
+"%PY_EXE%" -m pip install "pip==%PIP_VERSION%" --quiet >> "%LAUNCH_LOG%" 2>&1
+if errorlevel 1 (
+    echo [%date% %time%] ERROR: pinned pip install failed >> "%LAUNCH_LOG%"
+    echo   LOI: Khong cai duoc pip %PIP_VERSION%. Xem log: %LAUNCH_LOG%
+    exit /b 1
+)
+"%PY_EXE%" -m pip install --no-deps -r "%REQUIREMENTS_LOCK_FILE%" >> "%LAUNCH_LOG%" 2>&1
 if errorlevel 1 (
     echo [%date% %time%] ERROR: dependency sync failed >> "%LAUNCH_LOG%"
     echo   LOI: Dong bo dependency that bai. Xem log: %LAUNCH_LOG%

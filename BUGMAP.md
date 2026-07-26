@@ -2975,8 +2975,8 @@ def _to_int(val, default=0):
 | **File** | `services/ke_hoach_cv_khnv_service.py` → `_doc_raw_values_sheet()` / `doc_nhiem_vu_gsheet()` / `kiem_tra_ket_noi()` |
 | **Dấu hiệu** | `Không đọc được Google Sheets: APIError: [400]: Unable to parse range: NhiemVuGiao` dù tab KhHoach/KetQua vẫn đọc tốt |
 | **Nguyên nhân** | Spreadsheet chưa có tab `NhiemVuGiao` (tab tuỳ chọn). Google trả 400 parse range; `_doc_raw_values_sheet` ghi biến toàn cục `_LAST_ERROR` rồi raise; `doc_nhiem_vu_gsheet` catch trả df rỗng nhưng `_LAST_ERROR` vẫn bẩn → UI hiện banner như thể toàn bộ GSheet hỏng |
-| **Fix** | Thêm `_la_loi_tab_khong_ton_tai()` + cờ `optional` cho `_doc_raw_values_sheet`: tab tuỳ chọn đọc hụt (parse range) thì trả `[]` êm, không ghi `_LAST_ERROR`, không raise. `doc_nhiem_vu_gsheet` gọi `optional=True`; `kiem_tra_ket_noi` tách đọc NV, thiếu thì báo "chưa tạo (tuỳ chọn)" thay vì fail |
-| **Test** | `venv\Scripts\python.exe -c "import py_compile; py_compile.compile('services/ke_hoach_cv_khnv_service.py', doraise=True)"` |
+| **Fix** | Thêm `_la_loi_tab_khong_ton_tai()` + cờ `optional` cho `_doc_raw_values_sheet`: tab tuỳ chọn đọc hụt (parse range) thì trả `[]` êm, không ghi `_LAST_ERROR`, không raise. `doc_nhiem_vu_gsheet` gọi `optional=True`; `kiem_tra_ket_noi` tách đọc NV, thiếu thì báo "chưa tạo (tuỳ chọn)" thay vì fail. **Fix tiếp (cùng ngày):** trong `kiem_tra_ket_noi`, nhánh NV/GV `_la_loi_tab_khong_ton_tai(e)` phải `global _LAST_ERROR` + gán `_LAST_ERROR = None` trước khi trả thành công — vì `_doc_raw_values_sheet` (gọi KHÔNG optional) đã ghi `_LAST_ERROR` rồi mới raise, khiến banner vẫn hiện dù kết quả OK |
+| **Test** | `venv\Scripts\python.exe -m pytest tests\test_ke_hoach_cv_khnv_service.py -q` (10 passed; regression a/b/c: optional missing tab không bẩn `_LAST_ERROR`, `kiem_tra_ket_noi` NV parse-range trả True + `_LAST_ERROR` None, NV 401/403/500 vẫn fail) |
 | **Ngày fix** | 2026-07-26 |
 
 ---

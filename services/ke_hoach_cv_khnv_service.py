@@ -15,6 +15,7 @@ import pandas as pd
 import db
 from config import (
     BASE_DIR,
+    KE_HOACH_CV_KHNV_SHEET_GV,
     KE_HOACH_CV_KHNV_SHEET_ID,
     KE_HOACH_CV_KHNV_SHEET_KH,
     KE_HOACH_CV_KHNV_SHEET_KQ,
@@ -63,6 +64,19 @@ COT_NV_GIAO = [
     "uu_tien",
     "trang_thai",
     "ghi_chu",
+]
+
+# Cột của tab GiaoViec (Google Form giao việc lãnh đạo)
+COT_GV = [
+    "thoi_gian",
+    "nguoi_nhan",
+    "tuan_thuc_hien",
+    "nhom_cong_tac",
+    "dau_viec",
+    "noi_dung",
+    "ket_qua_can_dat",
+    "thoi_han",
+    "uu_tien",
 ]
 
 TRANG_THAI_NHIEM_VU = ["Mới giao", "Đang thực hiện", "Hoàn thành", "Tạm dừng"]
@@ -416,8 +430,120 @@ def doc_nhiem_vu_gsheet_cached(ttl: int = 300):
     return _cached
 
 
+# ── GiaoViec (Form giao việc lãnh đạo) ──────────────────────────────────────
+
+
+def _chuan_hoa_giao_viec(df: pd.DataFrame) -> pd.DataFrame:
+    """Chuẩn hóa dữ liệu giao việc đọc từ tab GiaoViec."""
+    if df.empty:
+        return pd.DataFrame(columns=COT_GV + ["han", "tuan"])
+    result = df.copy()
+    for col in result.columns:
+        if col not in {"thoi_gian", "tuan_thuc_hien", "thoi_han"}:
+            result[col] = result[col].apply(_clean_text)
+    for col in ["thoi_gian", "tuan_thuc_hien", "thoi_han"]:
+        if col in result.columns:
+            result[col] = pd.to_datetime(result[col], dayfirst=True, errors="coerce")
+    result["han"] = result["thoi_han"].dt.date
+    result["tuan"] = result["tuan_thuc_hien"].dt.date
+    return result
+
+
+def doc_giao_viec() -> pd.DataFrame:
+    """Đọc tab GiaoViec từ Google Sheets, không cache."""
+    try:
+        data = _doc_raw_values_sheet(KE_HOACH_CV_KHNV_SHEET_GV)
+        return _chuan_hoa_giao_viec(_rows_to_df(data, COT_GV))
+    except Exception as e:
+        logger.error("doc_giao_viec: %s", e, exc_info=True)
+        return pd.DataFrame(columns=COT_GV + ["han", "tuan"])
+
+
+def loc_giao_viec_theo_can_bo(df_gv: pd.DataFrame, ten_can_bo: str) -> pd.DataFrame:
+    """Lọc nhiệm vụ được giao cho một cán bộ cụ thể."""
+    if df_gv.empty or not ten_can_bo.strip():
+        return df_gv
+    ten = _clean_text(ten_can_bo).casefold()
+    mask = df_gv.get("nguoi_nhan", pd.Series(dtype=str)).apply(
+        lambda x: ten in _clean_text(x).casefold()
+    )
+    return df_gv[mask]
+
+
+def doi_chieu_giao_viec_ket_qua(
+    df_gv: pd.DataFrame,
+    df_kq: pd.DataFrame,
+) -> pd.DataFrame:
+    """Đối chiếu nhiệm vụ giao (GiaoViec) với kết quả báo cáo (KetQua).
+
+    Ghép theo họ tên cán bộ + đầu việc (gần đúng). Trả về DataFrame
+    với cột 'trang_thai_kq' và 'da_bao_cao'.
+    """
+    if df_gv.empty:
+        return pd.DataFrame()
+
+    result = df_gv.copy()
+    result["da_bao_cao"] = False
+    result["trang_thai_kq"] = ""
+    result["ket_qua_chi_tiet"] = ""
+
+    if df_kq is None or df_kq.empty:
+        return result
+
+    for idx, row_gv in result.iterrows():
+        ten = _clean_text(row_gv.get("nguoi_nhan", "")).casefold()
+        dau_viec = _clean_text(row_gv.get("dau_viec", "")).casefold()
+        if not ten:
+            continue
+        # Tìm báo cáo kết quả khớp tên + đầu việc
+        mask_ten = df_kq.get("ho_ten", pd.Series(dtype=str)).apply(
+            lambda x: ten in _clean_text(x).casefold()
+        )
+        kq_match = df_kq[mask_ten]
+        if dau_viec and "dau_viec" in kq_match.columns:
+            kq_dv = kq_match[
+                kq_match["dau_viec"].apply(lambda x: dau_viec in _clean_text(x).casefold())
+            ]
+            if not kq_dv.empty:
+                kq_match = kq_dv
+        if not kq_match.empty:
+            result.at[idx, "da_bao_cao"] = True
+            trang_thai_list = kq_match.get("trang_thai", pd.Series(dtype=str)).tolist()
+            result.at[idx, "trang_thai_kq"] = "; ".join(
+                str(t).strip() for t in trang_thai_list if str(t).strip()
+            )
+            ket_qua_list = kq_match.get("ket_qua", pd.Series(dtype=str)).tolist()
+            result.at[idx, "ket_qua_chi_tiet"] = "; ".join(
+                str(k).strip() for k in ket_qua_list if str(k).strip()
+            )
+    return result
+
+
+def tinh_tong_hop_giao_viec(df_gv: pd.DataFrame) -> dict[str, int]:
+    """Tính KPI cho dữ liệu giao việc từ Form."""
+    if not isinstance(df_gv, pd.DataFrame) or df_gv.empty:
+        return {"tong": 0, "qua_han": 0, "da_bao_cao": 0, "chua_bao_cao": 0}
+    today = date.today()
+    tong = len(df_gv)
+    qua_han = 0
+    if "han" in df_gv.columns:
+        qua_han = int(
+            df_gv["han"].apply(
+                lambda h: isinstance(h, date) and h < today
+            ).sum()
+        )
+    da_bao_cao = int(df_gv.get("da_bao_cao", pd.Series(dtype=bool)).fillna(False).sum())
+    return {
+        "tong": tong,
+        "qua_han": qua_han,
+        "da_bao_cao": da_bao_cao,
+        "chua_bao_cao": max(0, tong - da_bao_cao),
+    }
+
+
 def kiem_tra_ket_noi() -> tuple[bool, str]:
     """Kiểm tra credentials, Sheet ID và ba tab KhHoach/KetQua/NhiemVuGiao."""
+    global _LAST_ERROR
     try:
         cred_path = _tim_credentials()
     except Exception as e:
@@ -441,7 +567,22 @@ def kiem_tra_ket_noi() -> tuple[bool, str]:
         nv_msg = f"{KE_HOACH_CV_KHNV_SHEET_NV} {len(nv)} dòng"
     except Exception as e:
         if _la_loi_tab_khong_ton_tai(e):
+            # Tab tuỳ chọn chưa tạo: _doc_raw_values_sheet (không optional) đã
+            # ghi _LAST_ERROR trước khi raise → phải làm sạch để không hiện banner.
+            _LAST_ERROR = None
             nv_msg = f"{KE_HOACH_CV_KHNV_SHEET_NV} chưa tạo (tuỳ chọn)"
+        else:
+            logger.error("kiem_tra_ket_noi: %s", e, exc_info=True)
+            return False, f"{type(e).__name__}: {e}{_goi_y_loi_gsheet(e)}"
+
+    # Tab GiaoViec tuỳ chọn
+    try:
+        gv = _doc_raw_values_sheet(KE_HOACH_CV_KHNV_SHEET_GV, sheet_id)
+        gv_msg = f"{KE_HOACH_CV_KHNV_SHEET_GV} {len(gv)} dòng"
+    except Exception as e:
+        if _la_loi_tab_khong_ton_tai(e):
+            _LAST_ERROR = None
+            gv_msg = f"{KE_HOACH_CV_KHNV_SHEET_GV} chưa tạo (tuỳ chọn)"
         else:
             logger.error("kiem_tra_ket_noi: %s", e, exc_info=True)
             return False, f"{type(e).__name__}: {e}{_goi_y_loi_gsheet(e)}"
@@ -449,7 +590,7 @@ def kiem_tra_ket_noi() -> tuple[bool, str]:
     return (
         True,
         f"OK — {cred_path.name}: {KE_HOACH_CV_KHNV_SHEET_KH} {len(kh)} dòng, "
-        f"{KE_HOACH_CV_KHNV_SHEET_KQ} {len(kq)} dòng, {nv_msg}",
+        f"{KE_HOACH_CV_KHNV_SHEET_KQ} {len(kq)} dòng, {nv_msg}, {gv_msg}",
     )
 
 

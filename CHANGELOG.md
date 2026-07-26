@@ -1,5 +1,18 @@
 # CHANGELOG
 
+## [2026-07-26] — Củng cố regression test H14: chứng minh riêng nhánh NV clear _LAST_ERROR
+- `tests/test_ke_hoach_cv_khnv_service.py` — `test_kiem_tra_ket_noi_nv_chua_tao_khong_ban_last_error`: capture `_LAST_ERROR` vào `observed["before_gv"]` tại thời điểm đọc GiaoViec (ngay sau NV fail, trước khi GV thành công tự xoá lỗi), rồi assert `observed["before_gv"] is None` SAU khi `kiem_tra_ket_noi()` return. Assertion nằm ngoài luồng service nên không phụ thuộc `_la_loi_tab_khong_ton_tai()` và không bị pytest assertion rewriting làm nhiễu (bẫy: assert trần đính kèm chuỗi parse-range khiến classifier nhận diện nhầm thành "tab chưa tạo"). Đã mutation-check: tắt dòng clear NV → test fail; khôi phục → 10 passed
+
+## [2026-07-26] — Fix tiếp H14: làm sạch _LAST_ERROR trong kiem_tra_ket_noi khi tab tuỳ chọn chưa tạo
+- `services/ke_hoach_cv_khnv_service.py` dòng ~545 — `kiem_tra_ket_noi()` thêm `global _LAST_ERROR`; nhánh `_la_loi_tab_khong_ton_tai(e)` của NV (và GV) gán `_LAST_ERROR = None` trước khi trả thành công, giữ thông báo "chưa tạo (tuỳ chọn)"; không làm yếu xử lý lỗi KH/KQ hay auth/mạng của NV
+- `tests/test_ke_hoach_cv_khnv_service.py` — mock `test_doc_nhiem_vu_gsheet_chuan_hoa` nhận kw-only `optional`; thêm regression a/b/c (optional missing tab không bẩn `_LAST_ERROR`; `kiem_tra_ket_noi` NV parse-range trả True + `_LAST_ERROR` None; NV 401/403/500 vẫn fail)
+- `BUGMAP.md` — cập nhật entry H14 (fix tiếp + lệnh pytest)
+
+## [2026-07-26] — Đọc tab GiaoViec từ Google Sheets + hiển thị theo cán bộ + đối chiếu KQ
+- `config.py` dòng ~1132 — thêm `KE_HOACH_CV_KHNV_SHEET_GV = "GiaoViec"`
+- `services/ke_hoach_cv_khnv_service.py` — thêm `COT_GV` (9 cột Form giao việc), `doc_giao_viec()`, `_chuan_hoa_giao_viec()`, `loc_giao_viec_theo_can_bo()`, `doi_chieu_giao_viec_ket_qua()`, `tinh_tong_hop_giao_viec()`; cập nhật `kiem_tra_ket_noi()` kiểm tra thêm tab GiaoViec (tuỳ chọn)
+- `tabs/tab_ke_hoach_cv_khnv.py` — thêm sub-tab "Giao việc (Form)": KPI tổng/quá hạn/đã BC/chưa BC, lọc theo cán bộ + trạng thái báo cáo, đối chiếu tự động với KetQua, tổng hợp theo cán bộ, xuất Excel; cập nhật Hướng dẫn thêm dòng GiaoViec
+
 ## [2026-07-26] — Fix banner lỗi GSheet khi tab NhiemVuGiao chưa tạo (H14)
 - `services/ke_hoach_cv_khnv_service.py` — thêm `_la_loi_tab_khong_ton_tai()` + cờ `optional` cho `_doc_raw_values_sheet`: tab tuỳ chọn đọc hụt (400 parse range) trả `[]` êm, không ghi `_LAST_ERROR`, không raise; `doc_nhiem_vu_gsheet` dùng `optional=True`; `kiem_tra_ket_noi` tách đọc NV, thiếu báo "chưa tạo (tuỳ chọn)"
 

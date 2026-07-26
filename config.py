@@ -1129,6 +1129,7 @@ KE_HOACH_CV_KHNV_SHEET_ID = ""
 KE_HOACH_CV_KHNV_SHEET_KH = "KhHoach"
 KE_HOACH_CV_KHNV_SHEET_KQ = "KetQua"
 KE_HOACH_CV_KHNV_SHEET_NV = "NhiemVuGiao"
+KE_HOACH_CV_KHNV_SHEET_GV = "GiaoViec"
 KE_HOACH_CV_KHNV_NHOM = [
     "Công tác tham mưu",
     "Công tác tổng hợp",

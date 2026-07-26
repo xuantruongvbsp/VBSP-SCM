@@ -37,6 +37,11 @@ def _doc_nhiem_vu_gsheet_cached() -> pd.DataFrame:
     return svc.doc_nhiem_vu_gsheet()
 
 
+@st.cache_data(ttl=300)
+def _doc_giao_viec_cached() -> pd.DataFrame:
+    return svc.doc_giao_viec()
+
+
 def _fmt_date(value: Any) -> str:
     if pd.isna(value):
         return ""
@@ -195,6 +200,7 @@ def _render_huong_dan(cfg: dict[str, Any]) -> None:
                 {"Tab Sheet": "KhHoach", "Dữ liệu": "Đăng ký kế hoạch công việc"},
                 {"Tab Sheet": "KetQua", "Dữ liệu": "Báo cáo kết quả công việc"},
                 {"Tab Sheet": "NhiemVuGiao", "Dữ liệu": "Nhiệm vụ lãnh đạo phòng giao"},
+                {"Tab Sheet": "GiaoViec", "Dữ liệu": "Giao việc qua Form (lãnh đạo → cán bộ)"},
             ]
         ),
         hide_index=True,
@@ -739,6 +745,133 @@ def _render_ket_qua(df_kq: pd.DataFrame, username: str = "unknown") -> None:
             )
 
 
+def _render_giao_viec_form(
+    df_gv: pd.DataFrame,
+    df_kq: pd.DataFrame,
+    username: str = "unknown",
+) -> None:
+    """Hiển thị nhiệm vụ từ Form giao việc (tab GiaoViec), xem theo từng người + đối chiếu KQ."""
+    st.markdown("### Giao việc qua Form")
+    st.caption("Dữ liệu từ tab GiaoViec — Google Sheets")
+
+    if df_gv.empty:
+        st.info("Chưa có dữ liệu giao việc từ Google Sheets (tab GiaoViec).")
+        return
+
+    # Đối chiếu với kết quả báo cáo
+    df_dc = svc.doi_chieu_giao_viec_ket_qua(df_gv, df_kq)
+    metrics = svc.tinh_tong_hop_giao_viec(df_dc)
+
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Tổng việc giao", metrics["tong"])
+    c2.metric("Quá hạn", metrics["qua_han"])
+    c3.metric("Đã báo cáo KQ", metrics["da_bao_cao"])
+    c4.metric("Chưa báo cáo", metrics["chua_bao_cao"])
+
+    st.divider()
+
+    # Lọc theo cán bộ
+    ds_can_bo = _unique_text(df_dc, "nguoi_nhan")
+    col_can_bo, col_trang_thai = st.columns([1.5, 1])
+    with col_can_bo:
+        can_bo_chon = st.selectbox(
+            "Xem theo cán bộ",
+            options=["Tất cả"] + ds_can_bo,
+            key=f"{KEY_PREFIX}gv_can_bo",
+        )
+    with col_trang_thai:
+        trang_thai_loc = st.selectbox(
+            "Trạng thái báo cáo",
+            ["Tất cả", "Đã báo cáo", "Chưa báo cáo"],
+            key=f"{KEY_PREFIX}gv_trang_thai",
+        )
+
+    filtered = df_dc.copy()
+    if can_bo_chon != "Tất cả":
+        filtered = svc.loc_giao_viec_theo_can_bo(filtered, can_bo_chon)
+    if trang_thai_loc == "Đã báo cáo":
+        filtered = filtered[filtered.get("da_bao_cao", pd.Series(dtype=bool)).fillna(False)]
+    elif trang_thai_loc == "Chưa báo cáo":
+        filtered = filtered[~filtered.get("da_bao_cao", pd.Series(dtype=bool)).fillna(False)]
+
+    if filtered.empty:
+        st.info("Không có nhiệm vụ phù hợp bộ lọc.")
+        return
+
+    # Bảng hiển thị
+    display = _display_df(filtered, ["tuan_thuc_hien", "thoi_han"])
+    display = display.rename(
+        columns={
+            "thoi_gian": "Thời gian ghi nhận",
+            "nguoi_nhan": "Người nhận việc",
+            "tuan_thuc_hien": "Tuần thực hiện",
+            "nhom_cong_tac": "Nhóm công tác",
+            "dau_viec": "Đầu việc",
+            "noi_dung": "Nội dung, yêu cầu",
+            "ket_qua_can_dat": "Kết quả cần đạt",
+            "thoi_han": "Thời hạn",
+            "uu_tien": "Ưu tiên",
+            "da_bao_cao": "Đã báo cáo",
+            "trang_thai_kq": "Trạng thái KQ",
+            "ket_qua_chi_tiet": "Kết quả chi tiết",
+        }
+    )
+    display = display.drop(columns=[c for c in ["han", "tuan"] if c in display.columns])
+    # Đổi cột bool sang text dễ đọc
+    if "Đã báo cáo" in display.columns:
+        display["Đã báo cáo"] = display["Đã báo cáo"].map({True: "✅", False: "❌"})
+
+    st.dataframe(display, hide_index=True, use_container_width=True)
+
+    # Tổng hợp theo cán bộ
+    if can_bo_chon == "Tất cả" and "nguoi_nhan" in filtered.columns:
+        st.divider()
+        st.markdown("#### Tổng hợp theo cán bộ")
+        tong_hop_cb = (
+            filtered.groupby("nguoi_nhan")
+            .agg(
+                Tổng_việc=("nguoi_nhan", "size"),
+                Đã_báo_cáo=("da_bao_cao", "sum"),
+            )
+            .reset_index()
+        )
+        tong_hop_cb["Chưa_báo_cáo"] = tong_hop_cb["Tổng_việc"] - tong_hop_cb["Đã_báo_cáo"]
+        tong_hop_cb["Tỷ lệ BC"] = tong_hop_cb.apply(
+            lambda row: _fmt_pct_vn(row["Đã_báo_cáo"] / row["Tổng_việc"] if row["Tổng_việc"] else 0),
+            axis=1,
+        )
+        tong_hop_cb = tong_hop_cb.rename(columns={"nguoi_nhan": "Cán bộ"})
+        st.dataframe(tong_hop_cb, hide_index=True, use_container_width=True)
+
+    # Xuất Excel
+    st.divider()
+    try:
+        excel_bytes = xuat_excel_chuyen_nghiep(
+            display,
+            title="Giao việc qua Form — Phòng KH-NV",
+            nguoi_xuat=username,
+            subtitle=f"Xuất ngày {date.today().strftime('%d/%m/%Y')}",
+            columns=[(c, c, "text") for c in display.columns],
+            kpi_items=[
+                ("Tổng việc giao", metrics["tong"], "việc"),
+                ("Quá hạn", metrics["qua_han"], "việc"),
+                ("Đã báo cáo KQ", metrics["da_bao_cao"], "việc"),
+                ("Chưa báo cáo", metrics["chua_bao_cao"], "việc"),
+            ],
+        )
+    except Exception as e:
+        logger.warning("_render_giao_viec_form: fallback Excel thường — %s", e, exc_info=True)
+        excel_bytes = xuat_excel({"Giao việc": display})
+    st.download_button(
+        "📥 Tải Excel giao việc",
+        data=excel_bytes,
+        file_name=excel_ten_file("khnv_giao_viec_form"),
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        key=f"{KEY_PREFIX}gv_excel",
+        use_container_width=False,
+    )
+
+
 def render(tab: DeltaGenerator = None, **kwargs) -> None:
     ctx = TabContext(tab, **kwargs)
     role = normalize_role(str(kwargs.get("role", "user") or "user"))
@@ -768,17 +901,18 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
         df_kq = _doc_ket_qua_cached()
         df_nv_gsheet = _doc_nhiem_vu_gsheet_cached()
         df_nv_app = svc.doc_nhiem_vu_app()
+        df_gv = _doc_giao_viec_cached()
         loi = svc.lay_loi_doc_gsheet_gan_nhat()
         if loi:
             st.warning(f"Không đọc được Google Sheets: {loi}")
 
         if can_config:
-            t0, t1, t2, t3, t4, t5 = st.tabs(
-                ["Hướng dẫn", "Cài đặt", "Tổng quan", "Nhiệm vụ giao", "Kế hoạch đăng ký", "Kết quả báo cáo"]
+            t0, t1, t2, t3, t4, t5, t6 = st.tabs(
+                ["Hướng dẫn", "Cài đặt", "Tổng quan", "Giao việc (Form)", "Nhiệm vụ giao", "Kế hoạch đăng ký", "Kết quả báo cáo"]
             )
         else:
-            t0, t2, t3, t4, t5 = st.tabs(
-                ["Hướng dẫn", "Tổng quan", "Nhiệm vụ giao", "Kế hoạch đăng ký", "Kết quả báo cáo"]
+            t0, t2, t3, t4, t5, t6 = st.tabs(
+                ["Hướng dẫn", "Tổng quan", "Giao việc (Form)", "Nhiệm vụ giao", "Kế hoạch đăng ký", "Kết quả báo cáo"]
             )
             t1 = None
 
@@ -790,6 +924,8 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
         with t2:
             _render_tong_quan(df_kh, df_kq, svc.gop_nhiem_vu(df_nv_app, df_nv_gsheet), username)
         with t3:
+            _render_giao_viec_form(df_gv, df_kq, username)
+        with t4:
             _render_nhiem_vu_giao(
                 df_nv_app,
                 df_nv_gsheet,
@@ -797,7 +933,7 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                 username=username,
                 cfg=cfg,
             )
-        with t4:
-            _render_ke_hoach(df_kh, username)
         with t5:
+            _render_ke_hoach(df_kh, username)
+        with t6:
             _render_ket_qua(df_kq, username)

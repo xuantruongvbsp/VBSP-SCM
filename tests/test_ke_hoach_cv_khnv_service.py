@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date
+from pathlib import Path
 
 import pandas as pd
 import pytest
@@ -68,7 +69,11 @@ def test_doc_nhiem_vu_gsheet_chuan_hoa(monkeypatch):
             "gấp",
         ],
     ]
-    monkeypatch.setattr(svc, "_doc_raw_values_sheet", lambda tab, sheet_id=None: rows)
+    monkeypatch.setattr(
+        svc,
+        "_doc_raw_values_sheet",
+        lambda tab, sheet_id=None, *, optional=False: rows,
+    )
 
     df = svc.doc_nhiem_vu_gsheet()
 
@@ -162,3 +167,74 @@ def test_gop_nhiem_vu_uu_tien_app_va_tinh_kpi():
 
     kpi = svc.tinh_tong_hop_nhiem_vu(df)
     assert kpi == {"tong": 2, "hoan_thanh": 1, "qua_han": 1, "dang_mo": 1}
+
+
+# --- Regression H14: tab tuỳ chọn NhiemVuGiao chưa tạo không làm bẩn _LAST_ERROR ---
+
+
+def test_doc_raw_values_optional_missing_tab_khong_ban_last_error(monkeypatch):
+    """(a) optional=True + tab chưa tạo → trả [] và KHÔNG ghi _LAST_ERROR."""
+    monkeypatch.setattr(svc, "_ket_noi_gsheet", lambda: object())
+
+    def fake_request(client, method, url, params=None):
+        raise Exception("APIError: [400]: Unable to parse range: NhiemVuGiao")
+
+    monkeypatch.setattr(svc, "_gsheet_request_json", fake_request)
+    svc._LAST_ERROR = None
+
+    result = svc._doc_raw_values_sheet("NhiemVuGiao", "sheet-x", optional=True)
+
+    assert result == []
+    assert svc.lay_loi_doc_gsheet_gan_nhat() is None
+
+
+def test_kiem_tra_ket_noi_nv_chua_tao_khong_ban_last_error(monkeypatch):
+    """(b) kiem_tra_ket_noi() với NV parse-range → True và _LAST_ERROR là None."""
+    monkeypatch.setattr(svc, "_tim_credentials", lambda: Path("credentials.json"))
+    monkeypatch.setattr(svc, "_lay_sheet_id", lambda: "sheet-x")
+    monkeypatch.setattr(svc, "_ket_noi_gsheet", lambda: object())
+
+    # Capture _LAST_ERROR tại thời điểm đọc GiaoViec (ngay SAU khi NV fail, TRƯỚC
+    # khi GV đọc thành công tự xoá lỗi). Assertion đặt NGOÀI luồng service nên
+    # không phụ thuộc _la_loi_tab_khong_ton_tai() và không bị pytest rewriting
+    # làm nhiễu — chứng minh RIÊNG nhánh NV đã clear _LAST_ERROR.
+    observed: dict[str, object] = {}
+
+    def fake_request(client, method, url, params=None):
+        if svc.KE_HOACH_CV_KHNV_SHEET_NV in url:
+            raise Exception("APIError: [400]: Unable to parse range: NhiemVuGiao")
+        if svc.KE_HOACH_CV_KHNV_SHEET_GV in url:
+            observed["before_gv"] = svc.lay_loi_doc_gsheet_gan_nhat()
+        return {"values": [["header"], ["row1"]]}
+
+    monkeypatch.setattr(svc, "_gsheet_request_json", fake_request)
+    svc._LAST_ERROR = None
+
+    ok, msg = svc.kiem_tra_ket_noi()
+
+    assert ok is True
+    assert "chưa tạo (tuỳ chọn)" in msg
+    assert observed.get("before_gv") is None
+    assert svc.lay_loi_doc_gsheet_gan_nhat() is None
+
+
+@pytest.mark.parametrize("status", ["401", "403", "500"])
+def test_kiem_tra_ket_noi_nv_loi_auth_mang_van_fail(monkeypatch, status):
+    """(c) NV lỗi auth/mạng (401/403/500) → kiem_tra_ket_noi vẫn thất bại đúng."""
+    monkeypatch.setattr(svc.time, "sleep", lambda s: None)
+    monkeypatch.setattr(svc, "_tim_credentials", lambda: Path("credentials.json"))
+    monkeypatch.setattr(svc, "_lay_sheet_id", lambda: "sheet-x")
+    monkeypatch.setattr(svc, "_ket_noi_gsheet", lambda: object())
+
+    def fake_request(client, method, url, params=None):
+        if svc.KE_HOACH_CV_KHNV_SHEET_NV in url:
+            raise Exception(f"APIError: [{status}]: permission/network error")
+        return {"values": [["header"], ["row1"]]}
+
+    monkeypatch.setattr(svc, "_gsheet_request_json", fake_request)
+    svc._LAST_ERROR = None
+
+    ok, msg = svc.kiem_tra_ket_noi()
+
+    assert ok is False
+    assert status in msg

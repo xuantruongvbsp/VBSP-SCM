@@ -8,10 +8,10 @@
 
 | | Số lượng |
 |---|---|
-| File test | 45 |
-| Test cases (ước tính) | ~826 |
-| Modules có test | 28/~60 |
-| 🔴 Modules chưa có test | ~32 |
+| File test | 46 |
+| Test cases (ước tính) | ~844 |
+| Modules có test | 30/~60 |
+| 🔴 Modules chưa có test | ~30 |
 
 ---
 
@@ -59,6 +59,7 @@
 | `services/telegram_schedule_service.py` | `test_telegram_schedule_service.py` | 14 | 🟢 Khá | Validate rule, daily/weekly due slot, chống gửi trùng, retry cooldown, toggle, legacy ownership, chạy thử, heartbeat và baseline full→delta reset theo ngày |
 | `services/telegram_delta.py` | `test_telegram_jobs_delta.py` | 5 | 🟢 Khá | So sánh PGD nộp báo cáo, tiến độ nhập liệu, khoản đến hạn mới/mất và dư nợ thay đổi với snapshot đầu ngày; không đổi thì trả rỗng |
 | `services/report_submission_service.py` | `test_report_submission_service.py` | 16 | 🟢 Khá | Alias tên Form, nghĩa vụ theo deadline, thiếu file, lưu trữ/khôi phục và chặn Telegram nhắc báo cáo đã lưu trữ |
+| `tabs/tab_theo_doi_nhap`, `tabs/tab_theo_doi_khao_sat.py` | `test_tab_theo_doi_nhap_builtin_visibility.py` | 18 | 🟢 Khá | Default visibility, audit, quyền admin, lọc sheet, identity dropdown và đồng bộ widget state |
 
 ---
 

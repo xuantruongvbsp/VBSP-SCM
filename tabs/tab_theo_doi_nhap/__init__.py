@@ -27,12 +27,40 @@ from .data import (
 from .constants import BUILTIN_MODULES
 from .ui_overview import render_tong_quan
 from .ui_detail import render_chi_tiet
-from .ui_settings import render_cai_dat
+from .ui_settings import render_cai_dat, render_quan_ly_danh_sach
 from .ui_guide import render_huong_dan
 from .ui_dieu_chinh import render_dieu_chinh_tang_truong
 from .ui_trang_thai_chot import render_trang_thai_chot
 
 logger = get_logger(__name__)
+
+_SHEET_OPTIONS_STATE_KEY = "_ttdn_sheet_option_ids"
+
+
+def _selection_needs_reset(
+    selected: object,
+    previous_option_ids: object,
+    current_option_ids: tuple[str, ...],
+) -> bool:
+    """True khi state dropdown không còn khớp danh sách lựa chọn hiện tại."""
+    if previous_option_ids != current_option_ids:
+        return True
+    return (
+        not isinstance(selected, int)
+        or selected < 0
+        or selected >= len(current_option_ids)
+    )
+
+
+def _visible_sheet_entries(
+    ds_sheet: list[dict],
+) -> list[tuple[int, dict]]:
+    """Giữ index gốc khi lọc các sheet đang bật."""
+    return [
+        (index, cfg)
+        for index, cfg in enumerate(ds_sheet)
+        if cfg.get("enabled", True)
+    ]
 
 
 def _deadline_badge(cfg: dict) -> str:
@@ -86,13 +114,28 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
         vis = doc_builtin_visibility()
         visible_builtins = [m for m in BUILTIN_MODULES if vis.get(m["id"], True)]
         n_builtins = len(visible_builtins)
+        visible_sheets = _visible_sheet_entries(ds_sheet)
 
         sheet_labels = [
-            (cfg.get("ten_hien_thi") or cfg.get("sheet_tab", f"Sheet {i+1}"))
+            (
+                cfg.get("ten_hien_thi")
+                or cfg.get("sheet_tab", f"Sheet {original_index + 1}")
+            )
             + _deadline_badge(cfg)
-            for i, cfg in enumerate(ds_sheet)
+            for original_index, cfg in visible_sheets
         ]
         all_labels = [m["label"] for m in visible_builtins] + sheet_labels
+        current_option_ids = tuple(
+            [f"builtin:{m['id']}" for m in visible_builtins]
+            + [
+                (
+                    f"sheet:{original_index}:"
+                    f"{cfg.get('sheet_id', '')}:"
+                    f"{cfg.get('sheet_tab', '')}"
+                )
+                for original_index, cfg in visible_sheets
+            ]
+        )
 
         if not all_labels:
             st.info(
@@ -100,19 +143,29 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                 "Bật lại module tích hợp hoặc thêm sheet theo dõi trong Cài đặt."
             )
             if can_config:
-                with st.expander("⚙️ Cài đặt sheet theo dõi nhập liệu", expanded=True):
+                render_quan_ly_danh_sach(ds_sheet, username, role_n)
+                with st.expander(
+                    "⚙️ Cài đặt sheet theo dõi nhập liệu",
+                    expanded=True,
+                ):
                     render_cai_dat(ds_sheet, username)
             return
 
         # Reset index nếu danh sách sheet thay đổi (vd: xóa sheet, ẩn module)
         _sel = st.session_state.get("ttdn_sheet_sel", 0)
-        if not isinstance(_sel, int) or _sel >= len(all_labels):
+        previous_option_ids = st.session_state.get(_SHEET_OPTIONS_STATE_KEY)
+        if _selection_needs_reset(
+            _sel,
+            previous_option_ids,
+            current_option_ids,
+        ):
             st.session_state["ttdn_sheet_sel"] = 0
+        st.session_state[_SHEET_OPTIONS_STATE_KEY] = current_option_ids
 
         col_sel, col_ref = st.columns([5, 1])
         with col_sel:
             idx = st.selectbox(
-                "📂 Chọn sheet theo dõi",
+                "📂 Chọn báo cáo để xem",
                 range(len(all_labels)),
                 format_func=lambda i: all_labels[i],
                 key="ttdn_sheet_sel",
@@ -126,6 +179,10 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                 doc_sheet.clear()
                 st.rerun()
 
+        if can_config:
+            st.divider()
+            render_quan_ly_danh_sach(ds_sheet, username, role_n)
+
         # ── Nhánh module tích hợp sẵn ────────────────────────────────────
         if idx < n_builtins:
             module_id = visible_builtins[idx]["id"]
@@ -138,10 +195,6 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
             elif module_id == "trang_thai_chot":
                 render_trang_thai_chot(username=username)
 
-            if can_config:
-                st.divider()
-                with st.expander("⚙️ Cài đặt sheet theo dõi nhập liệu", expanded=False):
-                    render_cai_dat(ds_sheet, username)
             return
 
         # ── Nhánh sheet thông thường (offset = số module tích hợp) ───────
@@ -161,10 +214,10 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
         sheet_id = ""
         sheet_tab = ""
 
-        if not ds_sheet:
+        if not visible_sheets:
             st.info("⚙️ Chưa có sheet nào. Vào tab **⚙️ Cài đặt** để thêm.")
         else:
-            cfg_sel = ds_sheet[idx - n_builtins]
+            _, cfg_sel = visible_sheets[idx - n_builtins]
             ten_sheet = all_labels[idx]
             ds_ct = cfg_sel.get("ds_chuong_trinh", [])
             deadline_str = cfg_sel.get("deadline", "")

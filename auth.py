@@ -932,6 +932,12 @@ def hien_thi_login():
     line-height: 1.55;
   }
   form[data-testid="stForm"] {
+    /* Form nằm NGOÀI .login-form-card nên phải tự định nghĩa biến,
+       nếu không var(--login-form-text) không resolve → chữ inherit màu
+       sáng (dark mode) trên nền input trắng => không nhìn thấy. */
+    --login-form-text: #0f172a;
+    --login-form-muted: #64748b;
+    --login-form-accent: #16a34a;
     background: rgba(255,255,255,0.98) !important;
     color: var(--login-form-text) !important;
     border-radius: 22px;

@@ -213,6 +213,25 @@
 
 ## B. Streamlit UI
 
+### B47 — Ô đăng nhập (tài khoản / mật khẩu) bị trắng, không thấy chữ
+| | |
+|---|---|
+| **File** | `auth.py` (khối CSS login ~dòng 934) |
+| **Dấu hiệu** | Nhãn "Tên đăng nhập"/"Mật khẩu" và chữ gõ vào ô không hiện (trắng trên nền trắng) ở màn hình đăng nhập khi app ở dark mode |
+| **Nguyên nhân** | Biến CSS `--login-form-text` chỉ định nghĩa trong `.login-form-card`, nhưng `st.form("login")` nằm NGOÀI div đó (header đóng div trước form). Nên `color: var(--login-form-text)` trong `form`/`input`/`label` không resolve → rớt về màu inherit (sáng trong dark mode) trên nền input `#f8fafc` trắng |
+| **Fix** | Định nghĩa lại `--login-form-text/muted/accent` ngay trên `form[data-testid="stForm"]` (form đăng nhập luôn là bề mặt sáng cố định) để var resolve đúng trong form và các input/label con |
+| **Ngày fix** | 2026-07-26 |
+
+### B46 — Theo dõi nhập lệch quyền và stale state khi ẩn module tích hợp
+| | |
+|---|---|
+| **File** | `tabs/tab_theo_doi_nhap/__init__.py`, `ui_settings.py`; `tabs/tab_theo_doi_khao_sat.py` |
+| **Dấu hiệu** | Manager vẫn thấy nút 🗑; checkbox Khảo sát có thể hiện bật lại sau khi bỏ theo dõi; ẩn module đứng trước có thể làm dropdown chuyển sang sheet khác dù index vẫn hợp lệ |
+| **Nguyên nhân** | Quyền dùng chung `can_config` gồm manager; Streamlit giữ widget state theo key và ưu tiên state cũ hơn `value=`; dropdown chỉ kiểm tra type/range mà không theo dõi identity danh sách options |
+| **Fix** | Dùng `la_admin_cn()` cho quyền bỏ theo dõi; lưu signature visibility để đồng bộ widget khi KV đổi; lưu tuple option ID và reset dropdown khi tuple thay đổi |
+| **Test** | `tests/test_tab_theo_doi_nhap_builtin_visibility.py` — 18 cases cho quyền, default/audit, lọc sheet, visibility state và selection identity |
+| **Ngày fix** | 2026-07-26 |
+
 ### B45 — Theo dõi nhập lỗi stale `ttdn_sheet_sel` kiểu chuỗi
 | | |
 |---|---|

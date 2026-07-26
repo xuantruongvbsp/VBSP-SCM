@@ -1,5 +1,21 @@
 # CHANGELOG
 
+## [2026-07-26] — Fix ô đăng nhập bị trắng (chữ/label không thấy)
+- `auth.py` dòng ~934 — định nghĩa lại `--login-form-text/muted/accent` trên `form[data-testid="stForm"]` vì form nằm ngoài `.login-form-card` nên var không resolve, chữ inherit màu sáng trên nền input trắng
+
+## [2026-07-26] — Thống nhất UX "Quản lý danh sách theo dõi" (panel tập trung)
+- `tabs/tab_theo_doi_nhap/ui_settings.py` dòng ~404 — panel `render_quan_ly_danh_sach` nhận `role`, phân quyền `disabled`: cột hệ thống chỉ admin CN tắt được (qua `_can_untrack_builtin`), cột sheet theo quyền cấu hình; đổi tiêu đề cấu hình chi tiết
+- `tabs/tab_theo_doi_nhap/__init__.py` dòng ~145,167,183 — dropdown đổi tên "📂 Chọn báo cáo để xem"; truyền `role_n` vào panel quản lý
+- `tabs/tab_theo_doi_khao_sat.py` — bỏ nút 🗑 bỏ theo dõi rải rác (quản lý tập trung ở panel), dọn import/ biến thừa; giữ `_can_untrack_builtin` làm nguồn phân quyền chung
+
+## [2026-07-26] — Hoàn thiện bỏ theo dõi module tích hợp
+- `tabs/tab_theo_doi_nhap/__init__.py` dòng ~38, ~112 — lọc sheet theo `enabled`, theo dõi identity danh sách dropdown và reset lựa chọn khi module/sheet thay đổi, kể cả index cũ vẫn còn trong range
+- `tabs/tab_theo_doi_nhap/ui_settings.py` dòng ~38, ~405 — đồng bộ widget state visibility với cấu hình KV khi module bị ẩn từ luồng khác, không ghi đè thay đổi checkbox chưa lưu
+- `tabs/tab_theo_doi_khao_sat.py` dòng ~273 — giới hạn nút bỏ theo dõi cho admin Chi nhánh qua `la_admin_cn()`
+- `tests/test_tab_theo_doi_nhap_builtin_visibility.py` — thêm 18 regression tests cho default visibility, audit, quyền admin, lọc sheet, identity dropdown và đồng bộ session state
+- `TEST_COVERAGE.md` — cập nhật bản đồ kiểm thử cho module Theo dõi nhập liệu
+- `BUGMAP.md` — thêm mục B46 cho nhóm lỗi quyền và stale state khi ẩn module tích hợp
+
 ## [2026-07-25] — Fix stale session_state dropdown Theo dõi nhập
 - `tabs/tab_theo_doi_nhap/__init__.py` dòng ~108 — reset `ttdn_sheet_sel` về `0` nếu session state cũ không phải `int`, tránh `TypeError` khi so sánh với số lượng option
 - `BUGMAP.md` — thêm mục B45 cho lỗi stale `selectbox` state kiểu chuỗi trong tab Theo dõi nhập liệu

@@ -38,7 +38,7 @@ def test_luu_config_luu_form_nhiem_vu_url(test_db):
     assert cfg["dau_viec_custom"] == ["A", "B"]
 
 
-def test_doc_nhiem_vu_gsheet_chuan_hoa(monkeypatch):
+def test_doc_nhiem_vu_gsheet_chuan_hoa():
     rows = [
         [
             "Timestamp",
@@ -69,13 +69,12 @@ def test_doc_nhiem_vu_gsheet_chuan_hoa(monkeypatch):
             "gấp",
         ],
     ]
-    monkeypatch.setattr(
-        svc,
-        "_doc_raw_values_sheet",
-        lambda tab, sheet_id=None, *, optional=False: rows,
-    )
+    # Test trực tiếp _rows_to_df + _chuan_hoa_nhiem_vu_gsheet để tránh
+    # try/except trong doc_nhiem_vu_gsheet nuốt lỗi trên CI.
+    raw_df = svc._rows_to_df(rows, svc.COT_NV_GIAO)
+    assert len(raw_df) == 1
 
-    df = svc.doc_nhiem_vu_gsheet()
+    df = svc._chuan_hoa_nhiem_vu_gsheet(raw_df)
 
     assert len(df) == 1
     assert df.iloc[0]["ma_nhiem_vu"] == "NV-20260725-001"

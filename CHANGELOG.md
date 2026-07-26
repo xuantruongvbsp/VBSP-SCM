@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## [2026-07-26] — Fix 3 test failures trên CI Linux
+- `tests/test_launcher_batch.py` — thêm `@pytest.mark.skipif(sys.platform != "win32")` cho 2 test Windows-only (cmd.exe self-test, CRLF check)
+- `tests/test_ke_hoach_cv_khnv_service.py` — `test_doc_nhiem_vu_gsheet_chuan_hoa` gọi trực tiếp `_rows_to_df` + `_chuan_hoa_nhiem_vu_gsheet` thay vì qua `doc_nhiem_vu_gsheet()` (try/except nuốt lỗi trên CI)
+
 ## [2026-07-26] — Củng cố regression test H14: chứng minh riêng nhánh NV clear _LAST_ERROR
 - `tests/test_ke_hoach_cv_khnv_service.py` — `test_kiem_tra_ket_noi_nv_chua_tao_khong_ban_last_error`: capture `_LAST_ERROR` vào `observed["before_gv"]` tại thời điểm đọc GiaoViec (ngay sau NV fail, trước khi GV thành công tự xoá lỗi), rồi assert `observed["before_gv"] is None` SAU khi `kiem_tra_ket_noi()` return. Assertion nằm ngoài luồng service nên không phụ thuộc `_la_loi_tab_khong_ton_tai()` và không bị pytest assertion rewriting làm nhiễu (bẫy: assert trần đính kèm chuỗi parse-range khiến classifier nhận diện nhầm thành "tab chưa tạo"). Đã mutation-check: tắt dòng clear NV → test fail; khôi phục → 10 passed
 

@@ -2,7 +2,10 @@
 from __future__ import annotations
 
 import subprocess
+import sys
 from pathlib import Path
+
+import pytest
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -63,6 +66,7 @@ def test_launcher_keeps_project_runtime_contract() -> None:
     assert "start powershell" not in content.lower()
 
 
+@pytest.mark.skipif(sys.platform != "win32", reason="cmd.exe only available on Windows")
 def test_launcher_self_test_runs_without_starting_app() -> None:
     result = subprocess.run(
         [
@@ -84,6 +88,7 @@ def test_launcher_self_test_runs_without_starting_app() -> None:
     assert "LAUNCHER SELF-TEST OK" in result.stdout
 
 
+@pytest.mark.skipif(sys.platform != "win32", reason="CRLF guarantee only relevant on Windows")
 def test_batch_files_stay_ascii_crlf_for_cmd_compatibility() -> None:
     for path in (MAIN_LAUNCHER, COMPAT_LAUNCHER):
         raw = path.read_bytes()

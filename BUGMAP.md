@@ -2957,6 +2957,18 @@ def _to_int(val, default=0):
 
 ---
 
+### J67 — Test fail trên CI Linux: cmd.exe, CRLF, và try/except nuốt lỗi
+| | |
+|---|---|
+| **File** | `tests/test_launcher_batch.py`, `tests/test_ke_hoach_cv_khnv_service.py` |
+| **Dấu hiệu** | CI Linux: `FileNotFoundError: 'cmd.exe'`; `assert b'\n' not in ...` (CRLF); `assert 0 == 1` (empty DataFrame) |
+| **Nguyên nhân** | 2 test launcher gọi `cmd.exe` và kiểm tra CRLF — chỉ đúng trên Windows. Test `doc_nhiem_vu_gsheet_chuan_hoa` mock `_doc_raw_values_sheet` nhưng `doc_nhiem_vu_gsheet()` có try/except nuốt lỗi → trả DataFrame rỗng trên CI |
+| **Fix** | Thêm `@pytest.mark.skipif(sys.platform != "win32")` cho 2 test launcher. Test GSheet gọi trực tiếp `_rows_to_df()` + `_chuan_hoa_nhiem_vu_gsheet()` để lỗi không bị nuốt |
+| **Test** | `venv\Scripts\python.exe -m pytest tests/test_launcher_batch.py tests/test_ke_hoach_cv_khnv_service.py -q` |
+| **Ngày fix** | 2026-07-26 |
+
+---
+
 ### H13 — Tab Tiến độ nộp BC thiếu import helper cảnh báo lệch tên
 | | |
 |---|---|

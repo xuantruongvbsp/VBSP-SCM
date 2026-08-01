@@ -52,6 +52,7 @@ from config import (
     PGD_DATA_DIR,
 )
 from tabs.base_tab import TabContext
+from utils import lazy_tabs
 
 
 # ── Hằng số nội bộ ─────────────────────────────────────────────────────────
@@ -1013,38 +1014,33 @@ def render(tab=None, **kwargs) -> None:
 
         # ── Xác định sub-tabs theo role ──────────────────────────────────
         if la_cn:
-            tab_labels = [
-                "📂 Tệp nguồn",
-                "🔗 Merge & Cache",
-                "📸 Snapshot",
-                "👥 Người dùng",
-                "💾 Hệ thống",
-                "📋 Audit Log",
-            ]
-            tabs = st.tabs(tab_labels)
-            with tabs[0]:
-                _render_tep_nguon(la_cn=True, pgd_user=None)
-            with tabs[1]:
-                _render_merge_cache(la_cn=True)
-            with tabs[2]:
-                _render_snapshot()
-            with tabs[3]:
-                _render_nguoi_dung()
-            with tabs[4]:
-                _render_he_thong(la_cn=la_cn, username=username)
-            with tabs[5]:
-                _render_audit(la_cn=True, username=username)
+            lazy_tabs(
+                [
+                    "📂 Tệp nguồn",
+                    "🔗 Merge & Cache",
+                    "📸 Snapshot",
+                    "👥 Người dùng",
+                    "💾 Hệ thống",
+                    "📋 Audit Log",
+                ],
+                [
+                    lambda c: _render_tep_nguon(la_cn=True, pgd_user=None),
+                    lambda c: _render_merge_cache(la_cn=True),
+                    lambda c: _render_snapshot(),
+                    lambda c: _render_nguoi_dung(),
+                    lambda c: _render_he_thong(la_cn=la_cn, username=username),
+                    lambda c: _render_audit(la_cn=True, username=username),
+                ],
+                key="trang_thai_nguon_cn",
+            )
         else:
             # PGD chỉ thấy tệp nguồn của mình + audit cá nhân
-            tab_labels = [
-                "📂 Tệp nguồn",
-                "🔗 Merge",
-                "📋 Audit Log",
-            ]
-            tabs = st.tabs(tab_labels)
-            with tabs[0]:
-                _render_tep_nguon(la_cn=False, pgd_user=pgd_user)
-            with tabs[1]:
-                _render_merge_cache(la_cn=False)
-            with tabs[2]:
-                _render_audit(la_cn=False, username=username)
+            lazy_tabs(
+                ["📂 Tệp nguồn", "🔗 Merge", "📋 Audit Log"],
+                [
+                    lambda c: _render_tep_nguon(la_cn=False, pgd_user=pgd_user),
+                    lambda c: _render_merge_cache(la_cn=False),
+                    lambda c: _render_audit(la_cn=False, username=username),
+                ],
+                key="trang_thai_nguon_pgd",
+            )

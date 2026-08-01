@@ -21,6 +21,7 @@ import streamlit as st
 
 from auth import la_phan_he_cn, normalize_role
 from tabs.base_tab import TabContext
+from utils import lazy_tabs
 
 from . import _status_board, _merge_panel, _baseline, _delete
 from ._upload_don_vi import render_upload_don_vi, render_import_hang_loat
@@ -57,18 +58,7 @@ def render(tab=None, **kwargs) -> None:
             "💡 Upload file Điện báo thực hiện tại tab **📡 Điện Báo**, không phải tab này."
         )
 
-        # ── 6 sub-tabs ────────────────────────────────────────────────────────
-        tab_tq, tab_dv, tab_hl, tab_cn, tab_bl, tab_xoa = st.tabs([
-            "📊 Tổng quan",
-            "📤 Upload đơn vị",
-            "📦 Import hàng loạt",
-            "🏢 Toàn Chi nhánh",
-            "📅 Mốc 31/12",
-            "🗑️ Xóa dữ liệu",
-        ])
-
-        # ── Tab 1: Tổng quan & Merge ──────────────────────────────────────────
-        with tab_tq:
+        def _render_tong_quan(_tab=None) -> None:
             col_tt, col_rf = st.columns([5, 1])
             with col_tt:
                 st.markdown("#### 📋 Trạng thái Upload — 22 Đơn vị")
@@ -85,8 +75,7 @@ def render(tab=None, **kwargs) -> None:
             st.markdown("#### 🔄 Merge & Rebuild Cache")
             _merge_panel.render(username)
 
-        # ── Tab 2: Upload đơn vị ─────────────────────────────────────────────
-        with tab_dv:
+        def _render_upload_don_vi(_tab=None) -> None:
             st.markdown("#### 📤 Upload file cho từng đơn vị")
             st.caption(
                 "Upload 1–4 file cho một đơn vị. "
@@ -95,8 +84,7 @@ def render(tab=None, **kwargs) -> None:
             )
             render_upload_don_vi(username)
 
-        # ── Tab 3: Import hàng loạt ──────────────────────────────────────────
-        with tab_hl:
+        def _render_import_hang_loat(_tab=None) -> None:
             st.markdown("#### 📦 Import hàng loạt")
             st.caption(
                 "Chọn nhiều file cùng lúc — hệ thống tự nhận diện loại và PGD. "
@@ -104,26 +92,41 @@ def render(tab=None, **kwargs) -> None:
             )
             render_import_hang_loat(role, username)
 
-        # ── Tab 4: Toàn Chi nhánh ────────────────────────────────────────────
-        with tab_cn:
+        def _render_toan_chi_nhanh(_tab=None) -> None:
             st.markdown("#### 🏢 Upload dữ liệu Toàn Chi nhánh")
-            sub_cdto, sub_nq11, sub_gqvl = st.tabs([
-                "🏆 CDTOTKVV toàn CN",
-                "📑 Danh sách mã KU NQ11",
-                "📋 GQVL toàn CN",
-            ])
-            with sub_cdto:
-                render_cdto_toan_cn(username)
-            with sub_nq11:
-                render_nq11_toan_cn(username)
-            with sub_gqvl:
-                render_gqvl_toan_cn(username, df_full)
+            lazy_tabs(
+                ["🏆 CDTOTKVV toàn CN", "📑 Danh sách mã KU NQ11", "📋 GQVL toàn CN"],
+                [
+                    lambda c: render_cdto_toan_cn(username),
+                    lambda c: render_nq11_toan_cn(username),
+                    lambda c: render_gqvl_toan_cn(username, df_full),
+                ],
+                key="khnv_upload_toan_cn",
+            )
 
-        # ── Tab 5: Mốc 31/12 ─────────────────────────────────────────────────
-        with tab_bl:
+        def _render_baseline(_tab=None) -> None:
             _baseline.render(username)
 
-        # ── Tab 6: Xóa dữ liệu ──────────────────────────────────────────────
-        with tab_xoa:
+        def _render_xoa_du_lieu(_tab=None) -> None:
             st.markdown("#### 🗑️ Xóa dữ liệu PGD")
             _delete.render(role=role, username=username)
+
+        lazy_tabs(
+            [
+                "📊 Tổng quan",
+                "📤 Upload đơn vị",
+                "📦 Import hàng loạt",
+                "🏢 Toàn Chi nhánh",
+                "📅 Mốc 31/12",
+                "🗑️ Xóa dữ liệu",
+            ],
+            [
+                _render_tong_quan,
+                _render_upload_don_vi,
+                _render_import_hang_loat,
+                _render_toan_chi_nhanh,
+                _render_baseline,
+                _render_xoa_du_lieu,
+            ],
+            key="khnv_upload",
+        )

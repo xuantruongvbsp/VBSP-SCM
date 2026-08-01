@@ -52,6 +52,7 @@ from tabs.tab_khtd import (
     _fmt_vn_signed,
     _iter_khtd_cn_group_rows,
     _nv_int_tu_ma_key,
+    _quet_ct_co_du_no,
     _tinh_thuc_hien_khtd_cn,
     _tinh_thuc_hien_theo_ct,
 )
@@ -910,7 +911,7 @@ def xuat_to_trinh_bgd_word(username: str = "unknown") -> bytes:
     ngay_sl = ""
     du_no_pgd: dict[str, float] = {}
 
-    if CACHE_HSTD.exists():
+    if os.path.exists(CACHE_HSTD):
         try:
             df_h = pd.read_parquet(CACHE_HSTD)
             if not df_h.empty:

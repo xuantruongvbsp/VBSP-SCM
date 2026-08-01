@@ -7,6 +7,7 @@ import os
 import time
 import warnings
 from datetime import datetime, date
+from pathlib import Path
 import streamlit as st
 
 # Khởi tạo logging ngay khi app.py được import — đảm bảo logs/app.log tồn tại
@@ -33,7 +34,7 @@ import duckdb
 import pandas as pd
 
 from config import (
-    COT_DU_NO_KHOANH,
+    COT_DU_NO_KHOANH, COT_LAI_TON, COT_LAI_THANG, COT_LAI_TON_QH,
     FILE_PATH, FILE_PATH_NQ11, FILE_PATH_DB, FILE_PATH_DB_PREV,
     FILE_PATH_SK_GQVL, CACHE_SK_GQVL,
     TEN_FILE, TEN_FILE_NQ11, TEN_FILE_DB, TEN_FILE_DB_PREV,
@@ -68,6 +69,28 @@ from security import (
 )
 
 
+def _ghi_runtime_pid_marker() -> None:
+    """Ghi PID để launcher nhận đúng VBSP-SCM khi Windows ẩn process metadata."""
+    try:
+        from streamlit.runtime.scriptrunner import get_script_run_ctx
+
+        if get_script_run_ctx(suppress_warning=True) is None:
+            return
+
+        root = Path(__file__).resolve().parent
+        marker = root / "tmp" / "vbsp_streamlit.pid"
+        marker.parent.mkdir(parents=True, exist_ok=True)
+        marker.write_text(
+            f"PID={os.getpid()}\nROOT={root}\nAPP={Path(__file__).resolve()}\n",
+            encoding="ascii",
+        )
+    except Exception:
+        logging.getLogger(__name__).error(
+            "Khong ghi duoc runtime PID marker cho launcher",
+            exc_info=True,
+        )
+
+
 def _chuan_hoa_pgd_user(ten_pgd: str | None) -> str | None:
     if not ten_pgd:
         return None
@@ -87,7 +110,19 @@ def _toi_uu_dtype(df: pd.DataFrame) -> pd.DataFrame:
     Keep float64 for large monetary columns (>1e9) to avoid overflow.
     No category conversion for object columns: nunique() on 163 cols x 349K rows
     costs ~6s and causes "category type does not support sum operations" bugs.
+
+    OPTIMIZE 2026-08-01: pre-compute numeric columns cho các cột tài chính
+    cốt lõi (dư nợ, quá hạn, lãi…) để tránh mỗi tab gọi pd.to_numeric() lặp lại.
     """
+    # ── KEY FINANCIAL COLUMNS: pd.to_numeric() một lần, dùng cho tất cả tabs ─
+    _key_num_cols = [
+        COT_TONG_DU_NO, COT_DU_NO_QH, COT_DU_NO_TH, COT_DU_NO_KHOANH,
+        COT_LAI_TON, COT_LAI_THANG, COT_LAI_TON_QH,
+    ]
+    for col in _key_num_cols:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+
     for col in df.select_dtypes(include="float64").columns:
         try:
             col_max = df[col].abs().max(skipna=True)
@@ -103,6 +138,13 @@ def _toi_uu_dtype(df: pd.DataFrame) -> pd.DataFrame:
             pass
 
     return df
+
+
+def _num0(series: pd.Series) -> pd.Series:
+    """Trả về Series số đã fill 0; fast path cho cột đã pre-compute numeric."""
+    if pd.api.types.is_numeric_dtype(series):
+        return series.fillna(0)
+    return pd.to_numeric(series, errors="coerce").fillna(0)
 
 
 @st.cache_resource(show_spinner=False, ttl=3600)
@@ -207,14 +249,14 @@ def _enrich_hstd(
         _tong_col = next((c for c in [COT_TONG_DU_NO, "Tổng dư nợ"] if c in df.columns), None)
         _qh_col   = next((c for c in [COT_DU_NO_QH,   "Dư nợ quá hạn"] if c in df.columns), None)
         if _tong_col:
-            df["__dn_nq11"] = pd.to_numeric(df[_tong_col], errors="coerce").fillna(0).where(df["__is_nq11"], 0)
+            df["__dn_nq11"] = _num0(df[_tong_col]).where(df["__is_nq11"], 0.0)
         elif COT_DU_NO_TH in df.columns and _qh_col:
             df["__dn_nq11"] = (
-                pd.to_numeric(df[COT_DU_NO_TH], errors="coerce").fillna(0)
-                + pd.to_numeric(df[_qh_col],    errors="coerce").fillna(0)
-            ).where(df["__is_nq11"], 0)
+                _num0(df[COT_DU_NO_TH])
+                + _num0(df[_qh_col])
+            ).where(df["__is_nq11"], 0.0)
         if _qh_col:
-            df["__qh_nq11"] = pd.to_numeric(df[_qh_col], errors="coerce").fillna(0).where(df["__is_nq11"], 0)
+            df["__qh_nq11"] = _num0(df[_qh_col]).where(df["__is_nq11"], 0.0)
 
     # ── GQVL ──
     # Dùng df[COT_SO_KU] thay vì _ku để tránh index mismatch sau NQ11 merge
@@ -255,7 +297,7 @@ def _loc_hstd_active(df: pd.DataFrame) -> pd.DataFrame:
     mask = pd.Series(False, index=df.index)
     for col in (COT_TONG_DU_NO, COT_DU_NO_QH, COT_DU_NO_KHOANH):
         if col in df.columns:
-            mask |= pd.to_numeric(df[col], errors="coerce").fillna(0) > 0
+            mask |= _num0(df[col]) > 0
 
     if bool(mask.all()):
         return df
@@ -967,6 +1009,8 @@ def render_workspace_picker() -> None:
 
 
 def main():
+    _ghi_runtime_pid_marker()
+
     # ── Dọn audit_log cũ — 1 lần/ngày ───────────────────────────────────────
     from datetime import date as _date
     _today = _date.today().isoformat()
@@ -1318,7 +1362,7 @@ def main():
                     if os.path.exists(path_hstd_pgd):
                         df_pgd = doc_hstd_pgd(pgd_user, ts_file(path_hstd_pgd))
                         if df_pgd is not None and not df_pgd.empty:
-                            df = df_pgd
+                            df = _toi_uu_dtype(df_pgd.copy())
                         else:
                             st.warning(f"⚠️ File HSTD của `{pgd_user}` rỗng.")
                     else:
@@ -1327,7 +1371,7 @@ def main():
                     # _pgd_op_ts đã được tính và cache bên ngoài block — dùng lại
                     df_op = doc_hstd_toan_cn_pgd(_pgd_op_ts)
                     if df_op is not None and not df_op.empty:
-                        df = df_op
+                        df = _toi_uu_dtype(df_op.copy())
                         _using_operation_upload = True
             # management/executive: df = active_only (cho tìm kiếm, tổng quan)
             # df_full = full (cho báo cáo KHNV, tabs cần tất cả hồ sơ)

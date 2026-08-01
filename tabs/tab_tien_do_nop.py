@@ -18,7 +18,7 @@ from tabs.tab_tien_do_nop_archive import render_archive
 from tabs.tab_tien_do_nop_list import render_submission_list
 from tabs.tab_tien_do_nop_manual import render_manual_override
 from tabs.tab_tien_do_nop_settings import render_settings
-from utils import xuat_excel
+from utils import lazy_tabs, xuat_excel
 
 # ── Import từ service lõi (single source of truth) ──
 from services.report_submission_service import (
@@ -523,34 +523,13 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
             ds_pgd_scope,
         )
 
-        # Tab hướng dẫn hiển thị cho tất cả users
-        if can_config:
-            # Thứ tự tab theo quy trình vận hành trong hướng dẫn:
-            # Bước 1: Cài đặt thời hạn → Bước 2: Tổng quan → Bước 4: Danh sách nộp
-            t0, t1, t2, t3, t4 = st.tabs([
-                "📖 Hướng dẫn PGD gửi BC về CN",
-                "⚙️ Cài đặt thời hạn",
-                "📊 Tổng quan",
-                "📋 Danh sách nộp",
-                "🗃️ Đã lưu trữ",
-            ])
-        else:
-            t0, t2, t3, t4 = st.tabs([
-                "📖 Hướng dẫn PGD gửi BC về CN",
-                "📊 Tổng quan",
-                "📋 Danh sách nộp",
-                "🗃️ Đã lưu trữ",
-            ])
-            t1 = None
-
-        with t0:
+        def _render_tab_huong_dan(_tab=None) -> None:
             _render_huong_dan_mockup()
 
-        if t1 is not None:
-            with t1:
-                render_settings(df_hoat_dong, deadline_cfg, username)
+        def _render_tab_settings(_tab=None) -> None:
+            render_settings(df_hoat_dong, deadline_cfg, username)
 
-        with t2:
+        def _render_tab_tong_quan(_tab=None) -> None:
             _render_tong_quan(
                 df_hoat_dong,
                 deadline_cfg,
@@ -561,7 +540,7 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                 bao_cao_tien_do,
             )
 
-        with t3:
+        def _render_tab_danh_sach(_tab=None) -> None:
             render_submission_list(
                 df_hoat_dong,
                 deadline_cfg,
@@ -570,5 +549,43 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                 bao_cao_tien_do,
             )
 
-        with t4:
+        def _render_tab_archive(_tab=None) -> None:
             render_archive(df, archive_cfg, username, can_config)
+
+        # Tab hướng dẫn hiển thị cho tất cả users
+        if can_config:
+            # Thứ tự tab theo quy trình vận hành trong hướng dẫn:
+            # Bước 1: Cài đặt thời hạn → Bước 2: Tổng quan → Bước 4: Danh sách nộp
+            lazy_tabs(
+                [
+                    "📖 Hướng dẫn PGD gửi BC về CN",
+                    "⚙️ Cài đặt thời hạn",
+                    "📊 Tổng quan",
+                    "📋 Danh sách nộp",
+                    "🗃️ Đã lưu trữ",
+                ],
+                [
+                    _render_tab_huong_dan,
+                    _render_tab_settings,
+                    _render_tab_tong_quan,
+                    _render_tab_danh_sach,
+                    _render_tab_archive,
+                ],
+                key="tien_do_nop",
+            )
+        else:
+            lazy_tabs(
+                [
+                    "📖 Hướng dẫn PGD gửi BC về CN",
+                    "📊 Tổng quan",
+                    "📋 Danh sách nộp",
+                    "🗃️ Đã lưu trữ",
+                ],
+                [
+                    _render_tab_huong_dan,
+                    _render_tab_tong_quan,
+                    _render_tab_danh_sach,
+                    _render_tab_archive,
+                ],
+                key="tien_do_nop_pgd",
+            )

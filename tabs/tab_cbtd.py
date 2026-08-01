@@ -25,13 +25,16 @@ from config import (
     COT_HINH_THUC_VAY, COT_MA_KH, COT_SO_KU, COT_TEN_THON, COT_TEN_XA,
     COT_TONG_DU_NO, COT_DU_NO_QH, DS_PGD, DON_VI_CHI_NHANH, lay_dgd_cho_pgd,
 )
-from auth import la_phan_he_cn, la_executive, normalize_role
+from auth import la_phan_he_cn, la_executive, la_quan_ly_cn, normalize_role
+from logger import get_logger
 from state_manager import SCMStateManager
 from utils import xuat_excel, hien_thi_dataframe_phan_trang, fmt_so
 from data.khtd import doc_cbtd, luu_cbtd, lay_ap_tu_dgd_list, gan_cbtd_vao_df
 
 if TYPE_CHECKING:
     from streamlit.delta_generator import DeltaGenerator
+
+logger = get_logger(__name__)
 
 DS_PGD_ALL = [DON_VI_CHI_NHANH] + DS_PGD
 
@@ -44,6 +47,7 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
     username = kwargs.get("username", "unknown")
     pgd_user = kwargs.get("pgd_user", "")  # PGD mode filter
     state = SCMStateManager()
+    _kp = f"pgd_{pgd_user.strip().lower().replace(' ', '_')}_" if pgd_user else "cn_"
 
     import streamlit as _st
     ctx = tab if tab is not None else _st.container()
@@ -166,7 +170,7 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                         "Trạng thái": loai,
                         "Cập nhật":  info.get("ngay_cap", ""),
                     })
-                hien_thi_dataframe_phan_trang(pd.DataFrame(rows), key="cbtd_ds")
+                hien_thi_dataframe_phan_trang(pd.DataFrame(rows), key=f"{_kp}cbtd_ds")
 
                 # ĐGD chưa có CBTD
                 tong_dgd_cfg = sum(
@@ -193,9 +197,9 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                 st.warning("Chưa có cấu hình ĐGD.")
             else:
                 pgd_opts = ["Tất cả"] + [p for p in dgd_map if dgd_map[p]]
-                loc_pgd = st.selectbox("Lọc theo PGD", pgd_opts, key="bd_pgd")
+                loc_pgd = st.selectbox("Lọc theo PGD", pgd_opts, key=f"{_kp}bd_pgd")
                 loc_tt  = st.selectbox("Tình trạng",
-                    ["Tất cả", "✅ Đã phân", "⚠️ Chưa phân"], key="bd_tt")
+                    ["Tất cả", "✅ Đã phân", "⚠️ Chưa phân"], key=f"{_kp}bd_tt")
 
                 rows_bd = []
                 for pgd_k, xa_block in dgd_map.items():
@@ -224,7 +228,7 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                     m1, m2 = st.columns(2)
                     m1.metric("Tổng ĐGD", len(df_bd))
                     m2.metric("Chưa phân CBTD", len(df_bd[df_bd["Tình trạng"]=="⚠️ Chưa phân"]))
-                    hien_thi_dataframe_phan_trang(df_bd, key="cbtd_bd_dgd", height=420)
+                    hien_thi_dataframe_phan_trang(df_bd, key=f"{_kp}cbtd_bd_dgd", height=420)
                 else:
                     st.info("Không có ĐGD nào phù hợp bộ lọc.")
 
@@ -240,7 +244,7 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                 }
                 chon = st.selectbox("Chọn CBTD", list(opts_xem.keys()),
                                     format_func=lambda k: opts_xem[k],
-                                    key="cbtd_chon_xem")
+                                    key=f"{_kp}cbtd_chon_xem")
                 info_xem = cbtd_data[chon]
                 pgd_xem  = info_xem.get("pgd", "")
                 ds_dgd_xem = info_xem.get("ds_dgd", [])
@@ -269,8 +273,8 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                     if COT_HINH_THUC_VAY in df_cb_xem.columns:
                         df_cb_xem = df_cb_xem[df_cb_xem[COT_HINH_THUC_VAY] != 1]
 
-                    tdn = df_cb_xem[COT_TONG_DU_NO].sum() if COT_TONG_DU_NO in df_cb_xem.columns else 0
-                    dqh = df_cb_xem[COT_DU_NO_QH].sum()   if COT_DU_NO_QH   in df_cb_xem.columns else 0
+                    tdn = pd.to_numeric(df_cb_xem[COT_TONG_DU_NO], errors="coerce").sum() if COT_TONG_DU_NO in df_cb_xem.columns else 0
+                    dqh = pd.to_numeric(df_cb_xem[COT_DU_NO_QH], errors="coerce").sum()   if COT_DU_NO_QH   in df_cb_xem.columns else 0
                     tlqh = (dqh/tdn*100) if tdn > 0 else 0
 
                     mx1, mx2, mx3, mx4 = st.columns(4)
@@ -292,7 +296,7 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                         th_ap["QH %"] = (th_ap["Dư_nợ_QH"]/th_ap["Tổng_dư_nợ"]*100).fillna(0).round(2)
                         hien_thi_dataframe_phan_trang(
                             th_ap[[COT_TEN_XA, COT_TEN_THON, "Số_KH", "Tổng dư nợ (tr.đ)", "Dư nợ QH (tr.đ)", "QH %"]],
-                            key="cbtd_ct_ap",
+                            key=f"{_kp}cbtd_ct_ap",
                         )
 
                 # ── Cross-link: Tổ TK&VV thuộc địa bàn CBTD ─────────────────
@@ -317,9 +321,10 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                         }
                         hien_thi_dataframe_phan_trang(
                             df_tos[col_hien].rename(columns=rename_tos),
-                            key="cbtd_ct_to_tkvv",
+                            key=f"{_kp}cbtd_ct_to_tkvv",
                         )
-                except Exception:
+                except Exception as e:
+                    logger.error("tab_cbtd: cross-link To TK&VV — %s", e, exc_info=True)
                     st.caption("Chưa có dữ liệu Tổ TK&VV.")
 
         st.divider()
@@ -327,12 +332,12 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
         # ════════════════════════════════════════════════════════════════════
         # CRUD (admin + manager CN)
         # ════════════════════════════════════════════════════════════════════
-        if not la_phan_he_cn(role) or la_executive(role):
-            st.caption("Chỉ Quản lý Chi nhánh mới được thêm/sửa/xóa CBTD.")
+        if not la_quan_ly_cn(role):
+            st.caption("Chỉ Quản lý Chi nhánh (admin/manager) mới được thêm/sửa/xóa CBTD.")
         else:
             che_do = st.radio("Thao tác",
                 ["➕ Thêm mới", "✏️ Chỉnh sửa", "🗑️ Xóa"],
-                horizontal=True, key="cbtd_mode")
+                horizontal=True, key=f"{_kp}cbtd_mode")
             st.divider()
 
             # ── THÊM MỚI ─────────────────────────────────────────────────────
@@ -341,11 +346,11 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                 c1, c2 = st.columns(2)
 
                 with c1:
-                    ma_new  = st.text_input("Mã CBTD *", placeholder="vd: CB01", key="cbtd_ma_new")
-                    ten_new = st.text_input("Họ và tên *", key="cbtd_ten_new")
-                    dt_new  = st.text_input("Số điện thoại", key="cbtd_dt_new")
-                    gc_new  = st.text_input("Ghi chú", key="cbtd_gc_new")
-                    pgd_new = st.selectbox("PGD trực thuộc *", DS_PGD_ALL, key="cbtd_pgd_new")
+                    ma_new  = st.text_input("Mã CBTD *", placeholder="vd: CB01", key=f"{_kp}cbtd_ma_new")
+                    ten_new = st.text_input("Họ và tên *", key=f"{_kp}cbtd_ten_new")
+                    dt_new  = st.text_input("Số điện thoại", key=f"{_kp}cbtd_dt_new")
+                    gc_new  = st.text_input("Ghi chú", key=f"{_kp}cbtd_gc_new")
+                    pgd_new = st.selectbox("PGD trực thuộc *", DS_PGD_ALL, key=f"{_kp}cbtd_pgd_new")
 
                 with c2:
                     dgd_opts_new = _ds_dgd_cua_pgd(pgd_new)
@@ -358,7 +363,7 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                             "ĐGD phụ trách *",
                             labels_new,
                             help="1 CBTD phụ trách 2–4 ĐGD trong cùng PGD",
-                            key="cbtd_dgd_new")
+                            key=f"{_kp}cbtd_dgd_new")
                         dgd_sel_new = [d for xa, d in dgd_opts_new
                                        if _label_dgd(xa, d) in sel_labels]
 
@@ -378,7 +383,7 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                         else:
                             st.caption("👆 Chọn ít nhất 1 ĐGD")
 
-                if st.button("✅ Thêm CBTD", type="primary", key="btn_them_cbtd"):
+                if st.button("✅ Thêm CBTD", type="primary", key=f"{_kp}btn_them_cbtd"):
                     err = []
                     if not ma_new.strip():   err.append("Thiếu Mã CBTD")
                     if not ten_new.strip():  err.append("Thiếu Họ tên")
@@ -405,6 +410,7 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                         db.ghi_audit(username, "luu_cbtd",
                                      f"Thêm {ma_key} — {ten_new.strip()} "
                                      f"({pgd_new}, {len(dgd_sel_new)} ĐGD)")
+                        st.cache_data.clear()
                         st.success(f"✅ Đã thêm **{ma_key}** — {ten_new.strip()}")
                         st.rerun()
 
@@ -420,20 +426,20 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                         format_func=lambda k: f"{k} — {cbtd_data[k]['ho_ten']} "
                                               f"/ {cbtd_data[k].get('pgd','?')} "
                                               f"({len(cbtd_data[k].get('ds_dgd',[]))} ĐGD)",
-                        key="cbtd_chon_sua")
+                        key=f"{_kp}cbtd_chon_sua")
                     info_cu = cbtd_data[chon_sua]
 
                     c1, c2 = st.columns(2)
                     with c1:
                         ten_sua = st.text_input("Họ và tên *",
-                            value=info_cu.get("ho_ten",""), key="cbtd_ten_sua")
+                            value=info_cu.get("ho_ten",""), key=f"{_kp}cbtd_ten_sua")
                         dt_sua  = st.text_input("Số điện thoại",
-                            value=info_cu.get("dien_thoai",""), key="cbtd_dt_sua")
+                            value=info_cu.get("dien_thoai",""), key=f"{_kp}cbtd_dt_sua")
                         gc_sua  = st.text_input("Ghi chú",
-                            value=info_cu.get("ghi_chu",""), key="cbtd_gc_sua")
+                            value=info_cu.get("ghi_chu",""), key=f"{_kp}cbtd_gc_sua")
                         pgd_idx = DS_PGD_ALL.index(info_cu["pgd"]) if info_cu.get("pgd") in DS_PGD_ALL else 0
                         pgd_sua = st.selectbox("PGD trực thuộc *",
-                            DS_PGD_ALL, index=pgd_idx, key="cbtd_pgd_sua")
+                            DS_PGD_ALL, index=pgd_idx, key=f"{_kp}cbtd_pgd_sua")
 
                     with c2:
                         dgd_opts_sua = _ds_dgd_cua_pgd(pgd_sua)
@@ -449,7 +455,7 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                                 "ĐGD phụ trách *",
                                 labels_sua,
                                 default=default_labels,
-                                key="cbtd_dgd_sua")
+                                key=f"{_kp}cbtd_dgd_sua")
                             dgd_sel_sua = [d for xa, d in dgd_opts_sua
                                            if _label_dgd(xa, d) in sel_labels_sua]
 
@@ -462,7 +468,7 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                                     tong_ap_sua = lay_ap_tu_dgd_list(pgd_sua, dgd_sel_sua, dgd_map)
                                     st.info(f"✅ {len(dgd_sel_sua)} ĐGD → {len(tong_ap_sua)} ấp/thôn")
 
-                    if st.button("💾 Lưu thay đổi", type="primary", key="btn_luu_sua"):
+                    if st.button("💾 Lưu thay đổi", type="primary", key=f"{_kp}btn_luu_sua"):
                         if not ten_sua.strip():
                             st.error("❌ Họ tên không được để trống")
                         elif not dgd_sel_sua:
@@ -494,6 +500,7 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                                     luu_cbtd(cbtd_data)
                                     db.ghi_audit(username, "luu_cbtd",
                                                  f"Sửa {chon_sua} — {pgd_sua}, {len(dgd_sel_sua)} ĐGD")
+                                    st.cache_data.clear()
                                     st.success(f"✅ Đã cập nhật **{chon_sua}**")
                                     st.rerun()
 
@@ -508,19 +515,20 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                         list(cbtd_data.keys()),
                         format_func=lambda k: f"{k} — {cbtd_data[k]['ho_ten']} "
                                               f"/ {cbtd_data[k].get('pgd','?')}",
-                        key="cbtd_chon_xoa")
+                        key=f"{_kp}cbtd_chon_xoa")
                     info_xoa = cbtd_data[chon_xoa]
                     st.warning(
                         f"⚠️ Sắp xóa: **{chon_xoa}** — {info_xoa['ho_ten']}\n\n"
                         f"PGD: {info_xoa.get('pgd','?')} | "
                         f"ĐGD: {', '.join(info_xoa.get('ds_dgd',[]))}"
                     )
-                    xn = st.checkbox("Xác nhận xóa", key="cbtd_xn_xoa")
+                    xn = st.checkbox("Xác nhận xóa", key=f"{_kp}cbtd_xn_xoa")
                     if st.button("🗑️ Xóa", type="primary",
-                                 disabled=not xn, key="btn_xoa_cbtd"):
+                                 disabled=not xn, key=f"{_kp}btn_xoa_cbtd"):
                         del cbtd_data[chon_xoa]
                         luu_cbtd(cbtd_data)
                         db.ghi_audit(username, "luu_cbtd", f"Xóa {chon_xoa}")
+                        st.cache_data.clear()
                         st.success(f"✅ Đã xóa **{chon_xoa}**")
                         st.rerun()
 
@@ -553,8 +561,8 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
             df_cb = df_joined[df_joined["CBTD"] == ma]
             if df_cb.empty:
                 continue
-            tdn = df_cb[COT_TONG_DU_NO].sum() if COT_TONG_DU_NO in df_cb.columns else 0
-            dqh = df_cb[COT_DU_NO_QH].sum()   if COT_DU_NO_QH   in df_cb.columns else 0
+            tdn = pd.to_numeric(df_cb[COT_TONG_DU_NO], errors="coerce").sum() if COT_TONG_DU_NO in df_cb.columns else 0
+            dqh = pd.to_numeric(df_cb[COT_DU_NO_QH], errors="coerce").sum()   if COT_DU_NO_QH   in df_cb.columns else 0
             rows_bc.append({
                 "Mã CBTD":       ma,
                 "Họ tên":        info["ho_ten"],
@@ -573,9 +581,9 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
             st.info("Không có dữ liệu dư nợ cho CBTD nào (kiểm tra lại tên thôn trong ĐGD).")
             return
 
-        hien_thi_dataframe_phan_trang(pd.DataFrame(rows_bc), key="cbtd_bc_tong_hop")
+        hien_thi_dataframe_phan_trang(pd.DataFrame(rows_bc), key=f"{_kp}cbtd_bc_tong_hop")
 
-        if st.button("📥 Xuất báo cáo CBTD", key="btn_xuat_cbtd"):
+        if st.button("📥 Xuất báo cáo CBTD", key=f"{_kp}btn_xuat_cbtd"):
             buf = BytesIO()
             with pd.ExcelWriter(buf, engine="openpyxl") as w:
                 pd.DataFrame(rows_bc).to_excel(w, index=False, sheet_name="Tổng hợp CBTD")
@@ -596,6 +604,6 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                 data=state.downloads.get_bytes("cbtd_excel"),
                 file_name=state.downloads.get_filename("cbtd_excel") or f"BC_CBTD_{datetime.today().strftime('%d%m%Y')}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                key="dl_cbtd",
+                key=f"{_kp}dl_cbtd",
             ):
                 state.downloads.clear("cbtd_excel")

@@ -367,6 +367,7 @@ HSTD_THU_NO_NAM_ALIASES = (
 
 DB_HT_CACHE   = str(CACHE_DIR / "dienbao_ht.xlsx")
 DB_PREV_CACHE = str(CACHE_DIR / "dienbao_prev.xlsx")
+DB_PREV_MONTH_CACHE = str(CACHE_DIR / "dienbao_prev_month.xlsx")
 
 FILE_KEHOACH  = str(BASE_DIR / "kehoach.json")
 FILE_CBTD     = str(BASE_DIR / "cbtd.json")

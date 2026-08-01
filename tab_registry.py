@@ -101,7 +101,7 @@ register(TabDef("tab_no_khoanh", "🔒 Quản lý Nợ Khoanh theo CV 368", "Ki�
 # ⚠️ "🏦 Nguồn vốn địa phương" là hàm nội bộ (_render_nguon_von_dia_phuong) — giữ trong workspace
 register(TabDef("tab_khtd", "📈 Kế hoạch tín dụng", "Kế hoạch Tín dụng", "cn", icon="file-text", extra_kwargs={"khtd_mode": "cn"}, order=1))
 register(TabDef("tab_khtd_giao_dc", "📋 Giao & ĐC KHTD", "Kế hoạch Tín dụng", "cn", icon="upload", order=2))
-register(TabDef("tab_candoi", "📡 Điện báo & KH vs TH", "Kế hoạch Tín dụng", "cn", icon="antenna", order=3))
+register(TabDef("tab_candoi", "📡 Điện báo Cân đối", "Kế hoạch Tín dụng", "cn", icon="antenna", order=3))
 register(TabDef("tab_khtd_xuat", "📤 Xuất báo cáo KHTD", "Kế hoạch Tín dụng", "cn", icon="file-export", render_fn="render_xuat_baocao", order=4))
 
 # ── Ủy Thác ──────────────────────────────────────────────────────────────────

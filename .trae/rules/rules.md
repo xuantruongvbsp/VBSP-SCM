@@ -209,8 +209,41 @@ if "Ten_ct" not in cols:
 df = duckdb.query(f"SELECT ... FROM '{CACHE_HSTD}'").df()
 ```
 
-### 6.17 Tóm tắt sau mỗi task
-Kết thúc mỗi task bằng tóm tắt ngắn để user gửi Codex kiểm tra. Xem format đầy đủ trong `SIGNATURES.md`.
+### 6.17 Tóm tắt sau mỗi task — BẮT BUỘC
+Kết thúc **MỌI** task (fix bug, thêm feature, refactor) bằng khối tóm tắt theo template dưới đây để user gửi Codex kiểm tra. **Không được bỏ qua.**
+
+````markdown
+## CODEX_REVIEW — {tên task ngắn}
+
+### Thay đổi
+| File | Dòng | Hàm/Khu vực | Mô tả |
+|---|---|---|---|
+| `path/file.py` | ~NNN | `ten_ham()` | Mô tả thay đổi |
+
+### Lý do
+{1-2 câu: bug gì / yêu cầu gì}
+
+### Cần kiểm tra
+- [ ] {Logic cụ thể cần review, vd: "closure trong lambda có capture đúng biến không?"}
+- [ ] {Edge case, vd: "khi ds_sheet rỗng thì selectbox có crash không?"}
+- [ ] {Scope, vd: "biến _la_kh định nghĩa trước block if _cd_sub==0 không?"}
+
+### Không cần kiểm tra
+- {Những phần không thay đổi, vd: "doc_dienbao() không sửa"}
+
+### Trạng thái
+- Compile: ✅/❌
+- CHANGELOG: ✅/❌
+- BUGMAP: ✅/❌ (nếu fix bug)
+````
+
+**Quy tắc:**
+- **MỖI lệnh sửa = 1 khối CODEX_REVIEW RIÊNG (scoped theo đúng phần vừa sửa).** KHÔNG gom nhiều lệnh sửa thành 1 khối tổng hợp toàn phiên. User ra lệnh chỉnh sửa nào → sửa xong → xuất ngay 1 prompt CODEX_REVIEW cho riêng phần đó để Codex kiểm tra/sửa/hoàn chỉnh.
+- **Ngoại lệ — Codex KHÔNG xuất CODEX_REVIEW.** Quy tắc này chỉ áp dụng cho agent viết code (Trae/Cline/Cursor...) để chuyển cho Codex review. Khi **Codex** là agent trực tiếp sửa code thì không cần xuất prompt cho chính nó.
+- Mỗi file thay đổi = 1 dòng trong bảng
+- "Cần kiểm tra" phải cụ thể — không ghi chung chung "review logic"
+- Ghi rõ edge case và biến nào dễ lỗi
+- Nếu task chạm `auth.py`/`db.py` → thêm dòng: `⚠️ Rủi ro cao — đề xuất GPT-5.6-sol`
 
 ### 6.18 Numeric columns — pd.to_numeric() trước groupby
 ```python

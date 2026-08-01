@@ -213,6 +213,86 @@
 
 ## B. Streamlit UI
 
+### B57 — Khối xuất Cân đối crash khi không mở sub-tab Tổng quan hoặc KH thiếu thành phần tiền gửi
+| | |
+|---|---|
+| **File** | `tabs/tab_candoi.py` → `render()`, `_build_export_frames()` |
+| **Dấu hiệu** | Mở sub-tab Theo chương trình/Biểu đồ/Ma trận có thể báo biến `tien_gui_tt_ht` chưa được gán; ở chế độ Kế hoạch giao thiếu Huy động vốn hoặc TK qua Tổ, phép trừ với `None` làm cả tab lỗi trước khi bấm xuất. |
+| **Nguyên nhân** | Khối dựng dữ liệu xuất chạy mỗi rerun nhưng dùng biến chỉ được gán trong nhánh `_cd_sub == 0`; nhánh KH còn biểu diễn thành phần thiếu bằng `None` nhưng không guard trước phép tính. |
+| **Fix** | Tách `_build_export_frames()` tự tính toàn bộ dữ liệu từ `db_ht_rows/db_prev_rows`, không phụ thuộc sub-tab; chỉ chèn dòng `TG TT TCTC & TK CN` khi đủ hai thành phần so sánh. |
+| **Test** | `tests/test_tab_candoi.py::test_export_kh_thieu_thanh_phan_tien_gui_khong_crash_va_khong_chen_dong_tinh`, `test_export_tien_gui_tinh_doc_lap_voi_subtab_tong_quan` |
+| **Ngày fix** | 2026-08-01 |
+
+### B60 — Expander lịch sử Điện báo rỗng sau redesign upload
+| | |
+|---|---|
+| **File** | `tabs/tab_candoi.py` → `_render_upload_section()` |
+| **Dấu hiệu** | Khi chưa có metadata `dienbao_meta_*`, expander `Lịch sử điện báo đã upload` vẫn hiện nhưng bên trong trống. |
+| **Nguyên nhân** | `_render_dienbao_lich_su()` return sớm nếu không có metadata, nhưng caller luôn render expander bao ngoài. |
+| **Fix** | Thêm `_co_dienbao_lich_su()` kiểm tra đủ 3 loại `ht/prev/prev_month`; chỉ render expander khi có dữ liệu, ngược lại hiển thị caption ngắn. |
+| **Test** | `tests/test_tab_candoi.py::test_render_upload_section_khong_hien_expander_lich_su_rong`, `test_co_dienbao_lich_su_doc_du_3_loai` |
+| **Ngày fix** | 2026-08-01 |
+
+### B61 — Quản lý tệp Điện báo qua popover/panel còn rườm rà
+| | |
+|---|---|
+| **File** | `tabs/tab_candoi.py` → `_render_quan_ly_tep_inline()` |
+| **Dấu hiệu** | Tab `📡 Điện báo Cân đối`, mục quản lý tệp cần mở popover rồi bấm thêm nút để hiện panel upload; thao tác đổi/upload file mất nhiều bước và trạng thái file không hiện ngay trong luồng chính. |
+| **Nguyên nhân** | UI quản lý tệp bị tách qua popover + session flag, trong khi đây là thao tác nghiệp vụ thường dùng và cần drag/drop trực tiếp. |
+| **Fix** | Bỏ popover quản lý tệp; render container inline gồm trạng thái kỳ số liệu, 3 cột upload trực tiếp, ngày số liệu HT/tháng trước và lịch sử upload. |
+| **Test** | `tests/test_tab_candoi.py::test_quan_ly_tep_inline_upload_truc_tiep_khong_popover_trung_gian` |
+| **Ngày fix** | 2026-08-01 |
+
+### B62 — Điện báo Cân đối lỗi `_has_file_prev` sau refactor quản lý tệp inline
+| | |
+|---|---|
+| **File** | `tabs/tab_candoi.py` → `render()` STATE B |
+| **Dấu hiệu** | Mở tab `📡 Điện báo Cân đối` báo `Lỗi render **📡 Điện báo Cân đối**: name '_has_file_prev' is not defined`. |
+| **Nguyên nhân** | Khi bỏ layout 2 cột + popover, dòng gán `_has_file_prev = _has_previous_file(path_prev, path_ht)` bị xóa, nhưng khối mốc so sánh phía dưới vẫn dùng biến này. |
+| **Fix** | Khôi phục `_has_file_prev` ngay sau khi xác định metadata file hiện tại và trước khi dựng lựa chọn mốc so sánh. |
+| **Test** | `tests/test_tab_candoi.py::test_render_state_b_khoi_phuc_has_file_prev_truoc_moc_so_sanh` |
+| **Ngày fix** | 2026-08-01 |
+
+### B63 — Chuyển sub-tab nội dung chậm vì `st.tabs()` render tất cả panel
+| | |
+|---|---|
+| **File** | `tabs/tab_upload_khnv/__init__.py`, `tabs/tab_trang_thai_nguon.py`, `tabs/tab_so_sanh_ky/render_nhieu_ky.py`, `tabs/tab_tien_do_nop.py`, `tabs/tab_theo_doi_nhap/__init__.py` |
+| **Dấu hiệu** | Chuyển giữa các tab nội dung có cảm giác load lâu; mở một panel nhẹ vẫn kéo theo bảng trạng thái, snapshot, audit, Google Sheet hoặc nhiều loại dữ liệu khác cùng chạy trong một rerun. |
+| **Nguyên nhân** | `st.tabs()` của Streamlit render toàn bộ nội dung của mọi tab trong mỗi rerun; các panel dữ liệu nặng bị tính trước dù user chỉ xem một tab. |
+| **Fix** | Thay các cụm sub-tab dữ liệu nặng bằng `utils.lazy_tabs()` và renderer callable để chỉ dựng tab đang active; giữ nguyên các hàm tính toán/hiển thị hiện có. |
+| **Test** | `venv\Scripts\python.exe -m py_compile tabs\tab_upload_khnv\__init__.py tabs\tab_trang_thai_nguon.py tabs\tab_so_sanh_ky\render_nhieu_ky.py tabs\tab_tien_do_nop.py tabs\tab_theo_doi_nhap\__init__.py` |
+| **Ngày fix** | 2026-08-01 |
+
+### B64 — Điện báo Cân đối giữ state widget cũ sau khi đổi sheet/file
+| | |
+|---|---|
+| **File** | `tabs/tab_candoi.py` → khối Mốc so sánh / Nguồn so sánh |
+| **Dấu hiệu** | Sau khi đổi sheet hiện tại hoặc upload file Điện báo có danh sách sheet khác, radio/selectbox mốc so sánh có thể giữ giá trị cũ không còn hợp lệ; mốc `Y/KH` được tính theo sheet pre-compute thay vì sheet thực tế sau selectbox. |
+| **Nguyên nhân** | `_y_sheet`/`_kh_sheet` được dựng từ `_pre_ht` trước khi render selectbox; các widget key `cd_sheet_ht`, `cd_moc_ss`, `cd_sheet_pv` không reset khi options mới không còn chứa giá trị state cũ. |
+| **Fix** | Render/chốt `sheet_ht` trước, rồi tính sheet so sánh theo `sheet_ht`; trước mỗi widget, chỉ reset `st.session_state[key]` khi key đã tồn tại nhưng giá trị không nằm trong options hiện tại. |
+| **Test** | `venv\Scripts\python.exe -m py_compile tabs\tab_candoi.py`; `venv\Scripts\python.exe -m pytest tests\test_tab_candoi.py` |
+| **Ngày fix** | 2026-08-01 |
+
+### B65 — Mốc `vs Tháng trước` đọc trùng file tháng trước
+| | |
+|---|---|
+| **File** | `tabs/tab_candoi.py` → khối đọc `db_prev_rows` / `db_prev_month_rows` |
+| **Dấu hiệu** | Khi chọn mốc `vs Tháng trước`, cùng file `prev_month` có thể vừa là nguồn so sánh chính vừa là nguồn cho bộ cột phụ `Tháng trước`, làm bảng/export dư hoặc trùng nghĩa cột. |
+| **Nguyên nhân** | Nhánh mới `_moc_val == "thang_truoc"` đọc `path_prev_month` vào `db_prev_rows`, nhưng nhánh đọc `db_prev_month_rows` phía dưới vẫn chạy vô điều kiện khi có file tháng trước. |
+| **Fix** | Chỉ đọc `db_prev_month_rows` khi `_moc_val != "thang_truoc"`; nếu tháng trước là mốc chính thì dùng duy nhất `db_prev_rows`. |
+| **Test** | `tests/test_tab_candoi.py::test_moc_thang_truoc_khong_doc_lap_lai_cot_phu_thang_truoc` |
+| **Ngày fix** | 2026-08-01 |
+
+### B66 — Upload Điện báo Cân đối dễ lưu nhầm ngày số liệu
+| | |
+|---|---|
+| **File** | `tabs/tab_candoi.py` → `_render_upload_section()`, `_render_quan_ly_tep_inline()`, `_upload_one_file()` |
+| **Dấu hiệu** | User upload file Điện báo xong mới chọn ngày số liệu; do upload thành công gọi `st.rerun()` ngay, bước chọn ngày phía dưới dễ bị quên hoặc giữ ngày cũ/today sai kỳ. |
+| **Nguyên nhân** | Uploader được render trước `date_input`; khi có file upload, code lưu file rồi rerun trước khi chạy tới phần chốt ngày số liệu. |
+| **Fix** | Render ngày số liệu trước uploader cho cả HT/kỳ trước/tháng trước; truyền kỳ đang chọn vào `_upload_one_file()` và lưu `dienbao_ky_*` trước `st.rerun()`, đọc lại KV mới nhất để tránh audit trùng. |
+| **Test** | `tests/test_tab_candoi.py::test_upload_dienbao_chon_ngay_truoc_khi_upload_va_luu_truoc_rerun` |
+| **Ngày fix** | 2026-08-01 |
+
 ### B48 — Panel quản lý Theo dõi nhập liệu chiếm chỗ, làm loãng nội dung
 | | |
 |---|---|
@@ -268,6 +348,36 @@
 | **Nguyên nhân** | Thay dấu phân cách bằng `.replace(",", ".")` một bước làm lẫn dấu nghìn với dấu thập phân; mọi chênh lệch đều format 0 số lẻ |
 | **Fix** | Đổi dấu qua ký tự trung gian để ra chuẩn Việt Nam (`12.903,4`); chênh lệch khác 0 nhưng dưới 1 triệu đồng hiển thị 1 số lẻ |
 | **Ngày fix** | 2026-07-18 |
+
+### B36 — KPI Điện báo hiển thị nhỏ hơn 1 triệu lần (regression _to_ty)
+| | |
+|---|---|
+| **File** | `tabs/tab_candoi.py` → `_to_ty()` ~dòng 381–385 |
+| **Dấu hiệu** | KPI "Tổng dư nợ" hiển thị `0.01 tỷ đồng` thay vì `13,430.7 tỷ đồng`; biểu đồ thanh gần bằng 0 |
+| **Nguyên nhân** | `_to_ty(x)` chia cho `1_000_000_000` (as if val là VND) nhưng `doc_dienbao()` trả val theo đơn vị **triệu đồng**. Regression từ B5 (fix đúng là `/1000`) |
+| **Fix** | Đọc `don_vi_trieu` từ rows → `_dv_div = 1_000` (triệu) hoặc `1_000_000` (nghìn); `_to_ty(x) = x / _dv_div`. Thêm `don_vi_trieu` cho dòng NQH con trong `doc_dienbao()` |
+| **Test** | Compile check OK |
+| **Ngày fix** | 2026-07-30 |
+
+### B49 — Điện báo `don_vi_trieu=False` nhập nhằng giữa đồng và nghìn đồng
+| | |
+|---|---|
+| **File** | `data/hstd.py`, `tabs/tab_candoi.py`, `services/khnv_bao_cao_service.py` |
+| **Dấu hiệu** | File ghi đơn vị `Đồng` có thể bị tab Cân đối hiểu như `nghìn đồng` và chia sai 1000x; nếu sheet hiện tại/kỳ trước khác đơn vị thì delta, tỷ lệ và biểu đồ so sánh bị lệch |
+| **Nguyên nhân** | Metadata chỉ có boolean `don_vi_trieu`; `False` không phân biệt được `đồng` và `nghìn đồng`. `tab_candoi` còn dùng một hệ số từ sheet hiện tại cho cả sheet so sánh |
+| **Fix** | Thêm `don_vi_nguon`, `he_so_vnd`, `don_vi_label`; chuẩn hóa các giá trị so sánh trong `tab_candoi` về VND trước khi tính KPI/delta/chart/export; service KHNV dùng `he_so_vnd` khi có |
+| **Test** | Compile + `tests/test_hstd.py::TestDonViDienBao` + `tests/test_khnv_bao_cao.py` |
+| **Ngày fix** | 2026-07-31 |
+
+### B50 — Biểu đồ và Excel Cân đối không áp dụng mapping Kế hoạch giao
+| | |
+|---|---|
+| **File** | `tabs/tab_candoi.py` → `render()` ~dòng 500–1080 |
+| **Dấu hiệu** | Chọn mốc `Kế hoạch giao` thì KPI/bảng chi tiết có số, nhưng biểu đồ hoặc file Excel export vẫn ra 0 cho nhiều chỉ tiêu KH có tên khác sheet M/DB; badge khớp có thể cao sai khi đang lọc nhóm |
+| **Nguyên nhân** | `_KH_NAME_MAP` chỉ được dùng ở KPI, bảng chi tiết và tab Theo chương trình; các nhánh biểu đồ/export vẫn gọi exact `db_lookup()`. `_match_count` tăng trước khi áp bộ lọc nhóm nên tử số có thể gồm dòng không hiển thị |
+| **Fix** | Tạo helper tra mốc so sánh dùng chung `_lookup_prev_vnd()`/`_match_prev_row_vnd()` ở module-level; dùng helper này cho biểu đồ, Excel export và bảng chi tiết; dời `_match_count` sau bộ lọc |
+| **Test** | `tests/test_tab_candoi.py`; `venv\Scripts\python.exe -m py_compile tabs\tab_candoi.py`; `venv\Scripts\python.exe scripts\check_conventions.py tabs\tab_candoi.py` |
+| **Ngày fix** | 2026-07-31 |
 
 ### B34 — Báo cáo NQH tuần lỗi import `CACHE_HSTD` từ sai module
 | | |
@@ -869,6 +979,16 @@
 | **Fix** | Chạy từng SQL statement; riêng lỗi `CREATE INDEX` do thiếu cột thì bỏ qua để migration tiếp tục, các `ALTER TABLE` backward-compatible ở migration sau bổ sung schema |
 | **Ngày fix** | 2026-07-25 |
 
+### D8 — Fallback radio Cân đối tự ghi đè mốc so sánh đã lưu
+| | |
+|---|---|
+| **File** | `tabs/tab_candoi.py` → radio `Mốc so sánh` |
+| **Dấu hiệu** | KV đang lưu `31_12`, nhưng file mới thiếu sheet Y/file kỳ trước; chỉ cần mở tab đã tự đổi KV sang `kh_giao` hoặc `custom` và ghi audit dù user chưa thao tác |
+| **Nguyên nhân** | Điều kiện lưu chỉ so sánh giá trị radio với KV. Khi giá trị KV không còn trong `MOC_VALUES`, radio fallback về `index=0` nên bị hiểu nhầm là user đổi |
+| **Fix** | Đánh dấu thay đổi bằng callback `on_change`; chỉ gọi `ghi_kv()` khi callback xác nhận thao tác thật và giá trị mới khác KV. Mọi lần ghi đều gọi `ghi_audit()` ngay sau đó |
+| **Test** | `tests/test_tab_candoi.py::test_moc_choice_chi_luu_khi_user_thuc_su_doi`, `tests/test_tab_candoi.py::test_render_moc_choice_dung_on_change_de_phan_biet_fallback` |
+| **Ngày fix** | 2026-07-31 |
+
 ### D1 — `database is locked`
 | | |
 |---|---|
@@ -1110,6 +1230,16 @@
 | **Fix** | Sau import hàng loạt, tự gọi `merge_nhieu_loai_toan_cn()` cho các loại HSTD/NQ11/GQVL vừa lưu, xóa các loại merge thành công khỏi pending queue và gọi `lam_moi_du_lieu_app()` để app đọc cache mới |
 | **Ngày fix** | 2026-07-10 |
 
+### E20 — Upload Điện báo báo lỗi `[Errno 22] Invalid argument` khi ghi đè file
+| | |
+|---|---|
+| **File** | `services/upload_service.py` → `_ghi_va_xoa_cache()` |
+| **Dấu hiệu** | Upload file Điện báo mới báo `❌ Lỗi: [Errno 22] Invalid argument: '...\cache\dienbao_ht.xlsx'` dù file không bị mở bởi chương trình khác |
+| **Nguyên nhân** | Windows có thể từ chối ghi/replace tạm thời khi file đang được đọc hoặc có nhiều rerun/session cùng ghi. Retry `open(path, "wb")` vẫn truncate file cũ trước khi ghi thành công; uploader còn giữ nguyên file nên rerun có thể xử lý lại cùng payload |
+| **Fix** | Ghi vào file tạm cùng thư mục rồi `os.replace()` nguyên tử; serialize writer trong process, bỏ qua payload đã trùng, retry replace 5 lần và luôn dọn file tạm. Tab Cân đối đổi version key uploader sau thành công để chặn upload lặp |
+| **Test** | `tests/test_upload_service.py::TestGhiVaXoaCache`, `tests/test_tab_candoi.py::test_upload_dienbao_reset_uploader_sau_khi_luu_thanh_cong` |
+| **Ngày fix** | 2026-07-31 |
+
 ---
 
 ## F. PDF / Word
@@ -1191,6 +1321,26 @@
 | **Nguyên nhân** | `python-docx` là dependency tùy chọn ở runtime, nhưng file service dùng `WD_ALIGN_PARAGRAPH.LEFT` và `.CENTER` trong default argument của helper module-level. Khi import `docx` thất bại, `except ImportError` chỉ set `_DOCX_READY=False`, còn symbol enum không tồn tại nên module crash ngay lúc định nghĩa hàm |
 | **Fix** | Trong nhánh `except ImportError`, khai báo fallback object có các thuộc tính `LEFT/CENTER/RIGHT/JUSTIFY` và `WD_TABLE_ALIGNMENT.CENTER`. Nhờ vậy tab Tổng quan import/render bình thường; hàm xuất Word vẫn dừng sớm với thông báo thiếu `python-docx` khi được gọi |
 | **Ngày fix** | 2026-07-19 |
+
+### F10 — PDF Cân đối tạo thành công nhưng không có bảng dữ liệu
+| | |
+|---|---|
+| **File** | `services/bc_tongquan_service.py` → `xuat_pdf_bc()`; gọi từ `tabs/tab_candoi.py` |
+| **Dấu hiệu** | Nút Xuất PDF trả file mở được nhưng chỉ có tiêu đề/chân trang, thiếu hai bảng `Tổng hợp chỉ tiêu` và `Theo chương trình`. |
+| **Nguyên nhân** | Service chỉ render khi dictionary có khóa đúng `Tổng hợp`, trong khi tab Cân đối truyền hai khóa tên khác. |
+| **Fix** | Render mọi DataFrame không rỗng theo thứ tự truyền vào; mỗi sheet thành một phần riêng trên A4 ngang, có header lặp, độ rộng cột động, format số và số trang. Caller từ chối lưu nếu service trả bytes rỗng. |
+| **Test** | `tests/test_bc_tongquan_pdf.py::test_xuat_pdf_bc_render_tat_ca_sheet_khong_rong`; render PNG kiểm tra trực quan 2 trang. |
+| **Ngày fix** | 2026-08-01 |
+
+### F11 — PDF Cân đối có trang trắng cuối chỉ chứa footer
+| | |
+|---|---|
+| **File** | `services/bc_tongquan_service.py` → `xuat_pdf_bc()` |
+| **Dấu hiệu** | Báo cáo có bảng Theo chương trình dài xuất hiện thêm một trang cuối gần như trắng, chỉ còn dòng nguồn hệ thống và số trang. |
+| **Nguyên nhân** | Footer được thêm bằng `HRFlowable`/`Paragraph` ở cuối story; khi bảng vừa chiếm hết trang, ReportLab đẩy riêng footer sang trang kế tiếp. |
+| **Fix** | Vẽ dòng nguồn hệ thống và số trang trực tiếp trong callback `onFirstPage/onLaterPages`; loại footer khỏi luồng story nên không thể tự tạo trang mới. |
+| **Test** | `tests/test_bc_tongquan_pdf.py::test_xuat_pdf_bc_khong_tao_trang_trang_chi_co_footer`; render PNG toàn bộ trang. |
+| **Ngày fix** | 2026-08-01 |
 
 ---
 
@@ -1320,6 +1470,16 @@
 | **Fix** | Thêm bảng đối chiếu riêng lọc `Nguồn vốn = Địa phương`, `_nv_cap_label = ĐP cấp xã/khác`, `Mã CT in (3, 6)`; thêm `_rules_cache_key()` vào `nv_cache_key`; bỏ seed CT06 `INV1201260090198`; khóa test tổng chuẩn `GQVL=93.479`, `NS&VSMTNT=2.480`, `Tổng=95.959` triệu |
 | **Test** | `tests/test_tab_hhi.py::test_bang_nguon_von_xa_02_ct_khop_so_chuan`, `tests/test_tab_hhi.py::test_bang_nguon_von_xa_02_ct_loai_tru_rule_cap_tinh` |
 | **Ngày fix** | 2026-07-19 |
+
+### G29 — KHTD per-xã đánh dấu sai trạng thái và bảng Theo dõi Xã hiện tuple
+| | |
+|---|---|
+| **File** | `services/khtd_service.py`, `tabs/tab_khtd_giao_dc.py` |
+| **Dấu hiệu** | Payload có `xa_da_nhap=[]` vẫn có thể bị coi là đã nhập do fallback từ `du_lieu`; key editor theo index xã dễ giữ state sai khi danh sách xã đổi; bảng chi tiết Theo dõi Xã hiện tuple `(pgd, xã, mã)` thay vì tên chương trình. |
+| **Nguyên nhân** | Fallback dùng điều kiện falsy nên không phân biệt field thiếu với list rỗng; widget key dùng index loop; drill-down merge dict TW/ĐP rồi lookup `_CT_MAP` bằng tuple key. |
+| **Fix** | Chỉ fallback trạng thái khi payload thiếu hẳn `xa_da_nhap`, key widget theo slug xã, tách helper dựng dòng chi tiết theo từng nguồn và dùng `ma_key` để lấy tên chương trình. |
+| **Test** | `tests/test_khtd_service.py::test_trang_thai_xa_empty_list_does_not_fallback_to_du_lieu`, `tests/test_khtd_giao_dc.py::test_build_rows_ct_theo_xa_giu_ten_ct_va_nguon_rieng` |
+| **Ngày fix** | 2026-08-01 |
 
 ### G10 — `🏛️ KHTD Chi nhánh`: `TH` GQVL bị lấy nhầm tiền từ `GQVL.parquet` thay vì `HSTD`
 | | |
@@ -1652,6 +1812,16 @@
 ---
 
 ## J. Python / Code Pattern
+
+### J72 — Bản in HTML Cân đối chèn thẳng dữ liệu Excel và tên file chứa ký tự cấm
+| | |
+|---|---|
+| **File** | `tabs/tab_candoi.py` → `_build_print_html()`, `_safe_export_name_part()` |
+| **Dấu hiệu** | Tên chỉ tiêu/đơn vị có ký tự HTML có thể làm vỡ bản in hoặc thực thi markup khi mở file; nhãn kỳ dạng `31/07/2026` tạo tên tải xuống chứa dấu `/` không hợp lệ trên Windows. |
+| **Nguyên nhân** | Chuỗi động được nội suy trực tiếp vào HTML và tên file chưa được chuẩn hóa. |
+| **Fix** | Escape toàn bộ title/header/cell động bằng `html.escape()`; chỉ coi giá trị thiếu là dấu gạch, giữ đúng tỷ lệ 0%; thay ký tự cấm Windows trong từng phần tên file. |
+| **Test** | `tests/test_tab_candoi.py::test_build_print_html_escape_du_lieu_dong_va_hien_thi_ty_le_zero`, `test_safe_export_name_part_loai_ky_tu_cam_tren_windows` |
+| **Ngày fix** | 2026-08-01 |
 
 ### J3 — Integration test patch sai target → ghi đè cache/hstd.parquet thật
 
@@ -2468,6 +2638,36 @@ val = pd.to_numeric(df[COT_X], errors="coerce").sum() if COT_X in df.columns els
 | **Test** | `tests/test_cdtotkvv_history.py::test_doi_chieu_hstd_theo_ma_to_loai_ma_0_va_hien_to_thieu_cdto` |
 | **Ngày fix** | 2026-07-14 |
 
+### C34 — Điện báo Cân đối: KPI Vốn TW bằng 0 dù file có số liệu
+| | |
+|---|---|
+| **File** | `data/hstd.py` → `doc_dienbao()` ~dòng 443 |
+| **Dấu hiệu** | Tab `📡 Điện báo Cân đối` hiển thị `Vốn TW (KHA)` = 0, trong khi file Điện báo có dòng `Nguồn vốn cân đối từ TW (KHA)` |
+| **Nguyên nhân** | Parser bỏ qua mọi dòng có substring `cân đối` để lọc header, vô tình loại cả chỉ tiêu nghiệp vụ cần đọc |
+| **Fix** | Thu hẹp điều kiện skip header/metadata: chỉ bỏ dòng header chính xác hoặc dòng chứa `điện báo`/`ngân hàng`, giữ chỉ tiêu có chữ `cân đối` trong tên |
+| **Test** | `tests/test_hstd.py::TestDocDienBao::test_giu_chi_tieu_nguon_von_can_doi_va_bo_metadata` |
+| **Ngày fix** | 2026-07-31 |
+
+### C35 — Ma trận PGD Điện báo không nhận sheet `Dulieu`/`TonghopBC`
+| | |
+|---|---|
+| **File** | `data/hstd.py` → `liet_ke_sheet_dienbao()`, `doc_dienbao_matrix()`; `tabs/tab_candoi.py` → sub-tab Ma trận PGD |
+| **Dấu hiệu** | Mục `Ma trận PGD` báo sheet không có dữ liệu ma trận hoặc chỉ hiện lựa chọn kém hữu ích, dù file có 22 cột PGD |
+| **Nguyên nhân** | Parser cố định header ở dòng 4/cột C = `Cộng`; file thực tế đặt header ở dòng 5-6, `TonghopBC` có cột `Tổng`, `Dulieu` không có cột tổng mà cần tự cộng PGD |
+| **Fix** | Thêm detect layout theo dòng `Chỉ tiêu`; đọc đúng cột `Tổng` nếu có, hoặc tự cộng cột PGD nếu không có; UI chỉ chọn sheet matrix thật và thêm kiểm tra `Cộng` so với tổng PGD |
+| **Test** | `tests/test_hstd.py::TestDocDienBao::test_sheet_ma_tran_co_cot_tong_khong_cong_trung_pgd`, `tests/test_hstd.py::TestDocDienBao::test_sheet_ma_tran_khong_cot_tong_tu_cong_cac_pgd` |
+| **Ngày fix** | 2026-07-31 |
+
+### C36 — Tối ưu numeric HSTD có thể làm sai nhánh PGD operation
+| | |
+|---|---|
+| **File** | `app.py` → `_enrich_hstd()`, `_loc_hstd_active()`, workspace operation load |
+| **Dấu hiệu** | PGD dùng file HSTD riêng có thể tính `__dn_nq11` sai nếu cột dư nợ còn dtype object/string; phép `Dư nợ TH + Dư nợ QH` nối chuỗi thay vì cộng số, hoặc lọc hồ sơ active crash khi so sánh string với `0`. |
+| **Nguyên nhân** | Tối ưu bỏ `pd.to_numeric()` trong `_enrich_hstd()`/`_loc_hstd_active()` giả định mọi HSTD đã đi qua `_toi_uu_dtype()`, nhưng nhánh `doc_hstd_pgd()`/`doc_hstd_toan_cn_pgd()` của workspace operation đọc ngoài `_load_hstd()`. |
+| **Fix** | Đưa dataframe từ `doc_hstd_pgd()` và `doc_hstd_toan_cn_pgd()` qua `_toi_uu_dtype()` trước khi enrich; thêm `_num0()` fast path: numeric thì chỉ `.fillna(0)`, object/string thì fallback `pd.to_numeric(errors="coerce")`. |
+| **Test** | `tests/test_app_numeric_optimization.py` |
+| **Ngày fix** | 2026-08-01 |
+
 ### J29 — Pre-commit phụ thuộc PATH và xử lý đối số file chưa an toàn
 | | |
 |---|---|
@@ -3012,6 +3212,159 @@ def _to_int(val, default=0):
 | **Fix** | Thêm `_la_loi_tab_khong_ton_tai()` + cờ `optional` cho `_doc_raw_values_sheet`: tab tuỳ chọn đọc hụt (parse range) thì trả `[]` êm, không ghi `_LAST_ERROR`, không raise. `doc_nhiem_vu_gsheet` gọi `optional=True`; `kiem_tra_ket_noi` tách đọc NV, thiếu thì báo "chưa tạo (tuỳ chọn)" thay vì fail. **Fix tiếp (cùng ngày):** trong `kiem_tra_ket_noi`, nhánh NV/GV `_la_loi_tab_khong_ton_tai(e)` phải `global _LAST_ERROR` + gán `_LAST_ERROR = None` trước khi trả thành công — vì `_doc_raw_values_sheet` (gọi KHÔNG optional) đã ghi `_LAST_ERROR` rồi mới raise, khiến banner vẫn hiện dù kết quả OK |
 | **Test** | `venv\Scripts\python.exe -m pytest tests\test_ke_hoach_cv_khnv_service.py -q` (10 passed; regression a/b/c: optional missing tab không bẩn `_LAST_ERROR`, `kiem_tra_ket_noi` NV parse-range trả True + `_LAST_ERROR` None, NV 401/403/500 vẫn fail) |
 | **Ngày fix** | 2026-07-26 |
+
+---
+
+### J69 — Launcher không nhận Streamlit chạy từ terminal khi CIM trả rỗng
+| | |
+|---|---|
+| **File** | `Chay_VBSP_SCM.bat` → `is_vbsp_process`; `app.py` → `_ghi_runtime_pid_marker()` |
+| **Dấu hiệu** | Port 8502 do đúng VBSP-SCM chiếm nhưng launcher báo PID không được xác minh; `Get-CimInstance Win32_Process` không trả `ExecutablePath`/`CommandLine` |
+| **Nguyên nhân** | Một số process chạy từ terminal hoặc khác context quyền bị Windows ẩn metadata; WMIC cũng đã bị gỡ trên Windows mới. Match `venv\Scripts\python.exe` tương đối có thể nhận nhầm dự án khác |
+| **Fix** | `app.py` ghi marker gồm PID + root + app path; launcher kiểm cả ba trường làm fallback, còn nhánh metadata tiếp tục yêu cầu đúng `%PY_EXE%` + `streamlit` + `app.py` |
+| **Test** | `tests/test_launcher_batch.py::test_port_process_is_verified_before_force_kill`; `Chay_VBSP_SCM.bat --self-test` |
+| **Ngày fix** | 2026-07-27 |
+
+---
+
+### J71 — Launcher cảnh báo PID lặp và không cho biết ứng dụng chiếm port
+| | |
+|---|---|
+| **File** | `Chay_VBSP_SCM.bat` → `kill_port_processes`, `show_process_info`, `cleanup_stale_pid_marker`; `AGENTS.md` |
+| **Dấu hiệu** | Cùng một PID bị cảnh báo hai lần; thông báo chỉ nói “không được xác minh” nên khó biết ứng dụng nào đang giữ port 8502; marker PID cũ còn lại sau khi app đã dừng |
+| **Nguyên nhân** | `netstat` có thể trả nhiều listener IPv4/IPv6 cùng PID; launcher chưa khử trùng, chưa in metadata của tiến trình bị từ chối và chưa dọn marker khi PID đã kết thúc; agent QA còn dùng chung port production |
+| **Fix** | Chỉ xử lý mỗi PID một lần; khi từ chối, đọc tên và executable path bằng CIM rồi hiện trên màn hình/ghi log; xóa marker chỉ khi PID không còn; quy ước agent QA dùng port 18502. Vẫn chỉ `taskkill` tiến trình đã xác minh đúng VBSP-SCM |
+| **Test** | `tests/test_launcher_batch.py`; `Chay_VBSP_SCM.bat --self-test` |
+| **Ngày fix** | 2026-08-01 |
+
+---
+
+### B51 — Mốc so sánh "Tùy chọn khác" trong Điện báo Cân đối không hiện gì
+| | |
+|---|---|
+| **File** | `tabs/tab_candoi.py` → `render()` ~dòng 533-548 |
+| **Dấu hiệu** | Chọn "🔧 Tùy chọn khác" nhưng không thấy selectbox "Sheet SO SÁNH" và không có dữ liệu so sánh |
+| **Nguyên nhân** | Guard `len(ds_sheet) > 1` bỏ qua selectbox khi file chỉ có 1 sheet; khi file nhiều sheet, selectbox chứa cả sheet hiện tại nên default có thể trùng `sheet_ht` → `sheet_pv == sheet_ht` → dòng 575 bỏ qua đọc dữ liệu so sánh |
+| **Fix** | Lọc `sheet_ht` khỏi danh sách tùy chọn qua `_custom_sheet_options()`; gộp option "📁 File kỳ trước" (sentinel `_FILE_PREV_SENTINEL`) vào selectbox nguồn so sánh để luôn có gì chọn khi file chỉ 1 sheet; sentinel → `sheet_pv=None` → dùng `path_prev`; chỉ cảnh báo khi không còn sheet khác và không có file kỳ trước |
+| **Test** | `tests/test_tab_candoi.py::test_custom_mot_sheet_van_co_option_file_ky_truoc`, `test_label_option_file_ky_truoc_hien_ten_file`, `test_has_previous_file_chi_nhan_file_khac_hien_tai` |
+| **Ngày fix** | 2026-07-31 |
+
+---
+
+### B52 — Sub-info KPI nằm ngoài card và che mất mốc so sánh bằng 0
+| | |
+|---|---|
+| **File** | `components/delta_card.py` → `delta_card()`; `tabs/tab_candoi.py` → `render()` ~dòng 727 |
+| **Dấu hiệu** | Caption kỳ trước nằm dưới border của KPI nên các card lệch khung; chỉ tiêu có kỳ trước/KH giao bằng 0 không hiện sub-info; số 1 chữ số có thể sai ở biên do `round(2)` rồi format `.1f` |
+| **Nguyên nhân** | `st.caption()` được gọi sau `st.metric(border=True)` nên không thuộc card; `_ss()` dùng guard truthy `if not pv_v`; formatter lấy kết quả `_to_ty()` đã làm tròn hai chữ số để làm tròn lần nữa |
+| **Fix** | Dùng `st.container(border=True)` bao metric `border=False` và caption; luôn trình bày mốc 0 khi có nguồn so sánh; format trực tiếp VND sang một chữ số và chỉ tính tỷ trọng khi `tong_dn_ht > 0` |
+| **Test** | `tests/test_delta_card.py`; kiểm thử trực quan preview Streamlit dark mode; `tests/test_tab_candoi.py` |
+| **Ngày fix** | 2026-08-01 |
+
+---
+
+### J70 — Alias đường dẫn bị nhận nhầm là file Điện báo kỳ trước
+| | |
+|---|---|
+| **File** | `tabs/tab_candoi.py` → `_has_previous_file()`, `_fmt_nguon_ss()` |
+| **Dấu hiệu** | Hai path khác chuỗi nhưng trỏ cùng file vật lý vẫn được đưa vào nguồn so sánh; test tên file Windows có thể sai trên CI Linux |
+| **Nguyên nhân** | Code chỉ dùng `path_prev != path_ht` và `os.path.basename()` theo hệ điều hành đang chạy |
+| **Fix** | Xác thực bằng `os.path.isfile()` + `os.path.samefile()`, fallback so path chuẩn hóa; dùng `ntpath.basename()` để đọc đúng tên path Windows trên mọi OS |
+| **Test** | `tests/test_tab_candoi.py::test_has_previous_file_loai_alias_cung_mot_file`, `test_label_option_file_ky_truoc_hien_ten_file` |
+| **Ngày fix** | 2026-08-01 |
+
+---
+
+### B53 — Nguồn so sánh tự động trùng sheet Điện báo hiện tại
+| | |
+|---|---|
+| **File** | `tabs/tab_candoi.py` → `render()` ~dòng 520 |
+| **Dấu hiệu** | Khi chọn `Y` hoặc sheet KH làm sheet hiện tại, mốc 31/12/KH có thể chọn lại chính sheet đó; luồng đọc bỏ qua vì hai sheet trùng nhau, hoặc fallback sang file kỳ trước nhưng vẫn xử lý như dữ liệu KH. |
+| **Nguyên nhân** | Logic phát hiện và chọn sheet tự động chỉ kiểm tra tên sheet có tồn tại, không loại `sheet_ht`. |
+| **Fix** | Thêm `_first_comparison_sheet()` để mọi nguồn tự động loại sheet hiện tại; chỉ cung cấp mốc 31/12/KH khi còn nguồn hợp lệ, riêng 31/12 vẫn được fallback file kỳ trước. |
+| **Test** | `tests/test_tab_candoi.py::test_moc_tu_dong_khong_chon_lai_sheet_hien_tai` |
+| **Ngày fix** | 2026-08-01 |
+
+---
+
+### B54 — Không thể xóa nhãn kỳ số liệu Điện báo đã lưu
+| | |
+|---|---|
+| **File** | `tabs/tab_candoi.py` → `_render_upload_section()` ~dòng 341–420 |
+| **Dấu hiệu** | Xóa nội dung ô `Kỳ số liệu` nhưng radio/KPI vẫn dùng nhãn cũ từ kv_store. |
+| **Nguyên nhân** | Điều kiện lưu yêu cầu chuỗi sau `strip()` phải khác rỗng, nên thao tác xóa không bao giờ gọi `db.ghi_kv()`. |
+| **Fix** | Chuẩn hóa cả nhãn đã lưu và nhãn nhập; `_persist_ky_label_if_changed()` lưu chuỗi rỗng khi giá trị thay đổi để `doc_kv(...) or fallback` hoạt động, rồi gọi audit liền ngay sau `ghi_kv()`. |
+| **Test** | `tests/test_tab_candoi.py::test_ky_so_lieu_cho_phep_xoa_nhan_da_luu_va_audit_lien_ke` |
+| **Ngày fix** | 2026-08-01 |
+
+---
+
+### B55 — KPI Vốn TW và Huy động vốn hiển thị số liệu chưa đúng
+| | |
+|---|---|
+| **File** | `tabs/tab_candoi.py` → sub-tab Tổng quan Cân đối |
+| **Dấu hiệu** | Hai card `Vốn TW (KHA)` và `Huy động vốn` hiển thị giá trị/tỷ lệ chưa phản ánh đúng nguồn số liệu nghiệp vụ |
+| **Nguyên nhân** | Mapping chỉ tiêu Điện báo cho hai KPI này chưa đủ tin cậy để dùng làm chỉ số Tổng quan |
+| **Fix** | Bỏ hai card ở cả nhánh có/không có kỳ so sánh; xóa lookup chỉ phục vụ card và thu lưới đầu tiên còn 2 cột. Bảng chi tiết và dữ liệu nguồn không thay đổi |
+| **Test** | `tests/test_tab_candoi.py::test_tong_quan_khong_hien_kpi_von_tw_va_huy_dong` |
+| **Ngày fix** | 2026-08-01 |
+
+---
+
+### B56 — KPI tiền gửi kỳ KH dùng 0 khi thiếu thành phần
+| | |
+|---|---|
+| **File** | `tabs/tab_candoi.py` → `_lookup_kh_optional_vnd()`, sub-tab Tổng quan Cân đối |
+| **Dấu hiệu** | Khi sheet Kế hoạch giao thiếu `Tổng huy động vốn` hoặc `Tiền gửi tiết kiệm qua Tổ TK&VV`, KPI `TG TT TCTC & TK CN` vẫn hiển thị một giá trị so sánh như thể thành phần thiếu bằng 0 |
+| **Nguyên nhân** | `_lookup_kh_vnd()` trả cùng giá trị `0.0` cho cả trường hợp không tìm thấy chỉ tiêu và giá trị thực bằng 0; phép trừ vì vậy không nhận biết dữ liệu KH chưa đầy đủ |
+| **Fix** | Thêm lookup tùy chọn trả `None` khi không tìm thấy, chuẩn hóa `TK&VV`/`TKVV`; chỉ tính và render KPI/dòng chi tiết khi đủ hai thành phần, đồng thời cảnh báo trên UI nếu thiếu |
+| **Test** | `tests/test_tab_candoi.py::test_lookup_kh_optional_phan_biet_thieu_chi_tieu_va_gia_tri_zero`, `tests/test_tab_candoi.py::test_tong_quan_an_kpi_tien_gui_khi_sheet_kh_thieu_thanh_phan` |
+| **Ngày fix** | 2026-08-01 |
+
+---
+
+### B58 — Cột tháng trước Cân đối có thể tính sai hoặc lệch UI/export
+| | |
+|---|---|
+| **File** | `tabs/tab_candoi.py` → `_build_export_frames()`, `_render_upload_section()`, `render()` |
+| **Dấu hiệu** | Dòng `TG TT TCTC & TK CN` tính chênh lệch tháng trước như thể chỉ tiêu thiếu bằng 0; export có thể hiện cột tháng trước khi reader trả list rỗng; lịch sử upload không thấy file tháng trước. |
+| **Nguyên nhân** | `_lookup_vnd()` trả cùng `0.0` cho cả thiếu chỉ tiêu và giá trị thật bằng 0; `_has_pm` dùng `rows_prev_month is not None`; lịch sử chỉ đọc metadata `ht/prev`. |
+| **Fix** | Thêm `_lookup_optional_vnd()` cho Điện báo thường; dòng tính toán để trống ô tháng trước khi thiếu thành phần; `_has_pm = bool(rows_prev_month)`; lịch sử upload đọc thêm `dienbao_meta_prev_month*`. |
+| **Test** | `tests/test_tab_candoi.py::test_lookup_optional_vnd_phan_biet_thieu_chi_tieu_va_gia_tri_zero`, `test_export_prev_month_rong_khong_them_cot_thang_truoc`, `test_export_prev_month_thieu_thanh_phan_tien_gui_de_trong_o_tinh_toan` |
+| **Ngày fix** | 2026-08-01 |
+
+---
+
+### B59 — Card Điện báo kỳ trước còn cho chọn nhiều mốc thời gian
+| | |
+|---|---|
+| **File** | `tabs/tab_candoi.py` → `_render_upload_section()` |
+| **Dấu hiệu** | Card `Điện báo kỳ trước` vẫn có radio `31/12 / cuối tháng trước / tự chọn`, gây lẫn vai trò với card `Điện báo tháng trước`. |
+| **Nguyên nhân** | UI cũ gom nhiều mốc vào card kỳ trước; sau khi thêm upload tháng trước riêng, radio này trở thành trùng trách nhiệm. |
+| **Fix** | Bỏ radio `Mốc kỳ trước`; card kỳ trước luôn dùng `31/12/{năm trước}` và khóa `date_input`, còn tháng trước xử lý ở card riêng. |
+| **Test** | `tests/test_tab_candoi.py::test_upload_card_ky_truoc_chi_la_nam_truoc` |
+| **Ngày fix** | 2026-08-01 |
+
+---
+
+### D9 — Metadata upload Điện báo ghi kv_store thiếu audit liền kề
+| | |
+|---|---|
+| **File** | `services/upload_service.py` → `luu_dienbao()` |
+| **Dấu hiệu** | Upload Điện báo ghi key `dienbao_meta_*` nhưng chỉ có audit upload file trước đó, không có audit ngay sau lần `db.ghi_kv()` metadata. |
+| **Nguyên nhân** | Luồng metadata được thêm sau audit upload chính, nhưng chưa bổ sung `db.ghi_audit()` kế tiếp `db.ghi_kv()` theo rule 5.2. |
+| **Fix** | Tách `_meta_key/_meta_value`, gọi `db.ghi_kv(_meta_key, ...)` rồi gọi ngay `db.ghi_audit(username, "dienbao_meta", ...)`. |
+| **Test** | `tests/test_upload_service.py::TestLuuDienbao::test_ghi_metadata_co_audit_ngay_sau_ghi_kv` |
+| **Ngày fix** | 2026-08-01 |
+
+### J15 — tab_khtd_xuat crash: CACHE_HSTD.exists() trên str + thiếu import _quet_ct_co_du_no
+| | |
+|---|---|
+| **File** | `tabs/tab_khtd_xuat.py` → `xuat_to_trinh_bgd_word()` ~dòng 913 + import block ~dòng 44 |
+| **Dấu hiệu** | Nhấn "Tạo Tờ trình Word" → `AttributeError: 'str' object has no attribute 'exists'` hoặc `NameError: name '_quet_ct_co_du_no' is not defined` |
+| **Nguyên nhân** | 1) `CACHE_HSTD` là `str` (config.py dòng 36: `str(CACHE_DIR / "hstd.parquet")`), không phải `Path` → không có `.exists()`. 2) Hàm `_quet_ct_co_du_no` định nghĩa trong `tab_khtd.py` nhưng không được import vào `tab_khtd_xuat.py`. |
+| **Fix** | 1) Đổi `CACHE_HSTD.exists()` → `os.path.exists(CACHE_HSTD)`. 2) Thêm `_quet_ct_co_du_no` vào khối `from tabs.tab_khtd import (...)`. |
+| **Ngày fix** | 2026-08-01 |
 
 ---
 

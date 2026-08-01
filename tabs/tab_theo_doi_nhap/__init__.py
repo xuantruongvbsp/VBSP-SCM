@@ -14,6 +14,7 @@ from streamlit.delta_generator import DeltaGenerator
 from auth import la_phan_he_cn, la_quan_ly_cn, normalize_role
 from logger import get_logger
 from tabs.base_tab import TabContext
+from utils import lazy_tabs
 
 from .data import (
     tim_credentials,
@@ -292,39 +293,50 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
 
         # ── Tabs nội dung ──────────────────────────────────────────────────
         if can_config:
-            t0, t1, t2, t3 = st.tabs([
-                "📊 Tổng quan", "📋 Chi tiết", "⚙️ Cài đặt", "📖 Hướng dẫn",
-            ])
+            lazy_tabs(
+                ["📊 Tổng quan", "📋 Chi tiết", "⚙️ Cài đặt", "📖 Hướng dẫn"],
+                [
+                    lambda c: render_tong_quan(
+                        df_td, ds_ct, ten_sheet,
+                        pgd_groups=groups,
+                        name_idx=name_col_idx,
+                        sheet_id=sheet_id,
+                        sheet_tab=sheet_tab,
+                        username=username,
+                        deadline=deadline_str,
+                    ),
+                    lambda c: render_chi_tiet(
+                        df_td, ds_ct, username,
+                        pgd_groups=groups,
+                        name_idx=name_col_idx,
+                    ),
+                    lambda c: render_cai_dat(ds_sheet, username),
+                    lambda c: render_huong_dan(),
+                ],
+                key="theo_doi_nhap",
+            )
         else:
-            t0, t1, t3 = st.tabs([
-                "📊 Tổng quan", "📋 Chi tiết", "📖 Hướng dẫn",
-            ])
-            t2 = None
-
-        with t0:
-            render_tong_quan(
-                df_td, ds_ct, ten_sheet,
-                pgd_groups=groups,
-                name_idx=name_col_idx,
-                sheet_id=sheet_id,
-                sheet_tab=sheet_tab,
-                username=username,
-                deadline=deadline_str,
+            lazy_tabs(
+                ["📊 Tổng quan", "📋 Chi tiết", "📖 Hướng dẫn"],
+                [
+                    lambda c: render_tong_quan(
+                        df_td, ds_ct, ten_sheet,
+                        pgd_groups=groups,
+                        name_idx=name_col_idx,
+                        sheet_id=sheet_id,
+                        sheet_tab=sheet_tab,
+                        username=username,
+                        deadline=deadline_str,
+                    ),
+                    lambda c: render_chi_tiet(
+                        df_td, ds_ct, username,
+                        pgd_groups=groups,
+                        name_idx=name_col_idx,
+                    ),
+                    lambda c: render_huong_dan(),
+                ],
+                key="theo_doi_nhap_pgd",
             )
-
-        with t1:
-            render_chi_tiet(
-                df_td, ds_ct, username,
-                pgd_groups=groups,
-                name_idx=name_col_idx,
-            )
-
-        if t2 is not None:
-            with t2:
-                render_cai_dat(ds_sheet, username)
-
-        with t3:
-            render_huong_dan()
 
         # ── Cleanup định kỳ snapshot cũ (1 lần/session) ─────────────────────
         if not st.session_state.get("_ttdn_cleanup_done"):

@@ -1,5 +1,303 @@
 # CHANGELOG
 
+## [2026-08-01] — Bỏ sub-tab Ma trận PGD khỏi Điện báo Cân đối
+- `tabs/tab_candoi.py` — xóa sub-tab "🔍 Ma trận PGD" (elif _cd_sub == 3), còn 3 sub-tabs: Tổng quan, Theo chương trình, Biểu đồ.
+
+## [2026-08-01] — Chọn ngày số liệu trước khi upload Điện báo Cân đối
+- `tabs/tab_candoi.py` dòng ~816, ~963 — đưa `date_input` ngày số liệu lên trước uploader cho cả trạng thái chưa có file và đã có file; `_upload_one_file()` lưu kỳ số liệu đang chọn trước khi `st.rerun()`.
+- `tests/test_tab_candoi.py` — thêm regression test bảo đảm ngày số liệu nằm trước uploader và upload chốt kỳ trước khi rerun.
+- `BUGMAP.md` — thêm B66 cho lỗi UX upload xong mới chọn ngày số liệu dễ quên và lưu nhầm kỳ.
+
+## [2026-08-01] — Thêm launcher DEV không mở thêm tab Chrome
+- `Chay_VBSP_SCM.bat` dòng ~24, ~339 — thêm tham số `--no-browser` để chạy Streamlit với `--server.headless true`, giữ tab Chrome hiện có khi restart server.
+- `Chay_DEV_VBSP_SCM.bat` — thêm launcher dev gọi `Chay_VBSP_SCM.bat --no-browser`, phù hợp khi sửa code liên tục.
+- `tests/test_launcher_batch.py` — thêm regression test cho launcher DEV và contract headless theo tham số.
+
+## [2026-08-01] — Thêm mốc "vs Tháng trước" vào Cấu hình so sánh (tab Điện báo Cân đối)
+- `tabs/tab_candoi.py` dòng ~1162 — thêm `_ky_pm_label`, `_has_prev_month`
+- `tabs/tab_candoi.py` dòng ~1234 — thêm option "vs Tháng trước" vào MOC_LABELS khi có file prev_month
+- `tabs/tab_candoi.py` dòng ~1327 — thêm nhánh `elif _moc_val == "thang_truoc"` trong derive section
+- `tabs/tab_candoi.py` dòng ~1373 — đọc `db_prev_rows` từ `path_prev_month` khi mốc = tháng trước
+- `tabs/tab_candoi.py` dòng ~1386 — không đọc lại `db_prev_month_rows` khi mốc chính đã là tháng trước, tránh bảng/export có hai bộ cột tháng trước
+- `tests/test_tab_candoi.py` — thêm regression test cho mốc tháng trước không đọc lặp cột phụ
+- `BUGMAP.md` — thêm B65 cho lỗi mốc tháng trước đọc trùng file
+
+## [2026-08-01] — Fix state stale khi đổi sheet Điện báo Cân đối
+- `tabs/tab_candoi.py` dòng ~1187-1277 — tính sheet so sánh từ `sheet_ht` thực tế sau selectbox; reset các widget state `cd_sheet_ht/cd_moc_ss/cd_sheet_pv` khi giá trị cũ không còn nằm trong options mới.
+- `BUGMAP.md` — thêm B64 cho lỗi state widget stale khi danh sách sheet/mốc so sánh thay đổi.
+
+## [2026-08-01] — Tăng tốc chuyển sub-tab nội dung nặng
+- `tabs/tab_upload_khnv/__init__.py` dòng ~24, ~97 — đổi 6 sub-tab Upload KH-NV và 3 sub-tab Toàn Chi nhánh từ `st.tabs()` sang `lazy_tabs()` để chỉ render panel đang chọn.
+- `tabs/tab_trang_thai_nguon.py` dòng ~55, ~1017 — đổi sub-tab trạng thái nguồn CN/PGD sang `lazy_tabs()`, tránh render đồng thời tệp nguồn, merge/cache, snapshot, audit và hệ thống.
+- `tabs/tab_so_sanh_ky/render_nhieu_ky.py` dòng ~17, ~875 — đổi nhóm HSTD/NQ11/GQVL/CDTOTKVV sang lazy render.
+- `tabs/tab_tien_do_nop.py` dòng ~21, ~559 — đổi các tab Hướng dẫn/Cài đặt/Tổng quan/Danh sách/Lưu trữ sang lazy render.
+- `tabs/tab_theo_doi_nhap/__init__.py` dòng ~17, ~296 — đổi các tab Tổng quan/Chi tiết/Cài đặt/Hướng dẫn sang lazy render.
+- `BUGMAP.md` — thêm B63 cho pattern `st.tabs()` render đồng loạt gây chuyển tab chậm.
+
+## [2026-08-01] — Cải thiện UX khu vực Mốc so sánh + Nguồn so sánh (tab Điện báo Cân đối)
+- `tabs/tab_candoi.py` dòng ~1172-1340 — tái cấu trúc UI: gom Sheet hiện tại + Mốc so sánh vào bordered container 2 cột; thêm dòng tóm tắt "A ↔ B" trực quan; dọn label radio gọn hơn; bỏ caption trùng lặp ở sub-tab Tổng quan.
+
+## [2026-08-01] — Fix Điện báo Cân đối thiếu `_has_file_prev`
+- `tabs/tab_candoi.py` dòng ~1137 — khôi phục `_has_file_prev = _has_previous_file(path_prev, path_ht)` trước khối mốc so sánh sau refactor quản lý tệp inline.
+- `tests/test_tab_candoi.py` — thêm regression test bảo đảm `_has_file_prev` được gán trước khi dùng trong lựa chọn mốc so sánh.
+- `BUGMAP.md` — thêm B62 cho lỗi render `name '_has_file_prev' is not defined`.
+
+## [2026-08-01] — Thiết kế lại quản lý tệp Điện báo: bỏ popover, upload inline trực tiếp
+- `tabs/tab_candoi.py` dòng ~787-878 — `_render_quan_ly_tep_inline()`: thay popover+panel bằng container inline (3 cột upload trực tiếp + trạng thái + kỳ số liệu + lịch sử)
+- `tabs/tab_candoi.py` dòng ~1127-1151 — STATE B trong `render()`: bỏ layout 2 cột (info + popover), thay bằng caption + gọi hàm inline mới
+- `tests/test_tab_candoi.py` — cập nhật regression test cho quản lý tệp inline không còn popover/nút trung gian
+- `BUGMAP.md` — cập nhật B61 theo hướng bỏ popover quản lý tệp, upload trực tiếp 1 bước
+
+## [2026-08-01] — Fix lỗi tab "Xuất báo cáo KHTD" crash khi tạo Tờ trình Word
+- `tabs/tab_khtd_xuat.py` dòng ~913 — sửa `CACHE_HSTD.exists()` → `os.path.exists(CACHE_HSTD)` (CACHE_HSTD là str, không có method .exists())
+- `tabs/tab_khtd_xuat.py` dòng ~44-58 — thêm `_quet_ct_co_du_no` vào import từ `tabs.tab_khtd` (thiếu → NameError khi gọi `xuat_to_trinh_bgd_word()`)
+
+## [2026-08-01] — Tối ưu popover quản lý tệp Điện báo Cân đối
+- `tabs/tab_candoi.py` — tách popover quản lý tệp thành helper lazy; mặc định chỉ render trạng thái nhẹ, upload form chỉ dựng khi user bấm `Đổi/upload tệp`.
+- `tests/test_tab_candoi.py` — thêm regression test bảo đảm popover không render upload form nặng ngay từ đầu.
+- `BUGMAP.md` — thêm B61 cho lỗi popover quản lý tệp Điện báo xổ chậm do dựng sẵn upload form.
+
+## [2026-08-01] — Review KHTD per-xã và Theo dõi thực hiện
+- `services/khtd_service.py` — `luu_dot_xa()` tôn trọng `xa_da_nhap=[]`, merge xã mới nhưng không tự đánh dấu các xã cũ; `trang_thai_xa()` chỉ fallback legacy khi thiếu hẳn field.
+- `tabs/tab_khtd_giao_dc.py` — đổi key editor/nút lưu sang slug xã, cache kết quả pivot trong một render, thêm min-width scroll cho bảng pivot rộng và sửa bảng chi tiết xã không còn hiển thị tuple/mất nguồn.
+- `tests/test_khtd_service.py` — thêm regression test cho merge per-xã và fallback trạng thái xã legacy/empty-list.
+- `tests/test_khtd_giao_dc.py` — thêm regression test quy đổi VND→triệu trong pivot và bảng chi tiết giữ đúng tên chương trình/nguồn vốn.
+- `BUGMAP.md` — thêm G29 cho lỗi trạng thái per-xã và drill-down Theo dõi Xã sau redesign.
+
+## [2026-08-01] — Thiết kế lại KHTD: nhập per-xã + Theo dõi thực hiện 3 cấp
+- `services/khtd_service.py` — thêm `luu_dot_xa()`: lưu KH per-xã merge vào payload PGD; thêm `trang_thai_xa()`: trả về trạng thái nhập per xã
+- `tabs/tab_khtd_giao_dc.py` — `_section_b_giao()`: thêm selectbox chọn xã + progress indicator, lưu bằng `luu_dot_xa()`
+- `tabs/tab_khtd_giao_dc.py` — thêm `_build_th_map_toan_cn()`, `_tinh_pivot_kh_th()`, `_html_pivot_kh_th()`: bảng pivot PGD × CT × (KH/TH/CL/%)
+- `tabs/tab_khtd_giao_dc.py` — thêm `_section_f_theo_doi()`: tab "📍 Theo dõi Xã" với 3 cấp drill-down (PGD → KPI cards xã → bảng CT chi tiết)
+- `tabs/tab_khtd_giao_dc.py` — `render()`: thêm tab "📍 Theo dõi Xã" vào danh sách tab CN
+
+## [2026-08-01] — Thiết kế lại Điện báo Cân đối không dùng expander
+- `tabs/tab_candoi.py` — thay toàn bộ expander bằng popover quản lý tệp/hướng dẫn và container hiển thị trực tiếp cho lịch sử, bảng chỉ tiêu, danh sách sheet, kiểm tra lệch
+- `tests/test_tab_candoi.py` — bổ sung regression test bảo đảm tab không tái sử dụng expander
+
+## [2026-08-01] — Tối ưu tốc độ: pre-compute numeric columns
+- `app.py` — `_toi_uu_dtype()`: pre-compute `pd.to_numeric()` cho 7 cột tài chính cốt lõi (dư nợ, quá hạn, khoanh, lãi) ngay khi load HSTD → tất cả tab không cần gọi lặp lại
+- `app.py` — thêm `_num0()` fast path: cột đã numeric chỉ `.fillna(0)`, cột object/string fallback `pd.to_numeric(errors="coerce")` để tránh sai số ở caller ngoài `_load_hstd()`.
+- `app.py` — `_enrich_hstd()` và `_loc_hstd_active()`: dùng `_num0()` thay cho `pd.to_numeric()` lặp lại, vẫn an toàn với object numeric.
+- `app.py` — nhánh `doc_hstd_pgd()` và `doc_hstd_toan_cn_pgd()` trong workspace operation được đưa qua `_toi_uu_dtype()` trước khi enrich/truyền tabs.
+- `app.py` — thêm import `COT_LAI_TON`, `COT_LAI_THANG`, `COT_LAI_TON_QH`
+- `tests/test_app_numeric_optimization.py` — thêm regression test cho 7 cột tài chính pre-compute, NQ11 enrich không nối chuỗi object, và lọc hồ sơ active với object numeric.
+- `BUGMAP.md` — thêm C36 về rủi ro PGD operation không đi qua `_toi_uu_dtype()` sau tối ưu.
+
+## [2026-08-01] — Review redesign upload Điện báo Cân đối
+- `tabs/tab_candoi.py` — không render expander lịch sử rỗng khi chưa có metadata upload; hiển thị caption ngắn thay thế.
+- `tests/test_tab_candoi.py` — cập nhật regression test theo helper `_upload_one_file()` mới, kiểm tra key uploader/version chung và lịch sử upload không rỗng.
+- `BUGMAP.md` — thêm B60 cho lỗi expander lịch sử Điện báo rỗng sau redesign.
+
+## [2026-08-01] — Thiết kế lại phần nhập dữ liệu tab Điện báo Cân đối
+- `tabs/tab_candoi.py` — thêm `_upload_one_file()` helper giảm trùng lặp logic upload (3× → 1×)
+- `tabs/tab_candoi.py` — redesign `_render_upload_section()`: file hiện tại full-width nổi bật, 2 file tùy chọn compact 2 cột, bỏ date_input disabled kỳ trước (→ text tĩnh), bỏ HTML divider/badge thừa, lịch sử upload chuyển vào expander
+
+## [2026-08-01] — Tách rõ card Điện báo kỳ trước chỉ cho năm trước
+- `tabs/tab_candoi.py` — bỏ radio `Mốc kỳ trước` trong card upload `Điện báo kỳ trước`; card này luôn dùng mốc `31/12/{năm trước}` và khóa `date_input` để không lẫn với tháng trước.
+- `tests/test_tab_candoi.py` — thêm regression test đảm bảo card kỳ trước không còn option cuối tháng trước/tự chọn.
+- `BUGMAP.md` — thêm B59 ghi nhận lỗi card kỳ trước ôm nhiều mốc thời gian sau khi đã có card tháng trước riêng.
+
+## [2026-08-01] — Hoàn thiện review Điện báo tháng trước trong Cân đối
+- `tabs/tab_candoi.py` — thêm `_lookup_optional_vnd()` để phân biệt chỉ tiêu tháng trước bị thiếu với giá trị thật bằng 0; dòng tính toán `TG TT TCTC & TK CN` để trống cột tháng trước khi thiếu thành phần thay vì tính sai.
+- `tabs/tab_candoi.py` — mặc định ngày file tháng trước về cuối tháng trước và không tự ghi `dienbao_ky_pm*` khi chưa có file/metadata hoặc chưa có thao tác user; lịch sử upload hiển thị thêm metadata `prev_month`.
+- `tabs/tab_candoi.py` — `_build_export_frames()` chỉ thêm cột tháng trước khi `rows_prev_month` có dữ liệu thật, đồng bộ với bảng UI.
+- `services/upload_service.py` — sau khi ghi metadata `dienbao_meta_*` vào `kv_store`, gọi `db.ghi_audit()` ngay kế tiếp theo rule audit.
+- `tests/test_tab_candoi.py` — thêm regression test cho optional lookup, export không thêm cột khi list tháng trước rỗng, và dòng TG tháng trước thiếu thành phần.
+- `tests/test_upload_service.py` — thêm regression test thứ tự `ghi_kv` → `ghi_audit` cho metadata Điện báo.
+
+## [2026-08-01] — Thêm upload Điện báo tháng trước + cột tăng/giảm tháng trước trong bảng chi tiết & xuất file
+- `config.py` — thêm `DB_PREV_MONTH_CACHE = cache/dienbao_prev_month.xlsx`.
+- `data/pgd.py` — thêm nhánh `loai == "dienbao_prev_month"` trong `duong_dan_pgd()`.
+- `services/upload_service.py` — thêm nhánh `loai == "prev_month"` trong `luu_dienbao()`, import `DB_PREV_MONTH_CACHE`.
+- `tabs/tab_candoi.py` — thêm khu upload cột 3 "📅 Điện báo tháng trước" trong `_render_upload_section()` (3 cột thay 2); thêm `store_prev_month`, `path_prev_month`, `path_dien_prev_month`; fix cột 3: ngày mặc định = tháng liền trước kỳ HT (trước sai = hôm nay), thêm badge `NĂM {năm}`, đổi widget key `inp_ky_pm2` để reset state cũ.
+- `tabs/tab_candoi.py` — đọc `db_prev_month_rows` từ file tháng trước; thêm `_he_so_pm`; tính `tien_gui_tt_pm` (scope ngoài `if db_prev_rows` để tránh NameError).
+- `tabs/tab_candoi.py` — `build_row()` thêm tham số `val_pm` + 3 cột mới: "Tháng trước", "Tăng/giảm so với tháng trước", "Tỷ lệ % tháng trước"; đổi tên "Chênh lệch" → "Tăng/giảm so với năm trước", "Tỷ lệ %" → "Tỷ lệ % năm trước".
+- `tabs/tab_candoi.py` — bảng chi tiết UI: thêm cột tháng trước (chỉ hiện khi có dữ liệu), format số đúng.
+- `tabs/tab_candoi.py` — `_build_export_frames()` thêm `rows_prev_month` + `he_so_prev_month`; xuất Excel/PDF/HTML cũng có cột tháng trước khi có dữ liệu.
+
+## [2026-08-01] — Thêm card KPI Nợ khoanh vào Cân đối
+- `tabs/tab_candoi.py` — thêm card `Nợ khoanh` vào hàng KPI thứ hai; giá trị cộng `Dư nợ Khoanh KHA + Dư nợ Khoanh KHB` cho hiện tại và kỳ so sánh, hỗ trợ cả chế độ Kế hoạch giao.
+- `tabs/tab_candoi.py` — gom phép cộng vào `_lookup_khoanh_vnd()` để ba nhánh dùng chung một nguồn logic.
+- `tests/test_tab_candoi.py` — thêm regression test phép cộng KHA/KHB, chế độ KH và ba call-site trong `render()`.
+
+## [2026-08-01] — Bỏ trang trắng cuối PDF Cân đối
+- `services/bc_tongquan_service.py` — chuyển dòng nguồn hệ thống từ flowable cuối story sang footer cố định trên từng trang, tránh phát sinh trang trắng khi bảng Theo chương trình vừa đầy trang.
+- `tests/test_bc_tongquan_pdf.py` — thêm regression test với bảng dài, xác nhận trang cuối vẫn chứa header/dữ liệu bảng chứ không chỉ có footer.
+- `BUGMAP.md` — thêm F11 ghi nhận lỗi footer đẩy ra trang trắng cuối PDF.
+
+## [2026-08-01] — Review và sửa xuất Excel/PDF/In bảng Cân đối
+- `tabs/tab_candoi.py` — tách dựng dữ liệu xuất khỏi sub-tab Tổng quan để không còn biến chưa khởi tạo; bỏ dòng tiền gửi tính toán khi KH thiếu thành phần; chuẩn hóa tiền sang triệu đồng; escape HTML, chuẩn hóa tên file Windows và bắt lỗi sinh Excel/HTML/PDF rỗng.
+- `services/bc_tongquan_service.py` — xuất toàn bộ sheet DataFrame không rỗng thay vì chỉ khóa `Tổng hợp`; đổi sang A4 ngang, co giãn độ rộng cột, format số, escape nội dung, thêm người xuất và số trang.
+- `tests/test_tab_candoi.py` — thêm regression test cho KH thiếu thành phần, xuất độc lập sub-tab, HTML escape và tên file hợp lệ.
+- `tests/test_bc_tongquan_pdf.py` — thêm test đọc lại PDF, xác nhận cả hai bảng và nội dung chính đều tồn tại.
+- `BUGMAP.md` — thêm B57, F10 và J72 cho ba nhóm lỗi đã sửa.
+
+## [2026-08-01] — Bỏ card Tổng huy động vốn khỏi KPI Cân đối
+- `tabs/tab_candoi.py` — bỏ card `Tổng huy động vốn` ở cả nhánh có/không có kỳ so sánh; vẫn giữ lookup chỉ tiêu làm thành phần tính `TG TT TCTC & TK CN`, lưới không có kỳ so sánh giảm còn 3 cột.
+- `tests/test_tab_candoi.py` — cập nhật regression test bảo đảm card không được render nhưng công thức và lookup Tổng huy động vốn vẫn còn.
+
+## [2026-08-01] — Chặn KPI tiền gửi tính sai khi Kế hoạch giao thiếu thành phần
+- `tabs/tab_candoi.py` — thêm lookup KH tùy chọn phân biệt chỉ tiêu không tồn tại với giá trị thực bằng 0, hỗ trợ cả tên `TK&VV`/`TKVV`; khi thiếu Tổng huy động vốn hoặc Tiền gửi tiết kiệm qua Tổ TK&VV thì không tính/không hiển thị KPI `TG TT TCTC & TK CN` và cảnh báo rõ trên UI.
+- `tests/test_tab_candoi.py` — cập nhật regression test theo bộ KPI hiện hành và bổ sung test cho alias, giá trị 0, chỉ tiêu thiếu cùng điều kiện ẩn KPI.
+- `BUGMAP.md` — thêm B56 ghi nhận nhánh Kế hoạch giao từng âm thầm dùng 0 cho thành phần không tìm thấy.
+
+## [2026-08-01] — Bỏ KPI Vốn TW và Huy động vốn khỏi Tổng quan Cân đối
+- `tabs/tab_candoi.py` — bỏ hai card `Vốn TW (KHA)` và `Huy động vốn` ở cả nhánh có/không có kỳ so sánh do số liệu chưa đúng; lưới KPI đầu tiên đổi từ 4 xuống 2 cột và xóa các lookup chỉ phục vụ hai card này.
+- `tests/test_tab_candoi.py` — thêm regression test bảo đảm hai KPI không được render lại ngoài ý muốn.
+- `BUGMAP.md` — thêm B55 ghi nhận hai KPI Tổng quan dùng số liệu chưa phù hợp.
+
+## [2026-08-01] — Cải thiện chẩn đoán xung đột port của launcher
+- `Chay_VBSP_SCM.bat` — khử PID trùng do nhiều listener IPv4/IPv6; giữ nguyên fail-safe chỉ tắt tiến trình đã xác minh; khi từ chối sẽ hiển thị và ghi log tên/đường dẫn tiến trình; tự xóa runtime PID marker nếu PID đã kết thúc.
+- `tests/test_launcher_batch.py` — thêm regression assertions cho khử PID trùng, chẩn đoán tiến trình, dọn marker hết hạn và quy ước port QA.
+- `AGENTS.md` — dành riêng port `8502` cho app thật/launcher; preview và visual QA của agent dùng port `18502`.
+- `BUGMAP.md` — thêm J71 về cảnh báo PID lặp và thiếu thông tin khi port bị runtime trung gian chiếm.
+
+## [2026-08-01] — Cập nhật KPI cards Cân đối: bỏ Vốn TW (KHA), thêm Tổng huy động vốn + Tiền gửi TT TCTC & TK CN
+- `tabs/tab_candoi.py` — bỏ chỉ tiêu "Nguồn vốn cân đối từ TW (KHA)" khỏi KPI grid; thêm lookup `huy_dong_ht`, `tiet_kiem_to_tkvv_ht` và tính `tien_gui_tt_ht = huy_dong_ht - tiet_kiem_to_tkvv_ht` (Tiền gửi thanh toán TCTC & TK cá nhân = Tổng huy động vốn − Tiền gửi tiết kiệm qua Tổ TK&VV); thêm lookup tương ứng cho kỳ trước (`huy_dong_pv`, `tiet_kiem_to_tkvv_pv`, `tien_gui_tt_pv`) cả 2 nhánh KH/normal; row 1 đổi từ 2→4 cards: Tổng dư nợ | Tổng huy động vốn | TG TT TCTC & TK CN | Vốn UTĐT ĐP.
+- `tabs/tab_candoi.py` — bảng chi tiết tất cả chỉ tiêu: bỏ 2 dòng "Tiền gửi của tổ chức, cá nhân" và "Tiền gửi tiết kiệm dân cư" (skip bằng contains); chèn dòng tính toán "TG TT TCTC & TK CN (= HĐV − TK qua Tổ TK&VV)" ngay sau dòng "Tổng huy động vốn"; thêm `tien_gui_tt_pv = 0.0` default trước nhánh `if db_prev_rows` để biến luôn tồn tại.
+- `tabs/tab_candoi.py` — thêm nút "Xuất PDF" (dùng `xuat_pdf_bc` từ `bc_tongquan_service`) + nút "In bảng" (tạo HTML standalone có CSS `@media print` + nút `window.print()`, download `.html`); refactor block xuất file thành 3 cột `st.columns(3)`: Excel | PDF | In; data xuất cũng áp dụng skip 2 dòng tiền gửi + chèn dòng tính toán TG TT TCTC & TK CN; thêm helper `_build_print_html()`.
+
+## [2026-08-01] — Redesign KPI cards sub-tab Tổng quan (Cân đối)
+- `utils_theme.py` — thêm CSS section 21 `.cdk-*`: KPI card nền layered (radial glow theo tone + gradient surface), viền top accent, hover lift + glow, animation reveal so le (`cdkIn` + `--i`), delta pill (up/down/flat), hàng stats 3 cột có hairline divider; 4 tone accent/info/warn/error dùng semantic token, tương thích dark mode.
+- `utils_theme.py` — hàng stats `.cdk-stat`: tăng độ sáng/tương phản (giá trị → `text_heading` + 0.88rem, caption → `text_sub`) do phản hồi "màu hơi tối".
+- `utils_theme.py` + `tabs/tab_candoi.py` — hàng stats đổi từ 3 cột ngang (bị `text-overflow: ellipsis` cắt mất giá trị ở card hẹp hàng 4 cột) sang layout dọc dạng bảng số liệu: mỗi dòng `nhãn (trái) — giá trị (phải)` dùng trọn chiều rộng card, divider mảnh giữa các dòng; đổi thứ tự HTML trong `_kpi_card_html()` (span trước b) để nhãn nằm trái. Fix phản hồi "dãy card trên bị che dữ liệu".
+- `tabs/tab_candoi.py` — thêm helpers `_fmt_so_vn()`, `_stat_ty()`, `_stat_cl()`, `_stat_pct()`, `_kpi_card_html()`, `_render_kpi_grid()`; thay 4 lời gọi `kpi_row()` trong sub-tab Tổng quan bằng `_render_kpi_grid()` với stats cấu trúc (kỳ trước | chênh lệch | tỷ trọng/NQH) thay cho caption nối "·"; bỏ import `kpi_row` + 3 helper lồng `_ss`/`_trong`/`_gop` (dead code).
+
+## [2026-08-01] — Thêm bảng lịch sử điện báo đã upload + fix key metadata prev
+- `tabs/tab_candoi.py` — thêm `_render_dienbao_lich_su()`: hiển thị bảng tóm tắt các điện báo đã upload (loại, tên file, kỳ số liệu, ngày upload, số sheet, số chỉ tiêu) ngay trên khu upload để user biết trạng thái.
+- `tabs/tab_candoi.py` dòng ~520 — fix bug: đọc metadata kỳ trước dùng đúng key `dienbao_meta_prev{key_sfx}` (trước đó ghi sai `dienbao_meta_pv` → không khớp với key upload_service ghi).
+
+## [2026-08-01] — Cải tiến upload Điện báo: phân biệt mốc 31/12 vs tháng trước + hiệu suất
+- `services/upload_service.py` — thêm `trich_xuat_ky_dienbao()` parse ngày từ tên file; `luu_dienbao()` ghi metadata vào kv_store key `dienbao_meta_{loai}{key_sfx}` sau upload thành công; thông báo kết quả upload kèm kỳ số liệu phát hiện (hoặc cảnh báo nếu không phát hiện).
+- `services/__init__.py` — export `trich_xuat_ky_dienbao`.
+- `tabs/tab_candoi.py` — thay `text_input` kỳ số liệu bằng `date_input(format="DD/MM/YYYY")` + auto-fill từ metadata; thêm radio "Mốc kỳ trước" (31/12 / cuối tháng trước / tự chọn) cho file prev; thêm `_parse_ddmmyyyy()` helper; truyền `ts=ts_file()` cho `liet_ke_sheet_dienbao()`.
+- `tabs/tab_candoi.py` — cải thiện UI khu upload: mỗi file đóng khung `container(border)` riêng, header có tag pill năm, chip trạng thái file (dot phát sáng) thay `st.success`/`st.warning` thô, divider + nhãn kỳ số liệu uppercase, badge "tự phát hiện"; thêm helper `_db_file_chip()`.
+- `utils_theme.py` — thêm khối CSS `#20` cho card upload Điện báo (`.db-up-head/.db-up-tag/.db-up-file/.db-up-badge/.db-up-div/.db-up-kylabel` + animation `dbpulse`), dùng token semantic, tương thích dark mode.
+- `data/hstd.py` — thêm `@st.cache_data(ttl=7200)` cho `liet_ke_sheet_dienbao()`; tối ưu đọc 12 dòng đầu thay vì toàn sheet; dùng openpyxl read_only lấy kích thước sheet.
+- `tests/test_upload_service.py` — thêm 7 test cho `trich_xuat_ky_dienbao()`.
+- `tests/test_tab_candoi.py` — thêm 2 test cho `_parse_ddmmyyyy()`.
+
+## [2026-08-01] — Xác minh lưu nhãn kỳ số liệu và thứ tự audit
+- `tabs/tab_candoi.py` — gom lưu nhãn vào `_persist_ky_label_if_changed()`; tính thông báo trước, sau đó gọi liền kề `db.ghi_kv()` và `db.ghi_audit()`.
+- `tests/test_tab_candoi.py` — kiểm tra thứ tự sự kiện KV → audit, xóa nhãn bằng khoảng trắng và không ghi lặp sau rerun.
+- `BUGMAP.md` — cập nhật B54 với helper và regression test kiểm tra audit/ghi một lần.
+
+## [2026-08-01] — Cho phép xóa nhãn kỳ số liệu Điện báo
+- `tabs/tab_candoi.py` — chuẩn hóa và so sánh nhãn kỳ trước khi lưu; giá trị rỗng được ghi vào kv_store để quay về nhãn fallback, kèm audit ngay sau mỗi lần ghi.
+- `tests/test_tab_candoi.py` — thêm regression test cho thao tác xóa nhãn, trim khoảng trắng và trường hợp không thay đổi.
+- `BUGMAP.md` — thêm B54 về lỗi không thể xóa nhãn kỳ số liệu đã lưu.
+
+## [2026-08-01] — Kỳ số liệu Điện báo: user tự gắn nhãn, phân biệt mốc so sánh
+- `tabs/tab_candoi.py` dòng ~339-354, ~393-408 — thêm text_input "Kỳ số liệu" cho file HT và file kỳ trước trong khu upload; lưu kv_store `dienbao_ky_ht{key_sfx}` / `dienbao_ky_pv{key_sfx}` + audit.
+- `tabs/tab_candoi.py` dòng ~526-530 — đọc nhãn kỳ từ kv_store, dùng làm `label_ht`/`label_pv` thay vì hardcode "31/12/{năm}".
+- `tabs/tab_candoi.py` dòng ~577 — milestone radio hiện "📅 vs {nhãn kỳ trước}" thay vì "vs 31/12 năm trước".
+- `tabs/tab_candoi.py` dòng ~634, ~679 — label_pv dùng nhãn kv_store cho cả mốc 31/12 và custom sentinel.
+
+## [2026-08-01] — Không dùng lại sheet hiện tại làm mốc so sánh Điện báo
+- `tabs/tab_candoi.py` — loại sheet hiện tại khỏi nguồn tự động 31/12/KH, tránh fallback nhầm sang file kỳ trước nhưng vẫn giữ chế độ KH.
+- `tests/test_tab_candoi.py` — thêm regression test cho sheet `Y`/KH đang được chọn làm sheet hiện tại.
+- `BUGMAP.md` — thêm B53 về lỗi nguồn tự động trùng sheet hiện tại.
+
+## [2026-08-01] — Review & fix Điện báo Cân đối và KPI sub-info
+- `components/delta_card.py` — bọc metric và caption phụ trong cùng container có border; `sub` được forward an toàn qua `kpi_row()`.
+- `tabs/tab_candoi.py` — nhận diện file kỳ trước bằng `isfile()` + `samefile()`, format tên file Windows ổn định trên CI, hiển thị rõ nguồn fallback; không che mốc 0, tránh double-round và chỉ tính tỷ trọng khi Tổng DN dương.
+- `tests/test_delta_card.py` — thêm regression test cho layout container và `kpi_row(..., sub=...)`.
+- `tests/test_tab_candoi.py` — thêm regression test loại alias/hard-link trỏ cùng file hiện tại.
+- `SIGNATURES.md` — cập nhật chữ ký `delta_card(..., sub: str | None = None)`.
+- `BUGMAP.md` — thêm B52 và J70 cho các lỗi layout/format KPI và nhận diện đường dẫn file kỳ trước.
+
+## [2026-07-31] — KPI cards Điện báo Cân đối hiển thị thêm thông tin phụ
+- `components/delta_card.py` — thêm tham số `sub` cho `delta_card()`: dòng caption thông tin phụ bên dưới thẻ.
+- `tabs/tab_candoi.py` dòng ~726-742 — thêm helper `_ss()`, `_trong()`, `_gop()` dùng chung 2 nhánh có/không có dữ liệu so sánh.
+- `tabs/tab_candoi.py` dòng ~780-840 — mỗi card thêm sub: giá trị kỳ trước + chênh lệch tuyệt đối (tỷ), tỷ trọng % trên tổng dư nợ, tỷ lệ NQH kỳ trước; chế độ KH hiện "KH giao: X tỷ".
+
+## [2026-07-31] — "Tùy chọn khác" Điện báo: gộp option File kỳ trước vào selectbox
+- `tabs/tab_candoi.py` dòng ~214-241 — thêm `_FILE_PREV_SENTINEL` và helper `_fmt_nguon_ss()`.
+- `tabs/tab_candoi.py` dòng ~568-589 — "Tùy chọn khác" luôn hiện selectbox (sheet khác + option "📁 File kỳ trước"); sentinel → `sheet_pv=None` → dùng `path_prev`.
+- `tabs/tab_candoi.py` dòng ~602-605 — `label_pv` = "File kỳ trước" khi chọn sentinel.
+- `tests/test_tab_candoi.py` — thêm regression test cho file chỉ có sheet `Formula`, option file kỳ trước và label nguồn so sánh.
+
+## [2026-07-31] — Fix mốc so sánh "Tùy chọn khác" Điện báo Cân đối không hiện gì
+- `tabs/tab_candoi.py` dòng ~214, ~549 — lọc sheet hiện tại khỏi selectbox so sánh; chỉ fallback khi đường dẫn kỳ trước là file hợp lệ, khác file hiện tại; thêm thông báo khi không còn sheet so sánh.
+- `tests/test_tab_candoi.py` — thêm regression test cho danh sách sheet custom và điều kiện fallback file kỳ trước.
+- `BUGMAP.md` — thêm B51 và test phòng ngừa tái phát.
+
+## [2026-07-31] — Hoàn thiện fix Errno 22 khi upload Điện báo
+- `services/upload_service.py` — thay ghi trực tiếp bằng file tạm + `os.replace`, khóa writer trong process, bỏ qua payload trùng và retry bước replace; lỗi ghi không còn làm hỏng file cũ.
+- `tabs/tab_candoi.py` — đọc uploader bằng `getvalue()` và đổi version key sau upload thành công để file không bị xử lý lại trên rerun.
+- `tests/test_upload_service.py`, `tests/test_tab_candoi.py` — thêm regression test cho Errno 22, bảo toàn file cũ và reset uploader.
+- `BUGMAP.md` — cập nhật E20 vì retry ghi trực tiếp trước đó chưa xử lý hết lỗi.
+
+## [2026-07-31] — Fix Errno 22 khi upload ghi đè file Điện báo
+- `services/upload_service.py` — thêm retry 3 lần (0.3s) trong `_ghi_va_xoa_cache()` khi `open("wb")` bị `OSError` trên Windows (file bị khóa tạm thời bởi cache/antivirus).
+- `BUGMAP.md` — thêm E20.
+
+## [2026-07-31] — Chỉ lưu mốc so sánh Điện báo khi user thực sự đổi
+- `tabs/tab_candoi.py` — dùng sự kiện `on_change` để không tự ghi default khi mở tab hoặc ghi đè KV khi mốc cũ tạm không còn trong danh sách; mọi lần ghi thật đều có audit ngay sau đó.
+- `tests/test_tab_candoi.py` — thêm regression test cho lần mở đầu, fallback khi thiếu sheet Y và thao tác đổi thật.
+- `BUGMAP.md` — thêm D8 về lỗi fallback radio tự ghi đè mốc so sánh đã lưu.
+
+## [2026-07-31] — Lưu mốc so sánh Điện báo Cân đối vào kv_store
+- `tabs/tab_candoi.py` — đọc mốc so sánh đã lưu từ kv_store (`candoi_moc_ss`) làm default khi mở tab; tự động lưu + audit khi user đổi mốc. Key phân biệt CN/PGD qua `key_sfx`.
+
+## [2026-07-31] — Di chuyển expander "Đổi file" Điện báo Cân đối lên đầu tab
+- `tabs/tab_candoi.py` — chuyển expander "📤 Đổi file / Upload mới" từ cuối tab lên ngay sau info bar (dòng ~401), xóa expander cũ ở cuối tab để user không phải cuộn xa khi cần đổi file.
+
+## [2026-07-31] — Thêm regression test KH mapping Điện báo Cân đối
+- `tabs/tab_candoi.py` — tách helper lookup/khớp mốc so sánh ra module-level để test trực tiếp và dùng chung trong UI.
+- `tests/test_tab_candoi.py` — thêm test cho KH mapping khi tên chỉ tiêu lệch, ưu tiên `he_so_vnd` trên từng row, và guard biểu đồ/export dùng helper chung.
+- `BUGMAP.md` — cập nhật B50 với test regression mới.
+
+## [2026-07-31] — Fix KH mapping khi xuất/biểu đồ Điện báo Cân đối
+- `tabs/tab_candoi.py` — dùng chung helper tra mốc so sánh để biểu đồ và Excel export cũng áp dụng `_KH_NAME_MAP` khi chọn mốc `Kế hoạch giao`.
+- `tabs/tab_candoi.py` — sửa badge tỷ lệ khớp dữ liệu để chỉ đếm các chỉ tiêu thật sự đang hiển thị sau bộ lọc nhóm.
+- `BUGMAP.md` — thêm B50 về biểu đồ/export Cân đối bị 0 ở chế độ Kế hoạch giao.
+
+## [2026-07-31] — Nâng cấp Ma trận PGD trong Điện báo Cân đối
+- `data/hstd.py` — thêm nhận diện layout Điện báo linh hoạt cho sheet ma trận có header ở dòng 5-6; đọc đúng sheet có cột `Tổng` và sheet không có cột `Tổng` bằng cách tự cộng các PGD.
+- `tabs/tab_candoi.py` — tab `Ma trận PGD` chỉ chọn sheet ma trận thật, hiển thị số đơn vị/số chỉ tiêu/số dòng lệch và kiểm tra `Cộng` so với tổng các PGD.
+- `tests/test_hstd.py` — thêm regression test cho hai layout ma trận `TonghopBC` và `Dulieu`.
+
+## [2026-07-31] — Fix parser Điện báo bỏ sót chỉ tiêu vốn cân đối
+- `data/hstd.py` — thu hẹp điều kiện bỏ qua header/metadata trong `doc_dienbao()`, không loại chỉ tiêu `Nguồn vốn cân đối từ TW (KHA)` chỉ vì chứa từ "cân đối".
+- `tests/test_hstd.py` — thêm regression test giữ chỉ tiêu vốn cân đối và bỏ dòng metadata `Đơn vị tính`.
+
+## [2026-07-31] — Fix quy đổi đơn vị Điện báo khi so sánh Cân đối
+- `data/hstd.py` — thêm metadata tường minh `don_vi_nguon`, `he_so_vnd`, `don_vi_label` cho `doc_dienbao()` và `doc_dienbao_matrix()`; giữ `don_vi_trieu` để tương thích code cũ.
+- `tabs/tab_candoi.py` — chuẩn hóa KPI, bảng chi tiết, bảng chương trình, biểu đồ và Excel export về VND trước khi so sánh; xử lý đúng khi sheet hiện tại/kỳ trước khác đơn vị nguồn.
+- `services/khnv_bao_cao_service.py` — dùng `he_so_vnd` mới khi tổng hợp Điện báo, fallback tương thích `don_vi_trieu` cũ.
+- `workspaces/ws_management.py` — map legacy label "📡 Điện báo & KH vs TH" sang "📡 Điện báo Cân đối" để giữ đúng menu sau khi đổi tên.
+- `tests/test_hstd.py` — bổ sung regression test nhận diện `Đồng` và `Nghìn đồng` bằng `don_vi_nguon`.
+
+## [2026-07-30] — Fix + hoàn thiện tab Điện báo Cân đối (tab_candoi)
+- `tabs/tab_candoi.py` — fix `_to_ty()` regression: chia đúng hệ số theo `don_vi_trieu` (triệu→/1000, nghìn→/1_000_000) thay vì cứng /1e9
+- `tabs/tab_candoi.py` — đọc `don_vi_trieu` từ kết quả `doc_dienbao()` để xác định đơn vị động
+- `tabs/tab_candoi.py` — gom `SCMStateManager()` về 1 lần khởi tạo duy nhất
+- `tabs/tab_candoi.py` — **thêm selector "Mốc so sánh"**: vs 31/12, vs Kế hoạch giao, Tùy chọn khác; auto-map sheet
+- `tabs/tab_candoi.py` — **thêm `_KH_NAME_MAP`** ánh xạ tên chỉ tiêu M/DB ↔ KH giao, `_lookup_kh()` helper
+- `tabs/tab_candoi.py` — **KH mode**: KPI hiển thị % Hoàn thành KH thay vì delta; badge tỷ lệ khớp dữ liệu
+- `tabs/tab_candoi.py` — **KH mode**: bảng chi tiết + Theo CT dùng `_lookup_kh` fallback khi exact match thất bại
+- `tabs/tab_candoi.py` — cập nhật docstring phản ánh đúng 4 sub-tabs + mốc so sánh
+- `data/hstd.py` — thêm `don_vi_trieu` cho dòng NQH con trong `doc_dienbao()` (trước đây thiếu → KeyError tiềm ẩn)
+- `data/hstd.py` — thêm `@st.cache_data(ttl=7200)` cho `doc_dienbao_matrix()` (trước đây đọc lại file mỗi render)
+- `tab_registry.py` — đổi tên tab: "📡 Điện báo & KH vs TH" → "📡 Điện báo Cân đối"
+- `workspaces/ws_management.py` — đồng bộ tên menu "📡 Điện báo Cân đối"
+- `workspaces/ws_management.py` — dời nhóm "Kế hoạch Tín dụng" lên ngay sau "Nội bộ Phòng" (trước nằm sau "Kiểm soát")
+
+## [2026-07-27] — Fix nhóm A: tab CBTD & Địa bàn (phân quyền, numeric, key prefix, cache)
+- `tabs/tab_cbtd.py` — CRUD chỉ cho `la_quan_ly_cn(role)` (trước đây chuyenvien_cn cũng sửa được).
+- `tabs/tab_cbtd.py` — thêm `pd.to_numeric(errors="coerce")` trước `.sum()` dư nợ (2 vị trí).
+- `tabs/tab_cbtd.py` — thêm `_kp` prefix cho toàn bộ 28 widget key, tránh DuplicateElementKey khi mount cả CN lẫn PGD.
+- `tabs/tab_cbtd.py` — thêm `st.cache_data.clear()` sau mỗi thao tác thêm/sửa/xóa CBTD.
+- `tabs/tab_cbtd.py` — thêm `logger.error()` cho khối cross-link Tổ TK&VV (trước đây nuốt lỗi).
+
+## [2026-07-27] — Launcher nhận đúng Streamlit chạy từ terminal
+- `app.py` — ghi PID marker gồm PID, thư mục dự án và đường dẫn app khi thực sự chạy dưới Streamlit.
+- `Chay_VBSP_SCM.bat` — dùng PID marker làm fallback khi Windows không trả process metadata; giữ exact-path check để không kill nhầm dự án Streamlit khác và chỉ gọi WMIC khi executable còn tồn tại.
+- `tests/test_launcher_batch.py` — thêm regression assertions cho marker scope và cấm fallback path tương đối quá rộng.
+- `BUGMAP.md` — thêm J69 về launcher không nhận process Streamlit khi CIM trả metadata rỗng.
+
 ## [2026-07-26] — Ẩn module KH Công việc KH-NV khỏi phân hệ PGD
 - `tabs/tab_theo_doi_nhap/constants.py` — gắn phạm vi `cn` cho builtin module `khcv`.
 - `tabs/tab_theo_doi_nhap/__init__.py` — lọc builtin module theo visibility và phân hệ trước khi tạo dropdown.

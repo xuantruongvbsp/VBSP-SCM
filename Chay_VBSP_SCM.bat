@@ -11,6 +11,7 @@ set "PORT=8502"
 set "URL=http://localhost:%PORT%"
 set "PY_EXE=%ROOT%\venv\Scripts\python.exe"
 set "TMP_DIR=%ROOT%\tmp"
+set "APP_PID_FILE=%TMP_DIR%\vbsp_streamlit.pid"
 set "LOG_DIR=%ROOT%\logs"
 set "LOCK_DIR=%TMP_DIR%\vbsp_launcher.lock"
 set "PROBE_FILE=%TMP_DIR%\python_exec_check.txt"
@@ -22,6 +23,7 @@ set "REQUIREMENTS_LOCK_FILE=%ROOT%\requirements.lock.txt"
 set "PIP_VERSION=26.1.2"
 set "LOG_RETENTION_DAYS=30"
 set "JUST_INSTALLED=0"
+set "HEADLESS=false"
 
 rem Python 3.12 mac dinh; fallback path co dinh o buoc auto-detect
 set "PY_CMD=py"
@@ -31,6 +33,7 @@ if not exist "%TMP_DIR%" mkdir "%TMP_DIR%" >nul 2>&1
 if not exist "%LOG_DIR%" mkdir "%LOG_DIR%" >nul 2>&1
 
 if /I "%~1"=="--self-test" goto :self_test
+if /I "%~1"=="--no-browser" set "HEADLESS=true"
 
 rem Archive log cua lan chay truoc, sau do xoa log launcher qua han.
 set "RUN_STAMP=%date%_%time%"
@@ -47,6 +50,7 @@ forfiles /p "%LOG_DIR%" /m "launcher_*.log" /d -%LOG_RETENTION_DAYS% /c "cmd /c 
 
 echo [%date% %time%] START Chay_VBSP_SCM.bat > "%LAUNCH_LOG%"
 echo CWD=%CD% >> "%LAUNCH_LOG%"
+call :cleanup_stale_pid_marker
 
 rem ============================================================================
 rem  1. Lock check - tranh chay 2 lan
@@ -334,9 +338,15 @@ if not exist "%PY_EXE%" (
 )
 
 echo.
-echo   Streamlit se tu mo trinh duyet neu Windows cho phep.
-echo   Neu trinh duyet khong tu mo, vao thu cong:
-echo   %URL%
+if /I "%HEADLESS%"=="true" (
+    echo   Che do DEV: Streamlit khong tu mo them tab trinh duyet.
+    echo   Giu nguyen tab Chrome hien co, hoac mo thu cong:
+    echo   %URL%
+) else (
+    echo   Streamlit se tu mo trinh duyet neu Windows cho phep.
+    echo   Neu trinh duyet khong tu mo, vao thu cong:
+    echo   %URL%
+)
 echo.
 echo   De tat app: quay lai cua so nay va nhan Ctrl+C.
 echo.
@@ -344,7 +354,7 @@ echo [%date% %time%] Start streamlit run >> "%LAUNCH_LOG%"
 
 "%PY_EXE%" -m streamlit run app.py ^
   --server.port %PORT% ^
-  --server.headless false ^
+  --server.headless %HEADLESS% ^
   --browser.gatherUsageStats false
 
 set "APP_RC=%errorlevel%"
@@ -368,29 +378,72 @@ exit /b 1
 :kill_port_processes
 set "KILLED_PIDS="
 set "KILL_FAILED=0"
+set "SEEN_PIDS="
 for /f "tokens=5" %%p in ('netstat -ano ^| findstr ":%PORT% " ^| findstr "LISTENING"') do (
-    call :is_vbsp_process %%p
-    if errorlevel 1 (
-        echo [%date% %time%] REFUSE: PID %%p is not verified as VBSP-SCM >> "%LAUNCH_LOG%"
-        echo   CANH BAO: PID %%p khong duoc xac minh la VBSP-SCM.
-        set "KILL_FAILED=1"
-    ) else (
-        echo [%date% %time%] Stop verified VBSP-SCM on port %PORT%, PID %%p >> "%LAUNCH_LOG%"
-        echo   Tat phien VBSP-SCM cu PID %%p...
-        taskkill /F /PID %%p >nul 2>&1
-        if errorlevel 1 (
-            echo [%date% %time%] WARN: taskkill failed for PID %%p >> "%LAUNCH_LOG%"
-            echo   CANH BAO: Khong tat duoc PID %%p.
-            set "KILL_FAILED=1"
-        ) else (
-            set "KILLED_PIDS=!KILLED_PIDS! %%p"
-        )
-    )
+    call :register_pid_once %%p
+    if not errorlevel 1 call :handle_port_pid %%p
 )
 if not "!KILLED_PIDS!"=="" timeout /t 2 >nul
 if "!KILL_FAILED!"=="1" (
     netstat -ano | findstr ":%PORT% " | findstr "LISTENING" >nul 2>&1
     if not errorlevel 1 exit /b 1
+)
+exit /b 0
+
+:register_pid_once
+for %%s in (!SEEN_PIDS!) do if "%%s"=="%~1" exit /b 1
+set "SEEN_PIDS=!SEEN_PIDS! %~1"
+exit /b 0
+
+:handle_port_pid
+set "PORT_PID=%~1"
+call :is_vbsp_process %PORT_PID%
+if errorlevel 1 (
+    echo [%date% %time%] REFUSE: PID %PORT_PID% is not verified as VBSP-SCM >> "%LAUNCH_LOG%"
+    echo   CANH BAO: PID %PORT_PID% khong duoc xac minh la VBSP-SCM.
+    call :show_process_info %PORT_PID%
+    set "KILL_FAILED=1"
+) else (
+    echo [%date% %time%] Stop verified VBSP-SCM on port %PORT%, PID %PORT_PID% >> "%LAUNCH_LOG%"
+    echo   Tat phien VBSP-SCM cu PID %PORT_PID%...
+    taskkill /F /PID %PORT_PID% >nul 2>&1
+    if errorlevel 1 (
+        echo [%date% %time%] WARN: taskkill failed for PID %PORT_PID% >> "%LAUNCH_LOG%"
+        echo   CANH BAO: Khong tat duoc PID %PORT_PID%.
+        set "KILL_FAILED=1"
+    ) else (
+        set "KILLED_PIDS=!KILLED_PIDS! %PORT_PID%"
+    )
+)
+exit /b 0
+
+:show_process_info
+set "INFO_PID=%~1"
+set "PID_DIAG_FILE=%TMP_DIR%\vbsp_pid_diag_%INFO_PID%.txt"
+del "%PID_DIAG_FILE%" >nul 2>&1
+powershell.exe -NoLogo -NoProfile -NonInteractive -Command "$p=Get-CimInstance Win32_Process -Filter 'ProcessId=%INFO_PID%' -ErrorAction SilentlyContinue; if ($null -eq $p) { Write-Output '      Khong doc duoc thong tin tien trinh.' } else { $path=$p.ExecutablePath; if ([string]::IsNullOrWhiteSpace($path)) { $path='(khong doc duoc)' }; Write-Output ('      Ten: ' + $p.Name); Write-Output ('      Duong dan: ' + $path) }" > "%PID_DIAG_FILE%" 2>nul
+if exist "%PID_DIAG_FILE%" (
+    type "%PID_DIAG_FILE%"
+    type "%PID_DIAG_FILE%" >> "%LAUNCH_LOG%"
+)
+del "%PID_DIAG_FILE%" >nul 2>&1
+exit /b 0
+
+:cleanup_stale_pid_marker
+if not exist "%APP_PID_FILE%" exit /b 0
+set "STALE_MARKER_PID="
+for /f "usebackq tokens=1,* delims==" %%a in ("%APP_PID_FILE%") do (
+    if /I "%%a"=="PID" set "STALE_MARKER_PID=%%b"
+)
+set "VBSP_STALE_MARKER_PID=!STALE_MARKER_PID!"
+powershell.exe -NoLogo -NoProfile -NonInteractive -Command "$parsed=0; if (-not [int]::TryParse($env:VBSP_STALE_MARKER_PID, [ref]$parsed)) { exit 1 }; if ($null -eq (Get-Process -Id $parsed -ErrorAction SilentlyContinue)) { exit 1 }; exit 0" >nul 2>&1
+set "VBSP_STALE_MARKER_PID="
+if not errorlevel 1 exit /b 0
+del "%APP_PID_FILE%" >nul 2>&1
+if not exist "%APP_PID_FILE%" (
+    echo [%date% %time%] Remove stale runtime PID marker >> "%LAUNCH_LOG%"
+) else (
+    echo [%date% %time%] WARN: cannot remove stale runtime PID marker >> "%LAUNCH_LOG%"
 )
 exit /b 0
 
@@ -400,11 +453,23 @@ set "PID_INFO_FILE=%TMP_DIR%\vbsp_pid_%CHECK_PID%.txt"
 set "IS_VBSP_PROCESS=1"
 del "%PID_INFO_FILE%" >nul 2>&1
 
+rem Marker do chinh app.py ghi: ho tro process chay tu terminal khi Windows an metadata.
+call :is_marked_vbsp_process
+if not errorlevel 1 exit /b 0
+
 rem PowerShell chay dong bo trong cung console, chi doc metadata process.
 powershell.exe -NoLogo -NoProfile -NonInteractive -Command "$p=Get-CimInstance Win32_Process -Filter 'ProcessId=%CHECK_PID%' -ErrorAction SilentlyContinue; if ($null -ne $p) { Write-Output $p.ExecutablePath; Write-Output $p.CommandLine }" > "%PID_INFO_FILE%" 2>nul
-if not exist "%PID_INFO_FILE%" exit /b 1
-for %%z in ("%PID_INFO_FILE%") do if %%~zz EQU 0 set "IS_VBSP_PROCESS=0"
 
+rem Fallback WMIC chi dung tren Windows cu con cung cap executable nay.
+if not exist "%PID_INFO_FILE%" goto :pid_check_fail
+for %%z in ("%PID_INFO_FILE%") do if %%~zz EQU 0 (
+    where wmic.exe >nul 2>&1
+    if not errorlevel 1 wmic.exe process where "ProcessId=%CHECK_PID%" get ExecutablePath,CommandLine /format:list > "%PID_INFO_FILE%" 2>nul
+)
+if not exist "%PID_INFO_FILE%" goto :pid_check_fail
+for %%z in ("%PID_INFO_FILE%") do if %%~zz EQU 0 goto :pid_check_fail
+
+rem Metadata co san thi van bat buoc exact project venv + streamlit + app.py.
 findstr /I /L /C:"%PY_EXE%" "%PID_INFO_FILE%" >nul 2>&1
 if errorlevel 1 set "IS_VBSP_PROCESS=0"
 findstr /I /L /C:"streamlit" "%PID_INFO_FILE%" >nul 2>&1
@@ -415,6 +480,25 @@ if errorlevel 1 set "IS_VBSP_PROCESS=0"
 del "%PID_INFO_FILE%" >nul 2>&1
 if "%IS_VBSP_PROCESS%"=="1" exit /b 0
 exit /b 1
+
+:pid_check_fail
+del "%PID_INFO_FILE%" >nul 2>&1
+exit /b 1
+
+:is_marked_vbsp_process
+if not exist "%APP_PID_FILE%" exit /b 1
+set "MARKER_PID="
+set "MARKER_ROOT="
+set "MARKER_APP="
+for /f "usebackq tokens=1,* delims==" %%a in ("%APP_PID_FILE%") do (
+    if /I "%%a"=="PID" set "MARKER_PID=%%b"
+    if /I "%%a"=="ROOT" set "MARKER_ROOT=%%b"
+    if /I "%%a"=="APP" set "MARKER_APP=%%b"
+)
+if not "!MARKER_PID!"=="%CHECK_PID%" exit /b 1
+if /I not "!MARKER_ROOT!"=="%ROOT%" exit /b 1
+if /I not "!MARKER_APP!"=="%ROOT%\app.py" exit /b 1
+exit /b 0
 
 :calculate_requirements_hash
 set "REQ_HASH="
@@ -503,6 +587,22 @@ if errorlevel 1 (
 call :is_vbsp_process 0
 if not errorlevel 1 (
     echo LAUNCHER SELF-TEST FAILED: PID ownership guard
+    exit /b 1
+)
+set "SEEN_PIDS="
+call :register_pid_once 4456
+if errorlevel 1 (
+    echo LAUNCHER SELF-TEST FAILED: PID dedup first value
+    exit /b 1
+)
+call :register_pid_once 4456
+if not errorlevel 1 (
+    echo LAUNCHER SELF-TEST FAILED: PID dedup duplicate
+    exit /b 1
+)
+call :register_pid_once 7788
+if errorlevel 1 (
+    echo LAUNCHER SELF-TEST FAILED: PID dedup second value
     exit /b 1
 )
 echo LAUNCHER SELF-TEST OK

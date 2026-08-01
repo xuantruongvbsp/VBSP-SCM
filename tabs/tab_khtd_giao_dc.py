@@ -809,10 +809,28 @@ def _section_b_giao(
     if not ds_xa:
         st.warning(f"⚠️ {ten_chon} chưa có danh sách xã trong cấu hình. Liên hệ Admin.")
         return
+
+    # Tiến độ nhập per-xã
+    tt_xa = khtd_service.trang_thai_xa(slug_chon, nam, thang, dot)
+    so_da_nhap = sum(1 for v in tt_xa.values() if v)
+    st.caption(f"📊 Tiến độ nhập KH: **{so_da_nhap}/{len(ds_xa)}** xã")
+
+    # Chọn xã để nhập
+    xa_chon_idx = st.selectbox(
+        "Chọn xã/phường để nhập KH",
+        range(len(ds_xa)),
+        format_func=lambda i: (
+            f"{'✅' if tt_xa.get(ds_xa[i]) else '⬜'} {ds_xa[i]}"
+        ),
+        key=_SS + f"sel_xa_{slug_chon}",
+    )
+    xa_chon = ds_xa[xa_chon_idx]
+    xa_key_widget = _pgd_slug(xa_chon)
+
     du_no_map = _build_du_no_map(df_hstd, ten_chon)
 
     rows_nhap: list[dict] = []
-    for xa in ds_xa:
+    for xa in [xa_chon]:
         for ma_key, _ma_ct, ten_ct, nguon, _ in CHUONG_TRINH_KHTD:
             if ma_key.startswith("3_") and ma_key not in GQVL_MA_KEY_GIAO:
                 continue
@@ -857,12 +875,12 @@ def _section_b_giao(
 
     if not readonly:
         with tab_tw:
-            st.caption("Mỗi dòng là một xã/phường × chương trình · Đơn vị: triệu đồng")
+            st.caption(f"Nhập KH cho **{xa_chon}** · Đơn vị: triệu đồng")
             if not df_long_tw.empty:
                 df_edited_tw = st.data_editor(
                     df_long_tw,
                     column_config=_long_col_config(readonly=False),
-                    key=_SS + f"editor_tw_{slug_chon}",
+                    key=_SS + f"editor_tw_{slug_chon}_{xa_key_widget}",
                     hide_index=True,
                     disabled=[
                         "Xã/phường", "Chương trình", "Mã CT",
@@ -880,12 +898,12 @@ def _section_b_giao(
             else:
                 st.info("Không có chương trình TW.")
         with tab_dp:
-            st.caption("Mỗi dòng là một xã/phường × chương trình · Đơn vị: triệu đồng")
+            st.caption(f"Nhập KH cho **{xa_chon}** · Đơn vị: triệu đồng")
             if not df_long_dp.empty:
                 df_edited_dp = st.data_editor(
                     df_long_dp,
                     column_config=_long_col_config(readonly=False),
-                    key=_SS + f"editor_dp_{slug_chon}",
+                    key=_SS + f"editor_dp_{slug_chon}_{xa_key_widget}",
                     hide_index=True,
                     disabled=[
                         "Xã/phường", "Chương trình", "Mã CT",
@@ -924,13 +942,13 @@ def _section_b_giao(
     c2.metric("Tổng KH giao ĐP (triệu đồng)", f"{tong_dp:,.0f}".replace(",", "."))
 
     if st.button(
-        f"💾 Lưu KH giao — {ten_chon}",
-        key=_SS + "btn_luu_giao",
+        f"💾 Lưu KH giao — {xa_chon} ({ten_chon})",
+        key=_SS + f"btn_luu_giao_{slug_chon}_{xa_key_widget}",
         type="primary",
     ):
         du_lieu = _long_to_du_lieu(df_edited_tw, df_edited_dp)
-        kq = khtd_service.luu_dot(
-            slug_chon, nam, thang, dot, LOAI_GIAO, du_lieu, username,
+        kq = khtd_service.luu_dot_xa(
+            slug_chon, xa_chon, nam, thang, dot, LOAI_GIAO, du_lieu, username,
         )
         kq.hien_thi()
         if kq.thanh_cong:
@@ -1297,6 +1315,360 @@ def _section_e_so_sanh_kh_th(
             st.error(f"❌ Lỗi xuất Excel: {e}")
 
 
+# ── Section F: Theo dõi thực hiện per xã (3 cấp drill-down) ──────────────────
+
+
+def _build_th_map_toan_cn(
+    df_hstd: pd.DataFrame | None,
+) -> dict[tuple[str, str, int, int], float]:
+    """Trả về {(ten_pgd, xa_key, ma_ct_int, nguon_int): du_no_trieu}."""
+    if df_hstd is None or df_hstd.empty:
+        return {}
+    required = (COT_TEN_PGD, COT_TEN_XA, COT_MA_CHUONG_TRINH, COT_NGUON_VON)
+    if not all(c in df_hstd.columns for c in required):
+        return {}
+    dh = df_hstd.copy()
+    dh["_mc"] = pd.to_numeric(dh[COT_MA_CHUONG_TRINH], errors="coerce").fillna(-1).astype(int)
+    dh["_nv"] = pd.to_numeric(dh[COT_NGUON_VON], errors="coerce").fillna(0).astype(int)
+    if COT_TONG_DU_NO in dh.columns:
+        dh["_dn"] = pd.to_numeric(dh[COT_TONG_DU_NO], errors="coerce").fillna(0)
+    else:
+        cols_dn = [c for c in (COT_DU_NO_TH, COT_DU_NO_QH, COT_DU_NO_KHOANH) if c in dh.columns]
+        for c in cols_dn:
+            dh[c] = pd.to_numeric(dh[c], errors="coerce").fillna(0)
+        dh["_dn"] = dh[cols_dn].sum(axis=1)
+    dh["_xa_key"] = dh[COT_TEN_XA].map(
+        lambda v: tim_ten_xa_trong_hstd(str(v).strip()).casefold() if pd.notna(v) else ""
+    )
+    agg = dh.groupby([COT_TEN_PGD, "_xa_key", "_mc", "_nv"])["_dn"].sum().reset_index()
+    return {
+        (r[COT_TEN_PGD], r["_xa_key"], int(r["_mc"]), int(r["_nv"])): r["_dn"] / 1e6
+        for _, r in agg.iterrows()
+    }
+
+
+def _tinh_pivot_kh_th(
+    nam: int, thang: str, dot: str,
+    nguon: str,
+    df_hstd: pd.DataFrame | None,
+    th_map: dict[tuple[str, str, int, int], float] | None = None,
+) -> tuple[dict, list[str], dict[str, list[str]]]:
+    """
+    Tính pivot KH/TH per (pgd_slug, xa, ma_key).
+    Trả về: (data_dict, active_mk_list, xas_per_pgd_dict)
+      data_dict: {(pgd_slug, xa, ma_key): (kh_trieu, th_trieu, cl_trieu, pct)}
+    """
+    df_kh = khtd_service.tong_hop(nam, thang, dot)
+    if df_kh.empty:
+        return {}, [], {}
+
+    df_kh = df_kh[df_kh["nguon"] == nguon].copy()
+    km_c = "kh_moi_tw" if nguon == "TW" else "kh_moi_dp"
+    df_kh[km_c] = pd.to_numeric(df_kh[km_c], errors="coerce").fillna(0)
+
+    if th_map is None:
+        th_map = _build_th_map_toan_cn(df_hstd)
+
+    active_mk: list[str] = []
+    mk_set: set[str] = set()
+    for mk in df_kh["ma_key"]:
+        if mk not in mk_set:
+            active_mk.append(mk)
+            mk_set.add(mk)
+
+    data: dict[tuple, tuple] = {}
+    xas_per_pgd: dict[str, list[str]] = {}
+
+    for _, r in df_kh.iterrows():
+        pgd_s = r["pgd_slug"]
+        xa = r.get("xa", "")
+        mk = r["ma_key"]
+        kh_trieu = float(r[km_c]) / 1e6
+
+        # Lookup TH
+        ma_ct = _MAKEY_TO_MACT.get(mk, -1)
+        nguon_int = 1 if nguon == "TW" else 2
+        ten_pgd = _slug_to_ten(pgd_s)
+        xa_key = tim_ten_xa_trong_hstd(str(xa).strip()).casefold() if xa else ""
+        th_trieu = th_map.get((ten_pgd, xa_key, ma_ct, nguon_int), 0.0)
+
+        cl = th_trieu - kh_trieu
+        pct = round(th_trieu / kh_trieu * 100, 1) if kh_trieu else 0.0
+        data[(pgd_s, xa, mk)] = (kh_trieu, th_trieu, cl, pct)
+
+        if xa:
+            xas_per_pgd.setdefault(pgd_s, [])
+            if xa not in xas_per_pgd[pgd_s]:
+                xas_per_pgd[pgd_s].append(xa)
+
+    return data, active_mk, xas_per_pgd
+
+
+def _mau_pct(pct: float) -> str:
+    if pct >= 95:
+        return "#059669"
+    if pct >= 80:
+        return "#d97706"
+    return "#dc2626"
+
+
+def _mau_cl(cl: float) -> str:
+    if cl > 0:
+        return "#059669"
+    if cl < 0:
+        return "#dc2626"
+    return "inherit"
+
+
+def _html_pivot_kh_th(
+    nam: int, thang: str, dot: str,
+    nguon: str,
+    df_hstd: pd.DataFrame | None,
+    pivot_data: tuple[dict, list[str], dict[str, list[str]]] | None = None,
+) -> str:
+    """Render HTML bảng pivot Cấp 1: PGD × CT × (KH, TH, CL, %)."""
+    if pivot_data is None:
+        pivot_data = _tinh_pivot_kh_th(nam, thang, dot, nguon, df_hstd)
+    data, active_mk, xas_per_pgd = pivot_data
+    if not data:
+        return "<p style='color:var(--text-color);padding:12px'>⚠️ Chưa có dữ liệu KHTD cho đợt này.</p>"
+
+    def fn(v: float) -> str:
+        return "" if v == 0 else f"{v:,.1f}".replace(",", ".")
+
+    def fpct(v: float) -> str:
+        return f"{v:.1f}%".replace(".", ",") if v else "—"
+
+    td = "border:1px solid #e2e8f0;padding:3px 6px"
+    th_hdr = "border:1px solid #1e40af;padding:4px 6px;background:rgba(30,64,175,0.85);color:#fff;text-align:center;font-size:10px;white-space:nowrap"
+    th_sub = "border:1px solid #2563eb;padding:2px 5px;background:rgba(37,99,235,0.75);color:#fff;text-align:center;font-size:9px;white-space:nowrap"
+    th_base = "border:1px solid #e2e8f0;padding:4px 8px;background:rgba(239,246,255,0.9);text-align:center;font-size:11px;font-weight:600;white-space:nowrap"
+
+    html: list[str] = [
+        "<div style='overflow-x:auto;max-width:100%;font-size:11px;margin-top:8px'>",
+        f"<table style='border-collapse:collapse;white-space:nowrap;min-width:{max(960, 260 + len(active_mk) * 220)}px'>",
+        "<thead>",
+        "<tr>",
+        f'<th rowspan="2" style="{th_base}">STT</th>',
+        f'<th rowspan="2" style="{th_base}">Tên đơn vị</th>',
+    ]
+    for mk in active_mk:
+        html.append(f'<th colspan="4" style="{th_hdr}">{_ten_ngan(mk)}</th>')
+    html += ["</tr>", "<tr>"]
+    for _ in active_mk:
+        html += [
+            f'<th style="{th_sub}">KH</th>',
+            f'<th style="{th_sub}">TH</th>',
+            f'<th style="{th_sub}">CL</th>',
+            f'<th style="{th_sub}">%</th>',
+        ]
+    html += ["</tr>", "</thead>", "<tbody>"]
+
+    totals: dict[str, list[float]] = {mk: [0.0, 0.0, 0.0] for mk in active_mk}
+    pgd_order = [("hoi_so", DON_VI_CHI_NHANH)] + [
+        (_pgd_slug(p), p) for p in DS_PGD
+    ]
+    pgd_idx = 0
+
+    for pgd_slug, pgd_name in pgd_order:
+        if pgd_slug not in xas_per_pgd:
+            continue
+        pgd_idx += 1
+        roman = _ROMAN[pgd_idx - 1] if pgd_idx <= len(_ROMAN) else str(pgd_idx)
+        xas = xas_per_pgd[pgd_slug]
+
+        # Row PGD (tổng)
+        html.append("<tr style='background:rgba(219,234,254,0.6);font-weight:700'>")
+        html.append(f'<td style="{td};text-align:center">{roman}</td>')
+        html.append(f'<td style="{td}">{pgd_name}</td>')
+        for mk in active_mk:
+            kh = sum(data.get((pgd_slug, xa, mk), (0, 0, 0, 0))[0] for xa in xas)
+            th = sum(data.get((pgd_slug, xa, mk), (0, 0, 0, 0))[1] for xa in xas)
+            cl = th - kh
+            pct = round(th / kh * 100, 1) if kh else 0.0
+            totals[mk][0] += kh
+            totals[mk][1] += th
+            totals[mk][2] += cl
+            html += [
+                f'<td style="{td};text-align:right">{fn(kh)}</td>',
+                f'<td style="{td};text-align:right">{fn(th)}</td>',
+                f'<td style="{td};text-align:right;color:{_mau_cl(cl)}">{fn(cl)}</td>',
+                f'<td style="{td};text-align:right;color:{_mau_pct(pct)}">{fpct(pct)}</td>',
+            ]
+        html.append("</tr>")
+
+        # Rows xã
+        for stt_xa, xa in enumerate(xas, 1):
+            html.append("<tr>")
+            html.append(f'<td style="{td};text-align:center;opacity:.5">{stt_xa}</td>')
+            html.append(f'<td style="{td};padding-left:20px">{xa}</td>')
+            for mk in active_mk:
+                kh, th, cl, pct = data.get((pgd_slug, xa, mk), (0, 0, 0, 0))
+                html += [
+                    f'<td style="{td};text-align:right">{fn(kh)}</td>',
+                    f'<td style="{td};text-align:right">{fn(th)}</td>',
+                    f'<td style="{td};text-align:right;color:{_mau_cl(cl)}">{fn(cl)}</td>',
+                    f'<td style="{td};text-align:right;color:{_mau_pct(pct)}">{fpct(pct)}</td>',
+                ]
+            html.append("</tr>")
+
+    # Row tổng cộng
+    html.append("<tr style='background:rgba(240,253,244,0.8);font-weight:700'>")
+    html.append(f'<td style="{td}" colspan="2">Tổng cộng</td>')
+    for mk in active_mk:
+        kh, th, cl = totals[mk]
+        pct = round(th / kh * 100, 1) if kh else 0.0
+        html += [
+            f'<td style="{td};text-align:right">{fn(kh)}</td>',
+            f'<td style="{td};text-align:right">{fn(th)}</td>',
+            f'<td style="{td};text-align:right;color:{_mau_cl(cl)}">{fn(cl)}</td>',
+            f'<td style="{td};text-align:right;color:{_mau_pct(pct)}">{fpct(pct)}</td>',
+        ]
+    html += [
+        "</tr>", "</tbody>", "</table>",
+        "<p style='font-size:11px;margin-top:4px;color:var(--text-color)'>"
+        "Đơn vị: triệu đồng · 🟢 ≥95% · 🟡 80–95% · 🔴 &lt;80%</p>",
+        "</div>",
+    ]
+    return "\n".join(html)
+
+
+def _build_rows_ct_theo_xa(
+    data_tw: dict[tuple, tuple],
+    data_dp: dict[tuple, tuple],
+    slug_chon: str,
+    xa_chon: str,
+) -> list[dict]:
+    rows_ct: list[dict] = []
+    for nguon_label, source_data in (("TW", data_tw), ("ĐP", data_dp)):
+        for (pgd_s, xa, ma_key), (kh, th, cl, pct) in source_data.items():
+            if pgd_s != slug_chon or xa != xa_chon:
+                continue
+            rows_ct.append({
+                "_sort": (_MAKEY_TO_MACT.get(ma_key, 999), nguon_label, ma_key),
+                "Chương trình": _CT_MAP.get(ma_key, ma_key),
+                "Nguồn": nguon_label,
+                "KH (tr.đ)": round(kh, 1),
+                "TH (tr.đ)": round(th, 1),
+                "CL": round(cl, 1),
+                "% TH/KH": pct,
+            })
+    rows_ct.sort(key=lambda r: r["_sort"])
+    for row in rows_ct:
+        row.pop("_sort", None)
+    return rows_ct
+
+
+def _section_f_theo_doi(
+    nam: int, thang: str, dot: str, df_hstd: pd.DataFrame | None
+) -> None:
+    """Section theo dõi thực hiện: 3 cấp drill-down (PGD → xã → CT)."""
+    th_map = _build_th_map_toan_cn(df_hstd)
+    pivot_tw = _tinh_pivot_kh_th(nam, thang, dot, "TW", df_hstd, th_map)
+    pivot_dp = _tinh_pivot_kh_th(nam, thang, dot, "DP", df_hstd, th_map)
+    data_tw = pivot_tw[0]
+    data_dp = pivot_dp[0]
+
+    tab_tw, tab_dp = st.tabs(["🏦 Nguồn TW", "🏙️ Nguồn ĐP"])
+
+    with tab_tw:
+        st.html(_html_pivot_kh_th(nam, thang, dot, "TW", df_hstd, pivot_tw))
+    with tab_dp:
+        st.html(_html_pivot_kh_th(nam, thang, dot, "DP", df_hstd, pivot_dp))
+
+    # ── Drill-down: chọn PGD → KPI cards xã ──
+    st.divider()
+    st.markdown("##### 🔍 Xem chi tiết theo đơn vị")
+    ds = _ds_slug_label()
+    labels = [x[0] for x in ds]
+    slugs = [x[1] for x in ds]
+
+    idx_pgd = st.selectbox(
+        "Chọn PGD",
+        range(len(labels)),
+        format_func=lambda i: labels[i],
+        key=_SS + "f_pgd_sel",
+    )
+    slug_chon = slugs[idx_pgd]
+    ten_chon = labels[idx_pgd]
+
+    # KPI cards per xã
+    tt_xa = khtd_service.trang_thai_xa(slug_chon, nam, thang, dot)
+    ds_xa = list(tt_xa.keys())
+    if not ds_xa:
+        st.info(f"{ten_chon} chưa có danh sách xã.")
+        return
+
+    so_da_nhap = sum(1 for v in tt_xa.values() if v)
+    st.caption(f"Tiến độ nhập KH: **{so_da_nhap}/{len(ds_xa)}** xã")
+
+    xa_kpi: dict[str, dict] = {}
+    for xa in ds_xa:
+        kh_t = sum(v[0] for k, v in data_tw.items() if k[0] == slug_chon and k[1] == xa)
+        th_t = sum(v[1] for k, v in data_tw.items() if k[0] == slug_chon and k[1] == xa)
+        kh_d = sum(v[0] for k, v in data_dp.items() if k[0] == slug_chon and k[1] == xa)
+        th_d = sum(v[1] for k, v in data_dp.items() if k[0] == slug_chon and k[1] == xa)
+        kh = kh_t + kh_d
+        th = th_t + th_d
+        pct = round(th / kh * 100, 1) if kh else 0.0
+        xa_kpi[xa] = {"kh": kh, "th": th, "pct": pct, "da_nhap": tt_xa.get(xa, False)}
+
+    # Render KPI cards (tối đa 5 cột)
+    cols_per_row = min(5, len(ds_xa))
+    for row_start in range(0, len(ds_xa), cols_per_row):
+        cols = st.columns(cols_per_row)
+        for ci, xa in enumerate(ds_xa[row_start:row_start + cols_per_row]):
+            info = xa_kpi[xa]
+            badge = "✅" if info["da_nhap"] else "⬜"
+            mau = _mau_pct(info["pct"])
+            with cols[ci]:
+                st.markdown(
+                    f"<div style='border:1px solid #e2e8f0;border-radius:8px;"
+                    f"padding:10px;text-align:center;margin-bottom:6px'>"
+                    f"<div style='font-weight:600;font-size:12px'>{badge} {xa}</div>"
+                    f"<div style='font-size:11px;color:var(--text-color)'>"
+                    f"KH: {info['kh']:,.0f}</div>"
+                    f"<div style='font-size:11px;color:var(--text-color)'>"
+                    f"TH: {info['th']:,.0f}</div>"
+                    f"<div style='font-size:14px;font-weight:700;color:{mau}'>"
+                    f"{info['pct']:.1f}%</div>"
+                    f"</div>",
+                    unsafe_allow_html=True,
+                )
+
+    # ── Drill-down cấp 3: chọn xã → bảng chi tiết CT ──
+    st.divider()
+    idx_xa = st.selectbox(
+        "Chọn xã xem chi tiết",
+        range(len(ds_xa)),
+        format_func=lambda i: ds_xa[i],
+        key=_SS + f"f_xa_sel_{slug_chon}",
+    )
+    xa_chon = ds_xa[idx_xa]
+
+    rows_ct = _build_rows_ct_theo_xa(data_tw, data_dp, slug_chon, xa_chon)
+
+    if rows_ct:
+        df_ct = pd.DataFrame(rows_ct)
+        # Thêm dòng tổng
+        tong_kh = df_ct["KH (tr.đ)"].sum()
+        tong_th = df_ct["TH (tr.đ)"].sum()
+        tong_cl = tong_th - tong_kh
+        tong_pct = round(tong_th / tong_kh * 100, 1) if tong_kh else 0.0
+        df_ct.loc[len(df_ct)] = {
+            "Chương trình": "TỔNG CỘNG",
+            "Nguồn": "",
+            "KH (tr.đ)": round(tong_kh, 1),
+            "TH (tr.đ)": round(tong_th, 1),
+            "CL": round(tong_cl, 1),
+            "% TH/KH": tong_pct,
+        }
+        st.markdown(f"**Xã {xa_chon}** — {ten_chon}")
+        hien_thi_dataframe_phan_trang(df_ct, key=_SS + "f_ct_tbl", height=450)
+    else:
+        st.info(f"Chưa có dữ liệu KHTD cho xã {xa_chon}.")
+
+
 def render(tab=None, **kwargs) -> None:
     username = st.session_state.get("username", "unknown")
     role = kwargs.get("role", "user")
@@ -1382,7 +1754,7 @@ def render(tab=None, **kwargs) -> None:
             tab_labels.append("⚙️ Khởi tạo")
         if loai_val == LOAI_GIAO:
             tab_labels.append("📝 Nhập KH Giao")
-        tab_labels += ["📊 Tổng hợp KH", "📈 So sánh KH/TH"]
+        tab_labels += ["📊 Tổng hợp KH", "📈 So sánh KH/TH", "📍 Theo dõi Xã"]
 
         tabs_ui = st.tabs(tab_labels)
         t_idx = 0
@@ -1403,3 +1775,7 @@ def render(tab=None, **kwargs) -> None:
 
         with tabs_ui[t_idx]:
             _section_e_so_sanh_kh_th(nam, thang, dot, df_hstd)
+        t_idx += 1
+
+        with tabs_ui[t_idx]:
+            _section_f_theo_doi(nam, thang, dot, df_hstd)

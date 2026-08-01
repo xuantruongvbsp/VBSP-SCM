@@ -192,6 +192,36 @@ def _tim_file_dienbao_prev() -> str | None:
     return None
 
 
+def _don_vi_dienbao_meta(rows: list | None = None, data: dict | None = None) -> tuple[int, str, bool]:
+    """Lấy hệ số quy đổi VND từ metadata mới, fallback tương thích `don_vi_trieu` cũ."""
+    data = data or {}
+    rows = rows or []
+    he_so_vnd = data.get("he_so_vnd")
+    don_vi_label = data.get("don_vi_label")
+    don_vi_nguon = data.get("don_vi_nguon")
+
+    if not he_so_vnd:
+        for row in rows:
+            he_so_vnd = row.get("he_so_vnd")
+            don_vi_label = row.get("don_vi_label")
+            don_vi_nguon = row.get("don_vi_nguon")
+            if he_so_vnd:
+                break
+
+    if he_so_vnd:
+        he_so_vnd = int(he_so_vnd)
+        if not don_vi_label:
+            don_vi_label = {
+                "trieu": "triệu đồng",
+                "nghin": "nghìn đồng",
+                "dong": "đồng",
+            }.get(str(don_vi_nguon or ""), "triệu đồng" if he_so_vnd == 1_000_000 else "đồng")
+        return he_so_vnd, str(don_vi_label), he_so_vnd == 1_000_000
+
+    don_vi_trieu = bool(data.get("don_vi_trieu", any(row.get("don_vi_trieu") for row in rows)))
+    return (1_000_000, "triệu đồng", True) if don_vi_trieu else (1, "đồng", False)
+
+
 def tong_hop_tu_dienbao(sheet_name: str = "DB1", file_path_override: str | None = None) -> dict:
     """Đọc file Điện báo → tổng hợp các chỉ số chính + bảng theo đơn vị.
 
@@ -229,15 +259,12 @@ def tong_hop_tu_dienbao(sheet_name: str = "DB1", file_path_override: str | None 
             return {"nguon": "Điện báo", "error": f"Lỗi đọc: {e}"}
 
     rows = data.get("rows", [])
-    don_vi_trieu = bool(
-        data.get("don_vi_trieu", any(row.get("don_vi_trieu") for row in rows))
-    )
-    he_so_vnd = 1_000_000 if don_vi_trieu else 1
+    he_so_vnd, don_vi_label, don_vi_trieu = _don_vi_dienbao_meta(rows, data)
     result = {
         "nguon": "Điện báo",
         "file_path": fp,
         "ngay_bao_cao": data.get("ngay_bao_cao", ""),
-        "don_vi_nguon": "triệu đồng" if don_vi_trieu else "đồng",
+        "don_vi_nguon": don_vi_label,
     }
 
     for key, ten_ct in CAC_CHI_TIEU_DIEN_BAO.items():
@@ -270,12 +297,11 @@ def tong_hop_tu_dienbao(sheet_name: str = "DB1", file_path_override: str | None 
 def _tong_hop_tu_format_cu(rows: list, fp: str) -> dict:
     """Fallback: đọc Điện báo format cũ (chỉ có cột Cộng)."""
     from data.hstd import db_lookup
-    don_vi_trieu = any(row.get("don_vi_trieu") for row in rows)
-    he_so_vnd = 1_000_000 if don_vi_trieu else 1
+    he_so_vnd, don_vi_label, don_vi_trieu = _don_vi_dienbao_meta(rows)
     result = {
         "nguon": "Điện báo (format cũ)",
         "file_path": fp,
-        "don_vi_nguon": "triệu đồng" if don_vi_trieu else "đồng",
+        "don_vi_nguon": don_vi_label,
     }
     for key, ten_ct in CAC_CHI_TIEU_DIEN_BAO.items():
         result[key] = db_lookup(rows, ten_ct) * he_so_vnd

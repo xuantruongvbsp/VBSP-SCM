@@ -1,5 +1,6 @@
 """Đọc file dữ liệu gốc: HSTD, NQ11, GQVL, Điện báo."""
 import os
+import unicodedata
 from pathlib import Path
 
 import pandas as pd
@@ -358,8 +359,94 @@ def doc_file_sk_gqvl(fp: str, _ts) -> pd.DataFrame:
 
 
 # ── ĐIỆN BÁO ─────────────────────────────────────────────────────────────────
-def _dienbao_don_vi_trieu(df_raw: pd.DataFrame) -> bool:
-    """Nhận diện đơn vị nguồn; ưu tiên cụm rõ nghĩa `triệu đồng`."""
+_DIENBAO_UNIT_META = {
+    "trieu": {"don_vi_trieu": True, "he_so_vnd": 1_000_000, "don_vi_label": "triệu đồng"},
+    "nghin": {"don_vi_trieu": False, "he_so_vnd": 1_000, "don_vi_label": "nghìn đồng"},
+    "dong": {"don_vi_trieu": False, "he_so_vnd": 1, "don_vi_label": "đồng"},
+}
+
+
+def _dienbao_norm_text(value: object) -> str:
+    if value is None or pd.isna(value):
+        return ""
+    text = str(value).strip().casefold()
+    text = "".join(
+        c for c in unicodedata.normalize("NFD", text)
+        if unicodedata.category(c) != "Mn"
+    )
+    return text.replace("đ", "d")
+
+
+def _dienbao_cell(df_raw: pd.DataFrame, row: int, col: int) -> object:
+    if row < 0 or col < 0 or row >= len(df_raw) or col >= len(df_raw.columns):
+        return None
+    return df_raw.iloc[row, col]
+
+
+def _dienbao_is_total_header(value: object) -> bool:
+    text = _dienbao_norm_text(value)
+    return text in {"tong", "cong", "tong cong"} or "cong" in text
+
+
+def _dienbao_detect_layout(df_raw: pd.DataFrame) -> dict[str, object]:
+    """Nhận diện layout điện báo dọc/ma trận thay vì cố định dòng header."""
+    n_cols = len(df_raw.columns)
+    default = {
+        "is_matrix": False,
+        "chi_tieu_col": 1,
+        "total_col": 2 if n_cols >= 3 else None,
+        "unit_start_col": 3,
+        "unit_header_row": None,
+        "first_data_row": 0,
+        "n_units": 0,
+    }
+    if n_cols < 4 or df_raw.empty:
+        return default
+
+    for i in range(min(12, len(df_raw))):
+        col_chi_tieu = _dienbao_norm_text(_dienbao_cell(df_raw, i, 1))
+        if "chi tieu" not in col_chi_tieu:
+            continue
+
+        col2 = _dienbao_cell(df_raw, i, 2)
+        col2_norm = _dienbao_norm_text(col2)
+        col3_norm = _dienbao_norm_text(_dienbao_cell(df_raw, i, 3))
+
+        total_col = 2 if _dienbao_is_total_header(col2) else None
+        unit_start_col = 3
+        if total_col is None and (
+            "ma chi tieu" in col2_norm
+            or "trong do" in col3_norm
+            or any(pd.notna(_dienbao_cell(df_raw, i + 1, j)) for j in range(3, n_cols))
+        ):
+            unit_start_col = 3
+        elif total_col is None:
+            continue
+
+        unit_header_row = i + 1
+        n_units = 0
+        for j in range(unit_start_col, n_cols):
+            ten_dv = _dienbao_cell(df_raw, unit_header_row, j)
+            ten_norm = _dienbao_norm_text(ten_dv)
+            if ten_norm and ten_norm not in {"nan", "none"}:
+                n_units += 1
+
+        if n_units > 0:
+            return {
+                "is_matrix": True,
+                "chi_tieu_col": 1,
+                "total_col": total_col,
+                "unit_start_col": unit_start_col,
+                "unit_header_row": unit_header_row,
+                "first_data_row": unit_header_row + 1,
+                "n_units": n_units,
+            }
+
+    return default
+
+
+def _dienbao_don_vi_nguon(df_raw: pd.DataFrame) -> str:
+    """Nhận diện đơn vị nguồn: `trieu`, `nghin`, hoặc `dong`."""
     texts = [
         str(df_raw.iloc[i, j]).lower()
         for i in range(min(8, len(df_raw)))
@@ -367,14 +454,24 @@ def _dienbao_don_vi_trieu(df_raw: pd.DataFrame) -> bool:
         if pd.notna(df_raw.iloc[i, j])
     ]
     if any("triệu đồng" in value for value in texts):
-        return True
+        return "trieu"
+    if any("nghìn đồng" in value or "ngàn đồng" in value for value in texts):
+        return "nghin"
     if any(
-        "nghìn đồng" in value
-        or ("đồng" in value and "triệu" not in value and "tỷ" not in value)
+        "đồng" in value
+        and "triệu" not in value
+        and "tỷ" not in value
+        and "nghìn" not in value
+        and "ngàn" not in value
         for value in texts
     ):
-        return False
-    return True
+        return "dong"
+    return "trieu"
+
+
+def _dienbao_don_vi_trieu(df_raw: pd.DataFrame) -> bool:
+    """Backward-compatible helper: True khi đơn vị nguồn là triệu đồng."""
+    return _dienbao_don_vi_nguon(df_raw) == "trieu"
 
 
 @st.cache_data(ttl=7200, show_spinner=False)
@@ -387,7 +484,7 @@ def doc_dienbao(fp: str, ts: float = 0, sheet_name: str | None = None) -> list:
     Format 2 (mới - ma trận): Cột B = tên chỉ tiêu, Cột C = Cộng (tổng),
                               từ Cột D trở đi = giá trị từng PGD.
 
-    Trả về list[dict]: {ten, val, la_nqh_con, cha}
+    Trả về list[dict]: {ten, val, la_nqh_con, cha, don_vi_trieu, don_vi_nguon, he_so_vnd}
     val luôn là TỔNG (nếu nhiều cột PGD thì tự cộng).
 
     Nếu sheet_name được chỉ định, chỉ đọc sheet đó.
@@ -397,47 +494,58 @@ def doc_dienbao(fp: str, ts: float = 0, sheet_name: str | None = None) -> list:
     else:
         df_raw = pd.read_excel(fp, header=None)
 
-    # Tự động nhận diện: col[2] là "Cộng"/"Tổng" → đọc 1 cột, nếu không → cộng tất cả
+    layout = _dienbao_detect_layout(df_raw)
     n_cols = len(df_raw.columns)
-    col2_is_tong = False
-    sum_all_cols = False
-    if n_cols >= 5 and len(df_raw) >= 5:
-        v2 = str(df_raw.iloc[4, 2]).strip().lower() if pd.notna(df_raw.iloc[4, 2]) else ""
-        if "cộng" in v2 or "tong" in v2 or "tổng" in v2:
-            col2_is_tong = True
-        else:
-            # col[2] là tên PGD (vd: "Hội sở CN Đồng Nai") → cần cộng tất cả cột
-            sum_all_cols = True
+    total_col = layout["total_col"]
+    unit_start_col = int(layout["unit_start_col"])
+    sum_unit_cols = bool(layout["is_matrix"] and total_col is None)
 
-    don_vi_trieu = _dienbao_don_vi_trieu(df_raw)
+    don_vi_nguon = _dienbao_don_vi_nguon(df_raw)
+    don_vi_meta = _DIENBAO_UNIT_META[don_vi_nguon]
 
     rows, ten_cha = [], None
     skip_keywords = ("", "nan", "chỉ tiêu", "điện báo ngày", "stt", "b.", "a.", "i", "ii", "iii")
     nqh_prefixes = ("trđ:", "nqh:", "trd:")
 
-    for _, row in df_raw.iterrows():
+    first_data_row = int(layout["first_data_row"]) if layout["is_matrix"] else 0
+    for _, row in df_raw.iloc[first_data_row:].iterrows():
         ten = str(row.iloc[1]).strip() if pd.notna(row.iloc[1]) else ""
 
         # Bỏ qua dòng tiêu đề / trống
         if ten.lower() in skip_keywords or ten == "":
             continue
-        # Bỏ qua dòng header của bảng
-        if any(kw in ten.lower() for kw in ("điện báo", "ngân hàng", "chi nhánh", "cân đối")):
+        # Bỏ qua dòng header/metadata, nhưng giữ chỉ tiêu nghiệp vụ như
+        # "Nguồn vốn cân đối từ TW (KHA)".
+        ten_l = ten.lower()
+        if ten_l.startswith("đơn vị tính"):
+            continue
+        if any(kw in ten_l for kw in ("điện báo", "ngân hàng")):
+            continue
+        if ten_l in (
+            "chi nhánh",
+            "cân đối",
+            "cân đối nguồn vốn",
+            "sử dụng vốn",
+            "kế hoạch nguồn vốn",
+            "trung ương",
+            "địa phương",
+        ):
             continue
 
         # Đọc giá trị
-        if sum_all_cols:
-            # Cộng tất cả cột số từ col[2] trở đi
+        if sum_unit_cols:
+            # Sheet ma trận không có cột Tổng/Cộng: cộng các cột PGD.
             val = 0.0
-            for j in range(2, n_cols):
+            for j in range(unit_start_col, n_cols):
                 try:
                     val += float(row.iloc[j]) if pd.notna(row.iloc[j]) else 0.0
                 except (ValueError, TypeError):
                     pass
         else:
-            # Đọc col[2] như cũ (Cộng/Tổng)
+            # Đọc cột Tổng/Cộng, hoặc col[2] với format dọc cũ.
+            value_col = int(total_col) if total_col is not None else 2
             try:
-                val = float(row.iloc[2]) if pd.notna(row.iloc[2]) else 0.0
+                val = float(row.iloc[value_col]) if pd.notna(row.iloc[value_col]) else 0.0
             except (ValueError, TypeError):
                 val = 0.0
 
@@ -445,21 +553,30 @@ def doc_dienbao(fp: str, ts: float = 0, sheet_name: str | None = None) -> list:
         if ten.startswith("-") or ten.startswith("+"):
             ten_clean = ten.lstrip("-+ ").strip()
             rows.append({"ten": f"  NQH: {ten_clean}", "val": val,
-                         "la_nqh_con": True, "cha": ten_cha})
+                         "la_nqh_con": True, "cha": ten_cha,
+                         "don_vi_trieu": don_vi_meta["don_vi_trieu"],
+                         "don_vi_nguon": don_vi_nguon,
+                         "he_so_vnd": don_vi_meta["he_so_vnd"]})
             continue
         elif any(ten.lower().startswith(p) for p in nqh_prefixes):
             rows.append({"ten": f"  NQH: {ten_cha}", "val": val,
-                         "la_nqh_con": True, "cha": ten_cha})
+                         "la_nqh_con": True, "cha": ten_cha,
+                         "don_vi_trieu": don_vi_meta["don_vi_trieu"],
+                         "don_vi_nguon": don_vi_nguon,
+                         "he_so_vnd": don_vi_meta["he_so_vnd"]})
             continue
 
         rows.append({"ten": ten, "val": val,
                      "la_nqh_con": False, "cha": None,
-                     "don_vi_trieu": don_vi_trieu})
+                     "don_vi_trieu": don_vi_meta["don_vi_trieu"],
+                     "don_vi_nguon": don_vi_nguon,
+                     "he_so_vnd": don_vi_meta["he_so_vnd"]})
         ten_cha = ten
 
     return rows
 
 
+@st.cache_data(ttl=7200, show_spinner=False)
 def doc_dienbao_matrix(
     fp: str,
     ts: float = 0,
@@ -477,6 +594,8 @@ def doc_dienbao_matrix(
         "matrix": {ten_ct: {ten_dv: float}},  # ma trận đầy đủ
         "ngay_bao_cao": str,      # ngày trên file
         "sheet_name": str,
+        "don_vi_nguon": str,
+        "he_so_vnd": int,
     }
     """
     if sheet_name:
@@ -484,15 +603,22 @@ def doc_dienbao_matrix(
     else:
         df_raw = pd.read_excel(fp, header=None)
 
-    # Trả metadata để service quy đổi về VND trước khi đối chiếu với HSTD.
-    don_vi_trieu = _dienbao_don_vi_trieu(df_raw)
+    layout = _dienbao_detect_layout(df_raw)
 
-    # ── Trích xuất danh sách đơn vị (từ row 4, từ cột 3 trở đi) ──
+    # Trả metadata để service quy đổi về VND trước khi đối chiếu với HSTD.
+    don_vi_nguon = _dienbao_don_vi_nguon(df_raw)
+    don_vi_meta = _DIENBAO_UNIT_META[don_vi_nguon]
+
+    # ── Trích xuất danh sách đơn vị ──
     units = []
     unit_codes = []
-    for j in range(3, len(df_raw.columns)):
-        ten_dv = str(df_raw.iloc[4, j]).strip() if pd.notna(df_raw.iloc[4, j]) else ""
-        raw_ma = df_raw.iloc[3, j]
+    unit_header_row = layout["unit_header_row"]
+    unit_start_col = int(layout["unit_start_col"])
+    if unit_header_row is None:
+        unit_header_row = 4
+    for j in range(unit_start_col, len(df_raw.columns)):
+        ten_dv = str(df_raw.iloc[unit_header_row, j]).strip() if pd.notna(df_raw.iloc[unit_header_row, j]) else ""
+        raw_ma = df_raw.iloc[unit_header_row - 1, j] if unit_header_row > 0 else None
         try:
             ma_dv = str(int(raw_ma)) if pd.notna(raw_ma) else ""
         except (ValueError, TypeError):
@@ -529,26 +655,36 @@ def doc_dienbao_matrix(
                      "sử dụng vốn", "kế hoạch nguồn vốn", "trung ương",
                      "địa phương")
 
-    for i in range(5, len(df_raw)):
+    first_data_row = int(layout["first_data_row"]) if layout["is_matrix"] else 5
+    total_col = layout["total_col"]
+    for i in range(first_data_row, len(df_raw)):
         ten = str(df_raw.iloc[i, 1]).strip() if pd.notna(df_raw.iloc[i, 1]) else ""
         if not ten or ten.lower() in skip_keywords:
             continue
         if ten.lower() in ("i", "ii", "iii"):
             continue
 
-        try:
-            val_tong = float(df_raw.iloc[i, cot_tong]) if pd.notna(df_raw.iloc[i, cot_tong]) else 0.0
-        except (ValueError, TypeError):
-            val_tong = 0.0
-
         # Đọc giá trị từng đơn vị
         dv_vals = {}
         for j, dv_name in enumerate(units):
-            col_idx = 3 + j
+            col_idx = unit_start_col + j
             try:
                 dv_vals[dv_name] = float(df_raw.iloc[i, col_idx]) if pd.notna(df_raw.iloc[i, col_idx]) else 0.0
             except (ValueError, TypeError):
                 dv_vals[dv_name] = 0.0
+
+        if total_col is None:
+            val_tong = sum(dv_vals.values())
+        else:
+            try:
+                val_tong = float(df_raw.iloc[i, int(total_col)]) if pd.notna(df_raw.iloc[i, int(total_col)]) else 0.0
+            except (ValueError, TypeError):
+                val_tong = 0.0
+        if not layout["is_matrix"] and total_col is None:
+            try:
+                val_tong = float(df_raw.iloc[i, cot_tong]) if pd.notna(df_raw.iloc[i, cot_tong]) else 0.0
+            except (ValueError, TypeError):
+                val_tong = 0.0
 
         matrix[ten] = dv_vals
 
@@ -557,11 +693,15 @@ def doc_dienbao_matrix(
             ten_clean = ten.lstrip("-+ ").strip()
             rows.append({"ten": f"  NQH: {ten_clean}", "val": val_tong,
                          "la_nqh_con": True, "cha": ten_cha,
-                         "don_vi_trieu": don_vi_trieu})
+                         "don_vi_trieu": don_vi_meta["don_vi_trieu"],
+                         "don_vi_nguon": don_vi_nguon,
+                         "he_so_vnd": don_vi_meta["he_so_vnd"]})
         else:
             rows.append({"ten": ten, "val": val_tong,
                          "la_nqh_con": False, "cha": None,
-                         "don_vi_trieu": don_vi_trieu})
+                         "don_vi_trieu": don_vi_meta["don_vi_trieu"],
+                         "don_vi_nguon": don_vi_nguon,
+                         "he_so_vnd": don_vi_meta["he_so_vnd"]})
             ten_cha = ten
 
     return {
@@ -571,35 +711,47 @@ def doc_dienbao_matrix(
         "matrix": matrix,
         "ngay_bao_cao": ngay_bc,
         "sheet_name": sheet_name or "",
-        "don_vi_trieu": don_vi_trieu,
+        "don_vi_trieu": don_vi_meta["don_vi_trieu"],
+        "don_vi_nguon": don_vi_nguon,
+        "he_so_vnd": don_vi_meta["he_so_vnd"],
+        "don_vi_label": don_vi_meta["don_vi_label"],
     }
 
 
-def liet_ke_sheet_dienbao(fp: str) -> list[dict]:
-    """Liệt kê các sheet trong file Điện báo, kèm metadata."""
+@st.cache_data(ttl=7200, show_spinner=False)
+def liet_ke_sheet_dienbao(fp: str, ts: float = 0) -> list[dict]:
+    """Liệt kê các sheet trong file Điện báo, kèm metadata.
+
+    Tham số ts (timestamp) dùng để cache bust — truyền ts_file(fp) khi gọi.
+    """
     import pandas as pd
+    from openpyxl import load_workbook
+
+    # Dùng openpyxl read_only để lấy tổng số dòng nhanh
+    try:
+        wb = load_workbook(fp, read_only=True, data_only=True)
+        sheet_dims = {
+            s: (wb[s].max_row or 0, wb[s].max_column or 0)
+            for s in wb.sheetnames
+        }
+        wb.close()
+    except Exception:
+        sheet_dims = {}
+
     xls = pd.ExcelFile(fp)
     result = []
     for s in xls.sheet_names:
-        df = pd.read_excel(fp, sheet_name=s, header=None)
-        n_rows = len(df)
-        n_cols = len(df.columns)
-        # Xác định format
-        is_matrix = False
-        if n_cols >= 5 and n_rows >= 5:
-            v = str(df.iloc[4, 2]).strip().lower() if pd.notna(df.iloc[4, 2]) else ""
-            if "cộng" in v or "tong" in v:
-                is_matrix = True
-        # Đếm đơn vị nếu là matrix
-        n_dv = 0
-        if is_matrix:
-            for j in range(3, n_cols):
-                if pd.notna(df.iloc[4, j]) and str(df.iloc[4, j]).strip().lower() != "nan":
-                    n_dv += 1
+        # Chỉ đọc 12 dòng đầu để phát hiện layout + ngày (nhanh hơn đọc cả sheet)
+        df = pd.read_excel(fp, sheet_name=s, header=None, nrows=12)
+        n_rows = sheet_dims.get(s, (len(df), 0))[0] or len(df)
+        n_cols = sheet_dims.get(s, (0, len(df.columns)))[1] or len(df.columns)
+        layout = _dienbao_detect_layout(df)
+        is_matrix = bool(layout["is_matrix"])
+        n_dv = int(layout["n_units"])
         # Tìm ngày
         ngay = ""
-        for i in range(min(5, n_rows)):
-            for j in range(min(20, n_cols)):
+        for i in range(min(5, len(df))):
+            for j in range(min(20, len(df.columns))):
                 v = str(df.iloc[i, j]) if pd.notna(df.iloc[i, j]) else ""
                 if "ngày" in v.lower():
                     ngay = v.strip()[:60]

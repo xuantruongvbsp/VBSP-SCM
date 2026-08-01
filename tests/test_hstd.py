@@ -11,7 +11,16 @@ from __future__ import annotations
 import pandas as pd
 import pytest
 
-from data.hstd import _dienbao_don_vi_trieu, canh_bao_migration, danh_dau_khong_hd
+from data.hstd import (
+    _dienbao_don_vi_nguon,
+    _dienbao_don_vi_trieu,
+    canh_bao_migration,
+    danh_dau_khong_hd,
+    db_lookup,
+    doc_dienbao,
+    doc_dienbao_matrix,
+    liet_ke_sheet_dienbao,
+)
 
 
 class TestDonViDienBao:
@@ -22,6 +31,77 @@ class TestDonViDienBao:
     def test_nhan_dien_dong(self):
         df = pd.DataFrame([["Đơn vị tính: Đồng"]])
         assert _dienbao_don_vi_trieu(df) is False
+        assert _dienbao_don_vi_nguon(df) == "dong"
+
+    def test_nhan_dien_nghin_dong(self):
+        df = pd.DataFrame([["Đơn vị tính: Nghìn đồng"]])
+        assert _dienbao_don_vi_trieu(df) is False
+        assert _dienbao_don_vi_nguon(df) == "nghin"
+
+
+class TestDocDienBao:
+    def test_giu_chi_tieu_nguon_von_can_doi_va_bo_metadata(self, tmp_path):
+        fp = tmp_path / "dienbao.xlsx"
+        df = pd.DataFrame([
+            [None, "NGÂN HÀNG CHÍNH SÁCH XÃ HỘI", None],
+            [None, "Đơn vị tính: Triệu đồng", None],
+            [None, None, None],
+            [None, None, None],
+            ["STT", "Chỉ tiêu", "Cộng"],
+            [1, "Nguồn vốn cân đối từ TW (KHA)", 123],
+            [2, "Tổng dư nợ", 456],
+        ])
+        df.to_excel(fp, index=False, header=False)
+
+        rows = doc_dienbao(str(fp), ts=1)
+
+        assert "Đơn vị tính: Triệu đồng" not in [r["ten"] for r in rows]
+        assert db_lookup(rows, "Nguồn vốn cân đối từ TW (KHA)") == 123
+
+    def test_sheet_ma_tran_co_cot_tong_khong_cong_trung_pgd(self, tmp_path):
+        fp = tmp_path / "dienbao_matrix_tong.xlsx"
+        df = pd.DataFrame([
+            ["NHCSXH", None, None, None, None],
+            [None, None, None, None, None],
+            ["CÂN ĐỐI NGUỒN VỐN VÀ SỬ DỤNG VỐN", None, None, None, None],
+            ["Đơn vị tính: Triệu đồng", None, None, None, None],
+            [None, None, None, None, None],
+            ["TT", "Chỉ tiêu", "Tổng", "Trong đó", None],
+            [None, None, None, "PGD A", "PGD B"],
+            ["A", "Tổng dư nợ", 300, 100, 200],
+        ])
+        df.to_excel(fp, index=False, header=False, sheet_name="TonghopBC")
+
+        sheets = liet_ke_sheet_dienbao(str(fp))
+        rows = doc_dienbao(str(fp), ts=1, sheet_name="TonghopBC")
+        data = doc_dienbao_matrix(str(fp), ts=1, sheet_name="TonghopBC")
+
+        assert sheets[0]["format"] == "matrix"
+        assert sheets[0]["n_don_vi"] == 2
+        assert db_lookup(rows, "Tổng dư nợ") == 300
+        assert data["units"] == ["PGD A", "PGD B"]
+        assert data["matrix"]["Tổng dư nợ"] == {"PGD A": 100, "PGD B": 200}
+
+    def test_sheet_ma_tran_khong_cot_tong_tu_cong_cac_pgd(self, tmp_path):
+        fp = tmp_path / "dienbao_matrix_khong_tong.xlsx"
+        df = pd.DataFrame([
+            ["NHCSXH", None, None, None, None],
+            [None, None, None, None, None],
+            ["CÂN ĐỐI NGUỒN VỐN VÀ SỬ DỤNG VỐN", None, None, None, None],
+            ["Đơn vị tính: Triệu đồng", None, None, None, None],
+            [None, None, None, None, None],
+            ["TT", "Chỉ tiêu", "Mã chỉ tiêu", "Trong đó", None],
+            [None, None, None, "PGD A", "PGD B"],
+            ["A", "Tổng dư nợ", "TDN", 100, 200],
+        ])
+        df.to_excel(fp, index=False, header=False, sheet_name="Dulieu")
+
+        rows = doc_dienbao(str(fp), ts=1, sheet_name="Dulieu")
+        data = doc_dienbao_matrix(str(fp), ts=1, sheet_name="Dulieu")
+
+        assert db_lookup(rows, "Tổng dư nợ") == 300
+        assert data["rows"][0]["val"] == 300
+        assert data["units"] == ["PGD A", "PGD B"]
 
 
 # ══════════════════════════════════════════════════════════════════════════════

@@ -15,14 +15,18 @@ import pytest
 
 # ── Import module cần test ──────────────────────────────────────────────────
 try:
+    import services.upload_service as upload_service
     from services.upload_service import (
         KetQuaUpload,
+        _ghi_va_xoa_cache,
         kiem_tra_file,
         kiem_tra_file_he_thong,
     )
 except ImportError:
+    import upload_service
     from upload_service import (
         KetQuaUpload,
+        _ghi_va_xoa_cache,
         kiem_tra_file,
         kiem_tra_file_he_thong,
     )
@@ -44,6 +48,60 @@ def _excel_bytes_hop_le() -> bytes:
     ws.append(["PGD Biên Hòa", "KH001", 10_000_000])
     wb.save(buf)
     return buf.getvalue()
+
+
+class TestGhiVaXoaCache:
+    def test_ghi_nguyen_tu_va_xoa_cache_lien_quan(self, tmp_path):
+        target = tmp_path / "dienbao.xlsx"
+        cache = tmp_path / "dienbao.parquet"
+        target.write_bytes(b"ban-cu")
+        cache.write_bytes(b"cache-cu")
+
+        _ghi_va_xoa_cache(str(target), b"ban-moi", str(cache))
+
+        assert target.read_bytes() == b"ban-moi"
+        assert not cache.exists()
+        assert not list(tmp_path.glob(".dienbao.xlsx.*.tmp"))
+
+    def test_retry_replace_khi_windows_bao_err_invalid_argument(self, tmp_path):
+        target = tmp_path / "dienbao.xlsx"
+        target.write_bytes(b"ban-cu")
+        real_replace = upload_service.os.replace
+        calls = 0
+
+        def flaky_replace(src, dst):
+            nonlocal calls
+            calls += 1
+            if calls == 1:
+                raise OSError(22, "Invalid argument", str(dst))
+            return real_replace(src, dst)
+
+        with (
+            patch.object(upload_service.os, "replace", side_effect=flaky_replace),
+            patch.object(upload_service.time, "sleep"),
+        ):
+            _ghi_va_xoa_cache(str(target), b"ban-moi")
+
+        assert calls == 2
+        assert target.read_bytes() == b"ban-moi"
+
+    def test_replace_that_bai_khong_lam_hong_file_cu(self, tmp_path):
+        target = tmp_path / "dienbao.xlsx"
+        target.write_bytes(b"ban-cu")
+
+        with (
+            patch.object(
+                upload_service.os,
+                "replace",
+                side_effect=OSError(22, "Invalid argument", str(target)),
+            ),
+            patch.object(upload_service.time, "sleep"),
+            pytest.raises(OSError),
+        ):
+            _ghi_va_xoa_cache(str(target), b"ban-moi")
+
+        assert target.read_bytes() == b"ban-cu"
+        assert not list(tmp_path.glob(".dienbao.xlsx.*.tmp"))
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -151,3 +209,65 @@ class TestKiemTraFileHeThong:
             ok, msg = kiem_tra_file_he_thong("wrong.pdf", b"\x00" * 5000)
         assert ok is False
         assert "pdf" in msg.lower() or "không được hỗ trợ" in msg.lower()
+
+
+# ── trich_xuat_ky_dienbao ────────────────────────────────────────────────────
+
+class TestTrichXuatKyDienbao:
+    def test_dau_cham(self):
+        from services.upload_service import trich_xuat_ky_dienbao
+        assert trich_xuat_ky_dienbao("Dien bao 31.07.2026.xlsx") == "31/07/2026"
+
+    def test_dau_gach(self):
+        from services.upload_service import trich_xuat_ky_dienbao
+        assert trich_xuat_ky_dienbao("DB_31-12-2025.xlsx") == "31/12/2025"
+
+    def test_dau_underscore(self):
+        from services.upload_service import trich_xuat_ky_dienbao
+        assert trich_xuat_ky_dienbao("file_01_08_2026.xlsx") == "01/08/2026"
+
+    def test_dang_lien(self):
+        from services.upload_service import trich_xuat_ky_dienbao
+        assert trich_xuat_ky_dienbao("report_31072026.xlsx") == "31/07/2026"
+
+    def test_khong_co_ngay(self):
+        from services.upload_service import trich_xuat_ky_dienbao
+        assert trich_xuat_ky_dienbao("dienbao.xlsx") is None
+
+    def test_ten_rong(self):
+        from services.upload_service import trich_xuat_ky_dienbao
+        assert trich_xuat_ky_dienbao("") is None
+        assert trich_xuat_ky_dienbao(None) is None
+
+    def test_ngay_khong_hop_le(self):
+        from services.upload_service import trich_xuat_ky_dienbao
+        assert trich_xuat_ky_dienbao("file_99.99.2026.xlsx") is None
+
+
+class TestLuuDienbao:
+    def test_ghi_metadata_co_audit_ngay_sau_ghi_kv(self):
+        events = []
+
+        def fake_ghi_kv(key, value, username):
+            events.append(("kv", key, username))
+
+        def fake_ghi_audit(username, action, detail):
+            events.append(("audit", action, detail))
+
+        with (
+            patch.object(upload_service, "_ghi_va_xoa_cache"),
+            patch.object(upload_service.db, "ghi_kv", side_effect=fake_ghi_kv),
+            patch.object(upload_service.db, "ghi_audit", side_effect=fake_ghi_audit),
+            patch.object(upload_service.st, "session_state", {"username": "tester"}),
+        ):
+            kq = upload_service.luu_dienbao(
+                "prev_month",
+                _excel_bytes_hop_le(),
+                "Dien bao 31.07.2026.xlsx",
+            )
+
+        assert kq.thanh_cong is True
+        kv_index = next(i for i, event in enumerate(events) if event[0] == "kv")
+        assert events[kv_index][1] == "dienbao_meta_prev_month"
+        assert events[kv_index + 1][0] == "audit"
+        assert events[kv_index + 1][1] == "dienbao_meta"

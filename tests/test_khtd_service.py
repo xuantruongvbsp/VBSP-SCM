@@ -244,6 +244,68 @@ def test_luu_dot_converts_to_vnd(test_db):
     assert raw["du_lieu"][0]["kh_moi_tw"] == 200_000_000
 
 
+def test_luu_dot_xa_respects_explicit_empty_status(test_db):
+    key = khtd_service.kv_key_dot("test_pgd", 2026, "05", "Dot1")
+    test_db.ghi_kv(
+        key,
+        {
+            "loai": "giao",
+            "xa_da_nhap": [],
+            "du_lieu": [
+                {"xa": "Xã B", "ma_key": "2_TW", "ten_ct": "CT2",
+                 "nguon": "TW", "kh_tw": 10_000_000, "dc_tw": 0,
+                 "kh_moi_tw": 10_000_000, "kh_dp": 0, "dc_dp": 0,
+                 "kh_moi_dp": 0, "ly_do": ""}
+            ],
+        },
+        "seed",
+    )
+
+    kq = khtd_service.luu_dot_xa(
+        "test_pgd", "Xã A", 2026, "05", "Dot1", "giao",
+        [{"xa": "Xã A", "ma_key": "1_TW", "ten_ct": "CT1",
+          "nguon": "TW", "kh_tw": 100.0, "dc_tw": 0.0,
+          "kh_dp": 0.0, "dc_dp": 0.0, "ly_do": ""}],
+        "tester",
+    )
+
+    raw = test_db.doc_kv(key)
+    assert kq.thanh_cong is True
+    assert raw["xa_da_nhap"] == ["Xã A"]
+    assert {r["xa"] for r in raw["du_lieu"]} == {"Xã A", "Xã B"}
+    assert next(r for r in raw["du_lieu"] if r["xa"] == "Xã A")["kh_moi_tw"] == 100_000_000
+
+
+def test_trang_thai_xa_empty_list_does_not_fallback_to_du_lieu(test_db, monkeypatch):
+    monkeypatch.setattr(khtd_service, "_slug_to_ten_dv", lambda _slug: "PGD Test")
+    monkeypatch.setattr(khtd_service, "PGD_XA_MAP", {"PGD Test": ["Xã A", "Xã B"]})
+    test_db.ghi_kv(
+        khtd_service.kv_key_dot("test_pgd", 2026, "05", "Dot2"),
+        {"loai": "giao", "xa_da_nhap": [], "du_lieu": [{"xa": "Xã A"}]},
+        "seed",
+    )
+
+    assert khtd_service.trang_thai_xa("test_pgd", 2026, "05", "Dot2") == {
+        "Xã A": False,
+        "Xã B": False,
+    }
+
+
+def test_trang_thai_xa_legacy_payload_missing_field_fallbacks(test_db, monkeypatch):
+    monkeypatch.setattr(khtd_service, "_slug_to_ten_dv", lambda _slug: "PGD Test")
+    monkeypatch.setattr(khtd_service, "PGD_XA_MAP", {"PGD Test": ["Xã A", "Xã B"]})
+    test_db.ghi_kv(
+        khtd_service.kv_key_dot("test_pgd", 2026, "05", "Dot3"),
+        {"loai": "giao", "du_lieu": [{"xa": "Xã A"}]},
+        "seed",
+    )
+
+    assert khtd_service.trang_thai_xa("test_pgd", 2026, "05", "Dot3") == {
+        "Xã A": True,
+        "Xã B": False,
+    }
+
+
 # ── _dot_sort_key ─────────────────────────────────────────────────────────────
 
 def test_dot_sort_key_numeric_order():

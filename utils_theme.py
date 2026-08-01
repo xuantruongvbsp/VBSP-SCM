@@ -385,6 +385,147 @@ hr {{ border: none !important; border-top: 1px solid {c['border']} !important; m
     background: {c['error_bg']}; color: {c['error_text']};
     border-color: {c['error_border']};
 }}
+
+/* ── 20. ĐIỆN BÁO — UPLOAD CARDS ── */
+.db-up-head {{
+    display: flex; align-items: center; gap: 9px;
+    font-size: 1.02rem; font-weight: 700; color: {c['text_heading']};
+    letter-spacing: .2px; margin: 2px 0 2px;
+}}
+.db-up-head .ico {{ font-size: 1.2rem; line-height: 1; filter: drop-shadow(0 0 6px {c['accent_glow']}55); }}
+.db-up-tag {{
+    margin-left: auto; font-size: .68rem; font-weight: 700; letter-spacing: .4px;
+    padding: 3px 10px; border-radius: 20px;
+    background: {c['accent_soft']}; color: {c['accent_text']};
+    border: 1px solid {c['accent']};
+}}
+.db-up-head.prev .ico {{ filter: drop-shadow(0 0 6px {c['info_border']}66); }}
+.db-up-head.prev .db-up-tag {{
+    background: {c['info_bg']}; color: {c['info_text']}; border-color: {c['info_border']};
+}}
+.db-up-sub {{
+    font-size: .78rem; color: {c['text_muted']}; margin: 2px 0 12px; line-height: 1.45;
+}}
+.db-up-file {{
+    display: flex; align-items: center; gap: 9px;
+    background: {c['success_bg']}; border: 1px solid {c['success_border']};
+    color: {c['success_text']}; border-radius: 10px;
+    padding: 9px 13px; font-size: .82rem; font-weight: 600; margin: 10px 0 4px;
+}}
+.db-up-file.empty {{
+    background: {c['bg_subtle']}; border: 1px dashed {c['border']};
+    color: {c['text_muted']}; font-weight: 500;
+}}
+.db-up-file .dot {{
+    width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto;
+    background: {c['accent_glow']}; box-shadow: 0 0 8px {c['accent_glow']};
+    animation: dbpulse 2.2s ease-in-out infinite;
+}}
+.db-up-file.empty .dot {{ background: {c['text_muted']}; box-shadow: none; animation: none; }}
+@keyframes dbpulse {{ 0%,100% {{ opacity: 1; }} 50% {{ opacity: .45; }} }}
+.db-up-file .meta {{ margin-left: auto; font-weight: 500; opacity: .85; font-size: .76rem; }}
+.db-up-badge {{
+    display: inline-flex; align-items: center; gap: 5px;
+    background: {c['info_bg']}; color: {c['info_text']}; border: 1px solid {c['info_border']};
+    border-radius: 20px; padding: 3px 11px; font-size: .74rem; font-weight: 600; margin: 0 0 8px;
+    transition: background .15s ease;
+}}
+.db-up-div {{ height: 1px; background: linear-gradient(90deg, {c['border']}, transparent); margin: 14px 0 12px; }}
+.db-up-kylabel {{
+    font-size: .72rem; font-weight: 700; color: {c['text_sub']};
+    text-transform: uppercase; letter-spacing: .7px; margin: 0 0 4px;
+}}
+
+/* ── 21. CÂN ĐỐI — KPI CARDS (.cdk) ── */
+.cdk {{
+    --tone: {c['accent_glow']};
+    --tone-bg: {c['accent_soft']};
+    --tone-border: {c['accent']};
+    position: relative; overflow: hidden;
+    background:
+        radial-gradient(120% 90% at 100% 0%, var(--tone-bg) 0%, transparent 55%),
+        linear-gradient(165deg, {c['surface']} 0%, {c['bg_subtle']} 100%);
+    border: 1px solid {c['border']};
+    border-radius: 14px;
+    padding: 14px 16px 12px;
+    transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease;
+    animation: cdkIn .45s cubic-bezier(.22,.9,.3,1) both;
+    animation-delay: calc(var(--i, 0) * 70ms);
+}}
+.cdk::before {{
+    content: ""; position: absolute; inset: 0 0 auto 0; height: 3px;
+    background: linear-gradient(90deg, var(--tone), transparent 70%);
+    opacity: .9;
+}}
+.cdk:hover {{
+    transform: translateY(-3px);
+    border-color: var(--tone-border);
+    box-shadow: 0 10px 28px -8px rgba(0,0,0,.55), 0 0 0 1px var(--tone-border),
+                0 0 22px -6px var(--tone);
+}}
+@keyframes cdkIn {{
+    from {{ opacity: 0; transform: translateY(10px); }}
+    to   {{ opacity: 1; transform: translateY(0); }}
+}}
+.cdk--info  {{ --tone: {c['info_border']};  --tone-bg: {c['info_bg']};  --tone-border: {c['info_border']}; }}
+.cdk--warn  {{ --tone: {c['warn_border']};  --tone-bg: {c['warn_bg']};  --tone-border: {c['warn_border']}; }}
+.cdk--error {{ --tone: {c['error_border']}; --tone-bg: {c['error_bg']}; --tone-border: {c['error_border']}; }}
+
+.cdk-top {{ display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }}
+.cdk-ico {{
+    width: 30px; height: 30px; flex: 0 0 auto;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 15px; border-radius: 9px;
+    background: var(--tone-bg); border: 1px solid var(--tone-border);
+    box-shadow: 0 0 10px -3px var(--tone);
+}}
+.cdk-label {{
+    font-size: .72rem; font-weight: 700; color: {c['text_sub']};
+    text-transform: uppercase; letter-spacing: .7px; line-height: 1.25;
+}}
+.cdk-delta {{
+    margin-left: auto; flex: 0 0 auto;
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: .74rem; font-weight: 700; font-variant-numeric: tabular-nums;
+    padding: 3px 9px; border-radius: 20px; border: 1px solid transparent;
+    white-space: nowrap;
+}}
+.cdk-delta.up   {{ background: {c['success_bg']}; color: {c['success_text']}; border-color: {c['success_border']}; }}
+.cdk-delta.down {{ background: {c['error_bg']};   color: {c['error_text']};   border-color: {c['error_border']}; }}
+.cdk-delta.flat {{ background: {c['bg_subtle']};  color: {c['text_muted']};   border-color: {c['border']}; }}
+.cdk-delta .arr {{ font-size: .62rem; line-height: 1; }}
+
+.cdk-val {{
+    font-size: 1.85rem; font-weight: 800; color: {c['text_heading']};
+    letter-spacing: -0.8px; line-height: 1.1;
+    font-variant-numeric: tabular-nums;
+}}
+.cdk-unit {{
+    font-size: .78rem; font-weight: 600; color: {c['text_muted']};
+    letter-spacing: 0; margin-left: 5px;
+}}
+
+.cdk-stats {{
+    display: flex; flex-direction: column;
+    margin-top: 12px; border-top: 1px solid {c['border']}; padding-top: 6px;
+}}
+.cdk-stat {{
+    display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+    padding: 5px 0;
+}}
+.cdk-stat + .cdk-stat {{ border-top: 1px solid {c['border']}66; }}
+.cdk-stat span {{
+    font-size: .66rem; color: {c['text_sub']};
+    text-transform: uppercase; letter-spacing: .5px;
+    white-space: nowrap;
+}}
+.cdk-stat b {{
+    font-size: .85rem; font-weight: 700; color: {c['text_heading']};
+    font-variant-numeric: tabular-nums; white-space: nowrap;
+    letter-spacing: -0.2px;
+}}
+.cdk-stat b.pos {{ color: {c['success_text']}; }}
+.cdk-stat b.neg {{ color: {c['error_text']}; }}
 </style>"""
 
 

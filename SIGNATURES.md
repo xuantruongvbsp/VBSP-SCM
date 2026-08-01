@@ -24,6 +24,7 @@ def delta_card(
     precision: int = 0,
     key: str | None = None,
     use_container_width: bool = True,
+    sub: str | None = None,          # dòng thông tin phụ trong cùng khung KPI
 ): ...
 ```
 

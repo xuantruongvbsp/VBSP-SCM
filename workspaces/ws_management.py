@@ -337,6 +337,13 @@ def _build_all_items(role: str, username: str, **kwargs) -> list:
         {"group": "Nội bộ Phòng", "label": "🗂️ Nội bộ Phòng KH-NV",             "icon": "users",    "fn": lambda: _get_tab("tab_khnv_noi_bo").render(None, **kwargs)},
         {"group": "Nội bộ Phòng", "label": " Quản lý Công việc & Nhiệm vụ",   "icon": "layout",   "fn": lambda: _get_tab("tab_quan_ly_cv").render(None, **kwargs)},
 
+        # ── Kế hoạch Tín dụng ──────────────────────────────────────────────────
+        {"group": "Kế hoạch Tín dụng", "label": "📈 Kế hoạch tín dụng",       "icon": "file-text",   "fn": lambda: _get_tab("tab_khtd").render(None, **dict(kwargs, khtd_mode="cn"))},
+        {"group": "Kế hoạch Tín dụng", "label": "📋 Giao & ĐC KHTD",          "icon": "upload",       "fn": lambda: _get_tab("tab_khtd_giao_dc").render(None, **kwargs)},
+        {"group": "Kế hoạch Tín dụng", "label": "📡 Điện báo Cân đối",     "icon": "antenna",      "fn": lambda: _get_tab("tab_candoi").render(None, **kwargs)},
+        {"group": "Kế hoạch Tín dụng", "label": "📤 Xuất báo cáo KHTD",       "icon": "file-export",  "fn": lambda: _get_tab("tab_khtd_xuat").render_xuat_baocao(role=kwargs.get("role", ""), username=kwargs.get("username", ""), df_full=kwargs.get("df"))},
+        nguon_von_item,
+
         # ── Báo cáo ────────────────────────────────────────────────────────────
         {"group": "Báo cáo", "label": "📊 Báo cáo tín dụng",    "icon": "file",          "fn": lambda: _get_tab("tab_baocao").render(None, **kwargs)},
         {"group": "Báo cáo", "label": "⏰ Nợ Đến Hạn",           "icon": "clock",         "fn": lambda: _get_tab("tab_den_han").render(None, role=role, username=username, df_full=df_full)},
@@ -368,13 +375,6 @@ def _build_all_items(role: str, username: str, **kwargs) -> list:
             ],
         },
 
-        # ── Kế hoạch Tín dụng ──────────────────────────────────────────────────
-        {"group": "Kế hoạch Tín dụng", "label": "📈 Kế hoạch tín dụng",       "icon": "file-text",   "fn": lambda: _get_tab("tab_khtd").render(None, **dict(kwargs, khtd_mode="cn"))},
-        {"group": "Kế hoạch Tín dụng", "label": "📋 Giao & ĐC KHTD",          "icon": "upload",       "fn": lambda: _get_tab("tab_khtd_giao_dc").render(None, **kwargs)},
-        {"group": "Kế hoạch Tín dụng", "label": "📡 Điện báo & KH vs TH",     "icon": "antenna",      "fn": lambda: _get_tab("tab_candoi").render(None, **kwargs)},
-        {"group": "Kế hoạch Tín dụng", "label": "📤 Xuất báo cáo KHTD",       "icon": "file-export",  "fn": lambda: _get_tab("tab_khtd_xuat").render_xuat_baocao(role=kwargs.get("role", ""), username=kwargs.get("username", ""), df_full=kwargs.get("df"))},
-        nguon_von_item,
-
         # ── Ủy Thác ────────────────────────────────────────────────────────────
         {"group": "Ủy Thác", "label": "🏛️ Ban Đại Diện",  "icon": "building",  "fn": lambda: _get_tab("tab_ban_dai_dien").render(None, cap="tinh", **kwargs)},
         {"group": "Ủy Thác", "label": "🤝 Ủy thác",        "icon": "handshake", "fn": lambda: _get_tab("tab_uy_thac").render(None, **kwargs)},
@@ -400,6 +400,7 @@ def _normalize_active_label(all_items: list, active_label: str | None) -> str | 
         "📊 Phân tích nguồn vốn": "🏦 Nguồn vốn địa phương",
         "🏷️ Mã NĐT địa phương": "🏦 Nguồn vốn địa phương",
         "Mã NĐT địa phương": "🏦 Nguồn vốn địa phương",
+        "📡 Điện báo & KH vs TH": "📡 Điện báo Cân đối",
     }
     if active_label in legacy_labels:
         return legacy_labels[active_label]

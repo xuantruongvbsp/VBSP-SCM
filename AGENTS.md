@@ -12,6 +12,7 @@ Hệ thống Quản trị Tín dụng Nội bộ — **Ngân hàng Chính sách 
 
 - **Stack:** Streamlit + Python + SQLite + PyArrow/Parquet
 - **Chạy:** `venv\Scripts\python.exe -m streamlit run app.py --server.port 8502` → `http://localhost:8502`
+- **Port:** `8502` chỉ dành cho app thật/launcher; Codex/agent chạy preview hoặc visual QA phải dùng `18502` và dừng tiến trình sau khi kiểm tra
 - **Python chuẩn:** `D:\VBSP-SCM\venv\Scripts\python.exe` (Python 3.12)
 - **Không dùng:** `D:\VBSP-SCM\.venv` / `.venv*` vì đây là môi trường cũ Python 3.14, dễ làm IDE/agent probe nhầm và gây cửa sổ CMD chớp
 - **Người dùng:** ~20 users, 9 vai trò, 2 phân hệ
@@ -281,6 +282,27 @@ Các lỗi tham số phổ biến cần nhớ:
 ### 8.1 Checklist trước khi sửa
 
 > **Đầy đủ:** xem `.trae/rules/rules.md` section 8 (Checklist) + section 8.1 (Rà soát). Tóm tắt nhanh:
+
+### 8.2 Sau mỗi task — TẠO KHỐI CODEX_REVIEW (BẮT BUỘC)
+
+Kết thúc **mọi** task bằng khối tóm tắt `CODEX_REVIEW` để user gửi Codex kiểm tra. Template đầy đủ xem `.trae/rules/rules.md` section 6.17. Tóm tắt nhanh:
+
+> **QUY TẮC BẮT BUỘC — 1 lệnh sửa = 1 prompt RIÊNG (scoped):**
+> Mỗi khi user ra **một** lệnh chỉnh sửa, sau khi sửa xong phải xuất **ngay một khối CODEX_REVIEW riêng cho đúng phần vừa sửa đó**. **TUYỆT ĐỐI KHÔNG** gom nhiều lệnh sửa / toàn bộ phiên làm việc thành một khối tổng hợp. Mục đích: để Codex kiểm tra, sửa chữa và hoàn chỉnh từng phần một cách tập trung.
+>
+> **Ngoại lệ — Codex KHÔNG xuất CODEX_REVIEW:** quy tắc này dành cho agent viết code (Trae/Cline/Cursor) để chuyển cho Codex review. Khi **Codex** trực tiếp sửa code thì không xuất prompt cho chính nó.
+
+```markdown
+## CODEX_REVIEW — {tên task}
+### Thay đổi
+| File | Dòng | Hàm | Mô tả |
+### Lý do
+### Cần kiểm tra
+- [ ] {cụ thể, không chung chung}
+### Không cần kiểm tra
+### Trạng thái
+- Compile: ✅ | CHANGELOG: ✅ | BUGMAP: ✅/—
+```
 
 ---
 

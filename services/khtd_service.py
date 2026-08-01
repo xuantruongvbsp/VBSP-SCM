@@ -820,3 +820,102 @@ def tao_dot_giao_dau_nam(
     except ImportError:
         pass
     return ket_qua
+
+
+# ── Nhập KHTD per-xã (merge vào payload PGD) ─────────────────────────────────
+
+
+def luu_dot_xa(
+    pgd_slug: str,
+    xa: str,
+    nam: str | int,
+    thang: str | int,
+    dot: str | int,
+    loai: str,
+    du_lieu_xa: list[dict],
+    username: str,
+) -> KetQuaUpload:
+    """Lưu KH cho 1 xã, merge vào payload PGD hiện có (giữ rows xã khác)."""
+    key = _kv_key(pgd_slug, nam, thang, dot)
+    try:
+        raw = db.doc_kv(key)
+        existing: list[dict] = []
+        if raw and isinstance(raw, dict) and raw.get("du_lieu"):
+            existing = [
+                r for r in raw["du_lieu"]
+                if isinstance(r, dict) and r.get("xa") != xa
+            ]
+
+        du_lieu_vnd, loi_am = _du_lieu_chuyen_trieu_sang_vnd(loai, du_lieu_xa)
+        all_du_lieu = existing + du_lieu_vnd
+
+        xa_da_nhap_set: set[str] = set()
+        if raw and isinstance(raw, dict):
+            if "xa_da_nhap" in raw:
+                xa_da_nhap_set = {
+                    str(x).strip()
+                    for x in (raw.get("xa_da_nhap") or [])
+                    if str(x or "").strip()
+                }
+            else:
+                xa_da_nhap_set = {
+                    str(r.get("xa")).strip()
+                    for r in (raw.get("du_lieu") or [])
+                    if isinstance(r, dict) and str(r.get("xa") or "").strip()
+                }
+        if str(xa or "").strip():
+            xa_da_nhap_set.add(str(xa).strip())
+        xa_da_nhap = sorted(xa_da_nhap_set)
+        payload = {
+            "loai": loai,
+            "du_lieu": all_du_lieu,
+            "timestamp": datetime.now().isoformat(),
+            "trang_thai": "cho_duyet",
+            "xa_da_nhap": xa_da_nhap,
+        }
+        db.ghi_kv(key, payload, username)
+        db.ghi_audit(
+            username,
+            "luu_dot_khtd_xa",
+            f"{pgd_slug}/{xa} · {nam}/{thang}/{dot} · loai={loai} · "
+            f"{len(du_lieu_vnd)} dòng · tổng {len(all_du_lieu)} dòng",
+        )
+        msg = (
+            f"✅ Đã lưu KH — {xa} ({pgd_slug}) · {nam}/{thang}/{dot} · "
+            f"{len(du_lieu_vnd)} dòng."
+        )
+        if loi_am:
+            msg += f"\n⚠️ Bỏ qua {len(loi_am)} dòng KH mới âm."
+        return KetQuaUpload(True, msg, key)
+    except Exception as e:
+        msg = f"❌ Lưu KHTD per-xã thất bại: {e}"
+        logger.error("luu_dot_xa [%s/%s]: %s", pgd_slug, xa, e, exc_info=True)
+        db.ghi_audit(username, "luu_dot_khtd_xa_error", f"{pgd_slug}/{xa} · {e}")
+        return KetQuaUpload(False, msg, "")
+
+
+def trang_thai_xa(
+    pgd_slug: str,
+    nam: str | int,
+    thang: str | int,
+    dot: str | int,
+) -> dict[str, bool]:
+    """Trả về {tên_xã: đã_nhập_chưa} cho PGD."""
+    key = _kv_key(pgd_slug, nam, thang, dot)
+    raw = db.doc_kv(key)
+    ten_pgd = _slug_to_ten_dv(pgd_slug)
+    ds_xa = PGD_XA_MAP.get(ten_pgd, [])
+    if not raw or not isinstance(raw, dict):
+        return {xa: False for xa in ds_xa}
+    xa_da_nhap = {
+        str(x).strip()
+        for x in (raw.get("xa_da_nhap") or [])
+        if str(x or "").strip()
+    }
+    if "xa_da_nhap" not in raw and raw.get("du_lieu"):
+        xa_da_nhap = {
+            str(r.get("xa")).strip()
+            for r in raw["du_lieu"]
+            if isinstance(r, dict) and str(r.get("xa") or "").strip()
+        }
+    return {xa: (xa in xa_da_nhap) for xa in ds_xa}

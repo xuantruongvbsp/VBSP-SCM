@@ -17,10 +17,14 @@ Các hàm công khai:
   merge_du_lieu_toan_cn()  — gộp file 22 đơn vị thành dữ liệu toàn CN
   luu_cdtotkvv()           — lưu file chấm điểm Tổ TK&VV theo tháng (legacy)
 """
+import hashlib
 import os
+import re
 import shutil
 import socket
+import tempfile
 import threading
+import time
 from dataclasses import asdict, dataclass
 from datetime import datetime
 from io import BytesIO
@@ -46,7 +50,7 @@ from config import (
     CACHE_DIR,
     TEN_FILE, TEN_FILE_NQ11,
     FILE_PATH, FILE_PATH_NQ11,
-    DB_HT_CACHE, DB_PREV_CACHE,
+    DB_HT_CACHE, DB_PREV_CACHE, DB_PREV_MONTH_CACHE,
     CDTOTKVV_DIR,
     TEN_FILE_GQVL, FILE_PATH_GQVL, CACHE_GQVL, CACHE_HSTD, CACHE_NQ11,
     DS_PGD, DON_VI_CHI_NHANH, GQVL_COT_MAP, COT_TEN_PGD,
@@ -61,6 +65,7 @@ _MERGE_LOCK: dict[str, threading.RLock] = {
     "nq11": threading.RLock(),
     "gqvl": threading.RLock(),
 }
+_FILE_WRITE_LOCK = threading.RLock()
 
 _BAD_VALS = {"nan", "None", "<NA>", "NaT"}
 
@@ -344,18 +349,70 @@ def kiem_tra_file_he_thong(ten_file: str, file_bytes: bytes) -> tuple[bool, str]
 
 # ── Ghi file nội bộ ───────────────────────────────────────────────────────────
 
+def _noi_dung_file_khop(duong_dan: Path, file_bytes: bytes) -> bool:
+    """So sánh theo SHA-256 mà không nạp thêm toàn bộ file đĩa vào RAM."""
+    try:
+        if not duong_dan.is_file() or duong_dan.stat().st_size != len(file_bytes):
+            return False
+        digest = hashlib.sha256()
+        with duong_dan.open("rb") as f:
+            for chunk in iter(lambda: f.read(1024 * 1024), b""):
+                digest.update(chunk)
+        return digest.digest() == hashlib.sha256(file_bytes).digest()
+    except OSError:
+        return False
+
+
 def _ghi_va_xoa_cache(
     duong_dan: str,
     file_bytes: bytes,
     duong_dan_cache: str | None = None,
 ) -> None:
     """
-    Ghi bytes ra đĩa, xóa file cache liên quan nếu tồn tại.
+    Ghi bytes nguyên tử ra đĩa, xóa file cache liên quan nếu tồn tại.
     Hàm nội bộ — không gọi trực tiếp từ ngoài module.
+    Retry bước replace trên Windows khi file bị khóa tạm thời.
     """
-    os.makedirs(os.path.dirname(os.path.abspath(duong_dan)), exist_ok=True)
-    with open(duong_dan, "wb") as f:
-        f.write(file_bytes)
+    target = Path(duong_dan).resolve()
+    target.parent.mkdir(parents=True, exist_ok=True)
+
+    with _FILE_WRITE_LOCK:
+        # Uploader có thể rerun với cùng payload; không mở lại file đích.
+        if not _noi_dung_file_khop(target, file_bytes):
+            temp_path: Path | None = None
+            try:
+                with tempfile.NamedTemporaryFile(
+                    mode="wb",
+                    dir=target.parent,
+                    prefix=f".{target.name}.",
+                    suffix=".tmp",
+                    delete=False,
+                ) as temp_file:
+                    temp_file.write(file_bytes)
+                    temp_path = Path(temp_file.name)
+
+                for attempt in range(5):
+                    try:
+                        os.replace(temp_path, target)
+                        temp_path = None
+                        break
+                    except OSError:
+                        # Process/session khác có thể vừa ghi cùng payload.
+                        if _noi_dung_file_khop(target, file_bytes):
+                            break
+                        if attempt == 4:
+                            raise
+                        time.sleep(0.3 * (attempt + 1))
+            finally:
+                if temp_path is not None:
+                    try:
+                        temp_path.unlink(missing_ok=True)
+                    except OSError:
+                        logger.warning(
+                            "Không xóa được file upload tạm: %s",
+                            temp_path,
+                            exc_info=True,
+                        )
 
     if duong_dan_cache and Path(duong_dan_cache).exists():
         os.remove(duong_dan_cache)
@@ -388,6 +445,29 @@ def luu_file_he_thong(ten_file: str, file_bytes: bytes) -> KetQuaUpload:
 
 # ── Lưu file Điện báo (tab Cân đối) ──────────────────────────────────────────
 
+
+def trich_xuat_ky_dienbao(ten_file: str) -> str | None:
+    """Trích ngày từ tên file Điện báo → 'DD/MM/YYYY' hoặc None.
+
+    Hỗ trợ: '31.07.2026', '31-07-2026', '31_07_2026', '31072026'.
+    """
+    if not ten_file:
+        return None
+    # Dạng có dấu phân cách: 31.07.2026 / 31-07-2026 / 31_07_2026
+    m = re.search(r"(\d{1,2})[.\-_](\d{1,2})[.\-_](\d{4})", ten_file)
+    if m:
+        ng, th, nam = int(m.group(1)), int(m.group(2)), int(m.group(3))
+        if 1 <= ng <= 31 and 1 <= th <= 12:
+            return f"{ng:02d}/{th:02d}/{nam}"
+    # Dạng liền: 31072026
+    m = re.search(r"(?<!\d)(\d{2})(\d{2})(\d{4})(?!\d)", ten_file)
+    if m:
+        ng, th, nam = int(m.group(1)), int(m.group(2)), int(m.group(3))
+        if 1 <= ng <= 31 and 1 <= th <= 12:
+            return f"{ng:02d}/{th:02d}/{nam}"
+    return None
+
+
 def luu_dienbao(
     loai: str,
     file_bytes: bytes,
@@ -415,6 +495,13 @@ def luu_dienbao(
             duong_dan_pgd(ten_pgd, "dienbao_prev")
             if ten_pgd
             else DB_PREV_CACHE
+        )
+    elif loai == "prev_month":
+        ten_hien = "Điện báo tháng trước"
+        duong_dan = (
+            duong_dan_pgd(ten_pgd, "dienbao_prev_month")
+            if ten_pgd
+            else DB_PREV_MONTH_CACHE
         )
     else:
         return KetQuaUpload(False, f"Loại Điện báo không hợp lệ: '{loai}'")
@@ -490,11 +577,38 @@ def luu_dienbao(
     if ten_pgd:
         chi_tiet += f" pgd={ten_pgd}"
     db.ghi_audit(username, "upload_dienbao", chi_tiet)
+
+    # ── Ghi metadata upload vào kv_store (mục B) ──
+    try:
+        from data.pgd import pgd_slug as _slug_fn
+        _key_sfx = f"_{_slug_fn(ten_pgd)}" if ten_pgd else ""
+    except Exception:
+        _key_sfx = ""
+    ky_tu_file = trich_xuat_ky_dienbao(ten_file_goc or "")
+    _meta_key = f"dienbao_meta_{loai}{_key_sfx}"
+    _meta_value = {
+        "ky": ky_tu_file or "",
+        "ten_file": ten_file_goc or "",
+        "ngay_upload": datetime.now().isoformat(),
+        "n_sheets": n_sheets,
+        "n_chi_tieu": n_chi_tieu,
+        "is_matrix": is_matrix,
+        "n_don_vi": n_don_vi if is_matrix else 0,
+    }
+    db.ghi_kv(_meta_key, _meta_value, username)
+    db.ghi_audit(username, "dienbao_meta", f"{_meta_key} file={ten}")
+
+    # Thông báo kết quả kèm kỳ số liệu phát hiện
+    ky_note = (
+        f" · 📅 Kỳ số liệu: **{ky_tu_file}** (từ tên file)"
+        if ky_tu_file
+        else " · ⚠️ Không phát hiện kỳ số liệu từ tên file — vui lòng chọn ngày bên dưới"
+    )
     return KetQuaUpload(
         True,
         f"✅ Đã lưu file {ten_hien} ({n_sheets} sheet, {n_chi_tieu} chỉ tiêu"
         + (f", {n_don_vi} đơn vị" if is_matrix else "")
-        + ")",
+        + f"){ky_note}",
         duong_dan,
     )
 

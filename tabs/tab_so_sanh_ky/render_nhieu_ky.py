@@ -14,7 +14,7 @@ import plotly.graph_objects as go
 
 import db
 from auth import normalize_role, la_phan_he_pgd, la_phan_he_cn
-from utils import fmt_ty, fmt_so
+from utils import fmt_ty, fmt_so, lazy_tabs
 from tabs.base_tab import TabContext
 from state_manager import SCMStateManager
 from snapshot_service import (
@@ -872,19 +872,13 @@ def render_nhieu_ky(tab: DeltaGenerator = None, **kwargs) -> None:
 
         st.divider()
 
-        # 4 tabs ngang
-        tab_hstd, tab_nq11, tab_gqvl, tab_cdt = st.tabs([
-            "📊 HSTD", "📋 NQ11", "💼 GQVL", "🏆 CDTOTKVV"
-        ])
-
-        with tab_hstd:
-            _render_hstd_tab(ky_list, pgd_mode, pgd_user, pgd_filter, username)
-
-        with tab_nq11:
-            _render_nq11_tab(ky_list, pgd_mode, pgd_user)
-
-        with tab_gqvl:
-            _render_gqvl_tab(ky_list, pgd_mode, pgd_user)
-
-        with tab_cdt:
-            _render_cdtotkvv_tab(ky_list, pgd_mode, pgd_user)
+        lazy_tabs(
+            ["📊 HSTD", "📋 NQ11", "💼 GQVL", "🏆 CDTOTKVV"],
+            [
+                lambda c: _render_hstd_tab(ky_list, pgd_mode, pgd_user, pgd_filter, username),
+                lambda c: _render_nq11_tab(ky_list, pgd_mode, pgd_user),
+                lambda c: _render_gqvl_tab(ky_list, pgd_mode, pgd_user),
+                lambda c: _render_cdtotkvv_tab(ky_list, pgd_mode, pgd_user),
+            ],
+            key="so_sanh_nhieu_ky_dataset",
+        )

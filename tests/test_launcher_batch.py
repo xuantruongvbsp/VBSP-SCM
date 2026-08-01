@@ -11,6 +11,7 @@ from scripts.validate_dependency_lock import validate_lock
 
 ROOT = Path(__file__).resolve().parents[1]
 MAIN_LAUNCHER = ROOT / "Chay_VBSP_SCM.bat"
+DEV_LAUNCHER = ROOT / "Chay_DEV_VBSP_SCM.bat"
 COMPAT_LAUNCHER = ROOT / "run.bat"
 SETUP_SCRIPT = ROOT / "setup_env.bat"
 DIRECT_REQUIREMENTS = ROOT / "requirements.txt"
@@ -33,13 +34,48 @@ def test_chay_vbsp_scm_is_the_only_real_launcher() -> None:
 def test_port_process_is_verified_before_force_kill() -> None:
     content = _read(MAIN_LAUNCHER)
 
-    assert "call :is_vbsp_process %%p" in content
+    assert "call :handle_port_pid %%p" in content
+    assert "call :is_vbsp_process %PORT_PID%" in content
     assert "Get-CimInstance Win32_Process" in content
+    assert "call :is_marked_vbsp_process" in content
+    assert 'APP_PID_FILE=%TMP_DIR%\\vbsp_streamlit.pid' in content
+    assert 'if /I not "!MARKER_ROOT!"=="%ROOT%" exit /b 1' in content
+    assert 'if /I not "!MARKER_APP!"=="%ROOT%\\app.py" exit /b 1' in content
     assert '/C:"%PY_EXE%"' in content
     assert '/C:"streamlit"' in content
     assert '/C:"app.py"' in content
-    assert "REFUSE: PID %%p is not verified as VBSP-SCM" in content
+    assert '/C:"venv\\Scripts\\python.exe"' not in content
+    assert "REFUSE: PID %PORT_PID% is not verified as VBSP-SCM" in content
     assert "taskkill /F /IM python" not in content
+
+
+def test_launcher_deduplicates_pids_and_explains_refused_process() -> None:
+    content = _read(MAIN_LAUNCHER)
+
+    assert 'set "SEEN_PIDS="' in content
+    assert "call :register_pid_once %%p" in content
+    assert 'for %%s in (!SEEN_PIDS!) do if "%%s"=="%~1"' in content
+    assert "LAUNCHER SELF-TEST FAILED: PID dedup duplicate" in content
+    assert "call :show_process_info %PORT_PID%" in content
+    assert "Ten: " in content
+    assert "Duong dan: " in content
+
+
+def test_launcher_removes_only_stale_runtime_marker() -> None:
+    content = _read(MAIN_LAUNCHER)
+
+    assert "call :cleanup_stale_pid_marker" in content
+    assert ":cleanup_stale_pid_marker" in content
+    assert "Get-Process -Id $parsed" in content
+    assert 'del "%APP_PID_FILE%"' in content
+    assert "Remove stale runtime PID marker" in content
+
+
+def test_agent_guidance_reserves_production_port_for_launcher() -> None:
+    agents = _read(ROOT / "AGENTS.md")
+
+    assert "`8502` chỉ dành cho app thật/launcher" in agents
+    assert "18502" in agents
 
 
 def test_dependency_lock_is_installed_and_synced_by_combined_sha256() -> None:
@@ -119,8 +155,18 @@ def test_launcher_keeps_project_runtime_contract() -> None:
 
     assert 'PORT=8502' in content
     assert 'PY_EXE=%ROOT%\\venv\\Scripts\\python.exe' in content
-    assert "--server.headless false" in content
+    assert 'set "HEADLESS=false"' in content
+    assert 'if /I "%~1"=="--no-browser" set "HEADLESS=true"' in content
+    assert "--server.headless %HEADLESS%" in content
     assert "start powershell" not in content.lower()
+
+
+def test_dev_launcher_reuses_browser_tab_without_opening_new_one() -> None:
+    content = _read(DEV_LAUNCHER)
+
+    assert 'call "%~dp0Chay_VBSP_SCM.bat" --no-browser' in content
+    assert "khong mo them tab Chrome" in content
+    assert "http://localhost:8502" in content
 
 
 @pytest.mark.skipif(sys.platform != "win32", reason="cmd.exe only available on Windows")
@@ -147,7 +193,7 @@ def test_launcher_self_test_runs_without_starting_app() -> None:
 
 @pytest.mark.skipif(sys.platform != "win32", reason="CRLF guarantee only relevant on Windows")
 def test_batch_files_stay_ascii_crlf_for_cmd_compatibility() -> None:
-    for path in (MAIN_LAUNCHER, COMPAT_LAUNCHER, SETUP_SCRIPT):
+    for path in (MAIN_LAUNCHER, DEV_LAUNCHER, COMPAT_LAUNCHER, SETUP_SCRIPT):
         raw = path.read_bytes()
         assert all(byte < 128 for byte in raw)
         assert b"\n" not in raw.replace(b"\r\n", b"")

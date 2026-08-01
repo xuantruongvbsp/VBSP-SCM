@@ -26,6 +26,7 @@ def delta_card(
     precision: int = 0,
     key: str | None = None,
     use_container_width: bool = True,
+    sub: str | None = None,
 ):
     """Thẻ KPI có delta + info popover.
 
@@ -41,6 +42,7 @@ def delta_card(
         precision: Số chữ số thập phân cho delta
         key: Key cho Streamlit widget
         use_container_width: Tự động giãn chiều rộng
+        sub: Dòng thông tin phụ bên dưới thẻ (vd: "Kỳ trước: 12,3 tỷ · +0,5 tỷ")
     """
     _value_str = _fmt_vn_num(value)
     display_value = f"{icon} {_value_str}" if icon else _value_str
@@ -58,14 +60,20 @@ def delta_card(
     col1, col2 = st.columns([1, 0.05])
 
     with col1:
-        st.metric(
-            label=label,
-            value=display_value,
-            delta=delta_str,
-            delta_color=delta_color if delta is not None else "off",
-            help=help,
-            border=True,
-        )
+        # st.metric() không phải context manager; caption gọi sau metric sẽ nằm
+        # ngoài border của metric. Dùng container làm card để giữ metric và
+        # dòng thông tin phụ trong cùng một khung, đồng thời đồng nhất chiều cao.
+        with st.container(border=True):
+            st.metric(
+                label=label,
+                value=display_value,
+                delta=delta_str,
+                delta_color=delta_color if delta is not None else "off",
+                help=help,
+                border=False,
+            )
+            if sub is not None:
+                st.caption(sub)
 
     if help:
         with col2:

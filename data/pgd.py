@@ -53,6 +53,8 @@ def duong_dan_pgd(ten_pgd: str, loai: str) -> str:
         return str(slug_dir / "dienbao_ht.xlsx")
     if loai == "dienbao_prev":
         return str(slug_dir / "dienbao_prev.xlsx")
+    if loai == "dienbao_prev_month":
+        return str(slug_dir / "dienbao_prev_month.xlsx")
     if loai == "hstd_khnv":
         return str(thu_muc_pgd(ten_pgd) / "hstd_khnv.xlsx")
     return str(thu_muc_pgd(ten_pgd) / f"{loai}_latest.xlsx")

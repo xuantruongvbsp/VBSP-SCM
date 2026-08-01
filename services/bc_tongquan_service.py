@@ -376,7 +376,9 @@ def xuat_pdf_bc(sheets: Dict[str, pd.DataFrame], tieu_de: str, nguoi_xuat: str) 
     bytes - Nội dung file PDF
     """
     try:
-        from reportlab.lib.pagesizes import A4
+        from xml.sax.saxutils import escape as xml_escape
+
+        from reportlab.lib.pagesizes import A4, landscape
         from reportlab.lib import colors
         from reportlab.lib.units import cm
         from reportlab.platypus import (
@@ -401,18 +403,95 @@ def xuat_pdf_bc(sheets: Dict[str, pd.DataFrame], tieu_de: str, nguoi_xuat: str) 
             base_font = "Helvetica"
             base_font_bold = "Helvetica-Bold"
 
+        page_size = landscape(A4)
+        margin_x = 1.2 * cm
         doc = SimpleDocTemplate(
-            buf, pagesize=A4,
-            leftMargin=2.5*cm, rightMargin=2*cm,
-            topMargin=2*cm, bottomMargin=2*cm
+            buf, pagesize=page_size,
+            leftMargin=margin_x, rightMargin=margin_x,
+            topMargin=1.5*cm, bottomMargin=1.3*cm,
         )
 
         # Styles
         s_co_quan = ParagraphStyle("co_quan", fontName=base_font, fontSize=10, leading=14, alignment=1)
         s_tieu_de = ParagraphStyle("tieu_de", fontName=base_font_bold, fontSize=13, leading=18, alignment=1, spaceBefore=10, spaceAfter=4)
         s_phu_de = ParagraphStyle("phu_de", fontName=base_font, fontSize=10, leading=14, alignment=1, spaceAfter=10, textColor=colors.HexColor("#444444"))
-        s_normal = ParagraphStyle("normal", fontName=base_font, fontSize=9, leading=12)
-        s_footer = ParagraphStyle("footer", fontName=base_font, fontSize=8, leading=11, textColor=colors.grey)
+        s_section = ParagraphStyle("section", fontName=base_font_bold, fontSize=10, leading=13, spaceAfter=5, textColor=colors.HexColor("#185FA5"))
+        s_cell = ParagraphStyle("cell", fontName=base_font, fontSize=7.5, leading=9)
+        s_header = ParagraphStyle("table_header", fontName=base_font_bold, fontSize=7.5, leading=9, textColor=colors.white)
+
+        def _pdf_text(value: object) -> str:
+            text = str(value).replace("\u2013", "-").replace("\u2014", "-").replace("\u2212", "-")
+            return xml_escape(text)
+
+        def _format_cell(value: object, column: object) -> str:
+            missing = pd.isna(value)
+            if isinstance(missing, (bool, np.bool_)) and missing:
+                return "—"
+            if isinstance(value, (int, float, np.integer, np.floating)) and not isinstance(value, bool):
+                number = float(value)
+                if "tỷ lệ" in str(column).casefold():
+                    return f"{number:,.2f}%".replace(",", "X").replace(".", ",").replace("X", ".")
+                return f"{number:,.0f}".replace(",", ".")
+            return str(value)
+
+        available_width = page_size[0] - 2 * margin_x
+
+        def _column_widths(df: pd.DataFrame) -> list[float]:
+            weights: list[int] = []
+            sample = df.head(50)
+            for index, column in enumerate(df.columns):
+                lengths = [len(str(column))]
+                lengths.extend(len(_format_cell(value, column)) for value in sample[column].tolist())
+                weight = max(8, min(max(lengths, default=8), 30))
+                if index == 0:
+                    weight = max(weight, 22)
+                weights.append(weight)
+            total = sum(weights) or 1
+            return [available_width * weight / total for weight in weights]
+
+        def _add_sheet(story: list, sheet_name: str, df: pd.DataFrame) -> None:
+            story.append(Paragraph(_pdf_text(sheet_name), s_section))
+            header = [Paragraph(_pdf_text(col), s_header) for col in df.columns]
+            data = [header]
+            for _, row in df.iterrows():
+                data.append([
+                    Paragraph(_pdf_text(_format_cell(value, column)), s_cell)
+                    for column, value in row.items()
+                ])
+
+            table = Table(
+                data,
+                colWidths=_column_widths(df),
+                repeatRows=1,
+                hAlign="LEFT",
+            )
+            table_style = [
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#185FA5")),
+                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#F1EFE8")]),
+                ("GRID", (0, 0), (-1, -1), 0.3, colors.HexColor("#AAAAAA")),
+                ("TOPPADDING", (0, 0), (-1, -1), 3),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+                ("LEFTPADDING", (0, 0), (-1, -1), 4),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ]
+            for column_index, column in enumerate(df.columns):
+                alignment = "RIGHT" if pd.api.types.is_numeric_dtype(df[column]) else "LEFT"
+                table_style.append(("ALIGN", (column_index, 1), (column_index, -1), alignment))
+            table.setStyle(TableStyle(table_style))
+            story.append(table)
+
+        def _draw_page_number(canvas, document) -> None:
+            canvas.saveState()
+            canvas.setFont(base_font, 8)
+            canvas.setFillColor(colors.grey)
+            canvas.drawString(
+                margin_x,
+                0.55 * cm,
+                "Tài liệu được tạo tự động từ Hệ thống Quản trị Tín dụng Nội bộ VBSP-SCM",
+            )
+            canvas.drawRightString(page_size[0] - margin_x, 0.55 * cm, f"Trang {document.page}")
+            canvas.restoreState()
 
         story = []
         story.append(Paragraph("NGÂN HÀNG CHÍNH SÁCH XÃ HỘI VIỆT NAM", s_co_quan))
@@ -420,40 +499,25 @@ def xuat_pdf_bc(sheets: Dict[str, pd.DataFrame], tieu_de: str, nguoi_xuat: str) 
         story.append(Spacer(1, 0.3*cm))
         story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#185FA5")))
         story.append(Spacer(1, 0.4*cm))
-        story.append(Paragraph(tieu_de.upper(), s_tieu_de))
-        story.append(Paragraph(f"Ngày xuất: {datetime.now().strftime('%d/%m/%Y %H:%M')}", s_phu_de))
+        story.append(Paragraph(_pdf_text(tieu_de.upper()), s_tieu_de))
+        story.append(Paragraph(
+            f"Ngày xuất: {datetime.now().strftime('%d/%m/%Y %H:%M')} | Người xuất: {_pdf_text(nguoi_xuat or '—')}",
+            s_phu_de,
+        ))
         story.append(Spacer(1, 0.4*cm))
 
-        # Thêm bảng Tổng hợp (sheet 2)
-        if "Tổng hợp" in sheets and not sheets["Tổng hợp"].empty:
-            df_tong_hop = sheets["Tổng hợp"]
-            header = [Paragraph(f"<b>{col}</b>", s_normal) for col in df_tong_hop.columns]
-            data = [header]
-
-            for _, row in df_tong_hop.iterrows():
-                data.append([Paragraph(str(val), s_normal) for val in row.values])
-
-            tbl = Table(data, colWidths=[2*cm]*len(df_tong_hop.columns), repeatRows=1)
-            tbl.setStyle(TableStyle([
-                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#185FA5")),
-                ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#F1EFE8")]),
-                ("GRID", (0, 0), (-1, -1), 0.3, colors.HexColor("#AAAAAA")),
-                ("TOPPADDING", (0, 0), (-1, -1), 4),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
-                ("VALIGN", (0, 0), (-1, -1), "TOP"),
-            ]))
-            story.append(tbl)
+        non_empty_sheets = [
+            (sheet_name, df)
+            for sheet_name, df in sheets.items()
+            if isinstance(df, pd.DataFrame) and not df.empty
+        ]
+        for index, (sheet_name, df) in enumerate(non_empty_sheets):
+            if index:
+                story.append(PageBreak())
+            _add_sheet(story, sheet_name, df)
             story.append(Spacer(1, 0.6*cm))
 
-        story.append(HRFlowable(width="100%", thickness=0.5, color=colors.grey))
-        story.append(Spacer(1, 0.2*cm))
-        story.append(Paragraph(
-            "Tài liệu được tạo tự động từ Hệ thống Quản trị Tín dụng Nội bộ VBSP-SCM",
-            s_footer,
-        ))
-
-        doc.build(story)
+        doc.build(story, onFirstPage=_draw_page_number, onLaterPages=_draw_page_number)
         return buf.getvalue()
 
     except Exception as e:

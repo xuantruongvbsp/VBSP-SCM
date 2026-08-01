@@ -1342,6 +1342,16 @@
 | **Test** | `tests/test_bc_tongquan_pdf.py::test_xuat_pdf_bc_khong_tao_trang_trang_chi_co_footer`; render PNG toàn bộ trang. |
 | **Ngày fix** | 2026-08-01 |
 
+### F12 — PDF Cân đối extract tiếng Việt thành `Chnnng trình`
+| | |
+|---|---|
+| **File** | `services/bc_tongquan_service.py` → `xuat_pdf_bc()` |
+| **Dấu hiệu** | Test PDF footer/table fail: `pdfplumber.extract_text()` trả `Chnnng trình`, `Tài linu...` thay vì `Chương trình`, `Tài liệu...`; file nhìn có bảng nhưng text layer mất dấu. |
+| **Nguyên nhân** | Môi trường không có font Times Windows phù hợp thì service fallback Helvetica, font này không có Unicode tiếng Việt đầy đủ cho text extraction. |
+| **Fix** | Đăng ký font Unicode theo thứ tự DejaVuSans Windows/Linux → Arial Windows → Times Windows; dùng font đã đăng ký cho paragraph, table và footer. |
+| **Test** | `tests/test_bc_tongquan_pdf.py` |
+| **Ngày fix** | 2026-08-01 |
+
 ---
 
 ## G. Kế hoạch tín dụng
@@ -3212,6 +3222,16 @@ def _to_int(val, default=0):
 | **Fix** | Thêm `_la_loi_tab_khong_ton_tai()` + cờ `optional` cho `_doc_raw_values_sheet`: tab tuỳ chọn đọc hụt (parse range) thì trả `[]` êm, không ghi `_LAST_ERROR`, không raise. `doc_nhiem_vu_gsheet` gọi `optional=True`; `kiem_tra_ket_noi` tách đọc NV, thiếu thì báo "chưa tạo (tuỳ chọn)" thay vì fail. **Fix tiếp (cùng ngày):** trong `kiem_tra_ket_noi`, nhánh NV/GV `_la_loi_tab_khong_ton_tai(e)` phải `global _LAST_ERROR` + gán `_LAST_ERROR = None` trước khi trả thành công — vì `_doc_raw_values_sheet` (gọi KHÔNG optional) đã ghi `_LAST_ERROR` rồi mới raise, khiến banner vẫn hiện dù kết quả OK |
 | **Test** | `venv\Scripts\python.exe -m pytest tests\test_ke_hoach_cv_khnv_service.py -q` (10 passed; regression a/b/c: optional missing tab không bẩn `_LAST_ERROR`, `kiem_tra_ket_noi` NV parse-range trả True + `_LAST_ERROR` None, NV 401/403/500 vẫn fail) |
 | **Ngày fix** | 2026-07-26 |
+
+### H15 — Allowlist deadline kéo cả báo cáo chưa quá hạn vào Telegram
+| | |
+|---|---|
+| **File** | `services/report_submission_service.py` → `lay_danh_sach_can_nhac()` |
+| **Dấu hiệu** | Test `test_allowlist_khong_anh_huong_loc_deadline_qua_han` fail vào ngày 01/08/2026: deadline `2026-08-01` được đưa vào danh sách nhắc dù test kỳ vọng chỉ còn báo cáo đã quá hạn. |
+| **Nguyên nhân** | Hàm nhắc deadline dùng điều kiện `days_left <= 3`, nên allowlist có thể đưa cả báo cáo đúng ngày hiện tại hoặc sắp đến hạn vào luồng Telegram “cần nhắc”. |
+| **Fix** | Chỉ trả báo cáo có `days_left < 0` trong `lay_danh_sach_can_nhac()`; trạng thái “sắp đến hạn” vẫn được xử lý ở bảng nghĩa vụ báo cáo riêng. |
+| **Test** | `tests/test_report_submission_service.py::TestLayDanhSachCanNhacAllowlist::test_allowlist_khong_anh_huong_loc_deadline_qua_han` |
+| **Ngày fix** | 2026-08-01 |
 
 ---
 

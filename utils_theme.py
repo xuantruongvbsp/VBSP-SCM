@@ -526,6 +526,68 @@ hr {{ border: none !important; border-top: 1px solid {c['border']} !important; m
 }}
 .cdk-stat b.pos {{ color: {c['success_text']}; }}
 .cdk-stat b.neg {{ color: {c['error_text']}; }}
+
+/* ── 22. CÂN ĐỐI — BẢNG CHƯƠNG TRÌNH (.cdp) ── */
+.cdp-wrap {{
+    border: 1px solid {c['border']};
+    border-radius: 12px;
+    overflow: hidden;
+    background: {c['bg_subtle']};
+}}
+.cdp-table {{
+    width: 100%;
+    border-collapse: collapse;
+    font-size: .86rem;
+    font-variant-numeric: tabular-nums;
+}}
+.cdp-table thead th {{
+    background: {c['table_header']};
+    color: #fff;
+    font-weight: 700;
+    font-size: .7rem;
+    text-transform: uppercase;
+    letter-spacing: .6px;
+    padding: 9px 12px;
+    text-align: right;
+    border-bottom: 2px solid {c['accent']};
+    white-space: nowrap;
+}}
+.cdp-table thead th:first-child {{ text-align: left; }}
+.cdp-group td {{
+    background: linear-gradient(90deg, {c['accent_soft']} 0%, transparent 75%);
+    color: {c['accent_text']};
+    font-weight: 800;
+    font-size: .76rem;
+    text-transform: uppercase;
+    letter-spacing: 1.4px;
+    padding: 8px 14px;
+    border-top: 1px solid {c['border']};
+    border-bottom: 1px solid {c['border']};
+}}
+.cdp-row td {{
+    padding: 7px 12px;
+    border-bottom: 1px solid {c['border']}55;
+    color: {c['text']};
+    text-align: right;
+    white-space: nowrap;
+}}
+.cdp-row:last-child td {{ border-bottom: none; }}
+.cdp-row:hover td {{ background: {c['table_hover']}; }}
+.cdp-row td.cdp-name {{
+    text-align: left;
+    font-weight: 500;
+    white-space: normal;
+    min-width: 200px;
+}}
+.cdp-pos {{ color: {c['success_text']}; font-weight: 600; }}
+.cdp-neg {{ color: {c['error_text']}; font-weight: 600; }}
+.cdp-zero {{ color: {c['text_muted']}; }}
+.cdp-nqh {{ background: {c['warn_bg']}3D; }}
+.cdp-note {{
+    font-size: .78rem; color: {c['text_muted']};
+    padding: 8px 14px; border-top: 1px solid {c['border']};
+    background: {c['surface']};
+}}
 </style>"""
 
 

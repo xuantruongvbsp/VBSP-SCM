@@ -952,7 +952,7 @@ def lay_danh_sach_can_nhac(
                    "days_left": int, "ds_chua_nop": list[str]}
 
     Chỉ trả các loại:
-      - Có deadline đã qua hoặc trong 3 ngày tới.
+      - Có deadline đã quá hạn.
       - Nằm trong allowlist (nếu allowlist không None).
       - Còn ít nhất 1 PGD chưa nộp.
     """
@@ -986,7 +986,7 @@ def lay_danh_sach_can_nhac(
             continue
 
         days_left = (dl_date - today).days
-        if days_left > 3:
+        if days_left >= 0:
             continue
 
         # Tìm PGD chưa nộp

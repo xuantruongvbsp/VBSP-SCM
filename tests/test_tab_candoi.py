@@ -479,8 +479,7 @@ def test_build_print_html_escape_du_lieu_dong_va_hien_thi_ty_le_zero():
     ])
 
     result = tab_candoi._build_print_html(
-        df,
-        pd.DataFrame(),
+        [("Tổng hợp chỉ tiêu", df)],
         "<Kỳ trước>",
         "Hiện tại",
         "<b>PGD thử</b>",

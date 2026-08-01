@@ -1,5 +1,17 @@
 # CHANGELOG
 
+## [2026-08-01] — Redesign sub-tab Theo chương trình + nút In/PDF theo từng tab
+- `tabs/tab_candoi.py` — sub-tab "Theo chương trình": thêm 2 thẻ KPI (dư nợ KHA/KHB), caption số chương trình tăng/giảm, bảng HTML với dải nhóm KHA/KHB (`.cdp`), tô màu chênh lệch/tỷ lệ, cột NQH nền nhạt; giữ nguyên giá trị các hàng.
+- `tabs/tab_candoi.py` — thêm `_render_tab_export()` (cặp nút 📄 PDF + 🖨️ In) cho 3 sub-tab Tổng quan / Theo chương trình / Biểu đồ; `_build_print_html()` nhận danh sách bảng + tiêu đề tùy chọn.
+- `tabs/tab_candoi.py` — khung xuất cuối trang thu gọn còn nút Excel tổng hợp (2 sheet); export frames tính 1 lần dùng chung.
+- `utils_theme.py` — thêm CSS section 22 (`.cdp-*`) cho bảng chương trình, hỗ trợ dark mode.
+- `tests/test_tab_candoi.py` — cập nhật test theo signature mới của `_build_print_html()`.
+
+## [2026-08-01] — Fix test PDF Cân đối và nhắc deadline báo cáo
+- `services/bc_tongquan_service.py` dòng ~395 — ưu tiên đăng ký font Unicode DejaVu/Arial cho PDF để text tiếng Việt extract đúng trên môi trường không có Times Windows.
+- `services/report_submission_service.py` dòng ~954 — `lay_danh_sach_can_nhac()` chỉ trả báo cáo đã quá hạn, tránh allowlist kéo cả deadline đúng ngày hiện tại vào danh sách nhắc.
+- `BUGMAP.md` — thêm F12 và H15 cho hai regression trên.
+
 ## [2026-08-01] — Bỏ sub-tab Ma trận PGD khỏi Điện báo Cân đối
 - `tabs/tab_candoi.py` — xóa sub-tab "🔍 Ma trận PGD" (elif _cd_sub == 3), còn 3 sub-tabs: Tổng quan, Theo chương trình, Biểu đồ.
 

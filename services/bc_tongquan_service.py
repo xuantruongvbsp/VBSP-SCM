@@ -388,20 +388,53 @@ def xuat_pdf_bc(sheets: Dict[str, pd.DataFrame], tieu_de: str, nguoi_xuat: str) 
         from reportlab.lib.styles import ParagraphStyle
         from reportlab.pdfbase import pdfmetrics
         from reportlab.pdfbase.ttfonts import TTFont
-        import os
+        from pathlib import Path
 
         buf = io.BytesIO()
 
-        # Cố gắng dùng font TimesVN
-        font_dir = "C:/Windows/Fonts"
-        try:
-            pdfmetrics.registerFont(TTFont("TimesVN", os.path.join(font_dir, "times.ttf")))
-            pdfmetrics.registerFont(TTFont("TimesVN-Bold", os.path.join(font_dir, "timesbd.ttf")))
-            base_font = "TimesVN"
-            base_font_bold = "TimesVN-Bold"
-        except Exception:  # conv: skip
-            base_font = "Helvetica"
-            base_font_bold = "Helvetica-Bold"
+        def _register_unicode_font() -> tuple[str, str]:
+            """Đăng ký font Unicode để text tiếng Việt extract đúng trong PDF."""
+            font_pairs = [
+                (
+                    Path("C:/Windows/Fonts/DejaVuSans.ttf"),
+                    Path("C:/Windows/Fonts/DejaVuSans-Bold.ttf"),
+                    "DejaVuSansBC",
+                    "DejaVuSansBC-Bold",
+                ),
+                (
+                    Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"),
+                    Path("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"),
+                    "DejaVuSansBC",
+                    "DejaVuSansBC-Bold",
+                ),
+                (
+                    Path("C:/Windows/Fonts/arial.ttf"),
+                    Path("C:/Windows/Fonts/arialbd.ttf"),
+                    "ArialBC",
+                    "ArialBC-Bold",
+                ),
+                (
+                    Path("C:/Windows/Fonts/times.ttf"),
+                    Path("C:/Windows/Fonts/timesbd.ttf"),
+                    "TimesVN",
+                    "TimesVN-Bold",
+                ),
+            ]
+            for regular, bold, regular_name, bold_name in font_pairs:
+                if not regular.exists():
+                    continue
+                try:
+                    pdfmetrics.registerFont(TTFont(regular_name, str(regular)))
+                    if bold.exists():
+                        pdfmetrics.registerFont(TTFont(bold_name, str(bold)))
+                    else:
+                        bold_name = regular_name
+                    return regular_name, bold_name
+                except Exception:
+                    logger.warning("Không đăng ký được font PDF %s", regular, exc_info=True)
+            return "Helvetica", "Helvetica-Bold"
+
+        base_font, base_font_bold = _register_unicode_font()
 
         page_size = landscape(A4)
         margin_x = 1.2 * cm

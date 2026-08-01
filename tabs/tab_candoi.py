@@ -519,16 +519,19 @@ def _render_kpi_grid(cards: list[dict], num_columns: int = 4) -> None:
 
 
 def _build_print_html(
-    df1: pd.DataFrame,
-    df2: pd.DataFrame,
+    tables: list[tuple[str, pd.DataFrame]],
     label_pv: str,
     label_ht: str,
     pgd_user: str | None,
     pgd_mode: bool,
+    tieu_de: str | None = None,
 ) -> str:
-    """Tạo HTML standalone có 2 bảng + CSS print + nút In tự động."""
+    """Tạo HTML standalone gồm nhiều bảng + CSS print + nút In tự động.
+
+    tables: danh sách (caption, DataFrame) — mỗi cặp render thành 1 bảng.
+    """
     _scope = pgd_user if pgd_mode else "Toàn Chi nhánh"
-    _title = f"So sánh Cân đối — {_scope}"
+    _title = tieu_de or f"So sánh Cân đối — {_scope}"
     _sub = f"{label_pv} vs {label_ht} · Xuất ngày {datetime.today().strftime('%d/%m/%Y %H:%M')}"
 
     def _esc(value: object) -> str:
@@ -558,8 +561,9 @@ def _build_print_html(
             f'<tbody>{"".join(rows)}</tbody></table>'
         )
 
-    t1 = _df_to_html(df1, "Tổng hợp chỉ tiêu")
-    t2 = _df_to_html(df2, "Theo chương trình") if not df2.empty else ""
+    body = "".join(
+        _df_to_html(df, cap) for cap, df in tables if df is not None and not df.empty
+    )
 
     return f"""<!DOCTYPE html>
 <html lang="vi"><head><meta charset="utf-8">
@@ -592,8 +596,7 @@ def _build_print_html(
 <h1>{_esc(_title)}</h1>
 <p class="sub">{_esc(_sub)}</p>
 <div class="no-print"><button onclick="window.print()">🖨️ In trang này</button></div>
-{t1}
-{t2}
+{body}
 <script>window.onload=function(){{/* auto-focus for Ctrl+P */}}</script>
 </body></html>"""
 
@@ -732,6 +735,143 @@ def _safe_export_name_part(value: object, fallback: str) -> str:
     """Chuẩn hóa một phần tên file để hợp lệ trên Windows."""
     normalized = re.sub(r'[<>:"/\\|?*\x00-\x1f]+', "_", str(value)).strip(" ._")
     return normalized or fallback
+
+
+def _chuong_trinh_table_html(rows_ct: list[dict], label_pv: str, label_ht: str) -> str:
+    """Render bảng so sánh chương trình thành HTML với dải nhóm KHA/KHB.
+
+    Giữ nguyên giá trị từ rows_ct; chỉ trình bày: số liệu (triệu đồng) căn phải,
+    chênh lệch/tỷ lệ tô màu xanh-đỏ, cột NQH nền nhạt.
+    """
+    def _esc(v: object) -> str:
+        return html.escape(str(v), quote=True)
+
+    def _num(vnd: object) -> str:
+        try:
+            if vnd is None or (isinstance(vnd, float) and pd.isna(vnd)):
+                return '<span class="cdp-zero">—</span>'
+            return _fmt_so_vn(float(vnd) / 1_000_000, 0)
+        except Exception:
+            return '<span class="cdp-zero">—</span>'
+
+    head = (
+        "<thead><tr>"
+        "<th>Chương trình</th>"
+        f"<th>{_esc(label_pv)}</th>"
+        f"<th>{_esc(label_ht)}</th>"
+        "<th>Chênh lệch</th>"
+        "<th>Tỷ lệ %</th>"
+        f"<th>NQH {_esc(label_ht)}</th>"
+        f"<th>NQH {_esc(label_pv)}</th>"
+        "</tr></thead>"
+    )
+
+    body_rows: list[str] = []
+    for r in rows_ct:
+        if r.get("_is_header"):
+            ten_nhom = str(r.get("Chương trình", "")).replace("─", "").strip()
+            body_rows.append(
+                f'<tr class="cdp-group"><td colspan="7">{_esc(ten_nhom)}</td></tr>'
+            )
+            continue
+
+        ht = float(r.get("_ht", 0) or 0)
+        pv = float(r.get("_pv", 0) or 0)
+        cl = ht - pv
+        cl_cls = "cdp-pos" if cl > 0 else ("cdp-neg" if cl < 0 else "cdp-zero")
+        cl_sign = "+" if cl > 0 else ""
+        cl_html = f'<span class="{cl_cls}">{cl_sign}{_fmt_so_vn(cl / 1_000_000, 0)}</span>'
+
+        tl = r.get("Tỷ lệ %")
+        try:
+            tl_val = None if (tl is None or (isinstance(tl, float) and pd.isna(tl))) else float(tl)
+        except Exception:
+            tl_val = None
+        if tl_val is None:
+            tl_html = '<span class="cdp-zero">—</span>'
+        else:
+            tl_cls = "cdp-pos" if tl_val > 0 else ("cdp-neg" if tl_val < 0 else "cdp-zero")
+            tl_sign = "+" if tl_val > 0 else ""
+            tl_html = f'<span class="{tl_cls}">{tl_sign}{_fmt_so_vn(tl_val, 1)}%</span>'
+
+        body_rows.append(
+            '<tr class="cdp-row">'
+            f'<td class="cdp-name">{_esc(r.get("Chương trình", ""))}</td>'
+            f"<td>{_num(pv)}</td>"
+            f"<td>{_num(ht)}</td>"
+            f"<td>{cl_html}</td>"
+            f"<td>{tl_html}</td>"
+            f'<td class="cdp-nqh">{_num(r.get("NQH hiện tại"))}</td>'
+            f'<td class="cdp-nqh">{_num(r.get("NQH kỳ trước"))}</td>'
+            "</tr>"
+        )
+
+    return (
+        '<div class="cdp-wrap"><table class="cdp-table">'
+        + head
+        + f'<tbody>{"".join(body_rows)}</tbody>'
+        + "</table>"
+        + '<div class="cdp-note">Đơn vị: triệu đồng · NQH = nợ quá hạn (nền vàng nhạt)</div>'
+        + "</div>"
+    )
+
+
+def _render_tab_export(
+    sheets: dict[str, pd.DataFrame],
+    print_tables: list[tuple[str, pd.DataFrame]],
+    tieu_de: str,
+    key: str,
+    username: str,
+    fn_base: str,
+    label_pv: str,
+    label_ht: str,
+    pgd_user: str | None,
+    pgd_mode: bool,
+) -> None:
+    """Render cặp nút 📄 Xuất PDF + 🖨️ In cho nội dung của một sub-tab."""
+    state = SCMStateManager()
+    _c_pdf, _c_in, _ = st.columns([1, 1, 2])
+
+    with _c_pdf:
+        if st.button("📄 Xuất PDF", key=f"btn_pdf_{key}", use_container_width=True):
+            try:
+                from services.bc_tongquan_service import xuat_pdf_bc
+                _pdf_bytes = xuat_pdf_bc(sheets, tieu_de, username)
+                if not _pdf_bytes:
+                    raise RuntimeError("Dịch vụ PDF không trả về dữ liệu.")
+                state.downloads.set(f"pdf_{key}", _pdf_bytes, f"{fn_base}.pdf")
+            except Exception as _e:
+                logger.error("xuat_pdf %s: %s", key, _e, exc_info=True)
+                st.error(f"Lỗi tạo PDF: {_e}")
+        if state.downloads.has(f"pdf_{key}"):
+            if st.download_button(
+                "⬇ Tải PDF",
+                data=state.downloads.get_bytes(f"pdf_{key}"),
+                file_name=state.downloads.get_filename(f"pdf_{key}") or "BaoCao.pdf",
+                mime="application/pdf",
+                key=f"dl_pdf_{key}", use_container_width=True,
+            ):
+                state.downloads.clear(f"pdf_{key}")
+
+    with _c_in:
+        if st.button("🖨️ In bảng", key=f"btn_in_{key}", use_container_width=True):
+            try:
+                _html_str = _build_print_html(
+                    print_tables, label_pv, label_ht, pgd_user, pgd_mode, tieu_de=tieu_de,
+                )
+                state.downloads.set(f"html_{key}", _html_str.encode("utf-8"), f"{fn_base}.html")
+            except Exception as _e:
+                logger.error("xuat_html %s: %s", key, _e, exc_info=True)
+                st.error(f"Lỗi tạo bản in: {_e}")
+        if state.downloads.has(f"html_{key}"):
+            if st.download_button(
+                "⬇ Tải HTML để in",
+                data=state.downloads.get_bytes(f"html_{key}"),
+                file_name=state.downloads.get_filename(f"html_{key}") or "BaoCao.html",
+                mime="text/html",
+                key=f"dl_html_{key}", use_container_width=True,
+            ):
+                state.downloads.clear(f"html_{key}")
 
 
 def _render_dienbao_lich_su(key_sfx: str) -> None:
@@ -1487,6 +1627,28 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
 
         _la_kh = kieu_so_sanh == "thuc_hien_kh"
 
+        # ── Khung xuất dùng chung cho các sub-tab (tính 1 lần) ────────────
+        df_ex1: pd.DataFrame | None = None
+        df_ex2: pd.DataFrame | None = None
+        if db_ht_rows is not None:
+            try:
+                df_ex1, df_ex2 = _build_export_frames(
+                    db_ht_rows,
+                    db_prev_rows,
+                    _he_so_ht,
+                    _he_so_pv,
+                    _la_kh,
+                    label_pv,
+                    label_ht,
+                    rows_prev_month=db_prev_month_rows,
+                    he_so_prev_month=_he_so_pm,
+                )
+            except Exception as _e:
+                logger.error("build_export_frames: %s", _e, exc_info=True)
+        _fn_pv = _safe_export_name_part(label_pv[:20], "Moc_truoc")
+        _fn_ht = _safe_export_name_part(label_ht[:20], "Hien_tai")
+        _fn_base = f"CanDoi_{_fn_pv}_vs_{_fn_ht}_{datetime.today().strftime('%d%m%Y')}"
+
         # ──────────────────────────────────────────────────────────────────
         # TAB 1: TỔNG QUAN — KPI + bảng chi tiết hiển thị trực tiếp
         # ──────────────────────────────────────────────────────────────────
@@ -1745,6 +1907,20 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                                 f"({_pct_match}%) — "
                                 f":{_badge_color}[{'✅ Tốt' if _pct_match >= 80 else ('⚠️ Trung bình' if _pct_match >= 40 else '❌ Thấp — kiểm tra tên chỉ tiêu giữa 2 sheet')}]"
                             )
+                        # Nút xuất PDF / In cho bảng tổng quan
+                        if df_ex1 is not None and not df_ex1.empty:
+                            _render_tab_export(
+                                sheets={"Tổng hợp chỉ tiêu": df_ex1},
+                                print_tables=[("Tổng hợp chỉ tiêu", df_ex1)],
+                                tieu_de=f"Cân đối — Tổng hợp chỉ tiêu: {label_pv} vs {label_ht}",
+                                key=f"tongquan{key_sfx}",
+                                username=username,
+                                fn_base=_fn_base,
+                                label_pv=label_pv,
+                                label_ht=label_ht,
+                                pgd_user=pgd_user,
+                                pgd_mode=pgd_mode,
+                            )
                     else:
                         st.info("Không có dữ liệu phù hợp.")
 
@@ -1790,16 +1966,50 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                     })
 
                 df_ct = pd.DataFrame(rows_ct)
-                cols_ct = ["Chương trình", label_pv, label_ht, "Chênh lệch", "Tỷ lệ %", "NQH hiện tại", "NQH kỳ trước"]
-                df_ct_view = df_ct[cols_ct].copy()
-                for _col in [label_pv, label_ht, "Chênh lệch", "NQH hiện tại", "NQH kỳ trước"]:
-                    df_ct_view[_col] = df_ct_view[_col].apply(_fmt_vnd_trieu)
-                df_ct_view["Tỷ lệ %"] = df_ct_view["Tỷ lệ %"].apply(fmt_pct)
-                hien_thi_dataframe_phan_trang(
-                    df_ct_view,
-                    key=f"candoi_ct_chuong_trinh{key_sfx}",
-                    height=560,
+
+                # ── Thẻ tóm tắt: dư nợ KHA/KHB + số chương trình tăng/giảm ──
+                _data_rows = [r for r in rows_ct if not r.get("_is_header")]
+                _so_tang = sum(1 for r in _data_rows if r["_ht"] > r["_pv"])
+                _so_giam = sum(1 for r in _data_rows if r["_ht"] < r["_pv"])
+
+                def _ct_val(key_ct: str) -> tuple[float, float]:
+                    _ht = _lookup_vnd(db_ht_rows, key_ct, _he_so_ht)
+                    _pv = (
+                        _lookup_kh_vnd(db_prev_rows, key_ct, _he_so_pv)
+                        if _la_kh and db_prev_rows
+                        else _lookup_vnd(db_prev_rows, key_ct, _he_so_pv) if db_prev_rows
+                        else 0.0
+                    )
+                    return _ht, _pv
+
+                _kha_ht, _kha_pv = _ct_val("Dư nợ Kế hoạch A")
+                _khb_ht, _khb_pv = _ct_val("Dư nợ Kế hoạch B")
+                _render_kpi_grid([
+                    _kpi_card_html("Dư nợ Kế hoạch A", _kha_ht, delta=_kha_ht - _kha_pv, delta_label=f"tỷ so {label_pv}"),
+                    _kpi_card_html("Dư nợ Kế hoạch B", _khb_ht, delta=_khb_ht - _khb_pv, delta_label=f"tỷ so {label_pv}"),
+                ])
+                st.caption(
+                    f"📊 Có **{_so_tang + _so_giam}** chương trình biến động so với kỳ trước: "
+                    f":green[▲ {_so_tang} tăng] · :red[▼ {_so_giam} giảm]"
                 )
+
+                # ── Bảng so sánh chương trình (HTML, dải nhóm KHA/KHB) ──
+                st.html(_chuong_trinh_table_html(rows_ct, label_pv, label_ht))
+
+                # Nút xuất PDF / In cho bảng chương trình
+                if df_ex2 is not None and not df_ex2.empty:
+                    _render_tab_export(
+                        sheets={"Theo chương trình": df_ex2},
+                        print_tables=[("Theo chương trình", df_ex2)],
+                        tieu_de=f"Cân đối — Theo chương trình: {label_pv} vs {label_ht}",
+                        key=f"chuongtrinh{key_sfx}",
+                        username=username,
+                        fn_base=_fn_base,
+                        label_pv=label_pv,
+                        label_ht=label_ht,
+                        pgd_user=pgd_user,
+                        pgd_mode=pgd_mode,
+                    )
 
                 if db_prev_rows:
                     st.divider()
@@ -1918,100 +2128,58 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
                 )
                 st.plotly_chart(fig_bd, use_container_width=True)
 
+                # Nút xuất PDF / In cho dữ liệu biểu đồ
+                df_bd = pd.DataFrame({
+                    "Chỉ tiêu": ten_ng,
+                    f"{label_pv} (tỷ đồng)": val_pv_b,
+                    f"{label_ht} (tỷ đồng)": val_ht_b,
+                    "Chênh lệch (tỷ đồng)": [round(h - p, 2) for h, p in zip(val_ht_b, val_pv_b)],
+                })
+                _render_tab_export(
+                    sheets={"Bieu do": df_bd},
+                    print_tables=[(f"Biểu đồ — {chon_bd}", df_bd)],
+                    tieu_de=f"Cân đối — Biểu đồ {chon_bd}: {label_pv} vs {label_ht}",
+                    key=f"bieudo{key_sfx}",
+                    username=username,
+                    fn_base=_fn_base,
+                    label_pv=label_pv,
+                    label_ht=label_ht,
+                    pgd_user=pgd_user,
+                    pgd_mode=pgd_mode,
+                )
+
 
 
         # ══════════════════════════════════════════════════════════════════
-        # XUẤT EXCEL / PDF / IN — SO SÁNH CÂN ĐỐI
+        # XUẤT EXCEL TỔNG HỢP (2 sheet) — PDF/In đã chuyển vào từng sub-tab
         # ══════════════════════════════════════════════════════════════════
         st.divider()
-        state = SCMStateManager()
         if db_ht_rows is None:
             st.caption("Xuất file: cần có dữ liệu Điện báo.")
-        else:
-            df_ex1, df_ex2 = _build_export_frames(
-                db_ht_rows,
-                db_prev_rows,
-                _he_so_ht,
-                _he_so_pv,
-                _la_kh,
-                label_pv,
-                label_ht,
-                rows_prev_month=db_prev_month_rows,
-                he_so_prev_month=_he_so_pm,
-            )
-            _fn_pv = _safe_export_name_part(label_pv[:20], "Moc_truoc")
-            _fn_ht = _safe_export_name_part(label_ht[:20], "Hien_tai")
-            _fn_base = f"CanDoi_{_fn_pv}_vs_{_fn_ht}_{datetime.today().strftime('%d%m%Y')}"
-
-            # ── 3 nút: Excel | PDF | In ──
-            _bx1, _bx2, _bx3 = st.columns(3)
-
-            # --- Excel ---
-            with _bx1:
-                if st.button("📥 Xuất Excel", key=f"btn_xuat_cd{key_sfx}", use_container_width=True):
-                    try:
-                        buf = BytesIO()
-                        with pd.ExcelWriter(buf, engine="openpyxl") as _w:
-                            df_ex1.to_excel(_w, index=False, sheet_name="Tổng hợp chỉ tiêu")
-                            df_ex2.to_excel(_w, index=False, sheet_name="Theo chương trình")
-                        state.downloads.set(f"cd_excel{key_sfx}", buf.getvalue(), f"{_fn_base}.xlsx")
-                    except Exception as _e:
-                        logger.error("xuat_excel_candoi: %s", _e, exc_info=True)
-                        st.error(f"Lỗi tạo Excel: {_e}")
-                if state.downloads.has(f"cd_excel{key_sfx}"):
-                    if st.download_button(
-                        "⬇ Tải Excel",
-                        data=state.downloads.get_bytes(f"cd_excel{key_sfx}"),
-                        file_name=state.downloads.get_filename(f"cd_excel{key_sfx}") or "CanDoi.xlsx",
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                        key=f"dl_cd_excel{key_sfx}", use_container_width=True,
-                    ):
-                        state.downloads.clear(f"cd_excel{key_sfx}")
-
-            # --- PDF ---
-            with _bx2:
-                if st.button("📄 Xuất PDF", key=f"btn_pdf_cd{key_sfx}", use_container_width=True):
-                    try:
-                        from services.bc_tongquan_service import xuat_pdf_bc
-                        _pdf_bytes = xuat_pdf_bc(
-                            {"Tổng hợp chỉ tiêu": df_ex1, "Theo chương trình": df_ex2},
-                            f"So sánh Cân đối: {label_pv} vs {label_ht}",
-                            username,
-                        )
-                        if not _pdf_bytes:
-                            raise RuntimeError("Dịch vụ PDF không trả về dữ liệu.")
-                        state.downloads.set(f"cd_pdf{key_sfx}", _pdf_bytes, f"{_fn_base}.pdf")
-                    except Exception as _e:
-                        logger.error("xuat_pdf_candoi: %s", _e, exc_info=True)
-                        st.error(f"Lỗi tạo PDF: {_e}")
-                if state.downloads.has(f"cd_pdf{key_sfx}"):
-                    if st.download_button(
-                        "⬇ Tải PDF",
-                        data=state.downloads.get_bytes(f"cd_pdf{key_sfx}"),
-                        file_name=state.downloads.get_filename(f"cd_pdf{key_sfx}") or "CanDoi.pdf",
-                        mime="application/pdf",
-                        key=f"dl_cd_pdf{key_sfx}", use_container_width=True,
-                    ):
-                        state.downloads.clear(f"cd_pdf{key_sfx}")
-
-            # --- In (HTML print-friendly) ---
-            with _bx3:
-                if st.button("🖨️ In bảng", key=f"btn_in_cd{key_sfx}", use_container_width=True):
-                    try:
-                        _html = _build_print_html(df_ex1, df_ex2, label_pv, label_ht, pgd_user, pgd_mode)
-                        state.downloads.set(f"cd_html{key_sfx}", _html.encode("utf-8"), f"{_fn_base}.html")
-                    except Exception as _e:
-                        logger.error("xuat_html_candoi: %s", _e, exc_info=True)
-                        st.error(f"Lỗi tạo bản in: {_e}")
-                if state.downloads.has(f"cd_html{key_sfx}"):
-                    if st.download_button(
-                        "⬇ Tải HTML để in",
-                        data=state.downloads.get_bytes(f"cd_html{key_sfx}"),
-                        file_name=state.downloads.get_filename(f"cd_html{key_sfx}") or "CanDoi.html",
-                        mime="text/html",
-                        key=f"dl_cd_html{key_sfx}", use_container_width=True,
-                    ):
-                        state.downloads.clear(f"cd_html{key_sfx}")
+        elif df_ex1 is not None and df_ex2 is not None:
+            state = SCMStateManager()
+            if st.button(
+                "📥 Xuất Excel tổng hợp (Tổng hợp chỉ tiêu + Theo chương trình)",
+                key=f"btn_xuat_cd{key_sfx}", use_container_width=True,
+            ):
+                try:
+                    buf = BytesIO()
+                    with pd.ExcelWriter(buf, engine="openpyxl") as _w:
+                        df_ex1.to_excel(_w, index=False, sheet_name="Tổng hợp chỉ tiêu")
+                        df_ex2.to_excel(_w, index=False, sheet_name="Theo chương trình")
+                    state.downloads.set(f"cd_excel{key_sfx}", buf.getvalue(), f"{_fn_base}.xlsx")
+                except Exception as _e:
+                    logger.error("xuat_excel_candoi: %s", _e, exc_info=True)
+                    st.error(f"Lỗi tạo Excel: {_e}")
+            if state.downloads.has(f"cd_excel{key_sfx}"):
+                if st.download_button(
+                    "⬇ Tải Excel",
+                    data=state.downloads.get_bytes(f"cd_excel{key_sfx}"),
+                    file_name=state.downloads.get_filename(f"cd_excel{key_sfx}") or "CanDoi.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    key=f"dl_cd_excel{key_sfx}", use_container_width=True,
+                ):
+                    state.downloads.clear(f"cd_excel{key_sfx}")
 
         st.divider()
         with st.popover(

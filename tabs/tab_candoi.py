@@ -720,12 +720,13 @@ def _build_export_frames(
         difference = value_ht - value_prev
         rows_ex2.append({
             "Chương trình": ten_hien,
-            f"DN {label_prev} (triệu đồng)": _to_trieu(value_prev),
-            f"DN {label_ht} (triệu đồng)": _to_trieu(value_ht),
-            "Chênh lệch (triệu đồng)": _to_trieu(difference),
+            f"Dư nợ {label_prev} (triệu đồng)": _to_trieu(value_prev),
+            f"Dư nợ {label_ht} (triệu đồng)": _to_trieu(value_ht),
+            "Chênh lệch dư nợ (triệu đồng)": _to_trieu(difference),
             "Tỷ lệ %": round(difference / value_prev * 100, 2) if value_prev else 0,
-            f"NQH {label_prev} (triệu đồng)": _to_trieu(nqh_prev),
-            f"NQH {label_ht} (triệu đồng)": _to_trieu(nqh_ht),
+            f"Nợ quá hạn {label_prev} (triệu đồng)": _to_trieu(nqh_prev),
+            f"Nợ quá hạn {label_ht} (triệu đồng)": _to_trieu(nqh_ht),
+            "Chênh lệch nợ quá hạn (triệu đồng)": _to_trieu(nqh_ht - nqh_prev),
         })
 
     return pd.DataFrame(rows_ex1), pd.DataFrame(rows_ex2)
@@ -754,15 +755,24 @@ def _chuong_trinh_table_html(rows_ct: list[dict], label_pv: str, label_ht: str) 
         except Exception:
             return '<span class="cdp-zero">—</span>'
 
+    def _vnd_or_none(vnd: object) -> float | None:
+        try:
+            if vnd is None or pd.isna(vnd):
+                return None
+            return float(vnd)
+        except Exception:
+            return None
+
     head = (
         "<thead><tr>"
         "<th>Chương trình</th>"
-        f"<th>{_esc(label_pv)}</th>"
-        f"<th>{_esc(label_ht)}</th>"
-        "<th>Chênh lệch</th>"
+        f"<th>Dư nợ {_esc(label_pv)}</th>"
+        f"<th>Dư nợ {_esc(label_ht)}</th>"
+        "<th>Chênh lệch dư nợ</th>"
         "<th>Tỷ lệ %</th>"
-        f"<th>NQH {_esc(label_ht)}</th>"
-        f"<th>NQH {_esc(label_pv)}</th>"
+        f"<th>Nợ quá hạn {_esc(label_pv)}</th>"
+        f"<th>Nợ quá hạn {_esc(label_ht)}</th>"
+        "<th>Chênh lệch nợ quá hạn</th>"
         "</tr></thead>"
     )
 
@@ -771,7 +781,7 @@ def _chuong_trinh_table_html(rows_ct: list[dict], label_pv: str, label_ht: str) 
         if r.get("_is_header"):
             ten_nhom = str(r.get("Chương trình", "")).replace("─", "").strip()
             body_rows.append(
-                f'<tr class="cdp-group"><td colspan="7">{_esc(ten_nhom)}</td></tr>'
+                f'<tr class="cdp-group"><td colspan="8">{_esc(ten_nhom)}</td></tr>'
             )
             continue
 
@@ -794,6 +804,16 @@ def _chuong_trinh_table_html(rows_ct: list[dict], label_pv: str, label_ht: str) 
             tl_sign = "+" if tl_val > 0 else ""
             tl_html = f'<span class="{tl_cls}">{tl_sign}{_fmt_so_vn(tl_val, 1)}%</span>'
 
+        nqh_ht_v = _vnd_or_none(r.get("NQH hiện tại"))
+        nqh_pv_v = _vnd_or_none(r.get("NQH kỳ trước"))
+        if nqh_ht_v is None or nqh_pv_v is None:
+            nqh_cl_html = '<span class="cdp-zero">—</span>'
+        else:
+            nqh_cl = nqh_ht_v - nqh_pv_v
+            nqh_cl_cls = "cdp-pos" if nqh_cl > 0 else ("cdp-neg" if nqh_cl < 0 else "cdp-zero")
+            nqh_cl_sign = "+" if nqh_cl > 0 else ""
+            nqh_cl_html = f'<span class="{nqh_cl_cls}">{nqh_cl_sign}{_fmt_so_vn(nqh_cl / 1_000_000, 0)}</span>'
+
         body_rows.append(
             '<tr class="cdp-row">'
             f'<td class="cdp-name">{_esc(r.get("Chương trình", ""))}</td>'
@@ -801,8 +821,9 @@ def _chuong_trinh_table_html(rows_ct: list[dict], label_pv: str, label_ht: str) 
             f"<td>{_num(ht)}</td>"
             f"<td>{cl_html}</td>"
             f"<td>{tl_html}</td>"
-            f'<td class="cdp-nqh">{_num(r.get("NQH hiện tại"))}</td>'
             f'<td class="cdp-nqh">{_num(r.get("NQH kỳ trước"))}</td>'
+            f'<td class="cdp-nqh">{_num(r.get("NQH hiện tại"))}</td>'
+            f'<td class="cdp-nqh">{nqh_cl_html}</td>'
             "</tr>"
         )
 
@@ -811,7 +832,7 @@ def _chuong_trinh_table_html(rows_ct: list[dict], label_pv: str, label_ht: str) 
         + head
         + f'<tbody>{"".join(body_rows)}</tbody>'
         + "</table>"
-        + '<div class="cdp-note">Đơn vị: triệu đồng · NQH = nợ quá hạn (nền vàng nhạt)</div>'
+        + '<div class="cdp-note">Đơn vị: triệu đồng · Cột nền vàng nhạt = nợ quá hạn</div>'
         + "</div>"
     )
 
@@ -1984,14 +2005,41 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
 
                 _kha_ht, _kha_pv = _ct_val("Dư nợ Kế hoạch A")
                 _khb_ht, _khb_pv = _ct_val("Dư nợ Kế hoạch B")
-                _render_kpi_grid([
-                    _kpi_card_html("Dư nợ Kế hoạch A", _kha_ht, delta=_kha_ht - _kha_pv, delta_label=f"tỷ so {label_pv}"),
-                    _kpi_card_html("Dư nợ Kế hoạch B", _khb_ht, delta=_khb_ht - _khb_pv, delta_label=f"tỷ so {label_pv}"),
-                ])
-                st.caption(
-                    f"📊 Có **{_so_tang + _so_giam}** chương trình biến động so với kỳ trước: "
-                    f":green[▲ {_so_tang} tăng] · :red[▼ {_so_giam} giảm]"
-                )
+                if _la_kh:
+                    _ct_delta_fn = lambda ht, pv: round(ht / pv * 100, 1) if pv else None
+                    _ct_delta_label = "% KH"
+                else:
+                    _ct_delta_fn = _pct
+                    _ct_delta_label = f"vs {label_pv}"
+
+                _ct_cards = [
+                    {
+                        "label": "Dư nợ Kế hoạch A",
+                        "icon": "📋",
+                        "value": _to_ty(_kha_ht),
+                        "delta": _ct_delta_fn(_kha_ht, _kha_pv) if db_prev_rows else None,
+                        "delta_label": _ct_delta_label,
+                        "tone": "accent",
+                        "stats": [_stat_ty(_kha_pv, label_pv), _stat_cl(_kha_ht, _kha_pv)] if db_prev_rows else None,
+                    },
+                    {
+                        "label": "Dư nợ Kế hoạch B",
+                        "icon": "📋",
+                        "value": _to_ty(_khb_ht),
+                        "delta": _ct_delta_fn(_khb_ht, _khb_pv) if db_prev_rows else None,
+                        "delta_label": _ct_delta_label,
+                        "tone": "accent",
+                        "stats": [_stat_ty(_khb_pv, label_pv), _stat_cl(_khb_ht, _khb_pv)] if db_prev_rows else None,
+                    },
+                ]
+                _render_kpi_grid(_ct_cards, num_columns=2)
+                if db_prev_rows:
+                    st.caption(
+                        f"📊 Có **{_so_tang + _so_giam}** chương trình biến động so với kỳ trước: "
+                        f":green[▲ {_so_tang} tăng] · :red[▼ {_so_giam} giảm]"
+                    )
+                else:
+                    st.caption("📊 Chưa có mốc so sánh; bảng đang hiển thị kỳ trước bằng 0 để giữ cấu trúc đối chiếu.")
 
                 # ── Bảng so sánh chương trình (HTML, dải nhóm KHA/KHB) ──
                 st.html(_chuong_trinh_table_html(rows_ct, label_pv, label_ht))

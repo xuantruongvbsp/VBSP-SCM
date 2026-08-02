@@ -542,9 +542,42 @@ def doc_snapshot_nvdp_range(tu_ky: str, den_ky: str) -> pd.DataFrame:
                    ORDER BY ky ASC""",
                 (tu_ky, den_ky),
             ).fetchall()
-        return pd.DataFrame([dict(r) for r in rows]) if rows else pd.DataFrame()
+        if not rows:
+            return pd.DataFrame()
+        result = pd.DataFrame([dict(r) for r in rows])
+        result["tong_du_no"] = pd.to_numeric(result["tong_du_no"], errors="coerce").fillna(0.0)
+        return result
     except Exception as e:
         logger.error("doc_snapshot_nvdp_range: lỗi — %s", e, exc_info=True)
+        return pd.DataFrame()
+
+
+@st.cache_data(ttl=300, show_spinner=False)
+def doc_snapshot_nvdp_theo_pgd(ky: str) -> pd.DataFrame:
+    """TW vs ĐP breakdown theo từng PGD của 1 kỳ.
+
+    Trả về DataFrame cột: ten_pgd, nguon_von ('1'|'2'), tong_du_no.
+    Dùng cho heatmap / delta PGD trong tab Nguồn vốn địa phương.
+    """
+    try:
+        with db.get_conn() as conn:
+            rows = conn.execute(
+                """SELECT ten_pgd, nguon_von, SUM(tong_du_no) AS tong_du_no
+                   FROM hstd_snapshot
+                   WHERE ky=? AND nguon_von IN ('1', '2')
+                     AND ma_ct != 'ALL'
+                     AND ten_pgd != '__CN__'
+                   GROUP BY ten_pgd, nguon_von
+                   ORDER BY ten_pgd""",
+                (ky,),
+            ).fetchall()
+        if not rows:
+            return pd.DataFrame()
+        result = pd.DataFrame([dict(r) for r in rows])
+        result["tong_du_no"] = pd.to_numeric(result["tong_du_no"], errors="coerce").fillna(0.0)
+        return result
+    except Exception as e:
+        logger.error("doc_snapshot_nvdp_theo_pgd: lỗi kỳ %s — %s", ky, e, exc_info=True)
         return pd.DataFrame()
 
 

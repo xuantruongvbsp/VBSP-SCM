@@ -293,6 +293,136 @@
 | **Test** | `tests/test_tab_candoi.py::test_upload_dienbao_chon_ngay_truoc_khi_upload_va_luu_truoc_rerun` |
 | **Ngày fix** | 2026-08-01 |
 
+### B67 — KPI Theo chương trình Cân đối crash/sai đơn vị sau redesign
+| | |
+|---|---|
+| **File** | `tabs/tab_candoi.py` → sub-tab "Theo chương trình" |
+| **Dấu hiệu** | Mở sub-tab "Theo chương trình" có thể lỗi `TypeError` tại `_render_kpi_grid()`; nếu render được thì KPI KHA/KHB có nguy cơ hiển thị số quá lớn vì truyền VND thô vào card ghi đơn vị tỷ đồng. |
+| **Nguyên nhân** | Code truyền kết quả HTML string của `_kpi_card_html()` vào `_render_kpi_grid()`, trong khi helper này yêu cầu list dict để gọi `_kpi_card_html(idx=i, **c)`. Đồng thời delta truyền là chênh lệch VND dù card format delta theo phần trăm. |
+| **Fix** | Dựng `_ct_cards` dạng dict, `value=_to_ty(...)`, delta dùng `_pct`/`% KH` khi có mốc so sánh, chênh lệch tuyệt đối đưa vào stats; khi chưa có mốc so sánh thì caption không đếm toàn bộ chương trình là tăng. |
+| **Test** | `tests/test_tab_candoi.py::test_theo_chuong_trinh_kpi_dung_contract_render_grid_va_quy_doi_ty` |
+| **Ngày fix** | 2026-08-02 |
+
+### B68 — UI prefs KHTD dùng key global và restore state cũ không còn hợp lệ
+| | |
+|---|---|
+| **File** | `tabs/tab_khtd.py` → `_khoi_phuc_ui_prefs()`, `_luu_ui_prefs()` |
+| **Dấu hiệu** | User này có thể mở lại tab/PGD/Xã theo lựa chọn cuối của user khác; sau khi đổi cấu hình PGD/Xã, session restore có thể đưa value cũ vào widget không còn options tương ứng. |
+| **Nguyên nhân** | UI prefs lưu chung key `khtd_ui_prefs`; payload khôi phục thẳng vào `st.session_state` mà chưa validate tab index, nguồn vốn, PGD/Xã hiện hành; lần ghi KV cũng thiếu audit liền kề theo rule 6.2. |
+| **Fix** | Dùng key theo username `khtd_ui_prefs_{user}`; thêm `_sanitize_ui_prefs()` trước restore/save; gọi `db.ghi_audit()` ngay sau `db.ghi_kv()`. |
+| **Test** | `tests/test_khtd_quets.py::test_ui_prefs_key_tach_theo_username`, `tests/test_khtd_quets.py::test_sanitize_ui_prefs_bo_value_khong_con_trong_options` |
+| **Ngày fix** | 2026-08-02 |
+
+### B69 — Excel Nguồn vốn ĐP giữ nhiều buffer theo filter/rules_key dài
+| | |
+|---|---|
+| **File** | `tabs/tab_hhi.py` → khối Xuất Excel trong `render()` |
+| **Dấu hiệu** | Sau khi đổi filter/rule và tạo Excel nhiều lần, `st.session_state` có thể giữ nhiều buffer `.xlsx`; key session chứa toàn bộ `rules_key` nên dài theo số lượng rule Mã NĐT. |
+| **Nguyên nhân** | On-demand export lưu bytes theo key `nvdp_excel_buf_{view_key}_{ts_hstd}_{rules_key}` và không dọn buffer cũ khi tạo báo cáo mới. |
+| **Fix** | Hash `rules_key` bằng SHA1 12 ký tự trong `_excel_state_key()`; `_clear_old_excel_buffers()` xóa các buffer Excel Nguồn vốn ĐP cũ trước khi lưu buffer mới. |
+| **Test** | `tests/test_tab_hhi.py::test_excel_state_key_hash_rules_key_khong_phinh_session_key`, `tests/test_tab_hhi.py::test_clear_old_excel_buffers_chi_giu_active_key` |
+| **Ngày fix** | 2026-08-02 |
+
+### B70 — Nguồn vốn ĐP phát sinh Pandas4Warning khi pivot có fill_value
+| | |
+|---|---|
+| **File** | `tabs/tab_hhi.py` → `_bang_theo_nv()`, `_bang_nguon_von_xa_02_ct()` |
+| **Dấu hiệu** | Test tab Nguồn vốn ĐP pass nhưng hiện `Pandas4Warning: Using a fill_value that cannot be held in the existing dtype is deprecated`. |
+| **Nguyên nhân** | Dùng `.unstack(..., fill_value=0.0)` trên groupby có index/cột hỗn hợp; Pandas 4 sẽ siết dtype và có thể nâng warning thành lỗi. |
+| **Fix** | Đổi sang `.unstack(...).fillna(0.0)` sau khi pivot, giữ nguyên reindex/cột tiền và format hiện có. |
+| **Test** | `tests/test_tab_hhi.py::test_bang_nguon_von_xa_02_ct_khong_phat_sinh_pandas4_warning` |
+| **Ngày fix** | 2026-08-02 |
+
+### B71 — KHTD theo Xã có thể crash khi xã đã lưu không thuộc PGD hiện tại
+| | |
+|---|---|
+| **File** | `tabs/tab_khtd_nhap.py` → `_tab_khtd_theo_xa()` |
+| **Dấu hiệu** | Sau khi đổi PGD hoặc đổi cấu hình xã, widget `st.selectbox(..., key="khtd_xa_xa_sel")` có thể nhận state cũ không còn nằm trong `danh_sach_xa` và crash. |
+| **Nguyên nhân** | `khtd_xa_xa_sel` được persist/giữ trong `st.session_state`; `_sanitize_ui_prefs()` chỉ bảo vệ lúc restore đầu phiên, chưa bảo vệ thao tác đổi PGD trong cùng phiên. |
+| **Fix** | Thêm `_reset_khtd_xa_selection_if_stale(danh_sach_xa)` chạy ngay trước khi render selectbox Xã để pop state stale. |
+| **Test** | `tests/test_khtd_quets.py::test_reset_khtd_xa_selection_pop_stale_session_state`, `tests/test_khtd_quets.py::test_reset_khtd_xa_selection_giu_xa_hop_le` |
+| **Ngày fix** | 2026-08-02 |
+
+### B72 — Excel KH ĐP stale và parser đợt KHTD hẹp trong tab Nguồn vốn ĐP
+| | |
+|---|---|
+| **File** | `tabs/tab_hhi.py` → `_doc_kh_dp_theo_pgd()`, `_cached_excel_sheets()`, khối Xuất Excel |
+| **Dấu hiệu** | Sau khi sửa số KH trong cùng đợt KHTD, file Excel Nguồn vốn ĐP có thể vẫn giữ cột `KH ĐP giao` cũ; đợt KHTD có tên chứa `_` như `Dot_1` có thể không được chọn làm nguồn KH. |
+| **Nguyên nhân** | `_kh_map` là tham số underscore nên `st.cache_data` không hash; `excel_state_key` chỉ phụ thuộc HSTD/rules. Regex quét khóa KHTD chỉ nhận `[A-Za-z0-9]+` cho tên đợt và gọi private `_dot_sort_key`. |
+| **Fix** | Thêm `_kh_map_cache_key()` và đưa `kh_sig` vào cache/session key Excel; parse key theo danh sách slug KHTD để slug/dot có `_` vẫn hợp lệ, bỏ riêng dot có suffix timestamp `_\d{8}T\d{6}` và sort bằng helper local. |
+| **Test** | `tests/test_tab_hhi.py::test_excel_state_key_doi_khi_kh_map_doi`, `tests/test_tab_hhi.py::test_parse_khtd_period_key_chap_nhan_slug_va_dot_co_underscore`, `tests/test_tab_hhi.py::test_parse_khtd_period_key_bo_qua_key_timestamp` |
+| **Ngày fix** | 2026-08-02 |
+
+### B73 — Bảng Theo chương trình Cân đối còn viết tắt NQH và có thể in `nan`
+| | |
+|---|---|
+| **File** | `tabs/tab_candoi.py` → `_chuong_trinh_table_html()`, `_build_export_frames()` |
+| **Dấu hiệu** | Header/export vẫn có cột `Chênh lệch NQH` dù yêu cầu ghi rõ "nợ quá hạn"; nếu dòng dữ liệu có `NaN` ở cột nợ quá hạn thì ô chênh lệch có thể render `nan` thay vì dấu gạch. |
+| **Nguyên nhân** | `float(r.get("NQH hiện tại") or 0)` không chặn `NaN` vì `NaN` là truthy; nhãn chênh lệch nợ quá hạn chưa được đổi đầy đủ khỏi viết tắt. |
+| **Fix** | Thêm `_vnd_or_none()` guard `pd.isna()` trước khi tính chênh lệch; đổi nhãn sang `Chênh lệch nợ quá hạn`; sắp cụm nợ quá hạn theo thứ tự kỳ trước → hiện tại → chênh lệch. |
+| **Test** | `tests/test_tab_candoi.py::test_theo_chuong_trinh_html_nhan_ro_no_qua_han_va_khong_in_nan`, `tests/test_tab_candoi.py::test_export_theo_chuong_trinh_nhan_ro_no_qua_han_va_thu_tu_nhat_quan` |
+| **Ngày fix** | 2026-08-02 |
+
+### B74 — Tab Nguồn vốn ĐP tải chậm vì render eager bảng phụ
+| | |
+|---|---|
+| **File** | `tabs/tab_hhi.py` → `_phan_nguon_von()`, `render()` |
+| **Dấu hiệu** | Mở tab `🏦 Nguồn vốn địa phương` lâu dù chỉ cần xem KPI/tổng quan; mỗi rerun vẫn tính bảng đối chiếu 02 CT, bảng Mã NĐT chờ phân loại và kiểm tra INV thiếu nguồn vốn. |
+| **Nguyên nhân** | Cột `Nguồn vốn` dạng số bị xử lý qua chuỗi trên toàn HSTD; các bảng kiểm tra sâu được dựng eager trước sub-tab/lazy area và chưa cache theo `ts_hstd/rules/filter`. |
+| **Fix** | Thêm `_nguon_von_label_series()` fast-path dtype số; cache 3 bảng phụ bằng `st.cache_data`; defer trend/heatmap snapshot và bảng kiểm tra sâu bằng toggle mặc định tắt. |
+| **Test** | `tests/test_tab_hhi.py::test_nguon_von_label_series_giu_logic_map_cu`; `venv\Scripts\python.exe -m pytest tests\test_tab_hhi.py -q` |
+| **Ngày fix** | 2026-08-02 |
+
+### B76 — Scanner Mã NĐT ĐP có thể giữ trạng thái rule cũ
+| | |
+|---|---|
+| **File** | `tabs/tab_quan_ly_ndt_dp.py` → `_quet_ma_tu_hstd()`, `_dem_ma_moi_nhanh()` |
+| **Dấu hiệu** | Sau khi thêm rule Mã NĐT ĐP, badge/đếm nhanh hoặc bảng mã mới có thể vẫn coi cặp mã vừa lưu là "mới" trong cache nếu HSTD chưa đổi mốc `ts_hstd`. |
+| **Nguyên nhân** | `_quet_ma_tu_hstd()` dùng tham số underscore `_ds_all` nên `st.cache_data` bỏ qua danh mục rule khi hash; cache chỉ phụ thuộc `ts_hstd`. |
+| **Fix** | Thêm `_rules_signature(ds_all)` và truyền vào `_quet_ma_tu_hstd(..., rules_sig=...)` ở các call-site để bust cache khi rule list đổi; sau lưu vẫn clear cache như cũ. |
+| **Test** | `tests/test_tab_quan_ly_ndt_dp.py::test_rules_signature_doi_khi_rule_list_doi`, `tests/test_tab_quan_ly_ndt_dp.py::test_dem_ma_moi_nhanh_truyen_rule_signature` |
+| **Ngày fix** | 2026-08-02 |
+
+### B77 — Editor Mã NĐT ĐP lưu ghi chú prefill thay vì tên vừa sửa
+| | |
+|---|---|
+| **File** | `tabs/tab_quan_ly_ndt_dp.py` → `_render_ma_moi_tu_hstd()` |
+| **Dấu hiệu** | Admin sửa cột "Tên NĐT" trong editor mã mới HSTD nhưng không sửa "Ghi chú"; khi lưu, `ghi_chu` có thể giữ giá trị prefill cũ thay vì tên vừa nhập. |
+| **Nguyên nhân** | Cột "Ghi chú" được prefill từ "Tên NĐT", trong khi đoạn lưu ưu tiên "Ghi chú" trước. Vì vậy "Ghi chú" không trống dù user chỉ muốn sửa tên. |
+| **Fix** | Để "Ghi chú" mặc định trống trong editor; thêm `_ghi_chu_tu_editor_row()` ưu tiên ghi chú user nhập, fallback sang "Tên NĐT" nếu bỏ trống. |
+| **Test** | `tests/test_tab_quan_ly_ndt_dp.py::test_ghi_chu_tu_editor_row_fallback_sang_ten_ndt`, `tests/test_tab_quan_ly_ndt_dp.py::test_ghi_chu_tu_editor_row_uu_tien_ghi_chu_user_nhap` |
+| **Ngày fix** | 2026-08-02 |
+
+### B78 — Fragment Mã NĐT ĐP vẫn full-app rerun khi chọn/bỏ chọn
+| | |
+|---|---|
+| **File** | `tabs/tab_quan_ly_ndt_dp.py` → `_fragment_editor_ma_moi()` |
+| **Dấu hiệu** | Đã bọc editor mã mới HSTD bằng `@st.fragment` nhưng bấm "Chọn tất cả" hoặc "Bỏ chọn tất cả" vẫn tải lại toàn app, cảm giác chậm không cải thiện như kỳ vọng. |
+| **Nguyên nhân** | Trong Streamlit 1.60, `st.rerun()` mặc định là `scope="app"` ngay cả khi gọi trong fragment; muốn rerun nhanh phần fragment phải gọi `st.rerun(scope="fragment")`. |
+| **Fix** | Đổi hai nút chọn/bỏ chọn sang `st.rerun(scope="fragment")`; giữ nút "Lưu" là `st.rerun(scope="app")` để cập nhật KPI và danh sách rule sau khi ghi DB. |
+| **Test** | `tests/test_tab_quan_ly_ndt_dp.py::test_fragment_editor_chon_tat_ca_dung_fragment_rerun` |
+| **Ngày fix** | 2026-08-02 |
+
+### B79 — Tab Nguồn vốn ĐP crash: `'>=' not supported between instances of 'str' and 'int'`
+| | |
+|---|---|
+| **File** | `snapshot_service.py` → `doc_snapshot_nvdp_theo_pgd()`, `doc_snapshot_nvdp_range()` |
+| **Dấu hiệu** | Mở tab "🏦 Nguồn vốn địa phương" → heatmap delta PGD → lỗi `'>=' not supported between instances of 'str' and 'int'` tại dòng so sánh màu chart. |
+| **Nguyên nhân** | SQLite trả `tong_du_no` dạng TEXT; pandas giữ object dtype → pivot/arithmetic cho ra string → list comprehension `v >= 0` crash. |
+| **Fix** | Thêm `pd.to_numeric(result["tong_du_no"], errors="coerce").fillna(0.0)` ngay sau khi đọc từ SQLite trong cả 2 hàm. |
+| **Test** | Compile OK |
+| **Ngày fix** | 2026-08-02 |
+
+### B80 — Scheduler Telegram có thể gửi trùng cảnh báo rủi ro tín dụng
+| | |
+|---|---|
+| **File** | `services/telegram_jobs.py` → `telegram_job_dedupe_key()`; `services/telegram_schedule_service.py` → `run_due_rules()` |
+| **Dấu hiệu** | Nếu tạo hai rule `qh_moi` và `khoanh_tang` cùng mốc giờ, scheduler có thể gửi hai tin giống nhau vì cả hai runner đều gọi `_canh_bao_tong_hop_rui_ro()`. |
+| **Nguyên nhân** | Runlog chống trùng theo `rule_id`, nhưng `qh_moi` và `khoanh_tang` là hai rule/key khác nhau cùng trỏ đến một nội dung tổng hợp `rui_ro_tin_dung`. |
+| **Fix** | Thêm dedupe group cho job Telegram; trong một lượt `run_due_rules()`, các rule cùng `date_key + scheduled_at + dedupe_key` chỉ gửi rule đầu, rule sau ghi success `sent=0` với thông tin bỏ qua gửi trùng. |
+| **Test** | `tests/test_telegram_schedule_service.py::test_run_due_rules_bo_qua_job_rui_ro_cung_nhom_trong_cung_slot`; `venv\Scripts\python.exe -m pytest tests\test_telegram_schedule_service.py tests\test_telegram_jobs_delta.py` |
+| **Ngày fix** | 2026-08-02 |
+
 ### B48 — Panel quản lý Theo dõi nhập liệu chiếm chỗ, làm loãng nội dung
 | | |
 |---|---|
@@ -2678,6 +2808,26 @@ val = pd.to_numeric(df[COT_X], errors="coerce").sum() if COT_X in df.columns els
 | **Test** | `tests/test_app_numeric_optimization.py` |
 | **Ngày fix** | 2026-08-01 |
 
+### C37 — Bảng audit Mã NĐT ĐP có thể lệch dư nợ hoặc bỏ sót ô nguồn vốn rỗng
+| | |
+|---|---|
+| **File** | `tabs/tab_hhi.py` → `_bang_ma_ndt_cho_phan_loai()`, `_dem_nguon_von_nan_co_ma_ndt()` |
+| **Dấu hiệu** | Bảng "Mã NĐT chờ phân loại" có nguy cơ gán sai dư nợ nếu index giữa dataframe đã lọc và series dư nợ không khớp; cảnh báo thiếu nhãn nguồn vốn chỉ đếm `NaN` thật, bỏ sót chuỗi rỗng hoặc `"nan"`. |
+| **Nguyên nhân** | Gán dư nợ bằng `.values` dựa trên thứ tự dòng; kiểm tra cột Nguồn vốn bằng `.isna()` nên không bao phủ dữ liệu Excel đã normalize thành chuỗi. |
+| **Fix** | Gán dư nợ bằng `dn.reindex(sub.index)` và ép numeric; đếm nguồn vốn trống bằng `_text_sach().eq("")`; sanitize "Chương trình chính" để không hiển thị `NaN`. |
+| **Test** | `tests/test_tab_hhi.py::test_bang_ma_ndt_cho_phan_loai_bo_rule_va_can_index_du_no`, `tests/test_tab_hhi.py::test_dem_nguon_von_nan_co_ma_ndt_tinh_ca_chuoi_rong` |
+| **Ngày fix** | 2026-08-02 |
+
+### C38 — Vectorized mã chương trình crash khi gặp giá trị thập phân
+| | |
+|---|---|
+| **File** | `tabs/tab_hhi.py` → `_phan_nguon_von()`, `_bang_nguon_von_xa_02_ct()` |
+| **Dấu hiệu** | Tab Nguồn vốn ĐP có thể crash nếu `Mã chương trình` có dạng `"3.5"` hoặc float thập phân sau khi tối ưu vectorized bằng `.astype("Int64")`. |
+| **Nguyên nhân** | Pandas nullable integer chỉ nhận giá trị nguyên tương đương; helper cũ `int(float(value))` cắt phần thập phân, còn `.astype("Int64")` trực tiếp sẽ từ chối dữ liệu không nguyên. |
+| **Fix** | Thêm `_ma_ct_series_int()` để `pd.to_numeric(errors="coerce")`, lọc giá trị hợp lệ rồi cast qua `float → int` theo hành vi cũ; dùng chung cho phân loại nguồn vốn và bảng 02 chương trình. |
+| **Test** | `tests/test_tab_hhi.py::test_phan_nguon_von_ma_ct_thap_phan_khong_crash_va_giu_logic_cu` |
+| **Ngày fix** | 2026-08-02 |
+
 ### J29 — Pre-commit phụ thuộc PATH và xử lý đối số file chưa an toàn
 | | |
 |---|---|
@@ -3385,6 +3535,17 @@ def _to_int(val, default=0):
 | **Nguyên nhân** | 1) `CACHE_HSTD` là `str` (config.py dòng 36: `str(CACHE_DIR / "hstd.parquet")`), không phải `Path` → không có `.exists()`. 2) Hàm `_quet_ct_co_du_no` định nghĩa trong `tab_khtd.py` nhưng không được import vào `tab_khtd_xuat.py`. |
 | **Fix** | 1) Đổi `CACHE_HSTD.exists()` → `os.path.exists(CACHE_HSTD)`. 2) Thêm `_quet_ct_co_du_no` vào khối `from tabs.tab_khtd import (...)`. |
 | **Ngày fix** | 2026-08-01 |
+
+---
+
+### B75 — Bảng "Chi tiết theo Chương trình" hiển thị số kiểu Anh, không nhất quán với KPI
+| | |
+|---|---|
+| **File** | `tabs/tab_khtd_xuat.py` → `_tab_tien_do_kh_th()` ~dòng 678-700 |
+| **Dấu hiệu** | Trong mục 🎯 Tiến độ KH vs TH / 📋 Chi tiết theo Chương trình: thẻ KPI hiện `9.080.313` / `150,9%` (VN) nhưng bảng bên dưới hiện `9,080,313` / `150.9` (Anh); TL% > 100% (150,9%, 208,9%) làm thanh ProgressColumn kẹt đầy. Dòng tiêu đề "I. Trung ương"/"II. Địa phương"/"TỔNG CỘNG" không được tô đậm. |
+| **Nguyên nhân** | 1) Bảng dùng `NumberColumn(format=",.0f")` + `ProgressColumn(max_value=100, format=".1f")` (định dạng Anh) trong khi KPI dùng `_fvn` (VN). 2) `_to_mau_ct()` check `row.get("_nhom")` nhưng cột `_nhom` đã bị loại qua `df_ct[cols_show]` trước khi style → dead-code, tiêu đề không tô màu. |
+| **Fix** | Dựng `df_show` format số VN bằng `_fmt_vn` (KH/TH `d=0`, TL% `d=1` + hậu tố `%`, None → "—"), bỏ `column_config` NumberColumn/ProgressColumn; `df_ct` giữ số liệu gốc cho export Excel/PDF. `_to_mau_ct()` phát hiện tiêu đề theo `Chỉ tiêu` (`startswith(("I.","II."))` hoặc `== "TỔNG CỘNG"`). |
+| **Ngày fix** | 2026-08-02 |
 
 ---
 

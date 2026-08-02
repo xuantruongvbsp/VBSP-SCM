@@ -492,6 +492,69 @@ def test_build_print_html_escape_du_lieu_dong_va_hien_thi_ty_le_zero():
     assert "+0.0%" in result
 
 
+def test_theo_chuong_trinh_html_nhan_ro_no_qua_han_va_khong_in_nan():
+    rows = [
+        {
+            "Chương trình": "Hộ nghèo KHA",
+            "Tỷ lệ %": 0,
+            "NQH hiện tại": float("nan"),
+            "NQH kỳ trước": float("nan"),
+            "_is_header": False,
+            "_ht": 1_000_000,
+            "_pv": 1_000_000,
+        },
+    ]
+
+    result = tab_candoi._chuong_trinh_table_html(rows, "Kỳ trước", "Hiện tại")
+
+    assert "Chênh lệch nợ quá hạn" in result
+    assert "Chênh lệch NQH" not in result
+    assert "NQH" not in result
+    assert "nan" not in result.lower()
+    assert result.index("Nợ quá hạn Kỳ trước") < result.index("Nợ quá hạn Hiện tại")
+
+
+def test_export_theo_chuong_trinh_nhan_ro_no_qua_han_va_thu_tu_nhat_quan():
+    rows_ht = [
+        _row("Dư nợ hộ nghèo KHA", 100),
+        {"ten": "Nợ quá hạn hộ nghèo", "val": 3, "la_nqh_con": True, "cha": "Dư nợ hộ nghèo KHA"},
+    ]
+    rows_prev = [
+        _row("Dư nợ hộ nghèo KHA", 80),
+        {"ten": "Nợ quá hạn hộ nghèo", "val": 1, "la_nqh_con": True, "cha": "Dư nợ hộ nghèo KHA"},
+    ]
+
+    _, df_program = tab_candoi._build_export_frames(
+        rows_ht,
+        rows_prev,
+        1_000_000,
+        1_000_000,
+        False,
+        "Kỳ trước",
+        "Hiện tại",
+    )
+
+    assert "Chênh lệch nợ quá hạn (triệu đồng)" in df_program.columns
+    assert not any("NQH" in col for col in df_program.columns)
+    prev_idx = df_program.columns.get_loc("Nợ quá hạn Kỳ trước (triệu đồng)")
+    current_idx = df_program.columns.get_loc("Nợ quá hạn Hiện tại (triệu đồng)")
+    diff_idx = df_program.columns.get_loc("Chênh lệch nợ quá hạn (triệu đồng)")
+    assert prev_idx < current_idx < diff_idx
+    first_row = df_program[df_program["Chương trình"] == "Hộ nghèo KHA"].iloc[0]
+    assert first_row["Chênh lệch nợ quá hạn (triệu đồng)"] == 2
+
+
+def test_theo_chuong_trinh_kpi_dung_contract_render_grid_va_quy_doi_ty():
+    source = inspect.getsource(tab_candoi.render)
+
+    assert '_render_kpi_grid(_ct_cards, num_columns=2)' in source
+    assert '_kpi_card_html("Dư nợ Kế hoạch A"' not in source
+    assert '"value": _to_ty(_kha_ht)' in source
+    assert '"value": _to_ty(_khb_ht)' in source
+    assert '"delta": _ct_delta_fn(_kha_ht, _kha_pv) if db_prev_rows else None' in source
+    assert "Chưa có mốc so sánh" in source
+
+
 def test_safe_export_name_part_loai_ky_tu_cam_tren_windows():
     assert tab_candoi._safe_export_name_part("31/07/2026: HT", "fallback") == "31_07_2026_ HT"
 

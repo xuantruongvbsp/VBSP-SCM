@@ -10,7 +10,12 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import db
 from logger import get_logger
-from services.telegram_jobs import run_telegram_job, telegram_job_keys
+from services.telegram_jobs import (
+    TelegramJobResult,
+    run_telegram_job,
+    telegram_job_dedupe_key,
+    telegram_job_keys,
+)
 
 logger = get_logger(__name__)
 
@@ -369,6 +374,7 @@ def run_due_rules(now: datetime | None = None) -> list[dict[str, Any]]:
     if not cfg["enabled"]:
         return []
     outcomes: list[dict[str, Any]] = []
+    sent_groups: set[tuple[str, str, str]] = set()
     for rule in cfg["rules"]:
         if not _notify_enabled(rule["notify_key"]):
             continue
@@ -377,7 +383,21 @@ def run_due_rules(now: datetime | None = None) -> list[dict[str, Any]]:
             if not _can_claim(rule, slot, current):
                 continue
             attempts = _claim(rule, slot, current)
-            result = _run_scheduled_job(rule, slot, current)
+            group_key = (
+                slot["date_key"],
+                str(slot.get("scheduled_at") or ""),
+                telegram_job_dedupe_key(rule["notify_key"]),
+            )
+            if group_key in sent_groups:
+                result = TelegramJobResult(
+                    True,
+                    f"Đã bỏ qua gửi trùng nhóm {group_key[2]} trong cùng slot.",
+                    sent=0,
+                )
+            else:
+                result = _run_scheduled_job(rule, slot, current)
+                if result.ok:
+                    sent_groups.add(group_key)
             _finish(rule, slot, current, attempts, result)
             outcomes.append({
                 "slot_id": slot["slot_id"], "notify_key": rule["notify_key"],

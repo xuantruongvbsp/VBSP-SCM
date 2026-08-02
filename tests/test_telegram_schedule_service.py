@@ -107,6 +107,36 @@ def test_run_due_rules_claim_truoc_va_khong_gui_trung(monkeypatch, kv_store) -> 
     assert [item[1] for item in audits] == ["telegram_schedule_claim", "telegram_schedule_finish"]
 
 
+def test_run_due_rules_bo_qua_job_rui_ro_cung_nhom_trong_cung_slot(monkeypatch, kv_store) -> None:
+    values, _audits = kv_store
+    values[svc.RULES_KEY] = {
+        "schema_version": 1,
+        "enabled": True,
+        "rules": [
+            _rule(id="tg_rule_qh_moi_01", notify_key="qh_moi"),
+            _rule(id="tg_rule_khoanh_01", notify_key="khoanh_tang"),
+        ],
+    }
+    calls: list[str] = []
+    monkeypatch.setattr(
+        svc,
+        "run_telegram_job",
+        lambda key: calls.append(key) or TelegramJobResult(True, "OK", sent=1),
+    )
+
+    outcomes = svc.run_due_rules(datetime(2026, 7, 14, 8, 5, tzinfo=TZ))
+
+    assert calls == ["qh_moi"]
+    assert [(x["notify_key"], x["ok"], x["sent"]) for x in outcomes] == [
+        ("qh_moi", True, 1),
+        ("khoanh_tang", True, 0),
+    ]
+    log = values["telegram_schedule_runlog_20260714"]
+    skipped = log["tg_rule_khoanh_01:20260714:0800"]
+    assert skipped["status"] == "success"
+    assert "gửi trùng nhóm rui_ro_tin_dung" in skipped["info"]
+
+
 def test_failed_slot_retry_sau_cooldown(monkeypatch, kv_store) -> None:
     values, _audits = kv_store
     rule = _rule(

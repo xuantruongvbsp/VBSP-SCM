@@ -159,7 +159,7 @@ def _luu_kv(key: str, data: dict[str, Any], username: str) -> bool:
         khtd_service.luu_khtd_dict(key, data, username)
         return True
     except Exception as e:
-        _LOG.error("Lỗi lưu dữ liệu (key=%s): %s", key, e, exc_info=True)
+        logger.error("Lỗi lưu dữ liệu (key=%s): %s", key, e, exc_info=True)
         st.error(f"Lỗi lưu dữ liệu (key={key}): {e}")
         return False
 
@@ -496,7 +496,7 @@ def _tinh_thuc_hien_theo_ct(df: "pd.DataFrame") -> dict[str, float]:
             pct_lech = abs(tong_th - tong_du_no_full) / tong_du_no_full * 100.0
         else:
             pct_lech = 0.0
-        _LOG.debug(
+        logger.debug(
             "[KHTD TH] tong_th(ma_key)=%s dong | tong_du_no(df)=%s dong | "
             "chenh_lech=%.4f%% | tmp_th_sum=%s",
             tong_th,
@@ -629,6 +629,67 @@ def _doc_gqvl_parquet(ts: float = 0) -> "pd.DataFrame | None":
 
 from tabs.base_tab import TabContext
 
+# ── Persist UI selections ─────────────────────────────────────────────────────
+KV_KEY_UI_PREFS = "khtd_ui_prefs"
+_UI_KEYS = ("khtd_sub_tab", "khtd_cn_nv_radio", "khtd_xa_pgd_sel", "khtd_xa_xa_sel", "khtd_bc_sub_tab")
+_KHTD_MAIN_TAB_COUNT = 3
+_KHTD_REPORT_TAB_COUNT = 4
+_KHTD_CN_NV_OPTIONS = {"Tất cả", "Trung ương", "Địa phương"}
+
+
+def _ui_prefs_key(username: str) -> str:
+    user_key = re.sub(r"[^0-9A-Za-z_]+", "_", str(username or "unknown")).strip("_").lower()
+    return f"{KV_KEY_UI_PREFS}_{user_key or 'unknown'}"
+
+
+def _sanitize_ui_prefs(saved: dict[str, Any]) -> dict[str, Any]:
+    prefs = {k: saved[k] for k in _UI_KEYS if k in saved}
+
+    if not isinstance(prefs.get("khtd_sub_tab"), int) or not 0 <= prefs["khtd_sub_tab"] < _KHTD_MAIN_TAB_COUNT:
+        prefs.pop("khtd_sub_tab", None)
+    if not isinstance(prefs.get("khtd_bc_sub_tab"), int) or not 0 <= prefs["khtd_bc_sub_tab"] < _KHTD_REPORT_TAB_COUNT:
+        prefs.pop("khtd_bc_sub_tab", None)
+    if prefs.get("khtd_cn_nv_radio") not in _KHTD_CN_NV_OPTIONS:
+        prefs.pop("khtd_cn_nv_radio", None)
+
+    pgd = prefs.get("khtd_xa_pgd_sel")
+    if pgd not in DS_PGD:
+        prefs.pop("khtd_xa_pgd_sel", None)
+        prefs.pop("khtd_xa_xa_sel", None)
+        return prefs
+
+    xa = prefs.get("khtd_xa_xa_sel")
+    if xa is not None and xa not in PGD_XA_MAP.get(pgd, []):
+        prefs.pop("khtd_xa_xa_sel", None)
+    return prefs
+
+
+def _khoi_phuc_ui_prefs(username: str) -> None:
+    """Đọc UI prefs từ kv_store vào session_state (chạy 1 lần mỗi phiên browser)."""
+    kv_key = _ui_prefs_key(username)
+    if st.session_state.get("_khtd_prefs_loaded_key") == kv_key:
+        return
+    st.session_state["_khtd_prefs_loaded_key"] = kv_key
+    saved = db.doc_kv(kv_key)
+    if not isinstance(saved, dict):
+        return
+    for k, value in _sanitize_ui_prefs(saved).items():
+        if k not in st.session_state:
+            st.session_state[k] = value
+
+
+def _luu_ui_prefs(username: str) -> None:
+    """Lưu UI prefs hiện tại vào kv_store nếu có thay đổi."""
+    current = _sanitize_ui_prefs({k: st.session_state.get(k) for k in _UI_KEYS if k in st.session_state})
+    if not current:
+        return
+    kv_key = _ui_prefs_key(username)
+    saved = db.doc_kv(kv_key)
+    if isinstance(saved, dict) and saved == current:
+        return
+    db.ghi_kv(kv_key, current, username)
+    db.ghi_audit(username, "khtd_ui_prefs", f"Lưu tùy chọn UI tab KHTD: {', '.join(current.keys())}")
+
 
 # ── Entry point ───────────────────────────────────────────────────────────────
 def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
@@ -637,19 +698,19 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
     username = ctx.username
     df_full = ctx.df_full
 
+    _khoi_phuc_ui_prefs(username)
+
     with ctx:
-        st.title("🏛️ Kế hoạch Tín dụng — Phòng KH-NV")
-        st.caption(
-            "Quản lý KHTD cấp Chi nhánh và phân bổ xuống Xã · "
-            "Theo dõi chênh lệch phân bổ theo Chương trình"
-        )
+        st.header("🏛️ Kế hoạch Tín dụng")
 
         _khtd_labels = ["🏛️ KHTD Chi nhánh", "📍 KHTD theo Xã", "📊 Báo cáo & Xuất file"]
-        _khtd_sel = st.radio("", range(len(_khtd_labels)), format_func=lambda i: _khtd_labels[i],
-                             horizontal=True, key="khtd_sub_tab", label_visibility="collapsed")
-        st.divider()
+        _khtd_sel = st.radio(
+            "", range(len(_khtd_labels)),
+            format_func=lambda i: _khtd_labels[i],
+            horizontal=True, key="khtd_sub_tab", label_visibility="collapsed",
+        )
+
         if _khtd_sel == 0:
-            # Chỉ đọc GQVL khi vào màn Chi nhánh; tab Xã không dùng dữ liệu này.
             df_gqvl = _doc_gqvl_parquet(ts_file(CACHE_GQVL))
             from tabs.tab_khtd_nhap import render_nhap_cn  # lazy — tránh circular import
             render_nhap_cn(role, username, df_full, df_gqvl)
@@ -659,3 +720,5 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
         elif _khtd_sel == 2:
             from tabs.tab_khtd_xuat import render_xuat_baocao  # lazy — tránh circular import
             render_xuat_baocao(role, username, df_full)
+
+        _luu_ui_prefs(username)

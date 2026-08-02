@@ -1,7 +1,7 @@
 # AGENTS.md — VBSP-SCM
 > Hướng dẫn dự án dành riêng cho **Codex** / Trae / Cline / Cursor.  
 > Đọc toàn bộ file này trước khi đọc bất kỳ file code nào.  
-> Cập nhật: 06/06/2026
+> Cập nhật: 02/08/2026
 
 ---
 
@@ -17,6 +17,40 @@ Hệ thống Quản trị Tín dụng Nội bộ — **Ngân hàng Chính sách 
 - **Không dùng:** `D:\VBSP-SCM\.venv` / `.venv*` vì đây là môi trường cũ Python 3.14, dễ làm IDE/agent probe nhầm và gây cửa sổ CMD chớp
 - **Người dùng:** ~20 users, 9 vai trò, 2 phân hệ
 - **Phạm vi:** 22 đơn vị (Hội sở + 21 PGD), 95 xã/phường
+
+---
+
+## 1.1 Chính sách model bắt buộc
+
+Codex phải tự đánh giá độ phức tạp/rủi ro trước khi làm và chọn mức model tiết kiệm nhất nhưng đủ chắc:
+
+- `gpt-5.4`: đọc hiểu, grep, tóm tắt luồng, sửa nhỏ phạm vi hẹp.
+- `gpt-5.5`: sửa bug thường ở `tabs/`, `services/`, UI Streamlit, báo cáo, upload.
+- `gpt-5.6-sol`: `auth.py`, `db.py`, migration, phân quyền, ghi/xóa dữ liệu, audit/snapshot hoặc lỗi có nguy cơ mất dữ liệu.
+
+Codex cũng phải tự chọn `Effort` và `Speed` phù hợp nếu surface/host có hỗ trợ:
+
+| Loại việc | Model | Effort | Speed |
+|---|---|---|---|
+| Đọc hiểu, grep, tóm tắt, sửa tài liệu/text | `gpt-5.4` | Low hoặc Medium | Fast nếu có, nếu không dùng Standard |
+| Sửa nhỏ ≤ 2 file, ít rủi ro | `gpt-5.4` hoặc `gpt-5.5` | Medium | Standard |
+| Sửa bug thường ở `tabs/`, `services/`, UI/report/upload | `gpt-5.5` | Medium hoặc High | Standard |
+| Review logic phức tạp, nhiều file | `gpt-5.5` | High | Standard |
+| `auth.py`, `db.py`, migration, phân quyền, mất dữ liệu | `gpt-5.6-sol` | High | Standard |
+
+Nếu surface/host hiện tại không hỗ trợ đổi model, effort hoặc speed, Codex phải báo **model/effort/speed đề xuất** và tiếp tục bằng cấu hình đang chạy; không được tuyên bố đã chuyển cấu hình khi thực tế chưa chuyển. Không tự tạo task/thread riêng chỉ để né giới hạn model khi user chưa yêu cầu.
+
+### 1.1.1 Cảnh báo chọn model trước khi sửa
+
+Nếu cấu hình hiện tại có vẻ thấp hơn mức khuyến nghị cho task, Codex phải cảnh báo **trước khi sửa file** bằng mẫu ngắn:
+
+```text
+⚠️ Cấu hình đề xuất: Model <model> | Effort <effort> | Speed <speed>
+Lý do: <1 câu nêu rủi ro/độ phức tạp>.
+Nếu anh đang để cấu hình thấp hơn, nên đổi trong menu Model/Effort/Speed rồi gửi "tiếp tục".
+```
+
+Bắt buộc cảnh báo và chờ user xác nhận/đổi cấu hình trước khi sửa khi task chạm `auth.py`, `db.py`, migration, phân quyền, ghi/xóa dữ liệu, audit/snapshot hoặc có nguy cơ mất dữ liệu. Với task thường, chỉ hiện dòng model đề xuất rồi tiếp tục làm.
 
 ---
 
@@ -149,7 +183,7 @@ Google Sheets → tab_tien_do_nop:
 | 5.8 | pgd_mode | `if pgd_mode: path=duong_dan_pgd(...)` else `path=DB_HT_CACHE` |
 | 5.9 | CSS/UI | Inject CSS 1 lần trong app.py; `st.date_input(format="DD/MM/YYYY")`; không hardcode color |
 | 5.10 | Git | TUYỆT ĐỐI không tự commit/push |
-| 5.11 | Model | UI → Trae; auth/db → Codex Haiku+; mất dữ liệu → Opus |
+| 5.11 | Model | Codex tự chọn: `gpt-5.4` đọc/sửa nhỏ; `gpt-5.5` sửa bug thường; `gpt-5.6-sol` cho auth/db/migration/mất dữ liệu |
 | 5.12 | Dependency | Không thêm mới |
 | 5.13 | Tên cột | Dùng `COT_*` từ config.py → tra `COT_REF.md` |
 | 5.14 | Auth funcs | `normalize_role`, `la_phan_he_cn/pgd`, `co_quyen_*` → tra `SIGNATURES.md` |

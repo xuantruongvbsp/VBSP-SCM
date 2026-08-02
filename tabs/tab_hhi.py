@@ -9,6 +9,8 @@ Dữ liệu từ cột "Nguồn vốn" (1=TW, 2=ĐP) trong HSTD.
 """
 from __future__ import annotations
 
+import hashlib
+import re
 from datetime import date
 
 import pandas as pd
@@ -30,7 +32,12 @@ from config import (
     DS_PGD,
 )
 from logger import get_logger
-from snapshot_service import danh_sach_ky, doc_snapshot_nvdp_range, ky_baseline
+from data.pgd import pgd_slug
+from snapshot_service import (
+    danh_sach_ky,
+    doc_snapshot_nvdp_range,
+    ky_baseline,
+)
 from tabs.base_tab import TabContext
 from utils import fmt_ty, hien_thi_dataframe_phan_trang, xuat_excel, lazy_tabs
 
@@ -41,26 +48,30 @@ _COLOR_DP = "#EF5350"
 _COLOR_DP_TINH = "#26A69A"
 _COLOR_DP_XA = "#FFB74D"
 _CHART_LAYOUT = dict(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
+_EXCEL_STATE_PREFIX = "nvdp_excel_buf_"
 
 
 def _text_sach(value) -> str:
     if value is None or pd.isna(value):
         return ""
     text = str(value).strip()
-    return "" if text.lower() in {"nan", "none"} else text
+    return "" if text.lower() in {"nan", "none", "<na>"} else text
 
 
-def _ma_ct_int(value) -> int | None:
-    text = _text_sach(value)
-    if not text:
-        return None
-    try:
-        number = pd.to_numeric(pd.Series([text]), errors="coerce").iloc[0]
-    except Exception:
-        return None
-    if pd.isna(number):
-        return None
-    return int(number)
+def _text_sach_series(values: pd.Series) -> pd.Series:
+    text = values.astype("string").fillna("").str.strip()
+    return text.mask(text.str.lower().isin(("nan", "none", "<na>", "")), "")
+
+
+def _ma_ct_series_int(values: pd.Series | None, index: pd.Index) -> pd.Series:
+    if values is None:
+        return pd.Series(pd.NA, index=index, dtype="Int64")
+    numeric = pd.to_numeric(values, errors="coerce")
+    result = pd.Series(pd.NA, index=index, dtype="Int64")
+    valid = numeric.notna()
+    if valid.any():
+        result.loc[valid] = numeric.loc[valid].astype(float).astype(int)
+    return result
 
 
 def _map_nguon_von(v) -> str:
@@ -81,6 +92,26 @@ def _map_nguon_von(v) -> str:
     return "Khác"
 
 
+def _nguon_von_label_series(values: pd.Series) -> pd.Series:
+    """Vectorized version of _map_nguon_von for large HSTD frames."""
+    if pd.api.types.is_numeric_dtype(values):
+        numeric = pd.to_numeric(values, errors="coerce")
+        out = pd.Series("Khác", index=values.index, dtype="object")
+        out.loc[numeric.eq(1)] = "Trung ương"
+        out.loc[numeric.eq(2)] = "Địa phương"
+        return out
+
+    text = values.astype("string").fillna("").str.strip().str.upper()
+    numeric = pd.to_numeric(text, errors="coerce")
+
+    out = pd.Series("Khác", index=values.index, dtype="object")
+    mask_tw = text.isin(("1", "1.0", "TW", "TRUNG ƯƠNG")) | numeric.eq(1)
+    mask_dp = text.isin(("2", "2.0", "ĐP", "ĐỊA PHƯƠNG")) | numeric.eq(2)
+    out.loc[mask_tw] = "Trung ương"
+    out.loc[mask_dp] = "Địa phương"
+    return out
+
+
 def _rule_cap_lookup() -> tuple[dict[tuple[int, str], str], dict[str, str]]:
     """Map rule Mã CT + Mã NĐT sang cấp vốn, đọc kv_store đúng 1 lần mỗi render."""
     exact: dict[tuple[int, str], str] = {}
@@ -94,10 +125,10 @@ def _rule_cap_lookup() -> tuple[dict[tuple[int, str], str], dict[str, str]]:
         if ma_ct is None:
             fallback[ma_ndt] = cap
             continue
-        try:
-            exact[(int(ma_ct), ma_ndt)] = cap
-        except Exception:
+        ma_ct_i = _ma_ct_series_int(pd.Series([ma_ct]), pd.Index([0])).iloc[0]
+        if pd.isna(ma_ct_i):
             continue
+        exact[(int(ma_ct_i), ma_ndt)] = cap
     return exact, fallback
 
 
@@ -114,17 +145,28 @@ def _rules_cache_key(rules: list[dict]) -> str:
     return "|".join(sorted(parts))
 
 
-def _cap_label_tu_ma_ndt(ma_ct, ma_ndt, exact: dict[tuple[int, str], str], fallback: dict[str, str]) -> str:
-    ma = _text_sach(ma_ndt)
-    ma_ct_i = _ma_ct_int(ma_ct)
-    cap = "xa"
-    if ma:
-        cap = exact.get((ma_ct_i, ma), fallback.get(ma, "xa")) if ma_ct_i is not None else fallback.get(ma, "xa")
-    return "ĐP cấp tỉnh" if cap == "tinh" else "ĐP cấp xã/khác"
+def _kh_map_cache_key(nhan_dot: str, kh_map: dict[str, float] | None) -> str:
+    """Fingerprint KH ĐP để cache Excel đổi khi sửa số trong cùng một đợt."""
+    if not kh_map:
+        return "no_kh"
+    parts = [str(nhan_dot or "")]
+    parts.extend(f"{k}:{float(v or 0):.0f}" for k, v in sorted(kh_map.items()))
+    return hashlib.sha1("|".join(parts).encode("utf-8")).hexdigest()[:12]
+
+
+def _excel_state_key(view_key: str, ts_hstd: float, rules_key: str, kh_key: str = "") -> str:
+    digest = hashlib.sha1(f"{rules_key}|{kh_key}".encode("utf-8")).hexdigest()[:12]
+    return f"{_EXCEL_STATE_PREFIX}{view_key}_{ts_hstd}_{digest}"
+
+
+def _clear_old_excel_buffers(active_key: str) -> None:
+    for key in list(st.session_state.keys()):
+        if str(key).startswith(_EXCEL_STATE_PREFIX) and key != active_key:
+            st.session_state.pop(key, None)
 
 
 def _phan_nguon_von(df: pd.DataFrame) -> pd.DataFrame:
-    """Thêm nhãn nguồn vốn tổng và nhãn phân cấp ĐP từ Mã nhà đầu tư."""
+    """Thêm nhãn nguồn vốn tổng và nhãn phân cấp ĐP từ Mã nhà đầu tư (vectorized)."""
     if {"_nv_label", "_nv_cap_label"}.issubset(df.columns):
         return df
     if COT_NGUON_VON not in df.columns:
@@ -134,17 +176,31 @@ def _phan_nguon_von(df: pd.DataFrame) -> pd.DataFrame:
         return df
     df = df.copy()
     if "_nv_label" not in df.columns:
-        df["_nv_label"] = df[COT_NGUON_VON].map(_map_nguon_von)
+        df["_nv_label"] = _nguon_von_label_series(df[COT_NGUON_VON])
     df["_nv_cap_label"] = df["_nv_label"]
     mask_dp = df["_nv_label"].eq("Địa phương")
-    if mask_dp.any():
-        exact, fallback = _rule_cap_lookup()
-        ma_ct_s = df[COT_MA_CHUONG_TRINH] if COT_MA_CHUONG_TRINH in df.columns else pd.Series([None] * len(df), index=df.index)
-        ma_ndt_s = df[COT_MA_NHA_DAU_TU] if COT_MA_NHA_DAU_TU in df.columns else pd.Series([""] * len(df), index=df.index)
-        df.loc[mask_dp, "_nv_cap_label"] = [
-            _cap_label_tu_ma_ndt(ma_ct, ma_ndt, exact, fallback)
-            for ma_ct, ma_ndt in zip(ma_ct_s.loc[mask_dp], ma_ndt_s.loc[mask_dp])
-        ]
+    if not mask_dp.any():
+        return df
+
+    exact, fallback = _rule_cap_lookup()
+    idx_dp = df.index[mask_dp]
+    if COT_MA_CHUONG_TRINH in df.columns:
+        ma_ct_i = _ma_ct_series_int(df.loc[idx_dp, COT_MA_CHUONG_TRINH], idx_dp)
+    else:
+        ma_ct_i = _ma_ct_series_int(None, idx_dp)
+    if COT_MA_NHA_DAU_TU in df.columns:
+        ma_txt = _text_sach_series(df.loc[idx_dp, COT_MA_NHA_DAU_TU])
+    else:
+        ma_txt = pd.Series([""] * len(idx_dp), index=idx_dp)
+
+    # Ưu tiên rule exact (Mã CT + Mã NĐT) → fallback (Mã NĐT) → mặc định "xa".
+    # Trống Mã NĐT → luôn "ĐP cấp xã/khác" (giữ đúng logic per-row cũ).
+    exact_str = {f"{ct}|{ma}": cap for (ct, ma), cap in exact.items()}
+    cap = (ma_ct_i.astype(str) + "|" + ma_txt).map(exact_str)
+    cap = cap.fillna(ma_txt.map(fallback)).fillna("xa").mask(ma_txt.eq(""), "xa")
+    df.loc[idx_dp, "_nv_cap_label"] = cap.eq("tinh").map(
+        {True: "ĐP cấp tỉnh", False: "ĐP cấp xã/khác"}
+    )
     return df
 
 
@@ -185,7 +241,8 @@ def _bang_theo_nv(
     pivot = (
         df_agg.groupby(idx_cols + ["_nv_cap_label"])["_dn"]
         .sum()
-        .unstack("_nv_cap_label", fill_value=0.0)
+        .unstack("_nv_cap_label")
+        .fillna(0.0)
         .reset_index()
     )
     pivot.columns.name = None
@@ -206,6 +263,7 @@ def _bang_theo_nv(
         if r["_tong"] > 0 else 0.0,
         axis=1,
     )
+
     result = result.sort_values("_tong", ascending=False).reset_index(drop=True)
     if them_dong_tong:
         tong_row = {col: "" for col in idx_cols}
@@ -221,7 +279,7 @@ def _bang_theo_nv(
     result["TW (triệu đồng)"] = result["Trung ương"].apply(fmt_ty)
     result["ĐP cấp tỉnh (triệu đồng)"] = result["ĐP cấp tỉnh"].apply(fmt_ty)
     result["ĐP cấp xã/khác (triệu đồng)"] = result["ĐP cấp xã/khác"].apply(fmt_ty)
-    result["ĐP (triệu đồng)"] = result["Địa phương"].apply(fmt_ty)
+    result["Tổng dư nợ ĐP (triệu đồng)"] = result["Địa phương"].apply(fmt_ty)
     result["Tổng (triệu đồng)"] = result["_tong"].apply(fmt_ty)
     result["Tỷ trọng ĐP (%)"] = result["Tỷ trọng ĐP (%)"].apply(
         lambda x: f"{x:.1f}".replace(".", ",") + "%"
@@ -230,9 +288,9 @@ def _bang_theo_nv(
     display_cols = idx_cols + [
         "TW (triệu đồng)",
         "ĐP cấp tỉnh (triệu đồng)", "ĐP cấp xã/khác (triệu đồng)",
-        "ĐP (triệu đồng)",
-        "Tổng (triệu đồng)", "Tỷ trọng ĐP (%)",
+        "Tổng dư nợ ĐP (triệu đồng)",
     ]
+    display_cols += ["Tổng (triệu đồng)", "Tỷ trọng ĐP (%)"]
     return result[[c for c in display_cols if c in result.columns]]
 
 
@@ -264,11 +322,11 @@ def _bang_nguon_von_xa_02_ct(
         return pd.DataFrame()
 
     if df_labeled is not None and {"_nv_label", "_nv_cap_label"}.issubset(df_labeled.columns):
-        df_work = df_labeled.copy()
+        df_work = df_labeled
     else:
         df_work = _phan_nguon_von(df)
 
-    ma_ct = df_work[COT_MA_CHUONG_TRINH].map(_ma_ct_int)
+    ma_ct = _ma_ct_series_int(df_work[COT_MA_CHUONG_TRINH], df_work.index)
     dn = pd.to_numeric(df_work[COT_TONG_DU_NO], errors="coerce").fillna(0.0)
     mask = (
         df_work["_nv_label"].eq("Địa phương")
@@ -290,8 +348,9 @@ def _bang_nguon_von_xa_02_ct(
         pivot = (
             rows.groupby([COT_TEN_PGD, "_ma_ct"])["_dn"]
             .sum()
-            .unstack("_ma_ct", fill_value=0.0)
-            .reindex(units, fill_value=0.0)
+            .unstack("_ma_ct")
+            .reindex(units)
+            .fillna(0.0)
         )
         for col in (3, 6):
             if col not in pivot.columns:
@@ -320,6 +379,85 @@ def _bang_nguon_von_xa_02_ct(
     for col in ["GQVL nguồn vốn xã", "NS&VSMTNT nguồn vốn xã", "Tổng cộng"]:
         out[col] = out[col].apply(fmt_ty)
     return out
+
+
+def _bang_ma_ndt_cho_phan_loai(
+    df_labeled: pd.DataFrame,
+    dn: pd.Series,
+) -> pd.DataFrame:
+    """Mã NĐT nguồn ĐP chưa có rule phân cấp (đang mặc định tính vào cấp xã/khác)."""
+    required_cols = {COT_MA_NHA_DAU_TU, "_nv_label"}
+    if df_labeled is None or df_labeled.empty or not required_cols.issubset(df_labeled.columns):
+        return pd.DataFrame()
+    mask_dp = df_labeled["_nv_label"].eq("Địa phương")
+    if not mask_dp.any():
+        return pd.DataFrame()
+
+    rules = db.doc_ndt_dp_rule_list() or []
+    rule_mas = {
+        _text_sach(r.get("ma", ""))
+        for r in rules
+        if isinstance(r, dict)
+    }
+    rule_mas.discard("")
+
+    sub = df_labeled.loc[mask_dp].copy()
+    sub["_dn"] = pd.to_numeric(dn.reindex(sub.index), errors="coerce").fillna(0.0).to_numpy()
+    sub["_ma_ndt"] = sub[COT_MA_NHA_DAU_TU].map(_text_sach)
+    sub = sub[(sub["_ma_ndt"] != "") & (~sub["_ma_ndt"].isin(rule_mas))]
+    if sub.empty:
+        return pd.DataFrame()
+
+    rows = []
+    for ma, g in sub.groupby("_ma_ndt"):
+        ct_chinh = ""
+        if COT_TEN_CT in g.columns and not g.empty:
+            ct_chinh = _text_sach(g.loc[g["_dn"].idxmax(), COT_TEN_CT])
+        rows.append(
+            {
+                "Mã NĐT": ma,
+                "Dư nợ (triệu đồng)": fmt_ty(g["_dn"].sum()),
+                "Số PGD": g[COT_TEN_PGD].nunique() if COT_TEN_PGD in g.columns else 0,
+                "Số xã": g[COT_TEN_XA].nunique() if COT_TEN_XA in g.columns else 0,
+                "Chương trình chính": ct_chinh,
+                "_dn_sort": float(g["_dn"].sum()),
+            }
+        )
+    out = pd.DataFrame(rows).sort_values("_dn_sort", ascending=False).reset_index(drop=True)
+    out.insert(0, "STT", range(1, len(out) + 1))
+    return out.drop(columns=["_dn_sort"])
+
+
+def _dem_nguon_von_nan_co_ma_ndt(df: pd.DataFrame) -> int:
+    """Đếm dòng trống cột 'Nguồn vốn' nhưng mang Mã NĐT dạng INV — nghi vốn ĐP thiếu nhãn."""
+    if df is None or df.empty:
+        return 0
+    if COT_NGUON_VON not in df.columns or COT_MA_NHA_DAU_TU not in df.columns:
+        return 0
+    nv_nan = _text_sach_series(df[COT_NGUON_VON]).eq("")
+    ma_inv = _text_sach_series(df[COT_MA_NHA_DAU_TU]).str.upper().str.startswith("INV")
+    return int((nv_nan & ma_inv).sum())
+
+
+@st.cache_data(show_spinner=False)
+def _cached_bang_ma_ndt_cho_phan_loai(
+    _df_labeled: pd.DataFrame,
+    _dn: pd.Series,
+    cache_key: str,
+) -> pd.DataFrame:
+    """Cache bảng Mã NĐT chờ phân loại; bảng này chỉ đổi khi HSTD/rules/filter đổi."""
+    _ = cache_key
+    return _bang_ma_ndt_cho_phan_loai(_df_labeled, _dn)
+
+
+@st.cache_data(show_spinner=False)
+def _cached_dem_nguon_von_nan_co_ma_ndt(
+    _df: pd.DataFrame,
+    cache_key: str,
+) -> int:
+    """Cache kiểm tra INV thiếu nguồn vốn; phụ thuộc HSTD/filter hiện tại."""
+    _ = cache_key
+    return _dem_nguon_von_nan_co_ma_ndt(_df)
 
 
 def _ve_bieu_do_ngang(df_table: pd.DataFrame, label_col: str, tieu_de: str, key: str) -> None:
@@ -464,8 +602,13 @@ def _render_top_contributors(df_labeled: pd.DataFrame, dn: pd.Series, mask_dp: p
         st.markdown("**Top CT tỷ trọng ĐP:**\n" + "\n".join(items))
 
 
-def _render_sub_pgd(df: pd.DataFrame, df_labeled: pd.DataFrame | None = None) -> None:
-    df_pgd_hien = _bang_theo_nv(df, COT_TEN_PGD, df_labeled=df_labeled, them_dong_tong=True)
+def _render_sub_pgd(
+    df: pd.DataFrame,
+    df_labeled: pd.DataFrame | None = None,
+) -> None:
+    df_pgd_hien = _bang_theo_nv(
+        df, COT_TEN_PGD, df_labeled=df_labeled, them_dong_tong=True
+    )
     if df_pgd_hien.empty:
         st.warning("Không có dữ liệu PGD.")
         return
@@ -498,43 +641,6 @@ def _render_sub_ct(df: pd.DataFrame, kp: str = "", df_labeled: pd.DataFrame | No
     hien_thi_dataframe_phan_trang(df_ct, key=f"{kp}nvdp_ct_table", height=480)
 
 
-def _render_trend(ky_list: list[str], cache_key: str) -> None:
-    """Biểu đồ xu hướng TW vs ĐP qua các kỳ snapshot."""
-    if len(ky_list) < 2:
-        return
-    df_trend = _cached_snapshot_range(ky_list[-1], ky_list[0], cache_key)
-    if df_trend.empty:
-        return
-
-    df_tw = df_trend[df_trend["nguon_von"] == "1"].set_index("ky")["tong_du_no"]
-    df_dp = df_trend[df_trend["nguon_von"] == "2"].set_index("ky")["tong_du_no"]
-    ky_vals = sorted(df_trend["ky"].unique())
-
-    fig = go.Figure()
-    fig.add_trace(go.Bar(
-        x=ky_vals,
-        y=[df_tw.get(k, 0) / 1e9 for k in ky_vals],
-        name="Trung ương",
-        marker_color=_COLOR_TW,
-    ))
-    fig.add_trace(go.Bar(
-        x=ky_vals,
-        y=[df_dp.get(k, 0) / 1e9 for k in ky_vals],
-        name="Địa phương",
-        marker_color=_COLOR_DP,
-    ))
-    fig.update_layout(
-        barmode="stack",
-        title="Xu hướng dư nợ TW vs ĐP theo kỳ",
-        yaxis_title="Tỷ đồng",
-        height=350,
-        margin=dict(l=20, r=20, t=50, b=30),
-        legend=dict(orientation="h", y=1.08),
-        **_CHART_LAYOUT,
-    )
-    st.plotly_chart(fig, use_container_width=True, key="nvdp_trend_chart")
-
-
 # ── Cache snapshot context ────────────────────────────────────────────────────
 @st.cache_data(show_spinner=False, ttl=600)
 def _load_snapshot_context(cache_key: str) -> dict:
@@ -554,10 +660,89 @@ def _load_snapshot_context(cache_key: str) -> dict:
     return ctx
 
 
-@st.cache_data(show_spinner=False)
-def _cached_snapshot_range(tu_ky: str, den_ky: str, cache_key: str) -> pd.DataFrame:
-    """Cache doc_snapshot_nvdp_range — dùng cho trend chart."""
-    return doc_snapshot_nvdp_range(tu_ky, den_ky)
+# ── KH tín dụng ĐP theo PGD (Nhóm A: KH vs Thực tế) ──────────────────────────
+
+def _kh_dp_cua_pgd(ten_pgd: str, kh_map: dict[str, float]) -> float:
+    """Tra KH ĐP (VND) theo tên PGD; slug Hội sở trong KHTD là 'hoi_so'."""
+    slug = pgd_slug(ten_pgd)
+    kh = kh_map.get(slug)
+    if kh is None and slug.startswith("hoi_so"):
+        kh = kh_map.get("hoi_so")
+    return float(kh or 0.0)
+
+
+def _khtd_dot_sort_key(dot: str) -> tuple[int | str, ...]:
+    s = str(dot).strip()
+    m = re.match(r"(?i)dot\s*(\d+)$", s)
+    if m:
+        return (0, int(m.group(1)))
+    return (1, s.lower())
+
+
+def _is_khtd_timestamp_dot(dot: str) -> bool:
+    return bool(re.search(r"_\d{8}T\d{6}$", str(dot or "").strip()))
+
+
+def _parse_khtd_period_key(key: str, slugs: list[str]) -> tuple[int, str, str] | None:
+    """Parse khtd_{slug}_{YYYY}_{MM}_{dot}; slug/dot đều có thể chứa underscore."""
+    text = str(key or "")
+    if not text.startswith("khtd_"):
+        return None
+    for slug in sorted(slugs, key=len, reverse=True):
+        prefix = f"khtd_{slug}_"
+        if not text.startswith(prefix):
+            continue
+        suffix = text[len(prefix):].strip()
+        m = re.match(r"^(\d{4})_(\d{2})_(.+)$", suffix)
+        if not m:
+            return None
+        return int(m.group(1)), m.group(2), m.group(3).strip()
+    return None
+
+
+@st.cache_data(show_spinner=False, ttl=300)
+def _doc_kh_dp_theo_pgd() -> tuple[str, dict]:
+    """KH ĐP mới nhất theo PGD từ các đợt KHTD đã giao (kv_store).
+
+    Trả về (nhãn đợt, {pgd_slug: kh_moi_dp_vnd}); ("", {}) nếu chưa có đợt nào.
+    """
+    try:
+        from services import khtd_service
+
+        # Quét khóa khtd_{slug}_{năm}_{tháng}_{đợt}; slug và đợt có thể chứa underscore.
+        slugs = (
+            khtd_service.ds_slug()
+            if hasattr(khtd_service, "ds_slug")
+            else ["hoi_so"] + [pgd_slug(ten) for ten in DS_PGD]
+        )
+        periods: dict[tuple, int] = {}
+        for k in db.list_kv_prefix("khtd_"):
+            p = _parse_khtd_period_key(k, slugs)
+            if p is None:
+                continue
+            if _is_khtd_timestamp_dot(p[2]):
+                continue
+            periods[p] = periods.get(p, 0) + 1
+        if not periods:
+            return "", {}
+        nam, th, dot = max(
+            periods, key=lambda p: (p[0], p[1], _khtd_dot_sort_key(p[2]))
+        )
+        df = khtd_service.tong_hop(nam, th, dot)
+        if df is None or df.empty:
+            return "", {}
+        df = df[df["ma_key"].astype(str).str.contains("_DP", na=False)].copy()
+        if df.empty:
+            return "", {}
+        df["kh_moi_dp"] = pd.to_numeric(df["kh_moi_dp"], errors="coerce").fillna(0.0)
+        kh = df.groupby("pgd_slug")["kh_moi_dp"].sum()
+        kh = kh[kh > 0]
+        if kh.empty:
+            return "", {}
+        return f"đợt {dot}, {th}/{nam}", kh.to_dict()
+    except Exception as e:
+        logger.error("_doc_kh_dp_theo_pgd: %s", e, exc_info=True)
+    return "", {}
 
 
 # ── Cache Excel export ────────────────────────────────────────────────────────
@@ -569,16 +754,21 @@ def _cached_excel_sheets(
     view_key: str = "cn",
     ts: float = 0.0,
     rules_key: str = "",
+    nhan_dot: str = "",
+    kh_sig: str = "",
 ) -> bytes:
     """Cache Excel export — tránh tính lại bảng mỗi lần tải."""
-    _ = (view_key, ts, rules_key)
+    _ = (view_key, ts, rules_key, nhan_dot, kh_sig)
     sheets: dict[str, pd.DataFrame] = {
         "Nguồn xã 02 CT": _bang_nguon_von_xa_02_ct(_df_labeled, df_labeled=_df_labeled),
         "Theo Chương trình": _bang_theo_nv(_df_labeled, COT_TEN_CT, df_labeled=_df_labeled),
         "Theo Xã": _bang_theo_nv(_df_labeled, COT_TEN_XA, extra_cols=list(extra_cols), df_labeled=_df_labeled),
     }
     if not is_pgd_view:
-        sheets["Theo PGD"] = _bang_theo_nv(_df_labeled, COT_TEN_PGD, df_labeled=_df_labeled, them_dong_tong=True)
+        sheets["Theo PGD"] = _bang_theo_nv(
+            _df_labeled, COT_TEN_PGD, df_labeled=_df_labeled,
+            them_dong_tong=True,
+        )
     return xuat_excel(sheets)
 
 
@@ -651,14 +841,23 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
         dn_dp_xa = float(dn_series[mask_dp_xa].sum())
         tl_dp = dn_dp / tong_du_no * 100 if tong_du_no > 0 else 0.0
 
+        # KH ĐP theo đợt KHTD gần nhất (Nhóm A: KH vs Thực tế)
+        nhan_dot_kh, kh_map = _doc_kh_dp_theo_pgd()
+        if kh_map:
+            if pgd_user or selected_pgd:
+                kh_dp_view = _kh_dp_cua_pgd(str(pgd_user or selected_pgd), kh_map)
+            else:
+                kh_dp_view = float(sum(kh_map.values()))
+            dat_kh = dn_dp / kh_dp_view * 100 if kh_dp_view > 0 else None
+        else:
+            dat_kh = None
+
         # Delta từ snapshot — chỉ khi xem toàn CN (không filter PGD)
         delta_tong = delta_tw = delta_dp = delta_tl = None
         prev_label = "so với kỳ trước"
-        ky_list: list[str] = []
 
         if not pgd_user and selected_pgd is None:
             snap_ctx = _load_snapshot_context(f"nvdp_{ts_hstd}")
-            ky_list = snap_ctx["ky_list"]
             prev_label = snap_ctx["prev_label"]
             df_prev = snap_ctx["df_prev"]
             if not df_prev.empty:
@@ -726,54 +925,22 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
             ],
             num_columns=3,
         )
-
-        # ── Pie + Treemap + công thức ───────────────────────────────────────────
-        col_pie, col_treemap, col_info = st.columns([1.2, 1.2, 2])
-        with col_pie:
-            fig_pie = go.Figure(go.Pie(
-                labels=["Trung ương", "ĐP cấp tỉnh", "ĐP cấp xã/khác"],
-                values=[dn_tw, dn_dp_tinh, dn_dp_xa],
-                marker_colors=[_COLOR_TW, _COLOR_DP_TINH, _COLOR_DP_XA],
-                hole=0.4,
-                textinfo="label+percent",
-            ))
-            fig_pie.update_layout(
-                title="Cơ cấu nguồn vốn",
-                height=300,
-                margin=dict(l=10, r=10, t=40, b=10),
-                **_CHART_LAYOUT,
+        if dat_kh is not None:
+            kpi_row(
+                [
+                    {
+                        "label": f"Đạt KH ĐP — {nhan_dot_kh}",
+                        "value": f"{dat_kh:.1f}".replace(".", ",") + "%",
+                        "help": (
+                            "Dư nợ Địa phương thực tế / KH ĐP được giao "
+                            f"theo {nhan_dot_kh} (KHTD phần vốn Địa phương)."
+                        ),
+                        "icon": "🎯",
+                        "precision": 1,
+                    },
+                ],
+                num_columns=3,
             )
-            st.plotly_chart(fig_pie, use_container_width=True, key="nvdp_pie")
-
-        with col_treemap:
-            if COT_TEN_PGD in df_labeled.columns and not pgd_user and not selected_pgd:
-                _ve_treemap_pgd(df_labeled, dn_series)
-            elif COT_TEN_CT in df_labeled.columns:
-                _ve_treemap_ct(df_labeled, dn_series)
-            else:
-                st.info("Chưa có cột chương trình để vẽ treemap nguồn vốn.")
-
-        with col_info:
-            st.markdown("##### 📐 Cách đo lường")
-            st.latex(
-                r"\text{Tỷ lệ \%} = "
-                r"\frac{\text{Nguồn vốn ngân sách địa phương (Tỉnh/Huyện) ủy thác}}"
-                r"{\text{Tổng nguồn vốn tại địa phương}}"
-            )
-            st.info(
-                "Nguồn vốn được xác định từ cột **Nguồn vốn** trong HSTD: "
-                "**1 = Trung ương**, **2 = Địa phương**. "
-                "Riêng nguồn ĐP được tách tiếp theo rule **Mã CT + Mã nhà đầu tư** "
-                "đã cấu hình ở tab Mã NĐT địa phương."
-            )
-            st.markdown("##### 🔝 Đơn vị nổi bật")
-            _render_top_contributors(df_labeled, dn_series, mask_dp)
-
-        # ── Trend chart (chỉ khi xem toàn CN, có ít nhất 2 kỳ) ──────────────
-        if len(ky_list) >= 2:
-            st.divider()
-            st.markdown("**📈 Xu hướng theo kỳ snapshot**")
-            _render_trend(ky_list, f"nvdp_trend_{ts_hstd}")
 
         st.divider()
 
@@ -782,14 +949,33 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
         kp = f"pgd_" if is_pgd_view else ""
         extra_cols_tuple = (COT_TEN_PGD,) if COT_TEN_PGD in df_display.columns else ()
 
-        df_xa_02_ct = _bang_nguon_von_xa_02_ct(df_display, df_labeled=df_labeled)
-        if not df_xa_02_ct.empty:
-            st.markdown("**🏘️ Đối chiếu nguồn vốn ngân sách cấp xã nhận ủy thác**")
-            st.caption(
-                "Đơn vị: triệu đồng · Chỉ gồm 02 chương trình GQVL và NS&VSMTNT, "
-                "lọc `Nguồn vốn = Địa phương` và phân loại Mã NĐT là `ĐP cấp xã/khác`."
-            )
-            hien_thi_dataframe_phan_trang(df_xa_02_ct, key=f"{kp}nvdp_xa_02_ct_table", height=480)
+        if st.toggle(
+            "Hiện kiểm tra Mã NĐT & chất lượng dữ liệu",
+            value=False,
+            key=f"{kp}nvdp_show_data_quality",
+        ):
+            df_cho_pl = _cached_bang_ma_ndt_cho_phan_loai(df_labeled, dn_series, nv_cache_key)
+            n_nan_inv = _cached_dem_nguon_von_nan_co_ma_ndt(df_display, nv_cache_key)
+            st.markdown(f"**🔎 Mã NĐT chờ phân loại & kiểm tra chất lượng dữ liệu ({len(df_cho_pl)} mã)**")
+            if not df_cho_pl.empty:
+                st.caption(
+                    "Các Mã NĐT dưới đây thuộc nguồn Địa phương nhưng **chưa có rule phân cấp**, "
+                    "đang được tính mặc định vào **ĐP cấp xã/khác**."
+                )
+                hien_thi_dataframe_phan_trang(
+                    df_cho_pl, key=f"{kp}nvdp_ma_ndt_cho_pl", height=360
+                )
+                st.info(
+                    "Nếu mã nào là vốn **cấp tỉnh** ủy thác, hãy thêm rule tương ứng trong tab "
+                    "**Mã NĐT địa phương** để số liệu ĐP cấp tỉnh/xã chính xác."
+                )
+            if n_nan_inv > 0:
+                st.warning(
+                    f"⚠️ Có **{n_nan_inv}** dòng trống cột 'Nguồn vốn' nhưng mang Mã NĐT dạng INV — "
+                    "có thể là vốn Địa phương bị thiếu nhãn. Vui lòng kiểm tra lại file HSTD gốc."
+                )
+            if df_cho_pl.empty and n_nan_inv == 0:
+                st.success("Không phát hiện Mã NĐT chờ phân loại hoặc dòng INV thiếu nguồn vốn.")
             st.divider()
 
         # ── Sub-tabs phân tích ────────────────────────────────────────────────
@@ -817,7 +1003,9 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                     lambda: (
                         st.warning("Không tìm thấy cột Tên PGD trong dữ liệu.")
                         if COT_TEN_PGD not in df_display.columns
-                        else _render_sub_pgd(df_display, df_labeled=df_labeled)
+                        else _render_sub_pgd(
+                            df_display, df_labeled=df_labeled,
+                        )
                     ),
                     lambda: (
                         st.warning("Không tìm thấy cột Tên Xã trong dữ liệu.")
@@ -833,21 +1021,33 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                 key="nvdp_sub_cn",
             )
 
-        # ── Xuất Excel ────────────────────────────────────────────────────────
+        # ── Xuất Excel (on-demand — chỉ tính khi bấm nút, tránh eager) ──────
         st.divider()
         st.markdown("**📥 Xuất Excel — Báo cáo Nguồn vốn địa phương**")
         today_str = date.today().strftime("%d/%m/%Y")
         today_file = date.today().strftime("%Y%m%d")
-        try:
-            buf = _cached_excel_sheets(df_labeled, is_pgd_view, extra_cols_tuple, view_key, ts_hstd, rules_key)
-        except Exception as e:
-            logger.error("tab_hhi export excel: %s", e, exc_info=True)
-            st.warning(f"Không thể tạo đầy đủ file Excel nguồn vốn địa phương: {e}")
-            buf = xuat_excel({"Lỗi xuất file": pd.DataFrame({"Lỗi": [str(e)]})})
-        st.download_button(
-            label=f"⬇️ Tải Excel Nguồn vốn ĐP ({today_str})",
-            data=buf,
-            file_name=f"NguonVonDiaPhuong_{today_file}.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            key="nvdp_xuat_excel",
-        )
+        kh_sig = _kh_map_cache_key(nhan_dot_kh, kh_map)
+        excel_state_key = _excel_state_key(view_key, ts_hstd, rules_key, kh_sig)
+        if st.button("📊 Tạo báo cáo Excel", key="nvdp_tao_excel"):
+            with st.spinner("Đang tạo báo cáo Excel..."):
+                try:
+                    _clear_old_excel_buffers(excel_state_key)
+                    st.session_state[excel_state_key] = _cached_excel_sheets(
+                        df_labeled, is_pgd_view, extra_cols_tuple, view_key, ts_hstd, rules_key,
+                        nhan_dot_kh, kh_sig,
+                    )
+                except Exception as e:
+                    logger.error("tab_hhi export excel: %s", e, exc_info=True)
+                    st.warning(f"Không thể tạo đầy đủ file Excel nguồn vốn địa phương: {e}")
+                    _clear_old_excel_buffers(excel_state_key)
+                    st.session_state[excel_state_key] = xuat_excel(
+                        {"Lỗi xuất file": pd.DataFrame({"Lỗi": [str(e)]})}
+                    )
+        if excel_state_key in st.session_state:
+            st.download_button(
+                label=f"⬇️ Tải Excel Nguồn vốn ĐP ({today_str})",
+                data=st.session_state[excel_state_key],
+                file_name=f"NguonVonDiaPhuong_{today_file}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                key="nvdp_xuat_excel",
+            )

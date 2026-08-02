@@ -29,9 +29,11 @@ from utils import fmt_so, fmt_ty
 
 logger = get_logger(__name__)
 
-_CAP_OPTS = ["Cấp Tỉnh 🏛️", "Cấp Xã/Khác 🏘️"]
-_CAP_TO = {"Cấp Tỉnh 🏛️": "tinh", "Cấp Xã/Khác 🏘️": "xa"}
-_CAP_FROM = {"tinh": "Cấp Tỉnh 🏛️", "xa": "Cấp Xã/Khác 🏘️"}
+_CAP_TINH = "Cấp Tỉnh 🏛️"
+_CAP_XA = "Cấp Xã/Khác 🏘️"
+_CAP_OPTS = [_CAP_TINH, _CAP_XA]
+_CAP_TO = {_CAP_TINH: "tinh", _CAP_XA: "xa"}
+_CAP_FROM = {"tinh": _CAP_TINH, "xa": _CAP_XA}
 _COL_SO_MON = "Số món"
 _COL_SO_PGD = "Số PGD"
 _COL_TONG_DU_NO = "Tổng dư nợ"
@@ -40,6 +42,8 @@ _COL_TEN_NDT_VIEW = "Tên NĐT"
 _COL_PGD_PHAT_SINH = "PGD phát sinh"
 _COL_DA_CO_RULE = "Đã có rule"
 _COL_CHUONG_TRINH_VIEW = "Chương trình"
+_HSTD_EDITOR_KEY = "ndt_dp_hstd_editor"
+_HSTD_SELECTION_KEY = "ndt_dp_hstd_selection"
 _CT_META = {
     3: {
         "label": "GQVL ĐP",
@@ -91,6 +95,55 @@ def _text_or_empty(value) -> str:
     if value is None or pd.isna(value):
         return ""
     return str(value).strip()
+
+
+def _rules_signature(ds_all: list[dict]) -> tuple[tuple[int, str, str], ...]:
+    """Chữ ký nhẹ để bust cache quét khi danh mục rule thay đổi."""
+    return tuple(
+        sorted(
+            (
+                int(item.get("ma_ct", 0) or 0),
+                _text_or_empty(item.get("ma", "")),
+                _text_or_empty(item.get("cap", "tinh")),
+            )
+            for item in (ds_all or [])
+        )
+    )
+
+
+def _hstd_row_key(ma_ct: object, ma_ndt: object) -> str:
+    try:
+        ma_ct_i = int(ma_ct)
+    except Exception:
+        ma_ct_i = 0
+    return f"{ma_ct_i}|{_text_or_empty(ma_ndt)}"
+
+
+def _clear_hstd_editor_state() -> None:
+    """Xóa state của data_editor, gồm cả key phụ nếu Streamlit sinh thêm."""
+    for key in list(st.session_state.keys()):
+        if key == _HSTD_EDITOR_KEY or str(key).startswith(f"{_HSTD_EDITOR_KEY}-"):
+            st.session_state.pop(key, None)
+
+
+def _set_hstd_selection(selection_state: dict[str, bool], row_keys: list[str], selected: bool) -> None:
+    for row_key in row_keys:
+        selection_state[row_key] = bool(selected)
+
+
+def _sync_hstd_selection(
+    selection_state: dict[str, bool],
+    row_keys: list[str],
+    edited: pd.DataFrame,
+) -> None:
+    if edited is None or "Chọn" not in edited.columns:
+        return
+    for row_key, selected in zip(row_keys, edited["Chọn"].tolist()):
+        selection_state[row_key] = bool(selected)
+
+
+def _ghi_chu_tu_editor_row(row: pd.Series | dict) -> str:
+    return _text_or_empty(row.get("Ghi chú", "")) or _text_or_empty(row.get(_COL_TEN_NDT_VIEW, ""))
 
 
 def _first_non_empty(series: pd.Series) -> str:
@@ -150,8 +203,13 @@ def _tong_du_no_series(df: pd.DataFrame) -> pd.Series:
 
 
 @st.cache_data(show_spinner=False, ttl=300)
-def _quet_ma_tu_hstd(_df_full: pd.DataFrame | None, _ds_all: list[dict], ts: float = 0.0) -> pd.DataFrame:
-    _ = ts
+def _quet_ma_tu_hstd(
+    _df_full: pd.DataFrame | None,
+    _ds_all: list[dict],
+    ts: float = 0.0,
+    rules_sig: tuple[tuple[int, str, str], ...] = (),
+) -> pd.DataFrame:
+    _ = (ts, rules_sig)
     df_full = _df_full
     ds_all = _ds_all
     required = {COT_NGUON_VON, COT_MA_CHUONG_TRINH, COT_MA_NHA_DAU_TU}
@@ -244,7 +302,7 @@ def _df_rules(ds: list[dict]) -> pd.DataFrame:
                 "Mã CT": f"{int(item.get('ma_ct', 0) or 0):02d}",
                 "Chương trình": _CT_META.get(int(item.get("ma_ct", 0) or 0), {}).get("label", ""),
                 "Mã NĐT": item.get("ma", ""),
-                "Phân loại cấp": _CAP_FROM.get(cap, _CAP_OPTS[0]),
+                "Phân loại cấp": _CAP_FROM.get(cap, _CAP_TINH),
                 "Ghi chú": item.get("ghi_chu", "") or "",
             }
         )
@@ -331,7 +389,7 @@ def _render_tong_quan(ds_all: list[dict]) -> None:
 
 
 def _render_tinh_trang_ma_moi(df_full: pd.DataFrame | None, ds_all: list[dict], ts_hstd: float = 0.0) -> int:
-    df_scan = _quet_ma_tu_hstd(df_full, ds_all, ts_hstd)
+    df_scan = _quet_ma_tu_hstd(df_full, ds_all, ts_hstd, _rules_signature(ds_all))
     if df_scan.empty or _COL_DA_CO_RULE not in df_scan.columns:
         st.caption("Chưa phát hiện mã NĐT ĐP mới từ HSTD hiện tại.")
         return 0
@@ -415,7 +473,7 @@ def _render_ma_moi_tu_hstd(df_full: pd.DataFrame | None, ds_all: list[dict], can
         st.warning("HSTD hiện tại thiếu một trong các cột: `Nguồn vốn`, `Mã chương trình`, `Mã nhà đầu tư`.")
         return
 
-    df_scan = _quet_ma_tu_hstd(df_full, ds_all, ts_hstd)
+    df_scan = _quet_ma_tu_hstd(df_full, ds_all, ts_hstd, _rules_signature(ds_all))
     if df_scan.empty:
         st.info("Không tìm thấy dữ liệu nguồn ĐP thuộc CT 03/CT 06 trong HSTD hiện tại.")
         return
@@ -431,6 +489,14 @@ def _render_ma_moi_tu_hstd(df_full: pd.DataFrame | None, ds_all: list[dict], can
         st.success("Không còn mã NĐT mới nào cần gắn thuộc tính trong HSTD hiện tại.")
         return
 
+    st.caption("Các mã mới trong bảng dưới đây được chọn sẵn Cấp Xã/Khác; có thể đổi từng dòng trước khi lưu.")
+
+    _fragment_editor_ma_moi(df_new, ds_all, can_edit, username)
+
+
+@st.fragment
+def _fragment_editor_ma_moi(df_new: pd.DataFrame, ds_all: list[dict], can_edit: bool, username: str) -> None:
+    """Fragment tương tác — button click chỉ rerun fragment, KHÔNG rerun toàn trang."""
     ct_options = ["Tất cả"] + list(dict.fromkeys(df_new[_COL_CHUONG_TRINH_VIEW].tolist()))
     ct_chon = st.selectbox("Lọc theo chương trình", ct_options, key="ndt_dp_hstd_ct")
     df_view = df_new.copy()
@@ -445,9 +511,36 @@ def _render_ma_moi_tu_hstd(df_full: pd.DataFrame | None, ds_all: list[dict], can
             df_view[_COL_TONG_DU_NO],
         )
     ]
-    df_view["Chọn"] = False
-    df_view["Phân loại cấp"] = _CAP_OPTS[0]
-    df_view["Ghi chú"] = df_view[_COL_TEN_NDT_VIEW].astype(str).str.strip()
+    df_view["_row_key"] = [
+        _hstd_row_key(ma_ct, ma_ndt)
+        for ma_ct, ma_ndt in zip(df_view["Mã CT"], df_view["Mã NĐT"])
+    ]
+    row_keys = df_view["_row_key"].tolist()
+    selection_state = st.session_state.setdefault(_HSTD_SELECTION_KEY, {})
+    if not isinstance(selection_state, dict):
+        selection_state = {}
+        st.session_state[_HSTD_SELECTION_KEY] = selection_state
+
+    # ── Chọn tất cả / Bỏ chọn (fragment-scope rerun → nhanh) ──
+    col_sel_all, col_sel_none, col_spacer = st.columns([1, 1, 4])
+    with col_sel_all:
+        if st.button("☑️ Chọn tất cả", key="btn_ndt_dp_sel_all", use_container_width=True):
+            _set_hstd_selection(selection_state, row_keys, True)
+            st.session_state[_HSTD_SELECTION_KEY] = selection_state
+            _clear_hstd_editor_state()
+            st.rerun(scope="fragment")
+    with col_sel_none:
+        if st.button("☐ Bỏ chọn tất cả", key="btn_ndt_dp_sel_none", use_container_width=True):
+            _set_hstd_selection(selection_state, row_keys, False)
+            st.session_state[_HSTD_SELECTION_KEY] = selection_state
+            _clear_hstd_editor_state()
+            st.rerun(scope="fragment")
+
+    df_view["Chọn"] = [bool(selection_state.get(row_key, False)) for row_key in row_keys]
+    # Mặc định Cấp Xã/Khác: đa số mã mới (GQVL 2026) là ngân sách xã ủy thác,
+    # khớp với logic báo cáo tab_hhi (chưa có rule → ĐP cấp xã/khác).
+    df_view["Phân loại cấp"] = _CAP_XA
+    df_view["Ghi chú"] = ""
 
     editor_cols = [
         "Chọn",
@@ -490,14 +583,17 @@ def _render_ma_moi_tu_hstd(df_full: pd.DataFrame | None, ds_all: list[dict], can
         df_editor,
         hide_index=True,
         use_container_width=True,
-        key="ndt_dp_hstd_editor",
-        disabled=[_COL_CHUONG_TRINH_VIEW, "Mã NĐT", _COL_TEN_NDT_VIEW, "Phát sinh"],
+        key=_HSTD_EDITOR_KEY,
+        disabled=[_COL_CHUONG_TRINH_VIEW, "Mã NĐT", "Phát sinh"],
         column_config={
             "Chọn": st.column_config.CheckboxColumn("Chọn"),
+            _COL_TEN_NDT_VIEW: st.column_config.TextColumn("Tên NĐT", help="Tên nhà đầu tư — có thể nhập nếu HSTD thiếu"),
             "Phân loại cấp": st.column_config.SelectboxColumn("Phân loại cấp", options=_CAP_OPTS, required=True),
             "Ghi chú": st.column_config.TextColumn("Ghi chú", help="Có thể sửa lại tên/diễn giải trước khi lưu"),
         },
     )
+    _sync_hstd_selection(selection_state, row_keys, edited)
+    st.session_state[_HSTD_SELECTION_KEY] = selection_state
 
     if not st.button("💾 Lưu các mã đã chọn", key="btn_luu_ndt_dp_hstd", type="primary"):
         return
@@ -527,11 +623,13 @@ def _render_ma_moi_tu_hstd(df_full: pd.DataFrame | None, ds_all: list[dict], can
             continue
         if (ma_ct, ma_ndt) in existing_exact:
             continue
+        # Ưu tiên Ghi chú user nhập; fallback sang Tên NĐT nếu bỏ trống.
+        ghi_chu = _ghi_chu_tu_editor_row(row)
         ds_moi.append(
             {
                 "ma_ct": ma_ct,
                 "ma": ma_ndt,
-                "ghi_chu": _text_or_empty(row["Ghi chú"]),
+                "ghi_chu": ghi_chu,
                 "cap": _CAP_TO[cap_label],
             }
         )
@@ -550,8 +648,11 @@ def _render_ma_moi_tu_hstd(df_full: pd.DataFrame | None, ds_all: list[dict], can
         + ("..." if len(added_labels) > 8 else ""),
     )
     st.cache_data.clear()
+    st.session_state.pop(_HSTD_SELECTION_KEY, None)
+    _clear_hstd_editor_state()
     st.success(f"✅ Đã lưu {len(added_labels)} mã mới từ HSTD.")
-    st.rerun()
+    # Full app rerun để cập nhật KPI + danh sách rule
+    st.rerun(scope="app")
 
 
 def _render_danh_sach_theo_cap(ds: list[dict], ma_ct: int) -> None:
@@ -651,7 +752,7 @@ def _render_chinh_sua(ds: list[dict], ma_ct: int, can_edit: bool, username: str)
             key=f"ndt_gc_{ma_ct}_{i}",
             label_visibility="collapsed",
         )
-        cap_current = _CAP_FROM.get(item.get("cap", "tinh"), _CAP_OPTS[0])
+        cap_current = _CAP_FROM.get(item.get("cap", "tinh"), _CAP_TINH)
         cap_edit = cols[2].selectbox(
             "Cấp",
             _CAP_OPTS,
@@ -818,6 +919,14 @@ def _render_phan_tich() -> None:
         _phan_tich_nsvsmt(_doc_ds_theo_ct(6))
 
 
+def _dem_ma_moi_nhanh(df_full: pd.DataFrame | None, ds_all: list[dict], ts_hstd: float = 0.0) -> int:
+    """Đếm số mã mới mà KHÔNG render UI — dùng cho auto-open logic."""
+    df_scan = _quet_ma_tu_hstd(df_full, ds_all, ts_hstd, _rules_signature(ds_all))
+    if df_scan.empty or _COL_DA_CO_RULE not in df_scan.columns:
+        return 0
+    return int((~df_scan[_COL_DA_CO_RULE]).sum())
+
+
 def render(tab: DeltaGenerator = None, **kwargs) -> None:
     """CRUD Mã NĐT địa phương — quản lý theo Mã CT + Mã NĐT."""
     role = kwargs.get("role", "user")
@@ -841,7 +950,9 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
         _render_kpi_rules(ds_all)
 
         mode_options = ["📊 Tổng quan", "🆕 Mã mới từ HSTD", "⚙️ Quản lý", "🔎 Phân tích"]
-        so_ma_moi = _render_tinh_trang_ma_moi(df_full, ds_all, ts_hstd)
+
+        # Đếm nhanh (cached) để auto-open, KHÔNG render bảng nặng ở đây
+        so_ma_moi = _dem_ma_moi_nhanh(df_full, ds_all, ts_hstd)
         auto_open_key = "ndt_dp_auto_opened_new"
         if so_ma_moi > 0 and not st.session_state.get(auto_open_key):
             st.session_state["ndt_dp_mode"] = "🆕 Mã mới từ HSTD"
@@ -855,6 +966,7 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
         )
 
         if che_do == "📊 Tổng quan":
+            _render_tinh_trang_ma_moi(df_full, ds_all, ts_hstd)
             _render_tong_quan(ds_all)
         elif che_do == "🆕 Mã mới từ HSTD":
             _render_ma_moi_tu_hstd(df_full, ds_all, can_edit, username, ts_hstd)

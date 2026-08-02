@@ -1,5 +1,192 @@
 # CHANGELOG
 
+## [2026-08-02] — Thêm 13 loại thông báo vào scheduler Telegram + refactor _gui_ngay()
+- `services/telegram_jobs.py` — thêm 13 job runner mới (bao_cao_sang, khoang_den_han, phan_ky_nxh, khtd_tien_do, qh_moi, nop_moi_gsheet, lich_cong_tac, giai_ngan_tuan, khoanh_tang, nqh_tuan, khtd_ct, tong_ket_thang, health_check); thêm `JOB_LABELS` dict; tổng cộng 16 loại trong `_JOB_REGISTRY`
+- `services/telegram_jobs.py` — thêm `telegram_job_dedupe_key()` để gom `qh_moi`/`khoanh_tang` về cùng nhóm nội dung `rui_ro_tin_dung`
+- `services/telegram_schedule_service.py` — `run_due_rules()`: nếu nhiều rule cùng nhóm nội dung đến hạn trong cùng slot thì chỉ gửi rule đầu, rule sau ghi success `sent=0` để tránh bắn trùng
+- `tabs/tab_telegram_admin.py` — `_gui_ngay()`: rút gọn từ ~375 dòng còn ~35 dòng, delegate qua `run_telegram_job()` cho mọi key trong registry; chỉ giữ 3 loại event-driven xử lý tại chỗ
+- `tabs/tab_telegram_admin.py` — `_render_scheduler_rules()`: selectbox "Chọn nội dung nhắc tự động" hiện đủ 16 loại thay vì 3; dùng `JOB_LABELS` từ telegram_jobs
+- `tests/test_telegram_schedule_service.py` — thêm regression test khóa trường hợp `qh_moi` và `khoanh_tang` cùng giờ không gửi hai tin giống nhau
+
+## [2026-08-02] — Bảng chi tiết PGD: bỏ cột KH ĐP giao + Đạt KH, đổi tên cột ĐP → Tổng dư nợ ĐP
+- `tabs/tab_hhi.py` — `_bang_theo_nv()`: bỏ tham số `kh_map`, xóa logic tính `_kh_dp`/`_dat_kh`, bỏ cột `"KH ĐP giao"` và `"Đạt KH (%)"`
+- `tabs/tab_hhi.py` — đổi tên cột `"ĐP (triệu đồng)"` → `"Tổng dư nợ ĐP (triệu đồng)"`
+- `tabs/tab_hhi.py` — `_render_sub_pgd()`: bỏ tham số `kh_map`/`nhan_dot`, xóa caption KH
+- `tabs/tab_hhi.py` — `_cached_excel_sheets()`: bỏ tham số `_kh_map`
+- KPI card "Đạt KH ĐP" ở đầu tab vẫn giữ nguyên
+- `tests/test_tab_hhi.py` — cập nhật regression test theo tên cột mới và khóa việc không hiển thị lại `"KH ĐP giao (triệu đồng)"` / `"Đạt KH (%)"` trong bảng PGD.
+
+## [2026-08-02] — Bỏ 2 chức năng: Xu hướng snapshot + Đối chiếu nguồn vốn xã 02 CT khỏi tab Nguồn vốn ĐP
+- `tabs/tab_hhi.py` — xóa toggle "Hiện xu hướng & biến động snapshot" và "Hiện đối chiếu nguồn vốn xã 02 CT" trong render()
+- `tabs/tab_hhi.py` — xóa hàm dead code: `_render_trend`, `_render_heatmap_delta`, `_build_delta_pgd`, `_cached_snapshot_range`, `_cached_snapshot_pgd`, `_cached_bang_nguon_von_xa_02_ct`
+- `tabs/tab_hhi.py` — dọn import thừa `doc_snapshot_nvdp_theo_pgd`, biến `ky_list`
+- Giữ lại: `_bang_nguon_von_xa_02_ct` (vẫn dùng trong Excel export), `_load_snapshot_context` (vẫn dùng cho delta cards)
+
+## [2026-08-02] — Bỏ Pie chart + Treemap + Cách đo lường khỏi tab Nguồn vốn ĐP
+- `tabs/tab_hhi.py` dòng ~1163-1203 — xóa block 3 cột "Cơ cấu nguồn vốn" (pie), "TW vs ĐP theo PGD" (treemap), "Cách đo lường" (latex + info) + "Đơn vị nổi bật" theo yêu cầu user.
+
+## [2026-08-02] — Fix lỗi render Nguồn vốn ĐP: str >= int trong heatmap delta
+- `snapshot_service.py` dòng ~545 — `doc_snapshot_nvdp_range()`: thêm `pd.to_numeric(tong_du_no)` sau khi đọc từ SQLite.
+- `snapshot_service.py` dòng ~572 — `doc_snapshot_nvdp_theo_pgd()`: tương tự, ép numeric tránh string gây crash `'>=' not supported` trong tab_hhi heatmap.
+
+## [2026-08-02] — Review fragment Mã NĐT ĐP: chọn/bỏ chọn rerun đúng scope
+- `tabs/tab_quan_ly_ndt_dp.py` dòng ~531 — đổi nút "Chọn tất cả" trong `_fragment_editor_ma_moi()` từ `st.rerun()` mặc định full-app sang `st.rerun(scope="fragment")`.
+- `tabs/tab_quan_ly_ndt_dp.py` dòng ~537 — đổi nút "Bỏ chọn tất cả" sang `st.rerun(scope="fragment")`, giữ nút "Lưu" dùng `scope="app"` để refresh KPI/rule list sau khi ghi DB.
+- `tests/test_tab_quan_ly_ndt_dp.py` — thêm regression test static để fragment editor không còn `st.rerun()` trần.
+- `BUGMAP.md` — thêm B78 cho lỗi fragment optimization bị vô hiệu vì gọi rerun mặc định full-app.
+
+## [2026-08-02] — Review Mã NĐT ĐP: lưu đúng Tên NĐT nhập trong editor
+- `tabs/tab_quan_ly_ndt_dp.py` dòng ~145 — thêm `_ghi_chu_tu_editor_row()` để gom logic lấy ghi chú từ editor: ưu tiên "Ghi chú", fallback sang "Tên NĐT".
+- `tabs/tab_quan_ly_ndt_dp.py` dòng ~536 — để cột "Ghi chú" mặc định trống trong bảng mã mới HSTD, tránh giá trị prefill che mất "Tên NĐT" user vừa sửa.
+- `tests/test_tab_quan_ly_ndt_dp.py` — thêm regression test cho fallback "Tên NĐT" và nhánh ưu tiên ghi chú user nhập.
+- `BUGMAP.md` — thêm B77 cho lỗi editor Mã NĐT ĐP lưu ghi chú cũ/prefill thay vì tên user vừa sửa.
+
+## [2026-08-02] — Review Mã NĐT ĐP: chọn tất cả không ghi đè tick thủ công
+- `tabs/tab_quan_ly_ndt_dp.py` dòng ~92 — thêm selection map theo cặp `Mã CT|Mã NĐT`, helper xóa state editor và chữ ký rule để bust cache quét HSTD khi danh mục rule đổi.
+- `tabs/tab_quan_ly_ndt_dp.py` dòng ~453 — nút "Chọn tất cả/Bỏ chọn tất cả" cập nhật selection map theo các dòng đang lọc; data_editor đồng bộ lại lựa chọn thủ công sau mỗi rerun.
+- `tests/test_tab_quan_ly_ndt_dp.py` — thêm regression test cho selection map, xóa key phụ editor, rule signature và `_dem_ma_moi_nhanh()`.
+- `BUGMAP.md` — thêm B76 cho lỗi cache scanner Mã NĐT ĐP có thể stale theo danh mục rule.
+
+## [2026-08-02] — Fix định dạng số bảng "Chi tiết theo Chương trình" (Tiến độ KH vs TH)
+- `tabs/tab_khtd_xuat.py` dòng ~678 — `_tab_tien_do_kh_th()`: dựng `df_show` định dạng số kiểu VN (`_fmt_vn`: dấu "." nghìn, dấu "," thập phân, TL% kèm "%") khớp với các thẻ KPI phía trên; bỏ `NumberColumn(format=",.0f")` / `ProgressColumn(max_value=100)` hiển thị kiểu Anh và kẹt thanh tiến trình khi TL% > 100%. `df_ct` giữ số liệu gốc cho export Excel/PDF.
+- `tabs/tab_khtd_xuat.py` dòng ~694 — `_to_mau_ct()`: phát hiện dòng tiêu đề ("I.", "II.", "TỔNG CỘNG") theo "Chỉ tiêu" thay vì cột `_nhom` (đã bị loại trước khi style → dead-code, không tô đậm tiêu đề).
+
+## [2026-08-02] — Mã NĐT ĐP: thêm Chọn tất cả + tối ưu performance editor
+- `tabs/tab_quan_ly_ndt_dp.py` dòng ~453 — thêm 2 nút "☑️ Chọn tất cả" / "☐ Bỏ chọn tất cả" trong `_render_ma_moi_tu_hstd()`, dùng session_state điều khiển cột "Chọn" mặc định.
+- `tabs/tab_quan_ly_ndt_dp.py` dòng ~844 — thêm `_dem_ma_moi_nhanh()`: đếm mã mới không render UI, thay thế `_render_tinh_trang_ma_moi()` ở đầu `render()` giúp giảm rerun nặng khi tick checkbox trong data_editor.
+- `tabs/tab_quan_ly_ndt_dp.py` dòng ~889 — chỉ render `_render_tinh_trang_ma_moi()` khi ở chế độ "Tổng quan", không render lại mỗi rerun ở chế độ editor.
+- `tabs/tab_quan_ly_ndt_dp.py` dòng ~577 — mở khóa cột "Tên NĐT" (bỏ disabled), thêm TextColumn config để user nhập tên khi HSTD thiếu cột "Tên nhà đầu tư".
+- `tabs/tab_quan_ly_ndt_dp.py` dòng ~616 — khi lưu, fallback `ghi_chu` sang "Tên NĐT" nếu user bỏ trống Ghi chú.
+- `tabs/tab_quan_ly_ndt_dp.py` dòng ~497 — bọc phần editor tương tác vào `@st.fragment` (`_fragment_editor_ma_moi`): button "Chọn tất cả"/"Bỏ chọn" chỉ rerun fragment (nhanh), không rerun toàn trang; nút "Lưu" dùng `st.rerun(scope="app")` để refresh toàn bộ.
+
+## [2026-08-02] — Review KHTD theo Xã: khóa bảng tóm tắt dạng phẳng
+- `tabs/tab_khtd_nhap.py` dòng ~1000 — `_hien_thi_bang_tom_tat_xa()`: đổi biến nhóm không dùng thành `_`, giữ vòng lặp phẳng theo thứ tự `KHTD_CN_NHOM_MA_CT`.
+- `tests/test_khtd_quets.py` dòng ~88 — thêm regression test bảo vệ bảng phẳng: không render hàng nhóm, STT chạy liên tục, thứ tự chương trình giữ nguyên và Tổng cộng không cộng dòng chỉ phát sinh chưa có KH/TH.
+
+## [2026-08-02] — Tối ưu tải tab Nguồn vốn địa phương
+- `tabs/tab_hhi.py` dòng ~78 — thêm `_nguon_von_label_series()` có fast-path dtype số, giảm thời gian gán nhãn cột `Nguồn vốn` trên HSTD lớn.
+- `tabs/tab_hhi.py` dòng ~449 — cache các bảng phụ `Nguồn xã 02 CT`, `Mã NĐT chờ phân loại` và kiểm tra INV thiếu nguồn vốn theo `ts_hstd/rules/filter`.
+- `tabs/tab_hhi.py` dòng ~1180 — defer trend/heatmap snapshot và 2 bảng kiểm tra sâu bằng toggle, tránh dựng eager khi mở tab lần đầu.
+- `tests/test_tab_hhi.py` dòng ~125 — thêm regression test giữ logic phân loại nguồn vốn cũ khi chuyển sang vectorized.
+- `BUGMAP.md` — thêm B74 cho lỗi tab Nguồn vốn ĐP tải chậm vì render eager bảng phụ.
+
+## [2026-08-02] — Review Cân đối: nhãn nợ quá hạn rõ hơn và guard NaN
+- `tabs/tab_candoi.py` dòng ~721 — Excel export Theo chương trình đổi cột chênh lệch sang "Chênh lệch nợ quá hạn" và sắp cụm nợ quá hạn theo thứ tự kỳ trước → hiện tại → chênh lệch.
+- `tabs/tab_candoi.py` dòng ~750 — `_chuong_trinh_table_html()`: guard `NaN` khi tính chênh lệch nợ quá hạn, không render chuỗi `nan`; bỏ viết tắt `NQH` khỏi header/note.
+- `tests/test_tab_candoi.py` dòng ~495 — thêm regression test cho nhãn, thứ tự cột và dữ liệu `NaN`.
+
+## [2026-08-02] — KHTD theo Xã: bảng Tóm tắt hiện trạng dạng phẳng, bỏ chia nhóm
+- `tabs/tab_khtd_nhap.py` dòng ~927 — `_hien_thi_bang_tom_tat_xa()`: bỏ hàng tiêu đề nhóm (KHTD_CN_NHOM_MA_CT), liệt kê phẳng toàn bộ chương trình theo thứ tự cũ + giữ dòng Tổng cộng; bỏ hằng màu `NHOM_BG` không còn dùng.
+
+## [2026-08-02] — Cân đối: ghi nhãn rõ hơn cho bảng so sánh chương trình + thêm cột chênh lệch nợ quá hạn
+- `tabs/tab_candoi.py` dòng ~758 — `_chuong_trinh_table_html()`: đổi header "DN"→"Dư nợ", "NQH"→"Nợ quá hạn", "Chênh lệch"→"Chênh lệch dư nợ"; thêm cột "Chênh lệch nợ quá hạn" (tô màu xanh/đỏ).
+- `tabs/tab_candoi.py` dòng ~721 — Excel export `rows_ex2`: đổi tên cột tương tự + thêm "Chênh lệch nợ quá hạn (triệu đồng)".
+
+## [2026-08-03] — Nhóm C: Heatmap + Delta PGD trong tab Nguồn vốn địa phương
+- `snapshot_service.py` dòng ~551 — thêm `doc_snapshot_nvdp_theo_pgd(ky)`: trả TW/ĐP breakdown theo từng PGD từ bảng hstd_snapshot (cache ttl=300s).
+- `tabs/tab_hhi.py` dòng ~704 — thêm `_build_delta_pgd()`: gộp snapshot 2 kỳ → bảng delta dư nợ ĐP, tỷ trọng, Δ% theo PGD.
+- `tabs/tab_hhi.py` dòng ~733 — thêm `_render_heatmap_delta()`: chọn 2 kỳ → diverging bar chart Δ% ĐP + bảng so sánh chi tiết (chỉ CN view, ≥ 2 kỳ snapshot).
+- `tabs/tab_hhi.py` dòng ~698 — thêm `_cached_snapshot_pgd()`: cache wrapper cho heatmap.
+- `tabs/tab_hhi.py` render() dòng ~1163 — gọi `_render_heatmap_delta()` sau trend chart.
+- `tabs/tab_hhi.py` import — thêm `doc_snapshot_nvdp_theo_pgd`.
+
+## [2026-08-02] — Review Nhóm A KH ĐP vs Thực tế tab Nguồn vốn địa phương
+- `tabs/tab_hhi.py` dòng ~124 — thêm fingerprint `kh_map` vào key session/cache Excel, tránh file Excel giữ cột KH ĐP cũ khi sửa số trong cùng đợt KHTD.
+- `tabs/tab_hhi.py` dòng ~705 — thay regex quét đợt KHTD bằng parser theo slug, chấp nhận đợt có `_` như `Dot_1` nhưng vẫn bỏ key timestamp `*_YYYYMMDDTHHMMSS`; không gọi private `_dot_sort_key` từ `khtd_service`.
+- `tests/test_tab_hhi.py` dòng ~29 — thêm regression tests cho cache key KH và parser key KHTD.
+- `BUGMAP.md` — thêm B72 cho lỗi Excel KH ĐP stale / parser đợt KHTD hẹp.
+
+## [2026-08-02] — Nhóm A: KH ĐP vs Thực tế trong tab Nguồn vốn địa phương
+- `tabs/tab_hhi.py` dòng ~685 — thêm `_kh_dp_cua_pgd()`: tra KH ĐP theo tên PGD (xử lý slug Hội sở `hoi_so`).
+- `tabs/tab_hhi.py` dòng ~695 — thêm `_doc_kh_dp_theo_pgd()`: quét khóa `khtd_{slug}_{năm}_{tháng}_{đợt}`, chọn đợt mới nhất, tổng hợp `kh_moi_dp` theo PGD qua `khtd_service.tong_hop()`; cache ttl=300s.
+- `tabs/tab_hhi.py` dòng ~181 — `_bang_theo_nv()`: thêm tham số `kh_map`, bổ sung cột "KH ĐP giao (triệu đồng)" và "Đạt KH (%)" cho bảng Theo PGD (kể cả dòng Tổng cộng).
+- `tabs/tab_hhi.py` dòng ~575 — `_render_sub_pgd()`: nhận `kh_map`/`nhan_dot`, thêm caption nguồn KH.
+- `tabs/tab_hhi.py` render() — thêm KPI "Đạt KH ĐP — đợt Dot1, 01/2026" (chỉ hiện khi có dữ liệu KH); truyền `kh_map` vào Excel export.
+- `tabs/tab_hhi.py` — import `re`, `pgd_slug`.
+
+## [2026-08-02] — Review mặc định Cấp Xã/Khác bảng quét Mã NĐT mới
+- `tabs/tab_quan_ly_ndt_dp.py` dòng ~32 — thêm hằng `_CAP_TINH` / `_CAP_XA`, bỏ phụ thuộc vào index `_CAP_OPTS[1]` khi pre-fill bảng quét mã mới.
+- `tabs/tab_quan_ly_ndt_dp.py` dòng ~434 — thêm caption báo trước bảng quét đang chọn sẵn `Cấp Xã/Khác 🏘️` để Admin rà và đổi từng dòng nếu cần.
+
+## [2026-08-02] — Mặc định Cấp Xã/Khác cho bảng quét Mã NĐT mới
+- `tabs/tab_quan_ly_ndt_dp.py` dòng ~449 — `_render_ma_moi_tu_hstd()`: cột "Phân loại cấp" của mã mới quét từ HSTD chọn sẵn `Cấp Xã/Khác 🏘️` thay vì `Cấp Tỉnh 🏛️`, khớp logic báo cáo tab_hhi (chưa có rule → ĐP cấp xã/khác) và thực tế đa số mã GQVL 2026 là ngân sách xã ủy thác.
+
+## [2026-08-02] — Tối ưu hiệu năng tab Nguồn vốn địa phương (4.3s → 0.3s)
+- `tabs/tab_hhi.py` dòng ~118 — vectorize `_phan_nguon_von()`: bỏ vòng lặp per-row gọi `_cap_label_tu_ma_ndt`/`_ma_ct_int` (tạo `pd.Series` mỗi ô) trên ~48k dòng ĐP, chuyển sang map dict khóa `ma_ct|ma_ndt`. Kết quả phân loại giữ nguyên (đo trên 366.503 dòng: 289010/47342/28913/1238).
+- `tabs/tab_hhi.py` dòng ~288 — `_bang_nguon_von_xa_02_ct()`: thay `.map(_ma_ct_int)` bằng `pd.to_numeric(..., errors="coerce")`.
+- `tabs/tab_hhi.py` — xóa `_ma_ct_int()`, `_cap_label_tu_ma_ndt()` không còn call site.
+- `tabs/tab_hhi.py` dòng ~55 — thêm helper vectorized `_ma_ct_series_int()` / `_text_sach_series()` để giữ logic cắt mã CT kiểu cũ và xử lý `pd.NA` an toàn.
+- `tests/test_tab_hhi.py` dòng ~93 — thêm regression test mã CT dạng `"3.0"`/`"3.5"` không crash và vẫn match rule.
+
+## [2026-08-02] — Review panel Mã NĐT chờ phân loại tab Nguồn vốn ĐP
+- `tabs/tab_hhi.py` dòng ~340 — căn dư nợ bằng `reindex(sub.index)` thay vì `.values`, guard thiếu `_nv_label`, sanitize `Chương trình chính` để tránh `NaN`.
+- `tabs/tab_hhi.py` dòng ~381 — đếm Nguồn vốn trống bằng `_text_sach().eq("")`, bao phủ cả `NaN`, chuỗi rỗng và `"nan"`.
+- `tests/test_tab_hhi.py` dòng ~92 — thêm regression test cho bảng Mã NĐT chờ phân loại và đếm mã INV thiếu nguồn vốn.
+
+## [2026-08-02] — Tab Nguồn vốn ĐP: panel Mã NĐT chờ phân loại (Nhóm B)
+- `tabs/tab_hhi.py` dòng ~340 — thêm `_bang_ma_ndt_cho_phan_loai()`: liệt kê Mã NĐT nguồn ĐP chưa có rule phân cấp kèm dư nợ, số PGD/xã, chương trình chính.
+- `tabs/tab_hhi.py` dòng ~381 — thêm `_dem_nguon_von_nan_co_ma_ndt()`: đếm dòng trống cột Nguồn vốn nhưng mang mã INV (nghi vốn ĐP thiếu nhãn).
+- `tabs/tab_hhi.py` dòng ~862 — thêm expander "Mã NĐT chờ phân loại & kiểm tra chất lượng dữ liệu" sau bảng đối chiếu nguồn vốn xã.
+
+## [2026-08-02] — Guard chống crash selectbox Xã tab KHTD
+- `tabs/tab_khtd_nhap.py` dòng ~1088 — thêm `_reset_khtd_xa_selection_if_stale()` để pop `khtd_xa_xa_sel` khỏi session_state nếu xã đã persist không thuộc PGD hiện tại.
+- `tests/test_khtd_quets.py` dòng ~58 — thêm regression test cho nhánh pop xã stale và giữ xã hợp lệ.
+
+## [2026-08-02] — Fix hiệu năng tab Nguồn vốn địa phương
+- `tabs/tab_hhi.py` dòng ~198 và ~303 — bỏ `unstack(fill_value=0.0)`, chuyển sang `unstack().fillna(0.0)` để hết `Pandas4Warning`
+- `tabs/tab_hhi.py` dòng ~836 — Excel export chuyển on-demand (bấm nút mới tính), bỏ eager compute 3-4 bảng pivot mỗi render
+- `tabs/tab_hhi.py` dòng ~104 — hash `rules_key` trong session key Excel và dọn buffer Excel cũ khi tạo báo cáo mới
+- `workspaces/ws_management.py` dòng ~147 — vectorize `_tinh_tong_quan_nguon_von_dp`, bỏ vòng lặp `to_dict("records")` qua mọi dòng
+- `tests/test_tab_hhi.py` dòng ~15 — thêm regression test cho session key Excel ngắn, cleanup buffer cũ và không phát sinh `Pandas4Warning`
+
+## [2026-08-02] — Ẩn tab Giao & ĐC KHTD khỏi menu
+- `workspaces/ws_management.py` dòng ~341 — gỡ menu `📋 Giao & ĐC KHTD` khỏi nhóm Kế hoạch Tín dụng cấp Chi nhánh.
+- `workspaces/ws_operation.py` dòng ~568 — gỡ menu/tab `📋 Giao & ĐC KHTD` khỏi nhóm Kế hoạch PGD.
+- `workspaces/ws_executive.py` dòng ~1340 — gỡ mục `Giao & Điều chỉnh KHTD` khỏi workspace Lãnh đạo.
+
+## [2026-08-02] — Dọn giao diện tab KHTD: bỏ CSS leak, màu dark-mode, gọn bố cục
+- `tabs/tab_khtd_nhap.py` dòng ~619 — banner CN: màu rgba theme-independent, bỏ color hardcode
+- `tabs/tab_khtd_nhap.py` dòng ~643 — bảng tóm tắt CN vào expander, editor làm trung tâm
+- `tabs/tab_khtd_nhap.py` dòng ~1278 — header table Xã: màu rgba, gọn spacing
+- `tabs/tab_khtd_nhap.py` dòng ~1336 — XÓA CSS global leak ([data-testid=column]...) ảnh hưởng toàn app
+- `tabs/tab_khtd_nhap.py` dòng ~1357 — màu nền nhóm form: pastel → rgba
+
+## [2026-08-02] — Persist UI selections tab KHTD qua browser refresh
+- `tabs/tab_khtd.py` dòng ~632 — thêm `_khoi_phuc_ui_prefs()` / `_luu_ui_prefs()`, lưu UI prefs theo từng username qua kv key nền `khtd_ui_prefs`
+- `tabs/tab_khtd.py` dòng ~637 — sanitize tab index, nguồn vốn, PGD/Xã trước khi restore để tránh state cũ không còn trong options
+- `tests/test_khtd_quets.py` dòng ~28 — thêm regression test cho key UI prefs theo user và sanitize PGD/Xã stale
+
+## [2026-08-02] — Fix hiệu năng tab KHTD: st.tabs → st.radio (lazy render)
+- `tabs/tab_khtd.py` dòng ~643 — quay lại st.radio thay st.tabs, chỉ render tab đang chọn
+- `tabs/tab_khtd_xuat.py` dòng ~1295 — render_xuat_baocao: st.tabs → st.radio, tránh render 4 sub-tab cùng lúc
+
+## [2026-08-02] — Cải tiến giao diện tab Kế hoạch Tín dụng
+- `tabs/tab_khtd.py` dòng ~641 — thay st.radio bằng st.tabs, gọn header
+- `tabs/tab_khtd_nhap.py` dòng ~587 — bỏ subheader thừa, filter + banner cùng hàng, gọn caption
+- `tabs/tab_khtd_nhap.py` dòng ~1088 — PGD + Xã selectbox cạnh nhau, gom export/upload vào expander
+
+## [2026-08-02] — Thêm cảnh báo chọn model trước task rủi ro
+- `AGENTS.md` dòng ~43 — thêm mẫu cảnh báo cấu hình Model/Effort/Speed trước khi sửa file.
+- `AGENTS.md` dòng ~52 — bắt buộc cảnh báo và chờ xác nhận khi task chạm auth/db/migration/phân quyền/dữ liệu.
+
+## [2026-08-02] — Chuẩn hóa policy Effort/Speed theo UI Codex
+- `AGENTS.md` dòng ~31 — đổi bảng policy từ chỉ `Speed` sang đủ 3 trục `Model` / `Effort` / `Speed` theo giao diện Codex.
+- `AGENTS.md` dòng ~41 — yêu cầu Codex báo model/effort/speed đề xuất khi surface hiện tại không hỗ trợ đổi cấu hình.
+
+## [2026-08-02] — Bổ sung chính sách chọn speed model
+- `AGENTS.md` dòng ~31 — thêm bảng chọn speed Fast/Balanced/Deep theo loại việc và mức rủi ro.
+- `AGENTS.md` dòng ~41 — yêu cầu Codex báo model/speed đề xuất nếu surface hiện tại không hỗ trợ đổi cấu hình.
+
+## [2026-08-02] — Ghi chính sách tự chọn model cho Codex
+- `AGENTS.md` dòng ~4 — cập nhật ngày tài liệu sau khi bổ sung chính sách model.
+- `AGENTS.md` dòng ~22 — thêm mục "Chính sách model bắt buộc" để Codex tài khoản khác tự chọn `gpt-5.4` / `gpt-5.5` / `gpt-5.6-sol` theo rủi ro task.
+- `AGENTS.md` dòng ~164 — cập nhật rule 5.11 để khớp với chính sách model mới.
+
+## [2026-08-02] — Fix KPI sub-tab Theo chương trình Cân đối
+- `tabs/tab_candoi.py` dòng ~1987 — sửa 2 KPI KHA/KHB trong sub-tab "Theo chương trình" để truyền đúng contract `_render_kpi_grid()` dạng dict, quy đổi giá trị qua `_to_ty()` và chỉ hiển thị delta khi có mốc so sánh.
+- `tests/test_tab_candoi.py` dòng ~495 — thêm regression test khóa contract KPI Theo chương trình và trạng thái thiếu mốc so sánh.
+- `BUGMAP.md` — thêm B67 cho lỗi KPI Theo chương trình truyền HTML string vào `_render_kpi_grid()` và hiển thị sai đơn vị.
+
 ## [2026-08-01] — Redesign sub-tab Theo chương trình + nút In/PDF theo từng tab
 - `tabs/tab_candoi.py` — sub-tab "Theo chương trình": thêm 2 thẻ KPI (dư nợ KHA/KHB), caption số chương trình tăng/giảm, bảng HTML với dải nhóm KHA/KHB (`.cdp`), tô màu chênh lệch/tỷ lệ, cột NQH nền nhạt; giữ nguyên giá trị các hàng.
 - `tabs/tab_candoi.py` — thêm `_render_tab_export()` (cặp nút 📄 PDF + 🖨️ In) cho 3 sub-tab Tổng quan / Theo chương trình / Biểu đồ; `_build_print_html()` nhận danh sách bảng + tiêu đề tùy chọn.

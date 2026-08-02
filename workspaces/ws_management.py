@@ -147,11 +147,10 @@ def _tinh_tong_quan_nguon_von_dp(df_full: pd.DataFrame | None, ds_rule: list[dic
     df_dp = df_work.loc[mask_dp, [COT_MA_CHUONG_TRINH, COT_MA_NHA_DAU_TU]].copy()
     df_dp["_ma_ct"] = df_dp[COT_MA_CHUONG_TRINH].map(_ma_ct_int)
     df_dp["_ma_ndt"] = df_dp[COT_MA_NHA_DAU_TU].map(_text_sach)
-    ma_phat_sinh = {
-        (int(row["_ma_ct"]), row["_ma_ndt"])
-        for row in df_dp.to_dict("records")
-        if row.get("_ma_ct") in {3, 6} and row.get("_ma_ndt")
-    }
+    # Vectorized — tránh to_dict("records") lặp Python qua mọi dòng (chậm)
+    mask_ma = df_dp["_ma_ct"].isin([3, 6]) & df_dp["_ma_ndt"].ne("")
+    df_ma = df_dp.loc[mask_ma, ["_ma_ct", "_ma_ndt"]]
+    ma_phat_sinh = set(zip(df_ma["_ma_ct"].astype(int), df_ma["_ma_ndt"]))
     result["so_ma_moi"] = len(ma_phat_sinh - existing_rules)
     return result
 
@@ -339,7 +338,6 @@ def _build_all_items(role: str, username: str, **kwargs) -> list:
 
         # ── Kế hoạch Tín dụng ──────────────────────────────────────────────────
         {"group": "Kế hoạch Tín dụng", "label": "📈 Kế hoạch tín dụng",       "icon": "file-text",   "fn": lambda: _get_tab("tab_khtd").render(None, **dict(kwargs, khtd_mode="cn"))},
-        {"group": "Kế hoạch Tín dụng", "label": "📋 Giao & ĐC KHTD",          "icon": "upload",       "fn": lambda: _get_tab("tab_khtd_giao_dc").render(None, **kwargs)},
         {"group": "Kế hoạch Tín dụng", "label": "📡 Điện báo Cân đối",     "icon": "antenna",      "fn": lambda: _get_tab("tab_candoi").render(None, **kwargs)},
         {"group": "Kế hoạch Tín dụng", "label": "📤 Xuất báo cáo KHTD",       "icon": "file-export",  "fn": lambda: _get_tab("tab_khtd_xuat").render_xuat_baocao(role=kwargs.get("role", ""), username=kwargs.get("username", ""), df_full=kwargs.get("df"))},
         nguon_von_item,

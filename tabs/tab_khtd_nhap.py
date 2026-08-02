@@ -586,8 +586,6 @@ def _tab_khtd_chi_nhanh(
     role: str, username: str, df_full: "pd.DataFrame | None",
     df_gqvl: "pd.DataFrame | None" = None
 ) -> None:
-    st.subheader("🏛️ Kế hoạch Tín dụng Chi nhánh")
-
     co_quyen = get_permissions(role)["can_edit_khtd"]
     kh_cn = _dong_bo_nsvsmt_dp_keys(_doc_kv(KV_KEY_CN))
     hstd_mtime = ts_file(CACHE_HSTD)
@@ -595,7 +593,7 @@ def _tab_khtd_chi_nhanh(
     th_cn, th_gqvl = _tinh_th_cn_cached(df_full, df_gqvl, hstd_mtime, gqvl_mtime)
 
     if not co_quyen:
-        st.warning("⚠️ Chỉ Admin / Manager mới được nhập kế hoạch cấp Chi nhánh.")
+        st.info("🔒 Chế độ xem — chỉ Admin / Manager mới được nhập kế hoạch.")
         df_loc = df_full
         from tabs.tab_khtd_xuat import _hien_thi_bang_cn_readonly  # lazy – tránh circular import
         _hien_thi_bang_cn_readonly(
@@ -609,21 +607,7 @@ def _tab_khtd_chi_nhanh(
         _section_van_ban_qd_cn(role, username)
         return
 
-    nv_chon = st.radio(
-        "Hiển thị nguồn vốn (bảng tóm tắt)",
-        ["Tất cả", "Trung ương", "Địa phương"],
-        horizontal=True,
-        key="khtd_cn_nv_radio",
-    )
-    df_loc = df_full
-    ds_ct, ten_map_q = _du_lieu_hien_thi_khtd_cn_cached(
-        df_loc,
-        nv_chon,
-        tuple(sorted(set(kh_cn.keys()) | set(th_cn.keys()))),
-        hstd_mtime,
-    )
-
-    # ── Banner trạng thái KH ──
+    # ── Banner trạng thái ────────────────────────────────────────────────────
     tong_ct = len(MA_KEYS_CO_KHTD)
     so_ct_co_kh = sum(
         1 for mk in MA_KEYS_CO_KHTD if float(kh_cn.get(mk, 0.0)) > 0
@@ -634,52 +618,63 @@ def _tab_khtd_chi_nhanh(
     tong_kh_ty = tong_kh_trieu / 1000.0
 
     if so_ct_co_kh == 0:
-        mau = "#fff3cd"
-        vien = "#ffc107"
-        icon = "🔴"
+        mau, vien, icon = "rgba(245,158,11,0.12)", "#f59e0b", "🔴"
         noi_dung = f"Chưa có kế hoạch — 0/{tong_ct} chương trình"
     elif so_ct_co_kh < tong_ct:
-        mau = "#fff8e1"
-        vien = "#ff9800"
-        icon = "🟡"
+        mau, vien, icon = "rgba(249,115,22,0.12)", "#f97316", "🟡"
         noi_dung = (
             f"Đã nhập {so_ct_co_kh}/{tong_ct} chương trình · "
             f"Tổng KH: {_fvn(tong_kh_trieu, 0)} triệu đồng"
         )
     else:
-        mau = "#e8f5e9"
-        vien = "#4caf50"
-        icon = "🟢"
+        mau, vien, icon = "rgba(34,197,94,0.12)", "#22c55e", "🟢"
         noi_dung = (
             f"Đã nhập đủ {tong_ct}/{tong_ct} chương trình · "
             f"Tổng KH: {_fvn(tong_kh_ty, 3)} tỷ đồng"
         )
 
     st.markdown(
-        f"<div style='padding:8px 14px;background:{mau};border-left:4px solid {vien};"
-        f"border-radius:6px;font-size:0.9rem;font-weight:500;margin-bottom:8px;color:#1f2937'>"
+        f"<div style='padding:10px 16px;background:{mau};border-left:4px solid {vien};"
+        f"border-radius:6px;font-size:0.9rem;font-weight:500;margin-bottom:4px'>"
         f"{icon} {noi_dung}</div>",
         unsafe_allow_html=True,
     )
 
-    # ── Tóm tắt hiện trạng (luôn hiển thị) ───────────────────────────────
-    st.markdown("##### 📊 Tóm tắt hiện trạng")
-    from tabs.tab_khtd_xuat import _hien_thi_bang_cn_readonly  # lazy – tránh circular import
-    _hien_thi_bang_cn_readonly(
-        kh_cn,
-        th_cn,
-        ds_ct_loc=[mk for mk, _ in ds_ct],
-        df_loc=df_loc,
-        th_gqvl=th_gqvl,
-        username=username,
+    # ── Tóm tắt hiện trạng (expander — tránh trùng lặp với editor) ──────────
+    df_loc = df_full
+    with st.expander("📊 Tóm tắt hiện trạng (KH vs TH toàn chi nhánh)", expanded=False):
+        nv_chon = st.radio(
+            "Nguồn vốn",
+            ["Tất cả", "Trung ương", "Địa phương"],
+            horizontal=True,
+            key="khtd_cn_nv_radio",
+        )
+        ds_ct, ten_map_q = _du_lieu_hien_thi_khtd_cn_cached(
+            df_loc,
+            nv_chon,
+            tuple(sorted(set(kh_cn.keys()) | set(th_cn.keys()))),
+            hstd_mtime,
+        )
+        from tabs.tab_khtd_xuat import _hien_thi_bang_cn_readonly  # lazy – tránh circular import
+        _hien_thi_bang_cn_readonly(
+            kh_cn,
+            th_cn,
+            ds_ct_loc=[mk for mk, _ in ds_ct],
+            df_loc=df_loc,
+            th_gqvl=th_gqvl,
+            username=username,
+        )
+
+    # ten_map cho editor (không phụ thuộc filter)
+    _, ten_map_q = _du_lieu_hien_thi_khtd_cn_cached(
+        df_loc, "Tất cả",
+        tuple(sorted(set(kh_cn.keys()) | set(th_cn.keys()))),
+        hstd_mtime,
     )
 
-    st.caption(
-        "📌 Đơn vị nhập và hiển thị: triệu đồng — số nguyên. "
-        "HSTD là nguồn chính để tính thực hiện; riêng GQVL được tách 4 dòng theo nguồn TW/ĐP. "
-        "Bảng bên dưới là lưới nhập liệu trực tiếp; số kế hoạch hiển thị có phân cách hàng nghìn để dễ nhìn, "
-        "số thực hiện và còn phải thực hiện sẽ tự tính lại ngay khi chỉnh sửa."
-    )
+    # ── Nhập kế hoạch (trung tâm) ────────────────────────────────────────────
+    st.markdown("##### ✏️ Nhập kế hoạch")
+    st.caption("Đơn vị: triệu đồng (số nguyên) · TH tự tính từ HSTD · GQVL tách 4 dòng TW/ĐP")
     draft_cn = st.session_state.get("khtd_cn_editor_draft", {})
     df_editor_meta = _tao_bang_nhap_khtd_cn(kh_cn, th_cn, th_gqvl, ten_map_q, draft_cn)
     df_editor_view = _tao_view_editor_khtd_cn(df_editor_meta)
@@ -942,7 +937,6 @@ def _hien_thi_bang_tom_tat_xa(
 
     BD = "#d1d5db"
     H_BG = "#003D7A"
-    NHOM_BG = "#e8f0f8"
     TONG_BG = "#E8F4FD"
     RED = "#DC2626"
     AMBER = "#D97706"
@@ -1003,8 +997,7 @@ def _hien_thi_bang_tom_tat_xa(
         + "</tr>"
     )
 
-    for tieu_de_nhom, ds_ma_ct in KHTD_CN_NHOM_MA_CT:
-        group_rows: list[str] = []
+    for _, ds_ma_ct in KHTD_CN_NHOM_MA_CT:
         for ma_ct in ds_ma_ct:
             mk_tw = f"{ma_ct}_TW"
             mk_dp = f"{ma_ct}_DP"
@@ -1048,19 +1041,7 @@ def _hien_thi_bang_tom_tat_xa(
                 + _td(con_str, "right")
                 + _td(tl_str, "right", tl_c)
             )
-            group_rows.append(f"<tr>{tds}</tr>")
-
-        if group_rows:
-            tds = (
-                _td("", "center", "", NHOM_BG, "bold")
-                + _td(tieu_de_nhom, "left", "#1f2937", NHOM_BG, "bold")
-                + _td("", "right", "", NHOM_BG)
-                + _td("", "right", "", NHOM_BG)
-                + _td("", "right", "", NHOM_BG)
-                + _td("", "right", "", NHOM_BG)
-            )
             html_rows.append(f"<tr>{tds}</tr>")
-            html_rows.extend(group_rows)
 
     if stt_no == 0:
         st.info("Xã này chưa có dư nợ, giải ngân, thu nợ trong năm hoặc kế hoạch đã nhập.")
@@ -1087,162 +1068,167 @@ def _hien_thi_bang_tom_tat_xa(
     st.caption("📌 Đơn vị: triệu đồng. Mặc định chỉ hiện chương trình có KH hoặc có dư nợ/giải ngân/thu nợ trong năm của xã đang chọn.")
 
 
-def _tab_khtd_theo_xa(role: str, username: str, df_full: "pd.DataFrame | None") -> None:
-    st.subheader("📍 Kế hoạch Tín dụng theo Xã")
+def _reset_khtd_xa_selection_if_stale(danh_sach_xa: list[str]) -> None:
+    """Xóa xã đã lưu nếu không còn thuộc danh sách xã hiện tại."""
+    xa_luu = st.session_state.get("khtd_xa_xa_sel")
+    if xa_luu is not None and xa_luu not in danh_sach_xa:
+        st.session_state.pop("khtd_xa_xa_sel", None)
 
+
+def _tab_khtd_theo_xa(role: str, username: str, df_full: "pd.DataFrame | None") -> None:
     co_quyen = get_permissions(role)["can_edit_khtd"]
     if not co_quyen:
-        st.warning("⚠️ Chỉ Admin / Manager mới được nhập kế hoạch theo Xã.")
+        st.info("🔒 Chỉ Admin / Manager mới được nhập kế hoạch theo Xã.")
         return
 
     kh_xa = _doc_kv(KV_KEY_XA)
 
-    # ── Chọn PGD ─────────────────────────────────────────────────────────
-    pgd_chon = st.selectbox("Chọn PGD", DS_PGD, key="khtd_xa_pgd_sel")
+    # ── Chọn PGD + Xã ──────────────────────────────────────────────────────
+    col_pgd, col_xa = st.columns(2)
+    with col_pgd:
+        pgd_chon = st.selectbox("🏢 PGD", DS_PGD, key="khtd_xa_pgd_sel")
     danh_sach_xa = PGD_XA_MAP.get(pgd_chon, [])
     if not danh_sach_xa:
         st.warning(f"Chưa có danh sách xã cho **{pgd_chon}**.")
         return
 
-    # Nút xuất Excel tất cả xã
-    if st.button("📥 Xuất Excel tất cả xã", key="xuat_excel_tat_ca_xa"):
-        kh_xa = _doc_kv(KV_KEY_XA) or {}
-        ds_xa = PGD_XA_MAP.get(pgd_chon, [])
-        sheets = {}
+    _reset_khtd_xa_selection_if_stale(danh_sach_xa)
 
-        # Sheet tổng hợp PGD
-        rows_th = []
-        for ten_xa in ds_xa:
-            kh_tw = sum(
-                kh_xa.get(f"{ten_xa}|{mk}", 0)
-                for mk in MA_KEYS_CO_KHTD if mk.endswith("_TW")
-            ) / 1e6
-            kh_dp = sum(
-                kh_xa.get(f"{ten_xa}|{mk}", 0)
-                for mk in MA_KEYS_CO_KHTD if mk.endswith("_DP")
-            ) / 1e6
-            tong_kh = kh_tw + kh_dp
-            rows_th.append({
-                "Xã/Phường": ten_xa,
-                "KH TW (triệu)": round(kh_tw, 1),
-                "KH ĐP (triệu)": round(kh_dp, 1),
-                "Tổng KH (triệu)": round(tong_kh, 1),
-            })
-        if rows_th:
-            df_th = pd.DataFrame(rows_th)
-            tong_row = {
-                "Xã/Phường": "Tổng cộng",
-                "KH TW (triệu)": round(df_th["KH TW (triệu)"].sum(), 1),
-                "KH ĐP (triệu)": round(df_th["KH ĐP (triệu)"].sum(), 1),
-                "Tổng KH (triệu)": round(df_th["Tổng KH (triệu)"].sum(), 1),
-            }
-            df_th = pd.concat([df_th, pd.DataFrame([tong_row])], ignore_index=True)
-            sheets["Tổng hợp PGD"] = df_th
+    with col_xa:
+        xa_chon = st.selectbox("📍 Xã/Phường", danh_sach_xa, key="khtd_xa_xa_sel")
 
-        # Sheet từng xã
-        for ten_xa in ds_xa:
-            rows_xa = []
-            stt = 1
-            for _, ds_ma_ct in KHTD_CN_NHOM_MA_CT:
-                for ma_ct in ds_ma_ct:
-                    for mk, nv_label in [
-                        (f"{ma_ct}_TW", "TW"),
-                        (f"{ma_ct}_DP", "ĐP"),
-                    ]:
-                        if mk not in MA_KEYS_CO_KHTD:
-                            continue
-                        kh = kh_xa.get(f"{ten_xa}|{mk}", 0) / 1e6
-                        if kh <= 0:
-                            continue
-                        rows_xa.append({
-                            "STT": stt,
-                            "Chương trình": _ten_ct_base(ma_ct),
-                            "Nguồn vốn": nv_label,
-                            "KH (triệu)": round(kh, 1),
-                        })
-                        stt += 1
-            if rows_xa:
-                df_xa = pd.DataFrame(rows_xa)
-                tong_xa = {
-                    "STT": "",
-                    "Chương trình": "Tổng cộng",
-                    "Nguồn vốn": "",
-                    "KH (triệu)": round(df_xa["KH (triệu)"].sum(), 1),
-                }
-                df_xa = pd.concat(
-                    [df_xa, pd.DataFrame([tong_xa])], ignore_index=True
-                )
-                ten_sheet = _clean_sheet_name(ten_xa)
-                sheets[ten_sheet] = df_xa
+    # ── Toolbar: Xuất file & Upload ─────────────────────────────────────────
+    with st.expander("📥 Xuất file & Upload hàng loạt", expanded=False):
+        col_ex1, col_ex2 = st.columns(2)
+        with col_ex1:
+            if st.button("📥 Xuất Excel tất cả xã", key="xuat_excel_tat_ca_xa"):
+                kh_xa_ex = _doc_kv(KV_KEY_XA) or {}
+                sheets = {}
+                rows_th = []
+                for ten_xa in danh_sach_xa:
+                    kh_tw = sum(
+                        kh_xa_ex.get(f"{ten_xa}|{mk}", 0)
+                        for mk in MA_KEYS_CO_KHTD if mk.endswith("_TW")
+                    ) / 1e6
+                    kh_dp = sum(
+                        kh_xa_ex.get(f"{ten_xa}|{mk}", 0)
+                        for mk in MA_KEYS_CO_KHTD if mk.endswith("_DP")
+                    ) / 1e6
+                    tong_kh = kh_tw + kh_dp
+                    rows_th.append({
+                        "Xã/Phường": ten_xa,
+                        "KH TW (triệu)": round(kh_tw, 1),
+                        "KH ĐP (triệu)": round(kh_dp, 1),
+                        "Tổng KH (triệu)": round(tong_kh, 1),
+                    })
+                if rows_th:
+                    df_th = pd.DataFrame(rows_th)
+                    tong_row = {
+                        "Xã/Phường": "Tổng cộng",
+                        "KH TW (triệu)": round(df_th["KH TW (triệu)"].sum(), 1),
+                        "KH ĐP (triệu)": round(df_th["KH ĐP (triệu)"].sum(), 1),
+                        "Tổng KH (triệu)": round(df_th["Tổng KH (triệu)"].sum(), 1),
+                    }
+                    df_th = pd.concat([df_th, pd.DataFrame([tong_row])], ignore_index=True)
+                    sheets["Tổng hợp PGD"] = df_th
+                for ten_xa in danh_sach_xa:
+                    rows_xa = []
+                    stt = 1
+                    for _, ds_ma_ct in KHTD_CN_NHOM_MA_CT:
+                        for ma_ct in ds_ma_ct:
+                            for mk, nv_label in [
+                                (f"{ma_ct}_TW", "TW"),
+                                (f"{ma_ct}_DP", "ĐP"),
+                            ]:
+                                if mk not in MA_KEYS_CO_KHTD:
+                                    continue
+                                kh = kh_xa_ex.get(f"{ten_xa}|{mk}", 0) / 1e6
+                                if kh <= 0:
+                                    continue
+                                rows_xa.append({
+                                    "STT": stt,
+                                    "Chương trình": _ten_ct_base(ma_ct),
+                                    "Nguồn vốn": nv_label,
+                                    "KH (triệu)": round(kh, 1),
+                                })
+                                stt += 1
+                    if rows_xa:
+                        df_xa = pd.DataFrame(rows_xa)
+                        tong_xa = {
+                            "STT": "",
+                            "Chương trình": "Tổng cộng",
+                            "Nguồn vốn": "",
+                            "KH (triệu)": round(df_xa["KH (triệu)"].sum(), 1),
+                        }
+                        df_xa = pd.concat(
+                            [df_xa, pd.DataFrame([tong_xa])], ignore_index=True
+                        )
+                        ten_sheet = _clean_sheet_name(ten_xa)
+                        sheets[ten_sheet] = df_xa
+                if sheets:
+                    excel_bytes = xuat_excel(sheets)
+                    ten_file = ten_file_xuat(f"KHTD_XA_{pgd_chon}")
+                    st.download_button(
+                        "⬇️ Tải Excel",
+                        data=excel_bytes,
+                        file_name=ten_file,
+                        mime="application/vnd.openxmlformats-officedocument"
+                             ".spreadsheetml.sheet",
+                        key="dl_khtd_xa_excel",
+                    )
+                else:
+                    st.info("Chưa có dữ liệu kế hoạch để xuất.")
 
-        if sheets:
-            excel_bytes = xuat_excel(sheets)
-            ten_file = ten_file_xuat(f"KHTD_XA_{pgd_chon}")
-            st.download_button(
-                "⬇️ Tải Excel",
-                data=excel_bytes,
-                file_name=ten_file,
-                mime="application/vnd.openxmlformats-officedocument"
-                     ".spreadsheetml.sheet",
-                key="dl_khtd_xa_excel",
+        with col_ex2:
+            st.caption(
+                "Cấu trúc: **Cột A** = Tên xã · **Cột B** = Mã CT · "
+                "**Cột C** = Giá trị (triệu đồng)"
             )
-        else:
-            st.info("Chưa có dữ liệu kế hoạch để xuất.")
+            file_up = st.file_uploader(
+                "Upload Excel hàng loạt",
+                type=["xlsx", "xls"],
+                key="khtd_xa_file_upload",
+            )
+            if file_up:
+                try:
+                    updates, dem, canh_bao = _svc_doc_excel_khtd_xa_upload(
+                        file_up.getvalue(),
+                        ds_xa_hop_le=set(danh_sach_xa),
+                        ma_keys_co_khtd=set(MA_KEYS_CO_KHTD),
+                    )
+                    kh_xa.update(updates)
+                    if _luu_kv(KV_KEY_XA, kh_xa, username):
+                        db.ghi_audit(username, "upload_khtd_xa",
+                                     f"{dem} chỉ tiêu từ Excel")
+                        st.success(f"✅ Đã lưu {dem} chỉ tiêu kế hoạch xã từ file Excel!")
+                        if canh_bao:
+                            st.warning(
+                                f"⚠️ Có {len(canh_bao)} dòng bị bỏ qua:\n- "
+                                + "\n- ".join(canh_bao[:8])
+                                + ("\n- …" if len(canh_bao) > 8 else "")
+                            )
+                        st.rerun()
+                except Exception as e:
+                    logger.error("Lỗi trong khối except: %s", e, exc_info=True)
+                    st.error(f"Lỗi đọc file Excel: {e}")
 
-    # ── Thư mục lưu PDF ────────────────────────────────────────────────────
+    # ── PDF export ──────────────────────────────────────────────────────────
     st.session_state.setdefault("khtd_pdf_folder", "")
     col_path, col_btn = st.columns([3, 1])
     with col_path:
         pdf_folder = st.text_input(
             "📁 Thư mục lưu PDF",
             value=st.session_state["khtd_pdf_folder"],
-            placeholder="C:\\KHTD_PDF\\ hoặc /home/user/khtd_pdf/",
-            help="Để trống nếu muốn tải về thay vì lưu file",
-            key="khtd_pdf_folder_input"
+            placeholder="Để trống nếu muốn tải về thay vì lưu file",
+            help="VD: C:\\KHTD_PDF\\",
+            key="khtd_pdf_folder_input",
         )
         st.session_state["khtd_pdf_folder"] = pdf_folder
-    
     with col_btn:
         st.markdown("<br>", unsafe_allow_html=True)
         xuat_pdf_clicked = st.button("🖨️ Xuất PDF", use_container_width=True, type="primary", key="khtd_xuat_pdf")
 
-    # ── Upload Excel hàng loạt ────────────────────────────────────────────
-    with st.expander("📤 Upload Excel kế hoạch hàng loạt", expanded=False):
-        st.caption(
-            "Cấu trúc file: **Cột A** = Tên xã · **Cột B** = Mã CT (vd: `1_TW`) · "
-            "**Cột C** = Giá trị (triệu đồng)"
-        )
-        file_up = st.file_uploader(
-            "Chọn file Excel",
-            type=["xlsx", "xls"],
-            key="khtd_xa_file_upload",
-        )
-        if file_up:
-            try:
-                updates, dem, canh_bao = _svc_doc_excel_khtd_xa_upload(
-                    file_up.getvalue(),
-                    ds_xa_hop_le=set(danh_sach_xa),
-                    ma_keys_co_khtd=set(MA_KEYS_CO_KHTD),
-                )
-                kh_xa.update(updates)
-                if _luu_kv(KV_KEY_XA, kh_xa, username):
-                    db.ghi_audit(username, "upload_khtd_xa",
-                                 f"{dem} chỉ tiêu từ Excel")
-                    st.success(f"✅ Đã lưu {dem} chỉ tiêu kế hoạch xã từ file Excel!")
-                    if canh_bao:
-                        st.warning(
-                            f"⚠️ Có {len(canh_bao)} dòng bị bỏ qua:\n- "
-                            + "\n- ".join(canh_bao[:8])
-                            + ("\n- …" if len(canh_bao) > 8 else "")
-                        )
-                    st.rerun()
-            except Exception as e:
-                logger.error("Lỗi trong khối except: %s", e, exc_info=True)
-                st.error(f"Lỗi đọc file Excel: {e}")
-
-    st.divider()
-    xa_chon = st.selectbox("Chọn Xã/Phường", danh_sach_xa, key="khtd_xa_xa_sel")
-    st.caption("📌 Đơn vị nhập và hiển thị: triệu đồng")
+    st.caption("📌 Đơn vị: triệu đồng")
 
     hstd_mtime = ts_file(CACHE_HSTD)
     rules_ver = len(db.doc_ndt_dp_rule_list())
@@ -1285,29 +1271,29 @@ def _tab_khtd_theo_xa(role: str, username: str, df_full: "pd.DataFrame | None") 
     _colw_xa = [3, 1, 1, 1, 1]  # Chương trình | KH TW | TH TW | KH ĐP | TH ĐP
 
     _ths_xa = (
-        "font-size:0.82rem;font-weight:600;text-align:center;"
-        "padding:7px 6px;border-radius:4px;white-space:nowrap"
+        "font-size:0.72rem;font-weight:700;text-align:center;text-transform:uppercase;"
+        "letter-spacing:0.3px;padding:6px;border-radius:4px;white-space:nowrap"
     )
     st.markdown(
         f"""
-<table style="width:100%;border-collapse:separate;border-spacing:3px 3px;
-  table-layout:fixed;margin-bottom:2px">
+<table style="width:100%;border-collapse:separate;border-spacing:2px;
+  table-layout:fixed;margin:4px 0 2px">
 <colgroup>
-  <col style="width:42.86%">
-  <col style="width:14.28%"><col style="width:14.28%">
-  <col style="width:14.28%"><col style="width:14.28%">
+  <col style="width:44%">
+  <col style="width:14%"><col style="width:14%">
+  <col style="width:14%"><col style="width:14%">
 </colgroup>
 <tr>
-  <th style="{_ths_xa};background:#f0f4fa"></th>
-  <th colspan="2" style="{_ths_xa};background:#bbdefb;color:#1565c0">NGUỒN VỐN TRUNG ƯƠNG</th>
-  <th colspan="2" style="{_ths_xa};background:#c8e6c9;color:#2e7d32">NGUỒN VỐN ĐỊA PHƯƠNG</th>
+  <th style="{_ths_xa}"></th>
+  <th colspan="2" style="{_ths_xa};background:rgba(59,130,246,0.15);color:#3b82f6">Nguồn vốn Trung ương</th>
+  <th colspan="2" style="{_ths_xa};background:rgba(34,197,94,0.15);color:#22c55e">Nguồn vốn Địa phương</th>
 </tr>
 <tr>
-  <th style="{_ths_xa};background:#f0f4fa;color:#37474f">Chương trình</th>
-  <th style="{_ths_xa};background:#e3f2fd;color:#1565c0">Kế hoạch</th>
-  <th style="{_ths_xa};background:#e3f2fd;color:#1565c0">Thực hiện</th>
-  <th style="{_ths_xa};background:#e8f5e9;color:#2e7d32">Kế hoạch</th>
-  <th style="{_ths_xa};background:#e8f5e9;color:#2e7d32">Thực hiện</th>
+  <th style="{_ths_xa};text-align:left;padding-left:10px">Chương trình</th>
+  <th style="{_ths_xa}">Kế hoạch</th>
+  <th style="{_ths_xa}">Thực hiện</th>
+  <th style="{_ths_xa}">Kế hoạch</th>
+  <th style="{_ths_xa}">Thực hiện</th>
 </tr>
 </table>""",
         unsafe_allow_html=True,
@@ -1331,9 +1317,9 @@ def _tab_khtd_theo_xa(role: str, username: str, df_full: "pd.DataFrame | None") 
     _txt_kh_dp = f"{_fmt_vn(int(tong_kh_dp), 0)} tr" if tong_kh_dp > 0 else "—"
     _txt_th_dp = f"{_fmt_vn(int(tong_th_dp), 0)} tr" if tong_th_dp > 0 else "—"
     st.markdown(
-        f"<div style='display:flex;gap:12px;padding:8px 14px;background:#e8f4fd;color:#1f2937;"
-        f"border-radius:6px;margin:6px 0;font-size:0.9rem'>"
-        f"<span style='font-weight:600'>📊 Tổng cộng:</span>"
+        f"<div style='display:flex;flex-wrap:wrap;gap:14px;padding:9px 14px;"
+        f"background:rgba(120,120,128,0.12);border-radius:6px;margin:6px 0;font-size:0.88rem'>"
+        f"<span style='font-weight:700'>📊 Tổng cộng</span>"
         f"<span>KH TW: <b>{_txt_kh_tw}</b></span>"
         f"<span>TH TW: <b>{_txt_th_tw}</b></span>"
         f"<span>KH ĐP: <b>{_txt_kh_dp}</b></span>"
@@ -1342,65 +1328,34 @@ def _tab_khtd_theo_xa(role: str, username: str, df_full: "pd.DataFrame | None") 
         unsafe_allow_html=True,
     )
 
-    # ── CSS kẻ bảng ──
+    # ── CSS cho lưới nhập — chỉ dùng custom class, KHÔNG selector global ──
+    st.markdown("##### ✏️ Nhập kế hoạch xã")
     st.markdown(
         """
 <style>
-[data-testid="stHorizontalBlock"] {
-    border-bottom: 1px solid #e2e8f0 !important;
-    border-right: 1px solid #e2e8f0 !important;
-    padding: 4px 0 !important;
-    margin: 0 !important;
-}
-[data-testid="stHorizontalBlock"]:hover {
-    background-color: rgba(128,128,128,0.12) !important;
-}
-[data-testid="column"] {
-    border-right: 1px solid #e2e8f0 !important;
-    padding: 0 8px !important;
-}
-[data-testid="column"]:last-child {
-    border-right: none !important;
-}
 .khtd-program-name {
-    font-size: 17px !important;
-    font-weight: 500 !important;
-    padding: 6px 0 !important;
+    font-size: 0.92rem;
+    font-weight: 500;
+    padding: 8px 0;
+    line-height: 1.35;
 }
 .khtd-amount {
-    font-size: 18px !important;
-    font-weight: 600 !important;
-    padding: 4px 0 !important;
-}
-/* Tăng font size cho ô nhập số KHTD */
-.stNumberInput input[type="number"] {
-    font-size: 17px !important;
-    font-weight: 500 !important;
-    padding: 6px 8px !important;
-    height: 36px !important;
-}
-.stTextInput input {
-    font-size: 16px !important;
-    font-weight: 600 !important;
-    text-align: right !important;
-    padding: 8px 10px !important;
-    min-height: 38px !important;
-}
-.stTextInput > div,
-.stNumberInput > div {
-    width: 100% !important;
-}
-.stTextInput,
-.stNumberInput {
-    margin: 2px 0 !important;
+    font-size: 0.95rem;
+    font-weight: 600;
+    padding: 8px 0;
+    font-variant-numeric: tabular-nums;
 }
 </style>
 """,
         unsafe_allow_html=True,
     )
 
-    # ── Nhóm màu nền ──
-    nhom_mau_nen = ["#eef6ff", "#eefaf3", "#fff8ee"]
+    # ── Nhóm màu nền (rgba — tương thích dark mode) ──
+    nhom_mau_nen = [
+        "rgba(59,130,246,0.10)",
+        "rgba(34,197,94,0.10)",
+        "rgba(245,158,11,0.10)",
+    ]
     idx_nhom = 0
 
     with st.form(f"form_khtd_xa_{pgd_chon}_{xa_chon}"):
@@ -1414,7 +1369,7 @@ def _tab_khtd_theo_xa(role: str, username: str, df_full: "pd.DataFrame | None") 
             idx_nhom += 1
             st.markdown(
                 f"<p style='margin:0.8rem 0 0.4rem 0;padding:7px 12px;"
-                f"background-color:{bg};color:#1f2937;border-radius:6px;font-weight:600;"
+                f"background-color:{bg};border-radius:6px;font-weight:600;"
                 f"font-size:0.9rem'>{tieu_de_nhom}</p>",
                 unsafe_allow_html=True,
             )

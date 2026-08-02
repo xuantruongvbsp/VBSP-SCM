@@ -568,7 +568,6 @@ _WS_OP_MENU_ITEMS = [
         "children": [
             {"label": "🎯 KHTD"},
             {"label": "⚖️ Kế hoạch/Cân đối"},
-            {"label": "📋 Giao & ĐC KHTD"},
             {"label": "📋 Mẫu 07 Giao KH"},
             {"label": "📋 NQ11"},
             {"label": "📊 Dashboard GQVL"},
@@ -986,8 +985,6 @@ def render(**kwargs):
                     pgd_mode=True, pgd_user=pgd_user or pgd_filter or ""
 
                 )),
-
-                ("📋 Giao & ĐC KHTD", lambda tab: _lazy_tab("tab_khtd_giao_dc").render(tab, **kwargs)),
 
                 ("📋 Mẫu 07 Giao KH", lambda tab: _lazy_tab("tab_khtd_mau07").render(tab, **kwargs)),
 

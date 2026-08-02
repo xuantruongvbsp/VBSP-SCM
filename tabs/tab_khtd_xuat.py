@@ -677,8 +677,21 @@ def _tab_tien_do_kh_th() -> None:
 
     df_ct = pd.DataFrame(rows_ct)
 
+    cols_show = ["Chỉ tiêu", "KH (triệu đồng)", "TH (triệu đồng)", "TL%", "Trạng thái"]
+
+    # Bảng hiển thị: định dạng số kiểu VN (dấu "." ngăn cách nghìn, dấu "," thập phân)
+    # để khớp với các thẻ KPI phía trên (_fvn). df_ct giữ số liệu gốc cho export Excel/PDF.
+    df_show = df_ct[cols_show].copy()
+    df_show["KH (triệu đồng)"] = df_ct["KH (triệu đồng)"].map(lambda v: _fmt_vn(v, 0))
+    df_show["TH (triệu đồng)"] = df_ct["TH (triệu đồng)"].map(lambda v: _fmt_vn(v, 0))
+    df_show["TL%"] = [
+        "—" if (v is None or pd.isna(v)) else f"{_fmt_vn(v, 1)}%"
+        for v in df_ct["TL%"]
+    ]
+
     def _to_mau_ct(row):
-        if row.get("_nhom"):
+        chi_tieu = str(row.get("Chỉ tiêu", ""))
+        if chi_tieu.startswith(("I.", "II.")) or chi_tieu == "TỔNG CỘNG":
             return ["background-color: #D9E1F2; color:#1f2937; font-weight: bold"] * len(row)
         if "🔴" in str(row.get("Trạng thái", "")):
             return ["background-color: #ffd6d6; color:#1f2937"] * len(row)
@@ -686,17 +699,10 @@ def _tab_tien_do_kh_th() -> None:
             return ["background-color: #fff9d6; color:#1f2937"] * len(row)
         return [""] * len(row)
 
-    cols_show = ["Chỉ tiêu", "KH (triệu đồng)", "TH (triệu đồng)", "TL%", "Trạng thái"]
     hien_thi_dataframe_phan_trang(
-        df_ct[cols_show].style.apply(_to_mau_ct, axis=1),
+        df_show.style.apply(_to_mau_ct, axis=1),
         key="khtd_tien_do_ct",
         height=480,
-        column_config={
-            "KH (triệu đồng)": st.column_config.NumberColumn(format=",.0f"),
-            "TH (triệu đồng)": st.column_config.NumberColumn(format=",.0f"),
-            "TL%":     st.column_config.ProgressColumn(
-                           min_value=0, max_value=100, format=".1f"),
-        },
     )
 
     st.divider()
@@ -1293,18 +1299,19 @@ def _tab_xuat_to_trinh_bgd(username: str) -> None:
 
 
 def render_xuat_baocao(role: str = "", username: str = "", df_full: "pd.DataFrame | None" = None) -> None:
-    sub1, sub2, sub3, sub4 = st.tabs([
-        "📋 Tiến độ KH vs TH",
-        "⚠️ Chênh lệch phân bổ",
-        "📍 KHTD theo Xã",
-        "📄 Tờ trình BGĐ",
-    ])
-    with sub1:
+    _bc_labels = ["📋 Tiến độ KH vs TH", "⚠️ Chênh lệch phân bổ", "📍 KHTD theo Xã", "📄 Tờ trình BGĐ"]
+    _bc_sel = st.radio(
+        "", range(len(_bc_labels)),
+        format_func=lambda i: _bc_labels[i],
+        horizontal=True, key="khtd_bc_sub_tab", label_visibility="collapsed",
+    )
+
+    if _bc_sel == 0:
         _tab_tien_do_kh_th()
-    with sub2:
+    elif _bc_sel == 1:
         _tab_canh_bao_chenh_lech()
-    with sub3:
+    elif _bc_sel == 2:
         _tab_xuat_khtd_xa(role, username, df_full)
-    with sub4:
+    elif _bc_sel == 3:
         _tab_xuat_to_trinh_bgd(username)
 

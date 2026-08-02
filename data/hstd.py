@@ -364,6 +364,7 @@ _DIENBAO_UNIT_META = {
     "nghin": {"don_vi_trieu": False, "he_so_vnd": 1_000, "don_vi_label": "nghìn đồng"},
     "dong": {"don_vi_trieu": False, "he_so_vnd": 1, "don_vi_label": "đồng"},
 }
+_DIENBAO_LAYOUT_SCAN_ROWS = 24
 
 
 def _dienbao_norm_text(value: object) -> str:
@@ -403,7 +404,7 @@ def _dienbao_detect_layout(df_raw: pd.DataFrame) -> dict[str, object]:
     if n_cols < 4 or df_raw.empty:
         return default
 
-    for i in range(min(12, len(df_raw))):
+    for i in range(min(_DIENBAO_LAYOUT_SCAN_ROWS, len(df_raw))):
         col_chi_tieu = _dienbao_norm_text(_dienbao_cell(df_raw, i, 1))
         if "chi tieu" not in col_chi_tieu:
             continue
@@ -718,12 +719,17 @@ def doc_dienbao_matrix(
     }
 
 
-@st.cache_data(ttl=7200, show_spinner=False)
 def liet_ke_sheet_dienbao(fp: str, ts: float = 0) -> list[dict]:
     """Liệt kê các sheet trong file Điện báo, kèm metadata.
 
-    Tham số ts (timestamp) dùng để cache bust — truyền ts_file(fp) khi gọi.
+    Tham số ts (timestamp) dùng để cache bust. Nếu caller bỏ qua hoặc truyền 0,
+    hàm tự dùng mtime hiện tại của file để tránh stale cache.
     """
+    return _liet_ke_sheet_dienbao_cached(fp, ts or ts_file(fp))
+
+
+@st.cache_data(ttl=7200, show_spinner=False)
+def _liet_ke_sheet_dienbao_cached(fp: str, ts: float) -> list[dict]:
     import pandas as pd
     from openpyxl import load_workbook
 
@@ -741,8 +747,8 @@ def liet_ke_sheet_dienbao(fp: str, ts: float = 0) -> list[dict]:
     xls = pd.ExcelFile(fp)
     result = []
     for s in xls.sheet_names:
-        # Chỉ đọc 12 dòng đầu để phát hiện layout + ngày (nhanh hơn đọc cả sheet)
-        df = pd.read_excel(fp, sheet_name=s, header=None, nrows=12)
+        # Chỉ đọc phần đầu file để phát hiện layout + ngày (nhanh hơn đọc cả sheet)
+        df = pd.read_excel(fp, sheet_name=s, header=None, nrows=_DIENBAO_LAYOUT_SCAN_ROWS)
         n_rows = sheet_dims.get(s, (len(df), 0))[0] or len(df)
         n_cols = sheet_dims.get(s, (0, len(df.columns)))[1] or len(df.columns)
         layout = _dienbao_detect_layout(df)

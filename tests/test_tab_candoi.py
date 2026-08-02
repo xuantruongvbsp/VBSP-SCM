@@ -262,7 +262,7 @@ def test_quan_ly_tep_inline_upload_truc_tiep_khong_popover_trung_gian():
     assert '_upload_one_file("ht"' in source
     assert '_upload_one_file("prev"' in source
     assert '_upload_one_file("prev_month"' in source
-    assert 'key=f"inp_ky_ht{key_sfx}"' in source
+    assert 'key=_ky_ht_widget_key' in source
     assert 'key=_ky_pm_widget_key' in source
 
 
@@ -280,7 +280,20 @@ def test_upload_dienbao_chon_ngay_truoc_khi_upload_va_luu_truoc_rerun():
     assert source_inline.index('st.date_input(\n                "📅 Ngày số liệu tháng trước"') < source_inline.index('_upload_one_file("prev_month"')
 
     assert 'ky_saved_latest = db.doc_kv(ky_kv)' in source_upload
+    assert 'ky_from_name = trich_xuat_ky_dienbao(f_up.name) if loai != "prev" else None' in source_upload
+    assert "ky_effective = ky_from_name or ky_label" in source_upload
+    assert "ky_widget_ver_key" in source_upload
     assert source_upload.index("_persist_ky_label_if_changed(") < source_upload.index("st.rerun()")
+
+
+def test_upload_dienbao_khong_luu_ngay_ht_mac_dinh_khi_chua_co_nguon():
+    source_initial = inspect.getsource(tab_candoi._render_upload_section)
+    source_inline = inspect.getsource(tab_candoi._render_quan_ly_tep_inline)
+
+    assert "_ht_has_source = bool(_ky_ht_saved or _meta_ht.get(\"ky\") or os.path.exists(store_ht))" in source_initial
+    assert "_ht_user_changed = _ky_ht_had_state and _ky_ht_date != _default_ht" in source_initial
+    assert "if _ht_has_source or _ht_user_changed:" in source_initial
+    assert "_ht_has_source = bool(_ky_ht_saved or _meta_ht.get(\"ky\") or _has_ht)" in source_inline
 
 
 def test_render_state_b_khoi_phuc_has_file_prev_truoc_moc_so_sanh():

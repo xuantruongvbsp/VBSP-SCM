@@ -246,7 +246,7 @@ def tong_hop_tu_dienbao(sheet_name: str = "DB1", file_path_override: str | None 
         # Fallback: đọc sheet đầu tiên có matrix format
         try:
             from data.hstd import liet_ke_sheet_dienbao
-            sheets = liet_ke_sheet_dienbao(fp)
+            sheets = liet_ke_sheet_dienbao(fp, ts=ts_file(fp))
             matrix_sheets = [s["sheet"] for s in sheets if s["format"] == "matrix"]
             if not matrix_sheets:
                 # Thử format cũ

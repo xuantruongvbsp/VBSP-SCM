@@ -213,6 +213,16 @@
 
 ## B. Streamlit UI
 
+### B80 — Ngày số liệu Điện báo không auto-fill theo tên file sau upload
+| | |
+|---|---|
+| **File** | `tabs/tab_candoi.py` → `_render_upload_section()`, `_render_quan_ly_tep_inline()`, `_upload_one_file()` |
+| **Dấu hiệu** | Upload file có tên chứa ngày đúng nhưng `date_input`/label kỳ số liệu vẫn giữ ngày cũ hoặc ngày hiện tại. |
+| **Nguyên nhân** | Màn upload tự ghi ngày mặc định vào `dienbao_ky_ht` khi chỉ render; widget `date_input` dùng key cố định nên sau rerun vẫn giữ state cũ, che metadata vừa parse từ tên file. |
+| **Fix** | Chỉ persist ngày HT khi đã có nguồn hoặc user thật sự đổi ngày; `_upload_one_file()` ưu tiên `trich_xuat_ky_dienbao(f_up.name)` cho HT/tháng trước và tăng version key của widget ngày sau upload để rerun lấy KV mới. |
+| **Test** | `tests/test_tab_candoi.py::test_upload_dienbao_chon_ngay_truoc_khi_upload_va_luu_truoc_rerun`, `tests/test_tab_candoi.py::test_upload_dienbao_khong_luu_ngay_ht_mac_dinh_khi_chua_co_nguon` |
+| **Ngày fix** | 2026-08-02 |
+
 ### B57 — Khối xuất Cân đối crash khi không mở sub-tab Tổng quan hoặc KH thiếu thành phần tiền gửi
 | | |
 |---|---|
@@ -1100,6 +1110,16 @@
 
 ## D. Database / kv_store
 
+### D10 — Metadata Điện báo PGD có thể ghi nhầm vào key Chi nhánh
+| | |
+|---|---|
+| **File** | `services/upload_service.py` → `luu_dienbao()` |
+| **Dấu hiệu** | Upload Điện báo theo PGD nhưng metadata có thể xuất hiện ở `dienbao_meta_ht`/`dienbao_meta_prev` toàn Chi nhánh thay vì key có suffix PGD. |
+| **Nguyên nhân** | Code bắt mọi lỗi khi import/gọi `pgd_slug()` rồi fallback `_key_sfx=""`, làm scope PGD rơi về scope CN. |
+| **Fix** | Tách `_dienbao_key_sfx()`, tính suffix trước khi ghi file; nếu không tạo được slug PGD thì trả lỗi rõ và không ghi file/kv metadata. |
+| **Test** | `tests/test_upload_service.py::TestLuuDienbao::test_pgd_slug_loi_khong_fallback_ve_metadata_chi_nhanh` |
+| **Ngày fix** | 2026-08-02 |
+
 ### D7 — Migration DB cũ fail `no such column` khi tạo index
 | | |
 |---|---|
@@ -1166,6 +1186,16 @@
 ---
 
 ## E. Upload / Merge
+
+### E21 — Parser kỳ Điện báo nhận ngày không hợp lệ hoặc match lửng
+| | |
+|---|---|
+| **File** | `services/upload_service.py` → `trich_xuat_ky_dienbao()` |
+| **Dấu hiệu** | Tên file `file_31.02.2026.xlsx` vẫn trả `31/02/2026`; `report_131.07.2026.xlsx` bị match lửng thành `31/07/2026`. |
+| **Nguyên nhân** | Regex dạng có dấu thiếu boundary chữ số hai bên và chỉ kiểm tra range ngày/tháng, chưa validate ngày theo lịch. |
+| **Fix** | Thêm boundary `(?<!\d)/(?!\d)`, bắt cùng separator, và validate bằng `datetime.strptime("%d/%m/%Y")`; dạng `DDMMYYYY` vẫn giữ boundary chữ số. |
+| **Test** | `tests/test_upload_service.py::TestTrichXuatKyDienbao::test_ngay_khong_hop_le`, `tests/test_upload_service.py::TestTrichXuatKyDienbao::test_khong_match_lung_trong_chuoi_so_co_dau` |
+| **Ngày fix** | 2026-08-02 |
 
 ### E1 — Upload thành công nhưng dữ liệu không cập nhật
 | | |
@@ -1952,6 +1982,16 @@
 ---
 
 ## J. Python / Code Pattern
+
+### J73 — `liet_ke_sheet_dienbao()` cache stale khi caller quên truyền `ts`
+| | |
+|---|---|
+| **File** | `data/hstd.py` → `liet_ke_sheet_dienbao()` |
+| **Dấu hiệu** | Đổi/ghi đè file Điện báo cùng đường dẫn nhưng danh sách sheet/format vẫn giữ dữ liệu cũ tới 2 giờ ở các màn không truyền `ts_file(fp)`. |
+| **Nguyên nhân** | Hàm public được `@st.cache_data(ttl=7200)` trực tiếp với default `ts=0`; các call-site legacy gọi `liet_ke_sheet_dienbao(fp)` nên cache key không đổi theo mtime. Preview chỉ đọc 12 dòng nên header ở dòng 13+ cũng bị bỏ sót. |
+| **Fix** | Tách wrapper public tự đổi `ts=0` thành `ts_file(fp)` rồi gọi cached helper riêng; tăng số dòng scan layout lên 24 và cập nhật call-site KHNV truyền `ts_file(fp)` tường minh. |
+| **Test** | `tests/test_hstd.py::TestDocDienBao::test_liet_ke_sheet_detect_header_o_dong_13_va_tu_bust_cache` |
+| **Ngày fix** | 2026-08-02 |
 
 ### J72 — Bản in HTML Cân đối chèn thẳng dữ liệu Excel và tên file chứa ký tự cấm
 | | |

@@ -242,6 +242,12 @@ class TestTrichXuatKyDienbao:
     def test_ngay_khong_hop_le(self):
         from services.upload_service import trich_xuat_ky_dienbao
         assert trich_xuat_ky_dienbao("file_99.99.2026.xlsx") is None
+        assert trich_xuat_ky_dienbao("file_31.02.2026.xlsx") is None
+
+    def test_khong_match_lung_trong_chuoi_so_co_dau(self):
+        from services.upload_service import trich_xuat_ky_dienbao
+        assert trich_xuat_ky_dienbao("report_131.07.2026.xlsx") is None
+        assert trich_xuat_ky_dienbao("report_20260101_v2.xlsx") is None
 
 
 class TestLuuDienbao:
@@ -271,3 +277,22 @@ class TestLuuDienbao:
         assert events[kv_index][1] == "dienbao_meta_prev_month"
         assert events[kv_index + 1][0] == "audit"
         assert events[kv_index + 1][1] == "dienbao_meta"
+
+    def test_pgd_slug_loi_khong_fallback_ve_metadata_chi_nhanh(self):
+        with (
+            patch.object(upload_service, "_dienbao_key_sfx", side_effect=ValueError("slug lỗi")),
+            patch.object(upload_service, "_ghi_va_xoa_cache") as write_mock,
+            patch.object(upload_service.db, "ghi_kv") as kv_mock,
+            patch.object(upload_service.st, "session_state", {"username": "tester"}),
+        ):
+            kq = upload_service.luu_dienbao(
+                "ht",
+                _excel_bytes_hop_le(),
+                "Dien bao 31.07.2026.xlsx",
+                ten_pgd="PGD lỗi",
+            )
+
+        assert kq.thanh_cong is False
+        assert "mã PGD" in kq.thong_bao
+        write_mock.assert_not_called()
+        kv_mock.assert_not_called()

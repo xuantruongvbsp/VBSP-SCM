@@ -318,71 +318,25 @@ def _render_scheduler_rules(username: str) -> None:
     st.caption(
         "Chọn nội dung, ngày và giờ gửi. Hệ thống sẽ tự chạy theo lịch đã lưu."
     )
-    with st.expander("📘 Hướng dẫn cài đặt và chuyển sang máy mới", expanded=False):
+    with st.popover("📘 Hướng dẫn cài đặt và chuyển sang máy mới", use_container_width=True):
         st.markdown(
-            """
-**Nguyên tắc quan trọng:** chỉ để **một máy** chạy `VBSP-TelegramScheduler`.
-
-Nếu máy cũ và máy mới cùng chạy, Telegram có thể gửi thông báo hai lần.
-
-**Bước 1 — Trên máy cũ (nếu còn sử dụng)**
-
-Mở PowerShell bằng **Run as administrator**, rồi tắt scheduler:
-"""
+            "**Nguyên tắc:** chỉ để **một máy** chạy `VBSP-TelegramScheduler`. "
+            "Nếu máy cũ và máy mới cùng chạy, Telegram có thể gửi thông báo hai lần."
         )
-        st.code(
-            'Disable-ScheduledTask -TaskName "VBSP-TelegramScheduler"',
-            language="powershell",
-        )
+        st.markdown("**Bước 1 — Tắt scheduler máy cũ:**")
+        st.code('Disable-ScheduledTask -TaskName "VBSP-TelegramScheduler"', language="powershell")
         st.markdown(
-            """
-**Bước 2 — Chuyển chương trình sang máy mới**
-
-- Copy toàn bộ thư mục dự án vào `D:\\VBSP-SCM`.
-- Copy an toàn file `vbsp_scm.db` nếu muốn giữ Token, Chat ID và các rule hiện có.
-- Hoặc dùng mục **Xuất/Nhập cấu hình rule** phía dưới; file xuất không chứa Token và Chat ID.
-- File database có thông tin cấu hình Telegram: **không gửi qua nhóm chat, email công khai hoặc đưa lên GitHub**.
-- Nếu không copy database, nhập lại Token/Chat ID và tạo lại rule trong màn hình này.
-
-**Bước 3 — Cài Windows Task Scheduler trên máy mới**
-
-Mở PowerShell bằng **Run as administrator**, dán lần lượt:
-"""
+            "**Bước 2 — Chuyển dự án:** Copy thư mục vào `D:\\VBSP-SCM`, "
+            "copy `vbsp_scm.db` nếu muốn giữ cấu hình. "
+            "File database **không gửi qua chat/email/GitHub**."
         )
-        st.code(
-            """cd D:\\VBSP-SCM
-Set-ExecutionPolicy -Scope Process Bypass
-.\\scripts\\setup_task_scheduler.ps1""",
-            language="powershell",
-        )
-        st.markdown("Nếu dự án nằm ở thư mục khác, dùng lệnh:")
-        st.code(
-            '.\\scripts\\setup_task_scheduler.ps1 -ProjectDir "D:\\ThuMucKhac"',
-            language="powershell",
-        )
+        st.markdown("**Bước 3 — Cài Task Scheduler máy mới:**")
+        st.code("cd D:\\VBSP-SCM\nSet-ExecutionPolicy -Scope Process Bypass\n.\\scripts\\setup_task_scheduler.ps1", language="powershell")
+        st.markdown("**Bước 4 — Kiểm tra:**")
+        st.code('Get-ScheduledTask -TaskName "VBSP-TelegramScheduler"', language="powershell")
         st.markdown(
-            """
-**Bước 4 — Kiểm tra task đã được cài**
-"""
-        )
-        st.code(
-            'Get-ScheduledTask -TaskName "VBSP-TelegramScheduler"',
-            language="powershell",
-        )
-        st.markdown(
-            """
-Kết quả cần có trạng thái `Ready` hoặc `Running`.
-
-**Bước 5 — Tạo lịch và bật gửi**
-
-1. Tạo hoặc kiểm tra các rule ở phía dưới.
-2. Bật **Bật rule-based scheduler**.
-3. Bấm **💾 Lưu trạng thái Scheduler**.
-4. Xem mục **Runlog hôm nay** để kiểm tra lần chạy.
-
-**Gợi ý lịch đơn giản:** nhập `08:00, 14:00`, đặt `Lượt chạy tối đa/ngày = 2`,
-`Cửa sổ chạy = 10 phút`, `Thử lại tối đa = 1`.
-"""
+            "**Bước 5 — Tạo lịch:** Tạo rule → Bật scheduler → Lưu → Xem Runlog.\n\n"
+            "**Gợi ý:** nhập `08:00, 14:00`, đặt `Lượt chạy tối đa/ngày = 2`, `Cửa sổ chạy = 10 phút`."
         )
         st.info(
             "Nếu máy mới chưa gửi: kiểm tra task Windows, Token/Chat ID, toggle loại thông báo "
@@ -408,17 +362,24 @@ Kết quả cần có trạng thái `Ready` hoặc `Running`.
     if rules:
         st.markdown("##### Lịch đã tạo")
         for rule in rules:
-            trang_thai = "Đang bật" if rule["enabled"] and cfg["enabled"] else "Đang tắt"
+            _is_on = rule["enabled"] and cfg["enabled"]
             if rule["mode"] == "daily":
                 ngay_gui = "Mỗi ngày"
             elif rule["weekdays"] == [0, 1, 2, 3, 4]:
-                ngay_gui = "Thứ Hai–Thứ Sáu"
+                ngay_gui = "T2–T6"
             else:
-                ngay_gui = "Theo các thứ đã chọn"
-            st.write(
-                f"• **{labels.get(rule['notify_key'], rule['name'])}** — "
-                f"{ngay_gui}, lúc {', '.join(rule['times'])} — {trang_thai}"
-                + (" — lần sau chỉ gửi thay đổi" if rule.get("delivery_mode") == "full_then_delta" else "")
+                ngay_gui = "Theo thứ"
+            _delta_tag = " · delta" if rule.get("delivery_mode") == "full_then_delta" else ""
+            _status_icon = "🟢" if _is_on else "⚪"
+            _rule_label = labels.get(rule["notify_key"], rule["name"])
+            st.markdown(
+                f'<div style="display:flex;align-items:center;gap:10px;padding:8px 12px;margin:4px 0;'
+                f'border-radius:8px;background:#1E2130;border:1px solid #2A2D3E">'
+                f'<span style="font-size:1.1rem">{_status_icon}</span>'
+                f'<span style="flex:1;font-size:0.9rem;font-weight:600;color:#E0E6ED">{_rule_label}</span>'
+                f'<span style="font-size:0.8rem;color:#94A3B8">{ngay_gui} · {", ".join(rule["times"])}{_delta_tag}</span>'
+                f'</div>',
+                unsafe_allow_html=True,
             )
 
     st.markdown("##### Tạo hoặc thay đổi lịch")
@@ -794,6 +755,137 @@ Kết quả cần có trạng thái `Ready` hoặc `Running`.
         st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
 
 
+def _render_overview(username: str) -> None:
+    """Dashboard tổng quan trạng thái Telegram Bot."""
+    from services.telegram_jobs import JOB_LABELS, telegram_job_keys
+    from services.telegram_schedule_service import doc_schedule_config, scheduler_health
+
+    # ── Data gathering ──
+    notify_cfg = db.doc_kv("telegram_notify_config") or {}
+    sched_cfg = doc_schedule_config()
+    health = scheduler_health()
+    send_log = db.doc_kv("telegram_send_log") or []
+    tg_config = db.doc_kv("telegram_config") or {}
+    has_token = bool(tg_config.get("token", ""))
+
+    # Count enabled types (default True if not in config)
+    all_keys = [m["key"] for m in _NOTIFY_META]
+    enabled_count = sum(1 for k in all_keys if bool(notify_cfg.get(k, True)))
+    total_count = len(all_keys)
+
+    # Active rules
+    active_rules = [r for r in sched_cfg["rules"] if r["enabled"]] if sched_cfg["enabled"] else []
+
+    # Last send
+    last_send_ts = ""
+    last_send_ok = None
+    if send_log:
+        last_entry = send_log[0]
+        last_send_ts = (last_entry.get("ts") or "")[:16].replace("T", " ")
+        last_send_ok = last_entry.get("ok", False)
+
+    # ── KPI Row ──
+    k1, k2, k3, k4 = st.columns(4)
+    k1.metric("Loại thông báo đang bật", f"{enabled_count}/{total_count}")
+    k2.metric("Rule scheduler đang chạy", f"{len(active_rules)}")
+
+    status_map = {
+        "ok": "🟢 Hoạt động",
+        "stale": "🔴 Mất kết nối",
+        "never": "🟠 Chưa chạy",
+        "disabled": "⚪ Đang tắt",
+    }
+    k3.metric("Trạng thái Scheduler", status_map.get(health["status"], "—"))
+
+    if last_send_ts:
+        icon = "✅" if last_send_ok else "❌"
+        k4.metric("Lần gửi cuối", f"{icon} {last_send_ts}")
+    else:
+        k4.metric("Lần gửi cuối", "Chưa gửi")
+
+    # ── Alerts ──
+    alerts = []
+    if not has_token:
+        alerts.append("⚠️ Chưa cấu hình Bot Token — vào tab **Cấu hình Bot** để nhập.")
+    if health["status"] == "stale":
+        alerts.append("❌ Scheduler mất heartbeat — kiểm tra Windows Task Scheduler.")
+    elif health["status"] == "never" and sched_cfg["enabled"]:
+        alerts.append("⚠️ Scheduler đã bật nhưng chưa chạy lần nào — kiểm tra task đã cài chưa.")
+    if not sched_cfg["enabled"] and active_rules:
+        alerts.append("⚠️ Có rule đang bật nhưng Scheduler tổng đang tắt.")
+
+    if alerts:
+        for a in alerts:
+            st.warning(a)
+    else:
+        st.success("✅ Hệ thống Telegram hoạt động bình thường.")
+
+    # ── Summary table (HTML) ──
+    st.markdown("##### Trạng thái các loại thông báo")
+
+    # Build data for table
+    job_keys_set = set(telegram_job_keys())
+    rows_html = ""
+    for i, m in enumerate(_NOTIFY_META):
+        key = m["key"]
+        is_on = bool(notify_cfg.get(key, True))
+        has_rule = any(r["notify_key"] == key and r["enabled"] for r in sched_cfg["rules"]) if sched_cfg["enabled"] else False
+        schedulable = key in job_keys_set
+
+        # Status badge
+        if is_on and has_rule:
+            status_badge = '<span style="background:#0D2818;color:#81C784;padding:2px 8px;border-radius:999px;font-size:0.78rem;font-weight:600">🗓️ Theo lịch</span>'
+        elif is_on:
+            status_badge = '<span style="background:#0D2818;color:#81C784;padding:2px 8px;border-radius:999px;font-size:0.78rem;font-weight:600">✅ Đang bật</span>'
+        else:
+            status_badge = '<span style="background:#2D0D14;color:#EF9A9A;padding:2px 8px;border-radius:999px;font-size:0.78rem;font-weight:600">⏸️ Đang tắt</span>'
+
+        # Schedule info
+        if has_rule:
+            rule = next((r for r in sched_cfg["rules"] if r["notify_key"] == key and r["enabled"]), None)
+            sched_info = ", ".join(rule["times"]) if rule else "—"
+        elif key in _SCHEDULE_KEYS:
+            sched_cfg_legacy = db.doc_kv("telegram_schedule_config") or {}
+            sched_info = sched_cfg_legacy.get(key, m["gio_mac_dinh"]) if sched_cfg_legacy else m["gio_mac_dinh"]
+        elif key in _TASK_GIO:
+            sched_info = _TASK_GIO[key]
+        elif key in _EVENT_KEYS:
+            sched_info = "Sự kiện"
+        else:
+            sched_info = "Thủ công"
+
+        # Can schedule?
+        sched_tag = "✓" if schedulable else "—"
+
+        bg = "#161922" if i % 2 else "#0F1117"
+        rows_html += (
+            f'<tr style="background:{bg}">'
+            f'<td style="padding:6px 10px;border:0.5px solid #2A2D3E;font-size:0.88rem">{m["icon"]} {m["ten"]}</td>'
+            f'<td style="padding:6px 10px;border:0.5px solid #2A2D3E;text-align:center">{status_badge}</td>'
+            f'<td style="padding:6px 10px;border:0.5px solid #2A2D3E;text-align:center;font-size:0.84rem;color:#94A3B8">{sched_info}</td>'
+            f'<td style="padding:6px 10px;border:0.5px solid #2A2D3E;text-align:center;font-size:0.84rem;color:#94A3B8">{sched_tag}</td>'
+            f'</tr>\n'
+        )
+
+    html_table = f"""
+    <div style="overflow-x:auto;margin:8px 0">
+    <table style="border-collapse:collapse;width:100%;font-family:'Inter','Segoe UI',sans-serif">
+      <thead>
+        <tr style="background:linear-gradient(135deg,#1B5E20 0%,#2E7D32 100%)">
+          <th style="padding:8px 10px;border:0.5px solid #2A2D3E;color:#fff;font-size:0.83rem;text-align:left">Loại thông báo</th>
+          <th style="padding:8px 10px;border:0.5px solid #2A2D3E;color:#fff;font-size:0.83rem;text-align:center">Trạng thái</th>
+          <th style="padding:8px 10px;border:0.5px solid #2A2D3E;color:#fff;font-size:0.83rem;text-align:center">Giờ / Cơ chế</th>
+          <th style="padding:8px 10px;border:0.5px solid #2A2D3E;color:#fff;font-size:0.83rem;text-align:center">Scheduler</th>
+        </tr>
+      </thead>
+      <tbody>{rows_html}</tbody>
+    </table>
+    </div>
+    """
+    st.markdown(html_table, unsafe_allow_html=True)
+    st.caption(f"📊 {total_count} loại thông báo · {len(job_keys_set)} loại hỗ trợ scheduler · {enabled_count} đang bật")
+
+
 def render(tab: DeltaGenerator = None, **kwargs) -> None:
     role_raw = str(kwargs.get("role", "user") or "user")
     role     = normalize_role(role_raw)
@@ -808,9 +900,13 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
 
         st.subheader("🤖 Quản trị Telegram Bot")
 
-        tab_cfg, tab_tb, tab_sched, tab_log = st.tabs(
-            ["⚙️ Cấu hình Bot", "🔔 Thông báo", "🗓️ Lịch nâng cao", "📋 Lịch sử"]
+        tab_overview, tab_cfg, tab_tb, tab_sched, tab_log = st.tabs(
+            ["📊 Tổng quan", "⚙️ Cấu hình Bot", "🔔 Thông báo", "🗓️ Lịch nâng cao", "📋 Lịch sử"]
         )
+
+        # ── Sub-tab 0: Tổng quan ─────────────────────────────────────────────
+        with tab_overview:
+            _render_overview(username)
 
         # ── Sub-tab 1: Cấu hình Bot ───────────────────────────────────────────
         with tab_cfg:
@@ -990,9 +1086,21 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                 for group in _NOTIFY_GROUPS
                 for key in group["keys"]
             ]
-            st.caption(
-                f"{len(_NOTIFY_META)} loại thông báo được sắp xếp theo 4 nhóm nghiệp vụ."
-            )
+            # ── Filter nhanh ──
+            _filter_col1, _filter_col2 = st.columns([2, 1])
+            with _filter_col1:
+                tg_filter = st.radio(
+                    "Lọc hiển thị",
+                    options=["Tất cả", "Đang bật", "Đang tắt", "Có chat phụ"],
+                    horizontal=True,
+                    key="tg_notify_filter",
+                    label_visibility="collapsed",
+                )
+            with _filter_col2:
+                st.caption(
+                    f"{len(_NOTIFY_META)} loại · 4 nhóm",
+                    help="Dùng bộ lọc để xem nhanh trạng thái.",
+                )
 
             current_group = None
             group_container = None
@@ -1002,10 +1110,28 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                 cur_gio   = sched_cfg.get(key, m["gio_mac_dinh"])
                 has_extra = bool(extra_chats.get(key, ""))
 
+                # Áp dụng filter
+                if tg_filter == "Đang bật" and not cur_on:
+                    new_notify[key] = cur_on
+                    continue
+                if tg_filter == "Đang tắt" and cur_on:
+                    new_notify[key] = cur_on
+                    continue
+                if tg_filter == "Có chat phụ" and not has_extra:
+                    new_notify[key] = cur_on
+                    continue
+
                 group = group_by_key[key]
                 if group["ten"] != current_group:
+                    # Đếm bật/tắt trong nhóm
+                    _grp_on = sum(
+                        1 for gk in group["keys"]
+                        if bool(notify_cfg.get(gk, True))
+                    )
+                    _grp_total = len(group["keys"])
+                    _badge = f"{_grp_on}/{_grp_total} bật"
                     group_container = st.expander(
-                        f"{group['icon']} {group['ten']} ({len(group['keys'])})",
+                        f"{group['icon']} {group['ten']} ({_badge})",
                         expanded=current_group is None,
                     )
                     group_container.caption(group["mo_ta"])
@@ -1156,20 +1282,86 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
             if not log:
                 st.caption("Chưa có lịch sử gửi.")
             else:
+                # ── Thống kê nhanh ──
+                _today_str = date.today().strftime("%Y-%m-%d")
+                _today_entries = [e for e in log if (e.get("ts") or "").startswith(_today_str)]
+                _today_ok = sum(1 for e in _today_entries if e.get("ok"))
+                _today_fail = len(_today_entries) - _today_ok
+                _rate = f"{_today_ok / len(_today_entries) * 100:.0f}%" if _today_entries else "—"
+                # Loại gửi nhiều nhất hôm nay
+                _func_counts: dict[str, int] = {}
+                for e in _today_entries:
+                    _fn = e.get("func", "—")
+                    _func_counts[_fn] = _func_counts.get(_fn, 0) + 1
+                _top_func = max(_func_counts, key=_func_counts.get) if _func_counts else "—"
+
+                m1, m2, m3, m4 = st.columns(4)
+                m1.metric("Gửi hôm nay", len(_today_entries))
+                m2.metric("Thành công", _today_ok)
+                m3.metric("Thất bại", _today_fail)
+                m4.metric("Tỷ lệ OK", _rate, help=f"Gửi nhiều nhất: {_top_func}")
+
+                st.divider()
+
+                # ── Filter ──
+                _all_funcs = sorted({e.get("func", "") for e in log if e.get("func")})
+                _fc1, _fc2 = st.columns([2, 1])
+                with _fc1:
+                    _log_func_filter = st.multiselect(
+                        "Lọc theo loại",
+                        options=_all_funcs,
+                        default=[],
+                        key="tg_log_func_filter",
+                        placeholder="Tất cả loại",
+                    )
+                with _fc2:
+                    _log_result_filter = st.radio(
+                        "Kết quả",
+                        options=["Tất cả", "Thành công", "Thất bại"],
+                        horizontal=True,
+                        key="tg_log_result_filter",
+                        label_visibility="collapsed",
+                    )
+
+                # ── Build filtered rows ──
                 rows = []
-                for entry in log[:50]:
+                for entry in log[:100]:
+                    func = entry.get("func", "")
+                    ok   = entry.get("ok", False)
+                    # Áp dụng filter
+                    if _log_func_filter and func not in _log_func_filter:
+                        continue
+                    if _log_result_filter == "Thành công" and not ok:
+                        continue
+                    if _log_result_filter == "Thất bại" and ok:
+                        continue
                     ts      = (entry.get("ts") or "")[:19].replace("T", " ")
-                    func    = entry.get("func", "")
                     preview = entry.get("preview", "")
-                    ok      = entry.get("ok", False)
                     err     = entry.get("error", "")
-                    ket_qua = "✅" if ok else f"❌ {err[:180]}"
+                    ket_qua = "✅ OK" if ok else f"❌ {err[:120]}"
                     rows.append({
                         "Thời gian": ts,
                         "Loại": func,
                         "Nội dung": preview,
                         "Kết quả": ket_qua,
+                        "_ok": ok,
                     })
-                df_log = pd.DataFrame(rows)
-                st.dataframe(df_log, use_container_width=True, hide_index=True)
-                st.caption(f"Hiển thị {min(50, len(log))}/{len(log)} bản ghi gần nhất.")
+
+                if not rows:
+                    st.info("Không có bản ghi nào khớp bộ lọc.")
+                else:
+                    df_log = pd.DataFrame(rows)
+                    # Tô màu kết quả
+                    def _highlight_result(row):
+                        if row["_ok"]:
+                            return ["", "", "", "background-color: #0D2818; color: #81C784", ""]
+                        return ["", "", "", "background-color: #2D0D14; color: #EF9A9A", ""]
+                    styled = (
+                        df_log.drop(columns=["_ok"])
+                        .style.apply(_highlight_result, axis=1)
+                    )
+                    st.dataframe(styled, use_container_width=True, hide_index=True, height=400)
+                    st.caption(
+                        f"Hiển thị {len(rows)}/{min(100, len(log))} bản ghi gần nhất "
+                        f"(tối đa 100)."
+                    )

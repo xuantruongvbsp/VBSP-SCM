@@ -304,7 +304,7 @@ def render(tab: DeltaGenerator | None = None, **kwargs) -> None:
 
             # ── Chọn sheet ──
             from data.hstd import liet_ke_sheet_dienbao
-            ds_sheet = liet_ke_sheet_dienbao(fp_ht)
+            ds_sheet = liet_ke_sheet_dienbao(fp_ht, ts=ts_file(fp_ht))
             sheet_info = {s["sheet"]: s for s in ds_sheet}
             sheet_opts = [s["sheet"] for s in ds_sheet]
 
@@ -316,7 +316,7 @@ def render(tab: DeltaGenerator | None = None, **kwargs) -> None:
                                         format_func=lambda s: f"{s} · {sheet_info[s]['rows']} dòng · {sheet_info[s].get('ngay','')[:30]}")
             with col_shp:
                 if fp_prev:
-                    ds_sheet_pv = liet_ke_sheet_dienbao(fp_prev)
+                    ds_sheet_pv = liet_ke_sheet_dienbao(fp_prev, ts=ts_file(fp_prev))
                     sheet_opts_pv = [s["sheet"] for s in ds_sheet_pv]
                     sheet_info_pv = {s["sheet"]: s for s in ds_sheet_pv}
                     # Tự map: nếu ht chọn M → prev tự chọn Y
@@ -456,7 +456,7 @@ def render(tab: DeltaGenerator | None = None, **kwargs) -> None:
                 return
 
             from data.hstd import liet_ke_sheet_dienbao
-            sheets_db = liet_ke_sheet_dienbao(fp_db)
+            sheets_db = liet_ke_sheet_dienbao(fp_db, ts=ts_file(fp_db))
             sheet_options_db = [item["sheet"] for item in sheets_db]
             if not sheet_options_db:
                 st.warning("⚠️ File Điện báo không có sheet dữ liệu.")

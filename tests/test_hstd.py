@@ -8,6 +8,9 @@ Không cần SQLite, không cần file upload — test thuần DataFrame.
 """
 from __future__ import annotations
 
+import os
+import time
+
 import pandas as pd
 import pytest
 
@@ -81,6 +84,29 @@ class TestDocDienBao:
         assert db_lookup(rows, "Tổng dư nợ") == 300
         assert data["units"] == ["PGD A", "PGD B"]
         assert data["matrix"]["Tổng dư nợ"] == {"PGD A": 100, "PGD B": 200}
+
+    def test_liet_ke_sheet_detect_header_o_dong_13_va_tu_bust_cache(self, tmp_path):
+        fp = tmp_path / "dienbao_header_dong_13.xlsx"
+        df = pd.DataFrame(
+            [[None, None, None, None, None] for _ in range(12)]
+            + [
+                ["TT", "Chỉ tiêu", "Tổng", "Trong đó", None],
+                [None, None, None, "PGD A", "PGD B"],
+                ["A", "Tổng dư nợ", 300, 100, 200],
+            ]
+        )
+        df.to_excel(fp, index=False, header=False, sheet_name="M")
+
+        sheets = liet_ke_sheet_dienbao(str(fp))
+        assert sheets[0]["format"] == "matrix"
+        assert sheets[0]["n_don_vi"] == 2
+
+        df.to_excel(fp, index=False, header=False, sheet_name="Y")
+        future = time.time() + 10
+        os.utime(fp, (future, future))
+
+        sheets_after = liet_ke_sheet_dienbao(str(fp))
+        assert [s["sheet"] for s in sheets_after] == ["Y"]
 
     def test_sheet_ma_tran_khong_cot_tong_tu_cong_cac_pgd(self, tmp_path):
         fp = tmp_path / "dienbao_matrix_khong_tong.xlsx"

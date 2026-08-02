@@ -59,7 +59,7 @@ from state_manager import SCMStateManager
 import db
 from data import ts_file, doc_dienbao, db_lookup
 from data.pgd import duong_dan_pgd, pgd_slug
-from services import luu_dienbao
+from services import luu_dienbao, trich_xuat_ky_dienbao
 
 
 if TYPE_CHECKING:
@@ -971,23 +971,31 @@ def _render_quan_ly_tep_inline(
         _ky_pm_saved = _normalize_ky_label(db.doc_kv(_ky_pm_kv))
         _meta_pm = db.doc_kv(f"dienbao_meta_prev_month{key_sfx}") or {}
 
+        _has_ht = os.path.exists(store_ht)
         _has_prev = os.path.exists(store_prev)
         _has_prev_month = os.path.exists(store_prev_month)
 
         # ── Hàng 1: Chốt ngày số liệu trước khi upload ──
         _ky_col1, _ky_col2 = st.columns(2)
         with _ky_col1:
+            _ky_ht_widget_ver_key = f"inp_ky_ht_ver{key_sfx}"
+            _ky_ht_widget_ver = st.session_state.setdefault(_ky_ht_widget_ver_key, 0)
+            _ky_ht_widget_key = f"inp_ky_ht{key_sfx}_{_ky_ht_widget_ver}"
+            _ky_ht_had_state = _ky_ht_widget_key in st.session_state
             _ky_ht_date = st.date_input(
                 "📅 Ngày số liệu HT",
                 value=_default_ht,
                 format="DD/MM/YYYY",
-                key=f"inp_ky_ht{key_sfx}",
+                key=_ky_ht_widget_key,
                 help="Chọn đúng ngày trước khi upload; hệ thống sẽ lưu ngày này cùng file.",
             )
             _ky_ht_str = _ky_ht_date.strftime("%d/%m/%Y")
-            _persist_ky_label_if_changed(
-                _ky_ht_kv, _ky_ht_saved, _ky_ht_str, username, "kỳ số liệu HT",
-            )
+            _ht_has_source = bool(_ky_ht_saved or _meta_ht.get("ky") or _has_ht)
+            _ht_user_changed = _ky_ht_had_state and _ky_ht_date != _default_ht
+            if _ht_has_source or _ht_user_changed:
+                _persist_ky_label_if_changed(
+                    _ky_ht_kv, _ky_ht_saved, _ky_ht_str, username, "kỳ số liệu HT",
+                )
         with _ky_col2:
             _pm_default_date = _last_day_previous_month(_ky_ht_date)
             _default_pm = (
@@ -996,6 +1004,9 @@ def _render_quan_ly_tep_inline(
                 or _pm_default_date
             )
             _ky_pm_widget_key = f"inp_ky_pm2{key_sfx}"
+            _ky_pm_widget_ver_key = f"{_ky_pm_widget_key}_ver"
+            _ky_pm_widget_ver = st.session_state.setdefault(_ky_pm_widget_ver_key, 0)
+            _ky_pm_widget_key = f"{_ky_pm_widget_key}_{_ky_pm_widget_ver}"
             _ky_pm_had_state = _ky_pm_widget_key in st.session_state
             _ky_pm_date = st.date_input(
                 "📅 Ngày số liệu tháng trước",
@@ -1026,7 +1037,8 @@ def _render_quan_ly_tep_inline(
             _upload_one_file("ht", store_ht, "Chưa có file",
                              key_sfx, pgd_mode, pgd_user, username,
                              ky_kv=_ky_ht_kv,
-                             ky_label=_ky_ht_str, ky_audit_name="kỳ số liệu HT")
+                             ky_label=_ky_ht_str, ky_audit_name="kỳ số liệu HT",
+                             ky_widget_ver_key=_ky_ht_widget_ver_key)
         with col_prev:
             st.markdown(f"**🗓️ Kỳ trước** · {nam_prev}")
             _ky_pv_kv = f"dienbao_ky_pv{key_sfx}"
@@ -1045,7 +1057,8 @@ def _render_quan_ly_tep_inline(
             _upload_one_file("prev_month", store_prev_month, "Chưa có — tùy chọn",
                              key_sfx, pgd_mode, pgd_user, username,
                              ky_kv=_ky_pm_kv,
-                             ky_label=_ky_pm_str, ky_audit_name="kỳ số liệu tháng trước")
+                             ky_label=_ky_pm_str, ky_audit_name="kỳ số liệu tháng trước",
+                             ky_widget_ver_key=_ky_pm_widget_ver_key)
 
         # ── Hàng 4: Lịch sử upload (gọn) ──
         if _co_dienbao_lich_su(key_sfx):
@@ -1064,6 +1077,7 @@ def _upload_one_file(
     ky_kv: str | None = None,
     ky_label: str | None = None,
     ky_audit_name: str = "kỳ số liệu",
+    ky_widget_ver_key: str | None = None,
 ) -> None:
     """Upload 1 file Điện báo + hiển thị chip trạng thái. Dùng chung cho cả 3 loại."""
     ver_key = f"up_db_{loai}_ver{key_sfx}"
@@ -1086,10 +1100,14 @@ def _upload_one_file(
             kq.hien_thi()
             if kq.thanh_cong:
                 if ky_kv and ky_label is not None:
+                    ky_from_name = trich_xuat_ky_dienbao(f_up.name) if loai != "prev" else None
+                    ky_effective = ky_from_name or ky_label
                     ky_saved_latest = db.doc_kv(ky_kv)
                     _persist_ky_label_if_changed(
-                        ky_kv, ky_saved_latest, ky_label, username, ky_audit_name,
+                        ky_kv, ky_saved_latest, ky_effective, username, ky_audit_name,
                     )
+                if ky_widget_ver_key:
+                    st.session_state[ky_widget_ver_key] = st.session_state.get(ky_widget_ver_key, 0) + 1
                 st.session_state[ver_key] = ver + 1
                 st.cache_data.clear()
                 st.rerun()
@@ -1136,21 +1154,29 @@ def _render_upload_section(
             or _parse_ddmmyyyy(str(_meta_ht.get("ky", "")))
             or date.today()
         )
+        _ky_ht_widget_ver_key = f"inp_ky_ht_ver{key_sfx}"
+        _ky_ht_widget_ver = st.session_state.setdefault(_ky_ht_widget_ver_key, 0)
+        _ky_ht_widget_key = f"inp_ky_ht{key_sfx}_{_ky_ht_widget_ver}"
+        _ky_ht_had_state = _ky_ht_widget_key in st.session_state
         _ky_ht_date = st.date_input(
             "📅 Ngày số liệu",
             value=_default_ht,
             format="DD/MM/YYYY",
-            key=f"inp_ky_ht{key_sfx}",
+            key=_ky_ht_widget_key,
             help="Chọn đúng ngày trước khi upload; hệ thống sẽ lưu ngày này cùng file.",
         )
         _ky_ht_str = _ky_ht_date.strftime("%d/%m/%Y")
-        _persist_ky_label_if_changed(
-            _ky_ht_kv, _ky_ht_saved, _ky_ht_str, username, "kỳ số liệu HT",
-        )
+        _ht_has_source = bool(_ky_ht_saved or _meta_ht.get("ky") or os.path.exists(store_ht))
+        _ht_user_changed = _ky_ht_had_state and _ky_ht_date != _default_ht
+        if _ht_has_source or _ht_user_changed:
+            _persist_ky_label_if_changed(
+                _ky_ht_kv, _ky_ht_saved, _ky_ht_str, username, "kỳ số liệu HT",
+            )
         _upload_one_file("ht", store_ht, "Chưa có file — vui lòng upload",
                          key_sfx, pgd_mode, pgd_user, username,
                          ky_kv=_ky_ht_kv,
-                         ky_label=_ky_ht_str, ky_audit_name="kỳ số liệu HT")
+                         ky_label=_ky_ht_str, ky_audit_name="kỳ số liệu HT",
+                         ky_widget_ver_key=_ky_ht_widget_ver_key)
 
     # ── 2. FILE TÙY CHỌN (kỳ trước + tháng trước) ───────────────────────
     st.markdown(
@@ -1192,6 +1218,9 @@ def _render_upload_section(
                 or _pm_default_date
             )
             _ky_pm_widget_key = f"inp_ky_pm2{key_sfx}"
+            _ky_pm_widget_ver_key = f"{_ky_pm_widget_key}_ver"
+            _ky_pm_widget_ver = st.session_state.setdefault(_ky_pm_widget_ver_key, 0)
+            _ky_pm_widget_key = f"{_ky_pm_widget_key}_{_ky_pm_widget_ver}"
             _ky_pm_had_state = _ky_pm_widget_key in st.session_state
             _ky_pm_date = st.date_input(
                 "📅 Ngày số liệu",
@@ -1210,7 +1239,8 @@ def _render_upload_section(
             _upload_one_file("prev_month", store_prev_month, "Chưa có — không bắt buộc",
                              key_sfx, pgd_mode, pgd_user, username,
                              ky_kv=_ky_pm_kv,
-                             ky_label=_ky_pm_str, ky_audit_name="kỳ số liệu tháng trước")
+                             ky_label=_ky_pm_str, ky_audit_name="kỳ số liệu tháng trước",
+                             ky_widget_ver_key=_ky_pm_widget_ver_key)
 
     # ── 3. LỊCH SỬ UPLOAD ────────────────────────────────────────────────
     if _co_dienbao_lich_su(key_sfx):

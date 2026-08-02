@@ -1,5 +1,22 @@
 # CHANGELOG
 
+## [2026-08-02] — Fix upload Điện báo: kỳ số liệu, metadata PGD và cache sheet
+- `services/upload_service.py` dòng ~449 — validate ngày trích từ tên file bằng `datetime.strptime`, chặn match lửng trong chuỗi số và ngày lịch không hợp lệ.
+- `services/upload_service.py` dòng ~471 — metadata Điện báo PGD không còn fallback về key Chi nhánh khi tạo slug lỗi; fail rõ trước khi ghi file/kv.
+- `tabs/tab_candoi.py` dòng ~1055 — upload HT/tháng trước ưu tiên kỳ parse từ tên file, reset version key của `date_input`, và không tự lưu ngày HT mặc định khi chưa có file/metadata/user change.
+- `data/hstd.py` dòng ~721 — tách wrapper tự lấy `ts_file(fp)` khi caller truyền `ts=0`, tăng scan preview lên 24 dòng để nhận header Điện báo sâu hơn.
+- `tabs/tab_khnv_bao_cao.py`, `services/khnv_bao_cao_service.py` — truyền `ts_file(fp)` khi liệt kê sheet Điện báo.
+- `tests/test_upload_service.py`, `tests/test_tab_candoi.py`, `tests/test_hstd.py` — thêm regression tests cho parser ngày, metadata PGD, widget kỳ số liệu và cache/list sheet.
+
+## [2026-08-02] — Fix test time-dependent trong TestLayDanhSachCanNhacAllowlist
+- `tests/test_report_submission_service.py` dòng ~419 — freeze `date.today()` về `2026-07-20` trong `test_allowlist_khong_anh_huong_loc_deadline_qua_han` để test không phụ thuộc ngày chạy
+
+## [2026-08-02] — Nâng cấp giao diện tab Bot Telegram (4 bước)
+- `tabs/tab_telegram_admin.py` — thêm sub-tab "📊 Tổng quan" (đầu tiên): KPI row (loại bật, rule active, trạng thái scheduler, lần gửi cuối) + cảnh báo tự động + bảng HTML tóm tắt 16 loại thông báo với badge trạng thái
+- `tabs/tab_telegram_admin.py` — sub-tab "Thông báo": thêm radio lọc nhanh (Tất cả/Đang bật/Đang tắt/Có chat phụ); badge `{bật}/{tổng} bật` trong tiêu đề expander nhóm
+- `tabs/tab_telegram_admin.py` — sub-tab "Lịch nâng cao": thay expander hướng dẫn dài bằng `st.popover` gọn; danh sách rule đã tạo hiển thị dạng card HTML (icon trạng thái + tên + giờ) thay vì bullet text
+- `tabs/tab_telegram_admin.py` — sub-tab "Lịch sử": thêm metrics row (gửi hôm nay, thành công, thất bại, tỷ lệ OK); filter theo loại + kết quả; tô màu dòng xanh/đỏ; tăng giới hạn lên 100 bản ghi
+
 ## [2026-08-02] — Thêm 13 loại thông báo vào scheduler Telegram + refactor _gui_ngay()
 - `services/telegram_jobs.py` — thêm 13 job runner mới (bao_cao_sang, khoang_den_han, phan_ky_nxh, khtd_tien_do, qh_moi, nop_moi_gsheet, lich_cong_tac, giai_ngan_tuan, khoanh_tang, nqh_tuan, khtd_ct, tong_ket_thang, health_check); thêm `JOB_LABELS` dict; tổng cộng 16 loại trong `_JOB_REGISTRY`
 - `services/telegram_jobs.py` — thêm `telegram_job_dedupe_key()` để gom `qh_moi`/`khoanh_tang` về cùng nhóm nội dung `rui_ro_tin_dung`

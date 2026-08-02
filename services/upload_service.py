@@ -453,19 +453,39 @@ def trich_xuat_ky_dienbao(ten_file: str) -> str | None:
     """
     if not ten_file:
         return None
+
+    def _fmt_if_valid(ng: str, th: str, nam: str) -> str | None:
+        try:
+            return datetime.strptime(
+                f"{int(ng):02d}/{int(th):02d}/{int(nam):04d}",
+                "%d/%m/%Y",
+            ).strftime("%d/%m/%Y")
+        except ValueError:
+            return None
+
     # Dạng có dấu phân cách: 31.07.2026 / 31-07-2026 / 31_07_2026
-    m = re.search(r"(\d{1,2})[.\-_](\d{1,2})[.\-_](\d{4})", ten_file)
+    m = re.search(r"(?<!\d)(\d{1,2})([.\-_])(\d{1,2})\2(\d{4})(?!\d)", ten_file)
     if m:
-        ng, th, nam = int(m.group(1)), int(m.group(2)), int(m.group(3))
-        if 1 <= ng <= 31 and 1 <= th <= 12:
-            return f"{ng:02d}/{th:02d}/{nam}"
+        ky = _fmt_if_valid(m.group(1), m.group(3), m.group(4))
+        if ky:
+            return ky
     # Dạng liền: 31072026
     m = re.search(r"(?<!\d)(\d{2})(\d{2})(\d{4})(?!\d)", ten_file)
     if m:
-        ng, th, nam = int(m.group(1)), int(m.group(2)), int(m.group(3))
-        if 1 <= ng <= 31 and 1 <= th <= 12:
-            return f"{ng:02d}/{th:02d}/{nam}"
+        return _fmt_if_valid(m.group(1), m.group(2), m.group(3))
     return None
+
+
+def _dienbao_key_sfx(ten_pgd: str | None) -> str:
+    """Suffix metadata Điện báo; không fallback PGD về key Chi nhánh."""
+    if not ten_pgd:
+        return ""
+    from data.pgd import pgd_slug as _slug_fn
+
+    slug = _slug_fn(ten_pgd)
+    if not slug:
+        raise ValueError(f"Không tạo được slug PGD từ '{ten_pgd}'")
+    return f"_{slug}"
 
 
 def luu_dienbao(
@@ -509,6 +529,12 @@ def luu_dienbao(
     ok, msg = kiem_tra_file(ten_hien + ".xlsx", file_bytes)
     if not ok:
         return KetQuaUpload(False, msg)
+
+    try:
+        _key_sfx = _dienbao_key_sfx(ten_pgd)
+    except Exception as e:
+        logger.error("luu_dienbao: không tạo được key PGD %s: %s", ten_pgd, e, exc_info=True)
+        return KetQuaUpload(False, f"❌ Không xác định được mã PGD để lưu metadata Điện báo: {ten_pgd}")
 
     # Kiểm tra cấu trúc nội dung file điện báo
     try:
@@ -578,12 +604,6 @@ def luu_dienbao(
         chi_tiet += f" pgd={ten_pgd}"
     db.ghi_audit(username, "upload_dienbao", chi_tiet)
 
-    # ── Ghi metadata upload vào kv_store (mục B) ──
-    try:
-        from data.pgd import pgd_slug as _slug_fn
-        _key_sfx = f"_{_slug_fn(ten_pgd)}" if ten_pgd else ""
-    except Exception:
-        _key_sfx = ""
     ky_tu_file = trich_xuat_ky_dienbao(ten_file_goc or "")
     _meta_key = f"dienbao_meta_{loai}{_key_sfx}"
     _meta_value = {

@@ -1,6 +1,7 @@
 """Unit test cho services/report_submission_service.py — đổi tên loại BC."""
 from __future__ import annotations
 
+from datetime import date
 from unittest.mock import patch
 
 import pandas as pd
@@ -421,7 +422,9 @@ class TestLayDanhSachCanNhacAllowlist:
             {"thoi_gian": pd.Timestamp("2026-07-10"), "ten_pgd": "PGD A", "loai_bao_cao": "BC A", "file_dinh_kem": "https://x.com"},
         ])
 
-        ds = svc.lay_danh_sach_can_nhac(df=df, allowlist={"BC A", "BC B"})
-        # BC B có deadline > 3 ngày, không cần nhắc
+        with patch.object(svc, "date", wraps=date) as mock_date:
+            mock_date.today.return_value = date(2026, 7, 20)
+            ds = svc.lay_danh_sach_can_nhac(df=df, allowlist={"BC A", "BC B"})
+        # BC B có deadline 01/08 > 20/07, chưa quá hạn → không nhắc
         assert len(ds) == 1
         assert ds[0]["loai"] == "BC A"

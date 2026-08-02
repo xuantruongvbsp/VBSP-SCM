@@ -3589,6 +3589,18 @@ def _to_int(val, default=0):
 
 ---
 
+### B81 — Tab Bot Telegram lỗi render lịch sử gửi vì thiếu cột `_ok`
+| | |
+|---|---|
+| **File** | `tabs/tab_telegram_admin.py` → `_highlight_log_result()` / sub-tab Lịch sử |
+| **Dấu hiệu** | Mở tab `🤖 Bot Telegram` báo lỗi render `'_ok'` khi có lịch sử gửi Telegram. |
+| **Nguyên nhân** | DataFrame log có cột phụ `_ok`, nhưng code `df_log.drop(columns=["_ok"])` trước khi gọi `Styler.apply`; hàm style vẫn đọc `row["_ok"]` nên phát sinh `KeyError`. |
+| **Fix** | Tách helper `_highlight_log_result()` tô màu dựa trên cột hiển thị `Kết quả`, trả style đúng số cột hiện có; bảng vẫn drop `_ok` trước khi render. |
+| **Test** | `tests/test_tab_telegram_admin.py::test_highlight_log_result_khong_can_cot_ok`, `tests/test_tab_telegram_admin.py::test_highlight_log_result_to_mau_loi_theo_cot_ket_qua` |
+| **Ngày fix** | 2026-08-03 |
+
+---
+
 Mỗi khi fix bug, copy template dưới đây và điền vào đúng mục:
 
 ```

@@ -16,6 +16,26 @@ from logger import get_logger
 
 logger = get_logger(__name__)
 
+_TELEGRAM_LOG_OK_STYLE = "background-color: #0D2818; color: #81C784"
+_TELEGRAM_LOG_FAIL_STYLE = "background-color: #2D0D14; color: #EF9A9A"
+
+
+def _highlight_log_result(row: pd.Series) -> list[str]:
+    """Tô màu cột Kết quả trong bảng lịch sử gửi Telegram."""
+    styles = [""] * len(row)
+    try:
+        result_idx = list(row.index).index("Kết quả")
+    except ValueError:
+        return styles
+
+    result_text = str(row.get("Kết quả", ""))
+    styles[result_idx] = (
+        _TELEGRAM_LOG_OK_STYLE
+        if result_text.startswith("✅")
+        else _TELEGRAM_LOG_FAIL_STYLE
+    )
+    return styles
+
 # ── Metadata các loại thông báo ────────────────────────────────────────────
 _NOTIFY_META = [
     {
@@ -1351,14 +1371,9 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                     st.info("Không có bản ghi nào khớp bộ lọc.")
                 else:
                     df_log = pd.DataFrame(rows)
-                    # Tô màu kết quả
-                    def _highlight_result(row):
-                        if row["_ok"]:
-                            return ["", "", "", "background-color: #0D2818; color: #81C784", ""]
-                        return ["", "", "", "background-color: #2D0D14; color: #EF9A9A", ""]
                     styled = (
                         df_log.drop(columns=["_ok"])
-                        .style.apply(_highlight_result, axis=1)
+                        .style.apply(_highlight_log_result, axis=1)
                     )
                     st.dataframe(styled, use_container_width=True, hide_index=True, height=400)
                     st.caption(

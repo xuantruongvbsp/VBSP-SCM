@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## [2026-08-03] — Fix render tab Bot Telegram lỗi `_ok`
+- `tabs/tab_telegram_admin.py` dòng ~23 — thêm `_highlight_log_result()` tô màu cột `Kết quả` mà không phụ thuộc cột ẩn `_ok`.
+- `tabs/tab_telegram_admin.py` dòng ~1375 — bảng lịch sử gửi Telegram drop `_ok` trước khi render nhưng style vẫn hoạt động, không còn `KeyError: '_ok'`.
+- `tests/test_tab_telegram_admin.py` — thêm regression tests cho style dòng OK/lỗi của lịch sử gửi Telegram.
+
 ## [2026-08-02] — Fix upload Điện báo: kỳ số liệu, metadata PGD và cache sheet
 - `services/upload_service.py` dòng ~449 — validate ngày trích từ tên file bằng `datetime.strptime`, chặn match lửng trong chuỗi số và ngày lịch không hợp lệ.
 - `services/upload_service.py` dòng ~471 — metadata Điện báo PGD không còn fallback về key Chi nhánh khi tạo slug lỗi; fail rõ trước khi ghi file/kv.

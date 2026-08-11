@@ -23,7 +23,7 @@ _API_TIMEOUT     = 10  # giây
 _NOTIFY_PRESENTATION = {
     "bao_cao_sang":      ("Báo cáo tổng hợp sáng", "Toàn Chi nhánh", "HSTD"),
     "khoang_den_han":    ("Nhắc khoản đến hạn", "Toàn Chi nhánh", "HSTD"),
-    "phan_ky_nxh":       ("Nhắc phân kỳ nhà ở xã hội", "Theo PGD", "HSTD/Tiền gửi"),
+    "phan_ky_nxh":       ("Nhắc phân kỳ nhà ở xã hội", "Theo PGD", "File phân kỳ NXH/Tiền gửi"),
     "khtd_tien_do":     ("Tiến độ KHTD", "Toàn Chi nhánh", "HSTD/KHTD"),
     "qh_moi":            ("Cảnh báo NQH tăng", "Toàn Chi nhánh", "HSTD/Snapshot"),
     "rui_ro_tin_dung":   ("Cảnh báo rủi ro tín dụng", "Toàn Chi nhánh", "HSTD/Snapshot"),
@@ -41,6 +41,29 @@ _NOTIFY_PRESENTATION = {
     "nqh_tuan":          ("Báo cáo NQH tuần", "Toàn Chi nhánh", "HSTD/Baseline"),
     "khtd_ct":           ("KHTD theo chương trình", "Toàn Chi nhánh", "HSTD/KHTD"),
     "tong_ket_thang":   ("Tổng kết tháng", "Toàn Chi nhánh", "HSTD/KHTD"),
+}
+
+_NOTIFY_GROUP_BY_KEY = {
+    "bao_cao_sang": "bao_cao_dinh_ky",
+    "khtd_tien_do": "bao_cao_dinh_ky",
+    "giai_ngan_tuan": "bao_cao_dinh_ky",
+    "nqh_tuan": "bao_cao_dinh_ky",
+    "khtd_ct": "bao_cao_dinh_ky",
+    "tong_ket_thang": "bao_cao_dinh_ky",
+    "khoang_den_han": "nhac_nghiep_vu",
+    "phan_ky_nxh": "nhac_nghiep_vu",
+    "deadline_bc": "nhac_nghiep_vu",
+    "nhap_lieu": "nhac_nghiep_vu",
+    "nop_moi_gsheet": "nhac_nghiep_vu",
+    "den_han_phan_tang": "nhac_nghiep_vu",
+    "lich_cong_tac": "nhac_nghiep_vu",
+    "qh_moi": "canh_bao_rui_ro",
+    "khoanh_tang": "canh_bao_rui_ro",
+    "rui_ro_tin_dung": "canh_bao_rui_ro",
+    "upload_pgd": "su_kien_he_thong",
+    "merge_thanh_cong": "su_kien_he_thong",
+    "health_check": "su_kien_he_thong",
+    "he_thong": "su_kien_he_thong",
 }
 
 
@@ -67,6 +90,11 @@ def _dinh_dang_ngay_so_lieu(value: object) -> str:
 
 def _lay_ngay_so_lieu_thong_bao(notify_key: str, text: str, nguon: str) -> str:
     """Lấy ngày nghiệp vụ; nguồn HSTD ưu tiên metadata merge thay vì ngày gửi."""
+    if notify_key == "phan_ky_nxh":
+        ngay_trong_tin = _dinh_dang_ngay_so_lieu(text)
+        if re.fullmatch(r"\d{2}/\d{2}/\d{4}", ngay_trong_tin):
+            return ngay_trong_tin
+
     if "HSTD" in nguon:
         try:
             meta = db.doc_kv("merge_meta_hstd") or {}
@@ -148,6 +176,34 @@ def luu_extra_chat(notify_key: str, chat_id: str, username: str = "system") -> N
     db.ghi_kv("telegram_config", cfg, username)
     db.ghi_audit(username, "telegram_extra_chat",
                  f"Chat ID phụ: {notify_key} = {chat_id.strip() or '(đã xóa)'}")
+
+
+def luu_group_chat(group_key: str, chat_id: str, username: str = "system") -> None:
+    """Lưu hoặc xóa chat_id cho cả một nhóm thông báo Telegram."""
+    group_key = str(group_key or "").strip()
+    if not group_key:
+        raise ValueError("group_key Telegram không được trống")
+    cfg = db.doc_kv("telegram_config") or {}
+    group_chats = cfg.get("group_chats", {})
+    if chat_id.strip():
+        group_chats[group_key] = chat_id.strip()
+    else:
+        group_chats.pop(group_key, None)
+    cfg["group_chats"] = group_chats
+    db.ghi_kv("telegram_config", cfg, username)
+    db.ghi_audit(username, "telegram_group_chat",
+                 f"Chat ID nhóm: {group_key} = {chat_id.strip() or '(đã xóa)'}")
+
+
+def _chat_id_theo_notify(cfg: dict, notify_key: str, main_chat: str) -> str:
+    """Resolve Chat ID theo thứ tự: loại thông báo -> nhóm thông báo -> chat chính."""
+    key = str(notify_key or "").strip()
+    group_key = _NOTIFY_GROUP_BY_KEY.get(key, "")
+    return (
+        cfg.get("extra_chats", {}).get(key)
+        or (cfg.get("group_chats", {}).get(group_key) if group_key else None)
+        or main_chat
+    )
 
 
 def doc_deadline_bc_allowlist() -> list[str] | None:
@@ -358,7 +414,7 @@ def gui_tin_theo_notify_chi_tiet(
         text = _chuan_hoa_thong_bao(text, notify_key)
     token, main_chat = _get_config()
     cfg = db.doc_kv("telegram_config") or {}
-    chat_id = cfg.get("extra_chats", {}).get(notify_key, main_chat)
+    chat_id = _chat_id_theo_notify(cfg, notify_key, main_chat)
     ok, err = _gui_tin_core(token, chat_id, text, parse_mode=parse_mode)
     _ghi_log(notify_key, text, ok, err)
     return ok, err
@@ -446,7 +502,7 @@ def gui_nhac_phan_ky_nxh(
     ngay_du_lieu: str = "",
 ) -> bool:
     """Gửi danh sách phân kỳ NXH cho 1 PGD, chia 2 nhóm đủ/không đủ số dư.
-    Tự chia nhiều tin nếu > 3800 ký tự.
+    Tự chia nhiều tin nếu dài (ngưỡng ~3300 ký tự/chunk, chừa chỗ cho khung chuẩn).
 
     Mỗi item: {"ten_kh", "so_ku", "ngay_dh", "du_no", "tong_tgk",
                "sdt", "ten_xa", "ten_to_truong", "ghi_chu"}
@@ -479,45 +535,54 @@ def gui_nhac_phan_ky_nxh(
             return _html.escape(raw)       # không nhận dạng được → hiện nguyên
         return f'<a href="tel:{s}">{s}</a>'
 
+    def _fmt_tr(v: float) -> str:
+        """Triệu đồng, nguyên triệu, phân cách VN: 1.234 tr."""
+        return f"{v / 1e6:,.0f}".replace(",", ".") + " tr"
+
     def _dong_kh(k: dict, show_tgk: bool = False) -> list[str]:
+        """Một khách hàng = 2 dòng (nhóm đủ) hoặc 3 dòng (nhóm thiếu).
+
+        Dòng 1: tên KH (đậm) + số khế ước — dễ quét mắt.
+        Dòng 2: hạn trả · dư nợ · lãi tồn · TK.
+        Dòng 3 (chỉ nhóm thiếu): số tiền còn thiếu (đậm) + SĐT.
+        """
         ten_kh      = _html.escape(str(k.get("ten_kh", "")))
         so_ku       = _html.escape(str(k.get("so_ku", "")))
-        ngay        = str(k.get("ngay_dh", ""))
+        ngay        = _html.escape(str(k.get("ngay_dh", "")))
         du_no_val   = float(k.get("du_no", 0) or 0)
         lai_ton_val = float(k.get("lai_ton", 0) or 0)
-        so_tien     = f"{du_no_val / 1e6:,.0f}".replace(",", ".") + " tr"
         sdt_raw     = str(k.get("sdt", "") or "")
-        ten_xa      = _html.escape(str(k.get("ten_xa", "") or ""))
         co_canh_bao = bool(str(k.get("ghi_chu", "")).strip())
-        marker      = "⚠️ " if co_canh_bao else "  • "
+        marker      = "⚠️" if co_canh_bao else "▪️"
 
-        lai_str = ""
+        rows = [f"{marker} <b>{ten_kh}</b> · {so_ku}"]
+
+        sdt_str  = _fmt_sdt(sdt_raw) if sdt_raw else ""
+        chi_tiet = [f"Hạn {ngay}", f"Nợ {_fmt_tr(du_no_val)}"]
         if lai_ton_val > 0:
-            lai_str = f" | Lãi tồn: {lai_ton_val / 1e6:,.0f}".replace(",", ".") + " tr"
+            chi_tiet.append(f"Lãi tồn {_fmt_tr(lai_ton_val)}")
 
-        tgk_str = ""
         if show_tgk:
             tgk       = float(k.get("tong_tgk", 0) or 0)
-            phai_tra  = du_no_val + lai_ton_val
-            con_thieu = phai_tra - tgk
-            tgk_str   = (
-                f" | TK: {tgk / 1e6:,.0f}".replace(",", ".") + " tr"
-                + f", thiếu {con_thieu / 1e6:,.0f}".replace(",", ".") + " tr và lãi phát sinh tháng"
-            )
-
-        sdt_str = _fmt_sdt(sdt_raw) if sdt_raw else ""
-        sub = " | ".join(filter(None, [sdt_str, ten_xa]))
-        rows = [f"{marker}{ten_kh} — {so_ku} — {ngay} — {so_tien}{lai_str}{tgk_str}"]
-        if sub:
-            rows.append(f"    <i>{sub}</i>")
+            con_thieu = du_no_val + lai_ton_val - tgk
+            chi_tiet.append(f"TK {_fmt_tr(tgk)}")
+            rows.append("    ⏰ " + " · ".join(chi_tiet))
+            dong_thieu = f"👉 Thiếu <b>{_fmt_tr(con_thieu)}</b> và lãi phát sinh tháng"
+            if sdt_str:
+                dong_thieu += f" · 📞 {sdt_str}"
+            rows.append("    " + dong_thieu)
+        else:
+            if sdt_str:
+                chi_tiet.append(f"📞 {sdt_str}")
+            rows.append("    ⏰ " + " · ".join(chi_tiet))
         return rows
 
     # ── Đọc mapping xã → cán bộ ───────────────────────────────────────────────
     can_bo_map: dict[str, str] = {}
     try:
         can_bo_map = db.doc_kv("nxh_can_bo_xa") or {}
-    except Exception:
-        pass
+    except Exception as e:
+        logger.error("doc nxh_can_bo_xa cho Telegram NXH: %s", e, exc_info=True)
 
     def _build_xa_groups(ds: list[dict], show_tgk: bool) -> list[str]:
         """Nhóm KH theo xã, mỗi nhóm có header tên xã + cán bộ phụ trách."""
@@ -528,21 +593,22 @@ def gui_nhac_phan_ky_nxh(
             xa = str(k.get("ten_xa", "") or "")
             seen.setdefault(xa, []).append(k)
         for xa, items in seen.items():
+            xa_hien_thi = xa or "Chưa rõ xã"
             can_bo = can_bo_map.get(xa, "")
-            cb_str = f" — CB: <b>{_html.escape(can_bo)}</b>" if can_bo else ""
-            lines.append(f"\n📍 <b>{_html.escape(xa)}</b>{cb_str} ({len(items)} khoản)")
+            cb_str = f" · CB: <b>{_html.escape(can_bo)}</b>" if can_bo else ""
+            lines.append(f"\n📍 <b>{_html.escape(xa_hien_thi)}</b>{cb_str} · {len(items)} khoản")
             for k in items:
                 lines.extend(_dong_kh(k, show_tgk=show_tgk))
         return lines
 
     so_canh_bao = sum(1 for k in ds_khoan if str(k.get("ghi_chu", "")).strip())
-    canh_bao_str = f"   ⚠️ <b>{so_canh_bao} cảnh báo</b>" if so_canh_bao else ""
+    canh_bao_str = f" · ⚠️ <b>{so_canh_bao} cảnh báo</b>" if so_canh_bao else ""
     pgd_esc = _html.escape(ten_pgd)
 
     def _gui_nhom(loai_lines: list[str], loai_header: str) -> bool:
         """Gửi 1 nhóm (đủ hoặc không đủ) — tự chia chunk nếu dài."""
         # Chừa dung lượng cho khung chuẩn (ngày SL, nguồn, thời điểm cập nhật).
-        _MAX = 3400
+        _MAX = 3300
         chunks: list[list[str]] = []
         cur: list[str] = []
         cur_len = 0
@@ -562,13 +628,20 @@ def gui_nhac_phan_ky_nxh(
             page_tag = f" ({i + 1}/{n})" if n > 1 else ""
             if i == 0:
                 msg_header = (
-                    f"🏠 <b>{pgd_esc}</b> — Phân kỳ NXH tháng {thang}{page_tag}\n"
-                    f"📅 <b>{len(ds_khoan)} khoản</b> | 💰 <b>{tong_tien_hien}</b>"
-                    f" | ✅ {len(du_so_du)}   ❌ {len(khong_du)}{canh_bao_str}\n"
+                    f"🏠 <b>{pgd_esc} — Phân kỳ NXH tháng {thang}</b>{page_tag}\n"
+                    f"📆 <b>Ngày dữ liệu NXH:</b> {_html.escape(str(ngay_ref))}\n"
+                    f"📋 <b>{len(ds_khoan)} khoản</b> · 💰 <b>{tong_tien_hien}</b>"
+                    f" · ✅ Đủ số dư: {len(du_so_du)} · ❌ Chưa đủ: {len(khong_du)}"
+                    f"{canh_bao_str}\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━━\n"
                     f"{loai_header}\n"
                 )
             else:
-                msg_header = f"🏠 <b>{pgd_esc}</b> — tiếp theo{page_tag}\n"
+                msg_header = (
+                    f"🏠 <b>{pgd_esc} — Phân kỳ NXH tháng {thang}</b>"
+                    f" — tiếp theo{page_tag}\n"
+                    f"📆 <b>Ngày dữ liệu NXH:</b> {_html.escape(str(ngay_ref))}\n"
+                )
             if not _gui_tin_for(msg_header + "\n".join(chunk), "phan_ky_nxh"):
                 result = False
         return result
@@ -956,18 +1029,14 @@ def luu_pgd_chat(ten_pgd: str, chat_id: str, username: str = "system") -> None:
 
 
 def gui_tin_pgd(text: str, ten_pgd: str, notify_key: str = "", parse_mode: str = "HTML") -> bool:
-    """Gửi tin đến chat riêng của PGD (pgd_chats[slug]) → extra_chats[notify_key] → chat chính."""
+    """Gửi tin đến chat PGD → chat loại TB → chat nhóm TB → chat chính."""
     from data.pgd import pgd_slug
     if notify_key and parse_mode == "HTML":
         text = _chuan_hoa_thong_bao(text, notify_key)
     token, main_chat = _get_config()
     cfg  = db.doc_kv("telegram_config") or {}
     slug = pgd_slug(ten_pgd)
-    chat_id = (
-        cfg.get("pgd_chats", {}).get(slug)
-        or (cfg.get("extra_chats", {}).get(notify_key) if notify_key else None)
-        or main_chat
-    )
+    chat_id = cfg.get("pgd_chats", {}).get(slug) or _chat_id_theo_notify(cfg, notify_key, main_chat)
     ok, last_err = _gui_tin_core(token, chat_id, text, parse_mode=parse_mode)
     if ok:
         _ghi_log(notify_key or f"pgd:{slug}", text, True)

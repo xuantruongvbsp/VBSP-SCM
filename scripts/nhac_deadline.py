@@ -39,6 +39,7 @@ from data.phan_ky_nxh import (
     COL_NXH_TGK,
     COL_NXH_LAI,
     COL_NXH_PGD,
+    lay_ngay_du_lieu_phan_ky_nxh,
 )
 from services.telegram_delta import diff_deadline, diff_due_loans, diff_progress
 
@@ -447,7 +448,7 @@ def _nhac_phan_ky_nxh() -> int:
         today_ts  = pd.Timestamp(today).normalize()
         first_day = today_ts.replace(day=1)
         last_day  = first_day + pd.offsets.MonthEnd(0)
-        ngay_du_lieu = first_day.strftime("%d/%m/%Y")
+        ngay_du_lieu = lay_ngay_du_lieu_phan_ky_nxh(first_day.strftime("%d/%m/%Y"))
 
         mask = (
             df[COL_NXH_NGAY].notna()
@@ -492,7 +493,7 @@ def _nhac_phan_ky_nxh() -> int:
         db.ghi_kv("nxh_nhac_thang_da_gui", ky_thang, "system")
         logger.info(
             "_nhac_phan_ky_nxh: tháng %s — đã gửi %d/%d PGD, %d khoản",
-            ky_thang, sent, df_thang[COL_PGD].nunique(), len(df_thang),
+            ky_thang, sent, df_thang[COL_NXH_PGD].nunique(), len(df_thang),
         )
         return sent
     except Exception as e:

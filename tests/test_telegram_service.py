@@ -42,26 +42,29 @@ def _mock_config(monkeypatch, telegram_config: dict) -> None:
 
 
 @pytest.mark.parametrize(
-    ("pgd_chats", "extra_chats", "expected_chat"),
+    ("pgd_chats", "extra_chats", "group_chats", "expected_chat"),
     [
-        ({SLUG_PGD: "CHAT_PGD"}, {"upload_pgd": "CHAT_EXTRA"}, "CHAT_PGD"),
-        ({}, {"upload_pgd": "CHAT_EXTRA"}, "CHAT_EXTRA"),
-        ({}, {}, "CHAT_MAIN"),
+        ({SLUG_PGD: "CHAT_PGD"}, {"upload_pgd": "CHAT_EXTRA"}, {"su_kien_he_thong": "CHAT_GROUP"}, "CHAT_PGD"),
+        ({}, {"upload_pgd": "CHAT_EXTRA"}, {"su_kien_he_thong": "CHAT_GROUP"}, "CHAT_EXTRA"),
+        ({}, {}, {"su_kien_he_thong": "CHAT_GROUP"}, "CHAT_GROUP"),
+        ({}, {}, {}, "CHAT_MAIN"),
     ],
-    ids=["uu_tien_chat_pgd", "fallback_chat_phu", "fallback_chat_chinh"],
+    ids=["uu_tien_chat_pgd", "fallback_chat_phu", "fallback_chat_nhom", "fallback_chat_chinh"],
 )
 def test_upload_pgd_routing_dung_thu_tu(
     monkeypatch,
     pgd_chats: dict,
     extra_chats: dict,
+    group_chats: dict,
     expected_chat: str,
 ) -> None:
-    """Upload PGD phải route: chat PGD → chat phụ upload_pgd → chat chính."""
+    """Upload PGD phải route: chat PGD → chat phụ upload_pgd → chat nhóm → chat chính."""
     _mock_config(monkeypatch, {
         "token": "TOKEN_TEST",
         "chat_id": "CHAT_MAIN",
         "pgd_chats": pgd_chats,
         "extra_chats": extra_chats,
+        "group_chats": group_chats,
     })
     sender = Mock(return_value=(True, ""))
     ghi_log = Mock()
@@ -74,6 +77,39 @@ def test_upload_pgd_routing_dung_thu_tu(
     assert sender.call_args.kwargs == {"parse_mode": "HTML"}
     assert ghi_log.call_args.args[0] == "upload_pgd"
     assert ghi_log.call_args.args[2] is True
+
+
+@pytest.mark.parametrize(
+    ("extra_chats", "group_chats", "expected_chat"),
+    [
+        ({"deadline_bc": "CHAT_EXTRA"}, {"nhac_nghiep_vu": "CHAT_GROUP"}, "CHAT_EXTRA"),
+        ({}, {"nhac_nghiep_vu": "CHAT_GROUP"}, "CHAT_GROUP"),
+        ({}, {}, "CHAT_MAIN"),
+    ],
+    ids=["uu_tien_chat_loai", "fallback_chat_nhom", "fallback_chat_chinh"],
+)
+def test_notify_routing_dung_thu_tu_chat_loai_nhom_chinh(
+    monkeypatch,
+    extra_chats: dict,
+    group_chats: dict,
+    expected_chat: str,
+) -> None:
+    """Tin theo notify_key phải ưu tiên chat riêng từng loại rồi mới tới chat nhóm."""
+    _mock_config(monkeypatch, {
+        "token": "TOKEN_TEST",
+        "chat_id": "CHAT_MAIN",
+        "extra_chats": extra_chats,
+        "group_chats": group_chats,
+    })
+    sender = Mock(return_value=(True, ""))
+    monkeypatch.setattr(tg, "_gui_tin_core", sender)
+    monkeypatch.setattr(tg, "_ghi_log", Mock())
+
+    ok, err = tg.gui_tin_theo_notify_chi_tiet("Nhắc deadline", "deadline_bc")
+
+    assert ok is True
+    assert err == ""
+    assert sender.call_args.args[0:2] == ("TOKEN_TEST", expected_chat)
 
 
 def test_upload_pgd_gui_loi_ghi_dung_log_key(monkeypatch) -> None:
@@ -128,6 +164,97 @@ class TestChuanHoaThongBao:
 
         assert f"<b>Ngày số liệu:</b> {datetime.now():%d/%m/%Y}" in result
         assert "<b>Nguồn dữ liệu:</b> Google Sheets" in result
+
+    def test_phan_ky_nxh_khong_lay_ngay_hstd_cu(self, monkeypatch) -> None:
+        monkeypatch.setattr(
+            tg.db,
+            "doc_kv",
+            lambda key: {"ngay_sl": "30/06/2026"}
+            if key == "merge_meta_hstd" else None,
+        )
+
+        result = tg._chuan_hoa_thong_bao(
+            "🏠 <b>PGD Long Thành</b> — Phân kỳ NXH tháng 08/2026\n"
+            "📆 <b>Ngày dữ liệu NXH:</b> 05/08/2026\n"
+            "📅 <b>1 khoản</b>",
+            "phan_ky_nxh",
+        )
+
+        assert "<b>Ngày số liệu:</b> 05/08/2026" in result
+        assert "<b>Nguồn dữ liệu:</b> File phân kỳ NXH/Tiền gửi" in result
+
+    def test_gui_nhac_phan_ky_nxh_dua_ngay_du_lieu_vao_tin(self, monkeypatch) -> None:
+        sent: list[str] = []
+
+        monkeypatch.setattr(
+            tg.db,
+            "doc_kv",
+            lambda key: {"phan_ky_nxh": True}
+            if key == "telegram_notify_config" else {},
+        )
+        monkeypatch.setattr(
+            tg,
+            "_gui_tin_for",
+            lambda text, _key: sent.append(text) or True,
+        )
+
+        ok = tg.gui_nhac_phan_ky_nxh(
+            "PGD Long Thành",
+            [
+                {
+                    "ten_kh": "Nguyen Van A",
+                    "so_ku": "6600001",
+                    "ngay_dh": "12/08/2026",
+                    "du_no": 13_500_000,
+                    "lai_ton": 0,
+                    "tong_tgk": 20_000_000,
+                    "ten_xa": "Long Thành",
+                }
+            ],
+            ngay_du_lieu="05/08/2026",
+        )
+
+        assert ok is True
+        assert sent
+        assert "Ngày dữ liệu NXH:</b> 05/08/2026" in sent[0]
+
+    def test_gui_nhac_phan_ky_nxh_header_khong_loi_encoding_va_xa_rong(self, monkeypatch) -> None:
+        sent: list[str] = []
+
+        monkeypatch.setattr(
+            tg.db,
+            "doc_kv",
+            lambda key: {"phan_ky_nxh": True}
+            if key == "telegram_notify_config" else {},
+        )
+        monkeypatch.setattr(
+            tg,
+            "_gui_tin_for",
+            lambda text, _key: sent.append(text) or True,
+        )
+
+        ok = tg.gui_nhac_phan_ky_nxh(
+            "PGD Long Thành",
+            [
+                {
+                    "ten_kh": "Nguyen Van A",
+                    "so_ku": "6600001",
+                    "ngay_dh": "12/08/2026<script>",
+                    "du_no": 13_500_000,
+                    "lai_ton": 0,
+                    "tong_tgk": 0,
+                    "ten_xa": "",
+                }
+            ],
+            ngay_du_lieu="05/08/2026",
+        )
+
+        assert ok is True
+        assert sent
+        assert "�" not in sent[0]
+        assert "📋 <b>1 khoản</b>" in sent[0]
+        assert "📍 <b>Chưa rõ xã</b>" in sent[0]
+        assert "12/08/2026&lt;script&gt;" in sent[0]
 
     def test_chuan_hoa_idempotent(self, monkeypatch) -> None:
         monkeypatch.setattr(tg.db, "doc_kv", lambda _key: None)

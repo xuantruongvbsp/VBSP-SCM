@@ -1,5 +1,38 @@
 # CHANGELOG
 
+## [2026-08-08] — Fix ký tự lỗi trong header Telegram phân kỳ NXH
+- `services/telegram_service.py` dòng ~551/~584/~632 — thay ký tự lỗi `�` bằng icon `📋`, escape ngày hạn trong HTML, hiển thị xã trống là `Chưa rõ xã`, và log lỗi đọc mapping cán bộ thay vì bỏ qua im lặng.
+- `tests/test_telegram_service.py` dòng ~220 — thêm regression test đảm bảo tin phân kỳ NXH không còn ký tự lỗi encoding, có header danh sách và xử lý xã trống.
+- `BUGMAP.md` — thêm mục B84 cho lỗi ký tự lỗi trong header tin Telegram phân kỳ NXH.
+
+## [2026-08-07] — Thiết kế lại giao diện tin nhắn Telegram phân kỳ NXH
+- `services/telegram_service.py` dòng ~538 — `_dong_kh()`: mỗi khách hàng tách thành 2–3 dòng (dòng 1: tên đậm + khế ước; dòng 2: hạn · nợ · lãi tồn · TK; dòng 3: số tiền thiếu đậm + SĐT); bỏ lặp tên xã từng dòng vì đã nhóm theo header xã.
+- `services/telegram_service.py` dòng ~620 — header tin: tiêu đề đậm gọn, dòng thống kê có nhãn (`✅ Đủ số dư: n · ❌ Chưa đủ: n`), đường kẻ phân tách; tin "tiếp theo" giữ tiêu đề + ngày dữ liệu.
+- `services/telegram_service.py` dòng ~601 — ngưỡng chunk 3400 → 3300 ký tự để chừa chỗ cho header mới + khung chuẩn.
+
+## [2026-08-06] — Tách route Telegram theo nhóm thông báo
+- `services/telegram_service.py` dòng ~41/~172/~381/~982 — thêm `group_chats` cho 4 nhóm thông báo, resolve Chat ID theo thứ tự loại thông báo → nhóm thông báo → chat chính; riêng PGD vẫn ưu tiên chat PGD trước.
+- `tabs/tab_telegram_admin.py` dòng ~154/~1008/~1082/~1205 — thêm form cấu hình Chat ID nhóm trong tab Bot Telegram và hiển thị route “Loại/Nhóm” ở danh sách thông báo.
+- `tests/test_telegram_service.py` dòng ~45/~80 — thêm regression test cho fallback chat nhóm với upload PGD và notify key thông thường.
+
+## [2026-08-05] — Fix ngày dữ liệu Telegram phân kỳ NXH bị lấy theo HSTD cũ
+- `data/phan_ky_nxh.py` dòng ~243/~291 — lưu `ngay_du_lieu` khi upload NXH và thêm `lay_ngay_du_lieu_phan_ky_nxh()` ưu tiên metadata NXH, fallback theo mtime cache.
+- `services/telegram_service.py` dòng ~26/~68/~571 — đổi nguồn trình bày NXH sang file phân kỳ riêng, ưu tiên ngày trong tin NXH và đưa `Ngày dữ liệu NXH` vào nội dung gửi.
+- `services/telegram_jobs.py`, `scripts/nhac_deadline.py`, `scripts/daily_report.py` — các luồng gửi NXH dùng ngày dữ liệu từ metadata NXH thay vì ngày hiện tại/đầu tháng hoặc metadata HSTD.
+- `tests/test_telegram_service.py`, `tests/test_phan_ky_nxh.py` — thêm regression test chống lấy ngày HSTD cũ cho tin phân kỳ NXH.
+
+## [2026-08-04] — Fix Task Scheduler mất heartbeat khi máy dùng pin
+- `scripts/setup_task_scheduler.ps1` dòng ~51 — thêm `Set-VbspBatteryPolicy()` để các task VBSP không bị chặn bởi `No Start On Batteries` / `Stop On Battery Mode` sau khi cài lại.
+- Windows Task Scheduler — cập nhật `VBSP-TelegramScheduler` và `VBSP-TelegramPolling` để vẫn chạy khi máy đang dùng pin; khôi phục heartbeat tự động.
+
+## [2026-08-03] — Fix NameError COL_PGD trong nhắc phân kỳ NXH
+- `scripts/nhac_deadline.py` dòng ~495 — `logger.info` cuối `_nhac_phan_ky_nxh()` dùng `df_thang[COL_PGD]` (biến không tồn tại) → thay bằng `df_thang[COL_NXH_PGD]`; hết crash `NameError` sau khi gửi tin tháng 08/2026.
+
+## [2026-08-03] — Fix upload Phân kỳ NXH nhận header dòng 5
+- `data/phan_ky_nxh.py` dòng ~106 — thêm `_read_excel_nxh()` tự dò dòng header trong các dòng đầu, fallback mẫu cũ và đọc cột định danh bằng `dtype=str`.
+- `data/phan_ky_nxh.py` dòng ~151 — chuẩn hóa cột rỗng/`Unnamed`, giữ mã định danh dạng text và khôi phục số 0 đầu cho `Số điện thoại` khi Excel trả về số.
+- `tests/test_phan_ky_nxh.py` — thêm regression test cho file NXH có header dòng 5 và số điện thoại `090...`.
+
 ## [2026-08-03] — Fix render tab Bot Telegram lỗi `_ok`
 - `tabs/tab_telegram_admin.py` dòng ~23 — thêm `_highlight_log_result()` tô màu cột `Kết quả` mà không phụ thuộc cột ẩn `_ok`.
 - `tabs/tab_telegram_admin.py` dòng ~1375 — bảng lịch sử gửi Telegram drop `_ok` trước khi render nhưng style vẫn hoạt động, không còn `KeyError: '_ok'`.

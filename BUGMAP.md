@@ -1197,6 +1197,16 @@
 | **Test** | `tests/test_upload_service.py::TestTrichXuatKyDienbao::test_ngay_khong_hop_le`, `tests/test_upload_service.py::TestTrichXuatKyDienbao::test_khong_match_lung_trong_chuoi_so_co_dau` |
 | **Ngày fix** | 2026-08-02 |
 
+### E22 — Upload Phân kỳ NXH không nhận file TTBC có header dòng 5
+| | |
+|---|---|
+| **File** | `data/phan_ky_nxh.py` → `luu_phan_ky_nxh()` / `_read_excel_nxh()` |
+| **Dấu hiệu** | File `Sao kê nợ đến hạn kỳ con theo chương trình vay` có đủ cột nhưng upload báo không tìm thấy `Ngày đến hạn kỳ con` hoặc `Dư nợ kỳ con đến hạn`; nếu đọc được thì `Số điện thoại` có thể mất số 0 đầu. |
+| **Nguyên nhân** | Parser hardcode `header=3` rồi fallback `header=0`, trong khi mẫu TTBC mới đặt header ở dòng 5 (`header=4`); pandas tự suy luận `Số điện thoại` dạng số khi không ép dtype. |
+| **Fix** | Tự scan các dòng đầu để tìm header có đủ cột bắt buộc, fallback các header cũ, đọc cột định danh bằng `dtype=str`, và normalize mã/SĐT sau khi đọc. |
+| **Test** | `tests/test_phan_ky_nxh.py::test_read_excel_nxh_tu_do_header_dong_5_va_giu_sdt_text` |
+| **Ngày fix** | 2026-08-03 |
+
 ### E1 — Upload thành công nhưng dữ liệu không cập nhật
 | | |
 |---|---|
@@ -3598,6 +3608,53 @@ def _to_int(val, default=0):
 | **Fix** | Tách helper `_highlight_log_result()` tô màu dựa trên cột hiển thị `Kết quả`, trả style đúng số cột hiện có; bảng vẫn drop `_ok` trước khi render. |
 | **Test** | `tests/test_tab_telegram_admin.py::test_highlight_log_result_khong_can_cot_ok`, `tests/test_tab_telegram_admin.py::test_highlight_log_result_to_mau_loi_theo_cot_ket_qua` |
 | **Ngày fix** | 2026-08-03 |
+
+---
+
+### B82 — Nhắc phân kỳ NXH crash `NameError: COL_PGD` sau khi gửi, log sai lệch
+| | |
+|---|---|
+| **File** | `scripts/nhac_deadline.py` → `_nhac_phan_ky_nxh()` ~dòng 495 |
+| **Dấu hiệu** | Log ngày 01/08/2026 06:18:27: `NameError: name 'COL_PGD' is not defined` ngay sau khi gửi xong tin phân kỳ NXH tháng 08. Hàm trả về 0 dù đã gửi thành công. |
+| **Nguyên nhân** | `logger.info` cuối hàm dùng `df_thang[COL_PGD].nunique()` nhưng hàm chỉ import `COL_NXH_PGD` từ `data.phan_ky_nxh`; `COL_PGD` chưa bao giờ được định nghĩa trong scope này. |
+| **Fix** | Thay `df_thang[COL_PGD]` → `df_thang[COL_NXH_PGD]`. Lỗi xảy ra SAU `db.ghi_kv("nxh_nhac_thang_da_gui", ...)` nên key chống trùng đã ghi trước đó — không mất trạng thái, nhưng cần fix để log đúng số PGD và không nuốt kết quả gửi. |
+| **Ngày fix** | 2026-08-03 |
+
+---
+
+### B83 — Telegram phân kỳ NXH hiển thị ngày dữ liệu HSTD cũ
+| | |
+|---|---|
+| **File** | `services/telegram_service.py`, `services/telegram_jobs.py`, `scripts/nhac_deadline.py`, `scripts/daily_report.py`, `data/phan_ky_nxh.py` |
+| **Dấu hiệu** | Đã upload file phân kỳ NXH mới nhưng tin Telegram vẫn ghi `Ngày số liệu` theo ngày HSTD/merge cũ. |
+| **Nguyên nhân** | `_NOTIFY_PRESENTATION["phan_ky_nxh"]` khai báo nguồn chứa `HSTD`, nên `_lay_ngay_so_lieu_thong_bao()` ưu tiên `merge_meta_hstd.ngay_sl`; đồng thời nội dung tin chưa đưa `ngay_du_lieu` NXH vào header để wrapper nhận diện. |
+| **Fix** | Đổi nguồn trình bày sang `File phân kỳ NXH/Tiền gửi`, thêm dòng `Ngày dữ liệu NXH` vào tin, lưu/đọc `ngay_du_lieu` từ `phan_ky_nxh_meta`, và các runner truyền ngày này khi gửi. |
+| **Test** | `tests/test_telegram_service.py::TestChuanHoaThongBao::test_phan_ky_nxh_khong_lay_ngay_hstd_cu`, `tests/test_telegram_service.py::TestChuanHoaThongBao::test_gui_nhac_phan_ky_nxh_dua_ngay_du_lieu_vao_tin`, `tests/test_phan_ky_nxh.py::test_lay_ngay_du_lieu_phan_ky_nxh_uu_tien_meta` |
+| **Ngày fix** | 2026-08-05 |
+
+---
+
+### B84 — Header Telegram phân kỳ NXH có ký tự lỗi `�`
+| | |
+|---|---|
+| **File** | `services/telegram_service.py` → `gui_nhac_phan_ky_nxh()` ~dòng 632 |
+| **Dấu hiệu** | Tin Telegram phân kỳ NXH sau redesign hiển thị ký tự lỗi `�` trước số lượng khoản; xã trống có thể hiện header `📍  · n khoản`. |
+| **Nguyên nhân** | Icon trong f-string header bị lỗi encoding khi sửa file; nhánh nhóm theo xã dùng chuỗi rỗng trực tiếp làm nhãn hiển thị. |
+| **Fix** | Thay ký tự lỗi bằng `📋`, fallback xã trống thành `Chưa rõ xã`, escape ngày hạn trước khi đưa vào HTML và log lỗi đọc mapping cán bộ thay vì `except: pass`. |
+| **Test** | `tests/test_telegram_service.py::TestChuanHoaThongBao::test_gui_nhac_phan_ky_nxh_header_khong_loi_encoding_va_xa_rong` |
+| **Ngày fix** | 2026-08-08 |
+
+---
+
+### J61 — Task Scheduler mất heartbeat khi máy dùng pin
+| | |
+|---|---|
+| **File** | `scripts/setup_task_scheduler.ps1`; Windows Task Scheduler |
+| **Dấu hiệu** | Tab Bot Telegram báo `Scheduler mất heartbeat`; `VBSP-TelegramScheduler` ở trạng thái `Ready`, `LastTaskResult=0`, nhưng `LastRunTime` đứng ở 04/08/2026 07:55:31 và `NumberOfMissedRuns` tăng sau mỗi mốc 5 phút. |
+| **Nguyên nhân** | Settings mặc định của Scheduled Task bật `DisallowStartIfOnBatteries=True` và `StopIfGoingOnBatteries=True`; máy đang chạy pin nên Windows bỏ lượt chạy dù task vẫn enabled. |
+| **Fix** | Cập nhật trực tiếp `VBSP-TelegramScheduler` và `VBSP-TelegramPolling` để cho phép chạy khi dùng pin; thêm `Set-VbspBatteryPolicy()` trong `scripts/setup_task_scheduler.ps1` để các lần cài lại không tái tạo cấu hình chặn pin. |
+| **Test** | `Get-ScheduledTask`/`schtasks /query` xác nhận không còn `No Start On Batteries`; chờ qua mốc scheduler và kiểm `cache/telegram_scheduler.lock` cập nhật. |
+| **Ngày fix** | 2026-08-04 |
 
 ---
 

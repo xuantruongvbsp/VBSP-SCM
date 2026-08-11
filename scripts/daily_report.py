@@ -524,7 +524,7 @@ def generate_daily_report() -> str | None:
 
 def _nhac_phan_ky_nxh() -> int:
     """Đọc parquet NXH, lọc từ hôm nay đến cuối tháng, gửi 1 tin/PGD qua Telegram."""
-    from data.phan_ky_nxh import doc_phan_ky_nxh
+    from data.phan_ky_nxh import doc_phan_ky_nxh, lay_ngay_du_lieu_phan_ky_nxh
     from services.telegram_service import gui_nhac_phan_ky_nxh
 
     df = doc_phan_ky_nxh()
@@ -543,7 +543,7 @@ def _nhac_phan_ky_nxh() -> int:
     if COL_NGAY not in df.columns or COL_PGD not in df.columns:
         return 0
 
-    ngay_du_lieu = today_ts.strftime("%d/%m/%Y")
+    ngay_du_lieu = lay_ngay_du_lieu_phan_ky_nxh(today_ts.strftime("%d/%m/%Y"))
     # Chỉ lấy khoản đến hạn TỪ HÔM NAY trở đi (bỏ các khoản đã qua)
     mask = (
         df[COL_NGAY].notna()

@@ -141,7 +141,7 @@ def _run_khoang_den_han(baseline: dict | None = None) -> TelegramJobResult:
 
 def _run_phan_ky_nxh(baseline: dict | None = None) -> TelegramJobResult:
     import pandas as pd
-    from data.phan_ky_nxh import doc_phan_ky_nxh
+    from data.phan_ky_nxh import doc_phan_ky_nxh, lay_ngay_du_lieu_phan_ky_nxh
     from services import telegram_service as tg
 
     df = doc_phan_ky_nxh()
@@ -177,7 +177,8 @@ def _run_phan_ky_nxh(baseline: dict | None = None) -> TelegramJobResult:
             }
             for _, r in grp.iterrows()
         ]
-        ok_pgd = tg.gui_nhac_phan_ky_nxh(str(ten_pgd), ds, today_ts.strftime("%d/%m/%Y"))
+        ngay_du_lieu = lay_ngay_du_lieu_phan_ky_nxh(today_ts.strftime("%d/%m/%Y"))
+        ok_pgd = tg.gui_nhac_phan_ky_nxh(str(ten_pgd), ds, ngay_du_lieu)
         if ok_pgd:
             sent_count += 1
         else:

@@ -48,6 +48,17 @@ Write-Host ""
 
 # ── Helper tạo task ─────────────────────────────────────────────────────────
 
+function Set-VbspBatteryPolicy {
+    param(
+        [Parameter(Mandatory=$true)]
+        $Settings
+    )
+
+    # Server app cần scheduler chạy đều cả khi Windows báo đang dùng pin/UPS.
+    $Settings.DisallowStartIfOnBatteries = $false
+    $Settings.StopIfGoingOnBatteries = $false
+}
+
 function New-VbspTask {
     param(
         [string]$TaskName,
@@ -72,6 +83,7 @@ function New-VbspTask {
         -ExecutionTimeLimit "00:10:00" `
         -MultipleInstances IgnoreNew `
         -StartWhenAvailable
+    Set-VbspBatteryPolicy -Settings $settings
 
     # Chạy với tài khoản SYSTEM (không cần đăng nhập)
     $principal = New-ScheduledTaskPrincipal `
@@ -130,6 +142,7 @@ $schedulerSettings = New-ScheduledTaskSettingsSet `
     -ExecutionTimeLimit "00:04:00" `
     -MultipleInstances IgnoreNew `
     -StartWhenAvailable
+Set-VbspBatteryPolicy -Settings $schedulerSettings
 
 $schedulerPrincipal = New-ScheduledTaskPrincipal `
     -UserId "SYSTEM" -LogonType ServiceAccount -RunLevel Highest
@@ -165,6 +178,7 @@ $pollingSettings = New-ScheduledTaskSettingsSet `
     -ExecutionTimeLimit "00:00:30" `
     -MultipleInstances IgnoreNew `
     -StartWhenAvailable
+Set-VbspBatteryPolicy -Settings $pollingSettings
 
 $pollingPrincipal = New-ScheduledTaskPrincipal `
     -UserId "SYSTEM" -LogonType ServiceAccount -RunLevel Highest

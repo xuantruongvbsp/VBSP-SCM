@@ -159,6 +159,7 @@ _NOTIFY_GROUPS = [
     {
         "icon": "📊",
         "ten": "Báo cáo định kỳ",
+        "chat_key": "bao_cao_dinh_ky",
         "mo_ta": "Tổng hợp số liệu theo ngày, tuần, tháng và tiến độ KHTD.",
         "keys": (
             "bao_cao_sang", "khtd_tien_do", "giai_ngan_tuan",
@@ -168,6 +169,7 @@ _NOTIFY_GROUPS = [
     {
         "icon": "🔔",
         "ten": "Nhắc nghiệp vụ",
+        "chat_key": "nhac_nghiep_vu",
         "mo_ta": "Nhắc đến hạn, nộp báo cáo, nhập liệu và lịch công tác.",
         "keys": (
             "khoang_den_han", "phan_ky_nxh", "deadline_bc", "nhap_lieu",
@@ -177,12 +179,14 @@ _NOTIFY_GROUPS = [
     {
         "icon": "⚠️",
         "ten": "Cảnh báo rủi ro",
+        "chat_key": "canh_bao_rui_ro",
         "mo_ta": "Cảnh báo biến động nợ quá hạn và nợ khoanh.",
         "keys": ("qh_moi", "khoanh_tang"),
     },
     {
         "icon": "⚙️",
         "ten": "Sự kiện hệ thống",
+        "chat_key": "su_kien_he_thong",
         "mo_ta": "Theo dõi upload, merge, Health Check và cảnh báo hệ thống.",
         "keys": ("upload_pgd", "merge_thanh_cong", "health_check", "he_thong"),
     },
@@ -1004,11 +1008,47 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
 
             st.divider()
 
+            # ── Chat ID theo nhóm thông báo ──────────────────────────────────
+            st.markdown("##### Chat ID nhóm thông báo (khuyến nghị)")
+            st.caption(
+                "Một Chat ID áp dụng cho cả nhóm. "
+                "Ưu tiên: Chat PGD > Chat riêng từng loại > Chat nhóm > Chat chính."
+            )
+
+            group_chats = cfg.get("group_chats", {})
+            group_inputs: dict[str, str] = {}
+            with st.form("tg_group_chats_form"):
+                for group in _NOTIFY_GROUPS:
+                    chat_key = group["chat_key"]
+                    group_inputs[chat_key] = st.text_input(
+                        f"{group['icon']} {group['ten']}",
+                        value=group_chats.get(chat_key, ""),
+                        placeholder="-100xxxxxxxxxx (để trống = dùng chat chính)",
+                        key=f"tg_group_chat_{chat_key}",
+                    )
+
+                if st.form_submit_button("💾 Lưu Chat ID nhóm", type="primary"):
+                    from services.telegram_service import luu_group_chat
+
+                    changed = 0
+                    for chat_key, new_chat_id in group_inputs.items():
+                        if new_chat_id.strip() != str(group_chats.get(chat_key, "")).strip():
+                            luu_group_chat(chat_key, new_chat_id, username)
+                            changed += 1
+
+                    if changed:
+                        st.success(f"✅ Đã cập nhật {changed} nhóm thông báo.")
+                        st.rerun()
+                    else:
+                        st.info("Không có thay đổi Chat ID nhóm.")
+
+            st.divider()
+
             # ── Chat ID phụ theo loại thông báo ──────────────────────────────
             st.markdown("##### Chat ID phụ (tuỳ chọn)")
             st.caption(
-                "Mỗi loại thông báo có thể gửi vào 1 group riêng. "
-                "Để trống = dùng Chat ID chính ở trên."
+                "Ghi đè riêng cho một loại thông báo cụ thể. "
+                "Để trống = dùng Chat ID nhóm hoặc Chat ID chính."
             )
 
             notify_labels = {m["key"]: f"{m['icon']} {m['ten']}" for m in _NOTIFY_META}
@@ -1081,7 +1121,9 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
         with tab_tb:
             notify_cfg  = db.doc_kv("telegram_notify_config") or {}
             sched_cfg   = db.doc_kv("telegram_schedule_config") or {}
-            extra_chats = (db.doc_kv("telegram_config") or {}).get("extra_chats", {})
+            telegram_cfg = db.doc_kv("telegram_config") or {}
+            extra_chats = telegram_cfg.get("extra_chats", {})
+            group_chats = telegram_cfg.get("group_chats", {})
             from services.telegram_schedule_service import doc_schedule_config
 
             advanced_cfg = doc_schedule_config()
@@ -1129,6 +1171,8 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                 cur_on    = bool(notify_cfg.get(key, True))
                 cur_gio   = sched_cfg.get(key, m["gio_mac_dinh"])
                 has_extra = bool(extra_chats.get(key, ""))
+                group = group_by_key[key]
+                has_group_chat = bool(group_chats.get(group["chat_key"], ""))
 
                 # Áp dụng filter
                 if tg_filter == "Đang bật" and not cur_on:
@@ -1137,11 +1181,10 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                 if tg_filter == "Đang tắt" and cur_on:
                     new_notify[key] = cur_on
                     continue
-                if tg_filter == "Có chat phụ" and not has_extra:
+                if tg_filter == "Có chat phụ" and not (has_extra or has_group_chat):
                     new_notify[key] = cur_on
                     continue
 
-                group = group_by_key[key]
                 if group["ten"] != current_group:
                     # Đếm bật/tắt trong nhóm
                     _grp_on = sum(
@@ -1204,7 +1247,9 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
 
                 with c4:
                     if has_extra:
-                        st.markdown("📡", help="Đã cấu hình chat ID phụ")
+                        st.markdown("📡 Loại", help="Đã cấu hình Chat ID riêng cho loại thông báo này")
+                    elif has_group_chat:
+                        st.markdown("🗂 Nhóm", help=f"Đang dùng Chat ID nhóm {group['ten']}")
                     else:
                         st.caption("—")
 

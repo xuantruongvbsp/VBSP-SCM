@@ -3658,6 +3658,18 @@ def _to_int(val, default=0):
 
 ---
 
+### J72 — CI không import được module `data.phan_ky_nxh`
+| | |
+|---|---|
+| **File** | `.gitignore`; `data/phan_ky_nxh.py`; `tests/test_phan_ky_nxh.py` |
+| **Dấu hiệu** | Pytest dừng khi collection trên GitHub Actions với `ImportError: cannot import name 'phan_ky_nxh' from 'data'`, trong khi test chạy được trên máy phát triển. |
+| **Nguyên nhân** | `.gitignore` dùng rule `data/`, vô tình ignore cả Python package source. File test đã được commit nhưng module `data/phan_ky_nxh.py` chỉ tồn tại local nên runner CI không có file để import. |
+| **Fix** | Đổi rule thành `data/*` và thêm exception `!data/*.py`, nhờ đó vẫn bỏ qua Excel/database/thư mục runtime nhưng cho phép theo dõi source Python. |
+| **Test** | `tests/test_phan_ky_nxh.py` (2 passed); kiểm tra `git check-ignore data/phan_ky_nxh.py` không còn match. |
+| **Ngày fix** | 2026-08-11 |
+
+---
+
 Mỗi khi fix bug, copy template dưới đây và điền vào đúng mục:
 
 ```

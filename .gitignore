@@ -58,10 +58,11 @@ VBSP-SCM/
 ~$*.xlsx
 ~$*.docx
 
-# File Excel - không commit
+# File Excel/dữ liệu runtime - không commit; vẫn theo dõi source Python trong data/
 *.xlsx
 *.XLSX
-data/
+data/*
+!data/*.py
 
 # C extensions
 *.so
@@ -277,4 +278,3 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 .claude/
- 

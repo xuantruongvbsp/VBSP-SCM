@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## [2026-08-11] — Fix CI không import được module phân kỳ NXH
+- `.gitignore` dòng ~61 — chỉ ignore dữ liệu runtime trong `data/`, cho phép Git theo dõi các module Python `data/*.py`.
+- `data/phan_ky_nxh.py` — đưa module đã có local ra khỏi diện bị ignore để CI có thể import.
+- `BUGMAP.md` — thêm mục J72 cho lỗi test đã commit nhưng source module bị `.gitignore` loại khỏi repository.
+
 ## [2026-08-08] — Fix ký tự lỗi trong header Telegram phân kỳ NXH
 - `services/telegram_service.py` dòng ~551/~584/~632 — thay ký tự lỗi `�` bằng icon `📋`, escape ngày hạn trong HTML, hiển thị xã trống là `Chưa rõ xã`, và log lỗi đọc mapping cán bộ thay vì bỏ qua im lặng.
 - `tests/test_telegram_service.py` dòng ~220 — thêm regression test đảm bảo tin phân kỳ NXH không còn ký tự lỗi encoding, có header danh sách và xử lý xã trống.

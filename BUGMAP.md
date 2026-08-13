@@ -3694,6 +3694,18 @@ def _to_int(val, default=0):
 
 ---
 
+### D12 — Phục hồi vẫn báo malformed dù DB trong zip lành (WAL cũ replay lên DB mới)
+| | |
+|---|---|
+| **File** | `backup_service.py` → `phuc_hoi_backup()` ~dòng 214-243; helper mới `_xoa_wal_shm()` dòng 120-133 |
+| **Dấu hiệu** | Phục hồi báo `Loi ghi DB: database disk image is malformed` rồi tự khôi phục từ `.pre_restore`, dù DB trong zip đã qua `integrity_check: ok`. Trên đĩa còn `vbsp_scm.db-wal`/`-shm` của DB cũ. |
+| **Nguyên nhân** | `phuc_hoi_backup()` copy DB mới đè lên file nhưng KHÔNG xóa `vbsp_scm.db-wal`/`-shm` của DB cũ. SQLite mở DB mới thấy file -wal cũ liền replay WAL sai DB → malformed. Ngoài ra bản sao `.pre_restore` chụp khi WAL chưa checkpoint nên có thể thiếu dữ liệu. |
+| **Fix** | Thêm `_xoa_wal_shm()` xóa -wal/-shm sau `reset_conn()` và trước `copy2()` (áp dụng cả nhánh khôi phục `.pre_restore`); checkpoint `PRAGMA wal_checkpoint(TRUNCATE)` trước khi tạo bản `.pre_restore`. |
+| **Test** | Smoke test với -wal đang tồn tại (206KB): backup → restore `db_ok: True`, login admin/123 OK, integrity ok; zip hỏng vẫn bị từ chối; DB nguyên vẹn. |
+| **Ngày fix** | 2026-08-13 |
+
+---
+
 Mỗi khi fix bug, copy template dưới đây và điền vào đúng mục:
 
 ```

@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## [2026-08-13] — Fix phục hồi malformed do WAL cũ replay lên DB mới (D12)
+- `backup_service.py` dòng 120-133 — thêm `_xoa_wal_shm()`: xóa `vbsp_scm.db-wal`/`-shm` cũ trước khi copy DB mới vào.
+- `backup_service.py` dòng ~214-243 — `phuc_hoi_backup()`: gọi `_xoa_wal_shm()` sau `reset_conn()` (cả nhánh chính lẫn nhánh khôi phục `.pre_restore`); checkpoint `PRAGMA wal_checkpoint(TRUNCATE)` trước khi chụp bản `.pre_restore` để bản sao đủ dữ liệu.
+
 ## [2026-08-13] — Fix backup DB malformed + phục hồi an toàn (không phá DB đang chạy)
 - `backup_service.py` dòng ~61-78 — `chay_backup()`: backup DB bằng SQLite backup API (`conn.backup()`) thay vì copy file thô, đảm bảo snapshot nhất quán khi app chạy ở WAL mode.
 - `backup_service.py` dòng ~175-225 — `phuc_hoi_backup()`: kiểm tra `PRAGMA integrity_check` DB trong zip TRƯỚC khi ghi đè (hỏng → hủy, không đụng DB hiện tại); lưu bản an toàn `.pre_restore` và tự khôi phục nếu ghi thất bại; thêm `import sqlite3`.

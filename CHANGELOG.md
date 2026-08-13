@@ -1,5 +1,17 @@
 # CHANGELOG
 
+## [2026-08-13] — Fix backup DB malformed + phục hồi an toàn (không phá DB đang chạy)
+- `backup_service.py` dòng ~61-78 — `chay_backup()`: backup DB bằng SQLite backup API (`conn.backup()`) thay vì copy file thô, đảm bảo snapshot nhất quán khi app chạy ở WAL mode.
+- `backup_service.py` dòng ~175-225 — `phuc_hoi_backup()`: kiểm tra `PRAGMA integrity_check` DB trong zip TRƯỚC khi ghi đè (hỏng → hủy, không đụng DB hiện tại); lưu bản an toàn `.pre_restore` và tự khôi phục nếu ghi thất bại; thêm `import sqlite3`.
+- `BUGMAP.md` — thêm mục D11.
+
+## [2026-08-13] — Tăng giới hạn upload để phục hồi backup zip lớn
+- `.streamlit/config.toml` phần `[server]` — thêm `maxUploadSize = 2048` và `maxMessageSize = 2048` (MB); mặc định Streamlit 200MB khiến upload file `backup_*.zip` toàn CN bị từ chối.
+
+## [2026-08-11] — Fix launcher tắt cửa sổ ngay trên máy mới thiếu credentials.json
+- `Chay_VBSP_SCM.bat` dòng ~281-310 — thay dấu ngoặc tròn `()` bằng ngoặc vuông `[]` trong các chuỗi cảnh báo file thiếu (`credentials.json`, `templates/`), tránh dấu `)` trong nội dung làm vỡ cú pháp khối `if (...)` của CMD khiến batch thoát ngay không kịp pause.
+- `BUGMAP.md` — thêm mục J73 cho lỗi launcher tắt cửa sổ khi thiếu `credentials.json`.
+
 ## [2026-08-11] — Fix CI không import được module phân kỳ NXH
 - `.gitignore` dòng ~61 — chỉ ignore dữ liệu runtime trong `data/`, cho phép Git theo dõi các module Python `data/*.py`.
 - `data/phan_ky_nxh.py` — đưa module đã có local ra khỏi diện bị ignore để CI có thể import.

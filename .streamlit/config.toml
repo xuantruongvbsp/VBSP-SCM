@@ -14,6 +14,9 @@ port = 8502
 headless = true
 fileWatcherType = "watchdog"
 runOnSave = true
+# Giới hạn upload file (MB) — mặc định Streamlit chỉ 200MB, không đủ cho zip backup toàn CN.
+maxUploadSize = 2048
+maxMessageSize = 2048
 folderWatchBlacklist = ["cache", "pgd_data", "data/baseline", "data/baseline_pgd", "__pycache__", ".git", "logs"]
 
 [client]

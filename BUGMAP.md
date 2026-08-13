@@ -3670,6 +3670,30 @@ def _to_int(val, default=0):
 
 ---
 
+### J73 — Launcher tắt cửa sổ ngay khi thiếu credentials.json
+| | |
+|---|---|
+| **File** | `Chay_VBSP_SCM.bat` → khối kiểm tra file cấu hình ~dòng 281-310 |
+| **Dấu hiệu** | Double-click `Chay_VBSP_SCM.bat` trên máy mới: cửa sổ CMD hiện lên rồi tắt ngay, app không khởi động. Log `logs/launcher_last.log` dừng ở `dependency lock unchanged`, ghi `\n was unexpected at this time.` ở console. |
+| **Nguyên nhân** | Khi máy thiếu `credentials.json`, biến `MISSING_FILES` được nạp chuỗi chứa dấu ngoặc `(Google Sheets/API)`. Khi `echo %MISSING_FILES%` bung biến bên trong khối `if (...)`, dấu `)` trong nội dung đóng sớm khối lệnh → CMD báo lỗi cú pháp và thoát batch ngay lập tức (không qua `pause`). Máy cũ có sẵn `credentials.json` nên nhánh này không bao giờ chạy, lỗi không lộ. |
+| **Fix** | Thay dấu ngoặc tròn bằng ngoặc vuông trong mọi chuỗi thông báo: `[Google Sheets/API]`, `[thu muc Word templates]`, `[Google Sheets]`; thêm `rem` nhắc không dùng `()` trong nội dung thông báo. |
+| **Test** | Chạy `Chay_VBSP_SCM.bat --no-browser` trên máy không có `credentials.json`: cảnh báo hiện đúng một lần, Streamlit khởi động, `Invoke-WebRequest http://localhost:8502` trả HTTP 200. |
+| **Ngày fix** | 2026-08-11 |
+
+---
+
+### D11 — Backup zip chứa DB malformed, phục hồi ghi đè hỏng DB đang chạy
+| | |
+|---|---|
+| **File** | `backup_service.py` → `chay_backup()` ~dòng 61-78; `phuc_hoi_backup()` ~dòng 175-225 |
+| **Dấu hiệu** | Phục hồi backup từ máy khác báo `❌ Phục hồi DB thất bại: Loi ghi DB: database disk image is malformed`; sau đó DB trên máy hiện tại cũng hỏng theo (mọi truy cập SQLite đều lỗi malformed) vì đã bị ghi đè trước khi phát hiện lỗi. |
+| **Nguyên nhân** | (1) `chay_backup()` copy thô file `vbsp_scm.db` bằng `shutil.copy2` khi app đang chạy ở WAL mode — dữ liệu chưa checkpoint nằm trong `.db-wal` không được copy, file backup có thể không nhất quán/hỏng. (2) `phuc_hoi_backup()` ghi đè DB hiện tại TRƯỚC khi kiểm tra DB trong zip, nên bản backup hỏng phá luôn DB đang chạy. |
+| **Fix** | `chay_backup()` chuyển sang SQLite backup API (`conn.backup()` — snapshot nhất quán, an toàn với WAL kể cả khi đang ghi). `phuc_hoi_backup()` chạy `PRAGMA integrity_check` trên DB trong zip trước, hỏng thì hủy toàn bộ không đụng DB hiện tại; trước khi ghi đè lưu bản `.pre_restore` và tự khôi phục lại nếu ghi thất bại. |
+| **Test** | Smoke test 6 bước: backup mới tạo có integrity=ok; restore zip tốt thành công + đăng nhập OK; restore zip chứa DB hỏng bị từ chối với thông báo `BI HONG` và DB hiện tại vẫn login/integrity OK. |
+| **Ngày fix** | 2026-08-13 |
+
+---
+
 Mỗi khi fix bug, copy template dưới đây và điền vào đúng mục:
 
 ```

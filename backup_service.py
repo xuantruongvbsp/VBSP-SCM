@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import io
 import shutil
+import sqlite3
 import tempfile
 import zipfile
 from datetime import datetime
@@ -58,16 +59,24 @@ def chay_backup() -> dict:
         "out_dir": str(out),
     }
 
-    # 1. SQLite DB
+    # 1. SQLite DB — dùng SQLite backup API để có snapshot nhất quán,
+    #    an toàn cả khi app đang chạy với WAL mode (KHÔNG copy file thô —
+    #    file .db có thể thiếu dữ liệu trong .db-wal → backup bị malformed).
     try:
         if _DB_FILE.exists():
-            shutil.copy2(_DB_FILE, out / _DB_FILE.name)
+            import db as db_module
+            dst_conn = sqlite3.connect(str(out / _DB_FILE.name))
+            try:
+                with dst_conn:
+                    db_module.get_conn().backup(dst_conn)
+            finally:
+                dst_conn.close()
             result["db_ok"] = True
             logger.info("backup [%s]: DB ok (%d KB)", ky, _DB_FILE.stat().st_size // 1024)
         else:
             logger.warning("backup [%s]: vbsp_scm.db khong tim thay", ky)
     except Exception as exc:
-        logger.error("backup [%s]: loi copy DB -- %s", ky, exc, exc_info=True)
+        logger.error("backup [%s]: loi backup DB -- %s", ky, exc, exc_info=True)
 
     # 2. Parquet cache
     try:
@@ -107,6 +116,22 @@ def chay_backup() -> dict:
 
 
 # -- zip_ban_backup ------------------------------------------------------------
+
+def _xoa_wal_shm(db_file: Path) -> None:
+    """Xóa file -wal/-shm cạnh DB.
+
+    Bắt buộc trước khi thay file DB bằng 1 bản khác: SQLite mở DB mới
+    mà thấy -wal cũ của DB trước sẽ replay WAL sai → 'database disk image
+    is malformed'.
+    """
+    for suffix in ("-wal", "-shm"):
+        f = Path(str(db_file) + suffix)
+        if f.exists():
+            try:
+                f.unlink()
+            except Exception as exc:
+                logger.warning("khong xoa duoc %s: %s", f.name, exc)
+
 
 def zip_ban_backup(ten_ky: str) -> bytes:
     """
@@ -165,12 +190,40 @@ def phuc_hoi_backup(zip_bytes: bytes) -> dict:
             result["loi"].append(msg)
             return result
 
-        # 1. DB
+        # 1. DB — KIỂM TRA tính toàn vẹn của DB trong backup TRƯỚC KHI ghi đè,
+        #    để không bao giờ phá DB đang chạy bằng 1 bản backup hỏng.
         db_src = tmp_path / "vbsp_scm.db"
         if db_src.exists():
             try:
+                chk = sqlite3.connect(str(db_src))
+                try:
+                    trang_thai = chk.execute("PRAGMA integrity_check").fetchone()[0]
+                finally:
+                    chk.close()
+            except Exception as exc:
+                trang_thai = f"khong mo duoc: {exc}"
+            if trang_thai != "ok":
+                msg = (
+                    f"DB trong file backup BI HONG (integrity_check: {trang_thai}). "
+                    "Da HUY phuc hoi — DB hien tai khong bi anh huong. "
+                    "Hay tao ban backup moi tren may kia (sau khi cap nhat code) "
+                    "va thu lai."
+                )
+                logger.error("phuc_hoi: %s", msg)
+                result["loi"].append(msg)
+                return result
+            try:
                 import db as db_module
+                # Giu ban an toan cua DB hien tai truoc khi ghi de.
+                # Checkpoint WAL vao DB chinh truoc de ban copy du day du.
+                if _DB_FILE.exists():
+                    try:
+                        db_module.get_conn().execute("PRAGMA wal_checkpoint(TRUNCATE)")
+                    except Exception as exc:
+                        logger.warning("phuc_hoi: checkpoint WAL truoc backup that bai -- %s", exc)
+                    shutil.copy2(_DB_FILE, str(_DB_FILE) + ".pre_restore")
                 db_module.reset_conn()          # dong connection truoc khi ghi
+                _xoa_wal_shm(_DB_FILE)           # xoa WAL/SHM cu — tranh replay len DB moi
                 shutil.copy2(db_src, _DB_FILE)
                 db_module.init_db()             # mo lai + dam bao schema
                 result["db_ok"] = True
@@ -179,6 +232,18 @@ def phuc_hoi_backup(zip_bytes: bytes) -> dict:
                 msg = f"Loi ghi DB: {exc}"
                 logger.error("phuc_hoi: %s", msg, exc_info=True)
                 result["loi"].append(msg)
+                # Khoi phuc lai ban an toan neu co
+                pre = Path(str(_DB_FILE) + ".pre_restore")
+                try:
+                    if pre.exists():
+                        import db as db_module
+                        db_module.reset_conn()
+                        _xoa_wal_shm(_DB_FILE)   # nhu tren — DB cu cung can WAL sach
+                        shutil.copy2(pre, _DB_FILE)
+                        db_module.init_db()
+                        result["loi"].append("Da khoi phuc lai DB cu tu ban .pre_restore")
+                except Exception as exc2:
+                    logger.error("phuc_hoi: khoi phuc DB cu that bai -- %s", exc2, exc_info=True)
         else:
             result["loi"].append("Zip khong chua vbsp_scm.db")
 

@@ -278,11 +278,12 @@ echo -- Kiem tra file cau hinh... --
 
 set "MISSING_FILES="
 
+rem KHONG dung dau ngoac () trong noi dung thong bao — lam vo cu phap if (...) cua CMD.
 if not exist "%ROOT%\credentials.json" (
-    set "MISSING_FILES=%MISSING_FILES%  - credentials.json (Google Sheets/API)\n"
+    set "MISSING_FILES=%MISSING_FILES%  - credentials.json [Google Sheets/API]\n"
 )
 if not exist "%ROOT%\templates" (
-    set "MISSING_FILES=%MISSING_FILES%  - templates/ (thu muc Word templates)\n"
+    set "MISSING_FILES=%MISSING_FILES%  - templates/ [thu muc Word templates]\n"
 )
 if not exist "%ROOT%\pgd_data" (
     mkdir "%ROOT%\pgd_data" >nul 2>&1
@@ -302,7 +303,7 @@ if not "%MISSING_FILES%"=="" (
     echo   CANH BAO: Thieu cac file/thu muc sau:
     echo %MISSING_FILES%
     echo   App van chay duoc nhung mot so tinh nang se bi han che.
-    echo   - credentials.json: can cho Tien do nop BC (Google Sheets)
+    echo   - credentials.json: can cho Tien do nop BC [Google Sheets]
     echo   - templates/: can cho xuat Word/PDF
     echo.
 ) else (

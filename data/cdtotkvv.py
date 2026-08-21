@@ -463,6 +463,53 @@ def tong_hop_tu_pgd_data() -> pd.DataFrame | None:
     return doc_cdtotkvv_toan_cn_pgd()
 
 
+def chuan_hoa_ma_to_key(val) -> str:
+    """Chuẩn hóa mã đơn vị/mã tổ để join.
+
+    Ví dụ: '0127399' / '127399' / 127399.0 → '127399'.
+    Nếu mã có chữ, giữ chữ để tránh collision.
+    """
+    if val is None or pd.isna(val):
+        return ""
+    text = str(val).strip()
+    if not text or text.lower() in {"nan", "none", "nat"}:
+        return ""
+    text = re.sub(r"\.0+$", "", text)
+    key = re.sub(r"[^0-9A-Za-z]+", "", text).upper()
+    if key.isdigit():
+        return key.lstrip("0") or "0"
+    return key
+
+
+@st.cache_data(show_spinner=False)
+def ban_do_ma_to_dvut() -> dict:
+    """Map Mã tổ → Mã ĐVUT từ cdtotkvv_latest.xlsx của toàn Chi nhánh.
+
+    Mã ĐVUT chuẩn: 11=Nông dân, 12=Phụ nữ, 13=Cựu chiến binh, 14=Đoàn thanh niên.
+    Dùng làm fallback khi file HSTD (export BCQUERY mới) không điền cột 'Tên ĐVUT'.
+    Key kép ``Mã đơn vị|Mã tổ`` được ưu tiên; key đơn ``Mã tổ`` chỉ giữ khi
+    không mơ hồ giữa nhiều ĐVUT.
+    """
+    df = doc_cdtotkvv_toan_cn_pgd()
+    if df is None or df.empty or "ma_to" not in df.columns or "dvut" not in df.columns:
+        return {}
+    out: dict = {}
+    simple_values: dict[str, set[str]] = {}
+    ma_dv_values = df["ma_dv"] if "ma_dv" in df.columns else [None] * len(df)
+    for ma_dv, ma_to, dvut in zip(ma_dv_values, df["ma_to"], df["dvut"]):
+        k = chuan_hoa_ma_to_key(ma_to)
+        v = "" if dvut is None or pd.isna(dvut) else str(dvut).strip()
+        if k and v and v != "CỘNG":
+            ma_dv_key = chuan_hoa_ma_to_key(ma_dv)
+            if ma_dv_key:
+                out.setdefault(f"{ma_dv_key}|{k}", v)
+            simple_values.setdefault(k, set()).add(v)
+    for k, values in simple_values.items():
+        if len(values) == 1:
+            out.setdefault(k, next(iter(values)))
+    return out
+
+
 @st.cache_data(show_spinner=False)
 def ds_thang_nam() -> list[str]:
     pat = re.compile(r"cdtotkvv_(\d{4})_(\d{2})\.xlsx$", re.IGNORECASE)
@@ -659,7 +706,9 @@ def tach_file_cdto_toan_cn(file_bytes: bytes) -> dict[str, bytes]:
 
     # Tự phát hiện dòng bắt đầu dữ liệu: dòng đầu tiên có MAPGD hợp lệ
     # (đáng tin hơn STT vì MAPGD là cột ta cần, header sẽ không có mã 6 số)
-    wb = openpyxl.load_workbook(BytesIO(file_bytes), read_only=True, data_only=True)
+    # read_only=False: file export có thể khai <dimension> sai (vd 11 dòng)
+    # khiến read_only=True cắt mất toàn bộ dữ liệu bên dưới dimension.
+    wb = openpyxl.load_workbook(BytesIO(file_bytes), read_only=False, data_only=True)
     ws = wb.active
     all_rows = [list(r) for r in ws.iter_rows(values_only=True)]
     wb.close()

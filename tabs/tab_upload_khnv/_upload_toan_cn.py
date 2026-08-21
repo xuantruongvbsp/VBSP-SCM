@@ -15,6 +15,41 @@ from ._state import them_vao_hang_cho, xoa_cache_trang_thai
 
 logger = get_logger(__name__)
 
+_CDTO_SS_BYTES = "cdto_cn_bytes"
+_CDTO_SS_PREVIEW = "cdto_cn_preview"
+_CDTO_SS_FILE_ID = "cdto_cn_file_id"
+_CDTO_SS_RESULT = "cdto_cn_upload_result"
+
+
+def _hien_thi_ket_qua_cdto_sau_rerun() -> None:
+    """Hiển thị kết quả upload CDTOTKVV đã lưu trước khi reset uploader."""
+    ket_qua = st.session_state.get(_CDTO_SS_RESULT)
+    if not ket_qua:
+        return
+
+    so_ok = int(ket_qua.get("so_ok") or 0)
+    tong = int(ket_qua.get("tong") or 0)
+    thang = ket_qua.get("thang") or "không rõ kỳ"
+    loi = list(ket_qua.get("loi") or [])
+
+    if so_ok == tong and not loi:
+        st.success(
+            f"✅ Upload xong CDTOTKVV toàn CN: đã lưu **{so_ok}/{tong}** đơn vị · kỳ **{thang}**."
+        )
+        return
+
+    if so_ok:
+        st.warning(
+            f"⚠️ Upload CDTOTKVV toàn CN hoàn tất một phần: đã lưu **{so_ok}/{tong}** đơn vị · kỳ **{thang}**."
+        )
+    else:
+        st.error(
+            f"❌ Upload CDTOTKVV toàn CN chưa lưu được đơn vị nào · kỳ **{thang}**."
+        )
+
+    if loi:
+        st.caption("Đơn vị lỗi: " + "; ".join(loi))
+
 
 def render_cdto_toan_cn(username: str) -> None:
     """Upload 1 file CDTOTKVV tổng hợp toàn CN → tự tách và lưu 22 PGD."""
@@ -31,25 +66,29 @@ def render_cdto_toan_cn(username: str) -> None:
         label_visibility="collapsed",
     )
 
-    _SS_BYTES   = "cdto_cn_bytes"
-    _SS_PREVIEW = "cdto_cn_preview"
-    _SS_FILE_ID = "cdto_cn_file_id"
-
     if uploaded is not None:
         file_id = (uploaded.name, uploaded.size)
-        if st.session_state.get(_SS_FILE_ID) != file_id:
-            st.session_state[_SS_FILE_ID] = file_id
-            st.session_state[_SS_BYTES]   = uploaded.read()
-            st.session_state.pop(_SS_PREVIEW, None)
+        if st.session_state.get(_CDTO_SS_FILE_ID) != file_id:
+            st.session_state[_CDTO_SS_FILE_ID] = file_id
+            st.session_state[_CDTO_SS_BYTES] = uploaded.read()
+            st.session_state.pop(_CDTO_SS_PREVIEW, None)
+            st.session_state.pop(_CDTO_SS_RESULT, None)
+            st.info(
+                f"📥 Đã nhận file **{uploaded.name}** ({uploaded.size / 1024:.1f} KB). "
+                "Hệ thống đang phân tích dữ liệu..."
+            )
 
-    if _SS_BYTES not in st.session_state:
+    _hien_thi_ket_qua_cdto_sau_rerun()
+
+    if _CDTO_SS_BYTES not in st.session_state:
         return
 
-    file_bytes: bytes = st.session_state[_SS_BYTES]
+    file_bytes: bytes = st.session_state[_CDTO_SS_BYTES]
 
-    if _SS_PREVIEW not in st.session_state:
-        with st.spinner("🔍 Đang phân tích file..."):
+    if _CDTO_SS_PREVIEW not in st.session_state:
+        with st.status("🔍 Đang phân tích file CDTOTKVV toàn CN...", expanded=True) as status:
             try:
+                status.write("Đang đọc cấu trúc file và nhận diện kỳ báo cáo.")
                 from data.cdtotkvv import (
                     tach_file_cdto_toan_cn,
                     doc_thang_tu_cdto_toan_cn,
@@ -60,6 +99,7 @@ def render_cdto_toan_cn(username: str) -> None:
                 thang   = doc_thang_tu_cdto_toan_cn(file_bytes) or doc_thang_nam_tu_file(file_bytes)
                 ds_tat_ca = [DON_VI_CHI_NHANH] + DS_PGD
                 thieu = [dv for dv in ds_tat_ca if dv not in pgd_map]
+                status.write(f"Đã nhận diện **{len(pgd_map)}** đơn vị, đang lập bảng preview.")
 
                 preview_rows = []
                 for ten_pgd, pgd_bytes in sorted(pgd_map.items()):
@@ -83,19 +123,26 @@ def render_cdto_toan_cn(username: str) -> None:
                         "Trạng thái": "✅ Sẵn sàng",
                     })
 
-                st.session_state[_SS_PREVIEW] = {
+                st.session_state[_CDTO_SS_PREVIEW] = {
                     "rows": preview_rows, "thang": thang,
                     "thieu": thieu, "so_dv": len(pgd_map),
                 }
+                status.update(
+                    label=f"✅ Phân tích xong: nhận diện {len(pgd_map)} đơn vị.",
+                    state="complete",
+                    expanded=False,
+                )
             except ValueError as e:
+                status.update(label="❌ Không phân tích được file CDTOTKVV.", state="error", expanded=False)
                 st.error(f"❌ {e}")
                 return
             except Exception as e:
                 logger.error("render_cdto_toan_cn: lỗi phân tích — %s", e, exc_info=True)
+                status.update(label="❌ Lỗi khi phân tích file CDTOTKVV.", state="error", expanded=False)
                 st.error(f"❌ Lỗi phân tích file: {e}")
                 return
 
-    preview = st.session_state.get(_SS_PREVIEW)
+    preview = st.session_state.get(_CDTO_SS_PREVIEW)
     if not preview:
         return
 
@@ -133,30 +180,59 @@ def render_cdto_toan_cn(username: str) -> None:
         type="primary",
         key="btn_cdto_cn_upload",
     ):
-        with st.spinner("⏳ Đang tách và lưu từng PGD..."):
+        with st.status("📤 Đang upload CDTOTKVV toàn CN...", expanded=True) as status:
             from services.upload_service import xu_ly_cdto_toan_cn
-            ket_qua = xu_ly_cdto_toan_cn(file_bytes)
+            status.write(f"Đang tách và lưu **{preview['so_dv']}** file đơn vị.")
+            try:
+                ket_qua = xu_ly_cdto_toan_cn(file_bytes)
+            except Exception as e:
+                logger.error("render_cdto_toan_cn: lỗi upload — %s", e, exc_info=True)
+                status.update(label="❌ Upload CDTOTKVV toàn CN thất bại.", state="error", expanded=False)
+                st.error(f"❌ Lỗi upload file: {e}")
+                return
 
-        if "_loi_doc" in ket_qua:
-            st.error(ket_qua["_loi_doc"].thong_bao)
-            return
+            if "_loi_doc" in ket_qua:
+                status.update(label="❌ Upload CDTOTKVV toàn CN thất bại.", state="error", expanded=False)
+                st.error(ket_qua["_loi_doc"].thong_bao)
+                return
 
-        for ten_pgd, kq in ket_qua.items():
-            if kq.thanh_cong:
-                db.ghi_audit(
-                    username, "upload_cdto_toan_cn",
-                    f"CDTOTKVV toàn CN — {ten_pgd} · tháng {thang or 'unknown'}",
-                )
+            status.write("Đã lưu file đơn vị, đang ghi audit upload.")
+            for ten_pgd, kq in ket_qua.items():
+                if kq.thanh_cong:
+                    db.ghi_audit(
+                        username, "upload_cdto_toan_cn",
+                        f"CDTOTKVV toàn CN — {ten_pgd} · tháng {thang or 'unknown'}",
+                    )
 
-        so_ok = sum(1 for v in ket_qua.values() if v.thanh_cong)
-        if so_ok:
-            st.success(f"✅ Đã lưu **{so_ok}** đơn vị thành công")
+            so_ok = sum(1 for v in ket_qua.values() if v.thanh_cong)
+            loi = [
+                f"{ten_pgd}: {kq.thong_bao}"
+                for ten_pgd, kq in ket_qua.items()
+                if not kq.thanh_cong
+            ]
+            status.update(
+                label=(
+                    f"✅ Upload xong: đã lưu {so_ok}/{len(ket_qua)} đơn vị."
+                    if not loi
+                    else f"⚠️ Upload xong một phần: đã lưu {so_ok}/{len(ket_qua)} đơn vị."
+                ),
+                state="complete" if not loi else "error",
+                expanded=False,
+            )
+
+        st.session_state[_CDTO_SS_RESULT] = {
+            "so_ok": so_ok,
+            "tong": len(ket_qua),
+            "thang": thang,
+            "loi": loi,
+        }
+
         for ten_pgd, kq in ket_qua.items():
             if not kq.thanh_cong:
                 st.warning(f"⚠️ {ten_pgd}: {kq.thong_bao}")
 
         st.cache_data.clear()
-        for _k in (_SS_PREVIEW, _SS_BYTES, _SS_FILE_ID):
+        for _k in (_CDTO_SS_PREVIEW, _CDTO_SS_BYTES, _CDTO_SS_FILE_ID):
             st.session_state.pop(_k, None)
         xoa_cache_trang_thai()
         st.session_state["cdto_cn_ver"] = _ver + 1

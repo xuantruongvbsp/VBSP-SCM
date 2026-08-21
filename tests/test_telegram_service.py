@@ -1,6 +1,7 @@
 """Regression tests cho routing thông báo Telegram theo PGD + allowlist auto-clean."""
 from __future__ import annotations
 
+import re
 import sys
 from datetime import datetime
 from types import ModuleType
@@ -183,6 +184,22 @@ class TestChuanHoaThongBao:
         assert "<b>Ngày số liệu:</b> 05/08/2026" in result
         assert "<b>Nguồn dữ liệu:</b> File phân kỳ NXH/Tiền gửi" in result
 
+    def test_phan_ky_nxh_header_lay_don_vi_thuc_te_va_gio_24h(self, monkeypatch) -> None:
+        monkeypatch.setattr(tg.db, "doc_kv", lambda _key: None)
+
+        result = tg._chuan_hoa_thong_bao(
+            "🏠 <b>Hội sở CN Đồng Nai — Phân kỳ NXH tháng 08/2026 — phần 1/2</b>\n"
+            "📆 <b>Ngày dữ liệu NXH:</b> 15/08/2026\n"
+            "📋 <b>12 khoản</b>",
+            "phan_ky_nxh",
+        )
+
+        assert "<b>Nhắc phân kỳ nhà ở xã hội — Hội sở CN Đồng Nai</b>" in result
+        assert "Nhắc phân kỳ nhà ở xã hội — Theo PGD" not in result
+        assert re.search(r"<b>Cập nhật lúc:</b> \d{2}:\d{2} \d{2}/\d{2}/\d{4}", result)
+        assert " AM" not in result
+        assert " PM" not in result
+
     def test_gui_nhac_phan_ky_nxh_dua_ngay_du_lieu_vao_tin(self, monkeypatch) -> None:
         sent: list[str] = []
 
@@ -255,6 +272,56 @@ class TestChuanHoaThongBao:
         assert "📋 <b>1 khoản</b>" in sent[0]
         assert "📍 <b>Chưa rõ xã</b>" in sent[0]
         assert "12/08/2026&lt;script&gt;" in sent[0]
+
+    def test_gui_nhac_phan_ky_nxh_phan_biet_du_thieu_va_dem_canh_bao(self, monkeypatch) -> None:
+        sent: list[str] = []
+
+        monkeypatch.setattr(
+            tg.db,
+            "doc_kv",
+            lambda key: {"phan_ky_nxh": True}
+            if key == "telegram_notify_config" else {},
+        )
+        monkeypatch.setattr(
+            tg,
+            "_gui_tin_for",
+            lambda text, _key: sent.append(text) or True,
+        )
+
+        ds = []
+        for i in range(7):
+            ds.append({
+                "ten_kh": f"KH du {i}",
+                "so_ku": f"KU{i}",
+                "ngay_dh": "22/08/2026",
+                "du_no": 10_000_000,
+                "lai_ton": 1_000_000,
+                "tong_tgk": 20_000_000,
+                "ten_xa": "Tam Hiệp",
+                "ghi_chu": "Có ghi chú nhưng đủ số dư",
+            })
+        for i in range(5):
+            ds.append({
+                "ten_kh": f"KH thieu {i}",
+                "so_ku": f"KUT{i}",
+                "ngay_dh": "22/08/2026",
+                "du_no": 10_000_000,
+                "lai_ton": 1_000_000,
+                "tong_tgk": 0,
+                "ten_xa": "Long Bình",
+            })
+
+        ok = tg.gui_nhac_phan_ky_nxh("Hội sở CN Đồng Nai", ds, ngay_du_lieu="15/08/2026")
+
+        assert ok is True
+        assert len(sent) == 2
+        assert "phần 1/2" in sent[0]
+        assert "phần 2/2" in sent[1]
+        assert "⚠️ <b>5 cảnh báo</b>" in sent[0]
+        assert "⚠️ <b>12 cảnh báo</b>" not in sent[0]
+        assert "✅ <b>KH du 0</b>" in sent[0]
+        assert "⚠️ <b>KH du 0</b>" not in sent[0]
+        assert "⚠️ <b>KH thieu 0</b>" in sent[1]
 
     def test_chuan_hoa_idempotent(self, monkeypatch) -> None:
         monkeypatch.setattr(tg.db, "doc_kv", lambda _key: None)

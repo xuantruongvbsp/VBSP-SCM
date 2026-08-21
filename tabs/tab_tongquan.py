@@ -20,7 +20,7 @@ from state_manager import SCMStateManager
 from config import (
     DS_PGD, DS_XA, CACHE_HSTD, DON_VI_CHI_NHANH, TEN_CHI_NHANH_HIEN_THI,
     PGD_XA_MAP, NAM_HT, HSTD_DS_CHO_VAY_NAM_ALIASES, HSTD_THU_NO_NAM_ALIASES,
-    COT_TEN_PGD, COT_TEN_TO, COT_MA_TO, COT_TEN_XA, COT_DVUT,
+    COT_TEN_PGD, COT_MA_PGD, COT_TEN_TO, COT_MA_TO, COT_TEN_XA, COT_DVUT,
     COT_TONG_DU_NO, COT_DU_NO_QH, COT_DU_NO_KHOANH, COT_DU_NO_TH,
     COT_TEN_CT, COT_NGUON_VON, COT_MA_KH, COT_TEN_KH, COT_SO_KU,
     COT_NGAY_DH, COT_LAI_TON, COT_NGAY_SL,
@@ -37,7 +37,10 @@ from utils import (
     lazy_tabs,
 )
 from data.pgd import ds_pgd_co_file
-from data.cdtotkvv import doc_cdtotkvv, ds_thang_nam, tong_hop_theo_pgd
+from data.cdtotkvv import (
+    doc_cdtotkvv, ds_thang_nam, tong_hop_theo_pgd,
+    ban_do_ma_to_dvut, chuan_hoa_ma_to_key,
+)
 from pdf_service import xuat_pdf
 from services.giao_ban_thang_service import tao_bao_cao_giao_ban_thang
 from services.hstd_word_service import xuat_word_hstd_tong_hop
@@ -144,7 +147,7 @@ def _cache_bq_counts(
 ) -> tuple:
     """Cache đếm PGD/Tổ/Xã/Hội cho BQ metrics — tránh df.copy() + 4 groupby mỗi rerun."""
     _ = (ts, pgd_filter)
-    cols_need = [c for c in [COT_TEN_PGD, COT_TEN_TO, COT_MA_TO, COT_TEN_XA, COT_DVUT, COT_TONG_DU_NO]
+    cols_need = [c for c in [COT_TEN_PGD, COT_MA_PGD, COT_TEN_TO, COT_MA_TO, COT_TEN_XA, COT_DVUT, COT_TONG_DU_NO]
                  if c in _df.columns]
     df_bq = _df[cols_need].copy()
     if COT_TONG_DU_NO in df_bq.columns:
@@ -172,8 +175,28 @@ def _cache_bq_counts(
         _xa_exclude = {"", "CỘNG", "Vay trực tiếp"}
         _df_xa = df_bq[df_bq[COT_TEN_XA].notna() & ~df_bq[COT_TEN_XA].isin(_xa_exclude)]
         n_xa = int(_df_xa[COT_TEN_XA].nunique())
-    n_hoi = (int(df_bq[COT_DVUT].dropna().loc[lambda s: (s != "") & (s != "CỘNG")].nunique())
-             if COT_DVUT in df_bq.columns else 0)
+    n_hoi = 0
+    if COT_DVUT in df_bq.columns:
+        _s_hoi = df_bq[COT_DVUT].dropna().astype(str).str.strip()
+        n_hoi = int(_s_hoi.loc[(_s_hoi != "") & (_s_hoi != "CỘNG")].nunique())
+    if n_hoi == 0 and COT_MA_TO in df_bq.columns:
+        # Fallback: export BCQUERY mới không điền 'Tên ĐVUT'
+        # → suy ra Hội đoàn thể từ Mã tổ qua danh sách Tổ TK&VV (CDTOTKVV)
+        try:
+            _map_dvut = ban_do_ma_to_dvut()
+        except Exception as _e:
+            logger.warning("_cache_bq_counts: lỗi đọc map ĐVUT từ CDTOTKVV — %s", _e)
+            _map_dvut = {}
+        if _map_dvut:
+            _ma_to_key = df_bq[COT_MA_TO].map(chuan_hoa_ma_to_key)
+            _dvut_suy_ra = _ma_to_key.map(_map_dvut)
+            if COT_MA_PGD in df_bq.columns:
+                _ma_pgd_key = df_bq[COT_MA_PGD].map(chuan_hoa_ma_to_key)
+                _key_kep = _ma_pgd_key + "|" + _ma_to_key
+                _dvut_suy_ra = _key_kep.map(_map_dvut).fillna(_dvut_suy_ra)
+            _dvut_suy_ra = _dvut_suy_ra.dropna()
+            _dvut_suy_ra = _dvut_suy_ra[_dvut_suy_ra != ""]
+            n_hoi = int(_dvut_suy_ra.nunique())
     return n_pgd_co_dn, n_to, n_xa, n_hoi
 
 

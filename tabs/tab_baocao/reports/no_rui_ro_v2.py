@@ -12,10 +12,15 @@ from config import (
     COT_TONG_DU_NO, COT_DU_NO_QH, COT_DU_NO_KHOANH,
 )
 from auth import la_phan_he_pgd
-from utils import fmt_ty, vn
+from utils import fmt_so, vn
 from pdf_service import xuat_pdf_chi_tiet
 
-from ..components.inline_filter import render_combined_filter_search
+from ..components.inline_filter import (
+    chuan_bi_du_lieu_bao_cao,
+    render_combined_filter_search,
+    render_inline_filter,
+    render_nguon_von_filter,
+)
 from ..components.sticky_table import render_sticky_table
 from ..components.quick_export import render_quick_export_buttons
 from ..components.tooltip import render_metric_with_tooltip
@@ -63,15 +68,6 @@ def render_no_rui_ro_v2(
         ctx.warning("⚠️ Chưa có dữ liệu HSTD.")
         return
     
-    # Kiểm tra cảnh báo
-    alerts = check_alerts(df)
-    if alerts:
-        ctx.markdown("#### 🔔 Cảnh báo nợ rủi ro")
-        for alert in alerts:
-            if alert["type"] in ["ty_le_qh", "ty_le_no_xau"]:
-                render_alert_card(alert, container=ctx)
-        ctx.divider()
-    
     # Options
     report_options = {
         "qh": ("🔴 Nợ quá hạn", "no_qh"),
@@ -98,7 +94,40 @@ def render_no_rui_ro_v2(
     df_filtered = df.copy()
     if la_phan_he_pgd(role) and pgd_user and COT_TEN_PGD in df_filtered.columns:
         df_filtered = df_filtered[df_filtered[COT_TEN_PGD] == pgd_user]
-    
+    elif COT_TEN_PGD in df_filtered.columns:
+        ctx.markdown("**🏢 Bộ lọc PGD**")
+        df_filtered = render_inline_filter(
+            df_filtered,
+            [COT_TEN_PGD],
+            key="nr_v2_pgd",
+            container=ctx,
+        )
+
+    # Bộ lọc nguồn vốn TW (1) / Địa phương (2)
+    df_filtered = render_nguon_von_filter(df_filtered, key="nr_v2", container=ctx)
+
+    # Chuẩn bị dữ liệu: loại dòng không có khế ước và gộp dòng lặp cùng khoản vay.
+    so_dong_truoc = len(df_filtered)
+    df_filtered = chuan_bi_du_lieu_bao_cao(df_filtered)
+    so_dong_loai = so_dong_truoc - len(df_filtered)
+    if so_dong_loai:
+        ctx.caption(
+            f"🧹 Đã loại **{fmt_so(so_dong_loai)}** dòng không có khế ước hoặc "
+            "lặp cùng khoản vay khỏi phạm vi báo cáo."
+        )
+    if df_filtered.empty:
+        ctx.warning("⚠️ Không có khoản vay phù hợp với bộ lọc hiện tại.")
+        return
+
+    # Cảnh báo phải phản ánh đúng PGD và nguồn vốn đang xem.
+    alerts = check_alerts(df_filtered)
+    if alerts:
+        ctx.markdown("#### 🔔 Cảnh báo nợ rủi ro")
+        for alert in alerts:
+            if alert["type"] in ["ty_le_qh", "ty_le_no_xau"]:
+                render_alert_card(alert, container=ctx)
+        ctx.divider()
+
     ctx.markdown(f"### {report_label}")
     
     # Render theo loại
@@ -119,7 +148,16 @@ def _render_no_qh_v2(ctx, df: pd.DataFrame, username: str) -> None:
         ctx.error("❌ Không có cột dư nợ quá hạn.")
         return
     
-    df_qh = df[df[COT_DU_NO_QH] > 0].copy()
+    filter_cols = [c for c in [COT_TEN_XA, COT_DVUT] if c in df.columns]
+    search_cols = [c for c in [COT_TEN_KH, COT_MA_KH, COT_SO_KU] if c in df.columns]
+    df_scope = render_combined_filter_search(
+        df,
+        filter_cols,
+        search_cols,
+        key="qh_v2",
+        container=ctx,
+    )
+    df_qh = df_scope[df_scope[COT_DU_NO_QH] > 0].copy()
     
     if df_qh.empty:
         ctx.success("✅ Không có nợ quá hạn!")
@@ -130,7 +168,7 @@ def _render_no_qh_v2(ctx, df: pd.DataFrame, username: str) -> None:
     
     render_metric_with_tooltip(
         "Số món QH",
-        fmt_ty(len(df_qh)),
+        fmt_so(len(df_qh)),
         "Số món vay đã quá hạn thanh toán",
         container=col1,
     )
@@ -142,7 +180,11 @@ def _render_no_qh_v2(ctx, df: pd.DataFrame, username: str) -> None:
         container=col2,
     )
     
-    tl_qh = df_qh[COT_DU_NO_QH].sum() / df[COT_TONG_DU_NO].sum() * 100 if df[COT_TONG_DU_NO].sum() > 0 else 0
+    tong_du_no_scope = df_scope[COT_TONG_DU_NO].sum()
+    tl_qh = (
+        df_qh[COT_DU_NO_QH].sum() / tong_du_no_scope * 100
+        if tong_du_no_scope > 0 else 0
+    )
     render_metric_with_tooltip(
         "Tỷ lệ QH",
         f"{tl_qh:.2f}%".replace(".", ","),
@@ -161,22 +203,12 @@ def _render_no_qh_v2(ctx, df: pd.DataFrame, username: str) -> None:
     
     ctx.divider()
     
-    # Filter và bảng
-    filter_cols = [c for c in [COT_TEN_PGD, COT_TEN_XA, COT_DVUT] if c in df_qh.columns]
-    search_cols = [c for c in [COT_TEN_KH, COT_MA_KH, COT_SO_KU] if c in df_qh.columns]
-    
+    # Bảng chi tiết dùng đúng cùng phạm vi với KPI.
     cols_display = [c for c in [
         COT_TEN_PGD, COT_TEN_XA, COT_DVUT, COT_MA_KH, COT_TEN_KH,
         COT_SO_KU, COT_TONG_DU_NO, COT_DU_NO_QH
     ] if c in df_qh.columns]
-    
-    df_display = render_combined_filter_search(
-        df_qh[cols_display],
-        filter_cols,
-        search_cols,
-        key="qh_v2",
-        container=ctx,
-    )
+    df_display = df_qh[cols_display]
     
     # Quick export
     render_quick_export_buttons(
@@ -205,7 +237,16 @@ def _render_no_khoanh_v2(ctx, df: pd.DataFrame, username: str) -> None:
         ctx.error("❌ Không có cột dư nợ khoanh.")
         return
     
-    df_kh = df[df[COT_DU_NO_KHOANH] > 0].copy()
+    filter_cols = [c for c in [COT_TEN_XA] if c in df.columns]
+    search_cols = [c for c in [COT_TEN_KH, COT_MA_KH] if c in df.columns]
+    df_scope = render_combined_filter_search(
+        df,
+        filter_cols,
+        search_cols,
+        key="kh_v2",
+        container=ctx,
+    )
+    df_kh = df_scope[df_scope[COT_DU_NO_KHOANH] > 0].copy()
     
     if df_kh.empty:
         ctx.success("✅ Không có nợ khoanh!")
@@ -213,10 +254,14 @@ def _render_no_khoanh_v2(ctx, df: pd.DataFrame, username: str) -> None:
     
     # Metrics
     col1, col2, col3 = ctx.columns(3)
-    col1.metric("Số món khoanh", fmt_ty(len(df_kh)))
+    col1.metric("Số món khoanh", fmt_so(len(df_kh)))
     col2.metric("Nợ khoanh", f"{df_kh[COT_DU_NO_KHOANH].sum()/1e9:.1f} tỷ".replace(".", ","))
     
-    tl_kh = df_kh[COT_DU_NO_KHOANH].sum() / df[COT_TONG_DU_NO].sum() * 100 if df[COT_TONG_DU_NO].sum() > 0 else 0
+    tong_du_no_scope = df_scope[COT_TONG_DU_NO].sum()
+    tl_kh = (
+        df_kh[COT_DU_NO_KHOANH].sum() / tong_du_no_scope * 100
+        if tong_du_no_scope > 0 else 0
+    )
     col3.metric("Tỷ lệ khoanh", f"{tl_kh:.2f}%".replace(".", ","))
     
     ctx.divider()
@@ -226,13 +271,7 @@ def _render_no_khoanh_v2(ctx, df: pd.DataFrame, username: str) -> None:
         COT_SO_KU, COT_TONG_DU_NO, COT_DU_NO_KHOANH
     ] if c in df_kh.columns]
     
-    df_display = render_combined_filter_search(
-        df_kh[cols_display],
-        [c for c in [COT_TEN_PGD, COT_TEN_XA] if c in df_kh.columns],
-        [COT_TEN_KH, COT_MA_KH],
-        key="kh_v2",
-        container=ctx,
-    )
+    df_display = df_kh[cols_display]
     
     render_quick_export_buttons(
         df_display, "NoKhoanh", "Báo cáo nợ khoanh", username, "BC_KHOANH",
@@ -248,7 +287,16 @@ def _render_den_han_v2(ctx, df: pd.DataFrame, ngay: int, username: str) -> None:
         ctx.error("❌ Không có cột ngày đến hạn.")
         return
     
-    df_tmp = df.copy()
+    filter_cols = [c for c in [COT_TEN_XA] if c in df.columns]
+    search_cols = [c for c in [COT_TEN_KH, COT_MA_KH] if c in df.columns]
+    df_scope = render_combined_filter_search(
+        df,
+        filter_cols,
+        search_cols,
+        key=f"dh{ngay}_v2",
+        container=ctx,
+    )
+    df_tmp = df_scope.copy()
     df_tmp[COT_NGAY_DH] = pd.to_datetime(df_tmp[COT_NGAY_DH], dayfirst=True, errors="coerce")
     
     hn = pd.Timestamp.today()
@@ -259,7 +307,7 @@ def _render_den_han_v2(ctx, df: pd.DataFrame, ngay: int, username: str) -> None:
         return
     
     col1, col2 = ctx.columns(2)
-    col1.metric("Số món đến hạn", fmt_ty(len(df_dh)))
+    col1.metric("Số món đến hạn", fmt_so(len(df_dh)))
     col2.metric("Dư nợ đến hạn", f"{df_dh[COT_TONG_DU_NO].sum()/1e9:.1f} tỷ".replace(".", ","))
     
     ctx.divider()
@@ -271,13 +319,7 @@ def _render_den_han_v2(ctx, df: pd.DataFrame, ngay: int, username: str) -> None:
     
     df_dh = df_dh.sort_values(COT_NGAY_DH)
     
-    df_display = render_combined_filter_search(
-        df_dh[cols_display],
-        [c for c in [COT_TEN_PGD, COT_TEN_XA] if c in df_dh.columns],
-        [COT_TEN_KH, COT_MA_KH],
-        key=f"dh{ngay}_v2",
-        container=ctx,
-    )
+    df_display = df_dh[cols_display]
     
     render_quick_export_buttons(
         df_display, f"DenHan{ngay}", f"Báo cáo đến hạn {ngay} ngày",

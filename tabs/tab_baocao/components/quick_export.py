@@ -59,11 +59,11 @@ def render_quick_export_buttons(
     if show_excel:
         with cols[0]:
             if st.button("📊 Excel", key=f"qexp_xl_{key}", type="secondary", use_container_width=True):
-                buf = xuat_excel({sheet_name: df})
+                xl_bytes = xuat_excel({sheet_name: df})
                 state_key = f"qexp_xl_{key}_data"
                 state.downloads.set(
                     state_key,
-                    buf.getvalue(),
+                    xl_bytes,
                     ten_file_bao_cao(prefix_file),
                 )
                 ghi_audit(username, "quick_export_excel", tieu_de)
@@ -150,11 +150,11 @@ def render_bulk_export(
             valid_sheets = {k: v for k, v in dfs.items() if not v.empty}
             
             if valid_sheets:
-                buf = xuat_excel(valid_sheets)
+                xl_bytes = xuat_excel(valid_sheets)
                 state_key = f"bulk_exp_{key}_data"
                 state.downloads.set(
                     state_key,
-                    buf.getvalue(),
+                    xl_bytes,
                     ten_file_bao_cao(f"{prefix_file}_FULL"),
                 )
                 ghi_audit(username, "bulk_export", f"{tieu_de} - {len(valid_sheets)} sheets")

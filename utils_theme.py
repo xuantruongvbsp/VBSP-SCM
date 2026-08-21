@@ -588,6 +588,171 @@ hr {{ border: none !important; border-top: 1px solid {c['border']} !important; m
     padding: 8px 14px; border-top: 1px solid {c['border']};
     background: {c['surface']};
 }}
+
+/* ── 23. CẢNH BÁO NQH — KPI CARDS + BẢNG ĐƠN VỊ ── */
+.nqh-grid {{
+    display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 14px; margin-bottom: 14px;
+}}
+.nqh-card {{
+    border-radius: 12px; padding: 18px 14px 16px;
+    border: 2px solid {c['border']}; text-align: center; min-height: 112px;
+    display: flex; flex-direction: column; justify-content: center; gap: 4px;
+}}
+.nqh-card .nv {{ font-size: 1.9rem; font-weight: 800; line-height: 1.15; margin: 0; }}
+.nqh-card .nl {{ font-size: .88rem; font-weight: 700; margin: 0; }}
+.nqh-card .ns {{ font-size: .78rem; font-weight: 500; margin: 0; line-height: 1.35; }}
+.nqh-red {{ background: {c['error_bg']}; border-color: {c['error_border']}; }}
+.nqh-red .nv, .nqh-red .nl {{ color: {c['error_text']}; }}
+.nqh-red .ns {{ color: {c['text_sub']}; }}
+.nqh-blue {{ background: {c['info_bg']}; border-color: {c['info_border']}; }}
+.nqh-blue .nv, .nqh-blue .nl {{ color: {c['info_text']}; }}
+.nqh-blue .ns {{ color: {c['text_sub']}; }}
+.nqhb-wrap {{
+    border-radius: 12px; border: 1px solid {c['border']}; overflow: hidden;
+    margin-bottom: 14px; background: {c['surface']};
+}}
+.nqhb {{ border-collapse: collapse; font-size: 13px; width: 100%; color: {c['text']}; }}
+.nqhb th {{
+    text-align: center; padding: 9px 8px; font-weight: 600; font-size: 11px;
+    color: {c['error_text']}; border-bottom: 2px solid {c['error_border']};
+    white-space: nowrap; background: {c['error_bg']};
+}}
+.nqhb th:first-child {{ text-align: left; padding-left: 14px; }}
+.nqhb td {{
+    text-align: center; padding: 7px 6px; color: {c['text']};
+    border-bottom: 1px solid {c['border']}; background: {c['surface']};
+}}
+.nqhb td:first-child {{ text-align: left; padding-left: 14px; font-weight: 600; }}
+.nqhb tbody tr:nth-child(even) td {{ background: {c['table_stripe']}; }}
+.nqhb tbody tr:hover td {{ background: {c['table_hover']}; }}
+.nqh-bar-tr {{
+    width: 110px; height: 6px; background: {c['error_bg']}; border-radius: 3px;
+    overflow: hidden; display: inline-block; vertical-align: middle;
+}}
+.nqh-bar-f {{ height: 100%; background: {c['error_border']}; border-radius: 3px; }}
+.nqh-tong td {{
+    background: {c['info_bg']} !important; color: {c['info_text']} !important;
+    font-weight: 700; border-top: 2px solid {c['info_border']};
+}}
+
+/* ── 24. BÁO CÁO TÍN DỤNG — BẢNG STICKY + CHI TIẾT ── */
+.sticky-table-wrap,
+.bct-wrap {{
+    overflow: auto;
+    border: 1px solid {c['border']};
+    border-radius: 10px;
+    margin: 8px 0;
+    background: {c['surface']};
+}}
+.sticky-table-wrap {{ max-height: var(--sticky-table-height, 400px); }}
+.bct-wrap {{ max-height: var(--bct-max-height, 520px); }}
+.sticky-table,
+.bct-table {{
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    color: {c['text']};
+    font-family: "Inter", "Segoe UI", system-ui, sans-serif;
+    font-variant-numeric: tabular-nums;
+}}
+.sticky-table thead,
+.bct-table thead {{
+    position: sticky;
+    top: 0;
+    z-index: 5;
+}}
+.sticky-table th {{
+    padding: 9px 10px;
+    border-right: 1px solid {c['border']};
+    border-bottom: 2px solid {c['accent']};
+    background: {c['surface_hi']};
+    color: {c['text_heading']};
+    text-align: left;
+    font-size: .78rem;
+    font-weight: 700;
+    white-space: nowrap;
+}}
+.sticky-table td {{
+    padding: 8px 10px;
+    border-right: 1px solid {c['border']};
+    border-bottom: 1px solid {c['border']};
+    color: {c['text']};
+    font-size: .84rem;
+}}
+.sticky-table tbody tr:nth-child(even) td,
+.bct-table tbody tr:nth-child(even) td {{ background: {c['table_stripe']}; }}
+.sticky-table tbody tr:hover td,
+.bct-table tbody tr:hover td {{ background: {c['table_hover']}; }}
+.bct-table {{ min-width: 980px; }}
+.bct-table thead th {{
+    padding: 7px 8px;
+    border-right: 1px solid {c['border']};
+    border-bottom: 1px solid {c['border']};
+    color: {c['text_heading']};
+    text-align: center;
+    font-size: .78rem;
+    font-weight: 700;
+    white-space: nowrap;
+}}
+.bct-table thead .hdr1 th {{
+    background: {c['table_header']};
+    color: #fff;
+    font-size: .76rem;
+    letter-spacing: .35px;
+}}
+.bct-table thead .hdr2 th {{ background: {c['surface_hi']}; }}
+.bct-table td {{
+    padding: 7px 10px;
+    border-right: 1px solid {c['border']};
+    border-bottom: 1px solid {c['border']};
+    background: {c['surface']};
+    color: {c['text']};
+    font-size: .84rem;
+}}
+.bct-table .bct-name {{
+    min-width: 180px;
+    text-align: left;
+    font-weight: 600;
+    white-space: normal;
+}}
+.bct-table .bct-num {{ text-align: right; white-space: nowrap; }}
+.bct-table .bct-badge-cell {{ text-align: center; white-space: nowrap; }}
+.bct-table .bct-total td {{
+    background: {c['info_bg']} !important;
+    color: {c['info_text']} !important;
+    border-top: 2px solid {c['info_border']};
+    font-weight: 800;
+}}
+.bct-badge {{
+    display: inline-block;
+    padding: 1px 8px;
+    border: 1px solid;
+    border-radius: 999px;
+    font-size: .78rem;
+    font-weight: 700;
+}}
+.bct-badge-good {{ background: {c['success_bg']}; border-color: {c['success_border']}; color: {c['success_text']}; }}
+.bct-badge-warn {{ background: {c['warn_bg']}; border-color: {c['warn_border']}; color: {c['warn_text']}; }}
+.bct-badge-danger {{ background: {c['error_bg']}; border-color: {c['error_border']}; color: {c['error_text']}; }}
+.bct-share {{ display: flex; align-items: center; gap: 7px; min-width: 125px; }}
+.bct-share-track {{
+    flex: 1;
+    height: 7px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: {c['bg_subtle']};
+}}
+.bct-share-fill {{ height: 100%; border-radius: 999px; background: {c['info_border']}; }}
+.bct-share span {{ min-width: 50px; color: {c['text_sub']}; text-align: right; font-size: .78rem; }}
+.bct-note {{ margin: 4px 0 0 !important; color: {c['text_muted']} !important; font-size: .78rem !important; }}
+.bct-note span {{ font-weight: 700; }}
+.bct-note-good {{ color: {c['success_text']}; }}
+.bct-note-warn {{ color: {c['warn_text']}; }}
+.bct-note-danger {{ color: {c['error_text']}; }}
+@media(max-width: 1000px) {{
+    .nqh-grid {{ grid-template-columns: repeat(2, minmax(0, 1fr)); }}
+}}
 </style>"""
 
 

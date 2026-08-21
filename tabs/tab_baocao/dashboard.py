@@ -16,9 +16,30 @@ from auth import la_phan_he_pgd
 from utils import fmt_ty
 from .components.metric_cards import render_metric_cards
 from .components.data_source_indicator import render_data_source_status
+from .components.inline_filter import chuan_bi_du_lieu_bao_cao, loc_nguon_von
 
 if TYPE_CHECKING:
     from streamlit.delta_generator import DeltaGenerator
+
+
+def _loc_hstd_metric(
+    df: pd.DataFrame | None,
+    selected_pgd: str = "Tất cả",
+    selected_nv: str = "all",
+) -> pd.DataFrame | None:
+    """Áp dụng cùng bộ lọc PGD/nguồn vốn cho các metric HSTD trên dashboard."""
+    if df is None or df.empty:
+        return df
+
+    result = df
+    if (
+        selected_pgd != "Tất cả"
+        and COT_TEN_PGD in result.columns
+        and result[COT_TEN_PGD].eq(selected_pgd).any()
+    ):
+        result = result.loc[result[COT_TEN_PGD].eq(selected_pgd)].copy()
+    result = loc_nguon_von(result, selected_nv)
+    return chuan_bi_du_lieu_bao_cao(result)
 
 
 def render_dashboard(
@@ -51,11 +72,6 @@ def render_dashboard(
     # Hiển thị trạng thái nguồn dữ liệu
     render_data_source_status(df, df_nq11, df_gqvl, df_cdtotkvv, container=ctx)
     
-    # Hiển thị metrics tổng quan
-    render_metric_cards(df, df_nq11, df_gqvl, container=ctx)
-    
-    ctx.divider()
-    
     # Chọn loại báo cáo
     ctx.markdown("### 🔍 Chọn báo cáo")
     
@@ -81,7 +97,7 @@ def render_dashboard(
         baocao_options,
         key="bc_dashboard_select",
     )
-    
+
     # Mapping từ lựa chọn sang key
     report_key_map = {
         "📁 Báo cáo Tổng hợp (HSTD)": "hstd",
@@ -91,4 +107,29 @@ def render_dashboard(
         "⭐ Báo cáo Chấm điểm Tổ TK&VV": "cdtotkvv",
     }
     
-    return report_key_map.get(selected, "hstd")
+    selected_key = report_key_map.get(selected, "hstd")
+
+    # Đồng bộ metric HSTD với bộ lọc PGD/nguồn vốn của báo cáo đang chọn.
+    selected_pgd = "Tất cả"
+    selected_nv = "all"
+    if not is_pgd:
+        if selected_key == "hstd":
+            selected_group = st.session_state.get("th_loai_hstd_v2", "pgd")
+            selected_pgd = st.session_state.get(
+                f"filter_th_{selected_group}_pgd_{COT_TEN_PGD}", "Tất cả"
+            )
+        elif selected_key == "noruiro":
+            selected_pgd = st.session_state.get(
+                f"filter_nr_v2_pgd_{COT_TEN_PGD}", "Tất cả"
+            )
+    if selected_key == "hstd":
+        selected_group = st.session_state.get("th_loai_hstd_v2", "pgd")
+        selected_nv = st.session_state.get(f"nv_filter_th_{selected_group}", "all")
+    elif selected_key == "noruiro":
+        selected_nv = st.session_state.get("nv_filter_nr_v2", "all")
+
+    df_metric = _loc_hstd_metric(df, selected_pgd, selected_nv)
+    render_metric_cards(df_metric, df_nq11, df_gqvl, container=ctx)
+    ctx.divider()
+
+    return selected_key

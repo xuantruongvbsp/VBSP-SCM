@@ -8,7 +8,7 @@ from .export_panel import render_export_panel
 
 # Components UX nâng cao
 from .skeleton_loader import render_skeleton_metrics, render_skeleton_table, render_skeleton_card
-from .sticky_table import render_sticky_table, render_sortable_table
+from .sticky_table import render_sticky_table, render_sortable_table, render_bang_chi_tiet_html
 from .inline_filter import render_inline_filter, render_quick_search, render_combined_filter_search
 from .quick_export import render_quick_export_buttons, render_bulk_export
 from .tooltip import render_tooltip, render_header_with_tooltip, render_metric_with_tooltip, render_formula_reference
@@ -28,6 +28,7 @@ __all__ = [
     "render_skeleton_card",
     "render_sticky_table",
     "render_sortable_table",
+    "render_bang_chi_tiet_html",
     "render_inline_filter",
     "render_quick_search",
     "render_combined_filter_search",

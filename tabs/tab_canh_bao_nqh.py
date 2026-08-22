@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import unicodedata
 from datetime import datetime
+from html import escape
 
 import pandas as pd
 import streamlit as st
@@ -57,6 +58,22 @@ from utils import (
 
 _COT_KHOANH = "Dư nợ khoanh"
 logger = get_logger(__name__)
+
+
+def _fmt_gon_vnd(v) -> str:
+    """Đồng → chuỗi gọn cho KPI card: ≥ 1 tỷ hiện 'x,y tỷ', nhỏ hơn hiện 'x tr'."""
+    try:
+        v = float(v)
+    except Exception:
+        return "—"
+    if abs(v) >= 1_000_000_000:
+        return f"{vn(v / 1e9, 1)} tỷ"
+    return f"{vn(v / 1e6, 0)} tr"
+
+
+def _chuan_hoa_ten_don_vi(series: pd.Series) -> pd.Series:
+    """Chuẩn hóa nhãn đơn vị để không đếm/nhóm chuỗi rỗng."""
+    return series.astype("string").str.strip().replace("", pd.NA)
 
 
 def _tim_cot(df: pd.DataFrame, *cac_ten: str) -> str | None:
@@ -845,17 +862,95 @@ def _render_nqh(df_kh: pd.DataFrame, ds_pgd_all: list, la_cn: bool, key_prefix: 
         st.info("Không có hồ sơ nợ quá hạn trong phạm vi đã lọc.")
         return
 
-    # ─── Metrics ────────────────────────────────────────────────────────────────
-    tong_qh = df_nqh[cot_nqh].sum() if cot_nqh and cot_nqh in df_nqh.columns else 0
+    # ─── KPI cards ──────────────────────────────────────────────────────────────
+    dn_num = pd.to_numeric(df_nqh[cot_nqh], errors="coerce").fillna(0) \
+        if cot_nqh and cot_nqh in df_nqh.columns else pd.Series(dtype=float)
+    tong_qh = float(dn_num.sum()) if len(dn_num) else 0.0
 
-    k1, k2, k3 = st.columns(3)
-    k1.metric("Số hồ sơ NQH", fmt_so(len(df_nqh)))
-    k2.metric("Dư nợ QH", fmt_ty(tong_qh) if tong_qh else "0")
     # Tỷ lệ NQH tính trên tổng dư nợ gốc (trước khi lọc)
     ty_le_nqh = (tong_qh / tong_du_no_goc * 100) if tong_du_no_goc else 0
-    k3.metric("Tỷ lệ NQH", f"{ty_le_nqh:.2f}%")
+
+    cot_pgd_nqh = _tim_cot(df_nqh, COT_TEN_PGD)
+    cot_xa_nqh = _tim_cot(df_nqh, COT_TEN_XA)
+    if la_cn and cot_pgd_nqh and cot_pgd_nqh in df_nqh.columns:
+        so_dv = _chuan_hoa_ten_don_vi(df_nqh[cot_pgd_nqh]).nunique()
+        label_dv, sub_dv = "🏦 Đơn vị có NQH", "PGD có hồ sơ nợ quá hạn"
+    elif cot_xa_nqh and cot_xa_nqh in df_nqh.columns:
+        so_dv = _chuan_hoa_ten_don_vi(df_nqh[cot_xa_nqh]).nunique()
+        label_dv, sub_dv = "🗺️ Xã có NQH", "Xã/phường có hồ sơ nợ quá hạn"
+    else:
+        so_dv, label_dv, sub_dv = 0, "🏦 Đơn vị có NQH", "Chưa xác định"
+
+    st.markdown(f"""
+    <div class="nqh-grid">
+        <div class="nqh-card nqh-red">
+            <div class="nl">🚨 Số hồ sơ NQH</div>
+            <div class="nv">{fmt_so(len(df_nqh))}</div>
+            <div class="ns">Hồ sơ trong phạm vi đang lọc</div>
+        </div>
+        <div class="nqh-card nqh-red">
+            <div class="nl">💰 Dư nợ quá hạn</div>
+            <div class="nv">{_fmt_gon_vnd(tong_qh)}</div>
+            <div class="ns">Tổng dư nợ gốc: {_fmt_gon_vnd(tong_du_no_goc)}</div>
+        </div>
+        <div class="nqh-card nqh-red">
+            <div class="nl">📊 Tỷ lệ NQH</div>
+            <div class="nv">{ty_le_nqh:.2f}%</div>
+            <div class="ns">Trên tổng dư nợ trước khi lọc</div>
+        </div>
+        <div class="nqh-card nqh-blue">
+            <div class="nl">{label_dv}</div>
+            <div class="nv">{fmt_so(so_dv)}</div>
+            <div class="ns">{sub_dv}</div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # ─── Tổng hợp theo PGD (chỉ phân hệ CN, khi chưa lọc PGD) ─────────────────
+    if (la_cn and loc_pgd == "Tất cả"
+            and cot_pgd_nqh and cot_pgd_nqh in df_nqh.columns):
+        ten_pgd = _chuan_hoa_ten_don_vi(df_nqh[cot_pgd_nqh]).fillna("Chưa xác định")
+        df_nhom = df_nqh.assign(_dn=dn_num, _ten_pgd=ten_pgd)
+        g = df_nhom.groupby("_ten_pgd").agg(
+            so_ho=("_dn", "size"), du_no=("_dn", "sum"),
+        ).sort_values("du_no", ascending=False)
+        if len(g) > 1:
+            max_dn = float(g["du_no"].max()) or 1.0
+            rows_html = []
+            for pgd, r in g.iterrows():
+                pct = min(100, int(r["du_no"] / max_dn * 100))
+                ty_trong = (r["du_no"] / tong_qh * 100) if tong_qh else 0
+                pgd_html = escape(str(pgd))
+                rows_html.append(
+                    f"<tr><td>{pgd_html}</td>"
+                    f"<td>{fmt_so(r['so_ho'])}</td>"
+                    f"<td style='text-align:right;padding-right:12px'>{fmt_ty(r['du_no'])}</td>"
+                    f"<td><span class='nqh-bar-tr'>"
+                    f"<span class='nqh-bar-f' style='width:{pct}%'></span></span></td>"
+                    f"<td>{ty_trong:.1f}%</td></tr>"
+                )
+            st.markdown("**🏦 Nợ quá hạn theo đơn vị**")
+            st.markdown(f"""
+            <div class="nqhb-wrap">
+            <table class="nqhb">
+            <thead><tr>
+                <th style="width:190px">PGD</th>
+                <th>🔢 Hồ sơ</th>
+                <th>💰 Dư nợ QH<br><small>(triệu đồng)</small></th>
+                <th style="width:150px">Quy mô</th>
+                <th>Trên tổng NQH</th>
+            </tr></thead>
+            <tbody>{''.join(rows_html)}
+            <tr class="nqh-tong"><td>Tổng cộng</td>
+            <td>{fmt_so(len(df_nqh))}</td>
+            <td style='text-align:right;padding-right:12px'>{fmt_ty(tong_qh)}</td>
+            <td></td><td>100%</td></tr>
+            </tbody></table>
+            </div>
+            """, unsafe_allow_html=True)
 
     # ─── Bảng chi tiết ──────────────────────────────────────────────────────────
+    st.markdown(f"**📃 Danh sách chi tiết** — {fmt_so(len(df_nqh))} hồ sơ")
     cols_ct = [c for c in [
         COT_TEN_PGD, COT_TEN_KH, COT_SO_KU, COT_TEN_CT, cot_nqh, cot_tong_dn,
         COT_NGAY_DH, COT_TEN_TO_TRUONG, COT_TEN_XA,

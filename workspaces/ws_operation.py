@@ -74,9 +74,9 @@ from config import (
 
     COT_DU_NO_QH, COT_DU_NO_TH, COT_TONG_DU_NO, COT_NGAY_DH, COT_NGAY_VAY,
 
-    COT_TEN_PGD, COT_SDT, COT_DIA_CHI,
+    COT_TEN_PGD, COT_MA_PGD, COT_SDT, COT_DIA_CHI,
 
-    COT_LAI_TON, COT_LAI_THANG, COT_DVUT, COT_TEN_XA, COT_TEN_TO,
+    COT_LAI_TON, COT_LAI_THANG, COT_DVUT, COT_TEN_XA, COT_TEN_TO, COT_MA_TO,
 
     COT_LAI_TON_QH,
 
@@ -97,6 +97,8 @@ from data import (
 )
 
 from data.pgd import pgd_slug
+
+from data.cdtotkvv import ban_do_ma_to_dvut, chuan_hoa_ma_to_key
 
 from utils import (
 
@@ -364,7 +366,41 @@ def _kpi_pgd_list_impl(df_pgd: pd.DataFrame, pgd_user: str) -> list[dict]:
 
         so_xa = df_pgd[COT_TEN_XA].dropna().loc[lambda s: (s != "") & (s != "CỘNG")].nunique() if COT_TEN_XA in df_pgd.columns else 0
 
-        so_hoi = df_pgd[COT_DVUT].nunique() if COT_DVUT in df_pgd.columns else 0
+        so_hoi = 0
+
+        if COT_DVUT in df_pgd.columns:
+
+            _s_hoi = df_pgd[COT_DVUT].dropna().astype(str).str.strip()
+
+            so_hoi = int(_s_hoi.loc[(_s_hoi != "") & (_s_hoi != "CỘNG")].nunique())
+
+        if so_hoi == 0 and COT_MA_TO in df_pgd.columns:
+
+            # Fallback: export BCQUERY mới không điền 'Tên ĐVUT'
+
+            # → suy ra Hội đoàn thể từ Mã tổ qua danh sách Tổ TK&VV (CDTOTKVV)
+
+            _map_dvut = ban_do_ma_to_dvut()
+
+            if _map_dvut:
+
+                _ma_to_key = df_pgd[COT_MA_TO].map(chuan_hoa_ma_to_key)
+
+                _dvut_suy_ra = _ma_to_key.map(_map_dvut)
+
+                if COT_MA_PGD in df_pgd.columns:
+
+                    _ma_pgd_key = df_pgd[COT_MA_PGD].map(chuan_hoa_ma_to_key)
+
+                    _key_kep = _ma_pgd_key + "|" + _ma_to_key
+
+                    _dvut_suy_ra = _key_kep.map(_map_dvut).fillna(_dvut_suy_ra)
+
+                _dvut_suy_ra = _dvut_suy_ra.dropna()
+
+                _dvut_suy_ra = _dvut_suy_ra[_dvut_suy_ra != ""]
+
+                so_hoi = int(_dvut_suy_ra.nunique())
 
         so_to = df_pgd[COT_TEN_TO].nunique() if COT_TEN_TO in df_pgd.columns else 0
 

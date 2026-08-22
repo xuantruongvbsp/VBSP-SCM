@@ -1,0 +1,141 @@
+"""Regression tests cho bảng Chi tiết của Báo cáo tổng hợp HSTD v2."""
+from __future__ import annotations
+
+import pandas as pd
+
+from config import (
+    COT_DU_NO_KHOANH,
+    COT_DU_NO_QH,
+    COT_DU_NO_TH,
+    COT_MA_KH,
+    COT_SO_KU,
+    COT_TEN_CT,
+    COT_TONG_DU_NO,
+)
+from tabs.tab_baocao.components.sticky_table import (
+    render_bang_chi_tiet_html,
+    render_sticky_table,
+)
+from tabs.tab_baocao.reports.tong_hop_hstd_v2 import (
+    _NHOM_KHONG_XAC_DINH,
+    _tao_tong_hop_theo_nhom,
+    _tinh_tong_cong,
+)
+from utils_theme import _css_part2
+
+
+def _df_mau() -> pd.DataFrame:
+    return pd.DataFrame(
+        {
+            COT_TEN_CT: ["CT A", "CT A", "CT B", None],
+            COT_MA_KH: ["KH1", "KH1", "KH1", "KH2"],
+            COT_SO_KU: ["KU1", "KU1", "KU2", "KU3"],
+            COT_TONG_DU_NO: [100, 100, 200, 300],
+            COT_DU_NO_TH: [90, 90, 200, 300],
+            COT_DU_NO_QH: [10, 10, 0, 0],
+            COT_DU_NO_KHOANH: [0, 0, 0, 0],
+        }
+    )
+
+
+def test_mon_qh_dem_khe_uoc_duy_nhat_thay_vi_dem_dong() -> None:
+    df_th, _, _ = _tao_tong_hop_theo_nhom(_df_mau(), "ct", COT_TEN_CT)
+
+    ct_a = df_th.loc[df_th[COT_TEN_CT] == "CT A"].iloc[0]
+
+    assert int(ct_a["Số_món"]) == 1
+    assert int(ct_a["Số_món_QH"]) == 1
+
+
+def test_tong_kh_va_bq_kh_khong_cong_trung_giua_cac_nhom() -> None:
+    df_th, df_group, _ = _tao_tong_hop_theo_nhom(_df_mau(), "ct", COT_TEN_CT)
+
+    tong = _tinh_tong_cong(df_th, df_group)
+
+    assert int(df_th["Số_KH"].sum()) == 3  # KH1 xuất hiện ở 2 nhóm; KH2 ở nhóm chưa rõ.
+    assert tong["tong_kh"] == 2
+    assert tong["tong_mon"] == 3
+    assert tong["tong_mon_qh"] == 1
+    assert tong["bq_kh"] == 350
+
+
+def test_nhom_rong_duoc_giu_lai_va_tong_du_no_doi_chieu_du() -> None:
+    df = _df_mau()
+
+    df_th, df_group, _ = _tao_tong_hop_theo_nhom(df, "ct", COT_TEN_CT)
+    tong = _tinh_tong_cong(df_th, df_group)
+
+    assert _NHOM_KHONG_XAC_DINH in df_th[COT_TEN_CT].tolist()
+    assert tong["tong_dn"] == df[COT_TONG_DU_NO].sum()
+    assert tong["ty_trong"] == 100.0
+
+
+def test_tap_du_no_bang_khong_khong_hien_ty_trong_100() -> None:
+    df = _df_mau().assign(
+        **{
+            COT_TONG_DU_NO: 0,
+            COT_DU_NO_TH: 0,
+            COT_DU_NO_QH: 0,
+        }
+    )
+
+    df_th, df_group, _ = _tao_tong_hop_theo_nhom(df, "ct", COT_TEN_CT)
+
+    assert _tinh_tong_cong(df_th, df_group)["ty_trong"] == 0.0
+    assert df_th["Tỷ_trọng_%"].eq(0).all()
+
+
+class _FakeContainer:
+    def __init__(self) -> None:
+        self.html = ""
+
+    def markdown(self, value: str, unsafe_allow_html: bool = False) -> None:
+        assert unsafe_allow_html is True
+        self.html = value
+
+
+def test_bang_chi_tiet_chi_dung_class_theme_toan_cuc_va_escape_ten() -> None:
+    container = _FakeContainer()
+    df = pd.DataFrame(
+        {
+            "Nhóm": ["<script>alert(1)</script>"],
+            "Số KH": [1],
+            "Tổng dư nợ": [12.5],
+            "Tỷ trọng %": [100],
+            "Tỷ lệ QH %": [0.5],
+        }
+    )
+
+    render_bang_chi_tiet_html(
+        df,
+        key="test",
+        cot_ten="Nhóm",
+        cot_dem=["Số KH"],
+        cot_tien=["Tổng dư nợ"],
+        cot_bar="Tỷ trọng %",
+        cot_badge="Tỷ lệ QH %",
+        container=container,
+    )
+
+    assert "<style>" not in container.html
+    assert "#FFFFFF" not in container.html
+    assert 'class="bct-wrap"' in container.html
+    assert '&lt;script&gt;alert(1)&lt;/script&gt;' in container.html
+
+
+def test_sticky_table_khong_inject_css_tai_component() -> None:
+    container = _FakeContainer()
+
+    render_sticky_table(pd.DataFrame({"A": [1]}), key="test", container=container)
+
+    assert "<style>" not in container.html
+    assert 'class="sticky-table-wrap"' in container.html
+    assert 'class="dataframe sticky-table"' in container.html
+
+
+def test_theme_toan_cuc_co_css_cho_bang_bao_cao() -> None:
+    css = _css_part2()
+
+    assert ".bct-wrap" in css
+    assert ".bct-table thead" in css
+    assert ".sticky-table-wrap" in css

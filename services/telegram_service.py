@@ -134,6 +134,10 @@ def _chuan_hoa_thong_bao(text: str, notify_key: str) -> str:
 
     ngay_so_lieu = _lay_ngay_so_lieu_thong_bao(notify_key, text, nguon)
     cap_nhat_luc = datetime.now().strftime("%H:%M %d/%m/%Y")
+    if notify_key == "phan_ky_nxh":
+        pham_vi_match = re.match(r"^[^\wÀ-ỹ]*\s*(.+?)\s+—\s+Phân kỳ NXH\b", tom_tat)
+        if pham_vi_match:
+            pham_vi = pham_vi_match.group(1).strip()
     return (
         f"📌 <b>{_html.escape(tieu_de)} — {_html.escape(pham_vi)}</b>\n"
         f"📅 <b>Ngày số liệu:</b> {_html.escape(ngay_so_lieu or '—')}\n"
@@ -552,8 +556,7 @@ def gui_nhac_phan_ky_nxh(
         du_no_val   = float(k.get("du_no", 0) or 0)
         lai_ton_val = float(k.get("lai_ton", 0) or 0)
         sdt_raw     = str(k.get("sdt", "") or "")
-        co_canh_bao = bool(str(k.get("ghi_chu", "")).strip())
-        marker      = "⚠️" if co_canh_bao else "▪️"
+        marker      = "⚠️" if show_tgk else "✅"
 
         rows = [f"{marker} <b>{ten_kh}</b> · {so_ku}"]
 
@@ -601,11 +604,16 @@ def gui_nhac_phan_ky_nxh(
                 lines.extend(_dong_kh(k, show_tgk=show_tgk))
         return lines
 
-    so_canh_bao = sum(1 for k in ds_khoan if str(k.get("ghi_chu", "")).strip())
+    so_canh_bao = len(khong_du)
     canh_bao_str = f" · ⚠️ <b>{so_canh_bao} cảnh báo</b>" if so_canh_bao else ""
     pgd_esc = _html.escape(ten_pgd)
 
-    def _gui_nhom(loai_lines: list[str], loai_header: str) -> bool:
+    def _gui_nhom(
+        loai_lines: list[str],
+        loai_header: str,
+        nhom_index: int,
+        tong_nhom: int,
+    ) -> bool:
         """Gửi 1 nhóm (đủ hoặc không đủ) — tự chia chunk nếu dài."""
         # Chừa dung lượng cho khung chuẩn (ngày SL, nguồn, thời điểm cập nhật).
         _MAX = 3300
@@ -625,10 +633,11 @@ def gui_nhac_phan_ky_nxh(
         n = len(chunks)
         result = True
         for i, chunk in enumerate(chunks):
-            page_tag = f" ({i + 1}/{n})" if n > 1 else ""
+            nhom_tag = f" — phần {nhom_index}/{tong_nhom}" if tong_nhom > 1 else ""
+            page_tag = f" · trang {i + 1}/{n}" if n > 1 else ""
             if i == 0:
                 msg_header = (
-                    f"🏠 <b>{pgd_esc} — Phân kỳ NXH tháng {thang}</b>{page_tag}\n"
+                    f"🏠 <b>{pgd_esc} — Phân kỳ NXH tháng {thang}{nhom_tag}{page_tag}</b>\n"
                     f"📆 <b>Ngày dữ liệu NXH:</b> {_html.escape(str(ngay_ref))}\n"
                     f"📋 <b>{len(ds_khoan)} khoản</b> · 💰 <b>{tong_tien_hien}</b>"
                     f" · ✅ Đủ số dư: {len(du_so_du)} · ❌ Chưa đủ: {len(khong_du)}"
@@ -639,23 +648,33 @@ def gui_nhac_phan_ky_nxh(
             else:
                 msg_header = (
                     f"🏠 <b>{pgd_esc} — Phân kỳ NXH tháng {thang}</b>"
-                    f" — tiếp theo{page_tag}\n"
+                    f"{nhom_tag} — tiếp theo{page_tag}\n"
                     f"📆 <b>Ngày dữ liệu NXH:</b> {_html.escape(str(ngay_ref))}\n"
                 )
             if not _gui_tin_for(msg_header + "\n".join(chunk), "phan_ky_nxh"):
                 result = False
         return result
 
+    tong_nhom = int(bool(du_so_du)) + int(bool(khong_du))
+    nhom_index = 0
+
     # ── Tin 1: ĐỦ SỐ DƯ ──────────────────────────────────────────────────────
     ok = True
     if du_so_du:
+        nhom_index += 1
         lines_du = _build_xa_groups(du_so_du, show_tgk=False)
         lines_du.append("\n<i>(*) Lãi phát sinh theo dư nợ</i>")
-        if not _gui_nhom(lines_du, f"✅ <b>ĐỦ SỐ DƯ THANH TOÁN ({len(du_so_du)} khoản)</b>"):
+        if not _gui_nhom(
+            lines_du,
+            f"✅ <b>ĐỦ SỐ DƯ THANH TOÁN ({len(du_so_du)} khoản)</b>",
+            nhom_index,
+            tong_nhom,
+        ):
             ok = False
 
     # ── Tin 2: CHƯA ĐỦ SỐ DƯ ────────────────────────────────────────────────
     if khong_du:
+        nhom_index += 1
         lines_khong = _build_xa_groups(khong_du, show_tgk=True)
         lines_khong.append("\n<i>(*) Lãi phát sinh theo dư nợ</i>")
         loai_header_khong = (
@@ -663,7 +682,7 @@ def gui_nhac_phan_ky_nxh(
             f"<i>Tính đến ngày {_html.escape(ngay_ref)}, các khách hàng dưới đây"
             f" chưa đủ số dư trong tài khoản để thanh toán nợ:</i>"
         )
-        if not _gui_nhom(lines_khong, loai_header_khong):
+        if not _gui_nhom(lines_khong, loai_header_khong, nhom_index, tong_nhom):
             ok = False
 
     return ok

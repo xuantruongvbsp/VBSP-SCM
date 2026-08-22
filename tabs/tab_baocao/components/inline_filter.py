@@ -5,8 +5,127 @@ import streamlit as st
 import pandas as pd
 from typing import TYPE_CHECKING, List, Dict, Any, Callable
 
+from config import COT_NGUON_VON, COT_SO_KU, COT_MA_KH
+
 if TYPE_CHECKING:
     from streamlit.delta_generator import DeltaGenerator
+
+
+# Nhãn hiển thị cho filter nguồn vốn: 1=TW, 2=ĐP
+_NV_LABELS = {
+    "all": "🌐 Tất cả nguồn vốn",
+    "1": "1 — Trung ương",
+    "2": "2 — Địa phương",
+}
+
+_NV_GROUP_LABELS = {
+    "1": "1 — Trung ương",
+    "2": "2 — Địa phương",
+}
+
+
+def _chuan_hoa_nguon_von(value) -> str:
+    """Chuẩn hóa giá trị cột Nguồn vốn về '1' (TW) / '2' (ĐP), khác → ''."""
+    s = str(value).strip()
+    if s in {"1", "01", "1.0", "01.0", "TW", "tw"}:
+        return "1"
+    if s in {"2", "02", "2.0", "02.0", "DP", "dp", "ĐP", "đp"}:
+        return "2"
+    return ""
+
+
+def chuan_bi_du_lieu_bao_cao(df: pd.DataFrame) -> pd.DataFrame:
+    """Chuẩn bị dữ liệu trước khi tổng hợp báo cáo tín dụng.
+
+    Loại hai dạng dòng gây sai số liệu trong phạm vi báo cáo tín dụng:
+    1. Dòng KHÔNG có Số khế ước (KH đã sạch nợ, dư nợ=0, vô chương trình) —
+       nếu giữ lại sẽ đội "Số KH" lên và gộp chung thành 1 "món" rỗng.
+    2. Nhiều dòng cùng khoản vay theo (Mã KH, Số khế ước) — giữ dòng đầu,
+       tránh double-count dư nợ. Dữ liệu nguồn không bị thay đổi.
+
+    Trả DataFrame đã làm sạch (bản copy).
+    """
+    if df is None or df.empty:
+        return df
+    out = df.copy()
+    if COT_SO_KU in out.columns:
+        ku = out[COT_SO_KU].astype("string").str.strip()
+        ku_rong = ku.isna() | ku.str.lower().isin({"", "nan", "none", "null", "<na>"})
+        out = out.loc[~ku_rong].copy()
+    if COT_MA_KH in out.columns and COT_SO_KU in out.columns:
+        ma_kh = out[COT_MA_KH].astype("string").str.strip()
+        so_ku = out[COT_SO_KU].astype("string").str.strip()
+        ma_kh_hop_le = ma_kh.notna() & ~ma_kh.str.lower().isin(
+            {"", "nan", "none", "null", "<na>"}
+        )
+        # Chỉ gộp khi có đủ hai thành phần khóa. Chuẩn hóa khoảng trắng để
+        # "KU1" và " KU1 " không bị coi là hai khoản vay khác nhau.
+        trung_khoa = pd.DataFrame(
+            {"_ma_kh": ma_kh, "_so_ku": so_ku},
+            index=out.index,
+        ).duplicated(keep="first")
+        out = out.loc[~(ma_kh_hop_le & trung_khoa)].copy()
+    return out
+
+
+def loc_nguon_von(df: pd.DataFrame, chon: str) -> pd.DataFrame:
+    """Lọc DataFrame theo mã nguồn vốn đã chuẩn hóa; lựa chọn không hợp lệ giữ nguyên df."""
+    if df is None or df.empty or COT_NGUON_VON not in df.columns or chon == "all":
+        return df
+
+    nv_chuan = df[COT_NGUON_VON].map(_chuan_hoa_nguon_von)
+    if chon not in {"1", "2"} or not nv_chuan.eq(chon).any():
+        return df
+    return df.loc[nv_chuan.eq(chon)].copy()
+
+
+def chuan_hoa_nhom_nguon_von(df: pd.DataFrame) -> pd.DataFrame:
+    """Gộp các biến thể 1/01/TW và 2/02/ĐP thành hai nhãn nguồn vốn chuẩn."""
+    if df is None or df.empty or COT_NGUON_VON not in df.columns:
+        return df
+
+    result = df.copy()
+    nv_chuan = result[COT_NGUON_VON].map(_chuan_hoa_nguon_von)
+    result[COT_NGUON_VON] = nv_chuan.map(_NV_GROUP_LABELS).fillna("Khác/Không xác định")
+    return result
+
+
+def render_nguon_von_filter(
+    df: pd.DataFrame,
+    key: str,
+    container: DeltaGenerator | None = None,
+) -> pd.DataFrame:
+    """
+    Filter dữ liệu theo nguồn vốn: Trung ương (1) / Địa phương (2).
+
+    Trả df nguyên vẹn khi thiếu cột Nguồn vốn, chọn "Tất cả" hoặc cột
+    không có giá trị 1/2 hợp lệ.
+    """
+    ctx = container if container is not None else st
+
+    if df is None or df.empty or COT_NGUON_VON not in df.columns:
+        return df
+
+    nv_chuan = df[COT_NGUON_VON].map(_chuan_hoa_nguon_von)
+    hien_co = [m for m in ("1", "2") if (nv_chuan == m).any()]
+    if not hien_co:
+        return df
+
+    chon = ctx.radio(
+        "💰 Nguồn vốn",
+        ["all"] + hien_co,
+        format_func=lambda m: _NV_LABELS[m],
+        horizontal=True,
+        key=f"nv_filter_{key}",
+    )
+    if chon == "all":
+        return df
+
+    df_loc = loc_nguon_von(df, chon)
+    ctx.caption(
+        f"🏦 Đang lọc: **{_NV_LABELS[chon]}** — {len(df_loc):,} dòng".replace(",", ".")
+    )
+    return df_loc
 
 
 def render_inline_filter(
@@ -40,14 +159,24 @@ def render_inline_filter(
     for idx, col_name in enumerate(filter_columns):
         if idx < len(cols) and col_name in df.columns:
             with cols[idx]:
-                # Lấy unique values
-                unique_vals = ["Tất cả"] + sorted(df[col_name].dropna().unique().tolist())
+                # Danh sách của filter sau phụ thuộc kết quả filter trước để
+                # không cho phép chọn một tổ hợp Xã/Chương trình không tồn tại.
+                unique_vals = ["Tất cả"] + sorted(
+                    df_filtered[col_name].dropna().unique().tolist(),
+                    key=lambda value: str(value).casefold(),
+                )
+                widget_key = f"filter_{key}_{col_name}"
+                if (
+                    widget_key in st.session_state
+                    and st.session_state[widget_key] not in unique_vals
+                ):
+                    st.session_state[widget_key] = "Tất cả"
                 
                 # Selectbox cho mỗi cột
                 selected = st.selectbox(
                     f"🔍 {col_name}",
                     unique_vals,
-                    key=f"filter_{key}_{col_name}",
+                    key=widget_key,
                     label_visibility="visible",
                 )
                 

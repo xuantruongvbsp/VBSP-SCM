@@ -239,6 +239,36 @@ def test_upload_dienbao_reset_uploader_sau_khi_luu_thanh_cong():
     assert "st.session_state[ver_key] = ver + 1" in source
 
 
+def test_file_chip_uu_tien_ten_goc_va_thoi_diem_upload(monkeypatch):
+    monkeypatch.setattr(tab_candoi.os.path, "exists", lambda _path: True)
+    monkeypatch.setattr(tab_candoi.os.path, "getsize", lambda _path: 5511)
+    monkeypatch.setattr(tab_candoi.os.path, "getmtime", lambda _path: 0)
+
+    chip = tab_candoi._db_file_chip(
+        r"D:\VBSP-SCM\cache\dienbao_prev.xlsx",
+        meta={
+            "ten_file": "31.12.xlsx",
+            "ngay_upload": "2026-08-01T09:07:42.927228",
+        },
+    )
+
+    assert "31.12.xlsx" in chip
+    assert "5 KB · 01/08/2026 09:07" in chip
+    assert "dienbao_prev.xlsx" not in chip
+    assert "01/01/1970" not in chip
+
+
+def test_file_details_fallback_filesystem_cho_metadata_legacy(monkeypatch):
+    monkeypatch.setattr(tab_candoi.os.path, "getsize", lambda _path: 2048)
+    monkeypatch.setattr(tab_candoi.os.path, "getmtime", lambda _path: 0)
+
+    name, kb, timestamp = tab_candoi._db_file_details("cache/dienbao_prev.xlsx")
+
+    assert name == "dienbao_prev.xlsx"
+    assert kb == 2
+    assert timestamp == tab_candoi.datetime.fromtimestamp(0).strftime("%d/%m/%Y %H:%M")
+
+
 def test_render_upload_section_khong_hien_expander_lich_su_rong():
     source = inspect.getsource(tab_candoi._render_upload_section)
 

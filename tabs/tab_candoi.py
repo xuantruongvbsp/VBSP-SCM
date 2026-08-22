@@ -404,18 +404,47 @@ def _has_previous_file(path_prev: str | None, path_ht: str | None) -> bool:
         return prev_norm != ht_norm
 
 
-def _db_file_chip(store_path: str, empty_text: str = "Chưa có file — vui lòng upload") -> str:
-    """HTML chip hiển thị trạng thái file Điện báo (đã lưu / chưa có)."""
-    if store_path and os.path.exists(store_path):
+def _db_file_details(
+    store_path: str,
+    meta: dict[str, Any] | None = None,
+) -> tuple[str, int | str, str]:
+    """Tên gốc, dung lượng và lúc upload của file Điện báo để hiển thị."""
+    meta = meta or {}
+    ten_file_goc = str(meta.get("ten_file") or "").strip()
+    ten_hien_thi = ntpath.basename(ten_file_goc) if ten_file_goc else os.path.basename(store_path)
+    ngay_upload = str(meta.get("ngay_upload") or "").strip()
+
+    try:
+        kb: int | str = os.path.getsize(store_path) // 1024
+    except OSError:
+        kb = "—"
+
+    if ngay_upload:
         try:
-            _mt = datetime.fromtimestamp(os.path.getmtime(store_path)).strftime("%d/%m/%Y %H:%M")
-            _kb = os.path.getsize(store_path) // 1024
-        except Exception:
-            _mt, _kb = "—", "—"
+            ngay_hien_thi = datetime.fromisoformat(ngay_upload).strftime("%d/%m/%Y %H:%M")
+        except ValueError:
+            ngay_hien_thi = ngay_upload
+    else:
+        try:
+            ngay_hien_thi = datetime.fromtimestamp(os.path.getmtime(store_path)).strftime("%d/%m/%Y %H:%M")
+        except OSError:
+            ngay_hien_thi = "—"
+
+    return ten_hien_thi, kb, ngay_hien_thi
+
+
+def _db_file_chip(
+    store_path: str,
+    empty_text: str = "Chưa có file — vui lòng upload",
+    meta: dict[str, Any] | None = None,
+) -> str:
+    """HTML chip trạng thái file, ưu tiên metadata của lần upload."""
+    if store_path and os.path.exists(store_path):
+        ten_hien_thi, kb, ngay_hien_thi = _db_file_details(store_path, meta)
         return (
             '<div class="db-up-file"><span class="dot"></span>'
-            f'<span>{os.path.basename(store_path)}</span>'
-            f'<span class="meta">{_kb} KB · {_mt}</span></div>'
+            f'<span>{html.escape(ten_hien_thi)}</span>'
+            f'<span class="meta">{kb} KB · {html.escape(ngay_hien_thi)}</span></div>'
         )
     return f'<div class="db-up-file empty"><span class="dot"></span>{empty_text}</div>'
 
@@ -1119,7 +1148,8 @@ def _upload_one_file(
             )
             st.error(f"❌ Lỗi: {e}")
     else:
-        st.markdown(_db_file_chip(store_path, empty_text), unsafe_allow_html=True)
+        meta = db.doc_kv(f"dienbao_meta_{loai}{key_sfx}") or {}
+        st.markdown(_db_file_chip(store_path, empty_text, meta), unsafe_allow_html=True)
 
 
 def _render_upload_section(
@@ -1347,14 +1377,11 @@ def render(tab: DeltaGenerator | None = None, **kwargs: dict) -> None:
         # ══════════════════════════════════════════════════════════════════
         # STATE B: Đã có file → Info bar + Quản lý tệp inline
         # ══════════════════════════════════════════════════════════════════
-        try:
-            _mtime = datetime.fromtimestamp(os.path.getmtime(path_ht)).strftime("%d/%m/%Y %H:%M")
-            _kb    = os.path.getsize(path_ht) // 1024
-        except Exception:
-            _mtime, _kb = "—", "—"
+        _meta_ht_status = db.doc_kv(f"dienbao_meta_ht{key_sfx}") or {}
+        _ten_ht, _kb, _mtime = _db_file_details(path_ht, _meta_ht_status)
 
         _has_file_prev = _has_previous_file(path_prev, path_ht)
-        st.caption(f"📂 **{os.path.basename(path_ht)}** · {_kb} KB · {_mtime}")
+        st.caption(f"📂 {_ten_ht} · {_kb} KB · {_mtime}")
 
         _render_quan_ly_tep_inline(
             store_ht,

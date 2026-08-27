@@ -36,8 +36,10 @@ tabs/*.docx
 
 # File tạm
 tmp_*.txt
+tmp/
 *.bak
 *.log
+*.db.pre_restore
 
 # IDE
 .vscode/
@@ -53,6 +55,7 @@ VBSP-SCM/
 .trae/cache/
 .trae/*.json
 # .trae/rules/ được commit để đồng bộ rules giữa các máy
+.agents/skills/
 
 # File Excel tạm khi mở
 ~$*.xlsx

@@ -3852,6 +3852,18 @@ def _to_int(val, default=0):
 
 ---
 
+### C44 — So mốc dư nợ 31/12 bị lẫn xã trùng PGD và cộng chồng snapshot
+| | |
+|---|---|
+| **File** | `data/giao_ban.py` → `loc_baseline_cung_xa_pgd()`; `services/khtd_mau07_service.py` → `tinh_du_no_ap_baseline()`; `tabs/tab_khtd_mau07.py`; `workspaces/ws_management.py` → `_doc_nqh_delta_snapshot()` |
+| **Dấu hiệu** | Các chỉ tiêu so với dư nợ 31/12 trong Giao ban xã/Mẫu 07 có thể lấy lẫn xã cùng tên ở PGD khác; bảng NQH tăng đột biến ở workspace KH-NV có thể cao gấp đôi vì snapshot có cả dòng tổng và dòng chi tiết. |
+| **Nguyên nhân** | Một số nơi chỉ lọc baseline theo `Tên xã` mà không khóa thêm `Tên PGD`; truy vấn snapshot nhóm theo PGD nhưng không giới hạn lớp tổng `ma_ct='ALL' AND nguon_von='ALL'`. |
+| **Fix** | Baseline giao ban lọc thêm PGD khi dữ liệu hiện tại thuộc đúng một PGD; Mẫu 07 truyền `pgd_chon` vào cả baseline/current HSTD; truy vấn snapshot chỉ đọc lớp tổng PGD. |
+| **Test** | `tests/test_giao_ban.py::TestTinhSoLieuVanXuoi::test_baseline_cung_ten_xa_khac_pgd_khong_bi_cong_lan`, `tests/test_khtd_mau07_service.py::test_tinh_du_no_ap_baseline_loc_them_pgd_khi_co_xa_trung_ten`, `tests/test_khtd_mau07_service.py::test_lay_ds_ma_key_co_du_lieu_loc_hstd_hien_tai_theo_pgd`, `tests/test_ws_management.py::test_nqh_delta_snapshot_chi_doc_lop_tong_pgd` |
+| **Ngày fix** | 2026-08-27 |
+
+---
+
 Mỗi khi fix bug, copy template dưới đây và điền vào đúng mục:
 
 ```

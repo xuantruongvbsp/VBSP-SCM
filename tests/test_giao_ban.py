@@ -119,7 +119,7 @@ class TestTinhSoLieuVanXuoi:
         result = tinh_so_lieu_van_xuoi(_df_xa(), df_bl, 2025)
 
         assert result["{{tang_giam_dau_nam}}"] == "tăng"
-        assert result["{{chenh_lech_dau_nam}}"] == "1"
+        assert result["{{chenh_lech_dau_nam}}"] == "2"
 
     # ── Edge cases ────────────────────────────────────────────────────────
 

@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [2026-08-27] — Rà soát và sửa các điểm so dư nợ mốc 31/12 còn lệch phạm vi
+- `data/giao_ban.py` — thêm `loc_baseline_cung_xa_pgd()` để các chỉ tiêu giao ban xã lọc baseline 31/12 theo cả `Tên xã` và đúng một `Tên PGD` khi xác định được từ dữ liệu hiện tại.
+- `services/khtd_mau07_service.py` — thêm lọc `ten_pgd` cho baseline/current HSTD khi tính dư nợ ấp và danh sách mã chương trình Mẫu 07, tránh lẫn xã trùng tên giữa PGD.
+- `tabs/tab_khtd_mau07.py` — truyền `pgd_chon` vào service và lọc danh sách ấp theo PGD đang chọn cho cả baseline 31/12 lẫn HSTD hiện tại.
+- `workspaces/ws_management.py` — truy vấn so sánh snapshot NQH chỉ đọc lớp tổng PGD `ma_ct='ALL' AND nguon_von='ALL'`, không cộng chồng lớp chi tiết chương trình/nguồn vốn.
+- `tests/test_giao_ban.py`, `tests/test_khtd_mau07_service.py`, `tests/test_ws_management.py` — thêm regression test cho xã trùng tên khác PGD và snapshot 31/12 không bị cộng chồng.
+
 ## [2026-08-27] — Vá lỗi baseline 31/12 lọc Nguồn vốn bị lấy nhầm toàn bảng
 - `tabs/tab_baocao/reports/tong_hop_hstd_v2.py` — `_doc_baseline_cung_pham_vi()` dùng lọc Nguồn vốn nghiêm cho baseline; khi baseline không có dòng khớp bộ lọc hiện tại vẫn giữ DataFrame rỗng có schema để cột mốc hiển thị `0` thay vì biến mất hoặc lấy nhầm toàn bộ baseline.
 - `tests/test_tong_hop_hstd_v2.py` — thêm regression test cho case chọn nguồn vốn Địa phương nhưng baseline cùng phạm vi chỉ có Trung ương.

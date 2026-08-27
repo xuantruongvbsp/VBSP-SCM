@@ -1,5 +1,8 @@
 # CHANGELOG
 
+## [2026-08-27] — Khôi phục BUGMAP sau merge GitHub
+- `BUGMAP.md` — khôi phục các entry lịch sử bị rơi trong lúc merge (`B85`-`B90`, `C39`, `C40`, `E23`, `J74`); code/test không đổi.
+
 ## [2026-08-27] — Dọn trạng thái Git trước khi commit GitHub
 - `.gitignore` — ignore `tmp/`, bản sao DB `.db.pre_restore` và `.agents/skills/` để installer/runtime/backup tạm không bị đưa vào commit.
 - `CHANGELOG.md` — giải conflict merge bằng cách giữ cả entry local 21-27/08 và entry GitHub về phục hồi backup WAL cũ.

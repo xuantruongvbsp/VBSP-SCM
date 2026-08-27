@@ -61,3 +61,21 @@ def test_xuat_pdf_bc_khong_tao_trang_trang_chi_co_footer():
 
     assert "Chương trình" in last_page_text
     assert "Tài liệu được tạo tự động" in last_page_text
+
+
+def test_xuat_pdf_bc_giu_nguyen_cot_ma_dinh_danh():
+    pdf_bytes = xuat_pdf_bc(
+        {
+            "Chi tiết": pd.DataFrame([
+                {"Mã KH": 75000001, "Số khế ước": "KU202600001", "Tổng dư nợ": 1_000_000},
+            ]),
+        },
+        "Báo cáo mã định danh",
+        "tester",
+    )
+
+    with pdfplumber.open(BytesIO(pdf_bytes)) as pdf:
+        extracted = "\n".join(page.extract_text() or "" for page in pdf.pages)
+
+    assert "75000001" in extracted
+    assert "75.000.001" not in extracted

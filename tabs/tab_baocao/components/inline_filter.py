@@ -5,7 +5,15 @@ import streamlit as st
 import pandas as pd
 from typing import TYPE_CHECKING, List, Dict, Any, Callable
 
-from config import COT_NGUON_VON, COT_SO_KU, COT_MA_KH
+from config import (
+    COT_MA_KH,
+    COT_NGUON_VON,
+    COT_SO_KU,
+    COT_TEN_PGD,
+    COT_TEN_XA,
+    DS_XA_THANH_THI,
+    DS_XA_THANH_THI_THEO_PGD,
+)
 
 if TYPE_CHECKING:
     from streamlit.delta_generator import DeltaGenerator
@@ -124,6 +132,94 @@ def render_nguon_von_filter(
     df_loc = loc_nguon_von(df, chon)
     ctx.caption(
         f"🏦 Đang lọc: **{_NV_LABELS[chon]}** — {len(df_loc):,} dòng".replace(",", ".")
+    )
+    return df_loc
+
+
+# ── Bộ lọc khu vực nông thôn / thành thị ────────────────────────────────────
+_KV_LABELS = {
+    "all": "🌐 Tất cả khu vực",
+    "thanh_thi": "🏙️ Thành thị",
+    "nong_thon": "🌾 Nông thôn",
+}
+
+_XA_THANH_THI_LC = frozenset(x.casefold() for x in DS_XA_THANH_THI)
+_XA_THANH_THI_THEO_PGD_LC = frozenset(
+    (ten_pgd.casefold(), ten_xa.casefold())
+    for ten_pgd, ten_xa in DS_XA_THANH_THI_THEO_PGD
+)
+
+
+def _phan_loai_khu_vuc(value) -> str:
+    """Phân loại một giá trị 'Tên xã' → 'thanh_thi' / 'nong_thon'."""
+    s = str(value).strip()
+    if not s or s.casefold() in {"nan", "none", "null", "<na>"}:
+        return "nong_thon"
+    return "thanh_thi" if s.casefold() in _XA_THANH_THI_LC else "nong_thon"
+
+
+def _chuan_hoa_text_series(series: pd.Series) -> pd.Series:
+    return series.astype("string").str.strip().str.casefold().fillna("")
+
+
+def phan_loai_khu_vuc_df(df: pd.DataFrame) -> pd.Series:
+    """Phân loại khu vực cho từng dòng; hỗ trợ ngoại lệ theo cặp PGD + Tên xã."""
+    kv = df[COT_TEN_XA].map(_phan_loai_khu_vuc)
+    if COT_TEN_PGD not in df.columns or not _XA_THANH_THI_THEO_PGD_LC:
+        return kv
+
+    ten_pgd = _chuan_hoa_text_series(df[COT_TEN_PGD])
+    ten_xa = _chuan_hoa_text_series(df[COT_TEN_XA])
+    mask_dac_biet = pd.Series(False, index=df.index)
+    for pgd_key, xa_key in _XA_THANH_THI_THEO_PGD_LC:
+        mask_dac_biet |= ten_pgd.eq(pgd_key) & ten_xa.eq(xa_key)
+    return kv.mask(mask_dac_biet, "thanh_thi")
+
+
+def loc_khu_vuc(df: pd.DataFrame, chon: str) -> pd.DataFrame:
+    """Lọc DataFrame theo khu vực nông thôn/thành thị; lựa chọn không hợp lệ giữ nguyên df."""
+    if df is None or df.empty or COT_TEN_XA not in df.columns or chon == "all":
+        return df
+    if chon not in {"thanh_thi", "nong_thon"}:
+        return df
+    kv = phan_loai_khu_vuc_df(df)
+    return df.loc[kv.eq(chon)].copy()
+
+
+def render_khu_vuc_filter(
+    df: pd.DataFrame,
+    key: str,
+    container: DeltaGenerator | None = None,
+) -> pd.DataFrame:
+    """
+    Filter dữ liệu theo khu vực: Thành thị (phường) / Nông thôn (xã).
+
+    Trả df nguyên vẹn khi thiếu cột Tên xã, chọn "Tất cả", hoặc cột
+    không có giá trị.
+    """
+    ctx = container if container is not None else st
+
+    if df is None or df.empty or COT_TEN_XA not in df.columns:
+        return df
+
+    kv = phan_loai_khu_vuc_df(df)
+    hien_co = [m for m in ("thanh_thi", "nong_thon") if (kv == m).any()]
+    if not hien_co:
+        return df
+
+    chon = ctx.radio(
+        "🏙️ Khu vực",
+        ["all"] + hien_co,
+        format_func=lambda m: _KV_LABELS[m],
+        horizontal=True,
+        key=f"kv_filter_{key}",
+    )
+    if chon == "all":
+        return df
+
+    df_loc = loc_khu_vuc(df, chon)
+    ctx.caption(
+        f"🏙️ Đang lọc: **{_KV_LABELS[chon]}** — {len(df_loc):,} dòng".replace(",", ".")
     )
     return df_loc
 

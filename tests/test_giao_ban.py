@@ -21,6 +21,7 @@ def _df_xa(
     qh = qh or [0, 500_000]
     return pd.DataFrame({
         "Tên xã":              ["Xã A", "Xã A"],
+        "Tên PGD":             ["PGD A", "PGD A"],
         "Mã KH":               ["KH001", "KH002"],
         "Tổng dư nợ":          dn,
         "Dư nợ quá hạn":       qh,
@@ -104,6 +105,21 @@ class TestTinhSoLieuVanXuoi:
         df_hien = _df_xa(dn=[500_000, 1_000_000], qh=[0, 0])  # ht = 1.5M
         result = tinh_so_lieu_van_xuoi(df_hien, df_bl, 2025)
         assert result["{{tang_giam_dau_nam}}"] == "giảm"
+
+    def test_baseline_cung_ten_xa_khac_pgd_khong_bi_cong_lan(self):
+        """Baseline 31/12 phải bám cùng PGD khi df_xa chỉ thuộc một PGD."""
+        df_bl = pd.concat(
+            [
+                _df_xa(dn=[500_000, 1_000_000], qh=[0, 0]),
+                _df_xa(dn=[100_000_000, 100_000_000], qh=[0, 0]).assign(**{"Tên PGD": "PGD B"}),
+            ],
+            ignore_index=True,
+        )
+
+        result = tinh_so_lieu_van_xuoi(_df_xa(), df_bl, 2025)
+
+        assert result["{{tang_giam_dau_nam}}"] == "tăng"
+        assert result["{{chenh_lech_dau_nam}}"] == "1"
 
     # ── Edge cases ────────────────────────────────────────────────────────
 

@@ -29,6 +29,7 @@ from config import (
     CHUONG_TRINH_KHTD,
     COT_MA_CHUONG_TRINH,
     COT_NGUON_VON,
+    COT_TEN_PGD,
     COT_TEN_THON,
     COT_TEN_XA,
     COT_TONG_DU_NO,
@@ -111,7 +112,26 @@ def _luu_kv(key: str, data, username: str) -> bool:
 # BUSINESS LOGIC
 # ══════════════════════════════════════════════════════════════════════════════
 
-def tinh_du_no_ap_baseline(df_baseline: pd.DataFrame, ten_xa: str) -> dict:
+def _loc_xa_pgd(
+    df: pd.DataFrame,
+    ten_xa: str,
+    ten_pgd: str | None = None,
+) -> pd.DataFrame:
+    """Lọc dữ liệu theo xã và, nếu có, theo đơn vị để tránh lẫn xã trùng tên."""
+    if df is None or df.empty or COT_TEN_XA not in df.columns:
+        return pd.DataFrame(columns=list(df.columns) if df is not None else [])
+    out = df[df[COT_TEN_XA] == ten_xa].copy()
+    pgd = str(ten_pgd or "").strip()
+    if pgd and COT_TEN_PGD in out.columns:
+        out = out[out[COT_TEN_PGD].astype(str).str.strip() == pgd].copy()
+    return out
+
+
+def tinh_du_no_ap_baseline(
+    df_baseline: pd.DataFrame,
+    ten_xa: str,
+    ten_pgd: str | None = None,
+) -> dict:
     """Từ HSTD 31/12 tính dư nợ theo ấp × chương trình × nguồn vốn.
 
     Returns: {"{ten_thon}|{ma_key}": du_no_trieu} hoặc {"_err": "..."}.
@@ -140,9 +160,10 @@ def tinh_du_no_ap_baseline(df_baseline: pd.DataFrame, ten_xa: str) -> dict:
         if missing:
             return {"_err": f"Thiếu cột: {missing}"}
 
-        df = df[df[col_xa] == ten_xa].copy()
+        df = _loc_xa_pgd(df, ten_xa, ten_pgd)
         if df.empty:
-            return {"_err": f"Xã '{ten_xa}' không có trong baseline"}
+            don_vi = f" của '{ten_pgd}'" if ten_pgd else ""
+            return {"_err": f"Xã '{ten_xa}'{don_vi} không có trong baseline"}
 
         df = df.dropna(subset=[col_thon, col_mact, col_nv])
         df[col_dn] = pd.to_numeric(df[col_dn], errors="coerce").fillna(0)
@@ -190,6 +211,7 @@ def _lay_ds_ma_key_co_du_lieu(
     df_full: pd.DataFrame | None,
     du_no_baseline: dict,
     lich_su: list,
+    ten_pgd: str | None = None,
 ) -> set:
     """Lấy danh sách ma_key có dữ liệu từ baseline + HSTD hiện tại + lịch sử."""
     ds_ma_key: set = set()
@@ -208,7 +230,7 @@ def _lay_ds_ma_key_co_du_lieu(
         col_mact = COT_MA_CHUONG_TRINH if COT_MA_CHUONG_TRINH in df_full.columns else None
         col_nv   = COT_NGUON_VON if COT_NGUON_VON in df_full.columns else None
         if col_xa and col_mact and col_nv:
-            df_xa = df_full[df_full[col_xa] == ten_xa].copy()
+            df_xa = _loc_xa_pgd(df_full, ten_xa, ten_pgd)
             df_xa = df_xa.dropna(subset=[col_mact, col_nv])
             for _, row in df_xa.iterrows():
                 ma_ct = int(row[col_mact])

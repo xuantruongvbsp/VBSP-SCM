@@ -7,17 +7,26 @@ from config import (
     COT_DU_NO_KHOANH,
     COT_DU_NO_QH,
     COT_DU_NO_TH,
+    COT_DVUT,
     COT_MA_KH,
+    COT_NGUON_VON,
     COT_SO_KU,
     COT_TEN_CT,
+    COT_TEN_PGD,
+    COT_TEN_TO,
+    COT_TEN_XA,
     COT_TONG_DU_NO,
+    DON_VI_CHI_NHANH,
 )
 from tabs.tab_baocao.components.sticky_table import (
     render_bang_chi_tiet_html,
     render_sticky_table,
 )
+from tabs.tab_baocao.reports import tong_hop_hstd_v2
 from tabs.tab_baocao.reports.tong_hop_hstd_v2 import (
     _NHOM_KHONG_XAC_DINH,
+    _doc_baseline_cung_pham_vi,
+    _tao_so_sanh_du_no_theo_tieu_chi,
     _tao_tong_hop_theo_nhom,
     _tinh_tong_cong,
 )
@@ -83,6 +92,127 @@ def test_tap_du_no_bang_khong_khong_hien_ty_trong_100() -> None:
 
     assert _tinh_tong_cong(df_th, df_group)["ty_trong"] == 0.0
     assert df_th["Tỷ_trọng_%"].eq(0).all()
+
+
+def test_so_sanh_du_no_theo_nhieu_tieu_chi_giu_quy_tac_phan_loai() -> None:
+    df = pd.DataFrame(
+        {
+            COT_TEN_PGD: [DON_VI_CHI_NHANH, "PGD A", "PGD B"],
+            COT_TEN_XA: ["Vay trực tiếp", "La Ngà", "phường Tân Phú"],
+            COT_TEN_CT: ["CT A", "CT A", "CT B"],
+            COT_NGUON_VON: [1, "02", "TW"],
+            COT_DVUT: ["Hội A", "Hội B", "Hội A"],
+            COT_TEN_TO: ["Tổ 1", "Tổ 2", "Tổ 3"],
+            COT_MA_KH: ["KH1", "KH2", "KH3"],
+            COT_SO_KU: ["KU1", "KU2", "KU3"],
+            COT_TONG_DU_NO: [100, 200, 300],
+            COT_DU_NO_TH: [100, 200, 300],
+            COT_DU_NO_QH: [0, 0, 0],
+            COT_DU_NO_KHOANH: [0, 0, 0],
+        }
+    )
+
+    result = _tao_so_sanh_du_no_theo_tieu_chi(
+        df,
+        tieu_chi_chon=["Khu vực", "Nguồn vốn"],
+        top_n=None,
+    )
+
+    theo_nhom = {
+        (row["Tiêu chí"], row["Nhóm"]): row["Tổng dư nợ"]
+        for _, row in result.iterrows()
+    }
+    assert theo_nhom[("Khu vực", "Thành thị")] == 400
+    assert theo_nhom[("Khu vực", "Nông thôn")] == 200
+    assert theo_nhom[("Nguồn vốn", "1 — Trung ương")] == 400
+    assert theo_nhom[("Nguồn vốn", "2 — Địa phương")] == 200
+
+    top_result = _tao_so_sanh_du_no_theo_tieu_chi(
+        df,
+        tieu_chi_chon=["PGD", "Chương trình"],
+        top_n=1,
+    )
+    assert top_result.groupby("Tiêu chí").size().to_dict() == {"Chương trình": 1, "PGD": 1}
+    assert top_result["Xếp hạng"].tolist() == [1, 1]
+    assert _tao_so_sanh_du_no_theo_tieu_chi(df, tieu_chi_chon=[]).empty
+
+
+def test_pdf_tong_hop_dung_dong_tong_chuan_va_co_bq_kh(monkeypatch) -> None:
+    df_th, df_group, co_khoanh = _tao_tong_hop_theo_nhom(
+        _df_mau(), "ct", COT_TEN_CT
+    )
+    tong = _tinh_tong_cong(df_th, df_group)
+    captured: dict[str, object] = {}
+
+    def fake_xuat_pdf(df, *args, **kwargs):
+        captured["df"] = df.copy()
+        captured["kwargs"] = kwargs
+        return b"%PDF-test"
+
+    monkeypatch.setattr(tong_hop_hstd_v2, "xuat_pdf", fake_xuat_pdf)
+
+    result = tong_hop_hstd_v2._xuat_pdf_tong_hop(
+        df_th,
+        tong,
+        COT_TEN_CT,
+        "Chương trình",
+        co_khoanh,
+        "Báo cáo test",
+        "tester",
+        "BC_TEST",
+    )
+
+    df_pdf = captured["df"]
+    kwargs = captured["kwargs"]
+    assert result == b"%PDF-test"
+    assert "BQ/KH" in df_pdf.columns
+    assert "TỔNG CỘNG" not in df_pdf["Chương trình"].tolist()
+    assert kwargs["them_dong_tong"] is True
+    assert kwargs["dong_tong"]["Số KH"] == 2
+    assert kwargs["dong_tong"]["Số món"] == 3
+
+
+def test_baseline_nguon_von_khong_khop_giu_schema_de_moc_bang_0(monkeypatch) -> None:
+    df_bl = pd.DataFrame(
+        {
+            COT_TEN_PGD: ["PGD A"],
+            COT_TEN_XA: ["Xã A"],
+            COT_TEN_CT: ["CT A"],
+            COT_NGUON_VON: [1],
+            COT_MA_KH: ["KH1"],
+            COT_SO_KU: ["KU1"],
+            COT_TONG_DU_NO: [100],
+            COT_DU_NO_TH: [100],
+            COT_DU_NO_QH: [0],
+            COT_DU_NO_KHOANH: [0],
+        }
+    )
+    monkeypatch.setattr(tong_hop_hstd_v2, "_ds_nam_baseline_hstd", lambda: [2025])
+    monkeypatch.setattr(tong_hop_hstd_v2, "ts_baseline_merged", lambda _nam: 123.0)
+    monkeypatch.setattr(
+        tong_hop_hstd_v2,
+        "doc_baseline_merged",
+        lambda _nam, ts=0.0: df_bl,
+    )
+    monkeypatch.setattr(
+        tong_hop_hstd_v2.st,
+        "session_state",
+        {"nv_filter_th_ct": "2"},
+    )
+
+    result, nam = _doc_baseline_cung_pham_vi(
+        "ct",
+        COT_TEN_CT,
+        role="admin",
+        pgd_user="",
+        hien_loc_pgd=False,
+        filter_cols=[],
+    )
+
+    assert nam == 2025
+    assert result is not None
+    assert result.empty
+    assert COT_TEN_CT in result.columns
 
 
 class _FakeContainer:

@@ -1,0 +1,163 @@
+"""Hồi quy số liệu cho toàn bộ nhóm Báo cáo tín dụng."""
+from __future__ import annotations
+
+import pandas as pd
+
+from config import (
+    COT_DNO_NQ11,
+    COT_DU_NO_KHOANH,
+    COT_DU_NO_QH,
+    COT_DU_NO_TH,
+    COT_GIAI_NGAN_TRONG_NAM,
+    COT_MA_NDT,
+    COT_NGAY_DH,
+    COT_NQ11_NO_QH,
+    COT_NQ11_NO_TH,
+    COT_SO_KU,
+    COT_TEN_PGD,
+    COT_TONG_DU_NO,
+)
+from tabs.tab_baocao.components.metric_cards import _tinh_chi_so_cards
+from tabs.tab_baocao.reports.cdtotkvv import (
+    _cac_cot_diem_co_du_lieu,
+    _chuan_bi_cdto,
+)
+from tabs.tab_baocao.reports.gqvl import (
+    _chuan_bi_gqvl,
+    _fmt_df_trieu as _fmt_gqvl,
+    _tong_hop_theo_nha_dau_tu,
+)
+from tabs.tab_baocao.reports.no_rui_ro_v2 import (
+    _loc_den_han,
+    _tao_ty_le_no_xau_theo_pgd,
+)
+from tabs.tab_baocao.reports.nq11 import _chuan_bi_nq11, _fmt_df_trieu as _fmt_nq11
+
+
+def test_nq11_dem_mot_lan_moi_khe_uoc_va_khong_sua_nguon() -> None:
+    df = pd.DataFrame({
+        COT_SO_KU: [" KU1 ", "KU1", "KU2", ""],
+        COT_DNO_NQ11: [100, 100, "200", 999],
+        COT_NQ11_NO_TH: [90, 90, 180, 999],
+        COT_NQ11_NO_QH: [10, 10, 20, 0],
+    })
+    original = df.copy(deep=True)
+
+    result = _chuan_bi_nq11(df)
+
+    pd.testing.assert_frame_equal(df, original)
+    assert result[COT_SO_KU].tolist() == ["KU1", "KU2"]
+    assert result[COT_DNO_NQ11].sum() == 300
+    assert result[COT_NQ11_NO_QH].sum() == 30
+
+
+def test_nq11_va_gqvl_format_dung_cot_tong_hop() -> None:
+    nq11 = _fmt_nq11(pd.DataFrame({"DNO_NQ11": [1_000_000]}))
+    gqvl = _fmt_gqvl(pd.DataFrame({"Tổng_dư_nợ": [2_000_000]}))
+
+    assert nq11.loc[0, "DNO_NQ11"] == "1"
+    assert gqvl.loc[0, "Tổng_dư_nợ"] == "2"
+
+
+def test_gqvl_tinh_du_no_tu_thanh_phan_va_loai_ban_sao_khe_uoc() -> None:
+    df = pd.DataFrame({
+        COT_SO_KU: ["KU1", "KU1", "KU2"],
+        COT_TEN_PGD: ["PGD Long Thành"] * 3,
+        COT_DU_NO_TH: [90, 90, 180],
+        COT_DU_NO_QH: [10, 10, 20],
+        COT_DU_NO_KHOANH: [0, 0, 5],
+        COT_GIAI_NGAN_TRONG_NAM: [50, 50, 70],
+    })
+
+    result = _chuan_bi_gqvl(df)
+
+    assert len(result) == 2
+    assert result["_so_ku_dem"].nunique() == 2
+    assert result[COT_TONG_DU_NO].sum() == 305
+    assert result[COT_DU_NO_QH].sum() == 30
+    assert result[COT_GIAI_NGAN_TRONG_NAM].sum() == 120
+
+
+def test_gqvl_theo_nha_dau_tu_khong_cat_top_20() -> None:
+    df = pd.DataFrame({
+        "_so_ku_dem": [f"KU{i}" for i in range(25)],
+        COT_MA_NDT: [f"NDT{i}" for i in range(25)],
+        COT_TONG_DU_NO: [i + 1 for i in range(25)],
+        COT_DU_NO_QH: [1] * 25,
+    })
+
+    result, group_col = _tong_hop_theo_nha_dau_tu(df)
+
+    assert group_col == COT_MA_NDT
+    assert len(result) == 25
+    assert result["Số_món"].sum() == 25
+    assert result["Tổng_dư_nợ"].sum() == sum(range(1, 26))
+
+
+def test_den_han_tinh_tu_dau_ngay_va_gom_ca_hom_nay() -> None:
+    df = pd.DataFrame({
+        COT_SO_KU: ["KU0", "KU1", "KU2", "KU3"],
+        COT_NGAY_DH: ["21/08/2026", "22/08/2026", "21/09/2026", "22/09/2026"],
+    })
+
+    result = _loc_den_han(df, 30, hom_nay="2026-08-22 15:30:00")
+
+    assert result[COT_SO_KU].tolist() == ["KU1", "KU2"]
+
+
+def test_ty_le_no_xau_khong_lam_roi_pgd_trong() -> None:
+    df = pd.DataFrame({
+        COT_TEN_PGD: ["PGD A", pd.NA],
+        COT_TONG_DU_NO: [1_000, 500],
+        COT_DU_NO_QH: [100, 0],
+        COT_DU_NO_KHOANH: [0, 50],
+    })
+
+    result = _tao_ty_le_no_xau_theo_pgd(df)
+
+    assert set(result[COT_TEN_PGD]) == {"PGD A", "Chưa xác định"}
+    assert result["Tổng_dư_nợ"].sum() == 1_500
+    assert result["Tổng_nợ_xấu"].sum() == 150
+
+
+def test_cdto_loai_to_het_du_no_loai_trung_va_nhan_dien_cot_diem() -> None:
+    df = pd.DataFrame({
+        "ma_dv": ["001", "001", "001"],
+        "ma_to": ["T1", "T1", "T2"],
+        "du_no": [100, 150, 0],
+        "diem_gdtx": [pd.NA, pd.NA, pd.NA],
+        "tong_diem": [80, 90, 70],
+        "xep_loai": ["Khá", "Tốt", "Tốt"],
+    })
+
+    result = _chuan_bi_cdto(df)
+
+    assert len(result) == 1
+    assert result.loc[0, "du_no"] == 150
+    assert result.loc[0, "xep_loai"] == "Tốt"
+    assert _cac_cot_diem_co_du_lieu(
+        result, ["diem_gdtx", "tong_diem"]
+    ) == ["tong_diem"]
+
+
+def test_cards_no_qua_han_dung_tu_so_va_khong_dem_trung() -> None:
+    hstd = pd.DataFrame({
+        COT_SO_KU: ["KU1", "KU1", "KU2"],
+        COT_TONG_DU_NO: [1_000, 1_000, 3_000],
+        COT_DU_NO_QH: [100, 100, 0],
+        COT_DU_NO_KHOANH: [500, 500, 0],
+    })
+    nq11 = pd.DataFrame({
+        COT_SO_KU: ["KU1", "KU1"],
+        COT_DNO_NQ11: [1_000, 1_000],
+    })
+
+    result = _tinh_chi_so_cards(hstd, nq11)
+
+    assert result == {
+        "tong_du_no": 4_000.0,
+        "no_qh": 100.0,
+        "so_mon": 2,
+        "tl_no_qh": 2.5,
+        "dno_nq11": 1_000.0,
+    }

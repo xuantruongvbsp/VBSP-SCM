@@ -18,6 +18,7 @@ from config import (
     COT_TONG_DU_NO,
     COT_DU_NO_QH,
     COT_TEN_CT,
+    COT_TEN_PGD,
     COT_TEN_XA,
     COT_LAI_TON,
     COT_LAI_TON_QH,
@@ -37,6 +38,37 @@ COT_MON_3M = "is_3m_inactive"  # từ danh_dau_khong_hd()
 
 def loc_theo_xa(df: pd.DataFrame, ten_xa: str) -> pd.DataFrame:
     return df[df[COT_TEN_XA] == ten_xa].copy()
+
+
+def loc_baseline_cung_xa_pgd(
+    df_baseline: pd.DataFrame | None,
+    df_xa: pd.DataFrame,
+    ten_xa: str | None = None,
+) -> pd.DataFrame | None:
+    """Lọc baseline cùng xã và, khi xác định được, cùng đúng một PGD với dữ liệu hiện tại."""
+    if df_baseline is None or df_baseline.empty:
+        return df_baseline
+    df_bl = df_baseline.copy()
+
+    xa = str(ten_xa or "").strip()
+    if not xa and COT_TEN_XA in df_xa.columns and not df_xa.empty:
+        xa = str(df_xa[COT_TEN_XA].iloc[0] or "").strip()
+    if xa and COT_TEN_XA in df_bl.columns:
+        df_bl = df_bl[df_bl[COT_TEN_XA] == xa].copy()
+
+    if COT_TEN_PGD in df_xa.columns and COT_TEN_PGD in df_bl.columns:
+        pgd_vals = (
+            df_xa[COT_TEN_PGD]
+            .dropna()
+            .astype(str)
+            .str.strip()
+        )
+        pgd_unique = [v for v in pgd_vals.unique().tolist() if v]
+        if len(pgd_unique) == 1:
+            pgd = pgd_unique[0]
+            df_bl = df_bl[df_bl[COT_TEN_PGD].astype(str).str.strip() == pgd].copy()
+
+    return df_bl
 
 
 def tinh_so_lieu_van_xuoi(
@@ -75,7 +107,7 @@ def tinh_so_lieu_van_xuoi(
     chenh_lech_dn = pct_dau_nam = 0.0
     tang_giam_dau_nam = "tăng"
     if df_baseline is not None and COT_TEN_XA in df_baseline.columns and not df_xa.empty and COT_TEN_XA in df_xa.columns:
-        df_bl_xa = df_baseline[df_baseline[COT_TEN_XA] == df_xa[COT_TEN_XA].iloc[0]]
+        df_bl_xa = loc_baseline_cung_xa_pgd(df_baseline, df_xa)
         dn_bl = pd.to_numeric(df_bl_xa[COT_TONG_DU_NO], errors="coerce").fillna(0).sum()
         chenh_lech_dn = tong_dn - dn_bl
         pct_dau_nam = chenh_lech_dn / dn_bl * 100 if dn_bl > 0 else 0.0
@@ -285,7 +317,7 @@ def tao_bang_chuong_trinh(
 ) -> None:
     if df_baseline is not None and COT_TEN_XA in df_baseline.columns:
         ten_xa = df_xa[COT_TEN_XA].iloc[0]
-        df_bl = df_baseline[df_baseline[COT_TEN_XA] == ten_xa]
+        df_bl = loc_baseline_cung_xa_pgd(df_baseline, df_xa, ten_xa)
     else:
         df_bl = None
 
@@ -747,7 +779,7 @@ def xuat_thong_bao_ket_luan_giao_ban(
     if df_baseline is not None and COT_TEN_XA in df_baseline.columns:
         ten_xa_val = df_xa[COT_TEN_XA].iloc[0] if COT_TEN_XA in df_xa.columns else None
         if ten_xa_val:
-            df_bl_xa = df_baseline[df_baseline[COT_TEN_XA] == ten_xa_val]
+            df_bl_xa = loc_baseline_cung_xa_pgd(df_baseline, df_xa, str(ten_xa_val))
             baseline = pd.to_numeric(df_bl_xa[COT_TONG_DU_NO], errors="coerce").sum()
             tang_giam = tong_dn - (baseline / 1e6)
             van_xuoi += f" (tăng/giảm {abs(tang_giam):,.0f} triệu so với cùng kỳ)"

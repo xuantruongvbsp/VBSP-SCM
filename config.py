@@ -960,6 +960,30 @@ XA_TO_PGD: dict[str, str] = {
     for xa in ds
 }
 
+# ── Phân loại khu vực nông thôn / thành thị ────────────────────────────────
+# Tên đơn vị hành chính THÀNH THỊ (phường) theo cột "Tên xã" trong HSTD.
+# Mọi đơn vị còn lại được coi là NÔNG THÔN (xã).
+# Giá trị khớp CHÍNH XÁC cột "Tên xã":
+#   - Phường cũ: không prefix (vd "Biên Hòa")
+#   - Phường đô thị hóa gần đây: lowercase "phường " (vd "phường Tân Phú")
+DS_XA_THANH_THI = frozenset([
+    "Biên Hòa", "Trấn Biên", "Trảng Dài", "Tam Hiệp",
+    "Long Bình", "Hố Nai", "Long Hưng", "Phước Tân",
+    "Tam Phước", "Tân Triều", "Bình Lộc", "Long Khánh",
+    "Bảo Vinh", "Xuân Lập", "Hàng Gòn",
+    "phường Long Thành", "phường Nhơn Trạch", "phường Trảng Bom",
+    "phường Dầu Giây", "phường Xuân Lộc", "phường Tân Phú",
+    "phường Trị An", "phường Đồng Phú", "phường Tân Khai",
+    "phường Lộc Ninh",
+    "Bình Phước", "Đồng Xoài", "Minh Hưng", "Chơn Thành",
+    "An Lộc", "Bình Long", "Phước Bình", "Phước Long",
+])
+
+# Một số dòng HSTD không phải tên xã/phường chuẩn nhưng cần xếp khu vực theo PGD.
+DS_XA_THANH_THI_THEO_PGD = frozenset([
+    (DON_VI_CHI_NHANH, "Vay trực tiếp"),
+])
+
 # ── Ngưỡng cảnh báo upload dữ liệu cũ (đơn vị: ngày) ────────────────────────
 # Nếu file của một đơn vị cũ hơn ngưỡng → hiện badge ⚠️
 UPLOAD_CANH_BAO_NGAY: dict[str, int] = {

@@ -36,7 +36,7 @@ import pandas as pd
 from config import (
     COT_DU_NO_KHOANH, COT_LAI_TON, COT_LAI_THANG, COT_LAI_TON_QH,
     FILE_PATH, FILE_PATH_NQ11, FILE_PATH_DB, FILE_PATH_DB_PREV,
-    FILE_PATH_SK_GQVL, CACHE_SK_GQVL,
+    FILE_PATH_SK_GQVL, CACHE_GQVL,
     TEN_FILE, TEN_FILE_NQ11, TEN_FILE_DB, TEN_FILE_DB_PREV,
     COT_TEN_PGD, COT_MA_KH, COT_NGAY_SL, COT_SO_KU, WORKSPACE_MAP,
     COT_TONG_DU_NO, COT_DU_NO_QH, COT_DU_NO_TH,
@@ -1269,7 +1269,14 @@ def main():
 
     _hstd_ts = ts_file(CACHE_HSTD) if os.path.exists(CACHE_HSTD) else 0.0
     _nq11_ts = ts_file(CACHE_NQ11) if os.path.exists(CACHE_NQ11) else 0.0
-    _gqvl_ts = ts_file(FILE_PATH_SK_GQVL) if os.path.exists(FILE_PATH_SK_GQVL) else 0.0
+    # Báo cáo GQVL ưu tiên cache đã merge toàn CN; file SK chỉ là nguồn
+    # tham chiếu/fallback và có thể chỉ chứa một phần dữ liệu.
+    _gqvl_path = (
+        CACHE_GQVL
+        if os.path.exists(CACHE_GQVL) and os.path.getsize(CACHE_GQVL) > 0
+        else FILE_PATH_SK_GQVL
+    )
+    _gqvl_ts = ts_file(_gqvl_path) if os.path.exists(_gqvl_path) else 0.0
 
     # PGD upload mtime — đưa vào _data_version để tự động reload khi PGD upload file mới
     # mà chưa có merge hệ thống (trường hợp này _hstd_ts không đổi → không detect được).
@@ -1387,8 +1394,11 @@ def main():
                 _df_nq11_fallback = _load_nq11(CACHE_NQ11, _nq11_ts)
 
             df_gqvl = None
-            if os.path.exists(FILE_PATH_SK_GQVL) and ws_hien_tai != "executive":
-                df_gqvl = doc_file_sk_gqvl(FILE_PATH_SK_GQVL, _gqvl_ts)
+            if os.path.exists(_gqvl_path) and ws_hien_tai != "executive":
+                if _gqvl_path == CACHE_GQVL:
+                    df_gqvl = pd.read_parquet(CACHE_GQVL)
+                else:
+                    df_gqvl = doc_file_sk_gqvl(FILE_PATH_SK_GQVL, _gqvl_ts)
 
             # Enrich HSTD với NQ11/GQVL flags — 1 lần, tất cả tabs dùng chung
             # QUAN TRỌNG: kiểm tra df is df_full TRƯỚC khi gọi _enrich_hstd vì hàm này

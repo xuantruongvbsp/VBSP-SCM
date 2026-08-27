@@ -1544,6 +1544,26 @@
 | **Test** | `tests/test_bc_tongquan_pdf.py` |
 | **Ngày fix** | 2026-08-01 |
 
+### F13 — PDF Báo cáo tín dụng thiếu tổng, lỗi emoji và in ngày dạng Timestamp
+| | |
+|---|---|
+| **File** | `pdf_service.py`; `tabs/tab_baocao/reports/tong_hop_hstd_v2.py`; `tabs/tab_baocao/reports/no_rui_ro_v2.py` |
+| **Dấu hiệu** | PDF Tỷ lệ nợ xấu in `1000000000.0`, thiếu tổng Nợ quá hạn/Tổng nợ xấu, cột cảnh báo thành ký tự rỗng; PDF Đến hạn in `2026-08-25 00:00:00`; dòng tổng PDF Tổng hợp không có kiểu tổng chuẩn. |
+| **Nguyên nhân** | `xuat_pdf_chi_tiet()` không nhận diện đủ tên cột tổng hợp nợ xấu và font Times không có emoji; ngày Timestamp đưa thẳng vào `Paragraph`; báo cáo Tổng hợp tự nối dòng tổng vào DataFrame rồi tắt cơ chế tổng của service. |
+| **Fix** | Thêm dòng tổng tùy chỉnh cho `xuat_pdf()`; PDF nợ xấu đổi sang bảng triệu đồng không emoji với đủ bốn cột tiền và tỷ lệ tổng có trọng số; chuẩn hóa ngày `dd/mm/yyyy`; PDF Tổng hợp truyền tổng nunique vào service và bổ sung BQ/KH. |
+| **Test** | `tests/test_pdf_service.py`; `tests/test_tong_hop_hstd_v2.py`; `tests/test_baocao_nguon_von.py` — 24/24 test đạt; đọc ngược PDF xác nhận không còn NUL/Timestamp và tổng 30.000/3.000/700/3.700 triệu, tỷ lệ 12,33%. |
+| **Ngày fix** | 2026-08-22 |
+
+### F14 — PDF báo cáo khó đọc: số tiền bẻ dòng, tổng không format và ký hiệu nhóm thành ô vuông
+| | |
+|---|---|
+| **File** | `pdf_service.py`; `components/export_pdf.py`; `services/bc_tongquan_service.py` |
+| **Dấu hiệu** | PDF tổng hợp 6 cột vẫn dùng khổ dọc làm số tiền tách nhiều dòng; dòng tổng có số kiểu `2385750000000` không phân cách hàng nghìn; group header hiện ký hiệu đầu dòng thành ô vuông; PDF nhiều sheet/kèm biểu đồ dùng màu hoặc độ rộng cột chưa đồng bộ; cột mã/số khế ước bị bẻ dòng; ô rỗng trong `xuat_pdf_co_chart()` có thể gây `UnboundLocalError`; phần trăm số lớn có thể thành `1,234,56 %`; môi trường thiếu `reportlab` có thể crash ngay khi import `components/export_pdf.py`. |
+| **Nguyên nhân** | `xuat_pdf()`/`xuat_pdf_co_chart()` chỉ chuyển landscape khi `>=8` cột và chỉ format một số kiểu số Python; group header dùng glyph `▸` không nằm trong font Times; PDF nhiều sheet chia độ rộng theo chiều dài chung và format cột mã định danh như số thường; nhánh ô rỗng của `xuat_pdf_co_chart()` gán `txt` nhưng chưa tạo `Paragraph`; `_format_phan_tram()` replace dấu thập phân trước khi đổi dấu hàng nghìn; palette màu component nằm ngoài guard `_REPORTLAB_READY`. |
+| **Fix** | Landscape từ 6 cột; tăng trọng số cột tiền/mã/số khế ước/tên KH; dùng helper format số nhận `numbers.Number`; escape text trước khi đưa vào `Paragraph`; đổi nhãn nhóm sang chữ thường; đồng bộ màu xanh VBSP, giữ nguyên mã định danh trong PDF nhiều sheet và vá ô rỗng của PDF kèm biểu đồ; đổi format phần trăm sang replace 3 bước; guard màu khi thiếu `reportlab`; escape thêm nhánh `xuat_pdf_bao_cao()`. |
+| **Test** | `tests/test_pdf_service.py`; `tests/test_bc_tongquan_pdf.py`; `tests/test_export_pdf_component.py`; render 6 PDF mẫu/10 trang PNG và recheck 3 PDF mẫu/3 trang PNG bằng `pypdfium2`; nhóm test PDF/báo cáo chính `34 passed`, nhóm PDF phụ `11 passed`. |
+| **Ngày fix** | 2026-08-24 |
+
 ---
 
 ## G. Kế hoạch tín dụng
@@ -3781,6 +3801,54 @@ def _to_int(val, default=0):
 | **Fix** | Dùng thẳng bytes trả về: `xl_bytes = xuat_excel({...})` rồi `state.downloads.set(state_key, xl_bytes, ...)`; bỏ `.getvalue()` ở cả 2 hàm |
 | **Test** | Compile `tabs/tab_baocao/components/quick_export.py`; grep xác nhận không còn `.getvalue()` trong file |
 | **Ngày fix** | 2026-08-21 |
+
+---
+
+### B91 — Báo cáo GQVL/CDTOTKVV dùng sai nguồn, sai schema hoặc cắt mất dữ liệu
+| | |
+|---|---|
+| **File** | `app.py`; `tabs/tab_baocao/reports/gqvl.py`; `tabs/tab_baocao/reports/cdtotkvv.py` |
+| **Dấu hiệu** | GQVL chỉ hiện 5.113 dòng từ file SK, thiếu cột Tổng dư nợ/Tên PGD; bảng nhà đầu tư chỉ xuất Top 20; CDTO báo thiếu cột xã, card `Tổ xuất sắc` luôn 0 và phân tích điểm thành phần toàn rỗng. |
+| **Nguyên nhân** | App nạp file SK tham chiếu thay cho cache GQVL merge 22 đơn vị; report GQVL cắt `.head(20)`; report CDTO tìm tên cột HSTD trong schema snake_case và tra nhãn `Xuất sắc` trong khi nguồn dùng `Tốt/Khá/Trung bình/Yếu`. |
+| **Fix** | Ưu tiên `CACHE_GQVL`, chuẩn hóa/loại bản sao theo Số khế ước và xuất đủ nhà đầu tư; CDTO dùng `ten_xa/ma_to`, KPI service chuẩn, lọc Tổ còn dư nợ và fallback phân tích `tong_diem`. |
+| **Test** | `tests/test_baocao_tin_dung_so_lieu.py` (8 test); đối chiếu thật GQVL 95.741 món/5.208.874.461.739 đồng, CDTO 4.555 Tổ kỳ 07/2026. |
+| **Ngày fix** | 2026-08-22 |
+
+---
+
+### C41 — KPI NQ11/card và cửa sổ đến hạn đếm sai phạm vi
+| | |
+|---|---|
+| **File** | `tabs/tab_baocao/reports/nq11.py`; `tabs/tab_baocao/components/metric_cards.py`; `tabs/tab_baocao/dashboard.py`; `tabs/tab_baocao/reports/no_rui_ro_v2.py` |
+| **Dấu hiệu** | NQ11 đếm số dòng như số món và luôn hiện “Món không NQ11 = 0”; card Nợ quá hạn hiện tiền QH nhưng delta lại cộng QH+khoanh; khoản đáo hạn đúng hôm nay không nằm trong báo cáo 30/60 ngày. |
+| **Nguyên nhân** | NQ11 được dựng từ tập HSTD đã lọc `__is_nq11` nhưng UI vẫn áp mô hình dữ liệu cũ; card dùng tử số khác nhãn; `pd.Timestamp.today()` có phần giờ nên lớn hơn ngày đến hạn ở 00:00. |
+| **Fix** | Chuẩn hóa và `nunique` theo Số khế ước, dùng đúng KPI NQ11 active; card dùng `QH/Tổng dư nợ` và cùng filter dashboard; chuẩn hóa mốc đầu ngày trước khi lọc đến hạn. |
+| **Test** | `tests/test_baocao_tin_dung_so_lieu.py`; đối chiếu thật NQ11 8.791 món/476.480.314.041 đồng, đến hạn 30 ngày 1.951 món và 60 ngày 8.113 món tại 22/08/2026. |
+| **Ngày fix** | 2026-08-22 |
+
+---
+
+### C42 — Bộ lọc khu vực không bảo toàn tổng dư nợ
+| | |
+|---|---|
+| **File** | `tabs/tab_baocao/components/inline_filter.py` → `_phan_loai_khu_vuc()`, `loc_khu_vuc()` |
+| **Dấu hiệu** | Tổng dư nợ khi chọn riêng `Nông thôn` và `Thành thị` có thể không bằng tổng dư nợ khi chọn `Tất cả khu vực`. |
+| **Nguyên nhân** | Dòng `Tên xã` rỗng/không xác định được gán nhãn `""` nên nằm trong `Tất cả` nhưng bị loại khỏi cả hai nhóm; lựa chọn khu vực hợp lệ nhưng không có dòng lại trả về nguyên DataFrame. |
+| **Fix** | Xếp giá trị xã rỗng/không chuẩn về `nong_thon` theo quy tắc “mọi đơn vị còn lại là nông thôn”; với lựa chọn hợp lệ không có dòng, trả DataFrame rỗng. |
+| **Test** | `tests/test_baocao_nguon_von.py::test_loc_khu_vuc_phan_loai_33_phuong_va_fallback_nong_thon`, `tests/test_baocao_nguon_von.py::test_loc_khu_vuc_nhom_hop_le_khong_co_du_lieu_tra_rong` |
+| **Ngày fix** | 2026-08-27 |
+
+---
+
+### C43 — Baseline 31/12 lọc Nguồn vốn bị lấy nhầm toàn bảng
+| | |
+|---|---|
+| **File** | `tabs/tab_baocao/reports/tong_hop_hstd_v2.py` → `_doc_baseline_cung_pham_vi()` ~dòng 160 |
+| **Dấu hiệu** | Cột `31/12/{năm}` trong Tổng hợp HSTD có thể hiện số baseline dù phạm vi đang chọn không có dòng baseline tương ứng, nhất là khi chọn Nguồn vốn TW/ĐP. |
+| **Nguyên nhân** | Helper baseline dùng `loc_nguon_von()` của UI; hàm này cố ý trả nguyên DataFrame khi lựa chọn không tồn tại trong dữ liệu, phù hợp cho UI thiếu mã hợp lệ nhưng sai khi replay một bộ lọc đang active lên baseline. Sau khi lọc hết dòng, helper còn trả `None` nên cột mốc biến mất thay vì hiện `0`. |
+| **Fix** | Thêm `_loc_nguon_von_baseline()` lọc nghiêm theo mã nguồn vốn chuẩn 1/2; giữ DataFrame rỗng có schema sau khi replay filter để bảng vẫn map baseline bằng `0`. |
+| **Test** | `tests/test_tong_hop_hstd_v2.py::test_baseline_nguon_von_khong_khop_giu_schema_de_moc_bang_0` |
+| **Ngày fix** | 2026-08-27 |
 
 ---
 

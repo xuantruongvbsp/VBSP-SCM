@@ -254,12 +254,16 @@ def _doc_nqh_delta_snapshot() -> pd.DataFrame:
     with get_conn() as conn:
         df_curr = pd.read_sql_query(
             "SELECT ten_pgd, SUM(du_no_qh) as qh_curr, SUM(tong_du_no) as dn_curr "
-            "FROM hstd_snapshot WHERE ky=? GROUP BY ten_pgd",
+            "FROM hstd_snapshot "
+            "WHERE ky=? AND ma_ct='ALL' AND nguon_von='ALL' "
+            "GROUP BY ten_pgd",
             conn, params=(ky_curr,),
         )
         df_prev = pd.read_sql_query(
             "SELECT ten_pgd, SUM(du_no_qh) as qh_prev, SUM(tong_du_no) as dn_prev "
-            "FROM hstd_snapshot WHERE ky=? GROUP BY ten_pgd",
+            "FROM hstd_snapshot "
+            "WHERE ky=? AND ma_ct='ALL' AND nguon_von='ALL' "
+            "GROUP BY ten_pgd",
             conn, params=(ky_prev,),
         )
     df = df_curr.merge(df_prev, on="ten_pgd", how="left").fillna(0)

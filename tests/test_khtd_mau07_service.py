@@ -6,6 +6,7 @@ import pytest
 from config import (
     COT_MA_CHUONG_TRINH,
     COT_NGUON_VON,
+    COT_TEN_PGD,
     COT_TEN_THON,
     COT_TEN_XA,
     COT_TONG_DU_NO,
@@ -50,6 +51,67 @@ def test_tinh_du_no_ap_baseline_basic():
     key_any = next(iter(out.keys()))
     assert "|" in key_any
     assert out[key_any] == 2.0
+
+
+def test_tinh_du_no_ap_baseline_loc_them_pgd_khi_co_xa_trung_ten():
+    df = pd.DataFrame(
+        [
+            {
+                COT_TEN_PGD: "PGD A",
+                COT_TEN_XA: "Vay trực tiếp",
+                COT_TEN_THON: "Ấp 1",
+                COT_MA_CHUONG_TRINH: 1,
+                COT_NGUON_VON: 1,
+                COT_TONG_DU_NO: 1_500_000,
+            },
+            {
+                COT_TEN_PGD: "PGD B",
+                COT_TEN_XA: "Vay trực tiếp",
+                COT_TEN_THON: "Ấp 1",
+                COT_MA_CHUONG_TRINH: 1,
+                COT_NGUON_VON: 1,
+                COT_TONG_DU_NO: 99_000_000,
+            },
+        ]
+    )
+
+    out = khtd_mau07_service.tinh_du_no_ap_baseline(
+        df,
+        "Vay trực tiếp",
+        ten_pgd="PGD A",
+    )
+
+    assert out["Ấp 1|1_TW"] == 1.5
+
+
+def test_lay_ds_ma_key_co_du_lieu_loc_hstd_hien_tai_theo_pgd():
+    df = pd.DataFrame(
+        [
+            {
+                COT_TEN_PGD: "PGD A",
+                COT_TEN_XA: "Vay trực tiếp",
+                COT_MA_CHUONG_TRINH: 1,
+                COT_NGUON_VON: 1,
+            },
+            {
+                COT_TEN_PGD: "PGD B",
+                COT_TEN_XA: "Vay trực tiếp",
+                COT_MA_CHUONG_TRINH: 19,
+                COT_NGUON_VON: 1,
+            },
+        ]
+    )
+
+    out = khtd_mau07_service._lay_ds_ma_key_co_du_lieu(
+        "Vay trực tiếp",
+        df,
+        du_no_baseline={},
+        lich_su=[],
+        ten_pgd="PGD A",
+    )
+
+    assert "1_TW" in out
+    assert "19_TW" not in out
 
 
 def test_build_extract_and_total():

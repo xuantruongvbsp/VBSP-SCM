@@ -1,0 +1,11 @@
+EXITCODE=0
+============================= test session starts =============================
+platform win32 -- Python 3.12.13, pytest-9.1.1, pluggy-1.6.0
+rootdir: D:\VBSP-SCM
+configfile: pytest.ini
+plugins: anyio-4.14.2, cov-7.1.0
+collected 13 items
+
+tests\test_pdf_service.py .............                                  [100%]
+
+======================= 13 passed in 115.12s (0:01:55) ========================

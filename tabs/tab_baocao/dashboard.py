@@ -129,7 +129,8 @@ def render_dashboard(
         selected_nv = st.session_state.get("nv_filter_nr_v2", "all")
 
     df_metric = _loc_hstd_metric(df, selected_pgd, selected_nv)
-    render_metric_cards(df_metric, df_nq11, df_gqvl, container=ctx)
+    df_nq11_metric = _loc_hstd_metric(df_nq11, selected_pgd, selected_nv)
+    render_metric_cards(df_metric, df_nq11_metric, df_gqvl, container=ctx)
     ctx.divider()
 
     return selected_key

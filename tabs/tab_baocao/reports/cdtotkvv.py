@@ -5,17 +5,44 @@ import streamlit as st
 import pandas as pd
 from typing import TYPE_CHECKING
 
-from config import (
-    COT_TEN_PGD,
-    COT_TEN_XA,
-    COT_TEN_TO,
-)
+from config import COT_TEN_XA, COT_TEN_TO
 from auth import la_phan_he_pgd
 from utils import fmt_so, hien_thi_dataframe_phan_trang
+from data.cdtotkvv import chuan_hoa_cdtotkvv_phan_tich
+from services.tongquan_cdto_service import compute_totkvv_kpi
+from services.cdtotkvv_service import loc_df
 from ..components.export_panel import render_export_panel
 
 if TYPE_CHECKING:
     from streamlit.delta_generator import DeltaGenerator
+
+
+def _chuan_bi_cdto(df: pd.DataFrame | None) -> pd.DataFrame:
+    """Chuẩn hóa và giữ một dòng cho mỗi khóa đơn vị + Tổ."""
+    out = chuan_hoa_cdtotkvv_phan_tich(df)
+    if out.empty:
+        return out
+    if {"ma_dv", "ma_to"}.issubset(out.columns):
+        ma_dv = out["ma_dv"].astype("string").str.strip()
+        ma_to = out["ma_to"].astype("string").str.strip()
+        day_du = ma_dv.notna() & ma_to.notna() & ma_dv.ne("") & ma_to.ne("")
+        trung = pd.DataFrame(
+            {"ma_dv": ma_dv, "ma_to": ma_to}, index=out.index
+        ).duplicated(keep="last")
+        out = out.loc[~(day_du & trung)].copy()
+    return out.reset_index(drop=True)
+
+
+def _cac_cot_diem_co_du_lieu(
+    df: pd.DataFrame,
+    cols: list[str],
+) -> list[str]:
+    """Chỉ lấy cột điểm có ít nhất một giá trị số thực sự."""
+    return [
+        col for col in cols
+        if col in df.columns
+        and pd.to_numeric(df[col], errors="coerce").notna().any()
+    ]
 
 
 def render_cdtotkvv(
@@ -42,13 +69,20 @@ def render_cdtotkvv(
         ctx.warning("⚠️ Chưa có dữ liệu CDTOTKVV.")
         return
     
+    if la_phan_he_pgd(role) and pgd_user:
+        df_cdtotkvv = loc_df(df_cdtotkvv, "pgd", pgd_user)
+    df_cdtotkvv = _chuan_bi_cdto(df_cdtotkvv)
+    if df_cdtotkvv.empty:
+        ctx.warning("⚠️ Không có Tổ còn dư nợ để lập báo cáo.")
+        return
+
     ctx.markdown("### ⭐ Báo cáo Chấm điểm Tổ TK&VV")
     
     # Các cột điểm chuẩn CDTOTKVV
-    diem_cols = [c for c in [
+    diem_cols = _cac_cot_diem_co_du_lieu(df_cdtotkvv, [
         "diem_gdtx", "diem_nqh", "diem_thu_no", "diem_thu_lai",
         "diem_tv_tiengui", "diem_ds_tg", "tong_diem"
-    ] if c in df_cdtotkvv.columns]
+    ])
     
     if not diem_cols:
         ctx.error("❌ Không tìm thấy các cột điểm trong dữ liệu CDTOTKVV.")
@@ -56,16 +90,15 @@ def render_cdtotkvv(
         return
     
     # Metrics tổng quan
-    tong_to = len(df_cdtotkvv)
-    avg_diem = df_cdtotkvv["tong_diem"].mean() if "tong_diem" in df_cdtotkvv.columns else 0
+    kpi = compute_totkvv_kpi(df_cdtotkvv)
+    tong_to = kpi["tong_to"]
+    avg_diem = kpi["diem_tb"]
     
     c1, c2, c3 = ctx.columns(3)
     c1.metric("Tổng số tổ", fmt_so(tong_to))
     c2.metric("Điểm trung bình", f"{avg_diem:.1f}")
     
-    if "xep_loai" in df_cdtotkvv.columns:
-        xl_counts = df_cdtotkvv["xep_loai"].value_counts()
-        c3.metric("Tổ xuất sắc", fmt_so(xl_counts.get("Xuất sắc", 0)))
+    c3.metric("Tổ tốt", fmt_so(kpi["to_tot"]))
     
     # Chọn loại báo cáo
     loai_bc = ctx.radio(
@@ -93,7 +126,7 @@ def _render_xep_hang(ctx, df: pd.DataFrame, username: str) -> None:
     
     # Chọn cột hiển thị
     display_cols = [c for c in [
-        "ma_dv", "ten_dv", "ten_xa", "ten_to_truong",
+        "ma_dv", "ten_dv", "ten_xa", "ma_to", "ten_to_truong",
         "tong_diem", "xep_loai", "tinh_trang"
     ] if c in df.columns]
     
@@ -107,32 +140,43 @@ def _render_xep_hang(ctx, df: pd.DataFrame, username: str) -> None:
 def _render_phan_tich_diem(ctx, df: pd.DataFrame, username: str) -> None:
     """Render phân tích điểm thành phần."""
     # Tính trung bình các điểm thành phần
-    diem_cols = [c for c in [
+    diem_cols = _cac_cot_diem_co_du_lieu(df, [
         "diem_gdtx", "diem_nqh", "diem_thu_no", "diem_thu_lai",
         "diem_tv_tiengui", "diem_ds_tg"
-    ] if c in df.columns]
+    ])
+    analysis_cols = diem_cols.copy()
+    if _cac_cot_diem_co_du_lieu(df, ["tong_diem"]):
+        analysis_cols.append("tong_diem")
     
-    if not diem_cols:
-        ctx.error("❌ Không có dữ liệu điểm thành phần.")
+    if not analysis_cols:
+        ctx.error("❌ Không có dữ liệu điểm để phân tích.")
         return
     
     # Tổng hợp theo xã
-    group_col = COT_TEN_XA if COT_TEN_XA in df.columns else (
-        COT_TEN_TO if COT_TEN_TO in df.columns else None
+    group_col = "ten_xa" if "ten_xa" in df.columns else (
+        COT_TEN_XA if COT_TEN_XA in df.columns else (
+            "ma_to" if "ma_to" in df.columns else (
+                COT_TEN_TO if COT_TEN_TO in df.columns else None
+            )
+        )
     )
     
     if group_col:
-        agg_dict = {col: "mean" for col in diem_cols}
-        if "tong_diem" in df.columns:
-            agg_dict["tong_diem"] = "mean"
+        df_tmp = df.copy()
+        nhom = df_tmp[group_col].astype("string").str.strip()
+        df_tmp[group_col] = nhom.mask(nhom.isna() | nhom.eq(""), "Chưa xác định")
+        agg_dict = {col: "mean" for col in analysis_cols}
         
-        df_th = df.groupby(group_col).agg(agg_dict).reset_index()
-        df_th = df_th.sort_values("tong_diem" if "tong_diem" in df_th.columns else diem_cols[0], ascending=False)
+        df_th = df_tmp.groupby(group_col, dropna=False).agg(agg_dict).reset_index()
+        df_th = df_th.sort_values(
+            "tong_diem" if "tong_diem" in df_th.columns else analysis_cols[0],
+            ascending=False,
+        )
         
         ctx.markdown(f"**📊 Điểm trung bình theo {group_col}**")
         
         # Format số
-        for col in diem_cols + (["tong_diem"] if "tong_diem" in df_th.columns else []):
+        for col in analysis_cols:
             if col in df_th.columns:
                 df_th[col] = df_th[col].round(1)
         
@@ -146,25 +190,25 @@ def _render_phan_tich_diem(ctx, df: pd.DataFrame, username: str) -> None:
 
 def _render_theo_dia_ban(ctx, df: pd.DataFrame, username: str) -> None:
     """Render theo địa bàn xã/thôn."""
-    group_col = COT_TEN_XA if COT_TEN_XA in df.columns else None
+    group_col = "ten_xa" if "ten_xa" in df.columns else (
+        COT_TEN_XA if COT_TEN_XA in df.columns else None
+    )
     
     if not group_col:
         ctx.error("❌ Không có cột xã trong dữ liệu.")
         return
     
-    # Tổng hợp theo xã
-    agg_dict = {
-        "ma_to": "count",
-    }
-    if "tong_diem" in df.columns:
-        agg_dict["tong_diem"] = "mean"
-    if "xep_loai" in df.columns:
-        # Đếm số tổ xuất sắc
-        df["is_xuatsac"] = df["xep_loai"].str.contains("xuất sắc", case=False, na=False)
-        agg_dict["Tổ_xuất_sắc"] = ("is_xuatsac", "sum")
-    
-    df_th = df.groupby(group_col).agg(agg_dict).reset_index()
-    df_th = df_th.rename(columns={"ma_to": "Số_tổ"})
+    df_tmp = df.copy()
+    nhom = df_tmp[group_col].astype("string").str.strip()
+    df_tmp[group_col] = nhom.mask(nhom.isna() | nhom.eq(""), "Chưa xác định")
+    df_tmp["_is_tot"] = df_tmp.get("xep_loai", pd.Series(index=df_tmp.index)).eq("Tốt")
+    agg_kwargs = {"Số_tổ": ("ma_to", "nunique")}
+    if "tong_diem" in df_tmp.columns:
+        agg_kwargs["tong_diem"] = ("tong_diem", "mean")
+    if "xep_loai" in df_tmp.columns:
+        agg_kwargs["Tổ_tốt"] = ("_is_tot", "sum")
+
+    df_th = df_tmp.groupby(group_col, dropna=False).agg(**agg_kwargs).reset_index()
     df_th = df_th.sort_values("Số_tổ", ascending=False)
     
     # Format

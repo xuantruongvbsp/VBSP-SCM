@@ -8,9 +8,8 @@ from typing import TYPE_CHECKING
 from config import (
     COT_TONG_DU_NO,
     COT_DU_NO_QH,
-    COT_DU_NO_KHOANH,
+    COT_SO_KU,
     COT_DNO_NQ11,
-    COT_NQ11_NO_QH,
 )
 from utils import fmt_so, vn
 
@@ -27,6 +26,48 @@ def _fmt_ty(x: float) -> str:
         return "0"
     except Exception:
         return "—"
+
+
+def _tinh_chi_so_cards(
+    df: pd.DataFrame | None,
+    df_nq11: pd.DataFrame | None,
+) -> dict[str, float | int]:
+    """Tính KPI card trên khóa khế ước duy nhất và cột số đã chuẩn hóa."""
+    tong_du_no = no_qh = dno_nq11 = 0.0
+    so_mon = 0
+
+    if df is not None and not df.empty:
+        hstd = df.copy()
+        if COT_SO_KU in hstd.columns:
+            hstd = hstd.drop_duplicates(subset=[COT_SO_KU], keep="first")
+        tong_du_no = (
+            float(pd.to_numeric(hstd[COT_TONG_DU_NO], errors="coerce").fillna(0).sum())
+            if COT_TONG_DU_NO in hstd.columns else 0.0
+        )
+        no_qh = (
+            float(pd.to_numeric(hstd[COT_DU_NO_QH], errors="coerce").fillna(0).sum())
+            if COT_DU_NO_QH in hstd.columns else 0.0
+        )
+        so_mon = int(
+            hstd[COT_SO_KU].nunique() if COT_SO_KU in hstd.columns else len(hstd)
+        )
+
+    if df_nq11 is not None and not df_nq11.empty:
+        nq11 = df_nq11.copy()
+        if COT_SO_KU in nq11.columns:
+            nq11 = nq11.drop_duplicates(subset=[COT_SO_KU], keep="first")
+        dno_nq11 = (
+            float(pd.to_numeric(nq11[COT_DNO_NQ11], errors="coerce").fillna(0).sum())
+            if COT_DNO_NQ11 in nq11.columns else 0.0
+        )
+
+    return {
+        "tong_du_no": tong_du_no,
+        "no_qh": no_qh,
+        "so_mon": so_mon,
+        "tl_no_qh": no_qh / tong_du_no * 100 if tong_du_no > 0 else 0.0,
+        "dno_nq11": dno_nq11,
+    }
 
 
 def render_metric_cards(
@@ -46,23 +87,12 @@ def render_metric_cards(
     """
     ctx = container if container is not None else st
     
-    # Tính toán metrics từ HSTD
-    if df is not None and not df.empty:
-        tong_du_no = df[COT_TONG_DU_NO].sum() if COT_TONG_DU_NO in df.columns else 0
-        no_qh = df[COT_DU_NO_QH].sum() if COT_DU_NO_QH in df.columns else 0
-        no_khoanh = df[COT_DU_NO_KHOANH].sum() if COT_DU_NO_KHOANH in df.columns else 0
-        so_mon = len(df)
-        tl_no_xau = (no_qh + no_khoanh) / tong_du_no * 100 if tong_du_no > 0 else 0
-    else:
-        tong_du_no = no_qh = no_khoanh = so_mon = tl_no_xau = 0
-    
-    # Tính toán metrics từ NQ11
-    if df_nq11 is not None and not df_nq11.empty:
-        dno_nq11 = df_nq11[COT_DNO_NQ11].sum() if COT_DNO_NQ11 in df_nq11.columns else 0
-        nq11_qh = df_nq11[COT_NQ11_NO_QH].sum() if COT_NQ11_NO_QH in df_nq11.columns else 0
-        so_mon_nq11 = len(df_nq11[df_nq11[COT_DNO_NQ11] > 0]) if COT_DNO_NQ11 in df_nq11.columns else 0
-    else:
-        dno_nq11 = nq11_qh = so_mon_nq11 = 0
+    chi_so = _tinh_chi_so_cards(df, df_nq11)
+    tong_du_no = chi_so["tong_du_no"]
+    no_qh = chi_so["no_qh"]
+    so_mon = chi_so["so_mon"]
+    tl_no_qh = chi_so["tl_no_qh"]
+    dno_nq11 = chi_so["dno_nq11"]
     
     # Hiển thị cards
     ctx.markdown("#### 📊 Chỉ số tổng quan")
@@ -80,9 +110,9 @@ def render_metric_cards(
         st.metric(
             "Nợ quá hạn",
             f"{_fmt_ty(no_qh)} tỷ",
-            delta=f"{tl_no_xau:.2f}%" if tl_no_xau > 0 else None,
+            delta=f"{tl_no_qh:.2f}%" if tl_no_qh > 0 else None,
             delta_color="inverse",
-            help="Dư nợ quá hạn + nợ khoanh"
+            help="Tỷ lệ nợ quá hạn trên tổng dư nợ"
         )
     
     with c3:

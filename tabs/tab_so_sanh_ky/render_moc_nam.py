@@ -39,6 +39,7 @@ from services.so_sanh_ky_service import (
     fmt_pct_vn as _fmt_pct_vn,
 )
 from services.period_compare import join_by_loan
+from tabs.tab_baocao.components.inline_filter import loc_khu_vuc, render_khu_vuc_filter
 from tabs.tab_so_sanh_ky._common import (
     delta_str, pct_change_str, fmt_pct_vn, tl_nqh,
     render_kpi_row, render_quality_bars_2_ky,
@@ -297,6 +298,17 @@ def _render_hstd_section(
     if df_ht is None or df_ht.empty:
         st.warning("⚠️ Chưa có dữ liệu HSTD hiện tại.")
         return
+
+    # ── Lọc khu vực nông thôn / thành thị — cùng phạm vi cho cả 2 kỳ ────────
+    df_ht = render_khu_vuc_filter(df_ht, key=f"{key_prefix}hstd_moc_nam", container=st)
+    chon_kv = st.session_state.get(f"kv_filter_{key_prefix}hstd_moc_nam", "all")
+    df_bl = loc_khu_vuc(df_bl, chon_kv)
+    if df_ht.empty or df_bl.empty:
+        st.warning("⚠️ Không có dữ liệu sau khi lọc khu vực.")
+        return
+    # Lan tỏa phạm vi đã lọc tới các khối tổng hợp theo PGD và xuất báo cáo
+    df_full = df_ht
+    df_bl_full = df_bl
 
     agg_ht = _agg_mot_pgd(df_ht)
     agg_bl = _agg_mot_pgd(df_bl)

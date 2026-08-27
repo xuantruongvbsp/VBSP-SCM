@@ -25,6 +25,7 @@ from auth import la_phan_he_pgd, normalize_role
 from config import (
     COT_MA_CHUONG_TRINH,
     COT_NGUON_VON,
+    COT_TEN_PGD,
     COT_TEN_XA,
     COT_TEN_THON,
     COT_TONG_DU_NO,
@@ -67,8 +68,12 @@ _BG_DP = "#fff8e1"
 # BUSINESS LOGIC
 # ══════════════════════════════════════════════════════════════════════════════
 @st.cache_data(show_spinner=False)
-def tinh_du_no_ap_baseline(_df_baseline: pd.DataFrame, ten_xa: str) -> dict:
-    return _svc_tinh_du_no_ap_baseline(_df_baseline, ten_xa)
+def tinh_du_no_ap_baseline(
+    _df_baseline: pd.DataFrame,
+    ten_xa: str,
+    ten_pgd: str | None = None,
+) -> dict:
+    return _svc_tinh_du_no_ap_baseline(_df_baseline, ten_xa, ten_pgd)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -271,7 +276,7 @@ def render(tab, **kwargs) -> None:
             co_baseline = False
 
         if co_baseline:
-            _raw = tinh_du_no_ap_baseline(df_baseline, xa_chon)
+            _raw = tinh_du_no_ap_baseline(df_baseline, xa_chon, pgd_chon)
             # Kiểm tra lỗi trả về từ hàm
             if "_err" in _raw:
                 _err_msg = _raw["_err"]
@@ -323,6 +328,10 @@ def render(tab, **kwargs) -> None:
             col_thon_bl = COT_TEN_THON if COT_TEN_THON in df_baseline.columns else None
             if col_xa_bl and col_thon_bl:
                 df_xa_bl = df_baseline[df_baseline[col_xa_bl] == xa_chon]
+                if COT_TEN_PGD in df_xa_bl.columns:
+                    df_xa_bl = df_xa_bl[
+                        df_xa_bl[COT_TEN_PGD].astype(str).str.strip() == str(pgd_chon).strip()
+                    ]
                 ap_list = df_xa_bl[col_thon_bl].dropna().astype(str).str.strip()
                 ds_ap_from_baseline_df = set(ap_list[ap_list != ""].unique())
 
@@ -333,6 +342,10 @@ def render(tab, **kwargs) -> None:
             col_thon_hstd = COT_TEN_THON if COT_TEN_THON in df_full.columns else None
             if col_xa_hstd and col_thon_hstd:
                 df_xa_full = df_full[df_full[col_xa_hstd] == xa_chon]
+                if COT_TEN_PGD in df_xa_full.columns:
+                    df_xa_full = df_xa_full[
+                        df_xa_full[COT_TEN_PGD].astype(str).str.strip() == str(pgd_chon).strip()
+                    ]
                 ap_list = df_xa_full[col_thon_hstd].dropna().astype(str).str.strip()
                 ds_ap_from_hstd_current = set(ap_list[ap_list != ""].unique())
 
@@ -378,7 +391,13 @@ def render(tab, **kwargs) -> None:
             st.stop()
 
         # ═══ LẤY DANH SÁCH CHƯƠNG TRÌNH CÓ DỮ LIỆU ═══
-        ds_ma_key = _lay_ds_ma_key_co_du_lieu(xa_chon, df_full, du_no_baseline, lich_su)
+        ds_ma_key = _lay_ds_ma_key_co_du_lieu(
+            xa_chon,
+            df_full,
+            du_no_baseline,
+            lich_su,
+            ten_pgd=pgd_chon,
+        )
 
         # ═══ BUILD VÀ HIỂN THỊ BẢNG ═══
         st.markdown("### 📊 Nhập chỉ tiêu theo ấp/thôn")

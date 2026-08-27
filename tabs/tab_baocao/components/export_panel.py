@@ -82,7 +82,13 @@ def render_export_panel(
                 with st.spinner("Đang tạo PDF..."):
                     cols = [c for c in df_export.columns[:15]]  # Giới hạn 15 cột
                     pdf_bytes = xuat_pdf_chi_tiet(
-                        df_export, cols, tieu_de, username, prefix_file
+                        df_export,
+                        cols,
+                        tieu_de,
+                        username,
+                        prefix_file,
+                        don_vi_tien="triệu đồng",
+                        scale_money=True,
                     )
                 state.downloads.set(
                     f"bc_pdf_{key_suffix}",

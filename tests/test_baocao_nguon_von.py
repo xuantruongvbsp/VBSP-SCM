@@ -7,6 +7,7 @@ from config import (
     COT_DU_NO_KHOANH,
     COT_DU_NO_QH,
     COT_MA_KH,
+    COT_NGAY_DH,
     COT_NGUON_VON,
     COT_SO_KU,
     COT_TEN_CT,
@@ -14,11 +15,14 @@ from config import (
     COT_TEN_PGD,
     COT_TEN_XA,
     COT_TONG_DU_NO,
+    DON_VI_CHI_NHANH,
+    DS_XA_THANH_THI,
 )
 from tabs.tab_baocao.components import inline_filter
 from tabs.tab_baocao.components.inline_filter import (
     chuan_bi_du_lieu_bao_cao,
     chuan_hoa_nhom_nguon_von,
+    loc_khu_vuc,
     loc_nguon_von,
     render_inline_filter,
 )
@@ -62,6 +66,55 @@ def test_chuan_hoa_nhom_nguon_von_khong_tach_nhieu_nhom_tuong_duong() -> None:
         "2 — Địa phương": 5,
         "Khác/Không xác định": 1,
     }
+
+
+def test_loc_khu_vuc_phan_loai_33_phuong_va_fallback_nong_thon() -> None:
+    df = pd.DataFrame(
+        {
+            COT_TEN_XA: [
+                "Biên Hòa",
+                "phường Tân Phú",
+                "  Trấn Biên  ",
+                "La Ngà",
+                "Vay trực tiếp",
+                "Vay trực tiếp",
+                None,
+            ],
+            COT_TEN_PGD: [
+                "PGD A",
+                "PGD B",
+                "PGD C",
+                "PGD D",
+                DON_VI_CHI_NHANH,
+                "PGD Đồng Phú",
+                DON_VI_CHI_NHANH,
+            ],
+            COT_TONG_DU_NO: [1, 2, 3, 4, 5, 6, 7],
+        }
+    )
+
+    assert len(DS_XA_THANH_THI) == 33
+    assert loc_khu_vuc(df, "thanh_thi")[COT_TONG_DU_NO].tolist() == [1, 2, 3, 5]
+    assert loc_khu_vuc(df, "nong_thon")[COT_TONG_DU_NO].tolist() == [4, 6, 7]
+    assert (
+        loc_khu_vuc(df, "thanh_thi")[COT_TONG_DU_NO].sum()
+        + loc_khu_vuc(df, "nong_thon")[COT_TONG_DU_NO].sum()
+        == df[COT_TONG_DU_NO].sum()
+    )
+    assert loc_khu_vuc(df, "all") is df
+    assert loc_khu_vuc(df, "khac") is df
+
+
+def test_loc_khu_vuc_nhom_hop_le_khong_co_du_lieu_tra_rong() -> None:
+    df = pd.DataFrame(
+        {
+            COT_TEN_XA: ["La Ngà", None],
+            COT_TONG_DU_NO: [4, 7],
+        }
+    )
+
+    assert loc_khu_vuc(df, "thanh_thi").empty
+    assert loc_khu_vuc(df, "nong_thon")[COT_TONG_DU_NO].sum() == 11
 
 
 def test_metric_dashboard_dung_cung_bo_loc_pgd_va_nguon_von() -> None:
@@ -203,3 +256,61 @@ def test_no_qh_metrics_va_bang_dung_cung_pham_vi_filter(monkeypatch) -> None:
     assert metrics["Tỷ lệ QH"] == "10,00%"
     assert len(exported) == 1
     assert exported[0][COT_SO_KU].tolist() == ["KU1"]
+
+
+def test_pdf_den_han_dinh_dang_ngay_dd_mm_yyyy(monkeypatch) -> None:
+    captured: dict[str, object] = {}
+
+    def fake_xuat_pdf_chi_tiet(df, cols, *args):
+        captured["df"] = df.copy()
+        captured["cols"] = cols
+        return b"%PDF-test"
+
+    monkeypatch.setattr(no_rui_ro_v2, "xuat_pdf_chi_tiet", fake_xuat_pdf_chi_tiet)
+    df = pd.DataFrame({
+        COT_NGAY_DH: [pd.Timestamp("2026-08-25"), pd.NaT],
+        COT_TONG_DU_NO: [100, 200],
+    })
+
+    result = no_rui_ro_v2._xuat_pdf_chi_tiet_no_rui_ro(
+        df, "Đến hạn", "tester", "BC_DH30"
+    )
+
+    assert result == b"%PDF-test"
+    assert captured["df"][COT_NGAY_DH].tolist() == ["25/08/2026", ""]
+    assert captured["cols"] == list(df.columns)
+
+
+def test_pdf_no_xau_du_cot_tien_tong_ty_le_va_khong_co_emoji(monkeypatch) -> None:
+    captured: dict[str, object] = {}
+
+    def fake_xuat_pdf(df, *args, **kwargs):
+        captured["df"] = df.copy()
+        captured["kwargs"] = kwargs
+        return b"%PDF-test"
+
+    monkeypatch.setattr(no_rui_ro_v2, "xuat_pdf", fake_xuat_pdf)
+    df = pd.DataFrame({
+        COT_TEN_PGD: ["PGD A", "PGD B"],
+        "Tổng_dư_nợ": [10_000_000_000, 20_000_000_000],
+        "Nợ_quá_hạn": [1_000_000_000, 2_000_000_000],
+        "Nợ_khoanh": [500_000_000, 200_000_000],
+        "Tổng_nợ_xấu": [1_500_000_000, 2_200_000_000],
+        "Tỷ_lệ_nợ_xấu_%": [15.0, 11.0],
+        "⚠️": ["🚨", "⚠️"],
+    })
+
+    result = no_rui_ro_v2._xuat_pdf_ty_le_no_xau(
+        df, "Báo cáo tỷ lệ nợ xấu", "tester"
+    )
+
+    df_pdf = captured["df"]
+    kwargs = captured["kwargs"]
+    assert result == b"%PDF-test"
+    assert "⚠️" not in df_pdf.columns
+    assert df_pdf["Nợ quá hạn"].tolist() == [1000.0, 2000.0]
+    assert kwargs["cols_tien"] == [
+        "Tổng dư nợ", "Nợ quá hạn", "Nợ khoanh", "Tổng nợ xấu"
+    ]
+    assert kwargs["dong_tong"]["Tổng nợ xấu"] == 3700
+    assert kwargs["dong_tong"]["Tỷ lệ nợ xấu %"] == 12.33

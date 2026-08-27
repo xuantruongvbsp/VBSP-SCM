@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import streamlit as st
 import pandas as pd
-from datetime import datetime, timedelta
 from typing import TYPE_CHECKING
 
 from config import (
@@ -13,7 +12,7 @@ from config import (
 )
 from auth import la_phan_he_pgd
 from utils import fmt_so, vn
-from pdf_service import xuat_pdf_chi_tiet
+from pdf_service import xuat_pdf, xuat_pdf_chi_tiet
 
 from ..components.inline_filter import (
     chuan_bi_du_lieu_bao_cao,
@@ -40,6 +39,119 @@ def _fmt_df_trieu(df: pd.DataFrame) -> pd.DataFrame:
                 lambda x: vn(x / 1_000_000, 0) if pd.notna(x) else "—"
             )
     return d
+
+
+def _loc_den_han(
+    df: pd.DataFrame,
+    ngay: int,
+    hom_nay: pd.Timestamp | str | None = None,
+) -> pd.DataFrame:
+    """Lọc món đến hạn từ đầu ngày hiện tại đến hết ngày cuối kỳ."""
+    if COT_NGAY_DH not in df.columns:
+        return df.iloc[0:0].copy()
+    out = df.copy()
+    out[COT_NGAY_DH] = pd.to_datetime(
+        out[COT_NGAY_DH], dayfirst=True, errors="coerce"
+    ).dt.normalize()
+    moc_dau = pd.Timestamp.today().normalize() if hom_nay is None else pd.Timestamp(hom_nay).normalize()
+    moc_cuoi = moc_dau + pd.Timedelta(days=ngay)
+    return out.loc[out[COT_NGAY_DH].between(moc_dau, moc_cuoi)].copy()
+
+
+def _tao_ty_le_no_xau_theo_pgd(df: pd.DataFrame) -> pd.DataFrame:
+    """Tổng hợp QH + khoanh theo PGD mà không làm rơi dòng thiếu tên nhóm."""
+    if COT_TEN_PGD not in df.columns:
+        return pd.DataFrame()
+    out = df.copy()
+    nhom = out[COT_TEN_PGD].astype("string").str.strip()
+    out[COT_TEN_PGD] = nhom.mask(nhom.isna() | nhom.eq(""), "Chưa xác định")
+    df_th = out.groupby(COT_TEN_PGD, dropna=False).agg(
+        Tổng_dư_nợ=(COT_TONG_DU_NO, "sum"),
+        Nợ_quá_hạn=(COT_DU_NO_QH, "sum"),
+        Nợ_khoanh=(COT_DU_NO_KHOANH, "sum"),
+    ).reset_index()
+    df_th["Tổng_nợ_xấu"] = df_th["Nợ_quá_hạn"] + df_th["Nợ_khoanh"]
+    df_th["Tỷ_lệ_nợ_xấu_%"] = (
+        df_th["Tổng_nợ_xấu"]
+        / df_th["Tổng_dư_nợ"].replace(0, float("nan"))
+        * 100
+    ).round(2).fillna(0)
+    return df_th
+
+
+def _xuat_pdf_chi_tiet_no_rui_ro(
+    df: pd.DataFrame,
+    tieu_de: str,
+    username: str,
+    prefix_file: str,
+) -> bytes:
+    """Xuất PDF chi tiết và chuẩn hóa ngày đến hạn về dd/mm/yyyy."""
+    df_xuat = df.copy()
+    if COT_NGAY_DH in df_xuat.columns:
+        ngay = pd.to_datetime(df_xuat[COT_NGAY_DH], dayfirst=True, errors="coerce")
+        df_xuat[COT_NGAY_DH] = ngay.dt.strftime("%d/%m/%Y").where(ngay.notna(), "")
+    return xuat_pdf_chi_tiet(
+        df_xuat,
+        list(df_xuat.columns),
+        tieu_de,
+        username,
+        prefix_file,
+    )
+
+
+def _xuat_pdf_ty_le_no_xau(
+    df: pd.DataFrame,
+    tieu_de: str,
+    username: str,
+    prefix_file: str = "BC_NOXAU",
+) -> bytes:
+    """Xuất PDF nợ xấu với đủ cột tiền, tổng tỷ lệ đúng và không dùng emoji."""
+    cot_tien_nguon = ["Tổng_dư_nợ", "Nợ_quá_hạn", "Nợ_khoanh", "Tổng_nợ_xấu"]
+    thieu_cot = [c for c in [COT_TEN_PGD, *cot_tien_nguon] if c not in df.columns]
+    if thieu_cot:
+        raise ValueError(f"Thiếu cột để xuất PDF tỷ lệ nợ xấu: {', '.join(thieu_cot)}")
+
+    so_tien = {
+        col: pd.to_numeric(df[col], errors="coerce").fillna(0)
+        for col in cot_tien_nguon
+    }
+    df_xuat = pd.DataFrame({
+        "PGD": df[COT_TEN_PGD].astype("string").fillna(""),
+        "Tổng dư nợ": (so_tien["Tổng_dư_nợ"] / 1_000_000).round(0),
+        "Nợ quá hạn": (so_tien["Nợ_quá_hạn"] / 1_000_000).round(0),
+        "Nợ khoanh": (so_tien["Nợ_khoanh"] / 1_000_000).round(0),
+        "Tổng nợ xấu": (so_tien["Tổng_nợ_xấu"] / 1_000_000).round(0),
+    })
+    tong_dn = float(so_tien["Tổng_dư_nợ"].sum())
+    tong_qh = float(so_tien["Nợ_quá_hạn"].sum())
+    tong_khoanh = float(so_tien["Nợ_khoanh"].sum())
+    tong_xau = float(so_tien["Tổng_nợ_xấu"].sum())
+    df_xuat["Tỷ lệ nợ xấu %"] = (
+        so_tien["Tổng_nợ_xấu"]
+        / so_tien["Tổng_dư_nợ"].replace(0, float("nan"))
+        * 100
+    ).round(2).fillna(0)
+
+    dong_tong = {
+        "PGD": "TỔNG CỘNG",
+        "Tổng dư nợ": round(tong_dn / 1_000_000),
+        "Nợ quá hạn": round(tong_qh / 1_000_000),
+        "Nợ khoanh": round(tong_khoanh / 1_000_000),
+        "Tổng nợ xấu": round(tong_xau / 1_000_000),
+        "Tỷ lệ nợ xấu %": round(tong_xau / tong_dn * 100, 2) if tong_dn > 0 else 0.0,
+    }
+    return xuat_pdf(
+        df_xuat,
+        f"{tieu_de} (triệu đồng)",
+        username,
+        cols_tien=["Tổng dư nợ", "Nợ quá hạn", "Nợ khoanh", "Tổng nợ xấu"],
+        don_vi_tien="triệu đồng",
+        prefix_file=prefix_file,
+        them_dong_tong=True,
+        cols_right=["Tỷ lệ nợ xấu %"],
+        dong_tong=dong_tong,
+        cols_percent=["Tỷ lệ nợ xấu %"],
+    )
 
 
 def render_no_rui_ro_v2(
@@ -219,7 +331,7 @@ def _render_no_qh_v2(ctx, df: pd.DataFrame, username: str) -> None:
         "BC_QH",
         key="qh_v2",
         container=ctx,
-        pdf_func=lambda d, t, u: xuat_pdf_chi_tiet(d, list(d.columns), t, u, "BC_QH"),
+        pdf_func=lambda d, t, u: _xuat_pdf_chi_tiet_no_rui_ro(d, t, u, "BC_QH"),
     )
     
     # Sticky table
@@ -276,6 +388,7 @@ def _render_no_khoanh_v2(ctx, df: pd.DataFrame, username: str) -> None:
     render_quick_export_buttons(
         df_display, "NoKhoanh", "Báo cáo nợ khoanh", username, "BC_KHOANH",
         key="kh_v2", container=ctx,
+        pdf_func=lambda d, t, u: _xuat_pdf_chi_tiet_no_rui_ro(d, t, u, "BC_KHOANH"),
     )
     
     render_sticky_table(_fmt_df_trieu(df_display), key="kh_table_v2", height=400, container=ctx)
@@ -296,11 +409,7 @@ def _render_den_han_v2(ctx, df: pd.DataFrame, ngay: int, username: str) -> None:
         key=f"dh{ngay}_v2",
         container=ctx,
     )
-    df_tmp = df_scope.copy()
-    df_tmp[COT_NGAY_DH] = pd.to_datetime(df_tmp[COT_NGAY_DH], dayfirst=True, errors="coerce")
-    
-    hn = pd.Timestamp.today()
-    df_dh = df_tmp[(df_tmp[COT_NGAY_DH] >= hn) & (df_tmp[COT_NGAY_DH] <= hn + pd.Timedelta(days=ngay))].copy()
+    df_dh = _loc_den_han(df_scope, ngay)
     
     if df_dh.empty:
         ctx.info(f"📅 Không có món vay đến hạn trong {ngay} ngày tới.")
@@ -324,6 +433,7 @@ def _render_den_han_v2(ctx, df: pd.DataFrame, ngay: int, username: str) -> None:
     render_quick_export_buttons(
         df_display, f"DenHan{ngay}", f"Báo cáo đến hạn {ngay} ngày",
         username, f"BC_DH{ngay}", key=f"dh{ngay}_v2", container=ctx,
+        pdf_func=lambda d, t, u: _xuat_pdf_chi_tiet_no_rui_ro(d, t, u, f"BC_DH{ngay}"),
     )
     
     render_sticky_table(_fmt_df_trieu(df_display), key=f"dh{ngay}_table_v2", height=400, container=ctx)
@@ -335,14 +445,7 @@ def _render_ty_le_no_xau_v2(ctx, df: pd.DataFrame, username: str) -> None:
         ctx.error("❌ Không có cột PGD.")
         return
     
-    df_th = df.groupby(COT_TEN_PGD).agg(
-        Tổng_dư_nợ=(COT_TONG_DU_NO, "sum"),
-        Nợ_quá_hạn=(COT_DU_NO_QH, "sum"),
-        Nợ_khoanh=(COT_DU_NO_KHOANH, "sum"),
-    ).reset_index()
-    
-    df_th["Tổng_nợ_xấu"] = df_th["Nợ_quá_hạn"] + df_th["Nợ_khoanh"]
-    df_th["Tỷ_lệ_nợ_xấu_%"] = (df_th["Tổng_nợ_xấu"] / df_th["Tổng_dư_nợ"].replace(0, float("nan")) * 100).round(2).fillna(0)
+    df_th = _tao_ty_le_no_xau_theo_pgd(df)
     
     # Highlight cảnh báo
     df_th["⚠️"] = df_th["Tỷ_lệ_nợ_xấu_%"].apply(lambda x: "🚨" if x > 15 else ("⚠️" if x > 10 else "✅"))
@@ -358,6 +461,7 @@ def _render_ty_le_no_xau_v2(ctx, df: pd.DataFrame, username: str) -> None:
     render_quick_export_buttons(
         df_th, "TyLeNoXau", "Báo cáo tỷ lệ nợ xấu",
         username, "BC_NOXAU", key="noxau_v2", container=ctx,
+        pdf_func=lambda d, t, u: _xuat_pdf_ty_le_no_xau(d, t, u),
     )
     
     render_sticky_table(_fmt_df_trieu(df_th), key="noxau_table_v2", height=400, container=ctx)

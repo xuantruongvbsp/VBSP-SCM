@@ -435,6 +435,10 @@ def xuat_pdf_bc(sheets: Dict[str, pd.DataFrame], tieu_de: str, nguoi_xuat: str) 
             return "Helvetica", "Helvetica-Bold"
 
         base_font, base_font_bold = _register_unicode_font()
+        report_green = colors.HexColor("#1B5E20")
+        report_green_mid = colors.HexColor("#4CAF50")
+        row_alt = colors.HexColor("#F8F9FA")
+        border_color = colors.HexColor("#90A4AE")
 
         page_size = landscape(A4)
         margin_x = 1.2 * cm
@@ -448,7 +452,7 @@ def xuat_pdf_bc(sheets: Dict[str, pd.DataFrame], tieu_de: str, nguoi_xuat: str) 
         s_co_quan = ParagraphStyle("co_quan", fontName=base_font, fontSize=10, leading=14, alignment=1)
         s_tieu_de = ParagraphStyle("tieu_de", fontName=base_font_bold, fontSize=13, leading=18, alignment=1, spaceBefore=10, spaceAfter=4)
         s_phu_de = ParagraphStyle("phu_de", fontName=base_font, fontSize=10, leading=14, alignment=1, spaceAfter=10, textColor=colors.HexColor("#444444"))
-        s_section = ParagraphStyle("section", fontName=base_font_bold, fontSize=10, leading=13, spaceAfter=5, textColor=colors.HexColor("#185FA5"))
+        s_section = ParagraphStyle("section", fontName=base_font_bold, fontSize=10, leading=13, spaceAfter=5, textColor=report_green)
         s_cell = ParagraphStyle("cell", fontName=base_font, fontSize=7.5, leading=9)
         s_header = ParagraphStyle("table_header", fontName=base_font_bold, fontSize=7.5, leading=9, textColor=colors.white)
 
@@ -456,10 +460,19 @@ def xuat_pdf_bc(sheets: Dict[str, pd.DataFrame], tieu_de: str, nguoi_xuat: str) 
             text = str(value).replace("\u2013", "-").replace("\u2014", "-").replace("\u2212", "-")
             return xml_escape(text)
 
+        def _is_code_column(column: object) -> bool:
+            c = str(column).casefold()
+            return any(k in c for k in ("mã", "ma ", "số khế", "so khe", "ku", "cmnd", "cccd"))
+
         def _format_cell(value: object, column: object) -> str:
             missing = pd.isna(value)
             if isinstance(missing, (bool, np.bool_)) and missing:
                 return "—"
+            if _is_code_column(column):
+                if isinstance(value, (int, float, np.integer, np.floating)) and not isinstance(value, bool):
+                    number = float(value)
+                    return str(int(number)) if number.is_integer() else str(value)
+                return str(value)
             if isinstance(value, (int, float, np.integer, np.floating)) and not isinstance(value, bool):
                 number = float(value)
                 if "tỷ lệ" in str(column).casefold():
@@ -475,9 +488,16 @@ def xuat_pdf_bc(sheets: Dict[str, pd.DataFrame], tieu_de: str, nguoi_xuat: str) 
             for index, column in enumerate(df.columns):
                 lengths = [len(str(column))]
                 lengths.extend(len(_format_cell(value, column)) for value in sample[column].tolist())
-                weight = max(8, min(max(lengths, default=8), 30))
-                if index == 0:
+                weight = max(8, min(max(lengths, default=8), 34))
+                c = str(column).casefold()
+                if index == 0 or any(k in c for k in ("chỉ tiêu", "chương trình", "tên ", "đơn vị")):
                     weight = max(weight, 22)
+                if _is_code_column(column):
+                    weight = max(weight, 16)
+                if any(k in c for k in ("dư nợ", "nợ", "tiền", "lãi", "gn")):
+                    weight = max(weight, 16)
+                if "tỷ lệ" in c or "%" in c:
+                    weight = max(weight, 12)
                 weights.append(weight)
             total = sum(weights) or 1
             return [available_width * weight / total for weight in weights]
@@ -499,9 +519,9 @@ def xuat_pdf_bc(sheets: Dict[str, pd.DataFrame], tieu_de: str, nguoi_xuat: str) 
                 hAlign="LEFT",
             )
             table_style = [
-                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#185FA5")),
-                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#F1EFE8")]),
-                ("GRID", (0, 0), (-1, -1), 0.3, colors.HexColor("#AAAAAA")),
+                ("BACKGROUND", (0, 0), (-1, 0), report_green),
+                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, row_alt]),
+                ("GRID", (0, 0), (-1, -1), 0.3, border_color),
                 ("TOPPADDING", (0, 0), (-1, -1), 3),
                 ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
                 ("LEFTPADDING", (0, 0), (-1, -1), 4),
@@ -530,7 +550,8 @@ def xuat_pdf_bc(sheets: Dict[str, pd.DataFrame], tieu_de: str, nguoi_xuat: str) 
         story.append(Paragraph("NGÂN HÀNG CHÍNH SÁCH XÃ HỘI VIỆT NAM", s_co_quan))
         story.append(Paragraph("Chi nhánh tỉnh Đồng Nai", s_co_quan))
         story.append(Spacer(1, 0.3*cm))
-        story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#185FA5")))
+        story.append(HRFlowable(width="100%", thickness=1, color=report_green))
+        story.append(HRFlowable(width="100%", thickness=0.5, color=report_green_mid))
         story.append(Spacer(1, 0.4*cm))
         story.append(Paragraph(_pdf_text(tieu_de.upper()), s_tieu_de))
         story.append(Paragraph(

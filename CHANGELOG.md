@@ -1,5 +1,84 @@
 # CHANGELOG
 
+## [2026-08-27] — Vá lỗi baseline 31/12 lọc Nguồn vốn bị lấy nhầm toàn bảng
+- `tabs/tab_baocao/reports/tong_hop_hstd_v2.py` — `_doc_baseline_cung_pham_vi()` dùng lọc Nguồn vốn nghiêm cho baseline; khi baseline không có dòng khớp bộ lọc hiện tại vẫn giữ DataFrame rỗng có schema để cột mốc hiển thị `0` thay vì biến mất hoặc lấy nhầm toàn bộ baseline.
+- `tests/test_tong_hop_hstd_v2.py` — thêm regression test cho case chọn nguồn vốn Địa phương nhưng baseline cùng phạm vi chỉ có Trung ương.
+
+## [2026-08-27] — So sánh mốc 31/12 năm trước: thêm cột vào Tổng hợp HSTD + lọc Khu vực cho màn So sánh mốc năm
+- `tabs/tab_baocao/reports/tong_hop_hstd_v2.py` — thêm `_ds_nam_baseline_hstd()`, `_doc_baseline_cung_pham_vi()` (đọc baseline 31/12 năm gần nhất, tái áp dụng đúng phạm vi: PGD theo role, selectbox PGD/Xã/Chương trình, Nguồn vốn, Khu vực, tìm kiếm); bảng tổng hợp thêm 2 cột "31/12/{năm}" và "± 31/12" (HTML + PDF + Excel), thêm metric "So mốc 31/12/{năm}"; `nhom_header` nhóm DƯ NỢ tăng colspan +2.
+- `tabs/tab_so_sanh_ky/render_moc_nam.py` — `_render_hstd_section()` thêm bộ lọc Khu vực (nông thôn/thành thị) áp dụng cùng phạm vi cho cả dữ liệu hiện tại lẫn baseline; phạm vi lọc lan tỏa tới khối Theo PGD và xuất báo cáo.
+
+## [2026-08-27] — Sửa phân hoạch bộ lọc khu vực Báo cáo Tổng hợp HSTD
+- `tabs/tab_baocao/components/inline_filter.py` — xã/phường rỗng hoặc không chuẩn được xếp về Nông thôn để `Thành thị + Nông thôn = Tất cả`; lựa chọn khu vực hợp lệ nhưng không có dòng trả bảng rỗng thay vì trả nhầm toàn bộ dữ liệu.
+- `tests/test_baocao_nguon_von.py` — thêm regression test bảo toàn tổng dư nợ qua hai nhóm khu vực và case nhóm hợp lệ không có dữ liệu.
+
+## [2026-08-26] — Thêm màn so sánh dư nợ theo nhiều tiêu chí
+- `tabs/tab_baocao/reports/tong_hop_hstd_v2.py` — thêm lựa chọn `So sánh dư nợ`, tổng hợp cùng lúc theo Khu vực, PGD, Xã/phường, Chương trình, Nguồn vốn, ĐVUT và CBTD/Tổ.
+- `tabs/tab_baocao/components/inline_filter.py` — đổi helper phân loại khu vực thành `phan_loai_khu_vuc_df()` để báo cáo so sánh dùng chung ngoại lệ theo PGD.
+- `tests/test_tong_hop_hstd_v2.py` — thêm regression test cho bảng so sánh nhiều tiêu chí, ngoại lệ Hội sở/Vay trực tiếp, nguồn vốn và giới hạn Top N.
+
+## [2026-08-26] — Thiết kế lại khối bộ lọc Báo cáo Tổng hợp HSTD
+- `tabs/tab_baocao/reports/tong_hop_hstd_v2.py` — gom chọn loại tổng hợp + lọc PGD + Nguồn vốn + Khu vực vào một khối phẳng có viền `container(border=True)`; Nguồn vốn và Khu vực đặt song song, tham khảo công thức chuyển vào cột phải trong khối. Widget key giữ nguyên nên trạng thái lọc cũ không mất.
+
+## [2026-08-26] — Thêm bộ lọc khu vực Nông thôn / Thành thị cho Báo cáo Tổng hợp HSTD
+- `config.py` — thêm hằng số `DS_XA_THANH_THI` (33 phường thành thị theo cột "Tên xã" HSTD); mọi đơn vị còn lại coi là nông thôn.
+- `config.py` — thêm ngoại lệ `(Hội sở Chi nhánh tỉnh, Vay trực tiếp)` vào nhóm thành thị.
+- `tabs/tab_baocao/components/inline_filter.py` — thêm `_phan_loai_khu_vuc()`, `loc_khu_vuc()`, `render_khu_vuc_filter()` để lọc theo khu vực và hỗ trợ ngoại lệ theo PGD.
+- `tabs/tab_baocao/reports/tong_hop_hstd_v2.py` — gắn bộ lọc khu vực ngay sau bộ lọc Nguồn vốn.
+- `tests/test_baocao_nguon_von.py` — thêm regression test cho danh sách 33 phường, ngoại lệ Hội sở/Vay trực tiếp, lọc thành thị/nông thôn và fallback giá trị ngoài danh sách.
+
+## [2026-08-24] — Đồng bộ định dạng PDF cho các báo cáo còn lại (NQ11, GQVL, CDTOTKVV, Tổng hợp, Nợ rủi ro)
+- `pdf_service.py` — mở rộng `_is_money_col()` nhận diện thêm cột tiền `DNO NQ11`/`Giải ngân trong năm`; dòng TỔNG CỘNG tự động cộng cả cột đếm (`cols_dem`) ngoài cột tiền.
+- `tabs/tab_baocao/components/export_panel.py` — nút "Xuất PDF" dùng chung tự suy luận cột tiền/đếm/% và xuất theo đơn vị "triệu đồng" (`scale_money=True`), áp dụng cho mọi báo cáo gọi `render_export_panel` (Tổng hợp HSTD, Nợ rủi ro, NQ11, GQVL, CDTOTKVV).
+- `tests/test_pdf_service.py` — thêm regression test nhận diện cột tiền NQ11/GQVL và test `xuat_pdf_chi_tiet(scale_money=True)` ra đơn vị triệu đồng.
+
+## [2026-08-24] — Vá lỗi còn sót sau rà soát PDF báo cáo
+- `pdf_service.py` — sửa format phần trăm số lớn theo chuẩn Việt Nam (`1.234,56 %`), escape text ở nhánh `xuat_pdf_bao_cao()` cho tiêu đề/người xuất/KPI/cell để không crash khi có `&`, `<`, `>`.
+- `components/export_pdf.py` — sửa format phần trăm số lớn và guard palette màu khi thiếu `reportlab` để module không crash lúc import fallback.
+- `tests/test_pdf_service.py` — thêm regression test cho phần trăm số lớn và ký tự đặc biệt trong `xuat_pdf_bao_cao()`.
+- `tests/test_export_pdf_component.py` — thêm regression test phần trăm số lớn cho PDF component.
+- Verify — `34 passed` nhóm PDF/báo cáo tín dụng, `11 passed` nhóm PDF phụ; compile sạch; render trực quan 3 PDF mẫu/3 trang PNG bằng `pypdfium2`.
+
+## [2026-08-24] — Hoàn thiện format và layout toàn diện báo cáo xuất PDF
+- `pdf_service.py` — đăng ký đủ 4 font TNR (regular/bold/italic/bold-italic); thêm palette màu VBSP brand chuẩn (#1B5E20 family); mở rộng signature `xuat_pdf()` thêm `cols_percent`/`cols_dem`; thêm helper `_format_phan_tram()`; cải thiện header (2-layer HR, tiêu đề 14pt xanh lá, meta Ngày xuất·Người xuất·Nguồn); cải thiện bảng dữ liệu (col_ratio tỷ lệ thông minh theo loại cột, 3 hướng align, % có dấu %, đếm có phân cách nghìn, padding 5px, grid 2 lớp border, dòng xen kẽ row, dòng tổng màu xanh nhạt + text xanh đậm + lineabove 2.0px); thêm ghi chú đơn vị dưới bảng; cải thiện khối ký tên (leading=28, italic "(Ký, ghi rõ họ tên)", chức năng theo số cột ≥8→PHÒNG CHUYÊN MÔN/<8→KIỂM SOÁT); page footer 2 bên (NHCSXH Đồng Nai · Báo cáo nội bộ) + kẻ ngang xanh; font size tiers 7.5→11pt theo số cột.
+- `components/export_pdf.py` — đồng bộ cải thiện format với `pdf_service.py`: đăng ký 4 font TNR, palette màu brand, `_ve_header()` return `ngay_str`; `xuat_pdf_co_chart()` cập nhật signature thêm `cols_percent`/`cols_dem`, col_ratio thông minh, align 3 hướng, format %/đếm riêng, khối ký tên, page footer, ghi chú đơn vị, font size tăng 7.5→9.5pt.
+- `tabs/tab_baocao/reports/tong_hop_hstd_v2.py` — `_xuat_pdf_tong_hop()` tách riêng `cols_tien`/`cols_dem`/`cols_percent`, thêm `don_vi_tien="triệu đồng"`.
+- `tabs/tab_baocao/reports/no_rui_ro_v2.py` — `_xuat_pdf_ty_le_no_xau()` thêm `don_vi_tien="triệu đồng"` và `cols_percent=["Tỷ lệ nợ xấu %"]`.
+
+## [2026-08-24] — Rà soát và làm đẹp bố cục PDF báo cáo
+- `pdf_service.py` — sửa footer dùng đúng `restoreState()`; bảng từ 6 cột dùng khổ ngang; tăng độ rộng cột tiền/mã/tên KH; dòng tổng format được số kiểu pandas/numpy; escape text trước khi đưa vào PDF; group header bỏ ký tự mũi tên lỗi font.
+- `components/export_pdf.py` — đồng bộ nhánh PDF kèm biểu đồ: bảng 6 cột dùng khổ ngang, sửa ô rỗng không tạo `Paragraph`, escape text, tăng width cột mã/số khế ước/tên KH/tiền và format tổng bằng helper chung.
+- `services/bc_tongquan_service.py` — đồng bộ màu xanh VBSP cho PDF nhiều sheet; tăng độ rộng cột mã/tiền/tên và giữ nguyên mã định danh thay vì format như số tiền.
+- `tests/test_pdf_service.py` — thêm regression test cho dòng tổng số lớn, khổ ngang 6 cột và group header không dùng glyph lạ.
+- `tests/test_bc_tongquan_pdf.py` — thêm regression test giữ nguyên mã định danh trong PDF nhiều sheet.
+- `tests/test_export_pdf_component.py` — thêm regression test cho PDF kèm biểu đồ có ô rỗng, text đặc biệt, mã định danh và bảng 6 cột.
+- Verify — render trực quan 6 PDF mẫu/10 trang PNG bằng `pypdfium2`; nhóm test PDF/báo cáo `31 passed`.
+
+## [2026-08-22] — Đối soát và hoàn thiện toàn bộ số liệu Báo cáo tín dụng
+- `app.py` — Báo cáo GQVL ưu tiên `cache/gqvl.parquet` đã merge toàn Chi nhánh thay vì file SK tham chiếu chỉ có một phần dữ liệu; mtime cache đi theo đúng nguồn được chọn.
+- `tabs/tab_baocao/dashboard.py` — card NQ11 dùng cùng phạm vi PGD/Nguồn vốn với các card HSTD.
+- `tabs/tab_baocao/components/metric_cards.py` — đếm món theo khế ước duy nhất, ép kiểu số phòng vệ; card Nợ quá hạn dùng đúng tỷ lệ `Nợ quá hạn/Tổng dư nợ`, không cộng nợ khoanh vào delta.
+- `tabs/tab_baocao/reports/nq11.py` — loại khế ước rỗng/trùng, tách đúng KPI số món/số KH/dư nợ/nợ quá hạn, bỏ chỉ tiêu “Món không NQ11” không tồn tại trong nguồn active và format đúng cột tổng hợp.
+- `tabs/tab_baocao/reports/gqvl.py` — chuẩn hóa đơn vị/nguồn vốn/cột số, dựng tổng dư nợ từ các thành phần, loại 50 bản sao khế ước, lọc PGD chính xác, xuất đủ 40 nhà đầu tư thay vì cắt Top 20 và format đúng cột tổng hợp.
+- `tabs/tab_baocao/reports/cdtotkvv.py` — dùng schema thực `ten_xa/ma_to`, lọc đúng PGD, loại Tổ hết dư nợ/trùng khóa, dùng KPI chuẩn và nhãn `Tổ tốt`; phân tích vẫn hiện `tong_diem` khi các cột điểm thành phần rỗng.
+- `tabs/tab_baocao/reports/no_rui_ro_v2.py` — khoản đến hạn đúng ngày hiện tại không còn bị loại do phần giờ; tổng hợp nợ xấu giữ nhóm thiếu tên PGD để bảo toàn tổng.
+- `tests/test_baocao_tin_dung_so_lieu.py` — thêm 8 regression test về đếm khế ước, bảo toàn tiền, cửa sổ đến hạn, schema CDTO, card và báo cáo nhà đầu tư.
+- `BUGMAP.md` — thêm B91/C41 ghi nhận các sai lệch nguồn, schema và phép đếm đã sửa.
+- Verify — `1.351 passed`; preview Streamlit cổng 18502 khởi động/hiện màn đăng nhập bình thường, không có lỗi console; tiến trình preview đã dừng sau kiểm tra.
+
+## [2026-08-22] — Rà soát và sửa lỗi nội dung PDF Báo cáo tín dụng
+- `pdf_service.py` — hỗ trợ dòng tổng tùy chỉnh có kiểu tổng chuẩn; căn phải/in đậm cột đếm và tỷ lệ trong dòng tổng.
+- `tabs/tab_baocao/reports/tong_hop_hstd_v2.py` — dùng dòng tổng tùy chỉnh thay vì ghép như dữ liệu thường; bổ sung cột BQ/KH vào PDF và giữ tổng KH/món theo nunique toàn cục.
+- `tabs/tab_baocao/reports/no_rui_ro_v2.py` — chuẩn hóa ngày đến hạn `dd/mm/yyyy`; tạo PDF tỷ lệ nợ xấu chuyên biệt theo triệu đồng, đủ bốn cột tiền và tỷ lệ tổng, loại emoji không được font PDF hỗ trợ.
+- `tests/test_pdf_service.py` — thêm regression test dòng tổng tùy chỉnh.
+- `tests/test_tong_hop_hstd_v2.py` — thêm test PDF tổng hợp dùng dòng tổng chuẩn, không chèn trùng và có BQ/KH.
+- `tests/test_baocao_nguon_von.py` — thêm test định dạng ngày đến hạn và tổng PDF tỷ lệ nợ xấu.
+- `BUGMAP.md` — thêm mục F13 ghi nhận lỗi PDF tín dụng vừa sửa.
+
+## [2026-08-22] — Nối nút xuất PDF cho Báo cáo tín dụng: Tổng hợp HSTD + 3 báo cáo Nợ rủi ro còn thiếu
+- `tabs/tab_baocao/reports/tong_hop_hstd_v2.py` — thêm `_xuat_pdf_tong_hop()`: dựng bảng PDF (triệu đồng) với dòng TỔNG CỘNG dùng nunique toàn cục từ `_tinh_tong_cong` (không cộng theo nhóm); truyền `pdf_func` vào `render_quick_export_buttons` để hiện nút 📄 PDF; chuyển tính `ten_nhom` lên trước khối export.
+- `tabs/tab_baocao/reports/no_rui_ro_v2.py` — thêm `pdf_func` (dùng `xuat_pdf_chi_tiet` sẵn có) cho 3 báo cáo: Nợ khoanh, Đến hạn 30/60 ngày, Tỷ lệ nợ xấu.
+
 ## [2026-08-21] — Hoàn thiện chuỗi bộ lọc và đồng bộ KPI Nợ rủi ro
 - `tabs/tab_baocao/components/inline_filter.py` — danh sách filter sau lấy từ dữ liệu đã qua filter trước; tự trả lựa chọn stale về `Tất cả`, tránh tổ hợp Xã/Chương trình không tồn tại và hỗ trợ dữ liệu khác kiểu khi sắp xếp.
 - `tabs/tab_baocao/reports/no_rui_ro_v2.py` — áp dụng Xã/ĐVUT/tìm kiếm lên phạm vi dữ liệu trước khi tính KPI, tỷ lệ, bảng và file xuất cho Nợ quá hạn/Nợ khoanh/Đến hạn; mọi đầu ra dùng cùng tập lọc.

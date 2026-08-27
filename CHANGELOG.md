@@ -1,5 +1,14 @@
 # CHANGELOG
 
+## [2026-08-27] — Sửa launcher batch không đạt kiểm tra ASCII/CRLF
+- `Chay_VBSP_SCM.bat` — thay ký tự gạch dài non-ASCII trong comment bằng dấu `-` ASCII và chuẩn hóa lại CRLF để CMD/test launcher tương thích.
+- `BUGMAP.md` — thêm entry `J75` cho lỗi batch launcher có byte non-ASCII/LF lẻ.
+
+## [2026-08-27] — Căn chỉnh PDF Báo cáo Tổng hợp HSTD (tiêu đề + độ rộng cột mốc 31/12)
+- `tabs/tab_baocao/reports/tong_hop_hstd_v2.py` — `_xuat_pdf_tong_hop()`: tiêu đề PDF bỏ emoji đầu nhãn (font TNR không có glyph emoji), đổi thành "BÁO CÁO TỔNG HỢP HSTD — {nhãn} (triệu đồng)".
+- `pdf_service.py` — `xuat_pdf()._col_ratio()` và `_col_ratio_pdf()`: cột "31/12" và cột bắt đầu "±" hưởng ratio 1.75 (ngang cột tiền); "bq/kh" tách riêng ratio 1.15 để header không bị cắt dòng.
+- `tests/test_tong_hop_hstd_v2.py`, `tests/test_pdf_service.py` — thêm regression test cho tiêu đề PDF không còn emoji và ratio cột mốc 31/12/BQ-KH.
+
 ## [2026-08-27] — Khôi phục BUGMAP sau merge GitHub
 - `BUGMAP.md` — khôi phục các entry lịch sử bị rơi trong lúc merge (`B85`-`B90`, `C39`, `C40`, `E23`, `J74`); code/test không đổi.
 

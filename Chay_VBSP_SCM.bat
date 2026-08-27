@@ -278,7 +278,7 @@ echo -- Kiem tra file cau hinh... --
 
 set "MISSING_FILES="
 
-rem KHONG dung dau ngoac () trong noi dung thong bao — lam vo cu phap if (...) cua CMD.
+rem KHONG dung dau ngoac () trong noi dung thong bao - lam vo cu phap if (...) cua CMD.
 if not exist "%ROOT%\credentials.json" (
     set "MISSING_FILES=%MISSING_FILES%  - credentials.json [Google Sheets/API]\n"
 )

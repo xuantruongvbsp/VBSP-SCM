@@ -1542,6 +1542,16 @@
 | **Test** | `tests/test_pdf_service.py`; `tests/test_bc_tongquan_pdf.py`; `tests/test_export_pdf_component.py`; render 6 PDF mẫu/10 trang PNG và recheck 3 PDF mẫu/3 trang PNG bằng `pypdfium2`; nhóm test PDF/báo cáo chính `34 passed`, nhóm PDF phụ `11 passed`. |
 | **Ngày fix** | 2026-08-24 |
 
+### F15 — PDF Tổng hợp HSTD lệch cột sau khi thêm mốc 31/12
+| | |
+|---|---|
+| **File** | `tabs/tab_baocao/reports/tong_hop_hstd_v2.py` → `_xuat_pdf_tong_hop()`; `pdf_service.py` → `_col_ratio_pdf()`, `xuat_pdf()._col_ratio()` |
+| **Dấu hiệu** | PDF Tổng hợp HSTD trong Báo cáo tín dụng nhìn không cân sau khi thêm cột `31/12/{năm}` và `± 31/12`; tiêu đề có thể hiện ô vuông do nhãn báo cáo chứa emoji, header `BQ/KH` dễ bị bẻ dòng. |
+| **Nguyên nhân** | Nhãn quick export có emoji được đưa thẳng vào title ReportLab dùng font Times; hai cột mốc 31/12 rơi về ratio mặc định thay vì ratio cột tiền; `BQ/KH` nằm trong nhóm cột đếm 0.9 quá hẹp. |
+| **Fix** | Strip emoji đầu nhãn trước khi gọi `xuat_pdf()`; ưu tiên ratio 1.75 cho cột chứa `31/12`/bắt đầu `±`; tách `BQ/KH` về ratio 1.15 trong cả helper chung và `xuat_pdf()`. |
+| **Test** | `tests/test_tong_hop_hstd_v2.py::test_pdf_tong_hop_moc_3112_bo_emoji_va_can_cot_tien`; `tests/test_pdf_service.py::TestXuatPdf::test_col_ratio_pdf_uu_tien_cot_moc_3112_va_bq_kh`; smoke sinh PDF thật. |
+| **Ngày fix** | 2026-08-27 |
+
 ---
 
 ## G. Kế hoạch tín dụng
@@ -3903,6 +3913,16 @@ def _to_int(val, default=0):
 | **Fix** | Dùng thẳng bytes trả về: `xl_bytes = xuat_excel({...})` rồi `state.downloads.set(state_key, xl_bytes, ...)`; bỏ `.getvalue()` ở cả 2 hàm |
 | **Test** | Compile `tabs/tab_baocao/components/quick_export.py`; grep xác nhận không còn `.getvalue()` trong file |
 | **Ngày fix** | 2026-08-21 |
+
+### J75 — Launcher batch có byte non-ASCII hoặc LF lẻ
+| | |
+|---|---|
+| **File** | `Chay_VBSP_SCM.bat` |
+| **Dấu hiệu** | Full test rớt `tests/test_launcher_batch.py::test_batch_files_stay_ascii_crlf_for_cmd_compatibility` tại `assert all(byte < 128 for byte in raw)` hoặc kiểm tra LF lẻ. |
+| **Nguyên nhân** | File `.bat` có ký tự gạch dài non-ASCII trong comment; sau khi sửa bằng patch, line ending có thể sinh LF lẻ nếu không chuẩn hóa lại CRLF. |
+| **Fix** | Thay ký tự gạch dài bằng dấu `-` ASCII và ghi lại file bằng ASCII + CRLF. |
+| **Test** | `tests/test_launcher_batch.py::test_batch_files_stay_ascii_crlf_for_cmd_compatibility`; full `pytest`. |
+| **Ngày fix** | 2026-08-27 |
 
 ---
 

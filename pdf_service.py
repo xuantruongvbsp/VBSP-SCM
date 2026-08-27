@@ -249,6 +249,10 @@ def _prepare_pdf_export_frame(
 
 def _col_ratio_pdf(col_name: object) -> float:
     c = str(col_name).casefold().replace("_", " ")
+    if "31/12" in c or c.startswith("±"):
+        return 1.75
+    if "bq/kh" in c:
+        return 1.15
     if any(k in c for k in ("mã kh", "mã tổ", "số khế", "cmnd", "cccd")):
         return 1.55
     if any(k in c for k in ("tên kh", "khách hàng")):
@@ -437,9 +441,14 @@ def xuat_pdf(
             return 1.6
         if any(k in c for k in ("tỷ lệ", "tl ", "%", "tỷ trọng", "ty trong")):
             return 0.9
-        if any(k in c for k in ("bq/kh", "số kh", "so kh", "số món", "so mon",
+        if any(k in c for k in ("số kh", "so kh", "số món", "so mon",
                                  "món qh", "mon qh")):
             return 0.9
+        if "bq/kh" in c:
+            return 1.15
+        if "31/12" in c or c.startswith("±"):
+            # Cột mốc 31/12 và tăng/giảm so mốc: rộng ngang cột tiền
+            return 1.75
         if any(k in c for k in ("dư nợ", "du no", "trong hạn", "qua hạn",
                                  "quá hạn", "khoanh", "lãi", "tiền")):
             return 1.75

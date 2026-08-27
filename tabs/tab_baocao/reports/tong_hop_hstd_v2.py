@@ -1,6 +1,7 @@
 """Báo cáo tổng hợp từ HSTD v2 - UX nâng cao."""
 from __future__ import annotations
 
+import re
 import streamlit as st
 import pandas as pd
 from typing import TYPE_CHECKING
@@ -442,9 +443,11 @@ def _xuat_pdf_tong_hop(
     ]
     dem_cols = ["Số KH", "Số món", "Món QH"]
     phan_tram_cols = ["Tỷ trọng %", "Tỷ lệ QH %"]
+    # Tiêu đề PDF: bỏ emoji đầu nhãn (font TNR không có glyph emoji)
+    nhan = re.sub(r"^\W+\s*", "", str(tieu_de), flags=re.UNICODE).strip() or str(tieu_de)
     return xuat_pdf(
         df_xuat,
-        f"{tieu_de} (triệu đồng)",
+        f"BÁO CÁO TỔNG HỢP HSTD — {nhan} (triệu đồng)",
         username,
         cols_tien=tien_cols,
         don_vi_tien="triệu đồng",

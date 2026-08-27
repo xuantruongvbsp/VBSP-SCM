@@ -151,6 +151,14 @@ class TestXuatPdf:
 
         assert page.width > page.height
 
+    def test_col_ratio_pdf_uu_tien_cot_moc_3112_va_bq_kh(self):
+        """Cột mốc 31/12 và BQ/KH không được rơi về ratio mặc định quá hẹp."""
+        from pdf_service import _col_ratio_pdf
+
+        assert _col_ratio_pdf("31/12/2025") == 1.75
+        assert _col_ratio_pdf("± 31/12") == 1.75
+        assert _col_ratio_pdf("BQ/KH") == 1.15
+
     def test_xuat_pdf_group_header_khong_dung_glyph_la(self):
         """Nhãn nhóm trong PDF group header phải render bằng chữ thường, không dùng ký tự dễ lỗi font."""
         pytest.importorskip("reportlab", reason="Chưa cài thư viện reportlab")

@@ -172,6 +172,46 @@ def test_pdf_tong_hop_dung_dong_tong_chuan_va_co_bq_kh(monkeypatch) -> None:
     assert kwargs["dong_tong"]["Số món"] == 3
 
 
+def test_pdf_tong_hop_moc_3112_bo_emoji_va_can_cot_tien(monkeypatch) -> None:
+    df_th, df_group, co_khoanh = _tao_tong_hop_theo_nhom(
+        _df_mau(), "ct", COT_TEN_CT
+    )
+    df_th = df_th.assign(DN_moc_3112=[80, 200, 250])
+    tong = _tinh_tong_cong(df_th, df_group)
+    captured: dict[str, object] = {}
+
+    def fake_xuat_pdf(df, *args, **kwargs):
+        captured["df"] = df.copy()
+        captured["title"] = args[0]
+        captured["kwargs"] = kwargs
+        return b"%PDF-test"
+
+    monkeypatch.setattr(tong_hop_hstd_v2, "xuat_pdf", fake_xuat_pdf)
+
+    result = tong_hop_hstd_v2._xuat_pdf_tong_hop(
+        df_th,
+        tong,
+        COT_TEN_CT,
+        "Chương trình",
+        co_khoanh,
+        "🏢 Theo Chương trình",
+        "tester",
+        "BC_TEST",
+        nam_bl=2025,
+    )
+
+    df_pdf = captured["df"]
+    kwargs = captured["kwargs"]
+    assert result == b"%PDF-test"
+    assert captured["title"] == "BÁO CÁO TỔNG HỢP HSTD — Theo Chương trình (triệu đồng)"
+    assert "🏢" not in captured["title"]
+    assert ["31/12/2025", "± 31/12"] == [
+        col for col in df_pdf.columns if col in {"31/12/2025", "± 31/12"}
+    ]
+    assert "31/12/2025" in kwargs["cols_tien"]
+    assert "± 31/12" in kwargs["cols_tien"]
+
+
 def test_baseline_nguon_von_khong_khop_giu_schema_de_moc_bang_0(monkeypatch) -> None:
     df_bl = pd.DataFrame(
         {

@@ -965,18 +965,6 @@
 
 ---
 
-### B86 — Card Điện báo hiển thị tên file nội bộ và thời gian filesystem cũ
-| | |
-|---|---|
-| **File** | `tabs/tab_candoi.py` → `_db_file_details()`, `_db_file_chip()`, `render()` |
-| **Dấu hiệu** | Card kỳ trước hiện `dienbao_prev.xlsx · 5 KB · 31/07/2026 16:56` dù file người dùng upload có tên `31.12.xlsx` vào `01/08/2026 09:07`. |
-| **Nguyên nhân** | UI đọc basename và `LastWriteTime` của file cache đích; thao tác copy/ghi file có thể giữ mtime cũ và tên đích luôn là tên kỹ thuật cố định. |
-| **Fix** | Ưu tiên `ten_file` và `ngay_upload` trong `dienbao_meta_*` cho cả 3 card và thanh trạng thái; chỉ dùng basename/mtime filesystem khi metadata legacy không có. |
-| **Test** | `tests/test_tab_candoi.py::test_file_chip_uu_tien_ten_goc_va_thoi_diem_upload`, `test_file_details_fallback_filesystem_cho_metadata_legacy` |
-| **Ngày fix** | 2026-08-13 |
-
----
-
 ## C. Dữ liệu / DataFrame
 
 ### C7 — Cột "Thời hạn vay" luôn trả "—" trong card tra cứu
@@ -1198,16 +1186,6 @@
 ---
 
 ## E. Upload / Merge
-
-### E23 — Upload CDTOTKVV toàn CN chỉ nhận 1 đơn vị dù file đủ 22 PGD
-| | |
-|---|---|
-| **File** | `data/cdtotkvv.py` → `tach_file_cdto_toan_cn()`, `doc_thang_tu_cdto_toan_cn()`, `doc_thang_nam_tu_file()` |
-| **Dấu hiệu** | Upload file CDTOTKVV tổng hợp toàn CN báo `⚠️ Thiếu 21 đơn vị: PGD Long Thành, ...`; preview chỉ nhận `Số đơn vị nhận diện: 1` (Hội sở) dù file thực tế đủ 22 đơn vị / ~4500 dòng. |
-| **Nguyên nhân** | File export khai metadata `<dimension>` của sheet sai (vd `A1:T11`) trong khi dữ liệu thực ~4570 dòng. `openpyxl.load_workbook(read_only=True)` tin theo `<dimension>` nên `iter_rows()` bị cắt ở dòng khai báo → parser chỉ thấy vài dòng đầu (toàn Hội sở), không thấy 21 PGD bên dưới. |
-| **Fix** | Chuyển 3 chỗ đọc file CDTOTKVV toàn CN từ `read_only=True` → `read_only=False` để openpyxl parse toàn bộ cell thay vì tin `<dimension>` metadata. File nhỏ (<1MB) nên không ảnh hưởng hiệu năng. |
-| **Test** | `tests/test_cdtotkvv_service.py` (22 cases), `tests/test_cdtotkvv_history.py` (6), `tests/test_file_detection_service.py` (22) — 50 passed. Verify file `.bak` thực tế: trước fix `so_dv=1`, sau fix `so_dv=22`, 4560 tổ, tháng 06/2026. |
-| **Ngày fix** | 2026-08-13 |
 
 ### E21 — Parser kỳ Điện báo nhận ngày không hợp lệ hoặc match lửng
 | | |
@@ -2920,26 +2898,6 @@ val = pd.to_numeric(df[COT_X], errors="coerce").sum() if COT_X in df.columns els
 | **Test** | `tests/test_tab_hhi.py::test_phan_nguon_von_ma_ct_thap_phan_khong_crash_va_giu_logic_cu` |
 | **Ngày fix** | 2026-08-02 |
 
-### C39 — BQ Hội hiện "—" do export BCQUERY mới không điền cột "Tên ĐVUT"
-| | |
-|---|---|
-| **File** | `tabs/tab_tongquan.py` → `_cache_bq_counts()` ~dòng 175; `workspaces/ws_operation.py` → `_kpi_pgd_list_impl()` ~dòng 366; `data/cdtotkvv.py` → `ban_do_ma_to_dvut()`, `chuan_hoa_ma_to_key()` |
-| **Dấu hiệu** | Card "🏛️ Dư nợ BQ Hội" ở Phòng KH-NV / 📊 Thông tin chung hiện "—"; KPI "Số hội đoàn thể" ở workspace PGD hiện 0 dù tổng dư nợ > 0 |
-| **Nguyên nhân** | Từ kỳ export HSTD 14/08/2026, sheet BCQUERY không điền `Tên ĐVUT`/`Tên tổ` (toàn NaN; `Mã ĐVUT`=99 cho mọi dòng) → `n_hoi = nunique() = 0` → card fallback "—". Format file cũ (`hstd_latest.xlsx` Hội sở) vẫn có tên ĐVUT. |
-| **Fix** | Fallback: nếu `Tên ĐVUT` không có giá trị, suy ra Hội từ cột `Mã tổ` qua map `Mã PGD|Mã tổ` → `dvut` đọc từ `pgd_data/*/cdtotkvv_latest.xlsx`; key đơn `Mã tổ` chỉ dùng khi không mơ hồ. |
-| **Test** | `tests/test_bq_hoi_fallback.py`; verify dữ liệu thật: `ban_do_ma_to_dvut()` trả 4555 tổ và `_cache_bq_counts(cache/hstd.parquet)` trả `n_hoi=4`, BQ Hội ≈ 3,424,272 tr |
-| **Ngày fix** | 2026-08-15 |
-
-### C40 — Báo cáo tín dụng: Số KH / Số món và dư nợ lệch giữa card với bảng
-| | |
-|---|---|
-| **File** | `tabs/tab_baocao/components/inline_filter.py` → `chuan_bi_du_lieu_bao_cao()`; `tabs/tab_baocao/dashboard.py`; `tabs/tab_baocao/reports/tong_hop_hstd_v2.py`, `no_rui_ro_v2.py` |
-| **Dấu hiệu** | Full HSTD đếm 250.322 KH do gồm KH không còn khế ước; mỗi PGD có thể cộng thêm một "món" rỗng; card dashboard dùng `len(df)` nên dư nợ/Số món lệch bảng sau khi bảng làm sạch; KPI món nợ rủi ro dùng formatter tiền nên có thể hiện `—`/0. |
-| **Nguyên nhân** | Có 29.960 dòng `Số khế ước` rỗng, dư nợ 0 (22.417 KH chỉ có dòng rỗng). Ngoài ra có 9 khóa `(Mã KH, Số khế ước)` lặp: thông tin khoản vay giống nhau nhưng khác sổ/số dư tiền gửi 105, làm dư nợ khoản vay bị cộng thêm 550 triệu; không phải dòng trùng hoàn toàn trên 174 cột. Agent mới chỉ thêm helper ở một số luồng, chưa đồng bộ dashboard và chưa chuẩn hóa khóa trước khi khử trùng. |
-| **Fix** | Làm sạch ở report-level: loại KU rỗng/null-token, strip Mã KH/Số KU trước khi nhận diện khóa lặp, chỉ gộp khi đủ hai thành phần khóa; áp dụng trước cảnh báo/tổng hợp ở hai báo cáo và sau filter dashboard. Giữ nguyên dữ liệu HSTD nguồn để không mất 2,17 tỷ tiền gửi 105. KPI số món dùng `fmt_so()`; TỔNG CỘNG dùng nunique toàn phạm vi. |
-| **Test** | `tests/test_baocao_nguon_von.py`, `tests/test_tong_hop_hstd_v2.py` — 13 passed. Dữ liệu thật: full `370.282 → 340.313` dòng, 227.905 KH / 340.313 món; active app `291.838 → 291.831` dòng, 213.275 KH / 291.831 món; dư nợ sau gộp 13.696.539.133.695 đồng. |
-| **Ngày fix** | 2026-08-21 |
-
 ### J29 — Pre-commit phụ thuộc PATH và xử lý đối số file chưa an toàn
 | | |
 |---|---|
@@ -3708,66 +3666,6 @@ def _to_int(val, default=0):
 
 ---
 
-### B87 — Telegram phân kỳ NXH đếm cảnh báo và icon gây hiểu nhầm
-| | |
-|---|---|
-| **File** | `services/telegram_service.py` → `_chuan_hoa_thong_bao()`, `gui_nhac_phan_ky_nxh()` |
-| **Dấu hiệu** | Tin phân kỳ NXH ghi tiêu đề `Theo PGD` nhưng tóm tắt là `Hội sở CN Đồng Nai`; nhóm `ĐỦ SỐ DƯ` vẫn dùng icon `⚠️`; tổng header ghi `12 cảnh báo` dù chỉ 5 khoản chưa đủ số dư; khi tách 2 tin không ghi rõ phần. |
-| **Nguyên nhân** | Khung chuẩn dùng phạm vi tĩnh từ `_NOTIFY_PRESENTATION`; icon từng khách hàng dựa vào `ghi_chu` cho cả nhóm đủ và thiếu; số cảnh báo đếm mọi dòng có ghi chú thay vì nhóm thiếu số dư; header nhóm chỉ có page tag khi chunk dài, không có tag phần đủ/thiếu. |
-| **Fix** | Với `phan_ky_nxh`, lấy đơn vị thực tế từ dòng tóm tắt để làm phạm vi; nhóm đủ dùng `✅`, nhóm thiếu dùng `⚠️`; `so_canh_bao = len(khong_du)`; thêm `phần x/y` khi gửi đủ và thiếu thành 2 tin. |
-| **Test** | `tests/test_telegram_service.py::TestChuanHoaThongBao::test_phan_ky_nxh_header_lay_don_vi_thuc_te_va_gio_24h`, `tests/test_telegram_service.py::TestChuanHoaThongBao::test_gui_nhac_phan_ky_nxh_phan_biet_du_thieu_va_dem_canh_bao` |
-| **Ngày fix** | 2026-08-15 |
-
----
-
-### B85 — Bảng NQH khó đọc ở dark theme và đếm đơn vị rỗng
-| | |
-|---|---|
-| **File** | `tabs/tab_canh_bao_nqh.py` → `_render_nqh()`; `utils_theme.py` → `_css_part2()` |
-| **Dấu hiệu** | Header/dòng chẵn của bảng “Nợ quá hạn theo đơn vị” có chữ trắng trên nền sáng; KPI có thể đếm thêm PGD/xã rỗng và bảng có hàng không tên. |
-| **Nguyên nhân** | CSS sáng được inject tại sub-tab nhưng kế thừa chữ trắng của dark theme; `nunique()` vẫn đếm chuỗi rỗng/whitespace; tên PGD từ dữ liệu upload được chèn thẳng vào HTML. |
-| **Fix** | Chuyển CSS sang theme toàn cục và dùng semantic tokens; strip rồi đổi tên đơn vị rỗng thành `pd.NA` khi đếm, gom các khoản thiếu tên vào “Chưa xác định” để bảo toàn tổng tiền; escape tên PGD bằng `html.escape()`. |
-| **Test** | Compile `tabs/tab_canh_bao_nqh.py`/`utils_theme.py`; kiểm tra helper loại `None`, chuỗi rỗng và whitespace; kiểm tra tên PGD có ký tự HTML được escape. |
-| **Ngày fix** | 2026-08-13 |
-
----
-
-### B88 — Báo cáo tín dụng lọc Nguồn vốn nhưng metrics/cảnh báo và nhóm nguồn chưa đồng bộ
-| | |
-|---|---|
-| **File** | `tabs/tab_baocao/dashboard.py`; `tabs/tab_baocao/components/inline_filter.py`; `tabs/tab_baocao/reports/tong_hop_hstd_v2.py`; `tabs/tab_baocao/reports/no_rui_ro_v2.py` |
-| **Dấu hiệu** | Chọn nguồn TW/ĐP nhưng dashboard cards và cảnh báo vẫn hiện số toàn bộ dữ liệu; báo cáo “Theo Nguồn vốn” có thể tách `1`, `01`, `1.0`, `TW` thành nhiều dòng; radio Nguồn vốn đứng trước bộ lọc PGD tương tác. |
-| **Nguyên nhân** | Filter được render sau metrics/cảnh báo; groupby dùng cột nguồn vốn thô; bộ lọc PGD nằm trong component bảng được gọi sau radio nguồn vốn. |
-| **Fix** | Áp dụng PGD rồi Nguồn vốn trước cảnh báo và các nhánh báo cáo; dashboard đọc cùng state filter; groupby dùng nhãn nguồn vốn chuẩn; bỏ bộ lọc PGD trùng trong bảng chi tiết. |
-| **Test** | `tests/test_baocao_nguon_von.py` — 4 test cho biến thể mã TW/ĐP, guard dữ liệu không hợp lệ, chuẩn hóa nhóm và metric theo PGD/Nguồn vốn. |
-| **Ngày fix** | 2026-08-21 |
-
----
-
-### B89 — Bảng "Chi tiết" HSTD sai KPI/tổng KH và loại dữ liệu thiếu tên nhóm
-| | |
-|---|---|
-| **File** | `tabs/tab_baocao/reports/tong_hop_hstd_v2.py`; `tabs/tab_baocao/components/sticky_table.py`; `utils_theme.py` |
-| **Dấu hiệu** | KPI `Số nhóm`/`Tổng KH` hiện 0; dòng tổng cộng đếm trùng KH giữa chương trình và làm BQ/KH thấp; món QH có thể đếm trùng dòng; báo cáo Theo Thôn thiếu 19,44% dư nợ còn ĐVUT/Tổ rỗng do tên nhóm null; tập dư nợ 0 vẫn ghi tỷ trọng 100%; bảng nền sáng khó đọc trên dark theme. |
-| **Nguyên nhân** | Dùng `fmt_ty()` cho số đếm; cộng `nunique()` từng nhóm thay vì tính duy nhất toàn phạm vi; món QH cộng cờ boolean; `groupby()` mặc định bỏ null; dòng tổng gán cứng 100%; component tự inject CSS và màu light-mode. |
-| **Fix** | Dùng `fmt_so()`; tính tổng KH/món/món QH từ mã đã chuẩn hóa trên dữ liệu gốc; món QH dùng `nunique(Số khế ước)`; đổi nhóm rỗng thành `Chưa xác định`; tỷ trọng tổng chỉ 100% khi có dư nợ; chuyển CSS sang `utils_theme.py` với semantic tokens và sticky toàn `thead`. |
-| **Test** | `tests/test_tong_hop_hstd_v2.py` (7 test); `tests/test_baocao_nguon_von.py` (4 test); đối chiếu cache thật: 250.322 KH duy nhất, Theo Thôn giữ đủ 100% dư nợ. |
-| **Ngày fix** | 2026-08-21 |
-
----
-
-### B90 — Bộ lọc phụ không liên hoàn và KPI Nợ rủi ro lệch bảng đã lọc
-| | |
-|---|---|
-| **File** | `tabs/tab_baocao/components/inline_filter.py` → `render_inline_filter()`; `tabs/tab_baocao/reports/no_rui_ro_v2.py` → `_render_no_qh_v2()`, `_render_no_khoanh_v2()`, `_render_den_han_v2()` |
-| **Dấu hiệu** | Sau khi chọn Xã, filter Chương trình vẫn liệt kê giá trị không thuộc xã đó và có thể trả bảng rỗng; khi lọc Xã/ĐVUT hoặc tìm KH, KPI Số món/Tỷ lệ/Dư nợ của báo cáo Nợ rủi ro vẫn hiện số trước lọc trong khi bảng và file xuất đã thu hẹp. |
-| **Nguyên nhân** | Mỗi selectbox lấy options từ DataFrame gốc thay vì kết quả của filter trước; ba nhánh Nợ rủi ro tính KPI trước khi gọi `render_combined_filter_search()`. |
-| **Fix** | Tạo options tuần tự từ `df_filtered`, reset widget state không còn hợp lệ; lọc/tìm trên phạm vi khoản vay trước rồi mới tách QH/khoanh/đến hạn, tính KPI/tỷ lệ và dựng bảng/export trên cùng phạm vi. |
-| **Test** | `tests/test_baocao_nguon_von.py::test_inline_filter_thu_hai_phu_thuoc_filter_thu_nhat`, `test_no_qh_metrics_va_bang_dung_cung_pham_vi_filter`; verify dữ liệu active: PGD/Xã/CT/NV đều giữ 213.275 KH, 291.831 món và 13.696.539.133.695 đồng. |
-| **Ngày fix** | 2026-08-21 |
-
----
-
 ### J61 — Task Scheduler mất heartbeat khi máy dùng pin
 | | |
 |---|---|
@@ -3792,15 +3690,39 @@ def _to_int(val, default=0):
 
 ---
 
-### J74 — Xuất Excel quick export: `'bytes' object has no attribute 'getvalue'`
+### J73 — Launcher tắt cửa sổ ngay khi thiếu credentials.json
 | | |
 |---|---|
-| **File** | `tabs/tab_baocao/components/quick_export.py` → `render_quick_export_buttons()` ~dòng 62, `render_bulk_export()` ~dòng 153 |
-| **Dấu hiệu** | Bấm `📊 Excel` trong `📊 Báo cáo tín dụng` (Tổng hợp / Nợ rủi ro) hiện `❌ Lỗi tạo báo cáo: 'bytes' object has no attribute 'getvalue'`, không tạo được file |
-| **Nguyên nhân** | `utils.xuat_excel()` trả **bytes** (đã `.getvalue()` bên trong), nhưng quick_export gọi thêm `buf.getvalue()` trên kết quả đó. Cùng dạng lỗi đã fix trong `export_panel.py` trước đây nhưng bỏ sót file này |
-| **Fix** | Dùng thẳng bytes trả về: `xl_bytes = xuat_excel({...})` rồi `state.downloads.set(state_key, xl_bytes, ...)`; bỏ `.getvalue()` ở cả 2 hàm |
-| **Test** | Compile `tabs/tab_baocao/components/quick_export.py`; grep xác nhận không còn `.getvalue()` trong file |
-| **Ngày fix** | 2026-08-21 |
+| **File** | `Chay_VBSP_SCM.bat` → khối kiểm tra file cấu hình ~dòng 281-310 |
+| **Dấu hiệu** | Double-click `Chay_VBSP_SCM.bat` trên máy mới: cửa sổ CMD hiện lên rồi tắt ngay, app không khởi động. Log `logs/launcher_last.log` dừng ở `dependency lock unchanged`, ghi `\n was unexpected at this time.` ở console. |
+| **Nguyên nhân** | Khi máy thiếu `credentials.json`, biến `MISSING_FILES` được nạp chuỗi chứa dấu ngoặc `(Google Sheets/API)`. Khi `echo %MISSING_FILES%` bung biến bên trong khối `if (...)`, dấu `)` trong nội dung đóng sớm khối lệnh → CMD báo lỗi cú pháp và thoát batch ngay lập tức (không qua `pause`). Máy cũ có sẵn `credentials.json` nên nhánh này không bao giờ chạy, lỗi không lộ. |
+| **Fix** | Thay dấu ngoặc tròn bằng ngoặc vuông trong mọi chuỗi thông báo: `[Google Sheets/API]`, `[thu muc Word templates]`, `[Google Sheets]`; thêm `rem` nhắc không dùng `()` trong nội dung thông báo. |
+| **Test** | Chạy `Chay_VBSP_SCM.bat --no-browser` trên máy không có `credentials.json`: cảnh báo hiện đúng một lần, Streamlit khởi động, `Invoke-WebRequest http://localhost:8502` trả HTTP 200. |
+| **Ngày fix** | 2026-08-11 |
+
+---
+
+### D11 — Backup zip chứa DB malformed, phục hồi ghi đè hỏng DB đang chạy
+| | |
+|---|---|
+| **File** | `backup_service.py` → `chay_backup()` ~dòng 61-78; `phuc_hoi_backup()` ~dòng 175-225 |
+| **Dấu hiệu** | Phục hồi backup từ máy khác báo `❌ Phục hồi DB thất bại: Loi ghi DB: database disk image is malformed`; sau đó DB trên máy hiện tại cũng hỏng theo (mọi truy cập SQLite đều lỗi malformed) vì đã bị ghi đè trước khi phát hiện lỗi. |
+| **Nguyên nhân** | (1) `chay_backup()` copy thô file `vbsp_scm.db` bằng `shutil.copy2` khi app đang chạy ở WAL mode — dữ liệu chưa checkpoint nằm trong `.db-wal` không được copy, file backup có thể không nhất quán/hỏng. (2) `phuc_hoi_backup()` ghi đè DB hiện tại TRƯỚC khi kiểm tra DB trong zip, nên bản backup hỏng phá luôn DB đang chạy. |
+| **Fix** | `chay_backup()` chuyển sang SQLite backup API (`conn.backup()` — snapshot nhất quán, an toàn với WAL kể cả khi đang ghi). `phuc_hoi_backup()` chạy `PRAGMA integrity_check` trên DB trong zip trước, hỏng thì hủy toàn bộ không đụng DB hiện tại; trước khi ghi đè lưu bản `.pre_restore` và tự khôi phục lại nếu ghi thất bại. |
+| **Test** | Smoke test 6 bước: backup mới tạo có integrity=ok; restore zip tốt thành công + đăng nhập OK; restore zip chứa DB hỏng bị từ chối với thông báo `BI HONG` và DB hiện tại vẫn login/integrity OK. |
+| **Ngày fix** | 2026-08-13 |
+
+---
+
+### D12 — Phục hồi vẫn báo malformed dù DB trong zip lành (WAL cũ replay lên DB mới)
+| | |
+|---|---|
+| **File** | `backup_service.py` → `phuc_hoi_backup()` ~dòng 214-243; helper mới `_xoa_wal_shm()` dòng 120-133 |
+| **Dấu hiệu** | Phục hồi báo `Loi ghi DB: database disk image is malformed` rồi tự khôi phục từ `.pre_restore`, dù DB trong zip đã qua `integrity_check: ok`. Trên đĩa còn `vbsp_scm.db-wal`/`-shm` của DB cũ. |
+| **Nguyên nhân** | `phuc_hoi_backup()` copy DB mới đè lên file nhưng KHÔNG xóa `vbsp_scm.db-wal`/`-shm` của DB cũ. SQLite mở DB mới thấy file -wal cũ liền replay WAL sai DB → malformed. Ngoài ra bản sao `.pre_restore` chụp khi WAL chưa checkpoint nên có thể thiếu dữ liệu. |
+| **Fix** | Thêm `_xoa_wal_shm()` xóa -wal/-shm sau `reset_conn()` và trước `copy2()` (áp dụng cả nhánh khôi phục `.pre_restore`); checkpoint `PRAGMA wal_checkpoint(TRUNCATE)` trước khi tạo bản `.pre_restore`. |
+| **Test** | Smoke test với -wal đang tồn tại (206KB): backup → restore `db_ok: True`, login admin/123 OK, integrity ok; zip hỏng vẫn bị từ chối; DB nguyên vẹn. |
+| **Ngày fix** | 2026-08-13 |
 
 ---
 

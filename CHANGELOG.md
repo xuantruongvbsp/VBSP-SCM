@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## [2026-08-27] — Dọn trạng thái Git trước khi commit GitHub
+- `.gitignore` — ignore `tmp/`, bản sao DB `.db.pre_restore` và `.agents/skills/` để installer/runtime/backup tạm không bị đưa vào commit.
+- `CHANGELOG.md` — giải conflict merge bằng cách giữ cả entry local 21-27/08 và entry GitHub về phục hồi backup WAL cũ.
+
 ## [2026-08-27] — Rà soát và sửa các điểm so dư nợ mốc 31/12 còn lệch phạm vi
 - `data/giao_ban.py` — thêm `loc_baseline_cung_xa_pgd()` để các chỉ tiêu giao ban xã lọc baseline 31/12 theo cả `Tên xã` và đúng một `Tên PGD` khi xác định được từ dữ liệu hiện tại.
 - `services/khtd_mau07_service.py` — thêm lọc `ten_pgd` cho baseline/current HSTD khi tính dư nợ ấp và danh sách mã chương trình Mẫu 07, tránh lẫn xã trùng tên giữa PGD.
@@ -92,78 +96,21 @@
 - `tests/test_baocao_nguon_von.py` — thêm test filter phụ thuộc và regression test KPI/tỷ lệ/bảng Nợ quá hạn cùng phạm vi; nhóm test báo cáo đạt 15/15.
 - `BUGMAP.md` — thêm mục B90; verify active HSTD: 213.275 KH / 291.831 món, tổng dư nợ không đổi qua nhóm PGD/Xã/Chương trình/Nguồn vốn.
 
-## [2026-08-21] — Khôi phục call `chuan_bi_du_lieu_bao_cao()` bị revert trong tong_hop_hstd_v2
-- `tabs/tab_baocao/reports/tong_hop_hstd_v2.py` dòng ~200 — áp dụng lại `chuan_bi_du_lieu_bao_cao()` sau bộ lọc nguồn vốn (call cũ bị mất khi refactor song song); đã verify end-to-end trên parquet: 370.282 → 340.313 dòng, Số KH 227.905, Số món 340.313, chênh dư nợ đúng 550 triệu (9 dòng trùng).
+## [2026-08-13] — Fix phục hồi malformed do WAL cũ replay lên DB mới (D12)
+- `backup_service.py` dòng 120-133 — thêm `_xoa_wal_shm()`: xóa `vbsp_scm.db-wal`/`-shm` cũ trước khi copy DB mới vào.
+- `backup_service.py` dòng ~214-243 — `phuc_hoi_backup()`: gọi `_xoa_wal_shm()` sau `reset_conn()` (cả nhánh chính lẫn nhánh khôi phục `.pre_restore`); checkpoint `PRAGMA wal_checkpoint(TRUNCATE)` trước khi chụp bản `.pre_restore` để bản sao đủ dữ liệu.
 
-## [2026-08-21] — Hoàn thiện số liệu Số KH / Số món vay Báo cáo tín dụng
-- `tabs/tab_baocao/components/inline_filter.py` — `chuan_bi_du_lieu_bao_cao()` loại khế ước rỗng và gộp khóa khoản vay `(Mã KH, Số khế ước)` sau khi strip; không sửa/xóa dữ liệu HSTD nguồn và không gộp các dòng thiếu Mã KH.
-- `tabs/tab_baocao/dashboard.py` — đồng bộ card HSTD với cùng bước làm sạch sau bộ lọc PGD/Nguồn vốn, tránh card Số món và dư nợ lệch bảng chi tiết.
-- `tabs/tab_baocao/reports/tong_hop_hstd_v2.py` dòng ~200 — thực sự áp dụng helper trước cảnh báo/tổng hợp; báo số dòng loại và chặn phạm vi rỗng. Đối chiếu full cache: 227.905 KH / 340.313 món; phạm vi active app: 213.275 KH / 291.831 món.
-- `tabs/tab_baocao/reports/no_rui_ro_v2.py` dòng ~109 — áp dụng cùng khóa khoản vay; đổi KPI Số món QH/khoanh/đến hạn từ formatter tiền `fmt_ty()` sang số đếm `fmt_so()`.
-- `tests/test_baocao_nguon_von.py` — thêm regression test cho khế ước rỗng, khóa có khoảng trắng, cùng Số KU nhưng khác KH, không sửa nguồn và dashboard không double-count.
-- `BUGMAP.md` — chỉnh mục C40 theo đúng bản chất dòng lặp do nhiều sổ tiết kiệm 105; bổ sung số liệu full/active đã đối chiếu.
+## [2026-08-13] — Fix backup DB malformed + phục hồi an toàn (không phá DB đang chạy)
+- `backup_service.py` dòng ~61-78 — `chay_backup()`: backup DB bằng SQLite backup API (`conn.backup()`) thay vì copy file thô, đảm bảo snapshot nhất quán khi app chạy ở WAL mode.
+- `backup_service.py` dòng ~175-225 — `phuc_hoi_backup()`: kiểm tra `PRAGMA integrity_check` DB trong zip TRƯỚC khi ghi đè (hỏng → hủy, không đụng DB hiện tại); lưu bản an toàn `.pre_restore` và tự khôi phục nếu ghi thất bại; thêm `import sqlite3`.
+- `BUGMAP.md` — thêm mục D11.
 
-## [2026-08-21] — Sửa toàn bộ sai số và dark theme bảng "📊 Chi tiết" Báo cáo tổng hợp HSTD
-- `tabs/tab_baocao/reports/tong_hop_hstd_v2.py` — tách helper tổng hợp có test; `Số món QH` đếm khế ước duy nhất; tổng KH/món/BQ-KH không cộng trùng giữa nhóm; nhóm rỗng được giữ dưới nhãn `Chưa xác định`; KPI số lượng dùng `fmt_so()`; tỷ trọng tập dư nợ 0 trả 0%.
-- `tabs/tab_baocao/components/sticky_table.py` — bỏ CSS/màu hardcode tại component cho cả bảng chi tiết mới và sticky table cũ; chỉ dựng HTML đã escape bằng class theme toàn cục.
-- `utils_theme.py` — thêm CSS semantic dark-theme cho `.bct-*` và `.sticky-table*`; sticky toàn bộ `thead`, zebra/hover/badge/tổng cộng dùng token chuẩn.
-- `tests/test_tong_hop_hstd_v2.py` — thêm 7 regression tests cho đếm trùng KH/món QH, nhóm thiếu tên, đối chiếu tổng dư nợ, trạng thái 0%, HTML escape và CSS toàn cục.
-- `BUGMAP.md` — thêm mục B89.
+## [2026-08-13] — Tăng giới hạn upload để phục hồi backup zip lớn
+- `.streamlit/config.toml` phần `[server]` — thêm `maxUploadSize = 2048` và `maxMessageSize = 2048` (MB); mặc định Streamlit 200MB khiến upload file `backup_*.zip` toàn CN bị từ chối.
 
-## [2026-08-21] — Thiết kế lại bảng "📊 Chi tiết" Báo cáo tổng hợp HSTD: thêm cột + giao diện HTML chuẩn
-- `tabs/tab_baocao/components/sticky_table.py` — thêm `render_bang_chi_tiet_html()` (+ `_fmt_trieu`, `_badge_qh`, `_thanh_ty_trong`): bảng HTML theo bảng màu UI_GUIDELINES, header 2 dòng (nhóm cột + tên cột), zebra, sticky header, badge màu tỷ lệ QH (<1% xanh / 1–3% vàng / ≥3% đỏ), thanh tiến độ tỷ trọng, dòng TỔNG CỘNG.
-- `tabs/tab_baocao/reports/tong_hop_hstd_v2.py` dòng ~135–260 — thêm cột mới vào tổng hợp: Dư nợ khoanh, Số món QH, Tỷ trọng %, BQ dư nợ/KH; ép `pd.to_numeric` trước groupby; hiển thị chi tiết bằng bảng HTML mới (bỏ `_fmt_df_trieu` + `render_sticky_table` cũ).
-- `tabs/tab_baocao/components/__init__.py` — export `render_bang_chi_tiet_html`.
-
-## [2026-08-21] — Fix xuất Excel Báo cáo tín dụng: `'bytes' object has no attribute 'getvalue'`
-- `tabs/tab_baocao/components/quick_export.py` dòng ~62/~153 — `render_quick_export_buttons()` và `render_bulk_export()`: `xuat_excel()` trả bytes, bỏ `.getvalue()` thừa trên kết quả (BUGMAP J74).
-
-## [2026-08-21] — Hoàn thiện lọc Nguồn vốn cho Báo cáo tín dụng
-- `tabs/tab_baocao/components/inline_filter.py` — tách helper lọc thuần, chuẩn hóa các biến thể mã TW/ĐP và gộp nhãn chuẩn cho báo cáo “Theo Nguồn vốn”.
-- `tabs/tab_baocao/dashboard.py` — metric HSTD trên dashboard dùng cùng trạng thái lọc PGD/Nguồn vốn của báo cáo đang chọn.
-- `tabs/tab_baocao/reports/tong_hop_hstd_v2.py` — đặt lọc Nguồn vốn sau PGD, tính cảnh báo/metrics/bảng/export trên dữ liệu đã lọc và không tách nhiều nhóm TW/ĐP tương đương.
-- `tabs/tab_baocao/reports/no_rui_ro_v2.py` — đặt lọc PGD/Nguồn vốn trước cảnh báo và toàn bộ 5 nhánh báo cáo; bỏ bộ lọc PGD trùng ở bảng chi tiết.
-- `tests/test_baocao_nguon_von.py` — thêm 4 regression tests cho biến thể mã, dữ liệu không hợp lệ, nhãn groupby và metric dashboard.
-- `BUGMAP.md` — thêm mục B88 cho lỗi metrics/cảnh báo/groupby chưa đồng bộ với lọc Nguồn vốn.
-
-## [2026-08-21] — Báo cáo tín dụng: thêm phân loại Nguồn vốn TW (1) / Địa phương (2) cho báo cáo Tổng hợp & Nợ rủi ro
-- `tabs/tab_baocao/components/inline_filter.py` — thêm `render_nguon_von_filter()` + `_chuan_hoa_nguon_von()`: radio lọc Tất cả / 1 — Trung ương / 2 — Địa phương theo `COT_NGUON_VON`, tự ẩn khi thiếu cột hoặc không có giá trị 1/2 hợp lệ.
-- `tabs/tab_baocao/reports/tong_hop_hstd_v2.py` dòng ~114 — gọi `render_nguon_von_filter()` sau bộ lọc PGD, áp dụng cho mọi nhóm tổng hợp (PGD/Xã/Thôn/CT/Nguồn vốn/ĐVUT/CBTD).
-- `tabs/tab_baocao/reports/no_rui_ro_v2.py` dòng ~103 — gọi `render_nguon_von_filter()` trước khi dispatch 5 loại báo cáo nợ rủi ro (QH, khoanh, đến hạn 30/60, nợ xấu).
-
-## [2026-08-15] — Fix card "Dư nợ BQ Hội" hiện "—" do file HSTD mới thiếu cột Tên ĐVUT
-- `data/cdtotkvv.py` ~dòng 466 — thêm `chuan_hoa_ma_to_key()` và `ban_do_ma_to_dvut()`: map `Mã PGD|Mã tổ` → mã ĐVUT (11..14) từ `pgd_data/*/cdtotkvv_latest.xlsx`; key đơn `Mã tổ` chỉ dùng khi không mơ hồ.
-- `tabs/tab_tongquan.py` ~dòng 175 — `_cache_bq_counts()`: khi `Tên ĐVUT` rỗng, fallback đếm số Hội đoàn thể qua map `Mã PGD|Mã tổ` → ĐVUT (BUGMAP C39).
-- `workspaces/ws_operation.py` ~dòng 366 — `_kpi_pgd_list_impl()`: `so_hoi` dùng cùng fallback; chuẩn hóa loại chuỗi rỗng/"CỘNG"; thêm import `COT_MA_PGD`, `COT_MA_TO`, `ban_do_ma_to_dvut`, `chuan_hoa_ma_to_key`.
-- `tests/test_bq_hoi_fallback.py` — thêm regression test cho key `Mã tổ` mơ hồ và ưu tiên key kép khi tính `n_hoi`.
-
-## [2026-08-15] — Sửa trình bày Telegram phân kỳ NXH
-- `services/telegram_service.py` dòng ~136/~540/~616 — khung tin phân kỳ NXH dùng đơn vị thực tế trong tiêu đề thay vì nhãn chung `Theo PGD`; nhóm đủ số dư dùng icon `✅`; tổng cảnh báo chỉ đếm khoản chưa đủ số dư; các tin tách nhóm ghi rõ `phần 1/2`, `phần 2/2`.
-- `tests/test_telegram_service.py` dòng ~183/~257 — thêm regression test cho tiêu đề/timestamp 24h, số cảnh báo 5/12, icon nhóm đủ/thiếu và nhãn phần khi tách tin.
-- `BUGMAP.md` — thêm mục B87 cho lỗi Telegram phân kỳ NXH gây hiểu nhầm cảnh báo và phạm vi gửi.
-
-## [2026-08-15] — Thêm trạng thái upload CDTOTKVV toàn Chi nhánh
-- `tabs/tab_upload_khnv/_upload_toan_cn.py` dòng ~17/~66/~178 — thêm thông báo khi nhận file, `st.status()` khi phân tích và khi tách/lưu CDTOTKVV toàn CN; lưu kết quả upload vào `session_state` để vẫn hiện rõ sau `st.rerun()`.
-- `tests/test_tab_upload_toan_cn.py` — thêm regression test cho thông báo upload CDTOTKVV thành công/từng phần và kiểm tra kết quả được lưu trước khi rerun.
-
-## [2026-08-13] — Hiển thị đúng metadata file Điện báo đã upload
-- `tabs/tab_candoi.py` dòng ~407/~1122/~1350 — các chip và thanh trạng thái ưu tiên tên file gốc, thời điểm upload từ `dienbao_meta_*`; chỉ fallback sang tên đích/mtime filesystem cho dữ liệu legacy.
-- `tests/test_tab_candoi.py` dòng ~242 — thêm regression test cho metadata upload và fallback file legacy.
-- `BUGMAP.md` — thêm mục B86 cho lỗi hiển thị tên file đích nội bộ và mtime cũ ở card Điện báo.
-
-## [2026-08-13] — Fix upload CDTOTKVV toàn CN chỉ nhận 1/22 đơn vị
-- `data/cdtotkvv.py` dòng ~322/~510/~665 — `tach_file_cdto_toan_cn()`, `doc_thang_tu_cdto_toan_cn()`, `doc_thang_nam_tu_file()`: chuyển `load_workbook(read_only=True)` → `read_only=False`. File export khai `<dimension>` sai (11 dòng thay vì ~4570) khiến chế độ read-only cắt mất dữ liệu → preview báo "Thiếu 21 đơn vị". Verify trên file thực: 22/22 đơn vị, 4.560 tổ, tháng 06/2026.
-- `BUGMAP.md` — thêm mục E23.
-
-## [2026-08-13] — Sửa giao diện và dữ liệu bảng Nợ quá hạn phát sinh
-- `tabs/tab_canh_bao_nqh.py` dòng ~60/~895 — bỏ CSS inject theo sub-tab; không đếm tên PGD/xã rỗng, gom khoản thiếu tên vào “Chưa xác định” để giữ đúng tổng tiền và escape tên PGD trước khi dựng HTML.
-- `utils_theme.py` dòng ~591 — chuyển CSS NQH vào theme toàn cục, dùng semantic tokens dark theme và đặt màu chữ/nền tương phản cho bảng.
-- `BUGMAP.md` — thêm mục B85 cho lỗi bảng NQH khó đọc ở dark theme, đếm đơn vị rỗng và chèn tên PGD chưa escape.
-
-## [2026-08-13] — Thiết kế lại giao diện sub-tab "Nợ quá hạn phát sinh"
-- `tabs/tab_canh_bao_nqh.py` dòng ~60 — thêm `_CSS_NQH` (KPI cards đỏ/xanh + bảng tổng hợp `.nqhb` có thanh quy mô) và helper `_fmt_gon_vnd()` (hiện gọn tỷ/triệu cho card).
-- `tabs/tab_canh_bao_nqh.py` dòng ~885 — `_render_nqh()`: thay 3 `st.metric` bằng 4 KPI cards (Số hồ sơ, Dư nợ QH, Tỷ lệ NQH, Đơn vị/Xã có NQH); thêm bảng HTML "Nợ quá hạn theo đơn vị" với bar quy mô + dòng Tổng cộng (chỉ phân hệ CN khi chưa lọc PGD); thêm heading "📃 Danh sách chi tiết".
-- `tabs/tab_canh_bao_nqh.py` — tổng dư nợ QH chuyển qua `pd.to_numeric(...).fillna(0)` trước khi sum/groupby (tránh dtype object).
+## [2026-08-11] — Fix launcher tắt cửa sổ ngay trên máy mới thiếu credentials.json
+- `Chay_VBSP_SCM.bat` dòng ~281-310 — thay dấu ngoặc tròn `()` bằng ngoặc vuông `[]` trong các chuỗi cảnh báo file thiếu (`credentials.json`, `templates/`), tránh dấu `)` trong nội dung làm vỡ cú pháp khối `if (...)` của CMD khiến batch thoát ngay không kịp pause.
+- `BUGMAP.md` — thêm mục J73 cho lỗi launcher tắt cửa sổ khi thiếu `credentials.json`.
 
 ## [2026-08-11] — Fix CI không import được module phân kỳ NXH
 - `.gitignore` dòng ~61 — chỉ ignore dữ liệu runtime trong `data/`, cho phép Git theo dõi các module Python `data/*.py`.

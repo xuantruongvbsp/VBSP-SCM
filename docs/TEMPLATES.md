@@ -164,7 +164,7 @@ nut_tai_word_va_pdf(docx_bytes, "TenMoi_001", "prefix")
 ### Context mẫu
 ```python
 context = {
-    "ten_cn": "Chi nhánh NHCSXH tỉnh Đồng Nai",
+  "ten_cn": "Chi nhánh Ngân hàng Chính sách xã hội thành phố Đồng Nai",
     "ten_pgd": "PGD Long Thành",
     "ten_xa": "Xã Bình An",
     "ngay_kt": "06/05/2026",

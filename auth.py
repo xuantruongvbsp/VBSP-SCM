@@ -747,7 +747,7 @@ def _build_login_hero(
       <img src="data:image/jpeg;base64,{LOGO_NHCSXH_B64}" alt="VBSP logo">
     </div>
     <div>
-      <div class="login-kicker">VBSP-SCM · NHCSXH Chi nhánh Đồng Nai</div>
+      <div class="login-kicker">VBSP-SCM · Chi nhánh Ngân hàng Chính sách xã hội thành phố Đồng Nai</div>
       <div class="login-main-title">Đăng nhập không gian làm việc</div>
       <div class="login-workspace-pill">{workspace_label}</div>
     </div>
@@ -1101,7 +1101,7 @@ def hien_thi_login():
 
                         st.error("Tên đăng nhập hoặc mật khẩu không đúng.")
 
-    st.caption("© 2025 NHCSXH Chi nhánh Đồng Nai · Phòng KH-NV")
+    st.caption("© 2025 Chi nhánh Ngân hàng Chính sách xã hội thành phố Đồng Nai · Phòng KH-NV")
 
     if so_tai_khoan <= 1:
 

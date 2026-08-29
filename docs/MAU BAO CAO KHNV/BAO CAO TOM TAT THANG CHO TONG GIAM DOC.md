@@ -4,13 +4,13 @@ ten_file: BC tóm tắt KQ T05.docx
 
 # BÁO CÁO TÓM TẮT Kết quả triển khai thực hiện nhiệm vụ tháng 5/2026 và Kế hoạch nhiệm vụ tháng 6/2026
 
-*Ngân hàng Chính sách Xã hội - Chi nhánh tỉnh Đồng Nai*
+*Chi nhánh Ngân hàng Chính sách xã hội thành phố Đồng Nai*
 
 **Số: /BC-NHCSXH**
 
 Đồng Nai, ngày 27 tháng 5 năm 2026
 
-Tháng 5/2026, Chi nhánh Ngân hàng Chính sách xã hội (NHCSXH) tỉnh Đồng Nai đã bám sát chỉ đạo của Tổng Giám đốc NHCSXH và chương trình, kế hoạch phát triển kinh tế - xã hội năm 2026 của Tỉnh ủy, HĐND, UBND tỉnh, với trọng tâm là đảm bảo tín dụng chính sách xã hội tiếp tục hoạt động ổn định, thông suốt và hiệu quả, Chi nhánh tỉnh và các Phòng giao dịch đã chủ động tham mưu cấp ủy, chính quyền các cấp và tập trung triển khai nhiệm vụ, với một số kết quả đạt được như sau:
+Tháng 5/2026, Chi nhánh Ngân hàng Chính sách xã hội thành phố Đồng Nai đã bám sát chỉ đạo của Tổng Giám đốc NHCSXH và chương trình, kế hoạch phát triển kinh tế - xã hội năm 2026 của Tỉnh ủy, HĐND, UBND tỉnh, với trọng tâm là đảm bảo tín dụng chính sách xã hội tiếp tục hoạt động ổn định, thông suốt và hiệu quả, Chi nhánh và các Phòng giao dịch đã chủ động tham mưu cấp ủy, chính quyền các cấp và tập trung triển khai nhiệm vụ, với một số kết quả đạt được như sau:
 
 ## I. KẾT QUẢ THỰC HIỆN NHIỆM VỤ 5 THÁNG ĐẦU NĂM 2026
 
@@ -38,7 +38,7 @@ Có 95/95 UBND xã, phường đã bố trí Điểm giao dịch, lực lượng
 
 #### b) Hoạt động ủy thác
 
-Chi nhánh NHCSXH tỉnh và các tổ chức CT-XH nhận ủy thác các cấp đã phối hợp triển khai thực hiện nghiêm túc Văn bản liên tịch và Hợp đồng ủy thác đã ký kết. Hoạt động tín dụng chính sách xã hội tiếp tục được triển khai đồng bộ, thuận lợi, kịp thời phục vụ tốt cho người nghèo và các đối tượng chính sách khác.
+Chi nhánh Ngân hàng Chính sách xã hội thành phố Đồng Nai và các tổ chức CT-XH nhận ủy thác các cấp đã phối hợp triển khai thực hiện nghiêm túc Văn bản liên tịch và Hợp đồng ủy thác đã ký kết. Hoạt động tín dụng chính sách xã hội tiếp tục được triển khai đồng bộ, thuận lợi, kịp thời phục vụ tốt cho người nghèo và các đối tượng chính sách khác.
 
 #### c) Triển khai kế hoạch tín dụng
 

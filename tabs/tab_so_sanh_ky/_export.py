@@ -24,6 +24,7 @@ from config import (
     COT_LAI_SUAT, COT_DU_NO_TH, COT_DU_NO_QH, COT_DU_NO_KHOANH,
     COT_TONG_DU_NO, COT_TEN_CT, COT_NGUON_VON,
     COT_TINH_TRANG, COT_LAI_TON,
+    TEN_CHI_NHANH_HIEN_THI,
 )
 
 try:
@@ -152,7 +153,7 @@ def xuat_pdf_tong_quan(
     # Footer
     elems.append(HRFlowable(width="100%", color=colors.HexColor("#d1d5db")))
     elems.append(Paragraph(
-        f"VBSP-SCM · Chi nhánh NHCSXH tỉnh Đồng Nai · Trang 1/1",
+        f"VBSP-SCM · {TEN_CHI_NHANH_HIEN_THI} · Trang 1/1",
         styles["footer"],
     ))
 
@@ -186,7 +187,7 @@ def xuat_pdf_da_chieu(
     elems.append(Spacer(1, 2*cm))
     elems.append(Paragraph(f"Ngày xuất: {datetime.now():%d/%m/%Y}", styles["sub"]))
     elems.append(Paragraph(f"Người xuất: {username}", styles["sub"]))
-    elems.append(Paragraph(f"Đơn vị: Chi nhánh NHCSXH tỉnh Đồng Nai", styles["sub"]))
+    elems.append(Paragraph(f"Đơn vị: {TEN_CHI_NHANH_HIEN_THI}", styles["sub"]))
     elems.append(PageBreak())
 
     # Tổng quan
@@ -217,7 +218,7 @@ def xuat_pdf_da_chieu(
     # Footer
     elems.append(HRFlowable(width="100%", color=colors.HexColor("#d1d5db")))
     elems.append(Paragraph(
-        "VBSP-SCM · Chi nhánh NHCSXH tỉnh Đồng Nai · Trang cuối",
+        f"VBSP-SCM · {TEN_CHI_NHANH_HIEN_THI} · Trang cuối",
         styles["footer"],
     ))
 

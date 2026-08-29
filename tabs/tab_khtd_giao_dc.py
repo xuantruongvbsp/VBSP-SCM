@@ -59,83 +59,6 @@ def _ten_ngan(ma_key: str) -> str:
     return _SHORT_CT.get(ma_key, ma_key)
 
 
-def _rows_to_wide(rows: list[dict], nguon: str) -> tuple[pd.DataFrame, list[str]]:
-    """Pivot rows_nhap (dài) → wide: mỗi hàng = 1 xã, mỗi CT = 3 cột."""
-    if not rows:
-        return pd.DataFrame(), []
-    kh_val_col = "KH giao TW (tr.đ)" if nguon == "TW" else "KH giao ĐP (tr.đ)"
-    mk_seen: list[str] = []
-    mk_set: set[str] = set()
-    for r in rows:
-        mk = r["Mã CT"]
-        if mk not in mk_set:
-            mk_seen.append(mk)
-            mk_set.add(mk)
-    xa_dict: dict[str, dict] = {}
-    for r in rows:
-        xa = r["Xã"]
-        if xa not in xa_dict:
-            xa_dict[xa] = {"Xã": xa}
-        short = _ten_ngan(r["Mã CT"])
-        xa_dict[xa][f"{short} / KH trước"] = r.get("KH trước (tr.đ)", 0.0)
-        xa_dict[xa][f"{short} / Dư nợ"]    = r.get("Dư nợ TH (tr.đ)", 0.0)
-        xa_dict[xa][f"{short} / KH giao"]  = r.get(kh_val_col, 0.0)
-    df = pd.DataFrame(list(xa_dict.values()))
-    ordered = ["Xã"]
-    for mk in mk_seen:
-        s = _ten_ngan(mk)
-        ordered += [f"{s} / KH trước", f"{s} / Dư nợ", f"{s} / KH giao"]
-    df = df[[c for c in ordered if c in df.columns]]
-    return df, mk_seen
-
-
-def _wide_col_config(df: pd.DataFrame, readonly: bool) -> dict:
-    cfg: dict = {"Xã": st.column_config.TextColumn(disabled=True, width="medium")}
-    for col in df.columns:
-        if col == "Xã":
-            continue
-        if "KH trước" in col:
-            cfg[col] = st.column_config.NumberColumn(disabled=True, format="%.1f", help="KH đợt trước (tr.đ)")
-        elif "Dư nợ" in col:
-            cfg[col] = st.column_config.NumberColumn(disabled=True, format="%.1f", help="Dư nợ TH (tr.đ)")
-        elif "KH giao" in col:
-            cfg[col] = st.column_config.NumberColumn(
-                disabled=readonly, format="%.1f", min_value=0.0,
-                help="Nhập KH giao (triệu đồng)",
-            )
-    return cfg
-
-
-def _wide_to_du_lieu(
-    df_tw: pd.DataFrame, mk_tw: list[str],
-    df_dp: pd.DataFrame, mk_dp: list[str],
-) -> list[dict]:
-    rows: list[dict] = []
-    if not df_tw.empty:
-        for _, row in df_tw.iterrows():
-            xa = row["Xã"]
-            for mk in mk_tw:
-                s = _ten_ngan(mk)
-                kh = float(row.get(f"{s} / KH giao", 0) or 0)
-                rows.append({
-                    "xa": xa, "ma_key": mk, "ten_ct": _CT_MAP.get(mk, mk),
-                    "nguon": "TW", "kh_tw": kh, "dc_tw": 0.0, "kh_moi_tw": kh,
-                    "kh_dp": 0.0, "dc_dp": 0.0, "kh_moi_dp": 0.0, "ly_do": "",
-                })
-    if not df_dp.empty:
-        for _, row in df_dp.iterrows():
-            xa = row["Xã"]
-            for mk in mk_dp:
-                s = _ten_ngan(mk)
-                kh = float(row.get(f"{s} / KH giao", 0) or 0)
-                rows.append({
-                    "xa": xa, "ma_key": mk, "ten_ct": _CT_MAP.get(mk, mk),
-                    "nguon": "DP", "kh_tw": 0.0, "dc_tw": 0.0, "kh_moi_tw": 0.0,
-                    "kh_dp": kh, "dc_dp": 0.0, "kh_moi_dp": kh, "ly_do": "",
-                })
-    return rows
-
-
 def _rows_to_long(rows: list[dict], nguon: str) -> pd.DataFrame:
     """Đưa dữ liệu giao KH về bảng dài, mỗi dòng là một xã × chương trình."""
     if not rows:
@@ -421,50 +344,6 @@ def _chon_dot() -> tuple[int, str, str]:
     return nam, thang, dot
 
 
-@st.cache_data(ttl=60, show_spinner=False)
-def _bang_pivot_tom_tat(nam: int, thang: str, dot: str) -> pd.DataFrame:
-    rows: list[dict] = []
-    for _ten, slug in _ds_slug_label():
-        raw = _doc_kv_dot(slug, nam, thang, dot)
-        loai = raw.get("loai") if raw else None
-        if loai == LOAI_GIAO:
-            tong_tw = tong_dp = 0.0
-            if raw and raw.get("du_lieu"):
-                for r in raw["du_lieu"]:
-                    if isinstance(r, dict):
-                        tong_tw += float(r.get("kh_tw") or 0)
-                        tong_dp += float(r.get("kh_dp") or 0)
-            loai_txt = "📋 Giao"
-        elif loai == LOAI_DIEU_CHINH:
-            tong_tw = tong_dp = 0.0
-            if raw and raw.get("du_lieu"):
-                for r in raw["du_lieu"]:
-                    if isinstance(r, dict):
-                        tong_tw += float(r.get("dc_tw") or 0)
-                        tong_dp += float(r.get("dc_dp") or 0)
-            loai_txt = "📉 Điều chỉnh"
-        else:
-            tong_tw = tong_dp = 0.0
-            loai_txt = "⬜ Chưa tải"
-
-        rows.append(
-            {
-                "PGD": _slug_to_ten(slug),
-                "Loại": loai_txt,
-                "Tổng TW": tong_tw,
-                "Tổng ĐP": tong_dp,
-                "Trạng thái": _badge_trang_thai(raw),
-            }
-        )
-    df = pd.DataFrame(rows)
-    if df.empty:
-        return df
-    disp = df.copy()
-    disp["Tổng TW"] = disp["Tổng TW"].map(fmt_tien)
-    disp["Tổng ĐP"] = disp["Tổng ĐP"].map(fmt_tien)
-    return disp
-
-
 def _bang_chi_tiet_pgd(slug: str, nam: int, thang: str, dot: str) -> pd.DataFrame:
     raw = db.doc_kv(khtd_service.kv_key_dot(slug, nam, thang, dot))
     if not raw or not raw.get("du_lieu"):
@@ -520,20 +399,6 @@ def _bang_chi_tiet_pgd(slug: str, nam: int, thang: str, dot: str) -> pd.DataFram
         drop_c = ["ĐC TW", "ĐC ĐP", "Lý do"]
         disp = disp.drop(columns=[c for c in drop_c if c in disp.columns])
     return disp
-
-
-def _tat_ca_da_nhap_giao(
-    nam: int, thang: str, dot: str, slugs: list[str]
-) -> bool:
-    for s in slugs:
-        raw = db.doc_kv(khtd_service.kv_key_dot(s, nam, thang, dot))
-        if (
-            not raw
-            or raw.get("loai") != LOAI_GIAO
-            or not raw.get("du_lieu")
-        ):
-            return False
-    return True
 
 
 def _section_a(

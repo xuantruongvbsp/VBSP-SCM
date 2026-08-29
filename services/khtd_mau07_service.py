@@ -3,7 +3,7 @@
 Chứa các hàm thuần logic/xuất Word không phụ thuộc streamlit:
   - Slug/key helpers
   - KV-store read/write helpers
-  - Business logic: lay_so_goc_cho_ap, _sync_khtd_xa, _lay_ds_ma_key_co_du_lieu
+  - Business logic: lay_so_goc_cho_ap, _lay_ds_ma_key_co_du_lieu
   - DataFrame helpers: _build_table_data, _extract_data_from_edited_df, _update_total_row
   - Word export helpers + xuat_mau07_word
 """
@@ -190,20 +190,6 @@ def lay_so_goc_cho_ap(ten_ap: str, ma_key: str, du_no_baseline: dict, lich_su: l
         return du_no_baseline.get(composite, 0.0)
     lan_truoc_data = lich_su[-1].get("data", {})
     return lan_truoc_data.get(composite, du_no_baseline.get(composite, 0.0))
-
-
-def _sync_khtd_xa(xa: str, data_dict: dict, username: str) -> None:
-    """Sum theo xã × ma_key → ghi vào khtd_xa để các tab khác không bị break."""
-    kv_xa = _doc_kv_dict("khtd_xa")
-    tong: dict = {}
-    for composite, gia_tri in data_dict.items():
-        parts = composite.split("|", 1)
-        if len(parts) == 2:
-            mk = parts[1]
-            k = f"{xa}|{mk}"
-            tong[k] = round(tong.get(k, 0.0) + float(gia_tri), 1)
-    kv_xa.update(tong)
-    _luu_kv("khtd_xa", kv_xa, username)
 
 
 def _lay_ds_ma_key_co_du_lieu(

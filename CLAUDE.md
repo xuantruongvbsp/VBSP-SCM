@@ -289,7 +289,7 @@ if co_quyen_upload_pgd(role): # admin_pgd, manager_pgd
 from config import DON_VI_CHI_NHANH, TEN_CHI_NHANH_HIEN_THI
 
 DON_VI_CHI_NHANH       = "Hội sở Chi nhánh tỉnh"             # dùng để LỌC df
-TEN_CHI_NHANH_HIEN_THI = "Chi nhánh NHCSXH tỉnh Đồng Nai"   # dùng để HIỂN THỊ UI
+TEN_CHI_NHANH_HIEN_THI = "Chi nhánh Ngân hàng Chính sách xã hội thành phố Đồng Nai"   # dùng để HIỂN THỊ UI
 
 # KHÔNG hardcode "PGD Biên Hòa" để lọc df — dùng DON_VI_CHI_NHANH
 ```

@@ -16,6 +16,7 @@ except ImportError:
 from config import COT_SO_KU, COT_MA_KH, COT_TEN_KH, COT_TEN_PGD, COT_TEN_CT
 from config import COT_TONG_DU_NO, COT_DU_NO_TH, COT_DU_NO_QH
 from config import COT_NGAY_VAY, COT_NGAY_DH, COT_THOI_HAN, COT_MUC_VAY
+from config import TEN_CHI_NHANH_HIEN_THI
 
 # ── Styles ───────────────────────────────────────────────────────────────────
 FONT_TITLE   = Font(name="Times New Roman", size=18, bold=True, color="2E75B6")
@@ -103,7 +104,7 @@ def _build_cover_sheet(wb: Workbook, title: str, subtitle: str = "",
     cell.alignment = ALIGN_CENTER
 
     row += 1
-    cell = ws.cell(row=row, column=2, value="CHI NHÁNH TỈNH")
+    cell = ws.cell(row=row, column=2, value=TEN_CHI_NHANH_HIEN_THI.upper())
     cell.font = FONT_NORMAL
     cell.alignment = ALIGN_CENTER
 

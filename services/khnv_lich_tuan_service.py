@@ -11,6 +11,7 @@ from datetime import date, timedelta
 from io import BytesIO
 
 from logger import get_logger
+from config import TEN_CHI_NHANH_HIEN_THI
 
 logger = get_logger(__name__)
 
@@ -278,7 +279,7 @@ def xuat_lich_bang_tuan(
 
     p_t2 = doc.add_paragraph()
     p_t2.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    _run(p_t2.add_run("CỦA PHÒNG KẾ HOẠCH - NGHIỆP VỤ TÍN DỤNG TỈNH ĐỒNG NAI"), bold=True, size=12)
+    _run(p_t2.add_run("CỦA PHÒNG KẾ HOẠCH - NGHIỆP VỤ TÍN DỤNG THÀNH PHỐ ĐỒNG NAI"), bold=True, size=12)
 
     p_t3 = doc.add_paragraph()
     p_t3.alignment = WD_ALIGN_PARAGRAPH.CENTER
@@ -501,7 +502,7 @@ def xuat_lich_lam_viec_tuan(
     _no_border(hdr)
     cell_l = hdr.rows[0].cells[0]
     for txt, bold in [("NGÂN HÀNG CHÍNH SÁCH XÃ HỘI", True),
-                       ("CHI NHÁNH TỈNH ĐỒNG NAI", True),
+                       (TEN_CHI_NHANH_HIEN_THI.upper(), True),
                        ("Phòng KHNVTD", False),
                        ("──────────────", False)]:
         p = cell_l.add_paragraph()

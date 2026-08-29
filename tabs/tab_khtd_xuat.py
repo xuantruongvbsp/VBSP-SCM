@@ -1010,7 +1010,7 @@ def xuat_to_trinh_bgd_word(username: str = "unknown") -> bytes:
        WD_ALIGN_PARAGRAPH.CENTER, False, 11)
     _p(f"(Tính đến ngày {ngay_sl})", WD_ALIGN_PARAGRAPH.CENTER, False, 10, GRAY, 8)
 
-    _p("Kính gửi: Ban Giám đốc Chi nhánh NHCSXH tỉnh Đồng Nai",
+    _p(f"Kính gửi: Ban Giám đốc {TEN_CHI_NHANH_HIEN_THI}",
        WD_ALIGN_PARAGRAPH.LEFT, False, 11, space_after=6)
 
     _p(

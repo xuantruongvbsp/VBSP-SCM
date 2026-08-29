@@ -29,12 +29,13 @@ def render_quick_export_buttons(
     show_excel: bool = True,
     show_pdf: bool = True,
     pdf_func = None,
+    df_excel: pd.DataFrame | None = None,
 ) -> None:
     """
     Hiển thị nút xuất nhanh ngay trên bảng.
     
     Args:
-        df: DataFrame cần xuất
+        df: DataFrame dùng cho PDF (thô, tự format trong pdf_func)
         sheet_name: Tên sheet
         tieu_de: Tiêu đề báo cáo
         username: Username
@@ -44,6 +45,7 @@ def render_quick_export_buttons(
         show_excel: Hiển thị nút Excel
         show_pdf: Hiển thị nút PDF
         pdf_func: Hàm tạo PDF (optional)
+        df_excel: DataFrame riêng cho Excel (đã format), mặc định dùng df
     """
     ctx = container if container is not None else st
     state = SCMStateManager()
@@ -52,6 +54,8 @@ def render_quick_export_buttons(
         ctx.caption("📭 Không có dữ liệu để xuất")
         return
     
+    df_export = df_excel if df_excel is not None else df
+    
     # Row chứa các nút export
     cols = ctx.columns([1, 1, 3])  # Excel, PDF, spacer
     
@@ -59,7 +63,7 @@ def render_quick_export_buttons(
     if show_excel:
         with cols[0]:
             if st.button("📊 Excel", key=f"qexp_xl_{key}", type="secondary", use_container_width=True):
-                xl_bytes = xuat_excel({sheet_name: df})
+                xl_bytes = xuat_excel({sheet_name: df_export})
                 state_key = f"qexp_xl_{key}_data"
                 state.downloads.set(
                     state_key,

@@ -34,7 +34,7 @@ except ImportError:
 from config import (
     COT_TEN_PGD, COT_TONG_DU_NO, COT_DU_NO_QH, COT_DU_NO_KHOANH,
     COT_MA_KH, COT_LAI_TON, COT_TEN_CT,
-    DON_VI_CHI_NHANH, DS_PGD,
+    DON_VI_CHI_NHANH, DS_PGD, TEN_CHI_NHANH_HIEN_THI,
 )
 from utils import fmt, fmt_so, vn
 from logger import get_logger
@@ -197,7 +197,7 @@ def _ve_header(story: list, thang: int, nam: int, username: str, usable_w: float
 
     bank_text = (
         "NGÂN HÀNG CHÍNH SÁCH XÃ HỘI<br/>"
-        "CHI NHÁNH TỈNH ĐỒNG NAI"
+        f"{TEN_CHI_NHANH_HIEN_THI.upper()}"
     )
     if logo_path:
         try:

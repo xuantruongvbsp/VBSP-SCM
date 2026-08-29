@@ -27,7 +27,7 @@ from config import (
     COT_TEN_PGD, COT_TEN_XA, COT_TEN_CT, COT_TEN_KH,
     COT_SO_KU, COT_MA_KH, COT_TONG_DU_NO, COT_DU_NO_QH, COT_DU_NO_TH,
     COT_DU_NO_KHOANH, COT_LAI_TON, COT_NGAY_DH, COT_NGUON_VON,
-    DS_PGD, COT_TEN_TO,
+    DS_PGD, COT_TEN_TO, TEN_CHI_NHANH_HIEN_THI,
 )
 from data.pgd import pgd_slug
 from utils import fmt_ty, fmt_so
@@ -313,7 +313,7 @@ def _build_bia_sheet(wb: Workbook):
     ws.cell(row=3, column=1).alignment = Alignment(horizontal="center")
 
     ws.merge_cells("A5:E5")
-    ws.cell(row=5, column=1, value="NHCSXH Chi nhánh Đồng Nai").font = Font(bold=True, size=12)
+    ws.cell(row=5, column=1, value=TEN_CHI_NHANH_HIEN_THI).font = Font(bold=True, size=12)
     ws.cell(row=5, column=1).alignment = Alignment(horizontal="center")
 
     ws.merge_cells("A7:E7")

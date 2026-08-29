@@ -35,6 +35,7 @@ from config import (
     COT_TINH_TRANG,
     DS_PGD,
     PGD_DATA_DIR,
+    TEN_CHI_NHANH_HIEN_THI,
 )
 from logger import get_logger
 from utils import fmt_ty, fmt_ngay, hien_thi_dataframe_phan_trang, xuat_excel, ten_file_xuat
@@ -997,7 +998,7 @@ def xuat_word_bien_ban_ktnb(dot_id: int) -> bytes | None:
 
     p_cn = doc.add_paragraph()
     p_cn.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    run = p_cn.add_run("CHI NHÁNH TỈNH ĐỒNG NAI")
+    run = p_cn.add_run(TEN_CHI_NHANH_HIEN_THI.upper())
     run.bold = True
     run.font.size = Pt(13)
 

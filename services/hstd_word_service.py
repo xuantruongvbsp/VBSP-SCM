@@ -19,7 +19,7 @@ import streamlit as st
 
 from config import (
     COT_TEN_PGD, COT_MA_KH, COT_TONG_DU_NO, COT_DU_NO_QH, COT_DU_NO_KHOANH,
-    COT_LAI_TON, COT_TEN_CT, DS_PGD, DON_VI_CHI_NHANH,
+    COT_LAI_TON, COT_TEN_CT, DS_PGD, DON_VI_CHI_NHANH, TEN_CHI_NHANH_HIEN_THI,
 )
 from utils import fmt, fmt_so
 from logger import get_logger
@@ -176,7 +176,7 @@ def _ve_trang_bia(doc: Document, thang: int, nam: int, username: str):
     _p(doc, "", size=14, space_after=10)
     _p(doc, "NGÂN HÀNG CHÍNH SÁCH XÃ HỘI VIỆT NAM", bold=True, size=13,
        align=WD_ALIGN_PARAGRAPH.CENTER, space_after=2)
-    _p(doc, "CHI NHÁNH TỈNH ĐỒNG NAI", bold=True, size=13,
+    _p(doc, TEN_CHI_NHANH_HIEN_THI.upper(), bold=True, size=13,
        align=WD_ALIGN_PARAGRAPH.CENTER, space_after=6)
 
     _p(doc, "—" * 50, size=9, align=WD_ALIGN_PARAGRAPH.CENTER,

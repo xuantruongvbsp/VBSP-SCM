@@ -93,7 +93,7 @@ rem ============================================================================
 echo.
 echo ============================================
 echo   VBSP-SCM - He thong Tin dung Noi Bo
-echo   NHCSXH Chi nhanh Dong Nai
+echo   Chi nhanh Ngan hang Chinh sach xa hoi thanh pho Dong Nai
 echo ============================================
 echo.
 

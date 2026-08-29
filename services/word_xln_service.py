@@ -13,6 +13,7 @@ from docx.oxml.ns import qn
 from docx.shared import Cm, Pt
 
 from utils import fmt
+from config import TEN_CHI_NHANH_HIEN_THI
 from services.rui_ro_aggregation import _tong_hop_no
 
 
@@ -637,7 +638,7 @@ def _tao_word_04xln(
     r0r = p0r.add_run("Mẫu số: 04/XLN")
     r0r.italic = True
 
-    hdr.rows[1].cells[0].paragraphs[0].add_run("Chi nhánh NHCSXH tỉnh Đồng Nai")
+    hdr.rows[1].cells[0].paragraphs[0].add_run(TEN_CHI_NHANH_HIEN_THI)
     p1r = hdr.rows[1].cells[1].paragraphs[0]
     p1r.alignment = WD_ALIGN_PARAGRAPH.RIGHT
     r1r = p1r.add_run("PGD gửi tỉnh, tỉnh tổng hợp gửi TW")
@@ -839,7 +840,7 @@ def _tao_word_05xln(
     r0r = p0r.add_run("Mẫu số: 05/XLN")
     r0r.italic = True
 
-    hdr.rows[1].cells[0].paragraphs[0].add_run("Chi nhánh NHCSXH tỉnh Đồng Nai")
+    hdr.rows[1].cells[0].paragraphs[0].add_run(TEN_CHI_NHANH_HIEN_THI)
     p1r = hdr.rows[1].cells[1].paragraphs[0]
     p1r.alignment = WD_ALIGN_PARAGRAPH.RIGHT
     r1r = p1r.add_run("PGD gửi tỉnh, tỉnh tổng hợp gửi TW")
@@ -1024,7 +1025,7 @@ def _tao_word_to_trinh_pgd(
 
     p_l = cell_l.paragraphs[0]
     p_l.alignment = WD_ALIGN_PARAGRAPH.LEFT
-    _set_run(p_l, "CHI NHÁNH NHCSXH TỈNH ĐỒNG NAI", bold=True)
+    _set_run(p_l, TEN_CHI_NHANH_HIEN_THI.upper(), bold=True)
     p_l2 = cell_l.add_paragraph()
     _set_run(p_l2, ten_pgd_line, bold=True)
     p_l3 = cell_l.add_paragraph()
@@ -1049,7 +1050,7 @@ def _tao_word_to_trinh_pgd(
     doc.add_paragraph(f"Nguồn vốn: {nguon_label}").alignment = WD_ALIGN_PARAGRAPH.CENTER
 
     doc.add_paragraph()
-    doc.add_paragraph("Kính gửi: Giám đốc Chi nhánh Ngân hàng Chính sách xã hội tỉnh Đồng Nai")
+    doc.add_paragraph("Kính gửi: Giám đốc Chi nhánh Ngân hàng Chính sách xã hội thành phố Đồng Nai")
 
     for line in [
         "Thực hiện Quyết định số 62/QĐ-HĐQT ngày 27/9/2021 của Chủ tịch Hội đồng",
@@ -1064,7 +1065,7 @@ def _tao_word_to_trinh_pgd(
         "Điều 7 Quyết định số 62/QĐ-HĐQT tổ chức kiểm tra thực tế, kiểm tra điều",
         "kiện, tính đầy đủ, chính xác, hợp pháp, hợp lệ của toàn bộ khoản nợ đề nghị",
         f"xử lý rủi ro đợt {dot} năm {nam}. Phòng giao dịch NHCSXH {ten_pgd_plain} báo cáo",
-        "và trình Giám đốc Chi nhánh NHCSXH tỉnh Đồng Nai các nội dung như sau:",
+        f"và trình Giám đốc {TEN_CHI_NHANH_HIEN_THI} các nội dung như sau:",
     ]:
         if line:
             doc.add_paragraph(line)
@@ -1134,8 +1135,8 @@ def _tao_word_to_trinh_pgd(
 
     doc.add_paragraph()
     doc.add_paragraph(
-        f"Phòng giao dịch NHCSXH {ten_pgd_plain} kính trình Giám đốc chi nhánh NHCSXH tỉnh"
-        " Đồng Nai trình cấp có thẩm quyền xem xét, quyết định./."
+        f"Phòng giao dịch NHCSXH {ten_pgd_plain} kính trình Giám đốc {TEN_CHI_NHANH_HIEN_THI} "
+        "trình cấp có thẩm quyền xem xét, quyết định./."
     )
 
     doc.add_paragraph()
@@ -1197,7 +1198,7 @@ def _tao_word_to_trinh_cn(
     p_l.alignment = WD_ALIGN_PARAGRAPH.LEFT
     _set_run(p_l, "NGÂN HÀNG CHÍNH SÁCH XÃ HỘI", bold=True)
     p_l2 = cell_l.add_paragraph()
-    _set_run(p_l2, f"CHI NHÁNH TỈNH {ten_tinh.upper()}", bold=True)
+    _set_run(p_l2, TEN_CHI_NHANH_HIEN_THI.upper(), bold=True)
     p_l3 = cell_l.add_paragraph()
     _set_run(p_l3, "Số: .../TTr-NHCS", bold=False)
 
@@ -1229,9 +1230,9 @@ def _tao_word_to_trinh_cn(
         "đồng quản trị NHCSXH.",
         "",
         "Căn cứ tình hình nợ bị rủi ro tại chi nhánh; Sau khi nhận được hồ sơ",
-        "đề nghị xử lý rủi ro của khách hàng, chi nhánh NHCSXH tỉnh đã tổ chức",
+        "đề nghị xử lý rủi ro của khách hàng, chi nhánh đã tổ chức",
         "kiểm tra thực tế khách hàng, kiểm tra hồ sơ của toàn bộ khoản nợ... "
-        f"Chi nhánh NHCSXH tỉnh {ten_tinh} kính trình Tổng Giám đốc các nội dung như sau:",
+        f"{TEN_CHI_NHANH_HIEN_THI} kính trình Tổng Giám đốc các nội dung như sau:",
     ]:
         if line:
             doc.add_paragraph(line)
@@ -1300,7 +1301,7 @@ def _tao_word_to_trinh_cn(
 
     doc.add_paragraph()
     doc.add_paragraph(
-        f"Chi nhánh NHCSXH tỉnh {ten_tinh} kính trình Tổng Giám đốc trình cấp có thẩm quyền"
+        f"{TEN_CHI_NHANH_HIEN_THI} kính trình Tổng Giám đốc trình cấp có thẩm quyền"
         " xem xét, quyết định./."
     )
 

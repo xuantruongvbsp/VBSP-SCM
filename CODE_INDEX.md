@@ -37,8 +37,8 @@
 | `data/pgd.py` | `pgd_slug()`, `thu_muc_pgd()`, `duong_dan_pgd()`, `kiem_tra_file_ton_tai_pgd()`, `duong_dan_hstd_hien_hanh()` |
 | `data/khtd.py` | `doc_khtd()`, `luu_khtd()`, `doc_kehoach()`, `luu_kehoach()`, `doc_cbtd()` |
 | `data/den_han.py` | `tinh_den_han_df()`, `loc_den_han_trong()`, `tong_hop_den_han()`, `canh_bao_tap_trung()` |
-| `data/giao_ban.py` | `loc_theo_xa()`, `tinh_so_lieu_van_xuoi()`, `tao_bang_dvut()`, `tao_bang_chuong_trinh()`, `tao_bang_ke_hoach()` |
-| `data/phan_ky_nxh.py` | `luu_phan_ky_nxh()`, `doc_phan_ky_nxh()` |
+| `data/giao_ban.py` | `loc_theo_xa()`, `loc_baseline_cung_xa_pgd()`, `tinh_so_lieu_van_xuoi()`, `tao_bang_dvut()`, `tao_bang_chuong_trinh()` |
+| `data/phan_ky_nxh.py` | `luu_phan_ky_nxh()`, `doc_phan_ky_nxh()`, `lay_ngay_du_lieu_phan_ky_nxh()` |
 
 ---
 
@@ -62,7 +62,6 @@
 | `services/cbtd_dia_ban_service.py` | Hàm xử lý dữ liệu (không có st.*) phục vụ Dashboard CBTD & Địa bàn. | `lay_to_theo_cbtd()`, `canh_bao_cbtd_dia_ban()`, `tom_tat_kpi()` |
 | `services/cdtotkvv_service.py` | Các hàm xử lý dữ liệu thuần (không có st.*) cho tab Chấm điểm Tổ TK&VV. | `tong_hop_tu_pgd_data()`, `bang_trang_thai_cdtotkvv()`, `loc_df()`, `cdtotkvv_ten_sheet_excel()`, `fmt_xuat_to_khong_dat_vn()` |
 | `services/ct_discovery.py` | Quét 3 file hàng ngày → cập nhật registry chương trình theo PGD. | `doc_ct_registry()`, `ghi_ct_registry()`, `quet_va_ghi_chuong_trinh()`, `doc_ket_qua_quet_cuoi()` |
-| `services/daily_report_service.py` | Báo cáo định kỳ — tự tạo Excel tóm tắt mỗi sáng, lưu vào cache/reports/. | `ten_file_ngay()`, `lay_bao_cao_sang_hom_nay()`, `lay_ds_bao_cao()`, `tao_bao_cao_sang()` |
 | `services/data_priority.py` | Hiển thị trạng thái dữ liệu PGD — chỉ dùng cho widget sidebar/status, không quyế | `kiem_tra_nguon_uu_tien()` |
 | `services/data_priority_service.py` | Dịch vụ Trạng thái Dữ liệu - VBSP SCM | `kiem_tra_nguon_uu_tien()`, `bao_cao_trang_thai_nguon()`, `cap_nhat_nguon_uu_tien()`, `lay_bao_cao_nguon()`, `render_widget_trang_thai()` |
 | `services/data_quality.py` | Lớp chuẩn hóa và kiểm soát chất lượng dữ liệu tập trung. | `chuan_hoa_ten_cot()`, `kiem_tra_du_no_am()`, `kiem_tra_so_tien_giai_ngan()`, `kiem_tra_ma_don_vi_hop_le()`, `chuan_hoa_ma_don_vi()` |
@@ -93,9 +92,9 @@
 | `services/report_submission_service.py` | report_submission_service.py — Service lõi cho luồng PGD nộp báo cáo về Chi nhán | `chuan_hoa_ten_pgd()`, `lay_loi_doc_gsheet_gan_nhat()`, `kiem_tra_ket_noi_gsheet()`, `doc_du_lieu_gsheet()`, `doc_deadline_config()` |
 | `services/so_sanh_ky_service.py` | Các hàm xử lý dữ liệu thuần (không có st.*) cho tab So sánh kỳ. | `agg_mot_pgd()`, `agg_theo_pgd()`, `agg_theo_dvut()`, `group_bien_dong()`, `delta_str()` |
 | `services/telegram_delta.py` | So sánh snapshot Telegram đầu ngày với dữ liệu hiện tại, không có I/O. | `diff_deadline()`, `diff_progress()`, `diff_due_loans()` |
-| `services/telegram_jobs.py` | Registry các job Telegram có thể chạy thủ công hoặc theo lịch. | `telegram_job_keys()`, `run_telegram_job()` |
+| `services/telegram_jobs.py` | Registry các job Telegram có thể chạy thủ công hoặc theo lịch. | `telegram_job_keys()`, `telegram_job_dedupe_key()`, `run_telegram_job()` |
 | `services/telegram_schedule_service.py` | Rule engine cho Telegram scheduler, lưu cấu hình và runlog bằng kv_store. | `default_schedule_config()`, `doc_schedule_config()`, `normalize_rule()`, `validate_schedule_config()`, `luu_schedule_config()` |
-| `services/telegram_service.py` | Gửi thông báo Telegram 1 chiều cho VBSP-SCM (push notification). | `luu_config()`, `luu_extra_chat()`, `doc_deadline_bc_allowlist()`, `luu_deadline_bc_allowlist()`, `lay_loi_gui_gan_nhat()` |
+| `services/telegram_service.py` | Gửi thông báo Telegram 1 chiều cho VBSP-SCM (push notification). | `luu_config()`, `luu_extra_chat()`, `luu_group_chat()`, `doc_deadline_bc_allowlist()`, `luu_deadline_bc_allowlist()` |
 | `services/template_detection_service.py` | Tự động phát hiện cấu trúc cột từ file Excel/CSV mẫu để tạo template. | `phat_hien_cau_truc()` |
 | `services/template_manager.py` | CRUD template cấu hình Google Sheet → kv_store. | `doc_ds_template()`, `doc_template()`, `luu_template()`, `xoa_template()`, `ten_da_ton_tai()` |
 | `services/template_service.py` | Template-based document generation cho VBSP-SCM. | `co_template()`, `dien_template()`, `docx_to_pdf()`, `docx_bytes_to_pdf()`, `nut_tai_word_va_pdf()` |
@@ -106,6 +105,7 @@
 | `services/upload_service.py` | Dịch vụ xử lý upload file tập trung (Upload Service). | `duong_dan_pgd()`, `danh_gia_chat_luong_file_upload()`, `kiem_tra_file()`, `kiem_tra_file_he_thong()`, `luu_file_he_thong()` |
 | `services/uy_thac_pdf_service.py` | Tạo PDF báo cáo số liệu và báo cáo điều hành Ủy thác bằng ReportLab. | `tao_pdf_bao_cao_dang_xem()`, `tao_pdf_dieu_hanh_uy_thac()` |
 | `services/uy_thac_service.py` | — | `tong_quan_uy_thac()`, `danh_sach_to_co_lai_ton()`, `danh_sach_to_da_hoi()`, `tong_quan_dieu_hanh_uy_thac()`, `tong_hop_uy_thac_theo()` |
+| `services/validation_schema.py` | Schema validation tập trung — single source of truth cho mọi quy tắc kiểm tra dữ | `get_schema()` |
 | `services/validation_service.py` | Service validation dữ liệu đa tầng cho hệ thống VBSP-SCM | `validate_hstd_cross_pgd_duplicates()`, `validate_dataframe()`, `get_validation_summary()` |
 | `services/xlrr_export_service.py` | Service xuất/nhập Excel cho luồng dữ liệu PGD → CN. | `xuat_danh_sach_rui_ro_excel()`, `nhap_danh_sach_rui_ro_excel()`, `merge_du_lieu_pgd_vao_cn()`, `tong_hop_theo_bien_phap()` |
 
@@ -177,7 +177,6 @@
 | `tabs/tab_quan_ly_dgd.py` | Tab quản lý Điểm Giao Dịch (dgd_map) — Phân hệ ws_management. | `render()` |
 | `tabs/tab_quan_ly_ndt_dp.py` | Quản lý Mã Nhà đầu tư Địa phương — dành cho Admin/Manager CN. | `render()` |
 | `tabs/tab_security.py` | Tab Quản lý Bảo mật — IP Whitelist, 2FA, Session Management | `render()` |
-| `tabs/tab_so_sanh_ky.py` | So sánh số liệu giữa 2 kỳ — router chọn loại so sánh. | `render()` |
 | `tabs/tab_so_sanh_suc_khoe_pgd.py` | So sánh tăng trưởng & sức khỏe tín dụng giữa 22 PGD — stacked bar, scatter, bar  | `render()` |
 | `tabs/tab_stress_test.py` | Stress test danh mục tín dụng — mô phỏng kịch bản rủi ro. | `render()` |
 | `tabs/tab_telegram_admin.py` | Quản trị Telegram Bot — cấu hình, bật/tắt, lịch gửi, thao tác thủ công. | `render()` |
@@ -194,7 +193,6 @@
 | `tabs/tab_tracuu_v2.py` | Tab Tra cứu hồ sơ — Phiên bản 2.0. | `render()` |
 | `tabs/tab_trang_chu_pgd.py` | Trang chủ dashboard PGD — KPI cards, truy cập nhanh, cảnh báo, nhiệm vụ. | `render()` |
 | `tabs/tab_trang_thai_nguon.py` | tab_trang_thai_nguon.py | `render()` |
-| `tabs/tab_upload_khnv.py` | Tab Upload KH-NV — Phòng Kế hoạch Nghiệp vụ. | `render()` |
 | `tabs/tab_upload_pgd.py` | Tab Upload Dữ liệu — Hỗ trợ địa bàn (PGD tự upload file của mình). | `render()` |
 | `tabs/tab_uy_thac.py` | Tab Ủy thác — Theo dõi Hội đoàn thể và các mẫu biểu kiểm tra. | `render()` |
 | `tabs/tab_xay_dung_khtd.py` | Xây dựng Kế hoạch Tín dụng tương lai — 3 loại: 1 năm / 3 năm / 5 năm (2026–2030) | `render()` |
@@ -227,3 +225,4 @@
 | `scripts/telegram_polling.py` | telegram_polling.py — Bot 2 chiều: nhận lệnh từ Telegram, trả kết quả. |
 | `scripts/telegram_scheduler.py` | Chạy Telegram rule engine; được Windows Task Scheduler gọi mỗi 5 phút. |
 | `scripts/validate_data.py` | scripts/validate_data.py |
+| `scripts/validate_dependency_lock.py` | Validate that direct requirements and the complete lockfile stay in sync. |

@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import date
 
 import db
+from config import TEN_CHI_NHANH_HIEN_THI
 
 
 def doc_ds(key: str) -> list:
@@ -80,7 +81,7 @@ def _xuat_bc_phan_cong(ds: list, thang: int, nam: int, ten_truong_phong: str = "
     cell_l = hdr.rows[0].cells[0]
     for i, (txt, bold) in enumerate([
         ("NGÂN HÀNG CHÍNH SÁCH XÃ HỘI", True),
-        ("Chi nhánh tỉnh Đồng Nai", False),
+        (TEN_CHI_NHANH_HIEN_THI, False),
         ("Phòng KH-NV", False),
         ("──────────────", False),
         ("Số:      /BC-KHNV", False),
@@ -239,7 +240,7 @@ def _xuat_bc_tien_do(ds: list, thang: int, nam: int, ten_truong_phong: str = "")
     cell_l = hdr.rows[0].cells[0]
     for i, (txt, bold) in enumerate([
         ("NGÂN HÀNG CHÍNH SÁCH XÃ HỘI", True),
-        ("Chi nhánh tỉnh Đồng Nai", False),
+        (TEN_CHI_NHANH_HIEN_THI, False),
         ("Phòng KH-NV", False),
         ("──────────────", False),
         ("Số:      /BC-KHNV", False),

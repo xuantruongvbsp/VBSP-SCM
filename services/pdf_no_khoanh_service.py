@@ -24,6 +24,7 @@ from config import (
     COT_TEN_TO,
     COT_TEN_XA,
     LY_DO_KHOANH_LABEL,
+    TEN_CHI_NHANH_HIEN_THI,
 )
 
 from utils import fmt_so
@@ -199,8 +200,10 @@ def _ve_header_pdf(elements, usable_w: float, tieu_de: str,
                    don_vi_tren: str = "", don_vi_duoi: str = "",
                    co_quoc_hieu: bool = True):
     logo_path = _tim_logo_qlnk()
-    bank_html = ("NGÂN HÀNG CHÍNH SÁCH XÃ HỘI VIỆT NAM<br/>"
-                 "<font size='10'>Chi nhánh tỉnh Đồng Nai</font>")
+    bank_html = (
+        "NGÂN HÀNG CHÍNH SÁCH XÃ HỘI VIỆT NAM<br/>"
+        f"<font size='10'>{TEN_CHI_NHANH_HIEN_THI}</font>"
+    )
 
     left_html = ""
     if don_vi_tren:
@@ -715,7 +718,7 @@ def _xuat_pdf_bb_kt_cv368(noi_dung: dict) -> bytes:
     _sR = ParagraphStyle("bbR", fontName=_FN, fontSize=10, leading=14, alignment=TA_RIGHT)
     left_html = (
         "NGÂN HÀNG CHÍNH SÁCH XÃ HỘI<br/>"
-        "Chi nhánh tỉnh Đồng Nai<br/>"
+        f"{TEN_CHI_NHANH_HIEN_THI}<br/>"
         f"<b>Phòng giao dịch {pgd}</b><br/>"
         "─────────────────────"
     )
@@ -831,7 +834,7 @@ def _xuat_pdf_mau_03qlnk(
     hdr_tbl = Table(
         [[
             Paragraph(
-                f"CHI NHÁNH TỈNH ĐỒNG NAI<br/>"
+                f"{TEN_CHI_NHANH_HIEN_THI.upper()}<br/>"
                 f"PHÒNG GIAO DỊCH {(ten_pgd or '').upper()}",
                 _sB,
             ),
@@ -1077,7 +1080,7 @@ def _xuat_pdf_qlnk_06(ds_ket_qua: list, ten_pgd: str = "",
 
     _ve_header_pdf(elements, usable_w,
                    tieu_de="BÁO CÁO KẾT QUẢ KIỂM TRA NỢ KHOANH",
-                   don_vi_tren="CHI NHÁNH NHCSXH TỈNH ĐỒNG NAI",
+                   don_vi_tren=TEN_CHI_NHANH_HIEN_THI.upper(),
                    don_vi_duoi=f"PHÒNG GIAO DỊCH {(ten_pgd or '').upper()}")
     elements.append(Paragraph(
         "<font size='7'><i>QLNK_06</i></font>",
@@ -1182,7 +1185,7 @@ def _xuat_pdf_m10(ds_luu_tam: list, ten_pgd: str = "") -> bytes:
 
     _ve_header_pdf(elements, usable_w,
                    tieu_de="DANH SÁCH MÓN VAY CHƯA NHẬP KẾT QUẢ KIỂM TRA",
-                   don_vi_tren="CHI NHÁNH NHCSXH TỈNH ĐỒNG NAI",
+                   don_vi_tren=TEN_CHI_NHANH_HIEN_THI.upper(),
                    don_vi_duoi=f"PHÒNG GIAO DỊCH {(ten_pgd or '').upper()}")
     elements.append(Paragraph(
         "<font size='8'><i>M10_QLNK</i></font>",
@@ -1304,7 +1307,7 @@ def _xuat_pdf_ke_hoach_kt(
     _sR  = ParagraphStyle("khR",  fontName=_FN, fontSize=10, leading=14, alignment=TA_RIGHT)
     left_html = (
         f"NGÂN HÀNG CHÍNH SÁCH XÃ HỘI<br/>"
-        f"Chi nhánh tỉnh Đồng Nai<br/>"
+        f"{TEN_CHI_NHANH_HIEN_THI}<br/>"
         f"<b>Phòng giao dịch {ten_pgd}</b><br/>"
         f"─────────────────────<br/>"
         f"Số: ......./KH-PGD"

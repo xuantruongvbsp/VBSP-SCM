@@ -41,7 +41,7 @@ ten_file: "MAU_LICH LAM VIEC TUAN KH-NV.docx"
 - Các nội dung công việc khác theo chỉ đạo của BGĐ CN tỉnh.
 
 NGÂN HÀNG CHÍNH SÁCH XÃ HỘI  
-CHI NHÁNH TỈNH ĐỒNG NAI
+CHI NHÁNH NGÂN HÀNG CHÍNH SÁCH XÃ HỘI THÀNH PHỐ ĐỒNG NAI
 
 Phòng KHNVTD | CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM  
 Độc lập - Tự do - Hạnh phúc

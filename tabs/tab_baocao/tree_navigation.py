@@ -23,6 +23,7 @@ REPORT_TREE = {
             {"key": "hstd_xa", "label": "🏘️ Theo Xã", "desc": "Tổng hợp theo đơn vị xã"},
             {"key": "hstd_thon", "label": "🏡 Theo Thôn/ấp", "desc": "Chi tiết đến cấp thôn"},
             {"key": "hstd_ct", "label": "📌 Theo Chương trình", "desc": "Phân loại theo chương trình vay"},
+            {"key": "hstd_md", "label": "🎯 Theo Mục đích vốn", "desc": "Tổng hợp theo Tên PNKT51"},
             {"key": "hstd_nv", "label": "🏦 Theo Nguồn vốn", "desc": "TW vs Địa phương"},
             {"key": "hstd_dvut", "label": "🤝 Theo ĐVUT", "desc": "Theo hội đoàn thể"},
             {"key": "hstd_cbtd", "label": "👤 Theo CBTD", "desc": "Theo cán bộ tín dụng"},

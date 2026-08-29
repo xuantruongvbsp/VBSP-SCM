@@ -11,6 +11,7 @@ import numpy as np
 
 from logger import get_logger
 from services import xuat_bao_cao
+from config import TEN_CHI_NHANH_HIEN_THI
 
 logger = get_logger(__name__)
 
@@ -548,7 +549,7 @@ def xuat_pdf_bc(sheets: Dict[str, pd.DataFrame], tieu_de: str, nguoi_xuat: str) 
 
         story = []
         story.append(Paragraph("NGÂN HÀNG CHÍNH SÁCH XÃ HỘI VIỆT NAM", s_co_quan))
-        story.append(Paragraph("Chi nhánh tỉnh Đồng Nai", s_co_quan))
+        story.append(Paragraph(TEN_CHI_NHANH_HIEN_THI, s_co_quan))
         story.append(Spacer(1, 0.3*cm))
         story.append(HRFlowable(width="100%", thickness=1, color=report_green))
         story.append(HRFlowable(width="100%", thickness=0.5, color=report_green_mid))

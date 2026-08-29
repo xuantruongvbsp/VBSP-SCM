@@ -15,7 +15,7 @@ set "PIP_VERSION=26.1.2"
 echo.
 echo ============================================================
 echo   VBSP-SCM - Cai dat moi truong 1 lan duy nhat
-echo   He thong Quan tri Tin dung Noi bo NHCSXH CN Dong Nai
+echo   He thong Quan tri Tin dung Noi bo Chi nhanh Ngan hang Chinh sach xa hoi thanh pho Dong Nai
 echo ============================================================
 echo.
 

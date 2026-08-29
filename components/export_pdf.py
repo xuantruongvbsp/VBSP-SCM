@@ -13,6 +13,8 @@ import pandas as pd
 import streamlit as st
 import plotly.graph_objects as go
 
+from config import TEN_CHI_NHANH_HIEN_THI
+
 try:
     from reportlab.lib import colors
     from reportlab.lib.pagesizes import A4, landscape
@@ -172,8 +174,10 @@ def _ve_header(elements: list, tieu_de: str, nguoi_xuat: str, usable_w: float) -
         alignment=TA_CENTER, textColor=VBSP_GREEN, spaceAfter=4, leading=18,
     )
 
-    bank_text = ("<b>NGÂN HÀNG CHÍNH SÁCH XÃ HỘI VIỆT NAM</b><br/>"
-                 "<font size='10'>Chi nhánh tỉnh Đồng Nai</font>")
+    bank_text = (
+        "<b>NGÂN HÀNG CHÍNH SÁCH XÃ HỘI VIỆT NAM</b><br/>"
+        f"<font size='10'>{xml_escape(TEN_CHI_NHANH_HIEN_THI)}</font>"
+    )
 
     if logo_path:
         try:
@@ -275,7 +279,7 @@ def xuat_pdf_co_chart(
         topMargin=margin,
         bottomMargin=2 * cm,
         title=tieu_de,
-        author="VBSP-SCM - NHCSXH Đồng Nai",
+        author=f"VBSP-SCM - {TEN_CHI_NHANH_HIEN_THI}",
     )
 
     fn = FONT_NORMAL
@@ -583,7 +587,7 @@ def xuat_pdf_co_chart(
         canvas.drawString(
             margin,
             0.8 * cm,
-            "NHCSXH Đồng Nai  ·  Báo cáo nội bộ"
+            f"{TEN_CHI_NHANH_HIEN_THI}  ·  Báo cáo nội bộ"
         )
         canvas.setStrokeColor(VBSP_GREEN_MID)
         canvas.setLineWidth(0.8)

@@ -6,7 +6,7 @@
 
 # 1. DỰ ÁN & STACK
 
-Hệ thống Quản trị Tín dụng Nội bộ — NHCSXH Chi nhánh Đồng Nai (đã sáp nhập Bình Phước 2025).
+Hệ thống Quản trị Tín dụng Nội bộ — Chi nhánh Ngân hàng Chính sách xã hội thành phố Đồng Nai (đã sáp nhập Bình Phước 2025).
 
 - **Stack:** Streamlit + Python + SQLite + PyArrow/Parquet
 - **Chạy:** `streamlit run app.py` → http://localhost:8501
@@ -160,7 +160,7 @@ Bảng 9 role đầy đủ:
 from config import DON_VI_CHI_NHANH, TEN_CHI_NHANH_HIEN_THI
 
 DON_VI_CHI_NHANH       = "Hội sở Chi nhánh tỉnh"             # lọc df
-TEN_CHI_NHANH_HIEN_THI = "Chi nhánh NHCSXH tỉnh Đồng Nai"   # hiển thị UI
+TEN_CHI_NHANH_HIEN_THI = "Chi nhánh Ngân hàng Chính sách xã hội thành phố Đồng Nai"   # hiển thị UI
 ```
 
 ---

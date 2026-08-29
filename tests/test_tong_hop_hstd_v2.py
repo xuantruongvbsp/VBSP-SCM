@@ -12,6 +12,7 @@ from config import (
     COT_NGUON_VON,
     COT_SO_KU,
     COT_TEN_CT,
+    COT_TEN_PNKT51,
     COT_TEN_PGD,
     COT_TEN_TO,
     COT_TEN_XA,
@@ -43,6 +44,7 @@ def _df_mau() -> pd.DataFrame:
             COT_DU_NO_TH: [90, 90, 200, 300],
             COT_DU_NO_QH: [10, 10, 0, 0],
             COT_DU_NO_KHOANH: [0, 0, 0, 0],
+            COT_TEN_PNKT51: ["Chăn nuôi bò", "Chăn nuôi bò", "Trồng cây điều", None],
         }
     )
 
@@ -100,6 +102,7 @@ def test_so_sanh_du_no_theo_nhieu_tieu_chi_giu_quy_tac_phan_loai() -> None:
             COT_TEN_PGD: [DON_VI_CHI_NHANH, "PGD A", "PGD B"],
             COT_TEN_XA: ["Vay trực tiếp", "La Ngà", "phường Tân Phú"],
             COT_TEN_CT: ["CT A", "CT A", "CT B"],
+            COT_TEN_PNKT51: ["Chăn nuôi bò", "Trồng cây điều", "Chăn nuôi bò"],
             COT_NGUON_VON: [1, "02", "TW"],
             COT_DVUT: ["Hội A", "Hội B", "Hội A"],
             COT_TEN_TO: ["Tổ 1", "Tổ 2", "Tổ 3"],
@@ -135,6 +138,35 @@ def test_so_sanh_du_no_theo_nhieu_tieu_chi_giu_quy_tac_phan_loai() -> None:
     assert top_result.groupby("Tiêu chí").size().to_dict() == {"Chương trình": 1, "PGD": 1}
     assert top_result["Xếp hạng"].tolist() == [1, 1]
     assert _tao_so_sanh_du_no_theo_tieu_chi(df, tieu_chi_chon=[]).empty
+
+
+def test_tong_hop_theo_muc_dich_von_dung_ten_pnkt51() -> None:
+    df_th, df_group, _ = _tao_tong_hop_theo_nhom(_df_mau(), "md", COT_TEN_PNKT51)
+
+    theo_muc_dich = {
+        row[COT_TEN_PNKT51]: row["Tổng_dư_nợ"]
+        for _, row in df_th.iterrows()
+    }
+
+    assert theo_muc_dich["Chăn nuôi bò"] == 200
+    assert theo_muc_dich["Trồng cây điều"] == 200
+    assert theo_muc_dich[_NHOM_KHONG_XAC_DINH] == 300
+    assert _tinh_tong_cong(df_th, df_group)["tong_dn"] == 700
+
+
+def test_so_sanh_du_no_co_tieu_chi_muc_dich_von() -> None:
+    ds_tieu_chi = tong_hop_hstd_v2._danh_sach_tieu_chi_so_sanh(_df_mau())
+
+    assert ("Mục đích vốn", COT_TEN_PNKT51) in ds_tieu_chi
+
+    result = _tao_so_sanh_du_no_theo_tieu_chi(
+        _df_mau(),
+        tieu_chi_chon=["Mục đích vốn"],
+        top_n=None,
+    )
+
+    assert result["Tiêu chí"].unique().tolist() == ["Mục đích vốn"]
+    assert "Chăn nuôi bò" in result["Nhóm"].tolist()
 
 
 def test_pdf_tong_hop_dung_dong_tong_chuan_va_co_bq_kh(monkeypatch) -> None:
@@ -309,3 +341,108 @@ def test_theme_toan_cuc_co_css_cho_bang_bao_cao() -> None:
     assert ".bct-wrap" in css
     assert ".bct-table thead" in css
     assert ".sticky-table-wrap" in css
+
+
+def test_pdf_tong_hop_md_bo_emoji_giua_tieu_de(monkeypatch) -> None:
+    df_th, df_group, co_khoanh = _tao_tong_hop_theo_nhom(
+        _df_mau(), "md", COT_TEN_PNKT51
+    )
+    tong = _tinh_tong_cong(df_th, df_group)
+    captured: dict[str, object] = {}
+
+    def fake_xuat_pdf(df, *args, **kwargs):
+        captured["title"] = args[0]
+        return b"%PDF-test"
+
+    monkeypatch.setattr(tong_hop_hstd_v2, "xuat_pdf", fake_xuat_pdf)
+
+    tong_hop_hstd_v2._xuat_pdf_tong_hop(
+        df_th,
+        tong,
+        COT_TEN_PNKT51,
+        "Mục đích sử dụng vốn",
+        co_khoanh,
+        "Báo cáo tổng hợp 🎯 Theo Mục đích sử dụng vốn",
+        "tester",
+        "BC_TH_MD",
+    )
+
+    assert "🎯" not in captured["title"]
+    assert "Báo cáo tổng hợp" not in captured["title"]
+    assert captured["title"] == (
+        "BÁO CÁO TỔNG HỢP HSTD — Theo Mục đích sử dụng vốn (triệu đồng)"
+    )
+
+
+def test_canh_bao_muc_dich_von_tren_nguong_5_phan_tram() -> None:
+    df_th, df_group, _ = _tao_tong_hop_theo_nhom(_df_mau(), "md", COT_TEN_PNKT51)
+
+    msg = tong_hop_hstd_v2._thong_diep_muc_dich_chua_xac_dinh(
+        df_th, COT_TEN_PNKT51, df_group
+    )
+
+    assert msg is not None
+    assert _NHOM_KHONG_XAC_DINH in msg
+    assert "42,9%" in msg
+
+
+def test_canh_bao_muc_dich_von_duoi_nguong_tra_ve_none() -> None:
+    df = _df_mau()
+    df.loc[df[COT_TEN_PNKT51].isna(), COT_TONG_DU_NO] = 10
+
+    df_th, df_group, _ = _tao_tong_hop_theo_nhom(df, "md", COT_TEN_PNKT51)
+
+    assert (
+        tong_hop_hstd_v2._thong_diep_muc_dich_chua_xac_dinh(
+            df_th, COT_TEN_PNKT51, df_group
+        )
+        is None
+    )
+
+
+def test_df_xuat_excel_tong_hop_them_dong_tong_va_lam_tron_trieu() -> None:
+    df_hien = pd.DataFrame(
+        {
+            "Chương trình": ["CT A", "CT B"],
+            "Số KH": [1, 2],
+            "Tổng dư nợ": [100.4, 200.6],
+            "Tỷ trọng %": [33.33, 66.67],
+        }
+    )
+    dong_tong = {
+        "Chương trình": "TỔNG CỘNG",
+        "Số KH": 3,
+        "Tổng dư nợ": 301.0,
+        "Tỷ trọng %": 100.0,
+    }
+
+    out = tong_hop_hstd_v2._df_xuat_excel_tong_hop(
+        df_hien, dong_tong, cot_tien=["Tổng dư nợ"]
+    )
+
+    assert out["Tổng dư nợ"].tolist() == [100.0, 201.0, 301.0]
+    assert out.iloc[-1]["Chương trình"] == "TỔNG CỘNG"
+    assert out.iloc[-1]["Số KH"] == 3
+    assert len(out) == 3
+
+
+def test_canh_bao_muc_dich_von_thieu_schema_tra_ve_none() -> None:
+    df_th = pd.DataFrame(
+        {
+            COT_TEN_PNKT51: [_NHOM_KHONG_XAC_DINH],
+            "Tỷ_trọng_%": [100.0],
+        }
+    )
+    df_group = pd.DataFrame(
+        {
+            COT_TEN_PGD: ["PGD A"],
+            COT_TEN_PNKT51: [_NHOM_KHONG_XAC_DINH],
+        }
+    )
+
+    assert (
+        tong_hop_hstd_v2._thong_diep_muc_dich_chua_xac_dinh(
+            df_th, COT_TEN_PNKT51, df_group
+        )
+        is None
+    )

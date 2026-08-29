@@ -19,7 +19,7 @@ from datetime import datetime
 
 from auth import la_phan_he_cn, la_executive
 from utils import xuat_excel
-from config import LOAI_CONG_VIEC, UU_TIEN_CV
+from config import LOAI_CONG_VIEC, UU_TIEN_CV, TEN_CHI_NHANH_HIEN_THI
 from services.upload_service import luu_attachment_nhiem_vu
 
 
@@ -993,7 +993,7 @@ def _xuat_pdf_nhiem_vu(ds_nv: list, chu_ky: str, ky: str) -> bytes:
 
     story = []
     story.append(Paragraph("NGÂN HÀNG CHÍNH SÁCH XÃ HỘI", s_co_quan))
-    story.append(Paragraph("Chi nhánh tỉnh Đồng Nai", s_co_quan))
+    story.append(Paragraph(TEN_CHI_NHANH_HIEN_THI, s_co_quan))
     story.append(Spacer(1, 0.3*cm))
     story.append(HRFlowable(width="100%", thickness=1,
                              color=colors.HexColor("#185FA5")))

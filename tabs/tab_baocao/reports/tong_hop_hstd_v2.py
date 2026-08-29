@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 from config import (
     COT_TEN_PGD, COT_TEN_XA, COT_TEN_THON, COT_TEN_CT,
     COT_NGUON_VON, COT_DVUT, COT_TEN_TO,
-    COT_MA_KH, COT_SO_KU, COT_TONG_DU_NO,
+    COT_MA_KH, COT_SO_KU, COT_TEN_PNKT51, COT_TONG_DU_NO,
     COT_DU_NO_TH, COT_DU_NO_QH, COT_DU_NO_KHOANH,
 )
 from auth import la_phan_he_pgd
@@ -132,6 +132,53 @@ def _tinh_tong_cong(
     }
 
 
+_NGUONG_CANH_BAO_MD_PHAN_TRAM = 5.0
+
+
+def _thong_diep_muc_dich_chua_xac_dinh(
+    df_th: pd.DataFrame,
+    group_col: str,
+    df_group: pd.DataFrame,
+    nguong_phan_tram: float = _NGUONG_CANH_BAO_MD_PHAN_TRAM,
+) -> str | None:
+    """Trả thông điệp cảnh báo khi nhóm Chưa xác định chiếm >= ngưỡng dư nợ, ngược lại None."""
+    required_cols = {group_col, "Tỷ_trọng_%", "Tổng_dư_nợ"}
+    if df_th is None or df_th.empty or not required_cols.issubset(df_th.columns):
+        return None
+    dong_cxd = df_th[df_th[group_col].eq(_NHOM_KHONG_XAC_DINH)]
+    if dong_cxd.empty:
+        return None
+    ty_trong = float(dong_cxd["Tỷ_trọng_%"].sum())
+    if ty_trong < nguong_phan_tram:
+        return None
+    dn_cxd = float(dong_cxd["Tổng_dư_nợ"].sum())
+    msg = (
+        f"⚠️ Nhóm \"{_NHOM_KHONG_XAC_DINH}\" chiếm {ty_trong:.1f}% dư nợ "
+        f"(≈ {dn_cxd / 1e9:.1f} tỷ) — dữ liệu thiếu mục đích sử dụng vốn "
+        "(Tên PNKT51), số liệu theo mục đích vốn ở phạm vi này chưa đầy đủ."
+    ).replace(".", ",")
+    required_group_cols = {COT_TEN_PGD, group_col, COT_TONG_DU_NO}
+    if df_group is not None and required_group_cols.issubset(df_group.columns):
+        cxd = df_group[df_group[group_col].eq(_NHOM_KHONG_XAC_DINH)]
+        if not cxd.empty:
+            cxd = cxd.copy()
+            cxd[COT_TONG_DU_NO] = pd.to_numeric(cxd[COT_TONG_DU_NO], errors="coerce").fillna(0)
+            top_pgd = (
+                cxd.groupby(COT_TEN_PGD)[COT_TONG_DU_NO]
+                .sum()
+                .sort_values(ascending=False)
+                .head(3)
+            )
+            ds = ", ".join(
+                f"{pgd} ({gia_tri / 1e9:.1f} tỷ)".replace(".", ",")
+                for pgd, gia_tri in top_pgd.items()
+                if gia_tri > 0
+            )
+            if ds:
+                msg += f" Thiếu nhiều nhất: {ds}."
+    return msg
+
+
 def _ds_nam_baseline_hstd() -> list[int]:
     """Các năm đã có baseline HSTD 31/12 (giảm dần), quét data/baseline_pgd."""
     from config import BASELINE_PGD_DIR
@@ -209,11 +256,11 @@ def _doc_baseline_cung_pham_vi(
     )
     df_bl = loc_khu_vuc(df_bl, st.session_state.get(f"kv_filter_th_{selected_report}", "all"))
 
-    # Tái áp dụng tìm kiếm nhanh (PGD / Xã / Mã KH)
+    # Tái áp dụng tìm kiếm nhanh (PGD / Xã / Mục đích vốn / Mã KH)
     tu_khoa = str(st.session_state.get(f"quick_search_th_{selected_report}_search", "") or "").strip()
     if tu_khoa:
         mask = pd.Series(False, index=df_bl.index)
-        for cot in (COT_TEN_PGD, COT_TEN_XA, COT_MA_KH):
+        for cot in (COT_TEN_PGD, COT_TEN_XA, COT_TEN_PNKT51, COT_MA_KH):
             if cot in df_bl.columns:
                 mask |= df_bl[cot].astype(str).str.lower().str.contains(
                     tu_khoa.lower(), na=False
@@ -232,6 +279,7 @@ def _danh_sach_tieu_chi_so_sanh(df: pd.DataFrame) -> list[tuple[str, str]]:
         ("PGD", COT_TEN_PGD),
         ("Xã/phường", COT_TEN_XA),
         ("Chương trình", COT_TEN_CT),
+        ("Mục đích vốn", COT_TEN_PNKT51),
         ("Nguồn vốn", COT_NGUON_VON),
         ("ĐVUT", COT_DVUT),
         ("CBTD/Tổ", COT_TEN_TO),
@@ -443,8 +491,11 @@ def _xuat_pdf_tong_hop(
     ]
     dem_cols = ["Số KH", "Số món", "Món QH"]
     phan_tram_cols = ["Tỷ trọng %", "Tỷ lệ QH %"]
-    # Tiêu đề PDF: bỏ emoji đầu nhãn (font TNR không có glyph emoji)
-    nhan = re.sub(r"^\W+\s*", "", str(tieu_de), flags=re.UNICODE).strip() or str(tieu_de)
+    # Tiêu đề PDF: bỏ emoji/ký tự đặc biệt ở MỌI vị trí (font TNR không có glyph emoji)
+    nhan = re.sub(r"\W+", " ", str(tieu_de), flags=re.UNICODE).strip()
+    nhan = re.sub(
+        r"^Báo cáo tổng hợp\s+", "", nhan, flags=re.IGNORECASE
+    ).strip() or str(tieu_de)
     return xuat_pdf(
         df_xuat,
         f"BÁO CÁO TỔNG HỢP HSTD — {nhan} (triệu đồng)",
@@ -460,64 +511,60 @@ def _xuat_pdf_tong_hop(
     )
 
 
-def render_tong_hop_hstd_v2(
-    tab: DeltaGenerator | None = None,
-    df: pd.DataFrame | None = None,
-    role: str = "",
-    pgd_user: str = "",
-    username: str = "",
-    specific_report: str | None = None,
-    **kwargs
-) -> None:
+# Các loại tổng hợp HSTD — thứ tự dict = thứ tự hiển thị khi render nhiều mục
+_REPORT_OPTIONS: dict[str, tuple[str, str]] = {
+    "pgd": ("🏢 Theo PGD", COT_TEN_PGD),
+    "xa": ("🏘️ Theo Xã", COT_TEN_XA),
+    "thon": ("🏡 Theo Thôn/ấp", COT_TEN_THON),
+    "ct": ("📌 Theo Chương trình", COT_TEN_CT),
+    "md": ("🎯 Theo Mục đích sử dụng vốn", COT_TEN_PNKT51),
+    "nv": ("🏦 Theo Nguồn vốn", COT_NGUON_VON),
+    "dvut": ("🤝 Theo ĐVUT", COT_DVUT),
+    "cbtd": ("👤 Theo CBTD/Tổ", COT_TEN_TO),
+    "sosanh": ("⚖️ So sánh dư nợ", COT_TEN_PGD),
+}
+
+
+def _chuan_hoa_trang_thai_chon_nhieu() -> None:
+    """Đảm bảo session state của multiselect là list key hợp lệ.
+
+    Phiên cũ dùng radio lưu chuỗi đơn (vd "pgd"); nếu còn trong session_state
+    thì chuyển sang list để multiselect không crash vì sai kiểu dữ liệu.
     """
-    Render báo cáo tổng hợp từ HSTD với UX nâng cao.
-    
-    Args:
-        tab: Streamlit container
-        df: DataFrame HSTD
-        role: Role người dùng
-        pgd_user: Tên PGD
-        username: Username
-        specific_report: Key của báo cáo cụ thể (pgd, xa, thon, ct, nv, dvut, cbtd)
-    """
-    ctx = tab if tab is not None else st
-    
-    if df is None or df.empty:
-        ctx.warning("⚠️ Chưa có dữ liệu HSTD.")
+    gia_tri = st.session_state.get("th_loai_hstd_v2")
+    if gia_tri is None:
         return
-    
-    # Xác định báo cáo cần render
-    report_options = {
-        "pgd": ("🏢 Theo PGD", COT_TEN_PGD),
-        "xa": ("🏘️ Theo Xã", COT_TEN_XA),
-        "thon": ("🏡 Theo Thôn/ấp", COT_TEN_THON),
-        "ct": ("📌 Theo Chương trình", COT_TEN_CT),
-        "nv": ("🏦 Theo Nguồn vốn", COT_NGUON_VON),
-        "dvut": ("🤝 Theo ĐVUT", COT_DVUT),
-        "cbtd": ("👤 Theo CBTD/Tổ", COT_TEN_TO),
-        "sosanh": ("⚖️ So sánh dư nợ", COT_TEN_PGD),
-    }
-    
+    if isinstance(gia_tri, str):
+        gia_tri = [gia_tri]
+    if not isinstance(gia_tri, (list, tuple)):
+        st.session_state.pop("th_loai_hstd_v2", None)
+        return
+    hop_le = [k for k in gia_tri if k in _REPORT_OPTIONS]
+    st.session_state["th_loai_hstd_v2"] = hop_le or ["pgd"]
+
+
+def _render_mot_loai_tong_hop(
+    ctx: DeltaGenerator,
+    df: pd.DataFrame,
+    selected_report: str,
+    role: str,
+    pgd_user: str,
+    username: str,
+    kem_formula: bool = False,
+) -> None:
+    """Render trọn vẹn MỘT loại tổng hợp HSTD: bộ lọc, cảnh báo, bảng, nút xuất.
+
+    Mỗi loại dùng bộ widget key riêng (th_{selected_report}_*) nên có thể
+    render nhiều loại liên tiếp trong cùng một lần chạy mà không trùng key.
+    """
+    report_label, group_col = _REPORT_OPTIONS[selected_report]
+
     df_filtered = df.copy()
 
     # ── Bảng điều khiển lọc: khối phẳng có viền, gom mọi bộ lọc một chỗ ─────
     with ctx.container(border=True):
-        # Nếu không chỉ định, cho phép chọn loại tổng hợp
-        if specific_report is None or specific_report not in report_options:
-            selected_report = ctx.radio(
-                "Tổng hợp theo",
-                list(report_options.keys()),
-                format_func=lambda k: report_options[k][0],
-                horizontal=True,
-                key="th_loai_hstd_v2",
-            )
-        else:
-            selected_report = specific_report
-
-        report_label, group_col = report_options[selected_report]
-
         # Kiểm tra cột tồn tại
-        if group_col not in df.columns:
+        if group_col not in df_filtered.columns:
             ctx.error(f"❌ Không có cột {group_col} trong dữ liệu.")
             return
 
@@ -535,7 +582,7 @@ def render_tong_hop_hstd_v2(
             )
 
         # Nguồn vốn + Khu vực đặt song song; tham khảo công thức bên phải
-        if specific_report is None or specific_report not in report_options:
+        if kem_formula:
             col_nv, col_kv, col_ref = ctx.columns([1.3, 1.3, 1])
             df_filtered = render_nguon_von_filter(
                 df_filtered, key=f"th_{selected_report}", container=col_nv
@@ -579,7 +626,10 @@ def render_tong_hop_hstd_v2(
         c for c in [COT_TEN_XA, COT_TEN_CT]
         if c in df_filtered.columns and c != group_col
     ]
-    search_cols = [c for c in [COT_TEN_PGD, COT_TEN_XA, COT_MA_KH] if c in df_filtered.columns]
+    search_cols = [
+        c for c in [COT_TEN_PGD, COT_TEN_XA, COT_TEN_PNKT51, COT_MA_KH]
+        if c in df_filtered.columns
+    ]
     
     df_filtered = render_combined_filter_search(
         df_filtered,
@@ -617,6 +667,13 @@ def render_tong_hop_hstd_v2(
             return
         tong_cong = _tinh_tong_cong(df_th, df_group)
 
+        if selected_report == "md":
+            canh_bao_md = _thong_diep_muc_dich_chua_xac_dinh(
+                df_th, group_col, df_group
+            )
+            if canh_bao_md:
+                ctx.warning(canh_bao_md)
+
         # Ghép dư nợ mốc 31/12 năm trước theo nhóm (cùng phạm vi bộ lọc)
         co_moc = False
         cot_moc = cot_tang = None
@@ -639,6 +696,11 @@ def render_tong_hop_hstd_v2(
             co_moc = True
             cot_moc = f"31/12/{nam_bl}"
             cot_tang = "± 31/12"
+        elif df_bl_3112 is not None and nam_bl is not None:
+            ctx.caption(
+                f"ℹ️ Baseline 31/12/{nam_bl} không có cột \"{group_col}\" — "
+                "bỏ qua cột so sánh mốc năm cho loại tổng hợp này."
+            )
 
         # Metrics
         if co_moc:
@@ -668,28 +730,7 @@ def render_tong_hop_hstd_v2(
             if "Theo " in report_label else report_label
         )
 
-        # Quick export
-        render_quick_export_buttons(
-            df_th,
-            f"TongHop_{selected_report}",
-            f"Báo cáo tổng hợp {report_label}",
-            username,
-            f"BC_TH_{selected_report.upper()}",
-            key=f"th_{selected_report}",
-            container=ctx,
-            pdf_func=lambda d, t, u: _xuat_pdf_tong_hop(
-                d, tong_cong, group_col, ten_nhom, co_khoanh, t, u,
-                f"BC_TH_{selected_report.upper()}", nam_bl=nam_bl if co_moc else None,
-            ),
-        )
-        
-        # Bảng chi tiết — HTML theo bảng màu chuẩn UI_GUIDELINES
-        render_header_with_tooltip(
-            "📊 Chi tiết",
-            tooltip_key="Tổng dư nợ",
-            container=ctx,
-        )
-
+        # Dựng bảng hiển thị + dòng tổng (triệu đồng) dùng chung cho HTML, Excel, PDF
         df_hien = pd.DataFrame({
             ten_nhom: df_th[group_col].astype(str),
             "Số KH": df_th["Số_KH"].astype(int),
@@ -732,18 +773,44 @@ def render_tong_hop_hstd_v2(
             dong_tong[cot_moc] = tong_dn_moc / 1_000_000
             dong_tong[cot_tang] = (float(tong_cong["tong_dn"]) - tong_dn_moc) / 1_000_000
 
+        cot_tien_list = [
+            c for c in (
+                "Tổng dư nợ", cot_moc, cot_tang,
+                "Trong hạn", "Quá hạn", "Khoanh", "BQ/KH",
+            )
+            if c and c in df_hien.columns
+        ]
+        df_xuat_excel = _df_xuat_excel_tong_hop(df_hien, dong_tong, cot_tien_list)
+
+        # Quick export
+        render_quick_export_buttons(
+            df_th,
+            f"TongHop_{selected_report}",
+            f"Báo cáo tổng hợp {report_label}",
+            username,
+            f"BC_TH_{selected_report.upper()}",
+            key=f"th_{selected_report}",
+            container=ctx,
+            pdf_func=lambda d, t, u: _xuat_pdf_tong_hop(
+                d, tong_cong, group_col, ten_nhom, co_khoanh, t, u,
+                f"BC_TH_{selected_report.upper()}", nam_bl=nam_bl if co_moc else None,
+            ),
+            df_excel=df_xuat_excel,
+        )
+
+        # Bảng chi tiết — HTML theo bảng màu chuẩn UI_GUIDELINES
+        render_header_with_tooltip(
+            "📊 Chi tiết",
+            tooltip_key="Tổng dư nợ",
+            container=ctx,
+        )
+
         render_bang_chi_tiet_html(
             df_hien,
             key=f"th_chi_tiet_{selected_report}",
             cot_ten=ten_nhom,
             cot_dem=["Số KH", "Số món", "Món QH"],
-            cot_tien=[
-                c for c in (
-                    "Tổng dư nợ", cot_moc, cot_tang,
-                    "Trong hạn", "Quá hạn", "Khoanh", "BQ/KH",
-                )
-                if c and c in df_hien.columns
-            ],
+            cot_tien=cot_tien_list,
             cot_bar="Tỷ trọng %",
             cot_badge="Tỷ lệ QH %",
             nhom_header=[
@@ -760,3 +827,79 @@ def render_tong_hop_hstd_v2(
     except Exception as e:
         logger.error("tong_hop_hstd_v2: lỗi tạo báo cáo — %s", e, exc_info=True)
         ctx.error(f"❌ Lỗi tạo báo cáo: {e}")
+
+
+def _df_xuat_excel_tong_hop(
+    df_hien: pd.DataFrame,
+    dong_tong: dict,
+    cot_tien: list[str],
+) -> pd.DataFrame:
+    """Dựng bảng Excel đồng nhất với bảng hiển thị: triệu đồng, cột sạch, kèm dòng TỔNG CỘNG."""
+    df = df_hien.copy()
+    for cot in cot_tien:
+        if cot in df.columns:
+            df[cot] = pd.to_numeric(df[cot], errors="coerce").round(0)
+    dong = {c: dong_tong.get(c) for c in df.columns}
+    for cot in cot_tien:
+        if cot in dong and pd.notna(dong.get(cot)):
+            dong[cot] = round(float(dong[cot]))
+    df.loc[len(df)] = dong
+    return df
+
+
+def render_tong_hop_hstd_v2(
+    tab: DeltaGenerator | None = None,
+    df: pd.DataFrame | None = None,
+    role: str = "",
+    pgd_user: str = "",
+    username: str = "",
+    specific_report: str | None = None,
+    **kwargs
+) -> None:
+    """
+    Render báo cáo tổng hợp từ HSTD với UX nâng cao.
+
+    Cho phép tick chọn NHIỀU loại tổng hợp cùng lúc (multiselect); mỗi loại
+    được chọn render thành một khối bảng xếp chồng liên tiếp từ trên xuống.
+
+    Args:
+        tab: Streamlit container
+        df: DataFrame HSTD
+        role: Role người dùng
+        pgd_user: Tên PGD
+        username: Username
+        specific_report: Key của báo cáo cụ thể (pgd, xa, thon, ct, nv, dvut,
+            cbtd, sosanh) — nếu truyền vào chỉ render báo cáo đó, ẩn multiselect
+    """
+    ctx = tab if tab is not None else st
+
+    if df is None or df.empty:
+        ctx.warning("⚠️ Chưa có dữ liệu HSTD.")
+        return
+
+    # Deep-link từ nơi khác: render duy nhất loại được chỉ định
+    if specific_report is not None and specific_report in _REPORT_OPTIONS:
+        _render_mot_loai_tong_hop(ctx, df, specific_report, role, pgd_user, username)
+        return
+
+    _chuan_hoa_trang_thai_chon_nhieu()
+    ds_chon = ctx.multiselect(
+        "🧭 Tổng hợp theo — tick chọn nhiều mục để xem cùng lúc",
+        list(_REPORT_OPTIONS.keys()),
+        default=["pgd"],
+        format_func=lambda k: _REPORT_OPTIONS[k][0],
+        key="th_loai_hstd_v2",
+    )
+    if not ds_chon:
+        ctx.info("👆 Vui lòng tick chọn ít nhất một loại tổng hợp để hiển thị báo cáo.")
+        return
+
+    # Giữ thứ tự chuẩn của _REPORT_OPTIONS bất kể thứ tự tick của user
+    ds_chon = [k for k in _REPORT_OPTIONS if k in ds_chon]
+    for vi_tri, selected_report in enumerate(ds_chon):
+        if vi_tri > 0:
+            ctx.divider()
+        _render_mot_loai_tong_hop(
+            ctx, df, selected_report, role, pgd_user, username,
+            kem_formula=(vi_tri == 0),
+        )

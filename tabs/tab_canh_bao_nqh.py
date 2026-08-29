@@ -1398,41 +1398,6 @@ def _render_risk_heatmap(
     )
 
 
-@st.cache_data(show_spinner=False, ttl=300)
-def _doc_snapshot_nqh_delta() -> pd.DataFrame:
-    """Lấy delta NQH giữa 2 kỳ gần nhất từ hstd_snapshot."""
-    import sqlite3
-    from db import get_conn
-    with get_conn() as conn:
-        ky_list = [r[0] for r in conn.execute(
-            "SELECT DISTINCT ky FROM hstd_snapshot ORDER BY ky DESC LIMIT 2"
-        ).fetchall()]
-    if len(ky_list) < 2:
-        return pd.DataFrame()
-    ky_curr, ky_prev = ky_list[0], ky_list[1]
-    with get_conn() as conn:
-        df_c = pd.read_sql_query(
-            "SELECT ten_pgd, SUM(du_no_qh) qh_curr, SUM(tong_du_no) dn_curr "
-            "FROM hstd_snapshot WHERE ky=? AND ma_ct='ALL' AND nguon_von='ALL' "
-            "AND ten_pgd!='__CN__' GROUP BY ten_pgd",
-            conn, params=(ky_curr,),
-        )
-        df_p = pd.read_sql_query(
-            "SELECT ten_pgd, SUM(du_no_qh) qh_prev, SUM(tong_du_no) dn_prev "
-            "FROM hstd_snapshot WHERE ky=? AND ma_ct='ALL' AND nguon_von='ALL' "
-            "AND ten_pgd!='__CN__' GROUP BY ten_pgd",
-            conn, params=(ky_prev,),
-        )
-    df = df_c.merge(df_p, on="ten_pgd", how="left").fillna(0)
-    df["delta_qh"] = df["qh_curr"] - df["qh_prev"]
-    df["pct_qh"] = df.apply(
-        lambda r: r["delta_qh"] / r["qh_prev"] * 100 if r["qh_prev"] != 0 else float("nan"), axis=1
-    )
-    df.attrs["ky_curr"] = ky_curr
-    df.attrs["ky_prev"] = ky_prev
-    return df
-
-
 def _render_nqh_so_sanh_ky(key_prefix: str) -> None:
     """So sánh NQH giữa N kỳ gần nhất từ hstd_snapshot — hỗ trợ chọn 3/6/12 kỳ."""
     st.subheader("📈 NQH so sánh kỳ")

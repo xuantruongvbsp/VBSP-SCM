@@ -1,7 +1,7 @@
 # ROADMAP — Lộ trình phát triển VBSP-SCM
 
 > Cập nhật: 2026-05-26 (đồng bộ hiện trạng)
-> Dự án: Hệ thống Quản trị Tín dụng Nội bộ — NHCSXH Chi nhánh Đồng Nai
+> Dự án: Hệ thống Quản trị Tín dụng Nội bộ — Chi nhánh Ngân hàng Chính sách xã hội thành phố Đồng Nai
 
 ---
 

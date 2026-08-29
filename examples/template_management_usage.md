@@ -107,7 +107,7 @@ VBSP-SCM/
 
 ```
 NGÂN HÀNG CHÍNH SÁCH XÃ HỘI VIỆT NAM
-CHI NHÁNH TỈNH
+CHI NHÁNH NGÂN HÀNG CHÍNH SÁCH XÃ HỘI THÀNH PHỐ ĐỒNG NAI
 
 TỜ TRÌNH
 Về việc cho vay vốn Nhà ở xã hội
@@ -134,7 +134,7 @@ Ngày {{ngay_in}}
 
 ```
 NGÂN HÀNG CHÍNH SÁCH XÃ HỘI VIỆT NAM  
-CHI NHÁNH TỈNH
+CHI NHÁNH NGÂN HÀNG CHÍNH SÁCH XÃ HỘI THÀNH PHỐ ĐỒNG NAI
 
 TỜ TRÌNH
 Về việc cho vay vốn Nhà ở xã hội

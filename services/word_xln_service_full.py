@@ -19,6 +19,7 @@ from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Cm, Pt
 
+from config import TEN_CHI_NHANH_HIEN_THI
 from utils import fmt
 from services.rui_ro_aggregation import _tong_hop_no
 
@@ -59,7 +60,7 @@ def _tao_word_04xln_v2(
     _set_margins(doc, left_cm=2.5, right_cm=2.0, top_cm=2.0, bottom_cm=2.0)
     
     ngay_lap = thong_tin.get('ngay_lap', date.today())
-    ten_nhcsxh = thong_tin.get('ten_nhcsxh', 'Chi nhánh NHCSXH')
+    ten_nhcsxh = thong_tin.get('ten_nhcsxh', TEN_CHI_NHANH_HIEN_THI)
     dia_danh = thong_tin.get('dia_danh', 'TP. Biên Hòa')
     
     # Header
@@ -118,7 +119,7 @@ def _tao_word_05xln_v2(
     _set_margins(doc, left_cm=2.5, right_cm=2.0, top_cm=2.0, bottom_cm=2.0)
     
     ngay_lap = thong_tin.get('ngay_lap', date.today())
-    ten_nhcsxh = thong_tin.get('ten_nhcsxh', 'Chi nhánh NHCSXH')
+    ten_nhcsxh = thong_tin.get('ten_nhcsxh', TEN_CHI_NHANH_HIEN_THI)
     dia_danh = thong_tin.get('dia_danh', 'TP. Biên Hòa')
     
     # Header
@@ -278,7 +279,7 @@ def _tao_word_thong_bao_ket_qua_cn(
 
     p_l = cell_l.paragraphs[0]
     p_l.alignment = WD_ALIGN_PARAGRAPH.LEFT
-    r = p_l.add_run("CHI NHÁNH NHCSXH TỈNH ĐỒNG NAI")
+    r = p_l.add_run(TEN_CHI_NHANH_HIEN_THI.upper())
     r.bold = True
     r.font.name = "Times New Roman"
     r.font.size = Pt(12)
@@ -458,7 +459,7 @@ def _tao_word_thong_bao_ket_qua_pgd(
 
     p_l = cell_l.paragraphs[0]
     p_l.alignment = WD_ALIGN_PARAGRAPH.LEFT
-    rl = p_l.add_run("CHI NHÁNH NHCSXH TỈNH ĐỒNG NAI")
+    rl = p_l.add_run(TEN_CHI_NHANH_HIEN_THI.upper())
     rl.bold = True
     rl.font.name = "Times New Roman"
     rl.font.size = Pt(12)

@@ -4,7 +4,7 @@
 FROM python:3.12-slim
 
 # Metadata
-LABEL maintainer="NHCSXH Chi nhanh Dong Nai" \
+LABEL maintainer="Chi nhanh Ngan hang Chinh sach xa hoi thanh pho Dong Nai" \
       description="He thong Quan tri Tin dung Noi bo VBSP-SCM"
 
 # System dependencies (tesseract OCR + poppler for pdf2image)

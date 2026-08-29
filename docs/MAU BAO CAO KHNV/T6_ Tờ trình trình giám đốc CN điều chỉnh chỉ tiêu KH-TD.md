@@ -6,7 +6,7 @@ ten_file: "T6_ Tờ trình trình giám đốc CN điều chỉnh chỉ tiêu KH
 
 Về việc phê duyệt điều chỉnh chỉ tiêu kế hoạch dư nợ năm 2026 giữa các xã, phường trên địa bàn thành phố Đồng Nai
 
-**Kính gửi:** Giám đốc Chi nhánh Ngân hàng Chính sách xã hội tỉnh Đồng Nai.
+**Kính gửi:** Giám đốc Chi nhánh Ngân hàng Chính sách xã hội thành phố Đồng Nai.
 
 Căn cứ Quyết định số **86/QĐ-NHCS** ngày 10/01/2014 của *Tổng Giám đốc Ngân hàng Chính sách xã hội* ban hành Quy định về xây dựng và tổ chức thực hiện kế hoạch tín dụng trong hệ thống Ngân hàng Chính sách xã hội;
 
@@ -20,7 +20,7 @@ Phòng Kế hoạch – Nghiệp vụ tín dụng kính trình Giám đốc Chi 
 
 Kính trình Giám đốc Chi nhánh xem xét, quyết định.
 
-| NGÂN HÀNG CHÍNH SÁCH XÃ HỘI<br>CHI NHÁNH TỈNH ĐỒNG NAI<br>PHÒNG KH-NV | CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM<br>Độc lập - Tự do - Hạnh phúc |
+| NGÂN HÀNG CHÍNH SÁCH XÃ HỘI<br>CHI NHÁNH NGÂN HÀNG CHÍNH SÁCH XÃ HỘI THÀNH PHỐ ĐỒNG NAI<br>PHÒNG KH-NV | CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM<br>Độc lập - Tự do - Hạnh phúc |
 |---|---|
 | | Đồng Nai, ngày 03 tháng 6 năm 2026 |
 

@@ -805,7 +805,7 @@ LY_DO_KHOANH_LABEL = {
 # "Hội sở Chi nhánh tỉnh" = PGD địa bàn Biên Hòa (key nội bộ, khớp cột Tên PGD trong HSTD)
 # TEN_CHI_NHANH_HIEN_THI = nhãn hiển thị toàn Chi nhánh trên UI
 DON_VI_CHI_NHANH = "Hội sở Chi nhánh tỉnh"
-TEN_CHI_NHANH_HIEN_THI = "Chi nhánh NHCSXH tỉnh Đồng Nai"
+TEN_CHI_NHANH_HIEN_THI = "Chi nhánh Ngân hàng Chính sách xã hội thành phố Đồng Nai"
 
 # DS_PGD: 21 PGD (không bao gồm Hội sở Chi nhánh tỉnh vì đã có DON_VI_CHI_NHANH)
 DS_PGD = [

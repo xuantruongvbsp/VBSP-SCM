@@ -7,7 +7,7 @@
 
 ## 1. Dự án
 
-- **Tên:** Hệ thống Quản trị Tín dụng Nội bộ — NHCSXH Chi nhánh Đồng Nai
+- **Tên:** Hệ thống Quản trị Tín dụng Nội bộ — Chi nhánh Ngân hàng Chính sách xã hội thành phố Đồng Nai
 - **Stack:** Streamlit + Python + SQLite + PyArrow/Parquet
 - **Chạy:** `venv\Scripts\python.exe -m streamlit run app.py --server.port 8502`
 - **Phạm vi:** 22 đơn vị (Hội sở + 21 PGD), 95 xã/phường, ~20 users, 9 role

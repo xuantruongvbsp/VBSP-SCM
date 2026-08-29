@@ -1070,6 +1070,15 @@
 | **Fix** | Thêm `if df.empty: return df` (hoặc `return None`) ở đầu hàm xử lý |
 | **Ngày fix** | 2026-05-21 |
 
+### C12 — Helper cảnh báo đọc DataFrame lệch schema gây `KeyError`
+| | |
+|---|---|
+| **File** | `tabs/tab_baocao/reports/tong_hop_hstd_v2.py` → `_thong_diep_muc_dich_chua_xac_dinh()` |
+| **Dấu hiệu** | Helper cảnh báo Mục đích vốn có thể crash khi test/call trực tiếp truyền `df_th` thiếu `Tổng_dư_nợ`/`Tỷ_trọng_%` hoặc `df_group` thiếu `Tổng dư nợ`. |
+| **Nguyên nhân** | Code chỉ guard `df_th.empty` và cột nhóm, nhưng đọc tiếp các cột tổng hợp và group top PGD theo cột dư nợ. |
+| **Fix** | Kiểm tra đủ schema bắt buộc trước khi cảnh báo; chỉ tính top PGD khi `df_group` có đủ PGD + nhóm + dư nợ; ép numeric dư nợ trước khi groupby. |
+| **Ngày fix** | 2026-08-28 |
+
 ### C11 — `UnboundLocalError` do Python 3.14 `except Exception:` syntax
 | | |
 |---|---|
@@ -1551,6 +1560,36 @@
 | **Fix** | Strip emoji đầu nhãn trước khi gọi `xuat_pdf()`; ưu tiên ratio 1.75 cho cột chứa `31/12`/bắt đầu `±`; tách `BQ/KH` về ratio 1.15 trong cả helper chung và `xuat_pdf()`. |
 | **Test** | `tests/test_tong_hop_hstd_v2.py::test_pdf_tong_hop_moc_3112_bo_emoji_va_can_cot_tien`; `tests/test_pdf_service.py::TestXuatPdf::test_col_ratio_pdf_uu_tien_cot_moc_3112_va_bq_kh`; smoke sinh PDF thật. |
 | **Ngày fix** | 2026-08-27 |
+
+### F16 — Chữ Việt mất khi xuất PDF trên Linux/CI (thiếu font italic TNR)
+| | |
+|---|---|
+| **File** | `pdf_service.py` → `_dang_ky_font()`; `assets/timesi.ttf`, `assets/timesbi.ttf` |
+| **Dấu hiệu** | CI fail `tests/test_pdf_service.py::TestXuatPdf::test_xuat_pdf_chi_tiet_scale_trieu_va_don_vi` với `AssertionError: assert 'triệu đồng' in ...`; PDF extract ra `"(Ký, ghi rõ hn tên)"` mất chữ "ọ" — chỉ fail trên Linux/CI, pass trên Windows local. |
+| **Nguyên nhân** | `assets/` chỉ commit `times.ttf`/`timesbd.ttf`; máy Linux/CI không có `C:\Windows\Fonts` nên `_dang_ky_font()` không tìm được font italic/bolditalic → ReportLab fallback về `Times-Italic`/`Times-BoldItalic` built-in **không hỗ trợ unicode** → mọi chữ Việt in nghiêng bị rơi mất (ghi chú "Đơn vị tiền: (triệu đồng)", chữ ký "(Ký, ghi rõ họ tên)"). |
+| **Fix** | Bổ sung `assets/timesi.ttf` (italic) + `assets/timesbi.ttf` (bolditalic) để đăng ký `TNR-Italic`/`TNR-BoldItalic`; thêm fallback `elif FONT_NORMAL == "TNR"` (dùng font regular đã đăng ký nếu thiếu italic) và `elif FONT_BOLD == "TNR-Bold"` (tương tự cho bolditalic) — chữ Việt không bao giờ rơi về font built-in không hỗ trợ unicode. |
+| **Test** | `tests/test_pdf_service.py::TestXuatPdf::test_xuat_pdf_chi_tiet_scale_trieu_va_don_vi`; smoke mô phỏng CI (mock bỏ timesi/timesbi) xác nhận giữ "triệu đồng"/"1.500"/"2.500"; cả file test PDF 14/14 pass. |
+| **Ngày fix** | 2026-08-27 |
+
+### F17 — PDF mất nhãn đơn vị tiền dù đã fallback font italic
+| | |
+|---|---|
+| **File** | `pdf_service.py` → `_dang_ky_font()`, `xuat_pdf()` ghi chú đơn vị |
+| **Dấu hiệu** | CI Linux vẫn fail `test_xuat_pdf_chi_tiet_scale_trieu_va_don_vi`: text extract không có `"triệu đồng"` dù bảng đã có số `1.500`/`2.500`; dòng chữ ký có thể mất dấu trong cụm `(Ký, ghi rõ họ tên)`. |
+| **Nguyên nhân** | Nhãn `"Đơn vị tiền: (triệu đồng)"` nằm trong style italic. Nếu font italic bị thiếu/lỗi trong quá trình đăng ký, `FONT_ITALIC` có thể quay về Times built-in không hỗ trợ tiếng Việt, làm mất nhãn đơn vị khi `pdfplumber.extract_text()`. |
+| **Fix** | Thêm fallback hậu kiểm sau khối đăng ký font để ép `FONT_ITALIC = FONT_NORMAL` và `FONT_BOLD_ITALIC = FONT_BOLD` khi regular/bold TNR đã sẵn sàng; riêng ghi chú đơn vị dùng font regular Unicode `fn` thay vì italic để nhãn đơn vị ổn định trên CI. |
+| **Test** | `tests/test_pdf_service.py::TestXuatPdf::test_xuat_pdf_chi_tiet_scale_trieu_va_don_vi`; smoke mô phỏng thiếu `timesi.ttf`/`timesbi.ttf` bằng monkeypatch `Path.exists`. |
+| **Ngày fix** | 2026-08-27 |
+
+### F18 — Emoji giữa tiêu đề PDF Tổng hợp HSTD không bị strip
+| | |
+|---|---|
+| **File** | `tabs/tab_baocao/reports/tong_hop_hstd_v2.py` → `_xuat_pdf_tong_hop()` |
+| **Dấu hiệu** | Tiêu đề PDF các mode tổng hợp (đặc biệt "Theo Mục đích sử dụng vốn") còn emoji 🎯/🏢 giữa dòng, render thành ô vuông do font TNR không có glyph. |
+| **Nguyên nhân** | Call site truyền tiêu đề dạng `"Báo cáo tổng hợp 🎯 Theo ..."` (emoji giữa chuỗi), nhưng regex chỉ strip ký tự non-word ở ĐẦU chuỗi (`^\W+`). |
+| **Fix** | Strip mọi ký tự non-word bằng `re.sub(r"\W+", " ", ...)` rồi collapse khoảng trắng; bỏ thêm tiền tố trùng lặp "Báo cáo tổng hợp" vì tiêu đề ngoài đã có "BÁO CÁO TỔNG HỢP HSTD". |
+| **Test** | `tests/test_tong_hop_hstd_v2.py::test_pdf_tong_hop_md_bo_emoji_giua_tieu_de`; test cũ `test_pdf_tong_hop_moc_3112_bo_emoji_va_can_cot_tien` vẫn pass. |
+| **Ngày fix** | 2026-08-28 |
 
 ---
 
@@ -3796,6 +3835,18 @@ def _to_int(val, default=0):
 
 ---
 
+### C45 — Khế ước NQ11 không khớp HSTD bị loại mà không có thông báo
+| | |
+|---|---|
+| **File** | `tabs/tab_baocao/reports/nq11.py`; `tabs/tab_baocao/__init__.py` |
+| **Dấu hiệu** | `Số khế ước` có trong danh sách NQ11 nhưng không tồn tại trong HSTD không xuất hiện ở báo cáo và người dùng không biết dữ liệu bị thiếu. |
+| **Nguyên nhân** | Báo cáo chỉ nhận tập HSTD đã gắn cờ `__is_nq11`; các mã không match đã bị loại trước khi render nên không còn dấu vết để cảnh báo. |
+| **Fix** | Truyền thêm HSTD đầy đủ vào báo cáo, đối chiếu với danh sách `nq11_so_khe_uoc`, hiển thị tỷ lệ khớp và danh sách mã thiếu; bỏ đối chiếu ở role PGD để tránh so phạm vi PGD với danh sách toàn CN. |
+| **Test** | `tests/test_baocao_tin_dung_so_lieu.py::test_nq11_doi_chieu_voi_hstd_full_khong_bao_nham_mon_tat_toan` |
+| **Ngày fix** | 2026-08-28 |
+
+---
+
 ### B85 — Bảng NQH khó đọc ở dark theme và đếm đơn vị rỗng
 | | |
 |---|---|
@@ -3923,6 +3974,26 @@ def _to_int(val, default=0):
 | **Fix** | Thay ký tự gạch dài bằng dấu `-` ASCII và ghi lại file bằng ASCII + CRLF. |
 | **Test** | `tests/test_launcher_batch.py::test_batch_files_stay_ascii_crlf_for_cmd_compatibility`; full `pytest`. |
 | **Ngày fix** | 2026-08-27 |
+
+### B92 — Header bảng HTML hiện thành khối mã phía trên bảng
+| | |
+|---|---|
+| **File** | `tabs/tab_baocao/components/sticky_table.py` → `render_bang_chi_tiet_html()` ~dòng 136 |
+| **Dấu hiệu** | Giao diện in nguyên chuỗi `<tr class="hdr2"><th>...</th></tr>` trong một khối code phía trên bảng; hàng tiêu đề thật không nằm trong bảng. |
+| **Nguyên nhân** | Chuỗi HTML nhiều dòng có dòng `<tr>` thụt bốn dấu cách; Markdown diễn giải dòng đó là code block dù `unsafe_allow_html=True`. |
+| **Fix** | Ghép toàn bộ bảng thành chuỗi HTML liên tục, không có khoảng trắng đầu dòng để Markdown giữ nguyên cấu trúc `thead`. |
+| **Test** | Compile component; visual QA Báo cáo NQ11 tại cổng `18502` xác nhận header nằm trong bảng và không còn khối mã. |
+| **Ngày fix** | 2026-08-28 |
+
+### B93 — Ô tìm kiếm báo cảnh báo accessibility vì label rỗng
+| | |
+|---|---|
+| **File** | `tabs/tab_baocao/components/inline_filter.py` → `render_quick_search()` ~dòng 316 |
+| **Dấu hiệu** | Streamlit log cảnh báo ``label` got an empty value` mỗi lần render báo cáo có ô tìm kiếm nhanh. |
+| **Nguyên nhân** | `st.text_input()` truyền chuỗi rỗng làm label dù đã dùng `label_visibility="collapsed"`; đồng thời bỏ qua container `ctx` được caller truyền vào. |
+| **Fix** | Dùng label truy cập `Tìm kiếm nhanh`, tiếp tục ẩn bằng `label_visibility="collapsed"`, và gọi `ctx.text_input()` để giữ đúng vùng render. |
+| **Test** | Compile component; visual QA Báo cáo NQ11 tại cổng `18502` không còn cảnh báo label rỗng. |
+| **Ngày fix** | 2026-08-28 |
 
 ---
 

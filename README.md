@@ -1,6 +1,6 @@
 # VBSP-SCM
 
-Hệ thống Quản trị & Tác nghiệp Tín dụng Nội bộ — NHCSXH Chi nhánh tỉnh Đồng Nai.
+Hệ thống Quản trị & Tác nghiệp Tín dụng Nội bộ — Chi nhánh Ngân hàng Chính sách xã hội thành phố Đồng Nai.
 
 ## Yêu cầu hệ thống
 

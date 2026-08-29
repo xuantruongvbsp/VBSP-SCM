@@ -14,6 +14,7 @@ from config import (
     COT_MA_KH,
     COT_SO_KU,
     COT_TONG_DU_NO,
+    TEN_CHI_NHANH_HIEN_THI,
 )
 
 try:
@@ -81,11 +82,22 @@ def _dang_ky_font():
         if italic:
             pdfmetrics.registerFont(TTFont("TNR-Italic", str(italic)))
             FONT_ITALIC = "TNR-Italic"
+        elif FONT_NORMAL == "TNR":
+            # Thiếu font italic (vd máy Linux/CI) → dùng font regular đã đăng ký
+            # để chữ Việt không bị mất do Times-Italic built-in không hỗ trợ unicode.
+            FONT_ITALIC = FONT_NORMAL
         if bolditalic:
             pdfmetrics.registerFont(TTFont("TNR-BoldItalic", str(bolditalic)))
             FONT_BOLD_ITALIC = "TNR-BoldItalic"
+        elif FONT_BOLD == "TNR-Bold":
+            FONT_BOLD_ITALIC = FONT_BOLD
     except Exception:
         warnings.warn("Không đăng ký được TNR từ file TTF, sẽ dùng font fallback.")
+
+    if FONT_NORMAL == "TNR" and FONT_ITALIC == "Times-Italic":
+        FONT_ITALIC = FONT_NORMAL
+    if FONT_BOLD == "TNR-Bold" and FONT_BOLD_ITALIC == "Times-BoldItalic":
+        FONT_BOLD_ITALIC = FONT_BOLD
 
     if not regular:
         warnings.warn("Không tìm thấy times.ttf — tiếng Việt có thể bị lỗi font.")
@@ -329,7 +341,7 @@ def xuat_pdf(
         leftMargin=margin, rightMargin=margin,
         topMargin=margin, bottomMargin=2 * cm,
         title=tieu_de,
-        author="VBSP-SCM - NHCSXH Đồng Nai",
+        author=f"VBSP-SCM - {TEN_CHI_NHANH_HIEN_THI}",
         subject=f"Báo cáo: {tieu_de}",
     )
 
@@ -349,7 +361,7 @@ def xuat_pdf(
             header_tbl = RLTable(
                 [[logo, Paragraph(
                     "<b>NGÂN HÀNG CHÍNH SÁCH XÃ HỘI VIỆT NAM</b><br/>"
-                    "<font size='10'>Chi nhánh tỉnh Đồng Nai</font>",
+                    f"<font size='10'>{xml_escape(TEN_CHI_NHANH_HIEN_THI)}</font>",
                     ParagraphStyle("hdr_txt", fontName=fb, fontSize=12,
                                    alignment=TA_CENTER, leading=15, spaceAfter=0)
                 )]],
@@ -368,7 +380,7 @@ def xuat_pdf(
                                alignment=TA_CENTER, spaceAfter=1)
             ))
             story.append(Paragraph(
-                "Chi nhánh tỉnh Đồng Nai",
+                TEN_CHI_NHANH_HIEN_THI,
                 ParagraphStyle("branch", fontName=fn, fontSize=10,
                                alignment=TA_CENTER, spaceAfter=4)
             ))
@@ -379,7 +391,7 @@ def xuat_pdf(
                            alignment=TA_CENTER, spaceAfter=1)
         ))
         story.append(Paragraph(
-            "Chi nhánh tỉnh Đồng Nai",
+            TEN_CHI_NHANH_HIEN_THI,
             ParagraphStyle("branch", fontName=fn, fontSize=10,
                            alignment=TA_CENTER, spaceAfter=4)
         ))
@@ -643,7 +655,7 @@ def xuat_pdf(
         if ghi_chu_parts:
             story.append(Paragraph(
                 "  ·  ".join(ghi_chu_parts),
-                ParagraphStyle("ghi_chu", fontName=fi, fontSize=8.5,
+                ParagraphStyle("ghi_chu", fontName=fn, fontSize=8.5,
                                alignment=TA_LEFT, textColor=TEXT_MUTED,
                                spaceAfter=0.8 * cm, spaceBefore=0.2 * cm)
             ))
@@ -696,7 +708,7 @@ def xuat_pdf(
         canvas.drawString(
             margin,
             0.8 * cm,
-            "NHCSXH Đồng Nai  ·  Báo cáo nội bộ"
+            f"{TEN_CHI_NHANH_HIEN_THI}  ·  Báo cáo nội bộ"
         )
         canvas.setStrokeColor(VBSP_GREEN_MID)
         canvas.setLineWidth(0.8)
@@ -889,7 +901,7 @@ def xuat_pdf_theo_nhom(
         header_tbl = RLTable(
             [[logo, Paragraph(
                 "NGÂN HÀNG CHÍNH SÁCH XÃ HỘI VIỆT NAM<br/>"
-                "<font size='9'>Chi nhánh tỉnh Đồng Nai</font>",
+                f"<font size='9'>{xml_escape(TEN_CHI_NHANH_HIEN_THI)}</font>",
                 ParagraphStyle("hdr_nhom", fontName=fb, fontSize=11,
                                alignment=TA_CENTER, leading=15)
             )]],
@@ -908,7 +920,7 @@ def xuat_pdf_theo_nhom(
                            alignment=TA_CENTER, spaceAfter=2)
         ))
         story.append(Paragraph(
-            "CHI NHÁNH TỈNH ĐỒNG NAI",
+            TEN_CHI_NHANH_HIEN_THI.upper(),
             ParagraphStyle("branch_nhom", fontName=fn, fontSize=10,
                            alignment=TA_CENTER, spaceAfter=6)
         ))
@@ -1185,7 +1197,7 @@ def render_huong_dan():
     - Font Times New Roman để xuất PDF tiếng Việt
 
     ### 📞 Hỗ trợ
-    Liên hệ bộ phận CNTT Chi nhánh NHCSXH tỉnh Đồng Nai
+    Liên hệ bộ phận CNTT Chi nhánh Ngân hàng Chính sách xã hội thành phố Đồng Nai
     """)
 
 
@@ -1235,7 +1247,7 @@ def xuat_pdf_bao_cao(
         header_tbl = RLTable(
             [[logo, Paragraph(
                 "NGÂN HÀNG CHÍNH SÁCH XÃ HỘI VIỆT NAM<br/>"
-                "<font size='9'>Chi nhánh tỉnh Đồng Nai</font>",
+                f"<font size='9'>{xml_escape(TEN_CHI_NHANH_HIEN_THI)}</font>",
                 ParagraphStyle("hdr_txt2", fontName=fb, fontSize=11,
                                alignment=TA_CENTER, leading=14)
             )]],
@@ -1437,7 +1449,7 @@ def xuat_pdf_group_header(
 
     co_quan_html = (
         "<b>NGÂN HÀNG CHÍNH SÁCH XÃ HỘI VIỆT NAM</b><br/>"
-        "<b>Chi nhánh tỉnh Đồng Nai</b>"
+        f"<b>{xml_escape(TEN_CHI_NHANH_HIEN_THI)}</b>"
     )
     if so_hieu:
         co_quan_html += f"<br/><font size='9'>{_pdf_text(so_hieu)}</font>"

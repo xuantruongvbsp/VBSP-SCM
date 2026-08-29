@@ -12,6 +12,7 @@ from io import BytesIO
 import streamlit as st
 
 from services.task_data_service import _doc_ketqua_task, _PGD_BIEN_HOA
+from config import TEN_CHI_NHANH_HIEN_THI
 from utils import fmt_ngay
 
 LOAI_TASK = {
@@ -86,7 +87,7 @@ def _xuat_pdf_bao_cao_tien_do(ds_task, username):
                            alignment=TA_CENTER, spaceAfter=2)
         ))
         story.append(Paragraph(
-            "CHI NHÁNH TỈNH ĐỒNG NAI",
+            TEN_CHI_NHANH_HIEN_THI.upper(),
             ParagraphStyle("branch", fontName=fn, fontSize=11,
                            alignment=TA_CENTER, spaceAfter=4)
         ))
@@ -545,7 +546,7 @@ def _xuat_pdf_tien_do(task, ds_kq, username):
 
         story.append(Paragraph(
             "NGÂN HÀNG CHÍNH SÁCH XÃ HỘI VIỆT NAM", title_style))
-        story.append(Paragraph("CHI NHÁNH TỈNH ĐỒNG NAI", subtitle_style))
+        story.append(Paragraph(TEN_CHI_NHANH_HIEN_THI.upper(), subtitle_style))
         story.append(Spacer(1, 6))
         story.append(Paragraph("BÁO CÁO TIẾN ĐỘ CÔNG VIỆC", header_style))
         story.append(Paragraph(task.get("tieu_de", ""), header_style))

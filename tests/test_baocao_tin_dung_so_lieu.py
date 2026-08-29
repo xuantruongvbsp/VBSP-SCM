@@ -13,7 +13,9 @@ from config import (
     COT_NGAY_DH,
     COT_NQ11_NO_QH,
     COT_NQ11_NO_TH,
+    COT_NQ11_MA_KH,
     COT_SO_KU,
+    COT_TEN_CT,
     COT_TEN_PGD,
     COT_TONG_DU_NO,
 )
@@ -31,7 +33,13 @@ from tabs.tab_baocao.reports.no_rui_ro_v2 import (
     _loc_den_han,
     _tao_ty_le_no_xau_theo_pgd,
 )
-from tabs.tab_baocao.reports.nq11 import _chuan_bi_nq11, _fmt_df_trieu as _fmt_nq11
+from tabs.tab_baocao.reports.nq11 import (
+    _chuan_bi_nq11,
+    _doi_chieu_so_khe_uoc_nq11,
+    _fmt_df_trieu as _fmt_nq11,
+    _tao_tong_hop_nq11,
+    _tinh_chi_so_nq11,
+)
 
 
 def test_nq11_dem_mot_lan_moi_khe_uoc_va_khong_sua_nguon() -> None:
@@ -57,6 +65,53 @@ def test_nq11_va_gqvl_format_dung_cot_tong_hop() -> None:
 
     assert nq11.loc[0, "DNO_NQ11"] == "1"
     assert gqvl.loc[0, "Tổng_dư_nợ"] == "2"
+
+
+def test_nq11_kpi_va_tong_hop_dung_cung_pham_vi() -> None:
+    df = pd.DataFrame({
+        COT_SO_KU: ["KU1", "KU2", "KU3"],
+        COT_NQ11_MA_KH: ["KH1", "KH1", "KH2"],
+        COT_TEN_CT: ["CT A", "CT A", pd.NA],
+        COT_DNO_NQ11: [1_000, 2_000, 1_000],
+        COT_NQ11_NO_TH: [900, 2_000, 800],
+        COT_NQ11_NO_QH: [100, 0, 200],
+    })
+    prepared = _chuan_bi_nq11(df)
+
+    kpi = _tinh_chi_so_nq11(prepared)
+    summary = _tao_tong_hop_nq11(prepared, COT_TEN_CT)
+
+    assert kpi == {
+        "so_mon": 3,
+        "so_kh": 2,
+        "du_no": 4_000.0,
+        "no_qh": 300.0,
+        "so_mon_qh": 2,
+        "ty_le_qh": 7.5,
+        "du_no_bq_mon": 4_000 / 3,
+    }
+    assert set(summary[COT_TEN_CT]) == {"CT A", "Chưa xác định"}
+    assert summary["Dư nợ NQ11"].sum() == 4_000
+    assert summary["Nợ quá hạn"].sum() == 300
+    assert round(summary["Tỷ trọng (%)"].sum(), 8) == 100
+
+
+def test_nq11_doi_chieu_voi_hstd_full_khong_bao_nham_mon_tat_toan() -> None:
+    hstd_full = pd.DataFrame({
+        COT_SO_KU: ["KU1", " KU2 ", "KU3", 1004.0],
+        COT_TONG_DU_NO: [100, 200, 0, 0],
+    })
+
+    result = _doi_chieu_so_khe_uoc_nq11(
+        hstd_full,
+        ["KU1", "KU2", "KU3", "1004", "KU_MISSING", "nan", None],
+    )
+
+    assert result == {
+        "tong_nq11": 5,
+        "da_khop": 4,
+        "chua_khop": ["KU_MISSING"],
+    }
 
 
 def test_gqvl_tinh_du_no_tu_thanh_phan_va_loai_ban_sao_khe_uoc() -> None:

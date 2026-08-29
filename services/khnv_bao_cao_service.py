@@ -186,12 +186,6 @@ def _tim_file_dienbao() -> str | None:
     return None
 
 
-def _tim_file_dienbao_prev() -> str | None:
-    if os.path.exists(DB_PREV_CACHE):
-        return DB_PREV_CACHE
-    return None
-
-
 def _don_vi_dienbao_meta(rows: list | None = None, data: dict | None = None) -> tuple[int, str, bool]:
     """Lấy hệ số quy đổi VND từ metadata mới, fallback tương thích `don_vi_trieu` cũ."""
     data = data or {}

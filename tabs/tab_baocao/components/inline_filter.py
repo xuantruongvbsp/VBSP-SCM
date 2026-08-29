@@ -313,8 +313,8 @@ def render_quick_search(
     ctx = container if container is not None else st
     
     # Search input
-    search_term = st.text_input(
-        "",
+    search_term = ctx.text_input(
+        "Tìm kiếm nhanh",
         placeholder=placeholder,
         key=f"quick_search_{key}",
         label_visibility="collapsed",

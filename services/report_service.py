@@ -6,6 +6,8 @@ from pathlib import Path
 from typing import Dict
 import pandas as pd
 
+from config import TEN_CHI_NHANH_HIEN_THI
+
 try:
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
@@ -96,10 +98,10 @@ def _tao_sheet_bia(wb: Workbook, tieu_de: str, nguoi_xuat: str) -> None:
     cell_bank.font = font_header
     cell_bank.alignment = center
     
-    # Chi nhánh (có thể lấy từ config trong tương lai)
+    # Chi nhánh
     row += 1
     cell_branch = ws[f'B{row}']
-    cell_branch.value = "CHI NHÁNH TỈNH"
+    cell_branch.value = TEN_CHI_NHANH_HIEN_THI.upper()
     cell_branch.font = font_normal
     cell_branch.alignment = center
     

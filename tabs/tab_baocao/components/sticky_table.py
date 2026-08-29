@@ -133,23 +133,19 @@ def render_bang_chi_tiet_html(
         cells = "".join(_cell_html(c, dong_tong.get(c, "—")) for c in cols)
         foot_html = f'<tr class="bct-total">{cells}</tr>'
 
-    html_table = f"""
-<div class="bct-wrap" data-key="{html_mod.escape(key)}" style="--bct-max-height:{int(height)}px">
-<table class="bct-table">
-  <thead>
-    {header1_row}
-    <tr class="hdr2">{header2}</tr>
-  </thead>
-  <tbody>{rows_html}{foot_html}</tbody>
-</table>
-</div>
-<p class="bct-note">
-  * Đơn vị tiền: triệu đồng &nbsp;|&nbsp; Tỷ lệ QH:
-  <span class="bct-note-good">&lt;1% tốt</span> ·
-  <span class="bct-note-warn">1–3% cảnh báo</span> ·
-  <span class="bct-note-danger">≥3% nguy hiểm</span>
-</p>
-"""
+    # Ghép HTML không có khoảng trắng đầu dòng. Markdown coi dòng HTML thụt
+    # bốn dấu cách là code block và sẽ in nguyên thẻ <tr> ra phía trên bảng.
+    html_table = (
+        f'<div class="bct-wrap" data-key="{html_mod.escape(key)}" '
+        f'style="--bct-max-height:{int(height)}px">'
+        '<table class="bct-table"><thead>'
+        f'{header1_row}<tr class="hdr2">{header2}</tr>'
+        f'</thead><tbody>{rows_html}{foot_html}</tbody></table></div>'
+        '<p class="bct-note">* Đơn vị tiền: triệu đồng &nbsp;|&nbsp; Tỷ lệ QH: '
+        '<span class="bct-note-good">&lt;1% tốt</span> · '
+        '<span class="bct-note-warn">1–3% cảnh báo</span> · '
+        '<span class="bct-note-danger">≥3% nguy hiểm</span></p>'
+    )
     ctx.markdown(html_table, unsafe_allow_html=True)
 
 

@@ -1,5 +1,5 @@
 # VBSP-SCM — Windsurf Rules
-# Hệ thống Quản trị Tín dụng Nội bộ — NHCSXH Chi nhánh Đồng Nai
+# Hệ thống Quản trị Tín dụng Nội bộ — Chi nhánh Ngân hàng Chính sách xã hội thành phố Đồng Nai
 # Đọc file này trước khi sinh bất kỳ code nào.
 # Không chứa dữ liệu nhạy cảm — chỉ function names, column names, patterns.
 # Cập nhật: 24/05/2026 — đồng bộ với .trae/rules/rules.md
@@ -8,7 +8,7 @@
 
 ## 1. Dự án
 
-- **Tên:** Hệ thống Quản trị Tín dụng Nội bộ — NHCSXH Chi nhánh Đồng Nai
+- **Tên:** Hệ thống Quản trị Tín dụng Nội bộ — Chi nhánh Ngân hàng Chính sách xã hội thành phố Đồng Nai
 - **Stack:** Streamlit + Python + SQLite + PyArrow/Parquet
 - **Chạy:** `streamlit run app.py` → `http://localhost:8501`
 - **Phạm vi:** 22 đơn vị (Hội sở + 21 PGD), 95 xã/phường, ~20 users, 9 role

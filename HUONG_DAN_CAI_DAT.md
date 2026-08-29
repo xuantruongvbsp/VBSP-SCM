@@ -1,6 +1,6 @@
 # Hướng dẫn cài đặt VBSP-SCM trên máy mới
 
-> **Dành cho:** Người dùng nội bộ NHCSXH Chi nhánh Đồng Nai  
+> **Dành cho:** Người dùng nội bộ Chi nhánh Ngân hàng Chính sách xã hội thành phố Đồng Nai
 > **Cập nhật:** 28/05/2026
 
 ---

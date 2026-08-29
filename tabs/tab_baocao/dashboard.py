@@ -42,6 +42,14 @@ def _loc_hstd_metric(
     return chuan_bi_du_lieu_bao_cao(result)
 
 
+def _nhom_hstd_dang_chon() -> str:
+    """Nhóm tổng hợp HSTD đang chọn — lấy mục đầu khi user tick nhiều mục."""
+    chon = st.session_state.get("th_loai_hstd_v2", "pgd")
+    if isinstance(chon, (list, tuple)):
+        return str(chon[0]) if chon else "pgd"
+    return str(chon)
+
+
 def render_dashboard(
     tab: DeltaGenerator | None = None,
     df: pd.DataFrame | None = None,
@@ -114,7 +122,7 @@ def render_dashboard(
     selected_nv = "all"
     if not is_pgd:
         if selected_key == "hstd":
-            selected_group = st.session_state.get("th_loai_hstd_v2", "pgd")
+            selected_group = _nhom_hstd_dang_chon()
             selected_pgd = st.session_state.get(
                 f"filter_th_{selected_group}_pgd_{COT_TEN_PGD}", "Tất cả"
             )
@@ -123,7 +131,7 @@ def render_dashboard(
                 f"filter_nr_v2_pgd_{COT_TEN_PGD}", "Tất cả"
             )
     if selected_key == "hstd":
-        selected_group = st.session_state.get("th_loai_hstd_v2", "pgd")
+        selected_group = _nhom_hstd_dang_chon()
         selected_nv = st.session_state.get(f"nv_filter_th_{selected_group}", "all")
     elif selected_key == "noruiro":
         selected_nv = st.session_state.get("nv_filter_nr_v2", "all")

@@ -359,15 +359,4 @@ if __name__ == "__main__":
     except Exception as _tg_err:
         print(f"  ⚠  Telegram health check: {_tg_err}", file=sys.stderr)
 
-    # Tự động tạo báo cáo sáng nếu chưa có hôm nay
-    try:
-        from services.daily_report_service import lay_bao_cao_sang_hom_nay, tao_bao_cao_sang
-        if lay_bao_cao_sang_hom_nay() is None:
-            path = tao_bao_cao_sang("health_check")
-            print(f"\n  ✅  Báo cáo sáng: đã tạo {path.name} ({path.stat().st_size // 1024} KB)")
-        else:
-            print(f"\n  ℹ   Báo cáo sáng: đã có hôm nay — bỏ qua")
-    except Exception as _bc_err:
-        print(f"\n  ⚠   Báo cáo sáng: không tạo được — {_bc_err}", file=sys.stderr)
-
     sys.exit(exit_code)

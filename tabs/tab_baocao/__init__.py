@@ -46,6 +46,7 @@ def render(tab: "DeltaGenerator | None" = None, **kwargs) -> None:
     ctx = TabContext(tab, **kwargs)
 
     df = kwargs.get("df")
+    df_full = kwargs.get("df_full", df)
     df_nq11 = kwargs.get("df_nq11")
     df_gqvl = kwargs.get("df_gqvl")
     df_cdtotkvv = kwargs.get("df_cdtotkvv")
@@ -94,7 +95,14 @@ def render(tab: "DeltaGenerator | None" = None, **kwargs) -> None:
         elif selected_report == "noruiro":
             render_no_rui_ro_v2(tab=None, df=df, role=role, pgd_user=pgd_user, username=username)
         elif selected_report == "nq11":
-            render_nq11(tab=None, df_nq11=df_nq11, role=role, pgd_user=pgd_user, username=username)
+            render_nq11(
+                tab=None,
+                df_nq11=df_nq11,
+                df_hstd_full=df_full,
+                role=role,
+                pgd_user=pgd_user,
+                username=username,
+            )
         elif selected_report == "gqvl":
             render_gqvl(tab=None, df_gqvl=df_gqvl, role=role, pgd_user=pgd_user, username=username)
         elif selected_report == "cdtotkvv":

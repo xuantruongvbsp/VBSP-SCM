@@ -1,5 +1,78 @@
 # CHANGELOG
 
+## [2026-08-28] — Dọn code chết Báo cáo định kỳ (bỏ services/daily_report_service.py)
+- `services/daily_report_service.py` — XÓA: 0% coverage, trùng tên với `scripts/daily_report.py`, không được tab `tab_bao_cao_dinh_ky` dùng (tab dùng `scripts/daily_report.py`).
+- `health_check.py` dòng ~362 — bỏ khối "tự tạo báo cáo sáng" gọi `services.daily_report_service` (báo cáo sáng thật đã do `scripts/daily_report.py` chạy qua Task Scheduler 07:00 tạo, không cần health_check làm thay).
+- `CODE_INDEX.md` — xóa dòng mô tả `services/daily_report_service.py`.
+
+## [2026-08-28] — Nâng cấp Báo cáo GQVL lên v2 (phân tầng 4 nhóm, multiselect, bảng sticky)
+- `tabs/tab_baocao/reports/gqvl.py` — thay radio "Loại báo cáo" bằng multiselect tick nhiều loại (Phân tầng 4 nhóm / Theo nhà đầu tư / Theo PGD / Theo Xã / Tổng hợp giải ngân); thêm phân tầng 4 nhóm chuẩn `GQVL_PHAN_TANG` (TW-NHCSXH, TW-NSNN, ĐP-cấp tỉnh, ĐP-cấp xã); thêm bộ lọc PGD/nguồn vốn/khu vực + tìm kiếm nhanh; thêm bảng sticky (thanh tỷ trọng, badge tỷ lệ QH, dòng TỔNG CỘNG) + metric tooltip + xuất Excel/PDF chuẩn; giữ nguyên `_chuan_bi_gqvl`, `_fmt_df_trieu`, `_tong_hop_theo_nha_dau_tu` (đang được test import).
+
+## [2026-08-28] — Cảnh báo Số khế ước NQ11 không khớp HSTD
+- `tabs/tab_baocao/reports/nq11.py` — đối chiếu danh sách NQ11 với HSTD đầy đủ, thông báo số đã khớp/chưa khớp và hiển thị danh sách cần kiểm tra.
+- `tabs/tab_baocao/__init__.py` — truyền `df_full` vào Báo cáo NQ11 để đối chiếu cả món đã tất toán, tránh cảnh báo sai.
+- `tests/test_baocao_tin_dung_so_lieu.py` — thêm hồi quy chuẩn hóa mã và không báo nhầm món đã tất toán còn tồn tại trong HSTD.
+
+## [2026-08-28] — Đồng nhất xuất Excel bảng Tổng hợp HSTD (triệu đồng + TỔNG CỘNG)
+- `tabs/tab_baocao/reports/tong_hop_hstd_v2.py` — thêm `_df_xuat_excel_tong_hop()` dựng bảng Excel khớp bảng hiển thị (triệu đồng, cột sạch, làm tròn, kèm dòng TỔNG CỘNG); đảo thứ tự dựng `df_hien`/`dong_tong` lên trước khối quick export và truyền `df_excel`.
+- `tabs/tab_baocao/components/quick_export.py` — `render_quick_export_buttons()` thêm tham số `df_excel` để xuất Excel bằng bảng đã format riêng, PDF giữ nguyên bảng thô.
+- `tests/test_tong_hop_hstd_v2.py` — thêm regression test `test_df_xuat_excel_tong_hop_them_dong_tong_va_lam_tron_trieu`.
+
+## [2026-08-28] — Thiết kế lại Báo cáo NQ11
+- `tabs/tab_baocao/reports/nq11.py` — bổ sung bộ lọc liên hoàn, KPI theo phạm vi, cảnh báo quá hạn, biểu đồ cơ cấu và 4 khu vực tổng quan/chương trình/địa bàn/chi tiết.
+- `tabs/tab_baocao/components/sticky_table.py` — sửa header bảng HTML bị Markdown hiển thị thành khối mã khi render bảng tổng hợp.
+- `tabs/tab_baocao/components/inline_filter.py` — bổ sung nhãn truy cập cho ô tìm kiếm nhanh và render đúng container được truyền vào.
+- `tests/test_baocao_tin_dung_so_lieu.py` — thêm hồi quy bảo toàn KPI, dư nợ, nợ quá hạn và tỷ trọng khi tổng hợp NQ11.
+
+## [2026-08-28] — Dọn helper unused rõ trong module production
+- `tabs/tab_khtd_giao_dc.py` — xóa các helper wide-table/tổng hợp trạng thái không còn call-site: `_rows_to_wide()`, `_wide_col_config()`, `_wide_to_du_lieu()`, `_bang_pivot_tom_tat()`, `_tat_ca_da_nhap_giao()`.
+- `services/khnv_bao_cao_service.py` — xóa `_tim_file_dienbao_prev()` vì không còn được gọi.
+- `services/khtd_mau07_service.py` — xóa `_sync_khtd_xa()` và cập nhật docstring module.
+- `tabs/tab_canh_bao_nqh.py` — xóa `_doc_snapshot_nqh_delta()` vì luồng so sánh kỳ đang dùng helper khác.
+- `tabs/tab_hhi.py` — xóa các helper treemap/top contributor không còn call-site.
+
+## [2026-08-28] — Nâng cấp Báo cáo GQVL lên v2 (phân tầng 4 nhóm, multiselect, bảng sticky)
+- `tabs/tab_baocao/reports/gqvl.py` — thay radio "Loại báo cáo" bằng multiselect tick nhiều loại (Phân tầng 4 nhóm / Theo nhà đầu tư / Theo PGD / Theo Xã / Tổng hợp giải ngân); thêm phân tầng 4 nhóm chuẩn `GQVL_PHAN_TANG` (TW-NHCSXH, TW-NSNN, ĐP-cấp tỉnh, ĐP-cấp xã); thêm bộ lọc PGD/nguồn vốn/khu vực + tìm kiếm nhanh; thêm bảng sticky (thanh tỷ trọng, badge tỷ lệ QH, dòng TỔNG CỘNG) + metric tooltip + xuất Excel/PDF chuẩn; giữ nguyên `_chuan_bi_gqvl`, `_fmt_df_trieu`, `_tong_hop_theo_nha_dau_tu` (đang được test import).
+
+## [2026-08-28] — Báo cáo tín dụng: "Tổng hợp theo" cho tick chọn nhiều mục cùng lúc
+- `tabs/tab_baocao/reports/tong_hop_hstd_v2.py` — thay radio "Tổng hợp theo" bằng multiselect (tick chọn nhiều mục); nâng `report_options` thành hằng module `_REPORT_OPTIONS`; tách phần render 1 loại tổng hợp thành `_render_mot_loai_tong_hop()` và render lần lượt xếp chồng từng mục được tick (giữ nguyên widget key riêng `th_{loai}_*` mỗi mục); thêm `_chuan_hoa_trang_thai_chon_nhieu()` chuyển session state chuỗi cũ (radio) sang list để không crash; deep-link `specific_report` giữ nguyên hành vi render 1 mục.
+- `tabs/tab_baocao/dashboard.py` — thêm `_nhom_hstd_dang_chon()`: đọc `th_loai_hstd_v2` an toàn khi giá trị là list (sync metric cards lấy mục đầu tiên).
+
+## [2026-08-28] — Dọn dead code tab legacy bị package che khuất
+- `tabs/tab_upload_khnv.py` — xóa file legacy trùng tên với package `tabs/tab_upload_khnv/`; runtime hiện import package `__init__.py`.
+- `tabs/tab_so_sanh_ky.py` — xóa router legacy trùng tên với package `tabs/tab_so_sanh_ky/`; runtime hiện import package `__init__.py`.
+- `CODE_INDEX.md` — sinh lại index sau khi xóa file legacy để tài liệu tra cứu không còn liệt kê entry đã dọn.
+
+## [2026-08-28] — Chặn cảnh báo Mục đích vốn crash khi thiếu schema
+- `tabs/tab_baocao/reports/tong_hop_hstd_v2.py` — `_thong_diep_muc_dich_chua_xac_dinh()`: thêm guard đủ cột tổng hợp/cột dữ liệu gốc trước khi đọc tỷ trọng, dư nợ và top PGD; ép numeric dư nợ trước khi group top PGD.
+- `tests/test_tong_hop_hstd_v2.py` — thêm regression test helper cảnh báo trả `None` khi DataFrame thiếu schema thay vì crash.
+- `BUGMAP.md` — thêm entry `C12` cho lỗi helper cảnh báo đọc DataFrame lệch schema.
+
+## [2026-08-28] — Hoàn thiện báo cáo Tổng hợp theo Mục đích vốn (GĐ1+GĐ2)
+- `tabs/tab_baocao/reports/tong_hop_hstd_v2.py` — `_xuat_pdf_tong_hop()`: strip emoji/ký tự đặc biệt ở MỌI vị trí trong tiêu đề PDF (không chỉ đầu chuỗi) và bỏ tiền tố trùng lặp "Báo cáo tổng hợp"; thêm `_thong_diep_muc_dich_chua_xac_dinh()` cảnh báo khi nhóm "Chưa xác định" chiếm ≥ 5% dư nợ kèm top 3 PGD thiếu nhiều nhất; thêm caption giải thích khi baseline 31/12 thiếu cột nhóm.
+- `tests/test_tong_hop_hstd_v2.py` — thêm 3 regression test: tiêu đề PDF md không emoji giữa chuỗi, cảnh báo trên ngưỡng 5%, dưới ngưỡng trả None.
+- `BUGMAP.md` — thêm entry `F18` cho lỗi emoji giữa tiêu đề PDF Tổng hợp HSTD.
+
+## [2026-08-27] — Thêm báo cáo HSTD theo mục đích sử dụng vốn
+- `tabs/tab_baocao/reports/tong_hop_hstd_v2.py` — thêm lựa chọn tổng hợp theo `Tên PNKT51`, đưa mục đích vốn vào báo cáo so sánh dư nợ và tìm kiếm nhanh.
+- `tabs/tab_baocao/tree_navigation.py` — bổ sung mục báo cáo "Theo Mục đích vốn" trong cây báo cáo.
+- `tests/test_tong_hop_hstd_v2.py` — thêm regression test cho tổng hợp và so sánh theo mục đích sử dụng vốn.
+
+## [2026-08-27] — Chặn test PDF mất nhãn đơn vị tiền trên CI
+- `pdf_service.py` — `_dang_ky_font()`: thêm fallback hậu kiểm để font italic/bolditalic không rơi về Times built-in nếu đã đăng ký được TNR regular/bold; ghi chú đơn vị tiền dùng font regular Unicode để giữ "triệu đồng" ổn định khi extract PDF trên Linux.
+- `BUGMAP.md` — thêm entry `F17` cho lỗi ghi chú đơn vị tiền PDF bị mất chữ Việt khi font nghiêng không ổn định trên CI.
+
+## [2026-08-27] — Đổi tên hiển thị Chi nhánh sang thành phố Đồng Nai
+- `config.py` — cập nhật `TEN_CHI_NHANH_HIEN_THI` thành "Chi nhánh Ngân hàng Chính sách xã hội thành phố Đồng Nai", giữ nguyên `DON_VI_CHI_NHANH` làm key nội bộ.
+- `app.py`, `auth.py` — đổi nhãn splash/login/footer sang tên Chi nhánh mới.
+- `pdf_service.py`, `components/export_pdf.py`, `services/*`, `tabs/tab_*`, `scripts/daily_report.py` — đổi header/footer/tờ trình/báo cáo PDF, Word, Excel sang dùng tên Chi nhánh mới hoặc hằng số hiển thị.
+- `services/word_xln_service.py`, `services/khnv_lich_tuan_service.py`, `docs/MAU BAO CAO KHNV/T6_ Tờ trình trình giám đốc CN điều chỉnh chỉ tiêu KH-TD.md` — rà soát bổ sung sau review, đổi nốt dòng kính gửi/tiêu đề còn ghi "tỉnh Đồng Nai".
+- `README.md`, `CLAUDE.md`, `CONVENTIONS.md`, `.trae/rules/rules.md`, `.clinerules`, `.cursorrules`, `.windsurfrules`, `docs/*`, `examples/*`, `Dockerfile`, `Chay_VBSP_SCM.bat`, `setup_env.bat` — cập nhật tài liệu, template, cấu hình và banner launcher liên quan.
+
+## [2026-08-27] — Fix test PDF fail trên CI Linux do thiếu font italic TNR
+- `pdf_service.py` — `_dang_ky_font()`: thêm fallback `elif FONT_NORMAL == "TNR"` / `elif FONT_BOLD == "TNR-Bold"` — khi thiếu font italic/bolditalic (máy Linux/CI) dùng font regular/bold đã đăng ký, tránh rơi về `Times-Italic` built-in không hỗ trợ unicode khiến chữ Việt bị mất (vd "(triệu đồng)", "(Ký, ghi rõ họ tên)").
+- `assets/timesi.ttf`, `assets/timesbi.ttf` — bổ sung font in nghiêng/in nghiêng-đậm Times New Roman để CI Linux đăng ký được `TNR-Italic`/`TNR-BoldItalic`.
+
 ## [2026-08-27] — Sửa launcher batch không đạt kiểm tra ASCII/CRLF
 - `Chay_VBSP_SCM.bat` — thay ký tự gạch dài non-ASCII trong comment bằng dấu `-` ASCII và chuẩn hóa lại CRLF để CMD/test launcher tương thích.
 - `BUGMAP.md` — thêm entry `J75` cho lỗi batch launcher có byte non-ASCII/LF lẻ.
@@ -63,7 +136,7 @@
 - Verify — `34 passed` nhóm PDF/báo cáo tín dụng, `11 passed` nhóm PDF phụ; compile sạch; render trực quan 3 PDF mẫu/3 trang PNG bằng `pypdfium2`.
 
 ## [2026-08-24] — Hoàn thiện format và layout toàn diện báo cáo xuất PDF
-- `pdf_service.py` — đăng ký đủ 4 font TNR (regular/bold/italic/bold-italic); thêm palette màu VBSP brand chuẩn (#1B5E20 family); mở rộng signature `xuat_pdf()` thêm `cols_percent`/`cols_dem`; thêm helper `_format_phan_tram()`; cải thiện header (2-layer HR, tiêu đề 14pt xanh lá, meta Ngày xuất·Người xuất·Nguồn); cải thiện bảng dữ liệu (col_ratio tỷ lệ thông minh theo loại cột, 3 hướng align, % có dấu %, đếm có phân cách nghìn, padding 5px, grid 2 lớp border, dòng xen kẽ row, dòng tổng màu xanh nhạt + text xanh đậm + lineabove 2.0px); thêm ghi chú đơn vị dưới bảng; cải thiện khối ký tên (leading=28, italic "(Ký, ghi rõ họ tên)", chức năng theo số cột ≥8→PHÒNG CHUYÊN MÔN/<8→KIỂM SOÁT); page footer 2 bên (NHCSXH Đồng Nai · Báo cáo nội bộ) + kẻ ngang xanh; font size tiers 7.5→11pt theo số cột.
+- `pdf_service.py` — đăng ký đủ 4 font TNR (regular/bold/italic/bold-italic); thêm palette màu VBSP brand chuẩn (#1B5E20 family); mở rộng signature `xuat_pdf()` thêm `cols_percent`/`cols_dem`; thêm helper `_format_phan_tram()`; cải thiện header (2-layer HR, tiêu đề 14pt xanh lá, meta Ngày xuất·Người xuất·Nguồn); cải thiện bảng dữ liệu (col_ratio tỷ lệ thông minh theo loại cột, 3 hướng align, % có dấu %, đếm có phân cách nghìn, padding 5px, grid 2 lớp border, dòng xen kẽ row, dòng tổng màu xanh nhạt + text xanh đậm + lineabove 2.0px); thêm ghi chú đơn vị dưới bảng; cải thiện khối ký tên (leading=28, italic "(Ký, ghi rõ họ tên)", chức năng theo số cột ≥8→PHÒNG CHUYÊN MÔN/<8→KIỂM SOÁT); page footer 2 bên (Chi nhánh Ngân hàng Chính sách xã hội thành phố Đồng Nai · Báo cáo nội bộ) + kẻ ngang xanh; font size tiers 7.5→11pt theo số cột.
 - `components/export_pdf.py` — đồng bộ cải thiện format với `pdf_service.py`: đăng ký 4 font TNR, palette màu brand, `_ve_header()` return `ngay_str`; `xuat_pdf_co_chart()` cập nhật signature thêm `cols_percent`/`cols_dem`, col_ratio thông minh, align 3 hướng, format %/đếm riêng, khối ký tên, page footer, ghi chú đơn vị, font size tăng 7.5→9.5pt.
 - `tabs/tab_baocao/reports/tong_hop_hstd_v2.py` — `_xuat_pdf_tong_hop()` tách riêng `cols_tien`/`cols_dem`/`cols_percent`, thêm `don_vi_tien="triệu đồng"`.
 - `tabs/tab_baocao/reports/no_rui_ro_v2.py` — `_xuat_pdf_ty_le_no_xau()` thêm `don_vi_tien="triệu đồng"` và `cols_percent=["Tỷ lệ nợ xấu %"]`.
@@ -3688,7 +3761,7 @@
 - `tabs/tab_so_sanh_ky/render_moc_nam.py` dòng ~302–437 — Thay thế 12 `st.metric()` cũ bằng dashboard mới: 2 big cards, 4 mini cards, donut chart Plotly, bảng so sánh compact
 
 ## [2026-05-25] — Fix 3 bugs mẫu 04/05 XLN
-- `tabs/tab_xu_ly_rui_ro.py` — Thêm import `TEN_CHI_NHANH_HIEN_THI`; thay 2 chỗ hardcode `"Chi nhánh NHCSXH tỉnh Đồng Nai"` bằng constant (vi phạm rule 5.6).
+- `tabs/tab_xu_ly_rui_ro.py` — Thêm import `TEN_CHI_NHANH_HIEN_THI`; thay 2 chỗ hardcode `"Chi nhánh Ngân hàng Chính sách xã hội thành phố Đồng Nai"` bằng constant (vi phạm rule 5.6).
 - `services/word_xln_service.py` dòng ~1830 — `_add_bang_tong_hop_04_05()`: bỏ param `loai` không dùng; cập nhật 2 caller.
 - `services/word_xln_service.py` dòng ~1863 — `_add_phan_ky_tong_hop()`: thêm dòng địa danh + ngày tháng trước bảng ký — param `ngay_lap`/`dia_danh` nhận vào nhưng chưa render → mẫu thiếu dòng bắt buộc.
 

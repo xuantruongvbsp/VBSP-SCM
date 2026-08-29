@@ -560,7 +560,7 @@ def render_splash() -> None:
                   <img src="data:image/png;base64,{LOGO_B64}" alt="VBSP logo">
                 </div>
                 <div>
-                  <div class="vbsp-splash-kicker">NHCSXH Chi nhánh Đồng Nai</div>
+                  <div class="vbsp-splash-kicker">{TEN_CHI_NHANH_HIEN_THI}</div>
                   <div class="vbsp-splash-title">VBSP-SCM</div>
                 </div>
               </div>

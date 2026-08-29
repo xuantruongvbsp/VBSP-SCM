@@ -217,7 +217,6 @@ def render(tab: DeltaGenerator | None = None, **kwargs) -> None:
     bang_pgd = pd.DataFrame()
     bang_ct = pd.DataFrame()
     bang_uy_thac = pd.DataFrame()
-    bang_dienbao = pd.DataFrame()
     chenh_lech: list = []
 
     with ctx:

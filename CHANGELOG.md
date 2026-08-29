@@ -8,7 +8,7 @@
 - `BUGMAP.md` — thêm entry `B95` cho lỗi menu báo cáo định kỳ bị tách rời/dễ gây nhầm luồng vận hành.
 
 ## [2026-08-29] — Bỏ khối "Chọn mẫu báo cáo" và nút tải Excel/Word trong tab Báo cáo KHNV
-- `tabs/tab_khnv_bao_cao.py` — bỏ toàn bộ khối "Chọn mẫu báo cáo" + 2 nút tải Excel/Word ở cuối tab (chỉ giữ 3 chế độ Điện báo/HSTD/Đối chiếu ở trên); dọn import `lay_danh_sach_mau`, `xuat_excel_bao_cao_khnv`, `xuat_word_bao_cao_khnv`, `build_template_vars`, `render_mau_preview` không còn dùng.
+- `tabs/tab_khnv_bao_cao.py` — bỏ toàn bộ khối "Chọn mẫu báo cáo" + 2 nút tải Excel/Word ở cuối tab (chỉ giữ 3 chế độ Điện báo/HSTD/Đối chiếu ở trên); dọn import `lay_danh_sach_mau`, `xuat_excel_bao_cao_khnv`, `xuat_word_bao_cao_khnv`, `build_template_vars`, `render_mau_preview` và các biến dead `bang_dienbao`, `role`, `username` không còn dùng.
 
 ## [2026-08-29] — Khóa phạm vi Báo cáo định kỳ và tách gửi Telegram khỏi tạo file thủ công
 - `tabs/tab_bao_cao_dinh_ky.py` dòng ~41 — chặn role PGD xem/tải báo cáo định kỳ toàn Chi nhánh; nút tạo thủ công gọi `generate_daily_report(notify=False)` và hiển thị rõ không gửi Telegram.

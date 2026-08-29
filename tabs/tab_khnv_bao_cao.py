@@ -209,8 +209,6 @@ def render(tab: DeltaGenerator | None = None, **kwargs) -> None:
 
     _df_full = kwargs.get("df_full")
     df_full = _df_full if _df_full is not None else kwargs.get("df")
-    role = kwargs.get("role", "")
-    username = kwargs.get("username", "unknown")
 
     # Biến dùng chung
     so_lieu: dict = {}
@@ -331,7 +329,6 @@ def render(tab: DeltaGenerator | None = None, **kwargs) -> None:
             )
             if "error" not in so_lieu_db:
                 so_lieu = {**so_lieu_db, "thang": thang, "nam": nam}
-                bang_dienbao = so_lieu_db.get("bang_theo_dv", pd.DataFrame())
             else:
                 st.error(f"❌ Không tổng hợp được Điện báo: {so_lieu_db['error']}")
 
@@ -491,8 +488,3 @@ def render(tab: DeltaGenerator | None = None, **kwargs) -> None:
                 )
             else:
                 st.info("Không có dữ liệu đối chiếu.")
-
-            bang_pgd = so_lieu.get("bang_pgd", pd.DataFrame())
-            bang_ct = so_lieu.get("bang_chuong_trinh", pd.DataFrame())
-            bang_uy_thac = so_lieu.get("bang_uy_thac", pd.DataFrame())
-            bang_dienbao = so_lieu_db.get("bang_theo_dv", pd.DataFrame())

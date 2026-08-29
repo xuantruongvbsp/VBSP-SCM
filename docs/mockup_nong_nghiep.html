@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mockup — Báo cáo Nông nghiệp</title>
+<style>
+  :root {
+    --green-900: #1B5E20;
+    --green-700: #2E7D32;
+    --green-500: #4CAF50;
+    --green-100: #C8E6C9;
+    --green-50:  #E8F5E9;
+    --bg:        #ffffff;
+    --border:    #E0E0E0;
+    --text:      #1f2937;
+    --muted:     #6b7280;
+    --warn-bg:   #FFF8E1;
+    --warn-tx:   #8a6d1a;
+    --warn-bd:   #f0d060;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "Segoe UI", Roboto, Arial, sans-serif;
+    background: #f5f6f8;
+    color: var(--text);
+    padding: 24px;
+    line-height: 1.45;
+  }
+  .wrap { max-width: 1120px; margin: 0 auto; }
+
+  /* Dropdown mô phỏng */
+  .selectbar {
+    background: #fff; border: 1px solid var(--border); border-radius: 10px;
+    padding: 14px 18px; margin-bottom: 16px;
+  }
+  .selectbar .lbl { font-size: 14px; color: var(--muted); margin-bottom: 6px; }
+  .selectbox {
+    display: flex; align-items: center; justify-content: space-between;
+    border: 1px solid #ccc; border-radius: 8px; padding: 10px 14px;
+    font-size: 15px; cursor: pointer; background: #fafafa;
+  }
+  .selectbox .caret { color: var(--muted); }
+
+  /* Tiêu đề */
+  h2.subtitle { font-size: 22px; font-weight: 700; margin: 20px 0 16px; }
+
+  /* KPI cards */
+  .kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
+  .kpi {
+    background: #fff; border: 1px solid var(--border); border-radius: 10px;
+    padding: 16px; border-top: 3px solid var(--green-500);
+  }
+  .kpi .k-label { font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+  .kpi .k-value { font-size: 24px; font-weight: 700; color: var(--green-900); }
+  .kpi .k-sub { font-size: 12px; color: var(--muted); margin-top: 4px; }
+
+  /* Tabs */
+  .tabs { display: flex; gap: 4px; border-bottom: 2px solid var(--green-100); margin-bottom: 16px; }
+  .tab {
+    padding: 10px 18px; font-size: 15px; cursor: pointer; color: var(--muted);
+    border-radius: 8px 8px 0 0;
+  }
+  .tab.active {
+    color: var(--green-900); font-weight: 600;
+    border-bottom: 3px solid var(--green-700); background: #fff;
+  }
+
+  /* Caption cảnh báo */
+  .note {
+    background: var(--warn-bg); border: 1px solid var(--warn-bd);
+    border-left: 4px solid #f0a020; color: var(--warn-tx);
+    padding: 10px 14px; border-radius: 8px; font-size: 13px; margin-bottom: 14px;
+  }
+
+  /* Bảng */
+  .card { background: #fff; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  thead th {
+    background: var(--green-700); color: #fff; padding: 11px 10px; text-align: right;
+    font-weight: 600; font-size: 13px; white-space: nowrap;
+  }
+  thead th.left { text-align: left; }
+  tbody td { padding: 10px; text-align: right; border-top: 1px solid #f0f0f0; white-space: nowrap; }
+  tbody td.left { text-align: left; font-weight: 600; }
+  tbody tr:hover { background: var(--green-50); }
+  .num { font-variant-numeric: tabular-nums; }
+  .bar-cell { min-width: 120px; }
+  .bar { height: 7px; border-radius: 4px; background: var(--green-500); }
+  .bar-wrap { background: #ececec; border-radius: 4px; overflow: hidden; }
+  .badge {
+    display: inline-block; background: var(--green-100); color: var(--green-900);
+    padding: 2px 8px; border-radius: 12px; font-size: 12px; font-weight: 600;
+  }
+  .badge.warn { background: #ffe0b2; color: #8a4b00; }
+
+  /* Nút tải */
+  .downloads { display: flex; gap: 12px; margin-top: 20px; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 11px 20px; border-radius: 8px; font-size: 14px; font-weight: 600;
+    cursor: pointer; border: 1px solid var(--green-700); color: var(--green-700);
+    background: #fff; transition: .15s;
+  }
+  .btn.primary { background: var(--green-700); color: #fff; }
+  .btn:hover { opacity: .88; }
+
+  .muted-note { font-size: 12px; color: var(--muted); margin-top: 14px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- Dropdown chọn báo cáo -->
+  <div class="selectbar">
+    <div class="lbl">🔍 Chọn báo cáo</div>
+    <div class="selectbox">
+      <span>🌾 Báo cáo Nông nghiệp (HSTD)</span>
+      <span class="caret">▾</span>
+    </div>
+  </div>
+
+  <h2 class="subtitle">🌾 Báo cáo Nông nghiệp</h2>
+
+  <!-- KPI -->
+  <div class="kpi-row">
+    <div class="kpi">
+      <div class="k-label">🌾 Tổng dư nợ NN</div>
+      <div class="k-value">3.967,0 tỷ</div>
+      <div class="k-sub">Toàn bộ lĩnh vực nông nghiệp</div>
+    </div>
+    <div class="kpi">
+      <div class="k-label">👥 Số KH</div>
+      <div class="k-value">14.820</div>
+      <div class="k-sub">Khách hàng có dư nợ NN</div>
+    </div>
+    <div class="kpi">
+      <div class="k-label">📄 Số món</div>
+      <div class="k-value">15.860</div>
+      <div class="k-sub">Món vay nông nghiệp</div>
+    </div>
+    <div class="kpi">
+      <div class="k-label">⚠️ Tỷ lệ QH</div>
+      <div class="k-value">0,64%</div>
+      <div class="k-sub">Nợ quá hạn / tổng dư nợ</div>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <div class="tab active" data-tab="nongthon">🌾 Xã nông thôn</div>
+    <div class="tab" data-tab="phuong">🏙️ Phường (thành thị)</div>
+  </div>
+
+  <!-- Panel: Xã nông thôn -->
+  <div class="panel" id="panel-nongthon">
+    <div class="note">ℹ️ 1.240/12.900 món thuộc "Khác nông nghiệp" đã được loại khỏi thống kê nông nghiệp.</div>
+
+    <div class="card">
+      <table>
+        <thead>
+          <tr>
+            <th class="left">Lĩnh vực</th>
+            <th>Số KH</th>
+            <th>Số món</th>
+            <th>Tổng dư nợ</th>
+            <th>Trong hạn</th>
+            <th>Quá hạn</th>
+            <th>Khoanh</th>
+            <th class="left">Tỷ trọng</th>
+            <th>Tỷ lệ QH %</th>
+            <th>BQ/KH</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="left">Trồng trọt</td>
+            <td class="num">8.450</td>
+            <td class="num">9.120</td>
+            <td class="num">2.450.300</td>
+            <td class="num">2.438.500</td>
+            <td class="num">11.800</td>
+            <td class="num">4.200</td>
+            <td class="bar-cell"><div class="bar-wrap"><div class="bar" style="width:62%"></div></div></td>
+            <td class="num">0,48</td>
+            <td class="num">290</td>
+          </tr>
+          <tr>
+            <td class="left">Chăn nuôi</td>
+            <td class="num">3.200</td>
+            <td class="num">3.400</td>
+            <td class="num">1.180.500</td>
+            <td class="num">1.172.000</td>
+            <td class="num">8.500</td>
+            <td class="num">1.900</td>
+            <td class="bar-cell"><div class="bar-wrap"><div class="bar" style="width:30%"></div></div></td>
+            <td class="num">0,72</td>
+            <td class="num">369</td>
+          </tr>
+          <tr>
+            <td class="left">Nuôi trồng thủy sản</td>
+            <td class="num">620</td>
+            <td class="num">660</td>
+            <td class="num">240.800</td>
+            <td class="num">239.500</td>
+            <td class="num">1.300</td>
+            <td class="num">250</td>
+            <td class="bar-cell"><div class="bar-wrap"><div class="bar" style="width:6%"></div></div></td>
+            <td class="num">0,54</td>
+            <td class="num">388</td>
+          </tr>
+          <tr>
+            <td class="left">Lâm nghiệp</td>
+            <td class="num">380</td>
+            <td class="num">410</td>
+            <td class="num">95.400</td>
+            <td class="num">94.800</td>
+            <td class="num">600</td>
+            <td class="num">100</td>
+            <td class="bar-cell"><div class="bar-wrap"><div class="bar" style="width:2%"></div></div></td>
+            <td class="num">0,63</td>
+            <td class="num">251</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Panel: Phường (thành thị) -->
+  <div class="panel" id="panel-phuong" style="display:none;">
+    <div class="note">ℹ️ 480/2.800 món thuộc "Khác nông nghiệp" đã được loại khỏi thống kê nông nghiệp.</div>
+
+    <div class="card">
+      <table>
+        <thead>
+          <tr>
+            <th class="left">Lĩnh vực</th>
+            <th>Số KH</th>
+            <th>Số món</th>
+            <th>Tổng dư nợ</th>
+            <th>Trong hạn</th>
+            <th>Quá hạn</th>
+            <th>Khoanh</th>
+            <th class="left">Tỷ trọng</th>
+            <th>Tỷ lệ QH %</th>
+            <th>BQ/KH</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="left">Trồng trọt</td>
+            <td class="num">1.200</td>
+            <td class="num">1.280</td>
+            <td class="num">360.700</td>
+            <td class="num">358.900</td>
+            <td class="num">1.800</td>
+            <td class="num">500</td>
+            <td class="bar-cell"><div class="bar-wrap"><div class="bar" style="width:62%"></div></div></td>
+            <td class="num">0,50</td>
+            <td class="num">301</td>
+          </tr>
+          <tr>
+            <td class="left">Chăn nuôi</td>
+            <td class="num">950</td>
+            <td class="num">1.010</td>
+            <td class="num">220.300</td>
+            <td class="num">219.000</td>
+            <td class="num">1.300</td>
+            <td class="num">300</td>
+            <td class="bar-cell"><div class="bar-wrap"><div class="bar" style="width:38%"></div></div></td>
+            <td class="num">0,59</td>
+            <td class="num">232</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="muted-note">Đơn vị: triệu đồng (Tổng dư nợ, Trong hạn, Quá hạn, Khoanh, BQ/KH).</div>
+
+  <!-- Nút tải -->
+  <div class="downloads">
+    <div class="btn primary">⬇️ Tải Excel (.xlsx)</div>
+    <div class="btn">⬇️ Tải PDF (.pdf)</div>
+  </div>
+
+</div>
+
+<script>
+  document.querySelectorAll('.tab').forEach(function (tab) {
+    tab.addEventListener('click', function () {
+      document.querySelectorAll('.tab').forEach(function (t) { t.classList.remove('active'); });
+      tab.classList.add('active');
+      var target = tab.getAttribute('data-tab');
+      document.querySelectorAll('.panel').forEach(function (p) { p.style.display = 'none'; });
+      document.getElementById('panel-' + target).style.display = 'block';
+    });
+  });
+</script>
+</body>
+</html>

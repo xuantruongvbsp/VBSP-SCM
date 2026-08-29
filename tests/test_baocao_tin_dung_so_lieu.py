@@ -50,6 +50,7 @@ from tabs.tab_baocao.reports.nq11 import (
     _tinh_chi_so_nq11,
 )
 from tabs.tab_baocao.reports.nong_nghiep import (
+    _dong_tong_nn,
     _gan_linh_vuc,
     _loc_pham_vi_nong_nghiep,
     _tong_hop_linh_vuc,
@@ -293,3 +294,28 @@ def test_nong_nghiep_tong_hop_fallback_khi_ma_kh_rong_va_thieu_cot_no() -> None:
     assert result.loc[0, "Số_món"] == 2
     assert result.loc[0, "Dư_nợ_trong_hạn"] == 0
     assert result.loc[0, "Dư_nợ_quá_hạn"] == 0
+
+
+def test_nong_nghiep_dong_tong_pdf_dung_pham_vi_bao_cao() -> None:
+    df = pd.DataFrame({
+        COT_TEN_XA: ["Xã Long Đức", "Biên Hòa", "Biên Hòa", "Xã Long Đức"],
+        COT_TEN_PNKT51: [
+            "Nuôi tôm",
+            "Nuôi trồng thủy sản",
+            "Chăn nuôi bò",
+            "Trồng rừng sản xuất",
+        ],
+        COT_TONG_DU_NO: [100_000_000, 200_000_000, 300_000_000, 400_000_000],
+        COT_DU_NO_TH: [100_000_000, 180_000_000, 270_000_000, 360_000_000],
+        COT_DU_NO_QH: [0, 20_000_000, 30_000_000, 40_000_000],
+        COT_SO_KU: ["KU1", "KU2", "KU3", "KU4"],
+        COT_MA_KH: ["KH1", "KH2", "KH3", "KH4"],
+    })
+
+    result = _dong_tong_nn(_gan_linh_vuc(df))
+
+    assert result is not None
+    assert result["Số KH"] == 3
+    assert result["Số món"] == 3
+    assert result["Tổng dư nợ"] == 800
+    assert result["Quá hạn"] == 70

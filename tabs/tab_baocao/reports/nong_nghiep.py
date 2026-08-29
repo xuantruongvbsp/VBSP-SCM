@@ -1,11 +1,10 @@
-"""Báo cáo Nông nghiệp — thống kê dư nợ theo lĩnh vực nông nghiệp.
+"""Báo cáo Nông nghiệp — thống kê dư nợ theo mục đích sử dụng vốn.
 
 Phạm vi:
-- Xã nông thôn: toàn bộ lĩnh vực nông nghiệp
-  (Trồng trọt, Chăn nuôi, Nuôi trồng thủy sản, Lâm nghiệp).
+- Xã nông thôn: TẤT CẢ mục đích sử dụng vốn (Tên PNKT51).
 - Phường (thành thị): Trồng trọt + Chăn nuôi.
 
-Phân loại lĩnh vực từ cột "Tên PNKT51" (Mục đích sử dụng vốn) theo từ khóa
+Phân loại lĩnh vực nông nghiệp (cho phường) từ cột "Tên PNKT51" theo từ khóa
 không dấu, khai báo trong config.py (NN_TU_KHOA_*).
 """
 from __future__ import annotations
@@ -35,13 +34,8 @@ if TYPE_CHECKING:
     from streamlit.delta_generator import DeltaGenerator
 
 _COT_LINH_VUC = "_linh_vuc_nn"
+_NHOM_CHUA_XAC_DINH = "Chưa xác định"
 
-_LINH_VUC_NONG_THON = [
-    NN_LINH_VUC_TRONG_TROT,
-    NN_LINH_VUC_CHAN_NUOI,
-    NN_LINH_VUC_THUY_SAN,
-    NN_LINH_VUC_LAM_NGHIEP,
-]
 _LINH_VUC_THANH_THI = [
     NN_LINH_VUC_TRONG_TROT,
     NN_LINH_VUC_CHAN_NUOI,
@@ -50,6 +44,7 @@ _LINH_VUC_THANH_THI = [
 _COT_TIEN = ("Tổng dư nợ", "Trong hạn", "Quá hạn", "Khoanh", "BQ/KH")
 _COT_DEM = ("Số KH", "Số món")
 _COT_PHAN_TRAM = ("Tỷ trọng %", "Tỷ lệ QH %")
+_NHAN_NHOM_GOP = "Mục đích / Lĩnh vực"
 
 
 def _bo_dau(s) -> str:
@@ -80,15 +75,13 @@ def _gan_linh_vuc(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def _loc_pham_vi_nong_nghiep(df_phan_loai: pd.DataFrame) -> pd.DataFrame:
-    """Lọc đúng phạm vi báo cáo: nông thôn lấy 4 lĩnh vực, phường lấy 2 lĩnh vực."""
+def _loc_pham_vi_bao_cao(df_phan_loai: pd.DataFrame) -> pd.DataFrame:
+    """Lọc phạm vi báo cáo: nông thôn lấy TẤT CẢ mục đích, phường lấy 2 lĩnh vực."""
     if df_phan_loai.empty:
         return df_phan_loai.copy()
 
     kv = phan_loai_khu_vuc_df(df_phan_loai)
-    mask_nong_thon = kv.eq("nong_thon") & df_phan_loai[_COT_LINH_VUC].isin(
-        _LINH_VUC_NONG_THON
-    )
+    mask_nong_thon = kv.eq("nong_thon")
     mask_thanh_thi = kv.eq("thanh_thi") & df_phan_loai[_COT_LINH_VUC].isin(
         _LINH_VUC_THANH_THI
     )
@@ -141,13 +134,61 @@ def _tong_hop_linh_vuc(df: pd.DataFrame, chi_linh_vuc: list[str]) -> pd.DataFram
     return df_th
 
 
-def _df_hien_thi(df_th: pd.DataFrame) -> pd.DataFrame:
+def _tong_hop_theo_muc_dich(df: pd.DataFrame) -> pd.DataFrame:
+    """Tổng hợp dư nợ theo MỤC ĐÍCH (Tên PNKT51) — lấy TẤT CẢ giá trị, không lọc."""
+    df = df.copy()
+    if df.empty:
+        return pd.DataFrame()
+
+    muc_dich = df[COT_TEN_PNKT51].astype("string").str.strip()
+    df[COT_TEN_PNKT51] = muc_dich.mask(
+        muc_dich.isna() | muc_dich.str.lower().isin({"", "nan", "none", "null", "<na>"}),
+        _NHOM_CHUA_XAC_DINH,
+    )
+
+    for cot in (COT_TONG_DU_NO, COT_DU_NO_TH, COT_DU_NO_QH, COT_DU_NO_KHOANH):
+        if cot in df.columns:
+            df[cot] = pd.to_numeric(df[cot], errors="coerce").fillna(0)
+        else:
+            df[cot] = 0.0
+
+    cot_kh = _chon_cot_dem_hop_le(df, [COT_MA_KH, COT_TEN_KH])
+    cot_ku = _chon_cot_dem_hop_le(df, [COT_SO_KU])
+    df["_kh_dem_nn"] = _series_dem_hop_le(df, cot_kh) if cot_kh else df.index.astype(str)
+    df["_ku_dem_nn"] = _series_dem_hop_le(df, cot_ku) if cot_ku else df.index.astype(str)
+
+    agg_kwargs = {
+        "Tổng_dư_nợ": (COT_TONG_DU_NO, "sum"),
+        "Dư_nợ_trong_hạn": (COT_DU_NO_TH, "sum"),
+        "Dư_nợ_quá_hạn": (COT_DU_NO_QH, "sum"),
+        "Số_KH": ("_kh_dem_nn", "nunique"),
+        "Số_món": ("_ku_dem_nn", "nunique"),
+        "Dư_nợ_khoanh": (COT_DU_NO_KHOANH, "sum"),
+    }
+
+    df_th = df.groupby(COT_TEN_PNKT51, dropna=False).agg(**agg_kwargs).reset_index()
+
+    tong_dn = float(df_th["Tổng_dư_nợ"].sum())
+    df_th["Tỷ_trọng_%"] = (
+        (df_th["Tổng_dư_nợ"] / tong_dn * 100).round(2) if tong_dn > 0 else 0.0
+    )
+    df_th["Tỷ_lệ_QH_%"] = (
+        df_th["Dư_nợ_quá_hạn"]
+        / df_th["Tổng_dư_nợ"].replace(0, float("nan"))
+        * 100
+    ).round(2).fillna(0)
+    df_th["BQ_KH"] = df_th["Tổng_dư_nợ"] / df_th["Số_KH"].replace(0, float("nan"))
+
+    return df_th.sort_values("Tổng_dư_nợ", ascending=False).reset_index(drop=True)
+
+
+def _df_hien_thi(df_th: pd.DataFrame, cot_nhom: str = _COT_LINH_VUC, nhan_nhom: str = "Lĩnh vực") -> pd.DataFrame:
     """Chuyển về bảng hiển thị (triệu đồng)."""
     if df_th.empty:
         return pd.DataFrame()
     co_khoanh = "Dư_nợ_khoanh" in df_th.columns
     df = pd.DataFrame({
-        "Lĩnh vực": df_th[_COT_LINH_VUC].astype(str),
+        nhan_nhom: df_th[cot_nhom].astype(str),
         "Số KH": df_th["Số_KH"].astype(int),
         "Số món": df_th["Số_món"].astype(int),
         "Tổng dư nợ": (df_th["Tổng_dư_nợ"] / 1_000_000).round(0),
@@ -165,15 +206,17 @@ def _df_hien_thi(df_th: pd.DataFrame) -> pd.DataFrame:
 def _df_tong_hop_hai_khu_vuc(df_phan_loai: pd.DataFrame, kv: pd.Series) -> pd.DataFrame:
     """Gộp bảng nông thôn + thành thị thành một bảng có cột 'Khu vực'."""
     parts = []
-    for khu_vuc, ds_lv, ten in (
-        ("nong_thon", _LINH_VUC_NONG_THON, "Xã nông thôn"),
-        ("thanh_thi", _LINH_VUC_THANH_THI, "Phường (thành thị)"),
-    ):
-        df_th = _tong_hop_linh_vuc(df_phan_loai[kv.eq(khu_vuc)], ds_lv)
-        if df_th.empty:
-            continue
-        df_h = _df_hien_thi(df_th)
-        df_h.insert(0, "Khu vực", ten)
+    # Nông thôn: tất cả mục đích sử dụng vốn
+    df_th_nt = _tong_hop_theo_muc_dich(df_phan_loai[kv.eq("nong_thon")])
+    if not df_th_nt.empty:
+        df_h = _df_hien_thi(df_th_nt, COT_TEN_PNKT51, _NHAN_NHOM_GOP)
+        df_h.insert(0, "Khu vực", "Xã nông thôn")
+        parts.append(df_h)
+    # Phường: trồng trọt + chăn nuôi
+    df_th_tt = _tong_hop_linh_vuc(df_phan_loai[kv.eq("thanh_thi")], _LINH_VUC_THANH_THI)
+    if not df_th_tt.empty:
+        df_h = _df_hien_thi(df_th_tt, _COT_LINH_VUC, _NHAN_NHOM_GOP)
+        df_h.insert(0, "Khu vực", "Phường (thành thị)")
         parts.append(df_h)
     if not parts:
         return pd.DataFrame()
@@ -182,7 +225,7 @@ def _df_tong_hop_hai_khu_vuc(df_phan_loai: pd.DataFrame, kv: pd.Series) -> pd.Da
 
 def _dong_tong_nn(df_phan_loai: pd.DataFrame) -> dict | None:
     """Dòng TỔNG CỘNG cho PDF — đếm KH/món theo nunique, không cộng trùng."""
-    df = df_phan_loai[df_phan_loai[_COT_LINH_VUC].isin(_LINH_VUC_NONG_THON)].copy()
+    df = _loc_pham_vi_bao_cao(df_phan_loai)
     if df.empty:
         return None
 
@@ -191,20 +234,15 @@ def _dong_tong_nn(df_phan_loai: pd.DataFrame) -> dict | None:
             return round(pd.to_numeric(df[cot], errors="coerce").fillna(0).sum() / 1_000_000)
         return ""
 
-    cot_kh = COT_MA_KH if COT_MA_KH in df.columns else (
-        COT_TEN_KH if COT_TEN_KH in df.columns else None
-    )
-    cot_ku = COT_SO_KU if COT_SO_KU in df.columns else None
-
     tong_dn = pd.to_numeric(df[COT_TONG_DU_NO], errors="coerce").fillna(0).sum()
     tong_qh = pd.to_numeric(df[COT_DU_NO_QH], errors="coerce").fillna(0).sum()
-    so_kh = int(df[cot_kh].nunique()) if cot_kh else len(df)
+    so_kh = _dem_khach_hang(df)
 
     dong = {
         "Khu vực": "TỔNG CỘNG",
-        "Lĩnh vực": "",
+        _NHAN_NHOM_GOP: "",
         "Số KH": so_kh,
-        "Số món": int(df[cot_ku].nunique()) if cot_ku else len(df),
+        "Số món": _dem_unique_hop_le(df, COT_SO_KU),
         "Tổng dư nợ": round(tong_dn / 1_000_000),
         "Trong hạn": _sum(COT_DU_NO_TH),
         "Quá hạn": round(tong_qh / 1_000_000),
@@ -328,7 +366,7 @@ def render_nong_nghiep(
     df_phan_loai = _gan_linh_vuc(df_scope)
     kv = phan_loai_khu_vuc_df(df_phan_loai)
 
-    df_nn = _loc_pham_vi_nong_nghiep(df_phan_loai)
+    df_nn = _loc_pham_vi_bao_cao(df_phan_loai)
     if not df_nn.empty:
         if COT_TONG_DU_NO in df_nn.columns:
             df_nn[COT_TONG_DU_NO] = pd.to_numeric(df_nn[COT_TONG_DU_NO], errors="coerce").fillna(0)
@@ -340,7 +378,7 @@ def render_nong_nghiep(
     so_mon = _dem_unique_hop_le(df_nn, COT_SO_KU)
 
     kpi_row([
-        {"label": "Tổng dư nợ NN", "value": tong_dn / 1e9, "icon": "🌾", "suffix": "tỷ", "precision": 3},
+        {"label": "Tổng dư nợ", "value": tong_dn / 1e9, "icon": "🌾", "suffix": "tỷ", "precision": 3},
         {"label": "Số KH", "value": so_kh, "icon": "👥", "precision": 0},
         {"label": "Số món", "value": so_mon, "icon": "📄", "precision": 0},
         {"label": "Tỷ lệ QH", "value": round(tong_qh / tong_dn * 100, 2) if tong_dn > 0 else 0.0, "icon": "⚠️", "suffix": "%", "precision": 2, "delta_color": "inverse"},
@@ -352,14 +390,11 @@ def render_nong_nghiep(
     t1, t2 = ctx.tabs(["🌾 Xã nông thôn", "🏙️ Phường (thành thị)"])
 
     with t1:
-        df_th_nt = _tong_hop_linh_vuc(df_phan_loai[kv.eq("nong_thon")], _LINH_VUC_NONG_THON)
+        df_th_nt = _tong_hop_theo_muc_dich(df_phan_loai[kv.eq("nong_thon")])
         if df_th_nt.empty:
-            st.info("Không có dữ liệu nông nghiệp ở khu vực nông thôn.")
+            st.info("Không có dữ liệu ở khu vực nông thôn.")
         else:
-            note = _thong_tin_khac(df_phan_loai, "nong_thon")
-            if note:
-                st.caption(note)
-            st.dataframe(_df_hien_thi(df_th_nt), use_container_width=True, hide_index=True, column_config=cfg)
+            st.dataframe(_df_hien_thi(df_th_nt, COT_TEN_PNKT51, "Mục đích"), use_container_width=True, hide_index=True, column_config=cfg)
 
     with t2:
         df_th_tt = _tong_hop_linh_vuc(df_phan_loai[kv.eq("thanh_thi")], _LINH_VUC_THANH_THI)
@@ -369,11 +404,11 @@ def render_nong_nghiep(
             note = _thong_tin_khac(df_phan_loai, "thanh_thi")
             if note:
                 st.caption(note)
-            st.dataframe(_df_hien_thi(df_th_tt), use_container_width=True, hide_index=True, column_config=cfg)
+            st.dataframe(_df_hien_thi(df_th_tt, _COT_LINH_VUC, "Lĩnh vực"), use_container_width=True, hide_index=True, column_config=cfg)
 
     sheets = {}
-    df_nt_xuat = _df_hien_thi(_tong_hop_linh_vuc(df_phan_loai[kv.eq("nong_thon")], _LINH_VUC_NONG_THON))
-    df_tt_xuat = _df_hien_thi(_tong_hop_linh_vuc(df_phan_loai[kv.eq("thanh_thi")], _LINH_VUC_THANH_THI))
+    df_nt_xuat = _df_hien_thi(_tong_hop_theo_muc_dich(df_phan_loai[kv.eq("nong_thon")]), COT_TEN_PNKT51, "Mục đích")
+    df_tt_xuat = _df_hien_thi(_tong_hop_linh_vuc(df_phan_loai[kv.eq("thanh_thi")], _LINH_VUC_THANH_THI), _COT_LINH_VUC, "Lĩnh vực")
     if not df_nt_xuat.empty:
         sheets["Xa nong thon"] = df_nt_xuat
     if not df_tt_xuat.empty:
@@ -383,7 +418,7 @@ def render_nong_nghiep(
     if sheets:
         with col_xl:
             buf = xuat_excel(sheets)
-            ctx.download_button(
+            st.download_button(
                 "⬇️ Tải Excel (.xlsx)",
                 data=buf,
                 file_name="BaoCao_NongNghiep.xlsx",
@@ -399,7 +434,7 @@ def render_nong_nghiep(
         pdf_bytes = None
     if pdf_bytes:
         with col_pdf:
-            ctx.download_button(
+            st.download_button(
                 "⬇️ Tải PDF (.pdf)",
                 data=pdf_bytes,
                 file_name="BaoCao_NongNghiep.pdf",

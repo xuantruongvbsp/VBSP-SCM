@@ -3859,6 +3859,18 @@ def _to_int(val, default=0):
 
 ---
 
+### C47 — Dòng TỔNG CỘNG PDF Báo cáo Nông nghiệp lệch phạm vi
+| | |
+|---|---|
+| **File** | `tabs/tab_baocao/reports/nong_nghiep.py` → `_dong_tong_nn()` |
+| **Dấu hiệu** | Bảng hiển thị/PDF chi tiết phường chỉ có trồng trọt + chăn nuôi, nhưng dòng TỔNG CỘNG PDF vẫn có thể cộng thêm thủy sản/lâm nghiệp ở phường. |
+| **Nguyên nhân** | Helper dòng tổng PDF lọc tất cả 4 lĩnh vực nông nghiệp trên toàn bộ dữ liệu, chưa dùng cùng quy tắc phân tách nông thôn/thành thị của báo cáo. |
+| **Fix** | Cho `_dong_tong_nn()` dùng `_loc_pham_vi_nong_nghiep()` trước khi tính tổng; đếm KH/món qua helper bỏ giá trị rỗng; giữ tiền ở đơn vị triệu đồng. |
+| **Test** | `tests/test_baocao_tin_dung_so_lieu.py::test_nong_nghiep_dong_tong_pdf_dung_pham_vi_bao_cao` |
+| **Ngày fix** | 2026-08-29 |
+
+---
+
 ### B85 — Bảng NQH khó đọc ở dark theme và đếm đơn vị rỗng
 | | |
 |---|---|

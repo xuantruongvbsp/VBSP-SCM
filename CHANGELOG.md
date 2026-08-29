@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## [2026-08-29] — Đồng bộ PDF Báo cáo Nông nghiệp với phạm vi báo cáo
+- `tabs/tab_baocao/reports/nong_nghiep.py` — dòng TỔNG CỘNG PDF dùng cùng phạm vi lọc với KPI/bảng; nút tải Excel/PDF render trong đúng cột.
+- `tests/test_baocao_tin_dung_so_lieu.py` — thêm hồi quy dòng tổng PDF không cộng thủy sản/lâm nghiệp ở phường.
+- `BUGMAP.md` — thêm entry `C47` cho lỗi dòng tổng PDF Báo cáo Nông nghiệp lệch phạm vi.
+
 ## [2026-08-29] — Sửa phạm vi và từ khóa Báo cáo Nông nghiệp
 - `config.py` — siết các từ khóa nông nghiệp quá ngắn/dễ bắt nhầm như `trong`, `cua`, `tom`; bổ sung cụm từ khóa rõ nghĩa hơn.
 - `tabs/tab_baocao/reports/nong_nghiep.py` — KPI tổng chỉ tính đúng phạm vi: xã nông thôn lấy 4 lĩnh vực, phường chỉ lấy trồng trọt + chăn nuôi; chuẩn hóa chữ `đ`, render nội dung đúng tab và fallback khi `Mã KH` rỗng/thiếu cột nợ thành phần.

@@ -92,6 +92,7 @@ def render_dashboard(
         "⚠️ Báo cáo Nợ rủi ro (HSTD)",
         "📑 Báo cáo NQ11",
         "💼 Báo cáo GQVL",
+        "🌾 Báo cáo Nông nghiệp (HSTD)",
         "⭐ Báo cáo Chấm điểm Tổ TK&VV",
     ]
     
@@ -112,6 +113,7 @@ def render_dashboard(
         "⚠️ Báo cáo Nợ rủi ro (HSTD)": "noruiro",
         "📑 Báo cáo NQ11": "nq11",
         "💼 Báo cáo GQVL": "gqvl",
+        "🌾 Báo cáo Nông nghiệp (HSTD)": "nongnghiep",
         "⭐ Báo cáo Chấm điểm Tổ TK&VV": "cdtotkvv",
     }
     

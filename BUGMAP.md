@@ -3847,6 +3847,18 @@ def _to_int(val, default=0):
 
 ---
 
+### C46 — Báo cáo Nông nghiệp tính sai phạm vi phường và bắt nhầm từ khóa ngắn
+| | |
+|---|---|
+| **File** | `tabs/tab_baocao/reports/nong_nghiep.py`; `config.py` |
+| **Dấu hiệu** | KPI tổng nông nghiệp có thể cộng cả thủy sản/lâm nghiệp ở phường, trong khi bảng phường chỉ hiển thị trồng trọt + chăn nuôi; các từ khóa ngắn như `trong`, `cua`, `tom` dễ bắt nhầm câu mô tả thông thường; schema thiếu cột nợ thành phần có thể gây `KeyError`. |
+| **Nguyên nhân** | KPI dùng toàn bộ 4 lĩnh vực nông nghiệp cho mọi khu vực thay vì áp quy tắc riêng theo nông thôn/thành thị; phân loại dùng so khớp substring trực tiếp với một số từ khóa quá rộng; hàm tổng hợp mặc định một số cột HSTD luôn tồn tại. |
+| **Fix** | Thêm `_loc_pham_vi_nong_nghiep()` để lọc đúng phạm vi trước khi tính KPI; chuẩn hóa chữ `đ`; thay từ khóa ngắn bằng cụm rõ nghĩa hơn trong `NN_TU_KHOA_*`; fallback khi `Mã KH` rỗng/thiếu cột nợ thành phần; render nội dung tab con bằng `st.*` trong context tab đang mở. |
+| **Test** | `tests/test_baocao_tin_dung_so_lieu.py::test_nong_nghiep_phan_loai_khong_bat_nham_tu_khoa_ngan`, `test_nong_nghiep_pham_vi_phuong_chi_lay_trong_trot_chan_nuoi`, `test_nong_nghiep_tong_hop_fallback_khi_ma_kh_rong_va_thieu_cot_no` |
+| **Ngày fix** | 2026-08-29 |
+
+---
+
 ### B85 — Bảng NQH khó đọc ở dark theme và đếm đơn vị rỗng
 | | |
 |---|---|

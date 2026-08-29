@@ -11,6 +11,7 @@ from .cdtotkvv import render_cdtotkvv
 # v2 - UX nâng cao
 from .tong_hop_hstd_v2 import render_tong_hop_hstd_v2
 from .no_rui_ro_v2 import render_no_rui_ro_v2
+from .nong_nghiep import render_nong_nghiep
 
 __all__ = [
     # v1
@@ -22,4 +23,6 @@ __all__ = [
     # v2
     "render_tong_hop_hstd_v2",
     "render_no_rui_ro_v2",
+    # chuyên đề
+    "render_nong_nghiep",
 ]

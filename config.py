@@ -984,6 +984,36 @@ DS_XA_THANH_THI_THEO_PGD = frozenset([
     (DON_VI_CHI_NHANH, "Vay trực tiếp"),
 ])
 
+# ── Phân loại lĩnh vực nông nghiệp (từ cột "Tên PNKT51" = Mục đích sử dụng vốn) ──
+# Nhóm văn bản tự do "Tên PNKT51" thành các lĩnh vực nông nghiệp chuẩn bằng từ
+# khóa KHÔNG DẤU, chữ thường (khớp không phân biệt hoa thường/dấu).
+# Thứ tự ưu tiên khi phân loại: Lâm nghiệp → Thủy sản → Chăn nuôi → Trồng trọt → Khác.
+# Muốn bổ sung/điều chỉnh, sửa trực tiếp các tuple từ khóa bên dưới.
+NN_LINH_VUC_TRONG_TROT = "Trồng trọt"
+NN_LINH_VUC_CHAN_NUOI = "Chăn nuôi"
+NN_LINH_VUC_THUY_SAN = "Nuôi trồng thủy sản"
+NN_LINH_VUC_LAM_NGHIEP = "Lâm nghiệp"
+NN_LINH_VUC_KHAC = "Khác nông nghiệp"
+
+NN_TU_KHOA_LAM_NGHIEP = (
+    "lam nghiep", "rung",
+)
+NN_TU_KHOA_THUY_SAN = (
+    "thuy san", "nuoi trong thuy san", "nuoi tom", "nuoi ca", "nuoi cua",
+    "ba ba", "ech", "luon",
+)
+NN_TU_KHOA_CHAN_NUOI = (
+    "chan nuoi", "gia suc", "gia cam", "nuoi bo", "bo sua", "bo thit",
+    "nuoi heo", "nuoi lon", "nuoi ga", "nuoi vit", "nuoi trau", "nuoi de",
+    "nuoi tho", "nuoi ong", "chim cut",
+)
+NN_TU_KHOA_TRONG_TROT = (
+    "trong trot", "trong cay", "gieo trong", "hoa mau", "lua", "cay dieu",
+    "ca phe", "ho tieu", "cao su", "sau rieng", "khoai", "rau", "bap",
+    "ngo", "dau phong", "dau xanh", "dau nanh", "mia", "chom chom",
+    "buoi", "xoai", "dua", "vuon cay", "giong cay",
+)
+
 # ── Ngưỡng cảnh báo upload dữ liệu cũ (đơn vị: ngày) ────────────────────────
 # Nếu file của một đơn vị cũ hơn ngưỡng → hiện badge ⚠️
 UPLOAD_CANH_BAO_NGAY: dict[str, int] = {

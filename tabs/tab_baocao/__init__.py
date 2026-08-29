@@ -20,6 +20,7 @@ from .reports import (
     render_cdtotkvv,
     render_tong_hop_hstd_v2,
     render_no_rui_ro_v2,
+    render_nong_nghiep,
 )
 
 if TYPE_CHECKING:
@@ -38,6 +39,7 @@ __all__ = [
     "render_export_panel",
     "render_tong_hop_hstd_v2",
     "render_no_rui_ro_v2",
+    "render_nong_nghiep",
 ]
 
 
@@ -107,5 +109,7 @@ def render(tab: "DeltaGenerator | None" = None, **kwargs) -> None:
             render_gqvl(tab=None, df_gqvl=df_gqvl, role=role, pgd_user=pgd_user, username=username)
         elif selected_report == "cdtotkvv":
             render_cdtotkvv(tab=None, df_cdtotkvv=df_cdtotkvv, role=role, pgd_user=pgd_user, username=username)
+        elif selected_report == "nongnghiep":
+            render_nong_nghiep(tab=None, df=df, role=role, pgd_user=pgd_user, username=username)
         else:
             st.info("👆 Vui lòng chọn loại báo cáo từ Dashboard bên trên")

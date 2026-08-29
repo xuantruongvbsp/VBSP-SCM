@@ -1,5 +1,22 @@
 # CHANGELOG
 
+## [2026-08-29] — Sửa phạm vi và từ khóa Báo cáo Nông nghiệp
+- `config.py` — siết các từ khóa nông nghiệp quá ngắn/dễ bắt nhầm như `trong`, `cua`, `tom`; bổ sung cụm từ khóa rõ nghĩa hơn.
+- `tabs/tab_baocao/reports/nong_nghiep.py` — KPI tổng chỉ tính đúng phạm vi: xã nông thôn lấy 4 lĩnh vực, phường chỉ lấy trồng trọt + chăn nuôi; chuẩn hóa chữ `đ`, render nội dung đúng tab và fallback khi `Mã KH` rỗng/thiếu cột nợ thành phần.
+- `tests/test_baocao_tin_dung_so_lieu.py` — thêm hồi quy phân loại không bắt nhầm từ khóa ngắn, loại thủy sản/lâm nghiệp khỏi phạm vi phường và không lỗi khi schema thiếu cột nợ thành phần.
+- `BUGMAP.md` — thêm entry `C46` cho lỗi phạm vi/từ khóa Báo cáo Nông nghiệp.
+
+## [2026-08-29] — Bổ sung chỉ số tổng quan Báo cáo tín dụng
+- `tabs/tab_baocao/components/metric_cards.py` — thêm card số khách hàng, nợ khoanh, nợ rủi ro, dư nợ bình quân/món và GQVL năm; các chỉ số tiếp tục đếm theo khế ước duy nhất.
+- `tests/test_baocao_tin_dung_so_lieu.py` — mở rộng hồi quy `_tinh_chi_so_cards()` cho các key mới và dữ liệu GQVL trùng khế ước.
+
+## [2026-08-29] — Thêm Báo cáo Nông nghiệp trong Báo cáo tín dụng
+- `config.py` — thêm hằng số phân loại lĩnh vực nông nghiệp (`NN_LINH_VUC_*`, `NN_TU_KHOA_*`) từ cột `Tên PNKT51`.
+- `tabs/tab_baocao/reports/nong_nghiep.py` — MỚI: báo cáo Nông nghiệp; xã nông thôn thống kê toàn bộ lĩnh vực (Trồng trọt/Chăn nuôi/Thủy sản/Lâm nghiệp), phường chỉ Trồng trọt + Chăn nuôi.
+- `tabs/tab_baocao/reports/__init__.py` — export `render_nong_nghiep`.
+- `tabs/tab_baocao/__init__.py` — thêm nhánh render báo cáo Nông nghiệp.
+- `tabs/tab_baocao/dashboard.py` — thêm loại báo cáo `🌾 Báo cáo Nông nghiệp (HSTD)` vào dropdown.
+
 ## [2026-08-29] — Gom menu Báo cáo định kỳ Chi nhánh vào wrapper
 - `tabs/tab_quan_ly_bc.py` dòng ~1 — mở rộng wrapper thành 4 tab con: `BC tự động`, `BC từ PGD`, `BC lên cấp trên`, `Báo cáo tổng hợp`.
 - `workspaces/ws_management.py` dòng ~352 — menu CN `📅 Báo cáo định kỳ` gọi wrapper `tab_quan_ly_bc`; bỏ item rời `📥 Tiến độ nộp BC` và map nhãn cũ về wrapper.

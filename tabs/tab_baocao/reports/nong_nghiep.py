@@ -27,6 +27,7 @@ from config import (
 )
 from auth import la_phan_he_pgd
 from utils import xuat_excel
+from pdf_service import xuat_pdf
 from components.delta_card import kpi_row
 from ..components.inline_filter import chuan_bi_du_lieu_bao_cao, phan_loai_khu_vuc_df
 
@@ -159,6 +160,84 @@ def _df_hien_thi(df_th: pd.DataFrame) -> pd.DataFrame:
     df["Tỷ lệ QH %"] = df_th["Tỷ_lệ_QH_%"]
     df["BQ/KH"] = (df_th["BQ_KH"] / 1_000_000).round(0)
     return df
+
+
+def _df_tong_hop_hai_khu_vuc(df_phan_loai: pd.DataFrame, kv: pd.Series) -> pd.DataFrame:
+    """Gộp bảng nông thôn + thành thị thành một bảng có cột 'Khu vực'."""
+    parts = []
+    for khu_vuc, ds_lv, ten in (
+        ("nong_thon", _LINH_VUC_NONG_THON, "Xã nông thôn"),
+        ("thanh_thi", _LINH_VUC_THANH_THI, "Phường (thành thị)"),
+    ):
+        df_th = _tong_hop_linh_vuc(df_phan_loai[kv.eq(khu_vuc)], ds_lv)
+        if df_th.empty:
+            continue
+        df_h = _df_hien_thi(df_th)
+        df_h.insert(0, "Khu vực", ten)
+        parts.append(df_h)
+    if not parts:
+        return pd.DataFrame()
+    return pd.concat(parts, ignore_index=True)
+
+
+def _dong_tong_nn(df_phan_loai: pd.DataFrame) -> dict | None:
+    """Dòng TỔNG CỘNG cho PDF — đếm KH/món theo nunique, không cộng trùng."""
+    df = df_phan_loai[df_phan_loai[_COT_LINH_VUC].isin(_LINH_VUC_NONG_THON)].copy()
+    if df.empty:
+        return None
+
+    def _sum(cot):
+        if cot in df.columns:
+            return round(pd.to_numeric(df[cot], errors="coerce").fillna(0).sum() / 1_000_000)
+        return ""
+
+    cot_kh = COT_MA_KH if COT_MA_KH in df.columns else (
+        COT_TEN_KH if COT_TEN_KH in df.columns else None
+    )
+    cot_ku = COT_SO_KU if COT_SO_KU in df.columns else None
+
+    tong_dn = pd.to_numeric(df[COT_TONG_DU_NO], errors="coerce").fillna(0).sum()
+    tong_qh = pd.to_numeric(df[COT_DU_NO_QH], errors="coerce").fillna(0).sum()
+    so_kh = int(df[cot_kh].nunique()) if cot_kh else len(df)
+
+    dong = {
+        "Khu vực": "TỔNG CỘNG",
+        "Lĩnh vực": "",
+        "Số KH": so_kh,
+        "Số món": int(df[cot_ku].nunique()) if cot_ku else len(df),
+        "Tổng dư nợ": round(tong_dn / 1_000_000),
+        "Trong hạn": _sum(COT_DU_NO_TH),
+        "Quá hạn": round(tong_qh / 1_000_000),
+    }
+    if COT_DU_NO_KHOANH in df.columns:
+        dong["Khoanh"] = _sum(COT_DU_NO_KHOANH)
+    dong["Tỷ trọng %"] = 100.0
+    dong["Tỷ lệ QH %"] = round(tong_qh / tong_dn * 100, 2) if tong_dn > 0 else 0.0
+    dong["BQ/KH"] = round(tong_dn / so_kh / 1_000_000) if so_kh > 0 else ""
+    return dong
+
+
+def _xuat_pdf_nong_nghiep(df_phan_loai: pd.DataFrame, kv: pd.Series, username: str) -> bytes | None:
+    df = _df_tong_hop_hai_khu_vuc(df_phan_loai, kv)
+    if df.empty:
+        return None
+    dong = _dong_tong_nn(df_phan_loai)
+    tien_cols = [c for c in ("Tổng dư nợ", "Trong hạn", "Quá hạn", "Khoanh", "BQ/KH") if c in df.columns]
+    dem_cols = ["Số KH", "Số món"]
+    percent_cols = ["Tỷ trọng %", "Tỷ lệ QH %"]
+    return xuat_pdf(
+        df,
+        "BÁO CÁO NÔNG NGHIỆP (triệu đồng)",
+        username,
+        cols_tien=tien_cols,
+        don_vi_tien="triệu đồng",
+        prefix_file="BC_NONG_NGHIEP",
+        them_dong_tong=True,
+        cols_right=dem_cols + percent_cols,
+        dong_tong=dong,
+        cols_percent=percent_cols,
+        cols_dem=dem_cols,
+    )
 
 
 def _column_config() -> dict:
@@ -299,12 +378,32 @@ def render_nong_nghiep(
         sheets["Xa nong thon"] = df_nt_xuat
     if not df_tt_xuat.empty:
         sheets["Phuong thanh thi"] = df_tt_xuat
+
+    col_xl, col_pdf = ctx.columns(2)
     if sheets:
-        buf = xuat_excel(sheets)
-        ctx.download_button(
-            "⬇️ Tải báo cáo nông nghiệp (.xlsx)",
-            data=buf,
-            file_name="BaoCao_NongNghiep.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            key="nn_dl_xl",
-        )
+        with col_xl:
+            buf = xuat_excel(sheets)
+            ctx.download_button(
+                "⬇️ Tải Excel (.xlsx)",
+                data=buf,
+                file_name="BaoCao_NongNghiep.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                key="nn_dl_xl",
+                use_container_width=True,
+            )
+
+    try:
+        pdf_bytes = _xuat_pdf_nong_nghiep(df_phan_loai, kv, username)
+    except Exception as e:
+        ctx.caption(f"⚠️ Không tạo được PDF: {e}")
+        pdf_bytes = None
+    if pdf_bytes:
+        with col_pdf:
+            ctx.download_button(
+                "⬇️ Tải PDF (.pdf)",
+                data=pdf_bytes,
+                file_name="BaoCao_NongNghiep.pdf",
+                mime="application/pdf",
+                key="nn_dl_pdf",
+                use_container_width=True,
+            )

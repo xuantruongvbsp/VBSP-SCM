@@ -12,7 +12,7 @@
 
 ## [2026-08-29] — Thêm Báo cáo Nông nghiệp trong Báo cáo tín dụng
 - `config.py` — thêm hằng số phân loại lĩnh vực nông nghiệp (`NN_LINH_VUC_*`, `NN_TU_KHOA_*`) từ cột `Tên PNKT51`.
-- `tabs/tab_baocao/reports/nong_nghiep.py` — MỚI: báo cáo Nông nghiệp; xã nông thôn thống kê toàn bộ lĩnh vực (Trồng trọt/Chăn nuôi/Thủy sản/Lâm nghiệp), phường chỉ Trồng trọt + Chăn nuôi.
+- `tabs/tab_baocao/reports/nong_nghiep.py` — MỚI: báo cáo Nông nghiệp; xã nông thôn thống kê toàn bộ lĩnh vực (Trồng trọt/Chăn nuôi/Thủy sản/Lâm nghiệp), phường chỉ Trồng trọt + Chăn nuôi; xuất Excel (2 sheet) + PDF (bảng gộp 2 khu vực, dòng TỔNG CỘNG).
 - `tabs/tab_baocao/reports/__init__.py` — export `render_nong_nghiep`.
 - `tabs/tab_baocao/__init__.py` — thêm nhánh render báo cáo Nông nghiệp.
 - `tabs/tab_baocao/dashboard.py` — thêm loại báo cáo `🌾 Báo cáo Nông nghiệp (HSTD)` vào dropdown.

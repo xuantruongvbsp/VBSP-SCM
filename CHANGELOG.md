@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## [2026-08-29] — Khóa phạm vi Báo cáo định kỳ và tách gửi Telegram khỏi tạo file thủ công
+- `tabs/tab_bao_cao_dinh_ky.py` dòng ~41 — chặn role PGD xem/tải báo cáo định kỳ toàn Chi nhánh; nút tạo thủ công gọi `generate_daily_report(notify=False)` và hiển thị rõ không gửi Telegram.
+- `scripts/daily_report.py` dòng ~366 — thêm tham số `notify=True` để Task Scheduler giữ hành vi gửi Telegram, còn UI có thể chỉ tạo file Excel.
+- `tests/test_bao_cao_dinh_ky.py` — thêm hồi quy PGD không truy cập báo cáo toàn CN và `notify=False` không chạy nhánh thông báo.
+- `BUGMAP.md` — thêm entry `B94` cho lỗi PGD có thể mở báo cáo định kỳ toàn Chi nhánh / nút tạo thủ công có side effect Telegram.
+
 ## [2026-08-28] — Dọn code chết Báo cáo định kỳ (bỏ services/daily_report_service.py)
 - `services/daily_report_service.py` — XÓA: 0% coverage, trùng tên với `scripts/daily_report.py`, không được tab `tab_bao_cao_dinh_ky` dùng (tab dùng `scripts/daily_report.py`).
 - `health_check.py` dòng ~362 — bỏ khối "tự tạo báo cáo sáng" gọi `services.daily_report_service` (báo cáo sáng thật đã do `scripts/daily_report.py` chạy qua Task Scheduler 07:00 tạo, không cần health_check làm thay).

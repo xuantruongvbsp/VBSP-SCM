@@ -3995,6 +3995,16 @@ def _to_int(val, default=0):
 | **Test** | Compile component; visual QA Báo cáo NQ11 tại cổng `18502` không còn cảnh báo label rỗng. |
 | **Ngày fix** | 2026-08-28 |
 
+### B94 — PGD có thể mở báo cáo định kỳ toàn Chi nhánh và nút tạo thủ công gửi Telegram
+| | |
+|---|---|
+| **File** | `tabs/tab_bao_cao_dinh_ky.py` → `render()`, `_render_daily_reports()`; `scripts/daily_report.py` → `generate_daily_report()` |
+| **Dấu hiệu** | User PGD thấy mục `📅 Báo cáo định kỳ`, có thể liệt kê/tải file `cache/reports/BaoCao_Ngay_*.xlsx` toàn Chi nhánh; bấm `🔄 Tạo báo cáo ngay` còn có thể kích hoạt các nhánh Telegram vốn dành cho Task Scheduler. |
+| **Nguyên nhân** | Tab dùng chung cho CN/PGD/Exec nhưng không guard theo role trước khi gọi `list_reports()`/`generate_word_report()`; `generate_daily_report()` luôn chạy side effect Telegram sau khi tạo file. |
+| **Fix** | Guard `ctx.is_cn or ctx.is_exec` trong tab; PGD nhận hướng dẫn chuyển sang `Tiến độ nộp BC`/`Báo cáo tín dụng`. Thêm `notify=True` mặc định cho `generate_daily_report()`, UI thủ công truyền `notify=False`, Task Scheduler giữ hành vi cũ. |
+| **Test** | `tests/test_bao_cao_dinh_ky.py`; smoke import/render liên quan. |
+| **Ngày fix** | 2026-08-29 |
+
 ---
 
 Mỗi khi fix bug, copy template dưới đây và điền vào đúng mục:

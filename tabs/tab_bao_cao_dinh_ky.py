@@ -4,7 +4,6 @@ Xem và tải báo cáo Excel được tạo tự động hằng ngày.
 """
 from __future__ import annotations
 
-import os
 from datetime import datetime
 
 import streamlit as st
@@ -40,6 +39,7 @@ def _render_word_report(ctx: TabContext) -> None:
 
 def _render_daily_reports(ctx: TabContext) -> None:
     st.caption("📊 Báo cáo Excel được tạo tự động lúc 07:00 mỗi sáng (qua Task Scheduler)")
+    st.caption("Nút tạo thủ công bên dưới chỉ tạo file Excel, không gửi Telegram.")
 
     reports = list_reports()
 
@@ -47,7 +47,7 @@ def _render_daily_reports(ctx: TabContext) -> None:
     with col_gen:
         if st.button("🔄 Tạo báo cáo ngay", type="primary", key="daily_report_gen"):
             try:
-                result = generate_daily_report()
+                result = generate_daily_report(notify=False)
                 if result:
                     st.toast("✅ Đã tạo báo cáo mới!", icon="📊")
                 else:
@@ -91,6 +91,14 @@ def render(tab: DeltaGenerator | None = None, **kwargs) -> None:
     with ctx:
         st.title("📊 Báo cáo Định kỳ")
         st.caption("Báo cáo Excel + Word tự động hằng ngày — Tổng quan, NQH, Đến hạn, KHTD")
+
+        if not (ctx.is_cn or ctx.is_exec):
+            st.info(
+                "Mục này chỉ dành cho Chi nhánh/Ban Giám đốc vì báo cáo được tạo từ dữ liệu toàn Chi nhánh. "
+                "PGD vui lòng dùng **📥 Tiến độ nộp BC** để theo dõi báo cáo đã gửi và **📊 Báo cáo tín dụng** "
+                "để xuất số liệu trong phạm vi đơn vị mình."
+            )
+            return
 
         col_excel, col_word = st.columns(2)
         with col_excel:

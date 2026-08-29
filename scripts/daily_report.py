@@ -363,8 +363,11 @@ def _den_gio_gui_rui_ro() -> bool:
         return _trong_gio_gui("qh_moi") or _trong_gio_gui("khoanh_tang")
 
 
-def generate_daily_report() -> str | None:
-    """Tạo báo cáo Excel hằng ngày. Trả về đường dẫn file hoặc None nếu lỗi."""
+def generate_daily_report(notify: bool = True) -> str | None:
+    """Tạo báo cáo Excel hằng ngày. Trả về đường dẫn file hoặc None nếu lỗi.
+
+    notify=True dùng cho Task Scheduler; UI thủ công truyền False để chỉ tạo file.
+    """
     REPORT_DIR.mkdir(parents=True, exist_ok=True)
 
     parquet_path = str(CACHE_HSTD)
@@ -399,125 +402,126 @@ def generate_daily_report() -> str | None:
 
     print(f"✅ Đã tạo báo cáo: {filepath} ({info['size'] / 1024:.1f} KB)")
 
-    # Gửi tóm tắt qua Telegram
-    try:
-        from services.telegram_service import gui_bao_cao_sang
-        from config import COT_TONG_DU_NO, COT_DU_NO_QH
+    if notify:
+        # Gửi tóm tắt qua Telegram
+        try:
+            from services.telegram_service import gui_bao_cao_sang
+            from config import COT_TONG_DU_NO, COT_DU_NO_QH
 
-        if os.path.exists(parquet_path):
-            sql_sum = f"""
+            if os.path.exists(parquet_path):
+                sql_sum = f"""
+                    SELECT
+                        SUM("{COT_TONG_DU_NO}") AS tong_dn,
+                        SUM("{COT_DU_NO_QH}")   AS tong_qh
+                    FROM read_parquet(?)
+                    WHERE "{COT_TONG_DU_NO}" IS NOT NULL
+                """
+                df_sum = _duckdb_query(sql_sum, [parquet_path])
+                tong_dn = int(df_sum["tong_dn"].iloc[0] or 0)
+                tong_qh = int(df_sum["tong_qh"].iloc[0] or 0)
+                ty_le_qh = f"{tong_qh / tong_dn * 100:.2f}%" if tong_dn > 0 else "—"
+
+                merge_meta = db.doc_kv("merge_meta_hstd") or {}
+                so_pgd = merge_meta.get("so_pgd", 0)
+
+                from config import DS_PGD
+                gui_bao_cao_sang(
+                    ngay=now.strftime("%d/%m/%Y"),
+                    tong_du_no=f"{_vn(tong_dn / 1e9, 1)} tỷ",
+                    tong_qh=f"{_vn(tong_qh / 1e6, 0)} triệu",
+                    ty_le_qh=ty_le_qh,
+                    so_pgd_da_upload=so_pgd,
+                    tong_pgd=len(DS_PGD),
+                )
+        except Exception as e:
+            print(f"⚠️ Telegram: {e}")
+
+        # Gửi nhắc khoản đến hạn trong tháng qua Telegram
+        try:
+            import calendar
+            from services.telegram_service import gui_nhac_khoang_den_han
+
+            last_day = calendar.monthrange(now.year, now.month)[1]
+            end_of_month = date(now.year, now.month, last_day).isoformat()
+            ngay_dh_expr = _duckdb_date_expr(COT_NGAY_DH)
+
+            sql_dh = f"""
+                WITH src AS (
+                    SELECT
+                        "{COT_TEN_KH}"     AS ten_kh,
+                        "{COT_SO_KU}"      AS so_ku,
+                        {ngay_dh_expr}     AS ngay_dh_date,
+                        "{COT_TONG_DU_NO}" AS du_no,
+                        "{COT_TEN_PGD}"    AS ten_pgd
+                    FROM read_parquet(?)
+                )
                 SELECT
-                    SUM("{COT_TONG_DU_NO}") AS tong_dn,
-                    SUM("{COT_DU_NO_QH}")   AS tong_qh
-                FROM read_parquet(?)
-                WHERE "{COT_TONG_DU_NO}" IS NOT NULL
+                    ten_kh,
+                    so_ku,
+                    STRFTIME(ngay_dh_date, '%d/%m/%Y') AS ngay_dh,
+                    du_no,
+                    ten_pgd
+                FROM src
+                WHERE ngay_dh_date IS NOT NULL
+                  AND ngay_dh_date >= CURRENT_DATE
+                  AND ngay_dh_date <= DATE '{end_of_month}'
+                  AND du_no > 0
+                ORDER BY ngay_dh_date, du_no DESC
             """
-            df_sum = _duckdb_query(sql_sum, [parquet_path])
-            tong_dn = int(df_sum["tong_dn"].iloc[0] or 0)
-            tong_qh = int(df_sum["tong_qh"].iloc[0] or 0)
-            ty_le_qh = f"{tong_qh / tong_dn * 100:.2f}%" if tong_dn > 0 else "—"
-
-            merge_meta = db.doc_kv("merge_meta_hstd") or {}
-            so_pgd = merge_meta.get("so_pgd", 0)
-
-            from config import DS_PGD
-            gui_bao_cao_sang(
-                ngay=now.strftime("%d/%m/%Y"),
-                tong_du_no=f"{_vn(tong_dn / 1e9, 1)} tỷ",
-                tong_qh=f"{_vn(tong_qh / 1e6, 0)} triệu",
-                ty_le_qh=ty_le_qh,
-                so_pgd_da_upload=so_pgd,
-                tong_pgd=len(DS_PGD),
-            )
-    except Exception as e:
-        print(f"⚠️ Telegram: {e}")
-
-    # Gửi nhắc khoản đến hạn trong tháng qua Telegram
-    try:
-        import calendar
-        from services.telegram_service import gui_nhac_khoang_den_han
-
-        last_day = calendar.monthrange(now.year, now.month)[1]
-        end_of_month = date(now.year, now.month, last_day).isoformat()
-        ngay_dh_expr = _duckdb_date_expr(COT_NGAY_DH)
-
-        sql_dh = f"""
-            WITH src AS (
-                SELECT
-                    "{COT_TEN_KH}"     AS ten_kh,
-                    "{COT_SO_KU}"      AS so_ku,
-                    {ngay_dh_expr}     AS ngay_dh_date,
-                    "{COT_TONG_DU_NO}" AS du_no,
-                    "{COT_TEN_PGD}"    AS ten_pgd
-                FROM read_parquet(?)
-            )
-            SELECT
-                ten_kh,
-                so_ku,
-                STRFTIME(ngay_dh_date, '%d/%m/%Y') AS ngay_dh,
-                du_no,
-                ten_pgd
-            FROM src
-            WHERE ngay_dh_date IS NOT NULL
-              AND ngay_dh_date >= CURRENT_DATE
-              AND ngay_dh_date <= DATE '{end_of_month}'
-              AND du_no > 0
-            ORDER BY ngay_dh_date, du_no DESC
-        """
-        if os.path.exists(parquet_path):
-            df_dh = _duckdb_query(sql_dh, [parquet_path])
-            ds_khoang = [
-                {
-                    "ten_kh":  str(row["ten_kh"] or ""),
-                    "so_ku":   str(row["so_ku"] or ""),
-                    "ngay_dh": str(row["ngay_dh"] or ""),
-                    "du_no":   f"{int(row['du_no'] or 0) / 1e6:,.0f} triệu".replace(",", "."),
-                    "ten_pgd": str(row["ten_pgd"] or ""),
-                }
-                for _, row in df_dh.iterrows()
-            ]
-            gui_nhac_khoang_den_han(ds_khoang)
-    except Exception as e:
-        print(f"⚠️ Telegram nhắc đến hạn: {e}")
-
-    try:
-        _nhac_phan_ky_nxh()
-    except Exception as e:
-        print(f"⚠️ Telegram nhắc phân kỳ NXH: {e}")
-
-    if _den_gio_gui_rui_ro():
-        try:
-            _canh_bao_tong_hop_rui_ro()
+            if os.path.exists(parquet_path):
+                df_dh = _duckdb_query(sql_dh, [parquet_path])
+                ds_khoang = [
+                    {
+                        "ten_kh":  str(row["ten_kh"] or ""),
+                        "so_ku":   str(row["so_ku"] or ""),
+                        "ngay_dh": str(row["ngay_dh"] or ""),
+                        "du_no":   f"{int(row['du_no'] or 0) / 1e6:,.0f} triệu".replace(",", "."),
+                        "ten_pgd": str(row["ten_pgd"] or ""),
+                    }
+                    for _, row in df_dh.iterrows()
+                ]
+                gui_nhac_khoang_den_han(ds_khoang)
         except Exception as e:
-            print(f"⚠️ Telegram cảnh báo rủi ro: {e}")
+            print(f"⚠️ Telegram nhắc đến hạn: {e}")
 
-    # Thứ Sáu: báo cáo giải ngân tuần
-    if date.today().weekday() == 4 and _trong_gio_gui("giai_ngan_tuan"):
         try:
-            _giai_ngan_tuan()
+            _nhac_phan_ky_nxh()
         except Exception as e:
-            print(f"⚠️ Telegram giải ngân tuần: {e}")
+            print(f"⚠️ Telegram nhắc phân kỳ NXH: {e}")
 
-    # Thứ Hai: báo cáo NQH tuần
-    if date.today().weekday() == 0 and _trong_gio_gui("nqh_tuan"):
-        try:
-            _bao_cao_nqh_tuan()
-        except Exception as e:
-            print(f"⚠️ Telegram NQH tuần: {e}")
+        if _den_gio_gui_rui_ro():
+            try:
+                _canh_bao_tong_hop_rui_ro()
+            except Exception as e:
+                print(f"⚠️ Telegram cảnh báo rủi ro: {e}")
 
-    # Mỗi ngày (nếu bật): tiến độ KHTD theo chương trình
-    if _trong_gio_gui("khtd_ct"):
-        try:
-            _bao_cao_khtd_theo_ct()
-        except Exception as e:
-            print(f"⚠️ Telegram KHTD chương trình: {e}")
+        # Thứ Sáu: báo cáo giải ngân tuần
+        if date.today().weekday() == 4 and _trong_gio_gui("giai_ngan_tuan"):
+            try:
+                _giai_ngan_tuan()
+            except Exception as e:
+                print(f"⚠️ Telegram giải ngân tuần: {e}")
 
-    # Ngày 25–31: tổng kết tháng
-    if date.today().day >= 25 and _trong_gio_gui("tong_ket_thang"):
-        try:
-            _tong_ket_thang()
-        except Exception as e:
-            print(f"⚠️ Telegram tổng kết tháng: {e}")
+        # Thứ Hai: báo cáo NQH tuần
+        if date.today().weekday() == 0 and _trong_gio_gui("nqh_tuan"):
+            try:
+                _bao_cao_nqh_tuan()
+            except Exception as e:
+                print(f"⚠️ Telegram NQH tuần: {e}")
+
+        # Mỗi ngày (nếu bật): tiến độ KHTD theo chương trình
+        if _trong_gio_gui("khtd_ct"):
+            try:
+                _bao_cao_khtd_theo_ct()
+            except Exception as e:
+                print(f"⚠️ Telegram KHTD chương trình: {e}")
+
+        # Ngày 25-31: tổng kết tháng
+        if date.today().day >= 25 and _trong_gio_gui("tong_ket_thang"):
+            try:
+                _tong_ket_thang()
+            except Exception as e:
+                print(f"⚠️ Telegram tổng kết tháng: {e}")
 
     return str(filepath)
 

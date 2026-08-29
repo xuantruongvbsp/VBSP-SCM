@@ -504,35 +504,18 @@ def render(tab: DeltaGenerator | None = None, **kwargs) -> None:
             bang_dienbao = so_lieu_db.get("bang_theo_dv", pd.DataFrame())
 
         # ═══════════════════════════════════════════
-        # 1. XEM & COPY BÁO CÁO (chính)
+        # 1. CHỌN MẪU BÁO CÁO (dùng cho xuất Word)
         # ═══════════════════════════════════════════
         st.divider()
-        st.markdown("### 📋 Báo cáo (copy sang Word)")
+        st.markdown("### 📋 Chọn mẫu báo cáo")
 
         ds_mau = lay_danh_sach_mau()
         mau_options = [m["ten_hien_thi"] for m in ds_mau] or ["Không tìm thấy mẫu"]
 
         ten_mau_chon = st.selectbox("Chọn loại báo cáo", mau_options, key="khnv_bc_mau")
 
-        if ten_mau_chon and ds_mau and so_lieu:
-            mau_info = next((m for m in ds_mau if m["ten_hien_thi"] == ten_mau_chon), None)
-            if mau_info:
-                vars_map = build_template_vars(so_lieu, bang_pgd, chenh_lech)
-                rendered = render_mau_preview(mau_info["ten_file"], vars_map)
-
-                # Text area lớn — bôi đen → Ctrl+C → paste vào Word
-                st.text_area(
-                    "Bôi đen toàn bộ → Ctrl+C → mở Word → Ctrl+V",
-                    value=rendered,
-                    height=550,
-                    key="khnv_bc_preview_area",
-                    label_visibility="visible",
-                )
-        else:
-            st.info("👆 Chọn nguồn dữ liệu & tháng/năm ở trên để hiển thị báo cáo.")
-
         st.divider()
-        st.caption("⬇️ Hoặc tải file:")
+        st.caption("⬇️ Tải file:")
 
         # ═══════════════════════════════════════════
         # 2. TẢI FILE Excel / Word (phụ)

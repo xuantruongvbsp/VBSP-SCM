@@ -1,5 +1,15 @@
 # CHANGELOG
 
+## [2026-08-29] — Gom menu Báo cáo định kỳ Chi nhánh vào wrapper
+- `tabs/tab_quan_ly_bc.py` dòng ~1 — mở rộng wrapper thành 4 tab con: `BC tự động`, `BC từ PGD`, `BC lên cấp trên`, `Báo cáo tổng hợp`.
+- `workspaces/ws_management.py` dòng ~352 — menu CN `📅 Báo cáo định kỳ` gọi wrapper `tab_quan_ly_bc`; bỏ item rời `📥 Tiến độ nộp BC` và map nhãn cũ về wrapper.
+- `tab_registry.py` dòng ~78 — đồng bộ registry CN để `📅 Báo cáo định kỳ` trỏ tới `tab_quan_ly_bc`, không đăng ký riêng `tab_tien_do_nop`.
+- `tests/test_bao_cao_dinh_ky.py` — thêm hồi quy menu CN gom vào wrapper và wrapper giữ đủ 4 submodule.
+- `BUGMAP.md` — thêm entry `B95` cho lỗi menu báo cáo định kỳ bị tách rời/dễ gây nhầm luồng vận hành.
+
+## [2026-08-29] — Bỏ khối "Chọn mẫu báo cáo" và nút tải Excel/Word trong tab Báo cáo KHNV
+- `tabs/tab_khnv_bao_cao.py` — bỏ toàn bộ khối "Chọn mẫu báo cáo" + 2 nút tải Excel/Word ở cuối tab (chỉ giữ 3 chế độ Điện báo/HSTD/Đối chiếu ở trên); dọn import `lay_danh_sach_mau`, `xuat_excel_bao_cao_khnv`, `xuat_word_bao_cao_khnv`, `build_template_vars`, `render_mau_preview` không còn dùng.
+
 ## [2026-08-29] — Khóa phạm vi Báo cáo định kỳ và tách gửi Telegram khỏi tạo file thủ công
 - `tabs/tab_bao_cao_dinh_ky.py` dòng ~41 — chặn role PGD xem/tải báo cáo định kỳ toàn Chi nhánh; nút tạo thủ công gọi `generate_daily_report(notify=False)` và hiển thị rõ không gửi Telegram.
 - `scripts/daily_report.py` dòng ~366 — thêm tham số `notify=True` để Task Scheduler giữ hành vi gửi Telegram, còn UI có thể chỉ tạo file Excel.

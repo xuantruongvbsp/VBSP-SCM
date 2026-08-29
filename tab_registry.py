@@ -75,10 +75,9 @@ register(TabDef("tab_quan_ly_cv", " Quản lý Công việc & Nhiệm vụ", "N�
 # ── Báo cáo ──────────────────────────────────────────────────────────────────
 register(TabDef("tab_baocao", "📊 Báo cáo tín dụng", "Báo cáo", "cn", icon="file", order=1))
 register(TabDef("tab_den_han", "⏰ Nợ Đến Hạn", "Báo cáo", "cn", icon="clock", order=2))
-register(TabDef("tab_bao_cao_dinh_ky", "📅 Báo cáo định kỳ", "Báo cáo", "cn", icon="calendar", order=3))
+register(TabDef("tab_quan_ly_bc", "📅 Báo cáo định kỳ", "Báo cáo", "cn", icon="calendar", order=3))
 register(TabDef("tab_khnv_bao_cao", "📄 Báo cáo KHNV", "Báo cáo", "cn", icon="file-report", order=4))
-register(TabDef("tab_tien_do_nop", "📥 Tiến độ nộp BC", "Báo cáo", "cn", icon="inbox", order=5))
-register(TabDef("tab_theo_doi_nhap", "📋 Theo dõi nhập liệu", "Báo cáo", "cn", icon="clipboard-list", order=6))
+register(TabDef("tab_theo_doi_nhap", "📋 Theo dõi nhập liệu", "Báo cáo", "cn", icon="clipboard-list", order=5))
 
 # ── Giám sát ─────────────────────────────────────────────────────────────────
 # ⚠️ "🔴 NQH tăng đột biến" là hàm nội bộ (_render_nqh_tang_dot_bien) — giữ trong workspace

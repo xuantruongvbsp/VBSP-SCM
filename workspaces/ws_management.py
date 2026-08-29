@@ -349,9 +349,8 @@ def _build_all_items(role: str, username: str, **kwargs) -> list:
         # ── Báo cáo ────────────────────────────────────────────────────────────
         {"group": "Báo cáo", "label": "📊 Báo cáo tín dụng",    "icon": "file",          "fn": lambda: _get_tab("tab_baocao").render(None, **kwargs)},
         {"group": "Báo cáo", "label": "⏰ Nợ Đến Hạn",           "icon": "clock",         "fn": lambda: _get_tab("tab_den_han").render(None, role=role, username=username, df_full=df_full)},
-        {"group": "Báo cáo", "label": "📅 Báo cáo định kỳ",      "icon": "calendar",      "fn": lambda: _get_tab("tab_bao_cao_dinh_ky").render(None, **kwargs)},
+        {"group": "Báo cáo", "label": "📅 Báo cáo định kỳ",      "icon": "calendar",      "fn": lambda: _get_tab("tab_quan_ly_bc").render(None, **kwargs)},
         {"group": "Báo cáo", "label": "📄 Báo cáo KHNV",         "icon": "file-report",   "fn": lambda: _get_tab("tab_khnv_bao_cao").render(None, **kwargs)},
-        {"group": "Báo cáo", "label": "📥 Tiến độ nộp BC",       "icon": "inbox",         "fn": lambda: _get_tab("tab_tien_do_nop").render(None, **kwargs)},
         {"group": "Báo cáo", "label": "📋 Theo dõi nhập liệu",   "icon": "clipboard-list","fn": lambda: _get_tab("tab_theo_doi_nhap").render(None, **kwargs)},
 
         # ── Giám sát ───────────────────────────────────────────────────────────
@@ -403,6 +402,7 @@ def _normalize_active_label(all_items: list, active_label: str | None) -> str | 
         "🏷️ Mã NĐT địa phương": "🏦 Nguồn vốn địa phương",
         "Mã NĐT địa phương": "🏦 Nguồn vốn địa phương",
         "📡 Điện báo & KH vs TH": "📡 Điện báo Cân đối",
+        "📥 Tiến độ nộp BC": "📅 Báo cáo định kỳ",
     }
     if active_label in legacy_labels:
         return legacy_labels[active_label]

@@ -27,11 +27,6 @@ from services.khnv_bao_cao_service import (
     tong_hop_so_lieu_thang,
     tong_hop_tu_dienbao,
     so_sanh_hstd_vs_dienbao,
-    lay_danh_sach_mau,
-    xuat_excel_bao_cao_khnv,
-    xuat_word_bao_cao_khnv,
-    build_template_vars,
-    render_mau_preview,
 )
 from components.delta_card import kpi_row
 from data import ts_file
@@ -502,43 +497,3 @@ def render(tab: DeltaGenerator | None = None, **kwargs) -> None:
             bang_ct = so_lieu.get("bang_chuong_trinh", pd.DataFrame())
             bang_uy_thac = so_lieu.get("bang_uy_thac", pd.DataFrame())
             bang_dienbao = so_lieu_db.get("bang_theo_dv", pd.DataFrame())
-
-        # ═══════════════════════════════════════════
-        # 1. CHỌN MẪU BÁO CÁO (dùng cho xuất Word)
-        # ═══════════════════════════════════════════
-        st.divider()
-        st.markdown("### 📋 Chọn mẫu báo cáo")
-
-        ds_mau = lay_danh_sach_mau()
-        mau_options = [m["ten_hien_thi"] for m in ds_mau] or ["Không tìm thấy mẫu"]
-
-        ten_mau_chon = st.selectbox("Chọn loại báo cáo", mau_options, key="khnv_bc_mau")
-
-        st.divider()
-        st.caption("⬇️ Tải file:")
-
-        # ═══════════════════════════════════════════
-        # 2. TẢI FILE Excel / Word (phụ)
-        # ═══════════════════════════════════════════
-        col_x1, col_x2 = st.columns(2)
-        fn = f"BC_KHNV_T{thang:02d}_{nam}"
-
-        with col_x1:
-            eb = xuat_excel_bao_cao_khnv(
-                so_lieu, bang_pgd, bang_ct, bang_uy_thac,
-                bang_dienbao=bang_dienbao if not bang_dienbao.empty else None,
-                chenh_lech=chenh_lech,
-            )
-            st.download_button(f"⬇️ Excel ({fn}.xlsx)", data=eb, file_name=f"{fn}.xlsx",
-                               mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                               key="khnv_dl_xl", use_container_width=True)
-
-        with col_x2:
-            wb = xuat_word_bao_cao_khnv(
-                so_lieu, ten_mau_chon, bang_pgd, bang_ct,
-                bang_dienbao=bang_dienbao if not bang_dienbao.empty else None,
-                chenh_lech=chenh_lech,
-            )
-            st.download_button(f"⬇️ Word ({fn}.docx)", data=wb, file_name=f"{fn}.docx",
-                               mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                               key="khnv_dl_wd", use_container_width=True)

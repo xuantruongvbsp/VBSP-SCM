@@ -4005,6 +4005,16 @@ def _to_int(val, default=0):
 | **Test** | `tests/test_bao_cao_dinh_ky.py`; smoke import/render liên quan. |
 | **Ngày fix** | 2026-08-29 |
 
+### B95 — Menu Báo cáo định kỳ CN bị tách rời nhiều mục
+| | |
+|---|---|
+| **File** | `workspaces/ws_management.py` → `_build_all_items()`; `tabs/tab_quan_ly_bc.py` → `render()`; `tab_registry.py` |
+| **Dấu hiệu** | Nhóm `Báo cáo` có `📅 Báo cáo định kỳ` và `📥 Tiến độ nộp BC` là hai mục rời, trong khi nghiệp vụ theo dõi báo cáo định kỳ cần cả báo cáo tự động, báo cáo PGD nộp và checklist gửi cấp trên. User dễ vào nhầm chỗ hoặc bỏ sót bước. |
+| **Nguyên nhân** | Wrapper `tab_quan_ly_bc.py` đã tồn tại nhưng không được gắn vào menu CN/registry; menu vẫn gọi trực tiếp từng tab con. |
+| **Fix** | Menu CN `📅 Báo cáo định kỳ` gọi `tab_quan_ly_bc`; wrapper gom 4 tab con `BC tự động`, `BC từ PGD`, `BC lên cấp trên`, `Báo cáo tổng hợp`; nhãn cũ `📥 Tiến độ nộp BC` được map về wrapper để tránh stale state. |
+| **Test** | `tests/test_bao_cao_dinh_ky.py::test_menu_cn_gom_bao_cao_dinh_ky_vao_wrapper`, `tests/test_bao_cao_dinh_ky.py::test_wrapper_bao_cao_dinh_ky_gom_du_submodule`; smoke import/render. |
+| **Ngày fix** | 2026-08-29 |
+
 ---
 
 Mỗi khi fix bug, copy template dưới đây và điền vào đúng mục:

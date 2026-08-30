@@ -17,6 +17,7 @@ from config import (
     COT_GIAI_NGAN_TRONG_NAM,
 )
 from utils import fmt_so, vn
+from .inline_filter import chuan_bi_du_lieu_bao_cao
 
 if TYPE_CHECKING:
     from streamlit.delta_generator import DeltaGenerator
@@ -41,14 +42,18 @@ def _valid_text_series(series: pd.Series) -> pd.Series:
 
 
 def _dedupe_theo_khe_uoc(df: pd.DataFrame) -> pd.DataFrame:
-    """Giữ một dòng cho mỗi khế ước nếu dữ liệu có cột Số KU."""
-    out = df.copy()
+    """Chuẩn hóa phạm vi món vay trước khi tính KPI card."""
+    out = chuan_bi_du_lieu_bao_cao(df)
+    if out is None or out.empty:
+        return pd.DataFrame() if out is None else out.copy()
     if COT_SO_KU not in out.columns:
         return out
     so_ku = _valid_text_series(out[COT_SO_KU])
     out = out.loc[so_ku.index].copy()
     out["_so_ku_dem"] = so_ku
-    return out.drop_duplicates(subset=["_so_ku_dem"], keep="first")
+    if COT_MA_KH not in out.columns:
+        out = out.drop_duplicates(subset=["_so_ku_dem"], keep="first")
+    return out
 
 
 def _sum_numeric(df: pd.DataFrame, col: str) -> float:
@@ -81,7 +86,7 @@ def _tinh_chi_so_cards(
         no_qh = _sum_numeric(hstd, COT_DU_NO_QH)
         no_khoanh = _sum_numeric(hstd, COT_DU_NO_KHOANH)
         so_mon = int(
-            hstd["_so_ku_dem"].nunique() if "_so_ku_dem" in hstd.columns else len(hstd)
+            len(hstd) if "_so_ku_dem" in hstd.columns else len(hstd)
         )
         so_kh = _count_khach_hang(hstd, so_mon)
 
@@ -99,7 +104,7 @@ def _tinh_chi_so_cards(
             )
         giai_ngan_gqvl = _sum_numeric(gqvl, COT_GIAI_NGAN_TRONG_NAM)
         so_mon_gqvl = int(
-            gqvl["_so_ku_dem"].nunique() if "_so_ku_dem" in gqvl.columns else len(gqvl)
+            len(gqvl) if "_so_ku_dem" in gqvl.columns else len(gqvl)
         )
 
     return {
@@ -184,11 +189,11 @@ def render_metric_cards(
     
     with c4:
         st.metric(
-            "Nợ rủi ro",
+            "Nợ xấu",
             f"{_fmt_ty(no_rui_ro)} tỷ",
             delta=f"{tl_no_rui_ro:.2f}%" if tl_no_rui_ro > 0 else None,
             delta_color="inverse",
-            help="Tổng nợ quá hạn và nợ khoanh"
+            help="Nợ xấu = nợ quá hạn + nợ khoanh"
         )
 
     c5, c6, c7, c8 = ctx.columns(4)
@@ -205,7 +210,7 @@ def render_metric_cards(
             "Số món vay",
             fmt_so(so_mon),
             delta=f"{_fmt_ty(du_no_bq_mon)} tỷ/món" if du_no_bq_mon > 0 else None,
-            help="Tổng số khế ước duy nhất; delta là dư nợ bình quân mỗi món"
+            help="Tổng số khoản vay còn dư nợ theo khóa Mã KH + Số khế ước; delta là dư nợ bình quân mỗi món"
         )
 
     with c7:

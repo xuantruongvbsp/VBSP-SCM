@@ -1,4 +1,4 @@
-"""
+r"""
 Debug script: phân tích chênh lệch TH KHTD giữa cấp CN và tổng 95 xã.
 Phát hiện: 21/27 ma_key có CN < Xã, 2 key có CN > Xã (12_TW, 12_DP).
 

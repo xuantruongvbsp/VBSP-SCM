@@ -33,6 +33,7 @@ from config import (
 )
 from logger import get_logger
 from data.pgd import pgd_slug
+from services.bc_tongquan_service import xuat_pdf_bc
 from snapshot_service import (
     danh_sach_ky,
     doc_snapshot_nvdp_range,
@@ -49,6 +50,29 @@ _COLOR_DP_TINH = "#26A69A"
 _COLOR_DP_XA = "#FFB74D"
 _CHART_LAYOUT = dict(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
 _EXCEL_STATE_PREFIX = "nvdp_excel_buf_"
+_PDF_STATE_PREFIX = "nvdp_pdf_buf_"
+_EXPORT_SOURCE_ALL = "Tất cả nguồn vốn"
+_EXPORT_SOURCE_DP = "Chỉ nguồn Địa phương"
+_EXPORT_SOURCE_DP_TINH = "Chỉ ĐP cấp tỉnh"
+_EXPORT_SOURCE_DP_XA = "Chỉ ĐP cấp xã/khác"
+_EXPORT_SOURCE_TW = "Chỉ nguồn Trung ương"
+_EXPORT_SOURCE_OPTIONS = [
+    _EXPORT_SOURCE_ALL,
+    _EXPORT_SOURCE_DP,
+    _EXPORT_SOURCE_DP_TINH,
+    _EXPORT_SOURCE_DP_XA,
+    _EXPORT_SOURCE_TW,
+]
+_EXPORT_SHEET_XA_02_CT = "Nguồn xã 02 CT"
+_EXPORT_SHEET_PGD = "Theo PGD"
+_EXPORT_SHEET_XA = "Theo Xã"
+_EXPORT_SHEET_CT = "Theo Chương trình"
+_EXPORT_SHEET_OPTIONS = [
+    _EXPORT_SHEET_XA_02_CT,
+    _EXPORT_SHEET_PGD,
+    _EXPORT_SHEET_XA,
+    _EXPORT_SHEET_CT,
+]
 
 
 def _text_sach(value) -> str:
@@ -163,6 +187,83 @@ def _clear_old_excel_buffers(active_key: str) -> None:
     for key in list(st.session_state.keys()):
         if str(key).startswith(_EXCEL_STATE_PREFIX) and key != active_key:
             st.session_state.pop(key, None)
+
+
+def _clear_old_pdf_buffers(active_key: str) -> None:
+    for key in list(st.session_state.keys()):
+        if str(key).startswith(_PDF_STATE_PREFIX) and key != active_key:
+            st.session_state.pop(key, None)
+
+
+def _export_sheet_options(is_pgd_view: bool) -> list[str]:
+    if is_pgd_view:
+        return [s for s in _EXPORT_SHEET_OPTIONS if s != _EXPORT_SHEET_PGD]
+    return list(_EXPORT_SHEET_OPTIONS)
+
+
+def _clean_selected_options(values: list[str] | tuple[str, ...], allowed: list[str]) -> list[str]:
+    allowed_set = set(allowed)
+    return [str(v) for v in values if str(v) in allowed_set]
+
+
+def _export_condition_key(
+    source_filter: str,
+    pgd_values: list[str] | tuple[str, ...],
+    xa_values: list[str] | tuple[str, ...],
+    ct_values: list[str] | tuple[str, ...],
+    sheet_names: list[str] | tuple[str, ...],
+) -> str:
+    parts = [
+        source_filter,
+        "|".join(sorted(map(str, pgd_values))),
+        "|".join(sorted(map(str, xa_values))),
+        "|".join(sorted(map(str, ct_values))),
+        "|".join(sorted(map(str, sheet_names))),
+    ]
+    return hashlib.sha1("\n".join(parts).encode("utf-8")).hexdigest()[:12]
+
+
+def _loc_du_lieu_xuat_theo_dieu_kien(
+    df_labeled: pd.DataFrame,
+    source_filter: str = _EXPORT_SOURCE_ALL,
+    pgd_values: list[str] | tuple[str, ...] = (),
+    xa_values: list[str] | tuple[str, ...] = (),
+    ct_values: list[str] | tuple[str, ...] = (),
+) -> pd.DataFrame:
+    """Lọc dữ liệu phục vụ xuất Excel/PDF theo nhiều điều kiện độc lập."""
+    if df_labeled is None or df_labeled.empty:
+        return pd.DataFrame()
+    df_out = df_labeled.copy()
+    if "_nv_label" not in df_out.columns or "_nv_cap_label" not in df_out.columns:
+        df_out = _phan_nguon_von(df_out)
+
+    if source_filter == _EXPORT_SOURCE_DP:
+        df_out = df_out[df_out["_nv_label"].eq("Địa phương")]
+    elif source_filter == _EXPORT_SOURCE_DP_TINH:
+        df_out = df_out[df_out["_nv_cap_label"].eq("ĐP cấp tỉnh")]
+    elif source_filter == _EXPORT_SOURCE_DP_XA:
+        df_out = df_out[df_out["_nv_cap_label"].eq("ĐP cấp xã/khác")]
+    elif source_filter == _EXPORT_SOURCE_TW:
+        df_out = df_out[df_out["_nv_label"].eq("Trung ương")]
+
+    for col, values in (
+        (COT_TEN_PGD, pgd_values),
+        (COT_TEN_XA, xa_values),
+        (COT_TEN_CT, ct_values),
+    ):
+        selected = {_text_sach(v) for v in values}
+        selected.discard("")
+        if selected and col in df_out.columns:
+            df_out = df_out[df_out[col].map(_text_sach).isin(selected)]
+
+    return df_out
+
+
+def _export_options_from_col(df: pd.DataFrame, col: str) -> list[str]:
+    if df is None or df.empty or col not in df.columns:
+        return []
+    values = [_text_sach(v) for v in df[col].dropna().tolist()]
+    return sorted({v for v in values if v})
 
 
 def _phan_nguon_von(df: pd.DataFrame) -> pd.DataFrame:
@@ -633,10 +734,41 @@ def _doc_kh_dp_theo_pgd() -> tuple[str, dict]:
 
 # ── Cache Excel export ────────────────────────────────────────────────────────
 @st.cache_data(show_spinner=False)
+def _cached_bao_cao_sheets(
+    _df_labeled: pd.DataFrame,
+    is_pgd_view: bool,
+    extra_cols: tuple[str, ...],
+    sheet_names: tuple[str, ...] = (),
+    view_key: str = "cn",
+    ts: float = 0.0,
+    rules_key: str = "",
+    nhan_dot: str = "",
+    kh_sig: str = "",
+) -> dict[str, pd.DataFrame]:
+    """Cache các bảng báo cáo — dùng chung cho xuất Excel và PDF."""
+    _ = (view_key, ts, rules_key, nhan_dot, kh_sig)
+    wanted = set(sheet_names)
+    sheets: dict[str, pd.DataFrame] = {
+        _EXPORT_SHEET_XA_02_CT: _bang_nguon_von_xa_02_ct(_df_labeled, df_labeled=_df_labeled),
+        _EXPORT_SHEET_CT: _bang_theo_nv(_df_labeled, COT_TEN_CT, df_labeled=_df_labeled),
+        _EXPORT_SHEET_XA: _bang_theo_nv(_df_labeled, COT_TEN_XA, extra_cols=list(extra_cols), df_labeled=_df_labeled),
+    }
+    if not is_pgd_view:
+        sheets[_EXPORT_SHEET_PGD] = _bang_theo_nv(
+            _df_labeled, COT_TEN_PGD, df_labeled=_df_labeled,
+            them_dong_tong=True,
+        )
+    if wanted:
+        sheets = {name: data for name, data in sheets.items() if name in wanted}
+    return {name: data for name, data in sheets.items() if isinstance(data, pd.DataFrame) and not data.empty}
+
+
+@st.cache_data(show_spinner=False)
 def _cached_excel_sheets(
     _df_labeled: pd.DataFrame,
     is_pgd_view: bool,
     extra_cols: tuple[str, ...],
+    sheet_names: tuple[str, ...] = (),
     view_key: str = "cn",
     ts: float = 0.0,
     rules_key: str = "",
@@ -644,17 +776,11 @@ def _cached_excel_sheets(
     kh_sig: str = "",
 ) -> bytes:
     """Cache Excel export — tránh tính lại bảng mỗi lần tải."""
-    _ = (view_key, ts, rules_key, nhan_dot, kh_sig)
-    sheets: dict[str, pd.DataFrame] = {
-        "Nguồn xã 02 CT": _bang_nguon_von_xa_02_ct(_df_labeled, df_labeled=_df_labeled),
-        "Theo Chương trình": _bang_theo_nv(_df_labeled, COT_TEN_CT, df_labeled=_df_labeled),
-        "Theo Xã": _bang_theo_nv(_df_labeled, COT_TEN_XA, extra_cols=list(extra_cols), df_labeled=_df_labeled),
-    }
-    if not is_pgd_view:
-        sheets["Theo PGD"] = _bang_theo_nv(
-            _df_labeled, COT_TEN_PGD, df_labeled=_df_labeled,
-            them_dong_tong=True,
-        )
+    sheets = _cached_bao_cao_sheets(
+        _df_labeled, is_pgd_view, extra_cols, sheet_names, view_key, ts, rules_key, nhan_dot, kh_sig
+    )
+    if not sheets:
+        raise RuntimeError("Không có bảng dữ liệu phù hợp điều kiện xuất.")
     return xuat_excel(sheets)
 
 
@@ -907,33 +1033,151 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                 key="nvdp_sub_cn",
             )
 
-        # ── Xuất Excel (on-demand — chỉ tính khi bấm nút, tránh eager) ──────
+        # ── Xuất báo cáo (on-demand — chỉ tính khi bấm nút, tránh eager) ────
         st.divider()
-        st.markdown("**📥 Xuất Excel — Báo cáo Nguồn vốn địa phương**")
+        st.markdown("**📥 Xuất báo cáo — Nguồn vốn địa phương**")
+
+        sheet_options = _export_sheet_options(is_pgd_view)
+        sheet_key = f"{kp}nvdp_export_sheets"
+        if sheet_key in st.session_state:
+            st.session_state[sheet_key] = _clean_selected_options(st.session_state[sheet_key], sheet_options)
+
+        with st.expander("Điều kiện xuất báo cáo", expanded=True):
+            c_filter_1, c_filter_2 = st.columns(2)
+            with c_filter_1:
+                source_filter = st.selectbox(
+                    "Nguồn vốn",
+                    _EXPORT_SOURCE_OPTIONS,
+                    key=f"{kp}nvdp_export_source",
+                )
+            with c_filter_2:
+                selected_sheet_names = st.multiselect(
+                    "Bảng đưa vào file",
+                    sheet_options,
+                    default=sheet_options,
+                    key=sheet_key,
+                    help="Có thể chọn một hoặc nhiều bảng. Bỏ hết lựa chọn thì chưa tạo file.",
+                )
+
+            c_filter_3, c_filter_4, c_filter_5 = st.columns(3)
+            with c_filter_3:
+                pgd_export = []
+                if not is_pgd_view:
+                    pgd_export = st.multiselect(
+                        "PGD",
+                        _export_options_from_col(df_labeled, COT_TEN_PGD),
+                        key=f"{kp}nvdp_export_pgd",
+                        help="Để trống là xuất tất cả PGD trong phạm vi đang xem.",
+                    )
+            with c_filter_4:
+                xa_export = st.multiselect(
+                    "Xã/Phường",
+                    _export_options_from_col(df_labeled, COT_TEN_XA),
+                    key=f"{kp}nvdp_export_xa",
+                    help="Để trống là xuất tất cả xã/phường trong phạm vi đang xem.",
+                )
+            with c_filter_5:
+                ct_export = st.multiselect(
+                    "Chương trình",
+                    _export_options_from_col(df_labeled, COT_TEN_CT),
+                    key=f"{kp}nvdp_export_ct",
+                    help="Để trống là xuất tất cả chương trình trong phạm vi đang xem.",
+                )
+
+        df_export = _loc_du_lieu_xuat_theo_dieu_kien(
+            df_labeled,
+            source_filter=source_filter,
+            pgd_values=pgd_export,
+            xa_values=xa_export,
+            ct_values=ct_export,
+        )
+        if not selected_sheet_names:
+            st.warning("Chọn ít nhất một bảng để tạo file báo cáo.")
+        elif df_export.empty:
+            st.warning("Không có dữ liệu phù hợp với điều kiện xuất đã chọn.")
+        else:
+            st.caption(
+                f"Dữ liệu xuất: {len(df_export):,} dòng · "
+                f"{len(selected_sheet_names)} bảng · {source_filter}"
+            )
+
         today_str = date.today().strftime("%d/%m/%Y")
         today_file = date.today().strftime("%Y%m%d")
         kh_sig = _kh_map_cache_key(nhan_dot_kh, kh_map)
-        excel_state_key = _excel_state_key(view_key, ts_hstd, rules_key, kh_sig)
-        if st.button("📊 Tạo báo cáo Excel", key="nvdp_tao_excel"):
-            with st.spinner("Đang tạo báo cáo Excel..."):
-                try:
-                    _clear_old_excel_buffers(excel_state_key)
-                    st.session_state[excel_state_key] = _cached_excel_sheets(
-                        df_labeled, is_pgd_view, extra_cols_tuple, view_key, ts_hstd, rules_key,
-                        nhan_dot_kh, kh_sig,
-                    )
-                except Exception as e:
-                    logger.error("tab_hhi export excel: %s", e, exc_info=True)
-                    st.warning(f"Không thể tạo đầy đủ file Excel nguồn vốn địa phương: {e}")
-                    _clear_old_excel_buffers(excel_state_key)
-                    st.session_state[excel_state_key] = xuat_excel(
-                        {"Lỗi xuất file": pd.DataFrame({"Lỗi": [str(e)]})}
-                    )
-        if excel_state_key in st.session_state:
-            st.download_button(
-                label=f"⬇️ Tải Excel Nguồn vốn ĐP ({today_str})",
-                data=st.session_state[excel_state_key],
-                file_name=f"NguonVonDiaPhuong_{today_file}.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                key="nvdp_xuat_excel",
-            )
+        sheet_names_tuple = tuple(selected_sheet_names)
+        condition_sig = _export_condition_key(
+            source_filter,
+            pgd_export,
+            xa_export,
+            ct_export,
+            sheet_names_tuple,
+        )
+        export_sig = f"{kh_sig}|{condition_sig}"
+        excel_state_key = _excel_state_key(view_key, ts_hstd, rules_key, export_sig)
+        pdf_state_key = f"{_PDF_STATE_PREFIX}{view_key}_{ts_hstd}_{condition_sig}"
+
+        tieu_de_pdf = "BÁO CÁO TỶ TRỌNG VỐN ỦY THÁC ĐỊA PHƯƠNG"
+        tieu_de_pdf += f" — {view_key}" if is_pgd_view else " — TOÀN CHI NHÁNH"
+
+        col_excel, col_pdf = st.columns(2)
+
+        with col_excel:
+            if st.button(
+                "📊 Tạo báo cáo Excel",
+                key="nvdp_tao_excel",
+                disabled=not selected_sheet_names or df_export.empty,
+            ):
+                with st.spinner("Đang tạo báo cáo Excel..."):
+                    try:
+                        _clear_old_excel_buffers(excel_state_key)
+                        st.session_state[excel_state_key] = _cached_excel_sheets(
+                            df_export, is_pgd_view, extra_cols_tuple, sheet_names_tuple, view_key, ts_hstd, rules_key,
+                            nhan_dot_kh, kh_sig,
+                        )
+                    except Exception as e:
+                        logger.error("tab_hhi export excel: %s", e, exc_info=True)
+                        st.warning(f"Không thể tạo đầy đủ file Excel nguồn vốn địa phương: {e}")
+                        _clear_old_excel_buffers(excel_state_key)
+                        st.session_state[excel_state_key] = xuat_excel(
+                            {"Lỗi xuất file": pd.DataFrame({"Lỗi": [str(e)]})}
+                        )
+            if excel_state_key in st.session_state:
+                st.download_button(
+                    label=f"⬇️ Tải Excel Nguồn vốn ĐP ({today_str})",
+                    data=st.session_state[excel_state_key],
+                    file_name=f"NguonVonDiaPhuong_{today_file}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    key="nvdp_xuat_excel",
+                )
+
+        with col_pdf:
+            if st.button(
+                "📄 Tạo báo cáo PDF",
+                key="nvdp_tao_pdf",
+                disabled=not selected_sheet_names or df_export.empty,
+            ):
+                with st.spinner("Đang tạo báo cáo PDF..."):
+                    try:
+                        _clear_old_pdf_buffers(pdf_state_key)
+                        sheets = _cached_bao_cao_sheets(
+                            df_export, is_pgd_view, extra_cols_tuple, sheet_names_tuple, view_key, ts_hstd,
+                            rules_key, nhan_dot_kh, kh_sig,
+                        )
+                        if not sheets:
+                            raise RuntimeError("Không có bảng dữ liệu phù hợp điều kiện xuất.")
+                        pdf_bytes = xuat_pdf_bc(sheets, tieu_de_pdf, ctx.username)
+                        if not pdf_bytes:
+                            raise RuntimeError("Dịch vụ PDF không trả về dữ liệu.")
+                        st.session_state[pdf_state_key] = pdf_bytes
+                    except Exception as e:
+                        logger.error("tab_hhi export pdf: %s", e, exc_info=True)
+                        _clear_old_pdf_buffers(pdf_state_key)
+                        st.warning(f"Không thể tạo PDF nguồn vốn địa phương: {e}")
+            if pdf_state_key in st.session_state:
+                st.download_button(
+                    label=f"⬇️ Tải PDF Nguồn vốn ĐP ({today_str})",
+                    data=st.session_state[pdf_state_key],
+                    file_name=f"NguonVonDiaPhuong_{today_file}.pdf",
+                    mime="application/pdf",
+                    key="nvdp_xuat_pdf",
+                )

@@ -24,6 +24,8 @@ set "PIP_VERSION=26.1.2"
 set "LOG_RETENTION_DAYS=30"
 set "JUST_INSTALLED=0"
 set "HEADLESS=false"
+set "FORCE_KILL=false"
+set "ALT_PORT=8503"
 
 rem Python 3.12 mac dinh; fallback path co dinh o buoc auto-detect
 set "PY_CMD=py"
@@ -32,8 +34,30 @@ set "PY_ARGS=-3.12"
 if not exist "%TMP_DIR%" mkdir "%TMP_DIR%" >nul 2>&1
 if not exist "%LOG_DIR%" mkdir "%LOG_DIR%" >nul 2>&1
 
+rem Parse flags loop
+:parse_flags
+if "%~1"=="" goto :flags_done
 if /I "%~1"=="--self-test" goto :self_test
-if /I "%~1"=="--no-browser" set "HEADLESS=true"
+if /I "%~1"=="--no-browser" (
+    set "HEADLESS=true"
+    shift
+    goto :parse_flags
+)
+if /I "%~1"=="--force-kill" (
+    set "FORCE_KILL=true"
+    shift
+    goto :parse_flags
+)
+if /I "%~1"=="--port" (
+    set "PORT=%~2"
+    set "URL=http://localhost:%~2"
+    shift
+    shift
+    goto :parse_flags
+)
+shift
+goto :parse_flags
+:flags_done
 
 rem Archive log cua lan chay truoc, sau do xoa log launcher qua han.
 set "RUN_STAMP=%date%_%time%"
@@ -65,9 +89,8 @@ if exist "%LOCK_DIR%" (
         echo.
         call :kill_port_processes
         if errorlevel 1 (
-            echo   LOI: Port %PORT% khong thuoc VBSP-SCM, launcher se khong tu tat.
-            echo   Hay dong ung dung dang chiem port hoac doi port cua ung dung do.
-            goto :error_pause
+            call :prompt_alt_port_or_exit
+            if errorlevel 1 goto :error_pause
         )
     )
     echo [%date% %time%] Remove stale launcher lock >> "%LAUNCH_LOG%"
@@ -108,16 +131,18 @@ if not errorlevel 1 (
     echo.
     call :kill_port_processes
     if errorlevel 1 (
-        echo   LOI: Port %PORT% khong thuoc VBSP-SCM, launcher se khong tu tat.
-        echo   Hay dong ung dung dang chiem port hoac doi port cua ung dung do.
-        goto :error_pause
+        call :prompt_alt_port_or_exit
+        if errorlevel 1 goto :error_pause
     )
     netstat -ano | findstr ":%PORT% " | findstr "LISTENING" >nul 2>&1
     if not errorlevel 1 (
-        echo [%date% %time%] ERROR: port %PORT% still listening after taskkill >> "%LAUNCH_LOG%"
-        echo   LOI: Khong tat duoc app cu dang chiem cong %PORT%.
-        echo   Hay dong cua so Streamlit/CMD cu roi chay lai file nay.
-        goto :error_pause
+        echo [%date% %time%] WARN: port %PORT% still listening, try alt port >> "%LAUNCH_LOG%"
+        call :prompt_alt_port_or_exit
+        if errorlevel 1 (
+            echo   LOI: Khong tat duoc app cu dang chiem cong %PORT%.
+            echo   Hay dong cua so Streamlit/CMD cu roi chay lai file nay.
+            goto :error_pause
+        )
     )
     echo   Da tat app cu tren cong %PORT%.
     echo.
@@ -398,23 +423,77 @@ exit /b 0
 
 :handle_port_pid
 set "PORT_PID=%~1"
-call :is_vbsp_process %PORT_PID%
+call :classify_pid_tier %PORT_PID%
+set "PID_TIER=%errorlevel%"
+
+echo [%date% %time%] PID %PORT_PID% classified as tier %PID_TIER% >> "%LAUNCH_LOG%"
+
+if "%PID_TIER%"=="0" goto :kill_silent_tier0
+if "%PID_TIER%"=="1" goto :handle_tier1
+if "%PID_TIER%"=="2" goto :handle_tier2
+if "%PID_TIER%"=="3" goto :handle_tier3
+goto :handle_tier3
+
+:kill_silent_tier0
+echo [%date% %time%] Stop verified VBSP-SCM on port %PORT%, PID %PORT_PID% (tier 0) >> "%LAUNCH_LOG%"
+echo   Tat phien VBSP-SCM cu PID %PORT_PID%...
+goto :do_kill
+
+:handle_tier1
+echo   CANH BAO: PID %PORT_PID% xac dinh la Python co dau hieu VBSP-SCM.
+call :show_process_info %PORT_PID%
+if /I "%FORCE_KILL%"=="true" goto :kill_silent_tier2
+call :prompt_user_kill Y 12 %PORT_PID% Tier-1
 if errorlevel 1 (
-    echo [%date% %time%] REFUSE: PID %PORT_PID% is not verified as VBSP-SCM >> "%LAUNCH_LOG%"
-    echo   CANH BAO: PID %PORT_PID% khong duoc xac minh la VBSP-SCM.
-    call :show_process_info %PORT_PID%
+    echo [%date% %time%] User skipped kill PID %PORT_PID% >> "%LAUNCH_LOG%"
+    set "KILL_FAILED=1"
+    exit /b 0
+)
+goto :do_kill
+
+:handle_tier2
+echo   CANH BAO: PID %PORT_PID% la tien trinh Python khong xac minh ro.
+call :show_process_info %PORT_PID%
+if /I "%FORCE_KILL%"=="true" goto :kill_silent_tier2
+call :prompt_user_kill Y 12 %PORT_PID% Tier-2
+if errorlevel 1 (
+    echo [%date% %time%] User skipped kill PID %PORT_PID% >> "%LAUNCH_LOG%"
+    set "KILL_FAILED=1"
+    exit /b 0
+)
+goto :do_kill
+
+:kill_silent_tier2
+echo [%date% %time%] Force-kill Python PID %PORT_PID% (--force-kill on) >> "%LAUNCH_LOG%"
+echo   Tu dong tat PID %PORT_PID% vi --force-kill...
+goto :do_kill
+
+:handle_tier3
+echo.
+echo   ========================================
+echo   ! CANH BAO CAO: PID %PORT_PID% KHONG phai Python
+echo   ========================================
+call :show_process_info %PORT_PID%
+echo   Day CO THE la dich vu quan trong khac.
+echo   Neu khong chac chan, HAY CHON [N] de bo qua.
+echo.
+call :prompt_user_kill N 20 %PORT_PID% Tier-3
+if errorlevel 1 (
+    echo [%date% %time%] User skipped kill (non-python safe default) PID %PORT_PID% >> "%LAUNCH_LOG%"
+    set "KILL_FAILED=1"
+    exit /b 0
+)
+goto :do_kill
+
+:do_kill
+taskkill /F /PID %PORT_PID% >nul 2>&1
+if errorlevel 1 (
+    echo [%date% %time%] WARN: taskkill failed for PID %PORT_PID% >> "%LAUNCH_LOG%"
+    echo   CANH BAO: Khong tat duoc PID %PORT_PID%.
     set "KILL_FAILED=1"
 ) else (
-    echo [%date% %time%] Stop verified VBSP-SCM on port %PORT%, PID %PORT_PID% >> "%LAUNCH_LOG%"
-    echo   Tat phien VBSP-SCM cu PID %PORT_PID%...
-    taskkill /F /PID %PORT_PID% >nul 2>&1
-    if errorlevel 1 (
-        echo [%date% %time%] WARN: taskkill failed for PID %PORT_PID% >> "%LAUNCH_LOG%"
-        echo   CANH BAO: Khong tat duoc PID %PORT_PID%.
-        set "KILL_FAILED=1"
-    ) else (
-        set "KILLED_PIDS=!KILLED_PIDS! %PORT_PID%"
-    )
+    echo [%date% %time%] taskkill OK PID %PORT_PID% >> "%LAUNCH_LOG%"
+    set "KILLED_PIDS=!KILLED_PIDS! %PORT_PID%"
 )
 exit /b 0
 
@@ -449,44 +528,77 @@ if not exist "%APP_PID_FILE%" (
 exit /b 0
 
 :is_vbsp_process
-set "CHECK_PID=%~1"
-set "PID_INFO_FILE=%TMP_DIR%\vbsp_pid_%CHECK_PID%.txt"
-set "IS_VBSP_PROCESS=1"
-del "%PID_INFO_FILE%" >nul 2>&1
+rem Backward compatible: return 0 only for tier 0 (exact VBSP verification)
+call :classify_pid_tier %~1
+if "%errorlevel%"=="0" exit /b 0
+exit /b 1
 
-rem Marker do chinh app.py ghi: ho tro process chay tu terminal khi Windows an metadata.
-call :is_marked_vbsp_process
-if not errorlevel 1 exit /b 0
+:classify_pid_tier
+set "CLASSIFY_PID=%~1"
+set "CLASSIFY_FILE=%TMP_DIR%\vbsp_classify_%CLASSIFY_PID%.txt"
+set "CLASSIFY_PS1=%TMP_DIR%\vbsp_classify_%CLASSIFY_PID%.ps1"
+del "%CLASSIFY_FILE%" >nul 2>&1
+del "%CLASSIFY_PS1%" >nul 2>&1
 
-rem PowerShell chay dong bo trong cung console, chi doc metadata process.
-powershell.exe -NoLogo -NoProfile -NonInteractive -Command "$p=Get-CimInstance Win32_Process -Filter 'ProcessId=%CHECK_PID%' -ErrorAction SilentlyContinue; if ($null -ne $p) { Write-Output $p.ExecutablePath; Write-Output $p.CommandLine }" > "%PID_INFO_FILE%" 2>nul
-
-rem Fallback WMIC chi dung tren Windows cu con cung cap executable nay.
-if not exist "%PID_INFO_FILE%" goto :pid_check_fail
-for %%z in ("%PID_INFO_FILE%") do if %%~zz EQU 0 (
-    where wmic.exe >nul 2>&1
-    if not errorlevel 1 wmic.exe process where "ProcessId=%CHECK_PID%" get ExecutablePath,CommandLine /format:list > "%PID_INFO_FILE%" 2>nul
+call :is_marked_vbsp_process_classify %CLASSIFY_PID%
+if not errorlevel 1 (
+    del "%CLASSIFY_FILE%" >nul 2>&1
+    del "%CLASSIFY_PS1%" >nul 2>&1
+    exit /b 0
 )
-if not exist "%PID_INFO_FILE%" goto :pid_check_fail
-for %%z in ("%PID_INFO_FILE%") do if %%~zz EQU 0 goto :pid_check_fail
 
-rem Metadata co san thi van bat buoc exact project venv + streamlit + app.py.
-findstr /I /L /C:"%PY_EXE%" "%PID_INFO_FILE%" >nul 2>&1
-if errorlevel 1 set "IS_VBSP_PROCESS=0"
-findstr /I /L /C:"streamlit" "%PID_INFO_FILE%" >nul 2>&1
-if errorlevel 1 set "IS_VBSP_PROCESS=0"
-findstr /I /L /C:"app.py" "%PID_INFO_FILE%" >nul 2>&1
-if errorlevel 1 set "IS_VBSP_PROCESS=0"
+set "VBSP_CLASSIFY_PY_EXE=%PY_EXE%"
+set "VBSP_CLASSIFY_ROOT=%ROOT%"
 
-del "%PID_INFO_FILE%" >nul 2>&1
-if "%IS_VBSP_PROCESS%"=="1" exit /b 0
-exit /b 1
+echo $p=Get-CimInstance Win32_Process -Filter 'ProcessId=%CLASSIFY_PID%' -ErrorAction SilentlyContinue ; > "%CLASSIFY_PS1%"
+echo if ($null -eq $p) { Write-Output 'MISSING' ; exit 0 } >> "%CLASSIFY_PS1%"
+echo $exe=[string]$p.ExecutablePath ; $cmd=[string]$p.CommandLine ; $name=[string]$p.Name ; >> "%CLASSIFY_PS1%"
+echo $pyExe=$env:VBSP_CLASSIFY_PY_EXE ; $root=$env:VBSP_CLASSIFY_ROOT ; >> "%CLASSIFY_PS1%"
+echo Write-Output ('EXE=' + $exe) ; >> "%CLASSIFY_PS1%"
+echo Write-Output ('CMD=' + $cmd) ; >> "%CLASSIFY_PS1%"
+echo Write-Output ('NAME=' + $name) ; >> "%CLASSIFY_PS1%"
+echo $combined=($exe + ' ^| ' + $cmd).ToLowerInvariant() ; >> "%CLASSIFY_PS1%"
+echo $pyExeNorm=$pyExe.ToLowerInvariant() ; $rootNorm=$root.ToLowerInvariant() ; >> "%CLASSIFY_PS1%"
+echo $tier=3 ; >> "%CLASSIFY_PS1%"
+echo $v0A = $combined.Contains($pyExeNorm) -or $combined.Contains($rootNorm + '\venv\') ; >> "%CLASSIFY_PS1%"
+echo $v0B = $combined.Contains('streamlit') -or $combined.Contains('app.py') ; >> "%CLASSIFY_PS1%"
+echo if ($v0A -and $v0B) { $tier=0 } >> "%CLASSIFY_PS1%"
+echo elseif ($combined.Contains($rootNorm) -or $combined.Contains('\venv\') -or $combined.Contains('streamlit') -or $combined.Contains('app.py')) { $tier=1 } >> "%CLASSIFY_PS1%"
+echo elseif ($name.ToLowerInvariant() -eq 'python.exe' -or $exe.ToLowerInvariant().EndsWith('python.exe') -or $exe.ToLowerInvariant().Contains('python3')) { $tier=2 } >> "%CLASSIFY_PS1%"
+echo Write-Output ('TIER=' + $tier) ; >> "%CLASSIFY_PS1%"
 
-:pid_check_fail
-del "%PID_INFO_FILE%" >nul 2>&1
-exit /b 1
+powershell.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "%CLASSIFY_PS1%" > "%CLASSIFY_FILE%" 2>nul
 
-:is_marked_vbsp_process
+del "%CLASSIFY_PS1%" >nul 2>&1
+
+if not exist "%CLASSIFY_FILE%" goto :classify_fallback
+for %%z in ("%CLASSIFY_FILE%") do if %%~zz EQU 0 goto :classify_fallback
+
+set "CLASSIFY_TIER=3"
+for /f "usebackq tokens=1,* delims==" %%a in ("%CLASSIFY_FILE%") do (
+    if /I "%%a"=="TIER" set "CLASSIFY_TIER=%%b"
+)
+del "%CLASSIFY_FILE%" >nul 2>&1
+
+if "%CLASSIFY_TIER%"=="0" exit /b 0
+if "%CLASSIFY_TIER%"=="1" exit /b 1
+if "%CLASSIFY_TIER%"=="2" exit /b 2
+exit /b 3
+
+:classify_fallback
+del "%CLASSIFY_FILE%" >nul 2>&1
+del "%CLASSIFY_PS1%" >nul 2>&1
+set "FALLBACK_FILE=%TMP_DIR%\vbsp_fb_%CLASSIFY_PID%.txt"
+where wmic.exe >nul 2>&1
+if not errorlevel 1 wmic.exe process where "ProcessId=%CLASSIFY_PID%" get Name /format:list > "%FALLBACK_FILE%" 2>nul
+set "FB_IS_PY=0"
+findstr /I /L /C:"python.exe" "%FALLBACK_FILE%" >nul 2>&1
+if not errorlevel 1 set "FB_IS_PY=1"
+del "%FALLBACK_FILE%" >nul 2>&1
+if "%FB_IS_PY%"=="1" exit /b 2
+exit /b 3
+
+:is_marked_vbsp_process_classify
 if not exist "%APP_PID_FILE%" exit /b 1
 set "MARKER_PID="
 set "MARKER_ROOT="
@@ -496,9 +608,92 @@ for /f "usebackq tokens=1,* delims==" %%a in ("%APP_PID_FILE%") do (
     if /I "%%a"=="ROOT" set "MARKER_ROOT=%%b"
     if /I "%%a"=="APP" set "MARKER_APP=%%b"
 )
-if not "!MARKER_PID!"=="%CHECK_PID%" exit /b 1
+if not "!MARKER_PID!"=="%~1" exit /b 1
 if /I not "!MARKER_ROOT!"=="%ROOT%" exit /b 1
 if /I not "!MARKER_APP!"=="%ROOT%\app.py" exit /b 1
+exit /b 0
+
+:prompt_user_kill
+set "PK_DEFAULT=%~1"
+set "PK_TIMEOUT=%~2"
+set "PK_PID=%~3"
+set "PK_TIER=%~4"
+set "PK_PROMPT_FILE=%TMP_DIR%\vbsp_prompt_%PK_PID%.txt"
+del "%PK_PROMPT_FILE%" >nul 2>&1
+
+rem Use choice.exe if available; fallback to set /p
+where choice.exe >nul 2>&1
+if errorlevel 1 goto :prompt_user_kill_fallback
+
+echo   Tiep tuc: Dong tien trinh PID %PK_PID%?
+choice /C YN /T %PK_TIMEOUT% /D %PK_DEFAULT% /M "   Lua chon [Y=Dong, N=Bo qua] (mac dinh %PK_DEFAULT% sau %PK_TIMEOUT%s)"
+set "PK_RC=%errorlevel%"
+del "%PK_PROMPT_FILE%" >nul 2>&1
+if "%PK_RC%"=="1" exit /b 0
+exit /b 1
+
+:prompt_user_kill_fallback
+set /P "PK_ANSWER=   Dong tien trinh PID %PK_PID%? [Y/N, mac dinh %PK_DEFAULT% sau %PK_TIMEOUT%s]: "
+if "%PK_ANSWER%"=="" set "PK_ANSWER=%PK_DEFAULT%"
+del "%PK_PROMPT_FILE%" >nul 2>&1
+if /I "%PK_ANSWER%"=="Y" exit /b 0
+exit /b 1
+
+:prompt_alt_port_or_exit
+echo.
+echo   ----------------------------------------------
+echo   Lua chon giai phap cong %PORT% van bi chiem:
+echo     [1] Su dung cong thay the %ALT_PORT% (de xuat)
+echo     [2] Thu dong cac tien trinh con lai tren cong %PORT%
+echo     [3] Thoat (dung co che)
+echo   ----------------------------------------------
+where choice.exe >nul 2>&1
+if errorlevel 1 goto :prompt_alt_port_fallback
+
+choice /C 123 /T 15 /D 1 /M "   Chon [1/2/3] (mac dinh 1 sau 15s)"
+set "PAP_RC=%errorlevel%"
+goto :dispatch_alt_port_choice
+
+:prompt_alt_port_fallback
+set /P "PAP_ANSWER=   Nhap 1, 2 hoac 3 (mac dinh 1): "
+if "%PAP_ANSWER%"=="" set "PAP_ANSWER=1"
+if "%PAP_ANSWER%"=="1" set "PAP_RC=1"
+if "%PAP_ANSWER%"=="2" set "PAP_RC=2"
+if "%PAP_ANSWER%"=="3" set "PAP_RC=3"
+goto :dispatch_alt_port_choice
+
+:dispatch_alt_port_choice
+if "%PAP_RC%"=="3" (
+    echo [%date% %time%] User chose abort on port conflict >> "%LAUNCH_LOG%"
+    exit /b 1
+)
+if "%PAP_RC%"=="2" (
+    echo [%date% %time%] Retry kill with --force-kill semantics for this round >> "%LAUNCH_LOG%"
+    set "FORCE_KILL=true"
+    call :kill_port_processes
+    if errorlevel 1 (
+        rem Still failing after force-kill attempt: force option 1
+        set "PAP_RC=1"
+        goto :switch_to_alt_port
+    )
+    set "FORCE_KILL=false"
+    netstat -ano | findstr ":%PORT% " | findstr "LISTENING" >nul 2>&1
+    if errorlevel 1 (
+        rem Port freed
+        exit /b 0
+    )
+    rem Port still occupied, offer alt port again
+    echo   Port %PORT% van con bi chiem sau khi thu tat cuong che.
+    goto :switch_to_alt_port
+)
+:switch_to_alt_port
+set "PORT=%ALT_PORT%"
+set "URL=http://localhost:%ALT_PORT%"
+echo [%date% %time%] Switched to alternate port %PORT% >> "%LAUNCH_LOG%"
+echo.
+echo   => Da chuyen sang su dung cong: %PORT%
+echo   => URL: %URL%
+echo.
 exit /b 0
 
 :calculate_requirements_hash

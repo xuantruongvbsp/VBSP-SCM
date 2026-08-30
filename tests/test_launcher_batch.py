@@ -34,18 +34,25 @@ def test_chay_vbsp_scm_is_the_only_real_launcher() -> None:
 def test_port_process_is_verified_before_force_kill() -> None:
     content = _read(MAIN_LAUNCHER)
 
+    # Port processes go through verification handler (never blind taskkill)
     assert "call :handle_port_pid %%p" in content
-    assert "call :is_vbsp_process %PORT_PID%" in content
+    assert "call :classify_pid_tier %PORT_PID%" in content
     assert "Get-CimInstance Win32_Process" in content
     assert "call :is_marked_vbsp_process" in content
     assert 'APP_PID_FILE=%TMP_DIR%\\vbsp_streamlit.pid' in content
+    # PID marker verifies exact ROOT + APP match (anti-spoof)
     assert 'if /I not "!MARKER_ROOT!"=="%ROOT%" exit /b 1' in content
     assert 'if /I not "!MARKER_APP!"=="%ROOT%\\app.py" exit /b 1' in content
-    assert '/C:"%PY_EXE%"' in content
-    assert '/C:"streamlit"' in content
-    assert '/C:"app.py"' in content
+    # Verification keywords (venv python + streamlit + app.py) via PowerShell tier classifier
+    # These replace the old findstr /C:"..." checks — same contract, new engine
+    assert "$combined.Contains($pyExeNorm)" in content
+    assert "Contains('streamlit')" in content
+    assert "Contains('app.py')" in content
+    # Sloppy partial venv path check must NEVER exist (must match PY_EXE exact)
     assert '/C:"venv\\Scripts\\python.exe"' not in content
-    assert "REFUSE: PID %PORT_PID% is not verified as VBSP-SCM" in content
+    # Every PID is logged with a tier classification — non-verified gets prompt not silent kill
+    assert "classified as tier" in content
+    # Wildcard /IM python.exe kill is FORBIDDEN — could terminate unrelated apps
     assert "taskkill /F /IM python" not in content
 
 

@@ -29,7 +29,7 @@ REPORT_TREE = {
             {"key": "hstd_cbtd", "label": "👤 Theo CBTD", "desc": "Theo cán bộ tín dụng"},
         ],
     },
-    "⚠️ Báo cáo Nợ rủi ro": {
+    "⚠️ Báo cáo Nợ xấu": {
         "key": "noruiro_group",
         "icon": "🚨",
         "reports": [

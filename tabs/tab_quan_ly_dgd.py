@@ -78,6 +78,69 @@ def _resolve_pgd_key(pgd_user: str) -> str:
     return pgd_user
 
 
+def _norm_text(value: Any) -> str:
+    if value is None:
+        return ""
+    try:
+        if pd.isna(value):
+            return ""
+    except (TypeError, ValueError):
+        pass
+    try:
+        text = str(value).strip().lower()
+    except Exception:
+        return ""
+    return "" if text in {"nan", "none", "<na>"} else text
+
+
+def _validate_trung_thon_toan_xa(the_dict: dict[str, list[str]]) -> list[str]:
+    """Trả về list msg các thôn bị trùng giữa 2 ĐGD bất kỳ trong một xã."""
+    ap_owner: dict[str, str] = {}
+    errors: list[str] = []
+    for dgd_name, th_list in the_dict.items():
+        for thon_name in th_list:
+            key_th = _norm_text(thon_name)
+            if not key_th:
+                continue
+            if key_th in ap_owner and ap_owner[key_th] != dgd_name:
+                errors.append(f"⚠️ Thôn **{thon_name}** bị trùng: **{ap_owner[key_th]}** ↔ **{dgd_name}**")
+            else:
+                ap_owner[key_th] = dgd_name
+    return errors
+
+
+def _build_prospective_xa_dgd(
+    xa_dgd: dict,
+    pending_block: dict[str, list[str]],
+) -> dict[str, list[str]]:
+    """Tạo trạng thái dự kiến; thôn trong ĐGD pending sẽ được gỡ khỏi ĐGD cũ trước."""
+    prospective: dict[str, list[str]] = {}
+    for d_name, raw_entry in (xa_dgd or {}).items():
+        prospective[d_name] = list(_normalize_entry(raw_entry)["thon"])
+
+    for d_name, th_list in (pending_block or {}).items():
+        th_clean: list[str] = []
+        seen: set[str] = set()
+        for th in th_list:
+            key_th = _norm_text(th)
+            if not key_th or key_th in seen:
+                continue
+            seen.add(key_th)
+            th_clean.append(str(th).strip())
+
+        moved_keys = {_norm_text(th) for th in th_clean}
+        for other_name, other_list in list(prospective.items()):
+            if other_name == d_name:
+                continue
+            prospective[other_name] = [
+                th for th in other_list
+                if _norm_text(th) not in moved_keys
+            ]
+        prospective[d_name] = th_clean
+
+    return prospective
+
+
 def _hostname() -> str:
     try:
         return socket.gethostname()
@@ -269,7 +332,7 @@ def _render_tong_quan(df_h: pd.DataFrame, username: str, hn: str) -> None:
 
 
 def _render_gan_thon(df_h: pd.DataFrame, username: str, hn: str) -> None:
-    """Tab gán thôn/ấp cho ĐGD — tên & lịch GD là bất biến (lấy từ DGD_DANH_SACH)."""
+    """Tab gán thôn/ấp cho ĐGD — Batch save + Cross-check HSTD + Validate trùng + Import Excel."""
     dgd_map = copy.deepcopy(db.doc_dgd_map())
     ten_pgd = st.selectbox("Chọn PGD", [DON_VI_CHI_NHANH] + DS_PGD, key="dgd_edit_pgd")
 
@@ -291,49 +354,240 @@ def _render_gan_thon(df_h: pd.DataFrame, username: str, hn: str) -> None:
     if not isinstance(xa_dgd, dict):
         xa_dgd = {}
 
+    # --- Cross-check HSTD % (NEW Gói 3) --- Build set thôn có dư nợ > 0
+    ap_co_dn: set[str] = set()
+    if df_h is not None and not df_h.empty:
+        try:
+            from config import COT_TEN_XA, COT_TEN_THON, COT_TONG_DU_NO
+            if COT_TEN_XA in df_h.columns and COT_TEN_THON in df_h.columns and COT_TONG_DU_NO in df_h.columns:
+                pgd_k = _resolve_pgd_key(ten_pgd)
+                # Lọc theo PGD + Xã (không phân biệt chữ hoa/thường)
+                norm_xa_target = _norm_text(chon_xa)
+                mask_pgd = (df_h.get("PGD", pd.Series(dtype="object")).apply(_norm_text) == _norm_text(pgd_k)) \
+                    if "PGD" in df_h.columns else pd.Series([True]*len(df_h))
+                mask_xa = df_h[COT_TEN_XA].fillna("").astype(str).apply(_norm_text) == norm_xa_target
+                dn = pd.to_numeric(df_h[COT_TONG_DU_NO], errors="coerce").fillna(0)
+                mask_dn = dn > 0
+                sub = df_h.loc[mask_pgd & mask_xa & mask_dn]
+                if not sub.empty:
+                    for _, r in sub.iterrows():
+                        th = _norm_text(r.get(COT_TEN_THON, ""))
+                        if th:
+                            ap_co_dn.add(th)
+        except Exception as e_cross:
+            logger.error("_render_gan_thon cross-check HSTD — %s", e_cross, exc_info=True)
+
     st.caption(f"**{len(ds_dgd_xa)}** điểm GD tại {chon_xa} — chỉ được gán thôn/ấp, tên & lịch GD là bất biến.")
 
+    # --- (NEW) KPI Block Cross-check ---
+    if ap_co_dn:
+        tong_thon_co_dn = len(ap_co_dn)
+        thon_da_gan_xa: set[str] = set()
+        for _, entry in xa_dgd.items():
+            for t in _normalize_entry(entry)["thon"]:
+                thon_da_gan_xa.add(str(t).strip().lower())
+        thon_match = ap_co_dn & thon_da_gan_xa
+        pct_match = round(len(thon_match) / tong_thon_co_dn * 100, 1) if tong_thon_co_dn else 0.0
+        kpi_c1, kpi_c2, kpi_c3 = st.columns(3)
+        kpi_c1.metric(f"📊 Thôn có dư nợ (HSTD)", f"{tong_thon_co_dn}")
+        kpi_c2.metric(f"✅ Đã gán ĐGD", f"{len(thon_match)}", delta=f"{pct_match:.0f}%",
+                     delta_color="normal" if pct_match >= 80 else "inverse")
+        kpi_c3.metric(f"🔴 Chưa gán", f"{tong_thon_co_dn - len(thon_match)}")
+        if pct_match < 80:
+            st.error(f"🚨 **{pct_match:.1f}% thôn có dư nợ chưa được gán ĐGD** "
+                     f"(ngưỡng an toàn ≥80%). Cần bổ sung cấu hình.")
+        elif pct_match < 95:
+            st.warning(f"⚠️ {pct_match:.1f}% thôn đã gán (chưa đầy đủ ≥95%).")
+        else:
+            st.success(f"✅ {pct_match:.1f}% thôn có dư nợ đã được gán (mức tốt).")
+
+    st.divider()
+
+    # --- (NEW) Import Excel Cấu hình ĐGD Block ---
+    with st.expander("📤 Import Excel cấu hình ĐGD (batch cập nhật thôn)", expanded=False):
+        st.caption("Template Excel các cột: **PGD | Xã | Tên ĐGD | Thôn/ấp** (mỗi dòng 1 thôn, cùng ĐGD lặp nhiều dòng).")
+        file_up = st.file_uploader("Chọn file Excel (.xlsx)", type=["xlsx"],
+                                   key=f"dgd_import_{ten_pgd}_{chon_xa}",
+                                   accept_multiple_files=False)
+        if file_up is not None:
+            try:
+                df_imp = pd.read_excel(file_up, dtype=str).fillna("")
+                st.caption(f"Đọc được {len(df_imp)} dòng. Column: {list(df_imp.columns)}")
+                # Xác định cột theo tên phổ biến
+                col_pgd_cand = [c for c in df_imp.columns if "pgd" in str(c).lower()]
+                col_xa_cand = [c for c in df_imp.columns if "xã" in str(c).lower() or "xa" == str(c).lower()]
+                col_dgd_cand = [c for c in df_imp.columns if "đgd" in str(c).lower() or "dgd" in str(c).lower() or "tên" in str(c).lower()]
+                col_th_cand = [c for c in df_imp.columns if "thôn" in str(c).lower() or "thon" in str(c).lower() or "ấp" in str(c).lower() or "ap" in str(c).lower()]
+                c_pgd = col_pgd_cand[0] if col_pgd_cand else df_imp.columns[0]
+                c_xa  = col_xa_cand[0]  if col_xa_cand  else df_imp.columns[1]
+                c_dgd = col_dgd_cand[0] if col_dgd_cand else df_imp.columns[2]
+                c_th  = col_th_cand[0]  if col_th_cand  else df_imp.columns[3]
+                # Group theo ĐGD
+                imp_dgd_thon: dict[str, list[str]] = {}
+                skip_pgd = skip_xa = skip_blank = 0
+                for _, r in df_imp.iterrows():
+                    rv_pgd = str(r.get(c_pgd, "")).strip()
+                    rv_xa = str(r.get(c_xa, "")).strip()
+                    rv_dgd = str(r.get(c_dgd, "")).strip()
+                    rv_th = str(r.get(c_th, "")).strip()
+                    # Lọc theo PGD+Xã hiện tại (chỉ import những dòng khớp, tránh overwrite nhầm)
+                    if rv_pgd and _norm_text(rv_pgd) != _norm_text(ten_pgd):
+                        skip_pgd += 1
+                        continue
+                    if rv_xa and _norm_text(rv_xa) != _norm_text(chon_xa):
+                        skip_xa += 1
+                        continue
+                    if not rv_dgd or not rv_th:
+                        skip_blank += 1
+                        continue
+                    imp_dgd_thon.setdefault(rv_dgd, [])
+                    if rv_th not in imp_dgd_thon[rv_dgd]:
+                        imp_dgd_thon[rv_dgd].append(rv_th)
+                st.caption(
+                    f"Đã lọc {sum(len(v) for v in imp_dgd_thon.values())} dòng khớp "
+                    f"PGD={ten_pgd}, Xã={chon_xa}; bỏ qua {skip_pgd + skip_xa + skip_blank} dòng "
+                    f"(PGD khác: {skip_pgd}, xã khác: {skip_xa}, thiếu ĐGD/thôn: {skip_blank})."
+                )
+                if imp_dgd_thon:
+                    st.markdown(f"📋 **{len(imp_dgd_thon)} ĐGD sẽ được cập nhật:**")
+                    prev_rows = []
+                    for dgd_name, th_list in imp_dgd_thon.items():
+                        prev_rows.append({"Tên ĐGD": dgd_name, "Số thôn": len(th_list),
+                                          "Danh sách thôn": ", ".join(th_list)})
+                    hien_thi_dataframe_phan_trang(pd.DataFrame(prev_rows),
+                                                  key=f"dgd_import_preview_{ten_pgd}_{chon_xa}")
+                    xn_imp = st.checkbox("Xác nhận áp dụng (sẽ overwrite cấu hình thôn của các ĐGD này)",
+                                         key=f"dgd_import_xn_{ten_pgd}_{chon_xa}")
+                    if st.button("💾 Áp dụng cấu hình từ Excel", type="primary",
+                                 disabled=not xn_imp,
+                                 key=f"dgd_import_apply_{ten_pgd}_{chon_xa}"):
+                        m_imp = copy.deepcopy(db.doc_dgd_map())
+                        cur_blk = m_imp.setdefault(_resolve_pgd_key(ten_pgd), {}).setdefault(chon_xa, {})
+                        prospective_import = _build_prospective_xa_dgd(cur_blk, imp_dgd_thon)
+                        for dgd_n, th_list in prospective_import.items():
+                            cur_blk[dgd_n] = {"thon": list(th_list)}
+                        db.luu_dgd_map(m_imp, username)
+                        db.ghi_audit(username, "gan_thon_dgd_import_excel",
+                                     f"[{hn}] PGD={ten_pgd} xa={chon_xa} "
+                                     f"import {len(imp_dgd_thon)} DGD: {list(imp_dgd_thon.keys())}")
+                        st.cache_data.clear()
+                        st.success(f"✅ Đã cập nhật {len(imp_dgd_thon)} ĐGD từ Excel.")
+                        st.rerun()
+                else:
+                    st.info("Không có dòng nào khớp với PGD/Xã đang chọn (kiểm tra lại cột PGD, Xã).")
+            except Exception as e_imp:
+                logger.error("_render_gan_thon import Excel — %s", e_imp, exc_info=True)
+                st.error(f"❌ Lỗi import: {e_imp}")
+
+    st.divider()
+
+    # --- Pending state dict (NEW Gói 3: Batch save nhiều ĐGD 1 lần) ---
+    pending_state_key = f"dgd_batch_pending_{ten_pgd}_{chon_xa}"
+    if pending_state_key not in st.session_state:
+        st.session_state[pending_state_key] = {}
+
+    # --- Build các ĐGD + multiselect, lưu vào pending dict, chỉ lưu khi bấm Lưu TẤT CẢ ---
+    has_changes_batch = False
     for dgd_info in ds_dgd_xa:
         ten_dgd = dgd_info["ten"]
         e = _normalize_entry(xa_dgd.get(ten_dgd, {}))
-        ds_thon = e["thon"]
+        ds_thon_hien_tai = list(e["thon"])
         sid = re.sub(r"\W+", "_", ten_dgd)[:40]
         with st.expander(f"📍 {ten_dgd}  •  Ngày {dgd_info['ngay_gd']}  •  {dgd_info['gio_gd']}", expanded=False):
             st.caption(f"📌 {dgd_info['dia_diem']}")
+            # Đặt default từ session state nếu có chỉnh sửa trước đó
+            key_multisel = f"dgd_th_{sid}_{ten_pgd}_{chon_xa}"
+            if key_multisel not in st.session_state:
+                st.session_state[key_multisel] = [t for t in ds_thon_hien_tai if t in pool]
             thon_sel = st.multiselect(
                 "Thôn/ấp phụ trách",
                 options=pool,
-                default=[t for t in ds_thon if t in pool],
-                key=f"dgd_th_{sid}_{ten_pgd}_{chon_xa}",
+                default=st.session_state[key_multisel],
+                key=key_multisel,
             )
-            if st.button("💾 Lưu thôn/ấp", key=f"dgd_sv_{sid}_{ten_pgd}_{chon_xa}"):
-                dup_m: list[str] = []
-                for other, raw_e in xa_dgd.items():
-                    if other == ten_dgd:
-                        continue
-                    thon_other = _normalize_entry(raw_e)["thon"]
-                    for t in thon_sel:
-                        if t in thon_other:
-                            dup_m.append(f"{t} → {other}")
-                if dup_m:
-                    st.error("Trùng thôn/ấp với ĐGD khác: " + ", ".join(dup_m))
-                else:
-                    try:
-                        m = copy.deepcopy(db.doc_dgd_map())
-                        cur = m.setdefault(_resolve_pgd_key(ten_pgd), {}).setdefault(chon_xa, {})
-                        cur[ten_dgd] = {"thon": list(thon_sel)}
-                        db.luu_dgd_map(m, username)
-                        db.ghi_audit(
-                            username, "gan_thon_dgd",
-                            f"[{hn}] PGD={ten_pgd} xa={chon_xa} ĐGD={ten_dgd!r}: {thon_sel}",
-                        )
-                        st.cache_data.clear()
-                        st.success("✅ Đã lưu.")
-                        st.rerun()
-                    except Exception as e:
-                        logger.error("Lỗi trong khối except: %s", e, exc_info=True)
-                        db.ghi_audit(username, "gan_thon_dgd_loi", f"[{hn}] {e}")
-                        st.error(f"❌ {e}")
+            # Cập nhật pending dict
+            if sorted(thon_sel) != sorted(ds_thon_hien_tai):
+                st.session_state[pending_state_key][ten_dgd] = list(thon_sel)
+                has_changes_batch = True
+            else:
+                if ten_dgd in st.session_state[pending_state_key]:
+                    del st.session_state[pending_state_key][ten_dgd]
+            # --- Cross-check per ĐGD: thôn có dư nợ nhưng chưa gán? ---
+            if ap_co_dn and thon_sel:
+                norm_th_sel = {str(t).strip().lower() for t in thon_sel}
+                cover = ap_co_dn & norm_th_sel
+                miss = ap_co_dn - norm_th_sel
+                if cover:
+                    st.success(f"📈 Đã bao phủ {len(cover)}/{tong_thon_co_dn} thôn có dư nợ ({len(cover)/tong_thon_co_dn*100:.0f}%).")
+
+    st.divider()
+
+    # --- Pending summary + Validate trùng + Batch save ---
+    pending_block: dict = st.session_state.get(pending_state_key, {}) or {}
+    if pending_block:
+        st.markdown(f"**📝 {len(pending_block)} ĐGD có thay đổi (chưa Lưu):**")
+        prev_rows = []
+        for dgd_name, th_list in pending_block.items():
+            old_list = _normalize_entry(xa_dgd.get(dgd_name, {}))["thon"]
+            add = [t for t in th_list if t not in old_list]
+            rem = [t for t in old_list if t not in th_list]
+            prev_rows.append({
+                "Tên ĐGD": dgd_name,
+                "Số thôn mới": len(th_list),
+                "+ Thêm": ", ".join(add) if add else "—",
+                "− Bớt": ", ".join(rem) if rem else "—",
+            })
+        hien_thi_dataframe_phan_trang(pd.DataFrame(prev_rows),
+                                      key=f"dgd_pending_{ten_pgd}_{chon_xa}",
+                                      height=min(260, 50 + len(prev_rows)*42))
+    else:
+        st.caption("ℹ️ Chưa có thay đổi nào so với dữ liệu đã lưu.")
+
+    # Build prospective dict = xa_dgd hiện tại + override từ pending
+    prospective_xa_dgd = _build_prospective_xa_dgd(xa_dgd, pending_block)
+    dup_list = _validate_trung_thon_toan_xa(prospective_xa_dgd)
+    if dup_list:
+        with st.expander(f"⚠️ **{len(dup_list)} trùng thôn cross-ĐGD** (phải sửa trước khi Lưu)",
+                         expanded=True):
+            for d_msg in dup_list:
+                st.error(d_msg)
+
+    btn_col_1, btn_col_2, btn_col_3 = st.columns([1, 1, 3])
+    with btn_col_1:
+        if st.button("🔄 Reset pending", key=f"dgd_reset_pending_{ten_pgd}_{chon_xa}",
+                     disabled=not pending_block):
+            # Clear session state multiselect về giá trị gốc
+            for dgd_info in ds_dgd_xa:
+                ten_dgd = dgd_info["ten"]
+                sid = re.sub(r"\W+", "_", ten_dgd)[:40]
+                k = f"dgd_th_{sid}_{ten_pgd}_{chon_xa}"
+                e2 = _normalize_entry(xa_dgd.get(ten_dgd, {}))
+                st.session_state[k] = [t for t in e2["thon"] if t in pool]
+            st.session_state[pending_state_key] = {}
+            st.rerun()
+    with btn_col_2:
+        disabled_save = (not pending_block) or bool(dup_list)
+        if st.button("💾 LƯU TẤT CẢ thay đổi", type="primary", disabled=disabled_save,
+                     key=f"dgd_luu_batch_{ten_pgd}_{chon_xa}"):
+            try:
+                m = copy.deepcopy(db.doc_dgd_map())
+                cur = m.setdefault(_resolve_pgd_key(ten_pgd), {}).setdefault(chon_xa, {})
+                for dgd_n, th_l in prospective_xa_dgd.items():
+                    cur[dgd_n] = {"thon": list(th_l)}
+                db.luu_dgd_map(m, username)
+                db.ghi_audit(
+                    username, "gan_thon_dgd_batch",
+                    f"[{hn}] PGD={ten_pgd} xa={chon_xa} "
+                    f"batch {len(pending_block)} DGD: {list(pending_block.keys())}",
+                )
+                st.cache_data.clear()
+                st.session_state[pending_state_key] = {}
+                st.success(f"✅ Đã lưu batch {len(pending_block)} ĐGD.")
+                st.rerun()
+            except Exception as e:
+                logger.error("gan_thon_dgd_batch error: %s", e, exc_info=True)
+                db.ghi_audit(username, "gan_thon_dgd_loi", f"[{hn}] batch err: {e}")
+                st.error(f"❌ {e}")
 
 
 def _render_gan_cbtd(df_h: pd.DataFrame, username: str, hn: str) -> None:

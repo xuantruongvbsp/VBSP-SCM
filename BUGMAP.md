@@ -3853,7 +3853,7 @@ def _to_int(val, default=0):
 | **File** | `tabs/tab_baocao/reports/nong_nghiep.py`; `config.py` |
 | **Dấu hiệu** | KPI tổng nông nghiệp có thể cộng cả thủy sản/lâm nghiệp ở phường, trong khi bảng phường chỉ hiển thị trồng trọt + chăn nuôi; các từ khóa ngắn như `trong`, `cua`, `tom` dễ bắt nhầm câu mô tả thông thường; schema thiếu cột nợ thành phần có thể gây `KeyError`. |
 | **Nguyên nhân** | KPI dùng toàn bộ 4 lĩnh vực nông nghiệp cho mọi khu vực thay vì áp quy tắc riêng theo nông thôn/thành thị; phân loại dùng so khớp substring trực tiếp với một số từ khóa quá rộng; hàm tổng hợp mặc định một số cột HSTD luôn tồn tại. |
-| **Fix** | Thêm `_loc_pham_vi_nong_nghiep()` để lọc đúng phạm vi trước khi tính KPI; chuẩn hóa chữ `đ`; thay từ khóa ngắn bằng cụm rõ nghĩa hơn trong `NN_TU_KHOA_*`; fallback khi `Mã KH` rỗng/thiếu cột nợ thành phần; render nội dung tab con bằng `st.*` trong context tab đang mở. |
+| **Fix** | Thêm helper lọc phạm vi báo cáo trước khi tính KPI; chuẩn hóa chữ `đ`; thay từ khóa ngắn bằng cụm rõ nghĩa hơn trong `NN_TU_KHOA_*`; fallback khi `Mã KH` rỗng/thiếu cột nợ thành phần; render nội dung tab con bằng `st.*` trong context tab đang mở. |
 | **Test** | `tests/test_baocao_tin_dung_so_lieu.py::test_nong_nghiep_phan_loai_khong_bat_nham_tu_khoa_ngan`, `test_nong_nghiep_pham_vi_phuong_chi_lay_trong_trot_chan_nuoi`, `test_nong_nghiep_tong_hop_fallback_khi_ma_kh_rong_va_thieu_cot_no` |
 | **Ngày fix** | 2026-08-29 |
 
@@ -3865,8 +3865,20 @@ def _to_int(val, default=0):
 | **File** | `tabs/tab_baocao/reports/nong_nghiep.py` → `_dong_tong_nn()` |
 | **Dấu hiệu** | Bảng hiển thị/PDF chi tiết phường chỉ có trồng trọt + chăn nuôi, nhưng dòng TỔNG CỘNG PDF vẫn có thể cộng thêm thủy sản/lâm nghiệp ở phường. |
 | **Nguyên nhân** | Helper dòng tổng PDF lọc tất cả 4 lĩnh vực nông nghiệp trên toàn bộ dữ liệu, chưa dùng cùng quy tắc phân tách nông thôn/thành thị của báo cáo. |
-| **Fix** | Cho `_dong_tong_nn()` dùng `_loc_pham_vi_nong_nghiep()` trước khi tính tổng; đếm KH/món qua helper bỏ giá trị rỗng; giữ tiền ở đơn vị triệu đồng. |
+| **Fix** | Cho `_dong_tong_nn()` dùng cùng helper lọc phạm vi báo cáo trước khi tính tổng; đếm KH/món qua helper bỏ giá trị rỗng; giữ tiền ở đơn vị triệu đồng. |
 | **Test** | `tests/test_baocao_tin_dung_so_lieu.py::test_nong_nghiep_dong_tong_pdf_dung_pham_vi_bao_cao` |
+| **Ngày fix** | 2026-08-29 |
+
+---
+
+### C48 — Báo cáo tín dụng đếm sai Số KH / Số món vay do chưa thống nhất phạm vi active
+| | |
+|---|---|
+| **File** | `tabs/tab_baocao/components/inline_filter.py` → `chuan_bi_du_lieu_bao_cao()`; `tabs/tab_baocao/components/metric_cards.py` → `_tinh_chi_so_cards()` |
+| **Dấu hiệu** | Card/tổng hợp `📊 Báo cáo tín dụng` có thể hiện `Số khách hàng` và `Số món vay` cao hơn thực tế khi nhận HSTD thô từ PGD hoặc lệch bảng khi card tự đếm theo `Số khế ước` riêng. |
+| **Nguyên nhân** | Helper chuẩn bị dữ liệu mới loại KU rỗng và dòng lặp khoản vay nhưng chưa loại khoản đã tất toán còn `Tổng dư nợ/Nợ quá hạn/Nợ khoanh = 0`; card KPI lại tự khử trùng theo `Số khế ước`, không dùng hoàn toàn cùng quy tắc với báo cáo. |
+| **Fix** | Lọc khoản còn dư nợ/quá hạn/khoanh trong `chuan_bi_du_lieu_bao_cao()`; card dùng helper này trước khi tính KPI và đếm số món theo số khoản vay hợp lệ sau làm sạch. |
+| **Test** | `tests/test_baocao_tin_dung_so_lieu.py::test_cards_so_khach_hang_va_so_mon_chi_dem_khoan_vay_hop_le`; dữ liệu thật `cache/hstd.parquet`: `291.831` món, `213.275` KH. |
 | **Ngày fix** | 2026-08-29 |
 
 ---
@@ -4038,6 +4050,150 @@ def _to_int(val, default=0):
 | **Fix** | Menu CN `📅 Báo cáo định kỳ` gọi `tab_quan_ly_bc`; wrapper gom 4 tab con `BC tự động`, `BC từ PGD`, `BC lên cấp trên`, `Báo cáo tổng hợp`; nhãn cũ `📥 Tiến độ nộp BC` được map về wrapper để tránh stale state. |
 | **Test** | `tests/test_bao_cao_dinh_ky.py::test_menu_cn_gom_bao_cao_dinh_ky_vao_wrapper`, `tests/test_bao_cao_dinh_ky.py::test_wrapper_bao_cao_dinh_ky_gom_du_submodule`; smoke import/render. |
 | **Ngày fix** | 2026-08-29 |
+
+---
+
+### B96 — Form thêm CBTD giữ lại ĐGD vừa lưu và tự báo trùng
+| | |
+|---|---|
+| **File** | `tabs/tab_cbtd.py` → `render()` ~dòng 344 |
+| **Dấu hiệu** | Sau khi thêm CBTD mới với ĐGD `Tam Phước`, form `➕ Thêm mới` rerun rồi hiện `Tam Phước đã thuộc CBTD 01 — Võ Thị Thủy`. |
+| **Nguyên nhân** | Widget `multiselect` và các input của form thêm mới dùng key cố định, nên Streamlit giữ lại lựa chọn ĐGD sau khi lưu. Dữ liệu đã lưu đúng, nhưng UI kiểm tra lại lựa chọn cũ và báo trùng với chính CBTD vừa thêm. |
+| **Fix** | Dùng prefix widget key theo version cho form thêm mới; sau khi lưu thành công tăng `cbtd_add_ver` trước `st.rerun()` để form render lại trống. |
+| **Test** | `tests/test_tab_cbtd_add_form.py` |
+| **Ngày fix** | 2026-08-29 |
+
+---
+
+### J76 — Test Báo cáo Nông nghiệp import helper cũ sau refactor
+| | |
+|---|---|
+| **File** | `tests/test_baocao_tin_dung_so_lieu.py` → import `tabs.tab_baocao.reports.nong_nghiep` |
+| **Dấu hiệu** | Chạy `pytest tests/test_baocao_tin_dung_so_lieu.py -q` rớt lúc collect: `ImportError: cannot import name '_loc_pham_vi_nong_nghiep'`. |
+| **Nguyên nhân** | Code đã đổi helper phạm vi sang `_loc_pham_vi_bao_cao()` để phản ánh yêu cầu nông thôn lấy tất cả mục đích, nhưng test vẫn import tên cũ và kỳ vọng phạm vi cũ. |
+| **Fix** | Cập nhật import test sang `_loc_pham_vi_bao_cao()`, thêm hồi quy `_tong_hop_theo_muc_dich()` lấy cả mục đích phi nông nghiệp ở nông thôn, và chỉnh kỳ vọng dòng tổng PDF theo phạm vi mới. |
+| **Test** | `tests/test_baocao_tin_dung_so_lieu.py` — 15 passed. |
+| **Ngày fix** | 2026-08-29 |
+
+---
+
+### J77 — Convention checker bắt lỗi logger ở nhánh optional và thiếu stacktrace khi tạo PDF
+| | |
+|---|---|
+| **File** | `services/ke_hoach_cv_khnv_service.py` → `kiem_tra_ket_noi()`; `tabs/tab_baocao/reports/nong_nghiep.py` → `render_nong_nghiep()` |
+| **Dấu hiệu** | Chạy `python scripts/check_conventions.py` báo logger violation ở hai nhánh tab Google Sheets tuỳ chọn và báo cáo `Báo cáo Nông nghiệp` thiếu `logger.error(..., exc_info=True)` khi tạo PDF lỗi; `compileall` báo `SyntaxWarning` với docstring có đường dẫn Windows `D:\...`. |
+| **Nguyên nhân** | Checker quét theo heuristic `except Exception as e` nên không phân biệt nhánh thiếu tab optional đã xử lý chủ động; riêng `nong_nghiep.py` thật sự chỉ hiện caption UI, chưa ghi stacktrace. |
+| **Fix** | Đánh dấu `# conv: skip` cho hai nhánh optional không phải lỗi hệ thống; thêm `get_logger()` và `logger.error(..., exc_info=True)` ở nhánh lỗi tạo PDF; đổi docstring script debug chứa đường dẫn Windows sang raw string. |
+| **Test** | `scripts/check_conventions.py` còn 3 cảnh báo darkmode trong `auth.py` cần xác nhận riêng trước khi sửa; `py_compile` sạch. |
+| **Ngày fix** | 2026-08-29 |
+
+---
+
+### J78 — Báo cáo Nông nghiệp refactor helper generic làm gãy import test cũ
+| | |
+|---|---|
+| **File** | `tabs/tab_baocao/reports/nong_nghiep.py` → `_tong_hop_theo_cot()`; `tests/test_baocao_tin_dung_so_lieu.py` |
+| **Dấu hiệu** | Chạy `pytest tests/test_baocao_tin_dung_so_lieu.py -q` rớt lúc collect: `ImportError: cannot import name '_tong_hop_theo_muc_dich'`. |
+| **Nguyên nhân** | Code đổi `_tong_hop_theo_muc_dich()` sang helper generic `_tong_hop_theo_cot(df, cot_nhom)` để tái dùng cho bảng Xã/Phường, nhưng test/import cũ vẫn cần tên helper cũ. Helper mới cũng chưa guard trường hợp thiếu cột nhóm. |
+| **Fix** | Thêm wrapper tương thích `_tong_hop_theo_muc_dich()` gọi `_tong_hop_theo_cot(..., COT_TEN_PNKT51)`; `_tong_hop_theo_cot()` trả `DataFrame()` khi thiếu cột nhóm; bổ sung hồi quy cho `Tên xã` rỗng và dòng tổng `Xã`/`Phường`. |
+| **Test** | `tests/test_baocao_tin_dung_so_lieu.py` — 18 passed; `py_compile` và convention riêng file sạch. |
+| **Ngày fix** | 2026-08-29 |
+
+---
+
+### J79 — Convention checker báo màu chữ literal trong form đăng nhập
+| | |
+|---|---|
+| **File** | `auth.py` → `hien_thi_login()` ~dòng 950 |
+| **Dấu hiệu** | `scripts/check_conventions.py auth.py` báo 3 vi phạm `DARKMODE` tại màu label, nội dung input và placeholder của form đăng nhập. |
+| **Nguyên nhân** | Form đã định nghĩa các custom property màu chữ nhưng ba selector con vẫn lặp lại literal màu tối; checker không thể liên hệ chắc chắn các literal đó với nền sáng của form. |
+| **Fix** | Dùng `var(--login-form-text, #0f172a)` và `var(--login-form-muted, #64748b)`; fallback giữ nguyên màu khi custom property không resolve, còn semantic variable làm rõ cặp màu nền/chữ. Không thay đổi logic xác thực hoặc phân quyền. |
+| **Test** | `venv\Scripts\python.exe scripts\check_conventions.py auth.py`; `venv\Scripts\python.exe -m py_compile auth.py`. |
+| **Ngày fix** | 2026-08-29 |
+
+---
+
+### C49 — Scorecard xếp hạng CBTD vượt ngưỡng 100 điểm (max = 120)
+| | |
+|---|---|
+| **File** | `services/cbtd_dia_ban_service.py` → `xep_hang_cbtd()` hàm tính điểm scorecard ~dòng 625 |
+| **Dấu hiệu** | Xếp hạng CBTD có thể đạt 120 điểm (vượt ngưỡng 100); CBTD "Xuất sắc" dễ có điểm > 100 làm tỷ lệ %/màu sắc sai trên thang 0-100. |
+| **Nguyên nhân** | Baseline scorecard được set `s = 50.0`, cộng thêm 4 chỉ tiêu (TL QH 25 + % Tổ đạt 20 + Điểm TB Tổ 15 + Workload 10) → tổng tối đa 50+25+20+15+10 = **120** điểm vượt ngưỡng 100. |
+| **Fix** | Giảm baseline từ `50.0` xuống `30.0`; ghi comment rõ tổng 30+25+20+15+10 = **100 MAX**; giữ nguyên trọng số 4 chỉ tiêu (25/20/15/10) vì tỷ lệ TL QH vẫn là chỉ tiêu quan trọng nhất. |
+| **Test** | Smoke compile `services/cbtd_dia_ban_service.py`; tính tay CBTD lý tưởng (TL QH 0% → 25đ, 100% Tổ đạt → 20đ, Điểm TB Tổ 10 → 15đ, workload cân bằng → 10đ) + baseline 30 = 100 đúng. |
+| **Ngày fix** | 2026-08-29 |
+
+---
+
+### C50 — Dòng tổng cộng báo cáo nông nghiệp KeyError cột "Khoanh" khi HSTD thiếu cột
+| | |
+|---|---|
+| **File** | `tabs/tab_baocao/reports/nong_nghiep.py` → `_dong_tong_hien_thi()` block tính `Khoanh` (~dòng 485 cũ) |
+| **Dấu hiệu** | Một số kỳ/upload HSTD không có cột "Dư nợ khoanh" (COT_DU_NO_KHOANH), render báo cáo nông nghiệp → crash `KeyError: 'Dư nợ khoanh'` khi build dòng TỔNG CỘNG append cuối bảng. |
+| **Nguyên nhân** | Code cũ đọc `round(float(df[COT_DU_NO_KHOANH].sum()) / 1_000_000)` MÀ KHÔNG guard `if COT_DU_NO_KHOANH in df.columns` trước khi slice DataFrame; 3 cột còn lại (DN/TH/QH) có guard riêng nhưng cột Khoanh bị quên. |
+| **Fix** | Khởi tạo `tong_khoanh = 0.0`; guard `if COT_DU_NO_KHOANH in df.columns: pd.to_numeric(...).fillna(0); tong_khoanh = float(df[...].sum())`; mới `dong["Khoanh"] = round(tong_khoanh / 1_000_000)`. Đồng thời guard tương tự cho `_df_hien_thi()` khi build cột Khoanh display. |
+| **Test** | Smoke compile; Grep toàn `COT_DU_NO_KHOANH` trong file — 100% site đều đã guard `if ... in df.columns`. Tạo test df giả không có cột Khoanh, gọi `_dong_tong_hien_thi()` trả về dict `Khoanh=0` không crash. |
+| **Ngày fix** | 2026-08-30 |
+
+---
+
+### J80 — Helper `_normalize(None)` crash `TypeError: 'NoneType' object has no attribute 'strip'`
+| | |
+|---|---|
+| **File** | `services/cbtd_dia_ban_service.py` → `_normalize(s: Any)` |
+| **Dấu hiệu** | Khi dữ liệu cột xã/thôn/tên CBTD trong HSTD chứa `None` (cell trống đọc từ Excel), service build lookup map hoặc groupby crash với `TypeError: 'NoneType' object has no attribute 'strip'` hoặc `lower()`. |
+| **Nguyên nhân** | Signature helper cũ khai báo `def _normalize(s: str)` và gọi trực tiếp `s.strip().lower()` mà không guard `None` / `pd.NA` / `NaN`; dữ liệu upload từ PGD có thể chứa cell trống ở cột định danh. |
+| **Fix** | Đổi signature nhận `Any` type; thêm guard đầu hàm `if s is None or (isinstance(s, float) and math.isnan(s)): return ""`; dùng `str(s).strip()` và bắt exception fallback `""`; cho `pd.NA` thì cũng trả rỗng. |
+| **Test** | `py_compile` sạch; tạo test case `_normalize(None) == ""`, `_normalize(pd.NA) == ""`, `_normalize(float("nan")) == ""`, `_normalize("  Xã A  ") == "xã a"`. |
+| **Ngày fix** | 2026-08-29 |
+
+---
+
+### J81 — Helper normalize CBTD còn để lọt `pd.NA`/`NaN` thành chuỗi `"<NA>"` hoặc `"nan"`
+| | |
+|---|---|
+| **File** | `services/cbtd_dia_ban_service.py` → `_normalize()`; `data/khtd.py` → `lay_ap_tu_dgd_list()`, `gan_cbtd_vao_df()` |
+| **Dấu hiệu** | Review 7 gói CBTD phát hiện `_normalize(pd.NA)` có thể trả `"<na>"`; `dgd_map` chứa `pd.NA` trong danh sách thôn có thể tạo key join rỗng/giả khi gán CBTD vào HSTD. |
+| **Nguyên nhân** | Guard mới chỉ xử lý `None` hoặc float NaN; chưa dùng `pd.isna()` và chưa loại các token string rỗng chuẩn (`nan`, `none`, `<na>`). |
+| **Fix** | Dùng normalize an toàn với `pd.isna()` cho scalar; loại token rỗng sau `str()`; `data/khtd.py` dùng cùng logic ở lookup side và Series vectorized ở DataFrame side, đồng thời bỏ qua thôn `None`/`pd.NA` trong `lay_ap_tu_dgd_list()`. |
+| **Test** | `tests/test_cbtd_dia_ban_review.py::test_cbtd_service_normalize_guard_none_nan_pdna`, `tests/test_cbtd_dia_ban_review.py::test_gan_cbtd_vao_df_join_key_normalize_dong_nhat_pdna` |
+| **Ngày fix** | 2026-08-30 |
+
+---
+
+### B97 — Batch ĐGD báo trùng giả hoặc import Excel crash khi HSTD rỗng/thiếu cột
+| | |
+|---|---|
+| **File** | `tabs/tab_quan_ly_dgd.py` → `_render_gan_thon()`, `_build_prospective_xa_dgd()` |
+| **Dấu hiệu** | Chuyển một thôn từ ĐGD A sang ĐGD B có thể bị validate như trùng cross-ĐGD nếu trạng thái dự kiến chưa gỡ thôn khỏi ĐGD cũ; import Excel cấu hình ĐGD có thể lỗi tên `_norm` khi không vào nhánh cross-check HSTD. |
+| **Nguyên nhân** | `_norm` được khai báo cục bộ bên trong nhánh cross-check HSTD nhưng block import dùng lại; prospective batch chỉ override ĐGD pending mà chưa áp dụng thao tác move theo thứ tự gỡ khỏi owner cũ rồi thêm owner mới. |
+| **Fix** | Đưa `_norm_text()` và `_validate_trung_thon_toan_xa()` lên module-level; thêm `_build_prospective_xa_dgd()` gỡ thôn khỏi ĐGD khác trước khi set ĐGD pending; batch-save ghi trạng thái prospective và import Excel báo rõ số dòng khớp/bị loại. |
+| **Test** | `tests/test_cbtd_dia_ban_review.py::test_build_prospective_xa_dgd_cho_phep_move_thon_khong_trung_gia`; smoke import/render `tabs.tab_quan_ly_dgd` |
+| **Ngày fix** | 2026-08-30 |
+
+---
+
+### J82 — Báo cáo Nông nghiệp LV2: cache wrapper đọc bytes sai và HTML table sinh style lỗi
+| | |
+|---|---|
+| **File** | `tabs/tab_baocao/reports/nong_nghiep.py` → `_tong_hop_*_cached()`, `_styler_html_table()` |
+| **Dấu hiệu** | Hai hàm `@st.cache_data` được khai báo nhưng render chính vẫn gọi raw; nếu chuyển sang dùng cache thì `pd.read_pickle(df_bytes)` đọc bytes nội dung như path/buffer sai. Bảng HTML dùng `align[:-1]` và hàng tổng có hai thuộc tính `style`, làm HTML invalid/dễ lệch render. |
+| **Nguyên nhân** | Wrapper cache thiếu `io.BytesIO`; phần render HTML ghép chuỗi thủ công bằng cách cắt ký tự cuối của style attribute thay vì gộp nội dung style. |
+| **Fix** | Đưa `import io` lên top-level, đọc pickle bằng `pd.read_pickle(io.BytesIO(df_bytes))`, render chính dùng cached wrapper cho các tổng hợp nặng. Thêm helper `_style_attr()` để nối style hợp lệ cho cả `<td>` và `<th>`. |
+| **Test** | `tests/test_baocao_tin_dung_so_lieu.py::test_nong_nghiep_cached_wrapper_doc_duoc_dataframe_bytes`, `tests/test_baocao_tin_dung_so_lieu.py::test_nong_nghiep_styler_html_table_khong_tao_style_attr_loi` |
+| **Ngày fix** | 2026-08-30 |
+
+---
+
+### C51 — Báo cáo Nông nghiệp LV2: Top/Bottom xã overlap và cảnh báo sớm lỗi khi thiếu cột nhóm
+| | |
+|---|---|
+| **File** | `tabs/tab_baocao/reports/nong_nghiep.py` → `_fig_top_bottom_xa_tlqh()`, `_tao_canh_bao()`, `_thong_tin_bi_loc_linh_vuc()` |
+| **Dấu hiệu** | Khi số xã nằm giữa `top_n` và `2*top_n`, một xã có thể xuất hiện ở cả nhóm TL QH cao và thấp. Nếu bảng cảnh báo mục đích chỉ còn các cột chỉ tiêu, fallback `[0]` có thể `IndexError`; dữ liệu note lĩnh vực rỗng/thiếu `Tên xã` có thể `KeyError`. |
+| **Nguyên nhân** | Nhóm bottom lấy từ `tail(top_n)`/sort tăng dần mà không loại nhóm high; fallback cột nhóm dùng truy cập phần tử đầu danh sách rỗng và note phụ chưa guard schema đầu vào. |
+| **Fix** | Nhóm TL QH thấp loại các xã đã nằm trong top cao khi có nhiều hơn `top_n` dòng; fallback dùng `next(iter(...), None)` và chỉ build cảnh báo khi xác định được cột nhóm; note lĩnh vực trả `None` khi dữ liệu thiếu schema tối thiểu. |
+| **Test** | `tests/test_baocao_tin_dung_so_lieu.py::test_nong_nghiep_top_bottom_xa_khong_overlap_khi_du_lieu_it_hon_hai_top_n`, `tests/test_baocao_tin_dung_so_lieu.py::test_nong_nghiep_tao_canh_bao_bo_qua_khi_khong_co_cot_nhom` |
+| **Ngày fix** | 2026-08-30 |
 
 ---
 

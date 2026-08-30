@@ -234,7 +234,7 @@ def render_no_rui_ro_v2(
     # Cảnh báo phải phản ánh đúng PGD và nguồn vốn đang xem.
     alerts = check_alerts(df_filtered)
     if alerts:
-        ctx.markdown("#### 🔔 Cảnh báo nợ rủi ro")
+        ctx.markdown("#### 🔔 Cảnh báo nợ xấu")
         for alert in alerts:
             if alert["type"] in ["ty_le_qh", "ty_le_no_xau"]:
                 render_alert_card(alert, container=ctx)

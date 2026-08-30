@@ -71,6 +71,88 @@ def test_clear_old_excel_buffers_chi_giu_active_key(monkeypatch):
     }
 
 
+def test_export_condition_key_doi_khi_doi_dieu_kien():
+    key_a = tab_hhi._export_condition_key(
+        tab_hhi._EXPORT_SOURCE_DP,
+        ["PGD A"],
+        ["Xã A"],
+        ["CT A"],
+        [tab_hhi._EXPORT_SHEET_XA],
+    )
+    key_b = tab_hhi._export_condition_key(
+        tab_hhi._EXPORT_SOURCE_DP_TINH,
+        ["PGD A"],
+        ["Xã A"],
+        ["CT A"],
+        [tab_hhi._EXPORT_SHEET_XA],
+    )
+
+    assert key_a != key_b
+    assert len(key_a) == 12
+
+
+def test_loc_du_lieu_xuat_theo_nhieu_dieu_kien(monkeypatch):
+    monkeypatch.setattr(
+        tab_hhi.db,
+        "doc_ndt_dp_rule_list",
+        lambda: [{"ma_ct": 6, "ma": "INV_TINH", "ghi_chu": "Nguồn tỉnh", "cap": "tinh"}],
+    )
+    df = pd.DataFrame(
+        {
+            COT_TEN_PGD: ["PGD A", "PGD A", "PGD B", "PGD A"],
+            COT_TEN_XA: ["Xã A", "Xã B", "Xã A", "Xã A"],
+            COT_TEN_CT: ["CT 6", "CT 6", "CT 6", "CT 1"],
+            COT_NGUON_VON: ["2", "2", "2", "1"],
+            COT_MA_CHUONG_TRINH: [6, 6, 6, 1],
+            COT_MA_NHA_DAU_TU: ["INV_TINH", "INV_XA", "INV_TINH", ""],
+            COT_TONG_DU_NO: [100_000_000, 50_000_000, 80_000_000, 200_000_000],
+        }
+    )
+    df_labeled = tab_hhi._phan_nguon_von(df)
+
+    out = tab_hhi._loc_du_lieu_xuat_theo_dieu_kien(
+        df_labeled,
+        source_filter=tab_hhi._EXPORT_SOURCE_DP_TINH,
+        pgd_values=["PGD A"],
+        xa_values=["Xã A"],
+        ct_values=["CT 6"],
+    )
+
+    assert len(out) == 1
+    assert out.iloc[0][COT_MA_NHA_DAU_TU] == "INV_TINH"
+
+
+def test_cached_bao_cao_sheets_chi_xuat_sheet_da_chon(monkeypatch):
+    monkeypatch.setattr(tab_hhi.db, "doc_ndt_dp_rule_list", lambda: [])
+    df = pd.DataFrame(
+        {
+            COT_TEN_PGD: ["PGD A", "PGD A"],
+            COT_TEN_XA: ["Xã A", "Xã A"],
+            COT_TEN_CT: ["CT 3", "CT 1"],
+            COT_NGUON_VON: ["2", "1"],
+            COT_MA_CHUONG_TRINH: [3, 1],
+            COT_MA_NHA_DAU_TU: ["INV_XA", ""],
+            COT_TONG_DU_NO: [100_000_000, 200_000_000],
+        }
+    )
+    df_labeled = tab_hhi._phan_nguon_von(df)
+
+    sheets = tab_hhi._cached_bao_cao_sheets(
+        df_labeled,
+        False,
+        (),
+        (tab_hhi._EXPORT_SHEET_XA,),
+        "cn",
+        1.0,
+        "",
+        "",
+        "",
+    )
+
+    assert list(sheets.keys()) == [tab_hhi._EXPORT_SHEET_XA]
+    assert sheets[tab_hhi._EXPORT_SHEET_XA].iloc[0][COT_TEN_XA] == "Xã A"
+
+
 def test_bang_theo_nv_tach_dp_cap_tinh_va_cap_xa(monkeypatch):
     monkeypatch.setattr(
         tab_hhi.db,

@@ -89,7 +89,7 @@ def render_dashboard(
     # Danh sách báo cáo theo role
     baocao_options = [
         "📁 Báo cáo Tổng hợp (HSTD)",
-        "⚠️ Báo cáo Nợ rủi ro (HSTD)",
+        "⚠️ Báo cáo Nợ xấu (HSTD)",
         "📑 Báo cáo NQ11",
         "💼 Báo cáo GQVL",
         "🌾 Báo cáo Nông nghiệp (HSTD)",
@@ -110,7 +110,7 @@ def render_dashboard(
     # Mapping từ lựa chọn sang key
     report_key_map = {
         "📁 Báo cáo Tổng hợp (HSTD)": "hstd",
-        "⚠️ Báo cáo Nợ rủi ro (HSTD)": "noruiro",
+        "⚠️ Báo cáo Nợ xấu (HSTD)": "noruiro",
         "📑 Báo cáo NQ11": "nq11",
         "💼 Báo cáo GQVL": "gqvl",
         "🌾 Báo cáo Nông nghiệp (HSTD)": "nongnghiep",

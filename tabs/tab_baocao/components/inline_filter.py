@@ -6,11 +6,14 @@ import pandas as pd
 from typing import TYPE_CHECKING, List, Dict, Any, Callable
 
 from config import (
+    COT_DU_NO_KHOANH,
+    COT_DU_NO_QH,
     COT_MA_KH,
     COT_NGUON_VON,
     COT_SO_KU,
     COT_TEN_PGD,
     COT_TEN_XA,
+    COT_TONG_DU_NO,
     DS_XA_THANH_THI,
     DS_XA_THANH_THI_THEO_PGD,
 )
@@ -45,10 +48,12 @@ def _chuan_hoa_nguon_von(value) -> str:
 def chuan_bi_du_lieu_bao_cao(df: pd.DataFrame) -> pd.DataFrame:
     """Chuẩn bị dữ liệu trước khi tổng hợp báo cáo tín dụng.
 
-    Loại hai dạng dòng gây sai số liệu trong phạm vi báo cáo tín dụng:
-    1. Dòng KHÔNG có Số khế ước (KH đã sạch nợ, dư nợ=0, vô chương trình) —
-       nếu giữ lại sẽ đội "Số KH" lên và gộp chung thành 1 "món" rỗng.
-    2. Nhiều dòng cùng khoản vay theo (Mã KH, Số khế ước) — giữ dòng đầu,
+    Loại các dạng dòng gây sai số liệu trong phạm vi báo cáo tín dụng:
+    1. Dòng không còn dư nợ/quá hạn/khoanh — nếu giữ lại sẽ đội "Số KH"
+       và "Số món vay" bởi các khoản đã tất toán.
+    2. Dòng KHÔNG có Số khế ước (KH đã sạch nợ, dư nợ=0, vô chương trình) —
+       nếu giữ lại sẽ gộp chung thành 1 "món" rỗng.
+    3. Nhiều dòng cùng khoản vay theo (Mã KH, Số khế ước) — giữ dòng đầu,
        tránh double-count dư nợ. Dữ liệu nguồn không bị thay đổi.
 
     Trả DataFrame đã làm sạch (bản copy).
@@ -56,6 +61,15 @@ def chuan_bi_du_lieu_bao_cao(df: pd.DataFrame) -> pd.DataFrame:
     if df is None or df.empty:
         return df
     out = df.copy()
+    cot_du_no = [
+        col for col in (COT_TONG_DU_NO, COT_DU_NO_QH, COT_DU_NO_KHOANH)
+        if col in out.columns
+    ]
+    if cot_du_no:
+        mask_con_du_no = pd.Series(False, index=out.index)
+        for col in cot_du_no:
+            mask_con_du_no |= pd.to_numeric(out[col], errors="coerce").fillna(0) > 0
+        out = out.loc[mask_con_du_no].copy()
     if COT_SO_KU in out.columns:
         ku = out[COT_SO_KU].astype("string").str.strip()
         ku_rong = ku.isna() | ku.str.lower().isin({"", "nan", "none", "null", "<na>"})

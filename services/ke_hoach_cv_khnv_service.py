@@ -565,7 +565,7 @@ def kiem_tra_ket_noi() -> tuple[bool, str]:
     try:
         nv = _doc_raw_values_sheet(KE_HOACH_CV_KHNV_SHEET_NV, sheet_id)
         nv_msg = f"{KE_HOACH_CV_KHNV_SHEET_NV} {len(nv)} dòng"
-    except Exception as e:
+    except Exception as e:  # conv: skip - tab optional, nhánh thiếu tab không phải lỗi hệ thống
         if _la_loi_tab_khong_ton_tai(e):
             # Tab tuỳ chọn chưa tạo: _doc_raw_values_sheet (không optional) đã
             # ghi _LAST_ERROR trước khi raise → phải làm sạch để không hiện banner.
@@ -579,7 +579,7 @@ def kiem_tra_ket_noi() -> tuple[bool, str]:
     try:
         gv = _doc_raw_values_sheet(KE_HOACH_CV_KHNV_SHEET_GV, sheet_id)
         gv_msg = f"{KE_HOACH_CV_KHNV_SHEET_GV} {len(gv)} dòng"
-    except Exception as e:
+    except Exception as e:  # conv: skip - tab optional, nhánh thiếu tab không phải lỗi hệ thống
         if _la_loi_tab_khong_ton_tai(e):
             _LAST_ERROR = None
             gv_msg = f"{KE_HOACH_CV_KHNV_SHEET_GV} chưa tạo (tuỳ chọn)"

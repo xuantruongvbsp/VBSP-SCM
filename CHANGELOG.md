@@ -1,5 +1,94 @@
 # CHANGELOG
 
+## [2026-08-30] — Nâng cấp toàn diện launcher: xử lý port conflict 4 cấp độ (tier)
+- `Chay_VBSP_SCM.bat` — Parse flags thành loop hỗ trợ nhiều flag cùng lúc. Thêm `--force-kill` (tự đóng Python trên port cho chạy unattended/scheduler) và `--port N` (chỉ định port tùy chỉnh). Thêm `ALT_PORT=8503` fallback.
+- `Chay_VBSP_SCM.bat` — `:is_vbsp_process` refactor thành **4-tier classification**: Tier 0 = marker exact match hoặc full venv+streamlit+app.py → kill silently; Tier 1 = Python có hint VBSP (venv/streamlit/app.py substring) → hỏi default Y; Tier 2 = bất kỳ python.exe nào → hỏi default Y; Tier 3 = non-Python → cảnh báo đỏ hỏi default N.
+- `Chay_VBSP_SCM.bat` — `:classify_pid_tier` mới: ghi script PowerShell tạm `.ps1` rồi chạy (tránh lỗi `^` line-continuation khi CMD/PowerShell parse), dùng `Get-CimInstance` lấy `ExecutablePath/CommandLine/Name`, combine rồi làm giàu tier; fallback WMIC khi PS bị lỗi.
+- `Chay_VBSP_SCM.bat` — Thay "REFUSE → abort toàn bộ launcher" cũ bằng **`:prompt_user_kill`** (choice.exe /t timeout, set /p fallback) với safe default theo tier.
+- `Chay_VBSP_SCM.bat` — Thêm **`:prompt_alt_port_or_exit`** menu 3 lựa chọn khi port vẫn bị chiem: [1] Đổi sang port 8503 / [2] Thử đóng bằng force-kill chế độ 1 vòng / [3] Thoát; default [1] sau 15s.
+- `Chay_VBSP_SCM.bat` — Fix **catch-22 lock directory**: cả 2 block conflict-check giờ gọi prompt_alt_port_or_exit thay vì goto error_pause ngay, cho phép đổi port thay vì treo launcher vĩnh viễn.
+- `Chay_VBSP_SCM.bat` — Logging gắn với tier classification (mỗi PID ghi "classified as tier N") giúp debug sau này dễ hơn.
+- `tests/test_launcher_batch.py` — `test_port_process_is_verified_before_force_kill` cập nhật assertion cho new engine: thay findstr `/C:"..."` cũ bằng PowerShell `$combined.Contains($pyExeNorm)`, `Contains('streamlit')`, `Contains('app.py')`; thêm kiểm tra `classified as tier` log; giữ nguyên security contract (không taskkill /IM, verify marker, không slopppy venv path).
+
+## [2026-08-30] — Review và vá 7 focus LV2 Báo cáo Nông nghiệp
+- `tabs/tab_baocao/reports/nong_nghiep.py` — sửa `_styler_html_table()` để gộp style hợp lệ, bỏ `align[:-1]` và tránh sinh hai thuộc tính `style` trên cùng ô tổng.
+- `tabs/tab_baocao/reports/nong_nghiep.py` — sửa `_fig_top_bottom_xa_tlqh()` để nhóm TL QH thấp loại các xã đã nằm trong nhóm TL QH cao khi đủ dữ liệu, tránh một xã xuất hiện ở cả hai nhóm.
+- `tabs/tab_baocao/reports/nong_nghiep.py` — guard fallback cột nhóm trong `_tao_canh_bao()` và guard note lĩnh vực bị lọc khi dữ liệu rỗng/thiếu `Tên xã`.
+- `tabs/tab_baocao/reports/nong_nghiep.py` — chuyển render chính sang dùng `_tong_hop_*_cached()` cho các tổng hợp nặng và sửa wrapper đọc pickle bytes qua `io.BytesIO`.
+- `tabs/tab_baocao/reports/nong_nghiep.py` — Excel sheet `02_Xa_nong_thon` thêm dòng `TỔNG CỘNG` giống sheet phường.
+- `tests/test_baocao_tin_dung_so_lieu.py` — thêm hồi quy cho HTML style, cache wrapper, Top/Bottom không overlap, và cảnh báo thiếu cột nhóm.
+- `BUGMAP.md` — thêm entry `J82` và `C51` cho các lỗi phát hiện sau review LV2 Nông nghiệp.
+
+## [2026-08-30] — Review và vá edge case CBTD & Địa bàn + Nâng cấp LV2 Báo cáo Nông nghiệp
+- `services/cbtd_dia_ban_service.py` — `_normalize()` xử lý an toàn `None`, `NaN`, `pd.NA` và token rỗng khi service build map/groupby.
+- `data/khtd.py` — đồng nhất normalize join key xã/thôn cho `gan_cbtd_vao_df()`, bỏ qua thôn rỗng/`<NA>` trong cấu hình ĐGD nhưng vẫn giữ Series vectorized phía DataFrame.
+- `tabs/tab_quan_ly_dgd.py` — đưa normalize/validate trùng thôn lên helper dùng chung, import Excel báo rõ số dòng khớp/bị loại và batch-save cho phép move thôn giữa ĐGD mà không báo trùng giả.
+- `tests/test_cbtd_dia_ban_review.py` — thêm hồi quy cho normalize, join CBTD với `pd.NA`, và move thôn ĐGD.
+- `BUGMAP.md` — thêm entry `J81` và `B97` cho hai edge case phát hiện sau review 7 gói CBTD.
+- `tabs/tab_baocao/reports/nong_nghiep.py` — **Vét lỗi prompt Codex 7 mục**: _styler_html_table dùng _style_attr robust thay slice cùi bắp; Top/Bottom xã dedup tránh overlap; IndexError fallback col_nhom guard None; _tong_hop_theo_cot_cached() gọi thực tế với df_bytes wrapper; Sheet 02_Xa_nong_thon append dòng tổng khi chưa có; Grep 100% widget key đều có _kp prefix; import io toplevel; unused df_bytes_nn thực tế được dùng line 836.
+  - Fix bug `_dong_tong_hien_thi()` KeyError cột `Khoanh` (guard `if COT_DU_NO_KHOANH in df` trước `.sum()`).
+  - Convention widget key_prefix `_kp` (cn_ / pgd_{slug}_) cho selectbox + download 2 nút.
+  - `@st.cache_data(ttl=300)` cache wrapper cho 2 hàm tổng hợp nặng.
+  - Bảng **Theo Đơn vị (PGD)** level trên Xã cho cả 2 khu vực (nông thôn + thành thị).
+  - 4 biểu đồ Plotly: Treemap Linh vực, Top/Bottom 15 Xã TLQH, TLQH theo PGD (màu 4 mức), Top 10 mục đích DN max.
+  - Expander **Cảnh báo sớm 4 loại**: 🔴 Xã TLQH≥5%, 🟠 Mục đích≥3%, 🟡 PGD chênh >mean+2σ, ℹ️ Thuỷ/Lâm nghiệp phường bị lọc.
+  - Excel từ 2→6 sheet: `01_Tong_quan_KPI`, `02_Xa_nong_thon`, `03_Phuong_thanh_thi`, `04_Theo_PGD`, `05_Top10_Xa_DN_max`, `06_Canh_bao_som`.
+  - Highlight **dòng TỔNG CỘNG** nền `#C8E6C9` + chữ đậm + zebra row `#f9fafb` qua `_styler_html_table()` HTML hand-crafted (≥8 cột rule 6.15); Header `#1B5E20` trắng.
+  - Spinner loading wrap toàn bộ tổng hợp, format số tiền dấu chấm nghìn (VN), align phải cột số/tiền.
+
+## [2026-08-29] — Nâng cấp toàn diện module 👔 CBTD & Địa bàn (7 gói)
+- `services/cbtd_dia_ban_service.py` — REWRITE toàn bộ service: thêm 4 hàm mới `so_huu_cbtd_full`, `danh_gia_workload_cbtd`, `xep_hang_cbtd`, `phan_tich_xu_huong_to`; mở rộng 7 loại cảnh báo; `tom_tat_kpi` 10 trường workload; **fix scorecard baseline 50→30** (trước đó tổng 120 điểm vượt ngưỡng 100); fix `_normalize(None)` crash NoneType.
+- `tabs/tab_cbtd_dashboard.py` — REWRITE toàn bộ Dashboard: thêm 5 biểu đồ Plotly (Phân bố xếp hạng, Workload ĐGD, Top/Bottom CBTD, TL QH theo PGD, Xu hướng theo tổ); bộ lọc PGD/CBTD + ngưỡng tuỳ chỉnh; Scorecard 0-100; Excel 8 sheet; PDF xếp hạng CBTD (VBSP palette, highlight theo xếp loại, ký tên 3 vị trí); block **Drill-down hồ sơ vay** (chọn CBTD → 4 KPI → top 50 hồ sơ lớn nhất → mở `loan_detail_drawer`); clean ugly `if 2 in [2]`.
+- `tabs/tab_cbtd.py` — REWRITE chức năng Quản lý CBTD: **schema v3** (thêm 2 field `chuc_vu`, `ngay_bo_nhiem`); regex validation form (SDT `^[0-9+\-\s]{8,15}$`, mã CB `^CB[A-Z0-9_-]{2,}$`); auto-generate mã CB `CB_{slug}_{NNN}`; multiselect bulk ĐGD; bộ lọc mạnh (search / PGD / workload / sort); **Export PDF hồ sơ năng lực A4** (4 block: thông tin cá nhân / địa bàn / KPI HSTD / chi tiết).
+- `tabs/tab_quan_ly_dgd.py` — REWRITE `_render_gan_thon`: **Batch save** (pending dict trong session → 1 nút "💾 LƯU TẤT CẢ" ghi 1 transaction + 1 audit); **Cross-check % HSTD** (3 ngưỡng: 🔴 <80% / ⚠️ <95% / ✅ ≥95%); Validate trùng prospective **toàn xã** (không chỉ per-ĐGD); **Import Excel cấu hình ĐGD** (auto-detect cột theo keyword, filter đúng PGD+Xã user đang chọn, preview + checkbox xác nhận).
+- `data/khtd.py` — **Vector hoá `gan_cbtd_vao_df`**: thay list comprehension per-row bằng `join_key = xa_s + "\x1f" + thon_s` (ASCII Unit Separator) → `Series.map(str_map_cb)` numpy vectorized O(N) thay Python loop.
+
+## [2026-08-29] — Nguồn vốn địa phương: xuất báo cáo theo nhiều điều kiện
+- `tabs/tab_hhi.py` — thêm khối `Điều kiện xuất báo cáo`: lọc nguồn vốn, PGD, xã/phường, chương trình và chọn nhiều sheet trước khi tạo Excel/PDF.
+- `tabs/tab_hhi.py` — thêm helper lọc dữ liệu xuất và cache key theo điều kiện, để file tải xuống đổi đúng khi người dùng đổi bộ lọc.
+- `tests/test_tab_hhi.py` — thêm hồi quy cho lọc nhiều điều kiện, chọn sheet xuất và fingerprint điều kiện xuất.
+
+## [2026-08-29] — Thêm xuất PDF cho báo cáo Nguồn vốn địa phương
+- `tabs/tab_hhi.py` — thêm import `xuat_pdf_bc`; tách `_cached_bao_cao_sheets()` dùng chung cho Excel/PDF; thêm nút "Tạo báo cáo PDF" + tải file song song với Excel, thêm `_PDF_STATE_PREFIX`/`_clear_old_pdf_buffers()`.
+
+## [2026-08-29] — Reset form thêm CBTD sau khi lưu thành công
+- `tabs/tab_cbtd.py` — form `➕ Thêm CBTD mới` dùng widget key theo version và tăng version sau khi lưu, tránh giữ lại ĐGD vừa chọn rồi tự báo trùng với CBTD vừa thêm.
+- `tests/test_tab_cbtd_add_form.py` — thêm hồi quy bảo vệ prefix key theo version và bước tăng version sau thao tác thêm CBTD.
+- `BUGMAP.md` — thêm entry `B96` cho lỗi form thêm CBTD giữ state cũ sau rerun.
+
+## [2026-08-29] — Dọn cảnh báo dark mode còn lại trong form đăng nhập
+- `auth.py` — thay ba khai báo `color` literal của label, input và placeholder bằng custom property có fallback, giữ độ tương phản trên nền form sáng và làm sạch convention checker mà không đổi logic xác thực/phân quyền.
+- `BUGMAP.md` — thêm entry `J79` ghi nhận cảnh báo convention CSS trong form đăng nhập.
+
+## [2026-08-29] — Báo cáo Nông nghiệp: thêm bảng theo Xã/Phường dưới bảng Mục đích
+- `tabs/tab_baocao/reports/nong_nghiep.py` — tab Xã nông thôn thêm bảng `🏘️ Theo Xã`, tab Phường thêm bảng `🏘️ Theo Phường` (đều nhóm theo `Tên xã`, kèm dòng TỔNG CỘNG); tách hàm gộp thành `_tong_hop_theo_cot(df, cot_nhom)` dùng chung cho Mục đích và Xã/Phường.
+- `tabs/tab_baocao/reports/nong_nghiep.py` — giữ wrapper `_tong_hop_theo_muc_dich()` để không gãy import/test cũ; `_tong_hop_theo_cot()` trả bảng rỗng nếu thiếu cột nhóm thay vì crash.
+- `tests/test_baocao_tin_dung_so_lieu.py` — thêm hồi quy `Tên xã` rỗng → `Chưa xác định` và dòng `TỔNG CỘNG` dùng đúng nhãn nhóm `Xã`/`Phường`.
+- `BUGMAP.md` — thêm entry `J78` cho lỗi test import helper cũ sau khi refactor báo cáo nông nghiệp sang helper generic.
+
+## [2026-08-29] — Đổi tên "Nợ rủi ro" thành "Nợ xấu" trong Báo cáo tín dụng
+- `tabs/tab_baocao/dashboard.py` — nhãn dropdown `⚠️ Báo cáo Nợ rủi ro (HSTD)` → `⚠️ Báo cáo Nợ xấu (HSTD)`.
+- `tabs/tab_baocao/tree_navigation.py` — nhãn nhóm `⚠️ Báo cáo Nợ rủi ro` → `⚠️ Báo cáo Nợ xấu`.
+- `tabs/tab_baocao/components/metric_cards.py` — card KPI `Nợ rủi ro` → `Nợ xấu`, help ghi rõ "Nợ xấu = nợ quá hạn + nợ khoanh".
+- `tabs/tab_baocao/reports/no_rui_ro_v2.py` — nhãn cảnh báo `Cảnh báo nợ rủi ro` → `Cảnh báo nợ xấu`.
+- `tabs/tab_baocao/reports/no_rui_ro.py` — tiêu đề `Báo cáo Nợ rủi ro` → `Báo cáo Nợ xấu`.
+
+## [2026-08-29] — Rà soát convention các mục khác của dự án
+- `services/ke_hoach_cv_khnv_service.py` — đánh dấu skip có chủ ý cho hai nhánh thiếu tab Google Sheets tuỳ chọn `NhiemVuGiao`/`GiaoViec`, tránh convention checker hiểu nhầm thành lỗi cần stacktrace.
+- `tabs/tab_baocao/reports/nong_nghiep.py` — thêm logger `exc_info=True` khi tạo PDF Báo cáo Nông nghiệp lỗi để có stacktrace phục vụ truy vết.
+- `scripts/debug_khtd_th.py`, `scripts/phan_tang_check.py` — đổi docstring đầu file sang raw string để hết `SyntaxWarning` do đường dẫn Windows `D:\...`.
+- `BUGMAP.md` — thêm entry `J77` cho lỗi convention logger/optional GSheet khi rà soát toàn dự án.
+
+## [2026-08-29] — Sửa số khách hàng và số món vay trong Báo cáo tín dụng
+- `tabs/tab_baocao/components/inline_filter.py` — chuẩn bị dữ liệu báo cáo nay loại khoản không còn dư nợ/quá hạn/khoanh trước khi đếm, giữ quy tắc bỏ KU rỗng và gộp dòng lặp cùng `(Mã KH, Số khế ước)`.
+- `tabs/tab_baocao/components/metric_cards.py` — card `Số khách hàng`/`Số món vay` dùng cùng helper chuẩn của báo cáo; `Số món vay` đếm số khoản vay hợp lệ sau làm sạch thay vì tự `nunique(Số khế ước)` riêng.
+- `tests/test_baocao_tin_dung_so_lieu.py` — thêm hồi quy card KPI chỉ đếm khoản vay hợp lệ, không đếm dòng đã tất toán/KU rỗng/trùng khoản vay.
+- `BUGMAP.md` — thêm entry `C48` cho lỗi số KH/số món trong Báo cáo tín dụng đếm cả khoản không còn dư nợ hoặc dùng quy tắc đếm riêng.
+
+## [2026-08-29] — Đồng bộ test Báo cáo Nông nghiệp sau đổi phạm vi nông thôn
+- `tests/test_baocao_tin_dung_so_lieu.py` — cập nhật import helper `_loc_pham_vi_bao_cao`, thêm hồi quy nông thôn lấy tất cả mục đích `Tên PNKT51` và chỉnh dòng tổng PDF theo phạm vi mới.
+- `BUGMAP.md` — thêm entry `J76` cho lỗi test import helper cũ sau khi refactor phạm vi Báo cáo Nông nghiệp.
+
 ## [2026-08-29] — Đồng bộ PDF Báo cáo Nông nghiệp với phạm vi báo cáo
 - `tabs/tab_baocao/reports/nong_nghiep.py` — dòng TỔNG CỘNG PDF dùng cùng phạm vi lọc với KPI/bảng; nút tải Excel/PDF render trong đúng cột.
 - `tests/test_baocao_tin_dung_so_lieu.py` — thêm hồi quy dòng tổng PDF không cộng thủy sản/lâm nghiệp ở phường.
@@ -17,7 +106,7 @@
 
 ## [2026-08-29] — Thêm Báo cáo Nông nghiệp trong Báo cáo tín dụng
 - `config.py` — thêm hằng số phân loại lĩnh vực nông nghiệp (`NN_LINH_VUC_*`, `NN_TU_KHOA_*`) từ cột `Tên PNKT51`.
-- `tabs/tab_baocao/reports/nong_nghiep.py` — MỚI: báo cáo Nông nghiệp; xã nông thôn thống kê toàn bộ lĩnh vực (Trồng trọt/Chăn nuôi/Thủy sản/Lâm nghiệp), phường chỉ Trồng trọt + Chăn nuôi; xuất Excel (2 sheet) + PDF (bảng gộp 2 khu vực, dòng TỔNG CỘNG).
+- `tabs/tab_baocao/reports/nong_nghiep.py` — MỚI: báo cáo Nông nghiệp; xã nông thôn thống kê TẤT CẢ mục đích sử dụng vốn (Tên PNKT51), phường chỉ Trồng trọt + Chăn nuôi; xuất Excel (2 sheet) + PDF (bảng gộp 2 khu vực, dòng TỔNG CỘNG).
 - `tabs/tab_baocao/reports/__init__.py` — export `render_nong_nghiep`.
 - `tabs/tab_baocao/__init__.py` — thêm nhánh render báo cáo Nông nghiệp.
 - `tabs/tab_baocao/dashboard.py` — thêm loại báo cáo `🌾 Báo cáo Nông nghiệp (HSTD)` vào dropdown.

@@ -100,10 +100,31 @@ def lay_ap_tu_dgd_list(pgd: str, ds_dgd: list, dgd_map: dict) -> list[tuple[str,
                 else:
                     thon_items = []
                 for ap in thon_items:
-                    ap_s = str(ap).strip()
-                    if ap_s:
+                    ap_s = "" if ap is None else str(ap).strip()
+                    if ap_s and ap_s.lower() not in {"nan", "none", "<na>"}:
                         result.append((ten_xa, ap_s))
     return result
+
+
+def _normalize_cbtd_join_text(value) -> str:
+    """Normalize key xã/thôn đồng nhất ở cả lookup và DataFrame side."""
+    if value is None:
+        return ""
+    try:
+        if pd.isna(value):
+            return ""
+    except (TypeError, ValueError):
+        pass
+    try:
+        text = str(value).strip().lower()
+    except Exception:
+        return ""
+    return "" if text in {"nan", "none", "<na>"} else text
+
+
+def _normalize_cbtd_join_series(values: pd.Series) -> pd.Series:
+    text = values.astype("string").fillna("").str.strip().str.lower()
+    return text.mask(text.isin(("nan", "none", "<na>")), "")
 
 
 def xay_ap_to_cbtd_map(cbtd_data: dict, dgd_map: dict) -> dict:
@@ -118,7 +139,7 @@ def xay_ap_to_cbtd_map(cbtd_data: dict, dgd_map: dict) -> dict:
         if not pgd or not ds_dgd:
             continue
         for ten_xa, ten_ap in lay_ap_tu_dgd_list(pgd, ds_dgd, dgd_map):
-            key = (ten_xa.lower().strip(), ten_ap.lower().strip())
+            key = (_normalize_cbtd_join_text(ten_xa), _normalize_cbtd_join_text(ten_ap))
             if key not in result:
                 result[key] = (ma_cb, info.get("ho_ten", ""))
     return result
@@ -133,7 +154,8 @@ def gan_cbtd_vao_df(
 ):
     """Thêm cột 'CBTD' (mã) và 'Tên CBTD' vào df. Join qua (Tên xã, Tên thôn).
 
-    Nếu không tìm được khớp, giá trị là None.
+    Vectorised version: dùng Series.map + string concatenation key thay list comprehension
+    per-row Python loop.
     """
     df = df.copy()
     ap_map = xay_ap_to_cbtd_map(cbtd_data, dgd_map)
@@ -141,11 +163,18 @@ def gan_cbtd_vao_df(
         df["CBTD"] = None
         df["Tên CBTD"] = None
         return df
-    xa_s = df[col_xa].fillna("").astype(str).str.strip().str.lower()
-    thon_s = df[col_thon].fillna("").astype(str).str.strip().str.lower()
-    keys = list(zip(xa_s, thon_s))
-    df["CBTD"]     = [ap_map.get(k, (None, None))[0] for k in keys]
-    df["Tên CBTD"] = [ap_map.get(k, (None, None))[1] for k in keys]
+    xa_s = _normalize_cbtd_join_series(df[col_xa])
+    thon_s = _normalize_cbtd_join_series(df[col_thon])
+    # Vectorised lookup: ghép key bằng string concatenation "xa||thon" → pandas .map (numpy level)
+    join_key = xa_s + "\x1f" + thon_s  # \x1f = unit separator, an toàn hơn "||"
+    str_map_cb: dict[str, str | None] = {}
+    str_map_ten: dict[str, str | None] = {}
+    for (kx, kt), (v_cb, v_ten) in ap_map.items():
+        k_str = f"{kx}\x1f{kt}"
+        str_map_cb[k_str] = v_cb
+        str_map_ten[k_str] = v_ten
+    df["CBTD"] = join_key.map(str_map_cb)
+    df["Tên CBTD"] = join_key.map(str_map_ten)
     return df
 
 

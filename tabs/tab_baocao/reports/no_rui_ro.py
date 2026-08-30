@@ -62,7 +62,7 @@ def render_no_rui_ro(
         ctx.warning("⚠️ Chưa có dữ liệu HSTD.")
         return
     
-    ctx.markdown("### ⚠️ Báo cáo Nợ rủi ro")
+    ctx.markdown("### ⚠️ Báo cáo Nợ xấu")
     
     # Chọn loại nợ
     loai_no = ctx.radio(

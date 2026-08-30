@@ -50,9 +50,18 @@ from tabs.tab_baocao.reports.nq11 import (
     _tinh_chi_so_nq11,
 )
 from tabs.tab_baocao.reports.nong_nghiep import (
+    _df_to_bytes,
     _dong_tong_nn,
+    _dong_tong_hien_thi,
+    _fig_top_bottom_xa_tlqh,
     _gan_linh_vuc,
-    _loc_pham_vi_nong_nghiep,
+    _loc_pham_vi_bao_cao,
+    _styler_html_table,
+    _tao_canh_bao,
+    _tong_hop_theo_cot_cached,
+    _tong_hop_theo_cot,
+    _tong_hop_linh_vuc_cached,
+    _tong_hop_theo_muc_dich,
     _tong_hop_linh_vuc,
     phan_loai_linh_vuc_nong_nghiep,
 )
@@ -249,6 +258,23 @@ def test_cards_no_qua_han_dung_tu_so_va_khong_dem_trung() -> None:
     }
 
 
+def test_cards_so_khach_hang_va_so_mon_chi_dem_khoan_vay_hop_le() -> None:
+    hstd = pd.DataFrame({
+        COT_SO_KU: [" KU1 ", "KU1", "KU2", "", "KU1"],
+        COT_MA_KH: ["KH1", " KH1 ", "KH2", "KH3", "KH4"],
+        COT_TONG_DU_NO: [100, 100, 0, 999, 50],
+        COT_DU_NO_QH: [0, 0, 0, 0, 0],
+        COT_DU_NO_KHOANH: [0, 0, 0, 0, 0],
+    })
+
+    result = _tinh_chi_so_cards(hstd, None)
+
+    assert result["tong_du_no"] == 150.0
+    assert result["so_kh"] == 2
+    assert result["so_mon"] == 2
+    assert result["du_no_bq_mon"] == 75.0
+
+
 def test_nong_nghiep_phan_loai_khong_bat_nham_tu_khoa_ngan() -> None:
     assert phan_loai_linh_vuc_nong_nghiep("Chăn nuôi bò") == NN_LINH_VUC_CHAN_NUOI
     assert phan_loai_linh_vuc_nong_nghiep("Nuôi trồng thủy sản") == NN_LINH_VUC_THUY_SAN
@@ -262,22 +288,76 @@ def test_nong_nghiep_phan_loai_khong_bat_nham_tu_khoa_ngan() -> None:
 
 def test_nong_nghiep_pham_vi_phuong_chi_lay_trong_trot_chan_nuoi() -> None:
     df = pd.DataFrame({
-        COT_TEN_XA: ["Xã Long Đức", "Biên Hòa", "Biên Hòa", "Xã Long Đức"],
+        COT_TEN_XA: ["Xã Long Đức", "Biên Hòa", "Biên Hòa", "Xã Long Đức", "Xã Long Đức"],
         COT_TEN_PNKT51: [
             "Nuôi tôm",
             "Nuôi trồng thủy sản",
             "Chăn nuôi bò",
             "Trồng rừng sản xuất",
+            "Buôn bán tạp hóa",
         ],
+        COT_TONG_DU_NO: [100, 200, 300, 400, 500],
+        COT_DU_NO_QH: [0, 20, 30, 40, 50],
+        COT_SO_KU: ["KU1", "KU2", "KU3", "KU4", "KU5"],
+    })
+
+    result = _loc_pham_vi_bao_cao(_gan_linh_vuc(df))
+
+    assert result[COT_SO_KU].tolist() == ["KU1", "KU3", "KU4", "KU5"]
+    assert result[COT_TONG_DU_NO].sum() == 1_300
+
+
+def test_nong_nghiep_nong_thon_tong_hop_tat_ca_muc_dich() -> None:
+    df = pd.DataFrame({
+        COT_TEN_PNKT51: ["Chăn nuôi bò", "Buôn bán tạp hóa", "", None],
         COT_TONG_DU_NO: [100, 200, 300, 400],
-        COT_DU_NO_QH: [0, 20, 30, 40],
+        COT_MA_KH: ["KH1", "KH2", "KH3", "KH4"],
         COT_SO_KU: ["KU1", "KU2", "KU3", "KU4"],
     })
 
-    result = _loc_pham_vi_nong_nghiep(_gan_linh_vuc(df))
+    result = _tong_hop_theo_muc_dich(df)
 
-    assert result[COT_SO_KU].tolist() == ["KU1", "KU3", "KU4"]
-    assert result[COT_TONG_DU_NO].sum() == 800
+    assert set(result[COT_TEN_PNKT51]) == {
+        "Chăn nuôi bò",
+        "Buôn bán tạp hóa",
+        "Chưa xác định",
+    }
+    assert result["Tổng_dư_nợ"].sum() == 1_000
+
+
+def test_nong_nghiep_tong_hop_theo_xa_doi_ten_rong_thanh_chua_xac_dinh() -> None:
+    df = pd.DataFrame({
+        COT_TEN_XA: ["Xã A", "", None, "nan"],
+        COT_TONG_DU_NO: [100, 200, 300, 400],
+        COT_DU_NO_TH: [100, 200, 300, 400],
+        COT_DU_NO_QH: [0, 0, 0, 0],
+        COT_MA_KH: ["KH1", "KH2", "KH3", "KH4"],
+        COT_SO_KU: ["KU1", "KU2", "KU3", "KU4"],
+    })
+
+    result = _tong_hop_theo_cot(df, COT_TEN_XA)
+
+    assert set(result[COT_TEN_XA]) == {"Xã A", "Chưa xác định"}
+    assert result.loc[result[COT_TEN_XA].eq("Chưa xác định"), "Tổng_dư_nợ"].item() == 900
+
+
+def test_nong_nghiep_dong_tong_xa_phuong_dung_nhan_nhom() -> None:
+    df = pd.DataFrame({
+        COT_TEN_XA: ["Xã A", "Xã B"],
+        COT_TONG_DU_NO: [100_000_000, 200_000_000],
+        COT_DU_NO_TH: [90_000_000, 180_000_000],
+        COT_DU_NO_QH: [10_000_000, 20_000_000],
+        COT_SO_KU: ["KU1", "KU2"],
+        COT_MA_KH: ["KH1", "KH2"],
+    })
+
+    dong_xa = _dong_tong_hien_thi(df, "Xã")
+    dong_phuong = _dong_tong_hien_thi(df, "Phường")
+
+    assert dong_xa["Xã"] == "TỔNG CỘNG"
+    assert "Phường" not in dong_xa
+    assert dong_phuong["Phường"] == "TỔNG CỘNG"
+    assert dong_phuong["Tổng dư nợ"] == 300
 
 
 def test_nong_nghiep_tong_hop_fallback_khi_ma_kh_rong_va_thieu_cot_no() -> None:
@@ -298,24 +378,98 @@ def test_nong_nghiep_tong_hop_fallback_khi_ma_kh_rong_va_thieu_cot_no() -> None:
 
 def test_nong_nghiep_dong_tong_pdf_dung_pham_vi_bao_cao() -> None:
     df = pd.DataFrame({
-        COT_TEN_XA: ["Xã Long Đức", "Biên Hòa", "Biên Hòa", "Xã Long Đức"],
+        COT_TEN_XA: ["Xã Long Đức", "Biên Hòa", "Biên Hòa", "Xã Long Đức", "Xã Long Đức"],
         COT_TEN_PNKT51: [
             "Nuôi tôm",
             "Nuôi trồng thủy sản",
             "Chăn nuôi bò",
             "Trồng rừng sản xuất",
+            "Buôn bán tạp hóa",
         ],
-        COT_TONG_DU_NO: [100_000_000, 200_000_000, 300_000_000, 400_000_000],
-        COT_DU_NO_TH: [100_000_000, 180_000_000, 270_000_000, 360_000_000],
-        COT_DU_NO_QH: [0, 20_000_000, 30_000_000, 40_000_000],
-        COT_SO_KU: ["KU1", "KU2", "KU3", "KU4"],
-        COT_MA_KH: ["KH1", "KH2", "KH3", "KH4"],
+        COT_TONG_DU_NO: [100_000_000, 200_000_000, 300_000_000, 400_000_000, 500_000_000],
+        COT_DU_NO_TH: [100_000_000, 180_000_000, 270_000_000, 360_000_000, 450_000_000],
+        COT_DU_NO_QH: [0, 20_000_000, 30_000_000, 40_000_000, 50_000_000],
+        COT_SO_KU: ["KU1", "KU2", "KU3", "KU4", "KU5"],
+        COT_MA_KH: ["KH1", "KH2", "KH3", "KH4", "KH5"],
     })
 
     result = _dong_tong_nn(_gan_linh_vuc(df))
 
     assert result is not None
-    assert result["Số KH"] == 3
-    assert result["Số món"] == 3
-    assert result["Tổng dư nợ"] == 800
-    assert result["Quá hạn"] == 70
+    assert result["Số KH"] == 4
+    assert result["Số món"] == 4
+    assert result["Tổng dư nợ"] == 1_300
+    assert result["Quá hạn"] == 120
+
+
+def test_nong_nghiep_styler_html_table_khong_tao_style_attr_loi() -> None:
+    df = pd.DataFrame({
+        "Mục đích": ["A", "TỔNG CỘNG"],
+        "Số KH": [1, 1],
+        "Tổng dư nợ": [100, 100],
+        "Tỷ lệ QH %": [1.5, 1.5],
+    })
+
+    html = _styler_html_table(df)
+
+    assert 'style="text-align:right;padding:4px 8px;background:#f9fafb;' in html
+    assert "<th style=" in html
+    assert "<th " in html
+    assert 'style="text-align:right;padding:4px 8px;" style=' not in html
+    assert 'style="text-align:left;padding:4px 8px;" style=' not in html
+
+
+def test_nong_nghiep_cached_wrapper_doc_duoc_dataframe_bytes() -> None:
+    df = pd.DataFrame({
+        COT_TEN_PNKT51: ["Chăn nuôi bò"],
+        COT_TONG_DU_NO: [100],
+        COT_DU_NO_TH: [90],
+        COT_DU_NO_QH: [10],
+        COT_MA_KH: ["KH1"],
+        COT_SO_KU: ["KU1"],
+    })
+    df_bytes = _df_to_bytes(df)
+
+    by_col = _tong_hop_theo_cot_cached(df_bytes, COT_TEN_PNKT51)
+    by_lv = _tong_hop_linh_vuc_cached(df_bytes, (NN_LINH_VUC_CHAN_NUOI,))
+
+    assert by_col.loc[0, "Tổng_dư_nợ"] == 100
+    assert by_lv.loc[0, "Tổng_dư_nợ"] == 100
+
+
+def test_nong_nghiep_top_bottom_xa_khong_overlap_khi_du_lieu_it_hon_hai_top_n() -> None:
+    df = pd.DataFrame({
+        "Xã": [f"Xã {i:02d}" for i in range(20)],
+        "Tỷ lệ QH %": list(range(20)),
+    })
+
+    fig = _fig_top_bottom_xa_tlqh(df, top_n=15)
+
+    assert fig is not None
+    high = {y for trace in fig.data if trace.name == "🔴 TL QH CAO" for y in trace.y}
+    low = {y for trace in fig.data if trace.name == "🟢 TL QH THẤP" for y in trace.y}
+    assert high.isdisjoint(low)
+    assert len(low) == 5
+
+
+def test_nong_nghiep_tao_canh_bao_bo_qua_khi_khong_co_cot_nhom() -> None:
+    df_th_md = pd.DataFrame({
+        "Số KH": [1],
+        "Số món": [1],
+        "Tổng dư nợ": [100],
+        "Trong hạn": [90],
+        "Quá hạn": [10],
+        "Khoanh": [0],
+        "Tỷ trọng %": [100],
+        "Tỷ lệ QH %": [10],
+        "BQ/KH": [100],
+    })
+
+    result = _tao_canh_bao(
+        pd.DataFrame(),
+        df_th_md,
+        pd.DataFrame(),
+        pd.DataFrame(),
+    )
+
+    assert result.loc[0, "Mức"] == "✅ An toàn"

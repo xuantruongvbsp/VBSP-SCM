@@ -1,6 +1,7 @@
 """Regression tests cho launcher Windows VBSP-SCM."""
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -22,6 +23,12 @@ def _read(path: Path) -> str:
     return path.read_text(encoding="utf-8").replace("\r\n", "\n")
 
 
+def _label_section(content: str, label: str, next_label: str) -> str:
+    start = content.index(f"\n:{label}\n")
+    end = content.index(f"\n:{next_label}\n", start + 1)
+    return content[start:end]
+
+
 def test_chay_vbsp_scm_is_the_only_real_launcher() -> None:
     main = _read(MAIN_LAUNCHER)
     compat = _read(COMPAT_LAUNCHER)
@@ -33,21 +40,28 @@ def test_chay_vbsp_scm_is_the_only_real_launcher() -> None:
 
 def test_port_process_is_verified_before_force_kill() -> None:
     content = _read(MAIN_LAUNCHER)
+    classifier = _label_section(content, "classify_pid_tier", "classify_fallback")
 
     # Port processes go through verification handler (never blind taskkill)
     assert "call :handle_port_pid %%p" in content
     assert "call :classify_pid_tier %PORT_PID%" in content
     assert "Get-CimInstance Win32_Process" in content
-    assert "call :is_marked_vbsp_process" in content
+    assert "call :is_marked_vbsp_process_classify %CLASSIFY_PID%" in classifier
     assert 'APP_PID_FILE=%TMP_DIR%\\vbsp_streamlit.pid' in content
     # PID marker verifies exact ROOT + APP match (anti-spoof)
     assert 'if /I not "!MARKER_ROOT!"=="%ROOT%" exit /b 1' in content
     assert 'if /I not "!MARKER_APP!"=="%ROOT%\\app.py" exit /b 1' in content
-    # Verification keywords (venv python + streamlit + app.py) via PowerShell tier classifier
-    # These replace the old findstr /C:"..." checks — same contract, new engine
-    assert "$combined.Contains($pyExeNorm)" in content
-    assert "Contains('streamlit')" in content
-    assert "Contains('app.py')" in content
+    # Tier 0 requires exact executable equality plus both command-line markers.
+    # Keep these assertions scoped to the generated classifier, not a loose substring
+    # that could be satisfied by comments or another launcher section.
+    assert "echo $v0A = $exeNorm -eq $pyExeNorm ;" in classifier
+    assert (
+        "echo $v0B = $cmdNorm.Contains('streamlit') "
+        "-and $cmdNorm.Contains('app.py') ;"
+    ) in classifier
+    assert "$combined.Contains($pyExeNorm)" not in content
+    # Tier 1 is still Python-only; a non-Python command mentioning app.py is Tier 3.
+    assert "echo elseif ($isPython -and (" in classifier
     # Sloppy partial venv path check must NEVER exist (must match PY_EXE exact)
     assert '/C:"venv\\Scripts\\python.exe"' not in content
     # Every PID is logged with a tier classification — non-verified gets prompt not silent kill
@@ -163,9 +177,109 @@ def test_launcher_keeps_project_runtime_contract() -> None:
     assert 'PORT=8502' in content
     assert 'PY_EXE=%ROOT%\\venv\\Scripts\\python.exe' in content
     assert 'set "HEADLESS=false"' in content
-    assert 'if /I "%~1"=="--no-browser" set "HEADLESS=true"' in content
+    assert 'if /I "%~1"=="--no-browser" (' in content
+    assert 'set "HEADLESS=true"' in content
     assert "--server.headless %HEADLESS%" in content
     assert "start powershell" not in content.lower()
+
+
+def test_flag_loop_consumes_three_flags_and_port_value() -> None:
+    content = _read(MAIN_LAUNCHER)
+    parser = _label_section(content, "parse_flags", "flags_done")
+
+    assert 'if /I "%~1"=="--no-browser" (' in parser
+    assert 'if /I "%~1"=="--force-kill" (' in parser
+    assert 'if /I "%~1"=="--port" (' in parser
+    assert 'set "PORT=%~2"' in parser
+    assert 'set "URL=http://localhost:%~2"' in parser
+    assert "    shift\n    shift\n    goto :parse_flags" in parser
+    assert content.index("\n:parse_flags\n") < content.index('set "RUN_STAMP=')
+    assert 'if "%PORT%"=="%ALT_PORT%" set "ALT_PORT=8504"' in content
+
+
+def test_prompt_defaults_and_force_kill_retry_are_state_safe() -> None:
+    content = _read(MAIN_LAUNCHER)
+    prompt_kill = _label_section(
+        content, "prompt_user_kill", "prompt_user_kill_fallback"
+    )
+    prompt_kill_fallback = _label_section(
+        content, "prompt_user_kill_fallback", "prompt_alt_port_or_exit"
+    )
+    alt_prompt = _label_section(content, "prompt_alt_port_or_exit", "calculate_requirements_hash")
+
+    assert "choice /C YN /T %PK_TIMEOUT% /D %PK_DEFAULT%" in prompt_kill
+    assert 'if "%PK_RC%"=="1" exit /b 0' in prompt_kill
+    assert 'set "PK_ANSWER="\nset /P "PK_ANSWER=' in prompt_kill_fallback
+    assert 'if "%PK_ANSWER%"=="" set "PK_ANSWER=%PK_DEFAULT%"' in prompt_kill_fallback
+    assert 'if /I "%PK_ANSWER%"=="Y" exit /b 0' in prompt_kill_fallback
+    assert 'set "PAP_ANSWER="\nset "PAP_RC=1"\nset /P "PAP_ANSWER=' in alt_prompt
+    assert ':switch_to_alt_port\nset "FORCE_KILL=false"' in alt_prompt
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="cmd.exe/PowerShell only available on Windows")
+def test_generated_classifier_ps1_has_literal_pipe_and_valid_syntax(tmp_path: Path) -> None:
+    content = _read(MAIN_LAUNCHER)
+    classifier = _label_section(content, "classify_pid_tier", "classify_fallback")
+    echo_lines = [
+        line
+        for line in classifier.splitlines()
+        if line.startswith("echo ") and '"%CLASSIFY_PS1%"' in line
+    ]
+    ps1_path = tmp_path / "classifier.ps1"
+    batch_path = tmp_path / "render_classifier.bat"
+    wrapper_lines = [
+        "@echo off",
+        "setlocal EnableExtensions EnableDelayedExpansion",
+        f'set "CLASSIFY_PID={os.getpid()}"',
+        f'set "CLASSIFY_PS1={ps1_path}"',
+        f'set "VBSP_CLASSIFY_PY_EXE={sys.executable}"',
+        f'set "VBSP_CLASSIFY_ROOT={ROOT}"',
+        *echo_lines,
+        'powershell.exe -NoLogo -NoProfile -NonInteractive '
+        '-ExecutionPolicy Bypass -File "%CLASSIFY_PS1%"',
+    ]
+    batch_path.write_bytes(("\r\n".join(wrapper_lines) + "\r\n").encode("ascii"))
+
+    result = subprocess.run(
+        ["cmd.exe", "/d", "/v:on", "/c", str(batch_path)],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=False,
+    )
+    generated = ps1_path.read_text(encoding="ascii")
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "$combined=($exeNorm + ' | ' + $cmdNorm) ;" in generated
+    assert "^|" not in generated
+    assert "MISSING" in result.stdout or "TIER=2" in result.stdout
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="WMIC/findstr fallback is Windows-only")
+def test_wmic_list_format_python_name_matches_findstr(tmp_path: Path) -> None:
+    wmic_output = tmp_path / "wmic.txt"
+    batch_path = tmp_path / "check_wmic.bat"
+    payload = "\r\r\nName=python.exe\r\r\n\r\r\n".encode("utf-16-le")
+    wmic_output.write_bytes(b"\xff\xfe" + payload)
+    batch_path.write_bytes(
+        (
+            '@echo off\r\n'
+            'type "%~dp0wmic.txt" 2>nul | more | '
+            'findstr /I /L /C:"Name=python.exe"\r\n'
+        ).encode("ascii")
+    )
+
+    result = subprocess.run(
+        ["cmd.exe", "/d", "/c", str(batch_path)],
+        capture_output=True,
+        text=True,
+        timeout=10,
+        check=False,
+    )
+
+    assert result.returncode == 0
+    assert "Name=python.exe" in result.stdout
 
 
 def test_dev_launcher_reuses_browser_tab_without_opening_new_one() -> None:
@@ -185,6 +299,10 @@ def test_launcher_self_test_runs_without_starting_app() -> None:
             "/v:on",
             "/c",
             str(MAIN_LAUNCHER),
+            "--no-browser",
+            "--force-kill",
+            "--port",
+            "8503",
             "--self-test",
         ],
         cwd=ROOT,
@@ -196,6 +314,10 @@ def test_launcher_self_test_runs_without_starting_app() -> None:
 
     assert result.returncode == 0, result.stdout + result.stderr
     assert "LAUNCHER SELF-TEST OK" in result.stdout
+    assert (
+        "LAUNCHER SELF-TEST CONFIG: PORT=8503 HEADLESS=true "
+        "FORCE_KILL=true ALT_PORT=8504"
+    ) in result.stdout
 
 
 @pytest.mark.skipif(sys.platform != "win32", reason="CRLF guarantee only relevant on Windows")

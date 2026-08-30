@@ -4197,6 +4197,18 @@ def _to_int(val, default=0):
 
 ---
 
+### J83 — Launcher 4-tier phân loại quá rộng và rò state prompt/force-kill
+| | |
+|---|---|
+| **File** | `Chay_VBSP_SCM.bat` → `classify_pid_tier`, `prompt_user_kill`, `prompt_alt_port_or_exit`; `tests/test_launcher_batch.py` |
+| **Dấu hiệu** | Tiến trình dùng đúng venv nhưng chỉ có một trong hai từ khóa `streamlit`/`app.py` có thể bị Tier 0 và kill im lặng; non-Python có từ khóa gợi ý bị Tier 1 default Y; nhấn Enter ở lần hỏi fallback sau có thể dùng lại câu trả lời cũ; fallback WMIC không nhận `Name=python.exe` khi file redirect là UTF-16; đổi port sau force-kill thất bại giữ state `FORCE_KILL=true`. |
+| **Nguyên nhân** | Tier 0 dùng `Contains($pyExeNorm)` trên chuỗi executable + command line và `-or` giữa hai marker; Tier 1 thiếu guard Python; biến `set /P` không được reset; `findstr` đọc trực tiếp output WMIC Unicode; label switch port không phục hồi state. |
+| **Fix** | So sánh `$exeNorm -eq $pyExeNorm`, bắt buộc `streamlit -and app.py`, guard `$isPython` cho Tier 1; clear/default biến prompt trước `set /P`; pipe WMIC qua `more` rồi match `Name=python.exe`; reset `FORCE_KILL=false` tại `switch_to_alt_port`; thêm runtime/static regression cho escape, flags, prompt và fallback. |
+| **Test** | `venv\\Scripts\\python.exe -m pytest tests\\test_launcher_batch.py -q` — 18 passed. |
+| **Ngày fix** | 2026-08-30 |
+
+---
+
 Mỗi khi fix bug, copy template dưới đây và điền vào đúng mục:
 
 ```

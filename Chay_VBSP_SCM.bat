@@ -26,6 +26,7 @@ set "JUST_INSTALLED=0"
 set "HEADLESS=false"
 set "FORCE_KILL=false"
 set "ALT_PORT=8503"
+set "SELF_TEST=0"
 
 rem Python 3.12 mac dinh; fallback path co dinh o buoc auto-detect
 set "PY_CMD=py"
@@ -37,7 +38,11 @@ if not exist "%LOG_DIR%" mkdir "%LOG_DIR%" >nul 2>&1
 rem Parse flags loop
 :parse_flags
 if "%~1"=="" goto :flags_done
-if /I "%~1"=="--self-test" goto :self_test
+if /I "%~1"=="--self-test" (
+    set "SELF_TEST=1"
+    shift
+    goto :parse_flags
+)
 if /I "%~1"=="--no-browser" (
     set "HEADLESS=true"
     shift
@@ -58,6 +63,8 @@ if /I "%~1"=="--port" (
 shift
 goto :parse_flags
 :flags_done
+if "%PORT%"=="%ALT_PORT%" set "ALT_PORT=8504"
+if "%SELF_TEST%"=="1" goto :self_test
 
 rem Archive log cua lan chay truoc, sau do xoa log launcher qua han.
 set "RUN_STAMP=%date%_%time%"
@@ -557,17 +564,21 @@ echo $pyExe=$env:VBSP_CLASSIFY_PY_EXE ; $root=$env:VBSP_CLASSIFY_ROOT ; >> "%CLA
 echo Write-Output ('EXE=' + $exe) ; >> "%CLASSIFY_PS1%"
 echo Write-Output ('CMD=' + $cmd) ; >> "%CLASSIFY_PS1%"
 echo Write-Output ('NAME=' + $name) ; >> "%CLASSIFY_PS1%"
-echo $combined=($exe + ' ^| ' + $cmd).ToLowerInvariant() ; >> "%CLASSIFY_PS1%"
+echo $exeNorm=$exe.ToLowerInvariant() ; $cmdNorm=$cmd.ToLowerInvariant() ; $nameNorm=$name.ToLowerInvariant() ; >> "%CLASSIFY_PS1%"
+echo $combined=($exeNorm + ' ^| ' + $cmdNorm) ; >> "%CLASSIFY_PS1%"
 echo $pyExeNorm=$pyExe.ToLowerInvariant() ; $rootNorm=$root.ToLowerInvariant() ; >> "%CLASSIFY_PS1%"
 echo $tier=3 ; >> "%CLASSIFY_PS1%"
-echo $v0A = $combined.Contains($pyExeNorm) -or $combined.Contains($rootNorm + '\venv\') ; >> "%CLASSIFY_PS1%"
-echo $v0B = $combined.Contains('streamlit') -or $combined.Contains('app.py') ; >> "%CLASSIFY_PS1%"
+echo $isPython = $nameNorm -eq 'python.exe' -or $exeNorm.EndsWith('\python.exe') -or $exeNorm.Contains('python3') ; >> "%CLASSIFY_PS1%"
+echo $v0A = $exeNorm -eq $pyExeNorm ; >> "%CLASSIFY_PS1%"
+echo $v0B = $cmdNorm.Contains('streamlit') -and $cmdNorm.Contains('app.py') ; >> "%CLASSIFY_PS1%"
 echo if ($v0A -and $v0B) { $tier=0 } >> "%CLASSIFY_PS1%"
-echo elseif ($combined.Contains($rootNorm) -or $combined.Contains('\venv\') -or $combined.Contains('streamlit') -or $combined.Contains('app.py')) { $tier=1 } >> "%CLASSIFY_PS1%"
-echo elseif ($name.ToLowerInvariant() -eq 'python.exe' -or $exe.ToLowerInvariant().EndsWith('python.exe') -or $exe.ToLowerInvariant().Contains('python3')) { $tier=2 } >> "%CLASSIFY_PS1%"
+echo elseif ($isPython -and ($combined.Contains($rootNorm) -or $combined.Contains('\venv\') -or $combined.Contains('streamlit') -or $combined.Contains('app.py'))) { $tier=1 } >> "%CLASSIFY_PS1%"
+echo elseif ($isPython) { $tier=2 } >> "%CLASSIFY_PS1%"
 echo Write-Output ('TIER=' + $tier) ; >> "%CLASSIFY_PS1%"
 
 powershell.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "%CLASSIFY_PS1%" > "%CLASSIFY_FILE%" 2>nul
+set "VBSP_CLASSIFY_PY_EXE="
+set "VBSP_CLASSIFY_ROOT="
 
 del "%CLASSIFY_PS1%" >nul 2>&1
 
@@ -589,10 +600,12 @@ exit /b 3
 del "%CLASSIFY_FILE%" >nul 2>&1
 del "%CLASSIFY_PS1%" >nul 2>&1
 set "FALLBACK_FILE=%TMP_DIR%\vbsp_fb_%CLASSIFY_PID%.txt"
+del "%FALLBACK_FILE%" >nul 2>&1
 where wmic.exe >nul 2>&1
 if not errorlevel 1 wmic.exe process where "ProcessId=%CLASSIFY_PID%" get Name /format:list > "%FALLBACK_FILE%" 2>nul
 set "FB_IS_PY=0"
-findstr /I /L /C:"python.exe" "%FALLBACK_FILE%" >nul 2>&1
+rem WMIC may redirect UTF-16 output; MORE normalizes it so FINDSTR can match.
+type "%FALLBACK_FILE%" 2>nul | more | findstr /I /L /C:"Name=python.exe" >nul 2>&1
 if not errorlevel 1 set "FB_IS_PY=1"
 del "%FALLBACK_FILE%" >nul 2>&1
 if "%FB_IS_PY%"=="1" exit /b 2
@@ -633,6 +646,7 @@ if "%PK_RC%"=="1" exit /b 0
 exit /b 1
 
 :prompt_user_kill_fallback
+set "PK_ANSWER="
 set /P "PK_ANSWER=   Dong tien trinh PID %PK_PID%? [Y/N, mac dinh %PK_DEFAULT% sau %PK_TIMEOUT%s]: "
 if "%PK_ANSWER%"=="" set "PK_ANSWER=%PK_DEFAULT%"
 del "%PK_PROMPT_FILE%" >nul 2>&1
@@ -655,6 +669,8 @@ set "PAP_RC=%errorlevel%"
 goto :dispatch_alt_port_choice
 
 :prompt_alt_port_fallback
+set "PAP_ANSWER="
+set "PAP_RC=1"
 set /P "PAP_ANSWER=   Nhap 1, 2 hoac 3 (mac dinh 1): "
 if "%PAP_ANSWER%"=="" set "PAP_ANSWER=1"
 if "%PAP_ANSWER%"=="1" set "PAP_RC=1"
@@ -687,6 +703,7 @@ if "%PAP_RC%"=="2" (
     goto :switch_to_alt_port
 )
 :switch_to_alt_port
+set "FORCE_KILL=false"
 set "PORT=%ALT_PORT%"
 set "URL=http://localhost:%ALT_PORT%"
 echo [%date% %time%] Switched to alternate port %PORT% >> "%LAUNCH_LOG%"
@@ -802,6 +819,7 @@ if errorlevel 1 (
     exit /b 1
 )
 echo LAUNCHER SELF-TEST OK
+echo LAUNCHER SELF-TEST CONFIG: PORT=%PORT% HEADLESS=%HEADLESS% FORCE_KILL=%FORCE_KILL% ALT_PORT=%ALT_PORT%
 exit /b 0
 
 :cleanup

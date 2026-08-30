@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [2026-08-30] — Siết an toàn launcher 4-tier và kiểm chứng parser/prompt
+- `Chay_VBSP_SCM.bat` — Tier 0 nay bắt buộc executable đúng tuyệt đối `%PY_EXE%` và command line có cả `streamlit` lẫn `app.py`; Tier 1 bắt buộc là Python, tránh silent/default-Y kill tiến trình không phải Python chỉ vì command line chứa từ khóa.
+- `Chay_VBSP_SCM.bat` — sửa fallback WMIC UTF-16 qua `more`, xóa câu trả lời `set /P` cũ, đặt default sạch cho menu alternate port, reset `FORCE_KILL=false` khi chuyển port và dùng 8504 làm alternate khi `--port 8503`.
+- `Chay_VBSP_SCM.bat` — parser tiếp tục consume toàn bộ flags kể cả `--self-test`; self-test in cấu hình thực tế để xác nhận `--no-browser --force-kill --port 8503` được đọc đúng.
+- `tests/test_launcher_batch.py` — siết assertion đúng section classifier, chạy thật lớp echo CMD→PowerShell, mô phỏng WMIC UTF-16/CRCRLF, kiểm tra prompt state và parse nhiều flags; sửa assertion `--no-browser` đã stale.
+- `BUGMAP.md` — thêm mục `J83` về Tier 0/Tier 1 quá rộng, WMIC Unicode và state prompt/force-kill bị rò.
+
 ## [2026-08-30] — Nâng cấp toàn diện launcher: xử lý port conflict 4 cấp độ (tier)
 - `Chay_VBSP_SCM.bat` — Parse flags thành loop hỗ trợ nhiều flag cùng lúc. Thêm `--force-kill` (tự đóng Python trên port cho chạy unattended/scheduler) và `--port N` (chỉ định port tùy chỉnh). Thêm `ALT_PORT=8503` fallback.
 - `Chay_VBSP_SCM.bat` — `:is_vbsp_process` refactor thành **4-tier classification**: Tier 0 = marker exact match hoặc full venv+streamlit+app.py → kill silently; Tier 1 = Python có hint VBSP (venv/streamlit/app.py substring) → hỏi default Y; Tier 2 = bất kỳ python.exe nào → hỏi default Y; Tier 3 = non-Python → cảnh báo đỏ hỏi default N.

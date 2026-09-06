@@ -1,0 +1,173 @@
+{
+  "Hội sở Chi nhánh tỉnh": {
+    "Biên Hòa": {
+      "Biên Hòa": {
+        "thon": [
+          "Khu phố Hóa An"
+        ]
+      },
+      "Bửu Hòa": {
+        "thon": [
+          "Khu Phố Bửu Hòa 2",
+          "Khu Phố Bửu Hòa 3",
+          "Khu phố Bửu Hòa 1"
+        ]
+      },
+      "Tân Hạnh": {
+        "thon": [
+          "Khu phố Tân Hạnh 1"
+        ]
+      },
+      "Tân Vạn": {
+        "thon": [
+          "Khu phố Tân Vạn"
+        ]
+      }
+    },
+    "Hố Nai": {
+      "Hố Nai": {
+        "thon": [
+          "Khu phố 1",
+          "Khu phố 3",
+          "Khu phố 4",
+          "Khu phố 9"
+        ]
+      },
+      "Hố Nai 3": {
+        "thon": [
+          "Khu phố 5",
+          "Khu phố 6",
+          "khu phố Lộ Đức",
+          "khu phố Ngũ Phúc",
+          "khu phố Đông Hải"
+        ]
+      }
+    },
+    "Long Bình": {
+      "Hố Nai 2": {
+        "thon": [
+          "Khu phố 1",
+          "Khu phố 2",
+          "Khu phố 3"
+        ]
+      },
+      "Long Bình": {
+        "thon": [
+          "Khu phố 10",
+          "Khu phố 11",
+          "Khu phố 12",
+          "Khu phố 14",
+          "Khu phố 7",
+          "Khu phố 8",
+          "Khu phố 9"
+        ]
+      },
+      "Tân Biên": {
+        "thon": [
+          "Khu phố 5",
+          "Khu phố 6"
+        ]
+      }
+    },
+    "Long Hưng": {
+      "Long Bình Tân": {
+        "thon": [
+          "Khu phố 2",
+          "Khu phố 3"
+        ]
+      }
+    },
+    "Phước Tân": {
+      "Phước Tân": {
+        "thon": [
+          "Khu phố Hương Phước",
+          "Khu phố Tân Cang",
+          "Khu phố Đồng",
+          "Tân Mai",
+          "Tân Mai 2"
+        ]
+      }
+    },
+    "Tam Hiệp": {
+      "Tân Hiệp 3": {
+        "thon": [
+          "Khu phố 6",
+          "Khu phố 7",
+          "Khu phố 8"
+        ]
+      },
+      "Tân Mai": {
+        "thon": [
+          "Khu phố 10",
+          "Khu phố 11",
+          "Khu phố 12",
+          "Khu phố 9"
+        ]
+      }
+    },
+    "Tam Phước": {
+      "Tam Phước": {
+        "thon": [
+          "Khu phố Long Khánh",
+          "Khu phố Long Đức",
+          "Khu phố Thiên Bình",
+          "Long Đức 1"
+        ]
+      }
+    },
+    "Trảng Dài": {
+      "Thiện Tân": {
+        "thon": [
+          "Khu phố Thiện Tân"
+        ]
+      },
+      "Trảng Dài": {
+        "thon": [
+          "Khu phố 1",
+          "Khu phố 3",
+          "Khu phố 4"
+        ]
+      }
+    },
+    "Trấn Biên": {
+      "An Bình": {
+        "thon": [
+          "Khu phố An Hảo",
+          "Khu phố Bình Đa"
+        ]
+      },
+      "Bửu Long": {
+        "thon": [
+          "Khu phố Bình Thành",
+          "Khu phố Bửu Long",
+          "Khu phố Tân Thành"
+        ]
+      },
+      "Hiệp Hòa": {
+        "thon": [
+          "khu phố Hiệp Hòa"
+        ]
+      },
+      "Thống Nhất 2": {
+        "thon": [
+          "Khu phố Bình Trước",
+          "Khu phố Thống Nhất",
+          "Khu phố Vinh Thạnh"
+        ]
+      },
+      "Trung Dũng": {
+        "thon": [
+          "Khu phố Quyết Thắng",
+          "Khu phố Trung Dũng"
+        ]
+      },
+      "Trấn Biên": {
+        "thon": [
+          "Khu Phố Hoà Bình",
+          "Khu phố Bình Thiền",
+          "Khu phố Quang Vinh"
+        ]
+      }
+    }
+  }
+}

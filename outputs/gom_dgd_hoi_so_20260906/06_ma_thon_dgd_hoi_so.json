@@ -1,0 +1,628 @@
+{
+  "Biên Hòa": {
+    "Tân Hạnh": {
+      "ngay_gdxa": 6,
+      "ma_thon": [
+        "46000410",
+        "46000412",
+        "46000413"
+      ],
+      "thon": [
+        "Khu phố  Tân Hạnh 1"
+      ],
+      "hstd_so_to": 8,
+      "hstd_kh_vay": 343,
+      "hstd_du_no_trieu": 17317.34,
+      "pdf_so_to": 8,
+      "pdf_kh_vay": 343,
+      "pdf_du_no_trieu": 17317.34,
+      "lech_du_no_trieu": 0.0,
+      "cach_xac_dinh": "khớp 1-1 theo ngày GDXA"
+    },
+    "Tân Vạn": {
+      "ngay_gdxa": 9,
+      "ma_thon": [
+        "46000414",
+        "46000415",
+        "46000416",
+        "46000417"
+      ],
+      "thon": [
+        "Khu phố Tân Vạn"
+      ],
+      "hstd_so_to": 4,
+      "hstd_kh_vay": 184,
+      "hstd_du_no_trieu": 9257.35,
+      "pdf_so_to": 4,
+      "pdf_kh_vay": 185,
+      "pdf_du_no_trieu": 9307.35,
+      "lech_du_no_trieu": -50.0,
+      "cach_xac_dinh": "khớp 1-1 theo ngày GDXA"
+    },
+    "Biên Hòa": {
+      "ngay_gdxa": 12,
+      "ma_thon": [
+        "46000406",
+        "46000407",
+        "46000409"
+      ],
+      "thon": [
+        "Khu phố Hóa An"
+      ],
+      "hstd_so_to": 5,
+      "hstd_kh_vay": 228,
+      "hstd_du_no_trieu": 17403.86,
+      "pdf_so_to": 5,
+      "pdf_kh_vay": 229,
+      "pdf_du_no_trieu": 17422.4,
+      "lech_du_no_trieu": -18.54,
+      "cach_xac_dinh": "khớp 1-1 theo ngày GDXA"
+    },
+    "Bửu Hòa": {
+      "ngay_gdxa": 17,
+      "ma_thon": [
+        "46000401",
+        "46000402",
+        "46000403",
+        "46000404",
+        "46000405"
+      ],
+      "thon": [
+        "Khu Phố Bửu Hòa 2",
+        "Khu Phố Bửu Hòa 3",
+        "Khu phố Bửu Hòa 1"
+      ],
+      "hstd_so_to": 7,
+      "hstd_kh_vay": 319,
+      "hstd_du_no_trieu": 17635.04,
+      "pdf_so_to": 7,
+      "pdf_kh_vay": 319,
+      "pdf_du_no_trieu": 17635.04,
+      "lech_du_no_trieu": 0.0,
+      "cach_xac_dinh": "khớp 1-1 theo ngày GDXA"
+    }
+  },
+  "Hố Nai": {
+    "Hố Nai 3": {
+      "ngay_gdxa": 15,
+      "ma_thon": [
+        "46002413",
+        "46002414",
+        "46002415",
+        "46002416",
+        "46002417"
+      ],
+      "thon": [
+        "Khu phố 5",
+        "Khu phố 6",
+        "khu phố Lộ Đức",
+        "khu phố Ngũ Phúc",
+        "khu phố Đông Hải"
+      ],
+      "hstd_so_to": 14,
+      "hstd_kh_vay": 585,
+      "hstd_du_no_trieu": 29423.56,
+      "pdf_so_to": 14,
+      "pdf_kh_vay": 586,
+      "pdf_du_no_trieu": 29437.89,
+      "lech_du_no_trieu": -14.33,
+      "cach_xac_dinh": "khớp 1-1 theo ngày GDXA"
+    },
+    "Hố Nai": {
+      "ngay_gdxa": 21,
+      "ma_thon": [
+        "46002401",
+        "46002404",
+        "46002409",
+        "46002410",
+        "46002411",
+        "46002412"
+      ],
+      "thon": [
+        "Khu phố 1",
+        "Khu phố 3",
+        "Khu phố 4",
+        "Khu phố 9"
+      ],
+      "hstd_so_to": 9,
+      "hstd_kh_vay": 347,
+      "hstd_du_no_trieu": 23299.18,
+      "pdf_so_to": 9,
+      "pdf_kh_vay": 347,
+      "pdf_du_no_trieu": 23299.18,
+      "lech_du_no_trieu": 0.0,
+      "cach_xac_dinh": "khớp 1-1 theo ngày GDXA"
+    }
+  },
+  "Long Bình": {
+    "Hố Nai 2": {
+      "ngay_gdxa": 19,
+      "ma_thon": [
+        "46002601",
+        "46002603",
+        "46002605",
+        "46002606",
+        "46002607",
+        "46002608",
+        "46002610",
+        "46002612",
+        "46002613"
+      ],
+      "thon": [
+        "Khu phố 1",
+        "Khu phố 2",
+        "Khu phố 3"
+      ],
+      "hstd_so_to": 9,
+      "hstd_kh_vay": 458,
+      "hstd_du_no_trieu": 29572.37,
+      "pdf_so_to": 9,
+      "pdf_kh_vay": 459,
+      "pdf_du_no_trieu": 29610.37,
+      "lech_du_no_trieu": -38.0,
+      "cach_xac_dinh": "khớp 1-1 theo ngày GDXA"
+    },
+    "Tân Biên": {
+      "ngay_gdxa": 21,
+      "ma_thon": [
+        "46002615",
+        "46002617",
+        "46002619",
+        "46002620",
+        "46002622",
+        "46002623",
+        "46002624",
+        "46002626",
+        "46002627"
+      ],
+      "thon": [
+        "Khu phố 5",
+        "Khu phố 6"
+      ],
+      "hstd_so_to": 11,
+      "hstd_kh_vay": 526,
+      "hstd_du_no_trieu": 35090.82,
+      "pdf_so_to": 11,
+      "pdf_kh_vay": 526,
+      "pdf_du_no_trieu": 35090.82,
+      "lech_du_no_trieu": 0.0,
+      "cach_xac_dinh": "khớp 1-1 theo ngày GDXA"
+    },
+    "Long Bình": {
+      "ngay_gdxa": 22,
+      "ma_thon": [
+        "46002628",
+        "46002629",
+        "46002631",
+        "46002632",
+        "46002633",
+        "46002634",
+        "46002635",
+        "46002636",
+        "46002637",
+        "46002639"
+      ],
+      "thon": [
+        "Khu phố 10",
+        "Khu phố 11",
+        "Khu phố 12",
+        "Khu phố 14",
+        "Khu phố 7",
+        "Khu phố 8",
+        "Khu phố 9"
+      ],
+      "hstd_so_to": 13,
+      "hstd_kh_vay": 588,
+      "hstd_du_no_trieu": 42492.6,
+      "pdf_so_to": 13,
+      "pdf_kh_vay": 588,
+      "pdf_du_no_trieu": 42492.6,
+      "lech_du_no_trieu": 0.0,
+      "cach_xac_dinh": "khớp 1-1 theo ngày GDXA"
+    }
+  },
+  "Long Hưng": {
+    "Long Bình Tân": {
+      "ngay_gdxa": 11,
+      "ma_thon": [
+        "46002801",
+        "46002802",
+        "46002804",
+        "46002805",
+        "46002806",
+        "46002807"
+      ],
+      "thon": [
+        "Khu phố 2",
+        "Khu phố 3"
+      ],
+      "hstd_so_to": 7,
+      "hstd_kh_vay": 313,
+      "hstd_du_no_trieu": 22456.39,
+      "pdf_so_to": 7,
+      "pdf_kh_vay": 313,
+      "pdf_du_no_trieu": 22456.39,
+      "lech_du_no_trieu": 0.0,
+      "cach_xac_dinh": "khớp 1-1 theo ngày GDXA"
+    },
+    "Long Hưng": {
+      "ngay_gdxa": 18,
+      "ma_thon": [
+        "46002812",
+        "46002813"
+      ],
+      "thon": [
+        "Khu phố 5"
+      ],
+      "hstd_so_to": 2,
+      "hstd_kh_vay": 104,
+      "hstd_du_no_trieu": 3410.2,
+      "pdf_so_to": 2,
+      "pdf_kh_vay": 104,
+      "pdf_du_no_trieu": 3410.2,
+      "lech_du_no_trieu": 0.0,
+      "cach_xac_dinh": "tách tập con mã thôn khớp chỉ tiêu PDF"
+    },
+    "An Hòa": {
+      "ngay_gdxa": 18,
+      "ma_thon": [
+        "46002808",
+        "46002809",
+        "46002810",
+        "46002811"
+      ],
+      "thon": [
+        "Khu phố 1"
+      ],
+      "hstd_so_to": 8,
+      "hstd_kh_vay": 366,
+      "hstd_du_no_trieu": 21784.82,
+      "pdf_so_to": 8,
+      "pdf_kh_vay": 367,
+      "pdf_du_no_trieu": 21799.82,
+      "lech_du_no_trieu": -15.0,
+      "cach_xac_dinh": "tách tập con mã thôn khớp chỉ tiêu PDF"
+    }
+  },
+  "Phước Tân": {
+    "Phước Tân": {
+      "ngay_gdxa": 16,
+      "ma_thon": [
+        "46005601",
+        "46005602",
+        "46005603",
+        "46005604",
+        "46005605",
+        "46005606",
+        "46005607",
+        "46005609"
+      ],
+      "thon": [
+        "Khu phố Hương Phước",
+        "Khu phố Tân Cang",
+        "Khu phố Đồng",
+        "Tân Mai",
+        "Tân Mai 2"
+      ],
+      "hstd_so_to": 23,
+      "hstd_kh_vay": 1083,
+      "hstd_du_no_trieu": 67941.51,
+      "pdf_so_to": 23,
+      "pdf_kh_vay": 1086,
+      "pdf_du_no_trieu": 67972.51,
+      "lech_du_no_trieu": -31.0,
+      "cach_xac_dinh": "khớp 1-1 theo ngày GDXA"
+    }
+  },
+  "Tam Hiệp": {
+    "Tân Hiệp 3": {
+      "ngay_gdxa": 10,
+      "ma_thon": [
+        "46005830",
+        "46005831",
+        "46005832",
+        "46005833",
+        "46005834"
+      ],
+      "thon": [
+        "Khu phố 6",
+        "Khu phố 7",
+        "Khu phố 8"
+      ],
+      "hstd_so_to": 9,
+      "hstd_kh_vay": 396,
+      "hstd_du_no_trieu": 30133.06,
+      "pdf_so_to": 9,
+      "pdf_kh_vay": 396,
+      "pdf_du_no_trieu": 30133.06,
+      "lech_du_no_trieu": 0.0,
+      "cach_xac_dinh": "khớp 1-1 theo ngày GDXA"
+    },
+    "Tân Mai": {
+      "ngay_gdxa": 13,
+      "ma_thon": [
+        "46005812",
+        "46005817",
+        "46005818",
+        "46005820",
+        "46005823",
+        "46005824",
+        "46005825",
+        "46005826",
+        "46005827",
+        "46005828"
+      ],
+      "thon": [
+        "Khu phố 10",
+        "Khu phố 11",
+        "Khu phố 12",
+        "Khu phố 9"
+      ],
+      "hstd_so_to": 8,
+      "hstd_kh_vay": 306,
+      "hstd_du_no_trieu": 27975.11,
+      "pdf_so_to": 8,
+      "pdf_kh_vay": 306,
+      "pdf_du_no_trieu": 27875.11,
+      "lech_du_no_trieu": 100.0,
+      "cach_xac_dinh": "khớp 1-1 theo ngày GDXA"
+    },
+    "Tam Hiệp": {
+      "ngay_gdxa": 22,
+      "ma_thon": [
+        "46005809",
+        "46005810",
+        "46005812",
+        "46005813",
+        "46005815"
+      ],
+      "thon": [
+        "Khu phố 12"
+      ],
+      "hstd_so_to": 6,
+      "hstd_kh_vay": 251,
+      "hstd_du_no_trieu": 17340.69,
+      "pdf_so_to": 6,
+      "pdf_kh_vay": 252,
+      "pdf_du_no_trieu": 17355.69,
+      "lech_du_no_trieu": -15.0,
+      "cach_xac_dinh": "tách tập con mã thôn khớp chỉ tiêu PDF"
+    },
+    "Bình Đa": {
+      "ngay_gdxa": 22,
+      "ma_thon": [
+        "46005802",
+        "46005804",
+        "46005805",
+        "46005806",
+        "46005807"
+      ],
+      "thon": [
+        "Khu phố 5"
+      ],
+      "hstd_so_to": 8,
+      "hstd_kh_vay": 424,
+      "hstd_du_no_trieu": 30034.74,
+      "pdf_so_to": 8,
+      "pdf_kh_vay": 427,
+      "pdf_du_no_trieu": 30087.74,
+      "lech_du_no_trieu": -53.0,
+      "cach_xac_dinh": "tách tập con mã thôn khớp chỉ tiêu PDF"
+    }
+  },
+  "Trảng Dài": {
+    "Thiện Tân": {
+      "ngay_gdxa": 10,
+      "ma_thon": [
+        "46006601",
+        "46006602",
+        "46006603"
+      ],
+      "thon": [
+        "Khu phố Thiện Tân"
+      ],
+      "hstd_so_to": 8,
+      "hstd_kh_vay": 383,
+      "hstd_du_no_trieu": 23010.36,
+      "pdf_so_to": 8,
+      "pdf_kh_vay": 383,
+      "pdf_du_no_trieu": 23010.36,
+      "lech_du_no_trieu": 0.0,
+      "cach_xac_dinh": "khớp 1-1 theo ngày GDXA"
+    },
+    "Trảng Dài": {
+      "ngay_gdxa": 19,
+      "ma_thon": [
+        "46006604",
+        "46006605",
+        "46006606",
+        "46006607",
+        "46006608",
+        "46006613",
+        "46006614"
+      ],
+      "thon": [
+        "Khu phố 1",
+        "Khu phố 3",
+        "Khu phố 4"
+      ],
+      "hstd_so_to": 8,
+      "hstd_kh_vay": 431,
+      "hstd_du_no_trieu": 41696.37,
+      "pdf_so_to": 8,
+      "pdf_kh_vay": 432,
+      "pdf_du_no_trieu": 41698.87,
+      "lech_du_no_trieu": -2.5,
+      "cach_xac_dinh": "khớp 1-1 theo ngày GDXA"
+    }
+  },
+  "Tam Phước": {
+    "Tam Phước": {
+      "ngay_gdxa": 15,
+      "ma_thon": [
+        "46005901",
+        "46005902",
+        "46005903",
+        "46005904",
+        "46005905",
+        "46005906",
+        "46005907"
+      ],
+      "thon": [
+        "Khu phố Long Khánh",
+        "Khu phố Long Đức",
+        "Khu phố Thiên Bình",
+        "Long Đức 1"
+      ],
+      "hstd_so_to": 17,
+      "hstd_kh_vay": 732,
+      "hstd_du_no_trieu": 45587.4,
+      "pdf_so_to": 17,
+      "pdf_kh_vay": 732,
+      "pdf_du_no_trieu": 45587.4,
+      "lech_du_no_trieu": 0.0,
+      "cach_xac_dinh": "khớp 1-1 theo ngày GDXA"
+    }
+  },
+  "Trấn Biên": {
+    "Trấn Biên": {
+      "ngay_gdxa": 6,
+      "ma_thon": [
+        "46006715",
+        "46006716",
+        "46006717",
+        "46006718",
+        "46006719",
+        "46006720",
+        "46006722",
+        "46006723",
+        "46006724"
+      ],
+      "thon": [
+        "Khu Phố Hoà Bình",
+        "Khu phố Bình Thiền",
+        "Khu phố Quang Vinh"
+      ],
+      "hstd_so_to": 11,
+      "hstd_kh_vay": 364,
+      "hstd_du_no_trieu": 28837.9,
+      "pdf_so_to": 11,
+      "pdf_kh_vay": 364,
+      "pdf_du_no_trieu": 28837.9,
+      "lech_du_no_trieu": 0.0,
+      "cach_xac_dinh": "khớp 1-1 theo ngày GDXA"
+    },
+    "Hiệp Hòa": {
+      "ngay_gdxa": 9,
+      "ma_thon": [
+        "46006712",
+        "46006713",
+        "46006714"
+      ],
+      "thon": [
+        "khu phố Hiệp Hòa"
+      ],
+      "hstd_so_to": 6,
+      "hstd_kh_vay": 211,
+      "hstd_du_no_trieu": 8841.78,
+      "pdf_so_to": 6,
+      "pdf_kh_vay": 211,
+      "pdf_du_no_trieu": 8841.78,
+      "lech_du_no_trieu": 0.0,
+      "cach_xac_dinh": "khớp 1-1 theo ngày GDXA"
+    },
+    "An Bình": {
+      "ngay_gdxa": 11,
+      "ma_thon": [
+        "46006701",
+        "46006702",
+        "46006707",
+        "46006709"
+      ],
+      "thon": [
+        "Khu phố An Hảo",
+        "Khu phố Bình Đa"
+      ],
+      "hstd_so_to": 4,
+      "hstd_kh_vay": 192,
+      "hstd_du_no_trieu": 14098.7,
+      "pdf_so_to": 4,
+      "pdf_kh_vay": 192,
+      "pdf_du_no_trieu": 14098.7,
+      "lech_du_no_trieu": 0.0,
+      "cach_xac_dinh": "khớp 1-1 theo ngày GDXA"
+    },
+    "Bửu Long": {
+      "ngay_gdxa": 12,
+      "ma_thon": [
+        "46006725",
+        "46006726",
+        "46006727",
+        "46006728",
+        "46006729"
+      ],
+      "thon": [
+        "Khu phố Bình Thành",
+        "Khu phố Bửu Long",
+        "Khu phố Tân Thành"
+      ],
+      "hstd_so_to": 9,
+      "hstd_kh_vay": 345,
+      "hstd_du_no_trieu": 21002.85,
+      "pdf_so_to": 9,
+      "pdf_kh_vay": 345,
+      "pdf_du_no_trieu": 21002.85,
+      "lech_du_no_trieu": 0.0,
+      "cach_xac_dinh": "khớp 1-1 theo ngày GDXA"
+    },
+    "Thống Nhất 2": {
+      "ngay_gdxa": 13,
+      "ma_thon": [
+        "46006730",
+        "46006732",
+        "46006734",
+        "46006736"
+      ],
+      "thon": [
+        "Khu phố Bình Trước",
+        "Khu phố Thống Nhất",
+        "Khu phố Vinh Thạnh"
+      ],
+      "hstd_so_to": 4,
+      "hstd_kh_vay": 140,
+      "hstd_du_no_trieu": 11292.93,
+      "pdf_so_to": 4,
+      "pdf_kh_vay": 140,
+      "pdf_du_no_trieu": 11292.93,
+      "lech_du_no_trieu": 0.0,
+      "cach_xac_dinh": "khớp 1-1 theo ngày GDXA"
+    },
+    "Trung Dũng": {
+      "ngay_gdxa": 17,
+      "ma_thon": [
+        "46006737",
+        "46006739",
+        "46006740",
+        "46006741",
+        "46006743",
+        "46006745",
+        "46006746",
+        "46006747",
+        "46006748",
+        "46006749"
+      ],
+      "thon": [
+        "Khu phố Quyết Thắng",
+        "Khu phố Trung Dũng"
+      ],
+      "hstd_so_to": 16,
+      "hstd_kh_vay": 577,
+      "hstd_du_no_trieu": 44343.27,
+      "pdf_so_to": 16,
+      "pdf_kh_vay": 577,
+      "pdf_du_no_trieu": 44343.27,
+      "lech_du_no_trieu": 0.0,
+      "cach_xac_dinh": "khớp 1-1 theo ngày GDXA"
+    }
+  }
+}

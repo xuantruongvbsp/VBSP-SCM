@@ -1,0 +1,17 @@
+{
+  "source": "pgd_data\\hoi_so_chi_nhanh_tinh\\hstd_khnv.parquet",
+  "rows": 15375,
+  "ngay_so_lieu": [
+    "31/07/2026"
+  ],
+  "dgd_danh_muc_hoi_so": 26,
+  "dgd_map_chac": 22,
+  "thon_map_chac": 63,
+  "du_no_map_chac": 392638296742,
+  "du_no_toan_file": 820336787532,
+  "du_no_ngoai_le": 427698490790,
+  "exception_groups": 274,
+  "missing_dgd_chac": 4,
+  "so_dong_fill_ten_thon_tu_ma": 1,
+  "du_no_fill_ten_thon_tu_ma": 0
+}

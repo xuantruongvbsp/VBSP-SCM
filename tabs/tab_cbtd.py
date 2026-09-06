@@ -465,6 +465,11 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                     return [str(a).strip() for a in thon_list if str(a).strip()]
             return []
 
+        def _label_dgd_day_du(pgd: str, xa: str, dgd_name: str) -> str:
+            so_ap = len(_ap_cua_dgd(pgd, dgd_name))
+            suffix = f"{so_ap} thôn/ấp" if so_ap else "chưa gom thôn"
+            return f"{_label_dgd(xa, dgd_name)} · {suffix}"
+
         def _so_ap_cbtd(info: dict) -> int:
             pgd = info.get("pgd", "")
             ds_dgd = info.get("ds_dgd", [])
@@ -1145,14 +1150,17 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                                 st.warning(f"PGD **{pgd_new}** chưa cấu hình ĐGD.")
                                 dgd_sel_new = []
                             else:
-                                labels_new = [_label_dgd(xa, d) for xa, d in dgd_opts_new]
+                                labels_new = [_label_dgd_day_du(pgd_new, xa, d) for xa, d in dgd_opts_new]
+                                label_to_dgd_new = {
+                                    _label_dgd_day_du(pgd_new, xa, d): d
+                                    for xa, d in dgd_opts_new
+                                }
                                 sel_labels = st.multiselect(
                                     "ĐGD phụ trách * (chọn nhiều cùng lúc)",
                                     labels_new,
                                     help="1 CBTD phụ trách 2–4 ĐGD trong cùng PGD — chọn hết rồi mới LƯU 1 lần",
                                     key=f"{add_kp}cbtd_dgd_new")
-                                dgd_sel_new = [d for xa, d in dgd_opts_new
-                                               if _label_dgd(xa, d) in sel_labels]
+                                dgd_sel_new = [label_to_dgd_new[lbl] for lbl in sel_labels if lbl in label_to_dgd_new]
 
                                 if dgd_sel_new:
                                     trung = _kiem_tra_trung_dgd(pgd_new, dgd_sel_new)
@@ -1265,9 +1273,13 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                                     st.warning(f"PGD **{pgd_sua}** chưa cấu hình ĐGD.")
                                     dgd_sel_sua = []
                                 else:
-                                    labels_sua = [_label_dgd(xa, d) for xa, d in dgd_opts_sua]
+                                    labels_sua = [_label_dgd_day_du(pgd_sua, xa, d) for xa, d in dgd_opts_sua]
+                                    label_to_dgd_sua = {
+                                        _label_dgd_day_du(pgd_sua, xa, d): d
+                                        for xa, d in dgd_opts_sua
+                                    }
                                     ds_dgd_cu  = info_cu.get("ds_dgd", []) if pgd_sua == info_cu.get("pgd") else []
-                                    default_labels = [_label_dgd(xa, d) for xa, d in dgd_opts_sua
+                                    default_labels = [_label_dgd_day_du(pgd_sua, xa, d) for xa, d in dgd_opts_sua
                                                       if d in ds_dgd_cu]
                                     sel_labels_sua = st.multiselect(
                                         "ĐGD phụ trách * (chọn nhiều rồi Lưu 1 lần)",
@@ -1275,8 +1287,7 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                                         default=default_labels,
                                         help="Chọn nhiều ĐGD cùng lúc → 1 nút Lưu cuối cùng",
                                         key=f"{_kp_g2}cbtd_dgd_sua")
-                                    dgd_sel_sua = [d for xa, d in dgd_opts_sua
-                                                   if _label_dgd(xa, d) in sel_labels_sua]
+                                    dgd_sel_sua = [label_to_dgd_sua[lbl] for lbl in sel_labels_sua if lbl in label_to_dgd_sua]
 
                                     if dgd_sel_sua:
                                         trung_sua = _kiem_tra_trung_dgd(pgd_sua, dgd_sel_sua, bo_qua_ma=chon_sua)

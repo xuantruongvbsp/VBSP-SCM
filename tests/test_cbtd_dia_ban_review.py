@@ -18,6 +18,7 @@ from data.khtd import gan_cbtd_vao_df
 from services.cbtd_dia_ban_service import _normalize, tong_hop_hstd_theo_cbtd
 from tabs.tab_quan_ly_dgd import (
     _build_prospective_xa_dgd,
+    _gop_dgd_thon_tu_excel_df,
     _validate_trung_thon_toan_xa,
 )
 
@@ -71,6 +72,29 @@ def test_build_prospective_xa_dgd_cho_phep_move_thon_khong_trung_gia():
     assert prospective["ĐGD A"] == ["Thôn 2"]
     assert prospective["ĐGD B"] == ["Thôn 1", "Thôn 3"]
     assert _validate_trung_thon_toan_xa(prospective) == []
+
+
+def test_gop_dgd_thon_tu_excel_filldown_va_tach_nhieu_thon():
+    df_imp = pd.DataFrame(
+        {
+            "PGD": ["PGD A", "", "", "PGD A"],
+            "Xã": ["Xã A", "", "", "Xã A"],
+            "Tên ĐGD": ["ĐGD 1", "", "", "ĐGD 2"],
+            "Thôn/ấp": ["Thôn 1, Thôn 2", "Thôn 2", "Thôn 3\nThôn 4", "Ấp 5"],
+        }
+    )
+
+    grouped, stats = _gop_dgd_thon_tu_excel_df(df_imp)
+
+    assert stats["rows"] == 4
+    assert stats["used_rows"] == 5
+    assert grouped["PGD A"]["Xã A"]["ĐGD 1"] == [
+        "Thôn 1",
+        "Thôn 2",
+        "Thôn 3",
+        "Thôn 4",
+    ]
+    assert grouped["PGD A"]["Xã A"]["ĐGD 2"] == ["Ấp 5"]
 
 
 def test_tong_hop_hstd_theo_cbtd_cong_so_lieu_tung_can_bo():

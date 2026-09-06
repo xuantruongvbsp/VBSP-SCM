@@ -9,6 +9,7 @@ logger = get_logger(__name__)
 import copy
 import re
 import socket
+import unicodedata
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
@@ -26,6 +27,7 @@ import db
 from auth import la_phan_he_cn, normalize_role
 from data.dgd_helpers import (
     dgd_dang_dung_trong_hstd,
+    khop_xa_dgd,
     pool_thon_cho_xa,
     trang_thai_pgd_vs_map,
 )
@@ -91,6 +93,229 @@ def _norm_text(value: Any) -> str:
     except Exception:
         return ""
     return "" if text in {"nan", "none", "<na>"} else text
+
+
+def _fold_import_text(value: Any) -> str:
+    """Chuẩn hóa mạnh để nhận diện header/tên từ Excel import."""
+    text = _norm_text(value)
+    if not text:
+        return ""
+    text = text.replace("đ", "d")
+    text = unicodedata.normalize("NFD", text)
+    text = "".join(ch for ch in text if unicodedata.category(ch) != "Mn")
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def _split_import_thon(value: Any) -> list[str]:
+    """Cho phép 1 ô chứa nhiều thôn, ngăn bằng xuống dòng/phẩy/chấm phẩy."""
+    text = "" if value is None else str(value).strip()
+    if not text or _norm_text(text) in {"nan", "none", "<na>"}:
+        return []
+    parts = re.split(r"[\n;,]+", text)
+    out: list[str] = []
+    seen: set[str] = set()
+    for part in parts:
+        item = re.sub(r"\s+", " ", part).strip()
+        key = _fold_import_text(item)
+        if item and key and key not in seen:
+            seen.add(key)
+            out.append(item)
+    return out
+
+
+def _pick_import_column(df: pd.DataFrame, kind: str) -> str | None:
+    """Tìm cột import theo tên phổ biến, tránh bắt nhầm 'Tên xã' thành 'Tên ĐGD'."""
+    if df is None or df.empty:
+        return None
+    for col in df.columns:
+        h = _fold_import_text(col)
+        if kind == "pgd" and (
+            "pgd" in h
+            or "phong gd" in h
+            or ("phong giao dich" in h and "diem" not in h)
+            or h in {"don vi", "ten don vi"}
+        ):
+            return col
+        if kind == "xa" and ("xa" in h or "phuong" in h or "thi tran" in h):
+            return col
+        if kind == "dgd" and (
+            "dgd" in h
+            or "diem gd" in h
+            or "diem giao dich" in h
+            or h in {"ten diem", "ten dgd"}
+        ):
+            return col
+        if kind == "thon" and (
+            "thon" in h
+            or "khu pho" in h
+            or re.search(r"(^|[\s/_-])ap($|[\s/_-])", h)
+            or re.search(r"(^|[\s/_-])kp($|[\s/_-])", h)
+            or h in {"thon ap", "thon/ap", "ap/kp"}
+        ):
+            return col
+    return None
+
+
+def _canon_pgd_import(value: Any) -> str:
+    raw = "" if value is None else str(value).strip()
+    if not raw:
+        return ""
+    key = _fold_import_text(raw)
+    for pgd in [DON_VI_CHI_NHANH] + DS_PGD:
+        if _fold_import_text(pgd) == key:
+            return _resolve_pgd_key(pgd)
+    return _resolve_pgd_key(raw)
+
+
+def _canon_xa_import(pgd: str, value: Any) -> str:
+    raw = "" if value is None else str(value).strip()
+    if not raw:
+        return ""
+    ds_xa = PGD_XA_MAP.get(_resolve_pgd_key(pgd), [])
+    raw_key = _fold_import_text(raw)
+    for xa in ds_xa:
+        if _fold_import_text(xa) == raw_key or khop_xa_dgd(xa, raw):
+            return xa
+    return raw
+
+
+def _infer_dgd_scope(pgd: str, xa: str, ten_dgd: str) -> tuple[str, str, str]:
+    """Chuẩn hóa tên ĐGD và suy ra PGD/Xã khi file chỉ có tên ĐGD."""
+    dgd_key = _fold_import_text(ten_dgd)
+    if not dgd_key:
+        return pgd, xa, ""
+
+    matches = [d for d in DGD_DANH_SACH if _fold_import_text(d.get("ten", "")) == dgd_key]
+    pgd_key = _resolve_pgd_key(pgd) if pgd else ""
+    if pgd_key:
+        matches = [d for d in matches if d.get("pgd") == pgd_key]
+    if xa:
+        matches = [d for d in matches if khop_xa_dgd(xa, d.get("xa", "")) or khop_xa_dgd(_canon_xa_import(pgd_key, xa), d.get("xa", ""))]
+
+    if len(matches) != 1:
+        return pgd_key or pgd, xa, ten_dgd
+
+    found = matches[0]
+    found_pgd = found.get("pgd", "") or pgd_key or pgd
+    found_xa = xa
+    if not found_xa:
+        for xa_cfg in PGD_XA_MAP.get(found_pgd, []):
+            if khop_xa_dgd(xa_cfg, found.get("xa", "")):
+                found_xa = xa_cfg
+                break
+        found_xa = found_xa or str(found.get("xa", "")).strip()
+    return found_pgd, found_xa, str(found.get("ten", ten_dgd)).strip()
+
+
+def _gop_dgd_thon_tu_excel_df(
+    df_imp: pd.DataFrame,
+    fallback_pgd: str = "",
+    fallback_xa: str = "",
+    only_scope: bool = False,
+) -> tuple[dict[str, dict[str, dict[str, list[str]]]], dict[str, Any]]:
+    """
+    Gom bảng Excel thành dgd_map patch: PGD -> Xã -> Tên ĐGD -> [Thôn/ấp].
+
+    Hỗ trợ file có ô PGD/Xã/ĐGD bị merge bằng cách fill-down ba cột định danh.
+    Nếu thiếu PGD/Xã, có thể dùng fallback hoặc suy ra từ DGD_DANH_SACH khi tên ĐGD khớp duy nhất.
+    """
+    grouped: dict[str, dict[str, dict[str, list[str]]]] = {}
+    stats: dict[str, Any] = {
+        "rows": 0,
+        "used_rows": 0,
+        "skip_blank": 0,
+        "skip_scope": 0,
+        "columns": {},
+    }
+    if df_imp is None or df_imp.empty:
+        return grouped, stats
+
+    df = df_imp.copy().fillna("")
+    cols = {
+        "pgd": _pick_import_column(df, "pgd"),
+        "xa": _pick_import_column(df, "xa"),
+        "dgd": _pick_import_column(df, "dgd"),
+        "thon": _pick_import_column(df, "thon"),
+    }
+    stats["columns"] = cols
+    if not cols["dgd"] or not cols["thon"]:
+        stats["error"] = "Không tìm thấy cột Tên ĐGD hoặc Thôn/ấp."
+        return grouped, stats
+
+    for col in [cols["pgd"], cols["xa"], cols["dgd"]]:
+        if col:
+            df[col] = df[col].replace("", pd.NA).ffill().fillna("")
+
+    fallback_pgd_key = _canon_pgd_import(fallback_pgd)
+    fallback_xa_key = _canon_xa_import(fallback_pgd_key, fallback_xa)
+    seen_by_dgd: dict[tuple[str, str, str], set[str]] = {}
+
+    stats["rows"] = int(len(df))
+    for _, row in df.iterrows():
+        raw_pgd = row.get(cols["pgd"], "") if cols["pgd"] else fallback_pgd_key
+        raw_xa = row.get(cols["xa"], "") if cols["xa"] else fallback_xa_key
+        raw_dgd = row.get(cols["dgd"], "")
+        thon_items = _split_import_thon(row.get(cols["thon"], ""))
+
+        pgd = _canon_pgd_import(raw_pgd) or fallback_pgd_key
+        xa = _canon_xa_import(pgd, raw_xa) or fallback_xa_key
+        pgd, xa, dgd = _infer_dgd_scope(pgd, xa, raw_dgd)
+        if pgd:
+            xa = _canon_xa_import(pgd, xa)
+
+        if only_scope and (
+            (fallback_pgd_key and _resolve_pgd_key(pgd) != fallback_pgd_key)
+            or (fallback_xa_key and _fold_import_text(xa) != _fold_import_text(fallback_xa_key))
+        ):
+            stats["skip_scope"] += 1
+            continue
+
+        if not pgd or not xa or not dgd or not thon_items:
+            stats["skip_blank"] += 1
+            continue
+
+        key = (_resolve_pgd_key(pgd), xa, dgd)
+        seen = seen_by_dgd.setdefault(key, set())
+        target = grouped.setdefault(key[0], {}).setdefault(key[1], {}).setdefault(key[2], [])
+        for thon in thon_items:
+            th_key = _fold_import_text(thon)
+            if th_key and th_key not in seen:
+                seen.add(th_key)
+                target.append(thon)
+                stats["used_rows"] += 1
+
+    return grouped, stats
+
+
+def _rows_preview_import_grouped(grouped: dict[str, dict[str, dict[str, list[str]]]]) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for pgd, xa_block in grouped.items():
+        for xa, dgd_block in xa_block.items():
+            for dgd_name, th_list in dgd_block.items():
+                rows.append({
+                    "PGD": pgd,
+                    "Xã": xa,
+                    "Tên ĐGD": dgd_name,
+                    "Số thôn/ấp": len(th_list),
+                    "Thôn/Ấp": ", ".join(th_list),
+                })
+    return rows
+
+
+def _apply_import_grouped_to_map(
+    current_map: dict,
+    grouped: dict[str, dict[str, dict[str, list[str]]]],
+) -> dict:
+    """Áp dụng patch import vào dgd_map, gỡ trùng thôn trong cùng xã trước khi set ĐGD mới."""
+    out = copy.deepcopy(current_map or {})
+    for pgd, xa_block in grouped.items():
+        pgd_block = out.setdefault(_resolve_pgd_key(pgd), {})
+        for xa, dgd_block in xa_block.items():
+            cur_xa = pgd_block.setdefault(xa, {})
+            prospective = _build_prospective_xa_dgd(cur_xa, dgd_block)
+            for dgd_name, th_list in prospective.items():
+                cur_xa[dgd_name] = {"thon": list(th_list)}
+    return out
 
 
 def _validate_trung_thon_toan_xa(the_dict: dict[str, list[str]]) -> list[str]:
@@ -400,6 +625,89 @@ def _render_gan_thon(df_h: pd.DataFrame, username: str, hn: str) -> None:
             st.warning(f"⚠️ {pct_match:.1f}% thôn đã gán (chưa đầy đủ ≥95%).")
         else:
             st.success(f"✅ {pct_match:.1f}% thôn có dư nợ đã được gán (mức tốt).")
+
+    st.divider()
+
+    # --- Import Excel toàn bộ: gom Thôn/Ấp theo ĐGD trước khi gắn CBTD ---
+    with st.expander("📤 Import Excel địa bàn → tự gom thôn theo Điểm GD", expanded=False):
+        st.caption(
+            "File nên có các cột: **PGD | Xã | Tên ĐGD | Thôn/ấp**. "
+            "Nếu PGD/Xã/ĐGD là ô merge, hệ thống sẽ tự fill xuống; một ô thôn có thể chứa nhiều tên ngăn bằng dấu phẩy hoặc xuống dòng."
+        )
+        only_current_scope = st.checkbox(
+            "Chỉ lấy các dòng thuộc PGD/Xã đang chọn",
+            value=False,
+            key=f"dgd_import_all_scope_{ten_pgd}_{chon_xa}",
+        )
+        file_all = st.file_uploader(
+            "Chọn file Excel địa bàn (.xlsx)",
+            type=["xlsx"],
+            key=f"dgd_import_all_{ten_pgd}_{chon_xa}",
+            accept_multiple_files=False,
+        )
+        if file_all is not None:
+            try:
+                df_imp_all = pd.read_excel(file_all, dtype=str).fillna("")
+                grouped_all, stats_all = _gop_dgd_thon_tu_excel_df(
+                    df_imp_all,
+                    fallback_pgd=ten_pgd,
+                    fallback_xa=chon_xa,
+                    only_scope=only_current_scope,
+                )
+                st.caption(
+                    f"Đọc {stats_all.get('rows', 0)} dòng · "
+                    f"cột nhận diện: {stats_all.get('columns', {})}"
+                )
+                if stats_all.get("error"):
+                    st.error(f"❌ {stats_all['error']}")
+                rows_all = _rows_preview_import_grouped(grouped_all)
+                if rows_all:
+                    so_pgd = len(grouped_all)
+                    so_xa = sum(len(xa_block) for xa_block in grouped_all.values())
+                    so_dgd = len(rows_all)
+                    so_thon = sum(int(r["Số thôn/ấp"]) for r in rows_all)
+                    c1, c2, c3, c4 = st.columns(4)
+                    c1.metric("PGD", fmt_so(so_pgd))
+                    c2.metric("Xã", fmt_so(so_xa))
+                    c3.metric("ĐGD", fmt_so(so_dgd))
+                    c4.metric("Thôn/ấp", fmt_so(so_thon))
+                    if stats_all.get("skip_blank") or stats_all.get("skip_scope"):
+                        st.warning(
+                            f"Bỏ qua {stats_all.get('skip_blank', 0)} dòng thiếu PGD/Xã/ĐGD/Thôn "
+                            f"và {stats_all.get('skip_scope', 0)} dòng ngoài phạm vi chọn."
+                        )
+                    hien_thi_dataframe_phan_trang(
+                        pd.DataFrame(rows_all),
+                        key=f"dgd_import_all_preview_{ten_pgd}_{chon_xa}",
+                        height=min(420, 70 + len(rows_all) * 38),
+                    )
+                    confirm_all = st.checkbox(
+                        "Xác nhận lưu cấu hình đã gom vào dgd_map",
+                        key=f"dgd_import_all_confirm_{ten_pgd}_{chon_xa}",
+                    )
+                    if st.button(
+                        "💾 Lưu địa bàn đã gom",
+                        type="primary",
+                        disabled=not confirm_all,
+                        key=f"dgd_import_all_apply_{ten_pgd}_{chon_xa}",
+                    ):
+                        m_all = _apply_import_grouped_to_map(db.doc_dgd_map(), grouped_all)
+                        db.luu_dgd_map(m_all, username)
+                        db.ghi_audit(
+                            username,
+                            "gan_thon_dgd_import_excel_toan_bo",
+                            f"[{hn}] import file={getattr(file_all, 'name', '')} "
+                            f"pgd={so_pgd} xa={so_xa} dgd={so_dgd} thon={so_thon} "
+                            f"only_scope={only_current_scope}",
+                        )
+                        st.cache_data.clear()
+                        st.success(f"✅ Đã lưu {so_thon} thôn/ấp vào {so_dgd} ĐGD.")
+                        st.rerun()
+                elif not stats_all.get("error"):
+                    st.info("Không có dòng hợp lệ để gom. Kiểm tra lại cột PGD/Xã/Tên ĐGD/Thôn.")
+            except Exception as e_all:
+                logger.error("_render_gan_thon import Excel toàn bộ — %s", e_all, exc_info=True)
+                st.error(f"❌ Lỗi import: {e_all}")
 
     st.divider()
 

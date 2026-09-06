@@ -1,5 +1,15 @@
 # CHANGELOG
 
+## [2026-09-06] — Lưu dgd_map Hội sở từ file dư nợ HSTD
+- `vbsp_scm.db` kv_store `dgd_map` — lưu cấu hình chắc cho `Hội sở Chi nhánh tỉnh`: 9 xã, 22 điểm giao dịch, 63 thôn/ấp; nguồn kiểm tra từ `pgd_data/hoi_so_chi_nhanh_tinh/hstd_khnv.parquet` kỳ 31/07/2026.
+- `outputs/gom_dgd_hoi_so_20260906/` — giữ file backup trước khi ghi, patch JSON và các CSV kiểm tra dư nợ/ngoại lệ để đối chiếu trước khi gắn CBTD.
+
+## [2026-09-06] — Import địa bàn gộp thôn theo Điểm GD để gắn CBTD nhanh
+- `tabs/tab_quan_ly_dgd.py` ~70-250/~480 — thêm helper import Excel địa bàn: tự nhận cột PGD/Xã/Tên ĐGD/Thôn, fill-down ô merge, tách nhiều thôn trong một ô, dedupe và gom thành `PGD → Xã → ĐGD → danh sách thôn/ấp`; UI preview thống kê PGD/Xã/ĐGD/thôn trước khi lưu vào `dgd_map`.
+- `tabs/tab_cbtd.py` ~468/~1148/~1268 — option chọn ĐGD trong form thêm/sửa CBTD hiển thị thêm số thôn/ấp đã gom, giúp gắn CBTD theo điểm giao dịch thay vì dò từng thôn.
+- `tests/test_cbtd_dia_ban_review.py` — thêm regression cho import Excel địa bàn với ô merge/fill-down và một ô chứa nhiều thôn.
+- `Verify` — `py_compile` 4 file liên quan pass; `pytest tests\test_cbtd_dia_ban_review.py tests\test_tab_cbtd_add_form.py -q` = 7 passed; convention scoped OK.
+
 ## [2026-09-06] — Thêm bảng số liệu HSTD theo từng CBTD
 - `services/cbtd_dia_ban_service.py` ~718-856 — thêm `tong_hop_hstd_theo_cbtd()` tổng hợp số liệu HSTD theo từng CBTD: số KH, số món vay, tổng dư nợ, dư nợ trong hạn, dư nợ quá hạn, tỷ lệ QH, số chương trình, chương trình dư nợ lớn nhất, KH mới tháng và món giải ngân tháng; giữ cả CBTD chưa có hồ sơ khớp để thấy cảnh báo phân công.
 - `services/cbtd_dia_ban_service.py` ~968 — `_parse_dt_series()` nhận cả định dạng `DD/MM/YYYY` và ISO `YYYY-MM-DD`, tránh lệch tháng khi tính KH mới/GN tháng theo CBTD.

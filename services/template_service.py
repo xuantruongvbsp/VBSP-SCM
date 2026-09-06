@@ -151,7 +151,7 @@ def hien_thi_nut_tai(key_prefix: str) -> None:
             mime="application/vnd.openxmlformats-officedocument"
                  ".wordprocessingml.document",
             key=f"{key_prefix}_dl_docx",
-            use_container_width=True,
+            width="stretch",
         ):
             state.downloads.clear(docx_key)
     with col2:
@@ -162,7 +162,7 @@ def hien_thi_nut_tai(key_prefix: str) -> None:
                 file_name=state.downloads.get_filename(pdf_key) or "file.pdf",
                 mime="application/pdf",
                 key=f"{key_prefix}_dl_pdf",
-                use_container_width=True,
+                width="stretch",
             ):
                 state.downloads.clear(pdf_key)
         else:

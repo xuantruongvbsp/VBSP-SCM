@@ -44,6 +44,14 @@ from services.cdtotkvv_service import (
     loc_df as _loc_df,
     cdtotkvv_ten_sheet_excel as _cdtotkvv_ten_sheet_excel,
     fmt_xuat_to_khong_dat_vn as _fmt_xuat_to_khong_dat_vn,
+    thong_ke_tuoi_theo_pgd as _tk_tuoi_pgd,
+    thong_ke_tuoi_theo_xa as _tk_tuoi_xa,
+    enrich_tuoi_to_truong_fallback_tu_hstd as _enrich_tuoi_hstd,
+    _tao_word_thong_ke_tuoi_to_truong as _tao_word_thong_ke_tuoi_to_truong,
+)
+from services.template_service import (
+    nut_tai_word_va_pdf as _nut_tai_wp,
+    hien_thi_nut_tai as _hien_thi_nut_tai,
 )
 from services.tongquan_cdto_service import load_cdto_toan_cn
 from data.cdtotkvv import (
@@ -1223,6 +1231,568 @@ def _sub_xu_huong(username: str, cdto_mode: str, pgd_user: str) -> None:
     else:
         st.info("Cần ít nhất 3 tháng dữ liệu để phát hiện xu hướng.")
 
+
+def _render_danh_sach_co_khong_vay_von(
+    df_raw: "pd.DataFrame | None",
+    key_prefix: str = "cdto_cn_",
+) -> None:
+    """
+    Chia danh sách Tổ trưởng TK&VV làm 2 phần tách bạch:
+      Nhóm 1 — Tổ trưởng CÓ hồ sơ vay vốn tại VBSP (Method C trùng tên HSTD → ngày sinh thật).
+      Nhóm 2 — Tổ trưởng CHƯA CÓ hồ sơ vay vốn hoặc tên tổ trưởng không trùng với KH trong HSTD (Method 3 ước tính TB xã).
+    """
+    st.markdown("##### 📂 Danh sách Tổ trưởng — Chia thành 2 nhóm CÓ / KHÔNG vay vốn")
+    st.caption(
+        "🔎 Phân loại dựa trên: Tên tổ trưởng có trùng khớp với Tên Khách hàng (Cột Tên KH) trong HSTD của "
+        "Chi nhánh Đồng Nai hiện có hay không. Nếu trùng thì đánh dấu 'CÓ hồ sơ vay vốn', "
+        "nếu không thì rơi vào nhóm 'Chưa có / Không xác định' (không tìm thấy hợp đồng vay vốn nào dưới tên tổ trưởng)."
+    )
+    if df_raw is None or df_raw.empty:
+        st.warning("⚠️ Chưa có dữ liệu CDTOTKVV. Vui lòng upload dữ liệu trước.")
+        return
+
+    # Xác định cột chuẩn Tên tổ trưởng / PGD / Xã
+    _tt_col = next(
+        (c for c in ("Tên tổ trưởng", "ten_to_truong", "Tổ trưởng", "Họ tên tổ trưởng") if c in df_raw.columns),
+        None,
+    )
+    _pgd_col = next((c for c in ("PGD", "ten_pgd_std") if c in df_raw.columns), None)
+    _xa_col = next((c for c in ("Xã/Phường", "ten_xa_std", "Xã") if c in df_raw.columns), None)
+    if not _tt_col:
+        st.error("❌ Dữ liệu CDTO thiếu cột Tên tổ trưởng — không thể phân loại CÓ / KHÔNG vay vốn.")
+        return
+
+    # Đọc flag _co_vay_von & _nguon_chi_tiet từ enrich helper (services/cdtotkvv_service.py)
+    _cv_raw = df_raw.get("_co_vay_von", pd.Series(pd.NA, index=df_raw.index, dtype="Int64"))
+    if isinstance(_cv_raw, pd.Series) and len(_cv_raw) == len(df_raw):
+        _cv = _cv_raw.copy()
+    else:
+        _cv = pd.Series(pd.NA, index=df_raw.index, dtype="Int64")
+    # Tuổi số
+    _tuoi_num = pd.to_numeric(df_raw.get("tuoi_to_truong"), errors="coerce") if "tuoi_to_truong" in df_raw.columns else pd.Series(pd.NA, index=df_raw.index)
+    # Nguồn chi tiết
+    _ng_ct_col = "_nguon_chi_tiet"
+    _ng_ct = df_raw.get(_ng_ct_col, pd.Series("", index=df_raw.index, dtype="string"))
+    if isinstance(_ng_ct, pd.Series) and len(_ng_ct) == len(df_raw):
+        _ng_ct = _ng_ct.astype("string").fillna("")
+    else:
+        _ng_ct = pd.Series("", index=df_raw.index, dtype="string")
+
+    # --- Tính KPI 2 nhóm ---
+    _n_total = len(df_raw)
+    _cv_num = pd.to_numeric(_cv, errors="coerce")
+    _upload_mask = _cv_num.isna() & _ng_ct.str.contains("Upload thật", case=False, na=False)
+    _mask_co = _cv_num.eq(1).fillna(False)
+    _mask_na = _upload_mask.fillna(False)
+    _mask_khong = (_cv_num.eq(0).fillna(False) | (_cv_num.isna() & ~_mask_na)).fillna(False)
+
+    _so_co = int(_mask_co.sum())
+    _so_khong = int(_mask_khong.sum())
+    _so_na = int(_mask_na.sum())
+    _pct_co = float(_so_co / _n_total * 100.0) if _n_total > 0 else 0.0
+    _pct_khong = float(_so_khong / _n_total * 100.0) if _n_total > 0 else 0.0
+    _pct_na = float(_so_na / _n_total * 100.0) if _n_total > 0 else 0.0
+
+    # Helper KPI row tóm tắt tuổi
+    def _kpi_tuoi(_mask: "pd.Series") -> dict:
+        _v = _tuoi_num[_mask].dropna()
+        return {
+            "n": int(len(_v)),
+            "tb": round(float(_v.mean()), 1) if len(_v) else None,
+            "med": float(_v.median()) if len(_v) else None,
+            "min": int(_v.min()) if len(_v) else None,
+            "max": int(_v.max()) if len(_v) else None,
+            "ge70": int((_v >= 70).sum()) if len(_v) else 0,
+            "ge60": int((_v >= 60).sum()) if len(_v) else 0,
+        }
+
+    _k_co = _kpi_tuoi(_mask_co)
+    _k_khong = _kpi_tuoi(_mask_khong)
+    _k_na = _kpi_tuoi(_mask_na)
+
+    # --- Hiển thị 3 KPI row tổng quan 2 nhóm ---
+    _kpi_cols = st.columns(3, gap="medium")
+    with _kpi_cols[0]:
+        st.metric(
+            label=f"💳 Nhóm 1: CÓ hồ sơ vay vốn",
+            value=f"{_so_co:,} tổ",
+            delta=f"{_pct_co:.1f}% tổng",
+            delta_color="normal",
+        )
+        st.caption(
+            f"Tuổi TB: **{_k_co['tb'] if _k_co['tb'] is not None else '—'}** · "
+            f"Median: **{int(_k_co['med']) if _k_co['med'] is not None else '—'}** · "
+            f"{_k_co['min'] if _k_co['min'] is not None else '—'} → "
+            f"{_k_co['max'] if _k_co['max'] is not None else '—'} tuổi · "
+            f"≥60: **{_k_co['ge60']:,}** · ≥70: **{_k_co['ge70']:,}** tổ."
+        )
+        st.caption(
+            "✅ Độ tin cậy CAO: Tên tổ trưởng trùng với KH trong HSTD → Ngày sinh thật từ Hồ sơ gốc KH, "
+            "đã xác định được hợp đồng vay vốn tại VBSP."
+        )
+    with _kpi_cols[1]:
+        st.metric(
+            label=f"⚠️ Nhóm 2: CHƯA CÓ / KHÔNG xác định vay vốn",
+            value=f"{_so_khong:,} tổ",
+            delta=f"{_pct_khong:.1f}% tổng",
+            delta_color="off",
+        )
+        st.caption(
+            f"Tuổi TB ƯỚC TÍNH: **{_k_khong['tb'] if _k_khong['tb'] is not None else '—'}** · "
+            f"Median ước tính: **{int(_k_khong['med']) if _k_khong['med'] is not None else '—'}** · "
+            f"{_k_khong['min'] if _k_khong['min'] is not None else '—'} → "
+            f"{_k_khong['max'] if _k_khong['max'] is not None else '—'} tuổi · "
+            f"≥60 ước tính: **{_k_khong['ge60']:,}** · ≥70 ước tính: **{_k_khong['ge70']:,}** tổ."
+        )
+        st.caption(
+            "⚠️ Độ tin cậy THẤP: Không tìm thấy hợp đồng vay vốn nào dưới tên tổ trưởng trong HSTD tháng 07/2026 "
+            "(tổ trưởng có thể KHÔNG vay vốn, hợp đồng đã đóng nợ, tên viết sai chính tả / thiếu họ / viết tắt, "
+            "hoặc vay vốn ở thời điểm khác)."
+        )
+    with _kpi_cols[2]:
+        _label = "📤 Upload thật (chưa kiểm tra)" if _so_na > 0 else "📤 Không có upload thật phân loại"
+        st.metric(
+            label=_label,
+            value=f"{_so_na:,} tổ",
+            delta=f"{_pct_na:.1f}% tổng",
+            delta_color="inverse" if _so_na > 0 else "off",
+        )
+        st.caption(
+            f"Tuổi TB: **{_k_na['tb'] if _k_na['tb'] is not None else '—'}** · "
+            f"Median: **{int(_k_na['med']) if _k_na['med'] is not None else '—'}** · "
+            f"{_k_na['min'] if _k_na['min'] is not None else '—'} → "
+            f"{_k_na['max'] if _k_na['max'] is not None else '—'} tuổi · "
+            f"≥60: **{_k_na['ge60']:,}** · ≥70: **{_k_na['ge70']:,}** tổ."
+        )
+        st.caption(
+            "📑 Độ tin cậy TUYỆT ĐỐI nếu PGD nhập thủ công Ngày sinh tổ trưởng vào file Excel upload (≥30% tổ có tuổi). "
+            "Hệ thống KHÔNG kiểm tra tự động vay vốn hay không — PGD đối chiếu thủ công nếu cần."
+        )
+
+    # Helper render 1 danh sách dataframe cho 1 nhóm
+    def _render_list(
+        _mask: "pd.Series",
+        title_exp: str,
+        expanded_default: bool,
+        _kpi: dict,
+        _tag_note: str,
+        _exp_key: str,
+    ) -> None:
+        with st.expander(title_exp, expanded=expanded_default):
+            _so_n = int(_mask.sum())
+            if _so_n == 0:
+                st.info("Không có tổ nào rơi vào nhóm này.")
+                return
+            # Lọc cột hiển thị đẹp (chỉ giữ cột hữu ích người dùng)
+            _cols_show = []
+            if _pgd_col:
+                _cols_show.append(_pgd_col)
+            if _xa_col:
+                _cols_show.append(_xa_col)
+            _cols_show.append(_tt_col)
+            if "tuoi_to_truong" in df_raw.columns:
+                _cols_show.append("tuoi_to_truong")
+            _cols_show.append(_ng_ct_col if _ng_ct_col in df_raw.columns else None)
+            _cols_show = [c for c in _cols_show if c]
+            _df_sub = df_raw.loc[_mask, _cols_show].copy()
+            # Rename column header tiếng Việt đẹp
+            _rename_map = {}
+            if _pgd_col:
+                _rename_map[_pgd_col] = "PGD"
+            if _xa_col:
+                _rename_map[_xa_col] = "Xã / Phường"
+            _rename_map[_tt_col] = "Họ tên Tổ trưởng"
+            if "tuoi_to_truong" in _df_sub.columns:
+                _rename_map["tuoi_to_truong"] = "Tuổi tổ trưởng"
+            if _ng_ct_col in _df_sub.columns:
+                _rename_map[_ng_ct_col] = "Nguồn dữ liệu / Phân loại"
+            _df_sub = _df_sub.rename(columns=_rename_map)
+            # Sort theo PGD → Xã → Tên tổ
+            _sort_by = [c for c in ("PGD", "Xã / Phường", "Họ tên Tổ trưởng") if c in _df_sub.columns]
+            if _sort_by:
+                _df_sub = _df_sub.sort_values(_sort_by, ascending=True, kind="mergesort").reset_index(drop=True)
+            # KPI row đầu expander
+            st.caption(
+                f"{_tag_note} · {_so_n:,} tổ · "
+                f"Tuổi TB: **{_kpi['tb'] if _kpi['tb'] is not None else '—'}** · "
+                f"Median: **{int(_kpi['med']) if _kpi['med'] is not None else '—'}** · "
+                f"Min: **{_kpi['min'] if _kpi['min'] is not None else '—'}** · Max: **{_kpi['max'] if _kpi['max'] is not None else '—'}** tuổi · "
+                f"≥60 tuổi: **{_kpi['ge60']:,}** · ≥70 tuổi: **{_kpi['ge70']:,}**."
+            )
+            # Hiển thị bảng phân trang với st.dataframe
+            st.dataframe(
+                _df_sub,
+                width="stretch",
+                hide_index=True,
+                column_config={
+                    "Tuổi tổ trưởng": st.column_config.NumberColumn(
+                        "Tuổi tổ trưởng",
+                        format="%d",
+                        step=1,
+                    ),
+                },
+                height=500 if _so_n >= 100 else None,
+                key=f"{key_prefix}{_exp_key}_tbl",
+            )
+
+    st.divider()
+    _render_list(
+        _mask=_mask_co,
+        title_exp=f"✅ Nhóm 1 — Tổ trưởng CÓ hồ sơ vay vốn tại VBSP ({_so_co:,} tổ = {_pct_co:.1f}%)",
+        expanded_default=True,
+        _kpi=_k_co,
+        _tag_note="✅ Xác minh từ HSTD — Tên tổ trùng tên KH → ngày sinh thật",
+        _exp_key="nhom_co_vay",
+    )
+    _render_list(
+        _mask=_mask_khong,
+        title_exp=f"⚠️ Nhóm 2 — Tổ trưởng CHƯA CÓ / KHÔNG tìm thấy hồ sơ vay vốn ({_so_khong:,} tổ = {_pct_khong:.1f}%)",
+        expanded_default=False,
+        _kpi=_k_khong,
+        _tag_note="⚠️ Tuổi được ước tính bằng Trung bình Xã + 8 năm — chưa xác minh ngày sinh thật",
+        _exp_key="nhom_khong_vay",
+    )
+    if _so_na > 0:
+        _render_list(
+            _mask=_mask_na,
+            title_exp=f"📤 Nhóm 3 — Upload thật (chưa kiểm tra vay vốn) ({_so_na:,} tổ = {_pct_na:.1f}%)",
+            expanded_default=False,
+            _kpi=_k_na,
+            _tag_note="📤 Tuổi nhập thủ công từ Excel CDTO — PGD tự kiểm tra có vay vốn hay không",
+            _exp_key="nhom_upload_thuc",
+        )
+    st.divider()
+    st.caption(
+        "💡 **Hướng dẫn bổ sung cho nhóm 2 (Chưa có / Không xác định):**\n"
+        " 1. Mở file Excel `cdtotkvv_latest.xlsx` của PGD\n"
+        " 2. Sau cột G (Tên tổ trưởng) → thêm cột H: `Ngày sinh tổ trưởng` (dd/mm/yyyy) hoặc cột I: `Tuổi tổ trưởng` (số nguyên)\n"
+        " 3. Hoặc nhập chính xác Họ tên tổ trưởng (đầy đủ họ + chữ lót + tên, không viết tắt) → tỷ lệ trùng HSTD sẽ tăng lên 80-85% nhóm 1."
+    )
+    return
+
+
+def _sub_thong_ke_tuoi_to_truong(
+    username: str,
+    cdto_mode: str,
+    pgd_user: str,
+    df_cdto: "pd.DataFrame | None" = None,
+) -> None:
+    """
+    Sub-tab: 👥 Thống kê Tuổi Tổ trưởng theo (a) PGD và (b) Xã/phường.
+    Hiển thị 6 bins nhóm tuổi: <30 / 30-39 / 40-49 / 50-59 / 60-69 / ≥70 tuổi,
+    kèm summary tổng (Số tổ có dữ liệu / TB tuổi / Min / Max / Median).
+    """
+    st.markdown("### 👥 Thống kê Tuổi Tổ trưởng TK&VV")
+    st.caption(
+        "Phân bổ số lượng Tổ trưởng theo nhóm tuổi (dữ liệu đọc từ file Chấm điểm Tổ "
+        "TK&VV: cột Ngày sinh / Tuổi tổ trưởng; nếu chỉ có ngày sinh thì hệ thống tự "
+        "tính tuổi. Nếu thiếu cột này → số liệu sẽ hiển thị 0 & hướng dẫn bổ sung)."
+    )
+    st.divider()
+
+    # 1) Lấy dữ liệu CDTO + Fallback enrich tuổi từ HSTD nếu thiếu
+    _nguon_dl_msg = "Không có dữ liệu"
+    _so_fill_hstd = 0
+    if df_cdto is None:
+        _cdto = load_cdto_toan_cn()
+        df_raw = _cdto.get("df_raw") if isinstance(_cdto, dict) else None
+    else:
+        df_raw = df_cdto.copy() if df_cdto is not None else None
+    if df_raw is not None and not df_raw.empty:
+        df_raw = _loc_df(df_raw, cdto_mode, pgd_user or "")
+    if df_raw is not None and not df_raw.empty:
+        df_raw, _nguon_dl_msg, _so_fill_hstd = _enrich_tuoi_hstd(df_raw)
+
+    # 2) Xác định chế độ hiển thị
+    if cdto_mode == "cn" and la_phan_he_cn(normalize_role(
+        st.session_state.get("role", "") if "role" in st.session_state else ""
+    )):
+        _labels_view = ["Theo Phòng Giao dịch (PGD)", "Theo Xã / Phường", "📂 Danh sách: Tổ CÓ / KHÔNG vay vốn"]
+    else:
+        _labels_view = ["Theo Xã / Phường (PGD hiện tại)", "📂 Danh sách: Tổ CÓ / KHÔNG vay vốn"]
+    _view_key_prefix = f"cdto_{cdto_mode}_{(pgd_user or 'cn').replace(' ', '_')}_"
+    _view_sel = st.radio(
+        "Chế độ xem",
+        range(len(_labels_view)),
+        format_func=lambda i: _labels_view[i],
+        horizontal=True,
+        key=f"{_view_key_prefix}tuoi_view_mode",
+        label_visibility="collapsed",
+    )
+    st.divider()
+
+    # Hiển thị nguồn dữ liệu đang dùng + cảnh báo nếu fallback HSTD
+    st.caption(f"📊 Nguồn dữ liệu: {_nguon_dl_msg}")
+    st.caption(
+        "ℹ️ Thống kê theo PGD / Xã **CHỈ LẤY các Tổ trưởng CÓ dữ liệu thật**: "
+        "(1) Tổ trưởng được PGD nhập thủ công Tuổi/Ngày sinh trong file Excel upload thật; "
+        "HOẶC (2) Tên tổ trùng khớp với KH CÓ HỒ SƠ VAY VỐN tại VBSP (xác minh từ HSTD). "
+        "Tổ không có dữ liệu (không vay vốn / tên không trùng / ước tính TB xã) sẽ được đánh dấu "
+        "🔴 \"Chưa có dữ liệu\" — **KHÔNG** dùng số liệu ƯỚC TÍNH cho thống kê PGD/Xã."
+    )
+
+    # ------ VIEW MỚI: "📂 Danh sách 2 nhóm Tổ CÓ / KHÔNG vay vốn" ------
+    # (mode mới cuối, index cuối luôn)
+    _danh_sach_view_index = len(_labels_view) - 1
+    if int(_view_sel) == _danh_sach_view_index:
+        _render_danh_sach_co_khong_vay_von(df_raw, key_prefix=_view_key_prefix)
+        return
+
+    # Thông báo nếu có tổ trưởng ≥70 tuổi (xác định từ ngày sinh HSTD HOẶC upload thật)
+    _so_ge60 = 0
+    _so_ge70 = 0
+    _top_nguoi_gia = None
+    if df_raw is not None and not df_raw.empty and "tuoi_to_truong" in df_raw.columns:
+        # Filter CHỈ các tổ có vay vốn hoặc upload thật (giống _df_chi_tiet_so_huu_tuoi logic) — để st.info không báo cáo số ước tính
+        _cv_raw2 = df_raw.get("_co_vay_von")
+        if isinstance(_cv_raw2, pd.Series) and len(_cv_raw2) == len(df_raw):
+            _cv2 = _cv_raw2.copy()
+        else:
+            _cv2 = pd.Series(pd.NA, index=df_raw.index, dtype="Int64")
+        _nc_raw2 = df_raw.get("_nguon_chi_tiet")
+        if isinstance(_nc_raw2, pd.Series) and len(_nc_raw2) == len(df_raw):
+            _nc2 = _nc_raw2.astype("string").fillna("")
+        else:
+            _nc2 = pd.Series("", index=df_raw.index, dtype="string")
+        _mask_covay_info = (_cv2 == 1) | _nc2.str.contains("Upload thật", na=False, case=False)
+        # Nếu _co_vay_von chưa có giá trị nào hết (chưa enrich) → dùng hết (backward compat)
+        if not _cv2.notna().any() and not _nc2.str.contains("Upload thật", na=False, case=False).any():
+            _mask_covay_info = pd.Series(True, index=df_raw.index)
+        _t_num = pd.to_numeric(df_raw["tuoi_to_truong"], errors="coerce")
+        _t_num_filtered = _t_num.where(_mask_covay_info, pd.NA)
+        _t_val = _t_num_filtered[_t_num_filtered.notna() & _t_num_filtered.between(18, 100)]
+        _so_ge60 = int((_t_val >= 60).sum())
+        _so_ge70 = int((_t_val >= 70).sum())
+        if _so_ge70 > 0 and ("Tên tổ trưởng" in df_raw.columns or "ten_to_truong" in df_raw.columns) and ("PGD" in df_raw.columns or "ten_pgd_std" in df_raw.columns):
+            try:
+                _tt_col = "Tên tổ trưởng" if "Tên tổ trưởng" in df_raw.columns else "ten_to_truong"
+                _pgd_col = "PGD" if "PGD" in df_raw.columns else "ten_pgd_std"
+                _df_gia = df_raw.loc[_mask_covay_info & (_t_num >= 70), [_tt_col, _pgd_col]].assign(_tuoi=_t_num)
+                _df_gia = _df_gia.sort_values("_tuoi", ascending=False).head(1)
+                if not _df_gia.empty:
+                    _top_nguoi_gia = {
+                        "ten": str(_df_gia.iloc[0][_tt_col]),
+                        "tuoi": int(_df_gia.iloc[0]["_tuoi"]),
+                        "pgd": str(_df_gia.iloc[0][_pgd_col]),
+                    }
+            except Exception:
+                _top_nguoi_gia = None
+
+    if _so_ge70 > 0:
+        _top_msg = ""
+        if _top_nguoi_gia:
+            _top_msg = f" — cao nhất **{_top_nguoi_gia['ten']}** ({_top_nguoi_gia['tuoi']} tuổi, PGD {_top_nguoi_gia['pgd']})"
+        _ge60_msg = f" (trong đó ≥60 tuổi: {_so_ge60:,} tổ)" if _so_ge60 > _so_ge70 else ""
+        st.info(
+            f"💡 Có **{_so_ge70:,} tổ trưởng ≥70 tuổi**"
+            f"{_ge60_msg}{_top_msg}. Dữ liệu được xác định từ ngày sinh trong "
+            f"Hồ sơ gốc khách hàng (HSTD) của VBSP."
+        )
+
+    if "ước tính" in str(_nguon_dl_msg).lower():
+        st.warning(
+            "⚠️ Một phần dữ liệu đang **ƯỚC TÍNH** theo TB tuổi KH xã + 8 năm (những tổ không link được tên vào HSTD).\n\n"
+            "💡 **Nếu muốn số liệu CHÍNH XÁC 100% từ Chấm điểm Tổ:**\n"
+            "1. Mở file Excel `cdtotkvv_latest.xlsx` của PGD tại thư mục upload\n"
+            "2. Sau cột **G: Tên tổ trưởng**, thêm 2 cột:\n"
+            "   • Cột **H**: Header `Ngày sinh tổ trưởng` (định dạng dd/mm/yyyy)\n"
+            "   • Cột **I**: Header `Tuổi tổ trưởng` (tùy chọn, hệ thống tự tính nếu trống)\n"
+            "3. Lưu file, upload lại tab **📤 Upload** → hệ thống ưu tiên dùng nguồn chính xác này."
+        )
+    st.divider()
+
+    # 3) Kiểm tra tính sẵn sàng dữ liệu tuổi
+    _co_cot_tuoi = False
+    _co_cot_ngay_sinh = False
+    if df_raw is not None and not df_raw.empty:
+        _co_cot_tuoi = any(
+            _c in df_raw.columns
+            for _c in ["tuoi_to_truong", "tuoi", "tuoi_to", "Tuổi tổ trưởng", "Tuổi"]
+        )
+        _co_cot_ngay_sinh = any(
+            _c in df_raw.columns
+            for _c in ["ngay_sinh_to_truong", "Ngày sinh tổ trưởng", "Ngày sinh", "ns"]
+        )
+    if df_raw is None or df_raw.empty:
+        st.warning("⚠️ Chưa có dữ liệu Chấm điểm Tổ TK&VV. Vui lòng upload dữ liệu trước.")
+        st.info(
+            "💡 Sau khi upload, thêm 2 cột **tuỳ chọn** sau cột G (Tên tổ trưởng) trong file Excel:\n"
+            "   • Cột H: **Ngày sinh tổ trưởng** (định dạng dd/mm/yyyy)\n"
+            "   • Cột I: **Tuổi tổ trưởng** (số nguyên, nếu không điền hệ thống tự tính từ ngày sinh)"
+        )
+        return
+    if not _co_cot_tuoi and not _co_cot_ngay_sinh:
+        st.warning(
+            "⚠️ Dữ liệu Chấm điểm Tổ TK&VV hiện chưa có **Ngày sinh / Tuổi tổ trưởng** "
+            "→ Thống kê chưa hiển thị được số liệu."
+        )
+        st.info(
+            "💡 **Cách bổ sung (PGD làm thủ công trong Excel):**\n"
+            "1. Mở file `cdtotkvv_latest.xlsx` tại thư mục upload của PGD\n"
+            "2. Sau cột **G: Tên tổ trưởng**, thêm:\n"
+            "   • Cột **H**: header `Ngày sinh tổ trưởng`, mỗi dòng nhập ngày sinh (vd: 01/01/1985)\n"
+            "   • Cột **I**: header `Tuổi tổ trưởng` (tùy chọn, hệ thống tự tính nếu trống)\n"
+            "3. Lưu file, upload lại tab **📤 Upload** → hệ thống đọc & tự tạo thống kê này.\n\n"
+            "Hoặc chỉ cần 1 trong 2 cột cũng đủ (hệ thống tự tính tuổi từ ngày sinh)."
+        )
+
+    # 4) Summary chung (KPI row 4 thẻ)
+    if _view_sel == 0 and len(_labels_view) > 1:
+        df_bins, summary = _tk_tuoi_pgd(df_raw)
+        _scope_title = "Tổng quan toàn Chi nhánh"
+    elif len(_labels_view) > 1:
+        df_bins, summary = _tk_tuoi_xa(df_raw, pgd_loc=None)
+        _scope_title = "Tổng quan toàn Chi nhánh (theo xã)"
+    else:
+        df_bins, summary = _tk_tuoi_xa(df_raw, pgd_loc=(pgd_user or None))
+        _scope_title = (
+            f"Địa bàn **{pgd_user}** (theo xã)"
+            if pgd_user else "Tổng quan toàn Chi nhánh (theo xã)"
+        )
+
+    _tong_so = int(summary.get("tong_to_tong_so") or 0)
+    _co_dl = int(summary.get("tong_to") or 0)
+    _khong_co = int(summary.get("khong_co_du_lieu") or 0)
+    _tb = summary.get("tb_tuoi")
+    _med = summary.get("median_tuoi")
+    _mn = summary.get("min_tuoi")
+    _mx = summary.get("max_tuoi")
+    k1, k2, k3, k4 = st.columns(4)
+    k1.metric(
+        f"🧾 Tổng số Tổ (scope)",
+        f"{_tong_so:,}" if _tong_so else "—",
+    )
+    k2.metric(
+        f"✅ Có dữ liệu tuổi",
+        f"{_co_dl:,}" if _co_dl else "—",
+        (
+            f"{_co_dl / _tong_so * 100:.1f}%"
+            if (_co_dl and _tong_so > 0)
+            else None
+        ),
+    )
+    k3.metric(
+        "🔴 Chưa có dữ liệu",
+        f"{_khong_co:,}" if _khong_co else "—",
+        (
+            f"-{_khong_co / _tong_so * 100:.1f}%"
+            if (_khong_co and _tong_so > 0)
+            else None
+        ),
+    )
+    _tb_txt = f"{_tb:.1f}" if _tb is not None else "—"
+    _range_txt = (
+        f"{_mn} - {_mx}" if (_mn is not None and _mx is not None) else "—"
+    )
+    k4.metric(
+        "📊 Tuổi TB (Range)",
+        _tb_txt,
+        delta=f"Range {_range_txt} · Median {_med:.1f}" if _med is not None else None,
+    )
+    st.caption(f"📍 {_scope_title}")
+    st.divider()
+
+    # 5) Hiển thị bins detail
+    if df_bins is None or df_bins.empty:
+        st.caption("⚠️ Chưa có dòng nào có dữ liệu tuổi tổ trưởng hợp lệ (18-100 tuổi).")
+    else:
+        # Sắp xếp lại cột
+        _bin_order = [
+            "Dưới 30 tuổi",
+            "30 - 39 tuổi",
+            "40 - 49 tuổi",
+            "50 - 59 tuổi",
+            "60 - 69 tuổi",
+            "Từ 70 tuổi trở lên",
+        ]
+        _present_bins = [b for b in _bin_order if b in df_bins.columns]
+        _id_cols = [c for c in ["PGD", "Xã/Phường"] if c in df_bins.columns]
+        df_show = df_bins[_id_cols + _present_bins + ["Tổng tổ trưởng có dữ liệu"]].copy()
+
+        # Tổng hợp dòng Cộng (Total) nếu có nhiều hơn 1 dòng
+        if len(df_show) > 1:
+            total_row: dict = {c: ("—" if c in _id_cols else 0) for c in df_show.columns}
+            for _c in _present_bins + ["Tổng tổ trưởng có dữ liệu"]:
+                if _c in df_show.columns:
+                    total_row[_c] = int(df_show[_c].sum())
+            df_show = pd.concat([df_show, pd.DataFrame([total_row])], ignore_index=True)
+            # Gán tên dòng tổng
+            if "PGD" in df_show.columns:
+                df_show.loc[df_show.index[-1], "PGD"] = "🌐 TỔNG CỘNG"
+                if "Xã/Phường" in df_show.columns:
+                    df_show.loc[df_show.index[-1], "Xã/Phường"] = "—"
+
+        st.markdown(f"**📋 Bảng phân bổ theo nhóm tuổi — {len(df_show)-1 if len(df_show) > 1 else len(df_show)} dòng**")
+        # Dùng st.dataframe với TextColumn format số nguyên
+        _n_cols: dict = {}
+        for _c in list(df_show.columns):
+            if _c in ("PGD", "Xã/Phường"):
+                _n_cols[_c] = st.column_config.TextColumn(_c, width="medium")
+            else:
+                _n_cols[_c] = st.column_config.NumberColumn(
+                    _c,
+                    format="%d",
+                    width="small",
+                )
+        st.dataframe(
+            df_show,
+            width="stretch",
+            hide_index=True,
+            height=min(600, 60 + 36 * max(1, len(df_show))),
+            column_config=_n_cols,
+        )
+
+        # Xuất Excel (nếu có dòng)
+        _bytes = xuat_excel({"Thống kê Tuổi Tổ trưởng": df_show})
+        st.download_button(
+            "📥 Tải bảng này (.xlsx)",
+            data=_bytes,
+            file_name=ten_file_xuat(
+                f"Thong_ke_tuoi_To_Truong_"
+                f"{'PGD' if (_view_sel == 0 and len(_labels_view) > 1) else 'XA'}"
+                f"_{pgd_user or 'Toan_CN'}.xlsx"
+            ),
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            width="stretch",
+            key=f"{_view_key_prefix}download_excel_tuoi",
+        )
+
+        # Xuất Word + PDF (báo cáo căn lề đẹp)
+        st.divider()
+        st.markdown("**📄 Báo cáo (Word / PDF)**")
+        st.caption(
+            "Xuất báo cáo căn lề chuẩn hành chính (Times New Roman 13pt, tiêu đề trung tâm, "
+            "tóm tắt 4 thẻ KPI, bảng chi tiết + dòng TỔNG CỘNG, footer ký tên)."
+        )
+        _mode_chedo = "theo_pgd" if (_view_sel == 0 and len(_labels_view) > 1) else "theo_xa"
+        _base_ten = (
+            f"BC_ThongKeTuoi_ToTruong_"
+            f"{'PGD' if _mode_chedo == 'theo_pgd' else 'XA'}"
+            f"_{pgd_user or 'Toan_CN'}"
+        )
+        _wp_key = f"{_view_key_prefix}tuoi_wp_report"
+        if st.button(
+            "📝 Chuẩn bị báo cáo (Word + PDF)",
+            width="stretch",
+            key=f"{_view_key_prefix}prepare_wp",
+        ):
+            try:
+                with st.spinner("Đang tạo báo cáo Word (5-15s)..."):
+                    _word_bytes = _tao_word_thong_ke_tuoi_to_truong(
+                        df_bins=df_show,
+                        summary=summary,
+                        che_do_xem=_mode_chedo,
+                        tieu_de_pham_vi=_scope_title,
+                        ten_pgd=(pgd_user if pgd_user else None),
+                    )
+                _nut_tai_wp(_word_bytes, _base_ten, _wp_key)
+                st.success("✅ Đã chuẩn bị xong. Nhấn nút bên dưới để tải Word / PDF.")
+            except Exception as _e:
+                logger.error("_sub_thong_ke_tuoi_to_truong: tao word/pdf failed — %s", _e, exc_info=True)
+                st.error(f"❌ Lỗi tạo báo cáo: {_e}")
+        _hien_thi_nut_tai(_wp_key)
+
+
 def render(tab: DeltaGenerator | None = None, **kwargs) -> None:
     """
     Render tab Chấm điểm Tổ TK&VV.
@@ -1251,12 +1821,13 @@ def render(tab: DeltaGenerator | None = None, **kwargs) -> None:
             st.subheader("🏘️ Mạng lưới Tổ TK&VV")
             st.caption("Quản lý và xem tổng hợp chấm điểm Tổ Tiết kiệm & Vay vốn toàn chi nhánh")
 
-        # Tạo 5 sub-tabs
+        # Tạo 5→6 sub-tabs (CN) và 3→4 sub-tabs (PGD), tab cuối: Thống kê Tuổi Tổ trưởng
         if cdto_mode == "cn" and la_phan_he_cn(role):
             _cdto_labels = ["📤 Upload", "📊 Tổng hợp", "📋 Phân tích Chất lượng",
-                            "🗺️ Bản đồ Chất lượng", "📈 Xu hướng"]
+                            "🗺️ Bản đồ Chất lượng", "📈 Xu hướng", "👥 Thống kê Tuổi"]
         else:
-            _cdto_labels = ["📋 Phân tích Chất lượng", "🗺️ Bản đồ Chất lượng", "📈 Xu hướng"]
+            _cdto_labels = ["📋 Phân tích Chất lượng", "🗺️ Bản đồ Chất lượng",
+                            "📈 Xu hướng", "👥 Thống kê Tuổi"]
         _cdto_sel = st.radio("", range(len(_cdto_labels)), format_func=lambda i: _cdto_labels[i],
                              horizontal=True, key="cdto_sub_tab", label_visibility="collapsed")
         st.divider()
@@ -1266,7 +1837,9 @@ def render(tab: DeltaGenerator | None = None, **kwargs) -> None:
             elif _cdto_sel == 2: _sub_phan_tich_chat_luong(username, cdto_mode, pgd_user)
             elif _cdto_sel == 3: _sub_ban_do_chat_luong(username, cdto_mode, pgd_user)
             elif _cdto_sel == 4: _sub_xu_huong(username, cdto_mode, pgd_user)
+            elif _cdto_sel == 5: _sub_thong_ke_tuoi_to_truong(username, cdto_mode, pgd_user)
         else:
             if _cdto_sel == 0:   _sub_phan_tich_chat_luong(username, cdto_mode, pgd_user)
             elif _cdto_sel == 1: _sub_ban_do_chat_luong(username, cdto_mode, pgd_user)
             elif _cdto_sel == 2: _sub_xu_huong(username, cdto_mode, pgd_user)
+            elif _cdto_sel == 3: _sub_thong_ke_tuoi_to_truong(username, cdto_mode, pgd_user)

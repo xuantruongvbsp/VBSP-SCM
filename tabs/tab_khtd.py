@@ -262,6 +262,23 @@ def _tong_tu_keys(data: dict[str, float] | None, keys: list[str]) -> float:
     return float(sum(float(data.get(key, 0.0) or 0.0) for key in keys))
 
 
+def _loc_khtd_active(df: "pd.DataFrame | None") -> "pd.DataFrame | None":
+    """Lọc bỏ NQ11 + hồ sơ không dư nợ khỏi phạm vi tính KHTD.
+
+    NQ11 (nợ khoanh nhóm 11) không phải tín dụng bình thường → không được
+    cộng vào số liệu Thực hiện Kế hoạch tín dụng.  Cột cờ `__is_nq11` được
+    app.py enrich một lần duy nhất trước khi truyền df vào workspace.
+    """
+    if df is None or df.empty:
+        return df
+    out = df
+    if "__is_nq11" in out.columns:
+        _mask_nq11 = out["__is_nq11"].fillna(False).astype(bool)
+        if _mask_nq11.any():
+            out = out.loc[~_mask_nq11]
+    return out
+
+
 def _dong_bo_gqvl_tong_keys(data: dict[str, float] | None) -> dict[str, float]:
     """Giữ tương thích giữa key tổng GQVL và 4 sub-key chi tiết."""
     out = dict(data or {})
@@ -317,6 +334,10 @@ def _tinh_thuc_hien_khtd_cn(
     if df_hstd is None or df_hstd.empty:
         return {}, {}
 
+    df_hstd = _loc_khtd_active(df_hstd)
+    if df_hstd is None or df_hstd.empty:
+        return {}, {}
+
     if COT_MA_CHUONG_TRINH not in df_hstd.columns or COT_NGUON_VON not in df_hstd.columns:
         return {}, {}
 
@@ -354,6 +375,9 @@ def _tinh_thuc_hien_khtd_cn(
 
 
 def _quet_ct_co_du_no(df: "pd.DataFrame | None") -> tuple[set[str], dict[str, str]]:
+    if df is None or df.empty:
+        return set(), {}
+    df = _loc_khtd_active(df)
     if df is None or df.empty:
         return set(), {}
     if (
@@ -454,6 +478,10 @@ def _tinh_thuc_hien_theo_ct(df: "pd.DataFrame") -> dict[str, float]:
     if df is None or df.empty:
         return {}
 
+    df = _loc_khtd_active(df)
+    if df is None or df.empty:
+        return {}
+
     if COT_MA_CHUONG_TRINH not in df.columns or COT_NGUON_VON not in df.columns:
         return {}
 
@@ -531,6 +559,10 @@ def _tinh_th_gqvl_dp_phan_tang(df_hstd: "pd.DataFrame | None") -> dict[str, floa
     if df_hstd is None or df_hstd.empty:
         return result
 
+    df_hstd = _loc_khtd_active(df_hstd)
+    if df_hstd is None or df_hstd.empty:
+        return result
+
     if COT_MA_CHUONG_TRINH not in df_hstd.columns or COT_NGUON_VON not in df_hstd.columns:
         return result
 
@@ -573,6 +605,10 @@ def _tinh_th_nsvsmt_dp_phan_tang(df_hstd: "pd.DataFrame | None") -> dict[str, fl
     - `6_DP_XA`: còn lại / thiếu Mã NĐT
     """
     result = {"6_DP_TINH": 0.0, "6_DP_XA": 0.0}
+    if df_hstd is None or df_hstd.empty:
+        return result
+
+    df_hstd = _loc_khtd_active(df_hstd)
     if df_hstd is None or df_hstd.empty:
         return result
 

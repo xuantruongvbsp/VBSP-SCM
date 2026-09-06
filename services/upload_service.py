@@ -25,6 +25,7 @@ import socket
 import tempfile
 import threading
 import time
+import unicodedata
 from dataclasses import asdict, dataclass
 from datetime import datetime
 from io import BytesIO
@@ -488,6 +489,182 @@ def _dienbao_key_sfx(ten_pgd: str | None) -> str:
     return f"_{slug}"
 
 
+_DIENBAO_SCAN_ROWS = 24
+_DIENBAO_SKIP_TEXT = {
+    "",
+    "nan",
+    "none",
+    "<na>",
+    "chi tieu",
+    "stt",
+    "a.",
+    "b.",
+    "i",
+    "ii",
+    "iii",
+    "chi nhanh",
+    "can doi",
+    "can doi nguon von",
+    "su dung von",
+    "ke hoach nguon von",
+    "trung uong",
+    "dia phuong",
+}
+_DIENBAO_REQUIRED_GROUPS = (
+    ("tong", "du", "no"),
+    ("du", "no", "ke", "hoach", "a"),
+    ("du", "no", "ke", "hoach", "b"),
+    ("nguon", "von"),
+    ("tong", "huy", "dong"),
+    ("tien", "gui"),
+    ("qua", "han"),
+    ("khoanh",),
+    ("utdt",),
+    ("gqvl",),
+    ("nsvsmt",),
+    ("ho", "ngheo"),
+)
+
+
+def _norm_dienbao_upload_text(value: object) -> str:
+    try:
+        if value is None or pd.isna(value):
+            return ""
+    except (TypeError, ValueError):
+        if value is None:
+            return ""
+    text = str(value).strip().casefold()
+    text = "".join(
+        c for c in unicodedata.normalize("NFD", text)
+        if unicodedata.category(c) != "Mn"
+    )
+    return text.replace("đ", "d")
+
+
+def _is_dienbao_indicator_text(text_norm: str) -> bool:
+    if not text_norm or text_norm in _DIENBAO_SKIP_TEXT:
+        return False
+    if text_norm.startswith("don vi tinh"):
+        return False
+    if "dien bao" in text_norm or "ngan hang" in text_norm:
+        return False
+    return True
+
+
+def _scan_dienbao_sheet(df_check: pd.DataFrame) -> dict:
+    n_cols = len(df_check.columns)
+    meta = {
+        "hop_le": False,
+        "n_chi_tieu": 0,
+        "n_nhan_dien": 0,
+        "n_so_lieu": 0,
+        "is_matrix": False,
+        "n_don_vi": 0,
+        "has_header": False,
+    }
+    if df_check.empty or n_cols < 3:
+        return meta
+
+    header_row = None
+    for i in range(min(_DIENBAO_SCAN_ROWS, len(df_check))):
+        if "chi tieu" in _norm_dienbao_upload_text(df_check.iloc[i, 1]):
+            header_row = i
+            meta["has_header"] = True
+            break
+
+    value_cols = [2]
+    if header_row is not None and n_cols >= 4:
+        unit_header_row = header_row + 1
+        units = []
+        if unit_header_row < len(df_check):
+            for j in range(3, n_cols):
+                unit_name = _norm_dienbao_upload_text(df_check.iloc[unit_header_row, j])
+                if unit_name and unit_name not in {"nan", "none", "<na>"}:
+                    units.append(j)
+        col2_header = _norm_dienbao_upload_text(df_check.iloc[header_row, 2])
+        if units:
+            meta["is_matrix"] = True
+            meta["n_don_vi"] = len(units)
+            if "cong" not in col2_header and "tong" not in col2_header:
+                value_cols = units
+
+    top_left_text = " ".join(
+        _norm_dienbao_upload_text(df_check.iloc[i, j])
+        for i in range(min(6, len(df_check)))
+        for j in range(min(8, n_cols))
+    )
+    if "dien bao" in top_left_text:
+        meta["has_header"] = True
+
+    matched_groups: set[tuple[str, ...]] = set()
+    first_data_row = header_row + 1 if header_row is not None else 0
+    for i in range(first_data_row, len(df_check)):
+        ten_norm = _norm_dienbao_upload_text(df_check.iloc[i, 1])
+        if not _is_dienbao_indicator_text(ten_norm):
+            continue
+
+        has_numeric = False
+        for col in value_cols:
+            if col >= n_cols:
+                continue
+            value = pd.to_numeric(pd.Series([df_check.iloc[i, col]]), errors="coerce").iloc[0]
+            if pd.notna(value):
+                has_numeric = True
+                break
+        if not has_numeric:
+            continue
+
+        meta["n_chi_tieu"] += 1
+        meta["n_so_lieu"] += 1
+        for group in _DIENBAO_REQUIRED_GROUPS:
+            if all(part in ten_norm for part in group):
+                matched_groups.add(group)
+
+    meta["n_nhan_dien"] = len(matched_groups)
+    meta["hop_le"] = (
+        meta["n_nhan_dien"] >= 2
+        and meta["n_so_lieu"] >= 2
+        and (meta["has_header"] or meta["n_nhan_dien"] >= 4)
+    )
+    return meta
+
+
+def _kiem_tra_noi_dung_dienbao(file_bytes: bytes, ten_hien: str) -> tuple[bool, str, dict]:
+    try:
+        xls = pd.ExcelFile(BytesIO(file_bytes))
+        n_sheets = len(xls.sheet_names)
+        best_meta: dict | None = None
+        for sheet in xls.sheet_names:
+            df_check = pd.read_excel(xls, sheet_name=sheet, header=None)
+            sheet_meta = _scan_dienbao_sheet(df_check)
+            sheet_meta["sheet"] = sheet
+            if best_meta is None or (
+                sheet_meta["n_nhan_dien"],
+                sheet_meta["n_so_lieu"],
+                sheet_meta["n_chi_tieu"],
+            ) > (
+                best_meta["n_nhan_dien"],
+                best_meta["n_so_lieu"],
+                best_meta["n_chi_tieu"],
+            ):
+                best_meta = sheet_meta
+        best_meta = best_meta or {}
+        best_meta["n_sheets"] = n_sheets
+    except Exception as e:
+        logger.error("Đọc workbook Điện báo thất bại: %s", e, exc_info=True)
+        return False, f"❌ Không đọc được file {ten_hien}: {e}", {}
+
+    if not best_meta.get("hop_le"):
+        return (
+            False,
+            f"❌ File {ten_hien} không đúng mẫu Điện báo Cân đối nên chưa được lưu. "
+            "Vui lòng xuất lại từ Báo cáo nhanh → Báo cáo theo công thức → Điện báo ngày "
+            "và chọn đúng file Excel có cột Chỉ tiêu, số liệu Tổng/Cộng.",
+            best_meta,
+        )
+    return True, "OK", best_meta
+
+
 def luu_dienbao(
     loai: str,
     file_bytes: bytes,
@@ -536,59 +713,14 @@ def luu_dienbao(
         logger.error("luu_dienbao: không tạo được key PGD %s: %s", ten_pgd, e, exc_info=True)
         return KetQuaUpload(False, f"❌ Không xác định được mã PGD để lưu metadata Điện báo: {ten_pgd}")
 
-    # Kiểm tra cấu trúc nội dung file điện báo
-    try:
-        df_check = pd.read_excel(BytesIO(file_bytes), header=None)
+    ok_noi_dung, msg_noi_dung, meta_noi_dung = _kiem_tra_noi_dung_dienbao(file_bytes, ten_hien)
+    if not ok_noi_dung:
+        return KetQuaUpload(False, msg_noi_dung, chi_tiet=meta_noi_dung)
 
-        # File phải có ít nhất 3 cột (STT, Tên chỉ tiêu, Giá trị)
-        if len(df_check.columns) < 3:
-            return KetQuaUpload(
-                False,
-                f"❌ File {ten_hien} sai cấu trúc: cần ít nhất 3 cột "
-                f"(hiện có {len(df_check.columns)} cột). "
-                f"Vui lòng tải file mẫu từ: Báo cáo nhanh → Báo cáo theo công thức → Điện báo ngày → Chọn tick tất cả",
-            )
-
-        # Cột giá trị (iloc[2]) phải có ít nhất 1 số hợp lệ
-        col_gia_tri = pd.to_numeric(df_check.iloc[:, 2], errors="coerce")
-        if col_gia_tri.dropna().empty:
-            return KetQuaUpload(
-                False,
-                f"❌ File {ten_hien} không có số liệu hợp lệ ở cột 3. "
-                f"Kiểm tra lại định dạng file mẫu.",
-            )
-
-        # ── Phát hiện format ma trận (nhiều cột PGD) ──
-        is_matrix = False
-        if len(df_check.columns) >= 5 and len(df_check) >= 5:
-            v_header = str(df_check.iloc[4, 2]).strip().lower() if pd.notna(df_check.iloc[4, 2]) else ""
-            if "cộng" in v_header or "tong" in v_header:
-                is_matrix = True
-
-        # Kiểm tra số sheet nếu là file có sheet
-        try:
-            xls = pd.ExcelFile(BytesIO(file_bytes))
-            n_sheets = len(xls.sheet_names)
-        except Exception:
-            n_sheets = 1
-
-        # Đếm số chỉ tiêu và đơn vị
-        n_chi_tieu = 0
-        n_don_vi = 0
-        skip_kw = ("", "nan", "chỉ tiêu", "điện báo ngày", "stt", "b.", "a.")
-        for i in range(5, len(df_check)):
-            ten = str(df_check.iloc[i, 1]).strip() if pd.notna(df_check.iloc[i, 1]) else ""
-            if ten and ten.lower() not in skip_kw and ten.lower() not in ("i", "ii", "iii"):
-                n_chi_tieu += 1
-
-        if is_matrix:
-            for j in range(3, len(df_check.columns)):
-                if pd.notna(df_check.iloc[4, j]) and str(df_check.iloc[4, j]).strip().lower() != "nan":
-                    n_don_vi += 1
-
-    except Exception as e:
-        logger.error("Lỗi trong khối except: %s", e, exc_info=True)
-        return KetQuaUpload(False, f"❌ Không đọc được file {ten_hien}: {e}")
+    n_sheets = int(meta_noi_dung.get("n_sheets") or 1)
+    n_chi_tieu = int(meta_noi_dung.get("n_chi_tieu") or 0)
+    is_matrix = bool(meta_noi_dung.get("is_matrix"))
+    n_don_vi = int(meta_noi_dung.get("n_don_vi") or 0)
 
     _ghi_va_xoa_cache(duong_dan, file_bytes)
     username = st.session_state.get("username", "unknown")

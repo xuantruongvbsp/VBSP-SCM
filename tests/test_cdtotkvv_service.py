@@ -6,7 +6,14 @@ from io import BytesIO
 import openpyxl
 import pandas as pd
 
-from config import DON_VI_CHI_NHANH
+import services.cdtotkvv_service as cdtotkvv_service
+from config import (
+    COT_NGAY_SINH,
+    COT_TEN_KH,
+    COT_TEN_PGD,
+    COT_TEN_XA,
+    DON_VI_CHI_NHANH,
+)
 from data.cdtotkvv import doc_cdtotkvv_path, doc_thang_tu_cdto_toan_cn, tach_file_cdto_toan_cn
 from services.cdtotkvv_service import (
     loc_df,
@@ -102,6 +109,66 @@ class TestFmtXuatToKhongDatVn:
         df_in = pd.DataFrame({"A": [1]})
         df_out = fmt_xuat_to_khong_dat_vn(df_in)
         assert len(df_out) == 1
+
+
+class TestEnrichTuoiToTruongFallback:
+    def test_method_c_fill_dung_mask_khi_df_giu_index_cu(self, tmp_path, monkeypatch):
+        hstd_path = tmp_path / "hstd.parquet"
+        pd.DataFrame({
+            COT_TEN_PGD: ["PGD A", "PGD A", "PGD A"],
+            COT_TEN_XA: ["Xã A", "Xã A", "Xã A"],
+            COT_TEN_KH: ["Nguyễn Văn A", "Trần Thị B", "Người Khác"],
+            COT_NGAY_SINH: ["01/01/1950", "01/01/1980", "01/01/1990"],
+        }).to_parquet(hstd_path)
+        monkeypatch.setattr(cdtotkvv_service, "CACHE_HSTD", str(hstd_path))
+
+        df_cdto = pd.DataFrame({
+            "ten_dv": ["PGD A", "PGD A", "PGD A"],
+            "ten_xa": ["Xã A", "Xã A", "Xã A"],
+            "ten_to_truong": ["Nguyễn Văn A", "Trần Thị B", "Không Có"],
+        }, index=[10, 20, 30])
+
+        enriched, source_msg, so_fill = cdtotkvv_service.enrich_tuoi_to_truong_fallback_tu_hstd(df_cdto)
+
+        assert so_fill == 3
+        assert "Tên tổ trưởng trùng KH HSTD" in source_msg
+        assert "2 tổ" in source_msg
+
+        by_name = enriched.set_index("ten_to_truong")
+        assert int(by_name.loc["Nguyễn Văn A", "tuoi_to_truong"]) >= 70
+        assert 18 <= int(by_name.loc["Không Có", "tuoi_to_truong"]) <= 100
+        assert "Tên tổ trùng KH" in by_name.loc["Nguyễn Văn A", "_nguon_tuoi_est"]
+        assert "TB tuổi KH xã" in by_name.loc["Không Có", "_nguon_tuoi_est"]
+        assert int(by_name.loc["Nguyễn Văn A", "_co_vay_von"]) == 1
+        assert int(by_name.loc["Không Có", "_co_vay_von"]) == 0
+
+    def test_upload_duoi_30_phan_tram_giu_na_va_nguon_chi_tiet(self, tmp_path, monkeypatch):
+        hstd_path = tmp_path / "hstd.parquet"
+        pd.DataFrame({
+            COT_TEN_PGD: ["PGD A", "PGD A"],
+            COT_TEN_XA: ["Xã A", "Xã A"],
+            COT_TEN_KH: ["Trần Thị B", "Người Khác"],
+            COT_NGAY_SINH: ["01/01/1980", "01/01/1990"],
+        }).to_parquet(hstd_path)
+        monkeypatch.setattr(cdtotkvv_service, "CACHE_HSTD", str(hstd_path))
+
+        df_cdto = pd.DataFrame({
+            "ten_dv": ["PGD A", "PGD A", "PGD A", "PGD A"],
+            "ten_xa": ["Xã A", "Xã A", "Xã A", "Xã A"],
+            "ten_to_truong": ["Nguyễn Văn A", "Trần Thị B", "Không Có 1", "Không Có 2"],
+            "tuoi_to_truong": [66, pd.NA, pd.NA, pd.NA],
+        })
+
+        enriched, source_msg, so_fill = cdtotkvv_service.enrich_tuoi_to_truong_fallback_tu_hstd(df_cdto)
+
+        assert so_fill == 3
+        assert "CDTOTKVV upload cho phần còn lại" in source_msg
+        by_name = enriched.set_index("ten_to_truong")
+        assert int(by_name.loc["Nguyễn Văn A", "tuoi_to_truong"]) == 66
+        assert pd.isna(by_name.loc["Nguyễn Văn A", "_co_vay_von"])
+        assert "Upload thật" in by_name.loc["Nguyễn Văn A", "_nguon_chi_tiet"]
+        assert int(by_name.loc["Trần Thị B", "_co_vay_von"]) == 1
+        assert int(by_name.loc["Không Có 1", "_co_vay_von"]) == 0
 
 
 def _build_cdto_toan_cn_bytes(leading_blank: bool) -> bytes:

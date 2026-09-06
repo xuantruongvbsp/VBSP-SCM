@@ -138,7 +138,7 @@ else:
 def _format_phan_tram(val: float | int | str) -> str:
     try:
         v = float(val)
-        return f"{v:,.2f} %".replace(",", "X").replace(".", ",").replace("X", ".")
+        return f"{v:,.1f} %".replace(",", "X").replace(".", ",").replace("X", ".")
     except (ValueError, TypeError):
         return str(val) if pd.notna(val) else ""
 
@@ -159,15 +159,21 @@ def _is_number(value: object) -> bool:
     return isinstance(value, Number) and not isinstance(value, bool)
 
 
-def _format_number_pdf(value: object, col_name: object = "") -> str:
+def _format_number_pdf(value: object, col_name: object = "", don_vi_tien: str = "") -> str:
     from utils import fmt_so
 
     c = str(col_name).casefold()
     if "tỷ lệ" in c or "%" in c:
         return _format_phan_tram(value).replace(" %", "")
+    dv = str(don_vi_tien or "").casefold()
     if _is_number(value):
-        return fmt_so(float(value))
+        num = float(value)
+        if "triệu" in dv and abs(num - round(num)) >= 0.05:
+            return f"{num:,.1f}".replace(",", "X").replace(".", ",").replace("X", ".")
+        return fmt_so(num)
     num = float(str(value).strip().replace(".", "").replace(",", "."))
+    if "triệu" in dv and abs(num - round(num)) >= 0.05:
+        return f"{num:,.1f}".replace(",", "X").replace(".", ",").replace("X", ".")
     return fmt_so(num)
 
 
@@ -432,7 +438,7 @@ def xuat_pdf(
     def _col_ratio(col_name: str) -> float:
         c = str(col_name).strip().lower()
         if c in ("stt",):
-            return 0.45
+            return 0.65
         if any(k in c for k in ("tiêu chí", "tieu chi", "chỉ tiêu", "chi tiêu",
                                  "đơn vị")):
             return 2.8
@@ -509,7 +515,7 @@ def xuat_pdf(
             val = row[col]
             if pd.isna(val):
                 p = Paragraph(
-                    "",
+                    "-",
                     cell_left_style if _is_left_align(col) else cell_right_style,
                 )
             elif col in cols_percent:
@@ -517,7 +523,7 @@ def xuat_pdf(
                 p = Paragraph(txt, cell_right_style)
             elif col in cols_tien and pd.notna(val):
                 try:
-                    txt = _format_number_pdf(val, col)
+                    txt = _format_number_pdf(val, col, don_vi_tien)
                     p = Paragraph(txt, cell_right_style)
                 except (ValueError, TypeError):
                     p = Paragraph(_pdf_text(val), cell_right_style)
@@ -570,7 +576,7 @@ def xuat_pdf(
                 p = Paragraph(txt, tong_right_style)
             elif col in cols_tien and val != "":
                 try:
-                    txt = f"<b>{_pdf_text(_format_number_pdf(val, col))}</b>"
+                    txt = f"<b>{_pdf_text(_format_number_pdf(val, col, don_vi_tien))}</b>"
                 except (ValueError, TypeError):
                     txt = f"<b>{txt}</b>"
                 p = Paragraph(txt, tong_right_style)
@@ -643,21 +649,21 @@ def xuat_pdf(
     story.append(tbl)
 
     story.append(Spacer(1, 0.2 * cm))
-    don_vi_hien = f"({don_vi_tien})" if don_vi_tien and don_vi_tien != "đồng" else ""
-    if don_vi_hien or cols_percent or cols_tien:
+    co_hien_thi_dv = (don_vi_tien and don_vi_tien.strip() and don_vi_tien.strip() != "đồng")
+    if co_hien_thi_dv or cols_percent or cols_tien:
         ghi_chu_parts = []
-        if don_vi_hien:
-            ghi_chu_parts.append(f"Đơn vị tiền: {don_vi_hien}")
+        if co_hien_thi_dv:
+            ghi_chu_parts.append(f"Đơn vị tính: {don_vi_tien.strip()}")
+        elif cols_tien:
+            ghi_chu_parts.append("Đơn vị tính: VND (đồng)")
         if cols_percent:
             ghi_chu_parts.append("Đơn vị %: phần trăm (%)")
-        if cols_tien and not don_vi_hien:
-            ghi_chu_parts.append("Đơn vị tiền: VND")
         if ghi_chu_parts:
             story.append(Paragraph(
                 "  ·  ".join(ghi_chu_parts),
-                ParagraphStyle("ghi_chu", fontName=fn, fontSize=8.5,
+                ParagraphStyle("ghi_chu", fontName=fn, fontSize=9,
                                alignment=TA_LEFT, textColor=TEXT_MUTED,
-                               spaceAfter=0.8 * cm, spaceBefore=0.2 * cm)
+                               spaceAfter=0.8 * cm, spaceBefore=0.3 * cm)
             ))
 
     story.append(Spacer(1, 1.0 * cm))
@@ -1096,6 +1102,11 @@ def xuat_pdf_bang(
     *,
     nguoi_xuat: str = "",
     cols_tien: list[str] | None = None,
+    cols_percent: list[str] | None = None,
+    cols_dem: list[str] | None = None,
+    don_vi_tien: str = "đồng",
+    dong_tong: dict[str, object] | None = None,
+    them_dong_tong: bool = True,
     prefix_file: str = "",
 ) -> bytes:
     if tieu_de_phu:
@@ -1107,6 +1118,11 @@ def xuat_pdf_bang(
         tieu_de_day_du,
         nguoi_xuat or "VBSP-SCM",
         cols_tien=cols_tien,
+        cols_percent=cols_percent,
+        cols_dem=cols_dem,
+        don_vi_tien=don_vi_tien,
+        dong_tong=dong_tong,
+        them_dong_tong=them_dong_tong,
         prefix_file=prefix_file,
     )
 

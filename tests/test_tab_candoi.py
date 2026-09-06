@@ -380,6 +380,34 @@ def test_lookup_kh_optional_tkvv_ho_tro_ten_khong_co_ampersand():
     ) == 12_000_000
 
 
+def test_lookup_gqvl_khb_nhan_alias_gqvk_tu_file_dienbao():
+    rows = [
+        _row("Dư nợ HSSV có HCKK", 1_692_800_340_000, he_so_vnd=1),
+        {
+            "ten": "  NQH: Dư nợ HSSV có HCKK",
+            "val": 1_525_840_000,
+            "la_nqh_con": True,
+            "cha": "Dư nợ HSSV có HCKK",
+            "he_so_vnd": 1,
+        },
+        _row("Dư nợ nhà ở gđ2 KHA", 10_543_220_000, he_so_vnd=1),
+        _row("Dư nợ GQVK KHB", 1_508_558_500_000, he_so_vnd=1),
+        {
+            "ten": "  NQH: Dư nợ GQVK KHB",
+            "val": 1_841_580_000,
+            "la_nqh_con": True,
+            "cha": "Dư nợ GQVK KHB",
+            "he_so_vnd": 1,
+        },
+    ]
+
+    assert tab_candoi._lookup_vnd(rows, "Dư nợ HSSV", 1) == 1_692_800_340_000
+    assert tab_candoi._nqh_con_vnd(rows, "Dư nợ HSSV", 1) == 1_525_840_000
+    assert tab_candoi._lookup_vnd(rows, "Dư nợ nhà ở gđ 2 KHA", 1) == 10_543_220_000
+    assert tab_candoi._lookup_vnd(rows, "Dư nợ GQVL KHB", 1) == 1_508_558_500_000
+    assert tab_candoi._nqh_con_vnd(rows, "Dư nợ GQVL KHB", 1) == 1_841_580_000
+
+
 def test_lookup_kh_optional_phan_biet_thieu_chi_tieu_va_gia_tri_zero():
     assert tab_candoi._lookup_kh_optional_vnd(
         [_row("Tiền gửi tiết kiệm qua Tổ TK&VV", 0)],

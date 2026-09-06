@@ -130,12 +130,24 @@ _CHUONG_TRINH_CANDOI: list[tuple[str, str | None]] = [
     ("Nợ khoanh KHB",              "Dư nợ Khoanh KHB"),
 ]
 
+_INDICATOR_ALIASES: dict[str, list[str]] = {
+    "Dư nợ HSSV": ["Dư nợ HSSV có HCKK"],
+    "Dư nợ nhà ở gđ 2 KHA": ["Dư nợ nhà ở gđ2 KHA"],
+    # Một số file Điện báo xuất "GQVK" cho chương trình Giải quyết việc làm KHB.
+    "Dư nợ GQVL KHB": ["Dư nợ GQVK KHB"],
+}
+
+
+def _indicator_candidates(ten_search: str) -> list[str]:
+    return [ten_search, *_INDICATOR_ALIASES.get(ten_search, [])]
+
 
 def _lay_nqh_con(rows: list[dict], ten_cha: str) -> float:
     """Tìm giá trị dòng NQH con ngay sau ten_cha."""
-    for r in rows:
-        if r["la_nqh_con"] and r["cha"] == ten_cha:
-            return r["val"]
+    for candidate in _indicator_candidates(ten_cha):
+        for r in rows:
+            if r["la_nqh_con"] and r["cha"] == candidate:
+                return r["val"]
     return 0.0
 
 
@@ -150,20 +162,27 @@ def _row_vnd(row: dict, fallback_he_so: int) -> float:
 
 
 def _lookup_vnd(rows: list[dict] | None, ten_search: str, he_so: int) -> float:
-    return _to_vnd(db_lookup(rows, ten_search), he_so) if rows else 0.0
+    if not rows:
+        return 0.0
+    for candidate in _indicator_candidates(ten_search):
+        val = db_lookup(rows, candidate)
+        if val:
+            return _to_vnd(val, he_so)
+    return 0.0
 
 
 def _lookup_optional_vnd(rows: list[dict] | None, ten_search: str, he_so: int) -> float | None:
     """Tra chỉ tiêu Điện báo thường, trả None khi không tìm thấy."""
     if not rows:
         return None
-    ten_l = ten_search.strip().lower()
-    for row in rows:
-        if not row.get("la_nqh_con") and str(row.get("ten", "")).strip() == ten_search.strip():
-            return _row_vnd(row, he_so)
-    for row in rows:
-        if not row.get("la_nqh_con") and ten_l in str(row.get("ten", "")).lower():
-            return _row_vnd(row, he_so)
+    for candidate in _indicator_candidates(ten_search):
+        ten_l = candidate.strip().lower()
+        for row in rows:
+            if not row.get("la_nqh_con") and str(row.get("ten", "")).strip() == candidate.strip():
+                return _row_vnd(row, he_so)
+        for row in rows:
+            if not row.get("la_nqh_con") and ten_l in str(row.get("ten", "")).lower():
+                return _row_vnd(row, he_so)
     return None
 
 

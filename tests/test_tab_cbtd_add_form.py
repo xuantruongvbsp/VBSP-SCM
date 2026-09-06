@@ -14,7 +14,8 @@ def test_cbtd_add_form_prefix_changes_by_version():
 def test_cbtd_add_form_uses_versioned_widget_keys():
     source = inspect.getsource(tab_cbtd.render)
 
-    assert "add_ver_key = f\"{_kp}cbtd_add_ver\"" in source
-    assert "add_kp = _cbtd_add_form_prefix(_kp, add_ver)" in source
+    assert "_kp_g2 = f\"{_kp}lv2_2_\"" in source
+    assert "add_ver_key = f\"{_kp_g2}cbtd_add_ver\"" in source
+    assert "add_kp = _cbtd_add_form_prefix(_kp_g2, add_ver)" in source
     assert "key=f\"{add_kp}cbtd_dgd_new\"" in source
     assert "st.session_state[add_ver_key] = add_ver + 1" in source

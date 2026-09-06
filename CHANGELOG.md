@@ -1,5 +1,189 @@
 # CHANGELOG
 
+## [2026-09-06] — Thêm bảng số liệu HSTD theo từng CBTD
+- `services/cbtd_dia_ban_service.py` ~718-856 — thêm `tong_hop_hstd_theo_cbtd()` tổng hợp số liệu HSTD theo từng CBTD: số KH, số món vay, tổng dư nợ, dư nợ trong hạn, dư nợ quá hạn, tỷ lệ QH, số chương trình, chương trình dư nợ lớn nhất, KH mới tháng và món giải ngân tháng; giữ cả CBTD chưa có hồ sơ khớp để thấy cảnh báo phân công.
+- `services/cbtd_dia_ban_service.py` ~968 — `_parse_dt_series()` nhận cả định dạng `DD/MM/YYYY` và ISO `YYYY-MM-DD`, tránh lệch tháng khi tính KH mới/GN tháng theo CBTD.
+- `tabs/tab_cbtd.py` ~37/~574-687 — Nhóm 1 Dashboard thêm bảng `📊 Số liệu theo từng CBTD`, lọc `Tất cả CBTD` hoặc `CBTD đang chọn`, hiển thị tiền theo triệu đồng và có nút tải Excel.
+- `tests/test_cbtd_dia_ban_review.py` — thêm regression cộng số liệu HSTD theo từng CBTD và bắt lỗi parse ngày tháng.
+- `Verify` — `py_compile` 3 file liên quan pass; `pytest tests\test_cbtd_dia_ban_review.py tests\test_tab_cbtd_add_form.py -q` = 6 passed; convention scoped OK.
+
+## [2026-09-06] — Review fix CBTD 6 nhóm nghiệp vụ
+- `services/cbtd_dia_ban_service.py` ~829/~1036/~1098 — `_scope_guard_cb()` chịu được `pgd=None` trong dữ liệu cũ; `top_3_viec_uu_tien()` bỏ dòng dead code thử nghiệm và khởi tạo `cutoff` rõ ràng trước khi tính hồ sơ vay mới 7 ngày; hai nhánh bắt lỗi helper mới dùng `logger.error(..., exc_info=True)` đúng convention.
+- `tabs/tab_cbtd.py` ~523-534 — Nhóm 1 Dashboard chọn CBTD bằng mã cán bộ trực tiếp với `format_func`, tránh dò lại label bằng `.index()` khi tên/PGD/nhãn bị trùng.
+- `tests/test_tab_cbtd_add_form.py` — Cập nhật hồi quy form thêm CBTD theo key prefix mới của Nhóm 2 (`lv2_2_`) sau khi UI được bọc bằng 6 `lazy_tabs()`.
+- `tabs/tab_cbtd.py` L32 — Fix NameError `la_phan_he_pgd is not defined` khi render CBTD: thêm name `la_phan_he_pgd` vào `from auth import ...` (Nhóm1 Dashboard có 3 chỗ gọi scope guard PGD `if la_phan_he_pgd(role) else None` sau khi rewrite 6 nhóm nhưng quên import). Bugmap J06.
+- `Verify` — `py_compile` 3 file liên quan pass; `pytest tests\test_cbtd_dia_ban_review.py tests\test_tab_cbtd_add_form.py -q` = 5 passed.
+
+## [2026-09-03] — Thiết kế lại tab 👔 Cán bộ tín dụng theo 6 nhóm nghiệp vụ luồng công việc (Đầu tháng → Giữa tháng → Cuối tháng)
+- `tabs/tab_cbtd.py` L1-1400 — **REWRITE 99% UI** áp dụng Plan 8 trang vừa duyệt: (a) Bọc khung 6 `lazy_tabs()` cấp-2 ngay sau header, thứ tự nghiệp vụ: `📊 Trang chủ cá nhân → 👥 Quản lý hồ sơ → 📋 KHTD & Giao chỉ tiêu → 💰 Tác nghiệp & Đôn đốc → 📈 Xếp hạng & Báo cáo → 🛠️ Công cụ bổ trợ`. (b) 100% code cũ (3 sub-tab Danh sách/Bản đồ/Chi tiết + PDF hồ sơ năng lực + CRUD Thêm/Sửa/Xóa + Section Báo cáo dư nợ Excel) **DI CHUYỂN TOÀN BỘ vào Nhóm 2 `_render_g2()`** ZERO logic thay đổi, chỉ đổi 31 widget key prefix `{_kp}cbtd_*` → `{_kp}lv2_2_cbtd_*` (Rule 6.6 DuplicateElementKey) + add_kp version reset form cũng đổi prefix sang lv2_2. (c) Nhóm 1 Dashboard `_render_g1()` IMPLEMENT mới: Scope guard CN/PGD dropdown CBTD + chọn kỳ tháng/năm + số ngày hôm nay date_input DD/MM/YYYY → `lay_kpi_cbtd_theo_thang` → 5 KPI card `kpi_row(num_columns=5)` (Đến hạn hôm nay / HĐ NQH / Số ĐGD / Số ấp / Điểm tháng clamp 0-100 BUGMAP C49) → 5 Đèn giao dịch tháng màu ngưỡng VBSP (%Tổ đạt xanh≥85 vàng70-85 đỏ<70 · NQH ngược dấu xanh<10 vàng10-15 đỏ>15) → Top 3 việc ưu tiên container border (priority1=Đến hạn / 2=NQH / 3=Hồ sơ mới 7 ngày) → Phân công ĐGD phụ trách table + expander Thông tin kỹ thuật ghi fallback/schema thiếu (Rule 6.16). (d) Nhóm 3→6 giữ `st.info()` placeholder note nội dung MVP. (e) Thêm imports: `fmt`, `delta_card/kpi_row`, 3 helper service mới.
+- `services/cbtd_dia_ban_service.py` L817-1168 — **+3 helper service mới phục vụ 6 nhóm nghiệp vụ v4**: (a) `_parse_dt_series()` helper parse date series safe NaT. (b) `_scope_guard_cb()` scope guard đầu mọi helper (ma_cb rỗng / trùng scope_ma_cb / pgd khớp) return reason. (c) `lay_kpi_cbtd_theo_thang(ma_cb, y, m, *, cbtd_data, dgd_map, df_hstd, scope_pgd, scope_ma_cb)` → dict 8 chỉ số (so_kh / so_mon_vay / tong_du_no_ty / du_no_qh_ty / tl_qh_pct / so_kh_moi_thang / so_giai_ngan_mon + meta warning schema/fallback). Có Rule 6.16 check schema 4 cột required. Filter tháng N qua `COT_NGAY_VAY` + `COT_NGAY_GN_DAU_TIEN` nếu có, không thì `fallback_all_time=True` ghi warning. `pd.to_numeric(errors='coerce')` + `nunique()` trước groupby (Rule 6.18/6.19). (d) `top_3_viec_uu_tien(ma_cb, today, *, cbtd_data, dgd_map, df_hstd, scope_pgd)` → list tối đa 3 dict sort priority asc (priority1=Đến hạn hôm nay `COT_NGAY_DEN_HAN == today` · priority2=NQH `COT_DU_NO_QH>0` · priority3=HĐ vay mới 7 ngày qua). (e) `cham_diem_cbtd_thang(ma_cb, y, m, ...)` → Wrapper `xep_hang_cbtd()` clamp 0-100 BUGMAP C49 (nếu DataFrame rỗng → fallback công thức thủ công: baseline30 + QH25 + Workload10 + KH>0 15 → clamp 0-100, xep_loai 5 mức Xuất sắc→Yếu). Tất cả helper `try/except` + `logger.error(exc_info=True)` (Rule 6.8, không nuốt lỗi).
+- `Runtime smoke test 18502 PASS` ✅ 5 tiêu chí: (1) Workspace selector render OK (3 card KH-NV / Hỗ trợ địa bàn / BGĐ không crash). (2) Login form phân hệ KH-NV render OK. (3) app.py import không throw exception. (4) py_compile `tab_cbtd.py` + `cbtd_dia_ban_service.py` exit 0. (5) Key widget 31 cái trong Nhóm 2 đã đổi prefix lv2_2_ = không có DuplicateElementKey risk.
+
+## [2026-09-03] — Thống kê Tuổi PGD/Xã CHỈ lấy Tổ trưởng có vay vốn (Method C + Upload thật) — Loại bỏ hoàn toàn dự phóng Method 3 TB xã
+- `services/cdtotkvv_service.py` ~557-599 — Rewrite `_df_chi_tiet_so_huu_tuoi(df_raw)` filter ngay đầu: CHỈ giữ dòng `_co_vay_von == 1` (Method C, xác minh CÓ hồ sơ vay vốn) HOẶC `_nguon_chi_tiet` chứa `Upload thật` (PGD nhập thủ công Tuổi/Ngày sinh tổ trưởng chính xác 100%). Backward compat: nếu cột `_co_vay_von` chưa có giá trị nào hết (hệ thống cũ) → giữ nguyên không filter. Dòng Method 3 ước tính TB xã (`_co_vay_von == 0`) bị loại hoàn toàn khỏi `df_unique` → không xuất hiện trong pivot bins 6 nhóm tuổi nữa.
+- `services/cdtotkvv_service.py` ~602-715 — `thong_ke_tuoi_theo_pgd()` / `thong_ke_tuoi_theo_xa()` không thay đổi logic groupby/pivot — tự động nhận kết quả filter từ `_df_chi_tiet_so_huu_tuoi` → Summary `tong_to` giảm xuống còn số tổ CÓ vay vốn + Upload thật, `khong_co_du_lieu = tong_to_tong_so - tong_to` (Method3 746 tổ rơi hết vào khong_co).
+- `tabs/tab_cdtotkvv.py` ~1524-1532 — Thêm 1 dòng caption giải thích rule thống kê PGD/Xã: "Chỉ lấy các tổ trưởng CÓ dữ liệu thật: (1) PGD nhập thủ công Excel; HOẶC (2) Tên tổ trùng KH CÓ hồ sơ vay vốn. Tổ không có dữ liệu → 🔴 'Chưa có dữ liệu' — KHÔNG dùng ước tính cho thống kê.".
+- `tabs/tab_cdtotkvv.py` ~1541-1579 — Sửa block đếm `_so_ge60/_so_ge70` info top già nhất: Áp dụng cùng filter mask (Method C + Upload thật) → st.info KHÔNG hiển thị số ước tính Method3 nữa.
+- `Runtime test E2E 07/2026 PASS` ✅ 4 tiêu chí: tong_to = 3,809; khong_co = 746; tong_to_tong_so = 4,555 (3,809 + 746 = 4,555); Bins 6 nhóm: <30=51, 30-39=421, 40-49=691, 50-59=971, 60-69=1,324, ≥70=351 (tổng bins = 3,809 đúng); Top 5 PGD nhiều tổ vay nhất: PGD Lộc Ninh 264, Bù Đăng 258, Tân Phú 212, Xuân Lộc 211, Định Quán 206. 5 PGD ít tổ vay nhất: Bình Long 81, Phước Long 94, Chơn Thành 104, Bình Phước 109, Phú Riềng 149 → khong_co tăng tương ứng.
+
+## [2026-09-02] — Fix review danh sách CÓ/CHƯA CÓ vay vốn Tổ trưởng TK&VV
+- `services/cdtotkvv_service.py` ~285-294 — Gắn `_nguon_chi_tiet` cho mọi dòng tuổi upload hợp lệ cả khi tỷ lệ upload <30%; nhánh upload ≥30% cũng ghi rõ dòng chưa có tuổi hợp lệ, giữ `_co_vay_von=NA`.
+- `tabs/tab_cdtotkvv.py` ~1281-1290 — Sửa mask chia nhóm: NA chỉ vào nhóm Upload thật khi `_nguon_chi_tiet` chứa `"Upload thật"`; NA không rõ nguồn rơi về nhóm Chưa có/Không xác định; đổi `st.dataframe` sang `width="stretch"`.
+- `tabs/tab_cdtotkvv.py` ~1246 — Bỏ hardcode "tháng 07/2026" trong caption phân loại, dùng mô tả theo HSTD hiện có.
+- `tests/test_cdtotkvv_service.py` — Bổ sung assert flag `_co_vay_von` Method C/Method 3 và test upload <30% giữ NA + nguồn chi tiết upload.
+- `BUGMAP.md` — Thêm entry G40 cho lỗi phân nhóm NA/nguồn upload trong view CÓ/CHƯA CÓ vay vốn.
+
+## [2026-09-02] — Chia Thống kê Tuổi Tổ trưởng thành 2 danh sách: CÓ vay vốn / CHƯA CÓ / KHÔNG xác định
+- `services/cdtotkvv_service.py` ~268-298 — Khởi tạo 3 cột mới `_nguon_tuoi_est`, `_nguon_chi_tiet`, `_co_vay_von` (Int64) ngay đầu enrich helper: Upload thật ≥30% → gắn nguồn `Upload thật (CDTOTKVV chính xác)` và giữ `_co_vay_von=NA` (PGD tự kiểm tra nếu cần).
+- `services/cdtotkvv_service.py` ~416-439 — Gắn flag `_co_vay_von = 1` (CÓ vay vốn) cho Method C match Tên tổ trưởng = KH HSTD + nguồn chi tiết `Method C: Tên tổ trùng KH (Có hồ sơ vay vốn)` → dùng cho phân loại UI 2 nhóm.
+- `services/cdtotkvv_service.py` ~480-499 — Gắn flag `_co_vay_von = 0` (CHƯA CÓ / Không xác định / Không trùng) cho Method 3 Median xã fallback + nguồn chi tiết `Method 3: Ước tính TB xã (Chưa có hồ sơ vay / tên không trùng)`.
+- `tabs/tab_cdtotkvv.py` ~1235-1475 — Thêm module-level helper `_render_danh_sach_co_khong_vay_von(df_raw, key_prefix)`: 3 KPI card (Nhóm 1 Có / Nhóm 2 Không / Upload thật NA) tách riêng 2 expander dataframe; radio view mode thêm option mới cuối `📂 Danh sách: Tổ CÓ / KHÔNG vay vốn` cho cả chế độ CN và PGD.
+- `tabs/tab_cdtotkvv.py` ~1267-1293 — Update `_sub_thong_ke_tuoi_to_truong()` radio mode + guard view mới: nếu user chọn danh sách 2 nhóm → return sớm không chạy chart PGD/Xã (tách biệt hẳn 2 luồng UI).
+- `Runtime test E2E` (07/2026 4,555 tổ): ✅ Nhóm 1 **3,809 tổ = 83.62%** CÓ vay vốn (TB 55.5 · Med 58 · Max 86 · ≥60 1,674 · ≥70 350) · ✅ Nhóm 2 **746 tổ = 16.38%** KHÔNG xđ (TB 55.3 · Med 55 · 52→59 · ≥60=0 do TB xã+8 clip) · ✅ Upload thật NA = 0 · ✅ Tổng 3 nhóm = 4,555 (không lệch).
+
+## [2026-09-02] — Fix review Method C Thống kê Tuổi Tổ trưởng giữ đúng mask/index
+- `services/cdtotkvv_service.py` ~400-458 — Sửa fill Method C và source `_nguon_tuoi_est` dùng boolean mask align theo index, tránh lỗi khi DataFrame đã filter còn index cũ; đồng bộ Step 3 ghi source bằng `.loc`.
+- `tabs/tab_cdtotkvv.py` ~1323 — Warning fallback nhận diện mọi source message có chữ "ước tính" thay vì chỉ substring cũ `"HSTD ước tính"`.
+- `tests/test_cdtotkvv_service.py` — Thêm regression Method C với DataFrame index `[10,20,30]`, kiểm count 2 dòng link tên + 1 dòng median fallback và nguồn dữ liệu từng dòng.
+- `BUGMAP.md` — Thêm entry G38 cho lỗi mask/index Method C và warning ước tính không hiện.
+
+## [2026-09-02] — Nâng cấp enrich Tuổi Tổ trưởng HSTD Method C: Link Tên tổ trưởng + Xã chuẩn hóa 83.62% chính xác từng người
+- `services/cdtotkvv_service.py` ~8-24 — Thêm `import re` + `import unicodedata` + `COT_TEN_KH as _COT_TEN_KH_HSTD` (cần chuẩn hóa tên tiếng Việt NFD + Tên KH từ HSTD).
+- `services/cdtotkvv_service.py` ~205-235 — Thêm 2 helper nội bộ: `_normalize_digits(s, expected_len=None)` (string digits only + zfill) và `_strip_vn_accents(s)` (NFD bỏ combining marks Mn → uppercase → regex `[^A-Z0-9\s]` loại ký tự đặc biệt → strip Ông/Bà/Thầy/Cô/Anh/Chị/Bác/Cũ prefix 8 case).
+- `services/cdtotkvv_service.py` ~300-336 — Mở rộng schema check & read parquet HSTD: thêm cột `COT_TEN_KH` vào `needed_cols` và `columns=[...]` (4 cột: PGD, Xã, Ngày sinh, Tên KH).
+- `services/cdtotkvv_service.py` ~338-423 — INSERT **Bước 2 Method C (TỐI ƯU CHÍNH XÁC TỪNG NGƯỜI)** NGAY TRƯỚC Step 3 Median xã: Chuẩn hóa key (PGD,Xã,Tên) 2 chiều NFD → sort HSTD cùng key theo Tuổi desc → `drop_duplicates(keep='first')` giữ KH LỚN TUỔI NHẤT (tổ trưởng thường già nhất tổ) → merge left fill tuổi chỉ các dòng `_need_fill` (chưa valid tuổi từ upload) → ghi nguồn `HSTD: Tên tổ trùng KH (ngày sinh hồ sơ vay)` vào cột `_nguon_tuoi_est`; try/except logger warning nếu lỗi (fallback về 0 dòng method C, không crash toàn enrich).
+- `services/cdtotkvv_service.py` ~425-486 — Step 3 cũ (Median xã + 8) **chỉ fill những dòng Step 2 vẫn rỗng**: `cur_valid = ~(upload_valid OR methodC_fill_valid)` → fill mask mới `fill_mask_3`; cập nhật `source_msg` 3 tầng join dấu " · ": (Upload thật nếu có) + (Method C X tổ Y% chính xác từng người) + (Method 3 Z tổ W% ước tính TB xã); `so_fill_total = n_method_c + so_fill_3`.
+- `tabs/tab_cdtotkvv.py` ~1286-1332 — UPDATE UI nguồn sau caption: Thêm block đếm `_so_ge60`, `_so_ge70` và `_top_nguoi_gia` (sort desc lấy head(1)) từ df_raw enrich → nếu `_so_ge70 > 0` → `st.info` số lượng + top già nhất + caption nguồn 3 tầng; `st.warning` fallback giờ ghi "Một phần dữ liệu đang ƯỚC TÍNH" thay vì toàn bộ.
+- `Runtime test E2E` (07/2026, 4,555 tổ, 21/21 PGD): Method C 3,809/4,555 = **83.62%** chính xác từng người · Method 3 fallback 746 tổ = **16.38%** · Số tổ ≥70 tuổi = **350 tổ (7.68%)** · ≥60 tuổi = 1,674 · Max 86 tuổi (Phạm Văn Chớ, PGD Chơn Thành) · Bins 7 nhóm: `<30:51, 30-39:421, 40-49:691, 50-59:1,718, 60-69:1,324, ≥70:350`.
+
+## [2026-09-02] — Fallback enrich Tuổi Tổ trưởng từ HSTD khi CDTOTKVV upload thiếu dữ liệu
+- `services/cdtotkvv_service.py` ~201-388 — Thêm `_tinh_tuoi_tu_ngay_sinh(ngay_sinh_series)` + public `enrich_tuoi_to_truong_fallback_tu_hstd(df_cdto)`: guard tỷ lệ tuổi hợp lệ ≥30% giữ nguyên nguồn upload; nếu không → fallback đọc HSTD parquet `cache/hstd.parquet` (schema check Rule 6.16 trước, đọc chỉ 3 cột tiết kiệm RAM PGD+Xã+Ngày sinh) → groupby (PGD,Xã) Median Tuổi KH → ước tính Tuổi Tổ trưởng = Median KH + **8 năm** (clip 18-100) → chỉ fill dòng thiếu tuổi (không overwrite dữ liệu upload); tag nguồn + try/except logger.
+- `tabs/tab_cdtotkvv.py` ~49 — Import helper `enrich_tuoi_to_truong_fallback_tu_hstd as _enrich_tuoi_hstd`.
+- `tabs/tab_cdtotkvv.py` ~1254-1265 — Wiring call `_enrich_tuoi_hstd(df_raw)` NGAY SAU block load+loc dữ liệu trong `_sub_thong_ke_tuoi_to_truong()`; nhận 3 giá trị `(df_raw, _nguon_dl_msg, _so_fill_hstd)`.
+- `tabs/tab_cdtotkvv.py` ~1285-1298 — UI hiển thị `st.caption` nguồn dữ liệu; nếu chứa "HSTD ước tính" → `st.warning` hướng dẫn PGD bổ sung 2 cột H/I Excel CDTOTKVV (Ngày sinh/Tuổi tổ trưởng) để có dữ liệu chính xác 100%.
+
+## [2026-09-02] — Cleanup review fix CBTD/Tổ TK&VV Thống kê Tuổi
+- `tabs/tab_cdtotkvv.py` ~52, ~1254-1261 — Xóa import `_docx_to_pdf` và biến `_dl_available` không dùng; giữ nguyên guard extract `df_raw` từ `load_cdto_toan_cn()` và luồng truyền `df_cdto` riêng PGD.
+- `BUGMAP.md` ~4086 — Đồng bộ entry B90, bỏ mô tả `_dl_available` sau cleanup.
+
+## [2026-09-02] — Fix BUG render CBTD & Địa bàn/Tổ TK&VV: AttributeError 'dict' object has no attribute 'empty'
+- `tabs/tab_cdtotkvv.py` ~1254-1263 — Sửa block load dữ liệu đầu `_sub_thong_ke_tuoi_to_truong()`: `load_cdto_toan_cn()` trả về dict → extract đúng key `df_raw = _cdto.get("df_raw") if isinstance(_cdto, dict) else None`; tránh gọi `.empty` trên dict.
+- `tabs/tab_cdtotkvv_pgd.py` ~687-701 — Fix mode PGD: trước khi gọi helper shared → `_doc_df(pgd_user)` đọc file `cdtotkvv_latest.xlsx` riêng của PGD, guard None/empty → warning, sau đó truyền `df_cdto=_df_pgd_loc` vào helper (không fallback dùng toàn CN).
+- `BUGMAP.md` — Thêm entry B90 Section B (Streamlit UI) mô tả lỗi/cách fix.
+
+## [2026-09-02] — Fix geometry bảng Word Thống kê Tuổi Tổ trưởng TK&VV
+- `services/cdtotkvv_service.py` ~405-635 — Khóa bảng Word bằng `tblLayout=fixed`, `tblW`, `tblGrid` và `tcW` theo width cm đã tính; áp dụng cho header, KPI, bảng chi tiết và footer để Word/PDF không tự autofit làm lệch/tràn cột.
+- `services/cdtotkvv_service.py` ~405 — Ép `rFonts` đủ `ascii`, `hAnsi`, `eastAsia` về Times New Roman để chữ tiếng Việt giữ đúng font trong DOCX.
+- `BUGMAP.md` — Ghi nhận lỗi F20 về bảng DOCX set `cell.width` nhưng thiếu fixed OOXML geometry.
+
+## [2026-09-02] — Fix KPI Thống kê Tuổi Tổ trưởng đếm trùng dòng CDTO
+- `services/cdtotkvv_service.py` ~158-340 — Thêm helper chuẩn hóa/dedupe theo PGD + Xã + Tổ; KPI `tong_to`, `tong_to_tong_so`, `khong_co_du_lieu` và tuổi TB/Median/Min-Max nay dùng cùng tập unique Tổ với bảng pivot, tránh phồng số khi file CDTO có dòng trùng.
+- `tabs/tab_cdtotkvv.py` ~1243 — Sửa mô tả từ 7 bins thành 6 bins đúng với logic hiện tại (`<30`, `30-39`, `40-49`, `50-59`, `60-69`, `>=70`).
+- `CHANGELOG.md` / `BUGMAP.md` — Ghi nhận bug số liệu summary CDTO bị lệch do dùng `len(df)` thay vì unique Tổ.
+
+## [2026-09-02] — Feature mới: Báo cáo Word/PDF Thống kê Tuổi Tổ trưởng TK&VV (căn lề chuẩn hành chính, TNR 13pt)
+- `services/cdtotkvv_service.py` ~345-632 — Thêm `_tao_word_thong_ke_tuoi_to_truong(df_bins, summary, che_do_xem, tieu_de_pham_vi, ten_pgd=None)`: tạo Word .docx chuẩn NĐ30/2020 (Header 2 cột VBSP + Cộng hòa XHCN; Tiêu đề báo cáo trung tâm; KPI 2x2 (Tổng số tổ / Có DL / Chưa DL / TB tuổi Median Min-Max); Bảng Table Grid 6 bins + dòng TỔNG CỘNG fill vàng; Footer Người lập + Chủ tịch ký tên; Font TNR 13pt; margin 2cm; shade xanh pastel header.
+- `services/template_service.py` ~145-166 — Migration 2 chỗ `use_container_width=True` → `width='stretch'` trong `hien_thi_nut_tai()` (2 download button Word & PDF).
+- `tabs/tab_cdtotkvv.py` ~42-55 — Import 4 helper mới: `_tao_word_thong_ke_tuoi_to_truong` (cdtotkvv_service) và `docx_to_pdf`, `nut_tai_word_va_pdf`, `hien_thi_nut_tai` (template_service).
+- `tabs/tab_cdtotkvv.py` ~1436-1469 — **Wiring UI xuất Word/PDF**: Sau nút Excel → thêm divider + block "📄 Báo cáo (Word / PDF)": `st.button("📝 Chuẩn bị báo cáo (Word + PDF)", width='stretch', spinner "Đang tạo báo cáo Word (5-15s)...")` → gọi `_tao_word…` → `nut_tai_word_va_pdf(...)` lưu bytes vào session SCMStateManager; `st.success` confirm; `hien_thi_nut_tai(prefix_key)` hiển thị 2 nút Tải Word / PDF cạnh nhau `width='stretch'`; fallback caption "PDF: cần MS Word trên server" nếu không convert được; exception logging `logger.error(..., exc_info=True)`.
+
+## [2026-09-02] — Feature mới: Thống kê Tuổi Tổ trưởng TK&VV theo PGD / Xã trong mục 👔 CBTD & Địa bàn → 🏘️ Tổ TK&VV
+- `config.py` ~1146-1157 — Thêm `CDTOTKVV_TO_TRUONG_ALIAS` (2 cột chuẩn `ngay_sinh_to_truong`, `tuoi_to_truong` + 18 alias linh hoạt header để detect cột Ngày sinh / Tuổi tổ trưởng từ file upload 22 PGD).
+- `data/cdtotkvv.py` ~357-495 — Rewrite `doc_cdtotkvv_path()`: bỏ cut cứng 20 cột đầu (`iloc[:, :20]`) → openpyxl `iter_rows` đọc TẤT CẢ cột; detect alias header ở cột ≥20; enrich 2 cột chuẩn; tự tính `tuoi_to_truong` từ ngày sinh (range 18–100) nếu cột tuổi trống/NA; fallback `pd.read_excel` backward compat với PGD format cũ.
+- `services/cdtotkvv_service.py` ~143-341 — Thêm 2 helper: `thong_ke_tuoi_theo_pgd(df_raw)` (pivot bins theo PGD) & `thong_ke_tuoi_theo_xa(df_raw, pgd_loc=None)` (pivot bins theo PGD+Xã) với **6 bins chuẩn**: `<30 / 30–39 / 40–49 / 50–59 / 60–69 / ≥70` (tách riêng giai đoạn 60→dưới 70 và 70 trở lên theo yêu cầu). Dùng `aggfunc='nunique'` theo `ma_to` để tránh đếm trùng Tổ khi có dòng duplicate. Kèm summary dict (`tong_to`, `tb_tuoi`, `min_tuoi`, `max_tuoi`, `median_tuoi`, `khong_co_du_lieu`).
+- `tabs/tab_cdtotkvv.py` ~1229-1427 — Thêm `_sub_thong_ke_tuoi_to_truong()` UI: 4 KPI tổng hợp (Tổng số Tổ / Có DL tuổi / Chưa có DL / TB tuổi + Range Median Min–Max); radio 2 chế độ xem **Theo PGD** / **Theo Xã** (mode CN) hoặc chỉ **Theo Xã của PGD hiện tại** (mode PGD); warning + hướng dẫn PGD thêm 2 cột H/I nếu thiếu cột ngày sinh/tuổi; dòng TỔNG CỘNG cuối bảng pivot; nút xuất Excel `width='stretch'`.
+- `tabs/tab_cdtotkvv.py` ~1458-1479 — **Wiring radio sub-tab mới**: CN mode (5→6 sub-tab): thêm `"👥 Thống kê Tuổi"` index 5 (sau Xu hướng); PGD mode (3→4 sub-tab): thêm index 3; `elif _cdto_sel == 5/3:` gọi `_sub_thong_ke_tuoi_to_truong()`.
+- `tabs/tab_cdtotkvv.py` ~1406 — Migrate API cũ `st.dataframe(..., use_container_width=True)` → `width='stretch'`.
+- `tabs/tab_cdtotkvv_pgd.py` ~37-45, ~613-620, ~687-693 — Thêm tab riêng `"👥 Thống kê Tuổi"` (st.tabs 5th tab, sau Nợ đến hạn); import và gọi lại helper `_sub_thong_ke_tuoi_to_truong_shared` từ `tabs/tab_cdtotkvv`.
+- `tabs/tab_cdtotkvv_pgd.py` ~312, 495, 544, 673 — Migrate 4 chỗ `use_container_width=True` → `width='stretch'` (3 plotly_chart + 1 dataframe NĐH).
+- Compile: `py_compile doraise=True` pass cả 5 file (`config.py`, `data/cdtotkvv.py`, `services/cdtotkvv_service.py`, `tabs/tab_cdtotkvv.py`, `tabs/tab_cdtotkvv_pgd.py`). Grep `use_container_width` trong 2 tab: 0 hit.
+
+## [2026-08-31] — Bảng tổng hợp KHTD 95 xã/phường theo chương trình: Fix format 2 quy tắc (số nguyên tuyệt đối + tỷ lệ % 2 chữ số thập phân)
+- `tabs/tab_khtd_nhap.py` ~859-893 (section `_render_bang_thuc_hien_95_xa`) — **Quy ước format chuẩn VN mới BUG B82 (theo yêu cầu user 31/08 00:45)**:
+  • **Quy tắc 1 — Số tuyệt đối (triệu đồng / KH / TH)**: CHỈ lấy số nguyên `d=0` (không có số thập phân 0,5), ngăn cách hàng nghìn bằng dấu chấm → output `"1.234.567 triệu"` (KPI header + 6 cột tiền dataframe + 2 cell form nhập).
+  • **Quy tắc 2 — Tỷ lệ % TL%`: Lấy 2 SỐ SAU DẤU PHẨY `d=2`, hậu tố `%` ở cuối → `"78,45%"` (nếu 0 → hiển thị `"—"`).
+  Thực hiện: 4 KPI đổi `_fmt_vn(val, d=0)` (tiền) và `d=2` (%); Bảng 10 cột đổi `NumberColumn` → `TextColumn` (bypass locale US) + pre-format string bằng `_fmt_vn(trieu_val, d=0)` (cols tiền) / `_fmt_vn(tl, d=2) + "%"` (TL%). Guard floating `>1e-6`.
+- `tabs/tab_khtd_nhap.py` ~936 & 948 — 2 cell TH form nhập 95 xã: `_fmt_vn(..., d=0)` (đồng bộ nguyên với bảng).
+- `BUGMAP.md` ~980 — Update B82 match quy tắc 2 tầng mới.
+
+## [2026-08-31] — Số liệu KHTD toàn CN + theo Xã: Tách NQ11 khỏi Tổng dư nợ Thực hiện + Fix NameError mẫu Excel + Streamlit `width='stretch'` migration
+- `tabs/tab_khtd.py` ~265 (helper mới) — Thêm `_loc_khtd_active(df)` module-level filter chuẩn: dựa vào cột enrich `__is_nq11` từ `app.py` (nợ khoanh nhóm 11) và filter `~df["__is_nq11"]`. Inject filter này vào 5 hàm nghiệp vụ: `_tinh_thuc_hien_khtd_cn()`, `_quet_ct_co_du_no()`, `_tinh_thuc_hien_theo_ct()`, `_tinh_th_gqvl_dp_phan_tang()`, `_tinh_th_nsvsmt_dp_phan_tang()` — đảm bảo Thực hiện KHTD không cộng dư nợ NQ11 vào, khớp với module Tổng quan / Danh sách.
+- `tabs/tab_khtd_nhap.py:39 — **Fix WARNING NameError `name 'pgd_slug' is not defined`: Thêm `from data.pgd import pgd_slug` vào đầu file. Function này dùng tại `ten_file_xuat(f"Mau_KHTD_Xa_{pgd_slug(pgd_chon)}" line 1827 để tạo tên file mẫu Excel theo từng PGD (trước đó crash logger warning + caption "⚠️ Không tạo được mẫu").
+- `tabs/tab_khtd_nhap.py` toàn bộ 16 call site button/download_button/form_submit_button — **Migration API Streamlit `use_container_width` deprecated: `use_container_width=True` → `width='stretch'` (16 chỗ: 12 với trailing comma + 4 không có). Grep verify 0 hit `use_container_width` trong file. Compile py_compile ✅.
+- `BUGMAP.md` ~1975 — Thêm G36 (Section G. KHTD: Số liệu TH cộng cả NQ11 gây sai % Đạt KH).
+
+## [2026-08-31] — KHTD theo Xã: Định dạng số liệu chuẩn Việt Nam (thập phân phẩy) + thêm 2 cột "Còn phải thực hiện"
+- `tabs/tab_khtd_nhap.py` ~1976-2020 (4 thẻ KPI tổng cộng) — **Fix format số liệu #1**: Bỏ toàn bộ pattern thủ công `f"{int(val):,}".replace(",",".")` (chỉ có dấu chấm hàng nghìn, mất số thập phân) + bỏ cast `int(tong_kh_tw)` cắt phần thập phân. Tất cả value, sub caption, delta percent đều dùng chuẩn `_fmt_vn(tong_xxx, d=1)` 1 số thập phân (dấu chấm hàng nghìn + dấu phẩy thập phân theo chuẩn VN). Hiển thị kiểu "500,5 triệu đ" thay vì "500".
+- `tabs/tab_khtd_nhap.py` ~2145-2227 (form nhập từng dòng chương trình) — **Fix format số liệu #2**: Cột Thực hiện TW/ĐP đổi `_fmt_vn(int(trieu_tw), 0)` → `_fmt_vn(trieu_tw, d=1)` (bỏ int cast truncate). Thêm **2 cột Còn phải TH** cols[3] & cols[6] màu semantic: màu xanh `#16a34a` khi Còn=0 (đạt), màu mặc định khi còn >0, màu đỏ `#dc2626` khi TH vượt KH + HTML `title=` tooltip "Còn = Kế hoạch X tr - Thực hiện Y tr" hover từng cell.
+- `tabs/tab_khtd_nhap.py` ~1932-1963 (header bảng) — Đổi cấu trúc bảng: `_colw_xa = [3,1,1,1,1]` → `[3,1,1,1,1,1,1]` (7 cột). `<colgroup>` đổi colspan=2 → colspan=3 cho 2 nhóm nguồn vốn TW (3 cột: KH+TH+Còn) và ĐP (3 cột: KH+TH+Còn). Thêm 2 `<th>` "Còn phải TH" vào dòng 2 header.
+- `BUGMAP.md` ~968-976 — Thêm B81 (Section B Streamlit UI: KHTD xã format số liệu chưa chuẩn VN) + G35 (Section G KHTD: thiếu cột Còn phải TH form nhập).
+
+## [2026-08-30] — Sửa nghiêm trọng: Mẫu Excel nhập KHTD xã sai cấu trúc 3 cột + Edge case thẻ KPI 0/0
+- `tabs/tab_khtd_nhap.py` ~1808-1847 (tab Nhập KHTD xã) — **Fix nặng mẫu Excel**: trước đó gọi `_tao_df_mau_khtd_cn()` trả về 4 cột CN (Chương trình | Mã CT | Nguồn vốn | KH) nhưng service `doc_excel_khtd_xa_upload()` yêu cầu 3 cột (Tên xã | Mã CT | Giá trị triệu đồng) — nếu user tải mẫu cũ rồi upload sẽ bỏ sót hết dữ liệu. Sửa: (1) Tạo mẫu inline đúng 3 cột theo danh sách PGD đang chọn (`danh_sach_xa[0]` prefix + 3 `ma_key` TW `2_TW 1_DP …` mẫu 0), (2) Đổi tên file xuất: `Mau_KHTD_Xa_{slug_pgd}.xlsx`, (3) Sửa `st.info` cấu trúc cột rõ ràng 3 cột BẮT BUỘC (định dạng dấu đậm cột Mã CT / Giá trị), (4) Thêm `help=tooltip` cho file_uploader giải thích xã lạ sẽ bị cảnh báo + bỏ qua.
+- `tabs/tab_khtd_nhap.py` ~1989-2055 (4 thẻ KPI Tổng cộng) — Edge case KH=0 và/hoặc TH=0: trước đó value="0 triệu đ" suffix kèm 0 → user hiểu là có kế hoạch 0 thay vì chưa nhập. Sửa: (1) Nếu tong==0 → value="— Chưa có", suffix rỗng; (2) Nếu tong_kh==0 & tong_th==0 (chưa nhập gì) → sub thẻ Kế hoạch đổi text `⚠️ Chưa nhập kế hoạch — nhập giá trị bên dưới rồi 💾 Lưu` (mô tả rõ next step); (3) Đồng bộ _sub_th_dp dùng biến định nghĩa trước đó thay vì inline lambda (đảm bảo pattern = _sub_th_tw).
+- Kiểm tra: Streamlit version = 1.60.0 → `use_container_width=True` trên `st.form_submit_button` hỗ trợ chính thức từ 1.29+ — ✅ giữ nguyên, không cần xóa attr.
+- Tab state khi đổi PGD: st.tabs() không cung cấp API set active tab từ session state (limitation streamlit) — ghi chú limitation; user vẫn click tab Nhập lại 1 lần khi đổi PGD, không ảnh hưởng data.
+
+## [2026-08-30] — Cải thiện UI module KHTD theo Xã (5 khối border, kpi_row tổng 4 thẻ, tabs Xuất/Nhập)
+- `tabs/tab_khtd_nhap.py` — Import `delta_card.kpi_row`; Wrap 4 khu vực chính vào `st.container(border=True)`: (1) Chọn PGD/Xã + caption "🏢 Đơn vị đang làm việc", (2) Xuất/Nhập hàng loạt (thay expander = container + 2 st.tabs `📤 Xuất kế hoạch` / `📥 Nhập kế hoạch`), (3) Toolbar PDF caption "🖨️ Xuất báo cáo PDF" (text_input thư mục + 2 nút), (4) Container cuối "⬇️ Tải file đã xuất về máy" (2 nút PDF nếu có bytes, nếu không render disabled với help rõ cách tạo).
+- `tabs/tab_khtd_nhap.py` — Thay flex div `<div>` Tổng cộng inline = `kpi_row(cols=[4 thẻ], num_columns=4)` chính thức: 🏛️ Kế hoạch TW · ✅ Thực hiện TW (delta % KH màu xanh) · 🏘️ Kế hoạch ĐP · ✅ Thực hiện ĐP; mỗi thẻ có `sub="TH: X tr · Đạt: Y%"` và `help` hover giải thích.
+- `tabs/tab_khtd_nhap.py` — Tabs Nhập thêm nút "📋 Tải mẫu Excel nhập" (dùng `_tao_df_mau_khtd_cn()`) + `st.info` giải thích cấu trúc Cột A-D 1 dòng rõ ràng; Tabs Xuất thêm info về STT chuẩn I.1/I.2 & sheet rename.
+- `tabs/tab_khtd_nhap.py` — Nút submit 💾 Lưu kế hoạch đổi `use_container_width=True` (fullwidth giãn ra 1 cột thay vì mặc định nhỏ bên trái); 2 download button PDF cuối đổi fullwidth + disabled state khi chưa có file cho 1 luồng UX rõ ràng "tạo → tải".
+
+## [2026-08-30] — STT chuẩn I..XXII / 95 xã KHTD: PDF đơn xã · Excel hàng loạt · PDF tổng hợp 95 xã
+- `tabs/tab_khtd_nhap.py` — Thêm constant `_PGD_XA_STT_CHUAN` (22 PGD, 95 xã/phường, đúng thứ tự hành chính I..XXII 1..n do user cung cấp) + helper `_stt_pgd_xa(pgd, xa)` fuzzy mapping không phân biệt dấu/prefix.
+- `tabs/tab_khtd_nhap.py` — Tiêu đề PDF đơn xã (xuat_pdf_clicked): đổi từ `"XÃ XXX"` → `"KẾ HOẠCH TÍN DỤNG — III — PGD TRẢNG BOM · MỤC 3 · XÃ TRẢNG BOM"` dùng STT chuẩn; tieu_de_phu chỉ còn ngày tháng.
+- `tabs/tab_khtd_nhap.py` — Excel tất cả xã (expander Xuất file): sheet Tổng hợp PGD thêm cột STT format `I.1, I.2, ..., XXII.4`; sheet riêng từng xã đổi tên từ `Tên_xã` → `"I-1 Phường Phước Tân"` (STT PGD dấu gạch ngang STT xã + tên) để sắp xếp đúng thứ tự hành chính trong workbook.
+- `tabs/tab_khtd_nhap.py` — Thêm nút toolbar "📚 Xuất PDF tất cả 95 xã" (type secondary) + download_btn `⬇️ Tải PDF 95 xã về máy`. Helper `_xuat_pdf_tat_ca_95_xa_bytes()` build landscape A4: (a) Cover logo CN + ngày xuất; (b) PageBreak; (c) từng PGD có header xanh VBSP 15pt + HR line; (d) từng xã có header "Mục sx. Tên xã" 11.5pt → bảng 10 cột STT/CT/KH-TW/TH-TW/Còn-TW/%TW/KH-ĐP/TH-ĐP/Còn-ĐP/%ĐP màu VBSP chuẩn; xã chưa có KH/TH → dòng nghiêng "— Chưa có kế hoạch..."; (e) cuối block ký tên 3 cột Người lập / Phòng chuyên môn / Giám đốc; footer page number + line xanh.
+
+## [2026-08-30] — Cải thiện giao diện & chính xác PDF 📈 KHTD theo Xã (10 cột KH+TH+Còn+%)
+- `pdf_service.py` — Refactor dòng ghi chú dưới bảng PDF (đơn vị tính): bỏ format cồng kềnh `"Đơn vị tiền: (triệu đồng)"` → `"Đơn vị tính: triệu đồng"` (font 9pt); mở rộng signature `xuat_pdf_bang()` để chuyền thẳng `cols_percent`, `cols_dem`, `don_vi_tien`, `dong_tong`, `them_dong_tong` xuống `xuat_pdf()` mà không cần gọi trực tiếp hàm gốc.
+- `tabs/tab_khtd_nhap.py` (xuat_pdf_clicked handler) — Rewrite khối xuất PDF KHTD xã: bổ sung 8 cột mới `TH TW`, `Còn TW`, `Đạt TW%`, `KH ĐP`, `TH ĐP`, `Còn ĐP`, `Đạt ĐP%` (tổng 10 cột); giá trị lưu dạng numeric triệu đồng (không pre-format string, tránh `fmt()` chia 1e6 lần 2); tự động thêm dòng có `TH>0` ngay cả khi chưa có `KH`; tính dòng TỔNG CỘNG cuối bảng với `Tỷ lệ %` theo tổng có trọng số (không trung bình từng dòng); `cols_tien`/`cols_percent` explicit + `don_vi_tien="triệu đồng"` cho ghi chú đúng.
+- `BUGMAP.md` — thêm `F19` (PDF sai format đơn vị & thiếu TH) và `G34` (KHTD Xã PDF fmt chia 2 lần & thiếu cột).
+
+## [2026-08-30] — Tăng tốc load tab 📈 Kế hoạch tín dụng (bỏ hash DataFrame lớn)
+- `tabs/tab_khtd_nhap.py` — 4 hàm `@st.cache_data` ( `_tinh_th_cn_cached`, `_du_lieu_khtd_pgd_cached`, `_du_lieu_khtd_xa_cached`, `_du_lieu_hien_thi_khtd_cn_cached` ) bổ sung `hash_funcs={pd.DataFrame: lambda _: None}` để không hash toàn bộ `df_full`/`df_gqvl` (~366k dòng) mỗi rerun; cache key chỉ phụ thuộc `hstd_mtime`/`gqvl_mtime` đã có sẵn.
+- `BUGMAP.md` — thêm mục `K10` về hash DataFrame lớn gây chậm rerun tab KHTD.
+
+## [2026-08-30] — Đổi ô nhập kế hoạch 95 xã KHTD sang compact input
+- `tabs/tab_khtd_nhap.py` — bỏ nhập nhanh bằng `data_editor`; thay bằng form lưới compact dùng `text_input` thường cho `KH TW`/`KH ĐP`, tránh ô nhập bung to khi click nhưng vẫn lưu chung vào `khtd_xa`.
+- `tests/test_khtd_quets.py` — cập nhật hồi quy lưu kế hoạch 95 xã để bắt việc không dùng `data_editor` ở luồng nhập nhanh.
+- `BUGMAP.md` — thêm mục `G33` cho lỗi ô nhập kế hoạch trong bảng 95 xã phóng lớn/bất tiện khi click.
+
+## [2026-08-30] — Kiểm tra dữ liệu bảng Điện báo và sửa alias chỉ tiêu
+- `tabs/tab_candoi.py` — thêm alias cho các chỉ tiêu Điện báo bị lệch tên (`HSSV có HCKK`, `gđ2`, `GQVK KHB`) để bảng Theo chương trình và xuất file không còn hiện 0/thiếu NQH khi file nguồn viết khác mapping chuẩn.
+- `tests/test_tab_candoi.py` — thêm hồi quy cho dư nợ/NQH con của HSSV, Nhà ở giai đoạn 2 và GQVL KHB khi nguồn dùng tên biến thể.
+- `BUGMAP.md` — thêm mục `C52` cho lỗi bảng Cân đối rơi số một số chương trình do thiếu alias chỉ tiêu.
+
+## [2026-08-30] — Nhập và lưu kế hoạch 95 xã/phường theo chương trình trong KHTD
+- `tabs/tab_khtd_nhap.py` — mở rộng bảng 95 xã/phường thành bảng KH/TH: khi chọn một chương trình cụ thể và có quyền nhập, cho sửa `KH TW`/`KH ĐP` ngay trong lưới và lưu vào `khtd_xa`; khi xem tổng hợp vẫn hiển thị KH/TH/% đọc nhanh.
+- `tests/test_khtd_quets.py` — thêm hồi quy kéo kế hoạch đã lưu vào bảng 95 xã và phân bổ tổng KH vào các key con khi chương trình có nhiều key nguồn vốn.
+- `BUGMAP.md` — thêm mục `G32` cho lỗi bảng 95 xã chỉ có số thực hiện mà chưa có nhập/lưu kế hoạch.
+
+## [2026-08-30] — Chặn upload nhầm file Điện báo Cân đối
+- `services/upload_service.py` — thêm kiểm tra nội dung workbook Điện báo trước khi ghi file: phải nhận diện được header/chỉ tiêu nghiệp vụ và số liệu Tổng/Cộng; file Excel sai mẫu bị từ chối với thông báo lỗi rõ ràng, không ghi cache/metadata/audit.
+- `tests/test_upload_service.py` — thêm fixture Điện báo hợp lệ tối thiểu và hồi quy file Excel/HSTD sai mẫu không được lưu.
+- `BUGMAP.md` — thêm mục `E24` cho lỗi upload Điện báo nhận nhầm file Excel không đúng mẫu.
+
+## [2026-08-30] — Chuẩn hóa tên hiển thị 95 xã/phường trong bảng TH KHTD
+- `tabs/tab_khtd_nhap.py` — thêm helper hiển thị tên xã/phường theo danh mục hành chính chuẩn, giữ khóa khớp HSTD cũ để cộng số không lệch; bảng/Excel 95 xã nay hiện đúng tiền tố `Xã`/`Phường`.
+- `tests/test_khtd_quets.py` — thêm hồi quy cho Hội sở, `Xã Long Thành`, `Xã Dầu Giây` và `Xã Đak Lua` để bắt lỗi tên thiếu/sai tiền tố.
+- `BUGMAP.md` — thêm mục `G31` cho lỗi bảng TH KHTD dùng trực tiếp tên kỹ thuật từ `PGD_XA_MAP`.
+
+## [2026-08-30] — Review cache KHTD: rule fingerprint và giới hạn cache
+- `tabs/tab_khtd_nhap.py` — bỏ `hash_funcs` thừa ở các cache có tham số `_df_full`/`_df_gqvl`, thêm `max_entries=3`, và dùng `_ndt_dp_rules_cache_key()` thay cho `len(rule_list)` để bust cache khi sửa nội dung rule NĐT ĐP.
+- `tests/test_khtd_quets.py` — thêm hồi quy fingerprint rule ổn định theo thứ tự nhưng đổi khi nội dung rule đổi.
+- `BUGMAP.md` — chỉnh lại K10 theo Streamlit 1.60 và thêm K11 cho lỗi cache stale khi rule NĐT ĐP đổi cùng số lượng.
+
+## [2026-08-30] — Hiển thị số thực hiện 95 xã/phường theo chương trình trong KHTD
+- `tabs/tab_khtd_nhap.py` — thêm bảng đủ 95 xã/phường, bộ lọc chương trình, tách TH TW/ĐP, KPI và tải Excel; cho phép role chỉ đọc xem số thực hiện.
+- `tests/test_khtd_quets.py` — thêm hồi quy lọc đúng chương trình, khớp tên xã có/không tiền tố và luôn giữ đủ 95 địa bàn.
+- `BUGMAP.md` — ghi nhận lỗi thiếu góc nhìn toàn Chi nhánh theo xã/phường trong KHTD.
+
+## [2026-08-30] — Tăng tốc load tab 📈 Kế hoạch tín dụng (bỏ hash DataFrame lớn)
+- `tabs/tab_khtd_nhap.py` — 4 hàm `@st.cache_data` ( `_tinh_th_cn_cached`, `_du_lieu_khtd_pgd_cached`, `_du_lieu_khtd_xa_cached`, `_du_lieu_hien_thi_khtd_cn_cached` ) bổ sung `hash_funcs={pd.DataFrame: lambda _: None}` để không hash toàn bộ `df_full`/`df_gqvl` (~366k dòng) mỗi rerun; cache key chỉ phụ thuộc `hstd_mtime`/`gqvl_mtime` đã có sẵn.
+- `BUGMAP.md` — thêm mục `K10` về hash DataFrame lớn gây chậm rerun tab KHTD.
+
 ## [2026-08-30] — Siết an toàn launcher 4-tier và kiểm chứng parser/prompt
 - `Chay_VBSP_SCM.bat` — Tier 0 nay bắt buộc executable đúng tuyệt đối `%PY_EXE%` và command line có cả `streamlit` lẫn `app.py`; Tier 1 bắt buộc là Python, tránh silent/default-Y kill tiến trình không phải Python chỉ vì command line chứa từ khóa.
 - `Chay_VBSP_SCM.bat` — sửa fallback WMIC UTF-16 qua `more`, xóa câu trả lời `set /P` cũ, đặt default sạch cho menu alternate port, reset `FORCE_KILL=false` khi chuyển port và dùng 8504 làm alternate khi `--port 8503`.

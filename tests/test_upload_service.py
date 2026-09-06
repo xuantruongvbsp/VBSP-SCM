@@ -50,6 +50,27 @@ def _excel_bytes_hop_le() -> bytes:
     return buf.getvalue()
 
 
+def _dienbao_excel_bytes_hop_le() -> bytes:
+    """Tạo file Điện báo tối thiểu có header Chỉ tiêu + số liệu."""
+    import openpyxl
+    buf = io.BytesIO()
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "M"
+    ws.append(["", "ĐIỆN BÁO NGÀY 31/07/2026", ""])
+    ws.append(["", "", ""])
+    ws.append(["", "Đơn vị tính: Triệu đồng", ""])
+    ws.append(["", "", ""])
+    ws.append(["STT", "Chỉ tiêu", "Cộng"])
+    ws.append([1, "Tổng dư nợ", 100_000])
+    ws.append([2, "Dư nợ Kế hoạch A", 70_000])
+    ws.append([3, "Dư nợ Kế hoạch B", 30_000])
+    ws.append([4, "Dư nợ Quá hạn KHA", 1_000])
+    ws.append([5, "Nguồn vốn nhận UTĐT tại ĐP", 15_000])
+    wb.save(buf)
+    return buf.getvalue()
+
+
 class TestGhiVaXoaCache:
     def test_ghi_nguyen_tu_va_xoa_cache_lien_quan(self, tmp_path):
         target = tmp_path / "dienbao.xlsx"
@@ -268,7 +289,7 @@ class TestLuuDienbao:
         ):
             kq = upload_service.luu_dienbao(
                 "prev_month",
-                _excel_bytes_hop_le(),
+                _dienbao_excel_bytes_hop_le(),
                 "Dien bao 31.07.2026.xlsx",
             )
 
@@ -287,7 +308,7 @@ class TestLuuDienbao:
         ):
             kq = upload_service.luu_dienbao(
                 "ht",
-                _excel_bytes_hop_le(),
+                _dienbao_excel_bytes_hop_le(),
                 "Dien bao 31.07.2026.xlsx",
                 ten_pgd="PGD lỗi",
             )
@@ -296,3 +317,22 @@ class TestLuuDienbao:
         assert "mã PGD" in kq.thong_bao
         write_mock.assert_not_called()
         kv_mock.assert_not_called()
+
+    def test_tu_choi_file_excel_sai_mau_dienbao_va_khong_luu(self):
+        with (
+            patch.object(upload_service, "_ghi_va_xoa_cache") as write_mock,
+            patch.object(upload_service.db, "ghi_kv") as kv_mock,
+            patch.object(upload_service.db, "ghi_audit") as audit_mock,
+            patch.object(upload_service.st, "session_state", {"username": "tester"}),
+        ):
+            kq = upload_service.luu_dienbao(
+                "ht",
+                _excel_bytes_hop_le(),
+                "HSTD_BienHoa.xlsx",
+            )
+
+        assert kq.thanh_cong is False
+        assert "không đúng mẫu Điện báo Cân đối" in kq.thong_bao
+        write_mock.assert_not_called()
+        kv_mock.assert_not_called()
+        audit_mock.assert_not_called()

@@ -33,7 +33,13 @@ class TestXuatPdf:
     def test_format_phan_tram_giu_dung_dau_hang_nghin(self):
         from pdf_service import _format_phan_tram
 
-        assert _format_phan_tram(1234.56) == "1.234,56 %"
+        assert _format_phan_tram(1234.56) == "1.234,6 %"
+
+    def test_format_number_pdf_trieu_dong_giu_phan_le_khi_can(self):
+        from pdf_service import _format_number_pdf
+
+        assert _format_number_pdf(500.4, "KH TW", "triệu đồng") == "500,4"
+        assert _format_number_pdf(1500.0, "KH TW", "triệu đồng") == "1.500"
 
     def test_is_money_col_nhan_dien_nq11_giaingan(self):
         """Cột tiền NQ11/GQVL (DNO NQ11, Giải ngân) phải được nhận diện là cột tiền."""

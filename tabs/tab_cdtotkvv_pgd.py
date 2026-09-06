@@ -37,6 +37,13 @@ from data.pgd import duong_dan_pgd, luu_file_pgd_voi_lich_su
 from auth import la_phan_he_cn, la_phan_he_pgd
 from utils import fmt, fmt_bang_ty, fmt_so, hien_thi_dataframe_phan_trang, ten_file_xuat, xuat_excel
 
+# Reuse helper thống kê tuổi từ tab_cdtotkvv
+try:
+    from tabs.tab_cdtotkvv import _sub_thong_ke_tuoi_to_truong as _sub_tuoi_ttruong_shared
+except Exception:
+    # Fallback nếu import không được (test/debug)
+    _sub_tuoi_ttruong_shared = None
+
 
 if TYPE_CHECKING:
     from streamlit.delta_generator import DeltaGenerator
@@ -302,7 +309,7 @@ def _sub_phan_tich(pgd_user: str, username: str) -> None:
                     title="So sánh xếp loại 2 tháng",
                 )
                 fig.update_traces(marker_color="#1f77b4")
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width='stretch')
     else:
         st.info(
             "Cần ít nhất **2 tháng** đã lưu trong lịch sử upload (file cdtotkvv_YYYY_MM.xlsx) "
@@ -485,7 +492,7 @@ def _sub_xu_huong(pgd_user: str, _username: str) -> None:
         legend=dict(orientation="h", y=1.02),
         hovermode="x unified",
     )
-    st.plotly_chart(fig_line, use_container_width=True)
+    st.plotly_chart(fig_line, width='stretch')
 
     st.divider()
     st.markdown("**Điểm trung bình & tỷ lệ Tốt / Yếu theo tháng**")
@@ -534,7 +541,7 @@ def _sub_xu_huong(pgd_user: str, _username: str) -> None:
         legend=dict(orientation="h", y=1.05),
         hovermode="x unified",
     )
-    st.plotly_chart(fig_ty, use_container_width=True)
+    st.plotly_chart(fig_ty, width='stretch')
 
     st.divider()
     st.markdown("**Cảnh báo xu hướng xấu**")
@@ -603,12 +610,13 @@ def render(tab: DeltaGenerator | None = None, **kwargs) -> None:
         st.subheader(f"🏘️ Tổ TK&VV — {pgd_user}")
         st.caption("Dữ liệu từ file upload riêng của PGD · Độc lập với hệ thống tập trung")
 
-        sub1, sub2, sub3, sub_ndh = st.tabs(
+        sub1, sub2, sub3, sub_ndh, sub_tuoi = st.tabs(
             [
                 "📤 Upload",
                 "📋 Phân tích Chất lượng",
                 "📈 Xu hướng",
                 "📅 Nợ đến hạn",
+                "👥 Thống kê Tuổi",
             ]
         )
         with sub1:
@@ -662,7 +670,7 @@ def render(tab: DeltaGenerator | None = None, **kwargs) -> None:
                     c1.metric("Số món đến hạn", fmt_so(len(df_ndh)))
                     c2.metric("Tổng dư nợ (triệu đồng)", fmt(tong_dn))
 
-                    st.dataframe(df_ndh, use_container_width=True,
+                    st.dataframe(df_ndh, width='stretch',
                                  hide_index=True)
 
                     # Xuất Excel
@@ -675,4 +683,19 @@ def render(tab: DeltaGenerator | None = None, **kwargs) -> None:
                         mime="application/vnd.openxmlformats-"
                              "officedocument.spreadsheetml.sheet",
                         key="ndh_xuat_excel",
+                    )
+        with sub_tuoi:
+            if _sub_tuoi_ttruong_shared is None:
+                st.warning("⚠️ Chưa load được helper thống kê tuổi (lỗi import).")
+            else:
+                _df_pgd_loc = _doc_df(pgd_user)
+                if _df_pgd_loc is None or _df_pgd_loc.empty:
+                    st.warning(
+                        "⚠️ Chưa có dữ liệu Chấm điểm Tổ TK&VV riêng của PGD. "
+                        "Vui lòng upload ở tab 📤 Upload trước."
+                    )
+                else:
+                    _sub_tuoi_ttruong_shared(
+                        username=username, cdto_mode="pgd", pgd_user=pgd_user,
+                        df_cdto=_df_pgd_loc,
                     )

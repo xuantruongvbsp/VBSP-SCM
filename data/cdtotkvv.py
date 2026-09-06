@@ -12,6 +12,7 @@ from config import (
     CDTOTKVV_DIR,
     CDTOTKVV_COLS,
     CDTOTKVV_DATA_ROW_START,
+    CDTOTKVV_TO_TRUONG_ALIAS,
     COT_MA_PGD,
     COT_MA_TO,
     COT_HINH_THUC_VAY,
@@ -357,20 +358,97 @@ def doc_thang_nam_tu_file(file_bytes: bytes) -> str | None:
 def doc_cdtotkvv_path(duong_dan: str, _ts) -> pd.DataFrame | None:
     if not duong_dan or not os.path.exists(duong_dan):
         return None
-    df = pd.read_excel(
-        duong_dan,
-        engine="openpyxl",
-        header=None,
-        skiprows=CDTOTKVV_DATA_ROW_START,
-    )
-    if df.empty:
-        return None
-    df = df.iloc[:, : len(CDTOTKVV_COLS)].copy()
-    # File tách từ toàn CN: openpyxl bỏ trailing None → có thể thiếu cột cuối (tinh_trang)
-    for col in CDTOTKVV_COLS[len(df.columns):]:
-        df[col] = pd.NA
-    df.columns = CDTOTKVV_COLS
-    df = df[pd.to_numeric(df["stt"], errors="coerce").notna()].reset_index(drop=True)
+    try:
+        from datetime import date as _date
+        from openpyxl import load_workbook
+        wb = load_workbook(duong_dan, read_only=True, data_only=True)
+        ws = wb.active
+        all_rows = list(ws.iter_rows(values_only=True))
+        wb.close()
+    except Exception:
+        # Fallback: pd.read_excel (chậm hơn nhưng robust)
+        all_rows = None
+    if all_rows:
+        # 1) Đọc header row (row trước data start, cột >=20 nếu có) — tìm alias ngày sinh / tuổi
+        header_row_idx = CDTOTKVV_DATA_ROW_START - 1 if CDTOTKVV_DATA_ROW_START >= 1 else None
+        header_cells: list = []
+        if header_row_idx is not None and header_row_idx < len(all_rows):
+            header_cells = list(all_rows[header_row_idx])
+        # 2) Data rows bắt đầu từ DATA_ROW_START
+        data_rows = []
+        for row in all_rows[CDTOTKVV_DATA_ROW_START:]:
+            if row is None or all(v is None or (isinstance(v, float) and pd.isna(v)) for v in row):
+                continue
+            data_rows.append(list(row))
+        if not data_rows:
+            return None
+        # Tạo DataFrame với đủ cột có trong data rows
+        max_cols = max([len(r) for r in data_rows] + [0])
+        # Xử lý alias cột tổ trưởng (2 cột sau 20 cột tiêu chuẩn đầu)
+        alias_to_standard: dict[str, str] = {}
+        for key_std, alias_set in (CDTOTKVV_TO_TRUONG_ALIAS or {}).items():
+            for a in alias_set:
+                alias_to_standard[a] = key_std
+        extra_col_names: dict[int, str] = {}
+        for col_idx in range(len(CDTOTKVV_COLS), max_cols):
+            header_norm = _norm_text_key(header_cells[col_idx]) if col_idx < len(header_cells) else ""
+            key_standard = alias_to_standard.get(header_norm)
+            if key_standard:
+                extra_col_names[col_idx] = key_standard
+            else:
+                # Heuristic: thử 1 cell data ở row 0 (nếu có)
+                if data_rows and col_idx < len(data_rows[0]):
+                    sample = data_rows[0][col_idx]
+                    # Nếu là datetime hoặc parse được ngày tháng (01/01/1980 string) → đoán ngày sinh
+                    try:
+                        import datetime
+                        if isinstance(sample, datetime.datetime):
+                            extra_col_names[col_idx] = extra_col_names.get(col_idx, "ngay_sinh_to_truong")
+                        elif isinstance(sample, (int, float)):
+                            if 18 <= float(sample) <= 80:
+                                extra_col_names[col_idx] = extra_col_names.get(col_idx, "tuoi_to_truong")
+                        elif isinstance(sample, str):
+                            _s = sample.strip()
+                            if re.fullmatch(r"\d{1,2}[/-]\d{1,2}[/-]\d{2,4}", _s):
+                                extra_col_names[col_idx] = extra_col_names.get(col_idx, "ngay_sinh_to_truong")
+                    except Exception:
+                        pass
+        # Đổi tên chuẩn cho 20 cột đầu
+        std_cols = list(CDTOTKVV_COLS)
+        n_std = len(std_cols)
+        final_names = list(std_cols)
+        # Thêm các cột bổ sung theo alias (nếu không trùng key chuẩn)
+        for col_idx in range(n_std, max_cols):
+            name = extra_col_names.get(col_idx, f"extra_{col_idx - n_std}")
+            # Đảm bảo unique name
+            if name in final_names:
+                name = f"{name}_{col_idx - n_std}"
+            final_names.append(name)
+        # Tạo dataframe
+        padded_rows = [r + [pd.NA] * (len(final_names) - len(r)) for r in data_rows]
+        df = pd.DataFrame(padded_rows, columns=final_names)
+    else:
+        # Fallback đọc thô bằng pandas
+        df = pd.read_excel(
+            duong_dan,
+            engine="openpyxl",
+            header=None,
+            skiprows=CDTOTKVV_DATA_ROW_START,
+        )
+        if df.empty:
+            return None
+        # Bỏ giới hạn 20 cột → giữ tất cả cột có trong Excel
+        df = df.copy()
+        # Đảm bảo đủ 20 cột tiêu chuẩn
+        for i, col in enumerate(CDTOTKVV_COLS):
+            if i < len(df.columns):
+                df = df.rename(columns={df.columns[i]: col})
+            else:
+                df[col] = pd.NA
+        # Đổi các cột còn lại (sau 20) giữ nguyên name cột int (chưa biết tên) → sẽ lookup alias ở bước sau
+        # (fallback path không detect alias tốt, bỏ qua cột extra)
+    # Loại bỏ dòng header dư (stt không phải số):
+    df = df[pd.to_numeric(df.get("stt"), errors="coerce").notna()].reset_index(drop=True)
     for col in _COLS_FLOAT:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors="coerce")
@@ -378,6 +456,42 @@ def doc_cdtotkvv_path(duong_dan: str, _ts) -> pd.DataFrame | None:
         if col in df.columns:
             width = _CODE_WIDTHS.get(col)
             df[col] = df[col].map(lambda v, w=width: _normalize_code_value(v, w))
+    # Bổ sung: đảm bảo luôn có 2 cột ngày sinh / tuổi (dù NA nếu không có dữ liệu)
+    for _col_need in ["ngay_sinh_to_truong", "tuoi_to_truong"]:
+        if _col_need not in df.columns:
+            df[_col_need] = pd.NA
+    # Chuẩn hóa cột ngày sinh (dạng datetime nếu có):
+    if "ngay_sinh_to_truong" in df.columns:
+        ns_raw = df["ngay_sinh_to_truong"]
+        # Convert sang datetime
+        ns_dt = pd.to_datetime(ns_raw, dayfirst=True, errors="coerce")
+        df["ngay_sinh_to_truong"] = ns_dt
+        # Enrich tuổi nếu NA hoặc parse được:
+        if "tuoi_to_truong" in df.columns:
+            tuoi_raw = pd.to_numeric(df["tuoi_to_truong"], errors="coerce")
+            from datetime import datetime
+            _today = datetime.now().date()
+            def _calc_tuoi(row):
+                t_cur = tuoi_raw.loc[row.name] if row.name in tuoi_raw.index else pd.NA
+                if pd.notna(t_cur):
+                    try:
+                        t_float = float(t_cur)
+                        if 18 <= t_float <= 100:
+                            return int(round(t_float))
+                    except Exception:
+                        pass
+                dob = row["ngay_sinh_to_truong"]
+                if pd.isna(dob):
+                    return pd.NA
+                try:
+                    dob_date = dob.date() if hasattr(dob, "date") else dob
+                    delta = _today.year - dob_date.year
+                    if (_today.month, _today.day) < (dob_date.month, dob_date.day):
+                        delta -= 1
+                    return int(delta) if 18 <= delta <= 100 else pd.NA
+                except Exception:
+                    return pd.NA
+            df["tuoi_to_truong"] = df.apply(_calc_tuoi, axis=1)
     return chuan_hoa_cdtotkvv_phan_tich(df)
 
 

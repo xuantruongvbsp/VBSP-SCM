@@ -1134,7 +1134,7 @@ THON_TO_XA: dict[str, str] = {
 CDTOTKVV_DIR = BASE_DIR / "data" / "cdtotkvv"
 CDTOTKVV_DIR.mkdir(parents=True, exist_ok=True)
 
-# Các cột của file chấm điểm Tổ TK&VV (thứ tự cột A→T, index 0-based)
+# Các cột của file chấm điểm Tổ TK&VV (thứ tự cột A→T, index 0-based — 20 cột chuẩn)
 CDTOTKVV_COLS = [
     "stt", "ma_dv", "ten_dv", "ma_xa", "ten_xa", "ma_to",
     "ten_to_truong", "dvut", "loai_to", "du_no", "so_du_tk",
@@ -1142,6 +1142,19 @@ CDTOTKVV_COLS = [
     "diem_tv_tiengui", "diem_ds_tg", "tong_diem", "xep_loai", "tinh_trang"
 ]
 CDTOTKVV_DATA_ROW_START = 10  # dữ liệu bắt đầu từ row index 10 (0-based)
+
+# Các cột TÙY CHỌN về Tổ trưởng (ngay sau cột 20 tiêu chuẩn; alias linh hoạt theo tên Excel)
+# key chuẩn → alias tìm được trong header (dùng norm_text_key)
+CDTOTKVV_TO_TRUONG_ALIAS: dict[str, set[str]] = {
+    "ngay_sinh_to_truong": {
+        "ngaysinhtotruong", "ngaysinh", "ngaysinhtttv", "ngaysinhto",
+        "ns", "dobtotruong", "dob", "ngaysinhnguoito", "ngaysinhnguoilamto",
+    },
+    "tuoi_to_truong": {
+        "tuoitotruong", "tuoi", "tuoitttv", "tuoito",
+        "tuoingto", "ageto", "tuoingtochuc", "tuoingto",
+    },
+}
 
 # ── Mapping tên xã: Config (có "Xã") → HSTD (không có "Xã") ─────────────────────
 XA_NAME_MAP = {

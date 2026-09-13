@@ -34,7 +34,9 @@ from config import (
 from auth import la_phan_he_cn, la_phan_he_pgd, la_executive, la_quan_ly_cn, normalize_role
 from logger import get_logger
 from state_manager import SCMStateManager
-from utils import xuat_excel, hien_thi_dataframe_phan_trang, fmt, fmt_so, fmt_ty, fmt_cl, lazy_tabs
+from html import escape as _html_esc
+
+from utils import xuat_excel, hien_thi_dataframe_phan_trang, fmt, fmt_so, fmt_ty, fmt_cl, vn, lazy_tabs
 from components.delta_card import delta_card, kpi_row
 from services.cbtd_dia_ban_service import (
     lay_kpi_cbtd_theo_thang, tong_hop_hstd_theo_cbtd,
@@ -106,93 +108,245 @@ def _lay_snapshot_cbtd(ky: str, cbtd_data: dict, dgd_map: dict) -> pd.DataFrame:
         return pd.DataFrame()
 
 
-def _tao_bang_xep_hang(
+def _num0(value: Any) -> float:
+    parsed = pd.to_numeric(value, errors="coerce")
+    return 0.0 if pd.isna(parsed) else float(parsed)
+
+
+def _map_ky(df_ky: pd.DataFrame | None, col: str) -> dict[str, float]:
+    """Map Ma_CBTD → giá trị cột của kỳ so sánh (rỗng nếu thiếu kỳ/cột)."""
+    if df_ky is None or df_ky.empty:
+        return {}
+    if "Ma_CBTD" not in df_ky.columns or col not in df_ky.columns:
+        return {}
+    return {str(k): _num0(v) for k, v in zip(df_ky["Ma_CBTD"], df_ky[col])}
+
+
+def _delta_ky(cur: float, ky_map: dict[str, float], ma: str) -> float | None:
+    return (cur - ky_map[ma]) if ma in ky_map else None
+
+
+def _tao_bang_tong_hop(
     df_cur: pd.DataFrame,
-    col: str,
-    label: str,
-    *,
-    la_tien: bool = True,
-    df_ttr: pd.DataFrame | None = None,
-    df_ntr: pd.DataFrame | None = None,
+    df_ttr: pd.DataFrame | None,
+    df_ntr: pd.DataFrame | None,
 ) -> pd.DataFrame:
-    """Xây bảng xếp hạng 1 chỉ tiêu (giảm dần), kèm Δ tháng trước & Δ 31/12 năm trước."""
-    if df_cur is None or df_cur.empty or col not in df_cur.columns:
+    """Bảng dư nợ DỒN 1 bảng theo CBTD: tổng dư nợ, trong hạn, quá hạn, TL QH,
+    cho vay/thu nợ tháng + Δ dư nợ & Δ quá hạn so tháng trước và 31/12 năm trước."""
+    if df_cur is None or df_cur.empty:
         return pd.DataFrame()
 
-    def _num(value: Any) -> float:
-        parsed = pd.to_numeric(value, errors="coerce")
-        return 0.0 if pd.isna(parsed) else float(parsed)
-
-    ttr_map: dict[str, float] = {}
-    ntr_map: dict[str, float] = {}
-    if df_ttr is not None and not df_ttr.empty and col in df_ttr.columns:
-        ttr_map = {str(k): _num(v)
-                   for k, v in zip(df_ttr["Ma_CBTD"], df_ttr[col])}
-    if df_ntr is not None and not df_ntr.empty and col in df_ntr.columns:
-        ntr_map = {str(k): _num(v)
-                   for k, v in zip(df_ntr["Ma_CBTD"], df_ntr[col])}
+    metric_cols = ["Tong_du_no", "Du_no_trong_han", "Du_no_qh", "Cho_vay_thang", "Thu_no_thang"]
+    delta_cols = (("Tong_du_no", "DN"), ("Du_no_qh", "QH"))
+    maps = {c: (_map_ky(df_ttr, c), _map_ky(df_ntr, c)) for c in metric_cols}
 
     rows: list[dict] = []
     for _, r in df_cur.iterrows():
         ma = str(r.get("Ma_CBTD", ""))
-        cur = _num(r.get(col, 0))
-        rows.append({
-            "Mã CBTD": ma,
-            "Họ tên": r.get("Ho_ten", ""),
+        row: dict[str, Any] = {
+            "Ma_CBTD": ma,
+            "Ho_ten": r.get("Ho_ten", ""),
             "PGD": r.get("PGD", ""),
-            label: cur,
-            "Δ tháng trước": (cur - ttr_map[ma]) if ma in ttr_map else None,
-            "Δ 31/12 năm trước": (cur - ntr_map[ma]) if ma in ntr_map else None,
-        })
+            "TL_QH_pct": _num0(r.get("TL_QH_pct")),
+        }
+        for c in metric_cols:
+            row[c] = _num0(r.get(c))
+        for c, pre in delta_cols:
+            ttr_map, ntr_map = maps[c]
+            row[f"{pre}_dTTr"] = _delta_ky(row[c], ttr_map, ma)
+            row[f"{pre}_dNY"] = _delta_ky(row[c], ntr_map, ma)
+        rows.append(row)
 
-    df = pd.DataFrame(rows).sort_values(label, ascending=False).reset_index(drop=True)
-    df.insert(0, "Hạng", range(1, len(df) + 1))
+    df = pd.DataFrame(rows).sort_values("Tong_du_no", ascending=False).reset_index(drop=True)
+    df.insert(0, "STT", range(1, len(df) + 1))
 
-    tot_cur = float(df[label].sum())
-    tot_ttr = sum(ttr_map.values()) if ttr_map else None
-    tot_ntr = sum(ntr_map.values()) if ntr_map else None
-    tot_row = {
-        "Hạng": "",
-        "Mã CBTD": "TỔNG",
-        "Họ tên": "",
-        "PGD": "",
-        label: tot_cur,
-        "Δ tháng trước": (tot_cur - tot_ttr) if tot_ttr is not None else None,
-        "Δ 31/12 năm trước": (tot_cur - tot_ntr) if tot_ntr is not None else None,
-    }
-    return pd.concat([df, pd.DataFrame([tot_row])], ignore_index=True)
+    tot: dict[str, Any] = {"STT": "", "Ma_CBTD": "TỔNG", "Ho_ten": "", "PGD": ""}
+    for c in metric_cols:
+        tot[c] = float(df[c].sum())
+    tot["TL_QH_pct"] = round(tot["Du_no_qh"] / tot["Tong_du_no"] * 100, 1) if tot["Tong_du_no"] else 0.0
+    for c, pre in delta_cols:
+        ttr_map, ntr_map = maps[c]
+        tot[f"{pre}_dTTr"] = (tot[c] - sum(ttr_map.values())) if ttr_map else None
+        tot[f"{pre}_dNY"] = (tot[c] - sum(ntr_map.values())) if ntr_map else None
+    return pd.concat([df, pd.DataFrame([tot])], ignore_index=True)
 
 
-def _hien_thi_bxh(df: pd.DataFrame, label: str, la_tien: bool):
-    """Định dạng + tô màu cột Δ cho bảng xếp hạng (xanh tăng / đỏ giảm)."""
-    def _fmt_val(v):
-        if v is None or pd.isna(v):
-            return "—"
-        return fmt_ty(float(v)) if la_tien else fmt_so(float(v))
+def _tao_bang_no_quan_tam(
+    df_cur: pd.DataFrame,
+    df_ttr: pd.DataFrame | None,
+    df_ntr: pd.DataFrame | None,
+) -> pd.DataFrame:
+    """Bảng cụm chỉ tiêu nợ cần quan tâm: món đến hạn, 3T KHĐ, tiềm ẩn rủi ro + Δ."""
+    if df_cur is None or df_cur.empty:
+        return pd.DataFrame()
 
-    def _fmt_delta(v):
-        if v is None or pd.isna(v):
-            return "—"
-        if abs(float(v)) < 0.5:
-            return "0"
-        if la_tien:
-            return fmt_cl(float(v))
-        s = fmt_so(abs(float(v)))
-        return ("+" + s) if float(v) > 0 else ("-" + s)
+    metric_cols = ["No_den_han_mon", "So_mon_3m_khd", "So_mon_rui_ro"]
+    pre_map = {"No_den_han_mon": "DH", "So_mon_3m_khd": "K3", "So_mon_rui_ro": "RR"}
+    maps = {c: (_map_ky(df_ttr, c), _map_ky(df_ntr, c)) for c in metric_cols}
 
-    def _color(v):
-        if v is None or pd.isna(v):
-            return ""
-        if float(v) > 0.5:
-            return "color: #2da44e"
-        if float(v) < -0.5:
-            return "color: #cf222e"
-        return ""
+    rows: list[dict] = []
+    for _, r in df_cur.iterrows():
+        ma = str(r.get("Ma_CBTD", ""))
+        row: dict[str, Any] = {
+            "Ma_CBTD": ma,
+            "Ho_ten": r.get("Ho_ten", ""),
+            "PGD": r.get("PGD", ""),
+        }
+        for c in metric_cols:
+            row[c] = _num0(r.get(c))
+            ttr_map, ntr_map = maps[c]
+            row[f"{pre_map[c]}_dTTr"] = _delta_ky(row[c], ttr_map, ma)
+            row[f"{pre_map[c]}_dNY"] = _delta_ky(row[c], ntr_map, ma)
+        rows.append(row)
 
+    df = pd.DataFrame(rows).sort_values("No_den_han_mon", ascending=False).reset_index(drop=True)
+    df.insert(0, "STT", range(1, len(df) + 1))
+
+    tot: dict[str, Any] = {"STT": "", "Ma_CBTD": "TỔNG", "Ho_ten": "", "PGD": ""}
+    for c in metric_cols:
+        tot[c] = float(df[c].sum())
+        ttr_map, ntr_map = maps[c]
+        tot[f"{pre_map[c]}_dTTr"] = (tot[c] - sum(ttr_map.values())) if ttr_map else None
+        tot[f"{pre_map[c]}_dNY"] = (tot[c] - sum(ntr_map.values())) if ntr_map else None
+    return pd.concat([df, pd.DataFrame([tot])], ignore_index=True)
+
+
+# ── Format ô bảng HTML (dùng class .cdp-* của utils_theme) ───────────────────
+
+def _fmt_tr(v: Any) -> str:
+    """VND → triệu đồng kiểu VN (0 số lẻ); 0 → '0'."""
+    try:
+        x = float(v)
+    except (TypeError, ValueError):
+        return "—"
+    if pd.isna(x):
+        return "—"
+    return f"{x / 1_000_000:,.0f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+
+def _fmt_tr_dau(v: Any) -> str:
+    """Chênh lệch triệu đồng có dấu +/-; |Δ| < 0.5 triệu → '0'."""
+    try:
+        x = float(v)
+    except (TypeError, ValueError):
+        return "—"
+    if pd.isna(x) or abs(x) < 500_000:
+        return "0"
+    return ("+" if x > 0 else "-") + _fmt_tr(abs(x))
+
+
+def _fmt_so_dau(v: Any) -> str:
+    """Chênh lệch số món có dấu +/-; None → '—'."""
+    try:
+        x = float(v)
+    except (TypeError, ValueError):
+        return "—"
+    if pd.isna(x) or abs(x) < 0.5:
+        return "0"
+    return ("+" if x > 0 else "-") + fmt_so(abs(x))
+
+
+def _cls_delta(v: Any, tang_la_tot: bool) -> str:
+    """Class màu cho ô Δ: xanh = thuận lợi, đỏ = cần chú ý."""
+    try:
+        x = float(v)
+    except (TypeError, ValueError):
+        return "cdp-zero"
+    if pd.isna(x) or x == 0:
+        return "cdp-zero"
+    tang = x > 0
+    return "cdp-pos" if tang == tang_la_tot else "cdp-neg"
+
+
+def _td(content: str, bold: bool = False, align: str = "right") -> str:
+    style = " style='text-align:left'" if align == "left" else ""
+    body = f"<b>{content}</b>" if bold else content
+    return f"<td{style}>{body}</td>"
+
+
+def _td_delta(v: Any, tang_la_tot: bool, bold: bool = False, la_tien: bool = True) -> str:
+    txt = _fmt_tr_dau(v) if la_tien else _fmt_so_dau(v)
+    if txt == "—":
+        return _td('<span class="cdp-zero">—</span>', bold)
+    return _td(f'<span class="{_cls_delta(v, tang_la_tot)}">{txt}</span>', bold)
+
+
+def _html_bang_du_no(df: pd.DataFrame) -> str:
+    """Bảng dư nợ dồn 1 bảng — header 2 hàng nhóm giống mẫu biểu VBSP."""
+    head = (
+        "<thead><tr>"
+        "<th rowspan='2'>STT</th><th rowspan='2'>Mã CBTD</th><th rowspan='2'>Họ tên</th>"
+        "<th rowspan='2'>PGD</th><th rowspan='2'>Tổng dư nợ</th>"
+        "<th colspan='2'>Trong đó</th>"
+        "<th rowspan='2'>TL QH (%)</th><th rowspan='2'>Cho vay</th><th rowspan='2'>Thu nợ</th>"
+        "<th colspan='2'>Dư nợ tăng/giảm</th><th colspan='2'>Quá hạn tăng/giảm</th>"
+        "</tr><tr>"
+        "<th>Trong hạn</th><th>Quá hạn</th>"
+        "<th>So tháng trước</th><th>So 31/12 năm trước</th>"
+        "<th>So tháng trước</th><th>So 31/12 năm trước</th>"
+        "</tr></thead>"
+    )
+    body: list[str] = []
+    for _, r in df.iterrows():
+        b = str(r.get("Ma_CBTD", "")) == "TỔNG"
+        cells = [
+            _td(str(r.get("STT", "")), b, "left"),
+            _td(_html_esc(str(r.get("Ma_CBTD", ""))), b, "left"),
+            _td(_html_esc(str(r.get("Ho_ten", ""))), b, "left"),
+            _td(_html_esc(str(r.get("PGD", ""))), b, "left"),
+            _td(_fmt_tr(r.get("Tong_du_no")), b),
+            _td(_fmt_tr(r.get("Du_no_trong_han")), b),
+            _td(_fmt_tr(r.get("Du_no_qh")), b),
+            _td(vn(r.get("TL_QH_pct"), 1), b),
+            _td(_fmt_tr(r.get("Cho_vay_thang")), b),
+            _td(_fmt_tr(r.get("Thu_no_thang")), b),
+            _td_delta(r.get("DN_dTTr"), True, b),
+            _td_delta(r.get("DN_dNY"), True, b),
+            _td_delta(r.get("QH_dTTr"), False, b),
+            _td_delta(r.get("QH_dNY"), False, b),
+        ]
+        body.append(f'<tr class="cdp-row">{"".join(cells)}</tr>')
     return (
-        df.style
-        .map(_color, subset=["Δ tháng trước", "Δ 31/12 năm trước"])
-        .format({label: _fmt_val, "Δ tháng trước": _fmt_delta, "Δ 31/12 năm trước": _fmt_delta}, na_rep="—")
+        '<div class="cdp-wrap"><table class="cdp-table">'
+        f"{head}<tbody>{''.join(body)}</tbody></table></div>"
+    )
+
+
+def _html_bang_no_quan_tam(df: pd.DataFrame) -> str:
+    """Bảng cụm chỉ tiêu nợ cần quan tâm — header 2 hàng, 3 nhóm × 3 cột."""
+    head = (
+        "<thead><tr>"
+        "<th rowspan='2'>STT</th><th rowspan='2'>Mã CBTD</th><th rowspan='2'>Họ tên</th>"
+        "<th rowspan='2'>PGD</th>"
+        "<th colspan='3'>Món đến hạn</th>"
+        "<th colspan='3'>Món 3T không hoạt động</th>"
+        "<th colspan='3'>Món tiềm ẩn rủi ro</th>"
+        "</tr><tr>"
+        + "<th>Hiện tại</th><th>So tháng trước</th><th>So 31/12 năm trước</th>" * 3
+        + "</tr></thead>"
+    )
+    body: list[str] = []
+    for _, r in df.iterrows():
+        b = str(r.get("Ma_CBTD", "")) == "TỔNG"
+        cells = [
+            _td(str(r.get("STT", "")), b, "left"),
+            _td(_html_esc(str(r.get("Ma_CBTD", ""))), b, "left"),
+            _td(_html_esc(str(r.get("Ho_ten", ""))), b, "left"),
+            _td(_html_esc(str(r.get("PGD", ""))), b, "left"),
+            _td(fmt_so(r.get("No_den_han_mon")), b),
+            _td_delta(r.get("DH_dTTr"), False, b, la_tien=False),
+            _td_delta(r.get("DH_dNY"), False, b, la_tien=False),
+            _td(fmt_so(r.get("So_mon_3m_khd")), b),
+            _td_delta(r.get("K3_dTTr"), False, b, la_tien=False),
+            _td_delta(r.get("K3_dNY"), False, b, la_tien=False),
+            _td(fmt_so(r.get("So_mon_rui_ro")), b),
+            _td_delta(r.get("RR_dTTr"), False, b, la_tien=False),
+            _td_delta(r.get("RR_dNY"), False, b, la_tien=False),
+        ]
+        body.append(f'<tr class="cdp-row">{"".join(cells)}</tr>')
+    return (
+        '<div class="cdp-wrap"><table class="cdp-table">'
+        f"{head}<tbody>{''.join(body)}</tbody></table></div>"
     )
 
 
@@ -3203,28 +3357,23 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                     {"label": "TL QH %", "value": f"{_tq_tl:.1f}%", "icon": "📉"},
                 ], num_columns=4)
 
-                _xep = [
-                    ("💰 Tổng dư nợ", "Tong_du_no", "Tổng dư nợ (tr)", True),
-                    ("✅ Nợ trong hạn", "Du_no_trong_han", "Nợ trong hạn (tr)", True),
-                    ("🚨 Nợ quá hạn", "Du_no_qh", "Nợ quá hạn (tr)", True),
-                    ("📈 Cho vay tháng", "Cho_vay_thang", "Cho vay tháng (tr)", True),
-                    ("📉 Thu nợ tháng", "Thu_no_thang", "Thu nợ tháng (tr)", True),
-                    ("📅 Cho vay năm", "Cho_vay_nam", "Cho vay năm (tr)", True),
-                    ("📆 Thu nợ năm", "Thu_no_nam", "Thu nợ năm (tr)", True),
-                    ("📌 Món đến hạn", "No_den_han_mon", "Món đến hạn", False),
-                    ("⏳ Món 3T KHĐ", "So_mon_3m_khd", "Món 3T KHĐ", False),
-                    ("⚠️ Món rủi ro", "So_mon_rui_ro", "Món rủi ro", False),
-                ]
-                for _tieu, _col, _lab, _tien in _xep:
-                    st.markdown(f"##### {_tieu}")
-                    _bxh = _tao_bang_xep_hang(_df_tq, _col, _lab, la_tien=_tien, df_ttr=_df_ttr, df_ntr=_df_ntr)
-                    if _bxh.empty:
-                        st.caption(f"⚠️ Chưa có chỉ tiêu **{_lab}**.")
-                    else:
-                        hien_thi_dataframe_phan_trang(
-                            _hien_thi_bxh(_bxh, _lab, _tien),
-                            key=f"{_kp}tq_{_col}",
-                        )
+                _df_th = _tao_bang_tong_hop(_df_tq, _df_ttr, _df_ntr)
+                _df_nqt = _tao_bang_no_quan_tam(_df_tq, _df_ttr, _df_ntr)
+
+                st.markdown("##### 📊 Dư nợ theo CBTD quản lý địa bàn (triệu đồng)")
+                if _df_th.empty:
+                    st.caption("⚠️ Chưa tổng hợp được dư nợ theo CBTD.")
+                else:
+                    st.html(_html_bang_du_no(_df_th))
+                    st.caption(
+                        "Màu Δ: **xanh** = thuận lợi, **đỏ** = cần chú ý · '—' = chưa có snapshot kỳ so sánh."
+                    )
+
+                st.markdown("##### ⏳ Cụm chỉ tiêu nợ cần quan tâm (món)")
+                if _df_nqt.empty:
+                    st.caption("⚠️ Chưa tổng hợp được chỉ tiêu nợ cần quan tâm.")
+                else:
+                    st.html(_html_bang_no_quan_tam(_df_nqt))
 
                 st.markdown("##### 🏅 Chất lượng Tổ TK&VV")
                 _bang_to = _bang_to_tkvv(cbtd_data, dgd_map, _ky_truoc, _ky_baseline)
@@ -3233,19 +3382,28 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                 else:
                     hien_thi_dataframe_phan_trang(_hien_thi_bang_to(_bang_to), key=f"{_kp}tq_to")
 
-                _rename_xuat = {
-                    "Ma_CBTD": "Mã CBTD", "Ho_ten": "Họ tên", "PGD": "PGD",
-                    "So_KH": "Số KH", "So_mon_vay": "Số món vay",
-                    "Tong_du_no": "Tổng dư nợ", "Du_no_trong_han": "Dư nợ trong hạn",
-                    "Du_no_qh": "Dư nợ quá hạn", "TL_QH_pct": "TL QH %",
-                    "Cho_vay_thang": "Cho vay tháng", "Thu_no_thang": "Thu nợ tháng",
-                    "Cho_vay_nam": "Cho vay năm", "Thu_no_nam": "Thu nợ năm",
-                    "No_den_han_mon": "Món đến hạn", "No_den_han_goc": "Gốc đến hạn",
-                    "So_mon_3m_khd": "Món 3T KHĐ", "So_mon_rui_ro": "Món rủi ro",
+                _rename_th = {
+                    "STT": "STT", "Ma_CBTD": "Mã CBTD", "Ho_ten": "Họ tên", "PGD": "PGD",
+                    "Tong_du_no": "Tổng dư nợ", "Du_no_trong_han": "Trong hạn",
+                    "Du_no_qh": "Quá hạn", "TL_QH_pct": "TL QH (%)",
+                    "Cho_vay_thang": "Cho vay", "Thu_no_thang": "Thu nợ",
+                    "DN_dTTr": "Dư nợ Δ so tháng trước", "DN_dNY": "Dư nợ Δ so 31/12 năm trước",
+                    "QH_dTTr": "QH Δ so tháng trước", "QH_dNY": "QH Δ so 31/12 năm trước",
                 }
-                _df_xuat = _df_tq.rename(columns={k: v for k, v in _rename_xuat.items() if k in _df_tq.columns})
+                _rename_nqt = {
+                    "STT": "STT", "Ma_CBTD": "Mã CBTD", "Ho_ten": "Họ tên", "PGD": "PGD",
+                    "No_den_han_mon": "Món đến hạn",
+                    "DH_dTTr": "Đến hạn Δ so tháng trước", "DH_dNY": "Đến hạn Δ so 31/12 năm trước",
+                    "So_mon_3m_khd": "Món 3T KHĐ",
+                    "K3_dTTr": "3T KHĐ Δ so tháng trước", "K3_dNY": "3T KHĐ Δ so 31/12 năm trước",
+                    "So_mon_rui_ro": "Món rủi ro",
+                    "RR_dTTr": "Rủi ro Δ so tháng trước", "RR_dNY": "Rủi ro Δ so 31/12 năm trước",
+                }
+                _df_th_x = _df_th.rename(columns=_rename_th) if not _df_th.empty else pd.DataFrame()
+                _df_nqt_x = _df_nqt.rename(columns=_rename_nqt) if not _df_nqt.empty else pd.DataFrame()
                 _xlsx = xuat_excel({
-                    "Tong_quan_CBTD": _df_xuat,
+                    "Du_no_theo_CBTD": _df_th_x,
+                    "No_can_quan_tam": _df_nqt_x,
                     "Thang_truoc": _df_ttr,
                     "3112_nam_truoc": _df_ntr,
                 })
@@ -3259,20 +3417,22 @@ def render(tab: DeltaGenerator = None, **kwargs) -> None:
                         key=f"{_kp}tq_dl_xl",
                     )
                 with _c2:
-                    _df_pdf = _df_xuat.copy()
-                    _cols_tien = [c for c in ["Tổng dư nợ", "Dư nợ trong hạn", "Dư nợ quá hạn",
-                                              "Cho vay tháng", "Thu nợ tháng", "Cho vay năm", "Thu nợ năm",
-                                              "Gốc đến hạn"] if c in _df_pdf.columns]
+                    _df_pdf = _df_th_x.copy()
+                    _cols_tien = [c for c in ["Tổng dư nợ", "Trong hạn", "Quá hạn",
+                                              "Cho vay", "Thu nợ",
+                                              "Dư nợ Δ so tháng trước", "Dư nợ Δ so 31/12 năm trước",
+                                              "QH Δ so tháng trước", "QH Δ so 31/12 năm trước"]
+                                  if c in _df_pdf.columns]
                     for _c in _cols_tien:
                         _df_pdf[_c] = pd.to_numeric(_df_pdf[_c], errors="coerce").fillna(0).div(1_000_000).round(0)
-                    _cols_dem = [c for c in ["Số KH", "Số món vay", "Món đến hạn", "Món 3T KHĐ", "Món rủi ro"] if c in _df_pdf.columns]
-                    _cols_pct = ["TL QH %"] if "TL QH %" in _df_pdf.columns else []
-                    if st.button("🖨️ In PDF tổng quan CBTD", key=f"{_kp}tq_btn_pdf", type="primary"):
+                    _cols_dem: list[str] = []
+                    _cols_pct = ["TL QH (%)"] if "TL QH (%)" in _df_pdf.columns else []
+                    if st.button("🖨️ In PDF dư nợ theo CBTD", key=f"{_kp}tq_btn_pdf", type="primary"):
                         try:
                             from components.export_pdf import xuat_pdf_co_chart
                             _pdf_bytes = xuat_pdf_co_chart(
                                 _df_pdf,
-                                tieu_de="TỔNG QUAN THEO CBTD",
+                                tieu_de="DƯ NỢ THEO CÁN BỘ TÍN DỤNG QUẢN LÝ ĐỊA BÀN",
                                 nguoi_xuat=username or "system",
                                 cols_tien=_cols_tien,
                                 cols_dem=_cols_dem,

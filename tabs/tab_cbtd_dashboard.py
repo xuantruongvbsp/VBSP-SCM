@@ -657,20 +657,32 @@ def render(tab: "DeltaGenerator | None" = None, **kwargs) -> None:
                 if val == "Trung bình": return "background-color:#FFF3E0;color:#E65100"
                 if val == "Yếu": return f"background-color:#FFEBEE;color:{_VBSP_RED};font-weight:bold"
                 return ""
-            styled = df_renamed.style.map(_mau_xep_loai, subset=["Xếp loại"])
-            hien_thi_dataframe_phan_trang(
-                df_renamed,
-                key=f"{_kp}cbtd_xep_hang",
-                column_config={
-                    "Hạng": st.column_config.NumberColumn("Hạng", format="%d"),
-                    "Số KH": st.column_config.NumberColumn("Số KH", format=",.0f"),
-                    "Dư nợ (tỷ)": st.column_config.NumberColumn("Dư nợ (tỷ)", format=",.2f"),
-                    "TL QH (%)": st.column_config.NumberColumn("TL QH (%)", format=",.2f"),
-                    "% Tổ đạt": st.column_config.NumberColumn("% Tổ đạt", format=",.1f"),
-                    "Điểm TB Tổ": st.column_config.NumberColumn("Điểm TB Tổ", format=",.1f"),
-                    "Điểm tổng": st.column_config.NumberColumn("Điểm tổng", format=",.1f"),
-                },
+            def _fmt_le(v, d: int) -> str:
+                try:
+                    x = float(v)
+                    if pd.isna(x):
+                        return "—"
+                    return f"{x:,.{d}f}".replace(",", "X").replace(".", ",").replace("X", ".")
+                except (TypeError, ValueError):
+                    return "—"
+
+            _fmt_map = {
+                "Hạng": lambda v: fmt_so(v),
+                "Số ĐGD": lambda v: fmt_so(v),
+                "Số ấp": lambda v: fmt_so(v),
+                "Số KH": lambda v: fmt_so(v),
+                "Dư nợ (tỷ)": lambda v: _fmt_le(v, 2),
+                "TL QH (%)": lambda v: _fmt_le(v, 2),
+                "Số Tổ": lambda v: fmt_so(v),
+                "% Tổ đạt": lambda v: _fmt_le(v, 1),
+                "Điểm TB Tổ": lambda v: _fmt_le(v, 1),
+                "Điểm tổng": lambda v: _fmt_le(v, 1),
+            }
+            styled = df_renamed.style.map(_mau_xep_loai, subset=["Xếp loại"]).format(
+                {k: f for k, f in _fmt_map.items() if k in df_renamed.columns},
+                na_rep="—",
             )
+            hien_thi_dataframe_phan_trang(styled, key=f"{_kp}cbtd_xep_hang")
 
         st.divider()
 
